@@ -253,6 +253,114 @@ html, body {
   margin: 4px 0;
 }
 
+/* ── 노트 검색 결과 ────────────────────────────────────── */
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.search-header {
+  font-size: 11px;
+  color: var(--label);
+  padding: 0 4px;
+}
+
+.note-card {
+  background: var(--ai-bubble);
+  border: 1.5px solid var(--border);
+  border-left: 3px solid #34C759;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  transition: opacity 0.15s;
+}
+
+.note-card-inactive {
+  opacity: 0.45;
+  border-left-color: var(--border);
+}
+
+.note-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ai-text);
+  margin-bottom: 5px;
+}
+
+.note-card-excerpt {
+  font-size: 12px;
+  color: var(--label);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 8px;
+}
+
+.note-card-remove {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--label);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+}
+
+.note-card-remove:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.note-card-remove:disabled { opacity: 0.4; cursor: default; }
+
+/* ── 활성 노트 바 ──────────────────────────────────────── */
+
+#notes-bar {
+  background: var(--header-bg);
+  border-top: 1px solid var(--border);
+  padding: 6px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.note-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #EDFAEF;
+  border: 1px solid #34C759;
+  border-radius: 14px;
+  padding: 3px 8px 3px 10px;
+  font-size: 11px;
+  color: #1C7A3A;
+  max-width: 200px;
+}
+
+.note-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-chip-x {
+  background: none;
+  border: none;
+  color: #1C7A3A;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 /* ── 입력 영역 ─────────────────────────────────────────── */
 
 #input-area {

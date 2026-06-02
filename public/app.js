@@ -1,11 +1,18 @@
 'use strict';
 
-const sessionId      = crypto.randomUUID();
+const sessionId = (() => {
+  const stored = localStorage.getItem('councilSessionId');
+  if (stored) return stored;
+  const newId = crypto.randomUUID();
+  localStorage.setItem('councilSessionId', newId);
+  return newId;
+})();
 let currentModel     = 'claude';
 let isLoading        = false;
 let councilMode      = false;
 let councilAvailable = false;
 let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
+let activeNotes     = [];            // 활성 참조 노트 목록
 
 // ─── 초기화 ──────────────────────────────────────────────────────────────────
 
@@ -71,6 +78,45 @@ async function init() {
   });
 
   document.getElementById('input').addEventListener('input', autoResize);
+
+  await loadHistory();
+}
+
+// ─── 히스토리 복원 ───────────────────────────────────────────────────────────
+
+async function loadHistory() {
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}`);
+    if (!res.ok) return;
+    const { messages } = await res.json();
+    if (!messages || messages.length === 0) return;
+
+    document.querySelector('.welcome')?.remove();
+    messages.forEach(msg => {
+      if (msg.role === 'user') {
+        appendUserBubble(msg.content);
+      } else {
+        appendHistoryBubble(msg.content, msg.model);
+      }
+    });
+  } catch (_) {}
+}
+
+function appendHistoryBubble(content, model) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = document.createElement('div');
+  label.className = 'model-label';
+  label.textContent = model || 'AI';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble md';
+  bubble.innerHTML = DOMPurify.sanitize(marked.parse(content));
+
+  group.append(label, bubble);
+  getMessages().appendChild(group);
+  scrollDown();
 }
 
 // ─── 모델 선택 ────────────────────────────────────────────────────────────────
@@ -97,6 +143,21 @@ function toggleCouncil() {
 // ─── 메시지 전송 디스패처 ────────────────────────────────────────────────────
 
 function sendMessage() {
+  const inputEl = document.getElementById('input');
+  const text = inputEl.value.trim();
+  if (text === '/memory' || text.startsWith('/memory ')) {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleMemoryCommand(text);
+    return;
+  }
+  if (text.startsWith('/search ')) {
+    const query = text.slice(8).trim();
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    if (query) handleSearch(query);
+    return;
+  }
   if (councilMode) sendCouncilMessage();
   else sendSingleMessage();
 }
@@ -122,7 +183,7 @@ async function sendSingleMessage() {
     const res = await fetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, model: currentModel, sessionId }),
+      body:    JSON.stringify({ message: text, model: currentModel, sessionId, activeNotes }),
     });
     const data = await res.json();
     loadingEl.remove();
@@ -175,7 +236,7 @@ async function sendCouncilMessage() {
     const debateRes = await fetch('/api/council/debate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ question: text, sessionId, councilDraftMode }),
+      body:    JSON.stringify({ question: text, sessionId, councilDraftMode, activeNotes }),
     });
     const debateData = await debateRes.json();
 
@@ -482,6 +543,200 @@ async function saveCouncilNote(btn, data) {
     btn.disabled = false;
     showToast('서버 연결 오류');
   }
+}
+
+// ─── 볼트 검색 ────────────────────────────────────────────────────────────────
+
+async function handleSearch(query) {
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble(`/search ${query}`);
+
+  const loadingEl = appendLoading();
+  try {
+    const res  = await fetch(`/api/vault/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (data.error) { appendError(data.error); return; }
+    if (!data.results || data.results.length === 0) {
+      appendError(`"${query}" 관련 노트를 찾지 못했습니다.`);
+      return;
+    }
+
+    renderSearchResults(data.results);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  }
+}
+
+function renderSearchResults(results) {
+  const wrap = document.createElement('div');
+  wrap.className = 'search-results';
+
+  const header = document.createElement('div');
+  header.className = 'search-header';
+  header.textContent = `${results.length}개 노트 발견 — 모두 컨텍스트에 추가됨`;
+  wrap.appendChild(header);
+
+  results.forEach(note => {
+    addActiveNote(note);
+    wrap.appendChild(makeNoteCard(note));
+  });
+
+  getMessages().appendChild(wrap);
+  scrollDown();
+  updateNotesBar();
+}
+
+function makeNoteCard(note) {
+  const card = document.createElement('div');
+  card.className = 'note-card';
+  card.dataset.filename = note.filename;
+
+  const title = document.createElement('div');
+  title.className = 'note-card-title';
+  title.textContent = note.title;
+
+  const excerpt = document.createElement('div');
+  excerpt.className = 'note-card-excerpt';
+  excerpt.textContent = note.excerpt;
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'note-card-remove';
+  removeBtn.textContent = '컨텍스트 제거';
+  removeBtn.addEventListener('click', () => {
+    removeActiveNote(note.filename);
+    card.classList.toggle('note-card-inactive', !activeNotes.find(n => n.filename === note.filename));
+    removeBtn.textContent = '제거됨';
+    removeBtn.disabled = true;
+  });
+
+  card.append(title, excerpt, removeBtn);
+  return card;
+}
+
+function addActiveNote(note) {
+  if (!activeNotes.find(n => n.filename === note.filename)) {
+    activeNotes.push({ filename: note.filename, title: note.title });
+  }
+}
+
+function removeActiveNote(filename) {
+  activeNotes = activeNotes.filter(n => n.filename !== filename);
+  updateNotesBar();
+}
+
+function updateNotesBar() {
+  const bar = document.getElementById('notes-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  if (activeNotes.length === 0) { bar.style.display = 'none'; return; }
+
+  bar.style.display = 'flex';
+  activeNotes.forEach(note => {
+    const chip = document.createElement('div');
+    chip.className = 'note-chip';
+
+    const label = document.createElement('span');
+    label.textContent = note.title;
+
+    const x = document.createElement('button');
+    x.className = 'note-chip-x';
+    x.textContent = '×';
+    x.addEventListener('click', () => {
+      removeActiveNote(note.filename);
+      // 채팅의 해당 카드도 비활성 표시
+      const card = document.querySelector(`.note-card[data-filename="${note.filename}"]`);
+      if (card) {
+        card.classList.add('note-card-inactive');
+        const btn = card.querySelector('.note-card-remove');
+        if (btn) { btn.textContent = '제거됨'; btn.disabled = true; }
+      }
+    });
+
+    chip.append(label, x);
+    bar.appendChild(chip);
+  });
+}
+
+// ─── 사용자 메모리 ───────────────────────────────────────────────────────────
+
+async function handleMemoryCommand(command) {
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble(command);
+
+  const [, action, ...rest] = command.split(/\s+/);
+  const value = rest.join(' ').trim();
+  const loadingEl = appendLoading();
+
+  try {
+    let res;
+    if (!action) {
+      res = await fetch('/api/memory');
+    } else if (action === 'add') {
+      if (!value) {
+        loadingEl.remove();
+        appendError('저장할 메모리를 입력해주세요. 예: /memory add 앞으로 말 편하게 해');
+        return;
+      }
+      res = await fetch('/api/memory', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ content: value }),
+      });
+    } else if (action === 'remove') {
+      if (!value) {
+        loadingEl.remove();
+        appendError('삭제할 메모리 번호를 입력해주세요. 예: /memory remove 1');
+        return;
+      }
+      res = await fetch(`/api/memory/${encodeURIComponent(value)}`, { method: 'DELETE' });
+    } else if (action === 'clear') {
+      res = await fetch('/api/memory', { method: 'DELETE' });
+    } else {
+      loadingEl.remove();
+      appendError('사용법: /memory, /memory add 내용, /memory remove 번호, /memory clear');
+      return;
+    }
+
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+    renderMemoryResult(data.items || [], action);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('메모리 요청 중 서버 연결 오류가 발생했습니다.');
+  }
+}
+
+function renderMemoryResult(items, action) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = document.createElement('div');
+  label.className = 'model-label';
+  label.textContent = 'Memory';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble md';
+
+  const title = action === 'add'
+    ? '메모리를 저장했습니다.'
+    : action === 'remove'
+    ? '메모리를 삭제했습니다.'
+    : action === 'clear'
+    ? '메모리를 모두 삭제했습니다.'
+    : '저장된 메모리';
+
+  const body = items.length > 0
+    ? items.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
+    : '저장된 메모리가 없습니다.';
+
+  bubble.textContent = `${title}\n\n${body}`;
+  group.append(label, bubble);
+  getMessages().appendChild(group);
+  scrollDown();
 }
 
 function appendCouncilError(body, msg) {

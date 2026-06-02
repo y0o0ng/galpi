@@ -6,6 +6,7 @@ const fs = require('fs/promises');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
+const Database = require('better-sqlite3');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,12 @@ const COUNCIL_TOKEN_LIMITS = {
   review:          800,
   synthesis:       5000,
 };
+const MAX_ACTIVE_NOTES = 5;
+const MAX_NOTE_CONTEXT_CHARS = 2000;
+const MAX_MEMORY_ITEMS = 20;
+const MAX_MEMORY_CHARS = 1200;
+const MEMORY_DIR = '_system';
+const MEMORY_FILE = 'memory.md';
 
 if (!VAULT_PATH) {
   console.error('❌ .env 파일에 VAULT_PATH가 없습니다. .env.example을 참고해 .env를 만들어주세요.');
@@ -55,13 +62,93 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// 세션별 대화 기록 (재시작 시 초기화됨)
+// 세션별 대화 기록 (AI 컨텍스트용 인메모리)
 const sessions = {};
+
+// ─── SQLite DB ───────────────────────────────────────────────────────────────
+
+const db = new Database(path.join(__dirname, 'council.db'));
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    last_active INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  );
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    model TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
+`);
+
+const stmtEnsureSession = db.prepare(`
+  INSERT INTO sessions (id) VALUES (?)
+  ON CONFLICT(id) DO UPDATE SET last_active = strftime('%s','now')
+`);
+const stmtInsertMessage = db.prepare(
+  'INSERT INTO messages (session_id, role, content, model) VALUES (?, ?, ?, ?)'
+);
+const stmtGetMessages = db.prepare(
+  'SELECT role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC'
+);
+
+function dbSaveMessage(sessionId, role, content, model = null) {
+  stmtEnsureSession.run(sessionId);
+  stmtInsertMessage.run(sessionId, role, content, model);
+}
+
+function getMemoryPath() {
+  return path.join(VAULT_PATH, MEMORY_DIR, MEMORY_FILE);
+}
+
+function formatMemoryFile(items) {
+  const body = items.map(item => `- ${item}`).join('\n');
+  return `---
+type: system_memory
+always_include: true
+---
+
+# 사용자 메모리
+
+${body || '<!-- 비어 있음 -->'}
+`;
+}
+
+async function readMemoryItems() {
+  try {
+    const raw = await fs.readFile(getMemoryPath(), 'utf8');
+    return stripFrontmatter(raw)
+      .split('\n')
+      .map(line => line.match(/^\s*-\s+(.+)$/)?.[1]?.trim())
+      .filter(Boolean)
+      .slice(0, MAX_MEMORY_ITEMS);
+  } catch {
+    return [];
+  }
+}
+
+async function writeMemoryItems(items) {
+  const cleaned = [...new Set(
+    items
+      .map(item => String(item || '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .map(item => item.slice(0, 180))
+  )].slice(0, MAX_MEMORY_ITEMS);
+
+  await fs.mkdir(path.join(VAULT_PATH, MEMORY_DIR), { recursive: true });
+  await fs.writeFile(getMemoryPath(), formatMemoryFile(cleaned), 'utf8');
+  return cleaned;
+}
 
 // ─── 채팅 ────────────────────────────────────────────────────────────────────
 
 app.post('/api/chat', async (req, res) => {
-  const { message, model, sessionId } = req.body;
+  const { message, model, sessionId, activeNotes } = req.body;
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
   }
@@ -74,7 +161,13 @@ app.post('/api/chat', async (req, res) => {
   const history = sessions[sessionId];
   history.push({ role: 'user', content: message });
 
-  const context = history.slice(-CONTEXT_N);
+  // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
+  const memoryItems = await readMemoryItems();
+  const resolvedNotes = await getContextNotesForQuestion(message, activeNotes);
+  const baseContext = history.slice(-CONTEXT_N);
+  const context = memoryItems.length > 0 || resolvedNotes.length > 0
+    ? [...baseContext.slice(0, -1), { role: 'user', content: buildContextMessage(message, resolvedNotes, memoryItems) }]
+    : baseContext;
 
   try {
     let reply, usedModel;
@@ -98,6 +191,9 @@ app.post('/api/chat', async (req, res) => {
 
     history.push({ role: 'assistant', content: reply });
     sessions[sessionId] = sessions[sessionId].slice(-(CONTEXT_N * 2));
+
+    dbSaveMessage(sessionId, 'user',      message, null);
+    dbSaveMessage(sessionId, 'assistant', reply,   model === 'claude' ? 'Claude' : 'GPT');
 
     res.json({
       reply,
@@ -223,6 +319,199 @@ app.get('/api/config', (_req, res) => {
     hasClaude:   HAS_CLAUDE,
     hasGpt:      HAS_GPT,
   });
+});
+
+// ─── 사용자 메모리 ───────────────────────────────────────────────────────────
+
+app.get('/api/memory', async (_req, res) => {
+  const items = await readMemoryItems();
+  res.json({ items });
+});
+
+app.post('/api/memory', async (req, res) => {
+  const content = String(req.body?.content || '').replace(/\s+/g, ' ').trim();
+  if (!content) return res.status(400).json({ error: '저장할 메모리를 입력해주세요.' });
+
+  const current = await readMemoryItems();
+  const items = await writeMemoryItems([...current, content]);
+  res.json({ success: true, items });
+});
+
+app.delete('/api/memory/:index', async (req, res) => {
+  const index = Number.parseInt(req.params.index, 10);
+  const current = await readMemoryItems();
+  if (!Number.isInteger(index) || index < 1 || index > current.length) {
+    return res.status(400).json({ error: '삭제할 메모리 번호가 올바르지 않습니다.' });
+  }
+
+  current.splice(index - 1, 1);
+  const items = await writeMemoryItems(current);
+  res.json({ success: true, items });
+});
+
+app.delete('/api/memory', async (_req, res) => {
+  const items = await writeMemoryItems([]);
+  res.json({ success: true, items });
+});
+
+// ─── 볼트 검색 ───────────────────────────────────────────────────────────────
+// 향후 벡터/임베딩 검색으로 교체 시 searchVault() 함수만 수정하면 됨
+
+function stripFrontmatter(content) {
+  return content.replace(/^---[\s\S]*?---\n?/, '').trim();
+}
+
+function parseNoteTitle(raw, filename) {
+  const titleMatch = raw.match(/^title:\s*"?([^"\n]+)"?/m);
+  return titleMatch ? titleMatch[1].trim() : filename.replace(/\.md$/, '');
+}
+
+async function readVaultNote(filename) {
+  const safeName = path.basename(filename || '');
+  if (!safeName || safeName !== filename || !safeName.endsWith('.md')) return null;
+
+  const filepath = path.join(VAULT_PATH, safeName);
+  if (!filepath.startsWith(VAULT_PATH + path.sep)) return null;
+
+  try {
+    const raw = await fs.readFile(filepath, 'utf8');
+    return {
+      filename: safeName,
+      title:    parseNoteTitle(raw, safeName),
+      content:  stripFrontmatter(raw),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveActiveNotes(activeNotes) {
+  if (!Array.isArray(activeNotes)) return [];
+  const filenames = [...new Set(
+    activeNotes
+      .map(n => typeof n === 'string' ? n : n?.filename)
+      .filter(Boolean)
+      .slice(0, MAX_ACTIVE_NOTES)
+  )];
+
+  const notes = await Promise.all(filenames.map(readVaultNote));
+  return notes.filter(Boolean);
+}
+
+async function getContextNotesForQuestion(question, activeNotes) {
+  const active = await resolveActiveNotes(activeNotes);
+  if (active.length >= MAX_ACTIVE_NOTES) return active;
+
+  // 향후 임베딩/벡터 검색으로 교체할 때는 searchVault() 구현만 바꾸면 됨.
+  const searched = await searchVault(question);
+  const merged = [...active];
+  for (const hit of searched) {
+    if (merged.length >= MAX_ACTIVE_NOTES) break;
+    if (merged.some(n => n.filename === hit.filename)) continue;
+    const note = await readVaultNote(hit.filename);
+    if (note) merged.push(note);
+  }
+  return merged;
+}
+
+async function searchVault(query) {
+  const queryLower = query.toLowerCase();
+  const terms = [...new Set(
+    queryLower
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .map(t => t.trim())
+      .filter(t => t.length >= 2)
+      .filter(t => !['그리고', '그런데', '저번에', '우리가', '관련', '내용', '알려줘', '호출해줘', '불러와줘', '꺼내줘'].includes(t))
+  )];
+  let files;
+  try {
+    files = await fs.readdir(VAULT_PATH);
+  } catch {
+    return [];
+  }
+
+  const results = [];
+  for (const filename of files.filter(f => f.endsWith('.md'))) {
+    try {
+      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const title = parseNoteTitle(raw, filename);
+      const body  = stripFrontmatter(raw);
+      const titleLower = title.toLowerCase();
+      const bodyLower = body.toLowerCase();
+
+      let score = 0;
+      if (titleLower.includes(queryLower)) score += 20;
+      if (bodyLower.includes(queryLower)) score += 10;
+      for (const term of terms) {
+        if (titleLower.includes(term)) score += 6;
+        if (bodyLower.includes(term)) score += 1;
+      }
+
+      if (score > 0) {
+        const firstTermHit = terms.map(t => bodyLower.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0];
+        const idx     = bodyLower.indexOf(queryLower);
+        const hitIdx  = idx >= 0 ? idx : (firstTermHit ?? 0);
+        const start   = Math.max(0, hitIdx - 80);
+        const excerpt = body.slice(start, start + 300).replace(/\n{3,}/g, '\n\n').trim();
+        results.push({ filename, title, excerpt, score });
+      }
+    } catch { /* 파일 읽기 실패 시 스킵 */ }
+  }
+  return results
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_ACTIVE_NOTES)
+    .map(({ score, ...result }) => result);
+}
+
+app.get('/api/vault/search', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: '검색어를 입력해주세요.' });
+  const results = await searchVault(q);
+  res.json({ results });
+});
+
+// 사용자 메모리는 항상, activeNotes/자동 검색 노트는 질문별 참조로 주입하는 헬퍼
+// 향후 벡터 검색으로 노트를 불러올 때도 이 함수를 그대로 사용
+function buildContextMessage(question, activeNotes, memoryItems = []) {
+  const memoryText = memoryItems.length > 0
+    ? `사용자 메모리:\n${memoryItems.join('\n').slice(0, MAX_MEMORY_CHARS)}`
+    : '';
+
+  const noteBlock = activeNotes.map(n => {
+    const body = n.content.length > MAX_NOTE_CONTEXT_CHARS
+      ? n.content.slice(0, MAX_NOTE_CONTEXT_CHARS) + '\n...(이하 생략)'
+      : n.content;
+    return `[참조 노트: ${n.title}]\n${body}`;
+  }).join('\n\n---\n\n');
+
+  const noteText = noteBlock
+    ? `참조 노트:\n${noteBlock}`
+    : '';
+
+  return `아래 사용자 메모리와 참조 노트를 우선 반영하여 질문에 답해줘.
+
+${[memoryText, noteText].filter(Boolean).join('\n\n---\n\n')}
+
+---
+
+질문: ${question}`;
+}
+
+// ─── 세션 히스토리 ───────────────────────────────────────────────────────────
+
+app.get('/api/sessions/:id', (req, res) => {
+  const { id } = req.params;
+  const messages = stmtGetMessages.all(id);
+
+  // 인메모리 컨텍스트 복원 (서버 재시작 후 AI가 이전 대화 참고 가능)
+  if (messages.length > 0 && !sessions[id]) {
+    sessions[id] = messages.slice(-CONTEXT_N * 2).map(m => ({
+      role: m.role, content: m.content,
+    }));
+  }
+
+  res.json({ messages });
 });
 
 // ─── 의회 모드 프롬프트 빌더 ──────────────────────────────────────────────────
@@ -382,7 +671,7 @@ ${reviewSection}최종 답변을 작성하라.
 
 // 1단계: 1차 답변 생성
 app.post('/api/council/debate', async (req, res) => {
-  const { question, sessionId, councilDraftMode } = req.body;
+  const { question, sessionId, councilDraftMode, activeNotes } = req.body;
   if (!question || !sessionId) return res.status(400).json({ error: '필수 항목 누락' });
   if (!HAS_CLAUDE || !HAS_GPT) return res.status(400).json({ error: '의회 모드는 Claude와 GPT 키가 모두 필요합니다.' });
 
@@ -391,8 +680,13 @@ app.post('/api/council/debate', async (req, res) => {
   if (!sessions[sessionId]) sessions[sessionId] = [];
   const history = sessions[sessionId];
 
-  // 1차 답변 프롬프트 (mode에 따라 분기)
-  const firstAnswerPrompt = buildFirstAnswerPrompt(question, mode);
+  // 1차 답변 프롬프트 (mode에 따라 분기, 사용자 메모리 + 활성/자동 검색 노트 주입)
+  const memoryItems = await readMemoryItems();
+  const resolvedNotes = await getContextNotesForQuestion(question, activeNotes);
+  const effectiveQuestion = memoryItems.length > 0 || resolvedNotes.length > 0
+    ? buildContextMessage(question, resolvedNotes, memoryItems)
+    : question;
+  const firstAnswerPrompt = buildFirstAnswerPrompt(effectiveQuestion, mode);
   const context = [...history.slice(-CONTEXT_N), { role: 'user', content: firstAnswerPrompt }];
   const maxTokens = mode === 'compressed'
     ? COUNCIL_TOKEN_LIMITS.compressedFirst
@@ -515,10 +809,14 @@ app.post('/api/council/synthesize', async (req, res) => {
     sessions[sessionId].push({ role: 'user',      content: question  });
     sessions[sessionId].push({ role: 'assistant', content: synthesis });
 
+    const synthLabel = synthesizer === 'claude' ? 'Claude' : 'GPT';
+    dbSaveMessage(sessionId, 'user',      question,  null);
+    dbSaveMessage(sessionId, 'assistant', synthesis, `${synthLabel} (의회)`);
+
     res.json({
       divergence,
       synthesis,
-      synthesizer:        synthesizer === 'claude' ? 'Claude' : 'GPT',
+      synthesizer:        synthLabel,
       synthesizerModelId: usedModel,
       messageId:          uuidv4(),
     });
