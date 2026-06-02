@@ -16,6 +16,8 @@ const HISTORY_CONTEXT_MESSAGES = CONTEXT_N * 2; // 최근 10턴 내외를 user/a
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 const GPT_MODEL    = process.env.GPT_MODEL    || 'gpt-4o';
 const PORT         = parseInt(process.env.PORT || '3000');
+const GPT_LANGUAGE_SYSTEM = { role: 'system', content: '사용자가 쓴 언어로 답변하라. 한국어, 영어, 중국어, 일본어, 스페인어, 프랑스어, 독일어, 포르투갈어, 러시아어, 아랍어만 사용하라.' };
+
 const COUNCIL_TOKEN_LIMITS = {
   compressedFirst: 900,
   fullFirst:       4096,
@@ -377,7 +379,7 @@ app.post('/api/chat', async (req, res) => {
     } else {
       const response = await openai.chat.completions.create({
         model: GPT_MODEL,
-        messages: context,
+        messages: [GPT_LANGUAGE_SYSTEM, ...context],
       });
       reply = response.choices[0].message.content;
       usedModel = GPT_MODEL;
@@ -966,7 +968,7 @@ app.post('/api/council/debate', async (req, res) => {
       }),
       openai.chat.completions.create({
         model: GPT_MODEL,
-        messages: context,
+        messages: [GPT_LANGUAGE_SYSTEM, ...context],
         max_completion_tokens: maxTokens,
       }),
     ]);
@@ -1009,7 +1011,7 @@ app.post('/api/council/review', async (req, res) => {
       }),
       openai.chat.completions.create({
         model: GPT_MODEL,
-        messages: [{ role: 'user', content: gptReviewPrompt }],
+        messages: [GPT_LANGUAGE_SYSTEM, { role: 'user', content: gptReviewPrompt }],
         max_completion_tokens: COUNCIL_TOKEN_LIMITS.review,
       }),
     ]);
@@ -1059,7 +1061,7 @@ app.post('/api/council/synthesize', async (req, res) => {
     } else {
       const r = await openai.chat.completions.create({
         model: GPT_MODEL,
-        messages: [{ role: 'user', content: synthPrompt }],
+        messages: [GPT_LANGUAGE_SYSTEM, { role: 'user', content: synthPrompt }],
         max_completion_tokens: COUNCIL_TOKEN_LIMITS.synthesis,
       });
       rawText   = r.choices[0].message.content;
