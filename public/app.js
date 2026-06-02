@@ -42,7 +42,9 @@ async function init() {
     } else {
       councilBtn.title = 'Claude와 GPT 키가 모두 필요합니다';
     }
-  } catch (_) {}
+  } catch (_) {
+    appendError('서버에 연결할 수 없습니다. node server.js가 실행 중인지 확인해주세요.');
+  }
 
   document.querySelectorAll('.model-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -150,7 +152,7 @@ async function sendCouncilMessage() {
     });
     const data = await res.json();
     if (data.error) { appendCouncilError(container, data.error); return; }
-    showDebate(container, text, data.claudeReply, data.gptReply);
+    showDebate(container, text, data.claudeReply, data.gptReply, data.claudeError, data.gptError);
   } catch (_) {
     appendCouncilError(container, '서버에 연결할 수 없습니다.');
   } finally {
@@ -183,7 +185,7 @@ function appendCouncilLoading(msg) {
   return group;
 }
 
-function showDebate(container, question, claudeReply, gptReply) {
+function showDebate(container, question, claudeReply, gptReply, claudeError, gptError) {
   container.innerHTML = '';
 
   const tag = document.createElement('div');
@@ -194,8 +196,8 @@ function showDebate(container, question, claudeReply, gptReply) {
   section.className = 'debate-section';
 
   section.append(
-    makeDebateAnswer('Claude', claudeReply),
-    makeDebateAnswer('GPT', gptReply),
+    claudeReply ? makeDebateAnswer('Claude', claudeReply) : makeDebateError('Claude', claudeError),
+    gptReply    ? makeDebateAnswer('GPT', gptReply)       : makeDebateError('GPT', gptError),
     makePicker(container, section, question, claudeReply, gptReply),
   );
 
@@ -214,10 +216,26 @@ function makeDebateAnswer(modelName, reply) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
-  bubble.innerHTML = marked.parse(reply);
+  bubble.innerHTML = DOMPurify.sanitize(marked.parse(reply));
 
   details.append(summary, bubble);
   return details;
+}
+
+function makeDebateError(modelName, errorMsg) {
+  const div = document.createElement('div');
+  div.className = 'debate-answer';
+
+  const label = document.createElement('div');
+  label.className = 'model-label';
+  label.textContent = modelName;
+
+  const err = document.createElement('div');
+  err.className = 'error-msg';
+  err.textContent = `⚠️ ${modelName} 응답 실패: ${errorMsg || '알 수 없는 오류'}`;
+
+  div.append(label, err);
+  return div;
 }
 
 function makePicker(container, section, question, claudeReply, gptReply) {
@@ -235,10 +253,16 @@ function makePicker(container, section, question, claudeReply, gptReply) {
     const btn = document.createElement('button');
     btn.className = 'synth-btn';
     btn.textContent = model === 'claude' ? 'Claude가 종합' : 'GPT가 종합';
-    btn.addEventListener('click', () => {
-      pickerBtns.querySelectorAll('.synth-btn').forEach(b => b.disabled = true);
-      chooseSynthesizer(container, section, question, claudeReply, gptReply, model);
-    });
+    const available = model === 'claude' ? !!claudeReply : !!gptReply;
+    if (!available) {
+      btn.disabled = true;
+      btn.title = '이 모델의 응답이 없어 종합할 수 없습니다.';
+    } else {
+      btn.addEventListener('click', () => {
+        pickerBtns.querySelectorAll('.synth-btn').forEach(b => b.disabled = true);
+        chooseSynthesizer(container, section, question, claudeReply, gptReply, model);
+      });
+    }
     pickerBtns.appendChild(btn);
   });
 
@@ -290,7 +314,7 @@ function showSynthesis(section, question, claudeReply, gptReply, data) {
 
     const divBubble = document.createElement('div');
     divBubble.className = 'bubble md divergence-bubble';
-    divBubble.innerHTML = marked.parse(data.divergence);
+    divBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.divergence));
 
     synthSection.append(divLabel, divBubble);
   }
@@ -302,7 +326,7 @@ function showSynthesis(section, question, claudeReply, gptReply, data) {
 
   const synthBubble = document.createElement('div');
   synthBubble.className = 'bubble md synthesis-bubble';
-  synthBubble.innerHTML = marked.parse(data.synthesis);
+  synthBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.synthesis));
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'save-btn';
@@ -435,7 +459,7 @@ function appendAssistantBubble(data) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
-  bubble.innerHTML = marked.parse(data.reply);
+  bubble.innerHTML = DOMPurify.sanitize(marked.parse(data.reply));
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'save-btn';

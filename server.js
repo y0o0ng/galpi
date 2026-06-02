@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs/promises');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
+const rateLimit = require('express-rate-limit');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -35,8 +36,17 @@ const openai    = HAS_GPT    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }
 // ─── 앱 ─────────────────────────────────────────────────────────────────────
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,   // 1분
+  max: 30,               // 최대 30회
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+});
+app.use('/api/', apiLimiter);
 
 // 세션별 대화 기록 (1차: 서버 메모리에만 보관, 재시작 시 초기화됨)
 const sessions = {};
@@ -48,6 +58,11 @@ app.post('/api/chat', async (req, res) => {
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
   }
+  if (model !== 'claude' && model !== 'gpt') return res.status(400).json({ error: '알 수 없는 모델입니다.' });
+  if (model === 'claude' && !HAS_CLAUDE)     return res.status(400).json({ error: 'Claude 키가 없습니다.' });
+  if (model === 'gpt'    && !HAS_GPT)        return res.status(400).json({ error: 'GPT 키가 없습니다.' });
+  if (message.length > 10000)                return res.status(400).json({ error: '메시지가 너무 깁니다 (최대 10,000자).' });
+
 
   if (!sessions[sessionId]) sessions[sessionId] = [];
   const history = sessions[sessionId];
@@ -77,6 +92,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     history.push({ role: 'assistant', content: reply });
+    sessions[sessionId] = sessions[sessionId].slice(-(CONTEXT_N * 2));
 
     res.json({
       reply,
@@ -130,7 +146,8 @@ app.post('/api/save-note', async (req, res) => {
   const pad    = (n) => String(n).padStart(2, '0');
   const dateId = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   const slug   = title.replace(/\s+/g, '-').replace(/[^\w가-힣\-]/g, '');
-  const fileId = `${dateId}-${slug}`;
+  const rand   = Math.random().toString(36).slice(2, 6);
+  const fileId = `${dateId}-${rand}-${slug}`;
   const createdStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   // 여러 줄 답변을 callout 형식으로 변환 (각 줄 앞에 "> " 추가)
@@ -138,7 +155,7 @@ app.post('/api/save-note', async (req, res) => {
 
   const noteContent = `---
 id: ${fileId}
-title: ${title}
+title: "${title.replace(/"/g, "'")}"
 aliases: []
 created: ${createdStr}
 mode: single
@@ -221,7 +238,7 @@ app.post('/api/council/debate', async (req, res) => {
   const context = [...history.slice(-CONTEXT_N), { role: 'user', content: question }];
 
   try {
-    const [claudeRes, gptRes] = await Promise.all([
+    const [claudeResult, gptResult] = await Promise.allSettled([
       anthropic.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: 8192,
@@ -233,10 +250,16 @@ app.post('/api/council/debate', async (req, res) => {
       }),
     ]);
 
-    res.json({
-      claudeReply: claudeRes.content[0].text,
-      gptReply:    gptRes.choices[0].message.content,
-    });
+    const claudeReply = claudeResult.status === 'fulfilled' ? claudeResult.value.content[0].text         : null;
+    const gptReply    = gptResult.status    === 'fulfilled' ? gptResult.value.choices[0].message.content : null;
+    const claudeError = claudeResult.status === 'rejected'  ? claudeResult.reason.message                : null;
+    const gptError    = gptResult.status    === 'rejected'  ? gptResult.reason.message                  : null;
+
+    if (!claudeReply && !gptReply) {
+      return res.status(500).json({ error: '두 모델 모두 응답하지 못했습니다.' });
+    }
+
+    res.json({ claudeReply, gptReply, claudeError, gptError });
   } catch (err) {
     console.error('의회 토론 오류:', err.message);
     res.status(500).json({ error: err.message });
@@ -349,14 +372,15 @@ app.post('/api/council/save-note', async (req, res) => {
   const pad    = (n) => String(n).padStart(2, '0');
   const dateId = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   const slug   = title.replace(/\s+/g, '-').replace(/[^\w가-힣\-]/g, '');
-  const fileId = `${dateId}-${slug}`;
+  const rand   = Math.random().toString(36).slice(2, 6);
+  const fileId = `${dateId}-${rand}-${slug}`;
   const createdStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   const fmtCallout = (text) => text.split('\n').map(l => `> ${l}`).join('\n');
 
   const noteContent = `---
 id: ${fileId}
-title: ${title}
+title: "${title.replace(/"/g, "'")}"
 aliases: []
 created: ${createdStr}
 mode: council
@@ -418,7 +442,7 @@ ${fmtCallout(gptReply)}
 
 // ─── 서버 시작 ────────────────────────────────────────────────────────────────
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '127.0.0.1', () => {
   console.log('\n✅ AI 의회 서버 실행 중');
   console.log(`   로컬:     http://localhost:${PORT}`);
   console.log(`   볼트:     ${VAULT_PATH}`);
