@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="AI 의회">
+  <title>AI 의회</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <header id="header">
+      <div id="header-top">
+        <span id="app-title">AI 의회</span>
+        <span id="model-indicator"></span>
+      </div>
+      <div id="toggle-row">
+        <button class="model-btn active" data-model="claude">Claude</button>
+        <button class="model-btn" data-model="gpt">GPT</button>
+        <button class="council-btn disabled">의회</button>
+      </div>
+    </header>
+
+    <div id="chat">
+      <div id="messages"></div>
+    </div>
+
+    <div id="input-area">
+      <textarea id="input" placeholder="질문을 입력하세요… (Shift+Enter로 줄바꿈)" rows="1"></textarea>
+      <button id="send-btn" title="전송 (Enter)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
