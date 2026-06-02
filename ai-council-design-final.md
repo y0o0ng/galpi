@@ -1,4 +1,273 @@
-# AI 의회 × 옵시디언 — 설계 문서 (최종본 / v1.3)
+
+
+ # AI 의회 × 옵시디언 — 설계 문서 (v1.4)
+
+  ## 1. 핵심 철학
+
+  이 프로젝트는 단순 챗봇이 아니라, 사용자의 대화·결정·아이디어를 장기적으로 축
+  적하고 다시 꺼내 쓰는 개인용 AI 기억 시스템이다.
+
+  기억은 두 층으로 나눈다.
+
+  - DB = 창고
+      - 모든 대화, 답변, 세션, 저장 이벤트를 보존한다.
+      - 검색·복원·디버깅·전체 기록 회수에 사용한다.
+
+  - Obsidian = 서재
+      - 사용자가 의미 있다고 판단한 내용만 노트화한다.
+      - AI가 다시 읽고 연결하고 추론할 수 있는 지식 단위로 관리한다.
+
+  Codex는 답변 모델이 아니라, 나중에 Obsidian 서재를 정리하고 연결하는 정리 담당
+  자다.
+
+  ## 2. 저장 정책
+
+  모든 대화는 DB에 저장한다.
+  하지만 모든 대화를 Obsidian 노트로 만들지는 않는다.
+
+  Obsidian 노트화 대상:
+
+  - 사용자가 명시적으로 저장한 단일 답변
+  - “저장해둬”, /save 등으로 저장 요청한 문서/아이디어
+  - 의회 모드의 최종 결과 및 주요 토론 과정
+  - 장기적으로 다시 꺼낼 가치가 있는 결정, 설계, 아이디어, 규칙
+
+  Obsidian 노트화하지 않는 것:
+
+  - 짧은 확인
+  - 잡담
+  - 임시 질문
+  - 틀린 시도
+  - 저장 가치가 낮은 단순 재질문
+
+  ## 3. 노트 추적
+
+  모든 노트화된 파일은 DB의 notes 테이블에도 등록한다.
+
+  필수 추적 필드:
+
+  filename
+  title
+  note_type
+  archived
+  codex_status
+  source_session
+  source_message
+  created_at
+  updated_at
+
+  codex_status 값:
+
+  pending
+  processed
+  failed
+  needs_manual_check
+
+  새로 저장되는 노트는 기본적으로 pending이다.
+
+  ## 4. 노트 형식
+
+  노트는 사람도 읽을 수 있어야 하지만, 더 중요한 목적은 미래의 AI가 빠르게 회수
+  하고 연결할 수 있게 하는 것이다.
+
+  기본 구조:
+
+  ---
+  title: ""
+  created:
+  updated:
+  note_type:
+  archived: false
+  codex_status: pending
+  ai_readable: true
+  knowledge_type:
+  confidence:
+  source_session:
+  source_message:
+  ---
+
+  # 제목
+
+  ## AI 회수 힌트
+  - 핵심 개념:
+  - 노트 성격:
+  - 다시 꺼낼 상황:
+  - 연결 후보:
+  - 신뢰도:
+
+  ## 본문
+  ...
+
+  ## 결론
+  ...
+
+  ## 🏷️ 주제 태그
+  <!-- CODEX-TAGS-START -->
+  <!-- CODEX-TAGS-END -->
+
+  ## 🔗 연결
+  <!-- CODEX-LINKS-START -->
+  <!-- CODEX-LINKS-END -->
+
+  > [!note]- 원본
+  ...
+
+  역할 구분:
+
+  - AI 회수 힌트
+      - 저장 시점에 GPT/Claude가 채우는 초기 의미 설명
+      - 검색, 자동 참조, 임베딩 품질 향상에 사용
+
+  - CODEX-TAGS
+      - Codex가 나중에 채우는 주제 태그 구역
+
+  - CODEX-LINKS
+      - Codex가 vault 전체를 보고 추가하는 연결 구역
+
+  ## 5. Codex 수정 규칙
+
+  Codex는 기존 노트 전체를 자유롭게 수정하지 않는다.
+
+  허용:
+
+  - CODEX-TAGS-START와 CODEX-TAGS-END 사이
+  - CODEX-LINKS-START와 CODEX-LINKS-END 사이
+  - Codex 소유 인덱스/지도 노트
+  - 정리 로그
+
+  금지:
+
+  - 질문 원문 수정
+  - 결론 본문 수정
+  - 원본 답변 수정
+  - 사용자가 작성한 본문 재작성
+  - 노트 삭제
+  - 노트 병합
+  - 볼트 외부 접근
+  - 쉘 명령으로 파일 삭제/이동
+
+  ## 6. 검색과 회수
+
+  검색은 단계적으로 발전시킨다.
+
+  현재:
+
+  - 키워드 검색
+  - 활성 노트 우선
+  - 질문 기반 자동 노트 검색
+
+  다음:
+
+  - AI 회수 힌트 기반 검색 품질 향상
+  - notes 테이블 기반 필터링
+  - archived 제외
+  - codex_status 활용
+
+  나중:
+
+  - 임베딩/벡터 검색
+  - 주제별 인덱스
+  - 연결 그래프 기반 회수
+
+  회수 우선순위:
+
+  1. 활성 노트
+  2. 관련 Obsidian 노트
+  3. 사용자 메모리
+  4. 최근 대화 10턴
+  5. 필요 시 DB 전체 검색
+
+  ## 7. 명령어 체계
+
+  현재 명령:
+
+  /search
+  /save
+  /memory
+
+  다음 명령 후보:
+
+  /organize
+  /organize run
+  /audit
+  /challenge
+  /synthesize
+  /export
+
+  의미:
+
+  - /search: 관련 노트 찾기
+  - /save: 사용자가 직접 저장 요청한 내용 노트화
+  - /memory: 항상 참조할 사용자 규칙/선호 관리
+  - /organize: Codex 정리 상태 확인
+  - /organize run: Codex 정리 실행
+  - /challenge: 과거 노트를 근거로 현재 생각 반박
+  - /synthesize: 여러 노트에서 패턴 추출
+  - /export: 다른 AI에게 넘길 스냅샷 생성
+
+  ## 8. 구현 순서
+
+  1. notes 테이블 추가
+  2. 세 저장 경로를 saveVaultNoteRecord()로 통합
+  3. 새 노트에 codex_status: pending 등록
+  4. 기존 노트 backfill
+  5. 새 노트 템플릿에 AI 회수 힌트 추가
+  6. /organize 상태 조회
+  7. 검증 스크립트 작성
+  8. codex_jobs 추가
+  9. Codex 실행 연결
+  10. /challenge, /synthesize 같은 고급 명령 확장
+
+  ## 9. 안전 원칙
+
+  - 기존 노트 대량 수정은 피한다.
+  - 새 형식은 새 노트부터 적용한다.
+  - 기존 노트는 우선 DB에만 backfill한다.
+  - Codex 실행 전후 diff를 검증한다.
+  - 마커 밖 수정이 있으면 실패 처리한다.
+  - 실패 3회 이상은 needs_manual_check로 넘긴다.
+  - 사용자가 의미 있다고 판단한 것만 서재에 올린다.
+
+  ## 10. 현재 달성한 것
+
+  현재 구현된 것:
+
+  - 단일/의회 채팅
+  - 최근 10턴 컨텍스트 전달
+  - 모델별 이전 답변 라벨링
+  - SQLite 세션/메시지 저장
+  - 새로고침 후 히스토리 복원
+  - localStorage 보조 복원
+  - /search
+  - /save
+  - /memory
+  - 활성 노트 자동 컨텍스트 주입
+  - 질문 기반 자동 노트 검색
+  - notes 테이블 추가
+  - saveVaultNoteRecord() 추가
+  - 세 저장 경로의 pending 등록 준비
+  - Obsidian 노트에 CODEX-TAGS/LINKS 마커 유지
+
+  ## 11. 판단 기준
+
+  기능 추가 시 항상 묻는다.
+
+  - 이 기능은 DB 창고용인가, Obsidian 서재용인가?
+  - 이 정보는 다시 꺼낼 가치가 있는가?
+  - AI가 나중에 이 노트를 빠르게 이해할 수 있는가?
+  - Codex가 안전하게 수정할 수 있는 경계가 있는가?
+  - 지금 구현이 나중에 벡터 검색/Codex 정리로 교체 가능하게 열려 있는가?
+
+
+
+-------
+
+
+
+
+
+
+# AI 의회 × 옵시디언 — 설계 문서 (v1.3)
 
 > 한 화면에서 Claude와 GPT에게 묻고, 둘이 논의해 도출한 답을 옵시디언 볼트에 노트로 쌓으며,
 > Codex가 정해진 구역 안에서만 노트들을 주제별로 연결해 “뇌처럼” 자라는 지식 그래프를 만드는 개인용 시스템.

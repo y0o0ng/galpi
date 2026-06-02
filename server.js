@@ -86,7 +86,21 @@ db.exec(`
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     FOREIGN KEY (session_id) REFERENCES sessions(id)
   );
+  CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    note_type TEXT NOT NULL,
+    archived INTEGER NOT NULL DEFAULT 0,
+    codex_status TEXT NOT NULL DEFAULT 'pending',
+    source_session TEXT,
+    source_message TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  );
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_notes_codex_status ON notes(codex_status, archived);
+  CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
 `);
 
 const stmtEnsureSession = db.prepare(`
@@ -96,6 +110,23 @@ const stmtEnsureSession = db.prepare(`
 const stmtInsertMessage = db.prepare(
   'INSERT INTO messages (session_id, role, content, model) VALUES (?, ?, ?, ?)'
 );
+const stmtUpsertNote = db.prepare(`
+  INSERT INTO notes (
+    filename, title, note_type, archived, codex_status,
+    source_session, source_message
+  ) VALUES (
+    @filename, @title, @noteType, @archived, @codexStatus,
+    @sourceSession, @sourceMessage
+  )
+  ON CONFLICT(filename) DO UPDATE SET
+    title = excluded.title,
+    note_type = excluded.note_type,
+    archived = excluded.archived,
+    codex_status = excluded.codex_status,
+    source_session = excluded.source_session,
+    source_message = excluded.source_message,
+    updated_at = strftime('%s','now')
+`);
 const stmtGetMessages = db.prepare(
   'SELECT role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC'
 );
@@ -113,6 +144,26 @@ const stmtGetRecentMessages = db.prepare(`
 function dbSaveMessage(sessionId, role, content, model = null) {
   stmtEnsureSession.run(sessionId);
   stmtInsertMessage.run(sessionId, role, content, model);
+}
+
+function dbUpsertNote({
+  filename,
+  title,
+  noteType,
+  archived = false,
+  codexStatus = 'pending',
+  sourceSession = null,
+  sourceMessage = null,
+}) {
+  stmtUpsertNote.run({
+    filename,
+    title,
+    noteType,
+    archived: archived ? 1 : 0,
+    codexStatus,
+    sourceSession: sourceSession || null,
+    sourceMessage: sourceMessage || null,
+  });
 }
 
 function hydrateSessionFromDb(sessionId) {
@@ -195,6 +246,26 @@ async function writeVaultNote(fileId, noteContent) {
   await fs.writeFile(tmpPath, noteContent, 'utf8');
   await fs.rename(tmpPath, filepath);
   await fs.access(filepath);
+}
+
+async function saveVaultNoteRecord({
+  fileId,
+  title,
+  noteType,
+  noteContent,
+  sessionId = null,
+  messageId = null,
+  codexStatus = 'pending',
+}) {
+  await writeVaultNote(fileId, noteContent);
+  dbUpsertNote({
+    filename: fileId + '.md',
+    title,
+    noteType,
+    codexStatus,
+    sourceSession: sessionId,
+    sourceMessage: messageId,
+  });
 }
 
 function parseJsonObject(text) {
@@ -429,14 +500,26 @@ id: ${fileId}
 title: "${title.replace(/"/g, "'")}"
 aliases: []
 created: ${createdStr}
+updated: ${createdStr}
 mode: user_document
 note_type: user_manual
 archived: false
 codex_status: pending
+ai_readable: true
+knowledge_type: user_document
+confidence: medium
 source_session: ${sessionId || 'unknown'}
+source_message: unknown
 ---
 
 # ${title}
+
+## AI 회수 힌트
+- 핵심 개념: ${title}
+- 노트 성격: 사용자 저장 문서
+- 다시 꺼낼 상황: 사용자가 이 문서나 아이디어를 바탕으로 후속 질문을 할 때
+- 연결 후보: ${metadata.links?.length ? metadata.links.map(link => `[[${link.title}]]`).join(', ') : '정리 엔진이 추후 보강'}
+- 신뢰도: medium
 
 ## 문서
 ${content}
@@ -458,7 +541,14 @@ ${linksBlock}
 *생성: ${createdStr} · 사용자 저장 문서 · 정리 엔진: ${HAS_GPT ? 'GPT' : HAS_CLAUDE ? 'Claude' : 'fallback'}*
 `;
 
-    await writeVaultNote(fileId, noteContent);
+    await saveVaultNoteRecord({
+      fileId,
+      title,
+      noteType: 'user_manual',
+      noteContent,
+      sessionId,
+      codexStatus: 'pending',
+    });
 
     if (sessionId && sessionId !== 'unknown') {
       hydrateSessionFromDb(sessionId);
@@ -524,9 +614,14 @@ id: ${fileId}
 title: "${title.replace(/"/g, "'")}"
 aliases: []
 created: ${createdStr}
+updated: ${createdStr}
 mode: single
 note_type: single_manual
 archived: false
+codex_status: pending
+ai_readable: true
+knowledge_type: answer
+confidence: medium
 models:
   claude: ${CLAUDE_MODEL}
   gpt: ${GPT_MODEL}
@@ -536,6 +631,13 @@ source_message: ${messageId || 'unknown'}
 ---
 
 # ${title}
+
+## AI 회수 힌트
+- 핵심 개념: ${title}
+- 노트 성격: 단일 답변 수동 저장
+- 다시 꺼낼 상황: 같은 질문, 같은 주제의 후속 판단, 저장된 답변을 다시 참고할 때
+- 연결 후보: 정리 엔진이 추후 보강
+- 신뢰도: medium
 
 ## ❓ 질문
 ${question}
@@ -559,17 +661,16 @@ ${calloutAnswer}
 *생성: ${createdStr} · 단일 모드 · 최종 종합자: 없음*
 `;
 
-  const filepath = path.join(VAULT_PATH, fileId + '.md');
-
-  if (!filepath.startsWith(VAULT_PATH + path.sep) && filepath !== VAULT_PATH) {
-    return res.status(400).json({ error: '잘못된 경로입니다.' });
-  }
-
   try {
-    const tmpPath = filepath + '.tmp';
-    await fs.writeFile(tmpPath, noteContent, 'utf8');
-    await fs.rename(tmpPath, filepath);
-    await fs.access(filepath);
+    await saveVaultNoteRecord({
+      fileId,
+      title,
+      noteType: 'single_manual',
+      noteContent,
+      sessionId,
+      messageId,
+      codexStatus: 'pending',
+    });
     res.json({ success: true, filename: fileId + '.md', title });
   } catch (err) {
     console.error('노트 저장 오류:', err.message);
@@ -623,6 +724,68 @@ app.delete('/api/memory', async (_req, res) => {
   res.json({ success: true, items });
 });
 
+// ─── 기존 노트 DB 등록 ───────────────────────────────────────────────────────
+
+function shouldSkipBackfillFile(filename) {
+  return (
+    !filename.endsWith('.md') ||
+    filename.startsWith('.') ||
+    filename === MEMORY_FILE
+  );
+}
+
+async function backfillNotesFromVault() {
+  let files;
+  try {
+    files = await fs.readdir(VAULT_PATH);
+  } catch (err) {
+    throw new Error(`볼트 읽기 실패: ${err.message}`);
+  }
+
+  const result = { scanned: 0, registered: 0, skipped: 0 };
+
+  for (const filename of files) {
+    if (shouldSkipBackfillFile(filename)) {
+      result.skipped += 1;
+      continue;
+    }
+
+    result.scanned += 1;
+
+    try {
+      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const fm = parseSimpleFrontmatter(raw);
+      const archived = parseFrontmatterBoolean(fm.archived);
+
+      dbUpsertNote({
+        filename,
+        title: fm.title || filename.replace(/\.md$/, ''),
+        noteType: fm.note_type || 'legacy',
+        archived,
+        codexStatus: fm.codex_status || (archived ? 'processed' : 'pending'),
+        sourceSession: fm.source_session || null,
+        sourceMessage: fm.source_message || null,
+      });
+
+      result.registered += 1;
+    } catch (err) {
+      console.warn(`노트 backfill 실패 (${filename}):`, err.message);
+      result.skipped += 1;
+    }
+  }
+
+  return result;
+}
+
+app.post('/api/notes/backfill', async (_req, res) => {
+  try {
+    const result = await backfillNotesFromVault();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── 볼트 검색 ───────────────────────────────────────────────────────────────
 // 향후 벡터/임베딩 검색으로 교체 시 searchVault() 함수만 수정하면 됨
 
@@ -630,9 +793,28 @@ function stripFrontmatter(content) {
   return content.replace(/^---[\s\S]*?---\n?/, '').trim();
 }
 
+function parseSimpleFrontmatter(raw) {
+  const match = String(raw || '').match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return {};
+
+  return match[1].split('\n').reduce((acc, line) => {
+    const parts = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!parts) return acc;
+
+    const key = parts[1];
+    const value = parts[2].trim().replace(/^"(.*)"$/, '$1');
+    acc[key] = value;
+    return acc;
+  }, {});
+}
+
+function parseFrontmatterBoolean(value) {
+  return String(value || '').trim().toLowerCase() === 'true';
+}
+
 function parseNoteTitle(raw, filename) {
-  const titleMatch = raw.match(/^title:\s*"?([^"\n]+)"?/m);
-  return titleMatch ? titleMatch[1].trim() : filename.replace(/\.md$/, '');
+  const fm = parseSimpleFrontmatter(raw);
+  return fm.title ? fm.title.trim() : filename.replace(/\.md$/, '');
 }
 
 async function readVaultNote(filename) {
@@ -1159,10 +1341,15 @@ id: ${fileId}
 title: "${title.replace(/"/g, "'")}"
 aliases: []
 created: ${createdStr}
+updated: ${createdStr}
 mode: council
 note_type: council
 draft_mode: ${mode}
 archived: false
+codex_status: pending
+ai_readable: true
+knowledge_type: council_synthesis
+confidence: medium
 models:
   claude: ${CLAUDE_MODEL}
   gpt: ${GPT_MODEL}
@@ -1172,6 +1359,13 @@ source_message: ${messageId || 'unknown'}
 ---
 
 # ${title}
+
+## AI 회수 힌트
+- 핵심 개념: ${title}
+- 노트 성격: 의회 모드 종합
+- 다시 꺼낼 상황: 같은 주제의 중요한 판단, 찬반 비교, 이전 의회 결론을 다시 검토할 때
+- 연결 후보: 정리 엔진이 추후 보강
+- 신뢰도: medium
 
 ## ❓ 질문
 ${question}
@@ -1200,16 +1394,16 @@ ${reviewSection}
 *생성: ${createdStr} · 의회 모드 (${mode}) · 최종 종합자: ${synthesizer} (${synthesizerModelId})*
 `;
 
-  const filepath = path.join(VAULT_PATH, fileId + '.md');
-  if (!filepath.startsWith(VAULT_PATH + path.sep) && filepath !== VAULT_PATH) {
-    return res.status(400).json({ error: '잘못된 경로입니다.' });
-  }
-
   try {
-    const tmpPath = filepath + '.tmp';
-    await fs.writeFile(tmpPath, noteContent, 'utf8');
-    await fs.rename(tmpPath, filepath);
-    await fs.access(filepath);
+    await saveVaultNoteRecord({
+      fileId,
+      title,
+      noteType: 'council',
+      noteContent,
+      sessionId,
+      messageId,
+      codexStatus: 'pending',
+    });
     res.json({ success: true, filename: fileId + '.md', title });
   } catch (err) {
     console.error('노트 저장 오류:', err.message);
