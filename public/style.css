@@ -332,6 +332,36 @@ html, body {
   100% { opacity: 0; }
 }
 
+/* ── 의회 답변 방식 토글 ───────────────────────────────────── */
+
+.council-mode-toggle {
+  display: flex;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.mode-opt {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: var(--label);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.mode-opt.active {
+  background: #AF52DE;
+  color: #fff;
+}
+
+.mode-opt:not(.active):hover {
+  color: #AF52DE;
+}
+
 /* ── 의회 모드 ─────────────────────────────────────────────── */
 
 .council-group {
@@ -367,10 +397,38 @@ html, body {
   color: var(--label);
 }
 
+.council-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .debate-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.reviews-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}
+
+.review-answer {
+  width: 100%;
+}
+
+.review-summary {
+  color: #8E8E93;
+}
+
+.review-bubble {
+  background: #F9F9FB;
+  border-left: 2px solid var(--border);
+  font-size: 13px;
 }
 
 .debate-answer {

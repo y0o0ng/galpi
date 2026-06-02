@@ -5,6 +5,7 @@ let currentModel     = 'claude';
 let isLoading        = false;
 let councilMode      = false;
 let councilAvailable = false;
+let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
 
 // ─── 초기화 ──────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,16 @@ async function init() {
     btn.addEventListener('click', () => {
       if (councilMode) return;
       selectModel(btn.dataset.model);
+    });
+  });
+
+  // 의회 답변 방식 토글: 빠름(compressed) / 기본(full) / 심층(deep)
+  document.querySelectorAll('.mode-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      councilDraftMode = btn.dataset.mode;
+      document.querySelectorAll('.mode-opt').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === councilDraftMode);
+      });
     });
   });
 
@@ -142,19 +153,75 @@ async function sendCouncilMessage() {
   document.querySelector('.welcome')?.remove();
 
   appendUserBubble(text);
-  const container = appendCouncilLoading('두 AI가 생각 중…');
+
+  // 의회 컨테이너 생성
+  const container = document.createElement('div');
+  container.className = 'council-group';
+  const tag = document.createElement('div');
+  tag.className = 'council-tag';
+  tag.textContent = '의회';
+  const body = document.createElement('div');
+  body.className = 'council-body';
+  container.append(tag, body);
+  getMessages().appendChild(container);
+
+  // 로딩 인디케이터
+  const loadingEl = createCouncilLoadingEl('1차 답변 생성 중…');
+  body.appendChild(loadingEl);
+  scrollDown();
 
   try {
-    const res = await fetch('/api/council/debate', {
+    // ── 1단계: 1차 답변 ────────────────────────────────────────────
+    const debateRes = await fetch('/api/council/debate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ question: text, sessionId }),
+      body:    JSON.stringify({ question: text, sessionId, councilDraftMode }),
     });
-    const data = await res.json();
-    if (data.error) { appendCouncilError(container, data.error); return; }
-    showDebate(container, text, data.claudeReply, data.gptReply, data.claudeError, data.gptError);
+    const debateData = await debateRes.json();
+
+    if (debateData.error) {
+      loadingEl.remove();
+      appendCouncilError(body, debateData.error);
+      return;
+    }
+
+    renderInitialAnswers(body, loadingEl, debateData);
+
+    // ── 2단계: 상호 검토 (심층 모드 + 두 답변 모두 있을 때만) ────
+    let reviewData = { claudeReview: null, gptReview: null };
+
+    if (councilDraftMode === 'deep' && debateData.claudeReply && debateData.gptReply) {
+      updateLoadingText(loadingEl, '상호 검토 중…');
+
+      try {
+        const reviewRes = await fetch('/api/council/review', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            question: text,
+            claudeReply: debateData.claudeReply,
+            gptReply:    debateData.gptReply,
+            councilDraftMode,
+            sessionId,
+          }),
+        });
+        reviewData = await reviewRes.json();
+        if (!reviewData.error) renderReviews(body, loadingEl, reviewData);
+      } catch (_) {
+        // 검토 실패는 전체 실패로 만들지 않음
+      }
+    }
+
+    loadingEl.remove();
+
+    // ── 3단계: 종합자 선택 ─────────────────────────────────────────
+    if (debateData.claudeReply && debateData.gptReply) {
+      renderPicker(container, body, text, debateData, reviewData);
+    }
+
   } catch (_) {
-    appendCouncilError(container, '서버에 연결할 수 없습니다.');
+    loadingEl.remove();
+    appendCouncilError(body, '서버에 연결할 수 없습니다.');
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
@@ -162,53 +229,46 @@ async function sendCouncilMessage() {
   }
 }
 
-function appendCouncilLoading(msg) {
-  const group = document.createElement('div');
-  group.className = 'council-group';
+// ── 로딩 헬퍼 ──────────────────────────────────────────────────────────────
 
-  const tag = document.createElement('div');
-  tag.className = 'council-tag';
-  tag.textContent = '의회';
-
+function createCouncilLoadingEl(msg) {
   const wrap = document.createElement('div');
   wrap.className = 'council-loading';
   wrap.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
-
   const txt = document.createElement('span');
   txt.className = 'loading-text';
   txt.textContent = msg;
   wrap.appendChild(txt);
-
-  group.append(tag, wrap);
-  getMessages().appendChild(group);
-  scrollDown();
-  return group;
+  return wrap;
 }
 
-function showDebate(container, question, claudeReply, gptReply, claudeError, gptError) {
-  container.innerHTML = '';
+function updateLoadingText(loadingEl, msg) {
+  const txt = loadingEl.querySelector('.loading-text');
+  if (txt) txt.textContent = msg;
+}
 
-  const tag = document.createElement('div');
-  tag.className = 'council-tag';
-  tag.textContent = '의회';
+// ── 1차 답변 렌더링 ────────────────────────────────────────────────────────
 
-  const section = document.createElement('div');
-  section.className = 'debate-section';
+function renderInitialAnswers(body, loadingEl, debateData) {
+  const isCompressed = debateData.councilDraftMode !== 'full';
 
-  section.append(
-    claudeReply ? makeDebateAnswer('Claude', claudeReply) : makeDebateError('Claude', claudeError),
-    gptReply    ? makeDebateAnswer('GPT', gptReply)       : makeDebateError('GPT', gptError),
-    makePicker(container, section, question, claudeReply, gptReply),
-  );
+  ['claude', 'gpt'].forEach(model => {
+    const reply = model === 'claude' ? debateData.claudeReply : debateData.gptReply;
+    const error = model === 'claude' ? debateData.claudeError : debateData.gptError;
+    const name  = model === 'claude' ? 'Claude' : 'GPT';
+    const el    = reply
+      ? makeDebateAnswer(name, reply, !isCompressed)
+      : makeDebateError(name, error);
+    body.insertBefore(el, loadingEl);
+  });
 
-  container.append(tag, section);
   scrollDown();
 }
 
-function makeDebateAnswer(modelName, reply) {
+function makeDebateAnswer(modelName, reply, open = true) {
   const details = document.createElement('details');
   details.className = 'debate-answer';
-  details.open = true;
+  details.open = open;
 
   const summary = document.createElement('summary');
   summary.className = 'model-label debate-summary';
@@ -238,7 +298,45 @@ function makeDebateError(modelName, errorMsg) {
   return div;
 }
 
-function makePicker(container, section, question, claudeReply, gptReply) {
+// ── 상호 검토 렌더링 ────────────────────────────────────────────────────────
+
+function renderReviews(body, loadingEl, reviewData) {
+  const section = document.createElement('div');
+  section.className = 'reviews-section';
+
+  if (reviewData.claudeReview) {
+    section.appendChild(makeReview('Claude의 GPT 검토', reviewData.claudeReview));
+  }
+  if (reviewData.gptReview) {
+    section.appendChild(makeReview('GPT의 Claude 검토', reviewData.gptReview));
+  }
+
+  if (section.children.length > 0) {
+    body.insertBefore(section, loadingEl);
+    scrollDown();
+  }
+}
+
+function makeReview(label, review) {
+  const details = document.createElement('details');
+  details.className = 'review-answer';
+  details.open = false; // 검토는 기본 접힘
+
+  const summary = document.createElement('summary');
+  summary.className = 'model-label debate-summary review-summary';
+  summary.textContent = label;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble md review-bubble';
+  bubble.innerHTML = DOMPurify.sanitize(marked.parse(review));
+
+  details.append(summary, bubble);
+  return details;
+}
+
+// ── 종합자 선택 ────────────────────────────────────────────────────────────
+
+function renderPicker(container, body, question, debateData, reviewData) {
   const picker = document.createElement('div');
   picker.className = 'synthesizer-picker';
 
@@ -253,55 +351,61 @@ function makePicker(container, section, question, claudeReply, gptReply) {
     const btn = document.createElement('button');
     btn.className = 'synth-btn';
     btn.textContent = model === 'claude' ? 'Claude가 종합' : 'GPT가 종합';
-    const available = model === 'claude' ? !!claudeReply : !!gptReply;
+    const available = model === 'claude' ? !!debateData.claudeReply : !!debateData.gptReply;
     if (!available) {
       btn.disabled = true;
       btn.title = '이 모델의 응답이 없어 종합할 수 없습니다.';
     } else {
       btn.addEventListener('click', () => {
         pickerBtns.querySelectorAll('.synth-btn').forEach(b => b.disabled = true);
-        chooseSynthesizer(container, section, question, claudeReply, gptReply, model);
+        chooseSynthesizer(container, body, question, debateData, reviewData, model);
       });
     }
     pickerBtns.appendChild(btn);
   });
 
   picker.append(pickerLabel, pickerBtns);
-  return picker;
+  body.appendChild(picker);
+  scrollDown();
 }
 
-async function chooseSynthesizer(container, section, question, claudeReply, gptReply, synthesizer) {
+async function chooseSynthesizer(container, body, question, debateData, reviewData, synthesizer) {
   const label = synthesizer === 'claude' ? 'Claude' : 'GPT';
 
-  const loadingWrap = document.createElement('div');
-  loadingWrap.className = 'council-loading synthesis-loading';
-  loadingWrap.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
-  const txt = document.createElement('span');
-  txt.className = 'loading-text';
-  txt.textContent = `${label}가 종합 중…`;
-  loadingWrap.appendChild(txt);
-  section.appendChild(loadingWrap);
+  const loadingEl = createCouncilLoadingEl(`${label}가 최종 종합 중…`);
+  body.appendChild(loadingEl);
   scrollDown();
 
   try {
     const res = await fetch('/api/council/synthesize', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ question, claudeReply, gptReply, synthesizer, sessionId }),
+      body:    JSON.stringify({
+        question,
+        claudeReply:  debateData.claudeReply,
+        gptReply:     debateData.gptReply,
+        claudeReview: reviewData.claudeReview,
+        gptReview:    reviewData.gptReview,
+        synthesizer,
+        sessionId,
+        councilDraftMode,
+      }),
     });
     const data = await res.json();
-    loadingWrap.remove();
-    if (data.error) { appendCouncilError(container, data.error); return; }
-    showSynthesis(section, question, claudeReply, gptReply, data);
+    loadingEl.remove();
+    if (data.error) { appendCouncilError(body, data.error); return; }
+    renderSynthesis(body, question, debateData, reviewData, data);
   } catch (_) {
-    loadingWrap.remove();
-    appendCouncilError(container, '서버에 연결할 수 없습니다.');
+    loadingEl.remove();
+    appendCouncilError(body, '서버에 연결할 수 없습니다.');
   }
 }
 
-function showSynthesis(section, question, claudeReply, gptReply, data) {
-  // 개별 답변 접기
-  section.querySelectorAll('.debate-answer').forEach(d => d.open = false);
+// ── 종합 결과 렌더링 ───────────────────────────────────────────────────────
+
+function renderSynthesis(body, question, debateData, reviewData, data) {
+  // 1차 답변 및 검토 접기
+  body.querySelectorAll('.debate-answer, .review-answer').forEach(d => d.open = false);
 
   const synthSection = document.createElement('div');
   synthSection.className = 'synthesis-section';
@@ -333,19 +437,24 @@ function showSynthesis(section, question, claudeReply, gptReply, data) {
   saveBtn.textContent = '노트로 저장';
   saveBtn.addEventListener('click', () => saveCouncilNote(saveBtn, {
     question,
-    claudeReply,
-    gptReply,
+    claudeReply:        debateData.claudeReply,
+    gptReply:           debateData.gptReply,
+    claudeReview:       reviewData.claudeReview,
+    gptReview:          reviewData.gptReview,
     divergence:         data.divergence,
     synthesis:          data.synthesis,
     synthesizer:        data.synthesizer,
     synthesizerModelId: data.synthesizerModelId,
     messageId:          data.messageId,
+    councilDraftMode,
   }));
 
   synthSection.append(synthLabel, synthBubble, saveBtn);
-  section.appendChild(synthSection);
+  body.appendChild(synthSection);
   scrollDown();
 }
+
+// ── 노트 저장 ──────────────────────────────────────────────────────────────
 
 async function saveCouncilNote(btn, data) {
   btn.disabled = true;
@@ -375,11 +484,11 @@ async function saveCouncilNote(btn, data) {
   }
 }
 
-function appendCouncilError(container, msg) {
+function appendCouncilError(body, msg) {
   const err = document.createElement('div');
   err.className = 'error-msg';
   err.textContent = `⚠️ ${msg}`;
-  container.appendChild(err);
+  body.appendChild(err);
   scrollDown();
 }
 
