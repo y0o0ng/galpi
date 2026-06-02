@@ -12,6 +12,7 @@ const Database = require('better-sqlite3');
 
 const VAULT_PATH = process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : null;
 const CONTEXT_N  = parseInt(process.env.CONTEXT_N  || '10');
+const HISTORY_CONTEXT_MESSAGES = CONTEXT_N * 2; // 최근 10턴 내외를 user/assistant 메시지 쌍으로 전달
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 const GPT_MODEL    = process.env.GPT_MODEL    || 'gpt-4o';
 const PORT         = parseInt(process.env.PORT || '3000');
@@ -96,10 +97,203 @@ const stmtInsertMessage = db.prepare(
 const stmtGetMessages = db.prepare(
   'SELECT role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC'
 );
+const stmtGetRecentMessages = db.prepare(`
+  SELECT role, content, model FROM (
+    SELECT role, content, model, created_at, id
+    FROM messages
+    WHERE session_id = ?
+    ORDER BY created_at DESC, id DESC
+    LIMIT ?
+  )
+  ORDER BY created_at ASC, id ASC
+`);
 
 function dbSaveMessage(sessionId, role, content, model = null) {
   stmtEnsureSession.run(sessionId);
   stmtInsertMessage.run(sessionId, role, content, model);
+}
+
+function hydrateSessionFromDb(sessionId) {
+  if (sessions[sessionId]) return sessions[sessionId];
+
+  sessions[sessionId] = stmtGetRecentMessages
+    .all(sessionId, HISTORY_CONTEXT_MESSAGES)
+    .map(m => ({ role: m.role, content: m.content, model: m.model }));
+
+  return sessions[sessionId];
+}
+
+function formatHistoryForModelContext(messages) {
+  return messages.map(msg => {
+    if (msg.role !== 'assistant' || !msg.model) {
+      return { role: msg.role, content: msg.content };
+    }
+
+    const content = String(msg.model).includes('의회')
+      ? extractCouncilSynthesis(msg.content)
+      : msg.content;
+
+    return {
+      role: 'assistant',
+      content: `[${msg.model}의 이전 답변]\n${content}`,
+    };
+  });
+}
+
+function buildCouncilTranscript({ question, claudeReply, gptReply, claudeReview, gptReview, divergence, synthesis, synthesizer }) {
+  const sections = [
+    `## 질문\n${question}`,
+    `## Claude 1차 답변\n${claudeReply || '응답 없음'}`,
+    `## GPT 1차 답변\n${gptReply || '응답 없음'}`,
+  ];
+
+  if (claudeReview || gptReview) {
+    sections.push(`## Claude의 GPT 검토\n${claudeReview || '검토 없음'}`);
+    sections.push(`## GPT의 Claude 검토\n${gptReview || '검토 없음'}`);
+  }
+
+  if (divergence) sections.push(`## 갈린 지점\n${divergence}`);
+  sections.push(`## 종합 (${synthesizer})\n${synthesis}`);
+  return sections.join('\n\n---\n\n');
+}
+
+function extractCouncilSynthesis(content) {
+  const text = String(content || '');
+  const match = text.match(/## 종합[^\n]*\n([\s\S]*)$/);
+  return match ? match[1].trim() : text;
+}
+
+function sanitizeTitle(title, fallback = '저장한 문서') {
+  const cleaned = String(title || fallback)
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60);
+  return cleaned || fallback;
+}
+
+function createNoteIdentity(title) {
+  const now    = new Date();
+  const pad    = (n) => String(n).padStart(2, '0');
+  const dateId = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const slug   = title.replace(/\s+/g, '-').replace(/[^\w가-힣\-]/g, '');
+  const rand   = Math.random().toString(36).slice(2, 6);
+  const fileId = `${dateId}-${rand}-${slug || 'note'}`;
+  const createdStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return { fileId, createdStr };
+}
+
+async function writeVaultNote(fileId, noteContent) {
+  const filepath = path.join(VAULT_PATH, fileId + '.md');
+  if (!filepath.startsWith(VAULT_PATH + path.sep) && filepath !== VAULT_PATH) {
+    throw new Error('잘못된 경로입니다.');
+  }
+
+  const tmpPath = filepath + '.tmp';
+  await fs.writeFile(tmpPath, noteContent, 'utf8');
+  await fs.rename(tmpPath, filepath);
+  await fs.access(filepath);
+}
+
+function parseJsonObject(text) {
+  const raw = String(text || '').trim();
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = fenced ? fenced[1].trim() : raw;
+  const objectMatch = body.match(/\{[\s\S]*\}/);
+  return JSON.parse(objectMatch ? objectMatch[0] : body);
+}
+
+function normalizeTag(tag) {
+  return String(tag || '')
+    .replace(/^#+/, '')
+    .replace(/[^\p{L}\p{N}_-]/gu, '')
+    .trim()
+    .slice(0, 30);
+}
+
+function formatCodexTags(tags) {
+  const normalized = [...new Set((Array.isArray(tags) ? tags : []).map(normalizeTag).filter(Boolean))]
+    .slice(0, 8);
+  return normalized.map(tag => `#${tag}`).join(' ');
+}
+
+function formatCodexLinks(links) {
+  if (!Array.isArray(links) || links.length === 0) return '';
+
+  const grouped = new Map();
+  links.slice(0, 8).forEach(link => {
+    const topic = String(link.topic || '관련 노트').replace(/\s+/g, ' ').trim().slice(0, 40);
+    const title = String(link.title || '').replace(/[\[\]\n]/g, '').trim().slice(0, 80);
+    if (!title) return;
+    const reason = String(link.reason || '관련 내용').replace(/\s+/g, ' ').trim().slice(0, 100);
+    const stars = '⭐'.repeat(Math.min(3, Math.max(1, Number.parseInt(link.strength, 10) || 1)));
+    if (!grouped.has(topic)) grouped.set(topic, []);
+    grouped.get(topic).push(`- ${stars} [[${title}]] — ${reason}`);
+  });
+
+  return [...grouped.entries()]
+    .map(([topic, rows]) => `**[${topic}]**\n${rows.join('\n')}`)
+    .join('\n\n');
+}
+
+// 지금은 GPT/Claude로 저장 메타데이터를 채우고, 나중에 Codex 정리 엔진으로 이 함수만 대체한다.
+async function generateDocumentMetadata(content) {
+  const fallbackTitle = sanitizeTitle(content.replace(/\n/g, ' ').slice(0, 40), '저장한 문서');
+  const candidates = await searchVault(content);
+  const candidateTitles = candidates.map(n => n.title).slice(0, 12);
+
+  const prompt = `사용자가 아래 내용을 옵시디언 노트로 저장하려고 한다.
+제목, 짧은 정리, 주제 태그, 기존 노트 연결 후보를 만들어라.
+
+규칙:
+- JSON 객체만 반환한다.
+- title: 한국어 10~30자
+- summary: 1~3문장
+- tags: 한국어/영어 태그 3~8개, # 없이
+- links: 기존 노트와 관련 있을 때만 작성
+- links[].title은 "기존 노트 후보"에 있는 제목을 정확히 사용한다.
+- links[].strength는 1~3 숫자다.
+
+기존 노트 후보:
+${candidateTitles.length ? candidateTitles.map(t => `- ${t}`).join('\n') : '- 없음'}
+
+저장할 내용:
+${content.slice(0, 6000)}
+
+반환 형식:
+{"title":"","summary":"","tags":[],"links":[{"topic":"","title":"","reason":"","strength":1}]}`;
+
+  try {
+    let text;
+    if (HAS_GPT) {
+      const r = await openai.chat.completions.create({
+        model: GPT_MODEL,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      text = r.choices[0].message.content;
+    } else if (HAS_CLAUDE) {
+      const r = await anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      text = r.content[0].text;
+    }
+
+    const parsed = parseJsonObject(text);
+    const allowedTitles = new Set(candidateTitles);
+    return {
+      title:   sanitizeTitle(parsed.title, fallbackTitle),
+      summary: String(parsed.summary || '').trim().slice(0, 800),
+      tags:    Array.isArray(parsed.tags) ? parsed.tags : [],
+      links:   Array.isArray(parsed.links)
+        ? parsed.links.filter(link => allowedTitles.has(String(link.title || '').trim()))
+        : [],
+    };
+  } catch (err) {
+    console.warn('저장 메타데이터 생성 실패:', err.message);
+    return { title: fallbackTitle, summary: '', tags: [], links: [] };
+  }
 }
 
 function getMemoryPath() {
@@ -157,14 +351,14 @@ app.post('/api/chat', async (req, res) => {
   if (model === 'gpt'    && !HAS_GPT)        return res.status(400).json({ error: 'GPT 키가 없습니다.' });
   if (message.length > 10000)                return res.status(400).json({ error: '메시지가 너무 깁니다 (최대 10,000자).' });
 
-  if (!sessions[sessionId]) sessions[sessionId] = [];
+  hydrateSessionFromDb(sessionId);
   const history = sessions[sessionId];
   history.push({ role: 'user', content: message });
 
   // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
   const memoryItems = await readMemoryItems();
   const resolvedNotes = await getContextNotesForQuestion(message, activeNotes);
-  const baseContext = history.slice(-CONTEXT_N);
+  const baseContext = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
   const context = memoryItems.length > 0 || resolvedNotes.length > 0
     ? [...baseContext.slice(0, -1), { role: 'user', content: buildContextMessage(message, resolvedNotes, memoryItems) }]
     : baseContext;
@@ -189,8 +383,8 @@ app.post('/api/chat', async (req, res) => {
       usedModel = GPT_MODEL;
     }
 
-    history.push({ role: 'assistant', content: reply });
-    sessions[sessionId] = sessions[sessionId].slice(-(CONTEXT_N * 2));
+    history.push({ role: 'assistant', content: reply, model: model === 'claude' ? 'Claude' : 'GPT' });
+    sessions[sessionId] = sessions[sessionId].slice(-HISTORY_CONTEXT_MESSAGES);
 
     dbSaveMessage(sessionId, 'user',      message, null);
     dbSaveMessage(sessionId, 'assistant', reply,   model === 'claude' ? 'Claude' : 'GPT');
@@ -213,6 +407,78 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // ─── 노트 저장 ────────────────────────────────────────────────────────────────
+
+app.post('/api/vault/save-document', async (req, res) => {
+  const content = String(req.body?.content || '').trim();
+  const originalText = String(req.body?.originalText || content).trim();
+  const sessionId = String(req.body?.sessionId || 'unknown').trim();
+  if (!content) return res.status(400).json({ error: '저장할 내용을 입력해주세요.' });
+  if (content.length > 20000) return res.status(400).json({ error: '저장할 내용이 너무 깁니다 (최대 20,000자).' });
+
+  try {
+    const metadata = await generateDocumentMetadata(content);
+    const title = sanitizeTitle(metadata.title);
+    const { fileId, createdStr } = createNoteIdentity(title);
+    const tagsBlock = formatCodexTags(metadata.tags);
+    const linksBlock = formatCodexLinks(metadata.links);
+
+    const noteContent = `---
+id: ${fileId}
+title: "${title.replace(/"/g, "'")}"
+aliases: []
+created: ${createdStr}
+mode: user_document
+note_type: user_manual
+archived: false
+codex_status: pending
+source_session: ${sessionId || 'unknown'}
+---
+
+# ${title}
+
+## 문서
+${content}
+
+## 정리
+${metadata.summary || '정리 없음'}
+
+## 🏷️ 주제 태그
+<!-- CODEX-TAGS-START -->
+${tagsBlock}
+<!-- CODEX-TAGS-END -->
+
+## 🔗 연결
+<!-- CODEX-LINKS-START -->
+${linksBlock}
+<!-- CODEX-LINKS-END -->
+
+---
+*생성: ${createdStr} · 사용자 저장 문서 · 정리 엔진: ${HAS_GPT ? 'GPT' : HAS_CLAUDE ? 'Claude' : 'fallback'}*
+`;
+
+    await writeVaultNote(fileId, noteContent);
+
+    if (sessionId && sessionId !== 'unknown') {
+      hydrateSessionFromDb(sessionId);
+      sessions[sessionId].push({ role: 'user', content: originalText });
+      sessions[sessionId].push({ role: 'assistant', content: `노트 저장됨: ${title}`, model: '저장' });
+      sessions[sessionId] = sessions[sessionId].slice(-HISTORY_CONTEXT_MESSAGES);
+      dbSaveMessage(sessionId, 'user', originalText, null);
+      dbSaveMessage(sessionId, 'assistant', `노트 저장됨: ${title}`, '저장');
+    }
+
+    res.json({
+      success: true,
+      filename: fileId + '.md',
+      title,
+      tags: metadata.tags,
+      links: metadata.links,
+    });
+  } catch (err) {
+    console.error('문서 저장 오류:', err.message);
+    res.status(500).json({ error: `문서 저장 실패: ${err.message}` });
+  }
+});
 
 app.post('/api/save-note', async (req, res) => {
   const { question, answer, model, modelId, sessionId, messageId } = req.body;
@@ -316,6 +582,7 @@ app.get('/api/config', (_req, res) => {
     claudeModel: CLAUDE_MODEL,
     gptModel:    GPT_MODEL,
     contextN:    CONTEXT_N,
+    contextMessages: HISTORY_CONTEXT_MESSAGES,
     hasClaude:   HAS_CLAUDE,
     hasGpt:      HAS_GPT,
   });
@@ -505,11 +772,7 @@ app.get('/api/sessions/:id', (req, res) => {
   const messages = stmtGetMessages.all(id);
 
   // 인메모리 컨텍스트 복원 (서버 재시작 후 AI가 이전 대화 참고 가능)
-  if (messages.length > 0 && !sessions[id]) {
-    sessions[id] = messages.slice(-CONTEXT_N * 2).map(m => ({
-      role: m.role, content: m.content,
-    }));
-  }
+  hydrateSessionFromDb(id);
 
   res.json({ messages });
 });
@@ -677,7 +940,7 @@ app.post('/api/council/debate', async (req, res) => {
 
   const mode = normalizeCouncilDraftMode(councilDraftMode);
 
-  if (!sessions[sessionId]) sessions[sessionId] = [];
+  hydrateSessionFromDb(sessionId);
   const history = sessions[sessionId];
 
   // 1차 답변 프롬프트 (mode에 따라 분기, 사용자 메모리 + 활성/자동 검색 노트 주입)
@@ -687,7 +950,7 @@ app.post('/api/council/debate', async (req, res) => {
     ? buildContextMessage(question, resolvedNotes, memoryItems)
     : question;
   const firstAnswerPrompt = buildFirstAnswerPrompt(effectiveQuestion, mode);
-  const context = [...history.slice(-CONTEXT_N), { role: 'user', content: firstAnswerPrompt }];
+  const context = [...formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES)), { role: 'user', content: firstAnswerPrompt }];
   const maxTokens = mode === 'compressed'
     ? COUNCIL_TOKEN_LIMITS.compressedFirst
     : mode === 'deep'
@@ -804,14 +1067,25 @@ app.post('/api/council/synthesize', async (req, res) => {
     }
 
     const { divergence, synthesis } = parseSynthesisResponse(rawText);
-
-    if (!sessions[sessionId]) sessions[sessionId] = [];
-    sessions[sessionId].push({ role: 'user',      content: question  });
-    sessions[sessionId].push({ role: 'assistant', content: synthesis });
-
     const synthLabel = synthesizer === 'claude' ? 'Claude' : 'GPT';
+    const transcript = buildCouncilTranscript({
+      question,
+      claudeReply,
+      gptReply,
+      claudeReview,
+      gptReview,
+      divergence,
+      synthesis,
+      synthesizer: synthLabel,
+    });
+
+    hydrateSessionFromDb(sessionId);
+    sessions[sessionId].push({ role: 'user',      content: question  });
+    sessions[sessionId].push({ role: 'assistant', content: synthesis, model: `${synthLabel} (의회)` });
+    sessions[sessionId] = sessions[sessionId].slice(-HISTORY_CONTEXT_MESSAGES);
+
     dbSaveMessage(sessionId, 'user',      question,  null);
-    dbSaveMessage(sessionId, 'assistant', synthesis, `${synthLabel} (의회)`);
+    dbSaveMessage(sessionId, 'assistant', transcript, `${synthLabel} (의회)`);
 
     res.json({
       divergence,
@@ -949,5 +1223,5 @@ app.listen(PORT, '127.0.0.1', () => {
   console.log(`   볼트:     ${VAULT_PATH}`);
   console.log(`   Claude:   ${CLAUDE_MODEL}`);
   console.log(`   GPT:      ${GPT_MODEL}`);
-  console.log(`   컨텍스트: 최근 ${CONTEXT_N}개 메시지\n`);
+  console.log(`   컨텍스트: 최근 ${CONTEXT_N}턴 내외 (${HISTORY_CONTEXT_MESSAGES}개 메시지)\n`);
 });

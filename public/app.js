@@ -7,12 +7,23 @@ const sessionId = (() => {
   localStorage.setItem('councilSessionId', newId);
   return newId;
 })();
+const uiHistoryKey = `councilUiHistory:${sessionId}`;
+const activeNotesKey = `councilActiveNotes:${sessionId}`;
 let currentModel     = 'claude';
 let isLoading        = false;
 let councilMode      = false;
 let councilAvailable = false;
 let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
-let activeNotes     = [];            // 활성 참조 노트 목록
+let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
+let isRestoringHistory = false;
+const slashCommands = [
+  { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 활성 컨텍스트에 추가' },
+  { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
+  { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
+  { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
+  { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
+  { command: '/memory clear', title: '메모리 초기화', description: '저장된 사용자 메모리 전체 삭제' },
+];
 
 // ─── 초기화 ──────────────────────────────────────────────────────────────────
 
@@ -74,12 +85,23 @@ async function init() {
   document.getElementById('send-btn').addEventListener('click', sendMessage);
 
   document.getElementById('input').addEventListener('keydown', e => {
+    if (e.key === 'Escape') hideCommandPalette();
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
 
-  document.getElementById('input').addEventListener('input', autoResize);
+  document.getElementById('input').addEventListener('input', e => {
+    autoResize(e);
+    updateCommandPalette(e.target.value);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#command-palette') && !e.target.closest('#input')) {
+      hideCommandPalette();
+    }
+  });
 
   await loadHistory();
+  updateNotesBar();
 }
 
 // ─── 히스토리 복원 ───────────────────────────────────────────────────────────
@@ -87,19 +109,48 @@ async function init() {
 async function loadHistory() {
   try {
     const res = await fetch(`/api/sessions/${sessionId}`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      restoreLocalUiHistory();
+      return;
+    }
     const { messages } = await res.json();
-    if (!messages || messages.length === 0) return;
+    if (!messages || messages.length === 0) {
+      restoreLocalUiHistory();
+      return;
+    }
 
     document.querySelector('.welcome')?.remove();
-    messages.forEach(msg => {
-      if (msg.role === 'user') {
-        appendUserBubble(msg.content);
-      } else {
-        appendHistoryBubble(msg.content, msg.model);
-      }
+    isRestoringHistory = true;
+    try {
+      messages.forEach(msg => {
+        if (msg.role === 'user') {
+          appendUserBubble(msg.content);
+        } else {
+          appendHistoryBubble(msg.content, msg.model);
+        }
+      });
+    } finally {
+      isRestoringHistory = false;
+    }
+  } catch (_) {
+    restoreLocalUiHistory();
+  }
+}
+
+function restoreLocalUiHistory() {
+  const history = loadUiHistory();
+  if (history.length === 0) return;
+
+  document.querySelector('.welcome')?.remove();
+  isRestoringHistory = true;
+  try {
+    history.forEach(msg => {
+      if (msg.role === 'user') appendUserBubble(msg.content);
+      else appendHistoryBubble(msg.content, msg.model);
     });
-  } catch (_) {}
+  } finally {
+    isRestoringHistory = false;
+  }
 }
 
 function appendHistoryBubble(content, model) {
@@ -117,6 +168,35 @@ function appendHistoryBubble(content, model) {
   group.append(label, bubble);
   getMessages().appendChild(group);
   scrollDown();
+}
+
+function loadUiHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(uiHistoryKey) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveUiMessage(role, content, model = null) {
+  if (isRestoringHistory) return;
+  const history = loadUiHistory();
+  history.push({ role, content, model });
+  localStorage.setItem(uiHistoryKey, JSON.stringify(history.slice(-100)));
+}
+
+function loadStoredActiveNotes() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(activeNotesKey) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveActiveNotes() {
+  localStorage.setItem(activeNotesKey, JSON.stringify(activeNotes));
 }
 
 // ─── 모델 선택 ────────────────────────────────────────────────────────────────
@@ -145,6 +225,7 @@ function toggleCouncil() {
 function sendMessage() {
   const inputEl = document.getElementById('input');
   const text = inputEl.value.trim();
+  hideCommandPalette();
   if (text === '/memory' || text.startsWith('/memory ')) {
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -158,8 +239,93 @@ function sendMessage() {
     if (query) handleSearch(query);
     return;
   }
+  if (text.startsWith('/save ')) {
+    const content = text.slice(6).trim();
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    if (content) handleDocumentSave(text, content);
+    return;
+  }
+  const saveContent = extractSaveRequestContent(text);
+  if (saveContent) {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleDocumentSave(text, saveContent);
+    return;
+  }
   if (councilMode) sendCouncilMessage();
   else sendSingleMessage();
+}
+
+function extractSaveRequestContent(text) {
+  const trimmed = text.trim();
+  const patterns = [
+    /\s*(?:저장해줘|저장해둬|저장해놔|저장해 두자|저장해 줘|노트로 저장해줘|노트로 저장해둬|옵시디언에 넣어줘|옵시디언에 저장해줘)\s*$/u,
+    /^\s*(?:저장해줘|저장해둬|노트로 저장해줘|옵시디언에 넣어줘)[:\s]+/u,
+  ];
+
+  for (const pattern of patterns) {
+    if (!pattern.test(trimmed)) continue;
+    const content = trimmed.replace(pattern, '').trim();
+    return content.length >= 8 ? content : null;
+  }
+
+  return null;
+}
+
+// ─── 슬래시 명령어 팔레트 ─────────────────────────────────────────────────────
+
+function updateCommandPalette(value) {
+  const palette = document.getElementById('command-palette');
+  if (!palette) return;
+
+  if (!value.startsWith('/')) {
+    hideCommandPalette();
+    return;
+  }
+
+  const matched = slashCommands.filter(cmd => cmd.command.startsWith(value) || value.startsWith(cmd.command.trim()));
+  const commands = matched.length > 0 ? matched : slashCommands;
+  renderCommandPalette(commands);
+}
+
+function renderCommandPalette(commands) {
+  const palette = document.getElementById('command-palette');
+  if (!palette) return;
+
+  palette.innerHTML = '';
+  commands.forEach(cmd => {
+    const item = document.createElement('button');
+    item.className = 'command-item';
+    item.type = 'button';
+
+    const command = document.createElement('span');
+    command.className = 'command-name';
+    command.textContent = cmd.command.trim();
+
+    const meta = document.createElement('span');
+    meta.className = 'command-meta';
+    meta.textContent = `${cmd.title} · ${cmd.description}`;
+
+    item.append(command, meta);
+    item.addEventListener('click', () => {
+      const input = document.getElementById('input');
+      input.value = cmd.command;
+      input.focus();
+      input.selectionStart = input.selectionEnd = input.value.length;
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 130) + 'px';
+      hideCommandPalette();
+    });
+    palette.appendChild(item);
+  });
+
+  palette.style.display = 'flex';
+}
+
+function hideCommandPalette() {
+  const palette = document.getElementById('command-palette');
+  if (palette) palette.style.display = 'none';
 }
 
 // ─── 단일 모드 ────────────────────────────────────────────────────────────────
@@ -494,8 +660,10 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
   synthBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.synthesis));
 
   const saveBtn = document.createElement('button');
-  saveBtn.className = 'save-btn';
-  saveBtn.textContent = '노트로 저장';
+  saveBtn.className = 'save-btn icon-save-btn';
+  saveBtn.title = '노트로 저장';
+  saveBtn.setAttribute('aria-label', '노트로 저장');
+  saveBtn.innerHTML = saveIconSvg();
   saveBtn.addEventListener('click', () => saveCouncilNote(saveBtn, {
     question,
     claudeReply:        debateData.claudeReply,
@@ -512,14 +680,32 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
 
   synthSection.append(synthLabel, synthBubble, saveBtn);
   body.appendChild(synthSection);
+  saveUiMessage('assistant', buildCouncilTranscript(question, debateData, reviewData, data), `종합 (${data.synthesizer})`);
   scrollDown();
+}
+
+function buildCouncilTranscript(question, debateData, reviewData, data) {
+  const sections = [
+    `## 질문\n${question}`,
+    `## Claude 1차 답변\n${debateData.claudeReply || '응답 없음'}`,
+    `## GPT 1차 답변\n${debateData.gptReply || '응답 없음'}`,
+  ];
+
+  if (reviewData.claudeReview || reviewData.gptReview) {
+    sections.push(`## Claude의 GPT 검토\n${reviewData.claudeReview || '검토 없음'}`);
+    sections.push(`## GPT의 Claude 검토\n${reviewData.gptReview || '검토 없음'}`);
+  }
+
+  if (data.divergence) sections.push(`## 갈린 지점\n${data.divergence}`);
+  sections.push(`## 종합 (${data.synthesizer})\n${data.synthesis}`);
+  return sections.join('\n\n---\n\n');
 }
 
 // ── 노트 저장 ──────────────────────────────────────────────────────────────
 
 async function saveCouncilNote(btn, data) {
   btn.disabled = true;
-  btn.textContent = '저장 중…';
+  btn.innerHTML = loadingIconSvg();
   try {
     const res = await fetch('/api/council/save-note', {
       method:  'POST',
@@ -528,17 +714,23 @@ async function saveCouncilNote(btn, data) {
     });
     const result = await res.json();
     if (result.success) {
-      btn.textContent = '✓ 저장됨';
+      btn.innerHTML = checkIconSvg();
+      btn.title = '저장됨';
+      btn.setAttribute('aria-label', '저장됨');
       btn.classList.add('saved');
       showToast(`저장됨: ${result.title}`);
     } else {
-      btn.textContent = '다시 시도';
+      btn.innerHTML = saveIconSvg();
+      btn.title = '다시 시도';
+      btn.setAttribute('aria-label', '다시 시도');
       btn.classList.add('error');
       btn.disabled = false;
       showToast(`오류: ${result.error}`);
     }
   } catch (_) {
-    btn.textContent = '다시 시도';
+    btn.innerHTML = saveIconSvg();
+    btn.title = '다시 시도';
+    btn.setAttribute('aria-label', '다시 시도');
     btn.classList.add('error');
     btn.disabled = false;
     showToast('서버 연결 오류');
@@ -568,6 +760,61 @@ async function handleSearch(query) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다.');
   }
+}
+
+async function handleDocumentSave(originalText, content) {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble(originalText);
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await fetch('/api/vault/save-document', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ content, originalText, sessionId }),
+    });
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (data.error) {
+      appendError(data.error);
+      return;
+    }
+
+    if (data.filename && data.title) {
+      addActiveNote({ filename: data.filename, title: data.title });
+      updateNotesBar();
+    }
+    renderDocumentSaveResult(data);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
+function renderDocumentSaveResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = document.createElement('div');
+  label.className = 'model-label';
+  label.textContent = '저장';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = `노트 저장됨: ${data.title}`;
+
+  group.append(label, bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, '저장');
+  scrollDown();
 }
 
 function renderSearchResults(results) {
@@ -619,11 +866,13 @@ function makeNoteCard(note) {
 function addActiveNote(note) {
   if (!activeNotes.find(n => n.filename === note.filename)) {
     activeNotes.push({ filename: note.filename, title: note.title });
+    saveActiveNotes();
   }
 }
 
 function removeActiveNote(filename) {
   activeNotes = activeNotes.filter(n => n.filename !== filename);
+  saveActiveNotes();
   updateNotesBar();
 }
 
@@ -736,6 +985,7 @@ function renderMemoryResult(items, action) {
   bubble.textContent = `${title}\n\n${body}`;
   group.append(label, bubble);
   getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Memory');
   scrollDown();
 }
 
@@ -751,7 +1001,7 @@ function appendCouncilError(body, msg) {
 
 async function saveNote(btn, data) {
   btn.disabled = true;
-  btn.textContent = '저장 중…';
+  btn.innerHTML = loadingIconSvg();
 
   try {
     const res = await fetch('/api/save-note', {
@@ -768,17 +1018,23 @@ async function saveNote(btn, data) {
     });
     const result = await res.json();
     if (result.success) {
-      btn.textContent = '✓ 저장됨';
+      btn.innerHTML = checkIconSvg();
+      btn.title = '저장됨';
+      btn.setAttribute('aria-label', '저장됨');
       btn.classList.add('saved');
       showToast(`저장됨: ${result.title}`);
     } else {
-      btn.textContent = '다시 시도';
+      btn.innerHTML = saveIconSvg();
+      btn.title = '다시 시도';
+      btn.setAttribute('aria-label', '다시 시도');
       btn.classList.add('error');
       btn.disabled = false;
       showToast(`오류: ${result.error}`);
     }
   } catch (_) {
-    btn.textContent = '다시 시도';
+    btn.innerHTML = saveIconSvg();
+    btn.title = '다시 시도';
+    btn.setAttribute('aria-label', '다시 시도');
     btn.classList.add('error');
     btn.disabled = false;
     showToast('서버 연결 오류');
@@ -810,6 +1066,7 @@ function appendUserBubble(text) {
   bubble.textContent = text;
   group.appendChild(bubble);
   getMessages().appendChild(group);
+  saveUiMessage('user', text);
   scrollDown();
 }
 
@@ -826,13 +1083,28 @@ function appendAssistantBubble(data) {
   bubble.innerHTML = DOMPurify.sanitize(marked.parse(data.reply));
 
   const saveBtn = document.createElement('button');
-  saveBtn.className = 'save-btn';
-  saveBtn.textContent = '노트로 저장';
+  saveBtn.className = 'save-btn icon-save-btn';
+  saveBtn.title = '노트로 저장';
+  saveBtn.setAttribute('aria-label', '노트로 저장');
+  saveBtn.innerHTML = saveIconSvg();
   saveBtn.addEventListener('click', () => saveNote(saveBtn, data));
 
   group.append(label, bubble, saveBtn);
   getMessages().appendChild(group);
+  saveUiMessage('assistant', data.reply, data.model);
   scrollDown();
+}
+
+function saveIconSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`;
+}
+
+function checkIconSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`;
+}
+
+function loadingIconSvg() {
+  return `<svg class="spin-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"></path></svg>`;
 }
 
 function appendLoading() {
