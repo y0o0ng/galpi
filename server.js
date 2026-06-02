@@ -98,9 +98,20 @@ db.exec(`
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
+  CREATE TABLE IF NOT EXISTS codex_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    note_filenames_json TEXT NOT NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    started_at INTEGER,
+    finished_at INTEGER
+  );
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_notes_codex_status ON notes(codex_status, archived);
   CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
+  CREATE INDEX IF NOT EXISTS idx_codex_jobs_status ON codex_jobs(status, created_at);
 `);
 
 const stmtEnsureSession = db.prepare(`
@@ -126,6 +137,34 @@ const stmtUpsertNote = db.prepare(`
     source_session = excluded.source_session,
     source_message = excluded.source_message,
     updated_at = strftime('%s','now')
+`);
+const stmtGetNoteStatusCounts = db.prepare(`
+  SELECT codex_status AS codexStatus, COUNT(*) AS count
+  FROM notes
+  WHERE archived = 0
+  GROUP BY codex_status
+`);
+const stmtGetPendingNotes = db.prepare(`
+  SELECT filename, title, note_type AS noteType, codex_status AS codexStatus
+  FROM notes
+  WHERE archived = 0 AND codex_status = 'pending'
+  ORDER BY created_at ASC, id ASC
+`);
+const stmtCreateCodexJob = db.prepare(`
+  INSERT INTO codex_jobs (status, note_filenames_json)
+  VALUES ('pending', ?)
+`);
+const stmtUpdateNoteCodexStatus = db.prepare(`
+  UPDATE notes
+  SET codex_status = ?, updated_at = strftime('%s','now')
+  WHERE filename = ?
+`);
+const stmtGetRecentCodexJobs = db.prepare(`
+  SELECT id, status, note_filenames_json AS noteFilenamesJson, attempt_count AS attemptCount,
+         error, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt
+  FROM codex_jobs
+  ORDER BY created_at DESC, id DESC
+  LIMIT ?
 `);
 const stmtGetMessages = db.prepare(
   'SELECT role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC'
@@ -165,6 +204,21 @@ function dbUpsertNote({
     sourceMessage: sourceMessage || null,
   });
 }
+
+const createCodexJobFromPending = db.transaction((limit = 5) => {
+  const notes = stmtGetPendingNotes.all().slice(0, limit);
+  if (notes.length === 0) return null;
+
+  const filenames = notes.map(note => note.filename);
+  const result = stmtCreateCodexJob.run(JSON.stringify(filenames));
+  filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('queued', filename));
+
+  return {
+    id: result.lastInsertRowid,
+    status: 'pending',
+    notes: notes.map(note => ({ ...note, codexStatus: 'queued' })),
+  };
+});
 
 function hydrateSessionFromDb(sessionId) {
   if (sessions[sessionId]) return sessions[sessionId];
@@ -781,6 +835,54 @@ app.post('/api/notes/backfill', async (_req, res) => {
   try {
     const result = await backfillNotesFromVault();
     res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── 정리 상태 조회 ─────────────────────────────────────────────────────────
+
+app.get('/api/organize/status', (_req, res) => {
+  const counts = {
+    pending: 0,
+    queued: 0,
+    running: 0,
+    processed: 0,
+    failed: 0,
+    needsManualCheck: 0,
+  };
+
+  stmtGetNoteStatusCounts.all().forEach(row => {
+    if (row.codexStatus === 'needs_manual_check') counts.needsManualCheck = row.count;
+    else if (Object.hasOwn(counts, row.codexStatus)) counts[row.codexStatus] = row.count;
+  });
+
+  res.json({
+    success: true,
+    ...counts,
+    notes: stmtGetPendingNotes.all(),
+    jobs: stmtGetRecentCodexJobs.all(5).map(({ noteFilenamesJson, ...job }) => ({
+      ...job,
+      noteFilenames: JSON.parse(noteFilenamesJson),
+    })),
+  });
+});
+
+app.post('/api/organize/queue', (_req, res) => {
+  try {
+    const job = createCodexJobFromPending(5);
+    if (!job) {
+      res.json({ success: true, created: false, message: '정리 대기 노트가 없습니다.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      created: true,
+      jobId: job.id,
+      status: job.status,
+      notes: job.notes,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -19,6 +19,7 @@ let isRestoringHistory = false;
 const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 활성 컨텍스트에 추가' },
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
+  { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
@@ -237,6 +238,12 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     if (query) handleSearch(query);
+    return;
+  }
+  if (text === '/organize') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleOrganizeStatus();
     return;
   }
   if (text.startsWith('/save ')) {
@@ -760,6 +767,59 @@ async function handleSearch(query) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다.');
   }
+}
+
+async function handleOrganizeStatus() {
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/organize');
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await fetch('/api/organize/status');
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (data.error) {
+      appendError(data.error);
+      return;
+    }
+
+    renderOrganizeStatus(data);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  }
+}
+
+function renderOrganizeStatus(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = document.createElement('div');
+  label.className = 'model-label';
+  label.textContent = 'Organize';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  const notes = Array.isArray(data.notes) ? data.notes : [];
+  const rows = notes.slice(0, 10).map((note, index) =>
+    `${index + 1}. ${note.title} (${note.noteType})`
+  );
+  const more = notes.length > 10 ? `\n...외 ${notes.length - 10}개` : '';
+
+  bubble.textContent = [
+    `정리 대기: ${data.pending || 0}개`,
+    `완료: ${data.processed || 0}개`,
+    `실패: ${data.failed || 0}개`,
+    `수동 확인: ${data.needsManualCheck || 0}개`,
+    rows.length ? `\n대기 노트:\n${rows.join('\n')}${more}` : '\n대기 노트 없음',
+  ].join('\n');
+
+  group.append(label, bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Organize');
+  scrollDown();
 }
 
 async function handleDocumentSave(originalText, content) {

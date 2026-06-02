@@ -1,0 +1,95 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const VAULT_PATH = process.env.VAULT_PATH
+  ? path.resolve(process.env.VAULT_PATH)
+  : path.join(ROOT, 'ai-council-vault');
+
+const REQUIRED_FRONTMATTER = [
+  'title',
+  'note_type',
+  'archived',
+  'codex_status',
+  'ai_readable',
+  'knowledge_type',
+  'confidence',
+];
+
+const REQUIRED_MARKERS = [
+  '<!-- CODEX-TAGS-START -->',
+  '<!-- CODEX-TAGS-END -->',
+  '<!-- CODEX-LINKS-START -->',
+  '<!-- CODEX-LINKS-END -->',
+];
+
+function parseFrontmatter(raw) {
+  const match = raw.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return null;
+
+  const fields = {};
+  match[1].split('\n').forEach(line => {
+    const parts = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!parts) return;
+    fields[parts[1]] = parts[2].trim().replace(/^"(.*)"$/, '$1');
+  });
+
+  return fields;
+}
+
+function shouldSkipFile(filename) {
+  return !filename.endsWith('.md') || filename.startsWith('.');
+}
+
+function validateFile(filename) {
+  const filepath = path.join(VAULT_PATH, filename);
+  const raw = fs.readFileSync(filepath, 'utf8');
+  const warnings = [];
+  const frontmatter = parseFrontmatter(raw);
+
+  if (!frontmatter) {
+    warnings.push('frontmatter 없음');
+  } else {
+    REQUIRED_FRONTMATTER.forEach(field => {
+      if (!(field in frontmatter) || frontmatter[field] === '') {
+        warnings.push(`frontmatter 누락: ${field}`);
+      }
+    });
+
+    if (String(frontmatter.archived).toLowerCase() === 'true') {
+      warnings.push('archived 노트: Codex 정리 대상에서 제외 필요');
+    }
+  }
+
+  REQUIRED_MARKERS.forEach(marker => {
+    if (!raw.includes(marker)) warnings.push(`CODEX 마커 누락: ${marker}`);
+  });
+
+  return warnings;
+}
+
+function main() {
+  const files = fs.readdirSync(VAULT_PATH).filter(filename => !shouldSkipFile(filename));
+  const failures = [];
+
+  files.forEach(filename => {
+    const warnings = validateFile(filename);
+    if (warnings.length > 0) failures.push({ filename, warnings });
+  });
+
+  if (failures.length === 0) {
+    console.log(`Codex validation passed: ${files.length} notes checked.`);
+    return;
+  }
+
+  console.error(`Codex validation failed: ${failures.length}/${files.length} notes need attention.`);
+  failures.forEach(({ filename, warnings }) => {
+    console.error(`\n${filename}`);
+    warnings.forEach(warning => console.error(`- ${warning}`));
+  });
+  process.exit(1);
+}
+
+main();
