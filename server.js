@@ -921,10 +921,15 @@ ${qaEntry}
 `;
 }
 
-function formatQaLogEntry({ qaId, question, answer, model }) {
+function formatQaLogEntry({ qaId, question, answer, model, isMemo = false }) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  if (isMemo) {
+    return `### ${stamp} · 메모
+<!-- qa_id: ${qaId || createQaId()} -->
+**내용:** ${String(answer || '').trim()}`;
+  }
   const modelLabel = model ? ` · ${model}` : '';
   return `### ${stamp}${modelLabel}
 <!-- qa_id: ${qaId || createQaId()} -->
@@ -983,28 +988,29 @@ async function findBestTopicNote(signalText, queryEmbedding) {
   return null;
 }
 
-async function autoAppendTopicNote({ question, answer, sessionId, userMessageId, assistantMessageId, model }) {
-  const classification = classifyAutoSaveValue(question, answer);
-  if (!classification.save) {
-    logAutoSaveDecision({
-      sessionId,
-      userMessageId,
-      assistantMessageId,
-      model,
-      decision: 'skip',
-      reason: classification.reason,
-      question,
-      answer,
-    });
-    return null;
+async function autoAppendTopicNote({ question, answer, sessionId, userMessageId, assistantMessageId, model, isMemo = false }) {
+  // 메모는 필터 없이 바로 저장
+  if (!isMemo) {
+    const classification = classifyAutoSaveValue(question, answer);
+    if (!classification.save) {
+      logAutoSaveDecision({
+        sessionId, userMessageId, assistantMessageId, model,
+        decision: 'skip', reason: classification.reason, question, answer,
+      });
+      return null;
+    }
   }
 
-  const signalText = `${question}\n${answer.slice(0, 1200)}`;
+  const signalText = isMemo
+    ? String(answer || '').slice(0, 1200)
+    : `${question}\n${answer.slice(0, 1200)}`;
   const queryEmbedding = await generateEmbedding(signalText);
   const existing = await findBestTopicNote(signalText, queryEmbedding);
-  const title = existing ? existing.title : await generateTopicTitle(question, answer);
+  const title = existing
+    ? existing.title
+    : (isMemo ? await generateTopicTitle(answer, answer) : await generateTopicTitle(question, answer));
   const qaId = createQaId();
-  const entry = formatQaLogEntry({ qaId, question, answer, model });
+  const entry = formatQaLogEntry({ qaId, question, answer, model, isMemo });
 
   if (existing) {
     const filepath = path.join(VAULT_PATH, existing.filename);
@@ -1485,62 +1491,19 @@ app.post('/api/vault/save-document', async (req, res) => {
   if (content.length > 20000) return res.status(400).json({ error: '저장할 내용이 너무 깁니다 (최대 20,000자).' });
 
   try {
-    const metadata = await generateDocumentMetadata(content);
-    const title = sanitizeTitle(metadata.title);
-    const { fileId, createdStr } = createNoteIdentity(title);
-
-    const noteContent = `---
-id: ${fileId}
-title: "${title.replace(/"/g, "'")}"
-aliases: []
-created: ${createdStr}
-updated: ${createdStr}
-mode: user_document
-note_type: user_manual
-archived: false
-codex_status: pending
-ai_readable: true
-knowledge_type: user_document
-confidence: medium
-source_session: ${sessionId || 'unknown'}
-source_message: unknown
----
-
-# ${title}
-
-## AI 회수 힌트
-- 핵심 개념: ${title}
-- 노트 성격: 사용자 저장 문서
-- 다시 꺼낼 상황: 사용자가 이 문서나 아이디어를 바탕으로 후속 질문을 할 때
-- 연결 후보: Codex가 추후 보강
-- 신뢰도: medium
-
-## 문서
-${content}
-
-## 정리
-${metadata.summary || '정리 없음'}
-
-## 🏷️ 주제 태그
-<!-- CODEX-TAGS-START -->
-<!-- CODEX-TAGS-END -->
-
-## 🔗 연결
-<!-- CODEX-LINKS-START -->
-<!-- CODEX-LINKS-END -->
-
----
-*생성: ${createdStr} · 사용자 저장 문서 · 정리 엔진: Codex pending*
-`;
-
-    const queuedJob = await saveVaultNoteRecord({
-      fileId,
-      title,
-      noteType: 'user_manual',
-      noteContent,
+    // 토픽 파이프라인으로 저장
+    const result = await autoAppendTopicNote({
+      question: null,   // 메모 형식 (질문 없음)
+      answer: content,
       sessionId,
-      codexStatus: 'pending',
+      userMessageId: null,
+      assistantMessageId: null,
+      model: null,
+      isMemo: true,
     });
+
+    const title = result?.title || '저장됨';
+    const filename = result?.filename || '';
 
     if (sessionId && sessionId !== 'unknown') {
       hydrateSessionFromDb(sessionId);
@@ -1551,16 +1514,12 @@ ${metadata.summary || '정리 없음'}
       dbSaveMessage(sessionId, 'assistant', `노트 저장됨: ${title}`, '저장');
     }
 
-    res.json({
-      success: true,
-      filename: fileId + '.md',
-      title,
-      queuedJob,
-    });
+    return res.json({ success: true, filename, title, action: result?.action });
   } catch (err) {
-    console.error('문서 저장 오류:', err.message);
-    res.status(500).json({ error: `문서 저장 실패: ${err.message}` });
+    console.error('save-document 오류:', err.message);
+    return res.status(500).json({ error: err.message });
   }
+
 });
 
 app.post('/api/save-note', async (req, res) => {
