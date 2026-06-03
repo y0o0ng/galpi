@@ -727,6 +727,47 @@ function makeTopicTitle(question) {
   return sanitizeTitle(compact.slice(0, 28), '새 토픽');
 }
 
+function updateFrontmatterTitle(raw, newTitle) {
+  const escaped = newTitle.replace(/"/g, '\\"');
+  return raw
+    .replace(/^title:\s*"?[^"\n]*"?\s*$/m, `title: "${escaped}"`)
+    .replace(/^# .+$/m, `# ${newTitle}`);
+}
+
+async function regenerateTopicTitle(raw) {
+  const qaLog = extractMarkerBody(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
+  const entries = splitQaLogEntries(qaLog);
+  if (entries.length < 2) return null; // 1개일 땐 기존 제목 유지
+
+  const digest = entries
+    .slice(-6) // 최근 6개만
+    .map(e => e.replace(/<!-- qa_id:.*?-->/g, '').replace(/^###.*\n/, '').trim())
+    .join('\n---\n')
+    .slice(0, 1200);
+
+  const prompt = `다음은 하나의 토픽 노트에 쌓인 대화들이야. 이 모든 대화를 관통하는 핵심 주제를 가장 짧고 단순하게 2~4단어로 지어줘. 대화가 많을수록 더 추상적이고 단순한 제목이 좋아. 제목만 반환해. 따옴표·특수문자 없이.
+
+${digest}`;
+
+  try {
+    if (HAS_CLAUDE) {
+      const r = await anthropic.messages.create({
+        model: CLAUDE_MODEL, max_tokens: 20,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      return sanitizeTitle(r.content[0].text.trim(), null);
+    }
+    if (HAS_GPT) {
+      const r = await openai.chat.completions.create({
+        model: GPT_MODEL, max_completion_tokens: 20,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      return sanitizeTitle(r.choices[0].message.content.trim(), null);
+    }
+  } catch { /* 실패 시 null 반환 → 기존 제목 유지 */ }
+  return null;
+}
+
 async function generateTopicTitle(question, answer) {
   const prompt = `다음 대화를 가장 잘 나타내는 토픽 제목을 한국어로 2~5단어로 지어줘. 제목만 반환해. 따옴표·특수문자·마침표 없이.
 
@@ -972,20 +1013,28 @@ async function autoAppendTopicNote({ question, answer, sessionId, userMessageId,
     if (!appended) throw new Error(`${existing.filename}에 QA-LOG 마커가 없습니다.`);
     const withSummary = refreshTopicSummary(appended, title);
     const nextRaw = touchUpdatedFrontmatter(withSummary);
-    await overwriteVaultNote(existing.filename, nextRaw);
+
+    // 제목 재생성 (비동기 — 응답 블로킹 없음)
+    const newTitle = await regenerateTopicTitle(nextRaw).catch(() => null);
+    const finalRaw = newTitle && newTitle !== title
+      ? updateFrontmatterTitle(nextRaw, newTitle)
+      : nextRaw;
+    const finalTitle = newTitle || title;
+
+    await overwriteVaultNote(existing.filename, finalRaw);
     dbUpsertNote({
       filename: existing.filename,
-      title,
+      title: finalTitle,
       noteType: 'topic',
       codexStatus: 'pending',
       sourceSession: sessionId,
       sourceMessage: assistantMessageId,
     });
-    generateAndStoreEmbedding(existing.filename, buildSemanticEmbeddingText(title, nextRaw)).catch(() => {});
+    generateAndStoreEmbedding(existing.filename, buildSemanticEmbeddingText(finalTitle, finalRaw)).catch(() => {});
     saveQaChunkRecord({
       qaId,
       filename: existing.filename,
-      title,
+      title: finalTitle,
       question,
       answer,
       model,
