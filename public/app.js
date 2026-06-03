@@ -123,11 +123,13 @@ async function loadHistory() {
     document.querySelector('.welcome')?.remove();
     isRestoringHistory = true;
     try {
+      let lastUserContent = null;
       messages.forEach(msg => {
         if (msg.role === 'user') {
+          lastUserContent = msg.content;
           appendUserBubble(msg.content);
         } else {
-          appendHistoryBubble(msg.content, msg.model);
+          appendHistoryBubble(msg.content, msg.model, msg.id, lastUserContent);
         }
       });
     } finally {
@@ -145,28 +147,48 @@ function restoreLocalUiHistory() {
   document.querySelector('.welcome')?.remove();
   isRestoringHistory = true;
   try {
+    let lastUserContent = null;
     history.forEach(msg => {
-      if (msg.role === 'user') appendUserBubble(msg.content);
-      else appendHistoryBubble(msg.content, msg.model);
+      if (msg.role === 'user') {
+        lastUserContent = msg.content;
+        appendUserBubble(msg.content);
+      } else {
+        appendHistoryBubble(msg.content, msg.model, null, lastUserContent);
+      }
     });
   } finally {
     isRestoringHistory = false;
   }
 }
 
-function appendHistoryBubble(content, model) {
+function appendHistoryBubble(content, model, messageId, question) {
   const group = document.createElement('div');
   group.className = 'msg-group assistant';
 
-  const label = document.createElement('div');
-  label.className = 'model-label';
-  label.textContent = model || 'AI';
+  const label = makeModelLabel(model || 'AI');
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
   bubble.innerHTML = DOMPurify.sanitize(marked.parse(content));
 
   group.append(label, bubble);
+
+  if (question) {
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'save-btn icon-save-btn';
+    saveBtn.title = '노트로 저장';
+    saveBtn.setAttribute('aria-label', '노트로 저장');
+    saveBtn.innerHTML = saveIconSvg();
+    saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, {
+      question,
+      reply:   content,
+      model:   model || 'AI',
+      modelId: null,
+      messageId,
+    })));
+    group.appendChild(saveBtn);
+  }
+
   getMessages().appendChild(group);
   scrollDown();
 }
@@ -504,9 +526,8 @@ function makeDebateAnswer(modelName, reply, open = true) {
   details.className = 'debate-answer';
   details.open = open;
 
-  const summary = document.createElement('summary');
+  const summary = makeModelLabel(modelName, 'summary');
   summary.className = 'model-label debate-summary';
-  summary.textContent = modelName;
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
@@ -520,9 +541,7 @@ function makeDebateError(modelName, errorMsg) {
   const div = document.createElement('div');
   div.className = 'debate-answer';
 
-  const label = document.createElement('div');
-  label.className = 'model-label';
-  label.textContent = modelName;
+  const label = makeModelLabel(modelName);
 
   const err = document.createElement('div');
   err.className = 'error-msg';
@@ -671,7 +690,7 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
   saveBtn.title = '노트로 저장';
   saveBtn.setAttribute('aria-label', '노트로 저장');
   saveBtn.innerHTML = saveIconSvg();
-  saveBtn.addEventListener('click', () => saveCouncilNote(saveBtn, {
+  saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveCouncilNote(saveBtn, {
     question,
     claudeReply:        debateData.claudeReply,
     gptReply:           debateData.gptReply,
@@ -683,7 +702,7 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
     synthesizerModelId: data.synthesizerModelId,
     messageId:          data.messageId,
     councilDraftMode,
-  }));
+  })));
 
   synthSection.append(synthLabel, synthBubble, saveBtn);
   body.appendChild(synthSection);
@@ -1134,9 +1153,7 @@ function appendAssistantBubble(data) {
   const group = document.createElement('div');
   group.className = 'msg-group assistant';
 
-  const label = document.createElement('div');
-  label.className = 'model-label';
-  label.textContent = data.model;
+  const label = makeModelLabel(data.model);
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
@@ -1147,12 +1164,65 @@ function appendAssistantBubble(data) {
   saveBtn.title = '노트로 저장';
   saveBtn.setAttribute('aria-label', '노트로 저장');
   saveBtn.innerHTML = saveIconSvg();
-  saveBtn.addEventListener('click', () => saveNote(saveBtn, data));
+  saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, data)));
 
   group.append(label, bubble, saveBtn);
   getMessages().appendChild(group);
   saveUiMessage('assistant', data.reply, data.model);
   scrollDown();
+}
+
+function showSaveConfirm(saveBtn, onConfirm) {
+  const parent = saveBtn.parentNode;
+  const confirm = document.createElement('span');
+  confirm.className = 'save-confirm';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'save-confirm-cancel';
+  cancelBtn.textContent = '취소';
+  cancelBtn.addEventListener('click', () => {
+    confirm.replaceWith(saveBtn);
+  });
+
+  const okBtn = document.createElement('button');
+  okBtn.className = 'save-confirm-ok';
+  okBtn.textContent = '저장';
+  okBtn.addEventListener('click', () => {
+    confirm.replaceWith(saveBtn);
+    onConfirm();
+  });
+
+  confirm.append(cancelBtn, okBtn);
+  saveBtn.replaceWith(confirm);
+}
+
+const ICON_CLAUDE = '/lib/icons/sX8kIHSVvTDsFMiq9VQtQRczlnC6Ao5W6GvDvETovqQIJ1wxbLKydnVC-kBFsRoucWrclKkEW0ohQcJx3jm_pg.svg';
+const ICON_GPT    = '/lib/icons/9yf4h0kNu7QBf_SABY4CQJ8IFmv9Kby2YRVNQADCntaBn8kQyiAMcGNT9JgMcI2Ec2NCqTTIx6eg9TZK7h1NbQ.svg';
+
+function makeModelLabel(modelName, tag = 'div') {
+  const el = document.createElement(tag);
+  el.className = 'model-label';
+
+  const nameLower = (modelName || '').toLowerCase();
+  const iconSrc = nameLower.includes('claude') ? ICON_CLAUDE
+                : nameLower.includes('gpt')    ? ICON_GPT
+                : null;
+
+  if (iconSrc) {
+    const img = document.createElement('img');
+    img.src = iconSrc;
+    img.width = 18;
+    img.height = 18;
+    img.className = 'model-logo-label' + (iconSrc === ICON_GPT ? ' logo-gpt' : '');
+    img.setAttribute('aria-hidden', 'true');
+    el.appendChild(img);
+  }
+
+  const text = document.createElement('span');
+  text.textContent = modelName || 'AI';
+  el.appendChild(text);
+
+  return el;
 }
 
 function saveIconSvg() {
@@ -1197,6 +1267,30 @@ function autoResize(e) {
   e.target.style.height = Math.min(e.target.scrollHeight, 130) + 'px';
 }
 
+// ─── 테마 토글 ────────────────────────────────────────────────────────────────
+
+function initTheme() {
+  const saved = localStorage.getItem('councilTheme');
+  const isDark = saved === 'dark';
+  applyTheme(isDark);
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') !== 'dark';
+    applyTheme(next);
+    localStorage.setItem('councilTheme', next ? 'dark' : 'light');
+  });
+}
+
+function applyTheme(dark) {
+  if (dark) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  document.getElementById('icon-moon').style.display = dark ? 'none' : '';
+  document.getElementById('icon-sun').style.display  = dark ? ''     : 'none';
+}
+
 // ─── 실행 ─────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => { init(); initTheme(); });

@@ -167,7 +167,7 @@ const stmtGetRecentCodexJobs = db.prepare(`
   LIMIT ?
 `);
 const stmtGetMessages = db.prepare(
-  'SELECT role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC'
+  'SELECT id, role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC, id ASC'
 );
 const stmtGetRecentMessages = db.prepare(`
   SELECT role, content, model FROM (

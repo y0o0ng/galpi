@@ -15,11 +15,35 @@
     <header id="header">
       <div id="header-top">
         <span id="app-title">AI 의회</span>
-        <span id="model-indicator"></span>
+        <div id="header-right">
+          <span id="model-indicator"></span>
+          <button id="theme-toggle" title="다크/라이트 모드 전환" aria-label="테마 전환">
+            <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+            <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </button>
+        </div>
       </div>
       <div id="toggle-row">
-        <button class="model-btn active" data-model="claude">Claude</button>
-        <button class="model-btn" data-model="gpt">GPT</button>
+        <button class="model-btn active" data-model="claude">
+          <img class="model-logo-icon" src="/lib/icons/sX8kIHSVvTDsFMiq9VQtQRczlnC6Ao5W6GvDvETovqQIJ1wxbLKydnVC-kBFsRoucWrclKkEW0ohQcJx3jm_pg.svg" width="22" height="22" aria-hidden="true">
+          Claude
+        </button>
+        <button class="model-btn" data-model="gpt">
+          <img class="model-logo-icon logo-gpt" src="/lib/icons/9yf4h0kNu7QBf_SABY4CQJ8IFmv9Kby2YRVNQADCntaBn8kQyiAMcGNT9JgMcI2Ec2NCqTTIx6eg9TZK7h1NbQ.svg" width="22" height="22" aria-hidden="true">
+          GPT
+        </button>
         <button class="council-btn disabled">의회</button>
         <div class="council-mode-toggle" aria-label="의회 답변 방식">
           <button class="mode-opt active" data-mode="compressed" title="1차 답변을 짧게 만들어 빠르고 저렴하게 종합합니다">빠름</button>

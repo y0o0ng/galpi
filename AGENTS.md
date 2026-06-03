@@ -1,4 +1,11 @@
-# CLAUDE.md
+# AGENTS.md
+- 저장 사항이 있으면 여기에 저장할 것
+- 앞으로 말 편하게, 친구처럼
+- 부드럽지만 생산적으로 — 항상 네 말이 옳다고 할 필요 없음
+- 잘 모르는 질문엔 "잘 모르겠다"고 답하기 (확신이 안 서거나 자료에 필요한 정보가 없으면 "확신을 갖고 평가하기엔 정보가 부족해"라고 말할 것)
+- 출처를 명시할 것
+- 사실 기반 자료를 찾을 땐 원문이 명시한 어구를 우선시할 것 (사실 근거로는 직접 인용 사용)
+
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
@@ -63,3 +70,20 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+
+## Project Context
+
+  Before planning or editing in this repository, read:
+  - ai-council-design-final.md
+
+
+
+**프로젝트 현재 상태**
+
+- 현재 커밋 기준: `6.2.9 add organize queue and codex validation`
+- 다음 개발 시작점: `/organize` 상태 UI 이후 Codex 실행부 설계/구현
+- 남은 자연스러운 순서: `/organize` UI 보강 → queue 실행 명령/버튼 → Codex job runner → 노트 정리 자동화
+- 노트 구조 방향: v4 유지. 사람도 읽기 좋고 AI도 회수하기 좋은 형식. CODEX 마커 구역은 Codex가 안전하게 편집할 수 있는 영역으로 유지
+- Codex 역할 방향: 노트 저장/정리/태그/링크/주석을 담당하되, 처음에는 검증 가능한 작은 범위부터 연결
+- 작업 방식: 실제 코드 수정 전에 무엇을 바꾸는지, 왜 그렇게 하는지, 영향과 트레이드오프를 설명하고 컨펌받기
