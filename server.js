@@ -120,6 +120,7 @@ const sessions = {};
 // ─── SQLite DB ───────────────────────────────────────────────────────────────
 
 const db = new Database(path.join(__dirname, 'council.db'));
+db.pragma('journal_mode = WAL'); // 동시 읽기/쓰기 + 백업 2번째 커넥션 시 lock 경합 완화 (Pi SD카드 I/O)
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -447,6 +448,10 @@ const stmtGetArchivedNotes = db.prepare(`
   WHERE archived = 1
   ORDER BY updated_at DESC, id DESC
 `);
+const stmtGetAllNoteFilenames = db.prepare('SELECT filename, title FROM notes');
+const stmtDeleteNote = db.prepare('DELETE FROM notes WHERE filename = ?');
+const stmtDeleteNoteChunksByNote = db.prepare('DELETE FROM note_chunks WHERE note_filename = ?');
+const stmtDeleteNoteEdgesByNote = db.prepare('DELETE FROM note_edges WHERE source_filename = ? OR target_filename = ?');
 const stmtUpdateChunkNoteTitle = db.prepare(
   "UPDATE note_chunks SET note_title = ?, updated_at = strftime('%s','now') WHERE note_filename = ?"
 );
@@ -1805,6 +1810,44 @@ async function backfillNotesFromVault() {
 
   return result;
 }
+
+// 디스크에서 사라진 노트의 DB 흔적(notes/chunks/edges) 제거.
+// archived 노트는 _archive/에 있으니 둘 다 확인해 살아있는 파일은 건드리지 않는다.
+const deleteNoteEverywhere = db.transaction((filename) => {
+  stmtDeleteNoteChunksByNote.run(filename);
+  stmtDeleteNoteEdgesByNote.run(filename, filename);
+  stmtDeleteNote.run(filename);
+});
+
+async function pruneMissingNotes() {
+  const pruned = [];
+  for (const { filename, title } of stmtGetAllNoteFilenames.all()) {
+    const inRoot = await fs.access(path.join(VAULT_PATH, filename)).then(() => true).catch(() => false);
+    if (inRoot) continue;
+    const inArchive = await fs.access(path.join(VAULT_PATH, ARCHIVE_DIR, filename)).then(() => true).catch(() => false);
+    if (inArchive) continue;
+    deleteNoteEverywhere(filename);
+    noteSearchCache.delete(filename);
+    pruned.push({ filename, title });
+  }
+  return pruned;
+}
+
+// 신규 노트 등록(backfill) + 사라진 노트 정리(prune). 옵시디언에서 직접 편집/삭제한 변경을 DB에 반영.
+async function syncVaultDb() {
+  const backfill = await backfillNotesFromVault();
+  const pruned = await pruneMissingNotes();
+  return { ...backfill, pruned: pruned.length, prunedNotes: pruned };
+}
+
+app.post('/api/notes/sync', async (_req, res) => {
+  try {
+    const result = await syncVaultDb();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.post('/api/notes/backfill', async (_req, res) => {
   try {
@@ -3444,3 +3487,11 @@ app.listen(PORT, HOST, () => {
   maybeDailyBackup();
   setInterval(maybeDailyBackup, BACKUP_CHECK_INTERVAL_MS).unref();
 });
+
+// systemd stop / 재부팅 시 DB를 정리하고 종료 (WAL 체크포인트 포함)
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    try { db.close(); } catch { /* 이미 닫힘 */ }
+    process.exit(0);
+  });
+}

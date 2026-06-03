@@ -25,6 +25,7 @@ const slashCommands = [
   { command: '/organize all', title: '전체 재정리', description: '모든 활성 노트를 Codex로 다시 정리' },
   { command: '/archived', title: '보관함', description: '숨긴(보관한) 노트 목록 — 복원 가능' },
   { command: '/backup', title: '백업', description: '볼트+DB를 지금 백업 (자동: 하루 1회, 7일 보관)' },
+  { command: '/sync', title: '볼트 동기화', description: '옵시디언 직접 편집 반영 — 신규 노트 등록 + 삭제 노트 정리' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
@@ -411,6 +412,12 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleBackup();
+    return;
+  }
+  if (text === '/sync') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleSync();
     return;
   }
   if (text.startsWith('/save ')) {
@@ -1369,6 +1376,57 @@ function renderBackupResult(data) {
   group.appendChild(bubble);
   getMessages().appendChild(group);
   saveUiMessage('assistant', bubble.textContent, 'Backup');
+  scrollDown();
+}
+
+async function handleSync() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/sync');
+
+  const loadingEl = appendLoading();
+  document.dispatchEvent(new Event('pet:building'));
+  try {
+    const res = await apiFetch('/api/notes/sync', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+    renderSyncResult(data);
+    document.dispatchEvent(new Event('pet:happy'));
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
+function renderSyncResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('Sync'));
+
+  const prunedNotes = Array.isArray(data.prunedNotes) ? data.prunedNotes : [];
+  const prunedRows = prunedNotes.slice(0, 10).map(n => `- ${n.title || n.filename}`);
+  const morePruned = prunedNotes.length > 10 ? `\n...외 ${prunedNotes.length - 10}개` : '';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = [
+    '볼트 동기화 완료',
+    `등록: ${data.registered ?? 0}개`,
+    `정리(삭제된 노트): ${data.pruned ?? 0}개`,
+    prunedRows.length ? `\n정리된 노트:\n${prunedRows.join('\n')}${morePruned}` : '',
+    '\n새 노트 시맨틱 검색까지 원하면 /embed 실행',
+  ].filter(Boolean).join('\n');
+
+  group.appendChild(bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Sync');
   scrollDown();
 }
 

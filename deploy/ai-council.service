@@ -1,0 +1,18 @@
+[Unit]
+Description=AI Council
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User/경로는 실제 환경에 맞게 교체
+User=pi
+WorkingDirectory=/home/pi/apps/ai-council
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+# 종료 시 graceful shutdown(SIGTERM)으로 DB 정리할 시간 확보
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

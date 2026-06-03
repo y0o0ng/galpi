@@ -43,6 +43,7 @@ npm install
 ```sh
 cp .env.example .env
 nano .env
+chmod 600 .env   # 키가 들어있으니 본인만 읽게 권한 제한
 ```
 
 라즈베리파이에서는 아래 값을 특히 확인한다.
@@ -88,6 +89,28 @@ hostname -I
 ```text
 http://<라즈베리파이_IP>:3000
 ```
+
+### 자동 실행 (systemd — 재부팅·크래시 생존)
+
+`npm start`는 터미널을 닫으면 멈춘다. 재부팅·크래시 후 자동으로 다시 뜨게 하려면 systemd에 등록한다. `deploy/ai-council.service`가 템플릿이다(User/경로를 실제 환경으로 교체).
+
+```sh
+sudo cp deploy/ai-council.service /etc/systemd/system/ai-council.service
+sudo nano /etc/systemd/system/ai-council.service   # User, WorkingDirectory, ExecStart 경로 확인
+sudo systemctl daemon-reload
+sudo systemctl enable --now ai-council
+```
+
+확인 / 로그:
+
+```sh
+systemctl status ai-council
+journalctl -u ai-council -f
+```
+
+- `Restart=on-failure`로 크래시 시 자동 재시작, `enable`로 재부팅 후 자동 기동.
+- 자동 백업(인프로세스)도 서버가 떠 있어야 도니, systemd 등록이 사실상 백업의 전제다.
+- 코드 갱신 후 재시작: `sudo systemctl restart ai-council`
 
 ## 5. Smoke Test
 
@@ -158,6 +181,23 @@ crontab -e
 
 - `.env`(API 키)는 백업 대상이 아니다 — 키는 따로 안전하게 보관할 것. (분실해도 키만 다시 입력하면 됨.)
 - 백업 폴더에는 DB(전체 대화 기록)가 들어 있으니 외부 공유 금지.
+
+### 복원
+
+백업에서 되돌릴 때 (`<stamp>`는 복원할 백업 시각):
+
+```sh
+sudo systemctl stop ai-council          # 서버 멈춤 (systemd 미사용이면 그냥 종료)
+cd ~/apps/ai-council
+cp council.db council.db.bak            # 혹시 모를 현재 상태 보존
+cp ~/backups/ai-council/council-<stamp>.db council.db
+rm -f council.db-wal council.db-shm     # 옛 WAL 잔재 제거
+rm -rf ai-council-vault
+tar -xzf ~/backups/ai-council/vault-<stamp>.tar.gz   # ai-council-vault/ 통째로 풀림
+sudo systemctl start ai-council
+```
+
+DB와 볼트는 **같은 stamp**로 맞춰 복원하는 게 안전하다(시점 일치).
 
 ## 8. 자주 보는 문제
 
