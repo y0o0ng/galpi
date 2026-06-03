@@ -53,12 +53,15 @@ OPENAI_API_KEY=...
 VAULT_PATH=/home/pi/apps/ai-council/ai-council-vault
 HOST=0.0.0.0
 PORT=3000
+API_TOKEN=아무도-모를-긴-문자열
 CODEX_RUNNER_MODE=codex
 CODEX_BIN=codex
 CODEX_AUTO_QUEUE_THRESHOLD=5
 ```
 
 로컬에서만 쓸 때는 `HOST=127.0.0.1`이어도 된다. 폰/맥에서 접속하려면 `HOST=0.0.0.0`이 필요하다.
+
+`HOST=0.0.0.0`으로 LAN에 열 때는 `API_TOKEN`을 **반드시** 설정한다. 비워두면 같은 네트워크의 누구나 API를 호출해 키 크레딧을 쓰고 볼트를 읽을 수 있다(서버 시작 시 경고가 뜬다). 설정하면 첫 접속 시 브라우저가 토큰을 한 번 묻고 저장한다.
 
 ## 4. 실행
 
