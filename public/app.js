@@ -385,12 +385,13 @@ async function sendSingleMessage() {
     const data = await res.json();
     loadingEl.remove();
     if (data.error) appendError(data.error);
-    else appendAssistantBubble({ ...data, question: text });
-    document.dispatchEvent(new Event('pet:happy'));
+    else {
+      appendAssistantBubble({ ...data, question: text });
+      document.dispatchEvent(new Event('pet:happy'));
+    }
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
-    document.dispatchEvent(new Event('pet:happy'));
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
@@ -479,11 +480,11 @@ async function sendCouncilMessage() {
     if (debateData.claudeReply && debateData.gptReply) {
       renderPicker(container, body, text, debateData, reviewData);
     }
+    document.dispatchEvent(new Event('pet:happy'));
 
   } catch (_) {
     loadingEl.remove();
     appendCouncilError(body, '서버에 연결할 수 없습니다.');
-    document.dispatchEvent(new Event('pet:happy'));
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
@@ -1080,6 +1081,7 @@ function appendCouncilError(body, msg) {
   err.textContent = `⚠️ ${msg}`;
   body.appendChild(err);
   scrollDown();
+  document.dispatchEvent(new Event('pet:error'));
 }
 
 // ─── 단일 모드 노트 저장 ─────────────────────────────────────────────────────

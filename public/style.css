@@ -955,9 +955,6 @@ html, body {
   transition: transform 0.1s;
 }
 
-#pet.pet-bounce {
-  animation: pet-bounce 0.5s var(--ease-spring);
-}
 
 
 #pet-menu {
