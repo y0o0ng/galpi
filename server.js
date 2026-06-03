@@ -132,6 +132,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_codex_jobs_status ON codex_jobs(status, created_at);
 `);
 
+// 마이그레이션: embedding 컬럼
+if (!db.prepare('PRAGMA table_info(notes)').all().some(c => c.name === 'embedding')) {
+  db.exec('ALTER TABLE notes ADD COLUMN embedding TEXT');
+}
+
 const stmtEnsureSession = db.prepare(`
   INSERT INTO sessions (id) VALUES (?)
   ON CONFLICT(id) DO UPDATE SET last_active = strftime('%s','now')
@@ -159,6 +164,15 @@ const stmtUpsertNote = db.prepare(`
 const stmtGetNoteByMessageId = db.prepare(`
   SELECT filename, title FROM notes WHERE source_message = ? LIMIT 1
 `);
+const stmtUpdateNoteEmbedding = db.prepare(
+  'UPDATE notes SET embedding = ? WHERE filename = ?'
+);
+const stmtGetNotesWithEmbedding = db.prepare(
+  'SELECT filename, embedding FROM notes WHERE archived = 0'
+);
+const stmtGetNotesWithoutEmbedding = db.prepare(
+  'SELECT filename, title FROM notes WHERE archived = 0 AND embedding IS NULL'
+);
 const stmtGetNoteStatusCounts = db.prepare(`
   SELECT codex_status AS codexStatus, COUNT(*) AS count
   FROM notes
@@ -387,14 +401,11 @@ async function saveVaultNoteRecord({
   codexStatus = 'pending',
 }) {
   await writeVaultNote(fileId, noteContent);
-  dbUpsertNote({
-    filename: fileId + '.md',
-    title,
-    noteType,
-    codexStatus,
-    sourceSession: sessionId,
-    sourceMessage: messageId,
-  });
+  const filename = fileId + '.md';
+  dbUpsertNote({ filename, title, noteType, codexStatus, sourceSession: sessionId, sourceMessage: messageId });
+
+  // embedding 비동기 생성 (응답 블로킹 없음)
+  generateAndStoreEmbedding(filename, title + '\n' + noteContent).catch(() => {});
 
   return maybeCreateCodexJobFromPending();
 }
@@ -1551,54 +1562,130 @@ async function getContextNotesForQuestion(question, activeNotes) {
   return merged;
 }
 
-async function searchVault(query) {
-  const queryLower = query.toLowerCase();
-  const terms = [...new Set(
-    queryLower
+const SEARCH_STOP_WORDS = new Set([
+  '그리고', '그런데', '저번에', '우리가', '관련', '내용', '알려줘', '호출해줘',
+  '불러와줘', '꺼내줘', '해줘', '해줘요', '해주세요', '알고', '싶어', '있어',
+  '없어', '어떤', '어떻게', '무엇', '뭐가', '뭔지', '대해', '대한', '관한',
+  '이번', '저번', '지난', '이런', '저런', '그런', '이것', '저것', '그것',
+  '분석', '정리', '설명', '요약', '노트', '저장', '기록',
+]);
+
+function extractQueryTerms(query) {
+  return [...new Set(
+    query.toLowerCase()
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)
       .map(t => t.trim())
-      .filter(t => t.length >= 2)
-      .filter(t => !['그리고', '그런데', '저번에', '우리가', '관련', '내용', '알려줘', '호출해줘', '불러와줘', '꺼내줘'].includes(t))
+      .filter(t => t.length >= 2 && !SEARCH_STOP_WORDS.has(t))
   )];
-  let files;
-  try {
-    files = await fs.readdir(VAULT_PATH);
-  } catch {
-    return [];
-  }
+}
 
-  const results = [];
-  for (const filename of files.filter(f => f.endsWith('.md'))) {
+async function generateEmbedding(text) {
+  if (!openai) return null;
+  try {
+    const r = await openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: text.slice(0, 8000),
+    });
+    return r.data[0].embedding;
+  } catch {
+    return null;
+  }
+}
+
+function cosineSimilarity(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na  += a[i] * a[i];
+    nb  += b[i] * b[i];
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+async function generateAndStoreEmbedding(filename, text) {
+  const vec = await generateEmbedding(text);
+  if (vec) stmtUpdateNoteEmbedding.run(JSON.stringify(vec), filename);
+  return vec;
+}
+
+async function searchVault(query) {
+  const terms = extractQueryTerms(query);
+  let files;
+  try { files = await fs.readdir(VAULT_PATH); } catch { return []; }
+  const mdFiles = files.filter(f => f.endsWith('.md'));
+
+  // 노트 내용 + DB embedding 수집
+  const embeddingMap = new Map(
+    stmtGetNotesWithEmbedding.all()
+      .filter(r => r.embedding)
+      .map(r => [r.filename, JSON.parse(r.embedding)])
+  );
+
+  const noteData = [];
+  const termDocFreq = new Map();
+
+  for (const filename of mdFiles) {
     try {
-      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const raw  = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
       const title = parseNoteTitle(raw, filename);
       const body  = stripFrontmatter(raw);
-      const titleLower = title.toLowerCase();
-      const bodyLower = body.toLowerCase();
+      const textLower = (title + ' ' + body).toLowerCase();
 
-      let score = 0;
-      if (titleLower.includes(queryLower)) score += 20;
-      if (bodyLower.includes(queryLower)) score += 10;
-      for (const term of terms) {
-        if (titleLower.includes(term)) score += 6;
-        if (bodyLower.includes(term)) score += 1;
-      }
+      // IDF용 term 집합
+      const noteTermSet = new Set(
+        textLower.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(t => t.length >= 2)
+      );
+      for (const t of noteTermSet) termDocFreq.set(t, (termDocFreq.get(t) || 0) + 1);
 
-      if (score > 0) {
-        const firstTermHit = terms.map(t => bodyLower.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0];
-        const idx     = bodyLower.indexOf(queryLower);
-        const hitIdx  = idx >= 0 ? idx : (firstTermHit ?? 0);
-        const start   = Math.max(0, hitIdx - 80);
-        const excerpt = body.slice(start, start + 300).replace(/\n{3,}/g, '\n\n').trim();
-        results.push({ filename, title, excerpt, score });
-      }
-    } catch { /* 파일 읽기 실패 시 스킵 */ }
+      noteData.push({ filename, title, body, titleLower: title.toLowerCase(), bodyLower: body.toLowerCase() });
+    } catch { /* skip */ }
   }
+
+  const N = noteData.length || 1;
+  const queryEmbedding = await generateEmbedding(query);
+
+  const results = [];
+  for (const { filename, title, body, titleLower, bodyLower } of noteData) {
+    // ── IDF 키워드 점수 ──
+    let kwScore = 0;
+    for (const term of terms) {
+      const df  = termDocFreq.get(term) || 1;
+      const idf = Math.log((N + 1) / (df + 1)) + 1; // smoothed
+      const tf  = (titleLower.match(new RegExp(term, 'g')) || []).length * 5
+                + (bodyLower.match(new RegExp(term, 'g'))  || []).length;
+      kwScore += tf * idf;
+    }
+
+    // ── 임베딩 유사도 점수 ──
+    const vec = embeddingMap.get(filename);
+    const embScore = (queryEmbedding && vec)
+      ? Math.max(0, cosineSimilarity(queryEmbedding, vec))
+      : null;
+
+    // ── 하이브리드 최종 점수 ──
+    let finalScore;
+    if (embScore !== null) {
+      const normKw = Math.min(kwScore / 30, 1);
+      finalScore = 0.35 * normKw + 0.65 * embScore;
+    } else {
+      finalScore = kwScore;
+    }
+
+    const MIN_SCORE = embScore !== null ? 0.25 : 3;
+    if (finalScore < MIN_SCORE) continue;
+
+    const hitIdx = terms.map(t => bodyLower.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0] ?? 0;
+    const start  = Math.max(0, hitIdx - 80);
+    const excerpt = body.slice(start, start + 300).replace(/\n{3,}/g, '\n\n').trim();
+    results.push({ filename, title, excerpt, score: finalScore });
+  }
+
   return results
     .sort((a, b) => b.score - a.score)
     .slice(0, MAX_ACTIVE_NOTES)
-    .map(({ score, ...result }) => result);
+    .map(({ score, ...r }) => r);
 }
 
 app.get('/api/vault/search', async (req, res) => {
@@ -1606,6 +1693,29 @@ app.get('/api/vault/search', async (req, res) => {
   if (!q) return res.status(400).json({ error: '검색어를 입력해주세요.' });
   const results = await searchVault(q);
   res.json({ results });
+});
+
+app.post('/api/vault/embed-all', async (req, res) => {
+  if (!openai) return res.status(400).json({ error: 'OpenAI API 키가 없습니다.' });
+
+  const notes = stmtGetNotesWithoutEmbedding.all();
+  if (notes.length === 0) return res.json({ success: true, embedded: 0, message: '모든 노트에 임베딩이 있습니다.' });
+
+  res.json({ success: true, total: notes.length, message: `${notes.length}개 노트 임베딩 생성 시작` });
+
+  // 응답 후 백그라운드 처리
+  (async () => {
+    let done = 0;
+    for (const { filename, title } of notes) {
+      try {
+        const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+        const body = stripFrontmatter(raw);
+        await generateAndStoreEmbedding(filename, title + '\n' + body);
+        done++;
+      } catch { /* skip */ }
+    }
+    console.log(`✅ 임베딩 완료: ${done}/${notes.length}개`);
+  })();
 });
 
 // 사용자 메모리는 항상, activeNotes/자동 검색 노트는 질문별 참조로 주입하는 헬퍼

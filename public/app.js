@@ -19,6 +19,7 @@ let isRestoringHistory = false;
 const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 활성 컨텍스트에 추가' },
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
+  { command: '/embed', title: '임베딩 생성', description: '모든 노트의 시맨틱 검색용 임베딩 생성' },
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
   { command: '/organize run', title: '정리 큐 생성', description: '정리 대기 노트를 Codex job queue에 추가' },
   { command: '/organize process', title: '정리 실행', description: '대기 중인 Codex job 하나를 처리' },
@@ -374,6 +375,12 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleOrganizeAll(true);
+    return;
+  }
+  if (text === '/embed') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleEmbed();
     return;
   }
   if (text === '/organize') {
@@ -934,6 +941,41 @@ async function handleOrganizeStatus() {
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다.');
+  }
+}
+
+async function handleEmbed() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/embed');
+
+  const loadingEl = appendLoading();
+  document.dispatchEvent(new Event('pet:building'));
+  try {
+    const res = await fetch('/api/vault/embed-all', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+
+    const group = document.createElement('div');
+    group.className = 'msg-group assistant';
+    group.append(makeModelLabel('Embed'));
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = data.message || '임베딩 생성 시작됨';
+    group.appendChild(bubble);
+    getMessages().appendChild(group);
+    scrollDown();
+    document.dispatchEvent(new Event('pet:happy'));
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
   }
 }
 
