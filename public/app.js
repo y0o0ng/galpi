@@ -216,13 +216,19 @@ function parseCouncilTranscript(content, model) {
     return match ? match[1].trim() : null;
   };
 
+  const SENTINEL = '응답 없음';
   const synthesisSection = sections.find(item => item.startsWith('## 종합'));
   const synthesisMatch = synthesisSection?.match(/^## 종합 \(([^)]+)\)\n([\s\S]*)$/);
   const question = getSection('질문');
-  const claudeReply = getSection('Claude 1차 답변');
-  const gptReply = getSection('GPT 1차 답변');
+  const claudeReplyRaw = getSection('Claude 1차 답변');
+  const gptReplyRaw    = getSection('GPT 1차 답변');
+  const claudeReply = claudeReplyRaw === SENTINEL ? null : claudeReplyRaw;
+  const gptReply    = gptReplyRaw    === SENTINEL ? null : gptReplyRaw;
   const synthesis = synthesisMatch ? synthesisMatch[2].trim() : null;
   if (!question || !synthesis || (!claudeReply && !gptReply)) return null;
+
+  const settingsRaw = getSection('의회 설정');
+  const parsedMode = settingsRaw?.match(/draftMode: (.+)/)?.[1]?.trim() || null;
 
   return {
     question,
@@ -234,7 +240,7 @@ function parseCouncilTranscript(content, model) {
     synthesis,
     synthesizer: synthesisMatch ? synthesisMatch[1].trim() : modelText.replace(/\s*\(의회\)\s*$/, '') || 'AI',
     synthesizerModelId: null,
-    councilDraftMode: 'restored',
+    councilDraftMode: parsedMode || 'compressed',
   };
 }
 
@@ -835,6 +841,7 @@ function buildCouncilTranscript(question, debateData, reviewData, data) {
     `## 질문\n${question}`,
     `## Claude 1차 답변\n${debateData.claudeReply || '응답 없음'}`,
     `## GPT 1차 답변\n${debateData.gptReply || '응답 없음'}`,
+    `## 의회 설정\ndraftMode: ${debateData.councilDraftMode || 'compressed'}`,
   ];
 
   if (reviewData.claudeReview || reviewData.gptReview) {
