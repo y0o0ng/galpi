@@ -2052,6 +2052,34 @@ const reassignNoteReferences = db.transaction((fromFilename, toFilename, toTitle
   stmtDeleteNoteEdgesByNote.run(fromFilename, fromFilename);
 });
 
+// target CODEX-LINKS에서 흡수된 source 노트로 향하는 링크 제거 (빈 그룹 헤더도 정리).
+// DB edge는 reassignNoteReferences가 self-loop로 지우지만, 파일 마크다운 링크는 별도라 여기서 맞춘다.
+function stripCodexLinksToTitles(raw, titles) {
+  if (!hasMarkerBlock(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->')) return raw;
+  const titleSet = new Set(titles.map(t => String(t || '').trim()).filter(Boolean));
+  if (titleSet.size === 0) return raw;
+
+  const block = extractMarkerBody(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->');
+  const kept = block.split('\n').filter(line => {
+    const trimmed = line.trim();
+    const link = trimmed.match(/\[\[([^\]\n]+)\]\]/);
+    return !(trimmed.startsWith('- ') && link && titleSet.has(link[1].trim()));
+  });
+
+  // 링크가 사라져 비게 된 그룹 헤더(**[...]**) 제거
+  const cleaned = [];
+  for (let i = 0; i < kept.length; i++) {
+    if (/^\*\*\[.*\]\*\*$/.test(kept[i].trim())) {
+      let j = i + 1;
+      while (j < kept.length && kept[j].trim() === '') j++;
+      if (!(j < kept.length && kept[j].trim().startsWith('- '))) continue; // 다음 링크 없음 → 고아 헤더
+    }
+    cleaned.push(kept[i]);
+  }
+
+  return replaceMarkerBlock(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', cleaned.join('\n').trim());
+}
+
 async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle = null }) {
   let srcNames = [...new Set((filenames || []).map(f => String(f || '').trim()).filter(Boolean))]
     .filter(f => f !== targetFilename);
@@ -2092,6 +2120,7 @@ async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle 
     if (hasMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
       raw = replaceMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw }));
     }
+    raw = stripCodexLinksToTitles(raw, sources.map(s => s.title)); // 이미 흡수한 노트로 가는 링크 제거
     raw = touchUpdatedFrontmatter(raw);
     await overwriteVaultNote(resultFilename, raw);
     dbUpsertNote({ filename: resultFilename, title: resultTitle, noteType: 'topic', codexStatus: 'pending' });
