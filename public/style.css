@@ -368,6 +368,13 @@ html, body {
   flex: none;
 }
 
+.organize-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 2px;
+}
+
 /* 저장 확인 인라인 UI */
 .save-confirm {
   display: inline-flex;

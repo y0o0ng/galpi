@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs/promises');
+const { execFile } = require('child_process');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
@@ -31,6 +32,10 @@ const MAX_MEMORY_ITEMS = 20;
 const MAX_MEMORY_CHARS = 1200;
 const MEMORY_DIR = '_system';
 const MEMORY_FILE = 'memory.md';
+const CODEX_BIN = process.env.CODEX_BIN || 'codex';
+const CODEX_RUNNER_MODE = process.env.CODEX_RUNNER_MODE || 'codex';
+const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '180000');
+const CODEX_AUTO_QUEUE_THRESHOLD = Math.max(1, parseInt(process.env.CODEX_AUTO_QUEUE_THRESHOLD || '5', 10) || 5);
 
 if (!VAULT_PATH) {
   console.error('❌ .env 파일에 VAULT_PATH가 없습니다. .env.example을 참고해 .env를 만들어주세요.');
@@ -150,6 +155,12 @@ const stmtGetPendingNotes = db.prepare(`
   WHERE archived = 0 AND codex_status = 'pending'
   ORDER BY created_at ASC, id ASC
 `);
+const stmtGetOrganizableNotes = db.prepare(`
+  SELECT filename, title, note_type AS noteType, codex_status AS codexStatus
+  FROM notes
+  WHERE archived = 0
+  ORDER BY created_at ASC, id ASC
+`);
 const stmtCreateCodexJob = db.prepare(`
   INSERT INTO codex_jobs (status, note_filenames_json)
   VALUES ('pending', ?)
@@ -165,6 +176,27 @@ const stmtGetRecentCodexJobs = db.prepare(`
   FROM codex_jobs
   ORDER BY created_at DESC, id DESC
   LIMIT ?
+`);
+const stmtGetNextPendingCodexJob = db.prepare(`
+  SELECT id, note_filenames_json AS noteFilenamesJson
+  FROM codex_jobs
+  WHERE status = 'pending'
+  ORDER BY created_at ASC, id ASC
+  LIMIT 1
+`);
+const stmtStartCodexJob = db.prepare(`
+  UPDATE codex_jobs
+  SET status = 'running',
+      attempt_count = attempt_count + 1,
+      error = NULL,
+      started_at = strftime('%s','now'),
+      finished_at = NULL
+  WHERE id = ? AND status = 'pending'
+`);
+const stmtFinishCodexJob = db.prepare(`
+  UPDATE codex_jobs
+  SET status = ?, error = ?, finished_at = strftime('%s','now')
+  WHERE id = ?
 `);
 const stmtGetMessages = db.prepare(
   'SELECT id, role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC, id ASC'
@@ -219,6 +251,33 @@ const createCodexJobFromPending = db.transaction((limit = 5) => {
     notes: notes.map(note => ({ ...note, codexStatus: 'queued' })),
   };
 });
+
+function maybeCreateCodexJobFromPending() {
+  if (!Number.isFinite(CODEX_AUTO_QUEUE_THRESHOLD) || CODEX_AUTO_QUEUE_THRESHOLD <= 0) {
+    return null;
+  }
+
+  const pendingCount = stmtGetPendingNotes.all().length;
+  if (pendingCount < CODEX_AUTO_QUEUE_THRESHOLD) return null;
+  return createCodexJobFromPending(CODEX_AUTO_QUEUE_THRESHOLD);
+}
+
+const startNextCodexJob = db.transaction(() => {
+  const job = stmtGetNextPendingCodexJob.get();
+  if (!job) return null;
+
+  const result = stmtStartCodexJob.run(job.id);
+  if (result.changes !== 1) return null;
+
+  const filenames = JSON.parse(job.noteFilenamesJson);
+  filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('running', filename));
+
+  return { id: job.id, filenames };
+});
+
+function finishCodexJob(jobId, status, error = null) {
+  stmtFinishCodexJob.run(status, error, jobId);
+}
 
 function hydrateSessionFromDb(sessionId) {
   if (sessions[sessionId]) return sessions[sessionId];
@@ -320,6 +379,8 @@ async function saveVaultNoteRecord({
     sourceSession: sessionId,
     sourceMessage: messageId,
   });
+
+  return maybeCreateCodexJobFromPending();
 }
 
 function parseJsonObject(text) {
@@ -363,32 +424,23 @@ function formatCodexLinks(links) {
     .join('\n\n');
 }
 
-// 지금은 GPT/Claude로 저장 메타데이터를 채우고, 나중에 Codex 정리 엔진으로 이 함수만 대체한다.
+// 저장 시점에는 제목/요약만 만든다. 태그/링크는 Codex runner가 CODEX 구역에 채운다.
 async function generateDocumentMetadata(content) {
   const fallbackTitle = sanitizeTitle(content.replace(/\n/g, ' ').slice(0, 40), '저장한 문서');
-  const candidates = await searchVault(content);
-  const candidateTitles = candidates.map(n => n.title).slice(0, 12);
 
   const prompt = `사용자가 아래 내용을 옵시디언 노트로 저장하려고 한다.
-제목, 짧은 정리, 주제 태그, 기존 노트 연결 후보를 만들어라.
+제목과 짧은 정리를 만들어라.
 
 규칙:
 - JSON 객체만 반환한다.
 - title: 한국어 10~30자
 - summary: 1~3문장
-- tags: 한국어/영어 태그 3~8개, # 없이
-- links: 기존 노트와 관련 있을 때만 작성
-- links[].title은 "기존 노트 후보"에 있는 제목을 정확히 사용한다.
-- links[].strength는 1~3 숫자다.
-
-기존 노트 후보:
-${candidateTitles.length ? candidateTitles.map(t => `- ${t}`).join('\n') : '- 없음'}
 
 저장할 내용:
 ${content.slice(0, 6000)}
 
 반환 형식:
-{"title":"","summary":"","tags":[],"links":[{"topic":"","title":"","reason":"","strength":1}]}`;
+{"title":"","summary":""}`;
 
   try {
     let text;
@@ -408,18 +460,13 @@ ${content.slice(0, 6000)}
     }
 
     const parsed = parseJsonObject(text);
-    const allowedTitles = new Set(candidateTitles);
     return {
       title:   sanitizeTitle(parsed.title, fallbackTitle),
       summary: String(parsed.summary || '').trim().slice(0, 800),
-      tags:    Array.isArray(parsed.tags) ? parsed.tags : [],
-      links:   Array.isArray(parsed.links)
-        ? parsed.links.filter(link => allowedTitles.has(String(link.title || '').trim()))
-        : [],
     };
   } catch (err) {
     console.warn('저장 메타데이터 생성 실패:', err.message);
-    return { title: fallbackTitle, summary: '', tags: [], links: [] };
+    return { title: fallbackTitle, summary: '' };
   }
 }
 
@@ -546,8 +593,6 @@ app.post('/api/vault/save-document', async (req, res) => {
     const metadata = await generateDocumentMetadata(content);
     const title = sanitizeTitle(metadata.title);
     const { fileId, createdStr } = createNoteIdentity(title);
-    const tagsBlock = formatCodexTags(metadata.tags);
-    const linksBlock = formatCodexLinks(metadata.links);
 
     const noteContent = `---
 id: ${fileId}
@@ -572,7 +617,7 @@ source_message: unknown
 - 핵심 개념: ${title}
 - 노트 성격: 사용자 저장 문서
 - 다시 꺼낼 상황: 사용자가 이 문서나 아이디어를 바탕으로 후속 질문을 할 때
-- 연결 후보: ${metadata.links?.length ? metadata.links.map(link => `[[${link.title}]]`).join(', ') : '정리 엔진이 추후 보강'}
+- 연결 후보: Codex가 추후 보강
 - 신뢰도: medium
 
 ## 문서
@@ -583,19 +628,17 @@ ${metadata.summary || '정리 없음'}
 
 ## 🏷️ 주제 태그
 <!-- CODEX-TAGS-START -->
-${tagsBlock}
 <!-- CODEX-TAGS-END -->
 
 ## 🔗 연결
 <!-- CODEX-LINKS-START -->
-${linksBlock}
 <!-- CODEX-LINKS-END -->
 
 ---
-*생성: ${createdStr} · 사용자 저장 문서 · 정리 엔진: ${HAS_GPT ? 'GPT' : HAS_CLAUDE ? 'Claude' : 'fallback'}*
+*생성: ${createdStr} · 사용자 저장 문서 · 정리 엔진: Codex pending*
 `;
 
-    await saveVaultNoteRecord({
+    const queuedJob = await saveVaultNoteRecord({
       fileId,
       title,
       noteType: 'user_manual',
@@ -617,8 +660,7 @@ ${linksBlock}
       success: true,
       filename: fileId + '.md',
       title,
-      tags: metadata.tags,
-      links: metadata.links,
+      queuedJob,
     });
   } catch (err) {
     console.error('문서 저장 오류:', err.message);
@@ -716,7 +758,7 @@ ${calloutAnswer}
 `;
 
   try {
-    await saveVaultNoteRecord({
+    const queuedJob = await saveVaultNoteRecord({
       fileId,
       title,
       noteType: 'single_manual',
@@ -725,7 +767,7 @@ ${calloutAnswer}
       messageId,
       codexStatus: 'pending',
     });
-    res.json({ success: true, filename: fileId + '.md', title });
+    res.json({ success: true, filename: fileId + '.md', title, queuedJob });
   } catch (err) {
     console.error('노트 저장 오류:', err.message);
     res.status(500).json({ error: `노트 저장 실패: ${err.message}` });
@@ -740,6 +782,7 @@ app.get('/api/config', (_req, res) => {
     gptModel:    GPT_MODEL,
     contextN:    CONTEXT_N,
     contextMessages: HISTORY_CONTEXT_MESSAGES,
+    codexAutoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
     hasClaude:   HAS_CLAUDE,
     hasGpt:      HAS_GPT,
   });
@@ -859,6 +902,7 @@ app.get('/api/organize/status', (_req, res) => {
 
   res.json({
     success: true,
+    autoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
     ...counts,
     notes: stmtGetPendingNotes.all(),
     jobs: stmtGetRecentCodexJobs.all(5).map(({ noteFilenamesJson, ...job }) => ({
@@ -870,7 +914,7 @@ app.get('/api/organize/status', (_req, res) => {
 
 app.post('/api/organize/queue', (_req, res) => {
   try {
-    const job = createCodexJobFromPending(5);
+    const job = createCodexJobFromPending(CODEX_AUTO_QUEUE_THRESHOLD);
     if (!job) {
       res.json({ success: true, created: false, message: '정리 대기 노트가 없습니다.' });
       return;
@@ -883,6 +927,37 @@ app.post('/api/organize/queue', (_req, res) => {
       status: job.status,
       notes: job.notes,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/organize/process', async (_req, res) => {
+  try {
+    const result = await runNextCodexJob();
+    if (!result) {
+      res.json({ success: true, processed: false, message: '실행할 정리 job이 없습니다.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      processed: true,
+      jobId: result.id,
+      status: result.status,
+      notes: result.processed,
+      failed: result.failed,
+      error: result.error || null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/organize/all', async (_req, res) => {
+  try {
+    const result = await runAllCodexNotes();
+    res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -936,6 +1011,436 @@ async function readVaultNote(filename) {
   } catch {
     return null;
   }
+}
+
+function extractAiHint(raw) {
+  const match = String(raw || '').match(/## AI 회수 힌트\n([\s\S]*?)(?=\n## |\n---|\s*$)/);
+  return match ? match[1].trim() : '';
+}
+
+function getCodexSignalText(raw) {
+  return stripFrontmatter(raw)
+    .replace(/## AI 회수 힌트\n[\s\S]*?(?=\n## |\n---|\s*$)/g, '')
+    .replace(/<!-- CODEX-TAGS-START -->[\s\S]*?<!-- CODEX-TAGS-END -->/g, '')
+    .replace(/<!-- CODEX-LINKS-START -->[\s\S]*?<!-- CODEX-LINKS-END -->/g, '')
+    .replace(/> \[!note\]- 원본[\s\S]*?(?=\n---|\s*$)/g, '')
+    .replace(/^#{1,6}\s+.*$/gm, '')
+    .replace(/^---+$/gm, '')
+    .trim();
+}
+
+function noteTokenize(text) {
+  const stopWords = new Set([
+    '그리고', '그러나', '하지만', '대한', '관련', '내용', '정리', '노트', '사용자',
+    '다시', '꺼낼', '상황', '후속', '질문', '답변', '문서', '때', '것', '수',
+    '핵심', '개념', '성격', '신뢰도', '후속', '판단', '참고할', '저장된',
+    '같은', '주제의', '수동', '저장', '모드', '단일', '생성', '엔진이',
+    '추후', '보강', 'medium', 'answer', 'council_synthesis', 'user_document',
+    'single_manual', 'user_manual', 'council',
+    'AI', '회수', '힌트', '질문이나', '이전', '판단을', '연결', '후보',
+    '결론', '주제', '태그', 'Claude', 'GPT', 'claude', 'gpt', '있습니다',
+    '합니다', '한다', '했다', '된다', '되어', '하는', '해야', 'note',
+    '생각합니다', '관점이', '지점', '갈린', '모델', '원본',
+    '최종', '종합자', '없음', '것이', '있는', '있고', '있다', '대해',
+    '다만', '반면', '구체적으로', '유용한', '저는',
+  ]);
+
+  return [...new Set(String(text || '')
+    .replace(/[^\p{L}\p{N}\s_-]/gu, ' ')
+    .split(/\s+/)
+    .map(t => t.trim())
+    .filter(t => t.length >= 2)
+    .filter(t => !/^-+$/.test(t))
+    .filter(t => !/^\d+$/.test(t))
+    .filter(t => !/^\d{4}-\d{2}-\d{2}/.test(t))
+    .filter(t => !stopWords.has(t))
+  )];
+}
+
+function buildCodexTags({ title, frontmatter, raw }) {
+  const hint = extractAiHint(raw);
+  const base = [
+    title,
+    hint,
+    getCodexSignalText(raw).slice(0, 600),
+  ].join(' ');
+
+  const tags = noteTokenize(base).slice(0, 6);
+  if (frontmatter.note_type === 'council') tags.unshift('의회');
+  if (frontmatter.note_type === 'single_manual') tags.unshift('단일답변');
+  if (frontmatter.note_type === 'user_manual') tags.unshift('사용자저장');
+  return tags;
+}
+
+async function listVaultNoteCandidates(excludeFilename) {
+  let files;
+  try {
+    files = await fs.readdir(VAULT_PATH);
+  } catch {
+    return [];
+  }
+
+  const candidates = [];
+  for (const filename of files.filter(f => f.endsWith('.md') && f !== excludeFilename && f !== MEMORY_FILE)) {
+    try {
+      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const fm = parseSimpleFrontmatter(raw);
+      if (parseFrontmatterBoolean(fm.archived)) continue;
+      const title = parseNoteTitle(raw, filename);
+      candidates.push({
+        filename,
+        title,
+        text: [title, getCodexSignalText(raw).slice(0, 1600)].join(' '),
+      });
+    } catch { /* 후보 노트 읽기 실패 시 스킵 */ }
+  }
+  return candidates;
+}
+
+async function buildCodexLinks({ filename, title, raw }) {
+  const sourceTokens = noteTokenize([title, getCodexSignalText(raw).slice(0, 1600)].join(' '));
+  if (sourceTokens.length === 0) return [];
+
+  const candidates = await listVaultNoteCandidates(filename);
+  const indexed = candidates.map(candidate => ({
+    candidate,
+    tokens: noteTokenize(candidate.text),
+  }));
+  const docFreq = new Map();
+  indexed.forEach(({ tokens }) => {
+    tokens.forEach(token => docFreq.set(token, (docFreq.get(token) || 0) + 1));
+  });
+
+  return indexed
+    .map(({ candidate, tokens }) => {
+      const overlap = sourceTokens
+        .filter(token => tokens.includes(token))
+        .filter(token => token.length >= 3)
+        .filter(token => (docFreq.get(token) || 0) <= 2)
+        .slice(0, 5);
+      return { candidate, overlap };
+    })
+    .filter(result => result.overlap.length >= 2)
+    .sort((a, b) => b.overlap.length - a.overlap.length)
+    .slice(0, 5)
+    .map(({ candidate, overlap }) => ({
+      topic: '관련 노트',
+      title: candidate.title,
+      reason: `공통 키워드: ${overlap.join(', ')}`,
+      strength: Math.min(3, overlap.length),
+    }));
+}
+
+function replaceMarkerBlock(raw, startMarker, endMarker, replacement) {
+  const start = raw.indexOf(startMarker);
+  const end = raw.indexOf(endMarker);
+  if (start < 0 || end < 0 || end < start) {
+    throw new Error(`CODEX 마커 누락: ${startMarker} / ${endMarker}`);
+  }
+
+  const before = raw.slice(0, start + startMarker.length);
+  const after = raw.slice(end);
+  const body = replacement ? `\n${replacement}\n` : '\n';
+  return before + body + after;
+}
+
+async function writeVaultNoteByFilename(filename, content) {
+  const safeName = path.basename(filename || '');
+  if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
+    throw new Error('잘못된 노트 파일명입니다.');
+  }
+
+  const filepath = path.join(VAULT_PATH, safeName);
+  if (!filepath.startsWith(VAULT_PATH + path.sep)) {
+    throw new Error('잘못된 경로입니다.');
+  }
+
+  const tmpPath = filepath + '.tmp';
+  await fs.writeFile(tmpPath, content, 'utf8');
+  await fs.rename(tmpPath, filepath);
+}
+
+function execFileWithInput(command, args, input, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = execFile(command, args, {
+      cwd: options.cwd || __dirname,
+      env: options.env || process.env,
+      timeout: options.timeout || CODEX_RUNNER_TIMEOUT_MS,
+      maxBuffer: 1024 * 1024 * 8,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+
+    if (input) child.stdin.end(input);
+  });
+}
+
+function stripCodexOwnedBlocks(raw) {
+  return String(raw || '')
+    .replace(/<!-- CODEX-TAGS-START -->[\s\S]*?<!-- CODEX-TAGS-END -->/g, '<!-- CODEX-TAGS-START -->\n<!-- CODEX-TAGS-END -->')
+    .replace(/<!-- CODEX-LINKS-START -->[\s\S]*?<!-- CODEX-LINKS-END -->/g, '<!-- CODEX-LINKS-START -->\n<!-- CODEX-LINKS-END -->');
+}
+
+function assertOnlyCodexBlocksChanged(before, after, filename) {
+  const requiredMarkers = [
+    '<!-- CODEX-TAGS-START -->',
+    '<!-- CODEX-TAGS-END -->',
+    '<!-- CODEX-LINKS-START -->',
+    '<!-- CODEX-LINKS-END -->',
+  ];
+
+  requiredMarkers.forEach(marker => {
+    if (!String(after || '').includes(marker)) {
+      throw new Error(`${filename}: CODEX 마커 누락: ${marker}`);
+    }
+  });
+
+  if (stripCodexOwnedBlocks(before) !== stripCodexOwnedBlocks(after)) {
+    throw new Error(`${filename}: CODEX 허용 구역 밖 변경 감지`);
+  }
+}
+
+async function snapshotVaultFiles(filenames) {
+  const snapshots = new Map();
+  for (const filename of filenames) {
+    const safeName = path.basename(filename || '');
+    if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
+      throw new Error(`잘못된 노트 파일명입니다: ${filename}`);
+    }
+    snapshots.set(safeName, await fs.readFile(path.join(VAULT_PATH, safeName), 'utf8'));
+  }
+  return snapshots;
+}
+
+async function restoreVaultSnapshots(snapshots) {
+  for (const [filename, raw] of snapshots.entries()) {
+    await writeVaultNoteByFilename(filename, raw);
+  }
+}
+
+async function assertCodexDiffAllowed(snapshots) {
+  for (const [filename, before] of snapshots.entries()) {
+    const after = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+    assertOnlyCodexBlocksChanged(before, after, filename);
+  }
+}
+
+async function validateCodexEdit() {
+  await execFileWithInput(process.execPath, [path.join(__dirname, 'scripts/validate-codex-edit.js')], '', {
+    cwd: __dirname,
+    env: { ...process.env, VAULT_PATH },
+    timeout: 30000,
+  });
+}
+
+function buildCodexRunnerPrompt(filenames) {
+  return `너는 AI Council Obsidian vault의 Codex 정리 담당자다.
+
+작업 루트는 현재 디렉터리이며, 이 디렉터리는 Obsidian vault다.
+
+대상 파일:
+${filenames.map(filename => `- ${filename}`).join('\n')}
+
+목표:
+- 각 대상 노트를 읽고 의미 기반 주제 태그를 작성한다.
+- vault 안의 다른 노트들을 참고해 의미상 강한 연결만 작성한다.
+- 연결 근거가 약하면 CODEX-LINKS 구역을 비워둔다.
+
+수정 허용 범위:
+- <!-- CODEX-TAGS-START --> 와 <!-- CODEX-TAGS-END --> 사이
+- <!-- CODEX-LINKS-START --> 와 <!-- CODEX-LINKS-END --> 사이
+
+절대 수정 금지:
+- frontmatter
+- 제목
+- AI 회수 힌트
+- 질문 원문
+- 본문/결론
+- 원본 답변
+- 사용자 작성 문서
+- CODEX 마커 자체
+- 대상 파일 밖의 파일
+- 파일 삭제/이동/이름 변경
+
+출력 형식:
+- 태그는 #태그 형식으로 3~8개 작성한다.
+- 링크는 Obsidian wiki link 형식 [[노트 제목]]을 사용한다.
+- 링크는 "왜 연결되는지"를 짧게 쓴다.
+- 확신이 낮은 링크는 만들지 않는다.
+
+작업 후 최종 답변에는 처리한 파일명만 간단히 적어라.`;
+}
+
+async function runCodexCliForJob(filenames) {
+  const prompt = buildCodexRunnerPrompt(filenames);
+  return execFileWithInput(CODEX_BIN, [
+    'exec',
+    '-C', VAULT_PATH,
+    '--skip-git-repo-check',
+    '--sandbox', 'workspace-write',
+    '--color', 'never',
+    '-',
+  ], prompt, {
+    cwd: VAULT_PATH,
+    env: process.env,
+    timeout: CODEX_RUNNER_TIMEOUT_MS,
+  });
+}
+
+async function processCodexNoteWithHeuristic(filename) {
+  const safeName = path.basename(filename || '');
+  if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
+    throw new Error('잘못된 노트 파일명입니다.');
+  }
+
+  const filepath = path.join(VAULT_PATH, safeName);
+  const raw = await fs.readFile(filepath, 'utf8');
+  const frontmatter = parseSimpleFrontmatter(raw);
+  const title = parseNoteTitle(raw, safeName);
+  const tagsBlock = formatCodexTags(buildCodexTags({ title, frontmatter, raw }));
+  const linksBlock = formatCodexLinks(await buildCodexLinks({ filename: safeName, title, raw }));
+
+  let next = replaceMarkerBlock(raw, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->', tagsBlock);
+  next = replaceMarkerBlock(next, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', linksBlock);
+
+  if (next !== raw) await writeVaultNoteByFilename(safeName, next);
+  stmtUpdateNoteCodexStatus.run('processed', safeName);
+
+  return { filename: safeName, title, tags: tagsBlock, links: linksBlock };
+}
+
+async function processCodexJobWithCodex(filenames) {
+  const snapshots = await snapshotVaultFiles(filenames);
+
+  try {
+    await runCodexCliForJob(filenames);
+    await assertCodexDiffAllowed(snapshots);
+    await validateCodexEdit();
+  } catch (err) {
+    await restoreVaultSnapshots(snapshots);
+    throw new Error(`Codex 실행/검증 실패: ${err.message}${err.stderr ? ` (${String(err.stderr).slice(0, 500)})` : ''}`);
+  }
+
+  return Promise.all(filenames.map(async filename => {
+    const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+    const title = parseNoteTitle(raw, filename);
+    stmtUpdateNoteCodexStatus.run('processed', filename);
+    return { filename, title, tags: null, links: null };
+  }));
+}
+
+async function processImmediateCodexBatch(filenames) {
+  filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('running', filename));
+
+  if (CODEX_RUNNER_MODE === 'codex') {
+    return processCodexJobWithCodex(filenames);
+  }
+
+  const processed = [];
+  for (const filename of filenames) {
+    processed.push(await processCodexNoteWithHeuristic(filename));
+  }
+  return processed;
+}
+
+async function runAllCodexNotes() {
+  const notes = stmtGetOrganizableNotes.all();
+  if (notes.length === 0) {
+    return {
+      processed: false,
+      message: '재정리할 노트가 없습니다.',
+      processedCount: 0,
+      failedCount: 0,
+      batches: [],
+      notes: [],
+      failed: [],
+    };
+  }
+
+  const processed = [];
+  const failed = [];
+  const batches = [];
+  const batchSize = CODEX_AUTO_QUEUE_THRESHOLD;
+
+  for (let i = 0; i < notes.length; i += batchSize) {
+    const batch = notes.slice(i, i + batchSize);
+    const filenames = batch.map(note => note.filename);
+
+    try {
+      const batchProcessed = await processImmediateCodexBatch(filenames);
+      processed.push(...batchProcessed);
+      batches.push({
+        index: batches.length + 1,
+        status: 'processed',
+        filenames,
+        processedCount: batchProcessed.length,
+        failedCount: 0,
+      });
+    } catch (err) {
+      filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('needs_manual_check', filename));
+      const batchFailures = filenames.map(filename => ({ filename, error: err.message }));
+      failed.push(...batchFailures);
+      batches.push({
+        index: batches.length + 1,
+        status: 'failed',
+        filenames,
+        processedCount: 0,
+        failedCount: batchFailures.length,
+        error: err.message,
+      });
+    }
+  }
+
+  return {
+    processed: true,
+    status: failed.length > 0 ? 'partial_failed' : 'processed',
+    processedCount: processed.length,
+    failedCount: failed.length,
+    batches,
+    notes: processed,
+    failed,
+  };
+}
+
+async function runNextCodexJob() {
+  const job = startNextCodexJob();
+  if (!job) return null;
+
+  const processed = [];
+  const failed = [];
+
+  if (CODEX_RUNNER_MODE === 'codex') {
+    try {
+      processed.push(...await processCodexJobWithCodex(job.filenames));
+    } catch (err) {
+      job.filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('needs_manual_check', filename));
+      failed.push(...job.filenames.map(filename => ({ filename, error: err.message })));
+    }
+  } else {
+    for (const filename of job.filenames) {
+      try {
+        processed.push(await processCodexNoteWithHeuristic(filename));
+      } catch (err) {
+        stmtUpdateNoteCodexStatus.run('needs_manual_check', filename);
+        failed.push({ filename, error: err.message });
+      }
+    }
+  }
+
+  if (failed.length > 0) {
+    const error = `${failed.length}/${job.filenames.length}개 노트 정리 실패`;
+    finishCodexJob(job.id, 'failed', error);
+    return { id: job.id, status: 'failed', processed, failed, error };
+  }
+
+  finishCodexJob(job.id, 'processed', null);
+  return { id: job.id, status: 'processed', processed, failed };
 }
 
 async function resolveActiveNotes(activeNotes) {
@@ -1497,7 +2002,7 @@ ${reviewSection}
 `;
 
   try {
-    await saveVaultNoteRecord({
+    const queuedJob = await saveVaultNoteRecord({
       fileId,
       title,
       noteType: 'council',
@@ -1506,7 +2011,7 @@ ${reviewSection}
       messageId,
       codexStatus: 'pending',
     });
-    res.json({ success: true, filename: fileId + '.md', title });
+    res.json({ success: true, filename: fileId + '.md', title, queuedJob });
   } catch (err) {
     console.error('노트 저장 오류:', err.message);
     res.status(500).json({ error: `노트 저장 실패: ${err.message}` });

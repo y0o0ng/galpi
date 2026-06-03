@@ -20,6 +20,9 @@ const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 활성 컨텍스트에 추가' },
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
+  { command: '/organize run', title: '정리 큐 생성', description: '정리 대기 노트를 Codex job queue에 추가' },
+  { command: '/organize process', title: '정리 실행', description: '대기 중인 Codex job 하나를 처리' },
+  { command: '/organize all', title: '전체 재정리', description: '모든 활성 노트를 Codex로 다시 정리' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
@@ -260,6 +263,24 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     if (query) handleSearch(query);
+    return;
+  }
+  if (text === '/organize run') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleOrganizeRun(true);
+    return;
+  }
+  if (text === '/organize process') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleOrganizeProcess(true);
+    return;
+  }
+  if (text === '/organize all') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleOrganizeAll(true);
     return;
   }
   if (text === '/organize') {
@@ -817,13 +838,98 @@ async function handleOrganizeStatus() {
   }
 }
 
+async function handleOrganizeRun(showUserCommand = false) {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  if (showUserCommand) appendUserBubble('/organize run');
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await fetch('/api/organize/queue', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (data.error) {
+      appendError(data.error);
+      return;
+    }
+
+    renderOrganizeQueueResult(data);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
+async function handleOrganizeProcess(showUserCommand = false) {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  if (showUserCommand) appendUserBubble('/organize process');
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await fetch('/api/organize/process', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (data.error && !data.processed) {
+      appendError(data.error);
+      return;
+    }
+
+    renderOrganizeProcessResult(data);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
+async function handleOrganizeAll(showUserCommand = false) {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  if (showUserCommand) appendUserBubble('/organize all');
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await fetch('/api/organize/all', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (data.error) {
+      appendError(data.error);
+      return;
+    }
+
+    renderOrganizeAllResult(data);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
 function renderOrganizeStatus(data) {
   const group = document.createElement('div');
   group.className = 'msg-group assistant';
 
-  const label = document.createElement('div');
-  label.className = 'model-label';
-  label.textContent = 'Organize';
+  const label = makeModelLabel('Organize');
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
@@ -835,12 +941,133 @@ function renderOrganizeStatus(data) {
   const more = notes.length > 10 ? `\n...외 ${notes.length - 10}개` : '';
 
   bubble.textContent = [
+    `자동 큐 기준: ${data.autoQueueThreshold || 5}개`,
     `정리 대기: ${data.pending || 0}개`,
+    `큐 대기: ${data.queued || 0}개`,
+    `실행 중: ${data.running || 0}개`,
     `완료: ${data.processed || 0}개`,
     `실패: ${data.failed || 0}개`,
     `수동 확인: ${data.needsManualCheck || 0}개`,
     rows.length ? `\n대기 노트:\n${rows.join('\n')}${more}` : '\n대기 노트 없음',
   ].join('\n');
+
+  group.append(label, bubble);
+
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+  const runnableJobs = jobs.filter(job => job.status === 'pending');
+
+  if (notes.length > 0 || runnableJobs.length > 0) {
+    const actionRow = document.createElement('div');
+    actionRow.className = 'organize-actions';
+
+    if (notes.length > 0) {
+      const queueBtn = document.createElement('button');
+      queueBtn.className = 'save-btn';
+      queueBtn.textContent = '정리 큐에 넣기';
+      queueBtn.addEventListener('click', () => handleOrganizeRun(false));
+      actionRow.appendChild(queueBtn);
+    }
+
+    if (runnableJobs.length > 0) {
+      const processBtn = document.createElement('button');
+      processBtn.className = 'save-btn';
+      processBtn.textContent = '정리';
+      processBtn.addEventListener('click', () => handleOrganizeProcess(false));
+      actionRow.appendChild(processBtn);
+    }
+
+    group.appendChild(actionRow);
+  }
+
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Organize');
+  scrollDown();
+}
+
+function renderOrganizeQueueResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = makeModelLabel('Organize');
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  const notes = Array.isArray(data.notes) ? data.notes : [];
+  const rows = notes.map((note, index) =>
+    `${index + 1}. ${note.title} (${note.noteType})`
+  );
+
+  bubble.textContent = data.created
+    ? [
+        `정리 job 생성됨: #${data.jobId}`,
+        `상태: ${data.status}`,
+        rows.length ? `\n큐에 들어간 노트:\n${rows.join('\n')}` : '',
+      ].filter(Boolean).join('\n')
+    : (data.message || '정리 대기 노트가 없습니다.');
+
+  group.append(label, bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Organize');
+  scrollDown();
+}
+
+function renderOrganizeProcessResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = makeModelLabel('Organize');
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  const notes = Array.isArray(data.notes) ? data.notes : [];
+  const failed = Array.isArray(data.failed) ? data.failed : [];
+  const rows = notes.map((note, index) => `${index + 1}. ${note.title}`);
+  const failedRows = failed.map(item => `- ${item.filename}: ${item.error}`);
+
+  bubble.textContent = data.processed
+    ? [
+        `정리 job 처리됨: #${data.jobId}`,
+        `상태: ${data.status}`,
+        rows.length ? `\n처리한 노트:\n${rows.join('\n')}` : '',
+        failedRows.length ? `\n수동 확인 필요:\n${failedRows.join('\n')}` : '',
+      ].filter(Boolean).join('\n')
+    : (data.message || '실행할 정리 job이 없습니다.');
+
+  group.append(label, bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Organize');
+  scrollDown();
+}
+
+function renderOrganizeAllResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = makeModelLabel('Organize');
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  const batches = Array.isArray(data.batches) ? data.batches : [];
+  const failed = Array.isArray(data.failed) ? data.failed : [];
+  const batchRows = batches.map(batch =>
+    `${batch.index}. ${batch.status} (${batch.processedCount || 0}/${batch.filenames?.length || 0})`
+  );
+  const failedRows = failed.slice(0, 10).map(item => `- ${item.filename}: ${item.error}`);
+  const moreFailed = failed.length > 10 ? `\n...외 ${failed.length - 10}개` : '';
+
+  bubble.textContent = data.processed
+    ? [
+        '전체 재정리 완료',
+        `상태: ${data.status}`,
+        `처리: ${data.processedCount || 0}개`,
+        `실패: ${data.failedCount || 0}개`,
+        batchRows.length ? `\n배치:\n${batchRows.join('\n')}` : '',
+        failedRows.length ? `\n수동 확인 필요:\n${failedRows.join('\n')}${moreFailed}` : '',
+      ].filter(Boolean).join('\n')
+    : (data.message || '재정리할 노트가 없습니다.');
 
   group.append(label, bubble);
   getMessages().appendChild(group);
