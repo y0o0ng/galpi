@@ -2604,6 +2604,7 @@ async function generateEmbedding(text) {
 }
 
 function cosineSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return 0;
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
@@ -3276,4 +3277,9 @@ app.listen(PORT, HOST, () => {
   console.log(`   GPT:      ${GPT_MODEL} / deep ${GPT_DEEP_MODEL}`);
   console.log(`   Codex:    ${CODEX_MODEL} / deep ${CODEX_DEEP_MODEL}`);
   console.log(`   컨텍스트: 최근 ${CONTEXT_N}턴 내외 (${HISTORY_CONTEXT_MESSAGES}개 메시지)\n`);
+  if (HOST === '0.0.0.0' && !API_TOKEN) {
+    console.warn('⚠️  경고: 0.0.0.0으로 LAN에 열려 있는데 API_TOKEN이 비어 있습니다.');
+    console.warn('   같은 네트워크의 누구나 API를 호출해 키 크레딧을 쓰고 볼트를 읽을 수 있습니다.');
+    console.warn('   .env에 API_TOKEN을 설정하세요.\n');
+  }
 });
