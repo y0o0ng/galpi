@@ -40,7 +40,12 @@ function parseFrontmatter(raw) {
 }
 
 function shouldSkipFile(filename) {
-  return !filename.endsWith('.md') || filename.startsWith('.');
+  return (
+    !filename.endsWith('.md') ||
+    filename.startsWith('.') ||
+    filename === 'memory.md' ||
+    filename.startsWith('_system/')
+  );
 }
 
 function validateFile(filename) {

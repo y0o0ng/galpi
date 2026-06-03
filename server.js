@@ -409,14 +409,15 @@ function formatCodexLinks(links) {
   if (!Array.isArray(links) || links.length === 0) return '';
 
   const grouped = new Map();
-  links.slice(0, 8).forEach(link => {
+  links.slice(0, 10).forEach(link => {
     const topic = String(link.topic || '관련 노트').replace(/\s+/g, ' ').trim().slice(0, 40);
     const title = String(link.title || '').replace(/[\[\]\n]/g, '').trim().slice(0, 80);
     if (!title) return;
     const reason = String(link.reason || '관련 내용').replace(/\s+/g, ' ').trim().slice(0, 100);
-    const stars = '⭐'.repeat(Math.min(3, Math.max(1, Number.parseInt(link.strength, 10) || 1)));
+    const rawScore = Number.parseInt(link.score ?? link.strength, 10);
+    const score = Math.min(100, Math.max(60, Number.isFinite(rawScore) ? rawScore : 60));
     if (!grouped.has(topic)) grouped.set(topic, []);
-    grouped.get(topic).push(`- ${stars} [[${title}]] — ${reason}`);
+    grouped.get(topic).push(`- ${score} [[${title}]] — ${reason}`);
   });
 
   return [...grouped.entries()]
@@ -1122,24 +1123,39 @@ async function buildCodexLinks({ filename, title, raw }) {
     })
     .filter(result => result.overlap.length >= 2)
     .sort((a, b) => b.overlap.length - a.overlap.length)
-    .slice(0, 5)
+    .slice(0, 10)
     .map(({ candidate, overlap }) => ({
       topic: '관련 노트',
       title: candidate.title,
       reason: `공통 키워드: ${overlap.join(', ')}`,
-      strength: Math.min(3, overlap.length),
+      score: Math.min(95, 45 + (overlap.length * 15)),
     }));
 }
 
+function findLastMarkerBlock(raw, startMarker, endMarker) {
+  const text = String(raw || '');
+  const start = text.lastIndexOf(startMarker);
+  if (start < 0) return null;
+
+  const end = text.indexOf(endMarker, start + startMarker.length);
+  if (end < 0) return null;
+
+  return {
+    start,
+    bodyStart: start + startMarker.length,
+    end,
+    endWithMarker: end + endMarker.length,
+  };
+}
+
 function replaceMarkerBlock(raw, startMarker, endMarker, replacement) {
-  const start = raw.indexOf(startMarker);
-  const end = raw.indexOf(endMarker);
-  if (start < 0 || end < 0 || end < start) {
+  const range = findLastMarkerBlock(raw, startMarker, endMarker);
+  if (!range) {
     throw new Error(`CODEX 마커 누락: ${startMarker} / ${endMarker}`);
   }
 
-  const before = raw.slice(0, start + startMarker.length);
-  const after = raw.slice(end);
+  const before = raw.slice(0, range.bodyStart);
+  const after = raw.slice(range.end);
   const body = replacement ? `\n${replacement}\n` : '\n';
   return before + body + after;
 }
@@ -1181,10 +1197,27 @@ function execFileWithInput(command, args, input, options = {}) {
   });
 }
 
+function isCodexRunnerUnavailableError(err) {
+  const text = `${err?.message || ''}\n${err?.stderr || ''}\n${err?.stdout || ''}`.toLowerCase();
+  return (
+    text.includes('usage limit') ||
+    text.includes('purchase more credits') ||
+    text.includes('try again at') ||
+    text.includes('rate limit')
+  );
+}
+
 function stripCodexOwnedBlocks(raw) {
-  return String(raw || '')
-    .replace(/<!-- CODEX-TAGS-START -->[\s\S]*?<!-- CODEX-TAGS-END -->/g, '<!-- CODEX-TAGS-START -->\n<!-- CODEX-TAGS-END -->')
-    .replace(/<!-- CODEX-LINKS-START -->[\s\S]*?<!-- CODEX-LINKS-END -->/g, '<!-- CODEX-LINKS-START -->\n<!-- CODEX-LINKS-END -->');
+  let text = String(raw || '');
+  [
+    ['<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->'],
+    ['<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->'],
+  ].forEach(([startMarker, endMarker]) => {
+    const range = findLastMarkerBlock(text, startMarker, endMarker);
+    if (!range) return;
+    text = text.slice(0, range.bodyStart) + '\n' + text.slice(range.end);
+  });
+  return text;
 }
 
 function assertOnlyCodexBlocksChanged(before, after, filename) {
@@ -1270,9 +1303,18 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 
 출력 형식:
 - 태그는 #태그 형식으로 3~8개 작성한다.
-- 링크는 Obsidian wiki link 형식 [[노트 제목]]을 사용한다.
-- 링크는 "왜 연결되는지"를 짧게 쓴다.
-- 확신이 낮은 링크는 만들지 않는다.
+- 링크는 아래 형식을 정확히 따른다.
+  **[주제명]**
+  - 85 [[노트 제목]] — 왜 연결되는지 짧은 이유
+- 링크 점수는 1~100 정수로, 반드시 wiki link 앞에 쓴다.
+- 90~100: 같은 핵심 개념/프로젝트/문제의 직접 후속 또는 거의 같은 맥락.
+- 75~89: 같은 큰 주제 안에서 함께 보면 의미가 강하게 보강되는 노트.
+- 60~74: 보조 맥락으로 유용하지만 핵심은 다른 노트.
+- 60 미만이거나 확신이 낮은 링크는 만들지 않는다.
+- 각 대상 노트당 링크는 최대 10개까지 작성한다.
+- 재정리 중 기존 링크보다 점수가 높거나 의미 연결성이 더 강한 후보를 찾으면, 낮은 점수의 기존 링크를 대체해 상위 10개만 남긴다.
+- 기존 링크와 새 후보가 같은 노트를 가리키면 더 정확한 점수와 이유로 갱신하되 중복으로 남기지 않는다.
+- 존재하지 않는 노트 제목을 만들지 말고, vault 안의 실제 노트 제목만 사용한다.
 
 작업 후 최종 답변에는 처리한 파일명만 간단히 적어라.`;
 }
@@ -1371,6 +1413,7 @@ async function runAllCodexNotes() {
   for (let i = 0; i < notes.length; i += batchSize) {
     const batch = notes.slice(i, i + batchSize);
     const filenames = batch.map(note => note.filename);
+    const previousStatuses = new Map(batch.map(note => [note.filename, note.codexStatus || 'processed']));
 
     try {
       const batchProcessed = await processImmediateCodexBatch(filenames);
@@ -1383,7 +1426,13 @@ async function runAllCodexNotes() {
         failedCount: 0,
       });
     } catch (err) {
-      filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('needs_manual_check', filename));
+      const retryableRunnerFailure = isCodexRunnerUnavailableError(err);
+      filenames.forEach(filename => {
+        const nextStatus = retryableRunnerFailure
+          ? previousStatuses.get(filename) || 'processed'
+          : 'needs_manual_check';
+        stmtUpdateNoteCodexStatus.run(nextStatus, filename);
+      });
       const batchFailures = filenames.map(filename => ({ filename, error: err.message }));
       failed.push(...batchFailures);
       batches.push({
@@ -1419,7 +1468,9 @@ async function runNextCodexJob() {
     try {
       processed.push(...await processCodexJobWithCodex(job.filenames));
     } catch (err) {
-      job.filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('needs_manual_check', filename));
+      const retryableRunnerFailure = isCodexRunnerUnavailableError(err);
+      const failedStatus = retryableRunnerFailure ? 'pending' : 'needs_manual_check';
+      job.filenames.forEach(filename => stmtUpdateNoteCodexStatus.run(failedStatus, filename));
       failed.push(...job.filenames.map(filename => ({ filename, error: err.message })));
     }
   } else {
