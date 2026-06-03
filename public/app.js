@@ -964,7 +964,7 @@ async function handleEmbed() {
     group.append(makeModelLabel('Embed'));
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    bubble.textContent = data.message || '임베딩 생성 시작됨';
+    bubble.textContent = data.message || `완료: ${data.embedded ?? 0}개 임베딩 생성`;
     group.appendChild(bubble);
     getMessages().appendChild(group);
     scrollDown();

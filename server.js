@@ -1739,23 +1739,24 @@ app.post('/api/vault/embed-all', async (req, res) => {
   if (!openai) return res.status(400).json({ error: 'OpenAI API 키가 없습니다.' });
 
   const notes = stmtGetNotesWithoutEmbedding.all();
-  if (notes.length === 0) return res.json({ success: true, embedded: 0, message: '모든 노트에 임베딩이 있습니다.' });
+  if (notes.length === 0) return res.json({ success: true, embedded: 0, message: '모든 노트에 이미 임베딩이 있습니다.' });
 
-  res.json({ success: true, total: notes.length, message: `${notes.length}개 노트 임베딩 생성 시작` });
+  let done = 0, failed = 0;
+  for (const { filename, title } of notes) {
+    try {
+      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const body = stripFrontmatter(raw);
+      await generateAndStoreEmbedding(filename, title + '\n' + body);
+      done++;
+    } catch { failed++; }
+  }
 
-  // 응답 후 백그라운드 처리
-  (async () => {
-    let done = 0;
-    for (const { filename, title } of notes) {
-      try {
-        const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
-        const body = stripFrontmatter(raw);
-        await generateAndStoreEmbedding(filename, title + '\n' + body);
-        done++;
-      } catch { /* skip */ }
-    }
-    console.log(`✅ 임베딩 완료: ${done}/${notes.length}개`);
-  })();
+  res.json({
+    success: true,
+    embedded: done,
+    failed,
+    message: `완료: ${done}개 임베딩 생성${failed > 0 ? `, ${failed}개 실패` : ''}`,
+  });
 });
 
 // 사용자 메모리는 항상, activeNotes/자동 검색 노트는 질문별 참조로 주입하는 헬퍼
