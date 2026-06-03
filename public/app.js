@@ -9,6 +9,7 @@ const sessionId = (() => {
 })();
 const uiHistoryKey = `councilUiHistory:${sessionId}`;
 const activeNotesKey = `councilActiveNotes:${sessionId}`;
+const apiTokenKey = 'councilApiToken';
 let currentModel     = 'claude';
 let isLoading        = false;
 let councilMode      = false;
@@ -22,11 +23,34 @@ const slashCommands = [
   { command: '/embed', title: '임베딩 생성', description: '모든 노트의 시맨틱 검색용 임베딩 생성' },
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
   { command: '/organize all', title: '전체 재정리', description: '모든 활성 노트를 Codex로 다시 정리' },
+  { command: '/archived', title: '보관함', description: '숨긴(보관한) 노트 목록 — 복원 가능' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
   { command: '/memory clear', title: '메모리 초기화', description: '저장된 사용자 메모리 전체 삭제' },
 ];
+
+function getApiToken() {
+  return localStorage.getItem(apiTokenKey) || '';
+}
+
+function setApiToken(token) {
+  const clean = String(token || '').trim();
+  if (clean) localStorage.setItem(apiTokenKey, clean);
+}
+
+function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = getApiToken();
+  if (token) headers.set('X-API-Token', token);
+  return fetch(url, { ...options, headers });
+}
+
+function ensureApiToken(config) {
+  if (!config?.requiresApiToken || getApiToken()) return;
+  const token = window.prompt('API 토큰을 입력해주세요.');
+  setApiToken(token);
+}
 
 // ─── 초기화 ──────────────────────────────────────────────────────────────────
 
@@ -36,7 +60,8 @@ async function init() {
   document.querySelector('.council-mode-toggle').classList.add('disabled');
 
   try {
-    const config = await fetch('/api/config').then(r => r.json());
+    const config = await apiFetch('/api/config').then(r => r.json());
+    ensureApiToken(config);
     document.getElementById('model-indicator').textContent =
       `Claude: ${config.claudeModel}  |  GPT: ${config.gptModel}`;
 
@@ -357,18 +382,6 @@ function sendMessage() {
     if (query) handleSearch(query);
     return;
   }
-  if (text === '/organize run') {
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
-    handleOrganizeRun(true);
-    return;
-  }
-  if (text === '/organize process') {
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
-    handleOrganizeProcess(true);
-    return;
-  }
   if (text === '/organize all') {
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -385,6 +398,12 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleOrganizeStatus();
+    return;
+  }
+  if (text === '/archived') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleArchivedList();
     return;
   }
   if (text.startsWith('/save ')) {
@@ -496,7 +515,7 @@ async function sendSingleMessage() {
 
   try {
     document.dispatchEvent(new Event('pet:building'));
-    const res = await fetch('/api/chat', {
+    const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ message: text, model: currentModel, sessionId, activeNotes }),
@@ -553,7 +572,7 @@ async function sendCouncilMessage() {
 
   try {
     // ── 1단계: 1차 답변 ────────────────────────────────────────────
-    const debateRes = await fetch('/api/council/debate', {
+    const debateRes = await apiFetch('/api/council/debate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ question: text, sessionId, councilDraftMode, activeNotes }),
@@ -575,7 +594,7 @@ async function sendCouncilMessage() {
       updateLoadingText(loadingEl, '상호 검토 중…');
 
       try {
-        const reviewRes = await fetch('/api/council/review', {
+        const reviewRes = await apiFetch('/api/council/review', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
@@ -756,7 +775,7 @@ async function chooseSynthesizer(container, body, question, debateData, reviewDa
   scrollDown();
 
   try {
-    const res = await fetch('/api/council/synthesize', {
+    const res = await apiFetch('/api/council/synthesize', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
@@ -865,7 +884,7 @@ async function saveCouncilNote(btn, data) {
   btn.disabled = true;
   btn.innerHTML = loadingIconSvg();
   try {
-    const res = await fetch('/api/council/save-note', {
+    const res = await apiFetch('/api/council/save-note', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ ...data, sessionId }),
@@ -926,7 +945,7 @@ async function handleOrganizeStatus() {
 
   const loadingEl = appendLoading();
   try {
-    const res = await fetch('/api/organize/status');
+    const res = await apiFetch('/api/organize/status');
     const data = await res.json();
     loadingEl.remove();
 
@@ -952,7 +971,7 @@ async function handleEmbed() {
   const loadingEl = appendLoading();
   document.dispatchEvent(new Event('pet:building'));
   try {
-    const res = await fetch('/api/vault/embed-all', { method: 'POST' });
+    const res = await apiFetch('/api/vault/embed-all', { method: 'POST' });
     const data = await res.json();
     loadingEl.remove();
     if (data.error) { appendError(data.error); return; }
@@ -977,68 +996,6 @@ async function handleEmbed() {
   }
 }
 
-async function handleOrganizeRun(showUserCommand = false) {
-  if (isLoading) return;
-  isLoading = true;
-  document.getElementById('send-btn').disabled = true;
-  document.querySelector('.welcome')?.remove();
-  if (showUserCommand) appendUserBubble('/organize run');
-
-  document.dispatchEvent(new Event('pet:thinking'));
-  const loadingEl = appendLoading();
-  try {
-    const res = await fetch('/api/organize/queue', { method: 'POST' });
-    const data = await res.json();
-    loadingEl.remove();
-
-    if (data.error) {
-      appendError(data.error);
-      return;
-    }
-
-    renderOrganizeQueueResult(data);
-    document.dispatchEvent(new Event('pet:happy'));
-  } catch (_) {
-    loadingEl.remove();
-    appendError('서버에 연결할 수 없습니다.');
-  } finally {
-    isLoading = false;
-    document.getElementById('send-btn').disabled = false;
-    document.getElementById('input').focus();
-  }
-}
-
-async function handleOrganizeProcess(showUserCommand = false) {
-  if (isLoading) return;
-  isLoading = true;
-  document.getElementById('send-btn').disabled = true;
-  document.querySelector('.welcome')?.remove();
-  if (showUserCommand) appendUserBubble('/organize process');
-
-  document.dispatchEvent(new Event('pet:building'));
-  const loadingEl = appendLoading();
-  try {
-    const res = await fetch('/api/organize/process', { method: 'POST' });
-    const data = await res.json();
-    loadingEl.remove();
-
-    if (data.error && !data.processed) {
-      appendError(data.error);
-      return;
-    }
-
-    renderOrganizeProcessResult(data);
-    document.dispatchEvent(new Event('pet:happy'));
-  } catch (_) {
-    loadingEl.remove();
-    appendError('서버에 연결할 수 없습니다.');
-  } finally {
-    isLoading = false;
-    document.getElementById('send-btn').disabled = false;
-    document.getElementById('input').focus();
-  }
-}
-
 async function handleOrganizeAll(showUserCommand = false) {
   if (isLoading) return;
   isLoading = true;
@@ -1049,7 +1006,7 @@ async function handleOrganizeAll(showUserCommand = false) {
   document.dispatchEvent(new Event('pet:building'));
   const loadingEl = appendLoading();
   try {
-    const res = await fetch('/api/organize/all', { method: 'POST' });
+    const res = await apiFetch('/api/organize/all', { method: 'POST' });
     const data = await res.json();
     loadingEl.remove();
 
@@ -1103,63 +1060,6 @@ function renderOrganizeStatus(data) {
   scrollDown();
 }
 
-function renderOrganizeQueueResult(data) {
-  const group = document.createElement('div');
-  group.className = 'msg-group assistant';
-
-  const label = makeModelLabel('Organize');
-
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-
-  const notes = Array.isArray(data.notes) ? data.notes : [];
-  const rows = notes.map((note, index) =>
-    `${index + 1}. ${note.title} (${note.noteType})`
-  );
-
-  bubble.textContent = data.created
-    ? [
-        `정리 job 생성됨: #${data.jobId}`,
-        `상태: ${data.status}`,
-        rows.length ? `\n큐에 들어간 노트:\n${rows.join('\n')}` : '',
-      ].filter(Boolean).join('\n')
-    : (data.message || '정리 대기 노트가 없습니다.');
-
-  group.append(label, bubble);
-  getMessages().appendChild(group);
-  saveUiMessage('assistant', bubble.textContent, 'Organize');
-  scrollDown();
-}
-
-function renderOrganizeProcessResult(data) {
-  const group = document.createElement('div');
-  group.className = 'msg-group assistant';
-
-  const label = makeModelLabel('Organize');
-
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-
-  const notes = Array.isArray(data.notes) ? data.notes : [];
-  const failed = Array.isArray(data.failed) ? data.failed : [];
-  const rows = notes.map((note, index) => `${index + 1}. ${note.title}`);
-  const failedRows = failed.map(item => `- ${item.filename}: ${item.error}`);
-
-  bubble.textContent = data.processed
-    ? [
-        `정리 job 처리됨: #${data.jobId}`,
-        `상태: ${data.status}`,
-        rows.length ? `\n처리한 노트:\n${rows.join('\n')}` : '',
-        failedRows.length ? `\n수동 확인 필요:\n${failedRows.join('\n')}` : '',
-      ].filter(Boolean).join('\n')
-    : (data.message || '실행할 정리 job이 없습니다.');
-
-  group.append(label, bubble);
-  getMessages().appendChild(group);
-  saveUiMessage('assistant', bubble.textContent, 'Organize');
-  scrollDown();
-}
-
 function renderOrganizeAllResult(data) {
   const group = document.createElement('div');
   group.className = 'msg-group assistant';
@@ -1203,7 +1103,7 @@ async function handleDocumentSave(originalText, content) {
 
   const loadingEl = appendLoading();
   try {
-    const res = await fetch('/api/vault/save-document', {
+    const res = await apiFetch('/api/vault/save-document', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ content, originalText, sessionId }),
@@ -1291,8 +1191,131 @@ function makeNoteCard(note) {
     removeBtn.disabled = true;
   });
 
-  card.append(title, excerpt, removeBtn);
+  const archiveBtn = document.createElement('button');
+  archiveBtn.className = 'note-card-remove';
+  archiveBtn.textContent = '보관';
+  archiveBtn.title = '노트를 _archive로 숨김 (검색·그래프 제외, /archived에서 복원)';
+  archiveBtn.addEventListener('click', () => archiveNoteFromUi(note.filename, archiveBtn, card));
+
+  card.append(title, excerpt, removeBtn, archiveBtn);
   return card;
+}
+
+async function archiveNoteFromUi(filename, btn, card) {
+  btn.disabled = true;
+  btn.textContent = '보관 중…';
+  try {
+    const res = await apiFetch('/api/notes/archive', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ filename }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      removeActiveNote(filename);
+      if (card) card.remove();
+      showToast('보관됨 — /archived에서 복원 가능');
+    } else {
+      btn.disabled = false;
+      btn.textContent = '보관';
+      showToast(`오류: ${data.error}`);
+    }
+  } catch (_) {
+    btn.disabled = false;
+    btn.textContent = '보관';
+    showToast('서버 연결 오류');
+  }
+}
+
+async function handleArchivedList() {
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/archived');
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await apiFetch('/api/notes/archived');
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+    renderArchivedList(Array.isArray(data.notes) ? data.notes : []);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  }
+}
+
+function renderArchivedList(notes) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('Archive'));
+
+  if (notes.length === 0) {
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = '보관된 노트가 없습니다.';
+    group.appendChild(bubble);
+    getMessages().appendChild(group);
+    scrollDown();
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'search-results';
+  const header = document.createElement('div');
+  header.className = 'search-header';
+  header.textContent = `보관된 노트 ${notes.length}개`;
+  wrap.appendChild(header);
+
+  notes.forEach(note => {
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    card.dataset.filename = note.filename;
+
+    const title = document.createElement('div');
+    title.className = 'note-card-title';
+    title.textContent = note.title;
+
+    const meta = document.createElement('div');
+    meta.className = 'note-card-excerpt';
+    meta.textContent = note.noteType || '';
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.className = 'note-card-remove';
+    restoreBtn.textContent = '복원';
+    restoreBtn.addEventListener('click', () => restoreNoteFromUi(note.filename, restoreBtn, card));
+
+    card.append(title, meta, restoreBtn);
+    wrap.appendChild(card);
+  });
+
+  group.appendChild(wrap);
+  getMessages().appendChild(group);
+  scrollDown();
+}
+
+async function restoreNoteFromUi(filename, btn, card) {
+  btn.disabled = true;
+  btn.textContent = '복원 중…';
+  try {
+    const res = await apiFetch('/api/notes/restore', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ filename }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (card) card.remove();
+      showToast('복원됨');
+    } else {
+      btn.disabled = false;
+      btn.textContent = '복원';
+      showToast(`오류: ${data.error}`);
+    }
+  } catch (_) {
+    btn.disabled = false;
+    btn.textContent = '복원';
+    showToast('서버 연결 오류');
+  }
 }
 
 function addActiveNote(note) {
@@ -1354,14 +1377,14 @@ async function handleMemoryCommand(command) {
   try {
     let res;
     if (!action) {
-      res = await fetch('/api/memory');
+      res = await apiFetch('/api/memory');
     } else if (action === 'add') {
       if (!value) {
         loadingEl.remove();
         appendError('저장할 메모리를 입력해주세요. 예: /memory add 앞으로 말 편하게 해');
         return;
       }
-      res = await fetch('/api/memory', {
+      res = await apiFetch('/api/memory', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ content: value }),
@@ -1372,9 +1395,9 @@ async function handleMemoryCommand(command) {
         appendError('삭제할 메모리 번호를 입력해주세요. 예: /memory remove 1');
         return;
       }
-      res = await fetch(`/api/memory/${encodeURIComponent(value)}`, { method: 'DELETE' });
+      res = await apiFetch(`/api/memory/${encodeURIComponent(value)}`, { method: 'DELETE' });
     } else if (action === 'clear') {
-      res = await fetch('/api/memory', { method: 'DELETE' });
+      res = await apiFetch('/api/memory', { method: 'DELETE' });
     } else {
       loadingEl.remove();
       appendError('사용법: /memory, /memory add 내용, /memory remove 번호, /memory clear');
@@ -1437,7 +1460,7 @@ async function saveNote(btn, data) {
   btn.innerHTML = loadingIconSvg();
 
   try {
-    const res = await fetch('/api/save-note', {
+    const res = await apiFetch('/api/save-note', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
