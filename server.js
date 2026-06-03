@@ -4,6 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs/promises');
 const { execFile } = require('child_process');
+const crypto = require('crypto');
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
@@ -81,13 +82,20 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+function safeTokenEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+
 function requireApiToken(req, res, next) {
   if (req.originalUrl === '/api/config') return next();
   if (!API_TOKEN) return next();
   const authHeader = req.get('Authorization') || '';
   const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
   const token = req.get('X-API-Token') || bearerToken;
-  if (token !== API_TOKEN) return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
+  if (!safeTokenEqual(token, API_TOKEN)) return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
   return next();
 }
 
@@ -595,12 +603,14 @@ function formatHistoryForModelContext(messages) {
   });
 }
 
-function buildCouncilTranscript({ question, claudeReply, gptReply, claudeReview, gptReview, divergence, synthesis, synthesizer }) {
+function buildCouncilTranscript({ question, claudeReply, gptReply, claudeReview, gptReview, divergence, synthesis, synthesizer, councilDraftMode }) {
   const sections = [
     `## 질문\n${question}`,
     `## Claude 1차 답변\n${claudeReply || '응답 없음'}`,
     `## GPT 1차 답변\n${gptReply || '응답 없음'}`,
   ];
+
+  if (councilDraftMode) sections.push(`## 의회 설정\ndraftMode: ${councilDraftMode}`);
 
   if (claudeReview || gptReview) {
     sections.push(`## Claude의 GPT 검토\n${claudeReview || '검토 없음'}`);
@@ -3100,6 +3110,7 @@ app.post('/api/council/synthesize', async (req, res) => {
       divergence,
       synthesis,
       synthesizer: synthLabel,
+      councilDraftMode: mode,
     });
 
     hydrateSessionFromDb(sessionId);
@@ -3250,7 +3261,7 @@ ${reviewSection}
 `;
 
   try {
-    const queuedJob = await saveVaultNoteRecord({
+    await saveVaultNoteRecord({
       fileId,
       title,
       noteType: 'council',
@@ -3259,7 +3270,7 @@ ${reviewSection}
       messageId,
       codexStatus: 'pending',
     });
-    res.json({ success: true, filename: fileId + '.md', title, queuedJob });
+    res.json({ success: true, filename: fileId + '.md', title });
   } catch (err) {
     console.error('노트 저장 오류:', err.message);
     res.status(500).json({ error: `노트 저장 실패: ${err.message}` });
