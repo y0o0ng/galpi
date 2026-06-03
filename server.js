@@ -132,9 +132,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_codex_jobs_status ON codex_jobs(status, created_at);
 `);
 
-// 마이그레이션: embedding 컬럼
+// 마이그레이션: notes embedding
 if (!db.prepare('PRAGMA table_info(notes)').all().some(c => c.name === 'embedding')) {
   db.exec('ALTER TABLE notes ADD COLUMN embedding TEXT');
+}
+// 마이그레이션: messages embedding
+if (!db.prepare('PRAGMA table_info(messages)').all().some(c => c.name === 'embedding')) {
+  db.exec('ALTER TABLE messages ADD COLUMN embedding TEXT');
 }
 
 const stmtEnsureSession = db.prepare(`
@@ -167,6 +171,20 @@ const stmtGetNoteByMessageId = db.prepare(`
 const stmtUpdateNoteEmbedding = db.prepare(
   'UPDATE notes SET embedding = ? WHERE filename = ?'
 );
+const stmtUpdateMessageEmbedding = db.prepare(
+  'UPDATE messages SET embedding = ? WHERE id = ?'
+);
+const stmtGetUserMessagesForSearch = db.prepare(`
+  SELECT m.id, m.content, m.created_at, m.session_id, m.embedding,
+    (SELECT content FROM messages
+     WHERE session_id = m.session_id AND id > m.id AND role = 'assistant'
+     ORDER BY id ASC LIMIT 1) AS answer
+  FROM messages m
+  WHERE m.role = 'user'
+  AND m.session_id != ?
+  AND length(m.content) >= 20
+  AND m.embedding IS NOT NULL
+`);
 const stmtGetNotesWithEmbedding = db.prepare(
   'SELECT filename, embedding FROM notes WHERE archived = 0'
 );
@@ -244,7 +262,13 @@ const stmtGetRecentMessages = db.prepare(`
 
 function dbSaveMessage(sessionId, role, content, model = null) {
   stmtEnsureSession.run(sessionId);
-  stmtInsertMessage.run(sessionId, role, content, model);
+  const result = stmtInsertMessage.run(sessionId, role, content, model);
+
+  if (role === 'user' && content.length >= 20) {
+    generateEmbedding(content).then(vec => {
+      if (vec) stmtUpdateMessageEmbedding.run(JSON.stringify(vec), result.lastInsertRowid);
+    }).catch(() => {});
+  }
 }
 
 function dbUpsertNote({
@@ -559,10 +583,10 @@ app.post('/api/chat', async (req, res) => {
 
   // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
   const memoryItems = await readMemoryItems();
-  const resolvedNotes = await getContextNotesForQuestion(message, activeNotes);
+  const { notes: resolvedNotes, pastMessages } = await getContextNotesForQuestion(message, activeNotes, sessionId);
   const baseContext = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
-  const context = memoryItems.length > 0 || resolvedNotes.length > 0
-    ? [...baseContext.slice(0, -1), { role: 'user', content: buildContextMessage(message, resolvedNotes, memoryItems) }]
+  const context = memoryItems.length > 0 || resolvedNotes.length > 0 || pastMessages.length > 0
+    ? [...baseContext.slice(0, -1), { role: 'user', content: buildContextMessage(message, resolvedNotes, memoryItems, pastMessages) }]
     : baseContext;
 
   try {
@@ -1546,12 +1570,25 @@ async function resolveActiveNotes(activeNotes) {
   return notes.filter(Boolean);
 }
 
-async function getContextNotesForQuestion(question, activeNotes) {
-  const active = await resolveActiveNotes(activeNotes);
-  if (active.length >= MAX_ACTIVE_NOTES) return active;
+function searchPastMessages(queryEmbedding, currentSessionId, limit = 2) {
+  if (!queryEmbedding) return [];
+  const candidates = stmtGetUserMessagesForSearch.all(currentSessionId);
+  return candidates
+    .map(row => ({ ...row, sim: cosineSimilarity(queryEmbedding, JSON.parse(row.embedding)) }))
+    .filter(r => r.sim >= 0.65 && r.answer)
+    .sort((a, b) => b.sim - a.sim)
+    .slice(0, limit)
+    .map(({ embedding, sim, ...r }) => r);
+}
 
-  // 향후 임베딩/벡터 검색으로 교체할 때는 searchVault() 구현만 바꾸면 됨.
-  const searched = await searchVault(question);
+async function getContextNotesForQuestion(question, activeNotes, sessionId = null) {
+  const active = await resolveActiveNotes(activeNotes);
+
+  const [searched, queryEmbedding] = await Promise.all([
+    searchVault(question),
+    generateEmbedding(question),
+  ]);
+
   const merged = [...active];
   for (const hit of searched) {
     if (merged.length >= MAX_ACTIVE_NOTES) break;
@@ -1559,7 +1596,10 @@ async function getContextNotesForQuestion(question, activeNotes) {
     const note = await readVaultNote(hit.filename);
     if (note) merged.push(note);
   }
-  return merged;
+
+  const pastMessages = sessionId ? searchPastMessages(queryEmbedding, sessionId) : [];
+
+  return { notes: merged, pastMessages };
 }
 
 const SEARCH_STOP_WORDS = new Set([
@@ -1720,7 +1760,7 @@ app.post('/api/vault/embed-all', async (req, res) => {
 
 // 사용자 메모리는 항상, activeNotes/자동 검색 노트는 질문별 참조로 주입하는 헬퍼
 // 향후 벡터 검색으로 노트를 불러올 때도 이 함수를 그대로 사용
-function buildContextMessage(question, activeNotes, memoryItems = []) {
+function buildContextMessage(question, activeNotes, memoryItems = [], pastMessages = []) {
   const memoryText = memoryItems.length > 0
     ? `사용자 메모리:\n${memoryItems.join('\n').slice(0, MAX_MEMORY_CHARS)}`
     : '';
@@ -1732,13 +1772,20 @@ function buildContextMessage(question, activeNotes, memoryItems = []) {
     return `[참조 노트: ${n.title}]\n${body}`;
   }).join('\n\n---\n\n');
 
-  const noteText = noteBlock
-    ? `참조 노트:\n${noteBlock}`
+  const noteText = noteBlock ? `참조 노트:\n${noteBlock}` : '';
+
+  const pastText = pastMessages.length > 0
+    ? `관련 과거 대화 (자연스럽게 참조해):\n` + pastMessages.map(m => {
+        const date = new Date(m.created_at * 1000).toLocaleDateString('ko-KR');
+        const q = m.content.slice(0, 300);
+        const a = m.answer.slice(0, 500);
+        return `[${date}]\n이전 질문: ${q}\n이전 답변: ${a}`;
+      }).join('\n\n---\n\n')
     : '';
 
-  return `아래 사용자 메모리와 참조 노트를 우선 반영하여 질문에 답해줘.
+  return `아래 맥락을 반영하여 질문에 답해줘. 관련 과거 대화가 있으면 자연스럽게 언급해도 좋아.
 
-${[memoryText, noteText].filter(Boolean).join('\n\n---\n\n')}
+${[memoryText, pastText, noteText].filter(Boolean).join('\n\n---\n\n')}
 
 ---
 
@@ -1925,9 +1972,9 @@ app.post('/api/council/debate', async (req, res) => {
 
   // 1차 답변 프롬프트 (mode에 따라 분기, 사용자 메모리 + 활성/자동 검색 노트 주입)
   const memoryItems = await readMemoryItems();
-  const resolvedNotes = await getContextNotesForQuestion(question, activeNotes);
-  const effectiveQuestion = memoryItems.length > 0 || resolvedNotes.length > 0
-    ? buildContextMessage(question, resolvedNotes, memoryItems)
+  const { notes: resolvedNotes, pastMessages } = await getContextNotesForQuestion(question, activeNotes, sessionId);
+  const effectiveQuestion = memoryItems.length > 0 || resolvedNotes.length > 0 || pastMessages.length > 0
+    ? buildContextMessage(question, resolvedNotes, memoryItems, pastMessages)
     : question;
   const firstAnswerPrompt = buildFirstAnswerPrompt(effectiveQuestion, mode);
   const context = [...formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES)), { role: 'user', content: firstAnswerPrompt }];
