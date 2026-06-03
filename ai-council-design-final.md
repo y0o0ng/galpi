@@ -1,33 +1,94 @@
 
 
- # AI 의회 × 옵시디언 — 설계 문서 (v1.4)
+ # AI 의회 × 옵시디언 — 설계 문서 (v1.5)
+
+  ## 0. v1.5 아키텍처 전환 요약
+
+  v1.5의 중심은 “대화 하나를 노트 하나로 저장”하는 구조에서
+  “저장 가치가 있는 Q&A를 성장형 토픽 노트에 누적”하는 구조로 바꾸는 것이다.
+
+  유지하는 것:
+
+  - 모든 대화는 DB에 저장한다.
+  - 수동 저장 버튼은 유지한다.
+  - 기존 Q&A 스냅샷 노트는 유지한다.
+  - Codex organize queue와 검증 파이프라인은 유지한다.
+
+  바꾸는 것:
+
+  - 자동 저장의 기본 대상은 독립 노트가 아니라 topic 노트다.
+  - 수동 저장은 highlight/single_manual 계열로 분리한다.
+  - 검색은 작은 스냅샷 노트 5개를 고르는 방식에서 topic 우선 회수로 이동한다.
+  - 임베딩은 frontmatter를 포함한 전체 파일이 아니라 의미 본문 중심으로 만든다.
+
+  권한 모델:
+
+  - Claude/GPT는 답변 담당이다.
+  - Claude/GPT는 관련 노트를 읽고 저장/분열/병합/링크 후보를 제안할 수 있다.
+  - Claude/GPT는 볼트를 직접 수정하지 않는다.
+  - Codex는 Obsidian 볼트를 정리하는 단일 관리자다.
+  - Clawd/UI는 split, merge, 기준 변경 같은 위험 작업을 승인하는 관리자 화면이다.
+
+  토픽 노트 운영 원칙:
+
+  - QA-LOG는 append-only다.
+  - QA-LOG의 각 항목은 `qa_id`를 가진다.
+  - `qa_id`는 DB의 note_chunks.chunk_id와 연결된다.
+  - Codex는 원본 Q&A를 삭제하거나 재작성하지 않는다.
+  - Codex는 CODEX-SUMMARY, CODEX-TAGS, CODEX-LINKS, CODEX-PROPOSALS 구역만 수정한다.
+  - split/merge는 Codex가 먼저 제안하고, 사용자가 승인한 뒤 수행한다.
+  - 메모리는 Codex 정리 대상이 아니다.
+
+  Graphify 참고 원칙:
+
+  - Obsidian 링크는 사람이 보는 결과물이다.
+  - DB 그래프는 검색, 분석, split/merge 후보 감지를 위한 실제 구조다.
+  - 관계에는 점수뿐 아니라 confidence label을 붙인다.
+      - EXTRACTED: 원문에 명시된 관계
+      - INFERRED: 임베딩/키워드/Codex 판단으로 추론한 관계
+      - AMBIGUOUS: 관련 가능성이 있으나 검토가 필요한 관계
+  - 나중에 `_system/GRAPH_REPORT.md`를 만들어 god nodes, surprising connections, suggested questions, split 후보를 요약한다.
+  - 초기에는 `/api/graph/report` 수동 호출로 report를 만들고, 나중에 organize 이후 자동 갱신으로 확장한다.
 
   ## 1. 핵심 철학
 
   이 프로젝트는 단순 챗봇이 아니라, 사용자의 대화·결정·아이디어를 장기적으로 축
   적하고 다시 꺼내 쓰는 개인용 AI 기억 시스템이다.
 
-  기억은 두 층으로 나눈다.
+  기억은 세 층으로 나눈다.
 
   - DB = 창고
       - 모든 대화, 답변, 세션, 저장 이벤트를 보존한다.
       - 검색·복원·디버깅·전체 기록 회수에 사용한다.
 
   - Obsidian = 서재
-      - 사용자가 의미 있다고 판단한 내용만 노트화한다.
+      - 저장 가치가 있는 대화를 토픽 단위로 누적한다.
       - AI가 다시 읽고 연결하고 추론할 수 있는 지식 단위로 관리한다.
 
-  Codex는 답변 모델이 아니라, 나중에 Obsidian 서재를 정리하고 연결하는 정리 담당
-  자다.
+  - Codex = 사서
+      - Obsidian 서재를 정리하고 연결하는 단일 관리자다.
+      - Claude/GPT가 제안한 저장·분열·병합 후보를 안전 규칙 안에서 처리한다.
+
+  Codex는 답변 모델이 아니라, Obsidian 서재를 관리하는 정리 담당자다.
 
   ## 2. 저장 정책
 
   모든 대화는 DB에 저장한다.
-  하지만 모든 대화를 Obsidian 노트로 만들지는 않는다.
+  하지만 모든 대화를 독립 Obsidian 노트로 만들지는 않는다.
+
+  기본 저장 방향은 B안이다.
+
+  - 대화가 발생하면 DB에는 항상 저장한다.
+  - 저장 가치가 있는 Q&A는 관련 토픽 노트에 자동 누적한다.
+  - 수동 저장 버튼은 특정 Q&A를 별도 하이라이트 노트로 남기기 위해 유지한다.
+  - 기존 Q&A 스냅샷 노트는 유지하되, 새 성장 구조의 중심은 토픽 노트다.
 
   Obsidian 노트화 대상:
 
-  - 사용자가 명시적으로 저장한 단일 답변
+  - 저장 가치 조건을 만족한 Q&A
+      - 예: 사용자 질문 50자 이상, AI 답변 200자 이상
+      - 짧은 확인, 명령어, 메모리 관리, 정리 명령은 제외한다.
+  - 사용자가 명시적으로 저장한 단일 답변 또는 하이라이트
   - “저장해둬”, /save 등으로 저장 요청한 문서/아이디어
   - 의회 모드의 최종 결과 및 주요 토론 과정
   - 장기적으로 다시 꺼낼 가치가 있는 결정, 설계, 아이디어, 규칙
@@ -55,6 +116,77 @@
   source_message
   created_at
   updated_at
+  embedding
+
+  note_chunks 테이블:
+
+  chunk_id
+      QA entry의 안정 ID. topic QA 로그의 `qa_id`와 동일하다.
+
+  note_filename
+      chunk가 속한 Obsidian 노트 파일명
+
+  note_title
+      chunk가 속한 노트 제목
+
+  chunk_type
+      topic_qa 등 chunk 종류
+
+  content
+      임베딩과 검색에 사용할 의미 본문
+
+  source_session
+  source_user_message
+  source_assistant_message
+  embedding
+  created_at
+  updated_at
+
+  auto_save_decisions 테이블:
+
+  session_id
+  source_user_message
+  source_assistant_message
+  model
+  decision
+      save 또는 skip
+
+  reason
+      semantic_signal, weak_signal, system_command 등 저장 가치 판단 이유
+
+  question
+  answer_excerpt
+  qa_id
+  note_filename
+  note_title
+  action
+      created 또는 appended
+
+  created_at
+
+  note_edges 테이블:
+
+  source_filename
+  source_title
+  target_filename
+  target_title
+  relation
+      related, supports, contradicts, expands 등
+
+  score
+      1~100 연결 강도
+
+  confidence
+      EXTRACTED, INFERRED, AMBIGUOUS
+
+  reason
+      연결 근거
+
+  created_by
+      codex, user, system
+
+  created_at
+  updated_at
 
   codex_status 값:
 
@@ -65,25 +197,34 @@
 
   새로 저장되는 노트는 기본적으로 pending이다.
 
+  note_type 값:
+
+  - topic: 자동 저장 Q&A가 누적되는 성장형 토픽 노트
+  - highlight: 사용자가 수동 저장한 독립 하이라이트 노트
+  - single_manual: 기존 단일 답변 수동 저장 노트
+  - council: 의회 모드 결과 노트
+  - user_manual: /save 등으로 저장한 사용자 작성 문서/아이디어
+  - legacy: 이전 형식에서 backfill된 노트
+
   ## 4. 노트 형식
 
   노트는 사람도 읽을 수 있어야 하지만, 더 중요한 목적은 미래의 AI가 빠르게 회수
   하고 연결할 수 있게 하는 것이다.
 
-  기본 구조:
+  토픽 노트 기본 구조:
 
   ---
   title: ""
   created:
   updated:
-  note_type:
+  note_type: topic
   archived: false
   codex_status: pending
   ai_readable: true
   knowledge_type:
   confidence:
-  source_session:
-  source_message:
+  source_sessions:
+  source_messages:
   ---
 
   # 제목
@@ -95,11 +236,19 @@
   - 연결 후보:
   - 신뢰도:
 
-  ## 본문
-  ...
+  ## 요약
+  <!-- CODEX-SUMMARY-START -->
+  <!-- CODEX-SUMMARY-END -->
 
-  ## 결론
-  ...
+  ## Q&A 로그
+  <!-- QA-LOG-START -->
+
+  ### 2026-06-03 21:30
+  <!-- qa_id: qa-... -->
+  **Q:** ...
+  **A:** ...
+
+  <!-- QA-LOG-END -->
 
   ## 🏷️ 주제 태그
   <!-- CODEX-TAGS-START -->
@@ -109,8 +258,9 @@
   <!-- CODEX-LINKS-START -->
   <!-- CODEX-LINKS-END -->
 
-  > [!note]- 원본
-  ...
+  ## Codex 제안
+  <!-- CODEX-PROPOSALS-START -->
+  <!-- CODEX-PROPOSALS-END -->
 
   역할 구분:
 
@@ -124,14 +274,26 @@
   - CODEX-LINKS
       - Codex가 vault 전체를 보고 추가하는 연결 구역
 
+  - CODEX-SUMMARY
+      - Codex가 누적 Q&A를 산문으로 정리하는 구역
+
+  - CODEX-PROPOSALS
+      - Codex가 split/merge/기준 변경을 사용자에게 제안하는 구역
+
+  - QA-LOG
+      - 자동 저장 파이프라인이 append-only로 추가하는 원본 Q&A 로그
+      - Codex는 이 구역의 기존 원문을 삭제하거나 재작성하지 않는다.
+
   ## 5. Codex 수정 규칙
 
   Codex는 기존 노트 전체를 자유롭게 수정하지 않는다.
 
   허용:
 
+  - CODEX-SUMMARY-START와 CODEX-SUMMARY-END 사이
   - CODEX-TAGS-START와 CODEX-TAGS-END 사이
   - CODEX-LINKS-START와 CODEX-LINKS-END 사이
+  - CODEX-PROPOSALS-START와 CODEX-PROPOSALS-END 사이
   - Codex 소유 인덱스/지도 노트
   - 정리 로그
 
@@ -140,11 +302,20 @@
   - 질문 원문 수정
   - 결론 본문 수정
   - 원본 답변 수정
+  - QA-LOG 기존 항목 삭제 또는 재작성
   - 사용자가 작성한 본문 재작성
   - 노트 삭제
-  - 노트 병합
+  - 사용자 승인 없는 노트 병합
+  - 사용자 승인 없는 노트 분열
   - 볼트 외부 접근
   - 쉘 명령으로 파일 삭제/이동
+
+  Claude/GPT 권한:
+
+  - 답변 생성
+  - 관련 노트 읽기
+  - 저장 가치, 새 토픽, 분열, 병합, 링크 후보 제안
+  - 볼트 직접 수정 금지
 
   ## 6. 검색과 회수
 
@@ -155,27 +326,36 @@
   - 키워드 검색
   - 활성 노트 우선
   - 질문 기반 자동 노트 검색
+  - 노트/메시지 임베딩 검색
 
   다음:
 
-  - AI 회수 힌트 기반 검색 품질 향상
+  - 토픽 노트 우선 검색
+  - frontmatter를 제외한 의미 본문 중심 임베딩
+  - 토픽 제목, AI 회수 힌트, CODEX-SUMMARY, QA-LOG를 분리해 검색 품질 관리
   - notes 테이블 기반 필터링
   - archived 제외
   - codex_status 활용
 
   나중:
 
-  - 임베딩/벡터 검색
-  - 주제별 인덱스
-  - 연결 그래프 기반 회수
+  - note_chunks 테이블 기반 청크 임베딩
+  - 주제별 인덱스와 hot cache
+  - note_edges 기반 연결 그래프 회수
+  - BM25 + embedding + rerank 하이브리드
+  - GRAPH_REPORT.md 생성
 
   회수 우선순위:
 
   1. 활성 노트
-  2. 관련 Obsidian 노트
-  3. 사용자 메모리
-  4. 최근 대화 10턴
-  5. 필요 시 DB 전체 검색
+  2. 관련 토픽 노트
+  3. 관련 하이라이트/의회/사용자 저장 노트
+  4. 사용자 메모리
+  5. 최근 대화 10턴
+  6. 필요 시 DB 전체 검색
+
+  전체 재정리는 토큰과 시간이 많이 들기 때문에 기본 운영 방식으로 삼지 않는다.
+  새 대화가 들어올 때 토픽 노트가 조금씩 성장하고, Codex가 필요한 범위만 주기적으로 정리한다.
 
   ## 7. 명령어 체계
 
@@ -189,6 +369,9 @@
 
   /organize
   /organize run
+  /organize process
+  /organize all
+  /graph report
   /audit
   /challenge
   /synthesize
@@ -200,33 +383,60 @@
   - /save: 사용자가 직접 저장 요청한 내용 노트화
   - /memory: 항상 참조할 사용자 규칙/선호 관리
   - /organize: Codex 정리 상태 확인
-  - /organize run: Codex 정리 실행
+  - /organize run: Codex 정리 큐 생성
+  - /organize process: 대기 중인 Codex job 하나 처리. UI 라벨은 “정리”
+  - /organize all: 모든 활성 노트를 즉시 재정리. 기존 큐에 넣지 않고 별도 실행
+  - /graph report: DB 그래프와 자동 저장 판단 로그를 `_system/GRAPH_REPORT.md`로 요약
   - /challenge: 과거 노트를 근거로 현재 생각 반박
   - /synthesize: 여러 노트에서 패턴 추출
   - /export: 다른 AI에게 넘길 스냅샷 생성
 
   ## 8. 구현 순서
 
-  1. notes 테이블 추가
-  2. 세 저장 경로를 saveVaultNoteRecord()로 통합
-  3. 새 노트에 codex_status: pending 등록
+  이미 구현된 기반:
+
+  1. notes 테이블
+  2. saveVaultNoteRecord()
+  3. 새 노트 pending 등록
   4. 기존 노트 backfill
-  5. 새 노트 템플릿에 AI 회수 힌트 추가
-  6. /organize 상태 조회
-  7. 검증 스크립트 작성
-  8. codex_jobs 추가
-  9. Codex 실행 연결
-  10. /challenge, /synthesize 같은 고급 명령 확장
+  5. AI 회수 힌트와 CODEX 마커
+  6. /organize 상태/큐/실행
+  7. Codex job runner와 검증 스크립트
+  8. 노트/메시지 임베딩 검색
+
+  다음 구현 순서:
+
+  1. topic note 템플릿과 append-only QA-LOG 헬퍼 추가
+  2. QA entry ID와 note_chunks 테이블 추가
+  3. 저장 가치 판단 함수와 auto_save_decisions 로그 추가
+  4. 기존 topic note 선택 함수 추가
+      - 유사도가 충분하면 기존 topic에 append
+      - 애매하면 새 topic 또는 inbox topic 생성
+  5. assistant 응답 저장 직후 자동 topic append 연결
+  6. topic note 임베딩은 frontmatter 제외 의미 본문으로 생성
+  7. topic_qa chunk embedding 저장
+  8. Codex 정리 프롬프트를 CODEX-SUMMARY/LINKS/TAGS/PROPOSALS 중심으로 변경
+  9. note_edges 테이블과 confidence label 기반 그래프 저장 추가
+  10. GRAPH_REPORT.md 생성 API 추가
+  11. split/merge는 즉시 실행하지 않고 Clawd/UI 승인 제안으로 먼저 구현
 
   ## 9. 안전 원칙
 
   - 기존 노트 대량 수정은 피한다.
   - 새 형식은 새 노트부터 적용한다.
   - 기존 노트는 우선 DB에만 backfill한다.
+  - 기존 Q&A 스냅샷 노트는 유지한다.
+  - 자동 저장은 topic 노트에 누적하고, 수동 저장은 highlight/single_manual로 분리한다.
+  - QA-LOG는 append-only 원칙을 지킨다.
+  - QA-LOG 항목과 note_chunks row는 같은 qa_id로 연결한다.
+  - 자동 저장 기준 변경은 auto_save_decisions 로그를 근거로 제안한다.
+  - Obsidian 링크와 note_edges DB 그래프를 함께 유지한다.
+  - GRAPH_REPORT.md는 `_system`에 두되, 메모리처럼 항상 참조하지는 않는다.
   - Codex 실행 전후 diff를 검증한다.
   - 마커 밖 수정이 있으면 실패 처리한다.
   - 실패 3회 이상은 needs_manual_check로 넘긴다.
-  - 사용자가 의미 있다고 판단한 것만 서재에 올린다.
+  - split/merge/기준 변경은 Codex가 제안하고 Clawd/UI에서 승인한다.
+  - 메모리는 Codex 정리 대상이 아니다.
 
   ## 10. 현재 달성한 것
 
@@ -247,6 +457,11 @@
   - saveVaultNoteRecord() 추가
   - 세 저장 경로의 pending 등록 준비
   - Obsidian 노트에 CODEX-TAGS/LINKS 마커 유지
+  - /organize process, /organize all
+  - 의회 심층/일반 모델 티어 분리
+  - Codex 일반/deep 모델 티어 분리
+  - 새로고침 후 의회 답변 레이아웃 복원
+  - 노트/메시지 임베딩 검색
 
   ## 11. 판단 기준
 
@@ -254,8 +469,10 @@
 
   - 이 기능은 DB 창고용인가, Obsidian 서재용인가?
   - 이 정보는 다시 꺼낼 가치가 있는가?
+  - 이 정보는 topic에 누적할 것인가, highlight로 별도 보존할 것인가?
   - AI가 나중에 이 노트를 빠르게 이해할 수 있는가?
   - Codex가 안전하게 수정할 수 있는 경계가 있는가?
+  - Claude/GPT가 직접 수정하려는 일을 Codex 제안으로 바꿀 수 있는가?
   - 지금 구현이 나중에 벡터 검색/Codex 정리로 교체 가능하게 열려 있는가?
 
 

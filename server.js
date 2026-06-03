@@ -35,6 +35,12 @@ const MAX_MEMORY_ITEMS = 20;
 const MAX_MEMORY_CHARS = 1200;
 const MEMORY_DIR = '_system';
 const MEMORY_FILE = 'memory.md';
+const GRAPH_REPORT_FILE = 'GRAPH_REPORT.md';
+const AUTO_TOPIC_MIN_USER_CHARS = parseInt(process.env.AUTO_TOPIC_MIN_USER_CHARS || '20', 10);
+const AUTO_TOPIC_MIN_ASSISTANT_CHARS = parseInt(process.env.AUTO_TOPIC_MIN_ASSISTANT_CHARS || '120', 10);
+const TOPIC_MATCH_THRESHOLD = Number.parseFloat(process.env.TOPIC_MATCH_THRESHOLD || '0.72');
+const TOPIC_MATCH_SOFT_THRESHOLD = Number.parseFloat(process.env.TOPIC_MATCH_SOFT_THRESHOLD || '0.62');
+const TOPIC_MATCH_MIN_TOKEN_OVERLAP = parseInt(process.env.TOPIC_MATCH_MIN_TOKEN_OVERLAP || '2', 10);
 const CODEX_BIN = process.env.CODEX_BIN || 'codex';
 const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.4-mini';
 const CODEX_DEEP_MODEL = process.env.CODEX_DEEP_MODEL || 'gpt-5.5';
@@ -126,10 +132,62 @@ db.exec(`
     started_at INTEGER,
     finished_at INTEGER
   );
+  CREATE TABLE IF NOT EXISTS note_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chunk_id TEXT UNIQUE NOT NULL,
+    note_filename TEXT NOT NULL,
+    note_title TEXT NOT NULL,
+    chunk_type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    source_session TEXT,
+    source_user_message INTEGER,
+    source_assistant_message INTEGER,
+    embedding TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  );
+  CREATE TABLE IF NOT EXISTS auto_save_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT,
+    source_user_message INTEGER,
+    source_assistant_message INTEGER,
+    model TEXT,
+    decision TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    question TEXT NOT NULL,
+    answer_excerpt TEXT NOT NULL,
+    qa_id TEXT,
+    note_filename TEXT,
+    note_title TEXT,
+    action TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  );
+  CREATE TABLE IF NOT EXISTS note_edges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_filename TEXT NOT NULL,
+    source_title TEXT NOT NULL,
+    target_filename TEXT NOT NULL,
+    target_title TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    confidence TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    UNIQUE(source_filename, target_filename, relation, created_by)
+  );
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_notes_codex_status ON notes(codex_status, archived);
   CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
   CREATE INDEX IF NOT EXISTS idx_codex_jobs_status ON codex_jobs(status, created_at);
+  CREATE INDEX IF NOT EXISTS idx_note_chunks_note ON note_chunks(note_filename, chunk_type);
+  CREATE INDEX IF NOT EXISTS idx_note_chunks_type ON note_chunks(chunk_type);
+  CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_created ON auto_save_decisions(created_at);
+  CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_decision ON auto_save_decisions(decision, reason);
+  CREATE INDEX IF NOT EXISTS idx_note_edges_source ON note_edges(source_filename);
+  CREATE INDEX IF NOT EXISTS idx_note_edges_target ON note_edges(target_filename);
+  CREATE INDEX IF NOT EXISTS idx_note_edges_confidence ON note_edges(confidence, score);
 `);
 
 // 마이그레이션: notes embedding
@@ -174,6 +232,114 @@ const stmtUpdateNoteEmbedding = db.prepare(
 const stmtUpdateMessageEmbedding = db.prepare(
   'UPDATE messages SET embedding = ? WHERE id = ?'
 );
+const stmtUpsertNoteChunk = db.prepare(`
+  INSERT INTO note_chunks (
+    chunk_id, note_filename, note_title, chunk_type, content,
+    source_session, source_user_message, source_assistant_message
+  ) VALUES (
+    @chunkId, @noteFilename, @noteTitle, @chunkType, @content,
+    @sourceSession, @sourceUserMessage, @sourceAssistantMessage
+  )
+  ON CONFLICT(chunk_id) DO UPDATE SET
+    note_filename = excluded.note_filename,
+    note_title = excluded.note_title,
+    chunk_type = excluded.chunk_type,
+    content = excluded.content,
+    source_session = excluded.source_session,
+    source_user_message = excluded.source_user_message,
+    source_assistant_message = excluded.source_assistant_message,
+    updated_at = strftime('%s','now')
+`);
+const stmtUpdateNoteChunkEmbedding = db.prepare(
+  'UPDATE note_chunks SET embedding = ? WHERE chunk_id = ?'
+);
+const stmtInsertAutoSaveDecision = db.prepare(`
+  INSERT INTO auto_save_decisions (
+    session_id, source_user_message, source_assistant_message, model,
+    decision, reason, question, answer_excerpt,
+    qa_id, note_filename, note_title, action
+  ) VALUES (
+    @sessionId, @sourceUserMessage, @sourceAssistantMessage, @model,
+    @decision, @reason, @question, @answerExcerpt,
+    @qaId, @noteFilename, @noteTitle, @action
+  )
+`);
+const stmtUpsertNoteEdge = db.prepare(`
+  INSERT INTO note_edges (
+    source_filename, source_title, target_filename, target_title,
+    relation, score, confidence, reason, created_by
+  ) VALUES (
+    @sourceFilename, @sourceTitle, @targetFilename, @targetTitle,
+    @relation, @score, @confidence, @reason, @createdBy
+  )
+  ON CONFLICT(source_filename, target_filename, relation, created_by) DO UPDATE SET
+    source_title = excluded.source_title,
+    target_title = excluded.target_title,
+    score = excluded.score,
+    confidence = excluded.confidence,
+    reason = excluded.reason,
+    updated_at = strftime('%s','now')
+`);
+const stmtGraphNoteCounts = db.prepare(`
+  SELECT note_type AS noteType, COUNT(*) AS count
+  FROM notes
+  WHERE archived = 0
+  GROUP BY note_type
+`);
+const stmtGraphTopEdges = db.prepare(`
+  SELECT source_title AS sourceTitle, target_title AS targetTitle, relation,
+         score, confidence, reason, created_by AS createdBy
+  FROM note_edges
+  ORDER BY score DESC, updated_at DESC
+  LIMIT ?
+`);
+const stmtGraphEdgeDegrees = db.prepare(`
+  SELECT title, filename, SUM(degree) AS degree FROM (
+    SELECT source_title AS title, source_filename AS filename, COUNT(*) AS degree
+    FROM note_edges
+    GROUP BY source_filename
+    UNION ALL
+    SELECT target_title AS title, target_filename AS filename, COUNT(*) AS degree
+    FROM note_edges
+    GROUP BY target_filename
+  )
+  GROUP BY filename
+  ORDER BY degree DESC
+  LIMIT ?
+`);
+const stmtGraphAmbiguousEdges = db.prepare(`
+  SELECT source_title AS sourceTitle, target_title AS targetTitle, score, reason
+  FROM note_edges
+  WHERE confidence = 'AMBIGUOUS'
+  ORDER BY score DESC, updated_at DESC
+  LIMIT ?
+`);
+const stmtGraphTopicChunkCounts = db.prepare(`
+  SELECT note_filename AS filename, note_title AS title, COUNT(*) AS qaCount
+  FROM note_chunks
+  WHERE chunk_type = 'topic_qa'
+  GROUP BY note_filename
+  ORDER BY qaCount DESC
+  LIMIT ?
+`);
+const stmtGraphIsolatedTopics = db.prepare(`
+  SELECT n.filename, n.title
+  FROM notes n
+  WHERE n.archived = 0
+    AND n.note_type = 'topic'
+    AND NOT EXISTS (
+      SELECT 1 FROM note_edges e
+      WHERE e.source_filename = n.filename OR e.target_filename = n.filename
+    )
+  ORDER BY n.updated_at DESC
+  LIMIT ?
+`);
+const stmtGraphAutoSaveSummary = db.prepare(`
+  SELECT decision, reason, COUNT(*) AS count
+  FROM auto_save_decisions
+  GROUP BY decision, reason
+  ORDER BY decision ASC, count DESC
+`);
 const stmtGetUserMessagesForSearch = db.prepare(`
   SELECT m.id, m.content, m.created_at, m.session_id, m.embedding,
     (SELECT content FROM messages
@@ -187,6 +353,9 @@ const stmtGetUserMessagesForSearch = db.prepare(`
 `);
 const stmtGetNotesWithEmbedding = db.prepare(
   'SELECT filename, embedding FROM notes WHERE archived = 0'
+);
+const stmtGetTopicNotesWithEmbedding = db.prepare(
+  "SELECT filename, title, embedding FROM notes WHERE archived = 0 AND note_type = 'topic' AND embedding IS NOT NULL"
 );
 const stmtGetNotesWithoutEmbedding = db.prepare(
   'SELECT filename, title FROM notes WHERE archived = 0 AND embedding IS NULL'
@@ -269,6 +438,8 @@ function dbSaveMessage(sessionId, role, content, model = null) {
       if (vec) stmtUpdateMessageEmbedding.run(JSON.stringify(vec), result.lastInsertRowid);
     }).catch(() => {});
   }
+
+  return result.lastInsertRowid;
 }
 
 function dbUpsertNote({
@@ -429,9 +600,468 @@ async function saveVaultNoteRecord({
   dbUpsertNote({ filename, title, noteType, codexStatus, sourceSession: sessionId, sourceMessage: messageId });
 
   // embedding 비동기 생성 (응답 블로킹 없음)
-  generateAndStoreEmbedding(filename, title + '\n' + noteContent).catch(() => {});
+  generateAndStoreEmbedding(filename, buildSemanticEmbeddingText(title, noteContent)).catch(() => {});
 
   return maybeCreateCodexJobFromPending();
+}
+
+async function overwriteVaultNote(filename, noteContent) {
+  const safeName = path.basename(filename || '');
+  if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
+    throw new Error('잘못된 노트 파일명입니다.');
+  }
+
+  const filepath = path.join(VAULT_PATH, safeName);
+  if (!filepath.startsWith(VAULT_PATH + path.sep)) {
+    throw new Error('잘못된 경로입니다.');
+  }
+
+  const tmpPath = filepath + '.tmp';
+  await fs.writeFile(tmpPath, noteContent, 'utf8');
+  await fs.rename(tmpPath, filepath);
+  await fs.access(filepath);
+}
+
+function buildSemanticEmbeddingText(title, raw) {
+  const body = stripFrontmatter(String(raw || ''))
+    .replace(/<!-- CODEX-TAGS-START -->[\s\S]*?<!-- CODEX-TAGS-END -->/g, '')
+    .replace(/<!-- CODEX-LINKS-START -->[\s\S]*?<!-- CODEX-LINKS-END -->/g, '')
+    .replace(/<!-- CODEX-PROPOSALS-START -->[\s\S]*?<!-- CODEX-PROPOSALS-END -->/g, '')
+    .replace(/<!-- CODEX-SUMMARY-START -->|<!-- CODEX-SUMMARY-END -->/g, '')
+    .replace(/<!-- QA-LOG-START -->|<!-- QA-LOG-END -->/g, '')
+    .replace(/^---+$/gm, '')
+    .trim();
+  return `${title || ''}\n${body}`.trim();
+}
+
+const AUTO_SAVE_COMMAND_PREFIXES = [
+  '/search',
+  '/save',
+  '/embed',
+  '/organize',
+  '/memory',
+];
+const AUTO_SAVE_VALUE_KEYWORDS = [
+  '설계', '구조', '계획', '기준', '판단', '결정', '아이디어', '문학관',
+  '분석', '정리', '비교', '이유', '문제', '해결', '프로젝트', '아키텍처',
+  '라즈베리파이', '옵시디언', '코덱스', '의회', '기억', '검색', '임베딩',
+];
+const AUTO_SAVE_LOW_VALUE_REPLIES = [
+  '노트 저장됨:',
+  '정리 대기 노트가 없습니다',
+  '실행할 정리 job이 없습니다',
+];
+
+function classifyAutoSaveValue(question, answer) {
+  const q = String(question || '').trim();
+  const a = String(answer || '').trim();
+
+  if (!q || !a) return { save: false, reason: 'empty' };
+  if (AUTO_SAVE_COMMAND_PREFIXES.some(prefix => q === prefix || q.startsWith(`${prefix} `))) {
+    return { save: false, reason: 'system_command' };
+  }
+  if (AUTO_SAVE_LOW_VALUE_REPLIES.some(prefix => a.startsWith(prefix))) {
+    return { save: false, reason: 'low_value_reply' };
+  }
+  if (a.length < AUTO_TOPIC_MIN_ASSISTANT_CHARS) {
+    return { save: false, reason: 'answer_too_short' };
+  }
+
+  const hasQuestionSignal = q.length >= AUTO_TOPIC_MIN_USER_CHARS
+    || /[?？]$/.test(q)
+    || AUTO_SAVE_VALUE_KEYWORDS.some(keyword => q.includes(keyword));
+  const hasAnswerSignal = a.length >= 500
+    || /```|#{2,}|^- |\n- |\d+\./m.test(a)
+    || AUTO_SAVE_VALUE_KEYWORDS.some(keyword => a.includes(keyword));
+
+  if (hasQuestionSignal && hasAnswerSignal) {
+    return { save: true, reason: 'semantic_signal' };
+  }
+
+  return { save: false, reason: 'weak_signal' };
+}
+
+function shouldAutoSaveTopic(question, answer) {
+  return classifyAutoSaveValue(question, answer).save;
+}
+
+function logAutoSaveDecision({
+  sessionId,
+  userMessageId,
+  assistantMessageId,
+  model,
+  decision,
+  reason,
+  question,
+  answer,
+  qaId = null,
+  noteFilename = null,
+  noteTitle = null,
+  action = null,
+}) {
+  try {
+    stmtInsertAutoSaveDecision.run({
+      sessionId: sessionId || null,
+      sourceUserMessage: userMessageId || null,
+      sourceAssistantMessage: assistantMessageId || null,
+      model: model || null,
+      decision,
+      reason,
+      question: String(question || '').trim().slice(0, 4000),
+      answerExcerpt: String(answer || '').trim().slice(0, 1200),
+      qaId,
+      noteFilename,
+      noteTitle,
+      action,
+    });
+  } catch (err) {
+    console.warn('자동 저장 판단 로그 기록 실패:', err.message);
+  }
+}
+
+function makeTopicTitle(question) {
+  const compact = String(question || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .trim();
+  return sanitizeTitle(compact.slice(0, 28), '새 토픽');
+}
+
+async function generateTopicTitle(question, answer) {
+  const prompt = `다음 대화를 가장 잘 나타내는 토픽 제목을 한국어로 2~5단어로 지어줘. 제목만 반환해. 따옴표·특수문자·마침표 없이.
+
+Q: ${String(question || '').slice(0, 300)}
+A: ${String(answer || '').slice(0, 300)}`;
+
+  try {
+    if (HAS_CLAUDE) {
+      const r = await anthropic.messages.create({
+        model: CLAUDE_MODEL, max_tokens: 30,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      return sanitizeTitle(r.content[0].text.trim(), makeTopicTitle(question));
+    }
+    if (HAS_GPT) {
+      const r = await openai.chat.completions.create({
+        model: GPT_MODEL, max_completion_tokens: 30,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      return sanitizeTitle(r.choices[0].message.content.trim(), makeTopicTitle(question));
+    }
+  } catch {
+    /* 실패 시 폴백 */
+  }
+  return makeTopicTitle(question);
+}
+
+function formatTopicFrontmatterList(value) {
+  if (!value) return '[]';
+  return `[${String(value).replace(/[\[\]\n]/g, '').trim()}]`;
+}
+
+function createQaId() {
+  return `qa-${uuidv4()}`;
+}
+
+function buildQaChunkText({ question, answer, model }) {
+  return [
+    model ? `모델: ${model}` : '',
+    `Q: ${String(question || '').trim()}`,
+    `A: ${String(answer || '').trim()}`,
+  ].filter(Boolean).join('\n');
+}
+
+function dbUpsertNoteChunk({
+  chunkId,
+  noteFilename,
+  noteTitle,
+  chunkType,
+  content,
+  sourceSession = null,
+  sourceUserMessage = null,
+  sourceAssistantMessage = null,
+}) {
+  stmtUpsertNoteChunk.run({
+    chunkId,
+    noteFilename,
+    noteTitle,
+    chunkType,
+    content,
+    sourceSession: sourceSession || null,
+    sourceUserMessage: sourceUserMessage || null,
+    sourceAssistantMessage: sourceAssistantMessage || null,
+  });
+}
+
+async function generateAndStoreChunkEmbedding(chunkId, text) {
+  const vec = await generateEmbedding(text);
+  if (vec) stmtUpdateNoteChunkEmbedding.run(JSON.stringify(vec), chunkId);
+  return vec;
+}
+
+function saveQaChunkRecord({ qaId, filename, title, question, answer, model, sessionId, userMessageId, assistantMessageId }) {
+  const content = buildQaChunkText({ question, answer, model });
+  dbUpsertNoteChunk({
+    chunkId: qaId,
+    noteFilename: filename,
+    noteTitle: title,
+    chunkType: 'topic_qa',
+    content,
+    sourceSession: sessionId,
+    sourceUserMessage: userMessageId || null,
+    sourceAssistantMessage: assistantMessageId || null,
+  });
+  generateAndStoreChunkEmbedding(qaId, content).catch(() => {});
+}
+
+function createTopicNoteContent({ fileId, title, createdStr, qaId, question, answer, sessionId, messageId, model }) {
+  const qaEntry = formatQaLogEntry({ qaId, question, answer, model });
+  const draftRaw = `# ${title}
+
+## Q&A 로그
+<!-- QA-LOG-START -->
+
+${qaEntry}
+
+<!-- QA-LOG-END -->`;
+  const summary = buildTopicSummary({ title, raw: draftRaw });
+
+  return `---
+id: ${fileId}
+title: "${title.replace(/"/g, "'")}"
+aliases: []
+created: ${createdStr}
+updated: ${createdStr}
+note_type: topic
+archived: false
+codex_status: pending
+ai_readable: true
+knowledge_type: topic
+confidence: medium
+source_sessions: ${formatTopicFrontmatterList(sessionId || 'unknown')}
+source_messages: ${formatTopicFrontmatterList(messageId || 'unknown')}
+---
+
+# ${title}
+
+## AI 회수 힌트
+- 핵심 개념: ${title}
+- 노트 성격: 자동 누적 토픽 노트
+- 다시 꺼낼 상황: 같은 주제의 후속 질문, 이전 생각의 흐름을 이어갈 때
+- 연결 후보: Codex가 추후 보강
+- 신뢰도: medium
+
+## 요약
+<!-- CODEX-SUMMARY-START -->
+${summary}
+<!-- CODEX-SUMMARY-END -->
+
+## Q&A 로그
+<!-- QA-LOG-START -->
+
+${qaEntry}
+
+<!-- QA-LOG-END -->
+
+## 🏷️ 주제 태그
+<!-- CODEX-TAGS-START -->
+<!-- CODEX-TAGS-END -->
+
+## 🔗 연결
+<!-- CODEX-LINKS-START -->
+<!-- CODEX-LINKS-END -->
+
+## Codex 제안
+<!-- CODEX-PROPOSALS-START -->
+<!-- CODEX-PROPOSALS-END -->
+
+---
+*생성: ${createdStr} · 자동 토픽 노트 · 정리 엔진: Codex pending*
+`;
+}
+
+function formatQaLogEntry({ qaId, question, answer, model }) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const modelLabel = model ? ` · ${model}` : '';
+  return `### ${stamp}${modelLabel}
+<!-- qa_id: ${qaId || createQaId()} -->
+**Q:** ${String(question || '').trim()}
+
+**A:** ${String(answer || '').trim()}`;
+}
+
+function appendQaLogEntry(raw, entry) {
+  const marker = '<!-- QA-LOG-END -->';
+  if (!raw.includes(marker)) return null;
+  return raw.replace(marker, `${entry.trim()}\n\n${marker}`);
+}
+
+function refreshTopicSummary(raw, title) {
+  if (!hasMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
+    return raw;
+  }
+  return replaceMarkerBlock(
+    raw,
+    '<!-- CODEX-SUMMARY-START -->',
+    '<!-- CODEX-SUMMARY-END -->',
+    buildTopicSummary({ title, raw })
+  );
+}
+
+function touchUpdatedFrontmatter(raw) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const updated = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  if (/^updated:\s*.*$/m.test(raw)) return raw.replace(/^updated:\s*.*$/m, `updated: ${updated}`);
+  return raw;
+}
+
+async function findBestTopicNote(signalText, queryEmbedding) {
+  if (!queryEmbedding) return null;
+
+  const queryTokens = noteTokenize(signalText);
+  const topics = stmtGetTopicNotesWithEmbedding.all();
+  let best = null;
+  for (const topic of topics) {
+    try {
+      const sim = cosineSimilarity(queryEmbedding, JSON.parse(topic.embedding));
+      const raw = await fs.readFile(path.join(VAULT_PATH, topic.filename), 'utf8');
+      const topicTokens = noteTokenize([topic.title, getCodexSignalText(raw).slice(0, 1200)].join(' '));
+      const overlap = queryTokens.filter(token => topicTokens.includes(token)).length;
+      if (!best || sim > best.sim || (sim === best.sim && overlap > best.overlap)) {
+        best = { ...topic, sim, overlap };
+      }
+    } catch { /* 잘못된 임베딩은 스킵 */ }
+  }
+
+  if (!best) return null;
+  if (best.sim >= TOPIC_MATCH_THRESHOLD) return best;
+  if (best.sim >= TOPIC_MATCH_SOFT_THRESHOLD && best.overlap >= TOPIC_MATCH_MIN_TOKEN_OVERLAP) return best;
+  return null;
+}
+
+async function autoAppendTopicNote({ question, answer, sessionId, userMessageId, assistantMessageId, model }) {
+  const classification = classifyAutoSaveValue(question, answer);
+  if (!classification.save) {
+    logAutoSaveDecision({
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+      model,
+      decision: 'skip',
+      reason: classification.reason,
+      question,
+      answer,
+    });
+    return null;
+  }
+
+  const signalText = `${question}\n${answer.slice(0, 1200)}`;
+  const queryEmbedding = await generateEmbedding(signalText);
+  const existing = await findBestTopicNote(signalText, queryEmbedding);
+  const title = existing ? existing.title : await generateTopicTitle(question, answer);
+  const qaId = createQaId();
+  const entry = formatQaLogEntry({ qaId, question, answer, model });
+
+  if (existing) {
+    const filepath = path.join(VAULT_PATH, existing.filename);
+    const raw = await fs.readFile(filepath, 'utf8');
+    const appended = appendQaLogEntry(raw, entry);
+    if (!appended) throw new Error(`${existing.filename}에 QA-LOG 마커가 없습니다.`);
+    const withSummary = refreshTopicSummary(appended, title);
+    const nextRaw = touchUpdatedFrontmatter(withSummary);
+    await overwriteVaultNote(existing.filename, nextRaw);
+    dbUpsertNote({
+      filename: existing.filename,
+      title,
+      noteType: 'topic',
+      codexStatus: 'pending',
+      sourceSession: sessionId,
+      sourceMessage: assistantMessageId,
+    });
+    generateAndStoreEmbedding(existing.filename, buildSemanticEmbeddingText(title, nextRaw)).catch(() => {});
+    saveQaChunkRecord({
+      qaId,
+      filename: existing.filename,
+      title,
+      question,
+      answer,
+      model,
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+    });
+    maybeCreateCodexJobFromPending();
+    logAutoSaveDecision({
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+      model,
+      decision: 'save',
+      reason: classification.reason,
+      question,
+      answer,
+      qaId,
+      noteFilename: existing.filename,
+      noteTitle: title,
+      action: 'appended',
+    });
+    return { filename: existing.filename, title, action: 'appended' };
+  }
+
+  const { fileId, createdStr } = createNoteIdentity(title);
+  const noteContent = createTopicNoteContent({
+    fileId,
+    title,
+    createdStr,
+    qaId,
+    question,
+    answer,
+    sessionId,
+    messageId: assistantMessageId || userMessageId,
+    model,
+  });
+
+  await saveVaultNoteRecord({
+    fileId,
+    title,
+    noteType: 'topic',
+    noteContent,
+    sessionId,
+    messageId: assistantMessageId || userMessageId,
+    codexStatus: 'pending',
+  });
+
+  saveQaChunkRecord({
+    qaId,
+    filename: fileId + '.md',
+    title,
+    question,
+    answer,
+    model,
+    sessionId,
+    userMessageId,
+    assistantMessageId,
+  });
+
+  logAutoSaveDecision({
+    sessionId,
+    userMessageId,
+    assistantMessageId,
+    model,
+    decision: 'save',
+    reason: classification.reason,
+    question,
+    answer,
+    qaId,
+    noteFilename: fileId + '.md',
+    noteTitle: title,
+    action: 'created',
+  });
+
+  return { filename: fileId + '.md', title, action: 'created' };
 }
 
 function parseJsonObject(text) {
@@ -474,6 +1104,97 @@ function formatCodexLinks(links) {
   return [...grouped.entries()]
     .map(([topic, rows]) => `**[${topic}]**\n${rows.join('\n')}`)
     .join('\n\n');
+}
+
+function confidenceForEdgeScore(score, explicit = false) {
+  if (explicit) return 'EXTRACTED';
+  if (score >= 75) return 'INFERRED';
+  return 'AMBIGUOUS';
+}
+
+function dbUpsertNoteEdge({
+  sourceFilename,
+  sourceTitle,
+  targetFilename,
+  targetTitle,
+  relation = 'related',
+  score,
+  confidence,
+  reason,
+  createdBy = 'codex',
+}) {
+  if (!sourceFilename || !targetFilename || sourceFilename === targetFilename) return;
+  stmtUpsertNoteEdge.run({
+    sourceFilename,
+    sourceTitle,
+    targetFilename,
+    targetTitle,
+    relation,
+    score: Math.min(100, Math.max(1, Number.parseInt(score, 10) || 1)),
+    confidence,
+    reason: String(reason || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+    createdBy,
+  });
+}
+
+function saveCodexLinkEdges({ sourceFilename, sourceTitle, links }) {
+  if (!Array.isArray(links)) return;
+  links.forEach(link => {
+    if (!link.filename) return;
+    const score = Math.min(100, Math.max(1, Number.parseInt(link.score, 10) || 1));
+    dbUpsertNoteEdge({
+      sourceFilename,
+      sourceTitle,
+      targetFilename: link.filename,
+      targetTitle: link.title,
+      relation: link.relation || 'related',
+      score,
+      confidence: link.confidence || confidenceForEdgeScore(score, false),
+      reason: link.reason,
+      createdBy: 'codex',
+    });
+  });
+}
+
+async function filenameForNoteTitle(title) {
+  const normalized = String(title || '').trim();
+  if (!normalized) return null;
+
+  let files;
+  try { files = await fs.readdir(VAULT_PATH); } catch { return null; }
+  for (const filename of files.filter(f => f.endsWith('.md'))) {
+    try {
+      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      if (parseNoteTitle(raw, filename) === normalized) return filename;
+    } catch { /* skip */ }
+  }
+  return null;
+}
+
+async function extractCodexLinkEdgesFromRaw({ sourceFilename, sourceTitle, raw }) {
+  const block = extractMarkerBody(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->');
+  if (!block) return [];
+
+  const links = [];
+  for (const line of block.split('\n')) {
+    const match = line.trim().match(/^- (?:([1-9][0-9]?|100)\s+)?\[\[([^\]\n]+)\]\]\s+—\s+(.+)$/);
+    if (!match) continue;
+    const score = Number.parseInt(match[1] || '60', 10);
+    const title = match[2].trim();
+    const filename = await filenameForNoteTitle(title);
+    if (!filename || filename === sourceFilename) continue;
+    links.push({
+      filename,
+      title,
+      reason: match[3].trim(),
+      score,
+      confidence: confidenceForEdgeScore(score, false),
+      relation: 'related',
+    });
+  }
+
+  saveCodexLinkEdges({ sourceFilename, sourceTitle, links });
+  return links;
 }
 
 // 저장 시점에는 제목/요약만 만든다. 태그/링크는 Codex runner가 CODEX 구역에 채운다.
@@ -526,6 +1247,10 @@ function getMemoryPath() {
   return path.join(VAULT_PATH, MEMORY_DIR, MEMORY_FILE);
 }
 
+function getGraphReportPath() {
+  return path.join(VAULT_PATH, MEMORY_DIR, GRAPH_REPORT_FILE);
+}
+
 function formatMemoryFile(items) {
   const body = items.map(item => `- ${item}`).join('\n');
   return `---
@@ -537,6 +1262,66 @@ always_include: true
 
 ${body || '<!-- 비어 있음 -->'}
 `;
+}
+
+function formatReportRows(rows, formatter, emptyText = '- 없음') {
+  if (!rows || rows.length === 0) return emptyText;
+  return rows.map(formatter).join('\n');
+}
+
+function buildGraphReport() {
+  const generatedAt = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+  const noteCounts = stmtGraphNoteCounts.all();
+  const topNodes = stmtGraphEdgeDegrees.all(10);
+  const topEdges = stmtGraphTopEdges.all(15);
+  const ambiguousEdges = stmtGraphAmbiguousEdges.all(10);
+  const topicChunkCounts = stmtGraphTopicChunkCounts.all(10);
+  const isolatedTopics = stmtGraphIsolatedTopics.all(10);
+  const autoSaveSummary = stmtGraphAutoSaveSummary.all();
+
+  return `---
+type: graph_report
+generated_at: ${generatedAt}
+---
+
+# Graph Report
+
+## 요약
+- 생성 시각: ${generatedAt}
+- 활성 노트 타입: ${noteCounts.map(row => `${row.noteType} ${row.count}`).join(', ') || '없음'}
+- edge 수 기준 중심 노트: ${topNodes[0] ? `${topNodes[0].title} (${topNodes[0].degree})` : '없음'}
+- 가장 큰 topic QA 로그: ${topicChunkCounts[0] ? `${topicChunkCounts[0].title} (${topicChunkCounts[0].qaCount})` : '없음'}
+
+## 중심 노트
+${formatReportRows(topNodes, row => `- ${row.degree} [[${row.title}]]`)}
+
+## 강한 연결
+${formatReportRows(topEdges, row => `- ${row.score} ${row.confidence} [[${row.sourceTitle}]] → [[${row.targetTitle}]] — ${row.reason}`)}
+
+## 검토 필요한 연결
+${formatReportRows(ambiguousEdges, row => `- ${row.score} [[${row.sourceTitle}]] → [[${row.targetTitle}]] — ${row.reason}`)}
+
+## 큰 토픽 후보
+${formatReportRows(topicChunkCounts, row => `- ${row.qaCount} [[${row.title}]]`)}
+
+## 고립 토픽
+${formatReportRows(isolatedTopics, row => `- [[${row.title}]]`)}
+
+## 자동 저장 판단 요약
+${formatReportRows(autoSaveSummary, row => `- ${row.decision}/${row.reason}: ${row.count}`)}
+
+## 다음 제안 후보
+- 큰 토픽 후보 중 QA가 8개 이상인 노트는 split proposal 검토 대상이다.
+- 고립 토픽은 링크 후보가 부족하거나 topic 선택 기준이 너무 보수적인지 확인한다.
+- skip이 과도하면 저장 기준을 낮추고, save가 과도하면 저장 기준을 높인다.
+`;
+}
+
+async function writeGraphReport() {
+  const report = buildGraphReport();
+  await fs.mkdir(path.join(VAULT_PATH, MEMORY_DIR), { recursive: true });
+  await fs.writeFile(getGraphReportPath(), report, 'utf8');
+  return report;
 }
 
 async function readMemoryItems() {
@@ -612,8 +1397,17 @@ app.post('/api/chat', async (req, res) => {
     history.push({ role: 'assistant', content: reply, model: model === 'claude' ? 'Claude' : 'GPT' });
     sessions[sessionId] = sessions[sessionId].slice(-HISTORY_CONTEXT_MESSAGES);
 
-    dbSaveMessage(sessionId, 'user',      message, null);
-    dbSaveMessage(sessionId, 'assistant', reply,   model === 'claude' ? 'Claude' : 'GPT');
+    const userMessageId = dbSaveMessage(sessionId, 'user', message, null);
+    const assistantMessageId = dbSaveMessage(sessionId, 'assistant', reply, model === 'claude' ? 'Claude' : 'GPT');
+
+    autoAppendTopicNote({
+      question: message,
+      answer: reply,
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+      model: model === 'claude' ? 'Claude' : 'GPT',
+    }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
 
     res.json({
       reply,
@@ -1024,6 +1818,19 @@ app.post('/api/organize/all', async (_req, res) => {
   }
 });
 
+app.post('/api/graph/report', async (_req, res) => {
+  try {
+    const report = await writeGraphReport();
+    res.json({
+      success: true,
+      filename: path.join(MEMORY_DIR, GRAPH_REPORT_FILE),
+      chars: report.length,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── 볼트 검색 ───────────────────────────────────────────────────────────────
 // 향후 벡터/임베딩 검색으로 교체 시 searchVault() 함수만 수정하면 됨
 
@@ -1082,8 +1889,8 @@ function extractAiHint(raw) {
 function getCodexSignalText(raw) {
   return stripFrontmatter(raw)
     .replace(/## AI 회수 힌트\n[\s\S]*?(?=\n## |\n---|\s*$)/g, '')
-    .replace(/<!-- CODEX-TAGS-START -->[\s\S]*?<!-- CODEX-TAGS-END -->/g, '')
-    .replace(/<!-- CODEX-LINKS-START -->[\s\S]*?<!-- CODEX-LINKS-END -->/g, '')
+    .replace(/<!-- CODEX-[A-Z-]+-START -->[\s\S]*?<!-- CODEX-[A-Z-]+-END -->/g, '')
+    .replace(/<!-- QA-LOG-START -->|<!-- QA-LOG-END -->/g, '')
     .replace(/> \[!note\]- 원본[\s\S]*?(?=\n---|\s*$)/g, '')
     .replace(/^#{1,6}\s+.*$/gm, '')
     .replace(/^---+$/gm, '')
@@ -1186,9 +1993,12 @@ async function buildCodexLinks({ filename, title, raw }) {
     .slice(0, 10)
     .map(({ candidate, overlap }) => ({
       topic: '관련 노트',
+      filename: candidate.filename,
       title: candidate.title,
       reason: `공통 키워드: ${overlap.join(', ')}`,
       score: Math.min(95, 45 + (overlap.length * 15)),
+      confidence: confidenceForEdgeScore(Math.min(95, 45 + (overlap.length * 15)), false),
+      relation: 'related',
     }));
 }
 
@@ -1218,6 +2028,64 @@ function replaceMarkerBlock(raw, startMarker, endMarker, replacement) {
   const after = raw.slice(range.end);
   const body = replacement ? `\n${replacement}\n` : '\n';
   return before + body + after;
+}
+
+function hasMarkerBlock(raw, startMarker, endMarker) {
+  return !!findLastMarkerBlock(raw, startMarker, endMarker);
+}
+
+function extractMarkerBody(raw, startMarker, endMarker) {
+  const range = findLastMarkerBlock(raw, startMarker, endMarker);
+  if (!range) return '';
+  return raw.slice(range.bodyStart, range.end).trim();
+}
+
+function splitQaLogEntries(qaLog) {
+  return String(qaLog || '')
+    .split(/(?=^###\s+\d{4}-\d{2}-\d{2}\s+)/m)
+    .map(item => item.trim())
+    .filter(item => /^###\s+\d{4}-\d{2}-\d{2}\s+/.test(item));
+}
+
+function buildTopicSummary({ title, raw }) {
+  const qaLog = extractMarkerBody(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
+  const entries = splitQaLogEntries(qaLog);
+  if (entries.length === 0) return '';
+
+  const latestEntry = entries[entries.length - 1]
+    .replace(/<!--\s*qa_id:[\s\S]*?-->/g, '')
+    .replace(/^.*?\n/, '')
+    .trim();
+  const latestQuestion = (latestEntry.match(/\*\*Q:\*\*\s*([\s\S]*?)(?=\n\s*\*\*A:\*\*)/)?.[1] || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+  const latestAnswer = (latestEntry.match(/\*\*A:\*\*\s*([\s\S]*)$/)?.[1] || '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/[#*_>`-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  const latest = [latestQuestion && `질문: ${latestQuestion}`, latestAnswer && `답변: ${latestAnswer}`]
+    .filter(Boolean)
+    .join(' / ');
+
+  return [
+    `- 이 토픽은 "${title}"에 대한 누적 Q&A 노트다.`,
+    `- 현재 ${entries.length}개의 Q&A가 쌓여 있다.`,
+    `- 최근 흐름: ${latest}`,
+  ].join('\n');
+}
+
+function buildTopicProposals({ title, raw }) {
+  const qaLog = extractMarkerBody(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
+  const entries = splitQaLogEntries(qaLog);
+  if (entries.length < 8) return '';
+
+  return [
+    `- 제안: "${title}" 토픽에 Q&A가 ${entries.length}개 쌓였으므로, 반복되는 하위 주제가 있는지 검토할 것.`,
+    '- 실행 방식: Codex가 바로 분열하지 말고 Clawd에 split 후보를 알림으로 제안할 것.',
+  ].join('\n');
 }
 
 async function writeVaultNoteByFilename(filename, content) {
@@ -1270,8 +2138,10 @@ function isCodexRunnerUnavailableError(err) {
 function stripCodexOwnedBlocks(raw) {
   let text = String(raw || '');
   [
+    ['<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->'],
     ['<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->'],
     ['<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->'],
+    ['<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->'],
   ].forEach(([startMarker, endMarker]) => {
     const range = findLastMarkerBlock(text, startMarker, endMarker);
     if (!range) return;
@@ -1282,16 +2152,26 @@ function stripCodexOwnedBlocks(raw) {
 
 function assertOnlyCodexBlocksChanged(before, after, filename) {
   const requiredMarkers = [
-    '<!-- CODEX-TAGS-START -->',
-    '<!-- CODEX-TAGS-END -->',
-    '<!-- CODEX-LINKS-START -->',
-    '<!-- CODEX-LINKS-END -->',
+    ['<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->'],
+    ['<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->'],
+  ];
+  const optionalMarkers = [
+    ['<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->'],
+    ['<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->'],
   ];
 
-  requiredMarkers.forEach(marker => {
-    if (!String(after || '').includes(marker)) {
-      throw new Error(`${filename}: CODEX 마커 누락: ${marker}`);
-    }
+  requiredMarkers.forEach(([startMarker, endMarker]) => {
+    [startMarker, endMarker].forEach(marker => {
+      if (!String(after || '').includes(marker)) {
+        throw new Error(`${filename}: CODEX 마커 누락: ${marker}`);
+      }
+    });
+  });
+
+  optionalMarkers.forEach(([startMarker, endMarker]) => {
+    const beforeHad = String(before || '').includes(startMarker) || String(before || '').includes(endMarker);
+    const afterHad = String(after || '').includes(startMarker) || String(after || '').includes(endMarker);
+    if (beforeHad && !afterHad) throw new Error(`${filename}: CODEX 선택 마커 삭제 감지: ${startMarker}`);
   });
 
   if (stripCodexOwnedBlocks(before) !== stripCodexOwnedBlocks(after)) {
@@ -1344,10 +2224,14 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 각 대상 노트를 읽고 의미 기반 주제 태그를 작성한다.
 - vault 안의 다른 노트들을 참고해 의미상 강한 연결만 작성한다.
 - 연결 근거가 약하면 CODEX-LINKS 구역을 비워둔다.
+- note_type이 topic인 노트는 누적 Q&A를 바탕으로 CODEX-SUMMARY 구역에 짧은 산문 요약을 작성한다.
+- note_type이 topic인 노트가 너무 커졌거나 하위 주제가 뚜렷하면 CODEX-PROPOSALS 구역에 split/merge 제안만 작성한다.
 
 수정 허용 범위:
+- <!-- CODEX-SUMMARY-START --> 와 <!-- CODEX-SUMMARY-END --> 사이
 - <!-- CODEX-TAGS-START --> 와 <!-- CODEX-TAGS-END --> 사이
 - <!-- CODEX-LINKS-START --> 와 <!-- CODEX-LINKS-END --> 사이
+- <!-- CODEX-PROPOSALS-START --> 와 <!-- CODEX-PROPOSALS-END --> 사이
 
 절대 수정 금지:
 - frontmatter
@@ -1356,12 +2240,16 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 질문 원문
 - 본문/결론
 - 원본 답변
+- QA-LOG 기존 항목
 - 사용자 작성 문서
 - CODEX 마커 자체
 - 대상 파일 밖의 파일
 - 파일 삭제/이동/이름 변경
+- 노트 병합/분열 직접 실행
 
 출력 형식:
+- CODEX-SUMMARY는 topic 노트에만 작성한다. 기존 Q&A 원문을 복사하지 말고, 3~6문장으로 누적 맥락을 요약한다.
+- CODEX-PROPOSALS는 실행 명령이 아니라 사용자에게 보낼 제안만 적는다. 제안이 없으면 비워둔다.
 - 태그는 #태그 형식으로 3~8개 작성한다.
 - 링크는 아래 형식을 정확히 따른다.
   **[주제명]**
@@ -1409,10 +2297,19 @@ async function processCodexNoteWithHeuristic(filename) {
   const frontmatter = parseSimpleFrontmatter(raw);
   const title = parseNoteTitle(raw, safeName);
   const tagsBlock = formatCodexTags(buildCodexTags({ title, frontmatter, raw }));
-  const linksBlock = formatCodexLinks(await buildCodexLinks({ filename: safeName, title, raw }));
+  const links = await buildCodexLinks({ filename: safeName, title, raw });
+  const linksBlock = formatCodexLinks(links);
 
-  let next = replaceMarkerBlock(raw, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->', tagsBlock);
+  let next = raw;
+  if (frontmatter.note_type === 'topic' && hasMarkerBlock(next, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
+    next = replaceMarkerBlock(next, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ title, raw }));
+  }
+  if (frontmatter.note_type === 'topic' && hasMarkerBlock(next, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->')) {
+    next = replaceMarkerBlock(next, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->', buildTopicProposals({ title, raw }));
+  }
+  next = replaceMarkerBlock(next, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->', tagsBlock);
   next = replaceMarkerBlock(next, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', linksBlock);
+  saveCodexLinkEdges({ sourceFilename: safeName, sourceTitle: title, links });
 
   if (next !== raw) await writeVaultNoteByFilename(safeName, next);
   stmtUpdateNoteCodexStatus.run('processed', safeName);
@@ -1435,6 +2332,7 @@ async function processCodexJobWithCodex(filenames, model = CODEX_MODEL) {
   return Promise.all(filenames.map(async filename => {
     const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
     const title = parseNoteTitle(raw, filename);
+    await extractCodexLinkEdgesFromRaw({ sourceFilename: filename, sourceTitle: title, raw });
     stmtUpdateNoteCodexStatus.run('processed', filename);
     return { filename, title, tags: null, links: null };
   }));
@@ -2119,8 +3017,17 @@ app.post('/api/council/synthesize', async (req, res) => {
     sessions[sessionId].push({ role: 'assistant', content: synthesis, model: `${synthLabel} (의회)` });
     sessions[sessionId] = sessions[sessionId].slice(-HISTORY_CONTEXT_MESSAGES);
 
-    dbSaveMessage(sessionId, 'user',      question,  null);
-    dbSaveMessage(sessionId, 'assistant', transcript, `${synthLabel} (의회)`);
+    const userMessageId = dbSaveMessage(sessionId, 'user', question, null);
+    const assistantMessageId = dbSaveMessage(sessionId, 'assistant', transcript, `${synthLabel} (의회)`);
+
+    autoAppendTopicNote({
+      question,
+      answer: synthesis,
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+      model: `${synthLabel} (의회)`,
+    }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
 
     res.json({
       divergence,

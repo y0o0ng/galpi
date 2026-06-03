@@ -24,6 +24,14 @@ const REQUIRED_MARKERS = [
   '<!-- CODEX-LINKS-START -->',
   '<!-- CODEX-LINKS-END -->',
 ];
+const TOPIC_REQUIRED_MARKERS = [
+  '<!-- CODEX-SUMMARY-START -->',
+  '<!-- CODEX-SUMMARY-END -->',
+  '<!-- QA-LOG-START -->',
+  '<!-- QA-LOG-END -->',
+  '<!-- CODEX-PROPOSALS-START -->',
+  '<!-- CODEX-PROPOSALS-END -->',
+];
 
 function countOccurrences(raw, marker) {
   return String(raw || '').split(marker).length - 1;
@@ -37,6 +45,13 @@ function extractMarkerBlock(raw, startMarker, endMarker) {
   if (end < 0) return null;
 
   return raw.slice(start + startMarker.length, end).trim();
+}
+
+function splitQaLogEntries(qaLog) {
+  return String(qaLog || '')
+    .split(/(?=^###\s+\d{4}-\d{2}-\d{2}\s+)/m)
+    .map(item => item.trim())
+    .filter(item => /^###\s+\d{4}-\d{2}-\d{2}\s+/.test(item));
 }
 
 function parseFrontmatter(raw) {
@@ -71,15 +86,15 @@ function validateFile(filename) {
   if (!frontmatter) {
     warnings.push('frontmatter 없음');
   } else {
+    if (String(frontmatter.archived).toLowerCase() === 'true') {
+      return [];
+    }
+
     REQUIRED_FRONTMATTER.forEach(field => {
       if (!(field in frontmatter) || frontmatter[field] === '') {
         warnings.push(`frontmatter 누락: ${field}`);
       }
     });
-
-    if (String(frontmatter.archived).toLowerCase() === 'true') {
-      warnings.push('archived 노트: Codex 정리 대상에서 제외 필요');
-    }
   }
 
   REQUIRED_MARKERS.forEach(marker => {
@@ -87,6 +102,23 @@ function validateFile(filename) {
     if (count === 0) warnings.push(`CODEX 마커 누락: ${marker}`);
     if (count > 1) warnings.push(`CODEX 마커 중복: ${marker} (${count})`);
   });
+
+  if (frontmatter?.note_type === 'topic') {
+    TOPIC_REQUIRED_MARKERS.forEach(marker => {
+      const count = countOccurrences(raw, marker);
+      if (count === 0) warnings.push(`topic 마커 누락: ${marker}`);
+      if (count > 1) warnings.push(`topic 마커 중복: ${marker} (${count})`);
+    });
+
+    const qaLog = extractMarkerBlock(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
+    if (qaLog) {
+      splitQaLogEntries(qaLog).forEach((entry, index) => {
+        if (!/<!--\s*qa_id:\s*qa-[a-f0-9-]+\s*-->/.test(entry)) {
+          warnings.push(`topic QA 항목 qa_id 누락: ${index + 1}번째`);
+        }
+      });
+    }
+  }
 
   const linksBlock = extractMarkerBlock(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->');
   if (linksBlock) {
