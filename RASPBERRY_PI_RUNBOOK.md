@@ -136,23 +136,25 @@ curl http://127.0.0.1:3000/api/organize/status
 
 ## 7. 백업
 
-최소 백업 대상:
+볼트(`ai-council-vault/`)와 DB(`council.db`)를 자동 백업한다. (DB는 SQLite 온라인 백업이라 서버 실행 중에도 안전.)
 
-```text
-council.db
-ai-council-vault/
-.env
-```
+- **자동:** 서버가 떠 있으면 하루 1회. 서버가 꺼져 24시간 넘겼다가 다시 뜨면 시작 시 1회 따라잡기(catch-up).
+- **보관:** 7일 지난 백업은 자동 삭제.
+- **위치:** 기본 `~/backups/ai-council/`. `.env`의 `BACKUP_DIR`로 변경 가능.
+- **수동:** 채팅에 `/backup`, 또는 `node scripts/backup.js`.
 
-예시:
+서버가 꺼져 있어도 백업하고 싶으면 cron으로도 돌릴 수 있다 (같은 스크립트). 예: 매일 04:00.
 
 ```sh
-mkdir -p ~/backups/ai-council
-cp council.db ~/backups/ai-council/council-$(date +%Y%m%d-%H%M).db
-tar -czf ~/backups/ai-council/vault-$(date +%Y%m%d-%H%M).tar.gz ai-council-vault
+crontab -e
+# 경로는 실제 설치 위치로 교체
+0 4 * * * cd /home/pi/apps/ai-council && /usr/bin/node scripts/backup.js >> ~/backups/ai-council/backup.log 2>&1
 ```
 
-`.env`에는 키가 있으므로 외부 공유 금지.
+주의:
+
+- `.env`(API 키)는 백업 대상이 아니다 — 키는 따로 안전하게 보관할 것. (분실해도 키만 다시 입력하면 됨.)
+- 백업 폴더에는 DB(전체 대화 기록)가 들어 있으니 외부 공유 금지.
 
 ## 8. 자주 보는 문제
 

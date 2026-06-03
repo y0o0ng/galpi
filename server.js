@@ -9,6 +9,8 @@ const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
 const Database = require('better-sqlite3');
+const os = require('os');
+const { runBackup, listBackups } = require('./scripts/backup');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,9 @@ const CODEX_DEEP_MODEL = process.env.CODEX_DEEP_MODEL || 'gpt-5.5';
 const CODEX_RUNNER_MODE = process.env.CODEX_RUNNER_MODE || 'codex';
 const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '180000');
 const CODEX_AUTO_QUEUE_THRESHOLD = Math.max(1, parseInt(process.env.CODEX_AUTO_QUEUE_THRESHOLD || '5', 10) || 5);
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'ai-council');
+const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;        // 하루 1회 기준
+const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000;       // 1시간마다 "24h 지났나" 확인
 
 if (!VAULT_PATH) {
   console.error('❌ .env 파일에 VAULT_PATH가 없습니다. .env.example을 참고해 .env를 만들어주세요.');
@@ -1880,6 +1885,68 @@ app.get('/api/notes/archived', (_req, res) => {
   res.json({ notes: stmtGetArchivedNotes.all() });
 });
 
+// ─── 백업 ────────────────────────────────────────────────────────────────────
+// 인프로세스 데일리 백업: 마지막 백업이 24h 넘으면 1회 실행(서버 다운 후 재시작 시 catch-up).
+// 핵심 로직은 scripts/backup.js — cron으로도 동일하게 돌릴 수 있다.
+
+let backupRunning = false;
+
+async function lastBackupTime() {
+  const entries = await listBackups(BACKUP_DIR);
+  return entries.length > 0 ? entries[0].mtimeMs : 0;
+}
+
+async function runBackupOnce() {
+  if (backupRunning) return null;
+  backupRunning = true;
+  try {
+    return await runBackup({ db, backupDir: BACKUP_DIR });
+  } finally {
+    backupRunning = false;
+  }
+}
+
+async function maybeDailyBackup() {
+  try {
+    if (Date.now() - await lastBackupTime() < BACKUP_INTERVAL_MS) return;
+    const r = await runBackupOnce();
+    if (r) console.log(`🗂  자동 백업: ${path.basename(r.dbDest)} · ${path.basename(r.vaultDest)} (오래된 백업 ${r.pruned}개 정리)`);
+  } catch (err) {
+    console.warn('자동 백업 실패:', err.message);
+  }
+}
+
+app.post('/api/backup', async (_req, res) => {
+  if (backupRunning) return res.status(409).json({ error: '이미 백업이 실행 중입니다.' });
+  try {
+    const r = await runBackupOnce();
+    res.json({
+      success: true,
+      dbFile: path.basename(r.dbDest),
+      vaultFile: path.basename(r.vaultDest),
+      pruned: r.pruned,
+      backupDir: r.backupDir,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/backup/status', async (_req, res) => {
+  try {
+    const backups = await listBackups(BACKUP_DIR);
+    res.json({
+      success: true,
+      backupDir: BACKUP_DIR,
+      lastBackup: backups[0]?.mtimeMs || null,
+      count: backups.length,
+      backups: backups.slice(0, 14),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── 정리 상태 조회 ─────────────────────────────────────────────────────────
 
 app.get('/api/organize/status', (_req, res) => {
@@ -3372,4 +3439,8 @@ app.listen(PORT, HOST, () => {
     console.warn('   같은 네트워크의 누구나 API를 호출해 키 크레딧을 쓰고 볼트를 읽을 수 있습니다.');
     console.warn('   .env에 API_TOKEN을 설정하세요.\n');
   }
+  console.log(`   백업:     ${BACKUP_DIR} (하루 1회 자동, 7일 보관)`);
+
+  maybeDailyBackup();
+  setInterval(maybeDailyBackup, BACKUP_CHECK_INTERVAL_MS).unref();
 });

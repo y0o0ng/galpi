@@ -24,6 +24,7 @@ const slashCommands = [
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
   { command: '/organize all', title: '전체 재정리', description: '모든 활성 노트를 Codex로 다시 정리' },
   { command: '/archived', title: '보관함', description: '숨긴(보관한) 노트 목록 — 복원 가능' },
+  { command: '/backup', title: '백업', description: '볼트+DB를 지금 백업 (자동: 하루 1회, 7일 보관)' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
@@ -404,6 +405,12 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleArchivedList();
+    return;
+  }
+  if (text === '/backup') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleBackup();
     return;
   }
   if (text.startsWith('/save ')) {
@@ -1316,6 +1323,53 @@ async function restoreNoteFromUi(filename, btn, card) {
     btn.textContent = '복원';
     showToast('서버 연결 오류');
   }
+}
+
+async function handleBackup() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/backup');
+
+  const loadingEl = appendLoading();
+  document.dispatchEvent(new Event('pet:building'));
+  try {
+    const res = await apiFetch('/api/backup', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+    renderBackupResult(data);
+    document.dispatchEvent(new Event('pet:happy'));
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
+function renderBackupResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('Backup'));
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = [
+    '백업 완료',
+    `DB: ${data.dbFile}`,
+    `볼트: ${data.vaultFile}`,
+    `오래된 백업 ${data.pruned ?? 0}개 정리 (7일 보관)`,
+    `위치: ${data.backupDir}`,
+  ].join('\n');
+
+  group.appendChild(bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Backup');
+  scrollDown();
 }
 
 function addActiveNote(note) {

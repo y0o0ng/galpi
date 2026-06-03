@@ -531,12 +531,13 @@
 
 > 갱신: 2026-06-04. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3 “조용히 정리되고, 안 망가진다” 진행 중.
+- **현재 단계:** V3 핵심 완료 → 라즈베리파이 이식 준비 단계.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
-  - V3 — Codex 자동 정리 큐(5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), **soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지)**.
-- **다음 (V3 마지막):** 백업 — 볼트 + `council.db` 일일 백업, 7일 보관, 가능하면 Git 자동 커밋.
-- **최근 작업(2026-06-04):** 코드 리뷰 기반 수정 — 자동/수동 저장 QA 중복 제거, 질문 임베딩 3→1, 토픽 쓰기 직렬화, searchVault mtime 캐시, findBestTopicNote 상위 후보만 읽기; 견고성 — 0.0.0.0+빈 토큰 경고, 코사인 차원 가드, deep/codex 모델 문서화, API 토큰 timing-safe 비교.
+  - V3 — Codex 자동 정리 큐(5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
+- **다음:** 라즈베리파이 배포 체크리스트 — better-sqlite3 네이티브 빌드(ARM), codex CLI 유무(없으면 `CODEX_RUNNER_MODE=heuristic`), `HOST=0.0.0.0` 시 `API_TOKEN` 설정, 모델명 유효성(`/api/config`). 이후 V4(음성 입력).
+- **보너스(미착수):** 백업 Git 자동 커밋, 그래프 edge에서 archived 노트 제외.
+- **최근 작업(2026-06-04):** 코드 리뷰 기반 수정 — 자동/수동 저장 QA 중복 제거, 질문 임베딩 3→1, 토픽 쓰기 직렬화, searchVault mtime 캐시, findBestTopicNote 상위 후보만 읽기; 견고성 — 0.0.0.0+빈 토큰 경고, 코사인 차원 가드, deep/codex 모델 문서화, API 토큰 timing-safe 비교; soft delete/_archive 구현; 백업 시스템 구현.
 - **작업 방식:** 실제 코드 수정 전에 무엇을·왜·영향·트레이드오프를 설명하고 컨펌받는다. (`git add -p`는 현재 환경에서 막혀 있어, 사용자의 미커밋 작업과 섞인 파일은 통째로 커밋하거나 분리 협의.)
 
 -----
