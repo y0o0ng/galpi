@@ -26,6 +26,7 @@ const slashCommands = [
   { command: '/archived', title: '보관함', description: '숨긴(보관한) 노트 목록 — 복원 가능' },
   { command: '/backup', title: '백업', description: '볼트+DB를 지금 백업 (자동: 하루 1회, 7일 보관)' },
   { command: '/sync', title: '볼트 동기화', description: '옵시디언 직접 편집 반영 — 신규 노트 등록 + 삭제 노트 정리' },
+  { command: '/merge', title: '토픽 병합', description: '유사한 토픽 병합 후보 — 검색 카드의 "병합"으로 직접 묶기도 가능' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
@@ -418,6 +419,12 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleSync();
+    return;
+  }
+  if (text === '/merge') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleMergeCandidates();
     return;
   }
   if (text.startsWith('/save ')) {
@@ -1211,7 +1218,13 @@ function makeNoteCard(note) {
   archiveBtn.title = '노트를 _archive로 숨김 (검색·그래프 제외, /archived에서 복원)';
   archiveBtn.addEventListener('click', () => archiveNoteFromUi(note.filename, archiveBtn, card));
 
-  card.append(title, excerpt, removeBtn, archiveBtn);
+  const mergeBtn = document.createElement('button');
+  mergeBtn.className = 'note-card-remove';
+  mergeBtn.textContent = '병합';
+  mergeBtn.title = '이 노트를 다른 토픽에 흡수하거나 새 토픽으로 묶기';
+  mergeBtn.addEventListener('click', () => mergeNoteFromCard(note.filename, card));
+
+  card.append(title, excerpt, removeBtn, archiveBtn, mergeBtn);
   return card;
 }
 
@@ -1427,6 +1440,162 @@ function renderSyncResult(data) {
   group.appendChild(bubble);
   getMessages().appendChild(group);
   saveUiMessage('assistant', bubble.textContent, 'Sync');
+  scrollDown();
+}
+
+// ─── 토픽 병합 ────────────────────────────────────────────────────────────────
+
+async function mergeNoteFromCard(filename, card) {
+  if (card.querySelector('.merge-picker')) return; // 이미 열림
+
+  let topics = [];
+  try {
+    const res = await apiFetch('/api/topics');
+    topics = (await res.json()).topics || [];
+  } catch (_) {
+    showToast('토픽 목록을 불러오지 못했습니다.');
+    return;
+  }
+
+  const picker = document.createElement('div');
+  picker.className = 'merge-picker';
+
+  const select = document.createElement('select');
+  const optNew = document.createElement('option');
+  optNew.value = '__new__';
+  optNew.textContent = '+ 새 토픽으로';
+  select.appendChild(optNew);
+  topics.filter(t => t.filename !== filename).forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.filename;
+    o.textContent = t.title;
+    select.appendChild(o);
+  });
+
+  const ok = document.createElement('button');
+  ok.className = 'note-card-remove';
+  ok.textContent = '병합 실행';
+  ok.addEventListener('click', async () => {
+    ok.disabled = true;
+    ok.textContent = '병합 중…';
+    const targetFilename = select.value === '__new__' ? null : select.value;
+    try {
+      const res = await apiFetch('/api/notes/merge', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ filenames: [filename], targetFilename }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        removeActiveNote(filename);
+        card.remove();
+        showToast(data.createdNew ? `새 토픽 "${data.title}"으로 병합됨` : `"${data.title}"에 병합됨`);
+      } else {
+        showToast(`오류: ${data.error}`);
+        ok.disabled = false;
+        ok.textContent = '병합 실행';
+      }
+    } catch (_) {
+      showToast('서버 연결 오류');
+      ok.disabled = false;
+      ok.textContent = '병합 실행';
+    }
+  });
+
+  const cancel = document.createElement('button');
+  cancel.className = 'note-card-remove';
+  cancel.textContent = '취소';
+  cancel.addEventListener('click', () => picker.remove());
+
+  picker.append(select, ok, cancel);
+  card.appendChild(picker);
+}
+
+async function handleMergeCandidates() {
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/merge');
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await apiFetch('/api/notes/merge-candidates');
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+    renderMergeCandidates(Array.isArray(data.candidates) ? data.candidates : []);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  }
+}
+
+function renderMergeCandidates(candidates) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('Merge'));
+
+  if (candidates.length === 0) {
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = '병합 후보가 없습니다. 검색 결과 카드의 "병합" 버튼으로 직접 묶을 수 있어요.';
+    group.appendChild(bubble);
+    getMessages().appendChild(group);
+    scrollDown();
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'search-results';
+  const header = document.createElement('div');
+  header.className = 'search-header';
+  header.textContent = `병합 후보 ${candidates.length}쌍 (유사한 토픽)`;
+  wrap.appendChild(header);
+
+  candidates.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'note-card';
+
+    const title = document.createElement('div');
+    title.className = 'note-card-title';
+    title.textContent = `${c.a.title} ↔ ${c.b.title}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'note-card-excerpt';
+    meta.textContent = `유사도 ${c.sim} · "${c.a.title}"에 "${c.b.title}" 흡수`;
+
+    const btn = document.createElement('button');
+    btn.className = 'note-card-remove';
+    btn.textContent = '병합';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '병합 중…';
+      try {
+        const res = await apiFetch('/api/notes/merge', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ filenames: [c.b.filename], targetFilename: c.a.filename }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          card.remove();
+          showToast(`"${data.title}"으로 병합됨`);
+        } else {
+          showToast(`오류: ${data.error}`);
+          btn.disabled = false;
+          btn.textContent = '병합';
+        }
+      } catch (_) {
+        showToast('서버 연결 오류');
+        btn.disabled = false;
+        btn.textContent = '병합';
+      }
+    });
+
+    card.append(title, meta, btn);
+    wrap.appendChild(card);
+  });
+
+  group.appendChild(wrap);
+  getMessages().appendChild(group);
   scrollDown();
 }
 

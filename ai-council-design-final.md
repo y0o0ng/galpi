@@ -536,6 +536,7 @@
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
 - **배포 견고성(완료):** SQLite WAL 모드, SIGTERM graceful shutdown, systemd 유닛(`deploy/ai-council.service`)+런북 자동기동, 백업 복원 절차 문서, vault↔DB 동기화(`/sync` — 신규 등록 + 삭제 노트 prune), `.env` chmod.
+- **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안(기존) + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
 - **다음:** 라즈베리파이 배포 체크리스트 — better-sqlite3 네이티브 빌드(ARM), codex CLI 유무(없으면 `CODEX_RUNNER_MODE=heuristic`), `HOST=0.0.0.0` 시 `API_TOKEN` 설정, 모델명 유효성(`/api/config`). 이후 V4(음성 입력).
 - **보너스(미착수):** 백업 Git 자동 커밋, 그래프 edge에서 archived 노트 제외.
 - **최근 작업(2026-06-04):** 코드 리뷰 기반 수정 — 자동/수동 저장 QA 중복 제거, 질문 임베딩 3→1, 토픽 쓰기 직렬화, searchVault mtime 캐시, findBestTopicNote 상위 후보만 읽기; 견고성 — 0.0.0.0+빈 토큰 경고, 코사인 차원 가드, deep/codex 모델 문서화, API 토큰 timing-safe 비교; soft delete/_archive 구현; 백업 시스템 구현.

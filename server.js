@@ -452,6 +452,10 @@ const stmtGetAllNoteFilenames = db.prepare('SELECT filename, title FROM notes');
 const stmtDeleteNote = db.prepare('DELETE FROM notes WHERE filename = ?');
 const stmtDeleteNoteChunksByNote = db.prepare('DELETE FROM note_chunks WHERE note_filename = ?');
 const stmtDeleteNoteEdgesByNote = db.prepare('DELETE FROM note_edges WHERE source_filename = ? OR target_filename = ?');
+const stmtReassignChunks = db.prepare('UPDATE note_chunks SET note_filename = ?, note_title = ?, updated_at = strftime(\'%s\',\'now\') WHERE note_filename = ?');
+const stmtReassignDecisions = db.prepare('UPDATE auto_save_decisions SET note_filename = ?, note_title = ? WHERE note_filename = ?');
+const stmtGetEdgesTouchingNote = db.prepare('SELECT source_filename AS sourceFilename, source_title AS sourceTitle, target_filename AS targetFilename, target_title AS targetTitle, relation, score, confidence, reason, created_by AS createdBy FROM note_edges WHERE source_filename = ? OR target_filename = ?');
+const stmtGetTopicNotes = db.prepare("SELECT filename, title FROM notes WHERE archived = 0 AND note_type = 'topic' ORDER BY updated_at DESC, id DESC");
 const stmtUpdateChunkNoteTitle = db.prepare(
   "UPDATE note_chunks SET note_title = ?, updated_at = strftime('%s','now') WHERE note_filename = ?"
 );
@@ -991,8 +995,8 @@ function saveQaChunkRecord({ qaId, filename, title, question, answer, model, ses
   generateAndStoreChunkEmbedding(qaId, content).catch(() => {});
 }
 
-function createTopicNoteContent({ fileId, title, createdStr, qaId, question, answer, sessionId, messageId, model }) {
-  const qaEntry = formatQaLogEntry({ qaId, question, answer, model });
+function createTopicNoteContent({ fileId, title, createdStr, qaId, question, answer, sessionId, messageId, model, qaEntry: qaEntryOverride }) {
+  const qaEntry = qaEntryOverride || formatQaLogEntry({ qaId, question, answer, model });
   const draftRaw = `# ${title}
 
 ## Q&A 로그
@@ -1996,6 +2000,168 @@ app.get('/api/backup/status', async (_req, res) => {
       count: backups.length,
       backups: backups.slice(0, 14),
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── 토픽 병합 ────────────────────────────────────────────────────────────────
+// 병합 결과는 항상 토픽. 명시 target 토픽 > sources 중 첫 토픽(promote) > 없으면 새 토픽.
+// source는 아무 타입(토픽/의회/레거시)이고, 흡수 후 _archive로 보관한다.
+
+function extractNoteSection(raw, heading) {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = String(raw || '').match(new RegExp(`^##\\s+${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|\\n---|\\s*$)`, 'm'));
+  return m ? m[1].trim() : '';
+}
+
+// 한 노트를 흡수할 QA-LOG 항목으로 변환. 토픽이면 기존 항목 보존, 아니면 본문을 항목 1개로 접는다.
+function sourceToEntries(src) {
+  if (src.noteType === 'topic') {
+    const entries = splitQaLogEntries(extractMarkerBody(src.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->'));
+    if (entries.length > 0) return entries.map(text => ({ text, isExistingChunk: true }));
+  }
+  const question = src.title;
+  const answer = (extractNoteSection(src.raw, '결론')
+    || getCodexSignalText(src.raw).slice(0, 6000)
+    || stripFrontmatter(src.raw).slice(0, 6000)).trim();
+  const qaId = createQaId();
+  return [{ text: formatQaLogEntry({ qaId, question, answer, model: `병합:${src.title}` }), isExistingChunk: false, qaId, question, answer }];
+}
+
+async function loadNoteForMerge(filename) {
+  const safeName = assertSafeNoteFilename(filename);
+  const raw = await fs.readFile(path.join(VAULT_PATH, safeName), 'utf8');
+  const fm = parseSimpleFrontmatter(raw);
+  return { filename: safeName, raw, fm, title: parseNoteTitle(raw, safeName), noteType: fm.note_type || 'legacy' };
+}
+
+// source의 DB 참조(chunks/decisions/edges)를 target으로 재지정. edge는 자기루프 제거 + upsert dedup.
+const reassignNoteReferences = db.transaction((fromFilename, toFilename, toTitle) => {
+  stmtReassignChunks.run(toFilename, toTitle, fromFilename);
+  stmtReassignDecisions.run(toFilename, toTitle, fromFilename);
+  for (const e of stmtGetEdgesTouchingNote.all(fromFilename, fromFilename)) {
+    const sf = e.sourceFilename === fromFilename ? toFilename : e.sourceFilename;
+    const st = e.sourceFilename === fromFilename ? toTitle : e.sourceTitle;
+    const tf = e.targetFilename === fromFilename ? toFilename : e.targetFilename;
+    const tt = e.targetFilename === fromFilename ? toTitle : e.targetTitle;
+    if (sf !== tf) {
+      dbUpsertNoteEdge({ sourceFilename: sf, sourceTitle: st, targetFilename: tf, targetTitle: tt, relation: e.relation, score: e.score, confidence: e.confidence, reason: e.reason, createdBy: e.createdBy });
+    }
+  }
+  stmtDeleteNoteEdgesByNote.run(fromFilename, fromFilename);
+});
+
+async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle = null }) {
+  let srcNames = [...new Set((filenames || []).map(f => String(f || '').trim()).filter(Boolean))]
+    .filter(f => f !== targetFilename);
+
+  const loaded = new Map();
+  for (const f of [...srcNames, ...(targetFilename ? [targetFilename] : [])]) {
+    if (!loaded.has(f)) loaded.set(f, await loadNoteForMerge(f));
+  }
+
+  // target 결정
+  let target = null;
+  if (targetFilename) {
+    target = loaded.get(targetFilename);
+    if (target.noteType !== 'topic') throw new Error('target은 topic 노트여야 합니다.');
+  } else {
+    const promote = srcNames.find(f => loaded.get(f).noteType === 'topic');
+    if (promote) { target = loaded.get(promote); srcNames = srcNames.filter(f => f !== promote); }
+  }
+
+  const sources = srcNames.map(f => loaded.get(f));
+  if (sources.length === 0) throw new Error('흡수할 노트가 없습니다.');
+
+  const folded = [];
+  for (const src of sources) {
+    for (const e of sourceToEntries(src)) folded.push({ ...e, sourceFilename: src.filename, sourceTitle: src.title });
+  }
+
+  let resultFilename, resultTitle, createdNew = false;
+  if (target) {
+    resultFilename = target.filename;
+    resultTitle = target.title;
+    let raw = target.raw;
+    for (const f of folded) {
+      const appended = appendQaLogEntry(raw, f.text);
+      if (!appended) throw new Error(`${resultFilename}에 QA-LOG 마커가 없습니다.`);
+      raw = appended;
+    }
+    if (hasMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
+      raw = replaceMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw }));
+    }
+    raw = touchUpdatedFrontmatter(raw);
+    await overwriteVaultNote(resultFilename, raw);
+    dbUpsertNote({ filename: resultFilename, title: resultTitle, noteType: 'topic', codexStatus: 'pending' });
+    generateAndStoreEmbedding(resultFilename, buildSemanticEmbeddingText(resultTitle, raw)).catch(() => {});
+  } else {
+    createdNew = true;
+    resultTitle = sanitizeTitle(newTitle, null)
+      || await generateTopicTitle(sources[0].title, folded[0]?.answer || sources[0].title).catch(() => makeTopicTitle(sources[0].title))
+      || makeTopicTitle(sources[0].title);
+    const { fileId, createdStr } = createNoteIdentity(resultTitle);
+    resultFilename = fileId + '.md';
+    const content = createTopicNoteContent({ fileId, title: resultTitle, createdStr, qaEntry: folded.map(f => f.text).join('\n\n'), sessionId: 'merge', messageId: 'merge' });
+    await saveVaultNoteRecord({ fileId, title: resultTitle, noteType: 'topic', noteContent: content, codexStatus: 'pending' });
+  }
+
+  for (const src of sources) reassignNoteReferences(src.filename, resultFilename, resultTitle);
+  for (const f of folded.filter(x => !x.isExistingChunk)) {
+    saveQaChunkRecord({ qaId: f.qaId, filename: resultFilename, title: resultTitle, question: f.question, answer: f.answer, model: '병합' });
+  }
+
+  const archived = [];
+  for (const src of sources) {
+    try { await moveNoteArchived(src.filename, true); archived.push(src.filename); }
+    catch (err) { console.warn(`병합 후 보관 실패 (${src.filename}):`, err.message); }
+  }
+
+  return { target: resultFilename, title: resultTitle, createdNew, absorbed: sources.map(s => s.filename), archived, entries: folded.length };
+}
+
+async function findMergeCandidates(threshold = 0.6, limit = 12) {
+  const topics = stmtGetTopicNotesWithEmbedding.all()
+    .map(t => { try { return { filename: t.filename, title: t.title, vec: JSON.parse(t.embedding) }; } catch { return null; } })
+    .filter(Boolean);
+
+  const pairs = [];
+  for (let i = 0; i < topics.length; i++) {
+    for (let j = i + 1; j < topics.length; j++) {
+      const sim = cosineSimilarity(topics[i].vec, topics[j].vec);
+      if (sim >= threshold) {
+        pairs.push({
+          a: { filename: topics[i].filename, title: topics[i].title },
+          b: { filename: topics[j].filename, title: topics[j].title },
+          sim: Math.round(sim * 100) / 100,
+        });
+      }
+    }
+  }
+  return pairs.sort((x, y) => y.sim - x.sim).slice(0, limit);
+}
+
+app.get('/api/topics', (_req, res) => {
+  res.json({ topics: stmtGetTopicNotes.all() });
+});
+
+app.get('/api/notes/merge-candidates', async (_req, res) => {
+  try {
+    res.json({ success: true, candidates: await findMergeCandidates() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/notes/merge', async (req, res) => {
+  const filenames = Array.isArray(req.body?.filenames) ? req.body.filenames : [];
+  const targetFilename = req.body?.targetFilename ? String(req.body.targetFilename).trim() : null;
+  const newTitle = req.body?.newTitle ? String(req.body.newTitle).trim() : null;
+  if (filenames.length === 0) return res.status(400).json({ error: '병합할 노트를 지정해주세요.' });
+  try {
+    const result = await mergeNotesIntoTopic({ filenames, targetFilename, newTitle });
+    res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
