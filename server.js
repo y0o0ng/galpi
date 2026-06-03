@@ -433,6 +433,15 @@ const stmtUpdateNoteCodexStatus = db.prepare(`
   SET codex_status = ?, updated_at = strftime('%s','now')
   WHERE filename = ?
 `);
+const stmtSetNoteArchived = db.prepare(
+  "UPDATE notes SET archived = ?, updated_at = strftime('%s','now') WHERE filename = ?"
+);
+const stmtGetArchivedNotes = db.prepare(`
+  SELECT filename, title, note_type AS noteType
+  FROM notes
+  WHERE archived = 1
+  ORDER BY updated_at DESC, id DESC
+`);
 const stmtUpdateChunkNoteTitle = db.prepare(
   "UPDATE note_chunks SET note_title = ?, updated_at = strftime('%s','now') WHERE note_filename = ?"
 );
@@ -1799,6 +1808,76 @@ app.post('/api/notes/backfill', async (_req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─── 노트 숨김(soft delete) ──────────────────────────────────────────────────
+// filename은 basename 그대로 두고, archived 플래그로 물리 위치(_archive)만 가른다.
+// → note_chunks/note_edges/auto_save_decisions의 filename 참조를 건드리지 않아도 됨.
+
+const ARCHIVE_DIR = '_archive';
+
+function setFrontmatterArchived(raw, archived) {
+  if (!/^archived:\s*.*$/m.test(raw)) return raw;
+  return raw.replace(/^archived:\s*.*$/m, `archived: ${archived ? 'true' : 'false'}`);
+}
+
+function assertSafeNoteFilename(filename) {
+  const safeName = path.basename(filename || '');
+  if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
+    throw new Error('잘못된 노트 파일명입니다.');
+  }
+  return safeName;
+}
+
+async function moveNoteArchived(filename, archived) {
+  const safeName = assertSafeNoteFilename(filename);
+  const rootPath = path.join(VAULT_PATH, safeName);
+  const archivePath = path.join(VAULT_PATH, ARCHIVE_DIR, safeName);
+  const src = archived ? rootPath : archivePath;
+  const dest = archived ? archivePath : rootPath;
+
+  let raw;
+  try {
+    raw = await fs.readFile(src, 'utf8');
+  } catch {
+    throw new Error(archived ? '노트를 찾을 수 없습니다.' : '보관된 노트를 찾을 수 없습니다.');
+  }
+
+  const next = touchUpdatedFrontmatter(setFrontmatterArchived(raw, archived));
+  if (archived) await fs.mkdir(path.join(VAULT_PATH, ARCHIVE_DIR), { recursive: true });
+
+  const tmp = dest + '.tmp';
+  await fs.writeFile(tmp, next, 'utf8');
+  await fs.rename(tmp, dest);
+  await fs.unlink(src).catch(() => {});
+
+  stmtSetNoteArchived.run(archived ? 1 : 0, safeName);
+  noteSearchCache.delete(safeName);
+  return safeName;
+}
+
+app.post('/api/notes/archive', async (req, res) => {
+  const filename = String(req.body?.filename || '').trim();
+  if (!filename) return res.status(400).json({ error: '노트 파일명이 필요합니다.' });
+  try {
+    res.json({ success: true, filename: await moveNoteArchived(filename, true) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/notes/restore', async (req, res) => {
+  const filename = String(req.body?.filename || '').trim();
+  if (!filename) return res.status(400).json({ error: '노트 파일명이 필요합니다.' });
+  try {
+    res.json({ success: true, filename: await moveNoteArchived(filename, false) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/notes/archived', (_req, res) => {
+  res.json({ notes: stmtGetArchivedNotes.all() });
 });
 
 // ─── 정리 상태 조회 ─────────────────────────────────────────────────────────
