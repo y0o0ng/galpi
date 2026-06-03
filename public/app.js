@@ -373,8 +373,10 @@ async function sendSingleMessage() {
 
   appendUserBubble(text);
   const loadingEl = appendLoading();
+  document.dispatchEvent(new Event('pet:thinking'));
 
   try {
+    document.dispatchEvent(new Event('pet:building'));
     const res = await fetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -384,9 +386,11 @@ async function sendSingleMessage() {
     loadingEl.remove();
     if (data.error) appendError(data.error);
     else appendAssistantBubble({ ...data, question: text });
+    document.dispatchEvent(new Event('pet:happy'));
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+    document.dispatchEvent(new Event('pet:happy'));
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
@@ -425,6 +429,7 @@ async function sendCouncilMessage() {
   const loadingEl = createCouncilLoadingEl('1차 답변 생성 중…');
   body.appendChild(loadingEl);
   scrollDown();
+  document.dispatchEvent(new Event('pet:building'));
 
   try {
     // ── 1단계: 1차 답변 ────────────────────────────────────────────
@@ -478,6 +483,7 @@ async function sendCouncilMessage() {
   } catch (_) {
     loadingEl.remove();
     appendCouncilError(body, '서버에 연결할 수 없습니다.');
+    document.dispatchEvent(new Event('pet:happy'));
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
@@ -1252,6 +1258,7 @@ function appendError(text) {
   div.textContent = `⚠️ ${text}`;
   getMessages().appendChild(div);
   scrollDown();
+  document.dispatchEvent(new Event('pet:error'));
 }
 
 function showToast(text) {
@@ -1293,4 +1300,4 @@ function applyTheme(dark) {
 
 // ─── 실행 ─────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => { init(); initTheme(); });
+document.addEventListener('DOMContentLoaded', () => { init(); initTheme(); initPet(); });
