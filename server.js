@@ -1607,7 +1607,7 @@ const SEARCH_STOP_WORDS = new Set([
   '불러와줘', '꺼내줘', '해줘', '해줘요', '해주세요', '알고', '싶어', '있어',
   '없어', '어떤', '어떻게', '무엇', '뭐가', '뭔지', '대해', '대한', '관한',
   '이번', '저번', '지난', '이런', '저런', '그런', '이것', '저것', '그것',
-  '분석', '정리', '설명', '요약', '노트', '저장', '기록',
+  '정리', '설명', '요약', '노트', '저장', '기록',
 ]);
 
 function extractQueryTerms(query) {
@@ -1616,7 +1616,7 @@ function extractQueryTerms(query) {
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)
       .map(t => t.trim())
-      .filter(t => t.length >= 2 && !SEARCH_STOP_WORDS.has(t))
+      .filter(t => t.length >= 1 && !SEARCH_STOP_WORDS.has(t))
   )];
 }
 
@@ -1713,7 +1713,7 @@ async function searchVault(query) {
       finalScore = kwScore;
     }
 
-    const MIN_SCORE = embScore !== null ? 0.25 : 3;
+    const MIN_SCORE = embScore !== null ? 0.08 : 2;
     if (finalScore < MIN_SCORE) continue;
 
     const hitIdx = terms.map(t => bodyLower.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0] ?? 0;
