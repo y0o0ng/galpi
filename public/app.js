@@ -1560,7 +1560,10 @@ function renderMergeCandidates(candidates) {
 
     const meta = document.createElement('div');
     meta.className = 'note-card-excerpt';
-    meta.textContent = `유사도 ${c.sim} · "${c.a.title}"에 "${c.b.title}" 흡수`;
+    const tags = [];
+    if (c.sources?.includes('codex')) tags.push('Codex 제안');
+    if (typeof c.sim === 'number') tags.push(`유사도 ${c.sim}`);
+    meta.textContent = `${tags.join(' · ')} · "${c.a.title}"에 "${c.b.title}" 흡수${c.reason ? ` — ${c.reason}` : ''}`;
 
     const btn = document.createElement('button');
     btn.className = 'note-card-remove';

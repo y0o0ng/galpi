@@ -2122,24 +2122,65 @@ async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle 
 }
 
 async function findMergeCandidates(threshold = 0.6, limit = 12) {
-  const topics = stmtGetTopicNotesWithEmbedding.all()
+  const pairKey = (x, y) => [x, y].sort().join('||');
+  const byPair = new Map();
+
+  // 1) 임베딩 유사도 쌍
+  const embTopics = stmtGetTopicNotesWithEmbedding.all()
     .map(t => { try { return { filename: t.filename, title: t.title, vec: JSON.parse(t.embedding) }; } catch { return null; } })
     .filter(Boolean);
+  for (let i = 0; i < embTopics.length; i++) {
+    for (let j = i + 1; j < embTopics.length; j++) {
+      const sim = cosineSimilarity(embTopics[i].vec, embTopics[j].vec);
+      if (sim < threshold) continue;
+      byPair.set(pairKey(embTopics[i].filename, embTopics[j].filename), {
+        a: { filename: embTopics[i].filename, title: embTopics[i].title },
+        b: { filename: embTopics[j].filename, title: embTopics[j].title },
+        sim: Math.round(sim * 100) / 100,
+        sources: ['similarity'],
+      });
+    }
+  }
 
-  const pairs = [];
-  for (let i = 0; i < topics.length; i++) {
-    for (let j = i + 1; j < topics.length; j++) {
-      const sim = cosineSimilarity(topics[i].vec, topics[j].vec);
-      if (sim >= threshold) {
-        pairs.push({
-          a: { filename: topics[i].filename, title: topics[i].title },
-          b: { filename: topics[j].filename, title: topics[j].title },
-          sim: Math.round(sim * 100) / 100,
+  // 2) Codex 제안: 각 토픽의 CODEX-PROPOSALS에서 "- MERGE [[제목]] — 이유" 라인 파싱
+  const titleToFile = new Map(stmtGetAllNoteFilenames.all().map(n => [n.title, n.filename]));
+  for (const topic of stmtGetTopicNotes.all()) {
+    let raw;
+    try { raw = await fs.readFile(path.join(VAULT_PATH, topic.filename), 'utf8'); } catch { continue; }
+    const block = extractMarkerBody(raw, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->');
+    if (!block) continue;
+    for (const line of block.split('\n')) {
+      const m = line.trim().match(/^-\s*MERGE\s+\[\[([^\]\n]+)\]\]\s*(?:—\s*(.+))?$/i);
+      if (!m) continue;
+      const otherTitle = m[1].trim();
+      const otherFile = titleToFile.get(otherTitle) || await filenameForNoteTitle(otherTitle);
+      if (!otherFile || otherFile === topic.filename) continue;
+      const reason = (m[2] || '').trim().slice(0, 200);
+      const key = pairKey(topic.filename, otherFile);
+      const existing = byPair.get(key);
+      if (existing) {
+        if (!existing.sources.includes('codex')) existing.sources.push('codex');
+        if (reason && !existing.reason) existing.reason = reason;
+      } else {
+        byPair.set(key, {
+          a: { filename: topic.filename, title: topic.title },
+          b: { filename: otherFile, title: otherTitle },
+          sources: ['codex'],
+          reason: reason || undefined,
         });
       }
     }
   }
-  return pairs.sort((x, y) => y.sim - x.sim).slice(0, limit);
+
+  // Codex 제안 우선, 그다음 유사도 높은 순
+  return [...byPair.values()]
+    .sort((x, y) => {
+      const cx = x.sources.includes('codex') ? 1 : 0;
+      const cy = y.sources.includes('codex') ? 1 : 0;
+      if (cx !== cy) return cy - cx;
+      return (y.sim || 0) - (x.sim || 0);
+    })
+    .slice(0, limit);
 }
 
 app.get('/api/topics', (_req, res) => {
@@ -2673,6 +2714,7 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 첫 문장은 제목을 반복 설명하지 말고, 이 토픽에서 사용자가 무엇을 고민/판단/축적하고 있는지 바로 쓴다.
 - 최근 항목만 요약하지 말고 QA-LOG 전체의 흐름, 선호, 결론 변화를 압축한다.
 - CODEX-PROPOSALS는 실행 명령이 아니라 사용자에게 보낼 제안만 적는다. 제안이 없으면 비워둔다.
+- 다른 토픽과 합치는 게 낫다고 판단되면 병합 제안을 정확히 이 형식의 줄로 쓴다: "- MERGE [[합칠 대상 노트 제목]] — 이유" (대상은 vault에 실제로 있는 노트 제목만, 자기 자신 금지). 이 줄은 /merge 후보로 자동 수집된다.
 - 태그는 #태그 형식으로 3~8개 작성한다.
 - 링크는 아래 형식을 정확히 따른다.
   **[주제명]**
