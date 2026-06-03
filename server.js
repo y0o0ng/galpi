@@ -1080,10 +1080,21 @@ function appendQaLogEntry(raw, entry) {
   return raw.replace(marker, `${entry.trim()}\n\n${marker}`);
 }
 
+// buildTopicSummary가 찍는 placeholder(또는 빈 요약) 여부. 실제 Codex 산문 요약과 구분.
+function isPlaceholderSummary(body) {
+  const text = String(body || '').trim();
+  return text === '' || /Codex 정리 대기: QA-LOG에/.test(text);
+}
+
 function refreshTopicSummary(raw, title) {
   if (!hasMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
     return raw;
   }
+  // 실제 Codex 산문 요약은 보존한다 (append가 placeholder로 되돌리지 않도록).
+  // append 시 codex_status는 pending으로 되돌아가므로, 다음 정리 때 새 요약으로 교체된다.
+  const current = extractMarkerBody(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->');
+  if (!isPlaceholderSummary(current)) return raw;
+  // placeholder거나 비어 있을 때만 항목 수를 갱신한다.
   return replaceMarkerBlock(
     raw,
     '<!-- CODEX-SUMMARY-START -->',
