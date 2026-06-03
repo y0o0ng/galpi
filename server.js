@@ -15,7 +15,9 @@ const VAULT_PATH = process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH)
 const CONTEXT_N  = parseInt(process.env.CONTEXT_N  || '10');
 const HISTORY_CONTEXT_MESSAGES = CONTEXT_N * 2; // 최근 10턴 내외를 user/assistant 메시지 쌍으로 전달
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+const CLAUDE_DEEP_MODEL = process.env.CLAUDE_DEEP_MODEL || 'claude-opus-4-5';
 const GPT_MODEL    = process.env.GPT_MODEL    || 'gpt-4o';
+const GPT_DEEP_MODEL = process.env.GPT_DEEP_MODEL || 'gpt-5.5';
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const GPT_LANGUAGE_SYSTEM = { role: 'system', content: '사용자가 쓴 언어로 답변하라. 한국어, 영어, 중국어, 일본어, 스페인어, 프랑스어, 독일어, 포르투갈어, 러시아어, 아랍어만 사용하라.' };
@@ -34,6 +36,8 @@ const MAX_MEMORY_CHARS = 1200;
 const MEMORY_DIR = '_system';
 const MEMORY_FILE = 'memory.md';
 const CODEX_BIN = process.env.CODEX_BIN || 'codex';
+const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.4-mini';
+const CODEX_DEEP_MODEL = process.env.CODEX_DEEP_MODEL || 'gpt-5.5';
 const CODEX_RUNNER_MODE = process.env.CODEX_RUNNER_MODE || 'codex';
 const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '180000');
 const CODEX_AUTO_QUEUE_THRESHOLD = Math.max(1, parseInt(process.env.CODEX_AUTO_QUEUE_THRESHOLD || '5', 10) || 5);
@@ -55,6 +59,14 @@ if (!HAS_CLAUDE && !HAS_GPT) {
 
 const anthropic = HAS_CLAUDE ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 const openai    = HAS_GPT    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })    : null;
+
+function getGptModelForCouncilMode(mode) {
+  return mode === 'deep' ? GPT_DEEP_MODEL : GPT_MODEL;
+}
+
+function getClaudeModelForCouncilMode(mode) {
+  return mode === 'deep' ? CLAUDE_DEEP_MODEL : CLAUDE_MODEL;
+}
 
 // ─── 앱 ─────────────────────────────────────────────────────────────────────
 
@@ -143,6 +155,9 @@ const stmtUpsertNote = db.prepare(`
     source_session = excluded.source_session,
     source_message = excluded.source_message,
     updated_at = strftime('%s','now')
+`);
+const stmtGetNoteByMessageId = db.prepare(`
+  SELECT filename, title FROM notes WHERE source_message = ? LIMIT 1
 `);
 const stmtGetNoteStatusCounts = db.prepare(`
   SELECT codex_status AS codexStatus, COUNT(*) AS count
@@ -676,6 +691,11 @@ app.post('/api/save-note', async (req, res) => {
     return res.status(400).json({ error: '질문과 답변이 필요합니다.' });
   }
 
+  if (messageId) {
+    const existing = stmtGetNoteByMessageId.get(String(messageId));
+    if (existing) return res.json({ success: true, title: existing.title, filename: existing.filename, duplicate: true });
+  }
+
   let title = question.replace(/\n/g, ' ').slice(0, 40).trim();
   try {
     const titlePrompt = `다음 질문에 대한 옵시디언 노트 제목을 한국어로 10~20자 이내로 지어줘. 제목 텍스트만 반환해. 따옴표나 특수문자 없이.\n\n질문: ${question}`;
@@ -781,7 +801,11 @@ ${calloutAnswer}
 app.get('/api/config', (_req, res) => {
   res.json({
     claudeModel: CLAUDE_MODEL,
+    claudeDeepModel: CLAUDE_DEEP_MODEL,
     gptModel:    GPT_MODEL,
+    gptDeepModel: GPT_DEEP_MODEL,
+    codexModel:  CODEX_MODEL,
+    codexDeepModel: CODEX_DEEP_MODEL,
     contextN:    CONTEXT_N,
     contextMessages: HISTORY_CONTEXT_MESSAGES,
     codexAutoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
@@ -1322,10 +1346,11 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 작업 후 최종 답변에는 처리한 파일명만 간단히 적어라.`;
 }
 
-async function runCodexCliForJob(filenames) {
+async function runCodexCliForJob(filenames, model = CODEX_MODEL) {
   const prompt = buildCodexRunnerPrompt(filenames);
   return execFileWithInput(CODEX_BIN, [
     'exec',
+    '--model', model,
     '-C', VAULT_PATH,
     '--skip-git-repo-check',
     '--sandbox', 'workspace-write',
@@ -1360,11 +1385,11 @@ async function processCodexNoteWithHeuristic(filename) {
   return { filename: safeName, title, tags: tagsBlock, links: linksBlock };
 }
 
-async function processCodexJobWithCodex(filenames) {
+async function processCodexJobWithCodex(filenames, model = CODEX_MODEL) {
   const snapshots = await snapshotVaultFiles(filenames);
 
   try {
-    await runCodexCliForJob(filenames);
+    await runCodexCliForJob(filenames, model);
     await assertCodexDiffAllowed(snapshots);
     await validateCodexEdit();
   } catch (err) {
@@ -1380,11 +1405,11 @@ async function processCodexJobWithCodex(filenames) {
   }));
 }
 
-async function processImmediateCodexBatch(filenames) {
+async function processImmediateCodexBatch(filenames, model = CODEX_MODEL) {
   filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('running', filename));
 
   if (CODEX_RUNNER_MODE === 'codex') {
-    return processCodexJobWithCodex(filenames);
+    return processCodexJobWithCodex(filenames, model);
   }
 
   const processed = [];
@@ -1416,10 +1441,10 @@ async function runAllCodexNotes() {
   for (let i = 0; i < notes.length; i += batchSize) {
     const batch = notes.slice(i, i + batchSize);
     const filenames = batch.map(note => note.filename);
-    const previousStatuses = new Map(batch.map(note => [note.filename, note.codexStatus || 'processed']));
+    const previousStatuses = new Map(batch.map(note => [note.filename, note.codexStatus || 'pending']));
 
     try {
-      const batchProcessed = await processImmediateCodexBatch(filenames);
+      const batchProcessed = await processImmediateCodexBatch(filenames, CODEX_DEEP_MODEL);
       processed.push(...batchProcessed);
       batches.push({
         index: batches.length + 1,
@@ -1432,7 +1457,7 @@ async function runAllCodexNotes() {
       const retryableRunnerFailure = isCodexRunnerUnavailableError(err);
       filenames.forEach(filename => {
         const nextStatus = retryableRunnerFailure
-          ? previousStatuses.get(filename) || 'processed'
+          ? previousStatuses.get(filename) || 'pending'
           : 'needs_manual_check';
         stmtUpdateNoteCodexStatus.run(nextStatus, filename);
       });
@@ -1469,7 +1494,7 @@ async function runNextCodexJob() {
 
   if (CODEX_RUNNER_MODE === 'codex') {
     try {
-      processed.push(...await processCodexJobWithCodex(job.filenames));
+      processed.push(...await processCodexJobWithCodex(job.filenames, CODEX_MODEL));
     } catch (err) {
       const retryableRunnerFailure = isCodexRunnerUnavailableError(err);
       const failedStatus = retryableRunnerFailure ? 'pending' : 'needs_manual_check';
@@ -1801,16 +1826,18 @@ app.post('/api/council/debate', async (req, res) => {
     : mode === 'deep'
     ? COUNCIL_TOKEN_LIMITS.deepFirst
     : COUNCIL_TOKEN_LIMITS.fullFirst;
+  const claudeModel = getClaudeModelForCouncilMode(mode);
+  const gptModel = getGptModelForCouncilMode(mode);
 
   try {
     const [claudeResult, gptResult] = await Promise.allSettled([
       anthropic.messages.create({
-        model: CLAUDE_MODEL,
+        model: claudeModel,
         max_tokens: maxTokens,
         messages: context,
       }),
       openai.chat.completions.create({
-        model: GPT_MODEL,
+        model: gptModel,
         messages: [GPT_LANGUAGE_SYSTEM, ...context],
         max_completion_tokens: maxTokens,
       }),
@@ -1840,6 +1867,8 @@ app.post('/api/council/review', async (req, res) => {
   }
 
   const mode = normalizeCouncilDraftMode(councilDraftMode);
+  const claudeModel = getClaudeModelForCouncilMode(mode);
+  const gptModel = getGptModelForCouncilMode(mode);
 
   // 상호 검토 프롬프트 (Claude는 GPT를, GPT는 Claude를 검토)
   const claudeReviewPrompt = buildReviewPrompt(question, claudeReply, gptReply, mode);
@@ -1848,12 +1877,12 @@ app.post('/api/council/review', async (req, res) => {
   try {
     const [claudeResult, gptResult] = await Promise.allSettled([
       anthropic.messages.create({
-        model: CLAUDE_MODEL,
+        model: claudeModel,
         max_tokens: COUNCIL_TOKEN_LIMITS.review,
         messages: [{ role: 'user', content: claudeReviewPrompt }],
       }),
       openai.chat.completions.create({
-        model: GPT_MODEL,
+        model: gptModel,
         messages: [GPT_LANGUAGE_SYSTEM, { role: 'user', content: gptReviewPrompt }],
         max_completion_tokens: COUNCIL_TOKEN_LIMITS.review,
       }),
@@ -1873,10 +1902,13 @@ app.post('/api/council/review', async (req, res) => {
 
 // 3단계: 최종 종합
 app.post('/api/council/synthesize', async (req, res) => {
-  const { question, claudeReply, gptReply, claudeReview, gptReview, synthesizer, sessionId } = req.body;
+  const { question, claudeReply, gptReply, claudeReview, gptReview, synthesizer, sessionId, councilDraftMode } = req.body;
   if (!question || !claudeReply || !gptReply || !synthesizer || !sessionId) {
     return res.status(400).json({ error: '필수 항목 누락' });
   }
+  const mode = normalizeCouncilDraftMode(councilDraftMode);
+  const claudeModel = getClaudeModelForCouncilMode(mode);
+  const gptModel = getGptModelForCouncilMode(mode);
 
   // 최종 종합 프롬프트 (검토 결과 포함, 항상 자연스러운 사용자용 답변)
   const synthPrompt = buildSynthesisPrompt(question, claudeReply, gptReply, claudeReview, gptReview);
@@ -1896,19 +1928,19 @@ app.post('/api/council/synthesize', async (req, res) => {
     let rawText, usedModel;
     if (synthesizer === 'claude') {
       const r = await anthropic.messages.create({
-        model: CLAUDE_MODEL, max_tokens: COUNCIL_TOKEN_LIMITS.synthesis,
+        model: claudeModel, max_tokens: COUNCIL_TOKEN_LIMITS.synthesis,
         messages: [{ role: 'user', content: synthPrompt }],
       });
       rawText   = r.content[0].text;
-      usedModel = CLAUDE_MODEL;
+      usedModel = claudeModel;
     } else {
       const r = await openai.chat.completions.create({
-        model: GPT_MODEL,
+        model: gptModel,
         messages: [GPT_LANGUAGE_SYSTEM, { role: 'user', content: synthPrompt }],
         max_completion_tokens: COUNCIL_TOKEN_LIMITS.synthesis,
       });
       rawText   = r.choices[0].message.content;
-      usedModel = GPT_MODEL;
+      usedModel = gptModel;
     }
 
     const { divergence, synthesis } = parseSynthesisResponse(rawText);
@@ -1956,20 +1988,27 @@ app.post('/api/council/save-note', async (req, res) => {
     return res.status(400).json({ error: '필수 항목 누락' });
   }
 
+  if (messageId) {
+    const existing = stmtGetNoteByMessageId.get(String(messageId));
+    if (existing) return res.json({ success: true, title: existing.title, filename: existing.filename, duplicate: true });
+  }
+
   const mode = normalizeCouncilDraftMode(councilDraftMode);
+  const claudeModel = getClaudeModelForCouncilMode(mode);
+  const gptModel = getGptModelForCouncilMode(mode);
 
   let title = question.replace(/\n/g, ' ').slice(0, 40).trim();
   try {
     const titlePrompt = `다음 질문에 대한 옵시디언 노트 제목을 한국어로 10~20자 이내로 지어줘. 제목 텍스트만 반환해. 따옴표나 특수문자 없이.\n\n질문: ${question}`;
     if (synthesizer === 'Claude') {
       const r = await anthropic.messages.create({
-        model: CLAUDE_MODEL, max_tokens: 60,
+        model: claudeModel, max_tokens: 60,
         messages: [{ role: 'user', content: titlePrompt }],
       });
       title = r.content[0].text.trim();
     } else {
       const r = await openai.chat.completions.create({
-        model: GPT_MODEL,
+        model: gptModel,
         messages: [{ role: 'user', content: titlePrompt }],
       });
       title = r.choices[0].message.content.trim();
@@ -2012,8 +2051,8 @@ ai_readable: true
 knowledge_type: council_synthesis
 confidence: medium
 models:
-  claude: ${CLAUDE_MODEL}
-  gpt: ${GPT_MODEL}
+  claude: ${claudeModel}
+  gpt: ${gptModel}
 final_synthesizer: ${synthesizer}
 source_session: ${sessionId || 'unknown'}
 source_message: ${messageId || 'unknown'}
@@ -2079,7 +2118,8 @@ app.listen(PORT, HOST, () => {
   console.log(`   로컬:     http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   if (HOST === '0.0.0.0') console.log(`   네트워크: http://<라즈베리파이_IP>:${PORT}`);
   console.log(`   볼트:     ${VAULT_PATH}`);
-  console.log(`   Claude:   ${CLAUDE_MODEL}`);
-  console.log(`   GPT:      ${GPT_MODEL}`);
+  console.log(`   Claude:   ${CLAUDE_MODEL} / deep ${CLAUDE_DEEP_MODEL}`);
+  console.log(`   GPT:      ${GPT_MODEL} / deep ${GPT_DEEP_MODEL}`);
+  console.log(`   Codex:    ${CODEX_MODEL} / deep ${CODEX_DEEP_MODEL}`);
   console.log(`   컨텍스트: 최근 ${CONTEXT_N}턴 내외 (${HISTORY_CONTEXT_MESSAGES}개 메시지)\n`);
 });

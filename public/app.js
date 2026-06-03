@@ -167,6 +167,12 @@ function restoreLocalUiHistory() {
 }
 
 function appendHistoryBubble(content, model, messageId, question) {
+  const councilData = parseCouncilTranscript(content, model);
+  if (councilData) {
+    renderRestoredCouncilMessage(councilData, messageId);
+    return;
+  }
+
   const group = document.createElement('div');
   group.className = 'msg-group assistant';
 
@@ -195,6 +201,82 @@ function appendHistoryBubble(content, model, messageId, question) {
   }
 
   getMessages().appendChild(group);
+  scrollDown();
+}
+
+function parseCouncilTranscript(content, model) {
+  const text = String(content || '');
+  const modelText = String(model || '');
+  if (!modelText.includes('의회') && !/^## 질문\n/.test(text)) return null;
+
+  const sections = text.split(/\n\n---\n\n/).map(section => section.trim()).filter(Boolean);
+  const getSection = (heading) => {
+    const section = sections.find(item => item.startsWith(`## ${heading}`));
+    const match = section?.match(/^## [^\n]+\n([\s\S]*)$/);
+    return match ? match[1].trim() : null;
+  };
+
+  const synthesisSection = sections.find(item => item.startsWith('## 종합'));
+  const synthesisMatch = synthesisSection?.match(/^## 종합 \(([^)]+)\)\n([\s\S]*)$/);
+  const question = getSection('질문');
+  const claudeReply = getSection('Claude 1차 답변');
+  const gptReply = getSection('GPT 1차 답변');
+  const synthesis = synthesisMatch ? synthesisMatch[2].trim() : null;
+  if (!question || !synthesis || (!claudeReply && !gptReply)) return null;
+
+  return {
+    question,
+    claudeReply,
+    gptReply,
+    claudeReview: getSection('Claude의 GPT 검토'),
+    gptReview: getSection('GPT의 Claude 검토'),
+    divergence: getSection('갈린 지점'),
+    synthesis,
+    synthesizer: synthesisMatch ? synthesisMatch[1].trim() : modelText.replace(/\s*\(의회\)\s*$/, '') || 'AI',
+    synthesizerModelId: null,
+    councilDraftMode: 'restored',
+  };
+}
+
+function renderRestoredCouncilMessage(data, messageId = null) {
+  const container = document.createElement('div');
+  container.className = 'council-group';
+
+  const tag = document.createElement('div');
+  tag.className = 'council-tag';
+  tag.textContent = '의회';
+
+  const body = document.createElement('div');
+  body.className = 'council-body';
+
+  if (data.claudeReply) body.appendChild(makeDebateAnswer('Claude', data.claudeReply, false));
+  if (data.gptReply) body.appendChild(makeDebateAnswer('GPT', data.gptReply, false));
+
+  if (data.claudeReview || data.gptReview) {
+    const reviews = document.createElement('div');
+    reviews.className = 'reviews-section';
+    if (data.claudeReview) reviews.appendChild(makeReview('Claude의 GPT 검토', data.claudeReview));
+    if (data.gptReview) reviews.appendChild(makeReview('GPT의 Claude 검토', data.gptReview));
+    body.appendChild(reviews);
+  }
+
+  appendSynthesisSection(body, data.question, {
+    claudeReply: data.claudeReply,
+    gptReply: data.gptReply,
+    councilDraftMode: data.councilDraftMode,
+  }, {
+    claudeReview: data.claudeReview,
+    gptReview: data.gptReview,
+  }, {
+    divergence: data.divergence,
+    synthesis: data.synthesis,
+    synthesizer: data.synthesizer,
+    synthesizerModelId: data.synthesizerModelId,
+    messageId,
+  });
+
+  container.append(tag, body);
+  getMessages().appendChild(container);
   scrollDown();
 }
 
@@ -674,7 +756,7 @@ async function chooseSynthesizer(container, body, question, debateData, reviewDa
         gptReview:    reviewData.gptReview,
         synthesizer,
         sessionId,
-        councilDraftMode,
+        councilDraftMode: debateData.councilDraftMode || councilDraftMode,
       }),
     });
     const data = await res.json();
@@ -693,6 +775,12 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
   // 1차 답변 및 검토 접기
   body.querySelectorAll('.debate-answer, .review-answer').forEach(d => d.open = false);
 
+  appendSynthesisSection(body, question, debateData, reviewData, data);
+  saveUiMessage('assistant', buildCouncilTranscript(question, debateData, reviewData, data), `종합 (${data.synthesizer})`);
+  scrollDown();
+}
+
+function appendSynthesisSection(body, question, debateData, reviewData, data) {
   const synthSection = document.createElement('div');
   synthSection.className = 'synthesis-section';
 
@@ -723,6 +811,7 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
   saveBtn.title = '노트로 저장';
   saveBtn.setAttribute('aria-label', '노트로 저장');
   saveBtn.innerHTML = saveIconSvg();
+  const noteDraftMode = debateData.councilDraftMode || councilDraftMode;
   saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveCouncilNote(saveBtn, {
     question,
     claudeReply:        debateData.claudeReply,
@@ -734,13 +823,11 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
     synthesizer:        data.synthesizer,
     synthesizerModelId: data.synthesizerModelId,
     messageId:          data.messageId,
-    councilDraftMode,
+    councilDraftMode:   noteDraftMode,
   })));
 
   synthSection.append(synthLabel, synthBubble, saveBtn);
   body.appendChild(synthSection);
-  saveUiMessage('assistant', buildCouncilTranscript(question, debateData, reviewData, data), `종합 (${data.synthesizer})`);
-  scrollDown();
 }
 
 function buildCouncilTranscript(question, debateData, reviewData, data) {
