@@ -136,7 +136,6 @@ const PET_MENU_ITEMS = [
   { label: '🔍 노트 검색',   command: '/search ',    autoSend: false },
   { label: '🧠 메모리 보기', command: '/memory',      autoSend: true  },
   { label: '🗂 정리 상태',   command: '/organize',    autoSend: true  },
-  { label: '🧹 정리',        command: '/organize process', autoSend: true },
   { label: '🔁 전체 재정리', command: '/organize all', autoSend: true },
   { label: '➕ 메모리 추가', command: '/memory add ', autoSend: false },
 ];

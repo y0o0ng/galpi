@@ -160,6 +160,7 @@ db.exec(`
     note_filename TEXT,
     note_title TEXT,
     action TEXT,
+    organize_queued INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
   CREATE TABLE IF NOT EXISTS note_edges (
@@ -198,6 +199,11 @@ if (!db.prepare('PRAGMA table_info(notes)').all().some(c => c.name === 'embeddin
 if (!db.prepare('PRAGMA table_info(messages)').all().some(c => c.name === 'embedding')) {
   db.exec('ALTER TABLE messages ADD COLUMN embedding TEXT');
 }
+// 마이그레이션: auto_save_decisions organize_queued
+if (!db.prepare('PRAGMA table_info(auto_save_decisions)').all().some(c => c.name === 'organize_queued')) {
+  db.exec('ALTER TABLE auto_save_decisions ADD COLUMN organize_queued INTEGER NOT NULL DEFAULT 0');
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_queue ON auto_save_decisions(organize_queued, decision, action)');
 
 const stmtEnsureSession = db.prepare(`
   INSERT INTO sessions (id) VALUES (?)
@@ -257,11 +263,11 @@ const stmtInsertAutoSaveDecision = db.prepare(`
   INSERT INTO auto_save_decisions (
     session_id, source_user_message, source_assistant_message, model,
     decision, reason, question, answer_excerpt,
-    qa_id, note_filename, note_title, action
+    qa_id, note_filename, note_title, action, organize_queued
   ) VALUES (
     @sessionId, @sourceUserMessage, @sourceAssistantMessage, @model,
     @decision, @reason, @question, @answerExcerpt,
-    @qaId, @noteFilename, @noteTitle, @action
+    @qaId, @noteFilename, @noteTitle, @action, @organizeQueued
   )
 `);
 const stmtUpsertNoteEdge = db.prepare(`
@@ -372,6 +378,20 @@ const stmtGetPendingNotes = db.prepare(`
   WHERE archived = 0 AND codex_status = 'pending'
   ORDER BY created_at ASC, id ASC
 `);
+const stmtGetUnqueuedSaveDecisionCount = db.prepare(`
+  SELECT COUNT(*) AS count
+  FROM auto_save_decisions
+  WHERE organize_queued = 0
+    AND decision = 'save'
+    AND action IN ('created', 'appended')
+`);
+const stmtMarkUnqueuedSaveDecisionsQueued = db.prepare(`
+  UPDATE auto_save_decisions
+  SET organize_queued = 1
+  WHERE organize_queued = 0
+    AND decision = 'save'
+    AND action IN ('created', 'appended')
+`);
 const stmtGetOrganizableNotes = db.prepare(`
   SELECT filename, title, note_type AS noteType, codex_status AS codexStatus
   FROM notes
@@ -387,6 +407,18 @@ const stmtUpdateNoteCodexStatus = db.prepare(`
   SET codex_status = ?, updated_at = strftime('%s','now')
   WHERE filename = ?
 `);
+const stmtUpdateChunkNoteTitle = db.prepare(
+  "UPDATE note_chunks SET note_title = ?, updated_at = strftime('%s','now') WHERE note_filename = ?"
+);
+const stmtUpdateDecisionNoteTitle = db.prepare(
+  'UPDATE auto_save_decisions SET note_title = ? WHERE note_filename = ?'
+);
+const stmtUpdateEdgeSourceTitle = db.prepare(
+  "UPDATE note_edges SET source_title = ?, updated_at = strftime('%s','now') WHERE source_filename = ?"
+);
+const stmtUpdateEdgeTargetTitle = db.prepare(
+  "UPDATE note_edges SET target_title = ?, updated_at = strftime('%s','now') WHERE target_filename = ?"
+);
 const stmtGetRecentCodexJobs = db.prepare(`
   SELECT id, status, note_filenames_json AS noteFilenamesJson, attempt_count AS attemptCount,
          error, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt
@@ -429,6 +461,8 @@ const stmtGetRecentMessages = db.prepare(`
   ORDER BY created_at ASC, id ASC
 `);
 
+let organizeWorkerRunning = false;
+
 function dbSaveMessage(sessionId, role, content, model = null) {
   stmtEnsureSession.run(sessionId);
   const result = stmtInsertMessage.run(sessionId, role, content, model);
@@ -462,8 +496,10 @@ function dbUpsertNote({
   });
 }
 
-const createCodexJobFromPending = db.transaction((limit = 5) => {
-  const notes = stmtGetPendingNotes.all().slice(0, limit);
+const createCodexJobFromPending = db.transaction((limit = null) => {
+  const notes = Number.isInteger(limit) && limit > 0
+    ? stmtGetPendingNotes.all().slice(0, limit)
+    : stmtGetPendingNotes.all();
   if (notes.length === 0) return null;
 
   const filenames = notes.map(note => note.filename);
@@ -477,14 +513,18 @@ const createCodexJobFromPending = db.transaction((limit = 5) => {
   };
 });
 
-function maybeCreateCodexJobFromPending() {
+function maybeCreateCodexJobFromSaveEvents() {
   if (!Number.isFinite(CODEX_AUTO_QUEUE_THRESHOLD) || CODEX_AUTO_QUEUE_THRESHOLD <= 0) {
     return null;
   }
 
-  const pendingCount = stmtGetPendingNotes.all().length;
-  if (pendingCount < CODEX_AUTO_QUEUE_THRESHOLD) return null;
-  return createCodexJobFromPending(CODEX_AUTO_QUEUE_THRESHOLD);
+  const eventCount = stmtGetUnqueuedSaveDecisionCount.get().count;
+  if (eventCount < CODEX_AUTO_QUEUE_THRESHOLD) return null;
+  const job = createCodexJobFromPending();
+  if (!job) return null;
+  stmtMarkUnqueuedSaveDecisionsQueued.run();
+  kickOrganizeWorker();
+  return job;
 }
 
 const startNextCodexJob = db.transaction(() => {
@@ -555,12 +595,13 @@ function extractCouncilSynthesis(content) {
 }
 
 function sanitizeTitle(title, fallback = '저장한 문서') {
-  const cleaned = String(title || fallback)
+  const base = title || fallback || '';
+  const cleaned = String(base)
     .replace(/[\\/:*?"<>|]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 60);
-  return cleaned || fallback;
+  return cleaned || fallback || '';
 }
 
 function createNoteIdentity(title) {
@@ -602,7 +643,7 @@ async function saveVaultNoteRecord({
   // embedding 비동기 생성 (응답 블로킹 없음)
   generateAndStoreEmbedding(filename, buildSemanticEmbeddingText(title, noteContent)).catch(() => {});
 
-  return maybeCreateCodexJobFromPending();
+  return null;
 }
 
 async function overwriteVaultNote(filename, noteContent) {
@@ -698,6 +739,7 @@ function logAutoSaveDecision({
   noteFilename = null,
   noteTitle = null,
   action = null,
+  organizeQueued = 0,
 }) {
   try {
     stmtInsertAutoSaveDecision.run({
@@ -713,6 +755,7 @@ function logAutoSaveDecision({
       noteFilename,
       noteTitle,
       action,
+      organizeQueued,
     });
   } catch (err) {
     console.warn('자동 저장 판단 로그 기록 실패:', err.message);
@@ -731,7 +774,32 @@ function updateFrontmatterTitle(raw, newTitle) {
   const escaped = newTitle.replace(/"/g, '\\"');
   return raw
     .replace(/^title:\s*"?[^"\n]*"?\s*$/m, `title: "${escaped}"`)
-    .replace(/^# .+$/m, `# ${newTitle}`);
+    .replace(/^# .+$/m, `# ${newTitle}`)
+    .replace(/^- 핵심 개념:\s*.*$/m, `- 핵심 개념: ${newTitle}`);
+}
+
+function isLikelyQuestionFragmentTitle(title) {
+  const text = String(title || '').trim();
+  if (!text) return true;
+  if (text.length >= 24) return true;
+  if (/(내가|나는|혹시|어때|해줘|봐바|뭐야|뭔가|질문|추천|알려줘|정리해줘)/.test(text)) return true;
+  if (/[?？]$/.test(text)) return true;
+  return false;
+}
+
+function isSafeTopicTitle(title) {
+  const text = String(title || '').trim();
+  if (!text || text.length > 30) return false;
+  if (/[?？.!]/.test(text)) return false;
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return wordCount >= 1 && wordCount <= 6;
+}
+
+function syncTopicTitleReferences(filename, title) {
+  stmtUpdateChunkNoteTitle.run(title, filename);
+  stmtUpdateDecisionNoteTitle.run(title, filename);
+  stmtUpdateEdgeSourceTitle.run(title, filename);
+  stmtUpdateEdgeTargetTitle.run(title, filename);
 }
 
 async function regenerateTopicTitle(raw) {
@@ -745,7 +813,15 @@ async function regenerateTopicTitle(raw) {
     .join('\n---\n')
     .slice(0, 1200);
 
-  const prompt = `다음은 하나의 토픽 노트에 쌓인 대화들이야. 이 모든 대화를 관통하는 핵심 주제를 가장 짧고 단순하게 2~4단어로 지어줘. 대화가 많을수록 더 추상적이고 단순한 제목이 좋아. 제목만 반환해. 따옴표·특수문자 없이.
+  const prompt = `너는 topic note 제목을 다듬는 정리자다.
+
+규칙:
+- 제목은 한국어 2~5단어
+- 첫 질문 문장을 그대로 자르지 말 것
+- 제품명/인명/작품명은 topic의 핵심일 때만 포함
+- Q&A가 많을수록 더 추상적이고 단순한 제목을 쓸 것
+- 제목만 반환
+- 따옴표, 마침표, 물음표, 설명 금지
 
 ${digest}`;
 
@@ -755,21 +831,30 @@ ${digest}`;
         model: CLAUDE_MODEL, max_tokens: 20,
         messages: [{ role: 'user', content: prompt }],
       });
-      return sanitizeTitle(r.content[0].text.trim(), null);
+      const title = sanitizeTitle(r.content[0].text.trim(), null);
+      return isSafeTopicTitle(title) ? title : null;
     }
     if (HAS_GPT) {
       const r = await openai.chat.completions.create({
         model: GPT_MODEL, max_completion_tokens: 20,
         messages: [{ role: 'user', content: prompt }],
       });
-      return sanitizeTitle(r.choices[0].message.content.trim(), null);
+      const title = sanitizeTitle(r.choices[0].message.content.trim(), null);
+      return isSafeTopicTitle(title) ? title : null;
     }
   } catch { /* 실패 시 null 반환 → 기존 제목 유지 */ }
   return null;
 }
 
 async function generateTopicTitle(question, answer) {
-  const prompt = `다음 대화를 가장 잘 나타내는 토픽 제목을 한국어로 2~5단어로 지어줘. 제목만 반환해. 따옴표·특수문자·마침표 없이.
+  const prompt = `다음 대화를 가장 잘 나타내는 topic note 제목을 한국어로 2~5단어로 지어줘.
+
+규칙:
+- 첫 질문 문장을 그대로 자르지 말 것
+- 너무 넓게 쓰지 말 것
+- 제품명/작품명/인명은 핵심일 때만 포함
+- 제목만 반환
+- 따옴표·특수문자·마침표·물음표 금지
 
 Q: ${String(question || '').slice(0, 300)}
 A: ${String(answer || '').slice(0, 300)}`;
@@ -780,14 +865,16 @@ A: ${String(answer || '').slice(0, 300)}`;
         model: CLAUDE_MODEL, max_tokens: 30,
         messages: [{ role: 'user', content: prompt }],
       });
-      return sanitizeTitle(r.content[0].text.trim(), makeTopicTitle(question));
+      const title = sanitizeTitle(r.content[0].text.trim(), makeTopicTitle(question));
+      return isSafeTopicTitle(title) ? title : makeTopicTitle(question);
     }
     if (HAS_GPT) {
       const r = await openai.chat.completions.create({
         model: GPT_MODEL, max_completion_tokens: 30,
         messages: [{ role: 'user', content: prompt }],
       });
-      return sanitizeTitle(r.choices[0].message.content.trim(), makeTopicTitle(question));
+      const title = sanitizeTitle(r.choices[0].message.content.trim(), makeTopicTitle(question));
+      return isSafeTopicTitle(title) ? title : makeTopicTitle(question);
     }
   } catch {
     /* 실패 시 폴백 */
@@ -865,7 +952,7 @@ function createTopicNoteContent({ fileId, title, createdStr, qaId, question, ans
 ${qaEntry}
 
 <!-- QA-LOG-END -->`;
-  const summary = buildTopicSummary({ title, raw: draftRaw });
+  const summary = buildTopicSummary({ raw: draftRaw });
 
   return `---
 id: ${fileId}
@@ -952,7 +1039,7 @@ function refreshTopicSummary(raw, title) {
     raw,
     '<!-- CODEX-SUMMARY-START -->',
     '<!-- CODEX-SUMMARY-END -->',
-    buildTopicSummary({ title, raw })
+    buildTopicSummary({ raw })
   );
 }
 
@@ -988,10 +1075,10 @@ async function findBestTopicNote(signalText, queryEmbedding) {
   return null;
 }
 
-async function autoAppendTopicNote({ question, answer, sessionId, userMessageId, assistantMessageId, model, isMemo = false }) {
-  // 메모는 필터 없이 바로 저장
-  if (!isMemo) {
-    const classification = classifyAutoSaveValue(question, answer);
+async function autoAppendTopicNote({ question, answer, sessionId, userMessageId, assistantMessageId, model, isMemo = false, forceSave = false }) {
+  let classification = { save: true, reason: isMemo ? 'manual_memo' : 'manual_save' };
+  if (!isMemo && !forceSave) {
+    classification = classifyAutoSaveValue(question, answer);
     if (!classification.save) {
       logAutoSaveDecision({
         sessionId, userMessageId, assistantMessageId, model,
@@ -1020,8 +1107,9 @@ async function autoAppendTopicNote({ question, answer, sessionId, userMessageId,
     const withSummary = refreshTopicSummary(appended, title);
     const nextRaw = touchUpdatedFrontmatter(withSummary);
 
-    // 제목 재생성 (비동기 — 응답 블로킹 없음)
-    const newTitle = await regenerateTopicTitle(nextRaw).catch(() => null);
+    const newTitle = isLikelyQuestionFragmentTitle(title)
+      ? await regenerateTopicTitle(nextRaw).catch(() => null)
+      : null;
     const finalRaw = newTitle && newTitle !== title
       ? updateFrontmatterTitle(nextRaw, newTitle)
       : nextRaw;
@@ -1036,6 +1124,7 @@ async function autoAppendTopicNote({ question, answer, sessionId, userMessageId,
       sourceSession: sessionId,
       sourceMessage: assistantMessageId,
     });
+    if (finalTitle !== title) syncTopicTitleReferences(existing.filename, finalTitle);
     generateAndStoreEmbedding(existing.filename, buildSemanticEmbeddingText(finalTitle, finalRaw)).catch(() => {});
     saveQaChunkRecord({
       qaId,
@@ -1048,7 +1137,6 @@ async function autoAppendTopicNote({ question, answer, sessionId, userMessageId,
       userMessageId,
       assistantMessageId,
     });
-    maybeCreateCodexJobFromPending();
     logAutoSaveDecision({
       sessionId,
       userMessageId,
@@ -1060,10 +1148,11 @@ async function autoAppendTopicNote({ question, answer, sessionId, userMessageId,
       answer,
       qaId,
       noteFilename: existing.filename,
-      noteTitle: title,
+      noteTitle: finalTitle,
       action: 'appended',
     });
-    return { filename: existing.filename, title, action: 'appended' };
+    maybeCreateCodexJobFromSaveEvents();
+    return { filename: existing.filename, title: finalTitle, action: 'appended' };
   }
 
   const { fileId, createdStr } = createNoteIdentity(title);
@@ -1115,6 +1204,7 @@ async function autoAppendTopicNote({ question, answer, sessionId, userMessageId,
     noteTitle: title,
     action: 'created',
   });
+  maybeCreateCodexJobFromSaveEvents();
 
   return { filename: fileId + '.md', title, action: 'created' };
 }
@@ -1523,7 +1613,7 @@ app.post('/api/vault/save-document', async (req, res) => {
 });
 
 app.post('/api/save-note', async (req, res) => {
-  const { question, answer, model, modelId, sessionId, messageId } = req.body;
+  const { question, answer, model, sessionId, messageId } = req.body;
   if (!question || !answer) {
     return res.status(400).json({ error: '질문과 답변이 필요합니다.' });
   }
@@ -1533,104 +1623,21 @@ app.post('/api/save-note', async (req, res) => {
     if (existing) return res.json({ success: true, title: existing.title, filename: existing.filename, duplicate: true });
   }
 
-  let title = question.replace(/\n/g, ' ').slice(0, 40).trim();
   try {
-    const titlePrompt = `다음 질문에 대한 옵시디언 노트 제목을 한국어로 10~20자 이내로 지어줘. 제목 텍스트만 반환해. 따옴표나 특수문자 없이.\n\n질문: ${question}`;
-    if (model === 'Claude') {
-      const r = await anthropic.messages.create({
-        model: CLAUDE_MODEL, max_tokens: 60,
-        messages: [{ role: 'user', content: titlePrompt }],
-      });
-      title = r.content[0].text.trim();
-    } else {
-      const r = await openai.chat.completions.create({
-        model: GPT_MODEL,
-        messages: [{ role: 'user', content: titlePrompt }],
-      });
-      title = r.choices[0].message.content.trim();
-    }
-  } catch (e) {
-    console.warn('제목 생성 실패, 질문 앞부분 사용:', e.message);
-  }
-
-  title = title.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  const now    = new Date();
-  const pad    = (n) => String(n).padStart(2, '0');
-  const dateId = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const slug   = title.replace(/\s+/g, '-').replace(/[^\w가-힣\-]/g, '');
-  const rand   = Math.random().toString(36).slice(2, 6);
-  const fileId = `${dateId}-${rand}-${slug}`;
-  const createdStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
-  const calloutAnswer = answer.split('\n').map(l => `> ${l}`).join('\n');
-
-  const noteContent = `---
-id: ${fileId}
-title: "${title.replace(/"/g, "'")}"
-aliases: []
-created: ${createdStr}
-updated: ${createdStr}
-mode: single
-note_type: single_manual
-archived: false
-codex_status: pending
-ai_readable: true
-knowledge_type: answer
-confidence: medium
-models:
-  claude: ${CLAUDE_MODEL}
-  gpt: ${GPT_MODEL}
-final_synthesizer: none
-source_session: ${sessionId || 'unknown'}
-source_message: ${messageId || 'unknown'}
----
-
-# ${title}
-
-## AI 회수 힌트
-- 핵심 개념: ${title}
-- 노트 성격: 단일 답변 수동 저장
-- 다시 꺼낼 상황: 같은 질문, 같은 주제의 후속 판단, 저장된 답변을 다시 참고할 때
-- 연결 후보: 정리 엔진이 추후 보강
-- 신뢰도: medium
-
-## ❓ 질문
-${question}
-
-## 결론
-${answer}
-
-## 🏷️ 주제 태그
-<!-- CODEX-TAGS-START -->
-<!-- CODEX-TAGS-END -->
-
-## 🔗 연결
-<!-- CODEX-LINKS-START -->
-<!-- CODEX-LINKS-END -->
-
-> [!note]- 원본 답변
-> **모델:** ${model}
-${calloutAnswer}
-
----
-*생성: ${createdStr} · 단일 모드 · 최종 종합자: 없음*
-`;
-
-  try {
-    const queuedJob = await saveVaultNoteRecord({
-      fileId,
-      title,
-      noteType: 'single_manual',
-      noteContent,
-      sessionId,
-      messageId,
-      codexStatus: 'pending',
+    const result = await autoAppendTopicNote({
+      question, answer, sessionId,
+      userMessageId: null,
+      assistantMessageId: messageId || null,
+      model,
+      forceSave: true,
     });
-    res.json({ success: true, filename: fileId + '.md', title, queuedJob });
+    const title = result?.title || question.slice(0, 40);
+    return res.json({ success: true, filename: result?.filename || '', title, action: result?.action });
   } catch (err) {
     console.error('노트 저장 오류:', err.message);
-    res.status(500).json({ error: `노트 저장 실패: ${err.message}` });
+    return res.status(500).json({ error: `노트 저장 실패: ${err.message}` });
   }
+
 });
 
 // ─── 프론트엔드가 활성 모델명 확인용 ────────────────────────────────────────
@@ -1777,7 +1784,7 @@ app.get('/api/organize/status', (_req, res) => {
 
 app.post('/api/organize/queue', (_req, res) => {
   try {
-    const job = createCodexJobFromPending(CODEX_AUTO_QUEUE_THRESHOLD);
+    const job = createCodexJobFromPending();
     if (!job) {
       res.json({ success: true, created: false, message: '정리 대기 노트가 없습니다.' });
       return;
@@ -1790,6 +1797,7 @@ app.post('/api/organize/queue', (_req, res) => {
       status: job.status,
       notes: job.notes,
     });
+    kickOrganizeWorker();
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2055,33 +2063,13 @@ function splitQaLogEntries(qaLog) {
     .filter(item => /^###\s+\d{4}-\d{2}-\d{2}\s+/.test(item));
 }
 
-function buildTopicSummary({ title, raw }) {
+function buildTopicSummary({ raw }) {
   const qaLog = extractMarkerBody(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
   const entries = splitQaLogEntries(qaLog);
-  if (entries.length === 0) return '';
-
-  const latestEntry = entries[entries.length - 1]
-    .replace(/<!--\s*qa_id:[\s\S]*?-->/g, '')
-    .replace(/^.*?\n/, '')
-    .trim();
-  const latestQuestion = (latestEntry.match(/\*\*Q:\*\*\s*([\s\S]*?)(?=\n\s*\*\*A:\*\*)/)?.[1] || '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
-  const latestAnswer = (latestEntry.match(/\*\*A:\*\*\s*([\s\S]*)$/)?.[1] || '')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/[#*_>`-]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 160);
-  const latest = [latestQuestion && `질문: ${latestQuestion}`, latestAnswer && `답변: ${latestAnswer}`]
-    .filter(Boolean)
-    .join(' / ');
-
+  const count = entries.length;
   return [
-    `- 이 토픽은 "${title}"에 대한 누적 Q&A 노트다.`,
-    `- 현재 ${entries.length}개의 Q&A가 쌓여 있다.`,
-    `- 최근 흐름: ${latest}`,
+    `- Codex 정리 대기: QA-LOG에 ${count}개의 항목이 쌓여 있다.`,
+    '- /organize process 또는 /organize all 실행 시 이 구역을 누적 맥락 요약으로 교체한다.',
   ].join('\n');
 }
 
@@ -2224,6 +2212,7 @@ function buildCodexRunnerPrompt(filenames) {
   return `너는 AI Council Obsidian vault의 Codex 정리 담당자다.
 
 작업 루트는 현재 디렉터리이며, 이 디렉터리는 Obsidian vault다.
+이 환경에는 rg가 없을 수 있으므로 파일 탐색은 find, ls, sed 같은 기본 명령만 사용한다.
 
 대상 파일:
 ${filenames.map(filename => `- ${filename}`).join('\n')}
@@ -2256,7 +2245,11 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 노트 병합/분열 직접 실행
 
 출력 형식:
-- CODEX-SUMMARY는 topic 노트에만 작성한다. 기존 Q&A 원문을 복사하지 말고, 3~6문장으로 누적 맥락을 요약한다.
+- CODEX-SUMMARY는 topic 노트에만 작성한다.
+- CODEX-SUMMARY 안에 "Codex 정리 대기" placeholder가 있으면 반드시 실제 요약으로 교체한다.
+- 기존 Q&A 원문을 복사하지 말고, 2~3문장의 짧은 산문으로 누적 맥락을 요약한다.
+- 첫 문장은 제목을 반복 설명하지 말고, 이 토픽에서 사용자가 무엇을 고민/판단/축적하고 있는지 바로 쓴다.
+- 최근 항목만 요약하지 말고 QA-LOG 전체의 흐름, 선호, 결론 변화를 압축한다.
 - CODEX-PROPOSALS는 실행 명령이 아니라 사용자에게 보낼 제안만 적는다. 제안이 없으면 비워둔다.
 - 태그는 #태그 형식으로 3~8개 작성한다.
 - 링크는 아래 형식을 정확히 따른다.
@@ -2310,7 +2303,7 @@ async function processCodexNoteWithHeuristic(filename) {
 
   let next = raw;
   if (frontmatter.note_type === 'topic' && hasMarkerBlock(next, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
-    next = replaceMarkerBlock(next, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ title, raw }));
+    next = replaceMarkerBlock(next, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw }));
   }
   if (frontmatter.note_type === 'topic' && hasMarkerBlock(next, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->')) {
     next = replaceMarkerBlock(next, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->', buildTopicProposals({ title, raw }));
@@ -2461,6 +2454,33 @@ async function runNextCodexJob() {
 
   finishCodexJob(job.id, 'processed', null);
   return { id: job.id, status: 'processed', processed, failed };
+}
+
+function kickOrganizeWorker() {
+  if (organizeWorkerRunning) return;
+  organizeWorkerRunning = true;
+
+  setTimeout(async () => {
+    try {
+      while (true) {
+        const result = await runNextCodexJob();
+        if (!result) break;
+
+        if (result.status === 'processed') {
+          writeGraphReport().catch(err => {
+            console.warn('자동 그래프 리포트 갱신 실패:', err.message);
+          });
+        }
+
+        if (result.status === 'failed') break;
+      }
+    } catch (err) {
+      console.warn('자동 정리 worker 실패:', err.message);
+    } finally {
+      organizeWorkerRunning = false;
+      if (stmtGetNextPendingCodexJob.get()) kickOrganizeWorker();
+    }
+  }, 0);
 }
 
 async function resolveActiveNotes(activeNotes) {

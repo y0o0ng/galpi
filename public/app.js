@@ -21,8 +21,6 @@ const slashCommands = [
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
   { command: '/embed', title: '임베딩 생성', description: '모든 노트의 시맨틱 검색용 임베딩 생성' },
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
-  { command: '/organize run', title: '정리 큐 생성', description: '정리 대기 노트를 Codex job queue에 추가' },
-  { command: '/organize process', title: '정리 실행', description: '대기 중인 Codex job 하나를 처리' },
   { command: '/organize all', title: '전체 재정리', description: '모든 활성 노트를 Codex로 다시 정리' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
@@ -1099,32 +1097,6 @@ function renderOrganizeStatus(data) {
   ].join('\n');
 
   group.append(label, bubble);
-
-  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
-  const runnableJobs = jobs.filter(job => job.status === 'pending');
-
-  if (notes.length > 0 || runnableJobs.length > 0) {
-    const actionRow = document.createElement('div');
-    actionRow.className = 'organize-actions';
-
-    if (notes.length > 0) {
-      const queueBtn = document.createElement('button');
-      queueBtn.className = 'save-btn';
-      queueBtn.textContent = '정리 큐에 넣기';
-      queueBtn.addEventListener('click', () => handleOrganizeRun(false));
-      actionRow.appendChild(queueBtn);
-    }
-
-    if (runnableJobs.length > 0) {
-      const processBtn = document.createElement('button');
-      processBtn.className = 'save-btn';
-      processBtn.textContent = '정리';
-      processBtn.addEventListener('click', () => handleOrganizeProcess(false));
-      actionRow.appendChild(processBtn);
-    }
-
-    group.appendChild(actionRow);
-  }
 
   getMessages().appendChild(group);
   saveUiMessage('assistant', bubble.textContent, 'Organize');

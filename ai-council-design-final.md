@@ -162,6 +162,9 @@
   action
       created 또는 appended
 
+  organize_queued
+      해당 저장 이벤트가 Codex 정리 큐 생성에 반영되었는지 여부
+
   created_at
 
   note_edges 테이블:
@@ -276,6 +279,9 @@
 
   - CODEX-SUMMARY
       - Codex가 누적 Q&A를 산문으로 정리하는 구역
+      - 저장/append 직후에는 규칙 기반 요약을 만들지 않고 정리 대기 placeholder만 둔다.
+      - 실제 누적 요약은 자동 정리 worker 또는 /organize all에서 Codex가 QA-LOG 전체를 읽고 작성한다.
+      - 기본 요약 길이는 2~3문장으로 제한해 정리 시간을 줄이고 읽기 밀도를 높인다.
 
   - CODEX-PROPOSALS
       - Codex가 split/merge/기준 변경을 사용자에게 제안하는 구역
@@ -368,8 +374,6 @@
   다음 명령 후보:
 
   /organize
-  /organize run
-  /organize process
   /organize all
   /graph report
   /audit
@@ -383,8 +387,8 @@
   - /save: 사용자가 직접 저장 요청한 내용 노트화
   - /memory: 항상 참조할 사용자 규칙/선호 관리
   - /organize: Codex 정리 상태 확인
-  - /organize run: Codex 정리 큐 생성
-  - /organize process: 대기 중인 Codex job 하나 처리. UI 라벨은 “정리”
+  - /organize run: 내부/디버깅용. 현재 pending 노트 전체를 Codex 정리 큐로 생성하고 자동 실행 worker를 깨움
+  - /organize process: 내부/디버깅용. 대기 중인 Codex job 하나 처리
   - /organize all: 모든 활성 노트를 즉시 재정리. 기존 큐에 넣지 않고 별도 실행
   - /graph report: DB 그래프와 자동 저장 판단 로그를 `_system/GRAPH_REPORT.md`로 요약
   - /challenge: 과거 노트를 근거로 현재 생각 반박
@@ -432,6 +436,9 @@
   - 자동 저장 기준 변경은 auto_save_decisions 로그를 근거로 제안한다.
   - Obsidian 링크와 note_edges DB 그래프를 함께 유지한다.
   - GRAPH_REPORT.md는 `_system`에 두되, 메모리처럼 항상 참조하지는 않는다.
+  - 자동 정리 큐는 pending 노트 개수가 아니라 save/appended 이벤트 수를 기준으로 만든다.
+  - 미처리 save/appended 이벤트가 5개 쌓이면 현재 pending 노트 전체를 하나의 Codex job으로 넘기고 백그라운드에서 자동 실행한다.
+  - Clawd/UI에서는 수동 정리 버튼을 숨기고, 상태 조회와 전체 재정리만 노출한다.
   - Codex 실행 전후 diff를 검증한다.
   - 마커 밖 수정이 있으면 실패 처리한다.
   - 실패 3회 이상은 needs_manual_check로 넘긴다.
@@ -1152,8 +1159,8 @@ DB에만 두고 노트화하지 않는 것: 짧은 확인, 잡담, 임시 질문
 
 - 모든 Codex 정리는 `codex_jobs`의 job 단위로 실행한다.
 - `/organize`는 상태를 보여준다.
-- `/organize run`은 `pending` 노트를 job queue에 넣는다.
-- `/organize process`는 대기 중인 job 하나를 실행한다.
+- save/appended 이벤트가 5개 쌓이면 서버가 `pending` 노트를 job queue에 넣고 백그라운드 worker로 자동 실행한다.
+- `/organize run`과 `/organize process`는 내부/디버깅용 수동 명령으로 유지하되, Clawd/UI 기본 버튼에서는 숨긴다.
 - 상태 흐름은 기본적으로 `pending → queued → running → processed`다.
 - 실패하면 job은 `failed`, 해당 노트는 `needs_manual_check`로 보낸다.
 

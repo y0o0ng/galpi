@@ -76,6 +76,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
   Before planning or editing in this repository, read:
   - ai-council-design-final.md
+  - roadmap.md
 
 
 
