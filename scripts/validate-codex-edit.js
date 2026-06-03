@@ -25,6 +25,20 @@ const REQUIRED_MARKERS = [
   '<!-- CODEX-LINKS-END -->',
 ];
 
+function countOccurrences(raw, marker) {
+  return String(raw || '').split(marker).length - 1;
+}
+
+function extractMarkerBlock(raw, startMarker, endMarker) {
+  const start = raw.indexOf(startMarker);
+  if (start < 0) return null;
+
+  const end = raw.indexOf(endMarker, start + startMarker.length);
+  if (end < 0) return null;
+
+  return raw.slice(start + startMarker.length, end).trim();
+}
+
 function parseFrontmatter(raw) {
   const match = raw.match(/^---\n([\s\S]*?)\n---/);
   if (!match) return null;
@@ -69,8 +83,23 @@ function validateFile(filename) {
   }
 
   REQUIRED_MARKERS.forEach(marker => {
-    if (!raw.includes(marker)) warnings.push(`CODEX 마커 누락: ${marker}`);
+    const count = countOccurrences(raw, marker);
+    if (count === 0) warnings.push(`CODEX 마커 누락: ${marker}`);
+    if (count > 1) warnings.push(`CODEX 마커 중복: ${marker} (${count})`);
   });
+
+  const linksBlock = extractMarkerBlock(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->');
+  if (linksBlock) {
+    linksBlock.split('\n').forEach((line, index) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('**[') || trimmed.endsWith(']**')) return;
+      if (!trimmed.startsWith('- ')) return;
+
+      if (!/^- (?:[1-9][0-9]?|100) \[\[[^\]\n]+\]\] — .+/.test(trimmed)) {
+        warnings.push(`CODEX 링크 형식 오류: ${index + 1}행`);
+      }
+    });
+  }
 
   return warnings;
 }

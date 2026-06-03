@@ -33,6 +33,8 @@ const slashCommands = [
 
 async function init() {
   showWelcome();
+  document.body.dataset.activeModel = currentModel;
+  document.querySelector('.council-mode-toggle').classList.add('disabled');
 
   try {
     const config = await fetch('/api/config').then(r => r.json());
@@ -232,18 +234,21 @@ function selectModel(model) {
   document.querySelectorAll('.model-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.model === model);
   });
+  document.body.dataset.activeModel = model;
 }
 
 function toggleCouncil() {
   if (!councilAvailable) return;
   councilMode = !councilMode;
   document.querySelector('.council-btn').classList.toggle('active', councilMode);
+  document.querySelector('.council-mode-toggle').classList.toggle('disabled', !councilMode);
   document.querySelectorAll('.model-btn').forEach(b => {
     if (!b.disabled) {
       b.style.opacity       = councilMode ? '0.4' : '';
       b.style.pointerEvents = councilMode ? 'none' : '';
     }
   });
+  document.body.dataset.activeModel = councilMode ? 'council' : currentModel;
 }
 
 // ─── 메시지 전송 디스패처 ────────────────────────────────────────────────────

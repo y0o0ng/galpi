@@ -17,6 +17,7 @@ const HISTORY_CONTEXT_MESSAGES = CONTEXT_N * 2; // 최근 10턴 내외를 user/a
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 const GPT_MODEL    = process.env.GPT_MODEL    || 'gpt-4o';
 const PORT         = parseInt(process.env.PORT || '3000');
+const HOST         = process.env.HOST || '127.0.0.1';
 const GPT_LANGUAGE_SYSTEM = { role: 'system', content: '사용자가 쓴 언어로 답변하라. 한국어, 영어, 중국어, 일본어, 스페인어, 프랑스어, 독일어, 포르투갈어, 러시아어, 아랍어만 사용하라.' };
 
 const COUNCIL_TOKEN_LIMITS = {
@@ -1307,6 +1308,8 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
   **[주제명]**
   - 85 [[노트 제목]] — 왜 연결되는지 짧은 이유
 - 링크 점수는 1~100 정수로, 반드시 wiki link 앞에 쓴다.
+- 기존 CODEX-LINKS 안에 별표 링크, 점수 없는 링크, 주제명 없는 링크가 있으면 모두 새 숫자 점수 형식으로 다시 쓴다.
+- CODEX-LINKS 안에는 "- [[노트 제목]]", "- ⭐ [[노트 제목]]" 같은 옛 형식을 절대 남기지 않는다.
 - 90~100: 같은 핵심 개념/프로젝트/문제의 직접 후속 또는 거의 같은 맥락.
 - 75~89: 같은 큰 주제 안에서 함께 보면 의미가 강하게 보강되는 노트.
 - 60~74: 보조 맥락으로 유용하지만 핵심은 다른 노트.
@@ -2071,9 +2074,10 @@ ${reviewSection}
 
 // ─── 서버 시작 ────────────────────────────────────────────────────────────────
 
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, HOST, () => {
   console.log('\n✅ AI 의회 서버 실행 중');
-  console.log(`   로컬:     http://localhost:${PORT}`);
+  console.log(`   로컬:     http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  if (HOST === '0.0.0.0') console.log(`   네트워크: http://<라즈베리파이_IP>:${PORT}`);
   console.log(`   볼트:     ${VAULT_PATH}`);
   console.log(`   Claude:   ${CLAUDE_MODEL}`);
   console.log(`   GPT:      ${GPT_MODEL}`);
