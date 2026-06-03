@@ -845,6 +845,7 @@ async function handleOrganizeRun(showUserCommand = false) {
   document.querySelector('.welcome')?.remove();
   if (showUserCommand) appendUserBubble('/organize run');
 
+  document.dispatchEvent(new Event('pet:thinking'));
   const loadingEl = appendLoading();
   try {
     const res = await fetch('/api/organize/queue', { method: 'POST' });
@@ -857,6 +858,7 @@ async function handleOrganizeRun(showUserCommand = false) {
     }
 
     renderOrganizeQueueResult(data);
+    document.dispatchEvent(new Event('pet:happy'));
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다.');
@@ -874,6 +876,7 @@ async function handleOrganizeProcess(showUserCommand = false) {
   document.querySelector('.welcome')?.remove();
   if (showUserCommand) appendUserBubble('/organize process');
 
+  document.dispatchEvent(new Event('pet:building'));
   const loadingEl = appendLoading();
   try {
     const res = await fetch('/api/organize/process', { method: 'POST' });
@@ -886,6 +889,7 @@ async function handleOrganizeProcess(showUserCommand = false) {
     }
 
     renderOrganizeProcessResult(data);
+    document.dispatchEvent(new Event('pet:happy'));
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다.');
@@ -903,6 +907,7 @@ async function handleOrganizeAll(showUserCommand = false) {
   document.querySelector('.welcome')?.remove();
   if (showUserCommand) appendUserBubble('/organize all');
 
+  document.dispatchEvent(new Event('pet:building'));
   const loadingEl = appendLoading();
   try {
     const res = await fetch('/api/organize/all', { method: 'POST' });
@@ -915,6 +920,7 @@ async function handleOrganizeAll(showUserCommand = false) {
     }
 
     renderOrganizeAllResult(data);
+    document.dispatchEvent(new Event(data.failedCount > 0 ? 'pet:error' : 'pet:happy'));
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다.');
