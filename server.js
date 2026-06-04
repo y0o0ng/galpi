@@ -3165,10 +3165,13 @@ async function loadNoteSearchData(filename) {
   const body = stripFrontmatter(raw);
   const titleLower = title.toLowerCase();
   const bodyLower = body.toLowerCase();
+  // Codex가 채운 주제 태그. 검색에서 강한 가중치를 줘 "태그로 묶인 노트"가 잘 잡히게 한다.
+  const tagsLower = (raw.match(/<!-- CODEX-TAGS-START -->([\s\S]*?)<!-- CODEX-TAGS-END -->/)?.[1] || '')
+    .replace(/#/g, ' ').toLowerCase();
   const termSet = new Set(
     (titleLower + ' ' + bodyLower).replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(t => t.length >= 2)
   );
-  const entry = { mtime: mtimeMs, archived: parseFrontmatterBoolean(fm.archived), title, body, titleLower, bodyLower, termSet };
+  const entry = { mtime: mtimeMs, archived: parseFrontmatterBoolean(fm.archived), title, body, titleLower, bodyLower, tagsLower, termSet };
   noteSearchCache.set(filename, entry);
   return entry;
 }
@@ -3193,7 +3196,7 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
       const data = await loadNoteSearchData(filename);
       if (data.archived) continue;
       for (const t of data.termSet) termDocFreq.set(t, (termDocFreq.get(t) || 0) + 1);
-      noteData.push({ filename, title: data.title, body: data.body, titleLower: data.titleLower, bodyLower: data.bodyLower });
+      noteData.push({ filename, title: data.title, body: data.body, titleLower: data.titleLower, bodyLower: data.bodyLower, tagsLower: data.tagsLower });
     } catch { /* skip */ }
   }
 
@@ -3201,14 +3204,15 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
   const queryEmbedding = precomputedEmbedding || await generateEmbedding(query);
 
   const results = [];
-  for (const { filename, title, body, titleLower, bodyLower } of noteData) {
+  for (const { filename, title, body, titleLower, bodyLower, tagsLower } of noteData) {
     // ── IDF 키워드 점수 ──
     let kwScore = 0;
     for (const term of terms) {
       const df  = termDocFreq.get(term) || 1;
       const idf = Math.log((N + 1) / (df + 1)) + 1; // smoothed
       const tf  = (titleLower.match(new RegExp(term, 'g')) || []).length * 5
-                + (bodyLower.match(new RegExp(term, 'g'))  || []).length;
+                + (bodyLower.match(new RegExp(term, 'g'))  || []).length
+                + ((tagsLower || '').match(new RegExp(term, 'g')) || []).length * 20; // 태그 일치 = 강한 신호
       kwScore += tf * idf;
     }
 
