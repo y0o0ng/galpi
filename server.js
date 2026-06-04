@@ -831,8 +831,13 @@ function makeTopicTitle(question) {
 
 function updateFrontmatterTitle(raw, newTitle) {
   const escaped = newTitle.replace(/"/g, '\\"');
+  // aliases에 새 제목 + 옛 제목을 둔다 → 제목이 바뀌어도 [[새제목]]/[[옛제목]] 링크가 Obsidian에서 해석됨.
+  const oldTitle = (raw.match(/^title:\s*"?(.+?)"?\s*$/m)?.[1] || '').replace(/"/g, '').trim();
+  const aliasList = [...new Set([newTitle, oldTitle].filter(Boolean))]
+    .map(a => `"${a.replace(/"/g, "'")}"`).join(', ');
   return raw
     .replace(/^title:\s*"?[^"\n]*"?\s*$/m, `title: "${escaped}"`)
+    .replace(/^aliases:.*$/m, `aliases: [${aliasList}]`)
     .replace(/^# .+$/m, `# ${newTitle}`)
     .replace(/^- 핵심 개념:\s*.*$/m, `- 핵심 개념: ${newTitle}`);
 }
@@ -1016,7 +1021,7 @@ ${qaEntry}
   return `---
 id: ${fileId}
 title: "${title.replace(/"/g, "'")}"
-aliases: []
+aliases: ["${title.replace(/"/g, "'")}"]
 created: ${createdStr}
 updated: ${createdStr}
 note_type: topic
@@ -3727,7 +3732,7 @@ ${gptReview ? fmtCallout(gptReview) : '> 검토 없음'}
   const noteContent = `---
 id: ${fileId}
 title: "${title.replace(/"/g, "'")}"
-aliases: []
+aliases: ["${title.replace(/"/g, "'")}"]
 created: ${createdStr}
 updated: ${createdStr}
 mode: council
