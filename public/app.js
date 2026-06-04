@@ -19,6 +19,7 @@ const slashCommands = [
   { command: '/embed', title: '임베딩 생성', description: '모든 노트의 시맨틱 검색용 임베딩 생성' },
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
   { command: '/organize all', title: '전체 재정리', description: '모든 활성 노트를 Codex로 다시 정리' },
+  { command: '/archive ', title: '노트 보관', description: '검색어로 노트를 찾아 _archive로 보관' },
   { command: '/archived', title: '보관함', description: '숨긴(보관한) 노트 목록 — 복원 가능' },
   { command: '/backup', title: '백업', description: '볼트+DB를 지금 백업 (자동: 하루 1회, 7일 보관)' },
   { command: '/sync', title: '볼트 동기화', description: '옵시디언 직접 편집 반영 — 신규 노트 등록 + 삭제 노트 정리' },
@@ -451,6 +452,13 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleArchivedList();
+    return;
+  }
+  if (text.startsWith('/archive ')) {
+    const query = text.slice(9).trim();
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    if (query) handleArchiveCommand(query);
     return;
   }
   if (text === '/backup') {
@@ -1297,6 +1305,90 @@ async function archiveNoteFromUi(filename, btn, card) {
     btn.textContent = '보관';
     showToast('서버 연결 오류');
   }
+}
+
+async function handleArchiveCommand(query) {
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble(`/archive ${query}`);
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await apiFetch(`/api/vault/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (data.error) { appendError(data.error); return; }
+    const results = Array.isArray(data.results) ? data.results : [];
+    if (results.length === 0) {
+      appendError(`"${query}" 관련 노트를 찾지 못했습니다.`);
+      return;
+    }
+
+    if (results.length === 1) {
+      await archiveNoteByFilename(results[0].filename, results[0].title);
+      return;
+    }
+
+    renderArchiveCandidates(query, results);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  }
+}
+
+async function archiveNoteByFilename(filename, title) {
+  try {
+    const res = await apiFetch('/api/notes/archive', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ filename }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      removeActiveNote(filename);
+      showToast(`보관됨: ${title || filename}`);
+      renderArchiveCommandResult(title || filename);
+    } else {
+      appendError(data.error || '보관 실패');
+    }
+  } catch (_) {
+    appendError('서버 연결 오류');
+  }
+}
+
+function renderArchiveCommandResult(title) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('Archive'));
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = `보관됨: ${title}\n/archived에서 복원할 수 있습니다.`;
+
+  group.appendChild(bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Archive');
+  scrollDown();
+}
+
+function renderArchiveCandidates(query, results) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('Archive'));
+
+  const wrap = document.createElement('div');
+  wrap.className = 'search-results';
+
+  const header = document.createElement('div');
+  header.className = 'search-header';
+  header.textContent = `"${query}" 보관 후보 ${results.length}개`;
+  wrap.appendChild(header);
+
+  results.forEach(note => wrap.appendChild(renderNoteCard(note)));
+
+  group.appendChild(wrap);
+  getMessages().appendChild(group);
+  scrollDown();
 }
 
 async function handleArchivedList() {

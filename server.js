@@ -258,6 +258,12 @@ const stmtUpsertNote = db.prepare(`
 const stmtGetNoteByMessageId = db.prepare(`
   SELECT filename, title FROM notes WHERE source_message = ? LIMIT 1
 `);
+const stmtGetNoteByFilename = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived, codex_status AS codexStatus
+  FROM notes
+  WHERE filename = ?
+  LIMIT 1
+`);
 const stmtGetNoteByChunkMessageId = db.prepare(`
   SELECT note_filename AS filename, note_title AS title
   FROM note_chunks
@@ -1806,12 +1812,20 @@ async function backfillNotesFromVault() {
       const fm = parseSimpleFrontmatter(raw);
       const archived = parseFrontmatterBoolean(fm.archived);
 
+      const existing = stmtGetNoteByFilename.get(filename);
+      const frontmatterStatus = fm.codex_status || null;
+      const codexStatus = archived
+        ? 'processed'
+        : existing?.codexStatus && existing.codexStatus !== 'pending'
+          ? existing.codexStatus
+          : frontmatterStatus || 'pending';
+
       dbUpsertNote({
         filename,
         title: fm.title || filename.replace(/\.md$/, ''),
         noteType: fm.note_type || 'legacy',
         archived,
-        codexStatus: fm.codex_status || (archived ? 'processed' : 'pending'),
+        codexStatus,
         sourceSession: fm.source_session || null,
         sourceMessage: fm.source_message || null,
       });
@@ -1880,8 +1894,48 @@ app.post('/api/notes/backfill', async (_req, res) => {
 const ARCHIVE_DIR = '_archive';
 
 function setFrontmatterArchived(raw, archived) {
-  if (!/^archived:\s*.*$/m.test(raw)) return raw;
-  return raw.replace(/^archived:\s*.*$/m, `archived: ${archived ? 'true' : 'false'}`);
+  let next = raw;
+  if (/^archived:\s*.*$/m.test(next)) {
+    next = next.replace(/^archived:\s*.*$/m, `archived: ${archived ? 'true' : 'false'}`);
+  }
+  if (archived && /^codex_status:\s*.*$/m.test(next)) {
+    next = next.replace(/^codex_status:\s*.*$/m, 'codex_status: processed');
+  } else if (!archived && /^codex_status:\s*.*$/m.test(next)) {
+    next = next.replace(/^codex_status:\s*.*$/m, 'codex_status: pending');
+  }
+  return next;
+}
+
+function insertMergeArchiveNotice(raw, targetTitle) {
+  const title = String(targetTitle || '').trim();
+  if (!title) return raw;
+
+  const notice = [
+    '> [!note]',
+    `> 이 노트는 [[${title.replace(/\]/g, '')}]] 노트로 병합되어 보관되었다.`,
+    '',
+  ].join('\n');
+
+  const withoutOldNotice = raw.replace(/\n> \[!note\]\n> 이 (?:토픽|노트)은 \[\[[^\]\n]+\]\] 노트로 병합되었다\.\n/g, '\n');
+  if (/^# .+$/m.test(withoutOldNotice)) {
+    return withoutOldNotice.replace(/^# .+$/m, match => `${match}\n\n${notice.trimEnd()}`);
+  }
+  return `${notice}\n${withoutOldNotice}`;
+}
+
+function normalizeArchivedNote(raw, options = {}) {
+  let next = setFrontmatterArchived(raw, true);
+  next = insertMergeArchiveNotice(next, options.mergedIntoTitle);
+  if (hasMarkerBlock(next, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->')) {
+    next = replaceMarkerBlock(next, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->', '');
+  }
+  if (hasMarkerBlock(next, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->')) {
+    next = replaceMarkerBlock(next, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', '');
+  }
+  if (hasMarkerBlock(next, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->')) {
+    next = replaceMarkerBlock(next, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->', '');
+  }
+  return next;
 }
 
 function assertSafeNoteFilename(filename) {
@@ -1892,7 +1946,7 @@ function assertSafeNoteFilename(filename) {
   return safeName;
 }
 
-async function moveNoteArchived(filename, archived) {
+async function moveNoteArchived(filename, archived, options = {}) {
   const safeName = assertSafeNoteFilename(filename);
   const rootPath = path.join(VAULT_PATH, safeName);
   const archivePath = path.join(VAULT_PATH, ARCHIVE_DIR, safeName);
@@ -1906,7 +1960,8 @@ async function moveNoteArchived(filename, archived) {
     throw new Error(archived ? '노트를 찾을 수 없습니다.' : '보관된 노트를 찾을 수 없습니다.');
   }
 
-  const next = touchUpdatedFrontmatter(setFrontmatterArchived(raw, archived));
+  const archivedRaw = archived ? normalizeArchivedNote(raw, options) : setFrontmatterArchived(raw, false);
+  const next = touchUpdatedFrontmatter(archivedRaw);
   if (archived) await fs.mkdir(path.join(VAULT_PATH, ARCHIVE_DIR), { recursive: true });
 
   const tmp = dest + '.tmp';
@@ -1915,6 +1970,7 @@ async function moveNoteArchived(filename, archived) {
   await fs.unlink(src).catch(() => {});
 
   stmtSetNoteArchived.run(archived ? 1 : 0, safeName);
+  stmtUpdateNoteCodexStatus.run(archived ? 'processed' : 'pending', safeName);
   noteSearchCache.delete(safeName);
   return safeName;
 }
@@ -2080,6 +2136,24 @@ function stripCodexLinksToTitles(raw, titles) {
   return replaceMarkerBlock(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', cleaned.join('\n').trim());
 }
 
+function getArchivedNoteTitles() {
+  return stmtGetArchivedNotes.all().map(note => note.title);
+}
+
+async function stripArchivedLinksFromNoteFile(filename) {
+  const safeName = assertSafeNoteFilename(filename);
+  const archivedTitles = getArchivedNoteTitles();
+  if (archivedTitles.length === 0) return false;
+
+  const filepath = path.join(VAULT_PATH, safeName);
+  const raw = await fs.readFile(filepath, 'utf8');
+  const next = stripCodexLinksToTitles(raw, archivedTitles);
+  if (next === raw) return false;
+
+  await writeVaultNoteByFilename(safeName, next);
+  return true;
+}
+
 async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle = null }) {
   let srcNames = [...new Set((filenames || []).map(f => String(f || '').trim()).filter(Boolean))]
     .filter(f => f !== targetFilename);
@@ -2143,7 +2217,7 @@ async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle 
 
   const archived = [];
   for (const src of sources) {
-    try { await moveNoteArchived(src.filename, true); archived.push(src.filename); }
+    try { await moveNoteArchived(src.filename, true, { mergedIntoTitle: resultTitle }); archived.push(src.filename); }
     catch (err) { console.warn(`병합 후 보관 실패 (${src.filename}):`, err.message); }
   }
 
@@ -2398,6 +2472,7 @@ function getCodexSignalText(raw) {
   return stripFrontmatter(raw)
     .replace(/## AI 회수 힌트\n[\s\S]*?(?=\n## |\n---|\s*$)/g, '')
     .replace(/<!-- CODEX-[A-Z-]+-START -->[\s\S]*?<!-- CODEX-[A-Z-]+-END -->/g, '')
+    .replace(/<!--\s*qa_id:\s*[^>]+-->/g, '')
     .replace(/<!-- QA-LOG-START -->|<!-- QA-LOG-END -->/g, '')
     .replace(/> \[!note\]- 원본[\s\S]*?(?=\n---|\s*$)/g, '')
     .replace(/^#{1,6}\s+.*$/gm, '')
@@ -2418,7 +2493,7 @@ function noteTokenize(text) {
     '합니다', '한다', '했다', '된다', '되어', '하는', '해야', 'note',
     '생각합니다', '관점이', '지점', '갈린', '모델', '원본',
     '최종', '종합자', '없음', '것이', '있는', '있고', '있다', '대해',
-    '다만', '반면', '구체적으로', '유용한', '저는',
+    '다만', '반면', '구체적으로', '유용한', '저는', 'qa_id',
   ]);
 
   return [...new Set(String(text || '')
@@ -2428,6 +2503,8 @@ function noteTokenize(text) {
     .filter(t => t.length >= 2)
     .filter(t => !/^-+$/.test(t))
     .filter(t => !/^\d+$/.test(t))
+    .filter(t => !/^qa-[a-f0-9-]+$/i.test(t))
+    .filter(t => !/^[a-f0-9]{8,}$/i.test(t))
     .filter(t => !/^\d{4}-\d{2}-\d{2}/.test(t))
     .filter(t => !stopWords.has(t))
   )];
@@ -2751,6 +2828,8 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 링크 점수는 1~100 정수로, 반드시 wiki link 앞에 쓴다.
 - 기존 CODEX-LINKS 안에 별표 링크, 점수 없는 링크, 주제명 없는 링크가 있으면 모두 새 숫자 점수 형식으로 다시 쓴다.
 - CODEX-LINKS 안에는 "- [[노트 제목]]", "- ⭐ [[노트 제목]]" 같은 옛 형식을 절대 남기지 않는다.
+- archived: true 노트와 _archive 폴더 안의 노트는 링크 후보로 쓰지 않는다.
+- 이미 CODEX-LINKS에 archived 노트 링크가 있으면 제거한다.
 - 90~100: 같은 핵심 개념/프로젝트/문제의 직접 후속 또는 거의 같은 맥락.
 - 75~89: 같은 큰 주제 안에서 함께 보면 의미가 강하게 보강되는 노트.
 - 60~74: 보조 맥락으로 유용하지만 핵심은 다른 노트.
@@ -2803,6 +2882,7 @@ async function processCodexNoteWithHeuristic(filename) {
   }
   next = replaceMarkerBlock(next, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->', tagsBlock);
   next = replaceMarkerBlock(next, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', linksBlock);
+  next = stripCodexLinksToTitles(next, getArchivedNoteTitles());
   saveCodexLinkEdges({ sourceFilename: safeName, sourceTitle: title, links });
 
   if (next !== raw) await writeVaultNoteByFilename(safeName, next);
@@ -2817,6 +2897,7 @@ async function processCodexJobWithCodex(filenames, model = CODEX_MODEL) {
   try {
     await runCodexCliForJob(filenames, model);
     await assertCodexDiffAllowed(snapshots);
+    await Promise.all(filenames.map(filename => stripArchivedLinksFromNoteFile(filename)));
     await validateCodexEdit();
   } catch (err) {
     await restoreVaultSnapshots(snapshots);
