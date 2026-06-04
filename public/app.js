@@ -168,7 +168,7 @@ async function init() {
 
 async function loadHistory() {
   try {
-    const res = await fetch(`/api/sessions/${sessionId}`);
+    const res = await apiFetch(`/api/sessions/${sessionId}`);
     if (!res.ok) {
       restoreLocalUiHistory();
       return;
@@ -970,7 +970,7 @@ async function handleSearch(query) {
 
   const loadingEl = appendLoading();
   try {
-    const res  = await fetch(`/api/vault/search?q=${encodeURIComponent(query)}`);
+    const res  = await apiFetch(`/api/vault/search?q=${encodeURIComponent(query)}`);
     const data = await res.json();
     loadingEl.remove();
 
