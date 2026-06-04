@@ -33,8 +33,8 @@ const COUNCIL_TOKEN_LIMITS = {
   review:          800,
   synthesis:       5000,
 };
-const MAX_ACTIVE_NOTES = 5;
-const MAX_NOTE_CONTEXT_CHARS = 2000;
+const MAX_ACTIVE_NOTES = 8;
+const MAX_NOTE_CONTEXT_CHARS = 5000;
 const MAX_MEMORY_ITEMS = 20;
 const MAX_MEMORY_CHARS = 1200;
 const MEMORY_DIR = '_system';
