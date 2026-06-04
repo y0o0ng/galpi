@@ -1,9 +1,19 @@
 'use strict';
 
+// crypto.randomUUID는 보안 컨텍스트(https/localhost)에서만 제공된다.
+// http로 호스트명/IP 접속(예: Tailscale http://pi:3000) 시 없으므로 폴백을 둔다.
+function genUuid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 const sessionId = (() => {
   const stored = localStorage.getItem('councilSessionId');
   if (stored) return stored;
-  const newId = crypto.randomUUID();
+  const newId = genUuid();
   localStorage.setItem('councilSessionId', newId);
   return newId;
 })();
