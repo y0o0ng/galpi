@@ -161,42 +161,59 @@ async function init() {
   });
 
   await loadHistory();
+  setInterval(pollForUpdates, 7000);
   updateNotesBar();
 }
 
 // ─── 히스토리 복원 ───────────────────────────────────────────────────────────
 
+let lastRenderedMsgId = 0;
+
+// 메시지 배열로 대화창을 처음부터 다시 그린다. (폴링 갱신과 공유)
+function renderMessages(messages) {
+  getMessages().innerHTML = '';
+  isRestoringHistory = true;
+  try {
+    let lastUserContent = null;
+    messages.forEach(msg => {
+      if (msg.role === 'user') {
+        lastUserContent = msg.content;
+        appendUserBubble(msg.content);
+      } else {
+        appendHistoryBubble(msg.content, msg.model, msg.id, lastUserContent);
+      }
+    });
+  } finally {
+    isRestoringHistory = false;
+  }
+  lastRenderedMsgId = messages.length ? (messages[messages.length - 1].id || 0) : 0;
+}
+
 async function loadHistory() {
   try {
     const res = await apiFetch(`/api/sessions/${sessionId}`);
-    if (!res.ok) {
-      restoreLocalUiHistory();
-      return;
-    }
+    if (!res.ok) { restoreLocalUiHistory(); return; }
     const { messages } = await res.json();
-    if (!messages || messages.length === 0) {
-      restoreLocalUiHistory();
-      return;
-    }
-
-    document.querySelector('.welcome')?.remove();
-    isRestoringHistory = true;
-    try {
-      let lastUserContent = null;
-      messages.forEach(msg => {
-        if (msg.role === 'user') {
-          lastUserContent = msg.content;
-          appendUserBubble(msg.content);
-        } else {
-          appendHistoryBubble(msg.content, msg.model, msg.id, lastUserContent);
-        }
-      });
-    } finally {
-      isRestoringHistory = false;
-    }
+    if (!messages || messages.length === 0) { restoreLocalUiHistory(); return; }
+    renderMessages(messages);
   } catch (_) {
     restoreLocalUiHistory();
   }
+}
+
+// 다른 기기에서 온 새 메시지 자동 반영: 7초마다, 탭 보일 때만, 최신 메시지 ID가 바뀌었을 때만 다시 그림.
+async function pollForUpdates() {
+  if (document.hidden || isLoading) return;
+  if (document.querySelector('.synthesizer-picker') || document.querySelector('.council-loading')) return;
+  try {
+    const res = await apiFetch(`/api/sessions/${sessionId}`);
+    if (!res.ok) return;
+    const { messages } = await res.json();
+    if (!messages || messages.length === 0) return;
+    const latestId = messages[messages.length - 1].id || 0;
+    if (latestId === lastRenderedMsgId) return;
+    renderMessages(messages);
+  } catch (_) { /* 조용히 무시 */ }
 }
 
 function restoreLocalUiHistory() {
@@ -573,6 +590,7 @@ async function sendSingleMessage() {
     if (data.error) appendError(data.error);
     else {
       appendAssistantBubble({ ...data, question: text });
+      lastRenderedMsgId = data.messageId || lastRenderedMsgId; // 방금 보낸 건 폴링이 다시 안 그리게
       document.dispatchEvent(new Event('pet:happy'));
     }
   } catch (_) {
