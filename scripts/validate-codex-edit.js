@@ -83,6 +83,10 @@ function validateFile(filename) {
   const warnings = [];
   const frontmatter = parseFrontmatter(raw);
 
+  // 레거시/비-Codex 노트(frontmatter도 CODEX 마커도 없음)는 Codex 관리 대상이 아니므로 검증 제외
+  const hasCodexMarkers = raw.includes('<!-- CODEX-TAGS-START -->') || raw.includes('<!-- CODEX-LINKS-START -->');
+  if (!frontmatter && !hasCodexMarkers) return [];
+
   if (!frontmatter) {
     warnings.push('frontmatter 없음');
   } else {
