@@ -1229,7 +1229,15 @@ function renderSearchResults(results) {
 
   const header = document.createElement('div');
   header.className = 'search-header';
-  header.textContent = `${results.length}개 노트 발견 — 모두 컨텍스트에 추가됨`;
+  header.textContent = `${results.length}개 발견 — 컨텍스트로 쓰거나, 체크해서 병합`;
+
+  const mergeSelBtn = document.createElement('button');
+  mergeSelBtn.className = 'note-card-remove';
+  mergeSelBtn.textContent = '선택 병합';
+  mergeSelBtn.style.marginLeft = '8px';
+  mergeSelBtn.addEventListener('click', () => openBatchMerge(wrap));
+  header.appendChild(mergeSelBtn);
+
   wrap.appendChild(header);
 
   results.forEach(note => {
@@ -1242,10 +1250,97 @@ function renderSearchResults(results) {
   updateNotesBar();
 }
 
+// 검색 결과에서 체크한 노트들을 한 번에 병합 (새 토픽 제목 직접 입력 가능)
+async function openBatchMerge(wrap) {
+  const checked = [...wrap.querySelectorAll('.note-card-check:checked')].map(c => c.dataset.filename);
+  if (checked.length === 0) { showToast('병합할 노트를 체크해주세요'); return; }
+  if (wrap.querySelector('.batch-merge-config')) return; // 이미 열림
+
+  let topics = [];
+  try { topics = (await apiFetch('/api/topics').then(r => r.json())).topics || []; } catch (_) { /* 목록 없어도 새 토픽은 가능 */ }
+
+  const cfg = document.createElement('div');
+  cfg.className = 'batch-merge-config';
+  cfg.style.cssText = 'margin:8px 0;padding:10px;border:1px solid #4a6cf7;border-radius:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;';
+
+  const info = document.createElement('span');
+  info.textContent = `${checked.length}개 병합 →`;
+
+  const select = document.createElement('select');
+  const optNew = document.createElement('option');
+  optNew.value = '__new__';
+  optNew.textContent = '+ 새 토픽으로';
+  select.appendChild(optNew);
+  topics.filter(t => !checked.includes(t.filename)).forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.filename;
+    o.textContent = t.title;
+    select.appendChild(o);
+  });
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.placeholder = '새 토픽 제목 (비우면 자동)';
+  titleInput.style.cssText = 'padding:6px;border:1px solid #ccc;border-radius:6px;font-size:14px;';
+  const syncTitle = () => { titleInput.style.display = select.value === '__new__' ? '' : 'none'; };
+  select.addEventListener('change', syncTitle);
+  syncTitle();
+
+  const ok = document.createElement('button');
+  ok.className = 'note-card-remove';
+  ok.textContent = '병합 실행';
+  ok.addEventListener('click', async () => {
+    ok.disabled = true;
+    ok.textContent = '병합 중…';
+    const targetFilename = select.value === '__new__' ? null : select.value;
+    const newTitle = select.value === '__new__' ? titleInput.value.trim() : null;
+    try {
+      const res = await apiFetch('/api/notes/merge', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ filenames: checked, targetFilename, newTitle }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.createdNew ? `새 토픽 "${data.title}"으로 ${checked.length}개 병합` : `"${data.title}"에 ${checked.length}개 병합`);
+        checked.forEach(fn => {
+          const c = wrap.querySelector(`.note-card[data-filename="${fn}"]`);
+          if (c) c.remove();
+          removeActiveNote(fn);
+        });
+        cfg.remove();
+      } else {
+        showToast(`오류: ${data.error}`);
+        ok.disabled = false;
+        ok.textContent = '병합 실행';
+      }
+    } catch (_) {
+      showToast('서버 연결 오류');
+      ok.disabled = false;
+      ok.textContent = '병합 실행';
+    }
+  });
+
+  const cancel = document.createElement('button');
+  cancel.className = 'note-card-remove';
+  cancel.textContent = '취소';
+  cancel.addEventListener('click', () => cfg.remove());
+
+  cfg.append(info, select, titleInput, ok, cancel);
+  wrap.querySelector('.search-header').after(cfg);
+}
+
 function makeNoteCard(note) {
   const card = document.createElement('div');
   card.className = 'note-card';
   card.dataset.filename = note.filename;
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'note-card-check';
+  checkbox.dataset.filename = note.filename;
+  checkbox.title = '병합 선택';
+  checkbox.style.marginRight = '6px';
 
   const title = document.createElement('div');
   title.className = 'note-card-title';
@@ -1277,7 +1372,7 @@ function makeNoteCard(note) {
   mergeBtn.title = '이 노트를 다른 토픽에 흡수하거나 새 토픽으로 묶기';
   mergeBtn.addEventListener('click', () => mergeNoteFromCard(note.filename, card));
 
-  card.append(title, excerpt, removeBtn, archiveBtn, mergeBtn);
+  card.append(checkbox, title, excerpt, removeBtn, archiveBtn, mergeBtn);
   return card;
 }
 
@@ -1609,6 +1704,14 @@ async function mergeNoteFromCard(filename, card) {
     select.appendChild(o);
   });
 
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.placeholder = '새 토픽 제목 (비우면 자동)';
+  titleInput.style.cssText = 'padding:6px;border:1px solid #ccc;border-radius:6px;font-size:14px;';
+  const syncTitle = () => { titleInput.style.display = select.value === '__new__' ? '' : 'none'; };
+  select.addEventListener('change', syncTitle);
+  syncTitle();
+
   const ok = document.createElement('button');
   ok.className = 'note-card-remove';
   ok.textContent = '병합 실행';
@@ -1616,11 +1719,12 @@ async function mergeNoteFromCard(filename, card) {
     ok.disabled = true;
     ok.textContent = '병합 중…';
     const targetFilename = select.value === '__new__' ? null : select.value;
+    const newTitle = select.value === '__new__' ? titleInput.value.trim() : null;
     try {
       const res = await apiFetch('/api/notes/merge', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ filenames: [filename], targetFilename }),
+        body:    JSON.stringify({ filenames: [filename], targetFilename, newTitle }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1644,7 +1748,7 @@ async function mergeNoteFromCard(filename, card) {
   cancel.textContent = '취소';
   cancel.addEventListener('click', () => picker.remove());
 
-  picker.append(select, ok, cancel);
+  picker.append(select, titleInput, ok, cancel);
   card.appendChild(picker);
 }
 

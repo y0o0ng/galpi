@@ -3173,7 +3173,7 @@ async function loadNoteSearchData(filename) {
   return entry;
 }
 
-async function searchVault(query, precomputedEmbedding = null) {
+async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIVE_NOTES) {
   const terms = extractQueryTerms(query);
   const activeNotes = stmtGetNotesWithEmbedding.all();
   if (activeNotes.length === 0) return [];
@@ -3238,14 +3238,14 @@ async function searchVault(query, precomputedEmbedding = null) {
 
   return results
     .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_ACTIVE_NOTES)
+    .slice(0, limit)
     .map(({ score, ...r }) => r);
 }
 
 app.get('/api/vault/search', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: '검색어를 입력해주세요.' });
-  const results = await searchVault(q);
+  const results = await searchVault(q, null, 30); // 검색 결과는 넉넉히(병합 선택용), 컨텍스트 주입과 별개
   res.json({ results });
 });
 
