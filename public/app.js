@@ -1,22 +1,8 @@
 'use strict';
 
-// crypto.randomUUID는 보안 컨텍스트(https/localhost)에서만 제공된다.
-// http로 호스트명/IP 접속(예: Tailscale http://pi:3000) 시 없으므로 폴백을 둔다.
-function genUuid() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
-}
-
-const sessionId = (() => {
-  const stored = localStorage.getItem('councilSessionId');
-  if (stored) return stored;
-  const newId = genUuid();
-  localStorage.setItem('councilSessionId', newId);
-  return newId;
-})();
+// 단일 사용자 비서: 모든 기기가 같은 대화를 이어가도록 고정 세션 ID를 공유한다.
+// (지식/노트는 원래 서버에서 공유되고, 이 값으로 라이브 대화 thread까지 기기 간 공유)
+const sessionId = 'shared-main';
 const uiHistoryKey = `councilUiHistory:${sessionId}`;
 const activeNotesKey = `councilActiveNotes:${sessionId}`;
 const apiTokenKey = 'councilApiToken';
@@ -56,13 +42,44 @@ function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const token = getApiToken();
   if (token) headers.set('X-API-Token', token);
-  return fetch(url, { ...options, headers });
+  return fetch(url, { ...options, headers }).then(res => {
+    if (res.status === 401) {
+      localStorage.removeItem(apiTokenKey); // 잘못된 토큰 → 비우고 다시 입력받기
+      showTokenGate();
+    }
+    return res;
+  });
 }
 
+
+// 토큰이 필요한데 없으면 화면 안 입력칸(게이트)을 띄운다.
+// window.prompt는 iOS Safari가 자동 로드 중에 막아버려서 못 씀.
 function ensureApiToken(config) {
-  if (!config?.requiresApiToken || getApiToken()) return;
-  const token = window.prompt('API 토큰을 입력해주세요.');
-  setApiToken(token);
+  if (!config?.requiresApiToken || getApiToken()) return false;
+  showTokenGate();
+  return true;
+}
+
+function showTokenGate() {
+  getMessages().innerHTML = `
+    <div style="max-width:340px;margin:60px auto;text-align:center;padding:24px;">
+      <p style="margin-bottom:14px;opacity:0.85;">이 서버는 접속 토큰이 필요합니다.</p>
+      <input id="token-input" type="password" placeholder="토큰 입력" autocomplete="off"
+        style="width:100%;padding:11px;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;">
+      <button id="token-submit"
+        style="margin-top:10px;padding:10px 22px;border:none;border-radius:8px;background:#4a6cf7;color:#fff;font-size:15px;cursor:pointer;">입력</button>
+      <p id="token-error" style="color:#e04848;font-size:13px;margin-top:8px;display:none;">토큰이 올바르지 않습니다.</p>
+    </div>`;
+  const input = document.getElementById('token-input');
+  const submit = () => {
+    const v = input.value.trim();
+    if (!v) return;
+    setApiToken(v);
+    location.reload();
+  };
+  document.getElementById('token-submit').addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  input.focus();
 }
 
 // ─── 초기화 ──────────────────────────────────────────────────────────────────
@@ -74,7 +91,7 @@ async function init() {
 
   try {
     const config = await apiFetch('/api/config').then(r => r.json());
-    ensureApiToken(config);
+    if (ensureApiToken(config)) return;
     document.getElementById('model-indicator').textContent =
       `Claude: ${config.claudeModel}  |  GPT: ${config.gptModel}`;
 
