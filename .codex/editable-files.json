@@ -1,0 +1,8 @@
+{
+  "editableFiles": [
+    {
+      "path": "config/codex-policy.json",
+      "reason": "Codex may propose tuning retrieval, topic matching, merge candidate, link scoring, and organize thresholds without editing server code."
+    }
+  ]
+}

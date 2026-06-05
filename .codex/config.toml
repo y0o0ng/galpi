@@ -1,0 +1,28 @@
+[mcp_servers.ai_council_obsidian]
+command = "/home/pi/.nvm/versions/node/v24.16.0/bin/node"
+args = ["scripts/ai-council-mcp.mjs"]
+cwd = "/home/pi/ai-council"
+env = { AI_COUNCIL_URL = "http://127.0.0.1:3000", PATH = "/home/pi/.nvm/versions/node/v24.16.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
+enabled_tools = [
+  "get_config",
+  "list_notes",
+  "search_notes",
+  "read_note",
+  "organize_status",
+  "validate_vault",
+  "run_organize_process",
+  "archive_note",
+  "restore_note",
+  "list_merge_candidates",
+]
+default_tools_approval_mode = "approve"
+tool_timeout_sec = 30
+
+[mcp_servers.ai_council_obsidian.tools.run_organize_process]
+approval_mode = "prompt"
+
+[mcp_servers.ai_council_obsidian.tools.archive_note]
+approval_mode = "prompt"
+
+[mcp_servers.ai_council_obsidian.tools.restore_note]
+approval_mode = "prompt"

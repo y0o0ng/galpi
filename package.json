@@ -5,10 +5,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "mcp:obsidian": "node scripts/ai-council-mcp.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0",
     "dompurify": "^3.4.7",
     "dotenv": "^16.4.5",
@@ -16,6 +18,7 @@
     "express-rate-limit": "^8.5.2",
     "marked": "^18.0.4",
     "openai": "^4.77.0",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "zod": "^3.25.76"
   }
 }
