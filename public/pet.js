@@ -135,7 +135,10 @@ function scheduleWander() {
 const PET_MENU_ITEMS = [
   { label: '🔍 노트 검색',   command: '/search ',    autoSend: false },
   { label: '🧠 메모리 보기', command: '/memory',      autoSend: true  },
+  { label: '🔔 알림센터',   action:  'notifications' },
   { label: '🗂 정리 상태',   command: '/organize',    autoSend: true  },
+  { label: '🕸 그래프 리포트', command: '/graph report', autoSend: true },
+  { label: '🧪 시스템 검사', command: '/audit', autoSend: true },
   { label: '🔁 전체 재정리', command: '/organize all', autoSend: true },
   { label: '➕ 메모리 추가', command: '/memory add ', autoSend: false },
 ];
@@ -171,6 +174,10 @@ function openMenu() {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       closeMenu();
+      if (item.action === 'notifications') {
+        window.openNotificationsPanel?.();
+        return;
+      }
       runCommand(item.command, item.autoSend);
     });
     menuEl.appendChild(btn);

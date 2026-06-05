@@ -6,6 +6,7 @@ const sessionId = 'shared-main';
 const uiHistoryKey = `councilUiHistory:${sessionId}`;
 const activeNotesKey = `councilActiveNotes:${sessionId}`;
 const apiTokenKey = 'councilApiToken';
+const notificationPositionKey = 'councilNotificationPosition';
 let currentModel     = 'claude';
 let isLoading        = false;
 let councilMode      = false;
@@ -23,7 +24,10 @@ const slashCommands = [
   { command: '/archived', title: '보관함', description: '숨긴(보관한) 노트 목록 — 복원 가능' },
   { command: '/backup', title: '백업', description: '볼트+DB를 지금 백업 (자동: 하루 1회, 7일 보관)' },
   { command: '/sync', title: '볼트 동기화', description: '옵시디언 직접 편집 반영 — 신규 노트 등록 + 삭제 노트 정리' },
+  { command: '/graph report', title: '그래프 리포트', description: '연결/고립/큰 토픽 요약 리포트 생성' },
+  { command: '/audit', title: '시스템 검사', description: '검증, 정리 상태, 알림, 고립 토픽을 한 번에 점검' },
   { command: '/merge', title: '토픽 병합', description: '유사한 토픽 병합 후보 — 검색 카드의 "병합"으로 직접 묶기도 가능' },
+  { command: '/notifications', title: '알림센터', description: 'Codex 제안과 시스템 알림을 작은 패널로 보기' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
@@ -473,10 +477,28 @@ function sendMessage() {
     handleSync();
     return;
   }
+  if (text === '/graph report') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleGraphReport();
+    return;
+  }
+  if (text === '/audit') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleAudit();
+    return;
+  }
   if (text === '/merge') {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleMergeCandidates();
+    return;
+  }
+  if (text === '/notifications') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    openNotificationsPanel();
     return;
   }
   if (text.startsWith('/save ')) {
@@ -1675,6 +1697,114 @@ function renderSyncResult(data) {
   scrollDown();
 }
 
+async function handleGraphReport() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/graph report');
+
+  const loadingEl = appendLoading();
+  document.dispatchEvent(new Event('pet:building'));
+  try {
+    const res = await apiFetch('/api/graph/report', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+    renderGraphReportResult(data);
+    document.dispatchEvent(new Event('pet:happy'));
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
+function renderGraphReportResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('Graph'));
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = [
+    '그래프 리포트 생성 완료',
+    `파일: ${data.filename || '_system/GRAPH_REPORT.md'}`,
+    `크기: ${data.chars || 0}자`,
+  ].join('\n');
+
+  group.appendChild(bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Graph');
+  scrollDown();
+}
+
+async function handleAudit() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/audit');
+
+  const loadingEl = appendLoading();
+  document.dispatchEvent(new Event('pet:building'));
+  try {
+    const res = await apiFetch('/api/audit');
+    const data = await res.json();
+    loadingEl.remove();
+    if (data.error) { appendError(data.error); return; }
+    renderAuditResult(data);
+    document.dispatchEvent(new Event(data.ok ? 'pet:happy' : 'pet:error'));
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
+function renderAuditResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+  group.append(makeModelLabel('검사'));
+
+  const issues = Array.isArray(data.issues) ? data.issues : [];
+  const isolated = Array.isArray(data.isolatedTopics) ? data.isolatedTopics : [];
+  const large = Array.isArray(data.largeTopics) ? data.largeTopics : [];
+  const counts = data.statusCounts || {};
+
+  const issueRows = issues.length
+    ? issues.map(item => `- ${item.level.toUpperCase()} ${item.label}: ${item.message}`)
+    : ['- 문제 없음'];
+  const isolatedRows = isolated.slice(0, 5).map(item => `- ${item.title}`);
+  const largeRows = large.slice(0, 5).map(item => `- ${item.title} (${item.qaCount})`);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = [
+    `검사 결과: ${data.ok ? 'OK' : '주의 필요'}`,
+    `검증: ${data.validation?.ok ? '통과' : '실패'}`,
+    `정책 파일: ${data.policy?.ok ? '정상' : '오류'}`,
+    `정리 상태: pending ${counts.pending || 0}, queued ${counts.queued || 0}, failed ${counts.failed || 0}, manual ${counts.needsManualCheck || 0}`,
+    `알림: ${(data.notifications || []).length}개`,
+    '',
+    '이슈',
+    issueRows.join('\n'),
+    isolatedRows.length ? `\n고립 토픽 후보\n${isolatedRows.join('\n')}` : '',
+    largeRows.length ? `\n큰 토픽 후보\n${largeRows.join('\n')}` : '',
+  ].filter(Boolean).join('\n');
+
+  group.appendChild(bubble);
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, '검사');
+  scrollDown();
+}
+
 // ─── 토픽 병합 ────────────────────────────────────────────────────────────────
 
 async function mergeNoteFromCard(filename, card) {
@@ -1841,6 +1971,303 @@ function renderMergeCandidates(candidates) {
   group.appendChild(wrap);
   getMessages().appendChild(group);
   scrollDown();
+}
+
+window.openNotificationsPanel = openNotificationsPanel;
+
+async function openNotificationsPanel() {
+  let panel = document.getElementById('notification-center');
+  if (!panel) {
+    panel = createNotificationsPanel();
+    document.body.appendChild(panel);
+  }
+  applyNotificationPanelPosition(panel);
+  panel.classList.add('open');
+  await refreshNotificationsPanel(panel);
+}
+
+function closeNotificationsPanel() {
+  document.getElementById('notification-center')?.classList.remove('open');
+}
+
+function createNotificationsPanel() {
+  const panel = document.createElement('section');
+  panel.id = 'notification-center';
+  panel.setAttribute('aria-label', '알림센터');
+
+  const head = document.createElement('div');
+  head.className = 'notification-head';
+  head.title = '드래그해서 위치 이동';
+
+  const titleWrap = document.createElement('div');
+  const kicker = document.createElement('div');
+  kicker.className = 'notification-kicker';
+  kicker.textContent = 'CLAWD';
+  const title = document.createElement('div');
+  title.className = 'notification-title';
+  title.textContent = '알림센터';
+  titleWrap.append(kicker, title);
+
+  const actions = document.createElement('div');
+  actions.className = 'notification-actions';
+  const refresh = document.createElement('button');
+  refresh.className = 'notification-icon-btn';
+  refresh.type = 'button';
+  refresh.title = '새로고침';
+  refresh.textContent = '↻';
+  refresh.addEventListener('click', () => refreshNotificationsPanel(panel));
+  const close = document.createElement('button');
+  close.className = 'notification-icon-btn';
+  close.type = 'button';
+  close.title = '닫기';
+  close.textContent = '×';
+  close.addEventListener('click', closeNotificationsPanel);
+  actions.append(refresh, close);
+
+  const tabs = document.createElement('div');
+  tabs.className = 'notification-tabs';
+  [
+    ['all', '전체'],
+    ['codex', 'Codex'],
+    ['system', '시스템'],
+  ].forEach(([value, label]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'notification-tab';
+    btn.dataset.filter = value;
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      panel.dataset.filter = value;
+      panel.querySelectorAll('.notification-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.filter === value);
+      });
+      renderNotificationItems(panel);
+    });
+    if (value === 'all') btn.classList.add('active');
+    tabs.appendChild(btn);
+  });
+
+  const body = document.createElement('div');
+  body.className = 'notification-body';
+
+  head.append(titleWrap, actions);
+  panel.append(head, tabs, body);
+  panel.dataset.filter = 'all';
+  panel._notifications = [];
+  enableNotificationPanelDrag(panel, head);
+  return panel;
+}
+
+function isNotificationMobileLayout() {
+  return window.matchMedia('(max-width: 640px)').matches;
+}
+
+function loadNotificationPanelPosition() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(notificationPositionKey) || 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!Number.isFinite(parsed.left) || !Number.isFinite(parsed.top)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function applyNotificationPanelPosition(panel) {
+  if (isNotificationMobileLayout()) {
+    panel.style.left = '';
+    panel.style.top = '';
+    panel.style.right = '';
+    panel.style.bottom = '';
+    return;
+  }
+  const pos = loadNotificationPanelPosition();
+  if (!pos) return;
+  const width = panel.offsetWidth || 380;
+  const height = panel.offsetHeight || 420;
+  const left = Math.max(8, Math.min(pos.left, window.innerWidth - width - 8));
+  const top = Math.max(8, Math.min(pos.top, window.innerHeight - height - 8));
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+  panel.style.right = 'auto';
+  panel.style.bottom = 'auto';
+}
+
+function enableNotificationPanelDrag(panel, handle) {
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('button') || isNotificationMobileLayout()) return;
+    const rect = panel.getBoundingClientRect();
+    dragging = true;
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    panel.classList.add('dragging');
+    panel.style.left = `${rect.left}px`;
+    panel.style.top = `${rect.top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+    handle.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  });
+
+  handle.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const rect = panel.getBoundingClientRect();
+    const left = Math.max(8, Math.min(e.clientX - offsetX, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(e.clientY - offsetY, window.innerHeight - rect.height - 8));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+  });
+
+  const endDrag = e => {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('dragging');
+    const rect = panel.getBoundingClientRect();
+    localStorage.setItem(notificationPositionKey, JSON.stringify({ left: rect.left, top: rect.top }));
+    try { handle.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
+  };
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+}
+
+async function refreshNotificationsPanel(panel) {
+  const body = panel.querySelector('.notification-body');
+  body.innerHTML = '<div class="notification-empty">알림을 불러오는 중…</div>';
+  try {
+    const res = await apiFetch('/api/notifications');
+    const data = await res.json();
+    if (data.error) {
+      body.innerHTML = `<div class="notification-empty danger">${escapeHtml(data.error)}</div>`;
+      return;
+    }
+    panel._notifications = Array.isArray(data.notifications) ? data.notifications : [];
+    renderNotificationItems(panel);
+  } catch (_) {
+    body.innerHTML = '<div class="notification-empty danger">서버에 연결할 수 없습니다.</div>';
+  }
+}
+
+function renderNotificationItems(panel) {
+  const body = panel.querySelector('.notification-body');
+  const filter = panel.dataset.filter || 'all';
+  const items = (panel._notifications || []).filter(item => {
+    if (filter === 'all') return true;
+    return item.source === filter;
+  });
+
+  if (items.length === 0) {
+    body.innerHTML = '<div class="notification-empty">표시할 알림이 없습니다.</div>';
+    return;
+  }
+
+  body.innerHTML = '';
+  items.forEach(item => body.appendChild(makeNotificationCard(item)));
+}
+
+function makeNotificationCard(item) {
+  const card = document.createElement('article');
+  card.className = `notification-card type-${item.type || 'review'}`;
+
+  const top = document.createElement('div');
+  top.className = 'notification-card-top';
+
+  const badge = document.createElement('span');
+  badge.className = 'notification-badge';
+  badge.textContent = item.title || '알림';
+
+  const source = document.createElement('span');
+  source.className = 'notification-source';
+  source.textContent = item.source || 'system';
+  top.append(badge, source);
+
+  const note = document.createElement('div');
+  note.className = 'notification-note';
+  note.textContent = item.note?.title || '관련 노트 없음';
+
+  const text = document.createElement('div');
+  text.className = 'notification-text';
+  text.textContent = item.text || '';
+
+  const footer = document.createElement('div');
+  footer.className = 'notification-footer';
+  const file = document.createElement('span');
+  file.className = 'notification-file';
+  file.textContent = item.note?.filename || '';
+  footer.appendChild(file);
+
+  const actionWrap = document.createElement('div');
+  actionWrap.className = 'notification-card-actions';
+
+  const approve = document.createElement('button');
+  approve.type = 'button';
+  approve.className = 'notification-action primary';
+  approve.textContent = notificationPrimaryActionLabel(item);
+  approve.addEventListener('click', () => handleNotificationDecision(item, 'approve', card));
+
+  const ignore = document.createElement('button');
+  ignore.type = 'button';
+  ignore.className = 'notification-action';
+  ignore.textContent = '무시';
+  ignore.addEventListener('click', () => handleNotificationDecision(item, 'ignore', card));
+
+  actionWrap.append(approve, ignore);
+  footer.appendChild(actionWrap);
+
+  card.append(top, note, text, footer);
+  return card;
+}
+
+function notificationPrimaryActionLabel(item) {
+  if (item.type === 'merge') return '병합 실행';
+  if (item.type === 'split' && item.executable) return '분리 실행';
+  if (item.type === 'policy' && item.executable) return '정책 적용';
+  return '검토 완료';
+}
+
+async function handleNotificationDecision(item, action, card) {
+  const buttons = card.querySelectorAll('button');
+  buttons.forEach(btn => { btn.disabled = true; });
+  try {
+    const res = await apiFetch(`/api/notifications/${encodeURIComponent(item.id)}/${action}`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) {
+      showToast(data.error || '알림 처리 실패');
+      buttons.forEach(btn => { btn.disabled = false; });
+      return;
+    }
+
+    const panel = document.getElementById('notification-center');
+    if (panel) {
+      panel._notifications = (panel._notifications || []).filter(n => n.id !== item.id);
+      renderNotificationItems(panel);
+    } else {
+      card.remove();
+    }
+    showToast(action === 'approve' ? notificationDoneMessage(item) : '무시됨');
+  } catch (_) {
+    showToast('서버 연결 오류');
+    buttons.forEach(btn => { btn.disabled = false; });
+  }
+}
+
+function notificationDoneMessage(item) {
+  if (item.type === 'merge') return '병합됨';
+  if (item.type === 'split' && item.executable) return '분리됨';
+  if (item.type === 'policy' && item.executable) return '정책 파일에 반영됨';
+  return '검토 완료';
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function addActiveNote(note) {
