@@ -1,0 +1,86 @@
+{
+  "autoSave": {
+    "minUserChars": 20,
+    "minAssistantChars": 120
+  },
+  "topicMatch": {
+    "threshold": 0.48,
+    "softThreshold": 0.38,
+    "minTokenOverlap": 1
+  },
+  "organize": {
+    "autoQueueThreshold": 5
+  },
+  "retrieval": {
+    "maxActiveNotes": 8,
+    "maxNoteContextChars": 5000,
+    "keywordWeight": 0.35,
+    "embeddingWeight": 0.65,
+    "keywordNormalizer": 30,
+    "minEmbeddingScore": 0.08,
+    "minKeywordScore": 2
+  },
+  "codexLinks": {
+    "maxLinksPerNote": 10,
+    "minOverlap": 2,
+    "minScore": 60,
+    "scoreBase": 45,
+    "scorePerOverlap": 15,
+    "maxScore": 95,
+    "inferredMinScore": 75
+  },
+  "mergeCandidates": {
+    "similarityThreshold": 0.72,
+    "strongSimilarity": 0.82,
+    "minTokenOverlap": 2,
+    "overlapStopwords": [
+      "내가",
+      "있어",
+      "있는",
+      "있다",
+      "그게",
+      "좋아",
+      "특히",
+      "중에",
+      "같은",
+      "이미지",
+      "이미지가",
+      "감각",
+      "느낌",
+      "표현",
+      "부분",
+      "생각",
+      "정도",
+      "이런",
+      "저런",
+      "그런",
+      "어떤",
+      "너무",
+      "조금",
+      "많이",
+      "다른",
+      "아니면",
+      "그냥",
+      "나는",
+      "비슷한",
+      "않고",
+      "것도",
+      "하고",
+      "무겁게",
+      "하면",
+      "해서",
+      "라고",
+      "부터",
+      "까지",
+      "보다",
+      "처럼",
+      "좋은",
+      "싫은",
+      "괜찮은",
+      "어울리는",
+      "나중에",
+      "이번에",
+      "전에"
+    ]
+  }
+}
