@@ -82,5 +82,16 @@
       "이번에",
       "전에"
     ]
+  },
+  "webSearch": {
+    "enabled": false,
+    "modelTool": true,
+    "modelToolMaxQueryChars": 180,
+    "provider": "tavily",
+    "maxResults": 5,
+    "searchDepth": "basic",
+    "cacheTtlSeconds": 900,
+    "maxSnippetChars": 800,
+    "monthlyCreditSoftLimit": 800
   }
 }

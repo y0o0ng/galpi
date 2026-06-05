@@ -16,6 +16,7 @@ let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
 let isRestoringHistory = false;
 const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 활성 컨텍스트에 추가' },
+  { command: '/web ', title: '웹 검색', description: '외부 웹 검색 결과를 같은 근거로 모델에 주입' },
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
   { command: '/embed', title: '임베딩 생성', description: '모든 노트의 시맨틱 검색용 임베딩 생성' },
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
@@ -434,6 +435,17 @@ function sendMessage() {
     if (query) handleSearch(query);
     return;
   }
+  if (text.startsWith('/web ')) {
+    const query = text.slice(5).trim();
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    if (query) {
+      const opts = { overrideText: query, displayText: `/web ${query}`, webSearch: true };
+      if (councilMode) sendCouncilMessage(opts);
+      else sendSingleMessage(opts);
+    }
+    return;
+  }
   if (text === '/organize all') {
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -592,19 +604,19 @@ function hideCommandPalette() {
 
 // ─── 단일 모드 ────────────────────────────────────────────────────────────────
 
-async function sendSingleMessage() {
+async function sendSingleMessage(options = {}) {
   if (isLoading) return;
   const inputEl = document.getElementById('input');
-  const text = inputEl.value.trim();
+  const text = (options.overrideText ?? inputEl.value).trim();
   if (!text) return;
 
-  inputEl.value = '';
+  if (!options.overrideText) inputEl.value = '';
   inputEl.style.height = 'auto';
   isLoading = true;
   document.getElementById('send-btn').disabled = true;
   document.querySelector('.welcome')?.remove();
 
-  appendUserBubble(text);
+  appendUserBubble(options.displayText || text);
   const loadingEl = appendLoading();
   document.dispatchEvent(new Event('pet:thinking'));
 
@@ -613,7 +625,7 @@ async function sendSingleMessage() {
     const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, model: currentModel, sessionId, activeNotes }),
+      body:    JSON.stringify({ message: text, model: currentModel, sessionId, activeNotes, webSearch: !!options.webSearch }),
     });
     const data = await res.json();
     loadingEl.remove();
@@ -635,19 +647,19 @@ async function sendSingleMessage() {
 
 // ─── 의회 모드 ────────────────────────────────────────────────────────────────
 
-async function sendCouncilMessage() {
+async function sendCouncilMessage(options = {}) {
   if (isLoading) return;
   const inputEl = document.getElementById('input');
-  const text = inputEl.value.trim();
+  const text = (options.overrideText ?? inputEl.value).trim();
   if (!text) return;
 
-  inputEl.value = '';
+  if (!options.overrideText) inputEl.value = '';
   inputEl.style.height = 'auto';
   isLoading = true;
   document.getElementById('send-btn').disabled = true;
   document.querySelector('.welcome')?.remove();
 
-  appendUserBubble(text);
+  appendUserBubble(options.displayText || text);
 
   // 의회 컨테이너 생성
   const container = document.createElement('div');
@@ -671,7 +683,7 @@ async function sendCouncilMessage() {
     const debateRes = await apiFetch('/api/council/debate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ question: text, sessionId, councilDraftMode, activeNotes }),
+      body:    JSON.stringify({ question: text, sessionId, councilDraftMode, activeNotes, webSearch: !!options.webSearch }),
     });
     const debateData = await debateRes.json();
 
@@ -883,6 +895,7 @@ async function chooseSynthesizer(container, body, question, debateData, reviewDa
         synthesizer,
         sessionId,
         councilDraftMode: debateData.councilDraftMode || councilDraftMode,
+        webSources: debateData.webSources || [],
       }),
     });
     const data = await res.json();
@@ -950,6 +963,7 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
     synthesizerModelId: data.synthesizerModelId,
     messageId:          data.messageId,
     councilDraftMode:   noteDraftMode,
+    webSources:         debateData.webSources || [],
   })));
 
   synthSection.append(synthLabel, synthBubble, saveBtn);
@@ -971,6 +985,12 @@ function buildCouncilTranscript(question, debateData, reviewData, data) {
 
   if (data.divergence) sections.push(`## 갈린 지점\n${data.divergence}`);
   sections.push(`## 종합 (${data.synthesizer})\n${data.synthesis}`);
+  if (Array.isArray(debateData.webSources) && debateData.webSources.length > 0) {
+    const sources = debateData.webSources
+      .map((source, index) => `${index + 1}. ${source.title || source.url}\n${source.url}`)
+      .join('\n\n');
+    sections.push(`## Web sources\n${sources}`);
+  }
   return sections.join('\n\n---\n\n');
 }
 

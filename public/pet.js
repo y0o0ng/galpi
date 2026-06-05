@@ -134,6 +134,7 @@ function scheduleWander() {
 
 const PET_MENU_ITEMS = [
   { label: '🔍 노트 검색',   command: '/search ',    autoSend: false },
+  { label: '🌐 웹 검색',     command: '/web ',       autoSend: false },
   { label: '🧠 메모리 보기', command: '/memory',      autoSend: true  },
   { label: '🔔 알림센터',   action:  'notifications' },
   { label: '🗂 정리 상태',   command: '/organize',    autoSend: true  },
