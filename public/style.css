@@ -510,7 +510,7 @@ html, body {
   box-shadow: var(--shadow-md);
 }
 
-[data-theme="dark"] .note-card { background: rgba(255, 255, 255, 0.04); }
+[data-theme="dark"] .note-card { background: rgba(255, 255, 255, 0.055); }
 
 .note-card-inactive {
   opacity: 0.45;
@@ -561,20 +561,34 @@ html, body {
   border-left-color: var(--gpt-color);
   background: rgba(16, 163, 127, 0.08);
 }
+[data-theme="dark"] .note-card-selected { background: rgba(16, 163, 127, 0.18); }
 
 .merge-tray {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 9px;
   margin: 2px 0 6px;
-  padding: 9px 12px;
+  padding: 10px 12px;
   background: var(--ai-bubble);
   border: 1px solid var(--gpt-color);
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
   animation: merge-tray-in 0.2s var(--ease-out);
 }
+
+.merge-tray-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.merge-tray-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.merge-tray-controls select { flex: 1 1 0; min-width: 0; }
 .merge-tray.is-hiding { animation: merge-tray-out 0.16s var(--ease-out) forwards; }
 
 @keyframes merge-tray-in {
@@ -602,7 +616,7 @@ html, body {
   background: var(--bg);
   color: var(--ai-text);
 }
-.merge-tray-title { flex: 1; min-width: 130px; }
+.merge-tray-title { flex: 2 1 0; min-width: 0; }
 .merge-tray-field:focus-visible {
   outline: 2px solid var(--gpt-color);
   outline-offset: 1px;
@@ -612,7 +626,7 @@ html, body {
 .merge-tray-actions {
   display: flex;
   gap: 6px;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .merge-btn {

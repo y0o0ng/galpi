@@ -1354,7 +1354,15 @@ async function buildMergeTray(wrap) {
   actions.className = 'merge-tray-actions';
   actions.append(cancel, ok);
 
-  tray.append(count, select, titleInput, actions);
+  const head = document.createElement('div');
+  head.className = 'merge-tray-head';
+  head.append(count, actions);
+
+  const controls = document.createElement('div');
+  controls.className = 'merge-tray-controls';
+  controls.append(select, titleInput);
+
+  tray.append(head, controls);
   return tray;
 }
 
@@ -1941,7 +1949,15 @@ async function mergeNoteFromCard(filename, card) {
   actions.className = 'merge-tray-actions';
   actions.append(cancel, ok);
 
-  picker.append(label, select, titleInput, actions);
+  const head = document.createElement('div');
+  head.className = 'merge-tray-head';
+  head.append(label, actions);
+
+  const controls = document.createElement('div');
+  controls.className = 'merge-tray-controls';
+  controls.append(select, titleInput);
+
+  picker.append(head, controls);
   card.appendChild(picker);
 }
 
