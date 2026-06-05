@@ -2178,6 +2178,12 @@ app.get('/api/config', (req, res) => {
     contextN:    CONTEXT_N,
     contextMessages: HISTORY_CONTEXT_MESSAGES,
     codexAutoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
+    webSearch: {
+      enabled: WEB_SEARCH_ENABLED,
+      provider: WEB_SEARCH_PROVIDER,
+      usage: getCurrentWebSearchUsage(),
+      softLimit: WEB_SEARCH_MONTHLY_CREDIT_SOFT_LIMIT,
+    },
     requiresApiToken: !!API_TOKEN,
     hasClaude:   HAS_CLAUDE,
     hasGpt:      HAS_GPT,
@@ -3354,39 +3360,48 @@ function normalizeWebUrl(value) {
   }
 }
 
+function matchesDomain(host, domain) {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+function matchesAnyDomain(host, domains) {
+  return domains.some(domain => matchesDomain(host, domain));
+}
+
 function classifyWebSourceType(hostname, url) {
   const host = String(hostname || '').replace(/^www\./, '').toLowerCase();
   const fullUrl = String(url || '').toLowerCase();
   if (!host) return 'unknown';
   if (host.endsWith('.gov') || host.endsWith('.go.kr') || host.endsWith('.gov.uk')) return 'official';
-  if (host.endsWith('.edu') || host.includes('arxiv.org') || host.includes('doi.org')) return 'academic';
+  if (host.endsWith('.edu') || matchesAnyDomain(host, ['arxiv.org', 'doi.org'])) return 'academic';
   if (host === 'github.com' || host.endsWith('.github.io') || host === 'gitlab.com') return 'code';
-  if (host.includes('reddit.com') || host.includes('stackoverflow.com') || host.includes('stackexchange.com')) return 'community';
+  if (matchesAnyDomain(host, ['reddit.com', 'stackoverflow.com', 'stackexchange.com'])) return 'community';
   if (
     host.startsWith('docs.') ||
     host.startsWith('developer.') ||
     host.startsWith('developers.') ||
-    host.includes('platform.') ||
+    host.startsWith('platform.') ||
     fullUrl.includes('/docs') ||
     fullUrl.includes('/documentation') ||
     fullUrl.includes('/api-reference')
   ) return 'docs';
-  if (
-    host.includes('reuters.com') ||
-    host.includes('apnews.com') ||
-    host.includes('bloomberg.com') ||
-    host.includes('nytimes.com') ||
-    host.includes('wsj.com') ||
-    host.includes('bbc.') ||
-    host.includes('cnn.com') ||
-    host.includes('theverge.com') ||
-    host.includes('techcrunch.com') ||
-    host.includes('yna.co.kr') ||
-    host.includes('hani.co.kr') ||
-    host.includes('khan.co.kr') ||
-    host.includes('chosun.com') ||
-    host.includes('joongang.co.kr')
-  ) return 'news';
+  if (matchesAnyDomain(host, [
+    'reuters.com',
+    'apnews.com',
+    'bloomberg.com',
+    'nytimes.com',
+    'wsj.com',
+    'bbc.com',
+    'bbc.co.uk',
+    'cnn.com',
+    'theverge.com',
+    'techcrunch.com',
+    'yna.co.kr',
+    'hani.co.kr',
+    'khan.co.kr',
+    'chosun.com',
+    'joongang.co.kr',
+  ])) return 'news';
   return 'unknown';
 }
 
@@ -3471,6 +3486,22 @@ function cacheWebSearch(cacheKey, value) {
   webSearchCache.set(cacheKey, { createdAt: Date.now(), value });
 }
 
+function getCurrentWebSearchUsage() {
+  return stmtGetWebSearchUsage.get(currentUsageMonth()) || {
+    month: currentUsageMonth(),
+    provider: WEB_SEARCH_PROVIDER,
+    credits: 0,
+    requestCount: 0,
+  };
+}
+
+function assertWebSearchBudgetAvailable(nextCredits) {
+  const usage = getCurrentWebSearchUsage();
+  if (usage.credits + nextCredits > WEB_SEARCH_MONTHLY_CREDIT_SOFT_LIMIT) {
+    throw new Error(`외부 검색 월 한도에 도달했습니다 (${usage.credits}/${WEB_SEARCH_MONTHLY_CREDIT_SOFT_LIMIT} credits).`);
+  }
+}
+
 async function searchTavilyWeb(query, options = {}) {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) throw new Error('TAVILY_API_KEY가 설정되어 있지 않습니다.');
@@ -3532,6 +3563,7 @@ async function searchWeb(query, options = {}) {
   const cached = getCachedWebSearch(cacheKey);
   if (cached) return { ...cached, cached: true };
 
+  assertWebSearchBudgetAvailable(webSearchCreditsForDepth(searchDepth));
   const result = await searchTavilyWeb(cleanQuery, { ...options, maxResults, searchDepth, topic, timeRange });
   stmtAddWebSearchUsage.run(currentUsageMonth(), result.provider, result.credits);
   const retrievedAt = new Date().toISOString();

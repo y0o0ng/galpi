@@ -100,6 +100,7 @@ async function init() {
     if (ensureApiToken(config)) return;
     document.getElementById('model-indicator').textContent =
       `Claude: ${config.claudeModel}  |  GPT: ${config.gptModel}`;
+    renderWebUsagePill(config.webSearch);
 
     if (!config.hasClaude) {
       const btn = document.querySelector('[data-model="claude"]');
@@ -169,6 +170,34 @@ async function init() {
   await loadHistory();
   setInterval(pollForUpdates, 7000);
   updateNotesBar();
+}
+
+function renderWebUsagePill(webSearch) {
+  const pill = document.getElementById('web-usage-pill');
+  if (!pill) return;
+
+  if (!webSearch?.enabled) {
+    pill.textContent = 'Web off';
+    pill.classList.remove('warn');
+    pill.title = '외부 검색 비활성화';
+    return;
+  }
+
+  const credits = Number(webSearch.usage?.credits || 0);
+  const softLimit = Number(webSearch.softLimit || 0);
+  const requestCount = Number(webSearch.usage?.requestCount || 0);
+  pill.textContent = softLimit > 0 ? `Web ${credits}/${softLimit}` : `Web ${credits}`;
+  pill.classList.toggle('warn', softLimit > 0 && credits >= softLimit * 0.8);
+  pill.title = `이번 달 ${webSearch.provider || 'web'} 사용량: ${credits} credits / ${softLimit || 'limit 없음'} · ${requestCount} requests`;
+}
+
+async function refreshWebUsagePill() {
+  try {
+    const config = await apiFetch('/api/config').then(r => r.json());
+    if (!config.requiresApiToken) renderWebUsagePill(config.webSearch);
+  } catch (_) {
+    // 사용량 갱신 실패는 답변 흐름을 막지 않는다.
+  }
 }
 
 // ─── 히스토리 복원 ───────────────────────────────────────────────────────────
@@ -632,6 +661,7 @@ async function sendSingleMessage(options = {}) {
     if (data.error) appendError(data.error);
     else {
       appendAssistantBubble({ ...data, question: text });
+      if (Array.isArray(data.webSources) && data.webSources.length > 0) refreshWebUsagePill();
       lastRenderedMsgId = data.messageId || lastRenderedMsgId; // 방금 보낸 건 폴링이 다시 안 그리게
       document.dispatchEvent(new Event('pet:happy'));
     }
@@ -694,6 +724,7 @@ async function sendCouncilMessage(options = {}) {
     }
 
     renderInitialAnswers(body, loadingEl, debateData);
+    if (Array.isArray(debateData.webSources) && debateData.webSources.length > 0) refreshWebUsagePill();
 
     // ── 2단계: 상호 검토 (심층 모드 + 두 답변 모두 있을 때만) ────
     let reviewData = { claudeReview: null, gptReview: null };
