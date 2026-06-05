@@ -408,7 +408,7 @@
 
   다음 명령 후보:
 
-  - /web: 외부 웹 검색(백엔드 search agent) 결과를 의회 양쪽에 같은 근거로 주입해 답변. 설계 확정·미구현 (상세는 "외부 검색 (웹 근거 주입)" 절)
+  - /web: 외부 웹 검색(백엔드 search agent) 결과를 의회 양쪽에 같은 근거로 주입해 답변. **구현됨**, Pi에서 가동 중 (상세는 "외부 검색 (웹 근거 주입)" 절)
   - /challenge: 과거 노트를 근거로 현재 생각 반박
   - /synthesize: 여러 노트에서 패턴 추출
   - /export: 다른 AI에게 넘길 스냅샷 생성
@@ -562,7 +562,7 @@
 - **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, Clawd 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
 - **그래프/검사(완료):** `/graph report`는 `_system/GRAPH_REPORT.md`를 생성/갱신한다. `/audit`은 화면 표시상 "시스템 검사"이며 Codex validation, policy 파일 파싱, 정리 상태, 알림, 고립 토픽, 큰 토픽, 최근 job을 요약한다.
 - **파일명/링크 안정화(완료):** 새 노트 파일명은 ASCII 날짜-시간-난수 형식으로 생성한다. Obsidian 링크는 `[[파일ID|표시 제목]]`을 기본으로 써서 유령 노트 생성을 막는다. validator는 CODEX-LINKS/MERGE/SPLIT 제안의 형식·bare wiki link를 거부한다.
-- **외부 검색(설계 확정·미구현):** 백엔드 search agent(Tavily 1개)가 한 번 검색해 같은 evidence를 의회 양쪽에 주입하는 `/web`. MVP 4원칙 — 명시적 `/web` / 의회 양쪽 동일 evidence / 프롬프트 인젝션 격리 / 저장 시 provenance. 기본 `enabled:false`. 상세는 "외부 검색 (웹 근거 주입)" 절.
+- **외부 검색(구현 완료, 2026-06-06):** 백엔드 search agent(Tavily)가 한 번 검색해 같은 evidence를 의회 양쪽에 주입하는 `/web`. MVP 4원칙(명시적 `/web` / 의회 양쪽 동일 evidence / 인젝션 격리 / 저장 시 provenance) + planner(topic·timeRange·maxResults·sourceStrategy 검증, sourceType 라벨·전략 재정렬) + 모델 주도 `tool_request`(단일 2-pass / 의회 양쪽 1회) + 보안(월 한도 집행, sourceType 정확매칭) 까지 구현. Pi에서 `enabled:true`로 가동 중. 상세는 "외부 검색 (웹 근거 주입)" 절.
 - **보류:** `/challenge`, `/synthesize`, `/export`는 검색/회수와 서재 관리가 더 안정화된 뒤 구현한다. 제한적 재정리(연결 0개, 최근 N일, 특정 주제/태그, 정책 변경 영향 노트)는 다음 관리 기능 후보로 둔다.
 - **작업 방식:** 실제 코드 수정 전에 무엇을·왜·영향·트레이드오프를 설명하고 컨펌받는다. (`git add -p`는 현재 환경에서 막혀 있어, 사용자의 미커밋 작업과 섞인 파일은 통째로 커밋하거나 분리 협의.)
 
@@ -693,9 +693,10 @@ v1에서는 벡터 DB 없이 시작한다. 제목·태그·본문 검색으로 �
 
 -----
 
-## 외부 검색 (웹 근거 주입) — 설계 확정 · 미구현
+## 외부 검색 (웹 근거 주입) — 구현 완료
 
 > 결정: 2026-06-05. MVP는 Tavily 단일 provider, 명시적 `/web`만. 자동 검색 판단은 보류.
+> 구현: 2026-06-06. MVP + planner + 보안(soft limit 집행·sourceType 정확매칭)까지 완료, Pi에 `enabled:true` 배포. 모델 주도 `tool_request`(단일 2-pass / 의회 양쪽 1회 검색)도 구현됨. 아래는 그 설계 기록.
 
 ### 핵심 원칙
 
