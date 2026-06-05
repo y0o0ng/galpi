@@ -209,7 +209,7 @@ html, body {
 .council-btn:hover:not(.disabled):not(.active) {
   border-color: var(--council);
   color: var(--council);
-  background: rgba(175, 82, 222, 0.06);
+  background: rgba(124, 111, 205, 0.08);
 }
 
 .council-btn:active:not(.disabled) {
@@ -473,6 +473,12 @@ html, body {
   max-width: 85%;
   text-align: center;
   margin: 4px 0;
+}
+
+[data-theme="dark"] .error-msg {
+  background: rgba(255, 59, 48, 0.12);
+  border-color: rgba(255, 59, 48, 0.35);
+  color: #FF8078;
 }
 
 /* ── 노트 검색 결과 ────────────────────────────────────── */
@@ -881,6 +887,10 @@ html, body {
   background: rgba(52, 199, 89, 0.14);
 }
 
+[data-theme="dark"] .notification-action.primary {
+  color: #5BD97E;
+}
+
 .notification-action:disabled {
   opacity: 0.45;
   cursor: default;
@@ -930,6 +940,13 @@ html, body {
   color: #1C7A3A;
   max-width: 200px;
 }
+
+[data-theme="dark"] .note-chip {
+  background: rgba(52, 199, 89, 0.14);
+  border-color: rgba(52, 199, 89, 0.45);
+  color: #5BD97E;
+}
+[data-theme="dark"] .note-chip-x { color: #5BD97E; }
 
 .note-chip span {
   overflow: hidden;
@@ -985,7 +1002,7 @@ html, body {
   min-width: 92px;
   font-size: 13px;
   font-weight: 700;
-  color: #AF52DE;
+  color: var(--council);
 }
 
 .command-meta {
@@ -1147,7 +1164,7 @@ body[data-active-model="council"] #send-btn {
 
 .mode-opt:not(.active):hover {
   color: var(--council);
-  background: rgba(175, 82, 222, 0.06);
+  background: rgba(124, 111, 205, 0.08);
 }
 
 /* ── 의회 모드 ─────────────────────────────────────────────── */
@@ -1246,9 +1263,9 @@ body[data-active-model="council"] #send-btn {
 .synth-btn {
   padding: 5px 12px;
   border-radius: 20px;
-  border: 1.5px solid #AF52DE;
+  border: 1.5px solid var(--council);
   background: transparent;
-  color: #AF52DE;
+  color: var(--council);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -1257,7 +1274,7 @@ body[data-active-model="council"] #send-btn {
 }
 
 .synth-btn:hover:not(:disabled) {
-  background: #AF52DE;
+  background: var(--council);
   color: #fff;
 }
 
@@ -1295,7 +1312,7 @@ body[data-active-model="council"] #send-btn {
 .synthesis-bubble {
   border-left: 3px solid var(--council);
   padding-left: 10px;
-  background: rgba(175, 82, 222, 0.04);
+  background: rgba(124, 111, 205, 0.06);
   border-radius: 0 6px 6px 0;
   padding-top: 4px;
   padding-bottom: 4px;
