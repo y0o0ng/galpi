@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const { execFile } = require('child_process');
 const crypto = require('crypto');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -33,24 +34,149 @@ const COUNCIL_TOKEN_LIMITS = {
   review:          800,
   synthesis:       5000,
 };
-const MAX_ACTIVE_NOTES = 8;
-const MAX_NOTE_CONTEXT_CHARS = 5000;
+
+function parseInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseFloatValue(value, fallback) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampNumber(value, fallback, min, max) {
+  const parsed = Number(value);
+  const base = Number.isFinite(parsed) ? parsed : fallback;
+  return Math.min(max, Math.max(min, base));
+}
+
+function clampInteger(value, fallback, min, max) {
+  return Math.round(clampNumber(value, fallback, min, max));
+}
+
+function mergePolicyDefaults(defaults, overrides) {
+  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) return defaults;
+  const merged = { ...defaults };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      defaults[key] &&
+      typeof defaults[key] === 'object' &&
+      !Array.isArray(defaults[key])
+    ) {
+      merged[key] = mergePolicyDefaults(defaults[key], value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+const CODEX_POLICY_PATH = path.join(__dirname, 'config', 'codex-policy.json');
+const DEFAULT_CODEX_POLICY = {
+  autoSave: {
+    minUserChars: parseInteger(process.env.AUTO_TOPIC_MIN_USER_CHARS, 20),
+    minAssistantChars: parseInteger(process.env.AUTO_TOPIC_MIN_ASSISTANT_CHARS, 120),
+  },
+  topicMatch: {
+    threshold: parseFloatValue(process.env.TOPIC_MATCH_THRESHOLD, 0.48),
+    softThreshold: parseFloatValue(process.env.TOPIC_MATCH_SOFT_THRESHOLD, 0.38),
+    minTokenOverlap: parseInteger(process.env.TOPIC_MATCH_MIN_TOKEN_OVERLAP, 1),
+  },
+  organize: {
+    autoQueueThreshold: parseInteger(process.env.CODEX_AUTO_QUEUE_THRESHOLD, 5),
+  },
+  retrieval: {
+    maxActiveNotes: 8,
+    maxNoteContextChars: 5000,
+    keywordWeight: 0.35,
+    embeddingWeight: 0.65,
+    keywordNormalizer: 30,
+    minEmbeddingScore: 0.08,
+    minKeywordScore: 2,
+  },
+  codexLinks: {
+    maxLinksPerNote: 10,
+    minOverlap: 2,
+    minScore: 60,
+    scoreBase: 45,
+    scorePerOverlap: 15,
+    maxScore: 95,
+    inferredMinScore: 75,
+  },
+  mergeCandidates: {
+    similarityThreshold: 0.72,
+    strongSimilarity: 0.82,
+    minTokenOverlap: 2,
+    overlapStopwords: [
+      '내가', '있어', '있는', '있다', '그게', '좋아', '특히', '중에', '같은',
+      '이미지', '이미지가', '감각', '느낌', '표현', '부분', '생각', '정도',
+      '이런', '저런', '그런', '어떤', '너무', '조금', '많이', '다른',
+      '아니면', '그냥', '나는', '비슷한', '않고', '것도', '하고', '무겁게',
+      '하면', '해서', '하고', '라고', '부터', '까지', '보다', '처럼',
+      '좋은', '싫은', '괜찮은', '어울리는', '나중에', '이번에', '전에',
+    ],
+  },
+};
+
+function loadCodexPolicy() {
+  try {
+    if (!fsSync.existsSync(CODEX_POLICY_PATH)) return DEFAULT_CODEX_POLICY;
+    const parsed = JSON.parse(fsSync.readFileSync(CODEX_POLICY_PATH, 'utf8'));
+    return mergePolicyDefaults(DEFAULT_CODEX_POLICY, parsed);
+  } catch (err) {
+    console.warn(`⚠️ Codex policy 파일을 읽지 못해 기본값을 사용합니다: ${err.message}`);
+    return DEFAULT_CODEX_POLICY;
+  }
+}
+
+const CODEX_POLICY = loadCodexPolicy();
+const AUTO_TOPIC_MIN_USER_CHARS = clampInteger(CODEX_POLICY.autoSave?.minUserChars, 20, 0, 500);
+const AUTO_TOPIC_MIN_ASSISTANT_CHARS = clampInteger(CODEX_POLICY.autoSave?.minAssistantChars, 120, 0, 2000);
+const TOPIC_MATCH_THRESHOLD = clampNumber(CODEX_POLICY.topicMatch?.threshold, 0.48, 0, 1);
+const TOPIC_MATCH_SOFT_THRESHOLD = clampNumber(CODEX_POLICY.topicMatch?.softThreshold, 0.38, 0, TOPIC_MATCH_THRESHOLD);
+const TOPIC_MATCH_MIN_TOKEN_OVERLAP = clampInteger(CODEX_POLICY.topicMatch?.minTokenOverlap, 1, 0, 20);
+const CODEX_AUTO_QUEUE_THRESHOLD = clampInteger(CODEX_POLICY.organize?.autoQueueThreshold, 5, 1, 100);
+const MAX_ACTIVE_NOTES = clampInteger(CODEX_POLICY.retrieval?.maxActiveNotes, 8, 1, 30);
+const MAX_NOTE_CONTEXT_CHARS = clampInteger(CODEX_POLICY.retrieval?.maxNoteContextChars, 5000, 500, 30000);
+const SEARCH_KEYWORD_WEIGHT_RAW = clampNumber(CODEX_POLICY.retrieval?.keywordWeight, 0.35, 0, 1);
+const SEARCH_EMBEDDING_WEIGHT_RAW = clampNumber(CODEX_POLICY.retrieval?.embeddingWeight, 0.65, 0, 1);
+const SEARCH_WEIGHT_TOTAL = SEARCH_KEYWORD_WEIGHT_RAW + SEARCH_EMBEDDING_WEIGHT_RAW;
+const SEARCH_KEYWORD_WEIGHT = SEARCH_WEIGHT_TOTAL > 0 ? SEARCH_KEYWORD_WEIGHT_RAW / SEARCH_WEIGHT_TOTAL : 0.35;
+const SEARCH_EMBEDDING_WEIGHT = SEARCH_WEIGHT_TOTAL > 0 ? SEARCH_EMBEDDING_WEIGHT_RAW / SEARCH_WEIGHT_TOTAL : 0.65;
+const SEARCH_KEYWORD_NORMALIZER = clampNumber(CODEX_POLICY.retrieval?.keywordNormalizer, 30, 1, 200);
+const SEARCH_MIN_EMBED_SCORE = clampNumber(CODEX_POLICY.retrieval?.minEmbeddingScore, 0.08, 0, 1);
+const SEARCH_MIN_KEYWORD_SCORE = clampNumber(CODEX_POLICY.retrieval?.minKeywordScore, 2, 0, 100);
+const CODEX_LINK_MAX_PER_NOTE = clampInteger(CODEX_POLICY.codexLinks?.maxLinksPerNote, 10, 0, 30);
+const CODEX_LINK_MIN_OVERLAP = clampInteger(CODEX_POLICY.codexLinks?.minOverlap, 2, 1, 10);
+const CODEX_LINK_MIN_SCORE = clampInteger(CODEX_POLICY.codexLinks?.minScore, 60, 1, 100);
+const CODEX_LINK_SCORE_BASE = clampInteger(CODEX_POLICY.codexLinks?.scoreBase, 45, 1, 100);
+const CODEX_LINK_SCORE_PER_OVERLAP = clampInteger(CODEX_POLICY.codexLinks?.scorePerOverlap, 15, 1, 50);
+const CODEX_LINK_MAX_SCORE = clampInteger(CODEX_POLICY.codexLinks?.maxScore, 95, 1, 100);
+const CODEX_LINK_INFERRED_MIN_SCORE = clampInteger(CODEX_POLICY.codexLinks?.inferredMinScore, 75, 1, 100);
+const MERGE_SIMILARITY_THRESHOLD = clampNumber(CODEX_POLICY.mergeCandidates?.similarityThreshold, 0.72, 0, 1);
+const MERGE_STRONG_SIMILARITY = clampNumber(CODEX_POLICY.mergeCandidates?.strongSimilarity, 0.82, MERGE_SIMILARITY_THRESHOLD, 1);
+const MERGE_SOFT_MIN_TOKEN_OVERLAP = clampInteger(CODEX_POLICY.mergeCandidates?.minTokenOverlap, 2, 0, 20);
+const MERGE_OVERLAP_STOP_WORDS = new Set(
+  Array.isArray(CODEX_POLICY.mergeCandidates?.overlapStopwords)
+    ? CODEX_POLICY.mergeCandidates.overlapStopwords
+        .map(word => String(word || '').trim())
+        .filter(Boolean)
+    : DEFAULT_CODEX_POLICY.mergeCandidates.overlapStopwords
+);
 const MAX_MEMORY_ITEMS = 20;
 const MAX_MEMORY_CHARS = 1200;
 const MEMORY_DIR = '_system';
 const MEMORY_FILE = 'memory.md';
 const GRAPH_REPORT_FILE = 'GRAPH_REPORT.md';
-const AUTO_TOPIC_MIN_USER_CHARS = parseInt(process.env.AUTO_TOPIC_MIN_USER_CHARS || '20', 10);
-const AUTO_TOPIC_MIN_ASSISTANT_CHARS = parseInt(process.env.AUTO_TOPIC_MIN_ASSISTANT_CHARS || '120', 10);
-const TOPIC_MATCH_THRESHOLD = Number.parseFloat(process.env.TOPIC_MATCH_THRESHOLD || '0.48');
-const TOPIC_MATCH_SOFT_THRESHOLD = Number.parseFloat(process.env.TOPIC_MATCH_SOFT_THRESHOLD || '0.38');
-const TOPIC_MATCH_MIN_TOKEN_OVERLAP = parseInt(process.env.TOPIC_MATCH_MIN_TOKEN_OVERLAP || '1', 10);
 const CODEX_BIN = process.env.CODEX_BIN || 'codex';
 const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.4-mini';
 const CODEX_DEEP_MODEL = process.env.CODEX_DEEP_MODEL || 'gpt-5.5';
 const CODEX_RUNNER_MODE = process.env.CODEX_RUNNER_MODE || 'codex';
 const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '180000');
-const CODEX_AUTO_QUEUE_THRESHOLD = Math.max(1, parseInt(process.env.CODEX_AUTO_QUEUE_THRESHOLD || '5', 10) || 5);
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'ai-council');
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;        // 하루 1회 기준
 const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000;       // 1시간마다 "24h 지났나" 확인
@@ -94,19 +220,38 @@ function safeTokenEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
+function getRequestToken(req) {
+  const authHeader = req.get('Authorization') || '';
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
+  return req.get('X-API-Token') || bearerToken;
+}
+
+function isLoopbackRequest(req) {
+  const addresses = [req.ip, req.socket?.remoteAddress]
+    .filter(Boolean)
+    .map(value => String(value));
+  return addresses.some(value => (
+    value === '127.0.0.1' ||
+    value === '::1' ||
+    value === '::ffff:127.0.0.1'
+  ));
+}
+
+function isTrustedLocalApiRequest(req) {
+  return !!API_TOKEN && isLoopbackRequest(req) && safeTokenEqual(getRequestToken(req), API_TOKEN);
+}
+
 function requireApiToken(req, res, next) {
   if (req.originalUrl === '/api/config') return next();
   if (!API_TOKEN) return next();
-  const authHeader = req.get('Authorization') || '';
-  const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
-  const token = req.get('X-API-Token') || bearerToken;
-  if (!safeTokenEqual(token, API_TOKEN)) return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
+  if (!safeTokenEqual(getRequestToken(req), API_TOKEN)) return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
   return next();
 }
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  skip: isTrustedLocalApiRequest,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
@@ -204,6 +349,17 @@ db.exec(`
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     UNIQUE(source_filename, target_filename, relation, created_by)
   );
+  CREATE TABLE IF NOT EXISTS notification_actions (
+    notification_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    source TEXT NOT NULL,
+    type TEXT NOT NULL,
+    note_filename TEXT,
+    target_filename TEXT,
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  );
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_notes_codex_status ON notes(codex_status, archived);
   CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
@@ -215,6 +371,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_note_edges_source ON note_edges(source_filename);
   CREATE INDEX IF NOT EXISTS idx_note_edges_target ON note_edges(target_filename);
   CREATE INDEX IF NOT EXISTS idx_note_edges_confidence ON note_edges(confidence, score);
+  CREATE INDEX IF NOT EXISTS idx_notification_actions_status ON notification_actions(status, updated_at);
 `);
 
 // 마이그레이션: notes embedding
@@ -230,6 +387,25 @@ if (!db.prepare('PRAGMA table_info(auto_save_decisions)').all().some(c => c.name
   db.exec('ALTER TABLE auto_save_decisions ADD COLUMN organize_queued INTEGER NOT NULL DEFAULT 0');
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_queue ON auto_save_decisions(organize_queued, decision, action)');
+
+const stmtGetNotificationAction = db.prepare(`
+  SELECT status FROM notification_actions WHERE notification_id = ? LIMIT 1
+`);
+const stmtUpsertNotificationAction = db.prepare(`
+  INSERT INTO notification_actions (
+    notification_id, status, source, type, note_filename, target_filename, text
+  ) VALUES (
+    @id, @status, @source, @type, @noteFilename, @targetFilename, @text
+  )
+  ON CONFLICT(notification_id) DO UPDATE SET
+    status = excluded.status,
+    source = excluded.source,
+    type = excluded.type,
+    note_filename = excluded.note_filename,
+    target_filename = excluded.target_filename,
+    text = excluded.text,
+    updated_at = strftime('%s','now')
+`);
 
 const stmtEnsureSession = db.prepare(`
   INSERT INTO sessions (id) VALUES (?)
@@ -331,7 +507,8 @@ const stmtGraphNoteCounts = db.prepare(`
   GROUP BY note_type
 `);
 const stmtGraphTopEdges = db.prepare(`
-  SELECT source_title AS sourceTitle, target_title AS targetTitle, relation,
+  SELECT source_title AS sourceTitle, target_title AS targetTitle,
+         source_filename AS sourceFilename, target_filename AS targetFilename, relation,
          score, confidence, reason, created_by AS createdBy
   FROM note_edges
   ORDER BY score DESC, updated_at DESC
@@ -352,7 +529,8 @@ const stmtGraphEdgeDegrees = db.prepare(`
   LIMIT ?
 `);
 const stmtGraphAmbiguousEdges = db.prepare(`
-  SELECT source_title AS sourceTitle, target_title AS targetTitle, score, reason
+  SELECT source_title AS sourceTitle, target_title AS targetTitle,
+         source_filename AS sourceFilename, target_filename AS targetFilename, score, reason
   FROM note_edges
   WHERE confidence = 'AMBIGUOUS'
   ORDER BY score DESC, updated_at DESC
@@ -454,12 +632,29 @@ const stmtGetArchivedNotes = db.prepare(`
   WHERE archived = 1
   ORDER BY updated_at DESC, id DESC
 `);
+const stmtListActiveNotesForVault = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
+  FROM notes
+  WHERE archived = 0
+  ORDER BY updated_at DESC, id DESC
+  LIMIT ?
+`);
+const stmtListAllNotesForVault = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
+  FROM notes
+  ORDER BY archived ASC, updated_at DESC, id DESC
+  LIMIT ?
+`);
 const stmtGetAllNoteFilenames = db.prepare('SELECT filename, title FROM notes');
 const stmtDeleteNote = db.prepare('DELETE FROM notes WHERE filename = ?');
 const stmtDeleteNoteChunksByNote = db.prepare('DELETE FROM note_chunks WHERE note_filename = ?');
 const stmtDeleteNoteEdgesByNote = db.prepare('DELETE FROM note_edges WHERE source_filename = ? OR target_filename = ?');
 const stmtReassignChunks = db.prepare('UPDATE note_chunks SET note_filename = ?, note_title = ?, updated_at = strftime(\'%s\',\'now\') WHERE note_filename = ?');
 const stmtReassignDecisions = db.prepare('UPDATE auto_save_decisions SET note_filename = ?, note_title = ? WHERE note_filename = ?');
+const stmtMoveChunkByQaId = db.prepare("UPDATE note_chunks SET note_filename = ?, note_title = ?, updated_at = strftime('%s','now') WHERE chunk_id = ?");
+const stmtMoveDecisionByQaId = db.prepare('UPDATE auto_save_decisions SET note_filename = ?, note_title = ? WHERE qa_id = ?');
 const stmtGetEdgesTouchingNote = db.prepare('SELECT source_filename AS sourceFilename, source_title AS sourceTitle, target_filename AS targetFilename, target_title AS targetTitle, relation, score, confidence, reason, created_by AS createdBy FROM note_edges WHERE source_filename = ? OR target_filename = ?');
 const stmtGetTopicNotes = db.prepare("SELECT filename, title FROM notes WHERE archived = 0 AND note_type = 'topic' ORDER BY updated_at DESC, id DESC");
 const stmtUpdateChunkNoteTitle = db.prepare(
@@ -667,13 +862,13 @@ function sanitizeTitle(title, fallback = '저장한 문서') {
   return cleaned || fallback || '';
 }
 
-function createNoteIdentity(title) {
+function createNoteIdentity() {
   const now    = new Date();
   const pad    = (n) => String(n).padStart(2, '0');
   const dateId = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const slug   = title.replace(/\s+/g, '-').replace(/[^\w가-힣\-]/g, '');
+  // 파일명은 ASCII만(날짜-코드) — 한글 슬러그 제거. 한글 NFC/NFD 불일치로 Obsidian 링크가 안 풀리는 문제 방지.
   const rand   = Math.random().toString(36).slice(2, 6);
-  const fileId = `${dateId}-${rand}-${slug || 'note'}`;
+  const fileId = `${dateId}-${rand}`;
   const createdStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
   return { fileId, createdStr };
 }
@@ -1247,7 +1442,7 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
     return { filename: existing.filename, title: finalTitle, action: 'appended' };
   }
 
-  const { fileId, createdStr } = createNoteIdentity(title);
+  const { fileId, createdStr } = createNoteIdentity();
   const noteContent = createTopicNoteContent({
     fileId,
     title,
@@ -1327,15 +1522,18 @@ function formatCodexLinks(links) {
   if (!Array.isArray(links) || links.length === 0) return '';
 
   const grouped = new Map();
-  links.slice(0, 10).forEach(link => {
+  links.slice(0, CODEX_LINK_MAX_PER_NOTE).forEach(link => {
     const topic = String(link.topic || '관련 노트').replace(/\s+/g, ' ').trim().slice(0, 40);
     const title = String(link.title || '').replace(/[\[\]\n]/g, '').trim().slice(0, 80);
     if (!title) return;
     const reason = String(link.reason || '관련 내용').replace(/\s+/g, ' ').trim().slice(0, 100);
     const rawScore = Number.parseInt(link.score ?? link.strength, 10);
-    const score = Math.min(100, Math.max(60, Number.isFinite(rawScore) ? rawScore : 60));
+    const score = Math.min(100, Math.max(CODEX_LINK_MIN_SCORE, Number.isFinite(rawScore) ? rawScore : CODEX_LINK_MIN_SCORE));
     if (!grouped.has(topic)) grouped.set(topic, []);
-    grouped.get(topic).push(`- ${score} [[${title}]] — ${reason}`);
+    // Obsidian이 날짜접두사 파일명으로 정확히 풀도록 [[파일명|제목]] 형식 사용 (유령 노트 방지)
+    const fnBase = String(link.filename || '').replace(/\.md$/, '').replace(/[\[\]\n|]/g, '').trim();
+    const wiki = fnBase ? `[[${fnBase}|${title}]]` : `[[${title}]]`;
+    grouped.get(topic).push(`- ${score} ${wiki} — ${reason}`);
   });
 
   return [...grouped.entries()]
@@ -1345,7 +1543,7 @@ function formatCodexLinks(links) {
 
 function confidenceForEdgeScore(score, explicit = false) {
   if (explicit) return 'EXTRACTED';
-  if (score >= 75) return 'INFERRED';
+  if (score >= CODEX_LINK_INFERRED_MIN_SCORE) return 'INFERRED';
   return 'AMBIGUOUS';
 }
 
@@ -1393,6 +1591,10 @@ function saveCodexLinkEdges({ sourceFilename, sourceTitle, links }) {
   });
 }
 
+function codexLinkScore(overlapCount) {
+  return Math.min(CODEX_LINK_MAX_SCORE, CODEX_LINK_SCORE_BASE + (overlapCount * CODEX_LINK_SCORE_PER_OVERLAP));
+}
+
 async function filenameForNoteTitle(title) {
   const normalized = String(title || '').trim();
   if (!normalized) return null;
@@ -1417,8 +1619,17 @@ async function extractCodexLinkEdgesFromRaw({ sourceFilename, sourceTitle, raw }
     const match = line.trim().match(/^- (?:([1-9][0-9]?|100)\s+)?\[\[([^\]\n]+)\]\]\s+—\s+(.+)$/);
     if (!match) continue;
     const score = Number.parseInt(match[1] || '60', 10);
-    const title = match[2].trim();
-    const filename = await filenameForNoteTitle(title);
+    const inner = match[2].trim();
+    // [[파일명|제목]] 또는 [[제목]] 둘 다 지원
+    let title, filename;
+    if (inner.includes('|')) {
+      const fnPart = inner.slice(0, inner.indexOf('|')).trim();
+      title = inner.slice(inner.indexOf('|') + 1).trim();
+      filename = fnPart.endsWith('.md') ? fnPart : `${fnPart}.md`;
+    } else {
+      title = inner;
+      filename = await filenameForNoteTitle(title);
+    }
     if (!filename || filename === sourceFilename) continue;
     links.push({
       filename,
@@ -1506,6 +1717,14 @@ function formatReportRows(rows, formatter, emptyText = '- 없음') {
   return rows.map(formatter).join('\n');
 }
 
+// Obsidian이 ASCII 파일명으로 정확히 풀도록 [[파일명|제목]] 형식 (유령 노트 방지)
+function graphWikiLink(filename, title) {
+  const base = String(filename || '').replace(/\.md$/, '').trim();
+  const label = String(title || '').replace(/[\[\]\n|]/g, '').trim();
+  if (!base) return `[[${label}]]`;
+  return `[[${base}|${label}]]`;
+}
+
 function buildGraphReport() {
   const generatedAt = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
   const noteCounts = stmtGraphNoteCounts.all();
@@ -1530,19 +1749,19 @@ generated_at: ${generatedAt}
 - 가장 큰 topic QA 로그: ${topicChunkCounts[0] ? `${topicChunkCounts[0].title} (${topicChunkCounts[0].qaCount})` : '없음'}
 
 ## 중심 노트
-${formatReportRows(topNodes, row => `- ${row.degree} [[${row.title}]]`)}
+${formatReportRows(topNodes, row => `- ${row.degree} ${graphWikiLink(row.filename, row.title)}`)}
 
 ## 강한 연결
-${formatReportRows(topEdges, row => `- ${row.score} ${row.confidence} [[${row.sourceTitle}]] → [[${row.targetTitle}]] — ${row.reason}`)}
+${formatReportRows(topEdges, row => `- ${row.score} ${row.confidence} ${graphWikiLink(row.sourceFilename, row.sourceTitle)} → ${graphWikiLink(row.targetFilename, row.targetTitle)} — ${row.reason}`)}
 
 ## 검토 필요한 연결
-${formatReportRows(ambiguousEdges, row => `- ${row.score} [[${row.sourceTitle}]] → [[${row.targetTitle}]] — ${row.reason}`)}
+${formatReportRows(ambiguousEdges, row => `- ${row.score} ${graphWikiLink(row.sourceFilename, row.sourceTitle)} → ${graphWikiLink(row.targetFilename, row.targetTitle)} — ${row.reason}`)}
 
 ## 큰 토픽 후보
-${formatReportRows(topicChunkCounts, row => `- ${row.qaCount} [[${row.title}]]`)}
+${formatReportRows(topicChunkCounts, row => `- ${row.qaCount} ${graphWikiLink(row.filename, row.title)}`)}
 
 ## 고립 토픽
-${formatReportRows(isolatedTopics, row => `- [[${row.title}]]`)}
+${formatReportRows(isolatedTopics, row => `- ${graphWikiLink(row.filename, row.title)}`)}
 
 ## 자동 저장 판단 요약
 ${formatReportRows(autoSaveSummary, row => `- ${row.decision}/${row.reason}: ${row.count}`)}
@@ -1734,7 +1953,13 @@ app.post('/api/save-note', async (req, res) => {
 
 // ─── 프론트엔드가 활성 모델명 확인용 ────────────────────────────────────────
 
-app.get('/api/config', (_req, res) => {
+app.get('/api/config', (req, res) => {
+  if (API_TOKEN && !safeTokenEqual(getRequestToken(req), API_TOKEN)) {
+    return res.json({
+      requiresApiToken: true,
+    });
+  }
+
   res.json({
     claudeModel: CLAUDE_MODEL,
     claudeDeepModel: CLAUDE_DEEP_MODEL,
@@ -1911,13 +2136,29 @@ function setFrontmatterArchived(raw, archived) {
   return next;
 }
 
-function insertMergeArchiveNotice(raw, targetTitle) {
-  const title = String(targetTitle || '').trim();
+function formatVaultWikiLink(filename, title) {
+  const label = String(title || '').replace(/[\[\]\n|]/g, '').trim();
+  const base = String(filename || '').replace(/\.md$/, '').replace(/[\[\]\n|]/g, '').trim();
+  if (!base) return `[[${label}]]`;
+  return `[[${base}|${label}]]`;
+}
+
+function parseVaultWikiLinkInner(inner) {
+  const text = String(inner || '').trim();
+  if (!text) return { filename: null, title: '' };
+  if (!text.includes('|')) return { filename: null, title: text };
+  const base = text.slice(0, text.indexOf('|')).trim();
+  const title = text.slice(text.indexOf('|') + 1).trim();
+  return { filename: base ? `${base.replace(/\.md$/, '')}.md` : null, title };
+}
+
+function insertMergeArchiveNotice(raw, target) {
+  const title = String(target?.title || '').trim();
   if (!title) return raw;
 
   const notice = [
     '> [!note]',
-    `> 이 노트는 [[${title.replace(/\]/g, '')}]] 노트로 병합되어 보관되었다.`,
+    `> 이 노트는 ${formatVaultWikiLink(target?.filename, title)} 노트로 병합되어 보관되었다.`,
     '',
   ].join('\n');
 
@@ -1930,7 +2171,7 @@ function insertMergeArchiveNotice(raw, targetTitle) {
 
 function normalizeArchivedNote(raw, options = {}) {
   let next = setFrontmatterArchived(raw, true);
-  next = insertMergeArchiveNotice(next, options.mergedIntoTitle);
+  next = insertMergeArchiveNotice(next, { title: options.mergedIntoTitle, filename: options.mergedIntoFilename });
   if (hasMarkerBlock(next, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->')) {
     next = replaceMarkerBlock(next, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->', '');
   }
@@ -2097,6 +2338,58 @@ async function loadNoteForMerge(filename) {
   return { filename: safeName, raw, fm, title: parseNoteTitle(raw, safeName), noteType: fm.note_type || 'legacy' };
 }
 
+function qaEntryQuestion(entry) {
+  return String(entry || '').match(/\*\*Q:\*\*\s*([^\n]+)/)?.[1]?.trim() || '';
+}
+
+function qaEntryId(entry) {
+  return String(entry || '').match(/<!--\s*qa_id:\s*([^-\s][^>]*)-->/)?.[1]?.trim()
+    || String(entry || '').match(/<!--\s*qa_id:\s*([^>]+?)\s*-->/)?.[1]?.trim()
+    || null;
+}
+
+async function splitQaEntryIntoTopic({ sourceFilename, targetFilename, qaId }) {
+  const source = await loadNoteForMerge(sourceFilename);
+  if (source.noteType !== 'topic') throw new Error('토픽 노트만 분리할 수 있습니다.');
+  if (targetFilename === source.filename) throw new Error('같은 노트로는 분리할 수 없습니다.');
+
+  const target = stmtGetTopicNotes.all().find(note => note.filename === targetFilename);
+  if (!target) throw new Error(`대상 토픽을 찾을 수 없습니다: ${targetFilename}`);
+
+  const sourceQaLog = extractMarkerBody(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
+  const entries = splitQaLogEntries(sourceQaLog);
+  const entry = entries.find(item => qaEntryId(item) === qaId);
+  if (!entry) throw new Error(`분리할 QA 항목을 찾을 수 없습니다: ${qaId}`);
+
+  const remaining = entries.filter(item => item !== entry).join('\n\n');
+  let nextSource = replaceMarkerBlock(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->', remaining);
+  nextSource = replaceMarkerBlock(nextSource, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw: nextSource }));
+  nextSource = touchUpdatedFrontmatter(nextSource);
+
+  const targetRaw = await fs.readFile(path.join(VAULT_PATH, target.filename), 'utf8');
+  let nextTarget = appendQaLogEntry(targetRaw, entry);
+  if (!nextTarget) throw new Error(`${target.filename}에 QA-LOG 마커가 없습니다.`);
+  nextTarget = refreshTopicSummary(nextTarget, target.title);
+  nextTarget = touchUpdatedFrontmatter(nextTarget);
+
+  await writeVaultNoteByFilename(source.filename, nextSource);
+  await writeVaultNoteByFilename(target.filename, nextTarget);
+  if (qaId) {
+    stmtMoveChunkByQaId.run(target.filename, target.title, qaId);
+    stmtMoveDecisionByQaId.run(target.filename, target.title, qaId);
+  }
+  stmtUpdateNoteCodexStatus.run('pending', source.filename);
+  stmtUpdateNoteCodexStatus.run('pending', target.filename);
+
+  return {
+    source: source.filename,
+    target: target.filename,
+    title: target.title,
+    qaId,
+    moved: qaEntryQuestion(entry),
+  };
+}
+
 // source의 DB 참조(chunks/decisions/edges)를 target으로 재지정. edge는 자기루프 제거 + upsert dedup.
 const reassignNoteReferences = db.transaction((fromFilename, toFilename, toTitle) => {
   stmtReassignChunks.run(toFilename, toTitle, fromFilename);
@@ -2124,7 +2417,9 @@ function stripCodexLinksToTitles(raw, titles) {
   const kept = block.split('\n').filter(line => {
     const trimmed = line.trim();
     const link = trimmed.match(/\[\[([^\]\n]+)\]\]/);
-    return !(trimmed.startsWith('- ') && link && titleSet.has(link[1].trim()));
+    const inner = link ? link[1].trim() : '';
+    const linkTitle = inner.includes('|') ? inner.slice(inner.indexOf('|') + 1).trim() : inner;
+    return !(trimmed.startsWith('- ') && link && titleSet.has(linkTitle));
   });
 
   // 링크가 사라져 비게 된 그룹 헤더(**[...]**) 제거
@@ -2143,6 +2438,45 @@ function stripCodexLinksToTitles(raw, titles) {
 
 function getArchivedNoteTitles() {
   return stmtGetArchivedNotes.all().map(note => note.title);
+}
+
+// vault 루트 노트의 제목 → 파일명 맵 (1회 스캔)
+async function buildTitleToFilenameMap() {
+  const map = new Map();
+  let files;
+  try { files = await fs.readdir(VAULT_PATH); } catch { return map; }
+  for (const f of files.filter(name => name.endsWith('.md'))) {
+    try {
+      const raw = await fs.readFile(path.join(VAULT_PATH, f), 'utf8');
+      const title = parseNoteTitle(raw, f);
+      if (title) map.set(title, f);
+    } catch { /* skip */ }
+  }
+  return map;
+}
+
+// Codex가 쓴 CODEX-LINKS의 [[제목]]을 [[파일명|제목]]으로 변환 (Obsidian 유령 노트 방지)
+async function convertNoteLinksToFilenames(filename, titleMap) {
+  const safeName = assertSafeNoteFilename(filename);
+  const filepath = path.join(VAULT_PATH, safeName);
+  let raw;
+  try { raw = await fs.readFile(filepath, 'utf8'); } catch { return false; }
+  if (!hasMarkerBlock(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->')) return false;
+
+  const block = extractMarkerBody(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->');
+  let changed = false;
+  const newBlock = block.replace(/\[\[([^\]\n|]+)\]\]/g, (m, x) => {
+    const fn = titleMap.get(x.trim());
+    if (!fn) return m; // 못 찾으면 그대로 (Codex는 실제 노트만 링크)
+    changed = true;
+    return `[[${fn.replace(/\.md$/, '')}|${x.trim()}]]`;
+  });
+  if (!changed) return false;
+
+  const next = replaceMarkerBlock(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', newBlock.trim());
+  if (next === raw) return false;
+  await writeVaultNoteByFilename(safeName, next);
+  return true;
 }
 
 async function stripArchivedLinksFromNoteFile(filename) {
@@ -2209,7 +2543,7 @@ async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle 
     resultTitle = sanitizeTitle(newTitle, null)
       || await generateTopicTitle(sources[0].title, folded[0]?.answer || sources[0].title).catch(() => makeTopicTitle(sources[0].title))
       || makeTopicTitle(sources[0].title);
-    const { fileId, createdStr } = createNoteIdentity(resultTitle);
+    const { fileId, createdStr } = createNoteIdentity();
     resultFilename = fileId + '.md';
     const content = createTopicNoteContent({ fileId, title: resultTitle, createdStr, qaEntry: folded.map(f => f.text).join('\n\n'), sessionId: 'merge', messageId: 'merge' });
     await saveVaultNoteRecord({ fileId, title: resultTitle, noteType: 'topic', noteContent: content, codexStatus: 'pending' });
@@ -2222,14 +2556,34 @@ async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle 
 
   const archived = [];
   for (const src of sources) {
-    try { await moveNoteArchived(src.filename, true, { mergedIntoTitle: resultTitle }); archived.push(src.filename); }
+    try { await moveNoteArchived(src.filename, true, { mergedIntoTitle: resultTitle, mergedIntoFilename: resultFilename }); archived.push(src.filename); }
     catch (err) { console.warn(`병합 후 보관 실패 (${src.filename}):`, err.message); }
   }
 
   return { target: resultFilename, title: resultTitle, createdNew, absorbed: sources.map(s => s.filename), archived, entries: folded.length };
 }
 
-async function findMergeCandidates(threshold = 0.6, limit = 12) {
+async function buildMergeCandidateProfile(topic) {
+  let raw = '';
+  try {
+    raw = await fs.readFile(path.join(VAULT_PATH, topic.filename), 'utf8');
+  } catch { /* DB에만 있고 파일이 없으면 제목 토큰만 사용 */ }
+
+  return {
+    ...topic,
+    tokens: noteTokenize([topic.title, getCodexSignalText(raw).slice(0, 2500)].join(' ')),
+  };
+}
+
+function mergeTokenOverlap(aTokens, bTokens) {
+  const bSet = new Set(bTokens || []);
+  return (aTokens || [])
+    .filter(token => token.length >= 2)
+    .filter(token => !MERGE_OVERLAP_STOP_WORDS.has(token))
+    .filter(token => bSet.has(token));
+}
+
+async function findMergeCandidates(threshold = MERGE_SIMILARITY_THRESHOLD, limit = 12) {
   const pairKey = (x, y) => [x, y].sort().join('||');
   const byPair = new Map();
 
@@ -2237,21 +2591,33 @@ async function findMergeCandidates(threshold = 0.6, limit = 12) {
   const embTopics = stmtGetTopicNotesWithEmbedding.all()
     .map(t => { try { return { filename: t.filename, title: t.title, vec: JSON.parse(t.embedding) }; } catch { return null; } })
     .filter(Boolean);
+  const profiles = new Map();
+  for (const topic of embTopics) {
+    profiles.set(topic.filename, await buildMergeCandidateProfile(topic));
+  }
   for (let i = 0; i < embTopics.length; i++) {
     for (let j = i + 1; j < embTopics.length; j++) {
       const sim = cosineSimilarity(embTopics[i].vec, embTopics[j].vec);
       if (sim < threshold) continue;
+      const aProfile = profiles.get(embTopics[i].filename);
+      const bProfile = profiles.get(embTopics[j].filename);
+      const overlap = mergeTokenOverlap(aProfile?.tokens, bProfile?.tokens);
+      if (sim < MERGE_STRONG_SIMILARITY && overlap.length < MERGE_SOFT_MIN_TOKEN_OVERLAP) continue;
+
       byPair.set(pairKey(embTopics[i].filename, embTopics[j].filename), {
         a: { filename: embTopics[i].filename, title: embTopics[i].title },
         b: { filename: embTopics[j].filename, title: embTopics[j].title },
         sim: Math.round(sim * 100) / 100,
+        overlap: overlap.slice(0, 8),
         sources: ['similarity'],
       });
     }
   }
 
-  // 2) Codex 제안: 각 토픽의 CODEX-PROPOSALS에서 "- MERGE [[제목]] — 이유" 라인 파싱
-  const titleToFile = new Map(stmtGetAllNoteFilenames.all().map(n => [n.title, n.filename]));
+  // 2) Codex 제안: 각 토픽의 CODEX-PROPOSALS에서 "- MERGE [[파일ID|제목]] — 이유" 라인 파싱
+  const allNotes = stmtGetAllNoteFilenames.all();
+  const titleToFile = new Map(allNotes.map(n => [n.title, n.filename]));
+  const fileToTitle = new Map(allNotes.map(n => [n.filename, n.title]));
   for (const topic of stmtGetTopicNotes.all()) {
     let raw;
     try { raw = await fs.readFile(path.join(VAULT_PATH, topic.filename), 'utf8'); } catch { continue; }
@@ -2260,9 +2626,11 @@ async function findMergeCandidates(threshold = 0.6, limit = 12) {
     for (const line of block.split('\n')) {
       const m = line.trim().match(/^-\s*MERGE\s+\[\[([^\]\n]+)\]\]\s*(?:—\s*(.+))?$/i);
       if (!m) continue;
-      const otherTitle = m[1].trim();
-      const otherFile = titleToFile.get(otherTitle) || await filenameForNoteTitle(otherTitle);
+      const parsed = parseVaultWikiLinkInner(m[1]);
+      const otherFile = parsed.filename || titleToFile.get(parsed.title) || await filenameForNoteTitle(parsed.title);
       if (!otherFile || otherFile === topic.filename) continue;
+      if (parsed.filename && !fileToTitle.has(parsed.filename)) continue;
+      const otherTitle = parsed.title || fileToTitle.get(otherFile);
       const reason = (m[2] || '').trim().slice(0, 200);
       const key = pairKey(topic.filename, otherFile);
       const existing = byPair.get(key);
@@ -2293,6 +2661,264 @@ async function findMergeCandidates(threshold = 0.6, limit = 12) {
 
 app.get('/api/topics', (_req, res) => {
   res.json({ topics: stmtGetTopicNotes.all() });
+});
+
+function notificationTitleForProposal(type) {
+  if (type === 'merge') return '병합 제안';
+  if (type === 'split') return '분리 검토';
+  if (type === 'policy') return '정책 조정 제안';
+  return '검토 제안';
+}
+
+function classifyCodexProposal(line) {
+  const text = String(line || '').trim();
+  if (/^-\s*MERGE\s+\[\[/i.test(text)) return 'merge';
+  if (/split|분열|분리|나누/i.test(text)) return 'split';
+  if (/policy|정책|기준|threshold|가중치|stopword|불용어|기능어/i.test(text)) return 'policy';
+  return 'review';
+}
+
+function parseCodexProposalLine(line) {
+  const text = String(line || '').trim();
+  if (!text || !text.startsWith('- ')) return null;
+
+  const policy = parsePolicyProposalLine(text);
+  if (policy) return policy;
+
+  const merge = text.match(/^-\s*MERGE\s+\[\[([^\]\n]+)\]\]\s*(?:—\s*(.+))?$/i);
+  if (merge) {
+    const parsed = parseVaultWikiLinkInner(merge[1]);
+    return {
+      type: 'merge',
+      text,
+      targetFilename: parsed.filename,
+      targetTitle: parsed.title,
+      reason: (merge[2] || '').trim(),
+    };
+  }
+
+  const split = text.match(/^-\s*SPLIT\s+(\S+)\s*(?:→|->)\s*\[\[([^\]\n]+)\]\]\s*(?:—\s*(.+))?$/i);
+  if (split) {
+    const parsed = parseVaultWikiLinkInner(split[2]);
+    return {
+      type: 'split',
+      text,
+      qaId: split[1].trim(),
+      targetFilename: parsed.filename,
+      targetTitle: parsed.title,
+      reason: (split[3] || '').trim(),
+    };
+  }
+
+  return {
+    type: classifyCodexProposal(text),
+    text: text.replace(/^-\s*/, ''),
+  };
+}
+
+function parsePolicyProposalLine(text) {
+  const match = String(text || '').trim().match(/^-\s*POLICY\s+({[\s\S]*})\s*(?:—\s*(.+))?$/i);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    const changes = Array.isArray(parsed.changes)
+      ? parsed.changes
+      : [{ path: parsed.path, value: parsed.value }];
+    const cleanChanges = changes
+      .map(change => ({ path: String(change.path || '').trim(), value: change.value }))
+      .filter(change => change.path);
+    if (cleanChanges.length === 0) return null;
+    return {
+      type: 'policy',
+      text,
+      reason: (match[2] || '').trim(),
+      policyChanges: cleanChanges,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function listCodexProposalNotifications(limit = 50, options = {}) {
+  const notifications = [];
+  for (const note of stmtGetTopicNotes.all()) {
+    let raw;
+    try {
+      raw = await fs.readFile(path.join(VAULT_PATH, note.filename), 'utf8');
+    } catch {
+      continue;
+    }
+
+    const block = extractMarkerBody(raw, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->');
+    if (!block) continue;
+
+    for (const line of block.split('\n')) {
+      const proposal = parseCodexProposalLine(line);
+      if (!proposal) continue;
+      notifications.push({
+        id: crypto.createHash('sha1').update(`${note.filename}:${proposal.text}`).digest('hex').slice(0, 12),
+        source: 'codex',
+        type: proposal.type,
+        title: notificationTitleForProposal(proposal.type),
+        note: { filename: note.filename, title: note.title },
+        text: proposal.reason || proposal.text,
+        executable: proposal.type === 'merge'
+          || (proposal.type === 'split' && !!proposal.targetFilename && !!proposal.qaId)
+          || (proposal.type === 'policy' && Array.isArray(proposal.policyChanges) && proposal.policyChanges.length > 0),
+        target: proposal.targetTitle ? {
+          filename: proposal.targetFilename || null,
+          title: proposal.targetTitle,
+        } : null,
+        payload: {
+          ...(proposal.qaId ? { qaId: proposal.qaId } : {}),
+          ...(proposal.policyChanges ? { policyChanges: proposal.policyChanges } : {}),
+        },
+      });
+    }
+  }
+  return notifications
+    .filter(item => options.includeHandled || !stmtGetNotificationAction.get(item.id))
+    .slice(0, limit);
+}
+
+function recordNotificationAction(notification, status) {
+  stmtUpsertNotificationAction.run({
+    id: notification.id,
+    status,
+    source: notification.source || 'system',
+    type: notification.type || 'review',
+    noteFilename: notification.note?.filename || null,
+    targetFilename: notification.target?.filename || null,
+    text: notification.text || '',
+  });
+}
+
+async function findCurrentNotificationById(id) {
+  const notifications = await listCodexProposalNotifications(500, { includeHandled: true });
+  return notifications.find(item => item.id === id) || null;
+}
+
+function getPathValue(root, dottedPath) {
+  return String(dottedPath || '').split('.').reduce((acc, key) => (
+    acc && Object.prototype.hasOwnProperty.call(acc, key) ? acc[key] : undefined
+  ), root);
+}
+
+function setPathValue(root, dottedPath, value) {
+  const parts = String(dottedPath || '').split('.');
+  let cursor = root;
+  for (const part of parts.slice(0, -1)) {
+    if (!cursor[part] || typeof cursor[part] !== 'object' || Array.isArray(cursor[part])) {
+      cursor[part] = {};
+    }
+    cursor = cursor[part];
+  }
+  cursor[parts[parts.length - 1]] = value;
+}
+
+function validatePolicyChange(change) {
+  const policyPath = String(change?.path || '').trim();
+  if (!/^[A-Za-z0-9_.]+$/.test(policyPath)) throw new Error(`허용되지 않는 policy path: ${policyPath}`);
+  if (policyPath.split('.').some(part => ['__proto__', 'prototype', 'constructor'].includes(part))) {
+    throw new Error(`허용되지 않는 policy path: ${policyPath}`);
+  }
+  const defaultValue = getPathValue(DEFAULT_CODEX_POLICY, policyPath);
+  if (defaultValue === undefined || defaultValue !== null && typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
+    throw new Error(`수정할 수 없는 policy path: ${policyPath}`);
+  }
+
+  if (Array.isArray(defaultValue)) {
+    if (!Array.isArray(change.value) || !change.value.every(item => typeof item === 'string')) {
+      throw new Error(`${policyPath} 값은 문자열 배열이어야 합니다.`);
+    }
+    return { path: policyPath, value: change.value.map(item => item.trim()).filter(Boolean) };
+  }
+
+  if (typeof defaultValue === 'number') {
+    const numeric = Number(change.value);
+    if (!Number.isFinite(numeric)) throw new Error(`${policyPath} 값은 숫자여야 합니다.`);
+    return { path: policyPath, value: numeric };
+  }
+
+  if (typeof defaultValue === 'boolean') {
+    if (typeof change.value !== 'boolean') throw new Error(`${policyPath} 값은 boolean이어야 합니다.`);
+    return { path: policyPath, value: change.value };
+  }
+
+  if (typeof defaultValue === 'string') {
+    return { path: policyPath, value: String(change.value || '').trim() };
+  }
+
+  throw new Error(`지원하지 않는 policy value type: ${policyPath}`);
+}
+
+async function applyCodexPolicyChanges(changes) {
+  const validated = changes.map(validatePolicyChange);
+  const currentRaw = await fs.readFile(CODEX_POLICY_PATH, 'utf8').catch(() => '{}');
+  const current = mergePolicyDefaults(DEFAULT_CODEX_POLICY, JSON.parse(currentRaw || '{}'));
+  validated.forEach(change => setPathValue(current, change.path, change.value));
+  await fs.writeFile(CODEX_POLICY_PATH, `${JSON.stringify(current, null, 2)}\n`, 'utf8');
+  return {
+    filename: path.relative(__dirname, CODEX_POLICY_PATH),
+    changes: validated,
+    requiresRestart: true,
+  };
+}
+
+app.get('/api/notifications', async (_req, res) => {
+  try {
+    const notifications = await listCodexProposalNotifications();
+    res.json({ success: true, count: notifications.length, notifications });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/notifications/:id/ignore', async (req, res) => {
+  try {
+    const notification = await findCurrentNotificationById(req.params.id);
+    if (!notification) return res.status(404).json({ error: '알림을 찾을 수 없습니다.' });
+    recordNotificationAction(notification, 'ignored');
+    res.json({ success: true, status: 'ignored' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/notifications/:id/approve', async (req, res) => {
+  try {
+    const notification = await findCurrentNotificationById(req.params.id);
+    if (!notification) return res.status(404).json({ error: '알림을 찾을 수 없습니다.' });
+
+    let result = null;
+    if (notification.type === 'merge') {
+      const sourceFilename = notification.note?.filename;
+      const targetFilename = notification.target?.filename;
+      if (!sourceFilename || !targetFilename) {
+        return res.status(400).json({ error: '병합 대상 파일 정보가 부족합니다.' });
+      }
+      result = await mergeNotesIntoTopic({ filenames: [sourceFilename], targetFilename });
+    } else if (notification.type === 'split') {
+      const sourceFilename = notification.note?.filename;
+      const targetFilename = notification.target?.filename;
+      const qaId = notification.payload?.qaId;
+      if (!sourceFilename || !targetFilename || !qaId) {
+        return res.status(400).json({ error: '분리 대상 정보가 부족합니다.' });
+      }
+      result = await splitQaEntryIntoTopic({ sourceFilename, targetFilename, qaId });
+    } else if (notification.type === 'policy') {
+      const changes = notification.payload?.policyChanges;
+      if (!Array.isArray(changes) || changes.length === 0) {
+        return res.status(400).json({ error: '정책 변경 정보가 부족합니다.' });
+      }
+      result = await applyCodexPolicyChanges(changes);
+    }
+
+    recordNotificationAction(notification, 'approved');
+    res.json({ success: true, status: 'approved', action: notification.type, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/notes/merge-candidates', async (_req, res) => {
@@ -2418,8 +3044,107 @@ app.post('/api/graph/report', async (_req, res) => {
   }
 });
 
+async function runSystemAudit() {
+  const statusCounts = {
+    pending: 0,
+    queued: 0,
+    running: 0,
+    processed: 0,
+    failed: 0,
+    needsManualCheck: 0,
+  };
+  stmtGetNoteStatusCounts.all().forEach(row => {
+    if (row.codexStatus === 'needs_manual_check') statusCounts.needsManualCheck = row.count;
+    else if (Object.hasOwn(statusCounts, row.codexStatus)) statusCounts[row.codexStatus] = row.count;
+  });
+
+  let validation = { ok: true, message: 'Codex validation passed.' };
+  try {
+    await validateCodexEdit();
+  } catch (err) {
+    validation = { ok: false, message: err.message };
+  }
+
+  let policy = { ok: true, message: 'codex-policy.json parsed.' };
+  try {
+    JSON.parse(await fs.readFile(CODEX_POLICY_PATH, 'utf8'));
+  } catch (err) {
+    policy = { ok: false, message: err.message };
+  }
+
+  const notifications = await listCodexProposalNotifications(100);
+  const isolatedTopics = stmtGraphIsolatedTopics.all(10);
+  const ambiguousEdges = stmtGraphAmbiguousEdges.all(10);
+  const largeTopics = stmtGraphTopicChunkCounts.all(10).filter(row => row.qaCount >= 8);
+  const recentJobs = stmtGetRecentCodexJobs.all(5).map(({ noteFilenamesJson, ...job }) => ({
+    ...job,
+    noteFilenames: JSON.parse(noteFilenamesJson),
+  }));
+
+  const issues = [];
+  if (!validation.ok) issues.push({ level: 'error', label: 'vault validation', message: validation.message });
+  if (!policy.ok) issues.push({ level: 'error', label: 'policy', message: policy.message });
+  if (statusCounts.failed > 0) issues.push({ level: 'error', label: 'organize failed', message: `${statusCounts.failed}개 노트 실패` });
+  if (statusCounts.needsManualCheck > 0) issues.push({ level: 'warn', label: 'manual check', message: `${statusCounts.needsManualCheck}개 노트 수동 확인 필요` });
+  if (notifications.length > 0) issues.push({ level: 'info', label: 'notifications', message: `${notifications.length}개 알림 대기` });
+  if (isolatedTopics.length > 0) issues.push({ level: 'info', label: 'isolated topics', message: `${isolatedTopics.length}개 고립 토픽 후보` });
+  if (largeTopics.length > 0) issues.push({ level: 'info', label: 'large topics', message: `${largeTopics.length}개 큰 토픽 후보` });
+
+  return {
+    success: true,
+    ok: issues.every(issue => issue.level !== 'error'),
+    generatedAt: new Date().toISOString(),
+    validation,
+    policy,
+    statusCounts,
+    notifications: notifications.slice(0, 10),
+    isolatedTopics,
+    ambiguousEdges,
+    largeTopics,
+    recentJobs,
+    issues,
+  };
+}
+
+app.get('/api/audit', async (_req, res) => {
+  try {
+    res.json(await runSystemAudit());
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── 볼트 검색 ───────────────────────────────────────────────────────────────
 // 향후 벡터/임베딩 검색으로 교체 시 searchVault() 함수만 수정하면 됨
+
+app.get('/api/vault/notes', (req, res) => {
+  const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true';
+  const requestedLimit = Number.parseInt(req.query.limit || '50', 10);
+  const limit = Math.min(100, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50));
+  const notes = includeArchived
+    ? stmtListAllNotesForVault.all(limit)
+    : stmtListActiveNotesForVault.all(limit);
+  res.json({ success: true, notes });
+});
+
+app.get('/api/vault/note/:filename', async (req, res) => {
+  try {
+    const note = await readVaultNote(req.params.filename);
+    if (!note) return res.status(404).json({ error: '노트를 찾을 수 없습니다.' });
+    res.json({ success: true, note });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/vault/validate', async (_req, res) => {
+  try {
+    await validateCodexEdit();
+    res.json({ success: true, message: 'Codex validation passed.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 function stripFrontmatter(content) {
   return content.replace(/^---[\s\S]*?---\n?/, '').trim();
@@ -2578,18 +3303,21 @@ async function buildCodexLinks({ filename, title, raw }) {
         .slice(0, 5);
       return { candidate, overlap };
     })
-    .filter(result => result.overlap.length >= 2)
+    .filter(result => result.overlap.length >= CODEX_LINK_MIN_OVERLAP)
     .sort((a, b) => b.overlap.length - a.overlap.length)
-    .slice(0, 10)
-    .map(({ candidate, overlap }) => ({
-      topic: '관련 노트',
-      filename: candidate.filename,
-      title: candidate.title,
-      reason: `공통 키워드: ${overlap.join(', ')}`,
-      score: Math.min(95, 45 + (overlap.length * 15)),
-      confidence: confidenceForEdgeScore(Math.min(95, 45 + (overlap.length * 15)), false),
-      relation: 'related',
-    }));
+    .slice(0, CODEX_LINK_MAX_PER_NOTE)
+    .map(({ candidate, overlap }) => {
+      const score = codexLinkScore(overlap.length);
+      return {
+        topic: '관련 노트',
+        filename: candidate.filename,
+        title: candidate.title,
+        reason: `공통 키워드: ${overlap.join(', ')}`,
+        score,
+        confidence: confidenceForEdgeScore(score, false),
+        relation: 'related',
+      };
+    });
 }
 
 function findLastMarkerBlock(raw, startMarker, endMarker) {
@@ -2825,14 +3553,17 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 첫 문장은 제목을 반복 설명하지 말고, 이 토픽에서 사용자가 무엇을 고민/판단/축적하고 있는지 바로 쓴다.
 - 최근 항목만 요약하지 말고 QA-LOG 전체의 흐름, 선호, 결론 변화를 압축한다.
 - CODEX-PROPOSALS는 실행 명령이 아니라 사용자에게 보낼 제안만 적는다. 제안이 없으면 비워둔다.
-- 다른 토픽과 합치는 게 낫다고 판단되면 병합 제안을 정확히 이 형식의 줄로 쓴다: "- MERGE [[합칠 대상 노트 제목]] — 이유" (대상은 vault에 실제로 있는 노트 제목만, 자기 자신 금지). 이 줄은 /merge 후보로 자동 수집된다.
+- 다른 토픽과 합치는 게 낫다고 판단되면 병합 제안을 정확히 이 형식의 줄로 쓴다: "- MERGE [[파일ID|합칠 대상 노트 제목]] — 이유" (파일ID는 .md 확장자를 뺀 실제 vault 파일명, 대상은 vault에 실제로 있는 노트만, 자기 자신 금지). 이 줄은 /merge 후보로 자동 수집된다.
+- 정리 기준 변경이 필요하면 정책 제안을 정확히 이 형식의 줄로 쓴다: "- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유" 또는 "- POLICY {"changes":[{"path":"codexLinks.maxLinksPerNote","value":12},{"path":"codexLinks.minScore","value":55}]} — 이유".
+- POLICY path는 config/codex-policy.json 안의 leaf 값만 사용한다. 예: autoSave.minUserChars, topicMatch.threshold, organize.autoQueueThreshold, retrieval.keywordWeight, retrieval.embeddingWeight, codexLinks.maxLinksPerNote, mergeCandidates.similarityThreshold, mergeCandidates.overlapStopwords.
+- POLICY는 제안일 뿐이며 Clawd 승인 전까지 적용되지 않는다.
 - 태그는 #태그 형식으로 3~8개 작성한다.
 - 링크는 아래 형식을 정확히 따른다.
   **[주제명]**
-  - 85 [[노트 제목]] — 왜 연결되는지 짧은 이유
+  - 85 [[파일ID|노트 제목]] — 왜 연결되는지 짧은 이유
 - 링크 점수는 1~100 정수로, 반드시 wiki link 앞에 쓴다.
 - 기존 CODEX-LINKS 안에 별표 링크, 점수 없는 링크, 주제명 없는 링크가 있으면 모두 새 숫자 점수 형식으로 다시 쓴다.
-- CODEX-LINKS 안에는 "- [[노트 제목]]", "- ⭐ [[노트 제목]]" 같은 옛 형식을 절대 남기지 않는다.
+- CODEX-LINKS 안에는 "- [[노트 제목]]", "- ⭐ [[노트 제목]]" 같은 옛 형식이나 파일ID 없는 bare 링크를 절대 남기지 않는다.
 - archived: true 노트와 _archive 폴더 안의 노트는 링크 후보로 쓰지 않는다.
 - 이미 CODEX-LINKS에 archived 노트 링크가 있으면 제거한다.
 - 90~100: 같은 핵심 개념/프로젝트/문제의 직접 후속 또는 거의 같은 맥락.
@@ -2842,7 +3573,7 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 각 대상 노트당 링크는 최대 10개까지 작성한다.
 - 재정리 중 기존 링크보다 점수가 높거나 의미 연결성이 더 강한 후보를 찾으면, 낮은 점수의 기존 링크를 대체해 상위 10개만 남긴다.
 - 기존 링크와 새 후보가 같은 노트를 가리키면 더 정확한 점수와 이유로 갱신하되 중복으로 남기지 않는다.
-- 존재하지 않는 노트 제목을 만들지 말고, vault 안의 실제 노트 제목만 사용한다.
+- 존재하지 않는 파일ID/노트 제목을 만들지 말고, vault 안의 실제 파일명과 노트 제목만 사용한다.
 
 작업 후 최종 답변에는 처리한 파일명만 간단히 적어라.`;
 }
@@ -2903,6 +3634,8 @@ async function processCodexJobWithCodex(filenames, model = CODEX_MODEL) {
     await runCodexCliForJob(filenames, model);
     await assertCodexDiffAllowed(snapshots);
     await Promise.all(filenames.map(filename => stripArchivedLinksFromNoteFile(filename)));
+    const titleMap = await buildTitleToFilenameMap();
+    await Promise.all(filenames.map(filename => convertNoteLinksToFilenames(filename, titleMap)));
     await validateCodexEdit();
   } catch (err) {
     await restoreVaultSnapshots(snapshots);
@@ -3230,13 +3963,13 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
     // ── 하이브리드 최종 점수 ──
     let finalScore;
     if (embScore !== null) {
-      const normKw = Math.min(kwScore / 30, 1);
-      finalScore = 0.35 * normKw + 0.65 * embScore;
+      const normKw = Math.min(kwScore / SEARCH_KEYWORD_NORMALIZER, 1);
+      finalScore = SEARCH_KEYWORD_WEIGHT * normKw + SEARCH_EMBEDDING_WEIGHT * embScore;
     } else {
       finalScore = kwScore;
     }
 
-    const MIN_SCORE = embScore !== null ? 0.08 : 2;
+    const MIN_SCORE = embScore !== null ? SEARCH_MIN_EMBED_SCORE : SEARCH_MIN_KEYWORD_SCORE;
     if (finalScore < MIN_SCORE) continue;
 
     const hitIdx = terms.map(t => bodyLower.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0] ?? 0;
