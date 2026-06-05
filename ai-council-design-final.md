@@ -365,32 +365,49 @@
 
   ## 7. 명령어 체계
 
-  현재 명령:
+  현재 사용자 명령:
 
   /search
   /save
   /memory
-
-  다음 명령 후보:
-
+  /embed
   /organize
   /organize all
+  /archive
+  /archived
+  /backup
+  /sync
+  /merge
+  /notifications
   /graph report
   /audit
-  /challenge
-  /synthesize
-  /export
 
   의미:
 
   - /search: 관련 노트 찾기
   - /save: 사용자가 직접 저장 요청한 내용 노트화
   - /memory: 항상 참조할 사용자 규칙/선호 관리
+  - /embed: 모든 활성 노트의 임베딩 생성/갱신
   - /organize: Codex 정리 상태 확인
-  - /organize run: 내부/디버깅용. 현재 pending 노트 전체를 Codex 정리 큐로 생성하고 자동 실행 worker를 깨움
-  - /organize process: 내부/디버깅용. 대기 중인 Codex job 하나 처리
   - /organize all: 모든 활성 노트를 즉시 재정리. 기존 큐에 넣지 않고 별도 실행
+  - /archive: 검색어로 노트를 찾아 `_archive`로 보관
+  - /archived: 보관된 노트 목록과 복원
+  - /backup: 볼트+DB 수동 백업
+  - /sync: vault 직접 편집분을 DB에 동기화하고 삭제된 노트 참조 정리
+  - /merge: 유사 토픽/QUERY 기반 병합 후보 확인 및 승인 병합
+  - /notifications: Clawd 알림센터 열기. Codex 제안, split/merge/policy 승인/무시 처리
   - /graph report: DB 그래프와 자동 저장 판단 로그를 `_system/GRAPH_REPORT.md`로 요약
+  - /audit: 화면 표시상 "시스템 검사". validation, policy, 정리 상태, 알림, 고립/큰 토픽을 점검
+
+  내부/디버깅 API:
+
+  - /api/organize/queue: pending 노트를 Codex job queue에 넣고 worker를 깨움
+  - /api/organize/process: 대기 중인 Codex job 하나 처리
+  - /api/vault/validate: Codex validation 실행
+  - /api/notifications/:id/approve, /ignore: 알림 승인/무시
+
+  다음 명령 후보:
+
   - /challenge: 과거 노트를 근거로 현재 생각 반박
   - /synthesize: 여러 노트에서 패턴 추출
   - /export: 다른 AI에게 넘길 스냅샷 생성
@@ -529,17 +546,22 @@
 
 ### 현재 진행 상태 (구현)
 
-> 갱신: 2026-06-04. 단계 구분은 `roadmap.md`(V1~V7) 기준.
+> 갱신: 2026-06-05. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3 핵심 완료 → 라즈베리파이 이식 준비 단계.
+- **현재 단계:** V3 핵심 완료 + 라즈베리파이 이식 완료. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
-  - V3 — Codex 자동 정리 큐(5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
-- **배포 견고성(완료):** SQLite WAL 모드, SIGTERM graceful shutdown, systemd 유닛(`deploy/ai-council.service`)+런북 자동기동, 백업 복원 절차 문서, vault↔DB 동기화(`/sync` — 신규 등록 + 삭제 노트 prune), `.env` chmod.
-- **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안(기존) + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
-- **다음:** 라즈베리파이 배포 체크리스트 — better-sqlite3 네이티브 빌드(ARM), codex CLI 유무(없으면 `CODEX_RUNNER_MODE=heuristic`), `HOST=0.0.0.0` 시 `API_TOKEN` 설정, 모델명 유효성(`/api/config`). 이후 V4(음성 입력).
-- **보너스(미착수):** 백업 Git 자동 커밋, 그래프 edge에서 archived 노트 제외.
-- **최근 작업(2026-06-04):** 코드 리뷰 기반 수정 — 자동/수동 저장 QA 중복 제거, 질문 임베딩 3→1, 토픽 쓰기 직렬화, searchVault mtime 캐시, findBestTopicNote 상위 후보만 읽기; 견고성 — 0.0.0.0+빈 토큰 경고, 코사인 차원 가드, deep/codex 모델 문서화, API 토큰 timing-safe 비교; soft delete/_archive 구현; 백업 시스템 구현.
+  - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
+  - Pi 이식 — systemd 기반 상시 실행, API_TOKEN 기반 접근, SQLite WAL, `.env` 권한 관리, Tailscale 접속, Pi 기준 검증/재시작 흐름 정착.
+- **Codex/MCP(완료):** Pi의 Codex가 서버를 직접 다룰 수 있도록 ai-council MCP 서버(`scripts/ai-council-mcp.mjs`)와 `.codex/config.toml`을 구성했다. 읽기 도구(list/read/search/status/validate/merge candidates)와 승인 필요 도구(organize process, archive/restore)를 분리한다.
+- **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
+- **토픽 분리(완료):** Codex split 제안을 Clawd 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.
+- **알림센터(완료):** Clawd 메뉴와 `/notifications`로 PIP 알림센터를 연다. CODEX-PROPOSALS에서 merge/split/policy/review 제안을 읽어오고, 승인/무시 상태를 DB(`notification_actions`)에 저장한다. 창은 데스크톱에서 드래그 이동 가능하며 위치를 localStorage에 저장한다.
+- **정책 파일(완료):** `config/codex-policy.json`에 자동 저장, 토픽 매칭, organize, retrieval, Codex 링크, 병합 후보 가중치/임계값/불용어를 둔다. Codex가 수정 가능한 파일은 `.codex/editable-files.json`에 제한한다.
+- **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, Clawd 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
+- **그래프/검사(완료):** `/graph report`는 `_system/GRAPH_REPORT.md`를 생성/갱신한다. `/audit`은 화면 표시상 "시스템 검사"이며 Codex validation, policy 파일 파싱, 정리 상태, 알림, 고립 토픽, 큰 토픽, 최근 job을 요약한다.
+- **파일명/링크 안정화(완료):** 새 노트 파일명은 ASCII 날짜-시간-난수 형식으로 생성한다. Obsidian 링크는 `[[파일ID|표시 제목]]`을 기본으로 써서 유령 노트 생성을 막는다. validator는 CODEX-LINKS/MERGE/SPLIT 제안의 형식·bare wiki link를 거부한다.
+- **보류:** `/challenge`, `/synthesize`, `/export`는 검색/회수와 서재 관리가 더 안정화된 뒤 구현한다. 제한적 재정리(연결 0개, 최근 N일, 특정 주제/태그, 정책 변경 영향 노트)는 다음 관리 기능 후보로 둔다.
 - **작업 방식:** 실제 코드 수정 전에 무엇을·왜·영향·트레이드오프를 설명하고 컨펌받는다. (`git add -p`는 현재 환경에서 막혀 있어, 사용자의 미커밋 작업과 섞인 파일은 통째로 커밋하거나 분리 협의.)
 
 -----
@@ -1255,6 +1277,10 @@ Codex는 vault를 직접 읽고 쓸 수 있다. 단, 수정 허용 범위는 아
 - Codex는 정리 중 기준 변경이 필요하다고 판단하면 **제안**만 만든다.
 - 기준 변경 제안은 Clawd를 통해 사용자에게 요청/알림처럼 표시한다.
 - 사용자가 승인하기 전까지 서버의 실제 정리 기준은 바뀌지 않는다.
+- 조정 가능한 기준은 `config/codex-policy.json`에 둔다. Codex가 직접 수정할 수 있는 파일 목록은 `.codex/editable-files.json`으로 제한한다.
+- 실행 가능한 정책 제안은 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `- POLICY {"changes":[{"path":"codexLinks.maxLinksPerNote","value":12}]} — 이유` 형식만 허용한다.
+- Clawd 알림센터에서 사용자가 `정책 적용`을 승인하면 서버가 `config/codex-policy.json`만 수정한다. path는 policy 파일 안의 leaf 값만 허용하고, 위험한 JS prototype key는 거부한다.
+- 정책 파일은 서버 시작 시 읽히므로, 정책 적용 후 실제 런타임 반영은 서버 재시작 후 이루어진다.
 - 제안에는 최소한 아래 내용을 포함한다.
   - 바꾸고 싶은 기준
   - 바꾸려는 이유

@@ -68,6 +68,26 @@ function parseFrontmatter(raw) {
   return fields;
 }
 
+function collectVaultFileStems() {
+  return new Set(
+    fs.readdirSync(VAULT_PATH)
+      .filter(filename => filename.endsWith('.md'))
+      .map(filename => filename.replace(/\.md$/, ''))
+  );
+}
+
+function validateWikiLinkInner(inner, fileStems, context) {
+  const text = String(inner || '').trim();
+  if (!text.includes('|')) return `${context}: 파일ID 없는 bare wiki link`;
+
+  const fileId = text.slice(0, text.indexOf('|')).trim().replace(/\.md$/, '');
+  const title = text.slice(text.indexOf('|') + 1).trim();
+  if (!/^\d{8}-\d{6}-[a-z0-9]{4}$/.test(fileId)) return `${context}: 파일ID 형식 오류`;
+  if (!title) return `${context}: 표시 제목 누락`;
+  if (!fileStems.has(fileId)) return `${context}: 대상 파일 없음`;
+  return null;
+}
+
 function shouldSkipFile(filename) {
   return (
     !filename.endsWith('.md') ||
@@ -77,7 +97,7 @@ function shouldSkipFile(filename) {
   );
 }
 
-function validateFile(filename) {
+function validateFile(filename, fileStems) {
   const filepath = path.join(VAULT_PATH, filename);
   const raw = fs.readFileSync(filepath, 'utf8');
   const warnings = [];
@@ -131,8 +151,46 @@ function validateFile(filename) {
       if (!trimmed || trimmed.startsWith('**[') || trimmed.endsWith(']**')) return;
       if (!trimmed.startsWith('- ')) return;
 
-      if (!/^- (?:[1-9][0-9]?|100) \[\[[^\]\n]+\]\] — .+/.test(trimmed)) {
+      const match = trimmed.match(/^- (?:[1-9][0-9]?|100) \[\[([^\]\n]+)\]\] — .+/);
+      if (!match) {
         warnings.push(`CODEX 링크 형식 오류: ${index + 1}행`);
+        return;
+      }
+
+      const linkWarning = validateWikiLinkInner(match[1], fileStems, `CODEX 링크 ${index + 1}행`);
+      if (linkWarning) warnings.push(linkWarning);
+    });
+  }
+
+  const proposalsBlock = extractMarkerBlock(raw, '<!-- CODEX-PROPOSALS-START -->', '<!-- CODEX-PROPOSALS-END -->');
+  if (proposalsBlock) {
+    proposalsBlock.split('\n').forEach((line, index) => {
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('- MERGE ')) {
+        const match = trimmed.match(/^-\s*MERGE\s+\[\[([^\]\n]+)\]\]\s*(?:—\s*.+)?$/i);
+        if (!match) {
+          warnings.push(`MERGE 제안 형식 오류: ${index + 1}행`);
+          return;
+        }
+        const linkWarning = validateWikiLinkInner(match[1], fileStems, `MERGE 제안 ${index + 1}행`);
+        if (linkWarning) warnings.push(linkWarning);
+        return;
+      }
+
+      if (trimmed.startsWith('- SPLIT ')) {
+        const match = trimmed.match(/^-\s*SPLIT\s+(\S+)\s*(?:→|->)\s*\[\[([^\]\n]+)\]\]\s*(?:—\s*.+)?$/i);
+        if (!match) {
+          warnings.push(`SPLIT 제안 형식 오류: ${index + 1}행`);
+          return;
+        }
+        if (!/^qa-[a-f0-9-]+$/.test(match[1])) {
+          warnings.push(`SPLIT 제안 qa_id 형식 오류: ${index + 1}행`);
+          return;
+        }
+        const linkWarning = validateWikiLinkInner(match[2], fileStems, `SPLIT 제안 ${index + 1}행`);
+        if (linkWarning) warnings.push(linkWarning);
+        return;
       }
     });
   }
@@ -142,10 +200,11 @@ function validateFile(filename) {
 
 function main() {
   const files = fs.readdirSync(VAULT_PATH).filter(filename => !shouldSkipFile(filename));
+  const fileStems = collectVaultFileStems();
   const failures = [];
 
   files.forEach(filename => {
-    const warnings = validateFile(filename);
+    const warnings = validateFile(filename, fileStems);
     if (warnings.length > 0) failures.push({ filename, warnings });
   });
 
