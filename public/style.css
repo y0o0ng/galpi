@@ -504,6 +504,8 @@ html, body {
   box-shadow: var(--shadow-md);
 }
 
+[data-theme="dark"] .note-card { background: rgba(255, 255, 255, 0.04); }
+
 .note-card-inactive {
   opacity: 0.45;
   border-left-color: var(--border);
@@ -543,6 +545,94 @@ html, body {
 }
 
 .note-card-remove:disabled { opacity: 0.4; cursor: default; }
+
+/* ── 선택 병합 트레이 ───────────────────────────────────── */
+
+.note-card-check { accent-color: var(--gpt-color); cursor: pointer; margin-right: 6px; }
+
+.note-card-selected {
+  border-color: var(--gpt-color);
+  border-left-color: var(--gpt-color);
+  background: rgba(16, 163, 127, 0.08);
+}
+
+.merge-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 6px;
+  padding: 9px 12px;
+  background: var(--ai-bubble);
+  border: 1px solid var(--gpt-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  animation: merge-tray-in 0.2s var(--ease-out);
+}
+.merge-tray.is-hiding { animation: merge-tray-out 0.16s var(--ease-out) forwards; }
+
+@keyframes merge-tray-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes merge-tray-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+
+.merge-tray-count {
+  font-size: 12.5px;
+  color: var(--ai-text);
+  white-space: nowrap;
+}
+.merge-tray-count b { color: var(--gpt-color); font-weight: 700; }
+
+.merge-tray-field {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ai-text);
+}
+.merge-tray-title { flex: 1; min-width: 130px; }
+.merge-tray-field:focus-visible {
+  outline: 2px solid var(--gpt-color);
+  outline-offset: 1px;
+  border-color: var(--gpt-color);
+}
+
+.merge-tray-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.merge-btn {
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.merge-btn--primary { background: var(--gpt-color); color: #fff; }
+.merge-btn--primary:hover:not(:disabled) { opacity: 0.88; }
+.merge-btn--primary:disabled { opacity: 0.5; cursor: default; }
+.merge-btn--ghost {
+  background: transparent;
+  color: var(--label);
+  border-color: var(--border);
+}
+.merge-btn--ghost:hover { color: var(--ai-text); border-color: var(--ai-text); }
+.merge-btn:focus-visible { outline: 2px solid var(--gpt-color); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .merge-tray, .merge-tray.is-hiding { animation: none; }
+}
 
 /* ── 알림센터 PIP ─────────────────────────────────────── */
 

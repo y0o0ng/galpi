@@ -1252,14 +1252,6 @@ function renderSearchResults(results) {
   const header = document.createElement('div');
   header.className = 'search-header';
   header.textContent = `${results.length}개 발견 — 컨텍스트로 쓰거나, 체크해서 병합`;
-
-  const mergeSelBtn = document.createElement('button');
-  mergeSelBtn.className = 'note-card-remove';
-  mergeSelBtn.textContent = '선택 병합';
-  mergeSelBtn.style.marginLeft = '8px';
-  mergeSelBtn.addEventListener('click', () => openBatchMerge(wrap));
-  header.appendChild(mergeSelBtn);
-
   wrap.appendChild(header);
 
   results.forEach(note => {
@@ -1267,33 +1259,72 @@ function renderSearchResults(results) {
     wrap.appendChild(makeNoteCard(note));
   });
 
+  // 노트를 체크하는 순간 병합 트레이가 뜨고, 체크할 때마다 카운트 갱신 (이벤트 위임)
+  wrap.addEventListener('change', e => {
+    if (!e.target.classList.contains('note-card-check')) return;
+    e.target.closest('.note-card')?.classList.toggle('note-card-selected', e.target.checked);
+    updateMergeTray(wrap);
+  });
+  wrap.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const tray = wrap.querySelector('.merge-tray:not(.is-hiding)');
+    if (tray) clearTraySelection(wrap, tray);
+  });
+
   getMessages().appendChild(wrap);
   scrollDown();
   updateNotesBar();
 }
 
-// 검색 결과에서 체크한 노트들을 한 번에 병합 (새 토픽 제목 직접 입력 가능)
-async function openBatchMerge(wrap) {
-  const checked = [...wrap.querySelectorAll('.note-card-check:checked')].map(c => c.dataset.filename);
-  if (checked.length === 0) { showToast('병합할 노트를 체크해주세요'); return; }
-  if (wrap.querySelector('.batch-merge-config')) return; // 이미 열림
+// 체크된 노트 수에 따라 병합 트레이를 띄우거나(없으면 생성) 카운트만 갱신
+const checkedCount = wrap => wrap.querySelectorAll('.note-card-check:checked').length;
 
+async function updateMergeTray(wrap) {
+  let tray = wrap.querySelector('.merge-tray:not(.is-hiding)');
+
+  if (checkedCount(wrap) === 0) {
+    if (tray) closeMergeTray(tray);
+    return;
+  }
+
+  if (!tray) {
+    const built = await buildMergeTray(wrap); // 토픽 로드(async) 동안 상태가 바뀔 수 있음
+    if (checkedCount(wrap) === 0) return;     // 기다리는 사이 모두 해제됨
+    // 동시 호출이 먼저 트레이를 넣었으면 새로 만든 건 버림 (중복 방지)
+    tray = wrap.querySelector('.merge-tray:not(.is-hiding)');
+    if (!tray) { tray = built; wrap.querySelector('.search-header').after(tray); }
+  }
+  tray.querySelector('.merge-tray-count').innerHTML = `<b>${checkedCount(wrap)}개</b> 선택됨`;
+}
+
+function closeMergeTray(tray) {
+  tray.classList.add('is-hiding');
+  tray.addEventListener('animationend', () => tray.remove(), { once: true });
+  setTimeout(() => tray.remove(), 250); // reduced-motion 등 애니메이션 미발생 대비
+}
+
+// 검색 결과에서 체크한 노트들을 한 번에 병합하는 트레이 (target 토픽 선택 / 새 토픽 직접 입력)
+async function buildMergeTray(wrap) {
   let topics = [];
   try { topics = (await apiFetch('/api/topics').then(r => r.json())).topics || []; } catch (_) { /* 목록 없어도 새 토픽은 가능 */ }
 
-  const cfg = document.createElement('div');
-  cfg.className = 'batch-merge-config';
-  cfg.style.cssText = 'margin:8px 0;padding:10px;border:1px solid #4a6cf7;border-radius:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;';
+  const tray = document.createElement('div');
+  tray.className = 'merge-tray';
+  tray.setAttribute('role', 'group');
+  tray.setAttribute('aria-label', '선택한 노트 병합');
 
-  const info = document.createElement('span');
-  info.textContent = `${checked.length}개 병합 →`;
+  const count = document.createElement('span');
+  count.className = 'merge-tray-count';
+  count.setAttribute('aria-live', 'polite');
 
   const select = document.createElement('select');
+  select.className = 'merge-tray-field';
+  select.setAttribute('aria-label', '병합할 대상 토픽');
   const optNew = document.createElement('option');
   optNew.value = '__new__';
   optNew.textContent = '+ 새 토픽으로';
   select.appendChild(optNew);
-  topics.filter(t => !checked.includes(t.filename)).forEach(t => {
+  topics.forEach(t => {
     const o = document.createElement('option');
     o.value = t.filename;
     o.textContent = t.title;
@@ -1302,54 +1333,74 @@ async function openBatchMerge(wrap) {
 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
+  titleInput.className = 'merge-tray-field merge-tray-title';
   titleInput.placeholder = '새 토픽 제목 (비우면 자동)';
-  titleInput.style.cssText = 'padding:6px;border:1px solid #ccc;border-radius:6px;font-size:14px;';
-  const syncTitle = () => { titleInput.style.display = select.value === '__new__' ? '' : 'none'; };
+  titleInput.setAttribute('aria-label', '새 토픽 제목');
+  const syncTitle = () => { titleInput.hidden = select.value !== '__new__'; };
   select.addEventListener('change', syncTitle);
   syncTitle();
 
   const ok = document.createElement('button');
-  ok.className = 'note-card-remove';
+  ok.className = 'merge-btn merge-btn--primary';
   ok.textContent = '병합 실행';
-  ok.addEventListener('click', async () => {
-    ok.disabled = true;
-    ok.textContent = '병합 중…';
-    const targetFilename = select.value === '__new__' ? null : select.value;
-    const newTitle = select.value === '__new__' ? titleInput.value.trim() : null;
-    try {
-      const res = await apiFetch('/api/notes/merge', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ filenames: checked, targetFilename, newTitle }),
+  ok.addEventListener('click', () => runTrayMerge(wrap, tray, { select, titleInput, ok }));
+
+  const cancel = document.createElement('button');
+  cancel.className = 'merge-btn merge-btn--ghost';
+  cancel.textContent = '취소';
+  cancel.addEventListener('click', () => clearTraySelection(wrap, tray));
+
+  const actions = document.createElement('div');
+  actions.className = 'merge-tray-actions';
+  actions.append(cancel, ok);
+
+  tray.append(count, select, titleInput, actions);
+  return tray;
+}
+
+// 실행 시점에 선택 상태를 다시 읽어 병합 (트레이 열어둔 채 선택을 바꿔도 정확)
+async function runTrayMerge(wrap, tray, { select, titleInput, ok }) {
+  const filenames = [...wrap.querySelectorAll('.note-card-check:checked')].map(c => c.dataset.filename);
+  if (filenames.length === 0) { showToast('병합할 노트를 체크해주세요'); return; }
+
+  ok.disabled = true;
+  ok.textContent = '병합 중…';
+  const targetFilename = select.value === '__new__' ? null : select.value;
+  const newTitle = select.value === '__new__' ? titleInput.value.trim() : null;
+  try {
+    const res = await apiFetch('/api/notes/merge', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ filenames, targetFilename, newTitle }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.createdNew ? `새 토픽 "${data.title}"으로 ${filenames.length}개 병합` : `"${data.title}"에 ${filenames.length}개 병합`);
+      filenames.forEach(fn => {
+        wrap.querySelector(`.note-card[data-filename="${fn}"]`)?.remove();
+        removeActiveNote(fn);
       });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.createdNew ? `새 토픽 "${data.title}"으로 ${checked.length}개 병합` : `"${data.title}"에 ${checked.length}개 병합`);
-        checked.forEach(fn => {
-          const c = wrap.querySelector(`.note-card[data-filename="${fn}"]`);
-          if (c) c.remove();
-          removeActiveNote(fn);
-        });
-        cfg.remove();
-      } else {
-        showToast(`오류: ${data.error}`);
-        ok.disabled = false;
-        ok.textContent = '병합 실행';
-      }
-    } catch (_) {
-      showToast('서버 연결 오류');
+      tray.remove();
+      updateNotesBar();
+    } else {
+      showToast(`오류: ${data.error}`);
       ok.disabled = false;
       ok.textContent = '병합 실행';
     }
+  } catch (_) {
+    showToast('서버 연결 오류');
+    ok.disabled = false;
+    ok.textContent = '병합 실행';
+  }
+}
+
+// 취소: 선택 전부 해제 + 하이라이트 제거 + 트레이 닫기
+function clearTraySelection(wrap, tray) {
+  wrap.querySelectorAll('.note-card-check:checked').forEach(c => {
+    c.checked = false;
+    c.closest('.note-card')?.classList.remove('note-card-selected');
   });
-
-  const cancel = document.createElement('button');
-  cancel.className = 'note-card-remove';
-  cancel.textContent = '취소';
-  cancel.addEventListener('click', () => cfg.remove());
-
-  cfg.append(info, select, titleInput, ok, cancel);
-  wrap.querySelector('.search-header').after(cfg);
+  closeMergeTray(tray);
 }
 
 function makeNoteCard(note) {
@@ -1362,7 +1413,6 @@ function makeNoteCard(note) {
   checkbox.className = 'note-card-check';
   checkbox.dataset.filename = note.filename;
   checkbox.title = '병합 선택';
-  checkbox.style.marginRight = '6px';
 
   const title = document.createElement('div');
   title.className = 'note-card-title';
@@ -1808,7 +1858,7 @@ function renderAuditResult(data) {
 // ─── 토픽 병합 ────────────────────────────────────────────────────────────────
 
 async function mergeNoteFromCard(filename, card) {
-  if (card.querySelector('.merge-picker')) return; // 이미 열림
+  if (card.querySelector('.merge-tray')) return; // 이미 열림
 
   let topics = [];
   try {
@@ -1820,9 +1870,17 @@ async function mergeNoteFromCard(filename, card) {
   }
 
   const picker = document.createElement('div');
-  picker.className = 'merge-picker';
+  picker.className = 'merge-tray';
+  picker.setAttribute('role', 'group');
+  picker.setAttribute('aria-label', '이 노트를 병합');
+
+  const label = document.createElement('span');
+  label.className = 'merge-tray-count';
+  label.textContent = '이 노트를 병합';
 
   const select = document.createElement('select');
+  select.className = 'merge-tray-field';
+  select.setAttribute('aria-label', '병합할 대상 토픽');
   const optNew = document.createElement('option');
   optNew.value = '__new__';
   optNew.textContent = '+ 새 토픽으로';
@@ -1836,14 +1894,15 @@ async function mergeNoteFromCard(filename, card) {
 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
+  titleInput.className = 'merge-tray-field merge-tray-title';
   titleInput.placeholder = '새 토픽 제목 (비우면 자동)';
-  titleInput.style.cssText = 'padding:6px;border:1px solid #ccc;border-radius:6px;font-size:14px;';
-  const syncTitle = () => { titleInput.style.display = select.value === '__new__' ? '' : 'none'; };
+  titleInput.setAttribute('aria-label', '새 토픽 제목');
+  const syncTitle = () => { titleInput.hidden = select.value !== '__new__'; };
   select.addEventListener('change', syncTitle);
   syncTitle();
 
   const ok = document.createElement('button');
-  ok.className = 'note-card-remove';
+  ok.className = 'merge-btn merge-btn--primary';
   ok.textContent = '병합 실행';
   ok.addEventListener('click', async () => {
     ok.disabled = true;
@@ -1874,11 +1933,15 @@ async function mergeNoteFromCard(filename, card) {
   });
 
   const cancel = document.createElement('button');
-  cancel.className = 'note-card-remove';
+  cancel.className = 'merge-btn merge-btn--ghost';
   cancel.textContent = '취소';
   cancel.addEventListener('click', () => picker.remove());
 
-  picker.append(select, titleInput, ok, cancel);
+  const actions = document.createElement('div');
+  actions.className = 'merge-tray-actions';
+  actions.append(cancel, ok);
+
+  picker.append(label, select, titleInput, actions);
   card.appendChild(picker);
 }
 
