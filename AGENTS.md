@@ -75,8 +75,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## Project Context
 
   Before planning or editing in this repository, read:
-  - ai-council-design-final.md
-  - roadmap.md
+  - docs/ai-council-design-final.md
+  - docs/roadmap.md
+
+  Pi 운영·복구는 docs/RASPBERRY_PI_RUNBOOK.md 참조.
 
 
 
