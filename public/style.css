@@ -191,27 +191,23 @@ html, body {
   box-shadow: 0 2px 8px rgba(217, 119, 87, 0.35);
 }
 
-.model-btn[data-model="gpt"].active {
-  background: var(--gpt-color);
-  border-color: var(--gpt-color);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(16, 163, 127, 0.35);
-}
-
 .model-btn[data-model="claude"]:hover:not(.active) {
   border-color: var(--claude-color);
   color: var(--claude-color);
   background: rgba(217, 119, 87, 0.08);
 }
 
-.model-btn[data-model="gpt"]:hover:not(.active) {
-  border-color: var(--gpt-color);
-  color: var(--gpt-color);
-  background: rgba(16, 163, 127, 0.08);
-}
-
 .model-btn:active:not(:disabled) {
   transform: scale(0.95);
+}
+
+.model-chip {
+  cursor: default;
+  pointer-events: none;
+}
+
+.model-chip.disabled {
+  opacity: 0.4;
 }
 
 .council-btn {

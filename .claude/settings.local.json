@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "Bash(ssh *)"
     ]
   }
 }

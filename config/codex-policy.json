@@ -84,14 +84,14 @@
     ]
   },
   "webSearch": {
-    "enabled": false,
+    "enabled": true,
     "modelTool": true,
     "modelToolMaxQueryChars": 180,
     "provider": "tavily",
-    "maxResults": 5,
+    "maxResults": 3,
     "searchDepth": "basic",
     "cacheTtlSeconds": 900,
-    "maxSnippetChars": 800,
+    "maxSnippetChars": 400,
     "monthlyCreditSoftLimit": 800
   }
 }

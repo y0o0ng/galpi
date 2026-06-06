@@ -7,7 +7,6 @@ const uiHistoryKey = `councilUiHistory:${sessionId}`;
 const activeNotesKey = `councilActiveNotes:${sessionId}`;
 const apiTokenKey = 'councilApiToken';
 const notificationPositionKey = 'councilNotificationPosition';
-let currentModel     = 'claude';
 let isLoading        = false;
 let councilMode      = false;
 let councilAvailable = false;
@@ -92,31 +91,21 @@ function showTokenGate() {
 
 async function init() {
   showWelcome();
-  document.body.dataset.activeModel = currentModel;
+  document.body.dataset.activeModel = 'claude';
   document.querySelector('.council-mode-toggle').classList.add('disabled');
 
   try {
     const config = await apiFetch('/api/config').then(r => r.json());
     if (ensureApiToken(config)) return;
     document.getElementById('model-indicator').textContent =
-      `Claude: ${config.claudeModel}  |  GPT: ${config.gptModel}`;
+      `기본 Claude: ${config.claudeModel}  |  의회 GPT: ${config.gptModel}`;
     renderWebUsagePill(config.webSearch);
 
     if (!config.hasClaude) {
       const btn = document.querySelector('[data-model="claude"]');
-      btn.disabled = true;
+      btn.classList.add('disabled');
       btn.title = 'ANTHROPIC_API_KEY가 .env에 없습니다';
       btn.style.opacity = '0.4';
-      btn.style.cursor = 'not-allowed';
-      if (currentModel === 'claude') selectModel('gpt');
-    }
-    if (!config.hasGpt) {
-      const btn = document.querySelector('[data-model="gpt"]');
-      btn.disabled = true;
-      btn.title = 'OPENAI_API_KEY가 .env에 없습니다';
-      btn.style.opacity = '0.4';
-      btn.style.cursor = 'not-allowed';
-      if (currentModel === 'gpt') selectModel('claude');
     }
 
     const councilBtn = document.querySelector('.council-btn');
@@ -131,13 +120,6 @@ async function init() {
   } catch (_) {
     appendError('서버에 연결할 수 없습니다. node server.js가 실행 중인지 확인해주세요.');
   }
-
-  document.querySelectorAll('.model-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (councilMode) return;
-      selectModel(btn.dataset.model);
-    });
-  });
 
   // 의회 답변 방식 토글: 빠름(compressed) / 기본(full) / 심층(deep)
   document.querySelectorAll('.mode-opt').forEach(btn => {
@@ -324,7 +306,7 @@ function parseCouncilTranscript(content, model) {
 
   const SENTINEL = '응답 없음';
   const synthesisSection = sections.find(item => item.startsWith('## 종합'));
-  const synthesisMatch = synthesisSection?.match(/^## 종합 \(([^)]+)\)\n([\s\S]*)$/);
+  const synthesisMatch = synthesisSection?.match(/^## 종합(?: \(([^)]+)\))?\n([\s\S]*)$/);
   const question = getSection('질문');
   const claudeReplyRaw = getSection('Claude 1차 답변');
   const gptReplyRaw    = getSection('GPT 1차 답변');
@@ -344,7 +326,7 @@ function parseCouncilTranscript(content, model) {
     gptReview: getSection('GPT의 Claude 검토'),
     divergence: getSection('갈린 지점'),
     synthesis,
-    synthesizer: synthesisMatch ? synthesisMatch[1].trim() : modelText.replace(/\s*\(의회\)\s*$/, '') || 'AI',
+    synthesizer: synthesisMatch?.[1]?.trim() || '의회',
     synthesizerModelId: null,
     councilDraftMode: parsedMode || 'compressed',
   };
@@ -421,28 +403,12 @@ function saveActiveNotes() {
   localStorage.setItem(activeNotesKey, JSON.stringify(activeNotes));
 }
 
-// ─── 모델 선택 ────────────────────────────────────────────────────────────────
-
-function selectModel(model) {
-  currentModel = model;
-  document.querySelectorAll('.model-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.model === model);
-  });
-  document.body.dataset.activeModel = model;
-}
-
 function toggleCouncil() {
   if (!councilAvailable) return;
   councilMode = !councilMode;
   document.querySelector('.council-btn').classList.toggle('active', councilMode);
   document.querySelector('.council-mode-toggle').classList.toggle('disabled', !councilMode);
-  document.querySelectorAll('.model-btn').forEach(b => {
-    if (!b.disabled) {
-      b.style.opacity       = councilMode ? '0.4' : '';
-      b.style.pointerEvents = councilMode ? 'none' : '';
-    }
-  });
-  document.body.dataset.activeModel = councilMode ? 'council' : currentModel;
+  document.body.dataset.activeModel = councilMode ? 'council' : 'claude';
 }
 
 // ─── 메시지 전송 디스패처 ────────────────────────────────────────────────────
@@ -654,7 +620,7 @@ async function sendSingleMessage(options = {}) {
     const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, model: currentModel, sessionId, activeNotes, webSearch: !!options.webSearch }),
+      body:    JSON.stringify({ message: text, model: 'claude', sessionId, activeNotes, webSearch: !!options.webSearch }),
     });
     const data = await res.json();
     loadingEl.remove();
@@ -946,7 +912,7 @@ function renderSynthesis(body, question, debateData, reviewData, data) {
   body.querySelectorAll('.debate-answer, .review-answer').forEach(d => d.open = false);
 
   appendSynthesisSection(body, question, debateData, reviewData, data);
-  saveUiMessage('assistant', buildCouncilTranscript(question, debateData, reviewData, data), `종합 (${data.synthesizer})`);
+  saveUiMessage('assistant', buildCouncilTranscript(question, debateData, reviewData, data), '의회');
   scrollDown();
 }
 
@@ -970,7 +936,7 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
   // 종합
   const synthLabel = document.createElement('div');
   synthLabel.className = 'model-label synthesis-label';
-  synthLabel.textContent = `종합 (${data.synthesizer})`;
+  synthLabel.textContent = '종합';
 
   const synthBubble = document.createElement('div');
   synthBubble.className = 'bubble md synthesis-bubble';
@@ -990,7 +956,7 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
     gptReview:          reviewData.gptReview,
     divergence:         data.divergence,
     synthesis:          data.synthesis,
-    synthesizer:        data.synthesizer,
+    synthesizer:        '의회',
     synthesizerModelId: data.synthesizerModelId,
     messageId:          data.messageId,
     councilDraftMode:   noteDraftMode,
@@ -1015,7 +981,7 @@ function buildCouncilTranscript(question, debateData, reviewData, data) {
   }
 
   if (data.divergence) sections.push(`## 갈린 지점\n${data.divergence}`);
-  sections.push(`## 종합 (${data.synthesizer})\n${data.synthesis}`);
+  sections.push(`## 종합\n${data.synthesis}`);
   if (Array.isArray(debateData.webSources) && debateData.webSources.length > 0) {
     const sources = debateData.webSources
       .map((source, index) => `${index + 1}. ${source.title || source.url}\n${source.url}`)
@@ -2591,8 +2557,8 @@ function scrollDown() {
 function showWelcome() {
   getMessages().innerHTML = `
     <div class="welcome">
-      <p>안녕하세요!<br>질문을 입력하면 Claude 또는 GPT가 답해줍니다.</p>
-      <p style="margin-top:10px;font-size:12px;opacity:0.7">상단 버튼으로 모델을 선택하세요</p>
+      <p>안녕하세요!<br>기본 답변은 Claude가 맡습니다.</p>
+      <p style="margin-top:10px;font-size:12px;opacity:0.7">의회 모드에서는 GPT와 함께 비교합니다.</p>
     </div>`;
 }
 

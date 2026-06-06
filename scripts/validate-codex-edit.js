@@ -179,6 +179,8 @@ function validateFile(filename, fileStems) {
       }
 
       if (trimmed.startsWith('- SPLIT ')) {
+        if (!/^-\s*SPLIT\s+qa-/i.test(trimmed)) return;
+
         const match = trimmed.match(/^-\s*SPLIT\s+(\S+)\s*(?:→|->)\s*\[\[([^\]\n]+)\]\]\s*(?:—\s*.+)?$/i);
         if (!match) {
           warnings.push(`SPLIT 제안 형식 오류: ${index + 1}행`);
@@ -199,7 +201,12 @@ function validateFile(filename, fileStems) {
 }
 
 function main() {
-  const files = fs.readdirSync(VAULT_PATH).filter(filename => !shouldSkipFile(filename));
+  const requestedFiles = process.argv.slice(2)
+    .map(filename => path.basename(String(filename || '').trim()))
+    .filter(Boolean);
+  const files = requestedFiles.length > 0
+    ? requestedFiles.filter(filename => !shouldSkipFile(filename))
+    : fs.readdirSync(VAULT_PATH).filter(filename => !shouldSkipFile(filename));
   const fileStems = collectVaultFileStems();
   const failures = [];
 
