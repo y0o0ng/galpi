@@ -1283,44 +1283,6 @@ body[data-active-model="council"] #send-btn {
   align-items: flex-start;
 }
 
-.synthesizer-picker {
-  padding: 5px 4px 1px;
-}
-
-.picker-label {
-  font-size: 12px;
-  color: var(--label);
-  margin-bottom: 5px;
-}
-
-.picker-btns {
-  display: flex;
-  gap: 6px;
-}
-
-.synth-btn {
-  padding: 5px 12px;
-  border-radius: 20px;
-  border: 1.5px solid var(--council);
-  background: transparent;
-  color: var(--council);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: var(--font);
-}
-
-.synth-btn:hover:not(:disabled) {
-  background: var(--council);
-  color: #fff;
-}
-
-.synth-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
 .synthesis-section {
   display: flex;
   flex-direction: column;
