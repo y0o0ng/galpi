@@ -221,7 +221,7 @@ async function loadHistory() {
 // 다른 기기에서 온 새 메시지 자동 반영: 7초마다, 탭 보일 때만, 최신 메시지 ID가 바뀌었을 때만 다시 그림.
 async function pollForUpdates() {
   if (document.hidden || isLoading) return;
-  if (document.querySelector('.synthesizer-picker') || document.querySelector('.council-loading')) return;
+  if (document.querySelector('.council-loading')) return;
   try {
     const res = await apiFetch(`/api/sessions/${sessionId}`);
     if (!res.ok) return;
@@ -306,27 +306,26 @@ function parseCouncilTranscript(content, model) {
 
   const SENTINEL = '응답 없음';
   const synthesisSection = sections.find(item => item.startsWith('## 종합'));
-  const synthesisMatch = synthesisSection?.match(/^## 종합(?: \(([^)]+)\))?\n([\s\S]*)$/);
+  const synthesisMatch = synthesisSection?.match(/^## 종합\n([\s\S]*)$/);
   const question = getSection('질문');
-  const claudeReplyRaw = getSection('Claude 1차 답변');
-  const gptReplyRaw    = getSection('GPT 1차 답변');
-  const claudeReply = claudeReplyRaw === SENTINEL ? null : claudeReplyRaw;
-  const gptReply    = gptReplyRaw    === SENTINEL ? null : gptReplyRaw;
-  const synthesis = synthesisMatch ? synthesisMatch[2].trim() : null;
-  if (!question || !synthesis || (!claudeReply && !gptReply)) return null;
+  const claudeDraftRaw = getSection('Claude 초안');
+  const claudeDraft = claudeDraftRaw === SENTINEL ? null : claudeDraftRaw;
+  const gptCritiqueRaw = getSection('GPT 검증');
+  const gptCritique = gptCritiqueRaw === '검증 없음' ? null : gptCritiqueRaw;
+  const synthesis = synthesisMatch ? synthesisMatch[1].trim() : null;
+  if (!question || !synthesis || !claudeDraft) return null;
 
   const settingsRaw = getSection('의회 설정');
   const parsedMode = settingsRaw?.match(/draftMode: (.+)/)?.[1]?.trim() || null;
 
   return {
     question,
-    claudeReply,
-    gptReply,
-    claudeReview: getSection('Claude의 GPT 검토'),
-    gptReview: getSection('GPT의 Claude 검토'),
-    divergence: getSection('갈린 지점'),
+    claudeDraft,
+    gptCritique,
+    revisedDraft: getSection('Claude 수정 초안'),
+    gptCritique2: getSection('GPT 재검증'),
+    divergence: getSection('검증 반영'),
     synthesis,
-    synthesizer: synthesisMatch?.[1]?.trim() || '의회',
     synthesizerModelId: null,
     councilDraftMode: parsedMode || 'compressed',
   };
@@ -343,28 +342,28 @@ function renderRestoredCouncilMessage(data, messageId = null) {
   const body = document.createElement('div');
   body.className = 'council-body';
 
-  if (data.claudeReply) body.appendChild(makeDebateAnswer('Claude', data.claudeReply, false));
-  if (data.gptReply) body.appendChild(makeDebateAnswer('GPT', data.gptReply, false));
+  if (data.claudeDraft) body.appendChild(makeDebateAnswer('Claude 초안', data.claudeDraft, false));
+  if (data.gptCritique) body.appendChild(makeDebateAnswer('GPT 검증', data.gptCritique, false));
 
-  if (data.claudeReview || data.gptReview) {
+  if (data.revisedDraft || data.gptCritique2) {
     const reviews = document.createElement('div');
     reviews.className = 'reviews-section';
-    if (data.claudeReview) reviews.appendChild(makeReview('Claude의 GPT 검토', data.claudeReview));
-    if (data.gptReview) reviews.appendChild(makeReview('GPT의 Claude 검토', data.gptReview));
+    if (data.revisedDraft) reviews.appendChild(makeReview('Claude 수정 초안', data.revisedDraft));
+    if (data.gptCritique2) reviews.appendChild(makeReview('GPT 재검증', data.gptCritique2));
     body.appendChild(reviews);
   }
 
   appendSynthesisSection(body, data.question, {
-    claudeReply: data.claudeReply,
-    gptReply: data.gptReply,
+    claudeDraft: data.claudeDraft,
+    gptCritique: data.gptCritique,
     councilDraftMode: data.councilDraftMode,
+    webSources: [],
   }, {
-    claudeReview: data.claudeReview,
-    gptReview: data.gptReview,
+    revisedDraft: data.revisedDraft,
+    gptCritique2: data.gptCritique2,
   }, {
     divergence: data.divergence,
     synthesis: data.synthesis,
-    synthesizer: data.synthesizer,
     synthesizerModelId: data.synthesizerModelId,
     messageId,
   });
@@ -669,13 +668,13 @@ async function sendCouncilMessage(options = {}) {
   getMessages().appendChild(container);
 
   // 로딩 인디케이터
-  const loadingEl = createCouncilLoadingEl('1차 답변 생성 중…');
+  const loadingEl = createCouncilLoadingEl('Claude 초안·GPT 검증 생성 중…');
   body.appendChild(loadingEl);
   scrollDown();
   document.dispatchEvent(new Event('pet:building'));
 
   try {
-    // ── 1단계: 1차 답변 ────────────────────────────────────────────
+    // ── 1단계: Claude 초안 + GPT 비평 ──────────────────────────────
     const debateRes = await apiFetch('/api/council/debate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -692,11 +691,11 @@ async function sendCouncilMessage(options = {}) {
     renderInitialAnswers(body, loadingEl, debateData);
     if (Array.isArray(debateData.webSources) && debateData.webSources.length > 0) refreshWebUsagePill();
 
-    // ── 2단계: 상호 검토 (심층 모드 + 두 답변 모두 있을 때만) ────
-    let reviewData = { claudeReview: null, gptReview: null };
+    // ── 2단계: 심층 재비평 루프 (Claude 수정 → GPT 재비평) ─────────
+    let reviewData = { revisedDraft: null, gptCritique2: null };
 
-    if (councilDraftMode === 'deep' && debateData.claudeReply && debateData.gptReply) {
-      updateLoadingText(loadingEl, '상호 검토 중…');
+    if (councilDraftMode === 'deep' && debateData.claudeDraft && debateData.gptCritique) {
+      updateLoadingText(loadingEl, '심층 재검증 중…');
 
       try {
         const reviewRes = await apiFetch('/api/council/review', {
@@ -704,24 +703,26 @@ async function sendCouncilMessage(options = {}) {
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
             question: text,
-            claudeReply: debateData.claudeReply,
-            gptReply:    debateData.gptReply,
+            claudeDraft: debateData.claudeDraft,
+            gptCritique: debateData.gptCritique,
             councilDraftMode,
             sessionId,
+            activeNotes,
+            webSources: debateData.webSources || [],
           }),
         });
         reviewData = await reviewRes.json();
         if (!reviewData.error) renderReviews(body, loadingEl, reviewData);
       } catch (_) {
-        // 검토 실패는 전체 실패로 만들지 않음
+        // 재비평 실패는 전체 실패로 만들지 않음
       }
     }
 
     loadingEl.remove();
 
-    // ── 3단계: 종합자 선택 ─────────────────────────────────────────
-    if (debateData.claudeReply && debateData.gptReply) {
-      renderPicker(container, body, text, debateData, reviewData);
+    // ── 3단계: Claude 최종 (종합자 고정 — 선택 없음) ───────────────
+    if (debateData.claudeDraft) {
+      await finalizeCouncil(container, body, text, debateData, reviewData);
     }
     document.dispatchEvent(new Event('pet:happy'));
 
@@ -758,17 +759,31 @@ function updateLoadingText(loadingEl, msg) {
 function renderInitialAnswers(body, loadingEl, debateData) {
   const isCompressed = debateData.councilDraftMode !== 'full';
 
-  ['claude', 'gpt'].forEach(model => {
-    const reply = model === 'claude' ? debateData.claudeReply : debateData.gptReply;
-    const error = model === 'claude' ? debateData.claudeError : debateData.gptError;
-    const name  = model === 'claude' ? 'Claude' : 'GPT';
-    const el    = reply
-      ? makeDebateAnswer(name, reply, !isCompressed)
-      : makeDebateError(name, error);
-    body.insertBefore(el, loadingEl);
-  });
+  // Claude 초안 (앞무대)
+  const draftEl = debateData.claudeDraft
+    ? makeDebateAnswer('Claude 초안', debateData.claudeDraft, !isCompressed)
+    : makeDebateError('Claude 초안', debateData.claudeError);
+  body.insertBefore(draftEl, loadingEl);
+
+  // GPT 검증 (없으면 Claude 단독 강등 안내)
+  const critiqueEl = debateData.gptCritique
+    ? makeDebateAnswer('GPT 검증', debateData.gptCritique, false)
+    : makeDebateNote('GPT 검증', 'GPT 검증 없이 Claude 단독으로 진행합니다.');
+  body.insertBefore(critiqueEl, loadingEl);
 
   scrollDown();
+}
+
+function makeDebateNote(modelName, msg) {
+  const div = document.createElement('div');
+  div.className = 'debate-answer';
+  const label = makeModelLabel(modelName);
+  const note = document.createElement('div');
+  note.className = 'bubble md review-bubble';
+  note.style.opacity = '0.7';
+  note.textContent = msg;
+  div.append(label, note);
+  return div;
 }
 
 function makeDebateAnswer(modelName, reply, open = true) {
@@ -807,11 +822,11 @@ function renderReviews(body, loadingEl, reviewData) {
   const section = document.createElement('div');
   section.className = 'reviews-section';
 
-  if (reviewData.claudeReview) {
-    section.appendChild(makeReview('Claude의 GPT 검토', reviewData.claudeReview));
+  if (reviewData.revisedDraft) {
+    section.appendChild(makeReview('Claude 수정 초안', reviewData.revisedDraft));
   }
-  if (reviewData.gptReview) {
-    section.appendChild(makeReview('GPT의 Claude 검토', reviewData.gptReview));
+  if (reviewData.gptCritique2) {
+    section.appendChild(makeReview('GPT 재검증', reviewData.gptCritique2));
   }
 
   if (section.children.length > 0) {
@@ -837,45 +852,10 @@ function makeReview(label, review) {
   return details;
 }
 
-// ── 종합자 선택 ────────────────────────────────────────────────────────────
+// ── 최종 (Claude 고정, 선택 없음) ───────────────────────────────────────────
 
-function renderPicker(container, body, question, debateData, reviewData) {
-  const picker = document.createElement('div');
-  picker.className = 'synthesizer-picker';
-
-  const pickerLabel = document.createElement('div');
-  pickerLabel.className = 'picker-label';
-  pickerLabel.textContent = '누가 종합할까요?';
-
-  const pickerBtns = document.createElement('div');
-  pickerBtns.className = 'picker-btns';
-
-  ['claude', 'gpt'].forEach(model => {
-    const btn = document.createElement('button');
-    btn.className = 'synth-btn';
-    btn.textContent = model === 'claude' ? 'Claude가 종합' : 'GPT가 종합';
-    const available = model === 'claude' ? !!debateData.claudeReply : !!debateData.gptReply;
-    if (!available) {
-      btn.disabled = true;
-      btn.title = '이 모델의 응답이 없어 종합할 수 없습니다.';
-    } else {
-      btn.addEventListener('click', () => {
-        pickerBtns.querySelectorAll('.synth-btn').forEach(b => b.disabled = true);
-        chooseSynthesizer(container, body, question, debateData, reviewData, model);
-      });
-    }
-    pickerBtns.appendChild(btn);
-  });
-
-  picker.append(pickerLabel, pickerBtns);
-  body.appendChild(picker);
-  scrollDown();
-}
-
-async function chooseSynthesizer(container, body, question, debateData, reviewData, synthesizer) {
-  const label = synthesizer === 'claude' ? 'Claude' : 'GPT';
-
-  const loadingEl = createCouncilLoadingEl(`${label}가 최종 종합 중…`);
+async function finalizeCouncil(container, body, question, debateData, reviewData) {
+  const loadingEl = createCouncilLoadingEl('Claude가 최종 정리 중…');
   body.appendChild(loadingEl);
   scrollDown();
 
@@ -885,11 +865,10 @@ async function chooseSynthesizer(container, body, question, debateData, reviewDa
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
         question,
-        claudeReply:  debateData.claudeReply,
-        gptReply:     debateData.gptReply,
-        claudeReview: reviewData.claudeReview,
-        gptReview:    reviewData.gptReview,
-        synthesizer,
+        claudeDraft:  debateData.claudeDraft,
+        gptCritique:  debateData.gptCritique,
+        revisedDraft: reviewData.revisedDraft,
+        gptCritique2: reviewData.gptCritique2,
         sessionId,
         councilDraftMode: debateData.councilDraftMode || councilDraftMode,
         webSources: debateData.webSources || [],
@@ -920,11 +899,11 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
   const synthSection = document.createElement('div');
   synthSection.className = 'synthesis-section';
 
-  // 갈린 지점
+  // 검증 반영 (GPT 지적 중 기각한 것 + 이유)
   if (data.divergence) {
     const divLabel = document.createElement('div');
     divLabel.className = 'model-label divergence-label';
-    divLabel.textContent = '갈린 지점';
+    divLabel.textContent = '검증 반영';
 
     const divBubble = document.createElement('div');
     divBubble.className = 'bubble md divergence-bubble';
@@ -950,17 +929,15 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
   const noteDraftMode = debateData.councilDraftMode || councilDraftMode;
   saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveCouncilNote(saveBtn, {
     question,
-    claudeReply:        debateData.claudeReply,
-    gptReply:           debateData.gptReply,
-    claudeReview:       reviewData.claudeReview,
-    gptReview:          reviewData.gptReview,
-    divergence:         data.divergence,
-    synthesis:          data.synthesis,
-    synthesizer:        '의회',
-    synthesizerModelId: data.synthesizerModelId,
-    messageId:          data.messageId,
-    councilDraftMode:   noteDraftMode,
-    webSources:         debateData.webSources || [],
+    claudeDraft:      debateData.claudeDraft,
+    gptCritique:      debateData.gptCritique,
+    revisedDraft:     reviewData.revisedDraft,
+    gptCritique2:     reviewData.gptCritique2,
+    divergence:       data.divergence,
+    synthesis:        data.synthesis,
+    messageId:        data.messageId,
+    councilDraftMode: noteDraftMode,
+    webSources:       debateData.webSources || [],
   })));
 
   synthSection.append(synthLabel, synthBubble, saveBtn);
@@ -970,17 +947,15 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
 function buildCouncilTranscript(question, debateData, reviewData, data) {
   const sections = [
     `## 질문\n${question}`,
-    `## Claude 1차 답변\n${debateData.claudeReply || '응답 없음'}`,
-    `## GPT 1차 답변\n${debateData.gptReply || '응답 없음'}`,
+    `## Claude 초안\n${debateData.claudeDraft || '응답 없음'}`,
+    `## GPT 검증\n${debateData.gptCritique || '검증 없음'}`,
     `## 의회 설정\ndraftMode: ${debateData.councilDraftMode || 'compressed'}`,
   ];
 
-  if (reviewData.claudeReview || reviewData.gptReview) {
-    sections.push(`## Claude의 GPT 검토\n${reviewData.claudeReview || '검토 없음'}`);
-    sections.push(`## GPT의 Claude 검토\n${reviewData.gptReview || '검토 없음'}`);
-  }
+  if (reviewData.revisedDraft) sections.push(`## Claude 수정 초안\n${reviewData.revisedDraft}`);
+  if (reviewData.gptCritique2) sections.push(`## GPT 재검증\n${reviewData.gptCritique2}`);
 
-  if (data.divergence) sections.push(`## 갈린 지점\n${data.divergence}`);
+  if (data.divergence) sections.push(`## 검증 반영\n${data.divergence}`);
   sections.push(`## 종합\n${data.synthesis}`);
   if (Array.isArray(debateData.webSources) && debateData.webSources.length > 0) {
     const sources = debateData.webSources
