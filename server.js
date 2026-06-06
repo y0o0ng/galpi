@@ -903,21 +903,19 @@ function formatHistoryForModelContext(messages, currentModel = null) {
   });
 }
 
-function buildCouncilTranscript({ question, claudeReply, gptReply, claudeReview, gptReview, divergence, synthesis, synthesizer, councilDraftMode, webSources = [] }) {
+function buildCouncilTranscript({ question, claudeDraft, gptCritique, revisedDraft, gptCritique2, divergence, synthesis, councilDraftMode, webSources = [] }) {
   const sections = [
     `## 질문\n${question}`,
-    `## Claude 1차 답변\n${claudeReply || '응답 없음'}`,
-    `## GPT 1차 답변\n${gptReply || '응답 없음'}`,
+    `## Claude 초안\n${claudeDraft || '응답 없음'}`,
+    `## GPT 검증\n${gptCritique || '검증 없음'}`,
   ];
 
   if (councilDraftMode) sections.push(`## 의회 설정\ndraftMode: ${councilDraftMode}`);
 
-  if (claudeReview || gptReview) {
-    sections.push(`## Claude의 GPT 검토\n${claudeReview || '검토 없음'}`);
-    sections.push(`## GPT의 Claude 검토\n${gptReview || '검토 없음'}`);
-  }
+  if (revisedDraft) sections.push(`## Claude 수정 초안\n${revisedDraft}`);
+  if (gptCritique2) sections.push(`## GPT 재검증\n${gptCritique2}`);
 
-  if (divergence) sections.push(`## 갈린 지점\n${divergence}`);
+  if (divergence) sections.push(`## 검증 반영\n${divergence}`);
   sections.push(`## 종합\n${synthesis}`);
   if (Array.isArray(webSources) && webSources.length > 0) {
     const rows = webSources
@@ -4732,95 +4730,99 @@ ${question}`;
 ${question}`;
 }
 
-// 상호 검토 프롬프트
-function buildReviewPrompt(question, ownAnswer, otherAnswer, mode) {
-  const modeRule = mode === 'full'
-    ? '- 문체, 톤, 뉘앙스, 표현 손실, 사용자 의도와의 어긋남도 함께 평가한다.'
-    : mode === 'deep'
-    ? '- 논리의 빈틈, 근거 강도, 빠진 리스크, 최종 판단에 필요한 선택 기준을 우선 평가한다.'
-    : '- 정보 밀도, 정확성, 누락 위험을 우선 평가한다.';
+// GPT 비평 프롬프트 — 다시 쓰지 않고 Claude 초안의 약점만 구조화해 지적
+function buildGptCritiquePrompt(questionWithContext, claudeDraft) {
+  return `다음은 같은 질문에 대한 Claude의 초안이다. 너의 역할은 다시 답을 쓰는 것이 아니라, 이 초안을 비판적으로 검증하는 것이다.
 
-  return `상대 답변을 압축 검토하라.
+${questionWithContext}
 
-질문:
-${question}
+[Claude 초안]
+${claudeDraft}
 
-내 답변:
-${ownAnswer}
+위 컨텍스트(대화, 참조 노트, 검색 결과)를 근거로 초안의 약점만 구조화해 지적하라.
+- 빠진 전제 / 검토되지 않은 조건
+- 논리 구멍 / 비약
+- 사실·수치 오류 또는 출처 불명
+- 놓친 관점 / 대안
+- 간과한 리스크
 
-상대 답변:
-${otherAnswer}
+규칙:
+- 전체 대안 답안을 다시 쓰지 말 것. 지적만 한다.
+- 초안이 견고하면 억지로 흠을 만들지 말고 "중대한 결함 없음"이라고 적은 뒤 사소한 보완점만 남겨라.
+- 각 지적은 한두 줄로 간결하게, 중복 없이.
 
 형식:
-합의:
-- ...
-차이:
-- ...
-누락:
-- ...
-최종 종합에 반영할 점:
-- ...
-
-규칙:
-- 짧게.
-- 중복 금지.
-- 평가만.
-- 새 장문 답변 작성 금지.
-- 질문 유형에 맞게 정확성, 실용성, 문체, 누락 위험 중 중요한 기준을 우선 평가.
-- 반드시 완결된 검토를 작성한다. 길어질 것 같으면 각 항목을 1개씩만 남긴다.
-${modeRule}`;
+- [분류] 지적 내용`;
 }
 
-// 최종 종합 프롬프트
-function buildSynthesisPrompt(question, claudeReply, gptReply, claudeReview, gptReview) {
-  const hasReview = !!(claudeReview || gptReview);
-  const reviewSection = hasReview
-    ? `[Claude의 GPT 답변 검토]
-${claudeReview || '검토 없음'}
+// 심층: GPT 비평을 반영해 Claude가 내부 초안을 개선 (아직 최종 아님)
+function buildRevisePrompt(questionWithContext, claudeDraft, gptCritique) {
+  return `너의 초안과 그에 대한 검증 지적이다. 지적을 반영해 초안을 개선하라.
 
-[GPT의 Claude 답변 검토]
-${gptReview || '검토 없음'}
+${questionWithContext}
 
-`
-    : '';
+[내 초안]
+${claudeDraft}
 
-  return `아래는 동일한 질문에 대한 두 AI의 1차 답변${hasReview ? '과 상호 검토' : ''}다.
+[검증 지적]
+${gptCritique || '검증 없음'}
+
+규칙:
+- 타당한 지적은 반영해 더 정확하고 견고한 초안으로 고친다.
+- 동의하지 않는 지적은 무리하게 반영하지 않는다.
+- 아직 최종 사용자용 답변이 아니므로 완성된 문체보다 판단 재료의 정확성을 우선한다.
+- 개선된 초안 본문만 출력한다.`;
+}
+
+// 최종: Claude가 (최신 초안 + 최신 검증)을 받아 사용자용 최종 답변 작성, 기각 명시 강제
+function buildFinalizePrompt(question, claudeDraft, gptCritique) {
+  return `아래는 네 초안과, 그 초안에 대한 검증 에이전트(GPT)의 지적이다.
 
 질문:
 ${question}
 
-[Claude 1차 답변]
-${claudeReply}
+[내 초안]
+${claudeDraft}
 
-[GPT 1차 답변]
-${gptReply}
+[검증 지적]
+${gptCritique || '검증 없음'}
 
-${reviewSection}최종 답변을 작성하라.
+이 둘을 바탕으로 사용자에게 보여줄 최종 답변을 작성하라.
 
 규칙:
-- 최종 답변은 사용자에게 직접 보여주는 답변이다.
-- 압축 문체를 쓰지 않는다.
-- 자연스럽고 읽기 좋은 정상 말투로 작성한다.
-- 두 1차 답변과 상호 검토를 모두 반영한다.
-- 단순히 두 답변을 섞지 말고 비판적으로 판단한다.
-- 반드시 우선순위를 정하고 1순위 결론을 제시한다.
+- 타당한 지적은 반영해 답을 개선한다.
+- 동의하지 않는 지적이라도 무시하지 말고, 왜 반영하지 않았는지 이유를 분명히 한다.
+- 압축 문체를 쓰지 않고 자연스럽고 읽기 좋게 작성한다.
+- 우선순위를 정하고 1순위 결론을 먼저 제시한다.
 - 불확실한 부분은 명확히 표시한다.
-- 분석형 질문이면 결론, 근거, 리스크가 선명해야 한다.
-- 코드 질문이면 실행 가능성과 간결함을 우선한다.
-- 글쓰기형 질문이면 최종 문장의 완성도, 톤, 뉘앙스를 우선한다.
 
 아래 형식을 지켜라.
 
-<갈린_지점>
-두 답변과 상호 검토에서 실제로 갈린 핵심 포인트를 최대 3개 정리한다.
-실질적으로 차이가 없다면 "두 답변의 관점이 대체로 일치합니다"라고 적는다.
-</갈린_지점>
+<검증_반영>
+검증 지적 중 반영하지 않은(기각한) 핵심 포인트와 그 이유를 최대 3개 적는다.
+모두 반영했다면 "검증 지적을 모두 반영했습니다"라고 적는다.
+검증이 없었다면 "단독 답변(검증 없음)"이라고 적는다.
+</검증_반영>
 
 <종합>
 사용자에게 보여줄 최종 답변만 작성한다.
-갈린 지점 분석을 반복하지 않는다.
-이 블록 안에 <갈린_지점> 태그를 포함하지 않는다.
+이 블록 안에 <검증_반영> 태그를 포함하지 않는다.
 </종합>`;
+}
+
+// 의회 각 단계가 공유하는 모델 컨텍스트 (히스토리 + 컨텍스트가 주입된 질문)
+async function buildCouncilModelContext(question, activeNotes, sessionId, webSources) {
+  const memoryItems = await readMemoryItems();
+  const { notes, pastMessages } = await getContextNotesForQuestion(question, activeNotes, sessionId);
+  hydrateSessionFromDb(sessionId);
+  const history = sessions[sessionId];
+  const webEvidence = Array.isArray(webSources) && webSources.length > 0 ? { results: webSources } : null;
+  const hasContext = memoryItems.length > 0 || notes.length > 0 || pastMessages.length > 0 || webEvidence;
+  const questionWithContext = hasContext
+    ? buildContextMessage(question, notes, memoryItems, pastMessages, webEvidence)
+    : question;
+  const historyCtx = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
+  return { questionWithContext, historyCtx };
 }
 
 // ─── 의회 모드 ────────────────────────────────────────────────────────────────
@@ -4848,39 +4850,48 @@ app.post('/api/council/debate', async (req, res) => {
   const gptModel = getGptModelForCouncilMode(mode);
 
   try {
+    // 웹 evidence: 명시적 /web 또는 Claude tool_use 판단
     let webEvidence = webSearch ? await searchWeb(question) : null;
-    const baseContext = [...formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES)), { role: 'user', content: buildFirstAnswerPrompt(question, mode) }];
+    const probeContext = [...formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES)), { role: 'user', content: buildFirstAnswerPrompt(question, mode) }];
     if (!webEvidence) {
-      webEvidence = await decideCouncilWebEvidence(baseContext, claudeModel);
+      webEvidence = await decideCouncilWebEvidence(probeContext, claudeModel);
     }
-    const effectiveQuestion = memoryItems.length > 0 || resolvedNotes.length > 0 || pastMessages.length > 0 || webEvidence
+    const questionWithContext = memoryItems.length > 0 || resolvedNotes.length > 0 || pastMessages.length > 0 || webEvidence
       ? buildContextMessage(question, resolvedNotes, memoryItems, pastMessages, webEvidence)
       : question;
-    const firstAnswerPrompt = buildFirstAnswerPrompt(effectiveQuestion, mode);
-    const context = [...formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES)), { role: 'user', content: firstAnswerPrompt }];
-    const [claudeResult, gptResult] = await Promise.allSettled([
-      anthropic.messages.create({
+    const historyCtx = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
+
+    // ① Claude 초안 (앞무대 — 실패 시 의회 중단)
+    let claudeDraft = null, claudeError = null;
+    try {
+      const r = await anthropic.messages.create({
         model: claudeModel,
         max_tokens: maxTokens,
-        messages: context,
-      }),
-      openai.chat.completions.create({
-        model: gptModel,
-        messages: [GPT_LANGUAGE_SYSTEM, ...context],
-        max_completion_tokens: maxTokens,
-      }),
-    ]);
-
-    const claudeReply = claudeResult.status === 'fulfilled' ? claudeResult.value.content[0].text         : null;
-    const gptReply    = gptResult.status    === 'fulfilled' ? gptResult.value.choices[0].message.content : null;
-    const claudeError = claudeResult.status === 'rejected'  ? claudeResult.reason.message                : null;
-    const gptError    = gptResult.status    === 'rejected'  ? gptResult.reason.message                  : null;
-
-    if (!claudeReply && !gptReply) {
-      return res.status(500).json({ error: '두 모델 모두 응답하지 못했습니다.' });
+        messages: [...historyCtx, { role: 'user', content: buildFirstAnswerPrompt(questionWithContext, mode) }],
+      });
+      claudeDraft = r.content[0].text;
+    } catch (err) {
+      claudeError = err.message;
+    }
+    if (!claudeDraft) {
+      return res.status(500).json({ error: `Claude 초안 생성 실패: ${claudeError || '알 수 없음'}` });
     }
 
-    res.json({ claudeReply, gptReply, claudeError, gptError, councilDraftMode: mode, webSources: webEvidence?.results || [] });
+    // ② GPT 비평 (대화·노트·메모리·검색결과 + Claude 초안 전부 전달, 실패 시 우아한 강등)
+    let gptCritique = null, gptCritiqueError = null;
+    try {
+      const r = await openai.chat.completions.create({
+        model: gptModel,
+        messages: [GPT_LANGUAGE_SYSTEM, ...historyCtx, { role: 'user', content: buildGptCritiquePrompt(questionWithContext, claudeDraft) }],
+        max_completion_tokens: COUNCIL_TOKEN_LIMITS.review,
+      });
+      gptCritique = r.choices[0].message.content;
+    } catch (err) {
+      gptCritiqueError = err.message;
+      console.warn('GPT 비평 실패:', err.message);
+    }
+
+    res.json({ claudeDraft, gptCritique, claudeError, gptCritiqueError, councilDraftMode: mode, webSources: webEvidence?.results || [] });
   } catch (err) {
     console.error('의회 토론 오류:', err.message);
     res.status(500).json({ error: err.message });
@@ -4889,63 +4900,73 @@ app.post('/api/council/debate', async (req, res) => {
 
 // 2단계: 상호 검토
 app.post('/api/council/review', async (req, res) => {
-  const { question, claudeReply, gptReply, councilDraftMode, sessionId } = req.body;
-  if (!question || !claudeReply || !gptReply || !sessionId) {
+  const { question, claudeDraft, gptCritique, councilDraftMode, sessionId, activeNotes, webSources } = req.body;
+  if (!question || !claudeDraft || !sessionId) {
     return res.status(400).json({ error: '필수 항목 누락' });
   }
 
   const mode = normalizeCouncilDraftMode(councilDraftMode);
   const claudeModel = getClaudeModelForCouncilMode(mode);
   const gptModel = getGptModelForCouncilMode(mode);
-
-  // 상호 검토 프롬프트 (Claude는 GPT를, GPT는 Claude를 검토)
-  const claudeReviewPrompt = buildReviewPrompt(question, claudeReply, gptReply, mode);
-  const gptReviewPrompt    = buildReviewPrompt(question, gptReply, claudeReply, mode);
+  const maxTokens = COUNCIL_TOKEN_LIMITS.deepFirst;
 
   try {
-    const [claudeResult, gptResult] = await Promise.allSettled([
-      anthropic.messages.create({
+    const { questionWithContext, historyCtx } = await buildCouncilModelContext(question, activeNotes, sessionId, webSources);
+
+    // ③ Claude 수정 (비평 반영 개선 초안, 실패 시 원래 초안 유지)
+    let revisedDraft = claudeDraft, claudeError = null;
+    try {
+      const r = await anthropic.messages.create({
         model: claudeModel,
-        max_tokens: COUNCIL_TOKEN_LIMITS.review,
-        messages: [{ role: 'user', content: claudeReviewPrompt }],
-      }),
-      openai.chat.completions.create({
+        max_tokens: maxTokens,
+        messages: [...historyCtx, { role: 'user', content: buildRevisePrompt(questionWithContext, claudeDraft, gptCritique) }],
+      });
+      revisedDraft = r.content[0].text;
+    } catch (err) {
+      claudeError = err.message;
+      console.warn('Claude 수정 실패:', err.message);
+    }
+
+    // ②' GPT 재비평 (개선본 대상, 실패 시 우아한 강등)
+    let gptCritique2 = null, gptCritiqueError = null;
+    try {
+      const r = await openai.chat.completions.create({
         model: gptModel,
-        messages: [GPT_LANGUAGE_SYSTEM, { role: 'user', content: gptReviewPrompt }],
+        messages: [GPT_LANGUAGE_SYSTEM, ...historyCtx, { role: 'user', content: buildGptCritiquePrompt(questionWithContext, revisedDraft) }],
         max_completion_tokens: COUNCIL_TOKEN_LIMITS.review,
-      }),
-    ]);
+      });
+      gptCritique2 = r.choices[0].message.content;
+    } catch (err) {
+      gptCritiqueError = err.message;
+      console.warn('GPT 재비평 실패:', err.message);
+    }
 
-    const claudeReview      = claudeResult.status === 'fulfilled' ? claudeResult.value.content[0].text         : null;
-    const gptReview         = gptResult.status    === 'fulfilled' ? gptResult.value.choices[0].message.content : null;
-    const claudeReviewError = claudeResult.status === 'rejected'  ? claudeResult.reason.message                : null;
-    const gptReviewError    = gptResult.status    === 'rejected'  ? gptResult.reason.message                  : null;
-
-    res.json({ claudeReview, gptReview, claudeReviewError, gptReviewError });
+    res.json({ revisedDraft, gptCritique2, claudeError, gptCritiqueError });
   } catch (err) {
-    console.error('상호 검토 오류:', err.message);
+    console.error('심층 재비평 오류:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 // 3단계: 최종 종합
 app.post('/api/council/synthesize', async (req, res) => {
-  const { question, claudeReply, gptReply, claudeReview, gptReview, synthesizer, sessionId, councilDraftMode, webSources } = req.body;
-  if (!question || !claudeReply || !gptReply || !synthesizer || !sessionId) {
+  const { question, claudeDraft, gptCritique, revisedDraft, gptCritique2, sessionId, councilDraftMode, webSources } = req.body;
+  if (!question || !claudeDraft || !sessionId) {
     return res.status(400).json({ error: '필수 항목 누락' });
   }
   const mode = normalizeCouncilDraftMode(councilDraftMode);
   const claudeModel = getClaudeModelForCouncilMode(mode);
-  const gptModel = getGptModelForCouncilMode(mode);
 
-  // 최종 종합 프롬프트 (검토 결과 포함, 항상 자연스러운 사용자용 답변)
-  const synthPrompt = buildSynthesisPrompt(question, claudeReply, gptReply, claudeReview, gptReview);
+  // 최종은 항상 Claude. 심층이면 수정 초안/재검증을 우선 사용한다.
+  const finalDraft = revisedDraft || claudeDraft;
+  const finalCritique = gptCritique2 || gptCritique;
+  const finalizePrompt = buildFinalizePrompt(question, finalDraft, finalCritique);
 
-  function parseSynthesisResponse(text) {
-    const divMatch   = text.match(/<갈린_지점>([\s\S]*?)<\/갈린_지점>/);
+  function parseFinalizeResponse(text) {
+    const divMatch   = text.match(/<검증_반영>([\s\S]*?)<\/검증_반영>/);
     const synthMatch = text.match(/<종합>([\s\S]*?)<\/종합>/);
     let synthesis = synthMatch ? synthMatch[1].trim() : text.trim();
-    synthesis = synthesis.replace(/<갈린_지점>[\s\S]*?<\/갈린_지점>/g, '').trim();
+    synthesis = synthesis.replace(/<검증_반영>[\s\S]*?<\/검증_반영>/g, '').trim();
     return {
       divergence: divMatch ? divMatch[1].trim() : null,
       synthesis,
@@ -4953,35 +4974,22 @@ app.post('/api/council/synthesize', async (req, res) => {
   }
 
   try {
-    let rawText, usedModel;
-    if (synthesizer === 'claude') {
-      const r = await anthropic.messages.create({
-        model: claudeModel, max_tokens: COUNCIL_TOKEN_LIMITS.synthesis,
-        messages: [{ role: 'user', content: synthPrompt }],
-      });
-      rawText   = r.content[0].text;
-      usedModel = claudeModel;
-    } else {
-      const r = await openai.chat.completions.create({
-        model: gptModel,
-        messages: [GPT_LANGUAGE_SYSTEM, { role: 'user', content: synthPrompt }],
-        max_completion_tokens: COUNCIL_TOKEN_LIMITS.synthesis,
-      });
-      rawText   = r.choices[0].message.content;
-      usedModel = gptModel;
-    }
+    const r = await anthropic.messages.create({
+      model: claudeModel, max_tokens: COUNCIL_TOKEN_LIMITS.synthesis,
+      messages: [{ role: 'user', content: finalizePrompt }],
+    });
+    const rawText   = r.content[0].text;
+    const usedModel = claudeModel;
 
-    const { divergence, synthesis } = parseSynthesisResponse(rawText);
-    const synthLabel = synthesizer === 'claude' ? 'Claude' : 'GPT';
+    const { divergence, synthesis } = parseFinalizeResponse(rawText);
     const transcript = buildCouncilTranscript({
       question,
-      claudeReply,
-      gptReply,
-      claudeReview,
-      gptReview,
+      claudeDraft,
+      gptCritique,
+      revisedDraft,
+      gptCritique2,
       divergence,
       synthesis,
-      synthesizer: synthLabel,
       councilDraftMode: mode,
       webSources,
     });
@@ -5007,7 +5015,6 @@ app.post('/api/council/synthesize', async (req, res) => {
     res.json({
       divergence,
       synthesis,
-      synthesizer:        synthLabel,
       synthesizerModelId: usedModel,
       messageId:          uuidv4(),
     });
@@ -5020,11 +5027,11 @@ app.post('/api/council/synthesize', async (req, res) => {
 // 의회 노트 저장
 app.post('/api/council/save-note', async (req, res) => {
   const {
-    question, claudeReply, gptReply, claudeReview, gptReview,
-    divergence, synthesis, synthesizer, synthesizerModelId,
+    question, claudeDraft, gptCritique, revisedDraft, gptCritique2,
+    divergence, synthesis,
     sessionId, messageId, councilDraftMode, webSources,
   } = req.body;
-  if (!question || !claudeReply || !gptReply || !synthesis) {
+  if (!question || !claudeDraft || !synthesis) {
     return res.status(400).json({ error: '필수 항목 누락' });
   }
 
@@ -5035,6 +5042,7 @@ app.post('/api/council/save-note', async (req, res) => {
 
   const mode = normalizeCouncilDraftMode(councilDraftMode);
   const claudeModel = getClaudeModelForCouncilMode(mode);
+  const gptModel = getGptModelForCouncilMode(mode);
 
   let title = question.replace(/\n/g, ' ').slice(0, 40).trim();
   try {
@@ -5061,12 +5069,12 @@ app.post('/api/council/save-note', async (req, res) => {
 
   const fmtCallout = (text) => text.split('\n').map(l => `> ${l}`).join('\n');
 
-  const reviewSection = (claudeReview || gptReview) ? `
-> [!note]- Claude의 GPT 검토
-${claudeReview ? fmtCallout(claudeReview) : '> 검토 없음'}
+  const deepSection = (revisedDraft || gptCritique2) ? `
+> [!note]- Claude 수정 초안
+${revisedDraft ? fmtCallout(revisedDraft) : '> 수정 없음'}
 
-> [!note]- GPT의 Claude 검토
-${gptReview ? fmtCallout(gptReview) : '> 검토 없음'}
+> [!note]- GPT 재검증
+${gptCritique2 ? fmtCallout(gptCritique2) : '> 재검증 없음'}
 ` : '';
   const webSourcesSection = formatWebSourcesSection(webSources);
 
@@ -5087,7 +5095,7 @@ confidence: medium
 models:
   claude: ${claudeModel}
   gpt: ${gptModel}
-final_synthesizer: ${synthesizer}
+final_synthesizer: claude
 source_session: ${sessionId || 'unknown'}
 source_message: ${messageId || 'unknown'}
 ---
@@ -5104,7 +5112,7 @@ source_message: ${messageId || 'unknown'}
 ## ❓ 질문
 ${question}
 
-## ⚡ 갈린 지점
+## ⚡ 검증 반영
 ${divergence || '분석 없음'}
 
 ## 결론
@@ -5119,14 +5127,14 @@ ${webSourcesSection}
 <!-- CODEX-LINKS-START -->
 <!-- CODEX-LINKS-END -->
 
-> [!note]- Claude 1차 답변
-${fmtCallout(claudeReply)}
+> [!note]- Claude 초안
+${fmtCallout(claudeDraft)}
 
-> [!note]- GPT 1차 답변
-${fmtCallout(gptReply)}
-${reviewSection}
+> [!note]- GPT 검증
+${gptCritique ? fmtCallout(gptCritique) : '> 검증 없음'}
+${deepSection}
 ---
-*생성: ${createdStr} · 의회 모드 (${mode}) · 최종 종합자: ${synthesizer} (${synthesizerModelId})*
+*생성: ${createdStr} · 의회 모드 (${mode}) · 최종: Claude (검증: GPT)*
 `;
 
   try {
