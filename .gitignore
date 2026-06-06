@@ -6,6 +6,7 @@ council.db
 council.db-*
 reference/
 ai-council-vault/
+deploy-backups/
 
 # agent skills (tooling, 개인 환경)
 skills-lock.json
