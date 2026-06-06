@@ -1917,7 +1917,12 @@ async function generateChatReply(model, context, { enableWebTool = false } = {})
 
   const webEvidences = [];
   const toolResults = [];
-  for (const toolUse of toolUses.slice(0, 1)) {
+  // Claude는 web_search를 병렬로 여러 번 호출할 수 있다. 모든 tool_use에는 짝이 되는
+  // tool_result가 있어야 하므로(없으면 Anthropic 400), tool_use를 전부 순회한다.
+  // 실제 검색 호출만 비용 보호를 위해 제한하고, 나머지는 생략 tool_result로 채운다.
+  const MAX_TOOL_SEARCHES = 3;
+  let searchCount = 0;
+  for (const toolUse of toolUses) {
     const requestInput = normalizeWebToolInput(toolUse.input);
     if (!requestInput) {
       toolResults.push({
@@ -1928,6 +1933,15 @@ async function generateChatReply(model, context, { enableWebTool = false } = {})
       });
       continue;
     }
+    if (searchCount >= MAX_TOOL_SEARCHES) {
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: '검색 횟수 제한으로 이 요청은 생략되었습니다.',
+      });
+      continue;
+    }
+    searchCount++;
     try {
       const evidence = await searchWeb(requestInput.query, requestInput);
       webEvidences.push(evidence);
