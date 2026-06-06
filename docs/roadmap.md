@@ -33,7 +33,7 @@ V7  손발(보너스)    — 기기 제어 (정말 나중, 선택)
 ### 핵심
 1. 라즈베리파이 기본 세팅 (OS, 외장 저장소, 볼트 폴더 배치)
 2. 단순한 웹 채팅 UI (말풍선 쌓이는 평범한 화면)
-3. 백엔드에서 Claude **또는** GPT 하나 호출 → 답 표시
+3. 백엔드에서 Claude 호출 → 답 표시
 4. 모든 대화 DB(SQLite) 자동 저장 + 새로고침 후 복원
 5. 폰·맥에서 Tailscale 접속 → 홈 화면에 얹기
 
@@ -58,8 +58,8 @@ V7  손발(보너스)    — 기기 제어 (정말 나중, 선택)
 
 ### 핵심
 1. DB 정식화 (sessions / messages / notes)
-2. 단일 모드 토글 (Claude / GPT) + 수동 저장 버튼
-3. **의회 모드** (1차 → 2차 → 수동 종합자 선택 → 종합, 실패 시 멈추고 알림)
+2. 단일 Claude 모드 + 수동 저장 버튼
+3. **의회 모드** (빠름/기본/심층 → 수동 종합자 선택 → 종합, 실패 시 멈추고 알림)
    - 의회 답은 자동 노트화, [저장 취소]/[숨김] 제공
 4. **"꺼내줘" 검색** (제목 → 별칭 → 태그 → 본문 → 후보 → 모델이 선택, 숨김 제외)
 
@@ -129,17 +129,18 @@ Codex가 사서로서 뒤에서 일하고, 시스템이 견고해진다.
 
 새 V단계가 아니라 기존 회수/답변 파이프라인 위에 얹는 보강. 외부 웹 근거를 답변에 주입한다.
 
-> **상태:** MVP + planner + 보안(월 한도 집행·sourceType 정확매칭)까지 구현, Pi에 `enabled:true` 배포 완료.
+> **상태:** MVP + planner + 보안(월 한도 집행·sourceType 정확매칭) + 단일 Claude `tool_use` 검색 + 의회 공통 evidence 주입까지 구현, Pi에 `enabled:true`, `maxResults:3`, `maxSnippetChars:400` 배포 완료.
 
 ### 핵심
-1. 백엔드 search agent가 **한 번** 검색 → 같은 evidence를 **의회 양쪽에 주입** (모델별 web search MCP 직결 대신 — 같은 근거로 비교가 성립).
+1. 단일 Claude는 `web_search` tool_use로 백엔드 search agent(Tavily)를 직접 요청한다.
 2. MVP: 명시적 `/web` / Tavily 1개 / 프롬프트 인젝션 격리 / 저장 시 provenance.
-3. 기본 `enabled: false`. 자동 검색 판단·요약 가공은 나중.
+3. 의회 모드는 백엔드 search agent가 한 번 검색한 evidence를 Claude/GPT 양쪽에 주입한다.
 
 > 상세 설계는 `ai-council-design-final.md`의 "외부 검색 (웹 근거 주입)" 절.
 
 ### 통과 기준
-- [x] `/web 검색어` → 같은 근거가 Claude·GPT 양쪽에 주입돼 답변에 출처가 달린다
+- [x] 단일 Claude tool_use 또는 `/web 검색어` → 답변에 출처가 달린다
+- [x] 의회 검색 → 같은 근거가 Claude·GPT 양쪽에 주입된다
 - [x] 웹 결과가 `/save`·Codex·정책·파일 수정을 트리거하지 못한다 (격리 확인)
 - [x] 웹 근거로 저장된 노트에 출처가 남는다 (frontmatter + 인라인)
 

@@ -21,11 +21,24 @@
   - 검색은 작은 스냅샷 노트 5개를 고르는 방식에서 topic 우선 회수로 이동한다.
   - 임베딩은 frontmatter를 포함한 전체 파일이 아니라 의미 본문 중심으로 만든다.
 
+  현재 운영 기준 (2026-06-06 반영):
+
+  - 프론트엔드 기본 채팅은 단일 Claude 모드다.
+  - GPT 단일 채팅 토글은 제거한다.
+  - GPT는 의회 모드의 비교·검토·종합 과정에서만 호출한다.
+  - Codex는 별도 정리 실행자이므로 GPT/Codex 모델 설정을 일반 답변 정책과 분리한다.
+  - 채팅 히스토리와 자동 저장 모델명은 `Claude` 또는 `의회`로 단순화한다.
+      - 의회 최종 답변은 종합자가 Claude/GPT 중 누구였는지와 관계없이 다음 대화에서는 하나의 이전 비서 답변으로 취급한다.
+      - 의회 transcript에는 Claude/GPT 1차 답변과 검토 과정은 남기되, 모델 입력용 히스토리는 최종 종합 중심으로 회수한다.
+  - 단일 Claude 모드는 Anthropic tool_use 방식의 `web_search` 도구를 제공받고, Claude가 필요하다고 판단하면 백엔드 search agent(Tavily)를 호출한다.
+  - 웹 검색 결과는 기본 `maxResults=3`, `maxSnippetChars=400`으로 제한해 Claude 입력 토큰 폭증을 막는다.
+  - 단일 채팅, 저장 메타데이터, 토픽 제목 생성 등 의회가 아닌 백엔드 작업에서는 GPT를 사용하지 않는다.
+
   권한 모델:
 
-  - Claude/GPT는 답변 담당이다.
-  - Claude/GPT는 관련 노트를 읽고 저장/분열/병합/링크 후보를 제안할 수 있다.
-  - Claude/GPT는 볼트를 직접 수정하지 않는다.
+  - Claude는 기본 답변 담당이다.
+  - GPT는 의회 모드에서 Claude와 같은 입력 근거를 보고 비교·검토·종합 후보 역할을 한다.
+  - Claude/GPT는 관련 노트를 읽고 저장/분열/병합/링크 후보를 제안할 수 있지만, 볼트를 직접 수정하지 않는다.
   - Codex는 Obsidian 볼트를 정리하는 단일 관리자다.
   - Clawd/UI는 split, merge, 기준 변경 같은 위험 작업을 승인하는 관리자 화면이다.
 
@@ -398,6 +411,7 @@
   - /notifications: Clawd 알림센터 열기. Codex 제안, split/merge/policy 승인/무시 처리
   - /graph report: DB 그래프와 자동 저장 판단 로그를 `_system/GRAPH_REPORT.md`로 요약
   - /audit: 화면 표시상 "시스템 검사". validation, policy, 정리 상태, 알림, 고립/큰 토픽을 점검
+  - /web: 외부 웹 검색 결과를 현재 답변 흐름에 주입한다. 단일 Claude 모드에서는 Claude에, 의회 모드에서는 Claude/GPT 양쪽에 같은 evidence를 주입한다.
 
   내부/디버깅 API:
 
@@ -467,9 +481,12 @@
 
   현재 구현된 것:
 
-  - 단일/의회 채팅
+  - 단일 Claude 채팅 / 의회 채팅
   - 최근 10턴 컨텍스트 전달
-  - 모델별 이전 답변 라벨링
+  - 이전 답변 히스토리 통일
+      - 단일 답변은 `Claude`
+      - 의회 최종 답변은 종합자와 무관하게 `의회`
+      - 모델 입력에는 `[다른 AI ...]` 같은 화자 라벨을 넣지 않는다.
   - SQLite 세션/메시지 저장
   - 새로고침 후 히스토리 복원
   - localStorage 보조 복원
@@ -483,7 +500,7 @@
   - 세 저장 경로의 pending 등록 준비
   - Obsidian 노트에 CODEX-TAGS/LINKS 마커 유지
   - /organize process, /organize all
-  - 의회 심층/일반 모델 티어 분리
+  - 의회 빠름/기본/심층 모드 유지
   - Codex 일반/deep 모델 티어 분리
   - 새로고침 후 의회 답변 레이아웃 복원
   - 노트/메시지 임베딩 검색
@@ -562,7 +579,7 @@
 - **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, Clawd 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
 - **그래프/검사(완료):** `/graph report`는 `_system/GRAPH_REPORT.md`를 생성/갱신한다. `/audit`은 화면 표시상 "시스템 검사"이며 Codex validation, policy 파일 파싱, 정리 상태, 알림, 고립 토픽, 큰 토픽, 최근 job을 요약한다.
 - **파일명/링크 안정화(완료):** 새 노트 파일명은 ASCII 날짜-시간-난수 형식으로 생성한다. Obsidian 링크는 `[[파일ID|표시 제목]]`을 기본으로 써서 유령 노트 생성을 막는다. validator는 CODEX-LINKS/MERGE/SPLIT 제안의 형식·bare wiki link를 거부한다.
-- **외부 검색(구현 완료, 2026-06-06):** 백엔드 search agent(Tavily)가 한 번 검색해 같은 evidence를 의회 양쪽에 주입하는 `/web`. MVP 4원칙(명시적 `/web` / 의회 양쪽 동일 evidence / 인젝션 격리 / 저장 시 provenance) + planner(topic·timeRange·maxResults·sourceStrategy 검증, sourceType 라벨·전략 재정렬) + 모델 주도 `tool_request`(단일 2-pass / 의회 양쪽 1회) + 보안(월 한도 집행, sourceType 정확매칭) 까지 구현. Pi에서 `enabled:true`로 가동 중. 상세는 "외부 검색 (웹 근거 주입)" 절.
+- **외부 검색(구현 완료, 2026-06-06):** 백엔드 search agent(Tavily)가 검색을 실행하고 결과를 sanitize/정규화해 답변 흐름에 주입한다. 단일 Claude 모드는 Anthropic `tool_use`로 `web_search` 도구를 직접 요청할 수 있고, 의회 모드는 같은 evidence를 Claude/GPT 양쪽에 주입한다. MVP 4원칙(명시적 `/web` / 의회 양쪽 동일 evidence / 인젝션 격리 / 저장 시 provenance) + planner(topic·timeRange·maxResults·sourceStrategy 검증, sourceType 라벨·전략 재정렬) + 보안(월 한도 집행, sourceType 정확매칭)까지 구현. Pi에서 `enabled:true`, `maxResults:3`, `maxSnippetChars:400`으로 가동 중. 상세는 "외부 검색 (웹 근거 주입)" 절.
 - **보류:** `/challenge`, `/synthesize`, `/export`는 검색/회수와 서재 관리가 더 안정화된 뒤 구현한다. 제한적 재정리(연결 0개, 최근 N일, 특정 주제/태그, 정책 변경 영향 노트)는 다음 관리 기능 후보로 둔다.
 - **작업 방식:** 실제 코드 수정 전에 무엇을·왜·영향·트레이드오프를 설명하고 컨펌받는다. (`git add -p`는 현재 환경에서 막혀 있어, 사용자의 미커밋 작업과 섞인 파일은 통째로 커밋하거나 분리 협의.)
 
@@ -572,10 +589,10 @@
 
 - **호스팅**: 라즈베리파이에 서버를 두고 24시간 켜둠. 볼트는 외장 저장소에 저장.
 - **접속**: 폰에서는 Tailscale로 라즈베리파이에 안전하게 접속. 클라우드/포트포워딩 불필요.
-- **질의응답 모델**: Claude + GPT 2종. Gemini는 제외.
+- **질의응답 모델**: 단일 채팅은 Claude가 담당한다. GPT는 의회 모드의 비교·검토·종합 후보로만 사용한다. Gemini는 제외.
 - **볼트 정리·연결**: Codex가 담당. 단, Codex는 전체 파일을 마음대로 고치는 것이 아니라 **허용된 구역만 수정**한다.
 - **형태**: 웹사이트. 폰에서는 브라우저 “홈 화면에 추가”로 앱처럼 사용. 네이티브 앱 아님.
-- **v1 범위**: 볼트 읽기/쓰기는 백엔드가 대행한다. 모델이 파일을 도구로 직접 다루는 방식(MCP/함수호출)은 v2로 미룸. 단, Codex는 예외적으로 볼트를 직접 읽고 쓴다.
+- **v1 범위**: 볼트 읽기/쓰기는 백엔드가 대행한다. Claude/GPT가 파일을 도구로 직접 다루는 방식(MCP/함수호출)은 답변 경로에서는 쓰지 않는다. 단, Codex는 예외적으로 MCP/허용 파일 목록을 통해 볼트를 읽고, 검증 가능한 마커 구역만 수정한다.
 
 ### 핵심 원칙
 
@@ -589,14 +606,14 @@
 ## 2. 채팅 세션 — UI의 핵심
 
 - 화면은 **평범한 AI 채팅 화면**. 대화가 말풍선으로 위로 쌓임.
-- 상단에 **토글 3개**: `단일 A (Claude)` / `단일 B (GPT)` / `의회`.
-- **채팅창은 하나뿐이다.** 토글은 “이번 질문을 누구에게 보낼지”만 결정한다.
+- 상단에는 기본 Claude 상태 표시와 `의회` 진입 버튼, 의회 속도 선택(`빠름` / `기본` / `심층`)을 둔다.
+- **채팅창은 하나뿐이다.** 기본 질문은 Claude에게 보내고, 의회 모드를 켠 질문만 Claude/GPT 비교 흐름으로 보낸다.
 - 한 대화 안에서 모드를 자유롭게 섞을 수 있다.
-  - 예: 의회로 답 받기 → 단일 A에게 후속 질문 → 다시 의회.
+  - 예: 의회로 답 받기 → Claude에게 후속 질문 → 다시 의회.
 - 각 답에는 **누가 답했는지 라벨**을 표시한다.
-  - Claude / GPT / 의회 합의
+  - Claude / 의회
 - 의회 모드의 답은 화면에 “합의된 결론” 중심으로 표시한다.
-- 의회 모드의 1차·2차 과정은 화면에 기본 표시하지 않고, 노트에 접힌 원본 기록으로 보관한다.
+- 의회 모드의 1차·검토 과정은 화면에 기본 표시하지 않고, transcript/노트에 접힌 원본 기록으로 보관한다.
 - “그 노트 꺼내줘” 같은 요청도 같은 채팅에서 이어서 처리한다.
 
 ### 토큰 관리
@@ -612,16 +629,17 @@
 
 ## 3. 의회 모드 동작
 
-질문 1건당 다음 단계를 거친다. 기본 API 호출은 총 5번이다.
+질문 1건당 Claude와 GPT가 같은 사용자 입력, 같은 검색 근거, 같은 회수 컨텍스트를 보고 비교한다. 의회 속도는 세 단계다.
 
-1. **1차** — 두 모델이 각자 독립적으로 답변한다. 병렬 실행.
-1. **2차** — 각 모델이 상대의 1차 답을 읽고 자기 답을 수정한다. 병렬 실행.
+1. **빠름** — Claude/GPT가 압축된 1차 답변을 병렬 생성하고, 사용자가 고른 종합자가 바로 결론을 만든다.
+1. **기본** — Claude/GPT가 더 넉넉한 1차 답변을 병렬 생성하고, 사용자가 고른 종합자가 결론을 만든다.
+1. **심층** — Claude/GPT 1차 답변 뒤, 서로의 답을 검토한 다음 종합한다.
+
+심층 검토에서는 아래를 드러내게 한다.
+
 - 상대의 어떤 점을 받아들였는지
 - 어떤 점을 반박했는지
 - 자기 결론이 어떻게 바뀌었는지
-  를 드러내게 한다.
-1. **종합자 선택** — 질문 성격에 따라 최종 종합 모델을 고른다.
-1. **종합** — 선택된 종합자가 두 2차 답을 하나의 결론으로 합친다.
 
 ### 종합자 선택 규칙
 
@@ -633,7 +651,7 @@
   - **Claude가 어울리는 질문**: 문학·글쓰기, 긴 맥락 정리, 문체·뉘앙스, 감정·관계·해석, 여러 관점을 자연스럽게 묶기.
   - **GPT가 어울리는 질문**: 코딩·시스템 설계·아키텍처, 논리 검증·누락 검토, 수치·구조·절차, 구현 순서·API·데이터 구조.
 
-최종 노트에는 반드시 아래 정보를 남긴다.
+Transcript에는 최종 종합자 정보를 남길 수 있다. 다만 DB/session/message의 모델명과 일반 채팅 히스토리에서는 종합자가 누구였는지 구분하지 않고 `의회`로 취급한다.
 
 ```md
 *의회 모드 · 최종 종합자: GPT · 선택 이유: 시스템 설계/구현 검토 성격이 강함*
@@ -667,15 +685,14 @@
 
 ### 단일 모드
 
-- 단일 모드 모델은 토글로 그때그때 선택한다.
-  - 단일 A = Claude
-  - 단일 B = GPT
-- 기본값은 설정에서 지정한다.
+- 단일 모드는 Claude만 사용한다.
+- GPT 단일 채팅 토글은 제거한다.
+- 비의회 백엔드 작업(채팅 답변, 저장 메타데이터, 토픽 제목 생성)은 Claude로 통일한다.
 - 단일 모드도 노트 저장 대상이 될 수 있다.
 
 ### “그 노트 꺼내줘”
 
-“꺼내줘” 요청은 의회를 거치지 않고, 현재 선택된 단일 모델이 처리한다.
+“꺼내줘” 요청은 의회를 거치지 않고 Claude가 처리한다.
 
 검색은 두 갈래다 (자세한 규칙은 섹션 16-검색 정책).
 
@@ -695,30 +712,34 @@ v1에서는 벡터 DB 없이 시작한다. 제목·태그·본문 검색으로 �
 
 ## 외부 검색 (웹 근거 주입) — 구현 완료
 
-> 결정: 2026-06-05. MVP는 Tavily 단일 provider, 명시적 `/web`만. 자동 검색 판단은 보류.
-> 구현: 2026-06-06. MVP + planner + 보안(soft limit 집행·sourceType 정확매칭)까지 완료, Pi에 `enabled:true` 배포. 모델 주도 `tool_request`(단일 2-pass / 의회 양쪽 1회 검색)도 구현됨. 아래는 그 설계 기록.
+> 결정: 2026-06-05. provider는 Tavily 단일 구성으로 시작한다.
+> 구현: 2026-06-06. MVP + planner + 보안(soft limit 집행·sourceType 정확매칭) + 단일 Claude `tool_use` 검색 + 의회 공통 evidence 주입까지 완료, Pi에 `enabled:true`, `maxResults:3`, `maxSnippetChars:400`으로 배포. 아래는 그 설계 기록.
 
 ### 핵심 원칙
 
 - 외부 검색은 Claude/GPT가 각자 하지 않는다. 백엔드 **search agent가 한 번** 검색한다.
-- 같은 검색 결과(evidence)를 Claude/GPT **둘 다**에게 주입한다.
+- 단일 Claude 모드에서는 Claude가 `web_search` 도구를 직접 요청하면 백엔드가 Tavily를 실행하고 `tool_result`로 돌려준다.
+- 의회 모드에서는 Claude/GPT **둘 다**에게 같은 검색 결과(evidence)를 주입한다.
   - 그래야 의회 모드에서 "같은 근거를 보고 서로 다른 판단을 비교"가 성립한다.
   - 이것이 각 모델에 web search MCP를 직접 붙이는 방식보다 나은 **가장 강한 이유**다(모델마다 다른 자료를 보면 비교가 깨진다).
 - 웹 결과는 노트/메모리보다 **신뢰도가 낮다.** 답변 근거로만 쓰고, 저장은 사용자/AI가 실제로 반영한 경우에만 한다.
 
 ### MVP 범위
 
-1. 명시적 `/web 검색어`만 지원 (자동 검색 판단은 보류).
-2. `/web`은 **한방 흐름**: 검색 → evidence 주입 → 현재 모드(단일/의회)로 바로 답변.
-3. Tavily provider 1개로 시작. provider 추상화는 둔다 (`WEB_SEARCH_PROVIDER=tavily`).
-4. 결과 표준화: `{ title, url, snippet, publishedDate, source, provider }`.
-5. 검색 결과는 바로 노트 저장하지 않음. 저장될 때는 반드시 provenance 포함.
+1. 명시적 `/web 검색어`를 지원한다.
+2. 단일 Claude 모드는 Anthropic `tool_use`로 `web_search`를 요청한다. 서버는 Tavily 실행 결과를 `tool_result`로 반환하고 Claude가 최종 답변한다.
+3. 의회 모드는 별도 planner/decision 단계가 검색 필요성을 판단하고, 같은 evidence를 양쪽에 주입한다.
+4. `/web`은 **한방 흐름**: 검색 → evidence 주입 → 현재 모드(단일/의회)로 바로 답변.
+5. Tavily provider 1개로 시작. provider 추상화는 둔다 (`WEB_SEARCH_PROVIDER=tavily`).
+6. 결과 표준화: `{ title, url, snippet, publishedDate, source, provider }`.
+7. 검색 결과는 바로 노트 저장하지 않음. 저장될 때는 반드시 provenance 포함.
 
 흐름:
 
 ```
-사용자 /web 질문 → searchAgent(query) → 결과 정규화/sanitize
-  → <web_context>로 감싸 Claude·GPT 양쪽 컨텍스트에 주입 → 답변(출처 링크 포함)
+사용자 질문 → 단일 Claude tool_use(web_search) 또는 /web 또는 의회 planner
+  → searchAgent(query) → 결과 정규화/sanitize
+  → 단일 Claude에는 tool_result, 의회에는 <web_context>로 주입 → 답변(출처 링크 포함)
   → 사용자가 저장하거나 답변에 반영되면 토픽 노트로 저장(provenance 포함)
 ```
 
@@ -757,23 +778,23 @@ v1에서는 벡터 DB 없이 시작한다. 제목·태그·본문 검색으로 �
 
 ```
 "webSearch": {
-  "enabled": false,
+  "enabled": true,
   "provider": "tavily",
-  "maxResults": 5,
+  "maxResults": 3,
   "searchDepth": "basic",
   "cacheTtlSeconds": 900,
-  "maxSnippetChars": 800,
+  "maxSnippetChars": 400,
   "monthlyCreditSoftLimit": 800
 }
 ```
 
-기본 `enabled: false`, `basic`. 켜기 전까지 기존 동작에 영향 0.
+Pi 운영 기준은 `enabled: true`, `basic`, `maxResults: 3`, `maxSnippetChars: 400`이다. 검색 결과 개수와 snippet 길이는 Claude 입력 토큰 폭증을 막기 위해 작게 둔다.
 
 ### 비용 / 한도
 
 - `/web`은 호출마다 과금되는 API → `express-rate-limit`로 별도 제한.
 - 같은 query 단기 캐싱(`cacheTtlSeconds`. 단일 프로세스라 인메모리 Map+TTL로 충분).
-- 자동 검색 금지(명시적 호출만).
+- 단일 Claude는 `web_search` tool_use가 있을 때 검색한다. 일반 질문에는 도구를 쓰지 않도록 시스템 프롬프트에서 제한한다.
 - 월 사용량을 DB에 persist(`web_search_usage` 같은 작은 테이블 + 월 리셋)해서, `monthlyCreditSoftLimit` 근처면 **알림센터에 경고**.
 - Tavily 요율(basic 1 / advanced 2 credit)·무료 티어는 **구현 시점에 docs로 재확인**.
 
@@ -846,6 +867,7 @@ v1에서는 벡터 DB 없이 시작한다. 제목·태그·본문 검색으로 �
 ### settings
 
 - 단일 모드 기본 모델
+  - Claude 고정
 - 의회 종합자 기본값
   - Claude / GPT (매 질문마다 직접 고를 수도 있음. 자동 판단은 v2)
 - 최근 대화 개수 N
@@ -937,7 +959,7 @@ source_message: message-id
 > **최종 종합:** …
 
 ---
-*생성: YYYY-MM-DD HH:MM · 의회 / 단일 모드 · 최종 종합자: Claude/GPT/없음*
+*생성: YYYY-MM-DD HH:MM · 의회 / 단일 Claude 모드 · 최종 종합자: Claude/GPT/없음*
 ```
 
 ### 단일 모드 원본 답변 형식
@@ -1173,7 +1195,7 @@ codex exec "<지시>" --sandbox workspace-write
   - 한국어 태그 / 영어 태그 / 혼합
   - 띄어쓰기 처리 방식
 - 단일 모드 기본 모델
-  - Claude / GPT
+  - Claude 고정
 - AI에 보낼 최근 대화 개수 N
   - 기본값은 10으로 시작
 - Codex 정리 기준 개수
@@ -1195,7 +1217,7 @@ codex exec "<지시>" --sandbox workspace-write
 
 1. 라즈베리파이 기본 세팅 (OS 설치, 외장 저장소 연결, 볼트 폴더 배치)
 1. 아주 단순한 웹 채팅 UI
-1. 백엔드에서 Claude 또는 GPT **하나** 호출 → 답 표시
+1. 백엔드에서 Claude 호출 → 답 표시
 1. 노트 저장 (임시파일→atomic rename으로 안전하게 / 제목 / frontmatter / 원본 답변 callout / CODEX-TAGS·LINKS 마커는 빈 채로 삽입)
 1. 폰에서 Tailscale 접속 → 홈 화면에 얹기
 
@@ -1204,8 +1226,8 @@ codex exec "<지시>" --sandbox workspace-write
 핵심 기능을 채운다.
 
 1. 대화 기록 DB 정식화 (sessions / messages / notes) — **모든 대화는 DB에 자동 저장**
-1. 단일 모드 토글 (A = Claude / B = GPT) + **단일 모드 수동 저장 버튼**([노트로 저장])
-1. 의회 모드 (1차 → 2차 → **수동 종합자** 선택 → 종합, 실패 시 멈추고 알림) — **의회 답은 자동 노트화**, [저장 취소]/[숨김] 제공
+1. 단일 Claude 모드 + **단일 모드 수동 저장 버튼**([노트로 저장])
+1. 의회 모드 (빠름/기본/심층, **수동 종합자** 선택 → 종합, 실패 시 멈추고 알림) — **의회 답은 자동 노트화**, [저장 취소]/[숨김] 제공
 1. “꺼내줘” 검색 (옵시디언 우선: 제목 → 별칭 → 태그 → 본문 → 후보 5개 → 모델이 선택. 숨김 노트 제외)
 
 ### ■ 3차 — 자동화와 견고함
