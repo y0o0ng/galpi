@@ -1056,7 +1056,6 @@ function classifyAutoSaveValue(question, answer) {
   }
 
   const hasQuestionSignal = q.length >= AUTO_TOPIC_MIN_USER_CHARS
-    || /[?？]$/.test(q)
     || AUTO_SAVE_VALUE_KEYWORDS.some(keyword => q.includes(keyword));
   const hasAnswerSignal = a.length >= 500
     || /```|#{2,}|^- |\n- |\d+\./m.test(a)
