@@ -5027,8 +5027,8 @@ ${gptCritique || '검증 없음'}
 }
 
 // 최종: Claude가 (최신 초안 + 최신 검증)을 받아 사용자용 최종 답변 작성, 기각 명시 강제
-function buildFinalizePrompt(question, claudeDraft, gptCritique, now = new Date()) {
-  return `${buildCurrentTimeLine(now)}
+function buildFinalizePrompt(question, claudeDraft, gptCritique) {
+  return `${buildCurrentTimeLine(new Date())}
 
 아래는 네 초안과, 그 초안에 대한 검증 에이전트(GPT)의 지적이다.
 

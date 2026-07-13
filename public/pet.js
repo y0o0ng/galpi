@@ -30,7 +30,6 @@ let lastTs       = null;
 let isDragging   = false;
 let dragOffsetX  = 0;
 let dragOffsetY  = 0;
-let preDrawState = 'idle';
 
 // ─── 초기화 ───────────────────────────────────────────────────────────────────
 
@@ -225,7 +224,6 @@ function runCommand(command, autoSend) {
 function onDragStart(e) {
   if (e.button !== 0) return;
   isDragging = true;
-  preDrawState = state;
   dragOffsetX = e.clientX - petEl.getBoundingClientRect().left;
   dragOffsetY = e.clientY - petEl.getBoundingClientRect().top;
 
