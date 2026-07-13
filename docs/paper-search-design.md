@@ -33,9 +33,15 @@ arXiv/OpenAlex는 대안으로 보관 — S2가 부족하다고 *실측*될 때�
 
 **레이트리밋 주의**: 키 없이 쓰면 공용 풀이라 429 잦음. <https://www.semanticscholar.org/product/api> 에서 무료 키 발급 → `.env`에 `S2_API_KEY`. 키 있으면 초당 1회 수준 — 사용자 트리거 검색이라 자연히 준수됨.
 
-## 3. 구조 — 기존 웹 검색 모듈에 1:1 매핑
+## 3. 구조 — 기존 웹 검색 패턴을 별도 모듈에 매핑
 
-새 패턴을 발명하지 않는다. Tavily 웹 검색 모듈이 이미 정답 구조다:
+새 패턴을 발명하지 않는다. Tavily 웹 검색 흐름을 따르되, 5천 줄이 넘은 `server.js`에 구현을 더 쌓지 않는다.
+
+- `lib/paper-search.js`: Semantic Scholar 호출, 응답 검증·정규화, 검색 캐시
+- `server.js`: 환경 설정, 기존 노트 저장 파이프라인 연결, 얇은 API 라우트
+- `public/app.js`: `/paper` 명령과 결과 카드·저장 동작
+
+기존 `server.js`를 먼저 분해하지는 않는다. 논문 검색부터 새 기능을 모듈로 시작하고, 기존 웹 검색 코드는 그 영역을 크게 수정할 때 테스트와 함께 옮긴다.
 
 |기존 (웹 검색)                                  |신규 (논문 검색)               |비고                 |
 |-------------------------------------------|-------------------------|-------------------|
@@ -73,13 +79,17 @@ GET https://api.semanticscholar.org/graph/v1/paper/search
 헤더: x-api-key: {S2_API_KEY}   (키 있을 때)
 ```
 
-### 함수 시그니처 (server.js)
+### 함수 시그니처 (`lib/paper-search.js`)
 
 ```js
 async function searchSemanticScholar(query, { limit = 10 } = {})
   // → [{ paperId, title, abstract, year, authors: [이름들],
   //      citationCount, tldr, url, arxivId, doi }] (정규화 완료)
+```
 
+### 서버 통합 (`server.js`)
+
+```js
 async function savePaperAsNote(paper)
   // → 기존 노트 생성 유틸(createNoteIdentity, writeVaultNote 등) 재사용
   // → { filename, title }
@@ -152,7 +162,7 @@ ai_readable: true
 
 **1차 — 검색만** (반나절)
 
-- `searchSemanticScholar` + `/api/papers/search` + `/paper` 명령 + 결과 카드
+- `lib/paper-search.js`의 `searchSemanticScholar` + `/api/papers/search` + `/paper` 명령 + 결과 카드
 - 검증: 검색어 입력 → 카드가 뜬다. LLM 호출 0, 저장 기능 없음.
 
 **2차 — 저장 → 뇌 편입** (반나절)
@@ -182,7 +192,8 @@ ai_readable: true
 
 ## 10. 예상 변경 규모
 
-- server.js: 함수 3~4개 + 라우트 2개 (~150줄) — 웹 검색 모듈 바로 아래 배치
+- `lib/paper-search.js`: S2 호출·정규화·캐시 (~100~130줄)
+- `server.js`: 설정 + 기존 저장 흐름 연결 + 얇은 라우트 2개 (~30~50줄)
 - app.js: 명령 등록 + 카드 렌더 (~80줄)
 - style.css: 카드 스타일 (~30줄)
 - 설계 문서: 섹션 3·16 note_type 목록에 `paper` 추가
