@@ -1040,7 +1040,7 @@ async function saveCouncilNote(btn, data) {
     const result = await res.json();
     if (result.success) {
       markSaveButtonSaved(btn);
-      showToast(`저장됨: ${result.title}`);
+      showToast(result.duplicate ? `이미 저장된 노트야: ${result.title}` : `저장됨: ${result.title}`);
     } else {
       btn.innerHTML = saveIconSvg();
       btn.title = '다시 시도';
@@ -2695,7 +2695,7 @@ async function saveNote(btn, data) {
     const result = await res.json();
     if (result.success) {
       markSaveButtonSaved(btn);
-      showToast(`저장됨: ${result.title}`);
+      showToast(result.duplicate ? `이미 저장된 노트야: ${result.title}` : `저장됨: ${result.title}`);
     } else {
       btn.innerHTML = saveIconSvg();
       btn.title = '다시 시도';
