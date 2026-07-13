@@ -4647,6 +4647,8 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
 }
 
 const SEARCH_STOP_WORDS = new Set([
+  '이', '가', '은', '는', '을', '를', '에', '의', '와', '과', '도', '로', '만',
+  '내', '네', '그', '저', '것', '수', '더', '한', '두', '때', '등',
   '그리고', '그런데', '저번에', '우리가', '관련', '내용', '알려줘', '호출해줘',
   '불러와줘', '꺼내줘', '해줘', '해줘요', '해주세요', '알고', '싶어', '있어',
   '없어', '어떤', '어떻게', '무엇', '뭐가', '뭔지', '대해', '대한', '관한',
@@ -4697,7 +4699,7 @@ async function generateAndStoreEmbedding(filename, text) {
 
 // 검색용 노트 파생 데이터 캐시. 파일 mtime으로 무효화하므로
 // 옵시디언/Codex/수동 편집처럼 서버를 거치지 않은 변경도 다음 검색에 반영된다.
-const noteSearchCache = new Map(); // filename -> { mtime, archived, title, body, titleLower, bodyLower, termSet }
+const noteSearchCache = new Map(); // filename -> { mtime, archived, title, body, titleLower, bodyLower, tagsLower }
 
 async function loadNoteSearchData(filename) {
   const filepath = path.join(VAULT_PATH, filename);
@@ -4714,16 +4716,14 @@ async function loadNoteSearchData(filename) {
   // Codex가 채운 주제 태그. 검색에서 강한 가중치를 줘 "태그로 묶인 노트"가 잘 잡히게 한다.
   const tagsLower = (raw.match(/<!-- CODEX-TAGS-START -->([\s\S]*?)<!-- CODEX-TAGS-END -->/)?.[1] || '')
     .replace(/#/g, ' ').toLowerCase();
-  const termSet = new Set(
-    (titleLower + ' ' + bodyLower).replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(t => t.length >= 2)
-  );
-  const entry = { mtime: mtimeMs, archived: parseFrontmatterBoolean(fm.archived), title, body, titleLower, bodyLower, tagsLower, termSet };
+  const entry = { mtime: mtimeMs, archived: parseFrontmatterBoolean(fm.archived), title, body, titleLower, bodyLower, tagsLower };
   noteSearchCache.set(filename, entry);
   return entry;
 }
 
 async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIVE_NOTES) {
   const terms = extractQueryTerms(query);
+  if (terms.length === 0) return [];
   const activeNotes = stmtGetNotesWithEmbedding.all();
   if (activeNotes.length === 0) return [];
 
@@ -4735,18 +4735,19 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
   );
 
   const noteData = [];
-  const termDocFreq = new Map();
-
   for (const { filename } of activeNotes) {
     try {
       const data = await loadNoteSearchData(filename);
       if (data.archived) continue;
-      for (const t of data.termSet) termDocFreq.set(t, (termDocFreq.get(t) || 0) + 1);
       noteData.push({ filename, title: data.title, body: data.body, titleLower: data.titleLower, bodyLower: data.bodyLower, tagsLower: data.tagsLower });
     } catch { /* skip */ }
   }
 
   const N = noteData.length || 1;
+  const termDocFreq = new Map(terms.map(term => [
+    term,
+    noteData.filter(data => data.titleLower.includes(term) || data.bodyLower.includes(term) || data.tagsLower.includes(term)).length,
+  ]));
   const queryEmbedding = precomputedEmbedding || await generateEmbedding(query);
 
   const results = [];
