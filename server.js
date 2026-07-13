@@ -35,7 +35,7 @@ const COUNCIL_TOKEN_LIMITS = {
   compressedFirst: 900,
   fullFirst:       4096,
   deepFirst:       2500,
-  review:          800,
+  review:          4000,
   synthesis:       5000,
 };
 
@@ -238,7 +238,7 @@ const CODEX_BIN = process.env.CODEX_BIN || 'codex';
 const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.4-mini';
 const CODEX_DEEP_MODEL = process.env.CODEX_DEEP_MODEL || 'gpt-5.5';
 const CODEX_RUNNER_MODE = process.env.CODEX_RUNNER_MODE || 'codex';
-const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '180000');
+const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '300000');
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'ai-council');
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;        // 하루 1회 기준
 const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000;       // 1시간마다 "24h 지났나" 확인
@@ -673,6 +673,13 @@ const stmtGetPendingNotes = db.prepare(`
   WHERE archived = 0 AND codex_status = 'pending'
   ORDER BY created_at ASC, id ASC
 `);
+const stmtGetManualCheckNotes = db.prepare(`
+  SELECT filename, title, note_type AS noteType, codex_status AS codexStatus,
+         updated_at AS updatedAt
+  FROM notes
+  WHERE archived = 0 AND codex_status = 'needs_manual_check'
+  ORDER BY updated_at DESC, id DESC
+`);
 const stmtGetUnqueuedSaveDecisionCount = db.prepare(`
   SELECT COUNT(*) AS count
   FROM auto_save_decisions
@@ -831,7 +838,9 @@ function getSavedNoteByMessageId(messageId) {
   return stmtGetNoteByMessageId.get(id) || stmtGetNoteByChunkMessageId.get(id, id) || null;
 }
 
-const createCodexJobFromPending = db.transaction((limit = null) => {
+// 한 job(=codex 한 세션)에 노트를 너무 많이 묶으면 정리 시간이 길어져 타임아웃으로 통째 실패한다.
+// 기본 배치 크기를 자동 큐 임계값으로 제한하고, 남은 pending은 다음 job에서 처리한다.
+const createCodexJobFromPending = db.transaction((limit = CODEX_AUTO_QUEUE_THRESHOLD) => {
   const notes = Number.isInteger(limit) && limit > 0
     ? stmtGetPendingNotes.all().slice(0, limit)
     : stmtGetPendingNotes.all();
@@ -2710,6 +2719,82 @@ async function splitQaEntryIntoTopic({ sourceFilename, targetFilename, qaId }) {
   };
 }
 
+// 여러 Q&A 항목을 source 토픽에서 새 토픽(또는 기존 토픽)으로 한 번에 분리한다. (merge의 대칭)
+// source의 Q&A가 전부 빠지면 빈 껍데기 노트를 완전삭제한다(edge까지 정리 → 유령 링크 방지).
+async function splitQaEntriesIntoTopic({ sourceFilename, qaIds, targetFilename = null, newTitle = null }) {
+  const ids = [...new Set((qaIds || []).map(s => String(s || '').trim()).filter(Boolean))];
+  if (ids.length === 0) throw new Error('분리할 Q&A 항목을 선택해주세요.');
+
+  const source = await loadNoteForMerge(sourceFilename);
+  if (source.noteType !== 'topic') throw new Error('토픽 노트만 분리할 수 있습니다.');
+  if (targetFilename && targetFilename === source.filename) throw new Error('같은 노트로는 분리할 수 없습니다.');
+
+  const sourceQaLog = extractMarkerBody(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
+  const entries = splitQaLogEntries(sourceQaLog);
+  const idSet = new Set(ids);
+  const moved = entries.filter(e => idSet.has(qaEntryId(e)));
+  const movedIds = [...new Set(moved.map(qaEntryId).filter(Boolean))];
+  const missingIds = ids.filter(id => !movedIds.includes(id));
+  if (missingIds.length > 0) throw new Error(`선택한 Q&A 항목을 찾을 수 없습니다: ${missingIds.join(', ')}`);
+  const remaining = entries.filter(e => !idSet.has(qaEntryId(e)));
+
+  // 대상 토픽 결정: 기존 target에 흡수, 또는 새 토픽 생성
+  let resultFilename, resultTitle, createdNew = false;
+  if (targetFilename) {
+    const target = stmtGetTopicNotes.all().find(n => n.filename === targetFilename);
+    if (!target) throw new Error(`대상 토픽을 찾을 수 없습니다: ${targetFilename}`);
+    let targetRaw = await fs.readFile(path.join(VAULT_PATH, target.filename), 'utf8');
+    const targetIds = new Set(splitQaLogEntries(
+      extractMarkerBody(targetRaw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->')
+    ).map(qaEntryId).filter(Boolean));
+    const duplicateId = movedIds.find(id => targetIds.has(id));
+    if (duplicateId) throw new Error(`대상 토픽에 이미 같은 Q&A가 있습니다: ${duplicateId}`);
+    for (const e of moved) {
+      const appended = appendQaLogEntry(targetRaw, e);
+      if (!appended) throw new Error(`${target.filename}에 QA-LOG 마커가 없습니다.`);
+      targetRaw = appended;
+    }
+    targetRaw = refreshTopicSummary(targetRaw, target.title);
+    targetRaw = touchUpdatedFrontmatter(targetRaw);
+    await writeVaultNoteByFilename(target.filename, targetRaw);
+    generateAndStoreEmbedding(target.filename, buildSemanticEmbeddingText(target.title, targetRaw)).catch(() => {});
+    resultFilename = target.filename;
+    resultTitle = target.title;
+  } else {
+    createdNew = true;
+    resultTitle = sanitizeTitle(newTitle, null) || makeTopicTitle(qaEntryQuestion(moved[0]) || source.title);
+    const { fileId, createdStr } = createNoteIdentity();
+    resultFilename = fileId + '.md';
+    const content = createTopicNoteContent({ fileId, title: resultTitle, createdStr, qaEntry: moved.join('\n\n'), sessionId: 'split', messageId: 'split' });
+    await saveVaultNoteRecord({ fileId, title: resultTitle, noteType: 'topic', noteContent: content, codexStatus: 'pending' });
+  }
+
+  // chunk/decision 참조를 분리된 토픽으로 이동
+  for (const id of movedIds) {
+    stmtMoveChunkByQaId.run(resultFilename, resultTitle, id);
+    stmtMoveDecisionByQaId.run(resultFilename, resultTitle, id);
+  }
+
+  // source 갱신, Q&A가 전부 빠졌으면 완전삭제
+  let sourceDeleted = false;
+  if (remaining.length === 0) {
+    await fs.unlink(path.join(VAULT_PATH, source.filename));
+    deleteNoteEverywhere(source.filename);
+    noteSearchCache.delete(source.filename);
+    sourceDeleted = true;
+  } else {
+    let nextSource = replaceMarkerBlock(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->', remaining.join('\n\n'));
+    nextSource = replaceMarkerBlock(nextSource, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw: nextSource }));
+    nextSource = touchUpdatedFrontmatter(nextSource);
+    await writeVaultNoteByFilename(source.filename, nextSource);
+    stmtUpdateNoteCodexStatus.run('pending', source.filename);
+    generateAndStoreEmbedding(source.filename, buildSemanticEmbeddingText(source.title, nextSource)).catch(() => {});
+  }
+  stmtUpdateNoteCodexStatus.run('pending', resultFilename);
+
+  return { source: source.filename, sourceDeleted, target: resultFilename, title: resultTitle, createdNew, movedCount: moved.length };
+}
+
 // source의 DB 참조(chunks/decisions/edges)를 target으로 재지정. edge는 자기루프 제거 + upsert dedup.
 const reassignNoteReferences = db.transaction((fromFilename, toFilename, toTitle) => {
   stmtReassignChunks.run(toFilename, toTitle, fromFilename);
@@ -3113,9 +3198,26 @@ function recordNotificationAction(notification, status) {
   });
 }
 
+// 수동 확인 필요(needs_manual_check) 노트를 시스템 알림 항목으로 변환한다.
+// 같은 노트가 나중에 다시 실패하면 새 알림이 생기도록 상태 변경 시각을 ID에 포함한다.
+function listManualCheckNotifications(options = {}) {
+  return stmtGetManualCheckNotes.all()
+    .map(note => ({
+      id: crypto.createHash('sha1').update(`manual:${note.filename}:${note.updatedAt}`).digest('hex').slice(0, 12),
+      source: 'system',
+      type: 'manual_check',
+      title: '수동 확인 필요',
+      note: { filename: note.filename, title: note.title },
+      text: 'Codex 자동 정리가 실패했습니다. 옵시디언에서 직접 확인·수정한 뒤 확인 완료를 누르세요.',
+      executable: true,
+    }))
+    .filter(item => options.includeHandled || !stmtGetNotificationAction.get(item.id));
+}
+
 async function findCurrentNotificationById(id) {
-  const notifications = await listCodexProposalNotifications(500, { includeHandled: true });
-  return notifications.find(item => item.id === id) || null;
+  const codex = await listCodexProposalNotifications(500, { includeHandled: true });
+  const manual = listManualCheckNotifications({ includeHandled: true });
+  return [...manual, ...codex].find(item => item.id === id) || null;
 }
 
 function getPathValue(root, dottedPath) {
@@ -3187,7 +3289,8 @@ async function applyCodexPolicyChanges(changes) {
 
 app.get('/api/notifications', async (_req, res) => {
   try {
-    const notifications = await listCodexProposalNotifications();
+    const codex = await listCodexProposalNotifications();
+    const notifications = [...listManualCheckNotifications(), ...codex];
     res.json({ success: true, count: notifications.length, notifications });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3232,6 +3335,14 @@ app.post('/api/notifications/:id/approve', async (req, res) => {
         return res.status(400).json({ error: '정책 변경 정보가 부족합니다.' });
       }
       result = await applyCodexPolicyChanges(changes);
+    } else if (notification.type === 'manual_check') {
+      const filename = notification.note?.filename;
+      if (!filename) return res.status(400).json({ error: '노트 파일 정보가 없습니다.' });
+      // 옵시디언 수동 편집을 먼저 DB에 반영한 뒤 확인 완료로 표시한다.
+      // (순서를 바꾸면 backfill upsert가 success 상태를 덮어쓸 수 있다.)
+      const sync = await syncVaultDb();
+      stmtUpdateNoteCodexStatus.run('success', filename);
+      result = { synced: true, ...sync };
     }
 
     recordNotificationAction(notification, 'approved');
@@ -3259,6 +3370,48 @@ app.post('/api/notes/merge', async (req, res) => {
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// /split UI 데이터: 노트의 Q&A 항목을 제목(질문)별로 나열
+app.get('/api/notes/:filename/qa-entries', async (req, res) => {
+  try {
+    const note = await loadNoteForMerge(req.params.filename || '');
+    if (note.noteType !== 'topic') return res.status(400).json({ error: '토픽 노트만 분리할 수 있습니다.' });
+    const qaLog = extractMarkerBody(note.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
+    const entries = splitQaLogEntries(qaLog)
+      .map(e => ({ qaId: qaEntryId(e), question: qaEntryQuestion(e) || '(제목 없음)' }))
+      .filter(e => e.qaId);
+    res.json({ success: true, filename: note.filename, title: note.title, entries });
+  } catch (err) {
+    const status = err.code === 'ENOENT' ? 404 : err.message === '잘못된 노트 파일명입니다.' ? 400 : 500;
+    res.status(status).json({ error: err.code === 'ENOENT' ? '노트를 찾을 수 없습니다.' : err.message });
+  }
+});
+
+// 선택한 Q&A 항목들을 새 토픽(newTitle) 또는 기존 토픽(targetFilename)으로 분리
+app.post('/api/notes/split', async (req, res) => {
+  const { sourceFilename, qaIds, targetFilename, newTitle } = req.body || {};
+  if (!sourceFilename || !Array.isArray(qaIds) || qaIds.length === 0) {
+    return res.status(400).json({ error: '분리할 노트와 Q&A 항목을 지정해주세요.' });
+  }
+  try {
+    const result = await splitQaEntriesIntoTopic({
+      sourceFilename,
+      qaIds,
+      targetFilename: targetFilename || null,
+      newTitle: newTitle || null,
+    });
+    // 분리가 실행됐으니 이 노트의 split 제안 알림은 처리 완료로 기록한다 (알림센터에서 사라짐)
+    try {
+      const proposals = await listCodexProposalNotifications(500, { includeHandled: true });
+      proposals
+        .filter(n => n.type === 'split' && n.note?.filename === sourceFilename)
+        .forEach(n => recordNotificationAction(n, 'approved'));
+    } catch (_) { /* 알림 정리 실패는 분리 결과에 영향 주지 않음 */ }
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -4316,6 +4469,7 @@ async function runAllCodexNotes() {
         failedCount: 0,
       });
     } catch (err) {
+      console.error(`[codex] 배치 정리 실패 — ${filenames.join(', ')}: ${err.message}`);
       const retryableRunnerFailure = isCodexRunnerUnavailableError(err);
       filenames.forEach(filename => {
         const nextStatus = retryableRunnerFailure
@@ -4376,6 +4530,7 @@ async function runNextCodexJob() {
 
   if (failed.length > 0) {
     const error = `${failed.length}/${job.filenames.length}개 노트 정리 실패`;
+    failed.forEach(f => console.error(`[codex] 정리 실패 — ${f.filename}: ${f.error}`));
     finishCodexJob(job.id, 'failed', error);
     return { id: job.id, status: 'failed', processed, failed, error };
   }

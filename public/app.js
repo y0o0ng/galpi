@@ -27,6 +27,7 @@ const slashCommands = [
   { command: '/graph report', title: '그래프 리포트', description: '연결/고립/큰 토픽 요약 리포트 생성' },
   { command: '/audit', title: '시스템 검사', description: '검증, 정리 상태, 알림, 고립 토픽을 한 번에 점검' },
   { command: '/merge', title: '토픽 병합', description: '유사한 토픽 병합 후보 — 검색 카드의 "병합"으로 직접 묶기도 가능' },
+  { command: '/split ', title: '노트 분리', description: '노트의 Q&A를 제목별로 골라 새 토픽으로 분리 (제목으로 노트 검색)' },
   { command: '/notifications', title: '알림센터', description: 'Codex 제안과 시스템 알림을 작은 패널로 보기' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
@@ -297,7 +298,11 @@ function parseCouncilTranscript(content, model) {
   const modelText = String(model || '');
   if (!modelText.includes('의회') && !/^## 질문\n/.test(text)) return null;
 
-  const sections = text.split(/\n\n---\n\n/).map(section => section.trim()).filter(Boolean);
+  // 섹션 구분자(\n\n---\n\n)는 종합 본문 속 마크다운 수평선과 형태가 같다.
+  // 뒤에 실제 의회 헤딩이 오는 구분자에서만 쪼개야 본문 수평선에서 잘리지 않는다.
+  const SECTION_HEADINGS = ['질문', 'Claude 초안', 'GPT 검증', '의회 설정', 'Claude 수정 초안', 'GPT 재검증', '검증 반영', '종합', 'Web sources'];
+  const sectionSep = new RegExp(`\\n\\n---\\n\\n(?=## (?:${SECTION_HEADINGS.join('|')})(?:\\n|$))`);
+  const sections = text.split(sectionSep).map(section => section.trim()).filter(Boolean);
   const getSection = (heading) => {
     const section = sections.find(item => item.startsWith(`## ${heading}`));
     const match = section?.match(/^## [^\n]+\n([\s\S]*)$/);
@@ -499,6 +504,13 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleMergeCandidates();
+    return;
+  }
+  if (text.startsWith('/split ')) {
+    const query = text.slice(7).trim();
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleSplit(query);
     return;
   }
   if (text === '/notifications') {
@@ -1293,6 +1305,135 @@ function closeMergeTray(tray) {
   tray.classList.add('is-hiding');
   tray.addEventListener('animationend', () => tray.remove(), { once: true });
   setTimeout(() => tray.remove(), 250); // reduced-motion 등 애니메이션 미발생 대비
+}
+
+// ── 노트 분리 (/split) — merge 대칭: 한 노트의 Q&A를 골라 새/기존 토픽으로 떼기 ──
+async function handleSplit(query) {
+  const q = String(query || '').trim();
+  if (!q) { showToast('분리할 노트 제목을 입력해줘 — 예: /split 주식 시장'); return; }
+  let notes = [];
+  try {
+    notes = (await apiFetch('/api/topics').then(r => r.json())).topics || [];
+  } catch (_) { showToast('노트 목록을 불러오지 못했어'); return; }
+  const lower = q.toLowerCase();
+  const matches = notes.filter(n => n.filename === q || String(n.title || '').toLowerCase().includes(lower));
+  if (matches.length === 0) { showToast(`"${q}"에 맞는 노트가 없어`); return; }
+  if (matches.length > 1) {
+    const exact = matches.find(n => String(n.title || '').toLowerCase() === lower);
+    if (!exact) {
+      showToast(`여러 개 매칭(${matches.length}) — 더 정확히: ${matches.slice(0, 3).map(n => n.title).join(' / ')}`);
+      return;
+    }
+    return renderSplitPanel(exact.filename);
+  }
+  return renderSplitPanel(matches[0].filename);
+}
+
+async function renderSplitPanel(filename) {
+  let data, topics = [];
+  try {
+    data = await apiFetch(`/api/notes/${encodeURIComponent(filename)}/qa-entries`).then(r => r.json());
+    topics = (await apiFetch('/api/topics').then(r => r.json())).topics || [];
+  } catch (_) { showToast('노트를 불러오지 못했어'); return; }
+  if (!data.success) { showToast(data.error || '노트 조회 실패'); return; }
+  if (!data.entries.length) { showToast('이 노트엔 분리할 Q&A가 없어'); return; }
+
+  const panel = document.createElement('div');
+  panel.className = 'split-panel';
+
+  const head = document.createElement('div');
+  head.className = 'split-panel-head';
+  head.textContent = `${data.title} — Q&A ${data.entries.length}개, 체크해서 분리`;
+  panel.appendChild(head);
+
+  const list = document.createElement('div');
+  list.className = 'split-qa-list';
+  data.entries.forEach(e => {
+    const row = document.createElement('label');
+    row.className = 'split-qa-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'split-qa-check';
+    cb.dataset.qaid = e.qaId;
+    const text = document.createElement('span');
+    text.className = 'split-qa-q';
+    text.textContent = e.question;
+    row.append(cb, text);
+    list.appendChild(row);
+  });
+  panel.appendChild(list);
+
+  // 트레이 (merge-tray 스타일 재활용): 대상 토픽 선택 / 새 토픽 직접 입력
+  const tray = document.createElement('div');
+  tray.className = 'merge-tray';
+
+  const select = document.createElement('select');
+  select.className = 'merge-tray-field';
+  select.setAttribute('aria-label', '분리할 대상 토픽');
+  const optNew = document.createElement('option');
+  optNew.value = '__new__';
+  optNew.textContent = '+ 새 토픽으로';
+  select.appendChild(optNew);
+  topics.filter(t => t.filename !== filename).forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.filename;
+    o.textContent = t.title;
+    select.appendChild(o);
+  });
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'merge-tray-field merge-tray-title';
+  titleInput.placeholder = '새 토픽 제목 (비우면 자동)';
+  titleInput.setAttribute('aria-label', '새 토픽 제목');
+  const syncTitle = () => { titleInput.hidden = select.value !== '__new__'; };
+  select.addEventListener('change', syncTitle);
+  syncTitle();
+
+  const ok = document.createElement('button');
+  ok.className = 'merge-btn merge-btn--primary';
+  ok.textContent = '분리 실행';
+  ok.addEventListener('click', () => runSplit(filename, panel, { select, titleInput, ok }));
+
+  const controls = document.createElement('div');
+  controls.className = 'merge-tray-controls';
+  controls.append(select, titleInput, ok);
+  tray.appendChild(controls);
+  panel.appendChild(tray);
+
+  getMessages().appendChild(panel);
+  scrollDown();
+}
+
+async function runSplit(filename, panel, { select, titleInput, ok }) {
+  const qaIds = [...panel.querySelectorAll('.split-qa-check:checked')].map(c => c.dataset.qaid);
+  if (qaIds.length === 0) { showToast('분리할 Q&A를 체크해줘'); return; }
+
+  ok.disabled = true;
+  ok.textContent = '분리 중…';
+  const targetFilename = select.value === '__new__' ? null : select.value;
+  const newTitle = select.value === '__new__' ? titleInput.value.trim() : null;
+  try {
+    const res = await apiFetch('/api/notes/split', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceFilename: filename, qaIds, targetFilename, newTitle }),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      showToast(data.error || '분리 실패');
+      ok.disabled = false;
+      ok.textContent = '분리 실행';
+      return;
+    }
+    const where = data.createdNew ? `새 토픽 "${data.title}"` : `"${data.title}"`;
+    showToast(`${data.movedCount}개를 ${where}(으)로 분리${data.sourceDeleted ? ' · 빈 원본 삭제' : ''}`);
+    panel.remove();
+  } catch (_) {
+    showToast('서버 연결 오류');
+    ok.disabled = false;
+    ok.textContent = '분리 실행';
+  }
 }
 
 // 검색 결과에서 체크한 노트들을 한 번에 병합하는 트레이 (target 토픽 선택 / 새 토픽 직접 입력)
@@ -2277,7 +2418,16 @@ function makeNotificationCard(item) {
   approve.type = 'button';
   approve.className = 'notification-action primary';
   approve.textContent = notificationPrimaryActionLabel(item);
-  approve.addEventListener('click', () => handleNotificationDecision(item, 'approve', card));
+  approve.addEventListener('click', () => {
+    // split 제안은 실행 정보(qaId)가 없으므로, 해당 노트의 /split 패널을 열어 직접 고르게 한다
+    if (item.type === 'split') {
+      closeNotificationsPanel();
+      if (item.note?.filename) renderSplitPanel(item.note.filename);
+      else showToast('이 제안에 노트 정보가 없어');
+      return;
+    }
+    handleNotificationDecision(item, 'approve', card);
+  });
 
   const ignore = document.createElement('button');
   ignore.type = 'button';
@@ -2294,8 +2444,9 @@ function makeNotificationCard(item) {
 
 function notificationPrimaryActionLabel(item) {
   if (item.type === 'merge') return '병합 실행';
-  if (item.type === 'split' && item.executable) return '분리 실행';
+  if (item.type === 'split') return '분리 검토';
   if (item.type === 'policy' && item.executable) return '정책 적용';
+  if (item.type === 'manual_check') return '확인 완료';
   return '검토 완료';
 }
 
@@ -2329,6 +2480,7 @@ function notificationDoneMessage(item) {
   if (item.type === 'merge') return '병합됨';
   if (item.type === 'split' && item.executable) return '분리됨';
   if (item.type === 'policy' && item.executable) return '정책 파일에 반영됨';
+  if (item.type === 'manual_check') return '확인 완료 · 동기화됨';
   return '검토 완료';
 }
 

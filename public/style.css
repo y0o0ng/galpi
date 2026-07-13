@@ -587,6 +587,44 @@ html, body {
 }
 [data-theme="dark"] .note-card-selected { background: rgba(16, 163, 127, 0.18); }
 
+/* 노트 분리 패널 (/split) */
+.split-panel {
+  margin: 6px 0;
+  padding: 12px;
+  background: var(--ai-bubble);
+  border: 1px solid var(--gpt-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.split-panel-head {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-bottom: 10px;
+}
+.split-qa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.split-qa-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.split-qa-row:hover { background: rgba(127, 127, 127, 0.1); }
+.split-qa-check { margin-top: 3px; flex: 0 0 auto; }
+.split-qa-q { flex: 1 1 auto; line-height: 1.45; word-break: break-word; }
+/* 분리 패널 안의 트레이는 패널이 이미 박스라 테두리 제거 */
+.split-panel .merge-tray { border: none; box-shadow: none; background: transparent; margin: 0; padding: 0; animation: none; }
+
 .merge-tray {
   display: flex;
   flex-direction: column;
