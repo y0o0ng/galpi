@@ -433,9 +433,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_notes_codex_status ON notes(codex_status, archived);
   CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
+  CREATE INDEX IF NOT EXISTS idx_notes_source_message ON notes(source_message);
   CREATE INDEX IF NOT EXISTS idx_codex_jobs_status ON codex_jobs(status, created_at);
   CREATE INDEX IF NOT EXISTS idx_note_chunks_note ON note_chunks(note_filename, chunk_type);
   CREATE INDEX IF NOT EXISTS idx_note_chunks_type ON note_chunks(chunk_type);
+  CREATE INDEX IF NOT EXISTS idx_note_chunks_source_assistant ON note_chunks(source_assistant_message);
+  CREATE INDEX IF NOT EXISTS idx_note_chunks_source_user ON note_chunks(source_user_message);
   CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_created ON auto_save_decisions(created_at);
   CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_decision ON auto_save_decisions(decision, reason);
   CREATE INDEX IF NOT EXISTS idx_note_edges_source ON note_edges(source_filename);
@@ -784,9 +787,21 @@ const stmtFinishCodexJob = db.prepare(`
   SET status = ?, error = ?, finished_at = strftime('%s','now')
   WHERE id = ?
 `);
-const stmtGetMessages = db.prepare(
-  'SELECT id, role, content, model FROM messages WHERE session_id = ? ORDER BY created_at ASC, id ASC'
-);
+const stmtGetMessages = db.prepare(`
+  SELECT m.id, m.role, m.content, m.model,
+    CASE WHEN m.role = 'assistant' AND (
+      EXISTS (
+        SELECT 1 FROM notes n
+        WHERE n.source_message = CAST(m.id AS TEXT)
+      ) OR EXISTS (
+        SELECT 1 FROM note_chunks c
+        WHERE c.source_assistant_message = m.id OR c.source_user_message = m.id
+      )
+    ) THEN 1 ELSE 0 END AS noteSaved
+  FROM messages m
+  WHERE m.session_id = ?
+  ORDER BY m.created_at ASC, m.id ASC
+`);
 const stmtGetRecentMessages = db.prepare(`
   SELECT role, content, model, created_at AS createdAt FROM (
     SELECT role, content, model, created_at, id
@@ -1493,6 +1508,11 @@ function autoAppendTopicNote(args) {
 }
 
 async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessageId, assistantMessageId, model, isMemo = false, forceSave = false, webSources = [] }) {
+  if (forceSave && assistantMessageId) {
+    const saved = getSavedNoteByMessageId(assistantMessageId);
+    if (saved) return { ...saved, duplicate: true };
+  }
+
   let classification = { save: true, reason: isMemo ? 'manual_memo' : 'manual_save' };
   if (!isMemo && !forceSave) {
     classification = classifyAutoSaveValue(question, answer);
@@ -2297,7 +2317,13 @@ app.post('/api/save-note', async (req, res) => {
       forceSave: true,
     });
     const title = result?.title || question.slice(0, 40);
-    return res.json({ success: true, filename: result?.filename || '', title, action: result?.action });
+    return res.json({
+      success: true,
+      filename: result?.filename || '',
+      title,
+      action: result?.action,
+      duplicate: !!result?.duplicate,
+    });
   } catch (err) {
     console.error('노트 저장 오류:', err.message);
     return res.status(500).json({ error: `노트 저장 실패: ${err.message}` });
@@ -4912,12 +4938,29 @@ ${question}
 
 app.get('/api/sessions/:id', (req, res) => {
   const { id } = req.params;
-  const messages = stmtGetMessages.all(id);
+  const messages = stmtGetMessages.all(id).map(message => ({
+    ...message,
+    noteSaved: !!message.noteSaved,
+  }));
 
   // 인메모리 컨텍스트 복원 (서버 재시작 후 AI가 이전 대화 참고 가능)
   hydrateSessionFromDb(id);
 
   res.json({ messages });
+});
+
+app.get('/api/messages/:id/save-status', (req, res) => {
+  const messageId = Number(req.params.id);
+  if (!Number.isSafeInteger(messageId) || messageId <= 0) {
+    return res.status(400).json({ error: '올바른 메시지 ID가 필요합니다.' });
+  }
+
+  const saved = getSavedNoteByMessageId(messageId);
+  return res.json({
+    saved: !!saved,
+    title: saved?.title || null,
+    filename: saved?.filename || null,
+  });
 });
 
 // ─── 의회 모드 프롬프트 빌더 ──────────────────────────────────────────────────
@@ -5270,7 +5313,7 @@ app.post('/api/council/synthesize', async (req, res) => {
       divergence,
       synthesis,
       synthesizerModelId: usedModel,
-      messageId:          uuidv4(),
+      messageId:          assistantMessageId,
     });
   } catch (err) {
     console.error('종합 오류:', err.message);
@@ -5290,6 +5333,7 @@ app.post('/api/council/save-note', async (req, res) => {
   }
 
   if (messageId) {
+    await topicWriteChain;
     const existing = getSavedNoteByMessageId(messageId);
     if (existing) return res.json({ success: true, title: existing.title, filename: existing.filename, duplicate: true });
   }

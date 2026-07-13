@@ -186,6 +186,14 @@ async function refreshWebUsagePill() {
 // ─── 히스토리 복원 ───────────────────────────────────────────────────────────
 
 let lastRenderedMsgId = 0;
+let lastRenderedSaveSignature = '';
+
+function getNoteSaveSignature(messages) {
+  return messages
+    .filter(message => message.noteSaved)
+    .map(message => message.id)
+    .join(',');
+}
 
 // 메시지 배열로 대화창을 처음부터 다시 그린다. (폴링 갱신과 공유)
 function renderMessages(messages) {
@@ -198,13 +206,14 @@ function renderMessages(messages) {
         lastUserContent = msg.content;
         appendUserBubble(msg.content);
       } else {
-        appendHistoryBubble(msg.content, msg.model, msg.id, lastUserContent);
+        appendHistoryBubble(msg.content, msg.model, msg.id, lastUserContent, msg.noteSaved);
       }
     });
   } finally {
     isRestoringHistory = false;
   }
   lastRenderedMsgId = messages.length ? (messages[messages.length - 1].id || 0) : 0;
+  lastRenderedSaveSignature = getNoteSaveSignature(messages);
 }
 
 async function loadHistory() {
@@ -219,7 +228,7 @@ async function loadHistory() {
   }
 }
 
-// 다른 기기에서 온 새 메시지 자동 반영: 7초마다, 탭 보일 때만, 최신 메시지 ID가 바뀌었을 때만 다시 그림.
+// 다른 기기에서 온 새 메시지 자동 반영: 7초마다, 탭 보일 때만, 메시지나 저장 상태가 바뀌었을 때 다시 그림.
 async function pollForUpdates() {
   if (document.hidden || isLoading) return;
   if (document.querySelector('.council-loading')) return;
@@ -229,7 +238,8 @@ async function pollForUpdates() {
     const { messages } = await res.json();
     if (!messages || messages.length === 0) return;
     const latestId = messages[messages.length - 1].id || 0;
-    if (latestId === lastRenderedMsgId) return;
+    const saveSignature = getNoteSaveSignature(messages);
+    if (latestId === lastRenderedMsgId && saveSignature === lastRenderedSaveSignature) return;
     renderMessages(messages);
   } catch (_) { /* 조용히 무시 */ }
 }
@@ -255,10 +265,10 @@ function restoreLocalUiHistory() {
   }
 }
 
-function appendHistoryBubble(content, model, messageId, question) {
+function appendHistoryBubble(content, model, messageId, question, noteSaved = false) {
   const councilData = parseCouncilTranscript(content, model);
   if (councilData) {
-    renderRestoredCouncilMessage(councilData, messageId);
+    renderRestoredCouncilMessage(councilData, messageId, noteSaved);
     return;
   }
 
@@ -279,13 +289,17 @@ function appendHistoryBubble(content, model, messageId, question) {
     saveBtn.title = '노트로 저장';
     saveBtn.setAttribute('aria-label', '노트로 저장');
     saveBtn.innerHTML = saveIconSvg();
-    saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, {
-      question,
-      reply:   content,
-      model:   model || 'AI',
-      modelId: null,
-      messageId,
-    })));
+    if (noteSaved) {
+      markSaveButtonSaved(saveBtn);
+    } else {
+      saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, {
+        question,
+        reply:   content,
+        model:   model || 'AI',
+        modelId: null,
+        messageId,
+      })));
+    }
     group.appendChild(saveBtn);
   }
 
@@ -336,7 +350,7 @@ function parseCouncilTranscript(content, model) {
   };
 }
 
-function renderRestoredCouncilMessage(data, messageId = null) {
+function renderRestoredCouncilMessage(data, messageId = null, noteSaved = false) {
   const container = document.createElement('div');
   container.className = 'council-group';
 
@@ -371,6 +385,7 @@ function renderRestoredCouncilMessage(data, messageId = null) {
     synthesis: data.synthesis,
     synthesizerModelId: data.synthesizerModelId,
     messageId,
+    noteSaved,
   });
 
   container.append(tag, body);
@@ -939,18 +954,23 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
   saveBtn.setAttribute('aria-label', '노트로 저장');
   saveBtn.innerHTML = saveIconSvg();
   const noteDraftMode = debateData.councilDraftMode || councilDraftMode;
-  saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveCouncilNote(saveBtn, {
-    question,
-    claudeDraft:      debateData.claudeDraft,
-    gptCritique:      debateData.gptCritique,
-    revisedDraft:     reviewData.revisedDraft,
-    gptCritique2:     reviewData.gptCritique2,
-    divergence:       data.divergence,
-    synthesis:        data.synthesis,
-    messageId:        data.messageId,
-    councilDraftMode: noteDraftMode,
-    webSources:       debateData.webSources || [],
-  })));
+  if (data.noteSaved) {
+    markSaveButtonSaved(saveBtn);
+  } else {
+    saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveCouncilNote(saveBtn, {
+      question,
+      claudeDraft:      debateData.claudeDraft,
+      gptCritique:      debateData.gptCritique,
+      revisedDraft:     reviewData.revisedDraft,
+      gptCritique2:     reviewData.gptCritique2,
+      divergence:       data.divergence,
+      synthesis:        data.synthesis,
+      messageId:        data.messageId,
+      councilDraftMode: noteDraftMode,
+      webSources:       debateData.webSources || [],
+    })));
+    if (!isRestoringHistory) watchMessageSaveState(saveBtn, data.messageId);
+  }
 
   synthSection.append(synthLabel, synthBubble, saveBtn);
   body.appendChild(synthSection);
@@ -980,6 +1000,34 @@ function buildCouncilTranscript(question, debateData, reviewData, data) {
 
 // ── 노트 저장 ──────────────────────────────────────────────────────────────
 
+function markSaveButtonSaved(btn) {
+  btn.disabled = true;
+  btn.innerHTML = checkIconSvg();
+  btn.title = '저장됨';
+  btn.setAttribute('aria-label', '저장됨');
+  btn.classList.remove('error');
+  btn.classList.add('saved');
+}
+
+function watchMessageSaveState(btn, messageId) {
+  const id = Number(messageId);
+  if (!Number.isSafeInteger(id) || id <= 0) return;
+
+  [1500, 4000].forEach(delay => {
+    setTimeout(async () => {
+      if (!btn.isConnected || btn.disabled || btn.classList.contains('saved')) return;
+      try {
+        const res = await apiFetch(`/api/messages/${id}/save-status`);
+        if (!res.ok) return;
+        const result = await res.json();
+        if (result.saved) markSaveButtonSaved(btn);
+      } catch (_) {
+        // 기존 7초 히스토리 폴링이 최종 상태를 다시 확인한다.
+      }
+    }, delay);
+  });
+}
+
 async function saveCouncilNote(btn, data) {
   btn.disabled = true;
   btn.innerHTML = loadingIconSvg();
@@ -991,10 +1039,7 @@ async function saveCouncilNote(btn, data) {
     });
     const result = await res.json();
     if (result.success) {
-      btn.innerHTML = checkIconSvg();
-      btn.title = '저장됨';
-      btn.setAttribute('aria-label', '저장됨');
-      btn.classList.add('saved');
+      markSaveButtonSaved(btn);
       showToast(`저장됨: ${result.title}`);
     } else {
       btn.innerHTML = saveIconSvg();
@@ -2649,10 +2694,7 @@ async function saveNote(btn, data) {
     });
     const result = await res.json();
     if (result.success) {
-      btn.innerHTML = checkIconSvg();
-      btn.title = '저장됨';
-      btn.setAttribute('aria-label', '저장됨');
-      btn.classList.add('saved');
+      markSaveButtonSaved(btn);
       showToast(`저장됨: ${result.title}`);
     } else {
       btn.innerHTML = saveIconSvg();
@@ -2720,6 +2762,7 @@ function appendAssistantBubble(data) {
 
   group.append(label, bubble, saveBtn);
   getMessages().appendChild(group);
+  watchMessageSaveState(saveBtn, data.messageId);
   saveUiMessage('assistant', data.reply, data.model);
   scrollDown();
 }
