@@ -4547,7 +4547,13 @@ function kickOrganizeWorker() {
     try {
       while (true) {
         const result = await runNextCodexJob();
-        if (!result) break;
+        if (!result) {
+          // 배치 크기 제한으로 한 job이 pending 전부를 담지 못하므로,
+          // job 큐가 비어도 pending 노트가 남아있으면 다음 배치 job을 만들어 이어간다.
+          // (실패 시엔 아래 break로 멈추므로 실패 노트 무한 재시도는 없음)
+          if (!createCodexJobFromPending()) break;
+          continue;
+        }
 
         if (result.status === 'processed') {
           writeGraphReport().catch(err => {
