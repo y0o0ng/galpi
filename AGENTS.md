@@ -86,10 +86,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **프로젝트 현재 상태**
 
 - 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크와 Clawd 패널 이동 확장까지 Pi 배포 완료 (`a70d9d0`, `1d4c704`, `78583e9`, `d145784`, `874c47a`, `c9bf470`). Pi에서 `node:test` 17개, 실제 TradingAgents 논문 저장, DB·볼트 `note_type: paper`, 29,531자 임베딩, 하이브리드 검색 1순위 회수, 인증 노트 목록 API와 새 정적 파일 응답을 확인했다.
-- 현재 개발 상태: 2.5A 제품 연결 전 파서 spike 완료. `pdf-parse` 2.4.5로 TradingAgents PDF 38페이지·104,235자를 Mac/Pi에서 동일하게 추출했고, Pi 격리 환경에서 약 1.1초·최대 RSS 156MB·의존성 설치 용량 약 87MB를 측정했다. 서버·DB·UI와 Pi 앱에는 아직 연결·배포하지 않았다.
-- 다음 개발 시작점: 변경 이유·구조·운영 영향을 설명하고 컨펌받은 뒤 `lib/paper-fulltext.js`를 기반으로 2.5A Phase B 전용 DB 테이블·숨김 원본 캐시·청크 분할/검색을 구현한다. 모델 도구는 Phase C로 분리한다. 실제 브라우저 확인, Claude 질문 컨텍스트와 Codex paper 태그·링크 인수도 남아 있다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다.
+- 현재 개발 상태: 2.5A Phase A 파서 spike와 Phase B 로컬 색인·검색 구현 완료, Pi 앱 배포 전. `paper_documents`/`paper_chunks`, 해시 기반 숨김 원본 캐시, 동시 색인 직렬화, SHA-256 중복 차단, 중단 복구와 BM25/선택적 임베딩 검색을 별도 모듈에 구현했다. Mac 임시 환경에서 TradingAgents 38페이지·104,235자를 97개 청크로 색인했고 방법론·실험·한계 질문 3/3의 목표 근거가 top 4에 들어왔다. 서버에는 스키마 초기화만 연결했다.
+- 다음 개발 시작점: Phase B 커밋을 Pi에 배포해 전용 테이블·캐시·검색을 재검증한다. 이후 URL 다운로드·redirect별 SSRF 방어, 도구 호출 2회·누적 10,000자 상한과 모델 통합 영향을 설명하고 컨펌받은 뒤 Phase C `paper_fulltext_search`/`paper_fulltext_read`를 연결한다. 실제 브라우저 확인, Claude 질문 컨텍스트와 Codex paper 태그·링크 인수도 남아 있다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
-- 코드 구조 방향: `server.js`는 현재 5,594줄. 기존 코드를 한꺼번에 분해하지 말고, 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
+- 코드 구조 방향: `server.js`는 현재 5,596줄. 기존 코드를 한꺼번에 분해하지 말고, 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것
 - 비용 확인은 상단 `Claude 크레딧 ↗`에서 공식 Billing을 연다. 잔액 자동 조회는 하지 않고 Console 로그인 정보·쿠키·관리자 키를 앱에 저장하지 않을 것
 - 노트 구조 방향: v4 유지. 사람도 읽기 좋고 AI도 회수하기 좋은 형식. CODEX 마커 구역은 Codex가 안전하게 편집할 수 있는 영역으로 유지

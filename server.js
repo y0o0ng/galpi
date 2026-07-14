@@ -15,6 +15,7 @@ const { runBackup, listBackups } = require('./scripts/backup');
 const { searchSemanticScholar } = require('./lib/paper-search');
 const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
 const { createPaperNoteSaver } = require('./lib/paper-notes');
+const { initializePaperFullTextSchema } = require('./lib/paper-fulltext');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -473,6 +474,7 @@ if (!db.prepare('PRAGMA table_info(auto_save_decisions)').all().some(c => c.name
   db.exec('ALTER TABLE auto_save_decisions ADD COLUMN organize_queued INTEGER NOT NULL DEFAULT 0');
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_queue ON auto_save_decisions(organize_queued, decision, action)');
+initializePaperFullTextSchema(db);
 
 const stmtGetNotificationAction = db.prepare(`
   SELECT status FROM notification_actions WHERE notification_id = ? LIMIT 1
