@@ -85,9 +85,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **프로젝트 현재 상태**
 
-- 현재 배포 상태: V4 논문 검색 1차·함정 케이스 mock·429/5xx 지수 백오프까지 Pi 배포·인수 완료 (`a70d9d0`, `1d4c704`, `78583e9`). `S2_API_KEY` 실검색은 HTTP 200·결과 10개, 성공 응답 캐시, Playwright 카드 렌더링과 `node:test` 10개를 통과했다.
-- 현재 개발 상태: V4 논문 검색 2차와 논문 서재 UI Mac 구현 완료. `lib/paper-notes.js`, `note_type: paper`, 활성 노트 기준 `paper_id` 중복 차단, 저장 상태 복원, 기존 임베딩·Codex 큐 연결에 더해 `public/paper-panel.js`의 저장 논문 목록·읽기 전용 상세·검색/저장, 데스크톱 사이드 패널·모바일 바텀시트를 구현했다. `node:test` 17개와 mock Playwright 검증을 통과했고 Pi 배포·실데이터 인수 전이다.
-- 다음 개발 시작점: 2차 코드를 Pi에 배포해 실제 논문 저장 후 임베딩·하이브리드 검색·질문 컨텍스트·Codex 태그/링크를 인수한다. 통과하면 V4 음성 입력으로 진행한다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다.
+- 현재 배포 상태: V4 논문 검색 1·2차와 논문 서재 UI까지 Pi 배포 완료 (`a70d9d0`, `1d4c704`, `78583e9`, `d145784`, `874c47a`). Pi에서 `node:test` 17개, 실제 TradingAgents 논문 저장, DB·볼트 `note_type: paper`, 29,531자 임베딩, 하이브리드 검색 1순위 회수, Codex 형식 검증을 통과했다.
+- 현재 개발 상태: `lib/paper-notes.js`의 저장·중복 차단과 `public/paper-panel.js`의 저장 논문 목록·읽기 전용 상세·검색/저장, 데스크톱 사이드 패널·모바일 바텀시트가 Pi에서 운영 중이다. 단순 열람은 activeNotes를 바꾸지 않으며 에이전트 탭은 자리만 열어둔다.
+- 다음 개발 시작점: 실제 Claude 질문에서 저장 논문이 자동 컨텍스트로 잡히는지 확인하고, Codex가 paper 노트의 태그·링크를 처리하는지 인수한다. 통과하면 V4 음성 입력으로 진행한다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
 - 코드 구조 방향: `server.js`는 현재 5,593줄. 기존 코드를 한꺼번에 분해하지 말고, 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것
