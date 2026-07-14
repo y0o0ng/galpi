@@ -156,6 +156,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### 핵심 A — 논문 검색 (반나절×2, 상세는 별도 설계 문서 `paper-search-design.md`)
 > 1차 Pi 인수 완료 (`a70d9d0`, mock 보강 `1d4c704`, 백오프 `78583e9`): 별도 `lib/paper-search.js`, `/api/papers/search`, `/paper` 결과 카드, 10분 캐시, 429/5xx 지수 백오프·timeout 처리와 `node:test` 10개를 추가했다. Pi에서 S2 키 실검색 HTTP 200·결과 10개, 성공 응답 캐시, Playwright 실제 카드 렌더링을 확인했다.
+>
+> **다음 작업:** 2차 [저장] 버튼 → `note_type: paper` 노트 생성 → `paper_id` 중복 차단 → 기존 검색·임베딩·Codex 편입 검증.
 
 1. `/paper 검색어` → Semantic Scholar API 검색 → 결과 카드 (LLM 호출 0)
 2. [저장] 클릭 → note_type `paper` 노트 생성 → 기존 파이프라인 자동 편입 (임베딩·검색·Codex)
