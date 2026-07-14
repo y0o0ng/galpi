@@ -89,7 +89,7 @@ Codex가 사서로서 뒤에서 일하고, 시스템이 견고해진다.
 3. 숨김(soft delete) 처리 (`_archive` 이동 + 그래프·검색 제외)
 4. 보안 점검 (.env 보호, path traversal 차단, 프롬프트 인젝션 방지)
 
-> 최근 저장 추적 보강 완료 (2026-07-15, Pi 배포 전): Clawd 알림센터에 `최근 저장` 탭을 추가했다. 기존 `auto_save_decisions`를 활성 topic 노트와 조인해 질문/메모, 새 토픽 생성·기존 토픽 추가, 저장 시각과 현재 대상 토픽을 표시하고 카드를 누르면 노트 상세를 연다. AI 호출과 저장 판단 로직은 바꾸지 않는다. 단위 테스트와 모바일 390px·데스크톱 1440px Playwright 검증을 통과했다.
+> 최근 저장 추적 보강 Pi 배포 완료 (`5d28d73`, 2026-07-15): Clawd 알림센터에 `최근 저장` 탭을 추가했다. 기존 `auto_save_decisions`를 활성 topic 노트와 조인해 질문/메모, 새 토픽 생성·기존 토픽 추가, 저장 시각과 현재 대상 토픽을 표시하고 카드를 누르면 노트 상세를 연다. AI 호출과 저장 판단 로직은 바꾸지 않는다. 모바일 390px·데스크톱 1440px Playwright 검증과 Pi 전체 테스트 30개를 통과했고, 실사용 API에서 최근 저장 30건을 확인했다.
 
 ### 보너스 (나중)
 - `/challenge`, `/synthesize` 같은 고급 명령
@@ -167,14 +167,14 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 >
 > 2.5A 파서 spike 완료 (2026-07-15, 제품 연결 전): `lib/paper-fulltext.js`에 `pdf-parse` 2.4.5 기반 페이지 텍스트·섹션 추출을 분리했다. TradingAgents PDF 38페이지에서 104,235자를 Mac/Pi 동일하게 추출했고, Pi 격리 환경은 약 1.1초·최대 RSS 156MB·설치 용량 약 87MB였다. 잘못된 PDF, 빈 텍스트, 100페이지 초과와 파서 실패를 테스트하며 서버·DB·UI에는 아직 연결하지 않았다.
 >
-> 2.5A Phase B 로컬 색인·검색 구현 완료 (2026-07-15, Pi 앱 배포 전): `paper_documents`/`paper_chunks`, 해시 기반 `.paper-sources` 원본 캐시, 논문별 동시 색인 직렬화, SHA-256 중복 차단, 중단 복구, 섹션·페이지 청킹과 BM25/선택적 임베딩 검색을 별도 모듈에 구현했다. 실제 TradingAgents 38페이지·104,235자를 Mac 임시 환경에서 97개 청크로 색인했고 방법론·실험·한계 질문 3/3의 목표 근거가 top 4에 들어왔다. 기존 `note_chunks`, paper 노트 본문과 Codex 큐는 건드리지 않는다.
+> 2.5A Phase B 로컬 색인·검색 Pi 배포 완료 (`1078df5`, 2026-07-15): `paper_documents`/`paper_chunks`, 해시 기반 `.paper-sources` 원본 캐시, 논문별 동시 색인 직렬화, SHA-256 중복 차단, 중단 복구, 섹션·페이지 청킹과 BM25/선택적 임베딩 검색을 별도 모듈에 구현했다. Pi 임시 DB·볼트에서 TradingAgents 38페이지·104,235자를 97개 청크로 색인했고 원본 캐시, 두 번째 색인 재사용, 방법론·실험·한계 질의의 top 4 근거 회수를 확인했다. 기존 `note_chunks`, paper 노트 본문, Codex 큐와 실사용 전문 테이블 데이터는 건드리지 않았다.
 >
-> **다음 작업:** 현재 커밋을 Pi에 배포해 전용 테이블·캐시·검색을 재검증한다. 이후 변경 이유·외부 입력 보안·토큰 상한을 설명하고 컨펌받은 뒤 Phase C에서 공개 PDF URL 다운로드/SSRF 방어와 `paper_fulltext_search`/`paper_fulltext_read` 모델 도구를 연결한다. 실제 브라우저의 모바일 바텀시트·공개 PDF 열기, Claude 질문 컨텍스트와 Codex paper 태그·링크 인수도 별도로 남아 있다.
+> **다음 작업:** 변경 이유·외부 입력 보안·토큰 상한을 설명하고 컨펌받은 뒤 Phase C에서 공개 PDF URL 다운로드/redirect별 SSRF 방어와 `paper_fulltext_search`/`paper_fulltext_read` 모델 도구를 연결한다. 실제 브라우저의 모바일 바텀시트·공개 PDF 열기, Claude 질문 컨텍스트와 Codex paper 태그·링크 인수도 별도로 남아 있다. 배포 시 확인된 `npm audit` 경고 3건은 `pdf-parse` 경로가 아닌 기존 `dompurify`, `form-data`, `hono`이며 자동 수정 대신 별도 회귀 테스트와 함께 갱신한다.
 
 1. 패널 검색 또는 `/paper 검색어` → Semantic Scholar API 검색 → 논문 서재 결과 카드 (LLM 호출 0)
 2. [저장] 클릭 → note_type `paper` 노트 생성 → 기존 파이프라인 자동 편입 (임베딩·검색·Codex)
 3. 기존 웹 검색 모듈(`searchTavilyWeb` 등)에 1:1 매핑해 구현 — 새 의존성 0
-4. (2.5A) **저장 논문 전문 능동 독서** — 파서 spike와 로컬 색인·검색 구현 완료(Pi 앱 배포 전), 모델 도구는 구현 전. 초록으로 부족할 때만 공개 PDF를 1회 색인하고, 모델이 `paper_fulltext_search`/`paper_fulltext_read`로 필요한 섹션·페이지를 최대 2회 검색. 질문당 전문 컨텍스트는 최대 3,000토큰
+4. (2.5A) **저장 논문 전문 능동 독서** — 파서 spike와 로컬 색인·검색 Pi 배포·검증 완료, 모델 도구는 구현 전. 초록으로 부족할 때만 공개 PDF를 1회 색인하고, 모델이 `paper_fulltext_search`/`paper_fulltext_read`로 필요한 섹션·페이지를 최대 2회 검색. 질문당 전문 컨텍스트는 최대 3,000토큰
 5. (2.5B, v1이 잘 돌면) 웹 검색 tool 패턴을 복제해 외부 논문 발견 검색을 모델이 자율 호출 — 검색만 자율, 저장은 사용자 클릭 유지
 
 ### 핵심 B — 음성 입력

@@ -85,9 +85,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **프로젝트 현재 상태**
 
-- 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크와 Clawd 패널 이동 확장까지 Pi 배포 완료 (`a70d9d0`, `1d4c704`, `78583e9`, `d145784`, `874c47a`, `c9bf470`). Pi에서 `node:test` 17개, 실제 TradingAgents 논문 저장, DB·볼트 `note_type: paper`, 29,531자 임베딩, 하이브리드 검색 1순위 회수, 인증 노트 목록 API와 새 정적 파일 응답을 확인했다.
-- 현재 개발 상태: 알림센터 `최근 저장` 추적과 2.5A Phase A/B 구현 완료, Pi 앱 배포 전. 최근 저장은 `auto_save_decisions`를 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 표시하고 클릭 시 노트 상세를 연다. AI 호출·저장 판단은 바꾸지 않았다. 모바일/데스크톱 Playwright와 전체 테스트 30개를 통과했다. 전문검색은 TradingAgents 38페이지·104,235자를 97개 청크로 색인하고 방법론·실험·한계 질문 3/3의 목표 근거가 top 4에 들어왔다.
-- 다음 개발 시작점: 최근 저장 커밋과 Phase A/B를 Pi에 함께 배포해 최근 저장 API/UI, 전용 테이블·캐시·검색을 재검증한다. 이후 URL 다운로드·redirect별 SSRF 방어, 도구 호출 2회·누적 10,000자 상한과 모델 통합 영향을 설명하고 컨펌받은 뒤 Phase C `paper_fulltext_search`/`paper_fulltext_read`를 연결한다. 실제 브라우저 확인, Claude 질문 컨텍스트와 Codex paper 태그·링크 인수도 남아 있다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다.
+- 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크, Clawd 패널 이동, 알림센터 `최근 저장`, 2.5A Phase A/B까지 Pi 배포 완료 (`c9bf470`, `4c3d07f`, `1078df5`, `5d28d73`). Pi에서 전체 테스트 30개, 최근 저장 API 30건, Semantic Scholar 실검색 5건, 전문 전용 테이블 생성을 확인했다.
+- 현재 개발 상태: 최근 저장은 `auto_save_decisions`를 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 표시하고 클릭 시 노트 상세를 연다. AI 호출·저장 판단은 바꾸지 않았다. 전문검색은 Pi 임시 DB·볼트에서 TradingAgents 38페이지·104,235자를 97개 청크로 색인했고 원본 캐시, 두 번째 색인 재사용, 방법론·실험·한계 질의의 top 4 근거 회수를 확인했다. 실사용 DB에는 전문 문서·청크를 남기지 않았다.
+- 다음 개발 시작점: URL 다운로드·redirect별 SSRF 방어, 도구 호출 2회·누적 10,000자 상한과 모델 통합 영향을 설명하고 컨펌받은 뒤 Phase C `paper_fulltext_search`/`paper_fulltext_read`를 연결한다. 실제 브라우저 확인, Claude 질문 컨텍스트와 Codex paper 태그·링크 인수도 남아 있다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다. `npm audit`의 기존 의존성 경고(`dompurify`, `form-data`, `hono`)는 자동 수정하지 말고 별도 회귀 테스트와 함께 갱신한다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
 - 코드 구조 방향: `server.js`는 현재 5,605줄. 기존 코드를 한꺼번에 분해하지 말고, 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것
