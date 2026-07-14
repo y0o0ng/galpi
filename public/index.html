@@ -18,6 +18,11 @@
         <div id="header-tools">
           <span id="web-usage-pill" class="header-pill web-usage-pill" title="외부 검색 사용량">Web off</span>
           <a class="header-pill billing-link" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener noreferrer" title="남은 Claude API 크레딧 확인" aria-label="Claude Billing에서 남은 API 크레딧 확인">Claude 크레딧 <span aria-hidden="true">↗</span></a>
+          <button id="knowledge-panel-toggle" title="지식 패널 열기" aria-label="지식 패널 열기" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"></path>
+            </svg>
+          </button>
           <button id="theme-toggle" title="다크/라이트 모드 전환" aria-label="테마 전환">
             <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
@@ -50,30 +55,61 @@
       </div>
     </header>
 
-    <div id="chat">
-      <div id="messages"></div>
-    </div>
+    <main id="workspace">
+      <section id="chat-column" aria-label="AI 채팅">
+        <div id="chat">
+          <div id="messages"></div>
+        </div>
 
-    <div id="notes-bar" style="display:none"></div>
+        <div id="notes-bar" style="display:none"></div>
 
-    <div id="command-palette" style="display:none"></div>
+        <div id="command-palette" style="display:none"></div>
 
-    <div id="input-area">
-      <textarea id="input" placeholder="질문을 입력하세요… (Shift+Enter로 줄바꿈)" rows="1"></textarea>
-      <button id="send-btn" title="전송 (Enter)">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>
+        <div id="input-area">
+          <textarea id="input" placeholder="질문을 입력하세요… (Shift+Enter로 줄바꿈)" rows="1"></textarea>
+          <button id="send-btn" title="전송 (Enter)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </section>
 
+      <aside id="knowledge-panel" aria-label="지식 패널">
+        <div id="knowledge-panel-head">
+          <nav id="knowledge-tabs" aria-label="지식 유형">
+            <button class="knowledge-tab" data-panel-tab="agents" type="button">에이전트</button>
+            <button class="knowledge-tab active" data-panel-tab="papers" type="button">논문</button>
+          </nav>
+          <button id="knowledge-panel-close" type="button" title="지식 패널 닫기" aria-label="지식 패널 닫기">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m18 6-12 12"></path><path d="m6 6 12 12"></path></svg>
+          </button>
+        </div>
+
+        <section id="agent-panel" class="knowledge-panel-view" hidden>
+          <div class="panel-empty-state">준비 중</div>
+        </section>
+
+        <section id="paper-panel" class="knowledge-panel-view">
+          <form id="paper-panel-search" role="search">
+            <input id="paper-panel-query" type="search" maxlength="200" placeholder="논문 검색" autocomplete="off" aria-label="논문 검색어">
+            <button type="submit" title="논문 검색" aria-label="논문 검색">
+              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            </button>
+          </form>
+          <div id="paper-panel-content" aria-live="polite"></div>
+        </section>
+      </aside>
+    </main>
   </div>
+  <div id="knowledge-panel-backdrop" hidden></div>
   <div id="pet">
     <img id="pet-img" src="/lib/icons/Claude_code_pet/clawd-idle.gif" alt="clawd" draggable="false">
   </div>
   <script src="lib/marked.min.js"></script>
   <script src="lib/purify.min.js"></script>
+  <script src="paper-panel.js"></script>
   <script src="app.js"></script>
   <script src="pet.js"></script>
 </body>

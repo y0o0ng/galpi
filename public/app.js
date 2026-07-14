@@ -99,6 +99,7 @@ async function init() {
   try {
     const config = await apiFetch('/api/config').then(r => r.json());
     if (ensureApiToken(config)) return;
+    initPaperPanel();
     document.getElementById('model-indicator').textContent =
       `기본 Claude: ${config.claudeModel}  |  의회 GPT: ${config.gptModel}`;
     renderWebUsagePill(config.webSearch);
@@ -1073,133 +1074,23 @@ async function saveCouncilNote(btn, data) {
 async function handlePaperSearch(query) {
   document.querySelector('.welcome')?.remove();
   appendUserBubble(`/paper ${query}`);
-
-  const loadingEl = appendLoading();
-  try {
-    const res = await apiFetch(`/api/papers/search?q=${encodeURIComponent(query)}`);
-    const data = await res.json();
-    loadingEl.remove();
-
-    if (!res.ok || data.error) {
-      appendError(data.error || '논문 검색에 실패했습니다.');
-      return;
-    }
-    if (!Array.isArray(data.results) || data.results.length === 0) {
-      appendError(`"${query}" 관련 논문을 찾지 못했습니다.`);
-      return;
-    }
-
-    renderPaperResults(data);
-  } catch (_) {
-    loadingEl.remove();
-    appendError('논문 검색 서버에 연결할 수 없습니다.');
+  if (!window.PaperPanel) {
+    appendError('논문 패널을 불러오지 못했습니다.');
+    return;
   }
+  await window.PaperPanel.search(query);
 }
 
-function formatPaperAuthors(authors) {
-  if (!Array.isArray(authors) || authors.length === 0) return '저자 정보 없음';
-  if (authors.length <= 4) return authors.join(', ');
-  return `${authors.slice(0, 4).join(', ')} 외 ${authors.length - 4}명`;
-}
-
-async function savePaperNote(btn, paper) {
-  btn.disabled = true;
-  btn.innerHTML = loadingIconSvg();
-  try {
-    const res = await apiFetch('/api/papers/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paper }),
-    });
-    const result = await res.json();
-    if (!res.ok || !result.success) throw new Error(result.error || '논문 저장에 실패했습니다.');
-
-    paper.saved = true;
-    markSaveButtonSaved(btn);
-    showToast(result.duplicate ? `이미 저장된 논문이야: ${result.title}` : `논문 저장됨: ${result.title}`);
-  } catch (error) {
-    btn.innerHTML = saveIconSvg();
-    btn.title = '다시 시도';
-    btn.setAttribute('aria-label', '다시 시도');
-    btn.classList.add('error');
-    btn.disabled = false;
-    showToast(`오류: ${error.message}`);
-  }
-}
-
-function makePaperCard(paper) {
-  const card = document.createElement('article');
-  card.className = 'paper-card';
-
-  const top = document.createElement('div');
-  top.className = 'paper-card-top';
-
-  const meta = document.createElement('div');
-  meta.className = 'paper-card-meta';
-  const year = Number.isInteger(paper.year) ? String(paper.year) : '연도 미상';
-  const citations = Number(paper.citationCount || 0).toLocaleString('ko-KR');
-  meta.textContent = `${year} · 인용 ${citations}`;
-
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'save-btn icon-save-btn paper-card-save';
-  saveBtn.title = '논문 노트로 저장';
-  saveBtn.setAttribute('aria-label', '논문 노트로 저장');
-  saveBtn.innerHTML = saveIconSvg();
-  if (paper.saved) {
-    markSaveButtonSaved(saveBtn);
-  } else {
-    saveBtn.addEventListener('click', () => savePaperNote(saveBtn, paper));
-  }
-  top.append(meta, saveBtn);
-
-  const title = document.createElement('a');
-  title.className = 'paper-card-title';
-  title.href = paper.url;
-  title.target = '_blank';
-  title.rel = 'noopener noreferrer';
-  title.textContent = `${paper.title} ↗`;
-
-  const authors = document.createElement('div');
-  authors.className = 'paper-card-authors';
-  authors.textContent = formatPaperAuthors(paper.authors);
-
-  card.append(top, title, authors);
-
-  const summaryText = paper.tldr || paper.abstract;
-  if (summaryText) {
-    const summary = document.createElement('p');
-    summary.className = 'paper-card-summary';
-    summary.textContent = summaryText;
-    card.appendChild(summary);
-  }
-
-  return card;
-}
-
-function renderPaperResults(data) {
-  const wrap = document.createElement('section');
-  wrap.className = 'paper-results';
-
-  const header = document.createElement('div');
-  header.className = 'paper-results-head';
-
-  const count = document.createElement('span');
-  count.className = 'paper-results-count';
-  count.textContent = `논문 ${data.results.length}개`;
-
-  const source = document.createElement('span');
-  source.className = 'paper-results-source';
-  const sourceLabels = ['Semantic Scholar'];
-  if (data.mock) sourceLabels.push('테스트 데이터');
-  if (data.cached) sourceLabels.push('캐시');
-  source.textContent = sourceLabels.join(' · ');
-
-  header.append(count, source);
-  wrap.appendChild(header);
-  data.results.forEach(paper => wrap.appendChild(makePaperCard(paper)));
-
-  getMessages().appendChild(wrap);
-  scrollDown();
+function initPaperPanel() {
+  window.PaperPanel?.init({
+    apiFetch,
+    showToast,
+    icons: {
+      save: saveIconSvg,
+      check: checkIconSvg,
+      loading: loadingIconSvg,
+    },
+  });
 }
 
 async function handleSearch(query) {

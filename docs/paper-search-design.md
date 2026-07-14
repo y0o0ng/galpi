@@ -2,7 +2,7 @@
 
 > 작성: 2026-07 (1차 구현·Pi 인수 완료)
 
-> 현재 상태 (2026-07-14): 1차 검색 Pi 인수 완료. 2차 논문 저장·중복 차단은 Mac 구현과 mock 통합 검증을 마쳤으며 Pi 배포 후 실제 임베딩·회수·Codex 인수가 남았다.
+> 현재 상태 (2026-07-14): 1차 검색 Pi 인수 완료. 2차 논문 저장·중복 차단과 논문 서재 UI는 Mac 구현·mock 통합 검증을 마쳤으며 Pi 배포 후 실제 임베딩·회수·Codex 인수가 남았다.
 
 ## 0. 한 줄 요약
 
@@ -42,7 +42,8 @@ arXiv/OpenAlex는 대안으로 보관 — S2가 부족하다고 *실측*될 때�
 - `lib/paper-search.js`: Semantic Scholar 호출, 응답 검증·정규화, 검색 캐시
 - `lib/paper-notes.js`: 논문 노트 포맷, 저장 직렬화·중복 처리
 - `server.js`: 환경 설정, 기존 노트 저장 파이프라인 연결, 얇은 API 라우트
-- `public/app.js`: `/paper` 명령과 결과 카드·저장 동작
+- `public/app.js`: `/paper` 명령을 논문 패널로 연결
+- `public/paper-panel.js`: 저장 논문 목록·읽기 전용 상세·검색 결과·저장 동작
 
 기존 `server.js`를 먼저 분해하지는 않는다. 논문 검색부터 새 기능을 모듈로 시작하고, 기존 웹 검색 코드는 그 영역을 크게 수정할 때 테스트와 함께 옮긴다.
 
@@ -62,13 +63,13 @@ arXiv/OpenAlex는 대안으로 보관 — S2가 부족하다고 *실측*될 때�
 ```
 /paper 검색어
   → GET /api/papers/search?q=...        (LLM 호출 0)
-  → 결과 카드 렌더 (제목·연도·인용수·tldr) + [저장] 버튼
+  → 논문 서재 패널에 결과 카드 렌더 (제목·연도·인용수·tldr) + [저장] 버튼
   → [저장] 클릭 → POST /api/papers/save
   → note_type 'paper' 노트 생성 (기존 노트 생성 흐름 재사용)
   → 이후 자동: 임베딩 생성 → codex_jobs 큐 → 하이브리드 검색 대상 편입
 ```
 
-저장된 논문에 대해 대화하고 싶으면? **아무것도 새로 안 만든다.** 이미 노트니까 자동 검색(`getContextNotesForQuestion`)이나 activeNotes로 컨텍스트에 들어온다.
+저장된 논문에 대해 대화하고 싶으면? **아무것도 새로 안 만든다.** 이미 노트니까 자동 검색(`getContextNotesForQuestion`)이나 사용자가 명시적으로 선택한 activeNotes로 컨텍스트에 들어온다. 논문 서재에서 읽기 전용으로 여는 것만으로는 activeNotes를 바꾸지 않는다.
 
 ## 4. API 설계
 
@@ -150,12 +151,14 @@ confidence: medium
 
 임베딩 대상: 제목 + TL;DR + 초록 (기존 `buildSemanticEmbeddingText` 흐름에 태움).
 
-## 6. UI (app.js / style.css)
+## 6. UI (paper-panel.js / app.js / style.css)
 
 - 슬래시 명령 팔레트에 `/paper ` 등록 (autoSend: false — 검색어 입력 필요)
-- 결과 카드: **제목(링크) · 연도 · 인용수 · tldr 한 줄** + [저장] 버튼
+- 데스크톱은 채팅 오른쪽 350px 사이드 패널, 900px 이하는 바텀시트
+- 기본 화면은 저장된 `paper` 노트 목록. 선택하면 읽기 전용 상세를 열고 activeNotes는 바꾸지 않음
+- 패널 검색과 `/paper` 명령은 같은 결과 화면을 사용. 결과 카드: **제목(링크) · 연도 · 인용수 · tldr 한 줄** + [저장] 버튼
 - 저장 완료 시 버튼 → “저장됨 ✓” 비활성화. 재검색·새로고침 후에도 DB의 `paper_id` 조회로 상태 복원
-- Clawd 펫 메뉴에 “📄 논문 검색” 항목 추가 (선택)
+- 에이전트 탭은 후속 기능을 위한 자리만 표시하고 현재는 `준비 중`
 
 ## 7. 통제·보안 체크리스트
 
@@ -179,6 +182,7 @@ confidence: medium
 - [x] `savePaperAsNote` + `/api/papers/save` + [저장] 버튼 + note_type paper
 - [x] 활성 노트 `paper_id` 고유 인덱스 + 동시 저장 직렬화 + 재검색 상태 복원
 - [x] mock 저장 노트 생성·Codex 형식 검증·동시 요청 중복 차단·데스크톱/모바일 UI 검증
+- [x] 논문 서재 모듈 + `noteType=paper` 목록 필터 + 읽기 전용 상세 + 데스크톱 사이드 패널·모바일 바텀시트
 - [ ] Pi 실데이터 검증: ① 임베딩 생김 ② `/search`로 검색됨 ③ 관련 질문 시 자동 컨텍스트로 잡힘 ④ Codex가 태그/링크 채움
 
 **2.5차 — 모델 자율 호출** (v1이 한동안 잘 돌아간 뒤에)
@@ -206,7 +210,8 @@ confidence: medium
 - `lib/paper-search.js`: S2 호출·정규화·캐시
 - `lib/paper-notes.js`: 노트 포맷·저장 직렬화·중복 처리
 - `server.js`: 설정 + 기존 저장 흐름 연결 + 얇은 라우트 2개 (~30~50줄)
-- app.js: 명령 등록 + 카드 렌더 (~80줄)
-- style.css: 카드 스타일 (~30줄)
+- `public/app.js`: 명령 등록 + 패널 연결
+- `public/paper-panel.js`: 저장 논문·검색·상세·저장 UI
+- `public/style.css`: 데스크톱 패널·모바일 바텀시트
 - 설계 문서: 섹션 3·16 note_type 목록에 `paper` 추가
 - 새 의존성: **0개**

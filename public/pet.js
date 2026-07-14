@@ -81,6 +81,11 @@ function updateZone() {
     zone = { min: rect.right + 5, max: window.innerWidth - PET_SIZE - 5 };
   } else if (leftW >= 10) {
     zone = { min: 5, max: rect.left - PET_SIZE - 5 };
+  } else if (window.innerWidth > 900) {
+    const chatRect = document.getElementById('chat-column')?.getBoundingClientRect();
+    const min = (chatRect?.left ?? rect.left) + 10;
+    const max = Math.max(min, (chatRect?.right ?? rect.right) - PET_SIZE - 10);
+    zone = { min, max };
   } else {
     // 창이 좁아서 여백 없음 → 하단 고정 우측 코너
     zone = { min: window.innerWidth - PET_SIZE - 10, max: window.innerWidth - PET_SIZE - 10 };

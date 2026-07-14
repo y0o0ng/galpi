@@ -567,7 +567,7 @@
 
 > 갱신: 2026-07-14. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 저장 상태 복원 수정, V4 논문 검색 1차까지 Pi 인수 완료. 논문 저장·`paper_id` 중복 차단 2차는 Mac 구현·mock 통합 검증을 마쳤고 Pi 배포·실데이터 인수 전이다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
+- **현재 단계:** V3.5와 저장 상태 복원 수정, V4 논문 검색 1차까지 Pi 인수 완료. 논문 저장·`paper_id` 중복 차단과 논문 서재 UI는 Mac 구현·mock 통합 검증을 마쳤고 Pi 배포·실데이터 인수 전이다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
@@ -575,7 +575,7 @@
   - Pi 이식 — systemd 기반 상시 실행, API_TOKEN 기반 접근, SQLite WAL, `.env` 권한 관리, Tailscale 접속, Pi 기준 검증/재시작 흐름 정착.
 - **코드 구조 원칙:** `server.js`를 선행 대규모 리팩터링하지 않는다. V4부터 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 만들고, 기존 영역은 크게 수정할 때 테스트와 함께 점진적으로 옮긴다.
 - **V4 논문 검색 1차(Pi 인수 완료):** Semantic Scholar 관련도 검색을 `lib/paper-search.js`에 분리하고 `/api/papers/search`, `/paper` 결과 카드, 선택적 `S2_API_KEY`, 10분 캐시, 429/5xx 지수 백오프·timeout 처리와 단위 테스트를 추가했다. Pi 키 실검색 HTTP 200·결과 10개·성공 응답 캐시와 Playwright 카드 렌더링을 통과했다.
-- **V4 논문 검색 2차(Mac 구현 완료, Pi 인수 전):** `lib/paper-notes.js`에 노트 생성·저장 직렬화를 분리하고 `note_type: paper`, `paper_id` 활성 고유 인덱스, 저장 버튼·재검색 상태 복원, 기존 임베딩·저장 이벤트 기반 Codex 큐 연결을 구현했다. 단위 테스트 17개, mock API 저장·동시 중복 차단·Codex 노트 검증, 데스크톱/모바일 Playwright UI를 통과했다.
+- **V4 논문 검색 2차(Mac 구현 완료, Pi 인수 전):** `lib/paper-notes.js`에 노트 생성·저장 직렬화를 분리하고 `note_type: paper`, `paper_id` 활성 고유 인덱스, 저장 버튼·재검색 상태 복원, 기존 임베딩·저장 이벤트 기반 Codex 큐 연결을 구현했다. `public/paper-panel.js`에는 저장 논문 서재·읽기 전용 상세·검색/저장을 분리하고, 데스크톱 사이드 패널과 모바일 바텀시트를 적용했다. 단순 열람은 activeNotes를 바꾸지 않는다. 단위 테스트 17개, mock API 저장·동시 중복 차단·Codex 노트 검증, 데스크톱/모바일 Playwright UI를 통과했다.
 - **Codex/MCP(완료):** Pi의 Codex가 서버를 직접 다룰 수 있도록 ai-council MCP 서버(`scripts/ai-council-mcp.mjs`)와 `.codex/config.toml`을 구성했다. 읽기 도구(list/read/search/status/validate/merge candidates)와 승인 필요 도구(organize process, archive/restore)를 분리한다.
 - **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
 - **토픽 분리(완료):** Codex split 제안을 Clawd 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.

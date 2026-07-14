@@ -750,10 +750,26 @@ const stmtListActiveNotesForVault = db.prepare(`
   ORDER BY updated_at DESC, id DESC
   LIMIT ?
 `);
+const stmtListActiveNotesByType = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
+  FROM notes
+  WHERE archived = 0 AND note_type = ?
+  ORDER BY updated_at DESC, id DESC
+  LIMIT ?
+`);
 const stmtListAllNotesForVault = db.prepare(`
   SELECT filename, title, note_type AS noteType, archived,
          codex_status AS codexStatus, updated_at AS updatedAt
   FROM notes
+  ORDER BY archived ASC, updated_at DESC, id DESC
+  LIMIT ?
+`);
+const stmtListAllNotesByType = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
+  FROM notes
+  WHERE note_type = ?
   ORDER BY archived ASC, updated_at DESC, id DESC
   LIMIT ?
 `);
@@ -4030,12 +4046,16 @@ app.post('/api/search/web', async (req, res) => {
 
 app.get('/api/vault/notes', (req, res) => {
   const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true';
+  const noteType = String(req.query.noteType || '').trim();
+  if (noteType && !/^[a-z][a-z0-9_]{0,39}$/i.test(noteType)) {
+    return res.status(400).json({ success: false, error: '잘못된 노트 타입입니다.' });
+  }
   const requestedLimit = Number.parseInt(req.query.limit || '50', 10);
   const limit = Math.min(100, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50));
-  const notes = includeArchived
-    ? stmtListAllNotesForVault.all(limit)
-    : stmtListActiveNotesForVault.all(limit);
-  res.json({ success: true, notes });
+  const notes = noteType
+    ? (includeArchived ? stmtListAllNotesByType.all(noteType, limit) : stmtListActiveNotesByType.all(noteType, limit))
+    : (includeArchived ? stmtListAllNotesForVault.all(limit) : stmtListActiveNotesForVault.all(limit));
+  return res.json({ success: true, notes });
 });
 
 app.get('/api/vault/note/:filename', async (req, res) => {
