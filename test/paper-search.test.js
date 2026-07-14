@@ -141,15 +141,54 @@ test('searchSemanticScholar normalizes results and caches the same query', async
   assert.equal(first.results[0].paperId, 'paper-2');
 });
 
-test('searchSemanticScholar maps rate limits to a user-facing error', async () => {
-  const fetchImpl = async () => ({
-    ok: false,
-    status: 429,
-    json: async () => ({ message: 'Too Many Requests' }),
+test('searchSemanticScholar retries transient responses with exponential backoff and caches success', async () => {
+  let calls = 0;
+  const delays = [];
+  const responses = [429, 503, 200];
+  const fetchImpl = async () => {
+    const status = responses[calls];
+    calls += 1;
+    return {
+      ok: status === 200,
+      status,
+      json: async () => status === 200
+        ? { total: 1, data: [{ paperId: 'retry-paper', title: 'Recovered paper' }] }
+        : { message: 'try again' },
+    };
+  };
+
+  const first = await searchSemanticScholar('retry success', {
+    fetchImpl,
+    randomImpl: () => 0.5,
+    sleepImpl: async delay => delays.push(delay),
   });
+  const second = await searchSemanticScholar('retry success', { fetchImpl });
+
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [1125, 2125]);
+  assert.equal(first.results[0].paperId, 'retry-paper');
+  assert.equal(first.cached, false);
+  assert.equal(second.cached, true);
+});
+
+test('searchSemanticScholar stops after two retries and maps persistent rate limits', async () => {
+  let calls = 0;
+  const delays = [];
+  const fetchImpl = async () => {
+    calls += 1;
+    return {
+      ok: false,
+      status: 429,
+      json: async () => ({ message: 'Too Many Requests' }),
+    };
+  };
 
   await assert.rejects(
-    searchSemanticScholar('rate limit test', { fetchImpl }),
+    searchSemanticScholar('rate limit test', {
+      fetchImpl,
+      randomImpl: () => 0,
+      sleepImpl: async delay => delays.push(delay),
+    }),
     error => {
       assert.ok(error instanceof PaperSearchError);
       assert.equal(error.statusCode, 429);
@@ -157,10 +196,34 @@ test('searchSemanticScholar maps rate limits to a user-facing error', async () =
       return true;
     },
   );
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [1000, 2000]);
+});
+
+test('searchSemanticScholar does not retry invalid or authentication responses', async () => {
+  for (const status of [400, 401, 403]) {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls += 1;
+      return {
+        ok: false,
+        status,
+        json: async () => ({}),
+      };
+    };
+
+    await assert.rejects(
+      searchSemanticScholar(`non-retryable ${status}`, { fetchImpl }),
+      error => error instanceof PaperSearchError,
+    );
+    assert.equal(calls, 1);
+  }
 });
 
 test('searchSemanticScholar maps timeouts to a retryable gateway error', async () => {
+  let calls = 0;
   const fetchImpl = async () => {
+    calls += 1;
     const error = new Error('timed out');
     error.name = 'TimeoutError';
     throw error;
@@ -176,6 +239,7 @@ test('searchSemanticScholar maps timeouts to a retryable gateway error', async (
       return true;
     },
   );
+  assert.equal(calls, 1);
 });
 
 test('searchSemanticScholar rejects empty and oversized queries before fetch', async () => {
