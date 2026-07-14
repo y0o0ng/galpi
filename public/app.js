@@ -15,6 +15,7 @@ let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
 let isRestoringHistory = false;
 const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 활성 컨텍스트에 추가' },
+  { command: '/paper ', title: '논문 검색', description: 'Semantic Scholar에서 관련 논문 검색' },
   { command: '/web ', title: '웹 검색', description: '외부 웹 검색 결과를 같은 근거로 모델에 주입' },
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
   { command: '/embed', title: '임베딩 생성', description: '모든 노트의 시맨틱 검색용 임베딩 생성' },
@@ -447,6 +448,14 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     if (query) handleSearch(query);
+    return;
+  }
+  if (text === '/paper' || text.startsWith('/paper ')) {
+    const query = text.slice(6).trim();
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    if (query) handlePaperSearch(query);
+    else appendError('논문 검색어를 입력해주세요.');
     return;
   }
   if (text.startsWith('/web ')) {
@@ -1060,6 +1069,95 @@ async function saveCouncilNote(btn, data) {
 }
 
 // ─── 볼트 검색 ────────────────────────────────────────────────────────────────
+
+async function handlePaperSearch(query) {
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble(`/paper ${query}`);
+
+  const loadingEl = appendLoading();
+  try {
+    const res = await apiFetch(`/api/papers/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (!res.ok || data.error) {
+      appendError(data.error || '논문 검색에 실패했습니다.');
+      return;
+    }
+    if (!Array.isArray(data.results) || data.results.length === 0) {
+      appendError(`"${query}" 관련 논문을 찾지 못했습니다.`);
+      return;
+    }
+
+    renderPaperResults(data);
+  } catch (_) {
+    loadingEl.remove();
+    appendError('논문 검색 서버에 연결할 수 없습니다.');
+  }
+}
+
+function formatPaperAuthors(authors) {
+  if (!Array.isArray(authors) || authors.length === 0) return '저자 정보 없음';
+  if (authors.length <= 4) return authors.join(', ');
+  return `${authors.slice(0, 4).join(', ')} 외 ${authors.length - 4}명`;
+}
+
+function makePaperCard(paper) {
+  const card = document.createElement('article');
+  card.className = 'paper-card';
+
+  const meta = document.createElement('div');
+  meta.className = 'paper-card-meta';
+  const year = Number.isInteger(paper.year) ? String(paper.year) : '연도 미상';
+  const citations = Number(paper.citationCount || 0).toLocaleString('ko-KR');
+  meta.textContent = `${year} · 인용 ${citations}`;
+
+  const title = document.createElement('a');
+  title.className = 'paper-card-title';
+  title.href = paper.url;
+  title.target = '_blank';
+  title.rel = 'noopener noreferrer';
+  title.textContent = `${paper.title} ↗`;
+
+  const authors = document.createElement('div');
+  authors.className = 'paper-card-authors';
+  authors.textContent = formatPaperAuthors(paper.authors);
+
+  card.append(meta, title, authors);
+
+  const summaryText = paper.tldr || paper.abstract;
+  if (summaryText) {
+    const summary = document.createElement('p');
+    summary.className = 'paper-card-summary';
+    summary.textContent = summaryText;
+    card.appendChild(summary);
+  }
+
+  return card;
+}
+
+function renderPaperResults(data) {
+  const wrap = document.createElement('section');
+  wrap.className = 'paper-results';
+
+  const header = document.createElement('div');
+  header.className = 'paper-results-head';
+
+  const count = document.createElement('span');
+  count.className = 'paper-results-count';
+  count.textContent = `논문 ${data.results.length}개`;
+
+  const source = document.createElement('span');
+  source.className = 'paper-results-source';
+  source.textContent = data.cached ? 'Semantic Scholar · 캐시' : 'Semantic Scholar';
+
+  header.append(count, source);
+  wrap.appendChild(header);
+  data.results.forEach(paper => wrap.appendChild(makePaperCard(paper)));
+
+  getMessages().appendChild(wrap);
+  scrollDown();
+}
 
 async function handleSearch(query) {
   document.querySelector('.welcome')?.remove();

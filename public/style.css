@@ -512,6 +512,127 @@ html, body {
   color: #FF8078;
 }
 
+/* ── 논문 검색 결과 ────────────────────────────────────── */
+
+.paper-results {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: min(100%, 680px);
+  min-width: 0;
+  max-width: 100%;
+  margin: 5px 0 10px;
+}
+
+.paper-results-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 3px 2px;
+  color: var(--label);
+  font-size: 11px;
+}
+
+.paper-results-count {
+  color: var(--ai-text);
+  font-weight: 700;
+}
+
+.paper-results-source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paper-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+}
+
+.paper-card:hover {
+  border-color: rgba(0, 122, 255, 0.34);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .paper-card {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.paper-card-meta {
+  color: var(--label);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.paper-card-title {
+  min-width: 0;
+  color: var(--ai-text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.paper-card-title:hover {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.paper-card-title:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.paper-card-authors {
+  min-width: 0;
+  color: var(--label);
+  font-size: 11.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.paper-card-summary {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ai-text);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.82;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+@media (max-width: 640px) {
+  .paper-results {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .paper-card {
+    padding: 10px;
+  }
+
+  .paper-card-title {
+    font-size: 13.5px;
+  }
+}
+
 /* ── 노트 검색 결과 ────────────────────────────────────── */
 
 .search-results {

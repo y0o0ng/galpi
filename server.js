@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const Database = require('better-sqlite3');
 const os = require('os');
 const { runBackup, listBackups } = require('./scripts/backup');
+const { searchSemanticScholar } = require('./lib/paper-search');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -3641,6 +3642,25 @@ app.get('/api/audit', async (_req, res) => {
     res.json(await runSystemAudit());
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── 논문 검색 ──────────────────────────────────────────────────────────────
+
+app.get('/api/papers/search', async (req, res) => {
+  try {
+    const result = await searchSemanticScholar(req.query.q, {
+      apiKey: process.env.S2_API_KEY,
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const status = Number.isInteger(err.statusCode) ? err.statusCode : 500;
+    if (status >= 500) console.error('논문 검색 오류:', err.message);
+    return res.status(status).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'paper_search_failed',
+    });
   }
 });
 
