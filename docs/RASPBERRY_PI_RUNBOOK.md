@@ -51,6 +51,8 @@ chmod 600 .env   # 키가 들어있으니 본인만 읽게 권한 제한
 ```env
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
+S2_API_KEY=...
+PAPER_SEARCH_MOCK=false
 VAULT_PATH=/home/pi/apps/ai-council/ai-council-vault
 HOST=0.0.0.0
 PORT=3000
@@ -59,6 +61,8 @@ CODEX_RUNNER_MODE=codex
 CODEX_BIN=codex
 CODEX_AUTO_QUEUE_THRESHOLD=5
 ```
+
+`PAPER_SEARCH_MOCK=true`는 논문 정규화·카드 문제 해결용 고정 응답이다. 실제 Semantic Scholar 검색에서는 `false`로 유지한다.
 
 로컬에서만 쓸 때는 `HOST=127.0.0.1`이어도 된다. 폰/맥에서 접속하려면 `HOST=0.0.0.0`이 필요하다.
 
