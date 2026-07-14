@@ -86,8 +86,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **프로젝트 현재 상태**
 
 - 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크와 Clawd 패널 이동 확장까지 Pi 배포 완료 (`a70d9d0`, `1d4c704`, `78583e9`, `d145784`, `874c47a`, `c9bf470`). Pi에서 `node:test` 17개, 실제 TradingAgents 논문 저장, DB·볼트 `note_type: paper`, 29,531자 임베딩, 하이브리드 검색 1순위 회수, 인증 노트 목록 API와 새 정적 파일 응답을 확인했다.
-- 현재 개발 상태: 단순 열람은 activeNotes를 바꾸지 않고 PDF 다운로드·파싱·Pi 프록시는 하지 않는다. 실제 브라우저에서 모바일 바텀시트·PDF 열기·Clawd 패널 이동을 시각 확인하는 단계다.
-- 다음 개발 시작점: 실제 브라우저 확인 후 Claude 질문에서 저장 논문이 자동 컨텍스트로 잡히는지와 Codex가 paper 노트의 태그·링크를 처리하는지 인수한다. 통과하면 V4 음성 입력으로 진행한다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다.
+- 현재 개발 상태: 2.5A 제품 연결 전 파서 spike 완료. `pdf-parse` 2.4.5로 TradingAgents PDF 38페이지·104,235자를 Mac/Pi에서 동일하게 추출했고, Pi 격리 환경에서 약 1.1초·최대 RSS 156MB·의존성 설치 용량 약 87MB를 측정했다. 서버·DB·UI와 Pi 앱에는 아직 연결·배포하지 않았다.
+- 다음 개발 시작점: 변경 이유·구조·운영 영향을 설명하고 컨펌받은 뒤 `lib/paper-fulltext.js`를 기반으로 2.5A Phase B 전용 DB 테이블·숨김 원본 캐시·청크 분할/검색을 구현한다. 모델 도구는 Phase C로 분리한다. 실제 브라우저 확인, Claude 질문 컨텍스트와 Codex paper 태그·링크 인수도 남아 있다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
 - 코드 구조 방향: `server.js`는 현재 5,594줄. 기존 코드를 한꺼번에 분해하지 말고, 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것
