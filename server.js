@@ -14,6 +14,7 @@ const os = require('os');
 const { runBackup, listBackups } = require('./scripts/backup');
 const { searchSemanticScholar } = require('./lib/paper-search');
 const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
+const { createPaperNoteSaver } = require('./lib/paper-notes');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -351,6 +352,7 @@ db.exec(`
     filename TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL,
     note_type TEXT NOT NULL,
+    paper_id TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     codex_status TEXT NOT NULL DEFAULT 'pending',
     source_session TEXT,
@@ -453,6 +455,15 @@ db.exec(`
 if (!db.prepare('PRAGMA table_info(notes)').all().some(c => c.name === 'embedding')) {
   db.exec('ALTER TABLE notes ADD COLUMN embedding TEXT');
 }
+// 마이그레이션: 논문 원본 ID (활성 노트 중복 저장 차단)
+if (!db.prepare('PRAGMA table_info(notes)').all().some(c => c.name === 'paper_id')) {
+  db.exec('ALTER TABLE notes ADD COLUMN paper_id TEXT');
+}
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_active_paper_id
+  ON notes(paper_id)
+  WHERE paper_id IS NOT NULL AND archived = 0
+`);
 // 마이그레이션: messages embedding
 if (!db.prepare('PRAGMA table_info(messages)').all().some(c => c.name === 'embedding')) {
   db.exec('ALTER TABLE messages ADD COLUMN embedding TEXT');
@@ -501,15 +512,16 @@ const stmtInsertMessage = db.prepare(
 );
 const stmtUpsertNote = db.prepare(`
   INSERT INTO notes (
-    filename, title, note_type, archived, codex_status,
+    filename, title, note_type, paper_id, archived, codex_status,
     source_session, source_message
   ) VALUES (
-    @filename, @title, @noteType, @archived, @codexStatus,
+    @filename, @title, @noteType, @paperId, @archived, @codexStatus,
     @sourceSession, @sourceMessage
   )
   ON CONFLICT(filename) DO UPDATE SET
     title = excluded.title,
     note_type = excluded.note_type,
+    paper_id = COALESCE(excluded.paper_id, notes.paper_id),
     archived = excluded.archived,
     codex_status = excluded.codex_status,
     source_session = excluded.source_session,
@@ -523,6 +535,12 @@ const stmtGetNoteByFilename = db.prepare(`
   SELECT filename, title, note_type AS noteType, archived, codex_status AS codexStatus
   FROM notes
   WHERE filename = ?
+  LIMIT 1
+`);
+const stmtGetActivePaperById = db.prepare(`
+  SELECT filename, title
+  FROM notes
+  WHERE paper_id = ? AND archived = 0
   LIMIT 1
 `);
 const stmtGetNoteByChunkMessageId = db.prepare(`
@@ -838,6 +856,7 @@ function dbUpsertNote({
   codexStatus = 'pending',
   sourceSession = null,
   sourceMessage = null,
+  paperId = null,
 }) {
   stmtUpsertNote.run({
     filename,
@@ -847,6 +866,7 @@ function dbUpsertNote({
     codexStatus,
     sourceSession: sourceSession || null,
     sourceMessage: sourceMessage || null,
+    paperId: paperId || null,
   });
 }
 
@@ -1026,10 +1046,19 @@ async function saveVaultNoteRecord({
   sessionId = null,
   messageId = null,
   codexStatus = 'pending',
+  paperId = null,
 }) {
   await writeVaultNote(fileId, noteContent);
   const filename = fileId + '.md';
-  dbUpsertNote({ filename, title, noteType, codexStatus, sourceSession: sessionId, sourceMessage: messageId });
+  dbUpsertNote({
+    filename,
+    title,
+    noteType,
+    codexStatus,
+    sourceSession: sessionId,
+    sourceMessage: messageId,
+    paperId,
+  });
 
   // embedding 비동기 생성 (응답 블로킹 없음)
   generateAndStoreEmbedding(filename, buildSemanticEmbeddingText(title, noteContent)).catch(() => {});
@@ -3654,7 +3683,11 @@ app.get('/api/papers/search', async (req, res) => {
       apiKey: process.env.S2_API_KEY,
       mockResponse: process.env.PAPER_SEARCH_MOCK === 'true' ? MOCK_S2_RESPONSE : undefined,
     });
-    return res.json({ success: true, ...result });
+    const results = result.results.map(paper => ({
+      ...paper,
+      saved: Boolean(stmtGetActivePaperById.get(paper.paperId)),
+    }));
+    return res.json({ success: true, ...result, results });
   } catch (err) {
     const status = Number.isInteger(err.statusCode) ? err.statusCode : 500;
     if (status >= 500) console.error('논문 검색 오류:', err.message);
@@ -3662,6 +3695,41 @@ app.get('/api/papers/search', async (req, res) => {
       success: false,
       error: err.message,
       code: err.code || 'paper_search_failed',
+    });
+  }
+});
+
+const savePaperAsNote = createPaperNoteSaver({
+  findActivePaper: paperId => stmtGetActivePaperById.get(paperId),
+  createNoteIdentity,
+  saveNote: saveVaultNoteRecord,
+  cleanupNote: filename => fs.unlink(path.join(VAULT_PATH, filename)).catch(() => {}),
+  onCreated: async ({ paper, filename }) => {
+    logAutoSaveDecision({
+      model: 'semantic-scholar',
+      decision: 'save',
+      reason: 'manual_paper',
+      question: paper.title,
+      answer: paper.tldr || paper.abstract || '',
+      noteFilename: filename,
+      noteTitle: paper.title,
+      action: 'created',
+    });
+    maybeCreateCodexJobFromSaveEvents();
+  },
+});
+
+app.post('/api/papers/save', async (req, res) => {
+  try {
+    const result = await savePaperAsNote(req.body?.paper);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const status = Number.isInteger(err.statusCode) ? err.statusCode : 500;
+    if (status >= 500) console.error('논문 저장 오류:', err.message);
+    return res.status(status).json({
+      success: false,
+      error: err.message,
+      code: 'paper_save_failed',
     });
   }
 });

@@ -566,10 +566,23 @@ html, body {
   background: rgba(255, 255, 255, 0.045);
 }
 
+.paper-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  gap: 8px;
+}
+
 .paper-card-meta {
+  min-width: 0;
   color: var(--label);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
+}
+
+.paper-card-save {
+  margin: -5px -5px -5px 0;
 }
 
 .paper-card-title {

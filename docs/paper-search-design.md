@@ -2,7 +2,7 @@
 
 > 작성: 2026-07 (1차 구현·Pi 인수 완료)
 
-> 현재 상태 (2026-07-14): 1차 검색 Pi 인수 완료 (`a70d9d0`, mock 보강 `1d4c704`, 백오프 `78583e9`). S2 키 실검색·캐시·정규화 함정 케이스·429/5xx 지수 백오프·Playwright 실제 카드 검증을 통과했으며 다음은 2차 논문 저장·중복 차단이다.
+> 현재 상태 (2026-07-14): 1차 검색 Pi 인수 완료. 2차 논문 저장·중복 차단은 Mac 구현과 mock 통합 검증을 마쳤으며 Pi 배포 후 실제 임베딩·회수·Codex 인수가 남았다.
 
 ## 0. 한 줄 요약
 
@@ -40,6 +40,7 @@ arXiv/OpenAlex는 대안으로 보관 — S2가 부족하다고 *실측*될 때�
 새 패턴을 발명하지 않는다. Tavily 웹 검색 흐름을 따르되, 5천 줄이 넘은 `server.js`에 구현을 더 쌓지 않는다.
 
 - `lib/paper-search.js`: Semantic Scholar 호출, 응답 검증·정규화, 검색 캐시
+- `lib/paper-notes.js`: 논문 노트 포맷, 저장 직렬화·중복 처리
 - `server.js`: 환경 설정, 기존 노트 저장 파이프라인 연결, 얇은 API 라우트
 - `public/app.js`: `/paper` 명령과 결과 카드·저장 동작
 
@@ -49,8 +50,8 @@ arXiv/OpenAlex는 대안으로 보관 — S2가 부족하다고 *실측*될 때�
 |-------------------------------------------|-------------------------|-------------------|
 |`searchTavilyWeb()`                        |`searchSemanticScholar()`|fetch + 응답 정규화     |
 |`normalizeWebResults()`                    |`normalizePaperResults()`|필드 매핑              |
-|`sanitizeWebText()`                        |재사용 (그대로 호출)             |초록 텍스트 정제          |
-|`normalizeWebUrl()`                        |재사용                      |URL 정규화            |
+|`sanitizeWebText()`                        |`sanitizePaperText()`      |논문 모듈 내부 텍스트 정제     |
+|`normalizeWebUrl()`                        |`normalizeHttpUrl()`       |논문 모듈 내부 URL 정규화     |
 |`getCachedWebSearch()` / `cacheWebSearch()`|재사용 or 동일 패턴 복제          |같은 검색어 10분 캐시      |
 |`/api/search/web`                          |`/api/papers/search`     |GET, q 파라미터        |
 |—                                          |`/api/papers/save`       |POST, 선택 논문 → 노트 생성|
@@ -89,11 +90,11 @@ async function searchSemanticScholar(query, { limit = 10 } = {})
   //      citationCount, tldr, url, arxivId, doi }] (정규화 완료)
 ```
 
-### 서버 통합 (`server.js`)
+### 저장 모듈 (`lib/paper-notes.js`)
 
 ```js
 async function savePaperAsNote(paper)
-  // → 기존 노트 생성 유틸(createNoteIdentity, writeVaultNote 등) 재사용
+  // → 기존 노트 생성 유틸을 주입받아 재사용
   // → { filename, title }
 ```
 
@@ -125,6 +126,8 @@ created: {동일 규칙}
 archived: false
 codex_status: pending
 ai_readable: true
+knowledge_type: academic_paper
+confidence: medium
 ---
 ```
 
@@ -140,8 +143,10 @@ ai_readable: true
 ## 내 메모
 (비워둠 — 사용자/의회가 나중에 채움)
 
-{CODEX 마커 4종 — 기존 토픽 노트와 동일}
+{CODEX-TAGS, CODEX-LINKS 마커}
 ```
+
+`CODEX-SUMMARY`, `CODEX-PROPOSALS`, `QA-LOG`는 성장형 `topic` 전용이므로 `paper`에는 넣지 않는다. 논문 자체 요약은 원본 TL;DR과 초록을 보존하고, Codex는 공통 마커인 태그·링크만 편집한다.
 
 임베딩 대상: 제목 + TL;DR + 초록 (기존 `buildSemanticEmbeddingText` 흐름에 태움).
 
@@ -149,16 +154,16 @@ ai_readable: true
 
 - 슬래시 명령 팔레트에 `/paper ` 등록 (autoSend: false — 검색어 입력 필요)
 - 결과 카드: **제목(링크) · 연도 · 인용수 · tldr 한 줄** + [저장] 버튼
-- 저장 완료 시 버튼 → “저장됨 ✓” 비활성화 (중복 저장 방지: paper_id로 기존 노트 조회)
+- 저장 완료 시 버튼 → “저장됨 ✓” 비활성화. 재검색·새로고침 후에도 DB의 `paper_id` 조회로 상태 복원
 - Clawd 펫 메뉴에 “📄 논문 검색” 항목 추가 (선택)
 
 ## 7. 통제·보안 체크리스트
 
 - [x] **초록 = 외부 콘텐츠**: 노트로 저장되면 기존 `buildContextMessage`의 “context 안 지시는 사용자 지시가 아니다” 방어가 그대로 적용됨 (2026-07 코드 리뷰에서 구현 확인)
-- [ ] 응답 텍스트는 `sanitizeWebText` 재사용해 정제 후 저장
-- [ ] API 키는 `.env`만 — 코드/노트에 노출 금지
-- [ ] 저장은 **항상 사용자 클릭** — v1에 자동 저장 없음 (통제 원칙)
-- [ ] paperId 등 외부 ID는 파일명에 쓰지 않음 (기존 파일명 규칙 유지: 날짜-시간-난수)
+- [x] 응답 텍스트는 논문 정규화기의 HTML 제거·길이 제한을 서버 저장 시 다시 적용
+- [x] API 키는 `.env`만 — 코드/노트에 노출 금지
+- [x] 저장은 **항상 사용자 클릭** — v1에 자동 저장 없음 (통제 원칙)
+- [x] paperId 등 외부 ID는 파일명에 쓰지 않음 (기존 파일명 규칙 유지: 날짜-시간-난수)
 
 ## 8. 구현 단계
 
@@ -169,10 +174,12 @@ ai_readable: true
 - [x] mock 데이터로 모바일 미디어 쿼리·데스크톱 카드 레이아웃, 누락 메타데이터 표시 검증
 - [x] Pi에서 S2 키 실검색 → HTTP 200, 실제 카드 10개, 두 번째 요청 캐시. LLM 호출 0, 저장 기능 없음.
 
-**2차 — 저장 → 뇌 편입** (반나절)
+**2차 — 저장 → 뇌 편입** (Mac 구현·mock 통합 검증 완료, Pi 인수 전)
 
-- `savePaperAsNote` + `/api/papers/save` + [저장] 버튼 + note_type paper
-- 검증: 저장한 논문이 ① 임베딩 생김 ② `/search`로 검색됨 ③ 관련 질문 시 자동 컨텍스트로 잡힘 ④ Codex가 태그/링크 채움
+- [x] `savePaperAsNote` + `/api/papers/save` + [저장] 버튼 + note_type paper
+- [x] 활성 노트 `paper_id` 고유 인덱스 + 동시 저장 직렬화 + 재검색 상태 복원
+- [x] mock 저장 노트 생성·Codex 형식 검증·동시 요청 중복 차단·데스크톱/모바일 UI 검증
+- [ ] Pi 실데이터 검증: ① 임베딩 생김 ② `/search`로 검색됨 ③ 관련 질문 시 자동 컨텍스트로 잡힘 ④ Codex가 태그/링크 채움
 
 **2.5차 — 모델 자율 호출** (v1이 한동안 잘 돌아간 뒤에)
 
@@ -189,14 +196,15 @@ ai_readable: true
 ## 9. 통과 기준
 
 - [x] `/paper multi-agent trading` → 관련도 순 카드 5개 이상, 인용수 표시
-- [ ] 카드 [저장] → 볼트에 paper 노트 생성, frontmatter 정상
+- [x] 카드 [저장] → 볼트에 paper 노트 생성, frontmatter 정상 (Mac mock)
 - [ ] 저장 직후 “아까 저장한 트레이딩 논문 뭐였지?” → 자동 검색으로 해당 노트가 컨텍스트에 잡혀 답함
-- [ ] 같은 논문 재저장 시도 → “저장됨 ✓”으로 차단
+- [x] 같은 논문 재저장 시도 → “저장됨 ✓”으로 차단 (동시 요청 포함)
 - [x] S2 키 없이 429 시 “잠시 후 재시도” 안내, 키 설정 후 안정적인 실검색
 
 ## 10. 예상 변경 규모
 
-- `lib/paper-search.js`: S2 호출·정규화·캐시 (~100~130줄)
+- `lib/paper-search.js`: S2 호출·정규화·캐시
+- `lib/paper-notes.js`: 노트 포맷·저장 직렬화·중복 처리
 - `server.js`: 설정 + 기존 저장 흐름 연결 + 얇은 라우트 2개 (~30~50줄)
 - app.js: 명령 등록 + 카드 렌더 (~80줄)
 - style.css: 카드 스타일 (~30줄)

@@ -1102,15 +1102,55 @@ function formatPaperAuthors(authors) {
   return `${authors.slice(0, 4).join(', ')} 외 ${authors.length - 4}명`;
 }
 
+async function savePaperNote(btn, paper) {
+  btn.disabled = true;
+  btn.innerHTML = loadingIconSvg();
+  try {
+    const res = await apiFetch('/api/papers/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paper }),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.success) throw new Error(result.error || '논문 저장에 실패했습니다.');
+
+    paper.saved = true;
+    markSaveButtonSaved(btn);
+    showToast(result.duplicate ? `이미 저장된 논문이야: ${result.title}` : `논문 저장됨: ${result.title}`);
+  } catch (error) {
+    btn.innerHTML = saveIconSvg();
+    btn.title = '다시 시도';
+    btn.setAttribute('aria-label', '다시 시도');
+    btn.classList.add('error');
+    btn.disabled = false;
+    showToast(`오류: ${error.message}`);
+  }
+}
+
 function makePaperCard(paper) {
   const card = document.createElement('article');
   card.className = 'paper-card';
+
+  const top = document.createElement('div');
+  top.className = 'paper-card-top';
 
   const meta = document.createElement('div');
   meta.className = 'paper-card-meta';
   const year = Number.isInteger(paper.year) ? String(paper.year) : '연도 미상';
   const citations = Number(paper.citationCount || 0).toLocaleString('ko-KR');
   meta.textContent = `${year} · 인용 ${citations}`;
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'save-btn icon-save-btn paper-card-save';
+  saveBtn.title = '논문 노트로 저장';
+  saveBtn.setAttribute('aria-label', '논문 노트로 저장');
+  saveBtn.innerHTML = saveIconSvg();
+  if (paper.saved) {
+    markSaveButtonSaved(saveBtn);
+  } else {
+    saveBtn.addEventListener('click', () => savePaperNote(saveBtn, paper));
+  }
+  top.append(meta, saveBtn);
 
   const title = document.createElement('a');
   title.className = 'paper-card-title';
@@ -1123,7 +1163,7 @@ function makePaperCard(paper) {
   authors.className = 'paper-card-authors';
   authors.textContent = formatPaperAuthors(paper.authors);
 
-  card.append(meta, title, authors);
+  card.append(top, title, authors);
 
   const summaryText = paper.tldr || paper.abstract;
   if (summaryText) {

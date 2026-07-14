@@ -41,6 +41,18 @@ test('normalizePaper keeps useful metadata and removes unsafe markup', () => {
   });
 });
 
+test('normalizePaper preserves an already normalized browser result', () => {
+  const first = normalizePaper({
+    paperId: 'roundtrip-paper',
+    title: 'Roundtrip paper',
+    authors: [{ name: 'Kim' }, { name: 'Lee' }],
+    tldr: { text: 'Short finding' },
+    externalIds: { DOI: '10.1000/roundtrip', ArXiv: '2501.00002' },
+  });
+
+  assert.deepEqual(normalizePaper(first), first);
+});
+
 test('mock fixture normalizes missing, unsafe, and invalid paper fields', () => {
   const papers = normalizePaperResults(MOCK_S2_RESPONSE.data);
 
