@@ -155,6 +155,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 입구만 새로 뚫고, 뒷단(저장·회수·임베딩·Codex)은 V2~V3 그대로 재사용. 쉬운 입구(논문)부터 열어 손 풀고, 어려운 입구(음성)로.
 
 ### 핵심 A — 논문 검색 (반나절×2, 상세는 별도 설계 문서 `paper-search-design.md`)
+> 1차 코드 구현 완료 (`a70d9d0`, Pi 배포·성공 검색 검증 대기): 별도 `lib/paper-search.js`, `/api/papers/search`, `/paper` 결과 카드, 10분 캐시, 429/timeout 처리와 `node:test` 5개를 추가했다. Mac 무키 실검색은 S2 공용 풀 429를 재현했으며 사용자 메시지 매핑은 확인했다.
+
 1. `/paper 검색어` → Semantic Scholar API 검색 → 결과 카드 (LLM 호출 0)
 2. [저장] 클릭 → note_type `paper` 노트 생성 → 기존 파이프라인 자동 편입 (임베딩·검색·Codex)
 3. 기존 웹 검색 모듈(`searchTavilyWeb` 등)에 1:1 매핑해 구현 — 새 의존성 0

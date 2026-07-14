@@ -566,13 +566,14 @@
 
 > 갱신: 2026-07-14. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5 시간 감각·검색 튜닝과 Pi 인수 완료. 다음 개발은 V4 논문 검색부터 시작한다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
+- **현재 단계:** V3.5와 저장 상태 복원 수정은 Pi 인수 완료. V4 논문 검색 1차 코드는 `a70d9d0`으로 구현했고 Pi 배포·성공 검색 검증을 기다린다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
   - V3.5 — 모든 모델 경로에 KST 현재 시각 주입, DB timestamp 보존 + `[N일 후]` 컨텍스트 가공, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 노이즈 제거와 IDF/TF 검색 기준 정렬. 2026-07-14 Pi 인수 테스트 통과.
   - Pi 이식 — systemd 기반 상시 실행, API_TOKEN 기반 접근, SQLite WAL, `.env` 권한 관리, Tailscale 접속, Pi 기준 검증/재시작 흐름 정착.
 - **코드 구조 원칙:** `server.js`를 선행 대규모 리팩터링하지 않는다. V4부터 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 만들고, 기존 영역은 크게 수정할 때 테스트와 함께 점진적으로 옮긴다.
+- **V4 논문 검색 1차(코드 완료, Pi 검증 대기):** Semantic Scholar 관련도 검색을 `lib/paper-search.js`에 분리하고 `/api/papers/search`, `/paper` 결과 카드, 선택적 `S2_API_KEY`, 10분 캐시, 429/timeout 처리와 단위 테스트를 추가했다. 저장·PDF·LLM 요약은 2차 이후로 유지한다.
 - **Codex/MCP(완료):** Pi의 Codex가 서버를 직접 다룰 수 있도록 ai-council MCP 서버(`scripts/ai-council-mcp.mjs`)와 `.codex/config.toml`을 구성했다. 읽기 도구(list/read/search/status/validate/merge candidates)와 승인 필요 도구(organize process, archive/restore)를 분리한다.
 - **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
 - **토픽 분리(완료):** Codex split 제안을 Clawd 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.

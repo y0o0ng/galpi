@@ -2,6 +2,8 @@
 
 > 작성: 2026-07 (전역 후 구현 예정. Claude Code에 이 문서를 그대로 전달해 구현 가능하도록 작성)
 
+> 현재 상태 (2026-07-14): 1차 검색 코드 구현 완료 (`a70d9d0`). 단위 테스트·429 처리·반응형 카드 검증은 통과했고, Pi 배포와 Semantic Scholar 성공 응답 검증은 대기 중이다.
+
 ## 0. 한 줄 요약
 
 **논문 검색은 새 “입력구”다 — V4 음성과 같은 원리.**
@@ -160,10 +162,12 @@ ai_readable: true
 
 ## 8. 구현 단계
 
-**1차 — 검색만** (반나절)
+**1차 — 검색만** (코드 구현 완료, Pi 인수 대기)
 
-- `lib/paper-search.js`의 `searchSemanticScholar` + `/api/papers/search` + `/paper` 명령 + 결과 카드
-- 검증: 검색어 입력 → 카드가 뜬다. LLM 호출 0, 저장 기능 없음.
+- [x] `lib/paper-search.js`의 `searchSemanticScholar` + `/api/papers/search` + `/paper` 명령 + 결과 카드
+- [x] 정규화·캐시·429·timeout·입력 검증 `node:test` 5개
+- [x] 샘플 데이터로 모바일 미디어 쿼리·데스크톱 카드 레이아웃 검증
+- [ ] Pi에서 검색어 입력 → 실제 카드 5개 이상. LLM 호출 0, 저장 기능 없음.
 
 **2차 — 저장 → 뇌 편입** (반나절)
 
@@ -184,7 +188,7 @@ ai_readable: true
 
 ## 9. 통과 기준
 
-- [ ] `/paper multi-agent trading` → 카드 5개 이상, 인용수 순 정렬
+- [ ] `/paper multi-agent trading` → 관련도 순 카드 5개 이상, 인용수 표시
 - [ ] 카드 [저장] → 볼트에 paper 노트 생성, frontmatter 정상
 - [ ] 저장 직후 “아까 저장한 트레이딩 논문 뭐였지?” → 자동 검색으로 해당 노트가 컨텍스트에 잡혀 답함
 - [ ] 같은 논문 재저장 시도 → “저장됨 ✓”으로 차단
