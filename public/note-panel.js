@@ -157,7 +157,7 @@
     }
   }
 
-  async function openNote(note) {
+  async function openNote(note, onBack = renderList) {
     state.mode = 'detail';
     const requestId = ++state.requestId;
     renderLoading();
@@ -170,15 +170,20 @@
       const { content } = elements();
       content.innerHTML = '';
       content.scrollTop = 0;
-      content.appendChild(makeSectionHead(noteTypeLabel(note.noteType), null, renderList));
+      content.appendChild(makeSectionHead(noteTypeLabel(note.noteType), null, onBack));
       const article = document.createElement('article');
       article.className = 'knowledge-note-detail';
       article.innerHTML = DOMPurify.sanitize(marked.parse(data.note.content || ''));
       content.appendChild(article);
     } catch (error) {
       if (requestId !== state.requestId) return;
-      renderError(error.message, renderList);
+      renderError(error.message, onBack);
     }
+  }
+
+  function open(note) {
+    if (!note?.filename) return;
+    openNote({ ...note, noteType: note.noteType || 'topic' }, loadNotes);
   }
 
   function show() {
@@ -199,5 +204,5 @@
     });
   }
 
-  global.NotePanel = { init, show, loadNotes };
+  global.NotePanel = { init, show, loadNotes, open };
 })(window);

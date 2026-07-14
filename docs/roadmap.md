@@ -89,6 +89,8 @@ Codex가 사서로서 뒤에서 일하고, 시스템이 견고해진다.
 3. 숨김(soft delete) 처리 (`_archive` 이동 + 그래프·검색 제외)
 4. 보안 점검 (.env 보호, path traversal 차단, 프롬프트 인젝션 방지)
 
+> 최근 저장 추적 보강 완료 (2026-07-15, Pi 배포 전): Clawd 알림센터에 `최근 저장` 탭을 추가했다. 기존 `auto_save_decisions`를 활성 topic 노트와 조인해 질문/메모, 새 토픽 생성·기존 토픽 추가, 저장 시각과 현재 대상 토픽을 표시하고 카드를 누르면 노트 상세를 연다. AI 호출과 저장 판단 로직은 바꾸지 않는다. 단위 테스트와 모바일 390px·데스크톱 1440px Playwright 검증을 통과했다.
+
 ### 보너스 (나중)
 - `/challenge`, `/synthesize` 같은 고급 명령
 - 그래프 리포트(GRAPH_REPORT.md), note_edges 기반 연결 회수

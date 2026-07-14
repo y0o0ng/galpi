@@ -567,7 +567,7 @@
 
 > 갱신: 2026-07-15. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 저장 상태 복원 수정, V4 논문 검색 1·2차, 논문 서재와 일반 노트 열람·공개 PDF 링크·Clawd 패널 이동 확장까지 Pi 배포 완료 (`c9bf470`). 실제 논문 저장·임베딩·하이브리드 검색 회수를 인수했고, 2.5A 파서 spike와 로컬 색인·검색도 구현했다. Phase B의 Pi 앱 배포·재검증, 능동 독서 도구, 실제 브라우저 PDF 열기, 질문 컨텍스트와 Codex 태그·링크 처리가 남았다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
+- **현재 단계:** V3.5와 저장 상태 복원 수정, V4 논문 검색 1·2차, 논문 서재와 일반 노트 열람·공개 PDF 링크·Clawd 패널 이동 확장까지 Pi 배포 완료 (`c9bf470`). 실제 논문 저장·임베딩·하이브리드 검색 회수를 인수했고, 2.5A 파서 spike·로컬 색인/검색과 알림센터 최근 저장 추적도 구현했다. 최근 저장과 Phase B의 Pi 앱 배포·재검증, 능동 독서 도구, 실제 브라우저 PDF 열기, 질문 컨텍스트와 Codex 태그·링크 처리가 남았다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
@@ -582,7 +582,7 @@
 - **Codex/MCP(완료):** Pi의 Codex가 서버를 직접 다룰 수 있도록 ai-council MCP 서버(`scripts/ai-council-mcp.mjs`)와 `.codex/config.toml`을 구성했다. 읽기 도구(list/read/search/status/validate/merge candidates)와 승인 필요 도구(organize process, archive/restore)를 분리한다.
 - **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
 - **토픽 분리(완료):** Codex split 제안을 Clawd 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.
-- **알림센터(완료):** Clawd 메뉴와 `/notifications`로 PIP 알림센터를 연다. CODEX-PROPOSALS에서 merge/split/policy/review 제안을 읽어오고, 승인/무시 상태를 DB(`notification_actions`)에 저장한다. 창은 데스크톱에서 드래그 이동 가능하며 위치를 localStorage에 저장한다.
+- **알림센터(완료):** Clawd 메뉴와 `/notifications`로 PIP 알림센터를 연다. CODEX-PROPOSALS에서 merge/split/policy/review 제안을 읽어오고, 승인/무시 상태를 DB(`notification_actions`)에 저장한다. `최근 저장` 탭은 `auto_save_decisions`의 성공 기록을 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 보여주며 카드를 누르면 노트 상세를 연다. 저장 판단·AI 호출은 추가하지 않는다. 창은 데스크톱에서 드래그 이동 가능하며 위치를 localStorage에 저장한다.
 - **정책 파일(완료):** `config/codex-policy.json`에 자동 저장, 토픽 매칭, organize, retrieval, Codex 링크, 병합 후보 가중치/임계값/불용어를 둔다. Codex가 수정 가능한 파일은 `.codex/editable-files.json`에 제한한다.
 - **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, Clawd 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
 - **그래프/검사(완료):** `/graph report`는 `_system/GRAPH_REPORT.md`를 생성/갱신한다. `/audit`은 화면 표시상 "시스템 검사"이며 Codex validation, policy 파일 파싱, 정리 상태, 알림, 고립 토픽, 큰 토픽, 최근 job을 요약한다.

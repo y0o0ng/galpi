@@ -1353,7 +1353,7 @@ html, body {
 
 .notification-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   padding: 10px 12px 8px;
 }
@@ -1413,6 +1413,40 @@ html, body {
 .notification-card.type-split { border-left-color: var(--council); }
 .notification-card.type-policy { border-left-color: var(--primary); }
 .notification-card.type-review { border-left-color: var(--claude-color); }
+.notification-card.type-save { border-left-color: var(--primary); }
+
+.recent-save-card {
+  width: 100%;
+  color: inherit;
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), background 0.15s var(--ease-out), transform 0.1s var(--ease-spring);
+}
+
+.recent-save-card:hover {
+  border-color: rgba(217, 119, 87, 0.48);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.recent-save-card:active {
+  transform: scale(0.99);
+}
+
+[data-theme="dark"] .recent-save-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.recent-save-file {
+  margin-top: 9px;
+}
+
+.recent-save-card .notification-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
 
 .notification-card-top,
 .notification-footer {

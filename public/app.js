@@ -2319,6 +2319,7 @@ function createNotificationsPanel() {
     ['all', '전체'],
     ['codex', 'Codex'],
     ['system', '시스템'],
+    ['saves', '최근 저장'],
   ].forEach(([value, label]) => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -2343,6 +2344,7 @@ function createNotificationsPanel() {
   panel.append(head, tabs, body);
   panel.dataset.filter = 'all';
   panel._notifications = [];
+  panel._recentSaves = [];
   enableNotificationPanelDrag(panel, head);
   return panel;
 }
@@ -2434,6 +2436,7 @@ async function refreshNotificationsPanel(panel) {
       return;
     }
     panel._notifications = Array.isArray(data.notifications) ? data.notifications : [];
+    panel._recentSaves = Array.isArray(data.recentSaves) ? data.recentSaves : [];
     renderNotificationItems(panel);
   } catch (_) {
     body.innerHTML = '<div class="notification-empty danger">서버에 연결할 수 없습니다.</div>';
@@ -2443,6 +2446,16 @@ async function refreshNotificationsPanel(panel) {
 function renderNotificationItems(panel) {
   const body = panel.querySelector('.notification-body');
   const filter = panel.dataset.filter || 'all';
+  if (filter === 'saves') {
+    const saves = panel._recentSaves || [];
+    if (saves.length === 0) {
+      body.innerHTML = '<div class="notification-empty">최근 토픽 저장 기록이 없습니다.</div>';
+      return;
+    }
+    body.innerHTML = '';
+    saves.forEach(item => body.appendChild(makeRecentSaveCard(item)));
+    return;
+  }
   const items = (panel._notifications || []).filter(item => {
     if (filter === 'all') return true;
     return item.source === filter;
@@ -2455,6 +2468,54 @@ function renderNotificationItems(panel) {
 
   body.innerHTML = '';
   items.forEach(item => body.appendChild(makeNotificationCard(item)));
+}
+
+function formatRecentSaveTime(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(seconds * 1000));
+}
+
+function makeRecentSaveCard(item) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'notification-card type-save recent-save-card';
+  card.setAttribute('aria-label', `${item.note?.title || '토픽'} 열기`);
+
+  const top = document.createElement('div');
+  top.className = 'notification-card-top';
+  const badge = document.createElement('span');
+  badge.className = 'notification-badge';
+  badge.textContent = item.action === 'created' ? '새 토픽' : '토픽에 추가';
+  const time = document.createElement('span');
+  time.className = 'notification-source';
+  time.textContent = formatRecentSaveTime(item.createdAt);
+  top.append(badge, time);
+
+  const note = document.createElement('div');
+  note.className = 'notification-note';
+  note.textContent = item.note?.title || '대상 토픽 없음';
+  const text = document.createElement('div');
+  text.className = 'notification-text';
+  text.textContent = item.text || '저장 내용 없음';
+  const file = document.createElement('div');
+  file.className = 'notification-file recent-save-file';
+  file.textContent = item.note?.filename || '';
+
+  card.append(top, note, text, file);
+  card.addEventListener('click', () => {
+    if (!item.note?.filename) return;
+    closeNotificationsPanel();
+    window.PaperPanel?.open('notes');
+    window.NotePanel?.open({ ...item.note, noteType: 'topic' });
+  });
+  return card;
 }
 
 function makeNotificationCard(item) {

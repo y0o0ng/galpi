@@ -16,6 +16,7 @@ const { searchSemanticScholar } = require('./lib/paper-search');
 const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
 const { createPaperNoteSaver } = require('./lib/paper-notes');
 const { initializePaperFullTextSchema } = require('./lib/paper-fulltext');
+const { createRecentSavesReader } = require('./lib/recent-saves');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -475,6 +476,7 @@ if (!db.prepare('PRAGMA table_info(auto_save_decisions)').all().some(c => c.name
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_queue ON auto_save_decisions(organize_queued, decision, action)');
 initializePaperFullTextSchema(db);
+const listRecentSaves = createRecentSavesReader(db);
 
 const stmtGetNotificationAction = db.prepare(`
   SELECT status FROM notification_actions WHERE notification_id = ? LIMIT 1
@@ -3397,7 +3399,14 @@ app.get('/api/notifications', async (_req, res) => {
   try {
     const codex = await listCodexProposalNotifications();
     const notifications = [...listManualCheckNotifications(), ...codex];
-    res.json({ success: true, count: notifications.length, notifications });
+    const recentSaves = listRecentSaves();
+    res.json({
+      success: true,
+      count: notifications.length,
+      notifications,
+      recentSaveCount: recentSaves.length,
+      recentSaves,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
