@@ -84,7 +84,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **프로젝트 현재 상태**
 
-- 현재 배포 상태: V4 논문 검색 1차와 함정 케이스 mock까지 Pi 배포·인수 완료 (`a70d9d0`, `1d4c704`). `S2_API_KEY` 실검색은 HTTP 200·결과 10개, 두 번째 요청 캐시, Playwright 카드 렌더링을 통과했다.
+- 현재 배포 상태: V4 논문 검색 1차·함정 케이스 mock·429/5xx 지수 백오프까지 Pi 배포·인수 완료 (`a70d9d0`, `1d4c704`, `78583e9`). `S2_API_KEY` 실검색은 HTTP 200·결과 10개, 성공 응답 캐시, Playwright 카드 렌더링과 `node:test` 10개를 통과했다.
 - 현재 개발 상태: V4 논문 검색 1차 완료. Pi `.env`는 `PAPER_SEARCH_MOCK=false`로 실검색을 사용하며, mock은 정규화·UI 문제 해결 때만 켠다.
 - 다음 개발 시작점: `docs/paper-search-design.md`의 2차 논문 저장·`paper_id` 중복 차단. 검색 1차 코드는 실사용 중 발견되는 문제 외에는 확장하지 않는다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
