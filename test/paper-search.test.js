@@ -161,6 +161,37 @@ test('searchSemanticScholar normalizes results and caches the same query', async
   assert.equal(first.results[0].paperId, 'paper-2');
 });
 
+test('searchSemanticScholar rejects malformed 200 responses without caching them', async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => { throw new SyntaxError('invalid JSON'); },
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        total: 1,
+        data: [{ paperId: 'recovered-paper', title: 'Recovered response' }],
+      }),
+    };
+  };
+
+  await assert.rejects(
+    searchSemanticScholar('malformed 200', { fetchImpl }),
+    error => error instanceof PaperSearchError && error.code === 'invalid_response',
+  );
+  const recovered = await searchSemanticScholar('malformed 200', { fetchImpl });
+
+  assert.equal(calls, 2);
+  assert.equal(recovered.results[0].paperId, 'recovered-paper');
+});
+
 test('searchSemanticScholar retries transient responses with exponential backoff and caches success', async () => {
   let calls = 0;
   const delays = [];

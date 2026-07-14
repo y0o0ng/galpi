@@ -17,6 +17,7 @@ const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
 const { createPaperNoteSaver } = require('./lib/paper-notes');
 const { initializePaperFullTextSchema } = require('./lib/paper-fulltext');
 const { createRecentSavesReader } = require('./lib/recent-saves');
+const { createNoteSaveStateReader } = require('./lib/note-save-state');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -477,6 +478,7 @@ if (!db.prepare('PRAGMA table_info(auto_save_decisions)').all().some(c => c.name
 db.exec('CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_queue ON auto_save_decisions(organize_queued, decision, action)');
 initializePaperFullTextSchema(db);
 const listRecentSaves = createRecentSavesReader(db);
+const noteSaveState = createNoteSaveStateReader(db);
 
 const stmtGetNotificationAction = db.prepare(`
   SELECT status FROM notification_actions WHERE notification_id = ? LIMIT 1
@@ -532,9 +534,6 @@ const stmtUpsertNote = db.prepare(`
     source_message = excluded.source_message,
     updated_at = strftime('%s','now')
 `);
-const stmtGetNoteByMessageId = db.prepare(`
-  SELECT filename, title FROM notes WHERE source_message = ? LIMIT 1
-`);
 const stmtGetNoteByFilename = db.prepare(`
   SELECT filename, title, note_type AS noteType, archived, codex_status AS codexStatus
   FROM notes
@@ -545,12 +544,6 @@ const stmtGetActivePaperById = db.prepare(`
   SELECT filename, title
   FROM notes
   WHERE paper_id = ? AND archived = 0
-  LIMIT 1
-`);
-const stmtGetNoteByChunkMessageId = db.prepare(`
-  SELECT note_filename AS filename, note_title AS title
-  FROM note_chunks
-  WHERE source_assistant_message = ? OR source_user_message = ?
   LIMIT 1
 `);
 const stmtUpdateNoteEmbedding = db.prepare(
@@ -762,6 +755,14 @@ const stmtListActiveNotesByType = db.prepare(`
   ORDER BY updated_at DESC, id DESC
   LIMIT ?
 `);
+const stmtListActiveNotesExceptType = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
+  FROM notes
+  WHERE archived = 0 AND note_type != ?
+  ORDER BY updated_at DESC, id DESC
+  LIMIT ?
+`);
 const stmtListAllNotesForVault = db.prepare(`
   SELECT filename, title, note_type AS noteType, archived,
          codex_status AS codexStatus, updated_at AS updatedAt
@@ -774,6 +775,14 @@ const stmtListAllNotesByType = db.prepare(`
          codex_status AS codexStatus, updated_at AS updatedAt
   FROM notes
   WHERE note_type = ?
+  ORDER BY archived ASC, updated_at DESC, id DESC
+  LIMIT ?
+`);
+const stmtListAllNotesExceptType = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
+  FROM notes
+  WHERE note_type != ?
   ORDER BY archived ASC, updated_at DESC, id DESC
   LIMIT ?
 `);
@@ -827,21 +836,6 @@ const stmtFinishCodexJob = db.prepare(`
   SET status = ?, error = ?, finished_at = strftime('%s','now')
   WHERE id = ?
 `);
-const stmtGetMessages = db.prepare(`
-  SELECT m.id, m.role, m.content, m.model,
-    CASE WHEN m.role = 'assistant' AND (
-      EXISTS (
-        SELECT 1 FROM notes n
-        WHERE n.source_message = CAST(m.id AS TEXT)
-      ) OR EXISTS (
-        SELECT 1 FROM note_chunks c
-        WHERE c.source_assistant_message = m.id OR c.source_user_message = m.id
-      )
-    ) THEN 1 ELSE 0 END AS noteSaved
-  FROM messages m
-  WHERE m.session_id = ?
-  ORDER BY m.created_at ASC, m.id ASC
-`);
 const stmtGetRecentMessages = db.prepare(`
   SELECT role, content, model, created_at AS createdAt FROM (
     SELECT role, content, model, created_at, id
@@ -890,10 +884,8 @@ function dbUpsertNote({
   });
 }
 
-function getSavedNoteByMessageId(messageId) {
-  if (!messageId) return null;
-  const id = String(messageId);
-  return stmtGetNoteByMessageId.get(id) || stmtGetNoteByChunkMessageId.get(id, id) || null;
+function getSavedNoteByMessageId(messageId, noteType = 'topic') {
+  return noteSaveState.find(messageId, noteType);
 }
 
 // 한 job(=codex 한 세션)에 노트를 너무 많이 묶으면 정리 시간이 길어져 타임아웃으로 통째 실패한다.
@@ -4058,14 +4050,30 @@ app.post('/api/search/web', async (req, res) => {
 app.get('/api/vault/notes', (req, res) => {
   const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true';
   const noteType = String(req.query.noteType || '').trim();
-  if (noteType && !/^[a-z][a-z0-9_]{0,39}$/i.test(noteType)) {
+  const excludeNoteType = String(req.query.excludeNoteType || '').trim();
+  const noteTypePattern = /^[a-z][a-z0-9_]{0,39}$/i;
+  if ((noteType && !noteTypePattern.test(noteType)) || (excludeNoteType && !noteTypePattern.test(excludeNoteType))) {
     return res.status(400).json({ success: false, error: '잘못된 노트 타입입니다.' });
+  }
+  if (noteType && excludeNoteType) {
+    return res.status(400).json({ success: false, error: '노트 타입 포함·제외 필터를 함께 사용할 수 없습니다.' });
   }
   const requestedLimit = Number.parseInt(req.query.limit || '50', 10);
   const limit = Math.min(100, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50));
-  const notes = noteType
-    ? (includeArchived ? stmtListAllNotesByType.all(noteType, limit) : stmtListActiveNotesByType.all(noteType, limit))
-    : (includeArchived ? stmtListAllNotesForVault.all(limit) : stmtListActiveNotesForVault.all(limit));
+  let notes;
+  if (noteType) {
+    notes = includeArchived
+      ? stmtListAllNotesByType.all(noteType, limit)
+      : stmtListActiveNotesByType.all(noteType, limit);
+  } else if (excludeNoteType) {
+    notes = includeArchived
+      ? stmtListAllNotesExceptType.all(excludeNoteType, limit)
+      : stmtListActiveNotesExceptType.all(excludeNoteType, limit);
+  } else {
+    notes = includeArchived
+      ? stmtListAllNotesForVault.all(limit)
+      : stmtListActiveNotesForVault.all(limit);
+  }
   return res.json({ success: true, notes });
 });
 
@@ -4871,9 +4879,10 @@ async function loadNoteSearchData(filename) {
 
 async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIVE_NOTES) {
   const terms = extractQueryTerms(query);
-  if (terms.length === 0) return [];
   const activeNotes = stmtGetNotesWithEmbedding.all();
   if (activeNotes.length === 0) return [];
+  const queryEmbedding = precomputedEmbedding || await generateEmbedding(query);
+  if (terms.length === 0 && !queryEmbedding) return [];
 
   // 노트 내용 + DB embedding 수집
   const embeddingMap = new Map(
@@ -4896,8 +4905,6 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
     term,
     noteData.filter(data => data.titleLower.includes(term) || data.bodyLower.includes(term) || data.tagsLower.includes(term)).length,
   ]));
-  const queryEmbedding = precomputedEmbedding || await generateEmbedding(query);
-
   const results = [];
   for (const { filename, title, body, titleLower, bodyLower, tagsLower } of noteData) {
     // ── IDF 키워드 점수 ──
@@ -5060,7 +5067,7 @@ ${question}
 
 app.get('/api/sessions/:id', (req, res) => {
   const { id } = req.params;
-  const messages = stmtGetMessages.all(id).map(message => ({
+  const messages = noteSaveState.listSessionMessages(id).map(message => ({
     ...message,
     noteSaved: !!message.noteSaved,
   }));
@@ -5077,7 +5084,7 @@ app.get('/api/messages/:id/save-status', (req, res) => {
     return res.status(400).json({ error: '올바른 메시지 ID가 필요합니다.' });
   }
 
-  const saved = getSavedNoteByMessageId(messageId);
+  const saved = noteSaveState.findForMessage(messageId);
   return res.json({
     saved: !!saved,
     title: saved?.title || null,
@@ -5456,7 +5463,7 @@ app.post('/api/council/save-note', async (req, res) => {
 
   if (messageId) {
     await topicWriteChain;
-    const existing = getSavedNoteByMessageId(messageId);
+    const existing = getSavedNoteByMessageId(messageId, 'council');
     if (existing) return res.json({ success: true, title: existing.title, filename: existing.filename, duplicate: true });
   }
 

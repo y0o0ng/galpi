@@ -144,11 +144,11 @@
     const requestId = ++state.requestId;
     renderLoading();
     try {
-      const response = await state.apiFetch('/api/vault/notes?limit=100');
+      const response = await state.apiFetch('/api/vault/notes?excludeNoteType=paper&limit=100');
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || '노트 목록을 불러오지 못했습니다.');
       if (requestId !== state.requestId) return;
-      state.notes = (Array.isArray(data.notes) ? data.notes : []).filter(note => note.noteType !== 'paper');
+      state.notes = Array.isArray(data.notes) ? data.notes : [];
       state.loaded = true;
       renderList();
     } catch (error) {
@@ -187,14 +187,16 @@
   }
 
   function show() {
-    if (!state.loaded) loadNotes();
+    loadNotes();
   }
 
   function init({ apiFetch }) {
     if (state.initialized) return;
-    state.initialized = true;
-    state.apiFetch = apiFetch;
     const el = elements();
+    if (typeof apiFetch !== 'function' || !el.form || !el.query || !el.content) {
+      throw new Error('노트 패널 필수 요소를 찾지 못했습니다.');
+    }
+    state.apiFetch = apiFetch;
     el.form.addEventListener('submit', event => {
       event.preventDefault();
       renderList();
@@ -202,6 +204,7 @@
     el.query.addEventListener('input', () => {
       if (state.loaded) renderList();
     });
+    state.initialized = true;
   }
 
   global.NotePanel = { init, show, loadNotes, open };

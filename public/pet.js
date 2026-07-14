@@ -30,6 +30,7 @@ let lastTs       = null;
 let isDragging   = false;
 let dragOffsetX  = 0;
 let dragOffsetY  = 0;
+let ignoreNextPetClick = false;
 
 // ─── 초기화 ───────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,10 @@ let menuEl = null;
 
 function onPetClick(e) {
   e.stopPropagation();
+  if (ignoreNextPetClick) {
+    ignoreNextPetClick = false;
+    return;
+  }
   resetSleepTimer();
 
   if (state === 'sleeping') {
@@ -211,8 +216,29 @@ function runCommand(command, autoSend) {
 
 // ─── 드래그 ───────────────────────────────────────────────────────────────────
 
+function findUnderlyingControl(clientX, clientY) {
+  const previousVisibility = petEl.style.visibility;
+  let target;
+  try {
+    petEl.style.visibility = 'hidden';
+    target = document.elementFromPoint(clientX, clientY);
+  } finally {
+    petEl.style.visibility = previousVisibility;
+  }
+  return target?.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]') || null;
+}
+
 function onDragStart(e) {
   if (e.button !== 0) return;
+  const underlyingControl = findUnderlyingControl(e.clientX, e.clientY);
+  if (underlyingControl) {
+    ignoreNextPetClick = true;
+    setTimeout(() => { ignoreNextPetClick = false; }, 500);
+    underlyingControl.focus?.();
+    underlyingControl.click();
+    e.preventDefault();
+    return;
+  }
   isDragging = true;
   dragOffsetX = e.clientX - petEl.getBoundingClientRect().left;
   dragOffsetY = e.clientY - petEl.getBoundingClientRect().top;

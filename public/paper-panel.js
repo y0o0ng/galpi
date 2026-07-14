@@ -383,13 +383,25 @@
 
   function init({ apiFetch, showToast, icons }) {
     if (state.initialized) return;
-    state.initialized = true;
+    const el = elements();
+    const required = [
+      el.panel, el.backdrop, el.toggle, el.close, el.notes, el.agents,
+      el.papers, el.form, el.query, el.content,
+    ];
+    if (
+      typeof apiFetch !== 'function'
+      || typeof showToast !== 'function'
+      || !icons?.save || !icons?.check || !icons?.loading
+      || required.some(item => !item)
+      || el.tabs.length === 0
+    ) {
+      throw new Error('논문 패널 필수 요소를 찾지 못했습니다.');
+    }
+
+    global.NotePanel?.init({ apiFetch });
     state.apiFetch = apiFetch;
     state.showToast = showToast;
     state.icons = icons;
-    global.NotePanel?.init({ apiFetch });
-
-    const el = elements();
     el.toggle.addEventListener('click', () => {
       if (el.panel.classList.contains('open')) close();
       else open();
@@ -405,6 +417,7 @@
       if (event.key === 'Escape' && el.panel.classList.contains('open')) close();
     });
 
+    state.initialized = true;
     loadSavedPapers();
     setTab('notes');
   }

@@ -121,6 +121,7 @@ async function init() {
       councilBtn.title = 'Claude와 GPT 키가 모두 필요합니다';
     }
   } catch (_) {
+    initPaperPanel();
     appendError('서버에 연결할 수 없습니다. node server.js가 실행 중인지 확인해주세요.');
   }
 
@@ -189,12 +190,37 @@ async function refreshWebUsagePill() {
 
 let lastRenderedMsgId = 0;
 let lastRenderedSaveSignature = '';
+let renderedSavedMessageIds = new Set();
 
 function getNoteSaveSignature(messages) {
   return messages
     .filter(message => message.noteSaved)
     .map(message => message.id)
     .join(',');
+}
+
+function rememberMessageSaved(messageId) {
+  const id = Number(messageId);
+  if (!Number.isSafeInteger(id) || id <= 0) return;
+  renderedSavedMessageIds.add(String(id));
+  lastRenderedSaveSignature = [...renderedSavedMessageIds]
+    .map(Number)
+    .sort((a, b) => a - b)
+    .join(',');
+}
+
+function syncRenderedSaveButtons(messages) {
+  renderedSavedMessageIds = new Set(
+    messages
+      .filter(message => message.noteSaved)
+      .map(message => String(message.id))
+  );
+  document.querySelectorAll('.save-btn[data-message-id]').forEach(button => {
+    if (renderedSavedMessageIds.has(button.dataset.messageId)) {
+      markSaveButtonSaved(button);
+    }
+  });
+  lastRenderedSaveSignature = getNoteSaveSignature(messages);
 }
 
 // 메시지 배열로 대화창을 처음부터 다시 그린다. (폴링 갱신과 공유)
@@ -215,7 +241,7 @@ function renderMessages(messages) {
     isRestoringHistory = false;
   }
   lastRenderedMsgId = messages.length ? (messages[messages.length - 1].id || 0) : 0;
-  lastRenderedSaveSignature = getNoteSaveSignature(messages);
+  syncRenderedSaveButtons(messages);
 }
 
 async function loadHistory() {
@@ -242,6 +268,10 @@ async function pollForUpdates() {
     const latestId = messages[messages.length - 1].id || 0;
     const saveSignature = getNoteSaveSignature(messages);
     if (latestId === lastRenderedMsgId && saveSignature === lastRenderedSaveSignature) return;
+    if (latestId === lastRenderedMsgId) {
+      syncRenderedSaveButtons(messages);
+      return;
+    }
     renderMessages(messages);
   } catch (_) { /* 조용히 무시 */ }
 }
@@ -291,6 +321,9 @@ function appendHistoryBubble(content, model, messageId, question, noteSaved = fa
     saveBtn.title = '노트로 저장';
     saveBtn.setAttribute('aria-label', '노트로 저장');
     saveBtn.innerHTML = saveIconSvg();
+    if (Number.isSafeInteger(Number(messageId)) && Number(messageId) > 0) {
+      saveBtn.dataset.messageId = String(messageId);
+    }
     if (noteSaved) {
       markSaveButtonSaved(saveBtn);
     } else {
@@ -963,6 +996,9 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
   saveBtn.title = '노트로 저장';
   saveBtn.setAttribute('aria-label', '노트로 저장');
   saveBtn.innerHTML = saveIconSvg();
+  if (Number.isSafeInteger(Number(data.messageId)) && Number(data.messageId) > 0) {
+    saveBtn.dataset.messageId = String(data.messageId);
+  }
   const noteDraftMode = debateData.councilDraftMode || councilDraftMode;
   if (data.noteSaved) {
     markSaveButtonSaved(saveBtn);
@@ -1017,6 +1053,7 @@ function markSaveButtonSaved(btn) {
   btn.setAttribute('aria-label', '저장됨');
   btn.classList.remove('error');
   btn.classList.add('saved');
+  rememberMessageSaved(btn.dataset.messageId);
 }
 
 function watchMessageSaveState(btn, messageId) {
@@ -1049,6 +1086,7 @@ async function saveCouncilNote(btn, data) {
     });
     const result = await res.json();
     if (result.success) {
+      rememberMessageSaved(data.messageId);
       markSaveButtonSaved(btn);
       showToast(result.duplicate ? `이미 저장된 노트야: ${result.title}` : `저장됨: ${result.title}`);
     } else {
@@ -1074,7 +1112,7 @@ async function saveCouncilNote(btn, data) {
 async function handlePaperSearch(query) {
   document.querySelector('.welcome')?.remove();
   appendUserBubble(`/paper ${query}`);
-  if (!window.PaperPanel) {
+  if (!initPaperPanel()) {
     appendError('논문 패널을 불러오지 못했습니다.');
     return;
   }
@@ -1082,15 +1120,22 @@ async function handlePaperSearch(query) {
 }
 
 function initPaperPanel() {
-  window.PaperPanel?.init({
-    apiFetch,
-    showToast,
-    icons: {
-      save: saveIconSvg,
-      check: checkIconSvg,
-      loading: loadingIconSvg,
-    },
-  });
+  if (!window.PaperPanel) return false;
+  try {
+    window.PaperPanel.init({
+      apiFetch,
+      showToast,
+      icons: {
+        save: saveIconSvg,
+        check: checkIconSvg,
+        loading: loadingIconSvg,
+      },
+    });
+    return true;
+  } catch (error) {
+    console.warn('논문 패널 초기화 실패:', error.message);
+    return false;
+  }
 }
 
 async function handleSearch(query) {
@@ -2787,6 +2832,7 @@ async function saveNote(btn, data) {
     });
     const result = await res.json();
     if (result.success) {
+      rememberMessageSaved(data.messageId);
       markSaveButtonSaved(btn);
       showToast(result.duplicate ? `이미 저장된 노트야: ${result.title}` : `저장됨: ${result.title}`);
     } else {
@@ -2851,6 +2897,9 @@ function appendAssistantBubble(data) {
   saveBtn.title = '노트로 저장';
   saveBtn.setAttribute('aria-label', '노트로 저장');
   saveBtn.innerHTML = saveIconSvg();
+  if (Number.isSafeInteger(Number(data.messageId)) && Number(data.messageId) > 0) {
+    saveBtn.dataset.messageId = String(data.messageId);
+  }
   saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, data)));
 
   group.append(label, bubble, saveBtn);
@@ -2869,6 +2918,7 @@ function showSaveConfirm(saveBtn, onConfirm) {
   cancelBtn.className = 'save-confirm-cancel';
   cancelBtn.textContent = '취소';
   cancelBtn.addEventListener('click', () => {
+    if (renderedSavedMessageIds.has(saveBtn.dataset.messageId)) markSaveButtonSaved(saveBtn);
     confirm.replaceWith(saveBtn);
   });
 
