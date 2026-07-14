@@ -22,6 +22,7 @@ test('buildPaperNoteContent creates a searchable paper note', () => {
       url: 'https://www.semanticscholar.org/paper/abc123',
       arxivId: '2412.20138',
       doi: '10.1000/example',
+      openAccessPdfUrl: 'https://arxiv.org/pdf/2412.20138',
       tldr: 'A multi-agent LLM framework.',
       abstract: 'Significant progress has been made.',
     },
@@ -31,7 +32,9 @@ test('buildPaperNoteContent creates a searchable paper note', () => {
   assert.match(content, /^note_type: paper$/m);
   assert.match(content, /^authors: \["Yijia Xiao", "Edward Sun"\]$/m);
   assert.match(content, /^paper_id: "abc123"$/m);
+  assert.match(content, /^open_access_pdf_url: "https:\/\/arxiv\.org\/pdf\/2412\.20138"$/m);
   assert.match(content, /^knowledge_type: academic_paper$/m);
+  assert.match(content, /## 원문\n\n\[공개 PDF 열기 ↗\]\(https:\/\/arxiv\.org\/pdf\/2412\.20138\)/);
   assert.match(content, /## TL;DR\n\nA multi-agent LLM framework\./);
   assert.match(content, /## 초록\n\nSignificant progress has been made\./);
   assert.match(content, /<!-- CODEX-TAGS-START -->/);

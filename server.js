@@ -4118,6 +4118,7 @@ async function readVaultNote(filename) {
       filename: safeName,
       title:    parseNoteTitle(raw, safeName),
       content:  stripFrontmatter(raw),
+      metadata: parseSimpleFrontmatter(raw),
     };
   } catch {
     return null;

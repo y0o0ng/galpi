@@ -2,7 +2,7 @@
 
 > 작성: 2026-07 (1차 구현·Pi 인수 완료)
 
-> 현재 상태 (2026-07-14): 1차 검색과 2차 논문 저장·중복 차단·논문 서재 UI를 Pi에 배포했다. 실제 TradingAgents 논문 저장, 임베딩 생성, 하이브리드 검색 회수까지 인수했고 실제 질문 컨텍스트와 Codex 태그·링크 처리가 남았다.
+> 현재 상태 (2026-07-14): 1차 검색과 2차 논문 저장·중복 차단·논문 서재 UI를 Pi에 배포했다. 일반 노트 열람과 공개 PDF 외부 링크는 Mac 구현·테스트를 마쳤고 Pi 배포 전이다. 실제 TradingAgents 논문 저장, 임베딩 생성, 하이브리드 검색 회수까지 인수했으며 실제 질문 컨텍스트와 Codex 태그·링크 처리가 남았다.
 
 ## 0. 한 줄 요약
 
@@ -15,7 +15,7 @@
 
 **v1에서 하지 않는 것** (범위 밖 — 욕심내지 말 것):
 
-- PDF 전문 다운로드/파싱 (초록만으로 시작)
+- PDF 전문 다운로드/파싱 (초록만 저장하고, 공개 PDF가 있으면 외부 링크만 제공)
 - 논문 자동 요약 (LLM 호출 0으로 시작)
 - 정기 자동 수집 → V5 리서치 에이전트의 일 (섹션 8의 3차)
 - 인용 그래프 탐색
@@ -78,7 +78,7 @@ arXiv/OpenAlex는 대안으로 보관 — S2가 부족하다고 *실측*될 때�
 ```
 GET https://api.semanticscholar.org/graph/v1/paper/search
   ?query={검색어}
-  &fields=title,abstract,year,authors,citationCount,externalIds,url,tldr
+  &fields=title,abstract,year,authors,citationCount,externalIds,url,tldr,openAccessPdf
   &limit=10
 헤더: x-api-key: {S2_API_KEY}   (키 있을 때)
 ```
@@ -88,7 +88,7 @@ GET https://api.semanticscholar.org/graph/v1/paper/search
 ```js
 async function searchSemanticScholar(query, { limit = 10 } = {})
   // → [{ paperId, title, abstract, year, authors: [이름들],
-  //      citationCount, tldr, url, arxivId, doi }] (정규화 완료)
+  //      citationCount, tldr, url, arxivId, doi, openAccessPdfUrl }] (정규화 완료)
 ```
 
 ### 저장 모듈 (`lib/paper-notes.js`)
@@ -122,6 +122,7 @@ year: 2025
 citation_count: 142        # 저장 시점 스냅샷
 paper_id: {S2 paperId}
 arxiv_id: 2412.20138       # 있을 때만
+open_access_pdf_url: https://... # S2가 공개 PDF를 제공할 때만
 url: https://...
 created: {동일 규칙}
 archived: false
@@ -135,6 +136,9 @@ confidence: medium
 본문 구조:
 
 ```
+## 원문
+[공개 PDF 열기 ↗](https://...)  # 있을 때만
+
 ## TL;DR
 {S2 tldr — 없으면 생략}
 
@@ -156,7 +160,9 @@ confidence: medium
 - 슬래시 명령 팔레트에 `/paper ` 등록 (autoSend: false — 검색어 입력 필요)
 - 데스크톱은 채팅 오른쪽 350px 사이드 패널, 900px 이하는 바텀시트
 - 기본 화면은 저장된 `paper` 노트 목록. 선택하면 읽기 전용 상세를 열고 activeNotes는 바꾸지 않음
+- `노트` 탭은 일반 노트를 별도 `public/note-panel.js`로 읽기 전용 표시하며 activeNotes를 바꾸지 않음
 - 패널 검색과 `/paper` 명령은 같은 결과 화면을 사용. 결과 카드: **제목(링크) · 연도 · 인용수 · tldr 한 줄** + [저장] 버튼
+- S2 `openAccessPdf.url`이 있거나 arXiv ID를 가진 논문은 공개 PDF를 새 탭에서 연다. 앱은 PDF를 다운로드·파싱·프록시하지 않음
 - 저장 완료 시 버튼 → “저장됨 ✓” 비활성화. 재검색·새로고침 후에도 DB의 `paper_id` 조회로 상태 복원
 - 에이전트 탭은 후속 기능을 위한 자리만 표시하고 현재는 `준비 중`
 

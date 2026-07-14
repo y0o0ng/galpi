@@ -8,9 +8,47 @@
     apiFetch: null,
     showToast: null,
     icons: null,
+    activeTab: 'notes',
   };
 
   const backIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
+
+  function normalizeExternalUrl(value) {
+    try {
+      const url = new URL(String(value || '').trim());
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function arxivPdfUrl(value) {
+    const id = String(value || '').trim();
+    if (!id || !/^[a-z0-9._/-]+$/i.test(id)) return '';
+    return `https://arxiv.org/pdf/${id.split('/').map(encodeURIComponent).join('/')}`;
+  }
+
+  function paperFullTextUrl(paper) {
+    return normalizeExternalUrl(paper?.openAccessPdfUrl) || arxivPdfUrl(paper?.arxivId);
+  }
+
+  function makeExternalLink(url, label) {
+    const link = document.createElement('a');
+    link.className = 'paper-external-link';
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = `${label} ↗`;
+    return link;
+  }
+
+  function makePaperActions(fullTextUrl, sourceUrl = '') {
+    const actions = document.createElement('div');
+    actions.className = 'paper-panel-actions';
+    if (fullTextUrl) actions.appendChild(makeExternalLink(fullTextUrl, '원문 PDF'));
+    if (sourceUrl && sourceUrl !== fullTextUrl) actions.appendChild(makeExternalLink(sourceUrl, '논문 페이지'));
+    return actions;
+  }
 
   function elements() {
     return {
@@ -19,6 +57,7 @@
       toggle: document.getElementById('knowledge-panel-toggle'),
       close: document.getElementById('knowledge-panel-close'),
       tabs: [...document.querySelectorAll('[data-panel-tab]')],
+      notes: document.getElementById('note-panel'),
       agents: document.getElementById('agent-panel'),
       papers: document.getElementById('paper-panel'),
       form: document.getElementById('paper-panel-search'),
@@ -27,7 +66,7 @@
     };
   }
 
-  function open(tab = 'papers') {
+  function open(tab = state.activeTab) {
     const el = elements();
     setTab(tab);
     el.panel.classList.add('open');
@@ -46,10 +85,16 @@
 
   function setTab(tab) {
     const el = elements();
-    const showPapers = tab === 'papers';
-    el.tabs.forEach(button => button.classList.toggle('active', button.dataset.panelTab === tab));
-    el.agents.hidden = showPapers;
-    el.papers.hidden = !showPapers;
+    state.activeTab = tab;
+    el.tabs.forEach(button => {
+      const active = button.dataset.panelTab === tab;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+    el.notes.hidden = tab !== 'notes';
+    el.agents.hidden = tab !== 'agents';
+    el.papers.hidden = tab !== 'papers';
+    if (tab === 'notes') global.NotePanel?.show();
   }
 
   function makeSectionHead(title, count, onBack) {
@@ -85,6 +130,7 @@
   function renderLoading(title) {
     const { content } = elements();
     content.innerHTML = '';
+    content.scrollTop = 0;
     content.appendChild(makeSectionHead(title));
     const skeleton = document.createElement('div');
     skeleton.className = 'paper-panel-skeleton';
@@ -95,6 +141,7 @@
   function renderError(message, retry) {
     const { content } = elements();
     content.innerHTML = '';
+    content.scrollTop = 0;
     const wrap = document.createElement('div');
     wrap.className = 'panel-empty-state panel-error-state';
     const text = document.createElement('p');
@@ -158,6 +205,7 @@
       const notes = Array.isArray(data.notes) ? data.notes : [];
       const { content } = elements();
       content.innerHTML = '';
+      content.scrollTop = 0;
       content.appendChild(makeSectionHead('저장된 논문', notes.length));
       if (notes.length === 0) {
         const empty = document.createElement('div');
@@ -189,10 +237,17 @@
 
       const { content } = elements();
       content.innerHTML = '';
+      content.scrollTop = 0;
       content.appendChild(makeSectionHead('논문', null, loadSavedPapers));
 
+      const metadata = data.note.metadata || {};
+      const fullTextUrl = normalizeExternalUrl(metadata.open_access_pdf_url) || arxivPdfUrl(metadata.arxiv_id);
+      const sourceUrl = normalizeExternalUrl(metadata.url);
+      const actions = makePaperActions(fullTextUrl, sourceUrl);
+      if (actions.childElementCount > 0) content.appendChild(actions);
+
       const article = document.createElement('article');
-      article.className = 'paper-note-detail';
+      article.className = 'knowledge-note-detail';
       article.innerHTML = DOMPurify.sanitize(marked.parse(data.note.content || ''));
       content.appendChild(article);
     } catch (error) {
@@ -279,6 +334,8 @@
       summary.textContent = summaryText;
       card.appendChild(summary);
     }
+    const fullTextUrl = paperFullTextUrl(paper);
+    if (fullTextUrl) card.appendChild(makePaperActions(fullTextUrl));
     return card;
   }
 
@@ -304,6 +361,7 @@
       const papers = Array.isArray(data.results) ? data.results : [];
       const { content } = elements();
       content.innerHTML = '';
+      content.scrollTop = 0;
       content.appendChild(makeSectionHead('검색 결과', papers.length, loadSavedPapers));
       if (papers.length === 0) {
         const empty = document.createElement('div');
@@ -329,11 +387,12 @@
     state.apiFetch = apiFetch;
     state.showToast = showToast;
     state.icons = icons;
+    global.NotePanel?.init({ apiFetch });
 
     const el = elements();
     el.toggle.addEventListener('click', () => {
       if (el.panel.classList.contains('open')) close();
-      else open('papers');
+      else open();
     });
     el.close.addEventListener('click', close);
     el.backdrop.addEventListener('click', close);
@@ -347,6 +406,7 @@
     });
 
     loadSavedPapers();
+    setTab('notes');
   }
 
   global.PaperPanel = { init, open, close, search, loadSavedPapers };

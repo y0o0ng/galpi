@@ -72,24 +72,9 @@ function updateZone() {
   const appEl = document.getElementById('app');
   if (!appEl) return;
   const rect = appEl.getBoundingClientRect();
-
-  const leftW  = rect.left - PET_SIZE - 10;
-  const rightW = window.innerWidth - rect.right - PET_SIZE - 10;
-
-  // 여유 공간이 있는 쪽 선택, 둘 다 있으면 더 넓은 쪽
-  if (rightW >= 10 && rightW >= leftW) {
-    zone = { min: rect.right + 5, max: window.innerWidth - PET_SIZE - 5 };
-  } else if (leftW >= 10) {
-    zone = { min: 5, max: rect.left - PET_SIZE - 5 };
-  } else if (window.innerWidth > 900) {
-    const chatRect = document.getElementById('chat-column')?.getBoundingClientRect();
-    const min = (chatRect?.left ?? rect.left) + 10;
-    const max = Math.max(min, (chatRect?.right ?? rect.right) - PET_SIZE - 10);
-    zone = { min, max };
-  } else {
-    // 창이 좁아서 여백 없음 → 하단 고정 우측 코너
-    zone = { min: window.innerWidth - PET_SIZE - 10, max: window.innerWidth - PET_SIZE - 10 };
-  }
+  const min = Math.max(5, rect.left + 5);
+  const max = Math.max(min, Math.min(window.innerWidth - PET_SIZE - 5, rect.right - PET_SIZE - 5));
+  zone = { min, max };
 
   // 현재 위치가 구간 밖이면 구간 안으로 이동
   posX = Math.max(zone.min, Math.min(posX || zone.min, zone.max));

@@ -24,6 +24,7 @@ test('normalizePaper keeps useful metadata and removes unsafe markup', () => {
     citationCount: 42,
     externalIds: { DOI: '10.1000/example', ArXiv: '2501.00001' },
     url: 'javascript:alert(1)',
+    openAccessPdf: { url: 'https://example.com/paper.pdf' },
     tldr: { text: '<i>Short</i> finding' },
   });
 
@@ -38,6 +39,7 @@ test('normalizePaper keeps useful metadata and removes unsafe markup', () => {
     url: 'https://www.semanticscholar.org/paper/paper-1',
     arxivId: '2501.00001',
     doi: '10.1000/example',
+    openAccessPdfUrl: 'https://example.com/paper.pdf',
   });
 });
 
@@ -63,6 +65,9 @@ test('mock fixture normalizes missing, unsafe, and invalid paper fields', () => 
   assert.match(tldrOnly.tldr, /intentionally provides a TLDR/);
   assert.equal(tldrOnly.citationCount, 0);
 
+  const fullText = papers.find(paper => paper.paperId === 'abc123');
+  assert.equal(fullText.openAccessPdfUrl, 'https://arxiv.org/pdf/2412.20138');
+
   const sparse = papers.find(paper => paper.paperId === 'edge-missing-metadata');
   assert.equal(sparse.abstract, null);
   assert.equal(sparse.tldr, null);
@@ -70,6 +75,7 @@ test('mock fixture normalizes missing, unsafe, and invalid paper fields', () => 
   assert.deepEqual(sparse.authors, []);
   assert.equal(sparse.citationCount, 0);
   assert.equal(sparse.url, 'https://www.semanticscholar.org/paper/edge-missing-metadata');
+  assert.equal(sparse.openAccessPdfUrl, null);
 
   const unsafe = papers.find(paper => paper.paperId === 'edge-many-authors');
   assert.equal(unsafe.title, 'Robust Multi-Agent Evaluation');
@@ -77,6 +83,7 @@ test('mock fixture normalizes missing, unsafe, and invalid paper fields', () => 
   assert.equal(unsafe.authors.length, 6);
   assert.equal(unsafe.citationCount, 17);
   assert.equal(unsafe.url, 'https://www.semanticscholar.org/paper/edge-many-authors');
+  assert.equal(unsafe.openAccessPdfUrl, null);
 });
 
 test('mock search uses the production normalization and cache path without fetching', async () => {
@@ -147,6 +154,7 @@ test('searchSemanticScholar normalizes results and caches the same query', async
   assert.equal(calls, 1);
   assert.match(requestedUrl, /query=multi-agent(?:\+|%20)trading/);
   assert.match(requestedUrl, /limit=10/);
+  assert.match(requestedUrl, /openAccessPdf/);
   assert.equal(requestedHeaders['x-api-key'], 'secret-key');
   assert.equal(first.cached, false);
   assert.equal(second.cached, true);
