@@ -7,8 +7,10 @@ const {
   PaperSearchError,
   clearPaperSearchCache,
   normalizePaper,
+  normalizePaperResults,
   searchSemanticScholar,
 } = require('../lib/paper-search');
+const { MOCK_S2_RESPONSE } = require('../lib/paper-search-mock');
 
 test.beforeEach(() => clearPaperSearchCache());
 
@@ -37,6 +39,70 @@ test('normalizePaper keeps useful metadata and removes unsafe markup', () => {
     arxivId: '2501.00001',
     doi: '10.1000/example',
   });
+});
+
+test('mock fixture normalizes missing, unsafe, and invalid paper fields', () => {
+  const papers = normalizePaperResults(MOCK_S2_RESPONSE.data);
+
+  assert.equal(papers.length, 4);
+
+  const tldrOnly = papers.find(paper => paper.paperId === 'edge-tldr-only');
+  assert.equal(tldrOnly.abstract, null);
+  assert.match(tldrOnly.tldr, /intentionally provides a TLDR/);
+  assert.equal(tldrOnly.citationCount, 0);
+
+  const sparse = papers.find(paper => paper.paperId === 'edge-missing-metadata');
+  assert.equal(sparse.abstract, null);
+  assert.equal(sparse.tldr, null);
+  assert.equal(sparse.year, null);
+  assert.deepEqual(sparse.authors, []);
+  assert.equal(sparse.citationCount, 0);
+  assert.equal(sparse.url, 'https://www.semanticscholar.org/paper/edge-missing-metadata');
+
+  const unsafe = papers.find(paper => paper.paperId === 'edge-many-authors');
+  assert.equal(unsafe.title, 'Robust Multi-Agent Evaluation');
+  assert.equal(unsafe.abstract, 'Evidence without executable markup.');
+  assert.equal(unsafe.authors.length, 6);
+  assert.equal(unsafe.citationCount, 17);
+  assert.equal(unsafe.url, 'https://www.semanticscholar.org/paper/edge-many-authors');
+});
+
+test('mock search uses the production normalization and cache path without fetching', async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    throw new Error('mock mode must not fetch');
+  };
+
+  const first = await searchSemanticScholar('mock edge cases', {
+    fetchImpl,
+    mockResponse: MOCK_S2_RESPONSE,
+  });
+  const second = await searchSemanticScholar('mock edge cases', {
+    fetchImpl,
+    mockResponse: MOCK_S2_RESPONSE,
+  });
+
+  assert.equal(calls, 0);
+  assert.equal(first.mock, true);
+  assert.equal(first.cached, false);
+  assert.equal(first.results.length, 4);
+  assert.equal(second.cached, true);
+});
+
+test('mock search preserves an empty result set', async () => {
+  const emptyResult = await searchSemanticScholar('no results', {
+    mockResponse: { total: 0, data: [] },
+  });
+  const malformedResult = await searchSemanticScholar('malformed response', {
+    mockResponse: null,
+  });
+
+  assert.equal(emptyResult.mock, true);
+  assert.equal(emptyResult.total, 0);
+  assert.deepEqual(emptyResult.results, []);
+  assert.equal(malformedResult.total, 0);
+  assert.deepEqual(malformedResult.results, []);
 });
 
 test('searchSemanticScholar normalizes results and caches the same query', async () => {

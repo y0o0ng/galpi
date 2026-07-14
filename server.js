@@ -13,6 +13,7 @@ const Database = require('better-sqlite3');
 const os = require('os');
 const { runBackup, listBackups } = require('./scripts/backup');
 const { searchSemanticScholar } = require('./lib/paper-search');
+const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -3651,6 +3652,7 @@ app.get('/api/papers/search', async (req, res) => {
   try {
     const result = await searchSemanticScholar(req.query.q, {
       apiKey: process.env.S2_API_KEY,
+      mockResponse: process.env.PAPER_SEARCH_MOCK === 'true' ? MOCK_S2_RESPONSE : undefined,
     });
     return res.json({ success: true, ...result });
   } catch (err) {

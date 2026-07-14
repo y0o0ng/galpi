@@ -1149,7 +1149,10 @@ function renderPaperResults(data) {
 
   const source = document.createElement('span');
   source.className = 'paper-results-source';
-  source.textContent = data.cached ? 'Semantic Scholar · 캐시' : 'Semantic Scholar';
+  const sourceLabels = ['Semantic Scholar'];
+  if (data.mock) sourceLabels.push('테스트 데이터');
+  if (data.cached) sourceLabels.push('캐시');
+  source.textContent = sourceLabels.join(' · ');
 
   header.append(count, source);
   wrap.appendChild(header);
