@@ -20,6 +20,11 @@ const { createPaperFullTextTools, formatPaperEvidenceBlock } = require('./lib/pa
 const { runClaudeToolLoop } = require('./lib/claude-tool-loop');
 const { createRecentSavesReader } = require('./lib/recent-saves');
 const { createNoteSaveStateReader } = require('./lib/note-save-state');
+const {
+  cosineSimilarity,
+  extractQueryTerms,
+  rankNoteCandidates,
+} = require('./lib/assistant-retrieval');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -4820,26 +4825,6 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   return { notes: merged, pastMessages, queryEmbedding };
 }
 
-const SEARCH_STOP_WORDS = new Set([
-  '이', '가', '은', '는', '을', '를', '에', '의', '와', '과', '도', '로', '만',
-  '내', '네', '그', '저', '것', '수', '더', '한', '두', '때', '등',
-  '그리고', '그런데', '저번에', '우리가', '관련', '내용', '알려줘', '호출해줘',
-  '불러와줘', '꺼내줘', '해줘', '해줘요', '해주세요', '알고', '싶어', '있어',
-  '없어', '어떤', '어떻게', '무엇', '뭐가', '뭔지', '대해', '대한', '관한',
-  '이번', '저번', '지난', '이런', '저런', '그런', '이것', '저것', '그것',
-  '정리', '설명', '요약', '노트', '저장', '기록',
-]);
-
-function extractQueryTerms(query) {
-  return [...new Set(
-    query.toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-      .split(/\s+/)
-      .map(t => t.trim())
-      .filter(t => t.length >= 1 && !SEARCH_STOP_WORDS.has(t))
-  )];
-}
-
 async function generateEmbedding(text) {
   if (!openai) return null;
   try {
@@ -4864,18 +4849,6 @@ async function generatePaperChunkEmbeddings(texts) {
   return [...response.data]
     .sort((a, b) => a.index - b.index)
     .map(item => item.embedding);
-}
-
-function cosineSimilarity(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return 0;
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na  += a[i] * a[i];
-    nb  += b[i] * b[i];
-  }
-  const denom = Math.sqrt(na) * Math.sqrt(nb);
-  return denom === 0 ? 0 : dot / denom;
 }
 
 async function generateAndStoreEmbedding(filename, text) {
@@ -4927,55 +4900,29 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
     try {
       const data = await loadNoteSearchData(filename);
       if (data.archived) continue;
-      noteData.push({ filename, title: data.title, body: data.body, titleLower: data.titleLower, bodyLower: data.bodyLower, tagsLower: data.tagsLower });
+      noteData.push({
+        filename,
+        title: data.title,
+        body: data.body,
+        titleLower: data.titleLower,
+        bodyLower: data.bodyLower,
+        tagsLower: data.tagsLower,
+        embedding: embeddingMap.get(filename),
+      });
     } catch { /* skip */ }
   }
 
-  const N = noteData.length || 1;
-  const termDocFreq = new Map(terms.map(term => [
-    term,
-    noteData.filter(data => data.titleLower.includes(term) || data.bodyLower.includes(term) || data.tagsLower.includes(term)).length,
-  ]));
-  const results = [];
-  for (const { filename, title, body, titleLower, bodyLower, tagsLower } of noteData) {
-    // ── IDF 키워드 점수 ──
-    let kwScore = 0;
-    for (const term of terms) {
-      const df  = termDocFreq.get(term) || 1;
-      const idf = Math.log((N + 1) / (df + 1)) + 1; // smoothed
-      const tf  = (titleLower.match(new RegExp(term, 'g')) || []).length * 5
-                + (bodyLower.match(new RegExp(term, 'g'))  || []).length
-                + ((tagsLower || '').match(new RegExp(term, 'g')) || []).length * 20; // 태그 일치 = 강한 신호
-      kwScore += tf * idf;
-    }
-
-    // ── 임베딩 유사도 점수 ──
-    const vec = embeddingMap.get(filename);
-    const embScore = (queryEmbedding && vec)
-      ? Math.max(0, cosineSimilarity(queryEmbedding, vec))
-      : null;
-
-    // ── 하이브리드 최종 점수 ──
-    let finalScore;
-    if (embScore !== null) {
-      const normKw = Math.min(kwScore / SEARCH_KEYWORD_NORMALIZER, 1);
-      finalScore = SEARCH_KEYWORD_WEIGHT * normKw + SEARCH_EMBEDDING_WEIGHT * embScore;
-    } else {
-      finalScore = kwScore;
-    }
-
-    const MIN_SCORE = embScore !== null ? SEARCH_MIN_EMBED_SCORE : SEARCH_MIN_KEYWORD_SCORE;
-    if (finalScore < MIN_SCORE) continue;
-
-    const hitIdx = terms.map(t => bodyLower.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0] ?? 0;
-    const start  = Math.max(0, hitIdx - 80);
-    const excerpt = body.slice(start, start + 300).replace(/\n{3,}/g, '\n\n').trim();
-    results.push({ filename, title, excerpt, score: finalScore });
-  }
-
-  return results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
+  return rankNoteCandidates({
+    query,
+    queryEmbedding,
+    notes: noteData,
+    limit,
+    keywordWeight: SEARCH_KEYWORD_WEIGHT,
+    embeddingWeight: SEARCH_EMBEDDING_WEIGHT,
+    keywordNormalizer: SEARCH_KEYWORD_NORMALIZER,
+    minEmbeddingScore: SEARCH_MIN_EMBED_SCORE,
+    minKeywordScore: SEARCH_MIN_KEYWORD_SCORE,
+  })
     .map(({ score, ...r }) => r);
 }
 
