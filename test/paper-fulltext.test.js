@@ -252,6 +252,18 @@ test('paper full-text service serializes indexing, caches the source, and stays 
     queryEmbedding: [1, 0],
   });
   assert.equal(semanticResults[0].section, '2. Methodology');
+  const exactChunks = service.getPaperChunks({
+    paperId: 'paper-1',
+    chunkIds: [semanticResults[0].chunkId, 'missing-chunk'],
+  });
+  assert.equal(exactChunks.length, 1);
+  assert.equal(exactChunks[0].chunkId, semanticResults[0].chunkId);
+  const adjacentChunks = service.readPaper({
+    paperId: 'paper-1',
+    chunkId: semanticResults[0].chunkId,
+  });
+  assert.ok(adjacentChunks.length > 0 && adjacentChunks.length <= 2);
+  assert.equal(adjacentChunks.some(chunk => chunk.chunkId === semanticResults[0].chunkId), false);
 
   const keywordResults = service.searchPaper({
     paperId: 'paper-1',
@@ -261,6 +273,11 @@ test('paper full-text service serializes indexing, caches the source, and stays 
 
   db.prepare('UPDATE notes SET archived = 1 WHERE paper_id = ?').run('paper-1');
   assert.deepEqual(service.searchPaper({ paperId: 'paper-1', query: 'risk management' }), []);
+  assert.deepEqual(service.getPaperChunks({ paperId: 'paper-1', chunkIds: [semanticResults[0].chunkId] }), []);
+  assert.throws(
+    () => service.readPaper({ paperId: 'paper-1', chunkId: semanticResults[0].chunkId }),
+    error => error.code === 'chunk_not_found',
+  );
 
   await fs.writeFile(path.join(vaultPath, 'paper-restored.md'), noteContent);
   db.prepare(`

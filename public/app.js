@@ -779,6 +779,7 @@ async function sendCouncilMessage(options = {}) {
             sessionId,
             activeNotes,
             webSources: debateData.webSources || [],
+            paperEvidenceRefs: debateData.paperEvidenceRefs || [],
           }),
         });
         reviewData = await reviewRes.json();
