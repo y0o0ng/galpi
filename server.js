@@ -25,6 +25,10 @@ const {
   extractQueryTerms,
   rankNoteCandidates,
 } = require('./lib/assistant-retrieval');
+const {
+  createAssistantRetrievalShadow,
+  parseStoredEmbedding,
+} = require('./lib/assistant-retrieval-shadow');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -398,6 +402,17 @@ db.exec(`
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
+  CREATE TABLE IF NOT EXISTS assistant_retrieval_shadow_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT,
+    mode TEXT NOT NULL,
+    notes_json TEXT NOT NULL,
+    chunks_json TEXT NOT NULL,
+    context_chars INTEGER NOT NULL DEFAULT 0,
+    latency_ms INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  );
   CREATE TABLE IF NOT EXISTS auto_save_decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT,
@@ -457,6 +472,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_note_chunks_type ON note_chunks(chunk_type);
   CREATE INDEX IF NOT EXISTS idx_note_chunks_source_assistant ON note_chunks(source_assistant_message);
   CREATE INDEX IF NOT EXISTS idx_note_chunks_source_user ON note_chunks(source_user_message);
+  CREATE INDEX IF NOT EXISTS idx_retrieval_shadow_created ON assistant_retrieval_shadow_runs(created_at);
   CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_created ON auto_save_decisions(created_at);
   CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_decision ON auto_save_decisions(decision, reason);
   CREATE INDEX IF NOT EXISTS idx_note_edges_source ON note_edges(source_filename);
@@ -592,6 +608,32 @@ const stmtUpsertNoteChunk = db.prepare(`
 const stmtUpdateNoteChunkEmbedding = db.prepare(
   'UPDATE note_chunks SET embedding = ? WHERE chunk_id = ?'
 );
+const stmtGetTopicChunksByNote = db.prepare(`
+  SELECT
+    chunk_id AS chunkId,
+    note_filename AS noteFilename,
+    note_title AS noteTitle,
+    chunk_type AS chunkType,
+    content,
+    embedding,
+    created_at AS createdAt,
+    updated_at AS updatedAt
+  FROM note_chunks
+  WHERE note_filename = ? AND chunk_type = 'topic_qa'
+  ORDER BY created_at ASC, id ASC
+`);
+const stmtInsertRetrievalShadowRun = db.prepare(`
+  INSERT INTO assistant_retrieval_shadow_runs (
+    session_id, mode, notes_json, chunks_json, context_chars, latency_ms, error
+  ) VALUES (
+    @sessionId, @mode, @notesJson, @chunksJson, @contextChars, @latencyMs, @error
+  )
+`);
+const assistantRetrievalShadow = createAssistantRetrievalShadow({
+  getChunksByNote: filename => stmtGetTopicChunksByNote.all(filename),
+  insertRun: values => stmtInsertRetrievalShadowRun.run(values),
+  onRecordError: error => console.warn('shadow retrieval trace 저장 실패:', error.message),
+});
 const stmtInsertAutoSaveDecision = db.prepare(`
   INSERT INTO auto_save_decisions (
     session_id, source_user_message, source_assistant_message, model,
@@ -2253,7 +2295,12 @@ app.post('/api/chat', async (req, res) => {
 
   // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
   const memoryItems = await readMemoryItems();
-  const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(message, activeNotes, sessionId);
+  const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
+    message,
+    activeNotes,
+    sessionId,
+    'chat',
+  );
   const baseContext = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
   let webEvidence = null;
 
@@ -4806,11 +4853,12 @@ function searchPastMessages(queryEmbedding, currentSessionId, limit = 2) {
     .map(({ embedding, sim, ...r }) => r);
 }
 
-async function getContextNotesForQuestion(question, activeNotes, sessionId = null) {
+async function getContextNotesForQuestion(question, activeNotes, sessionId = null, mode = 'chat') {
   const active = await resolveActiveNotes(activeNotes);
 
   const queryEmbedding = await generateEmbedding(question);
-  const searched = await searchVault(question, queryEmbedding);
+  const rankedSearched = await rankVaultNoteCandidates(question, queryEmbedding);
+  const searched = rankedSearched.map(({ score, ...note }) => note);
 
   const merged = [...active];
   for (const hit of searched) {
@@ -4822,7 +4870,28 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
 
   const pastMessages = sessionId ? searchPastMessages(queryEmbedding, sessionId) : [];
 
-  return { notes: merged, pastMessages, queryEmbedding };
+  const shadowStartedAt = Date.now();
+  let shadowRetrieval = null;
+  let shadowError = null;
+  try {
+    shadowRetrieval = assistantRetrievalShadow.retrieve({
+      query: question,
+      queryEmbedding,
+      activeNotes: active,
+      rankedCandidates: rankedSearched,
+    });
+  } catch (error) {
+    shadowError = error;
+  }
+  assistantRetrievalShadow.record({
+    sessionId,
+    mode,
+    retrieval: shadowRetrieval,
+    latencyMs: Date.now() - shadowStartedAt,
+    error: shadowError,
+  });
+
+  return { notes: merged, pastMessages, queryEmbedding, shadowRetrieval };
 }
 
 async function generateEmbedding(text) {
@@ -4881,7 +4950,7 @@ async function loadNoteSearchData(filename) {
   return entry;
 }
 
-async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIVE_NOTES) {
+async function rankVaultNoteCandidates(query, precomputedEmbedding = null, limit = MAX_ACTIVE_NOTES) {
   const terms = extractQueryTerms(query);
   const activeNotes = stmtGetNotesWithEmbedding.all();
   if (activeNotes.length === 0) return [];
@@ -4892,7 +4961,8 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
   const embeddingMap = new Map(
     activeNotes
       .filter(r => r.embedding)
-      .map(r => [r.filename, JSON.parse(r.embedding)])
+      .map(r => [r.filename, parseStoredEmbedding(r.embedding)])
+      .filter(([, embedding]) => embedding)
   );
 
   const noteData = [];
@@ -4922,9 +4992,35 @@ async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIV
     keywordNormalizer: SEARCH_KEYWORD_NORMALIZER,
     minEmbeddingScore: SEARCH_MIN_EMBED_SCORE,
     minKeywordScore: SEARCH_MIN_KEYWORD_SCORE,
-  })
-    .map(({ score, ...r }) => r);
+  });
 }
+
+async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIVE_NOTES) {
+  const ranked = await rankVaultNoteCandidates(query, precomputedEmbedding, limit);
+  return ranked.map(({ score, ...note }) => note);
+}
+
+app.get('/api/vault/retrieval-shadow', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  if (!query) return res.status(400).json({ error: '검색어를 입력해주세요.' });
+  if (query.length > 10000) return res.status(400).json({ error: '검색어가 너무 깁니다.' });
+
+  try {
+    const queryEmbedding = await generateEmbedding(query);
+    const rankedCandidates = await rankVaultNoteCandidates(query, queryEmbedding);
+    const retrieval = assistantRetrievalShadow.retrieve({
+      query,
+      queryEmbedding,
+      rankedCandidates,
+    });
+    return res.json({
+      success: true,
+      retrieval: assistantRetrievalShadow.toPublicResult(retrieval),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 app.get('/api/vault/search', async (req, res) => {
   const q = (req.query.q || '').trim();
@@ -5222,7 +5318,12 @@ ${gptCritique || '검증 없음'}
 // 의회 각 단계가 공유하는 모델 컨텍스트 (히스토리 + 컨텍스트가 주입된 질문)
 async function buildCouncilModelContext(question, activeNotes, sessionId, webSources, paperEvidenceRefs = []) {
   const memoryItems = await readMemoryItems();
-  const { notes, pastMessages } = await getContextNotesForQuestion(question, activeNotes, sessionId);
+  const { notes, pastMessages } = await getContextNotesForQuestion(
+    question,
+    activeNotes,
+    sessionId,
+    'council-synthesis',
+  );
   hydrateSessionFromDb(sessionId);
   const history = sessions[sessionId];
   const webEvidence = Array.isArray(webSources) && webSources.length > 0 ? { results: webSources } : null;
@@ -5249,7 +5350,12 @@ app.post('/api/council/debate', async (req, res) => {
 
   // 1차 답변 프롬프트 (mode에 따라 분기, 사용자 메모리 + 활성/자동 검색 노트 주입)
   const memoryItems = await readMemoryItems();
-  const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(question, activeNotes, sessionId);
+  const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
+    question,
+    activeNotes,
+    sessionId,
+    'council-debate',
+  );
   const maxTokens = mode === 'compressed'
     ? COUNCIL_TOKEN_LIMITS.compressedFirst
     : mode === 'deep'

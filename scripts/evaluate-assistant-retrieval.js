@@ -7,13 +7,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   createLegacyBaselineRetriever,
+  createShadowRetriever,
   evaluateRetrievalFixture,
   formatEvaluationReport,
 } = require('../lib/assistant-retrieval-eval');
-const { rankNoteCandidates } = require('../lib/assistant-retrieval');
+const {
+  DEFAULT_SHADOW_RETRIEVAL_LIMITS,
+  rankNoteCandidates,
+} = require('../lib/assistant-retrieval');
 
 function parseArguments(argv) {
-  const options = { fixture: null, baseUrl: null, json: false };
+  const options = { fixture: null, baseUrl: null, mode: 'legacy', json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--json') {
@@ -24,9 +28,15 @@ function parseArguments(argv) {
     } else if (argument === '--base-url') {
       options.baseUrl = argv[index + 1];
       index += 1;
+    } else if (argument === '--mode') {
+      options.mode = argv[index + 1];
+      index += 1;
     } else {
       throw new Error(`알 수 없는 인자입니다: ${argument}`);
     }
+  }
+  if (!['legacy', 'shadow'].includes(options.mode)) {
+    throw new Error('--mode는 legacy 또는 shadow여야 합니다.');
   }
   return options;
 }
@@ -56,6 +66,33 @@ function createSyntheticRetriever(fixture) {
       limit: 8,
     }),
     readNote: async filename => noteMap.get(filename) || null,
+  });
+}
+
+function createSyntheticShadowRetriever(fixture) {
+  if (!Array.isArray(fixture.notes)) {
+    throw new Error('합성 평가 fixture에 notes 배열이 필요합니다.');
+  }
+  return createShadowRetriever({
+    searchNotes: async testCase => rankNoteCandidates({
+      query: testCase.query,
+      queryEmbedding: testCase.queryEmbedding,
+      notes: fixture.notes,
+      limit: DEFAULT_SHADOW_RETRIEVAL_LIMITS.maxNotes,
+      minEmbeddingScore: DEFAULT_SHADOW_RETRIEVAL_LIMITS.minEmbeddingScore,
+      minKeywordScore: DEFAULT_SHADOW_RETRIEVAL_LIMITS.minKeywordScore,
+    }),
+    readChunks: async selectedNotes => selectedNotes.flatMap(candidate => {
+      const note = fixture.notes.find(item => item.filename === candidate.filename);
+      if (!note) return [];
+      return note.chunks.map(chunk => ({
+        ...chunk,
+        noteFilename: note.filename,
+        noteTitle: note.title,
+        chunkType: 'topic_qa',
+        embedding: note.embedding,
+      }));
+    }),
   });
 }
 
@@ -89,15 +126,35 @@ function createLiveRetriever(baseUrl, apiToken) {
   });
 }
 
+function createLiveShadowRetriever(baseUrl, apiToken) {
+  const origin = String(baseUrl || '').replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(origin)) throw new Error('--base-url은 HTTP(S) URL이어야 합니다.');
+  const headers = apiToken ? { 'X-API-Token': apiToken } : {};
+
+  return async function retrieveLiveShadow(testCase) {
+    const response = await fetch(
+      `${origin}/api/vault/retrieval-shadow?q=${encodeURIComponent(testCase.query)}`,
+      { headers }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    return payload.retrieval || { notes: [], chunks: [], contextChars: 0 };
+  };
+}
+
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   if (options.baseUrl && !options.fixture) {
     throw new Error('라이브 평가는 해당 볼트의 비공개 --fixture가 필요합니다.');
   }
   const fixture = loadFixture(options.fixture);
-  const retrieve = options.baseUrl
-    ? createLiveRetriever(options.baseUrl, process.env.API_TOKEN || '')
-    : createSyntheticRetriever(fixture);
+  const retrieve = options.mode === 'shadow'
+    ? options.baseUrl
+      ? createLiveShadowRetriever(options.baseUrl, process.env.API_TOKEN || '')
+      : createSyntheticShadowRetriever(fixture)
+    : options.baseUrl
+      ? createLiveRetriever(options.baseUrl, process.env.API_TOKEN || '')
+      : createSyntheticRetriever(fixture);
   const summary = await evaluateRetrievalFixture(fixture, retrieve);
   process.stdout.write(options.json
     ? `${JSON.stringify(summary, null, 2)}\n`
