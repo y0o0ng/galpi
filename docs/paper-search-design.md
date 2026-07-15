@@ -340,7 +340,7 @@ paper_fulltext_read({
 
 선택의 대가는 설치 용량과 약 150MB대 피크 메모리다. 실제 복잡한 편집 문서에서 검색 품질이 부족하다고 측정될 때만 Poppler를 대안으로 다시 비교한다. 스캔 PDF의 실제 OCR 추출은 검증하지 않았으며, 현재는 텍스트가 없으면 `pdf_text_empty`로 분류한다. Claude PDF 전체 입력은 표·그림 품질은 좋지만 TradingAgents에서 87,811토큰이므로 기본 파서로 쓰지 않는다. 자동 OCR도 첫 구현 범위에서 제외한다.
 
-**Phase B 색인 구현:** `createPaperFullTextService()`는 이미 저장된 활성 paper 노트와 검증된 PDF 바이트만 입력받는다. 논문 ID를 해시한 숨김 경로에 원본을 원자적으로 저장하고, 논문별 인프로세스 직렬화와 SHA-256·파서 버전·임베딩 유무를 기준으로 재색인을 차단한다. 중단된 `indexing` 상태는 다음 시작에서 `failed/index_interrupted`로 복구하고, 텍스트가 없으면 `needs_ocr`로 남긴다. URL 다운로드와 redirect별 SSRF 검사는 외부 입력 경로를 여는 Phase C에서 붙인다.
+**Phase B 색인 구현:** `createPaperFullTextService()`는 이미 저장된 활성 paper 노트와 검증된 PDF 바이트만 입력받는다. 논문 ID를 해시한 숨김 경로에 원본을 원자적으로 저장하고, 논문별 인프로세스 직렬화와 SHA-256·파서 버전·임베딩 유무를 기준으로 재색인을 차단한다. 중단된 `indexing` 상태는 다음 시작에서 `failed/index_interrupted`로 복구하고, 텍스트가 없으면 `needs_ocr`로 남긴다. 외부 입력 경로의 URL 다운로드와 redirect별 SSRF 검사는 Phase C 로컬 구현에서 연결했으며 Pi 인수 전이다.
 
 ### 11.5 검색 방식
 
@@ -355,7 +355,7 @@ paper_fulltext_read({
 
 이 방식은 청크에 문서별 문맥을 덧붙여 임베딩·키워드 검색을 개선하는 Anthropic Contextual Retrieval의 원리를 사용하되, 색인 단계의 LLM 호출은 생략하고 논문의 기존 섹션 구조를 활용한다.
 
-2026-07-15 Mac 임시 환경에서 TradingAgents 38페이지·104,235자를 97개 청크로 색인했다. 임베딩 없이 BM25 계열 검색만 사용한 기준 질문에서도 Analyst Team, Maximum Drawdown/Simulation Setup, Conclusion이 각각 방법론·실험·한계 질문의 top 4 안에 들어왔다(3/3). 임베딩 하이브리드 경로는 주입형 벡터 단위 테스트를 통과했으며 실제 OpenAI 질의 임베딩 재사용은 Phase C 연결 시 검증한다.
+2026-07-15 Mac 임시 환경에서 TradingAgents 38페이지·104,235자를 97개 청크로 색인했다. 임베딩 없이 BM25 계열 검색만 사용한 기준 질문에서도 Analyst Team, Maximum Drawdown/Simulation Setup, Conclusion이 각각 방법론·실험·한계 질문의 top 4 안에 들어왔다(3/3). 임베딩 하이브리드 경로는 주입형 벡터 단위 테스트를 통과했고 Phase C 코드가 기존 질문 임베딩을 전문 검색에 재사용한다. 실제 OpenAI 청크·질의 임베딩 조합은 Pi 인수에서 확인한다.
 
 ### 11.6 토큰 예산과 비용 통제
 
@@ -403,10 +403,12 @@ Phase B 구현은 `paper_documents`에 source SHA/path, parser version, 상태, 
 - 전문 근거는 기존 `<context>` 방어와 같은 외부 자료 블록으로 주입
 - 답변에는 `초록 기반`, `전문 근거 사용`, `전문 미확보` 중 실제 상태를 표시할 수 있게 메타데이터 반환
 
+**Phase C 로컬 구현 (`6bd1f57`, 2026-07-15):** `lib/paper-fulltext-download.js`가 URL·DNS·모든 redirect를 검사하고 검증된 DNS 주소를 실제 HTTP(S) 연결에 고정한다. `lib/paper-fulltext-tools.js`는 현재 요청에서 회수된 활성 paper 노트 최대 3편만 후보로 만들고, search 응답에 실제 포함된 chunkId만 두 번째 read에 허용한다. 단일 Claude와 의회 첫 Claude가 같은 2라운드 도구 실행기를 사용하며, 의회 GPT 비평·심층 수정에는 브라우저가 원문을 재전송하지 않고 paperId/chunkId 참조를 서버가 DB에서 재검증해 같은 evidence를 공유한다. 전체 `node:test` 47개와 mock Playwright `debate → review` 참조 전달을 통과했으며 Pi 실제 호출은 아직 전이다.
+
 ### 11.9 실패·보안 경계
 
 - 공개 PDF가 없음: 초록 기반으로만 답하고 `전문 미확보` 안내
-- 다운로드/파싱 실패: paper 노트는 정상 유지, 색인 상태와 오류만 기록, 지수 백오프로 수동 재시도
+- 다운로드/파싱 실패: paper 노트는 정상 유지하고 색인 상태와 오류만 기록한다. 다음 전문 요청에서 재시도하며, 반복 실패 cooldown/backoff는 Pi 운영 로그에서 필요성이 확인될 때 추가한다.
 - 텍스트가 거의 없음: `needs_ocr`; 자동 OCR·전체 Claude 전송으로 몰래 우회하지 않음
 - SSRF 방어: DNS 해석과 모든 redirect 단계에서 loopback·사설·link-local 주소 차단
 - 파일 방어: PDF magic bytes, 크기·페이지·처리 시간 제한, 파서는 shell 문자열 결합 없이 인자 배열로 실행
@@ -434,6 +436,9 @@ Phase B 구현은 `paper_documents`에 source SHA/path, parser version, 상태, 
 
 **C. 능동 독서 도구**
 
+- [x] 안전한 공개 PDF 다운로드 + 온디맨드 색인 + 기존 색인 재사용 코드 연결
+- [x] search→read 순서, 허용 paper/chunk 검증, 호출 2회·5,000자/회·10,000자/답변 하드 상한 단위 테스트
+- [x] 단일 Claude와 의회 공통 evidence 연결, mock Playwright `debate → review` 참조 전달
 - [ ] 초록 답변 가능 질문 10개에서 도구 오호출 0회
 - [ ] 전문 필요 질문 10개에서 섹션/페이지 근거 회수 성공률 8/10 이상
 - [ ] 어떤 모델 출력에도 호출 2회·누적 10,000자 상한이 깨지지 않음
