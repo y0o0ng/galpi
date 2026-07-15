@@ -86,10 +86,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **프로젝트 현재 상태**
 
 - 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크, Clawd 패널 이동, 알림센터 `최근 저장`, 2.5A Phase A/B/C와 유지보수 리뷰 버그 1~9까지 Pi 배포 완료 (`c9bf470`, `4c3d07f`, `1078df5`, `5d28d73`, `fd615c7`, `6bd1f57`). Pi에서 전체 테스트 47개와 Phase C 실제 모델/PDF 스모크 테스트를 통과했다.
-- 현재 개발 상태: 2.5A Phase C 전문 능동 독서를 Pi에서 인수했다. TradingAgents 초록 질문은 전문 도구 0회·0자, 세부 실험 질문은 도구 1회·4,999자로 섹션·PDF 페이지 근거를 반환했다. 최초 요청에서 38페이지·104,235자를 97개 청크로 색인하고 OpenAI 임베딩 97개를 저장했으며 상태는 `ready`다. 안전 다운로드, search→read 허용 범위, 호출 2회·5,000자/회·10,000자/답변 상한은 서버와 테스트로 집행한다.
-- 다음 개발 시작점: Phase C는 실사용으로 관찰하고, 초록 10개+전문 10개 품질 평가는 토큰 비용 때문에 별도 컨펌 후 진행한다. 남은 V4 논문 항목은 자동 컨텍스트 회수와 Codex paper 태그·링크 실제 처리이며 우선순위를 다시 정한다. Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다. 유지보수 구조 이슈는 `docs/maintenance.md`에서 추적하고, `npm audit`의 기존 의존성 경고(`dompurify`, `form-data`, `hono`)는 자동 수정하지 않는다.
+- 현재 개발 상태: V4-A 논문 검색·저장·전문 능동 독서를 완료하고, V4-B 음성보다 먼저 진행할 V4.5 비서 기본기 설계를 확정했다. Pi 실사용 집계에서 활성 topic 13개·`topic_qa` 61개, 큰 topic 상위 10개 중 8개가 현재 5,000자 컨텍스트 한도를 넘는 것을 확인했다. 다음 설계는 기존 청크의 실제 회수, 최신성·provenance·Q&A invalidation, 평가 trace, 승인형 구조화 메모리, task·reminder·Today를 순서대로 추가한다.
+- 다음 개발 시작점: `docs/assistant-foundation-design.md`의 A0부터 시작한다. 합성 fixture와 Pi 비공개 실사용 평가 20개로 현재 note/chunk 회수 기준선을 기록하고 Pi 밖 암호화 백업·임시 복원을 확인한 뒤, A1 청크 회수 shadow mode로 넘어간다. V4.5를 통과하기 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며, Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다. 유지보수 구조 이슈는 `docs/maintenance.md`에서 추적하고 `npm audit` 기존 경고는 자동 수정하지 않는다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
-- 코드 구조 방향: `server.js`는 현재 5,681줄. 기존 코드를 한꺼번에 분해하지 말고, 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
+- 코드 구조 방향: `server.js`는 현재 5,681줄. 기존 코드를 한꺼번에 분해하지 말고, V4.5는 retrieval·memory·trace·task·scheduler를 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것
 - 비용 확인은 상단 `Claude 크레딧 ↗`에서 공식 Billing을 연다. 잔액 자동 조회는 하지 않고 Console 로그인 정보·쿠키·관리자 키를 앱에 저장하지 않을 것
 - 노트 구조 방향: v4 유지. 사람도 읽기 좋고 AI도 회수하기 좋은 형식. CODEX 마커 구역은 Codex가 안전하게 편집할 수 있는 영역으로 유지
