@@ -293,7 +293,7 @@ test('topic store audit reports the same qa_id appearing in multiple topic files
     qaEntry('qa-a111', '첫 질문', '첫 답변'),
   ]));
   await fs.writeFile(path.join(vaultPath, 'b.md'), topicNote('B', [
-    qaEntry('qa-a111', '복제 질문', '복제 답변'),
+    qaEntry('qa-a111', '첫 질문', '첫 답변'),
   ]));
   db.prepare("INSERT INTO notes VALUES ('a.md', 'A', 'topic', 0), ('b.md', 'B', 'topic', 0)").run();
   db.prepare(`
@@ -321,13 +321,41 @@ test('topic store audit reports the same qa_id appearing in multiple topic files
   const plan = buildTopicRepairPlan(report);
   const duplicate = plan.operations.find(item => item.kind === 'duplicate_file_qa');
   assert.equal(duplicate.status, 'manual_review');
+  assert.equal(duplicate.recommendation.action, 'remove_duplicate_file_entry');
   assert.equal(duplicate.recommendation.preserveQaIdIn, 'a.md');
-  assert.deepEqual(duplicate.recommendation.assignNewQaIdIn, ['b.md']);
+  assert.deepEqual(duplicate.recommendation.removeDuplicateFrom, ['b.md']);
+  assert.deepEqual(duplicate.recommendation.assignNewQaIdIn, []);
   assert.deepEqual(duplicate.evidence.ownerSignals, {
     dbAssignment: ['a.md'],
     autoSaveDecision: ['a.md'],
-    contentMatch: ['a.md'],
+    contentMatch: ['a.md', 'b.md'],
   });
+});
+
+test('repair planner marks a DB-only chunk replaceable when the same content is already indexed', async t => {
+  const vaultPath = await fs.mkdtemp(path.join(os.tmpdir(), 'topic-store-stale-chunk-'));
+  t.after(() => fs.rm(vaultPath, { recursive: true, force: true }));
+  const db = createDatabase();
+  t.after(() => db.close());
+
+  await fs.writeFile(path.join(vaultPath, 'topic.md'), topicNote('Topic', [
+    qaEntry('qa-c111', '같은 질문', '같은 답변'),
+  ]));
+  db.prepare("INSERT INTO notes VALUES ('topic.md', 'Topic', 'topic', 0)").run();
+  const insertChunk = db.prepare(`
+    INSERT INTO note_chunks VALUES (?, 'topic.md', 'Topic', 'topic_qa', ?, NULL, NULL, NULL, '[]')
+  `);
+  const content = chunkContent('같은 질문', '같은 답변');
+  insertChunk.run('qa-c111', content);
+  insertChunk.run('qa-d222', content);
+
+  const report = await auditTopicStore({ db, vaultPath });
+  assert.deepEqual(report.findings.dbOnlyChunks, [{ chunkId: 'qa-d222', filename: 'topic.md' }]);
+
+  const stale = buildTopicRepairPlan(report).operations.find(item => item.target.chunkId === 'qa-d222');
+  assert.equal(stale.status, 'ready');
+  assert.equal(stale.recommendation.action, 'mark_source_missing');
+  assert.deepEqual(stale.evidence.indexedMatchingFileEntries.map(item => item.qaId), ['qa-c111']);
 });
 
 test('topic audit CLI arguments reject unknown or incomplete options', () => {
