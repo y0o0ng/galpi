@@ -590,8 +590,8 @@
 
 > 갱신: 2026-07-16. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0 기준선과 A1 청크 회수 shadow mode, S0a 읽기 전용 topic audit까지 Pi에 배포했다(`3a96ff3`, `c5e5d04`, `575205a`). Pi 활성 topic 13개에서 파일 QA 57개·DB QA 60개 중 55개가 고유하게 일치했고, 중복 ID 1건·DB-only 4건·제목 drift 8건·source 참조 오류 1건·보관 노트 청크 1건을 확인했다. 전체 테스트 64개를 통과했으며 감사 전후 DB hash는 같았다.
-- **다음 단계 설계:** S0b에서 중복 QA ID의 소유권을 내용·DB 배정·source로 확인하고, DB-only 청크의 `source_missing` 처리와 재색인을 구분한 dry-run 복구 계획을 만든다. 백업과 별도 컨펌 뒤에만 데이터를 변경하며, 그다음 append/split/merge/archive 공용 쓰기 경로와 A1b 전역 청크 검색+노트 soft prior를 진행한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
+- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0 기준선·A1 청크 회수 shadow mode, S0a audit, S0b-1 readonly 복구 계획까지 Pi에 배포했다(`3a96ff3`, `c5e5d04`, `575205a`, `fdabe05`, `8c2d490`). Pi 계획 15건은 적용 후보 13건과 수동 2건으로 나뉘었고, 전체 테스트 65개와 실행 전후 DB hash 불변을 확인했다.
+- **다음 단계 설계:** S0b-2에서 schema migration·백업·입력 hash 재검증·승인형 적용·재감사 절차를 별도 컨펌받아 구현한다. M60 토픽의 중복 ID는 유지하고 향수 토픽의 동일 복사본을 제거하며, UUID형 source 참조는 legacy provenance로 보존한다. 그다음 append/split/merge/archive 공용 쓰기 경로와 A1b 전역 청크 검색+노트 soft prior를 진행한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.

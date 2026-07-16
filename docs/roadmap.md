@@ -215,7 +215,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0a 읽기 전용 audit Pi 검증 완료. S0b 복구와 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
+> 상태: A0·A1 shadow, S0a audit, S0b-1 readonly 복구 계획 Pi 검증 완료. S0b-2 적용과 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -227,7 +227,9 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > S0a Pi 검증 완료 (`575205a`, 2026-07-16): QA-LOG 구조 파서와 결정적 SHA-256, SQLite readonly/query_only 감사 CLI, malformed·중복·file-only·DB-only·배정 drift·제목·source 참조 fixture를 추가했다. Pi 활성 topic 13개의 파일 QA 57개·DB QA 60개 중 55개가 고유하게 일치했다. malformed·file-only·배정 drift·고아·임베딩 누락은 0건이고, 중복 ID 1건(파일 2개), DB-only 4건, 제목 drift 8건, 잘못된 source 참조 1건, 보관 노트 청크 1건을 확인했다. 전체 테스트 64개 통과, 감사 전후 DB hash 동일, 서비스 `active`를 확인했다. 자동 복구·schema 변경은 없다.
 
-> S0b는 중복 두 본문의 내용·DB 배정·source를 근거로 ID 소유권을 먼저 정하고, DB-only 청크의 `source_missing` 처리와 재색인을 구분한 dry-run 복구 계획을 만든다. 실제 변경은 백업과 별도 컨펌 뒤에 적용한다.
+> S0b-1 Pi 검증 완료 (`fdabe05`, `8c2d490`, 2026-07-16): `npm run plan:topic-repair`가 원문 대신 본문 hash·DB 배정·자동저장 provenance와 입력 상태 hash를 기록한다. 계획 15건은 적용 후보 13건(제목 캐시 8, DB-only `source_missing` 4, 보관 청크 제외 1)과 수동 2건으로 분리됐다. M60 Q&A의 완전 동일 복사본은 향수 토픽에서 제거하고 M60 ID를 유지하는 근거가 확인됐으며, UUID형 source 참조는 legacy provenance로 보존한다. Pi 전체 테스트 65개 통과, 실행 전후 DB hash 동일, 서비스 `active`를 확인했다.
+
+> S0b-2는 schema migration과 백업, 계획 입력 hash 재검증, 승인된 작업 적용, 재감사를 하나의 명시적 절차로 만든다. 실제 파일·DB 변경 범위는 구현 전에 다시 컨펌받는다.
 
 1. schema version과 순차 migration을 별도 모듈로 관리
 2. append·split·merge·archive를 공용 QA-LOG parser와 topic mutation queue로 직렬화
