@@ -81,3 +81,30 @@ test('regular assistant messages still use topic chunks as their saved state', (
   assert.throws(() => reader.find(20, 'paper'), /지원하지 않는/);
   db.close();
 });
+
+test('source_missing chunks do not mark an assistant response as saved', () => {
+  const db = createDb();
+  db.exec(`
+    ALTER TABLE note_chunks
+    ADD COLUMN index_status TEXT NOT NULL DEFAULT 'ready'
+  `);
+  db.prepare('INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?)')
+    .run(30, 'shared', 'assistant', 'answer', 'Claude', 30);
+  db.prepare('INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?)')
+    .run(1, 'topic.md', '토픽', 'topic', '30', 30);
+  db.prepare(`
+    INSERT INTO note_chunks (
+      chunk_id, note_filename, note_title,
+      source_user_message, source_assistant_message, updated_at, index_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run('chunk-3', 'topic.md', '토픽', null, 30, 30, 'source_missing');
+
+  const reader = createNoteSaveStateReader(db);
+  assert.equal(reader.findForMessage(30), null);
+  assert.equal(reader.listSessionMessages('shared')[0].noteSaved, 0);
+
+  db.prepare("UPDATE note_chunks SET index_status = 'ready' WHERE chunk_id = 'chunk-3'").run();
+  assert.equal(reader.findForMessage(30).filename, 'topic.md');
+  assert.equal(reader.listSessionMessages('shared')[0].noteSaved, 1);
+  db.close();
+});

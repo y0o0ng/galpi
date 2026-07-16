@@ -91,6 +91,33 @@ test('chunk ranker combines keyword and embedding relevance and rejects weak evi
   assert.deepEqual(ranked.map(chunk => chunk.chunkId), ['paper-current']);
 });
 
+test('chunk ranker excludes source_missing evidence while accepting legacy rows', () => {
+  const ranked = rankChunkCandidates({
+    query: '배포 경로',
+    chunks: [
+      {
+        chunkId: 'missing',
+        noteFilename: 'deploy.md',
+        content: '배포 경로는 /missing 이다.',
+        indexStatus: 'source_missing',
+      },
+      {
+        chunkId: 'ready',
+        noteFilename: 'deploy.md',
+        content: '배포 경로는 /ready 이다.',
+        indexStatus: 'ready',
+      },
+      {
+        chunkId: 'legacy',
+        noteFilename: 'legacy.md',
+        content: '배포 경로는 /legacy 이다.',
+      },
+    ],
+  });
+
+  assert.deepEqual(ranked.map(chunk => chunk.chunkId).sort(), ['legacy', 'ready']);
+});
+
 test('chunk ranker limits one note from monopolizing the result', () => {
   const ranked = rankChunkCandidates({
     query: '배포 백업',

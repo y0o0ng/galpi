@@ -20,6 +20,8 @@ const { createPaperFullTextTools, formatPaperEvidenceBlock } = require('./lib/pa
 const { runClaudeToolLoop } = require('./lib/claude-tool-loop');
 const { createRecentSavesReader } = require('./lib/recent-saves');
 const { createNoteSaveStateReader } = require('./lib/note-save-state');
+const { runDatabaseMigrations } = require('./lib/database-migrations');
+const { createTopicChunkStore } = require('./lib/topic-chunk-store');
 const {
   cosineSimilarity,
   extractQueryTerms,
@@ -399,6 +401,9 @@ db.exec(`
     source_user_message INTEGER,
     source_assistant_message INTEGER,
     embedding TEXT,
+    content_sha256 TEXT,
+    index_status TEXT NOT NULL DEFAULT 'ready'
+      CHECK (index_status IN ('ready', 'source_missing')),
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
@@ -481,28 +486,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_notification_actions_status ON notification_actions(status, updated_at);
 `);
 
-// 마이그레이션: notes embedding
-if (!db.prepare('PRAGMA table_info(notes)').all().some(c => c.name === 'embedding')) {
-  db.exec('ALTER TABLE notes ADD COLUMN embedding TEXT');
-}
-// 마이그레이션: 논문 원본 ID (활성 노트 중복 저장 차단)
-if (!db.prepare('PRAGMA table_info(notes)').all().some(c => c.name === 'paper_id')) {
-  db.exec('ALTER TABLE notes ADD COLUMN paper_id TEXT');
-}
-db.exec(`
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_active_paper_id
-  ON notes(paper_id)
-  WHERE paper_id IS NOT NULL AND archived = 0
-`);
-// 마이그레이션: messages embedding
-if (!db.prepare('PRAGMA table_info(messages)').all().some(c => c.name === 'embedding')) {
-  db.exec('ALTER TABLE messages ADD COLUMN embedding TEXT');
-}
-// 마이그레이션: auto_save_decisions organize_queued
-if (!db.prepare('PRAGMA table_info(auto_save_decisions)').all().some(c => c.name === 'organize_queued')) {
-  db.exec('ALTER TABLE auto_save_decisions ADD COLUMN organize_queued INTEGER NOT NULL DEFAULT 0');
-}
-db.exec('CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_queue ON auto_save_decisions(organize_queued, decision, action)');
+runDatabaseMigrations(db);
+const topicChunkStore = createTopicChunkStore(db);
 const paperFullTextService = createPaperFullTextService({
   db,
   vaultPath: VAULT_PATH,
@@ -587,41 +572,6 @@ const stmtUpdateNoteEmbedding = db.prepare(
 const stmtUpdateMessageEmbedding = db.prepare(
   'UPDATE messages SET embedding = ? WHERE id = ?'
 );
-const stmtUpsertNoteChunk = db.prepare(`
-  INSERT INTO note_chunks (
-    chunk_id, note_filename, note_title, chunk_type, content,
-    source_session, source_user_message, source_assistant_message
-  ) VALUES (
-    @chunkId, @noteFilename, @noteTitle, @chunkType, @content,
-    @sourceSession, @sourceUserMessage, @sourceAssistantMessage
-  )
-  ON CONFLICT(chunk_id) DO UPDATE SET
-    note_filename = excluded.note_filename,
-    note_title = excluded.note_title,
-    chunk_type = excluded.chunk_type,
-    content = excluded.content,
-    source_session = excluded.source_session,
-    source_user_message = excluded.source_user_message,
-    source_assistant_message = excluded.source_assistant_message,
-    updated_at = strftime('%s','now')
-`);
-const stmtUpdateNoteChunkEmbedding = db.prepare(
-  'UPDATE note_chunks SET embedding = ? WHERE chunk_id = ?'
-);
-const stmtGetTopicChunksByNote = db.prepare(`
-  SELECT
-    chunk_id AS chunkId,
-    note_filename AS noteFilename,
-    note_title AS noteTitle,
-    chunk_type AS chunkType,
-    content,
-    embedding,
-    created_at AS createdAt,
-    updated_at AS updatedAt
-  FROM note_chunks
-  WHERE note_filename = ? AND chunk_type = 'topic_qa'
-  ORDER BY created_at ASC, id ASC
-`);
 const stmtInsertRetrievalShadowRun = db.prepare(`
   INSERT INTO assistant_retrieval_shadow_runs (
     session_id, mode, notes_json, chunks_json, context_chars, latency_ms, error
@@ -630,7 +580,7 @@ const stmtInsertRetrievalShadowRun = db.prepare(`
   )
 `);
 const assistantRetrievalShadow = createAssistantRetrievalShadow({
-  getChunksByNote: filename => stmtGetTopicChunksByNote.all(filename),
+  getChunksByNote: filename => topicChunkStore.listReadyByNote(filename),
   insertRun: values => stmtInsertRetrievalShadowRun.run(values),
   onRecordError: error => console.warn('shadow retrieval trace 저장 실패:', error.message),
 });
@@ -700,7 +650,7 @@ const stmtGraphAmbiguousEdges = db.prepare(`
 const stmtGraphTopicChunkCounts = db.prepare(`
   SELECT note_filename AS filename, note_title AS title, COUNT(*) AS qaCount
   FROM note_chunks
-  WHERE chunk_type = 'topic_qa'
+  WHERE chunk_type = 'topic_qa' AND index_status = 'ready'
   GROUP BY note_filename
   ORDER BY qaCount DESC
   LIMIT ?
@@ -1386,7 +1336,7 @@ function dbUpsertNoteChunk({
   sourceUserMessage = null,
   sourceAssistantMessage = null,
 }) {
-  stmtUpsertNoteChunk.run({
+  topicChunkStore.upsert({
     chunkId,
     noteFilename,
     noteTitle,
@@ -1400,7 +1350,7 @@ function dbUpsertNoteChunk({
 
 async function generateAndStoreChunkEmbedding(chunkId, text) {
   const vec = await generateEmbedding(text);
-  if (vec) stmtUpdateNoteChunkEmbedding.run(JSON.stringify(vec), chunkId);
+  if (vec) topicChunkStore.updateEmbedding(chunkId, JSON.stringify(vec));
   return vec;
 }
 

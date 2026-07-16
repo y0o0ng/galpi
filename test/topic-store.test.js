@@ -358,6 +358,65 @@ test('repair planner marks a DB-only chunk replaceable when the same content is 
   assert.deepEqual(stale.evidence.indexedMatchingFileEntries.map(item => item.qaId), ['qa-c111']);
 });
 
+test('topic audit excludes source_missing chunks and classifies matching UUID provenance', async t => {
+  const vaultPath = await fs.mkdtemp(path.join(os.tmpdir(), 'topic-store-legacy-source-'));
+  t.after(() => fs.rm(vaultPath, { recursive: true, force: true }));
+  const db = createDatabase();
+  t.after(() => db.close());
+  db.exec(`
+    ALTER TABLE note_chunks ADD COLUMN content_sha256 TEXT;
+    ALTER TABLE note_chunks
+      ADD COLUMN index_status TEXT NOT NULL DEFAULT 'ready';
+  `);
+
+  const assistantSource = 'ef28370c-f21f-467c-b6e0-0a2c5325eba4';
+  await fs.writeFile(path.join(vaultPath, 'topic.md'), topicNote('Topic', [
+    qaEntry('qa-a111', '질문', '답변'),
+  ]));
+  db.prepare("INSERT INTO notes VALUES ('topic.md', 'Topic', 'topic', 0)").run();
+  db.prepare(`
+    INSERT INTO note_chunks (
+      chunk_id, note_filename, note_title, chunk_type, content,
+      source_session, source_user_message, source_assistant_message,
+      embedding, content_sha256, index_status
+    ) VALUES (?, 'topic.md', 'Topic', 'topic_qa', ?, NULL, NULL, ?, '[]', NULL, ?)
+  `).run('qa-a111', chunkContent('질문', '답변'), assistantSource, 'ready');
+  db.prepare(`
+    INSERT INTO note_chunks (
+      chunk_id, note_filename, note_title, chunk_type, content,
+      source_session, source_user_message, source_assistant_message,
+      embedding, content_sha256, index_status
+    ) VALUES (?, 'topic.md', 'Topic', 'topic_qa', ?, NULL, NULL, NULL, '[]', NULL, ?)
+  `).run('qa-old', chunkContent('사라진 질문', '사라진 답변'), 'source_missing');
+  db.prepare(`
+    INSERT INTO auto_save_decisions (
+      id, qa_id, note_filename, source_user_message,
+      source_assistant_message, decision, action
+    ) VALUES (1, 'qa-a111', 'topic.md', NULL, ?, 'save', 'created')
+  `).run(assistantSource);
+
+  const report = await auditTopicStore({ db, vaultPath });
+  assert.equal(report.healthy, true);
+  assert.equal(report.summary.dbActiveTopicChunks, 1);
+  assert.equal(report.summary.matchedQa, 1);
+  assert.deepEqual(report.findings.dbOnlyChunks, []);
+  assert.deepEqual(report.findings.sourceReferenceErrors, []);
+  assert.deepEqual(report.observations.sourceMissingChunks, [{
+    chunkId: 'qa-old',
+    filename: 'topic.md',
+  }]);
+  assert.deepEqual(report.observations.legacySourceReferences, [{
+    chunkId: 'qa-a111',
+    noteFilename: 'topic.md',
+    field: 'source_assistant_message',
+    value: assistantSource,
+    reason: 'matching_auto_save_decision',
+    autoSaveDecisionIds: [1],
+  }]);
+  assert.equal(buildTopicRepairPlan(report).status, 'clean');
+  assert.match(formatTopicStoreAudit(report), /Legacy source references \(1\)/);
+});
+
 test('topic audit CLI arguments reject unknown or incomplete options', () => {
   assert.deepEqual(parseArguments(['--json', '--db', './test.db', '--vault', './vault']), {
     dbPath: path.resolve('./test.db'),
