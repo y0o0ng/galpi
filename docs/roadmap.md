@@ -215,7 +215,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow, S0a audit, S0b-1 Pi 검증, S0b-2a 무결성 기반 로컬 구현 완료. S0b-2b 승인형 적용과 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
+> 상태: A0·A1 shadow, S0a audit, S0b-1 Pi 검증, S0b-2a·2b 로컬 구현 완료. Pi 승인형 복구와 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -231,12 +231,14 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > S0b-2a 로컬 구현 완료 (`699d1e9`, 2026-07-16): `schema_version` 기반 순차 migration, `note_chunks.content_sha256`, `ready | source_missing`, 공용 청크 저장 모듈을 추가했다. `source_missing`은 SQL 조회·랭커·저장 상태·감사 일치 집계에서 제외하고, 같은 자동저장 근거가 확인된 UUID형 source만 legacy provenance로 분류한다. 본문 hash 변경 시 오래된 임베딩을 비우며, 구형 DB 호환과 migration 멱등성을 포함한 전체 테스트 70개를 통과했다. 실제 로컬·Pi 운영 DB와 vault는 변경하지 않았다.
 
-> S0b-2b는 백업, 계획 입력 hash 재검증, 승인된 작업 적용, 재감사를 하나의 명시적 절차로 만든다. `699d1e9` 배포는 서버 시작 시 Pi DB migration을 실행하므로 apply CLI 구현 후 실제 파일·DB 변경 범위를 다시 컨펌받는다.
+> S0b-2b의 요구사항은 백업, 계획 입력 hash 재검증, 승인된 작업 적용, 재감사를 하나의 명시적 절차로 묶는 것이다. `699d1e9` 배포는 서버 시작 시 Pi DB migration을 실행하므로 실제 파일·DB 변경 범위는 별도로 다시 컨펌받는다.
+
+> S0b-2b 로컬 구현 완료 (`7e4fdc5`, 2026-07-16): 기본 readonly인 `npm run apply:topic-repair`에 서버 중지 확인·정확한 입력 hash·수동 작업 ID 승인을 모두 요구하는 apply 경로를 추가했다. 백업 후 migration hash를 다시 검사하고, 정확히 같은 중복 Q&A 제거는 원자적 파일 교체로, 제목 캐시와 `source_missing`은 DB transaction으로 처리한다. 최종 감사 실패나 DB 오류 시 vault와 migration 전 DB를 복원한다. 보관 청크는 활성 노트 JOIN으로 회수 제외하고 정상 관찰로 남긴다. 전체 테스트 76개를 통과했으며 Pi에는 아직 배포·적용하지 않았다.
 
 1. [x] schema version과 순차 migration을 별도 모듈로 관리
 2. [ ] append·split·merge·archive를 공용 QA-LOG parser와 topic mutation queue로 직렬화
-3. [ ] 원자적 파일 교체, DB transaction, hash 기반 audit/reindex로 중단 복구
-4. [ ] Markdown-only QA는 재색인하고 DB-only 청크는 `source_missing`으로 표시. 회수 제외 기반은 로컬 완료
+3. [x] 현재 복구 apply의 원자적 파일 교체, DB transaction, hash 재검증과 rollback
+4. [ ] Markdown-only QA 재색인은 후속. DB-only 청크의 `source_missing` 적용·회수 제외는 로컬 완료
 5. [ ] 현재 불일치를 백업 후 복구하고 Pi dry-run audit 0건 확인
 
 ### A — 기억 신뢰성

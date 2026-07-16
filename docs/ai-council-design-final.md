@@ -590,8 +590,8 @@
 
 > 갱신: 2026-07-16. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0 기준선·A1 청크 회수 shadow mode, S0a audit, S0b-1 readonly 복구 계획까지 Pi에 배포했다(`3a96ff3`, `c5e5d04`, `575205a`, `fdabe05`, `8c2d490`). Pi 계획 15건은 적용 후보 13건과 수동 2건으로 나뉘었고, 전체 테스트 65개와 실행 전후 DB hash 불변을 확인했다. S0b-2a 무결성 기반은 `699d1e9`에서 로컬 구현했으며, 순차 migration·청크 hash·`source_missing` 회수 제외·legacy provenance 판정을 포함한 전체 테스트 70개를 통과했다. 실제 운영 DB와 vault에는 아직 적용하지 않았다.
-- **다음 단계 설계:** S0b-2b에서 백업·입력 hash 재검증·승인형 적용 CLI·재감사를 구현한 뒤 별도 컨펌으로 Pi schema와 데이터를 적용한다. M60 토픽의 중복 ID는 유지하고 향수 토픽의 동일 복사본을 제거하며, UUID형 source 참조는 자동저장 근거와 함께 legacy provenance로 보존한다. 그다음 append/split/merge/archive 공용 쓰기 경로와 A1b 전역 청크 검색+노트 soft prior를 진행한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
+- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0 기준선·A1 청크 회수 shadow mode, S0a audit, S0b-1 readonly 복구 계획까지 Pi에 배포했다(`3a96ff3`, `c5e5d04`, `575205a`, `fdabe05`, `8c2d490`). Pi 계획 15건은 적용 후보 13건과 수동 2건으로 나뉘었고, 전체 테스트 65개와 실행 전후 DB hash 불변을 확인했다. S0b-2a·2b는 `699d1e9`, `7e4fdc5`에서 로컬 구현했다. 순차 migration, 청크 hash·상태, 승인형 apply, 백업, stale hash 차단, 원자적 중복 제거, DB transaction, 실패 rollback을 포함한 전체 테스트 76개를 통과했다. 실제 운영 DB와 vault에는 아직 적용하지 않았다.
+- **다음 단계 설계:** 별도 컨펌과 Pi maintenance window에서 dry-run 계획의 새 hash와 수동 작업 ID를 확인한 뒤 schema와 현재 불일치를 적용한다. M60 토픽의 중복 ID는 유지하고 향수 토픽의 동일 복사본을 제거하며, UUID형 source 참조는 자동저장 근거와 함께 legacy provenance로 보존한다. Pi 재감사 후 append/split/merge/archive 공용 쓰기 경로와 A1b 전역 청크 검색+노트 soft prior를 진행한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.

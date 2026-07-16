@@ -203,6 +203,39 @@ sudo systemctl start ai-council
 
 DB와 볼트는 **같은 stamp**로 맞춰 복원하는 게 안전하다(시점 일치).
 
+### 토픽 저장 복구
+
+토픽 감사에서 불일치를 실제로 복구할 때만 사용한다. 기본 명령은 readonly 계획 출력이며 DB와 vault를 수정하지 않는다.
+
+```sh
+cd /home/pi/ai-council
+npm run apply:topic-repair
+```
+
+출력된 `Input SHA-256`과 수동 작업 ID를 검토한 뒤 서비스 중지 상태에서만 적용한다.
+
+```sh
+sudo systemctl stop ai-council
+
+npm run apply:topic-repair -- \
+  --apply \
+  --confirm-service-stopped \
+  --input-sha256 <검토한-hash> \
+  --approve-operation <검토한-수동-작업-id>
+
+sudo systemctl start ai-council
+```
+
+적용 명령은 DB·vault 백업을 먼저 만들고, 입력 hash가 바뀌었거나 수동 승인이 빠졌으면 수정 전에 중단한다. 적용 후에는 다음을 확인한다.
+
+```sh
+npm run audit:topics
+npm test
+systemctl is-active ai-council
+```
+
+Pi에서 `sudo` 비밀번호가 필요하므로 서비스 중지·시작은 사용자가 직접 실행한다.
+
 ## 8. 자주 보는 문제
 
 ### 폰/맥에서 접속이 안 됨

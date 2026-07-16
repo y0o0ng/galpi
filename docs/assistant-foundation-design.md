@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-16
 >
-> 상태: A0·A1 shadow, S0a audit, S0b-1 Pi 검증, S0b-2a 무결성 기반 로컬 구현 완료, S0b-2b 적용 도구·Pi migration 전
+> 상태: A0·A1 shadow, S0a audit, S0b-1 Pi 검증, S0b-2a·2b 로컬 구현 완료, Pi migration·실제 복구 전
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -587,11 +587,15 @@ S0a 읽기 전용 감사 기반은 `575205a`에서 구현해 Pi까지 배포·�
 
 S0b-1은 `fdabe05`, `8c2d490`에서 readonly `npm run plan:topic-repair`로 구현해 Pi까지 검증했다. 원문을 출력하지 않고 Q&A·청크 본문 hash, DB 배정, `auto_save_decisions` provenance로 복구 근거를 만들며 입력 상태 hash도 고정한다. Pi 계획 15건은 적용 후보 13건(제목 캐시 8, DB-only `source_missing` 4, 보관 청크 제외 1)과 수동 검토 2건으로 나뉘었다. 전체 테스트 65개를 통과했고 실행 전후 DB SHA-256은 같았다.
 
-수동 항목 중 중복 Q&A는 M60 토픽과 향수 토픽에 본문 hash까지 같은 복사본이다. DB 청크와 자동저장 기록은 모두 M60 토픽을 가리키므로 M60의 ID를 유지하고 향수 토픽 복사본을 제거하는 계획이다. UUID형 assistant source 참조는 당시 `auto_save_decisions`에도 같은 값이 남은 legacy provenance라 조용히 지우지 않는다. S0b-2b에서 백업, 계획 입력 hash 재검증, 적용·재감사를 별도 컨펌받은 뒤 구현한다.
+수동 항목 중 중복 Q&A는 M60 토픽과 향수 토픽에 본문 hash까지 같은 복사본이다. DB 청크와 자동저장 기록은 모두 M60 토픽을 가리키므로 M60의 ID를 유지하고 향수 토픽 복사본을 제거하는 계획이다. UUID형 assistant source 참조는 당시 `auto_save_decisions`에도 같은 값이 남은 legacy provenance라 조용히 지우지 않는다. S0b-2b의 요구사항은 백업, 계획 입력 hash 재검증, 승인형 적용과 재감사로 확정했다.
 
 S0b-2a는 `699d1e9`에서 로컬 구현했다. `schema_version` 1·2를 순서대로 transaction 안에서 적용하는 migration 모듈을 만들고, 기존 `note_chunks`에 정규화 본문 `content_sha256`과 `ready | source_missing` 상태를 추가했다. 새 Q&A 저장은 hash와 `ready`를 함께 갱신하고 본문 hash가 바뀌면 오래된 임베딩만 비운다. `source_missing`은 청크 조회·랭커·저장 상태 표시·감사 일치 집계에서 제외하며, UUID형 source는 같은 `qa_id`·노트·`auto_save_decisions` 값이 모두 일치할 때만 legacy provenance 관찰 항목으로 분류한다. 구형 DB 호환과 migration 멱등성을 포함한 전체 테스트 70개를 통과했다.
 
 이번 단계는 메모리 DB fixture로만 검증했다. 실제 로컬·Pi 운영 DB와 vault는 변경하지 않았으며, 서버 시작 시 migration이 실행되므로 Pi 배포는 백업과 별도 컨펌 뒤에 진행한다.
+
+S0b-2b는 `7e4fdc5`에서 로컬 구현했다. `npm run apply:topic-repair`는 기본적으로 readonly 계획만 출력한다. 실제 적용은 서버 중지 확인, 정확한 계획 입력 SHA-256, 각 수동 작업 ID 승인을 요구한다. 승인 후에도 백업을 먼저 만들고 migration 뒤 같은 hash를 재검증하며, 정확히 같은 중복 Q&A만 임시 파일+rename으로 제거한다. 제목 캐시는 DB transaction에서 갱신하고 DB-only 청크는 물리 삭제 대신 `source_missing`으로 바꾼다. 적용 후 감사가 clean이 아니거나 중간 DB 작업이 실패하면 vault 파일과 migration 전 DB를 함께 복원한다.
+
+보관 노트 청크는 원본이 사라진 것이 아니므로 `source_missing`으로 바꾸지 않는다. 활성 topic과 JOIN한 조회에서 제외하고 감사에서는 정상 관찰 항목으로 남긴다. 사용자 지정 DB 경로 백업, 승인 누락, stale hash, 성공 적용, 강제 DB 실패 rollback을 포함해 전체 테스트 76개를 통과했다. Pi 배포·schema migration·실데이터 적용은 아직 하지 않았다.
 
 - [x] `schema_version`과 순차 migration을 별도 모듈로 관리
 - [ ] 모든 append·split·merge·archive를 공용 topic mutation queue와 QA-LOG parser로 통과
@@ -602,7 +606,10 @@ S0b-2a는 `699d1e9`에서 로컬 구현했다. `schema_version` 1·2를 순서�
 - [x] dry-run audit에서 malformed QA, file-only QA, DB-only 청크, source 참조 오류를 분리 보고
 - [x] 원문 비노출 hash·DB 배정·자동저장 provenance 기반 readonly 복구 계획 생성
 - [x] `source_missing` 청크를 회수·저장 상태에서 제외하고 일치하는 UUID형 legacy provenance를 별도 관찰
-- [ ] file-only QA는 재색인하고 DB-only 청크는 조용히 삭제하지 않고 `source_missing`으로 회수 제외
+- [x] 복구 apply는 백업·입력 hash·수동 작업 ID·서버 중지 확인을 모두 요구
+- [x] 복구 apply의 파일 원자 교체·DB transaction·실패 시 DB/vault rollback 구현
+- [ ] file-only QA를 원본 Q&A에서 재색인
+- [x] DB-only 청크를 조용히 삭제하지 않고 `source_missing`으로 적용·회수 제외
 - [ ] `note_chunks.note_title`은 호환 캐시로만 두고 표시·검색 제목은 `notes` 조인 또는 현재 파일 메타데이터 사용
 - [ ] 현재 4개 topic의 QA ID 불일치와 8개 제목 drift를 검토·복구한 뒤 Pi audit 0건 확인
 
