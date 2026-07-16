@@ -18,7 +18,7 @@ V2   뇌의 깊이       — 의회 + 저장/회수가 제대로 도는 뇌     
 V3   뇌의 자기관리   — Codex가 조용히 정리, 안 망가짐         ✅ 완료
 V3.5 시간과 검색     — 시간 감각 + 검색 튜닝                       ✅ 완료
 V4-A 논문 입력구     — 검색·저장·필요한 전문만 읽는다          ✅ 완료
-V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← S0 다음
+V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← S0 쓰기 경로·A1b
 V4-B 음성 입력구     — 확인한 전사를 대화·메모·할 일로 보낸다
 V5   전문 직원       — 주식·일정 등 역할 에이전트
 V6   비서의 얼굴     — 화면에 떠있는 Clawd, 어디서든
@@ -171,6 +171,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 >
 > 지식 패널 확장 Pi 배포 완료 (`c9bf470`): 일반 노트를 읽기 전용으로 열 수 있는 `노트` 탭을 별도 `public/note-panel.js`에 추가했다. Semantic Scholar의 `openAccessPdf`와 기존 `arxiv_id`로 공개 PDF를 새 탭에서 열 수 있으며, PDF 다운로드·파싱·Pi 프록시는 하지 않는다. Clawd의 이동 범위와 z-index도 전체 앱·패널 위로 확장했다. Pi에서 `node:test` 17개, 문법 검사, 인증 노트 목록 API와 새 정적 파일 응답을 확인했다.
 >
+> 컨텍스트 선택 UI Pi 배포 완료 (`516a147`, 2026-07-16): `/search` 결과를 더 이상 전부 활성 컨텍스트에 넣지 않고 검색 카드에서 필요한 노트만 추가·제거한다. 일반 노트와 저장 논문 상세에도 같은 토글을 연결하고 상단 활성 노트 칩과 상태를 동기화했다. 질문 기반 자동 회수는 변경하지 않았다. Mac 전체 테스트 76개와 데스크톱·390px Playwright를 통과했고 Pi 정적 파일 hash와 인증 API를 확인했다.
+>
 > 2.5A 파서 spike 완료 (2026-07-15, 제품 연결 전): `lib/paper-fulltext.js`에 `pdf-parse` 2.4.5 기반 페이지 텍스트·섹션 추출을 분리했다. TradingAgents PDF 38페이지에서 104,235자를 Mac/Pi 동일하게 추출했고, Pi 격리 환경은 약 1.1초·최대 RSS 156MB·설치 용량 약 87MB였다. 잘못된 PDF, 빈 텍스트, 100페이지 초과와 파서 실패를 테스트하며 서버·DB·UI에는 아직 연결하지 않았다.
 >
 > 2.5A Phase B 로컬 색인·검색 Pi 배포 완료 (`1078df5`, 2026-07-15): `paper_documents`/`paper_chunks`, 해시 기반 `.paper-sources` 원본 캐시, 논문별 동시 색인 직렬화, SHA-256 중복 차단, 중단 복구, 섹션·페이지 청킹과 BM25/선택적 임베딩 검색을 별도 모듈에 구현했다. Pi 임시 DB·볼트에서 TradingAgents 38페이지·104,235자를 97개 청크로 색인했고 원본 캐시, 두 번째 색인 재사용, 방법론·실험·한계 질의의 top 4 근거 회수를 확인했다. 기존 `note_chunks`, paper 노트 본문, Codex 큐와 실사용 전문 테이블 데이터는 건드리지 않았다.
@@ -215,7 +217,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow, S0a audit, S0b-1 Pi 검증, S0b-2a·2b 로컬 구현 완료. Pi 승인형 복구와 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
+> 상태: A0·A1 shadow와 S0b-2 Pi 승인형 복구까지 완료. append/split/merge/archive 공용 쓰기 경로와 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -229,17 +231,17 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > S0b-1 Pi 검증 완료 (`fdabe05`, `8c2d490`, 2026-07-16): `npm run plan:topic-repair`가 원문 대신 본문 hash·DB 배정·자동저장 provenance와 입력 상태 hash를 기록한다. 계획 15건은 적용 후보 13건(제목 캐시 8, DB-only `source_missing` 4, 보관 청크 제외 1)과 수동 2건으로 분리됐다. M60 Q&A의 완전 동일 복사본은 향수 토픽에서 제거하고 M60 ID를 유지하는 근거가 확인됐으며, UUID형 source 참조는 legacy provenance로 보존한다. Pi 전체 테스트 65개 통과, 실행 전후 DB hash 동일, 서비스 `active`를 확인했다.
 
-> S0b-2a 로컬 구현 완료 (`699d1e9`, 2026-07-16): `schema_version` 기반 순차 migration, `note_chunks.content_sha256`, `ready | source_missing`, 공용 청크 저장 모듈을 추가했다. `source_missing`은 SQL 조회·랭커·저장 상태·감사 일치 집계에서 제외하고, 같은 자동저장 근거가 확인된 UUID형 source만 legacy provenance로 분류한다. 본문 hash 변경 시 오래된 임베딩을 비우며, 구형 DB 호환과 migration 멱등성을 포함한 전체 테스트 70개를 통과했다. 실제 로컬·Pi 운영 DB와 vault는 변경하지 않았다.
+> S0b-2a 로컬 구현 완료 (`699d1e9`, 2026-07-16): `schema_version` 기반 순차 migration, `note_chunks.content_sha256`, `ready | source_missing`, 공용 청크 저장 모듈을 추가했다. `source_missing`은 SQL 조회·랭커·저장 상태·감사 일치 집계에서 제외하고, 같은 자동저장 근거가 확인된 UUID형 source만 legacy provenance로 분류한다. 본문 hash 변경 시 오래된 임베딩을 비우며, 구형 DB 호환과 migration 멱등성을 포함한 전체 테스트 70개를 통과했다. 이 구현 단계에서는 실제 로컬·Pi 운영 DB와 vault를 변경하지 않았다.
 
-> S0b-2b의 요구사항은 백업, 계획 입력 hash 재검증, 승인된 작업 적용, 재감사를 하나의 명시적 절차로 묶는 것이다. `699d1e9` 배포는 서버 시작 시 Pi DB migration을 실행하므로 실제 파일·DB 변경 범위는 별도로 다시 컨펌받는다.
+> S0b-2b 로컬 구현 완료 (`7e4fdc5`, 2026-07-16): 기본 readonly인 `npm run apply:topic-repair`에 서버 중지 확인·정확한 입력 hash·수동 작업 ID 승인을 모두 요구하는 apply 경로를 추가했다. 백업 후 migration hash를 다시 검사하고, 정확히 같은 중복 Q&A 제거는 원자적 파일 교체로, 제목 캐시와 `source_missing`은 DB transaction으로 처리한다. 최종 감사 실패나 DB 오류 시 vault와 migration 전 DB를 복원한다. 보관 청크는 활성 노트 JOIN으로 회수 제외하고 정상 관찰로 남긴다. 전체 테스트 76개를 통과했다.
 
-> S0b-2b 로컬 구현 완료 (`7e4fdc5`, 2026-07-16): 기본 readonly인 `npm run apply:topic-repair`에 서버 중지 확인·정확한 입력 hash·수동 작업 ID 승인을 모두 요구하는 apply 경로를 추가했다. 백업 후 migration hash를 다시 검사하고, 정확히 같은 중복 Q&A 제거는 원자적 파일 교체로, 제목 캐시와 `source_missing`은 DB transaction으로 처리한다. 최종 감사 실패나 DB 오류 시 vault와 migration 전 DB를 복원한다. 보관 청크는 활성 노트 JOIN으로 회수 제외하고 정상 관찰로 남긴다. 전체 테스트 76개를 통과했으며 Pi에는 아직 배포·적용하지 않았다.
+> S0b-2 Pi 운영 적용 완료 (`699d1e9`, `7e4fdc5`, 2026-07-16): 서비스 중지 상태에서 입력 hash `ce458e…e0f17`과 중복 작업 ID를 재검증하고 동시 DB·vault 백업 `20260716-1733`을 만든 뒤 schema version 2 migration과 작업 13건을 적용했다. M60 Q&A는 유지하고 향수 토픽의 동일 복사본만 제거했으며 제목 캐시 8건을 갱신하고 DB-only 청크 4건은 `source_missing`으로 회수 제외했다. 최종 감사에서 활성 Markdown Q&A 65개와 ready 청크 65개가 모두 일치했고 중복·DB-only·제목 drift·source 오류는 0건이었다. SQLite 무결성·외래키·Pi 전체 테스트 76개·인증 API·서비스 재기동을 통과했으며 재계획은 `clean`, 작업 0건이다.
 
 1. [x] schema version과 순차 migration을 별도 모듈로 관리
 2. [ ] append·split·merge·archive를 공용 QA-LOG parser와 topic mutation queue로 직렬화
 3. [x] 현재 복구 apply의 원자적 파일 교체, DB transaction, hash 재검증과 rollback
-4. [ ] Markdown-only QA 재색인은 후속. DB-only 청크의 `source_missing` 적용·회수 제외는 로컬 완료
-5. [ ] 현재 불일치를 백업 후 복구하고 Pi dry-run audit 0건 확인
+4. [ ] Markdown-only QA 재색인은 후속. DB-only 청크의 `source_missing` 적용·회수 제외는 Pi 운영 적용 완료
+5. [x] 현재 불일치를 백업 후 복구하고 Pi dry-run audit 0건 확인
 
 ### A — 기억 신뢰성
 

@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-16
 >
-> 상태: A0·A1 shadow, S0a audit, S0b-1 Pi 검증, S0b-2a·2b 로컬 구현 완료, Pi migration·실제 복구 전
+> 상태: A0·A1 shadow와 S0b-2 Pi migration·승인형 실제 복구 완료, 공용 topic 쓰기 경로·A1b 전
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -188,6 +188,8 @@ topic은 `note_chunks`가 실제 지식 단위다. 파일 전체 임베딩은 �
 1. **명시적 자료 경로**
    - activeNotes는 사용자가 직접 활성화한 자료로 우선한다.
    - activeNotes도 관련 청크를 우선하며, 긴 노트 전체가 요청 총량 상한을 우회하지 않는다.
+
+2026-07-16 `516a147`을 Pi에 배포해 `/search` 결과의 자동 활성화를 제거하고 검색 카드·일반 노트·저장 논문 상세에서만 명시적으로 activeNotes를 추가·제거하도록 바꿨다. 이 UI 변경은 질문 기반 자동 회수와 A1 shadow 경로를 변경하지 않는다.
 
 2. **일반 topic 경로**
    - 활성 topic의 `note_chunks`를 전역 후보로 검색한다.
@@ -595,7 +597,11 @@ S0b-2a는 `699d1e9`에서 로컬 구현했다. `schema_version` 1·2를 순서�
 
 S0b-2b는 `7e4fdc5`에서 로컬 구현했다. `npm run apply:topic-repair`는 기본적으로 readonly 계획만 출력한다. 실제 적용은 서버 중지 확인, 정확한 계획 입력 SHA-256, 각 수동 작업 ID 승인을 요구한다. 승인 후에도 백업을 먼저 만들고 migration 뒤 같은 hash를 재검증하며, 정확히 같은 중복 Q&A만 임시 파일+rename으로 제거한다. 제목 캐시는 DB transaction에서 갱신하고 DB-only 청크는 물리 삭제 대신 `source_missing`으로 바꾼다. 적용 후 감사가 clean이 아니거나 중간 DB 작업이 실패하면 vault 파일과 migration 전 DB를 함께 복원한다.
 
-보관 노트 청크는 원본이 사라진 것이 아니므로 `source_missing`으로 바꾸지 않는다. 활성 topic과 JOIN한 조회에서 제외하고 감사에서는 정상 관찰 항목으로 남긴다. 사용자 지정 DB 경로 백업, 승인 누락, stale hash, 성공 적용, 강제 DB 실패 rollback을 포함해 전체 테스트 76개를 통과했다. Pi 배포·schema migration·실데이터 적용은 아직 하지 않았다.
+보관 노트 청크는 원본이 사라진 것이 아니므로 `source_missing`으로 바꾸지 않는다. 활성 topic과 JOIN한 조회에서 제외하고 감사에서는 정상 관찰 항목으로 남긴다. 사용자 지정 DB 경로 백업, 승인 누락, stale hash, 성공 적용, 강제 DB 실패 rollback을 포함해 전체 테스트 76개를 통과했다.
+
+2026-07-16 Pi maintenance window에서 S0b-2를 실제 적용했다. 서비스 중지 후 새 계획의 입력 hash `ce458ee775f4f4e40e2a94b205f5cf968d515a0c0dcdea6ec9af6558a78e0f17`과 수동 작업 `duplicate-file-qa:qa-767c6f81-5915-48ba-be52-dbd6bd4bfc18`을 확인하고, 동시 백업 `council-20260716-1733.db`·`vault-20260716-1733.tar.gz`을 만든 뒤 schema version 2와 작업 13건을 적용했다. M60 토픽의 원본 Q&A는 유지하고 향수 토픽의 동일 복사본만 제거했으며, 제목 캐시 8건과 DB-only 청크 4건을 각각 현재 제목·`source_missing` 상태로 갱신했다.
+
+적용 후 활성 topic의 Markdown Q&A 65개와 ready 청크 65개가 모두 일치했다. malformed·file-only·DB-only·배정 drift·중복·제목 drift·source 참조 오류·고아·임베딩 누락은 모두 0건이고, SQLite `integrity_check=ok`, 외래키 오류 0건, Pi 전체 테스트 76개, 인증 API와 systemd 재기동을 통과했다. 재실행한 복구 계획은 `clean`, 작업 0건이다.
 
 - [x] `schema_version`과 순차 migration을 별도 모듈로 관리
 - [ ] 모든 append·split·merge·archive를 공용 topic mutation queue와 QA-LOG parser로 통과
@@ -611,7 +617,7 @@ S0b-2b는 `7e4fdc5`에서 로컬 구현했다. `npm run apply:topic-repair`는 �
 - [ ] file-only QA를 원본 Q&A에서 재색인
 - [x] DB-only 청크를 조용히 삭제하지 않고 `source_missing`으로 적용·회수 제외
 - [ ] `note_chunks.note_title`은 호환 캐시로만 두고 표시·검색 제목은 `notes` 조인 또는 현재 파일 메타데이터 사용
-- [ ] 현재 4개 topic의 QA ID 불일치와 8개 제목 drift를 검토·복구한 뒤 Pi audit 0건 확인
+- [x] 현재 topic의 QA ID 불일치와 8개 제목 drift를 검토·복구한 뒤 Pi audit 0건 확인
 
 교차 저장소 전체를 하나의 ACID transaction으로 만들 수는 없다. 대신 **직렬화된 변경 + 원자적 파일 교체 + DB transaction + hash 기반 재조정**으로 중단 후 복구 가능성을 보장한다. 혼자 쓰는 현재 규모에서는 전역 topic mutation queue가 가장 단순하며, 쓰기 처리량 손실은 무시할 수 있다.
 
@@ -673,7 +679,7 @@ note_chunks
 
 ### S0. 저장 무결성
 
-- [ ] 활성 topic의 QA ID 집합과 `ready` 청크 ID 집합 차이 0건
+- [x] 활성 topic의 QA ID 집합과 `ready` 청크 ID 집합 차이 0건
 - [ ] 같은 vault를 두 번 재색인해 동일한 chunk ID·본문 hash가 생성됨
 - [ ] append·split·merge 도중 DB 실패와 프로세스 중단을 재현해 원본 보존 또는 자동 복구
 - [ ] malformed topic 하나가 다른 정상 topic의 재색인을 막거나 기존 인덱스를 삭제하지 않음
