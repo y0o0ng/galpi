@@ -85,11 +85,11 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **프로젝트 현재 상태**
 
-- 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크, Clawd 패널 이동, 알림센터 `최근 저장`, 2.5A Phase A/B/C와 유지보수 리뷰 버그 1~9까지 Pi 배포 완료 (`c9bf470`, `4c3d07f`, `1078df5`, `5d28d73`, `fd615c7`, `6bd1f57`). V4.5 A0 파일(`3a96ff3`)을 Pi에 복사하고 전체 테스트 52개를 통과했으며, 실행 중인 서비스의 재시작은 아직 남아 있다.
-- 현재 개발 상태: V4.5 A0 기준선 고정을 완료했다. 합성 20개는 note Recall@3 20/20·chunk Recall@6 11/20, Pi 비공개 실사용 20개는 엄격한 note Recall@3 15/20(알려진 기억 15/16)·chunk Recall@6 7/20·abstention 0/4였다. 기존 컨텍스트는 평균 35,327자·최대 40,439자였다. Pi 밖 FileVault 위치의 동시 DB·vault 백업은 SHA-256 일치, SQLite 무결성, 외래키, 추적 노트 임시 복원 검증을 통과했다.
-- 다음 개발 시작점: `docs/assistant-foundation-design.md`의 A1 청크 회수 shadow mode다. 실제 답변은 기존 회수를 유지하고, 새 경로가 고른 노트 최대 3개·청크 최대 6개·총 8,000자 이내 evidence와 낮은 관련도 중단 결과를 trace에만 남겨 같은 20개 평가로 비교한다. V4.5를 통과하기 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며, Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다. 유지보수 구조 이슈는 `docs/maintenance.md`에서 추적하고 `npm audit` 기존 경고는 자동 수정하지 않는다.
+- 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크, Clawd 패널 이동, 알림센터 `최근 저장`, 2.5A Phase A/B/C와 유지보수 리뷰 버그 1~9까지 Pi 배포 완료 (`c9bf470`, `4c3d07f`, `1078df5`, `5d28d73`, `fd615c7`, `6bd1f57`). V4.5 A0 기준선과 A1 청크 회수 shadow mode(`3a96ff3`, `c5e5d04`)도 Pi에 배포했고 전체 테스트 58개를 통과했다.
+- 현재 개발 상태: A1 shadow는 실제 답변을 기존 회수로 유지한 채 노트 최대 3개·청크 최대 6개·총 8,000자 evidence만 기록한다. 합성 20개는 note/chunk 20/20·abstention 4/4였고, Pi 비공개 실사용 20개는 note 15/20·chunk 9/20·abstention 0/4·상한 20/20이었다. 무관 노트 38/53, 무관 청크 58/71이라 A2 실제 답변 전환 기준은 아직 통과하지 못했다.
+- 다음 개발 시작점: `docs/assistant-foundation-design.md`의 S0 저장 무결성이다. 토픽 노트 구조는 유지하고 Markdown QA-LOG를 topic Q&A의 기준, `note_chunks`를 재생성 가능한 검색 인덱스로 둔다. 현재 확인된 4개 topic QA ID 불일치, 제목 캐시 8개, source 참조 1개를 백업·dry-run audit·reindex로 복구하고 append/split/merge/archive를 공용 쓰기 경로로 직렬화한다. 그 뒤 A1b에서 전역 청크 검색+노트 soft prior와 무관 evidence 중단을 shadow로 보정한다. V4.5를 통과하기 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며, Pi `.env`는 `PAPER_SEARCH_MOCK=false`를 유지한다. 유지보수 구조 이슈는 `docs/maintenance.md`에서 추적하고 `npm audit` 기존 경고는 자동 수정하지 않는다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
-- 코드 구조 방향: `server.js`는 현재 5,628줄. 기존 코드를 한꺼번에 분해하지 말고, V4.5는 retrieval·memory·trace·task·scheduler를 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
+- 코드 구조 방향: `server.js`는 현재 5,734줄. 기존 코드를 한꺼번에 분해하지 말고, V4.5는 topic-store·migration·retrieval·memory·trace·task·scheduler를 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것
 - 비용 확인은 상단 `Claude 크레딧 ↗`에서 공식 Billing을 연다. 잔액 자동 조회는 하지 않고 Console 로그인 정보·쿠키·관리자 키를 앱에 저장하지 않을 것
 - 노트 구조 방향: v4 유지. 사람도 읽기 좋고 AI도 회수하기 좋은 형식. CODEX 마커 구역은 Codex가 안전하게 편집할 수 있는 영역으로 유지

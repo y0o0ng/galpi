@@ -1,8 +1,8 @@
 # V4.5 믿을 수 있는 비서 기본기 설계
 
-> 작성: 2026-07-15
+> 작성: 2026-07-15 · 갱신: 2026-07-16
 >
-> 상태: A0 기준선 고정 완료, A1 청크 회수 shadow mode 전
+> 상태: A0 기준선 고정과 A1 청크 회수 shadow mode 구현 완료, S0 저장 무결성 보강 전
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -13,6 +13,8 @@
 1. **기억 신뢰성**: 긴 토픽의 특정 Q&A를 청크 단위로 회수하고, 최신 정보·출처·무효화 상태를 반영한다.
 2. **평가와 관측**: 무엇을 회수했고 왜 답했는지, 비용·지연·도구 사용이 어땠는지 측정한다.
 3. **약속 루프**: 할 일·기한·알림·후속 확인을 구조화해 비서가 먼저 챙길 수 있게 한다.
+
+이 세 기능 전에 **S0 저장 무결성**을 둔다. 토픽 노트 형식은 유지하되, Markdown `QA-LOG`와 SQLite 검색 인덱스가 어긋나도 감지·복구할 수 있게 만든 뒤 A2 실제 답변 회수로 전환한다. 저장 형식을 원자 노트나 외부 메모리 저장소로 교체하는 작업은 아니다.
 
 V4-B 음성은 이 기반 뒤에 연결한다. 음성 전사는 곧바로 영구 토픽에 저장하지 않고 Inbox/미리보기에서 사용자가 목적을 확인한 뒤 `대화 | 메모 | 할 일` 중 하나로 보낸다.
 
@@ -49,7 +51,7 @@ V4-B 음성은 이 기반 뒤에 연결한다. 음성 전사는 곧바로 영구
 - 가장 큰 topic은 Q&A 11개, 8,148자
 - 항상 주입되는 사용자 메모리 항목은 0개
 
-현재 `note_chunks`에는 Q&A별 본문과 임베딩이 있지만 일반 답변 회수에는 사용되지 않는다. `searchVault()`는 노트 전체를 후보로 고르고, 모델에는 파일 앞부분만 전달한다. 새 Q&A는 QA-LOG 뒤에 붙으므로 topic이 길어질수록 최신 내용이 잘릴 수 있다.
+현재 `note_chunks`에는 Q&A별 본문과 임베딩이 있다. A1 shadow 경로는 이를 검색하고 trace에 기록하지만, 실제 모델 답변은 아직 `searchVault()`가 고른 노트 앞부분을 사용한다. 새 Q&A는 QA-LOG 뒤에 붙으므로 기존 답변 경로에서는 topic이 길어질수록 최신 내용이 잘릴 수 있다.
 
 또한 Phase C 실제 스모크 질문 2건이 일반 `/api/chat` 저장 흐름을 타고 기존 topic에 들어갔다. 이는 테스트·운영 대화와 영구 기억을 구분하는 저장 정책이 필요하다는 실제 사례다.
 
@@ -73,16 +75,53 @@ V4-B 음성은 이 기반 뒤에 연결한다. 음성 전사는 곧바로 영구
 
 음성 입력만 먼저 추가하면 현재 저장·회수 경로에 더 많은 데이터가 빨리 들어갈 뿐, 이 빈칸은 해결되지 않는다.
 
+### 1.4 저장 구조 점검에서 확인한 문제
+
+2026-07-16 Pi DB와 vault를 읽기 전용으로 대조했다.
+
+- SQLite 외래키 오류, 고아 `note_chunks`, 임베딩 누락은 모두 0건이었다.
+- 활성 topic 13개의 Markdown QA는 57개, 활성 DB 청크는 60개였다.
+- 4개 topic에서 QA ID가 달랐고, 합계는 파일에만 있는 ID 1개와 DB에만 있는 ID 4개였다.
+- `note_chunks.note_title` 캐시 8개가 현재 노트 제목과 달랐고, assistant source 참조 1개는 원본 메시지를 찾지 못했다.
+- DB는 약 8.2MB, vault는 약 3.0MB였다. DB 용량 대부분은 약 7.3MB의 JSON 임베딩이므로 현재 문제는 저장 용량이나 벡터 검색 엔진이 아니라 일관성이다.
+
+이는 토픽 노트 방식의 결함이 아니라, 파일 쓰기와 DB 갱신, append와 split/merge, vault sync와 청크 재생성이 하나의 복구 규칙을 공유하지 않는 데서 생긴 문제다. A1 shadow가 잘못된 청크를 학습하거나 A2가 DB에만 남은 청크를 답변 근거로 쓰지 않도록 S0를 먼저 통과한다.
+
 ## 2. 설계 원칙
 
-### 2.1 기억은 원문과 파생 상태를 분리한다
+### 2.1 토픽 노트 구조를 유지하되 역할을 분리한다
+
+토픽 노트는 한 생각마다 파일을 만드는 원자 노트가 아니라, 사람이 한 주제의 흐름을 읽는 **성장형 dossier**다. 이 장점은 유지한다.
+
+- 하나의 Q&A에는 관리용 primary topic 하나를 둔다.
+- 여러 주제와 관련된 Q&A는 내용을 복제하지 않고 링크와 `note_edges`로 연결한다.
+- 별도 맥락으로 계속 성장할 만큼 경계가 분명할 때만 승인형 split을 사용한다.
+- AI는 긴 토픽 파일 전체가 아니라 관련 Q&A 청크와 짧은 현재 요약을 회수한다.
+- CODEX 요약은 현재 상태를 빠르게 읽는 파생 뷰이며 QA-LOG 원문을 대체하지 않는다.
+- 선호·사실·결정·목표와 task·reminder처럼 상태 전이가 필요한 정보는 토픽 본문에만 묻어두지 않고 SQLite 구조화 상태로 승격한다.
+
+정본과 파생 데이터의 경계는 다음과 같다.
+
+|영역|정본 또는 운영 기준|파생·표시 데이터|
+|---|---|---|
+|대화 원문|SQLite `messages`|대화 발췌·임베딩|
+|topic에 속한 Q&A와 표시 본문|Markdown `QA-LOG`|`note_chunks`, 청크 임베딩|
+|topic 제목·사람용 구성|Markdown 파일|SQLite `notes` 카탈로그|
+|유효성·provenance·승인 상태|SQLite 상태 필드|Markdown 상태 마커·UI|
+|요약·태그·연결|Markdown CODEX 구역|검색용 집계·그래프 리포트|
+|논문 원본|해시가 고정된 PDF 캐시|`paper_documents`, `paper_chunks`, 임베딩|
+|구조화 메모리·task·reminder|SQLite 상태 머신|관련 토픽 링크·Today/Inbox UI|
+
+`note_chunks`는 실제 AI 회수 단위지만 정본은 아니다. 유실하거나 스키마가 바뀌어도 QA-LOG에서 재생성할 수 있어야 한다.
+
+### 2.2 기억은 원문과 파생 상태를 분리한다
 
 - DB 메시지와 topic QA 원문은 보존한다.
 - 잘못된 기억은 물리 삭제보다 `invalidated` 상태로 회수에서 제외한다.
 - 요약·임베딩·점수·메모리 제안은 다시 만들 수 있는 파생 데이터다.
 - 사용자가 직접 말한 사실과 AI가 생성한 분석을 같은 신뢰도로 다루지 않는다.
 
-### 2.2 검색은 작은 고신호 조각을 반환한다
+### 2.3 검색은 작은 고신호 조각을 반환한다
 
 - 노트 전체를 여러 개 넣지 않는다.
 - 질문에 필요한 Q&A 청크, 요약, 출처만 넣는다.
@@ -91,20 +130,20 @@ V4-B 음성은 이 기반 뒤에 연결한다. 음성 전사는 곧바로 영구
 
 Anthropic의 context engineering 원칙인 "smallest possible set of high-signal tokens"를 적용한다.
 
-### 2.3 최신 정보가 과거 정보를 조용히 덮지 않게 한다
+### 2.4 최신 정보가 과거 정보를 조용히 덮지 않게 한다
 
 - 시간은 임베딩 유사도와 별도의 신호다.
 - 같은 사용자 사실·취향이 바뀌면 새 항목이 이전 항목을 `superseded` 처리한다.
 - 과거 내용은 감사·회고를 위해 남기되 현재 답변의 기본 근거에서는 제외한다.
 
-### 2.4 LLM은 제안하고 코드는 집행한다
+### 2.5 LLM은 제안하고 코드는 집행한다
 
 - 할 일 후보·메모리 후보 추출은 LLM이 할 수 있다.
 - 날짜 파싱, 상태 전이, 중복 알림, 재시도 상한은 코드가 처리한다.
 - 외부 행동과 민감한 변경은 사용자 승인을 요구한다.
 - 명확한 예약 작업은 자율 에이전트가 아니라 결정론적 scheduler/workflow로 실행한다.
 
-### 2.5 평가 없이 검색 가중치를 바꾸지 않는다
+### 2.6 평가 없이 검색 가중치를 바꾸지 않는다
 
 - RRF, 그래프 검색, reranker는 먼저 넣지 않는다.
 - 현재 하이브리드 검색을 기준선으로 기록한다.
@@ -144,20 +183,21 @@ Anthropic의 context engineering 원칙인 "smallest possible set of high-signal
 
 topic은 `note_chunks`가 실제 지식 단위다. 파일 전체 임베딩은 후보 노트를 찾는 보조 신호로만 유지한다.
 
-### 4.2 2단계 검색
+### 4.2 노트 신호와 전역 청크 검색
 
-1. **노트 후보 단계**
-   - 명시적 activeNotes를 먼저 둔다.
+1. **명시적 자료 경로**
+   - activeNotes는 사용자가 직접 활성화한 자료로 우선한다.
    - activeNotes도 관련 청크를 우선하며, 긴 노트 전체가 요청 총량 상한을 우회하지 않는다.
-   - 제목, aliases, Codex 태그, 요약, 노트 임베딩으로 후보를 좁힌다.
-   - archive된 노트는 제외한다.
 
-2. **청크 선택 단계**
-   - 후보 topic의 활성 `note_chunks`만 검색한다.
-   - 키워드와 기존 청크 임베딩을 함께 사용한다.
-   - 같은 topic의 비슷한 청크가 결과를 독점하지 않게 중복을 줄인다.
-   - 동일한 사실의 갱신 관계가 있으면 최신 active 항목을 우선한다.
-   - 낮은 점수 결과는 넣지 않는다.
+2. **일반 topic 경로**
+   - 활성 topic의 `note_chunks`를 전역 후보로 검색한다.
+   - 제목, aliases, Codex 태그, 요약, 노트 임베딩 점수는 청크 점수의 soft prior로 사용한다.
+   - 노트 top 3을 먼저 확정해 그 밖의 청크를 버리는 hard gate는 유일한 경로로 사용하지 않는다. A1 첫 shadow에서 목표 노트를 놓친 경우 그 안의 정답 청크를 회수할 수 없었기 때문이다.
+   - 키워드와 기존 청크 임베딩을 함께 사용하고, archive 또는 index가 준비되지 않은 청크는 제외한다.
+   - 같은 topic의 비슷한 청크가 결과를 독점하지 않도록 노트당 최대 2개를 둔다.
+   - 동일한 사실의 갱신 관계가 있으면 최신 active 항목을 우선하고, 낮은 점수 결과는 넣지 않는다.
+
+A1 shadow에서 기존 hard-gated 2단계 결과와 전역 청크+노트 soft prior 결과를 같은 fixture로 비교한다. 현재 61개 규모에서는 전역 후보 검색 비용이 작으며, 새 벡터 DB나 LLM reranker는 추가하지 않는다.
 
 초기 결과 상한:
 
@@ -507,6 +547,8 @@ OpenAI의 agent guide에서 말하는 고위험 행동의 human oversight 원칙
 대규모 선행 리팩터링은 하지 않는다. 각 단계를 구현할 때 아래 모듈을 새로 만들고 `server.js`에는 설정·의존성 주입·얇은 라우트만 둔다.
 
 ```text
+lib/topic-store.js           # QA-LOG 파싱, 토픽 변경 직렬화, audit/reindex
+lib/db-migrations.js         # schema version과 순차 migration
 lib/assistant-retrieval.js   # 노트 후보, 청크 검색, 컨텍스트 조립
 lib/assistant-memory.js      # 메모리 제안·갱신·상태 전이
 lib/assistant-trace.js       # run/evidence/feedback 기록
@@ -531,15 +573,55 @@ Pi 비공개 실사용 20개에서는 엄격한 note Recall@3 15/20, chunk Recal
 
 ### A1. 청크 회수 shadow mode
 
-- 새 retrieval이 고른 evidence를 trace에만 기록
-- 실제 모델 답변은 기존 회수를 사용
-- 20개 평가에서 기존과 새 결과 비교
+- [x] 새 retrieval이 고른 evidence를 trace에만 기록
+- [x] 실제 모델 답변은 기존 회수를 유지
+- [x] 합성·Pi 비공개 20개 평가에서 기존과 새 결과 비교
+
+`c5e5d04`에서 노트 최대 3개, 청크 최대 6개, 노트당 청크 2개, 청크당 1,400자, 총 8,000자 상한을 구현했다. 합성 shadow는 note Recall@3 20/20, chunk Recall@6 20/20, abstention 4/4, 컨텍스트 상한 20/20이었다.
+
+Pi 실사용 shadow는 note Recall@3 15/20, chunk Recall@6 9/20, abstention 0/4, 컨텍스트 상한 20/20이었다. 무관 노트는 53개 중 38개, 무관 청크는 71개 중 58개였다. 상한 집행은 성공했지만 hard note gate와 낮은 중단 성능 때문에 실제 답변 전환 기준은 통과하지 못했다.
+
+### S0. 토픽 저장 무결성 (A2 전 필수)
+
+- [ ] `schema_version`과 순차 migration을 별도 모듈로 관리
+- [ ] 모든 append·split·merge·archive를 공용 topic mutation queue와 QA-LOG parser로 통과
+- [ ] 파일은 임시 파일+rename으로 쓰고, 관련 DB 변경은 하나의 transaction으로 처리
+- [ ] 다중 파일 변경은 원본 snapshot을 두고 실패 시 복원하며, 프로세스 중단은 다음 audit에서 감지
+- [ ] `content_sha256`, `indexed_sha256`, `index_status`로 Markdown과 검색 인덱스의 일치 여부 기록
+- [ ] dry-run audit에서 malformed QA, file-only QA, DB-only 청크, source 참조 오류를 분리 보고
+- [ ] file-only QA는 재색인하고 DB-only 청크는 조용히 삭제하지 않고 `source_missing`으로 회수 제외
+- [ ] `note_chunks.note_title`은 호환 캐시로만 두고 표시·검색 제목은 `notes` 조인 또는 현재 파일 메타데이터 사용
+- [ ] 현재 4개 topic의 QA ID 불일치와 8개 제목 drift를 검토·복구한 뒤 Pi audit 0건 확인
+
+교차 저장소 전체를 하나의 ACID transaction으로 만들 수는 없다. 대신 **직렬화된 변경 + 원자적 파일 교체 + DB transaction + hash 기반 재조정**으로 중단 후 복구 가능성을 보장한다. 혼자 쓰는 현재 규모에서는 전역 topic mutation queue가 가장 단순하며, 쓰기 처리량 손실은 무시할 수 있다.
+
+S0의 최소 상태는 다음처럼 둔다.
+
+```text
+notes
+  content_sha256    # topic은 정규화한 QA-LOG, 그 외 노트는 의미 본문 hash
+  indexed_sha256    # 마지막으로 성공한 청크 인덱스의 원본 hash
+  index_status      # pending | ready | error | missing
+
+note_chunks
+  content_sha256    # qa_id에 대응하는 Q&A 내용 hash
+  index_status      # ready | source_missing
+```
+
+`index_status`는 파일과 인덱스의 동기화 건강 상태다. A3의 `validity: active | invalidated | superseded`와 합치지 않는다. 사용자가 기억을 폐기한 것과 원본 파일에서 청크를 찾지 못한 것은 원인과 복구 방법이 다르기 때문이다.
+
+### A1b. shadow 검색 보정
+
+- 전역 활성 청크 검색에 노트 점수를 soft prior로 결합
+- 무관 evidence 중단 임계값과 abstention을 Pi fixture로 조정
+- 현재 hard-gated shadow와 같은 20개 평가로 비교
+- 목표치를 넘기기 전에는 실제 모델 컨텍스트에 주입하지 않음
 
 ### A2. 청크 회수 전환
 
 - topic을 청크 단위로 주입
 - 전체 컨텍스트 8,000자 상한
-- invalidated/superseded 제외
+- `index_status=ready`인 청크만 사용
 - 문제 시 feature flag로 기존 검색 복귀
 
 ### A3. provenance·무효화·메모리 제안
@@ -568,6 +650,14 @@ Pi 비공개 실사용 20개에서는 엄격한 note Recall@3 15/20, chunk Recal
 - 대화·메모·task 분기
 
 ## 11. 통과 기준
+
+### S0. 저장 무결성
+
+- [ ] 활성 topic의 QA ID 집합과 `ready` 청크 ID 집합 차이 0건
+- [ ] 같은 vault를 두 번 재색인해 동일한 chunk ID·본문 hash가 생성됨
+- [ ] append·split·merge 도중 DB 실패와 프로세스 중단을 재현해 원본 보존 또는 자동 복구
+- [ ] malformed topic 하나가 다른 정상 topic의 재색인을 막거나 기존 인덱스를 삭제하지 않음
+- [ ] DB-only 청크와 source 참조 오류가 감사 기록 없이 물리 삭제되지 않음
 
 ### A. 기억 신뢰성
 
@@ -614,7 +704,9 @@ Pi 비공개 실사용 20개에서는 엄격한 note Recall@3 15/20, chunk Recal
 
 |단계|예상|
 |---|---:|
-|A0~A2 청크 회수·기준선|2~3일|
+|A0 기준선+A1 shadow|완료|
+|S0 저장 무결성|1~2일|
+|A1b 보정+A2 전환|1~2일|
 |A3 provenance·무효화·메모리|2~3일|
 |B trace·피드백|1~2일|
 |C task·reminder MVP|2~4일|
@@ -639,3 +731,7 @@ Pi 비공개 실사용 20개에서는 엄격한 note Recall@3 15/20, chunk Recal
 - [Anthropic, Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents): 실제 실패에서 시작한 20~50개 초기 평가와 trajectory/outcome 구분
 - [LongMemEval, ICLR 2025](https://arxiv.org/abs/2410.10813): 정보 추출, 세션 간 추론, 시간 추론, 지식 갱신, abstention의 장기 기억 평가 범주
 - [OpenAI, A practical guide to building agents](https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/): 고위험 행동의 human intervention과 layered guardrail 원칙
+- [Letta, Context hierarchy](https://docs.letta.com/guides/core-concepts/memory/context-hierarchy): 항상 보이는 core memory와 필요할 때 찾는 archival/external memory의 역할 분리
+- [Mem0, memory implementation](https://github.com/mem0ai/mem0/blob/main/mem0/memory/main.py): 사용자·에이전트 범위, 후보 overfetch, semantic/BM25/entity 신호 결합과 threshold 후 top-k 선택 참고
+- [Graphiti](https://github.com/getzep/graphiti): 원본 episode provenance를 보존하고 파생 사실·관계에 시간과 유효성을 두는 구조 참고
+- [LangChain memory template](https://github.com/langchain-ai/memory-template): hot path와 background memory 처리, precision/recall 평가 흐름 참고

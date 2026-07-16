@@ -47,6 +47,8 @@
   - QA-LOG는 append-only다.
   - QA-LOG의 각 항목은 `qa_id`를 가진다.
   - `qa_id`는 DB의 note_chunks.chunk_id와 연결된다.
+  - 토픽 노트는 사람이 주제 흐름을 읽는 성장형 기록이고, `note_chunks`는 QA-LOG에서 재생성 가능한 AI 검색 인덱스다.
+  - 하나의 Q&A는 primary topic 하나에만 저장하고, 다른 주제와의 관련성은 링크와 note_edges로 표현한다.
   - Codex는 원본 Q&A를 삭제하거나 재작성하지 않는다.
   - Codex는 CODEX-SUMMARY, CODEX-TAGS, CODEX-LINKS, CODEX-PROPOSALS 구역만 수정한다.
   - split/merge는 Codex가 먼저 제안하고, 사용자가 승인한 뒤 수행한다.
@@ -83,6 +85,28 @@
       - Claude/GPT가 제안한 저장·분열·병합 후보를 안전 규칙 안에서 처리한다.
 
   Codex는 답변 모델이 아니라, Obsidian 서재를 관리하는 정리 담당자다.
+
+  ### 토픽 노트 역할 경계
+
+  토픽 노트 방식을 원자 노트 체계로 교체하지 않는다. 대화형 비서에서는 같은 주제의 시간 흐름을 한곳에서 읽는 장점이 크고, Q&A마다 파일을 만들면 저장 판단과 분류 부담이 커진다.
+
+  대신 저장 단위와 회수 단위를 분리한다.
+
+  - 토픽 노트: 사람이 읽고 연결하는 주제별 dossier
+  - QA-LOG: 해당 토픽에 속한 Q&A의 append-only 원본
+  - CODEX-SUMMARY: 현재 상태를 빠르게 읽는 파생 요약
+  - note_chunks: AI가 실제로 검색하는 Q&A 단위 파생 인덱스
+  - 구조화 메모리/task: 변경·완료·승인 상태가 필요한 SQLite 기록
+
+  토픽이 길어지는 것 자체는 오류가 아니다. AI가 긴 파일 전체를 매번 넣지 않고 관련 청크만 회수해야 한다. 별도 맥락으로 계속 성장할 만큼 의미 경계가 분명할 때만 split하고, 여러 토픽과 관련된 내용은 복제 대신 링크·edge로 연결한다.
+
+  정본 경계:
+
+  - 대화 원문은 SQLite messages가 보존한다.
+  - topic에 속한 Q&A와 사람에게 보이는 내용은 Markdown QA-LOG를 기준으로 한다.
+  - note_chunks와 임베딩은 QA-LOG에서 다시 만들 수 있어야 한다.
+  - validity, provenance, 승인, task 상태는 SQLite를 기준으로 한다.
+  - CODEX 요약·태그·링크는 원문을 대체하지 않는 파생 결과다.
 
   ## 2. 저장 정책
 
@@ -140,7 +164,7 @@
       chunk가 속한 Obsidian 노트 파일명
 
   note_title
-      chunk가 속한 노트 제목
+      chunk가 속한 노트 제목의 호환 캐시. 정본으로 신뢰하지 않고 표시·검색 시 현재 notes/파일 제목을 사용한다.
 
   chunk_type
       topic_qa 등 chunk 종류
@@ -347,19 +371,18 @@
   - 활성 노트 우선
   - 질문 기반 자동 노트 검색
   - 노트/메시지 임베딩 검색
+  - A1 `note_chunks` shadow 검색과 식별자·점수 trace. 실제 답변은 아직 기존 노트 앞부분 회수를 사용
 
   다음:
 
-  - 토픽 노트 우선 검색
-  - frontmatter를 제외한 의미 본문 중심 임베딩
-  - 토픽 제목, AI 회수 힌트, CODEX-SUMMARY, QA-LOG를 분리해 검색 품질 관리
-  - notes 테이블 기반 필터링
-  - archived 제외
-  - codex_status 활용
+  - S0에서 QA-LOG와 note_chunks의 hash·ID 일치 audit/reindex
+  - append/split/merge/archive의 공용 parser와 쓰기 직렬화
+  - 전역 topic 청크 검색에 토픽 제목·태그·요약·노트 임베딩을 soft prior로 결합
+  - archived·source_missing·invalidated 제외와 요청 전체 8,000자 상한
+  - A1 shadow 평가를 통과한 뒤 A2 실제 답변 회수로 전환
 
   나중:
 
-  - note_chunks 테이블 기반 청크 임베딩
   - 주제별 인덱스와 hot cache
   - note_edges 기반 연결 그래프 회수
   - BM25 + embedding + rerank 하이브리드
@@ -565,10 +588,10 @@
 
 ### 현재 진행 상태 (구현)
 
-> 갱신: 2026-07-15. 단계 구분은 `roadmap.md`(V1~V7) 기준.
+> 갱신: 2026-07-16. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 저장 상태 복원 수정, V4 논문 검색 1·2차, 논문 서재와 일반 노트 열람·공개 PDF 링크·Clawd 패널 이동, 알림센터 최근 저장, 2.5A 파서·로컬 색인/검색·Phase C 전문 능동 독서까지 Pi 배포 완료 (`c9bf470`, `4c3d07f`, `1078df5`, `5d28d73`, `6bd1f57`). Phase C는 전체 테스트 47개와 TradingAgents 초록 1개·전문 1개 실제 스모크를 통과했다. 실제 브라우저 PDF 열기와 Codex paper 태그·링크 처리가 별도로 남았다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
-- **다음 단계 설계:** V4-B 음성보다 먼저 V4.5 비서 기본기를 진행한다. 기존 `note_chunks`를 실제 답변 회수에 연결하고 최신성·provenance·Q&A invalidation·평가 trace를 보강한 뒤, 할 일·기한·알림·후속 확인의 약속 루프를 추가한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다. 현재는 문서 설계만 확정했고 구현 전이다.
+- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서까지 Pi 배포를 마쳤고, V4.5 A0 기준선과 A1 청크 회수 shadow mode를 구현했다(`3a96ff3`, `c5e5d04`). A1은 실제 답변을 바꾸지 않고 새 evidence 식별자·점수·상한만 기록한다. 합성 shadow는 note/chunk 20/20이었지만 Pi 실사용은 note 15/20, chunk 9/20, abstention 0/4라 아직 전환 기준을 통과하지 못했다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
+- **다음 단계 설계:** A2 실제 답변 전환 전에 S0 저장 무결성을 진행한다. Markdown QA-LOG와 SQLite 청크의 ID/hash를 감사·재색인하고 append/split/merge/archive 쓰기를 공용 경로로 직렬화한다. 그 뒤 A1b에서 전역 청크 검색+노트 soft prior와 무관 evidence 중단을 shadow로 보정한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
