@@ -85,9 +85,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **프로젝트 현재 상태**
 
-- 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크, Clawd 패널 이동, 알림센터 `최근 저장`, 2.5A Phase A/B/C와 유지보수 리뷰 버그 1~9까지 Pi 배포 완료 (`c9bf470`, `4c3d07f`, `1078df5`, `5d28d73`, `fd615c7`, `6bd1f57`). V4.5 A0 기준선과 A1 청크 회수 shadow mode(`3a96ff3`, `c5e5d04`)도 Pi에 배포했고 전체 테스트 58개를 통과했다.
-- 현재 개발 상태: A1 shadow는 실제 답변을 기존 회수로 유지한 채 노트 최대 3개·청크 최대 6개·총 8,000자 evidence만 기록한다. Pi 비공개 실사용은 note 15/20·chunk 9/20·abstention 0/4라 A2 전환 전이다. S0a 읽기 전용 topic audit(`575205a`)는 로컬 구현을 완료했고 QA 7/7 일치, UUID형 assistant source 참조 오류 1건, DB SHA-256 불변, 전체 테스트 64개를 확인했다. Pi에는 아직 배포하지 않았다.
-- 다음 개발 시작점: S0a를 Pi에 배포해 `npm run audit:topics`로 기존 4개 topic QA ID 불일치·제목 캐시 8개·source 참조 1개를 읽기 전용으로 재현한다. 결과를 확인한 뒤 S0b schema·재색인·복구 범위를 다시 설명하고 컨펌받는다. 토픽 노트 구조는 유지하고 Markdown QA-LOG를 topic Q&A의 기준, `note_chunks`를 재생성 가능한 검색 인덱스로 둔다. 그 뒤 공용 쓰기 경로와 A1b 전역 청크 검색+노트 soft prior를 진행한다. V4.5 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며 Pi `.env`는 `PAPER_SEARCH_MOCK=false`, `npm audit` 기존 경고는 자동 수정하지 않는다.
+- 현재 배포 상태: V4 논문 검색 1·2차, 논문 서재 UI, 일반 노트 읽기, 공개 PDF 외부 링크, Clawd 패널 이동, 알림센터 `최근 저장`, 2.5A Phase A/B/C와 유지보수 리뷰 버그 1~9까지 Pi 배포 완료 (`c9bf470`, `4c3d07f`, `1078df5`, `5d28d73`, `fd615c7`, `6bd1f57`). V4.5 A0 기준선·A1 청크 회수 shadow mode와 S0a 읽기 전용 topic audit(`3a96ff3`, `c5e5d04`, `575205a`)도 Pi에 배포했고 전체 테스트 64개를 통과했다.
+- 현재 개발 상태: A1 shadow는 실제 답변을 기존 회수로 유지한 채 노트 최대 3개·청크 최대 6개·총 8,000자 evidence만 기록한다. Pi 비공개 실사용은 note 15/20·chunk 9/20·abstention 0/4라 A2 전환 전이다. S0a Pi 감사에서는 활성 topic 13개의 파일 QA 57개·DB QA 60개 중 55개가 고유하게 일치했다. 중복 ID 1건(파일 2개), DB-only 4건, 제목 drift 8건, 잘못된 assistant source 참조 1건, 보관 노트 청크 1건을 확인했고 malformed·file-only·배정 drift·고아·임베딩 누락은 0건이었다. 감사 전후 DB SHA-256은 같고 서비스는 정상이다.
+- 다음 개발 시작점: S0b에서 중복 QA ID 두 본문의 내용·DB 배정·source를 대조해 ID 소유권을 정하고, DB-only 청크의 `source_missing` 처리와 재색인을 구분한 dry-run 복구 계획을 만든다. 실제 데이터 변경은 백업과 별도 컨펌 뒤에만 한다. 토픽 노트 구조는 유지하고 Markdown QA-LOG를 topic Q&A의 기준, `note_chunks`를 재생성 가능한 검색 인덱스로 둔다. 그 뒤 공용 쓰기 경로와 A1b 전역 청크 검색+노트 soft prior를 진행한다. V4.5 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며 Pi `.env`는 `PAPER_SEARCH_MOCK=false`, `npm audit` 기존 경고는 자동 수정하지 않는다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
 - 코드 구조 방향: `server.js`는 현재 5,734줄. 기존 코드를 한꺼번에 분해하지 말고, V4.5는 topic-store·migration·retrieval·memory·trace·task·scheduler를 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것

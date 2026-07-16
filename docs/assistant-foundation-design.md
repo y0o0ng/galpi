@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-16
 >
-> 상태: A0·A1 shadow와 S0a 읽기 전용 audit 로컬 구현 완료, Pi audit와 S0b 복구 구현 전
+> 상태: A0·A1 shadow와 S0a 읽기 전용 audit Pi 검증 완료, S0b 복구 설계·구현 전
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -583,7 +583,9 @@ Pi 실사용 shadow는 note Recall@3 15/20, chunk Recall@6 9/20, abstention 0/4,
 
 ### S0. 토픽 저장 무결성 (A2 전 필수)
 
-S0a 읽기 전용 감사 기반은 `575205a`에서 로컬 구현했다. 날짜 제목+`qa_id`를 함께 보는 QA-LOG 파서, CRLF·trailing space를 정규화한 note/QA SHA-256, Markdown/DB의 file-only·DB-only·배정 drift·중복·제목·source 참조를 분리하는 `npm run audit:topics`를 추가했다. 실제 로컬 DB·vault에서는 QA 7/7이 일치했고 기존 UUID형 assistant source 참조 1건만 검출했다. 실행 전후 DB SHA-256은 같았고 전체 테스트 64개를 통과했다. Pi 배포·실행과 데이터 복구는 아직 하지 않았다.
+S0a 읽기 전용 감사 기반은 `575205a`에서 구현해 Pi까지 배포·검증했다. 날짜 제목+`qa_id`를 함께 보는 QA-LOG 파서, CRLF·trailing space를 정규화한 note/QA SHA-256, Markdown/DB의 file-only·DB-only·배정 drift·중복·제목·source 참조를 분리하는 `npm run audit:topics`를 추가했다. Pi의 활성 topic 13개에서 파일 QA 57개·DB QA 60개 중 55개가 고유하게 일치했다. malformed·file-only·배정 drift·고아·임베딩 누락은 0건이고, 동일 `qa_id`가 두 토픽 파일에 들어간 중복 1건, DB-only 4건, 제목 drift 8건, 형식이 잘못된 assistant source 참조 1건, 보관 노트 청크 1건을 확인했다. 전체 테스트 64개를 통과했고 감사 전후 `council.db` SHA-256도 같았다. 자동 복구·schema 변경·데이터 수정은 하지 않았다.
+
+S0b는 중복 `qa_id` 두 본문의 내용·DB 배정·source를 먼저 대조해 어느 항목의 ID를 유지할지 명시적인 복구 계획으로 만든다. DB-only 청크는 즉시 삭제하지 않고 `source_missing` 처리와 재색인 가능성을 구분하며, 백업·dry-run·사용자 컨펌 뒤에만 적용한다.
 
 - [ ] `schema_version`과 순차 migration을 별도 모듈로 관리
 - [ ] 모든 append·split·merge·archive를 공용 topic mutation queue와 QA-LOG parser로 통과
