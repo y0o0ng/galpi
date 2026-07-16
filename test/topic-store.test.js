@@ -8,11 +8,14 @@ const path = require('node:path');
 const Database = require('better-sqlite3');
 const {
   auditTopicStore,
+  buildTopicRepairPlan,
+  formatTopicRepairPlan,
   formatTopicStoreAudit,
   parseQaLog,
   parseTopicNote,
 } = require('../lib/topic-store');
 const { parseArguments } = require('../scripts/audit-topic-store');
+const { helpText: repairHelpText } = require('../scripts/plan-topic-repair');
 
 function qaEntry(qaId, question, answer, stamp = '2026-07-16 09:00') {
   return [
@@ -22,6 +25,14 @@ function qaEntry(qaId, question, answer, stamp = '2026-07-16 09:00') {
     '',
     `**A:** ${answer}`,
   ].join('\n');
+}
+
+function chunkContent(question, answer, model = '') {
+  return [
+    model ? `모델: ${model}` : '',
+    `Q: ${question}`,
+    `A: ${answer}`,
+  ].filter(Boolean).join('\n');
 }
 
 function topicNote(title, entries) {
@@ -65,10 +76,20 @@ function createDatabase() {
       note_filename TEXT NOT NULL,
       note_title TEXT NOT NULL,
       chunk_type TEXT NOT NULL,
+      content TEXT NOT NULL,
       source_session TEXT,
       source_user_message,
       source_assistant_message,
       embedding TEXT
+    );
+    CREATE TABLE auto_save_decisions (
+      id INTEGER PRIMARY KEY,
+      qa_id TEXT,
+      note_filename TEXT,
+      source_user_message,
+      source_assistant_message,
+      decision TEXT,
+      action TEXT
     );
   `);
   return db;
@@ -170,17 +191,17 @@ test('topic store audit separates repairable drift from unverifiable notes', asy
 
   const insertChunk = db.prepare(`
     INSERT INTO note_chunks (
-      chunk_id, note_filename, note_title, chunk_type,
+      chunk_id, note_filename, note_title, chunk_type, content,
       source_session, source_user_message, source_assistant_message, embedding
-    ) VALUES (?, ?, ?, 'topic_qa', ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, 'topic_qa', ?, ?, ?, ?, ?)
   `);
-  insertChunk.run('qa-a111', 'alpha.md', 'Alpha Cached', 'session-1', 1, 2, '[]');
-  insertChunk.run('qa-e555', 'alpha.md', 'Alpha Current', 'session-1', null, 'not-an-id', null);
-  insertChunk.run('qa-c333', 'alpha.md', 'Alpha Current', null, null, null, '[]');
-  insertChunk.run('qa-f666', 'bad.md', 'Bad', null, null, null, '[]');
-  insertChunk.run('qa-a777', 'archived.md', 'Archived', null, null, null, '[]');
-  insertChunk.run('qa-a888', 'orphan.md', 'Orphan', null, null, null, '[]');
-  insertChunk.run('qa-a999', 'highlight.md', 'Highlight', null, null, null, '[]');
+  insertChunk.run('qa-a111', 'alpha.md', 'Alpha Cached', chunkContent('일치 질문', '일치 답변'), 'session-1', 1, 2, '[]');
+  insertChunk.run('qa-e555', 'alpha.md', 'Alpha Current', chunkContent('DB 전용 질문', 'DB 전용 답변'), 'session-1', null, 'not-an-id', null);
+  insertChunk.run('qa-c333', 'alpha.md', 'Alpha Current', chunkContent('배정 질문', '배정 답변'), null, null, null, '[]');
+  insertChunk.run('qa-f666', 'bad.md', 'Bad', chunkContent('확인 불가', '확인 불가'), null, null, null, '[]');
+  insertChunk.run('qa-a777', 'archived.md', 'Archived', chunkContent('보관 질문', '보관 답변'), null, null, null, '[]');
+  insertChunk.run('qa-a888', 'orphan.md', 'Orphan', chunkContent('고아 질문', '고아 답변'), null, null, null, '[]');
+  insertChunk.run('qa-a999', 'highlight.md', 'Highlight', chunkContent('다른 타입', '다른 타입'), null, null, null, '[]');
 
   const report = await auditTopicStore({ db, vaultPath });
   const repeated = await auditTopicStore({ db, vaultPath });
@@ -221,6 +242,17 @@ test('topic store audit separates repairable drift from unverifiable notes', asy
   );
   assert.match(formatTopicStoreAudit(report), /Topic store audit: needs attention/);
 
+  const plan = buildTopicRepairPlan(report);
+  assert.deepEqual(buildTopicRepairPlan(repeated), plan);
+  assert.equal(plan.status, 'manual_review');
+  assert.equal(
+    plan.operations.find(item => item.kind === 'db_only_chunk').recommendation.action,
+    'mark_source_missing'
+  );
+  assert.equal(plan.operations.find(item => item.kind === 'assignmentDrift').status, 'manual_review');
+  assert.match(formatTopicRepairPlan(plan), /files and DB are not modified/);
+  assert.doesNotMatch(JSON.stringify(plan), /일치 답변|DB 전용 답변/);
+
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM notes').get().count, 6);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM note_chunks').get().count, 7);
 });
@@ -239,7 +271,8 @@ test('topic store audit passes a matching topic without changing data', async t 
   db.prepare("INSERT INTO messages VALUES (1, 'session-1'), (2, 'session-1')").run();
   db.prepare(`
     INSERT INTO note_chunks VALUES (
-      'qa-a111', 'topic.md', 'Topic', 'topic_qa', 'session-1', 1, 2, '[]'
+      'qa-a111', 'topic.md', 'Topic', 'topic_qa',
+      'Q: 질문\nA: 답변', 'session-1', 1, 2, '[]'
     )
   `).run();
 
@@ -247,6 +280,7 @@ test('topic store audit passes a matching topic without changing data', async t 
   assert.equal(report.healthy, true);
   assert.equal(report.summary.matchedQa, 1);
   assert.match(formatTopicStoreAudit(report), /Topic store audit: passed/);
+  assert.equal(buildTopicRepairPlan(report).status, 'clean');
 });
 
 test('topic store audit reports the same qa_id appearing in multiple topic files', async t => {
@@ -264,7 +298,13 @@ test('topic store audit reports the same qa_id appearing in multiple topic files
   db.prepare("INSERT INTO notes VALUES ('a.md', 'A', 'topic', 0), ('b.md', 'B', 'topic', 0)").run();
   db.prepare(`
     INSERT INTO note_chunks VALUES (
-      'qa-a111', 'a.md', 'A', 'topic_qa', NULL, NULL, NULL, '[]'
+      'qa-a111', 'a.md', 'A', 'topic_qa',
+      'Q: 첫 질문\nA: 첫 답변', NULL, NULL, NULL, '[]'
+    )
+  `).run();
+  db.prepare(`
+    INSERT INTO auto_save_decisions VALUES (
+      1, 'qa-a111', 'a.md', NULL, NULL, 'save', 'created'
     )
   `).run();
 
@@ -277,6 +317,17 @@ test('topic store audit reports the same qa_id appearing in multiple topic files
   assert.equal(report.summary.matchedQa, 0);
   assert.equal(report.summary.fileOnlyQa, 0);
   assert.equal(report.summary.dbOnlyChunks, 0);
+
+  const plan = buildTopicRepairPlan(report);
+  const duplicate = plan.operations.find(item => item.kind === 'duplicate_file_qa');
+  assert.equal(duplicate.status, 'manual_review');
+  assert.equal(duplicate.recommendation.preserveQaIdIn, 'a.md');
+  assert.deepEqual(duplicate.recommendation.assignNewQaIdIn, ['b.md']);
+  assert.deepEqual(duplicate.evidence.ownerSignals, {
+    dbAssignment: ['a.md'],
+    autoSaveDecision: ['a.md'],
+    contentMatch: ['a.md'],
+  });
 });
 
 test('topic audit CLI arguments reject unknown or incomplete options', () => {
@@ -288,4 +339,5 @@ test('topic audit CLI arguments reject unknown or incomplete options', () => {
   });
   assert.throws(() => parseArguments(['--db']), /파일 경로/);
   assert.throws(() => parseArguments(['--write']), /알 수 없는 인자/);
+  assert.match(repairHelpText(), /readonly\/query_only/);
 });

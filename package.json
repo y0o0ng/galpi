@@ -8,6 +8,7 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "audit:topics": "node scripts/audit-topic-store.js",
+    "plan:topic-repair": "node scripts/plan-topic-repair.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
     "mcp:obsidian": "node scripts/ai-council-mcp.mjs"
   },
