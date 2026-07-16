@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-16
 >
-> 상태: A0 기준선 고정과 A1 청크 회수 shadow mode 구현 완료, S0 저장 무결성 보강 전
+> 상태: A0·A1 shadow와 S0a 읽기 전용 audit 로컬 구현 완료, Pi audit와 S0b 복구 구현 전
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -583,12 +583,14 @@ Pi 실사용 shadow는 note Recall@3 15/20, chunk Recall@6 9/20, abstention 0/4,
 
 ### S0. 토픽 저장 무결성 (A2 전 필수)
 
+S0a 읽기 전용 감사 기반은 `575205a`에서 로컬 구현했다. 날짜 제목+`qa_id`를 함께 보는 QA-LOG 파서, CRLF·trailing space를 정규화한 note/QA SHA-256, Markdown/DB의 file-only·DB-only·배정 drift·중복·제목·source 참조를 분리하는 `npm run audit:topics`를 추가했다. 실제 로컬 DB·vault에서는 QA 7/7이 일치했고 기존 UUID형 assistant source 참조 1건만 검출했다. 실행 전후 DB SHA-256은 같았고 전체 테스트 64개를 통과했다. Pi 배포·실행과 데이터 복구는 아직 하지 않았다.
+
 - [ ] `schema_version`과 순차 migration을 별도 모듈로 관리
 - [ ] 모든 append·split·merge·archive를 공용 topic mutation queue와 QA-LOG parser로 통과
 - [ ] 파일은 임시 파일+rename으로 쓰고, 관련 DB 변경은 하나의 transaction으로 처리
 - [ ] 다중 파일 변경은 원본 snapshot을 두고 실패 시 복원하며, 프로세스 중단은 다음 audit에서 감지
 - [ ] `content_sha256`, `indexed_sha256`, `index_status`로 Markdown과 검색 인덱스의 일치 여부 기록
-- [ ] dry-run audit에서 malformed QA, file-only QA, DB-only 청크, source 참조 오류를 분리 보고
+- [x] dry-run audit에서 malformed QA, file-only QA, DB-only 청크, source 참조 오류를 분리 보고
 - [ ] file-only QA는 재색인하고 DB-only 청크는 조용히 삭제하지 않고 `source_missing`으로 회수 제외
 - [ ] `note_chunks.note_title`은 호환 캐시로만 두고 표시·검색 제목은 `notes` 조인 또는 현재 파일 메타데이터 사용
 - [ ] 현재 4개 topic의 QA ID 불일치와 8개 제목 drift를 검토·복구한 뒤 Pi audit 0건 확인

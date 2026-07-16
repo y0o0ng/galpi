@@ -590,8 +590,8 @@
 
 > 갱신: 2026-07-16. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서까지 Pi 배포를 마쳤고, V4.5 A0 기준선과 A1 청크 회수 shadow mode를 구현했다(`3a96ff3`, `c5e5d04`). A1은 실제 답변을 바꾸지 않고 새 evidence 식별자·점수·상한만 기록한다. 합성 shadow는 note/chunk 20/20이었지만 Pi 실사용은 note 15/20, chunk 9/20, abstention 0/4라 아직 전환 기준을 통과하지 못했다. Pi가 기본 런타임이며 Mac은 개발/편집 보조로 둔다.
-- **다음 단계 설계:** A2 실제 답변 전환 전에 S0 저장 무결성을 진행한다. Markdown QA-LOG와 SQLite 청크의 ID/hash를 감사·재색인하고 append/split/merge/archive 쓰기를 공용 경로로 직렬화한다. 그 뒤 A1b에서 전역 청크 검색+노트 soft prior와 무관 evidence 중단을 shadow로 보정한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
+- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0 기준선과 A1 청크 회수 shadow mode까지 Pi에 배포했다(`3a96ff3`, `c5e5d04`). S0a 읽기 전용 topic audit는 로컬 구현을 완료했다(`575205a`). QA-LOG 구조·hash와 Markdown/DB drift를 데이터 수정 없이 검사하며 로컬 QA 7/7 일치, source 참조 오류 1건, 전체 테스트 64개를 확인했다. S0a는 아직 Pi에 배포하지 않았다.
+- **다음 단계 설계:** Pi에서 S0a audit 결과를 재현한 뒤 S0b schema·재색인·복구를 별도 컨펌받아 구현한다. 그다음 append/split/merge/archive 공용 쓰기 경로와 A1b 전역 청크 검색+노트 soft prior를 진행한다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.

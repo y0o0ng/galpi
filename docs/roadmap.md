@@ -215,7 +215,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0 기준선 고정과 A1 청크 회수 shadow mode 구현 완료. S0 저장 무결성과 A1b 검색 보정이 다음이며, V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
+> 상태: A0·A1 shadow와 S0a 읽기 전용 audit 로컬 구현 완료. Pi audit와 S0b 복구, A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -224,6 +224,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 ### S0 — 저장 무결성 (다음)
 
 > 2026-07-16 읽기 전용 점검에서 외래키 오류·고아 청크·임베딩 누락은 0건이었지만, 활성 topic 4개의 QA ID가 Markdown과 DB에서 달랐다. 파일에만 있는 QA 1개, DB에만 있는 청크 4개, 오래된 청크 제목 8개, 원본 메시지를 찾지 못한 source 참조 1개가 확인됐다. 용량 문제는 아니며, A2 실제 답변 전환 전에 복구 규칙을 보강한다.
+
+> S0a 로컬 구현 완료 (`575205a`, 2026-07-16): QA-LOG 구조 파서와 결정적 SHA-256, SQLite readonly/query_only 감사 CLI, malformed·중복·file-only·DB-only·배정 drift·제목·source 참조 fixture를 추가했다. 로컬 실제 데이터는 QA 7/7 일치와 UUID형 assistant source 참조 1건을 검출했고 DB hash 불변, 전체 테스트 64개를 확인했다. Pi에는 아직 배포하지 않았고 자동 복구·schema 변경도 없다.
 
 1. schema version과 순차 migration을 별도 모듈로 관리
 2. append·split·merge·archive를 공용 QA-LOG parser와 topic mutation queue로 직렬화
