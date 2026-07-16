@@ -215,7 +215,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow, S0a audit, S0b-1 readonly 복구 계획 Pi 검증 완료. S0b-2 적용과 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
+> 상태: A0·A1 shadow, S0a audit, S0b-1 Pi 검증, S0b-2a 무결성 기반 로컬 구현 완료. S0b-2b 승인형 적용과 A1b 검색 보정이 다음이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -229,13 +229,15 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > S0b-1 Pi 검증 완료 (`fdabe05`, `8c2d490`, 2026-07-16): `npm run plan:topic-repair`가 원문 대신 본문 hash·DB 배정·자동저장 provenance와 입력 상태 hash를 기록한다. 계획 15건은 적용 후보 13건(제목 캐시 8, DB-only `source_missing` 4, 보관 청크 제외 1)과 수동 2건으로 분리됐다. M60 Q&A의 완전 동일 복사본은 향수 토픽에서 제거하고 M60 ID를 유지하는 근거가 확인됐으며, UUID형 source 참조는 legacy provenance로 보존한다. Pi 전체 테스트 65개 통과, 실행 전후 DB hash 동일, 서비스 `active`를 확인했다.
 
-> S0b-2는 schema migration과 백업, 계획 입력 hash 재검증, 승인된 작업 적용, 재감사를 하나의 명시적 절차로 만든다. 실제 파일·DB 변경 범위는 구현 전에 다시 컨펌받는다.
+> S0b-2a 로컬 구현 완료 (`699d1e9`, 2026-07-16): `schema_version` 기반 순차 migration, `note_chunks.content_sha256`, `ready | source_missing`, 공용 청크 저장 모듈을 추가했다. `source_missing`은 SQL 조회·랭커·저장 상태·감사 일치 집계에서 제외하고, 같은 자동저장 근거가 확인된 UUID형 source만 legacy provenance로 분류한다. 본문 hash 변경 시 오래된 임베딩을 비우며, 구형 DB 호환과 migration 멱등성을 포함한 전체 테스트 70개를 통과했다. 실제 로컬·Pi 운영 DB와 vault는 변경하지 않았다.
 
-1. schema version과 순차 migration을 별도 모듈로 관리
-2. append·split·merge·archive를 공용 QA-LOG parser와 topic mutation queue로 직렬화
-3. 원자적 파일 교체, DB transaction, hash 기반 audit/reindex로 중단 복구
-4. Markdown-only QA는 재색인하고 DB-only 청크는 `source_missing`으로 회수 제외
-5. 현재 불일치를 백업 후 복구하고 Pi dry-run audit 0건 확인
+> S0b-2b는 백업, 계획 입력 hash 재검증, 승인된 작업 적용, 재감사를 하나의 명시적 절차로 만든다. `699d1e9` 배포는 서버 시작 시 Pi DB migration을 실행하므로 apply CLI 구현 후 실제 파일·DB 변경 범위를 다시 컨펌받는다.
+
+1. [x] schema version과 순차 migration을 별도 모듈로 관리
+2. [ ] append·split·merge·archive를 공용 QA-LOG parser와 topic mutation queue로 직렬화
+3. [ ] 원자적 파일 교체, DB transaction, hash 기반 audit/reindex로 중단 복구
+4. [ ] Markdown-only QA는 재색인하고 DB-only 청크는 `source_missing`으로 표시. 회수 제외 기반은 로컬 완료
+5. [ ] 현재 불일치를 백업 후 복구하고 Pi dry-run audit 0건 확인
 
 ### A — 기억 신뢰성
 
