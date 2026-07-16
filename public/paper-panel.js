@@ -8,6 +8,7 @@
     apiFetch: null,
     showToast: null,
     icons: null,
+    contextNotes: null,
     activeTab: 'notes',
   };
 
@@ -244,7 +245,11 @@
       const fullTextUrl = normalizeExternalUrl(metadata.open_access_pdf_url) || arxivPdfUrl(metadata.arxiv_id);
       const sourceUrl = normalizeExternalUrl(metadata.url);
       const actions = makePaperActions(fullTextUrl, sourceUrl);
-      if (actions.childElementCount > 0) content.appendChild(actions);
+      actions.prepend(state.contextNotes.makeToggle({
+        filename: note.filename,
+        title: data.note.title || note.title || note.filename,
+      }));
+      content.appendChild(actions);
 
       const article = document.createElement('article');
       article.className = 'knowledge-note-detail';
@@ -381,7 +386,7 @@
     }
   }
 
-  function init({ apiFetch, showToast, icons }) {
+  function init({ apiFetch, showToast, icons, contextNotes }) {
     if (state.initialized) return;
     const el = elements();
     const required = [
@@ -391,6 +396,7 @@
     if (
       typeof apiFetch !== 'function'
       || typeof showToast !== 'function'
+      || typeof contextNotes?.makeToggle !== 'function'
       || !icons?.save || !icons?.check || !icons?.loading
       || required.some(item => !item)
       || el.tabs.length === 0
@@ -398,10 +404,11 @@
       throw new Error('논문 패널 필수 요소를 찾지 못했습니다.');
     }
 
-    global.NotePanel?.init({ apiFetch });
+    global.NotePanel?.init({ apiFetch, contextNotes });
     state.apiFetch = apiFetch;
     state.showToast = showToast;
     state.icons = icons;
+    state.contextNotes = contextNotes;
     el.toggle.addEventListener('click', () => {
       if (el.panel.classList.contains('open')) close();
       else open();

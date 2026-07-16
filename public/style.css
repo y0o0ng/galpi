@@ -1059,7 +1059,7 @@ html, body {
 .note-card {
   background: rgba(255,255,255,0.7);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--success);
+  border-left: 3px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   box-shadow: var(--shadow-sm);
@@ -1072,9 +1072,8 @@ html, body {
 
 [data-theme="dark"] .note-card { background: rgba(255, 255, 255, 0.055); }
 
-.note-card-inactive {
-  opacity: 0.45;
-  border-left-color: var(--border);
+.note-card-context-active {
+  border-left-color: var(--success);
 }
 
 .note-card-title {
@@ -1091,6 +1090,13 @@ html, body {
   white-space: pre-wrap;
   word-break: break-word;
   margin-bottom: 5px;
+}
+
+.note-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 .note-card-remove {
@@ -1111,6 +1117,46 @@ html, body {
 }
 
 .note-card-remove:disabled { opacity: 0.4; cursor: default; }
+
+.context-note-toggle {
+  min-height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--label);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.context-note-toggle svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.context-note-toggle:hover {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.context-note-toggle.active {
+  border-color: rgba(52, 199, 89, 0.42);
+  background: rgba(52, 199, 89, 0.09);
+  color: var(--success);
+}
+
+[data-theme="dark"] .context-note-toggle.active {
+  background: rgba(52, 199, 89, 0.14);
+}
 
 /* ── 선택 병합 트레이 ───────────────────────────────────── */
 

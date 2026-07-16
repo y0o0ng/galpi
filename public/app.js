@@ -14,7 +14,7 @@ let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
 let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
 let isRestoringHistory = false;
 const slashCommands = [
-  { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 활성 컨텍스트에 추가' },
+  { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 필요한 항목을 선택' },
   { command: '/paper ', title: '논문 검색', description: 'Semantic Scholar에서 관련 논문 검색' },
   { command: '/web ', title: '웹 검색', description: '외부 웹 검색 결과를 같은 근거로 모델에 주입' },
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
@@ -1126,6 +1126,9 @@ function initPaperPanel() {
     window.PaperPanel.init({
       apiFetch,
       showToast,
+      contextNotes: {
+        makeToggle: makeContextNoteToggle,
+      },
       icons: {
         save: saveIconSvg,
         check: checkIconSvg,
@@ -1378,11 +1381,10 @@ function renderSearchResults(results) {
 
   const header = document.createElement('div');
   header.className = 'search-header';
-  header.textContent = `${results.length}개 발견 — 컨텍스트로 쓰거나, 체크해서 병합`;
+  header.textContent = `${results.length}개 발견 — 필요한 노트만 컨텍스트에 추가하거나, 체크해서 병합`;
   wrap.appendChild(header);
 
   results.forEach(note => {
-    addActiveNote(note);
     wrap.appendChild(makeNoteCard(note));
   });
 
@@ -1400,7 +1402,6 @@ function renderSearchResults(results) {
 
   getMessages().appendChild(wrap);
   scrollDown();
-  updateNotesBar();
 }
 
 // 체크된 노트 수에 따라 병합 트레이를 띄우거나(없으면 생성) 카운트만 갱신
@@ -1671,6 +1672,7 @@ function makeNoteCard(note) {
   const card = document.createElement('div');
   card.className = 'note-card';
   card.dataset.filename = note.filename;
+  card.classList.toggle('note-card-context-active', isActiveNote(note.filename));
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
@@ -1686,15 +1688,7 @@ function makeNoteCard(note) {
   excerpt.className = 'note-card-excerpt';
   excerpt.textContent = note.excerpt;
 
-  const removeBtn = document.createElement('button');
-  removeBtn.className = 'note-card-remove';
-  removeBtn.textContent = '컨텍스트 제거';
-  removeBtn.addEventListener('click', () => {
-    removeActiveNote(note.filename);
-    card.classList.toggle('note-card-inactive', !activeNotes.find(n => n.filename === note.filename));
-    removeBtn.textContent = '제거됨';
-    removeBtn.disabled = true;
-  });
+  const contextBtn = makeContextNoteToggle(note);
 
   const archiveBtn = document.createElement('button');
   archiveBtn.className = 'note-card-remove';
@@ -1708,7 +1702,11 @@ function makeNoteCard(note) {
   mergeBtn.title = '이 노트를 다른 토픽에 흡수하거나 새 토픽으로 묶기';
   mergeBtn.addEventListener('click', () => mergeNoteFromCard(note.filename, card));
 
-  card.append(checkbox, title, excerpt, removeBtn, archiveBtn, mergeBtn);
+  const actions = document.createElement('div');
+  actions.className = 'note-card-actions';
+  actions.append(contextBtn, archiveBtn, mergeBtn);
+
+  card.append(checkbox, title, excerpt, actions);
   return card;
 }
 
@@ -2678,16 +2676,70 @@ function escapeHtml(value) {
 }
 
 function addActiveNote(note) {
-  if (!activeNotes.find(n => n.filename === note.filename)) {
-    activeNotes.push({ filename: note.filename, title: note.title });
-    saveActiveNotes();
-  }
+  const filename = String(note?.filename || '').trim();
+  if (!filename || isActiveNote(filename)) return false;
+  const title = String(note?.title || filename).trim() || filename;
+  activeNotes.push({ filename, title });
+  saveActiveNotes();
+  refreshActiveNotesUi();
+  return true;
 }
 
 function removeActiveNote(filename) {
-  activeNotes = activeNotes.filter(n => n.filename !== filename);
+  const next = activeNotes.filter(n => n.filename !== filename);
+  if (next.length === activeNotes.length) return false;
+  activeNotes = next;
   saveActiveNotes();
+  refreshActiveNotesUi();
+  return true;
+}
+
+function isActiveNote(filename) {
+  return activeNotes.some(note => note.filename === filename);
+}
+
+function toggleActiveNote(note) {
+  if (!note?.filename) return false;
+  if (isActiveNote(note.filename)) removeActiveNote(note.filename);
+  else addActiveNote(note);
+  return isActiveNote(note.filename);
+}
+
+function refreshActiveNotesUi() {
   updateNotesBar();
+  syncContextNoteControls();
+}
+
+function makeContextNoteToggle(note) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'context-note-toggle';
+  button.dataset.contextFilename = note.filename;
+  button.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleActiveNote(note);
+  });
+  syncContextNoteToggle(button);
+  return button;
+}
+
+function syncContextNoteToggle(button) {
+  const active = isActiveNote(button.dataset.contextFilename);
+  button.classList.toggle('active', active);
+  button.setAttribute('aria-pressed', String(active));
+  button.title = active ? '컨텍스트에서 제거' : '컨텍스트에 추가';
+  button.setAttribute('aria-label', button.title);
+  button.innerHTML = active
+    ? `${checkIconSvg()}<span>컨텍스트 제거</span>`
+    : `${plusIconSvg()}<span>컨텍스트 추가</span>`;
+}
+
+function syncContextNoteControls() {
+  document.querySelectorAll('.context-note-toggle[data-context-filename]').forEach(syncContextNoteToggle);
+  document.querySelectorAll('.note-card[data-filename]').forEach(card => {
+    card.classList.toggle('note-card-context-active', isActiveNote(card.dataset.filename));
+  });
 }
 
 function updateNotesBar() {
@@ -2709,13 +2761,6 @@ function updateNotesBar() {
     x.textContent = '×';
     x.addEventListener('click', () => {
       removeActiveNote(note.filename);
-      // 채팅의 해당 카드도 비활성 표시
-      const card = document.querySelector(`.note-card[data-filename="${note.filename}"]`);
-      if (card) {
-        card.classList.add('note-card-inactive');
-        const btn = card.querySelector('.note-card-remove');
-        if (btn) { btn.textContent = '제거됨'; btn.disabled = true; }
-      }
     });
 
     chip.append(label, x);
@@ -2970,6 +3015,10 @@ function saveIconSvg() {
 
 function checkIconSvg() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`;
+}
+
+function plusIconSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>`;
 }
 
 function loadingIconSvg() {

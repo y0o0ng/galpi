@@ -8,6 +8,7 @@
     mode: 'list',
     notes: [],
     apiFetch: null,
+    contextNotes: null,
   };
 
   const backIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
@@ -171,6 +172,13 @@
       content.innerHTML = '';
       content.scrollTop = 0;
       content.appendChild(makeSectionHead(noteTypeLabel(note.noteType), null, onBack));
+      const actions = document.createElement('div');
+      actions.className = 'paper-panel-actions';
+      actions.appendChild(state.contextNotes.makeToggle({
+        filename: note.filename,
+        title: data.note.title || note.title || note.filename,
+      }));
+      content.appendChild(actions);
       const article = document.createElement('article');
       article.className = 'knowledge-note-detail';
       article.innerHTML = DOMPurify.sanitize(marked.parse(data.note.content || ''));
@@ -190,13 +198,20 @@
     loadNotes();
   }
 
-  function init({ apiFetch }) {
+  function init({ apiFetch, contextNotes }) {
     if (state.initialized) return;
     const el = elements();
-    if (typeof apiFetch !== 'function' || !el.form || !el.query || !el.content) {
+    if (
+      typeof apiFetch !== 'function'
+      || typeof contextNotes?.makeToggle !== 'function'
+      || !el.form
+      || !el.query
+      || !el.content
+    ) {
       throw new Error('노트 패널 필수 요소를 찾지 못했습니다.');
     }
     state.apiFetch = apiFetch;
+    state.contextNotes = contextNotes;
     el.form.addEventListener('submit', event => {
       event.preventDefault();
       renderList();
