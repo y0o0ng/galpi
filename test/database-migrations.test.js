@@ -89,6 +89,10 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
   const db = createLegacyDatabase();
   runDatabaseMigrations(db);
   const store = createTopicChunkStore(db);
+  db.prepare(`
+    INSERT INTO notes (id, filename, title, note_type, archived)
+    VALUES (1, 'topic.md', 'Topic', 'topic', 0)
+  `).run();
 
   store.upsert({
     chunkId: 'qa-current',
@@ -108,6 +112,10 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
   assert.equal(chunk.contentSha256, sha256('Q: 첫 질문\nA: 첫 답변'));
   assert.equal(chunk.indexStatus, 'ready');
   assert.deepEqual(store.listReadyByNote('topic.md').map(item => item.chunkId), ['qa-current']);
+
+  db.prepare("UPDATE notes SET archived = 1 WHERE filename = 'topic.md'").run();
+  assert.deepEqual(store.listReadyByNote('topic.md'), []);
+  db.prepare("UPDATE notes SET archived = 0 WHERE filename = 'topic.md'").run();
 
   store.updateEmbedding('qa-current', '[1,0]');
   db.prepare(`

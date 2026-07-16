@@ -77,12 +77,19 @@ async function listBackups(backupDir = defaultBackupDir()) {
 }
 
 // db를 넘기면(인프로세스) 서버 연결로 온라인 백업, 안 넘기면(CLI) readonly 연결을 새로 연다.
-async function runBackup({ projectDir, vaultPath, backupDir, db, retentionDays = RETENTION_DAYS } = {}) {
+async function runBackup({
+  projectDir,
+  dbPath: dbPathOverride,
+  vaultPath,
+  backupDir,
+  db,
+  retentionDays = RETENTION_DAYS,
+} = {}) {
   const root = projectDir || path.resolve(__dirname, '..');
   const dir = backupDir || defaultBackupDir();
   const vault = vaultPath
     || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(root, 'ai-council-vault'));
-  const dbPath = path.join(root, 'council.db');
+  const dbPath = dbPathOverride || path.join(root, 'council.db');
 
   await fsp.mkdir(dir, { recursive: true });
   const stamp = timestamp();

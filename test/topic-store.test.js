@@ -13,6 +13,7 @@ const {
   formatTopicStoreAudit,
   parseQaLog,
   parseTopicNote,
+  removeQaLogEntry,
 } = require('../lib/topic-store');
 const { parseArguments } = require('../scripts/audit-topic-store');
 const { helpText: repairHelpText } = require('../scripts/plan-topic-repair');
@@ -159,6 +160,27 @@ test('topic parser reports malformed markers, missing ids, orphan ids, and dupli
   assert.ok(duplicateIds.issues.some(item => item.code === 'qa_id_duplicate_in_note'));
 });
 
+test('QA-LOG entry removal requires the expected content hash and preserves other entries', () => {
+  const raw = topicNote('Removal', [
+    qaEntry('qa-a111', '첫 질문', '첫 답변'),
+    qaEntry('qa-b222', '둘째 질문', '둘째 답변', '2026-07-16 10:00'),
+  ]).replace(/\n/g, '\r\n');
+  const parsed = parseTopicNote(raw, { filename: 'topic.md' });
+  const next = removeQaLogEntry(raw, {
+    qaId: 'qa-a111',
+    expectedContentSha256: parsed.entries[0].contentSha256,
+  });
+
+  assert.match(next, /\r\n/);
+  assert.doesNotMatch(next, /qa-a111|첫 질문|첫 답변/);
+  assert.match(next, /qa-b222|둘째 질문|둘째 답변/);
+  assert.equal(parseTopicNote(next, { filename: 'topic.md' }).parseable, true);
+  assert.throws(() => removeQaLogEntry(raw, {
+    qaId: 'qa-a111',
+    expectedContentSha256: '0'.repeat(64),
+  }), /hash가 계획과 다릅니다/);
+});
+
 test('topic store audit separates repairable drift from unverifiable notes', async t => {
   const vaultPath = await fs.mkdtemp(path.join(os.tmpdir(), 'topic-store-audit-'));
   t.after(() => fs.rm(vaultPath, { recursive: true, force: true }));
@@ -236,6 +258,10 @@ test('topic store audit separates repairable drift from unverifiable notes', asy
     dbFilename: 'alpha.md',
   }]);
   assert.equal(report.findings.sourceReferenceErrors[0].reason, 'invalid_format');
+  assert.deepEqual(report.observations.archivedChunks, [{
+    chunkId: 'qa-a777',
+    filename: 'archived.md',
+  }]);
   assert.match(
     report.notes.find(note => note.filename === 'alpha.md').qaEntries[0].contentSha256,
     /^[a-f0-9]{64}$/

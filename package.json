@@ -9,6 +9,7 @@
     "test": "node --test",
     "audit:topics": "node scripts/audit-topic-store.js",
     "plan:topic-repair": "node scripts/plan-topic-repair.js",
+    "apply:topic-repair": "node scripts/apply-topic-repair.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
     "mcp:obsidian": "node scripts/ai-council-mcp.mjs"
   },
