@@ -869,6 +869,14 @@ async function sendCouncilMessage(options = {}) {
 
 // ── 로딩 헬퍼 ──────────────────────────────────────────────────────────────
 
+function createProgressDots() {
+  const dots = document.createElement('span');
+  dots.className = 'progress-dots';
+  dots.setAttribute('aria-hidden', 'true');
+  dots.innerHTML = '<span></span><span></span><span></span>';
+  return dots;
+}
+
 function createCouncilLoadingEl(msg) {
   const wrap = document.createElement('div');
   wrap.className = 'council-loading';
@@ -877,7 +885,7 @@ function createCouncilLoadingEl(msg) {
   const txt = document.createElement('span');
   txt.className = 'loading-text';
   txt.textContent = msg;
-  wrap.appendChild(txt);
+  wrap.append(createProgressDots(), txt);
   return wrap;
 }
 
@@ -3101,7 +3109,7 @@ function appendLoading(statusText = '') {
     const txt = document.createElement('span');
     txt.className = 'loading-text';
     txt.textContent = statusText;
-    wrap.appendChild(txt);
+    wrap.append(createProgressDots(), txt);
   } else {
     wrap.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
   }
