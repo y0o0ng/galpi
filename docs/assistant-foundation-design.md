@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-17
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구와 S0c 공용 topic 쓰기 경로 Pi 인수 완료·A1b 전
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구와 S0c 공용 topic 쓰기 경로 Pi 인수 완료. A1b는 로컬 구현·Pi 백업 복제본 격리 평가 완료, 운영 Pi shadow 배포 전
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -196,10 +196,10 @@ topic은 `note_chunks`가 실제 지식 단위다. 파일 전체 임베딩은 �
    - 제목, aliases, Codex 태그, 요약, 노트 임베딩 점수는 청크 점수의 soft prior로 사용한다.
    - 노트 top 3을 먼저 확정해 그 밖의 청크를 버리는 hard gate는 유일한 경로로 사용하지 않는다. A1 첫 shadow에서 목표 노트를 놓친 경우 그 안의 정답 청크를 회수할 수 없었기 때문이다.
    - 키워드와 기존 청크 임베딩을 함께 사용하고, archive 또는 index가 준비되지 않은 청크는 제외한다.
-   - 같은 topic의 비슷한 청크가 결과를 독점하지 않도록 노트당 최대 2개를 둔다.
+   - 같은 topic의 비슷한 청크가 결과를 독점하지 않도록 기본 노트당 최대 3개를 둔다. `함께`, `같이`, `동시에`, `둘 다`, `각각`처럼 여러 근거를 명시한 질문만 최대 5개로 넓힌다.
    - 동일한 사실의 갱신 관계가 있으면 최신 active 항목을 우선하고, 낮은 점수 결과는 넣지 않는다.
 
-A1 shadow에서 기존 hard-gated 2단계 결과와 전역 청크+노트 soft prior 결과를 같은 fixture로 비교한다. 현재 61개 규모에서는 전역 후보 검색 비용이 작으며, 새 벡터 DB나 LLM reranker는 추가하지 않는다.
+A1 shadow에서 기존 hard-gated 2단계 결과와 전역 청크+노트 soft prior 결과를 같은 fixture로 비교한다. 현재 규모에서는 전역 후보 검색 비용이 작으며, 새 벡터 DB나 LLM reranker는 추가하지 않는다. 구현은 `getGlobalChunkCandidates` provider 경계 뒤에 후보 조회를 두므로, 청크 수와 retrieval p95가 병목이 될 때 랭킹 계약은 유지하고 provider만 FTS 또는 벡터 사전 선택으로 교체한다.
 
 초기 결과 상한:
 
@@ -646,10 +646,17 @@ note_chunks
 
 ### A1b. shadow 검색 보정
 
-- 전역 활성 청크 검색에 노트 점수를 soft prior로 결합
-- 무관 evidence 중단 임계값과 abstention을 Pi fixture로 조정
-- 현재 hard-gated shadow와 같은 20개 평가로 비교
-- 목표치를 넘기기 전에는 실제 모델 컨텍스트에 주입하지 않음
+- [x] 전역 활성 `ready` 청크 검색에 노트 점수를 soft prior로 결합
+- [x] 무관 evidence 중단 임계값과 abstention을 Pi fixture로 조정
+- [x] 현재 hard-gated shadow와 같은 20개 평가로 비교
+- [x] 실제 모델 컨텍스트는 기존 회수를 유지하고 A1b 결과만 trace
+- [ ] 운영 Pi에 shadow-only 배포하고 실제 trace를 관찰
+
+`adb41a6`에서 전역 후보 provider, 저장 Q/A의 질문부 가중치, 답변 내 같은 검색어 반복 상한, 보수적인 한국어 조사 변형, lexical anchor가 없는 중간 유사도 결과의 중단 기준을 추가했다. 노트 점수는 후보 제거가 아니라 최대 15% soft prior로만 사용한다. 전체 상한은 노트 3개·청크 6개·청크당 1,400자·총 8,000자를 유지하고, 실제 답변에는 여전히 기존 노트 컨텍스트가 들어간다.
+
+합성 20개는 note Recall@3 20/20, chunk Recall@6 20/20, abstention 4/4, 상한 20/20이었다. Pi 백업 `20260717-1754`로 만든 비공개 격리 복제본에서는 기존 hard-gated가 note 16/20·chunk 10/20·abstention 1/4였고, A1b는 note 20/20·chunk 18/20·abstention 4/4·상한 20/20이었다. 컨텍스트는 평균 3,973자, 최대 8,000자였고 오류는 0건이었다. 운영 서비스는 이 평가 중 변경하지 않았다.
+
+남은 실패는 두 종류다. 여러 세션 종합 1건은 서비스 이름과 최초 발상 표현 사이 lexical/embedding 연결이 약해 원형 청크를 놓쳤고, 최신 정보 1건은 같은 주제의 최근 결말 방향보다 다른 관련 청크가 앞섰다. 또한 fixture가 필수로 지정하지 않은 청크를 모두 무관으로 세는 엄격한 기준에서 무관 노트는 14/30, 무관 청크는 54/72였다. 목표 recall과 abstention은 넘겼지만 최신성·supersession과 과회수 문제가 남아 있으므로 A2는 자동 전환하지 않는다.
 
 ### A2. 청크 회수 전환
 
@@ -740,7 +747,8 @@ note_chunks
 |---|---:|
 |A0 기준선+A1 shadow|완료|
 |S0 저장 무결성|1~2일|
-|A1b 보정+A2 전환|1~2일|
+|A1b 보정|로컬 완료·Pi shadow 인수 전|
+|A2 전환|보류|
 |A3 provenance·무효화·메모리|2~3일|
 |B trace·피드백|1~2일|
 |C task·reminder MVP|2~4일|
