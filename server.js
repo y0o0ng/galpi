@@ -589,6 +589,7 @@ const stmtInsertRetrievalShadowRun = db.prepare(`
 `);
 const assistantRetrievalShadow = createAssistantRetrievalShadow({
   getChunksByNote: filename => topicChunkStore.listReadyByNote(filename),
+  getGlobalChunkCandidates: () => topicChunkStore.listAllReady(),
   insertRun: values => stmtInsertRetrievalShadowRun.run(values),
   onRecordError: error => console.warn('shadow retrieval trace 저장 실패:', error.message),
 });
@@ -4947,7 +4948,12 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
 
   const queryEmbedding = await generateEmbedding(question);
   const rankedSearched = await rankVaultNoteCandidates(question, queryEmbedding);
-  const searched = rankedSearched.map(({ score, ...note }) => note);
+  const searched = rankedSearched.map(({
+    score,
+    keywordScore,
+    embeddingScore,
+    ...note
+  }) => note);
 
   const merged = [...active];
   for (const hit of searched) {
@@ -4963,7 +4969,7 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   let shadowRetrieval = null;
   let shadowError = null;
   try {
-    shadowRetrieval = assistantRetrievalShadow.retrieve({
+    shadowRetrieval = await assistantRetrievalShadow.retrieveGlobal({
       query: question,
       queryEmbedding,
       activeNotes: active,
@@ -4974,7 +4980,7 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   }
   assistantRetrievalShadow.record({
     sessionId,
-    mode,
+    mode: `${mode}:a1b`,
     retrieval: shadowRetrieval,
     latencyMs: Date.now() - shadowStartedAt,
     error: shadowError,
@@ -5086,22 +5092,28 @@ async function rankVaultNoteCandidates(query, precomputedEmbedding = null, limit
 
 async function searchVault(query, precomputedEmbedding = null, limit = MAX_ACTIVE_NOTES) {
   const ranked = await rankVaultNoteCandidates(query, precomputedEmbedding, limit);
-  return ranked.map(({ score, ...note }) => note);
+  return ranked.map(({ score, keywordScore, embeddingScore, ...note }) => note);
 }
 
 app.get('/api/vault/retrieval-shadow', async (req, res) => {
   const query = String(req.query.q || '').trim();
+  const strategy = String(req.query.strategy || 'global-soft-prior').trim();
   if (!query) return res.status(400).json({ error: '검색어를 입력해주세요.' });
   if (query.length > 10000) return res.status(400).json({ error: '검색어가 너무 깁니다.' });
+  if (!['hard-gated', 'global-soft-prior'].includes(strategy)) {
+    return res.status(400).json({ error: '지원하지 않는 shadow 검색 전략입니다.' });
+  }
 
   try {
     const queryEmbedding = await generateEmbedding(query);
     const rankedCandidates = await rankVaultNoteCandidates(query, queryEmbedding);
-    const retrieval = assistantRetrievalShadow.retrieve({
-      query,
-      queryEmbedding,
-      rankedCandidates,
-    });
+    const retrieval = strategy === 'hard-gated'
+      ? assistantRetrievalShadow.retrieve({ query, queryEmbedding, rankedCandidates })
+      : await assistantRetrievalShadow.retrieveGlobal({
+          query,
+          queryEmbedding,
+          rankedCandidates,
+        });
     return res.json({
       success: true,
       retrieval: assistantRetrievalShadow.toPublicResult(retrieval),

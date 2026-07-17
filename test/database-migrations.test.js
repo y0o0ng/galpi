@@ -112,9 +112,15 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
   assert.equal(chunk.contentSha256, sha256('Q: 첫 질문\nA: 첫 답변'));
   assert.equal(chunk.indexStatus, 'ready');
   assert.deepEqual(store.listReadyByNote('topic.md').map(item => item.chunkId), ['qa-current']);
+  db.prepare("UPDATE notes SET title = 'Current Topic' WHERE filename = 'topic.md'").run();
+  assert.deepEqual(
+    store.listAllReady().map(item => ({ chunkId: item.chunkId, noteTitle: item.noteTitle })),
+    [{ chunkId: 'qa-current', noteTitle: 'Current Topic' }],
+  );
 
   db.prepare("UPDATE notes SET archived = 1 WHERE filename = 'topic.md'").run();
   assert.deepEqual(store.listReadyByNote('topic.md'), []);
+  assert.deepEqual(store.listAllReady(), []);
   db.prepare("UPDATE notes SET archived = 0 WHERE filename = 'topic.md'").run();
 
   store.updateEmbedding('qa-current', '[1,0]');
@@ -124,6 +130,7 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
     WHERE chunk_id = 'qa-current'
   `).run();
   assert.deepEqual(store.listReadyByNote('topic.md'), []);
+  assert.deepEqual(store.listAllReady(), []);
 
   store.upsert({
     chunkId: 'qa-current',

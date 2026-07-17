@@ -6,6 +6,7 @@ require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const {
+  createGlobalShadowRetriever,
   createLegacyBaselineRetriever,
   createShadowRetriever,
   evaluateRetrievalFixture,
@@ -35,8 +36,8 @@ function parseArguments(argv) {
       throw new Error(`알 수 없는 인자입니다: ${argument}`);
     }
   }
-  if (!['legacy', 'shadow'].includes(options.mode)) {
-    throw new Error('--mode는 legacy 또는 shadow여야 합니다.');
+  if (!['legacy', 'shadow', 'shadow-global'].includes(options.mode)) {
+    throw new Error('--mode는 legacy, shadow 또는 shadow-global이어야 합니다.');
   }
   return options;
 }
@@ -96,6 +97,29 @@ function createSyntheticShadowRetriever(fixture) {
   });
 }
 
+function createSyntheticGlobalShadowRetriever(fixture) {
+  if (!Array.isArray(fixture.notes)) {
+    throw new Error('합성 평가 fixture에 notes 배열이 필요합니다.');
+  }
+  return createGlobalShadowRetriever({
+    searchNotes: async testCase => rankNoteCandidates({
+      query: testCase.query,
+      queryEmbedding: testCase.queryEmbedding,
+      notes: fixture.notes,
+      limit: 8,
+      minEmbeddingScore: 0.08,
+      minKeywordScore: 2,
+    }),
+    readGlobalChunks: async () => fixture.notes.flatMap(note => note.chunks.map(chunk => ({
+      ...chunk,
+      noteFilename: note.filename,
+      noteTitle: note.title,
+      chunkType: 'topic_qa',
+      embedding: note.embedding,
+    }))),
+  });
+}
+
 function createLiveRetriever(baseUrl, apiToken) {
   const origin = String(baseUrl || '').replace(/\/+$/, '');
   if (!/^https?:\/\//i.test(origin)) throw new Error('--base-url은 HTTP(S) URL이어야 합니다.');
@@ -126,14 +150,14 @@ function createLiveRetriever(baseUrl, apiToken) {
   });
 }
 
-function createLiveShadowRetriever(baseUrl, apiToken) {
+function createLiveShadowRetriever(baseUrl, apiToken, strategy) {
   const origin = String(baseUrl || '').replace(/\/+$/, '');
   if (!/^https?:\/\//i.test(origin)) throw new Error('--base-url은 HTTP(S) URL이어야 합니다.');
   const headers = apiToken ? { 'X-API-Token': apiToken } : {};
 
   return async function retrieveLiveShadow(testCase) {
     const response = await fetch(
-      `${origin}/api/vault/retrieval-shadow?q=${encodeURIComponent(testCase.query)}`,
+      `${origin}/api/vault/retrieval-shadow?q=${encodeURIComponent(testCase.query)}&strategy=${strategy}`,
       { headers }
     );
     const payload = await response.json().catch(() => ({}));
@@ -148,13 +172,28 @@ async function main() {
     throw new Error('라이브 평가는 해당 볼트의 비공개 --fixture가 필요합니다.');
   }
   const fixture = loadFixture(options.fixture);
-  const retrieve = options.mode === 'shadow'
-    ? options.baseUrl
-      ? createLiveShadowRetriever(options.baseUrl, process.env.API_TOKEN || '')
-      : createSyntheticShadowRetriever(fixture)
-    : options.baseUrl
+  let retrieve;
+  if (options.mode === 'legacy') {
+    retrieve = options.baseUrl
       ? createLiveRetriever(options.baseUrl, process.env.API_TOKEN || '')
       : createSyntheticRetriever(fixture);
+  } else if (options.mode === 'shadow') {
+    retrieve = options.baseUrl
+      ? createLiveShadowRetriever(
+          options.baseUrl,
+          process.env.API_TOKEN || '',
+          'hard-gated',
+        )
+      : createSyntheticShadowRetriever(fixture);
+  } else {
+    retrieve = options.baseUrl
+      ? createLiveShadowRetriever(
+          options.baseUrl,
+          process.env.API_TOKEN || '',
+          'global-soft-prior',
+        )
+      : createSyntheticGlobalShadowRetriever(fixture);
+  }
   const summary = await evaluateRetrievalFixture(fixture, retrieve);
   process.stdout.write(options.json
     ? `${JSON.stringify(summary, null, 2)}\n`

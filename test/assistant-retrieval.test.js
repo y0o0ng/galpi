@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  buildGlobalShadowRetrieval,
   buildShadowRetrieval,
   buildChunkContext,
   cosineSimilarity,
@@ -13,6 +14,7 @@ const {
 const { createAssistantRetrievalShadow } = require('../lib/assistant-retrieval-shadow');
 const {
   buildLegacyNoteEvidence,
+  createGlobalShadowRetriever,
   createLegacyBaselineRetriever,
   createShadowRetriever,
   evaluateCase,
@@ -28,6 +30,48 @@ test('query terms preserve Korean meaning words and remove search commands', () 
     ['꾸었던', '꿈']
   );
   assert.deepEqual(extractQueryTerms('???'), []);
+  assert.deepEqual(extractQueryTerms('고양이 경로'), ['고양이', '경로']);
+});
+
+test('rankers match conservative Korean particle variants', () => {
+  const ranked = rankChunkCandidates({
+    query: '숙면대행서비스의 결말을 구성을',
+    chunks: [{
+      chunkId: 'sleep-story',
+      noteFilename: 'story.md',
+      content: '숙면대행서비스 최초 결말과 기승전결 구성',
+    }],
+    includeParticleVariants: true,
+    minKeywordScore: 3,
+  });
+
+  assert.deepEqual(ranked.map(chunk => chunk.chunkId), ['sleep-story']);
+});
+
+test('global chunk ranking prefers a matching stored question over repeated answer terms', () => {
+  const ranked = rankChunkCandidates({
+    query: '숙면대행서비스 결말',
+    chunks: [
+      {
+        chunkId: 'matching-question',
+        noteFilename: 'story.md',
+        content: 'Q: 숙면대행서비스 결말\nA: 아직 마지막 문장은 정하지 않았다.',
+      },
+      {
+        chunkId: 'repeated-answer',
+        noteFilename: 'other.md',
+        content: [
+          'Q: 다른 아이디어',
+          'A: 숙면대행서비스 결말 숙면대행서비스 결말 숙면대행서비스 결말',
+        ].join('\n'),
+      },
+    ],
+    questionKeywordWeight: 4,
+    maxAnswerTermOccurrences: 3,
+    minKeywordScore: 1,
+  });
+
+  assert.equal(ranked[0].chunkId, 'matching-question');
 });
 
 test('note ranker keeps the existing keyword and embedding scoring behavior', () => {
@@ -167,6 +211,124 @@ test('shadow retrieval keeps only chunks inside the selected notes', () => {
   assert.deepEqual(result.chunks.map(chunk => chunk.chunkId), ['deploy-path']);
 });
 
+test('global shadow retrieval recovers a strong chunk outside the note shortlist', () => {
+  const result = buildGlobalShadowRetrieval({
+    query: '현재 배포 경로',
+    queryEmbedding: [1, 0],
+    noteCandidates: [{
+      filename: 'shortlisted.md',
+      title: '후보 노트',
+      score: 0.8,
+      keywordScore: 1,
+    }],
+    chunks: [
+      {
+        chunkId: 'weak-shortlist',
+        noteFilename: 'shortlisted.md',
+        noteTitle: '후보 노트',
+        content: '과거 일정 기록',
+        embedding: [0, 1],
+      },
+      {
+        chunkId: 'global-answer',
+        noteFilename: 'outside.md',
+        noteTitle: '운영 정보',
+        content: '현재 배포 경로는 /srv/app이다.',
+        embedding: [1, 0],
+      },
+    ],
+  });
+
+  assert.equal(result.strategy, 'global-soft-prior');
+  assert.deepEqual(result.notes.map(note => note.filename), ['outside.md']);
+  assert.deepEqual(result.chunks.map(chunk => chunk.chunkId), ['global-answer']);
+});
+
+test('global shadow uses note scores as a soft prior without reviving weak chunks', () => {
+  const result = buildGlobalShadowRetrieval({
+    query: '배포',
+    queryEmbedding: [1, 0],
+    noteCandidates: [{
+      filename: 'prior.md',
+      title: '배포 노트',
+      score: 0.9,
+      keywordScore: 2,
+    }],
+    chunks: [
+      {
+        chunkId: 'prior-close',
+        noteFilename: 'prior.md',
+        noteTitle: '배포 노트',
+        content: '배포 절차',
+        embedding: [0.82, 0.5723635208501674],
+      },
+      {
+        chunkId: 'global-close',
+        noteFilename: 'global.md',
+        noteTitle: '운영 노트',
+        content: '배포 절차',
+        embedding: [0.84, 0.5425863986500215],
+      },
+      {
+        chunkId: 'weak-prior',
+        noteFilename: 'prior.md',
+        noteTitle: '배포 노트',
+        content: '관련 없는 본문',
+        embedding: [0.1, 0.99498743710662],
+      },
+    ],
+  });
+
+  assert.equal(result.chunks[0].chunkId, 'prior-close');
+  assert.ok(result.chunks.some(chunk => chunk.chunkId === 'global-close'));
+  assert.ok(!result.chunks.some(chunk => chunk.chunkId === 'weak-prior'));
+});
+
+test('global shadow abstains from medium semantic collisions without lexical evidence', () => {
+  const result = buildGlobalShadowRetrieval({
+    query: '고양이 종합백신 예약일',
+    queryEmbedding: [1, 0],
+    noteCandidates: [{ filename: 'other.md', title: '기타', score: 0.45 }],
+    chunks: [{
+      chunkId: 'semantic-collision',
+      noteFilename: 'other.md',
+      noteTitle: '기타',
+      content: '완전히 다른 개인 일정',
+      embedding: [0.75, 0.6614378277661477],
+    }],
+  });
+
+  assert.deepEqual(result.notes, []);
+  assert.deepEqual(result.chunks, []);
+  assert.equal(result.contextChars, 0);
+});
+
+test('global shadow expands one note only for explicit multi-evidence queries', () => {
+  const chunks = Array.from({ length: 6 }, (_, index) => ({
+    chunkId: `qa-${index + 1}`,
+    noteFilename: 'topic.md',
+    noteTitle: '배포 기록',
+    content: `배포 근거 ${index + 1}`,
+    embedding: [1, 0],
+  }));
+  const input = {
+    queryEmbedding: [1, 0],
+    noteCandidates: [{
+      filename: 'topic.md',
+      title: '배포 기록',
+      score: 0.9,
+      keywordScore: 2,
+    }],
+    chunks,
+  };
+
+  const single = buildGlobalShadowRetrieval({ ...input, query: '배포 근거' });
+  const multiple = buildGlobalShadowRetrieval({ ...input, query: '배포 근거를 같이 보여줘' });
+
+  assert.equal(single.chunks.length, 3);
+  assert.equal(multiple.chunks.length, 5);
+});
+
 test('shadow service records identifiers without content and isolates trace failures', () => {
   const inserted = [];
   let recordError = null;
@@ -204,6 +366,32 @@ test('shadow service records identifiers without content and isolates trace fail
   });
   assert.equal(failingService.record({ mode: 'chat' }), false);
   assert.equal(recordError.message, 'db unavailable');
+});
+
+test('shadow service accepts an async global candidate provider', async () => {
+  let request = null;
+  const service = createAssistantRetrievalShadow({
+    getChunksByNote: () => [],
+    getGlobalChunkCandidates: async input => {
+      request = input;
+      return [{
+        chunkId: 'qa-global',
+        noteFilename: 'global.md',
+        noteTitle: '전역 노트',
+        content: '현재 배포 경로',
+        embedding: JSON.stringify([1, 0]),
+      }];
+    },
+    insertRun: () => {},
+  });
+  const retrieval = await service.retrieveGlobal({
+    query: '현재 배포 경로',
+    queryEmbedding: [1, 0],
+  });
+
+  assert.equal(request.query, '현재 배포 경로');
+  assert.equal(retrieval.strategy, 'global-soft-prior');
+  assert.deepEqual(retrieval.chunks.map(chunk => chunk.chunkId), ['qa-global']);
 });
 
 test('legacy evidence exposes only QA markers visible before the note limit', () => {
@@ -292,6 +480,30 @@ test('synthetic A1 shadow retrieval meets the initial evidence targets', async (
 
   assert.equal(summary.noteRecallAt3.hits, 20);
   assert.ok(summary.chunkRecallAt6.hits >= 18);
+  assert.equal(summary.abstention.hits, 4);
+  assert.equal(summary.contextWithinLimit.hits, 20);
+});
+
+test('synthetic A1b global shadow preserves recall and strict abstention', async () => {
+  const retrieve = createGlobalShadowRetriever({
+    searchNotes: async testCase => rankNoteCandidates({
+      query: testCase.query,
+      queryEmbedding: testCase.queryEmbedding,
+      notes: fixture.notes,
+      limit: 8,
+      minEmbeddingScore: 0.08,
+    }),
+    readGlobalChunks: async () => fixture.notes.flatMap(note => note.chunks.map(chunk => ({
+      ...chunk,
+      noteFilename: note.filename,
+      noteTitle: note.title,
+      embedding: note.embedding,
+    }))),
+  });
+  const summary = await evaluateRetrievalFixture(fixture, retrieve);
+
+  assert.equal(summary.noteRecallAt3.hits, 20);
+  assert.equal(summary.chunkRecallAt6.hits, 20);
   assert.equal(summary.abstention.hits, 4);
   assert.equal(summary.contextWithinLimit.hits, 20);
 });
