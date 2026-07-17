@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-17
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구와 S0c 공용 topic 쓰기 경로 Pi 인수 완료. A1b는 로컬 구현·Pi 백업 복제본 격리 평가 완료, 운영 Pi shadow 배포 전
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -650,13 +650,16 @@ note_chunks
 - [x] 무관 evidence 중단 임계값과 abstention을 Pi fixture로 조정
 - [x] 현재 hard-gated shadow와 같은 20개 평가로 비교
 - [x] 실제 모델 컨텍스트는 기존 회수를 유지하고 A1b 결과만 trace
-- [ ] 운영 Pi에 shadow-only 배포하고 실제 trace를 관찰
+- [x] 운영 Pi에 shadow-only 배포·인수
+- [ ] 실제 trace의 과회수와 지연 관찰
 
 `adb41a6`에서 전역 후보 provider, 저장 Q/A의 질문부 가중치, 답변 내 같은 검색어 반복 상한, 보수적인 한국어 조사 변형, lexical anchor가 없는 중간 유사도 결과의 중단 기준을 추가했다. 노트 점수는 후보 제거가 아니라 최대 15% soft prior로만 사용한다. 전체 상한은 노트 3개·청크 6개·청크당 1,400자·총 8,000자를 유지하고, 실제 답변에는 여전히 기존 노트 컨텍스트가 들어간다.
 
 합성 20개는 note Recall@3 20/20, chunk Recall@6 20/20, abstention 4/4, 상한 20/20이었다. Pi 백업 `20260717-1754`로 만든 비공개 격리 복제본에서는 기존 hard-gated가 note 16/20·chunk 10/20·abstention 1/4였고, A1b는 note 20/20·chunk 18/20·abstention 4/4·상한 20/20이었다. 컨텍스트는 평균 3,973자, 최대 8,000자였고 오류는 0건이었다. 운영 서비스는 이 평가 중 변경하지 않았다.
 
 남은 실패는 두 종류다. 여러 세션 종합 1건은 서비스 이름과 최초 발상 표현 사이 lexical/embedding 연결이 약해 원형 청크를 놓쳤고, 최신 정보 1건은 같은 주제의 최근 결말 방향보다 다른 관련 청크가 앞섰다. 또한 fixture가 필수로 지정하지 않은 청크를 모두 무관으로 세는 엄격한 기준에서 무관 노트는 14/30, 무관 청크는 54/72였다. 목표 recall과 abstention은 넘겼지만 최신성·supersession과 과회수 문제가 남아 있으므로 A2는 자동 전환하지 않는다.
+
+2026-07-17 운영 Pi에는 실제 답변 경로를 바꾸지 않는 shadow-only 상태로 배포했다. DB·vault 백업 `20260717-1921`과 코드 백업 `a1b-pre-20260717-192117.tar.gz`를 만든 뒤 13개 파일 hash 일치, Pi 전체 테스트 93개, readonly audit 65/65, DB hash 불변을 확인했다. 재시작 후 `global-soft-prior`·`hard-gated` 진단 API와 잘못된 전략 `400` 검증, 오류 없는 시작 로그를 통과했다.
 
 ### A2. 청크 회수 전환
 
@@ -747,7 +750,7 @@ note_chunks
 |---|---:|
 |A0 기준선+A1 shadow|완료|
 |S0 저장 무결성|1~2일|
-|A1b 보정|로컬 완료·Pi shadow 인수 전|
+|A1b 보정|Pi shadow 인수 완료|
 |A2 전환|보류|
 |A3 provenance·무효화·메모리|2~3일|
 |B trace·피드백|1~2일|
