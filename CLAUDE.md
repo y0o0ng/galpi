@@ -85,9 +85,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **프로젝트 현재 상태**
 
-- 현재 배포 상태: V4 논문 검색·전문 능동 독서, 지식 패널, 알림센터 `최근 저장`, 유지보수 리뷰에 더해 컨텍스트 노트 선택 UI(`516a147`)와 V4.5 S0b-2a·2b(`699d1e9`, `7e4fdc5`)까지 Pi 배포·운영 적용 완료. `/search`는 결과를 자동 활성화하지 않고 검색 카드·일반 노트·저장 논문 상세에서 필요한 자료만 컨텍스트에 추가하며, 질문 기반 자동 회수는 그대로 유지한다.
-- 현재 개발 상태: S0 공용 쓰기 경로를 `d41defe`에서 로컬 구현했다. append·split·merge·archive/restore가 strict QA-LOG parser와 전역 mutation queue를 공유하고, 읽은 원문 precondition·임시 파일+rename·다중 파일 snapshot·SQLite transaction·실패 복원을 적용한다. split은 이동 대상 밖 청크가 있으면 source 삭제 전에 중단한다. 전체 테스트 85개, 임시 서버 HTTP split→archive/restore→merge, 로컬 audit Q&A 7/7을 통과했으며 Pi에는 아직 배포하지 않았다. A1 shadow의 Pi 실사용은 note 15/20·chunk 9/20·abstention 0/4라 A2 전환 전이다.
-- 다음 개발 시작점: `d41defe`를 Pi에 배포해 전체 테스트 85개·readonly topic audit 65/65·서비스와 인증 API를 인수한다. 그다음 A1b에서 전역 청크 검색+노트 soft prior와 무관 evidence 중단 임계값을 같은 Pi 비공개 20개 fixture로 shadow 보정한다. V4.5 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며 Pi `.env`는 `PAPER_SEARCH_MOCK=false`, `npm audit` 기존 경고는 자동 수정하지 않는다.
+- 현재 배포 상태: V4 논문 검색·전문 능동 독서, 지식 패널, 알림센터 `최근 저장`, 유지보수 리뷰, 컨텍스트 노트 선택 UI(`516a147`)와 V4.5 S0b-2a·2b(`699d1e9`, `7e4fdc5`)에 이어 S0c 공용 토픽 쓰기 경로(`d41defe`)까지 Pi 배포·운영 적용 완료. `/search`는 결과를 자동 활성화하지 않고 검색 카드·일반 노트·저장 논문 상세에서 필요한 자료만 컨텍스트에 추가하며, 질문 기반 자동 회수는 그대로 유지한다.
+- 현재 개발 상태: S0c의 append·split·merge·archive/restore가 strict QA-LOG parser와 전역 mutation queue를 공유하고, 읽은 원문 precondition·임시 파일+rename·다중 파일 snapshot·SQLite transaction·실패 복원을 적용한다. 2026-07-17 Pi 백업 `20260717-1754` 후 파일 hash 일치, 전체 테스트 85개, readonly topic audit 65/65, DB hash 불변, 서비스 재기동, 인증 API와 오류 로그 0건을 확인했다. A1 shadow의 Pi 실사용은 note 15/20·chunk 9/20·abstention 0/4라 A2 전환 전이다.
+- 다음 개발 시작점: A1b에서 전역 청크 검색+노트 soft prior와 무관 evidence 중단 임계값을 같은 Pi 비공개 20개 fixture로 shadow 보정한다. V4.5 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며 Pi `.env`는 `PAPER_SEARCH_MOCK=false`, `npm audit` 기존 경고는 자동 수정하지 않는다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
 - 코드 구조 방향: `server.js`는 현재 5,823줄. 기존 코드를 한꺼번에 분해하지 말고, V4.5는 topic-store·topic-mutation·migration·retrieval·memory·trace·task·scheduler를 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것

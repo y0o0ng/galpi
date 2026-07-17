@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-17
 >
-> 상태: A0·A1 shadow와 S0b-2 Pi 실제 복구 완료, S0c 공용 topic 쓰기 경로 로컬 완료·Pi 인수 전
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구와 S0c 공용 topic 쓰기 경로 Pi 인수 완료·A1b 전
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성 입력과 V5 전문 에이전트 전에 진행
 
@@ -603,14 +603,16 @@ S0b-2b는 `7e4fdc5`에서 로컬 구현했다. `npm run apply:topic-repair`는 �
 
 적용 후 활성 topic의 Markdown Q&A 65개와 ready 청크 65개가 모두 일치했다. malformed·file-only·DB-only·배정 drift·중복·제목 drift·source 참조 오류·고아·임베딩 누락은 모두 0건이고, SQLite `integrity_check=ok`, 외래키 오류 0건, Pi 전체 테스트 76개, 인증 API와 systemd 재기동을 통과했다. 재실행한 복구 계획은 `clean`, 작업 0건이다.
 
-S0c는 `d41defe`에서 로컬 구현했다. `lib/topic-mutation.js`의 전역 queue가 append·split·merge·archive/restore를 직렬화하고, `lib/topic-store.js`의 날짜 제목+`qa_id` strict parser를 쓰기와 Q&A 목록·요약·제목 재생성에 공통 사용한다. 각 파일 변경은 읽은 원문 또는 파일 부재를 precondition으로 다시 확인하고 같은 디렉터리의 임시 파일+rename으로 적용한다. 여러 파일은 전부 snapshot한 뒤 쓰며, 관련 `notes`·`note_chunks`·`auto_save_decisions`·edge 변경은 하나의 동기 SQLite transaction에서 처리한다. 파일 쓰기나 DB transaction이 실패하면 snapshot을 복원하고 queue는 다음 작업을 계속 받는다.
+S0c는 `d41defe`에서 구현해 Pi 인수까지 마쳤다. `lib/topic-mutation.js`의 전역 queue가 append·split·merge·archive/restore를 직렬화하고, `lib/topic-store.js`의 날짜 제목+`qa_id` strict parser를 쓰기와 Q&A 목록·요약·제목 재생성에 공통 사용한다. 각 파일 변경은 읽은 원문 또는 파일 부재를 precondition으로 다시 확인하고 같은 디렉터리의 임시 파일+rename으로 적용한다. 여러 파일은 전부 snapshot한 뒤 쓰며, 관련 `notes`·`note_chunks`·`auto_save_decisions`·edge 변경은 하나의 동기 SQLite transaction에서 처리한다. 파일 쓰기나 DB transaction이 실패하면 snapshot을 복원하고 queue는 다음 작업을 계속 받는다.
 
-merge는 target 변경 뒤 source 보관이 실패해도 성공으로 넘기던 동작을 제거하고 전체 mutation을 실패·복원한다. split은 청크 이동에 기존 source filename까지 요구하며, 빈 source를 지우기 전 source의 전체 청크 수가 이동 ID 수와 같은지 확인해 `source_missing` 등 숨은 청크를 조용히 삭제하지 않는다. 전체 테스트 85개, 임시 서버 HTTP split→archive/restore→merge와 최종 audit, 로컬 topic 3개·Q&A 7/7 readonly audit를 통과했고 로컬 DB hash는 전후 동일했다. 스키마와 실데이터는 변경하지 않았으며 Pi 인수는 남아 있다.
+merge는 target 변경 뒤 source 보관이 실패해도 성공으로 넘기던 동작을 제거하고 전체 mutation을 실패·복원한다. split은 청크 이동에 기존 source filename까지 요구하며, 빈 source를 지우기 전 source의 전체 청크 수가 이동 ID 수와 같은지 확인해 `source_missing` 등 숨은 청크를 조용히 삭제하지 않는다. 전체 테스트 85개, 임시 서버 HTTP split→archive/restore→merge와 최종 audit, 로컬 topic 3개·Q&A 7/7 readonly audit를 통과했고 로컬 DB hash는 전후 동일했다.
 
-파일시스템과 SQLite를 하나의 ACID transaction으로 만들 수는 없다. 잡힌 예외는 즉시 복원하지만 rename 뒤 `SIGKILL`·전원 차단이 발생하면 다음 `audit:topics`가 drift를 찾아야 한다. 현재 단일 사용자 규모에서는 영속 mutation journal보다 이 경계를 유지하는 편이 단순하며, Pi 인수에서 전체 테스트와 audit 65/65를 다시 확인한다.
+2026-07-17 Pi 배포 전 동시 DB·vault 백업 `20260717-1754`와 기존 코드 백업을 남겼다. 배포 파일 6개의 hash가 로컬과 일치했고 Pi 전체 테스트 85개를 통과했다. readonly audit은 활성 topic 13개, Markdown Q&A 65개, ready 청크 65개가 전부 일치했으며 DB hash는 전후 `c9c57afe…f1ede`로 같았다. 서비스는 새 PID로 재기동했고 `/api/config`, 인증된 `/api/organize/status`·`/api/notifications`가 정상 응답했으며 재기동 이후 error journal은 0건이다.
+
+파일시스템과 SQLite를 하나의 ACID transaction으로 만들 수는 없다. 잡힌 예외는 즉시 복원하지만 rename 뒤 `SIGKILL`·전원 차단이 발생하면 다음 `audit:topics`가 drift를 찾아야 한다. 현재 단일 사용자 규모에서는 영속 mutation journal보다 이 경계를 유지하는 편이 단순하며, 운영 중에는 readonly audit으로 이 경계를 감시한다.
 
 - [x] `schema_version`과 순차 migration을 별도 모듈로 관리
-- [x] 모든 append·split·merge·archive/restore를 공용 topic mutation queue와 QA-LOG parser로 통과 (`d41defe`, Pi 인수 전)
+- [x] 모든 append·split·merge·archive/restore를 공용 topic mutation queue와 QA-LOG parser로 통과 (`d41defe`, Pi 인수 완료)
 - [x] 파일은 임시 파일+rename으로 쓰고, 관련 DB 변경은 하나의 transaction으로 처리
 - [x] 다중 파일 변경은 원본 snapshot을 두고 실패 시 복원하며, 프로세스 중단은 다음 audit에서 감지
 - [x] `note_chunks.content_sha256`과 `index_status`로 원본 Q&A 존재 여부와 회수 상태 기록

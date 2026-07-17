@@ -18,7 +18,7 @@ V2   뇌의 깊이       — 의회 + 저장/회수가 제대로 도는 뇌     
 V3   뇌의 자기관리   — Codex가 조용히 정리, 안 망가짐         ✅ 완료
 V3.5 시간과 검색     — 시간 감각 + 검색 튜닝                       ✅ 완료
 V4-A 논문 입력구     — 검색·저장·필요한 전문만 읽는다          ✅ 완료
-V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← S0c Pi 인수·A1b
+V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← A1b
 V4-B 음성 입력구     — 확인한 전사를 대화·메모·할 일로 보낸다
 V5   전문 직원       — 주식·일정 등 역할 에이전트
 V6   비서의 얼굴     — 화면에 떠있는 Clawd, 어디서든
@@ -217,7 +217,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0b-2 Pi 승인형 복구 완료. S0c 공용 쓰기 경로는 `d41defe`에서 로컬 구현을 마쳤고 Pi 인수 뒤 A1b 검색 보정으로 넘어간다. V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
+> 상태: A0·A1 shadow와 S0b-2 Pi 승인형 복구, S0c 공용 쓰기 경로의 Pi 배포·인수까지 완료했다. 다음은 A1b 검색 보정이며 V4-B 음성·V5 전문 에이전트보다 먼저 진행한다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -237,10 +237,10 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > S0b-2 Pi 운영 적용 완료 (`699d1e9`, `7e4fdc5`, 2026-07-16): 서비스 중지 상태에서 입력 hash `ce458e…e0f17`과 중복 작업 ID를 재검증하고 동시 DB·vault 백업 `20260716-1733`을 만든 뒤 schema version 2 migration과 작업 13건을 적용했다. M60 Q&A는 유지하고 향수 토픽의 동일 복사본만 제거했으며 제목 캐시 8건을 갱신하고 DB-only 청크 4건은 `source_missing`으로 회수 제외했다. 최종 감사에서 활성 Markdown Q&A 65개와 ready 청크 65개가 모두 일치했고 중복·DB-only·제목 drift·source 오류는 0건이었다. SQLite 무결성·외래키·Pi 전체 테스트 76개·인증 API·서비스 재기동을 통과했으며 재계획은 `clean`, 작업 0건이다.
 
-> S0c 공용 쓰기 경로 로컬 구현 완료 (`d41defe`, 2026-07-17): append·split·merge·archive/restore를 strict QA-LOG parser와 하나의 전역 mutation queue로 직렬화했다. 각 변경은 읽은 원문 또는 파일 부재를 precondition으로 확인하고 임시 파일+rename, 다중 파일 snapshot, 동기 SQLite transaction을 거치며 파일·DB 오류 시 원본을 복원한다. merge source 보관 실패는 더 이상 부분 성공으로 처리하지 않고, split source에 이동 대상 밖 청크가 있으면 물리 삭제 전에 중단한다. 전체 테스트 85개, 임시 서버 HTTP split→archive/restore→merge와 최종 audit, 로컬 topic Q&A 7/7 audit를 통과했다. 스키마·실데이터 변경은 없고 Pi 배포·인수는 아직 하지 않았다.
+> S0c 공용 쓰기 경로 Pi 배포·인수 완료 (`d41defe`, 2026-07-17): append·split·merge·archive/restore를 strict QA-LOG parser와 하나의 전역 mutation queue로 직렬화했다. 각 변경은 읽은 원문 또는 파일 부재를 precondition으로 확인하고 임시 파일+rename, 다중 파일 snapshot, 동기 SQLite transaction을 거치며 파일·DB 오류 시 원본을 복원한다. merge source 보관 실패는 더 이상 부분 성공으로 처리하지 않고, split source에 이동 대상 밖 청크가 있으면 물리 삭제 전에 중단한다. 로컬 전체 테스트 85개와 임시 서버 HTTP mutation 시나리오를 통과한 뒤 Pi 동시 DB·vault 백업 `20260717-1754`와 기존 코드 백업을 만들고 배포했다. Pi에서 파일 hash 일치, 전체 테스트 85개, readonly audit의 활성 Q&A/ready 청크 65/65와 DB hash 불변, 서비스 재기동, 인증 API `200`, 재기동 후 오류 로그 0건을 확인했다.
 
 1. [x] schema version과 순차 migration을 별도 모듈로 관리
-2. [x] append·split·merge·archive/restore를 공용 QA-LOG parser와 topic mutation queue로 직렬화 (`d41defe`, Pi 인수 전)
+2. [x] append·split·merge·archive/restore를 공용 QA-LOG parser와 topic mutation queue로 직렬화 (`d41defe`, Pi 인수 완료)
 3. [x] 현재 복구 apply의 원자적 파일 교체, DB transaction, hash 재검증과 rollback
 4. [ ] Markdown-only QA 재색인은 후속. DB-only 청크의 `source_missing` 적용·회수 제외는 Pi 운영 적용 완료
 5. [x] 현재 불일치를 백업 후 복구하고 Pi dry-run audit 0건 확인
