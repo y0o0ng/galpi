@@ -8,11 +8,13 @@ const path = require('node:path');
 const Database = require('better-sqlite3');
 const {
   auditTopicStore,
+  appendQaLogEntries,
   buildTopicRepairPlan,
   formatTopicRepairPlan,
   formatTopicStoreAudit,
   parseQaLog,
   parseTopicNote,
+  replaceQaLogEntries,
   removeQaLogEntry,
 } = require('../lib/topic-store');
 const { parseArguments } = require('../scripts/audit-topic-store');
@@ -179,6 +181,35 @@ test('QA-LOG entry removal requires the expected content hash and preserves othe
     qaId: 'qa-a111',
     expectedContentSha256: '0'.repeat(64),
   }), /hash가 계획과 다릅니다/);
+});
+
+test('QA-LOG mutations use the strict parser and reject malformed or duplicate entries', () => {
+  const first = qaEntry('qa-a111', '첫 질문', '첫 답변');
+  const second = qaEntry(
+    'qa-b222',
+    '둘째 질문',
+    '둘째 답변\n\n### 2026-07-15 회고\n답변 안 제목',
+    '2026-07-16 10:00',
+  );
+  const raw = topicNote('Mutation', [first]).replace(/\n/g, '\r\n');
+  const appended = appendQaLogEntries(raw, [second]);
+  const parsed = parseTopicNote(appended, { filename: 'topic.md' });
+
+  assert.equal(parsed.parseable, true);
+  assert.deepEqual(parsed.entries.map(entry => entry.qaId), ['qa-a111', 'qa-b222']);
+  assert.match(parsed.entries[1].content, /### 2026-07-15 회고/);
+  assert.match(appended, /\r\n/);
+
+  const replaced = replaceQaLogEntries(appended, [parsed.entries[1]]);
+  assert.deepEqual(
+    parseTopicNote(replaced, { filename: 'topic.md' }).entries.map(entry => entry.qaId),
+    ['qa-b222'],
+  );
+  const emptied = replaceQaLogEntries(replaced, []);
+  assert.equal(parseTopicNote(emptied, { filename: 'topic.md' }).parseable, true);
+  assert.deepEqual(parseTopicNote(emptied, { filename: 'topic.md' }).entries, []);
+  assert.throws(() => appendQaLogEntries(raw, [first]), /QA-LOG 수정 결과가 올바르지 않습니다/);
+  assert.throws(() => appendQaLogEntries(raw.replace('<!-- QA-LOG-END -->', ''), [second]), /안전하게 수정/);
 });
 
 test('topic store audit separates repairable drift from unverifiable notes', async t => {

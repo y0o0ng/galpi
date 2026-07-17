@@ -23,6 +23,13 @@ const { createNoteSaveStateReader } = require('./lib/note-save-state');
 const { runDatabaseMigrations } = require('./lib/database-migrations');
 const { createTopicChunkStore } = require('./lib/topic-chunk-store');
 const {
+  appendQaLogEntries,
+  parseQaLog,
+  parseTopicNote,
+  replaceQaLogEntries,
+} = require('./lib/topic-store');
+const { createTopicMutationCoordinator } = require('./lib/topic-mutation');
+const {
   cosineSimilarity,
   extractQueryTerms,
   rankNoteCandidates,
@@ -488,6 +495,7 @@ db.exec(`
 
 runDatabaseMigrations(db);
 const topicChunkStore = createTopicChunkStore(db);
+const topicMutations = createTopicMutationCoordinator({ db });
 const paperFullTextService = createPaperFullTextService({
   db,
   vaultPath: VAULT_PATH,
@@ -800,11 +808,12 @@ const stmtListAllNotesExceptType = db.prepare(`
 const stmtGetAllNoteFilenames = db.prepare('SELECT filename, title FROM notes');
 const stmtDeleteNote = db.prepare('DELETE FROM notes WHERE filename = ?');
 const stmtDeleteNoteChunksByNote = db.prepare('DELETE FROM note_chunks WHERE note_filename = ?');
+const stmtCountNoteChunksByNote = db.prepare('SELECT COUNT(*) AS count FROM note_chunks WHERE note_filename = ?');
 const stmtDeleteNoteEdgesByNote = db.prepare('DELETE FROM note_edges WHERE source_filename = ? OR target_filename = ?');
 const stmtReassignChunks = db.prepare('UPDATE note_chunks SET note_filename = ?, note_title = ?, updated_at = strftime(\'%s\',\'now\') WHERE note_filename = ?');
 const stmtReassignDecisions = db.prepare('UPDATE auto_save_decisions SET note_filename = ?, note_title = ? WHERE note_filename = ?');
-const stmtMoveChunkByQaId = db.prepare("UPDATE note_chunks SET note_filename = ?, note_title = ?, updated_at = strftime('%s','now') WHERE chunk_id = ?");
-const stmtMoveDecisionByQaId = db.prepare('UPDATE auto_save_decisions SET note_filename = ?, note_title = ? WHERE qa_id = ?');
+const stmtMoveChunkByQaId = db.prepare("UPDATE note_chunks SET note_filename = ?, note_title = ?, updated_at = strftime('%s','now') WHERE chunk_id = ? AND note_filename = ?");
+const stmtMoveDecisionByQaId = db.prepare('UPDATE auto_save_decisions SET note_filename = ?, note_title = ? WHERE qa_id = ? AND note_filename = ?');
 const stmtGetEdgesTouchingNote = db.prepare('SELECT source_filename AS sourceFilename, source_title AS sourceTitle, target_filename AS targetFilename, target_title AS targetTitle, relation, score, confidence, reason, created_by AS createdBy FROM note_edges WHERE source_filename = ? OR target_filename = ?');
 const stmtGetTopicNotes = db.prepare("SELECT filename, title FROM notes WHERE archived = 0 AND note_type = 'topic' ORDER BY updated_at DESC, id DESC");
 const stmtUpdateChunkNoteTitle = db.prepare(
@@ -1089,23 +1098,6 @@ async function saveVaultNoteRecord({
   return null;
 }
 
-async function overwriteVaultNote(filename, noteContent) {
-  const safeName = path.basename(filename || '');
-  if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
-    throw new Error('잘못된 노트 파일명입니다.');
-  }
-
-  const filepath = path.join(VAULT_PATH, safeName);
-  if (!filepath.startsWith(VAULT_PATH + path.sep)) {
-    throw new Error('잘못된 경로입니다.');
-  }
-
-  const tmpPath = filepath + '.tmp';
-  await fs.writeFile(tmpPath, noteContent, 'utf8');
-  await fs.rename(tmpPath, filepath);
-  await fs.access(filepath);
-}
-
 function buildSemanticEmbeddingText(title, raw) {
   const body = stripFrontmatter(String(raw || ''))
     .replace(/<!-- CODEX-TAGS-START -->[\s\S]*?<!-- CODEX-TAGS-END -->/g, '')
@@ -1164,7 +1156,7 @@ function classifyAutoSaveValue(question, answer) {
   return { save: false, reason: 'weak_signal' };
 }
 
-function logAutoSaveDecision({
+function insertAutoSaveDecision({
   sessionId,
   userMessageId,
   assistantMessageId,
@@ -1179,22 +1171,26 @@ function logAutoSaveDecision({
   action = null,
   organizeQueued = 0,
 }) {
+  stmtInsertAutoSaveDecision.run({
+    sessionId: sessionId || null,
+    sourceUserMessage: userMessageId || null,
+    sourceAssistantMessage: assistantMessageId || null,
+    model: model || null,
+    decision,
+    reason,
+    question: String(question || '').trim().slice(0, 4000),
+    answerExcerpt: String(answer || '').trim().slice(0, 1200),
+    qaId,
+    noteFilename,
+    noteTitle,
+    action,
+    organizeQueued,
+  });
+}
+
+function logAutoSaveDecision(values) {
   try {
-    stmtInsertAutoSaveDecision.run({
-      sessionId: sessionId || null,
-      sourceUserMessage: userMessageId || null,
-      sourceAssistantMessage: assistantMessageId || null,
-      model: model || null,
-      decision,
-      reason,
-      question: String(question || '').trim().slice(0, 4000),
-      answerExcerpt: String(answer || '').trim().slice(0, 1200),
-      qaId,
-      noteFilename,
-      noteTitle,
-      action,
-      organizeQueued,
-    });
+    insertAutoSaveDecision(values);
   } catch (err) {
     console.warn('자동 저장 판단 로그 기록 실패:', err.message);
   }
@@ -1246,8 +1242,9 @@ function syncTopicTitleReferences(filename, title) {
 }
 
 async function regenerateTopicTitle(raw) {
-  const qaLog = extractMarkerBody(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
-  const entries = splitQaLogEntries(qaLog);
+  const parsed = parseQaLog(raw);
+  if (!parsed.parseable) throw new Error('제목을 재생성할 QA-LOG를 해석할 수 없습니다.');
+  const entries = parsed.entries.map(entry => entry.content);
   if (entries.length < 2) return null; // 1개일 땐 기존 제목 유지
 
   const digest = entries
@@ -1352,21 +1349,6 @@ async function generateAndStoreChunkEmbedding(chunkId, text) {
   const vec = await generateEmbedding(text);
   if (vec) topicChunkStore.updateEmbedding(chunkId, JSON.stringify(vec));
   return vec;
-}
-
-function saveQaChunkRecord({ qaId, filename, title, question, answer, model, sessionId, userMessageId, assistantMessageId }) {
-  const content = buildQaChunkText({ question, answer, model });
-  dbUpsertNoteChunk({
-    chunkId: qaId,
-    noteFilename: filename,
-    noteTitle: title,
-    chunkType: 'topic_qa',
-    content,
-    sourceSession: sessionId,
-    sourceUserMessage: userMessageId || null,
-    sourceAssistantMessage: assistantMessageId || null,
-  });
-  generateAndStoreChunkEmbedding(qaId, content).catch(() => {});
 }
 
 function createTopicNoteContent({ fileId, title, createdStr, qaId, question, answer, sessionId, messageId, model, qaEntry: qaEntryOverride }) {
@@ -1483,10 +1465,14 @@ function formatQaLogEntry({ qaId, question, answer, model, isMemo = false, webSo
 **A:** ${String(answer || '').trim()}${webSourceBlock}`;
 }
 
-function appendQaLogEntry(raw, entry) {
-  const marker = '<!-- QA-LOG-END -->';
-  if (!raw.includes(marker)) return null;
-  return raw.replace(marker, `${entry.trim()}\n\n${marker}`);
+function requireWritableTopic(raw, filename) {
+  const parsed = parseTopicNote(raw, { filename });
+  if (parsed.noteType !== 'topic') throw new Error(`${filename}은 topic 노트가 아닙니다.`);
+  if (!parsed.parseable) {
+    const detail = parsed.issues.map(item => `${item.code}: ${item.message}`).join('; ');
+    throw new Error(`${filename}의 QA-LOG를 안전하게 수정할 수 없습니다: ${detail}`);
+  }
+  return parsed;
 }
 
 // buildTopicSummary가 찍는 placeholder(또는 빈 요약) 여부. 실제 Codex 산문 요약과 구분.
@@ -1551,14 +1537,8 @@ async function findBestTopicNote(signalText, queryEmbedding) {
   return null;
 }
 
-// 토픽 노트 파일 쓰기는 전역 큐로 직렬화한다.
-// 같은 토픽에 동시 append가 겹치면 read-modify-write 경합으로 QA가 유실될 수 있어서다.
-let topicWriteChain = Promise.resolve();
-
 function autoAppendTopicNote(args) {
-  const run = topicWriteChain.then(() => autoAppendTopicNoteImpl(args));
-  topicWriteChain = run.then(() => {}, () => {});
-  return run;
+  return topicMutations.run(() => autoAppendTopicNoteImpl(args));
 }
 
 async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessageId, assistantMessageId, model, isMemo = false, forceSave = false, webSources = [] }) {
@@ -1593,8 +1573,8 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
   if (existing) {
     const filepath = path.join(VAULT_PATH, existing.filename);
     const raw = await fs.readFile(filepath, 'utf8');
-    const appended = appendQaLogEntry(raw, entry);
-    if (!appended) throw new Error(`${existing.filename}에 QA-LOG 마커가 없습니다.`);
+    requireWritableTopic(raw, existing.filename);
+    const appended = appendQaLogEntries(raw, [entry]);
     const withSummary = refreshTopicSummary(appended, title);
     const nextRaw = touchUpdatedFrontmatter(withSummary);
 
@@ -1605,43 +1585,50 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
       ? updateFrontmatterTitle(nextRaw, newTitle)
       : nextRaw;
     const finalTitle = newTitle || title;
+    requireWritableTopic(finalRaw, existing.filename);
+    const chunkContent = buildQaChunkText({ question, answer, model });
 
-    await overwriteVaultNote(existing.filename, finalRaw);
-    dbUpsertNote({
-      filename: existing.filename,
-      title: finalTitle,
-      noteType: 'topic',
-      codexStatus: 'pending',
-      sourceSession: sessionId,
-      sourceMessage: assistantMessageId,
+    await topicMutations.commit({
+      changes: [{ filepath, expectedContent: raw, nextContent: finalRaw }],
+      applyDatabase() {
+        dbUpsertNote({
+          filename: existing.filename,
+          title: finalTitle,
+          noteType: 'topic',
+          codexStatus: 'pending',
+          sourceSession: sessionId,
+          sourceMessage: assistantMessageId,
+        });
+        if (finalTitle !== title) syncTopicTitleReferences(existing.filename, finalTitle);
+        dbUpsertNoteChunk({
+          chunkId: qaId,
+          noteFilename: existing.filename,
+          noteTitle: finalTitle,
+          chunkType: 'topic_qa',
+          content: chunkContent,
+          sourceSession: sessionId,
+          sourceUserMessage: userMessageId,
+          sourceAssistantMessage: assistantMessageId,
+        });
+        insertAutoSaveDecision({
+          sessionId,
+          userMessageId,
+          assistantMessageId,
+          model,
+          decision: 'save',
+          reason: classification.reason,
+          question,
+          answer,
+          qaId,
+          noteFilename: existing.filename,
+          noteTitle: finalTitle,
+          action: 'appended',
+        });
+      },
     });
-    if (finalTitle !== title) syncTopicTitleReferences(existing.filename, finalTitle);
+
     generateAndStoreEmbedding(existing.filename, buildSemanticEmbeddingText(finalTitle, finalRaw)).catch(() => {});
-    saveQaChunkRecord({
-      qaId,
-      filename: existing.filename,
-      title: finalTitle,
-      question,
-      answer,
-      model,
-      sessionId,
-      userMessageId,
-      assistantMessageId,
-    });
-    logAutoSaveDecision({
-      sessionId,
-      userMessageId,
-      assistantMessageId,
-      model,
-      decision: 'save',
-      reason: classification.reason,
-      question,
-      answer,
-      qaId,
-      noteFilename: existing.filename,
-      noteTitle: finalTitle,
-      action: 'appended',
-    });
+    generateAndStoreChunkEmbedding(qaId, chunkContent).catch(() => {});
     maybeCreateCodexJobFromSaveEvents();
     return { filename: existing.filename, title: finalTitle, action: 'appended' };
   }
@@ -1658,46 +1645,54 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
     messageId: assistantMessageId || userMessageId,
     model,
   });
+  const filename = fileId + '.md';
+  const filepath = path.join(VAULT_PATH, filename);
+  const chunkContent = buildQaChunkText({ question, answer, model });
+  requireWritableTopic(noteContent, filename);
 
-  await saveVaultNoteRecord({
-    fileId,
-    title,
-    noteType: 'topic',
-    noteContent,
-    sessionId,
-    messageId: assistantMessageId || userMessageId,
-    codexStatus: 'pending',
+  await topicMutations.commit({
+    changes: [{ filepath, expectedContent: null, nextContent: noteContent }],
+    applyDatabase() {
+      dbUpsertNote({
+        filename,
+        title,
+        noteType: 'topic',
+        codexStatus: 'pending',
+        sourceSession: sessionId,
+        sourceMessage: assistantMessageId || userMessageId,
+      });
+      dbUpsertNoteChunk({
+        chunkId: qaId,
+        noteFilename: filename,
+        noteTitle: title,
+        chunkType: 'topic_qa',
+        content: chunkContent,
+        sourceSession: sessionId,
+        sourceUserMessage: userMessageId,
+        sourceAssistantMessage: assistantMessageId,
+      });
+      insertAutoSaveDecision({
+        sessionId,
+        userMessageId,
+        assistantMessageId,
+        model,
+        decision: 'save',
+        reason: classification.reason,
+        question,
+        answer,
+        qaId,
+        noteFilename: filename,
+        noteTitle: title,
+        action: 'created',
+      });
+    },
   });
 
-  saveQaChunkRecord({
-    qaId,
-    filename: fileId + '.md',
-    title,
-    question,
-    answer,
-    model,
-    sessionId,
-    userMessageId,
-    assistantMessageId,
-  });
-
-  logAutoSaveDecision({
-    sessionId,
-    userMessageId,
-    assistantMessageId,
-    model,
-    decision: 'save',
-    reason: classification.reason,
-    question,
-    answer,
-    qaId,
-    noteFilename: fileId + '.md',
-    noteTitle: title,
-    action: 'created',
-  });
+  generateAndStoreEmbedding(filename, buildSemanticEmbeddingText(title, noteContent)).catch(() => {});
+  generateAndStoreChunkEmbedding(qaId, chunkContent).catch(() => {});
   maybeCreateCodexJobFromSaveEvents();
 
-  return { filename: fileId + '.md', title, action: 'created' };
+  return { filename, title, action: 'created' };
 }
 
 function parseJsonObject(text) {
@@ -2521,11 +2516,13 @@ async function backfillNotesFromVault() {
 
 // 디스크에서 사라진 노트의 DB 흔적(notes/chunks/edges) 제거.
 // archived 노트는 _archive/에 있으니 둘 다 확인해 살아있는 파일은 건드리지 않는다.
-const deleteNoteEverywhere = db.transaction((filename) => {
+function deleteNoteEverywhereRecords(filename) {
   stmtDeleteNoteChunksByNote.run(filename);
   stmtDeleteNoteEdgesByNote.run(filename, filename);
   stmtDeleteNote.run(filename);
-});
+}
+
+const deleteNoteEverywhere = db.transaction(deleteNoteEverywhereRecords);
 
 async function pruneMissingNotes() {
   const pruned = [];
@@ -2641,31 +2638,56 @@ function assertSafeNoteFilename(filename) {
   return safeName;
 }
 
-async function moveNoteArchived(filename, archived, options = {}) {
+function buildArchiveMove({ filename, raw, archived, options = {} }) {
   const safeName = assertSafeNoteFilename(filename);
   const rootPath = path.join(VAULT_PATH, safeName);
   const archivePath = path.join(VAULT_PATH, ARCHIVE_DIR, safeName);
-  const src = archived ? rootPath : archivePath;
-  const dest = archived ? archivePath : rootPath;
+  const sourcePath = archived ? rootPath : archivePath;
+  const destinationPath = archived ? archivePath : rootPath;
+  const noteType = parseSimpleFrontmatter(raw).note_type || 'legacy';
+
+  if (noteType === 'topic') requireWritableTopic(raw, safeName);
+  const archivedRaw = archived ? normalizeArchivedNote(raw, options) : setFrontmatterArchived(raw, false);
+  const next = touchUpdatedFrontmatter(archivedRaw);
+  if (noteType === 'topic') requireWritableTopic(next, safeName);
+
+  return {
+    filename: safeName,
+    next,
+    changes: [
+      { filepath: destinationPath, expectedContent: null, nextContent: next },
+      { filepath: sourcePath, expectedContent: raw, nextContent: null },
+    ],
+  };
+}
+
+function moveNoteArchived(filename, archived, options = {}) {
+  return topicMutations.run(() => moveNoteArchivedImpl(filename, archived, options));
+}
+
+async function moveNoteArchivedImpl(filename, archived, options = {}) {
+  const safeName = assertSafeNoteFilename(filename);
+  const sourcePath = path.join(VAULT_PATH, archived ? '' : ARCHIVE_DIR, safeName);
 
   let raw;
   try {
-    raw = await fs.readFile(src, 'utf8');
+    raw = await fs.readFile(sourcePath, 'utf8');
   } catch {
     throw new Error(archived ? '노트를 찾을 수 없습니다.' : '보관된 노트를 찾을 수 없습니다.');
   }
 
-  const archivedRaw = archived ? normalizeArchivedNote(raw, options) : setFrontmatterArchived(raw, false);
-  const next = touchUpdatedFrontmatter(archivedRaw);
-  if (archived) await fs.mkdir(path.join(VAULT_PATH, ARCHIVE_DIR), { recursive: true });
+  const mutation = buildArchiveMove({ filename: safeName, raw, archived, options });
+  await topicMutations.commit({
+    changes: mutation.changes,
+    applyDatabase() {
+      const archivedResult = stmtSetNoteArchived.run(archived ? 1 : 0, safeName);
+      const codexResult = stmtUpdateNoteCodexStatus.run(archived ? 'processed' : 'pending', safeName);
+      if (archivedResult.changes !== 1 || codexResult.changes !== 1) {
+        throw new Error(`노트 DB 상태를 변경할 수 없습니다: ${safeName}`);
+      }
+    },
+  });
 
-  const tmp = dest + '.tmp';
-  await fs.writeFile(tmp, next, 'utf8');
-  await fs.rename(tmp, dest);
-  await fs.unlink(src).catch(() => {});
-
-  stmtSetNoteArchived.run(archived ? 1 : 0, safeName);
-  stmtUpdateNoteCodexStatus.run(archived ? 'processed' : 'pending', safeName);
   noteSearchCache.delete(safeName);
   return safeName;
 }
@@ -2769,8 +2791,14 @@ function extractNoteSection(raw, heading) {
 // 한 노트를 흡수할 QA-LOG 항목으로 변환. 토픽이면 기존 항목 보존, 아니면 본문을 항목 1개로 접는다.
 function sourceToEntries(src) {
   if (src.noteType === 'topic') {
-    const entries = splitQaLogEntries(extractMarkerBody(src.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->'));
-    if (entries.length > 0) return entries.map(text => ({ text, isExistingChunk: true }));
+    const parsed = requireWritableTopic(src.raw, src.filename);
+    if (parsed.entries.length > 0) {
+      return parsed.entries.map(entry => ({
+        text: entry.content,
+        isExistingChunk: true,
+        qaId: entry.qaId,
+      }));
+    }
   }
   const question = src.title;
   const answer = (extractNoteSection(src.raw, '결론')
@@ -2791,57 +2819,47 @@ function qaEntryQuestion(entry) {
   return String(entry || '').match(/\*\*Q:\*\*\s*([^\n]+)/)?.[1]?.trim() || '';
 }
 
-function qaEntryId(entry) {
-  return String(entry || '').match(/<!--\s*qa_id:\s*([^-\s][^>]*)-->/)?.[1]?.trim()
-    || String(entry || '').match(/<!--\s*qa_id:\s*([^>]+?)\s*-->/)?.[1]?.trim()
-    || null;
-}
-
-async function splitQaEntryIntoTopic({ sourceFilename, targetFilename, qaId }) {
-  const source = await loadNoteForMerge(sourceFilename);
-  if (source.noteType !== 'topic') throw new Error('토픽 노트만 분리할 수 있습니다.');
-  if (targetFilename === source.filename) throw new Error('같은 노트로는 분리할 수 없습니다.');
-
-  const target = stmtGetTopicNotes.all().find(note => note.filename === targetFilename);
-  if (!target) throw new Error(`대상 토픽을 찾을 수 없습니다: ${targetFilename}`);
-
-  const sourceQaLog = extractMarkerBody(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
-  const entries = splitQaLogEntries(sourceQaLog);
-  const entry = entries.find(item => qaEntryId(item) === qaId);
-  if (!entry) throw new Error(`분리할 QA 항목을 찾을 수 없습니다: ${qaId}`);
-
-  const remaining = entries.filter(item => item !== entry).join('\n\n');
-  let nextSource = replaceMarkerBlock(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->', remaining);
-  nextSource = replaceMarkerBlock(nextSource, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw: nextSource }));
-  nextSource = touchUpdatedFrontmatter(nextSource);
-
-  const targetRaw = await fs.readFile(path.join(VAULT_PATH, target.filename), 'utf8');
-  let nextTarget = appendQaLogEntry(targetRaw, entry);
-  if (!nextTarget) throw new Error(`${target.filename}에 QA-LOG 마커가 없습니다.`);
-  nextTarget = refreshTopicSummary(nextTarget, target.title);
-  nextTarget = touchUpdatedFrontmatter(nextTarget);
-
-  await writeVaultNoteByFilename(source.filename, nextSource);
-  await writeVaultNoteByFilename(target.filename, nextTarget);
-  if (qaId) {
-    stmtMoveChunkByQaId.run(target.filename, target.title, qaId);
-    stmtMoveDecisionByQaId.run(target.filename, target.title, qaId);
-  }
-  stmtUpdateNoteCodexStatus.run('pending', source.filename);
-  stmtUpdateNoteCodexStatus.run('pending', target.filename);
-
-  return {
-    source: source.filename,
-    target: target.filename,
-    title: target.title,
-    qaId,
-    moved: qaEntryQuestion(entry),
-  };
+function splitQaEntryIntoTopic({ sourceFilename, targetFilename, qaId }) {
+  return topicMutations.run(async () => {
+    const result = await splitQaEntriesIntoTopicImpl({
+      sourceFilename,
+      targetFilename,
+      qaIds: [qaId],
+      deleteEmptySource: false,
+    });
+    return {
+      source: result.source,
+      target: result.target,
+      title: result.title,
+      qaId,
+      moved: result.movedQuestions[0] || '',
+    };
+  });
 }
 
 // 여러 Q&A 항목을 source 토픽에서 새 토픽(또는 기존 토픽)으로 한 번에 분리한다. (merge의 대칭)
 // source의 Q&A가 전부 빠지면 빈 껍데기 노트를 완전삭제한다(edge까지 정리 → 유령 링크 방지).
-async function splitQaEntriesIntoTopic({ sourceFilename, qaIds, targetFilename = null, newTitle = null }) {
+function splitQaEntriesIntoTopic(args) {
+  return topicMutations.run(async () => {
+    const result = await splitQaEntriesIntoTopicImpl({ ...args, deleteEmptySource: true });
+    return {
+      source: result.source,
+      sourceDeleted: result.sourceDeleted,
+      target: result.target,
+      title: result.title,
+      createdNew: result.createdNew,
+      movedCount: result.movedCount,
+    };
+  });
+}
+
+async function splitQaEntriesIntoTopicImpl({
+  sourceFilename,
+  qaIds,
+  targetFilename = null,
+  newTitle = null,
+  deleteEmptySource = true,
+}) {
   const ids = [...new Set((qaIds || []).map(s => String(s || '').trim()).filter(Boolean))];
   if (ids.length === 0) throw new Error('분리할 Q&A 항목을 선택해주세요.');
 
@@ -2849,74 +2867,131 @@ async function splitQaEntriesIntoTopic({ sourceFilename, qaIds, targetFilename =
   if (source.noteType !== 'topic') throw new Error('토픽 노트만 분리할 수 있습니다.');
   if (targetFilename && targetFilename === source.filename) throw new Error('같은 노트로는 분리할 수 없습니다.');
 
-  const sourceQaLog = extractMarkerBody(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
-  const entries = splitQaLogEntries(sourceQaLog);
+  const sourceParsed = requireWritableTopic(source.raw, source.filename);
+  const entries = sourceParsed.entries;
   const idSet = new Set(ids);
-  const moved = entries.filter(e => idSet.has(qaEntryId(e)));
-  const movedIds = [...new Set(moved.map(qaEntryId).filter(Boolean))];
+  const moved = entries.filter(entry => idSet.has(entry.qaId));
+  const movedIds = moved.map(entry => entry.qaId);
   const missingIds = ids.filter(id => !movedIds.includes(id));
   if (missingIds.length > 0) throw new Error(`선택한 Q&A 항목을 찾을 수 없습니다: ${missingIds.join(', ')}`);
-  const remaining = entries.filter(e => !idSet.has(qaEntryId(e)));
+  const remaining = entries.filter(entry => !idSet.has(entry.qaId));
+  const changes = [];
 
   // 대상 토픽 결정: 기존 target에 흡수, 또는 새 토픽 생성
-  let resultFilename, resultTitle, createdNew = false;
+  let resultFilename;
+  let resultTitle;
+  let targetRaw;
+  let nextTarget;
+  let createdNew = false;
   if (targetFilename) {
-    const target = stmtGetTopicNotes.all().find(n => n.filename === targetFilename);
-    if (!target) throw new Error(`대상 토픽을 찾을 수 없습니다: ${targetFilename}`);
-    let targetRaw = await fs.readFile(path.join(VAULT_PATH, target.filename), 'utf8');
-    const targetIds = new Set(splitQaLogEntries(
-      extractMarkerBody(targetRaw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->')
-    ).map(qaEntryId).filter(Boolean));
-    const duplicateId = movedIds.find(id => targetIds.has(id));
-    if (duplicateId) throw new Error(`대상 토픽에 이미 같은 Q&A가 있습니다: ${duplicateId}`);
-    for (const e of moved) {
-      const appended = appendQaLogEntry(targetRaw, e);
-      if (!appended) throw new Error(`${target.filename}에 QA-LOG 마커가 없습니다.`);
-      targetRaw = appended;
-    }
-    targetRaw = refreshTopicSummary(targetRaw, target.title);
-    targetRaw = touchUpdatedFrontmatter(targetRaw);
-    await writeVaultNoteByFilename(target.filename, targetRaw);
-    generateAndStoreEmbedding(target.filename, buildSemanticEmbeddingText(target.title, targetRaw)).catch(() => {});
+    const targetRecord = stmtGetTopicNotes.all().find(note => note.filename === targetFilename);
+    if (!targetRecord) throw new Error(`대상 토픽을 찾을 수 없습니다: ${targetFilename}`);
+    const target = await loadNoteForMerge(targetRecord.filename);
+    requireWritableTopic(target.raw, target.filename);
+    targetRaw = target.raw;
+    nextTarget = appendQaLogEntries(targetRaw, moved);
+    nextTarget = refreshTopicSummary(nextTarget, target.title);
+    nextTarget = touchUpdatedFrontmatter(nextTarget);
+    requireWritableTopic(nextTarget, target.filename);
     resultFilename = target.filename;
     resultTitle = target.title;
+    changes.push({
+      filepath: path.join(VAULT_PATH, target.filename),
+      expectedContent: targetRaw,
+      nextContent: nextTarget,
+    });
   } else {
     createdNew = true;
-    resultTitle = sanitizeTitle(newTitle, null) || makeTopicTitle(qaEntryQuestion(moved[0]) || source.title);
+    resultTitle = sanitizeTitle(newTitle, null) || makeTopicTitle(qaEntryQuestion(moved[0].content) || source.title);
     const { fileId, createdStr } = createNoteIdentity();
     resultFilename = fileId + '.md';
-    const content = createTopicNoteContent({ fileId, title: resultTitle, createdStr, qaEntry: moved.join('\n\n'), sessionId: 'split', messageId: 'split' });
-    await saveVaultNoteRecord({ fileId, title: resultTitle, noteType: 'topic', noteContent: content, codexStatus: 'pending' });
-  }
-
-  // chunk/decision 참조를 분리된 토픽으로 이동
-  for (const id of movedIds) {
-    stmtMoveChunkByQaId.run(resultFilename, resultTitle, id);
-    stmtMoveDecisionByQaId.run(resultFilename, resultTitle, id);
+    nextTarget = createTopicNoteContent({
+      fileId,
+      title: resultTitle,
+      createdStr,
+      qaEntry: moved.map(entry => entry.content).join('\n\n'),
+      sessionId: 'split',
+      messageId: 'split',
+    });
+    requireWritableTopic(nextTarget, resultFilename);
+    changes.push({
+      filepath: path.join(VAULT_PATH, resultFilename),
+      expectedContent: null,
+      nextContent: nextTarget,
+    });
   }
 
   // source 갱신, Q&A가 전부 빠졌으면 완전삭제
-  let sourceDeleted = false;
-  if (remaining.length === 0) {
-    await fs.unlink(path.join(VAULT_PATH, source.filename));
-    deleteNoteEverywhere(source.filename);
-    noteSearchCache.delete(source.filename);
-    sourceDeleted = true;
+  const sourceDeleted = deleteEmptySource && remaining.length === 0;
+  if (sourceDeleted && stmtCountNoteChunksByNote.get(source.filename).count !== movedIds.length) {
+    throw new Error(`source 토픽에 이동 대상 밖의 청크가 있어 삭제할 수 없습니다: ${source.filename}`);
+  }
+  let nextSource = null;
+  if (sourceDeleted) {
+    changes.push({
+      filepath: path.join(VAULT_PATH, source.filename),
+      expectedContent: source.raw,
+      nextContent: null,
+    });
   } else {
-    let nextSource = replaceMarkerBlock(source.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->', remaining.join('\n\n'));
+    nextSource = replaceQaLogEntries(source.raw, remaining);
     nextSource = replaceMarkerBlock(nextSource, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw: nextSource }));
     nextSource = touchUpdatedFrontmatter(nextSource);
-    await writeVaultNoteByFilename(source.filename, nextSource);
-    stmtUpdateNoteCodexStatus.run('pending', source.filename);
+    requireWritableTopic(nextSource, source.filename);
+    changes.push({
+      filepath: path.join(VAULT_PATH, source.filename),
+      expectedContent: source.raw,
+      nextContent: nextSource,
+    });
+  }
+
+  await topicMutations.commit({
+    changes,
+    applyDatabase() {
+      if (createdNew) {
+        dbUpsertNote({
+          filename: resultFilename,
+          title: resultTitle,
+          noteType: 'topic',
+          codexStatus: 'pending',
+        });
+      }
+      for (const id of movedIds) {
+        const chunkResult = stmtMoveChunkByQaId.run(resultFilename, resultTitle, id, source.filename);
+        if (chunkResult.changes !== 1) throw new Error(`이동할 Q&A 청크를 찾을 수 없습니다: ${id}`);
+        stmtMoveDecisionByQaId.run(resultFilename, resultTitle, id, source.filename);
+      }
+      if (sourceDeleted) {
+        deleteNoteEverywhereRecords(source.filename);
+      } else if (stmtUpdateNoteCodexStatus.run('pending', source.filename).changes !== 1) {
+        throw new Error(`source 토픽 상태를 변경할 수 없습니다: ${source.filename}`);
+      }
+      if (stmtUpdateNoteCodexStatus.run('pending', resultFilename).changes !== 1) {
+        throw new Error(`target 토픽 상태를 변경할 수 없습니다: ${resultFilename}`);
+      }
+    },
+  });
+
+  noteSearchCache.delete(source.filename);
+  noteSearchCache.delete(resultFilename);
+  if (!sourceDeleted && nextSource) {
     generateAndStoreEmbedding(source.filename, buildSemanticEmbeddingText(source.title, nextSource)).catch(() => {});
   }
-  stmtUpdateNoteCodexStatus.run('pending', resultFilename);
+  generateAndStoreEmbedding(resultFilename, buildSemanticEmbeddingText(resultTitle, nextTarget)).catch(() => {});
 
-  return { source: source.filename, sourceDeleted, target: resultFilename, title: resultTitle, createdNew, movedCount: moved.length };
+  return {
+    source: source.filename,
+    sourceDeleted,
+    target: resultFilename,
+    title: resultTitle,
+    createdNew,
+    movedCount: moved.length,
+    movedQuestions: moved.map(entry => qaEntryQuestion(entry.content)),
+  };
 }
 
 // source의 DB 참조(chunks/decisions/edges)를 target으로 재지정. edge는 자기루프 제거 + upsert dedup.
-const reassignNoteReferences = db.transaction((fromFilename, toFilename, toTitle) => {
+function reassignNoteReferencesRecords(fromFilename, toFilename, toTitle) {
   stmtReassignChunks.run(toFilename, toTitle, fromFilename);
   stmtReassignDecisions.run(toFilename, toTitle, fromFilename);
   for (const e of stmtGetEdgesTouchingNote.all(fromFilename, fromFilename)) {
@@ -2929,7 +3004,7 @@ const reassignNoteReferences = db.transaction((fromFilename, toFilename, toTitle
     }
   }
   stmtDeleteNoteEdgesByNote.run(fromFilename, fromFilename);
-});
+}
 
 // target CODEX-LINKS에서 흡수된 source 노트로 향하는 링크 제거 (빈 그룹 헤더도 정리).
 // DB edge는 reassignNoteReferences가 self-loop로 지우지만, 파일 마크다운 링크는 별도라 여기서 맞춘다.
@@ -3018,7 +3093,11 @@ async function stripArchivedLinksFromNoteFile(filename) {
   return true;
 }
 
-async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle = null }) {
+function mergeNotesIntoTopic(args) {
+  return topicMutations.run(() => mergeNotesIntoTopicImpl(args));
+}
+
+async function mergeNotesIntoTopicImpl({ filenames, targetFilename = null, newTitle = null }) {
   let srcNames = [...new Set((filenames || []).map(f => String(f || '').trim()).filter(Boolean))]
     .filter(f => f !== targetFilename);
 
@@ -3045,24 +3124,27 @@ async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle 
     for (const e of sourceToEntries(src)) folded.push({ ...e, sourceFilename: src.filename, sourceTitle: src.title });
   }
 
-  let resultFilename, resultTitle, createdNew = false;
+  const changes = [];
+  let resultFilename;
+  let resultTitle;
+  let nextTarget;
+  let createdNew = false;
   if (target) {
     resultFilename = target.filename;
     resultTitle = target.title;
-    let raw = target.raw;
-    for (const f of folded) {
-      const appended = appendQaLogEntry(raw, f.text);
-      if (!appended) throw new Error(`${resultFilename}에 QA-LOG 마커가 없습니다.`);
-      raw = appended;
+    requireWritableTopic(target.raw, target.filename);
+    nextTarget = appendQaLogEntries(target.raw, folded.map(entry => entry.text));
+    if (hasMarkerBlock(nextTarget, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
+      nextTarget = replaceMarkerBlock(nextTarget, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw: nextTarget }));
     }
-    if (hasMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->')) {
-      raw = replaceMarkerBlock(raw, '<!-- CODEX-SUMMARY-START -->', '<!-- CODEX-SUMMARY-END -->', buildTopicSummary({ raw }));
-    }
-    raw = stripCodexLinksToTitles(raw, sources.map(s => s.title)); // 이미 흡수한 노트로 가는 링크 제거
-    raw = touchUpdatedFrontmatter(raw);
-    await overwriteVaultNote(resultFilename, raw);
-    dbUpsertNote({ filename: resultFilename, title: resultTitle, noteType: 'topic', codexStatus: 'pending' });
-    generateAndStoreEmbedding(resultFilename, buildSemanticEmbeddingText(resultTitle, raw)).catch(() => {});
+    nextTarget = stripCodexLinksToTitles(nextTarget, sources.map(source => source.title));
+    nextTarget = touchUpdatedFrontmatter(nextTarget);
+    requireWritableTopic(nextTarget, resultFilename);
+    changes.push({
+      filepath: path.join(VAULT_PATH, resultFilename),
+      expectedContent: target.raw,
+      nextContent: nextTarget,
+    });
   } else {
     createdNew = true;
     resultTitle = sanitizeTitle(newTitle, null)
@@ -3070,22 +3152,85 @@ async function mergeNotesIntoTopic({ filenames, targetFilename = null, newTitle 
       || makeTopicTitle(sources[0].title);
     const { fileId, createdStr } = createNoteIdentity();
     resultFilename = fileId + '.md';
-    const content = createTopicNoteContent({ fileId, title: resultTitle, createdStr, qaEntry: folded.map(f => f.text).join('\n\n'), sessionId: 'merge', messageId: 'merge' });
-    await saveVaultNoteRecord({ fileId, title: resultTitle, noteType: 'topic', noteContent: content, codexStatus: 'pending' });
+    nextTarget = createTopicNoteContent({
+      fileId,
+      title: resultTitle,
+      createdStr,
+      qaEntry: folded.map(entry => entry.text).join('\n\n'),
+      sessionId: 'merge',
+      messageId: 'merge',
+    });
+    requireWritableTopic(nextTarget, resultFilename);
+    changes.push({
+      filepath: path.join(VAULT_PATH, resultFilename),
+      expectedContent: null,
+      nextContent: nextTarget,
+    });
   }
 
-  for (const src of sources) reassignNoteReferences(src.filename, resultFilename, resultTitle);
-  for (const f of folded.filter(x => !x.isExistingChunk)) {
-    saveQaChunkRecord({ qaId: f.qaId, filename: resultFilename, title: resultTitle, question: f.question, answer: f.answer, model: '병합' });
+  for (const source of sources) {
+    const archiveMutation = buildArchiveMove({
+      filename: source.filename,
+      raw: source.raw,
+      archived: true,
+      options: { mergedIntoTitle: resultTitle, mergedIntoFilename: resultFilename },
+    });
+    changes.push(...archiveMutation.changes);
   }
 
-  const archived = [];
-  for (const src of sources) {
-    try { await moveNoteArchived(src.filename, true, { mergedIntoTitle: resultTitle, mergedIntoFilename: resultFilename }); archived.push(src.filename); }
-    catch (err) { console.warn(`병합 후 보관 실패 (${src.filename}):`, err.message); }
+  const newChunks = folded
+    .filter(entry => !entry.isExistingChunk)
+    .map(entry => ({
+      ...entry,
+      content: buildQaChunkText({ question: entry.question, answer: entry.answer, model: '병합' }),
+    }));
+
+  await topicMutations.commit({
+    changes,
+    applyDatabase() {
+      dbUpsertNote({
+        filename: resultFilename,
+        title: resultTitle,
+        noteType: 'topic',
+        codexStatus: 'pending',
+      });
+      for (const source of sources) {
+        reassignNoteReferencesRecords(source.filename, resultFilename, resultTitle);
+      }
+      for (const chunk of newChunks) {
+        dbUpsertNoteChunk({
+          chunkId: chunk.qaId,
+          noteFilename: resultFilename,
+          noteTitle: resultTitle,
+          chunkType: 'topic_qa',
+          content: chunk.content,
+        });
+      }
+      for (const source of sources) {
+        const archivedResult = stmtSetNoteArchived.run(1, source.filename);
+        const codexResult = stmtUpdateNoteCodexStatus.run('processed', source.filename);
+        if (archivedResult.changes !== 1 || codexResult.changes !== 1) {
+          throw new Error(`병합 source 상태를 변경할 수 없습니다: ${source.filename}`);
+        }
+      }
+    },
+  });
+
+  noteSearchCache.delete(resultFilename);
+  for (const source of sources) noteSearchCache.delete(source.filename);
+  generateAndStoreEmbedding(resultFilename, buildSemanticEmbeddingText(resultTitle, nextTarget)).catch(() => {});
+  for (const chunk of newChunks) {
+    generateAndStoreChunkEmbedding(chunk.qaId, chunk.content).catch(() => {});
   }
 
-  return { target: resultFilename, title: resultTitle, createdNew, absorbed: sources.map(s => s.filename), archived, entries: folded.length };
+  return {
+    target: resultFilename,
+    title: resultTitle,
+    createdNew,
+    absorbed: sources.map(source => source.filename),
+    archived: sources.map(source => source.filename),
+    entries: folded.length,
+  };
 }
 
 async function buildMergeCandidateProfile(topic) {
@@ -3505,10 +3650,11 @@ app.get('/api/notes/:filename/qa-entries', async (req, res) => {
   try {
     const note = await loadNoteForMerge(req.params.filename || '');
     if (note.noteType !== 'topic') return res.status(400).json({ error: '토픽 노트만 분리할 수 있습니다.' });
-    const qaLog = extractMarkerBody(note.raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
-    const entries = splitQaLogEntries(qaLog)
-      .map(e => ({ qaId: qaEntryId(e), question: qaEntryQuestion(e) || '(제목 없음)' }))
-      .filter(e => e.qaId);
+    const parsed = requireWritableTopic(note.raw, note.filename);
+    const entries = parsed.entries.map(entry => ({
+      qaId: entry.qaId,
+      question: qaEntryQuestion(entry.content) || '(제목 없음)',
+    }));
     res.json({ success: true, filename: note.filename, title: note.title, entries });
   } catch (err) {
     const status = err.code === 'ENOENT' ? 404 : err.message === '잘못된 노트 파일명입니다.' ? 400 : 500;
@@ -4329,17 +4475,10 @@ function extractMarkerBody(raw, startMarker, endMarker) {
   return raw.slice(range.bodyStart, range.end).trim();
 }
 
-function splitQaLogEntries(qaLog) {
-  return String(qaLog || '')
-    .split(/(?=^###\s+\d{4}-\d{2}-\d{2}\s+)/m)
-    .map(item => item.trim())
-    .filter(item => /^###\s+\d{4}-\d{2}-\d{2}\s+/.test(item));
-}
-
 function buildTopicSummary({ raw }) {
-  const qaLog = extractMarkerBody(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
-  const entries = splitQaLogEntries(qaLog);
-  const count = entries.length;
+  const parsed = parseQaLog(raw);
+  if (!parsed.parseable) throw new Error('요약할 QA-LOG를 해석할 수 없습니다.');
+  const count = parsed.entries.length;
   return [
     `- Codex 정리 대기: QA-LOG에 ${count}개의 항목이 쌓여 있다.`,
     '- /organize process 또는 /organize all 실행 시 이 구역을 누적 맥락 요약으로 교체한다.',
@@ -4347,12 +4486,12 @@ function buildTopicSummary({ raw }) {
 }
 
 function buildTopicProposals({ title, raw }) {
-  const qaLog = extractMarkerBody(raw, '<!-- QA-LOG-START -->', '<!-- QA-LOG-END -->');
-  const entries = splitQaLogEntries(qaLog);
-  if (entries.length < 8) return '';
+  const parsed = parseQaLog(raw);
+  if (!parsed.parseable) throw new Error('제안할 QA-LOG를 해석할 수 없습니다.');
+  if (parsed.entries.length < 8) return '';
 
   return [
-    `- 제안: "${title}" 토픽에 Q&A가 ${entries.length}개 쌓였으므로, 반복되는 하위 주제가 있는지 검토할 것.`,
+    `- 제안: "${title}" 토픽에 Q&A가 ${parsed.entries.length}개 쌓였으므로, 반복되는 하위 주제가 있는지 검토할 것.`,
     '- 실행 방식: Codex가 바로 분열하지 말고 Clawd에 split 후보를 알림으로 제안할 것.',
   ].join('\n');
 }
@@ -5534,7 +5673,7 @@ app.post('/api/council/save-note', async (req, res) => {
   }
 
   if (messageId) {
-    await topicWriteChain;
+    await topicMutations.run(() => {});
     const existing = getSavedNoteByMessageId(messageId, 'council');
     if (existing) return res.json({ success: true, title: existing.title, filename: existing.filename, duplicate: true });
   }
