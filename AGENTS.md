@@ -86,10 +86,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **프로젝트 현재 상태**
 
 - 현재 배포 상태: V4 논문 검색·전문 능동 독서, 지식 패널, 알림센터 `최근 저장`, 유지보수 리뷰에 더해 컨텍스트 노트 선택 UI(`516a147`)와 V4.5 S0b-2a·2b(`699d1e9`, `7e4fdc5`)까지 Pi 배포·운영 적용 완료. `/search`는 결과를 자동 활성화하지 않고 검색 카드·일반 노트·저장 논문 상세에서 필요한 자료만 컨텍스트에 추가하며, 질문 기반 자동 회수는 그대로 유지한다.
-- 현재 개발 상태: 2026-07-16 Pi 승인형 복구에서 동시 DB·vault 백업 `20260716-1733`을 만든 뒤 schema version 2 migration과 작업 13건을 적용했다. 활성 topic의 Markdown Q&A 65개와 ready 청크 65개가 모두 일치하고, 중복·DB-only·제목 drift·source 오류는 0건이다. 원본 없는 청크 4건은 삭제하지 않고 `source_missing`으로 회수 제외했으며 DB 무결성·외래키·전체 테스트 76개·인증 API·서비스 재기동을 통과했다. A1 shadow의 Pi 실사용은 note 15/20·chunk 9/20·abstention 0/4라 A2 전환 전이다.
-- 다음 개발 시작점: append/split/merge/archive를 공용 QA-LOG parser와 topic mutation queue로 직렬화하고 원자적 파일 교체·DB transaction·실패 복원을 공용 쓰기 경로에 적용한다. 그다음 A1b에서 전역 청크 검색+노트 soft prior와 무관 evidence 중단 임계값을 같은 Pi 비공개 20개 fixture로 shadow 보정한다. V4.5 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며 Pi `.env`는 `PAPER_SEARCH_MOCK=false`, `npm audit` 기존 경고는 자동 수정하지 않는다.
+- 현재 개발 상태: S0 공용 쓰기 경로를 `d41defe`에서 로컬 구현했다. append·split·merge·archive/restore가 strict QA-LOG parser와 전역 mutation queue를 공유하고, 읽은 원문 precondition·임시 파일+rename·다중 파일 snapshot·SQLite transaction·실패 복원을 적용한다. split은 이동 대상 밖 청크가 있으면 source 삭제 전에 중단한다. 전체 테스트 85개, 임시 서버 HTTP split→archive/restore→merge, 로컬 audit Q&A 7/7을 통과했으며 Pi에는 아직 배포하지 않았다. A1 shadow의 Pi 실사용은 note 15/20·chunk 9/20·abstention 0/4라 A2 전환 전이다.
+- 다음 개발 시작점: `d41defe`를 Pi에 배포해 전체 테스트 85개·readonly topic audit 65/65·서비스와 인증 API를 인수한다. 그다음 A1b에서 전역 청크 검색+노트 soft prior와 무관 evidence 중단 임계값을 같은 Pi 비공개 20개 fixture로 shadow 보정한다. V4.5 전에는 V4-B 음성·V5 전문 에이전트를 구현하지 않는다. 논문 10+10 품질 평가는 별도 컨펌 전이며 Pi `.env`는 `PAPER_SEARCH_MOCK=false`, `npm audit` 기존 경고는 자동 수정하지 않는다.
 - 완료된 V3.5: 모든 모델 경로 KST 현재 시각 주입, `[N일 후]` 경과 마커, 짧은 사실 확인 자동 저장 차단, 한 글자 기능어 검색 노이즈 제거
-- 코드 구조 방향: `server.js`는 현재 5,684줄. 기존 코드를 한꺼번에 분해하지 말고, V4.5는 topic-store·migration·retrieval·memory·trace·task·scheduler를 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
+- 코드 구조 방향: `server.js`는 현재 5,823줄. 기존 코드를 한꺼번에 분해하지 말고, V4.5는 topic-store·topic-mutation·migration·retrieval·memory·trace·task·scheduler를 별도 모듈로 작성하며 서버에는 설정과 얇은 라우트만 둘 것
 - 기존 검색·의회·Codex·웹 검색 코드는 해당 영역을 크게 수정할 때 회귀 테스트와 함께 점진적으로 모듈로 옮길 것
 - 비용 확인은 상단 `Claude 크레딧 ↗`에서 공식 Billing을 연다. 잔액 자동 조회는 하지 않고 Console 로그인 정보·쿠키·관리자 키를 앱에 저장하지 않을 것
 - 노트 구조 방향: v4 유지. 사람도 읽기 좋고 AI도 회수하기 좋은 형식. CODEX 마커 구역은 Codex가 안전하게 편집할 수 있는 영역으로 유지
