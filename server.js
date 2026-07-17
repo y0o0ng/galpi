@@ -18,6 +18,7 @@ const { createPaperNoteSaver } = require('./lib/paper-notes');
 const { createPaperFullTextService } = require('./lib/paper-fulltext');
 const { createPaperFullTextTools, formatPaperEvidenceBlock } = require('./lib/paper-fulltext-tools');
 const { runClaudeToolLoop } = require('./lib/claude-tool-loop');
+const { createProgressStream, progressStageForTool } = require('./lib/progress-stream');
 const { createRecentSavesReader } = require('./lib/recent-saves');
 const { createNoteSaveStateReader } = require('./lib/note-save-state');
 const { runDatabaseMigrations } = require('./lib/database-migrations');
@@ -2006,6 +2007,8 @@ async function generateClaudeReplyWithTools({
   messages,
   enableWebTool = false,
   paperToolSession = null,
+  onStage = () => {},
+  writingStage = 'answer',
 }) {
   const webEvidences = [];
   const MAX_TOOL_SEARCHES = 3;
@@ -2032,18 +2035,26 @@ async function generateClaudeReplyWithTools({
         if (!requestInput) return { isError: true, content: '검색어가 비어 있어 검색을 실행하지 못했습니다.' };
         if (searchCount >= MAX_TOOL_SEARCHES) return { content: '검색 횟수 제한으로 이 요청은 생략되었습니다.' };
         searchCount += 1;
+        onStage(progressStageForTool(toolUse.name));
         try {
           const evidence = await searchWeb(requestInput.query, requestInput);
           webEvidences.push(evidence);
           return { content: buildWebToolResultText(evidence) };
         } catch (error) {
           return { isError: true, content: `검색 실패: ${error.message}` };
+        } finally {
+          onStage(writingStage);
         }
       }
       if (toolUse.name === 'paper_fulltext_search' || toolUse.name === 'paper_fulltext_read') {
         if (!paperToolSession) return { isError: true, content: '현재 질문에는 전문 검색이 허용된 논문이 없습니다.' };
-        const toolResult = await paperToolSession.execute(toolUse.name, toolUse.input);
-        return { isError: toolResult.payload?.success === false, content: toolResult.content };
+        onStage(progressStageForTool(toolUse.name));
+        try {
+          const toolResult = await paperToolSession.execute(toolUse.name, toolUse.input);
+          return { isError: toolResult.payload?.success === false, content: toolResult.content };
+        } finally {
+          onStage(writingStage);
+        }
       }
       return { isError: true, content: '허용되지 않은 도구입니다.' };
     },
@@ -2059,7 +2070,11 @@ async function generateClaudeReplyWithTools({
   };
 }
 
-async function generateChatReply(model, context, { enableWebTool = false, paperToolSession = null } = {}) {
+async function generateChatReply(model, context, {
+  enableWebTool = false,
+  paperToolSession = null,
+  onStage = () => {},
+} = {}) {
   if (model !== 'claude') throw new Error('단일 채팅은 Claude만 사용합니다.');
   return generateClaudeReplyWithTools({
     model: CLAUDE_MODEL,
@@ -2067,6 +2082,7 @@ async function generateChatReply(model, context, { enableWebTool = false, paperT
     messages: context,
     enableWebTool,
     paperToolSession,
+    onStage,
   });
 }
 
@@ -2187,11 +2203,12 @@ function hasWebEvidenceResults(webEvidence) {
 // 의회 웹검색: Claude가 tool_use로 검색 필요성과 검색어를 판단한다.
 // 답변은 버리고 검색 evidence만 뽑아, 같은 근거를 Claude/GPT 양쪽 1차 답변에 주입한다.
 // (단일 채팅과 같은 도구를 쓰되, 여기서는 검색 결과만 회수한다.)
-async function decideCouncilWebEvidence(context, claudeModel) {
+async function decideCouncilWebEvidence(context, claudeModel, onStage = () => {}) {
   if (!WEB_SEARCH_ENABLED || !WEB_SEARCH_MODEL_TOOL_ENABLED) return null;
 
   let response;
   try {
+    onStage('evidence');
     response = await anthropic.messages.create({
       model: claudeModel,
       max_tokens: 600,
@@ -2213,6 +2230,7 @@ async function decideCouncilWebEvidence(context, claudeModel) {
   if (!requestInput) return null;
 
   try {
+    onStage('web_search');
     const evidence = await searchWeb(requestInput.query, requestInput);
     return hasWebEvidenceResults(evidence) ? evidence : null;
   } catch (err) {
@@ -2224,7 +2242,7 @@ async function decideCouncilWebEvidence(context, claudeModel) {
 // ─── 채팅 ────────────────────────────────────────────────────────────────────
 
 app.post('/api/chat', async (req, res) => {
-  const { message, model, sessionId, activeNotes, webSearch } = req.body;
+  const { message, model, sessionId, activeNotes, webSearch, progress: wantsProgress } = req.body;
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
   }
@@ -2232,29 +2250,33 @@ app.post('/api/chat', async (req, res) => {
   if (!HAS_CLAUDE)        return res.status(400).json({ error: 'Claude 키가 없습니다.' });
   if (message.length > 10000)                return res.status(400).json({ error: '메시지가 너무 깁니다 (최대 10,000자).' });
 
-  hydrateSessionFromDb(sessionId);
-  const history = sessions[sessionId];
-  const requestTime = new Date();
-  const requestCreatedAt = Math.floor(requestTime.getTime() / 1000);
-  const previousMessageCreatedAt = getLastMessageTimestamp(history);
-  history.push({ role: 'user', content: message, createdAt: requestCreatedAt });
-
-  // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
-  const memoryItems = await readMemoryItems();
-  const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
-    message,
-    activeNotes,
-    sessionId,
-    'chat',
-  );
-  const baseContext = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
-  let webEvidence = null;
+  const progress = createProgressStream(res, { enabled: wantsProgress === true });
+  progress.stage('context');
 
   try {
+    hydrateSessionFromDb(sessionId);
+    const history = sessions[sessionId];
+    const requestTime = new Date();
+    const requestCreatedAt = Math.floor(requestTime.getTime() / 1000);
+    const previousMessageCreatedAt = getLastMessageTimestamp(history);
+    history.push({ role: 'user', content: message, createdAt: requestCreatedAt });
+
+    // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
+    const memoryItems = await readMemoryItems();
+    const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
+      message,
+      activeNotes,
+      sessionId,
+      'chat',
+    );
+    const baseContext = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
+    let webEvidence = null;
+
     try {
-      webEvidence = webSearch
-        ? await searchWeb(message)
-        : null;
+      if (webSearch) {
+        progress.stage('web_search');
+        webEvidence = await searchWeb(message);
+      }
       if (!hasWebEvidenceResults(webEvidence)) webEvidence = null;
     } catch (err) {
       if (webSearch) throw err;
@@ -2266,6 +2288,7 @@ app.post('/api/chat', async (req, res) => {
     ];
     const allowModelWebTool = !webSearch && !hasWebEvidenceResults(webEvidence) && WEB_SEARCH_ENABLED && WEB_SEARCH_MODEL_TOOL_ENABLED;
     const paperToolSession = paperFullTextTools.createSession({ notes: resolvedNotes, queryEmbedding });
+    progress.stage('answer');
     let {
       reply,
       usedModel,
@@ -2275,6 +2298,7 @@ app.post('/api/chat', async (req, res) => {
     } = await generateChatReply(model, context, {
       enableWebTool: allowModelWebTool,
       paperToolSession,
+      onStage: progress.stage,
     });
     if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
 
@@ -2294,7 +2318,7 @@ app.post('/api/chat', async (req, res) => {
       webSources: webEvidence?.results || [],
     }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
 
-    res.json({
+    const payload = {
       reply,
       model: 'Claude',
       modelId: usedModel,
@@ -2306,11 +2330,14 @@ app.post('/api/chat', async (req, res) => {
         calls: paperFullTextUsage.calls,
         contextChars: paperFullTextUsage.contextChars,
       },
-    });
+    };
+    if (!progress.result(payload)) res.json(payload);
   } catch (err) {
     console.error('API 오류:', err.message);
     const apiError = formatChatApiError(err, model);
-    res.status(apiError.status).json({ error: apiError.message });
+    if (!progress.error(apiError.message, apiError.status)) {
+      res.status(apiError.status).json({ error: apiError.message });
+    }
   }
 });
 
@@ -5440,40 +5467,46 @@ async function buildCouncilModelContext(question, activeNotes, sessionId, webSou
 
 // 1단계: 1차 답변 생성
 app.post('/api/council/debate', async (req, res) => {
-  const { question, sessionId, councilDraftMode, activeNotes, webSearch } = req.body;
+  const { question, sessionId, councilDraftMode, activeNotes, webSearch, progress: wantsProgress } = req.body;
   if (!question || !sessionId) return res.status(400).json({ error: '필수 항목 누락' });
   if (!HAS_CLAUDE || !HAS_GPT) return res.status(400).json({ error: '의회 모드는 Claude와 GPT 키가 모두 필요합니다.' });
 
-  const mode = normalizeCouncilDraftMode(councilDraftMode);
-
-  hydrateSessionFromDb(sessionId);
-  const history = sessions[sessionId];
-
-  // 1차 답변 프롬프트 (mode에 따라 분기, 사용자 메모리 + 활성/자동 검색 노트 주입)
-  const memoryItems = await readMemoryItems();
-  const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
-    question,
-    activeNotes,
-    sessionId,
-    'council-debate',
-  );
-  const maxTokens = mode === 'compressed'
-    ? COUNCIL_TOKEN_LIMITS.compressedFirst
-    : mode === 'deep'
-    ? COUNCIL_TOKEN_LIMITS.deepFirst
-    : COUNCIL_TOKEN_LIMITS.fullFirst;
-  const claudeModel = getClaudeModelForCouncilMode(mode);
-  const gptModel = getGptModelForCouncilMode(mode);
+  const progress = createProgressStream(res, { enabled: wantsProgress === true });
+  progress.stage('context');
 
   try {
+    const mode = normalizeCouncilDraftMode(councilDraftMode);
+    hydrateSessionFromDb(sessionId);
+    const history = sessions[sessionId];
+
+    // 1차 답변 프롬프트 (mode에 따라 분기, 사용자 메모리 + 활성/자동 검색 노트 주입)
+    const memoryItems = await readMemoryItems();
+    const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
+      question,
+      activeNotes,
+      sessionId,
+      'council-debate',
+    );
+    const maxTokens = mode === 'compressed'
+      ? COUNCIL_TOKEN_LIMITS.compressedFirst
+      : mode === 'deep'
+      ? COUNCIL_TOKEN_LIMITS.deepFirst
+      : COUNCIL_TOKEN_LIMITS.fullFirst;
+    const claudeModel = getClaudeModelForCouncilMode(mode);
+    const gptModel = getGptModelForCouncilMode(mode);
+
     // 웹 evidence: 명시적 /web 또는 Claude tool_use 판단
-    let webEvidence = webSearch ? await searchWeb(question) : null;
+    let webEvidence = null;
+    if (webSearch) {
+      progress.stage('web_search');
+      webEvidence = await searchWeb(question);
+    }
     const requestTime = new Date();
     const previousMessageCreatedAt = getLastMessageTimestamp(history);
     const timedQuestion = `${buildTimeContext(requestTime, previousMessageCreatedAt)}\n\n${question}`;
     const probeContext = [...formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES)), { role: 'user', content: buildFirstAnswerPrompt(timedQuestion, mode) }];
     if (!webEvidence) {
-      webEvidence = await decideCouncilWebEvidence(probeContext, claudeModel);
+      webEvidence = await decideCouncilWebEvidence(probeContext, claudeModel, progress.stage);
     }
     const questionWithContext = buildContextMessage(question, resolvedNotes, memoryItems, pastMessages, webEvidence, requestTime, previousMessageCreatedAt);
     const historyCtx = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
@@ -5482,12 +5515,15 @@ app.post('/api/council/debate', async (req, res) => {
     // ① Claude 초안 (앞무대 — 실패 시 의회 중단)
     let claudeDraft = null, claudeError = null;
     let paperEvidence = [], paperEvidenceRefs = [], paperFullTextUsage = { calls: 0, contextChars: 0 };
+    progress.stage('council_draft');
     try {
       const result = await generateClaudeReplyWithTools({
         model: claudeModel,
         maxTokens,
         messages: [...historyCtx, { role: 'user', content: buildFirstAnswerPrompt(questionWithContext, mode) }],
         paperToolSession,
+        onStage: progress.stage,
+        writingStage: 'council_draft',
       });
       claudeDraft = result.reply;
       paperEvidence = result.paperEvidence;
@@ -5497,11 +5533,14 @@ app.post('/api/council/debate', async (req, res) => {
       claudeError = err.message;
     }
     if (!claudeDraft) {
-      return res.status(500).json({ error: `Claude 초안 생성 실패: ${claudeError || '알 수 없음'}` });
+      const error = `Claude 초안 생성 실패: ${claudeError || '알 수 없음'}`;
+      if (!progress.error(error, 500)) res.status(500).json({ error });
+      return;
     }
 
     // ② GPT 비평 (대화·노트·메모리·검색결과 + Claude 초안 전부 전달, 실패 시 우아한 강등)
     let gptCritique = null, gptCritiqueError = null;
+    progress.stage('council_critique');
     try {
       const sharedQuestionWithContext = appendPaperEvidence(questionWithContext, paperEvidence);
       const r = await openai.chat.completions.create({
@@ -5515,7 +5554,7 @@ app.post('/api/council/debate', async (req, res) => {
       console.warn('GPT 비평 실패:', err.message);
     }
 
-    res.json({
+    const payload = {
       claudeDraft,
       gptCritique,
       claudeError,
@@ -5524,10 +5563,11 @@ app.post('/api/council/debate', async (req, res) => {
       webSources: webEvidence?.results || [],
       paperEvidenceRefs,
       paperFullTextUsage,
-    });
+    };
+    if (!progress.result(payload)) res.json(payload);
   } catch (err) {
     console.error('의회 토론 오류:', err.message);
-    res.status(500).json({ error: err.message });
+    if (!progress.error(err.message, 500)) res.status(500).json({ error: err.message });
   }
 });
 

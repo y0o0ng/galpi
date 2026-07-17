@@ -492,6 +492,14 @@ html, body {
 /* 로딩 애니메이션 */
 .loading-wrap { padding: 2px 0; }
 
+.loading-wrap.has-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 7px 4px;
+  box-sizing: border-box;
+}
+
 .loading-dots {
   display: inline-flex;
   gap: 5px;
@@ -1880,8 +1888,9 @@ body[data-active-model="council"] #send-btn {
 .council-loading {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  min-height: 32px;
   padding: 7px 4px;
+  box-sizing: border-box;
   background: transparent;
   border-radius: 0;
   box-shadow: none;
@@ -1893,6 +1902,7 @@ body[data-active-model="council"] #send-btn {
 
 .loading-text {
   font-size: 13px;
+  line-height: 18px;
   color: var(--label);
 }
 

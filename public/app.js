@@ -7,6 +7,18 @@ const uiHistoryKey = `councilUiHistory:${sessionId}`;
 const activeNotesKey = `councilActiveNotes:${sessionId}`;
 const apiTokenKey = 'councilApiToken';
 const notificationPositionKey = 'councilNotificationPosition';
+const PROGRESS_STAGE_LABELS = Object.freeze({
+  context: '기억 찾는 중…',
+  evidence: '근거 확인 중…',
+  web_search: '웹 검색 중…',
+  paper_search: '논문 전문 검색 중…',
+  paper_read: '논문 전문 읽는 중…',
+  answer: '답변 작성 중…',
+  council_draft: 'Claude 초안 작성 중…',
+  council_critique: 'GPT 검증 중…',
+  council_review: '심층 재검증 중…',
+  council_synthesis: 'Claude가 최종 정리 중…',
+});
 let isLoading        = false;
 let councilMode      = false;
 let councilAvailable = false;
@@ -56,6 +68,54 @@ function apiFetch(url, options = {}) {
     }
     return res;
   });
+}
+
+async function readProgressResponse(response, onStage = () => {}) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/x-ndjson')) return response.json();
+
+  let buffer = '';
+  let terminalEvent = null;
+
+  const consumeLine = line => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line);
+    if (event.type === 'stage' && PROGRESS_STAGE_LABELS[event.stage]) {
+      onStage(event.stage);
+    } else if (event.type === 'result' || event.type === 'error') {
+      terminalEvent = event;
+    }
+  };
+
+  const consumeText = (text, flush = false) => {
+    buffer += text;
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    lines.forEach(consumeLine);
+    if (flush && buffer.trim()) {
+      consumeLine(buffer);
+      buffer = '';
+    }
+  };
+
+  if (response.body?.getReader) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      consumeText(decoder.decode(value, { stream: true }));
+    }
+    consumeText(decoder.decode(), true);
+  } else {
+    consumeText(await response.text(), true);
+  }
+
+  if (!terminalEvent) throw new Error('서버 진행 응답이 완료되지 않았습니다.');
+  if (terminalEvent.type === 'error') {
+    return { error: terminalEvent.error || '요청 처리 중 오류가 발생했습니다.' };
+  }
+  return terminalEvent.data;
 }
 
 
@@ -681,7 +741,7 @@ async function sendSingleMessage(options = {}) {
   document.querySelector('.welcome')?.remove();
 
   appendUserBubble(options.displayText || text);
-  const loadingEl = appendLoading();
+  const loadingEl = appendLoading(PROGRESS_STAGE_LABELS.context);
   document.dispatchEvent(new Event('pet:thinking'));
 
   try {
@@ -689,9 +749,9 @@ async function sendSingleMessage(options = {}) {
     const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, model: 'claude', sessionId, activeNotes, webSearch: !!options.webSearch }),
+      body:    JSON.stringify({ message: text, model: 'claude', sessionId, activeNotes, webSearch: !!options.webSearch, progress: true }),
     });
-    const data = await res.json();
+    const data = await readProgressResponse(res, stage => updateLoadingStage(loadingEl, stage));
     loadingEl.remove();
     if (data.error) appendError(data.error);
     else {
@@ -738,7 +798,7 @@ async function sendCouncilMessage(options = {}) {
   getMessages().appendChild(container);
 
   // 로딩 인디케이터
-  const loadingEl = createCouncilLoadingEl('Claude 초안·GPT 검증 생성 중…');
+  const loadingEl = createCouncilLoadingEl(PROGRESS_STAGE_LABELS.context);
   body.appendChild(loadingEl);
   scrollDown();
   document.dispatchEvent(new Event('pet:building'));
@@ -748,9 +808,9 @@ async function sendCouncilMessage(options = {}) {
     const debateRes = await apiFetch('/api/council/debate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ question: text, sessionId, councilDraftMode, activeNotes, webSearch: !!options.webSearch }),
+      body:    JSON.stringify({ question: text, sessionId, councilDraftMode, activeNotes, webSearch: !!options.webSearch, progress: true }),
     });
-    const debateData = await debateRes.json();
+    const debateData = await readProgressResponse(debateRes, stage => updateLoadingStage(loadingEl, stage));
 
     if (debateData.error) {
       loadingEl.remove();
@@ -765,7 +825,7 @@ async function sendCouncilMessage(options = {}) {
     let reviewData = { revisedDraft: null, gptCritique2: null };
 
     if (councilDraftMode === 'deep' && debateData.claudeDraft && debateData.gptCritique) {
-      updateLoadingText(loadingEl, '심층 재검증 중…');
+      updateLoadingText(loadingEl, PROGRESS_STAGE_LABELS.council_review);
 
       try {
         const reviewRes = await apiFetch('/api/council/review', {
@@ -812,7 +872,8 @@ async function sendCouncilMessage(options = {}) {
 function createCouncilLoadingEl(msg) {
   const wrap = document.createElement('div');
   wrap.className = 'council-loading';
-  wrap.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+  wrap.setAttribute('role', 'status');
+  wrap.setAttribute('aria-live', 'polite');
   const txt = document.createElement('span');
   txt.className = 'loading-text';
   txt.textContent = msg;
@@ -823,6 +884,11 @@ function createCouncilLoadingEl(msg) {
 function updateLoadingText(loadingEl, msg) {
   const txt = loadingEl.querySelector('.loading-text');
   if (txt) txt.textContent = msg;
+}
+
+function updateLoadingStage(loadingEl, stage) {
+  const label = PROGRESS_STAGE_LABELS[stage];
+  if (label) updateLoadingText(loadingEl, label);
 }
 
 // ── 1차 답변 렌더링 ────────────────────────────────────────────────────────
@@ -926,7 +992,7 @@ function makeReview(label, review) {
 // ── 최종 (Claude 고정, 선택 없음) ───────────────────────────────────────────
 
 async function finalizeCouncil(container, body, question, debateData, reviewData) {
-  const loadingEl = createCouncilLoadingEl('Claude가 최종 정리 중…');
+  const loadingEl = createCouncilLoadingEl(PROGRESS_STAGE_LABELS.council_synthesis);
   body.appendChild(loadingEl);
   scrollDown();
 
@@ -3025,10 +3091,20 @@ function loadingIconSvg() {
   return `<svg class="spin-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"></path></svg>`;
 }
 
-function appendLoading() {
+function appendLoading(statusText = '') {
   const wrap = document.createElement('div');
   wrap.className = 'msg-group assistant loading-wrap';
-  wrap.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+  if (statusText) {
+    wrap.classList.add('has-status');
+    wrap.setAttribute('role', 'status');
+    wrap.setAttribute('aria-live', 'polite');
+    const txt = document.createElement('span');
+    txt.className = 'loading-text';
+    txt.textContent = statusText;
+    wrap.appendChild(txt);
+  } else {
+    wrap.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+  }
   getMessages().appendChild(wrap);
   scrollDown();
   return wrap;
