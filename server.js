@@ -22,6 +22,12 @@ const { createProgressStream, progressStageForTool } = require('./lib/progress-s
 const { createRecentSavesReader } = require('./lib/recent-saves');
 const { createNoteSaveStateReader } = require('./lib/note-save-state');
 const { runDatabaseMigrations } = require('./lib/database-migrations');
+const {
+  buildSemanticEmbeddingText,
+  createNoteIndexStateStore,
+  deriveNoteIndexState,
+  noteContentSha256,
+} = require('./lib/note-index-state');
 const { createTopicChunkStore } = require('./lib/topic-chunk-store');
 const {
   appendQaLogEntries,
@@ -385,6 +391,10 @@ db.exec(`
     codex_status TEXT NOT NULL DEFAULT 'pending',
     source_session TEXT,
     source_message TEXT,
+    content_sha256 TEXT,
+    indexed_sha256 TEXT,
+    index_status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (index_status IN ('pending', 'ready', 'error', 'missing')),
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
@@ -497,6 +507,7 @@ db.exec(`
 
 runDatabaseMigrations(db);
 const topicChunkStore = createTopicChunkStore(db);
+const noteIndexState = createNoteIndexStateStore(db);
 const topicMutations = createTopicMutationCoordinator({ db });
 const paperFullTextService = createPaperFullTextService({
   db,
@@ -549,10 +560,10 @@ const stmtInsertMessage = db.prepare(
 const stmtUpsertNote = db.prepare(`
   INSERT INTO notes (
     filename, title, note_type, paper_id, archived, codex_status,
-    source_session, source_message
+    source_session, source_message, content_sha256, index_status
   ) VALUES (
     @filename, @title, @noteType, @paperId, @archived, @codexStatus,
-    @sourceSession, @sourceMessage
+    @sourceSession, @sourceMessage, @contentSha256, @indexStatus
   )
   ON CONFLICT(filename) DO UPDATE SET
     title = excluded.title,
@@ -562,6 +573,12 @@ const stmtUpsertNote = db.prepare(`
     codex_status = excluded.codex_status,
     source_session = excluded.source_session,
     source_message = excluded.source_message,
+    content_sha256 = excluded.content_sha256,
+    index_status = CASE
+      WHEN excluded.index_status = 'error' THEN 'error'
+      WHEN notes.indexed_sha256 = excluded.content_sha256 AND notes.embedding IS NOT NULL THEN 'ready'
+      ELSE excluded.index_status
+    END,
     updated_at = strftime('%s','now')
 `);
 const stmtGetNoteByFilename = db.prepare(`
@@ -576,9 +593,6 @@ const stmtGetActivePaperById = db.prepare(`
   WHERE paper_id = ? AND archived = 0
   LIMIT 1
 `);
-const stmtUpdateNoteEmbedding = db.prepare(
-  'UPDATE notes SET embedding = ? WHERE filename = ?'
-);
 const stmtUpdateMessageEmbedding = db.prepare(
   'UPDATE messages SET embedding = ? WHERE id = ?'
 );
@@ -661,10 +675,11 @@ const stmtGraphAmbiguousEdges = db.prepare(`
   LIMIT ?
 `);
 const stmtGraphTopicChunkCounts = db.prepare(`
-  SELECT note_filename AS filename, note_title AS title, COUNT(*) AS qaCount
-  FROM note_chunks
-  WHERE chunk_type = 'topic_qa' AND index_status = 'ready'
-  GROUP BY note_filename
+  SELECT c.note_filename AS filename, n.title, COUNT(*) AS qaCount
+  FROM note_chunks c
+  JOIN notes n ON n.filename = c.note_filename
+  WHERE c.chunk_type = 'topic_qa' AND c.index_status = 'ready'
+  GROUP BY c.note_filename, n.title
   ORDER BY qaCount DESC
   LIMIT ?
 `);
@@ -704,7 +719,16 @@ const stmtGetTopicNotesWithEmbedding = db.prepare(
   "SELECT filename, title, embedding FROM notes WHERE archived = 0 AND note_type = 'topic' AND embedding IS NOT NULL"
 );
 const stmtGetNotesWithoutEmbedding = db.prepare(
-  'SELECT filename, title FROM notes WHERE archived = 0 AND embedding IS NULL'
+  `SELECT filename, title, note_type AS noteType
+   FROM notes
+   WHERE archived = 0
+     AND (
+       embedding IS NULL
+       OR content_sha256 IS NULL
+       OR indexed_sha256 IS NULL
+       OR indexed_sha256 != content_sha256
+       OR index_status != 'ready'
+     )`
 );
 const stmtGetNoteStatusCounts = db.prepare(`
   SELECT codex_status AS codexStatus, COUNT(*) AS count
@@ -896,7 +920,15 @@ function dbUpsertNote({
   sourceSession = null,
   sourceMessage = null,
   paperId = null,
+  contentSha256,
+  indexStatus = 'pending',
 }) {
+  if (!['pending', 'error'].includes(indexStatus)) {
+    throw new TypeError(`지원하지 않는 note upsert index 상태입니다: ${indexStatus}`);
+  }
+  if (indexStatus === 'pending' && !contentSha256) {
+    throw new TypeError(`노트 content hash가 필요합니다: ${filename}`);
+  }
   stmtUpsertNote.run({
     filename,
     title,
@@ -906,6 +938,8 @@ function dbUpsertNote({
     sourceSession: sourceSession || null,
     sourceMessage: sourceMessage || null,
     paperId: paperId || null,
+    contentSha256: contentSha256 || null,
+    indexStatus,
   });
 }
 
@@ -1063,18 +1097,6 @@ function createNoteIdentity() {
   return { fileId, createdStr };
 }
 
-async function writeVaultNote(fileId, noteContent) {
-  const filepath = path.join(VAULT_PATH, fileId + '.md');
-  if (!filepath.startsWith(VAULT_PATH + path.sep) && filepath !== VAULT_PATH) {
-    throw new Error('잘못된 경로입니다.');
-  }
-
-  const tmpPath = filepath + '.tmp';
-  await fs.writeFile(tmpPath, noteContent, 'utf8');
-  await fs.rename(tmpPath, filepath);
-  await fs.access(filepath);
-}
-
 async function saveVaultNoteRecord({
   fileId,
   title,
@@ -1085,34 +1107,33 @@ async function saveVaultNoteRecord({
   codexStatus = 'pending',
   paperId = null,
 }) {
-  await writeVaultNote(fileId, noteContent);
   const filename = fileId + '.md';
-  dbUpsertNote({
-    filename,
-    title,
-    noteType,
-    codexStatus,
-    sourceSession: sessionId,
-    sourceMessage: messageId,
-    paperId,
-  });
+  const filepath = path.join(VAULT_PATH, filename);
+  const contentSha256 = noteContentSha256({ filename, title, noteType, raw: noteContent });
+  await topicMutations.run(() => topicMutations.commit({
+    changes: [{ filepath, expectedContent: null, nextContent: noteContent }],
+    applyDatabase() {
+      dbUpsertNote({
+        filename,
+        title,
+        noteType,
+        codexStatus,
+        sourceSession: sessionId,
+        sourceMessage: messageId,
+        paperId,
+        contentSha256,
+      });
+    },
+  }));
 
   // embedding 비동기 생성 (응답 블로킹 없음)
-  generateAndStoreEmbedding(filename, buildSemanticEmbeddingText(title, noteContent)).catch(() => {});
+  generateAndStoreEmbedding(
+    filename,
+    buildSemanticEmbeddingText(title, noteContent),
+    contentSha256,
+  ).catch(() => {});
 
   return null;
-}
-
-function buildSemanticEmbeddingText(title, raw) {
-  const body = stripFrontmatter(String(raw || ''))
-    .replace(/<!-- CODEX-TAGS-START -->[\s\S]*?<!-- CODEX-TAGS-END -->/g, '')
-    .replace(/<!-- CODEX-LINKS-START -->[\s\S]*?<!-- CODEX-LINKS-END -->/g, '')
-    .replace(/<!-- CODEX-PROPOSALS-START -->[\s\S]*?<!-- CODEX-PROPOSALS-END -->/g, '')
-    .replace(/<!-- CODEX-SUMMARY-START -->|<!-- CODEX-SUMMARY-END -->/g, '')
-    .replace(/<!-- QA-LOG-START -->|<!-- QA-LOG-END -->/g, '')
-    .replace(/^---+$/gm, '')
-    .trim();
-  return `${title || ''}\n${body}`.trim();
 }
 
 const AUTO_SAVE_COMMAND_PREFIXES = [
@@ -1591,6 +1612,12 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
       : nextRaw;
     const finalTitle = newTitle || title;
     requireWritableTopic(finalRaw, existing.filename);
+    const contentSha256 = noteContentSha256({
+      filename: existing.filename,
+      title: finalTitle,
+      noteType: 'topic',
+      raw: finalRaw,
+    });
     const chunkContent = buildQaChunkText({ question, answer, model });
 
     await topicMutations.commit({
@@ -1603,6 +1630,7 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
           codexStatus: 'pending',
           sourceSession: sessionId,
           sourceMessage: assistantMessageId,
+          contentSha256,
         });
         if (finalTitle !== title) syncTopicTitleReferences(existing.filename, finalTitle);
         dbUpsertNoteChunk({
@@ -1632,7 +1660,11 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
       },
     });
 
-    generateAndStoreEmbedding(existing.filename, buildSemanticEmbeddingText(finalTitle, finalRaw)).catch(() => {});
+    generateAndStoreEmbedding(
+      existing.filename,
+      buildSemanticEmbeddingText(finalTitle, finalRaw),
+      contentSha256,
+    ).catch(() => {});
     generateAndStoreChunkEmbedding(qaId, chunkContent).catch(() => {});
     maybeCreateCodexJobFromSaveEvents();
     return { filename: existing.filename, title: finalTitle, action: 'appended' };
@@ -1652,6 +1684,7 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
   });
   const filename = fileId + '.md';
   const filepath = path.join(VAULT_PATH, filename);
+  const contentSha256 = noteContentSha256({ filename, title, noteType: 'topic', raw: noteContent });
   const chunkContent = buildQaChunkText({ question, answer, model });
   requireWritableTopic(noteContent, filename);
 
@@ -1665,6 +1698,7 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
         codexStatus: 'pending',
         sourceSession: sessionId,
         sourceMessage: assistantMessageId || userMessageId,
+        contentSha256,
       });
       dbUpsertNoteChunk({
         chunkId: qaId,
@@ -1693,7 +1727,11 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
     },
   });
 
-  generateAndStoreEmbedding(filename, buildSemanticEmbeddingText(title, noteContent)).catch(() => {});
+  generateAndStoreEmbedding(
+    filename,
+    buildSemanticEmbeddingText(title, noteContent),
+    contentSha256,
+  ).catch(() => {});
   generateAndStoreChunkEmbedding(qaId, chunkContent).catch(() => {});
   maybeCreateCodexJobFromSaveEvents();
 
@@ -2495,17 +2533,34 @@ function shouldSkipBackfillFile(filename) {
 }
 
 async function backfillNotesFromVault() {
-  let files;
+  let rootFiles;
   try {
-    files = await fs.readdir(VAULT_PATH);
+    rootFiles = await fs.readdir(VAULT_PATH);
   } catch (err) {
     throw new Error(`볼트 읽기 실패: ${err.message}`);
   }
 
-  const result = { scanned: 0, registered: 0, skipped: 0 };
+  const archivePath = path.join(VAULT_PATH, ARCHIVE_DIR);
+  const archivedFiles = await fs.readdir(archivePath).catch(error => {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  });
+  const files = [
+    ...rootFiles.map(filename => ({ filename, basePath: VAULT_PATH, archived: false })),
+    ...archivedFiles.map(filename => ({ filename, basePath: archivePath, archived: true })),
+  ];
 
-  for (const filename of files) {
+  const result = { scanned: 0, registered: 0, skipped: 0 };
+  const registeredFilenames = new Set();
+
+  for (const file of files) {
+    const { filename } = file;
     if (shouldSkipBackfillFile(filename)) {
+      result.skipped += 1;
+      continue;
+    }
+    if (registeredFilenames.has(filename)) {
+      console.warn(`노트 sync 중복 파일 건너뜀 (${filename}): root와 _archive에 모두 존재`);
       result.skipped += 1;
       continue;
     }
@@ -2513,9 +2568,12 @@ async function backfillNotesFromVault() {
     result.scanned += 1;
 
     try {
-      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const raw = await fs.readFile(path.join(file.basePath, filename), 'utf8');
       const fm = parseSimpleFrontmatter(raw);
-      const archived = parseFrontmatterBoolean(fm.archived);
+      const archived = file.archived || parseFrontmatterBoolean(fm.archived);
+      const title = fm.title || filename.replace(/\.md$/, '');
+      const noteType = fm.note_type || 'legacy';
+      const indexState = deriveNoteIndexState({ filename, title, noteType, raw });
 
       const existing = stmtGetNoteByFilename.get(filename);
       const frontmatterStatus = fm.codex_status || null;
@@ -2527,14 +2585,17 @@ async function backfillNotesFromVault() {
 
       dbUpsertNote({
         filename,
-        title: fm.title || filename.replace(/\.md$/, ''),
-        noteType: fm.note_type || 'legacy',
+        title,
+        noteType,
         archived,
         codexStatus,
         sourceSession: fm.source_session || null,
         sourceMessage: fm.source_message || null,
+        contentSha256: indexState.contentSha256,
+        indexStatus: indexState.indexStatus,
       });
 
+      registeredFilenames.add(filename);
       result.registered += 1;
     } catch (err) {
       console.warn(`노트 backfill 실패 (${filename}):`, err.message);
@@ -2545,35 +2606,37 @@ async function backfillNotesFromVault() {
   return result;
 }
 
-// 디스크에서 사라진 노트의 DB 흔적(notes/chunks/edges) 제거.
-// archived 노트는 _archive/에 있으니 둘 다 확인해 살아있는 파일은 건드리지 않는다.
 function deleteNoteEverywhereRecords(filename) {
   stmtDeleteNoteChunksByNote.run(filename);
   stmtDeleteNoteEdgesByNote.run(filename, filename);
   stmtDeleteNote.run(filename);
 }
 
-const deleteNoteEverywhere = db.transaction(deleteNoteEverywhereRecords);
-
-async function pruneMissingNotes() {
-  const pruned = [];
+async function markMissingNotes() {
+  const missing = [];
   for (const { filename, title } of stmtGetAllNoteFilenames.all()) {
     const inRoot = await fs.access(path.join(VAULT_PATH, filename)).then(() => true).catch(() => false);
     if (inRoot) continue;
     const inArchive = await fs.access(path.join(VAULT_PATH, ARCHIVE_DIR, filename)).then(() => true).catch(() => false);
     if (inArchive) continue;
-    deleteNoteEverywhere(filename);
+    noteIndexState.markMissing(filename);
     noteSearchCache.delete(filename);
-    pruned.push({ filename, title });
+    missing.push({ filename, title });
   }
-  return pruned;
+  return missing;
 }
 
-// 신규 노트 등록(backfill) + 사라진 노트 정리(prune). 옵시디언에서 직접 편집/삭제한 변경을 DB에 반영.
+// 신규/수정 노트 등록 + 사라진 원문을 missing으로 표시한다. DB와 청크는 감사 전 물리 삭제하지 않는다.
 async function syncVaultDb() {
   const backfill = await backfillNotesFromVault();
-  const pruned = await pruneMissingNotes();
-  return { ...backfill, pruned: pruned.length, prunedNotes: pruned };
+  const missing = await markMissingNotes();
+  return {
+    ...backfill,
+    missing: missing.length,
+    missingNotes: missing,
+    pruned: 0,
+    prunedNotes: [],
+  };
 }
 
 app.post('/api/notes/sync', async (_req, res) => {
@@ -2681,9 +2744,14 @@ function buildArchiveMove({ filename, raw, archived, options = {} }) {
   const archivedRaw = archived ? normalizeArchivedNote(raw, options) : setFrontmatterArchived(raw, false);
   const next = touchUpdatedFrontmatter(archivedRaw);
   if (noteType === 'topic') requireWritableTopic(next, safeName);
+  const title = parseNoteTitle(next, safeName);
+  const contentSha256 = noteContentSha256({ filename: safeName, title, noteType, raw: next });
 
   return {
     filename: safeName,
+    title,
+    noteType,
+    contentSha256,
     next,
     changes: [
       { filepath: destinationPath, expectedContent: null, nextContent: next },
@@ -2716,10 +2784,23 @@ async function moveNoteArchivedImpl(filename, archived, options = {}) {
       if (archivedResult.changes !== 1 || codexResult.changes !== 1) {
         throw new Error(`노트 DB 상태를 변경할 수 없습니다: ${safeName}`);
       }
+      if (noteIndexState.markContent({
+        filename: safeName,
+        contentSha256: mutation.contentSha256,
+      }).changes !== 1) {
+        throw new Error(`노트 인덱스 상태를 변경할 수 없습니다: ${safeName}`);
+      }
     },
   });
 
   noteSearchCache.delete(safeName);
+  if (!archived) {
+    generateAndStoreEmbedding(
+      safeName,
+      buildSemanticEmbeddingText(mutation.title, mutation.next),
+      mutation.contentSha256,
+    ).catch(() => {});
+  }
   return safeName;
 }
 
@@ -2976,6 +3057,19 @@ async function splitQaEntriesIntoTopicImpl({
     });
   }
 
+  const targetContentSha256 = noteContentSha256({
+    filename: resultFilename,
+    title: resultTitle,
+    noteType: 'topic',
+    raw: nextTarget,
+  });
+  const sourceContentSha256 = sourceDeleted ? null : noteContentSha256({
+    filename: source.filename,
+    title: source.title,
+    noteType: 'topic',
+    raw: nextSource,
+  });
+
   await topicMutations.commit({
     changes,
     applyDatabase() {
@@ -2985,7 +3079,13 @@ async function splitQaEntriesIntoTopicImpl({
           title: resultTitle,
           noteType: 'topic',
           codexStatus: 'pending',
+          contentSha256: targetContentSha256,
         });
+      } else if (noteIndexState.markContent({
+        filename: resultFilename,
+        contentSha256: targetContentSha256,
+      }).changes !== 1) {
+        throw new Error(`target 토픽 인덱스 상태를 변경할 수 없습니다: ${resultFilename}`);
       }
       for (const id of movedIds) {
         const chunkResult = stmtMoveChunkByQaId.run(resultFilename, resultTitle, id, source.filename);
@@ -2994,8 +3094,16 @@ async function splitQaEntriesIntoTopicImpl({
       }
       if (sourceDeleted) {
         deleteNoteEverywhereRecords(source.filename);
-      } else if (stmtUpdateNoteCodexStatus.run('pending', source.filename).changes !== 1) {
-        throw new Error(`source 토픽 상태를 변경할 수 없습니다: ${source.filename}`);
+      } else {
+        if (stmtUpdateNoteCodexStatus.run('pending', source.filename).changes !== 1) {
+          throw new Error(`source 토픽 상태를 변경할 수 없습니다: ${source.filename}`);
+        }
+        if (noteIndexState.markContent({
+          filename: source.filename,
+          contentSha256: sourceContentSha256,
+        }).changes !== 1) {
+          throw new Error(`source 토픽 인덱스 상태를 변경할 수 없습니다: ${source.filename}`);
+        }
       }
       if (stmtUpdateNoteCodexStatus.run('pending', resultFilename).changes !== 1) {
         throw new Error(`target 토픽 상태를 변경할 수 없습니다: ${resultFilename}`);
@@ -3006,9 +3114,17 @@ async function splitQaEntriesIntoTopicImpl({
   noteSearchCache.delete(source.filename);
   noteSearchCache.delete(resultFilename);
   if (!sourceDeleted && nextSource) {
-    generateAndStoreEmbedding(source.filename, buildSemanticEmbeddingText(source.title, nextSource)).catch(() => {});
+    generateAndStoreEmbedding(
+      source.filename,
+      buildSemanticEmbeddingText(source.title, nextSource),
+      sourceContentSha256,
+    ).catch(() => {});
   }
-  generateAndStoreEmbedding(resultFilename, buildSemanticEmbeddingText(resultTitle, nextTarget)).catch(() => {});
+  generateAndStoreEmbedding(
+    resultFilename,
+    buildSemanticEmbeddingText(resultTitle, nextTarget),
+    targetContentSha256,
+  ).catch(() => {});
 
   return {
     source: source.filename,
@@ -3199,15 +3315,25 @@ async function mergeNotesIntoTopicImpl({ filenames, targetFilename = null, newTi
     });
   }
 
-  for (const source of sources) {
-    const archiveMutation = buildArchiveMove({
+  const sourceArchiveMutations = sources.map(source => ({
+    source,
+    mutation: buildArchiveMove({
       filename: source.filename,
       raw: source.raw,
       archived: true,
       options: { mergedIntoTitle: resultTitle, mergedIntoFilename: resultFilename },
-    });
-    changes.push(...archiveMutation.changes);
+    }),
+  }));
+  for (const { mutation } of sourceArchiveMutations) {
+    changes.push(...mutation.changes);
   }
+
+  const targetContentSha256 = noteContentSha256({
+    filename: resultFilename,
+    title: resultTitle,
+    noteType: 'topic',
+    raw: nextTarget,
+  });
 
   const newChunks = folded
     .filter(entry => !entry.isExistingChunk)
@@ -3224,6 +3350,7 @@ async function mergeNotesIntoTopicImpl({ filenames, targetFilename = null, newTi
         title: resultTitle,
         noteType: 'topic',
         codexStatus: 'pending',
+        contentSha256: targetContentSha256,
       });
       for (const source of sources) {
         reassignNoteReferencesRecords(source.filename, resultFilename, resultTitle);
@@ -3243,13 +3370,24 @@ async function mergeNotesIntoTopicImpl({ filenames, targetFilename = null, newTi
         if (archivedResult.changes !== 1 || codexResult.changes !== 1) {
           throw new Error(`병합 source 상태를 변경할 수 없습니다: ${source.filename}`);
         }
+        const archiveMutation = sourceArchiveMutations.find(item => item.source.filename === source.filename)?.mutation;
+        if (!archiveMutation || noteIndexState.markContent({
+          filename: source.filename,
+          contentSha256: archiveMutation.contentSha256,
+        }).changes !== 1) {
+          throw new Error(`병합 source 인덱스 상태를 변경할 수 없습니다: ${source.filename}`);
+        }
       }
     },
   });
 
   noteSearchCache.delete(resultFilename);
   for (const source of sources) noteSearchCache.delete(source.filename);
-  generateAndStoreEmbedding(resultFilename, buildSemanticEmbeddingText(resultTitle, nextTarget)).catch(() => {});
+  generateAndStoreEmbedding(
+    resultFilename,
+    buildSemanticEmbeddingText(resultTitle, nextTarget),
+    targetContentSha256,
+  ).catch(() => {});
   for (const chunk of newChunks) {
     generateAndStoreChunkEmbedding(chunk.qaId, chunk.content).catch(() => {});
   }
@@ -5046,10 +5184,24 @@ async function generatePaperChunkEmbeddings(texts) {
     .map(item => item.embedding);
 }
 
-async function generateAndStoreEmbedding(filename, text) {
-  const vec = await generateEmbedding(text);
-  if (vec) stmtUpdateNoteEmbedding.run(JSON.stringify(vec), filename);
-  return vec;
+async function generateAndStoreEmbedding(filename, text, contentSha256) {
+  if (!contentSha256) throw new TypeError(`노트 embedding 원본 hash가 필요합니다: ${filename}`);
+  try {
+    const vec = await generateEmbedding(text);
+    if (vec) {
+      noteIndexState.markReady({
+        filename,
+        contentSha256,
+        embedding: JSON.stringify(vec),
+      });
+    } else if (openai) {
+      noteIndexState.markError({ filename, contentSha256 });
+    }
+    return vec;
+  } catch (error) {
+    noteIndexState.markError({ filename, contentSha256 });
+    throw error;
+  }
 }
 
 // 검색용 노트 파생 데이터 캐시. 파일 mtime으로 무효화하므로
@@ -5168,11 +5320,22 @@ app.post('/api/vault/embed-all', async (req, res) => {
   if (notes.length === 0) return res.json({ success: true, embedded: 0, message: '모든 노트에 이미 임베딩이 있습니다.' });
 
   let done = 0, failed = 0;
-  for (const { filename, title } of notes) {
+  for (const { filename, title, noteType } of notes) {
     try {
       const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
-      const body = stripFrontmatter(raw);
-      await generateAndStoreEmbedding(filename, title + '\n' + body);
+      const indexState = deriveNoteIndexState({ filename, title, noteType, raw });
+      noteIndexState.markContent({
+        filename,
+        contentSha256: indexState.contentSha256,
+        indexStatus: indexState.indexStatus,
+      });
+      if (indexState.error) throw indexState.error;
+      const vec = await generateAndStoreEmbedding(
+        filename,
+        buildSemanticEmbeddingText(title, raw),
+        indexState.contentSha256,
+      );
+      if (!vec) throw new Error('노트 임베딩을 생성하지 못했습니다.');
       done++;
     } catch { failed++; }
   }

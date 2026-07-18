@@ -66,6 +66,10 @@ function createLegacyDatabase() {
 test('database migrations upgrade a legacy DB sequentially and remain idempotent', () => {
   const db = createLegacyDatabase();
   db.prepare(`
+    INSERT INTO notes (id, filename, title, note_type, archived)
+    VALUES (1, 'topic.md', 'Topic', 'topic', 0)
+  `).run();
+  db.prepare(`
     INSERT INTO note_chunks (
       chunk_id, note_filename, note_title, chunk_type, content
     ) VALUES (?, ?, ?, ?, ?)
@@ -73,10 +77,10 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [{ version: 1 }, { version: 2 }, { version: 3 }],
+    [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }],
   );
 
   const chunk = db.prepare(`
@@ -90,6 +94,15 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
     db.prepare('PRAGMA table_info(assistant_retrieval_shadow_runs)')
       .all()
       .some(column => column.name === 'query_sha256'),
+  );
+  assert.deepEqual(
+    db.prepare(`
+      SELECT content_sha256 AS contentSha256, indexed_sha256 AS indexedSha256,
+             index_status AS indexStatus
+      FROM notes
+      WHERE filename = 'topic.md'
+    `).get(),
+    { contentSha256: null, indexedSha256: null, indexStatus: 'pending' },
   );
 
   const second = runDatabaseMigrations(db);
@@ -129,6 +142,10 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
   assert.equal(chunk.indexStatus, 'ready');
   assert.deepEqual(store.listReadyByNote('topic.md').map(item => item.chunkId), ['qa-current']);
   db.prepare("UPDATE notes SET title = 'Current Topic' WHERE filename = 'topic.md'").run();
+  assert.deepEqual(
+    store.listReadyByNote('topic.md').map(item => ({ chunkId: item.chunkId, noteTitle: item.noteTitle })),
+    [{ chunkId: 'qa-current', noteTitle: 'Current Topic' }],
+  );
   assert.deepEqual(
     store.listAllReady().map(item => ({ chunkId: item.chunkId, noteTitle: item.noteTitle })),
     [{ chunkId: 'qa-current', noteTitle: 'Current Topic' }],

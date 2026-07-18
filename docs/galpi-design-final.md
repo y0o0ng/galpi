@@ -1480,7 +1480,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: 2026-07-15 설계 확정, 구현 전
+> 상태: 2026-07-18 S0 로컬 구현·검증 완료, schema v4 Pi 배포 전
 
 ### 문제 정의
 

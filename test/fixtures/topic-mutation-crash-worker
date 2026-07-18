@@ -1,0 +1,27 @@
+'use strict';
+
+const fs = require('node:fs/promises');
+const Database = require('better-sqlite3');
+
+const { createTopicMutationCoordinator } = require('../../lib/topic-mutation');
+
+async function main() {
+  const [dbPath, planPath] = process.argv.slice(2);
+  const plan = JSON.parse(await fs.readFile(planPath, 'utf8'));
+  const db = new Database(dbPath);
+  const coordinator = createTopicMutationCoordinator({ db });
+  await coordinator.commit({
+    changes: plan.changes,
+    verifyFiles() {
+      process.kill(process.pid, 'SIGKILL');
+    },
+    applyDatabase() {
+      db.prepare('INSERT INTO mutation_markers (value) VALUES (?)').run('must-not-commit');
+    },
+  });
+}
+
+main().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

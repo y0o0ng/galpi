@@ -191,6 +191,7 @@ test('server routes share one mutation path for split, archive/restore, and merg
   const sourceMissingChunk = 'Q: 사라진 질문\nA: 사라진 답변';
   insertChunk.run('qa-a111', 'source.md', 'Source', sourceChunk, sha256(sourceChunk));
   insertChunk.run('qa-b222', 'target.md', 'Target', targetChunk, sha256(targetChunk));
+  db.prepare("UPDATE note_chunks SET note_title = 'Stale Source' WHERE chunk_id = 'qa-a111'").run();
   db.prepare(`
     INSERT INTO note_chunks (
       chunk_id, note_filename, note_title, chunk_type, content,
@@ -198,6 +199,12 @@ test('server routes share one mutation path for split, archive/restore, and merg
     ) VALUES (?, ?, ?, 'topic_qa', ?, '[]', ?, 'source_missing')
   `).run('qa-extra', 'source.md', 'Source', sourceMissingChunk, sha256(sourceMissingChunk));
   db.close();
+
+  const graph = await api(url, '/api/graph/report', { method: 'POST', body: '{}' });
+  assert.equal(graph.response.status, 200, JSON.stringify(graph.body));
+  const graphRaw = await fs.readFile(path.join(vaultPath, '_system', 'GRAPH_REPORT.md'), 'utf8');
+  assert.match(graphRaw, /\[\[source\|Source\]\]/);
+  assert.doesNotMatch(graphRaw, /Stale Source/);
 
   const blockedSplit = await api(url, '/api/notes/split', {
     method: 'POST',
@@ -280,4 +287,13 @@ test('server routes share one mutation path for split, archive/restore, and merg
   assert.equal(audit.healthy, true);
   assert.equal(audit.summary.fileQaEntries, 3);
   assert.equal(audit.summary.matchedQa, 3);
+
+  await fs.rm(path.join(vaultPath, 'target.md'));
+  const missingSync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(missingSync.response.status, 200, JSON.stringify(missingSync.body));
+  assert.equal(missingSync.body.missing, 1);
+  const preservedDb = new Database(dbPath, { readonly: true });
+  assert.equal(preservedDb.prepare("SELECT index_status AS status FROM notes WHERE filename='target.md'").get().status, 'missing');
+  assert.equal(preservedDb.prepare("SELECT COUNT(*) AS count FROM note_chunks WHERE note_filename='target.md'").get().count, 3);
+  preservedDb.close();
 });

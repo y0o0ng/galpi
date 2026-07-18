@@ -305,8 +305,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### 통과 기준
 
-- [ ] 활성 topic의 Markdown QA ID와 `ready` 청크 ID 차이 0건, 같은 vault 재색인 결과가 결정적이다
-- [ ] append·split·merge 중 실패·중단을 재현해 원본 보존 또는 자동 복구한다
+- [x] 활성 topic의 Markdown QA ID와 `ready` 청크 ID 차이 0건, 같은 vault 재색인 결과가 결정적이다
+- [x] append·split·merge 중 잡힌 실패는 원본을 복원하고 hard process 중단은 다음 audit의 비파괴 복구 계획으로 이어진다
 - [ ] 실사용·합성 평가 20개에서 목표 note Recall@3와 chunk Recall@6 각각 18/20 이상
 - [ ] 8,000자 이상 topic의 마지막 Q&A를 정확히 회수한다
 - [ ] invalidated·superseded Q&A가 답변 근거로 다시 나오지 않는다

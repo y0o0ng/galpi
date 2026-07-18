@@ -77,6 +77,8 @@ test('regular assistant messages still use topic chunks as their saved state', (
 
   const reader = createNoteSaveStateReader(db);
   assert.equal(reader.findForMessage(20).filename, 'topic.md');
+  db.prepare("UPDATE notes SET title = '현재 토픽' WHERE filename = 'topic.md'").run();
+  assert.equal(reader.findForMessage(20).title, '현재 토픽');
   assert.equal(reader.listSessionMessages('shared')[0].noteSaved, 1);
   assert.throws(() => reader.find(20, 'paper'), /지원하지 않는/);
   db.close();

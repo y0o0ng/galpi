@@ -8,6 +8,7 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "audit:topics": "node scripts/audit-topic-store.js",
+    "audit:note-index": "node scripts/audit-note-index.js",
     "plan:topic-repair": "node scripts/plan-topic-repair.js",
     "apply:topic-repair": "node scripts/apply-topic-repair.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",

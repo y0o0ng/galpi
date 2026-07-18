@@ -326,7 +326,7 @@ test('repair apply backs up, migrates, applies approved operations, and reaches 
   const db = new Database(fixture.dbPath, { readonly: true });
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [{ version: 1 }, { version: 2 }, { version: 3 }],
+    [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }],
   );
   assert.deepEqual(
     db.prepare(`
@@ -452,6 +452,14 @@ test('repair apply reindexes one canonical file-only Q&A and is idempotent', asy
   db.close();
 
   const after = await readTopicRepairPlan(fixture);
+  const beforeRepeatedDb = new Database(fixture.dbPath, { readonly: true });
+  const beforeRepeatedChunks = beforeRepeatedDb.prepare(`
+    SELECT chunk_id AS chunkId, note_filename AS noteFilename,
+           content_sha256 AS contentSha256, index_status AS indexStatus
+    FROM note_chunks
+    ORDER BY chunk_id
+  `).all();
+  beforeRepeatedDb.close();
   const repeated = await applyTopicRepair({
     ...fixture,
     expectedInputSha256: after.plan.inputSha256,
@@ -463,6 +471,14 @@ test('repair apply reindexes one canonical file-only Q&A and is idempotent', asy
   assert.equal(repeated.appliedOperations, 0);
   assert.equal(repeated.finalPlan.status, 'clean');
   assert.equal(backup.calls.length, 1);
+  const afterRepeatedDb = new Database(fixture.dbPath, { readonly: true });
+  assert.deepEqual(afterRepeatedDb.prepare(`
+    SELECT chunk_id AS chunkId, note_filename AS noteFilename,
+           content_sha256 AS contentSha256, index_status AS indexStatus
+    FROM note_chunks
+    ORDER BY chunk_id
+  `).all(), beforeRepeatedChunks);
+  afterRepeatedDb.close();
 });
 
 test('repair plan keeps ambiguous file-only provenance in manual review', async t => {
@@ -486,6 +502,52 @@ test('repair plan keeps ambiguous file-only provenance in manual review', async 
     /수동 승인이 필요합니다/,
   );
   assert.equal(backup.calls.length, 0);
+});
+
+test('malformed topic is isolated while a healthy file-only Q&A is reindexed', async t => {
+  const fixture = await createFileOnlyRepairFixture(t);
+  const brokenRaw = '---\ntitle: "Broken"\nnote_type: topic\narchived: false\n---\n\n# Broken\n\nQA-LOG marker 없음';
+  await fs.writeFile(path.join(fixture.vaultPath, 'broken.md'), brokenRaw);
+  const setupDb = new Database(fixture.dbPath);
+  setupDb.prepare(`
+    INSERT INTO notes (filename, title, note_type, archived)
+    VALUES ('broken.md', 'Broken', 'topic', 0)
+  `).run();
+  setupDb.prepare(`
+    INSERT INTO note_chunks (
+      chunk_id, note_filename, note_title, chunk_type, content, embedding
+    ) VALUES ('qa-z999', 'broken.md', 'Broken', 'topic_qa', 'Q: 과거 질문\nA: 과거 답변', NULL)
+  `).run();
+  setupDb.close();
+
+  const backup = createTestBackupRecorder();
+  const before = await readTopicRepairPlan(fixture);
+  assert.equal(before.plan.status, 'manual_review');
+  assert.ok(before.plan.operations.some(operation => operation.kind === 'parserIssues'));
+  assert.ok(before.plan.operations.some(operation => operation.recommendation?.action === 'reindex_file_qa'));
+
+  const result = await applyTopicRepair({
+    ...fixture,
+    expectedInputSha256: before.plan.inputSha256,
+    approvedOperationIds: [],
+    confirmServiceStopped: true,
+    createBackup: backup.createBackup,
+    generateEmbedding: async () => [0.5, 0.5],
+  });
+
+  assert.equal(result.appliedOperations, 1);
+  assert.equal(result.finalAudit.healthy, false);
+  assert.equal(result.finalPlan.status, 'manual_review');
+  assert.deepEqual(
+    [...new Set(result.finalPlan.operations.map(operation => operation.kind))].sort(),
+    ['missing_embedding', 'parserIssues', 'unverifiableChunks'],
+  );
+  assert.equal(await fs.readFile(path.join(fixture.vaultPath, 'broken.md'), 'utf8'), brokenRaw);
+  const db = new Database(fixture.dbPath, { readonly: true });
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM note_chunks WHERE chunk_id='qa-e111'").get().count, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM notes WHERE filename='broken.md'").get().count, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM note_chunks WHERE chunk_id='qa-z999'").get().count, 1);
+  db.close();
 });
 
 test('repair apply rejects a changed file-only Q&A before backup', async t => {

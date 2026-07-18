@@ -2064,17 +2064,17 @@ function renderSyncResult(data) {
   group.className = 'msg-group assistant';
   group.append(makeModelLabel('Sync'));
 
-  const prunedNotes = Array.isArray(data.prunedNotes) ? data.prunedNotes : [];
-  const prunedRows = prunedNotes.slice(0, 10).map(n => `- ${n.title || n.filename}`);
-  const morePruned = prunedNotes.length > 10 ? `\n...외 ${prunedNotes.length - 10}개` : '';
+  const missingNotes = Array.isArray(data.missingNotes) ? data.missingNotes : [];
+  const missingRows = missingNotes.slice(0, 10).map(n => `- ${n.title || n.filename}`);
+  const moreMissing = missingNotes.length > 10 ? `\n...외 ${missingNotes.length - 10}개` : '';
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.textContent = [
     '볼트 동기화 완료',
     `등록: ${data.registered ?? 0}개`,
-    `정리(삭제된 노트): ${data.pruned ?? 0}개`,
-    prunedRows.length ? `\n정리된 노트:\n${prunedRows.join('\n')}${morePruned}` : '',
+    `원문 누락 표시: ${data.missing ?? 0}개`,
+    missingRows.length ? `\n누락된 노트:\n${missingRows.join('\n')}${moreMissing}` : '',
     '\n새 노트 시맨틱 검색까지 원하면 /embed 실행',
   ].filter(Boolean).join('\n');
 

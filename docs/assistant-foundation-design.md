@@ -625,6 +625,10 @@ S0d는 `68604af`에서 구현했다. audit이 단일 Markdown 정본과 누락 �
 
 같은 날 Pi DB·vault 백업 `20260718-1437`과 코드 백업 `s0d-reindex-pre-20260718-143720.tar.gz`를 만든 뒤 4개 파일의 로컬/Pi SHA-256 일치를 확인했다. Pi 전체 테스트 109개, readonly audit의 활성 Q&A/ready 청크 66/66, 복구 계획 `clean`·작업 0건, Codex 검증 20개를 통과했다. 재시작 전 백업과 재시작 후 현재 DB는 schema_version을 제외한 12개 application table 행 수가 모두 같고, 양쪽 모두 schema 3, `integrity_check=ok`, 외래키 오류 0건이었다. 인증된 `/api/config`·`/api/organize/status`가 `200`을 반환하고 새 PID 서비스와 시작 로그가 정상이었다. 현재 불일치가 없어 실제 복구 apply와 임베딩 호출은 실행하지 않았다.
 
+S0e는 2026-07-18 로컬에서 구현했다. schema version 4는 `notes.content_sha256`, `indexed_sha256`, `pending | ready | error | missing` 상태를 추가한다. topic은 strict parser로 정규화한 QA-LOG, 그 외 노트는 생성 태그·링크·제안 구역을 제외한 의미 본문을 hash한다. 노트 저장·append·split·merge·archive/restore·vault sync와 전체 임베딩 경로가 같은 상태 모듈을 사용하고, 비동기 임베딩은 시작할 때의 content hash가 현재 hash와 일치할 때만 `ready`가 된다. `/sync`는 원문이 사라진 노트와 청크를 더 이상 물리 삭제하지 않고 `missing`으로 표시한다. `npm run audit:note-index`는 본문을 출력하지 않고 파일/hash/마지막 성공 인덱스 상태를 readonly로 검사한다.
+
+`note_chunks.note_title`은 쓰기 호환 캐시로 유지하되 저장 상태·단일/전역 청크 조회·그래프 표시는 `notes.title` 조인을 사용한다. repair audit만 캐시 drift를 찾기 위해 `note_title`을 직접 읽는다. 같은 file-only Q&A 복구를 두 번 실행해 두 번째가 no-op이고 청크 ID·본문 hash·상태가 그대로임을 확인했다. malformed topic은 기존 파일·DB 증거를 보존한 채 격리되며 다른 정상 Q&A 재색인을 막지 않는다. 실제 자식 프로세스를 rename 직후 `SIGKILL`로 종료한 append와 split/merge 형태에서는 다음 audit이 각각 file-only Q&A와 assignment drift를 검출했고 DB 청크는 삭제되지 않았다. 로컬 전체 테스트 116개, 기존 topic readonly audit 7/7과 복구 계획 `clean`을 통과했으며 실제 로컬 DB migration과 Pi 배포는 수행하지 않았다.
+
 파일시스템과 SQLite를 하나의 ACID transaction으로 만들 수는 없다. 잡힌 예외는 즉시 복원하지만 rename 뒤 `SIGKILL`·전원 차단이 발생하면 다음 `audit:topics`가 drift를 찾아야 한다. 현재 단일 사용자 규모에서는 영속 mutation journal보다 이 경계를 유지하는 편이 단순하며, 운영 중에는 readonly audit으로 이 경계를 감시한다.
 
 - [x] `schema_version`과 순차 migration을 별도 모듈로 관리
@@ -632,7 +636,7 @@ S0d는 `68604af`에서 구현했다. audit이 단일 Markdown 정본과 누락 �
 - [x] 파일은 임시 파일+rename으로 쓰고, 관련 DB 변경은 하나의 transaction으로 처리
 - [x] 다중 파일 변경은 원본 snapshot을 두고 실패 시 복원하며, 프로세스 중단은 다음 audit에서 감지
 - [x] `note_chunks.content_sha256`과 `index_status`로 원본 Q&A 존재 여부와 회수 상태 기록
-- [ ] `notes.content_sha256`, `indexed_sha256`, `index_status`로 노트 전체와 마지막 성공 인덱스 상태 기록
+- [x] `notes.content_sha256`, `indexed_sha256`, `index_status`로 노트 전체와 마지막 성공 인덱스 상태 기록
 - [x] dry-run audit에서 malformed QA, file-only QA, DB-only 청크, source 참조 오류를 분리 보고
 - [x] 원문 비노출 hash·DB 배정·자동저장 provenance 기반 readonly 복구 계획 생성
 - [x] `source_missing` 청크를 회수·저장 상태에서 제외하고 일치하는 UUID형 legacy provenance를 별도 관찰
@@ -640,7 +644,7 @@ S0d는 `68604af`에서 구현했다. audit이 단일 Markdown 정본과 누락 �
 - [x] 복구 apply의 파일 원자 교체·DB transaction·실패 시 DB/vault rollback 구현
 - [x] file-only QA를 단일 정본 Q&A에서 재색인 (`68604af`, Pi 배포·인수 완료)
 - [x] DB-only 청크를 조용히 삭제하지 않고 `source_missing`으로 적용·회수 제외
-- [ ] `note_chunks.note_title`은 호환 캐시로만 두고 표시·검색 제목은 `notes` 조인 또는 현재 파일 메타데이터 사용
+- [x] `note_chunks.note_title`은 호환 캐시로만 두고 표시·검색 제목은 `notes` 조인 또는 현재 파일 메타데이터 사용
 - [x] 현재 topic의 QA ID 불일치와 8개 제목 drift를 검토·복구한 뒤 Pi audit 0건 확인
 
 교차 저장소 전체를 하나의 ACID transaction으로 만들 수는 없다. 대신 **직렬화된 변경 + 원자적 파일 교체 + DB transaction + hash 기반 재조정**으로 중단 후 복구 가능성을 보장한다. 혼자 쓰는 현재 규모에서는 전역 topic mutation queue가 가장 단순하며, 쓰기 처리량 손실은 무시할 수 있다.
@@ -726,10 +730,10 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 ### S0. 저장 무결성
 
 - [x] 활성 topic의 QA ID 집합과 `ready` 청크 ID 집합 차이 0건
-- [ ] 같은 vault를 두 번 재색인해 동일한 chunk ID·본문 hash가 생성됨
-- [ ] append·split·merge 도중 DB 실패와 프로세스 중단을 재현해 원본 보존 또는 자동 복구
-- [ ] malformed topic 하나가 다른 정상 topic의 재색인을 막거나 기존 인덱스를 삭제하지 않음
-- [ ] DB-only 청크와 source 참조 오류가 감사 기록 없이 물리 삭제되지 않음
+- [x] 같은 vault를 두 번 재색인해 동일한 chunk ID·본문 hash가 생성됨
+- [x] append·split·merge 도중 잡힌 DB 실패는 원본을 복원하고, hard process 중단은 다음 audit의 비파괴 복구 계획으로 이어짐
+- [x] malformed topic 하나가 다른 정상 topic의 재색인을 막거나 기존 인덱스를 삭제하지 않음
+- [x] DB-only 청크와 source 참조 오류가 감사 기록 없이 물리 삭제되지 않음
 
 ### A. 기억 신뢰성
 
