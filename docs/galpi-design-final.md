@@ -588,10 +588,10 @@
 
 ### 현재 진행 상태 (구현)
 
-> 갱신: 2026-07-17. 단계 구분은 `roadmap.md`(V1~V7) 기준.
+> 갱신: 2026-07-18. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0·A1 shadow, S0b-2 Pi 승인형 복구, S0c 공용 쓰기 경로와 A1b 전역 청크+노트 soft prior shadow 검색까지 Pi 운영 적용을 마쳤다. A1b는 `adb41a6`에서 구현했고 답변 생성 단계 UI와 정렬 보정은 `e7fe8f3`·`73b1ee7`로 배포했다. Pi 전체 테스트 97개, audit 66/66, 배포 파일 hash 일치, 인증 API·시작 로그와 재시작 전 온라인 백업 대비 13개 DB 테이블의 논리 동일성을 인수했다. 실제 모델 답변은 기존 노트 회수를 유지한다.
-- **다음 단계 설계:** 실사용 A1b trace의 과회수와 지연을 관찰한다. 최초 발상 1건과 최신 결말 1건 실패, 무관 판정 청크 54/72를 해소하거나 허용 가능한 근거로 분류하기 전에는 A2 실제 컨텍스트 전환을 자동 진행하지 않는다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
+- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0·A1 shadow, S0b-2 Pi 승인형 복구, S0c 공용 쓰기 경로와 A1b 전역 청크+노트 soft prior shadow 검색까지 Pi 운영 적용을 마쳤다. A1b는 `adb41a6`, 한국어 경계 보정은 `fc332e2`에서 구현했고 제품·비서·운영 경로는 `4ce7fdc`에서 갈피/시온과 `/home/pi/galpi`로 이관했다. Pi 전체 테스트 101개, audit 66/66, Codex 검증 20개, 배포 파일 hash, 인증 API·UI·온라인 백업과 13개 DB 테이블의 논리 동일성·DB hash 불변을 인수했다. 실제 모델 답변은 기존 노트 회수를 유지한다.
+- **다음 단계 설계:** 실사용 A1b trace의 과회수와 지연을 관찰한다. 정확 청크 2건과 별도 holdout 환율 false positive 1건을 해소하거나 허용 가능한 근거로 분류하기 전에는 A2 실제 컨텍스트 전환을 자동 진행하지 않는다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
