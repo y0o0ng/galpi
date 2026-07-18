@@ -1491,7 +1491,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: 2026-07-18 S0 schema v4 Pi 배포·운영 인수 완료
+> 상태: 2026-07-18 S0 schema v4 Pi 배포·운영 인수 완료, A1b 실사용 shadow 관찰 중, V4.5-C C0 상세 설계 완료·C1 구현 전 컨펌 대기
 
 ### 문제 정의
 
@@ -1505,7 +1505,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 4. 테스트는 `never`, 음성은 `inbox` 저장 정책을 사용한다.
 5. 사용자 메모리는 자동 확정하지 않고 시온 승인 제안으로 갱신한다.
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
-7. task·reminder는 SQLite 상태와 결정론적 scheduler로 실행한다.
+7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 무LLM·별도 정본만 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
 8. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
 
 ### 구조 원칙
@@ -1530,6 +1530,8 @@ A0 기준선 평가
   -> V5-A 딜 스카우트
   -> V5-B 주식 분석
 ```
+
+위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 기억 회수·자동 저장을 건드리지 않는 V4.5-C C0 설계와 C1 명시적 task/reminder는 별도 경계에서 진행할 수 있다. 이 약속 루프는 향후 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과 다르다.
 
 세부 스키마, 하드 상한, 마이그레이션, 보안 경계와 통과 기준은 상세 설계 문서를 단일 기준으로 삼는다.
 

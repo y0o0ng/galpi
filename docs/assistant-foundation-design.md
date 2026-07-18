@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-18
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C C0 상세 설계 완료
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성과 V5-A 딜 스카우트·V5-B 주식 분석 전에 진행
 
@@ -427,103 +427,21 @@ trace에는 API 키, 전체 프롬프트, 전체 외부 원문을 중복 저장�
 
 ## 6. C - 약속 루프
 
-### 6.1 범위
+첫 구현은 AI 에이전트가 아니라 개인 할 일·알림 시스템이다. 외부 캘린더를 읽고 일정을 재배치하는 향후 `V5-C 일정 에이전트`와 구분한다.
 
-첫 구현은 AI 에이전트가 아니라 개인 할 일·알림 시스템이다.
+구현 세부사항의 단일 기준은 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)다. 반복까지 2-table에 넣던 기존 초안은 회차 완료와 알림 확인을 분리하지 못하고 task의 `snoozed` 상태도 의미가 겹쳐 폐기했다.
 
-- 할 일 생성·수정·완료·보류
-- 기한과 단일/반복 알림
-- 오늘·지연된 일 보기
-- 첫 접속 또는 정해진 시각의 오늘 브리핑
-- 완료 후 결과 기록 제안
+C1은 아래 범위만 구현한다.
 
-외부 캘린더 동기화, 이메일 발송, 결제, 매매는 제외한다.
+- 명시적 `/task`와 사용자 확인 후 active task 생성
+- 기한 없음·날짜 전용·KST 절대 시각 기한
+- 단발성 reminder, 1분 scheduler, 재시작 catch-up, 중복 차단
+- Today·예정·Inbox, 완료·취소·되돌리기·확인·1시간 미루기
+- reminder 행 자체를 영속 알림 receipt로 사용하는 crash-safe 흐름
 
-### 6.2 데이터 구조
+자연어 후보, 반복, 오늘 브리핑, 완료 결과 기록, Web Push, 외부 캘린더는 C1에서 제외한다. 반복은 `task -> occurrence -> reminder`의 3층이 필요한 별도 schema migration으로 진행한다.
 
-```text
-assistant_tasks
-  id
-  title
-  detail
-  status            # proposed | active | done | snoozed | cancelled
-  due_at
-  timezone
-  recurrence_rule
-  source_session
-  source_message
-  related_note
-  created_at
-  updated_at
-  completed_at
-
-assistant_reminders
-  id
-  task_id
-  remind_at
-  status            # pending | fired | acknowledged | cancelled
-  occurrence_key    # 중복 발화 차단
-  fired_at
-  acknowledged_at
-```
-
-`occurrence_key`는 같은 반복 일정이 재시작·재시도 때문에 두 번 울리지 않도록 고유하게 만든다.
-
-### 6.3 생성 흐름
-
-```text
-"금요일까지 보고서 초안 써야 해"
-  -> LLM이 task 후보 {title, due expression} 제안
-  -> 서버가 KST 기준 절대 시각으로 정규화
-  -> 사용자에게 카드 표시
-  -> 확인 후 active
-```
-
-- 날짜가 모호하면 추측해 저장하지 않고 한 번 질문한다.
-- `내일`, `다음 주`, `저녁`의 해석 결과를 카드에 절대 날짜로 보여준다.
-- 대화 속 모든 미래형 문장을 자동 task로 만들지 않는다.
-- 명시적인 `기억해줘`, `해야 해`, `알려줘`, `/task`를 우선 신호로 쓴다.
-
-### 6.4 실행 흐름
-
-- 서버 내부 scheduler가 1분 단위로 pending reminder를 확인한다.
-- SQLite 상태 전이를 먼저 확정한 뒤 알림을 만든다.
-- 서버 재시작 후 놓친 알림은 catch-up하되 같은 occurrence를 중복 생성하지 않는다.
-- 초기 알림 채널은 시온 알림센터와 다음 접속 시 catch-up이다.
-- 브라우저가 닫힌 상태의 Web Push는 기본 루프가 안정된 뒤 별도 승인·권한 설계로 추가한다.
-- 알림 문구 생성에는 LLM이 필요 없다.
-
-### 6.5 오늘 브리핑
-
-브리핑은 새로운 독립 에이전트가 아니라 저장된 상태를 읽는 workflow다.
-
-입력:
-
-- 오늘 마감
-- 지연된 할 일
-- 오늘 알림
-- 최근 완료 후 결과 미기록 항목
-- 향후 에이전트 보고 노트
-
-출력:
-
-- 짧은 우선순위 목록
-- 필요한 경우에만 관련 노트 링크
-- 자동 실행은 하지 않고 다음 행동을 제안
-
-### 6.6 후속 확인
-
-완료된 task에는 선택적으로 결과를 묻는다.
-
-```text
-완료
-  -> 결과 기록 제안
-  -> 사용자가 한 줄 기록
-  -> 관련 topic 또는 task 결과에 저장
-  -> 필요하면 사용자 메모리 갱신 제안
-```
-
-모든 완료 항목에 질문하면 피로해지므로, 결정·구매·실험·연락처럼 결과가 다음 판단에 유용한 task만 제안한다.
+명시적 `/task`, 새 전용 테이블·모듈, 무LLM, 기억 회수·자동 저장 경로 불변을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다.
 
 ## 7. V4-B 음성 입력과의 경계
 
@@ -718,10 +636,10 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 
 ### C. task·reminder
 
-- 명시적 `/task`와 카드 확인부터 구현
-- 자연어 후보 추출
-- scheduler, 재시작 catch-up, 중복 차단
-- Today/Inbox와 브리핑
+- [상세 설계](task-reminder-design.md)의 C1부터 구현
+- 명시적 `/task`, 단발성 reminder, scheduler, 재시작 catch-up, 중복 차단
+- Today·예정·Inbox와 완료·취소·확인·1시간 미루기
+- 자연어 후보·반복·브리핑은 C1 Pi 인수 뒤 별도 단계
 
 ### D. 음성
 
@@ -763,13 +681,17 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 
 ### C. 약속 루프
 
-- [ ] 자연어 날짜를 절대 KST 시각으로 보여주고 확인 후 task 생성
+- [x] C0 상세 설계에서 제품 경계·시간 규칙·상태 머신·schema·API·crash semantics를 고정
+- [ ] 명시적 `/task`가 날짜·시각 입력 시 절대 KST 시각을 보여주고 확인 후에만 task 생성
 - [ ] 서버 재시작 후 task와 reminder가 유지됨
-- [ ] 같은 reminder occurrence가 중복 발화하지 않음
-- [ ] 놓친 알림이 다음 시작·접속에서 한 번만 catch-up됨
+- [ ] 같은 reminder occurrence의 DB 행이 하나이며 확인 전 같은 receipt를 계속 조회 가능
+- [ ] 놓친 단발성 알림이 다음 시작·접속에서 한 번만 catch-up됨
 - [ ] 완료·미루기·취소 상태가 UI와 DB에서 일치
-- [ ] Today에 오늘 마감·지연 항목이 정확히 표시됨
-- [ ] 결과 기록이 관련 task/note에 출처와 함께 연결됨
+- [ ] task 되돌리기는 terminal reminder를 자동 복원하지 않음
+- [ ] reminder는 명시적 확인 전에는 조회·패널 열기로 acknowledged되지 않음
+- [ ] Today·예정·Inbox에 날짜 전용·시각 기한이 KST 경계대로 표시됨
+- [ ] `/task` 경로의 LLM·임베딩·topic 저장 호출이 0회
+- [ ] 반복·자연어 후보·결과 기록은 C1 인수 뒤 별도 컨펌
 
 ### D. 음성 연결
 
