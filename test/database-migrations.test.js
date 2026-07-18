@@ -48,6 +48,17 @@ function createLegacyDatabase() {
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
       updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
+    CREATE TABLE assistant_retrieval_shadow_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT,
+      mode TEXT NOT NULL,
+      notes_json TEXT NOT NULL,
+      chunks_json TEXT NOT NULL,
+      context_chars INTEGER NOT NULL DEFAULT 0,
+      latency_ms INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    );
   `);
   return db;
 }
@@ -62,10 +73,10 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [{ version: 1 }, { version: 2 }],
+    [{ version: 1 }, { version: 2 }, { version: 3 }],
   );
 
   const chunk = db.prepare(`
@@ -75,6 +86,11 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
   `).get();
   assert.equal(chunk.contentSha256, sha256('Q: 질문\nA: 답변'));
   assert.equal(chunk.indexStatus, 'ready');
+  assert.ok(
+    db.prepare('PRAGMA table_info(assistant_retrieval_shadow_runs)')
+      .all()
+      .some(column => column.name === 'query_sha256'),
+  );
 
   const second = runDatabaseMigrations(db);
   assert.deepEqual(second, { currentVersion: LATEST_SCHEMA_VERSION, applied: [] });

@@ -430,12 +430,15 @@ test('shadow service records identifiers without content and isolates trace fail
   assert.equal(service.record({
     sessionId: 'session-1',
     mode: 'chat',
+    query: '배포 노트',
     retrieval,
     latencyMs: 1.6,
   }), true);
   assert.equal(inserted.length, 1);
   assert.equal(inserted[0].latencyMs, 2);
+  assert.match(inserted[0].querySha256, /^[a-f0-9]{64}$/);
   assert.doesNotMatch(inserted[0].chunksJson, /민감한|배포 노트/);
+  assert.doesNotMatch(JSON.stringify(inserted[0]), /배포 노트/);
 
   const failingService = createAssistantRetrievalShadow({
     getChunksByNote: () => [],

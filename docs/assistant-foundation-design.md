@@ -679,6 +679,10 @@ note_chunks
 
 같은 날 이름·경로 이관과 함께 이 후보를 Pi에 shadow-only로 배포했다. 운영 API의 비공개 20개 재평가는 note Recall@3 20/20, chunk Recall@6 18/20, abstention 4/4, 상한 20/20, 무관 노트 13/29, 무관 청크 51/69, 평균 362ms·최대 824ms, 오류 0이었다. 테스트 101개, audit 66/66, Codex 검증 20개와 DB hash 불변도 확인했다. 남은 실패는 시 작품의 정확 청크 1건, 포트폴리오 원문 청크 1건, 별도 holdout의 환율 false positive 1건이다. 최신성·supersession과 함께 실제 shadow trace를 더 관찰하기 전에는 A2로 전환하지 않는다.
 
+2026-07-18에는 실사용 trace를 안전하게 집계·검토하는 로컬 도구를 구현했다. schema version 3은 질문 원문을 trace에 중복 저장하지 않고 정규화 SHA-256만 남긴다. `npm run report:retrieval-shadow`는 SQLite를 readonly/query_only로 열어 A1b 추가 랭킹 지연 p50/p95, 컨텍스트·노트·청크 수, abstention·상한 도달·오류를 기본 집계하며 개인 내용은 출력하지 않는다. 명시적 `--review`에서만 기존 `messages`와 hash를 연결해 질문과 선택된 Q&A의 질문부를 보여주고 답변 본문은 출력하지 않는다. 같은 질문과 의회 내부 중복 단계는 하나의 고유 hash로 계산하며, hash가 없는 기존 trace도 숫자 집계에는 남긴다. 로컬 전체 테스트 104개를 통과했고 Pi에는 아직 배포하지 않았다.
+
+배포 전 Pi를 읽기 전용으로 집계한 결과 전체 shadow trace는 14건(2026-07-16 16:10~2026-07-17 23:27 KST)이지만 현재 A1b 모드 실사용은 1건뿐이었다. 따라서 고유 질문 30개를 최소 중간 점검선, 50개를 A2 판단선으로 둔다. 기억 회수, 여러 시점·최신 결말, 무관 질문의 abstention, 짧은 한국어 경계 사례가 함께 포함되어야 하며 같은 질문 반복은 표본 수에 더하지 않는다.
+
 ### A2. 청크 회수 전환
 
 - topic을 청크 단위로 주입

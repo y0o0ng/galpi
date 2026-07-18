@@ -419,6 +419,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT,
     mode TEXT NOT NULL,
+    query_sha256 TEXT,
     notes_json TEXT NOT NULL,
     chunks_json TEXT NOT NULL,
     context_chars INTEGER NOT NULL DEFAULT 0,
@@ -583,9 +584,11 @@ const stmtUpdateMessageEmbedding = db.prepare(
 );
 const stmtInsertRetrievalShadowRun = db.prepare(`
   INSERT INTO assistant_retrieval_shadow_runs (
-    session_id, mode, notes_json, chunks_json, context_chars, latency_ms, error
+    session_id, mode, query_sha256, notes_json, chunks_json,
+    context_chars, latency_ms, error
   ) VALUES (
-    @sessionId, @mode, @notesJson, @chunksJson, @contextChars, @latencyMs, @error
+    @sessionId, @mode, @querySha256, @notesJson, @chunksJson,
+    @contextChars, @latencyMs, @error
   )
 `);
 const assistantRetrievalShadow = createAssistantRetrievalShadow({
@@ -5008,6 +5011,7 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   assistantRetrievalShadow.record({
     sessionId,
     mode: `${mode}:a1b`,
+    query: question,
     retrieval: shadowRetrieval,
     latencyMs: Date.now() - shadowStartedAt,
     error: shadowError,
