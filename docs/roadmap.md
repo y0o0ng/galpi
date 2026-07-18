@@ -219,13 +219,13 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0b-2 Pi 승인형 복구, S0c 공용 쓰기 경로, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다.
+> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
 토픽 노트 방식은 유지한다. topic은 사람이 주제의 흐름을 읽는 성장형 기록이고, QA-LOG는 해당 topic에 속한 Q&A의 원본, `note_chunks`는 QA-LOG에서 재생성 가능한 AI 회수 인덱스다. 하나의 Q&A를 여러 원자 노트로 복제하지 않고 primary topic 하나와 링크·edge로 연결하며, 선호·사실·task처럼 상태 전이가 필요한 정보만 SQLite 구조화 상태로 승격한다.
 
-### S0 — 저장 무결성 (진행 중)
+### S0 — 저장 무결성 (완료)
 
 > 2026-07-16 초기 점검의 `file-only` 1건은 구조 파서로 다시 검사한 결과 별도 QA가 아니라 두 토픽 파일에 같은 `qa_id`가 들어간 중복이었다. 용량 문제는 아니며, A2 실제 답변 전환 전에 중복 소유권과 복구 규칙을 확정한다.
 
@@ -242,6 +242,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 > S0c 공용 쓰기 경로 Pi 배포·인수 완료 (`d41defe`, 2026-07-17): append·split·merge·archive/restore를 strict QA-LOG parser와 하나의 전역 mutation queue로 직렬화했다. 각 변경은 읽은 원문 또는 파일 부재를 precondition으로 확인하고 임시 파일+rename, 다중 파일 snapshot, 동기 SQLite transaction을 거치며 파일·DB 오류 시 원본을 복원한다. merge source 보관 실패는 더 이상 부분 성공으로 처리하지 않고, split source에 이동 대상 밖 청크가 있으면 물리 삭제 전에 중단한다. 로컬 전체 테스트 85개와 임시 서버 HTTP mutation 시나리오를 통과한 뒤 Pi 동시 DB·vault 백업 `20260717-1754`와 기존 코드 백업을 만들고 배포했다. Pi에서 파일 hash 일치, 전체 테스트 85개, readonly audit의 활성 Q&A/ready 청크 65/65와 DB hash 불변, 서비스 재기동, 인증 API `200`, 재기동 후 오류 로그 0건을 확인했다.
 
 > S0d Markdown-only Q&A 재색인 Pi 배포·인수 완료 (`68604af`, 2026-07-18): 기존 dry-run 계획의 `reindex_file_qa`를 승인형 apply에 연결했다. 단일 정본 Q&A만 strict parser와 계획 hash로 다시 확인하고 OpenAI 임베딩을 먼저 준비한 뒤 기존 `topic-chunk-store`를 통해 같은 DB transaction에 provenance·본문 hash·`ready` 상태를 쓴다. 자동 저장 출처가 여러 개이거나 현재 노트 배정과 다르면 수동 검토로 남기며, stale 원문은 백업 전에 중단하고 임베딩·DB 실패는 migration 전 DB로 복원한다. Pi DB·vault 백업 `20260718-1437`과 코드 백업 후 4개 파일 hash, 전체 테스트 109개, audit 66/66, 복구 계획 `clean`·작업 0건, Codex 검증 20개, schema 3·SQLite 무결성·외래키, 백업 대비 12개 application table 행 수 불변, 인증 API와 새 PID 서비스 기동을 인수했다. 실제 복구 apply와 임베딩 호출은 실행하지 않았다.
+
+> S0e 노트 인덱스 무결성 Pi 배포·인수 완료 (`9efb501`, 2026-07-18): schema v4의 노트 원문 hash·마지막 성공 인덱스 hash·`pending | ready | error | missing` 상태와 stale 비동기 임베딩 차단, 비파괴 sync, readonly note-index audit을 운영 적용했다. Pi DB·vault 백업 `20260718-1540`과 코드 백업 `s0e-pre-20260718-154007.tar.gz` 후 23개 파일 hash, 전체 테스트 116개, schema 3→4, sync 29개·missing 0, 활성 노트 재임베딩 20/20·실패 0을 확인했다. note-index audit은 DB/vault 29/29·ready 20·보관 pending 9·finding 0, topic audit은 66/66, 복구 계획은 `clean`·작업 0건, Codex 검증은 20개였다. SQLite 무결성·외래키, 백업 대비 12개 application table 행 수 불변, 인증 API·새 PID 서비스·재시작 오류 0건까지 인수했다.
 
 1. [x] schema version과 순차 migration을 별도 모듈로 관리
 2. [x] append·split·merge·archive/restore를 공용 QA-LOG parser와 topic mutation queue로 직렬화 (`d41defe`, Pi 인수 완료)
