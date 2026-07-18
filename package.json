@@ -13,6 +13,7 @@
     "apply:topic-repair": "node scripts/apply-topic-repair.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
     "report:retrieval-shadow": "node scripts/report-retrieval-shadow.js",
+    "check:codex-runner": "node scripts/check-codex-runner.js",
     "mcp:obsidian": "node scripts/galpi-mcp.mjs"
   },
   "dependencies": {

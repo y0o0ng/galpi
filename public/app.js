@@ -33,6 +33,7 @@ const slashCommands = [
   { command: '/save ', title: '문서 저장', description: '입력한 내용을 옵시디언 노트로 저장' },
   { command: '/embed', title: '임베딩 생성', description: '모든 노트의 시맨틱 검색용 임베딩 생성' },
   { command: '/organize', title: '정리 상태', description: 'Codex 정리 대기 노트 상태 조회' },
+  { command: '/organize process', title: '대기 job 실행', description: '이미 큐에 있는 Codex 정리 job 하나를 수동 실행' },
   { command: '/organize all', title: '전체 재정리', description: '모든 활성 노트를 Codex로 다시 정리' },
   { command: '/archive ', title: '노트 보관', description: '검색어로 노트를 찾아 _archive로 보관' },
   { command: '/archived', title: '보관함', description: '숨긴(보관한) 노트 목록 — 복원 가능' },
@@ -568,6 +569,12 @@ function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     handleOrganizeAll(true);
+    return;
+  }
+  if (text === '/organize process') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    handleOrganizeProcess();
     return;
   }
   if (text === '/embed') {
@@ -1262,6 +1269,37 @@ async function handleOrganizeStatus() {
   }
 }
 
+async function handleOrganizeProcess() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.querySelector('.welcome')?.remove();
+  appendUserBubble('/organize process');
+
+  document.dispatchEvent(new Event('pet:building'));
+  const loadingEl = appendLoading();
+  try {
+    const res = await apiFetch('/api/organize/process', { method: 'POST' });
+    const data = await res.json();
+    loadingEl.remove();
+
+    if (!res.ok || data.success === false) {
+      appendError(data.error || 'Codex 정리 job 실행에 실패했습니다.');
+      return;
+    }
+
+    renderOrganizeProcessResult(data);
+    document.dispatchEvent(new Event(data.status === 'processed' ? 'pet:happy' : 'pet:error'));
+  } catch (_) {
+    loadingEl.remove();
+    appendError('서버에 연결할 수 없습니다.');
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('input').focus();
+  }
+}
+
 async function handleEmbed() {
   if (isLoading) return;
   isLoading = true;
@@ -1342,8 +1380,30 @@ function renderOrganizeStatus(data) {
     `${index + 1}. ${note.title} (${note.noteType})`
   );
   const more = notes.length > 10 ? `\n...외 ${notes.length - 10}개` : '';
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+  const statusLabels = {
+    pending: '대기',
+    running: '실행 중',
+    processed: '완료',
+    success: '완료',
+    failed: '실패',
+    needs_manual_check: '수동 확인',
+  };
+  const jobRows = jobs.map(job => {
+    const status = statusLabels[job.status] || job.status || '알 수 없음';
+    const attempts = Number.isFinite(Number(job.attemptCount)) ? Number(job.attemptCount) : 0;
+    const error = String(job.error || '').trim();
+    return `#${job.id} ${status} · 시도 ${attempts}회${error ? `\n  오류: ${error}` : ''}`;
+  });
+  const runner = data.runner && typeof data.runner === 'object' ? data.runner : null;
+  const runnerSummary = runner
+    ? `정리 실행기: ${runner.ok ? '정상' : '보류'} (${runner.mode || 'unknown'}${runner.version ? ` · ${runner.version}` : ''})`
+    : null;
+  const runnerError = runner?.error ? `실행기 오류: ${runner.error}` : null;
 
   bubble.textContent = [
+    runnerSummary,
+    runnerError,
     `자동 큐 기준: ${data.autoQueueThreshold || 5}개`,
     `정리 대기: ${data.pending || 0}개`,
     `큐 대기: ${data.queued || 0}개`,
@@ -1352,10 +1412,41 @@ function renderOrganizeStatus(data) {
     `실패: ${data.failed || 0}개`,
     `수동 확인: ${data.needsManualCheck || 0}개`,
     rows.length ? `\n대기 노트:\n${rows.join('\n')}${more}` : '\n대기 노트 없음',
-  ].join('\n');
+    jobRows.length ? `\n최근 job:\n${jobRows.join('\n')}` : '\n최근 job 없음',
+  ].filter(Boolean).join('\n');
 
   group.append(label, bubble);
 
+  getMessages().appendChild(group);
+  saveUiMessage('assistant', bubble.textContent, 'Organize');
+  scrollDown();
+}
+
+function renderOrganizeProcessResult(data) {
+  const group = document.createElement('div');
+  group.className = 'msg-group assistant';
+
+  const label = makeModelLabel('Organize');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  const processedCount = Array.isArray(data.notes) ? data.notes.length : 0;
+  const failedCount = Array.isArray(data.failed) ? data.failed.length : 0;
+  const statusLabel = data.status === 'processed'
+    ? '완료'
+    : data.status === 'pending'
+    ? '실행기 복구 후 재시도 대기'
+    : '실패';
+  bubble.textContent = data.processed
+    ? [
+        `정리 job #${data.jobId} ${statusLabel}`,
+        `처리: ${processedCount}개`,
+        `실패: ${failedCount}개`,
+        data.error ? `오류: ${data.error}` : '',
+      ].filter(Boolean).join('\n')
+    : (data.message || '실행할 정리 job이 없습니다.');
+
+  group.append(label, bubble);
   getMessages().appendChild(group);
   saveUiMessage('assistant', bubble.textContent, 'Organize');
   scrollDown();

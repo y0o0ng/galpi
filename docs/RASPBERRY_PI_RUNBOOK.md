@@ -17,12 +17,38 @@ node --version
 npm --version
 ```
 
-Codex 확인:
+Codex 설치 위치 확인:
 
 ```sh
+command -v node
+command -v codex
 codex --version
 codex exec --help
 ```
+
+위의 bare `codex`는 설치 위치를 찾는 용도로만 쓴다. systemd는 로그인 셸과 `PATH`가 다르므로 `.env`의 `CODEX_BIN`에는 실행을 확인한 **절대 경로**를 넣는다.
+
+현재 Pi에서 검증한 패턴은 프로젝트 안의 고정 wrapper `/home/pi/galpi/bin/codex`가 실제 Node와 Codex JS 진입점을 절대 경로로 실행하는 방식이다. Node나 Codex를 업그레이드하면 `command -v node`와 `npm root -g` 결과로 두 경로를 다시 확인한다.
+
+```sh
+mkdir -p /home/pi/galpi/bin
+nano /home/pi/galpi/bin/codex
+```
+
+현재 검증된 wrapper 예시:
+
+```sh
+#!/bin/sh
+exec /home/pi/.nvm/versions/node/v24.16.0/bin/node /home/pi/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/bin/codex.js "$@"
+```
+
+```sh
+chmod 755 /home/pi/galpi/bin/codex
+/home/pi/galpi/bin/codex --version
+/home/pi/galpi/bin/codex exec --help
+```
+
+wrapper는 인자를 바꾸지 않고 `"$@"`로 전달해야 한다. 서버가 이 경로에 `exec`, 모델, vault 작업 경로, sandbox 옵션을 인자로 붙이고 정리 프롬프트는 표준 입력으로 전달한다.
 
 ## 2. 프로젝트 배치
 
@@ -58,7 +84,7 @@ HOST=0.0.0.0
 PORT=3000
 API_TOKEN=아무도-모를-긴-문자열
 CODEX_RUNNER_MODE=codex
-CODEX_BIN=codex
+CODEX_BIN=/home/pi/galpi/bin/codex
 CODEX_AUTO_QUEUE_THRESHOLD=5
 ```
 
@@ -118,17 +144,31 @@ journalctl -u galpi -f
 
 ## 5. Smoke Test
 
-서버에서:
+서비스를 재시작하기 전에 Codex 실행 파일과 로그인·모델 호출을 서비스 계정으로 직접 확인한다.
+
+```sh
+test -x /home/pi/galpi/bin/codex
+sudo -u pi /home/pi/galpi/bin/codex --version
+cd /home/pi/galpi
+npm run check:codex-runner
+sudo -u pi mkdir -p /tmp/galpi-codex-smoke
+printf '%s\n' 'Reply only RUNNER_OK. Do not modify files.' | sudo -u pi /home/pi/galpi/bin/codex exec --model gpt-5.4-mini -C /tmp/galpi-codex-smoke --skip-git-repo-check --sandbox workspace-write --color never -
+```
+
+`check:codex-runner`는 `.env`의 실제 `CODEX_BIN`으로 버전과 로그인 상태만 검사하며 모델 호출은 하지 않는다. 마지막 명령은 서버와 같은 `codex exec`·stdin 실행 경로를 빈 임시 폴더에서 실제로 한 번 호출한다. `.env`의 `CODEX_MODEL`을 바꿨다면 `--model`도 같은 값으로 바꾼다. 출력에 `RUNNER_OK`가 없으면 정리 job을 실행하지 말고 실행 파일·로그인·모델 설정부터 고친다.
+
+그다음 서버에서 정적 검증을 실행한다.
 
 ```sh
 node scripts/validate-codex-edit.js
 ```
 
-다른 터미널에서:
+서비스를 재시작하고 다른 터미널에서 인증된 API를 확인한다. `<API_TOKEN>`은 `.env`의 실제 값으로 교체한다.
 
 ```sh
-curl http://127.0.0.1:3000/api/config
-curl http://127.0.0.1:3000/api/organize/status
+sudo systemctl restart galpi
+curl -H 'X-API-Token: <API_TOKEN>' http://127.0.0.1:3000/api/config
+curl -H 'X-API-Token: <API_TOKEN>' http://127.0.0.1:3000/api/organize/status
 ```
 
 기대값:
@@ -146,11 +186,15 @@ curl http://127.0.0.1:3000/api/organize/status
 /organize
 ```
 
-대기 job 하나 실행:
+노트 상태와 최근 job의 상태·시도 횟수·실패 원인을 읽기만 한다. 파일명은 화면에 표시하지 않는다.
+
+이미 queue에 있는 대기 job 하나를 수동 실행:
 
 ```text
 /organize process
 ```
+
+이 명령은 새 job을 만들거나 모든 pending 노트를 재정리하지 않는다. 실행기 장애로 멈춘 job은 같은 job ID와 시도 횟수·오류를 보존한 채 `pending`에 남으므로, 원인을 고친 뒤 이 명령으로 바로 재시도할 수 있다. 실행할 queued job이 없으면 그대로 종료한다. 자동 worker가 정상일 때는 보통 직접 누를 필요가 없는 점검·복구용 명령이다.
 
 전체 재정리:
 
@@ -161,6 +205,7 @@ curl http://127.0.0.1:3000/api/organize/status
 주의:
 
 - `/organize all`은 초기/유지보수용이다.
+- runner preflight가 실패한 상태의 `/organize all`은 서버가 503으로 차단한다. 실행 중 runner 장애가 나도 현재 배치 상태를 복원하고 다음 배치를 중단한다.
 - 노트가 많아지면 토큰과 시간이 크게 든다.
 - 장기적으로는 새 노트/변경 노트 중심의 증분 정리를 기본으로 쓴다.
 
@@ -247,10 +292,15 @@ Pi에서 `sudo` 비밀번호가 필요하므로 서비스 중지·시작은 사�
 
 ### Codex가 실패함
 
-- `codex --version` 확인
-- Codex 로그인 상태 확인
+- `.env`의 `CODEX_BIN=/home/pi/galpi/bin/codex` 확인. bare `codex`나 이전 프로젝트 경로를 두지 않는다.
+- `test -x /home/pi/galpi/bin/codex`와 `sudo -u pi /home/pi/galpi/bin/codex --version` 확인
+- Smoke Test의 실제 `codex exec` 호출로 로그인·모델 호출 확인
+- `journalctl -u galpi --since '10 minutes ago'`에서 실제 runner 오류 확인
 - 사용량 제한 메시지인지 확인
+- `spawn ... ENOENT`는 노트 내용 문제가 아니라 실행 파일 경로 문제다. 경로 수정과 서비스 재시작 전에는 정리를 다시 실행하지 않는다.
 - quota/rate limit 실패는 노트 수동점검 문제가 아니다. 시간이 지난 뒤 다시 실행한다.
+- Node.js 또는 Codex를 업그레이드했다면 wrapper 안의 두 절대 경로를 갱신하고 preflight를 다시 통과시킨다.
+- preflight가 정상으로 돌아오면 `/organize process`로 오류가 남은 같은 pending job을 재시도한다. 새 job을 만들거나 `/organize all`을 누르지 않는다.
 
 ### 노트 검증 실패
 

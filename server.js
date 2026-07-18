@@ -45,6 +45,15 @@ const {
   createAssistantRetrievalShadow,
   parseStoredEmbedding,
 } = require('./lib/assistant-retrieval-shadow');
+const {
+  compactError,
+  formatCodexJobError,
+  isCodexInfrastructureError,
+  isCodexRunnerError,
+  redactCodexNoteNames,
+  recoverInterruptedCodexJobs,
+  validateOrganizedCodexOutput,
+} = require('./lib/codex-organizer');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
@@ -896,7 +905,16 @@ const stmtGetRecentMessages = db.prepare(`
   ORDER BY created_at ASC, id ASC
 `);
 
+const codexStartupRecovery = recoverInterruptedCodexJobs(db);
 let codexRunnerActive = false;
+let codexRunnerHealth = {
+  mode: CODEX_RUNNER_MODE,
+  ok: CODEX_RUNNER_MODE !== 'codex',
+  checkedAt: null,
+  version: CODEX_RUNNER_MODE === 'codex' ? null : 'heuristic',
+  login: CODEX_RUNNER_MODE === 'codex' ? null : 'not-required',
+  error: null,
+};
 
 function dbSaveMessage(sessionId, role, content, model = null, precomputedEmbedding = null) {
   stmtEnsureSession.run(sessionId);
@@ -958,6 +976,9 @@ const createCodexJobFromPending = db.transaction((limit = CODEX_AUTO_QUEUE_THRES
   const filenames = notes.map(note => note.filename);
   const result = stmtCreateCodexJob.run(JSON.stringify(filenames));
   filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('queued', filename));
+  // 수동 큐도 남은 pending 노트를 worker가 이어서 처리한다. 이미 반영된 저장 이벤트를
+  // 남겨두면 다음 자동 큐 임계값이 앞당겨지므로 job 생성과 같은 트랜잭션에서 소비한다.
+  stmtMarkUnqueuedSaveDecisionsQueued.run();
 
   return {
     id: result.lastInsertRowid,
@@ -975,7 +996,6 @@ function maybeCreateCodexJobFromSaveEvents() {
   if (eventCount < CODEX_AUTO_QUEUE_THRESHOLD) return null;
   const job = createCodexJobFromPending();
   if (!job) return null;
-  stmtMarkUnqueuedSaveDecisionsQueued.run();
   kickOrganizeWorker();
   return job;
 }
@@ -3780,9 +3800,9 @@ app.post('/api/notifications/:id/approve', async (req, res) => {
       const filename = notification.note?.filename;
       if (!filename) return res.status(400).json({ error: '노트 파일 정보가 없습니다.' });
       // 옵시디언 수동 편집을 먼저 DB에 반영한 뒤 확인 완료로 표시한다.
-      // (순서를 바꾸면 backfill upsert가 success 상태를 덮어쓸 수 있다.)
+      // (순서를 바꾸면 backfill upsert가 processed 상태를 덮어쓸 수 있다.)
       const sync = await syncVaultDb();
-      stmtUpdateNoteCodexStatus.run('success', filename);
+      stmtUpdateNoteCodexStatus.run('processed', filename);
       result = { synced: true, ...sync };
     }
 
@@ -3877,6 +3897,7 @@ app.get('/api/organize/status', (_req, res) => {
   res.json({
     success: true,
     autoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
+    runner: codexRunnerHealth,
     ...counts,
     notes: stmtGetPendingNotes.all(),
     jobs: stmtGetRecentCodexJobs.all(5).map(({ noteFilenamesJson, ...job }) => ({
@@ -3908,6 +3929,11 @@ app.post('/api/organize/queue', (_req, res) => {
 });
 
 app.post('/api/organize/process', async (_req, res) => {
+  if (codexRunnerActive) {
+    return res.status(409).json({ error: '이미 Codex 정리가 실행 중입니다.' });
+  }
+
+  codexRunnerActive = true;
   try {
     const result = await runNextCodexJob();
     if (!result) {
@@ -3926,12 +3952,28 @@ app.post('/api/organize/process', async (_req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  } finally {
+    codexRunnerActive = false;
+    if (
+      stmtGetNextPendingCodexJob.get() &&
+      (CODEX_RUNNER_MODE !== 'codex' || codexRunnerHealth.ok)
+    ) {
+      kickOrganizeWorker();
+    }
   }
 });
 
 app.post('/api/organize/all', async (_req, res) => {
   if (codexRunnerActive) {
     return res.status(409).json({ error: '이미 Codex 정리가 실행 중입니다.' });
+  }
+  if (
+    CODEX_RUNNER_MODE === 'codex' &&
+    (!codexRunnerHealth.checkedAt || !codexRunnerHealth.ok)
+  ) {
+    return res.status(503).json({
+      error: `Codex 실행기가 준비되지 않았습니다: ${codexRunnerHealth.error || 'preflight 확인 중'}`,
+    });
   }
 
   codexRunnerActive = true;
@@ -4698,18 +4740,59 @@ function execFileWithInput(command, args, input, options = {}) {
       resolve({ stdout, stderr });
     });
 
-    if (input) child.stdin.end(input);
+    child.stdin.end(input || undefined);
   });
 }
 
-function isCodexRunnerUnavailableError(err) {
-  const text = `${err?.message || ''}\n${err?.stderr || ''}\n${err?.stdout || ''}`.toLowerCase();
-  return (
-    text.includes('usage limit') ||
-    text.includes('purchase more credits') ||
-    text.includes('try again at') ||
-    text.includes('rate limit')
-  );
+function firstOutputLine(value) {
+  return String(value || '').trim().split(/\r?\n/, 1)[0].slice(0, 200) || null;
+}
+
+function updateCodexRunnerHealth({ ok, version, login, error }) {
+  codexRunnerHealth = {
+    mode: CODEX_RUNNER_MODE,
+    ok,
+    checkedAt: new Date().toISOString(),
+    version: version === undefined ? codexRunnerHealth.version : version,
+    login: login === undefined ? codexRunnerHealth.login : login,
+    error: error || null,
+  };
+  return codexRunnerHealth;
+}
+
+async function probeCodexRunner() {
+  if (CODEX_RUNNER_MODE !== 'codex') {
+    return updateCodexRunnerHealth({
+      ok: true,
+      version: 'heuristic',
+      login: 'not-required',
+      error: null,
+    });
+  }
+
+  try {
+    const versionResult = await execFileWithInput(CODEX_BIN, ['--version'], '', {
+      cwd: __dirname,
+      timeout: 10000,
+    });
+    const loginResult = await execFileWithInput(CODEX_BIN, ['login', 'status'], '', {
+      cwd: __dirname,
+      timeout: 10000,
+    });
+    return updateCodexRunnerHealth({
+      ok: true,
+      version: firstOutputLine(versionResult.stdout || versionResult.stderr),
+      login: firstOutputLine(loginResult.stdout || loginResult.stderr),
+      error: null,
+    });
+  } catch (err) {
+    return updateCodexRunnerHealth({
+      ok: false,
+      version: null,
+      login: null,
+      error: compactError(err, 500),
+    });
+  }
 }
 
 function stripCodexOwnedBlocks(raw) {
@@ -4864,19 +4947,29 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 
 async function runCodexCliForJob(filenames, model = CODEX_MODEL) {
   const prompt = buildCodexRunnerPrompt(filenames);
-  return execFileWithInput(CODEX_BIN, [
-    'exec',
-    '--model', model,
-    '-C', VAULT_PATH,
-    '--skip-git-repo-check',
-    '--sandbox', 'workspace-write',
-    '--color', 'never',
-    '-',
-  ], prompt, {
-    cwd: VAULT_PATH,
-    env: process.env,
-    timeout: CODEX_RUNNER_TIMEOUT_MS,
-  });
+  try {
+    const result = await execFileWithInput(CODEX_BIN, [
+      'exec',
+      '--model', model,
+      '-C', VAULT_PATH,
+      '--skip-git-repo-check',
+      '--sandbox', 'workspace-write',
+      '--color', 'never',
+      '-',
+    ], prompt, {
+      cwd: VAULT_PATH,
+      env: process.env,
+      timeout: CODEX_RUNNER_TIMEOUT_MS,
+    });
+    updateCodexRunnerHealth({ ok: true, error: null });
+    return result;
+  } catch (err) {
+    err.codexFailureKind = isCodexInfrastructureError(err)
+      ? 'runner_infrastructure'
+      : 'runner_execution';
+    updateCodexRunnerHealth({ ok: false, error: compactError(err, 500) });
+    throw err;
+  }
 }
 
 async function processCodexNoteWithHeuristic(filename) {
@@ -4921,9 +5014,22 @@ async function processCodexJobWithCodex(filenames, model = CODEX_MODEL) {
     const titleMap = await buildTitleToFilenameMap();
     await Promise.all(filenames.map(filename => convertNoteLinksToFilenames(filename, titleMap)));
     await validateCodexEdit(filenames);
+    for (const filename of filenames) {
+      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const validationErrors = validateOrganizedCodexOutput(raw);
+      if (validationErrors.length > 0) {
+        throw new Error(`${filename}: ${validationErrors.join(' / ')}`);
+      }
+    }
   } catch (err) {
     await restoreVaultSnapshots(snapshots);
-    throw new Error(`Codex 실행/검증 실패: ${err.message}${err.stderr ? ` (${String(err.stderr).slice(0, 500)})` : ''}`);
+    const wrapped = new Error(`Codex 실행/검증 실패: ${compactError(err)}`);
+    wrapped.cause = err;
+    if (err?.codexFailureKind) wrapped.codexFailureKind = err.codexFailureKind;
+    if (err?.code) wrapped.code = err.code;
+    if (err?.stderr) wrapped.stderr = err.stderr;
+    if (err?.stdout) wrapped.stdout = err.stdout;
+    throw wrapped;
   }
 
   return Promise.all(filenames.map(async filename => {
@@ -4967,6 +5073,7 @@ async function runAllCodexNotes() {
   const failed = [];
   const batches = [];
   const batchSize = CODEX_AUTO_QUEUE_THRESHOLD;
+  let aborted = false;
 
   for (let i = 0; i < notes.length; i += batchSize) {
     const batch = notes.slice(i, i + batchSize);
@@ -4985,14 +5092,15 @@ async function runAllCodexNotes() {
       });
     } catch (err) {
       console.error(`[codex] 배치 정리 실패 — ${filenames.join(', ')}: ${err.message}`);
-      const retryableRunnerFailure = isCodexRunnerUnavailableError(err);
+      const retryableRunnerFailure = isCodexRunnerError(err);
+      const error = compactError(err);
       filenames.forEach(filename => {
         const nextStatus = retryableRunnerFailure
           ? previousStatuses.get(filename) || 'pending'
           : 'needs_manual_check';
         stmtUpdateNoteCodexStatus.run(nextStatus, filename);
       });
-      const batchFailures = filenames.map(filename => ({ filename, error: err.message }));
+      const batchFailures = filenames.map(filename => ({ filename, error }));
       failed.push(...batchFailures);
       batches.push({
         index: batches.length + 1,
@@ -5000,8 +5108,14 @@ async function runAllCodexNotes() {
         filenames,
         processedCount: 0,
         failedCount: batchFailures.length,
-        error: err.message,
+        error,
       });
+      // 실행 파일·로그인·사용량 같은 공용 runner 장애면 다음 정상 노트도 같은 이유로
+      // 연쇄 실패한다. 현재 배치 상태만 복원하고 전체 재정리를 즉시 중단한다.
+      if (retryableRunnerFailure) {
+        aborted = true;
+        break;
+      }
     }
   }
 
@@ -5010,6 +5124,7 @@ async function runAllCodexNotes() {
     status: failed.length > 0 ? 'partial_failed' : 'processed',
     processedCount: processed.length,
     failedCount: failed.length,
+    aborted,
     batches,
     notes: processed,
     failed,
@@ -5022,15 +5137,17 @@ async function runNextCodexJob() {
 
   const processed = [];
   const failed = [];
+  let retryableRunnerFailure = false;
 
   if (CODEX_RUNNER_MODE === 'codex') {
     try {
       processed.push(...await processCodexJobWithCodex(job.filenames, CODEX_MODEL));
     } catch (err) {
-      const retryableRunnerFailure = isCodexRunnerUnavailableError(err);
-      const failedStatus = retryableRunnerFailure ? 'pending' : 'needs_manual_check';
+      retryableRunnerFailure = isCodexRunnerError(err);
+      const failedStatus = retryableRunnerFailure ? 'queued' : 'needs_manual_check';
       job.filenames.forEach(filename => stmtUpdateNoteCodexStatus.run(failedStatus, filename));
-      failed.push(...job.filenames.map(filename => ({ filename, error: err.message })));
+      const error = redactCodexNoteNames(err, job.filenames);
+      failed.push(...job.filenames.map(filename => ({ filename, error })));
     }
   } else {
     for (const filename of job.filenames) {
@@ -5038,16 +5155,17 @@ async function runNextCodexJob() {
         processed.push(await processCodexNoteWithHeuristic(filename));
       } catch (err) {
         stmtUpdateNoteCodexStatus.run('needs_manual_check', filename);
-        failed.push({ filename, error: err.message });
+        failed.push({ filename, error: redactCodexNoteNames(err, job.filenames) });
       }
     }
   }
 
   if (failed.length > 0) {
-    const error = `${failed.length}/${job.filenames.length}개 노트 정리 실패`;
+    const error = formatCodexJobError(failed, job.filenames.length);
     failed.forEach(f => console.error(`[codex] 정리 실패 — ${f.filename}: ${f.error}`));
-    finishCodexJob(job.id, 'failed', error);
-    return { id: job.id, status: 'failed', processed, failed, error };
+    const status = retryableRunnerFailure ? 'pending' : 'failed';
+    finishCodexJob(job.id, status, error);
+    return { id: job.id, status, processed, failed, error, retryable: retryableRunnerFailure };
   }
 
   finishCodexJob(job.id, 'processed', null);
@@ -5056,6 +5174,16 @@ async function runNextCodexJob() {
 
 function kickOrganizeWorker() {
   if (codexRunnerActive) return;
+  if (
+    CODEX_RUNNER_MODE === 'codex' &&
+    (!codexRunnerHealth.checkedAt || !codexRunnerHealth.ok)
+  ) {
+    console.warn(
+      `[codex] runner preflight 미통과로 자동 정리를 보류합니다: ` +
+      `${codexRunnerHealth.error || '확인 중'}`,
+    );
+    return;
+  }
   codexRunnerActive = true;
 
   setTimeout(async () => {
@@ -5076,13 +5204,18 @@ function kickOrganizeWorker() {
           });
         }
 
-        if (result.status === 'failed') break;
+        if (result.status !== 'processed') break;
       }
     } catch (err) {
       console.warn('자동 정리 worker 실패:', err.message);
     } finally {
       codexRunnerActive = false;
-      if (stmtGetNextPendingCodexJob.get()) kickOrganizeWorker();
+      if (
+        stmtGetNextPendingCodexJob.get() &&
+        (CODEX_RUNNER_MODE !== 'codex' || codexRunnerHealth.ok)
+      ) {
+        kickOrganizeWorker();
+      }
     }
   }, 0);
 }
@@ -6028,6 +6161,34 @@ app.listen(PORT, HOST, () => {
     console.warn('   .env에 API_TOKEN을 설정하세요.\n');
   }
   console.log(`   백업:     ${BACKUP_DIR} (하루 1회 자동, 7일 보관)`);
+
+  if (
+    codexStartupRecovery.recoveredJobs > 0 ||
+    codexStartupRecovery.resetNotes > 0 ||
+    codexStartupRecovery.normalizedStatuses > 0 ||
+    codexStartupRecovery.queuedNotes > 0
+  ) {
+    console.log(
+      `   Codex 복구: job ${codexStartupRecovery.recoveredJobs}개, ` +
+      `실행 노트 ${codexStartupRecovery.resetNotes}개, ` +
+      `레거시 상태 ${codexStartupRecovery.normalizedStatuses}개, ` +
+      `큐 노트 ${codexStartupRecovery.queuedNotes}개`,
+    );
+  }
+
+  probeCodexRunner().then(health => {
+    if (health.ok) {
+      console.log(`   Codex runner: 정상 (${health.version || health.mode})`);
+      if (stmtGetNextPendingCodexJob.get()) kickOrganizeWorker();
+      return;
+    }
+    console.warn(`⚠️  Codex runner preflight 실패: ${health.error}`);
+    if (stmtGetNextPendingCodexJob.get()) {
+      console.warn('   복구된 정리 job은 pending으로 보류합니다. 실행 경로·로그인·사용량을 확인하세요.');
+    }
+  }).catch(err => {
+    console.warn(`⚠️  Codex runner preflight 오류: ${compactError(err, 500)}`);
+  });
 
   maybeDailyBackup();
   setInterval(maybeDailyBackup, BACKUP_CHECK_INTERVAL_MS).unref();
