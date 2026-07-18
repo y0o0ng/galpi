@@ -47,9 +47,15 @@ const {
 } = require('./lib/assistant-retrieval-shadow');
 const {
   compactError,
+  createCodexRecoveryRequiredError,
+  createCodexStorageError,
   formatCodexJobError,
+  inspectCodexVaultRoot,
   isCodexInfrastructureError,
+  isCodexRecoveryRequiredError,
+  isCodexRetryableJobError,
   isCodexRunnerError,
+  normalizeCodexStorageError,
   redactCodexNoteNames,
   recoverInterruptedCodexJobs,
   validateOrganizedCodexOutput,
@@ -581,7 +587,10 @@ const stmtUpsertNote = db.prepare(`
     note_type = excluded.note_type,
     paper_id = COALESCE(excluded.paper_id, notes.paper_id),
     archived = excluded.archived,
-    codex_status = excluded.codex_status,
+    codex_status = CASE
+      WHEN notes.codex_status = 'recovery_required' THEN 'recovery_required'
+      ELSE excluded.codex_status
+    END,
     source_session = excluded.source_session,
     source_message = excluded.source_message,
     content_sha256 = excluded.content_sha256,
@@ -593,7 +602,8 @@ const stmtUpsertNote = db.prepare(`
     updated_at = strftime('%s','now')
 `);
 const stmtGetNoteByFilename = db.prepare(`
-  SELECT filename, title, note_type AS noteType, archived, codex_status AS codexStatus
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
   FROM notes
   WHERE filename = ?
   LIMIT 1
@@ -724,15 +734,21 @@ const stmtGetUserMessagesForSearch = db.prepare(`
   AND m.embedding IS NOT NULL
 `);
 const stmtGetNotesWithEmbedding = db.prepare(
-  'SELECT filename, title, embedding FROM notes WHERE archived = 0'
+  "SELECT filename, title, embedding FROM notes WHERE archived = 0 AND codex_status NOT IN ('running', 'recovery_required')"
 );
 const stmtGetTopicNotesWithEmbedding = db.prepare(
-  "SELECT filename, title, embedding FROM notes WHERE archived = 0 AND note_type = 'topic' AND embedding IS NOT NULL"
+  `SELECT filename, title, embedding
+   FROM notes
+   WHERE archived = 0
+     AND note_type = 'topic'
+     AND codex_status NOT IN ('running', 'needs_manual_check', 'recovery_required')
+     AND embedding IS NOT NULL`
 );
 const stmtGetNotesWithoutEmbedding = db.prepare(
   `SELECT filename, title, note_type AS noteType
    FROM notes
    WHERE archived = 0
+     AND codex_status NOT IN ('running', 'recovery_required')
      AND (
        embedding IS NULL
        OR content_sha256 IS NULL
@@ -757,7 +773,7 @@ const stmtGetManualCheckNotes = db.prepare(`
   SELECT filename, title, note_type AS noteType, codex_status AS codexStatus,
          updated_at AS updatedAt
   FROM notes
-  WHERE archived = 0 AND codex_status = 'needs_manual_check'
+  WHERE archived = 0 AND codex_status IN ('needs_manual_check', 'recovery_required')
   ORDER BY updated_at DESC, id DESC
 `);
 const stmtGetUnqueuedSaveDecisionCount = db.prepare(`
@@ -777,7 +793,9 @@ const stmtMarkUnqueuedSaveDecisionsQueued = db.prepare(`
 const stmtGetOrganizableNotes = db.prepare(`
   SELECT filename, title, note_type AS noteType, codex_status AS codexStatus
   FROM notes
+  -- 수동 확인·원본 복구 대상은 사람이 검증하기 전 전체 재정리로 우회 승인하지 않는다.
   WHERE archived = 0
+    AND codex_status NOT IN ('running', 'needs_manual_check', 'recovery_required')
   ORDER BY created_at ASC, id ASC
 `);
 const stmtCreateCodexJob = db.prepare(`
@@ -845,6 +863,20 @@ const stmtListAllNotesExceptType = db.prepare(`
   ORDER BY archived ASC, updated_at DESC, id DESC
   LIMIT ?
 `);
+const stmtListAiNotesForVault = db.prepare(`
+  SELECT filename, title, note_type AS noteType, archived,
+         codex_status AS codexStatus, updated_at AS updatedAt
+  FROM notes
+  WHERE (@includeArchived = 1 OR archived = 0)
+    AND (@noteType IS NULL OR note_type = @noteType)
+    AND (@excludeNoteType IS NULL OR note_type != @excludeNoteType)
+    AND codex_status NOT IN ('running', 'recovery_required')
+  ORDER BY
+    CASE WHEN @includeArchived = 1 THEN archived ELSE 0 END ASC,
+    updated_at DESC,
+    id DESC
+  LIMIT @limit
+`);
 const stmtGetAllNoteFilenames = db.prepare('SELECT filename, title FROM notes');
 const stmtDeleteNote = db.prepare('DELETE FROM notes WHERE filename = ?');
 const stmtDeleteNoteChunksByNote = db.prepare('DELETE FROM note_chunks WHERE note_filename = ?');
@@ -855,7 +887,19 @@ const stmtReassignDecisions = db.prepare('UPDATE auto_save_decisions SET note_fi
 const stmtMoveChunkByQaId = db.prepare("UPDATE note_chunks SET note_filename = ?, note_title = ?, updated_at = strftime('%s','now') WHERE chunk_id = ? AND note_filename = ?");
 const stmtMoveDecisionByQaId = db.prepare('UPDATE auto_save_decisions SET note_filename = ?, note_title = ? WHERE qa_id = ? AND note_filename = ?');
 const stmtGetEdgesTouchingNote = db.prepare('SELECT source_filename AS sourceFilename, source_title AS sourceTitle, target_filename AS targetFilename, target_title AS targetTitle, relation, score, confidence, reason, created_by AS createdBy FROM note_edges WHERE source_filename = ? OR target_filename = ?');
-const stmtGetTopicNotes = db.prepare("SELECT filename, title FROM notes WHERE archived = 0 AND note_type = 'topic' ORDER BY updated_at DESC, id DESC");
+const stmtGetTopicNotes = db.prepare(`
+  SELECT filename, title
+  FROM notes
+  WHERE archived = 0
+    AND note_type = 'topic'
+    AND codex_status NOT IN ('running', 'needs_manual_check', 'recovery_required')
+  ORDER BY updated_at DESC, id DESC
+`);
+const stmtCountRecoveryRequired = db.prepare(`
+  SELECT COUNT(*) AS count
+  FROM notes
+  WHERE archived = 0 AND codex_status = 'recovery_required'
+`);
 const stmtUpdateChunkNoteTitle = db.prepare(
   "UPDATE note_chunks SET note_title = ?, updated_at = strftime('%s','now') WHERE note_filename = ?"
 );
@@ -993,6 +1037,12 @@ const createCodexJobFromPending = db.transaction((limit = CODEX_JOB_BATCH_SIZE) 
   createCodexJobRecordFromPending(limit)
 ));
 
+const markNotesRecoveryRequired = db.transaction(filenames => {
+  for (const filename of filenames) {
+    stmtUpdateNoteCodexStatus.run('recovery_required', filename);
+  }
+});
+
 // 현재 job 종료(processed/failed)와 다음 배치 저장은 반드시 함께 커밋한다. 둘 사이에
 // 프로세스가 종료돼도 끝난 job만 남고 후속 pending 노트가 큐에서 고아가 되지 않는다.
 const finishCodexJobAndCreateNext = db.transaction((jobId, status, error = null) => {
@@ -1000,7 +1050,57 @@ const finishCodexJobAndCreateNext = db.transaction((jobId, status, error = null)
   return createCodexJobRecordFromPending();
 });
 
+const finishCodexJobRecoveryRequired = db.transaction((jobId, filenames, error) => {
+  for (const filename of filenames) {
+    stmtUpdateNoteCodexStatus.run('recovery_required', filename);
+  }
+  stmtFinishCodexJob.run('failed', error, jobId);
+});
+
+function applyCodexFinalNotes(finalNotes) {
+  for (const note of finalNotes) {
+    saveCodexLinkEdges({
+      sourceFilename: note.filename,
+      sourceTitle: note.title,
+      links: note.links,
+    });
+    stmtUpdateNoteCodexStatus.run('processed', note.filename);
+  }
+}
+
+const commitCodexFinalNotes = db.transaction(finalNotes => {
+  applyCodexFinalNotes(finalNotes);
+});
+
+// 최종 Markdown 검증 뒤 파생 edge·노트 상태·job 종료·다음 job 생성을 한 번에 보인다.
+// 이 transaction 중 프로세스가 종료되면 전부 rollback되고 startup recovery가 원본을 격리한다.
+const finishCodexJobWithFinalNotes = db.transaction((
+  jobId,
+  finalNotes,
+  status,
+  error = null,
+) => {
+  applyCodexFinalNotes(finalNotes);
+  stmtFinishCodexJob.run(status, error, jobId);
+  return createCodexJobRecordFromPending();
+});
+
+function hasCodexRecoveryRequired() {
+  return stmtCountRecoveryRequired.get().count > 0;
+}
+
+function createCodexRecoveryBlockedError() {
+  const error = new Error('원본 수동 복구가 필요한 노트가 있어 Codex 정리를 보류합니다. 알림센터에서 백업과 원본을 대조·복구한 뒤 확인 완료를 눌러주세요.');
+  error.code = 'CODEX_RECOVERY_BLOCKED';
+  return error;
+}
+
+function assertCodexRecoveryCleared() {
+  if (hasCodexRecoveryRequired()) throw createCodexRecoveryBlockedError();
+}
+
 function maybeCreateCodexJobFromSaveEvents() {
+  if (hasCodexRecoveryRequired()) return null;
   if (!Number.isFinite(CODEX_AUTO_QUEUE_THRESHOLD) || CODEX_AUTO_QUEUE_THRESHOLD <= 0) {
     return null;
   }
@@ -1014,13 +1114,19 @@ function maybeCreateCodexJobFromSaveEvents() {
 }
 
 async function partitionCodexTargets(filenames) {
+  assertCodexRecoveryCleared();
   const runnable = [];
   const skippedFilenames = [];
   const unavailable = [];
+  const rootIdentity = await inspectCodexVaultRoot(VAULT_PATH);
 
   for (const filename of filenames) {
     const note = stmtGetNoteByFilename.get(filename);
-    if (!note || note.archived) {
+    if (
+      !note ||
+      note.archived ||
+      ['needs_manual_check', 'recovery_required'].includes(note.codexStatus)
+    ) {
       skippedFilenames.push(filename);
       continue;
     }
@@ -1034,16 +1140,26 @@ async function partitionCodexTargets(filenames) {
     try {
       const stat = await fs.stat(path.join(VAULT_PATH, safeName));
       if (!stat.isFile()) throw new Error('원본 경로가 파일이 아닙니다.');
+      await fs.access(
+        path.join(VAULT_PATH, safeName),
+        fsSync.constants.R_OK | fsSync.constants.W_OK,
+      );
       runnable.push(note);
     } catch (err) {
-      const detail = err?.code === 'ENOENT'
-        ? '노트 원본 파일을 찾을 수 없습니다.'
-        : `노트 원본 파일을 읽을 수 없습니다${err?.code ? ` (${err.code})` : ''}.`;
-      unavailable.push({ note, error: detail });
+      if (err?.code === 'ENOENT' || err?.code === 'ENOTDIR' || !err?.code) {
+        if (err?.code) await inspectCodexVaultRoot(VAULT_PATH, rootIdentity);
+        const detail = err?.code
+          ? '노트 원본 파일을 찾을 수 없습니다.'
+          : '노트 원본 경로가 파일이 아닙니다.';
+        unavailable.push({ note, error: detail });
+        continue;
+      }
+      throw createCodexStorageError(err, 'Codex 노트 저장소에 접근할 수 없습니다');
     }
   }
 
-  return { runnable, skippedFilenames, unavailable };
+  await inspectCodexVaultRoot(VAULT_PATH, rootIdentity);
+  return { runnable, skippedFilenames, unavailable, rootIdentity };
 }
 
 const startPreparedCodexJob = db.transaction((jobId, filenames) => {
@@ -1059,7 +1175,21 @@ async function startNextCodexJob() {
   if (!job) return null;
 
   const queuedFilenames = JSON.parse(job.noteFilenamesJson);
-  const partition = await partitionCodexTargets(queuedFilenames);
+  let partition;
+  try {
+    partition = await partitionCodexTargets(queuedFilenames);
+  } catch (error) {
+    if (!isCodexRetryableJobError(error)) throw error;
+    if (!startPreparedCodexJob(job.id, [])) return null;
+    return {
+      id: job.id,
+      filenames: [],
+      runnable: [],
+      skippedFilenames: [],
+      unavailable: [],
+      infrastructureError: error,
+    };
+  }
   const filenames = partition.runnable.map(note => note.filename);
   if (filenames.length === 0 && partition.unavailable.length === 0) {
     return { id: job.id, filenames, ...partition };
@@ -1921,6 +2051,12 @@ async function filenameForNoteTitle(title) {
   try { files = await fs.readdir(VAULT_PATH); } catch { return null; }
   for (const filename of files.filter(f => f.endsWith('.md'))) {
     try {
+      const record = stmtGetNoteByFilename.get(filename);
+      if (
+        !record ||
+        record.archived ||
+        ['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)
+      ) continue;
       const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
       if (parseNoteTitle(raw, filename) === normalized) return filename;
     } catch { /* skip */ }
@@ -1928,7 +2064,7 @@ async function filenameForNoteTitle(title) {
   return null;
 }
 
-async function extractCodexLinkEdgesFromRaw({ sourceFilename, sourceTitle, raw }) {
+async function extractCodexLinkEdgesFromRaw({ sourceFilename, sourceTitle, raw, persist = true }) {
   const block = extractMarkerBody(raw, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->');
   if (!block) return [];
 
@@ -1959,7 +2095,7 @@ async function extractCodexLinkEdgesFromRaw({ sourceFilename, sourceTitle, raw }
     });
   }
 
-  saveCodexLinkEdges({ sourceFilename, sourceTitle, links });
+  if (persist) saveCodexLinkEdges({ sourceFilename, sourceTitle, links });
   return links;
 }
 
@@ -2627,7 +2763,7 @@ async function backfillNotesFromVault() {
     ...archivedFiles.map(filename => ({ filename, basePath: archivePath, archived: true })),
   ];
 
-  const result = { scanned: 0, registered: 0, skipped: 0 };
+  const result = { scanned: 0, registered: 0, skipped: 0, recoveryApproved: false };
   const registeredFilenames = new Set();
 
   for (const file of files) {
@@ -2644,6 +2780,13 @@ async function backfillNotesFromVault() {
 
     result.scanned += 1;
 
+    const existing = stmtGetNoteByFilename.get(filename);
+    if (existing?.codexStatus === 'recovery_required') {
+      registeredFilenames.add(filename);
+      result.skipped += 1;
+      continue;
+    }
+
     try {
       const raw = await fs.readFile(path.join(file.basePath, filename), 'utf8');
       const fm = parseSimpleFrontmatter(raw);
@@ -2651,8 +2794,6 @@ async function backfillNotesFromVault() {
       const title = fm.title || filename.replace(/\.md$/, '');
       const noteType = fm.note_type || 'legacy';
       const indexState = deriveNoteIndexState({ filename, title, noteType, raw });
-
-      const existing = stmtGetNoteByFilename.get(filename);
       const frontmatterStatus = fm.codex_status || null;
       const codexStatus = archived
         ? 'processed'
@@ -2683,6 +2824,59 @@ async function backfillNotesFromVault() {
   return result;
 }
 
+function syncRecoveryApprovedNote(filename) {
+  return topicMutations.run(async () => {
+    const safeName = assertSafeNoteFilename(filename);
+    const existing = stmtGetNoteByFilename.get(safeName);
+    if (!existing || existing.archived || existing.codexStatus !== 'recovery_required') {
+      throw new Error('원본 복구 승인 대상 노트를 찾을 수 없습니다.');
+    }
+
+    const rootPath = path.join(VAULT_PATH, safeName);
+    const archivePath = path.join(VAULT_PATH, ARCHIVE_DIR, safeName);
+    const archiveExists = await fs.access(archivePath).then(() => true).catch(error => {
+      if (error?.code === 'ENOENT') return false;
+      throw error;
+    });
+    if (archiveExists) {
+      throw new Error('복구 승인 노트가 vault와 _archive에 중복되어 있습니다.');
+    }
+
+    const raw = await fs.readFile(rootPath, 'utf8');
+    const fm = parseSimpleFrontmatter(raw);
+    if (parseFrontmatterBoolean(fm.archived)) {
+      throw new Error('복구 승인 노트가 archived 상태입니다.');
+    }
+    const title = fm.title || safeName.replace(/\.md$/, '');
+    const noteType = fm.note_type || 'legacy';
+    const indexState = deriveNoteIndexState({ filename: safeName, title, noteType, raw });
+    if (indexState.error) throw indexState.error;
+
+    dbUpsertNote({
+      filename: safeName,
+      title,
+      noteType,
+      archived: false,
+      codexStatus: 'recovery_required',
+      sourceSession: fm.source_session || null,
+      sourceMessage: fm.source_message || null,
+      contentSha256: indexState.contentSha256,
+      indexStatus: indexState.indexStatus,
+    });
+
+    return {
+      scanned: 1,
+      registered: 1,
+      skipped: 0,
+      recoveryApproved: true,
+      missing: 0,
+      missingNotes: [],
+      pruned: 0,
+      prunedNotes: [],
+    };
+  });
+}
+
 function deleteNoteEverywhereRecords(filename) {
   stmtDeleteNoteChunksByNote.run(filename);
   stmtDeleteNoteEdgesByNote.run(filename, filename);
@@ -2704,16 +2898,18 @@ async function markMissingNotes() {
 }
 
 // 신규/수정 노트 등록 + 사라진 원문을 missing으로 표시한다. DB와 청크는 감사 전 물리 삭제하지 않는다.
-async function syncVaultDb() {
-  const backfill = await backfillNotesFromVault();
-  const missing = await markMissingNotes();
-  return {
-    ...backfill,
-    missing: missing.length,
-    missingNotes: missing,
-    pruned: 0,
-    prunedNotes: [],
-  };
+function syncVaultDb() {
+  return topicMutations.run(async () => {
+    const backfill = await backfillNotesFromVault();
+    const missing = await markMissingNotes();
+    return {
+      ...backfill,
+      missing: missing.length,
+      missingNotes: missing,
+      pruned: 0,
+      prunedNotes: [],
+    };
+  });
 }
 
 app.post('/api/notes/sync', async (_req, res) => {
@@ -2727,7 +2923,7 @@ app.post('/api/notes/sync', async (_req, res) => {
 
 app.post('/api/notes/backfill', async (_req, res) => {
   try {
-    const result = await backfillNotesFromVault();
+    const result = await topicMutations.run(() => backfillNotesFromVault());
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2809,6 +3005,15 @@ function assertSafeNoteFilename(filename) {
   return safeName;
 }
 
+function assertNoteMutationAllowed(filename) {
+  const record = stmtGetNoteByFilename.get(filename);
+  if (!record) throw new Error(`노트를 찾을 수 없습니다: ${filename}`);
+  if (['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)) {
+    throw new Error(`수동 확인 또는 원본 복구가 필요한 노트는 변경할 수 없습니다: ${filename}`);
+  }
+  return record;
+}
+
 function buildArchiveMove({ filename, raw, archived, options = {} }) {
   const safeName = assertSafeNoteFilename(filename);
   const rootPath = path.join(VAULT_PATH, safeName);
@@ -2843,6 +3048,7 @@ function moveNoteArchived(filename, archived, options = {}) {
 
 async function moveNoteArchivedImpl(filename, archived, options = {}) {
   const safeName = assertSafeNoteFilename(filename);
+  assertNoteMutationAllowed(safeName);
   const sourcePath = path.join(VAULT_PATH, archived ? '' : ARCHIVE_DIR, safeName);
 
   let raw;
@@ -3051,6 +3257,9 @@ async function splitQaEntriesIntoTopicImpl({
 }) {
   const ids = [...new Set((qaIds || []).map(s => String(s || '').trim()).filter(Boolean))];
   if (ids.length === 0) throw new Error('분리할 Q&A 항목을 선택해주세요.');
+
+  assertNoteMutationAllowed(sourceFilename);
+  if (targetFilename) assertNoteMutationAllowed(targetFilename);
 
   const source = await loadNoteForMerge(sourceFilename);
   if (source.noteType !== 'topic') throw new Error('토픽 노트만 분리할 수 있습니다.');
@@ -3271,6 +3480,12 @@ async function buildTitleToFilenameMap() {
   try { files = await fs.readdir(VAULT_PATH); } catch { return map; }
   for (const f of files.filter(name => name.endsWith('.md'))) {
     try {
+      const record = stmtGetNoteByFilename.get(f);
+      if (
+        !record ||
+        record.archived ||
+        ['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)
+      ) continue;
       const raw = await fs.readFile(path.join(VAULT_PATH, f), 'utf8');
       const title = parseNoteTitle(raw, f);
       if (title) map.set(title, f);
@@ -3324,6 +3539,10 @@ function mergeNotesIntoTopic(args) {
 async function mergeNotesIntoTopicImpl({ filenames, targetFilename = null, newTitle = null }) {
   let srcNames = [...new Set((filenames || []).map(f => String(f || '').trim()).filter(Boolean))]
     .filter(f => f !== targetFilename);
+
+  for (const filename of [...srcNames, ...(targetFilename ? [targetFilename] : [])]) {
+    assertNoteMutationAllowed(filename);
+  }
 
   const loaded = new Map();
   for (const f of [...srcNames, ...(targetFilename ? [targetFilename] : [])]) {
@@ -3531,7 +3750,14 @@ async function findMergeCandidates(threshold = MERGE_SIMILARITY_THRESHOLD, limit
   }
 
   // 2) Codex 제안: 각 토픽의 CODEX-PROPOSALS에서 "- MERGE [[파일ID|제목]] — 이유" 라인 파싱
-  const allNotes = stmtGetAllNoteFilenames.all();
+  const allNotes = stmtGetAllNoteFilenames.all().filter(note => {
+    const record = stmtGetNoteByFilename.get(note.filename);
+    return record && !record.archived && ![
+      'running',
+      'needs_manual_check',
+      'recovery_required',
+    ].includes(record.codexStatus);
+  });
   const titleToFile = new Map(allNotes.map(n => [n.title, n.filename]));
   const fileToTitle = new Map(allNotes.map(n => [n.filename, n.title]));
   for (const topic of stmtGetTopicNotes.all()) {
@@ -3671,6 +3897,14 @@ async function listCodexProposalNotifications(limit = 50, options = {}) {
     for (const line of block.split('\n')) {
       const proposal = parseCodexProposalLine(line);
       if (!proposal) continue;
+      if (proposal.targetFilename) {
+        const target = stmtGetNoteByFilename.get(proposal.targetFilename);
+        if (
+          !target ||
+          target.archived ||
+          ['running', 'needs_manual_check', 'recovery_required'].includes(target.codexStatus)
+        ) continue;
+      }
       notifications.push({
         id: crypto.createHash('sha1').update(`${note.filename}:${proposal.text}`).digest('hex').slice(0, 12),
         source: 'codex',
@@ -3709,19 +3943,26 @@ function recordNotificationAction(notification, status) {
   });
 }
 
-// 수동 확인 필요(needs_manual_check) 노트를 시스템 알림 항목으로 변환한다.
+// 수동 확인·원본 복구 필요 노트를 시스템 알림 항목으로 변환한다.
 // 같은 노트가 나중에 다시 실패하면 새 알림이 생기도록 상태 변경 시각을 ID에 포함한다.
 function listManualCheckNotifications(options = {}) {
   return stmtGetManualCheckNotes.all()
-    .map(note => ({
-      id: crypto.createHash('sha1').update(`manual:${note.filename}:${note.updatedAt}`).digest('hex').slice(0, 12),
-      source: 'system',
-      type: 'manual_check',
-      title: '수동 확인 필요',
-      note: { filename: note.filename, title: note.title },
-      text: 'Codex 자동 정리가 실패했습니다. 옵시디언에서 직접 확인·수정한 뒤 확인 완료를 누르세요.',
-      executable: true,
-    }))
+    .map(note => {
+      const recoveryRequired = note.codexStatus === 'recovery_required';
+      return {
+        id: crypto.createHash('sha1').update(`manual:${note.codexStatus}:${note.filename}:${note.updatedAt}`).digest('hex').slice(0, 12),
+        source: 'system',
+        type: 'manual_check',
+        title: recoveryRequired ? '원본 수동 복구 필요' : '수동 확인 필요',
+        note: { filename: note.filename, title: note.title },
+        text: recoveryRequired
+          ? 'Codex 변경 뒤 원본 snapshot을 자동 복원하지 못했습니다. 백업과 현재 파일을 대조해 복구한 뒤에만 확인 완료를 누르세요.'
+          : 'Codex 자동 정리가 실패했습니다. 옵시디언에서 직접 확인·수정한 뒤 확인 완료를 누르세요.',
+        executable: true,
+        ignorable: !recoveryRequired,
+        recoveryRequired,
+      };
+    })
     .filter(item => options.includeHandled || !stmtGetNotificationAction.get(item.id));
 }
 
@@ -3819,6 +4060,9 @@ app.post('/api/notifications/:id/ignore', async (req, res) => {
   try {
     const notification = await findCurrentNotificationById(req.params.id);
     if (!notification) return res.status(404).json({ error: '알림을 찾을 수 없습니다.' });
+    if (notification.recoveryRequired) {
+      return res.status(400).json({ error: '원본 복구 필요 알림은 확인 완료 전까지 무시할 수 없습니다.' });
+    }
     recordNotificationAction(notification, 'ignored');
     res.json({ success: true, status: 'ignored' });
   } catch (err) {
@@ -3856,11 +4100,15 @@ app.post('/api/notifications/:id/approve', async (req, res) => {
     } else if (notification.type === 'manual_check') {
       const filename = notification.note?.filename;
       if (!filename) return res.status(400).json({ error: '노트 파일 정보가 없습니다.' });
-      // 옵시디언 수동 편집을 먼저 DB에 반영한 뒤 확인 완료로 표시한다.
-      // (순서를 바꾸면 backfill upsert가 processed 상태를 덮어쓸 수 있다.)
-      const sync = await syncVaultDb();
+      const sync = notification.recoveryRequired
+        ? await syncRecoveryApprovedNote(filename)
+        : await syncVaultDb();
+      noteSearchCache.delete(filename);
       stmtUpdateNoteCodexStatus.run('processed', filename);
       result = { synced: true, ...sync };
+      if (!hasCodexRecoveryRequired() && stmtGetNextPendingCodexJob.get()) {
+        kickOrganizeWorker();
+      }
     }
 
     recordNotificationAction(notification, 'approved');
@@ -3944,10 +4192,12 @@ app.get('/api/organize/status', (_req, res) => {
     processed: 0,
     failed: 0,
     needsManualCheck: 0,
+    recoveryRequired: 0,
   };
 
   stmtGetNoteStatusCounts.all().forEach(row => {
     if (row.codexStatus === 'needs_manual_check') counts.needsManualCheck = row.count;
+    else if (row.codexStatus === 'recovery_required') counts.recoveryRequired = row.count;
     else if (Object.hasOwn(counts, row.codexStatus)) counts[row.codexStatus] = row.count;
   });
 
@@ -3967,6 +4217,7 @@ app.get('/api/organize/status', (_req, res) => {
 
 app.post('/api/organize/queue', (_req, res) => {
   try {
+    assertCodexRecoveryCleared();
     const job = createCodexJobFromPending();
     if (!job) {
       res.json({ success: true, created: false, message: '정리 대기 노트가 없습니다.' });
@@ -3982,22 +4233,27 @@ app.post('/api/organize/queue', (_req, res) => {
     });
     kickOrganizeWorker();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'CODEX_RECOVERY_BLOCKED' ? 409 : 500).json({ error: err.message });
   }
 });
 
 app.post('/api/organize/process', async (_req, res) => {
+  if (hasCodexRecoveryRequired()) {
+    return res.status(409).json({ error: createCodexRecoveryBlockedError().message });
+  }
   if (codexRunnerActive) {
     return res.status(409).json({ error: '이미 Codex 정리가 실행 중입니다.' });
   }
 
   codexRunnerActive = true;
+  let shouldKickWorker = true;
   try {
     const result = await runNextCodexJob();
     if (!result) {
       res.json({ success: true, processed: false, message: '실행할 정리 job이 없습니다.' });
       return;
     }
+    if (result.status === 'pending' || result.recoveryRequired) shouldKickWorker = false;
 
     res.json({
       success: true,
@@ -4007,13 +4263,16 @@ app.post('/api/organize/process', async (_req, res) => {
       notes: result.processed,
       failed: result.failed,
       skippedCount: result.skippedCount || 0,
+      recoveryRequired: Boolean(result.recoveryRequired),
       error: result.error || null,
     });
   } catch (err) {
+    shouldKickWorker = false;
     res.status(500).json({ error: err.message });
   } finally {
     codexRunnerActive = false;
     if (
+      shouldKickWorker &&
       stmtGetNextPendingCodexJob.get() &&
       (CODEX_RUNNER_MODE !== 'codex' || codexRunnerHealth.ok)
     ) {
@@ -4023,6 +4282,9 @@ app.post('/api/organize/process', async (_req, res) => {
 });
 
 app.post('/api/organize/all', async (_req, res) => {
+  if (hasCodexRecoveryRequired()) {
+    return res.status(409).json({ error: createCodexRecoveryBlockedError().message });
+  }
   if (codexRunnerActive) {
     return res.status(409).json({ error: '이미 Codex 정리가 실행 중입니다.' });
   }
@@ -4036,14 +4298,17 @@ app.post('/api/organize/all', async (_req, res) => {
   }
 
   codexRunnerActive = true;
+  let shouldKickWorker = true;
   try {
     const result = await runAllCodexNotes();
+    if (result.aborted) shouldKickWorker = false;
     res.json({ success: true, ...result });
   } catch (err) {
+    shouldKickWorker = false;
     res.status(500).json({ error: err.message });
   } finally {
     codexRunnerActive = false;
-    if (stmtGetNextPendingCodexJob.get()) kickOrganizeWorker();
+    if (shouldKickWorker && stmtGetNextPendingCodexJob.get()) kickOrganizeWorker();
   }
 });
 
@@ -4068,9 +4333,11 @@ async function runSystemAudit() {
     processed: 0,
     failed: 0,
     needsManualCheck: 0,
+    recoveryRequired: 0,
   };
   stmtGetNoteStatusCounts.all().forEach(row => {
     if (row.codexStatus === 'needs_manual_check') statusCounts.needsManualCheck = row.count;
+    else if (row.codexStatus === 'recovery_required') statusCounts.recoveryRequired = row.count;
     else if (Object.hasOwn(statusCounts, row.codexStatus)) statusCounts[row.codexStatus] = row.count;
   });
 
@@ -4101,6 +4368,7 @@ async function runSystemAudit() {
   if (!validation.ok) issues.push({ level: 'error', label: 'vault validation', message: validation.message });
   if (!policy.ok) issues.push({ level: 'error', label: 'policy', message: policy.message });
   if (statusCounts.failed > 0) issues.push({ level: 'error', label: 'organize failed', message: `${statusCounts.failed}개 노트 실패` });
+  if (statusCounts.recoveryRequired > 0) issues.push({ level: 'error', label: 'recovery required', message: `${statusCounts.recoveryRequired}개 노트 원본 수동 복구 필요` });
   if (statusCounts.needsManualCheck > 0) issues.push({ level: 'warn', label: 'manual check', message: `${statusCounts.needsManualCheck}개 노트 수동 확인 필요` });
   if (notifications.length > 0) issues.push({ level: 'info', label: 'notifications', message: `${notifications.length}개 알림 대기` });
   if (isolatedTopics.length > 0) issues.push({ level: 'info', label: 'isolated topics', message: `${isolatedTopics.length}개 고립 토픽 후보` });
@@ -4485,6 +4753,7 @@ app.post('/api/search/web', async (req, res) => {
 
 app.get('/api/vault/notes', (req, res) => {
   const includeArchived = String(req.query.includeArchived || '').toLowerCase() === 'true';
+  const forAi = String(req.query.forAi || '').toLowerCase() === 'true';
   const noteType = String(req.query.noteType || '').trim();
   const excludeNoteType = String(req.query.excludeNoteType || '').trim();
   const noteTypePattern = /^[a-z][a-z0-9_]{0,39}$/i;
@@ -4497,7 +4766,14 @@ app.get('/api/vault/notes', (req, res) => {
   const requestedLimit = Number.parseInt(req.query.limit || '50', 10);
   const limit = Math.min(100, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50));
   let notes;
-  if (noteType) {
+  if (forAi) {
+    notes = stmtListAiNotesForVault.all({
+      includeArchived: includeArchived ? 1 : 0,
+      noteType: noteType || null,
+      excludeNoteType: excludeNoteType || null,
+      limit,
+    });
+  } else if (noteType) {
     notes = includeArchived
       ? stmtListAllNotesByType.all(noteType, limit)
       : stmtListActiveNotesByType.all(noteType, limit);
@@ -4515,7 +4791,16 @@ app.get('/api/vault/notes', (req, res) => {
 
 app.get('/api/vault/note/:filename', async (req, res) => {
   try {
-    const note = await readVaultNote(req.params.filename);
+    const forAi = String(req.query.forAi || '').toLowerCase() === 'true';
+    const note = forAi
+      ? await readAiStableNoteValue(
+          req.params.filename,
+          () => readVaultNote(req.params.filename),
+        )
+      : await readVaultNote(req.params.filename);
+    if (forAi && !note) {
+      return res.status(409).json({ error: '정리 중이거나 원본 복구가 필요한 노트는 AI가 읽을 수 없습니다.' });
+    }
     if (!note) return res.status(404).json({ error: '노트를 찾을 수 없습니다.' });
     res.json({ success: true, note });
   } catch (err) {
@@ -4653,6 +4938,12 @@ async function listVaultNoteCandidates(excludeFilename) {
   const candidates = [];
   for (const filename of files.filter(f => f.endsWith('.md') && f !== excludeFilename && f !== MEMORY_FILE)) {
     try {
+      const record = stmtGetNoteByFilename.get(filename);
+      if (
+        !record ||
+        record.archived ||
+        ['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)
+      ) continue;
       const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
       const fm = parseSimpleFrontmatter(raw);
       if (parseFrontmatterBoolean(fm.archived)) continue;
@@ -4898,7 +5189,10 @@ function assertOnlyCodexBlocksChanged(before, after, filename) {
   }
 }
 
-async function snapshotVaultFiles(filenames) {
+async function snapshotVaultFiles(filenames, expectedRootIdentity = null) {
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
+  }
   const snapshots = new Map();
   for (const filename of filenames) {
     const safeName = path.basename(filename || '');
@@ -4907,19 +5201,34 @@ async function snapshotVaultFiles(filenames) {
     }
     snapshots.set(safeName, await fs.readFile(path.join(VAULT_PATH, safeName), 'utf8'));
   }
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
+  }
   return snapshots;
 }
 
-async function restoreVaultSnapshots(snapshots) {
+async function restoreVaultSnapshots(snapshots, expectedRootIdentity = null) {
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
+  }
   for (const [filename, raw] of snapshots.entries()) {
     await writeVaultNoteByFilename(filename, raw);
   }
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
+  }
 }
 
-async function assertCodexDiffAllowed(snapshots) {
+async function assertCodexDiffAllowed(snapshots, expectedRootIdentity = null) {
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
+  }
   for (const [filename, before] of snapshots.entries()) {
     const after = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
     assertOnlyCodexBlocksChanged(before, after, filename);
+  }
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
   }
 }
 
@@ -5026,12 +5335,18 @@ async function runCodexCliForJob(filenames, model = CODEX_MODEL) {
     err.codexFailureKind = isCodexInfrastructureError(err)
       ? 'runner_infrastructure'
       : 'runner_execution';
-    updateCodexRunnerHealth({ ok: false, error: compactError(err, 500) });
+    updateCodexRunnerHealth({
+      ok: false,
+      error: redactCodexJobError(err, filenames, 500),
+    });
     throw err;
   }
 }
 
-async function processCodexNoteWithHeuristicImpl(filename) {
+async function processCodexNoteWithHeuristicImpl(
+  filename,
+  persistFinalNotes = commitCodexFinalNotes,
+) {
   const safeName = path.basename(filename || '');
   if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
     throw new Error('잘못된 노트 파일명입니다.');
@@ -5055,66 +5370,105 @@ async function processCodexNoteWithHeuristicImpl(filename) {
   next = replaceMarkerBlock(next, '<!-- CODEX-TAGS-START -->', '<!-- CODEX-TAGS-END -->', tagsBlock);
   next = replaceMarkerBlock(next, '<!-- CODEX-LINKS-START -->', '<!-- CODEX-LINKS-END -->', linksBlock);
   next = stripCodexLinksToTitles(next, getArchivedNoteTitles());
-  saveCodexLinkEdges({ sourceFilename: safeName, sourceTitle: title, links });
-
   if (next !== raw) await writeVaultNoteByFilename(safeName, next);
-  stmtUpdateNoteCodexStatus.run('processed', safeName);
+  persistFinalNotes([{ filename: safeName, title, links }]);
 
   return { filename: safeName, title, tags: tagsBlock, links: linksBlock };
 }
 
-async function processCodexJobWithCodexImpl(filenames, model = CODEX_MODEL) {
-  const snapshots = await snapshotVaultFiles(filenames);
+async function processCodexJobWithCodexImpl(
+  filenames,
+  model = CODEX_MODEL,
+  expectedRootIdentity = null,
+  persistFinalNotes = commitCodexFinalNotes,
+) {
+  const snapshots = await snapshotVaultFiles(filenames, expectedRootIdentity);
 
   try {
     await runCodexCliForJob(filenames, model);
-    await assertCodexDiffAllowed(snapshots);
+    await assertCodexDiffAllowed(snapshots, expectedRootIdentity);
     await Promise.all(filenames.map(filename => stripArchivedLinksFromNoteFile(filename)));
     const titleMap = await buildTitleToFilenameMap();
     await Promise.all(filenames.map(filename => convertNoteLinksToFilenames(filename, titleMap)));
     await validateCodexEdit(filenames);
-    for (const filename of filenames) {
+    if (expectedRootIdentity) {
+      await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
+    }
+    const finalNotes = await Promise.all(filenames.map(async filename => {
       const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
       const validationErrors = validateOrganizedCodexOutput(raw);
       if (validationErrors.length > 0) {
         throw new Error(`${filename}: ${validationErrors.join(' / ')}`);
       }
+      const title = parseNoteTitle(raw, filename);
+      const links = await extractCodexLinkEdgesFromRaw({
+        sourceFilename: filename,
+        sourceTitle: title,
+        raw,
+        persist: false,
+      });
+      return { filename, title, links };
+    }));
+    if (expectedRootIdentity) {
+      await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
     }
+
+    persistFinalNotes(finalNotes);
+    return finalNotes.map(({ filename, title }) => ({
+      filename,
+      title,
+      tags: null,
+      links: null,
+    }));
   } catch (err) {
-    await restoreVaultSnapshots(snapshots);
-    const wrapped = new Error(`Codex 실행/검증 실패: ${compactError(err)}`);
-    wrapped.cause = err;
-    if (err?.codexFailureKind) wrapped.codexFailureKind = err.codexFailureKind;
-    if (err?.code) wrapped.code = err.code;
-    if (err?.stderr) wrapped.stderr = err.stderr;
-    if (err?.stdout) wrapped.stdout = err.stdout;
+    const failure = normalizeCodexStorageError(err);
+    try {
+      await restoreVaultSnapshots(snapshots, expectedRootIdentity);
+    } catch (restoreError) {
+      const restoreFailure = normalizeCodexStorageError(
+        restoreError,
+        'Codex vault snapshot을 복원할 수 없습니다',
+      );
+      throw createCodexRecoveryRequiredError(restoreFailure, failure);
+    }
+    if (isCodexRetryableJobError(failure) && !isCodexRunnerError(failure)) throw failure;
+    const wrapped = new Error(`Codex 실행/검증 실패: ${compactError(failure)}`);
+    wrapped.cause = failure;
+    if (failure?.codexFailureKind) wrapped.codexFailureKind = failure.codexFailureKind;
+    if (failure?.code) wrapped.code = failure.code;
+    if (failure?.stderr) wrapped.stderr = failure.stderr;
+    if (failure?.stdout) wrapped.stdout = failure.stdout;
     throw wrapped;
   }
-
-  return Promise.all(filenames.map(async filename => {
-    const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
-    const title = parseNoteTitle(raw, filename);
-    await extractCodexLinkEdgesFromRaw({ sourceFilename: filename, sourceTitle: title, raw });
-    stmtUpdateNoteCodexStatus.run('processed', filename);
-    return { filename, title, tags: null, links: null };
-  }));
 }
 
-async function processImmediateCodexBatch(filenames, model = CODEX_MODEL) {
+async function processImmediateCodexBatch(
+  filenames,
+  model = CODEX_MODEL,
+  expectedRootIdentity = null,
+) {
+  assertCodexRecoveryCleared();
   filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('running', filename));
 
   if (CODEX_RUNNER_MODE === 'codex') {
-    return processCodexJobWithCodexImpl(filenames, model);
+    return processCodexJobWithCodexImpl(filenames, model, expectedRootIdentity);
   }
 
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
+  }
   const processed = [];
   for (const filename of filenames) {
     processed.push(await processCodexNoteWithHeuristicImpl(filename));
+  }
+  if (expectedRootIdentity) {
+    await inspectCodexVaultRoot(VAULT_PATH, expectedRootIdentity);
   }
   return processed;
 }
 
 async function runAllCodexNotes() {
+  assertCodexRecoveryCleared();
   const notes = stmtGetOrganizableNotes.all();
   if (notes.length === 0) {
     return {
@@ -5140,10 +5494,12 @@ async function runAllCodexNotes() {
     let previousStatuses = new Map();
     let skippedCount = 0;
     let unavailableFailures = [];
+    let rootIdentity = null;
 
     try {
       const batchProcessed = await topicMutations.run(async () => {
         const partition = await partitionCodexTargets(batch.map(note => note.filename));
+        rootIdentity = partition.rootIdentity;
         filenames = partition.runnable.map(note => note.filename);
         previousStatuses = new Map(
           partition.runnable.map(note => [note.filename, note.codexStatus || 'pending']),
@@ -5154,7 +5510,7 @@ async function runAllCodexNotes() {
           return { filename: note.filename, error };
         });
         if (filenames.length === 0) return [];
-        return processImmediateCodexBatch(filenames, CODEX_DEEP_MODEL);
+        return processImmediateCodexBatch(filenames, CODEX_DEEP_MODEL, rootIdentity);
       });
       processed.push(...batchProcessed);
       failed.push(...unavailableFailures);
@@ -5169,15 +5525,30 @@ async function runAllCodexNotes() {
         skippedCount,
       });
     } catch (err) {
-      console.error(`[codex] 배치 정리 실패 — ${filenames.join(', ')}: ${err.message}`);
-      const retryableRunnerFailure = isCodexRunnerError(err);
-      const error = compactError(err);
-      filenames.forEach(filename => {
-        const nextStatus = retryableRunnerFailure
-          ? previousStatuses.get(filename) || 'pending'
-          : 'needs_manual_check';
-        stmtUpdateNoteCodexStatus.run(nextStatus, filename);
-      });
+      const failure = normalizeCodexStorageError(err);
+      console.error(`[codex] 배치 정리 실패 — ${filenames.join(', ')}: ${failure.message}`);
+      const recoveryRequired = isCodexRecoveryRequiredError(failure);
+      const retryableInfrastructureFailure = isCodexRetryableJobError(failure);
+      const error = redactCodexJobError(failure, filenames);
+      if (retryableInfrastructureFailure && filenames.length === 0) {
+        const activeBatch = batch
+          .map(note => stmtGetNoteByFilename.get(note.filename))
+          .filter(note => note && !note.archived);
+        filenames = activeBatch.map(note => note.filename);
+        previousStatuses = new Map(
+          activeBatch.map(note => [note.filename, note.codexStatus || 'pending']),
+        );
+      }
+      if (recoveryRequired) {
+        markNotesRecoveryRequired(filenames);
+      } else {
+        filenames.forEach(filename => {
+          const nextStatus = retryableInfrastructureFailure
+            ? previousStatuses.get(filename) || 'pending'
+            : 'needs_manual_check';
+          stmtUpdateNoteCodexStatus.run(nextStatus, filename);
+        });
+      }
       const batchFailures = [
         ...unavailableFailures,
         ...filenames.map(filename => ({ filename, error })),
@@ -5185,16 +5556,16 @@ async function runAllCodexNotes() {
       failed.push(...batchFailures);
       batches.push({
         index: batches.length + 1,
-        status: 'failed',
+        status: recoveryRequired ? 'recovery_required' : 'failed',
         filenames,
         processedCount: 0,
         failedCount: batchFailures.length,
         skippedCount,
         error,
       });
-      // 실행 파일·로그인·사용량 같은 공용 runner 장애면 다음 정상 노트도 같은 이유로
+      // 실행 파일·로그인·사용량·vault 접근 같은 공용 장애면 다음 정상 노트도 같은 이유로
       // 연쇄 실패한다. 현재 배치 상태만 복원하고 전체 재정리를 즉시 중단한다.
-      if (retryableRunnerFailure) {
+      if (retryableInfrastructureFailure || recoveryRequired) {
         aborted = true;
         break;
       }
@@ -5214,8 +5585,25 @@ async function runAllCodexNotes() {
 }
 
 async function runNextCodexJobImpl() {
+  assertCodexRecoveryCleared();
   const job = await startNextCodexJob();
   if (!job) return null;
+
+  if (job.infrastructureError) {
+    const error = compactError(job.infrastructureError);
+    finishCodexJob(job.id, 'pending', error);
+    return {
+      id: job.id,
+      status: 'pending',
+      processed: [],
+      failed: [],
+      error,
+      retryable: true,
+      retryableKind: 'storage',
+      skippedCount: 0,
+      nextJobId: null,
+    };
+  }
 
   if (job.filenames.length === 0 && job.unavailable.length === 0) {
     const nextJob = finishCodexJobAndCreateNext(job.id, 'processed', null);
@@ -5234,49 +5622,109 @@ async function runNextCodexJobImpl() {
     stmtUpdateNoteCodexStatus.run('needs_manual_check', note.filename);
     return { filename: note.filename, error };
   });
-  let retryableRunnerFailure = false;
+  let retryableInfrastructureFailure = false;
+  let recoveryRequired = false;
+  let finalizedJob = null;
+
+  const finalizeCodexJobWithNotes = finalNotes => {
+    const status = failed.length > 0 ? 'failed' : 'processed';
+    const error = failed.length > 0
+      ? formatCodexJobError(failed, job.filenames.length + job.unavailable.length)
+      : null;
+    const nextJob = finishCodexJobWithFinalNotes(job.id, finalNotes, status, error);
+    finalizedJob = { status, error, nextJob };
+  };
 
   if (job.filenames.length > 0 && CODEX_RUNNER_MODE === 'codex') {
     try {
-      processed.push(...await processCodexJobWithCodexImpl(job.filenames, CODEX_MODEL));
+      processed.push(...await processCodexJobWithCodexImpl(
+        job.filenames,
+        CODEX_MODEL,
+        job.rootIdentity,
+        finalizeCodexJobWithNotes,
+      ));
     } catch (err) {
-      retryableRunnerFailure = isCodexRunnerError(err);
-      const failedStatus = retryableRunnerFailure ? 'queued' : 'needs_manual_check';
-      job.filenames.forEach(filename => stmtUpdateNoteCodexStatus.run(failedStatus, filename));
-      const error = redactCodexNoteNames(err, job.filenames);
+      const failure = normalizeCodexStorageError(err);
+      recoveryRequired = isCodexRecoveryRequiredError(failure);
+      retryableInfrastructureFailure = (
+        !recoveryRequired && isCodexRetryableJobError(failure)
+      );
+      if (!recoveryRequired) {
+        const failedStatus = retryableInfrastructureFailure ? 'queued' : 'needs_manual_check';
+        job.filenames.forEach(filename => stmtUpdateNoteCodexStatus.run(failedStatus, filename));
+      }
+      const error = redactCodexJobError(failure, job.filenames);
       failed.push(...job.filenames.map(filename => ({ filename, error })));
     }
   } else if (job.filenames.length > 0) {
+    const heuristicFinalNotes = [];
     for (const filename of job.filenames) {
       try {
-        processed.push(await processCodexNoteWithHeuristicImpl(filename));
+        processed.push(await processCodexNoteWithHeuristicImpl(
+          filename,
+          finalNotes => heuristicFinalNotes.push(...finalNotes),
+        ));
       } catch (err) {
+        const failure = normalizeCodexStorageError(err);
+        if (isCodexRetryableJobError(failure)) {
+          retryableInfrastructureFailure = true;
+          job.filenames.forEach(jobFilename => (
+            stmtUpdateNoteCodexStatus.run('queued', jobFilename)
+          ));
+          const error = redactCodexJobError(failure, job.filenames);
+          failed.push(...job.filenames.map(jobFilename => ({ filename: jobFilename, error })));
+          processed.length = 0;
+          break;
+        }
         stmtUpdateNoteCodexStatus.run('needs_manual_check', filename);
-        failed.push({ filename, error: redactCodexNoteNames(err, job.filenames) });
+        failed.push({ filename, error: redactCodexJobError(failure, job.filenames) });
+      }
+    }
+    if (!retryableInfrastructureFailure) {
+      try {
+        finalizeCodexJobWithNotes(heuristicFinalNotes);
+      } catch (err) {
+        recoveryRequired = true;
+        const error = redactCodexJobError(err, job.filenames);
+        const failedFilenames = new Set(failed.map(item => item.filename));
+        for (const filename of job.filenames) {
+          if (!failedFilenames.has(filename)) failed.push({ filename, error });
+        }
+        processed.length = 0;
       }
     }
   }
 
   if (failed.length > 0) {
-    const error = formatCodexJobError(failed, job.filenames.length + job.unavailable.length);
+    const error = finalizedJob?.error
+      || formatCodexJobError(failed, job.filenames.length + job.unavailable.length);
     failed.forEach(f => console.error(`[codex] 정리 실패 — ${f.filename}: ${f.error}`));
-    const status = retryableRunnerFailure ? 'pending' : 'failed';
-    let nextJob = null;
-    if (retryableRunnerFailure) finishCodexJob(job.id, status, error);
-    else nextJob = finishCodexJobAndCreateNext(job.id, status, error);
+    const status = finalizedJob?.status
+      || (retryableInfrastructureFailure ? 'pending' : 'failed');
+    let nextJob = finalizedJob?.nextJob || null;
+    if (!finalizedJob) {
+      if (retryableInfrastructureFailure) finishCodexJob(job.id, status, error);
+      else if (recoveryRequired) {
+        finishCodexJobRecoveryRequired(job.id, job.filenames, error);
+      }
+      else nextJob = finishCodexJobAndCreateNext(job.id, status, error);
+    }
     return {
       id: job.id,
       status,
       processed,
       failed,
       error,
-      retryable: retryableRunnerFailure,
+      retryable: retryableInfrastructureFailure,
+      recoveryRequired,
       skippedCount: job.skippedFilenames.length,
       nextJobId: nextJob?.id || null,
     };
   }
 
-  const nextJob = finishCodexJobAndCreateNext(job.id, 'processed', null);
+  const nextJob = finalizedJob
+    ? finalizedJob.nextJob
+    : finishCodexJobAndCreateNext(job.id, 'processed', null);
   return {
     id: job.id,
     status: 'processed',
@@ -5287,6 +5735,11 @@ async function runNextCodexJobImpl() {
   };
 }
 
+function redactCodexJobError(error, filenames = [], maxChars = 1500) {
+  const redacted = redactCodexNoteNames(error, filenames, maxChars);
+  return VAULT_PATH ? redacted.split(VAULT_PATH).join('[vault]') : redacted;
+}
+
 function runNextCodexJob() {
   // job 시작부터 snapshot 복구·DB 종료까지 같은 직렬 큐에 둔다. Codex가 파일을 가진 동안
   // append/split/merge/archive가 끼어들어 새 사용자 내용을 snapshot으로 덮는 일을 막는다.
@@ -5295,6 +5748,7 @@ function runNextCodexJob() {
 
 function kickOrganizeWorker() {
   if (codexRunnerActive) return;
+  if (hasCodexRecoveryRequired()) return;
   if (
     CODEX_RUNNER_MODE === 'codex' &&
     (!codexRunnerHealth.checkedAt || !codexRunnerHealth.ok)
@@ -5308,6 +5762,7 @@ function kickOrganizeWorker() {
   codexRunnerActive = true;
 
   setTimeout(async () => {
+    let shouldKickWorker = true;
     try {
       while (true) {
         const result = await runNextCodexJob();
@@ -5320,13 +5775,18 @@ function kickOrganizeWorker() {
         }
 
         if (result.status === 'failed' && result.nextJobId) continue;
-        if (result.status !== 'processed') break;
+        if (result.status !== 'processed') {
+          if (result.status === 'pending' || result.recoveryRequired) shouldKickWorker = false;
+          break;
+        }
       }
     } catch (err) {
+      shouldKickWorker = false;
       console.warn('자동 정리 worker 실패:', err.message);
     } finally {
       codexRunnerActive = false;
       if (
+        shouldKickWorker &&
         stmtGetNextPendingCodexJob.get() &&
         (CODEX_RUNNER_MODE !== 'codex' || codexRunnerHealth.ok)
       ) {
@@ -5345,8 +5805,34 @@ async function resolveActiveNotes(activeNotes) {
       .slice(0, MAX_ACTIVE_NOTES)
   )];
 
-  const notes = await Promise.all(filenames.map(readVaultNote));
+  const notes = await Promise.all(filenames.map(filename => (
+    readAiStableNoteValue(filename, () => readVaultNote(filename))
+  )));
   return notes.filter(Boolean);
+}
+
+function isAiReadableNoteState(note) {
+  return Boolean(
+    note &&
+    !note.archived &&
+    !['running', 'recovery_required'].includes(note.codexStatus)
+  );
+}
+
+async function readAiStableNoteValue(filename, readValue) {
+  return topicMutations.run(async () => {
+    const before = stmtGetNoteByFilename.get(filename);
+    if (!isAiReadableNoteState(before)) return null;
+    const value = await readValue();
+    const after = stmtGetNoteByFilename.get(filename);
+    if (
+      !value ||
+      !isAiReadableNoteState(after) ||
+      after.codexStatus !== before.codexStatus ||
+      after.updatedAt !== before.updatedAt
+    ) return null;
+    return value;
+  });
 }
 
 function searchPastMessages(queryEmbedding, currentSessionId, limit = 2) {
@@ -5376,7 +5862,7 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   for (const hit of searched) {
     if (merged.length >= MAX_ACTIVE_NOTES) break;
     if (merged.some(n => n.filename === hit.filename)) continue;
-    const note = await readVaultNote(hit.filename);
+    const note = await readAiStableNoteValue(hit.filename, () => readVaultNote(hit.filename));
     if (note) merged.push(note);
   }
 
@@ -5495,7 +5981,8 @@ async function rankVaultNoteCandidates(query, precomputedEmbedding = null, limit
   const noteData = [];
   for (const { filename } of activeNotes) {
     try {
-      const data = await loadNoteSearchData(filename);
+      const data = await readAiStableNoteValue(filename, () => loadNoteSearchData(filename));
+      if (!data) continue;
       if (data.archived) continue;
       noteData.push({
         filename,
@@ -5571,7 +6058,11 @@ app.post('/api/vault/embed-all', async (req, res) => {
   let done = 0, failed = 0;
   for (const { filename, title, noteType } of notes) {
     try {
-      const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
+      const raw = await readAiStableNoteValue(
+        filename,
+        () => fs.readFile(path.join(VAULT_PATH, filename), 'utf8'),
+      );
+      if (!raw) throw new Error('정리 중이거나 원본 복구가 필요한 노트입니다.');
       const indexState = deriveNoteIndexState({ filename, title, noteType, raw });
       noteIndexState.markContent({
         filename,
@@ -6279,14 +6770,14 @@ app.listen(PORT, HOST, () => {
   console.log(`   백업:     ${BACKUP_DIR} (하루 1회 자동, 7일 보관)`);
 
   if (
-    codexStartupRecovery.recoveredJobs > 0 ||
-    codexStartupRecovery.resetNotes > 0 ||
+    codexStartupRecovery.quarantinedJobs > 0 ||
+    codexStartupRecovery.quarantinedNotes > 0 ||
     codexStartupRecovery.normalizedStatuses > 0 ||
     codexStartupRecovery.queuedNotes > 0
   ) {
     console.log(
-      `   Codex 복구: job ${codexStartupRecovery.recoveredJobs}개, ` +
-      `실행 노트 ${codexStartupRecovery.resetNotes}개, ` +
+      `   Codex 복구: 중단 job ${codexStartupRecovery.quarantinedJobs}개 격리, ` +
+      `원본 복구 노트 ${codexStartupRecovery.quarantinedNotes}개, ` +
       `레거시 상태 ${codexStartupRecovery.normalizedStatuses}개, ` +
       `큐 노트 ${codexStartupRecovery.queuedNotes}개`,
     );
@@ -6300,7 +6791,7 @@ app.listen(PORT, HOST, () => {
     }
     console.warn(`⚠️  Codex runner preflight 실패: ${health.error}`);
     if (stmtGetNextPendingCodexJob.get()) {
-      console.warn('   복구된 정리 job은 pending으로 보류합니다. 실행 경로·로그인·사용량을 확인하세요.');
+      console.warn('   정리 job은 pending으로 보류합니다. 실행 경로·로그인·사용량을 확인하세요.');
     }
   }).catch(err => {
     console.warn(`⚠️  Codex runner preflight 오류: ${compactError(err, 500)}`);

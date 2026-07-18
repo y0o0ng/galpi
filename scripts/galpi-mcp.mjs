@@ -73,6 +73,7 @@ server.registerTool(
     const params = new URLSearchParams({
       limit: String(limit),
       includeArchived: String(includeArchived),
+      forAi: 'true',
     });
     return jsonResult(await apiRequest(`/api/vault/notes?${params.toString()}`));
   }
@@ -101,7 +102,7 @@ server.registerTool(
     },
   },
   async ({ filename }) => {
-    return jsonResult(await apiRequest(`/api/vault/note/${encodeURIComponent(filename)}`));
+    return jsonResult(await apiRequest(`/api/vault/note/${encodeURIComponent(filename)}?forAi=true`));
   }
 );
 

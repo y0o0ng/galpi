@@ -49,6 +49,7 @@ function createDb() {
       title TEXT NOT NULL,
       note_type TEXT NOT NULL,
       archived INTEGER NOT NULL DEFAULT 0,
+      codex_status TEXT NOT NULL DEFAULT 'pending',
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
       updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
@@ -147,6 +148,18 @@ test('note index state rejects stale async completion and records missing source
   assert.equal(store.markError({ filename: 'topic.md', contentSha256: firstHash }).changes, 0);
   assert.equal(store.markError({ filename: 'topic.md', contentSha256: nextHash }).changes, 1);
   assert.equal(store.get('topic.md').indexStatus, 'error');
+
+  db.prepare("UPDATE notes SET codex_status = 'recovery_required' WHERE filename = 'topic.md'").run();
+  const quarantinedState = store.get('topic.md');
+  const quarantinedHash = noteContentSha256({
+    filename: 'topic.md', title: '토픽', noteType: 'topic', raw: topicNote('복구 전 변경'),
+  });
+  assert.equal(store.markContent({ filename: 'topic.md', contentSha256: quarantinedHash }).changes, 0);
+  assert.equal(store.markReady({
+    filename: 'topic.md', contentSha256: nextHash, embedding: '[0.5,0.5]',
+  }).changes, 0);
+  assert.equal(store.markError({ filename: 'topic.md', contentSha256: nextHash }).changes, 0);
+  assert.deepEqual(store.get('topic.md'), quarantinedState);
 
   assert.equal(store.markMissing('topic.md').changes, 1);
   assert.equal(store.get('topic.md').indexStatus, 'missing');

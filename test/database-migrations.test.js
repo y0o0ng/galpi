@@ -27,7 +27,8 @@ function createLegacyDatabase() {
       filename TEXT UNIQUE NOT NULL,
       title TEXT NOT NULL,
       note_type TEXT NOT NULL,
-      archived INTEGER NOT NULL DEFAULT 0
+      archived INTEGER NOT NULL DEFAULT 0,
+      codex_status TEXT NOT NULL DEFAULT 'pending'
     );
     CREATE TABLE auto_save_decisions (
       id INTEGER PRIMARY KEY,
@@ -150,6 +151,19 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
     store.listAllReady().map(item => ({ chunkId: item.chunkId, noteTitle: item.noteTitle })),
     [{ chunkId: 'qa-current', noteTitle: 'Current Topic' }],
   );
+
+  db.prepare("UPDATE notes SET codex_status = 'running' WHERE filename = 'topic.md'").run();
+  assert.deepEqual(store.listReadyByNote('topic.md'), []);
+  assert.deepEqual(store.listAllReady(), []);
+  db.prepare("UPDATE notes SET codex_status = 'recovery_required' WHERE filename = 'topic.md'").run();
+  assert.equal(store.updateEmbedding('qa-current', '[9,9]').changes, 0);
+  assert.equal(
+    db.prepare("SELECT embedding FROM note_chunks WHERE chunk_id = 'qa-current'").get().embedding,
+    null,
+  );
+  assert.deepEqual(store.listReadyByNote('topic.md'), []);
+  assert.deepEqual(store.listAllReady(), []);
+  db.prepare("UPDATE notes SET codex_status = 'pending' WHERE filename = 'topic.md'").run();
 
   db.prepare("UPDATE notes SET archived = 1 WHERE filename = 'topic.md'").run();
   assert.deepEqual(store.listReadyByNote('topic.md'), []);

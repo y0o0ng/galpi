@@ -20,7 +20,7 @@ async function createFixture(t) {
   t.after(() => db.close());
   db.exec(`
     CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, model TEXT, created_at INTEGER NOT NULL);
-    CREATE TABLE notes (id INTEGER PRIMARY KEY, filename TEXT UNIQUE NOT NULL, title TEXT NOT NULL, note_type TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL DEFAULT 1);
+    CREATE TABLE notes (id INTEGER PRIMARY KEY, filename TEXT UNIQUE NOT NULL, title TEXT NOT NULL, note_type TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0, codex_status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE auto_save_decisions (id INTEGER PRIMARY KEY, decision TEXT NOT NULL, action TEXT);
     CREATE TABLE note_chunks (id INTEGER PRIMARY KEY, chunk_id TEXT UNIQUE NOT NULL, note_filename TEXT NOT NULL, note_title TEXT NOT NULL, chunk_type TEXT NOT NULL, content TEXT NOT NULL, source_session TEXT, source_user_message INTEGER, source_assistant_message INTEGER, embedding TEXT, created_at INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE assistant_retrieval_shadow_runs (id INTEGER PRIMARY KEY, mode TEXT NOT NULL, notes_json TEXT NOT NULL, chunks_json TEXT NOT NULL, context_chars INTEGER NOT NULL DEFAULT 0, latency_ms INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT 1);

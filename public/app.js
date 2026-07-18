@@ -1388,6 +1388,7 @@ function renderOrganizeStatus(data) {
     success: '완료',
     failed: '실패',
     needs_manual_check: '수동 확인',
+    recovery_required: '원본 복구 필요',
   };
   const jobRows = jobs.map(job => {
     const status = statusLabels[job.status] || job.status || '알 수 없음';
@@ -1412,6 +1413,7 @@ function renderOrganizeStatus(data) {
     `완료: ${data.processed || 0}개`,
     `실패: ${data.failed || 0}개`,
     `수동 확인: ${data.needsManualCheck || 0}개`,
+    `원본 복구 필요: ${data.recoveryRequired || 0}개`,
     rows.length ? `\n대기 노트:\n${rows.join('\n')}${more}` : '\n대기 노트 없음',
     jobRows.length ? `\n최근 job:\n${jobRows.join('\n')}` : '\n최근 job 없음',
   ].filter(Boolean).join('\n');
@@ -1434,10 +1436,12 @@ function renderOrganizeProcessResult(data) {
   const processedCount = Array.isArray(data.notes) ? data.notes.length : 0;
   const failedCount = Array.isArray(data.failed) ? data.failed.length : 0;
   const skippedCount = Number(data.skippedCount) || 0;
-  const statusLabel = data.status === 'processed'
+  const statusLabel = data.recoveryRequired
+    ? '수동 복구 필요'
+    : data.status === 'processed'
     ? (skippedCount > 0 && processedCount === 0 ? '건너뜀' : '완료')
     : data.status === 'pending'
-    ? '실행기 복구 후 재시도 대기'
+    ? '환경 복구 후 재시도 대기'
     : '실패';
   bubble.textContent = data.processed
     ? [
@@ -2274,7 +2278,7 @@ function renderAuditResult(data) {
     `검사 결과: ${data.ok ? 'OK' : '주의 필요'}`,
     `검증: ${data.validation?.ok ? '통과' : '실패'}`,
     `정책 파일: ${data.policy?.ok ? '정상' : '오류'}`,
-    `정리 상태: pending ${counts.pending || 0}, queued ${counts.queued || 0}, failed ${counts.failed || 0}, manual ${counts.needsManualCheck || 0}`,
+    `정리 상태: pending ${counts.pending || 0}, queued ${counts.queued || 0}, failed ${counts.failed || 0}, manual ${counts.needsManualCheck || 0}, recovery ${counts.recoveryRequired || 0}`,
     `알림: ${(data.notifications || []).length}개`,
     '',
     '이슈',
@@ -2783,13 +2787,15 @@ function makeNotificationCard(item) {
     handleNotificationDecision(item, 'approve', card);
   });
 
-  const ignore = document.createElement('button');
-  ignore.type = 'button';
-  ignore.className = 'notification-action';
-  ignore.textContent = '무시';
-  ignore.addEventListener('click', () => handleNotificationDecision(item, 'ignore', card));
-
-  actionWrap.append(approve, ignore);
+  actionWrap.appendChild(approve);
+  if (item.ignorable !== false) {
+    const ignore = document.createElement('button');
+    ignore.type = 'button';
+    ignore.className = 'notification-action';
+    ignore.textContent = '무시';
+    ignore.addEventListener('click', () => handleNotificationDecision(item, 'ignore', card));
+    actionWrap.appendChild(ignore);
+  }
   footer.appendChild(actionWrap);
 
   card.append(top, note, text, footer);
@@ -2887,6 +2893,10 @@ function makeContextNoteToggle(note) {
   button.type = 'button';
   button.className = 'context-note-toggle';
   button.dataset.contextFilename = note.filename;
+  button.dataset.contextBlocked = String(
+    ['running', 'recovery_required'].includes(note.codexStatus),
+  );
+  button.disabled = button.dataset.contextBlocked === 'true';
   button.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
@@ -2897,6 +2907,14 @@ function makeContextNoteToggle(note) {
 }
 
 function syncContextNoteToggle(button) {
+  if (button.dataset.contextBlocked === 'true') {
+    button.classList.remove('active');
+    button.setAttribute('aria-pressed', 'false');
+    button.title = '정리 중이거나 원본 복구가 필요한 노트는 컨텍스트에 추가할 수 없음';
+    button.setAttribute('aria-label', button.title);
+    button.innerHTML = '<span>컨텍스트 사용 불가</span>';
+    return;
+  }
   const active = isActiveNote(button.dataset.contextFilename);
   button.classList.toggle('active', active);
   button.setAttribute('aria-pressed', String(active));

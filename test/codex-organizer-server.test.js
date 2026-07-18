@@ -62,6 +62,15 @@ function pendingTopicNote() {
   ].join('\n');
 }
 
+function organizedTopicNote(summary = 'Codex 정리 결과가 허용 구역 안에 안전하게 반영됐다.') {
+  return pendingTopicNote()
+    .replace('- Codex 정리 대기: 테스트 항목이 쌓여 있다.', summary)
+    .replace(
+      '<!-- CODEX-TAGS-START -->\n<!-- CODEX-TAGS-END -->',
+      '<!-- CODEX-TAGS-START -->\n#갈피 #정리 #안전성\n<!-- CODEX-TAGS-END -->',
+    );
+}
+
 async function availablePort() {
   const server = net.createServer();
   server.listen(0, '127.0.0.1');
@@ -188,6 +197,61 @@ async function writeSlowSuccessfulCodexRunner(runnerPath, delayMs = 350) {
     "  raw = raw.replace(/(?<=<!-- CODEX-TAGS-START -->)[\\s\\S]*?(?=<!-- CODEX-TAGS-END -->)/, '\\n#갈피 #정리 #직렬화\\n');",
     "  fs.writeFileSync(path.join(root, note.filename), raw);",
     "}",
+    '',
+  ].join('\n'));
+  await fs.chmod(runnerPath, 0o755);
+}
+
+async function writeLinkedCodexRunner(runnerPath) {
+  await fs.writeFile(runnerPath, [
+    `#!${process.execPath}`,
+    "'use strict';",
+    "const fs = require('node:fs');",
+    "const path = require('node:path');",
+    "const args = process.argv.slice(2);",
+    "if (args[0] === '--version') { console.log('codex-cli atomic-finalize-test'); process.exit(0); }",
+    "if (args[0] === 'login') { console.log('Logged in using test'); process.exit(0); }",
+    "const root = args[args.indexOf('-C') + 1];",
+    "const prompt = fs.readFileSync(0, 'utf8');",
+    "const targetBlock = (prompt.split('대상 파일:\\n')[1] || '').split('\\n\\n목표:')[0];",
+    "const targets = targetBlock.split('\\n').filter(line => line.startsWith('- ')).map(line => line.slice(2).trim());",
+    "for (let index = 0; index < targets.length; index += 1) {",
+    "  const filename = targets[index];",
+    "  const other = targets[(index + 1) % targets.length];",
+    "  const filepath = path.join(root, filename);",
+    "  let raw = fs.readFileSync(filepath, 'utf8');",
+    "  raw = raw.replace(/(?<=<!-- CODEX-SUMMARY-START -->)[\\s\\S]*?(?=<!-- CODEX-SUMMARY-END -->)/, '\\n최종 파일과 파생 링크, job 종료는 하나의 DB transaction으로 확정된다.\\n');",
+    "  raw = raw.replace(/(?<=<!-- CODEX-TAGS-START -->)[\\s\\S]*?(?=<!-- CODEX-TAGS-END -->)/, '\\n#갈피 #정리 #원자성\\n');",
+    "  const otherBase = other.replace(/\\.md$/, '');",
+    "  const links = `\\n**[회귀 검증]**\\n- 80 [[${otherBase}|Organizer Regression]] — 원자적 job 종료 검증\\n`;",
+    "  raw = raw.replace(/(?<=<!-- CODEX-LINKS-START -->)[\\s\\S]*?(?=<!-- CODEX-LINKS-END -->)/, links);",
+    "  fs.writeFileSync(filepath, raw);",
+    "}",
+    '',
+  ].join('\n'));
+  await fs.chmod(runnerPath, 0o755);
+}
+
+async function writeUnsafeCodexRunner(runnerPath, delayMs = 350) {
+  await fs.writeFile(runnerPath, [
+    `#!${process.execPath}`,
+    "'use strict';",
+    "const fs = require('node:fs');",
+    "const path = require('node:path');",
+    "const args = process.argv.slice(2);",
+    "if (args[0] === '--version') { console.log('codex-cli unsafe-restore-test'); process.exit(0); }",
+    "if (args[0] === 'login') { console.log('Logged in using test'); process.exit(0); }",
+    "const root = args[args.indexOf('-C') + 1];",
+    "const prompt = fs.readFileSync(0, 'utf8');",
+    "const targetBlock = (prompt.split('대상 파일:\\n')[1] || '').split('\\n\\n목표:')[0];",
+    "const targets = targetBlock.split('\\n').filter(line => line.startsWith('- ')).map(line => line.slice(2).trim());",
+    "for (const filename of targets) {",
+    "  const filepath = path.join(root, filename);",
+    "  const raw = fs.readFileSync(filepath, 'utf8');",
+    "  fs.writeFileSync(filepath, raw.replace('**Q:**', '**Q:** [UNSAFE OUTSIDE CODEX]'));",
+    "}",
+    "fs.writeFileSync(process.env.RUNNER_SIGNAL_PATH, 'mutated');",
+    `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${delayMs});`,
     '',
   ].join('\n'));
   await fs.chmod(runnerPath, 0o755);
@@ -344,8 +408,8 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
     assert.equal(await fs.readFile(path.join(vaultPath, name), 'utf8'), originalNote);
   }
 
-  // 경로를 고친 뒤에도 현재 job 완료와 다음 batch 저장 사이가 원자적이어야 한다.
-  // 후속 job INSERT를 강제로 실패시켜 완료만 커밋되는 crash gap이 없는지 재현한다.
+  // 경로를 고친 뒤에도 최종 edge·노트 상태·현재 job 완료·다음 batch 저장이 원자적이어야 한다.
+  // 후속 job INSERT를 강제로 실패시켜 최종 노트 상태까지 함께 rollback되는지 재현한다.
   await stopServer(child);
   child = null;
   await fs.writeFile(missingCodexBin, [
@@ -427,11 +491,13 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
          WHERE filename IN (?, ?, ?)`,
       ).all(...filenames);
       const currentStatuses = new Map(currentNotes.map(note => [note.filename, note.codexStatus]));
-      const firstBatchProcessed = firstJobFilenames.every(name => currentStatuses.get(name) === 'processed');
+      const firstBatchRolledBack = firstJobFilenames.every(
+        name => currentStatuses.get(name) === 'needs_manual_check',
+      );
       if (
         currentJob?.status === 'running' &&
         currentJob.attemptCount === 3 &&
-        firstBatchProcessed &&
+        firstBatchRolledBack &&
         currentStatuses.get(tailFilename) === 'pending'
       ) {
         return { currentJob, currentStatuses };
@@ -440,8 +506,11 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
     },
   );
   assert.equal(interruptedState.currentJob.status, 'running');
+  for (const name of firstJobFilenames) {
+    assert.match(await fs.readFile(path.join(vaultPath, name), 'utf8'), /Codex 정리 대기/);
+  }
 
-  // 강제 중단 후 재시작하면 running job부터 되돌리고, 성공과 함께 다음 1개 job을 저장·실행한다.
+  // 강제 중단 후 재시작하면 안전을 추정해 재실행하지 않고 running job 대상 전체를 격리한다.
   await stopServer(child);
   child = null;
   const resumeDb = new Database(databasePath);
@@ -451,11 +520,11 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
   child = startRecoveryServer();
   await waitForServer(child, recoveryUrl, logs);
   await waitForRunnerHealth(child, recoveryUrl, logs, true);
-  const recoveredState = await waitForDatabaseState(
+  const quarantinedState = await waitForDatabaseState(
     child,
     databasePath,
     logs,
-    '배치 chain 복구 완료',
+    '중단 job 수동 복구 격리',
     currentDb => {
       const currentNotes = currentDb.prepare(
         `SELECT filename, codex_status AS codexStatus
@@ -467,11 +536,14 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
          FROM codex_jobs
          ORDER BY id ASC`,
       ).all();
+      const currentStatuses = new Map(currentNotes.map(note => [note.filename, note.codexStatus]));
+      const interruptedJob = currentJobs.find(currentJob => currentJob.id === queue.body.jobId);
       if (
         currentNotes.length === filenames.length &&
-        currentNotes.every(note => note.codexStatus === 'processed') &&
-        currentJobs.length === 2 &&
-        currentJobs.every(currentJob => currentJob.status === 'processed')
+        firstJobFilenames.every(name => currentStatuses.get(name) === 'recovery_required') &&
+        currentStatuses.get(tailFilename) === 'pending' &&
+        currentJobs.length === 1 &&
+        interruptedJob?.status === 'failed'
       ) {
         return { currentNotes, currentJobs };
       }
@@ -479,26 +551,36 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
     },
   );
 
-  const recoveredJob = recoveredState.currentJobs.find(currentJob => currentJob.id === queue.body.jobId);
-  const recoveredTailJob = recoveredState.currentJobs.find(currentJob => currentJob.id !== queue.body.jobId);
+  const recoveredJob = quarantinedState.currentJobs[0];
   assert.deepEqual(recoveredJob, {
     id: queue.body.jobId,
-    status: 'processed',
-    attemptCount: 4,
-    error: null,
+    status: 'failed',
+    attemptCount: 3,
+    error: '서버 중단으로 변경 검증을 완료하지 못했습니다. 수동 복구가 필요합니다.',
   });
-  assert.ok(recoveredTailJob);
-  assert.deepEqual(
-    {
-      status: recoveredTailJob.status,
-      attemptCount: recoveredTailJob.attemptCount,
-      error: recoveredTailJob.error,
-    },
-    { status: 'processed', attemptCount: 1, error: null },
-  );
-  for (const name of filenames) {
-    assert.match(await fs.readFile(path.join(vaultPath, name), 'utf8'), /#갈피 #정리 #복구/);
+
+  const blockedProcess = await api(recoveryUrl, '/api/organize/process', { method: 'POST', body: '{}' });
+  assert.equal(blockedProcess.response.status, 409, JSON.stringify(blockedProcess.body));
+  const notifications = await api(recoveryUrl, '/api/notifications');
+  const recoveryNotifications = notifications.body.notifications.filter(item => item.recoveryRequired);
+  assert.equal(recoveryNotifications.length, firstJobFilenames.length);
+  for (const notification of recoveryNotifications) {
+    const approval = await api(
+      recoveryUrl,
+      `/api/notifications/${notification.id}/approve`,
+      { method: 'POST', body: '{}' },
+    );
+    assert.equal(approval.response.status, 200, JSON.stringify(approval.body));
   }
+
+  const tailQueue = await api(recoveryUrl, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(tailQueue.response.status, 200, JSON.stringify(tailQueue.body));
+  assert.deepEqual(tailQueue.body.notes.map(note => note.filename), [tailFilename]);
+  await waitForJobStatus(child, recoveryUrl, logs, tailQueue.body.jobId, 'processed');
+  for (const name of firstJobFilenames) {
+    assert.match(await fs.readFile(path.join(vaultPath, name), 'utf8'), /Codex 정리 대기/);
+  }
+  assert.match(await fs.readFile(path.join(vaultPath, tailFilename), 'utf8'), /#갈피 #정리 #복구/);
 });
 
 test('exit-zero runner with no edits fails output validation instead of marking the note processed', async t => {
@@ -858,6 +940,733 @@ test('Codex serializes current mutations and skips an archived tail target', asy
     await fs.readFile(path.join(vaultPath, healthyFilename), 'utf8'),
     /#갈피 #정리 #직렬화/,
   );
+
+  // 파일 접근 권한 같은 저장소 장애는 노트를 manual로 소진하지 않고 같은 job을 보존한다.
+  const unreadableFilename = 'organizer-unreadable.md';
+  const retryHealthyFilename = 'organizer-retry-healthy.md';
+  await Promise.all([
+    fs.writeFile(path.join(vaultPath, unreadableFilename), pendingTopicNote()),
+    fs.writeFile(path.join(vaultPath, retryHealthyFilename), pendingTopicNote()),
+  ]);
+  const permissionSync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(permissionSync.response.status, 200, JSON.stringify(permissionSync.body));
+  await fs.chmod(path.join(vaultPath, unreadableFilename), 0o000);
+
+  const permissionQueue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(permissionQueue.response.status, 200, JSON.stringify(permissionQueue.body));
+  const permissionBlocked = await waitForDatabaseState(
+    child,
+    databasePath,
+    logs,
+    '파일 접근 장애 job 보존',
+    currentDb => {
+      const job = currentDb.prepare(
+        'SELECT status, attempt_count AS attemptCount, error FROM codex_jobs WHERE id = ?',
+      ).get(permissionQueue.body.jobId);
+      const notes = currentDb.prepare(
+        `SELECT filename, codex_status AS codexStatus
+         FROM notes
+         WHERE filename IN (?, ?)`,
+      ).all(unreadableFilename, retryHealthyFilename);
+      if (
+        job?.status === 'pending' &&
+        job.attemptCount === 1 &&
+        notes.length === 2 &&
+        notes.every(note => note.codexStatus === 'queued')
+      ) {
+        return { job, notes };
+      }
+      return null;
+    },
+  );
+  assert.match(permissionBlocked.job.error, /저장소에 접근할 수 없습니다 \(EACCES\)/);
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const retryGuardDb = new Database(databasePath, { readonly: true });
+  const guardedAttemptCount = retryGuardDb.prepare(
+    'SELECT attempt_count AS attemptCount FROM codex_jobs WHERE id = ?',
+  ).get(permissionQueue.body.jobId).attemptCount;
+  retryGuardDb.close();
+  assert.equal(guardedAttemptCount, 1, '공용 저장소 장애를 자동으로 무한 재시도하면 안 된다.');
+
+  await fs.chmod(path.join(vaultPath, unreadableFilename), 0o644);
+  const permissionRetry = await api(url, '/api/organize/process', { method: 'POST', body: '{}' });
+  assert.equal(permissionRetry.response.status, 200, JSON.stringify(permissionRetry.body));
+  assert.equal(permissionRetry.body.status, 'processed');
+  const permissionRecovered = await waitForDatabaseState(
+    child,
+    databasePath,
+    logs,
+    '파일 접근 장애 복구',
+    currentDb => {
+      const job = currentDb.prepare(
+        'SELECT status, attempt_count AS attemptCount FROM codex_jobs WHERE id = ?',
+      ).get(permissionQueue.body.jobId);
+      return job?.status === 'processed' && job.attemptCount === 2 ? job : null;
+    },
+  );
+  assert.equal(permissionRecovered.attemptCount, 2);
+
+  // vault 루트 자체가 사라져도 같은 pending job을 한 번만 시도하고 복구 후 재개한다.
+  const storageFilename = 'organizer-storage-recovery.md';
+  await fs.writeFile(path.join(vaultPath, storageFilename), pendingTopicNote());
+  const storageSync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(storageSync.response.status, 200, JSON.stringify(storageSync.body));
+  const storageFixtureDb = new Database(databasePath);
+  const storageJobId = storageFixtureDb.prepare(
+    "INSERT INTO codex_jobs (status, note_filenames_json) VALUES ('pending', ?)",
+  ).run(JSON.stringify([storageFilename])).lastInsertRowid;
+  storageFixtureDb.prepare(
+    "UPDATE notes SET codex_status = 'queued' WHERE filename = ?",
+  ).run(storageFilename);
+  storageFixtureDb.close();
+
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const offlineVaultPath = `${vaultPath}-offline`;
+  await fs.rename(vaultPath, offlineVaultPath);
+  let storageBlocked;
+  try {
+    storageBlocked = await api(url, '/api/organize/process', { method: 'POST', body: '{}' });
+  } finally {
+    await fs.rename(offlineVaultPath, vaultPath);
+  }
+  assert.equal(storageBlocked.response.status, 200, JSON.stringify(storageBlocked.body));
+  assert.equal(storageBlocked.body.status, 'pending');
+  assert.match(storageBlocked.body.error, /vault 저장소를 사용할 수 없습니다 \(ENOENT\)/);
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const storageGuardDb = new Database(databasePath, { readonly: true });
+  const storageGuard = storageGuardDb.prepare(
+    `SELECT status, attempt_count AS attemptCount, error
+     FROM codex_jobs
+     WHERE id = ?`,
+  ).get(storageJobId);
+  storageGuardDb.close();
+  assert.equal(storageGuard.status, 'pending');
+  assert.equal(storageGuard.attemptCount, 1);
+
+  const storageRetry = await api(url, '/api/organize/process', { method: 'POST', body: '{}' });
+  assert.equal(storageRetry.response.status, 200, JSON.stringify(storageRetry.body));
+  assert.equal(storageRetry.body.status, 'processed');
+  const storageRecoveredDb = new Database(databasePath, { readonly: true });
+  const storageRecovered = storageRecoveredDb.prepare(
+    'SELECT status, attempt_count AS attemptCount, error FROM codex_jobs WHERE id = ?',
+  ).get(storageJobId);
+  storageRecoveredDb.close();
+  assert.deepEqual(storageRecovered, { status: 'processed', attemptCount: 2, error: null });
+
+  // preflight 뒤 runner가 파일 권한 오류로 실패해도 snapshot 복원 성공 시 같은 job을 보존한다.
+  const midrunFilenames = [
+    'organizer-midrun-storage.md',
+    'organizer-midrun-storage-2.md',
+  ];
+  await Promise.all(midrunFilenames.map(filename => (
+    fs.writeFile(path.join(vaultPath, filename), pendingTopicNote())
+  )));
+  const midrunSync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(midrunSync.response.status, 200, JSON.stringify(midrunSync.body));
+  await fs.rm(runnerSignalPath, { force: true });
+  const midrunQueue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(midrunQueue.response.status, 200, JSON.stringify(midrunQueue.body));
+  assert.deepEqual(
+    new Set(midrunQueue.body.notes.map(note => note.filename)),
+    new Set(midrunFilenames),
+  );
+  await waitForFile(child, runnerSignalPath, logs);
+
+  let midrunBlocked;
+  await Promise.all(midrunFilenames.map(filename => (
+    fs.chmod(path.join(vaultPath, filename), 0o000)
+  )));
+  try {
+    midrunBlocked = await waitForDatabaseState(
+      child,
+      databasePath,
+      logs,
+      '실행 중 저장소 장애 job 보존',
+      currentDb => {
+        const job = currentDb.prepare(
+          'SELECT status, attempt_count AS attemptCount, error FROM codex_jobs WHERE id = ?',
+        ).get(midrunQueue.body.jobId);
+        const notes = currentDb.prepare(
+          `SELECT filename, codex_status AS codexStatus
+           FROM notes
+           WHERE filename IN (?, ?)`,
+        ).all(...midrunFilenames);
+        if (
+          job?.status === 'pending' &&
+          job.attemptCount === 1 &&
+          notes.length === 2 &&
+          notes.every(note => note.codexStatus === 'queued')
+        ) {
+          return { job, notes };
+        }
+        return null;
+      },
+    );
+  } finally {
+    await Promise.all(midrunFilenames.map(async filename => {
+      try { await fs.chmod(path.join(vaultPath, filename), 0o644); } catch { /* test cleanup */ }
+    }));
+  }
+  assert.match(midrunBlocked.job.error, /EACCES|permission denied/i);
+  assert.doesNotMatch(midrunBlocked.job.error, new RegExp(vaultPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  midrunFilenames.forEach(filename => assert.doesNotMatch(midrunBlocked.job.error, new RegExp(filename)));
+  const midrunStatus = await api(url, '/api/organize/status');
+  assert.equal(midrunStatus.response.status, 200, JSON.stringify(midrunStatus.body));
+  assert.ok(midrunStatus.body.runner.error);
+  assert.doesNotMatch(midrunStatus.body.runner.error, new RegExp(vaultPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  midrunFilenames.forEach(filename => (
+    assert.doesNotMatch(midrunStatus.body.runner.error, new RegExp(filename))
+  ));
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const midrunGuardDb = new Database(databasePath, { readonly: true });
+  const midrunAttemptCount = midrunGuardDb.prepare(
+    'SELECT attempt_count AS attemptCount FROM codex_jobs WHERE id = ?',
+  ).get(midrunQueue.body.jobId).attemptCount;
+  midrunGuardDb.close();
+  assert.equal(midrunAttemptCount, 1, '실행 중 저장소 장애도 자동 반복하면 안 된다.');
+
+  const midrunRetry = await api(url, '/api/organize/process', { method: 'POST', body: '{}' });
+  assert.equal(midrunRetry.response.status, 200, JSON.stringify(midrunRetry.body));
+  assert.equal(midrunRetry.body.status, 'processed');
+  const midrunRecoveredDb = new Database(databasePath, { readonly: true });
+  const midrunRecovered = midrunRecoveredDb.prepare(
+    'SELECT status, attempt_count AS attemptCount, error FROM codex_jobs WHERE id = ?',
+  ).get(midrunQueue.body.jobId);
+  midrunRecoveredDb.close();
+  assert.deepEqual(midrunRecovered, { status: 'processed', attemptCount: 2, error: null });
+
+  // 금지 구역 변경 뒤 root 교체로 snapshot 복원이 불가능하면 자동 재시도를 금지한다.
+  const unsafeFilenames = [
+    'organizer-recovery-required.md',
+    'organizer-recovery-required-2.md',
+  ];
+  await Promise.all(unsafeFilenames.map(filename => (
+    fs.writeFile(path.join(vaultPath, filename), pendingTopicNote())
+  )));
+  const unsafeSync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(unsafeSync.response.status, 200, JSON.stringify(unsafeSync.body));
+  await writeUnsafeCodexRunner(slowRunner);
+  await fs.rm(runnerSignalPath, { force: true });
+  const unsafeQueue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(unsafeQueue.response.status, 200, JSON.stringify(unsafeQueue.body));
+  assert.deepEqual(
+    new Set(unsafeQueue.body.notes.map(note => note.filename)),
+    new Set(unsafeFilenames),
+  );
+  await waitForFile(child, runnerSignalPath, logs);
+
+  const replacedVaultPath = `${vaultPath}-replaced`;
+  await fs.rename(vaultPath, replacedVaultPath);
+  await fs.mkdir(vaultPath);
+  await Promise.all(unsafeFilenames.map(filename => (
+    fs.writeFile(path.join(vaultPath, filename), pendingTopicNote())
+  )));
+  let unsafeBlocked;
+  try {
+    unsafeBlocked = await waitForDatabaseState(
+      child,
+      databasePath,
+      logs,
+      'snapshot 수동 복구 격리',
+      currentDb => {
+        const job = currentDb.prepare(
+          'SELECT status, attempt_count AS attemptCount, error FROM codex_jobs WHERE id = ?',
+        ).get(unsafeQueue.body.jobId);
+        const notes = currentDb.prepare(
+          `SELECT filename, codex_status AS codexStatus
+           FROM notes
+           WHERE filename IN (?, ?)`,
+        ).all(...unsafeFilenames);
+        if (
+          job?.status === 'failed' &&
+          job.attemptCount === 1 &&
+          notes.length === 2 &&
+          notes.every(note => note.codexStatus === 'recovery_required')
+        ) {
+          return { job, notes };
+        }
+        return null;
+      },
+    );
+  } finally {
+    await fs.rm(vaultPath, { recursive: true, force: true });
+    await fs.rename(replacedVaultPath, vaultPath);
+  }
+  assert.match(unsafeBlocked.job.error, /snapshot 자동 복구.*ESTALE.*수동 복구/);
+  assert.doesNotMatch(unsafeBlocked.job.error, new RegExp(vaultPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  unsafeFilenames.forEach(filename => {
+    assert.doesNotMatch(unsafeBlocked.job.error, new RegExp(filename));
+  });
+  const unsafeRaw = await fs.readFile(path.join(vaultPath, unsafeFilenames[0]), 'utf8');
+  assert.match(unsafeRaw, /UNSAFE OUTSIDE CODEX/);
+
+  const blockedRetry = await api(url, '/api/organize/process', { method: 'POST', body: '{}' });
+  assert.equal(blockedRetry.response.status, 409, JSON.stringify(blockedRetry.body));
+  const blockedQueue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(blockedQueue.response.status, 409, JSON.stringify(blockedQueue.body));
+  const blockedAll = await api(url, '/api/organize/all', { method: 'POST', body: '{}' });
+  assert.equal(blockedAll.response.status, 409, JSON.stringify(blockedAll.body));
+
+  // 일반 UI 직접 열람은 복구를 위해 유지하지만 AI/MCP용 목록·읽기와 검색에서는 격리한다.
+  const directList = await api(url, '/api/vault/notes?limit=100');
+  assert.equal(
+    directList.body.notes.filter(note => unsafeFilenames.includes(note.filename)).length,
+    unsafeFilenames.length,
+  );
+  const aiList = await api(url, '/api/vault/notes?limit=100&forAi=true');
+  assert.equal(aiList.body.notes.some(note => unsafeFilenames.includes(note.filename)), false);
+  const aiLimitedList = await api(url, '/api/vault/notes?limit=1&forAi=true');
+  assert.equal(aiLimitedList.body.notes.length, 1, 'AI 목록은 격리 필터 뒤에 limit을 적용해야 한다.');
+  assert.equal(unsafeFilenames.includes(aiLimitedList.body.notes[0].filename), false);
+  const directRead = await api(url, `/api/vault/note/${unsafeFilenames[0]}`);
+  assert.match(directRead.body.note.content, /UNSAFE OUTSIDE CODEX/);
+  const aiRead = await api(url, `/api/vault/note/${unsafeFilenames[0]}?forAi=true`);
+  assert.equal(aiRead.response.status, 409, JSON.stringify(aiRead.body));
+  const search = await api(url, '/api/vault/search?q=UNSAFE%20OUTSIDE%20CODEX');
+  assert.equal(search.body.results.some(note => unsafeFilenames.includes(note.filename)), false);
+  const blockedArchive = await api(url, '/api/notes/archive', {
+    method: 'POST',
+    body: JSON.stringify({ filename: unsafeFilenames[0] }),
+  });
+  assert.equal(blockedArchive.response.status, 500, JSON.stringify(blockedArchive.body));
+
+  const unsafeSyncAgain = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(unsafeSyncAgain.response.status, 200, JSON.stringify(unsafeSyncAgain.body));
+  const unsafeGuardDb = new Database(databasePath, { readonly: true });
+  const unsafeStatuses = unsafeGuardDb.prepare(
+    `SELECT filename, codex_status AS codexStatus
+     FROM notes
+     WHERE filename IN (?, ?)`,
+  ).all(...unsafeFilenames);
+  unsafeGuardDb.close();
+  assert.equal(unsafeStatuses.every(note => note.codexStatus === 'recovery_required'), true);
+  assert.match(
+    await fs.readFile(path.join(vaultPath, unsafeFilenames[0]), 'utf8'),
+    /UNSAFE OUTSIDE CODEX/,
+  );
+
+  // 복구 승인은 선택 노트 하나만 sync하고, 그 사이 생긴 관련 없는 수동 편집은 흡수하지 않는다.
+  const unrelatedFilename = 'organizer-recovery-unrelated.md';
+  const unrelatedPath = path.join(vaultPath, unrelatedFilename);
+  await fs.writeFile(unrelatedPath, pendingTopicNote());
+  const unrelatedSync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(unrelatedSync.response.status, 200, JSON.stringify(unrelatedSync.body));
+  const unrelatedBeforeDb = new Database(databasePath, { readonly: true });
+  const unrelatedHashBefore = unrelatedBeforeDb.prepare(
+    'SELECT content_sha256 AS contentSha256 FROM notes WHERE filename = ?',
+  ).get(unrelatedFilename).contentSha256;
+  unrelatedBeforeDb.close();
+  await fs.writeFile(
+    unrelatedPath,
+    pendingTopicNote().replace('같은 pending job의 queued 상태로 복구해야 한다.', '선택 복구 승인과 무관한 수동 편집이다.'),
+  );
+
+  const unsafeNotifications = await api(url, '/api/notifications');
+  const recoveryItems = unsafeNotifications.body.notifications.filter(item => (
+    item.recoveryRequired && unsafeFilenames.includes(item.note?.filename)
+  ));
+  assert.equal(recoveryItems.length, unsafeFilenames.length);
+  const ignoredRecovery = await api(
+    url,
+    `/api/notifications/${recoveryItems[0].id}/ignore`,
+    { method: 'POST', body: '{}' },
+  );
+  assert.equal(ignoredRecovery.response.status, 400, JSON.stringify(ignoredRecovery.body));
+
+  await Promise.all(unsafeFilenames.map(filename => (
+    fs.writeFile(path.join(vaultPath, filename), pendingTopicNote())
+  )));
+  for (const item of recoveryItems) {
+    const approval = await api(url, `/api/notifications/${item.id}/approve`, {
+      method: 'POST',
+      body: '{}',
+    });
+    assert.equal(approval.response.status, 200, JSON.stringify(approval.body));
+  }
+  const unrelatedAfterDb = new Database(databasePath, { readonly: true });
+  const unrelatedHashAfter = unrelatedAfterDb.prepare(
+    'SELECT content_sha256 AS contentSha256 FROM notes WHERE filename = ?',
+  ).get(unrelatedFilename).contentSha256;
+  unrelatedAfterDb.close();
+  assert.equal(unrelatedHashAfter, unrelatedHashBefore);
+  const approvedStatus = await api(url, '/api/organize/status');
+  assert.equal(approvedStatus.body.recoveryRequired, 0);
+
+  // 최종 edge/processed 반영과 job 종료가 한 transaction이므로 종료 UPDATE 실패 시 모두 rollback한다.
+  const atomicDb = new Database(databasePath);
+  atomicDb.prepare("UPDATE notes SET codex_status = 'processed' WHERE filename = ?").run(unrelatedFilename);
+  atomicDb.exec(`
+    CREATE TRIGGER fail_atomic_job_finalize
+    BEFORE UPDATE OF status ON codex_jobs
+    WHEN OLD.status = 'running' AND NEW.status = 'processed'
+    BEGIN
+      SELECT RAISE(ABORT, 'forced job finalize failure');
+    END;
+  `);
+  atomicDb.close();
+
+  const atomicFilenames = [
+    'organizer-atomic-finalize-a.md',
+    'organizer-atomic-finalize-b.md',
+  ];
+  await Promise.all(atomicFilenames.map(filename => (
+    fs.writeFile(path.join(vaultPath, filename), pendingTopicNote())
+  )));
+  const atomicSync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(atomicSync.response.status, 200, JSON.stringify(atomicSync.body));
+  await writeLinkedCodexRunner(slowRunner);
+  const atomicQueue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(atomicQueue.response.status, 200, JSON.stringify(atomicQueue.body));
+  assert.deepEqual(
+    new Set(atomicQueue.body.notes.map(note => note.filename)),
+    new Set(atomicFilenames),
+  );
+  const atomicFailure = await waitForDatabaseState(
+    child,
+    databasePath,
+    logs,
+    '최종 job transaction rollback',
+    currentDb => {
+      const job = currentDb.prepare('SELECT status, error FROM codex_jobs WHERE id = ?')
+        .get(atomicQueue.body.jobId);
+      const notes = currentDb.prepare(
+        `SELECT filename, codex_status AS codexStatus
+         FROM notes
+         WHERE filename IN (?, ?)`,
+      ).all(...atomicFilenames);
+      if (
+        job?.status === 'failed' &&
+        notes.length === 2 &&
+        notes.every(note => note.codexStatus === 'needs_manual_check')
+      ) return { job, notes };
+      return null;
+    },
+  );
+  assert.match(atomicFailure.job.error, /forced job finalize failure/);
+  const atomicVerifyDb = new Database(databasePath);
+  const atomicEdgeCount = atomicVerifyDb.prepare(
+    `SELECT COUNT(*) AS count
+     FROM note_edges
+     WHERE source_filename IN (?, ?)`,
+  ).get(...atomicFilenames).count;
+  atomicVerifyDb.exec('DROP TRIGGER fail_atomic_job_finalize');
+  atomicVerifyDb.close();
+  assert.equal(atomicEdgeCount, 0);
+  for (const filename of atomicFilenames) {
+    assert.match(
+      await fs.readFile(path.join(vaultPath, filename), 'utf8'),
+      /Codex 정리 대기/,
+    );
+  }
+});
+
+test('final output read stays inside the snapshot recovery boundary', async t => {
+  const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-organizer-final-boundary-'));
+  let child = null;
+  t.after(async () => {
+    if (child) await stopServer(child);
+    await fs.rm(appRoot, { recursive: true, force: true });
+  });
+
+  const vaultPath = path.join(appRoot, 'vault');
+  await fs.mkdir(vaultPath);
+  await fs.copyFile(path.join(ROOT, 'server.js'), path.join(appRoot, 'server.js'));
+  for (const name of ['lib', 'public', 'config', '.codex', 'node_modules']) {
+    await fs.symlink(path.join(ROOT, name), path.join(appRoot, name), 'dir');
+  }
+  const scriptsPath = path.join(appRoot, 'scripts');
+  await fs.mkdir(scriptsPath);
+  await fs.symlink(path.join(ROOT, 'scripts', 'backup.js'), path.join(scriptsPath, 'backup.js'));
+  await fs.writeFile(path.join(scriptsPath, 'validate-codex-edit.js'), [
+    `#!${process.execPath}`,
+    "'use strict';",
+    "const fs = require('node:fs');",
+    "fs.writeFileSync(process.env.FINAL_VALIDATION_SIGNAL_PATH, 'validating');",
+    'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);',
+    '',
+  ].join('\n'));
+
+  const filename = 'organizer-final-boundary.md';
+  await fs.writeFile(path.join(vaultPath, filename), pendingTopicNote());
+  const runnerSignalPath = path.join(appRoot, 'runner-started');
+  const finalValidationSignalPath = path.join(appRoot, 'final-validation-started');
+  const runnerPath = path.join(appRoot, 'valid-codex');
+  await writeSlowSuccessfulCodexRunner(runnerPath, 10);
+
+  const port = await availablePort();
+  const url = `http://127.0.0.1:${port}`;
+  const logs = [];
+  child = spawn(process.execPath, ['server.js'], {
+    cwd: appRoot,
+    env: {
+      ...process.env,
+      ANTHROPIC_API_KEY: 'test-key',
+      OPENAI_API_KEY: '',
+      API_TOKEN,
+      HOST: '127.0.0.1',
+      PORT: String(port),
+      VAULT_PATH: vaultPath,
+      BACKUP_DIR: path.join(appRoot, 'backups'),
+      CODEX_BIN: runnerPath,
+      CODEX_RUNNER_MODE: 'codex',
+      CODEX_RUNNER_TIMEOUT_MS: '2000',
+      RUNNER_SIGNAL_PATH: runnerSignalPath,
+      FINAL_VALIDATION_SIGNAL_PATH: finalValidationSignalPath,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  child.stdout.on('data', chunk => logs.push(chunk.toString()));
+  child.stderr.on('data', chunk => logs.push(chunk.toString()));
+
+  await waitForServer(child, url, logs);
+  await waitForRunnerHealth(child, url, logs, true);
+  const sync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(sync.response.status, 200, JSON.stringify(sync.body));
+  const queue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(queue.response.status, 200, JSON.stringify(queue.body));
+  await waitForFile(child, finalValidationSignalPath, logs);
+
+  const originalVaultPath = `${vaultPath}-original`;
+  await fs.rename(vaultPath, originalVaultPath);
+  await fs.mkdir(vaultPath);
+  await fs.writeFile(
+    path.join(vaultPath, filename),
+    organizedTopicNote('교체된 vault도 형식 검증만으로는 정상처럼 보인다.'),
+  );
+
+  const databasePath = path.join(appRoot, 'galpi.db');
+  const quarantined = await waitForDatabaseState(
+    child,
+    databasePath,
+    logs,
+    '최종 읽기 root 교체 격리',
+    currentDb => {
+      const job = currentDb.prepare(
+        'SELECT status, attempt_count AS attemptCount, error FROM codex_jobs WHERE id = ?',
+      ).get(queue.body.jobId);
+      const note = currentDb.prepare(
+        'SELECT codex_status AS codexStatus FROM notes WHERE filename = ?',
+      ).get(filename);
+      return job?.status === 'failed' && note?.codexStatus === 'recovery_required'
+        ? { job, note }
+        : null;
+    },
+  );
+  assert.equal(quarantined.job.attemptCount, 1);
+  assert.match(quarantined.job.error, /snapshot 자동 복구.*ESTALE.*수동 복구/);
+  assert.equal(
+    await fs.readFile(path.join(vaultPath, filename), 'utf8'),
+    organizedTopicNote('교체된 vault도 형식 검증만으로는 정상처럼 보인다.'),
+  );
+});
+
+test('SIGKILL after an unsafe edit quarantines the interrupted job on restart', async t => {
+  const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-organizer-crash-recovery-'));
+  let child = null;
+  t.after(async () => {
+    if (child) await stopServer(child);
+    await fs.rm(appRoot, { recursive: true, force: true });
+  });
+
+  const vaultPath = path.join(appRoot, 'vault');
+  await fs.mkdir(vaultPath);
+  await fs.copyFile(path.join(ROOT, 'server.js'), path.join(appRoot, 'server.js'));
+  for (const name of ['lib', 'scripts', 'public', 'config', '.codex', 'node_modules']) {
+    await fs.symlink(path.join(ROOT, name), path.join(appRoot, name), 'dir');
+  }
+  const filename = 'organizer-crash-recovery.md';
+  await fs.writeFile(path.join(vaultPath, filename), pendingTopicNote());
+  const runnerSignalPath = path.join(appRoot, 'unsafe-runner-mutated');
+  const runnerPath = path.join(appRoot, 'unsafe-codex');
+  await writeUnsafeCodexRunner(runnerPath, 1000);
+  const logs = [];
+
+  const startServer = async () => {
+    const port = await availablePort();
+    const url = `http://127.0.0.1:${port}`;
+    const server = spawn(process.execPath, ['server.js'], {
+      cwd: appRoot,
+      env: {
+        ...process.env,
+        ANTHROPIC_API_KEY: 'test-key',
+        OPENAI_API_KEY: '',
+        API_TOKEN,
+        HOST: '127.0.0.1',
+        PORT: String(port),
+        VAULT_PATH: vaultPath,
+        BACKUP_DIR: path.join(appRoot, 'backups'),
+        CODEX_BIN: runnerPath,
+        CODEX_RUNNER_MODE: 'codex',
+        CODEX_RUNNER_TIMEOUT_MS: '3000',
+        RUNNER_SIGNAL_PATH: runnerSignalPath,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    server.stdout.on('data', chunk => logs.push(chunk.toString()));
+    server.stderr.on('data', chunk => logs.push(chunk.toString()));
+    await waitForServer(server, url, logs);
+    await waitForRunnerHealth(server, url, logs, true);
+    return { server, url };
+  };
+
+  let started = await startServer();
+  child = started.server;
+  const sync = await api(started.url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(sync.response.status, 200, JSON.stringify(sync.body));
+  const queue = await api(started.url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(queue.response.status, 200, JSON.stringify(queue.body));
+  await waitForFile(child, runnerSignalPath, logs);
+  assert.match(await fs.readFile(path.join(vaultPath, filename), 'utf8'), /UNSAFE OUTSIDE CODEX/);
+
+  const crashed = child;
+  const crashExit = once(crashed, 'exit');
+  crashed.kill('SIGKILL');
+  await crashExit;
+  child = null;
+
+  const databasePath = path.join(appRoot, 'galpi.db');
+  const interruptedDb = new Database(databasePath, { readonly: true });
+  assert.deepEqual(
+    interruptedDb.prepare(
+      'SELECT status, attempt_count AS attemptCount FROM codex_jobs WHERE id = ?',
+    ).get(queue.body.jobId),
+    { status: 'running', attemptCount: 1 },
+  );
+  assert.equal(
+    interruptedDb.prepare(
+      'SELECT codex_status AS codexStatus FROM notes WHERE filename = ?',
+    ).get(filename).codexStatus,
+    'running',
+  );
+  interruptedDb.close();
+
+  started = await startServer();
+  child = started.server;
+  const recoveredDb = new Database(databasePath, { readonly: true });
+  const recoveredJob = recoveredDb.prepare(
+    'SELECT status, attempt_count AS attemptCount, error FROM codex_jobs WHERE id = ?',
+  ).get(queue.body.jobId);
+  const recoveredNote = recoveredDb.prepare(
+    'SELECT codex_status AS codexStatus FROM notes WHERE filename = ?',
+  ).get(filename);
+  recoveredDb.close();
+  assert.deepEqual(recoveredJob, {
+    status: 'failed',
+    attemptCount: 1,
+    error: '서버 중단으로 변경 검증을 완료하지 못했습니다. 수동 복구가 필요합니다.',
+  });
+  assert.equal(recoveredNote.codexStatus, 'recovery_required');
+
+  const blocked = await api(started.url, '/api/organize/process', { method: 'POST', body: '{}' });
+  assert.equal(blocked.response.status, 409, JSON.stringify(blocked.body));
+  await new Promise(resolve => setTimeout(resolve, 150));
+  const stableDb = new Database(databasePath, { readonly: true });
+  assert.equal(
+    stableDb.prepare('SELECT attempt_count AS attemptCount FROM codex_jobs WHERE id = ?')
+      .get(queue.body.jobId).attemptCount,
+    1,
+  );
+  stableDb.close();
+  assert.match(await fs.readFile(path.join(vaultPath, filename), 'utf8'), /UNSAFE OUTSIDE CODEX/);
+});
+
+test('heuristic final notes and job completion commit atomically', async t => {
+  const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-organizer-heuristic-atomic-'));
+  let child = null;
+  t.after(async () => {
+    if (child) await stopServer(child);
+    await fs.rm(appRoot, { recursive: true, force: true });
+  });
+
+  const vaultPath = path.join(appRoot, 'vault');
+  await fs.mkdir(vaultPath);
+  await fs.copyFile(path.join(ROOT, 'server.js'), path.join(appRoot, 'server.js'));
+  for (const name of ['lib', 'scripts', 'public', 'config', '.codex', 'node_modules']) {
+    await fs.symlink(path.join(ROOT, name), path.join(appRoot, name), 'dir');
+  }
+
+  const filenames = [
+    'organizer-heuristic-atomic-a.md',
+    'organizer-heuristic-atomic-b.md',
+  ];
+  const candidateFilename = 'organizer-heuristic-candidate.md';
+  await Promise.all([...filenames, candidateFilename].map(filename => (
+    fs.writeFile(path.join(vaultPath, filename), pendingTopicNote())
+  )));
+
+  const port = await availablePort();
+  const url = `http://127.0.0.1:${port}`;
+  const logs = [];
+  child = spawn(process.execPath, ['server.js'], {
+    cwd: appRoot,
+    env: {
+      ...process.env,
+      ANTHROPIC_API_KEY: 'test-key',
+      OPENAI_API_KEY: '',
+      API_TOKEN,
+      HOST: '127.0.0.1',
+      PORT: String(port),
+      VAULT_PATH: vaultPath,
+      BACKUP_DIR: path.join(appRoot, 'backups'),
+      CODEX_RUNNER_MODE: 'heuristic',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  child.stdout.on('data', chunk => logs.push(chunk.toString()));
+  child.stderr.on('data', chunk => logs.push(chunk.toString()));
+  await waitForServer(child, url, logs);
+
+  const sync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
+  assert.equal(sync.response.status, 200, JSON.stringify(sync.body));
+  const databasePath = path.join(appRoot, 'galpi.db');
+  const failpointDb = new Database(databasePath);
+  failpointDb.prepare("UPDATE notes SET codex_status = 'processed' WHERE filename = ?")
+    .run(candidateFilename);
+  failpointDb.exec(`
+    CREATE TRIGGER fail_heuristic_job_finalize
+    BEFORE UPDATE OF status ON codex_jobs
+    WHEN OLD.status = 'running' AND NEW.status = 'processed'
+    BEGIN
+      SELECT RAISE(ABORT, 'forced heuristic finalize failure');
+    END;
+  `);
+  failpointDb.close();
+
+  const queue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
+  assert.equal(queue.response.status, 200, JSON.stringify(queue.body));
+  assert.deepEqual(new Set(queue.body.notes.map(note => note.filename)), new Set(filenames));
+  const quarantined = await waitForDatabaseState(
+    child,
+    databasePath,
+    logs,
+    'heuristic 최종 transaction rollback',
+    currentDb => {
+      const job = currentDb.prepare('SELECT status, error FROM codex_jobs WHERE id = ?')
+        .get(queue.body.jobId);
+      const notes = currentDb.prepare(
+        `SELECT filename, codex_status AS codexStatus
+         FROM notes
+         WHERE filename IN (?, ?)`,
+      ).all(...filenames);
+      if (
+        job?.status === 'failed' &&
+        notes.length === 2 &&
+        notes.every(note => note.codexStatus === 'recovery_required')
+      ) return { job, notes };
+      return null;
+    },
+  );
+  assert.match(quarantined.job.error, /forced heuristic finalize failure/);
+  const verifyDb = new Database(databasePath, { readonly: true });
+  const edgeCount = verifyDb.prepare(
+    `SELECT COUNT(*) AS count
+     FROM note_edges
+     WHERE source_filename IN (?, ?)`,
+  ).get(...filenames).count;
+  verifyDb.close();
+  assert.equal(edgeCount, 0);
+  const blocked = await api(url, '/api/organize/process', { method: 'POST', body: '{}' });
+  assert.equal(blocked.response.status, 409, JSON.stringify(blocked.body));
 });
 
 test('/organize all revalidates future batches after a queued archive', async t => {

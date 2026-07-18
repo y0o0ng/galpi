@@ -231,9 +231,12 @@
   codex_status 값:
 
   pending
+  queued
+  running
   processed
   failed
   needs_manual_check
+  recovery_required
 
   새로 저장되는 노트는 기본적으로 pending이다.
 
@@ -493,11 +496,11 @@
   - Obsidian 링크와 note_edges DB 그래프를 함께 유지한다.
   - GRAPH_REPORT.md는 `_system`에 두되, 메모리처럼 항상 참조하지는 않는다.
   - 자동 정리 큐는 pending 노트 개수가 아니라 save/appended 이벤트 수를 기준으로 만든다.
-  - 미처리 save/appended 이벤트가 5개 쌓이면 현재 pending 노트 전체를 하나의 Codex job으로 넘기고 백그라운드에서 자동 실행한다.
+  - 미처리 save/appended 이벤트가 5개 쌓이면 pending 노트를 최대 2개짜리 Codex job으로 넘기고, 남은 pending은 후속 job으로 이어서 백그라운드 실행한다.
   - 시온/UI에서는 수동 정리 버튼을 숨기고, 상태 조회와 전체 재정리만 노출한다.
   - Codex 실행 전후 diff를 검증한다.
   - 마커 밖 수정이 있으면 실패 처리한다.
-  - 실패 3회 이상은 needs_manual_check로 넘긴다.
+  - snapshot 복원을 확인한 일반 검증 실패는 첫 실패에 needs_manual_check로 넘긴다. 실행기·저장소 장애는 같은 job을 pending으로 보존하고, 복원 불확실·실행 중 중단은 즉시 recovery_required로 격리한다.
   - split/merge/기준 변경은 Codex가 제안하고 시온/UI에서 승인한다.
   - 메모리는 Codex 정리 대상이 아니다.
 
@@ -590,7 +593,7 @@
 
 > 갱신: 2026-07-18. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 A0·A1 shadow, S0b-2 Pi 승인형 복구, S0c 공용 쓰기 경로, S0d Markdown-only Q&A 재색인과 A1b 전역 청크+노트 soft prior shadow 검색까지 Pi 운영 적용을 마쳤다. S0d는 `68604af`, A1b는 `adb41a6`, 한국어 경계 보정은 `fc332e2`, 실사용 관찰 도구는 `8655706`에서 구현했고 제품·비서·운영 경로는 `4ce7fdc`에서 갈피/시온과 `/home/pi/galpi`로 이관했다. Pi 전체 테스트 109개, audit 66/66, 배포 파일 hash, 인증 API·UI·온라인 백업과 schema_version 외 application table의 논리 동일성·SQLite 무결성·외래키를 인수했다. 실제 모델 답변은 기존 노트 회수를 유지한다.
+- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크+노트 soft prior shadow 검색, 한국어 경계 보정과 실사용 관찰 도구·답변 진행 UI까지 Pi 운영 적용을 마쳤다. S0e는 `9efb501`, A1b는 `adb41a6`, 한국어 경계 보정은 `fc332e2`, 실사용 관찰 도구는 `8655706`, 제품·비서·운영 경로 이관은 `4ce7fdc`다. S0e 배포에서 전체 테스트 116개, topic audit 66/66, note-index audit 29/29와 SQLite 무결성·외래키를 인수했다. Codex 실행기 실패 복구 `514dab3`은 Pi 적용했고, batch 신뢰성·중단 시 원본 복구 격리 보강은 로컬 전체 테스트 130/130을 통과해 Pi 배포 전이다. 실제 모델 답변은 기존 노트 회수를 유지한다.
 - **다음 단계 설계:** 실사용 A1b trace의 과회수와 지연을 관찰한다. 정확 청크 2건과 별도 holdout 환율 false positive 1건을 해소하거나 허용 가능한 근거로 분류하기 전에는 A2 실제 컨텍스트 전환을 자동 진행하지 않는다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
@@ -878,7 +881,7 @@ Pi 운영 기준은 `enabled: true`, `basic`, `maxResults: 3`, `maxSnippetChars:
 - `archived`  ← 숨김(soft delete) 여부. true면 그래프·검색 제외
 - `archived_at`
 - `codex_status`
-  - not_applicable / pending / processed / failed / needs_manual_check
+  - not_applicable / pending / queued / running / processed / failed / needs_manual_check / recovery_required
 - `last_codex_job_id`
 - `last_codex_at`
 - `created_at`
@@ -888,7 +891,7 @@ Pi 운영 기준은 `enabled: true`, `basic`, `maxResults: 3`, `maxSnippetChars:
 - `id`
 - `note_ids`
 - `status`
-  - pending / running / success / failed / needs_manual_check
+  - pending / running / processed / failed
 - `attempt_count`
 - `started_at`
 - `finished_at`
@@ -901,8 +904,10 @@ Pi 운영 기준은 `enabled: true`, `basic`, `maxResults: 3`, `maxSnippetChars:
 - 의회 종합자
   - Claude 고정 (선택 없음. GPT는 비평가)
 - 최근 대화 개수 N
-- Codex 정리 기준 노트 개수
-  - 기본값: 5
+- Codex 자동 정리 발동 기준
+  - save/appended 이벤트 5개
+- Codex job 크기
+  - 최대 2개 노트
 - 볼트 경로
 - DB 경로 (SQLite, 외장 디스크의 볼트 옆)
 - 백업 경로
@@ -1010,7 +1015,7 @@ source_message: message-id
 
 - **정리 대상은 옵시디언에 노트화된 것(`note_saved`)뿐이다.** DB에만 있는 기록(`db_only`)은 건드리지 않는다. (저장 정책 섹션 16.)
 - 노트가 저장되면 해당 노트를 Codex 작업 큐에 `pending`으로 넣는다.
-- `pending` 노트가 5개 이상이면 Codex 정리 작업을 실행한다.
+- 미처리 save/appended 이벤트가 5개 쌓이면 최대 2개 pending 노트로 Codex 정리 job을 만든다.
 - **갓 만든 노트는 유예 시간만큼 기다린 뒤** 큐에 넣는다 (의회 자동 저장 직후 “저장 취소”할 시간을 줌).
 - 정리 실행 중 새로 들어온 노트가 누락되지 않도록, 작업 시작 시점의 pending note id 목록을 고정한다.
 - **작업 도중 숨김(archived)되거나 사라진 노트는 건너뛴다** (없는 파일을 고치려다 실패하지 않도록).
@@ -1020,11 +1025,12 @@ source_message: message-id
 ```txt
 새 노트 생성
 → codex_jobs 또는 pending queue에 등록
-→ pending 5개 이상이면 Codex job 생성
+→ save/appended 이벤트 5개가 쌓이면 최대 2개 노트의 Codex job 생성
 → running
-→ 성공 시 success 및 해당 노트 processed 처리
-→ 실패 시 failed, attempt_count +1
-→ 3회 실패 시 needs_manual_check
+→ 성공 시 job과 해당 노트를 processed 처리
+→ snapshot 복원이 확인된 일반 실패 시 job failed, 해당 노트 needs_manual_check
+→ 실행기·저장소 장애 시 같은 job pending 유지
+→ snapshot 복원 불확실 또는 running 중 서버 중단 시 job failed, 해당 노트 recovery_required
 ```
 
 ### 작업 규칙
@@ -1199,7 +1205,7 @@ codex exec "<지시>" --sandbox workspace-write
 - **절약 레버**
   - 일상 질문은 단일 모드 사용.
   - 의회 모드는 중요한 질문에만 사용.
-  - Codex 정리는 5개 단위로 묶어 실행.
+  - Codex 정리는 저장 이벤트 5개에서 발동하되, 호출당 최대 2개 노트로 나눠 실행.
   - GPT/Claude 모델은 설정에서 저렴한 모델로 교체 가능하게 둔다.
 
 -----
@@ -1264,7 +1270,7 @@ codex exec "<지시>" --sandbox workspace-write
 
 여기서부터는 “조용히 망가지지 않게” 만드는 단계.
 
-1. Codex 정리 큐 (pending/running/success/failed/needs_manual_check, 5개 단위, 허용 구역만 수정, **노트화된 것만·유예·숨김 건너뛰기**)
+1. Codex 정리 큐 (저장 이벤트 5개에서 시작, job당 2개, pending/queued/running/processed/failed/needs_manual_check/recovery_required, 허용 구역만 수정, **노트화된 것만·유예·숨김 건너뛰기**)
 1. 백업 (**볼트 + DB** 일일 백업, 최근 7일 보관, 가능하면 Git 자동 커밋)
 1. 숨김(soft delete) 처리 (`_archive` 폴더 이동 + 그래프·검색 제외)
 1. 보안 점검 (`.env` 보호, path traversal 차단, 프롬프트 인젝션 방지, 필요해지면 웹 로그인)
@@ -1314,16 +1320,17 @@ DB에만 두고 노트화하지 않는 것: 짧은 확인, 잡담, 임시 질문
 - `message.save_status`: db_only / note_saved / note_deleted
 - `note.note_type`: topic / highlight / single_manual / council / paper / user_manual / legacy
 - `note.archived`: true/false (+ `archived_at`)
-- `note.codex_status`: not_applicable / pending / processed / failed / needs_manual_check
+- `note.codex_status`: not_applicable / pending / queued / running / processed / failed / needs_manual_check / recovery_required
+- `recovery_required`는 Codex 변경 뒤 snapshot 복원 또는 중단 시점의 안전성을 확인할 수 없을 때만 쓰는 별도 영속 격리 상태다.
 
 ### Codex 정리 대상
 
 - **대상**: 옵시디언에 노트화된 문서 (토픽·수동 저장·의회·논문 노트).
-- **제외**: DB에만 있는 로그, 저장 안 한 단일 답변, 임시 대화, 잡담, 오류 로그, **숨김 노트**.
+- **제외**: DB에만 있는 로그, 저장 안 한 단일 답변, 임시 대화, 잡담, 오류 로그, **숨김 노트**, `running`, `needs_manual_check`, `recovery_required` 노트.
 
 ### 검색 정책
 
-- **일반 지식 회수(“꺼내줘”)** → 옵시디언 노트 우선 (제목 → 태그 → 본문 → 후보 5개 → 모델 판단), 숨김 제외.
+- **일반 지식 회수(“꺼내줘”)** → 옵시디언 노트 우선 (제목 → 태그 → 본문 → 후보 5개 → 모델 판단), 숨김·`running`·`recovery_required` 제외.
 - **전체 대화 회수(“예전 말 전체에서 찾아줘”)** → DB 메시지·세션 검색, 필요시 노트와 함께 제시.
 - 애매하면 옵시디언(선별된 쪽)을 먼저, 없으면 DB로 확장.
 
@@ -1343,10 +1350,12 @@ DB에만 두고 노트화하지 않는 것: 짧은 확인, 잡담, 임시 질문
 
 - 모든 Codex 정리는 `codex_jobs`의 job 단위로 실행한다.
 - `/organize`는 상태를 보여준다.
-- save/appended 이벤트가 5개 쌓이면 서버가 `pending` 노트를 job queue에 넣고 백그라운드 worker로 자동 실행한다.
+- save/appended 이벤트가 5개 쌓이면 서버가 `pending` 노트를 최대 2개짜리 job queue에 넣고 백그라운드 worker로 자동 실행한다.
 - `/organize run`과 `/organize process`는 내부/디버깅용 수동 명령으로 유지하되, 시온/UI 기본 버튼에서는 숨긴다.
 - 상태 흐름은 기본적으로 `pending → queued → running → processed`다.
-- 실패하면 job은 `failed`, 해당 노트는 `needs_manual_check`로 보낸다.
+- snapshot 복원 성공이 확인된 일반 검증 실패는 job을 `failed`, 해당 노트를 `needs_manual_check`로 보낸다.
+- snapshot 복원 실패 또는 `running` 중 서버 중단은 job을 `failed`, 대상 노트를 `recovery_required`로 원자적으로 격리한다. 안전했다고 추정해 자동 재실행하지 않는다.
+- `recovery_required`가 하나라도 있으면 다른 노트까지 포함한 모든 Codex/heuristic 정리를 중단한다. Codex CLI가 격리 원문을 간접 참고하는 경로까지 닫기 위한 fail-close다.
 
 ### Codex 수정 권한
 
@@ -1377,8 +1386,10 @@ Codex는 vault를 직접 읽고 쓸 수 있다. 단, 수정 허용 범위는 아
 - Codex 실행 후 diff를 검사한다.
 - 마커 밖 변경이 있으면 결과를 폐기하고 실패 처리한다.
 - `scripts/validate-codex-edit.js`를 실행해 v4 구조와 CODEX 마커를 확인한다.
-- 검증이 통과한 뒤에만 DB 상태를 `processed`로 바꾼다.
+- 최종 원문 읽기와 vault `dev/ino` 재검사까지 snapshot 복원 경계 안에서 끝낸 뒤에만 edge·노트 `processed`·현재 job 종료·다음 job 생성을 한 DB transaction으로 처리한다. heuristic 경로도 같은 transaction 규칙을 쓰고, 최종 확정 실패 시 자동 안전 복원 근거가 없으므로 즉시 `recovery_required`로 격리한다.
 - 검증 실패 노트는 `needs_manual_check`로 두고, 원본을 억지로 고치지 않는다.
+- `recovery_required` 노트는 일반 UI에서 백업 대조용으로만 직접 열 수 있다. 검색·답변 컨텍스트·청크·논문 전문·MCP AI 읽기·임베딩·자동 쓰기에서는 제외하며, 알림의 명시적 복구 승인만 선택한 한 파일의 검증·sync와 격리 해제를 허용한다. 이 승인은 vault 전체 sync나 다른 노트의 수동 편집 반영을 동반하지 않는다.
+- sync와 AI용 원문 읽기는 Codex job과 같은 mutation queue에 직렬화해 실행 중 중간 파일을 DB나 모델이 읽지 않게 한다.
 
 ### 서버와 Codex의 역할 분리
 

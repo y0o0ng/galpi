@@ -171,6 +171,7 @@
     if (status === 'processed') return '정리됨';
     if (status === 'running') return '정리 중';
     if (status === 'queued') return '정리 대기';
+    if (status === 'recovery_required') return '원본 복구 필요';
     if (status === 'failed' || status === 'needs_manual_check') return '확인 필요';
     return '정리 대기';
   }

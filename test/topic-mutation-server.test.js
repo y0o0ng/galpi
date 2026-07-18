@@ -206,6 +206,62 @@ test('server routes share one mutation path for split, archive/restore, and merg
   assert.match(graphRaw, /\[\[source\|Source\]\]/);
   assert.doesNotMatch(graphRaw, /Stale Source/);
 
+  const quarantineDb = new Database(dbPath);
+  quarantineDb.prepare(
+    "UPDATE notes SET codex_status = 'recovery_required' WHERE filename = 'source.md'",
+  ).run();
+  quarantineDb.close();
+  const quarantinedSourceSplit = await api(url, '/api/notes/split', {
+    method: 'POST',
+    body: JSON.stringify({
+      sourceFilename: 'source.md',
+      qaIds: ['qa-a111'],
+      targetFilename: 'target.md',
+    }),
+  });
+  assert.equal(quarantinedSourceSplit.response.status, 400, JSON.stringify(quarantinedSourceSplit.body));
+  assert.match(quarantinedSourceSplit.body.error, /수동 확인 또는 원본 복구/);
+  const quarantinedSourceArchive = await api(url, '/api/notes/archive', {
+    method: 'POST',
+    body: JSON.stringify({ filename: 'source.md' }),
+  });
+  assert.equal(quarantinedSourceArchive.response.status, 500, JSON.stringify(quarantinedSourceArchive.body));
+  const quarantinedSourceMerge = await api(url, '/api/notes/merge', {
+    method: 'POST',
+    body: JSON.stringify({ filenames: ['source.md'], targetFilename: 'target.md' }),
+  });
+  assert.equal(quarantinedSourceMerge.response.status, 500, JSON.stringify(quarantinedSourceMerge.body));
+
+  const targetQuarantineDb = new Database(dbPath);
+  targetQuarantineDb.prepare("UPDATE notes SET codex_status = 'pending' WHERE filename = 'source.md'").run();
+  targetQuarantineDb.prepare(
+    "UPDATE notes SET codex_status = 'recovery_required' WHERE filename = 'target.md'",
+  ).run();
+  targetQuarantineDb.close();
+  const quarantinedTargetSplit = await api(url, '/api/notes/split', {
+    method: 'POST',
+    body: JSON.stringify({
+      sourceFilename: 'source.md',
+      qaIds: ['qa-a111'],
+      targetFilename: 'target.md',
+    }),
+  });
+  assert.equal(quarantinedTargetSplit.response.status, 400, JSON.stringify(quarantinedTargetSplit.body));
+  assert.match(quarantinedTargetSplit.body.error, /수동 확인 또는 원본 복구/);
+  const quarantinedTargetArchive = await api(url, '/api/notes/archive', {
+    method: 'POST',
+    body: JSON.stringify({ filename: 'target.md' }),
+  });
+  assert.equal(quarantinedTargetArchive.response.status, 500, JSON.stringify(quarantinedTargetArchive.body));
+  const quarantinedTargetMerge = await api(url, '/api/notes/merge', {
+    method: 'POST',
+    body: JSON.stringify({ filenames: ['legacy.md'], targetFilename: 'target.md' }),
+  });
+  assert.equal(quarantinedTargetMerge.response.status, 500, JSON.stringify(quarantinedTargetMerge.body));
+  const unquarantineDb = new Database(dbPath);
+  unquarantineDb.prepare("UPDATE notes SET codex_status = 'pending' WHERE filename = 'target.md'").run();
+  unquarantineDb.close();
+
   const blockedSplit = await api(url, '/api/notes/split', {
     method: 'POST',
     body: JSON.stringify({

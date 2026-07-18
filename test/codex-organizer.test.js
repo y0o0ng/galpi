@@ -2,13 +2,22 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 const Database = require('better-sqlite3');
 
 const {
   compactError,
+  createCodexRecoveryRequiredError,
+  createCodexStorageError,
   formatCodexJobError,
+  inspectCodexVaultRoot,
   isCodexInfrastructureError,
+  isCodexRecoveryRequiredError,
+  isCodexRetryableJobError,
   isCodexRunnerError,
+  normalizeCodexStorageError,
   redactCodexNoteNames,
   recoverInterruptedCodexJobs,
   validateOrganizedCodexOutput,
@@ -48,6 +57,54 @@ test('Codex 실행 환경 장애와 노트 검증 오류를 구분한다', () =>
   assert.equal(isCodexRunnerError(new Error('topic-timeout.md: 출력 검증 실패')), false);
   missing.codexFailureKind = 'runner_infrastructure';
   assert.equal(isCodexRunnerError(wrapped), true);
+  assert.equal(isCodexRetryableJobError(wrapped), true);
+
+  const storage = new Error('vault storage unavailable');
+  storage.codexFailureKind = 'storage_infrastructure';
+  assert.equal(isCodexRunnerError(storage), false);
+  assert.equal(isCodexRetryableJobError(storage), true);
+  assert.equal(isCodexRetryableJobError(createCodexStorageError({ code: 'EIO' })), true);
+});
+
+test('vault 루트가 파일 검사 사이에 교체되면 개별 누락이 아닌 저장소 장애다', async t => {
+  const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-vault-root-'));
+  t.after(() => fs.rm(parent, { recursive: true, force: true }));
+  const vaultPath = path.join(parent, 'vault');
+  const offlinePath = path.join(parent, 'vault-offline');
+  await fs.mkdir(vaultPath);
+
+  const identity = await inspectCodexVaultRoot(vaultPath);
+  await fs.rename(vaultPath, offlinePath);
+  await fs.mkdir(vaultPath);
+
+  await assert.rejects(
+    inspectCodexVaultRoot(vaultPath, identity),
+    error => (
+      error.codexFailureKind === 'storage_infrastructure' &&
+      /ESTALE/.test(error.message)
+    ),
+  );
+});
+
+test('vault I/O 오류는 경로를 버리고 재시도 가능한 저장소 오류로 정규화한다', () => {
+  const raw = new Error('EIO: input/output error, open /private/vault/secret-note.md');
+  raw.code = 'EIO';
+  const normalized = normalizeCodexStorageError(raw);
+
+  assert.equal(normalized.codexFailureKind, 'storage_infrastructure');
+  assert.equal(normalized.codexStorageCode, 'EIO');
+  assert.match(normalized.message, /저장소 오류.*\(EIO\)/);
+  assert.doesNotMatch(normalized.message, /\/private\/vault|secret-note/);
+});
+
+test('snapshot 복원 실패는 자동 재시도할 수 없는 수동 복구 오류다', () => {
+  const storage = createCodexStorageError({ code: 'EROFS' });
+  const recovery = createCodexRecoveryRequiredError(storage, new Error('validation failed'));
+
+  assert.equal(isCodexRecoveryRequiredError(recovery), true);
+  assert.equal(isCodexRetryableJobError(recovery), false);
+  assert.equal(recovery.codexStorageCode, 'EROFS');
+  assert.match(recovery.message, /수동 복구가 필요/);
 });
 
 test('Codex job 오류는 원인을 보존하면서 길이를 제한한다', () => {
@@ -83,7 +140,7 @@ test('Codex 출력은 실제 태그와 topic 요약을 요구한다', () => {
   assert.ok(tooManyTags.some(error => /9개/.test(error)));
 });
 
-test('재시작 복구는 실행 중 job을 대기로 되돌리고 해당 노트만 다시 큐에 넣는다', t => {
+test('재시작 복구는 검증이 끝나지 않은 job과 대상 노트를 수동 복구로 격리한다', t => {
   const db = new Database(':memory:');
   t.after(() => db.close());
   db.exec(`
@@ -106,6 +163,7 @@ test('재시작 복구는 실행 중 job을 대기로 되돌리고 해당 노트
 
   const insertNote = db.prepare('INSERT INTO notes (filename, archived, codex_status) VALUES (?, ?, ?)');
   insertNote.run('running-job.md', 0, 'running');
+  insertNote.run('processed-running-job.md', 0, 'processed');
   insertNote.run('pending-job.md', 0, 'pending');
   insertNote.run('orphan-running.md', 0, 'running');
   insertNote.run('manual.md', 0, 'needs_manual_check');
@@ -116,18 +174,22 @@ test('재시작 복구는 실행 중 job을 대기로 되돌리고 해당 노트
     INSERT INTO codex_jobs (status, note_filenames_json, error, started_at)
     VALUES (?, ?, ?, 123)
   `);
-  const runningJobId = Number(insertJob.run('running', JSON.stringify(['running-job.md']), null).lastInsertRowid);
+  const runningJobId = Number(insertJob.run(
+    'running',
+    JSON.stringify(['running-job.md', 'processed-running-job.md']),
+    null,
+  ).lastInsertRowid);
   insertJob.run('pending', JSON.stringify(['pending-job.md']), '기존 오류');
 
   const result = recoverInterruptedCodexJobs(db);
 
   assert.deepEqual(result, {
-    recoveredJobs: 1,
-    recoveredRunningJobIds: [runningJobId],
-    resetNotes: 2,
+    quarantinedJobs: 1,
+    quarantinedRunningJobIds: [runningJobId],
+    quarantinedNotes: 3,
     normalizedStatuses: 1,
-    queuedNotes: 2,
-    pendingJobs: 2,
+    queuedNotes: 1,
+    pendingJobs: 1,
   });
   assert.deepEqual(
     db.prepare('SELECT filename, codex_status AS status FROM notes ORDER BY filename').all(),
@@ -135,18 +197,20 @@ test('재시작 복구는 실행 중 job을 대기로 되돌리고 해당 노트
       { filename: 'archived-running.md', status: 'running' },
       { filename: 'legacy-success.md', status: 'processed' },
       { filename: 'manual.md', status: 'needs_manual_check' },
-      { filename: 'orphan-running.md', status: 'pending' },
+      { filename: 'orphan-running.md', status: 'recovery_required' },
       { filename: 'pending-job.md', status: 'queued' },
-      { filename: 'running-job.md', status: 'queued' },
+      { filename: 'processed-running-job.md', status: 'recovery_required' },
+      { filename: 'running-job.md', status: 'recovery_required' },
     ],
   );
-  assert.deepEqual(
-    db.prepare('SELECT status, error, started_at AS startedAt, finished_at AS finishedAt FROM codex_jobs WHERE id = ?').get(runningJobId),
-    {
-      status: 'pending',
-      error: '서버 재시작 후 대기열 복구',
-      startedAt: null,
-      finishedAt: null,
-    },
+  const quarantinedJob = db.prepare(
+    'SELECT status, error, started_at AS startedAt, finished_at AS finishedAt FROM codex_jobs WHERE id = ?',
+  ).get(runningJobId);
+  assert.equal(quarantinedJob.status, 'failed');
+  assert.equal(
+    quarantinedJob.error,
+    '서버 중단으로 변경 검증을 완료하지 못했습니다. 수동 복구가 필요합니다.',
   );
+  assert.equal(quarantinedJob.startedAt, 123);
+  assert.equal(Number.isInteger(quarantinedJob.finishedAt), true);
 });

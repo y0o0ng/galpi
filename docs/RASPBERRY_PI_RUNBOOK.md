@@ -176,6 +176,7 @@ curl -H 'X-API-Token: <API_TOKEN>' http://127.0.0.1:3000/api/organize/status
 - `hasGpt: true`
 - `codexJobBatchSize: 2`
 - `needsManualCheck: 0`
+- `recoveryRequired: 0`
 - `pending`, `queued`, `running` 값이 의도한 상태와 일치
 
 ## 6. Codex 정리
@@ -194,9 +195,17 @@ curl -H 'X-API-Token: <API_TOKEN>' http://127.0.0.1:3000/api/organize/status
 /organize process
 ```
 
-실행기 장애로 멈춘 job은 같은 job ID와 시도 횟수·오류를 보존한 채 `pending`에 남으므로, 원인을 고친 뒤 이 명령으로 바로 재시도할 수 있다. 해당 최대 2개 노트 배치가 끝나면 남은 pending 노트를 다음 2개 job으로 저장하고 자동 worker가 이어서 처리한다. 검증에 실패한 배치는 `needs_manual_check`로 격리하고 다음 배치로 진행하지만, 공용 runner 장애는 같은 job에서 멈춘다. 처음부터 queued job이 없으면 임계값 미달 pending을 새로 실행하지 않고 종료한다. 자동 worker가 정상일 때는 보통 직접 누를 필요가 없는 점검·복구용 명령이다.
+실행기 장애나 vault 루트·권한·I/O 같은 공용 저장소 장애로 멈춘 job은 같은 job ID와 시도 횟수·오류를 보존한 채 `pending`에 남으므로, 원인을 고친 뒤 이 명령으로 바로 재시도할 수 있다. 공용 장애는 자동으로 반복 실행하지 않아 같은 job의 시도 횟수가 무한히 늘지 않는다. 단, Codex가 파일을 건드린 뒤 원본 snapshot 복원까지 실패하거나 `running` 상태에서 서버가 중단되면 변경 안전성을 추정하지 않는다. job은 `failed`, 현재 최대 2개 대상 노트는 별도 `recovery_required`로 원자적으로 격리하고 후속 배치 생성을 멈춘다. 일반 검증 실패는 snapshot 복원 성공을 확인한 뒤 `needs_manual_check`로 보내며 다음 배치로 진행한다. 처음부터 queued job이 없으면 임계값 미달 pending을 새로 실행하지 않고 종료한다. 자동 worker가 정상일 때는 보통 직접 누를 필요가 없는 점검·복구용 명령이다.
 
-Codex가 대상 파일 snapshot을 잡고 있는 동안 append·split·merge·archive 같은 vault mutation은 같은 직렬 큐에서 기다린다. 한 job의 최대 2개 노트가 끝난 뒤 저장을 이어가므로 동시 수정 복구가 새 Q&A를 덮지 않지만, 그 사이 해당 저장 응답은 job 실행 시간만큼 늦어질 수 있다. 다음 job을 시작할 때는 active 상태와 원본 파일을 다시 확인한다. 그 사이 보관·병합·삭제된 노트는 건너뛰고, active DB 행만 남은 원본 누락 노트는 그 노트만 `needs_manual_check`로 격리해 같은 배치의 정상 노트를 계속 처리한다.
+Codex가 대상 파일 snapshot을 잡고 있는 동안 append·split·merge·archive, sync와 AI용 원문 읽기는 같은 직렬 큐에서 기다린다. 한 job의 최대 2개 노트가 끝난 뒤 저장·회수를 이어가므로 동시 수정 복구가 새 Q&A를 덮거나 중간 파일이 답변에 들어가지 않지만, 그 사이 해당 응답은 job 실행 시간만큼 늦어질 수 있다. 다음 job을 시작할 때는 active 상태, 원본 파일, vault 루트의 `dev/ino` 동일성을 다시 확인한다. 그 사이 보관·병합·삭제·수동 확인·복구 격리된 노트는 건너뛴다. vault 자체는 정상인데 active DB 행에 대응하는 원본 파일 하나만 확정적으로 없는 경우에만 그 노트를 `needs_manual_check`로 격리하고 같은 배치의 정상 노트를 계속 처리한다. vault 루트 교체·접근 불가·파일 권한 거부·I/O 오류는 개별 누락으로 오판하지 않고 공용 저장소 장애로 중단한다.
+
+`recovery_required`가 하나라도 있으면 `/organize queue|process|all`과 자동 worker 전체를 차단한다. 해당 노트는 일반 UI에서 백업 대조용으로 직접 열 수 있지만, 질문 컨텍스트·검색·A1b 청크·논문 전문·MCP list/read·임베딩·자동 append/병합/분리/보관에서는 제외한다. 알림은 무시할 수 없으며 다음 순서로만 해제한다.
+
+1. 현재 DB·vault를 추가 백업한다.
+2. 알림의 노트를 백업 원본과 대조해 수동 복구한다.
+3. 일반 노트 상세에서 복구 결과를 직접 확인한다.
+4. 알림센터의 `확인 완료`를 누른다. 이 승인에 한해서만 선택한 해당 파일 하나를 검증·sync하고 격리를 해제하며, 다른 vault 파일이나 missing 상태는 갱신하지 않는다.
+5. `/organize`에서 `recoveryRequired: 0`을 확인한 뒤 남은 `pending` 노트가 있으면 `/organize queue`로 새 job을 만든다. 중단된 기존 job은 재실행하지 않는다.
 
 전체 재정리:
 
@@ -207,7 +216,7 @@ Codex가 대상 파일 snapshot을 잡고 있는 동안 append·split·merge·ar
 주의:
 
 - `/organize all`은 초기/유지보수용이다.
-- runner preflight가 실패한 상태의 `/organize all`은 서버가 503으로 차단한다. 실행 중 runner 장애가 나도 현재 배치 상태를 복원하고 다음 배치를 중단한다.
+- runner preflight가 실패한 상태의 `/organize all`은 서버가 503으로 차단한다. `recovery_required`가 있으면 409로 차단한다. 실행 중 runner·저장소 장애가 나도 현재 배치 상태를 복원하고 다음 배치를 중단하며, snapshot 복원을 확인할 수 없는 배치는 위 수동 복구 절차 전까지 모든 Codex 정리를 막는다.
 - 노트가 많아지면 토큰과 시간이 크게 든다.
 - 장기적으로는 새 노트/변경 노트 중심의 증분 정리를 기본으로 쓴다.
 
