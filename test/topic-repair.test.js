@@ -12,7 +12,7 @@ const {
   readTopicRepairPlan,
 } = require('../lib/topic-repair');
 const { parseApplyArguments } = require('../scripts/apply-topic-repair');
-const { parseTopicNote } = require('../lib/topic-store');
+const { parseTopicNote, sha256 } = require('../lib/topic-store');
 
 function qaEntry(qaId, question, answer, stamp = '2026-07-16 09:00') {
   return [
@@ -162,6 +162,69 @@ async function createRepairFixture(t, { failTitleUpdate = false } = {}) {
   db.close();
 
   return { root, dbPath, vaultPath, backupDir };
+}
+
+async function createFileOnlyRepairFixture(t, { ambiguousProvenance = false, failInsert = false } = {}) {
+  const fixture = await createRepairFixture(t);
+  await Promise.all([
+    fs.rm(path.join(fixture.vaultPath, 'm60.md')),
+    fs.rm(path.join(fixture.vaultPath, 'perfume.md')),
+    fs.rm(path.join(fixture.vaultPath, 'archived.md')),
+  ]);
+  await fs.writeFile(path.join(fixture.vaultPath, 'topic.md'), topicNote('Reindex Topic', [
+    qaEntry('qa-e111', '복구 질문', '복구 답변'),
+  ]));
+
+  const db = new Database(fixture.dbPath);
+  db.exec(`
+    DELETE FROM auto_save_decisions;
+    DELETE FROM note_chunks;
+    DELETE FROM notes;
+    INSERT INTO notes (filename, title, note_type, archived)
+    VALUES ('topic.md', 'Reindex Topic', 'topic', 0);
+    INSERT INTO sessions (id) VALUES ('session-1');
+    INSERT INTO messages (id, session_id, role, content, model, created_at) VALUES
+      (10, 'session-1', 'user', '복구 질문', NULL, 1),
+      (11, 'session-1', 'assistant', '복구 답변', 'Claude', 2);
+    INSERT INTO auto_save_decisions (
+      session_id, source_user_message, source_assistant_message, model,
+      decision, reason, question, answer_excerpt,
+      qa_id, note_filename, note_title, action
+    ) VALUES (
+      'session-1', 10, 11, 'Claude',
+      'save', 'semantic_signal', '복구 질문', '복구 답변',
+      'qa-e111', 'topic.md', 'Reindex Topic', 'created'
+    );
+  `);
+  if (ambiguousProvenance) {
+    db.exec(`
+      INSERT INTO sessions (id) VALUES ('session-2');
+      INSERT INTO messages (id, session_id, role, content, model, created_at) VALUES
+        (20, 'session-2', 'user', '다른 복구 질문', NULL, 3),
+        (21, 'session-2', 'assistant', '다른 복구 답변', 'Claude', 4);
+      INSERT INTO auto_save_decisions (
+        session_id, source_user_message, source_assistant_message, model,
+        decision, reason, question, answer_excerpt,
+        qa_id, note_filename, note_title, action
+      ) VALUES (
+        'session-2', 20, 21, 'Claude',
+        'save', 'semantic_signal', '다른 복구 질문', '다른 복구 답변',
+        'qa-e111', 'topic.md', 'Reindex Topic', 'created'
+      );
+    `);
+  }
+  if (failInsert) {
+    db.exec(`
+      CREATE TRIGGER fail_reindex_insert
+      BEFORE INSERT ON note_chunks
+      WHEN NEW.chunk_id = 'qa-e111'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced reindex insert failure');
+      END
+    `);
+  }
+  db.close();
+  return fixture;
 }
 
 function createTestBackupRecorder() {
@@ -326,6 +389,177 @@ test('repair apply restores files and the pre-migration DB when a DB operation f
   assert.equal(
     db.prepare("SELECT note_title AS title FROM note_chunks WHERE chunk_id='qa-b222'").get().title,
     'Cached Title',
+  );
+  db.close();
+});
+
+test('repair apply reindexes one canonical file-only Q&A and is idempotent', async t => {
+  const fixture = await createFileOnlyRepairFixture(t);
+  const backup = createTestBackupRecorder();
+  const embeddingInputs = [];
+  const before = await readTopicRepairPlan(fixture);
+  const reindex = before.plan.operations.find(operation => operation.kind === 'file_only_qa');
+
+  assert.equal(before.plan.status, 'ready');
+  assert.equal(reindex.status, 'ready');
+  assert.equal(reindex.recommendation.action, 'reindex_file_qa');
+
+  const result = await applyTopicRepair({
+    ...fixture,
+    expectedInputSha256: before.plan.inputSha256,
+    approvedOperationIds: [],
+    confirmServiceStopped: true,
+    createBackup: backup.createBackup,
+    generateEmbedding: async text => {
+      embeddingInputs.push(text);
+      return [0.25, 0.75];
+    },
+  });
+
+  assert.equal(result.appliedOperations, 1);
+  assert.equal(result.finalAudit.healthy, true);
+  assert.equal(result.finalPlan.status, 'clean');
+  assert.deepEqual(embeddingInputs, ['Q: 복구 질문\nA: 복구 답변']);
+  assert.equal(backup.calls.length, 1);
+
+  const db = new Database(fixture.dbPath, { readonly: true });
+  const chunk = db.prepare(`
+    SELECT
+      chunk_id AS chunkId,
+      note_filename AS noteFilename,
+      note_title AS noteTitle,
+      content,
+      source_session AS sourceSession,
+      source_user_message AS sourceUserMessage,
+      source_assistant_message AS sourceAssistantMessage,
+      embedding,
+      content_sha256 AS contentSha256,
+      index_status AS indexStatus
+    FROM note_chunks
+  `).get();
+  assert.deepEqual(chunk, {
+    chunkId: 'qa-e111',
+    noteFilename: 'topic.md',
+    noteTitle: 'Reindex Topic',
+    content: 'Q: 복구 질문\nA: 복구 답변',
+    sourceSession: 'session-1',
+    sourceUserMessage: 10,
+    sourceAssistantMessage: 11,
+    embedding: '[0.25,0.75]',
+    contentSha256: sha256('Q: 복구 질문\nA: 복구 답변'),
+    indexStatus: 'ready',
+  });
+  db.close();
+
+  const after = await readTopicRepairPlan(fixture);
+  const repeated = await applyTopicRepair({
+    ...fixture,
+    expectedInputSha256: after.plan.inputSha256,
+    approvedOperationIds: [],
+    confirmServiceStopped: true,
+    createBackup: backup.createBackup,
+    generateEmbedding: async () => { throw new Error('should not run'); },
+  });
+  assert.equal(repeated.appliedOperations, 0);
+  assert.equal(repeated.finalPlan.status, 'clean');
+  assert.equal(backup.calls.length, 1);
+});
+
+test('repair plan keeps ambiguous file-only provenance in manual review', async t => {
+  const fixture = await createFileOnlyRepairFixture(t, { ambiguousProvenance: true });
+  const backup = createTestBackupRecorder();
+  const { plan } = await readTopicRepairPlan(fixture);
+  const reindex = plan.operations.find(operation => operation.kind === 'file_only_qa');
+
+  assert.equal(plan.status, 'manual_review');
+  assert.equal(reindex.status, 'manual_review');
+  assert.equal(reindex.recommendation.action, 'inspect_file_qa_provenance');
+  await assert.rejects(
+    applyTopicRepair({
+      ...fixture,
+      expectedInputSha256: plan.inputSha256,
+      approvedOperationIds: [],
+      confirmServiceStopped: true,
+      createBackup: backup.createBackup,
+      generateEmbedding: async () => [1],
+    }),
+    /수동 승인이 필요합니다/,
+  );
+  assert.equal(backup.calls.length, 0);
+});
+
+test('repair apply rejects a changed file-only Q&A before backup', async t => {
+  const fixture = await createFileOnlyRepairFixture(t);
+  const backup = createTestBackupRecorder();
+  const { plan } = await readTopicRepairPlan(fixture);
+  await fs.writeFile(path.join(fixture.vaultPath, 'topic.md'), topicNote('Reindex Topic', [
+    qaEntry('qa-e111', '바뀐 질문', '복구 답변'),
+  ]));
+
+  await assert.rejects(
+    applyTopicRepair({
+      ...fixture,
+      expectedInputSha256: plan.inputSha256,
+      approvedOperationIds: [],
+      confirmServiceStopped: true,
+      createBackup: backup.createBackup,
+      generateEmbedding: async () => [1],
+    }),
+    /입력 hash가 현재 상태와 다릅니다/,
+  );
+  assert.equal(backup.calls.length, 0);
+});
+
+test('repair apply restores the pre-migration DB when reindex embedding fails', async t => {
+  const fixture = await createFileOnlyRepairFixture(t);
+  const backup = createTestBackupRecorder();
+  const { plan } = await readTopicRepairPlan(fixture);
+
+  await assert.rejects(
+    applyTopicRepair({
+      ...fixture,
+      expectedInputSha256: plan.inputSha256,
+      approvedOperationIds: [],
+      confirmServiceStopped: true,
+      createBackup: backup.createBackup,
+      generateEmbedding: async () => null,
+    }),
+    /Q&A 임베딩 생성에 실패했습니다/,
+  );
+  assert.equal(backup.calls.length, 1);
+
+  const db = new Database(fixture.dbPath, { readonly: true });
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM note_chunks').get().count, 0);
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='schema_version'").get().count,
+    0,
+  );
+  db.close();
+});
+
+test('repair apply rolls back a failed file-only chunk insert', async t => {
+  const fixture = await createFileOnlyRepairFixture(t, { failInsert: true });
+  const backup = createTestBackupRecorder();
+  const { plan } = await readTopicRepairPlan(fixture);
+
+  await assert.rejects(
+    applyTopicRepair({
+      ...fixture,
+      expectedInputSha256: plan.inputSha256,
+      approvedOperationIds: [],
+      confirmServiceStopped: true,
+      createBackup: backup.createBackup,
+      generateEmbedding: async () => [0.5],
+    }),
+    /forced reindex insert failure/,
+  );
+  assert.equal(backup.calls.length, 1);
+
+  const db = new Database(fixture.dbPath, { readonly: true });
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM note_chunks').get().count, 0);
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='schema_version'").get().count,
+    0,
   );
   db.close();
 });

@@ -1,6 +1,7 @@
 'use strict';
 
 const path = require('node:path');
+const OpenAI = require('openai');
 const {
   applyTopicRepair,
   formatTopicRepairResult,
@@ -10,6 +11,21 @@ const { formatTopicRepairPlan } = require('../lib/topic-store');
 const { runBackup } = require('./backup');
 
 const ROOT = path.resolve(__dirname, '..');
+
+function createRepairEmbeddingGenerator() {
+  let client = null;
+  return async function generateRepairEmbedding(text) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('Q&A 재색인에는 OPENAI_API_KEY가 필요합니다.');
+    }
+    if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await client.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: String(text || '').slice(0, 8000),
+    });
+    return response.data?.[0]?.embedding || null;
+  };
+}
 
 function parseApplyArguments(argv) {
   const options = {
@@ -73,6 +89,7 @@ function helpText() {
     '  --input-sha256 <hash>            승인한 계획 입력 hash (적용 시 필수)',
     '  --approve-operation <id>         수동 작업 승인 (여러 번 지정 가능)',
     '  --backup-dir <path>              백업 폴더',
+    '  file-only Q&A는 OPENAI_API_KEY로 임베딩까지 준비된 뒤 적용됩니다.',
     '',
     'Common options:',
     '  --db <path>                      SQLite DB 경로',
@@ -108,6 +125,7 @@ async function main(argv = process.argv.slice(2)) {
     approvedOperationIds: options.approvedOperationIds,
     confirmServiceStopped: options.confirmServiceStopped,
     createBackup: values => runBackup({ ...values, projectDir: ROOT }),
+    generateEmbedding: createRepairEmbeddingGenerator(),
   });
   process.stdout.write(`${options.json ? JSON.stringify(result, null, 2) : formatTopicRepairResult(result)}\n`);
   return 0;
