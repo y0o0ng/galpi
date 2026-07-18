@@ -31,6 +31,84 @@ test('query terms preserve Korean meaning words and remove search commands', () 
   );
   assert.deepEqual(extractQueryTerms('???'), []);
   assert.deepEqual(extractQueryTerms('고양이 경로'), ['고양이', '경로']);
+  assert.deepEqual(
+    extractQueryTerms('내가 쓴 시 자료 좀 찾아줘 꿈 핏 키'),
+    ['시', '꿈', '핏', '키']
+  );
+});
+
+test('one-syllable Korean terms do not match inside unrelated compounds', () => {
+  const ranked = rankChunkCandidates({
+    query: '살을',
+    chunks: [
+      {
+        chunkId: 'literal-weight-loss',
+        noteFilename: 'health.md',
+        content: '살을 빼려면 식단과 운동을 함께 조절한다.',
+      },
+      {
+        chunkId: 'unrelated-story',
+        noteFilename: 'story.md',
+        content: '자살을 소재로 삼은 소설과 살인 장면을 검토했다.',
+      },
+    ],
+    includeParticleVariants: true,
+    minKeywordScore: 1,
+  });
+
+  assert.deepEqual(ranked.map(chunk => chunk.chunkId), ['literal-weight-loss']);
+});
+
+test('one-syllable Korean terms keep particle and plural matches', () => {
+  const ranked = rankChunkCandidates({
+    query: '시 자료 좀 찾아줘',
+    chunks: [
+      {
+        chunkId: 'poetry',
+        noteFilename: 'poetry.md',
+        content: '내 시와 오래된 시들을 다시 읽었다.',
+      },
+      {
+        chunkId: 'unrelated-compounds',
+        noteFilename: 'perfume.md',
+        content: '시향 기록과 시스템 점검 내용을 정리했다.',
+      },
+    ],
+    includeParticleVariants: true,
+    minKeywordScore: 1,
+  });
+
+  assert.deepEqual(ranked.map(chunk => chunk.chunkId), ['poetry']);
+});
+
+test('one-syllable Korean terms keep weaker matches at compound starts', () => {
+  const ranked = rankChunkCandidates({
+    query: '꿈',
+    chunks: [
+      {
+        chunkId: 'exact-dream',
+        noteFilename: 'dream.md',
+        content: '꿈은 다른 세계의 나라는 설정이다.',
+      },
+      {
+        chunkId: 'dream-compound',
+        noteFilename: 'story.md',
+        content: '꿈속 장면에서 주인공이 깨어난다.',
+      },
+      {
+        chunkId: 'embedded-dream',
+        noteFilename: 'unrelated.md',
+        content: '태몽꿈이라는 임의의 합성어다.',
+      },
+    ],
+    minKeywordScore: 0.2,
+  });
+
+  assert.deepEqual(
+    ranked.map(chunk => chunk.chunkId),
+    ['exact-dream', 'dream-compound']
+  );
+  assert.ok(ranked[0].keywordScore > ranked[1].keywordScore);
 });
 
 test('rankers match conservative Korean particle variants', () => {
@@ -451,7 +529,7 @@ test('synthetic A0 fixture fixes the legacy note baseline', async () => {
   assert.equal(summary.noteRecallAt3.hits, 20);
   assert.equal(summary.chunkRecallAt6.hits, 11);
   assert.equal(summary.abstention.hits, 4);
-  assert.equal(summary.contextWithinLimit.hits, 17);
+  assert.equal(summary.contextWithinLimit.hits, 18);
   assert.equal(summary.contextChars.maximum, 10425);
   assert.equal(summary.errors, 0);
   assert.match(formatEvaluationReport(summary), /Chunk Recall@6: 11\/20 \(55\.0%\)/);
