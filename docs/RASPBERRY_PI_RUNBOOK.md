@@ -151,10 +151,10 @@ sudo -u pi /home/pi/galpi/bin/codex --version
 cd /home/pi/galpi
 npm run check:codex-runner
 sudo -u pi mkdir -p /tmp/galpi-codex-smoke
-printf '%s\n' 'Reply only RUNNER_OK. Do not modify files.' | sudo -u pi /home/pi/galpi/bin/codex exec --model gpt-5.4-mini -C /tmp/galpi-codex-smoke --skip-git-repo-check --sandbox workspace-write --color never -
+printf '%s\n' 'Reply only RUNNER_OK. Do not modify files.' | sudo -u pi /home/pi/galpi/bin/codex exec --model gpt-5.6-terra -C /tmp/galpi-codex-smoke --skip-git-repo-check --sandbox workspace-write --color never -
 ```
 
-`check:codex-runner`는 `.env`의 실제 `CODEX_BIN`으로 버전과 로그인 상태만 검사하며 모델 호출은 하지 않는다. 마지막 명령은 서버와 같은 `codex exec`·stdin 실행 경로를 빈 임시 폴더에서 실제로 한 번 호출한다. `.env`의 `CODEX_MODEL`을 바꿨다면 `--model`도 같은 값으로 바꾼다. 출력에 `RUNNER_OK`가 없으면 정리 job을 실행하지 말고 실행 파일·로그인·모델 설정부터 고친다.
+`check:codex-runner`는 `.env`의 실제 `CODEX_BIN`으로 버전과 로그인 상태만 검사하며 모델 호출은 하지 않는다. 마지막 명령은 서버와 같은 `codex exec`·stdin 실행 경로를 빈 임시 폴더에서 실제로 한 번 호출한다. `.env`의 `CODEX_MODEL`을 바꿨다면 `--model`도 같은 값으로 바꾼다. `gpt-5.6-terra`는 Pi의 Codex CLI `0.144.5`에서 검증했으며, 구버전에서 최신 CLI 요구 오류가 나면 모델 설정 전에 CLI를 올린다. 출력에 `RUNNER_OK`가 없으면 정리 job을 실행하지 말고 실행 파일·로그인·모델 설정부터 고친다.
 
 그다음 서버에서 정적 검증을 실행한다.
 
