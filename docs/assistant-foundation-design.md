@@ -621,6 +621,8 @@ merge는 target 변경 뒤 source 보관이 실패해도 성공으로 넘기던 
 
 2026-07-17 Pi 배포 전 동시 DB·vault 백업 `20260717-1754`와 기존 코드 백업을 남겼다. 배포 파일 6개의 hash가 로컬과 일치했고 Pi 전체 테스트 85개를 통과했다. readonly audit은 활성 topic 13개, Markdown Q&A 65개, ready 청크 65개가 전부 일치했으며 DB hash는 전후 `c9c57afe…f1ede`로 같았다. 서비스는 새 PID로 재기동했고 `/api/config`, 인증된 `/api/organize/status`·`/api/notifications`가 정상 응답했으며 재기동 이후 error journal은 0건이다.
 
+S0d는 `68604af`에서 로컬 구현했다. audit이 단일 Markdown 정본과 누락 청크를 확인해 만든 `reindex_file_qa` 계획을 기존 승인형 apply가 실행한다. 적용 단계는 strict parser로 원문과 계획 hash를 다시 검사하고, 출처가 없거나 정확히 한 자동 저장 기록으로 확정되는 Q&A만 대상으로 삼는다. 자동 저장 출처가 여러 개이거나 현재 노트 배정과 다르면 `manual_review`로 남긴다. OpenAI 임베딩이 먼저 유효하게 생성된 경우에만 기존 `topic-chunk-store`가 provenance·본문 hash·`ready` 청크와 임베딩을 하나의 DB transaction에 쓰므로 검색 가능한 척하는 빈 임베딩 청크를 만들지 않는다. stale 원문은 백업 전에 중단하고, 백업 뒤 임베딩 실패나 DB insert 실패는 migration 전 DB로 복원한다. 성공·출처 중복·stale hash·임베딩 실패·DB 실패·재실행 멱등성을 포함한 전체 테스트 109개, 로컬 readonly audit 7/7과 복구 계획 `clean`을 통과했으며 Pi에는 아직 배포하지 않았다.
+
 파일시스템과 SQLite를 하나의 ACID transaction으로 만들 수는 없다. 잡힌 예외는 즉시 복원하지만 rename 뒤 `SIGKILL`·전원 차단이 발생하면 다음 `audit:topics`가 drift를 찾아야 한다. 현재 단일 사용자 규모에서는 영속 mutation journal보다 이 경계를 유지하는 편이 단순하며, 운영 중에는 readonly audit으로 이 경계를 감시한다.
 
 - [x] `schema_version`과 순차 migration을 별도 모듈로 관리
@@ -634,7 +636,7 @@ merge는 target 변경 뒤 source 보관이 실패해도 성공으로 넘기던 
 - [x] `source_missing` 청크를 회수·저장 상태에서 제외하고 일치하는 UUID형 legacy provenance를 별도 관찰
 - [x] 복구 apply는 백업·입력 hash·수동 작업 ID·서버 중지 확인을 모두 요구
 - [x] 복구 apply의 파일 원자 교체·DB transaction·실패 시 DB/vault rollback 구현
-- [ ] file-only QA를 원본 Q&A에서 재색인
+- [x] file-only QA를 단일 정본 Q&A에서 재색인 (`68604af`, 로컬 구현·Pi 미배포)
 - [x] DB-only 청크를 조용히 삭제하지 않고 `source_missing`으로 적용·회수 제외
 - [ ] `note_chunks.note_title`은 호환 캐시로만 두고 표시·검색 제목은 `notes` 조인 또는 현재 파일 메타데이터 사용
 - [x] 현재 topic의 QA ID 불일치와 8개 제목 drift를 검토·복구한 뒤 Pi audit 0건 확인

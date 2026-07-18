@@ -241,10 +241,12 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > S0c 공용 쓰기 경로 Pi 배포·인수 완료 (`d41defe`, 2026-07-17): append·split·merge·archive/restore를 strict QA-LOG parser와 하나의 전역 mutation queue로 직렬화했다. 각 변경은 읽은 원문 또는 파일 부재를 precondition으로 확인하고 임시 파일+rename, 다중 파일 snapshot, 동기 SQLite transaction을 거치며 파일·DB 오류 시 원본을 복원한다. merge source 보관 실패는 더 이상 부분 성공으로 처리하지 않고, split source에 이동 대상 밖 청크가 있으면 물리 삭제 전에 중단한다. 로컬 전체 테스트 85개와 임시 서버 HTTP mutation 시나리오를 통과한 뒤 Pi 동시 DB·vault 백업 `20260717-1754`와 기존 코드 백업을 만들고 배포했다. Pi에서 파일 hash 일치, 전체 테스트 85개, readonly audit의 활성 Q&A/ready 청크 65/65와 DB hash 불변, 서비스 재기동, 인증 API `200`, 재기동 후 오류 로그 0건을 확인했다.
 
+> S0d Markdown-only Q&A 재색인 로컬 구현 완료 (`68604af`, 2026-07-18, Pi 미배포): 기존 dry-run 계획의 `reindex_file_qa`를 승인형 apply에 연결했다. 단일 정본 Q&A만 strict parser와 계획 hash로 다시 확인하고 OpenAI 임베딩을 먼저 준비한 뒤 기존 `topic-chunk-store`를 통해 같은 DB transaction에 provenance·본문 hash·`ready` 상태를 쓴다. 자동 저장 출처가 여러 개이거나 현재 노트 배정과 다르면 수동 검토로 남기며, stale 원문은 백업 전에 중단하고 임베딩·DB 실패는 migration 전 DB로 복원한다. 재실행 멱등성을 포함한 전체 테스트 109개, 로컬 readonly audit 7/7, 복구 계획 `clean`을 통과했다.
+
 1. [x] schema version과 순차 migration을 별도 모듈로 관리
 2. [x] append·split·merge·archive/restore를 공용 QA-LOG parser와 topic mutation queue로 직렬화 (`d41defe`, Pi 인수 완료)
 3. [x] 현재 복구 apply의 원자적 파일 교체, DB transaction, hash 재검증과 rollback
-4. [ ] Markdown-only QA 재색인은 후속. DB-only 청크의 `source_missing` 적용·회수 제외는 Pi 운영 적용 완료
+4. [x] Markdown-only QA 재색인 로컬 구현 완료 (`68604af`, Pi 미배포). DB-only 청크의 `source_missing` 적용·회수 제외는 Pi 운영 적용 완료
 5. [x] 현재 불일치를 백업 후 복구하고 Pi dry-run audit 0건 확인
 
 ### A — 기억 신뢰성
