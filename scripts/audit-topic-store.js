@@ -34,8 +34,8 @@ function helpText() {
     'Usage: node scripts/audit-topic-store.js [options]',
     '',
     'Options:',
-    '  --db <path>       SQLite DB 경로 (기본: ./council.db)',
-    '  --vault <path>    vault 경로 (기본: VAULT_PATH 또는 ./ai-council-vault)',
+    '  --db <path>       SQLite DB 경로 (기본: ./galpi.db)',
+    '  --vault <path>    vault 경로 (기본: VAULT_PATH 또는 ./galpi-vault)',
     '  --json            JSON 출력',
     '  -h, --help        도움말',
     '',
@@ -51,9 +51,9 @@ async function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
-  const dbPath = options.dbPath || path.join(ROOT, 'council.db');
+  const dbPath = options.dbPath || path.join(ROOT, 'galpi.db');
   const vaultPath = options.vaultPath
-    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'ai-council-vault'));
+    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'galpi-vault'));
   const db = new Database(dbPath, { readonly: true, fileMustExist: true });
   try {
     db.pragma('query_only = ON');

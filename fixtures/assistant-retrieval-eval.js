@@ -70,9 +70,9 @@ const notes = [
     tags: '파이 배포 systemd 백업 경로',
     entries: [
       qa('pi-path-old', '2026-07-01', '예전 배포 경로는?', '예전 후보는 /home/pi/apps/ai-council이었다.'),
-      qa('pi-backup', '2026-07-05', '백업은 어디에 남지?', '/home/pi/backups/ai-council에 DB와 vault를 하루 1회 저장하고 7일 보관한다.'),
+      qa('pi-backup', '2026-07-05', '백업은 어디에 남지?', '/home/pi/backups/galpi에 DB와 vault를 하루 1회 저장하고 7일 보관한다.'),
       LONG_GAP,
-      qa('pi-path-current', '2026-07-13', '현재 배포 경로는?', '실제 배포 경로는 /home/pi/ai-council이다.'),
+      qa('pi-path-current', '2026-07-13', '현재 배포 경로는?', '실제 배포 경로는 /home/pi/galpi다.'),
     ],
   }),
   makeNote({
@@ -140,11 +140,11 @@ const notes = [
   }),
   makeNote({
     filename: 'interface.md',
-    title: 'Clawd와 논문 패널 UI',
+    title: '시온과 논문 패널 UI',
     topics: ['interface'],
-    tags: 'Clawd 패널 UI 모바일',
+    tags: '시온 패널 UI 모바일',
     entries: [
-      qa('ui-clawd-bounds', '2026-07-15', 'Clawd는 어디까지 움직이지?', 'Clawd는 패널과 창 위까지 이동하며 전체 앱 영역을 사용한다.'),
+      qa('ui-clawd-bounds', '2026-07-15', '시온은 어디까지 움직이지?', '시온은 패널과 창 위까지 이동하며 전체 앱 영역을 사용한다.'),
       qa('ui-paper-panel', '2026-07-15', '논문 패널은?', '데스크톱에서 사이드 패널, 모바일에서 바텀시트로 연다.'),
     ],
   }),
@@ -186,7 +186,7 @@ function retrievalCase({
 const cases = [
   retrievalCase({ id: 'single-01', category: 'single', query: 'M60 AUX 입력 연결 방법', topics: ['audio'], notes: ['m60-audio.md'], chunks: ['m60-aux-input'] }),
   retrievalCase({ id: 'single-02', category: 'single', query: 'Claude 남은 크레딧 Billing 링크', topics: ['budget'], notes: ['api-costs.md'], chunks: ['cost-billing-link'] }),
-  retrievalCase({ id: 'single-03', category: 'single', query: 'Clawd 이동 범위', topics: ['interface'], notes: ['interface.md'], chunks: ['ui-clawd-bounds'] }),
+  retrievalCase({ id: 'single-03', category: 'single', query: '시온 이동 범위', topics: ['interface'], notes: ['interface.md'], chunks: ['ui-clawd-bounds'] }),
   retrievalCase({ id: 'single-04', category: 'single', query: '숙면대행서비스 소설 결말', topics: ['creative'], notes: ['creative-writing.md'], chunks: ['creative-sleep-ending'] }),
   retrievalCase({ id: 'single-05', category: 'single', query: '논문 PDF 파서 페이지 제한', topics: ['paper'], notes: ['paper-search.md'], chunks: ['paper-parser-limit'] }),
 

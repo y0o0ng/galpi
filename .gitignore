@@ -4,10 +4,14 @@ node_modules/
 .DS_Store
 council.db
 council.db-*
+galpi.db
+galpi.db-*
 reference/
 ai-council-vault/
+galpi-vault/
 deploy-backups/
 fixtures/assistant-retrieval-private*.json
+.playwright-mcp/
 
 # agent skills (tooling, 개인 환경)
 skills-lock.json

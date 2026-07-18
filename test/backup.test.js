@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const Database = require('better-sqlite3');
 
-const { runBackup } = require('../scripts/backup');
+const { runBackup, listBackups } = require('../scripts/backup');
 
 test('runBackup honors an explicit DB path and creates a matching vault archive', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'backup-path-'));
@@ -34,5 +34,25 @@ test('runBackup honors an explicit DB path and creates a matching vault archive'
   const backupDb = new Database(result.dbDest, { readonly: true });
   assert.equal(backupDb.prepare('SELECT value FROM marker').get().value, 'custom-db');
   backupDb.close();
+  assert.match(path.basename(result.dbDest), /^galpi-\d{8}-\d{4}\.db$/);
   assert.ok((await fs.stat(result.vaultDest)).size > 0);
+});
+
+test('listBackups keeps legacy council DB backups visible after the rename', async t => {
+  const backupDir = await fs.mkdtemp(path.join(os.tmpdir(), 'backup-list-'));
+  t.after(() => fs.rm(backupDir, { recursive: true, force: true }));
+
+  await Promise.all([
+    fs.writeFile(path.join(backupDir, 'galpi-20260718-0100.db'), 'new'),
+    fs.writeFile(path.join(backupDir, 'council-20260717-0100.db'), 'legacy'),
+    fs.writeFile(path.join(backupDir, 'vault-20260718-0100.tar.gz'), 'vault'),
+    fs.writeFile(path.join(backupDir, 'unrelated.db'), 'ignore'),
+  ]);
+
+  const filenames = (await listBackups(backupDir)).map(entry => entry.filename).sort();
+  assert.deepEqual(filenames, [
+    'council-20260717-0100.db',
+    'galpi-20260718-0100.db',
+    'vault-20260718-0100.tar.gz',
+  ]);
 });

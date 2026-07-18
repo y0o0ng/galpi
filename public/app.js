@@ -3,6 +3,7 @@
 // 단일 사용자 비서: 모든 기기가 같은 대화를 이어가도록 고정 세션 ID를 공유한다.
 // (지식/노트는 원래 서버에서 공유되고, 이 값으로 라이브 대화 thread까지 기기 간 공유)
 const sessionId = 'shared-main';
+// 이름 변경 뒤에도 기존 브라우저 기록, 토큰, 패널 위치를 그대로 이어 쓴다.
 const uiHistoryKey = `councilUiHistory:${sessionId}`;
 const activeNotesKey = `councilActiveNotes:${sessionId}`;
 const apiTokenKey = 'councilApiToken';
@@ -2409,7 +2410,7 @@ function createNotificationsPanel() {
   const titleWrap = document.createElement('div');
   const kicker = document.createElement('div');
   kicker.className = 'notification-kicker';
-  kicker.textContent = 'CLAWD';
+  kicker.textContent = 'XION';
   const title = document.createElement('div');
   title.className = 'notification-title';
   title.textContent = '알림센터';

@@ -1,7 +1,7 @@
 {
-  "name": "ai-council",
+  "name": "galpi",
   "version": "1.0.0",
-  "description": "AI 의회 - Claude와 GPT에게 묻고 옵시디언에 노트로 남기는 시스템",
+  "description": "갈피 - 대화와 지식을 축적하고 다시 꺼내 쓰는 개인 AI 비서",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,7 +11,7 @@
     "plan:topic-repair": "node scripts/plan-topic-repair.js",
     "apply:topic-repair": "node scripts/apply-topic-repair.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
-    "mcp:obsidian": "node scripts/ai-council-mcp.mjs"
+    "mcp:obsidian": "node scripts/galpi-mcp.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -1,6 +1,6 @@
 
 
- # AI 의회 × 옵시디언 — 설계 문서 (v1.5)
+ # 갈피 × 옵시디언 — 설계 문서 (v1.5)
 
   ## 0. v1.5 아키텍처 전환 요약
 
@@ -40,7 +40,7 @@
   - GPT는 의회 모드에서 Claude 초안을 검증하는 비평가다(빠진 전제·논리 구멍·사실 오류·놓친 관점·리스크 지적). 최종 종합은 항상 Claude가 하고, GPT 답변은 앞무대에 직접 나오지 않는다.
   - Claude/GPT는 관련 노트를 읽고 저장/분열/병합/링크 후보를 제안할 수 있지만, 볼트를 직접 수정하지 않는다.
   - Codex는 Obsidian 볼트를 정리하는 단일 관리자다.
-  - Clawd/UI는 split, merge, 기준 변경 같은 위험 작업을 승인하는 관리자 화면이다.
+  - 시온/UI는 split, merge, 기준 변경 같은 위험 작업을 승인하는 관리자 화면이다.
 
   토픽 노트 운영 원칙:
 
@@ -432,7 +432,7 @@
   - /backup: 볼트+DB 수동 백업
   - /sync: vault 직접 편집분을 DB에 동기화하고 삭제된 노트 참조 정리
   - /merge: 유사 토픽/QUERY 기반 병합 후보 확인 및 승인 병합
-  - /notifications: Clawd 알림센터 열기. Codex 제안, split/merge/policy 승인/무시 처리
+  - /notifications: 시온 알림센터 열기. Codex 제안, split/merge/policy 승인/무시 처리
   - /graph report: DB 그래프와 자동 저장 판단 로그를 `_system/GRAPH_REPORT.md`로 요약
   - /audit: 화면 표시상 "시스템 검사". validation, policy, 정리 상태, 알림, 고립/큰 토픽을 점검
   - /web: 외부 웹 검색 결과를 현재 답변 흐름에 주입한다. 단일 Claude 모드에서는 Claude에, 의회 모드에서는 Claude/GPT 양쪽에 같은 evidence를 주입한다.
@@ -478,7 +478,7 @@
   8. Codex 정리 프롬프트를 CODEX-SUMMARY/LINKS/TAGS/PROPOSALS 중심으로 변경
   9. note_edges 테이블과 confidence label 기반 그래프 저장 추가
   10. GRAPH_REPORT.md 생성 API 추가
-  11. split/merge는 즉시 실행하지 않고 Clawd/UI 승인 제안으로 먼저 구현
+  11. split/merge는 즉시 실행하지 않고 시온/UI 승인 제안으로 먼저 구현
 
   ## 9. 안전 원칙
 
@@ -494,11 +494,11 @@
   - GRAPH_REPORT.md는 `_system`에 두되, 메모리처럼 항상 참조하지는 않는다.
   - 자동 정리 큐는 pending 노트 개수가 아니라 save/appended 이벤트 수를 기준으로 만든다.
   - 미처리 save/appended 이벤트가 5개 쌓이면 현재 pending 노트 전체를 하나의 Codex job으로 넘기고 백그라운드에서 자동 실행한다.
-  - Clawd/UI에서는 수동 정리 버튼을 숨기고, 상태 조회와 전체 재정리만 노출한다.
+  - 시온/UI에서는 수동 정리 버튼을 숨기고, 상태 조회와 전체 재정리만 노출한다.
   - Codex 실행 전후 diff를 검증한다.
   - 마커 밖 수정이 있으면 실패 처리한다.
   - 실패 3회 이상은 needs_manual_check로 넘긴다.
-  - split/merge/기준 변경은 Codex가 제안하고 Clawd/UI에서 승인한다.
+  - split/merge/기준 변경은 Codex가 제안하고 시온/UI에서 승인한다.
   - 메모리는 Codex 정리 대상이 아니다.
 
   ## 10. 현재 달성한 것
@@ -550,7 +550,7 @@
 
 
 
-# AI 의회 × 옵시디언 — 설계 문서 (v1.3)
+# 갈피 × 옵시디언 — 설계 문서 (v1.3)
 
 > 한 화면에서 Claude와 GPT에게 묻고, 둘이 논의해 도출한 답을 옵시디언 볼트에 노트로 쌓으며,
 > Codex가 정해진 구역 안에서만 노트들을 주제별로 연결해 “뇌처럼” 자라는 지식 그래프를 만드는 개인용 시스템.
@@ -600,20 +600,20 @@
 - **코드 구조 원칙:** `server.js`를 선행 대규모 리팩터링하지 않는다. V4부터 논문 검색·음성 입력 같은 큰 신규 기능은 별도 모듈로 만들고, 기존 영역은 크게 수정할 때 테스트와 함께 점진적으로 옮긴다.
 - **V4 논문 검색 1차(Pi 인수 완료):** Semantic Scholar 관련도 검색을 `lib/paper-search.js`에 분리하고 `/api/papers/search`, `/paper` 결과 카드, 선택적 `S2_API_KEY`, 10분 캐시, 429/5xx 지수 백오프·timeout 처리와 단위 테스트를 추가했다. Pi 키 실검색 HTTP 200·결과 10개·성공 응답 캐시와 Playwright 카드 렌더링을 통과했다.
 - **V4 논문 검색 2차(Pi 저장·회수 인수 완료):** `lib/paper-notes.js`에 노트 생성·저장 직렬화를 분리하고 `note_type: paper`, `paper_id` 활성 고유 인덱스, 저장 버튼·재검색 상태 복원, 기존 임베딩·저장 이벤트 기반 Codex 큐 연결을 구현했다. `public/paper-panel.js`에는 저장 논문 서재·읽기 전용 상세·검색/저장을 분리하고, 데스크톱 사이드 패널과 모바일 바텀시트를 적용했다. 단순 열람은 activeNotes를 바꾸지 않는다. Pi에서 단위 테스트 17개, 실제 TradingAgents 노트 저장, 임베딩 생성, 하이브리드 검색 1순위 회수, Codex 형식 검증을 통과했다. 실제 질문 컨텍스트와 Codex 태그·링크 실행은 다음 인수 항목이다.
-- **지식 패널 확장(Pi 배포 완료, `c9bf470`):** 일반 노트를 읽기 전용으로 여는 `노트` 탭을 `public/note-panel.js`로 분리했다. 논문 검색·저장 상세에는 S2 `openAccessPdf` 또는 기존 `arxiv_id` 기반 공개 PDF 외부 링크를 제공하며, PDF 다운로드·파싱·Pi 프록시는 하지 않는다. Clawd는 전체 앱 폭에서 패널 위까지 이동하도록 범위와 z-index를 조정했다. Pi에서 테스트 17개와 인증 목록 API·정적 파일 응답을 인수했다.
+- **지식 패널 확장(Pi 배포 완료, `c9bf470`):** 일반 노트를 읽기 전용으로 여는 `노트` 탭을 `public/note-panel.js`로 분리했다. 논문 검색·저장 상세에는 S2 `openAccessPdf` 또는 기존 `arxiv_id` 기반 공개 PDF 외부 링크를 제공하며, PDF 다운로드·파싱·Pi 프록시는 하지 않는다. 시온은 전체 앱 폭에서 패널 위까지 이동하도록 범위와 z-index를 조정했다. Pi에서 테스트 17개와 인증 목록 API·정적 파일 응답을 인수했다.
 - **컨텍스트 선택 UI(Pi 배포 완료, `516a147`):** `/search` 결과의 자동 activeNotes 추가를 제거하고 검색 카드·일반 노트·저장 논문 상세에서 명시적으로 컨텍스트를 추가·제거한다. 상단 활성 노트 칩과 열린 화면의 토글 상태를 동기화하며 질문 기반 자동 회수는 유지한다. Mac 전체 테스트 76개와 데스크톱·390px Playwright, Pi 정적 파일 hash·인증 API를 통과했다.
 - **S0c 공용 토픽 쓰기 경로(Pi 배포·인수 완료, `d41defe`):** append·split·merge·archive/restore를 `lib/topic-mutation.js`의 queue와 strict QA-LOG parser로 통합했다. 파일 원문 precondition, 원자 교체, 다중 snapshot, DB transaction, 실패 복원과 숨은 청크의 source 삭제 차단을 적용했다. merge 보관 실패는 부분 성공으로 남기지 않는다. Pi 백업 `20260717-1754` 후 파일 hash, 전체 테스트 85개, readonly audit 65/65와 DB hash 불변, 서비스 재기동·인증 API·오류 로그 0건을 확인했다.
 - **답변 생성 단계 UI(Pi 배포·인수 완료, `e7fe8f3`·`73b1ee7`):** 단일·의회 응답의 실제 작업 단계를 opt-in NDJSON으로 기존 로딩 위치에 표시한다. 문구는 답변 본문 시작선에 맞추고 보조색 점 3개가 위치 이동 없이 밝기만 순차 변화하며, 모션 감소 설정에서는 정지한다. 추가 모델/API 호출·영구 trace·내부 추론 노출은 없다. Pi 백업 `20260717-2345` 후 전체 테스트 97개, audit 66/66, 파일 hash·인증 API·시작 로그와 DB 논리 동일성을 확인했다.
 - **2.5A 전문 파서 spike(완료):** 별도 `lib/paper-fulltext.js`와 측정 스크립트에 `pdf-parse` 2.4.5 기반 페이지 텍스트·섹션 추출을 구현했다. TradingAgents PDF 38페이지·104,235자를 Mac/Pi에서 동일하게 추출했고 Pi 격리 환경에서 약 1.1초·최대 RSS 156MB, 의존성 설치 용량 약 87MB를 측정했다. 잘못된 PDF, 빈 텍스트, 100페이지 초과와 파서 실패 테스트를 추가했다.
 - **2.5A 로컬 색인·검색(Pi 배포·검증 완료, `1078df5`):** `paper_documents`/`paper_chunks`, 해시 기반 숨김 원본 캐시, 동시 색인 직렬화, SHA-256·파서 버전 중복 차단, 중단 복구, 섹션·페이지 청킹과 BM25/선택적 임베딩 검색을 구현했다. Pi 임시 환경에서 TradingAgents를 97개 청크로 색인하고 원본 캐시, 두 번째 색인 재사용, 방법론·실험·한계 질의의 top 4 근거 회수를 확인했다.
 - **2.5A 전문 능동 독서(Pi 배포·스모크 인수 완료, `6bd1f57`):** 공개 PDF 다운로드의 URL·DNS·redirect별 SSRF 방어와 DNS 고정 연결, 표준 HTTP(S) 포트·timeout·20MB·100페이지·PDF 형식 제한을 구현했다. 현재 질문에서 회수된 활성 paper 최대 3편만 도구 후보가 되며 `paper_fulltext_search` 후 실제 반환된 chunkId만 `paper_fulltext_read`로 인접 2개까지 읽는다. 호출 2회·호출당 5,000자·누적 10,000자를 서버가 집행하고, 단일 Claude와 의회 첫 Claude가 확보한 같은 evidence를 GPT 비평·심층 수정에 공유한다. Pi 전체 테스트 47개를 통과했고, TradingAgents 초록 질문은 도구 0회·0자, 전문 질문은 도구 1회·4,999자로 섹션·PDF 페이지 근거를 반환했다. 38페이지·104,235자는 97개 청크·97개 임베딩으로 저장됐고 문서 상태는 `ready`다.
-- **Codex/MCP(완료):** Pi의 Codex가 서버를 직접 다룰 수 있도록 ai-council MCP 서버(`scripts/ai-council-mcp.mjs`)와 `.codex/config.toml`을 구성했다. 읽기 도구(list/read/search/status/validate/merge candidates)와 승인 필요 도구(organize process, archive/restore)를 분리한다.
+- **Codex/MCP(완료):** Pi의 Codex가 서버를 직접 다룰 수 있도록 갈피 MCP 서버(`scripts/galpi-mcp.mjs`)와 `.codex/config.toml`을 구성했다. 읽기 도구(list/read/search/status/validate/merge candidates)와 승인 필요 도구(organize process, archive/restore)를 분리한다.
 - **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
-- **토픽 분리(완료):** Codex split 제안을 Clawd 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.
-- **알림센터(완료):** Clawd 메뉴와 `/notifications`로 PIP 알림센터를 연다. CODEX-PROPOSALS에서 merge/split/policy/review 제안을 읽어오고, 승인/무시 상태를 DB(`notification_actions`)에 저장한다. `최근 저장` 탭은 `auto_save_decisions`의 성공 기록을 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 보여주며 카드를 누르면 노트 상세를 연다. 저장 판단·AI 호출은 추가하지 않는다. 창은 데스크톱에서 드래그 이동 가능하며 위치를 localStorage에 저장한다.
+- **토픽 분리(완료):** Codex split 제안을 시온 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.
+- **알림센터(완료):** 시온 메뉴와 `/notifications`로 PIP 알림센터를 연다. CODEX-PROPOSALS에서 merge/split/policy/review 제안을 읽어오고, 승인/무시 상태를 DB(`notification_actions`)에 저장한다. `최근 저장` 탭은 `auto_save_decisions`의 성공 기록을 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 보여주며 카드를 누르면 노트 상세를 연다. 저장 판단·AI 호출은 추가하지 않는다. 창은 데스크톱에서 드래그 이동 가능하며 위치를 localStorage에 저장한다.
 - **유지보수 리뷰(Pi 배포·검증 완료, `fd615c7`):** 의회 자동 topic과 수동 council 저장 상태를 분리하고, 불용어 질의 임베딩 폴백, 저장 버튼 부분 갱신, 일반 노트의 서버 측 paper 제외, 패널 초기화 복구, malformed Semantic Scholar 200 거부, 펫 클릭 전달을 반영했다. 전체 테스트 34개와 모바일·데스크톱 Playwright 회귀 검증을 통과했고, Pi에서 서비스 기동·일반 노트 paper 제외·불용어 검색·의회 저장 상태 API를 확인했다. 구조 이슈와 후속 클린업은 `maintenance.md`에서 추적한다.
 - **정책 파일(완료):** `config/codex-policy.json`에 자동 저장, 토픽 매칭, organize, retrieval, Codex 링크, 병합 후보 가중치/임계값/불용어를 둔다. Codex가 수정 가능한 파일은 `.codex/editable-files.json`에 제한한다.
-- **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, Clawd 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
+- **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, 시온 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
 - **그래프/검사(완료):** `/graph report`는 `_system/GRAPH_REPORT.md`를 생성/갱신한다. `/audit`은 화면 표시상 "시스템 검사"이며 Codex validation, policy 파일 파싱, 정리 상태, 알림, 고립 토픽, 큰 토픽, 최근 job을 요약한다.
 - **파일명/링크 안정화(완료):** 새 노트 파일명은 ASCII 날짜-시간-난수 형식으로 생성한다. Obsidian 링크는 `[[파일ID|표시 제목]]`을 기본으로 써서 유령 노트 생성을 막는다. validator는 CODEX-LINKS/MERGE/SPLIT 제안의 형식·bare wiki link를 거부한다.
 - **외부 검색(구현 완료, 2026-06-06):** 백엔드 search agent(Tavily)가 검색을 실행하고 결과를 sanitize/정규화해 답변 흐름에 주입한다. 단일 Claude 모드는 Anthropic `tool_use`로 `web_search` 도구를 직접 요청할 수 있고, 의회 모드는 같은 evidence를 Claude/GPT 양쪽에 주입한다. MVP 4원칙(명시적 `/web` / 의회 양쪽 동일 evidence / 인젝션 격리 / 저장 시 provenance) + planner(topic·timeRange·maxResults·sourceStrategy 검증, sourceType 라벨·전략 재정렬) + 보안(월 한도 집행, sourceType 정확매칭)까지 구현. Pi에서 `enabled:true`, `maxResults:3`, `maxSnippetChars:400`으로 가동 중. 상세는 "외부 검색 (웹 근거 주입)" 절.
@@ -1343,7 +1343,7 @@ DB에만 두고 노트화하지 않는 것: 짧은 확인, 잡담, 임시 질문
 - 모든 Codex 정리는 `codex_jobs`의 job 단위로 실행한다.
 - `/organize`는 상태를 보여준다.
 - save/appended 이벤트가 5개 쌓이면 서버가 `pending` 노트를 job queue에 넣고 백그라운드 worker로 자동 실행한다.
-- `/organize run`과 `/organize process`는 내부/디버깅용 수동 명령으로 유지하되, Clawd/UI 기본 버튼에서는 숨긴다.
+- `/organize run`과 `/organize process`는 내부/디버깅용 수동 명령으로 유지하되, 시온/UI 기본 버튼에서는 숨긴다.
 - 상태 흐름은 기본적으로 `pending → queued → running → processed`다.
 - 실패하면 job은 `failed`, 해당 노트는 `needs_manual_check`로 보낸다.
 
@@ -1421,11 +1421,11 @@ Codex는 vault를 직접 읽고 쓸 수 있다. 단, 수정 허용 범위는 아
 
 - Codex는 링크 점수 기준, 최소 점수, 최대 링크 수, 대체 규칙 같은 운영 기준을 직접 바꾸지 않는다.
 - Codex는 정리 중 기준 변경이 필요하다고 판단하면 **제안**만 만든다.
-- 기준 변경 제안은 Clawd를 통해 사용자에게 요청/알림처럼 표시한다.
+- 기준 변경 제안은 시온을 통해 사용자에게 요청/알림처럼 표시한다.
 - 사용자가 승인하기 전까지 서버의 실제 정리 기준은 바뀌지 않는다.
 - 조정 가능한 기준은 `config/codex-policy.json`에 둔다. Codex가 직접 수정할 수 있는 파일 목록은 `.codex/editable-files.json`으로 제한한다.
 - 실행 가능한 정책 제안은 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `- POLICY {"changes":[{"path":"codexLinks.maxLinksPerNote","value":12}]} — 이유` 형식만 허용한다.
-- Clawd 알림센터에서 사용자가 `정책 적용`을 승인하면 서버가 `config/codex-policy.json`만 수정한다. path는 policy 파일 안의 leaf 값만 허용하고, 위험한 JS prototype key는 거부한다.
+- 시온 알림센터에서 사용자가 `정책 적용`을 승인하면 서버가 `config/codex-policy.json`만 수정한다. path는 policy 파일 안의 leaf 값만 허용하고, 위험한 JS prototype key는 거부한다.
 - 정책 파일은 서버 시작 시 읽히므로, 정책 적용 후 실제 런타임 반영은 서버 재시작 후 이루어진다.
 - 제안에는 최소한 아래 내용을 포함한다.
   - 바꾸고 싶은 기준
@@ -1491,7 +1491,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 2. 요청 전체 retrieval context를 8,000자로 제한한다.
 3. 청크에 source type, provenance, `active | invalidated | superseded` 상태를 둔다.
 4. 테스트는 `never`, 음성은 `inbox` 저장 정책을 사용한다.
-5. 사용자 메모리는 자동 확정하지 않고 Clawd 승인 제안으로 갱신한다.
+5. 사용자 메모리는 자동 확정하지 않고 시온 승인 제안으로 갱신한다.
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
 7. task·reminder는 SQLite 상태와 결정론적 scheduler로 실행한다.
 8. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.

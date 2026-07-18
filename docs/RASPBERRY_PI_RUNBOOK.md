@@ -1,6 +1,6 @@
 # Raspberry Pi Runbook
 
-AI Council을 라즈베리파이에 올릴 때 쓰는 최소 실행 절차.
+갈피를 라즈베리파이에 올릴 때 쓰는 최소 실행 절차.
 
 ## 1. 준비
 
@@ -29,10 +29,9 @@ codex exec --help
 예시 경로:
 
 ```sh
-mkdir -p ~/apps
-cd ~/apps
-git clone <repo-url> ai-council
-cd ai-council
+cd ~
+git clone <repo-url> galpi
+cd galpi
 npm install
 ```
 
@@ -53,7 +52,8 @@ ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
 S2_API_KEY=...
 PAPER_SEARCH_MOCK=false
-VAULT_PATH=/home/pi/apps/ai-council/ai-council-vault
+VAULT_PATH=/home/pi/galpi/galpi-vault
+BACKUP_DIR=/home/pi/backups/galpi
 HOST=0.0.0.0
 PORT=3000
 API_TOKEN=아무도-모를-긴-문자열
@@ -77,7 +77,7 @@ npm start
 서버 로그에서 아래를 확인한다.
 
 ```text
-AI 의회 서버 실행 중
+갈피 서버 실행 중
 로컬: http://localhost:3000
 네트워크: http://<라즈베리파이_IP>:3000
 ```
@@ -96,25 +96,25 @@ http://<라즈베리파이_IP>:3000
 
 ### 자동 실행 (systemd — 재부팅·크래시 생존)
 
-`npm start`는 터미널을 닫으면 멈춘다. 재부팅·크래시 후 자동으로 다시 뜨게 하려면 systemd에 등록한다. `deploy/ai-council.service`가 템플릿이다(User/경로를 실제 환경으로 교체).
+`npm start`는 터미널을 닫으면 멈춘다. 재부팅·크래시 후 자동으로 다시 뜨게 하려면 systemd에 등록한다. `deploy/galpi.service`가 템플릿이다(User/경로를 실제 환경으로 교체).
 
 ```sh
-sudo cp deploy/ai-council.service /etc/systemd/system/ai-council.service
-sudo nano /etc/systemd/system/ai-council.service   # User, WorkingDirectory, ExecStart 경로 확인
+sudo cp deploy/galpi.service /etc/systemd/system/galpi.service
+sudo nano /etc/systemd/system/galpi.service   # User, WorkingDirectory, ExecStart 경로 확인
 sudo systemctl daemon-reload
-sudo systemctl enable --now ai-council
+sudo systemctl enable --now galpi
 ```
 
 확인 / 로그:
 
 ```sh
-systemctl status ai-council
-journalctl -u ai-council -f
+systemctl status galpi
+journalctl -u galpi -f
 ```
 
 - `Restart=on-failure`로 크래시 시 자동 재시작, `enable`로 재부팅 후 자동 기동.
 - 자동 백업(인프로세스)도 서버가 떠 있어야 도니, systemd 등록이 사실상 백업의 전제다.
-- 코드 갱신 후 재시작: `sudo systemctl restart ai-council`
+- 코드 갱신 후 재시작: `sudo systemctl restart galpi`
 
 ## 5. Smoke Test
 
@@ -166,11 +166,11 @@ curl http://127.0.0.1:3000/api/organize/status
 
 ## 7. 백업
 
-볼트(`ai-council-vault/`)와 DB(`council.db`)를 자동 백업한다. (DB는 SQLite 온라인 백업이라 서버 실행 중에도 안전.)
+볼트(`galpi-vault/`)와 DB(`galpi.db`)를 자동 백업한다. (DB는 SQLite 온라인 백업이라 서버 실행 중에도 안전.)
 
 - **자동:** 서버가 떠 있으면 하루 1회. 서버가 꺼져 24시간 넘겼다가 다시 뜨면 시작 시 1회 따라잡기(catch-up).
 - **보관:** 7일 지난 백업은 자동 삭제.
-- **위치:** 기본 `~/backups/ai-council/`. `.env`의 `BACKUP_DIR`로 변경 가능.
+- **위치:** 기본 `~/backups/galpi/`. `.env`의 `BACKUP_DIR`로 변경 가능.
 - **수동:** 채팅에 `/backup`, 또는 `node scripts/backup.js`.
 
 서버가 꺼져 있어도 백업하고 싶으면 cron으로도 돌릴 수 있다 (같은 스크립트). 예: 매일 04:00.
@@ -178,7 +178,7 @@ curl http://127.0.0.1:3000/api/organize/status
 ```sh
 crontab -e
 # 경로는 실제 설치 위치로 교체
-0 4 * * * cd /home/pi/apps/ai-council && /usr/bin/node scripts/backup.js >> ~/backups/ai-council/backup.log 2>&1
+0 4 * * * cd /home/pi/galpi && /home/pi/.nvm/versions/node/v24.16.0/bin/node scripts/backup.js >> ~/backups/galpi/backup.log 2>&1
 ```
 
 주의:
@@ -191,31 +191,31 @@ crontab -e
 백업에서 되돌릴 때 (`<stamp>`는 복원할 백업 시각):
 
 ```sh
-sudo systemctl stop ai-council          # 서버 멈춤 (systemd 미사용이면 그냥 종료)
-cd ~/apps/ai-council
-cp council.db council.db.bak            # 혹시 모를 현재 상태 보존
-cp ~/backups/ai-council/council-<stamp>.db council.db
-rm -f council.db-wal council.db-shm     # 옛 WAL 잔재 제거
-rm -rf ai-council-vault
-tar -xzf ~/backups/ai-council/vault-<stamp>.tar.gz   # ai-council-vault/ 통째로 풀림
-sudo systemctl start ai-council
+sudo systemctl stop galpi          # 서버 멈춤 (systemd 미사용이면 그냥 종료)
+cd ~/galpi
+cp galpi.db galpi.db.bak           # 혹시 모를 현재 상태 보존
+cp ~/backups/galpi/galpi-<stamp>.db galpi.db
+rm -f galpi.db-wal galpi.db-shm    # 옛 WAL 잔재 제거
+rm -rf galpi-vault
+tar -xzf ~/backups/galpi/vault-<stamp>.tar.gz   # galpi-vault/ 통째로 풀림
+sudo systemctl start galpi
 ```
 
-DB와 볼트는 **같은 stamp**로 맞춰 복원하는 게 안전하다(시점 일치).
+DB와 볼트는 **같은 stamp**로 맞춰 복원하는 게 안전하다(시점 일치). 이름 변경 전 백업은 DB 파일명이 `council-<stamp>.db`이고 압축을 풀면 `ai-council-vault/`가 나오므로, 복사·압축 해제 후 각각 `galpi.db`와 `galpi-vault/`로 이름을 맞춘다.
 
 ### 토픽 저장 복구
 
 토픽 감사에서 불일치를 실제로 복구할 때만 사용한다. 기본 명령은 readonly 계획 출력이며 DB와 vault를 수정하지 않는다.
 
 ```sh
-cd /home/pi/ai-council
+cd /home/pi/galpi
 npm run apply:topic-repair
 ```
 
 출력된 `Input SHA-256`과 수동 작업 ID를 검토한 뒤 서비스 중지 상태에서만 적용한다.
 
 ```sh
-sudo systemctl stop ai-council
+sudo systemctl stop galpi
 
 npm run apply:topic-repair -- \
   --apply \
@@ -223,7 +223,7 @@ npm run apply:topic-repair -- \
   --input-sha256 <검토한-hash> \
   --approve-operation <검토한-수동-작업-id>
 
-sudo systemctl start ai-council
+sudo systemctl start galpi
 ```
 
 적용 명령은 DB·vault 백업을 먼저 만들고, 입력 hash가 바뀌었거나 수동 승인이 빠졌으면 수정 전에 중단한다. 적용 후에는 다음을 확인한다.
@@ -231,7 +231,7 @@ sudo systemctl start ai-council
 ```sh
 npm run audit:topics
 npm test
-systemctl is-active ai-council
+systemctl is-active galpi
 ```
 
 Pi에서 `sudo` 비밀번호가 필요하므로 서비스 중지·시작은 사용자가 직접 실행한다.

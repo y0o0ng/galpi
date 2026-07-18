@@ -11,7 +11,7 @@ const { execFile } = require('child_process');
 const Database = require('better-sqlite3');
 
 const RETENTION_DAYS = 7;
-const BACKUP_FILE_RE = /^(council-.*\.db|vault-.*\.tar\.gz)$/;
+const BACKUP_FILE_RE = /^((galpi|council)-.*\.db|vault-.*\.tar\.gz)$/;
 
 function timestamp(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
@@ -19,7 +19,7 @@ function timestamp(d = new Date()) {
 }
 
 function defaultBackupDir() {
-  return process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'ai-council');
+  return process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'galpi');
 }
 
 function tarVault(vaultPath, dest) {
@@ -88,14 +88,14 @@ async function runBackup({
   const root = projectDir || path.resolve(__dirname, '..');
   const dir = backupDir || defaultBackupDir();
   const vault = vaultPath
-    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(root, 'ai-council-vault'));
-  const dbPath = dbPathOverride || path.join(root, 'council.db');
+    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(root, 'galpi-vault'));
+  const dbPath = dbPathOverride || path.join(root, 'galpi.db');
 
   await fsp.mkdir(dir, { recursive: true });
   const stamp = timestamp();
 
   // SQLite 온라인 백업 — 서버가 쓰는 중에도 안전 (단순 복사로 인한 손상 방지)
-  const dbDest = path.join(dir, `council-${stamp}.db`);
+  const dbDest = path.join(dir, `galpi-${stamp}.db`);
   let ownDb = null;
   const conn = db || (ownDb = new Database(dbPath, { readonly: true, fileMustExist: true }));
   try {

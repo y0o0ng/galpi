@@ -76,7 +76,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## Project Context
 
   Before planning or editing in this repository, read:
-  - docs/ai-council-design-final.md
+  - docs/galpi-design-final.md
   - docs/roadmap.md
 
   Pi 운영·복구는 docs/RASPBERRY_PI_RUNBOOK.md 참조.
@@ -85,6 +85,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **프로젝트 현재 상태**
 
+- 제품명은 `갈피`(`galpi`), 화면에 보이는 비서 이름은 `시온`(`XION`)이다. `의회`는 Claude 초안과 GPT 검증을 결합하는 기능명으로 유지한다.
 - 현재 배포 상태: V4 논문 검색·전문 능동 독서, 지식 패널, 알림센터 `최근 저장`, 유지보수 리뷰, 컨텍스트 노트 선택 UI(`516a147`), V4.5 S0b-2a·2b(`699d1e9`, `7e4fdc5`), S0c 공용 토픽 쓰기 경로(`d41defe`), A1b 전역 청크 shadow 검색(`adb41a6`)과 답변 생성 단계 UI·정렬 보정(`e7fe8f3`, `73b1ee7`)까지 Pi 배포·운영 적용 완료. `/search`의 명시적 컨텍스트 선택과 질문 기반 기존 자동 회수는 그대로 유지하고, A1b는 실제 답변에 주입하지 않고 trace만 기록한다.
 - 현재 개발 상태: A1b는 모든 활성 `ready` topic 청크를 후보로 보고 기존 노트 점수를 soft prior로 결합한다. 후보 조회는 향후 FTS/벡터 사전 선택으로 교체 가능한 provider 경계 뒤에 뒀다. 운영 Pi 비공개 20개 진단 API 평가는 hard-gated note 16/20·chunk 10/20·abstention 1/4·평균 291ms 대비 A1b note 20/20·chunk 18/20·abstention 4/4·상한 20/20·평균 354ms였다. 한국어 한 글자 부분 문자열 과회수 보정은 로컬 후보까지 완료했으며 Pi 비공개 20개에서 note 16/16·chunk 14/16·abstention 4/4를 유지하고 무관 청크를 53/71에서 51/69로 줄였다. Pi에는 아직 배포하지 않았고 정확 청크 2건과 환율 false positive 1건이 남아 있다.
 - 답변 진행 UI 상태: 단일·의회 답변은 서버가 실제로 시작한 큰 단계만 답변 본문 시작선에 표시하며, 보조색 점 3개는 위치 이동 없이 밝기만 순차 변화한다. 추가 모델/API 호출과 내부 추론 노출은 없다. Pi 보정 배포 시 DB·vault 백업 `20260717-2345`과 코드 백업을 만들고 두 파일 hash, 전체 테스트 97개, audit 66/66, 서비스·인증 API·재시작 로그와 온라인 백업 대비 13개 DB 테이블의 논리 동일성을 확인했다.

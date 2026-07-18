@@ -178,7 +178,7 @@ test('server routes share one mutation path for split, archive/restore, and merg
   const sync = await api(url, '/api/notes/sync', { method: 'POST', body: '{}' });
   assert.equal(sync.response.status, 200, JSON.stringify(sync.body));
 
-  const dbPath = path.join(appRoot, 'council.db');
+  const dbPath = path.join(appRoot, 'galpi.db');
   const db = new Database(dbPath);
   const insertChunk = db.prepare(`
     INSERT INTO note_chunks (

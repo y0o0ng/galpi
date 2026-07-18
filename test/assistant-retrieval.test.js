@@ -530,7 +530,7 @@ test('synthetic A0 fixture fixes the legacy note baseline', async () => {
   assert.equal(summary.chunkRecallAt6.hits, 11);
   assert.equal(summary.abstention.hits, 4);
   assert.equal(summary.contextWithinLimit.hits, 18);
-  assert.equal(summary.contextChars.maximum, 10425);
+  assert.equal(summary.contextChars.maximum, 10413);
   assert.equal(summary.errors, 0);
   assert.match(formatEvaluationReport(summary), /Chunk Recall@6: 11\/20 \(55\.0%\)/);
 });

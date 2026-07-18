@@ -6,7 +6,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const VAULT_PATH = process.env.VAULT_PATH
   ? path.resolve(process.env.VAULT_PATH)
-  : path.join(ROOT, 'ai-council-vault');
+  : path.join(ROOT, 'galpi-vault');
 
 function parseFrontmatter(raw) {
   const match = raw.match(/^---\n([\s\S]*?)\n---/);

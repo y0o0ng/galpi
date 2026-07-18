@@ -12,8 +12,8 @@ const path = require('path');
 const Database = require('better-sqlite3');
 
 const ROOT = path.resolve(__dirname, '..');
-const DB_PATH = path.join(ROOT, 'council.db');
-const VAULT = process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'ai-council-vault');
+const DB_PATH = path.join(ROOT, 'galpi.db');
+const VAULT = process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'galpi-vault');
 const ARCHIVE = path.join(VAULT, '_archive');
 const REPORT = path.join(VAULT, '_system', 'GRAPH_REPORT.md');
 

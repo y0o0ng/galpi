@@ -271,7 +271,7 @@ const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.4-mini';
 const CODEX_DEEP_MODEL = process.env.CODEX_DEEP_MODEL || 'gpt-5.5';
 const CODEX_RUNNER_MODE = process.env.CODEX_RUNNER_MODE || 'codex';
 const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '300000');
-const BACKUP_DIR = process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'ai-council');
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'galpi');
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;        // 하루 1회 기준
 const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000;       // 1시간마다 "24h 지났나" 확인
 
@@ -358,7 +358,7 @@ const sessions = {};
 
 // ─── SQLite DB ───────────────────────────────────────────────────────────────
 
-const db = new Database(path.join(__dirname, 'council.db'));
+const db = new Database(path.join(__dirname, 'galpi.db'));
 db.pragma('journal_mode = WAL'); // 동시 읽기/쓰기 + 백업 2번째 커넥션 시 lock 경합 완화 (Pi SD카드 I/O)
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
@@ -4520,7 +4520,7 @@ function buildTopicProposals({ title, raw }) {
 
   return [
     `- 제안: "${title}" 토픽에 Q&A가 ${parsed.entries.length}개 쌓였으므로, 반복되는 하위 주제가 있는지 검토할 것.`,
-    '- 실행 방식: Codex가 바로 분열하지 말고 Clawd에 split 후보를 알림으로 제안할 것.',
+    '- 실행 방식: Codex가 바로 분열하지 말고 시온에 split 후보를 알림으로 제안할 것.',
   ].join('\n');
 }
 
@@ -4654,7 +4654,7 @@ async function validateCodexEdit(filenames = []) {
 }
 
 function buildCodexRunnerPrompt(filenames) {
-  return `너는 AI Council Obsidian vault의 Codex 정리 담당자다.
+  return `너는 갈피 Obsidian vault의 Codex 정리 담당자다.
 
 작업 루트는 현재 디렉터리이며, 이 디렉터리는 Obsidian vault다.
 이 환경에는 rg가 없을 수 있으므로 파일 탐색은 find, ls, sed 같은 기본 명령만 사용한다.
@@ -4699,7 +4699,7 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 다른 토픽과 합치는 게 낫다고 판단되면 병합 제안을 정확히 이 형식의 줄로 쓴다: "- MERGE [[파일ID|합칠 대상 노트 제목]] — 이유" (파일ID는 .md 확장자를 뺀 실제 vault 파일명, 대상은 vault에 실제로 있는 노트만, 자기 자신 금지). 이 줄은 /merge 후보로 자동 수집된다.
 - 정리 기준 변경이 필요하면 정책 제안을 정확히 이 형식의 줄로 쓴다: "- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유" 또는 "- POLICY {"changes":[{"path":"codexLinks.maxLinksPerNote","value":12},{"path":"codexLinks.minScore","value":55}]} — 이유".
 - POLICY path는 config/codex-policy.json 안의 leaf 값만 사용한다. 예: autoSave.minUserChars, topicMatch.threshold, organize.autoQueueThreshold, retrieval.keywordWeight, retrieval.embeddingWeight, codexLinks.maxLinksPerNote, mergeCandidates.similarityThreshold, mergeCandidates.overlapStopwords.
-- POLICY는 제안일 뿐이며 Clawd 승인 전까지 적용되지 않는다.
+- POLICY는 제안일 뿐이며 시온 승인 전까지 적용되지 않는다.
 - 태그는 #태그 형식으로 3~8개 작성한다.
 - 링크는 아래 형식을 정확히 따른다.
   **[주제명]**
@@ -5847,7 +5847,7 @@ ${deepSection}
 // ─── 서버 시작 ────────────────────────────────────────────────────────────────
 
 app.listen(PORT, HOST, () => {
-  console.log('\n✅ AI 의회 서버 실행 중');
+  console.log('\n✅ 갈피 서버 실행 중');
   console.log(`   로컬:     http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   if (HOST === '0.0.0.0') console.log(`   네트워크: http://<라즈베리파이_IP>:${PORT}`);
   console.log(`   볼트:     ${VAULT_PATH}`);

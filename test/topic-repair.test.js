@@ -51,7 +51,7 @@ function chunkContent(question, answer) {
 async function createRepairFixture(t, { failTitleUpdate = false } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'topic-repair-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const dbPath = path.join(root, 'council.db');
+  const dbPath = path.join(root, 'galpi.db');
   const vaultPath = path.join(root, 'vault');
   const backupDir = path.join(root, 'backups');
   await fs.mkdir(vaultPath);
@@ -169,7 +169,7 @@ function createTestBackupRecorder() {
   async function createBackup({ dbPath, vaultPath, backupDir }) {
     calls.push({ dbPath, vaultPath, backupDir });
     await fs.mkdir(backupDir, { recursive: true });
-    const dbDest = path.join(backupDir, 'council-test.db');
+    const dbDest = path.join(backupDir, 'galpi-test.db');
     const vaultDest = path.join(backupDir, 'vault-test.tar.gz');
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
     try {

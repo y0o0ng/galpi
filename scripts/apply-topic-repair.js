@@ -90,9 +90,9 @@ async function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
-  const dbPath = options.dbPath || path.join(ROOT, 'council.db');
+  const dbPath = options.dbPath || path.join(ROOT, 'galpi.db');
   const vaultPath = options.vaultPath
-    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'ai-council-vault'));
+    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'galpi-vault'));
 
   if (!options.apply) {
     const { plan } = await readTopicRepairPlan({ dbPath, vaultPath });
