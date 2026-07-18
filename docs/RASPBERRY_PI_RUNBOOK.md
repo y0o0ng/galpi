@@ -85,7 +85,6 @@ PORT=3000
 API_TOKEN=아무도-모를-긴-문자열
 CODEX_RUNNER_MODE=codex
 CODEX_BIN=/home/pi/galpi/bin/codex
-CODEX_AUTO_QUEUE_THRESHOLD=5
 ```
 
 `PAPER_SEARCH_MOCK=true`는 논문 정규화·카드 문제 해결용 고정 응답이다. 실제 Semantic Scholar 검색에서는 `false`로 유지한다.
@@ -175,6 +174,7 @@ curl -H 'X-API-Token: <API_TOKEN>' http://127.0.0.1:3000/api/organize/status
 
 - `hasClaude: true`
 - `hasGpt: true`
+- `codexJobBatchSize: 2`
 - `needsManualCheck: 0`
 - `pending`, `queued`, `running` 값이 의도한 상태와 일치
 
@@ -186,15 +186,17 @@ curl -H 'X-API-Token: <API_TOKEN>' http://127.0.0.1:3000/api/organize/status
 /organize
 ```
 
-노트 상태와 최근 job의 상태·시도 횟수·실패 원인을 읽기만 한다. 파일명은 화면에 표시하지 않는다.
+노트 상태와 최근 job의 상태·시도 횟수·실패 원인을 읽기만 한다. 파일명은 화면에 표시하지 않는다. 현재 `config/codex-policy.json`의 `organize.autoQueueThreshold`는 저장 이벤트 5개가 쌓이면 자동 큐를 시작하고, `organize.jobBatchSize`는 한 번의 Codex 호출을 2개 노트로 제한한다. 호출 수는 늘지만 정리 누락·타임아웃 때 한꺼번에 롤백되는 범위가 줄어든다.
 
-이미 queue에 있는 대기 job 하나를 수동 실행:
+이미 queue에 있는 가장 오래된 대기 job부터 수동 재개:
 
 ```text
 /organize process
 ```
 
-이 명령은 새 job을 만들거나 모든 pending 노트를 재정리하지 않는다. 실행기 장애로 멈춘 job은 같은 job ID와 시도 횟수·오류를 보존한 채 `pending`에 남으므로, 원인을 고친 뒤 이 명령으로 바로 재시도할 수 있다. 실행할 queued job이 없으면 그대로 종료한다. 자동 worker가 정상일 때는 보통 직접 누를 필요가 없는 점검·복구용 명령이다.
+실행기 장애로 멈춘 job은 같은 job ID와 시도 횟수·오류를 보존한 채 `pending`에 남으므로, 원인을 고친 뒤 이 명령으로 바로 재시도할 수 있다. 해당 최대 2개 노트 배치가 끝나면 남은 pending 노트를 다음 2개 job으로 저장하고 자동 worker가 이어서 처리한다. 검증에 실패한 배치는 `needs_manual_check`로 격리하고 다음 배치로 진행하지만, 공용 runner 장애는 같은 job에서 멈춘다. 처음부터 queued job이 없으면 임계값 미달 pending을 새로 실행하지 않고 종료한다. 자동 worker가 정상일 때는 보통 직접 누를 필요가 없는 점검·복구용 명령이다.
+
+Codex가 대상 파일 snapshot을 잡고 있는 동안 append·split·merge·archive 같은 vault mutation은 같은 직렬 큐에서 기다린다. 한 job의 최대 2개 노트가 끝난 뒤 저장을 이어가므로 동시 수정 복구가 새 Q&A를 덮지 않지만, 그 사이 해당 저장 응답은 job 실행 시간만큼 늦어질 수 있다. 다음 job을 시작할 때는 active 상태와 원본 파일을 다시 확인한다. 그 사이 보관·병합·삭제된 노트는 건너뛰고, active DB 행만 남은 원본 누락 노트는 그 노트만 `needs_manual_check`로 격리해 같은 배치의 정상 노트를 계속 처리한다.
 
 전체 재정리:
 

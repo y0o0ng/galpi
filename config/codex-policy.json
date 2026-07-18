@@ -9,7 +9,8 @@
     "minTokenOverlap": 1
   },
   "organize": {
-    "autoQueueThreshold": 5
+    "autoQueueThreshold": 5,
+    "jobBatchSize": 2
   },
   "retrieval": {
     "maxActiveNotes": 8,

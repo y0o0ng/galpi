@@ -138,7 +138,8 @@ const DEFAULT_CODEX_POLICY = {
     minTokenOverlap: parseInteger(process.env.TOPIC_MATCH_MIN_TOKEN_OVERLAP, 1),
   },
   organize: {
-    autoQueueThreshold: parseInteger(process.env.CODEX_AUTO_QUEUE_THRESHOLD, 5),
+    autoQueueThreshold: 5,
+    jobBatchSize: 2,
   },
   retrieval: {
     maxActiveNotes: 8,
@@ -202,6 +203,7 @@ const TOPIC_MATCH_THRESHOLD = clampNumber(CODEX_POLICY.topicMatch?.threshold, 0.
 const TOPIC_MATCH_SOFT_THRESHOLD = clampNumber(CODEX_POLICY.topicMatch?.softThreshold, 0.38, 0, TOPIC_MATCH_THRESHOLD);
 const TOPIC_MATCH_MIN_TOKEN_OVERLAP = clampInteger(CODEX_POLICY.topicMatch?.minTokenOverlap, 1, 0, 20);
 const CODEX_AUTO_QUEUE_THRESHOLD = clampInteger(CODEX_POLICY.organize?.autoQueueThreshold, 5, 1, 100);
+const CODEX_JOB_BATCH_SIZE = clampInteger(CODEX_POLICY.organize?.jobBatchSize, 2, 1, 20);
 const MAX_ACTIVE_NOTES = clampInteger(CODEX_POLICY.retrieval?.maxActiveNotes, 8, 1, 30);
 const MAX_NOTE_CONTEXT_CHARS = clampInteger(CODEX_POLICY.retrieval?.maxNoteContextChars, 5000, 500, 30000);
 const SEARCH_KEYWORD_WEIGHT_RAW = clampNumber(CODEX_POLICY.retrieval?.keywordWeight, 0.35, 0, 1);
@@ -965,9 +967,7 @@ function getSavedNoteByMessageId(messageId, noteType = 'topic') {
   return noteSaveState.find(messageId, noteType);
 }
 
-// 한 job(=codex 한 세션)에 노트를 너무 많이 묶으면 정리 시간이 길어져 타임아웃으로 통째 실패한다.
-// 기본 배치 크기를 자동 큐 임계값으로 제한하고, 남은 pending은 다음 job에서 처리한다.
-const createCodexJobFromPending = db.transaction((limit = CODEX_AUTO_QUEUE_THRESHOLD) => {
+function createCodexJobRecordFromPending(limit = CODEX_JOB_BATCH_SIZE) {
   const notes = Number.isInteger(limit) && limit > 0
     ? stmtGetPendingNotes.all().slice(0, limit)
     : stmtGetPendingNotes.all();
@@ -985,6 +985,19 @@ const createCodexJobFromPending = db.transaction((limit = CODEX_AUTO_QUEUE_THRES
     status: 'pending',
     notes: notes.map(note => ({ ...note, codexStatus: 'queued' })),
   };
+}
+
+// 자동 큐 발동 기준과 실제 Codex 호출 크기를 분리한다. 한 호출에 노트를 너무 많이 묶으면
+// 정리 누락·타임아웃이 배치 전체 롤백으로 이어지므로, 남은 pending은 다음 job에서 처리한다.
+const createCodexJobFromPending = db.transaction((limit = CODEX_JOB_BATCH_SIZE) => (
+  createCodexJobRecordFromPending(limit)
+));
+
+// 현재 job 종료(processed/failed)와 다음 배치 저장은 반드시 함께 커밋한다. 둘 사이에
+// 프로세스가 종료돼도 끝난 job만 남고 후속 pending 노트가 큐에서 고아가 되지 않는다.
+const finishCodexJobAndCreateNext = db.transaction((jobId, status, error = null) => {
+  stmtFinishCodexJob.run(status, error, jobId);
+  return createCodexJobRecordFromPending();
 });
 
 function maybeCreateCodexJobFromSaveEvents() {
@@ -1000,18 +1013,61 @@ function maybeCreateCodexJobFromSaveEvents() {
   return job;
 }
 
-const startNextCodexJob = db.transaction(() => {
+async function partitionCodexTargets(filenames) {
+  const runnable = [];
+  const skippedFilenames = [];
+  const unavailable = [];
+
+  for (const filename of filenames) {
+    const note = stmtGetNoteByFilename.get(filename);
+    if (!note || note.archived) {
+      skippedFilenames.push(filename);
+      continue;
+    }
+
+    const safeName = path.basename(filename || '');
+    if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
+      unavailable.push({ note, error: '잘못된 노트 파일명입니다.' });
+      continue;
+    }
+
+    try {
+      const stat = await fs.stat(path.join(VAULT_PATH, safeName));
+      if (!stat.isFile()) throw new Error('원본 경로가 파일이 아닙니다.');
+      runnable.push(note);
+    } catch (err) {
+      const detail = err?.code === 'ENOENT'
+        ? '노트 원본 파일을 찾을 수 없습니다.'
+        : `노트 원본 파일을 읽을 수 없습니다${err?.code ? ` (${err.code})` : ''}.`;
+      unavailable.push({ note, error: detail });
+    }
+  }
+
+  return { runnable, skippedFilenames, unavailable };
+}
+
+const startPreparedCodexJob = db.transaction((jobId, filenames) => {
+  const result = stmtStartCodexJob.run(jobId);
+  if (result.changes !== 1) return null;
+
+  filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('running', filename));
+  return true;
+});
+
+async function startNextCodexJob() {
   const job = stmtGetNextPendingCodexJob.get();
   if (!job) return null;
 
-  const result = stmtStartCodexJob.run(job.id);
-  if (result.changes !== 1) return null;
+  const queuedFilenames = JSON.parse(job.noteFilenamesJson);
+  const partition = await partitionCodexTargets(queuedFilenames);
+  const filenames = partition.runnable.map(note => note.filename);
+  if (filenames.length === 0 && partition.unavailable.length === 0) {
+    return { id: job.id, filenames, ...partition };
+  }
+  if (!startPreparedCodexJob(job.id, filenames)) return null;
 
-  const filenames = JSON.parse(job.noteFilenamesJson);
-  filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('running', filename));
-
-  return { id: job.id, filenames };
-});
+  return { id: job.id, filenames, ...partition };
+}
 
 function finishCodexJob(jobId, status, error = null) {
   stmtFinishCodexJob.run(status, error, jobId);
@@ -2497,6 +2553,7 @@ app.get('/api/config', (req, res) => {
     contextN:    CONTEXT_N,
     contextMessages: HISTORY_CONTEXT_MESSAGES,
     codexAutoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
+    codexJobBatchSize: CODEX_JOB_BATCH_SIZE,
     webSearch: {
       enabled: WEB_SEARCH_ENABLED,
       provider: WEB_SEARCH_PROVIDER,
@@ -3897,6 +3954,7 @@ app.get('/api/organize/status', (_req, res) => {
   res.json({
     success: true,
     autoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
+    jobBatchSize: CODEX_JOB_BATCH_SIZE,
     runner: codexRunnerHealth,
     ...counts,
     notes: stmtGetPendingNotes.all(),
@@ -3948,6 +4006,7 @@ app.post('/api/organize/process', async (_req, res) => {
       status: result.status,
       notes: result.processed,
       failed: result.failed,
+      skippedCount: result.skippedCount || 0,
       error: result.error || null,
     });
   } catch (err) {
@@ -4922,7 +4981,7 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - CODEX-PROPOSALS는 실행 명령이 아니라 사용자에게 보낼 제안만 적는다. 제안이 없으면 비워둔다.
 - 다른 토픽과 합치는 게 낫다고 판단되면 병합 제안을 정확히 이 형식의 줄로 쓴다: "- MERGE [[파일ID|합칠 대상 노트 제목]] — 이유" (파일ID는 .md 확장자를 뺀 실제 vault 파일명, 대상은 vault에 실제로 있는 노트만, 자기 자신 금지). 이 줄은 /merge 후보로 자동 수집된다.
 - 정리 기준 변경이 필요하면 정책 제안을 정확히 이 형식의 줄로 쓴다: "- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유" 또는 "- POLICY {"changes":[{"path":"codexLinks.maxLinksPerNote","value":12},{"path":"codexLinks.minScore","value":55}]} — 이유".
-- POLICY path는 config/codex-policy.json 안의 leaf 값만 사용한다. 예: autoSave.minUserChars, topicMatch.threshold, organize.autoQueueThreshold, retrieval.keywordWeight, retrieval.embeddingWeight, codexLinks.maxLinksPerNote, mergeCandidates.similarityThreshold, mergeCandidates.overlapStopwords.
+- POLICY path는 config/codex-policy.json 안의 leaf 값만 사용한다. 예: autoSave.minUserChars, topicMatch.threshold, organize.autoQueueThreshold, organize.jobBatchSize, retrieval.keywordWeight, retrieval.embeddingWeight, codexLinks.maxLinksPerNote, mergeCandidates.similarityThreshold, mergeCandidates.overlapStopwords.
 - POLICY는 제안일 뿐이며 시온 승인 전까지 적용되지 않는다.
 - 태그는 #태그 형식으로 3~8개 작성한다.
 - 링크는 아래 형식을 정확히 따른다.
@@ -4972,7 +5031,7 @@ async function runCodexCliForJob(filenames, model = CODEX_MODEL) {
   }
 }
 
-async function processCodexNoteWithHeuristic(filename) {
+async function processCodexNoteWithHeuristicImpl(filename) {
   const safeName = path.basename(filename || '');
   if (!safeName || safeName !== filename || !safeName.endsWith('.md')) {
     throw new Error('잘못된 노트 파일명입니다.');
@@ -5004,7 +5063,7 @@ async function processCodexNoteWithHeuristic(filename) {
   return { filename: safeName, title, tags: tagsBlock, links: linksBlock };
 }
 
-async function processCodexJobWithCodex(filenames, model = CODEX_MODEL) {
+async function processCodexJobWithCodexImpl(filenames, model = CODEX_MODEL) {
   const snapshots = await snapshotVaultFiles(filenames);
 
   try {
@@ -5045,12 +5104,12 @@ async function processImmediateCodexBatch(filenames, model = CODEX_MODEL) {
   filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('running', filename));
 
   if (CODEX_RUNNER_MODE === 'codex') {
-    return processCodexJobWithCodex(filenames, model);
+    return processCodexJobWithCodexImpl(filenames, model);
   }
 
   const processed = [];
   for (const filename of filenames) {
-    processed.push(await processCodexNoteWithHeuristic(filename));
+    processed.push(await processCodexNoteWithHeuristicImpl(filename));
   }
   return processed;
 }
@@ -5072,23 +5131,42 @@ async function runAllCodexNotes() {
   const processed = [];
   const failed = [];
   const batches = [];
-  const batchSize = CODEX_AUTO_QUEUE_THRESHOLD;
+  const batchSize = CODEX_JOB_BATCH_SIZE;
   let aborted = false;
 
   for (let i = 0; i < notes.length; i += batchSize) {
     const batch = notes.slice(i, i + batchSize);
-    const filenames = batch.map(note => note.filename);
-    const previousStatuses = new Map(batch.map(note => [note.filename, note.codexStatus || 'pending']));
+    let filenames = [];
+    let previousStatuses = new Map();
+    let skippedCount = 0;
+    let unavailableFailures = [];
 
     try {
-      const batchProcessed = await processImmediateCodexBatch(filenames, CODEX_DEEP_MODEL);
+      const batchProcessed = await topicMutations.run(async () => {
+        const partition = await partitionCodexTargets(batch.map(note => note.filename));
+        filenames = partition.runnable.map(note => note.filename);
+        previousStatuses = new Map(
+          partition.runnable.map(note => [note.filename, note.codexStatus || 'pending']),
+        );
+        skippedCount = partition.skippedFilenames.length;
+        unavailableFailures = partition.unavailable.map(({ note, error }) => {
+          stmtUpdateNoteCodexStatus.run('needs_manual_check', note.filename);
+          return { filename: note.filename, error };
+        });
+        if (filenames.length === 0) return [];
+        return processImmediateCodexBatch(filenames, CODEX_DEEP_MODEL);
+      });
       processed.push(...batchProcessed);
+      failed.push(...unavailableFailures);
       batches.push({
         index: batches.length + 1,
-        status: 'processed',
+        status: unavailableFailures.length > 0
+          ? (filenames.length > 0 ? 'partial_failed' : 'failed')
+          : (filenames.length > 0 ? 'processed' : 'skipped'),
         filenames,
         processedCount: batchProcessed.length,
-        failedCount: 0,
+        failedCount: unavailableFailures.length,
+        skippedCount,
       });
     } catch (err) {
       console.error(`[codex] 배치 정리 실패 — ${filenames.join(', ')}: ${err.message}`);
@@ -5100,7 +5178,10 @@ async function runAllCodexNotes() {
           : 'needs_manual_check';
         stmtUpdateNoteCodexStatus.run(nextStatus, filename);
       });
-      const batchFailures = filenames.map(filename => ({ filename, error }));
+      const batchFailures = [
+        ...unavailableFailures,
+        ...filenames.map(filename => ({ filename, error })),
+      ];
       failed.push(...batchFailures);
       batches.push({
         index: batches.length + 1,
@@ -5108,6 +5189,7 @@ async function runAllCodexNotes() {
         filenames,
         processedCount: 0,
         failedCount: batchFailures.length,
+        skippedCount,
         error,
       });
       // 실행 파일·로그인·사용량 같은 공용 runner 장애면 다음 정상 노트도 같은 이유로
@@ -5131,17 +5213,32 @@ async function runAllCodexNotes() {
   };
 }
 
-async function runNextCodexJob() {
-  const job = startNextCodexJob();
+async function runNextCodexJobImpl() {
+  const job = await startNextCodexJob();
   if (!job) return null;
 
+  if (job.filenames.length === 0 && job.unavailable.length === 0) {
+    const nextJob = finishCodexJobAndCreateNext(job.id, 'processed', null);
+    return {
+      id: job.id,
+      status: 'processed',
+      processed: [],
+      failed: [],
+      skippedCount: job.skippedFilenames.length,
+      nextJobId: nextJob?.id || null,
+    };
+  }
+
   const processed = [];
-  const failed = [];
+  const failed = job.unavailable.map(({ note, error }) => {
+    stmtUpdateNoteCodexStatus.run('needs_manual_check', note.filename);
+    return { filename: note.filename, error };
+  });
   let retryableRunnerFailure = false;
 
-  if (CODEX_RUNNER_MODE === 'codex') {
+  if (job.filenames.length > 0 && CODEX_RUNNER_MODE === 'codex') {
     try {
-      processed.push(...await processCodexJobWithCodex(job.filenames, CODEX_MODEL));
+      processed.push(...await processCodexJobWithCodexImpl(job.filenames, CODEX_MODEL));
     } catch (err) {
       retryableRunnerFailure = isCodexRunnerError(err);
       const failedStatus = retryableRunnerFailure ? 'queued' : 'needs_manual_check';
@@ -5149,10 +5246,10 @@ async function runNextCodexJob() {
       const error = redactCodexNoteNames(err, job.filenames);
       failed.push(...job.filenames.map(filename => ({ filename, error })));
     }
-  } else {
+  } else if (job.filenames.length > 0) {
     for (const filename of job.filenames) {
       try {
-        processed.push(await processCodexNoteWithHeuristic(filename));
+        processed.push(await processCodexNoteWithHeuristicImpl(filename));
       } catch (err) {
         stmtUpdateNoteCodexStatus.run('needs_manual_check', filename);
         failed.push({ filename, error: redactCodexNoteNames(err, job.filenames) });
@@ -5161,15 +5258,39 @@ async function runNextCodexJob() {
   }
 
   if (failed.length > 0) {
-    const error = formatCodexJobError(failed, job.filenames.length);
+    const error = formatCodexJobError(failed, job.filenames.length + job.unavailable.length);
     failed.forEach(f => console.error(`[codex] 정리 실패 — ${f.filename}: ${f.error}`));
     const status = retryableRunnerFailure ? 'pending' : 'failed';
-    finishCodexJob(job.id, status, error);
-    return { id: job.id, status, processed, failed, error, retryable: retryableRunnerFailure };
+    let nextJob = null;
+    if (retryableRunnerFailure) finishCodexJob(job.id, status, error);
+    else nextJob = finishCodexJobAndCreateNext(job.id, status, error);
+    return {
+      id: job.id,
+      status,
+      processed,
+      failed,
+      error,
+      retryable: retryableRunnerFailure,
+      skippedCount: job.skippedFilenames.length,
+      nextJobId: nextJob?.id || null,
+    };
   }
 
-  finishCodexJob(job.id, 'processed', null);
-  return { id: job.id, status: 'processed', processed, failed };
+  const nextJob = finishCodexJobAndCreateNext(job.id, 'processed', null);
+  return {
+    id: job.id,
+    status: 'processed',
+    processed,
+    failed,
+    skippedCount: job.skippedFilenames.length,
+    nextJobId: nextJob?.id || null,
+  };
+}
+
+function runNextCodexJob() {
+  // job 시작부터 snapshot 복구·DB 종료까지 같은 직렬 큐에 둔다. Codex가 파일을 가진 동안
+  // append/split/merge/archive가 끼어들어 새 사용자 내용을 snapshot으로 덮는 일을 막는다.
+  return topicMutations.run(runNextCodexJobImpl);
 }
 
 function kickOrganizeWorker() {
@@ -5190,13 +5311,7 @@ function kickOrganizeWorker() {
     try {
       while (true) {
         const result = await runNextCodexJob();
-        if (!result) {
-          // 배치 크기 제한으로 한 job이 pending 전부를 담지 못하므로,
-          // job 큐가 비어도 pending 노트가 남아있으면 다음 배치 job을 만들어 이어간다.
-          // (실패 시엔 아래 break로 멈추므로 실패 노트 무한 재시도는 없음)
-          if (!createCodexJobFromPending()) break;
-          continue;
-        }
+        if (!result) break;
 
         if (result.status === 'processed') {
           writeGraphReport().catch(err => {
@@ -5204,6 +5319,7 @@ function kickOrganizeWorker() {
           });
         }
 
+        if (result.status === 'failed' && result.nextJobId) continue;
         if (result.status !== 'processed') break;
       }
     } catch (err) {
@@ -6153,7 +6269,7 @@ app.listen(PORT, HOST, () => {
   console.log(`   볼트:     ${VAULT_PATH}`);
   console.log(`   Claude:   ${CLAUDE_MODEL} / deep ${CLAUDE_DEEP_MODEL}`);
   console.log(`   GPT:      ${GPT_MODEL} / deep ${GPT_DEEP_MODEL}`);
-  console.log(`   Codex:    ${CODEX_MODEL} / deep ${CODEX_DEEP_MODEL}`);
+  console.log(`   Codex:    ${CODEX_MODEL} / deep ${CODEX_DEEP_MODEL} (job당 ${CODEX_JOB_BATCH_SIZE}개)`);
   console.log(`   컨텍스트: 최근 ${CONTEXT_N}턴 내외 (${HISTORY_CONTEXT_MESSAGES}개 메시지)\n`);
   if (HOST === '0.0.0.0' && !API_TOKEN) {
     console.warn('⚠️  경고: 0.0.0.0으로 LAN에 열려 있는데 API_TOKEN이 비어 있습니다.');

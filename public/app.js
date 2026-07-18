@@ -1405,6 +1405,7 @@ function renderOrganizeStatus(data) {
     runnerSummary,
     runnerError,
     `자동 큐 기준: ${data.autoQueueThreshold || 5}개`,
+    `실행 배치: ${data.jobBatchSize || 2}개/job`,
     `정리 대기: ${data.pending || 0}개`,
     `큐 대기: ${data.queued || 0}개`,
     `실행 중: ${data.running || 0}개`,
@@ -1432,8 +1433,9 @@ function renderOrganizeProcessResult(data) {
 
   const processedCount = Array.isArray(data.notes) ? data.notes.length : 0;
   const failedCount = Array.isArray(data.failed) ? data.failed.length : 0;
+  const skippedCount = Number(data.skippedCount) || 0;
   const statusLabel = data.status === 'processed'
-    ? '완료'
+    ? (skippedCount > 0 && processedCount === 0 ? '건너뜀' : '완료')
     : data.status === 'pending'
     ? '실행기 복구 후 재시도 대기'
     : '실패';
@@ -1442,6 +1444,7 @@ function renderOrganizeProcessResult(data) {
         `정리 job #${data.jobId} ${statusLabel}`,
         `처리: ${processedCount}개`,
         `실패: ${failedCount}개`,
+        skippedCount > 0 ? `건너뜀: ${skippedCount}개` : '',
         data.error ? `오류: ${data.error}` : '',
       ].filter(Boolean).join('\n')
     : (data.message || '실행할 정리 job이 없습니다.');
@@ -1463,8 +1466,10 @@ function renderOrganizeAllResult(data) {
 
   const batches = Array.isArray(data.batches) ? data.batches : [];
   const failed = Array.isArray(data.failed) ? data.failed : [];
+  const skippedCount = batches.reduce((sum, batch) => sum + (Number(batch.skippedCount) || 0), 0);
   const batchRows = batches.map(batch =>
-    `${batch.index}. ${batch.status} (${batch.processedCount || 0}/${batch.filenames?.length || 0})`
+    `${batch.index}. ${batch.status} ` +
+    `(처리 ${batch.processedCount || 0} · 실패 ${batch.failedCount || 0} · 건너뜀 ${batch.skippedCount || 0})`
   );
   const failedRows = failed.slice(0, 10).map(item => `- ${item.filename}: ${item.error}`);
   const moreFailed = failed.length > 10 ? `\n...외 ${failed.length - 10}개` : '';
@@ -1475,6 +1480,7 @@ function renderOrganizeAllResult(data) {
         `상태: ${data.status}`,
         `처리: ${data.processedCount || 0}개`,
         `실패: ${data.failedCount || 0}개`,
+        `건너뜀: ${skippedCount}개`,
         batchRows.length ? `\n배치:\n${batchRows.join('\n')}` : '',
         failedRows.length ? `\n수동 확인 필요:\n${failedRows.join('\n')}${moreFailed}` : '',
       ].filter(Boolean).join('\n')

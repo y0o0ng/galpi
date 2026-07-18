@@ -167,7 +167,6 @@ test('server routes share one mutation path for split, archive/restore, and merg
       PORT: String(port),
       VAULT_PATH: vaultPath,
       BACKUP_DIR: path.join(appRoot, 'backups'),
-      CODEX_AUTO_QUEUE_THRESHOLD: '1000',
       CODEX_RUNNER_MODE: 'heuristic',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
