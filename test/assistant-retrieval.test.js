@@ -216,6 +216,32 @@ test('note ranker keeps the existing keyword and embedding scoring behavior', ()
   assert.equal(cosineSimilarity([1, 0], [Number.NaN, 0]), 0);
 });
 
+test('note ranker tolerates one-character variants in long compact titles only', () => {
+  const ranked = rankNoteCandidates({
+    query: '수면대행서비스',
+    notes: [
+      {
+        filename: 'sleep.md',
+        title: '숙면 대행 서비스',
+        body: '작품 구상',
+      },
+      {
+        filename: 'stock.md',
+        title: '주식 시장',
+        body: '최근 이야기',
+      },
+    ],
+    minKeywordScore: 1,
+  });
+
+  assert.deepEqual(ranked.map(note => note.filename), ['sleep.md']);
+  assert.deepEqual(rankNoteCandidates({
+    query: '시',
+    notes: [{ filename: 'meal.md', title: '식', body: '' }],
+    minKeywordScore: 1,
+  }), []);
+});
+
 test('chunk ranker combines keyword and embedding relevance and rejects weak evidence', () => {
   const ranked = rankChunkCandidates({
     query: '현재 논문 PDF 파서 방향',
