@@ -11,10 +11,10 @@ self.addEventListener('push', event => {
   const url = typeof payload.url === 'string' && payload.url.startsWith('/')
     ? payload.url
     : '/?panel=agents&taskView=reminders';
-  event.waitUntil(self.registration.showNotification('시온 일정 알림', {
+  event.waitUntil(self.registration.showNotification('XION 일정 알림', {
     body: '확인할 일정이 있어. 앱에서 내용을 확인해줘.',
-    icon: '/lib/icons/Claude_code_pet/clyde-idle-living.svg',
-    badge: '/lib/icons/Claude_code_pet/clyde-idle-living.svg',
+    icon: '/lib/icons/Xion/xion-app-icon.svg',
+    badge: '/lib/icons/Xion/xion-mark.svg',
     tag: `task-reminder:${reminderId}`,
     renotify: false,
     data: { url },

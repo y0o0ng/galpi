@@ -7,10 +7,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="갈피">
-  <meta name="theme-color" content="#f4f1eb">
+  <meta name="theme-color" content="#F3F5F2">
   <title>갈피</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/lib/icons/Claude_code_pet/clyde-idle-living.svg" type="image/svg+xml">
+  <link rel="icon" href="/lib/icons/Xion/xion-app-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -46,9 +46,9 @@
         </div>
       </div>
       <div id="toggle-row">
-        <div class="model-btn model-chip active" data-model="claude" aria-label="기본 답변 모델 Claude">
-          <img class="model-logo-icon" src="/lib/icons/sX8kIHSVvTDsFMiq9VQtQRczlnC6Ao5W6GvDvETovqQIJ1wxbLKydnVC-kBFsRoucWrclKkEW0ohQcJx3jm_pg.svg" width="22" height="22" aria-hidden="true">
-          Claude
+        <div class="model-btn model-chip active" data-model="claude" aria-label="기본 답변 모드 XION">
+          <span class="model-logo-icon xion-mark-icon" aria-hidden="true"></span>
+          XION
         </div>
         <button class="council-btn disabled">의회</button>
         <div class="council-mode-toggle" aria-label="의회 답변 방식">
@@ -70,6 +70,12 @@
         <div id="command-palette" style="display:none"></div>
 
         <div id="input-area">
+          <div id="assistant-tools">
+            <button id="assistant-tools-toggle" type="button" title="XION 도구" aria-label="XION 도구 열기" aria-controls="assistant-tools-menu" aria-expanded="false">
+              <span class="assistant-tools-icon" aria-hidden="true"></span>
+            </button>
+            <nav id="assistant-tools-menu" aria-label="XION 도구" hidden></nav>
+          </div>
           <textarea id="input" placeholder="질문을 입력하세요… (Shift+Enter로 줄바꿈)" rows="1"></textarea>
           <button id="send-btn" title="전송 (Enter)">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -139,9 +145,6 @@
     </main>
   </div>
   <div id="knowledge-panel-backdrop" hidden></div>
-  <div id="pet">
-    <img id="pet-img" src="/lib/icons/Claude_code_pet/clawd-idle.gif" alt="시온" draggable="false">
-  </div>
   <script src="lib/marked.min.js"></script>
   <script src="lib/purify.min.js"></script>
   <script src="note-panel.js"></script>
@@ -151,6 +154,5 @@
   <script src="agent-panel.js"></script>
   <script src="paper-panel.js"></script>
   <script src="app.js"></script>
-  <script src="pet.js"></script>
 </body>
 </html>

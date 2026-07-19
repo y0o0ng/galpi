@@ -52,6 +52,11 @@ const slashCommands = [
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
   { command: '/memory clear', title: '메모리 초기화', description: '저장된 사용자 메모리 전체 삭제' },
 ];
+const ASSISTANT_TOOL_GROUPS = [
+  { label: '검색', commands: ['/search ', '/web '] },
+  { label: '서재', commands: ['/notifications', '/memory', '/memory add '] },
+  { label: '관리', commands: ['/organize', '/graph report', '/audit', '/organize all'] },
+];
 
 function getApiToken() {
   return localStorage.getItem(apiTokenKey) || '';
@@ -167,7 +172,7 @@ async function init() {
     tasksEnabled = config.tasksEnabled === true;
     initPaperPanel();
     document.getElementById('model-indicator').textContent =
-      `기본 Claude: ${config.claudeModel}  |  의회 GPT: ${config.gptModel}`;
+      `XION: ${config.claudeModel}  |  의회 GPT: ${config.gptModel}`;
     renderWebUsagePill(config.webSearch);
 
     if (!config.hasClaude) {
@@ -224,6 +229,69 @@ async function init() {
   startTaskRefresh();
   setInterval(pollForUpdates, 7000);
   updateNotesBar();
+}
+
+function initAssistantTools() {
+  const toggle = document.getElementById('assistant-tools-toggle');
+  const menu = document.getElementById('assistant-tools-menu');
+  if (!toggle || !menu) return;
+
+  ASSISTANT_TOOL_GROUPS.forEach(group => {
+    const section = document.createElement('section');
+    section.className = 'assistant-tools-group';
+
+    const label = document.createElement('span');
+    label.className = 'assistant-tools-label';
+    label.textContent = group.label;
+    section.appendChild(label);
+
+    group.commands.forEach(command => {
+      const item = slashCommands.find(candidate => candidate.command === command);
+      if (!item) return;
+      const button = document.createElement('button');
+      button.className = 'assistant-tools-item';
+      button.type = 'button';
+      button.textContent = item.title;
+      button.addEventListener('click', () => runAssistantTool(command));
+      section.appendChild(button);
+    });
+
+    menu.appendChild(section);
+  });
+
+  toggle.addEventListener('click', event => {
+    event.stopPropagation();
+    setAssistantToolsOpen(menu.hidden);
+  });
+
+  document.addEventListener('click', event => {
+    if (!event.target.closest('#assistant-tools')) setAssistantToolsOpen(false);
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || menu.hidden) return;
+    setAssistantToolsOpen(false);
+    toggle.focus();
+  });
+}
+
+function setAssistantToolsOpen(open) {
+  const toggle = document.getElementById('assistant-tools-toggle');
+  const menu = document.getElementById('assistant-tools-menu');
+  if (!toggle || !menu) return;
+  menu.hidden = !open;
+  toggle.setAttribute('aria-expanded', String(open));
+  toggle.setAttribute('aria-label', open ? 'XION 도구 닫기' : 'XION 도구 열기');
+}
+
+function runAssistantTool(command) {
+  const input = document.getElementById('input');
+  if (!input) return;
+  setAssistantToolsOpen(false);
+  input.value = command;
+  input.focus();
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  if (!command.endsWith(' ')) sendMessage();
 }
 
 function renderWebUsagePill(webSearch) {
@@ -2846,7 +2914,7 @@ function scrollDown() {
 function showWelcome() {
   getMessages().innerHTML = `
     <div class="welcome">
-      <p>안녕하세요!<br>기본 답변은 Claude가 맡습니다.</p>
+      <p>안녕하세요!<br>기본 답변은 XION이 맡습니다.</p>
       <p style="margin-top:10px;font-size:12px;opacity:0.7">의회 모드에서는 GPT와 함께 비교합니다.</p>
     </div>`;
 }
@@ -3021,10 +3089,12 @@ function applyTheme(dark) {
   } else {
     document.documentElement.removeAttribute('data-theme');
   }
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', dark ? '#151A18' : '#F3F5F2');
   document.getElementById('icon-moon').style.display = dark ? 'none' : '';
   document.getElementById('icon-sun').style.display  = dark ? ''     : 'none';
 }
 
 // ─── 실행 ─────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => { init(); initTheme(); initPet(); });
+document.addEventListener('DOMContentLoaded', () => { init(); initTheme(); initAssistantTools(); });

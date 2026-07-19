@@ -12,6 +12,7 @@ galpi-vault/
 deploy-backups/
 fixtures/assistant-retrieval-private*.json
 .playwright-mcp/
+public/lib/icons/Xion/Xion_pet/*.zip
 
 # agent skills (tooling, 개인 환경)
 skills-lock.json

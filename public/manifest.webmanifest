@@ -2,22 +2,22 @@
   "id": "/",
   "name": "갈피",
   "short_name": "갈피",
-  "description": "시온과 대화하고 일정과 지식을 관리하는 개인 비서",
+  "description": "XION과 대화하고 일정과 지식을 관리하는 개인 비서",
   "lang": "ko",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f1eb",
-  "theme_color": "#f4f1eb",
+  "background_color": "#F3F5F2",
+  "theme_color": "#F3F5F2",
   "icons": [
     {
-      "src": "/lib/icons/Claude_code_pet/clyde-idle-living.svg",
+      "src": "/lib/icons/Xion/xion-app-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/lib/icons/Claude_code_pet/clyde-idle-living.svg",
+      "src": "/lib/icons/Xion/xion-app-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"

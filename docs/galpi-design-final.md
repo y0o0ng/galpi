@@ -615,6 +615,7 @@
 - **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
 - **토픽 분리(완료):** Codex split 제안을 시온 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.
 - **알림센터(완료):** 지식 시트의 첫 `알림` 탭과 `/notifications`에서 연다. `전체 | Codex | 시스템 | 최근 저장`을 제공하고 CODEX-PROPOSALS의 merge/split/policy/review 승인·무시 상태는 DB(`notification_actions`)에 저장한다. `최근 저장`은 `auto_save_decisions`의 성공 기록을 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 보여주며 카드를 누르면 같은 시트의 노트 상세를 연다. 저장 판단·AI 호출은 추가하지 않는다. 일정 알림은 범용 탭에서 제외하고 `에이전트 > 일정 에이전트`로 모으며, 기존 PIP·drag·localStorage 위치 층은 제거했다.
+- **XION 화면 정체성·도구 진입점(로컬 구현 완료, Pi 미배포):** 화면의 기본 비서 이름을 `XION`으로 통일하고 비취색 `#2F6B57` 중심의 light/dark token, favicon·PWA 아이콘과 단색 마크를 적용했다. 떠다니는 펫 런타임은 제거하되 캐릭터 자산은 V6 검토용으로 보존한다. 기존 펫의 빠른 기능은 채팅 입력창 왼쪽 XION 버튼으로 옮겨 `검색 | 서재 | 관리` 9개 항목을 제공하며, 입력이 필요한 명령은 채우기만 하고 나머지는 기존 명령 경로로 즉시 실행한다.
 - **유지보수 리뷰(Pi 배포·검증 완료, `fd615c7`):** 의회 자동 topic과 수동 council 저장 상태를 분리하고, 불용어 질의 임베딩 폴백, 저장 버튼 부분 갱신, 일반 노트의 서버 측 paper 제외, 패널 초기화 복구, malformed Semantic Scholar 200 거부, 펫 클릭 전달을 반영했다. 전체 테스트 34개와 모바일·데스크톱 Playwright 회귀 검증을 통과했고, Pi에서 서비스 기동·일반 노트 paper 제외·불용어 검색·의회 저장 상태 API를 확인했다. 구조 이슈와 후속 클린업은 `maintenance.md`에서 추적한다.
 - **정책 파일(완료):** `config/codex-policy.json`에 자동 저장, 토픽 매칭, organize, retrieval, Codex 링크, 병합 후보 가중치/임계값/불용어를 둔다. Codex가 수정 가능한 파일은 `.codex/editable-files.json`에 제한한다.
 - **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, 시온 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
@@ -1516,7 +1517,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
 7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 참조 가능한 `closed`와 일반 회수에서 제외하는 `deleted`, 무LLM·별도 정본을 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
 8. reminder는 약속 occurrence와 사용자 확인 상태의 정본, push subscription은 브라우저 endpoint 정본, delivery는 reminder×subscription 전송 receipt다. private HTTPS 홈 화면 PWA와 Web Push를 C1 첫 배포에 포함하되 일정 에이전트의 in-app reminder·foreground refresh를 fallback으로 유지한다.
-9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트를 둔다. 이전·현재·다음 3주 21일 swipe, 지연/오늘/예정/Inbox, 오늘/지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 일정 작업 화면을 같은 탭에 제공한다. task 변경 행동은 `TaskPanel` 단일 renderer만 사용한다.
+9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트를 둔다. 이전·현재·다음 3주 21일을 native swipe와 키보드 좌우 이동으로 탐색하고 별도 이전·오늘·다음 버튼은 두지 않는다. 지연/오늘/예정/Inbox, 오늘/지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 일정 작업 화면을 같은 탭에 제공한다. task 변경 행동은 `TaskPanel` 단일 renderer만 사용한다.
 10. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
 
 ### 구조 원칙

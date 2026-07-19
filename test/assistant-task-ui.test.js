@@ -14,6 +14,8 @@ function read(relativePath) {
 
 test('notification, task, and agent modules load before the panel shell and expose narrow APIs', () => {
   const html = read('public/index.html');
+  const appSource = read('public/app.js');
+  const css = read('public/style.css');
   const notificationSource = read('public/notification-panel.js');
   const taskSource = read('public/task-panel.js');
   const pushSource = read('public/push-client.js');
@@ -28,6 +30,18 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.match(html, /data-panel-tab="notifications"[^>]*class="[^"]*active|class="knowledge-tab active" data-panel-tab="notifications"/);
   assert.match(html, /id="notification-panel-content" class="notification-body" aria-live="polite"/);
   assert.match(html, /id="agent-panel-content" aria-live="polite"/);
+  assert.match(html, /data-model="claude" aria-label="기본 답변 모드 XION"/);
+  assert.match(html, /class="model-logo-icon xion-mark-icon"[^>]*>[\s\S]*?XION/);
+  assert.match(html, /id="assistant-tools-toggle"[^>]*aria-controls="assistant-tools-menu"[^>]*aria-expanded="false"/);
+  assert.match(html, /id="assistant-tools-menu" aria-label="XION 도구" hidden/);
+  assert.doesNotMatch(html, /id="pet"|src="pet\.js"/);
+  assert.match(appSource, /const ASSISTANT_TOOL_GROUPS = \[/);
+  assert.match(appSource, /function initAssistantTools\(\)/);
+  assert.match(appSource, /if \(!command\.endsWith\(' '\)\) sendMessage\(\)/);
+  assert.match(appSource, /DOMContentLoaded[\s\S]*initAssistantTools\(\)/);
+  assert.match(css, /#assistant-tools-toggle\s*{[^}]*width: 44px;[^}]*height: 44px/s);
+  assert.match(css, /#assistant-tools-menu\s*{[^}]*bottom: calc\(100% \+ 10px\)[^}]*max-height:/s);
+  assert.match(css, /\.model-btn\[data-model="claude"\]\.active\s*{[^}]*background: transparent;[^}]*color: var\(--brand-ink\)/s);
   assert.ok(notificationIndex > 0 && notificationIndex < taskIndex);
   assert.ok(taskIndex < pushIndex && pushIndex < agentIndex);
   assert.ok(agentIndex < paperIndex && paperIndex < appIndex);
@@ -56,9 +70,15 @@ test('minimal PWA has stable scope and a push-only service worker', () => {
   assert.equal(manifest.start_url, '/');
   assert.equal(manifest.scope, '/');
   assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.theme_color, '#F3F5F2');
+  assert.ok(manifest.icons.every(icon => icon.src === '/lib/icons/Xion/xion-app-icon.svg'));
   assert.ok(manifest.icons.some(icon => icon.purpose === 'maskable'));
+  assert.match(html, /rel="icon" href="\/lib\/icons\/Xion\/xion-app-icon\.svg"/);
   assert.match(worker, /addEventListener\('push'/);
-  assert.match(worker, /showNotification\('시온 일정 알림'/);
+  assert.match(worker, /showNotification\('XION 일정 알림'/);
+  assert.match(worker, /icon: '\/lib\/icons\/Xion\/xion-app-icon\.svg'/);
+  assert.match(worker, /badge: '\/lib\/icons\/Xion\/xion-mark\.svg'/);
+  assert.doesNotMatch(worker, /Claude_code_pet/);
   assert.match(worker, /tag: `task-reminder:\$\{reminderId\}`/);
   assert.match(worker, /addEventListener\('notificationclick'/);
   assert.match(worker, /\?panel=agents&taskView=reminders/);
@@ -165,6 +185,7 @@ test('push permission is requested only by explicit enable after canonical-origi
 test('runtime flag hides task entry points and foreground refresh stays separate from chat polling', () => {
   const app = read('public/app.js');
 
+  assert.match(app, /meta\[name="theme-color"\][\s\S]*dark \? '#151A18' : '#F3F5F2'/);
   assert.match(app, /tasksEnabled = config\.tasksEnabled === true/);
   assert.match(app, /command\.feature !== 'tasks' \|\| tasksEnabled/);
   assert.match(app, /window\.PaperPanel\.open\('agents'\)/);
@@ -214,15 +235,31 @@ test('agent shell delegates writes to TaskPanel and inserts task text as text co
   assert.doesNotMatch(`${taskPanel}\n${agentPanel}`, /[—–]/);
 });
 
-test('schedule layout preserves the five task views and mobile action targets', () => {
+test('schedule layout keeps native week navigation and minimal task controls', () => {
   const css = read('public/style.css');
+  const agentPanel = read('public/agent-panel.js');
+  const taskPanel = read('public/task-panel.js');
 
   assert.match(css, /\.notification-tabs\s*{[^}]*repeat\(4, 1fr\)/s);
-  assert.match(css, /\.task-view-tabs\s*{[^}]*repeat\(5, 1fr\)/s);
+  assert.match(css, /\.task-view-tabs\s*{[^}]*display: flex[^}]*border-bottom:/s);
+  assert.match(css, /:root\s*{[^}]*--bg:\s*#F3F5F2[^}]*--brand:\s*#2F6B57[^}]*--brand-ink:\s*#2F6B57/s);
+  assert.match(css, /\[data-theme="dark"\]\s*{[^}]*--bg:\s*#151A18[^}]*--brand-ink:\s*#7FB99F/s);
+  assert.match(css, /\.task-view-tab\.active\s*{[^}]*border-bottom-color: var\(--brand-ink\)/s);
+  assert.doesNotMatch(css, /217, 119, 87|var\(--claude-color\)/);
+  assert.match(css, /\.task-card\s*{[^}]*border-bottom: 1px solid var\(--border\)[^}]*background: transparent/s);
   assert.match(css, /\.schedule-agent-week\s*{[^}]*repeat\(7, minmax\(0, 1fr\)\)/s);
   assert.match(css, /\.schedule-agent-calendar-track\s*{[^}]*width: 300%/s);
   assert.match(css, /\.schedule-agent-calendar-viewport\s*{[^}]*scroll-snap-type: x mandatory/s);
+  assert.match(agentPanel, /const back = button\('<', openSummary\)/);
+  assert.match(agentPanel, /back\.setAttribute\('aria-label', '일정 요약으로 돌아가기'\)/);
+  assert.match(agentPanel, /add\.setAttribute\('aria-label', '일정 추가'\)/);
+  assert.doesNotMatch(agentPanel, /button\('(?:이전|오늘|다음)'/);
+  assert.match(agentPanel, /event\.key === 'ArrowLeft'[\s\S]*scrollCalendar\(-1\)/);
+  assert.match(agentPanel, /event\.key === 'ArrowRight'[\s\S]*scrollCalendar\(1\)/);
+  assert.match(taskPanel, /if \(task\.dueKind !== 'none'\)/);
+  assert.match(taskPanel, /if \(task\.reminder\)/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.task-action\s*{[^}]*min-height: 44px/s);
-  assert.match(css, /\.schedule-agent-action\s*{[^}]*min-height: 44px/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.schedule-agent-back,[\s\S]*?min-height: 44px/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.task-card-actions \.task-action\s*{[^}]*flex: 1 1 0[^}]*min-width: 0/s);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.task-panel-skeleton span/s);
 });

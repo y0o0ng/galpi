@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 45" width="500" height="500">
+  <defs>
+
+  </defs>
+
+
+  <rect id="ground-shadow" class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000000" opacity="0.5"></rect>
+
+
+  <g id="legs" fill="#51CB9A">
+    <rect id="outer-left-leg" x="3" y="12" width="1" height="3"></rect>
+    <rect id="inner-left-leg" x="5" y="12" width="1" height="3"></rect>
+    <rect id="inner-right-leg" x="9" y="12" width="1" height="3"></rect>
+    <rect id="outer-right-leg" x="11" y="12" width="1" height="3"></rect>
+  </g>
+
+
+  <g class="action-body">
+    <g class="breathe-anim">
+
+
+      <rect id="torso" x="2" y="6" width="11" height="7" fill="#51CB9A"></rect>
+
+
+
+      <g class="arm-l">
+        <rect id="left-arm" x="0" y="9" width="2" height="2" fill="#51CB9A"></rect>
+      </g>
+      <g class="arm-r">
+        <rect id="right-arm" x="13" y="9" width="2" height="2" fill="#51CB9A"></rect>
+      </g>
+
+
+      <rect class="yawn-mouth" x="6" y="10" width="3" height="2" fill="#000000"></rect>
+
+
+      <g class="eyes-look" fill="#000000">
+        <g class="eyes-blink">
+          <rect id="left-eye" x="4" y="8" width="1" height="2"></rect>
+          <rect id="right-eye" x="10" y="8" width="1" height="2"></rect>
+        </g>
+      </g>
+
+
+      <g fill="#F2969B" opacity="0.85"><rect x="2.6" y="10.1" width="1.4" height="0.9"></rect><rect x="11" y="10.1" width="1.4" height="0.9"></rect></g>
+      <rect class="yawn-tear" x="3.5" y="10" width="1" height="1" fill="#40C4FF"></rect>
+
+    </g>
+  </g>
+</svg>

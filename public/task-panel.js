@@ -135,13 +135,6 @@
   }
 
   function renderHeader(container) {
-    const head = document.createElement('div');
-    head.className = 'task-panel-head';
-    const title = document.createElement('strong');
-    title.textContent = '할 일';
-    const add = actionButton('일정 추가', () => renderComposer(container), true);
-    head.append(title, add);
-
     const nav = document.createElement('div');
     nav.className = 'task-view-tabs';
     nav.setAttribute('role', 'tablist');
@@ -160,7 +153,7 @@
       });
       nav.appendChild(button);
     });
-    container.append(head, nav);
+    container.appendChild(nav);
   }
 
   function dueFromForm(form) {
@@ -457,11 +450,17 @@
 
     const meta = document.createElement('div');
     meta.className = 'task-card-meta';
-    const due = document.createElement('span');
-    due.textContent = `마감 ${formatDue(task)}`;
-    const reminder = document.createElement('span');
-    reminder.textContent = `알림 ${task.reminder ? formatDateTime(task.reminder.remindAt) : '없음'}`;
-    meta.append(due, reminder);
+    if (task.dueKind !== 'none') {
+      const due = document.createElement('span');
+      due.textContent = `마감 ${formatDue(task)}`;
+      meta.appendChild(due);
+    }
+    if (task.reminder) {
+      const reminder = document.createElement('span');
+      reminder.textContent = `알림 ${formatDateTime(task.reminder.remindAt)}`;
+      meta.appendChild(reminder);
+    }
+    meta.hidden = meta.childElementCount === 0;
 
     const detail = document.createElement('p');
     detail.className = 'task-card-detail';

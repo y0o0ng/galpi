@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 45" width="500" height="500">
+  <defs>
+
+    <g id="smoke-puff">
+      <rect x="-1" y="-1" width="2" height="2" fill="#B0BEC5" rx="0.5"></rect>
+      <rect x="0" y="-2" width="2" height="2" fill="#CFD8DC" rx="0.5"></rect>
+    </g>
+  </defs>
+
+  <rect id="ground-shadow" x="-1" y="15" width="17" height="1" fill="#000000" opacity="0.5"></rect>
+
+
+  <g>
+    <use href="#smoke-puff" class="smoke sm1"></use>
+    <use href="#smoke-puff" class="smoke sm2" transform="translate(-2, 0)"></use>
+    <use href="#smoke-puff" class="smoke sm3" transform="translate(2, 0)"></use>
+  </g>
+
+  <g class="body-exhausted">
+
+    <g fill="#51CB9A">
+      <rect x="3" y="9" width="1" height="1"></rect>
+      <rect x="5" y="9" width="1" height="1"></rect>
+      <rect x="9" y="9" width="1" height="1"></rect>
+      <rect x="11" y="9" width="1" height="1"></rect>
+    </g>
+
+
+    <g fill="#51CB9A">
+      <rect x="1" y="10" width="13" height="5"></rect>
+      <rect x="-1" y="13" width="2" height="2"></rect>
+    </g>
+
+
+
+    <g class="arm-fan">
+      <rect x="13" y="11" width="2" height="2" fill="#51CB9A"></rect>
+    </g>
+
+
+    <g fill="#000000">
+
+      <rect x="3" y="12" width="0.6" height="2.2" transform="rotate(45 3.3 13.1)"></rect>
+      <rect x="3" y="12" width="0.6" height="2.2" transform="rotate(-45 3.3 13.1)"></rect>
+
+      <rect x="10" y="12" width="0.6" height="2.2" transform="rotate(45 10.3 13.1)"></rect>
+      <rect x="10" y="12" width="0.6" height="2.2" transform="rotate(-45 10.3 13.1)"></rect>
+    </g>
+  </g>
+
+
+  <g class="error-warning">
+
+    <text x="7.5" y="6" text-anchor="middle" font-family="&#39;Söhne&#39;, &#39;Helvetica Neue&#39;, Arial, sans-serif" font-size="3.5" font-weight="700" fill="#FF3B30">ERROR</text>
+  </g>
+</svg>

@@ -298,7 +298,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 3. reminder는 약속 occurrence 정본으로 두고, 결정론적 scheduler가 재시작 catch-up과 중복 차단 처리
 4. 지식 시트 첫 `알림` 탭은 `전체 | Codex | 시스템 | 최근 저장`만 다루고 일정 알림은 제외한다. 기존 floating·drag layer는 제거했다.
 5. 에이전트 탭 최상단 일정 에이전트가 3주 21일 native swipe·지연/오늘/예정/Inbox·오늘/지연 최대 3개·다음 알림·unresolved reminder·push 상태와 모든 일정 작업을 같은 탭에서 제공한다. mutation renderer는 `TaskPanel` 한 벌만 쓴다.
-6. 1440×900·390×844에서 주간 스와이프·오늘 복귀·작성/수정·deep link·알림 분리·확인 처리·light/dark·overflow·모바일 44px target을 확인했다.
+6. 1440×900·390×844에서 중앙 주 초기 표시·주간 스와이프·키보드 좌우 이동·작성/수정·deep link·알림 분리·확인 처리·light/dark·overflow·모바일 44px target을 확인했다. 화면의 `이전 | 오늘 | 다음` 중복 버튼은 제거했다.
 7. C1c는 fire/outbox 원자성, lease·TTL·bounded retry, endpoint allowlist, VAPID 비밀 비노출, canonical HTTPS에서만 가능한 사용자 opt-in을 구현했다. 다음은 Tailscale Serve와 iPhone 실기기 전달 검증이다.
 8. 자연어 후보는 C1.5, 반복은 schema v8 C2, 브리핑·결과 기록은 C3에서 별도 컨펌
 
@@ -509,7 +509,7 @@ Phase 0 GO는 실행 성공률 95% 이상, raw↔DB reconciliation 100%, 논리 
 - 한 글자 의미어("시", "꿈" 등)의 tf가 부분 문자열 매칭이라 "시간"·"회사"·"다시" 속 "시"까지 카운트됨. IDF가 눌러주지만 긴 노트가 부당 점수를 받을 수 있음. **검색 노이즈가 체감되면** → 한 글자 term은 제목/태그 매칭만 카운트로 좁히기
 - 자동 저장: `?` 시그널 제거(2026-07-14)로 15자 미만 짧은 질문은 답변이 알차도 키워드 없으면 자동 저장 안 됨 (의도된 사실확인 차단의 부작용). 아까운 답변이 자꾸 안 남으면 → "질문 짧아도 답변 신호 강하면 저장" 조합 재검토. 그 전엔 수동 [저장]으로 충분
 - `sessions` 인메모리 맵: 세션 수만큼 무한 증가 (각 세션 내부는 잘라냄). 혼자 쓰는 동안 무해 — 파이 메모리가 이상하게 차오르면 여기부터 볼 것
-- pet.js `runCommand`의 가짜 KeyboardEvent 전송: 동작하지만 깨지기 쉬움. app.js 리팩토링할 일 있으면 `sendMessage` 직접 호출로 교체
+- [x] 떠다니는 펫 런타임을 제거하고 입력창 XION 도구가 `sendMessage`를 직접 호출하도록 바꿨다. 보관 중인 `pet.js`의 가짜 KeyboardEvent 경로는 현재 로드되지 않으며, V6에서 펫을 다시 도입할 경우 새 도구 진입점을 재사용한다.
 
 ---
 

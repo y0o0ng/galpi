@@ -74,7 +74,7 @@
 `ASSISTANT_TASKS_ENABLED=true`일 때 기존 `에이전트` 탭의 첫 블록은 **일정 에이전트**다. 이는 외부 캘린더를 조정하는 V5-C 자율 에이전트가 아니라 같은 task DB를 읽는 C1 약속 루프의 요약·진입점이다.
 
 - 상단: `일정 에이전트` 제목과 이 브라우저의 `확인 중 | 알림 준비 중 | 알림 켜짐 | 알림 켜기 | 알림 차단됨 | 알림 미지원` 상태
-- 주간 이동: KST 기준 이전·현재·다음 3주, 총 21개 날짜만 받아 native horizontal scroll-snap으로 넘긴다. 한 주를 넘기면 그 주를 새 중앙으로 다시 조회하고 `이전 | 오늘 | 다음`과 키보드 좌우 이동도 제공한다.
+- 주간 이동: KST 기준 이전·현재·다음 3주, 총 21개 날짜만 받아 native horizontal scroll-snap으로 넘긴다. 한 주를 넘기면 그 주를 새 중앙으로 다시 조회한다. 화면에는 별도 `이전 | 오늘 | 다음` 버튼을 두지 않고 가로 스와이프와 키보드 좌우 이동만 제공한다.
 - 요약: `지연 | 오늘 | 예정 | Inbox`의 전체 건수
 - 미리보기: 지연 우선, 그다음 오늘 순으로 최대 3개
 - 다음 알림: 현재 시각 이후 가장 가까운 pending reminder의 시각과 task 제목
@@ -837,6 +837,7 @@ C1a 시점의 로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_
 - `public/task-panel.js`: `/task`, `/today`, Today·예정·Inbox·종결·삭제, 생성·수정·상태 전이, reminder 확인·고정 request key 1시간 미루기의 단일 renderer
 - `public/agent-panel.js`: 일정 summary와 unresolved reminder, 3주 스와이프, 같은 탭의 `TaskPanel` 작업 화면을 연결한다. mutation 구현은 `TaskPanel` 한 벌만 유지한다.
 - `public/notification-panel.js`, `public/index.html`, `public/paper-panel.js`, `public/app.js`, `public/style.css`: 지식 시트 첫 `알림` 탭과 네 범용 필터, AgentPanel 연결, 앱 시작·focus·visible·foreground 60초 갱신과 모바일 action wrap
+- 2026-07-19 UI 보정: 주간 이동의 중복 버튼을 제거하고 swipe·키보드 탐색만 유지했다. 전체 일정은 `<`로 요약에 복귀하며, 목록은 평면 구분선 구조와 모바일 한 줄 행동 버튼을 사용한다.
 - `test/assistant-task-ui.test.js`와 scheduler·서버 통합 테스트를 추가했다. `ASSISTANT_TASKS_ENABLED=false`의 일정 진입 비활성 경계도 유지한다.
 
 통과 기준:
@@ -855,7 +856,7 @@ C1a 시점의 로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_
 - [x] 에이전트 탭 첫 블록이 일정 에이전트이고 3주 21일·지연/오늘/예정/Inbox·preview 최대 3·nextReminder와 `알림 준비 중`을 표시
 - [x] 범용 알림 탭은 `task_reminder`를 제외하고 일정 에이전트가 `TaskPanel`의 단일 renderer로 확인·수정·종결 행동을 처리
 - [x] `일정 추가 | 전체 일정`, `/task`, `/today`, push click deep link가 모두 에이전트 탭 안의 해당 작업 화면을 연다
-- [x] 1440×900·390×844 실브라우저에서 스와이프·오늘 복귀·작성/수정·deep link·알림 분리·확인 처리·panel overflow와 44px 모바일 target 확인
+- [x] 1440×900·390×844 실브라우저에서 중앙 주 초기 표시·스와이프·키보드 좌우 이동·작성/수정·deep link·알림 분리·확인 처리·panel overflow와 44px 모바일 target 확인
 - [ ] Pi 실제 재시작 catch-up과 서비스 lifecycle 인수
 
 ### C1c — private HTTPS·PWA·Web Push
