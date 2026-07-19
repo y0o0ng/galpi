@@ -22,6 +22,7 @@ const { createProgressStream, progressStageForTool } = require('./lib/progress-s
 const { createRecentSavesReader } = require('./lib/recent-saves');
 const { createNoteSaveStateReader } = require('./lib/note-save-state');
 const { runDatabaseMigrations } = require('./lib/database-migrations');
+const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
   createNoteIndexStateStore,
@@ -412,6 +413,8 @@ db.exec(`
     indexed_sha256 TEXT,
     index_status TEXT NOT NULL DEFAULT 'pending'
       CHECK (index_status IN ('pending', 'ready', 'error', 'missing')),
+    ai_readable INTEGER NOT NULL DEFAULT 1
+      CHECK (ai_readable IN (0, 1)),
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
@@ -577,10 +580,10 @@ const stmtInsertMessage = db.prepare(
 const stmtUpsertNote = db.prepare(`
   INSERT INTO notes (
     filename, title, note_type, paper_id, archived, codex_status,
-    source_session, source_message, content_sha256, index_status
+    source_session, source_message, content_sha256, index_status, ai_readable
   ) VALUES (
     @filename, @title, @noteType, @paperId, @archived, @codexStatus,
-    @sourceSession, @sourceMessage, @contentSha256, @indexStatus
+    @sourceSession, @sourceMessage, @contentSha256, @indexStatus, @aiReadable
   )
   ON CONFLICT(filename) DO UPDATE SET
     title = excluded.title,
@@ -594,6 +597,7 @@ const stmtUpsertNote = db.prepare(`
     source_session = excluded.source_session,
     source_message = excluded.source_message,
     content_sha256 = excluded.content_sha256,
+    ai_readable = excluded.ai_readable,
     index_status = CASE
       WHEN excluded.index_status = 'error' THEN 'error'
       WHEN notes.indexed_sha256 = excluded.content_sha256 AND notes.embedding IS NOT NULL THEN 'ready'
@@ -603,7 +607,8 @@ const stmtUpsertNote = db.prepare(`
 `);
 const stmtGetNoteByFilename = db.prepare(`
   SELECT filename, title, note_type AS noteType, archived,
-         codex_status AS codexStatus, updated_at AS updatedAt
+         codex_status AS codexStatus, ai_readable AS aiReadable,
+         updated_at AS updatedAt
   FROM notes
   WHERE filename = ?
   LIMIT 1
@@ -662,37 +667,54 @@ const stmtUpsertNoteEdge = db.prepare(`
 const stmtGraphNoteCounts = db.prepare(`
   SELECT note_type AS noteType, COUNT(*) AS count
   FROM notes
-  WHERE archived = 0
+  WHERE archived = 0 AND ai_readable = 1
   GROUP BY note_type
 `);
 const stmtGraphTopEdges = db.prepare(`
-  SELECT source_title AS sourceTitle, target_title AS targetTitle,
-         source_filename AS sourceFilename, target_filename AS targetFilename, relation,
-         score, confidence, reason, created_by AS createdBy
-  FROM note_edges
-  ORDER BY score DESC, updated_at DESC
+  SELECT e.source_title AS sourceTitle, e.target_title AS targetTitle,
+         e.source_filename AS sourceFilename, e.target_filename AS targetFilename, e.relation,
+         e.score, e.confidence, e.reason, e.created_by AS createdBy
+  FROM note_edges e
+  JOIN notes source ON source.filename = e.source_filename
+  JOIN notes target ON target.filename = e.target_filename
+  WHERE source.ai_readable = 1 AND target.ai_readable = 1
+    AND source.archived = 0 AND target.archived = 0
+  ORDER BY e.score DESC, e.updated_at DESC
   LIMIT ?
 `);
 const stmtGraphEdgeDegrees = db.prepare(`
   SELECT title, filename, SUM(degree) AS degree FROM (
-    SELECT source_title AS title, source_filename AS filename, COUNT(*) AS degree
-    FROM note_edges
-    GROUP BY source_filename
+    SELECT e.source_title AS title, e.source_filename AS filename, COUNT(*) AS degree
+    FROM note_edges e
+    JOIN notes source ON source.filename = e.source_filename
+    JOIN notes target ON target.filename = e.target_filename
+    WHERE source.ai_readable = 1 AND target.ai_readable = 1
+      AND source.archived = 0 AND target.archived = 0
+    GROUP BY e.source_filename
     UNION ALL
-    SELECT target_title AS title, target_filename AS filename, COUNT(*) AS degree
-    FROM note_edges
-    GROUP BY target_filename
+    SELECT e.target_title AS title, e.target_filename AS filename, COUNT(*) AS degree
+    FROM note_edges e
+    JOIN notes source ON source.filename = e.source_filename
+    JOIN notes target ON target.filename = e.target_filename
+    WHERE source.ai_readable = 1 AND target.ai_readable = 1
+      AND source.archived = 0 AND target.archived = 0
+    GROUP BY e.target_filename
   )
   GROUP BY filename
   ORDER BY degree DESC
   LIMIT ?
 `);
 const stmtGraphAmbiguousEdges = db.prepare(`
-  SELECT source_title AS sourceTitle, target_title AS targetTitle,
-         source_filename AS sourceFilename, target_filename AS targetFilename, score, reason
-  FROM note_edges
-  WHERE confidence = 'AMBIGUOUS'
-  ORDER BY score DESC, updated_at DESC
+  SELECT e.source_title AS sourceTitle, e.target_title AS targetTitle,
+         e.source_filename AS sourceFilename, e.target_filename AS targetFilename,
+         e.score, e.reason
+  FROM note_edges e
+  JOIN notes source ON source.filename = e.source_filename
+  JOIN notes target ON target.filename = e.target_filename
+  WHERE e.confidence = 'AMBIGUOUS'
+    AND source.ai_readable = 1 AND target.ai_readable = 1
+    AND source.archived = 0 AND target.archived = 0
+  ORDER BY e.score DESC, e.updated_at DESC
   LIMIT ?
 `);
 const stmtGraphTopicChunkCounts = db.prepare(`
@@ -700,6 +722,7 @@ const stmtGraphTopicChunkCounts = db.prepare(`
   FROM note_chunks c
   JOIN notes n ON n.filename = c.note_filename
   WHERE c.chunk_type = 'topic_qa' AND c.index_status = 'ready'
+    AND n.archived = 0 AND n.ai_readable = 1
   GROUP BY c.note_filename, n.title
   ORDER BY qaCount DESC
   LIMIT ?
@@ -708,10 +731,16 @@ const stmtGraphIsolatedTopics = db.prepare(`
   SELECT n.filename, n.title
   FROM notes n
   WHERE n.archived = 0
+    AND n.ai_readable = 1
     AND n.note_type = 'topic'
     AND NOT EXISTS (
-      SELECT 1 FROM note_edges e
-      WHERE e.source_filename = n.filename OR e.target_filename = n.filename
+      SELECT 1
+      FROM note_edges e
+      JOIN notes source ON source.filename = e.source_filename
+      JOIN notes target ON target.filename = e.target_filename
+      WHERE (e.source_filename = n.filename OR e.target_filename = n.filename)
+        AND source.ai_readable = 1 AND target.ai_readable = 1
+        AND source.archived = 0 AND target.archived = 0
     )
   ORDER BY n.updated_at DESC
   LIMIT ?
@@ -734,12 +763,13 @@ const stmtGetUserMessagesForSearch = db.prepare(`
   AND m.embedding IS NOT NULL
 `);
 const stmtGetNotesWithEmbedding = db.prepare(
-  "SELECT filename, title, embedding FROM notes WHERE archived = 0 AND codex_status NOT IN ('running', 'recovery_required')"
+  "SELECT filename, title, embedding FROM notes WHERE archived = 0 AND ai_readable = 1 AND codex_status NOT IN ('running', 'recovery_required')"
 );
 const stmtGetTopicNotesWithEmbedding = db.prepare(
   `SELECT filename, title, embedding
    FROM notes
    WHERE archived = 0
+     AND ai_readable = 1
      AND note_type = 'topic'
      AND codex_status NOT IN ('running', 'needs_manual_check', 'recovery_required')
      AND embedding IS NOT NULL`
@@ -748,6 +778,7 @@ const stmtGetNotesWithoutEmbedding = db.prepare(
   `SELECT filename, title, note_type AS noteType
    FROM notes
    WHERE archived = 0
+     AND ai_readable = 1
      AND codex_status NOT IN ('running', 'recovery_required')
      AND (
        embedding IS NULL
@@ -766,7 +797,7 @@ const stmtGetNoteStatusCounts = db.prepare(`
 const stmtGetPendingNotes = db.prepare(`
   SELECT filename, title, note_type AS noteType, codex_status AS codexStatus
   FROM notes
-  WHERE archived = 0 AND codex_status = 'pending'
+  WHERE archived = 0 AND ai_readable = 1 AND codex_status = 'pending'
   ORDER BY created_at ASC, id ASC
 `);
 const stmtGetManualCheckNotes = db.prepare(`
@@ -795,8 +826,17 @@ const stmtGetOrganizableNotes = db.prepare(`
   FROM notes
   -- 수동 확인·원본 복구 대상은 사람이 검증하기 전 전체 재정리로 우회 승인하지 않는다.
   WHERE archived = 0
+    AND ai_readable = 1
     AND codex_status NOT IN ('running', 'needs_manual_check', 'recovery_required')
   ORDER BY created_at ASC, id ASC
+`);
+const stmtGetCodexReferenceNotes = db.prepare(`
+  SELECT filename
+  FROM notes
+  WHERE archived = 0
+    AND ai_readable = 1
+    AND codex_status NOT IN ('needs_manual_check', 'recovery_required')
+  ORDER BY filename ASC
 `);
 const stmtCreateCodexJob = db.prepare(`
   INSERT INTO codex_jobs (status, note_filenames_json)
@@ -868,6 +908,7 @@ const stmtListAiNotesForVault = db.prepare(`
          codex_status AS codexStatus, updated_at AS updatedAt
   FROM notes
   WHERE (@includeArchived = 1 OR archived = 0)
+    AND ai_readable = 1
     AND (@noteType IS NULL OR note_type = @noteType)
     AND (@excludeNoteType IS NULL OR note_type != @excludeNoteType)
     AND codex_status NOT IN ('running', 'recovery_required')
@@ -891,6 +932,7 @@ const stmtGetTopicNotes = db.prepare(`
   SELECT filename, title
   FROM notes
   WHERE archived = 0
+    AND ai_readable = 1
     AND note_type = 'topic'
     AND codex_status NOT IN ('running', 'needs_manual_check', 'recovery_required')
   ORDER BY updated_at DESC, id DESC
@@ -986,6 +1028,7 @@ function dbUpsertNote({
   paperId = null,
   contentSha256,
   indexStatus = 'pending',
+  aiReadable = true,
 }) {
   if (!['pending', 'error'].includes(indexStatus)) {
     throw new TypeError(`지원하지 않는 note upsert index 상태입니다: ${indexStatus}`);
@@ -1004,6 +1047,7 @@ function dbUpsertNote({
     paperId: paperId || null,
     contentSha256: contentSha256 || null,
     indexStatus,
+    aiReadable: aiReadable ? 1 : 0,
   });
 }
 
@@ -1125,6 +1169,7 @@ async function partitionCodexTargets(filenames) {
     if (
       !note ||
       note.archived ||
+      !note.aiReadable ||
       ['needs_manual_check', 'recovery_required'].includes(note.codexStatus)
     ) {
       skippedFilenames.push(filename);
@@ -2007,6 +2052,13 @@ function dbUpsertNoteEdge({
   createdBy = 'codex',
 }) {
   if (!sourceFilename || !targetFilename || sourceFilename === targetFilename) return;
+  const source = stmtGetNoteByFilename.get(sourceFilename);
+  const target = stmtGetNoteByFilename.get(targetFilename);
+  if (
+    !source || !target || source.archived || target.archived ||
+    !source.aiReadable || !target.aiReadable ||
+    source.codexStatus === 'recovery_required' || target.codexStatus === 'recovery_required'
+  ) return;
   stmtUpsertNoteEdge.run({
     sourceFilename,
     sourceTitle,
@@ -2055,6 +2107,7 @@ async function filenameForNoteTitle(title) {
       if (
         !record ||
         record.archived ||
+        !record.aiReadable ||
         ['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)
       ) continue;
       const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
@@ -2806,6 +2859,7 @@ async function backfillNotesFromVault() {
         title,
         noteType,
         archived,
+        aiReadable: parseAiReadable(fm.ai_readable),
         codexStatus,
         sourceSession: fm.source_session || null,
         sourceMessage: fm.source_message || null,
@@ -2857,6 +2911,7 @@ function syncRecoveryApprovedNote(filename) {
       title,
       noteType,
       archived: false,
+      aiReadable: parseAiReadable(fm.ai_readable),
       codexStatus: 'recovery_required',
       sourceSession: fm.source_session || null,
       sourceMessage: fm.source_message || null,
@@ -3010,6 +3065,14 @@ function assertNoteMutationAllowed(filename) {
   if (!record) throw new Error(`노트를 찾을 수 없습니다: ${filename}`);
   if (['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)) {
     throw new Error(`수동 확인 또는 원본 복구가 필요한 노트는 변경할 수 없습니다: ${filename}`);
+  }
+  return record;
+}
+
+function assertAiReadableNoteMutation(filename) {
+  const record = assertNoteMutationAllowed(filename);
+  if (!record.aiReadable) {
+    throw new Error(`AI 읽기를 허용하지 않은 노트는 분리·병합할 수 없습니다: ${filename}`);
   }
   return record;
 }
@@ -3258,8 +3321,8 @@ async function splitQaEntriesIntoTopicImpl({
   const ids = [...new Set((qaIds || []).map(s => String(s || '').trim()).filter(Boolean))];
   if (ids.length === 0) throw new Error('분리할 Q&A 항목을 선택해주세요.');
 
-  assertNoteMutationAllowed(sourceFilename);
-  if (targetFilename) assertNoteMutationAllowed(targetFilename);
+  assertAiReadableNoteMutation(sourceFilename);
+  if (targetFilename) assertAiReadableNoteMutation(targetFilename);
 
   const source = await loadNoteForMerge(sourceFilename);
   if (source.noteType !== 'topic') throw new Error('토픽 노트만 분리할 수 있습니다.');
@@ -3484,6 +3547,7 @@ async function buildTitleToFilenameMap() {
       if (
         !record ||
         record.archived ||
+        !record.aiReadable ||
         ['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)
       ) continue;
       const raw = await fs.readFile(path.join(VAULT_PATH, f), 'utf8');
@@ -3541,7 +3605,7 @@ async function mergeNotesIntoTopicImpl({ filenames, targetFilename = null, newTi
     .filter(f => f !== targetFilename);
 
   for (const filename of [...srcNames, ...(targetFilename ? [targetFilename] : [])]) {
-    assertNoteMutationAllowed(filename);
+    assertAiReadableNoteMutation(filename);
   }
 
   const loaded = new Map();
@@ -3752,7 +3816,7 @@ async function findMergeCandidates(threshold = MERGE_SIMILARITY_THRESHOLD, limit
   // 2) Codex 제안: 각 토픽의 CODEX-PROPOSALS에서 "- MERGE [[파일ID|제목]] — 이유" 라인 파싱
   const allNotes = stmtGetAllNoteFilenames.all().filter(note => {
     const record = stmtGetNoteByFilename.get(note.filename);
-    return record && !record.archived && ![
+    return record && !record.archived && record.aiReadable && ![
       'running',
       'needs_manual_check',
       'recovery_required',
@@ -4799,7 +4863,7 @@ app.get('/api/vault/note/:filename', async (req, res) => {
         )
       : await readVaultNote(req.params.filename);
     if (forAi && !note) {
-      return res.status(409).json({ error: '정리 중이거나 원본 복구가 필요한 노트는 AI가 읽을 수 없습니다.' });
+      return res.status(409).json({ error: 'AI 읽기가 허용되지 않았거나 정리·원본 복구 중인 노트입니다.' });
     }
     if (!note) return res.status(404).json({ error: '노트를 찾을 수 없습니다.' });
     res.json({ success: true, note });
@@ -4942,6 +5006,7 @@ async function listVaultNoteCandidates(excludeFilename) {
       if (
         !record ||
         record.archived ||
+        !record.aiReadable ||
         ['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)
       ) continue;
       const raw = await fs.readFile(path.join(VAULT_PATH, filename), 'utf8');
@@ -5245,7 +5310,7 @@ async function validateCodexEdit(filenames = []) {
   });
 }
 
-function buildCodexRunnerPrompt(filenames) {
+function buildCodexRunnerPrompt(filenames, referenceFilenames = []) {
   return `너는 갈피 Obsidian vault의 Codex 정리 담당자다.
 
 작업 루트는 현재 디렉터리이며, 이 디렉터리는 Obsidian vault다.
@@ -5260,6 +5325,10 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 - 연결 근거가 약하면 CODEX-LINKS 구역을 비워둔다.
 - note_type이 topic인 노트는 누적 Q&A를 바탕으로 CODEX-SUMMARY 구역에 짧은 산문 요약을 작성한다.
 - note_type이 topic인 노트가 너무 커졌거나 하위 주제가 뚜렷하면 CODEX-PROPOSALS 구역에 split/merge 제안만 작성한다.
+
+읽기 허용 파일:
+${referenceFilenames.map(filename => `- ${filename}`).join('\n') || '- 대상 파일만'}
+- 위 목록은 DB의 활성 ai_readable 노트에서 만들었다. 목록 밖의 노트와 폴더는 열거나 검색하지 않는다.
 
 수정 허용 범위:
 - <!-- CODEX-SUMMARY-START --> 와 <!-- CODEX-SUMMARY-END --> 사이
@@ -5314,7 +5383,8 @@ ${filenames.map(filename => `- ${filename}`).join('\n')}
 }
 
 async function runCodexCliForJob(filenames, model = CODEX_MODEL) {
-  const prompt = buildCodexRunnerPrompt(filenames);
+  const referenceFilenames = stmtGetCodexReferenceNotes.all().map(note => note.filename);
+  const prompt = buildCodexRunnerPrompt(filenames, referenceFilenames);
   try {
     const result = await execFileWithInput(CODEX_BIN, [
       'exec',
@@ -5815,6 +5885,7 @@ function isAiReadableNoteState(note) {
   return Boolean(
     note &&
     !note.archived &&
+    note.aiReadable === 1 &&
     !['running', 'recovery_required'].includes(note.codexStatus)
   );
 }

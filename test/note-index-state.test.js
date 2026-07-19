@@ -149,6 +149,12 @@ test('note index state rejects stale async completion and records missing source
   assert.equal(store.markError({ filename: 'topic.md', contentSha256: nextHash }).changes, 1);
   assert.equal(store.get('topic.md').indexStatus, 'error');
 
+  db.prepare("UPDATE notes SET ai_readable = 0 WHERE filename = 'topic.md'").run();
+  assert.equal(store.markReady({
+    filename: 'topic.md', contentSha256: nextHash, embedding: '[0.5,0.5]',
+  }).changes, 0);
+  db.prepare("UPDATE notes SET ai_readable = 1 WHERE filename = 'topic.md'").run();
+
   db.prepare("UPDATE notes SET codex_status = 'recovery_required' WHERE filename = 'topic.md'").run();
   const quarantinedState = store.get('topic.md');
   const quarantinedHash = noteContentSha256({

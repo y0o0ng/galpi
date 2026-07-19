@@ -78,10 +78,10 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }],
+    [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }],
   );
 
   const chunk = db.prepare(`
@@ -99,11 +99,11 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
   assert.deepEqual(
     db.prepare(`
       SELECT content_sha256 AS contentSha256, indexed_sha256 AS indexedSha256,
-             index_status AS indexStatus
+             index_status AS indexStatus, ai_readable AS aiReadable
       FROM notes
       WHERE filename = 'topic.md'
     `).get(),
-    { contentSha256: null, indexedSha256: null, indexStatus: 'pending' },
+    { contentSha256: null, indexedSha256: null, indexStatus: 'pending', aiReadable: 1 },
   );
 
   const second = runDatabaseMigrations(db);
@@ -169,6 +169,12 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
   assert.deepEqual(store.listReadyByNote('topic.md'), []);
   assert.deepEqual(store.listAllReady(), []);
   db.prepare("UPDATE notes SET archived = 0 WHERE filename = 'topic.md'").run();
+
+  db.prepare("UPDATE notes SET ai_readable = 0 WHERE filename = 'topic.md'").run();
+  assert.equal(store.updateEmbedding('qa-current', '[9,9]').changes, 0);
+  assert.deepEqual(store.listReadyByNote('topic.md'), []);
+  assert.deepEqual(store.listAllReady(), []);
+  db.prepare("UPDATE notes SET ai_readable = 1 WHERE filename = 'topic.md'").run();
 
   store.updateEmbedding('qa-current', '[1,0]');
   db.prepare(`

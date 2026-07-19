@@ -175,6 +175,7 @@ function createTestDatabase() {
       note_type TEXT NOT NULL,
       paper_id TEXT,
       archived INTEGER NOT NULL DEFAULT 0,
+      ai_readable INTEGER NOT NULL DEFAULT 1,
       codex_status TEXT NOT NULL DEFAULT 'pending'
     );
     CREATE TABLE note_chunks (
@@ -288,6 +289,21 @@ test('paper full-text service serializes indexing, caches the source, and stays 
     );
   }
   db.prepare("UPDATE notes SET codex_status = 'pending' WHERE paper_id = ?").run('paper-1');
+
+  db.prepare('UPDATE notes SET ai_readable = 0 WHERE paper_id = ?').run('paper-1');
+  assert.deepEqual(service.searchPaper({ paperId: 'paper-1', query: 'risk management' }), []);
+  assert.deepEqual(service.getPaperChunks({
+    paperId: 'paper-1', chunkIds: [semanticResults[0].chunkId],
+  }), []);
+  assert.throws(
+    () => service.readPaper({ paperId: 'paper-1', chunkId: semanticResults[0].chunkId }),
+    error => error.code === 'chunk_not_found',
+  );
+  await assert.rejects(
+    service.indexPaper(input),
+    error => error.code === 'paper_not_saved',
+  );
+  db.prepare('UPDATE notes SET ai_readable = 1 WHERE paper_id = ?').run('paper-1');
 
   db.prepare('UPDATE notes SET archived = 1 WHERE paper_id = ?').run('paper-1');
   assert.deepEqual(service.searchPaper({ paperId: 'paper-1', query: 'risk management' }), []);

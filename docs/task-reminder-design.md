@@ -210,9 +210,21 @@ SQLite 공식 문서는 동시 read transaction은 여러 개 가능하지만 �
 
 ## 6. 정본 schema
 
-운영 최신은 schema v4다. 선행하는 노트 `ai_readable` 접근 경계 보강이 v5를 사용하므로, C1 task core는 **schema v6**, Web Push는 독립 배포·feature flag 비활성화가 가능한 **schema v7**로 순차 적용한다. 기존 application table의 행과 컬럼은 바꾸지 않는다.
+운영 배포 최신은 schema v4다. 선행하는 노트 `ai_readable` 접근 경계 보강은 로컬 schema v5로 구현했으며, C1 task core는 **schema v6**, Web Push는 독립 배포·feature flag 비활성화가 가능한 **schema v7**로 순차 적용한다.
 
-### 6.1 schema v6 — task·event·reminder
+### 6.1 schema v5 — 노트 AI 읽기 경계
+
+```sql
+ALTER TABLE notes ADD COLUMN ai_readable INTEGER NOT NULL DEFAULT 1
+  CHECK (ai_readable IN (0, 1));
+```
+
+- 기존 노트는 동작 보존을 위해 `1`로 이관하고, `/sync`가 Markdown frontmatter의 명시적 `ai_readable: false`를 `0`으로 반영한다. 값이 없으면 레거시 호환으로 `true`, 잘못된 값은 fail-close로 `false`다.
+- `0`인 노트는 답변 컨텍스트·자동 검색·A1b 청크·논문 전문·MCP AI 조회·임베딩·Codex 대상/참고 허용 목록·AI 파생 그래프에서 제외한다. 사용자의 일반 목록과 직접 열람은 유지한다.
+- 이 값은 앱과 모델 컨텍스트를 가르는 정책 경계이지 암호화나 별도 OS 사용자 격리가 아니다. 비밀 키·인증정보 저장소로 사용하지 않는다.
+- 현재 vault와 파일명 정본은 그대로 둔다. 에이전트별 폴더, 범용 ACL, `relative_path`는 만들지 않는다.
+
+### 6.2 schema v6 — task·event·reminder
 
 ```sql
 CREATE TABLE assistant_tasks (
@@ -340,7 +352,7 @@ CREATE UNIQUE INDEX idx_assistant_reminders_one_live_per_task
   WHERE status IN ('pending', 'fired');
 ```
 
-### 6.2 schema v7 — Web Push 구독·delivery outbox
+### 6.3 schema v7 — Web Push 구독·delivery outbox
 
 ```sql
 CREATE TABLE assistant_push_subscriptions (
@@ -393,7 +405,7 @@ CREATE INDEX idx_assistant_push_deliveries_reminder
   ON assistant_push_deliveries(reminder_id, status);
 ```
 
-### 6.3 불변식
+### 6.4 불변식
 
 - task당 live reminder는 `pending | fired` 합쳐 최대 하나다.
 - `assistant_tasks`의 현재 행이 정본이고 `assistant_task_events`는 전이 감사 로그다. 같은 결과 상태 재요청은 새 event를 만들지 않는다.
@@ -871,7 +883,7 @@ C3에서만 오늘 브리핑·완료 결과 기록·Codex/Terra 기반 분석 �
 - [V4.5 비서 기본기 설계](assistant-foundation-design.md): 약속 루프의 제품 위치와 음성 연결 경계
 - [로드맵](roadmap.md): V4.5-C, V4-B, V5 전문 에이전트의 승격 순서
 - [최종 제품 설계](galpi-design-final.md): SQLite 정본, 결정론적 scheduler, 얇은 모듈 경계
-- [`lib/database-migrations.js`](../lib/database-migrations.js): 현재 schema v4와 순차 transaction migration
+- [`lib/database-migrations.js`](../lib/database-migrations.js): 배포 schema v4, 로컬 schema v5와 순차 transaction migration
 - [`server.js`](../server.js): 기존 `/api/notifications`, API token, startup/shutdown 경계
 - [`public/app.js`](../public/app.js): 기존 알림센터 shell과 7초 채팅 polling
 - [`public/index.html`](../public/index.html): 현재 Apple meta만 있고 manifest·Service Worker 등록은 없는 PWA 시작점

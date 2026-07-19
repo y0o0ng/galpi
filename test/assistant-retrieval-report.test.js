@@ -44,6 +44,10 @@ function createReportDatabase() {
       content TEXT NOT NULL,
       index_status TEXT NOT NULL DEFAULT 'ready'
     );
+    CREATE TABLE notes (
+      filename TEXT PRIMARY KEY,
+      ai_readable INTEGER NOT NULL DEFAULT 1
+    );
   `);
 
   const insertRun = db.prepare(`
@@ -77,6 +81,9 @@ function createReportDatabase() {
     INSERT INTO messages (session_id, role, content, created_at)
     VALUES (?, 'user', ?, ?)
   `).run('session-2', '내 볼트와 무관한 질문', 210);
+  db.prepare(`
+    INSERT INTO notes (filename) VALUES ('deploy.md')
+  `).run();
   db.prepare(`
     INSERT INTO note_chunks (chunk_id, note_filename, content)
     VALUES (?, ?, ?)
@@ -135,6 +142,13 @@ test('review mode links hashes to messages and shows selected QA questions only 
   const output = formatRetrievalShadowReport(report);
   assert.match(output, /질문: 마지막 배포 결말은\?/);
   assert.match(output, /Q: 최종 배포 결과는\?/);
+
+  db.pragma('query_only = OFF');
+  db.prepare("UPDATE notes SET ai_readable = 0 WHERE filename = 'deploy.md'").run();
+  db.pragma('query_only = ON');
+  const hiddenReport = buildRetrievalShadowReport({ db, includeReview: true, reviewLimit: 10 });
+  const hiddenDeployReview = hiddenReport.reviews.find(review => review.query === '마지막 배포 결말은?');
+  assert.ok(hiddenDeployReview.evidence.every(item => item.question === null));
   db.close();
 });
 
