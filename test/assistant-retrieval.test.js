@@ -10,6 +10,7 @@ const {
   extractQueryTerms,
   rankChunkCandidates,
   rankNoteCandidates,
+  truncateNoteContext,
 } = require('../lib/assistant-retrieval');
 const { createAssistantRetrievalShadow } = require('../lib/assistant-retrieval-shadow');
 const {
@@ -35,6 +36,27 @@ test('query terms preserve Korean meaning words and remove search commands', () 
     extractQueryTerms('내가 쓴 시 자료 좀 찾아줘 꿈 핏 키'),
     ['시', '꿈', '핏', '키']
   );
+});
+
+test('retrieval command phrasing does not create lexical anchors', () => {
+  assert.deepEqual(
+    extractQueryTerms('그 머냐 수면대행서비스 관련해서 가장 최근에 무슨 이야기를 했더라?'),
+    ['수면대행서비스'],
+  );
+  assert.deepEqual(
+    extractQueryTerms('그게 가장 최근 아닌가? 내가 비슷한 결의 소설이 있냐고 물어봤었잖아'),
+    ['비슷한', '결의', '소설이'],
+  );
+});
+
+test('long note context keeps both the opening summary and latest entries', () => {
+  const raw = `앞부분-${'a'.repeat(120)}-중간-${'b'.repeat(120)}-최신 QA`;
+  const context = truncateNoteContext(raw, 100);
+
+  assert.equal(context.length, 100);
+  assert.match(context, /^앞부분-/);
+  assert.match(context, /중간 생략/);
+  assert.match(context, /최신 QA$/);
 });
 
 test('one-syllable Korean terms do not match inside unrelated compounds', () => {
@@ -379,6 +401,37 @@ test('global shadow abstains from medium semantic collisions without lexical evi
   assert.deepEqual(result.notes, []);
   assert.deepEqual(result.chunks, []);
   assert.equal(result.contextChars, 0);
+});
+
+test('global shadow ignores conversational recency wording but keeps the topic prior', () => {
+  const result = buildGlobalShadowRetrieval({
+    query: '그 머냐 수면대행서비스 관련해서 가장 최근에 무슨 이야기를 했더라?',
+    queryEmbedding: [1, 0],
+    noteCandidates: [{
+      filename: 'sleep.md',
+      title: '숙면 대행 서비스',
+      score: 0.8,
+      keywordScore: 2,
+    }],
+    chunks: [
+      {
+        chunkId: 'sleep-latest',
+        noteFilename: 'sleep.md',
+        noteTitle: '숙면 대행 서비스',
+        content: 'Q: 혹시 비슷한 소재의 소설이 있는지 찾아봐줄 수 있어?\nA: 작품 비교 방향을 검토했다.',
+        embedding: [0.5, 0.8660254037844386],
+      },
+      {
+        chunkId: 'stock-recent',
+        noteFilename: 'stock.md',
+        noteTitle: '주식 분석',
+        content: 'Q: 가장 최근에 무슨 이야기를 했더라?\nA: 어제 기준 주가를 검토했다.',
+        embedding: [0.5, 0.8660254037844386],
+      },
+    ],
+  });
+
+  assert.deepEqual(result.chunks.map(chunk => chunk.chunkId), ['sleep-latest']);
 });
 
 test('global shadow expands one note only for explicit multi-evidence queries', () => {

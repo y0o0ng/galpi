@@ -29,6 +29,7 @@ const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
+const { classifyAutoSaveExclusion } = require('./lib/assistant-auto-save');
 const { createSchedulePrepareSession } = require('./lib/assistant-schedule-tools');
 const {
   buildActiveScheduleContext,
@@ -57,6 +58,7 @@ const {
   cosineSimilarity,
   extractQueryTerms,
   rankNoteCandidates,
+  truncateNoteContext,
 } = require('./lib/assistant-retrieval');
 const {
   createAssistantRetrievalShadow,
@@ -1538,6 +1540,8 @@ function classifyAutoSaveValue(question, answer) {
   if (AUTO_SAVE_LOW_VALUE_REPLIES.some(prefix => a.startsWith(prefix))) {
     return { save: false, reason: 'low_value_reply' };
   }
+  const exclusionReason = classifyAutoSaveExclusion(q, a);
+  if (exclusionReason) return { save: false, reason: exclusionReason };
   if (a.length < AUTO_TOPIC_MIN_ASSISTANT_CHARS) {
     return { save: false, reason: 'answer_too_short' };
   }
@@ -6389,9 +6393,7 @@ function buildContextMessage(
     : '';
 
   const noteBlock = activeNotes.map(n => {
-    const body = n.content.length > MAX_NOTE_CONTEXT_CHARS
-      ? n.content.slice(0, MAX_NOTE_CONTEXT_CHARS) + '\n...(이하 생략)'
-      : n.content;
+    const body = truncateNoteContext(n.content, MAX_NOTE_CONTEXT_CHARS);
     return `<note title="${String(n.title || '').replace(/"/g, "'")}">\n${body}\n</note>`;
   }).join('\n\n---\n\n');
 

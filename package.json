@@ -11,6 +11,7 @@
     "audit:note-index": "node scripts/audit-note-index.js",
     "plan:topic-repair": "node scripts/plan-topic-repair.js",
     "apply:topic-repair": "node scripts/apply-topic-repair.js",
+    "remove:topic-qa": "node scripts/remove-topic-qa.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
     "report:retrieval-shadow": "node scripts/report-retrieval-shadow.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
