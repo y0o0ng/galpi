@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C1c schema v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI 로컬 구현·실브라우저 검증 완료 · private HTTPS 실기기·Pi 미검증**
+> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트 Pi 배포 및 Tailscale Serve HTTPS 인수 완료(2026-07-19) · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -101,7 +101,7 @@
 - active task 생성, 수정, 완료, 취소, 다시 열기, 삭제, 복원
 - 기한 없음, 날짜 전용 기한, KST 절대 시각 기한
 - task당 동시에 최대 한 개의 live 단발성 reminder
-- 1분 scheduler, 시작 직후 catch-up, occurrence 중복 차단
+- 30초 scheduler, 시작 직후 catch-up, occurrence 중복 차단
 - reminder 확인과 한 번씩 멱등적인 1시간 미루기
 - 지식 시트 첫 탭의 범용 알림 네 필터와, 여기서 분리된 일정 에이전트의 Today·예정·Inbox·종결·삭제 복구 화면
 - 에이전트 탭 최상단의 일정 에이전트 3주 스와이프·요약·미리보기·unresolved 알림·작업 화면
@@ -213,7 +213,7 @@ SQLite 공식 문서는 동시 read transaction은 여러 개 가능하지만 �
 
 ## 6. 정본 schema
 
-운영 배포 최신은 schema v4다. 로컬에는 노트 `ai_readable` 접근 경계인 schema v5, C1 task core인 **schema v6**, 독립 feature flag로 끌 수 있는 Web Push subscription·delivery outbox **schema v7**까지 구현했다. 세 migration은 Pi 첫 C1 배포 때 4→5→6→7로 한 번에 적용한다.
+운영 Pi는 2026-07-19 schema v4→5→6→7을 한 번에 적용했다. 노트 `ai_readable` 접근 경계인 schema v5, C1 task core인 **schema v6**, 독립 feature flag로 끌 수 있는 Web Push subscription·delivery outbox **schema v7**이 현재 운영 정본이다.
 
 ### 6.1 schema v5 — 노트 AI 읽기 경계
 
@@ -448,7 +448,7 @@ CREATE INDEX idx_assistant_push_deliveries_reminder
 ```text
 server listen 완료
   -> 즉시 tick(capturedNow)
-  -> 이후 60초마다 tick
+  -> 이후 30초마다 tick
 
 tick transaction
   -> status='active' AND lifecycle='active' task에 속한 pending reminder 중 remind_at <= now
@@ -463,7 +463,7 @@ push dispatcher
   -> 결과를 accepted/retry/failed/expired로 기록
 ```
 
-- `<= now`를 사용해 정확히 경계에 도달한 항목도 처리한다.
+- `<= now`를 사용해 정확히 경계에 도달한 항목도 처리한다. 다음 30초 tick을 미리 당겨 처리하지 않으므로 조기 발송은 없고, 정상 event loop에서 tick 대기 지연은 30초 미만이다.
 - reminder 행은 약속 occurrence와 사용자 확인 상태의 정본이고, subscription별 delivery 행은 push outbox·전송 receipt다.
 - `/api/notifications`는 `fired` 행을 읽기만 하므로 commit 뒤 crash가 나도 다음 시작에 유실되지 않는다.
 - 한 tick 실패는 transaction 전체를 rollback하고 다음 tick에서 재시도한다.
@@ -802,7 +802,7 @@ DELETE /api/push/subscriptions/:id
 - [x] C1 첫 배포에 private HTTPS·PWA·Web Push와 in-app fallback 포함 결정
 - [x] 지식 시트 첫 범용 알림 탭과 에이전트 탭 안의 단일 task renderer 경계 결정
 
-### C1a — 정본과 API ✅ 로컬 구현 완료(2026-07-19, Pi 미배포)
+### C1a — 정본과 API ✅ Pi 배포 완료(2026-07-19)
 
 구현 파일:
 
@@ -830,9 +830,9 @@ C1a 시점의 로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_
 
 ### C1b — scheduler·in-app 일정 UI·일정 에이전트 블록
 
-로컬 구현 완료(2026-07-19):
+Pi 배포 완료(2026-07-19):
 
-- `lib/assistant-scheduler.js`: 즉시 catch-up 뒤 60초 tick, tick당 최대 100개, transaction·조건부 update 중복 차단, start/stop
+- `lib/assistant-scheduler.js`: 즉시 catch-up 뒤 30초 tick, tick당 최대 100개, transaction·조건부 update 중복 차단, start/stop. `remind_at <= now`만 fire해 30초 lookahead 조기 발송은 하지 않는다.
 - `lib/assistant-tasks.js`, `server.js`: stable fired reminder 조회, 기존 notification read merge, feature flag 뒤 scheduler lifecycle과 graceful stop
 - `public/task-panel.js`: `/task`, `/today`, Today·예정·Inbox·종결·삭제, 생성·수정·상태 전이, reminder 확인·고정 request key 1시간 미루기의 단일 renderer
 - `public/agent-panel.js`: 일정 summary와 unresolved reminder, 3주 스와이프, 같은 탭의 `TaskPanel` 작업 화면을 연결한다. mutation 구현은 `TaskPanel` 한 벌만 유지한다.
@@ -882,19 +882,20 @@ C1a 시점의 로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_
 - [x] 새 구독의 과거 fired reminder backfill 0건, opaque payload에 task 제목·설명·API token·endpoint·key 0건
 - [x] SW `fetch` handler·offline cache·silent push 0건, notification click은 focus 또는 앱 열기만 수행
 - [x] 1440×900·390×844 실제 브라우저에서 push disabled 상태·task UI overflow·light/dark 확인
-- [ ] Tailscale Serve canonical HTTPS, iOS/iPadOS 16.4+ 홈 화면 설치·권한·구독 실기기 확인
-- [ ] 잠긴 iPhone에서 앱을 벗어난 10회 시험 중 정상 네트워크·Focus 해제 조건에서 2분 안 표시 9회 이상. 플랫폼 보장이 아닌 GO 기준
+- [x] Tailscale Serve canonical HTTPS와 iPhone·iPad·Mac 홈 화면 설치·권한·구독 실기기 확인
+- [x] iPad가 SVG 홈 화면 아이콘 대신 fallback을 쓰는 문제를 167·180·192·512px PNG와 `apple-touch-icon`으로 보정하고 HTTPS 응답을 확인
+- [ ] 잠긴 iPhone에서 앱을 벗어난 10회 시험 중 정상 네트워크·Focus 해제 조건에서 2분 안 표시 9회 이상. 2026-07-19 첫 운영 reminder는 구독 3개 모두 provider `201 accepted`, retry·오류 0건이었다. 플랫폼 보장이 아닌 GO 기준
 
 향후 native 앱은 task·reminder 정본, scheduler, delivery의 멱등·lease·retry 의미를 재사용한다. `web-push-transport`는 APNs/FCM 어댑터로 추가·교체할 수 있지만, 브라우저 endpoint·`p256dh`·`auth` subscription schema, 구독 API, manifest·Service Worker는 Web 전용이므로 native 단계에서 확장하거나 대체한다. 지금 범위에서 다중 transport schema를 미리 만들지는 않는다.
 
 ### C1d — Pi 인수
 
-- 배포 전 DB·vault와 코드 백업
-- 로컬/Pi 변경 파일 SHA-256 일치
-- schema 4→5→6→7 순차 적용, `integrity_check=ok`, `foreign_key_check` 0건
-- 기존 application table 행 수와 note/topic audit 불변
-- Tailscale Serve HTTPS와 PWA 재설치 절차 확인
-- 서비스 새 PID, 인증 API, 시작 tick·push dispatcher, 재시작 오류 0건
+- [x] 배포 전 DB·vault와 코드 백업
+- [x] 로컬/Pi 변경 파일 SHA-256 일치
+- [x] schema 4→5→6→7 순차 적용, `integrity_check=ok`, `foreign_key_check` 0건
+- [x] 기존 application table 보존과 note/topic audit finding 0
+- [x] Tailscale Serve HTTPS와 PWA 설치·아이콘 보정 절차 확인
+- [x] 서비스 새 PID, 인증 API, 시작 tick·push dispatcher, 재시작 오류 0건
 - 운영 DB에는 별도 승인 없이 테스트 task를 만들지 않음
 - 기능 비활성화가 필요하면 먼저 `WEB_PUSH_ENABLED=false`로 dispatcher만 끄고, 필요할 때 `ASSISTANT_TASKS_ENABLED=false`로 scheduler·UI까지 끈다.
 - 이전 코드로 완전 rollback할 때는 v4 코드가 상위 schema DB를 거부하므로 코드 백업과 배포 전 DB 백업을 함께 복원한다.

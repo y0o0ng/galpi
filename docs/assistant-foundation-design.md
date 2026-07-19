@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-19
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI 로컬 구현과 desktop/mobile 실브라우저 검증 완료, private HTTPS 실기기·Pi 미검증
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS를 Pi에 인수했고 실기기 Web Push 10회 검증을 진행 중
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성과 V5-A 딜 스카우트·V5-B 주식 분석 전에 진행
 
@@ -435,7 +435,7 @@ C1은 아래 범위만 구현한다.
 
 - 명시적 `/task`와 사용자 확인 후 active task 생성
 - 기한 없음·날짜 전용·KST 절대 시각 기한
-- 단발성 reminder, 1분 scheduler, 재시작 catch-up, 중복 차단
+- 단발성 reminder, 30초 scheduler, 재시작 catch-up, 중복 차단
 - Today·예정·Inbox, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기
 - 완료·취소는 참조 가능한 `closed`, 잘못 만든 항목은 일반 회수에서 제외하는 `deleted`; C1 물리 purge 없음
 - reminder를 약속 occurrence 정본으로, subscription별 delivery를 별도 outbox·전송 receipt로 사용하는 crash-safe 흐름
@@ -468,7 +468,7 @@ C1은 아래 범위만 구현한다.
 
 ## 8. 보안과 승인 경계
 
-- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core와 C1b scheduler·UI 시점 148/148, schema v7·최종 UI를 포함한 현재 161/161을 통과했으며 Pi에는 아직 적용하지 않았다.
+- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core와 schema v7 Web Push까지 Pi에 적용했고, 30초 scheduler의 조기 발송 차단 회귀를 포함한 현재 전체 테스트를 통과했다.
 - 이 경계는 모델에 제공하는 컨텍스트와 자동 작업 범위를 통제한다. 암호화·OS 계정 분리는 아니므로 API 키와 인증정보는 vault에 넣지 않는다.
 - 에이전트 노트는 당장 폴더나 범용 ACL을 만들지 않는다. 첫 writer 구현 시 `owner_agent` 한 필드와 `담당 에이전트 본문 / 사서 CODEX 마커 / 타 에이전트 읽기 전용` 세 규칙만 추가한다.
 - 기본 회수 범위는 자기 소유와 공용 노트다. 교차 에이전트 노트는 명시적 링크·handoff·사용자 요청이 있을 때만 읽어 컨텍스트 오염을 막는다.
@@ -712,7 +712,7 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 - [x] 에이전트 탭 최상단 일정 블록의 3주 21일·지연/오늘/예정/Inbox·preview 최대 3·다음 알림이 같은 task DB와 일치함
 - [x] `일정 추가 | 전체 일정`과 `/task | /today`가 같은 에이전트 탭 작업 화면으로 이동하고 mutation은 `TaskPanel` 한 벌만 사용함
 - [x] loading·empty·error·push disabled 상태와 350px desktop panel·390px mobile bottom sheet가 overflow 없이 동작함
-- [ ] private HTTPS 홈 화면 PWA에서 사용자 opt-in Web Push가 백그라운드·앱 종료 상태의 reminder를 표시함
+- [ ] private HTTPS 홈 화면 PWA의 Web Push 10회 표시 기준을 충족함. 첫 운영 reminder는 3개 구독 모두 provider `201 accepted`, 표시 반복 검증은 진행 중
 - [ ] push 구독 만료·일시 실패·프로세스 재시작에도 delivery outbox가 유실·무한 재시도·중복 행을 만들지 않음
 - [ ] push 권한 거부·실패에도 일정 에이전트와 앱 복귀 reconciliation에서 같은 unresolved reminder를 조회 가능
 - [ ] push payload·URL·로그에 task 내용·API token·subscription secret이 없음

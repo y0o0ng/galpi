@@ -1501,7 +1501,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: 2026-07-19 S0 schema v4 Pi 배포·운영 인수 완료, schema v5 AI 읽기 경계·schema v6 task core/scheduler/UI·schema v7 Web Push outbox/PWA와 지식 시트/일정 에이전트 UI 로컬 구현·실브라우저 검증 완료, A1b 실사용 shadow 관찰 중. private HTTPS 실기기·Pi 인수 전
+> 상태: 2026-07-19 S0 schema v4와 V4.5-C schema v5 AI 읽기 경계·schema v6 task core/30초 scheduler/UI·schema v7 Web Push outbox/PWA, 지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS까지 Pi 배포·운영 인수 완료. A1b 실사용 shadow 관찰과 Web Push 실기기 10회 표시 검증 진행 중
 
 ### 문제 정의
 
@@ -1543,7 +1543,7 @@ A0 기준선 평가
   -> V5-B 주식 분석
 ```
 
-위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 기억 회수·자동 저장을 건드리지 않는 V4.5-C C1 명시적 task/reminder·private Web Push는 별도 경계에서 진행할 수 있다. schema v5 접근 경계, schema v6 task 정본·scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편을 독립 모듈로 로컬 구현했고 전체 테스트 161/161을 마쳤다. 1440×900·390×844 실브라우저의 주간 swipe·deep link·알림 경계·light/dark·overflow도 통과했다. 다음 순서는 Tailscale Serve·iPhone 실기기 확인 → Pi 일괄 인수다. 세 로컬 schema는 아직 Pi에 적용하지 않았고 `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED` 기본값은 `false`다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.
+위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 기억 회수·자동 저장을 건드리지 않는 V4.5-C C1 명시적 task/reminder·private Web Push를 별도 경계에서 구현해 Pi에 인수했다. schema v5 접근 경계, schema v6 task 정본·30초 scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편을 독립 모듈로 유지한다. Tailscale Serve canonical HTTPS, iPhone·iPad·Mac 구독과 첫 운영 reminder의 provider 3/3 `201 accepted`까지 확인했고 잠금화면 표시 10회 기준은 진행 중이다. `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED`의 코드 기본값은 `false`이며 운영 Pi에서만 켠다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.
 
 세부 스키마, 하드 상한, 마이그레이션, 보안 경계와 통과 기준은 상세 설계 문서를 단일 기준으로 삼는다.
 

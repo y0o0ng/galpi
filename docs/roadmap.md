@@ -219,7 +219,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C는 schema v5/v6/v7·최소 PWA·Web Push와 새 지식 시트/일정 에이전트 UI까지 로컬 구현·실브라우저 검증했고, 첫 일괄 배포 전 private HTTPS·iPhone 실기기 확인이 남아 있다.
+> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C schema v5/v6/v7·최소 PWA·Web Push·지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS도 Pi에 인수했고, 실기기 Web Push 10회 표시 검증을 진행 중이다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -291,9 +291,9 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### C — 약속 루프
 
-> **C1c schema v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI 로컬 구현·실브라우저 검증 완료(2026-07-19), private HTTPS 실기기·Pi 미검증.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다.
+> **C1d schema v5/v6/v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI Pi 인수 완료(2026-07-19), 실기기 Web Push 10회 표시 검증 진행 중.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다.
 
-1. schema v5 `ai_readable`, schema v6 task 정본·API·scheduler·UI, schema v7 Web Push subscription·delivery outbox와 최소 PWA를 독립 모듈로 로컬 구현했고 전체 테스트 161/161을 통과했다. 세 schema 모두 Pi에는 아직 적용하지 않았고 task·push flag 기본값은 `false`다.
+1. schema v5 `ai_readable`, schema v6 task 정본·API·30초 scheduler·UI, schema v7 Web Push subscription·delivery outbox와 최소 PWA를 독립 모듈로 구현해 Pi에 적용했다. task·push flag의 코드 기본값은 `false`이고 운영 Pi에서만 명시적으로 활성화한다.
 2. 날짜 전용 기한과 절대 KST 시각을 구분하고 사용자 확인 후에만 저장
 3. reminder는 약속 occurrence 정본으로 두고, 결정론적 scheduler가 재시작 catch-up과 중복 차단 처리
 4. 지식 시트 첫 `알림` 탭은 `전체 | Codex | 시스템 | 최근 저장`만 다루고 일정 알림은 제외한다. 기존 floating·drag layer는 제거했다.
@@ -328,7 +328,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [x] 완료·취소는 closed로 계속 참조되고 deleted는 일반 검색·AI에서 제외되며 복원 가능하다
 - [x] 에이전트 탭의 첫 블록이 task DB 기반 일정 요약이며 3주 21일·네 건수·미리보기·다음 알림·일정 작업 화면이 desktop/mobile에서 정확히 동작한다
 - [x] 일정 에이전트는 task 변경 행동을 중복 구현하지 않고 `TaskPanel`의 단일 renderer를 사용한다
-- [ ] private HTTPS 홈 화면 PWA의 Web Push가 앱을 벗어난 상태에서 알림을 표시하고, 구독 만료·전송 실패에도 일정 에이전트 fallback이 유실되지 않는다
+- [ ] private HTTPS 홈 화면 PWA의 Web Push가 10회 표시 기준을 충족하고, 구독 만료·전송 실패에도 일정 에이전트 fallback이 유실되지 않는다. 첫 운영 reminder는 3개 구독 모두 provider `201 accepted`였다
 - [ ] reminder·subscription 조합당 delivery가 하나이며 재시작·retry에도 중복 outbox와 무한 재시도가 없다
 
 ---

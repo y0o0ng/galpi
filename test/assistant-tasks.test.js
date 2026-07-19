@@ -454,6 +454,44 @@ test('scheduler catches up after reopen and repeated instances keep one stable f
   db.close();
 });
 
+test('scheduler runs every 30 seconds and keeps a reminder pending until its exact target time', t => {
+  const db = createDatabase();
+  const now = epoch('2026-07-19T03:00:00Z');
+  const reminderAt = now + 30;
+  let scheduledInterval = null;
+  t.mock.method(global, 'setInterval', (_callback, intervalMs) => {
+    scheduledInterval = intervalMs;
+    return { unref() {} };
+  });
+  t.mock.method(global, 'clearInterval', () => {});
+  const store = createAssistantTaskStore(db, { now: () => now });
+  const created = store.create(taskInput());
+  db.prepare('UPDATE assistant_reminders SET remind_at = ? WHERE id = ?')
+    .run(reminderAt, created.reminder.id);
+  const scheduler = createAssistantScheduler(db, { now: () => now });
+
+  assert.equal(scheduler.start(), true);
+  assert.equal(scheduledInterval, 30_000);
+  assert.equal(scheduler.stop(), true);
+
+  assert.deepEqual(scheduler.tick(reminderAt - 1), {
+    capturedAt: reminderAt - 1,
+    firedIds: [],
+    skipped: false,
+  });
+  assert.deepEqual(scheduler.tick(reminderAt), {
+    capturedAt: reminderAt,
+    firedIds: [created.reminder.id],
+    skipped: false,
+  });
+  assert.deepEqual(
+    db.prepare('SELECT status, fired_at AS firedAt FROM assistant_reminders WHERE id = ?')
+      .get(created.reminder.id),
+    { status: 'fired', firedAt: reminderAt },
+  );
+  db.close();
+});
+
 test('scheduler rolls back the whole due batch when one fire update fails', () => {
   const db = createDatabase();
   const now = epoch('2026-07-19T03:00:00Z');

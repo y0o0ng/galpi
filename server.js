@@ -6889,7 +6889,7 @@ const httpServer = app.listen(PORT, HOST, () => {
   console.log(`   백업:     ${BACKUP_DIR} (하루 1회 자동, 7일 보관)`);
   if (ASSISTANT_TASKS_ENABLED) {
     assistantScheduler.start();
-    console.log('   일정:     scheduler 실행 중 (60초)');
+    console.log('   일정:     scheduler 실행 중 (30초)');
   }
   if (assistantPushDispatcher) {
     assistantPushDispatcher.start();
