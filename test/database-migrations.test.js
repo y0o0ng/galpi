@@ -78,10 +78,13 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }],
+    [
+      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
+      { version: 5 }, { version: 6 }, { version: 7 },
+    ],
   );
 
   const chunk = db.prepare(`
@@ -110,11 +113,14 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       SELECT name
       FROM sqlite_master
       WHERE type = 'table' AND name IN (
-        'assistant_tasks', 'assistant_task_events', 'assistant_reminders'
+        'assistant_tasks', 'assistant_task_events', 'assistant_reminders',
+        'assistant_push_subscriptions', 'assistant_push_deliveries'
       )
       ORDER BY name
     `).all(),
     [
+      { name: 'assistant_push_deliveries' },
+      { name: 'assistant_push_subscriptions' },
       { name: 'assistant_reminders' },
       { name: 'assistant_task_events' },
       { name: 'assistant_tasks' },

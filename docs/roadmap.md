@@ -219,7 +219,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C는 schema v5/v6과 C1b scheduler·UI까지 로컬 구현했고, 첫 일괄 배포 전 private Web Push와 실브라우저 확인이 남아 있다.
+> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C는 schema v5/v6/v7·최소 PWA·Web Push와 새 지식 시트/일정 에이전트 UI까지 로컬 구현·실브라우저 검증했고, 첫 일괄 배포 전 private HTTPS·iPhone 실기기 확인이 남아 있다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -291,15 +291,16 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### C — 약속 루프
 
-> **C1b scheduler·알림센터·일정 요약 로컬 구현 완료(2026-07-19), 실브라우저 viewport·Pi 미검증.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다. C1 첫 배포에는 private HTTPS·PWA·Web Push까지 포함한다.
+> **C1c schema v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI 로컬 구현·실브라우저 검증 완료(2026-07-19), private HTTPS 실기기·Pi 미검증.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다.
 
-1. schema v5 `ai_readable` 경계와 schema v6 task 정본·API에 이어 결정론적 scheduler, stable fired 알림 합성, `/task`·`/today`, 알림센터 단일 task renderer와 읽기 전용 일정 에이전트 요약을 독립 모듈로 로컬 구현했고 전체 테스트 148/148을 통과했다. 두 schema 모두 Pi에는 아직 적용하지 않았고 flag 기본값은 `false`다.
+1. schema v5 `ai_readable`, schema v6 task 정본·API·scheduler·UI, schema v7 Web Push subscription·delivery outbox와 최소 PWA를 독립 모듈로 로컬 구현했고 전체 테스트 161/161을 통과했다. 세 schema 모두 Pi에는 아직 적용하지 않았고 task·push flag 기본값은 `false`다.
 2. 날짜 전용 기한과 절대 KST 시각을 구분하고 사용자 확인 후에만 저장
 3. reminder는 약속 occurrence 정본으로 두고, 결정론적 scheduler가 재시작 catch-up과 중복 차단 처리
-4. 시온 알림센터에 알림·Today·예정·Inbox, closed/deleted lifecycle, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기 제공
-5. 에이전트 탭 최상단에 일정 에이전트 블록을 두고 7일·지연/오늘/예정/Inbox·오늘/지연 최대 3개·다음 알림·push 상태와 `일정 추가 | 전체 일정` 진입만 제공
-6. C1c는 schema v7 subscription·delivery outbox, Tailscale Serve private HTTPS, 최소 PWA와 사용자 opt-in Web Push를 붙이고 알림센터·foreground refresh를 fallback으로 유지
-7. 자연어 후보는 C1.5, 반복은 schema v8 C2, 브리핑·결과 기록은 C3에서 별도 컨펌
+4. 지식 시트 첫 `알림` 탭은 `전체 | Codex | 시스템 | 최근 저장`만 다루고 일정 알림은 제외한다. 기존 floating·drag layer는 제거했다.
+5. 에이전트 탭 최상단 일정 에이전트가 3주 21일 native swipe·지연/오늘/예정/Inbox·오늘/지연 최대 3개·다음 알림·unresolved reminder·push 상태와 모든 일정 작업을 같은 탭에서 제공한다. mutation renderer는 `TaskPanel` 한 벌만 쓴다.
+6. 1440×900·390×844에서 주간 스와이프·오늘 복귀·작성/수정·deep link·알림 분리·확인 처리·light/dark·overflow·모바일 44px target을 확인했다.
+7. C1c는 fire/outbox 원자성, lease·TTL·bounded retry, endpoint allowlist, VAPID 비밀 비노출, canonical HTTPS에서만 가능한 사용자 opt-in을 구현했다. 다음은 Tailscale Serve와 iPhone 실기기 전달 검증이다.
+8. 자연어 후보는 C1.5, 반복은 schema v8 C2, 브리핑·결과 기록은 C3에서 별도 컨펌
 
 명시적 `/task`, 새 전용 테이블·모듈, 무LLM, 기억 회수·자동 저장 경로 불변을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다. 숨은 탭의 timer를 계속 돌리는 것은 지원하지 않으며 Pi scheduler가 시각을 판정하고 Web Push가 Service Worker를 이벤트성으로 깨운다.
 
@@ -325,9 +326,9 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [ ] task와 reminder가 Pi 재시작 뒤에도 유지되고 occurrence key당 stable reminder receipt·notification ID가 하나이며 확인 전 같은 행만 재표시된다
 - [x] Today에 오늘 마감·지연 항목이 정확히 표시된다
 - [x] 완료·취소는 closed로 계속 참조되고 deleted는 일반 검색·AI에서 제외되며 복원 가능하다
-- [ ] 에이전트 탭의 첫 블록이 task DB 기반 일정 요약이며 7일·네 건수·미리보기·다음 알림과 두 진입 버튼이 desktop/mobile에서 정확히 동작한다
-- [x] 일정 요약 블록은 task 변경 행동을 중복 구현하지 않고 알림센터의 단일 renderer로 이동한다
-- [ ] private HTTPS 홈 화면 PWA의 Web Push가 앱을 벗어난 상태에서 알림을 표시하고, 구독 만료·전송 실패에도 알림센터 fallback이 유실되지 않는다
+- [x] 에이전트 탭의 첫 블록이 task DB 기반 일정 요약이며 3주 21일·네 건수·미리보기·다음 알림·일정 작업 화면이 desktop/mobile에서 정확히 동작한다
+- [x] 일정 에이전트는 task 변경 행동을 중복 구현하지 않고 `TaskPanel`의 단일 renderer를 사용한다
+- [ ] private HTTPS 홈 화면 PWA의 Web Push가 앱을 벗어난 상태에서 알림을 표시하고, 구독 만료·전송 실패에도 일정 에이전트 fallback이 유실되지 않는다
 - [ ] reminder·subscription 조합당 delivery가 하나이며 재시작·retry에도 중복 outbox와 무한 재시도가 없다
 
 ---
@@ -402,7 +403,7 @@ Phase 0 GO는 실행 성공률 95% 이상, raw↔DB reconciliation 100%, 논리 
 ### 보너스 (나중)
 - **프론트 개편 — 에이전트 결과는 화면이 아니라 노트로, 표시는 사이드 패널로**:
   - V4에서 논문 서재용 패널 셸을 먼저 적용했다. C1b에서 task DB의 운영 요약인 일정 에이전트 블록을 최상단에 넣고, 향후 에이전트 보고가 실제 생기면 그 아래로 같은 패널을 확장한다
-  - 일정 블록은 보고 대시보드가 아니라 7일·건수·미리보기·다음 알림과 작성/전체 일정 진입만 제공한다. task 변경 행동은 알림센터에 둔다
+  - 일정 블록은 보고 대시보드가 아니라 3주 swipe·건수·미리보기·다음 알림과 같은 탭의 일정 작업 화면을 제공한다. task 변경 행동은 `TaskPanel` 한 벌만 사용한다
   - 에이전트 보고 = 노트 저장(뇌는 하나) + 알림센터 알림 + 시온 뱃지. 전용 대시보드 금지 — 기존 노트 시스템이 표시를 담당
   - **채팅 옆 노트 패널** (Artifacts/Canvas 패턴): 열람 전용, 편집은 옵시디언 링크로. 논문 서재의 단순 열람은 `activeNotes`를 바꾸지 않는다. 향후 에이전트 보고를 대화 컨텍스트에 넣는 동작은 별도 명시적 액션으로 설계한다
   - 패널 탭 = note_type 필터 뷰 ([열람 중][에이전트 보고][논문] 등). 시세·차트가 보고 싶으면 **직접 구현 금지, TradingView 무료 임베드 위젯(복붙 HTML)으로만** — 파싱·폴링·차트 코드 작성 금지 (증권앱 재발명 금지). 위젯은 표시 전용, 기록용 시세 스냅샷은 에이전트 보고 노트가 담당

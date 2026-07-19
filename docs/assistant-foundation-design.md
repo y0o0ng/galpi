@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-19
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C C0 설계 개정 완료, C1 첫 배포에 Web Push 포함
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI 로컬 구현과 desktop/mobile 실브라우저 검증 완료, private HTTPS 실기기·Pi 미검증
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성과 V5-A 딜 스카우트·V5-B 주식 분석 전에 진행
 
@@ -439,8 +439,9 @@ C1은 아래 범위만 구현한다.
 - Today·예정·Inbox, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기
 - 완료·취소는 참조 가능한 `closed`, 잘못 만든 항목은 일반 회수에서 제외하는 `deleted`; C1 물리 purge 없음
 - reminder를 약속 occurrence 정본으로, subscription별 delivery를 별도 outbox·전송 receipt로 사용하는 crash-safe 흐름
-- Tailscale Serve private HTTPS, 최소 PWA, 사용자 opt-in Web Push와 알림센터·foreground polling fallback
-- 에이전트 탭 최상단의 일정 에이전트 블록: 7일 스트립, 지연·오늘·예정·Inbox, 오늘·지연 최대 3개, 다음 알림, push 상태, `일정 추가 | 전체 일정`
+- Tailscale Serve private HTTPS, 최소 PWA, 사용자 opt-in Web Push와 일정 에이전트·foreground polling fallback
+- 지식 시트 첫 `알림` 탭: `전체 | Codex | 시스템 | 최근 저장`. 일정 알림은 여기서 제외한다.
+- 에이전트 탭 최상단의 일정 에이전트 블록: 3주 21일 스와이프, 지연·오늘·예정·Inbox, 오늘·지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 같은 탭의 일정 작업 화면
 
 자연어 후보, 반복, 오늘 브리핑, 완료 결과 기록, 외부 캘린더는 C1에서 제외한다. 반복은 `task -> occurrence -> reminder`의 3층이 필요한 별도 schema migration으로 진행한다. Web Push는 C1 범위지만 task core와 분리된 schema·feature flag·인수 단위로 구현한다.
 
@@ -467,7 +468,7 @@ C1은 아래 범위만 구현한다.
 
 ## 8. 보안과 승인 경계
 
-- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core와 C1b scheduler·UI를 포함해 로컬 전체 테스트 148/148을 통과했으며 Pi에는 아직 적용하지 않았다.
+- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core와 C1b scheduler·UI 시점 148/148, schema v7·최종 UI를 포함한 현재 161/161을 통과했으며 Pi에는 아직 적용하지 않았다.
 - 이 경계는 모델에 제공하는 컨텍스트와 자동 작업 범위를 통제한다. 암호화·OS 계정 분리는 아니므로 API 키와 인증정보는 vault에 넣지 않는다.
 - 에이전트 노트는 당장 폴더나 범용 ACL을 만들지 않는다. 첫 writer 구현 시 `owner_agent` 한 필드와 `담당 에이전트 본문 / 사서 CODEX 마커 / 타 에이전트 읽기 전용` 세 규칙만 추가한다.
 - 기본 회수 범위는 자기 소유와 공용 노트다. 교차 에이전트 노트는 명시적 링크·handoff·사용자 요청이 있을 때만 읽어 컨텍스트 오염을 막는다.
@@ -647,11 +648,13 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 ### C. task·reminder
 
 - [상세 설계](task-reminder-design.md)의 C1부터 구현
-- [x] schema v5 접근 경계 뒤 v6 task·event·reminder 정본, 독립 store·route·scheduler와 task·agent UI를 로컬 구현하고 전체 테스트 148/148 통과
+- [x] schema v5 접근 경계, v6 task·event·reminder 정본·scheduler/UI, v7 Web Push outbox·최소 PWA를 독립 모듈로 로컬 구현하고 전체 테스트 161/161 통과
 - 명시적 `/task`, 단발성 reminder, scheduler, 재시작 catch-up, 중복 차단
 - Today·예정·Inbox와 closed/deleted lifecycle, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기
-- 에이전트 탭 최상단 일정 블록과 readonly `GET /api/tasks/summary`: 7일·네 건수·preview 최대 3·다음 알림·push 상태·두 진입 버튼
-- schema v7 subscription·delivery outbox, private HTTPS·PWA·Web Push, 알림센터 fallback
+- 지식 시트 첫 범용 알림 탭과, 에이전트 탭 최상단 일정 블록·`GET /api/tasks/summary`: 중앙 주 앞뒤 3주·네 건수·preview 최대 3·다음 알림·unresolved reminder·push 상태·일정 작업 화면
+- [x] schema v7 subscription·delivery outbox, 사용자 opt-in PWA·Web Push와 일정 에이전트 fallback 로컬 구현
+- [x] 1440×900·390×844 viewport, 주간 스와이프·deep link·일반/일정 알림 경계·모바일 44px target 확인
+- [ ] Tailscale Serve private HTTPS와 iPhone 홈 화면 실기기 전달 확인
 - 자연어 후보·반복·브리핑은 C1 Pi 인수 뒤 별도 단계
 
 ### D. 음성
@@ -695,7 +698,7 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 ### C. 약속 루프
 
 - [x] C0 상세 설계에서 제품 경계·시간 규칙·closed/deleted 상태 머신·schema·API·crash semantics를 고정
-- [x] 일정 에이전트 readonly summary·두 진입 동작과 알림센터 단일 쓰기 경계를 고정
+- [x] 범용 알림 탭과 일정 에이전트 안의 `TaskPanel` 단일 쓰기 경계를 고정
 - [x] schema v6 정본·KST 검증·create 멱등성·낙관적 version·closed/deleted 전이·summary·ack/snooze API를 독립 모듈로 구현하고 flag 기본값을 `false`로 유지
 - [ ] 명시적 `/task`가 날짜·시각 입력 시 절대 KST 시각을 보여주고 확인 후에만 task 생성
 - [ ] 서버 재시작 후 task와 reminder가 유지됨
@@ -706,12 +709,12 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 - [ ] task 다시 열기·복원은 terminal reminder를 자동 복원하지 않음
 - [ ] reminder는 명시적 확인 전에는 조회·패널 열기로 acknowledged되지 않음
 - [ ] Today·예정·Inbox에 날짜 전용·시각 기한이 KST 경계대로 표시됨
-- [ ] 에이전트 탭 최상단 일정 블록의 7일·지연/오늘/예정/Inbox·preview 최대 3·다음 알림이 같은 task DB와 일치함
-- [ ] 일정 블록의 `일정 추가 | 전체 일정`은 작성 카드·알림센터로만 이동하고 블록 자체의 task 변경 호출은 0회
-- [ ] loading·empty·error·push 권한 상태와 350px desktop panel·390px mobile bottom sheet가 overflow 없이 동작함
+- [x] 에이전트 탭 최상단 일정 블록의 3주 21일·지연/오늘/예정/Inbox·preview 최대 3·다음 알림이 같은 task DB와 일치함
+- [x] `일정 추가 | 전체 일정`과 `/task | /today`가 같은 에이전트 탭 작업 화면으로 이동하고 mutation은 `TaskPanel` 한 벌만 사용함
+- [x] loading·empty·error·push disabled 상태와 350px desktop panel·390px mobile bottom sheet가 overflow 없이 동작함
 - [ ] private HTTPS 홈 화면 PWA에서 사용자 opt-in Web Push가 백그라운드·앱 종료 상태의 reminder를 표시함
 - [ ] push 구독 만료·일시 실패·프로세스 재시작에도 delivery outbox가 유실·무한 재시도·중복 행을 만들지 않음
-- [ ] push 권한 거부·실패에도 알림센터와 앱 복귀 reconciliation에서 같은 unresolved reminder를 조회 가능
+- [ ] push 권한 거부·실패에도 일정 에이전트와 앱 복귀 reconciliation에서 같은 unresolved reminder를 조회 가능
 - [ ] push payload·URL·로그에 task 내용·API token·subscription secret이 없음
 - [ ] `/task` 경로의 LLM·임베딩·topic 저장 호출이 0회
 - [ ] 반복·자연어 후보·결과 기록은 C1 인수 뒤 별도 컨펌

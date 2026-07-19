@@ -326,7 +326,10 @@ test('repair apply backs up, migrates, applies approved operations, and reaches 
   const db = new Database(fixture.dbPath, { readonly: true });
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }],
+    [
+      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
+      { version: 5 }, { version: 6 }, { version: 7 },
+    ],
   );
   assert.deepEqual(
     db.prepare(`

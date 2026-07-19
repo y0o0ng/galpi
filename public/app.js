@@ -3,11 +3,10 @@
 // 단일 사용자 비서: 모든 기기가 같은 대화를 이어가도록 고정 세션 ID를 공유한다.
 // (지식/노트는 원래 서버에서 공유되고, 이 값으로 라이브 대화 thread까지 기기 간 공유)
 const sessionId = 'shared-main';
-// 이름 변경 뒤에도 기존 브라우저 기록, 토큰, 패널 위치를 그대로 이어 쓴다.
+// 이름 변경 뒤에도 기존 브라우저 기록과 토큰을 그대로 이어 쓴다.
 const uiHistoryKey = `councilUiHistory:${sessionId}`;
 const activeNotesKey = `councilActiveNotes:${sessionId}`;
 const apiTokenKey = 'councilApiToken';
-const notificationPositionKey = 'councilNotificationPosition';
 const PROGRESS_STAGE_LABELS = Object.freeze({
   context: '기억 찾는 중…',
   evidence: '근거 확인 중…',
@@ -45,7 +44,7 @@ const slashCommands = [
   { command: '/audit', title: '시스템 검사', description: '검증, 정리 상태, 알림, 고립 토픽을 한 번에 점검' },
   { command: '/merge', title: '토픽 병합', description: '유사한 토픽 병합 후보 — 검색 카드의 "병합"으로 직접 묶기도 가능' },
   { command: '/split ', title: '노트 분리', description: '노트의 Q&A를 제목별로 골라 새 토픽으로 분리 (제목으로 노트 검색)' },
-  { command: '/notifications', title: '알림센터', description: 'Codex 제안과 시스템 알림을 작은 패널로 보기' },
+  { command: '/notifications', title: '알림센터', description: '서재에서 Codex 제안과 시스템 알림 보기' },
   { command: '/task ', title: '일정 추가', description: 'LLM 없이 할 일과 알림을 직접 등록', feature: 'tasks' },
   { command: '/today', title: '오늘 일정', description: '오늘과 지연된 할 일을 바로 보기', feature: 'tasks' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
@@ -221,6 +220,7 @@ async function init() {
   });
 
   await loadHistory();
+  openInitialPanelFromUrl();
   startTaskRefresh();
   setInterval(pollForUpdates, 7000);
   updateNotesBar();
@@ -1230,13 +1230,38 @@ async function handlePaperSearch(query) {
 }
 
 function initPaperPanel() {
-  if (!window.PaperPanel || !window.TaskPanel || !window.AgentPanel) return false;
+  if (
+    !window.PaperPanel
+    || !window.NotificationPanel
+    || !window.TaskPanel
+    || !window.AgentPanel
+    || !window.PushClient
+  ) return false;
   try {
+    window.PushClient.init({ apiFetch });
     window.TaskPanel.init({
       apiFetch,
       showToast,
       onChanged: handleTaskChanged,
       enabled: tasksEnabled,
+    });
+    window.NotificationPanel.init({
+      apiFetch,
+      showToast,
+      onSplit: filename => {
+        window.PaperPanel?.close();
+        renderSplitPanel(filename);
+      },
+      openNote: note => {
+        window.PaperPanel?.open('notes');
+        window.NotePanel?.open(note);
+      },
+    });
+    window.AgentPanel.init({
+      apiFetch,
+      enabled: tasksEnabled,
+      pushClient: window.PushClient,
+      showToast,
     });
     window.PaperPanel.init({
       apiFetch,
@@ -1248,11 +1273,6 @@ function initPaperPanel() {
         save: saveIconSvg,
         check: checkIconSvg,
         loading: loadingIconSvg,
-      },
-      agentPanel: {
-        enabled: tasksEnabled,
-        openCreate: () => openTaskComposer(''),
-        openTasks: () => openTaskList('today'),
       },
     });
     return true;
@@ -2522,57 +2542,42 @@ function renderMergeCandidates(candidates) {
 
 window.openNotificationsPanel = openNotificationsPanel;
 
+function openNotificationsPanel() {
+  if (!initPaperPanel()) return;
+  window.PaperPanel.open('notifications');
+}
+
 function openTaskComposer(initialTitle = '') {
-  return openNotificationsPanel({ filter: 'task', compose: true, initialTitle });
+  if (!initPaperPanel()) return;
+  window.PaperPanel.open('agents');
+  return window.AgentPanel.openTasks({ compose: true, initialTitle });
 }
 
-function openTaskList(view = 'today') {
-  return openNotificationsPanel({ filter: 'task', view });
+function openTaskList(view = 'today', options = {}) {
+  if (!initPaperPanel()) return;
+  window.PaperPanel.open('agents');
+  return window.AgentPanel.openTasks({ view, ...options });
 }
 
-function selectNotificationFilter(panel, filter, taskOptions = {}) {
-  panel.dataset.filter = filter;
-  panel.querySelectorAll('.notification-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.filter === filter);
-  });
-  if (filter === 'task') {
-    return window.TaskPanel.render(panel.querySelector('.notification-body'), taskOptions);
+function openInitialPanelFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('panel') === 'agents' || params.get('notification') === 'tasks') {
+    openTaskList('today', { focusReminders: params.get('taskView') === 'reminders' || params.get('notification') === 'tasks' });
+  } else if (params.get('panel') === 'notifications') {
+    openNotificationsPanel();
   }
-  return refreshNotificationsPanel(panel);
-}
-
-async function openNotificationsPanel(options = {}) {
-  let panel = document.getElementById('notification-center');
-  if (!panel) {
-    panel = createNotificationsPanel();
-    document.body.appendChild(panel);
-  }
-  applyNotificationPanelPosition(panel);
-  panel.classList.add('open');
-  const filter = options.filter || panel.dataset.filter || 'all';
-  await selectNotificationFilter(panel, filter, options);
-}
-
-function closeNotificationsPanel() {
-  document.getElementById('notification-center')?.classList.remove('open');
 }
 
 function refreshTaskViews() {
   if (!tasksEnabled || document.visibilityState !== 'visible') return;
-  window.AgentPanel?.refresh();
-  const panel = document.getElementById('notification-center');
-  if (!panel?.classList.contains('open')) return;
-  if (panel.dataset.filter === 'task') window.TaskPanel?.refresh();
-  else refreshNotificationsPanel(panel);
+  const panel = document.getElementById('agent-panel');
+  if (panel && !panel.hidden) window.AgentPanel?.refresh();
 }
 
 function handleTaskChanged() {
   if (!tasksEnabled) return;
-  window.AgentPanel?.refresh();
-  const panel = document.getElementById('notification-center');
-  if (panel?.classList.contains('open') && panel.dataset.filter !== 'task') {
-    refreshNotificationsPanel(panel);
-  }
+  const panel = document.getElementById('agent-panel');
+  if (panel && !panel.hidden) window.AgentPanel?.refresh();
 }
 
 function startTaskRefresh() {
@@ -2582,356 +2587,6 @@ function startTaskRefresh() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refreshTaskViews();
   });
-}
-
-function createNotificationsPanel() {
-  const panel = document.createElement('section');
-  panel.id = 'notification-center';
-  panel.classList.toggle('tasks-enabled', tasksEnabled);
-  panel.setAttribute('aria-label', '알림센터');
-
-  const head = document.createElement('div');
-  head.className = 'notification-head';
-  head.title = '드래그해서 위치 이동';
-
-  const titleWrap = document.createElement('div');
-  const kicker = document.createElement('div');
-  kicker.className = 'notification-kicker';
-  kicker.textContent = 'XION';
-  const title = document.createElement('div');
-  title.className = 'notification-title';
-  title.textContent = '알림센터';
-  titleWrap.append(kicker, title);
-
-  const actions = document.createElement('div');
-  actions.className = 'notification-actions';
-  const refresh = document.createElement('button');
-  refresh.className = 'notification-icon-btn';
-  refresh.type = 'button';
-  refresh.title = '새로고침';
-  refresh.textContent = '↻';
-  refresh.addEventListener('click', () => refreshNotificationsPanel(panel));
-  const close = document.createElement('button');
-  close.className = 'notification-icon-btn';
-  close.type = 'button';
-  close.title = '닫기';
-  close.textContent = '×';
-  close.addEventListener('click', closeNotificationsPanel);
-  actions.append(refresh, close);
-
-  const tabs = document.createElement('div');
-  tabs.className = 'notification-tabs';
-  [
-    ['all', '전체'],
-    ...(tasksEnabled ? [['task', '할 일']] : []),
-    ['codex', 'Codex'],
-    ['system', '시스템'],
-    ['saves', '최근 저장'],
-  ].forEach(([value, label]) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'notification-tab';
-    btn.dataset.filter = value;
-    btn.textContent = label;
-    btn.addEventListener('click', () => {
-      selectNotificationFilter(panel, value);
-    });
-    if (value === 'all') btn.classList.add('active');
-    tabs.appendChild(btn);
-  });
-
-  const body = document.createElement('div');
-  body.className = 'notification-body';
-
-  head.append(titleWrap, actions);
-  panel.append(head, tabs, body);
-  panel.dataset.filter = 'all';
-  panel._notifications = [];
-  panel._recentSaves = [];
-  enableNotificationPanelDrag(panel, head);
-  return panel;
-}
-
-function isNotificationMobileLayout() {
-  return window.matchMedia('(max-width: 640px)').matches;
-}
-
-function loadNotificationPanelPosition() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(notificationPositionKey) || 'null');
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (!Number.isFinite(parsed.left) || !Number.isFinite(parsed.top)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function applyNotificationPanelPosition(panel) {
-  if (isNotificationMobileLayout()) {
-    panel.style.left = '';
-    panel.style.top = '';
-    panel.style.right = '';
-    panel.style.bottom = '';
-    return;
-  }
-  const pos = loadNotificationPanelPosition();
-  if (!pos) return;
-  const width = panel.offsetWidth || 380;
-  const height = panel.offsetHeight || 420;
-  const left = Math.max(8, Math.min(pos.left, window.innerWidth - width - 8));
-  const top = Math.max(8, Math.min(pos.top, window.innerHeight - height - 8));
-  panel.style.left = `${left}px`;
-  panel.style.top = `${top}px`;
-  panel.style.right = 'auto';
-  panel.style.bottom = 'auto';
-}
-
-function enableNotificationPanelDrag(panel, handle) {
-  let dragging = false;
-  let offsetX = 0;
-  let offsetY = 0;
-
-  handle.addEventListener('pointerdown', e => {
-    if (e.target.closest('button') || isNotificationMobileLayout()) return;
-    const rect = panel.getBoundingClientRect();
-    dragging = true;
-    offsetX = e.clientX - rect.left;
-    offsetY = e.clientY - rect.top;
-    panel.classList.add('dragging');
-    panel.style.left = `${rect.left}px`;
-    panel.style.top = `${rect.top}px`;
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-    handle.setPointerCapture?.(e.pointerId);
-    e.preventDefault();
-  });
-
-  handle.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    const rect = panel.getBoundingClientRect();
-    const left = Math.max(8, Math.min(e.clientX - offsetX, window.innerWidth - rect.width - 8));
-    const top = Math.max(8, Math.min(e.clientY - offsetY, window.innerHeight - rect.height - 8));
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
-  });
-
-  const endDrag = e => {
-    if (!dragging) return;
-    dragging = false;
-    panel.classList.remove('dragging');
-    const rect = panel.getBoundingClientRect();
-    localStorage.setItem(notificationPositionKey, JSON.stringify({ left: rect.left, top: rect.top }));
-    try { handle.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
-  };
-  handle.addEventListener('pointerup', endDrag);
-  handle.addEventListener('pointercancel', endDrag);
-}
-
-async function refreshNotificationsPanel(panel) {
-  const body = panel.querySelector('.notification-body');
-  if (panel.dataset.filter === 'task') {
-    await window.TaskPanel.render(body);
-    return;
-  }
-  body.innerHTML = '<div class="notification-empty">알림을 불러오는 중…</div>';
-  try {
-    const res = await apiFetch('/api/notifications');
-    const data = await res.json();
-    if (data.error) {
-      body.innerHTML = `<div class="notification-empty danger">${escapeHtml(data.error)}</div>`;
-      return;
-    }
-    panel._notifications = Array.isArray(data.notifications) ? data.notifications : [];
-    panel._recentSaves = Array.isArray(data.recentSaves) ? data.recentSaves : [];
-    renderNotificationItems(panel);
-  } catch (_) {
-    body.innerHTML = '<div class="notification-empty danger">서버에 연결할 수 없습니다.</div>';
-  }
-}
-
-function renderNotificationItems(panel) {
-  const body = panel.querySelector('.notification-body');
-  const filter = panel.dataset.filter || 'all';
-  if (filter === 'saves') {
-    const saves = panel._recentSaves || [];
-    if (saves.length === 0) {
-      body.innerHTML = '<div class="notification-empty">최근 토픽 저장 기록이 없습니다.</div>';
-      return;
-    }
-    body.innerHTML = '';
-    saves.forEach(item => body.appendChild(makeRecentSaveCard(item)));
-    return;
-  }
-  const items = (panel._notifications || []).filter(item => {
-    if (filter === 'all') return true;
-    return item.source === filter;
-  });
-
-  if (items.length === 0) {
-    body.innerHTML = '<div class="notification-empty">표시할 알림이 없습니다.</div>';
-    return;
-  }
-
-  body.innerHTML = '';
-  items.forEach(item => body.appendChild(makeNotificationCard(item)));
-}
-
-function formatRecentSaveTime(value) {
-  const seconds = Number(value);
-  if (!Number.isFinite(seconds) || seconds <= 0) return '';
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(seconds * 1000));
-}
-
-function makeRecentSaveCard(item) {
-  const card = document.createElement('button');
-  card.type = 'button';
-  card.className = 'notification-card type-save recent-save-card';
-  card.setAttribute('aria-label', `${item.note?.title || '토픽'} 열기`);
-
-  const top = document.createElement('div');
-  top.className = 'notification-card-top';
-  const badge = document.createElement('span');
-  badge.className = 'notification-badge';
-  badge.textContent = item.action === 'created' ? '새 토픽' : '토픽에 추가';
-  const time = document.createElement('span');
-  time.className = 'notification-source';
-  time.textContent = formatRecentSaveTime(item.createdAt);
-  top.append(badge, time);
-
-  const note = document.createElement('div');
-  note.className = 'notification-note';
-  note.textContent = item.note?.title || '대상 토픽 없음';
-  const text = document.createElement('div');
-  text.className = 'notification-text';
-  text.textContent = item.text || '저장 내용 없음';
-  const file = document.createElement('div');
-  file.className = 'notification-file recent-save-file';
-  file.textContent = item.note?.filename || '';
-
-  card.append(top, note, text, file);
-  card.addEventListener('click', () => {
-    if (!item.note?.filename) return;
-    closeNotificationsPanel();
-    window.PaperPanel?.open('notes');
-    window.NotePanel?.open({ ...item.note, noteType: 'topic' });
-  });
-  return card;
-}
-
-function makeNotificationCard(item) {
-  if (item.type === 'task_reminder' && window.TaskPanel) {
-    return window.TaskPanel.makeReminderCard(item);
-  }
-  const card = document.createElement('article');
-  card.className = `notification-card type-${item.type || 'review'}`;
-
-  const top = document.createElement('div');
-  top.className = 'notification-card-top';
-
-  const badge = document.createElement('span');
-  badge.className = 'notification-badge';
-  badge.textContent = item.title || '알림';
-
-  const source = document.createElement('span');
-  source.className = 'notification-source';
-  source.textContent = item.source || 'system';
-  top.append(badge, source);
-
-  const note = document.createElement('div');
-  note.className = 'notification-note';
-  note.textContent = item.note?.title || '관련 노트 없음';
-
-  const text = document.createElement('div');
-  text.className = 'notification-text';
-  text.textContent = item.text || '';
-
-  const footer = document.createElement('div');
-  footer.className = 'notification-footer';
-  const file = document.createElement('span');
-  file.className = 'notification-file';
-  file.textContent = item.note?.filename || '';
-  footer.appendChild(file);
-
-  const actionWrap = document.createElement('div');
-  actionWrap.className = 'notification-card-actions';
-
-  const approve = document.createElement('button');
-  approve.type = 'button';
-  approve.className = 'notification-action primary';
-  approve.textContent = notificationPrimaryActionLabel(item);
-  approve.addEventListener('click', () => {
-    // split 제안은 실행 정보(qaId)가 없으므로, 해당 노트의 /split 패널을 열어 직접 고르게 한다
-    if (item.type === 'split') {
-      closeNotificationsPanel();
-      if (item.note?.filename) renderSplitPanel(item.note.filename);
-      else showToast('이 제안에 노트 정보가 없어');
-      return;
-    }
-    handleNotificationDecision(item, 'approve', card);
-  });
-
-  actionWrap.appendChild(approve);
-  if (item.ignorable !== false) {
-    const ignore = document.createElement('button');
-    ignore.type = 'button';
-    ignore.className = 'notification-action';
-    ignore.textContent = '무시';
-    ignore.addEventListener('click', () => handleNotificationDecision(item, 'ignore', card));
-    actionWrap.appendChild(ignore);
-  }
-  footer.appendChild(actionWrap);
-
-  card.append(top, note, text, footer);
-  return card;
-}
-
-function notificationPrimaryActionLabel(item) {
-  if (item.type === 'merge') return '병합 실행';
-  if (item.type === 'split') return '분리 검토';
-  if (item.type === 'policy' && item.executable) return '정책 적용';
-  if (item.type === 'manual_check') return '확인 완료';
-  return '검토 완료';
-}
-
-async function handleNotificationDecision(item, action, card) {
-  const buttons = card.querySelectorAll('button');
-  buttons.forEach(btn => { btn.disabled = true; });
-  try {
-    const res = await apiFetch(`/api/notifications/${encodeURIComponent(item.id)}/${action}`, { method: 'POST' });
-    const data = await res.json();
-    if (!data.success) {
-      showToast(data.error || '알림 처리 실패');
-      buttons.forEach(btn => { btn.disabled = false; });
-      return;
-    }
-
-    const panel = document.getElementById('notification-center');
-    if (panel) {
-      panel._notifications = (panel._notifications || []).filter(n => n.id !== item.id);
-      renderNotificationItems(panel);
-    } else {
-      card.remove();
-    }
-    showToast(action === 'approve' ? notificationDoneMessage(item) : '무시됨');
-  } catch (_) {
-    showToast('서버 연결 오류');
-    buttons.forEach(btn => { btn.disabled = false; });
-  }
-}
-
-function notificationDoneMessage(item) {
-  if (item.type === 'merge') return '병합됨';
-  if (item.type === 'split' && item.executable) return '분리됨';
-  if (item.type === 'policy' && item.executable) return '정책 파일에 반영됨';
-  if (item.type === 'manual_check') return '확인 완료 · 동기화됨';
-  return '검토 완료';
 }
 
 function escapeHtml(value) {

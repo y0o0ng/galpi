@@ -805,6 +805,30 @@ html, body {
   font-weight: 650;
 }
 
+.schedule-agent-push-action {
+  min-height: 30px;
+  background: rgba(217, 119, 87, 0.08);
+  border-color: rgba(217, 119, 87, 0.42);
+  color: var(--claude-color);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.schedule-agent-push-action:hover {
+  background: rgba(217, 119, 87, 0.14);
+  border-color: var(--claude-color);
+}
+
+.schedule-agent-push-action:active {
+  transform: scale(0.98);
+}
+
+.schedule-agent-push-action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .schedule-agent-section {
   display: grid;
   gap: 8px;
@@ -814,6 +838,76 @@ html, body {
   color: var(--label);
   font-size: 10px;
   font-weight: 700;
+}
+
+.schedule-agent-calendar {
+  min-width: 0;
+}
+
+.schedule-agent-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.schedule-agent-calendar-head h3 {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ai-text);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-agent-calendar-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.schedule-agent-action.schedule-agent-calendar-action {
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--label);
+  font-size: 10px;
+}
+
+.schedule-agent-calendar-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.schedule-agent-calendar-viewport {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schedule-agent-calendar-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.schedule-agent-calendar-viewport:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.schedule-agent-calendar-track {
+  display: flex;
+  width: 300%;
+}
+
+.schedule-agent-week-page {
+  flex: 0 0 calc(100% / 3);
+  min-width: 0;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
 }
 
 .schedule-agent-week {
@@ -855,6 +949,20 @@ html, body {
   color: var(--label);
   font-size: 10.5px;
   line-height: 1.4;
+}
+
+.schedule-agent-reminders {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-agent-reminders h3 {
+  color: var(--label);
+  font-size: 10px;
+}
+
+.schedule-agent-reminder-more {
+  width: 100%;
 }
 
 .schedule-agent-counts {
@@ -1003,6 +1111,32 @@ html, body {
 .schedule-agent-error .schedule-agent-action {
   justify-self: center;
   min-width: 110px;
+}
+
+.schedule-agent-workspace {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-agent-workspace-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.schedule-agent-workspace-head strong {
+  color: var(--ai-text);
+  font-size: 15px;
+}
+
+.schedule-agent-back {
+  min-width: 58px;
+}
+
+#agent-task-reminders[hidden] {
+  display: none;
 }
 
 .paper-panel-section-head {
@@ -1599,60 +1733,23 @@ html, body {
   .merge-tray, .merge-tray.is-hiding { animation: none; }
 }
 
-/* ── 알림센터 PIP ─────────────────────────────────────── */
+/* ── 서재 알림센터 ────────────────────────────────────── */
 
-#notification-center {
-  position: fixed;
-  right: 18px;
-  bottom: 96px;
-  z-index: 80;
-  width: min(380px, calc(100vw - 28px));
-  max-height: min(620px, calc(100dvh - 132px));
+#notification-panel:not([hidden]) {
   display: flex;
   flex-direction: column;
-  background: rgba(253, 250, 247, 0.96);
-  border: 1px solid rgba(160, 145, 132, 0.38);
-  border-radius: 14px;
-  box-shadow: 0 18px 50px rgba(44, 37, 31, 0.18), 0 2px 8px rgba(44, 37, 31, 0.08);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  min-height: 0;
   overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(10px) scale(0.98);
-  transition: opacity 0.16s var(--ease-out), transform 0.16s var(--ease-out);
 }
 
-#notification-center.open {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0) scale(1);
-}
-
-#notification-center.dragging {
-  transition: opacity 0.16s var(--ease-out);
-  user-select: none;
-}
-
-[data-theme="dark"] #notification-center {
-  background: rgba(37, 32, 23, 0.96);
-  border-color: rgba(112, 99, 86, 0.55);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
-}
-
-.notification-head {
+.notification-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 14px 14px 10px;
+  gap: 12px;
+  min-height: 66px;
+  padding: 12px;
   border-bottom: 1px solid rgba(160, 145, 132, 0.22);
-  cursor: grab;
-  touch-action: none;
-}
-
-#notification-center.dragging .notification-head {
-  cursor: grabbing;
 }
 
 .notification-kicker {
@@ -1663,39 +1760,32 @@ html, body {
 }
 
 .notification-title {
+  display: block;
   font-size: 17px;
   font-weight: 700;
   color: var(--ai-text);
   letter-spacing: -0.2px;
 }
 
-.notification-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.notification-icon-btn {
-  width: 28px;
-  height: 28px;
-  border: 1px solid transparent;
+.notification-panel-refresh {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: transparent;
   color: var(--label);
-  font-size: 17px;
-  line-height: 1;
+  font: 650 11px/1 var(--font);
   cursor: pointer;
-  font-family: var(--font);
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out), transform 0.1s var(--ease-spring);
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out), transform 0.1s;
 }
 
-.notification-icon-btn:hover {
+.notification-panel-refresh:hover {
   background: rgba(142, 142, 147, 0.12);
   color: var(--ai-text);
 }
 
-.notification-icon-btn:active {
-  transform: scale(0.92);
+.notification-panel-refresh:active {
+  transform: scale(0.98);
 }
 
 .notification-tabs {
@@ -1705,12 +1795,8 @@ html, body {
   padding: 10px 12px 8px;
 }
 
-#notification-center.tasks-enabled .notification-tabs {
-  grid-template-columns: repeat(5, 1fr);
-}
-
 .notification-tab {
-  min-height: 28px;
+  min-height: 36px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -1728,6 +1814,8 @@ html, body {
 }
 
 .notification-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1735,6 +1823,22 @@ html, body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+.notification-panel-skeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-panel-skeleton span {
+  display: block;
+  height: 88px;
+  border-radius: 8px;
+  background: rgba(142, 142, 147, 0.11);
+  animation: panel-pulse 1.1s ease-in-out infinite alternate;
+}
+
+.notification-panel-skeleton span:nth-child(2) { animation-delay: 0.12s; }
+.notification-panel-skeleton span:nth-child(3) { animation-delay: 0.24s; }
 
 .notification-empty {
   padding: 28px 10px 30px;
@@ -2021,6 +2125,11 @@ html, body {
   outline-offset: 2px;
 }
 
+.schedule-agent-push-action:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .recent-save-card {
   width: 100%;
   color: inherit;
@@ -2149,23 +2258,20 @@ html, body {
 }
 
 @media (max-width: 640px) {
-  #notification-center {
-    left: 8px !important;
-    right: 8px !important;
-    top: auto !important;
-    bottom: 76px !important;
-    width: auto;
-    max-height: min(72dvh, 620px);
-    border-radius: 16px 16px 12px 12px;
-  }
-
-  .notification-head {
-    cursor: default;
-    touch-action: auto;
+  .notification-tab,
+  .notification-panel-refresh,
+  .task-view-tab,
+  .schedule-agent-action.schedule-agent-calendar-action {
+    min-height: 44px;
   }
 
   .task-action {
     min-height: 44px;
+  }
+
+  .schedule-agent-push-action {
+    min-height: 44px;
+    padding-inline: 10px;
   }
 
   .task-card-actions .task-action {
@@ -2179,6 +2285,7 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .notification-panel-skeleton span,
   .schedule-agent-skeleton span,
   .task-panel-skeleton span {
     animation: none;

@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C1b scheduler·알림센터·일정 요약 로컬 구현 완료 · 실브라우저 viewport·Pi 미검증**
+> 상태: **C1c schema v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI 로컬 구현·실브라우저 검증 완료 · private HTTPS 실기기·Pi 미검증**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -17,7 +17,7 @@
 - task와 reminder는 별도 SQLite 정본으로 저장한다. 기존 `notification_actions`는 Codex 승인 이력이므로 재사용하지 않는다.
 - reminder 행은 약속 occurrence와 사용자 확인 상태의 영속 정본이다. 푸시 구독과 기기별 전송 receipt는 별도 정본으로 둬 네트워크 실패가 reminder를 되돌리지 못하게 한다.
 - Web Push는 후속 보너스가 아니라 C1 첫 배포의 필수 전달 채널이다. 다만 task core와 push migration·feature flag·인수 단위는 분리한다.
-- 에이전트 탭의 첫 블록은 task DB를 읽는 일정 에이전트 요약이다. 주간 현황과 다음 알림·push 상태만 보여주고 모든 task 변경은 알림센터 한 곳에서 처리한다.
+- 지식 시트의 첫 탭은 범용 `알림`이며 `전체 | Codex | 시스템 | 최근 저장`만 다룬다. 일정 알림·목록·수정은 `에이전트 > 일정 에이전트` 안에서 처리한다.
 - C1에는 반복, 자연어 후보 추출, 오늘 브리핑, 결과 기록, 외부 캘린더를 넣지 않는다.
 - 반복은 회차별 완료를 표현하는 세 번째 테이블이 필요하므로 C2의 별도 schema migration과 컨펌으로 진행한다.
 
@@ -56,7 +56,9 @@
 
 ### 2.2 목록 보기
 
-기존 시온 알림센터에 `할 일` 탭을 추가한다.
+지식 시트의 첫 탭은 범용 `알림`이다. 이 탭은 `전체 | Codex | 시스템 | 최근 저장` 네 필터만 제공하고 `task_reminder`는 표시하지 않는다. 기존 데스크톱 PIP·드래그 위치 저장은 제거한다.
+
+일정 목록과 행동은 `에이전트 > 일정 에이전트`의 전용 작업 화면에 둔다.
 
 - **알림**: 발화됐지만 아직 확인하지 않은 reminder
 - **오늘·지연**: KST 오늘 마감과 이미 지난 active task
@@ -65,20 +67,21 @@
 - **종결됨**: `closed`인 완료·취소 항목. 기본은 접고 최근 항목만 조회하며 AI와 사용자 검색에서 계속 참조할 수 있다.
 - **삭제됨**: `deleted` 항목. 일반 목록·검색·AI 참조에서는 제외하고 복구 화면에서만 조회한다.
 
-`/today`는 알림센터의 `할 일` 탭을 바로 연다. 단순히 패널을 열거나 목록을 조회했다고 reminder를 확인 처리하지 않는다.
+`/today`는 일정 에이전트의 `오늘` 목록을 바로 연다. `/task`는 같은 작업 화면의 작성 카드를 연다. 단순히 화면을 열거나 목록을 조회했다고 reminder를 확인 처리하지 않는다.
 
 ### 2.3 에이전트 탭의 일정 에이전트
 
 `ASSISTANT_TASKS_ENABLED=true`일 때 기존 `에이전트` 탭의 첫 블록은 **일정 에이전트**다. 이는 외부 캘린더를 조정하는 V5-C 자율 에이전트가 아니라 같은 task DB를 읽는 C1 약속 루프의 요약·진입점이다.
 
 - 상단: `일정 에이전트` 제목과 이 브라우저의 `확인 중 | 알림 준비 중 | 알림 켜짐 | 알림 켜기 | 알림 차단됨 | 알림 미지원` 상태
-- 이번 주: KST 월요일부터 일요일까지 7일짜리 비대화형 날짜 스트립, 날짜별 active 마감 건수와 오늘 강조
+- 주간 이동: KST 기준 이전·현재·다음 3주, 총 21개 날짜만 받아 native horizontal scroll-snap으로 넘긴다. 한 주를 넘기면 그 주를 새 중앙으로 다시 조회하고 `이전 | 오늘 | 다음`과 키보드 좌우 이동도 제공한다.
 - 요약: `지연 | 오늘 | 예정 | Inbox`의 전체 건수
 - 미리보기: 지연 우선, 그다음 오늘 순으로 최대 3개
 - 다음 알림: 현재 시각 이후 가장 가까운 pending reminder의 시각과 task 제목
-- 진입: `일정 추가`는 `/task` 작성 카드를 열고, `전체 일정`은 알림센터의 `할 일` 탭을 연다.
+- 확인할 알림: unresolved reminder를 같은 블록에서 보여주고 `확인 | 1시간 뒤 | 완료`를 처리한다.
+- 진입: `일정 추가`와 `전체 일정`은 같은 에이전트 탭 안의 일정 작업 화면으로 전환한다.
 
-일정 에이전트 블록에서 완료·수정·취소·삭제·확인·미루기를 직접 처리하지 않는다. 쓰기 행동은 알림센터의 단일 task renderer에만 둬 상태 전이·낙관적 갱신을 두 벌로 만들지 않는다. `ASSISTANT_TASKS_ENABLED=false`일 때는 블록을 숨기고 기존 에이전트 탭의 준비 상태를 유지한다.
+일정 에이전트 셸은 task 행동을 새로 구현하지 않고 `TaskPanel`의 단일 renderer를 호출한다. 따라서 에이전트 탭 안에서 행동하지만 상태 전이·낙관적 갱신 구현은 한 벌이다. `ASSISTANT_TASKS_ENABLED=false`일 때는 블록을 숨기고 기존 에이전트 탭의 준비 상태를 유지한다.
 
 ### 2.4 알림 행동
 
@@ -100,9 +103,9 @@
 - task당 동시에 최대 한 개의 live 단발성 reminder
 - 1분 scheduler, 시작 직후 catch-up, occurrence 중복 차단
 - reminder 확인과 한 번씩 멱등적인 1시간 미루기
-- 알림센터의 알림·Today·예정·Inbox·종결됨과 별도 삭제 복구 화면
-- 에이전트 탭 최상단의 일정 에이전트 주간 스트립·요약·미리보기·진입 버튼
-- 최소 PWA 기반, 사용자 opt-in Web Push, 알림센터·focus polling fallback
+- 지식 시트 첫 탭의 범용 알림 네 필터와, 여기서 분리된 일정 에이전트의 Today·예정·Inbox·종결·삭제 복구 화면
+- 에이전트 탭 최상단의 일정 에이전트 3주 스와이프·요약·미리보기·unresolved 알림·작업 화면
+- 최소 PWA 기반, 사용자 opt-in Web Push, 일정 에이전트·focus polling fallback
 - Tailscale Serve HTTPS origin, Service Worker `push`·`notificationclick`, 기기별 delivery outbox·재시도
 - API token 보호, 입력 상한, 낙관적 동시성, 결정론적 테스트 시계
 - task와 Web Push의 독립 feature flag를 통한 scheduler·UI·dispatcher 비활성화
@@ -112,7 +115,7 @@
 - 대화의 미래형 문장을 감지하는 자연어 task 후보
 - 매일·평일·매주·매월 등 반복 task/reminder
 - 첫 접속 또는 정해진 시각의 오늘 브리핑
-- 월간·연간 달력, drag-and-drop 일정 이동, 에이전트 탭 안의 task 변경 행동
+- 월간·연간 달력, drag-and-drop 일정 이동
 - 완료 결과를 노트나 사용자 메모리에 연결하는 흐름
 - 이메일, SMS, 외부 캘린더 읽기·쓰기
 - 백그라운드 탭을 계속 실행시키는 polling, 화면 Wake Lock, 상시 마이크·hotword
@@ -153,7 +156,7 @@ HTML `datetime-local`은 timezone을 포함하지 않으므로 C1에서는 `date
 - Pi가 꺼져 있는 동안 지난 단발성 reminder는 다음 서버 시작 tick에서 한 번 `fired`로 바뀐다.
 - 늦은 정도와 관계없이 같은 reminder 행 하나만 보인다.
 - 사용자가 `확인`, `1시간 뒤`, `완료`, `취소` 중 하나를 누를 때까지 같은 unresolved 카드가 재접속 때 다시 보일 수 있다. 이는 중복 발화가 아니라 같은 영속 receipt의 재표시다.
-- catch-up push는 `now - remind_at <= 24시간`인 unresolved reminder에만 생성한다. 그보다 오래된 reminder는 알림센터에는 남기되 뒤늦은 잠금화면 알림으로 사용자를 방해하지 않는다.
+- catch-up push는 `now - remind_at <= 24시간`인 unresolved reminder에만 생성한다. 그보다 오래된 reminder는 일정 에이전트에는 남기되 뒤늦은 잠금화면 알림으로 사용자를 방해하지 않는다.
 - 보장 범위는 **occurrence key당 reminder 행 최대 한 개 + subscription당 delivery 행 최대 한 개 + 확인 전 계속 조회 가능**이다. push service 수락, 기기 표시, 사용자 확인의 exactly-once는 보장하지 않는다.
 
 ## 5. 상태 머신
@@ -210,7 +213,7 @@ SQLite 공식 문서는 동시 read transaction은 여러 개 가능하지만 �
 
 ## 6. 정본 schema
 
-운영 배포 최신은 schema v4다. 로컬에는 노트 `ai_readable` 접근 경계인 schema v5와 C1 task core인 **schema v6**까지 구현했다. Web Push는 독립 배포·feature flag 비활성화가 가능한 **schema v7**로 이어서 적용한다.
+운영 배포 최신은 schema v4다. 로컬에는 노트 `ai_readable` 접근 경계인 schema v5, C1 task core인 **schema v6**, 독립 feature flag로 끌 수 있는 Web Push subscription·delivery outbox **schema v7**까지 구현했다. 세 migration은 Pi 첫 C1 배포 때 4→5→6→7로 한 번에 적용한다.
 
 ### 6.1 schema v5 — 노트 AI 읽기 경계
 
@@ -420,7 +423,7 @@ CREATE INDEX idx_assistant_push_deliveries_reminder
 - 물리 purge는 C1 API에 제공하지 않는다. 제품의 삭제는 `lifecycle=deleted` 전이이고 복구 가능하다.
 - reminder가 `fired`로 바뀌는 transaction 안에서 그 시점의 active subscription마다 delivery 행을 `INSERT ... ON CONFLICT DO NOTHING`으로 만든다. push 네트워크 호출은 commit 뒤 별도 dispatcher만 수행한다.
 - 완료·취소·삭제 시 아직 전송하지 않은 delivery는 같은 transaction에서 `skipped`로 바꾼다. dispatcher는 네트워크 호출 직전 정본을 재검증한다.
-- 새 subscription을 등록해도 이미 fired인 과거 reminder를 backfill하지 않는다. 알림센터의 unresolved reminder는 그대로 조회된다.
+- 새 subscription을 등록해도 이미 fired인 과거 reminder를 backfill하지 않는다. 일정 에이전트의 unresolved reminder는 그대로 조회된다.
 - delivery의 `accepted`는 push service의 HTTP 수락일 뿐 기기 표시·사용자 확인이 아니다. task·reminder 상태는 앱의 ack·complete·snooze 요청만 바꾼다.
 - subscription endpoint는 서버가 요청하는 capability URL이다. HTTPS push-service host allowlist를 적용하고 IP literal·loopback·private address·redirect를 거부해 SSRF 경계를 둔다.
 
@@ -432,11 +435,13 @@ CREATE INDEX idx_assistant_push_deliveries_reminder
 
 - `lib/assistant-tasks.js`: 검증, 정본 CRUD, 상태 전이, 목록 조회
 - `lib/assistant-scheduler.js`: 주입 가능한 `clock`, `tick(now)`, start/stop
-- `lib/assistant-push.js`: subscription 검증, delivery outbox, VAPID 전송·재시도
+- `lib/assistant-push.js`: subscription 검증, delivery outbox, lease·재시도 상태 기계
+- `lib/web-push-transport.js`: `web-push` 암호화·VAPID·provider HTTP 전송 어댑터
+- `lib/assistant-push-config.js`, `lib/assistant-push-routes.js`: fail-close 환경 설정과 인증 뒤 구독 API
 - `server.js`: 설정과 얇은 route, `/api/notifications` 합성, worker lifecycle 연결
 - `public/sw.js`: `push` 표시와 `notificationclick`만 담당
 
-기존 `server.js` 전체 분해나 알림센터 리팩터링은 하지 않는다.
+기존 `server.js` 전체 분해는 하지 않는다. 프론트에서는 범용 알림 renderer를 `NotificationPanel`, 일정 renderer를 `TaskPanel`로 분리하되 지식 시트 shell 자체는 유지한다.
 
 ### 7.2 한 tick
 
@@ -522,16 +527,56 @@ GET /api/tasks?view=today|upcoming|inbox|all|history|trash&status=done|cancelled
 ### 8.2 일정 에이전트 요약
 
 ```http
-GET /api/tasks/summary
+GET /api/tasks/summary?calendarCenter=2026-07-20
 ```
 
-한 요청에서 `now`를 한 번 캡처해 현재 KST 주간과 모든 건수를 일관되게 계산한다.
+한 요청에서 `now`를 한 번 캡처해 현재 KST 주간과 모든 건수를 일관되게 계산한다. `calendarCenter`는 선택적 KST 월요일이며 생략하면 현재 주를 중앙으로 쓴다. 월요일이 아니거나 잘못된 날짜는 `INVALID_CALENDAR_WEEK`로 거부한다.
 
 ```json
 {
   "capturedAt": 1784534400,
   "timezone": "Asia/Seoul",
   "counts": { "overdue": 1, "today": 2, "upcoming": 4, "inbox": 3 },
+  "currentWeekStart": "2026-07-20",
+  "calendarCenter": "2026-07-20",
+  "calendar": [
+    {
+      "startDate": "2026-07-13",
+      "days": [
+        { "date": "2026-07-13", "count": 0, "isToday": false },
+        { "date": "2026-07-14", "count": 0, "isToday": false },
+        { "date": "2026-07-15", "count": 0, "isToday": false },
+        { "date": "2026-07-16", "count": 0, "isToday": false },
+        { "date": "2026-07-17", "count": 0, "isToday": false },
+        { "date": "2026-07-18", "count": 0, "isToday": false },
+        { "date": "2026-07-19", "count": 0, "isToday": false }
+      ]
+    },
+    {
+      "startDate": "2026-07-20",
+      "days": [
+        { "date": "2026-07-20", "count": 2, "isToday": true },
+        { "date": "2026-07-21", "count": 1, "isToday": false },
+        { "date": "2026-07-22", "count": 0, "isToday": false },
+        { "date": "2026-07-23", "count": 1, "isToday": false },
+        { "date": "2026-07-24", "count": 0, "isToday": false },
+        { "date": "2026-07-25", "count": 0, "isToday": false },
+        { "date": "2026-07-26", "count": 0, "isToday": false }
+      ]
+    },
+    {
+      "startDate": "2026-07-27",
+      "days": [
+        { "date": "2026-07-27", "count": 0, "isToday": false },
+        { "date": "2026-07-28", "count": 0, "isToday": false },
+        { "date": "2026-07-29", "count": 0, "isToday": false },
+        { "date": "2026-07-30", "count": 0, "isToday": false },
+        { "date": "2026-07-31", "count": 0, "isToday": false },
+        { "date": "2026-08-01", "count": 0, "isToday": false },
+        { "date": "2026-08-02", "count": 0, "isToday": false }
+      ]
+    }
+  ],
   "week": [
     { "date": "2026-07-20", "count": 2, "isToday": true },
     { "date": "2026-07-21", "count": 1, "isToday": false },
@@ -560,7 +605,9 @@ GET /api/tasks/summary
 }
 ```
 
-- `week`은 KST 월요일부터 일요일까지 정확히 7개이며 각 `count`는 그 날짜에 마감하는 `status='active' AND lifecycle='active'` task 수다. 지연 항목을 오늘 건수에 합치지 않는다.
+- `calendar`는 중앙 주의 이전·중앙·다음 주 3개이고 각 `days`는 KST 월요일부터 일요일까지 정확히 7개다. 한 응답의 날짜 셀은 항상 21개다.
+- 각 날짜의 `count`는 그날 마감하는 `status='active' AND lifecycle='active'` task 수다. 지연 항목을 오늘 건수에 합치지 않는다.
+- `week`은 기존 소비자를 위한 중앙 주 `days` 별칭이다. `currentWeekStart`는 실제 오늘이 속한 주, `calendarCenter`는 사용자가 탐색 중인 중앙 주다.
 - `preview`는 `taskId`, `title`, `bucket`, `dueKind`, `dueDate`, `dueAt`만 가진 최대 3개 task다. `bucket`은 `overdue | today`이며 지연을 먼저 둔다. 같은 bucket에서는 KST 마감 날짜, `datetime` 우선, `dueAt`, `taskId` 순으로 안정 정렬한다.
 - `nextReminder`는 `status='active' AND lifecycle='active'` task에 속하고 현재 시각 이후인 가장 이른 pending reminder의 `reminderId`, `taskId`, `title`, `remindAt` 또는 `null`이다. 동률이면 reminder ID가 작은 것을 고른다.
 - `counts`는 응답 limit과 무관한 전체 건수다. 제목·설명은 기존 인증 뒤에서만 반환하고 GET은 상태를 바꾸지 않는다.
@@ -633,7 +680,7 @@ C1 snooze는 `minutes = 60`만 허용한다. retry는 같은 child reminder를 �
 
 handler는 응답 유실 retry를 위해 먼저 `(snoozed_from_id, snooze_request_key)`가 같은 기존 child를 조회한다. 있으면 그 행을 반환하고, 없을 때만 원 reminder가 현재 `fired`인지 검사해 새 child를 만든다.
 
-### 8.7 알림센터 합성
+### 8.7 일정 알림 합성
 
 기존 `GET /api/notifications` 응답에 아래 source를 추가한다.
 
@@ -651,7 +698,7 @@ handler는 응답 유실 retry를 위해 먼저 `(snoozed_from_id, snooze_reques
 }
 ```
 
-task 카드는 `item.type === 'task_reminder'`에서 기존 generic renderer보다 먼저 전용 renderer로 분기하고, 기존 `/approve`, `/ignore`를 호출하지 않는다. reminder 전용 endpoint를 사용한다.
+클라이언트는 `item.type === 'task_reminder'`를 범용 알림 탭에서 제외하고 일정 에이전트에서 `TaskPanel` 전용 renderer로 그린다. 기존 `/approve`, `/ignore`를 호출하지 않고 reminder 전용 endpoint를 사용한다.
 
 ### 8.8 Web Push 구독
 
@@ -665,7 +712,7 @@ DELETE /api/push/subscriptions/:id
 - 등록 body는 브라우저 `PushSubscription.toJSON()`의 `endpoint`, `keys.p256dh`, `keys.auth`와 선택적 device label만 받는다. capability URL인 endpoint는 원문 그대로 저장하고 URL parse·HTTPS·host·주소 정책만 검증한 뒤 upsert한다.
 - 등록·해제는 기존 API token 인증과 JSON 상한을 적용한다. endpoint·키 원문을 request/server log에 남기지 않는다.
 - 해제는 행을 물리 삭제하지 않고 `revoked`로 바꾼다. 브라우저의 `unsubscribe()` 실패와 서버 해제 실패를 각각 사용자에게 알려 재시도할 수 있게 한다.
-- 권한이 `denied`거나 Push API가 없으면 계속 요청하지 않고 알림센터 fallback 상태를 표시한다.
+- 권한이 `denied`거나 Push API가 없으면 계속 요청하지 않고 일정 에이전트의 in-app fallback 상태를 표시한다.
 
 ### 8.9 노트와의 관계
 
@@ -698,14 +745,15 @@ DELETE /api/push/subscriptions/:id
 ### 9.3 에이전트 탭 일정 블록
 
 - 현재 갈피의 색·서체·radius·다크모드 token을 그대로 사용한다. 새 palette·font·component library를 도입하지 않는다.
-- 350px 데스크톱 패널과 모바일 76dvh bottom sheet에서 같은 정보 순서를 유지한다. 월간 달력 대신 폭이 고정되는 7일 스트립을 사용하고, 스트립 자체는 비대화형이라 작은 날짜 칸을 touch target으로 가장하지 않는다.
-- 제목과 알림 상태, 7일 스트립, 네 건수, 미리보기, 다음 알림, 두 진입 버튼 순으로 한 개의 표면 안에 배치한다. 카드 안에 다시 여러 카드를 중첩하지 않는다.
+- 350px 데스크톱 패널과 모바일 76dvh bottom sheet에서 같은 정보 순서를 유지한다. 월간 달력 대신 이전·현재·다음 3주만 가진 native horizontal scroll-snap을 사용한다.
+- 제목과 알림 상태, 주간 이동, 확인할 알림, 네 건수, 미리보기, 다음 알림, 두 진입 버튼 순으로 한 개의 표면 안에 배치한다. 카드 안에 다시 여러 카드를 중첩하지 않는다.
+- 날짜 셀은 선택·편집 버튼이 아니라 탐색용 표식이다. 주 단위 스와이프가 끝났을 때만 새 중앙 주를 조회하고 다시 3주로 제한해 DOM을 누적하지 않는다.
 - `지연`, `오늘`, `예정`, `Inbox`는 색만으로 구분하지 않고 항상 text label과 숫자를 함께 표시한다. 숫자는 tabular figures를 사용한다.
 - `일정 추가`, `전체 일정`, `알림 켜기`의 모바일 hit area는 최소 44px이며 keyboard focus와 screen-reader name을 제공한다.
-- loading은 최종 블록 높이를 예약하는 skeleton, 전체 active task가 0개인 empty는 `등록된 일정 없음`과 `일정 추가`, error는 원인을 숨기지 않는 짧은 문구와 `다시 시도`를 표시한다. 주간 count만 모두 0이고 upcoming·Inbox가 남아 있으면 블록을 비우지 않고 7일 스트립에 `이번 주 마감 없음`을 표시한다.
+- loading은 최종 블록 높이를 예약하는 skeleton, 전체 active task가 0개인 empty는 `등록된 일정 없음`과 `일정 추가`, error는 원인을 숨기지 않는 짧은 문구와 `다시 시도`를 표시한다. 중앙 주 count만 모두 0이고 upcoming·Inbox가 남아 있으면 블록을 비우지 않고 주간 스트립에 `이번 주 마감 없음`을 표시한다.
 - `WEB_PUSH_ENABLED=false`이거나 schema v7 배포 전이면 비대화형 `알림 준비 중`, Push API·Service Worker를 지원하지 않으면 `알림 미지원`을 표시하고 버튼을 숨긴다. 상태를 읽는 동안은 `확인 중`, 구독이 있으면 `알림 켜짐`, 권한이 `denied`면 재요청 없이 `알림 차단됨`, 그 밖의 지원 가능한 미구독 상태에서만 `알림 켜기` 버튼을 보인다.
-- 탭을 처음 열 때, 앱 시작·focus·hidden→visible 복귀, foreground 60초 tick, task mutation 성공 뒤 같은 `refreshTaskViews()`가 알림센터와 일정 블록을 함께 갱신한다. 기존 채팅 7초 polling에는 연결하지 않는다.
-- `public/agent-panel.js`가 렌더링·loading/empty/error 상태를 맡고 기존 `apiFetch`를 주입받는다. 현재 tab shell을 가진 `paper-panel.js`에는 `AgentPanel.init()`·`show()` 연결만 추가하며 공용 패널 선행 리팩터링은 하지 않는다.
+- 탭을 처음 열 때, 앱 시작·focus·hidden→visible 복귀, foreground 60초 tick, task mutation 성공 뒤 일정 에이전트를 갱신한다. 범용 알림의 일반 source는 별도 `NotificationPanel`이 갱신하며 기존 채팅 7초 polling에는 연결하지 않는다.
+- `public/agent-panel.js`가 일정 셸·주간 탐색·loading/empty/error를 맡고 기존 `apiFetch`와 `TaskPanel`을 주입받는다. `public/notification-panel.js`는 범용 알림 네 필터만 맡는다. 현재 tab shell 이름인 `paper-panel.js`는 유지하고 큰 공용 패널 리팩터링은 하지 않는다.
 - 이후 딜·주식 에이전트 블록은 일정 블록 아래에 추가한다. 일정 블록은 노트 기반 에이전트 보고와 달리 task 정본의 운영 요약이므로 별도 보고 노트를 만들지 않는다.
 
 ## 10. 입력·보안·개인정보 경계
@@ -717,7 +765,7 @@ DELETE /api/push/subscriptions/:id
 - 알림 문구에 LLM을 호출하지 않는다.
 - `ASSISTANT_TASKS_ENABLED` 기본값은 `false`다. `/api/config`는 `tasksEnabled`를 노출한다.
 - flag가 `false`면 task UI를 숨기고 scheduler를 시작하지 않으며 task/reminder 읽기·쓰기 API는 `503 { error, code: 'TASKS_DISABLED' }`를 반환한다. migration과 기존 행 보존은 그대로 수행한다.
-- `WEB_PUSH_ENABLED` 기본값도 `false`다. false면 권한 요청·구독 버튼·dispatcher를 끄고 일정 블록에는 비대화형 `알림 준비 중`을 표시하되 task scheduler와 알림센터는 계속 동작한다.
+- `WEB_PUSH_ENABLED` 기본값도 `false`다. false면 권한 요청·구독 버튼·dispatcher를 끄고 일정 블록에는 비대화형 `알림 준비 중`을 표시하되 task scheduler와 일정 에이전트의 in-app reminder는 계속 동작한다.
 - VAPID private key와 subject는 Pi `.env`에만 두고 DB·vault·API·로그·브라우저 bundle에 넣지 않는다. key 교체는 기존 subscription 재등록이 필요한 운영 변경으로 취급한다.
 - subscription endpoint·`p256dh`·`auth`와 push payload 원문은 로그·diagnostic report에서 제외한다. push service가 전송 시각·빈도·크기 메타데이터를 볼 수 있다는 한계도 설정 화면에 짧게 알린다.[^w3c-push-privacy]
 - Tailscale HTTPS 기기명은 인증서 발급 과정에서 Certificate Transparency log에 공개될 수 있으므로 개인 정보를 담지 않은 이름을 사용한다.[^tailscale-https]
@@ -735,10 +783,10 @@ DELETE /api/push/subscriptions/:id
 |완료와 tick 경합|commit 순서와 무관하게 최종 visible reminder 0개|
 |삭제와 tick·push 경합|삭제 commit 뒤 새 fire·delivery 0개, pending delivery는 skipped; 이미 push service로 나간 요청은 회수하지 못하지만 task는 deleted|
 |push service `404 | 410`|subscription expired, 이후 delivery 생성·재시도 중단|
-|push `408 | 429 | 5xx`·network 오류|TTL 안 bounded retry, reminder·알림센터는 유지|
+|push `408 | 429 | 5xx`·network 오류|TTL 안 bounded retry, reminder·일정 에이전트 fallback은 유지|
 |push accepted 뒤 receipt 기록 전 중단|재전송 가능, 같은 tag로 표시 중복 완화; exactly-once라고 주장하지 않음|
 |delivery claim 뒤 worker 중단|lease 만료 뒤 retry로 회수, 영구 sending 0건|
-|권한 거부·구독 없음·지원 안 됨|in-app 알림센터와 foreground refresh만 유지|
+|권한 거부·구독 없음·지원 안 됨|일정 에이전트의 in-app reminder와 foreground refresh만 유지|
 |HTTPS origin 전환|API token 1회 재입력, 서버 DB의 대화·task는 불변|
 |시계가 뒤로 이동|이미 fired인 행은 pending으로 돌아가지 않음|
 |시계가 앞으로 이동|도달한 pending을 catch-up하고 같은 행을 중복 생성하지 않음|
@@ -752,7 +800,7 @@ DELETE /api/push/subscriptions/:id
 - [x] A1b와 병행 가능한 무LLM·별도 정본 경계 결정
 - [x] 완료·취소=`closed`, 잘못 생성=`deleted`, 물리 purge 없음 결정
 - [x] C1 첫 배포에 private HTTPS·PWA·Web Push와 in-app fallback 포함 결정
-- [x] 에이전트 탭 최상단 일정 요약과 알림센터 단일 쓰기 경계 결정
+- [x] 지식 시트 첫 범용 알림 탭과 에이전트 탭 안의 단일 task renderer 경계 결정
 
 ### C1a — 정본과 API ✅ 로컬 구현 완료(2026-07-19, Pi 미배포)
 
@@ -780,16 +828,16 @@ DELETE /api/push/subscriptions/:id
 
 C1a 시점의 로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_ENABLED` 기본값은 `false`이며 이 task 정본과 API 위에 아래 C1b를 추가했다.
 
-### C1b — scheduler·알림센터·일정 에이전트 블록
+### C1b — scheduler·in-app 일정 UI·일정 에이전트 블록
 
 로컬 구현 완료(2026-07-19):
 
 - `lib/assistant-scheduler.js`: 즉시 catch-up 뒤 60초 tick, tick당 최대 100개, transaction·조건부 update 중복 차단, start/stop
-- `lib/assistant-tasks.js`, `server.js`: stable fired reminder 조회, 기존 알림센터 read merge, feature flag 뒤 scheduler lifecycle과 graceful stop
+- `lib/assistant-tasks.js`, `server.js`: stable fired reminder 조회, 기존 notification read merge, feature flag 뒤 scheduler lifecycle과 graceful stop
 - `public/task-panel.js`: `/task`, `/today`, Today·예정·Inbox·종결·삭제, 생성·수정·상태 전이, reminder 확인·고정 request key 1시간 미루기의 단일 renderer
-- `public/agent-panel.js`: task summary만 읽는 7일·네 건수·미리보기·다음 알림과 두 진입 버튼. task mutation은 두지 않음
-- `public/index.html`, `public/paper-panel.js`, `public/app.js`, `public/style.css`: runtime flag, 알림센터 `할 일`, AgentPanel 연결, 앱 시작·focus·visible·foreground 60초 갱신과 모바일 action wrap
-- `test/assistant-task-ui.test.js`와 scheduler·서버 통합 테스트를 추가했고 기존 전체 회귀 148/148을 통과했다. `ASSISTANT_TASKS_ENABLED=false`의 기존 4탭·`준비 중` 상태도 유지한다.
+- `public/agent-panel.js`: 일정 summary와 unresolved reminder, 3주 스와이프, 같은 탭의 `TaskPanel` 작업 화면을 연결한다. mutation 구현은 `TaskPanel` 한 벌만 유지한다.
+- `public/notification-panel.js`, `public/index.html`, `public/paper-panel.js`, `public/app.js`, `public/style.css`: 지식 시트 첫 `알림` 탭과 네 범용 필터, AgentPanel 연결, 앱 시작·focus·visible·foreground 60초 갱신과 모바일 action wrap
+- `test/assistant-task-ui.test.js`와 scheduler·서버 통합 테스트를 추가했다. `ASSISTANT_TASKS_ENABLED=false`의 일정 진입 비활성 경계도 유지한다.
 
 통과 기준:
 
@@ -800,38 +848,43 @@ C1a 시점의 로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_
 - [x] ack·snooze retry가 멱등적이고 snooze child 1개
 - [x] create·PATCH·snooze 경합에서도 task당 live reminder 최대 1개
 - [x] KST 자정 직전·정각·직후 Today 분류가 정확함
-- [x] summary 한 요청의 `capturedAt`으로 건수·7일·preview·nextReminder가 일치하고 GET 전후 DB가 불변
+- [x] summary 한 요청의 `capturedAt`으로 건수·3주 21일·preview·nextReminder가 일치하고 GET 전후 DB가 불변
 - [x] history·trash 조회, reopen·restore 뒤 terminal reminder 미복원, flag off에서 API·UI·scheduler 비활성 경계를 유지
-- [x] 기존 Codex 승인·수동 복구·최근 저장 알림 회귀 없이 전체 148/148 통과
+- [x] 기존 Codex 승인·수동 복구·최근 저장 알림 회귀 없이 최종 전체 161/161 통과
 - [x] task title/detail을 `textContent`로 렌더하고 server log에 본문을 남기지 않음
-- [x] 에이전트 탭 첫 블록이 일정 에이전트이고 7일·지연/오늘/예정/Inbox·preview 최대 3·nextReminder와 `알림 준비 중`을 표시
-- [x] 일정 블록의 `일정 추가`는 작성 카드, `전체 일정`은 알림센터 task 탭을 열며 요약 블록 자체의 mutation API 호출 0회
-- [ ] 1440×900·390×844 실브라우저에서 생성·수정·완료·확인·미루기와 panel overflow 최종 확인
+- [x] 에이전트 탭 첫 블록이 일정 에이전트이고 3주 21일·지연/오늘/예정/Inbox·preview 최대 3·nextReminder와 `알림 준비 중`을 표시
+- [x] 범용 알림 탭은 `task_reminder`를 제외하고 일정 에이전트가 `TaskPanel`의 단일 renderer로 확인·수정·종결 행동을 처리
+- [x] `일정 추가 | 전체 일정`, `/task`, `/today`, push click deep link가 모두 에이전트 탭 안의 해당 작업 화면을 연다
+- [x] 1440×900·390×844 실브라우저에서 스와이프·오늘 복귀·작성/수정·deep link·알림 분리·확인 처리·panel overflow와 44px 모바일 target 확인
 - [ ] Pi 실제 재시작 catch-up과 서비스 lifecycle 인수
 
 ### C1c — private HTTPS·PWA·Web Push
 
-변경 예정:
+로컬 구현 완료:
 
-- Pi Tailscale Serve private HTTPS origin과 설치 전환 절차
-- `manifest.webmanifest`, PWA 아이콘, `public/sw.js`
-- `lib/database-migrations.js`: schema v7
-- `lib/assistant-push.js`, 구독 API, dispatcher lifecycle
-- `public/app.js`: 명시적 설치·알림 opt-in과 fallback 상태
+- schema v7의 Web Push subscription·기기별 delivery outbox와 endpoint SSRF allowlist
+- scheduler fire와 outbox insert, task 종결·reminder 확인과 delivery skip의 동일 transaction 연결
+- `pending | sending | retry | accepted | failed | expired | skipped`, lease 회수, 24시간 TTL, `Retry-After` 우선 재시도
+- 실제 프로토콜을 `web-push-transport` 한 파일에 둔 dispatcher lifecycle과 제한 시간 종료 drain
+- 인증 뒤 config·등록·soft revoke API, private VAPID 값 비노출, `WEB_PUSH_ENABLED=false` 기본값
+- canonical HTTPS origin에서만 동작하는 최소 PWA, fetch cache가 없는 Service Worker, 사용자 버튼 기반 opt-in
+- 일정 에이전트 블록의 `확인 중 | 알림 켜짐 | 알림 켜기 | 알림 차단됨 | 알림 미지원 | 알림 준비 중` 상태
 
-통과 기준:
+검증 상태:
 
-- plain HTTP에서는 구독하지 않고 canonical private HTTPS에서만 Service Worker·subscription이 활성화
-- iOS/iPadOS 16.4+ 홈 화면 설치 앱에서 사용자 버튼 뒤 권한·구독 성공, 거부 시 반복 prompt 0회
-- push 상태가 `확인 중 | 알림 켜짐 | 알림 켜기 | 알림 차단됨 | 알림 미지원`으로 브라우저 실제 권한·구독·지원 여부와 일치하고, 상호작용 버튼은 `알림 켜기`에서만 노출
-- 같은 reminder·subscription에 delivery 최대 1개, 반복 tick·서버 재시작·두 dispatcher instance에도 outbox 중복·동시 claim 0개
-- fire와 outbox insert 사이 강제 중단은 전체 rollback, commit 직후 강제 중단은 시작 worker가 pending delivery 복구
-- `2xx` accepted를 seen으로 오인하지 않고 notification click만으로 reminder 상태 불변
-- `404 | 410` 구독 만료, `408 | 429 | 5xx` bounded retry, permanent error 무한 retry 0회
-- 새 구독에 과거 fired reminder push backfill 0건, push 실패·권한 거부에서도 앱을 열면 같은 unresolved reminder 조회
-- 잠금 화면 payload·URL·로그에 task 제목·설명·API token·endpoint·subscription key 0건
-- SW에 `fetch` handler·offline cache·silent push 0건, focus·visible 60초 reconciliation 유지
-- 잠긴 iPhone에서 앱을 벗어난 10회 실사용 시험 중 정상 네트워크·Focus 해제 조건에서 2분 안 표시 9회 이상을 운영 목표로 측정한다. 이는 플랫폼 보장이 아닌 GO 기준이다.
+- [x] plain HTTP·비canonical origin에서는 Service Worker·subscription 활성화 0회
+- [x] 권한 요청은 `알림 켜기` 직접 동작 뒤에만 1회, 자동 prompt 0회
+- [x] reminder·subscription당 delivery 최대 1개, 반복 enqueue와 두 claim instance의 동시 claim 0개
+- [x] fire와 outbox insert 사이 강제 실패 전체 rollback, terminal task·reminder의 미전송 delivery skip
+- [x] `2xx`는 accepted receipt만 기록하고 reminder를 seen으로 바꾸지 않음
+- [x] `404 | 410` 구독 만료, `408 | 429 | 5xx | network` TTL 내 재시도, permanent error 재시도 0회
+- [x] 새 구독의 과거 fired reminder backfill 0건, opaque payload에 task 제목·설명·API token·endpoint·key 0건
+- [x] SW `fetch` handler·offline cache·silent push 0건, notification click은 focus 또는 앱 열기만 수행
+- [x] 1440×900·390×844 실제 브라우저에서 push disabled 상태·task UI overflow·light/dark 확인
+- [ ] Tailscale Serve canonical HTTPS, iOS/iPadOS 16.4+ 홈 화면 설치·권한·구독 실기기 확인
+- [ ] 잠긴 iPhone에서 앱을 벗어난 10회 시험 중 정상 네트워크·Focus 해제 조건에서 2분 안 표시 9회 이상. 플랫폼 보장이 아닌 GO 기준
+
+향후 native 앱은 task·reminder 정본, scheduler, delivery의 멱등·lease·retry 의미를 재사용한다. `web-push-transport`는 APNs/FCM 어댑터로 추가·교체할 수 있지만, 브라우저 endpoint·`p256dh`·`auth` subscription schema, 구독 API, manifest·Service Worker는 Web 전용이므로 native 단계에서 확장하거나 대체한다. 지금 범위에서 다중 transport schema를 미리 만들지는 않는다.
 
 ### C1d — Pi 인수
 
@@ -875,10 +928,10 @@ C3에서만 오늘 브리핑·완료 결과 기록·Codex/Terra 기반 분석 �
 - **단발성 우선**: 반복 사용성은 늦어지지만, task 완료와 회차 완료를 잘못 섞은 schema를 운영에 넣지 않는다.
 - **Web Push를 첫 배포에 포함**: HTTPS·PWA·구독·재시도 때문에 C1이 커지지만, 일정 기능의 핵심인 백그라운드 전달을 실제 사용 전에 검증한다. task core와 push migration은 나눠 rollback 범위를 제한한다.
 - **서버가 시각 정본**: 브라우저를 계속 깨워 두지는 못하지만 Pi scheduler가 탭 수명주기와 무관하게 약속 시각을 판정한다.
-- **알림센터 fallback 유지**: push는 빠른 전달을 보강하고, 유실·권한 거부·만료 때도 unresolved reminder를 앱에서 복구한다.
+- **in-app fallback 유지**: push는 빠른 전달을 보강하고, 유실·권한 거부·만료 때도 일정 에이전트에서 unresolved reminder를 복구한다.
 - **KST 고정**: 여행·다중 timezone은 아직 못 다루지만 현재 단일 사용자 환경의 날짜 경계를 결정적으로 만든다.
 - **closed/deleted 분리, 물리 purge 없음**: DB는 조금씩 커지지만 종결 항목은 계속 참조하고 잘못 만든 항목은 일반 회수에서 숨긴 채 복구할 수 있다.
-- **기존 알림센터 shell 재사용**: 새 화면을 빠르게 붙일 수 있지만 task 행동은 Codex 승인 API와 명확히 분기해야 한다.
+- **기존 지식 시트 shell 재사용**: 범용 알림과 일정의 위치는 분리하지만 새 최상위 화면은 만들지 않는다. task 행동은 Codex 승인 API와 명확히 분기한다.
 
 ## 15. 근거와 현행 코드
 
@@ -889,7 +942,7 @@ C3에서만 오늘 브리핑·완료 결과 기록·Codex/Terra 기반 분석 �
 - [최종 제품 설계](galpi-design-final.md): SQLite 정본, 결정론적 scheduler, 얇은 모듈 경계
 - [`lib/database-migrations.js`](../lib/database-migrations.js): 배포 schema v4, 로컬 schema v5와 순차 transaction migration
 - [`server.js`](../server.js): 기존 `/api/notifications`, API token, startup/shutdown 경계
-- [`public/app.js`](../public/app.js): 기존 알림센터 shell과 7초 채팅 polling
+- [`public/app.js`](../public/app.js): 지식 시트 진입·command/deep link와 7초 채팅 polling
 - [`public/index.html`](../public/index.html): 현재 Apple meta만 있고 manifest·Service Worker 등록은 없는 PWA 시작점
 - [Pi 운영·복구 runbook](RASPBERRY_PI_RUNBOOK.md): 현재 HTTP 접속 기준; C1 구현 때 private HTTPS 전환·복구 절차를 함께 갱신
 

@@ -433,7 +433,7 @@ test('ai_readable false stays human-visible and is excluded from every server AI
 
   const dbPath = path.join(appRoot, 'galpi.db');
   const db = new Database(dbPath, { readonly: true });
-  assert.equal(db.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 6);
+  assert.equal(db.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 7);
   assert.deepEqual(
     db.prepare('SELECT filename, ai_readable AS aiReadable FROM notes ORDER BY filename').all(),
     [

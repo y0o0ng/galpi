@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="갈피">
+  <meta name="theme-color" content="#f4f1eb">
   <title>갈피</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/lib/icons/Claude_code_pet/clyde-idle-living.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -79,7 +83,8 @@
       <aside id="knowledge-panel" aria-label="지식 패널">
         <div id="knowledge-panel-head">
           <nav id="knowledge-tabs" aria-label="지식 유형" role="tablist">
-            <button class="knowledge-tab active" data-panel-tab="notes" type="button" role="tab" aria-selected="true" aria-controls="note-panel">노트</button>
+            <button class="knowledge-tab active" data-panel-tab="notifications" type="button" role="tab" aria-selected="true" aria-controls="notification-panel" title="알림센터">알림</button>
+            <button class="knowledge-tab" data-panel-tab="notes" type="button" role="tab" aria-selected="false" aria-controls="note-panel">노트</button>
             <button class="knowledge-tab" data-panel-tab="agents" type="button" role="tab" aria-selected="false" aria-controls="agent-panel">에이전트</button>
             <button class="knowledge-tab" data-panel-tab="papers" type="button" role="tab" aria-selected="false" aria-controls="paper-panel">논문</button>
           </nav>
@@ -88,7 +93,24 @@
           </button>
         </div>
 
-        <section id="note-panel" class="knowledge-panel-view" role="tabpanel">
+        <section id="notification-panel" class="knowledge-panel-view" role="tabpanel">
+          <div class="notification-panel-head">
+            <div>
+              <span class="notification-kicker">XION</span>
+              <strong class="notification-title">알림센터</strong>
+            </div>
+            <button id="notification-panel-refresh" class="notification-panel-refresh" type="button">새로고침</button>
+          </div>
+          <div class="notification-tabs" role="tablist" aria-label="알림 유형">
+            <button class="notification-tab active" data-notification-filter="all" type="button" role="tab" aria-selected="true">전체</button>
+            <button class="notification-tab" data-notification-filter="codex" type="button" role="tab" aria-selected="false">Codex</button>
+            <button class="notification-tab" data-notification-filter="system" type="button" role="tab" aria-selected="false">시스템</button>
+            <button class="notification-tab" data-notification-filter="saves" type="button" role="tab" aria-selected="false">최근 저장</button>
+          </div>
+          <div id="notification-panel-content" class="notification-body" aria-live="polite"></div>
+        </section>
+
+        <section id="note-panel" class="knowledge-panel-view" role="tabpanel" hidden>
           <form id="note-panel-search" role="search">
             <input id="note-panel-query" type="search" maxlength="200" placeholder="노트 제목 검색" autocomplete="off" aria-label="노트 제목 검색어">
             <button type="submit" title="노트 검색" aria-label="노트 검색">
@@ -123,7 +145,9 @@
   <script src="lib/marked.min.js"></script>
   <script src="lib/purify.min.js"></script>
   <script src="note-panel.js"></script>
+  <script src="notification-panel.js"></script>
   <script src="task-panel.js"></script>
+  <script src="push-client.js"></script>
   <script src="agent-panel.js"></script>
   <script src="paper-panel.js"></script>
   <script src="app.js"></script>

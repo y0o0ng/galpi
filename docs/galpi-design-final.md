@@ -614,7 +614,7 @@
 - **Codex/MCP(완료):** Pi의 Codex가 서버를 직접 다룰 수 있도록 갈피 MCP 서버(`scripts/galpi-mcp.mjs`)와 `.codex/config.toml`을 구성했다. 읽기 도구(list/read/search/status/validate/merge candidates)와 승인 필요 도구(organize process, archive/restore)를 분리한다.
 - **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
 - **토픽 분리(완료):** Codex split 제안을 시온 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.
-- **알림센터(완료):** 시온 메뉴와 `/notifications`로 PIP 알림센터를 연다. CODEX-PROPOSALS에서 merge/split/policy/review 제안을 읽어오고, 승인/무시 상태를 DB(`notification_actions`)에 저장한다. `최근 저장` 탭은 `auto_save_decisions`의 성공 기록을 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 보여주며 카드를 누르면 노트 상세를 연다. 저장 판단·AI 호출은 추가하지 않는다. 창은 데스크톱에서 드래그 이동 가능하며 위치를 localStorage에 저장한다.
+- **알림센터(완료):** 지식 시트의 첫 `알림` 탭과 `/notifications`에서 연다. `전체 | Codex | 시스템 | 최근 저장`을 제공하고 CODEX-PROPOSALS의 merge/split/policy/review 승인·무시 상태는 DB(`notification_actions`)에 저장한다. `최근 저장`은 `auto_save_decisions`의 성공 기록을 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 보여주며 카드를 누르면 같은 시트의 노트 상세를 연다. 저장 판단·AI 호출은 추가하지 않는다. 일정 알림은 범용 탭에서 제외하고 `에이전트 > 일정 에이전트`로 모으며, 기존 PIP·drag·localStorage 위치 층은 제거했다.
 - **유지보수 리뷰(Pi 배포·검증 완료, `fd615c7`):** 의회 자동 topic과 수동 council 저장 상태를 분리하고, 불용어 질의 임베딩 폴백, 저장 버튼 부분 갱신, 일반 노트의 서버 측 paper 제외, 패널 초기화 복구, malformed Semantic Scholar 200 거부, 펫 클릭 전달을 반영했다. 전체 테스트 34개와 모바일·데스크톱 Playwright 회귀 검증을 통과했고, Pi에서 서비스 기동·일반 노트 paper 제외·불용어 검색·의회 저장 상태 API를 확인했다. 구조 이슈와 후속 클린업은 `maintenance.md`에서 추적한다.
 - **정책 파일(완료):** `config/codex-policy.json`에 자동 저장, 토픽 매칭, organize, retrieval, Codex 링크, 병합 후보 가중치/임계값/불용어를 둔다. Codex가 수정 가능한 파일은 `.codex/editable-files.json`에 제한한다.
 - **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, 시온 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
@@ -1500,7 +1500,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: 2026-07-19 S0 schema v4 Pi 배포·운영 인수 완료, schema v5 AI 읽기 경계와 schema v6 C1a task core·API 및 C1b scheduler·UI 로컬 구현 완료, A1b 실사용 shadow 관찰 중. C1 첫 배포에 private HTTPS·PWA·Web Push 포함, 실브라우저 viewport·Pi 인수 전
+> 상태: 2026-07-19 S0 schema v4 Pi 배포·운영 인수 완료, schema v5 AI 읽기 경계·schema v6 task core/scheduler/UI·schema v7 Web Push outbox/PWA와 지식 시트/일정 에이전트 UI 로컬 구현·실브라우저 검증 완료, A1b 실사용 shadow 관찰 중. private HTTPS 실기기·Pi 인수 전
 
 ### 문제 정의
 
@@ -1515,8 +1515,8 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 5. 사용자 메모리는 자동 확정하지 않고 시온 승인 제안으로 갱신한다.
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
 7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 참조 가능한 `closed`와 일반 회수에서 제외하는 `deleted`, 무LLM·별도 정본을 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
-8. reminder는 약속 occurrence와 사용자 확인 상태의 정본, push subscription은 브라우저 endpoint 정본, delivery는 reminder×subscription 전송 receipt다. private HTTPS 홈 화면 PWA와 Web Push를 C1 첫 배포에 포함하되 알림센터·foreground refresh를 fallback으로 유지한다.
-9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트 운영 요약을 둔다. 7일·지연/오늘/예정/Inbox·오늘/지연 최대 3개·다음 알림·push 상태와 `일정 추가 | 전체 일정` 진입만 제공하고, task 변경 행동은 알림센터의 단일 renderer에 둔다.
+8. reminder는 약속 occurrence와 사용자 확인 상태의 정본, push subscription은 브라우저 endpoint 정본, delivery는 reminder×subscription 전송 receipt다. private HTTPS 홈 화면 PWA와 Web Push를 C1 첫 배포에 포함하되 일정 에이전트의 in-app reminder·foreground refresh를 fallback으로 유지한다.
+9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트를 둔다. 이전·현재·다음 3주 21일 swipe, 지연/오늘/예정/Inbox, 오늘/지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 일정 작업 화면을 같은 탭에 제공한다. task 변경 행동은 `TaskPanel` 단일 renderer만 사용한다.
 10. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
 
 ### 구조 원칙
@@ -1542,7 +1542,7 @@ A0 기준선 평가
   -> V5-B 주식 분석
 ```
 
-위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 기억 회수·자동 저장을 건드리지 않는 V4.5-C C1 명시적 task/reminder·private Web Push는 별도 경계에서 진행할 수 있다. schema v5 접근 경계, schema v6 task 정본·API, C1b 결정론적 scheduler·알림센터·일정 요약은 독립 모듈로 로컬 구현했고 전체 테스트 148/148을 마쳤다. 다음 순서는 schema v7 HTTPS·PWA·push → 실브라우저 viewport 확인 → Pi 일괄 인수다. 두 로컬 schema는 아직 Pi에 적용하지 않았고 `ASSISTANT_TASKS_ENABLED` 기본값은 `false`다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다.
+위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 기억 회수·자동 저장을 건드리지 않는 V4.5-C C1 명시적 task/reminder·private Web Push는 별도 경계에서 진행할 수 있다. schema v5 접근 경계, schema v6 task 정본·scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편을 독립 모듈로 로컬 구현했고 전체 테스트 161/161을 마쳤다. 1440×900·390×844 실브라우저의 주간 swipe·deep link·알림 경계·light/dark·overflow도 통과했다. 다음 순서는 Tailscale Serve·iPhone 실기기 확인 → Pi 일괄 인수다. 세 로컬 schema는 아직 Pi에 적용하지 않았고 `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED` 기본값은 `false`다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.
 
 세부 스키마, 하드 상한, 마이그레이션, 보안 경계와 통과 기준은 상세 설계 문서를 단일 기준으로 삼는다.
 

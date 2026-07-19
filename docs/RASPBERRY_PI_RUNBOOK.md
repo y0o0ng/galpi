@@ -93,6 +93,50 @@ CODEX_BIN=/home/pi/galpi/bin/codex
 
 `HOST=0.0.0.0`으로 LAN에 열 때는 `API_TOKEN`을 **반드시** 설정한다. 비워두면 같은 네트워크의 누구나 API를 호출해 키 크레딧을 쓰고 볼트를 읽을 수 있다(서버 시작 시 경고가 뜬다). 설정하면 첫 접속 시 브라우저가 토큰을 한 번 묻고 저장한다.
 
+### C1 일정·private Web Push를 처음 켤 때
+
+C1 일괄 배포 전에는 아래 flag를 `false`로 유지한다. schema v5→v6→v7은 코드가 순차 적용하지만, 운영 DB에는 배포 전 동시 DB·vault 백업을 먼저 만든다.
+
+VAPID 키 쌍은 Pi 프로젝트에서 한 번 생성한다. 출력된 private key는 `.env`에만 넣고 DB·vault·문서·채팅에 복사하지 않는다.
+
+```sh
+cd /home/pi/galpi
+./node_modules/.bin/web-push generate-vapid-keys
+```
+
+Pi `.env`에 다음 값을 채운다. HTTPS 노드 이름에는 개인 정보를 넣지 않는다.
+
+```env
+ASSISTANT_TASKS_ENABLED=true
+WEB_PUSH_ENABLED=true
+WEB_PUSH_CANONICAL_ORIGIN=https://<pi-node>.<tailnet-name>.ts.net
+WEB_PUSH_VAPID_SUBJECT=mailto:<운영자-이메일>
+WEB_PUSH_VAPID_PUBLIC_KEY=<생성한-public-key>
+WEB_PUSH_VAPID_PRIVATE_KEY=<생성한-private-key>
+```
+
+갈피의 3000번 포트를 공개 Funnel 없이 tailnet 안의 HTTPS로만 노출한다. 설치된 Tailscale 버전의 명령 형식은 [공식 Serve CLI 문서](https://tailscale.com/docs/reference/tailscale-cli/serve)를 기준으로 다시 확인한다.
+
+```sh
+tailscale version
+tailscale status
+sudo tailscale serve --bg 3000
+tailscale serve status
+```
+
+서비스를 재시작한 뒤 canonical HTTPS에서 인증 config를 확인한다. API token은 shell history에 남기지 않도록 실제 인수 때 안전한 방식으로 전달한다.
+
+```sh
+sudo systemctl restart galpi
+curl -H 'X-API-Token: <API_TOKEN>' https://<pi-node>.<tailnet-name>.ts.net/api/push/config
+```
+
+기대값은 `enabled: true`, `.env`와 같은 `canonicalOrigin`, VAPID **public** key다. private key와 subject는 응답·로그에 없어야 한다. 기존 `http://<Pi_IP>:3000`과 새 HTTPS는 브라우저 저장소 origin이 달라 첫 접속 때 API token을 다시 입력한다.
+
+iPhone·iPad는 iOS/iPadOS 16.4 이상에서 canonical HTTPS를 Safari로 열어 홈 화면에 추가한 다음, 그 홈 화면 앱 안의 일정 에이전트 블록에서 `알림 켜기`를 직접 누른다. 일반 Safari 탭은 iOS Push 인수 대상으로 세지 않는다. 알림 권한을 거부했을 때 앱이 다시 prompt하지 않고 일정 에이전트의 unresolved reminder fallback을 유지하는지도 확인한다. push를 누르면 `/?panel=agents&taskView=reminders`로 이동해야 한다.
+
+문제가 생기면 먼저 `WEB_PUSH_ENABLED=false`로 바꾸고 서비스를 재시작한다. 이 조치는 dispatcher와 새 구독만 끄며 task 정본·scheduler·일정 에이전트 화면은 유지한다. 일정 기능 전체를 멈춰야 할 때만 `ASSISTANT_TASKS_ENABLED=false`를 추가로 적용한다.
+
 ## 4. 실행
 
 ```sh

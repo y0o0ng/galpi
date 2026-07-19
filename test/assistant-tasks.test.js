@@ -387,8 +387,25 @@ test('KST list buckets and weekly summary use one captured clock', () => {
   assert.equal(summary.week[0].date, '2026-07-20');
   assert.equal(summary.week[0].count, 2);
   assert.equal(summary.week[0].isToday, true);
+  assert.equal(summary.currentWeekStart, '2026-07-20');
+  assert.equal(summary.calendarCenter, '2026-07-20');
+  assert.deepEqual(summary.calendar.map(week => week.startDate), [
+    '2026-07-13', '2026-07-20', '2026-07-27',
+  ]);
+  assert.ok(summary.calendar.every(week => week.days.length === 7));
   assert.deepEqual(summary.preview.map(item => item.title), ['곧 지연', '오늘 시각', '오늘 날짜']);
   assert.equal(summary.nextReminder.title, '오늘 시각');
+
+  const later = store.summary({ calendarCenter: '2026-07-27' });
+  assert.equal(later.calendarCenter, '2026-07-27');
+  assert.deepEqual(later.calendar.map(week => week.startDate), [
+    '2026-07-20', '2026-07-27', '2026-08-03',
+  ]);
+  assert.ok(later.week.every(day => day.isToday === false));
+  assert.throws(
+    () => store.summary({ calendarCenter: '2026-07-26' }),
+    error => error.code === 'INVALID_CALENDAR_WEEK',
+  );
   db.close();
 });
 

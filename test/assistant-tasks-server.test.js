@@ -58,7 +58,7 @@ function kstDateTimeAfter(seconds) {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`;
 }
 
-async function startServer(t, enabled) {
+async function startServer(t, enabled, pushEnabled = false) {
   const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'assistant-tasks-server-'));
   const vaultPath = path.join(appRoot, 'vault');
   await fs.mkdir(vaultPath);
@@ -82,6 +82,11 @@ async function startServer(t, enabled) {
       BACKUP_DIR: path.join(appRoot, 'backups'),
       CODEX_RUNNER_MODE: 'heuristic',
       ASSISTANT_TASKS_ENABLED: enabled ? 'true' : 'false',
+      WEB_PUSH_ENABLED: pushEnabled ? 'true' : 'false',
+      WEB_PUSH_CANONICAL_ORIGIN: 'https://galpi-test.example.ts.net',
+      WEB_PUSH_VAPID_SUBJECT: 'mailto:test@example.com',
+      WEB_PUSH_VAPID_PUBLIC_KEY: 'A'.repeat(87),
+      WEB_PUSH_VAPID_PRIVATE_KEY: 'B'.repeat(43),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -115,12 +120,61 @@ test('task routes stay authenticated and return 503 while the feature flag is of
   const config = await api(url, '/api/config');
   assert.equal(config.response.status, 200);
   assert.equal(config.body.tasksEnabled, false);
+
+  const pushConfig = await api(url, '/api/push/config');
+  assert.deepEqual(pushConfig.body, {
+    enabled: false,
+    publicKey: null,
+    canonicalOrigin: null,
+    install: { display: 'standalone', iosHomeScreenRequired: true },
+  });
 });
 
 test('task routes expose the independent store with JSON, idempotency, and lifecycle contracts', async t => {
-  const { appRoot, url } = await startServer(t, true);
+  const { appRoot, url } = await startServer(t, true, true);
   const config = await api(url, '/api/config');
   assert.equal(config.body.tasksEnabled, true);
+
+  const unauthorizedPush = await api(url, '/api/push/config', {}, false);
+  assert.equal(unauthorizedPush.response.status, 401);
+  const pushConfig = await api(url, '/api/push/config');
+  assert.deepEqual(pushConfig.body, {
+    enabled: true,
+    publicKey: 'A'.repeat(87),
+    canonicalOrigin: 'https://galpi-test.example.ts.net',
+    install: { display: 'standalone', iosHomeScreenRequired: true },
+  });
+  const pushBody = {
+    endpoint: 'https://web.push.apple.com/test-device',
+    keys: { p256dh: 'C'.repeat(87), auth: 'D'.repeat(22) },
+    deviceLabel: '통합 테스트',
+  };
+  const pushCreated = await api(url, '/api/push/subscriptions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pushBody),
+  });
+  assert.equal(pushCreated.response.status, 201, JSON.stringify(pushCreated.body));
+  assert.equal(pushCreated.body.status, 'active');
+  assert.equal('endpoint' in pushCreated.body, false);
+  assert.equal('keys' in pushCreated.body, false);
+  const pushReplayed = await api(url, '/api/push/subscriptions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pushBody),
+  });
+  assert.equal(pushReplayed.response.status, 200);
+  assert.equal(pushReplayed.body.replayed, true);
+  const pushRejected = await api(url, '/api/push/subscriptions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...pushBody, endpoint: 'https://example.com/not-a-push-service' }),
+  });
+  assert.equal(pushRejected.response.status, 400);
+  assert.equal(pushRejected.body.code, 'PUSH_ENDPOINT_NOT_ALLOWED');
+  const pushRevoked = await api(url, `/api/push/subscriptions/${pushCreated.body.id}`, { method: 'DELETE' });
+  assert.equal(pushRevoked.response.status, 200);
+  assert.equal(pushRevoked.body.status, 'revoked');
 
   const notJson = await api(url, '/api/tasks', {
     method: 'POST',
@@ -181,6 +235,16 @@ test('task routes expose the independent store with JSON, idempotency, and lifec
   const summary = await api(url, '/api/tasks/summary');
   assert.equal(summary.response.status, 200);
   assert.equal(summary.body.counts.overdue + summary.body.counts.today + summary.body.counts.upcoming, 1);
+  assert.equal(summary.body.calendar.length, 3);
+  assert.ok(summary.body.calendar.every(week => week.days.length === 7));
+  const nextCenter = summary.body.calendar[2].startDate;
+  const nextCalendar = await api(url, `/api/tasks/summary?calendarCenter=${nextCenter}`);
+  assert.equal(nextCalendar.response.status, 200);
+  assert.equal(nextCalendar.body.calendarCenter, nextCenter);
+  const invalidCenter = summary.body.calendar[1].days[6].date;
+  const invalidCalendar = await api(url, `/api/tasks/summary?calendarCenter=${invalidCenter}`);
+  assert.equal(invalidCalendar.response.status, 400);
+  assert.equal(invalidCalendar.body.code, 'INVALID_CALENDAR_WEEK');
 
   const alertPayload = {
     ...payload,
@@ -248,5 +312,9 @@ test('task routes expose the independent store with JSON, idempotency, and lifec
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_reminders').get().count, 2);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM notes').get().count, 0);
+  assert.deepEqual(
+    db.prepare('SELECT status, endpoint FROM assistant_push_subscriptions').get(),
+    { status: 'revoked', endpoint: pushBody.endpoint },
+  );
   db.close();
 });
