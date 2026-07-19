@@ -13,7 +13,7 @@ self.addEventListener('push', event => {
     : '/?panel=agents&taskView=reminders';
   event.waitUntil(self.registration.showNotification('XION 일정 알림', {
     body: '확인할 일정이 있어. 앱에서 내용을 확인해줘.',
-    icon: '/lib/icons/Xion/xion-app-icon.svg',
+    icon: '/lib/icons/Xion/xion-app-icon-192.png',
     badge: '/lib/icons/Xion/xion-mark.svg',
     tag: `task-reminder:${reminderId}`,
     renotify: false,

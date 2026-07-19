@@ -71,12 +71,24 @@ test('minimal PWA has stable scope and a push-only service worker', () => {
   assert.equal(manifest.scope, '/');
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.theme_color, '#F3F5F2');
-  assert.ok(manifest.icons.every(icon => icon.src === '/lib/icons/Xion/xion-app-icon.svg'));
+  assert.deepEqual(
+    manifest.icons.map(icon => [icon.src, icon.sizes, icon.type, icon.purpose]),
+    [
+      ['/lib/icons/Xion/xion-app-icon-192.png', '192x192', 'image/png', 'any'],
+      ['/lib/icons/Xion/xion-app-icon-512.png', '512x512', 'image/png', 'any'],
+      ['/lib/icons/Xion/xion-app-icon-512.png', '512x512', 'image/png', 'maskable'],
+    ],
+  );
   assert.ok(manifest.icons.some(icon => icon.purpose === 'maskable'));
   assert.match(html, /rel="icon" href="\/lib\/icons\/Xion\/xion-app-icon\.svg"/);
+  assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="\/lib\/icons\/Xion\/xion-app-icon-180\.png"/);
+  assert.match(html, /rel="apple-touch-icon" sizes="167x167" href="\/lib\/icons\/Xion\/xion-app-icon-167\.png"/);
+  for (const size of [167, 180, 192, 512]) {
+    assert.ok(fs.existsSync(path.join(ROOT, `public/lib/icons/Xion/xion-app-icon-${size}.png`)));
+  }
   assert.match(worker, /addEventListener\('push'/);
   assert.match(worker, /showNotification\('XION 일정 알림'/);
-  assert.match(worker, /icon: '\/lib\/icons\/Xion\/xion-app-icon\.svg'/);
+  assert.match(worker, /icon: '\/lib\/icons\/Xion\/xion-app-icon-192\.png'/);
   assert.match(worker, /badge: '\/lib\/icons\/Xion\/xion-mark\.svg'/);
   assert.doesNotMatch(worker, /Claude_code_pet/);
   assert.match(worker, /tag: `task-reminder:\$\{reminderId\}`/);
