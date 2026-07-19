@@ -83,6 +83,7 @@ test('unknown stages are ignored and tool names map to public stage identifiers'
   assert.equal(progressStageForTool('web_search'), 'web_search');
   assert.equal(progressStageForTool('paper_fulltext_search'), 'paper_search');
   assert.equal(progressStageForTool('paper_fulltext_read'), 'paper_read');
+  assert.equal(progressStageForTool('schedule_prepare'), 'schedule_prepare');
   assert.equal(progressStageForTool('unknown'), null);
 });
 

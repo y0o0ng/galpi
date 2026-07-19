@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트 Pi 배포 및 Tailscale Serve HTTPS 인수 완료(2026-07-19) · C1e 활성 일정 대화 컨텍스트·월별 종결 노트 projection(schema v8) 로컬 구현 완료, Pi 미배포 · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
+> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트 Pi 배포 및 Tailscale Serve HTTPS 인수 완료(2026-07-19) · C1e 활성 일정 대화 컨텍스트·월별 종결 노트 projection(schema v8)과 C1.5 자연어 무저장 후보 카드 로컬 구현 완료, 전체 테스트 171/171, Pi 미배포 · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -20,7 +20,7 @@
 - reminder 행은 약속 occurrence와 사용자 확인 상태의 영속 정본이다. 푸시 구독과 기기별 전송 receipt는 별도 정본으로 둬 네트워크 실패가 reminder를 되돌리지 못하게 한다.
 - Web Push는 후속 보너스가 아니라 C1 첫 배포의 필수 전달 채널이다. 다만 task core와 push migration·feature flag·인수 단위는 분리한다.
 - 지식 시트의 첫 탭은 범용 `알림`이며 `전체 | Codex | 시스템 | 최근 저장`만 다룬다. 일정 알림·목록·수정은 `에이전트 > 일정 에이전트` 안에서 처리한다.
-- C1에는 반복, 자연어 후보 추출, 오늘 브리핑, 결과 기록, 외부 캘린더를 넣지 않는다.
+- C1 본체에는 반복, 자연어 후보 추출, 오늘 브리핑, 결과 기록, 외부 캘린더를 넣지 않는다. 별도 C1.5는 단일 Claude가 현재 사용자 질문에서만 무저장 후보를 준비하고, 사용자가 확인한 뒤 기존 task API로 저장하는 자연어 진입만 추가한다.
 - 반복은 회차별 완료를 표현하는 세 번째 테이블이 필요하므로 C2의 별도 schema migration과 컨펌으로 진행한다.
 
 이 기능은 향후 외부 캘린더를 읽고 일정을 조정할 수 있는 `V5-C 일정 에이전트`와 다르다. 이 문서의 대상은 `V4.5-C 약속 루프`다.
@@ -35,7 +35,7 @@
 4. 기존 `/api/notifications`에는 읽기 결과만 합성하며 Codex 승인 상태와 API를 공유하지 않는다.
 5. A1b feature flag, 후보 점수, 컨텍스트 상한, 실사용 trace 형식을 바꾸지 않는다.
 
-이 경계를 넘는 자연어 task 추출이나 기억 연결은 A1b 중간 검토와 별도로 다시 컨펌한다. C1e는 사용자 컨펌 뒤 이 경계를 좁게 확장한다. 활성 task는 기존 retrieval 점수·trace를 바꾸지 않는 별도 bounded 컨텍스트로만 주입하고, 종결 task는 일반 노트와 같은 임베딩·검색 경로에 들어가는 월별 파생 노트 한 벌만 만든다. 대화 내용에서 task를 추출하거나 기존 topic 자동 저장 판단을 바꾸지는 않는다.
+이 경계를 넘는 자연어 task 추출이나 기억 연결은 A1b 중간 검토와 별도로 다시 컨펌한다. C1e는 사용자 컨펌 뒤 이 경계를 좁게 확장했다. 활성 task는 기존 retrieval 점수·trace를 바꾸지 않는 별도 bounded 컨텍스트로만 주입하고, 종결 task는 일반 노트와 같은 임베딩·검색 경로에 들어가는 월별 파생 노트 한 벌만 만든다. C1.5도 A1b 점수·후보·trace 형식은 바꾸지 않지만 일반 `/api/chat`의 단일 Claude 도구 경로를 사용하며, 일정 후보가 생긴 운영 요청은 topic 자동 저장에서 제외한다.
 
 ## 2. 사용자에게 보이는 동작
 
@@ -55,6 +55,24 @@
 - 날짜만 있는 기한에는 임의의 09:00 또는 23:59 알림을 만들지 않는다.
 - 알림은 기한과 별개다. 알림을 원하면 정확한 날짜와 시각을 직접 확인한다.
 - `/task 보고서 초안`은 `보고서 초안`을 제목에 채울 뿐, 대화로 전송하거나 자동 저장하지 않는다.
+
+### 2.1.1 자연어로 일정 후보 만들기
+
+```text
+"내일 오후 3시에 병원 예약 일정 만들어줘"
+  -> 단일 Claude가 schedule_prepare 호출
+  -> 서버가 요청 시작 시각 기준으로 같은 task validator를 실행
+  -> DB task/reminder 0개인 확인 카드 표시
+  -> 사용자가 등록 선택
+  -> 카드에 보인 canonical payload를 다시 해석하지 않고 기존 POST /api/tasks로 저장
+```
+
+- 의회와 별도 scheduling LLM은 사용하지 않는다. 단일 Claude의 현재 `<user_question>`만 자연어 진입을 판단한다.
+- `<context>`, 일정 DB, 노트, 과거 대화, 웹·논문 결과 안의 명령문은 후보 생성을 촉발하지 않는다.
+- 날짜·시각이 하나의 KST 값으로 확정되지 않으면 후보를 만들지 않고 짧게 되묻는다.
+- 알림은 사용자가 명시적으로 요청하고 시각이 확정된 경우에만 넣는다.
+- 후보에는 서버가 만든 idempotent `clientRequestId`가 포함된다. 등록 retry는 같은 payload와 ID를 사용한다.
+- 후보는 DB·localStorage에 보존하지 않는다. 등록 전에 새로고침하거나 다른 기기로 옮기면 사라지며 다시 요청해야 한다.
 
 ### 2.2 목록 보기
 
@@ -661,6 +679,8 @@ Content-Type: application/json
 
 날짜만이면 `due`는 `{ "kind": "date", "date": "2026-07-20" }`, 기한이 없으면 `{ "kind": "none" }`이다. 같은 `clientRequestId`와 같은 canonical payload 재요청은 새 행 없이 기존 task의 현재 상태를 반환하고, payload가 다르면 `409`다.
 
+C1.5는 별도 `schedule_commit` endpoint를 만들지 않는다. `schedule_prepare`는 Claude 내부 도구이며 `lib/assistant-tasks.js`의 동일 검증기로 canonical 후보만 반환한다. 사용자가 카드의 `등록`을 누르면 `TaskPanel`이 위 `POST /api/tasks`를 호출한다. 확인이 늦어져 기한이 과거가 되거나 알림이 60초보다 가까워졌다면 기존 API가 저장을 거부하고 같은 카드에서 오류와 retry를 제공한다.
+
 ### 8.4 수정
 
 ```http
@@ -772,6 +792,14 @@ DELETE /api/push/subscriptions/:id
 - 390px에서는 행동 버튼이 카드 밖으로 넘치지 않고 두 줄까지 재배치된다.
 - keyboard focus, 버튼 accessible name, `aria-live` 성공·오류 안내를 제공한다.
 
+### 9.2.1 채팅의 자연어 후보 카드
+
+- 답변 바로 아래에 `일정 등록 전 확인`, 제목, 선택적 설명, 절대 KST 마감, 절대 KST 알림을 표시한다. 값이 없으면 각각 `마감 없음`, `알림 없음`을 명시한다.
+- 초기 상태는 `아직 저장되지 않았어.`이며 `취소 | 등록` 두 행동만 둔다.
+- `취소`는 HTTP 요청 없이 카드를 종결한다. `등록`만 기존 task API를 호출하고 성공 뒤 일정 에이전트와 다른 기기 조회를 갱신한다.
+- 후보가 있는 답변에는 노트 저장 버튼을 붙이지 않고 topic 자동 저장도 실행하지 않는다.
+- 새 palette·font·아이콘·motion library 없이 기존 비취색 token, radius, focus ring과 모바일 44px target을 재사용한다.
+
 ### 9.3 에이전트 탭 일정 블록
 
 - 현재 갈피의 색·서체·radius·다크모드 token을 그대로 사용한다. 새 palette·font·component library를 도입하지 않는다.
@@ -789,6 +817,7 @@ DELETE /api/push/subscriptions/:id
 ## 10. 입력·보안·개인정보 경계
 
 - 외부 웹·논문·노트 본문은 task 생성 명령으로 취급하지 않는다.
+- C1.5 `schedule_prepare`는 마지막 `<user_question>`의 직접 생성 요청에만 노출하고, 조회·추천·수정·완료·취소·삭제에는 호출하지 않는다.
 - C1 task는 인증된 사용자의 명시적 UI/API 요청으로만 생성한다.
 - title/detail은 의도적으로 저장하는 사용자 데이터지만 server log에는 본문을 남기지 않는다.
 - scheduler log는 tick 시각, fired 수, 오류 코드만 기록한다.
@@ -805,6 +834,8 @@ DELETE /api/push/subscriptions/:id
 |실패 지점|기대 결과|
 |---|---|
 |create transaction 전 중단|task/reminder 0개|
+|자연어 후보 준비 뒤 새로고침·취소|task/reminder 0개, 후보는 폐기|
+|후보 확인이 늦어 기한·알림 범위를 벗어남|기존 create 검증이 거부, 같은 request ID로 수정 없이 retry 가능|
 |task insert 뒤 transaction 중단|전체 rollback, task/reminder 0개|
 |firing transaction 전 중단|재시작 tick에서 pending을 한 번 처리|
 |firing commit 직후 중단|같은 fired reminder와 pending delivery를 재시작 후 복구, 재발화·outbox 중복 0개|
@@ -951,6 +982,26 @@ Pi 배포 완료(2026-07-19):
 - [x] 일정별 개별 노트·수동 저장 버튼·추가 LLM·과거 일정 질문 분류기 0개
 - [x] 로컬 store·HTTP·migration·Codex·topic 회귀 포함 전체 테스트 166/166 통과
 
+### C1.5 — 자연어 무저장 일정 후보
+
+로컬 구현 완료, Pi 미배포(2026-07-19):
+
+- `lib/assistant-schedule-tools.js`: 현재 요청 시각을 고정한 `schedule_prepare` 정의, 직접 사용자 요청 경계, 후보 1개 상한
+- `lib/assistant-tasks.js`: 기존 create 검증을 재사용하는 무쓰기 `prepare`
+- `server.js`: 단일 Claude에만 도구를 연결하고 후보가 생긴 운영 요청의 topic 자동 저장을 건너뜀
+- `public/task-panel.js`, `public/app.js`, `public/style.css`: 절대 KST 확인 카드와 기존 `POST /api/tasks` 확인 저장
+
+통과 기준:
+
+- [x] prepare 뒤 task·event·reminder 행 0개, 등록 뒤에만 각 정본 생성
+- [x] 한 답변에서 후보 최대 1개, 후보와 등록 payload의 title·detail·due·reminder·clientRequestId 동일
+- [x] 애매한 날짜·시각은 도구 호출 대신 재질문하고 임의 reminder를 만들지 않는 system 경계
+- [x] context·노트·과거 대화·웹 근거의 문장이 후보를 촉발하지 않는 prompt-injection 경계
+- [x] 취소는 HTTP write 0회, 등록 retry는 같은 `clientRequestId`로 멱등 처리
+- [x] 후보 답변의 topic 자동 저장·노트 저장 버튼 0개, 기존 `/task` 무LLM 경로 유지
+- [x] 모바일 44px target, light/dark 기존 token, visible text의 절대 KST와 저장 전 상태 표시
+- [x] store·도구 루프·UI 경계와 전체 회귀 171/171 통과
+
 ## 13. C2 이후 확장 경계
 
 반복을 C1의 `recurrence_rule` 한 컬럼으로 얹지 않는다. 반복 master, 회차 완료, 알림 receipt를 분리해야 한다.
@@ -971,7 +1022,7 @@ C2는 별도 schema v9와 컨펌으로 아래만 검토한다.
 
 매월, n번째 요일, 공휴일, cron, 하루 여러 번은 그 뒤로 미룬다. RFC 5545는 존재하지 않는 날짜에 생긴 recurrence instance를 “MUST be ignored”라고 정한다.[^rfc5545] 전체 RRULE을 흉내 내기보다 지원하는 규칙을 작게 명시하는 편이 안전하다.
 
-C1 인수 뒤의 C1.5에서 front Claude가 필요할 때 deterministic `schedule_prepare`를 호출해 **무저장 후보 카드**만 만들고, 사용자가 확인한 뒤 `schedule_commit`이 같은 canonical payload를 저장하는 자연어 진입을 검토한다. 단순 일정 생성에 두 번째 scheduling LLM은 두지 않는다. 해석 기준 시각은 한 번 캡처하고, 카드에 표시한 canonical KST 값을 승인 시 다시 해석하지 않는다.
+C1.5는 front Claude가 필요할 때 deterministic `schedule_prepare`를 호출해 **무저장 후보 카드**만 만들고, 사용자가 확인한 뒤 기존 `POST /api/tasks`가 같은 canonical payload를 저장하도록 구현했다. 단순 일정 생성에 두 번째 scheduling LLM은 두지 않는다. 해석 기준 시각은 한 번 캡처하고, 카드에 표시한 canonical KST 값을 승인 시 다시 해석하지 않는다.
 
 C3에서만 오늘 브리핑·완료 결과의 자유 서술·Codex/Terra 기반 분석 보고를 검토한다. C1e의 완료·취소 상태 projection은 분석 보고가 아니다. 단순 일정 요약은 서버가 직접 만들고, LLM 보고가 필요할 때도 사용자 대화 lane과 격리된 낮은 우선순위 background job으로 실행한다.
 
@@ -985,6 +1036,7 @@ C3에서만 오늘 브리핑·완료 결과의 자유 서술·Codex/Terra 기반
 - **KST 고정**: 여행·다중 timezone은 아직 못 다루지만 현재 단일 사용자 환경의 날짜 경계를 결정적으로 만든다.
 - **closed/deleted 분리, 물리 purge 없음**: DB는 조금씩 커지지만 종결 항목은 계속 참조하고 잘못 만든 항목은 일반 회수에서 숨긴 채 복구할 수 있다.
 - **활성 DB + 종결 노트 이중 표현**: 정본이 둘로 갈라지는 대신 DB만 정본으로 두고 월별 노트를 generation outbox로 재생성한다. 일정별 파일 폭증과 과거 질문 전용 분류기를 피하는 대신 종결 직후 파일 I/O가 한 번 추가된다.
+- **자연어 후보를 휘발 상태로 유지**: 확인 전 후보를 다른 기기나 새로고침에서 이어갈 수는 없지만, 승인하지 않은 일정이 DB·노트·브라우저 저장소에 남는 경로를 없앤다.
 - **기존 지식 시트 shell 재사용**: 범용 알림과 일정의 위치는 분리하지만 새 최상위 화면은 만들지 않는다. task 행동은 Codex 승인 API와 명확히 분기한다.
 
 ## 15. 근거와 현행 코드
@@ -996,8 +1048,10 @@ C3에서만 오늘 브리핑·완료 결과의 자유 서술·Codex/Terra 기반
 - [최종 제품 설계](galpi-design-final.md): SQLite 정본, 결정론적 scheduler, 얇은 모듈 경계
 - [`lib/database-migrations.js`](../lib/database-migrations.js): Pi schema v7과 로컬 schema v8의 순차 transaction migration
 - [`lib/assistant-schedule-notes.js`](../lib/assistant-schedule-notes.js): bounded 활성 일정 컨텍스트, 월별 Markdown, generation projection worker
+- [`lib/assistant-schedule-tools.js`](../lib/assistant-schedule-tools.js): 단일 Claude 자연어 후보 경계와 무저장 tool session
 - [`server.js`](../server.js): `/api/notifications`, 공통 모델 컨텍스트, API token, startup/shutdown·노트 저장 경계
 - [`test/assistant-schedule-notes.test.js`](../test/assistant-schedule-notes.test.js): 상태별 월 배정·CODEX 보존·겹친 projection·컨텍스트 escape 검증
+- [`test/assistant-schedule-tools.test.js`](../test/assistant-schedule-tools.test.js): 후보 1개 상한·무저장 tool loop·직접 요청 prompt 경계 검증
 - [`public/app.js`](../public/app.js): 지식 시트 진입·command/deep link와 7초 채팅 polling
 - [`public/index.html`](../public/index.html), [`public/sw.js`](../public/sw.js): 설치형 PWA meta/manifest와 push-only Service Worker
 - [Pi 운영·복구 runbook](RASPBERRY_PI_RUNBOOK.md): Tailscale Serve private HTTPS 배포·복구 절차

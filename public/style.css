@@ -2154,6 +2154,91 @@ html, body {
   margin-top: 9px;
 }
 
+.task-candidate-card {
+  display: grid;
+  gap: 7px;
+  width: min(100%, 520px);
+  margin: 5px 0 3px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  border-radius: 10px;
+  background: var(--ai-bubble);
+  color: var(--ai-text);
+}
+
+.task-candidate-heading {
+  color: var(--brand-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.task-candidate-title {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.task-candidate-detail {
+  color: var(--ai-text);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.82;
+  overflow-wrap: anywhere;
+}
+
+.task-candidate-meta {
+  display: grid;
+  gap: 3px;
+  color: var(--label);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+}
+
+.task-candidate-status {
+  min-height: 17px;
+  color: var(--label);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.task-candidate-status.error {
+  color: var(--ai-text);
+  font-weight: 650;
+}
+
+.task-candidate-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.task-candidate-actions .task-action {
+  min-height: 40px;
+  border-color: var(--border);
+  transition: transform 0.1s var(--ease-spring), background 0.15s var(--ease-out);
+}
+
+.task-candidate-actions .task-action.primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-on);
+}
+
+.task-candidate-actions .task-action:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.task-candidate-card.is-confirmed {
+  border-left-color: var(--success);
+}
+
+.task-candidate-card.is-cancelled {
+  border-left-color: var(--border);
+}
+
 .task-action:focus-visible,
 .task-submit:focus-visible,
 .task-view-tab:focus-visible,
@@ -2327,6 +2412,10 @@ html, body {
   .task-reminder-actions .task-action {
     flex: 1 1 calc(33.333% - 4px);
     padding-inline: 7px;
+  }
+
+  .task-candidate-actions .task-action {
+    min-height: 44px;
   }
 }
 

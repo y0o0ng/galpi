@@ -1501,7 +1501,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: 2026-07-19 S0 schema v4와 V4.5-C schema v5 AI 읽기 경계·schema v6 task core/30초 scheduler/UI·schema v7 Web Push outbox/PWA, 지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS까지 Pi 배포·운영 인수 완료. schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection은 로컬 구현 완료, Pi 미배포. A1b 실사용 shadow 관찰과 Web Push 실기기 10회 표시 검증 진행 중
+> 상태: 2026-07-19 S0 schema v4와 V4.5-C schema v5 AI 읽기 경계·schema v6 task core/30초 scheduler/UI·schema v7 Web Push outbox/PWA, 지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS까지 Pi 배포·운영 인수 완료. schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드는 로컬 구현 완료, 전체 테스트 171/171, Pi 미배포. A1b 실사용 shadow 관찰과 Web Push 실기기 10회 표시 검증 진행 중
 
 ### 문제 정의
 
@@ -1519,7 +1519,8 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 8. reminder는 약속 occurrence와 사용자 확인 상태의 정본, push subscription은 브라우저 endpoint 정본, delivery는 reminder×subscription 전송 receipt다. private HTTPS 홈 화면 PWA와 Web Push를 C1 첫 배포에 포함하되 일정 에이전트의 in-app reminder·foreground refresh를 fallback으로 유지한다.
 9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트를 둔다. 이전·현재·다음 3주 21일을 native swipe와 키보드 좌우 이동으로 탐색하고 별도 이전·오늘·다음 버튼은 두지 않는다. 지연/오늘/예정/Inbox, 오늘/지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 일정 작업 화면을 같은 탭에 제공한다. task 변경 행동은 `TaskPanel` 단일 renderer만 사용한다.
 10. 활성 task는 별도 분류 LLM 없이 최대 20개·6,000자의 DB 스냅샷으로 단일 Claude와 의회 공통 컨텍스트에 넣는다. 완료·취소는 KST 월별 `schedule_history` 노트로 자동 투영해 일반 노트 검색이 과거 일정을 찾게 하며, 다시 열기·삭제·복원 때 재생성한다. DB가 정본이고 노트는 파생본이다.
-11. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
+11. C1.5 자연어 생성은 단일 Claude의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보 하나를 만든다. 확인 카드의 `등록`만 기존 task API를 같은 request ID로 호출하며, 후보는 새로고침·취소 때 폐기하고 topic 자동 저장·노트 저장 버튼에서 제외한다.
+12. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
 
 ### 구조 원칙
 
@@ -1544,7 +1545,7 @@ A0 기준선 평가
   -> V5-B 주식 분석
 ```
 
-위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 V4.5-C C1 명시적 task/reminder·private Web Push를 별도 경계에서 구현해 Pi에 인수했다. schema v5 접근 경계, schema v6 task 정본·30초 scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편을 독립 모듈로 유지한다. 이후 사용자 컨펌으로 schema v8의 활성 일정 bounded 대화 컨텍스트와 월별 종결 노트 projection을 로컬에 추가했다. 이 확장은 topic 자동 저장 판단·A1b 점수·trace를 바꾸지 않고, 일정 DB를 유일한 정본으로 유지하며 별도 과거 일정 분류기나 일정별 노트를 만들지 않는다. Tailscale Serve canonical HTTPS, iPhone·iPad·Mac 구독과 첫 운영 reminder의 provider 3/3 `201 accepted`까지 확인했고 잠금화면 표시 10회 기준은 진행 중이다. `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED`의 코드 기본값은 `false`이며 운영 Pi에서만 켠다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.
+위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 V4.5-C C1 명시적 task/reminder·private Web Push를 별도 경계에서 구현해 Pi에 인수했다. schema v5 접근 경계, schema v6 task 정본·30초 scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편을 독립 모듈로 유지한다. 이후 사용자 컨펌으로 schema v8의 활성 일정 bounded 대화 컨텍스트와 월별 종결 노트 projection, 단일 Claude `schedule_prepare`와 휘발 확인 카드를 로컬에 추가했다. C1e는 topic 자동 저장 판단·A1b 점수·trace를 바꾸지 않고, 일정 DB를 유일한 정본으로 유지하며 별도 과거 일정 분류기나 일정별 노트를 만들지 않는다. C1.5도 A1b 점수·trace 형식은 그대로 두고 후보가 실제로 생긴 운영 요청만 topic 자동 저장에서 제외한다. Tailscale Serve canonical HTTPS, iPhone·iPad·Mac 구독과 첫 운영 reminder의 provider 3/3 `201 accepted`까지 확인했고 잠금화면 표시 10회 기준은 진행 중이다. `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED`의 코드 기본값은 `false`이며 운영 Pi에서만 켠다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.
 
 세부 스키마, 하드 상한, 마이그레이션, 보안 경계와 통과 기준은 상세 설계 문서를 단일 기준으로 삼는다.
 

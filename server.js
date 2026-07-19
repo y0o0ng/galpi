@@ -29,6 +29,7 @@ const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
+const { createSchedulePrepareSession } = require('./lib/assistant-schedule-tools');
 const {
   buildActiveScheduleContext,
   buildScheduleHistoryNote,
@@ -2434,6 +2435,7 @@ async function generateClaudeReplyWithTools({
   messages,
   enableWebTool = false,
   paperToolSession = null,
+  scheduleToolSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -2443,6 +2445,7 @@ async function generateClaudeReplyWithTools({
   const system = [
     enableWebTool ? CLAUDE_WEB_TOOL_SYSTEM_PROMPT : '',
     paperToolSession?.hasCandidates ? CLAUDE_PAPER_TOOL_SYSTEM_PROMPT : '',
+    scheduleToolSession?.systemPrompt || '',
   ].filter(Boolean).join('\n\n');
 
   const result = await runClaudeToolLoop({
@@ -2455,6 +2458,7 @@ async function generateClaudeReplyWithTools({
     getTools: () => [
       ...(enableWebTool && searchCount < MAX_TOOL_SEARCHES ? [CLAUDE_WEB_SEARCH_TOOL] : []),
       ...(paperToolSession?.getToolDefinitions() || []),
+      ...(scheduleToolSession?.getToolDefinitions() || []),
     ],
     executeTool: async toolUse => {
       if (toolUse.name === 'web_search') {
@@ -2483,6 +2487,15 @@ async function generateClaudeReplyWithTools({
           onStage(writingStage);
         }
       }
+      if (toolUse.name === 'schedule_prepare') {
+        if (!scheduleToolSession) return { isError: true, content: '현재 요청에서는 일정 등록이 허용되지 않습니다.' };
+        onStage(progressStageForTool(toolUse.name));
+        try {
+          return scheduleToolSession.execute(toolUse.name, toolUse.input);
+        } finally {
+          onStage(writingStage);
+        }
+      }
       return { isError: true, content: '허용되지 않은 도구입니다.' };
     },
   });
@@ -2494,12 +2507,14 @@ async function generateClaudeReplyWithTools({
     paperEvidence: paperToolSession?.getEvidence() || [],
     paperEvidenceRefs: paperToolSession?.getEvidenceRefs() || [],
     paperFullTextUsage: paperToolSession?.getUsage() || { calls: 0, contextChars: 0 },
+    scheduleCandidate: scheduleToolSession?.getCandidate() || null,
   };
 }
 
 async function generateChatReply(model, context, {
   enableWebTool = false,
   paperToolSession = null,
+  scheduleToolSession = null,
   onStage = () => {},
 } = {}) {
   if (model !== 'claude') throw new Error('단일 채팅은 Claude만 사용합니다.');
@@ -2509,6 +2524,7 @@ async function generateChatReply(model, context, {
     messages: context,
     enableWebTool,
     paperToolSession,
+    scheduleToolSession,
     onStage,
   });
 }
@@ -2727,6 +2743,12 @@ app.post('/api/chat', async (req, res) => {
     ];
     const allowModelWebTool = !webSearch && !hasWebEvidenceResults(webEvidence) && WEB_SEARCH_ENABLED && WEB_SEARCH_MODEL_TOOL_ENABLED;
     const paperToolSession = paperFullTextTools.createSession({ notes: resolvedNotes, queryEmbedding });
+    const scheduleToolSession = ASSISTANT_TASKS_ENABLED
+      ? createSchedulePrepareSession(assistantTasks, {
+        capturedAt: requestCreatedAt,
+        clientRequestId: `chat-task:${uuidv4()}`,
+      })
+      : null;
     progress.stage('answer');
     let {
       reply,
@@ -2734,9 +2756,11 @@ app.post('/api/chat', async (req, res) => {
       webEvidence: toolWebEvidence,
       paperEvidenceRefs,
       paperFullTextUsage,
+      scheduleCandidate,
     } = await generateChatReply(model, context, {
       enableWebTool: allowModelWebTool,
       paperToolSession,
+      scheduleToolSession,
       onStage: progress.stage,
     });
     if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
@@ -2747,21 +2771,24 @@ app.post('/api/chat', async (req, res) => {
     const userMessageId = dbSaveMessage(sessionId, 'user', message, null, queryEmbedding);
     const assistantMessageId = dbSaveMessage(sessionId, 'assistant', reply, 'Claude');
 
-    autoAppendTopicNote({
-      question: message,
-      answer: reply,
-      sessionId,
-      userMessageId,
-      assistantMessageId,
-      model: 'Claude',
-      webSources: webEvidence?.results || [],
-    }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
+    if (!scheduleCandidate) {
+      autoAppendTopicNote({
+        question: message,
+        answer: reply,
+        sessionId,
+        userMessageId,
+        assistantMessageId,
+        model: 'Claude',
+        webSources: webEvidence?.results || [],
+      }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
+    }
 
     const payload = {
       reply,
       model: 'Claude',
       modelId: usedModel,
       messageId: assistantMessageId,
+      scheduleCandidate,
       webSources: webEvidence?.results || [],
       paperFullText: {
         used: paperEvidenceRefs.length > 0,

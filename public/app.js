@@ -13,6 +13,7 @@ const PROGRESS_STAGE_LABELS = Object.freeze({
   web_search: '웹 검색 중…',
   paper_search: '논문 전문 검색 중…',
   paper_read: '논문 전문 읽는 중…',
+  schedule_prepare: '일정 확인 중…',
   answer: '답변 작성 중…',
   council_draft: 'Claude 초안 작성 중…',
   council_critique: 'GPT 검증 중…',
@@ -2941,6 +2942,19 @@ function appendAssistantBubble(data) {
   bubble.className = 'bubble md';
   bubble.innerHTML = DOMPurify.sanitize(marked.parse(data.reply));
 
+  const candidateCard = data.scheduleCandidate
+    ? window.TaskPanel?.makeScheduleCandidateCard(data.scheduleCandidate)
+    : null;
+
+  group.append(label, bubble);
+  if (candidateCard) {
+    group.appendChild(candidateCard);
+    getMessages().appendChild(group);
+    saveUiMessage('assistant', data.reply, data.model);
+    scrollDown();
+    return;
+  }
+
   const saveBtn = document.createElement('button');
   saveBtn.className = 'save-btn icon-save-btn';
   saveBtn.title = '노트로 저장';
@@ -2951,7 +2965,7 @@ function appendAssistantBubble(data) {
   }
   saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, data)));
 
-  group.append(label, bubble, saveBtn);
+  group.appendChild(saveBtn);
   getMessages().appendChild(group);
   watchMessageSaveState(saveBtn, data.messageId);
   saveUiMessage('assistant', data.reply, data.model);

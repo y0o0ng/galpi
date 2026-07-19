@@ -87,6 +87,34 @@ function assertTaskError(fn, code, statusCode = 400) {
   ));
 }
 
+test('task prepare canonicalizes one candidate without writing to the database', () => {
+  const db = createDatabase();
+  const capturedAt = epoch('2026-07-19T03:00:00Z');
+  const store = createAssistantTaskStore(db, { now: () => capturedAt });
+
+  const prepared = store.prepare(taskInput(), { capturedAt });
+  assert.deepEqual(prepared, {
+    capturedAt,
+    timezone: 'Asia/Seoul',
+    task: {
+      clientRequestId: 'web-create-0001',
+      title: '보고서 초안',
+      detail: '1차 목차까지',
+      due: { kind: 'datetime', at: '2026-07-20T18:00:00+09:00' },
+      reminderAt: '2026-07-20T17:00:00+09:00',
+    },
+  });
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_tasks').get().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_task_events').get().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_reminders').get().count, 0);
+
+  const created = store.create(prepared.task);
+  assert.equal(created.task.title, prepared.task.title);
+  assert.equal(created.task.dueAt, epoch('2026-07-20T09:00:00Z'));
+  assert.equal(created.reminder.remindAt, epoch('2026-07-20T08:00:00Z'));
+  db.close();
+});
+
 test('task create is transactional and retries by canonical payload after later edits', () => {
   const db = createDatabase();
   let now = epoch('2026-07-19T03:00:00Z');

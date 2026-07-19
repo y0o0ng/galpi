@@ -612,6 +612,100 @@
     return card;
   }
 
+  function formatCandidateDateTime(value) {
+    const epoch = Math.floor(Date.parse(value) / 1000);
+    if (!Number.isFinite(epoch)) return String(value || '');
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(new Date(epoch * 1000));
+  }
+
+  function makeScheduleCandidateCard(candidate) {
+    const input = candidate?.task;
+    if (
+      !state.enabled || !state.apiFetch || !input
+      || typeof input.clientRequestId !== 'string'
+      || typeof input.title !== 'string'
+      || typeof input.detail !== 'string'
+      || !input.due || typeof input.due !== 'object'
+      || !['none', 'date', 'datetime'].includes(input.due.kind)
+      || (input.reminderAt !== null && typeof input.reminderAt !== 'string')
+    ) return null;
+
+    const payload = JSON.parse(JSON.stringify(input));
+    const card = document.createElement('article');
+    card.className = 'task-candidate-card';
+    card.setAttribute('aria-label', '일정 등록 전 확인');
+
+    const heading = document.createElement('strong');
+    heading.className = 'task-candidate-heading';
+    heading.textContent = '일정 등록 전 확인';
+    const title = document.createElement('div');
+    title.className = 'task-candidate-title';
+    title.textContent = payload.title;
+    const detail = document.createElement('p');
+    detail.className = 'task-candidate-detail';
+    detail.textContent = payload.detail;
+    detail.hidden = !payload.detail;
+
+    const meta = document.createElement('div');
+    meta.className = 'task-candidate-meta';
+    const due = document.createElement('span');
+    due.textContent = payload.due.kind === 'date'
+      ? `마감 ${formatDate(payload.due.date)}`
+      : payload.due.kind === 'datetime'
+        ? `마감 ${formatCandidateDateTime(payload.due.at)} KST`
+        : '마감 없음';
+    const reminder = document.createElement('span');
+    reminder.textContent = payload.reminderAt
+      ? `알림 ${formatCandidateDateTime(payload.reminderAt)} KST`
+      : '알림 없음';
+    meta.append(due, reminder);
+
+    const status = document.createElement('p');
+    status.className = 'task-candidate-status';
+    status.setAttribute('aria-live', 'polite');
+    status.textContent = '아직 저장되지 않았어.';
+    const actions = document.createElement('div');
+    actions.className = 'task-candidate-actions';
+    const cancel = actionButton('취소', () => {
+      actions.remove();
+      card.classList.add('is-cancelled');
+      status.textContent = '등록하지 않았어.';
+    });
+    const confirm = actionButton('등록', async () => {
+      cancel.disabled = true;
+      confirm.disabled = true;
+      confirm.textContent = '등록 중';
+      status.classList.remove('error');
+      status.textContent = '일정을 등록하고 있어.';
+      try {
+        await request('/api/tasks', { method: 'POST', body: JSON.stringify(payload) });
+        actions.remove();
+        card.classList.add('is-confirmed');
+        status.textContent = '일정을 등록했어.';
+        state.showToast('일정을 만들었어');
+        state.onChanged?.();
+      } catch (error) {
+        cancel.disabled = false;
+        confirm.disabled = false;
+        confirm.textContent = '등록';
+        status.classList.add('error');
+        status.textContent = error.message;
+        state.showToast(error.message);
+      }
+    }, true);
+    actions.append(cancel, confirm);
+    card.append(heading, title, detail, meta, status, actions);
+    return card;
+  }
+
   function init({ apiFetch, showToast, onChanged, enabled }) {
     if (state.initialized) return;
     if (typeof apiFetch !== 'function' || typeof showToast !== 'function') {
@@ -624,5 +718,5 @@
     state.initialized = true;
   }
 
-  global.TaskPanel = { init, render, refresh, makeReminderCard };
+  global.TaskPanel = { init, render, refresh, makeReminderCard, makeScheduleCandidateCard };
 })(window);

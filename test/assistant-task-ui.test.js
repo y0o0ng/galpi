@@ -51,7 +51,7 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.deepEqual(Object.keys(notificationWindow.NotificationPanel).sort(), ['init', 'refresh', 'show']);
   const taskWindow = {};
   vm.runInNewContext(taskSource, { window: taskWindow }, { filename: 'task-panel.js' });
-  assert.deepEqual(Object.keys(taskWindow.TaskPanel).sort(), ['init', 'makeReminderCard', 'refresh', 'render']);
+  assert.deepEqual(Object.keys(taskWindow.TaskPanel).sort(), ['init', 'makeReminderCard', 'makeScheduleCandidateCard', 'refresh', 'render']);
   const pushWindow = {};
   vm.runInNewContext(pushSource, { window: pushWindow }, { filename: 'push-client.js' });
   assert.deepEqual(Object.keys(pushWindow.PushClient).sort(), ['enable', 'getState', 'init', 'refresh']);
@@ -232,6 +232,26 @@ test('task reminders use the dedicated renderer and never enter Codex decisions'
   assert.match(taskPanel, /\/api\/reminders\/\$\{item\.reminderId\}\/acknowledge/);
   assert.match(taskPanel, /\/api\/reminders\/\$\{item\.reminderId\}\/snooze/);
   assert.match(taskPanel, /const snoozeRequestKey = makeRequestKey\('web-snooze'\)/);
+});
+
+test('chat schedule candidates remain unpersisted until the existing task API confirms them', () => {
+  const app = read('public/app.js');
+  const taskPanel = read('public/task-panel.js');
+  const server = read('server.js');
+  const css = read('public/style.css');
+
+  assert.match(server, /createSchedulePrepareSession\(assistantTasks/);
+  assert.match(server, /if \(!scheduleCandidate\) \{[\s\S]*?autoAppendTopicNote/);
+  assert.match(server, /scheduleCandidate,/);
+  assert.match(app, /TaskPanel\?\.makeScheduleCandidateCard\(data\.scheduleCandidate\)/);
+  assert.match(app, /if \(candidateCard\) \{[\s\S]*?group\.appendChild\(candidateCard\)[\s\S]*?return;/);
+  assert.match(taskPanel, /const payload = JSON\.parse\(JSON\.stringify\(input\)\)/);
+  assert.match(taskPanel, /request\('\/api\/tasks', \{ method: 'POST', body: JSON\.stringify\(payload\) \}\)/);
+  assert.match(taskPanel, /const cancel = actionButton\('취소', \(\) => \{[\s\S]*?actions\.remove\(\)[\s\S]*?등록하지 않았어/);
+  assert.match(taskPanel, /const confirm = actionButton\('등록'/);
+  assert.match(taskPanel, /아직 저장되지 않았어/);
+  assert.match(css, /\.task-candidate-card\s*{[^}]*border-left: 3px solid var\(--brand\)/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.task-candidate-actions \.task-action\s*{[^}]*min-height: 44px/s);
 });
 
 test('agent shell delegates writes to TaskPanel and inserts task text as text content', () => {

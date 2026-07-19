@@ -219,7 +219,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C schema v5/v6/v7·최소 PWA·Web Push·지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS도 Pi에 인수했고, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection은 로컬 구현을 완료했으나 Pi에는 아직 배포하지 않았다. 실기기 Web Push 10회 표시 검증을 진행 중이다.
+> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C schema v5/v6/v7·최소 PWA·Web Push·지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS도 Pi에 인수했고, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드는 로컬 구현을 완료했으나 Pi에는 아직 배포하지 않았다. 로컬 전체 테스트는 171/171이며 실기기 Web Push 10회 표시 검증을 진행 중이다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -291,7 +291,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### C — 약속 루프
 
-> **C1d schema v5/v6/v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI Pi 인수 완료(2026-07-19). C1e schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection은 로컬 구현 완료, Pi 미배포. 실기기 Web Push 10회 표시 검증 진행 중.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다.
+> **C1d schema v5/v6/v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI Pi 인수 완료(2026-07-19). C1e schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드는 로컬 구현 완료, 전체 테스트 171/171, Pi 미배포. 실기기 Web Push 10회 표시 검증 진행 중.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다.
 
 1. schema v5 `ai_readable`, schema v6 task 정본·API·30초 scheduler·UI, schema v7 Web Push subscription·delivery outbox와 최소 PWA를 독립 모듈로 구현해 Pi에 적용했다. task·push flag의 코드 기본값은 `false`이고 운영 Pi에서만 명시적으로 활성화한다.
 2. 날짜 전용 기한과 절대 KST 시각을 구분하고 사용자 확인 후에만 저장
@@ -301,9 +301,10 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 6. 1440×900·390×844에서 중앙 주 초기 표시·주간 스와이프·키보드 좌우 이동·작성/수정·deep link·알림 분리·확인 처리·light/dark·overflow·모바일 44px target을 확인했다. 화면의 `이전 | 오늘 | 다음` 중복 버튼은 제거했다.
 7. C1c는 fire/outbox 원자성, lease·TTL·bounded retry, endpoint allowlist, VAPID 비밀 비노출, canonical HTTPS에서만 가능한 사용자 opt-in을 구현했다. 다음은 Tailscale Serve와 iPhone 실기기 전달 검증이다.
 8. C1e는 활성 task DB를 최대 20개·6,000자의 공통 채팅 컨텍스트로 합성하고, 완료·취소를 월별 `schedule_history` 노트로 투영한다. 다시 열기·삭제·복원은 같은 월을 재생성하고 DB만 정본으로 유지한다. 일정별 노트·저장 버튼·추가 LLM·과거 일정 질문 분류기는 두지 않는다.
-9. 자연어 후보는 C1.5, 반복은 schema v9 C2, 브리핑·자유 서술 결과 기록은 C3에서 별도 컨펌
+9. C1.5는 단일 Claude의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보를 만들고, 사용자가 채팅 카드의 `등록`을 누를 때만 `TaskPanel`이 기존 task API를 호출한다. 후보는 휘발 상태이며 후보 답변은 topic 자동 저장과 노트 저장 버튼에서 제외한다.
+10. 반복은 schema v9 C2, 브리핑·자유 서술 결과 기록은 C3에서 별도 컨펌
 
-명시적 `/task`, 새 전용 테이블·모듈, 무LLM을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다. C1e는 A1b 후보 점수·trace와 topic 자동 저장은 그대로 두고, 활성 일정 전용 bounded 블록과 종결 일정의 일반 노트 projection만 추가한다. 숨은 탭의 timer를 계속 돌리는 것은 지원하지 않으며 Pi scheduler가 시각을 판정하고 Web Push가 Service Worker를 이벤트성으로 깨운다.
+명시적 `/task`, 새 전용 테이블·모듈, 무LLM을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다. C1e는 A1b 후보 점수·trace와 topic 자동 저장은 그대로 두고, 활성 일정 전용 bounded 블록과 종결 일정의 일반 노트 projection만 추가한다. C1.5도 A1b 점수·trace 형식을 바꾸지 않으며 후보가 실제로 생긴 운영 요청만 topic 자동 저장에서 제외한다. 숨은 탭의 timer를 계속 돌리는 것은 지원하지 않으며 Pi scheduler가 시각을 판정하고 Web Push가 Service Worker를 이벤트성으로 깨운다.
 
 ### 하지 않는 것
 
@@ -330,6 +331,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [x] 에이전트 탭의 첫 블록이 task DB 기반 일정 요약이며 3주 21일·네 건수·미리보기·다음 알림·일정 작업 화면이 desktop/mobile에서 정확히 동작한다
 - [x] 일정 에이전트는 task 변경 행동을 중복 구현하지 않고 `TaskPanel`의 단일 renderer를 사용한다
 - [x] 활성 일정은 일정 DB에서 공통 채팅 컨텍스트로 들어가고, 완료·취소는 월별 노트로 자동 투영되며 deleted·reopen·restore가 같은 projection에 반영된다
+- [x] 자연어 일정 요청은 확인 전 task 행 0개인 canonical 카드로 표시되고, 취소는 write 0회, 등록만 기존 API를 같은 request ID로 호출한다
 - [ ] private HTTPS 홈 화면 PWA의 Web Push가 10회 표시 기준을 충족하고, 구독 만료·전송 실패에도 일정 에이전트 fallback이 유실되지 않는다. 첫 운영 reminder는 3개 구독 모두 provider `201 accepted`였다
 - [ ] reminder·subscription 조합당 delivery가 하나이며 재시작·retry에도 중복 outbox와 무한 재시도가 없다
 
