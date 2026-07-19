@@ -7,6 +7,7 @@ const {
   buildShadowRetrieval,
   buildChunkContext,
   cosineSimilarity,
+  GLOBAL_SHADOW_SEARCH_STOP_WORDS,
   extractQueryTerms,
   rankChunkCandidates,
   rankNoteCandidates,
@@ -40,13 +41,25 @@ test('query terms preserve Korean meaning words and remove search commands', () 
 
 test('retrieval command phrasing does not create lexical anchors', () => {
   assert.deepEqual(
-    extractQueryTerms('그 머냐 수면대행서비스 관련해서 가장 최근에 무슨 이야기를 했더라?'),
+    extractQueryTerms(
+      '그 머냐 수면대행서비스 관련해서 가장 최근에 무슨 이야기를 했더라?',
+      GLOBAL_SHADOW_SEARCH_STOP_WORDS,
+    ),
     ['수면대행서비스'],
   );
   assert.deepEqual(
-    extractQueryTerms('그게 가장 최근 아닌가? 내가 비슷한 결의 소설이 있냐고 물어봤었잖아'),
+    extractQueryTerms(
+      '그게 가장 최근 아닌가? 내가 비슷한 결의 소설이 있냐고 물어봤었잖아',
+      GLOBAL_SHADOW_SEARCH_STOP_WORDS,
+    ),
     ['비슷한', '결의', '소설이'],
   );
+});
+
+test('global shadow stop words do not change the legacy note query contract', () => {
+  assert.ok(extractQueryTerms(
+    '그 머냐 수면대행서비스 관련해서 가장 최근에 무슨 이야기를 했더라?',
+  ).includes('최근에'));
 });
 
 test('long note context keeps both the opening summary and latest entries', () => {
