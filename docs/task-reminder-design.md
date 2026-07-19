@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트 Pi 배포 및 Tailscale Serve HTTPS 인수 완료(2026-07-19) · C1e 활성 일정 대화 컨텍스트·월별 종결 노트 projection(schema v8)과 C1.5 자연어 무저장 후보 카드 로컬 구현 완료, 전체 테스트 171/171, Pi 미배포 · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
+> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트와 C1e schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection, C1.5 자연어 무저장 후보 카드까지 Pi 배포·운영 인수 완료(2026-07-19) · 로컬/Pi 전체 테스트 171/171 · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -234,7 +234,7 @@ SQLite 공식 문서는 동시 read transaction은 여러 개 가능하지만 �
 
 ## 6. 정본 schema
 
-운영 Pi는 2026-07-19 schema v4→5→6→7을 한 번에 적용했다. 노트 `ai_readable` 접근 경계인 schema v5, C1 task core인 **schema v6**, 독립 feature flag로 끌 수 있는 Web Push subscription·delivery outbox **schema v7**이 현재 운영 정본이다. schema v8 일정 노트 projection은 로컬 구현 상태이며 Pi에는 아직 적용하지 않았다.
+운영 Pi는 2026-07-19 schema v4→5→6→7을 적용한 뒤 C1e·C1.5 배포에서 v7→8을 순차 적용했다. 노트 `ai_readable` 접근 경계인 schema v5, C1 task core인 **schema v6**, 독립 feature flag로 끌 수 있는 Web Push subscription·delivery outbox **schema v7**, 일정 노트 projection과 `owner_agent` 경계인 **schema v8**이 현재 운영 정본이다.
 
 ### 6.1 schema v5 — 노트 AI 읽기 경계
 
@@ -963,7 +963,7 @@ Pi 배포 완료(2026-07-19):
 
 ### C1e — 대화 컨텍스트·월별 종결 노트
 
-로컬 구현 완료, Pi 미배포(2026-07-19):
+Pi 배포·인수 완료(2026-07-19, `efbea3c`):
 
 - schema v8의 `notes.owner_agent`와 `assistant_schedule_note_projections` generation outbox
 - 단일 Claude·의회 모든 경로에 활성 task DB의 bounded `<schedule>` 컨텍스트 주입
@@ -982,9 +982,11 @@ Pi 배포 완료(2026-07-19):
 - [x] 일정별 개별 노트·수동 저장 버튼·추가 LLM·과거 일정 질문 분류기 0개
 - [x] 로컬 store·HTTP·migration·Codex·topic 회귀 포함 전체 테스트 166/166 통과
 
+Pi에서는 DB·vault 백업 `20260719-2131`과 코드 백업 `code-c1e-c15-pre-20260719-213141.tar.gz`를 검증한 뒤 schema 7→8을 적용했다. 배포 전후 공통 application table 17개의 행 수는 모두 같았고 새 `assistant_schedule_note_projections`만 추가됐다. 기존 일정 2개는 이미 `deleted`라 초기 월별 projection 0개가 정상이며, 운영 테스트 일정을 만들지 않았다. note-index는 DB/vault 30/30·finding 0, topic audit은 14/14(Q&A 75/75)·finding 0, SQLite 무결성 `ok`·외래키 오류 0을 확인했다.
+
 ### C1.5 — 자연어 무저장 일정 후보
 
-로컬 구현 완료, Pi 미배포(2026-07-19):
+Pi 배포·인수 완료(2026-07-19, `479ce7a`):
 
 - `lib/assistant-schedule-tools.js`: 현재 요청 시각을 고정한 `schedule_prepare` 정의, 직접 사용자 요청 경계, 후보 1개 상한
 - `lib/assistant-tasks.js`: 기존 create 검증을 재사용하는 무쓰기 `prepare`
@@ -1001,6 +1003,8 @@ Pi 배포 완료(2026-07-19):
 - [x] 후보 답변의 topic 자동 저장·노트 저장 버튼 0개, 기존 `/task` 무LLM 경로 유지
 - [x] 모바일 44px target, light/dark 기존 token, visible text의 절대 KST와 저장 전 상태 표시
 - [x] store·도구 루프·UI 경계와 전체 회귀 171/171 통과
+
+Pi 전체 테스트도 171/171을 통과했다. 운영 DB를 read-only로 연 `prepare` 스모크에서 후보는 유효했고 task 2·event 6·reminder 2·projection 0·note 30이 전후 동일했다. 인증 config·task summary·organizer·push API는 모두 HTTP 200, 서비스는 새 PID로 기동했으며 재시작 이후 error journal은 0건이었다. 실제 Claude 후보 카드→등록은 가짜 운영 일정을 남기지 않기 위해 배포 검증에서 호출하지 않고 다음 실사용 일정으로 확인한다.
 
 ## 13. C2 이후 확장 경계
 
@@ -1046,7 +1050,7 @@ C3에서만 오늘 브리핑·완료 결과의 자유 서술·Codex/Terra 기반
 - [V4.5 비서 기본기 설계](assistant-foundation-design.md): 약속 루프의 제품 위치와 음성 연결 경계
 - [로드맵](roadmap.md): V4.5-C, V4-B, V5 전문 에이전트의 승격 순서
 - [최종 제품 설계](galpi-design-final.md): SQLite 정본, 결정론적 scheduler, 얇은 모듈 경계
-- [`lib/database-migrations.js`](../lib/database-migrations.js): Pi schema v7과 로컬 schema v8의 순차 transaction migration
+- [`lib/database-migrations.js`](../lib/database-migrations.js): Pi schema v8까지의 순차 transaction migration
 - [`lib/assistant-schedule-notes.js`](../lib/assistant-schedule-notes.js): bounded 활성 일정 컨텍스트, 월별 Markdown, generation projection worker
 - [`lib/assistant-schedule-tools.js`](../lib/assistant-schedule-tools.js): 단일 Claude 자연어 후보 경계와 무저장 tool session
 - [`server.js`](../server.js): `/api/notifications`, 공통 모델 컨텍스트, API token, startup/shutdown·노트 저장 경계

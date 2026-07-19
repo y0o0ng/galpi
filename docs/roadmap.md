@@ -219,7 +219,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C schema v5/v6/v7·최소 PWA·Web Push·지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS도 Pi에 인수했고, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드는 로컬 구현을 완료했으나 Pi에는 아직 배포하지 않았다. 로컬 전체 테스트는 171/171이며 실기기 Web Push 10회 표시 검증을 진행 중이다.
+> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C schema v5/v6/v7·최소 PWA·Web Push·지식 시트/일정 에이전트 UI, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드까지 Pi에 인수했다. 로컬/Pi 전체 테스트는 171/171이며 실기기 Web Push 10회 표시 검증을 진행 중이다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -293,7 +293,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### C — 약속 루프
 
-> **C1d schema v5/v6/v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI Pi 인수 완료(2026-07-19). C1e schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드는 로컬 구현 완료, 전체 테스트 171/171, Pi 미배포. 실기기 Web Push 10회 표시 검증 진행 중.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다.
+> **C1d schema v5/v6/v7·최소 PWA·Web Push와 지식 시트/일정 에이전트 UI, C1e schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection, C1.5 자연어 무저장 후보 카드까지 Pi 인수 완료(2026-07-19). 로컬/Pi 전체 테스트 171/171, 실기기 Web Push 10회 표시 검증 진행 중.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다.
 
 1. schema v5 `ai_readable`, schema v6 task 정본·API·30초 scheduler·UI, schema v7 Web Push subscription·delivery outbox와 최소 PWA를 독립 모듈로 구현해 Pi에 적용했다. task·push flag의 코드 기본값은 `false`이고 운영 Pi에서만 명시적으로 활성화한다.
 2. 날짜 전용 기한과 절대 KST 시각을 구분하고 사용자 확인 후에만 저장

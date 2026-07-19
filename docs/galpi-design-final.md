@@ -591,7 +591,7 @@
 
 ### 현재 진행 상태 (구현)
 
-> 갱신: 2026-07-18. 단계 구분은 `roadmap.md`(V1~V7) 기준.
+> 갱신: 2026-07-19. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
 - **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크+노트 soft prior shadow 검색, 한국어 경계 보정과 실사용 관찰 도구·답변 진행 UI까지 Pi 운영 적용을 마쳤다. S0e는 `9efb501`, A1b는 `adb41a6`, 한국어 경계 보정은 `fc332e2`, 실사용 관찰 도구는 `8655706`, 제품·비서·운영 경로 이관은 `4ce7fdc`다. S0e 배포에서 전체 테스트 116개, topic audit 66/66, note-index audit 29/29와 SQLite 무결성·외래키를 인수했다. Codex 실행기 실패 복구 `514dab3`과 batch 신뢰성·중단 시 원본 복구 격리 보강 `bd4041e`를 Pi 적용했고, 로컬·Pi 전체 테스트 130/130, 최종 organizer processed 21·pending/queued/running/failed/needsManualCheck/recoveryRequired 0, topic audit 14/14(Q&A 71/71), note-index audit 30/30, Codex validation 21과 SQLite 무결성·외래키를 확인했다. organizer 기본 모델은 `0b8d8de`에서 `gpt-5.6-terra`로 전환하고 깊은 재처리는 `gpt-5.5`를 유지했다. Pi Codex CLI `0.144.5`, Terra runner smoke, 로컬·Pi 테스트 130/130, 인증 config/status API와 시작 후 오류 로그 0건을 확인했다. 실제 모델 답변은 기존 노트 회수를 유지한다.
 - **다음 단계 설계:** 실사용 A1b trace의 과회수와 지연을 관찰한다. 정확 청크 2건과 별도 holdout 환율 false positive 1건을 해소하거나 허용 가능한 근거로 분류하기 전에는 A2 실제 컨텍스트 전환을 자동 진행하지 않는다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
@@ -615,7 +615,7 @@
 - **토픽 병합(완료):** `POST /api/notes/merge` — 결과는 항상 토픽(명시 target > sources 첫 토픽 promote > 새 토픽). source는 아무 타입(비-토픽은 본문을 QA 항목 1개로 접음), chunks/edges/decisions 재지정 + edge self-loop 제거·dedup, source `_archive` 보관, target 재임베딩 + 요약 무효화. 트리거: Codex가 CODEX-PROPOSALS에 제안 + 사람이 `/merge`(유사도 후보) 또는 검색 카드 "병합" 버튼(target 선택/새 토픽).
 - **토픽 분리(완료):** Codex split 제안을 시온 알림센터로 올리고, 승인 시 특정 QA-LOG 항목을 source 토픽에서 target 토픽으로 이동한다. 제안 형식은 `- SPLIT <qa_id> → [[파일ID|타겟토픽]] — 이유`로, 이동할 항목은 `qa_id`, 대상 토픽은 위키링크로 명시한다(MERGE와 동일하게 구조적). 휴리스틱 추론은 제거했고 둘 다 명시된 제안만 실행 가능하다. `qa_id` 기준으로 `note_chunks`, `auto_save_decisions`도 함께 재배정하고 source/target을 `pending` 처리한다.
 - **알림센터(완료):** 지식 시트의 첫 `알림` 탭과 `/notifications`에서 연다. `전체 | Codex | 시스템 | 최근 저장`을 제공하고 CODEX-PROPOSALS의 merge/split/policy/review 승인·무시 상태는 DB(`notification_actions`)에 저장한다. `최근 저장`은 `auto_save_decisions`의 성공 기록을 활성 topic과 조인해 질문/메모, 생성/추가, 시각과 현재 대상 토픽을 보여주며 카드를 누르면 같은 시트의 노트 상세를 연다. 저장 판단·AI 호출은 추가하지 않는다. 일정 알림은 범용 탭에서 제외하고 `에이전트 > 일정 에이전트`로 모으며, 기존 PIP·drag·localStorage 위치 층은 제거했다.
-- **XION 화면 정체성·도구 진입점(로컬 구현 완료, Pi 미배포):** 화면의 기본 비서 이름을 `XION`으로 통일하고 비취색 `#2F6B57` 중심의 light/dark token, favicon·PWA 아이콘과 단색 마크를 적용했다. 떠다니는 펫 런타임은 제거하되 캐릭터 자산은 V6 검토용으로 보존한다. 기존 펫의 빠른 기능은 채팅 입력창 왼쪽 XION 버튼으로 옮겨 `검색 | 서재 | 관리` 9개 항목을 제공하며, 입력이 필요한 명령은 채우기만 하고 나머지는 기존 명령 경로로 즉시 실행한다.
+- **XION 화면 정체성·도구 진입점(Pi 배포 완료, `0209573`):** 화면의 기본 비서 이름을 `XION`으로 통일하고 비취색 `#2F6B57` 중심의 light/dark token, favicon·PWA 아이콘과 단색 마크를 적용했다. 떠다니는 펫 런타임은 제거하되 캐릭터 자산은 V6 검토용으로 보존한다. 기존 펫의 빠른 기능은 채팅 입력창 왼쪽 XION 버튼으로 옮겨 `검색 | 서재 | 관리` 9개 항목을 제공하며, 입력이 필요한 명령은 채우기만 하고 나머지는 기존 명령 경로로 즉시 실행한다.
 - **유지보수 리뷰(Pi 배포·검증 완료, `fd615c7`):** 의회 자동 topic과 수동 council 저장 상태를 분리하고, 불용어 질의 임베딩 폴백, 저장 버튼 부분 갱신, 일반 노트의 서버 측 paper 제외, 패널 초기화 복구, malformed Semantic Scholar 200 거부, 펫 클릭 전달을 반영했다. 전체 테스트 34개와 모바일·데스크톱 Playwright 회귀 검증을 통과했고, Pi에서 서비스 기동·일반 노트 paper 제외·불용어 검색·의회 저장 상태 API를 확인했다. 구조 이슈와 후속 클린업은 `maintenance.md`에서 추적한다.
 - **정책 파일(완료):** `config/codex-policy.json`에 자동 저장, 토픽 매칭, organize, retrieval, Codex 링크, 병합 후보 가중치/임계값/불용어를 둔다. Codex가 수정 가능한 파일은 `.codex/editable-files.json`에 제한한다.
 - **정책 승인 실행기(완료):** Codex가 `- POLICY {"path":"retrieval.keywordWeight","value":0.4} — 이유` 또는 `changes` 배열 형식으로 제안하면, 시온 알림센터 승인 후 `config/codex-policy.json`에 반영한다. 실제 런타임 반영은 서버 재시작 후 적용된다.
@@ -1501,7 +1501,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: 2026-07-19 S0 schema v4와 V4.5-C schema v5 AI 읽기 경계·schema v6 task core/30초 scheduler/UI·schema v7 Web Push outbox/PWA, 지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS까지 Pi 배포·운영 인수 완료. schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드는 로컬 구현 완료, 전체 테스트 171/171, Pi 미배포. A1b 실사용 shadow 관찰과 Web Push 실기기 10회 표시 검증 진행 중
+> 상태: 2026-07-19 S0 schema v4와 V4.5-C schema v5 AI 읽기 경계·schema v6 task core/30초 scheduler/UI·schema v7 Web Push outbox/PWA, 지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드까지 Pi 배포·운영 인수 완료. 로컬/Pi 전체 테스트 171/171. A1b 실사용 shadow 관찰과 Web Push 실기기 10회 표시 검증 진행 중
 
 ### 문제 정의
 
@@ -1545,7 +1545,7 @@ A0 기준선 평가
   -> V5-B 주식 분석
 ```
 
-위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 V4.5-C C1 명시적 task/reminder·private Web Push를 별도 경계에서 구현해 Pi에 인수했다. schema v5 접근 경계, schema v6 task 정본·30초 scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편을 독립 모듈로 유지한다. 이후 사용자 컨펌으로 schema v8의 활성 일정 bounded 대화 컨텍스트와 월별 종결 노트 projection, 단일 Claude `schedule_prepare`와 휘발 확인 카드를 로컬에 추가했다. C1e는 topic 자동 저장 판단·A1b 점수·trace를 바꾸지 않고, 일정 DB를 유일한 정본으로 유지하며 별도 과거 일정 분류기나 일정별 노트를 만들지 않는다. C1.5도 A1b 점수·trace 형식은 그대로 두고 후보가 실제로 생긴 운영 요청만 topic 자동 저장에서 제외한다. Tailscale Serve canonical HTTPS, iPhone·iPad·Mac 구독과 첫 운영 reminder의 provider 3/3 `201 accepted`까지 확인했고 잠금화면 표시 10회 기준은 진행 중이다. `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED`의 코드 기본값은 `false`이며 운영 Pi에서만 켠다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.
+위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 V4.5-C C1 명시적 task/reminder·private Web Push를 별도 경계에서 구현해 Pi에 인수했다. schema v5 접근 경계, schema v6 task 정본·30초 scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편, schema v8 활성 일정 bounded 대화 컨텍스트·월별 종결 노트 projection, 단일 Claude `schedule_prepare`와 휘발 확인 카드까지 독립 모듈로 배포했다. C1e는 topic 자동 저장 판단·A1b 점수·trace를 바꾸지 않고, 일정 DB를 유일한 정본으로 유지하며 별도 과거 일정 분류기나 일정별 노트를 만들지 않는다. C1.5도 A1b 점수·trace 형식은 그대로 두고 후보가 실제로 생긴 운영 요청만 topic 자동 저장에서 제외한다. 배포 전 DB·vault 백업 `20260719-2131`과 코드 백업을 검증하고 schema 7→8, 로컬/Pi 테스트 171/171, 공통 application table 17개 행 수 불변, note-index 30/30·topic Q&A 75/75 finding 0, SQLite 무결성·외래키, 인증 API·새 PID·재시작 오류 0건을 확인했다. Tailscale Serve canonical HTTPS, iPhone·iPad·Mac 구독과 첫 운영 reminder의 provider 3/3 `201 accepted`까지 확인했고 잠금화면 표시 10회 기준은 진행 중이다. `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED`의 코드 기본값은 `false`이며 운영 Pi에서만 켠다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.
 
 세부 스키마, 하드 상한, 마이그레이션, 보안 경계와 통과 기준은 상세 설계 문서를 단일 기준으로 삼는다.
 

@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-19
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS를 Pi에 인수했고, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드는 로컬 구현 완료·Pi 미배포다. 로컬 전체 테스트 171/171을 통과했고 실기기 Web Push 10회 검증을 진행 중
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI와 Tailscale Serve HTTPS, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드까지 Pi에 인수했다. 로컬/Pi 전체 테스트 171/171을 통과했고 실기기 Web Push 10회 검증을 진행 중
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성과 V5-A 딜 스카우트·V5-B 주식 분석 전에 진행
 
@@ -468,7 +468,7 @@ C1은 아래 범위만 구현한다.
 
 ## 8. 보안과 승인 경계
 
-- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core와 schema v7 Web Push까지 Pi에 적용했고, schema v8 일정 노트 projection과 C1.5 자연어 후보는 로컬에만 구현했다. 30초 scheduler의 조기 발송 차단, projection, 무저장 후보 경계를 포함한 전체 테스트 171/171을 통과했다.
+- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core, schema v7 Web Push, schema v8 일정 노트 projection과 C1.5 자연어 후보까지 Pi에 적용했다. 30초 scheduler의 조기 발송 차단, projection, 무저장 후보 경계를 포함한 로컬/Pi 전체 테스트 171/171을 통과했다.
 - 이 경계는 모델에 제공하는 컨텍스트와 자동 작업 범위를 통제한다. 암호화·OS 계정 분리는 아니므로 API 키와 인증정보는 vault에 넣지 않는다.
 - 첫 실제 에이전트 노트 writer인 일정 월별 종결 기록에 `owner_agent=schedule`을 추가했다. 일정 에이전트 본문 / 사서 CODEX 마커 / 타 에이전트 읽기 전용의 세 규칙을 적용하되 폴더·범용 ACL·`relative_path`는 만들지 않는다.
 - 기본 회수 범위는 자기 소유와 공용 노트다. 교차 에이전트 노트는 명시적 링크·handoff·사용자 요청이 있을 때만 읽어 컨텍스트 오염을 막는다.
@@ -656,11 +656,11 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 - 지식 시트 첫 범용 알림 탭과, 에이전트 탭 최상단 일정 블록·`GET /api/tasks/summary`: 중앙 주 앞뒤 3주·네 건수·preview 최대 3·다음 알림·unresolved reminder·push 상태·일정 작업 화면
 - [x] schema v7 subscription·delivery outbox, 사용자 opt-in PWA·Web Push와 일정 에이전트 fallback 로컬 구현
 - [x] 1440×900·390×844 viewport, 주간 스와이프·deep link·일반/일정 알림 경계·모바일 44px target 확인
-- [x] schema v8 `owner_agent`·generation outbox, 활성 일정 bounded 대화 컨텍스트, 완료·취소 월별 노트 projection을 로컬 구현
-- [x] 단일 Claude `schedule_prepare`, 기존 task validator의 무쓰기 후보, 채팅 확인 뒤 기존 API 저장을 로컬 구현
+- [x] schema v8 `owner_agent`·generation outbox, 활성 일정 bounded 대화 컨텍스트, 완료·취소 월별 노트 projection을 Pi 인수
+- [x] 단일 Claude `schedule_prepare`, 기존 task validator의 무쓰기 후보, 채팅 확인 뒤 기존 API 저장을 Pi 인수
 - [x] Tailscale Serve private HTTPS와 iPhone·iPad·Mac 홈 화면 구독, provider acceptance 3/3 확인
 - [ ] 잠금화면 표시 10회 GO 기준 확인
-- C1.5 자연어 후보는 로컬 구현 완료·Pi 미배포, 반복·브리핑은 후속 별도 단계
+- C1.5 자연어 후보는 Pi 배포 완료, 실제 후보 카드→등록은 다음 실사용 일정으로 확인하며 반복·브리핑은 후속 별도 단계
 
 ### D. 음성
 
