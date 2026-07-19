@@ -296,6 +296,15 @@ test('task routes expose the independent store with JSON, idempotency, and lifec
   const history = await api(url, '/api/tasks?view=history&status=done');
   assert.equal(history.body.tasks.length, 1);
 
+  const scheduleFilename = `xion-schedule-${dueAt.slice(0, 7)}.md`;
+  const blockedArchive = await api(url, '/api/notes/archive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: scheduleFilename }),
+  });
+  assert.equal(blockedArchive.response.status, 500);
+  assert.match(blockedArchive.body.error, /에이전트 소유 노트/);
+
   const deleted = await api(url, `/api/tasks/${created.body.task.id}/delete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -311,7 +320,18 @@ test('task routes expose the independent store with JSON, idempotency, and lifec
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_tasks').get().count, 2);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_reminders').get().count, 2);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, 0);
-  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM notes').get().count, 0);
+  assert.deepEqual(
+    db.prepare(`
+      SELECT note_type AS noteType, owner_agent AS ownerAgent
+      FROM notes
+    `).get(),
+    { noteType: 'schedule_history', ownerAgent: 'schedule' },
+  );
+  const scheduleNote = await fs.readFile(
+    path.join(appRoot, 'vault', scheduleFilename),
+    'utf8',
+  );
+  assert.doesNotMatch(scheduleNote, /서버 일정/);
   assert.deepEqual(
     db.prepare('SELECT status, endpoint FROM assistant_push_subscriptions').get(),
     { status: 'revoked', endpoint: pushBody.endpoint },

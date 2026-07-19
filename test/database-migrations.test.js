@@ -78,12 +78,12 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
-      { version: 5 }, { version: 6 }, { version: 7 },
+      { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
     ],
   );
 
@@ -102,11 +102,18 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
   assert.deepEqual(
     db.prepare(`
       SELECT content_sha256 AS contentSha256, indexed_sha256 AS indexedSha256,
-             index_status AS indexStatus, ai_readable AS aiReadable
+             index_status AS indexStatus, ai_readable AS aiReadable,
+             owner_agent AS ownerAgent
       FROM notes
       WHERE filename = 'topic.md'
     `).get(),
-    { contentSha256: null, indexedSha256: null, indexStatus: 'pending', aiReadable: 1 },
+    {
+      contentSha256: null,
+      indexedSha256: null,
+      indexStatus: 'pending',
+      aiReadable: 1,
+      ownerAgent: null,
+    },
   );
   assert.deepEqual(
     db.prepare(`
@@ -114,7 +121,8 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       FROM sqlite_master
       WHERE type = 'table' AND name IN (
         'assistant_tasks', 'assistant_task_events', 'assistant_reminders',
-        'assistant_push_subscriptions', 'assistant_push_deliveries'
+        'assistant_push_subscriptions', 'assistant_push_deliveries',
+        'assistant_schedule_note_projections'
       )
       ORDER BY name
     `).all(),
@@ -122,6 +130,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       { name: 'assistant_push_deliveries' },
       { name: 'assistant_push_subscriptions' },
       { name: 'assistant_reminders' },
+      { name: 'assistant_schedule_note_projections' },
       { name: 'assistant_task_events' },
       { name: 'assistant_tasks' },
     ],

@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트 Pi 배포 및 Tailscale Serve HTTPS 인수 완료(2026-07-19) · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
+> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트 Pi 배포 및 Tailscale Serve HTTPS 인수 완료(2026-07-19) · C1e 활성 일정 대화 컨텍스트·월별 종결 노트 projection(schema v8) 로컬 구현 완료, Pi 미배포 · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -15,6 +15,8 @@
 - C1은 task 생성·수정·완료·취소·다시 열기·삭제·복원, Today·예정·Inbox, 단발성 알림·확인·1시간 미루기를 지원한다.
 - 완료·취소는 내용을 계속 참조할 수 있는 `closed`, 잘못 만든 항목의 삭제는 평소 검색·AI 참조에서 제외하는 `deleted`로 분리한다. C1에는 물리 purge가 없다.
 - task와 reminder는 별도 SQLite 정본으로 저장한다. 기존 `notification_actions`는 Codex 승인 이력이므로 재사용하지 않는다.
+- 활성 task는 별도 분류 모델 없이 매 채팅의 bounded `<schedule>` 컨텍스트로 합성한다. 일정 질문에도 최종 답은 Claude/GPT/의회가 이 DB 스냅샷을 참고해 생성한다.
+- 완료·취소 task는 일정별 파일이 아니라 KST 월별 `schedule_history` Markdown 노트로 자동 투영한다. DB가 정본이고 노트는 다시 만들 수 있는 검색용 파생본이다.
 - reminder 행은 약속 occurrence와 사용자 확인 상태의 영속 정본이다. 푸시 구독과 기기별 전송 receipt는 별도 정본으로 둬 네트워크 실패가 reminder를 되돌리지 못하게 한다.
 - Web Push는 후속 보너스가 아니라 C1 첫 배포의 필수 전달 채널이다. 다만 task core와 push migration·feature flag·인수 단위는 분리한다.
 - 지식 시트의 첫 탭은 범용 `알림`이며 `전체 | Codex | 시스템 | 최근 저장`만 다룬다. 일정 알림·목록·수정은 `에이전트 > 일정 에이전트` 안에서 처리한다.
@@ -27,13 +29,13 @@
 
 현재 A1b는 실제 답변에 새 청크를 주입하지 않는 shadow 관찰 단계다. C1은 아래 경계를 지키는 동안 A1b 관찰과 독립적으로 진행할 수 있다.
 
-1. 새 `assistant_tasks`, `assistant_task_events`, `assistant_reminders`, `assistant_push_subscriptions`, `assistant_push_deliveries`만 쓰고 `messages`, `notes`, `note_chunks`, retrieval trace를 수정하지 않는다.
+1. C1a~d는 새 `assistant_tasks`, `assistant_task_events`, `assistant_reminders`, `assistant_push_subscriptions`, `assistant_push_deliveries`만 쓰고 `messages`, `notes`, `note_chunks`, retrieval trace를 수정하지 않는다.
 2. `/task` 경로에서 LLM·임베딩·웹 검색·자동 저장·Codex organizer를 호출하지 않는다.
 3. scheduler는 새 task/reminder 정본만 읽고 쓰고, push dispatcher는 commit된 delivery outbox만 처리한다.
 4. 기존 `/api/notifications`에는 읽기 결과만 합성하며 Codex 승인 상태와 API를 공유하지 않는다.
 5. A1b feature flag, 후보 점수, 컨텍스트 상한, 실사용 trace 형식을 바꾸지 않는다.
 
-이 경계를 넘는 자연어 task 추출이나 기억 연결은 A1b 중간 검토와 별도로 다시 컨펌한다.
+이 경계를 넘는 자연어 task 추출이나 기억 연결은 A1b 중간 검토와 별도로 다시 컨펌한다. C1e는 사용자 컨펌 뒤 이 경계를 좁게 확장한다. 활성 task는 기존 retrieval 점수·trace를 바꾸지 않는 별도 bounded 컨텍스트로만 주입하고, 종결 task는 일반 노트와 같은 임베딩·검색 경로에 들어가는 월별 파생 노트 한 벌만 만든다. 대화 내용에서 task를 추출하거나 기존 topic 자동 저장 판단을 바꾸지는 않는다.
 
 ## 2. 사용자에게 보이는 동작
 
@@ -106,6 +108,7 @@
 - 지식 시트 첫 탭의 범용 알림 네 필터와, 여기서 분리된 일정 에이전트의 Today·예정·Inbox·종결·삭제 복구 화면
 - 에이전트 탭 최상단의 일정 에이전트 3주 스와이프·요약·미리보기·unresolved 알림·작업 화면
 - 최소 PWA 기반, 사용자 opt-in Web Push, 일정 에이전트·focus polling fallback
+- 활성 task DB 스냅샷의 공통 채팅 컨텍스트와 완료·취소 월별 검색 노트 projection
 - Tailscale Serve HTTPS origin, Service Worker `push`·`notificationclick`, 기기별 delivery outbox·재시도
 - API token 보호, 입력 상한, 낙관적 동시성, 결정론적 테스트 시계
 - task와 Web Push의 독립 feature flag를 통한 scheduler·UI·dispatcher 비활성화
@@ -116,7 +119,7 @@
 - 매일·평일·매주·매월 등 반복 task/reminder
 - 첫 접속 또는 정해진 시각의 오늘 브리핑
 - 월간·연간 달력, drag-and-drop 일정 이동
-- 완료 결과를 노트나 사용자 메모리에 연결하는 흐름
+- 일정별 개별 노트, 완료 결과의 자유 서술·분석 보고, 사용자 메모리 자동 확정
 - 이메일, SMS, 외부 캘린더 읽기·쓰기
 - 백그라운드 탭을 계속 실행시키는 polling, 화면 Wake Lock, 상시 마이크·hotword
 - 푸시 알림에서 바로 완료·미루기 같은 인증 write를 수행하는 action
@@ -213,7 +216,7 @@ SQLite 공식 문서는 동시 read transaction은 여러 개 가능하지만 �
 
 ## 6. 정본 schema
 
-운영 Pi는 2026-07-19 schema v4→5→6→7을 한 번에 적용했다. 노트 `ai_readable` 접근 경계인 schema v5, C1 task core인 **schema v6**, 독립 feature flag로 끌 수 있는 Web Push subscription·delivery outbox **schema v7**이 현재 운영 정본이다.
+운영 Pi는 2026-07-19 schema v4→5→6→7을 한 번에 적용했다. 노트 `ai_readable` 접근 경계인 schema v5, C1 task core인 **schema v6**, 독립 feature flag로 끌 수 있는 Web Push subscription·delivery outbox **schema v7**이 현재 운영 정본이다. schema v8 일정 노트 projection은 로컬 구현 상태이며 Pi에는 아직 적용하지 않았다.
 
 ### 6.1 schema v5 — 노트 AI 읽기 경계
 
@@ -408,11 +411,35 @@ CREATE INDEX idx_assistant_push_deliveries_reminder
   ON assistant_push_deliveries(reminder_id, status);
 ```
 
-### 6.4 불변식
+### 6.4 schema v8 — 일정 노트 소유권·projection outbox
+
+```sql
+ALTER TABLE notes ADD COLUMN owner_agent TEXT;
+
+CREATE TABLE assistant_schedule_note_projections (
+  month_key TEXT PRIMARY KEY,
+  generation INTEGER NOT NULL DEFAULT 1,
+  projected_generation INTEGER NOT NULL DEFAULT 0,
+  content_sha256 TEXT,
+  last_error TEXT,
+  updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  projected_at INTEGER,
+  CHECK (generation >= 1),
+  CHECK (projected_generation >= 0 AND projected_generation <= generation)
+);
+```
+
+- 완료·취소·다시 열기·종결 task 삭제·복원 transaction은 영향받는 월의 `generation`을 같은 transaction에서 올린다. 파일 I/O와 임베딩은 commit 뒤 worker가 수행한다.
+- worker는 `generation > projected_generation`인 월을 재시도한다. 파일·노트 DB 반영 뒤 죽어도 같은 월을 결정론적으로 다시 쓰며, 처리 중 새 변경이 들어오면 현재 tick이 끝나기 전에 한 번 더 돈다.
+- 파일은 평면 vault의 `xion-schedule-YYYY-MM.md`, `note_type=schedule_history`, `owner_agent=schedule`이다. 일정 에이전트는 `XION-SCHEDULE` 본문을 재생성하고, 사서 Codex는 `CODEX-TAGS`·`CODEX-LINKS`만 수정하며 다른 에이전트는 읽기 전용이다. 일반 노트 archive/restore·split/merge mutation은 에이전트 소유 노트를 거부한다.
+- 월 배정은 날짜 기한 → datetime 기한의 KST 월 → 기한이 없으면 `closed_at`의 KST 월 순이다. 완료와 취소는 구역을 분리하고 `deleted`는 제외한다.
+
+### 6.5 불변식
 
 - task당 live reminder는 `pending | fired` 합쳐 최대 하나다.
 - `assistant_tasks`의 현재 행이 정본이고 `assistant_task_events`는 전이 감사 로그다. 같은 결과 상태 재요청은 새 event를 만들지 않는다.
 - `closed` task는 참조 가능하지만 수정할 수 없다. `deleted` task는 복구 API 이외의 일반 조회·알림·AI 후보에서 제외한다.
+- `assistant_tasks`가 일정의 유일한 정본이다. 월별 Markdown은 일반 노트 검색을 위한 재생성 가능한 projection이며 직접 편집해 task를 바꾸지 않는다.
 - create 시 정규화한 최초 payload의 SHA-256을 `create_payload_sha256`에 고정하고 이후 task 수정 때 바꾸지 않는다. 같은 `client_request_id` retry는 이 hash가 같을 때만 기존 task의 현재 상태를 `replayed: true`로 반환한다.
 - canonical payload는 NFC 정규화·양끝 공백 제거한 `title`, `detail`과 서버가 확정한 `dueKind`, `dueDate`, `dueAt`, `reminderAt`을 고정된 key 순서의 JSON으로 직렬화한 값이다. request ID는 hash에서 제외한다.
 - `occurrence_key`는 서버가 `task:{taskId}:v{reminderVersion}:{remindAt}` 형태로 만든다. 현재 tick 시각으로 만들지 않는다.
@@ -435,10 +462,11 @@ CREATE INDEX idx_assistant_push_deliveries_reminder
 
 - `lib/assistant-tasks.js`: 검증, 정본 CRUD, 상태 전이, 목록 조회
 - `lib/assistant-scheduler.js`: 주입 가능한 `clock`, `tick(now)`, start/stop
+- `lib/assistant-schedule-notes.js`: 활성 일정 컨텍스트, 월 배정·Markdown formatter, generation outbox·projection worker
 - `lib/assistant-push.js`: subscription 검증, delivery outbox, lease·재시도 상태 기계
 - `lib/web-push-transport.js`: `web-push` 암호화·VAPID·provider HTTP 전송 어댑터
 - `lib/assistant-push-config.js`, `lib/assistant-push-routes.js`: fail-close 환경 설정과 인증 뒤 구독 API
-- `server.js`: 설정과 얇은 route, `/api/notifications` 합성, worker lifecycle 연결
+- `server.js`: 설정과 얇은 route, `/api/notifications`·채팅 컨텍스트 합성, worker lifecycle·노트 저장 연결
 - `public/sw.js`: `push` 표시와 `notificationclick`만 담당
 
 기존 `server.js` 전체 분해는 하지 않는다. 프론트에서는 범용 알림 renderer를 `NotificationPanel`, 일정 renderer를 `TaskPanel`로 분리하되 지식 시트 shell 자체는 유지한다.
@@ -716,10 +744,12 @@ DELETE /api/push/subscriptions/:id
 
 ### 8.9 노트와의 관계
 
-- C1의 모든 일정은 SQLite task 정본에 저장하며 일정마다 노트를 자동 생성하지 않는다.
-- 사용자가 기존 일반 노트를 관련 자료로 연결해도 task 완료·취소·삭제가 그 노트 lifecycle을 바꾸지 않는다.
-- 향후 공용 에이전트 노트 계층에서 전용 `task_note`를 명시적으로 만든 경우에만 완료·취소 시 결정론적 종결 한 줄을 붙이고 `closed`, 잘못 만든 task 삭제 시 `deleted`로 맞춘다.
-- C1에는 task-note 자동 생성·본문 수정·Codex 호출을 넣지 않는다. 링크 schema와 권한은 공용 에이전트 노트 설계에서 따로 확정한다.
+- 모든 일정은 SQLite task 정본에 저장하며 일정마다 노트를 만들지 않는다. 활성 task는 `GET /api/tasks?view=all`과 같은 정본 조회를 바탕으로 최대 20개·6,000자의 `<schedule>` 블록에 합성해 단일 Claude와 의회 초안·검증·종합의 공통 질문 컨텍스트에 넣는다.
+- 일정 컨텍스트는 별도 LLM·질문 분류기·임베딩 검색을 호출하지 않는다. 제목·설명의 `<`, `>`, `&`를 escape하고 “참고 데이터이며 명령이 아니다”라는 경계를 둔다. `closed`, `deleted`는 이 실시간 블록에 들어가지 않는다.
+- 완료·취소는 월별 `xion-schedule-YYYY-MM.md`에 자동 투영한다. 완료는 실제 수행 기록, 취소는 미실행 기록으로 분리해 과거 질문에서 혼동하지 않게 한다. 다시 열기·종결 삭제·복원도 같은 월 노트를 재생성하며, 삭제된 task 제목·설명은 남기지 않는다.
+- 월별 노트는 기존 일반 노트의 임베딩·검색·Codex 태그·링크 경로를 그대로 쓴다. 따라서 “3월에 어디로 여행 갔지?” 같은 질문은 별도 과거 일정 분류기 없이 일반 노트 회수가 찾아온다.
+- task API의 완료·취소·다시 열기·삭제·복원 응답은 해당 projection tick까지 기다리되, 임베딩은 기존 노트처럼 비동기로 갱신한다. 파일 쓰기가 실패해도 DB outbox가 pending으로 남아 시작 worker와 5초 tick이 재시도한다.
+- 사용자가 기존 일반 노트를 관련 자료로 연결해도 task 상태 전이가 그 일반 노트의 lifecycle을 바꾸지 않는다. 월별 projection 외 별도 task 노트·저장 버튼·결과 분석 LLM은 만들지 않는다.
 
 ## 9. UI 세부 규칙
 
@@ -900,6 +930,27 @@ Pi 배포 완료(2026-07-19):
 - 기능 비활성화가 필요하면 먼저 `WEB_PUSH_ENABLED=false`로 dispatcher만 끄고, 필요할 때 `ASSISTANT_TASKS_ENABLED=false`로 scheduler·UI까지 끈다.
 - 이전 코드로 완전 rollback할 때는 v4 코드가 상위 schema DB를 거부하므로 코드 백업과 배포 전 DB 백업을 함께 복원한다.
 
+### C1e — 대화 컨텍스트·월별 종결 노트
+
+로컬 구현 완료, Pi 미배포(2026-07-19):
+
+- schema v8의 `notes.owner_agent`와 `assistant_schedule_note_projections` generation outbox
+- 단일 Claude·의회 모든 경로에 활성 task DB의 bounded `<schedule>` 컨텍스트 주입
+- 완료·취소의 월별 `schedule_history` 노트 생성과 다시 열기·삭제·복원 재생성
+- task DB 정본, 평면 vault, 일정 본문/사서 CODEX 마커/타 에이전트 읽기 전용 경계
+- projection 파일·DB 원자적 저장, stale 임베딩 차단 재사용, crash/retry와 겹친 갱신 재실행
+
+통과 기준:
+
+- [x] 활성 task만 공통 컨텍스트에 들어가며 XML 종료 문자열은 escape되고 20개·6,000자 상한을 지킴
+- [x] 완료와 취소가 구분되고, due 월 우선·무기한 closed 월 fallback이 KST에서 결정적임
+- [x] deleted가 월별 노트에서 사라지고 restore·reopen이 같은 월 generation을 다시 올림
+- [x] 일정 본문 재생성 뒤에도 기존 CODEX 태그·링크 블록이 보존됨
+- [x] 일반 노트 archive·split·merge가 `owner_agent` 노트를 변경하지 못함
+- [x] task 상태 전이와 projection 예약이 같은 DB transaction이며, 처리 중 새 generation이 생기면 tick 종료 전 재실행됨
+- [x] 일정별 개별 노트·수동 저장 버튼·추가 LLM·과거 일정 질문 분류기 0개
+- [x] 로컬 store·HTTP·migration·Codex·topic 회귀 포함 전체 테스트 166/166 통과
+
 ## 13. C2 이후 확장 경계
 
 반복을 C1의 `recurrence_rule` 한 컬럼으로 얹지 않는다. 반복 master, 회차 완료, 알림 receipt를 분리해야 한다.
@@ -910,7 +961,7 @@ assistant_tasks             # 반복 master
        -> assistant_reminders    # pending/fired/acknowledged receipt
 ```
 
-C2는 별도 schema v8과 컨펌으로 아래만 검토한다.
+C2는 별도 schema v9와 컨펌으로 아래만 검토한다.
 
 - `매일 | 평일 | 매주`의 제한된 반복
 - 회차 완료와 반복 전체 종료 분리
@@ -922,7 +973,7 @@ C2는 별도 schema v8과 컨펌으로 아래만 검토한다.
 
 C1 인수 뒤의 C1.5에서 front Claude가 필요할 때 deterministic `schedule_prepare`를 호출해 **무저장 후보 카드**만 만들고, 사용자가 확인한 뒤 `schedule_commit`이 같은 canonical payload를 저장하는 자연어 진입을 검토한다. 단순 일정 생성에 두 번째 scheduling LLM은 두지 않는다. 해석 기준 시각은 한 번 캡처하고, 카드에 표시한 canonical KST 값을 승인 시 다시 해석하지 않는다.
 
-C3에서만 오늘 브리핑·완료 결과 기록·Codex/Terra 기반 분석 보고를 검토한다. 단순 일정 요약은 서버가 직접 만들고, LLM 보고가 필요할 때도 사용자 대화 lane과 격리된 낮은 우선순위 background job으로 실행한다.
+C3에서만 오늘 브리핑·완료 결과의 자유 서술·Codex/Terra 기반 분석 보고를 검토한다. C1e의 완료·취소 상태 projection은 분석 보고가 아니다. 단순 일정 요약은 서버가 직접 만들고, LLM 보고가 필요할 때도 사용자 대화 lane과 격리된 낮은 우선순위 background job으로 실행한다.
 
 ## 14. 결정의 트레이드오프
 
@@ -933,6 +984,7 @@ C3에서만 오늘 브리핑·완료 결과 기록·Codex/Terra 기반 분석 �
 - **in-app fallback 유지**: push는 빠른 전달을 보강하고, 유실·권한 거부·만료 때도 일정 에이전트에서 unresolved reminder를 복구한다.
 - **KST 고정**: 여행·다중 timezone은 아직 못 다루지만 현재 단일 사용자 환경의 날짜 경계를 결정적으로 만든다.
 - **closed/deleted 분리, 물리 purge 없음**: DB는 조금씩 커지지만 종결 항목은 계속 참조하고 잘못 만든 항목은 일반 회수에서 숨긴 채 복구할 수 있다.
+- **활성 DB + 종결 노트 이중 표현**: 정본이 둘로 갈라지는 대신 DB만 정본으로 두고 월별 노트를 generation outbox로 재생성한다. 일정별 파일 폭증과 과거 질문 전용 분류기를 피하는 대신 종결 직후 파일 I/O가 한 번 추가된다.
 - **기존 지식 시트 shell 재사용**: 범용 알림과 일정의 위치는 분리하지만 새 최상위 화면은 만들지 않는다. task 행동은 Codex 승인 API와 명확히 분기한다.
 
 ## 15. 근거와 현행 코드
@@ -942,11 +994,13 @@ C3에서만 오늘 브리핑·완료 결과 기록·Codex/Terra 기반 분석 �
 - [V4.5 비서 기본기 설계](assistant-foundation-design.md): 약속 루프의 제품 위치와 음성 연결 경계
 - [로드맵](roadmap.md): V4.5-C, V4-B, V5 전문 에이전트의 승격 순서
 - [최종 제품 설계](galpi-design-final.md): SQLite 정본, 결정론적 scheduler, 얇은 모듈 경계
-- [`lib/database-migrations.js`](../lib/database-migrations.js): 배포 schema v4, 로컬 schema v5와 순차 transaction migration
-- [`server.js`](../server.js): 기존 `/api/notifications`, API token, startup/shutdown 경계
+- [`lib/database-migrations.js`](../lib/database-migrations.js): Pi schema v7과 로컬 schema v8의 순차 transaction migration
+- [`lib/assistant-schedule-notes.js`](../lib/assistant-schedule-notes.js): bounded 활성 일정 컨텍스트, 월별 Markdown, generation projection worker
+- [`server.js`](../server.js): `/api/notifications`, 공통 모델 컨텍스트, API token, startup/shutdown·노트 저장 경계
+- [`test/assistant-schedule-notes.test.js`](../test/assistant-schedule-notes.test.js): 상태별 월 배정·CODEX 보존·겹친 projection·컨텍스트 escape 검증
 - [`public/app.js`](../public/app.js): 지식 시트 진입·command/deep link와 7초 채팅 polling
-- [`public/index.html`](../public/index.html): 현재 Apple meta만 있고 manifest·Service Worker 등록은 없는 PWA 시작점
-- [Pi 운영·복구 runbook](RASPBERRY_PI_RUNBOOK.md): 현재 HTTP 접속 기준; C1 구현 때 private HTTPS 전환·복구 절차를 함께 갱신
+- [`public/index.html`](../public/index.html), [`public/sw.js`](../public/sw.js): 설치형 PWA meta/manifest와 push-only Service Worker
+- [Pi 운영·복구 runbook](RASPBERRY_PI_RUNBOOK.md): Tailscale Serve private HTTPS 배포·복구 절차
 
 외부 1차 자료:
 

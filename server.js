@@ -29,6 +29,13 @@ const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
+const {
+  buildActiveScheduleContext,
+  buildScheduleHistoryNote,
+  createScheduleNoteProjectionStore,
+  createScheduleNoteProjector,
+  scheduleFilename,
+} = require('./lib/assistant-schedule-notes');
 const { createWebPushTransport } = require('./lib/web-push-transport');
 const { parseAiReadable } = require('./lib/note-access');
 const {
@@ -431,6 +438,7 @@ db.exec(`
       CHECK (index_status IN ('pending', 'ready', 'error', 'missing')),
     ai_readable INTEGER NOT NULL DEFAULT 1
       CHECK (ai_readable IN (0, 1)),
+    owner_agent TEXT,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
@@ -542,12 +550,20 @@ db.exec(`
 `);
 
 runDatabaseMigrations(db);
+const assistantScheduleNoteProjections = createScheduleNoteProjectionStore(db);
+let assistantScheduleNoteProjector = null;
 const assistantPush = createAssistantPushService(db, {
   enabled: ASSISTANT_PUSH_CONFIG.enabled,
 });
 const assistantTasks = createAssistantTaskStore(db, {
   onTaskInactive: (taskId, changedAt) => assistantPush.skipTask(taskId, changedAt),
   onReminderResolved: (reminderId, changedAt) => assistantPush.skipReminder(reminderId, changedAt),
+  onTaskChanged: (previous, next, _eventType, changedAt) => {
+    const dirtyMonths = assistantScheduleNoteProjections.markTaskChange(previous, next, changedAt);
+    if (dirtyMonths.length > 0) {
+      queueMicrotask(() => { void assistantScheduleNoteProjector?.tick(); });
+    }
+  },
 });
 const assistantScheduler = createAssistantScheduler(db, {
   onReminderFired: (reminderId, firedAt) => assistantPush.enqueueReminder(reminderId, firedAt),
@@ -621,10 +637,10 @@ const stmtInsertMessage = db.prepare(
 const stmtUpsertNote = db.prepare(`
   INSERT INTO notes (
     filename, title, note_type, paper_id, archived, codex_status,
-    source_session, source_message, content_sha256, index_status, ai_readable
+    source_session, source_message, content_sha256, index_status, ai_readable, owner_agent
   ) VALUES (
     @filename, @title, @noteType, @paperId, @archived, @codexStatus,
-    @sourceSession, @sourceMessage, @contentSha256, @indexStatus, @aiReadable
+    @sourceSession, @sourceMessage, @contentSha256, @indexStatus, @aiReadable, @ownerAgent
   )
   ON CONFLICT(filename) DO UPDATE SET
     title = excluded.title,
@@ -639,6 +655,7 @@ const stmtUpsertNote = db.prepare(`
     source_message = excluded.source_message,
     content_sha256 = excluded.content_sha256,
     ai_readable = excluded.ai_readable,
+    owner_agent = excluded.owner_agent,
     index_status = CASE
       WHEN excluded.index_status = 'error' THEN 'error'
       WHEN notes.indexed_sha256 = excluded.content_sha256 AND notes.embedding IS NOT NULL THEN 'ready'
@@ -649,7 +666,7 @@ const stmtUpsertNote = db.prepare(`
 const stmtGetNoteByFilename = db.prepare(`
   SELECT filename, title, note_type AS noteType, archived,
          codex_status AS codexStatus, ai_readable AS aiReadable,
-         updated_at AS updatedAt
+         owner_agent AS ownerAgent, updated_at AS updatedAt
   FROM notes
   WHERE filename = ?
   LIMIT 1
@@ -1070,6 +1087,7 @@ function dbUpsertNote({
   contentSha256,
   indexStatus = 'pending',
   aiReadable = true,
+  ownerAgent = null,
 }) {
   if (!['pending', 'error'].includes(indexStatus)) {
     throw new TypeError(`지원하지 않는 note upsert index 상태입니다: ${indexStatus}`);
@@ -1089,6 +1107,7 @@ function dbUpsertNote({
     contentSha256: contentSha256 || null,
     indexStatus,
     aiReadable: aiReadable ? 1 : 0,
+    ownerAgent: ownerAgent || null,
   });
 }
 
@@ -1427,6 +1446,67 @@ async function saveVaultNoteRecord({
 
   return null;
 }
+
+async function writeAssistantScheduleNoteProjection({ monthKey, tasks, updatedAt }) {
+  const filename = scheduleFilename(monthKey);
+  const filepath = path.join(VAULT_PATH, filename);
+
+  return topicMutations.run(async () => {
+    const existing = stmtGetNoteByFilename.get(filename);
+    if (existing?.codexStatus === 'recovery_required') {
+      throw new Error(`복구 승인 전에는 일정 노트를 갱신할 수 없습니다: ${filename}`);
+    }
+
+    let previousRaw = null;
+    try {
+      previousRaw = await fs.readFile(filepath, 'utf8');
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+
+    const noteContent = buildScheduleHistoryNote({
+      monthKey,
+      tasks,
+      previousRaw: previousRaw || '',
+      updatedAt,
+    });
+    const title = `${Number(monthKey.slice(0, 4))}년 ${Number(monthKey.slice(5, 7))}월 일정 기록`;
+    const contentSha256 = noteContentSha256({
+      filename,
+      title,
+      noteType: 'schedule_history',
+      raw: noteContent,
+    });
+
+    await topicMutations.commit({
+      changes: [{ filepath, expectedContent: previousRaw, nextContent: noteContent }],
+      applyDatabase() {
+        dbUpsertNote({
+          filename,
+          title,
+          noteType: 'schedule_history',
+          codexStatus: 'pending',
+          contentSha256,
+          ownerAgent: 'schedule',
+        });
+      },
+    });
+
+    generateAndStoreEmbedding(
+      filename,
+      buildSemanticEmbeddingText(title, noteContent),
+      contentSha256,
+    ).catch(() => {});
+    return { contentSha256 };
+  });
+}
+
+assistantScheduleNoteProjector = createScheduleNoteProjector(assistantScheduleNoteProjections, {
+  project: writeAssistantScheduleNoteProjection,
+  onError(error, item) {
+    console.error(`일정 노트 projection 오류 (${item.monthKey}): ${error?.code || error?.name || 'UNKNOWN'}`);
+  },
+});
 
 const AUTO_SAVE_COMMAND_PREFIXES = [
   '/search',
@@ -2631,7 +2711,19 @@ app.post('/api/chat', async (req, res) => {
     }
     const context = [
       ...baseContext.slice(0, -1),
-      { role: 'user', content: buildContextMessage(message, resolvedNotes, memoryItems, pastMessages, webEvidence, requestTime, previousMessageCreatedAt) },
+      {
+        role: 'user',
+        content: buildContextMessage(
+          message,
+          resolvedNotes,
+          memoryItems,
+          pastMessages,
+          webEvidence,
+          requestTime,
+          previousMessageCreatedAt,
+          getActiveScheduleContext(),
+        ),
+      },
     ];
     const allowModelWebTool = !webSearch && !hasWebEvidenceResults(webEvidence) && WEB_SEARCH_ENABLED && WEB_SEARCH_MODEL_TOOL_ENABLED;
     const paperToolSession = paperFullTextTools.createSession({ notes: resolvedNotes, queryEmbedding });
@@ -2797,7 +2889,12 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-registerAssistantTaskRoutes({ app, store: assistantTasks, enabled: ASSISTANT_TASKS_ENABLED });
+registerAssistantTaskRoutes({
+  app,
+  store: assistantTasks,
+  enabled: ASSISTANT_TASKS_ENABLED,
+  onTaskMutation: () => assistantScheduleNoteProjector.tick(),
+});
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
 
 // ─── 사용자 메모리 ───────────────────────────────────────────────────────────
@@ -2905,6 +3002,7 @@ async function backfillNotesFromVault() {
         noteType,
         archived,
         aiReadable: parseAiReadable(fm.ai_readable),
+        ownerAgent: fm.owner_agent || null,
         codexStatus,
         sourceSession: fm.source_session || null,
         sourceMessage: fm.source_message || null,
@@ -2957,6 +3055,7 @@ function syncRecoveryApprovedNote(filename) {
       noteType,
       archived: false,
       aiReadable: parseAiReadable(fm.ai_readable),
+      ownerAgent: fm.owner_agent || null,
       codexStatus: 'recovery_required',
       sourceSession: fm.source_session || null,
       sourceMessage: fm.source_message || null,
@@ -3108,6 +3207,9 @@ function assertSafeNoteFilename(filename) {
 function assertNoteMutationAllowed(filename) {
   const record = stmtGetNoteByFilename.get(filename);
   if (!record) throw new Error(`노트를 찾을 수 없습니다: ${filename}`);
+  if (record.ownerAgent) {
+    throw new Error(`에이전트 소유 노트는 담당 에이전트 본문과 사서 CODEX 구역에서만 변경할 수 있습니다: ${filename}`);
+  }
   if (['running', 'needs_manual_check', 'recovery_required'].includes(record.codexStatus)) {
     throw new Error(`수동 확인 또는 원본 복구가 필요한 노트는 변경할 수 없습니다: ${filename}`);
   }
@@ -6232,7 +6334,17 @@ function buildTimeContext(now = new Date(), previousMessageCreatedAt = null) {
   return [buildCurrentTimeLine(now), elapsedMarker].filter(Boolean).join('\n');
 }
 
-// 현재 시각은 항상, 사용자 메모리와 activeNotes/자동 검색 노트는 질문별 참조로 주입한다.
+function getActiveScheduleContext() {
+  if (!ASSISTANT_TASKS_ENABLED) return '';
+  try {
+    return buildActiveScheduleContext(assistantTasks.list({ view: 'all', limit: 20 }));
+  } catch (error) {
+    console.warn(`일정 컨텍스트 조회 실패: ${error?.code || error?.name || 'UNKNOWN'}`);
+    return '';
+  }
+}
+
+// 현재 시각과 활성 일정은 항상, 사용자 메모리와 activeNotes/자동 검색 노트는 질문별 참조로 주입한다.
 // 향후 벡터 검색으로 노트를 불러올 때도 이 함수를 그대로 사용한다.
 function buildContextMessage(
   question,
@@ -6241,7 +6353,8 @@ function buildContextMessage(
   pastMessages = [],
   webEvidence = null,
   now = new Date(),
-  previousMessageCreatedAt = null
+  previousMessageCreatedAt = null,
+  scheduleText = ''
 ) {
   const timeContext = buildTimeContext(now, previousMessageCreatedAt);
   const memoryText = memoryItems.length > 0
@@ -6267,7 +6380,7 @@ function buildContextMessage(
     : '';
 
   const webText = buildWebContextBlock(webEvidence);
-  const contextParts = [memoryText, pastText, noteText, webText].filter(Boolean);
+  const contextParts = [scheduleText, memoryText, pastText, noteText, webText].filter(Boolean);
 
   if (contextParts.length === 0) {
     return `${timeContext}
@@ -6482,7 +6595,16 @@ async function buildCouncilModelContext(question, activeNotes, sessionId, webSou
   const history = sessions[sessionId];
   const webEvidence = Array.isArray(webSources) && webSources.length > 0 ? { results: webSources } : null;
   const requestTime = new Date();
-  const baseQuestionWithContext = buildContextMessage(question, notes, memoryItems, pastMessages, webEvidence, requestTime, getLastMessageTimestamp(history));
+  const baseQuestionWithContext = buildContextMessage(
+    question,
+    notes,
+    memoryItems,
+    pastMessages,
+    webEvidence,
+    requestTime,
+    getLastMessageTimestamp(history),
+    getActiveScheduleContext(),
+  );
   const paperEvidence = paperFullTextTools.resolveEvidenceRefs({ notes, refs: paperEvidenceRefs });
   const questionWithContext = appendPaperEvidence(baseQuestionWithContext, paperEvidence);
   const historyCtx = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
@@ -6534,7 +6656,16 @@ app.post('/api/council/debate', async (req, res) => {
     if (!webEvidence) {
       webEvidence = await decideCouncilWebEvidence(probeContext, claudeModel, progress.stage);
     }
-    const questionWithContext = buildContextMessage(question, resolvedNotes, memoryItems, pastMessages, webEvidence, requestTime, previousMessageCreatedAt);
+    const questionWithContext = buildContextMessage(
+      question,
+      resolvedNotes,
+      memoryItems,
+      pastMessages,
+      webEvidence,
+      requestTime,
+      previousMessageCreatedAt,
+      getActiveScheduleContext(),
+    );
     const historyCtx = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
     const paperToolSession = paperFullTextTools.createSession({ notes: resolvedNotes, queryEmbedding });
 
@@ -6889,7 +7020,9 @@ const httpServer = app.listen(PORT, HOST, () => {
   console.log(`   백업:     ${BACKUP_DIR} (하루 1회 자동, 7일 보관)`);
   if (ASSISTANT_TASKS_ENABLED) {
     assistantScheduler.start();
+    assistantScheduleNoteProjector.start();
     console.log('   일정:     scheduler 실행 중 (30초)');
+    console.log('   일정 노트: 월별 종결 기록 projection 실행 중');
   }
   if (assistantPushDispatcher) {
     assistantPushDispatcher.start();
@@ -6935,11 +7068,13 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     if (shuttingDown) return;
     shuttingDown = true;
     assistantScheduler.stop();
+    assistantScheduleNoteProjector.stop();
     assistantPushDispatcher?.stop();
     let finished = false;
     const finish = async () => {
       if (finished) return;
       finished = true;
+      await assistantScheduleNoteProjector.drain(1500);
       await assistantPushDispatcher?.drain(1500);
       try { db.close(); } catch { /* 이미 닫힘 */ }
       process.exit(0);
