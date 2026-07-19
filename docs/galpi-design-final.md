@@ -1491,7 +1491,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: 2026-07-18 S0 schema v4 Pi 배포·운영 인수 완료, A1b 실사용 shadow 관찰 중, V4.5-C C0 상세 설계 완료·C1 구현 전 컨펌 대기
+> 상태: 2026-07-19 S0 schema v4 Pi 배포·운영 인수 완료, A1b 실사용 shadow 관찰 중, V4.5-C C0 설계 개정 완료·C1 구현 전. C1 첫 배포에 private HTTPS·PWA·Web Push 포함
 
 ### 문제 정의
 
@@ -1505,8 +1505,10 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 4. 테스트는 `never`, 음성은 `inbox` 저장 정책을 사용한다.
 5. 사용자 메모리는 자동 확정하지 않고 시온 승인 제안으로 갱신한다.
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
-7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 무LLM·별도 정본만 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
-8. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
+7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 참조 가능한 `closed`와 일반 회수에서 제외하는 `deleted`, 무LLM·별도 정본을 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
+8. reminder는 약속 occurrence와 사용자 확인 상태의 정본, push subscription은 브라우저 endpoint 정본, delivery는 reminder×subscription 전송 receipt다. private HTTPS 홈 화면 PWA와 Web Push를 C1 첫 배포에 포함하되 알림센터·foreground refresh를 fallback으로 유지한다.
+9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트 운영 요약을 둔다. 7일·지연/오늘/예정/Inbox·오늘/지연 최대 3개·다음 알림·push 상태와 `일정 추가 | 전체 일정` 진입만 제공하고, task 변경 행동은 알림센터의 단일 renderer에 둔다.
+10. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
 
 ### 구조 원칙
 
@@ -1514,7 +1516,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 - 무효화는 회수 제외 상태이며 되돌릴 수 있다.
 - AI 분석은 사용자 진술이나 원문 근거와 같은 신뢰도로 취급하지 않는다.
 - 그래프 검색·reranker·새 벡터 DB는 현재 평가에서 필요성이 확인될 때만 도입한다.
-- 새 구현은 retrieval, memory, trace, task, scheduler 모듈로 분리하고 `server.js`에는 얇은 연결만 둔다.
+- 새 구현은 retrieval, memory, trace, task, scheduler, push와 frontend agent-panel 모듈로 분리하고 `server.js`에는 얇은 연결만 둔다.
 - 외부 행동은 V4.5 범위 밖이며 향후 별도 승인·권한·감사 로그를 요구한다.
 
 ### 순서
@@ -1525,13 +1527,13 @@ A0 기준선 평가
   -> A2 실제 회수 전환
   -> A3 provenance·무효화·구조화 메모리
   -> B trace·피드백
-  -> C task·reminder·Today
+  -> C task·reminder·Today·일정 에이전트 요약
   -> V4-B 음성
   -> V5-A 딜 스카우트
   -> V5-B 주식 분석
 ```
 
-위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 기억 회수·자동 저장을 건드리지 않는 V4.5-C C0 설계와 C1 명시적 task/reminder는 별도 경계에서 진행할 수 있다. 이 약속 루프는 향후 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과 다르다.
+위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 기억 회수·자동 저장을 건드리지 않는 V4.5-C C1 명시적 task/reminder·private Web Push는 별도 경계에서 진행할 수 있다. 구현 순서는 선행 schema v5 접근 경계 보강 → schema v6 task·event·reminder → scheduler·알림센터·에이전트 탭 일정 요약 → schema v7 HTTPS·PWA·push → Pi 인수다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다.
 
 세부 스키마, 하드 상한, 마이그레이션, 보안 경계와 통과 기준은 상세 설계 문서를 단일 기준으로 삼는다.
 

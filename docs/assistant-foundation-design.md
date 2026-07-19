@@ -1,8 +1,8 @@
 # V4.5 믿을 수 있는 비서 기본기 설계
 
-> 작성: 2026-07-15 · 갱신: 2026-07-18
+> 작성: 2026-07-15 · 갱신: 2026-07-19
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C C0 상세 설계 완료
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 shadow 검색·한국어 경계 보정 Pi 인수 완료. A2 전환 전 실사용 trace 관찰 중. V4.5-C C0 설계 개정 완료, C1 첫 배포에 Web Push 포함
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성과 V5-A 딜 스카우트·V5-B 주식 분석 전에 진행
 
@@ -436,12 +436,15 @@ C1은 아래 범위만 구현한다.
 - 명시적 `/task`와 사용자 확인 후 active task 생성
 - 기한 없음·날짜 전용·KST 절대 시각 기한
 - 단발성 reminder, 1분 scheduler, 재시작 catch-up, 중복 차단
-- Today·예정·Inbox, 완료·취소·되돌리기·확인·1시간 미루기
-- reminder 행 자체를 영속 알림 receipt로 사용하는 crash-safe 흐름
+- Today·예정·Inbox, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기
+- 완료·취소는 참조 가능한 `closed`, 잘못 만든 항목은 일반 회수에서 제외하는 `deleted`; C1 물리 purge 없음
+- reminder를 약속 occurrence 정본으로, subscription별 delivery를 별도 outbox·전송 receipt로 사용하는 crash-safe 흐름
+- Tailscale Serve private HTTPS, 최소 PWA, 사용자 opt-in Web Push와 알림센터·foreground polling fallback
+- 에이전트 탭 최상단의 일정 에이전트 블록: 7일 스트립, 지연·오늘·예정·Inbox, 오늘·지연 최대 3개, 다음 알림, push 상태, `일정 추가 | 전체 일정`
 
-자연어 후보, 반복, 오늘 브리핑, 완료 결과 기록, Web Push, 외부 캘린더는 C1에서 제외한다. 반복은 `task -> occurrence -> reminder`의 3층이 필요한 별도 schema migration으로 진행한다.
+자연어 후보, 반복, 오늘 브리핑, 완료 결과 기록, 외부 캘린더는 C1에서 제외한다. 반복은 `task -> occurrence -> reminder`의 3층이 필요한 별도 schema migration으로 진행한다. Web Push는 C1 범위지만 task core와 분리된 schema·feature flag·인수 단위로 구현한다.
 
-명시적 `/task`, 새 전용 테이블·모듈, 무LLM, 기억 회수·자동 저장 경로 불변을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다.
+명시적 `/task`, 새 전용 테이블·모듈, 무LLM, 기억 회수·자동 저장 경로 불변을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다. 숨은 웹 탭을 계속 refresh하는 방식은 지원 계약이 아니며, Pi scheduler가 시각을 판정하고 Service Worker가 push event 때만 깨어난 뒤 앱 복귀 시 정본을 재동기화한다.
 
 ## 7. V4-B 음성 입력과의 경계
 
@@ -486,9 +489,11 @@ lib/assistant-memory.js      # 메모리 제안·갱신·상태 전이
 lib/assistant-trace.js       # run/evidence/feedback 기록
 lib/assistant-tasks.js       # task/reminder 상태와 검증
 lib/assistant-scheduler.js   # due reminder, catch-up, 중복 차단
+lib/assistant-push.js        # subscription, delivery outbox, retry
+public/agent-panel.js        # 일정 요약과 향후 에이전트 블록
 ```
 
-프론트엔드는 에이전트 탭을 만들기 전에 `paper-panel.js`와 `note-panel.js`의 공용 패널 헬퍼를 추출한다. 다만 retrieval 백엔드와 무관한 시각 리팩터링을 같은 커밋에 섞지 않는다.
+기존 에이전트 탭 shell은 유지하고 `public/agent-panel.js`를 별도 모듈로 추가한다. 현재 tab 전환을 가진 `paper-panel.js`에는 `AgentPanel.init()`·`show()` 연결만 두며, `paper-panel.js`와 `note-panel.js`의 공용 helper 추출을 선행 조건으로 만들지 않는다. 일정 데이터가 생기기 전 빈 대시보드를 먼저 만들지 않고 C1b task summary와 함께 활성화한다.
 
 ## 10. 구현 순서
 
@@ -637,8 +642,11 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 ### C. task·reminder
 
 - [상세 설계](task-reminder-design.md)의 C1부터 구현
+- 선행 schema v5 접근 경계 보강 뒤 v6 task·event·reminder 정본과 API
 - 명시적 `/task`, 단발성 reminder, scheduler, 재시작 catch-up, 중복 차단
-- Today·예정·Inbox와 완료·취소·확인·1시간 미루기
+- Today·예정·Inbox와 closed/deleted lifecycle, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기
+- 에이전트 탭 최상단 일정 블록과 readonly `GET /api/tasks/summary`: 7일·네 건수·preview 최대 3·다음 알림·push 상태·두 진입 버튼
+- schema v7 subscription·delivery outbox, private HTTPS·PWA·Web Push, 알림센터 fallback
 - 자연어 후보·반복·브리핑은 C1 Pi 인수 뒤 별도 단계
 
 ### D. 음성
@@ -681,15 +689,24 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 
 ### C. 약속 루프
 
-- [x] C0 상세 설계에서 제품 경계·시간 규칙·상태 머신·schema·API·crash semantics를 고정
+- [x] C0 상세 설계에서 제품 경계·시간 규칙·closed/deleted 상태 머신·schema·API·crash semantics를 고정
+- [x] 일정 에이전트 readonly summary·두 진입 동작과 알림센터 단일 쓰기 경계를 고정
 - [ ] 명시적 `/task`가 날짜·시각 입력 시 절대 KST 시각을 보여주고 확인 후에만 task 생성
 - [ ] 서버 재시작 후 task와 reminder가 유지됨
 - [ ] 같은 reminder occurrence의 DB 행이 하나이며 확인 전 같은 receipt를 계속 조회 가능
 - [ ] 놓친 단발성 알림이 다음 시작·접속에서 한 번만 catch-up됨
-- [ ] 완료·미루기·취소 상태가 UI와 DB에서 일치
-- [ ] task 되돌리기는 terminal reminder를 자동 복원하지 않음
+- [ ] 완료·취소는 closed로 계속 참조되고, 잘못 만든 항목은 deleted로 일반 검색·AI에서 제외됨
+- [ ] 완료·미루기·취소·다시 열기·삭제·복원 상태가 UI와 DB에서 일치
+- [ ] task 다시 열기·복원은 terminal reminder를 자동 복원하지 않음
 - [ ] reminder는 명시적 확인 전에는 조회·패널 열기로 acknowledged되지 않음
 - [ ] Today·예정·Inbox에 날짜 전용·시각 기한이 KST 경계대로 표시됨
+- [ ] 에이전트 탭 최상단 일정 블록의 7일·지연/오늘/예정/Inbox·preview 최대 3·다음 알림이 같은 task DB와 일치함
+- [ ] 일정 블록의 `일정 추가 | 전체 일정`은 작성 카드·알림센터로만 이동하고 블록 자체의 task 변경 호출은 0회
+- [ ] loading·empty·error·push 권한 상태와 350px desktop panel·390px mobile bottom sheet가 overflow 없이 동작함
+- [ ] private HTTPS 홈 화면 PWA에서 사용자 opt-in Web Push가 백그라운드·앱 종료 상태의 reminder를 표시함
+- [ ] push 구독 만료·일시 실패·프로세스 재시작에도 delivery outbox가 유실·무한 재시도·중복 행을 만들지 않음
+- [ ] push 권한 거부·실패에도 알림센터와 앱 복귀 reconciliation에서 같은 unresolved reminder를 조회 가능
+- [ ] push payload·URL·로그에 task 내용·API token·subscription secret이 없음
 - [ ] `/task` 경로의 LLM·임베딩·topic 저장 호출이 0회
 - [ ] 반복·자연어 후보·결과 기록은 C1 인수 뒤 별도 컨펌
 
@@ -712,7 +729,7 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 |A2 전환|보류|
 |A3 provenance·무효화·메모리|2~3일|
 |B trace·피드백|1~2일|
-|C task·reminder MVP|2~4일|
+|C task·reminder + private Web Push MVP|4~7일|
 |D 음성 MVP|1~2일|
 
 정확한 기간은 기존 큰 topic의 backfill과 모바일 알림 UX에서 달라질 수 있다. 각 단계는 독립 커밋·독립 Pi 인수로 끝낸다.
@@ -722,7 +739,8 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 - 키워드/임베딩/최신성의 정확한 가중치
 - RRF 또는 LLM reranker 도입
 - graph edge를 세 번째 회수 경로로 사용할지
-- 브라우저 Web Push와 외부 캘린더 제공자
+- 외부 캘린더 제공자
+- Web Push 실측 뒤 native local notification이 추가로 필요한지
 - 자동 메모리 제안의 호출 시점과 모델
 - 장기 task의 별도 프로젝트 계층
 - SQLite FTS5 또는 sqlite-vec 전환 시점
