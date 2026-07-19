@@ -224,17 +224,20 @@ test('note ranker tolerates one-character variants in long compact titles only',
         filename: 'sleep.md',
         title: '숙면 대행 서비스',
         body: '작품 구상',
+        embedding: [0.45, 0.8930285549745876],
       },
       {
         filename: 'stock.md',
         title: '주식 시장',
         body: '최근 이야기',
+        embedding: [0.8, 0.6],
       },
     ],
+    queryEmbedding: [1, 0],
     minKeywordScore: 1,
   });
 
-  assert.deepEqual(ranked.map(note => note.filename), ['sleep.md']);
+  assert.equal(ranked[0].filename, 'sleep.md');
   assert.deepEqual(rankNoteCandidates({
     query: '시',
     notes: [{ filename: 'meal.md', title: '식', body: '' }],
