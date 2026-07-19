@@ -467,7 +467,7 @@ C1은 아래 범위만 구현한다.
 
 ## 8. 보안과 승인 경계
 
-- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core와 함께 로컬 전체 테스트 141/141을 통과했으며 둘 다 Pi에는 아직 적용하지 않았다.
+- schema v5는 `notes.ai_readable`을 Markdown frontmatter와 동기화한다. 명시적 `false`인 노트는 답변·검색·A1b·논문 전문·MCP AI 읽기·임베딩·Codex·AI 파생 그래프에서 제외하되 사람의 직접 열람은 유지한다. schema v6 task core와 C1b scheduler·UI를 포함해 로컬 전체 테스트 148/148을 통과했으며 Pi에는 아직 적용하지 않았다.
 - 이 경계는 모델에 제공하는 컨텍스트와 자동 작업 범위를 통제한다. 암호화·OS 계정 분리는 아니므로 API 키와 인증정보는 vault에 넣지 않는다.
 - 에이전트 노트는 당장 폴더나 범용 ACL을 만들지 않는다. 첫 writer 구현 시 `owner_agent` 한 필드와 `담당 에이전트 본문 / 사서 CODEX 마커 / 타 에이전트 읽기 전용` 세 규칙만 추가한다.
 - 기본 회수 범위는 자기 소유와 공용 노트다. 교차 에이전트 노트는 명시적 링크·handoff·사용자 요청이 있을 때만 읽어 컨텍스트 오염을 막는다.
@@ -647,7 +647,7 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 ### C. task·reminder
 
 - [상세 설계](task-reminder-design.md)의 C1부터 구현
-- [x] schema v5 접근 경계 뒤 v6 task·event·reminder 정본과 독립 store·route API를 로컬 구현하고 전체 테스트 141/141 통과
+- [x] schema v5 접근 경계 뒤 v6 task·event·reminder 정본, 독립 store·route·scheduler와 task·agent UI를 로컬 구현하고 전체 테스트 148/148 통과
 - 명시적 `/task`, 단발성 reminder, scheduler, 재시작 catch-up, 중복 차단
 - Today·예정·Inbox와 closed/deleted lifecycle, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기
 - 에이전트 탭 최상단 일정 블록과 readonly `GET /api/tasks/summary`: 7일·네 건수·preview 최대 3·다음 알림·push 상태·두 진입 버튼

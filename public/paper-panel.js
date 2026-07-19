@@ -96,6 +96,7 @@
     el.agents.hidden = tab !== 'agents';
     el.papers.hidden = tab !== 'papers';
     if (tab === 'notes') global.NotePanel?.show();
+    if (tab === 'agents') global.AgentPanel?.show();
   }
 
   function makeSectionHead(title, count, onBack) {
@@ -387,7 +388,7 @@
     }
   }
 
-  function init({ apiFetch, showToast, icons, contextNotes }) {
+  function init({ apiFetch, showToast, icons, contextNotes, agentPanel }) {
     if (state.initialized) return;
     const el = elements();
     const required = [
@@ -398,6 +399,8 @@
       typeof apiFetch !== 'function'
       || typeof showToast !== 'function'
       || typeof contextNotes?.makeToggle !== 'function'
+      || typeof agentPanel?.openCreate !== 'function'
+      || typeof agentPanel?.openTasks !== 'function'
       || !icons?.save || !icons?.check || !icons?.loading
       || required.some(item => !item)
       || el.tabs.length === 0
@@ -406,6 +409,12 @@
     }
 
     global.NotePanel?.init({ apiFetch, contextNotes });
+    global.AgentPanel?.init({
+      apiFetch,
+      enabled: agentPanel.enabled,
+      openCreate: agentPanel.openCreate,
+      openTasks: agentPanel.openTasks,
+    });
     state.apiFetch = apiFetch;
     state.showToast = showToast;
     state.icons = icons;

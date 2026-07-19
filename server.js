@@ -23,6 +23,7 @@ const { createRecentSavesReader } = require('./lib/recent-saves');
 const { createNoteSaveStateReader } = require('./lib/note-save-state');
 const { runDatabaseMigrations } = require('./lib/database-migrations');
 const { registerAssistantTaskRoutes } = require('./lib/assistant-task-routes');
+const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
 const { parseAiReadable } = require('./lib/note-access');
 const {
@@ -534,6 +535,11 @@ db.exec(`
 
 runDatabaseMigrations(db);
 const assistantTasks = createAssistantTaskStore(db);
+const assistantScheduler = createAssistantScheduler(db, {
+  onError(error) {
+    console.error(`일정 scheduler 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+  },
+});
 const topicChunkStore = createTopicChunkStore(db);
 const noteIndexState = createNoteIndexStateStore(db);
 const topicMutations = createTopicMutationCoordinator({ db });
@@ -4117,7 +4123,10 @@ async function applyCodexPolicyChanges(changes) {
 app.get('/api/notifications', async (_req, res) => {
   try {
     const codex = await listCodexProposalNotifications();
-    const notifications = [...listManualCheckNotifications(), ...codex];
+    const taskNotifications = ASSISTANT_TASKS_ENABLED
+      ? assistantTasks.listFiredNotifications()
+      : [];
+    const notifications = [...taskNotifications, ...listManualCheckNotifications(), ...codex];
     const recentSaves = listRecentSaves();
     res.json({
       success: true,
@@ -6835,7 +6844,7 @@ ${deepSection}
 
 // ─── 서버 시작 ────────────────────────────────────────────────────────────────
 
-app.listen(PORT, HOST, () => {
+const httpServer = app.listen(PORT, HOST, () => {
   console.log('\n✅ 갈피 서버 실행 중');
   console.log(`   로컬:     http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   if (HOST === '0.0.0.0') console.log(`   네트워크: http://<라즈베리파이_IP>:${PORT}`);
@@ -6850,6 +6859,10 @@ app.listen(PORT, HOST, () => {
     console.warn('   .env에 API_TOKEN을 설정하세요.\n');
   }
   console.log(`   백업:     ${BACKUP_DIR} (하루 1회 자동, 7일 보관)`);
+  if (ASSISTANT_TASKS_ENABLED) {
+    assistantScheduler.start();
+    console.log('   일정:     scheduler 실행 중 (60초)');
+  }
 
   if (
     codexStartupRecovery.quarantinedJobs > 0 ||
@@ -6884,9 +6897,18 @@ app.listen(PORT, HOST, () => {
 });
 
 // systemd stop / 재부팅 시 DB를 정리하고 종료 (WAL 체크포인트 포함)
+let shuttingDown = false;
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, () => {
-    try { db.close(); } catch { /* 이미 닫힘 */ }
-    process.exit(0);
+    if (shuttingDown) return;
+    shuttingDown = true;
+    assistantScheduler.stop();
+    const finish = () => {
+      try { db.close(); } catch { /* 이미 닫힘 */ }
+      process.exit(0);
+    };
+    httpServer.close(finish);
+    httpServer.closeIdleConnections?.();
+    setTimeout(finish, 2000).unref();
   });
 }

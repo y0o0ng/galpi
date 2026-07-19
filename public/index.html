@@ -99,7 +99,9 @@
         </section>
 
         <section id="agent-panel" class="knowledge-panel-view" role="tabpanel" hidden>
-          <div class="panel-empty-state">준비 중</div>
+          <div id="agent-panel-content" aria-live="polite">
+            <div class="panel-empty-state">준비 중</div>
+          </div>
         </section>
 
         <section id="paper-panel" class="knowledge-panel-view" role="tabpanel" hidden>
@@ -121,6 +123,8 @@
   <script src="lib/marked.min.js"></script>
   <script src="lib/purify.min.js"></script>
   <script src="note-panel.js"></script>
+  <script src="task-panel.js"></script>
+  <script src="agent-panel.js"></script>
   <script src="paper-panel.js"></script>
   <script src="app.js"></script>
   <script src="pet.js"></script>

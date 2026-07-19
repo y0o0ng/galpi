@@ -182,6 +182,46 @@ test('task routes expose the independent store with JSON, idempotency, and lifec
   assert.equal(summary.response.status, 200);
   assert.equal(summary.body.counts.overdue + summary.body.counts.today + summary.body.counts.upcoming, 1);
 
+  const alertPayload = {
+    ...payload,
+    clientRequestId: 'web-server-alert01',
+    title: '발화 알림',
+  };
+  const alertTask = await api(url, '/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(alertPayload),
+  });
+  assert.equal(alertTask.response.status, 201, JSON.stringify(alertTask.body));
+  const writableDb = new Database(path.join(appRoot, 'galpi.db'));
+  writableDb.prepare(`
+    UPDATE assistant_reminders
+    SET status = 'fired', fired_at = ?, updated_at = ?
+    WHERE id = ?
+  `).run(12345, 12345, alertTask.body.reminder.id);
+  writableDb.close();
+  const notifications = await api(url, '/api/notifications');
+  const taskNotification = notifications.body.notifications.find(item => item.type === 'task_reminder');
+  assert.deepEqual(taskNotification, {
+    id: `task-reminder:${alertTask.body.reminder.id}`,
+    source: 'task',
+    type: 'task_reminder',
+    reminderId: alertTask.body.reminder.id,
+    taskId: alertTask.body.task.id,
+    taskVersion: 1,
+    title: '발화 알림',
+    remindAt: alertTask.body.reminder.remindAt,
+    firedAt: 12345,
+  });
+  const acknowledged = await api(url, `/api/reminders/${alertTask.body.reminder.id}/acknowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(acknowledged.body.reminder.status, 'acknowledged');
+  const afterAcknowledge = await api(url, '/api/notifications');
+  assert.equal(afterAcknowledge.body.notifications.some(item => item.type === 'task_reminder'), false);
+
   const completed = await api(url, `/api/tasks/${created.body.task.id}/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -200,12 +240,12 @@ test('task routes expose the independent store with JSON, idempotency, and lifec
   assert.equal(deleted.body.task.lifecycle, 'deleted');
   const normal = await api(url, '/api/tasks?view=all');
   const trash = await api(url, '/api/tasks?view=trash');
-  assert.equal(normal.body.tasks.length, 0);
+  assert.deepEqual(normal.body.tasks.map(task => task.title), ['발화 알림']);
   assert.equal(trash.body.tasks.length, 1);
 
   const db = new Database(path.join(appRoot, 'galpi.db'), { readonly: true });
-  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_tasks').get().count, 1);
-  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_reminders').get().count, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_tasks').get().count, 2);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_reminders').get().count, 2);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM notes').get().count, 0);
   db.close();

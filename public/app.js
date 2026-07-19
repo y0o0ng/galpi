@@ -26,6 +26,8 @@ let councilAvailable = false;
 let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
 let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
 let isRestoringHistory = false;
+let tasksEnabled = false;
+let taskRefreshTimer = null;
 const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 필요한 항목을 선택' },
   { command: '/paper ', title: '논문 검색', description: 'Semantic Scholar에서 관련 논문 검색' },
@@ -44,6 +46,8 @@ const slashCommands = [
   { command: '/merge', title: '토픽 병합', description: '유사한 토픽 병합 후보 — 검색 카드의 "병합"으로 직접 묶기도 가능' },
   { command: '/split ', title: '노트 분리', description: '노트의 Q&A를 제목별로 골라 새 토픽으로 분리 (제목으로 노트 검색)' },
   { command: '/notifications', title: '알림센터', description: 'Codex 제안과 시스템 알림을 작은 패널로 보기' },
+  { command: '/task ', title: '일정 추가', description: 'LLM 없이 할 일과 알림을 직접 등록', feature: 'tasks' },
+  { command: '/today', title: '오늘 일정', description: '오늘과 지연된 할 일을 바로 보기', feature: 'tasks' },
   { command: '/memory', title: '메모리 보기', description: '항상 참조되는 사용자 메모리 목록 표시' },
   { command: '/memory add ', title: '메모리 추가', description: '항상 참조할 말투, 선호, 규칙 저장' },
   { command: '/memory remove ', title: '메모리 삭제', description: '번호로 메모리 항목 삭제' },
@@ -161,6 +165,7 @@ async function init() {
   try {
     const config = await apiFetch('/api/config').then(r => r.json());
     if (ensureApiToken(config)) return;
+    tasksEnabled = config.tasksEnabled === true;
     initPaperPanel();
     document.getElementById('model-indicator').textContent =
       `기본 Claude: ${config.claudeModel}  |  의회 GPT: ${config.gptModel}`;
@@ -216,6 +221,7 @@ async function init() {
   });
 
   await loadHistory();
+  startTaskRefresh();
   setInterval(pollForUpdates, 7000);
   updateNotesBar();
 }
@@ -533,6 +539,26 @@ function sendMessage() {
   const inputEl = document.getElementById('input');
   const text = inputEl.value.trim();
   hideCommandPalette();
+  if (text === '/task' || text.startsWith('/task ')) {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    if (!tasksEnabled) {
+      showToast('일정 기능이 아직 비활성화되어 있어');
+      return;
+    }
+    openTaskComposer(text.slice(5).trim());
+    return;
+  }
+  if (text === '/today') {
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    if (!tasksEnabled) {
+      showToast('일정 기능이 아직 비활성화되어 있어');
+      return;
+    }
+    openTaskList('today');
+    return;
+  }
   if (text === '/memory' || text.startsWith('/memory ')) {
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -690,8 +716,9 @@ function updateCommandPalette(value) {
     return;
   }
 
-  const matched = slashCommands.filter(cmd => cmd.command.startsWith(value) || value.startsWith(cmd.command.trim()));
-  const commands = matched.length > 0 ? matched : slashCommands;
+  const availableCommands = slashCommands.filter(command => command.feature !== 'tasks' || tasksEnabled);
+  const matched = availableCommands.filter(cmd => cmd.command.startsWith(value) || value.startsWith(cmd.command.trim()));
+  const commands = matched.length > 0 ? matched : availableCommands;
   renderCommandPalette(commands);
 }
 
@@ -1203,8 +1230,14 @@ async function handlePaperSearch(query) {
 }
 
 function initPaperPanel() {
-  if (!window.PaperPanel) return false;
+  if (!window.PaperPanel || !window.TaskPanel || !window.AgentPanel) return false;
   try {
+    window.TaskPanel.init({
+      apiFetch,
+      showToast,
+      onChanged: handleTaskChanged,
+      enabled: tasksEnabled,
+    });
     window.PaperPanel.init({
       apiFetch,
       showToast,
@@ -1215,6 +1248,11 @@ function initPaperPanel() {
         save: saveIconSvg,
         check: checkIconSvg,
         loading: loadingIconSvg,
+      },
+      agentPanel: {
+        enabled: tasksEnabled,
+        openCreate: () => openTaskComposer(''),
+        openTasks: () => openTaskList('today'),
       },
     });
     return true;
@@ -2484,7 +2522,26 @@ function renderMergeCandidates(candidates) {
 
 window.openNotificationsPanel = openNotificationsPanel;
 
-async function openNotificationsPanel() {
+function openTaskComposer(initialTitle = '') {
+  return openNotificationsPanel({ filter: 'task', compose: true, initialTitle });
+}
+
+function openTaskList(view = 'today') {
+  return openNotificationsPanel({ filter: 'task', view });
+}
+
+function selectNotificationFilter(panel, filter, taskOptions = {}) {
+  panel.dataset.filter = filter;
+  panel.querySelectorAll('.notification-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.filter === filter);
+  });
+  if (filter === 'task') {
+    return window.TaskPanel.render(panel.querySelector('.notification-body'), taskOptions);
+  }
+  return refreshNotificationsPanel(panel);
+}
+
+async function openNotificationsPanel(options = {}) {
   let panel = document.getElementById('notification-center');
   if (!panel) {
     panel = createNotificationsPanel();
@@ -2492,16 +2549,45 @@ async function openNotificationsPanel() {
   }
   applyNotificationPanelPosition(panel);
   panel.classList.add('open');
-  await refreshNotificationsPanel(panel);
+  const filter = options.filter || panel.dataset.filter || 'all';
+  await selectNotificationFilter(panel, filter, options);
 }
 
 function closeNotificationsPanel() {
   document.getElementById('notification-center')?.classList.remove('open');
 }
 
+function refreshTaskViews() {
+  if (!tasksEnabled || document.visibilityState !== 'visible') return;
+  window.AgentPanel?.refresh();
+  const panel = document.getElementById('notification-center');
+  if (!panel?.classList.contains('open')) return;
+  if (panel.dataset.filter === 'task') window.TaskPanel?.refresh();
+  else refreshNotificationsPanel(panel);
+}
+
+function handleTaskChanged() {
+  if (!tasksEnabled) return;
+  window.AgentPanel?.refresh();
+  const panel = document.getElementById('notification-center');
+  if (panel?.classList.contains('open') && panel.dataset.filter !== 'task') {
+    refreshNotificationsPanel(panel);
+  }
+}
+
+function startTaskRefresh() {
+  if (!tasksEnabled || taskRefreshTimer) return;
+  taskRefreshTimer = setInterval(refreshTaskViews, 60_000);
+  window.addEventListener('focus', refreshTaskViews);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshTaskViews();
+  });
+}
+
 function createNotificationsPanel() {
   const panel = document.createElement('section');
   panel.id = 'notification-center';
+  panel.classList.toggle('tasks-enabled', tasksEnabled);
   panel.setAttribute('aria-label', '알림센터');
 
   const head = document.createElement('div');
@@ -2537,6 +2623,7 @@ function createNotificationsPanel() {
   tabs.className = 'notification-tabs';
   [
     ['all', '전체'],
+    ...(tasksEnabled ? [['task', '할 일']] : []),
     ['codex', 'Codex'],
     ['system', '시스템'],
     ['saves', '최근 저장'],
@@ -2547,11 +2634,7 @@ function createNotificationsPanel() {
     btn.dataset.filter = value;
     btn.textContent = label;
     btn.addEventListener('click', () => {
-      panel.dataset.filter = value;
-      panel.querySelectorAll('.notification-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.filter === value);
-      });
-      renderNotificationItems(panel);
+      selectNotificationFilter(panel, value);
     });
     if (value === 'all') btn.classList.add('active');
     tabs.appendChild(btn);
@@ -2647,6 +2730,10 @@ function enableNotificationPanelDrag(panel, handle) {
 
 async function refreshNotificationsPanel(panel) {
   const body = panel.querySelector('.notification-body');
+  if (panel.dataset.filter === 'task') {
+    await window.TaskPanel.render(body);
+    return;
+  }
   body.innerHTML = '<div class="notification-empty">알림을 불러오는 중…</div>';
   try {
     const res = await apiFetch('/api/notifications');
@@ -2739,6 +2826,9 @@ function makeRecentSaveCard(item) {
 }
 
 function makeNotificationCard(item) {
+  if (item.type === 'task_reminder' && window.TaskPanel) {
+    return window.TaskPanel.makeReminderCard(item);
+  }
   const card = document.createElement('article');
   card.className = `notification-card type-${item.type || 'review'}`;
 

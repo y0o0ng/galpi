@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C1a 정본·API 로컬 구현 완료 · C1b 구현 전 · Pi 미배포**
+> 상태: **C1b scheduler·알림센터·일정 요약 로컬 구현 완료 · 실브라우저 viewport·Pi 미검증**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -778,37 +778,36 @@ DELETE /api/push/subscriptions/:id
 - [x] snooze child의 task ID를 서버가 원 reminder에서만 파생해 서로 다른 task parent 입력 경로가 없음
 - [x] `/task` 경로 LLM·임베딩·topic 저장 호출 0회
 
-로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_ENABLED` 기본값은 `false`이며 UI·scheduler·Pi schema 적용은 아직 시작하지 않았다.
+C1a 시점의 로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_ENABLED` 기본값은 `false`이며 이 task 정본과 API 위에 아래 C1b를 추가했다.
 
 ### C1b — scheduler·알림센터·일정 에이전트 블록
 
-변경 예정:
+로컬 구현 완료(2026-07-19):
 
-- `lib/assistant-scheduler.js`: 결정론적 tick, start/stop
-- `lib/assistant-task-routes.js`: scheduler·알림센터에 필요한 읽기 계약 확장
-- `server.js`: scheduler lifecycle과 notification read merge의 얇은 연결
-- `public/agent-panel.js`: 일정 에이전트 요약·상태·진입 동작
-- `public/index.html`, `public/paper-panel.js`, `public/app.js`, `public/style.css`: `/task`, `/today`, task tab, AgentPanel 연결과 카드 행동
-- scheduler·서버 통합·브라우저 테스트
+- `lib/assistant-scheduler.js`: 즉시 catch-up 뒤 60초 tick, tick당 최대 100개, transaction·조건부 update 중복 차단, start/stop
+- `lib/assistant-tasks.js`, `server.js`: stable fired reminder 조회, 기존 알림센터 read merge, feature flag 뒤 scheduler lifecycle과 graceful stop
+- `public/task-panel.js`: `/task`, `/today`, Today·예정·Inbox·종결·삭제, 생성·수정·상태 전이, reminder 확인·고정 request key 1시간 미루기의 단일 renderer
+- `public/agent-panel.js`: task summary만 읽는 7일·네 건수·미리보기·다음 알림과 두 진입 버튼. task mutation은 두지 않음
+- `public/index.html`, `public/paper-panel.js`, `public/app.js`, `public/style.css`: runtime flag, 알림센터 `할 일`, AgentPanel 연결, 앱 시작·focus·visible·foreground 60초 갱신과 모바일 action wrap
+- `test/assistant-task-ui.test.js`와 scheduler·서버 통합 테스트를 추가했고 기존 전체 회귀 148/148을 통과했다. `ASSISTANT_TASKS_ENABLED=false`의 기존 4탭·`준비 중` 상태도 유지한다.
 
 통과 기준:
 
-- 같은 tick 반복, 서버 재시작, 두 scheduler instance에서도 같은 reminder 행이 한 번만 fired
-- 두 번째 tick에서 `fired_at`과 안정된 `task-reminder:{id}` notification ID가 바뀌지 않음
-- 중단 중 지난 단발성 reminder가 시작 후 한 번 fired
-- fired commit 직후 crash에서도 알림 조회 가능
-- notification GET이 DB를 변경하지 않음
-- ack·snooze retry가 멱등적이고 snooze child 1개
-- create·PATCH·snooze 경합에서도 task당 live reminder 최대 1개
-- KST 자정 직전·정각·직후 Today 분류가 정확함
-- summary 한 요청의 `capturedAt`으로 건수·7일·preview·nextReminder가 일치하고 GET 전후 DB가 불변
-- history·trash 조회, reopen·restore 뒤 terminal reminder 미복원, flag off에서 API·UI·scheduler 비활성 및 행 보존
-- 기존 Codex 승인·수동 복구·최근 저장 알림의 카드·count·filter 회귀 0건
-- task title/detail의 HTML이 실행되지 않고 server log에 본문이 남지 않음
-- 에이전트 탭 첫 블록이 일정 에이전트이고 7일·지연/오늘/예정/Inbox·preview 최대 3·nextReminder를 task DB에 맞게 표시하며 push 미배포 상태는 `알림 준비 중`으로 표시
-- 일정 블록의 `일정 추가`는 작성 카드, `전체 일정`은 알림센터 task 탭을 열며 요약 블록 자체의 task mutation API 호출 0회
-- loading·전체 empty·주간 마감 empty·error·push 준비 상태와 1440×900·390×844 생성·수정·완료·확인·미루기·panel overflow 검증
-- 기존 전체 테스트와 note/topic audit 회귀 0건
+- [x] 같은 tick 반복, DB 재오픈, 두 scheduler instance에서도 같은 reminder 행이 한 번만 fired
+- [x] 두 번째 tick에서 `fired_at`과 안정된 `task-reminder:{id}` notification ID가 바뀌지 않음
+- [x] 중단 중 지난 단발성 reminder가 시작 후 한 번 fired
+- [x] fired commit 뒤 readonly 알림 조회가 가능하고 notification GET이 DB를 변경하지 않음
+- [x] ack·snooze retry가 멱등적이고 snooze child 1개
+- [x] create·PATCH·snooze 경합에서도 task당 live reminder 최대 1개
+- [x] KST 자정 직전·정각·직후 Today 분류가 정확함
+- [x] summary 한 요청의 `capturedAt`으로 건수·7일·preview·nextReminder가 일치하고 GET 전후 DB가 불변
+- [x] history·trash 조회, reopen·restore 뒤 terminal reminder 미복원, flag off에서 API·UI·scheduler 비활성 경계를 유지
+- [x] 기존 Codex 승인·수동 복구·최근 저장 알림 회귀 없이 전체 148/148 통과
+- [x] task title/detail을 `textContent`로 렌더하고 server log에 본문을 남기지 않음
+- [x] 에이전트 탭 첫 블록이 일정 에이전트이고 7일·지연/오늘/예정/Inbox·preview 최대 3·nextReminder와 `알림 준비 중`을 표시
+- [x] 일정 블록의 `일정 추가`는 작성 카드, `전체 일정`은 알림센터 task 탭을 열며 요약 블록 자체의 mutation API 호출 0회
+- [ ] 1440×900·390×844 실브라우저에서 생성·수정·완료·확인·미루기와 panel overflow 최종 확인
+- [ ] Pi 실제 재시작 catch-up과 서비스 lifecycle 인수
 
 ### C1c — private HTTPS·PWA·Web Push
 

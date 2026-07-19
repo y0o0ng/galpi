@@ -219,7 +219,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C는 2026-07-19 C0 설계를 개정해 C1 첫 배포에 private Web Push를 포함했고 코드는 아직 구현 전이다.
+> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C는 schema v5/v6과 C1b scheduler·UI까지 로컬 구현했고, 첫 일괄 배포 전 private Web Push와 실브라우저 확인이 남아 있다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -291,9 +291,9 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### C — 약속 루프
 
-> **C1a schema v6·task core·API 로컬 구현 완료(2026-07-19), C1b scheduler·UI 구현 전, Pi 미배포.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다. C1 첫 배포에는 private HTTPS·PWA·Web Push까지 포함한다.
+> **C1b scheduler·알림센터·일정 요약 로컬 구현 완료(2026-07-19), 실브라우저 viewport·Pi 미검증.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다. C1 첫 배포에는 private HTTPS·PWA·Web Push까지 포함한다.
 
-1. schema v5 `ai_readable` 경계와 schema v6 `assistant_tasks`·`assistant_task_events`·`assistant_reminders` 정본, 독립 `assistant-tasks`·`assistant-task-routes` 모듈, 인증·feature flag 뒤 create/list/summary/update/complete/cancel/reopen/delete/restore/acknowledge/snooze API를 로컬 구현했고 전체 테스트 141/141을 통과했다. 두 schema 모두 Pi에는 아직 적용하지 않았고 flag 기본값은 `false`다.
+1. schema v5 `ai_readable` 경계와 schema v6 task 정본·API에 이어 결정론적 scheduler, stable fired 알림 합성, `/task`·`/today`, 알림센터 단일 task renderer와 읽기 전용 일정 에이전트 요약을 독립 모듈로 로컬 구현했고 전체 테스트 148/148을 통과했다. 두 schema 모두 Pi에는 아직 적용하지 않았고 flag 기본값은 `false`다.
 2. 날짜 전용 기한과 절대 KST 시각을 구분하고 사용자 확인 후에만 저장
 3. reminder는 약속 occurrence 정본으로 두고, 결정론적 scheduler가 재시작 catch-up과 중복 차단 처리
 4. 시온 알림센터에 알림·Today·예정·Inbox, closed/deleted lifecycle, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기 제공
@@ -323,10 +323,10 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [ ] 테스트 세션 자동 topic 저장 0건, 웹·논문 저장에는 provenance가 남는다
 - [ ] 모든 모델 요청에서 사용 evidence·지연·토큰·도구 호출을 추적할 수 있다
 - [ ] task와 reminder가 Pi 재시작 뒤에도 유지되고 occurrence key당 stable reminder receipt·notification ID가 하나이며 확인 전 같은 행만 재표시된다
-- [ ] Today에 오늘 마감·지연 항목이 정확히 표시된다
-- [ ] 완료·취소는 closed로 계속 참조되고 deleted는 일반 검색·AI에서 제외되며 복원 가능하다
+- [x] Today에 오늘 마감·지연 항목이 정확히 표시된다
+- [x] 완료·취소는 closed로 계속 참조되고 deleted는 일반 검색·AI에서 제외되며 복원 가능하다
 - [ ] 에이전트 탭의 첫 블록이 task DB 기반 일정 요약이며 7일·네 건수·미리보기·다음 알림과 두 진입 버튼이 desktop/mobile에서 정확히 동작한다
-- [ ] 일정 요약 블록은 task 변경 행동을 중복 구현하지 않고 알림센터의 단일 renderer로 이동한다
+- [x] 일정 요약 블록은 task 변경 행동을 중복 구현하지 않고 알림센터의 단일 renderer로 이동한다
 - [ ] private HTTPS 홈 화면 PWA의 Web Push가 앱을 벗어난 상태에서 알림을 표시하고, 구독 만료·전송 실패에도 알림센터 fallback이 유실되지 않는다
 - [ ] reminder·subscription 조합당 delivery가 하나이며 재시작·retry에도 중복 outbox와 무한 재시도가 없다
 

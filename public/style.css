@@ -672,8 +672,9 @@ html, body {
 }
 
 #agent-panel:not([hidden]) {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 #note-panel:not([hidden]),
@@ -748,6 +749,260 @@ html, body {
   overflow-y: auto;
   padding: 12px;
   -webkit-overflow-scrolling: touch;
+}
+
+#agent-panel-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schedule-agent-block {
+  display: grid;
+  gap: 15px;
+  min-height: 390px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+[data-theme="dark"] .schedule-agent-block {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.schedule-agent-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-agent-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--claude-color);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.schedule-agent-head h2 {
+  font-size: 17px;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+}
+
+.schedule-agent-status {
+  flex-shrink: 0;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--label);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.schedule-agent-section {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-agent-section h3 {
+  color: var(--label);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.schedule-agent-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.schedule-agent-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 1px;
+  border-radius: 7px;
+  color: var(--label);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-agent-day strong {
+  color: var(--ai-text);
+  font-size: 12px;
+}
+
+.schedule-agent-day.today {
+  background: rgba(217, 119, 87, 0.12);
+  color: var(--claude-color);
+}
+
+.schedule-agent-day-count {
+  min-width: 16px;
+  color: var(--label);
+  text-align: center;
+}
+
+.schedule-agent-week-empty,
+.schedule-agent-muted {
+  color: var(--label);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.schedule-agent-counts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.schedule-agent-counts > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 5px;
+  text-align: center;
+}
+
+.schedule-agent-counts dt {
+  color: var(--label);
+  font-size: 9.5px;
+}
+
+.schedule-agent-counts dd {
+  color: var(--ai-text);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-agent-preview ul {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+}
+
+.schedule-agent-preview li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.schedule-agent-preview li strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ai-text);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-agent-bucket {
+  min-width: 30px;
+  color: var(--primary);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.schedule-agent-bucket.overdue {
+  color: var(--danger);
+}
+
+.schedule-agent-next {
+  display: grid;
+  gap: 4px;
+}
+
+.schedule-agent-next span {
+  color: var(--label);
+  font-size: 10px;
+}
+
+.schedule-agent-next strong {
+  overflow: hidden;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-agent-empty {
+  align-self: center;
+  display: grid;
+  gap: 6px;
+  padding: 28px 4px;
+  text-align: center;
+}
+
+.schedule-agent-empty strong {
+  font-size: 14px;
+}
+
+.schedule-agent-empty p,
+.schedule-agent-error p {
+  color: var(--label);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.schedule-agent-actions {
+  align-self: end;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.schedule-agent-action {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ai-text);
+  font: 650 11px/1 var(--font);
+  cursor: pointer;
+}
+
+.schedule-agent-action.primary {
+  border-color: var(--claude-color);
+  background: var(--claude-color);
+  color: #fff;
+}
+
+.schedule-agent-action:hover {
+  border-color: var(--label);
+}
+
+.schedule-agent-skeleton span {
+  display: block;
+  height: 54px;
+  border-radius: 8px;
+  background: rgba(142, 142, 147, 0.11);
+  animation: panel-pulse 1.1s ease-in-out infinite alternate;
+}
+
+.schedule-agent-skeleton span:nth-child(2) { height: 76px; animation-delay: 0.12s; }
+.schedule-agent-skeleton span:nth-child(3) { height: 96px; animation-delay: 0.24s; }
+.schedule-agent-skeleton span:nth-child(4) { height: 44px; animation-delay: 0.36s; }
+
+.schedule-agent-error {
+  align-content: center;
+  min-height: 260px;
+  text-align: center;
+}
+
+.schedule-agent-error .schedule-agent-action {
+  justify-self: center;
+  min-width: 110px;
 }
 
 .paper-panel-section-head {
@@ -1450,6 +1705,10 @@ html, body {
   padding: 10px 12px 8px;
 }
 
+#notification-center.tasks-enabled .notification-tabs {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .notification-tab {
   min-height: 28px;
   border: 1px solid transparent;
@@ -1506,6 +1765,261 @@ html, body {
 .notification-card.type-policy { border-left-color: var(--primary); }
 .notification-card.type-review { border-left-color: var(--claude-color); }
 .notification-card.type-save { border-left-color: var(--primary); }
+.notification-card.type-task-reminder { border-left-color: var(--danger); }
+
+.task-panel-head,
+.task-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-panel-head strong,
+.task-form-head strong {
+  font-size: 15px;
+}
+
+.task-view-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+}
+
+.task-view-tab {
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--label);
+  font: 600 10.5px/1 var(--font);
+  cursor: pointer;
+}
+
+.task-view-tab.active {
+  border-color: rgba(217, 119, 87, 0.22);
+  background: rgba(217, 119, 87, 0.1);
+  color: var(--claude-color);
+}
+
+.task-list,
+.task-list-section {
+  display: grid;
+  gap: 8px;
+}
+
+.task-list-section h3 {
+  margin-top: 2px;
+  color: var(--label);
+  font-size: 10.5px;
+}
+
+.task-card {
+  display: grid;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+[data-theme="dark"] .task-card {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.task-card-top,
+.task-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-card-top strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.task-card-meta {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  color: var(--label);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-card-detail {
+  color: var(--ai-text);
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  opacity: 0.8;
+}
+
+.task-bucket {
+  flex-shrink: 0;
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.task-bucket.overdue {
+  color: var(--danger);
+}
+
+.task-card-actions,
+.task-reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-action,
+.task-submit {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ai-text);
+  font: 600 11px/1 var(--font);
+  cursor: pointer;
+}
+
+.task-action.primary,
+.task-submit {
+  border-color: var(--claude-color);
+  background: var(--claude-color);
+  color: #fff;
+}
+
+.task-action:disabled,
+.task-submit:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.task-form {
+  display: grid;
+  gap: 11px;
+}
+
+.task-form-field {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.task-form-label {
+  color: var(--label);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.task-form-field input,
+.task-form-field textarea,
+.task-form-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--ai-bubble);
+  color: var(--ai-text);
+  font: 12px/1.4 var(--font);
+}
+
+.task-form-field textarea {
+  resize: vertical;
+}
+
+.task-form-field input:focus,
+.task-form-field textarea:focus,
+.task-form-field select:focus {
+  border-color: var(--claude-color);
+}
+
+.task-form-field small,
+.task-char-count {
+  color: var(--label);
+  font-size: 9.5px;
+}
+
+.task-char-count {
+  position: absolute;
+  right: 7px;
+  top: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.task-reminder-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  color: var(--ai-text);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.task-form-summary,
+.task-form-error {
+  min-height: 16px;
+  color: var(--label);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.task-form-error {
+  color: var(--danger);
+}
+
+.task-submit {
+  min-height: 44px;
+}
+
+.task-panel-skeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.task-panel-skeleton span {
+  display: block;
+  height: 76px;
+  border-radius: 9px;
+  background: rgba(142, 142, 147, 0.11);
+  animation: panel-pulse 1.1s ease-in-out infinite alternate;
+}
+
+.task-panel-skeleton span:nth-child(2) { animation-delay: 0.12s; }
+.task-panel-skeleton span:nth-child(3) { animation-delay: 0.24s; }
+
+.task-panel-error p {
+  margin-bottom: 10px;
+}
+
+.task-reminder-actions {
+  margin-top: 9px;
+}
+
+.task-action:focus-visible,
+.task-submit:focus-visible,
+.task-view-tab:focus-visible,
+.schedule-agent-action:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 
 .recent-save-card {
   width: 100%;
@@ -1648,6 +2162,26 @@ html, body {
   .notification-head {
     cursor: default;
     touch-action: auto;
+  }
+
+  .task-action {
+    min-height: 44px;
+  }
+
+  .task-card-actions .task-action {
+    flex: 1 1 calc(50% - 3px);
+  }
+
+  .task-reminder-actions .task-action {
+    flex: 1 1 calc(33.333% - 4px);
+    padding-inline: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedule-agent-skeleton span,
+  .task-panel-skeleton span {
+    animation: none;
   }
 }
 

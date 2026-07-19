@@ -2,17 +2,21 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 const Database = require('better-sqlite3');
 
 const { runDatabaseMigrations } = require('../lib/database-migrations');
+const { createAssistantScheduler } = require('../lib/assistant-scheduler');
 const { AssistantTaskError, createAssistantTaskStore } = require('../lib/assistant-tasks');
 
 function epoch(value) {
   return Math.floor(Date.parse(value) / 1000);
 }
 
-function createDatabase() {
-  const db = new Database(':memory:');
+function createDatabase(filename = ':memory:') {
+  const db = new Database(filename);
   db.pragma('foreign_keys = ON');
   db.exec(`
     CREATE TABLE messages (
@@ -385,5 +389,80 @@ test('KST list buckets and weekly summary use one captured clock', () => {
   assert.equal(summary.week[0].isToday, true);
   assert.deepEqual(summary.preview.map(item => item.title), ['곧 지연', '오늘 시각', '오늘 날짜']);
   assert.equal(summary.nextReminder.title, '오늘 시각');
+  db.close();
+});
+
+test('scheduler catches up after reopen and repeated instances keep one stable fired receipt', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'assistant-scheduler-'));
+  const dbPath = path.join(root, 'galpi.db');
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const now = epoch('2026-07-19T03:00:00Z');
+  let db = createDatabase(dbPath);
+  const store = createAssistantTaskStore(db, { now: () => now });
+  const created = store.create(taskInput());
+  db.prepare('UPDATE assistant_reminders SET remind_at = ? WHERE id = ?').run(now - 30, created.reminder.id);
+  db.close();
+
+  db = new Database(dbPath);
+  db.pragma('foreign_keys = ON');
+  const first = createAssistantScheduler(db, { now: () => now });
+  const second = createAssistantScheduler(db, { now: () => now + 10 });
+  assert.deepEqual(first.tick(), { capturedAt: now, firedIds: [created.reminder.id], skipped: false });
+  const firedAt = db.prepare('SELECT fired_at AS firedAt FROM assistant_reminders WHERE id = ?')
+    .get(created.reminder.id).firedAt;
+  assert.deepEqual(second.tick(), { capturedAt: now + 10, firedIds: [], skipped: false });
+  assert.equal(
+    db.prepare('SELECT fired_at AS firedAt FROM assistant_reminders WHERE id = ?').get(created.reminder.id).firedAt,
+    firedAt,
+  );
+
+  const reopenedStore = createAssistantTaskStore(db, { now: () => now + 10 });
+  const before = db.prepare('SELECT status, fired_at AS firedAt FROM assistant_reminders WHERE id = ?')
+    .get(created.reminder.id);
+  const notifications = reopenedStore.listFiredNotifications();
+  const after = db.prepare('SELECT status, fired_at AS firedAt FROM assistant_reminders WHERE id = ?')
+    .get(created.reminder.id);
+  assert.deepEqual(after, before);
+  assert.deepEqual(notifications, [{
+    id: `task-reminder:${created.reminder.id}`,
+    source: 'task',
+    type: 'task_reminder',
+    reminderId: created.reminder.id,
+    taskId: created.task.id,
+    taskVersion: 1,
+    title: '보고서 초안',
+    remindAt: now - 30,
+    firedAt,
+  }]);
+  db.close();
+});
+
+test('scheduler rolls back the whole due batch when one fire update fails', () => {
+  const db = createDatabase();
+  const now = epoch('2026-07-19T03:00:00Z');
+  const store = createAssistantTaskStore(db, { now: () => now });
+  const first = store.create(taskInput({ clientRequestId: 'web-scheduler-one1' }));
+  const second = store.create(taskInput({ clientRequestId: 'web-scheduler-two2' }));
+  db.prepare('UPDATE assistant_reminders SET remind_at = ? WHERE id IN (?, ?)')
+    .run(now - 30, first.reminder.id, second.reminder.id);
+  db.exec(`
+    CREATE TRIGGER fail_second_scheduler_fire
+    BEFORE UPDATE OF status ON assistant_reminders
+    WHEN OLD.id = ${second.reminder.id} AND NEW.status = 'fired'
+    BEGIN
+      SELECT RAISE(ABORT, 'forced scheduler failure');
+    END;
+  `);
+  const scheduler = createAssistantScheduler(db, { now: () => now });
+  assert.throws(() => scheduler.tick(), /forced scheduler failure/);
+  assert.deepEqual(
+    db.prepare('SELECT status, fired_at AS firedAt FROM assistant_reminders ORDER BY id').all(),
+    [
+      { status: 'pending', firedAt: null },
+      { status: 'pending', firedAt: null },
+    ],
+  );
+  db.exec('DROP TRIGGER fail_second_scheduler_fire');
+  assert.deepEqual(scheduler.tick().firedIds, [first.reminder.id, second.reminder.id]);
   db.close();
 });
