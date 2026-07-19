@@ -291,9 +291,9 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### C — 약속 루프
 
-> **C0 설계 개정 완료(2026-07-19), 선행 schema v5 로컬 구현 완료, C1 task core 구현 전.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다. C1 첫 배포에는 private HTTPS·PWA·Web Push까지 포함한다.
+> **C1a schema v6·task core·API 로컬 구현 완료(2026-07-19), C1b scheduler·UI 구현 전, Pi 미배포.** 단일 기준은 [시온 약속 루프 상세 설계](task-reminder-design.md)다. 이 단계는 외부 캘린더를 운영하는 V5-C 일정 에이전트가 아니다. C1 첫 배포에는 private HTTPS·PWA·Web Push까지 포함한다.
 
-1. schema v5 `ai_readable`은 평면 vault를 유지하면서 답변·검색·A1b·논문 전문·MCP·임베딩·Codex·파생 그래프에서 비허용 노트를 제외하도록 로컬 구현했고 전체 테스트 132/132를 통과했다. 다음 C1a는 명시적 `/task`, schema v6 task·event·reminder 정본과 단발성 알림부터 구현
+1. schema v5 `ai_readable` 경계와 schema v6 `assistant_tasks`·`assistant_task_events`·`assistant_reminders` 정본, 독립 `assistant-tasks`·`assistant-task-routes` 모듈, 인증·feature flag 뒤 create/list/summary/update/complete/cancel/reopen/delete/restore/acknowledge/snooze API를 로컬 구현했고 전체 테스트 141/141을 통과했다. 두 schema 모두 Pi에는 아직 적용하지 않았고 flag 기본값은 `false`다.
 2. 날짜 전용 기한과 절대 KST 시각을 구분하고 사용자 확인 후에만 저장
 3. reminder는 약속 occurrence 정본으로 두고, 결정론적 scheduler가 재시작 catch-up과 중복 차단 처리
 4. 시온 알림센터에 알림·Today·예정·Inbox, closed/deleted lifecycle, 완료·취소·다시 열기·삭제·복원·확인·1시간 미루기 제공

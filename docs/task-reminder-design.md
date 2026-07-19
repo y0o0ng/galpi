@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C0 설계 개정 완료 · C1 구현 전**
+> 상태: **C1a 정본·API 로컬 구현 완료 · C1b 구현 전 · Pi 미배포**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -210,7 +210,7 @@ SQLite 공식 문서는 동시 read transaction은 여러 개 가능하지만 �
 
 ## 6. 정본 schema
 
-운영 배포 최신은 schema v4다. 선행하는 노트 `ai_readable` 접근 경계 보강은 로컬 schema v5로 구현했으며, C1 task core는 **schema v6**, Web Push는 독립 배포·feature flag 비활성화가 가능한 **schema v7**로 순차 적용한다.
+운영 배포 최신은 schema v4다. 로컬에는 노트 `ai_readable` 접근 경계인 schema v5와 C1 task core인 **schema v6**까지 구현했다. Web Push는 독립 배포·feature flag 비활성화가 가능한 **schema v7**로 이어서 적용한다.
 
 ### 6.1 schema v5 — 노트 AI 읽기 경계
 
@@ -517,6 +517,7 @@ GET /api/tasks?view=today|upcoming|inbox|all|history|trash&status=done|cancelled
 - `all`: 모든 active task를 기한순·최근 수정순으로 조회
 - `history`: `closed` task를 최근 상태 변경순으로 조회. `status` 기본값은 `all`이며 이 view에서만 받는다.
 - `trash`: `deleted` task를 삭제 최근순으로 조회. 복구 UI에서만 호출하고 일반 검색·알림·AI 조회에는 합성하지 않는다.
+- 각 task 항목은 현재 `pending | fired` reminder 하나를 `reminder`로 함께 반환하며 없으면 `null`이다. terminal reminder 이력 전체는 목록 응답에 싣지 않는다.
 
 ### 8.2 일정 에이전트 요약
 
@@ -753,35 +754,39 @@ DELETE /api/push/subscriptions/:id
 - [x] C1 첫 배포에 private HTTPS·PWA·Web Push와 in-app fallback 포함 결정
 - [x] 에이전트 탭 최상단 일정 요약과 알림센터 단일 쓰기 경계 결정
 
-### C1a — 정본과 API
+### C1a — 정본과 API ✅ 로컬 구현 완료(2026-07-19, Pi 미배포)
 
-변경 예정:
+구현 파일:
 
 - `lib/database-migrations.js`: 선행 v5 뒤 schema v6
 - `lib/assistant-tasks.js`: 검증·transaction·상태 전이·목록
-- `server.js`: 얇은 task/reminder route
-- migration·store·API 테스트
+- `lib/assistant-task-routes.js`: 인증 뒤 feature flag·JSON·task/reminder HTTP 계약
+- `server.js`: 설정·store 생성·route 등록만 담당하는 얇은 연결
+- `test/assistant-tasks.test.js`, `test/assistant-tasks-server.test.js`: store·HTTP 계약
 
 통과 기준:
 
-- v5→v6 migration과 재실행이 멱등적이고 기존 application table 행이 불변
-- 확인 전 DB 행 0개, create retry 뒤 task/reminder 각 최대 1개
-- create 후 task를 수정해도 최초 create retry hash가 같으면 같은 task를 반환하고, 다른 payload면 409
-- date-only와 datetime 기한이 host timezone과 무관하게 분류됨
-- 인증 없음·JSON 아님·길이 초과·잘못된 달력 날짜·offset·과거·10년 초과 입력을 거부
-- version 충돌 409, 완료·취소·다시 열기·삭제·복원 상태와 reminder 정리가 일치
-- closed는 참조 가능·수정 불가, deleted는 일반 조회·검색·AI 후보 0건, 복구 조회에서만 노출
-- 모든 실제 상태 전이에 event 1개, 멱등 retry에는 추가 event 0개
-- due 수정과 reminder `keep`에서 reminder ID·시각이 불변
-- 서로 다른 task 사이 snooze parent 연결을 거부
-- `/task` 경로 LLM·임베딩·topic 저장 호출 0회
+- [x] v5→v6 migration과 재실행이 멱등적이고 기존 application table 행이 불변
+- [x] 확인 전 DB 행 0개, create retry 뒤 task/reminder 각 최대 1개
+- [x] create 후 task를 수정해도 최초 create retry hash가 같으면 같은 task를 반환하고, 다른 payload면 409
+- [x] date-only와 datetime 기한이 host timezone과 무관하게 분류됨
+- [x] 인증 없음·JSON 아님·길이 초과·잘못된 달력 날짜·offset·과거·10년 초과 입력을 거부
+- [x] version 충돌 409, 완료·취소·다시 열기·삭제·복원 상태와 reminder 정리가 일치
+- [x] closed는 참조 가능·수정 불가, deleted는 일반 조회·검색·AI 후보 0건, 복구 조회에서만 노출
+- [x] 모든 실제 상태 전이에 event 1개, 멱등 retry에는 추가 event 0개
+- [x] due 수정과 reminder `keep`에서 reminder ID·시각이 불변
+- [x] snooze child의 task ID를 서버가 원 reminder에서만 파생해 서로 다른 task parent 입력 경로가 없음
+- [x] `/task` 경로 LLM·임베딩·topic 저장 호출 0회
+
+로컬 전체 회귀는 141/141을 통과했다. `ASSISTANT_TASKS_ENABLED` 기본값은 `false`이며 UI·scheduler·Pi schema 적용은 아직 시작하지 않았다.
 
 ### C1b — scheduler·알림센터·일정 에이전트 블록
 
 변경 예정:
 
 - `lib/assistant-scheduler.js`: 결정론적 tick, start/stop
-- `server.js`: lifecycle, notification read merge, readonly task summary route
+- `lib/assistant-task-routes.js`: scheduler·알림센터에 필요한 읽기 계약 확장
+- `server.js`: scheduler lifecycle과 notification read merge의 얇은 연결
 - `public/agent-panel.js`: 일정 에이전트 요약·상태·진입 동작
 - `public/index.html`, `public/paper-panel.js`, `public/app.js`, `public/style.css`: `/task`, `/today`, task tab, AgentPanel 연결과 카드 행동
 - scheduler·서버 통합·브라우저 테스트
