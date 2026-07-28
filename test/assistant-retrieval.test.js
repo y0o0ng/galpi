@@ -54,6 +54,13 @@ test('retrieval command phrasing does not create lexical anchors', () => {
     ),
     ['비슷한', '결의', '소설이'],
   );
+  assert.deepEqual(
+    extractQueryTerms(
+      '나는 지금 이걸 사려고 한 건 아냐',
+      GLOBAL_SHADOW_SEARCH_STOP_WORDS,
+    ),
+    [],
+  );
 });
 
 test('global shadow stop words do not change the legacy note query contract', () => {
@@ -445,6 +452,82 @@ test('global shadow abstains from medium semantic collisions without lexical evi
   assert.equal(result.contextChars, 0);
 });
 
+test('automatic note keyword matches do not anchor unrelated chunks', () => {
+  const input = {
+    query: '시험 일정',
+    queryEmbedding: [1, 0],
+    noteCandidates: [{
+      filename: 'mixed.md',
+      title: '혼합 노트',
+      score: 0.9,
+      keywordScore: 5,
+    }],
+    chunks: [{
+      chunkId: 'unrelated-chunk',
+      noteFilename: 'mixed.md',
+      noteTitle: '혼합 노트',
+      content: 'Q: 주식 전략\nA: 이동평균선을 검토했다.',
+      embedding: [0.5, 0.8660254037844386],
+    }],
+  };
+  const result = buildGlobalShadowRetrieval(input);
+  const previousPolicy = buildGlobalShadowRetrieval({
+    ...input,
+    limits: {
+      globalAllowNoteKeywordAnchor: true,
+      globalAllowAutomaticStrongNotePrior: true,
+    },
+  });
+
+  assert.deepEqual(result.chunks, []);
+  assert.deepEqual(previousPolicy.chunks.map(chunk => chunk.chunkId), ['unrelated-chunk']);
+});
+
+test('answer-only keyword overlap is not an automatic lexical anchor', () => {
+  const result = buildGlobalShadowRetrieval({
+    query: '아이폰 일반형 고민',
+    queryEmbedding: [1, 0],
+    chunks: [{
+      chunkId: 'answer-only',
+      noteFilename: 'story.md',
+      content: 'Q: 소설 초안\nA: 주인공은 일반형 휴대폰을 살지 고민한다.',
+      embedding: [0.5, 0.8660254037844386],
+    }],
+  });
+
+  assert.deepEqual(result.chunks, []);
+});
+
+test('automatic note priors cannot lower the semantic-only threshold', () => {
+  const input = {
+    query: '시험 일정',
+    queryEmbedding: [1, 0],
+    chunks: [{
+      chunkId: 'semantic-collision',
+      noteFilename: 'mixed.md',
+      noteTitle: '혼합 노트',
+      content: 'Q: 자격증 계획\nA: 다음 달 학습 계획을 세웠다.',
+      embedding: [0.5, 0.8660254037844386],
+    }],
+  };
+  const automatic = buildGlobalShadowRetrieval({
+    ...input,
+    noteCandidates: [{
+      filename: 'mixed.md',
+      title: '혼합 노트',
+      score: 0.95,
+      keywordScore: 4,
+    }],
+  });
+  const explicit = buildGlobalShadowRetrieval({
+    ...input,
+    activeNotes: [{ filename: 'mixed.md', title: '혼합 노트' }],
+  });
+
+  assert.deepEqual(automatic.chunks, []);
+  assert.deepEqual(explicit.chunks.map(chunk => chunk.chunkId), ['semantic-collision']);
+});
+
 test('global shadow ignores conversational recency wording but keeps the topic prior', () => {
   const result = buildGlobalShadowRetrieval({
     query: '그 머냐 수면대행서비스 관련해서 가장 최근에 무슨 이야기를 했더라?',
@@ -454,6 +537,8 @@ test('global shadow ignores conversational recency wording but keeps the topic p
       title: '숙면 대행 서비스',
       score: 0.8,
       keywordScore: 2,
+      titleKeywordScore: 20,
+      titleMatchedTerms: 1,
     }],
     chunks: [
       {
@@ -500,6 +585,37 @@ test('global shadow expands one note only for explicit multi-evidence queries', 
 
   assert.equal(single.chunks.length, 3);
   assert.equal(multiple.chunks.length, 5);
+});
+
+test('global shadow drops weak automatic tails but preserves explicit note evidence', () => {
+  const chunks = [
+    {
+      chunkId: 'top',
+      noteFilename: 'auto.md',
+      content: 'Q: 아이폰 가격\nA: 현재 가격을 확인했다.',
+      embedding: [1, 0],
+    },
+    {
+      chunkId: 'weak-tail',
+      noteFilename: 'other.md',
+      content: 'Q: 자켓 가격\nA: 중고 매물을 확인했다.',
+      embedding: [0.8, 0.6],
+    },
+  ];
+  const automatic = buildGlobalShadowRetrieval({
+    query: '아이폰 가격',
+    queryEmbedding: [1, 0],
+    chunks,
+  });
+  const explicit = buildGlobalShadowRetrieval({
+    query: '아이폰 가격',
+    queryEmbedding: [1, 0],
+    activeNotes: [{ filename: 'other.md', title: '직접 선택' }],
+    chunks,
+  });
+
+  assert.deepEqual(automatic.chunks.map(chunk => chunk.chunkId), ['top']);
+  assert.ok(explicit.chunks.some(chunk => chunk.chunkId === 'weak-tail'));
 });
 
 test('shadow service records identifiers without content and isolates trace failures', () => {

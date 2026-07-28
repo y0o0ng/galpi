@@ -18,7 +18,9 @@ V2   뇌의 깊이       — 의회 + 저장/회수가 제대로 도는 뇌     
 V3   뇌의 자기관리   — Codex가 조용히 정리, 안 망가짐         ✅ 완료
 V3.5 시간과 검색     — 시간 감각 + 검색 튜닝                       ✅ 완료
 V4-A 논문 입력구     — 검색·저장·필요한 전문만 읽는다          ✅ 완료
-V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← A1b
+V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← A2 운영 관찰
+V4.5-M 모델 런타임   — 단일 GPT·동적 모델·Codex 모델 설정       ✅ Pi 인수 완료
+DEV-D Docker          — 데이터 경계 분리·개발/CI 재현성           ○ 설계 확정
 V4-B 음성 입력구     — 확인한 전사를 대화·메모·할 일로 보낸다
 V5   전문 직원       — 딜 스카우트 → 주식 분석 → 후속 역할
 V6   비서의 얼굴     — 화면에 떠있는 시온, 어디서든
@@ -27,7 +29,7 @@ V7   손발(보너스)    — 기기 제어 (정말 나중, 선택)
 
 > 갈피/시온 이름·운영 경로 이관 완료 (`4ce7fdc`, 2026-07-18): GitHub 저장소와 패키지·MCP·설계문서·systemd를 `galpi`로, 화면 비서 이름을 시온(`XION`)으로 변경했다. Pi는 동시 DB·vault와 코드 백업 후 `/home/pi/galpi`, `galpi.db`, `galpi-vault`, `/home/pi/backups/galpi`, `galpi.service`로 이관했다. 기존 `council-*` 백업은 계속 조회·정리 가능하고 의회 API·노트 타입·브라우저 저장 키는 호환성을 위해 유지한다. 테스트 101개, audit 66/66, Codex 검증 20개, 핵심 파일 hash와 DB hash·13개 테이블 행 수, 인증 API·UI·새 온라인 백업을 인수했다.
 
-핵심 통찰: **V1~V4-A까지는 개인 지식 비서의 뇌다.** 생활 비서가 되려면 V4.5에서 최신 기억을 정확히 읽고, 할 일·기한·후속 조치를 먼저 챙기는 루프가 추가돼야 한다. 그 기반과 V4-B 음성 뒤에 V5-A 딜 스카우트로 전문 에이전트의 공통 실행·승인·감사 패턴을 먼저 검증하고, V5-B 주식 분석으로 확장한다.
+핵심 통찰: **V1~V4-A까지는 개인 지식 비서의 뇌다.** 생활 비서가 되려면 V4.5에서 최신 기억을 정확히 읽고, 할 일·기한·후속 조치를 먼저 챙기는 루프가 추가돼야 한다. V4.5-M은 그 뇌의 답변 런타임을 단일 GPT로 바꾸는 병행 기반 트랙이다. 그 기반과 V4-B 음성 뒤에 V5-A 딜 스카우트로 전문 에이전트의 공통 실행·승인·감사 패턴을 먼저 검증하고, V5-B 주식 분석으로 확장한다.
 
 ---
 
@@ -219,7 +221,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > 상세 설계: [assistant-foundation-design.md](assistant-foundation-design.md)
 >
-> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 shadow 검색까지 Pi 배포·인수를 완료했다. 다음은 실사용 trace의 과회수·지연 관찰이며 A2 실제 회수 전환은 보류한다. V4.5-C schema v5/v6/v7·최소 PWA·Web Push·지식 시트/일정 에이전트 UI, schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드까지 Pi에 인수했다. 로컬/Pi 전체 테스트는 171/171이며 실기기 Web Push 10회 표시 검증을 진행 중이다.
+> 상태: A0·A1 shadow와 S0 저장 무결성 전체, A1b 전역 청크 검색을 거쳐 보수 A2를 2026-07-28 단일 GPT 전환과 함께 Pi에 활성화했다. V4.5-C schema v5/v6/v7·최소 PWA·Web Push·지식 시트/일정 에이전트 UI, schema v8 일정 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보 카드도 Pi에 인수했다. GPT+A2 전체 회귀는 207/207이며 실기기 Web Push 10회 표시와 새 GPT generation A2 온라인 관찰을 진행 중이다.
 
 현재 시스템은 지식을 저장하고 관련 노트를 찾는 데 강하지만, 긴 topic의 특정 Q&A·최신 변경을 정확히 읽는 경로와 할 일·기한·후속 확인 구조가 부족하다. V4.5는 새 에이전트를 붙이는 단계가 아니라 기존 뇌를 믿을 수 있게 만들고 비서의 기본 약속 루프를 추가하는 단계다.
 
@@ -273,6 +275,12 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 > A1b 실사용 21개 실패 보정 Pi 배포·인수 완료(`3a0e10c`, `917b1ef`, `b96a44f`, `d55256d`, 2026-07-19): 숙면 대행 서비스의 최신 대화를 묻는 연속 2개 질문을 opt-in review했다. 첫 질문은 주식·TradingAgents 청크만 고른 과회수였고, 둘째 질문은 실제 `비슷한 소재의 소설` Q&A를 1위로 찾았지만 직전 오답과 `시` 청크도 함께 골랐다. 기존 실제 답변 경로는 관련 노트를 찾고도 앞 5,000자만 주입해 9,000자 이후의 최신 Q&A를 보지 못했다. A2를 켜지 않은 채 노트 컨텍스트를 앞·뒤 균형으로 자르고, 회수 명령형 일반어를 A1b lexical anchor에서 제외했으며, 5자 이상 compact 제목의 한 글자 차이를 제한적으로 보정했다. 과거 대화 회수 질문과 회수 실패·불확실 답변은 topic 자동 저장에서 제외한다. 사용자 승인형 `remove:topic-qa`는 파일 Q&A·ready 청크·자동 저장 기록만 exact hash/source guard 뒤 물리 삭제하고 원본 대화는 보존하며, 삭제한 노트의 전체 임베딩은 재색인 전까지 `pending`으로 둔다. 승인된 오저장 2건을 삭제하고 두 노트를 재색인했다. 운영 진단에서 첫 질문의 실제 검색은 `숙면 대행 서비스`가 1위였고 두 질문의 A1b는 각각 관련 숙면 청크 1개만 선택했다. 로컬·Pi 전체 테스트 181/181, note-index 31/31, topic Q&A 76/76, SQLite 무결성·외래키, 변경 파일 hash와 새 PID를 확인했다. 코드 백업은 `code-memory-fix-pre-20260719-224058.tar.gz`, 삭제 직전 DB·vault 백업은 `20260719-2245`다. A2는 계속 shadow-only이며 고유 질문은 21개로, 30개 중간 점검까지 9개가 남았다.
 
+> A1b 77개 전수 재생·A2 로컬 승격 후보 완료(2026-07-28): 운영 trace는 실행 79회·고유 질문 77개, 추가 지연 평균 38.6ms·p95 56ms·최대 60ms, 오류·손상 JSON 0건이었다. 첫 opt-in 검토에서 일정·기기·구매 질문에 주식·숙면 청크가 반복돼 기존 정책은 NO-GO였다. 과거 질문 이후 청크를 제외하고 해당 시점의 topic 청크만으로 본문을 재구성하는 readonly `review:retrieval-policy`를 추가했다. 자동 노트 키워드가 무관 청크를 살리는 경로와 자동 prior의 낮은 문턱을 제거하고, 저장 질문부 직접 일치·일반 0.45·lexical 임베딩 0.30·semantic-only 0.80·상위점 대비 0.11 꼬리 제한을 적용했다. 동일 corpus에서 이전 정책은 35개 질문·107개 청크·중단 42개, 새 정책은 10개 질문·15개 청크·중단 67개였다. opt-in 검토한 15개 근거는 모두 질문 주제와 연결됐고 합성 20개 note/chunk 20/20·abstention 4/4를 유지했다. `ASSISTANT_RETRIEVAL_A2_ENABLED`는 자동 topic 전체 노트 대신 `<retrieval>` 청크를 넣고 명시 선택 노트·비topic 자료는 보존하며, 기본값 false와 `:a2` trace를 사용한다. GPT 전환+A2 전체 회귀 207/207을 통과했으며 두 기능은 같은 Pi 백업·배포·재기동에서만 켠다.
+
+> V4.5-M·A2 Pi 통합 배포·인수 완료(2026-07-28): 사전 DB·Vault 백업 `20260728-2337`, 코드 롤백본 `code-v45m-a2-pre-20260728-233706.tar.gz` 뒤 42개 파일을 한 배포본으로 올리고 schema 8→9와 세 운영 flag를 한 재기동에서 활성화했다. `자동`은 실제 `gpt-5.6-terra`, Codex 일반은 Terra·깊은 재정리는 `gpt-5.5`로 resolve됐다. 실제 GPT 일반·웹·논문 전문·일정 무쓰기 후보, A2 무관 질문 중단과 기억 회수, Claude·의회 `410`, model catalog와 Codex next-job snapshot을 확인했다. 스모크가 자동 저장한 Q&A 2건은 추가 백업 `20260728-2351`과 exact guard 뒤 제거하고 원본 메시지를 보존했으며 두 노트를 재임베딩·Codex 재정리했다. 최종 전체 회귀 207/207, topic Q&A 105/105, note index 33/33·finding 0, Codex validation 23, SQLite 무결성·외래키, task/event/reminder 8/15/4 불변, 서비스 경고 0을 인수했다. 배포 후 A2는 무관 질문 0청크·35ms, 기억 질문 2청크·1,918자·41ms였고 새 `chat:gpt-single-v1:a2` 온라인 표본은 과거 77개와 분리한다.
+
+> V4.5-M 배포 전 77개 고유 trace는 그대로 보존한다. 모델 전환 뒤에는 `runtime_generation`과 `:a2` mode를 분리해 기록한다. 검색 후보 자체의 지표는 회수 정책이 같으면 이어서 참고할 수 있지만, 답변 품질·도구 사용·자동 저장 결과는 Claude generation과 GPT generation을 합산하지 않는다.
+
 1. 기존 `note_chunks`의 Q&A 임베딩을 일반 답변 회수에 연결
 2. 전역 청크 검색에 노트 점수를 soft prior로 결합하고 요청 전체 컨텍스트 8,000자 하드 상한 적용
 3. 사용자 발언·AI 분석·웹 근거·논문 근거의 provenance 구분
@@ -307,7 +315,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 7. C1c는 fire/outbox 원자성, lease·TTL·bounded retry, endpoint allowlist, VAPID 비밀 비노출, canonical HTTPS에서만 가능한 사용자 opt-in을 구현했다. 다음은 Tailscale Serve와 iPhone 실기기 전달 검증이다.
 8. C1e는 활성 task DB를 최대 20개·6,000자의 공통 채팅 컨텍스트로 합성하고, 완료·취소를 월별 `schedule_history` 노트로 투영한다. 다시 열기·삭제·복원은 같은 월을 재생성하고 DB만 정본으로 유지한다. 일정별 노트·저장 버튼·추가 LLM·과거 일정 질문 분류기는 두지 않는다.
 9. C1.5는 단일 Claude의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보를 만들고, 사용자가 채팅 카드의 `등록`을 누를 때만 `TaskPanel`이 기존 task API를 호출한다. 후보는 휘발 상태이며 후보 답변은 topic 자동 저장과 노트 저장 버튼에서 제외한다.
-10. 반복은 schema v9 C2, 브리핑·자유 서술 결과 기록은 C3에서 별도 컨펌
+10. 반복은 C2 구현 시점의 다음 가용 schema에서 별도 컨펌하고, 브리핑·자유 서술 결과 기록은 C3에서 별도 컨펌
 
 명시적 `/task`, 새 전용 테이블·모듈, 무LLM을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다. C1e는 A1b 후보 점수·trace와 topic 자동 저장은 그대로 두고, 활성 일정 전용 bounded 블록과 종결 일정의 일반 노트 projection만 추가한다. C1.5도 A1b 점수·trace 형식을 바꾸지 않으며 후보가 실제로 생긴 운영 요청만 topic 자동 저장에서 제외한다. 숨은 탭의 timer를 계속 돌리는 것은 지원하지 않으며 Pi scheduler가 시각을 판정하고 Web Push가 Service Worker를 이벤트성으로 깨운다.
 
@@ -340,6 +348,56 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [ ] private HTTPS 홈 화면 PWA의 Web Push가 10회 표시 기준을 충족하고, 구독 만료·전송 실패에도 일정 에이전트 fallback이 유실되지 않는다. 첫 운영 reminder는 3개 구독 모두 provider `201 accepted`였다
 - [ ] reminder·subscription 조합당 delivery가 하나이며 재시작·retry에도 중복 outbox와 무한 재시도가 없다
 
+### M — 단일 GPT와 모델 운영
+
+> 상태: 2026-07-28 M0~M5 구현과 Pi 기능 인수 완료. schema v9·settings/catalog·Responses 도구 parity, 단일 GPT chat, composer picker, 의회 신규 실행 410, 사서 Codex 설정과 job snapshot을 A2와 한 배포본으로 운영 활성화했다. 전체 회귀 207/207과 실제 OpenAI `gpt-5.6-terra` 일반·웹·논문·일정 후보, Pi Codex CLI 0.144.5 `model/list`·실제 organizer job을 통과했다. Claude/GPT 품질 A/B는 생략했다. 단일 기준은 [단일 GPT 채팅·모델 라우팅 설계](chat-model-routing-design.md)다.
+>
+> A1b 실사용 관찰과 Web Push 표시 검증에 영향을 주지 않는 병행 기반 트랙이다.
+>
+> 모바일 composer 보정 Pi 반영 완료(2026-07-29): 모델 선택 opener의 기본 경계를 없애고 hover·열림 상태에만 옅은 면을 남겼다. placeholder를 `메시지를 입력하세요`로 줄이고 textarea 축소 경계와 모바일 44px 전송 버튼·safe-area 여백을 보정했다. 390px·320px 실측에서 문서 가로 overflow 0, 로컬 전체 207/207, Pi UI 9/9를 통과했다. 정적 HTML/CSS 응답 hash가 배포본과 일치했고 서비스는 재시작 없이 PID `116558`을 유지했다. 복구본은 `/home/pi/backups/galpi/ui-composer-pre-20260729-0031.tar.gz`다.
+
+1. 앞무대 답변은 기존 OpenAI API 키와 Responses API를 사용하는 단일 GPT로 전환한다. ChatGPT 구독 계정은 메인 채팅 API 호출에 사용하지 않는다.
+2. 의회 신규 실행 UI·API·Claude/GPT 합성 경로는 제거하되 기존 의회 메시지·transcript·`note_type: council`은 읽기·검색 호환성을 유지한다.
+3. 대화는 기존 `shared-main` 하나를 유지한다. 모델 선택은 다음 답변부터 적용하며 selection과 실제 resolved model을 함께 기록한다.
+4. `자동`은 `발견 → Responses text·tool 호환성 probe → 승격`을 통과한 최신 균형형 모델로 이동한다. 고정 모델은 조용히 바꾸지 않는다.
+5. OpenAI API 카탈로그와 Codex 구독 카탈로그를 분리하고, 실패 시 마지막 정상 목록과 모델을 유지한다. embedding·audio·transcription·realtime·image generation 모델은 채팅 목록에 노출하지 않는다.
+6. 에이전트 탭에는 일정 블록 아래 `사서 Codex` 블록을 추가해 일반 정리와 깊은 재정리 모델을 각각 선택한다. 목록은 자동 갱신하되 선택 모델과 실행 중 job은 바꾸지 않는다.
+7. 강의 processing job과 주식 Champion처럼 재현성이 필요한 작업은 채팅의 `자동 최신`을 상속하지 않는다.
+8. schema v9는 settings·catalog cache·답변 runtime generation·Codex job model snapshot을 additive하게 저장한다.
+
+통과 기준:
+
+- [x] 웹 검색·논문 전문·일정 후보·기억 회수·진행 스트림이 GPT 경로에서 회귀 없이 동작한다
+- [x] 신규 의회 provider 호출은 410에서 끝난다
+- [x] 자동 선택과 실제 resolved model 기록이 재시작 뒤에도 일치한다
+- [x] 비채팅 모델이 catalog에 노출되지 않고 catalog 장애 시 마지막 정상 상태를 유지한다
+- [x] Codex 선택 모델이 생성된 다음 job에 snapshot된다
+- [x] desktop·390×844, 키보드·focus·44px target을 통과한다
+
+배포 계약:
+
+- V4.5-M과 A2 회수 상향은 같은 Pi 백업·배포본·재기동으로 활성화했고 함께 인수했다.
+- A1b 운영 trace 77개의 보수 정책 재생과 배포 후 새 GPT runtime generation은 분리해 관찰한다.
+
+### DEV-D — Docker 개발·CI 재현성
+
+> 상태: 설계 확정, 미구현. 상세 기준은 [Docker 개발·CI 설계](docker-development-design.md)다.
+
+- Docker는 개발·CI에 먼저 도입하고, 현재 Pi의 native Node.js + systemd 운영은 V4.5-M·A2 배포에서 유지한다.
+- 먼저 SQLite DB/WAL/SHM, Vault, backup 경로를 image 밖의 명시적 데이터 루트와 bind mount로 분리한다.
+- `better-sqlite3`의 x86_64/ARM64 install, migration, 전체 테스트를 같은 image 계약으로 검증한다.
+- Codex CLI의 ChatGPT 로그인과 organizer는 첫 단계에서 host 경계를 유지한다.
+- ARM64·backup/restore·scheduler·SIGTERM recovery와 단일 service manager 조건을 통과한 뒤에만 Pi container 운영을 별도 검토한다.
+
+### 첨부·강의 병행 lane
+
+- 일반 첨부 U0~U1은 V4.5-M의 도구 parity와 입력창 model picker가 안정된 뒤 병행할 수 있다. 상세는 [첨부파일 업로드·검색 설계](galpi-attachment-upload-design.md)다.
+- temporary 첨부는 연결 시 현재 `CONTEXT_N`을 `replay_window_turns`로 snapshot한다. 현재 로컬·Pi 값은 사용자 턴 10개이며, origin turn이 창에서 밀려나는 다음 사용자 턴의 모델 호출 전에 만료·비동기 삭제한다.
+- `CONTEXT_N`을 나중에 5로 바꾸면 새 첨부부터 5턴을 쓰며 기존 첨부에는 소급하지 않는다. 자연어 재언급은 수명을 늘리지 않고 명시적 `다시 첨부`만 새 연결을 만든다.
+- library는 명시적 승인 뒤 Vault로 승격하고 자동 만료하지 않는다. 미연결 upload는 60분 orphan TTL로 정리한다.
+- 강의 Phase 0은 개발 없이 지금 검증할 수 있다. 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 시작한다. 상세는 [갈피 강의 노트 설계](Lecture-note-system%20Design.md)다.
+- 강의 전체 구현은 V5-B 시작 전 또는 `PAPER_AUTONOMOUS` 관찰 기간에 병행할 수 있다. 거래 DB·worker queue·scheduler budget·API cost ledger를 공유하지 않는다.
+
 ---
 
 ## 외부 검색 (웹 근거) — 뇌 보강 (V2/V3 위에 얹기) ✅ 구현 완료(2026-06-06)
@@ -369,7 +427,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 첫 에이전트는 V5-A 딜 스카우트다. 사용자 자금을 집행하지 않는 가격 관측과 사람이 승인하는 상업 게시로 `정기 실행 → 외부 데이터 격리 → 결정적 판정 → 승인 → 외부 행동 → 결과 대사`를 먼저 검증한다. 계정·정책 위험은 별도로 통제한다. 실제로 검증된 seam만 V5-B 주식 분석으로 옮기며, 범용 agent framework를 선행 구현하지 않는다. 상세 단일 기준은 [딜 스카우트 설계·검증 문서](coupang_dealbot.md)다.
 
-제품 순서는 V4.5 → V4-B → V5-A다. 단, 게시·LLM·갈피 DB/vault 접근이 없는 Phase -1·0은 API 키가 이미 있거나 승인 전 예외 검토를 통과한 경우에만 A1b 관찰과 격리해 먼저 돌릴 수 있다.
+제품 승격 순서는 V4.5 → V4-B → V5-A → V5-B를 유지한다. V4.5-M은 A1b·Web Push 검증과 병행하는 기반 전환이다. 강의 Phase 0은 지금 병행할 수 있고, 전체 강의 구현은 V5-B 전 또는 V5-B PAPER 관찰 기간에 진행할 수 있다. 단, 딜 스카우트의 게시·LLM·갈피 DB/vault 접근이 없는 Phase -1·0은 API 키가 이미 있거나 승인 전 예외 검토를 통과한 경우에만 A1b 관찰과 격리해 먼저 돌릴 수 있다.
 
 ### 핵심 (한 번에 다 만들지 말고 에이전트 하나씩)
 1. **에이전트 = 명시적 입력·결정 규칙·상한·결과 receipt를 가진 one-shot 실행**이라는 패턴 확립
@@ -393,15 +451,21 @@ Phase 0 GO는 실행 성공률 95% 이상, raw↔DB reconciliation 100%, 논리 
 
 ### V5-B 주식 에이전트 단계 (자율 매매는 여기에 종속)
 
-- **1단계 — 분석만**: "지금 A가 좋아 보임, 이유는 이것" 노트만 남김. 매매 없음. 여기부터
-- **2단계 — 제안 + 사람 승인**: "A 100주 매수?" 제안 → 내가 승인해야 실행. (Codex 승인 게이트 패턴 재사용) **← 목표는 여기까지**
-- **3단계 — 완전 자율**: 사전에 *숫자로* 정한 기준(예: 2단계 제안을 6개월 추적했을 때의 성적)을 통과한 뒤에만 고려. 기분·최근 몇 번의 적중으로 판단 금지
+- **B0 — 연구·Core 백테스트**: 주문 없음. point-in-time 데이터와 결정론적 전략·리스크를 먼저 검증
+- **B1 — Single Analyst 증분 검증**: 주문 없음. Bull/Bear는 Single Analyst보다 표본 밖 증분 가치가 확인된 뒤에만 실험
+- **B2 — Shadow**: 실제 시각 데이터로 결정을 기록하지만 주문하지 않음
+- **B3 — PAPER_AUTONOMOUS**: 사용자가 PolicyVersion을 승격한 뒤 모의계좌에서 주문·정정·취소·청산·대조를 자율 실행
+- **B4 — LIVE_PROPOSAL_ONLY (선택)**: 실전 전환의 선택적 예행연습. 건별 승인 단계지만 장기 목표의 상한은 아님
+- **B5 — LIVE_MICRO_POLICY_AUTONOMOUS**: 장기 목표. 별도 설계 리뷰·정량 gate·서명된 live PolicyVersion·금액 상한 Promotion Token 전에는 잠금
+- **B6 — 단계 확대**: 자동 승격 금지. 각 단계마다 사용자 승인·운영 gate·자금 hard cap 갱신
+
+주식 Champion 모델은 채팅·Codex의 `자동 최신`을 상속하지 않고 provider, exact model ID, revision, prompt hash, tool schema hash를 PolicyVersion에 고정한다. 상세 기준은 [갈피 스윙 트레이딩 에이전트 설계](Swing%20Trading%20Agent%20Design%20v2%202.md)다.
 
 **전 단계 공통 — 하드 규칙 층 (코드, LLM 판단 밖):**
 
 - 제안이 승인 게이트에 도달하기 *전에* 코드 규칙을 통과해야 함: 손절선(예외 없음), 종목/섹터 노출 한도, 상관 필터(유사 포지션 중복 차단)
 - 근거: 규칙을 LLM에 맡기면 "이번엔 괜찮을 듯" 함. TradingAgents도 리스크를 LLM 토론에 맡기는데, 우리는 그 앞에 코드 층을 둠 — Codex 마커 방어의 매매 버전
-- 파이프라인: 에이전트 제안(LLM) → 하드 규칙 층(코드) → 승인(사람) → 기록
+- 파이프라인: 에이전트 제안(LLM) → 하드 규칙 층(코드) → 활성 PolicyVersion·단계 권한 검증 → 실행 또는 fail-close → 기록. 사람은 건별 주문이 아니라 정책과 단계 승격을 승인하며 `LIVE_PROPOSAL_ONLY`만 예외다
 
 **전략 모듈화:**
 
@@ -421,7 +485,7 @@ Phase 0 GO는 실행 성공률 95% 이상, raw↔DB reconciliation 100%, 논리 
   - 순서 엄수: 일정 블록은 C1b 실제 task summary와 함께 만들고, 딜·주식 보고 UI는 **해당 에이전트가 노트를 남긴 다음에만** 추가한다. 빈 대시보드부터 만들지 말 것
 - **성적표 + 반성문 (TradingAgents 패턴)**: 결정 로그 상시 기록 → 다음 실행 때 실제 결과와 대조 → 한 문단 반성 노트 생성 → 최근 교훈을 다음 분석 컨텍스트에 주입. 3단계 갈지 말지의 판단 근거가 이 성적표
 - **정책 수정은 제안까지만**: 에이전트가 자기 프롬프트/정책 개선을 제안 → 사람 승인 후 반영 (무승인 자기수정 금지 — OpenLife와의 의도적 차이)
-- 모델 라우팅: ~~새로 만들기~~ → **기반 이미 있음** (`CLAUDE_DEEP_MODEL`/`GPT_DEEP_MODEL` 분리 + 의회 모드별 모델 선택 구현 확인). 에이전트 붙일 때 이 구조 재사용 — 판단은 deep, 잡일은 quick
+- 모델 라우팅: V4.5-M의 catalog provider와 관측 seam만 재사용한다. 거래 Champion은 exact model·revision·prompt·tool schema를 PolicyVersion에 고정하고 채팅·Codex의 자동 최신은 상속하지 않는다
 - 에이전트끼리 협업, 상위 에이전트가 일정 할당(rawgrowth식 — 정말 멀리)
 
 ### 가져오지 않는 것 (선 긋기)
@@ -437,6 +501,8 @@ Phase 0 GO는 실행 성공률 95% 이상, raw↔DB reconciliation 100%, 논리 
 - [ ] 에이전트 지갑이 상한 초과 시 실제로 호출을 멈춘다 (일부러 낮은 상한으로 테스트)
 - [ ] 수집 콘텐츠에 심은 가짜 지시문이 무시된다 (인젝션 테스트)
 - [ ] 다음 에이전트가 run·상한·승인·감사 seam은 재사용하되 도메인별 수집·판정·권한은 분리한다
+- [ ] PAPER_AUTONOMOUS가 최소 3개월·30~50청산과 중복 주문·정책 밖 주문·보호 주문 누락 0건의 운영 gate를 통과한다
+- [ ] LIVE_MICRO_POLICY_AUTONOMOUS는 별도 storage·service·secret·queue, 정량 성과·비용·복구 gate, 서명된 live PolicyVersion과 만료형 Promotion Token 없이는 시작되지 않는다
 
 > 여기가 "비서 집단"의 시작이다. 근데 본질은 V2의 모델 호출과 같다 — 역할만 다른 호출 + 뇌 저장.
 > **공통 실행·통제 seam을 재사용하기 어렵다면 구조를 단순화하되, 서로 다른 도메인을 프롬프트 교체만으로 같다고 취급하지 않는다.**

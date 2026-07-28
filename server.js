@@ -19,10 +19,23 @@ const { createPaperNoteSaver } = require('./lib/paper-notes');
 const { createPaperFullTextService } = require('./lib/paper-fulltext');
 const { createPaperFullTextTools, formatPaperEvidenceBlock } = require('./lib/paper-fulltext-tools');
 const { runClaudeToolLoop } = require('./lib/claude-tool-loop');
+const { runOpenAIResponsesToolLoop } = require('./lib/openai-responses-tool-loop');
 const { createProgressStream, progressStageForTool } = require('./lib/progress-stream');
 const { createRecentSavesReader } = require('./lib/recent-saves');
 const { createNoteSaveStateReader } = require('./lib/note-save-state');
 const { runDatabaseMigrations } = require('./lib/database-migrations');
+const { createModelSettingsStore } = require('./lib/model-settings');
+const { createModelCatalogStore } = require('./lib/model-catalog-store');
+const {
+  CHAT_SELECTION_AUTO,
+  refreshOpenAIModelCatalog,
+  resolveChatModelSelection,
+} = require('./lib/openai-model-catalog');
+const {
+  listCodexModelsViaAppServer,
+  refreshCodexModelCatalog,
+} = require('./lib/codex-model-catalog');
+const { registerModelRuntimeRoutes } = require('./lib/model-runtime-routes');
 const { registerAssistantTaskRoutes } = require('./lib/assistant-task-routes');
 const { readAssistantPushConfig } = require('./lib/assistant-push-config');
 const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
@@ -90,6 +103,17 @@ const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 const CLAUDE_DEEP_MODEL = process.env.CLAUDE_DEEP_MODEL || 'claude-opus-4-5';
 const GPT_MODEL    = process.env.GPT_MODEL    || 'gpt-4o';
 const GPT_DEEP_MODEL = process.env.GPT_DEEP_MODEL || 'gpt-5.5';
+const GPT_RESPONSES_ENABLED = process.env.GPT_RESPONSES_ENABLED === 'true';
+const GPT_CHAT_BOOTSTRAP_MODEL = process.env.GPT_CHAT_BOOTSTRAP_MODEL || 'gpt-5.6-terra';
+const GPT_CHAT_REASONING_EFFORT = new Set(['none', 'low', 'medium', 'high', 'xhigh', 'max'])
+  .has(process.env.GPT_CHAT_REASONING_EFFORT)
+  ? process.env.GPT_CHAT_REASONING_EFFORT
+  : 'medium';
+const ASSISTANT_RETRIEVAL_A2_ENABLED =
+  process.env.ASSISTANT_RETRIEVAL_A2_ENABLED === 'true';
+const MODEL_CATALOG_REFRESH_ENABLED = process.env.MODEL_CATALOG_REFRESH_ENABLED === 'true';
+const MODEL_CATALOG_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const OPENAI_BASE_URL = String(process.env.OPENAI_BASE_URL || '').trim();
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const API_TOKEN    = process.env.API_TOKEN || '';
@@ -337,7 +361,10 @@ if (!HAS_CLAUDE && !HAS_GPT) {
 }
 
 const anthropic = HAS_CLAUDE ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
-const openai    = HAS_GPT    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })    : null;
+const openai    = HAS_GPT    ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  ...(OPENAI_BASE_URL ? { baseURL: OPENAI_BASE_URL } : {}),
+}) : null;
 
 function getGptModelForCouncilMode(mode) {
   return mode === 'deep' ? GPT_DEEP_MODEL : GPT_MODEL;
@@ -401,6 +428,23 @@ app.use('/api/', requireApiToken);
 
 // 세션별 대화 기록 (AI 컨텍스트용 인메모리)
 const sessions = {};
+const sessionChatTails = new Map();
+
+async function withSessionChatLock(sessionId, task) {
+  const key = String(sessionId);
+  const previous = sessionChatTails.get(key) || Promise.resolve();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const tail = previous.then(() => gate);
+  sessionChatTails.set(key, tail);
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    if (sessionChatTails.get(key) === tail) sessionChatTails.delete(key);
+  }
+}
 
 // ─── SQLite DB ───────────────────────────────────────────────────────────────
 
@@ -553,6 +597,13 @@ db.exec(`
 `);
 
 runDatabaseMigrations(db);
+const modelSettings = createModelSettingsStore(db);
+modelSettings.ensureDefaults({
+  'chat.model_selection': CHAT_SELECTION_AUTO,
+  'codex.general_model': CODEX_MODEL,
+  'codex.deep_model': CODEX_DEEP_MODEL,
+});
+const modelCatalogs = createModelCatalogStore(db);
 const assistantScheduleNoteProjections = createScheduleNoteProjectionStore(db);
 let assistantScheduleNoteProjector = null;
 const assistantPush = createAssistantPushService(db, {
@@ -634,9 +685,15 @@ const stmtEnsureSession = db.prepare(`
   INSERT INTO sessions (id) VALUES (?)
   ON CONFLICT(id) DO UPDATE SET last_active = strftime('%s','now')
 `);
-const stmtInsertMessage = db.prepare(
-  'INSERT INTO messages (session_id, role, content, model) VALUES (?, ?, ?, ?)'
-);
+const stmtInsertMessage = db.prepare(`
+  INSERT INTO messages (
+    session_id, role, content, model, embedding,
+    model_selection, model_catalog_generation, runtime_generation, reasoning_effort
+  ) VALUES (
+    @sessionId, @role, @content, @model, @embedding,
+    @modelSelection, @modelCatalogGeneration, @runtimeGeneration, @reasoningEffort
+  )
+`);
 const stmtUpsertNote = db.prepare(`
   INSERT INTO notes (
     filename, title, note_type, paper_id, archived, codex_status,
@@ -900,8 +957,12 @@ const stmtGetCodexReferenceNotes = db.prepare(`
   ORDER BY filename ASC
 `);
 const stmtCreateCodexJob = db.prepare(`
-  INSERT INTO codex_jobs (status, note_filenames_json)
-  VALUES ('pending', ?)
+  INSERT INTO codex_jobs (
+    status, note_filenames_json, model_selection, model_id, model_catalog_generation
+  )
+  VALUES (
+    'pending', @noteFilenamesJson, @modelSelection, @modelId, @modelCatalogGeneration
+  )
 `);
 const stmtUpdateNoteCodexStatus = db.prepare(`
   UPDATE notes
@@ -1017,13 +1078,17 @@ const stmtUpdateEdgeTargetTitle = db.prepare(
 );
 const stmtGetRecentCodexJobs = db.prepare(`
   SELECT id, status, note_filenames_json AS noteFilenamesJson, attempt_count AS attemptCount,
+         model_selection AS modelSelection, model_id AS modelId,
+         model_catalog_generation AS modelCatalogGeneration,
          error, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt
   FROM codex_jobs
   ORDER BY created_at DESC, id DESC
   LIMIT ?
 `);
 const stmtGetNextPendingCodexJob = db.prepare(`
-  SELECT id, note_filenames_json AS noteFilenamesJson
+  SELECT id, note_filenames_json AS noteFilenamesJson,
+         model_selection AS modelSelection, model_id AS modelId,
+         model_catalog_generation AS modelCatalogGeneration
   FROM codex_jobs
   WHERE status = 'pending'
   ORDER BY created_at ASC, id ASC
@@ -1065,17 +1130,99 @@ let codexRunnerHealth = {
   error: null,
 };
 
-function dbSaveMessage(sessionId, role, content, model = null, precomputedEmbedding = null) {
-  stmtEnsureSession.run(sessionId);
-  const result = stmtInsertMessage.run(sessionId, role, content, model);
+function insertMessageRecord({
+  sessionId,
+  role,
+  content,
+  model = null,
+  embedding = null,
+  modelSelection = null,
+  modelCatalogGeneration = null,
+  runtimeGeneration = null,
+  reasoningEffort = null,
+}) {
+  return stmtInsertMessage.run({
+    sessionId,
+    role,
+    content,
+    model,
+    embedding: embedding ? JSON.stringify(embedding) : null,
+    modelSelection,
+    modelCatalogGeneration,
+    runtimeGeneration,
+    reasoningEffort,
+  });
+}
 
-  if (role === 'user' && content.length >= 20) {
-    const store = vec => { if (vec) stmtUpdateMessageEmbedding.run(JSON.stringify(vec), result.lastInsertRowid); };
-    if (precomputedEmbedding) store(precomputedEmbedding);
-    else generateEmbedding(content).then(store).catch(() => {});
+function queueMessageEmbedding(messageId, content) {
+  if (content.length < 20) return;
+  generateEmbedding(content)
+    .then(vec => {
+      if (vec) stmtUpdateMessageEmbedding.run(JSON.stringify(vec), messageId);
+    })
+    .catch(() => {});
+}
+
+function dbSaveMessage(
+  sessionId,
+  role,
+  content,
+  model = null,
+  precomputedEmbedding = null,
+  metadata = {},
+) {
+  stmtEnsureSession.run(sessionId);
+  const result = insertMessageRecord({
+    sessionId,
+    role,
+    content,
+    model,
+    embedding: precomputedEmbedding,
+    ...metadata,
+  });
+
+  if (role === 'user' && !precomputedEmbedding) {
+    queueMessageEmbedding(result.lastInsertRowid, content);
   }
 
   return result.lastInsertRowid;
+}
+
+const saveChatExchangeTransaction = db.transaction(({
+  sessionId,
+  question,
+  answer,
+  queryEmbedding,
+  assistantModel,
+  modelSnapshot,
+}) => {
+  stmtEnsureSession.run(sessionId);
+  const userResult = insertMessageRecord({
+    sessionId,
+    role: 'user',
+    content: question,
+    embedding: queryEmbedding,
+  });
+  const assistantResult = insertMessageRecord({
+    sessionId,
+    role: 'assistant',
+    content: answer,
+    model: assistantModel,
+    modelSelection: modelSnapshot?.selection || null,
+    modelCatalogGeneration: modelSnapshot?.catalogGeneration ?? null,
+    runtimeGeneration: modelSnapshot?.runtimeGeneration || null,
+    reasoningEffort: modelSnapshot?.reasoningEffort || null,
+  });
+  return {
+    userMessageId: userResult.lastInsertRowid,
+    assistantMessageId: assistantResult.lastInsertRowid,
+  };
+});
+
+function dbSaveChatExchange(input) {
+  const result = saveChatExchangeTransaction(input);
+  if (!input.queryEmbedding) queueMessageEmbedding(result.userMessageId, input.question);
+  return result;
 }
 
 function dbUpsertNote({
@@ -1125,7 +1272,15 @@ function createCodexJobRecordFromPending(limit = CODEX_JOB_BATCH_SIZE) {
   if (notes.length === 0) return null;
 
   const filenames = notes.map(note => note.filename);
-  const result = stmtCreateCodexJob.run(JSON.stringify(filenames));
+  const generalSetting = modelSettings.get('codex.general_model');
+  const modelId = String(generalSetting?.value || CODEX_MODEL);
+  const catalogGeneration = modelCatalogs.get('codex_subscription')?.generation || 0;
+  const result = stmtCreateCodexJob.run({
+    noteFilenamesJson: JSON.stringify(filenames),
+    modelSelection: modelId,
+    modelId,
+    modelCatalogGeneration: catalogGeneration,
+  });
   filenames.forEach(filename => stmtUpdateNoteCodexStatus.run('queued', filename));
   // 수동 큐도 남은 pending 노트를 worker가 이어서 처리한다. 이미 반영된 저장 이벤트를
   // 남겨두면 다음 자동 큐 임계값이 앞당겨지므로 job 생성과 같은 트랜잭션에서 소비한다.
@@ -1134,6 +1289,9 @@ function createCodexJobRecordFromPending(limit = CODEX_JOB_BATCH_SIZE) {
   return {
     id: result.lastInsertRowid,
     status: 'pending',
+    modelSelection: modelId,
+    modelId,
+    modelCatalogGeneration: catalogGeneration,
     notes: notes.map(note => ({ ...note, codexStatus: 'queued' })),
   };
 }
@@ -1296,15 +1454,32 @@ async function startNextCodexJob() {
       skippedFilenames: [],
       unavailable: [],
       infrastructureError: error,
+      modelSelection: job.modelSelection,
+      modelId: job.modelId,
+      modelCatalogGeneration: job.modelCatalogGeneration,
     };
   }
   const filenames = partition.runnable.map(note => note.filename);
   if (filenames.length === 0 && partition.unavailable.length === 0) {
-    return { id: job.id, filenames, ...partition };
+    return {
+      id: job.id,
+      filenames,
+      ...partition,
+      modelSelection: job.modelSelection,
+      modelId: job.modelId,
+      modelCatalogGeneration: job.modelCatalogGeneration,
+    };
   }
   if (!startPreparedCodexJob(job.id, filenames)) return null;
 
-  return { id: job.id, filenames, ...partition };
+  return {
+    id: job.id,
+    filenames,
+    ...partition,
+    modelSelection: job.modelSelection,
+    modelId: job.modelId,
+    modelCatalogGeneration: job.modelCatalogGeneration,
+  };
 }
 
 function finishCodexJob(jobId, status, error = null) {
@@ -1644,6 +1819,42 @@ function syncTopicTitleReferences(filename, title) {
   stmtUpdateEdgeTargetTitle.run(title, filename);
 }
 
+function extractSmallResponseText(response) {
+  if (typeof response?.output_text === 'string' && response.output_text.trim()) {
+    return response.output_text.trim();
+  }
+  return (Array.isArray(response?.output) ? response.output : [])
+    .filter(item => item?.type === 'message' && item.role === 'assistant')
+    .flatMap(item => Array.isArray(item.content) ? item.content : [])
+    .filter(part => part?.type === 'output_text' && part.text)
+    .map(part => part.text)
+    .join('\n')
+    .trim();
+}
+
+async function generateSmallGptText(prompt, maxOutputTokens) {
+  if (!HAS_GPT) return null;
+  const snapshot = resolveChatModelSelection({
+    selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
+    catalogRow: modelCatalogs.get('openai_api'),
+    bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
+    reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+  });
+  const response = await openai.responses.create({
+    model: snapshot.modelId,
+    input: [{ role: 'user', content: prompt }],
+    store: false,
+    max_output_tokens: maxOutputTokens,
+    reasoning: { effort: 'none', context: 'current_turn' },
+  });
+  if (response?.status && response.status !== 'completed') {
+    throw new Error(`메타데이터 응답이 완료되지 않았습니다: ${response.status}`);
+  }
+  const text = extractSmallResponseText(response);
+  if (!text) throw new Error('메타데이터 응답이 비어 있습니다.');
+  return text;
+}
+
 async function regenerateTopicTitle(raw) {
   const parsed = parseQaLog(raw);
   if (!parsed.parseable) throw new Error('제목을 재생성할 QA-LOG를 해석할 수 없습니다.');
@@ -1669,12 +1880,9 @@ async function regenerateTopicTitle(raw) {
 ${digest}`;
 
   try {
-    if (HAS_CLAUDE) {
-      const r = await anthropic.messages.create({
-        model: CLAUDE_MODEL, max_tokens: 20,
-        messages: [{ role: 'user', content: prompt }],
-      });
-      const title = sanitizeTitle(r.content[0].text.trim(), null);
+    if (HAS_GPT) {
+      const text = await generateSmallGptText(prompt, 40);
+      const title = sanitizeTitle(text, null);
       return isSafeTopicTitle(title) ? title : null;
     }
   } catch { /* 실패 시 null 반환 → 기존 제목 유지 */ }
@@ -1695,12 +1903,9 @@ Q: ${String(question || '').slice(0, 300)}
 A: ${String(answer || '').slice(0, 300)}`;
 
   try {
-    if (HAS_CLAUDE) {
-      const r = await anthropic.messages.create({
-        model: CLAUDE_MODEL, max_tokens: 30,
-        messages: [{ role: 'user', content: prompt }],
-      });
-      const title = sanitizeTitle(r.content[0].text.trim(), makeTopicTitle(question));
+    if (HAS_GPT) {
+      const text = await generateSmallGptText(prompt, 50);
+      const title = sanitizeTitle(text, makeTopicTitle(question));
       return isSafeTopicTitle(title) ? title : makeTopicTitle(question);
     }
   } catch {
@@ -2297,15 +2502,7 @@ ${content.slice(0, 6000)}
 {"title":"","summary":""}`;
 
   try {
-    let text;
-    if (HAS_CLAUDE) {
-      const r = await anthropic.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      });
-      text = r.content[0].text;
-    }
+    const text = await generateSmallGptText(prompt, 1000);
 
     const parsed = parseJsonObject(text);
     return {
@@ -2433,10 +2630,7 @@ async function writeMemoryItems(items) {
   return cleaned;
 }
 
-async function generateClaudeReplyWithTools({
-  model,
-  maxTokens,
-  messages,
+function createChatToolRuntime({
   enableWebTool = false,
   paperToolSession = null,
   scheduleToolSession = null,
@@ -2446,19 +2640,8 @@ async function generateClaudeReplyWithTools({
   const webEvidences = [];
   const MAX_TOOL_SEARCHES = 3;
   let searchCount = 0;
-  const system = [
-    enableWebTool ? CLAUDE_WEB_TOOL_SYSTEM_PROMPT : '',
-    paperToolSession?.hasCandidates ? CLAUDE_PAPER_TOOL_SYSTEM_PROMPT : '',
-    scheduleToolSession?.systemPrompt || '',
-  ].filter(Boolean).join('\n\n');
 
-  const result = await runClaudeToolLoop({
-    createMessage: request => anthropic.messages.create(request),
-    model,
-    maxTokens,
-    messages,
-    system,
-    maxToolRounds: 2,
+  return {
     getTools: () => [
       ...(enableWebTool && searchCount < MAX_TOOL_SEARCHES ? [CLAUDE_WEB_SEARCH_TOOL] : []),
       ...(paperToolSession?.getToolDefinitions() || []),
@@ -2502,44 +2685,211 @@ async function generateClaudeReplyWithTools({
       }
       return { isError: true, content: '허용되지 않은 도구입니다.' };
     },
+    result() {
+      return {
+        webEvidence: webEvidences.find(hasWebEvidenceResults) || webEvidences[0] || null,
+        paperEvidence: paperToolSession?.getEvidence() || [],
+        paperEvidenceRefs: paperToolSession?.getEvidenceRefs() || [],
+        paperFullTextUsage: paperToolSession?.getUsage() || { calls: 0, contextChars: 0 },
+        scheduleCandidate: scheduleToolSession?.getCandidate() || null,
+      };
+    },
+  };
+}
+
+function buildChatToolInstructions({
+  enableWebTool,
+  paperToolSession,
+  scheduleToolSession,
+  includeLanguageRule = false,
+}) {
+  return [
+    includeLanguageRule ? GPT_LANGUAGE_SYSTEM.content : '',
+    enableWebTool ? CLAUDE_WEB_TOOL_SYSTEM_PROMPT : '',
+    paperToolSession?.hasCandidates ? CLAUDE_PAPER_TOOL_SYSTEM_PROMPT : '',
+    scheduleToolSession?.systemPrompt || '',
+  ].filter(Boolean).join('\n\n');
+}
+
+async function generateClaudeReplyWithTools({
+  model,
+  maxTokens,
+  messages,
+  enableWebTool = false,
+  paperToolSession = null,
+  scheduleToolSession = null,
+  onStage = () => {},
+  writingStage = 'answer',
+}) {
+  const runtime = createChatToolRuntime({
+    enableWebTool,
+    paperToolSession,
+    scheduleToolSession,
+    onStage,
+    writingStage,
+  });
+  const result = await runClaudeToolLoop({
+    createMessage: request => anthropic.messages.create(request),
+    model,
+    maxTokens,
+    messages,
+    system: buildChatToolInstructions({
+      enableWebTool,
+      paperToolSession,
+      scheduleToolSession,
+    }),
+    maxToolRounds: 2,
+    getTools: runtime.getTools,
+    executeTool: runtime.executeTool,
   });
 
   return {
     reply: extractAnthropicText(result.response.content),
     usedModel: model,
-    webEvidence: webEvidences.find(hasWebEvidenceResults) || webEvidences[0] || null,
-    paperEvidence: paperToolSession?.getEvidence() || [],
-    paperEvidenceRefs: paperToolSession?.getEvidenceRefs() || [],
-    paperFullTextUsage: paperToolSession?.getUsage() || { calls: 0, contextChars: 0 },
-    scheduleCandidate: scheduleToolSession?.getCandidate() || null,
+    ...runtime.result(),
+  };
+}
+
+async function generateGptReplyWithTools({
+  model,
+  maxOutputTokens,
+  messages,
+  reasoningEffort,
+  sessionId,
+  enableWebTool = false,
+  paperToolSession = null,
+  scheduleToolSession = null,
+  onStage = () => {},
+  writingStage = 'answer',
+}) {
+  const runtime = createChatToolRuntime({
+    enableWebTool,
+    paperToolSession,
+    scheduleToolSession,
+    onStage,
+    writingStage,
+  });
+  const safetyIdentifier = crypto
+    .createHash('sha256')
+    .update(String(sessionId || 'shared-main'))
+    .digest('hex')
+    .slice(0, 64);
+  const result = await runOpenAIResponsesToolLoop({
+    createResponse: request => openai.responses.create(request),
+    model,
+    maxOutputTokens,
+    input: messages,
+    instructions: buildChatToolInstructions({
+      enableWebTool,
+      paperToolSession,
+      scheduleToolSession,
+      includeLanguageRule: true,
+    }),
+    reasoningEffort,
+    reasoningContext: 'current_turn',
+    safetyIdentifier,
+    maxToolRounds: 2,
+    getTools: runtime.getTools,
+    executeTool: runtime.executeTool,
+  });
+
+  return {
+    reply: result.outputText,
+    usedModel: String(result.response.model || model),
+    usage: result.response.usage || null,
+    providerRequestId: result.response._request_id || result.response.id || null,
+    ...runtime.result(),
   };
 }
 
 async function generateChatReply(model, context, {
+  modelSnapshot = null,
+  sessionId = null,
   enableWebTool = false,
   paperToolSession = null,
   scheduleToolSession = null,
   onStage = () => {},
 } = {}) {
-  if (model !== 'claude') throw new Error('단일 채팅은 Claude만 사용합니다.');
-  return generateClaudeReplyWithTools({
-    model: CLAUDE_MODEL,
-    maxTokens: 8192,
-    messages: context,
-    enableWebTool,
-    paperToolSession,
-    scheduleToolSession,
-    onStage,
+  if (model === 'claude') {
+    return generateClaudeReplyWithTools({
+      model: CLAUDE_MODEL,
+      maxTokens: 8192,
+      messages: context,
+      enableWebTool,
+      paperToolSession,
+      scheduleToolSession,
+      onStage,
+    });
+  }
+  if (model === 'gpt' && modelSnapshot?.modelId) {
+    return generateGptReplyWithTools({
+      model: modelSnapshot.modelId,
+      maxOutputTokens: 8192,
+      messages: context,
+      reasoningEffort: modelSnapshot.reasoningEffort,
+      sessionId,
+      enableWebTool,
+      paperToolSession,
+      scheduleToolSession,
+      onStage,
+    });
+  }
+  throw new Error('지원하지 않는 단일 채팅 모델입니다.');
+}
+
+function unavailableProviderError(message) {
+  const error = new Error(message);
+  error.code = 'PROVIDER_AUTH_FAILED';
+  return error;
+}
+
+async function refreshOpenAICatalog() {
+  if (!openai) {
+    throw unavailableProviderError('OPENAI_API_KEY가 없어 OpenAI 모델 목록을 갱신할 수 없습니다.');
+  }
+  return refreshOpenAIModelCatalog({
+    store: modelCatalogs,
+    client: openai,
+  });
+}
+
+async function refreshCodexCatalog() {
+  if (CODEX_RUNNER_MODE !== 'codex') {
+    const error = new Error('Codex runner가 heuristic 모드라 구독 모델 목록을 읽을 수 없습니다.');
+    error.code = 'CODEX_RUNNER_DISABLED';
+    throw error;
+  }
+  return refreshCodexModelCatalog({
+    store: modelCatalogs,
+    listModels: () => listCodexModelsViaAppServer({
+      codexBin: CODEX_BIN,
+      cwd: __dirname,
+      timeoutMs: 10_000,
+    }),
   });
 }
 
 function formatChatApiError(err, model) {
   const message = String(err?.message || err || '');
   const status = Number(err?.status || err?.statusCode || 0);
+  const code = String(err?.code || '').toUpperCase();
   const lower = message.toLowerCase();
 
+  if (code === 'MODEL_UNAVAILABLE') {
+    return { status: 409, message: '선택한 모델을 현재 사용할 수 없어요. 모델 설정을 확인해주세요.' };
+  }
+  if (code === 'MODEL_CATALOG_UNAVAILABLE') {
+    return { status: 503, message: '사용 가능한 GPT 모델 목록을 확인하지 못했어요. 잠시 후 다시 시도해주세요.' };
+  }
+  if (code === 'INCOMPLETE_MODEL_RESPONSE' || code === 'TOOL_LOOP_EXHAUSTED') {
+    return { status: 502, message: '모델이 완결된 답변을 반환하지 못했어요. 다시 시도해주세요.' };
+  }
+  if (code === 'ETIMEDOUT' || code === 'PROVIDER_TIMEOUT') {
+    return { status: 504, message: '모델 응답 시간이 초과됐어요. 잠시 후 다시 시도해주세요.' };
+  }
   if (
     status === 429 ||
+    code === 'PROVIDER_RATE_LIMITED' ||
     lower.includes('rate_limit') ||
     lower.includes('rate limit') ||
     lower.includes('too many requests')
@@ -2551,12 +2901,13 @@ function formatChatApiError(err, model) {
   }
 
   if (
+    code === 'PROVIDER_AUTH_FAILED' ||
     lower.includes('api key') ||
     lower.includes('authentication') ||
     lower.includes('unauthorized') ||
     lower.includes('auth')
   ) {
-    return { status: 500, message: 'API 키를 확인해주세요 (.env 파일).' };
+    return { status: 503, message: 'API 인증을 확인해주세요 (.env 파일).' };
   }
 
   if (
@@ -2566,12 +2917,19 @@ function formatChatApiError(err, model) {
     lower.includes('not a valid model')
   ) {
     return {
-      status: 500,
-      message: `모델명을 확인해주세요. 현재 설정: ${CLAUDE_MODEL}`,
+      status: model === 'gpt' ? 409 : 500,
+      message: model === 'gpt'
+        ? '선택한 GPT 모델을 현재 사용할 수 없어요.'
+        : `모델명을 확인해주세요. 현재 설정: ${CLAUDE_MODEL}`,
     };
   }
 
-  return { status: 500, message };
+  return {
+    status: status >= 400 && status < 600 ? status : 500,
+    message: model === 'gpt'
+      ? 'GPT 답변 생성 중 오류가 발생했어요.'
+      : message,
+  };
 }
 
 const WEB_TOOL_ALLOWED_TOPICS = new Set(['general', 'news']);
@@ -2693,114 +3051,184 @@ app.post('/api/chat', async (req, res) => {
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
   }
-  if (model !== 'claude') return res.status(400).json({ error: '단일 채팅은 Claude만 사용합니다. GPT는 의회 모드에서만 호출됩니다.' });
-  if (!HAS_CLAUDE)        return res.status(400).json({ error: 'Claude 키가 없습니다.' });
-  if (message.length > 10000)                return res.status(400).json({ error: '메시지가 너무 깁니다 (최대 10,000자).' });
+  if (!['claude', 'gpt'].includes(model)) {
+    return res.status(400).json({ error: '지원하지 않는 단일 채팅 모델입니다.' });
+  }
+  if (model === 'claude' && GPT_RESPONSES_ENABLED) {
+    return res.status(410).json({
+      error: 'Claude 단일 채팅은 종료됐습니다. GPT 채팅을 사용해주세요.',
+      code: 'CLAUDE_CHAT_RETIRED',
+    });
+  }
+  if (model === 'claude' && !HAS_CLAUDE) {
+    return res.status(400).json({ error: 'Claude 키가 없습니다.' });
+  }
+  if (model === 'gpt' && !GPT_RESPONSES_ENABLED) {
+    return res.status(503).json({ error: 'GPT 단일 채팅은 아직 활성화되지 않았습니다.' });
+  }
+  if (model === 'gpt' && !HAS_GPT) {
+    return res.status(400).json({ error: 'OpenAI 키가 없습니다.' });
+  }
+  if (message.length > 10000) {
+    return res.status(400).json({ error: '메시지가 너무 깁니다 (최대 10,000자).' });
+  }
 
   const progress = createProgressStream(res, { enabled: wantsProgress === true });
   progress.stage('context');
 
   try {
-    hydrateSessionFromDb(sessionId);
-    const history = sessions[sessionId];
-    const requestTime = new Date();
-    const requestCreatedAt = Math.floor(requestTime.getTime() / 1000);
-    const previousMessageCreatedAt = getLastMessageTimestamp(history);
-    history.push({ role: 'user', content: message, createdAt: requestCreatedAt });
+    const payload = await withSessionChatLock(sessionId, async () => {
+      hydrateSessionFromDb(sessionId);
+      const history = sessions[sessionId];
+      const requestTime = new Date();
+      const requestCreatedAt = Math.floor(requestTime.getTime() / 1000);
+      const previousMessageCreatedAt = getLastMessageTimestamp(history);
+      const userEntry = { role: 'user', content: message, createdAt: requestCreatedAt };
+      const requestHistory = [...history, userEntry];
+      const modelSnapshot = model === 'gpt'
+        ? resolveChatModelSelection({
+          selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
+          catalogRow: modelCatalogs.get('openai_api'),
+          bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
+          reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+        })
+        : null;
 
-    // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
-    const memoryItems = await readMemoryItems();
-    const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
-      message,
-      activeNotes,
-      sessionId,
-      'chat',
-    );
-    const baseContext = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
-    let webEvidence = null;
+      // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
+      const memoryItems = await readMemoryItems();
+      const {
+        notes: resolvedNotes,
+        pastMessages,
+        queryEmbedding,
+        retrievalContext,
+      } = await getContextNotesForQuestion(
+        message,
+        activeNotes,
+        sessionId,
+        modelSnapshot?.runtimeGeneration
+          ? `chat:${modelSnapshot.runtimeGeneration}`
+          : 'chat',
+      );
+      const baseContext = formatHistoryForModelContext(
+        requestHistory.slice(-HISTORY_CONTEXT_MESSAGES),
+      );
+      let webEvidence = null;
 
-    try {
-      if (webSearch) {
-        progress.stage('web_search');
-        webEvidence = await searchWeb(message);
+      try {
+        if (webSearch) {
+          progress.stage('web_search');
+          webEvidence = await searchWeb(message);
+        }
+        if (!hasWebEvidenceResults(webEvidence)) webEvidence = null;
+      } catch (err) {
+        if (webSearch) throw err;
+        console.warn('명시적 웹 검색 실패:', err.message);
       }
-      if (!hasWebEvidenceResults(webEvidence)) webEvidence = null;
-    } catch (err) {
-      if (webSearch) throw err;
-      console.warn('명시적 웹 검색 실패:', err.message);
-    }
-    const context = [
-      ...baseContext.slice(0, -1),
-      {
-        role: 'user',
-        content: buildContextMessage(
-          message,
-          resolvedNotes,
-          memoryItems,
-          pastMessages,
-          webEvidence,
-          requestTime,
-          previousMessageCreatedAt,
-          getActiveScheduleContext(),
-        ),
-      },
-    ];
-    const allowModelWebTool = !webSearch && !hasWebEvidenceResults(webEvidence) && WEB_SEARCH_ENABLED && WEB_SEARCH_MODEL_TOOL_ENABLED;
-    const paperToolSession = paperFullTextTools.createSession({ notes: resolvedNotes, queryEmbedding });
-    const scheduleToolSession = ASSISTANT_TASKS_ENABLED
-      ? createSchedulePrepareSession(assistantTasks, {
-        capturedAt: requestCreatedAt,
-        clientRequestId: `chat-task:${uuidv4()}`,
-      })
-      : null;
-    progress.stage('answer');
-    let {
-      reply,
-      usedModel,
-      webEvidence: toolWebEvidence,
-      paperEvidenceRefs,
-      paperFullTextUsage,
-      scheduleCandidate,
-    } = await generateChatReply(model, context, {
-      enableWebTool: allowModelWebTool,
-      paperToolSession,
-      scheduleToolSession,
-      onStage: progress.stage,
-    });
-    if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
+      const context = [
+        ...baseContext.slice(0, -1),
+        {
+          role: 'user',
+          content: buildContextMessage(
+            message,
+            resolvedNotes,
+            memoryItems,
+            pastMessages,
+            webEvidence,
+            requestTime,
+            previousMessageCreatedAt,
+            getActiveScheduleContext(),
+            retrievalContext,
+          ),
+        },
+      ];
+      const allowModelWebTool = (
+        !webSearch &&
+        !hasWebEvidenceResults(webEvidence) &&
+        WEB_SEARCH_ENABLED &&
+        WEB_SEARCH_MODEL_TOOL_ENABLED
+      );
+      const paperToolSession = paperFullTextTools.createSession({
+        notes: resolvedNotes,
+        queryEmbedding,
+      });
+      const scheduleToolSession = ASSISTANT_TASKS_ENABLED
+        ? createSchedulePrepareSession(assistantTasks, {
+          capturedAt: requestCreatedAt,
+          clientRequestId: `chat-task:${uuidv4()}`,
+        })
+        : null;
+      progress.stage('answer');
+      const {
+        reply,
+        usedModel,
+        usage,
+        webEvidence: toolWebEvidence,
+        paperEvidenceRefs,
+        paperFullTextUsage,
+        scheduleCandidate,
+      } = await generateChatReply(model, context, {
+        modelSnapshot,
+        sessionId,
+        enableWebTool: allowModelWebTool,
+        paperToolSession,
+        scheduleToolSession,
+        onStage: progress.stage,
+      });
+      if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
 
-    history.push({ role: 'assistant', content: reply, model: 'Claude', createdAt: Math.floor(Date.now() / 1000) });
-    sessions[sessionId] = sessions[sessionId].slice(-HISTORY_CONTEXT_MESSAGES);
-
-    const userMessageId = dbSaveMessage(sessionId, 'user', message, null, queryEmbedding);
-    const assistantMessageId = dbSaveMessage(sessionId, 'assistant', reply, 'Claude');
-
-    if (!scheduleCandidate) {
-      autoAppendTopicNote({
+      const assistantModel = model === 'gpt' ? usedModel : 'Claude';
+      const { userMessageId, assistantMessageId } = dbSaveChatExchange({
+        sessionId,
         question: message,
         answer: reply,
-        sessionId,
-        userMessageId,
-        assistantMessageId,
-        model: 'Claude',
-        webSources: webEvidence?.results || [],
-      }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
-    }
+        queryEmbedding,
+        assistantModel,
+        modelSnapshot,
+      });
+      const assistantCreatedAt = Math.floor(Date.now() / 1000);
+      sessions[sessionId] = [
+        ...history,
+        userEntry,
+        {
+          role: 'assistant',
+          content: reply,
+          model: assistantModel,
+          createdAt: assistantCreatedAt,
+        },
+      ].slice(-HISTORY_CONTEXT_MESSAGES);
 
-    const payload = {
-      reply,
-      model: 'Claude',
-      modelId: usedModel,
-      messageId: assistantMessageId,
-      scheduleCandidate,
-      webSources: webEvidence?.results || [],
-      paperFullText: {
-        used: paperEvidenceRefs.length > 0,
-        evidenceRefs: paperEvidenceRefs,
-        calls: paperFullTextUsage.calls,
-        contextChars: paperFullTextUsage.contextChars,
-      },
-    };
+      if (!scheduleCandidate) {
+        autoAppendTopicNote({
+          question: message,
+          answer: reply,
+          sessionId,
+          userMessageId,
+          assistantMessageId,
+          model: assistantModel,
+          webSources: webEvidence?.results || [],
+        }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
+      }
+
+      return {
+        reply,
+        model: model === 'gpt' ? 'GPT' : 'Claude',
+        modelId: usedModel,
+        modelSelection: modelSnapshot?.selection || null,
+        catalogGeneration: modelSnapshot?.catalogGeneration ?? null,
+        runtimeGeneration: modelSnapshot?.runtimeGeneration || null,
+        reasoningEffort: modelSnapshot?.reasoningEffort || null,
+        usage: model === 'gpt' ? usage : undefined,
+        messageId: assistantMessageId,
+        scheduleCandidate,
+        webSources: webEvidence?.results || [],
+        paperFullText: {
+          used: paperEvidenceRefs.length > 0,
+          evidenceRefs: paperEvidenceRefs,
+          calls: paperFullTextUsage.calls,
+          contextChars: paperFullTextUsage.contextChars,
+        },
+      };
+    });
     if (!progress.result(payload)) res.json(payload);
   } catch (err) {
     console.error('API 오류:', err.message);
@@ -2901,6 +3329,11 @@ app.get('/api/config', (req, res) => {
     claudeDeepModel: CLAUDE_DEEP_MODEL,
     gptModel:    GPT_MODEL,
     gptDeepModel: GPT_DEEP_MODEL,
+    gptResponsesEnabled: GPT_RESPONSES_ENABLED,
+    gptChatBootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
+    gptChatReasoningEffort: GPT_CHAT_REASONING_EFFORT,
+    retrievalA2Enabled: ASSISTANT_RETRIEVAL_A2_ENABLED,
+    modelCatalogRefreshEnabled: MODEL_CATALOG_REFRESH_ENABLED,
     codexModel:  CODEX_MODEL,
     codexDeepModel: CODEX_DEEP_MODEL,
     contextN:    CONTEXT_N,
@@ -2918,6 +3351,17 @@ app.get('/api/config', (req, res) => {
     hasClaude:   HAS_CLAUDE,
     hasGpt:      HAS_GPT,
   });
+});
+
+registerModelRuntimeRoutes({
+  app,
+  settings: modelSettings,
+  catalogs: modelCatalogs,
+  bootstrapChatModel: GPT_CHAT_BOOTSTRAP_MODEL,
+  reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+  getCodexRunnerHealth: () => ({ ...codexRunnerHealth }),
+  refreshOpenAI: refreshOpenAICatalog,
+  refreshCodex: refreshCodexCatalog,
 });
 
 registerAssistantTaskRoutes({
@@ -5721,6 +6165,9 @@ async function processImmediateCodexBatch(
 async function runAllCodexNotes() {
   assertCodexRecoveryCleared();
   const notes = stmtGetOrganizableNotes.all();
+  const deepSetting = modelSettings.get('codex.deep_model');
+  const runModelId = String(deepSetting?.value || CODEX_DEEP_MODEL);
+  const runCatalogGeneration = modelCatalogs.get('codex_subscription')?.generation || 0;
   if (notes.length === 0) {
     return {
       processed: false,
@@ -5730,6 +6177,8 @@ async function runAllCodexNotes() {
       batches: [],
       notes: [],
       failed: [],
+      modelId: runModelId,
+      modelCatalogGeneration: runCatalogGeneration,
     };
   }
 
@@ -5761,7 +6210,7 @@ async function runAllCodexNotes() {
           return { filename: note.filename, error };
         });
         if (filenames.length === 0) return [];
-        return processImmediateCodexBatch(filenames, CODEX_DEEP_MODEL, rootIdentity);
+        return processImmediateCodexBatch(filenames, runModelId, rootIdentity);
       });
       processed.push(...batchProcessed);
       failed.push(...unavailableFailures);
@@ -5832,6 +6281,8 @@ async function runAllCodexNotes() {
     batches,
     notes: processed,
     failed,
+    modelId: runModelId,
+    modelCatalogGeneration: runCatalogGeneration,
   };
 }
 
@@ -5890,7 +6341,7 @@ async function runNextCodexJobImpl() {
     try {
       processed.push(...await processCodexJobWithCodexImpl(
         job.filenames,
-        CODEX_MODEL,
+        job.modelId || CODEX_MODEL,
         job.rootIdentity,
         finalizeCodexJobWithNotes,
       ));
@@ -6135,14 +6586,35 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   }
   assistantRetrievalShadow.record({
     sessionId,
-    mode: `${mode}:a1b`,
+    mode: `${mode}:${ASSISTANT_RETRIEVAL_A2_ENABLED ? 'a2' : 'a1b'}`,
     query: question,
     retrieval: shadowRetrieval,
     latencyMs: Date.now() - shadowStartedAt,
     error: shadowError,
   });
 
-  return { notes: merged, pastMessages, queryEmbedding, shadowRetrieval };
+  if (!ASSISTANT_RETRIEVAL_A2_ENABLED) {
+    return {
+      notes: merged,
+      pastMessages,
+      queryEmbedding,
+      shadowRetrieval,
+      retrievalContext: '',
+    };
+  }
+
+  const explicitlyActive = new Set(active.map(note => note.filename));
+  const contextNotes = merged.filter(note => (
+    explicitlyActive.has(note.filename)
+    || note.metadata?.note_type !== 'topic'
+  ));
+  return {
+    notes: contextNotes,
+    pastMessages,
+    queryEmbedding,
+    shadowRetrieval,
+    retrievalContext: shadowRetrieval?.context || '',
+  };
 }
 
 async function generateEmbedding(text) {
@@ -6151,6 +6623,7 @@ async function generateEmbedding(text) {
     const r = await openai.embeddings.create({
       model: 'text-embedding-3-small',
       input: text.slice(0, 8000),
+      encoding_format: 'float',
     });
     return r.data[0].embedding;
   } catch {
@@ -6165,6 +6638,7 @@ async function generatePaperChunkEmbeddings(texts) {
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-small',
     input: inputs,
+    encoding_format: 'float',
   });
   return [...response.data]
     .sort((a, b) => a.index - b.index)
@@ -6385,7 +6859,8 @@ function buildContextMessage(
   webEvidence = null,
   now = new Date(),
   previousMessageCreatedAt = null,
-  scheduleText = ''
+  scheduleText = '',
+  retrievalText = ''
 ) {
   const timeContext = buildTimeContext(now, previousMessageCreatedAt);
   const memoryText = memoryItems.length > 0
@@ -6409,7 +6884,14 @@ function buildContextMessage(
     : '';
 
   const webText = buildWebContextBlock(webEvidence);
-  const contextParts = [scheduleText, memoryText, pastText, noteText, webText].filter(Boolean);
+  const contextParts = [
+    scheduleText,
+    memoryText,
+    pastText,
+    noteText,
+    retrievalText,
+    webText,
+  ].filter(Boolean);
 
   if (contextParts.length === 0) {
     return `${timeContext}
@@ -6614,7 +7096,7 @@ ${gptCritique || '검증 없음'}
 // 의회 각 단계가 공유하는 모델 컨텍스트 (히스토리 + 컨텍스트가 주입된 질문)
 async function buildCouncilModelContext(question, activeNotes, sessionId, webSources, paperEvidenceRefs = []) {
   const memoryItems = await readMemoryItems();
-  const { notes, pastMessages } = await getContextNotesForQuestion(
+  const { notes, pastMessages, retrievalContext } = await getContextNotesForQuestion(
     question,
     activeNotes,
     sessionId,
@@ -6633,6 +7115,7 @@ async function buildCouncilModelContext(question, activeNotes, sessionId, webSou
     requestTime,
     getLastMessageTimestamp(history),
     getActiveScheduleContext(),
+    retrievalContext,
   );
   const paperEvidence = paperFullTextTools.resolveEvidenceRefs({ notes, refs: paperEvidenceRefs });
   const questionWithContext = appendPaperEvidence(baseQuestionWithContext, paperEvidence);
@@ -6641,6 +7124,13 @@ async function buildCouncilModelContext(question, activeNotes, sessionId, webSou
 }
 
 // ─── 의회 모드 ────────────────────────────────────────────────────────────────
+
+// stale 브라우저는 신규 provider 호출 없이 명시적으로 퇴역 안내를 받는다.
+app.use('/api/council', (_req, res) => res.status(410).json({
+  error: '의회 모드는 종료됐습니다. 단일 GPT 채팅을 사용해주세요.',
+  code: 'COUNCIL_RETIRED',
+  replacement: '/api/chat',
+}));
 
 // 1단계: 1차 답변 생성
 app.post('/api/council/debate', async (req, res) => {
@@ -6658,7 +7148,12 @@ app.post('/api/council/debate', async (req, res) => {
 
     // 1차 답변 프롬프트 (mode에 따라 분기, 사용자 메모리 + 활성/자동 검색 노트 주입)
     const memoryItems = await readMemoryItems();
-    const { notes: resolvedNotes, pastMessages, queryEmbedding } = await getContextNotesForQuestion(
+    const {
+      notes: resolvedNotes,
+      pastMessages,
+      queryEmbedding,
+      retrievalContext,
+    } = await getContextNotesForQuestion(
       question,
       activeNotes,
       sessionId,
@@ -6694,6 +7189,7 @@ app.post('/api/council/debate', async (req, res) => {
       requestTime,
       previousMessageCreatedAt,
       getActiveScheduleContext(),
+      retrievalContext,
     );
     const historyCtx = formatHistoryForModelContext(history.slice(-HISTORY_CONTEXT_MESSAGES));
     const paperToolSession = paperFullTextTools.createSession({ notes: resolvedNotes, queryEmbedding });
@@ -7032,6 +7528,23 @@ ${deepSection}
 
 // ─── 서버 시작 ────────────────────────────────────────────────────────────────
 
+let modelCatalogRefreshTimer = null;
+
+async function refreshModelCatalogsInBackground() {
+  const refreshes = [
+    ['OpenAI', refreshOpenAICatalog],
+    ['Codex', refreshCodexCatalog],
+  ];
+  const results = await Promise.allSettled(refreshes.map(([, refresh]) => refresh()));
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      const [label] = refreshes[index];
+      const code = result.reason?.code || result.reason?.name || 'MODEL_CATALOG_REFRESH_FAILED';
+      console.warn(`⚠️  ${label} 모델 목록 갱신 실패: ${code}`);
+    }
+  });
+}
+
 const httpServer = app.listen(PORT, HOST, () => {
   console.log('\n✅ 갈피 서버 실행 중');
   console.log(`   로컬:     http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
@@ -7086,6 +7599,15 @@ const httpServer = app.listen(PORT, HOST, () => {
     console.warn(`⚠️  Codex runner preflight 오류: ${compactError(err, 500)}`);
   });
 
+  if (MODEL_CATALOG_REFRESH_ENABLED) {
+    void refreshModelCatalogsInBackground();
+    modelCatalogRefreshTimer = setInterval(
+      () => { void refreshModelCatalogsInBackground(); },
+      MODEL_CATALOG_REFRESH_INTERVAL_MS,
+    );
+    modelCatalogRefreshTimer.unref();
+  }
+
   maybeDailyBackup();
   setInterval(maybeDailyBackup, BACKUP_CHECK_INTERVAL_MS).unref();
 });
@@ -7099,6 +7621,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     assistantScheduler.stop();
     assistantScheduleNoteProjector.stop();
     assistantPushDispatcher?.stop();
+    if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {
       if (finished) return;

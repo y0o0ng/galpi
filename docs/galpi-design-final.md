@@ -34,6 +34,36 @@
   - 웹 검색 결과는 기본 `maxResults=3`, `maxSnippetChars=400`으로 제한해 Claude 입력 토큰 폭증을 막는다.
   - 단일 채팅, 저장 메타데이터, 토픽 제목 생성 등 의회가 아닌 백엔드 작업에서는 GPT를 사용하지 않는다.
 
+  ### 승인된 다음 전환 — V4.5-M
+
+  > 상태: 2026-07-28 M0~M5 구현과 Pi 기능 인수 완료. schema v9·catalog·Responses parity, 단일 GPT UI, 의회 신규 실행 410, Codex job 모델 설정을 A2와 한 배포본으로 운영 활성화했다. Claude/GPT 품질 A/B는 생략했다. 상세 단일 기준은 [단일 GPT 채팅·모델 라우팅 설계](chat-model-routing-design.md)다.
+
+  - 앞무대 답변을 기존 OpenAI API 키의 Responses API 기반 단일 GPT로 전환한다.
+  - ChatGPT 구독 계정은 메인 채팅 API 호출에 사용하지 않고, Codex CLI의 ChatGPT 로그인은 별도 실행 경계로 유지한다.
+  - 의회 신규 실행 UI·API·모델 호출은 폐기하고 기존 의회 대화·transcript·노트의 읽기·검색 호환성만 유지한다.
+  - 대화는 기존 `shared-main` 하나를 유지하고 모델 변경은 다음 답변부터 적용한다.
+  - `자동`은 호환성 probe를 통과한 최신 균형형 모델로 이동하며, 수동 고정 모델은 조용히 바꾸지 않는다.
+  - API 채팅 모델, Codex 구독 모델, 강의·주식처럼 재현성이 필요한 background 모델은 서로 다른 정책 경계로 관리한다.
+  - 에이전트 탭의 일정 블록 아래 `사서 Codex` 모델 설정 블록을 추가한다.
+  - schema v9에 settings, catalog last-known-good, runtime generation, Codex job model snapshot을 additive하게 저장한다.
+  - A2 회수 상향은 같은 Pi 유지보수 창에서 함께 활성화했다. A1b 고유 질문 77개 전수 재생에서 보수 정책은 기존 107개 청크를 15개로 줄였고 수동 검토 15/15와 합성 note/chunk 20/20·abstention 4/4를 통과했다. 배포 후 실제 무관 질문은 0청크, 기억 질문은 관련 청크 2개만 주입했으며 새 GPT generation의 독립 온라인 관찰을 시작한다.
+
+  Docker 경계:
+
+  - Docker는 개발·CI 재현성을 위해 도입하되, 이번 V4.5-M·A2 Pi 배포는 현재 native Node.js + systemd 방식으로 진행한다.
+  - SQLite DB/WAL/SHM, Vault, backup의 데이터 루트를 먼저 분리하고 image 밖 bind mount로 둔다.
+  - Codex CLI ChatGPT 로그인과 organizer는 첫 단계에서 host 경계를 유지한다.
+  - Pi container 운영은 ARM64·backup/restore·scheduler·SIGTERM recovery와 단일 service manager 검증 뒤 별도 승격한다.
+  - 상세 단일 기준은 [Docker 개발·CI 설계](docker-development-design.md)다.
+
+  첨부·강의·주식 경계:
+
+  - temporary 첨부는 연결 당시 `CONTEXT_N`을 replay 사용자 턴 수로 snapshot한다. 현재 로컬·Pi 값은 10이며, 그 창에서 밀려나면 자동 만료·삭제한다.
+  - library 첨부는 명시적 사용자 승인 뒤에만 Vault로 승격한다.
+  - 강의 처리 모델은 job 단위 exact ID로 고정하고 이미 완료된 강의를 자동 재생성하지 않는다.
+  - 주식 Champion 모델은 PolicyVersion 단위 exact ID·revision·prompt·tool schema로 고정한다.
+  - 주식의 장기 목표는 정량 게이트와 서명된 정책을 통과한 policy-autonomous LIVE다. 현재 브로커 코드·키·계좌 연결은 없다.
+
   권한 모델:
 
   - Claude는 기본 답변 담당이다.
@@ -591,10 +621,14 @@
 
 ### 현재 진행 상태 (구현)
 
-> 갱신: 2026-07-19. 단계 구분은 `roadmap.md`(V1~V7) 기준.
+> 갱신: 2026-07-29. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
-- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크+노트 soft prior shadow 검색, 한국어 경계 보정과 실사용 관찰 도구·답변 진행 UI까지 Pi 운영 적용을 마쳤다. S0e는 `9efb501`, A1b는 `adb41a6`, 한국어 경계 보정은 `fc332e2`, 실사용 관찰 도구는 `8655706`, 제품·비서·운영 경로 이관은 `4ce7fdc`다. S0e 배포에서 전체 테스트 116개, topic audit 66/66, note-index audit 29/29와 SQLite 무결성·외래키를 인수했다. Codex 실행기 실패 복구 `514dab3`과 batch 신뢰성·중단 시 원본 복구 격리 보강 `bd4041e`를 Pi 적용했고, 로컬·Pi 전체 테스트 130/130, 최종 organizer processed 21·pending/queued/running/failed/needsManualCheck/recoveryRequired 0, topic audit 14/14(Q&A 71/71), note-index audit 30/30, Codex validation 21과 SQLite 무결성·외래키를 확인했다. organizer 기본 모델은 `0b8d8de`에서 `gpt-5.6-terra`로 전환하고 깊은 재처리는 `gpt-5.5`를 유지했다. Pi Codex CLI `0.144.5`, Terra runner smoke, 로컬·Pi 테스트 130/130, 인증 config/status API와 시작 후 오류 로그 0건을 확인했다. 실제 모델 답변은 기존 노트 회수를 유지한다.
-- **다음 단계 설계:** 실사용 A1b trace의 과회수와 지연을 관찰한다. 정확 청크 2건과 별도 holdout 환율 false positive 1건을 해소하거나 허용 가능한 근거로 분류하기 전에는 A2 실제 컨텍스트 전환을 자동 진행하지 않는다. 상세 설계와 실측 근거·통과 기준은 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
+- **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크 검색과 보수 A2, V4.5-M 단일 GPT·모델 UI·의회 신규 실행 퇴역·Codex 모델 설정까지 Pi 운영 적용을 마쳤다. Codex 일반 모델은 `gpt-5.6-terra`, 깊은 재처리는 `gpt-5.5`, Pi Codex CLI는 `0.144.5`다. 메인 채팅 `자동`도 실제 `gpt-5.6-terra`를 사용한다.
+- **다음 단계 설계:** 새 `chat:gpt-single-v1:a2` 온라인 표본에서 과회수·최신성·abstention을 독립 관찰한다. 유지보수·평가 세션이 자동 topic 저장되지 않는 명시적 경계는 별도 후속으로 설계한다. 상세 회수 근거는 [assistant-foundation-design.md](assistant-foundation-design.md), 모델 경계는 [chat-model-routing-design.md](chat-model-routing-design.md)를 따른다.
+- **V4.5-M·A2 Pi 인수 완료:** schema 8→9, API/Codex 분리 catalog와 last-known-good, OpenAI Responses text/tool parity, 요청·DB model snapshot, composer model picker, 의회 신규 실행 `410`, 사서 Codex 설정, A2 `:a2` 청크 주입을 한 배포본으로 활성화했다. 전체 회귀 207/207, 실제 GPT 일반·웹·논문·일정 무쓰기 후보와 A2 스모크, Codex job 41 Terra snapshot을 통과했다. 최종 topic Q&A 105/105, note index 33/33·finding 0, Codex validation 23, SQLite 무결성·외래키 오류 0, task/event/reminder 8/15/4 불변, 서비스 경고 0을 확인했다.
+- **모바일 composer 보정 Pi 반영 완료:** 모델 선택 opener는 기본 테두리 없이 hover·열림 상태에만 옅은 면을 쓰고, 입력 placeholder·flex 축소·44px 전송 버튼·safe-area 여백을 보정했다. 390px·320px에서 overflow 0, 로컬 전체 207/207, Pi UI 9/9와 정적 응답 hash 일치를 확인했다. 서비스 재시작과 DB 변경은 없었다.
+- **첨부·강의 설계 보정·미구현:** temporary 첨부는 현재 `CONTEXT_N=10` 사용자 턴을 연결 시 snapshot하고 replay 창을 벗어나면 자동 정리한다. library만 승인 후 영구 저장한다. 강의 Phase 0은 지금 검증할 수 있고, 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 진행한다. 전체 강의 구현은 V5-B 전 또는 PAPER 관찰 기간에 병행할 수 있다.
+- **V5-B 설계 보정·미구현:** 장기 목표는 PolicyVersion을 사전 승인한 자율 LIVE다. 연구·Core → Single Analyst → Shadow → PAPER_AUTONOMOUS → 선택적 LIVE_PROPOSAL_ONLY → LIVE_MICRO_POLICY_AUTONOMOUS 순서로만 진행하고 자동 승격을 금지한다. LIVE 코드·자격증명·계좌 연결은 시작하지 않았다.
 - **완료:**
   - V1·V2 핵심 — 채팅(단일/의회), DB 저장·복원, 자동 토픽 노트 누적, 임베딩 하이브리드 검색, 사용자 메모리.
   - V3 — Codex 자동 정리 큐(저장 이벤트 5개 임계 자동 큐 + worker) + 마커 밖 수정 시 폐기·복원(diff 검증), 보안(.env 분리·path traversal·프롬프트 인젝션 방지), soft delete/_archive(노트 보관·복원, 검색·그래프·Codex 제외, 링크 유지), **백업(볼트+DB 하루 1회 자동, 7일 보관, catch-up; `/backup` 수동 + cron 겸용 `scripts/backup.js`)**.
@@ -629,6 +663,8 @@
 -----
 
 ## 1. 전체 구성
+
+> 이 절부터 이어지는 Claude·의회 중심 설명은 현재 배포와 과거 설계의 보존 기록이다. V4.5-M 구현 시 모델·UI·의회 신규 실행에 관한 충돌 항목은 위 `승인된 다음 전환 — V4.5-M`과 `docs/chat-model-routing-design.md`가 우선한다. 기존 데이터 보존·노트·검색·Codex 안전 규칙은 계속 유효하다.
 
 - **호스팅**: 라즈베리파이에 서버를 두고 24시간 켜둠. 볼트는 외장 저장소에 저장.
 - **접속**: 폰에서는 Tailscale로 라즈베리파이에 안전하게 접속. 클라우드/포트포워딩 불필요.
@@ -1540,9 +1576,14 @@ A0 기준선 평가
   -> A3 provenance·무효화·구조화 메모리
   -> B trace·피드백
   -> C task·reminder·Today·일정 에이전트 요약
+  ↔ V4.5-M 단일 GPT·모델 런타임
   -> V4-B 음성
   -> V5-A 딜 스카우트
   -> V5-B 주식 분석
+
+Lecture Phase 0은 병행 가능
+Lecture Phase 1+는 V4.5-M·첨부 업로드 패턴 뒤,
+V5-B 전 또는 PAPER_AUTONOMOUS 관찰 중 병행
 ```
 
 위 순서는 승격 순서다. A1b 실사용 표본을 기다리는 동안 V4.5-C C1 명시적 task/reminder·private Web Push를 별도 경계에서 구현해 Pi에 인수했다. schema v5 접근 경계, schema v6 task 정본·30초 scheduler·UI, schema v7 Web Push outbox·최소 PWA와 지식 시트/일정 에이전트 재편, schema v8 활성 일정 bounded 대화 컨텍스트·월별 종결 노트 projection, 단일 Claude `schedule_prepare`와 휘발 확인 카드까지 독립 모듈로 배포했다. C1e는 topic 자동 저장 판단·A1b 점수·trace를 바꾸지 않고, 일정 DB를 유일한 정본으로 유지하며 별도 과거 일정 분류기나 일정별 노트를 만들지 않는다. C1.5도 A1b 점수·trace 형식은 그대로 두고 후보가 실제로 생긴 운영 요청만 topic 자동 저장에서 제외한다. 배포 전 DB·vault 백업 `20260719-2131`과 코드 백업을 검증하고 schema 7→8, 로컬/Pi 테스트 171/171, 공통 application table 17개 행 수 불변, note-index 30/30·topic Q&A 75/75 finding 0, SQLite 무결성·외래키, 인증 API·새 PID·재시작 오류 0건을 확인했다. Tailscale Serve canonical HTTPS, iPhone·iPad·Mac 구독과 첫 운영 reminder의 provider 3/3 `201 accepted`까지 확인했고 잠금화면 표시 10회 기준은 진행 중이다. `ASSISTANT_TASKS_ENABLED`, `WEB_PUSH_ENABLED`의 코드 기본값은 `false`이며 운영 Pi에서만 켠다. 숨은 탭의 지속 실행은 계약하지 않고 Pi가 시각을 판정한다. 일정 블록은 작은 운영 요약이며 향후 딜·주식 에이전트 보고 대시보드를 선행 구현하는 근거가 아니다. 이 약속 루프는 외부 캘린더를 읽고 일정을 최적화하는 V5-C 역할과도 다르다. 향후 native 앱에서도 task·scheduler·delivery 상태 의미는 유지하지만 Web Push subscription·Service Worker는 native transport로 대체한다.

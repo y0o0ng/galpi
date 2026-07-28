@@ -20,18 +20,24 @@ test('notification, task, and agent modules load before the panel shell and expo
   const taskSource = read('public/task-panel.js');
   const pushSource = read('public/push-client.js');
   const agentSource = read('public/agent-panel.js');
+  const modelPickerSource = read('public/model-picker.js');
   const notificationIndex = html.indexOf('<script src="notification-panel.js"></script>');
   const taskIndex = html.indexOf('<script src="task-panel.js"></script>');
   const pushIndex = html.indexOf('<script src="push-client.js"></script>');
   const agentIndex = html.indexOf('<script src="agent-panel.js"></script>');
+  const modelPickerIndex = html.indexOf('<script src="model-picker.js"></script>');
   const paperIndex = html.indexOf('<script src="paper-panel.js"></script>');
   const appIndex = html.indexOf('<script src="app.js"></script>');
 
   assert.match(html, /data-panel-tab="notifications"[^>]*class="[^"]*active|class="knowledge-tab active" data-panel-tab="notifications"/);
   assert.match(html, /id="notification-panel-content" class="notification-body" aria-live="polite"/);
   assert.match(html, /id="agent-panel-content" aria-live="polite"/);
-  assert.match(html, /data-model="claude" aria-label="기본 답변 모드 XION"/);
+  assert.match(html, /aria-label="기본 답변 비서 XION"/);
   assert.match(html, /class="model-logo-icon xion-mark-icon"[^>]*>[\s\S]*?XION/);
+  assert.match(html, /id="chat-model-button"[^>]*aria-haspopup="listbox"[^>]*aria-expanded="false"/);
+  assert.match(html, /id="chat-model-options" role="listbox" aria-label="GPT 모델"/);
+  assert.match(html, /id="input" placeholder="메시지를 입력하세요"/);
+  assert.doesNotMatch(html, /council-btn|council-mode-toggle|Claude 크레딧/);
   assert.match(html, /id="assistant-tools-toggle"[^>]*aria-controls="assistant-tools-menu"[^>]*aria-expanded="false"/);
   assert.match(html, /id="assistant-tools-menu" aria-label="XION 도구" hidden/);
   assert.doesNotMatch(html, /id="pet"|src="pet\.js"/);
@@ -41,10 +47,15 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.match(appSource, /DOMContentLoaded[\s\S]*initAssistantTools\(\)/);
   assert.match(css, /#assistant-tools-toggle\s*{[^}]*width: 44px;[^}]*height: 44px/s);
   assert.match(css, /#assistant-tools-menu\s*{[^}]*bottom: calc\(100% \+ 10px\)[^}]*max-height:/s);
-  assert.match(css, /\.model-btn\[data-model="claude"\]\.active\s*{[^}]*background: transparent;[^}]*color: var\(--brand-ink\)/s);
+  assert.match(css, /#chat-model-button\s*{[^}]*height: 44px;[^}]*border: none/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#chat-model-menu\s*{[^}]*position: fixed/s);
+  assert.match(css, /#input\s*{[^}]*min-width: 0/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#send-btn\s*{[^}]*width: 44px;[^}]*height: 44px/s);
+  assert.match(modelPickerSource, /If-Match/);
+  assert.match(modelPickerSource, /appliesFrom|다음 답변부터/);
   assert.ok(notificationIndex > 0 && notificationIndex < taskIndex);
   assert.ok(taskIndex < pushIndex && pushIndex < agentIndex);
-  assert.ok(agentIndex < paperIndex && paperIndex < appIndex);
+  assert.ok(agentIndex < modelPickerIndex && modelPickerIndex < paperIndex && paperIndex < appIndex);
 
   const notificationWindow = {};
   vm.runInNewContext(notificationSource, { window: notificationWindow }, { filename: 'notification-panel.js' });
@@ -58,6 +69,8 @@ test('notification, task, and agent modules load before the panel shell and expo
   const agentWindow = {};
   vm.runInNewContext(agentSource, { window: agentWindow }, { filename: 'agent-panel.js' });
   assert.deepEqual(Object.keys(agentWindow.AgentPanel).sort(), ['init', 'openTasks', 'refresh', 'show']);
+  assert.match(agentSource, /heading\.textContent = '사서 Codex'/);
+  assert.match(agentSource, /\/api\/settings\/codex-models/);
 });
 
 test('minimal PWA has stable scope and a push-only service worker', () => {
@@ -259,7 +272,9 @@ test('agent shell delegates writes to TaskPanel and inserts task text as text co
   const taskPanel = read('public/task-panel.js');
 
   assert.match(agentPanel, /state\.apiFetch\(`\/api\/tasks\/summary/);
-  assert.doesNotMatch(agentPanel, /method:\s*'(?:POST|PATCH|DELETE)'/);
+  assert.doesNotMatch(agentPanel, /\/api\/tasks[^'`]*['`][\s\S]{0,120}method:\s*'(?:POST|PUT|PATCH|DELETE)'/);
+  assert.match(agentPanel, /\/api\/models\/refresh[\s\S]*?method: 'POST'/);
+  assert.match(agentPanel, /\/api\/settings\/codex-models[\s\S]*?method: 'PUT'/);
   assert.doesNotMatch(agentPanel, /innerHTML\s*=\s*(?:message|data|item|task|error)/);
   assert.doesNotMatch(taskPanel, /innerHTML\s*=\s*(?:message|data|item|task|error)/);
   assert.match(taskPanel, /title\.textContent = task\.title/);

@@ -1016,7 +1016,7 @@ assistant_tasks             # 반복 master
        -> assistant_reminders    # pending/fired/acknowledged receipt
 ```
 
-C2는 별도 schema v9와 컨펌으로 아래만 검토한다.
+C2는 구현 시점의 다음 가용 schema와 별도 컨펌으로 아래만 검토한다. schema v9는 먼저 확정된 V4.5-M 모델 런타임의 additive migration이 사용한다.
 
 - `매일 | 평일 | 매주`의 제한된 반복
 - 회차 완료와 반복 전체 종료 분리

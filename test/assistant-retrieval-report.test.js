@@ -15,6 +15,10 @@ const {
   parseArguments,
   parseSince,
 } = require('../scripts/report-retrieval-shadow');
+const {
+  formatReview: formatPolicyReview,
+  parseArguments: parsePolicyArguments,
+} = require('../scripts/review-retrieval-policy');
 
 function createReportDatabase() {
   const db = new Database(':memory:');
@@ -170,4 +174,34 @@ test('report arguments parse KST dates and keep content review explicit', () => 
   assert.match(helpText(), /기본 출력에는 질문·노트 본문이 없습니다/);
   assert.match(helpText(), /readonly\/query_only/);
   assert.equal(percentile([10, 20, 30, 40], 0.95), 40);
+});
+
+test('policy replay keeps generated embeddings and question output explicit', () => {
+  const options = parsePolicyArguments([
+    '--db', './test.db',
+    '--vault', './vault',
+    '--limit', '77',
+    '--embed-missing',
+    '--env', './.env',
+    '--json',
+  ]);
+  assert.equal(options.limit, 77);
+  assert.equal(options.embedMissing, true);
+  assert.match(options.dbPath, /test\.db$/);
+  assert.match(options.vaultPath, /vault$/);
+  assert.match(options.envPath, /\.env$/);
+  assert.throws(() => parsePolicyArguments(['--limit', '101']), /1~100/);
+
+  const output = formatPolicyReview({
+    sourceRuns: 1,
+    uniqueQueries: 1,
+    comparableQueries: 1,
+    missingEmbeddings: 0,
+    baseline: { selectedQueries: 1, selectedChunks: 1, abstentions: 0 },
+    replacement: { selectedQueries: 0, selectedChunks: 0, abstentions: 1 },
+    changedQueries: 1,
+    reviews: [{ query: '개인 질문', evidence: [], baseline: [], replacement: [] }],
+  }, false);
+  assert.doesNotMatch(output, /개인 질문/);
+  assert.match(output, /--review/);
 });

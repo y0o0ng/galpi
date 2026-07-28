@@ -21,8 +21,6 @@ const PROGRESS_STAGE_LABELS = Object.freeze({
   council_synthesis: 'Claude가 최종 정리 중…',
 });
 let isLoading        = false;
-let councilMode      = false;
-let councilAvailable = false;
 let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
 let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
 let isRestoringHistory = false;
@@ -164,8 +162,7 @@ function showTokenGate() {
 
 async function init() {
   showWelcome();
-  document.body.dataset.activeModel = 'claude';
-  document.querySelector('.council-mode-toggle').classList.add('disabled');
+  document.body.dataset.activeModel = 'gpt';
 
   try {
     const config = await apiFetch('/api/config').then(r => r.json());
@@ -173,39 +170,17 @@ async function init() {
     tasksEnabled = config.tasksEnabled === true;
     initPaperPanel();
     document.getElementById('model-indicator').textContent =
-      `XION: ${config.claudeModel}  |  의회 GPT: ${config.gptModel}`;
+      `XION · ${config.gptChatBootstrapModel}`;
     renderWebUsagePill(config.webSearch);
-
-    if (!config.hasClaude) {
-      const btn = document.querySelector('[data-model="claude"]');
-      btn.classList.add('disabled');
-      btn.title = 'ANTHROPIC_API_KEY가 .env에 없습니다';
-      btn.style.opacity = '0.4';
-    }
-
-    const councilBtn = document.querySelector('.council-btn');
-    if (config.hasClaude && config.hasGpt) {
-      councilAvailable = true;
-      councilBtn.classList.remove('disabled');
-      councilBtn.title = '의회 모드';
-      councilBtn.addEventListener('click', toggleCouncil);
-    } else {
-      councilBtn.title = 'Claude와 GPT 키가 모두 필요합니다';
-    }
+    window.ChatModelPicker?.init({
+      apiFetch,
+      showToast,
+      isAnswering: () => isLoading,
+    });
   } catch (_) {
     initPaperPanel();
     appendError('서버에 연결할 수 없습니다. node server.js가 실행 중인지 확인해주세요.');
   }
-
-  // 의회 답변 방식 토글: 빠름(compressed) / 기본(full) / 심층(deep)
-  document.querySelectorAll('.mode-opt').forEach(btn => {
-    btn.addEventListener('click', () => {
-      councilDraftMode = btn.dataset.mode;
-      document.querySelectorAll('.mode-opt').forEach(b => {
-        b.classList.toggle('active', b.dataset.mode === councilDraftMode);
-      });
-    });
-  });
 
   document.getElementById('send-btn').addEventListener('click', sendMessage);
 
@@ -594,14 +569,6 @@ function saveActiveNotes() {
   localStorage.setItem(activeNotesKey, JSON.stringify(activeNotes));
 }
 
-function toggleCouncil() {
-  if (!councilAvailable) return;
-  councilMode = !councilMode;
-  document.querySelector('.council-btn').classList.toggle('active', councilMode);
-  document.querySelector('.council-mode-toggle').classList.toggle('disabled', !councilMode);
-  document.body.dataset.activeModel = councilMode ? 'council' : 'claude';
-}
-
 // ─── 메시지 전송 디스패처 ────────────────────────────────────────────────────
 
 function sendMessage() {
@@ -655,8 +622,7 @@ function sendMessage() {
     inputEl.style.height = 'auto';
     if (query) {
       const opts = { overrideText: query, displayText: `/web ${query}`, webSearch: true };
-      if (councilMode) sendCouncilMessage(opts);
-      else sendSingleMessage(opts);
+      sendSingleMessage(opts);
     }
     return;
   }
@@ -754,8 +720,7 @@ function sendMessage() {
     handleDocumentSave(text, saveContent);
     return;
   }
-  if (councilMode) sendCouncilMessage();
-  else sendSingleMessage();
+  sendSingleMessage();
 }
 
 function extractSaveRequestContent(text) {
@@ -853,7 +818,7 @@ async function sendSingleMessage(options = {}) {
     const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, model: 'claude', sessionId, activeNotes, webSearch: !!options.webSearch, progress: true }),
+      body:    JSON.stringify({ message: text, model: 'gpt', sessionId, activeNotes, webSearch: !!options.webSearch, progress: true }),
     });
     const data = await readProgressResponse(res, stage => updateLoadingStage(loadingEl, stage));
     loadingEl.remove();
@@ -2915,8 +2880,8 @@ function scrollDown() {
 function showWelcome() {
   getMessages().innerHTML = `
     <div class="welcome">
-      <p>안녕하세요!<br>기본 답변은 XION이 맡습니다.</p>
-      <p style="margin-top:10px;font-size:12px;opacity:0.7">의회 모드에서는 GPT와 함께 비교합니다.</p>
+      <p>안녕하세요!<br>XION이 이어서 이야기할게.</p>
+      <p style="margin-top:10px;font-size:12px;opacity:0.7">입력창의 모델 버튼에서 다음 답변 모델을 바꿀 수 있어.</p>
     </div>`;
 }
 
@@ -2935,8 +2900,9 @@ function appendUserBubble(text) {
 function appendAssistantBubble(data) {
   const group = document.createElement('div');
   group.className = 'msg-group assistant';
+  const actualModel = data.modelId || data.model;
 
-  const label = makeModelLabel(data.model);
+  const label = makeModelLabel(actualModel);
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
@@ -2950,7 +2916,7 @@ function appendAssistantBubble(data) {
   if (candidateCard) {
     group.appendChild(candidateCard);
     getMessages().appendChild(group);
-    saveUiMessage('assistant', data.reply, data.model);
+    saveUiMessage('assistant', data.reply, actualModel);
     scrollDown();
     return;
   }
@@ -2963,12 +2929,15 @@ function appendAssistantBubble(data) {
   if (Number.isSafeInteger(Number(data.messageId)) && Number(data.messageId) > 0) {
     saveBtn.dataset.messageId = String(data.messageId);
   }
-  saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, data)));
+  saveBtn.addEventListener('click', () => showSaveConfirm(saveBtn, () => saveNote(saveBtn, {
+    ...data,
+    model: actualModel,
+  })));
 
   group.appendChild(saveBtn);
   getMessages().appendChild(group);
   watchMessageSaveState(saveBtn, data.messageId);
-  saveUiMessage('assistant', data.reply, data.model);
+  saveUiMessage('assistant', data.reply, actualModel);
   scrollDown();
 }
 

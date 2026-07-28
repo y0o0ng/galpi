@@ -329,6 +329,11 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
     filename,
     'Organizer Regression',
   ).lastInsertRowid;
+  fixtureDb.prepare(`
+    UPDATE app_settings
+    SET value_json = '"gpt-5.6-sol"', version = version + 1
+    WHERE key = 'codex.general_model'
+  `).run();
   fixtureDb.close();
 
   const queue = await api(url, '/api/organize/queue', { method: 'POST', body: '{}' });
@@ -353,6 +358,9 @@ test('missing Codex runner keeps the same job retryable and exposes the infrastr
   const queuedJob = queuedStatus.body.jobs.find(job => job.id === queue.body.jobId);
   assert.equal(queuedJob.status, 'pending');
   assert.equal(queuedJob.attemptCount, 0);
+  assert.equal(queuedJob.modelSelection, 'gpt-5.6-sol');
+  assert.equal(queuedJob.modelId, 'gpt-5.6-sol');
+  assert.equal(queuedJob.modelCatalogGeneration, 0);
 
   // 명시적 수동 실행은 runner를 다시 시도하며, 실행 장애는 같은 job의 재시도 대기로 복구한다.
   const processResult = await api(url, '/api/organize/process', { method: 'POST', body: '{}' });

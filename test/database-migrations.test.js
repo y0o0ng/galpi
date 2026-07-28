@@ -78,12 +78,13 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
+      { version: 9 },
     ],
   );
 
@@ -114,6 +115,48 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       aiReadable: 1,
       ownerAgent: null,
     },
+  );
+  assert.deepEqual(
+    db.prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name IN ('app_settings', 'model_catalog_cache')
+      ORDER BY name
+    `).all(),
+    [
+      { name: 'app_settings' },
+      { name: 'model_catalog_cache' },
+    ],
+  );
+  assert.deepEqual(
+    db.prepare('PRAGMA table_info(messages)').all()
+      .filter(column => [
+        'model_selection',
+        'model_catalog_generation',
+        'runtime_generation',
+        'reasoning_effort',
+      ].includes(column.name))
+      .map(column => column.name),
+    [
+      'model_selection',
+      'model_catalog_generation',
+      'runtime_generation',
+      'reasoning_effort',
+    ],
+  );
+  assert.deepEqual(
+    db.prepare('PRAGMA table_info(codex_jobs)').all()
+      .filter(column => [
+        'model_selection',
+        'model_id',
+        'model_catalog_generation',
+      ].includes(column.name))
+      .map(column => column.name),
+    [
+      'model_selection',
+      'model_id',
+      'model_catalog_generation',
+    ],
   );
   assert.deepEqual(
     db.prepare(`

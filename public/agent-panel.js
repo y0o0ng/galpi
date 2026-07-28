@@ -18,6 +18,10 @@
     focusReminders: false,
     calendarLoading: false,
     calendarSettleTimer: null,
+    scheduleError: '',
+    codex: null,
+    codexError: '',
+    codexSaving: false,
   };
 
   const countLabels = [
@@ -107,11 +111,14 @@
 
   function renderLoading() {
     state.container.replaceChildren();
-    const skeleton = document.createElement('div');
-    skeleton.className = 'schedule-agent-block schedule-agent-skeleton';
-    skeleton.setAttribute('aria-label', '일정 요약을 불러오는 중');
-    skeleton.innerHTML = '<span></span><span></span><span></span><span></span>';
-    state.container.appendChild(skeleton);
+    const count = state.enabled ? 2 : 1;
+    for (let index = 0; index < count; index += 1) {
+      const skeleton = document.createElement('div');
+      skeleton.className = 'schedule-agent-block schedule-agent-skeleton';
+      skeleton.setAttribute('aria-label', '에이전트 설정을 불러오는 중');
+      skeleton.innerHTML = '<span></span><span></span><span></span>';
+      state.container.appendChild(skeleton);
+    }
   }
 
   function renderError(message) {
@@ -124,6 +131,158 @@
     detail.textContent = message;
     block.append(title, detail, button('다시 시도', refresh));
     state.container.appendChild(block);
+  }
+
+  function makeCodexSelect(labelText, value, models, name) {
+    const field = document.createElement('label');
+    field.className = 'codex-model-field';
+    const label = document.createElement('span');
+    label.textContent = labelText;
+    const select = document.createElement('select');
+    select.name = name;
+    select.disabled = state.codexSaving || models.length === 0;
+    const options = [...models];
+    if (value && !options.some(model => model.id === value)) {
+      options.unshift({ id: value, displayName: value, unavailable: true });
+    }
+    options.forEach(model => {
+      const option = document.createElement('option');
+      option.value = model.id;
+      option.textContent = `${model.displayName || model.id}${model.unavailable ? ' · 현재 목록 없음' : ''}`;
+      option.selected = model.id === value;
+      select.appendChild(option);
+    });
+    field.append(label, select);
+    return field;
+  }
+
+  async function saveCodexModels(block) {
+    if (!state.codex || state.codexSaving) return;
+    const general = block.querySelector('select[name="generalModel"]')?.value;
+    const deep = block.querySelector('select[name="deepModel"]')?.value;
+    if (!general || !deep) return;
+    state.codexSaving = true;
+    renderSummary();
+    try {
+      const response = await state.apiFetch('/api/settings/codex-models', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'If-Match': `"${state.codex.settings.general.version}"`,
+        },
+        body: JSON.stringify({
+          generalModel: general,
+          deepModel: deep,
+          deepVersion: state.codex.settings.deep.version,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Codex 모델을 저장하지 못했습니다.');
+      state.codex = data;
+      state.codexError = '';
+      state.showToast('다음 Codex 작업부터 새 모델을 쓸게');
+    } catch (error) {
+      state.codexError = error.message;
+      state.showToast(error.message);
+      await loadCodexData().catch(() => {});
+    } finally {
+      state.codexSaving = false;
+      renderSummary();
+    }
+  }
+
+  async function refreshCodexCatalog() {
+    if (state.codexSaving) return;
+    state.codexSaving = true;
+    renderSummary();
+    try {
+      const response = await state.apiFetch('/api/models/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ surface: 'codex' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.code || 'Codex 모델 목록 갱신에 실패했습니다.');
+      await loadCodexData();
+      state.codexError = '';
+      state.showToast('Codex 모델 목록을 갱신했어');
+    } catch (error) {
+      state.codexError = error.message;
+      state.showToast(error.message);
+    } finally {
+      state.codexSaving = false;
+      renderSummary();
+    }
+  }
+
+  function makeCodexBlock() {
+    const block = document.createElement('section');
+    block.className = 'codex-agent-block';
+    const head = document.createElement('div');
+    head.className = 'schedule-agent-head';
+    const title = document.createElement('div');
+    const kicker = document.createElement('span');
+    kicker.className = 'schedule-agent-kicker';
+    kicker.textContent = 'CODEX LIBRARIAN';
+    const heading = document.createElement('h2');
+    heading.textContent = '사서 Codex';
+    title.append(kicker, heading);
+    const status = document.createElement('span');
+    status.className = 'schedule-agent-status';
+    status.textContent = state.codex?.runner?.ok ? 'CLI 정상' : 'CLI 확인 필요';
+    status.classList.toggle('danger', state.codex?.runner?.ok !== true);
+    head.append(title, status);
+
+    const description = document.createElement('p');
+    description.className = 'codex-agent-description';
+    description.textContent = '노트 정리와 연결을 담당해. 변경은 실행 중 작업이 아니라 다음 작업부터 적용돼.';
+    block.append(head, description);
+
+    if (!state.codex) {
+      const error = document.createElement('p');
+      error.className = 'codex-agent-message danger';
+      error.textContent = state.codexError || 'Codex 모델 목록을 불러오지 못했습니다.';
+      block.appendChild(error);
+      const retry = button('다시 시도', refresh);
+      retry.classList.add('codex-agent-retry');
+      block.appendChild(retry);
+      return block;
+    }
+
+    const models = Array.isArray(state.codex.models) ? state.codex.models : [];
+    const fields = document.createElement('div');
+    fields.className = 'codex-model-fields';
+    fields.append(
+      makeCodexSelect('일반 정리 모델', state.codex.settings.general.value, models, 'generalModel'),
+      makeCodexSelect('깊은 재정리 모델', state.codex.settings.deep.value, models, 'deepModel'),
+    );
+    block.appendChild(fields);
+
+    const message = document.createElement('p');
+    message.className = 'codex-agent-message';
+    if (state.codexError) {
+      message.textContent = state.codexError;
+      message.classList.add('danger');
+    } else if (state.codex.catalog?.status === 'stale') {
+      message.textContent = '목록 갱신에 실패해 마지막 정상 목록을 사용 중이야.';
+      message.classList.add('warn');
+    } else if (models.length === 0) {
+      message.textContent = '모델 목록을 먼저 갱신해줘.';
+      message.classList.add('warn');
+    } else {
+      message.textContent = `${models.length}개 모델 · 선택한 정확한 ID를 유지해.`;
+    }
+    block.appendChild(message);
+
+    const actions = document.createElement('div');
+    actions.className = 'codex-agent-actions';
+    const refreshButton = button('목록 갱신', refreshCodexCatalog);
+    const saveButton = button(state.codexSaving ? '저장 중…' : '변경 저장', () => saveCodexModels(block), true);
+    refreshButton.disabled = state.codexSaving;
+    saveButton.disabled = state.codexSaving || models.length === 0;
+    actions.append(refreshButton, saveButton);
+    block.appendChild(actions);
+    return block;
   }
 
   async function enablePush(buttonElement) {
@@ -348,10 +507,7 @@
     return section;
   }
 
-  function renderSummary() {
-    const data = state.summary;
-    if (!data) return;
-    state.container.replaceChildren();
+  function makeScheduleBlock(data) {
     const block = document.createElement('section');
     block.className = 'schedule-agent-block';
     block.appendChild(makeHeader());
@@ -379,7 +535,34 @@
       button('전체 일정', () => openTasks({ view: 'today' })),
     );
     block.appendChild(actions);
-    state.container.appendChild(block);
+    return block;
+  }
+
+  function renderSummary() {
+    state.container.replaceChildren();
+    if (state.enabled) {
+      if (state.scheduleError) {
+        const block = document.createElement('section');
+        block.className = 'schedule-agent-block schedule-agent-error';
+        const title = document.createElement('strong');
+        title.textContent = '일정 요약을 불러오지 못했습니다.';
+        const detail = document.createElement('p');
+        detail.textContent = state.scheduleError;
+        block.append(title, detail, button('일정 다시 시도', refresh));
+        state.container.appendChild(block);
+      } else if (state.summary) {
+        state.container.appendChild(makeScheduleBlock(state.summary));
+      }
+    }
+    state.container.appendChild(makeCodexBlock());
+  }
+
+  async function loadCodexData() {
+    const response = await state.apiFetch('/api/models/codex');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Codex 모델 목록을 불러오지 못했습니다.');
+    state.codex = data;
+    return true;
   }
 
   async function loadAgentData() {
@@ -483,27 +666,33 @@
   }
 
   async function refresh() {
-    if (!state.initialized || !state.enabled) return;
+    if (!state.initialized) return;
     if (state.mode === 'summary') renderLoading();
-    try {
-      if (!await loadAgentData()) return;
-      if (state.mode === 'summary') renderSummary();
-      else {
+    if (state.mode !== 'summary') {
+      try {
+        if (!state.enabled || !await loadAgentData()) return;
         renderWorkspaceReminders();
         await global.TaskPanel.refresh();
+      } catch (error) {
+        renderWorkspaceReminders(error.message);
       }
-    } catch (error) {
-      if (state.mode === 'summary') renderError(error.message);
-      else renderWorkspaceReminders(error.message);
+      return;
     }
+    const [scheduleResult, codexResult] = await Promise.allSettled([
+      state.enabled ? loadAgentData() : Promise.resolve(false),
+      loadCodexData(),
+    ]);
+    state.scheduleError = scheduleResult.status === 'rejected'
+      ? scheduleResult.reason.message
+      : '';
+    state.codexError = codexResult.status === 'rejected'
+      ? codexResult.reason.message
+      : '';
+    renderSummary();
   }
 
   function show() {
     if (!state.initialized) return;
-    if (!state.enabled) {
-      renderUnavailable();
-      return;
-    }
     refresh();
   }
 
@@ -529,7 +718,6 @@
     state.showToast = showToast;
     state.container = container;
     state.initialized = true;
-    if (!state.enabled) renderUnavailable();
   }
 
   global.AgentPanel = { init, show, refresh, openTasks };

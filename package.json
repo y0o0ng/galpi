@@ -14,7 +14,9 @@
     "remove:topic-qa": "node scripts/remove-topic-qa.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
     "report:retrieval-shadow": "node scripts/report-retrieval-shadow.js",
+    "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
+    "smoke:openai-responses": "node scripts/smoke-openai-responses.js",
     "mcp:obsidian": "node scripts/galpi-mcp.mjs"
   },
   "dependencies": {
