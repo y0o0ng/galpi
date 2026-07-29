@@ -297,6 +297,8 @@ test('schedule layout keeps native week navigation and minimal task controls', (
   assert.match(css, /\.schedule-agent-week\s*{[^}]*repeat\(7, minmax\(0, 1fr\)\)/s);
   assert.match(css, /\.schedule-agent-calendar-track\s*{[^}]*width: 300%/s);
   assert.match(css, /\.schedule-agent-calendar-viewport\s*{[^}]*scroll-snap-type: x mandatory/s);
+  assert.match(css, /#agent-panel-content\s*{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow-y: auto/s);
+  assert.match(css, /#agent-panel-content > \*\s*{[^}]*flex: 0 0 auto;[^}]*min-width: 0/s);
   assert.match(agentPanel, /const back = button\('<', openSummary\)/);
   assert.match(agentPanel, /back\.setAttribute\('aria-label', '일정 요약으로 돌아가기'\)/);
   assert.match(agentPanel, /add\.setAttribute\('aria-label', '일정 추가'\)/);

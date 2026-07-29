@@ -355,6 +355,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 > A1b 실사용 관찰과 Web Push 표시 검증에 영향을 주지 않는 병행 기반 트랙이다.
 >
 > 모바일 composer 보정 Pi 반영 완료(2026-07-29): 모델 선택 opener의 기본 경계를 없애고 hover·열림 상태에만 옅은 면을 남겼다. placeholder를 `메시지를 입력하세요`로 줄이고 textarea 축소 경계와 모바일 44px 전송 버튼·safe-area 여백을 보정했다. 390px·320px 실측에서 문서 가로 overflow 0, 로컬 전체 207/207, Pi UI 9/9를 통과했다. 정적 HTML/CSS 응답 hash가 배포본과 일치했고 서비스는 재시작 없이 PID `116558`을 유지했다. 복구본은 `/home/pi/backups/galpi/ui-composer-pre-20260729-0031.tar.gz`다.
+>
+> 에이전트 탭 동적 높이 회귀 보정(2026-07-29): 일정 알림 카드가 늘어난 일정 에이전트와 사서 Codex 블록이 제한 높이 Grid 행에서 겹칠 수 있어, 탭 컨테이너를 비축소 세로 flex 흐름으로 바꿨다. 블록은 실제 콘텐츠 높이를 유지하고 탭만 스크롤한다. 알림 3개 fixture의 일정 블록 730.125px 뒤 사서 블록이 10px 간격으로 시작했고 390px·350px에서 overlap 0을 확인했다. UI 9/9, 전체 205/207 뒤 서버 기동 timeout 2건 격리 재실행 2/2를 통과했다.
 
 1. 앞무대 답변은 기존 OpenAI API 키와 Responses API를 사용하는 단일 GPT로 전환한다. ChatGPT 구독 계정은 메인 채팅 API 호출에 사용하지 않는다.
 2. 의회 신규 실행 UI·API·Claude/GPT 합성 경로는 제거하되 기존 의회 메시지·transcript·`note_type: council`은 읽기·검색 호환성을 유지한다.

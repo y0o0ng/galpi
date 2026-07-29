@@ -772,13 +772,19 @@ html, body {
 
 #agent-panel-content {
   flex: 1;
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
   min-height: 0;
   overflow-y: auto;
   padding: 12px;
   -webkit-overflow-scrolling: touch;
+}
+
+#agent-panel-content > * {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .schedule-agent-block {
