@@ -1,8 +1,8 @@
 # 갈피 Docker 개발·CI 설계
 
 > Version: 1.1
-> Date: 2026-07-29
-> Status: phase 1 implemented / first CI run pending / Pi production migration deferred
+> Date: 2026-07-30
+> Status: phase 1 complete / Pi production migration deferred
 > Scope: 로컬 개발, CI, ARM64 재현성, 데이터 경계
 
 ---
@@ -32,7 +32,7 @@ Docker는 도입한다. 다만 첫 목적은 **개발·CI 환경 재현성**이�
 - [x] multi-stage `Dockerfile`, `.dockerignore`, 개발용 Compose
 - [x] 기존 native test와 container test를 함께 실행하는 CI
 - [x] CI의 x86_64/ARM64 runtime image build
-- [ ] 첫 GitHub Actions 실행에서 container test와 양쪽 architecture build 확인
+- [x] 첫 GitHub Actions 실행에서 container test와 양쪽 architecture build 확인
 
 Docker의 bind mount는 공식 표현대로 host path와 container를 직접 연결한다.[^docker-storage] 운영 데이터는 image layer나 임시 container filesystem에 두지 않는다.
 
@@ -64,6 +64,15 @@ SQLite 문서에 따르면 WAL 파일은 항상 database 파일과 같은 디렉
 ## 3. 로컬 사용
 
 `.env`가 없다면 `.env.example`을 복사해 실제 API 키와 로컬 Vault 경로를 설정한다. 기존 `.env`를 덮어쓰면 안 된다.
+
+현재 Intel Mac 개발 환경은 Docker Desktop 대신 Colima를 수동 실행한다.
+
+```bash
+brew install colima docker docker-compose docker-buildx
+colima start --cpu 4 --memory 4 --disk 30 --runtime docker
+```
+
+자동 시작 서비스는 등록하지 않았다. 재부팅 뒤 필요할 때 `colima start`, 작업을 끝내면 `colima stop`을 사용한다.
 
 ```bash
 mkdir -p .docker-data/db .docker-data/backups galpi-vault
@@ -140,11 +149,14 @@ V4.5-M 단일 GPT 전환과 A2 회수 상향은 이미 native Pi 배포 방식�
 
 - 공통 경로·백업 집중 테스트: 6/6
 - 로컬 전체 native 회귀: 211/211
-- Compose·GitHub Actions YAML parse, JavaScript syntax, `git diff --check`: 통과
-- 로컬 Docker build: 이 Mac에 Docker CLI가 없어 미실행
-- GitHub Actions container test·amd64/ARM64 build: 첫 push 뒤 확인 예정
+- 로컬 amd64 Docker test target 전체 회귀: 211/211
+- 로컬 amd64 runtime smoke: HTTP 200, read-only rootfs, UID/GID `1000:1000`, `/var/lib/galpi`의 DB/WAL/SHM, `/backups` 자동 백업 확인
+- 로컬 ARM64 runtime build: 성공, image 안에서 `process.arch=arm64`와 `better-sqlite3` SQLite 3.53.1 load 확인
+- Compose `config --quiet`, GitHub Actions YAML parse, JavaScript syntax, `git diff --check`: 통과
+- GitHub Actions run `30463882969`: native test, container test, `linux/amd64`·`linux/arm64` runtime build 모두 성공
+- Codex 경계: runtime smoke에서 `/nonexistent/codex` preflight만 독립 실패하고 서버·백업은 정상 동작
 
-로컬 Docker 부재를 성공으로 간주하지 않는다. 1단계 완료 표시는 GitHub Actions의 container test와 두 architecture build가 실제로 통과한 뒤에만 한다.
+runtime smoke는 빈 격리 bind mount와 가짜 API key만 사용했다. 실제 Vault·provider API·Pi 서비스는 건드리지 않았다.
 
 ---
 

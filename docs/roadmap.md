@@ -20,7 +20,7 @@ V3.5 시간과 검색     — 시간 감각 + 검색 튜닝                     
 V4-A 논문 입력구     — 검색·저장·필요한 전문만 읽는다          ✅ 완료
 V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← A2 운영 관찰
 V4.5-M 모델 런타임   — 단일 GPT·동적 모델·Codex 모델 설정       ✅ Pi 인수 완료
-DEV-D Docker          — 데이터 경계 분리·개발/CI 재현성           ◐ 1단계 구현·CI 대기
+DEV-D Docker          — 데이터 경계 분리·개발/CI 재현성           ✅ 1단계 완료
 V4-B 음성 입력구     — 확인한 전사를 대화·메모·할 일로 보낸다
 V5   전문 직원       — 딜 스카우트 → 주식 분석 → 후속 역할
 V6   비서의 얼굴     — 화면에 떠있는 시온, 어디서든
@@ -383,13 +383,14 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### DEV-D — Docker 개발·CI 재현성
 
-> 상태: 1단계 구현 완료, 첫 GitHub Actions 검증 대기. Pi 운영 전환은 보류한다. 상세 기준은 [Docker 개발·CI 설계](docker-development-design.md)다.
+> 상태: 개발·CI 1단계 완료. Pi 운영 전환은 보류한다. 상세 기준은 [Docker 개발·CI 설계](docker-development-design.md)다.
 
 - [x] `GALPI_DATA_DIR`로 SQLite DB/WAL/SHM 디렉터리를 앱 코드에서 분리하고 기존 native 기본 경로를 보존한다.
 - [x] Vault와 backup을 독립 bind mount로 두고 `.env`·DB·Vault·인증을 build context에서 제외한다.
 - [x] Node.js 24.16.0 multi-stage image와 read-only `/app` Compose 계약을 추가한다.
 - [x] native test, container test, x86_64/ARM64 runtime build CI를 추가한다.
-- [ ] 첫 GitHub Actions에서 `better-sqlite3` install·전체 테스트·양쪽 architecture build를 확인한다.
+- [x] GitHub Actions에서 `better-sqlite3` install·전체 테스트·양쪽 architecture build를 확인한다.
+- [x] 로컬 amd64 runtime HTTP·read-only·DB/WAL/SHM·backup smoke와 ARM64 `better-sqlite3` load를 확인한다.
 - [x] Codex CLI의 ChatGPT 로그인과 organizer는 첫 단계에서 host 경계를 유지한다.
 - ARM64·backup/restore·scheduler·SIGTERM recovery와 단일 service manager 조건을 통과한 뒤에만 Pi container 운영을 별도 검토한다.
 
