@@ -10,10 +10,12 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { resolveRuntimePaths } = require('../lib/runtime-paths');
 
 const ROOT = path.resolve(__dirname, '..');
-const DB_PATH = path.join(ROOT, 'galpi.db');
-const VAULT = process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'galpi-vault');
+const RUNTIME_PATHS = resolveRuntimePaths({ appRoot: ROOT });
+const DB_PATH = RUNTIME_PATHS.dbPath;
+const VAULT = RUNTIME_PATHS.vaultPath;
 const ARCHIVE = path.join(VAULT, '_archive');
 const REPORT = path.join(VAULT, '_system', 'GRAPH_REPORT.md');
 

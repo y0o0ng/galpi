@@ -1,0 +1,44 @@
+name: galpi
+
+services:
+  galpi:
+    image: galpi:dev
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - .env
+    environment:
+      BACKUP_DIR: /backups
+      CODEX_BIN: /nonexistent/codex
+      GALPI_DATA_DIR: /var/lib/galpi
+      HOST: 0.0.0.0
+      PORT: 3000
+      VAULT_PATH: /vault
+    ports:
+      - "${GALPI_PORT:-3000}:3000"
+    user: "${GALPI_UID:-1000}:${GALPI_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=256m
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: bind
+        source: ${GALPI_DATA_HOST_PATH:-./.docker-data/db}
+        target: /var/lib/galpi
+      - type: bind
+        source: ${GALPI_VAULT_HOST_PATH:-./galpi-vault}
+        target: /vault
+      - type: bind
+        source: ${GALPI_BACKUP_HOST_PATH:-./.docker-data/backups}
+        target: /backups
+    stop_grace_period: 30s
+
+  test:
+    profiles:
+      - test
+    image: galpi:test
+    build:
+      context: .
+      target: test

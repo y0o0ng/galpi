@@ -11,8 +11,8 @@ const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
 const Database = require('better-sqlite3');
 const webPush = require('web-push');
-const os = require('os');
 const { runBackup, listBackups } = require('./scripts/backup');
+const { ensureDataDirectory, resolveRuntimePaths } = require('./lib/runtime-paths');
 const { searchSemanticScholar } = require('./lib/paper-search');
 const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
 const { createPaperNoteSaver } = require('./lib/paper-notes');
@@ -95,7 +95,10 @@ const {
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
 
-const VAULT_PATH = process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : null;
+const RUNTIME_PATHS = resolveRuntimePaths({ appRoot: __dirname });
+const DATA_DIR = RUNTIME_PATHS.dataDir;
+const DB_PATH = RUNTIME_PATHS.dbPath;
+const VAULT_PATH = process.env.VAULT_PATH ? RUNTIME_PATHS.vaultPath : null;
 const CONTEXT_N  = parseInt(process.env.CONTEXT_N  || '10');
 const HISTORY_CONTEXT_MESSAGES = CONTEXT_N * 2; // 최근 10턴 내외를 user/assistant 메시지 쌍으로 전달
 const ELAPSED_DAY_SECONDS = 24 * 60 * 60;
@@ -341,7 +344,7 @@ const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.6-terra';
 const CODEX_DEEP_MODEL = process.env.CODEX_DEEP_MODEL || 'gpt-5.5';
 const CODEX_RUNNER_MODE = process.env.CODEX_RUNNER_MODE || 'codex';
 const CODEX_RUNNER_TIMEOUT_MS = parseInt(process.env.CODEX_RUNNER_TIMEOUT_MS || '300000');
-const BACKUP_DIR = process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'galpi');
+const BACKUP_DIR = RUNTIME_PATHS.backupDir;
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;        // 하루 1회 기준
 const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000;       // 1시간마다 "24h 지났나" 확인
 
@@ -448,7 +451,8 @@ async function withSessionChatLock(sessionId, task) {
 
 // ─── SQLite DB ───────────────────────────────────────────────────────────────
 
-const db = new Database(path.join(__dirname, 'galpi.db'));
+ensureDataDirectory(DATA_DIR);
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL'); // 동시 읽기/쓰기 + 백업 2번째 커넥션 시 lock 경합 완화 (Pi SD카드 I/O)
 db.pragma('foreign_keys = ON');
 if (db.pragma('foreign_keys', { simple: true }) !== 1) {
@@ -7550,6 +7554,7 @@ const httpServer = app.listen(PORT, HOST, () => {
   console.log(`   로컬:     http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   if (HOST === '0.0.0.0') console.log(`   네트워크: http://<라즈베리파이_IP>:${PORT}`);
   console.log(`   볼트:     ${VAULT_PATH}`);
+  console.log(`   데이터:   ${DATA_DIR}`);
   console.log(`   Claude:   ${CLAUDE_MODEL} / deep ${CLAUDE_DEEP_MODEL}`);
   console.log(`   GPT:      ${GPT_MODEL} / deep ${GPT_DEEP_MODEL}`);
   console.log(`   Codex:    ${CODEX_MODEL} / deep ${CODEX_DEEP_MODEL} (job당 ${CODEX_JOB_BATCH_SIZE}개)`);

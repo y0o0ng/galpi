@@ -3,6 +3,7 @@
 const path = require('node:path');
 const { applyTopicQaRemoval, readTopicQaRemovalPlan } = require('../lib/topic-qa-removal');
 const { runBackup } = require('./backup');
+const { resolveRuntimePaths } = require('../lib/runtime-paths');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -74,9 +75,9 @@ async function main(argv = process.argv.slice(2)) {
     process.stdout.write(`${helpText()}\n`);
     return 0;
   }
-  const dbPath = options.dbPath || path.join(ROOT, 'galpi.db');
-  const vaultPath = options.vaultPath
-    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'galpi-vault'));
+  const runtimePaths = resolveRuntimePaths({ appRoot: ROOT });
+  const dbPath = options.dbPath || runtimePaths.dbPath;
+  const vaultPath = options.vaultPath || runtimePaths.vaultPath;
 
   if (!options.apply) {
     const plan = await readTopicQaRemovalPlan({ dbPath, vaultPath, targets: options.targets });

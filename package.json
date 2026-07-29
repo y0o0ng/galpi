@@ -7,6 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
+    "docker:test": "docker build --target test -t galpi:test .",
+    "docker:up": "docker compose up --build",
     "audit:topics": "node scripts/audit-topic-store.js",
     "audit:note-index": "node scripts/audit-note-index.js",
     "plan:topic-repair": "node scripts/plan-topic-repair.js",

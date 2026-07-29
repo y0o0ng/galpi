@@ -7,6 +7,7 @@ const {
   buildRetrievalShadowReport,
   formatRetrievalShadowReport,
 } = require('../lib/assistant-retrieval-report');
+const { resolveRuntimePaths } = require('../lib/runtime-paths');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -66,7 +67,7 @@ function helpText() {
     'Usage: npm run report:retrieval-shadow -- [options]',
     '',
     'Options:',
-    '  --db <path>       SQLite DB 경로 (기본: ./galpi.db)',
+    '  --db <path>       SQLite DB 경로 (기본: GALPI_DATA_DIR/galpi.db)',
     '  --since <date>    KST 날짜 또는 ISO 시각 이후만 집계',
     '  --all-modes       A1b 이전 shadow 실행도 포함',
     '  --review          질문과 선택된 Q&A를 명시적으로 표시',
@@ -81,13 +82,14 @@ function helpText() {
 }
 
 function main(argv = process.argv.slice(2)) {
+  require('dotenv').config({ path: path.join(ROOT, '.env') });
   const options = parseArguments(argv);
   if (options.help) {
     process.stdout.write(`${helpText()}\n`);
     return 0;
   }
 
-  const dbPath = options.dbPath || path.join(ROOT, 'galpi.db');
+  const dbPath = options.dbPath || resolveRuntimePaths({ appRoot: ROOT }).dbPath;
   const db = new Database(dbPath, { readonly: true, fileMustExist: true });
   try {
     db.pragma('query_only = ON');

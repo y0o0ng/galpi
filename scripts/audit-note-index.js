@@ -3,6 +3,7 @@
 const path = require('node:path');
 const Database = require('better-sqlite3');
 const { auditNoteIndex, formatNoteIndexAudit } = require('../lib/note-index-audit');
+const { resolveRuntimePaths } = require('../lib/runtime-paths');
 const { parseArguments } = require('./audit-topic-store');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -12,7 +13,7 @@ function helpText() {
     'Usage: node scripts/audit-note-index.js [options]',
     '',
     'Options:',
-    '  --db <path>       SQLite DB 경로 (기본: ./galpi.db)',
+    '  --db <path>       SQLite DB 경로 (기본: GALPI_DATA_DIR/galpi.db)',
     '  --vault <path>    vault 경로 (기본: VAULT_PATH 또는 ./galpi-vault)',
     '  --json            JSON 출력',
     '  -h, --help        도움말',
@@ -28,9 +29,9 @@ async function main(argv = process.argv.slice(2)) {
     process.stdout.write(`${helpText()}\n`);
     return 0;
   }
-  const dbPath = options.dbPath || path.join(ROOT, 'galpi.db');
-  const vaultPath = options.vaultPath
-    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(ROOT, 'galpi-vault'));
+  const runtimePaths = resolveRuntimePaths({ appRoot: ROOT });
+  const dbPath = options.dbPath || runtimePaths.dbPath;
+  const vaultPath = options.vaultPath || runtimePaths.vaultPath;
   const db = new Database(dbPath, { readonly: true, fileMustExist: true });
   try {
     db.pragma('query_only = ON');

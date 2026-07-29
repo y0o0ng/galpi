@@ -9,13 +9,14 @@ const {
   rankNoteCandidates,
 } = require('../lib/assistant-retrieval');
 const { buildRetrievalShadowReport } = require('../lib/assistant-retrieval-report');
+const { resolveRuntimePaths } = require('../lib/runtime-paths');
 
 const ROOT = path.resolve(__dirname, '..');
 
 function parseArguments(argv) {
   const options = {
-    dbPath: path.join(ROOT, 'galpi.db'),
-    vaultPath: path.join(ROOT, 'galpi-vault'),
+    dbPath: null,
+    vaultPath: null,
     limit: 100,
     review: false,
     json: false,
@@ -291,9 +292,14 @@ function formatReview(report, includeReview) {
 
 async function main(argv = process.argv.slice(2)) {
   const options = parseArguments(argv);
+  require('dotenv').config({
+    path: options.envPath || path.join(ROOT, '.env'),
+  });
+  const runtimePaths = resolveRuntimePaths({ appRoot: ROOT });
+  const dbPath = options.dbPath || runtimePaths.dbPath;
+  const vaultPath = options.vaultPath || runtimePaths.vaultPath;
   let embedMissing = null;
   if (options.embedMissing) {
-    require('dotenv').config(options.envPath ? { path: options.envPath } : undefined);
     const OpenAI = require('openai');
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     embedMissing = async inputs => {
@@ -306,10 +312,10 @@ async function main(argv = process.argv.slice(2)) {
         .map(item => item.embedding);
     };
   }
-  const db = new Database(options.dbPath, { readonly: true, fileMustExist: true });
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
   try {
     db.pragma('query_only = ON');
-    const report = await buildPolicyReview(db, options.vaultPath, options.limit, {
+    const report = await buildPolicyReview(db, vaultPath, options.limit, {
       embedMissing,
     });
     process.stdout.write(`${options.json

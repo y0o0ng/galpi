@@ -38,6 +38,43 @@ test('runBackup honors an explicit DB path and creates a matching vault archive'
   assert.ok((await fs.stat(result.vaultDest)).size > 0);
 });
 
+test('runBackup follows the configured data, vault, and backup roots', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'backup-runtime-paths-'));
+  const originalEnv = {
+    GALPI_DATA_DIR: process.env.GALPI_DATA_DIR,
+    VAULT_PATH: process.env.VAULT_PATH,
+    BACKUP_DIR: process.env.BACKUP_DIR,
+  };
+  t.after(async () => {
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  const dataDir = path.join(root, 'data');
+  const vaultPath = path.join(root, 'vault');
+  const backupDir = path.join(root, 'backups');
+  await Promise.all([fs.mkdir(dataDir), fs.mkdir(vaultPath)]);
+  await fs.writeFile(path.join(vaultPath, 'note.md'), '# configured roots\n');
+  process.env.GALPI_DATA_DIR = dataDir;
+  process.env.VAULT_PATH = vaultPath;
+  process.env.BACKUP_DIR = backupDir;
+
+  const db = new Database(path.join(dataDir, 'galpi.db'));
+  db.exec('CREATE TABLE marker (value TEXT NOT NULL)');
+  db.prepare('INSERT INTO marker VALUES (?)').run('configured-db');
+  db.close();
+
+  const result = await runBackup({ projectDir: path.join(root, 'app'), retentionDays: 30 });
+  const backupDb = new Database(result.dbDest, { readonly: true });
+  assert.equal(backupDb.prepare('SELECT value FROM marker').get().value, 'configured-db');
+  backupDb.close();
+  assert.equal(result.backupDir, backupDir);
+  assert.ok((await fs.stat(result.vaultDest)).size > 0);
+});
+
 test('listBackups keeps legacy council DB backups visible after the rename', async t => {
   const backupDir = await fs.mkdtemp(path.join(os.tmpdir(), 'backup-list-'));
   t.after(() => fs.rm(backupDir, { recursive: true, force: true }));

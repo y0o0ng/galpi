@@ -5,10 +5,10 @@
 //   CLI/cron : node scripts/backup.js
 
 const path = require('path');
-const os = require('os');
 const fsp = require('fs/promises');
 const { execFile } = require('child_process');
 const Database = require('better-sqlite3');
+const { resolveRuntimePaths } = require('../lib/runtime-paths');
 
 const RETENTION_DAYS = 7;
 const BACKUP_FILE_RE = /^((galpi|council)-.*\.db|vault-.*\.tar\.gz)$/;
@@ -19,7 +19,7 @@ function timestamp(d = new Date()) {
 }
 
 function defaultBackupDir() {
-  return process.env.BACKUP_DIR || path.join(os.homedir(), 'backups', 'galpi');
+  return resolveRuntimePaths({ appRoot: path.resolve(__dirname, '..') }).backupDir;
 }
 
 function tarVault(vaultPath, dest) {
@@ -86,10 +86,10 @@ async function runBackup({
   retentionDays = RETENTION_DAYS,
 } = {}) {
   const root = projectDir || path.resolve(__dirname, '..');
-  const dir = backupDir || defaultBackupDir();
-  const vault = vaultPath
-    || (process.env.VAULT_PATH ? path.resolve(process.env.VAULT_PATH) : path.join(root, 'galpi-vault'));
-  const dbPath = dbPathOverride || path.join(root, 'galpi.db');
+  const runtimePaths = resolveRuntimePaths({ appRoot: root });
+  const dir = backupDir || runtimePaths.backupDir;
+  const vault = vaultPath || runtimePaths.vaultPath;
+  const dbPath = dbPathOverride || runtimePaths.dbPath;
 
   await fsp.mkdir(dir, { recursive: true });
   const stamp = timestamp();
