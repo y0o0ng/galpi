@@ -172,6 +172,11 @@ async function init() {
     document.getElementById('model-indicator').textContent =
       `XION · ${config.gptChatBootstrapModel}`;
     renderWebUsagePill(config.webSearch);
+    window.VoiceRealtime?.init({
+      apiFetch,
+      showToast,
+      config: config.realtimeVoice,
+    });
     window.ChatModelPicker?.init({
       apiFetch,
       showToast,

@@ -21,7 +21,7 @@ V4-A 논문 입력구     — 검색·저장·필요한 전문만 읽는다     
 V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← A2 운영 관찰
 V4.5-M 모델 런타임   — 단일 GPT·동적 모델·Codex 모델 설정       ✅ Pi 인수 완료
 DEV-D Docker          — 데이터 경계 분리·개발/CI 재현성           ✅ 1단계 완료
-V4-B 음성 입력구     — 확인한 전사를 대화·메모·할 일로 보낸다
+V4-B 음성            — Realtime 대화 + 확인형 정밀 전사
 V5   전문 직원       — 딜 스카우트 → 주식 분석 → 후속 역할
 V6   비서의 얼굴     — 화면에 떠있는 시온, 어디서든
 V7   손발(보너스)    — 기기 제어 (정말 나중, 선택)
@@ -164,7 +164,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 입구만 새로 뚫고, 뒷단(저장·회수·임베딩·Codex)은 V2~V3 그대로 재사용. 쉬운 입구(논문)부터 열어 손 풀고, 어려운 입구(음성)로.
 
-> 순서 변경 (2026-07-15): V4-A 논문 검색 뒤에 V4.5 비서 기본기를 먼저 진행한다. 현재 긴 topic의 최신 Q&A가 컨텍스트에서 잘릴 수 있고 테스트·운영 대화도 자동 저장될 수 있으므로, 이 문제를 해결한 뒤 V4-B 음성을 연결한다. 상세 설계는 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
+> 순서 변경 (2026-07-30): V4-A와 V4.5-M·A2 기반 뒤에 V4-B를 진행한다. V4-B는 OpenAI Realtime WebRTC의 자연 대화와 확인형 정밀 전사를 함께 다루되 `R0 통신 spike → R1 읽기 전용 시온 → R2 기록·승인형 쓰기`로 나눈다. 상세 단일 기준은 [voice-realtime-design.md](voice-realtime-design.md), 저장·task 경계는 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
 
 ### 핵심 A — 논문 검색 (반나절×2, 상세는 별도 설계 문서 `paper-search-design.md`)
 > 1차 Pi 인수 완료 (`a70d9d0`, mock 보강 `1d4c704`, 백오프 `78583e9`): 별도 `lib/paper-search.js`, `/api/papers/search`, `/paper` 결과 카드, 10분 캐시, 429/5xx 지수 백오프·timeout 처리와 `node:test` 10개를 추가했다. Pi에서 S2 키 실검색 HTTP 200·결과 10개, 성공 응답 캐시, Playwright 실제 카드 렌더링을 확인했다.
@@ -189,15 +189,30 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 4. (2.5A) **저장 논문 전문 능동 독서** — 안전 다운로드·온디맨드 색인·모델 도구를 Pi에 배포하고 1+1 실제 스모크 인수 완료. 초록으로 부족할 때만 공개 PDF를 1회 색인하고, 모델이 `paper_fulltext_search`/`paper_fulltext_read`로 필요한 섹션·페이지를 최대 2회 검색. 질문당 전문 컨텍스트는 최대 10,000자(목표 약 3,000토큰)
 5. (2.5B, v1이 잘 돌면) 웹 검색 tool 패턴을 복제해 외부 논문 발견 검색을 모델이 자율 호출 — 검색만 자율, 저장은 사용자 클릭 유지
 
-### 핵심 B — 음성 입력
-1. 폰에서 음성 녹음 → 서버로 전송
-2. 음성 → 텍스트 변환 (STT, 예: Whisper 계열)
-3. 전사 미리보기에서 잘못 인식된 내용을 수정
-4. `대화 | 메모 | 할 일` 중 목적을 확인한 뒤 기존 파이프라인으로 전달
-5. 확인 전 전사와 테스트 녹음은 topic·task·memory에 영구 저장하지 않음
+### 핵심 B — Realtime 대화 + 확인형 정밀 전사
+
+> R0 Pi HTTPS 통신 인수 완료, iPhone 실제 마이크 인수 전 (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. iPhone 홈 화면 PWA의 한국어 10턴·끼어들기 5회·mute·수동 종료·5분 hard cap 인수 전에는 R1을 시작하지 않는다.
+
+1. **R0 통신 spike**
+   - OpenAI Realtime API를 vanilla JS WebRTC로 직접 연결
+   - 마이크·시온 음성·transcript·mute·종료·끼어들기
+   - 5분 hard cap, DB·Vault·task write 0회, 원본 오디오 보관 0건
+2. **R1 읽기 전용 시온**
+   - 기존 A2 기억 회수와 활성 일정 합성기를 read-only function tool로 재사용
+   - 기억·일정 뒤에만 웹·논문 도구를 필요한 순서로 추가
+   - 턴당 도구 2회, retrieval 8,000자 상한, 쓰기 tool 0개
+3. **R2 기록·승인형 쓰기**
+   - 완료된 user/assistant 턴만 `shared-main`에 정확히 한 번 저장
+   - 끼어든 assistant partial은 일반 메시지로 저장하지 않음
+   - 일정은 기존 무저장 후보 카드, 메모는 수정 가능한 manual 후보를 거쳐 사용자 확인 후 저장
+4. **정밀 전사 fallback**
+   - 폰 녹음 → STT → 전사 미리보기·수정
+   - `대화 | 메모 | 할 일` 중 목적을 확인한 뒤 기존 파이프라인으로 전달
+   - 확인 전 전사와 테스트 녹음은 topic·task·memory에 영구 저장하지 않음
 
 ### 보너스 (나중)
-- 화자 구분, 긴 녹음 자동 분할, 실시간 받아쓰기
+- 화자 구분, 긴 녹음 자동 분할
+- 상시 호출어·상시 마이크, 잠금화면·백그라운드 지속 대화
 - 논문 전체 PDF를 매 질문에 직접 전송, 자동 OCR, 인용 그래프 (전문검색 2.5A는 필요한 원문 조각만 회수)
 
 ### 통과 기준
@@ -209,11 +224,16 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [x] 초록으로 답할 수 있는 질문은 전문 도구를 호출하지 않는다 (Pi TradingAgents 스모크: 0회·0자)
 - [x] 세부 질문은 전문검색 최대 2회·추가 컨텍스트 3,000토큰 안에서 섹션/페이지 근거와 함께 답한다 (Pi 스모크: 1회·4,999자, §5.1/§5.2·PDF p.10)
 - [x] 전문 전체 직접 입력을 기본 경로에서 차단한다 (서버 하드 상한 2회·10,000자, TradingAgents 전체 입력 실측 87,811토큰)
+- [ ] iPhone PWA·Mac에서 Realtime 한국어 10턴과 끼어들기 5회, 종료 뒤 마이크 해제, API 키 비노출을 확인한다
+- [ ] R0 전후 DB·Vault·task가 불변이며 기존 텍스트 채팅·일정·Web Push가 회귀하지 않는다
+- [ ] R1이 기존 A2 기억과 활성 일정을 read-only로 회수하고, 무관 질문 abstention·도구 2회·8,000자 상한을 지킨다
+- [ ] R2 완료 턴은 정확히 한 번 저장되고 끼어든 assistant partial은 저장되지 않는다
+- [ ] 음성 일정 요청은 카드 확인 전 write 0회, 취소 0회, 등록 시 같은 request ID로 정확히 1회 생성된다
 - [ ] 폰에서 30초 녹음 → 텍스트로 변환돼 화면에 뜬다
 - [ ] 확인 전에는 저장되지 않고, 확인한 내용만 선택한 대화·메모·할 일 경로로 들어간다
 - [ ] 며칠 뒤 관련 질문 → 그 녹음에서 나온 내용을 꺼내온다
 
-> 핵심 포인트: STT 자체는 새 입력구 하나지만, 전사를 어디에 보낼지는 V4.5의 저장 정책과 약속 루프를 따른다. 음성을 `isMemo: true`로 바로 영구 저장하지 않는다.
+> 핵심 포인트: Realtime은 자연 대화의 새 세션 계층이고 정밀 전사는 승인형 입력구다. 둘 다 V4.5의 기억·약속 경계를 우회하지 않으며, 음성을 `isMemo: true`로 바로 영구 저장하지 않는다.
 
 ---
 
@@ -287,7 +307,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 4. `active | invalidated | superseded` 상태로 잘못된 기억과 갱신된 기억을 통제
 5. 최근 저장에서 Q&A 한 건만 `기억에서 제외`, 원문은 감사용으로 보존
 6. 명백한 오저장은 별도 승인형 유지보수 명령으로 Q&A·청크·저장 기록만 물리 삭제하고 원본 대화·사전 백업은 보존
-7. 테스트는 `never`, 음성 전사는 `inbox` 저장 정책 사용
+7. 테스트는 `never`, 정밀 전사와 R2 Realtime 완료 턴은 `inbox` 저장 정책 사용. R0·R1은 저장하지 않음
 8. 사용자 취향·사실·결정·목표는 승인형 구조화 메모리로 관리
 
 ### B — 평가와 관측

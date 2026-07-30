@@ -185,6 +185,17 @@ journalctl -u galpi -f
 - 자동 백업(인프로세스)도 서버가 떠 있어야 도니, systemd 등록이 사실상 백업의 전제다.
 - 코드 갱신 후 재시작: `sudo systemctl restart galpi`
 
+### sudo 비밀번호가 필요한 운영 작업
+
+- Codex 실행 환경에서 `sudo`가 TTY 또는 비밀번호를 요구하면 우회하지 않고 작업을 멈춘다.
+- 프로세스에 `SIGKILL`·`SIGHUP` 같은 실패 신호를 보내 `Restart=on-failure`를 유도하지 않는다.
+- 사용자에게 실행이 필요한 정확한 명령을 요청하고, 사용자가 완료했다고 확인한 뒤 새 PID·서비스 상태·로그 검증을 이어간다.
+- 일반 코드 배포의 기본 요청 명령은 다음 한 줄이다.
+
+```sh
+sudo systemctl restart galpi
+```
+
 ## 5. Smoke Test
 
 서비스를 재시작하기 전에 Codex 실행 파일과 로그인·모델 호출을 서비스 계정으로 직접 확인한다.

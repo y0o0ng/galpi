@@ -621,10 +621,11 @@
 
 ### 현재 진행 상태 (구현)
 
-> 갱신: 2026-07-29. 단계 구분은 `roadmap.md`(V1~V7) 기준.
+> 갱신: 2026-07-30. 단계 구분은 `roadmap.md`(V1~V7) 기준.
 
 - **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크 검색과 보수 A2, V4.5-M 단일 GPT·모델 UI·의회 신규 실행 퇴역·Codex 모델 설정까지 Pi 운영 적용을 마쳤다. Codex 일반 모델은 `gpt-5.6-terra`, 깊은 재처리는 `gpt-5.5`, Pi Codex CLI는 `0.144.5`다. 메인 채팅 `자동`도 실제 `gpt-5.6-terra`를 사용한다.
 - **다음 단계 설계:** 새 `chat:gpt-single-v1:a2` 온라인 표본에서 과회수·최신성·abstention을 독립 관찰한다. 유지보수·평가 세션이 자동 topic 저장되지 않는 명시적 경계는 별도 후속으로 설계한다. 상세 회수 근거는 [assistant-foundation-design.md](assistant-foundation-design.md), 모델 경계는 [chat-model-routing-design.md](chat-model-routing-design.md)를 따른다.
+- **V4-B R0 Pi HTTPS 통신 인수·iPhone 실제 마이크 인수 전:** OpenAI unified WebRTC SDP proxy를 `lib/realtime-session.js`, 브라우저 peer·media·data channel 상태 머신을 `public/voice-realtime.js`에 분리했다. 코드 기본 flag는 꺼져 있고 Pi 운영에서만 켰으며 tool·DB·Vault·task 쓰기 경로가 없다. `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 한국어 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·공용 cleanup을 구현했다. 공식 multipart 일반 필드와 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정하고, Mac·Pi HTTPS의 `201`·remote audio·완료 자막, 로컬/Pi Realtime 7/7, Pi 전체 214/214와 DB·Vault·task 불변을 통과했다. iPhone 한국어 10턴·끼어들기 5회·종료 인수 전에는 R1을 시작하지 않는다.
 - **V4.5-M·A2 Pi 인수 완료:** schema 8→9, API/Codex 분리 catalog와 last-known-good, OpenAI Responses text/tool parity, 요청·DB model snapshot, composer model picker, 의회 신규 실행 `410`, 사서 Codex 설정, A2 `:a2` 청크 주입을 한 배포본으로 활성화했다. 전체 회귀 207/207, 실제 GPT 일반·웹·논문·일정 무쓰기 후보와 A2 스모크, Codex job 41 Terra snapshot을 통과했다. 최종 topic Q&A 105/105, note index 33/33·finding 0, Codex validation 23, SQLite 무결성·외래키 오류 0, task/event/reminder 8/15/4 불변, 서비스 경고 0을 확인했다.
 - **모바일 composer 보정 Pi 반영 완료:** 모델 선택 opener는 기본 테두리 없이 hover·열림 상태에만 옅은 면을 쓰고, 입력 placeholder·flex 축소·44px 전송 버튼·safe-area 여백을 보정했다. 390px·320px에서 overflow 0, 로컬 전체 207/207, Pi UI 9/9와 정적 응답 hash 일치를 확인했다. 서비스 재시작과 DB 변경은 없었다.
 - **첨부·강의 설계 보정·미구현:** temporary 첨부는 현재 `CONTEXT_N=10` 사용자 턴을 연결 시 snapshot하고 replay 창을 벗어나면 자동 정리한다. library만 승인 후 영구 저장한다. 강의 Phase 0은 지금 검증할 수 있고, 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 진행한다. 전체 강의 구현은 V5-B 전 또는 PAPER 관찰 기간에 병행할 수 있다.
@@ -1494,42 +1495,65 @@ Codex는 vault를 직접 읽고 쓸 수 있다. 단, 수정 허용 범위는 아
 
 -----
 
-## 18. V4-B 음성 입력 — V4.5 이후 연결
+## 18. V4-B 음성 — 정밀 전사와 Realtime 대화
 
-> 코드 아님. STT는 새 입력구 하나지만, 전사를 곧바로 영구 저장하지 않는다. V4.5의 `inbox` 저장 정책과 task 후보 확인을 먼저 구현한 뒤 연결한다. 상세 경계는 [assistant-foundation-design.md](assistant-foundation-design.md) 7절을 따른다.
+> R0 Pi HTTPS 통신 인수 완료, iPhone 실제 마이크 다중턴·끼어들기 인수 전. 상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다. V4.5의 기억·일정·승인 경계는 [assistant-foundation-design.md](assistant-foundation-design.md) 7절을 함께 따른다.
 
-### 핵심 통찰 — 재사용 seam
+### 결정
 
-음성을 텍스트로 바꾼 뒤 사용자가 목적을 확인하면 기존 길을 탄다:
+음성을 하나의 경로로 억지로 합치지 않는다.
 
-```
+|경로|주 용도|저장 경계|
+|---|---|---|
+|정밀 전사|정확한 메모·일정 문구·짧은 음성 입력|전사 수정·목적 확인 전 `inbox`|
+|Realtime 대화|자연 대화·빠른 응답·끼어들기|R0/R1 무쓰기, R2 완료 턴만 DB|
+
+Realtime은 OpenAI Realtime API를 갈피가 WebRTC로 직접 연결한다. STT·VAD·끼어들기·스트리밍 TTS 엔진을 자체 제작하지 않는다. 브라우저에는 표준 OpenAI API 키를 전달하지 않고, Pi 서버가 기존 `OPENAI_API_KEY`로 세션 초기화만 중계한다.
+
+현재 GPT-5.6 Responses 채팅과 Realtime 모델은 별도 실행 경계다. 텍스트 모델 picker를 음성 세션에 그대로 적용하지 않으며, Realtime `자동`은 별도 호환성 probe와 last-known-good를 통과한 모델만 새 세션부터 사용한다.
+
+### 단계
+
+1. **R0 통신 spike**
+   - vanilla JS의 표준 WebRTC API로 마이크·시온 음성·transcript·mute·종료·끼어들기를 구현한다.
+   - 한 세션 5분 hard cap, DB·Vault·task write 0회, 원본 오디오 보관 0건을 계약한다.
+   - Agents SDK·번들러·도구·대화 저장은 만들지 않는다.
+2. **R1 읽기 전용 시온**
+   - 기존 A2 retrieval과 활성 일정 합성기를 function tool allowlist 뒤에서 재사용한다.
+   - 기억·일정 뒤에만 웹·논문 read-only 도구를 필요한 순서로 붙인다.
+   - 도구 턴당 2회·retrieval 8,000자 상한을 유지하고 모든 쓰기 도구는 제외한다.
+3. **R2 기록·승인형 쓰기**
+   - 완료된 user transcript와 정상 `response.done`만 `shared-main`에 idempotent하게 저장한다.
+   - 끼어들기로 취소된 assistant partial은 일반 메시지로 저장하지 않는다.
+   - 일정은 기존 `schedule_prepare` 후보와 확인 카드, 메모는 수정 가능한 manual 후보를 거치며 모델이 직접 쓰지 않는다.
+   - Realtime 대화는 처음에는 `inbox` source로 두고 명시적 저장만 topic으로 승격한다.
+
+### 정밀 전사 fallback
+
+```text
 폰 녹음 → 서버 업로드 → STT → 전사 미리보기·수정
                                  ├ 대화 → 기존 채팅
                                  ├ 메모 → 확인 후 manual 저장
                                  └ 할 일 → task 후보 카드 → 확인 후 active
 ```
 
-STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `isMemo: true`로 항상 저장하면 기존 자동 저장 노이즈가 커진다. 확인 전 transcript는 `inbox` 상태이며 topic·task·memory에 영구 반영하지 않는다.
+`POST /api/voice/transcribe`는 STT 결과만 반환하고 업로드 용량·timeout·임시파일 삭제를 집행한다. 확인 전 transcript는 topic·task·memory에 영구 반영하지 않으며, 확인 후 메모만 `source_type: manual_memo`로 기존 회수 경로에 들어간다. 원본 오디오는 장기 보관하지 않는다.
 
-### 구현 전 결정 포인트
+### 비핵심
 
-1. **STT를 어디서 돌리나** (가장 중요, Pi 실측 의존)
-   - 클라우드 API (OpenAI 음성 인식 등): Pi 부하 거의 없음, 네트워크·비용·키 의존. 30초 한국어 정확도 양호 예상. ← 기본 후보
-   - Pi 로컬 (whisper.cpp 등): 외부 의존 없음, ARM 성능상 느릴 수 있음. 실측 필요.
-   - 판단 기준: 30초 녹음의 변환 지연이 체감 가능한 수준인지(클라우드) vs Pi에서 견딜 만한지(로컬).
-2. **오디오 포맷 / 업로드** — 폰 브라우저 `MediaRecorder`(webm/opus 흔함) → multipart 업로드. 새 엔드포인트 `POST /api/voice/transcribe`는 STT 결과만 반환한다. 업로드 용량 제한·timeout·임시파일 삭제를 정의한다.
-3. **확인과 분기** — 전사 결과를 수정할 수 있게 보여주고 `대화 | 메모 | 할 일`로 보낸다. 서버에는 확인 전 영구 저장 금지 규칙을 둔다.
-4. **회수** — 확인 후 메모로 저장된 음성만 `source_type: manual_memo`와 음성 출처를 남기고 V4.5 청크 회수에 들어간다. 원본 오디오는 첫 구현에서 장기 보관하지 않는다.
+- 상시 호출어·상시 마이크
+- 잠금화면·백그라운드 지속 대화
+- 화자 구분, 장시간 녹음·강의 실시간 전사
+- 전화망/SIP, 음성 복제
+- Realtime 모델의 task·노트·정책 직접 쓰기
 
-### 비핵심 (V4-B에서 손대지 말 것)
+### 선결·통과 조건
 
-- 화자 구분, 긴 녹음 자동 분할, 실시간 받아쓰기 → 전부 나중.
-
-### 선결 조건
-
-- `assistant-foundation-design.md`의 A 기억 신뢰성, B 평가·trace, C task 기본 흐름을 먼저 통과한다.
-- 30초 한국어 STT spike에서 지연·비용·정확도와 모바일 포맷 호환성을 측정한다.
-- 확인 전 transcript와 임시 오디오가 영구 저장되지 않는 테스트를 둔다.
+- R0는 iPhone PWA와 Mac에서 한국어 10턴, 끼어들기 5회, 종료 후 마이크 해제, API 키 비노출, DB·Vault·task 불변을 확인한다.
+- R0가 통과하기 전 R1을 만들지 않는다.
+- R1은 기존 A2 기억과 활성 일정의 read-only parity, abstention, 도구·컨텍스트 상한과 무쓰기를 확인한다.
+- R2는 완료 턴 exactly-once, interrupted partial 미저장, 일정 카드 등록 전 write 0회·등록 후 1회를 확인한다.
+- `assistant-foundation-design.md`의 기억 신뢰성·task 기본 흐름과 V4.5-M의 단일 GPT 도구 parity를 유지한다.
 
 -----
 
@@ -1548,7 +1572,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 1. topic 회수는 노트 후보 → Q&A 청크의 2단계로 바꾼다.
 2. 요청 전체 retrieval context를 8,000자로 제한한다.
 3. 청크에 source type, provenance, `active | invalidated | superseded` 상태를 둔다.
-4. 테스트는 `never`, 음성은 `inbox` 저장 정책을 사용한다.
+4. 테스트는 `never`, 정밀 전사와 R2 Realtime 완료 턴은 `inbox` 저장 정책을 사용한다. R0·R1은 대화·지식 저장 자체를 하지 않는다.
 5. 사용자 메모리는 자동 확정하지 않고 시온 승인 제안으로 갱신한다.
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
 7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 참조 가능한 `closed`와 일반 회수에서 제외하는 `deleted`, 무LLM·별도 정본을 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
@@ -1556,7 +1580,7 @@ STT와 업로드 자체는 작은 기능이지만 잘못 인식된 음성을 `is
 9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트를 둔다. 이전·현재·다음 3주 21일을 native swipe와 키보드 좌우 이동으로 탐색하고 별도 이전·오늘·다음 버튼은 두지 않는다. 지연/오늘/예정/Inbox, 오늘/지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 일정 작업 화면을 같은 탭에 제공한다. task 변경 행동은 `TaskPanel` 단일 renderer만 사용한다.
 10. 활성 task는 별도 분류 LLM 없이 최대 20개·6,000자의 DB 스냅샷으로 단일 Claude와 의회 공통 컨텍스트에 넣는다. 완료·취소는 KST 월별 `schedule_history` 노트로 자동 투영해 일반 노트 검색이 과거 일정을 찾게 하며, 다시 열기·삭제·복원 때 재생성한다. DB가 정본이고 노트는 파생본이다.
 11. C1.5 자연어 생성은 단일 Claude의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보 하나를 만든다. 확인 카드의 `등록`만 기존 task API를 같은 request ID로 호출하며, 후보는 새로고침·취소 때 폐기하고 topic 자동 저장·노트 저장 버튼에서 제외한다.
-12. 음성은 전사 확인 후 대화·메모·할 일 중 하나로 보낸다.
+12. 음성은 Realtime 자연 대화와 확인형 정밀 전사로 나눈다. Realtime은 R0 무쓰기→R1 읽기 전용→R2 완료 턴·승인형 쓰기로 승격하고, 정밀 전사는 확인 후 대화·메모·할 일 중 하나로 보낸다.
 
 ### 구조 원칙
 

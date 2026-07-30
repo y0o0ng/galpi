@@ -52,6 +52,10 @@ const {
   scheduleFilename,
 } = require('./lib/assistant-schedule-notes');
 const { createWebPushTransport } = require('./lib/web-push-transport');
+const {
+  DEFAULT_MAX_SDP_BYTES,
+  createRealtimeSessionService,
+} = require('./lib/realtime-session');
 const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
@@ -117,6 +121,17 @@ const ASSISTANT_RETRIEVAL_A2_ENABLED =
 const MODEL_CATALOG_REFRESH_ENABLED = process.env.MODEL_CATALOG_REFRESH_ENABLED === 'true';
 const MODEL_CATALOG_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const OPENAI_BASE_URL = String(process.env.OPENAI_BASE_URL || '').trim();
+const OPENAI_REALTIME_ENABLED = process.env.OPENAI_REALTIME_ENABLED === 'true';
+const OPENAI_REALTIME_MODEL =
+  String(process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-2.1-mini').trim();
+const OPENAI_REALTIME_VOICE =
+  String(process.env.OPENAI_REALTIME_VOICE || 'marin').trim();
+const OPENAI_REALTIME_TRANSCRIPTION_MODEL =
+  String(process.env.OPENAI_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe').trim();
+const OPENAI_REALTIME_MAX_SESSION_SECONDS = parseInt(
+  process.env.OPENAI_REALTIME_MAX_SESSION_SECONDS || '300',
+  10,
+);
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const API_TOKEN    = process.env.API_TOKEN || '';
@@ -368,6 +383,15 @@ const openai    = HAS_GPT    ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   ...(OPENAI_BASE_URL ? { baseURL: OPENAI_BASE_URL } : {}),
 }) : null;
+const realtimeSessions = createRealtimeSessionService({
+  enabled: OPENAI_REALTIME_ENABLED,
+  apiKey: process.env.OPENAI_API_KEY,
+  baseUrl: OPENAI_BASE_URL,
+  model: OPENAI_REALTIME_MODEL,
+  voice: OPENAI_REALTIME_VOICE,
+  transcriptionModel: OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+  maxSessionSeconds: OPENAI_REALTIME_MAX_SESSION_SECONDS,
+});
 
 function getGptModelForCouncilMode(mode) {
   return mode === 'deep' ? GPT_DEEP_MODEL : GPT_MODEL;
@@ -411,6 +435,10 @@ function isTrustedLocalApiRequest(req) {
   return !!API_TOKEN && isLoopbackRequest(req) && safeTokenEqual(getRequestToken(req), API_TOKEN);
 }
 
+function socketRateLimitKey(req) {
+  return rateLimit.ipKeyGenerator(req.socket?.remoteAddress || '127.0.0.1');
+}
+
 function requireApiToken(req, res, next) {
   if (req.originalUrl === '/api/config') return next();
   if (!API_TOKEN) return next();
@@ -421,6 +449,7 @@ function requireApiToken(req, res, next) {
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  keyGenerator: socketRateLimitKey,
   skip: isTrustedLocalApiRequest,
   standardHeaders: true,
   legacyHeaders: false,
@@ -428,6 +457,16 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 app.use('/api/', requireApiToken);
+
+const realtimeSessionLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 6,
+  keyGenerator: socketRateLimitKey,
+  skip: isTrustedLocalApiRequest,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '음성 세션을 너무 자주 시작했어. 잠시 뒤 다시 시도해줘.' },
+});
 
 // 세션별 대화 기록 (AI 컨텍스트용 인메모리)
 const sessions = {};
@@ -3321,6 +3360,39 @@ app.post('/api/save-note', async (req, res) => {
 
 // ─── 프론트엔드가 활성 모델명 확인용 ────────────────────────────────────────
 
+app.post(
+  '/api/voice/realtime/session',
+  realtimeSessionLimiter,
+  express.text({ type: 'application/sdp', limit: DEFAULT_MAX_SDP_BYTES }),
+  async (req, res) => {
+    const safetyIdentifier = crypto
+      .createHash('sha256')
+      .update('shared-main:voice-realtime')
+      .digest('hex');
+    try {
+      const result = await realtimeSessions.createCall(req.body, { safetyIdentifier });
+      res
+        .status(201)
+        .type('application/sdp')
+        .set('Cache-Control', 'no-store')
+        .set('X-Galpi-Realtime-Model', result.model)
+        .send(result.sdp);
+    } catch (error) {
+      const status = Number.isInteger(error?.status) ? error.status : 500;
+      const code = error?.code || 'REALTIME_SESSION_FAILED';
+      const upstream = error?.upstreamStatus
+        ? ` upstream=${error.upstreamStatus}/${error.upstreamCode || 'unknown'}`
+          + (error.upstreamParam ? ` param=${error.upstreamParam}` : '')
+        : '';
+      console.warn(`⚠️ Realtime 세션 시작 실패: ${code}${upstream}`);
+      res.status(status).json({
+        error: error?.message || 'Realtime 음성 세션을 시작하지 못했습니다.',
+        code,
+      });
+    }
+  },
+);
+
 app.get('/api/config', (req, res) => {
   if (API_TOKEN && !safeTokenEqual(getRequestToken(req), API_TOKEN)) {
     return res.json({
@@ -3345,6 +3417,7 @@ app.get('/api/config', (req, res) => {
     codexAutoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
     codexJobBatchSize: CODEX_JOB_BATCH_SIZE,
     tasksEnabled: ASSISTANT_TASKS_ENABLED,
+    realtimeVoice: realtimeSessions.publicConfig(),
     webSearch: {
       enabled: WEB_SEARCH_ENABLED,
       provider: WEB_SEARCH_PROVIDER,
