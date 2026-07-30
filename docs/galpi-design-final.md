@@ -625,7 +625,7 @@
 
 - **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크 검색과 보수 A2, V4.5-M 단일 GPT·모델 UI·의회 신규 실행 퇴역·Codex 모델 설정까지 Pi 운영 적용을 마쳤다. Codex 일반 모델은 `gpt-5.6-terra`, 깊은 재처리는 `gpt-5.5`, Pi Codex CLI는 `0.144.5`다. 메인 채팅 `자동`도 실제 `gpt-5.6-terra`를 사용한다.
 - **다음 단계 설계:** 새 `chat:gpt-single-v1:a2` 온라인 표본에서 과회수·최신성·abstention을 독립 관찰한다. 유지보수·평가 세션이 자동 topic 저장되지 않는 명시적 경계는 별도 후속으로 설계한다. 상세 회수 근거는 [assistant-foundation-design.md](assistant-foundation-design.md), 모델 경계는 [chat-model-routing-design.md](chat-model-routing-design.md)를 따른다.
-- **V4-B R0 Pi HTTPS 통신 인수·iPhone 실제 마이크 인수 전:** OpenAI unified WebRTC SDP proxy를 `lib/realtime-session.js`, 브라우저 peer·media·data channel 상태 머신을 `public/voice-realtime.js`에 분리했다. 코드 기본 flag는 꺼져 있고 Pi 운영에서만 켰으며 tool·DB·Vault·task 쓰기 경로가 없다. `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 한국어 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·공용 cleanup을 구현했다. 공식 multipart 일반 필드와 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정하고, Mac·Pi HTTPS의 `201`·remote audio·완료 자막, 로컬/Pi Realtime 7/7, Pi 전체 214/214와 DB·Vault·task 불변을 통과했다. iPhone 한국어 10턴·끼어들기 5회·종료 인수 전에는 R1을 시작하지 않는다.
+- **V4-B R0 GO:** OpenAI unified WebRTC SDP proxy를 `lib/realtime-session.js`, 브라우저 peer·media·data channel 상태 머신을 `public/voice-realtime.js`에 분리했다. 코드 기본 flag는 꺼져 있고 Pi 운영에서만 켰으며 tool·DB·Vault·task 쓰기 경로가 없다. `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 한국어 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·공용 cleanup을 구현했다. 공식 multipart 일반 필드와 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정하고, Mac·Pi HTTPS의 `201`·remote audio·완료 자막, 로컬/Pi Realtime 7/7, Pi 전체 214/214와 DB·Vault·task 불변을 통과했다. 사용자 iPhone에서 5분 한·영 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 기능 GO로 승격했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
 - **V4.5-M·A2 Pi 인수 완료:** schema 8→9, API/Codex 분리 catalog와 last-known-good, OpenAI Responses text/tool parity, 요청·DB model snapshot, composer model picker, 의회 신규 실행 `410`, 사서 Codex 설정, A2 `:a2` 청크 주입을 한 배포본으로 활성화했다. 전체 회귀 207/207, 실제 GPT 일반·웹·논문·일정 무쓰기 후보와 A2 스모크, Codex job 41 Terra snapshot을 통과했다. 최종 topic Q&A 105/105, note index 33/33·finding 0, Codex validation 23, SQLite 무결성·외래키 오류 0, task/event/reminder 8/15/4 불변, 서비스 경고 0을 확인했다.
 - **모바일 composer 보정 Pi 반영 완료:** 모델 선택 opener는 기본 테두리 없이 hover·열림 상태에만 옅은 면을 쓰고, 입력 placeholder·flex 축소·44px 전송 버튼·safe-area 여백을 보정했다. 390px·320px에서 overflow 0, 로컬 전체 207/207, Pi UI 9/9와 정적 응답 hash 일치를 확인했다. 서비스 재시작과 DB 변경은 없었다.
 - **첨부·강의 설계 보정·미구현:** temporary 첨부는 현재 `CONTEXT_N=10` 사용자 턴을 연결 시 snapshot하고 replay 창을 벗어나면 자동 정리한다. library만 승인 후 영구 저장한다. 강의 Phase 0은 지금 검증할 수 있고, 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 진행한다. 전체 강의 구현은 V5-B 전 또는 PAPER 관찰 기간에 병행할 수 있다.
@@ -1497,7 +1497,7 @@ Codex는 vault를 직접 읽고 쓸 수 있다. 단, 수정 허용 범위는 아
 
 ## 18. V4-B 음성 — 정밀 전사와 Realtime 대화
 
-> R0 Pi HTTPS 통신 인수 완료, iPhone 실제 마이크 다중턴·끼어들기 인수 전. 상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다. V4.5의 기억·일정·승인 경계는 [assistant-foundation-design.md](assistant-foundation-design.md) 7절을 함께 따른다.
+> R0 GO, R1 읽기 전용 시온 착수 전. 상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다. V4.5의 기억·일정·승인 경계는 [assistant-foundation-design.md](assistant-foundation-design.md) 7절을 함께 따른다.
 
 ### 결정
 

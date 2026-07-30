@@ -191,7 +191,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### 핵심 B — Realtime 대화 + 확인형 정밀 전사
 
-> R0 Pi HTTPS 통신 인수 완료, iPhone 실제 마이크 인수 전 (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. iPhone 홈 화면 PWA의 한국어 10턴·끼어들기 5회·mute·수동 종료·5분 hard cap 인수 전에는 R1을 시작하지 않는다.
+> R0 GO (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. 사용자 iPhone 홈 화면 PWA에서 5분 연속 한국어·영어 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 R0 기능 GO를 승인했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
 
 1. **R0 통신 spike**
    - OpenAI Realtime API를 vanilla JS WebRTC로 직접 연결
@@ -224,8 +224,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [x] 초록으로 답할 수 있는 질문은 전문 도구를 호출하지 않는다 (Pi TradingAgents 스모크: 0회·0자)
 - [x] 세부 질문은 전문검색 최대 2회·추가 컨텍스트 3,000토큰 안에서 섹션/페이지 근거와 함께 답한다 (Pi 스모크: 1회·4,999자, §5.1/§5.2·PDF p.10)
 - [x] 전문 전체 직접 입력을 기본 경로에서 차단한다 (서버 하드 상한 2회·10,000자, TradingAgents 전체 입력 실측 87,811토큰)
-- [ ] iPhone PWA·Mac에서 Realtime 한국어 10턴과 끼어들기 5회, 종료 뒤 마이크 해제, API 키 비노출을 확인한다
-- [ ] R0 전후 DB·Vault·task가 불변이며 기존 텍스트 채팅·일정·Web Push가 회귀하지 않는다
+- [x] iPhone PWA·Mac에서 5분 한국어·영어 Realtime, 끼어들기, mute·수동/자동 종료와 마이크 해제, API 키 비노출을 확인한다
+- [x] R0 전후 DB·Vault·task가 불변이며 기존 텍스트 채팅·일정·Web Push가 회귀하지 않는다
 - [ ] R1이 기존 A2 기억과 활성 일정을 read-only로 회수하고, 무관 질문 abstention·도구 2회·8,000자 상한을 지킨다
 - [ ] R2 완료 턴은 정확히 한 번 저장되고 끼어든 assistant partial은 저장되지 않는다
 - [ ] 음성 일정 요청은 카드 확인 전 write 0회, 취소 0회, 등록 시 같은 request ID로 정확히 1회 생성된다

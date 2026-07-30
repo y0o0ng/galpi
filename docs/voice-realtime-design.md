@@ -4,7 +4,7 @@
 >
 > Date: 2026-07-30
 >
-> Status: R0 Pi HTTPS 통신 인수 완료, iPhone 실제 마이크 다중턴·끼어들기 인수 전
+> Status: R0 GO, R1 읽기 전용 시온 착수 전
 >
 > Scope: 짧은 음성 입력, 자연스러운 실시간 대화, 갈피 읽기 도구, 승인형 쓰기, 음성 모델 운영
 
@@ -35,7 +35,7 @@
 - 배포 전 백업은 `galpi-20260730-1744.db`, `vault-20260730-1744.tar.gz`, `code-v4b-r0-pre-20260730-174417.tar.gz`다. 최종 PID는 `124693`이다.
 - 실제 호출 전후 `messages 448`, `notes 34`, `assistant_tasks 8`, `assistant_task_events 16`, `assistant_reminders 4`, Vault 전체 hash `7e71c78e...c0dd`가 불변이고 SQLite integrity `ok`, foreign key 오류 0건이다.
 
-따라서 서버·브라우저 통신과 Pi 배포는 인수했지만 R0 전체 GO는 아니다. 다음 단계는 iPhone 홈 화면 PWA의 실제 마이크로 한국어 10턴·끼어들기 5회·mute·수동 종료·5분 hard cap cleanup을 확인하는 것이다. 이 결과 전에는 R1을 시작하지 않는다.
+2026-07-30 사용자 실기기 인수에서 iPhone 홈 화면 PWA로 5분 세션을 끝까지 사용했고 한국어·영어 전환, 시온 발화 중 끼어들기, mute/unmute, 수동 종료, 5분 hard cap 자동 종료와 마이크 해제가 모두 정상임을 확인했다. 턴 수와 끼어들기 횟수는 별도 계수하지 않았지만 사용자가 기능 GO를 승인했다. 따라서 R0는 완료했고, 다음 단계는 별도 컨펌 뒤 R1 읽기 전용 시온을 여는 것이다.
 
 ## 0. 결정 요약
 
@@ -352,13 +352,15 @@ R0에서는 `realtime-tool-dispatcher`와 `realtime-turn-store`를 만들지 않
 
 ### R0 GO
 
-- [ ] iPhone 홈 화면 PWA와 Mac 브라우저가 Tailscale HTTPS에서 세션을 시작한다.
-- [ ] 한국어로 10개 턴을 말하고 들을 수 있으며 완료 transcript가 화면에 표시된다.
-- [ ] 시온 발화 중 5회 끼어들기에서 재생되지 않은 답변이 계속 나오지 않고 다음 턴으로 전환된다.
-- [ ] mute/unmute, 사용자 종료, 오류 종료, 5분 hard cap 뒤 마이크 track과 peer connection이 남지 않는다.
-- [ ] 표준 API 키가 브라우저 응답·정적 파일·로그에 없다.
-- [ ] R0 전후 DB application table 행 수, task/event/reminder, Vault hash가 불변이다.
-- [ ] 기존 텍스트 GPT 채팅·Web Push·일정 에이전트 회귀 테스트가 통과한다.
+- [x] iPhone 홈 화면 PWA와 Mac 브라우저가 Tailscale HTTPS에서 세션을 시작한다.
+- [x] iPhone에서 5분 동안 한국어·영어로 말하고 들으며 완료 transcript가 표시된다.
+- [x] 시온 발화 중 끼어들기에서 남은 답변이 계속 나오지 않고 다음 턴으로 전환된다.
+- [x] mute/unmute, 사용자 종료, 5분 hard cap 뒤 마이크 track과 peer connection이 남지 않는다.
+- [x] 표준 API 키가 브라우저 응답·정적 파일·로그에 없다.
+- [x] R0 전후 DB application table 행 수, task/event/reminder, Vault hash가 불변이다.
+- [x] 기존 텍스트 GPT 채팅·Web Push·일정 에이전트 회귀 테스트가 통과한다.
+
+> 사용자 실기기 기능 인수는 통과했다. 5분 세션 안의 정확한 턴 수와 끼어들기 횟수는 별도 계수하지 않았다.
 
 R0가 위 기준을 통과하지 못하면 R1을 만들지 않는다. 정확한 지연은 먼저 기록하고, 첫 spike 전에 임의의 숫자 GO 기준을 만들지 않는다.
 

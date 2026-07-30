@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-30
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 검색·한국어 경계 보정, V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI, schema v8 일정 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보까지 Pi에 인수했다. 운영 trace 77개 재생으로 보수 정책을 검증한 A2 실제 청크 주입을 2026-07-28 단일 GPT 전환과 함께 Pi에 활성화했다. 새 GPT generation의 독립 온라인 관찰을 시작했다. 2026-07-30 V4-B R0 raw WebRTC를 Pi에 활성화하고 Mac·Pi HTTPS 실제 음성 응답과 무쓰기를 인수했다. iPhone 실제 마이크 다중턴·끼어들기와 R0 전체 GO는 남아 있다
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 검색·한국어 경계 보정, V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI, schema v8 일정 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보까지 Pi에 인수했다. 운영 trace 77개 재생으로 보수 정책을 검증한 A2 실제 청크 주입을 2026-07-28 단일 GPT 전환과 함께 Pi에 활성화했다. 새 GPT generation의 독립 온라인 관찰을 시작했다. 2026-07-30 V4-B R0 raw WebRTC를 Pi에 활성화하고 Mac·Pi HTTPS 실제 음성 응답과 무쓰기를 인수했다. 사용자 iPhone의 5분 한·영 대화, 끼어들기, mute, 수동·자동 종료와 마이크 해제까지 통과해 R0 GO로 승격했다
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성과 V5-A 딜 스카우트·V5-B 주식 분석 전에 진행
 
@@ -454,7 +454,7 @@ C1은 아래 범위만 구현한다.
 
 1. **Realtime 대화**
    - R0·R1은 DB·Vault·task에 쓰지 않는다.
-   - R0는 서버 소유 unified SDP proxy, raw WebRTC client, tool 0개, 5분 hard cap과 공용 media cleanup을 Pi 운영에 활성화했다. Mac·Pi HTTPS의 실제 `201`·remote audio·완료 자막과 DB·Vault·task 불변은 통과했지만 iPhone 실제 마이크 10턴·끼어들기 5회 인수 전이므로 R1은 열지 않는다.
+   - R0는 서버 소유 unified SDP proxy, raw WebRTC client, tool 0개, 5분 hard cap과 공용 media cleanup을 Pi 운영에 활성화했다. Mac·Pi HTTPS의 실제 `201`·remote audio·완료 자막과 DB·Vault·task 불변, 사용자 iPhone의 5분 한·영 대화·끼어들기·mute·수동/자동 종료·마이크 해제를 통과해 GO로 승격했다.
    - R1의 기억·일정 도구는 기존 A2 retrieval과 task 합성기를 읽기 전용으로 재사용한다.
    - R2는 완료된 user/assistant 턴만 DB에 idempotent하게 저장하고, 끼어들기로 취소된 assistant partial은 일반 메시지로 남기지 않는다.
    - 일정·메모는 모델의 직접 쓰기를 허용하지 않고 기존 후보 카드와 사용자 확인을 거친다.
@@ -748,8 +748,8 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 
 ### D. 음성 연결
 
-- [ ] iPhone PWA·Mac에서 Realtime 한국어 10턴과 끼어들기 5회, 종료 뒤 마이크 해제
-- [ ] R0/R1 전후 DB·Vault·task 불변, 표준 API 키 브라우저 비노출
+- [x] iPhone PWA·Mac에서 5분 한국어·영어 Realtime, 끼어들기, mute·수동/자동 종료와 마이크 해제
+- [x] R0 전후 DB·Vault·task 불변, 표준 API 키 브라우저 비노출
 - [ ] R1이 기존 A2 기억과 활성 일정을 같은 상한으로 읽고 모든 쓰기 tool을 제외
 - [ ] R2 완료 턴 exactly-once, interrupted assistant partial 미저장
 - [ ] 일정 후보 확인 전 write 0회, 취소 0회, 등록 시 같은 request ID로 1회 생성
