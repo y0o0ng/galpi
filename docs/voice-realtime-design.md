@@ -4,7 +4,7 @@
 >
 > Date: 2026-07-31
 >
-> Status: R0 GO, R1 노트 탐색·말투 연속성 Pi 기능 인수, R2a 이벤트 reconciliation·R2b bounded 턴 보정 Pi 기술 인수 완료, R2b 실기기 품질 확인과 R2c 이후 미구현
+> Status: R0 GO, R1 노트 탐색·말투 연속성 Pi 기능 인수, R2a 이벤트 reconciliation·R2b bounded 턴 보정 Pi 기술 인수 완료, `near_field` 실기기 잡음 표본 조건부 인수, R2c 이후 미구현
 >
 > Scope: 짧은 음성 입력, 자연스러운 실시간 대화, 갈피 읽기 도구, 보정 전사 정본, 승인형 쓰기, 음성 모델 운영
 
@@ -168,7 +168,7 @@ R2b recorder의 물리 output 경로도 예방적으로 분리했다. 기존 Web
 
 이 보정은 로컬 집중 24/24·전체 순차 235/235, Pi 집중 24/24·전체 순차 231/231을 통과했다. 배포 전 DB·Vault 백업은 `20260731-1053`, 코드 복구본은 `code-v4b-r2b-tool-race-pre-20260731-1053.tar.gz`다. `public/voice-realtime.js`와 회귀 테스트만 정적 배포해 서비스는 재시작하지 않고 PID `134945`를 유지했다. 배포 파일과 localhost 응답 hash `a126abeb...dac5`가 일치했고 messages/notes/task/event/reminder/trace `448/34/8/16/4/99`, Vault 59개 파일 content hash, SQLite integrity `ok`·foreign key 0은 불변이다. 백업 스크립트의 기존 7일 보관 정책으로 오래된 백업 2개가 정리됐다. 실기기에서는 PWA를 완전히 닫았다 다시 열고 현재 시각 질문의 도구 응답, `연결 오류` 부재, 바로 이어지는 다음 일반 질문을 확인한다.
 
-사용자는 위 active-response 보정을 실기기에서 정상으로 확인한 뒤, 시온이 말하는 동안 헛기침이나 알림음에도 응답이 멈추는 false interruption을 보고했다. 2026-07-31 운영 baseline에 브라우저의 기존 echo cancellation·noise suppression·AGC와 별도로 Realtime `audio.input.noise_reduction.type=near_field`를 추가했다. `semantic_vad`, `eagerness:auto`, `create_response:true`, `interrupt_response:true`는 바꾸지 않아 실제 사용자의 즉시 끼어들기를 유지한다. 로컬 집중 9/9·전체 235/235, Pi 집중 9/9·전체 231/231을 통과했고 배포 전 DB·Vault 백업은 `galpi-20260731-1124.db`, `vault-20260731-1124.tar.gz`, 코드 복구본은 `code-v4b-noise-reduction-pre-20260731-112415.tar.gz`다. 사용자 재시작 뒤 PID `138723`, 시작 시각 `2026-07-31 11:43:47 KST`, `active/running`, HTTP 200과 warning 이상 journal 0건을 확인했다. 실제 Pi session config 생성값은 mini·Cedar·4096 tokens와 `near_field`·기존 semantic VAD 조합이다. messages/notes/task/event/reminder/trace `448/34/8/16/4/99`, Vault 59개와 hash `7e71c78e...c0dd`, SQLite integrity `ok`·foreign key 0은 재시작 전후 불변이다. 서버 기술 인수는 완료했고 아래 헛기침·알림음·실제 끼어들기·작은 목소리 실기기 표본만 남아 있다.
+사용자는 위 active-response 보정을 실기기에서 정상으로 확인한 뒤, 시온이 말하는 동안 헛기침이나 알림음에도 응답이 멈추는 false interruption을 보고했다. 2026-07-31 운영 baseline에 브라우저의 기존 echo cancellation·noise suppression·AGC와 별도로 Realtime `audio.input.noise_reduction.type=near_field`를 추가했다. `semantic_vad`, `eagerness:auto`, `create_response:true`, `interrupt_response:true`는 바꾸지 않아 실제 사용자의 즉시 끼어들기를 유지한다. 로컬 집중 9/9·전체 235/235, Pi 집중 9/9·전체 231/231을 통과했고 배포 전 DB·Vault 백업은 `galpi-20260731-1124.db`, `vault-20260731-1124.tar.gz`, 코드 복구본은 `code-v4b-noise-reduction-pre-20260731-112415.tar.gz`다. 사용자 재시작 뒤 PID `138723`, 시작 시각 `2026-07-31 11:43:47 KST`, `active/running`, HTTP 200과 warning 이상 journal 0건을 확인했다. 실제 Pi session config 생성값은 mini·Cedar·4096 tokens와 `near_field`·기존 semantic VAD 조합이다. messages/notes/task/event/reminder/trace `448/34/8/16/4/99`, Vault 59개와 hash `7e71c78e...c0dd`, SQLite integrity `ok`·foreign key 0은 재시작 전후 불변이다. 서버 기술 인수는 완료했고 아래 헛기침·알림음·실제 끼어들기·작은 목소리 실기기 표본은 2026-07-31에 받았다. 결과와 조건부 인수 판단은 같은 문서의 `near_field` 실기기 인수 절에 기록했다.
 
 ## 0. 결정 요약
 
@@ -575,6 +575,10 @@ full 모델을 시험할 경우 reasoning effort는 먼저 `low`로 명시한다
 4. 평소보다 작은 목소리와 평소 목소리 각 5회: 첫 음절 손실, 미감지, 응답 시작 지연이 기존보다 나빠지지 않는지 확인한다.
 
 잡음 표본의 목표는 오중단 0회지만, 작은 목소리 미감지나 실제 끼어들기 실패가 생기면 잡음 억제 성공만으로 GO하지 않는다. `near_field` 뒤에도 오중단이 반복되면 다음 비교 후보는 `server_vad`의 더 높은 `threshold`다. OpenAI는 높은 threshold가 더 큰 소리를 요구해 noisy environment에서 나을 수 있다고 설명하지만,[^realtime-vad] 이 전환은 semantic turn ending을 포기하고 작은 목소리를 놓칠 수 있으므로 자동 fallback이나 기본값으로 넣지 않는다. `interrupt_response: false`와 애플리케이션 확인 뒤 수동 `response.cancel`은 더 강한 최후 후보지만 즉시 barge-in 지연과 별도 발화 판별 로직이 필요해 현재 범위 밖이다.
+
+2026-07-31 실기기 표본 결과는 다음과 같다. 헛기침은 5회 중 약 1회꼴로 응답을 오중단했고 사용자는 이를 크게 불편하지 않은 수준으로 평가했다. 알림음 5회는 오중단 0회였다. 의도한 끼어들기 5회는 모두 정상 동작했고, 작은 목소리와 평소 목소리 각 5회에서 첫 음절 손실·미감지·응답 지연이 기존보다 나빠지지 않았다. 따라서 목표인 오중단 0회는 달성하지 못했으나 위 문단이 실격 조건으로 정한 작은 목소리 미감지와 실제 끼어들기 실패는 발생하지 않았고, 잔존 헛기침 오중단은 noise reduction이 sound-event classifier가 아니라는 위 한계 서술과 일치한다. 이 상태를 조건부 인수로 남기고 `server_vad` threshold 비교는 열지 않는다. 현재 건강한 작은 목소리 감지와 semantic turn ending을 잔존 헛기침 1/5와 맞바꾸는 거래이기 때문이며, 헛기침 오중단이 실사용에서 불편해지면 그때 별도 컨펌으로 연다.
+
+같은 표본에서 헛기침이 오중단을 일으킬 때 빈 칸이거나 알아볼 수 없는 사용자 턴이 함께 생성되는 것을 확인했다. 이는 R2c의 저장 경계에 직접 영향을 준다. R2c는 보정 결과가 비었거나 무의미한 턴을 `shared-main`에 저장하지 않아야 하며, 그렇지 않으면 위 1/5 비율만큼 쓰레기 사용자 턴이 영구 대화 기록에 쌓인다. 이 필터는 provisional transcript가 아니라 corrected transcript를 기준으로 판정하고, 판정에서 제외된 턴은 assistant `incomplete`와 마찬가지로 거짓 `final`로 승격하지 않는다.
 
 기본 voice는 현재 Cedar다. Cedar와 Marin은 공식 품질 권장 voice지만 성별 label은 제공되지 않으므로 “남자 음성”을 제품 계약으로 쓰지 않는다. 사용자가 듣기에 남성적으로 느껴지는지, 한국어 억양·발음·친근한 말투가 맞는지를 실제 기기에서 평가한다. 한 세션에서 audio response가 한 번 나온 뒤 voice를 바꾸지 않고, 선택 변경은 새 세션부터 반영한다.[^realtime-conversations][^realtime-voices]
 
