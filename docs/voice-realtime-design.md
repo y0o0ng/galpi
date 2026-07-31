@@ -4,7 +4,7 @@
 >
 > Date: 2026-07-31
 >
-> Status: R0 GO, R1 노트 탐색·말투 연속성 Pi 기능 인수, R2a 이벤트 reconciliation·R2b bounded 턴 보정 Pi 기술 인수 완료, `near_field` 실기기 잡음 표본 조건부 인수, R2c 이후 미구현
+> Status: R0 GO, R1 노트 탐색·말투 연속성 Pi 기능 인수, R2a 이벤트 reconciliation·R2b bounded 턴 보정 Pi 기술 인수 완료, `near_field` 실기기 잡음 표본 조건부 인수, R2c-1 corrected-only finalization 로컬 구현 완료·Pi 미배포, R2c-2 이후 미구현
 >
 > Scope: 짧은 음성 입력, 자연스러운 실시간 대화, 갈피 읽기 도구, 보정 전사 정본, 승인형 쓰기, 음성 모델 운영
 
@@ -782,6 +782,19 @@ finalization은 `corrected_transcript`와 `assistant_status`가 모두 도착한
 2. 실질 문자가 2자 이하이고 필러·의성어 집합에 속하며 `assistant_status`가 `completed`가 아니면 제외한다.
 
 두 번째 갈래에 `assistant_status` 조건을 넣는 이유는 텍스트만으로 헛기침과 유효한 짧은 대답을 가를 수 없기 때문이다. false interruption은 정의상 진행 중인 응답을 끊으므로 정상 완료 assistant가 없고, 사용자의 실제 짧은 대답에는 `completed` 응답이 따른다. 필러 집합에 없는 `잠깐` 같은 실제 끼어들기는 `cancelled`여도 저장한다. 이 필터는 `messages` 행 생성을 막는 것이 목적이며, 검색 오염은 기존 20자 임베딩 가드가 2차 방어선으로 남는다.
+
+##### R2c-1 구현 결과
+
+로컬 구현을 마쳤고 Pi에는 아직 배포하지 않았다. schema v10과 `lib/realtime-turn-store.js`, 기존 `transcribe` 라우트의 `recordCorrection` 연결, 신규 `POST /api/voice/realtime/turns/:turnId/assistant`, `public/voice-realtime.js`의 `response.done` 보고로 나눴다.
+
+- assistant 결말은 브라우저만 관측할 수 있어 전용 라우트를 뒀다. 서버는 session·item ID, 4개 status, 본문 20,000자 상한을 집행한다.
+- assistant 본문은 표시용 DOM 자막이 아니라 `response.done`의 `response.output`에서 뽑는다. 자막에는 delta 누락과 중단 표시가 섞일 수 있다.
+- `completed`가 아닌 응답은 클라이언트에서 이미 본문을 비워 보내므로 partial text가 네트워크로도 나가지 않는다.
+- tool-only 응답은 사용자 대면 턴이 아니므로 확정하지 않는다.
+- store는 저장한 본문을 함께 반환해 호출부가 임베딩 대상 텍스트를 다시 추측하지 않는다. 보정이 assistant보다 늦게 도착하는 순서에서 잘못된 본문이 들어가는 경로를 막는다.
+- flag를 끄면 기존 `transcribe` 응답은 바이트 단위로 동일하고 `receipt` 필드도 나타나지 않는다.
+
+로컬 회귀는 253/253이며 store 11개, 서버 1개, 클라이언트 5개가 신규다. 보정 실패 턴은 R2c-2의 `다시 전사`·`직접 수정`·`기록 안 함`이 없는 동안 확정되지 않은 상태로 남고 `shared-main`에 들어가지 않는다.
 4. **R2d 일정·메모 확인**
    - corrected transcript만 기존 `schedule_prepare`와 manual memo 후보에 전달한다.
    - 후보 전 write 0회, 등록/저장 뒤 exactly-once를 확인한다.
