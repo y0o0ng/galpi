@@ -186,7 +186,8 @@ const REALTIME_ASSISTANT_STATUSES = new Set([
 const REALTIME_MAX_ASSISTANT_CHARS = 20000;
 const VOICE_HALFDUPLEX_ENABLED = process.env.VOICE_HALFDUPLEX_ENABLED === 'true';
 const VOICE_TTS_MODEL = String(process.env.VOICE_TTS_MODEL || 'gpt-4o-mini-tts').trim();
-const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'alloy').trim();
+const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'echo').trim();
+const VOICE_TTS_INSTRUCTIONS = process.env.VOICE_TTS_INSTRUCTIONS;
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const API_TOKEN    = process.env.API_TOKEN || '';
@@ -475,6 +476,7 @@ const voiceTts = createVoiceTtsService({
   baseUrl: OPENAI_BASE_URL,
   model: VOICE_TTS_MODEL,
   voice: VOICE_TTS_VOICE,
+  ...(VOICE_TTS_INSTRUCTIONS ? { instructions: VOICE_TTS_INSTRUCTIONS } : {}),
 });
 
 function getGptModelForCouncilMode(mode) {

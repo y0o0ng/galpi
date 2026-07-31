@@ -70,6 +70,8 @@ test('the enabled service sends the trimmed text and never leaks the key downstr
   assert.equal(requests[0].url, 'http://provider.invalid/v1/audio/speech');
   assert.equal(requests[0].body.model, 'gpt-4o-mini-tts');
   assert.equal(requests[0].body.response_format, 'wav');
+  // 전달 방식만 지시하고 답변 내용은 지시하지 않는다.
+  assert.match(requests[0].body.instructions, /활기찬|반말/);
   // 잘라낸 문장만 provider로 간다. 전체 답변을 보내지 않는다.
   assert.equal(requests[0].body.input, spoken);
   assert.doesNotMatch(spoken, /세 번째/);
@@ -93,4 +95,21 @@ test('an upstream rejection surfaces a bounded code without the answer text', as
     assert.doesNotMatch(error.message, /사용자 발화|비밀 본문/);
     return true;
   });
+});
+
+test('an empty instruction is omitted rather than sent as a blank field', async () => {
+  const requests = [];
+  const service = createVoiceTtsService({
+    enabled: true,
+    apiKey: 'k',
+    instructions: '   ',
+    async fetchImpl(url, options) {
+      requests.push(JSON.parse(options.body));
+      return { ok: true, body: (async function* () { yield Buffer.from('RIFF'); })() };
+    },
+  });
+
+  await service.speak('안녕');
+  assert.equal('instructions' in requests[0], false);
+  assert.equal(requests[0].voice, 'echo');
 });
