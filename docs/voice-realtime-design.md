@@ -576,9 +576,13 @@ full 모델을 시험할 경우 reasoning effort는 먼저 `low`로 명시한다
 
 잡음 표본의 목표는 오중단 0회지만, 작은 목소리 미감지나 실제 끼어들기 실패가 생기면 잡음 억제 성공만으로 GO하지 않는다. `near_field` 뒤에도 오중단이 반복되면 다음 비교 후보는 `server_vad`의 더 높은 `threshold`다. OpenAI는 높은 threshold가 더 큰 소리를 요구해 noisy environment에서 나을 수 있다고 설명하지만,[^realtime-vad] 이 전환은 semantic turn ending을 포기하고 작은 목소리를 놓칠 수 있으므로 자동 fallback이나 기본값으로 넣지 않는다. `interrupt_response: false`와 애플리케이션 확인 뒤 수동 `response.cancel`은 더 강한 최후 후보지만 즉시 barge-in 지연과 별도 발화 판별 로직이 필요해 현재 범위 밖이다.
 
-2026-07-31 실기기 표본 결과는 다음과 같다. 헛기침은 5회 중 약 1회꼴로 응답을 오중단했고 사용자는 이를 크게 불편하지 않은 수준으로 평가했다. 알림음 5회는 오중단 0회였다. 의도한 끼어들기 5회는 모두 정상 동작했고, 작은 목소리와 평소 목소리 각 5회에서 첫 음절 손실·미감지·응답 지연이 기존보다 나빠지지 않았다. 따라서 목표인 오중단 0회는 달성하지 못했으나 위 문단이 실격 조건으로 정한 작은 목소리 미감지와 실제 끼어들기 실패는 발생하지 않았고, 잔존 헛기침 오중단은 noise reduction이 sound-event classifier가 아니라는 위 한계 서술과 일치한다. 이 상태를 조건부 인수로 남기고 `server_vad` threshold 비교는 열지 않는다. 현재 건강한 작은 목소리 감지와 semantic turn ending을 잔존 헛기침 1/5와 맞바꾸는 거래이기 때문이며, 헛기침 오중단이 실사용에서 불편해지면 그때 별도 컨펌으로 연다.
+2026-07-31 실기기 표본 결과는 다음과 같다. 알림음 5회는 오중단 0회였다. 의도한 끼어들기 5회는 모두 정상 동작했고, 작은 목소리와 평소 목소리 각 5회에서 첫 음절 손실·미감지·응답 지연이 기존보다 나빠지지 않았다. 따라서 위 문단이 실격 조건으로 정한 작은 목소리 미감지와 실제 끼어들기 실패는 발생하지 않았다.
 
-같은 표본에서 헛기침이 오중단을 일으킬 때 빈 칸이거나 알아볼 수 없는 사용자 턴이 함께 생성되는 것을 확인했다. 이는 R2c의 저장 경계에 직접 영향을 준다. R2c는 보정 결과가 비었거나 무의미한 턴을 `shared-main`에 저장하지 않아야 하며, 그렇지 않으면 위 1/5 비율만큼 쓰레기 사용자 턴이 영구 대화 기록에 쌓인다. 이 필터는 provisional transcript가 아니라 corrected transcript를 기준으로 판정하고, 판정에서 제외된 턴은 assistant `incomplete`와 마찬가지로 거짓 `final`로 승격하지 않는다.
+헛기침 오중단은 단일 비율로 적을 수 없다. **마이크 거리에 강하게 의존한다.** 휴대폰을 얼굴 가까이 들면 5회 중 5회에 가깝게 오중단하고, 팔을 뻗어 멀리 두면 5회 중 0회에 가깝다. 최초 보고한 약 1/5은 중간 자세에서 나온 값이며 이 수치만 단독으로 인용하면 안 된다. 사용자는 평소 사용 자세에서는 크게 불편하지 않다고 평가했지만, 가까이 드는 자세에서는 사실상 매 턴 끊기므로 잔존 결함의 크기를 과소평가하지 않는다. 또한 Realtime 모델 자체는 해당 소리를 기침으로 인식한다. 즉 실패 지점은 모델의 이해가 아니라 VAD의 턴 종료·끼어들기 판정이다.
+
+이 상태를 조건부 인수로 남기고 `server_vad` threshold 비교는 아직 열지 않는다. 현재 건강한 작은 목소리 감지와 semantic turn ending을 맞바꾸는 거래이기 때문이다. 다만 거리 의존성의 원인은 아직 가르지 못했다. `near_field`가 가까운 입력의 헛기침을 오히려 또렷한 speech로 정리하는 것인지, 단순히 근접 음압이 커서 어떤 필터로도 VAD를 넘는 것인지 구분할 표본이 없다. 원인 판별은 같은 거리에서 `near_field`·`far_field`·비활성을 비교하는 별도 표본으로 다루고, 추측으로 설정을 바꾸지 않는다. 이 작업은 R2c와 독립이므로 순서를 나눈다.
+
+같은 표본에서 헛기침이 오중단을 일으킬 때 사용자 턴이 함께 생성되는 것을 확인했다. 실측된 corrected transcript는 빈 문자열과 `하...`, `그`, `음`, `흥.`, `음.` 같은 짧은 필러·의성어였고, 비음성 구간에서 흔히 보고되는 긴 상투구 hallucination은 관찰되지 않았다. 이는 R2c의 저장 경계에 직접 영향을 준다. R2c는 이런 턴을 `shared-main`에 저장하지 않아야 하며, 그렇지 않으면 위 거리 의존 비율만큼 쓰레기 사용자 턴이 영구 대화 기록에 쌓이고 `shared-main` 최근 완료 쌍을 통해 다음 세션 컨텍스트까지 오염시킨다. 이 필터는 provisional transcript가 아니라 corrected transcript를 기준으로 판정하고, 판정에서 제외된 턴은 assistant `incomplete`와 마찬가지로 거짓 `final`로 승격하지 않는다.
 
 기본 voice는 현재 Cedar다. Cedar와 Marin은 공식 품질 권장 voice지만 성별 label은 제공되지 않으므로 “남자 음성”을 제품 계약으로 쓰지 않는다. 사용자가 듣기에 남성적으로 느껴지는지, 한국어 억양·발음·친근한 말투가 맞는지를 실제 기기에서 평가한다. 한 세션에서 audio response가 한 번 나온 뒤 voice를 바꾸지 않고, 선택 변경은 새 세션부터 반영한다.[^realtime-conversations][^realtime-voices]
 
@@ -763,6 +767,21 @@ R0에서는 `realtime-tool-dispatcher`와 `realtime-turn-store`를 만들지 않
 3. **R2c corrected-only finalization**
    - receipt unique 경계와 한 transaction의 user/assistant message 반영을 연다.
    - failure에서 provisional fallback이 생기지 않는지 확인한다.
+   - R2c-1은 schema v10 receipt·exactly-once 저장·빈 턴 필터까지만 열고, `다시 전사`·`직접 수정`·`기록 안 함` UI는 R2c-2로 분리한다. 한 diff를 작게 유지해 첫 쓰기 배포의 원인 추적을 쉽게 한다.
+   - flag는 `OPENAI_REALTIME_FINALIZE_ENABLED`이고 코드 기본값은 `false`다.
+
+##### R2c-1 저장 경계
+
+`realtime_turn_receipts`의 `assistant_status`는 위 표의 3값 대신 `response.done.status`의 `completed | cancelled | failed | incomplete` 4값을 그대로 보존한다. R2b가 이미 이 4값을 분리해 표시하므로 3값으로 접으면 실제 끼어들기와 길이 초과 중단이 뭉개져 사후 원인 추적이 불가능해진다. `messages`의 assistant 행은 `completed`일 때만 만든다.
+
+finalization은 `corrected_transcript`와 `assistant_status`가 모두 도착한 뒤 한 transaction에서 실행한다. 이미 `finalized`면 기존 message ID를 그대로 반환하고 재삽입하지 않는다. user 행을 assistant 행보다 먼저 삽입해 `messages.id` 순서를 보장한다. 기존 과거 대화 검색이 답변을 `id > user_id`로 찾으므로 순서가 뒤집히면 엉뚱한 답변이 결합된다. 임베딩은 transaction 커밋 뒤 기존 20자 가드 경로를 그대로 재사용한다.
+
+빈·무의미 사용자 턴 필터는 아래 두 갈래로만 제외하고, 제외된 receipt는 `status = 'discarded'`에 `error_code = 'empty_turn'`을 남긴다. 사용자가 명시적으로 고른 `기록 안 함`과 같은 상태를 쓰되 원인을 구분해 필터 발동 빈도를 셀 수 있게 한다.
+
+1. 문장부호·공백을 제거한 뒤 빈 문자열이면 assistant 상태와 무관하게 제외한다.
+2. 실질 문자가 2자 이하이고 필러·의성어 집합에 속하며 `assistant_status`가 `completed`가 아니면 제외한다.
+
+두 번째 갈래에 `assistant_status` 조건을 넣는 이유는 텍스트만으로 헛기침과 유효한 짧은 대답을 가를 수 없기 때문이다. false interruption은 정의상 진행 중인 응답을 끊으므로 정상 완료 assistant가 없고, 사용자의 실제 짧은 대답에는 `completed` 응답이 따른다. 필러 집합에 없는 `잠깐` 같은 실제 끼어들기는 `cancelled`여도 저장한다. 이 필터는 `messages` 행 생성을 막는 것이 목적이며, 검색 오염은 기존 20자 임베딩 가드가 2차 방어선으로 남는다.
 4. **R2d 일정·메모 확인**
    - corrected transcript만 기존 `schedule_prepare`와 manual memo 후보에 전달한다.
    - 후보 전 write 0회, 등록/저장 뒤 exactly-once를 확인한다.
