@@ -3596,3 +3596,136 @@ body[data-active-model="council"] #send-btn {
 .bubble.md strong { font-weight: 700; }
 .bubble.md em { font-style: italic; }
 .bubble.md hr { border: none; border-top: 1px solid var(--border); margin: 5px 0; }
+
+/* ─── 반이중 음성 최소 패널 ─────────────────────────────────────────────── */
+
+#voice-hd-panel {
+  margin: 0 12px 10px;
+  padding: 12px;
+  border: 1px solid var(--brand-border);
+  border-radius: 16px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+#voice-hd-panel[hidden] {
+  display: none;
+}
+
+.voice-hd-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+}
+
+#voice-hd-status {
+  font-size: 0.94rem;
+  color: var(--ai-text);
+}
+
+#voice-hd-stop {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+#voice-hd-stop:hover {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+/* 상태를 색과 맥박으로만 구분한다. 위치는 움직이지 않는다. */
+.voice-hd-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--label);
+  opacity: 0.45;
+}
+
+.voice-hd-dot[data-phase="listening"] {
+  background: var(--brand);
+  opacity: 1;
+  animation: voice-hd-pulse 1.8s var(--ease-out) infinite;
+}
+
+.voice-hd-dot[data-phase="capturing"] {
+  background: var(--brand);
+  opacity: 1;
+}
+
+.voice-hd-dot[data-phase="transcribing"],
+.voice-hd-dot[data-phase="thinking"] {
+  background: var(--council);
+  opacity: 1;
+  animation: voice-hd-pulse 1.1s var(--ease-out) infinite;
+}
+
+.voice-hd-dot[data-phase="speaking"] {
+  background: var(--gpt-color);
+  opacity: 1;
+}
+
+.voice-hd-dot[data-phase="recovering"] {
+  background: var(--danger);
+  opacity: 1;
+}
+
+@keyframes voice-hd-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+#voice-hd-log {
+  margin-top: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#voice-hd-log:empty {
+  display: none;
+}
+
+.voice-hd-row {
+  padding: 7px 10px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.voice-hd-user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--user-bubble);
+  color: var(--user-text);
+}
+
+.voice-hd-assistant {
+  align-self: flex-start;
+  background: var(--ai-bubble);
+  color: var(--ai-text);
+  border: 1px solid var(--border);
+}
+
+.voice-hd-note {
+  margin-top: 9px;
+  color: var(--label);
+  font-size: 0.76rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-hd-dot { animation: none !important; }
+}

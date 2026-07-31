@@ -177,6 +177,11 @@ async function init() {
       showToast,
       config: config.realtimeVoice,
     });
+    window.VoiceHalfDuplexUi?.init({
+      apiFetch,
+      showToast,
+      config: config.halfDuplexVoice,
+    });
     window.ChatModelPicker?.init({
       apiFetch,
       showToast,
