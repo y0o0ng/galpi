@@ -137,6 +137,365 @@ iPhone·iPad는 iOS/iPadOS 16.4 이상에서 canonical HTTPS를 Safari로 열어
 
 문제가 생기면 먼저 `WEB_PUSH_ENABLED=false`로 바꾸고 서비스를 재시작한다. 이 조치는 dispatcher와 새 구독만 끄며 task 정본·scheduler·일정 에이전트 화면은 유지한다. 일정 기능 전체를 멈춰야 할 때만 `ASSISTANT_TASKS_ENABLED=false`를 추가로 적용한다.
 
+### R1 Realtime 읽기 도구
+
+R0 음성이 이미 정상이고 A2 실제 주입이 인수된 Pi에서만 R1 flag를 연다. 세 값 중 하나라도 false면 읽기 도구는 session config에 들어가지 않는다.
+
+```env
+OPENAI_REALTIME_ENABLED=true
+OPENAI_REALTIME_MODEL=gpt-realtime-2.1-mini
+OPENAI_REALTIME_VOICE=cedar
+OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+OPENAI_REALTIME_MAX_SESSION_SECONDS=300
+ASSISTANT_RETRIEVAL_A2_ENABLED=true
+OPENAI_REALTIME_READ_TOOLS_ENABLED=true
+```
+
+위 값은 2026-07-30 인수한 현재 baseline이다. voice와 모델 변경은 새 Realtime 세션부터 적용되므로 `.env`만 바꾸고 기존 브라우저 음성 세션으로 판단하지 않는다. 서비스를 재시작하고 새 음성 세션을 연다.
+
+재시작 직후 아래 세 가지를 확인한다.
+
+1. `systemctl show`의 `MainPID`와 `ExecMainStartTimestamp`가 새 값이고 `ActiveState=active`, `SubState=running`이다.
+2. 새 시작 시각 이후 journal에 기동 오류가 없다.
+3. 인증된 `/api/config`의 `realtimeVoice`가 `enabled=true`, expected model/voice/seconds, `readToolsEnabled=true`다.
+
+```sh
+systemctl show galpi \
+  -p MainPID \
+  -p ExecMainStartTimestamp \
+  -p ActiveState \
+  -p SubState \
+  --no-pager
+
+journalctl -u galpi --since '<방금 확인한 ExecMainStartTimestamp>' --no-pager
+
+curl -H 'X-API-Token: <API_TOKEN>' \
+  http://127.0.0.1:3000/api/config
+```
+
+`<API_TOKEN>`을 실제 값으로 바꾼 명령은 공유 로그·문서에 복사하지 않는다. 가능한 경우 임시 interactive shell 변수나 안전한 비밀 전달 방식을 사용하고, 검증 출력에는 `realtimeVoice` 공개 필드만 남긴다. 응답에는 tool session ID, API key, 기억·일정 내용이 없어야 한다. tool session ID는 실제 SDP 세션 응답의 `X-Galpi-Realtime-Tool-Session` 헤더로만 브라우저에 전달되고 5분 뒤 만료된다.
+
+2026-07-30 말투 보정 배포의 확인값은 PID `130040`, 시작 시각 `2026-07-30 22:42:57 KST`, `gpt-realtime-2.1-mini`, `cedar`, `300`, `readToolsEnabled=true`였고 새 시작 로그 오류는 0건이었다. 이 PID는 영구 기대값이 아니라 해당 배포 receipt이므로 다음 재시작에서는 새 PID를 정상으로 본다.
+
+실기기 인수는 다음 순서로 한다.
+
+1. 기존 A2 정답이 알려진 기억 질문 5개를 말해 관련 내용만 답하는지 확인한다.
+2. 갈피에 없는 질문 4개를 말해 무관 기억을 끼워 넣지 않는지 확인한다.
+3. “내 시들 중 마음에 드는 것 하나 읽어줘”로 `galpi_note_search → galpi_note_read`가 이어지고, topic 볼트 전문이 아니라 `ready` QA 청크의 시 한 편을 읽는지 확인한다.
+4. 존재하지 않는 노트와 `ai_readable=false` 노트가 내용 없이 `no_match`가 되는지 확인한다.
+5. 활성 일정 질문으로 task 정본과 맞고 완료·취소·삭제 일정이 섞이지 않는지 확인한다.
+6. 일정 등록·완료·취소와 노트 저장을 요청해 현재 음성은 조회 전용이라고 답하고 실제 write가 0회인지 확인한다.
+7. 전후 DB application table 수, task/event/reminder 수, Vault hash를 비교한다.
+
+R1에 문제가 있으면 `OPENAI_REALTIME_READ_TOOLS_ENABLED=false`만 적용하고 서비스를 재시작한다. 그러면 R0 자연 대화는 유지되고 기억·일정 도구만 session config에서 제거된다. `ASSISTANT_RETRIEVAL_A2_ENABLED`는 텍스트 채팅에도 영향을 주므로 R1만 되돌릴 때 함께 끄지 않는다.
+
+### R2a Realtime 휘발성 receipt
+
+R2a는 `public/voice-realtime.js`의 브라우저 메모리에서만 turn receipt와 event reconciliation을 수행한다. audio upload, 보정 STT route, schema, DB·Vault·message·task write가 없으므로 정적 파일만 바뀌는 배포에는 서비스 재시작이 필요 없다. 브라우저는 새로고침하거나 새 음성 세션을 열어 새 파일을 받는다.
+
+배포 전에는 DB·Vault 온라인 백업과 아래 두 파일의 코드 복구본을 만든다.
+
+```sh
+cd /home/pi/galpi
+/home/pi/.nvm/versions/node/v24.16.0/bin/node scripts/backup.js
+tar -czf /home/pi/backups/galpi/code-v4b-r2a-pre-<stamp>.tar.gz \
+  public/voice-realtime.js \
+  test/realtime-session.test.js
+```
+
+배포 뒤에는 정적 파일 hash, 집중 회귀, 전체 순차 회귀, DB·Vault 무쓰기를 확인한다.
+
+```sh
+cd /home/pi/galpi
+sha256sum public/voice-realtime.js test/realtime-session.test.js
+curl -fsS http://127.0.0.1:3000/voice-realtime.js | sha256sum
+
+/home/pi/.nvm/versions/node/v24.16.0/bin/node \
+  --test --test-concurrency=1 \
+  test/realtime-session.test.js \
+  test/realtime-session-server.test.js \
+  test/realtime-tool-dispatcher.test.js
+
+/home/pi/.nvm/versions/node/v24.16.0/bin/node \
+  --test --test-concurrency=1
+```
+
+합성 fixture의 기대값은 duplicate completion/delta가 행을 늘리지 않고, 서로 다른 턴의 늦은 completion이 원래 item 행에 붙으며, 정상 assistant는 `final`, completion 뒤 취소된 assistant는 `interrupted`, user completion은 `provisional`인 것이다. HTTP 요청은 기존 Realtime session handshake와 R1 read tool뿐이어야 한다.
+
+2026-07-30 첫 인수값은 DB·Vault `20260730-2354`, 코드 복구본 `code-v4b-r2a-pre-20260730-2353.tar.gz`, 집중 15/15, 전체 222/222다. `public/voice-realtime.js`와 실제 localhost 정적 응답 SHA-256은 `372a9c0d...42f48`로 일치했다. 서비스는 재시작하지 않아 PID `130040`을 유지했다. 전후 `messages 448`, `notes 34`, task/event/reminder `8/16/4`, retrieval trace `99`, Vault hash `7e71c78e...c0dd`가 불변이고 SQLite integrity `ok`, foreign key 오류 0건이었다.
+
+R2a 회귀가 생기면 새 schema나 data rollback은 없다. 정적 파일을 코드 복구본에서 되돌리고 브라우저를 새로고침하면 된다. R2a receipt는 세션 메모리뿐이므로 재시작이나 페이지 종료 뒤 복구 대상으로 취급하지 않는다.
+
+### R2b Realtime 턴 보정
+
+R2b는 동일 마이크 스트림의 사용자 턴을 16kHz mono PCM WAV로 bounded capture하고, 인증된 Pi route가 `gpt-transcribe`로 보정한 텍스트를 휘발성 말풍선에 돌려준다. 아직 schema·message·topic·task·retrieval trace write는 없고 원본 audio도 DB·Vault·backup·temp file에 저장하지 않는다.
+
+코드 기본값은 꺼져 있다. 운영 Pi에서만 아래 값을 사용한다.
+
+```dotenv
+OPENAI_REALTIME_CORRECTION_ENABLED=true
+OPENAI_REALTIME_CANONICAL_TRANSCRIPTION_MODEL=gpt-transcribe
+OPENAI_REALTIME_MAX_TURN_SECONDS=120
+OPENAI_REALTIME_MAX_TURN_BYTES=8388608
+```
+
+모델은 exact ID로 고정한다. 브라우저가 모델·상한·저장 목적을 보내 선택하게 하지 않는다. `OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe`는 Realtime provisional 자막용이고, 위 canonical model은 종료된 턴의 보정용이므로 서로 바꾸지 않는다.
+
+배포 전 DB·Vault 온라인 백업과 코드 복구본을 만든다.
+
+```sh
+cd /home/pi/galpi
+/home/pi/.nvm/versions/node/v24.16.0/bin/node scripts/backup.js
+tar -czf /home/pi/backups/galpi/code-v4b-r2b-pre-<stamp>.tar.gz \
+  package.json package-lock.json server.js \
+  lib/realtime-transcription.js \
+  public/index.html public/style.css \
+  public/voice-realtime.js public/voice-turn-recorder.js \
+  test/realtime-session.test.js \
+  test/realtime-session-server.test.js \
+  test/realtime-transcription.test.js \
+  test/realtime-turn-recorder.test.js
+```
+
+`busboy`가 새 runtime dependency다. Pi login shell의 PATH와 systemd의 Node가 다를 수 있으므로 현재 서비스가 사용하는 Node 경로를 먼저 확인하고, 필요하면 절대 경로로 설치한다. `npm audit fix`는 기존 경고와 transitive dependency를 임의 변경하므로 실행하지 않는다.
+
+```sh
+systemctl show galpi.service -p ExecStart
+cd /home/pi/galpi
+/home/pi/.nvm/versions/node/v24.16.0/bin/node \
+  /home/pi/.nvm/versions/node/v24.16.0/lib/node_modules/npm/bin/npm-cli.js \
+  install --omit=dev
+```
+
+배포 뒤에는 집중 회귀와 전체 순차 회귀를 실행한다.
+
+```sh
+cd /home/pi/galpi
+/home/pi/.nvm/versions/node/v24.16.0/bin/node \
+  --test --test-concurrency=1 \
+  test/realtime-transcription.test.js \
+  test/realtime-turn-recorder.test.js \
+  test/realtime-session.test.js \
+  test/realtime-session-server.test.js
+
+/home/pi/.nvm/versions/node/v24.16.0/bin/node \
+  --test --test-concurrency=1
+```
+
+집중 fixture에서 확인할 불변식:
+
+1. WAV header·16-bit mono·sample rate·server-derived duration을 bytes에서 검사한다.
+2. 같은 session/item/turn/audio hash는 provider를 한 번만 호출하고 다른 audio는 충돌로 거절한다.
+3. session별 provider 호출은 직렬화되며 미처리 3개를 넘지 않는다.
+4. timeout·잘못된 ID/MIME/WAV/duration·만료 session은 transcript와 audio를 로그에 남기지 않고 bounded 오류로 끝난다.
+5. 성공은 사용자 행을 `corrected`, 실패는 `기록 확인 필요`로 만들며 provisional을 저장 정본으로 승격하지 않는다.
+6. page close·사용자 종료는 upload·AudioContext·recorder buffer를 정리한다.
+7. 전후 application table과 Vault가 불변이다.
+
+기능 flag와 공개 config는 인증된 API로 확인하되 token·session header·transcript는 문서나 공유 로그에 남기지 않는다. 기대 공개 필드는 아래와 같다.
+
+```json
+{
+  "correctionEnabled": true,
+  "canonicalTranscriptionModel": "gpt-transcribe",
+  "maxTurnSeconds": 120,
+  "maxTurnBytes": 8388608
+}
+```
+
+서비스 재시작에는 sudo 권한이 필요할 수 있다. 자동 작업 환경에서 비밀번호가 필요한 경우 우회하지 말고 사용자에게 재시작을 요청한다. 사용자가 재시작한 뒤 아래를 확인한다.
+
+```sh
+sudo systemctl status galpi --no-pager
+systemctl show galpi.service -p MainPID -p ExecMainStartTimestamp -p ActiveState -p SubState
+sha256sum public/voice-realtime.js public/voice-turn-recorder.js lib/realtime-transcription.js
+curl -fsS http://127.0.0.1:3000/voice-realtime.js | sha256sum
+curl -fsS http://127.0.0.1:3000/voice-turn-recorder.js | sha256sum
+journalctl -u galpi.service --since "<restart timestamp>" --no-pager
+```
+
+실기기 인수에서는 PWA를 완전히 닫았다 열거나 hard refresh해 새 JS를 받은 뒤 아래를 확인한다.
+
+1. 짧은 한국어·영어·code-switch를 각각 말하고 사용자 자막이 `보정 중` 뒤 보정본으로 교체되는지 본다.
+2. `갈피`, `시온`, 실제 노트 제목, 날짜·시각·숫자를 말해 provisional과 corrected를 비교한다.
+3. 발화 첫·끝 음절이 500ms pre-roll·300ms post-roll 안에서 잘리지 않는지 본다.
+4. 시온 발화 중 끼어들어도 대화 중단·새 턴과 보정 queue가 함께 정상인지 본다.
+5. 화면 고지가 `보정 자막 · 아직 저장 안 함`인지 확인한다.
+6. 실패를 유도할 수 있으면 임시 자막이 남되 `기록 확인 필요`로 표시되고 저장 완료처럼 보이지 않는지 본다.
+7. 종료 뒤 브라우저 마이크 표시가 사라지고 다음 세션이 정상 시작하는지 본다.
+
+2026-07-31 첫 기술 인수값은 DB `galpi-20260731-0058.db`, Vault `vault-20260731-0058.tar.gz`, 코드 `code-v4b-r2b-pre-20260731-0055.tar.gz`, 로컬 집중 23/23·전체 234/234, Pi 집중 23/23·전체 230/230이다. 사용자 재시작 뒤 PID `133153`, 시작 시각 `2026-07-31 01:09:05 KST`, `active/running`, mini·Cedar·300초·read tools/correction 활성 config와 정적 응답 hash 일치를 확인했다. 전후 messages/notes/task/event/reminder/retrieval trace `448/34/8/16/4/99`, Vault hash `7e71c78e...c0dd`, SQLite integrity `ok`, foreign key 0이 불변이고 새 시작 로그의 correction·warning·error·exception은 0건이었다.
+
+문제가 생기면 먼저 `OPENAI_REALTIME_CORRECTION_ENABLED=false`로 바꾸고 서비스를 재시작한다. 그러면 R0/R1 자연 대화와 read tool은 유지되고 bounded audio capture·보정 upload만 빠진다. 데이터 migration이 없으므로 DB rollback은 하지 않는다. 코드까지 되돌릴 때는 위 R2b 코드 복구본에서 변경 파일만 복원하고 dependency lock과 `node_modules`가 맞는지 확인한 뒤 전체 회귀를 실행한다. R2b는 durable receipt가 없으므로 재시작 전에 진행 중이던 턴을 복구 대상으로 취급하지 않는다.
+
+### R2b 응답 중단·턴 순서·현재 시각 안정화
+
+어려운 질문에서 음성이 정상 재생되다가 회색 `중단됨`으로 끝나는 경우 먼저 provider 장애나 VAD 오인으로 단정하지 않는다. `response.done`의 상태와 reason 의미를 아래처럼 구분한다.
+
+|상태|UI|의미|
+|---|---|---|
+|`completed`|확정 답변|정상 완료|
+|`cancelled`|`중단됨`|사용자 끼어들기 등 실제 취소|
+|`failed`|`응답 오류`|provider 처리 실패|
+|`incomplete` + `max_output_tokens`|`답변이 길어 여기서 멈춤`|응답 상한 도달|
+|그 밖의 `incomplete`|`답변이 완료되지 않음`|정상 완료가 아닌 다른 종료|
+
+운영 설정은 아래 bounded 값을 사용한다.
+
+```dotenv
+OPENAI_REALTIME_MAX_OUTPUT_TOKENS=4096
+```
+
+공식 schema가 허용하는 `inf`는 사용하지 않는다. 4,096도 한 assistant response의 최대치일 뿐 목표 길이가 아니며, 시온은 핵심부터 간결하게 답하라는 지시를 계속 받는다. 상한에 닿은 답변을 자동으로 정상 완료로 바꾸거나 무한 continuation하지 않는다.
+
+턴 순서 안정화 뒤에는 server event 도착 순서가 화면 순서가 아니다. `speech_stopped` 사용자 턴과 tool continuation이 response 대기 queue를 만들고, 새 response는 가장 오래된 대기 턴에 결합한다. 화면은 `turn ID → user → assistant`로 재정렬한다. 아래 순서를 합성해도 같은 턴이어야 한다.
+
+```text
+user turn 1 speech_stopped
+user turn 2 speech_started
+turn 1 response.created
+turn 1 assistant transcript.done
+turn 1 user transcription.completed
+```
+
+현재 날짜·시각 질문에는 `galpi_current_time` read-only tool을 사용한다. 결과는 Pi system clock의 `Asia/Seoul` KST이며 인자를 받지 않는다. 기존 opaque tool session·call ID 멱등성·턴당 2회·8,000자·5초 timeout을 공유한다. Pi 시각 자체가 의심되면 먼저 확인한다.
+
+```sh
+timedatectl status
+date --iso-8601=seconds
+```
+
+`Time zone: Asia/Seoul`, `System clock synchronized: yes`, `NTP service: active`를 기대한다. 현재 시각 도구를 고치기 위해 외부 시간 API나 브라우저 clock을 추가하지 않는다.
+
+보정 recorder는 `AudioContext.destination`에 연결하지 않는다. `MediaStreamAudioDestinationNode` 격리 sink만 사용하며, 지원하지 않는 브라우저에서는 보정 recorder만 실패하고 Realtime 대화는 유지돼야 한다. iPhone에서 시온 음성이 새 사용자 발화로 오인되는 증상을 관찰할 때는 아래를 구분한다.
+
+1. 어려운 질문에서 일정 길이 뒤 종료되고 사용자가 말하지 않았다면 `response.done` incomplete 가능성을 본다.
+2. 사용자가 말하거나 환경 소음 직후 즉시 끝났다면 cancelled/VAD 가능성을 본다.
+3. UI 문구가 실제 status와 다르면 client status mapping 회귀다.
+4. 서버 journal에 오류가 없다는 사실만으로 client-side VAD나 max token 문제를 배제하지 않는다.
+
+안정화 배포 전에는 기존 R2b 백업과 별도로 DB·Vault·코드 복구본을 만든다. 첫 배포 receipt는 아래와 같다.
+
+- DB: `/home/pi/backups/galpi/galpi-20260731-0147.db`
+- Vault: `/home/pi/backups/galpi/vault-20260731-0147.tar.gz`
+- 코드: `/home/pi/backups/galpi/code-v4b-r2b-stability-pre-20260731-0147.tar.gz`
+- 로컬: 집중 24/24, 전체 순차 235/235
+- Pi: 집중 24/24, 전체 순차 231/231
+
+집중 회귀:
+
+```sh
+cd /home/pi/galpi
+/home/pi/.nvm/versions/node/v24.16.0/bin/node \
+  --test --test-concurrency=1 \
+  test/realtime-session-server.test.js \
+  test/realtime-transcription.test.js \
+  test/realtime-session.test.js \
+  test/realtime-tool-dispatcher.test.js \
+  test/realtime-turn-recorder.test.js
+```
+
+재시작 뒤 인증 config에서 `maxOutputTokens: 4096`, read tools와 correction 활성 상태를 확인한다. 정적 응답 hash, 새 PID·시작 시각, journal 오류, DB/Vault 불변도 다시 확인한다. sudo 비밀번호가 필요하면 자동화가 우회하지 않고 사용자에게 재시작을 요청한다.
+
+2026-07-31 사용자 재시작 뒤 PID `134945`, 시작 시각 `2026-07-31 02:02:36 KST`, `active/running`을 확인했다. 인증 config는 mini·Cedar·300초·`maxOutputTokens: 4096`·read tools·correction 활성 상태였고 실제 localhost 정적 응답 hash는 배치 파일과 일치했다. 새 시작 로그 오류는 0건이다. 재시작 전후 messages/notes/task/event/reminder/retrieval trace `448/34/8/16/4/99`, Vault 59개 파일 content hash, SQLite `integrity_check=ok`, foreign key 0이 불변이었다.
+
+#### 도구 후속 응답의 active-response 충돌
+
+`Conversation already has an active response in progress`가 보이면 API 장애나 실제 WebRTC 단절로 분류하기 전에 function-call event 순서를 확인한다.
+
+```text
+response.function_call_arguments.done
+response.done (completed, completed function_call 포함)
+갈피 read tool HTTP
+conversation.item.create (function_call_output)
+response.create
+```
+
+`response.function_call_arguments.done`에서는 도구를 실행하거나 `response.create`를 보내지 않는다. 원래 Response가 끝났음을 보장하는 completed `response.done` 뒤에만 실행한다. tool HTTP 중 새 `speech_started`로 turn이 바뀌면 output item만 보내고 늦은 음성 continuation은 만들지 않는다.
+
+Realtime server `error` event는 대부분 복구 가능하다는 공식 계약이 있으므로 client에서 peer·mic·data channel을 즉시 닫지 않는다. 안내를 표시하고 다음 speech/response에서 지우며, 실제 WebRTC `failed | closed`, 2초 넘는 `disconnected`, data channel 오류만 연결 종료로 처리한다.
+
+2026-07-31 보정 배포 receipt:
+
+- DB·Vault 백업: `galpi-20260731-1053.db`, `vault-20260731-1053.tar.gz`
+- 코드 복구본: `code-v4b-r2b-tool-race-pre-20260731-1053.tar.gz`
+- 로컬 집중 24/24·전체 순차 235/235
+- Pi 집중 24/24·전체 순차 231/231
+- 배포/localhost `voice-realtime.js`: `a126abeb...dac5`
+- 서비스 재시작 없음, PID `134945` 유지
+- messages/notes/task/event/reminder/trace `448/34/8/16/4/99`, Vault 59개 파일 hash, SQLite integrity·foreign key 불변
+- 기존 7일 보관 정책에 따라 백업 실행 중 오래된 백업 2개 정리
+
+실기기에서는 PWA를 완전히 닫았다 다시 열고 `지금 몇 시야?`를 먼저 묻는다. KST 시각을 답하고 `연결 오류`가 없어야 하며, 곧바로 일반 질문 하나를 이어서 같은 session이 살아 있는지 확인한다.
+
+#### Realtime 입력 잡음과 false interruption
+
+브라우저의 `echoCancellation`, `noiseSuppression`, `autoGainControl`이 켜져 있어도 헛기침이나 알림음을 `speech_started`로 오인하면 `interrupt_response: true`에 의해 진행 중 답변이 취소될 수 있다. 이 경우 첫 보정은 `semantic_vad`나 끼어들기 동작을 바꾸는 것이 아니라 Realtime session의 `audio.input.noise_reduction: { type: "near_field" }`를 켜는 것이다.
+
+`near_field`는 iPhone을 가까이 두고 말하는 현재 사용법의 운영 기준이다. 휴대폰을 멀리 둔 speakerphone 사용에서는 `far_field`를 별도 표본으로 비교하고 자동 전환하지 않는다. noise reduction은 VAD보다 앞에서 입력을 정리하지만 헛기침·알림음 전용 분류기가 아니므로 false interruption 0회를 구현만으로 단정하지 않는다.
+
+이 설정은 `lib/realtime-session.js`가 만드는 새 session config에 들어간다. 기존 WebRTC session에는 소급 적용되지 않으며 서비스 재시작과 새 음성 세션이 필요하다. schema·DB·Vault·dependency는 바뀌지 않는다.
+
+배포 전에는 DB·Vault 온라인 백업과 설정·테스트·문서 복구본을 만든다.
+
+```sh
+cd /home/pi/galpi
+/home/pi/.nvm/versions/node/v24.16.0/bin/node scripts/backup.js
+tar -czf /home/pi/backups/galpi/code-v4b-noise-reduction-pre-$(date +%Y%m%d-%H%M%S).tar.gz \
+  lib/realtime-session.js \
+  test/realtime-session.test.js \
+  docs/voice-realtime-design.md \
+  docs/RASPBERRY_PI_RUNBOOK.md \
+  AGENTS.md \
+  CLAUDE.md
+```
+
+배포 후 재시작 전후에는 집중 회귀와 전체 순차 회귀를 실행하고, 새 session config fixture가 `noise_reduction.type=near_field`와 기존 `semantic_vad`, `eagerness=auto`, `interrupt_response=true`를 함께 고정하는지 확인한다.
+
+```sh
+cd /home/pi/galpi
+/home/pi/.nvm/versions/node/v24.16.0/bin/node \
+  --test \
+  test/realtime-session.test.js \
+  test/realtime-session-server.test.js
+PATH=/home/pi/.nvm/versions/node/v24.16.0/bin:/usr/local/bin:/usr/bin:/bin \
+  /home/pi/.nvm/versions/node/v24.16.0/lib/node_modules/npm/bin/npm-cli.js \
+  test -- --test-concurrency=1
+```
+
+서비스 재시작에 sudo 비밀번호가 필요하면 우회하지 않고 사용자에게 요청한다. 재시작 뒤 새 PID·시작 시각·`active/running`, 새 시작 이후 journal 오류 0건과 인증 config의 기존 mini·Cedar·300초·4096 tokens·read tools·correction 값을 확인한다. noise reduction은 공개 `/api/config` 필드로 새로 노출하지 않는다.
+
+2026-07-31 첫 배포 receipt:
+
+- DB·Vault 백업: `galpi-20260731-1124.db`, `vault-20260731-1124.tar.gz`
+- 코드 복구본: `code-v4b-noise-reduction-pre-20260731-112415.tar.gz`
+- 로컬 집중 9/9·전체 순차 235/235
+- Pi 집중 9/9·전체 순차 231/231
+- 사용자 재시작 뒤 PID `138723`, 시작 시각 `2026-07-31 11:43:47 KST`, `active/running`
+- localhost HTTP 200, 새 시작 이후 warning 이상 journal 0건
+- 실제 session config 생성값: `gpt-realtime-2.1-mini`, `cedar`, 4096 tokens, `near_field`, 기존 `semantic_vad/eagerness:auto/create_response:true/interrupt_response:true`
+- messages/notes/task/event/reminder/trace `448/34/8/16/4/99`, Vault 59개와 hash `7e71c78e...c0dd`, SQLite integrity `ok`, foreign key 0으로 재시작 전후 불변
+
+실기기에서는 PWA를 완전히 닫았다 다시 열고 새 음성 세션에서 다음 순서로 확인한다.
+
+1. 시온이 말하는 동안 헛기침 5회와 실제 알림음 5회를 각각 재생하고 오중단·잘못 생성된 사용자 턴·불필요한 보정 요청 수를 기록한다.
+2. “잠깐”, “아니”, 완전한 새 질문 등 의도한 끼어들기 5회가 계속 즉시 동작하는지 확인한다.
+3. 작은 목소리와 평소 목소리 각 5회에서 미감지·첫 음절 손실·응답 시작 지연이 늘지 않았는지 확인한다.
+4. 목표는 잡음 오중단 0회지만, 실제 끼어들기 실패나 작은 목소리 회귀가 하나라도 있으면 GO하지 않는다.
+
+문제가 noise reduction 적용 뒤에만 생기면 가장 작은 rollback은 session config의 `noise_reduction` 블록만 제거하고 서비스를 재시작하는 것이다. `interrupt_response`를 끄거나 `semantic_vad`를 `server_vad`로 바꾸지 않는다. 잡음 오중단이 계속되면 동일 표본을 보존한 뒤 별도 컨펌으로 `server_vad` threshold 비교를 설계한다.
+
+실기기 회귀는 PWA를 완전히 닫았다 다시 열어 새 JS를 받은 뒤 진행한다.
+
+1. “지금 몇 시야?”에서 실제 KST 시각을 분 단위로 맞게 답하는지 확인한다.
+2. 이전에 잘렸던 같은 어려운 질문을 다시 말해 답변이 완결되는지 확인한다.
+3. 답변 중 아무 말도 하지 않았는데 `중단됨`이 생기지 않는지 본다.
+4. 실제로 끼어들었을 때만 이전 답변이 `중단됨`으로 바뀌는지 본다.
+5. 빠르게 두 턴을 이어 말하고 모든 행이 `나 → XION → 나 → XION` 순서인지 확인한다.
+6. 보정 자막이 계속 `보정 중 → corrected | 기록 확인 필요`로 수렴하는지 확인한다.
+
+회귀 시 가장 작은 rollback은 `OPENAI_REALTIME_MAX_OUTPUT_TOKENS=800`이 아니다. 그 값은 확인된 답변 절단 원인을 되살린다. 문제가 recorder audio graph에 한정되면 correction flag만 끄고, response/turn 상태 머신 회귀면 안정화 코드 복구본에서 관련 파일을 되돌린다. DB migration이 없으므로 data rollback은 하지 않는다.
+
 ## 4. 실행
 
 ```sh

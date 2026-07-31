@@ -626,6 +626,7 @@
 - **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크 검색과 보수 A2, V4.5-M 단일 GPT·모델 UI·의회 신규 실행 퇴역·Codex 모델 설정까지 Pi 운영 적용을 마쳤다. Codex 일반 모델은 `gpt-5.6-terra`, 깊은 재처리는 `gpt-5.5`, Pi Codex CLI는 `0.144.5`다. 메인 채팅 `자동`도 실제 `gpt-5.6-terra`를 사용한다.
 - **다음 단계 설계:** 새 `chat:gpt-single-v1:a2` 온라인 표본에서 과회수·최신성·abstention을 독립 관찰한다. 유지보수·평가 세션이 자동 topic 저장되지 않는 명시적 경계는 별도 후속으로 설계한다. 상세 회수 근거는 [assistant-foundation-design.md](assistant-foundation-design.md), 모델 경계는 [chat-model-routing-design.md](chat-model-routing-design.md)를 따른다.
 - **V4-B R0 GO:** OpenAI unified WebRTC SDP proxy를 `lib/realtime-session.js`, 브라우저 peer·media·data channel 상태 머신을 `public/voice-realtime.js`에 분리했다. 코드 기본 flag는 꺼져 있고 Pi 운영에서만 켰으며 tool·DB·Vault·task 쓰기 경로가 없다. `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 한국어 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·공용 cleanup을 구현했다. 공식 multipart 일반 필드와 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정하고, Mac·Pi HTTPS의 `201`·remote audio·완료 자막, 로컬/Pi Realtime 7/7, Pi 전체 214/214와 DB·Vault·task 불변을 통과했다. 사용자 iPhone에서 5분 한·영 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 기능 GO로 승격했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
+- **V4-B R1 운영·R2b 기술 인수:** R1은 A2 기억·노트 QA·활성 일정과 서버 KST 현재 시각을 다섯 read-only tool로 연결하고 실제 일정과 `시` 노트 읽기를 인수했다. Cedar·말투 프로필 600자·최근 완료 3쌍 보정은 로컬 전체 226/226, Pi Realtime 15/15·전체 222/222를 통과했고 사용자는 실제 음성 대화가 이전보다 “훨씬 낫다”고 승인했다. R2a는 브라우저 휘발성 receipt와 duplicate/out-of-order/interrupted event reconciliation을 Pi에 인수했다. R2b는 동일 mic stream의 500ms pre-roll·300ms post-roll을 16kHz mono PCM WAV로 만들고, 메모리 전용 multipart route가 120초·8MB·session/item/turn·audio hash를 검증한 뒤 `gpt-transcribe` 보정본을 휘발성 사용자 행에 표시한다. session 직렬화·pending 3개 backpressure·30초 timeout·같은 audio 멱등성·다른 audio 충돌·page close cleanup을 구현했으며 temp file·schema·DB/Vault/message/topic/task/trace write는 없다. 최초 Pi 인수는 로컬 집중 23/23·전체 234/234, Pi 집중 23/23·전체 230/230, 백업 `20260731-0058`과 코드 복구본 `code-v4b-r2b-pre-20260731-0055.tar.gz`, 재시작 PID `133153`, correction config·정적 hash·오류 로그 0건·DB/Vault 불변을 확인했다. 실기기에서 발견한 긴 답변 오중단·턴 역전·현재 시각 부재에는 `max_output_tokens` 800→4096, `completed | cancelled | failed | incomplete` 상태 분리, 발화 종료 순서의 응답 큐와 turn ID 기반 안정 정렬, `galpi_current_time`, 물리 출력과 분리된 보정 녹음 sink를 적용했다. 안정화본은 로컬 집중 24/24·전체 235/235와 Pi 집중 24/24·전체 231/231을 통과했고 백업 `20260731-0147` 뒤 새 PID `134945`로 재시작했다. 인증 config의 mini·Cedar·300초·4096토큰·read tools·correction 활성, 실제 정적 응답 hash, 시작 오류 0건, messages/notes/task/event/reminder/trace `448/34/8/16/4/99`, Vault 59개 파일 hash, SQLite 무결성·외래키 불변까지 기술 인수했다. 같은 어려운 질문과 순서·시각·끼어들기의 실기기 재확인은 남아 있다. 그 뒤 별도 컨펌으로 R2c durable receipt와 corrected-only exactly-once 저장을 열며, 보정 실패 fallback 금지·일정/메모 확인·원본 audio 무보관·저장 안정화 뒤 session rotation 경계는 유지한다.
 - **V4.5-M·A2 Pi 인수 완료:** schema 8→9, API/Codex 분리 catalog와 last-known-good, OpenAI Responses text/tool parity, 요청·DB model snapshot, composer model picker, 의회 신규 실행 `410`, 사서 Codex 설정, A2 `:a2` 청크 주입을 한 배포본으로 활성화했다. 전체 회귀 207/207, 실제 GPT 일반·웹·논문·일정 무쓰기 후보와 A2 스모크, Codex job 41 Terra snapshot을 통과했다. 최종 topic Q&A 105/105, note index 33/33·finding 0, Codex validation 23, SQLite 무결성·외래키 오류 0, task/event/reminder 8/15/4 불변, 서비스 경고 0을 확인했다.
 - **모바일 composer 보정 Pi 반영 완료:** 모델 선택 opener는 기본 테두리 없이 hover·열림 상태에만 옅은 면을 쓰고, 입력 placeholder·flex 축소·44px 전송 버튼·safe-area 여백을 보정했다. 390px·320px에서 overflow 0, 로컬 전체 207/207, Pi UI 9/9와 정적 응답 hash 일치를 확인했다. 서비스 재시작과 DB 변경은 없었다.
 - **첨부·강의 설계 보정·미구현:** temporary 첨부는 현재 `CONTEXT_N=10` 사용자 턴을 연결 시 snapshot하고 replay 창을 벗어나면 자동 정리한다. library만 승인 후 영구 저장한다. 강의 Phase 0은 지금 검증할 수 있고, 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 진행한다. 전체 강의 구현은 V5-B 전 또는 PAPER 관찰 기간에 병행할 수 있다.
@@ -1497,20 +1498,23 @@ Codex는 vault를 직접 읽고 쓸 수 있다. 단, 수정 허용 범위는 아
 
 ## 18. V4-B 음성 — 정밀 전사와 Realtime 대화
 
-> R0 GO, R1 읽기 전용 시온 착수 전. 상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다. V4.5의 기억·일정·승인 경계는 [assistant-foundation-design.md](assistant-foundation-design.md) 7절을 함께 따른다.
+> R0 GO, R1 노트 탐색·말투 연속성 Pi 기능 인수, R2a 휘발성 receipt·이벤트 reconciliation과 R2b bounded 턴 보정 Pi 기술 인수 완료. R2b 실기기 품질 확인과 R2c 이후는 미완료다. 상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다. V4.5의 기억·일정·승인 경계는 [assistant-foundation-design.md](assistant-foundation-design.md) 7절을 함께 따른다.
 
 ### 결정
 
 음성을 하나의 경로로 억지로 합치지 않는다.
 
-|경로|주 용도|저장 경계|
+|경로/역할|주 용도|저장 경계|
 |---|---|---|
-|정밀 전사|정확한 메모·일정 문구·짧은 음성 입력|전사 수정·목적 확인 전 `inbox`|
-|Realtime 대화|자연 대화·빠른 응답·끼어들기|R0/R1 무쓰기, R2 완료 턴만 DB|
+|Realtime 대화|자연 대화·빠른 응답·VAD·끼어들기·음성 출력|R0/R1 무쓰기, input transcription은 임시 자막|
+|Realtime 턴 보정|한 턴 종료 뒤 대화·쓰기의 텍스트 정본 생성|`gpt-transcribe` 성공본 또는 사용자 수정본만 R2 저장|
+|명시적 정밀 전사|정확한 메모·일정 문구·짧은 별도 음성 입력|전사 수정·목적 확인 전 `inbox`|
 
 Realtime은 OpenAI Realtime API를 갈피가 WebRTC로 직접 연결한다. STT·VAD·끼어들기·스트리밍 TTS 엔진을 자체 제작하지 않는다. 브라우저에는 표준 OpenAI API 키를 전달하지 않고, Pi 서버가 기존 `OPENAI_API_KEY`로 세션 초기화만 중계한다.
 
 현재 GPT-5.6 Responses 채팅과 Realtime 모델은 별도 실행 경계다. 텍스트 모델 picker를 음성 세션에 그대로 적용하지 않으며, Realtime `자동`은 별도 호환성 probe와 last-known-good를 통과한 모델만 새 세션부터 사용한다.
+
+Realtime input transcription은 Realtime 모델의 음성 이해와 별도로 실행되는 ASR이므로 갈피 정본으로 취급하지 않는다. 사용자가 듣는 즉각적인 대화는 지연시키지 않고, 같은 mic stream에서 bounded하게 잡은 사용자 턴을 종료 뒤 `gpt-transcribe`로 보정한다. 일반 대화는 보정본을 자동 확정할 수 있지만 일정·메모·외부 행동은 보정 뒤에도 기존 사용자 확인을 거친다. 보정 실패 때 임시 자막을 몰래 저장하지 않으며, `다시 전사 | 직접 수정 | 기록 안 함`으로 fail-close한다.
 
 ### 단계
 
@@ -1522,11 +1526,24 @@ Realtime은 OpenAI Realtime API를 갈피가 WebRTC로 직접 연결한다. STT�
    - 기존 A2 retrieval과 활성 일정 합성기를 function tool allowlist 뒤에서 재사용한다.
    - 기억·일정 뒤에만 웹·논문 read-only 도구를 필요한 순서로 붙인다.
    - 도구 턴당 2회·retrieval 8,000자 상한을 유지하고 모든 쓰기 도구는 제외한다.
+   - 첫 구현은 `galpi_context_lookup`, `schedule_read`를 Pi에 배포했고, 실기기에서 확인한 창작 노트 탐색 공백은 `galpi_note_search → galpi_note_read`로 로컬 보강했다. 브라우저는 OpenAI function event를 운반하고 Pi 서버가 opaque 5분 session, schema, call ID 멱등성, 턴별 직렬화, 2회·합계 8,000자·5초 timeout을 집행한다.
+   - A2 검색은 같은 전역 `ready` 청크 provider와 abstention 정책을 쓰되 R1 무쓰기 때문에 shadow trace를 남기지 않는다. 실사용 말투 차이를 근거로 세션 시작에는 사실 메모리 전체 대신 말투·호칭·답변 선호 최대 600자, `shared-main` 최근 완료 대화 3쌍 최대 2,400자, 전체 3,200자만 넣는다. 사실 기억과 일정은 계속 질문별 read tool을 사용한다.
+   - 노트 탐색은 A2 기준을 느슨하게 하지 않는다. 제목·종류로 활성 `ai_readable` 노트를 먼저 고르고, topic은 기존 `ready` QA 청크를 최대 6개·8,000자 안에서 읽는다. 비topic만 안정 상태의 bounded 본문으로 대체한다.
+   - 서버의 세션 시작 시각은 말투 연속성용 정적 참고값일 뿐 실시간 시계가 아니다. 날짜·현재 시각·요일 질문에는 무인자 `galpi_current_time`을 호출해 Pi 서버의 `Asia/Seoul` 시각을 초 단위로 읽는다. 이 도구도 기존 세션·호출 횟수·timeout·멱등성 상한 안에서만 실행하며 DB에는 쓰지 않는다.
 3. **R2 기록·승인형 쓰기**
-   - 완료된 user transcript와 정상 `response.done`만 `shared-main`에 idempotent하게 저장한다.
+   - partial과 Realtime completed input transcript는 화면·turn 매핑용 `provisional`이며 저장 정본이 아니다.
+   - 같은 mic stream의 bounded 턴 오디오를 `gpt-transcribe`로 보정하고, 성공본 또는 사용자 수정본만 user 정본으로 삼는다.
+   - R2b 첫 구현은 16kHz mono PCM WAV, 500ms pre-roll·300ms post-roll, 120초·8MB, pending 3개, provider 30초 timeout으로 제한한다. multipart와 provider 전달은 서버 메모리 안에서만 처리하며 temp file을 만들지 않는다.
+   - R2b 보정 성공은 같은 사용자 말풍선을 `corrected`로 교체하고 실패는 `기록 확인 필요`로 남긴다. 둘 다 아직 휘발 상태이며 durable 저장은 R2c가 연다.
+   - corrected user와 정상 `response.done`만 `shared-main`에 idempotent하게 저장한다.
    - 끼어들기로 취소된 assistant partial은 일반 메시지로 저장하지 않는다.
-   - 일정은 기존 `schedule_prepare` 후보와 확인 카드, 메모는 수정 가능한 manual 후보를 거치며 모델이 직접 쓰지 않는다.
+   - additive `realtime_turn_receipts`가 session·input item·final response·audio hash·message ID를 대사해 duplicate와 out-of-order event를 막는다.
+   - 보정 실패·timeout·빈 결과에서는 provisional fallback 저장을 금지하고 사용자 재시도·수정·폐기만 허용한다.
+   - 일정은 corrected transcript 기반 기존 `schedule_prepare` 후보와 확인 카드, 메모는 수정 가능한 manual 후보를 거치며 모델이 직접 쓰지 않는다.
    - Realtime 대화는 처음에는 `inbox` source로 두고 명시적 저장만 topic으로 승격한다.
+   - 원본 오디오는 메모리 우선으로 처리하고 DB·Vault·backup에 넣지 않는다. 임시 파일이 불가피하면 성공·실패·취소의 `finally` 삭제와 process crash TTL sweeper를 둔다.
+   - corrected-only 저장이 인수되면 사용자에게 보이는 5분 hard cap은 제거한다. OpenAI Realtime 단일 세션의 현재 60분 한도 전에 50~55분을 초기 목표로 턴 경계에서 새 세션을 만들고, bounded 최근 완료 대화·말투 프로필을 다시 넣고 사실 기억·일정은 read tool로 조회해 하나의 연속 대화처럼 이어간다.
+   - 진행 중 audio·partial·미완료 tool call은 세션 사이에 완료 기록처럼 넘기지 않는다. 장시간 무음·페이지 이탈·네트워크 단절에는 별도 cleanup을 유지하고 자동 재연결은 bounded하게 실패한다.
 
 ### 정밀 전사 fallback
 
@@ -1537,7 +1554,7 @@ Realtime은 OpenAI Realtime API를 갈피가 WebRTC로 직접 연결한다. STT�
                                  └ 할 일 → task 후보 카드 → 확인 후 active
 ```
 
-`POST /api/voice/transcribe`는 STT 결과만 반환하고 업로드 용량·timeout·임시파일 삭제를 집행한다. 확인 전 transcript는 topic·task·memory에 영구 반영하지 않으며, 확인 후 메모만 `source_type: manual_memo`로 기존 회수 경로에 들어간다. 원본 오디오는 장기 보관하지 않는다.
+`POST /api/voice/transcribe`는 R2의 `gpt-transcribe` provider adapter, audio validation, timeout, cleanup을 재사용하되 자동 턴 보정과 route·UX·idempotency 목적을 분리한다. STT 결과만 반환하고 업로드 용량·임시파일 삭제를 집행한다. 확인 전 transcript는 topic·task·memory에 영구 반영하지 않으며, 확인 후 메모만 `source_type: manual_memo`로 기존 회수 경로에 들어간다. 원본 오디오는 장기 보관하지 않는다.
 
 ### 비핵심
 
@@ -1551,8 +1568,17 @@ Realtime은 OpenAI Realtime API를 갈피가 WebRTC로 직접 연결한다. STT�
 
 - R0는 iPhone PWA와 Mac에서 한국어 10턴, 끼어들기 5회, 종료 후 마이크 해제, API 키 비노출, DB·Vault·task 불변을 확인한다.
 - R0가 통과하기 전 R1을 만들지 않는다.
-- R1은 기존 A2 기억과 활성 일정의 read-only parity, abstention, 도구·컨텍스트 상한과 무쓰기를 확인한다.
-- R2는 완료 턴 exactly-once, interrupted partial 미저장, 일정 카드 등록 전 write 0회·등록 후 1회를 확인한다.
+- R1 로컬 Realtime 13/13에서 allowlist, `function_call_output` loop, 멱등성, 동시 호출 직렬화, 도구·컨텍스트·timeout 상한, 무관 기억 abstention과 DB·Vault 불변을 확인했다. 전체 회귀는 222/224 뒤 병렬 기동 timeout 2건을 격리 9/9로 통과했다. Pi 백업 `20260730-2045` 뒤 R1 13/13·전체 220/220, audit, 로컬·Tailscale HTTPS config와 정적 hash, 새 PID `126573`, DB·Vault·task·retrieval trace 불변까지 기술 인수했다.
+- 노트 탐색 보강은 로컬 집중 14/14·전체 순차 225/225와 Pi 집중 14/14·전체 순차 221/221을 통과했다. fixture에서 `시` 노트를 찾은 뒤 볼트 전문이 아니라 기존 QA 청크만 반환하는 것을 확인했다. Pi 백업 `20260730-2137`과 코드 복구본 뒤 새 PID `128332`, DB·Vault·task·trace 불변, 운영 `시` 노트 ready QA 13개를 인수했고 사용자가 같은 음성 문장의 정상 동작을 승인했다.
+- 말투 연속성 후보는 기본 voice를 `cedar`로 바꾸고 한국어 지시를 친구 같은 자연스러운 반말·짧은 음성 문장으로 정렬했다. 말투 프로필과 최근 완료 대화만 bounded하게 세션에 넣고 무관 메모리·오래된 대화·미완료 턴을 제외한다. OpenAI가 voice 성별을 공식 분류하지 않으므로 남성 음성으로 계약하지 않는다. 로컬 단위 8/8·HTTP 통합 1/1, 전체 병렬 224/226 뒤 Codex 기동 timeout 격리 2/2와 최종 순차 전체 226/226을 통과했다. Pi 백업 `20260730-2228` 뒤 집중 15/15·전체 순차 222/222를 통과했고, 사용자 재시작 후 새 PID `130040`·mini/Cedar/read tools 운영 config·시작 오류 0건을 확인했다. 사용자 실기기 재확인에서 이전보다 훨씬 낫다는 체감 승인을 받아 mini/Cedar를 유지한다. 이는 고유명사·숫자·날짜별 정량 전사 평가는 아니며, 반복적인 품질 부족이 확인될 때만 full `gpt-realtime-2.1`을 검토한다.
+- R2b는 로컬 집중 23/23·전체 234/234, Pi 집중 23/23·전체 230/230을 통과했다. DB·Vault `20260731-0058`과 코드 복구본 뒤 사용자 재시작 PID `133153`, correction 활성 config와 실제 정적 hash, 새 시작 오류 0건을 확인했다. messages/notes/task/event/reminder/trace와 Vault·SQLite는 불변이다. 실기기에서는 한국어·영어·고유명사·날짜, 첫·끝 음절, 끼어들기 중 보정 상태를 아직 확인해야 한다.
+- R2b 실기기에서 어려운 질문의 음성·자막이 생성 도중 멈추고 회색 `중단됨`으로 남는 현상을 확인했다. 직접 원인은 800 output-token 상한으로 끝난 `incomplete`를 실제 사용자 끼어들기의 `cancelled`와 같은 상태로 렌더링한 것이었다. 상한은 무제한 대신 4096으로 올리고 서버에서 64~4096으로 clamp한다. `cancelled`만 `중단됨`, `incomplete`는 사유에 따라 `답변이 길어 여기서 멈춤` 또는 `답변이 완료되지 않음`, `failed`는 `응답 오류`로 확정한다. 길이 상한에 걸려도 마지막 문장을 마무리하도록 음성 프롬프트를 보강한다.
+- 입력 전사 완료와 응답 이벤트는 비동기라 도착 순서가 대화 순서와 같다는 보장을 두지 않는다. `speech_stopped`에서 user turn을 FIFO 응답 큐에 넣고, 새 response ID가 생길 때 가장 오래된 유효 turn에 한 번 결합한다. DOM은 이벤트 수신 순서가 아니라 숫자 turn ID와 같은 turn의 user→assistant 순서로 안정 정렬한다. tool output 뒤의 후속 `response.create`도 원래 turn을 다시 큐에 넣어 다음 사용자 턴을 빼앗지 않게 한다.
+- 보정 녹음의 `ScriptProcessor`는 물리 `AudioContext.destination`에 연결하지 않고 별도 `MediaStreamAudioDestinationNode` sink에만 연결한다. 브라우저가 이 sink를 지원하지 않으면 보정만 fail-close하고 Realtime 대화 자체는 유지한다. 이 안정화본은 로컬 집중 24/24·전체 235/235, Pi 집중 24/24·전체 231/231을 통과했으며 DB·Vault 백업 `20260731-0147`과 코드 복구본 뒤 새 PID `134945`의 config·정적 hash·로그·DB/Vault 불변까지 기술 인수했다. 같은 어려운 질문, 현재 시각, 실제 끼어들기, 빠른 연속 두 턴, 보정 UI는 실기기에서 확인한다.
+- 첫 현재 시각 실기기 질문의 active-response 충돌은 function call arguments 완료를 Response 완료로 오인한 것이 직접 원인이었다. 조기 이벤트에서는 side effect를 만들지 않고 completed `response.done`의 completed function item 뒤에만 read tool과 후속 `response.create`를 정확히 한 번 실행한다. tool HTTP 중 새 user turn이 시작되면 늦은 continuation은 만들지 않는다. Realtime request-level `error`는 연결 종료가 아니라 복구 가능한 안내로 처리하고 실제 peer/data-channel 실패만 세션을 닫는다. 로컬 24/24·235/235, Pi 24/24·231/231, 백업 `20260731-1053` 뒤 정적 배포 hash·PID `134945` 유지·DB/Vault/SQLite 불변을 확인했다.
+- R1 GO 전 Pi에서 기존 A2 기억 5개·무관 질문 4개·활성 일정 parity와 실제 음성 전후 DB·Vault·task 불변을 확인한다.
+- R2는 provisional 정본 저장 0회, corrected 턴 exactly-once, duplicate/out-of-order event 대사, interrupted partial 미저장, 보정 실패 fail-close, 모든 종료 경로의 원본 오디오 cleanup, 일정 카드 등록 전 write 0회·등록 후 1회를 확인한다.
+- R2 session rotation은 강제 단축 테스트로 중복·누락·partial 승계가 없음을 먼저 확인하고, 운영에서는 공식 60분 한도 전에 교체해 사용자가 5분 제한을 의식하지 않게 한다.
 - `assistant-foundation-design.md`의 기억 신뢰성·task 기본 흐름과 V4.5-M의 단일 GPT 도구 parity를 유지한다.
 
 -----
@@ -1572,7 +1598,7 @@ Realtime은 OpenAI Realtime API를 갈피가 WebRTC로 직접 연결한다. STT�
 1. topic 회수는 노트 후보 → Q&A 청크의 2단계로 바꾼다.
 2. 요청 전체 retrieval context를 8,000자로 제한한다.
 3. 청크에 source type, provenance, `active | invalidated | superseded` 상태를 둔다.
-4. 테스트는 `never`, 정밀 전사와 R2 Realtime 완료 턴은 `inbox` 저장 정책을 사용한다. R0·R1은 대화·지식 저장 자체를 하지 않는다.
+4. 테스트는 `never`, 명시적 정밀 전사와 R2 Realtime의 보정 완료 턴은 `inbox` 저장 정책을 사용한다. R0·R1과 R2 partial/provisional transcript는 대화·지식 정본으로 저장하지 않는다.
 5. 사용자 메모리는 자동 확정하지 않고 시온 승인 제안으로 갱신한다.
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
 7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 참조 가능한 `closed`와 일반 회수에서 제외하는 `deleted`, 무LLM·별도 정본을 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
@@ -1580,7 +1606,7 @@ Realtime은 OpenAI Realtime API를 갈피가 WebRTC로 직접 연결한다. STT�
 9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트를 둔다. 이전·현재·다음 3주 21일을 native swipe와 키보드 좌우 이동으로 탐색하고 별도 이전·오늘·다음 버튼은 두지 않는다. 지연/오늘/예정/Inbox, 오늘/지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 일정 작업 화면을 같은 탭에 제공한다. task 변경 행동은 `TaskPanel` 단일 renderer만 사용한다.
 10. 활성 task는 별도 분류 LLM 없이 최대 20개·6,000자의 DB 스냅샷으로 단일 Claude와 의회 공통 컨텍스트에 넣는다. 완료·취소는 KST 월별 `schedule_history` 노트로 자동 투영해 일반 노트 검색이 과거 일정을 찾게 하며, 다시 열기·삭제·복원 때 재생성한다. DB가 정본이고 노트는 파생본이다.
 11. C1.5 자연어 생성은 단일 Claude의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보 하나를 만든다. 확인 카드의 `등록`만 기존 task API를 같은 request ID로 호출하며, 후보는 새로고침·취소 때 폐기하고 topic 자동 저장·노트 저장 버튼에서 제외한다.
-12. 음성은 Realtime 자연 대화와 확인형 정밀 전사로 나눈다. Realtime은 R0 무쓰기→R1 읽기 전용→R2 완료 턴·승인형 쓰기로 승격하고, 정밀 전사는 확인 후 대화·메모·할 일 중 하나로 보낸다.
+12. 음성의 귀·입은 Realtime, 대화 저장의 기록관은 턴 종료 뒤 `gpt-transcribe`, 별도 캡처 입력구는 확인형 정밀 전사로 나눈다. Realtime은 R0 무쓰기→R1 읽기 전용→R2 corrected-only 턴·승인형 쓰기로 승격하고, 명시적 정밀 전사는 확인 후 대화·메모·할 일 중 하나로 보낸다.
 
 ### 구조 원칙
 

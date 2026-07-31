@@ -192,21 +192,47 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 ### 핵심 B — Realtime 대화 + 확인형 정밀 전사
 
 > R0 GO (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. 사용자 iPhone 홈 화면 PWA에서 5분 연속 한국어·영어 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 R0 기능 GO를 승인했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
+>
+> R1 Pi 기술 배포 (2026-07-30): 서버 소유 `galpi_context_lookup`·`schedule_read` allowlist와 브라우저 `function_call_output → response.create` loop를 추가했다. A2 전역 청크 검색은 trace 저장 없이 읽기만 하고, 일정은 기존 활성 task 합성기만 사용한다. opaque 5분 tool session, call ID 멱등성, 턴별 직렬화, 2회·합계 8,000자·5초 timeout을 서버가 집행한다. `OPENAI_REALTIME_READ_TOOLS_ENABLED`와 A2 flag가 함께 true일 때만 열리며 코드 기본값은 false다. 로컬 Realtime 13/13, 전체 222/224 뒤 병렬 기동 timeout 2건 격리 9/9, Pi Realtime 13/13·전체 220/220을 통과했다. 백업은 `20260730-2045`, 새 PID는 `126573`이고 로컬·Tailscale HTTPS config의 `readToolsEnabled=true`, 정적 파일 hash, DB·Vault·task·retrieval trace 불변을 확인했다. 실제 기억 5개·무관 4개·활성 일정 음성 인수 전이므로 R1 GO는 아직 아니다.
+>
+> R1 노트 탐색 Pi 기능 인수 (2026-07-30): 실기기에서 일정은 정상이나 “내 시들 중 마음에 드는 것 하나”가 전역 A2에서 0청크로 기권하는 차이를 확인했다. A2 문턱은 유지하고 `galpi_note_search → galpi_note_read` 두 read-only 도구를 추가했다. 첫 단계는 활성 `ai_readable` 노트를 제목·종류로 고르고, topic 읽기는 새 본문 엔진 없이 기존 `ready` QA 청크를 최대 6개·8,000자 안에서 사용한다. 비topic만 안정 상태의 bounded 본문을 읽는다. 로컬 집중 14/14·전체 순차 225/225, Pi 집중 14/14·전체 순차 221/221을 통과했다. 백업 `20260730-2137`, 코드 복구본 `code-v4b-r1-note-browse-pre-20260730-213738.tar.gz`, 새 PID `128332`이며 DB·Vault·task·trace 불변과 운영 `시` 노트 ready QA 13개를 확인했다. 사용자가 같은 음성 문장으로 다시 확인해 정상이라고 승인했다.
+>
+> R1 말투 연속성 Pi 적용 (2026-07-30): 실사용에서 번역투 문장과 텍스트 세션과 다른 말투가 확인돼 기본 voice를 `cedar`로 바꾸고, 한국어 지시를 친구 같은 자연스러운 반말·짧은 음성 문장으로 정렬했다. 세션 시작에는 메모리 전체 대신 말투·호칭·답변 선호 최대 600자와 `shared-main` 최근 완료 대화 3쌍 최대 2,400자만 넣고, 전체를 3,200자로 제한한다. 무관 메모리·오래된 대화·미완료 턴은 제외하며 사실 기억과 일정은 기존 질문별 read tool을 유지한다. OpenAI는 voice 성별을 공식 분류하지 않으므로 Cedar를 남성 음성으로 계약하지 않는다. 로컬 단위 8/8·HTTP 통합 1/1, 전체 병렬 224/226 뒤 Codex 기동 timeout 격리 2/2와 최종 순차 전체 226/226을 통과했다. Pi 백업 `galpi-20260730-2228.db`, `vault-20260730-2228.tar.gz`와 코드 복구본 `code-v4b-r1-tone-pre-20260730-2228.tar.gz` 뒤 Pi 집중 15/15·전체 순차 222/222를 통과했다. 사용자가 재시작했고 22:42:57 KST의 새 PID `130040`은 active/running, 인증 config는 mini·Cedar·300초·read tools 활성, 시작 오류 0건이다. 실기기 말투·발음 체감은 이 재시작 뒤 확인한다. mini를 먼저 유지하고 이 보정 뒤에도 문장·발음이 부족할 때만 full `gpt-realtime-2.1`을 검토한다.
+>
+> R2 정본 전사 결정 (2026-07-30, 설계 승인·미구현): Realtime input transcription은 별도 ASR이 만든 임시 자막이며 OpenAI도 모델 해석과 달라질 수 있는 “rough guide”로 설명한다. 따라서 귀·입·VAD·끼어들기는 Realtime이 계속 맡고, 같은 mic stream의 bounded 턴 오디오를 종료 뒤 `gpt-transcribe`로 보정한다. 일반 대화는 보정본만 `shared-main`에 exactly-once 저장하고, 일정·메모는 보정본을 기존 확인 카드에 넣는다. partial/provisional은 정본이 아니며 보정 실패 때 자동 fallback 저장하지 않는다. 원본 오디오는 메모리 우선으로 처리하고 DB·Vault·backup에 넣지 않으며, 임시 파일이 불가피하면 모든 종료 경로의 삭제와 crash TTL sweeper를 요구한다. 상세 상태·receipt·실패·비용·인수 기준은 [voice-realtime-design.md](voice-realtime-design.md) 4·6~9절을 따른다.
+>
+> R1 체감 승인·R2a Pi 인수 (2026-07-30): 사용자는 Cedar·bounded 말투 문맥 적용 뒤 실제 음성 대화를 “훨씬 낫다”고 승인했다. 이는 고유명사·숫자·날짜별 전사율을 계수한 평가는 아니므로 mini/Cedar를 그대로 유지한다. 이어 R2a에서 브라우저 메모리 안의 turn receipt와 input item→turn, response→turn, assistant item→response 대사를 추가했다. `event_id` 중복, 완료 뒤 late delta, 서로 다른 턴의 out-of-order completion, tool-only response, completion 뒤 cancellation을 합성 fixture로 고정했고 user 자막은 `provisional`, 취소된 assistant는 `interrupted`로 수렴한다. session 종료 때 모든 receipt를 지으며 당시에는 audio upload·보정 STT·schema·DB/Vault/message/task/trace write가 없었다. 로컬 집중 15/15·전체 226/226, Pi 집중 15/15·전체 순차 222/222를 통과했다. 백업은 DB·Vault `20260730-2354`, 코드 `code-v4b-r2a-pre-20260730-2353.tar.gz`이며 정적 응답 hash 일치, PID `130040` 유지, messages/notes/task/event/reminder/trace와 Vault hash 불변, SQLite integrity `ok`·foreign key 0을 확인했다.
+>
+> R2b Pi 기술 인수 (2026-07-31): 같은 mic stream을 Web Audio ring buffer에 연결해 500ms pre-roll·300ms post-roll의 16kHz mono PCM WAV 사용자 턴을 만들고, 120초·8MB 상한 안에서 `gpt-transcribe`로 보정한다. 서버는 multipart를 메모리에서만 parse하고 RIFF/WAVE·duration·session/item/turn을 검증하며 temp file·schema·DB/Vault/message/task/trace write를 만들지 않는다. 같은 audio hash는 provider 한 번으로 멱등 처리하고 다른 audio 충돌, session 직렬화, pending 3개 backpressure, 30초 timeout을 집행한다. UI는 `보정 자막 · 아직 저장 안 함`, `보정 중 → corrected | 기록 확인 필요`를 구분하고 종료·page close에서 recorder와 upload를 정리한다. 로컬 집중 23/23·전체 234/234, Pi 집중 23/23·전체 230/230을 통과했다. 백업은 DB/Vault `20260731-0058`, 코드 `code-v4b-r2b-pre-20260731-0055.tar.gz`다. 사용자 재시작 뒤 PID `133153`, mini/Cedar/read tools/correction 활성 config, 실제 정적 응답 hash, 오류 로그 0건과 messages/notes/task/event/reminder/trace `448/34/8/16/4/99`, Vault·SQLite 무변경을 확인했다. R2b 실기기 전사 품질 인수 뒤 별도 컨펌으로 R2c corrected-only 영구 finalization을 진행하며, 그 전에는 보정본도 세션 화면 밖에 저장되지 않는다.
+>
+> R2b 실기기 안정화 기술 인수·제품 재확인 대기 (2026-07-31): 어려운 질문이 재생 도중 회색 `중단됨`으로 끝나고 user/XION 행이 역전되며 현재 시각을 답하지 못하는 실사용 문제를 재현했다. 직접 원인은 `max_output_tokens=800`에 닿은 `incomplete`까지 모든 non-completed response를 끼어들기 `interrupted`로 합친 상태 처리, 비동기 input transcription을 DOM 도착 순서로 append한 UI, 늦은 response를 `currentTurnId`에 붙인 대사, 말투 전용 context 안에만 둔 세션 시작 시각이었다. 응답 상한은 무제한 `inf` 대신 bounded 4,096로 올리고 `completed | cancelled | failed | incomplete`를 분리한다. `speech_stopped`와 tool continuation의 response 대기 queue, turn ID·user-first 안정 정렬, 물리 `AudioContext.destination` 대신 격리 media sink, Pi KST를 초 단위로 읽는 무인자 `galpi_current_time` 도구를 추가했다. 로컬 집중 24/24·전체 235/235, Pi 집중 24/24·전체 231/231과 파일 hash 일치를 통과했다. 백업은 DB/Vault `20260731-0147`, 코드 `code-v4b-r2b-stability-pre-20260731-0147.tar.gz`이며 운영 `.env`에 output 4,096을 명시했다. 사용자 재시작 뒤 PID `134945`, mini/Cedar·300초·4,096토큰·read tools·correction config, 실제 정적 hash, 시작 오류 0건과 DB/Vault 불변을 확인해 서버 기술 인수를 완료했다. 같은 어려운 질문·현재 시각·실제 끼어들기·빠른 두 턴·보정 UI의 실기기 제품 인수는 아직 남아 있다.
+>
+> R2b tool continuation 경쟁 조건 보정 (2026-07-31): 첫 현재 시각 질문에서 원래 Response가 아직 활성인데 `response.function_call_arguments.done`만으로 도구 실행과 두 번째 `response.create`를 보내 `Conversation already has an active response in progress`가 발생했고, client가 복구 가능한 request error를 `연결 오류`로 오분류해 세션을 닫았다. 공식 흐름대로 `response.done.status=completed`와 completed function item 뒤에만 도구를 정확히 한 번 실행하고, tool HTTP 중 새 user turn이 시작되면 늦은 후속 응답을 만들지 않는다. Realtime `error` event는 한국어 안내만 표시하고 peer·mic·data channel을 유지하며 실제 transport 실패만 연결 종료로 처리한다. 로컬 집중 24/24·전체 235/235, Pi 집중 24/24·전체 231/231을 통과했다. DB/Vault 백업 `20260731-1053`, 코드 `code-v4b-r2b-tool-race-pre-20260731-1053.tar.gz` 뒤 정적 파일만 배포해 PID `134945`를 유지했고 localhost hash와 DB/Vault/SQLite 불변을 확인했다. PWA 재실행 뒤 현재 시각 도구·연결 유지·다음 일반 턴의 실기기 재확인은 남아 있다.
 
 1. **R0 통신 spike**
    - OpenAI Realtime API를 vanilla JS WebRTC로 직접 연결
    - 마이크·시온 음성·transcript·mute·종료·끼어들기
    - 5분 hard cap, DB·Vault·task write 0회, 원본 오디오 보관 0건
 2. **R1 읽기 전용 시온**
-   - 기존 A2 기억 회수와 활성 일정 합성기를 read-only function tool로 재사용
+   - 기존 A2 기억 회수, 노트별 QA 청크, 활성 일정 합성기를 read-only function tool로 재사용
+   - 구체적 기억은 `galpi_context_lookup`, 저장 노트 탐색은 `galpi_note_search → galpi_note_read`로 분리
    - 기억·일정 뒤에만 웹·논문 도구를 필요한 순서로 추가
    - 턴당 도구 2회, retrieval 8,000자 상한, 쓰기 tool 0개
+   - 질문별 A2 도구 abstention은 유지하고, 세션 상시 문맥은 말투 프로필 600자·최근 완료 대화 3쌍·전체 3,200자로 제한
 3. **R2 기록·승인형 쓰기**
-   - 완료된 user/assistant 턴만 `shared-main`에 정확히 한 번 저장
+   - Realtime partial/completed input transcript는 화면·turn 매핑용 임시본으로만 사용
+   - 같은 mic stream의 bounded 턴 오디오를 `gpt-transcribe`로 보정하고, 성공한 보정본 또는 사용자 수정본만 정본으로 사용
+   - 보정된 user와 정상 완료 assistant 턴만 `shared-main`에 정확히 한 번 저장
    - 끼어든 assistant partial은 일반 메시지로 저장하지 않음
-   - 일정은 기존 무저장 후보 카드, 메모는 수정 가능한 manual 후보를 거쳐 사용자 확인 후 저장
+   - 보정 실패·timeout·빈 결과에는 provisional fallback을 금지하고 `다시 전사 | 직접 수정 | 기록 안 함`
+   - 일정은 corrected transcript 기반 기존 무저장 후보 카드, 메모는 수정 가능한 manual 후보를 거쳐 사용자 확인 후 저장
+   - receipt가 session·input item·final response·audio hash와 message ID를 대사하며 duplicate/out-of-order event를 차단
+   - 원본 오디오는 DB·Vault·backup에 저장하지 않고 성공·실패·취소·crash 뒤 bounded cleanup
+   - corrected-only 저장이 안정된 뒤 사용자에게 보이는 5분 제한을 제거하고, OpenAI의 단일 세션 60분 한도 전에 턴 경계에서 내부 세션을 교체
+   - 새 세션은 bounded 최근 완료 대화·말투 프로필을 다시 읽고 사실 기억·활성 일정은 질문별 read tool로 조회하며, 장시간 무음·이탈에는 비용·마이크 cleanup을 유지
 4. **정밀 전사 fallback**
-   - 폰 녹음 → STT → 전사 미리보기·수정
+   - R2의 `gpt-transcribe` provider adapter·audio validation·cleanup을 재사용하되 자동 턴 보정과 route·UX·idempotency 목적은 분리
+   - 사용자가 명시적으로 폰 녹음 → STT → 전사 미리보기·수정
    - `대화 | 메모 | 할 일` 중 목적을 확인한 뒤 기존 파이프라인으로 전달
    - 확인 전 전사와 테스트 녹음은 topic·task·memory에 영구 저장하지 않음
 
@@ -227,13 +253,17 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [x] iPhone PWA·Mac에서 5분 한국어·영어 Realtime, 끼어들기, mute·수동/자동 종료와 마이크 해제, API 키 비노출을 확인한다
 - [x] R0 전후 DB·Vault·task가 불변이며 기존 텍스트 채팅·일정·Web Push가 회귀하지 않는다
 - [ ] R1이 기존 A2 기억과 활성 일정을 read-only로 회수하고, 무관 질문 abstention·도구 2회·8,000자 상한을 지킨다
-- [ ] R2 완료 턴은 정확히 한 번 저장되고 끼어든 assistant partial은 저장되지 않는다
+- [ ] R2 partial·provisional transcript가 message·topic·memory·task에 정본으로 저장되는 경로가 0개다
+- [ ] R2 보정 완료 턴은 정확히 한 번 저장되고 duplicate/out-of-order event에서도 중복·오매핑이 없으며 끼어든 assistant partial은 저장되지 않는다
+- [ ] 보정 STT timeout·429·5xx·빈 결과·상한 초과에서 provisional fallback 저장 0회, 사용자 수정·재시도·폐기만 가능하다
+- [ ] 성공·실패·취소·page close·process crash 뒤 원본 오디오가 DB·Vault·backup에 0개이고 temp root도 TTL 뒤 0개다
+- [ ] R2 강제 단축 rotation에서 완료 턴 10개가 중복·누락 없이 이어지고, 운영에서는 60분 전에 자동 교체돼 5분 강제 종료가 사용자에게 보이지 않는다
 - [ ] 음성 일정 요청은 카드 확인 전 write 0회, 취소 0회, 등록 시 같은 request ID로 정확히 1회 생성된다
 - [ ] 폰에서 30초 녹음 → 텍스트로 변환돼 화면에 뜬다
 - [ ] 확인 전에는 저장되지 않고, 확인한 내용만 선택한 대화·메모·할 일 경로로 들어간다
 - [ ] 며칠 뒤 관련 질문 → 그 녹음에서 나온 내용을 꺼내온다
 
-> 핵심 포인트: Realtime은 자연 대화의 새 세션 계층이고 정밀 전사는 승인형 입력구다. 둘 다 V4.5의 기억·약속 경계를 우회하지 않으며, 음성을 `isMemo: true`로 바로 영구 저장하지 않는다.
+> 핵심 포인트: Realtime은 자연 대화의 귀와 입, 턴 종료 뒤 `gpt-transcribe`는 기록관, 명시적 정밀 전사는 승인형 입력구다. 세 역할 모두 V4.5의 기억·약속 경계를 우회하지 않으며, 음성을 `isMemo: true`나 rough transcript로 바로 영구 저장하지 않는다.
 
 ---
 
@@ -307,7 +337,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 4. `active | invalidated | superseded` 상태로 잘못된 기억과 갱신된 기억을 통제
 5. 최근 저장에서 Q&A 한 건만 `기억에서 제외`, 원문은 감사용으로 보존
 6. 명백한 오저장은 별도 승인형 유지보수 명령으로 Q&A·청크·저장 기록만 물리 삭제하고 원본 대화·사전 백업은 보존
-7. 테스트는 `never`, 정밀 전사와 R2 Realtime 완료 턴은 `inbox` 저장 정책 사용. R0·R1은 저장하지 않음
+7. 테스트는 `never`, 명시적 정밀 전사와 R2 Realtime 보정 완료 턴은 `inbox` 저장 정책 사용. R0·R1과 partial/provisional transcript는 정본으로 저장하지 않음
 8. 사용자 취향·사실·결정·목표는 승인형 구조화 메모리로 관리
 
 ### B — 평가와 관측
