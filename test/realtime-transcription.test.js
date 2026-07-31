@@ -281,3 +281,31 @@ test('disabled Realtime correction exposes no model session and fails closed', a
     error => error.code === 'REALTIME_TRANSCRIPTION_DISABLED' && error.status === 503,
   );
 });
+
+test('an empty correction reports bounded audio diagnostics without any content', async () => {
+  const audio = pcmWav({ seconds: 0.4 });
+  const provider = createOpenAITranscriptionProvider({
+    apiKey: 'k',
+    baseUrl: 'http://provider.invalid/v1',
+    async fetchImpl() {
+      return {
+        ok: true,
+        status: 200,
+        async json() { return { text: '   ' }; },
+      };
+    },
+  });
+
+  await assert.rejects(
+    () => provider({ audio, mimeType: 'audio/wav', durationMs: 400 }),
+    error => {
+      assert.equal(error.code, 'REALTIME_TRANSCRIPTION_EMPTY');
+      // 짧은 발화 가설을 가르는 두 값만 싣고 오디오·전사는 싣지 않는다.
+      assert.equal(error.emptyDurationMs, 400);
+      assert.equal(error.emptyAudioBytes, audio.length);
+      assert.equal(error.transcript, undefined);
+      assert.equal(error.audio, undefined);
+      return true;
+    },
+  );
+});
