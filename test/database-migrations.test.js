@@ -78,13 +78,13 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
-      { version: 9 },
+      { version: 9 }, { version: 10 },
     ],
   );
 
@@ -185,6 +185,35 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
     db.prepare('SELECT COUNT(*) AS count FROM schema_version').get().count,
     LATEST_SCHEMA_VERSION,
   );
+  db.close();
+});
+
+test('schema v10 enforces one receipt per realtime turn and one per final response', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+
+  const insert = db.prepare(`
+    INSERT INTO realtime_turn_receipts (session_id, input_item_id, final_response_id)
+    VALUES (?, ?, ?)
+  `);
+  insert.run('voice-1', 'item_1', 'resp_1');
+  insert.run('voice-1', 'item_2', null);
+  // 같은 session의 다른 턴은 허용하되 같은 턴의 중복 receipt는 막는다.
+  assert.throws(() => insert.run('voice-1', 'item_1', null), /UNIQUE/);
+  // 값이 있을 때만 response ID가 유일해야 하므로 NULL은 여러 개 들어간다.
+  insert.run('voice-2', 'item_1', null);
+  assert.throws(() => insert.run('voice-2', 'item_9', 'resp_1'), /UNIQUE/);
+
+  const setStatus = db.prepare(
+    'UPDATE realtime_turn_receipts SET status = ? WHERE session_id = ? AND input_item_id = ?',
+  );
+  assert.throws(() => setStatus.run('bogus', 'voice-1', 'item_1'), /CHECK/);
+  setStatus.run('finalized', 'voice-1', 'item_1');
+
+  const receipt = db.prepare(
+    'SELECT status FROM realtime_turn_receipts WHERE session_id = ? AND input_item_id = ?',
+  ).get('voice-1', 'item_2');
+  assert.equal(receipt.status, 'correction_pending');
   db.close();
 });
 
