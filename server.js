@@ -3574,7 +3574,9 @@ app.post('/api/voice/realtime/turns/:turnId/transcribe', async (req, res) => {
       : '';
     // 빈 전사가 짧은 발화 때문인지 가리기 위한 bounded 진단. 오디오·전사 내용은 남기지 않는다.
     const empty = code === 'REALTIME_TRANSCRIPTION_EMPTY'
-      ? ` duration=${error?.emptyDurationMs ?? 'unknown'}ms bytes=${error?.emptyAudioBytes ?? 'unknown'}`
+      ? ` duration=${error?.emptyDurationMs ?? 'unknown'}ms`
+        + ` bytes=${error?.emptyAudioBytes ?? 'unknown'}`
+        + ` audio=${String(error?.emptyAudioSha256 || 'unknown').slice(0, 16)}`
       : '';
     console.warn(`⚠️ Realtime 보정 전사 실패: ${code}${upstream}${empty}`);
     res.status(status).json({

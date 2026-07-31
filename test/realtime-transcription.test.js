@@ -309,3 +309,29 @@ test('an empty correction reports bounded audio diagnostics without any content'
     },
   );
 });
+
+test('the service tags an empty correction with the audio hash so turns can be compared', async () => {
+  const service = createRealtimeTranscriptionService({
+    enabled: true,
+    transcribeAudio: async () => ({ correctedTranscript: '' }),
+  });
+  const sessionId = service.createSession();
+  const audio = pcmWav({ seconds: 1 });
+
+  await assert.rejects(
+    () => service.transcribe({
+      sessionId,
+      inputItemId: 'item-1',
+      turnId: 'turn-1',
+      audio,
+      mimeType: 'audio/wav',
+      durationMs: 1000,
+    }),
+    error => {
+      assert.equal(error.code, 'REALTIME_TRANSCRIPTION_EMPTY');
+      assert.match(error.emptyAudioSha256, /^[0-9a-f]{64}$/);
+      assert.equal(error.emptyDurationMs, 1000);
+      return true;
+    },
+  );
+});
