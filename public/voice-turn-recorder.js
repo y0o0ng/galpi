@@ -69,6 +69,7 @@
     stream,
     onTurnReady = () => {},
     onError = () => {},
+    onLevel = null,
     AudioContextClass = global.AudioContext || global.webkitAudioContext,
     BlobClass = global.Blob,
     setTimeoutImpl = global.setTimeout.bind(global),
@@ -101,6 +102,12 @@
 
     function captureSamples(samples) {
       if (stopped || !(samples instanceof Float32Array) || samples.length === 0) return;
+      // 반이중 VAD가 같은 샘플을 다시 읽지 않도록 여기서 RMS만 흘려준다.
+      if (onLevel) {
+        let sum = 0;
+        for (const value of samples) sum += value * value;
+        onLevel(Math.sqrt(sum / samples.length));
+      }
       const copy = new Float32Array(samples);
       ring.push(copy);
       ringLength += copy.length;
