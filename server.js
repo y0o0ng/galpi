@@ -54,8 +54,18 @@ const {
 const { createWebPushTransport } = require('./lib/web-push-transport');
 const {
   DEFAULT_MAX_SDP_BYTES,
+  buildRealtimeConversationContext,
   createRealtimeSessionService,
 } = require('./lib/realtime-session');
+const {
+  createRealtimeToolDispatcher,
+} = require('./lib/realtime-tool-dispatcher');
+const {
+  DEFAULT_MAX_AUDIO_BYTES: DEFAULT_REALTIME_MAX_AUDIO_BYTES,
+  DEFAULT_MAX_DURATION_MS: DEFAULT_REALTIME_MAX_DURATION_MS,
+  createRealtimeTranscriptionService,
+  readRealtimeTranscriptionUpload,
+} = require('./lib/realtime-transcription');
 const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
@@ -72,6 +82,7 @@ const {
 } = require('./lib/topic-store');
 const { createTopicMutationCoordinator } = require('./lib/topic-mutation');
 const {
+  buildChunkContext,
   cosineSimilarity,
   extractQueryTerms,
   rankNoteCandidates,
@@ -125,12 +136,41 @@ const OPENAI_REALTIME_ENABLED = process.env.OPENAI_REALTIME_ENABLED === 'true';
 const OPENAI_REALTIME_MODEL =
   String(process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-2.1-mini').trim();
 const OPENAI_REALTIME_VOICE =
-  String(process.env.OPENAI_REALTIME_VOICE || 'marin').trim();
+  String(process.env.OPENAI_REALTIME_VOICE || 'cedar').trim();
 const OPENAI_REALTIME_TRANSCRIPTION_MODEL =
   String(process.env.OPENAI_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe').trim();
 const OPENAI_REALTIME_MAX_SESSION_SECONDS = parseInt(
   process.env.OPENAI_REALTIME_MAX_SESSION_SECONDS || '300',
   10,
+);
+const OPENAI_REALTIME_MAX_OUTPUT_TOKENS = Math.min(
+  4096,
+  Math.max(
+    64,
+    parseInt(process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS || '4096', 10) || 4096,
+  ),
+);
+const OPENAI_REALTIME_READ_TOOLS_ENABLED =
+  process.env.OPENAI_REALTIME_READ_TOOLS_ENABLED === 'true'
+  && ASSISTANT_RETRIEVAL_A2_ENABLED;
+const OPENAI_REALTIME_CORRECTION_ENABLED =
+  process.env.OPENAI_REALTIME_CORRECTION_ENABLED === 'true'
+  && OPENAI_REALTIME_ENABLED;
+const OPENAI_REALTIME_CANONICAL_TRANSCRIPTION_MODEL =
+  String(process.env.OPENAI_REALTIME_CANONICAL_TRANSCRIPTION_MODEL || 'gpt-transcribe').trim();
+const OPENAI_REALTIME_MAX_TURN_SECONDS = Math.min(
+  120,
+  Math.max(1, parseInt(process.env.OPENAI_REALTIME_MAX_TURN_SECONDS || '120', 10) || 120),
+);
+const OPENAI_REALTIME_MAX_TURN_BYTES = Math.min(
+  DEFAULT_REALTIME_MAX_AUDIO_BYTES,
+  Math.max(
+    1024,
+    parseInt(
+      process.env.OPENAI_REALTIME_MAX_TURN_BYTES || String(DEFAULT_REALTIME_MAX_AUDIO_BYTES),
+      10,
+    ) || DEFAULT_REALTIME_MAX_AUDIO_BYTES,
+  ),
 );
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
@@ -383,6 +423,14 @@ const openai    = HAS_GPT    ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   ...(OPENAI_BASE_URL ? { baseURL: OPENAI_BASE_URL } : {}),
 }) : null;
+const realtimeToolDispatcher = createRealtimeToolDispatcher({
+  enabled: OPENAI_REALTIME_READ_TOOLS_ENABLED,
+  lookupContext: lookupRealtimeContext,
+  searchNotes: searchRealtimeNotes,
+  readNote: readRealtimeNote,
+  readSchedule: readRealtimeSchedule,
+  sessionTtlMs: OPENAI_REALTIME_MAX_SESSION_SECONDS * 1000,
+});
 const realtimeSessions = createRealtimeSessionService({
   enabled: OPENAI_REALTIME_ENABLED,
   apiKey: process.env.OPENAI_API_KEY,
@@ -391,6 +439,20 @@ const realtimeSessions = createRealtimeSessionService({
   voice: OPENAI_REALTIME_VOICE,
   transcriptionModel: OPENAI_REALTIME_TRANSCRIPTION_MODEL,
   maxSessionSeconds: OPENAI_REALTIME_MAX_SESSION_SECONDS,
+  maxOutputTokens: OPENAI_REALTIME_MAX_OUTPUT_TOKENS,
+  tools: realtimeToolDispatcher.tools,
+});
+const realtimeTranscriptions = createRealtimeTranscriptionService({
+  enabled: OPENAI_REALTIME_CORRECTION_ENABLED,
+  apiKey: process.env.OPENAI_API_KEY,
+  baseUrl: OPENAI_BASE_URL,
+  model: OPENAI_REALTIME_CANONICAL_TRANSCRIPTION_MODEL,
+  sessionTtlMs: OPENAI_REALTIME_MAX_SESSION_SECONDS * 1000,
+  maxAudioBytes: OPENAI_REALTIME_MAX_TURN_BYTES,
+  maxDurationMs: Math.min(
+    DEFAULT_REALTIME_MAX_DURATION_MS,
+    OPENAI_REALTIME_MAX_TURN_SECONDS * 1000,
+  ),
 });
 
 function getGptModelForCouncilMode(mode) {
@@ -924,7 +986,7 @@ const stmtGetUserMessagesForSearch = db.prepare(`
   AND m.embedding IS NOT NULL
 `);
 const stmtGetNotesWithEmbedding = db.prepare(
-  "SELECT filename, title, embedding FROM notes WHERE archived = 0 AND ai_readable = 1 AND codex_status NOT IN ('running', 'recovery_required')"
+  "SELECT filename, title, note_type AS noteType, embedding FROM notes WHERE archived = 0 AND ai_readable = 1 AND codex_status NOT IN ('running', 'recovery_required')"
 );
 const stmtGetTopicNotesWithEmbedding = db.prepare(
   `SELECT filename, title, embedding
@@ -2660,6 +2722,23 @@ async function readMemoryItems() {
   }
 }
 
+async function getRealtimeConversationContext() {
+  try {
+    const memoryItems = await readMemoryItems();
+    const recentMessages = hydrateSessionFromDb('shared-main');
+    return buildRealtimeConversationContext({
+      currentTimeLine: buildCurrentTimeLine(),
+      memoryItems,
+      recentMessages,
+    });
+  } catch (error) {
+    console.warn(`⚠️ Realtime 대화 문맥 준비 실패: ${error?.code || error?.name || 'UNKNOWN'}`);
+    return buildRealtimeConversationContext({
+      currentTimeLine: buildCurrentTimeLine(),
+    });
+  }
+}
+
 async function writeMemoryItems(items) {
   const cleaned = [...new Set(
     items
@@ -3370,13 +3449,25 @@ app.post(
       .update('shared-main:voice-realtime')
       .digest('hex');
     try {
-      const result = await realtimeSessions.createCall(req.body, { safetyIdentifier });
-      res
+      const sessionContext = await getRealtimeConversationContext();
+      const result = await realtimeSessions.createCall(req.body, {
+        safetyIdentifier,
+        sessionContext,
+      });
+      const toolSessionId = realtimeToolDispatcher.createSession();
+      const correctionSessionId = realtimeTranscriptions.createSession();
+      const response = res
         .status(201)
         .type('application/sdp')
         .set('Cache-Control', 'no-store')
-        .set('X-Galpi-Realtime-Model', result.model)
-        .send(result.sdp);
+        .set('X-Galpi-Realtime-Model', result.model);
+      if (toolSessionId) {
+        response.set('X-Galpi-Realtime-Tool-Session', toolSessionId);
+      }
+      if (correctionSessionId) {
+        response.set('X-Galpi-Realtime-Correction-Session', correctionSessionId);
+      }
+      response.send(result.sdp);
     } catch (error) {
       const status = Number.isInteger(error?.status) ? error.status : 500;
       const code = error?.code || 'REALTIME_SESSION_FAILED';
@@ -3392,6 +3483,61 @@ app.post(
     }
   },
 );
+
+app.post('/api/voice/realtime/tool', async (req, res) => {
+  try {
+    const result = await realtimeToolDispatcher.execute(req.body);
+    res
+      .set('Cache-Control', 'no-store')
+      .json({ output: result });
+  } catch (error) {
+    const status = Number.isInteger(error?.status) ? error.status : 500;
+    const code = error?.code || 'REALTIME_TOOL_FAILED';
+    console.warn(`⚠️ Realtime 읽기 도구 실패: ${code}`);
+    res.status(status).json({
+      error: error?.message || 'Realtime 읽기 도구를 실행하지 못했습니다.',
+      code,
+    });
+  }
+});
+
+app.post('/api/voice/realtime/turns/:turnId/transcribe', async (req, res) => {
+  try {
+    if (!realtimeTranscriptions.publicConfig().correctionEnabled) {
+      return res.status(503).json({
+        error: 'Realtime 보정 전사 기능이 비활성화되어 있습니다.',
+        code: 'REALTIME_TRANSCRIPTION_DISABLED',
+      });
+    }
+    const upload = await readRealtimeTranscriptionUpload(req, {
+      maxAudioBytes: OPENAI_REALTIME_MAX_TURN_BYTES,
+    });
+    const result = await realtimeTranscriptions.transcribe({
+      ...upload,
+      turnId: req.params.turnId,
+    });
+    res
+      .set('Cache-Control', 'no-store')
+      .json({
+        correctedTranscript: result.correctedTranscript,
+        model: result.model,
+        usage: result.usage,
+        durationMs: result.durationMs,
+        duplicate: result.duplicate,
+      });
+  } catch (error) {
+    const status = Number.isInteger(error?.status) ? error.status : 500;
+    const code = error?.code || 'REALTIME_TRANSCRIPTION_FAILED';
+    const upstream = error?.upstreamStatus
+      ? ` upstream=${error.upstreamStatus}/${error.upstreamCode || 'unknown'}`
+      : '';
+    console.warn(`⚠️ Realtime 보정 전사 실패: ${code}${upstream}`);
+    res.status(status).json({
+      error: error?.message || 'Realtime 보정 전사를 완료하지 못했습니다.',
+      code,
+    });
+  }
+});
 
 app.get('/api/config', (req, res) => {
   if (API_TOKEN && !safeTokenEqual(getRequestToken(req), API_TOKEN)) {
@@ -3417,7 +3563,10 @@ app.get('/api/config', (req, res) => {
     codexAutoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
     codexJobBatchSize: CODEX_JOB_BATCH_SIZE,
     tasksEnabled: ASSISTANT_TASKS_ENABLED,
-    realtimeVoice: realtimeSessions.publicConfig(),
+    realtimeVoice: {
+      ...realtimeSessions.publicConfig(),
+      ...realtimeTranscriptions.publicConfig(),
+    },
     webSearch: {
       enabled: WEB_SEARCH_ENABLED,
       provider: WEB_SEARCH_PROVIDER,
@@ -6694,6 +6843,147 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   };
 }
 
+async function lookupRealtimeContext(query) {
+  const queryEmbedding = await generateEmbedding(query);
+  const rankedCandidates = await rankVaultNoteCandidates(query, queryEmbedding);
+  const retrieval = await assistantRetrievalShadow.retrieveGlobal({
+    query,
+    queryEmbedding,
+    activeNotes: [],
+    rankedCandidates,
+  });
+  return {
+    content: retrieval?.context || '',
+    found: (retrieval?.chunks || []).length > 0,
+  };
+}
+
+function normalizeRealtimeNoteSearchTerm(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function realtimeNoteSearchTerms(query) {
+  const values = [query, ...String(query || '').split(/\s+/)];
+  const terms = new Set();
+  for (const value of values) {
+    const normalized = normalizeRealtimeNoteSearchTerm(value);
+    if (!normalized) continue;
+    terms.add(normalized);
+    const withoutSuffix = normalized.replace(/(?:목록|모음|노트|문서|작품|들)$/u, '');
+    if (withoutSuffix) terms.add(withoutSuffix);
+  }
+  return [...terms];
+}
+
+async function searchRealtimeNotes(query) {
+  const rows = stmtGetNotesWithEmbedding.all();
+  const terms = realtimeNoteSearchTerms(query);
+  const direct = rows
+    .map(note => {
+      const title = normalizeRealtimeNoteSearchTerm(note.title);
+      const exactIndex = terms.findIndex(term => term === title);
+      const partialIndex = title.length >= 2
+        ? terms.findIndex(term => term.length >= 2 && (
+            title.includes(term) || term.includes(title)
+          ))
+        : -1;
+      const score = exactIndex >= 0
+        ? 1000 - exactIndex
+        : partialIndex >= 0
+          ? 500 - partialIndex
+          : 0;
+      return { ...note, score };
+    })
+    .filter(note => note.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const ranked = direct.length > 0 ? [] : await rankVaultNoteCandidates(query, null, 5);
+  const candidates = [];
+  const seen = new Set();
+  for (const note of [...direct, ...ranked]) {
+    if (!note?.filename || seen.has(note.filename)) continue;
+    candidates.push({
+      filename: note.filename,
+      title: note.title || note.filename,
+      noteType: note.noteType || stmtGetNoteByFilename.get(note.filename)?.noteType || 'unknown',
+    });
+    seen.add(note.filename);
+    if (candidates.length >= 5) break;
+  }
+
+  return {
+    found: candidates.length > 0,
+    content: candidates.length > 0
+      ? JSON.stringify({ noteCandidates: candidates })
+      : '',
+  };
+}
+
+function sampleRealtimeNoteChunks(chunks, limit = 6) {
+  const rows = Array.isArray(chunks) ? chunks : [];
+  if (rows.length <= limit) return rows;
+  const selected = [];
+  const seen = new Set();
+  for (let index = 0; index < limit; index += 1) {
+    const sourceIndex = Math.round(index * (rows.length - 1) / (limit - 1));
+    const chunk = rows[sourceIndex];
+    if (!chunk?.chunkId || seen.has(chunk.chunkId)) continue;
+    selected.push(chunk);
+    seen.add(chunk.chunkId);
+  }
+  return selected;
+}
+
+async function readRealtimeNote(filename) {
+  const row = stmtGetNoteByFilename.get(filename);
+  if (!isAiReadableNoteState(row)) return { content: '', found: false };
+
+  if (row.noteType === 'topic') {
+    const chunks = topicChunkStore.listReadyByNote(filename);
+    if (chunks.length === 0) return { content: '', found: false };
+
+    const sampled = sampleRealtimeNoteChunks(chunks);
+    const context = buildChunkContext(sampled);
+    const retrieval = {
+      ...context,
+      sampledChunks: sampled.length,
+      totalChunks: chunks.length,
+    };
+    if (!retrieval?.context) return { content: '', found: false };
+    return {
+      found: true,
+      content: [
+        JSON.stringify({
+          note: {
+            filename,
+            title: row.title,
+            noteType: row.noteType,
+            sampledChunks: retrieval.sampledChunks ?? retrieval.chunks.length,
+            totalChunks: retrieval.totalChunks ?? chunks.length,
+          },
+        }),
+        retrieval.context,
+      ].join('\n'),
+    };
+  }
+
+  const note = await readAiStableNoteValue(filename, () => readVaultNote(filename));
+  if (!note?.content) return { content: '', found: false };
+  return {
+    found: true,
+    content: JSON.stringify({
+      note: {
+        filename,
+        title: note.title,
+        noteType: row.noteType,
+        content: truncateNoteContext(note.content, 7600),
+      },
+    }),
+  };
+}
+
 async function generateEmbedding(text) {
   if (!openai) return null;
   try {
@@ -6924,6 +7214,14 @@ function getActiveScheduleContext() {
     console.warn(`일정 컨텍스트 조회 실패: ${error?.code || error?.name || 'UNKNOWN'}`);
     return '';
   }
+}
+
+function readRealtimeSchedule() {
+  const content = getActiveScheduleContext();
+  return {
+    content,
+    found: Boolean(content) && !content.includes('활성 일정: 없음'),
+  };
 }
 
 // 현재 시각과 활성 일정은 항상, 사용자 메모리와 activeNotes/자동 검색 노트는 질문별 참조로 주입한다.

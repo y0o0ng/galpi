@@ -2754,9 +2754,28 @@ html, body {
   opacity: 0.68;
 }
 
+.voice-transcript-row.correction_pending .voice-transcript-text,
+.voice-transcript-row.provisional .voice-transcript-text {
+  opacity: 0.78;
+}
+
+.voice-transcript-row.corrected .voice-transcript-text {
+  opacity: 1;
+}
+
+.voice-transcript-row.correction_failed .voice-transcript-text {
+  color: #B45309;
+}
+
 .voice-transcript-row.interrupted .voice-transcript-text {
   color: var(--label);
   opacity: 0.58;
+}
+
+.voice-transcript-row.incomplete .voice-transcript-text,
+.voice-transcript-row.failed .voice-transcript-text {
+  color: #B45309;
+  opacity: 0.9;
 }
 
 #voice-realtime-error {
