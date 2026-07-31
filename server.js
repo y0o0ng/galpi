@@ -66,7 +66,11 @@ const {
   createRealtimeTranscriptionService,
   readRealtimeTranscriptionUpload,
 } = require('./lib/realtime-transcription');
-const { createRealtimeTurnStore } = require('./lib/realtime-turn-store');
+const {
+  createRealtimeTurnStore,
+  isPersistableUserTurn,
+} = require('./lib/realtime-turn-store');
+const { createVoiceTtsService } = require('./lib/voice-tts');
 const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
@@ -180,6 +184,9 @@ const REALTIME_ASSISTANT_STATUSES = new Set([
   'completed', 'cancelled', 'failed', 'incomplete',
 ]);
 const REALTIME_MAX_ASSISTANT_CHARS = 20000;
+const VOICE_HALFDUPLEX_ENABLED = process.env.VOICE_HALFDUPLEX_ENABLED === 'true';
+const VOICE_TTS_MODEL = String(process.env.VOICE_TTS_MODEL || 'gpt-4o-mini-tts').trim();
+const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'alloy').trim();
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const API_TOKEN    = process.env.API_TOKEN || '';
@@ -461,6 +468,13 @@ const realtimeTranscriptions = createRealtimeTranscriptionService({
     DEFAULT_REALTIME_MAX_DURATION_MS,
     OPENAI_REALTIME_MAX_TURN_SECONDS * 1000,
   ),
+});
+const voiceTts = createVoiceTtsService({
+  enabled: VOICE_HALFDUPLEX_ENABLED,
+  apiKey: process.env.OPENAI_API_KEY,
+  baseUrl: OPENAI_BASE_URL,
+  model: VOICE_TTS_MODEL,
+  voice: VOICE_TTS_VOICE,
 });
 
 function getGptModelForCouncilMode(mode) {
@@ -3197,7 +3211,9 @@ async function decideCouncilWebEvidence(context, claudeModel, onStage = () => {}
 // ─── 채팅 ────────────────────────────────────────────────────────────────────
 
 app.post('/api/chat', async (req, res) => {
-  const { message, model, sessionId, activeNotes, webSearch, progress: wantsProgress } = req.body;
+  const {
+    message, model, sessionId, activeNotes, webSearch, progress: wantsProgress, source,
+  } = req.body;
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
   }
@@ -3347,7 +3363,9 @@ app.post('/api/chat', async (req, res) => {
         },
       ].slice(-HISTORY_CONTEXT_MESSAGES);
 
-      if (!scheduleCandidate) {
+      // 음성 출처 턴은 전사 오류가 지식 베이스에 굳지 않도록 topic 자동 저장에서 제외한다.
+      // 대화 자체는 기존 경로로 저장하고 명시적 저장만 허용한다.
+      if (!scheduleCandidate && source !== 'voice') {
         autoAppendTopicNote({
           question: message,
           answer: reply,
@@ -3564,6 +3582,8 @@ app.post('/api/voice/realtime/turns/:turnId/transcribe', async (req, res) => {
         usage: result.usage,
         durationMs: result.durationMs,
         duplicate: result.duplicate,
+        // 폐기 판정은 서버가 단독으로 소유한다. 클라이언트가 같은 규칙을 다시 구현하지 않는다.
+        persistable: isPersistableUserTurn(result.correctedTranscript),
         ...(finalized ? { receipt: finalized } : {}),
       });
   } catch (error) {
@@ -3636,6 +3656,40 @@ app.post('/api/voice/realtime/turns/:turnId/assistant', (req, res) => {
   }
 });
 
+// 반이중 음성 H1. 화면에는 전체 답변이 남고 음성은 앞부분만 읽는다.
+app.post('/api/voice/speak', async (req, res) => {
+  if (!voiceTts.available) {
+    return res.status(503).json({
+      error: '반이중 음성 기능이 비활성화되어 있습니다.',
+      code: 'VOICE_HALFDUPLEX_DISABLED',
+    });
+  }
+  const text = String(req.body?.text || '');
+  if (!text.trim()) {
+    return res.status(400).json({ error: '읽을 내용이 필요합니다.', code: 'VOICE_TTS_EMPTY_TEXT' });
+  }
+  try {
+    const { spoken, body } = await voiceTts.speak(text);
+    res.set('Cache-Control', 'no-store');
+    res.set('Content-Type', 'audio/wav');
+    // 실제로 읽은 문장을 화면 자막과 맞추기 위해 헤더로 돌려준다. 본문에는 넣지 않는다.
+    res.set('X-Galpi-Spoken-Chars', String(spoken.length));
+    for await (const chunk of body) res.write(chunk);
+    res.end();
+  } catch (error) {
+    const status = Number.isInteger(error?.status) ? error.status : 500;
+    console.warn(`⚠️ 음성 출력 실패: ${error?.code || 'VOICE_TTS_FAILED'}`);
+    if (!res.headersSent) {
+      res.status(status).json({
+        error: '음성을 만들지 못했습니다.',
+        code: error?.code || 'VOICE_TTS_FAILED',
+      });
+    } else {
+      res.end();
+    }
+  }
+});
+
 app.get('/api/config', (req, res) => {
   if (API_TOKEN && !safeTokenEqual(getRequestToken(req), API_TOKEN)) {
     return res.json({
@@ -3665,6 +3719,7 @@ app.get('/api/config', (req, res) => {
       ...realtimeTranscriptions.publicConfig(),
       ...realtimeTurnStore.publicConfig(),
     },
+    halfDuplexVoice: voiceTts.publicConfig(),
     webSearch: {
       enabled: WEB_SEARCH_ENABLED,
       provider: WEB_SEARCH_PROVIDER,

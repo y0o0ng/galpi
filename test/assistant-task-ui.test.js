@@ -254,7 +254,8 @@ test('chat schedule candidates remain unpersisted until the existing task API co
   const css = read('public/style.css');
 
   assert.match(server, /createSchedulePrepareSession\(assistantTasks/);
-  assert.match(server, /if \(!scheduleCandidate\) \{[\s\S]*?autoAppendTopicNote/);
+  // 일정 후보 제외는 그대로 두고 음성 출처 제외만 추가됐다.
+  assert.match(server, /if \(!scheduleCandidate && source !== 'voice'\) \{[\s\S]*?autoAppendTopicNote/);
   assert.match(server, /scheduleCandidate,/);
   assert.match(app, /TaskPanel\?\.makeScheduleCandidateCard\(data\.scheduleCandidate\)/);
   assert.match(app, /if \(candidateCard\) \{[\s\S]*?group\.appendChild\(candidateCard\)[\s\S]*?return;/);

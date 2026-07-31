@@ -466,6 +466,7 @@ test('authenticated Realtime route proxies only SDP and leaves application state
     },
     durationMs: 1000,
     duplicate: false,
+    persistable: true,
   });
 
   const duplicateCorrection = await fetch(
