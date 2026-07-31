@@ -197,6 +197,7 @@ test('authenticated Realtime route proxies only SDP and leaves application state
     canonicalTranscriptionModel: 'gpt-transcribe',
     maxTurnSeconds: 120,
     maxTurnBytes: 8388608,
+    finalizeEnabled: false,
   });
   assert.doesNotMatch(JSON.stringify(config), /server-only-realtime-key/);
 
@@ -509,5 +510,183 @@ test('authenticated Realtime route proxies only SDP and leaves application state
 
   assert.deepEqual(tableCounts(db, applicationTables), beforeCounts);
   assert.deepEqual(await fs.readdir(vaultPath), beforeVault);
+  db.close();
+});
+
+test('R2c-1 finalization writes one corrected pair and drops throat-clear turns', async t => {
+  const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'realtime-finalize-'));
+  const vaultPath = path.join(appRoot, 'vault');
+  await fs.mkdir(vaultPath);
+  await fs.copyFile(path.join(ROOT, 'server.js'), path.join(appRoot, 'server.js'));
+  for (const name of ['lib', 'scripts', 'public', 'config', '.codex', 'node_modules']) {
+    await fs.symlink(path.join(ROOT, name), path.join(appRoot, name), 'dir');
+  }
+
+  let correctedText = '내일 오후 회의가 몇 시였는지 알려줄 수 있어?';
+  const provider = http.createServer(async (req, res) => {
+    await readBody(req);
+    if (req.url === '/v1/embeddings') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        object: 'list',
+        data: [{ object: 'embedding', index: 0, embedding: [1, 0, 0] }],
+        model: 'text-embedding-3-small',
+        usage: { prompt_tokens: 1, total_tokens: 1 },
+      }));
+      return;
+    }
+    if (req.url === '/v1/audio/transcriptions') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ text: correctedText }));
+      return;
+    }
+    res.writeHead(201, { 'Content-Type': 'application/sdp' });
+    res.end('v=0\r\no=provider-answer\r\n');
+  });
+  provider.listen(0, '127.0.0.1');
+  await once(provider, 'listening');
+
+  const port = await availablePort();
+  const url = `http://127.0.0.1:${port}`;
+  const logs = [];
+  const child = spawn(process.execPath, ['server.js'], {
+    cwd: appRoot,
+    env: {
+      ...process.env,
+      ANTHROPIC_API_KEY: '',
+      OPENAI_API_KEY: 'server-only-realtime-key',
+      OPENAI_BASE_URL: `http://127.0.0.1:${provider.address().port}/v1`,
+      OPENAI_REALTIME_ENABLED: 'true',
+      OPENAI_REALTIME_CORRECTION_ENABLED: 'true',
+      OPENAI_REALTIME_FINALIZE_ENABLED: 'true',
+      OPENAI_REALTIME_CANONICAL_TRANSCRIPTION_MODEL: 'gpt-transcribe',
+      GPT_RESPONSES_ENABLED: 'false',
+      MODEL_CATALOG_REFRESH_ENABLED: 'false',
+      API_TOKEN,
+      HOST: '127.0.0.1',
+      PORT: String(port),
+      VAULT_PATH: vaultPath,
+      BACKUP_DIR: path.join(appRoot, 'backups'),
+      CODEX_RUNNER_MODE: 'heuristic',
+      WEB_PUSH_ENABLED: 'false',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  child.stdout.on('data', chunk => logs.push(chunk.toString()));
+  child.stderr.on('data', chunk => logs.push(chunk.toString()));
+
+  t.after(async () => {
+    await stopServer(child);
+    await new Promise(resolve => provider.close(resolve));
+    await fs.rm(appRoot, { recursive: true, force: true });
+  });
+
+  await waitForServer(child, url, logs);
+
+  const configResponse = await fetch(`${url}/api/config`, {
+    headers: { 'X-API-Token': API_TOKEN },
+  });
+  assert.equal((await configResponse.json()).realtimeVoice.finalizeEnabled, true);
+
+  const sdp = await fetch(`${url}/api/voice/realtime/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/sdp', 'X-API-Token': API_TOKEN },
+    body: 'v=0\r\no=caller\r\n',
+  });
+  const correctionSessionId = sdp.headers.get('x-galpi-realtime-correction-session');
+
+  const correct = async (inputItemId, audio) => {
+    const form = new FormData();
+    form.set('session_id', correctionSessionId);
+    form.set('input_item_id', inputItemId);
+    form.set('duration_ms', '1000');
+    form.set('audio', new Blob([audio], { type: 'audio/wav' }), 'turn.wav');
+    const response = await fetch(
+      `${url}/api/voice/realtime/turns/${inputItemId}/transcribe`,
+      { method: 'POST', headers: { 'X-API-Token': API_TOKEN }, body: form },
+    );
+    return { status: response.status, body: await response.json() };
+  };
+  const reportAssistant = async (inputItemId, payload) => {
+    const response = await fetch(
+      `${url}/api/voice/realtime/turns/${inputItemId}/assistant`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Token': API_TOKEN },
+        body: JSON.stringify({
+          session_id: correctionSessionId,
+          input_item_id: inputItemId,
+          ...payload,
+        }),
+      },
+    );
+    return { status: response.status, body: await response.json() };
+  };
+
+  const db = new Database(path.join(appRoot, 'galpi.db'), { readonly: true });
+  const messages = () => db
+    .prepare('SELECT id, session_id, role, content FROM messages ORDER BY id ASC')
+    .all();
+
+  // 보정만 도착한 동안에는 아무것도 저장하지 않는다.
+  const firstCorrection = await correct('item-real', pcmWav());
+  assert.equal(firstCorrection.status, 200);
+  assert.equal(firstCorrection.body.receipt.finalized, false);
+  assert.equal(messages().length, 0);
+
+  const finalize = await reportAssistant('item-real', {
+    final_response_id: 'resp-real',
+    assistant_transcript: '내일 오후 3시야. 회의실은 2층으로 잡혀 있어.',
+    assistant_status: 'completed',
+  });
+  assert.equal(finalize.status, 200, JSON.stringify(finalize.body));
+  assert.equal(finalize.body.receipt.finalized, true);
+
+  const savedPair = messages();
+  assert.equal(savedPair.length, 2);
+  assert.deepEqual(savedPair.map(row => row.role), ['user', 'assistant']);
+  assert.deepEqual(savedPair.map(row => row.session_id), ['shared-main', 'shared-main']);
+  assert.ok(savedPair[0].id < savedPair[1].id);
+  assert.equal(savedPair[0].content, correctedText);
+
+  // 같은 턴을 다시 보고해도 message를 늘리지 않는다.
+  const repeated = await reportAssistant('item-real', {
+    final_response_id: 'resp-real',
+    assistant_transcript: '내일 오후 3시야. 회의실은 2층으로 잡혀 있어.',
+    assistant_status: 'completed',
+  });
+  assert.equal(repeated.body.receipt.userMessageId, finalize.body.receipt.userMessageId);
+  assert.equal(messages().length, 2);
+
+  // 헛기침 턴은 보정본이 있어도 저장하지 않는다.
+  correctedText = '음.';
+  const throatClear = await correct('item-cough', pcmWav({ amplitude: 0.3 }));
+  assert.equal(throatClear.status, 200);
+  const discarded = await reportAssistant('item-cough', { assistant_status: 'cancelled' });
+  assert.equal(discarded.body.receipt.discarded, true);
+  assert.equal(discarded.body.receipt.userMessageId, null);
+  assert.equal(messages().length, 2);
+
+  const receipts = db.prepare(`
+    SELECT input_item_id AS inputItemId, status, error_code AS errorCode
+    FROM realtime_turn_receipts ORDER BY input_item_id
+  `).all();
+  assert.deepEqual(receipts, [
+    { inputItemId: 'item-cough', status: 'discarded', errorCode: 'empty_turn' },
+    { inputItemId: 'item-real', status: 'finalized', errorCode: null },
+  ]);
+
+  const badStatus = await reportAssistant('item-real', { assistant_status: 'bogus' });
+  assert.equal(badStatus.status, 400);
+  assert.equal(badStatus.body.code, 'REALTIME_FINALIZE_INVALID_STATUS');
+
+  const unauthorized = await fetch(`${url}/api/voice/realtime/turns/item-real/assistant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: 'x', input_item_id: 'y', assistant_status: 'completed' }),
+  });
+  assert.equal(unauthorized.status, 401);
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM notes').get().count, 0);
   db.close();
 });

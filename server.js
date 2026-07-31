@@ -66,6 +66,7 @@ const {
   createRealtimeTranscriptionService,
   readRealtimeTranscriptionUpload,
 } = require('./lib/realtime-transcription');
+const { createRealtimeTurnStore } = require('./lib/realtime-turn-store');
 const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
@@ -172,6 +173,13 @@ const OPENAI_REALTIME_MAX_TURN_BYTES = Math.min(
     ) || DEFAULT_REALTIME_MAX_AUDIO_BYTES,
   ),
 );
+const OPENAI_REALTIME_FINALIZE_ENABLED =
+  process.env.OPENAI_REALTIME_FINALIZE_ENABLED === 'true'
+  && OPENAI_REALTIME_CORRECTION_ENABLED;
+const REALTIME_ASSISTANT_STATUSES = new Set([
+  'completed', 'cancelled', 'failed', 'incomplete',
+]);
+const REALTIME_MAX_ASSISTANT_CHARS = 20000;
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const API_TOKEN    = process.env.API_TOKEN || '';
@@ -1328,6 +1336,26 @@ function dbSaveChatExchange(input) {
   const result = saveChatExchangeTransaction(input);
   if (!input.queryEmbedding) queueMessageEmbedding(result.userMessageId, input.question);
   return result;
+}
+
+const realtimeTurnStore = createRealtimeTurnStore({
+  db,
+  enabled: OPENAI_REALTIME_FINALIZE_ENABLED,
+  insertMessage: ({ sessionId, role, content }) => {
+    stmtEnsureSession.run(sessionId);
+    return Number(insertMessageRecord({ sessionId, role, content }).lastInsertRowid);
+  },
+});
+
+// finalize가 실제로 만든 message만 기존 임베딩 경로에 넘긴다. 20자 가드는 그대로 재사용한다.
+function queueFinalizedTurnEmbeddings(result) {
+  if (!result?.finalized) return;
+  if (result.userMessageId && result.userContent) {
+    queueMessageEmbedding(result.userMessageId, result.userContent);
+  }
+  if (result.assistantMessageId && result.assistantContent) {
+    queueMessageEmbedding(result.assistantMessageId, result.assistantContent);
+  }
 }
 
 function dbUpsertNote({
@@ -3516,6 +3544,18 @@ app.post('/api/voice/realtime/turns/:turnId/transcribe', async (req, res) => {
       ...upload,
       turnId: req.params.turnId,
     });
+    let finalized = null;
+    if (realtimeTurnStore.available) {
+      finalized = realtimeTurnStore.recordCorrection({
+        sessionId: upload.sessionId,
+        inputItemId: upload.inputItemId,
+        correctedTranscript: result.correctedTranscript,
+        transcriptionModel: result.model,
+        usage: result.usage,
+        audioSha256: result.audioSha256 || null,
+      });
+      queueFinalizedTurnEmbeddings(finalized);
+    }
     res
       .set('Cache-Control', 'no-store')
       .json({
@@ -3524,6 +3564,7 @@ app.post('/api/voice/realtime/turns/:turnId/transcribe', async (req, res) => {
         usage: result.usage,
         durationMs: result.durationMs,
         duplicate: result.duplicate,
+        ...(finalized ? { receipt: finalized } : {}),
       });
   } catch (error) {
     const status = Number.isInteger(error?.status) ? error.status : 500;
@@ -3535,6 +3576,56 @@ app.post('/api/voice/realtime/turns/:turnId/transcribe', async (req, res) => {
     res.status(status).json({
       error: error?.message || 'Realtime 보정 전사를 완료하지 못했습니다.',
       code,
+    });
+  }
+});
+
+// 브라우저가 WebRTC 연결을 잡고 있으므로 assistant 결말은 클라이언트만 알 수 있다.
+app.post('/api/voice/realtime/turns/:turnId/assistant', (req, res) => {
+  if (!realtimeTurnStore.available) {
+    return res.status(503).json({
+      error: 'Realtime 턴 저장 기능이 비활성화되어 있습니다.',
+      code: 'REALTIME_FINALIZE_DISABLED',
+    });
+  }
+  const sessionId = String(req.body?.session_id || '').trim();
+  const inputItemId = String(req.body?.input_item_id || '').trim();
+  const assistantStatus = String(req.body?.assistant_status || '').trim();
+  const finalResponseId = String(req.body?.final_response_id || '').trim() || null;
+  const assistantTranscript = String(req.body?.assistant_transcript || '');
+  if (!sessionId || !inputItemId) {
+    return res.status(400).json({
+      error: 'session_id와 input_item_id가 필요합니다.',
+      code: 'REALTIME_FINALIZE_INVALID_TURN',
+    });
+  }
+  if (!REALTIME_ASSISTANT_STATUSES.has(assistantStatus)) {
+    return res.status(400).json({
+      error: 'assistant_status 값이 올바르지 않습니다.',
+      code: 'REALTIME_FINALIZE_INVALID_STATUS',
+    });
+  }
+  if (assistantTranscript.length > REALTIME_MAX_ASSISTANT_CHARS) {
+    return res.status(413).json({
+      error: 'assistant 답변이 너무 깁니다.',
+      code: 'REALTIME_FINALIZE_TRANSCRIPT_TOO_LONG',
+    });
+  }
+  try {
+    const finalized = realtimeTurnStore.recordAssistant({
+      sessionId,
+      inputItemId,
+      finalResponseId,
+      assistantTranscript,
+      assistantStatus,
+    });
+    queueFinalizedTurnEmbeddings(finalized);
+    res.set('Cache-Control', 'no-store').json({ receipt: finalized });
+  } catch (error) {
+    console.warn(`⚠️ Realtime 턴 확정 실패: ${error?.code || 'REALTIME_FINALIZE_FAILED'}`);
+    res.status(500).json({
+      error: 'Realtime 턴을 확정하지 못했습니다.',
+      code: 'REALTIME_FINALIZE_FAILED',
     });
   }
 });
@@ -3566,6 +3657,7 @@ app.get('/api/config', (req, res) => {
     realtimeVoice: {
       ...realtimeSessions.publicConfig(),
       ...realtimeTranscriptions.publicConfig(),
+      ...realtimeTurnStore.publicConfig(),
     },
     webSearch: {
       enabled: WEB_SEARCH_ENABLED,
