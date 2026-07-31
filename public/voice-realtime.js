@@ -262,6 +262,7 @@
       correctionStatus: 'capturing',
       correctionQueued: false,
       correctedTranscript: '',
+      assistantReported: false,
     };
     state.turnReceipts.set(turnId, receipt);
     state.currentTurnId = turnId;
@@ -534,6 +535,47 @@
         void processCorrectionQueue();
       }
     }
+  }
+
+  // response.done의 output이 assistant 본문의 정본이다. DOM 자막은 표시용이라 쓰지 않는다.
+  function extractAssistantTranscript(response) {
+    const output = Array.isArray(response?.output) ? response.output : [];
+    return output
+      .filter(item => item?.type === 'message' && item?.role === 'assistant')
+      .flatMap(item => (Array.isArray(item.content) ? item.content : []))
+      .map(part => String(part?.transcript || part?.text || ''))
+      .join('')
+      .trim();
+  }
+
+  // 서버는 WebRTC 연결을 잡지 않으므로 assistant 결말을 브라우저만 알 수 있다.
+  function maybeReportAssistantOutcome(response) {
+    if (!state.config?.finalizeEnabled || !state.correctionSessionId) return;
+    const responseId = String(response?.id || '').trim();
+    const turnId = responseId ? state.responseTurns.get(responseId) : '';
+    const receipt = turnId ? state.turnReceipts.get(turnId) : null;
+    if (!receipt?.inputItemId || receipt.assistantReported) return;
+    const status = String(response?.status || '').trim();
+    if (!['completed', 'cancelled', 'failed', 'incomplete'].includes(status)) return;
+    receipt.assistantReported = true;
+    const runId = state.runId;
+    void state.apiFetch(
+      `/api/voice/realtime/turns/${encodeURIComponent(receipt.turnId)}/assistant`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: state.correctionSessionId,
+          input_item_id: receipt.inputItemId,
+          final_response_id: responseId,
+          assistant_transcript: status === 'completed' ? extractAssistantTranscript(response) : '',
+          assistant_status: status,
+        }),
+      },
+    ).catch(() => {
+      // 확정 실패는 대화를 막지 않는다. 저장되지 않은 턴은 receipt에 그대로 남는다.
+      if (runId === state.runId) receipt.assistantReported = false;
+    });
   }
 
   function maybeQueueCorrection(receipt) {
@@ -853,6 +895,7 @@
           String(response.status_details?.reason || '').trim(),
         );
       }
+      maybeReportAssistantOutcome(response);
       setPhase('listening');
       return;
     }
