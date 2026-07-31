@@ -49,6 +49,7 @@
       audio: null,
       runId: 0,
       pendingTurn: null,
+      correctionSessionId: '',
     };
 
     function now() { return Date.now(); }
@@ -178,6 +179,16 @@
       );
     }
 
+    // 반이중은 Realtime 핸드셰이크를 하지 않으므로 전사용 세션을 직접 받는다.
+    async function ensureCorrectionSession() {
+      if (state.correctionSessionId) return state.correctionSessionId;
+      const response = await state.apiFetch('/api/voice/session', { method: 'POST' });
+      if (!response.ok) return '';
+      const data = await response.json().catch(() => ({}));
+      state.correctionSessionId = String(data.sessionId || '');
+      return state.correctionSessionId;
+    }
+
     async function handleTurnReady(turn) {
       if (!state.active || !state.pendingTurn || turn.turnId !== state.pendingTurn.turnId) return;
       clearTimer('transcribe');
@@ -187,18 +198,30 @@
       }
       const runId = state.runId;
       try {
+        const sessionId = await ensureCorrectionSession();
+        if (runId !== state.runId) return;
+        if (!sessionId) {
+          recover('음성 세션을 열지 못했어.');
+          return;
+        }
         const form = new global.FormData();
-        form.set('session_id', SCRATCH_SESSION_ID);
+        form.set('session_id', sessionId);
         form.set('input_item_id', turn.turnId);
         form.set('duration_ms', String(turn.durationMs));
         form.set('audio', turn.blob, `${turn.turnId}.wav`);
         const response = await state.apiFetch(
-          `/api/voice/realtime/turns/${encodeURIComponent(turn.turnId)}/transcribe`,
+          `/api/voice/turns/${encodeURIComponent(turn.turnId)}/transcribe`,
           { method: 'POST', body: form },
         );
         const data = await response.json().catch(() => ({}));
         if (runId !== state.runId) return;
         if (!response.ok) {
+          // 세션이 만료됐으면 버리고 다음 턴에 새로 받는다.
+          if (data.code === 'REALTIME_TRANSCRIPTION_SESSION_EXPIRED') {
+            state.correctionSessionId = '';
+            recover('다시 말해줄래?');
+            return;
+          }
           recover(data.code === 'REALTIME_TRANSCRIPTION_EMPTY'
             ? '잘 못 들었어. 다시 말해줄래?'
             : '전사를 못 했어. 다시 말해줄래?');
@@ -321,6 +344,7 @@
       }
       state.runId += 1;
       state.active = true;
+      state.correctionSessionId = '';
       try {
         state.stream = await global.navigator.mediaDevices.getUserMedia({
           audio: {

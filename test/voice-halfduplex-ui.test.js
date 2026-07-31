@@ -37,6 +37,7 @@ function loadUi({ halfDuplexEnabled = true } = {}) {
   const ids = [
     'voice-hd-panel', 'voice-hd-dot', 'voice-hd-status',
     'voice-hd-stop', 'voice-hd-log', 'voice-hd-button',
+    'voice-realtime-button',
   ];
   const elements = Object.fromEntries(ids.map(id => [id, fakeElement(id)]));
   const coreCalls = [];
@@ -76,6 +77,16 @@ test('the panel stays hidden and the button never appears while the flag is off'
 
   assert.equal(elements['voice-hd-button'].hidden, true);
   assert.deepEqual(coreCalls, []);
+  // 반이중이 꺼져 있으면 기존 Realtime 버튼을 건드리지 않는다.
+  assert.equal(elements['voice-realtime-button'].hidden, false);
+});
+
+test('only one microphone button is offered once half-duplex is on', () => {
+  const { elements } = loadUi();
+
+  assert.equal(elements['voice-hd-button'].hidden, false);
+  // 같은 아이콘이 둘이면 어느 쪽이 반이중인지 고를 수 없다.
+  assert.equal(elements['voice-realtime-button'].hidden, true);
 });
 
 test('the button toggles the loop and reflects the pressed state', () => {

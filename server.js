@@ -188,6 +188,7 @@ const VOICE_HALFDUPLEX_ENABLED = process.env.VOICE_HALFDUPLEX_ENABLED === 'true'
 const VOICE_TTS_MODEL = String(process.env.VOICE_TTS_MODEL || 'gpt-4o-mini-tts').trim();
 const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'echo').trim();
 const VOICE_TTS_INSTRUCTIONS = process.env.VOICE_TTS_INSTRUCTIONS;
+const VOICE_SESSION_TTL_MS = 60 * 60 * 1000;
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const API_TOKEN    = process.env.API_TOKEN || '';
@@ -464,6 +465,20 @@ const realtimeTranscriptions = createRealtimeTranscriptionService({
   baseUrl: OPENAI_BASE_URL,
   model: OPENAI_REALTIME_CANONICAL_TRANSCRIPTION_MODEL,
   sessionTtlMs: OPENAI_REALTIME_MAX_SESSION_SECONDS * 1000,
+  maxAudioBytes: OPENAI_REALTIME_MAX_TURN_BYTES,
+  maxDurationMs: Math.min(
+    DEFAULT_REALTIME_MAX_DURATION_MS,
+    OPENAI_REALTIME_MAX_TURN_SECONDS * 1000,
+  ),
+});
+// 반이중은 Realtime 핸드셰이크를 하지 않으므로 자체 correction session이 필요하다.
+// Realtime의 5분 세션 상한은 반이중에 없는 개념이라 서비스를 분리해 TTL을 따로 둔다.
+const voiceTranscriptions = createRealtimeTranscriptionService({
+  enabled: VOICE_HALFDUPLEX_ENABLED,
+  apiKey: process.env.OPENAI_API_KEY,
+  baseUrl: OPENAI_BASE_URL,
+  model: OPENAI_REALTIME_CANONICAL_TRANSCRIPTION_MODEL,
+  sessionTtlMs: VOICE_SESSION_TTL_MS,
   maxAudioBytes: OPENAI_REALTIME_MAX_TURN_BYTES,
   maxDurationMs: Math.min(
     DEFAULT_REALTIME_MAX_DURATION_MS,
@@ -3655,6 +3670,60 @@ app.post('/api/voice/realtime/turns/:turnId/assistant', (req, res) => {
       error: 'Realtime 턴을 확정하지 못했습니다.',
       code: 'REALTIME_FINALIZE_FAILED',
     });
+  }
+});
+
+// 반이중 대화 하나에 correction session 하나. 만료되면 클라이언트가 다시 발급받는다.
+app.post('/api/voice/session', (req, res) => {
+  if (!voiceTts.available) {
+    return res.status(503).json({
+      error: '반이중 음성 기능이 비활성화되어 있습니다.',
+      code: 'VOICE_HALFDUPLEX_DISABLED',
+    });
+  }
+  const sessionId = voiceTranscriptions.createSession();
+  if (!sessionId) {
+    return res.status(503).json({
+      error: '음성 세션을 만들지 못했습니다.',
+      code: 'VOICE_SESSION_UNAVAILABLE',
+    });
+  }
+  res.set('Cache-Control', 'no-store').json({ sessionId });
+});
+
+// 반이중 전용 전사. Realtime 라우트와 세션 공간을 공유하지 않는다.
+app.post('/api/voice/turns/:turnId/transcribe', async (req, res) => {
+  try {
+    if (!voiceTts.available) {
+      return res.status(503).json({
+        error: '반이중 음성 기능이 비활성화되어 있습니다.',
+        code: 'VOICE_HALFDUPLEX_DISABLED',
+      });
+    }
+    const upload = await readRealtimeTranscriptionUpload(req, {
+      maxAudioBytes: OPENAI_REALTIME_MAX_TURN_BYTES,
+    });
+    const result = await voiceTranscriptions.transcribe({
+      ...upload,
+      turnId: req.params.turnId,
+    });
+    res
+      .set('Cache-Control', 'no-store')
+      .json({
+        correctedTranscript: result.correctedTranscript,
+        durationMs: result.durationMs,
+        persistable: isPersistableUserTurn(result.correctedTranscript),
+      });
+  } catch (error) {
+    const status = Number.isInteger(error?.status) ? error.status : 500;
+    const code = error?.code || 'REALTIME_TRANSCRIPTION_FAILED';
+    const empty = code === 'REALTIME_TRANSCRIPTION_EMPTY'
+      ? ` duration=${error?.emptyDurationMs ?? 'unknown'}ms`
+        + ` bytes=${error?.emptyAudioBytes ?? 'unknown'}`
+        + ` audio=${String(error?.emptyAudioSha256 || 'unknown').slice(0, 16)}`
+      : '';
+    console.warn(`⚠️ 반이중 전사 실패: ${code}${empty}`);
+    res.status(status).json({ error: '전사를 완료하지 못했습니다.', code });
   }
 });
 

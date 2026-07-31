@@ -98,6 +98,9 @@ function loadClient({ config = {}, responders = {} } = {}) {
       const responder = Object.entries(responders)
         .find(([pattern]) => url.includes(pattern))?.[1];
       if (responder) return responder(url, options);
+      if (url.includes('/api/voice/session')) {
+        return { ok: true, async json() { return { sessionId: 'vs-1' }; } };
+      }
       if (url.includes('/transcribe')) {
         return {
           ok: true,
@@ -280,4 +283,53 @@ test('the loop refuses to start while the flag is off', async () => {
   assert.equal(h.client.getState().active, false);
   assert.equal(h.calls.length, 0);
   assert.ok(h.toasts.some(message => message.includes('꺼져')));
+});
+
+test('a turn mints its own correction session instead of assuming a Realtime handshake', async () => {
+  const h = loadClient();
+  await h.client.start();
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  const session = h.calls.find(call => call.url === '/api/voice/session');
+  assert.ok(session, '반이중은 Realtime 핸드셰이크를 하지 않으므로 세션을 직접 받아야 한다');
+
+  const transcribe = h.calls.find(call => call.url.includes('/transcribe'));
+  // Realtime 세션 공간을 빌려 쓰지 않는다.
+  assert.doesNotMatch(transcribe.url, /\/realtime\//);
+  assert.equal(transcribe.options.body.get('session_id'), 'vs-1');
+});
+
+test('an expired session is dropped so the next turn asks for a new one', async () => {
+  let expire = true;
+  const h = loadClient({
+    responders: {
+      '/transcribe': async () => (expire
+        ? { ok: false, async json() { return { code: 'REALTIME_TRANSCRIPTION_SESSION_EXPIRED' }; } }
+        : { ok: true, async json() { return { correctedTranscript: '내일 일정', persistable: true }; } }),
+    },
+  });
+  await h.client.start();
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  assert.equal(h.client.getState().phase, 'cooldown');
+  h.fireTimer(500);
+
+  expire = false;
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-2', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  // 만료된 세션을 계속 쓰지 않고 두 번째 발급을 받는다.
+  assert.equal(h.calls.filter(call => call.url === '/api/voice/session').length, 2);
+  assert.deepEqual(h.transcripts, ['내일 일정']);
 });

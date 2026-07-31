@@ -60,6 +60,11 @@
         return;
       }
 
+      // 마이크 버튼은 하나만 남긴다. 같은 아이콘이 둘이면 무엇이 반이중인지 고를 수 없다.
+      // Realtime은 반이중 flag를 끌 때만 다시 나타나며 H5에서 완전히 걷는다.
+      const realtimeButton = global.document.getElementById('voice-realtime-button');
+      if (realtimeButton) realtimeButton.hidden = true;
+
       core.init({
         config,
         apiFetch,
