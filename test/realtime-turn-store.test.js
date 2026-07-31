@@ -85,17 +85,17 @@ function receiptRow(db) {
 test('empty and punctuation-only corrected transcripts are never persisted', () => {
   for (const value of ['', '   ', '.', '...', '  ??  ', null, undefined]) {
     assert.equal(
-      isPersistableUserTurn(value, { assistantStatus: 'completed' }),
+      isPersistableUserTurn(value),
       false,
-      `expected ${JSON.stringify(value)} to be filtered even with a completed assistant`,
+      `expected ${JSON.stringify(value)} to be filtered`,
     );
   }
 });
 
-test('observed throat-clear fillers are filtered when no completed answer followed', () => {
+test('observed throat-clear fillers are filtered regardless of the assistant outcome', () => {
   for (const value of ['하...', '그', '음', '흥.', '음.', '음음', '하하', 'uh', 'Um']) {
     assert.equal(
-      isPersistableUserTurn(value, { assistantStatus: 'cancelled' }),
+      isPersistableUserTurn(value),
       false,
       `expected ${JSON.stringify(value)} to be filtered`,
     );
@@ -103,14 +103,14 @@ test('observed throat-clear fillers are filtered when no completed answer follow
 });
 
 test('short real answers and real interruptions survive the filter', () => {
-  // 정상 완료 답변이 따르면 같은 글자라도 사용자의 실제 대답으로 본다.
-  assert.equal(isPersistableUserTurn('음', { assistantStatus: 'completed' }), true);
-  // 필러 집합에 없는 짧은 대답은 답변이 없어도 남긴다.
-  assert.equal(isPersistableUserTurn('응', { assistantStatus: 'cancelled' }), true);
-  assert.equal(isPersistableUserTurn('네', { assistantStatus: 'cancelled' }), true);
-  // 실제 끼어들기는 응답을 끊지만 저장한다.
-  assert.equal(isPersistableUserTurn('잠깐', { assistantStatus: 'cancelled' }), true);
-  assert.equal(isPersistableUserTurn('아니 그거 말고', { assistantStatus: 'cancelled' }), true);
+  // 필러 집합에 없는 짧은 대답은 그대로 남는다.
+  assert.equal(isPersistableUserTurn('응'), true);
+  assert.equal(isPersistableUserTurn('네'), true);
+  // 실제 끼어들기도 저장한다.
+  assert.equal(isPersistableUserTurn('잠깐'), true);
+  assert.equal(isPersistableUserTurn('아니 그거 말고'), true);
+  // 필러로 시작해도 실질 글자가 2자를 넘으면 실제 발화로 본다.
+  assert.equal(isPersistableUserTurn('음 좋아'), true);
 });
 
 test('a turn finalizes only after both the correction and the assistant outcome arrive', () => {
@@ -281,6 +281,31 @@ test('a throat-clear turn writes no message and is recorded as an empty turn', (
   });
   assert.equal(repeated.discarded, true);
   assert.equal(messageRows(db).length, 0);
+});
+
+// 2026-07-31 Pi 실기기 회귀. 시온이 말을 끝낸 뒤의 헛기침은 사용자 턴을 만들고
+// 정상 completed 답변까지 받아내므로, assistant 상태로는 걸러지지 않는다.
+test('a throat clear answered by a completed response is still discarded', () => {
+  const db = createDatabase();
+  const store = createStore(db);
+
+  store.recordCorrection({
+    sessionId: SESSION,
+    inputItemId: ITEM,
+    correctedTranscript: '음.',
+  });
+  const result = store.recordAssistant({
+    sessionId: SESSION,
+    inputItemId: ITEM,
+    finalResponseId: 'resp-cough',
+    assistantTranscript: '그래서 그 이미지는 부서진 여러 존재들이 겹겹이 쌓이면서 새로워지는 거야.',
+    assistantStatus: 'completed',
+  });
+
+  assert.equal(result.discarded, true);
+  assert.equal(result.finalized, false);
+  assert.equal(messageRows(db).length, 0);
+  assert.equal(receiptRow(db).error_code, 'empty_turn');
 });
 
 test('separate turns in one session are tracked independently', () => {

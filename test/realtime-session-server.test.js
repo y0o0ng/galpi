@@ -667,12 +667,24 @@ test('R2c-1 finalization writes one corrected pair and drops throat-clear turns'
   assert.equal(discarded.body.receipt.userMessageId, null);
   assert.equal(messages().length, 2);
 
+  // 시온이 말을 끝낸 뒤의 헛기침은 정상 completed 답변까지 받아내지만 저장하지 않는다.
+  correctedText = '흥.';
+  await correct('item-cough-answered', pcmWav({ amplitude: 0.4 }));
+  const answeredCough = await reportAssistant('item-cough-answered', {
+    final_response_id: 'resp-cough',
+    assistant_transcript: '그 부분은 이미지가 겹겹이 쌓이는 느낌이라 더 인상적이야.',
+    assistant_status: 'completed',
+  });
+  assert.equal(answeredCough.body.receipt.discarded, true);
+  assert.equal(messages().length, 2);
+
   const receipts = db.prepare(`
     SELECT input_item_id AS inputItemId, status, error_code AS errorCode
     FROM realtime_turn_receipts ORDER BY input_item_id
   `).all();
   assert.deepEqual(receipts, [
     { inputItemId: 'item-cough', status: 'discarded', errorCode: 'empty_turn' },
+    { inputItemId: 'item-cough-answered', status: 'discarded', errorCode: 'empty_turn' },
     { inputItemId: 'item-real', status: 'finalized', errorCode: null },
   ]);
 
