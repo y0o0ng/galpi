@@ -17,6 +17,7 @@
     noiseFrames: 12,
     speechFactor: 3.5,
     minRms: 0.006,
+    audioWatchdogMs: 2500,
   };
 
   // H1은 shared-main을 건드리지 않는다. H2에서 세션 ID만 바꾼다.
@@ -95,6 +96,23 @@
       setMicEnabled(true);
       setPhase('listening');
       armIdleTimeout();
+      // 재생이 오디오 그래프를 재웠을 수 있으므로 들을 때마다 깨운다.
+      void state.recorder?.resume?.();
+      armAudioWatchdog();
+    }
+
+    // 마이크가 조용히 죽는 것이 이 루프의 최악이다. 다시 들을 때마다 실제로 프레임이
+    // 도착하는지 확인하고, 안 오면 침묵으로 두지 않고 복구한다.
+    function armAudioWatchdog() {
+      clearTimer('audio');
+      state.timers.audio = global.setTimeout(() => {
+        if (!state.active || state.phase !== 'listening') return;
+        void state.recorder?.resume?.();
+        state.timers.audio = global.setTimeout(() => {
+          if (!state.active || state.phase !== 'listening') return;
+          recover('마이크가 멈춰서 다시 열었어.');
+        }, state.config.audioWatchdogMs);
+      }, state.config.audioWatchdogMs);
     }
 
     function enterCooldown() {
@@ -116,6 +134,8 @@
 
     function handleLevel(rms) {
       if (!state.active) return;
+      // 프레임이 한 번이라도 오면 오디오 그래프가 살아 있다는 뜻이다.
+      if (state.timers.audio) clearTimer('audio');
       if (state.phase !== 'listening' && state.phase !== 'capturing') return;
 
       if (state.threshold === 0) {

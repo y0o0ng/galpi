@@ -61,6 +61,7 @@ function loadClient({ config = {}, responders = {} } = {}) {
           async start() {},
           beginTurn(id) { recorderEvents.push(['begin', id]); return true; },
           endTurn(id) { recorderEvents.push(['end', id]); return true; },
+          async resume() { recorderEvents.push(['resume']); return true; },
           stop() { recorderEvents.push(['stop']); },
         };
         return recorder;
@@ -355,4 +356,43 @@ test('audio playback is unlocked inside the start gesture, before any await', as
   assert.equal(h.audioElements.length, 1);
   assert.equal(h.audioElements[0].playCount, 1);
   assert.equal(h.played.length, 1);
+});
+
+test('the audio graph is woken every time listening resumes', async () => {
+  const h = loadClient();
+  await h.client.start();
+  // 첫 청취부터 깨운다. iOS는 재생 뒤 그래프를 재울 수 있다.
+  assert.ok(h.recorderEvents.some(e => e[0] === 'resume'));
+
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+  h.fireTimer(500);
+
+  // 두 번째 턴 직전에도 다시 깨워야 마이크가 계속 산다.
+  assert.ok(h.recorderEvents.filter(e => e[0] === 'resume').length >= 2);
+  assert.equal(h.client.getState().phase, 'listening');
+});
+
+test('a listening state that receives no audio frames recovers instead of hanging', async () => {
+  const h = loadClient();
+  await h.client.start();
+
+  // 프레임이 한 장도 안 오면 두 번의 감시 주기 뒤 복구한다.
+  assert.equal(h.fireTimer(2500), true);
+  assert.equal(h.fireTimer(2500), true);
+
+  assert.ok(h.toasts.some(message => message.includes('마이크가 멈춰서')));
+  assert.equal(h.client.getState().phase, 'cooldown');
+});
+
+test('an arriving audio frame disarms the watchdog', async () => {
+  const h = loadClient();
+  await h.client.start();
+  h.client.__feedLevel(0.001);
+
+  // 프레임이 왔으므로 감시 타이머는 사라진다.
+  assert.equal(h.fireTimer(2500), false);
 });

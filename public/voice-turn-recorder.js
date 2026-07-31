@@ -222,6 +222,20 @@
       return true;
     }
 
+    // iOS는 <audio> 재생 뒤 AudioContext를 suspend할 수 있다. 그러면 onaudioprocess가
+    // 멈춰 음량 신호가 끊기므로, 다시 들을 때마다 명시적으로 깨운다.
+    async function resume() {
+      if (!context || stopped) return false;
+      if (context.state !== 'running' && typeof context.resume === 'function') {
+        try {
+          await context.resume();
+        } catch (_) {
+          return false;
+        }
+      }
+      return context.state === 'running';
+    }
+
     function stop() {
       if (stopped) return;
       stopped = true;
@@ -246,6 +260,7 @@
     return {
       beginTurn,
       endTurn,
+      resume,
       start,
       stop,
     };
