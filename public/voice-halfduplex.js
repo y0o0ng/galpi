@@ -311,8 +311,30 @@
       }
     }
 
+    // iOS는 사용자 제스처 밖에서 시작한 재생을 막는다. 답변 음성은 버튼을 누른 뒤 몇 초 지나
+    // 도착하므로, 제스처가 살아 있는 동안 요소를 열어 무음으로 잠금을 풀고 계속 재사용한다.
+    function primeAudioPlayback() {
+      if (state.audio) return;
+      try {
+        const player = new global.Audio();
+        player.playsInline = true;
+        state.audio = player;
+        const silent = global.VoiceTurnRecorder.encodePcmWav(new global.Float32Array(8), 8000);
+        player.src = global.URL.createObjectURL(new global.Blob([silent], { type: 'audio/wav' }));
+        const played = player.play?.();
+        if (played?.catch) played.catch(() => {});
+      } catch (_) {
+        // 잠금 해제 실패는 치명적이지 않다. 실제 재생 시점에 다시 시도한다.
+      }
+    }
+
     function playAudio(blob) {
       return new Promise(resolve => {
+        const player = state.audio;
+        if (!player) {
+          resolve();
+          return;
+        }
         let url = '';
         try {
           url = global.URL.createObjectURL(blob);
@@ -320,18 +342,16 @@
           resolve();
           return;
         }
-        const audio = new global.Audio(url);
-        state.audio = audio;
         const finish = () => {
-          audio.onended = null;
-          audio.onerror = null;
-          state.audio = null;
+          player.onended = null;
+          player.onerror = null;
           try { global.URL.revokeObjectURL(url); } catch (_) { /* 이미 해제됨 */ }
           resolve();
         };
-        audio.onended = finish;
-        audio.onerror = finish;
-        const played = audio.play?.();
+        player.onended = finish;
+        player.onerror = finish;
+        player.src = url;
+        const played = player.play?.();
         if (played?.catch) played.catch(finish);
       });
     }
@@ -345,6 +365,8 @@
       state.runId += 1;
       state.active = true;
       state.correctionSessionId = '';
+      // 어떤 await보다 먼저 해야 제스처 컨텍스트가 살아 있다.
+      primeAudioPlayback();
       try {
         state.stream = await global.navigator.mediaDevices.getUserMedia({
           audio: {
@@ -378,6 +400,8 @@
       state.stream = null;
       if (state.audio) {
         state.audio.pause?.();
+        state.audio.onended = null;
+        state.audio.onerror = null;
         state.audio = null;
       }
     }

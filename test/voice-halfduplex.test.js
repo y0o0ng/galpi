@@ -20,6 +20,7 @@ function loadClient({ config = {}, responders = {} } = {}) {
   let recorder = null;
   const recorderEvents = [];
   const played = [];
+  const audioElements = [];
 
   const fakeWindow = {
     setTimeout(fn, ms) {
@@ -32,16 +33,20 @@ function loadClient({ config = {}, responders = {} } = {}) {
     FormData,
     Blob,
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} },
+    Float32Array,
     Audio: class FakeAudio {
-      constructor(url) {
-        this.url = url;
-        played.push(url);
+      constructor() { this.playCount = 0; audioElements.push(this); }
+      set src(value) {
+        this._src = value;
+        played.push(value);
         // 재생 완료를 즉시 통지해 SPEAKING 이후 전이를 검사한다.
         setImmediate(() => this.onended?.());
       }
-      play() { return Promise.resolve(); }
+      get src() { return this._src; }
+      play() { this.playCount += 1; return Promise.resolve(); }
       pause() {}
     },
+    VoiceTurnRecorder: null,
     navigator: {
       mediaDevices: {
         async getUserMedia() {
@@ -49,7 +54,7 @@ function loadClient({ config = {}, responders = {} } = {}) {
         },
       },
     },
-    VoiceTurnRecorder: {
+    VoiceTurnRecorderReal: {
       create(options) {
         recorder = {
           options,
@@ -62,7 +67,11 @@ function loadClient({ config = {}, responders = {} } = {}) {
       },
     },
   };
-  fakeWindow.navigator = fakeWindow.navigator;
+  fakeWindow.VoiceTurnRecorder = {
+    ...fakeWindow.VoiceTurnRecorderReal,
+    encodePcmWav: () => new ArrayBuffer(44),
+  };
+  delete fakeWindow.VoiceTurnRecorderReal;
 
   const context = {
     window: fakeWindow,
@@ -77,6 +86,8 @@ function loadClient({ config = {}, responders = {} } = {}) {
     Error,
     Promise,
     Array,
+    Float32Array,
+    ArrayBuffer,
   };
   vm.runInNewContext(
     fs.readFileSync(path.join(ROOT, 'public/voice-halfduplex.js'), 'utf8'),
@@ -121,7 +132,7 @@ function loadClient({ config = {}, responders = {} } = {}) {
 
   return {
     client, calls, phases, toasts, transcripts, answers, tracks,
-    timers, recorderEvents, played, settleNoise,
+    timers, recorderEvents, played, audioElements, settleNoise,
     fireTimer(predicateMs) {
       for (const [id, entry] of timers) {
         if (entry.ms === predicateMs) {
@@ -162,7 +173,9 @@ test('a full turn walks listening through speaking and returns to cooldown', asy
   assert.deepEqual(h.answers, ['오전 10시에 하나 있어.']);
   assert.ok(h.phases.includes('thinking'));
   assert.ok(h.phases.includes('speaking'));
-  assert.equal(h.played.length, 1);
+  // iOS 잠금 해제용 무음 하나와 실제 답변 하나가 같은 요소에서 재생된다.
+  assert.equal(h.audioElements.length, 1);
+  assert.equal(h.played.length, 2);
   assert.equal(h.client.getState().phase, 'cooldown');
 });
 
@@ -332,4 +345,14 @@ test('an expired session is dropped so the next turn asks for a new one', async 
   // 만료된 세션을 계속 쓰지 않고 두 번째 발급을 받는다.
   assert.equal(h.calls.filter(call => call.url === '/api/voice/session').length, 2);
   assert.deepEqual(h.transcripts, ['내일 일정']);
+});
+
+test('audio playback is unlocked inside the start gesture, before any await', async () => {
+  const h = loadClient();
+  await h.client.start();
+
+  // 버튼을 누른 시점에 요소가 열려야 iOS가 이후 재생을 막지 않는다.
+  assert.equal(h.audioElements.length, 1);
+  assert.equal(h.audioElements[0].playCount, 1);
+  assert.equal(h.played.length, 1);
 });
