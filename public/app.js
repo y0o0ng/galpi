@@ -183,6 +183,8 @@ async function init() {
       config: config.halfDuplexVoice,
       // 음성 턴도 텍스트와 같은 경로로 보내 shared-main에 저장되고 메인 채팅에 그려진다.
       askAssistant: transcript => sendSingleMessage({ overrideText: transcript, source: 'voice' }),
+      // 말로 등록·취소할 때 음성이 새 요청을 만들지 않고 카드 버튼과 같은 경로를 부른다.
+      pendingConfirmation: () => window.TaskPanel?.getPendingScheduleConfirmation() || null,
     });
     window.ChatModelPicker?.init({
       apiFetch,

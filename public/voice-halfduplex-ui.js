@@ -41,7 +41,9 @@
       if (panel) panel.hidden = phase === 'idle';
     }
 
-    function init({ config, apiFetch, showToast: toast = () => {}, askAssistant } = {}) {
+    function init({
+      config, apiFetch, showToast: toast = () => {}, askAssistant, pendingConfirmation,
+    } = {}) {
       showToast = toast;
       core = global.VoiceHalfDuplex;
       const button = el('voice-hd-button');
@@ -61,6 +63,7 @@
         apiFetch,
         showToast,
         askAssistant,
+        pendingConfirmation,
         onPhase: renderPhase,
       });
 

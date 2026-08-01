@@ -4,7 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_INSTRUCTIONS,
   DEFAULT_MAX_CHARS,
+  DEFAULT_SPEED,
   createVoiceTtsService,
   selectSpokenText,
 } = require('../lib/voice-tts');
@@ -112,4 +114,35 @@ test('an empty instruction is omitted rather than sent as a blank field', async 
   await service.speak('안녕');
   assert.equal('instructions' in requests[0], false);
   assert.equal(requests[0].voice, 'echo');
+});
+
+test('the speaking rate is sent and held inside the range the API accepts', async () => {
+  const send = async speed => {
+    const requests = [];
+    const service = createVoiceTtsService({
+      enabled: true,
+      apiKey: 'k',
+      ...(speed === undefined ? {} : { speed }),
+      async fetchImpl(url, options) {
+        requests.push(JSON.parse(options.body));
+        return { ok: true, body: (async function* () { yield Buffer.from('RIFF'); })() };
+      },
+    });
+    await service.speak('안녕');
+    return requests[0].speed;
+  };
+
+  // 기본은 조금 빠르게 읽는다.
+  assert.equal(await send(undefined), DEFAULT_SPEED);
+  assert.ok(DEFAULT_SPEED > 1);
+  assert.equal(await send('1.3'), 1.3);
+  // 범위를 벗어난 설정값은 매 턴 400을 부르므로 코드에서 가둔다.
+  assert.equal(await send(9), 4);
+  assert.equal(await send(0.01), 0.25);
+  assert.equal(await send('빠르게'), DEFAULT_SPEED);
+});
+
+test('the delivery instruction no longer fights the speed setting', () => {
+  // 지시문이 "너무 빠르지 않게"라고 하면 speed를 올려도 서로 상쇄된다.
+  assert.doesNotMatch(DEFAULT_INSTRUCTIONS, /빠르지 않게|천천히/);
 });

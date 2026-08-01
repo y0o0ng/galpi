@@ -62,7 +62,7 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.deepEqual(Object.keys(notificationWindow.NotificationPanel).sort(), ['init', 'refresh', 'show']);
   const taskWindow = {};
   vm.runInNewContext(taskSource, { window: taskWindow }, { filename: 'task-panel.js' });
-  assert.deepEqual(Object.keys(taskWindow.TaskPanel).sort(), ['init', 'makeReminderCard', 'makeScheduleCandidateCard', 'refresh', 'render']);
+  assert.deepEqual(Object.keys(taskWindow.TaskPanel).sort(), ['getPendingScheduleConfirmation', 'init', 'makeReminderCard', 'makeScheduleCandidateCard', 'refresh', 'render']);
   const pushWindow = {};
   vm.runInNewContext(pushSource, { window: pushWindow }, { filename: 'push-client.js' });
   assert.deepEqual(Object.keys(pushWindow.PushClient).sort(), ['enable', 'getState', 'init', 'refresh']);
@@ -261,9 +261,13 @@ test('chat schedule candidates remain unpersisted until the existing task API co
   assert.match(app, /if \(candidateCard\) \{[\s\S]*?group\.appendChild\(candidateCard\)[\s\S]*?return;/);
   assert.match(taskPanel, /const payload = JSON\.parse\(JSON\.stringify\(input\)\)/);
   assert.match(taskPanel, /request\('\/api\/tasks', \{ method: 'POST', body: JSON\.stringify\(payload\) \}\)/);
-  assert.match(taskPanel, /const cancel = actionButton\('취소', \(\) => \{[\s\S]*?actions\.remove\(\)[\s\S]*?등록하지 않았어/);
-  assert.match(taskPanel, /const confirm = actionButton\('등록'/);
+  assert.match(taskPanel, /function runCancel\(\) \{[\s\S]*?actions\.remove\(\)[\s\S]*?등록하지 않았어/);
+  assert.match(taskPanel, /const cancel = actionButton\('취소', runCancel\)/);
+  assert.match(taskPanel, /const confirm = actionButton\('등록', runConfirm, true\)/);
   assert.match(taskPanel, /아직 저장되지 않았어/);
+  // 음성은 자기 요청을 만들지 않고 버튼과 똑같은 핸들러를 부른다.
+  assert.match(taskPanel, /state\.pendingCandidate = \{[\s\S]*?confirm: runConfirm,[\s\S]*?cancel: runCancel,/);
+  assert.match(app, /pendingConfirmation: \(\) => window\.TaskPanel\?\.getPendingScheduleConfirmation\(\)/);
   assert.match(css, /\.task-candidate-card\s*{[^}]*border-left: 3px solid var\(--brand\)/s);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.task-candidate-actions \.task-action\s*{[^}]*min-height: 44px/s);
 });
@@ -312,4 +316,115 @@ test('schedule layout keeps native week navigation and minimal task controls', (
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.schedule-agent-back,[\s\S]*?min-height: 44px/s);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.task-card-actions \.task-action\s*{[^}]*flex: 1 1 0[^}]*min-width: 0/s);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.task-panel-skeleton span/s);
+});
+
+// ─── 일정 후보 카드의 음성 확인 수명 ──────────────────────────────────────
+
+function loadTaskPanel({ apiFetch } = {}) {
+  function element(tag) {
+    const node = {
+      tagName: tag,
+      children: [],
+      classList: {
+        list: new Set(),
+        add(...names) { names.forEach(n => this.list.add(n)); },
+        remove(...names) { names.forEach(n => this.list.delete(n)); },
+        contains(n) { return this.list.has(n); },
+      },
+      attributes: {},
+      listeners: {},
+      textContent: '',
+      hidden: false,
+      disabled: false,
+      setAttribute(k, v) { this.attributes[k] = v; },
+      addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
+      append(...nodes) { this.children.push(...nodes); },
+      remove() {},
+    };
+    return node;
+  }
+
+  const win = {
+    document: { createElement: element },
+    Headers: class { constructor() { this.map = {}; } set(k, v) { this.map[k] = v; } },
+  };
+  vm.runInNewContext(read('public/task-panel.js'), {
+    window: win, document: win.document, Headers: win.Headers,
+    Object, JSON, String, Number, Date, Math, Promise, Error, Array, Set, Intl, console,
+  }, { filename: 'task-panel.js' });
+
+  win.TaskPanel.init({
+    apiFetch: apiFetch || (async () => ({ ok: true, async json() { return {}; } })),
+    showToast: () => {},
+    onChanged: () => {},
+    enabled: true,
+  });
+  return win.TaskPanel;
+}
+
+const CANDIDATE = {
+  task: {
+    clientRequestId: 'req-1',
+    title: '할머니집 가기',
+    detail: '',
+    due: { kind: 'datetime', at: '2026-08-01T11:00:00+09:00' },
+    reminderAt: null,
+  },
+};
+
+test('a fresh candidate card is offered to voice and released once it is answered', async () => {
+  const posts = [];
+  const panel = loadTaskPanel({
+    async apiFetch(path, options) {
+      posts.push({ path, body: JSON.parse(options.body) });
+      return { ok: true, async json() { return { task: { id: 1 } }; } };
+    },
+  });
+
+  assert.equal(panel.getPendingScheduleConfirmation(), null);
+  panel.makeScheduleCandidateCard(CANDIDATE);
+
+  const pending = panel.getPendingScheduleConfirmation();
+  assert.equal(pending.id, 'req-1');
+  assert.equal(pending.title, '할머니집 가기');
+
+  await pending.confirm();
+  // 같은 clientRequestId로 기존 task API를 한 번만 부른다.
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].path, '/api/tasks');
+  assert.equal(posts[0].body.clientRequestId, 'req-1');
+  // 답을 받은 카드는 더 이상 음성 확인 대상이 아니다. 남으면 다음 "응"이 또 등록한다.
+  assert.equal(panel.getPendingScheduleConfirmation(), null);
+});
+
+test('cancelling by voice releases the card without calling the task API', () => {
+  const posts = [];
+  const panel = loadTaskPanel({
+    async apiFetch(path) { posts.push(path); return { ok: true, async json() { return {}; } }; },
+  });
+
+  panel.makeScheduleCandidateCard(CANDIDATE);
+  panel.getPendingScheduleConfirmation().cancel();
+
+  assert.deepEqual(posts, []);
+  assert.equal(panel.getPendingScheduleConfirmation(), null);
+});
+
+test('a failed registration keeps the card so it can be pressed again', async () => {
+  const panel = loadTaskPanel({
+    async apiFetch() { return { ok: false, status: 500, async json() { return { error: '서버 오류' }; } }; },
+  });
+
+  panel.makeScheduleCandidateCard(CANDIDATE);
+  const pending = panel.getPendingScheduleConfirmation();
+  await assert.rejects(() => pending.confirm());
+  // 실패는 해제하지 않는다. 사용자가 화면에서 다시 누를 수 있어야 한다.
+  assert.equal(panel.getPendingScheduleConfirmation()?.id, 'req-1');
+});
+
+test('a newer candidate replaces the one still waiting', () => {
+  const panel = loadTaskPanel();
+  panel.makeScheduleCandidateCard(CANDIDATE);
+  panel.makeScheduleCandidateCard({ task: { ...CANDIDATE.task, clientRequestId: 'req-2' } });
+  assert.equal(panel.getPendingScheduleConfirmation().id, 'req-2');
 });

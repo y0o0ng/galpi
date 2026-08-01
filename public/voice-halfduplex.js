@@ -1,8 +1,8 @@
 'use strict';
 
-// H1 반이중 음성 루프.
+// 반이중 음성 루프.
 // LISTENING → CAPTURING → TRANSCRIBING → THINKING → SPEAKING → COOLDOWN → LISTENING
-// 되묻기·슬롯 검증은 H3, shared-main 저장은 H2에서 연다.
+// 되묻기·슬롯 검증은 H3에서 연다.
 (function setupVoiceHalfDuplex(global) {
   const DEFAULTS = {
     silenceMs: 1200,
@@ -18,12 +18,62 @@
     speechFactor: 3.5,
     minRms: 0.006,
     audioWatchdogMs: 2500,
+    // 카드가 뜬 뒤 이만큼의 턴 동안만 말로 등록·취소할 수 있다. 그 뒤의 "응"은
+    // 다른 얘기일 가능성이 커서 손으로 누르게 둔다. 카드 자체는 남는다.
+    confirmTurnWindow: 2,
   };
 
   const STATES = [
     'idle', 'listening', 'capturing', 'transcribing',
     'thinking', 'speaking', 'cooldown', 'recovering',
   ];
+
+  // 확인 카드가 떠 있을 때만 쓰는 좁은 어휘다. 판정을 모델에 맡기면 확인 카드를 둔
+  // 이유인 "모델이 틀려도 사람이 막는다"가 사라진다.
+  const CONFIRM_WORDS = new Set([
+    '등록', '등록해', '등록해줘', '등록해주세요', '등록하자', '등록할게', '등록해도돼',
+    '저장', '저장해', '저장해줘', '해줘', '해주세요', '하자',
+    '응', '어', '네', '예', '그래', '그래요', '좋아', '좋아요', '맞아', '맞아요',
+    '오케이', 'ok', 'okay', '콜',
+  ]);
+  const CANCEL_WORDS = new Set([
+    '취소', '취소해', '취소해줘', '취소해주세요', '취소하자', '취소할게',
+    '아니', '아냐', '아니야', '아니요', '아뇨', '됐어', '됐어요', '됐다',
+    '하지마', '하지마요', '안해', '안할래', '지워', '지워줘', '삭제',
+    '나중에', '나중에할게', '관둬', '등록하지마', '등록안해',
+  ]);
+  // "응, 등록해줘"처럼 앞에 붙는 맞장구를 떼고 다시 본다.
+  const LEADING_PARTICLES = ['응', '어', '네', '예', '그래', '좋아', '아니', '아냐', '아니야'];
+  // 이보다 길면 명령이 아니라 문장이다. "등록은 나중에 생각해볼게"가 등록으로 읽히면 안 된다.
+  const MAX_CONFIRM_LENGTH = 8;
+
+  function normalizeCommand(text) {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/[\p{P}\p{S}\p{Z}\s]/gu, '');
+  }
+
+  function classifyWord(word) {
+    if (CONFIRM_WORDS.has(word)) return 'confirm';
+    if (CANCEL_WORDS.has(word)) return 'cancel';
+    return null;
+  }
+
+  // 카드 확인 의도를 판정한다. 확신이 없으면 null을 돌려 평소대로 LLM에 보낸다.
+  function matchConfirmIntent(transcript) {
+    const normalized = normalizeCommand(transcript);
+    if (!normalized || normalized.length > MAX_CONFIRM_LENGTH) return null;
+
+    const direct = classifyWord(normalized);
+    if (direct) return direct;
+
+    for (const particle of LEADING_PARTICLES) {
+      if (normalized.length <= particle.length || !normalized.startsWith(particle)) continue;
+      const rest = classifyWord(normalized.slice(particle.length));
+      if (rest) return rest;
+    }
+    return null;
+  }
 
   function setupVoiceHalfDuplexModule() {
     const state = {
@@ -35,6 +85,9 @@
       onTranscript: () => {},
       onAnswer: () => {},
       onPhase: () => {},
+      pendingConfirmation: () => null,
+      confirmCardId: null,
+      confirmTurnsLeft: 0,
       stream: null,
       recorder: null,
       turnSequence: 0,
@@ -262,7 +315,49 @@
       }
     }
 
+    // 확인 창은 카드가 바뀔 때만 다시 열린다. 한참 뒤의 "응"이 엉뚱한 일정을
+    // 등록하지 않도록 창을 넘긴 카드는 손으로만 누르게 둔다.
+    function refreshConfirmWindow() {
+      const pending = state.pendingConfirmation?.() || null;
+      if (!pending) {
+        state.confirmCardId = null;
+        state.confirmTurnsLeft = 0;
+        return null;
+      }
+      if (pending.id !== state.confirmCardId) {
+        state.confirmCardId = pending.id;
+        state.confirmTurnsLeft = state.config.confirmTurnWindow;
+      }
+      return state.confirmTurnsLeft > 0 ? pending : null;
+    }
+
+    async function runCardIntent(pending, intent, runId) {
+      setPhase('thinking');
+      try {
+        if (intent === 'confirm') await pending.confirm();
+        else pending.cancel();
+      } catch (_) {
+        if (runId === state.runId) recover('일정을 등록하지 못했어. 화면에서 눌러줄래?');
+        return;
+      }
+      if (runId !== state.runId) return;
+      state.confirmCardId = null;
+      state.confirmTurnsLeft = 0;
+      await speak(intent === 'confirm' ? '일정 등록했어.' : '등록하지 않을게.', runId);
+    }
+
     async function think(transcript, runId) {
+      // 확인 카드가 떠 있으면 좁은 어휘를 먼저 본다. 모델 호출도 저장도 하지 않는다.
+      const pending = refreshConfirmWindow();
+      if (pending) {
+        const intent = matchConfirmIntent(transcript);
+        if (intent) {
+          await runCardIntent(pending, intent, runId);
+          return;
+        }
+        state.confirmTurnsLeft -= 1;
+      }
+
       setPhase('thinking');
       clearTimer('answer');
       state.timers.answer = global.setTimeout(
@@ -440,10 +535,12 @@
       onAnswer = () => {},
       onPhase = () => {},
       askAssistant = async () => ({ ok: false, reason: 'error' }),
+      pendingConfirmation = () => null,
     } = {}) {
       state.config = { ...DEFAULTS, ...(config || {}) };
       state.apiFetch = apiFetch;
       state.askAssistant = askAssistant;
+      state.pendingConfirmation = pendingConfirmation;
       state.showToast = showToast;
       state.onTranscript = onTranscript;
       state.onAnswer = onAnswer;
@@ -452,6 +549,7 @@
 
     return {
       DEFAULTS,
+      matchConfirmIntent,
       init,
       start,
       stop,

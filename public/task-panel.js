@@ -11,6 +11,8 @@
     view: 'today',
     mode: 'list',
     requestId: 0,
+    // 음성이 말로 등록·취소할 수 있는, 아직 답을 받지 않은 일정 후보 카드.
+    pendingCandidate: null,
   };
 
   const views = [
@@ -674,12 +676,21 @@
     status.textContent = '아직 저장되지 않았어.';
     const actions = document.createElement('div');
     actions.className = 'task-candidate-actions';
-    const cancel = actionButton('취소', () => {
+
+    // 카드가 답을 받으면 더는 음성 확인 대상이 아니다. 늦게 온 "응"이 다른 카드를
+    // 건드리지 않도록 여기서 지운다.
+    function releasePending() {
+      if (state.pendingCandidate?.id === payload.clientRequestId) state.pendingCandidate = null;
+    }
+
+    function runCancel() {
+      releasePending();
       actions.remove();
       card.classList.add('is-cancelled');
       status.textContent = '등록하지 않았어.';
-    });
-    const confirm = actionButton('등록', async () => {
+    }
+
+    async function runConfirm() {
       cancel.disabled = true;
       confirm.disabled = true;
       confirm.textContent = '등록 중';
@@ -687,6 +698,7 @@
       status.textContent = '일정을 등록하고 있어.';
       try {
         await request('/api/tasks', { method: 'POST', body: JSON.stringify(payload) });
+        releasePending();
         actions.remove();
         card.classList.add('is-confirmed');
         status.textContent = '일정을 등록했어.';
@@ -699,11 +711,28 @@
         status.classList.add('error');
         status.textContent = error.message;
         state.showToast(error.message);
+        throw error;
       }
-    }, true);
+    }
+
+    const cancel = actionButton('취소', runCancel);
+    const confirm = actionButton('등록', runConfirm, true);
     actions.append(cancel, confirm);
     card.append(heading, title, detail, meta, status, actions);
+
+    // 음성이 자기 요청을 새로 만들지 않고 버튼과 똑같은 경로를 부르게 한다.
+    state.pendingCandidate = {
+      id: payload.clientRequestId,
+      title: payload.title,
+      confirm: runConfirm,
+      cancel: runCancel,
+    };
     return card;
+  }
+
+  // 아직 등록도 취소도 되지 않은 가장 최근 카드. 없으면 null이다.
+  function getPendingScheduleConfirmation() {
+    return state.pendingCandidate;
   }
 
   function init({ apiFetch, showToast, onChanged, enabled }) {
@@ -718,5 +747,8 @@
     state.initialized = true;
   }
 
-  global.TaskPanel = { init, render, refresh, makeReminderCard, makeScheduleCandidateCard };
+  global.TaskPanel = {
+    init, render, refresh, makeReminderCard,
+    makeScheduleCandidateCard, getPendingScheduleConfirmation,
+  };
 })(window);

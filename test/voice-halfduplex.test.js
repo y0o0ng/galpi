@@ -8,9 +8,13 @@ const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
 
-function loadClient({ config = {}, responders = {}, askAssistant = null } = {}) {
+function loadClient({
+  config = {}, responders = {}, askAssistant = null, pendingConfirmation = null,
+} = {}) {
   const calls = [];
   const asks = [];
+  // 턴마다 다른 발화를 흘려보낼 수 있게 큐로 둔다. 비면 기본 문장을 쓴다.
+  const transcriptQueue = [];
   const phases = [];
   const toasts = [];
   const transcripts = [];
@@ -112,6 +116,7 @@ function loadClient({ config = {}, responders = {}, askAssistant = null } = {}) 
       if (askAssistant) return askAssistant(transcript);
       return { ok: true, reply: '오전 10시에 하나 있어.' };
     },
+    ...(pendingConfirmation ? { pendingConfirmation } : {}),
     async apiFetch(url, options) {
       calls.push({ url, options });
       const responder = Object.entries(responders)
@@ -121,10 +126,11 @@ function loadClient({ config = {}, responders = {}, askAssistant = null } = {}) 
         return { ok: true, async json() { return { sessionId: 'vs-1' }; } };
       }
       if (url.includes('/transcribe')) {
+        const next = transcriptQueue.length ? transcriptQueue.shift() : '내일 일정 알려줘';
         return {
           ok: true,
           async json() {
-            return { correctedTranscript: '내일 일정 알려줘', persistable: true };
+            return { correctedTranscript: next, persistable: true };
           },
         };
       }
@@ -137,7 +143,7 @@ function loadClient({ config = {}, responders = {}, askAssistant = null } = {}) 
 
   return {
     client, calls, asks, phases, toasts, transcripts, answers, tracks,
-    timers, recorderEvents, played, audioElements, settleNoise,
+    timers, recorderEvents, played, audioElements, settleNoise, transcriptQueue,
     fireTimer(predicateMs) {
       for (const [id, entry] of timers) {
         if (entry.ms === predicateMs) {
@@ -426,4 +432,135 @@ test('an arriving audio frame disarms the watchdog', async () => {
 
   // 프레임이 왔으므로 감시 타이머는 사라진다.
   assert.equal(h.fireTimer(2500), false);
+});
+
+
+// ─── 일정 카드 음성 확인 ──────────────────────────────────────────────────
+
+test('the confirm vocabulary takes commands but refuses sentences', () => {
+  const { matchConfirmIntent } = loadClient().client;
+
+  for (const text of ['등록', '등록해줘', '응', '그래', '좋아', '오케이', '응 등록해줘', '네, 등록해!']) {
+    assert.equal(matchConfirmIntent(text), 'confirm', text);
+  }
+  for (const text of ['취소', '취소해줘', '아니', '아냐', '됐어', '나중에', '아니 취소해', '등록하지마']) {
+    assert.equal(matchConfirmIntent(text), 'cancel', text);
+  }
+  // 문장은 명령이 아니다. 여기서 걸러야 확인 카드가 안전장치로 남는다.
+  for (const text of [
+    '등록은 나중에 생각해볼게',
+    '그 일정 등록하면 알림도 오나?',
+    '아까 등록한 거 언제였지',
+    '취소하면 어떻게 되는데',
+    '내일 일정 알려줘',
+    '',
+  ]) {
+    assert.equal(matchConfirmIntent(text), null, text);
+  }
+});
+
+function cardHarness({ confirmFails = false } = {}) {
+  const acted = [];
+  let pending = {
+    id: 'req-1',
+    title: '할머니집 가기',
+    async confirm() {
+      acted.push('confirm');
+      if (confirmFails) throw new Error('nope');
+      pending = null;
+    },
+    cancel() { acted.push('cancel'); pending = null; },
+  };
+  const h = loadClient({ pendingConfirmation: () => pending });
+  return { ...h, acted, dropCard: () => { pending = null; } };
+}
+
+async function runTurn(h, transcript, turnId) {
+  // 앞 턴이 cooldown으로 끝났으면 먼저 다시 듣는 상태로 돌려놓는다.
+  if (h.client.getState().phase === 'cooldown') h.fireTimer(500);
+  h.transcriptQueue.push(transcript);
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId, blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+}
+
+test('saying 등록 presses the card instead of building its own request', async () => {
+  const h = cardHarness();
+  await h.client.start();
+  await runTurn(h, '응 등록해줘', 'hd-1');
+
+  assert.deepEqual(h.acted, ['confirm']);
+  // 확인 명령은 대화가 아니다. 모델도 저장도 거치지 않는다.
+  assert.deepEqual(h.asks, []);
+  assert.equal(h.calls.filter(call => call.url === '/api/chat').length, 0);
+  assert.ok(h.calls.some(call => call.url.includes('/speak')));
+  assert.equal(h.client.getState().phase, 'cooldown');
+});
+
+test('saying 취소 dismisses the card without touching the task API', async () => {
+  const h = cardHarness();
+  await h.client.start();
+  await runTurn(h, '아니 취소해', 'hd-1');
+
+  assert.deepEqual(h.acted, ['cancel']);
+  assert.deepEqual(h.asks, []);
+});
+
+test('anything but a command still goes to the assistant with the card intact', async () => {
+  const h = cardHarness();
+  await h.client.start();
+  await runTurn(h, '등록은 나중에 생각해볼게', 'hd-1');
+
+  assert.deepEqual(h.acted, []);
+  assert.deepEqual(h.asks, ['등록은 나중에 생각해볼게']);
+});
+
+test('the spoken confirmation expires so a later 응 cannot register an old card', async () => {
+  const h = cardHarness();
+  await h.client.start();
+
+  // 창은 카드가 뜬 뒤 2턴이다. 두 번 다른 얘기를 하면 닫힌다.
+  await runTurn(h, '오늘 날씨 어때', 'hd-1');
+  await runTurn(h, '고마워', 'hd-2');
+  await runTurn(h, '응', 'hd-3');
+
+  assert.deepEqual(h.acted, []);
+  // 창이 닫혔으므로 마지막 "응"은 평범한 발화로 흘러간다.
+  assert.deepEqual(h.asks, ['오늘 날씨 어때', '고마워', '응']);
+});
+
+test('a new card reopens the window that the previous one used up', async () => {
+  const acted = [];
+  let pending = { id: 'req-1', confirm: async () => { acted.push('c1'); }, cancel() {} };
+  const h = loadClient({ pendingConfirmation: () => pending });
+  await h.client.start();
+
+  await runTurn(h, '오늘 날씨 어때', 'hd-1');
+  await runTurn(h, '고마워', 'hd-2');
+  pending = { id: 'req-2', confirm: async () => { acted.push('c2'); }, cancel() {} };
+  await runTurn(h, '응', 'hd-3');
+
+  assert.deepEqual(acted, ['c2']);
+});
+
+test('a failed registration says so instead of pretending it worked', async () => {
+  const h = cardHarness({ confirmFails: true });
+  await h.client.start();
+  await runTurn(h, '등록', 'hd-1');
+
+  assert.deepEqual(h.acted, ['confirm']);
+  assert.match(h.toasts.at(-1), /등록하지 못했어/);
+  assert.equal(h.client.getState().phase, 'cooldown');
+  h.fireTimer(500);
+  assert.equal(h.client.getState().phase, 'listening');
+});
+
+test('with no card showing the same words are ordinary speech', async () => {
+  const h = loadClient();
+  await h.client.start();
+  await runTurn(h, '응', 'hd-1');
+
+  assert.deepEqual(h.asks, ['응']);
 });

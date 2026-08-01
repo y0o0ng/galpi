@@ -188,6 +188,7 @@ const VOICE_HALFDUPLEX_ENABLED = process.env.VOICE_HALFDUPLEX_ENABLED === 'true'
 const VOICE_TTS_MODEL = String(process.env.VOICE_TTS_MODEL || 'gpt-4o-mini-tts').trim();
 const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'echo').trim();
 const VOICE_TTS_INSTRUCTIONS = process.env.VOICE_TTS_INSTRUCTIONS;
+const VOICE_TTS_SPEED = process.env.VOICE_TTS_SPEED;
 const VOICE_SESSION_TTL_MS = 60 * 60 * 1000;
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
@@ -492,6 +493,7 @@ const voiceTts = createVoiceTtsService({
   model: VOICE_TTS_MODEL,
   voice: VOICE_TTS_VOICE,
   ...(VOICE_TTS_INSTRUCTIONS ? { instructions: VOICE_TTS_INSTRUCTIONS } : {}),
+  ...(VOICE_TTS_SPEED ? { speed: VOICE_TTS_SPEED } : {}),
 });
 
 function getGptModelForCouncilMode(mode) {
