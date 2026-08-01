@@ -36,7 +36,7 @@ function fakeElement(id) {
 function loadUi({ halfDuplexEnabled = true } = {}) {
   const ids = [
     'voice-hd-panel', 'voice-hd-dot', 'voice-hd-status',
-    'voice-hd-stop', 'voice-hd-log', 'voice-hd-button',
+    'voice-hd-stop', 'voice-hd-button',
     'voice-realtime-button',
   ];
   const elements = Object.fromEntries(ids.map(id => [id, fakeElement(id)]));
@@ -63,13 +63,18 @@ function loadUi({ halfDuplexEnabled = true } = {}) {
     { filename: 'voice-halfduplex-ui.js' },
   );
 
+  const asks = [];
   fakeWindow.VoiceHalfDuplexUi.init({
     config: { halfDuplexEnabled },
     apiFetch: async () => ({ ok: true }),
     showToast: () => {},
+    askAssistant: async transcript => {
+      asks.push(transcript);
+      return { ok: true, reply: '알겠어.' };
+    },
   });
 
-  return { elements, coreCalls, ui: fakeWindow.VoiceHalfDuplexUi, hooks };
+  return { elements, coreCalls, asks, ui: fakeWindow.VoiceHalfDuplexUi, hooks };
 }
 
 test('the panel stays hidden and the button never appears while the flag is off', () => {
@@ -123,18 +128,16 @@ test('every phase renders a distinct label so a stuck loop is visible', () => {
   assert.equal(seen.size, Object.keys(ui.PHASE_LABELS).length);
 });
 
-test('transcripts and answers land in the log as separate rows', () => {
-  const { elements, hooks } = loadUi();
+test('the panel forwards the shared chat sender and renders no transcript of its own', async () => {
+  const { asks, hooks } = loadUi();
 
-  hooks.onTranscript('내일 일정 알려줘');
-  hooks.onAnswer('오전 10시에 하나 있어.');
+  // H2부터 발화와 답변 본문은 메인 채팅이 그린다. 패널이 따로 적으면 같은 말이 두 번 보인다.
+  assert.equal(typeof hooks.askAssistant, 'function');
+  assert.equal(hooks.onTranscript, undefined);
+  assert.equal(hooks.onAnswer, undefined);
 
-  const log = elements['voice-hd-log'];
-  assert.equal(log.children.length, 2);
-  assert.equal(log.children[0].className, 'voice-hd-row voice-hd-user');
-  assert.equal(log.children[0].textContent, '내일 일정 알려줘');
-  assert.equal(log.children[1].className, 'voice-hd-row voice-hd-assistant');
-  assert.equal(log.scrollTop, log.scrollHeight);
+  assert.deepEqual(await hooks.askAssistant('내일 일정 알려줘'), { ok: true, reply: '알겠어.' });
+  assert.deepEqual(asks, ['내일 일정 알려줘']);
 });
 
 test('the stop control ends the loop from inside the panel', () => {

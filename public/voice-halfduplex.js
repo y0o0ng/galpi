@@ -20,9 +20,6 @@
     audioWatchdogMs: 2500,
   };
 
-  // H1은 shared-main을 건드리지 않는다. H2에서 세션 ID만 바꾼다.
-  const SCRATCH_SESSION_ID = 'voice-halfduplex-scratch';
-
   const STATES = [
     'idle', 'listening', 'capturing', 'transcribing',
     'thinking', 'speaking', 'cooldown', 'recovering',
@@ -273,25 +270,23 @@
         state.config.answerTimeoutMs,
       );
       try {
-        const response = await state.apiFetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: transcript,
-            model: 'gpt',
-            sessionId: SCRATCH_SESSION_ID,
-            source: 'voice',
-          }),
-        });
-        const data = await response.json().catch(() => ({}));
+        const result = await state.askAssistant(transcript);
         clearTimer('answer');
         if (runId !== state.runId) return;
-        if (!response.ok || !data.reply) {
+        if (!result?.ok) {
+          // 텍스트 답변이 진행 중이면 음성 턴은 거절된다. 실패와 구분해서 알려준다.
+          recover(result?.reason === 'busy'
+            ? '다른 답변을 만들고 있어. 끝나면 다시 말해줄래?'
+            : '답변을 못 만들었어.');
+          return;
+        }
+        const reply = String(result.reply || '').trim();
+        if (!reply) {
           recover('답변을 못 만들었어.');
           return;
         }
-        state.onAnswer(data.reply);
-        await speak(data.reply, runId);
+        state.onAnswer(reply);
+        await speak(reply, runId);
       } catch (_) {
         clearTimer('answer');
         if (runId === state.runId) recover('답변을 못 만들었어.');
@@ -444,9 +439,11 @@
       onTranscript = () => {},
       onAnswer = () => {},
       onPhase = () => {},
+      askAssistant = async () => ({ ok: false, reason: 'error' }),
     } = {}) {
       state.config = { ...DEFAULTS, ...(config || {}) };
       state.apiFetch = apiFetch;
+      state.askAssistant = askAssistant;
       state.showToast = showToast;
       state.onTranscript = onTranscript;
       state.onAnswer = onAnswer;
@@ -455,7 +452,6 @@
 
     return {
       DEFAULTS,
-      SCRATCH_SESSION_ID,
       init,
       start,
       stop,

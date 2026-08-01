@@ -3691,43 +3691,6 @@ body[data-active-model="council"] #send-btn {
   50%      { opacity: 0.35; }
 }
 
-#voice-hd-log {
-  margin-top: 10px;
-  /* 시 원문처럼 긴 답변이 한 줄만 보이지 않도록 화면 높이를 따라간다. */
-  max-height: min(38vh, 320px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-#voice-hd-log:empty {
-  display: none;
-}
-
-.voice-hd-row {
-  padding: 7px 10px;
-  border-radius: 12px;
-  font-size: 0.9rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.voice-hd-user {
-  align-self: flex-end;
-  max-width: 85%;
-  background: var(--user-bubble);
-  color: var(--user-text);
-}
-
-.voice-hd-assistant {
-  align-self: flex-start;
-  background: var(--ai-bubble);
-  color: var(--ai-text);
-  border: 1px solid var(--border);
-}
-
 .voice-hd-note {
   margin-top: 9px;
   color: var(--label);

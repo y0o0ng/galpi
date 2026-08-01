@@ -181,6 +181,8 @@ async function init() {
       apiFetch,
       showToast,
       config: config.halfDuplexVoice,
+      // 음성 턴도 텍스트와 같은 경로로 보내 shared-main에 저장되고 메인 채팅에 그려진다.
+      askAssistant: transcript => sendSingleMessage({ overrideText: transcript, source: 'voice' }),
     });
     window.ChatModelPicker?.init({
       apiFetch,
@@ -807,11 +809,13 @@ function hideCommandPalette() {
 
 // ─── 단일 모드 ────────────────────────────────────────────────────────────────
 
+// 음성처럼 UI 밖에서 부르는 호출자를 위해 결과를 돌려준다. 거절 사유를 구분해야
+// 음성 루프가 "잠깐만"과 "못 만들었어"를 다르게 복구할 수 있다.
 async function sendSingleMessage(options = {}) {
-  if (isLoading) return;
+  if (isLoading) return { ok: false, reason: 'busy' };
   const inputEl = document.getElementById('input');
   const text = (options.overrideText ?? inputEl.value).trim();
-  if (!text) return;
+  if (!text) return { ok: false, reason: 'empty' };
 
   if (!options.overrideText) inputEl.value = '';
   inputEl.style.height = 'auto';
@@ -828,24 +832,28 @@ async function sendSingleMessage(options = {}) {
     const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, model: 'gpt', sessionId, activeNotes, webSearch: !!options.webSearch, progress: true }),
+      body:    JSON.stringify({ message: text, model: 'gpt', sessionId, activeNotes, webSearch: !!options.webSearch, source: options.source, progress: true }),
     });
     const data = await readProgressResponse(res, stage => updateLoadingStage(loadingEl, stage));
     loadingEl.remove();
-    if (data.error) appendError(data.error);
-    else {
-      appendAssistantBubble({ ...data, question: text });
-      if (Array.isArray(data.webSources) && data.webSources.length > 0) refreshWebUsagePill();
-      lastRenderedMsgId = data.messageId || lastRenderedMsgId; // 방금 보낸 건 폴링이 다시 안 그리게
-      document.dispatchEvent(new Event('pet:happy'));
+    if (data.error) {
+      appendError(data.error);
+      return { ok: false, reason: 'error' };
     }
+    appendAssistantBubble({ ...data, question: text });
+    if (Array.isArray(data.webSources) && data.webSources.length > 0) refreshWebUsagePill();
+    lastRenderedMsgId = data.messageId || lastRenderedMsgId; // 방금 보낸 건 폴링이 다시 안 그리게
+    document.dispatchEvent(new Event('pet:happy'));
+    return { ok: true, reply: data.reply || '' };
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+    return { ok: false, reason: 'error' };
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
-    inputEl.focus();
+    // 핸즈프리 음성 턴에서 focus를 잡으면 모바일 키보드가 올라온다.
+    if (!options.overrideText) inputEl.focus();
   }
 }
 

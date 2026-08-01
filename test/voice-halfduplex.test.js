@@ -8,8 +8,9 @@ const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
 
-function loadClient({ config = {}, responders = {} } = {}) {
+function loadClient({ config = {}, responders = {}, askAssistant = null } = {}) {
   const calls = [];
+  const asks = [];
   const phases = [];
   const toasts = [];
   const transcripts = [];
@@ -105,6 +106,12 @@ function loadClient({ config = {}, responders = {} } = {}) {
     onPhase: phase => phases.push(phase),
     onTranscript: text => transcripts.push(text),
     onAnswer: text => answers.push(text),
+    // 실제 앱에서는 sendSingleMessage가 들어와 메인 채팅에 그리고 shared-main에 저장한다.
+    async askAssistant(transcript) {
+      asks.push(transcript);
+      if (askAssistant) return askAssistant(transcript);
+      return { ok: true, reply: '오전 10시에 하나 있어.' };
+    },
     async apiFetch(url, options) {
       calls.push({ url, options });
       const responder = Object.entries(responders)
@@ -121,9 +128,6 @@ function loadClient({ config = {}, responders = {} } = {}) {
           },
         };
       }
-      if (url.includes('/api/chat')) {
-        return { ok: true, async json() { return { reply: '오전 10시에 하나 있어.' }; } };
-      }
       return { ok: true, async blob() { return new Blob(['RIFF']); } };
     },
   });
@@ -132,7 +136,7 @@ function loadClient({ config = {}, responders = {} } = {}) {
   const settleNoise = () => { client.__feedLevel(0.001); client.__feedLevel(0.001); };
 
   return {
-    client, calls, phases, toasts, transcripts, answers, tracks,
+    client, calls, asks, phases, toasts, transcripts, answers, tracks,
     timers, recorderEvents, played, audioElements, settleNoise,
     fireTimer(predicateMs) {
       for (const [id, entry] of timers) {
@@ -180,7 +184,7 @@ test('a full turn walks listening through speaking and returns to cooldown', asy
   assert.equal(h.client.getState().phase, 'cooldown');
 });
 
-test('the chat call is tagged as voice and kept off shared-main', async () => {
+test('the turn goes through the shared chat sender instead of its own request', async () => {
   const h = loadClient();
   await h.client.start();
   h.settleNoise();
@@ -189,12 +193,43 @@ test('the chat call is tagged as voice and kept off shared-main', async () => {
   await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
   await tick();
 
-  const chat = h.calls.find(call => call.url === '/api/chat');
-  const body = JSON.parse(chat.options.body);
-  assert.equal(body.source, 'voice');
-  assert.equal(body.sessionId, 'voice-halfduplex-scratch');
-  assert.notEqual(body.sessionId, 'shared-main');
-  assert.equal(body.message, '내일 일정 알려줘');
+  // H2는 자체 /api/chat 호출을 버렸다. 그래야 메인 채팅 렌더링과 저장이 한 경로로 모인다.
+  assert.deepEqual(h.asks, ['내일 일정 알려줘']);
+  assert.equal(h.calls.filter(call => call.url === '/api/chat').length, 0);
+  assert.deepEqual(h.answers, ['오전 10시에 하나 있어.']);
+});
+
+test('a busy sender recovers with its own message and keeps listening', async () => {
+  const h = loadClient({ askAssistant: async () => ({ ok: false, reason: 'busy' }) });
+  await h.client.start();
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  // 텍스트 답변이 진행 중이라 거절된 것은 실패와 다르게 알린다.
+  assert.match(h.toasts.at(-1), /다른 답변/);
+  assert.equal(h.client.getState().phase, 'cooldown');
+  h.fireTimer(500);
+  assert.equal(h.client.getState().phase, 'listening');
+  assert.equal(h.tracks[0].enabled, true);
+});
+
+test('an empty reply from the sender recovers instead of speaking silence', async () => {
+  const h = loadClient({ askAssistant: async () => ({ ok: true, reply: '   ' }) });
+  await h.client.start();
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  assert.deepEqual(h.answers, []);
+  assert.equal(h.calls.filter(call => call.url.includes('/speak')).length, 0);
+  assert.equal(h.client.getState().phase, 'cooldown');
+  h.fireTimer(500);
+  assert.equal(h.client.getState().phase, 'listening');
 });
 
 test('a turn the server marks unpersistable is dropped without a reply', async () => {
@@ -213,8 +248,8 @@ test('a turn the server marks unpersistable is dropped without a reply', async (
   await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
   await tick();
 
-  // 헛기침이면 시온이 반응하지 않고 계속 듣는다.
-  assert.equal(h.calls.filter(call => call.url === '/api/chat').length, 0);
+  // 헛기침이면 시온이 반응하지 않고 계속 듣는다. 저장 경로에도 닿지 않는다.
+  assert.deepEqual(h.asks, []);
   assert.deepEqual(h.transcripts, []);
   assert.equal(h.client.getState().phase, 'listening');
   assert.equal(h.tracks[0].enabled, true);
@@ -245,11 +280,7 @@ test('an empty transcription recovers to listening instead of locking the mic', 
 });
 
 test('an answer failure still returns the loop to listening', async () => {
-  const h = loadClient({
-    responders: {
-      '/api/chat': async () => ({ ok: false, async json() { return { error: 'boom' }; } }),
-    },
-  });
+  const h = loadClient({ askAssistant: async () => ({ ok: false, reason: 'error' }) });
   await h.client.start();
   h.settleNoise();
   h.client.__feedLevel(0.5);

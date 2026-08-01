@@ -23,16 +23,6 @@
       return elements[id];
     }
 
-    function appendRow(role, text) {
-      const log = el('voice-hd-log');
-      if (!log || !text) return;
-      const row = global.document.createElement('div');
-      row.className = `voice-hd-row voice-hd-${role}`;
-      row.textContent = text;
-      log.appendChild(row);
-      log.scrollTop = log.scrollHeight;
-    }
-
     function renderPhase(phase) {
       const status = el('voice-hd-status');
       if (status) status.textContent = PHASE_LABELS[phase] || phase;
@@ -51,7 +41,7 @@
       if (panel) panel.hidden = phase === 'idle';
     }
 
-    function init({ config, apiFetch, showToast: toast = () => {} } = {}) {
+    function init({ config, apiFetch, showToast: toast = () => {}, askAssistant } = {}) {
       showToast = toast;
       core = global.VoiceHalfDuplex;
       const button = el('voice-hd-button');
@@ -65,13 +55,13 @@
       const realtimeButton = global.document.getElementById('voice-realtime-button');
       if (realtimeButton) realtimeButton.hidden = true;
 
+      // 발화와 답변 본문은 메인 채팅이 그린다. 패널은 상태 표시만 맡는다.
       core.init({
         config,
         apiFetch,
         showToast,
+        askAssistant,
         onPhase: renderPhase,
-        onTranscript: text => appendRow('user', text),
-        onAnswer: text => appendRow('assistant', text),
       });
 
       if (button) {
