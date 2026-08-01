@@ -111,3 +111,72 @@ test('Claude tool loop returns a final reply while the prepared candidate stays 
   assert.equal(requests[1].tools, undefined);
   assert.equal(session.getCandidate().task.title, '병원 예약');
 });
+
+// ─── 확인 대기 중인 카드가 있을 때 ─────────────────────────────────────────
+
+function pendingSession() {
+  const prepared = [];
+  const store = {
+    prepare(input, options) {
+      prepared.push(input);
+      return { capturedAt: options.capturedAt, timezone: 'Asia/Seoul', task: input };
+    },
+  };
+  const session = createSchedulePrepareSession(store, {
+    capturedAt: Math.floor(Date.parse('2026-08-01T12:00:00+09:00') / 1000),
+    clientRequestId: 'chat-task:00000000-0000-4000-8000-000000000009',
+    pendingConfirmation: true,
+  });
+  return { session, prepared };
+}
+
+test('a card still waiting for an answer withholds the tool entirely', () => {
+  const { session } = pendingSession();
+  // 도구를 주지 않는 것이 1차 방어다. 매번 같은 카드가 하나씩 더 쌓이는 것을 막는다.
+  assert.deepEqual(session.getToolDefinitions(), []);
+  assert.match(session.systemPrompt, /확인 카드에서 등록 또는 취소/);
+  assert.match(session.systemPrompt, /새 일정 후보를 만들 수 없다/);
+  assert.match(session.systemPrompt, /2026-08-01T12:00:00\+09:00/);
+  // 이미 등록됐다고 말하지 않도록 못박는다.
+  assert.match(session.systemPrompt, /이미 등록됐다고 말하지 않는다/);
+});
+
+test('even a model that calls the withheld tool anyway writes nothing', () => {
+  const { session, prepared } = pendingSession();
+  const result = session.execute('schedule_prepare', {
+    title: '집 가기',
+    due: { kind: 'datetime', at: '2026-08-02T09:00:00+09:00' },
+  });
+
+  assert.equal(result.isError, true);
+  assert.match(result.content, /확인하지 않은 일정 카드/);
+  // 실행 경계에서도 닫혀야 도구 목록만 믿는 상태가 되지 않는다.
+  assert.deepEqual(prepared, []);
+  assert.equal(session.getCandidate(), null);
+});
+
+test('the pending gate is off by default so ordinary turns still prepare', () => {
+  const session = createSchedulePrepareSession(
+    { prepare: (input, options) => ({ capturedAt: options.capturedAt, task: input }) },
+    {
+      capturedAt: Math.floor(Date.parse('2026-08-01T12:00:00+09:00') / 1000),
+      clientRequestId: 'chat-task:00000000-0000-4000-8000-000000000010',
+    },
+  );
+  assert.deepEqual(session.getToolDefinitions(), [SCHEDULE_PREPARE_TOOL]);
+  assert.doesNotMatch(session.systemPrompt, /새 일정 후보를 만들 수 없다/);
+});
+
+test('only an exact true blocks, so a stray client value cannot silently disable schedules', () => {
+  for (const value of ['true', 1, {}, 'yes']) {
+    const session = createSchedulePrepareSession(
+      { prepare: (input, options) => ({ capturedAt: options.capturedAt, task: input }) },
+      {
+        capturedAt: Math.floor(Date.parse('2026-08-01T12:00:00+09:00') / 1000),
+        clientRequestId: 'chat-task:00000000-0000-4000-8000-000000000011',
+        pendingConfirmation: value,
+      },
+    );
+    assert.deepEqual(session.getToolDefinitions(), [SCHEDULE_PREPARE_TOOL], String(value));
+  }
+});

@@ -440,10 +440,17 @@ test('an arriving audio frame disarms the watchdog', async () => {
 test('the confirm vocabulary takes commands but refuses sentences', () => {
   const { matchConfirmIntent } = loadClient().client;
 
-  for (const text of ['등록', '등록해줘', '응', '그래', '좋아', '오케이', '응 등록해줘', '네, 등록해!']) {
+  for (const text of [
+    '등록', '등록해줘', '응', '그래', '좋아', '오케이', '응 등록해줘', '네, 등록해!',
+    // 실기기에서 실제로 쓴 청유형. 어미는 사람마다 달라 어간+꼬리로 받는다.
+    '등록해줄래?', '등록해주세요', '등록할래', '저장해줄래', '응 등록해줄래',
+  ]) {
     assert.equal(matchConfirmIntent(text), 'confirm', text);
   }
-  for (const text of ['취소', '취소해줘', '아니', '아냐', '됐어', '나중에', '아니 취소해', '등록하지마']) {
+  for (const text of [
+    '취소', '취소해줘', '아니', '아냐', '됐어', '나중에', '아니 취소해',
+    '등록하지마', '등록하지말자', '등록안해',
+  ]) {
     assert.equal(matchConfirmIntent(text), 'cancel', text);
   }
   // 문장은 명령이 아니다. 여기서 걸러야 확인 카드가 안전장치로 남는다.
@@ -453,6 +460,14 @@ test('the confirm vocabulary takes commands but refuses sentences', () => {
     '아까 등록한 거 언제였지',
     '취소하면 어떻게 되는데',
     '내일 일정 알려줘',
+    // 물음은 명령이 아니다. 어간이 같아도 꼬리로 가른다.
+    '등록할까?',
+    '등록됐어?',
+    // 미루는 말이 등록으로 읽히면 안 된다.
+    '조금 이따가 등록할게',
+    '이따가 내가 결정할게',
+    // 부분 문자열로 찾았다면 "해줘"가 걸려 시간 정정 중에 일정이 등록됐을 것이다.
+    '오전 9시로 해줘',
     '',
   ]) {
     assert.equal(matchConfirmIntent(text), null, text);

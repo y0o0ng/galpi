@@ -42,6 +42,18 @@
     '하지마', '하지마요', '안해', '안할래', '지워', '지워줘', '삭제',
     '나중에', '나중에할게', '관둬', '등록하지마', '등록안해',
   ]);
+  // 어미는 사람마다 달라서 다 적을 수 없다. `등록`·`저장` 뒤에 붙는 꼬리만 허용 목록으로 둔다.
+  // 꼬리를 열어두지 않고 목록으로 가두는 이유는 `등록할까`, `등록됐어` 같은 물음이
+  // 명령으로 읽히면 안 되기 때문이다.
+  const COMMAND_STEMS = ['등록', '저장'];
+  const CONFIRM_TAILS = new Set([
+    '', '해', '해줘', '해줘요', '해줄래', '해줄래요', '해주라', '해주세요',
+    '하자', '할게', '할래', '해도돼', '부탁해', '해줄수있어', '해줄수있을까',
+  ]);
+  const CANCEL_TAILS = new Set([
+    '하지마', '하지마요', '하지말자', '안해', '안할래', '취소', '말자',
+  ]);
+
   // "응, 등록해줘"처럼 앞에 붙는 맞장구를 떼고 다시 본다.
   const LEADING_PARTICLES = ['응', '어', '네', '예', '그래', '좋아', '아니', '아냐', '아니야'];
   // 이보다 길면 명령이 아니라 문장이다. "등록은 나중에 생각해볼게"가 등록으로 읽히면 안 된다.
@@ -56,6 +68,13 @@
   function classifyWord(word) {
     if (CONFIRM_WORDS.has(word)) return 'confirm';
     if (CANCEL_WORDS.has(word)) return 'cancel';
+    for (const stem of COMMAND_STEMS) {
+      if (!word.startsWith(stem)) continue;
+      const tail = word.slice(stem.length);
+      // 부정 어미를 먼저 본다. `등록하지마`가 `등록`으로 읽히면 안 된다.
+      if (CANCEL_TAILS.has(tail)) return 'cancel';
+      if (CONFIRM_TAILS.has(tail)) return 'confirm';
+    }
     return null;
   }
 

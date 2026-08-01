@@ -3232,6 +3232,7 @@ async function decideCouncilWebEvidence(context, claudeModel, onStage = () => {}
 app.post('/api/chat', async (req, res) => {
   const {
     message, model, sessionId, activeNotes, webSearch, progress: wantsProgress, source,
+    hasPendingScheduleCandidate,
   } = req.body;
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
@@ -3340,6 +3341,8 @@ app.post('/api/chat', async (req, res) => {
         ? createSchedulePrepareSession(assistantTasks, {
           capturedAt: requestCreatedAt,
           clientRequestId: `chat-task:${uuidv4()}`,
+          // 화면에 답을 받지 않은 확인 카드가 있으면 새 후보를 만들지 않는다.
+          pendingConfirmation: hasPendingScheduleCandidate === true,
         })
         : null;
       progress.stage('answer');
