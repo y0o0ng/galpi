@@ -523,41 +523,26 @@ test('saying 취소 dismisses the card without touching the task API', async () 
   assert.deepEqual(h.asks, []);
 });
 
-test('anything but a command still goes to the assistant with the card intact', async () => {
+test('moving on to another topic drops the card and the turn continues as normal', async () => {
   const h = cardHarness();
   await h.client.start();
   await runTurn(h, '등록은 나중에 생각해볼게', 'hd-1');
 
-  assert.deepEqual(h.acted, []);
+  // 일정을 부탁해 놓고 한참 뒤에 다시 볼 이유가 없다. 그 자리에서 취소하고 대화로 넘어간다.
+  assert.deepEqual(h.acted, ['cancel']);
   assert.deepEqual(h.asks, ['등록은 나중에 생각해볼게']);
 });
 
-test('the spoken confirmation expires so a later 응 cannot register an old card', async () => {
+test('a dropped card cannot be revived by a later 응', async () => {
   const h = cardHarness();
   await h.client.start();
 
-  // 창은 카드가 뜬 뒤 2턴이다. 두 번 다른 얘기를 하면 닫힌다.
   await runTurn(h, '오늘 날씨 어때', 'hd-1');
-  await runTurn(h, '고마워', 'hd-2');
-  await runTurn(h, '응', 'hd-3');
+  await runTurn(h, '응', 'hd-2');
 
-  assert.deepEqual(h.acted, []);
-  // 창이 닫혔으므로 마지막 "응"은 평범한 발화로 흘러간다.
-  assert.deepEqual(h.asks, ['오늘 날씨 어때', '고마워', '응']);
-});
-
-test('a new card reopens the window that the previous one used up', async () => {
-  const acted = [];
-  let pending = { id: 'req-1', confirm: async () => { acted.push('c1'); }, cancel() {} };
-  const h = loadClient({ pendingConfirmation: () => pending });
-  await h.client.start();
-
-  await runTurn(h, '오늘 날씨 어때', 'hd-1');
-  await runTurn(h, '고마워', 'hd-2');
-  pending = { id: 'req-2', confirm: async () => { acted.push('c2'); }, cancel() {} };
-  await runTurn(h, '응', 'hd-3');
-
-  assert.deepEqual(acted, ['c2']);
+  // 첫 턴에서 이미 취소됐으므로 뒤의 맞장구는 평범한 발화다.
+  assert.deepEqual(h.acted, ['cancel']);
+  assert.deepEqual(h.asks, ['오늘 날씨 어때', '응']);
 });
 
 test('a failed registration says so instead of pretending it worked', async () => {

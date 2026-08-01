@@ -834,8 +834,7 @@ async function sendSingleMessage(options = {}) {
     const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      // 확인 카드가 떠 있다는 사실만 알린다. 카드 제목 같은 자유 문자열은 보내지 않는다.
-      body:    JSON.stringify({ message: text, model: 'gpt', sessionId, activeNotes, webSearch: !!options.webSearch, source: options.source, hasPendingScheduleCandidate: !!window.TaskPanel?.getPendingScheduleConfirmation(), progress: true }),
+      body:    JSON.stringify({ message: text, model: 'gpt', sessionId, activeNotes, webSearch: !!options.webSearch, source: options.source, progress: true }),
     });
     const data = await readProgressResponse(res, stage => updateLoadingStage(loadingEl, stage));
     loadingEl.remove();

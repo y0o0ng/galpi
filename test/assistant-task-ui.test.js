@@ -268,9 +268,6 @@ test('chat schedule candidates remain unpersisted until the existing task API co
   // 음성은 자기 요청을 만들지 않고 버튼과 똑같은 핸들러를 부른다.
   assert.match(taskPanel, /state\.pendingCandidate = \{[\s\S]*?confirm: runConfirm,[\s\S]*?cancel: runCancel,/);
   assert.match(app, /pendingConfirmation: \(\) => window\.TaskPanel\?\.getPendingScheduleConfirmation\(\)/);
-  // 카드가 떠 있다는 사실만 보낸다. 제목 같은 자유 문자열은 프롬프트 주입 통로가 된다.
-  assert.match(app, /hasPendingScheduleCandidate: !!window\.TaskPanel\?\.getPendingScheduleConfirmation\(\)/);
-  assert.match(server, /pendingConfirmation: hasPendingScheduleCandidate === true/);
   assert.match(css, /\.task-candidate-card\s*{[^}]*border-left: 3px solid var\(--brand\)/s);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.task-candidate-actions \.task-action\s*{[^}]*min-height: 44px/s);
 });

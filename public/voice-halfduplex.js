@@ -18,9 +18,6 @@
     speechFactor: 3.5,
     minRms: 0.006,
     audioWatchdogMs: 2500,
-    // 카드가 뜬 뒤 이만큼의 턴 동안만 말로 등록·취소할 수 있다. 그 뒤의 "응"은
-    // 다른 얘기일 가능성이 커서 손으로 누르게 둔다. 카드 자체는 남는다.
-    confirmTurnWindow: 2,
   };
 
   const STATES = [
@@ -105,8 +102,6 @@
       onAnswer: () => {},
       onPhase: () => {},
       pendingConfirmation: () => null,
-      confirmCardId: null,
-      confirmTurnsLeft: 0,
       stream: null,
       recorder: null,
       turnSequence: 0,
@@ -334,22 +329,6 @@
       }
     }
 
-    // 확인 창은 카드가 바뀔 때만 다시 열린다. 한참 뒤의 "응"이 엉뚱한 일정을
-    // 등록하지 않도록 창을 넘긴 카드는 손으로만 누르게 둔다.
-    function refreshConfirmWindow() {
-      const pending = state.pendingConfirmation?.() || null;
-      if (!pending) {
-        state.confirmCardId = null;
-        state.confirmTurnsLeft = 0;
-        return null;
-      }
-      if (pending.id !== state.confirmCardId) {
-        state.confirmCardId = pending.id;
-        state.confirmTurnsLeft = state.config.confirmTurnWindow;
-      }
-      return state.confirmTurnsLeft > 0 ? pending : null;
-    }
-
     async function runCardIntent(pending, intent, runId) {
       setPhase('thinking');
       try {
@@ -360,21 +339,21 @@
         return;
       }
       if (runId !== state.runId) return;
-      state.confirmCardId = null;
-      state.confirmTurnsLeft = 0;
       await speak(intent === 'confirm' ? '일정 등록했어.' : '등록하지 않을게.', runId);
     }
 
     async function think(transcript, runId) {
       // 확인 카드가 떠 있으면 좁은 어휘를 먼저 본다. 모델 호출도 저장도 하지 않는다.
-      const pending = refreshConfirmWindow();
+      const pending = state.pendingConfirmation?.();
       if (pending) {
         const intent = matchConfirmIntent(transcript);
         if (intent) {
           await runCardIntent(pending, intent, runId);
           return;
         }
-        state.confirmTurnsLeft -= 1;
+        // 다른 얘기로 넘어가면 카드는 그 자리에서 취소한다. 일정을 부탁해 놓고 한참
+        // 뒤에 다시 볼 이유가 없고, 남겨두면 묵은 카드가 쌓이거나 늦은 "응"에 걸린다.
+        pending.cancel();
       }
 
       setPhase('thinking');
