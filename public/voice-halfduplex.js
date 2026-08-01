@@ -51,10 +51,16 @@
     '하지마', '하지마요', '하지말자', '안해', '안할래', '취소', '말자',
   ]);
 
-  // "응, 등록해줘"처럼 앞에 붙는 맞장구를 떼고 다시 본다.
-  const LEADING_PARTICLES = ['응', '어', '네', '예', '그래', '좋아', '아니', '아냐', '아니야'];
-  // 이보다 길면 명령이 아니라 문장이다. "등록은 나중에 생각해볼게"가 등록으로 읽히면 안 된다.
+  // 앞에 붙는 맞장구와 목적어를 떼고 다시 본다. "응 등록해줘"와 "일정 카드 등록해줄래"가
+  // 둘 다 걸려야 한다. 긴 것부터 떼려고 길이 내림차순으로 둔다.
+  const LEADING_PREFIXES = [
+    '응', '어', '네', '예', '그래', '좋아', '아니', '아냐', '아니야',
+    '일정카드', '일정', '카드', '그거', '이거', '그', '방금', '아까',
+  ].sort((a, b) => b.length - a.length);
+  // 명령 자체의 길이 상한. "등록은 나중에 생각해볼게"가 등록으로 읽히면 안 된다.
   const MAX_CONFIRM_LENGTH = 8;
+  // 접두어를 떼기 전 조각의 바깥 상한. 이보다 길면 문장이라 아예 보지 않는다.
+  const MAX_SEGMENT_LENGTH = 14;
 
   function normalizeCommand(text) {
     return String(text || '')
@@ -75,20 +81,41 @@
     return null;
   }
 
-  // 카드 확인 의도를 판정한다. 확신이 없으면 null을 돌려 평소대로 LLM에 보낸다.
-  function matchConfirmIntent(transcript) {
-    const normalized = normalizeCommand(transcript);
-    if (!normalized || normalized.length > MAX_CONFIRM_LENGTH) return null;
+  // "그 카드 등록해줘"처럼 앞에 두 개가 붙기도 한다. 그 이상은 문장으로 본다.
+  const MAX_PREFIX_STRIPS = 2;
 
-    const direct = classifyWord(normalized);
-    if (direct) return direct;
-
-    for (const particle of LEADING_PARTICLES) {
-      if (normalized.length <= particle.length || !normalized.startsWith(particle)) continue;
-      const rest = classifyWord(normalized.slice(particle.length));
-      if (rest) return rest;
+  function classifySegment(normalized) {
+    let text = normalized;
+    for (let depth = 0; depth <= MAX_PREFIX_STRIPS; depth += 1) {
+      if (text.length <= MAX_CONFIRM_LENGTH) {
+        const intent = classifyWord(text);
+        if (intent) return intent;
+      }
+      if (text.length > MAX_SEGMENT_LENGTH) return null;
+      const prefix = LEADING_PREFIXES
+        .find(candidate => text.length > candidate.length && text.startsWith(candidate));
+      if (!prefix) return null;
+      text = text.slice(prefix.length);
     }
     return null;
+  }
+
+  // 카드 확인 의도를 판정한다. 확신이 없으면 null을 돌려 평소대로 LLM에 보낸다.
+  // 안 먹혔다 싶으면 사람은 같은 말을 반복한다. 조각으로 나눠 보고 전부 같은 뜻일 때만 받는다.
+  function matchConfirmIntent(transcript) {
+    const segments = String(transcript || '')
+      .split(/[.!?。！？\n]+/)
+      .map(normalizeCommand)
+      .filter(Boolean);
+    if (!segments.length) return null;
+
+    let agreed = null;
+    for (const segment of segments) {
+      const intent = classifySegment(segment);
+      if (!intent || (agreed && intent !== agreed)) return null;
+      agreed = intent;
+    }
+    return agreed;
   }
 
   function setupVoiceHalfDuplexModule() {
