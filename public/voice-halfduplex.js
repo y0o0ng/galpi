@@ -413,6 +413,36 @@
       }
     }
 
+    // 조각 하나의 오디오를 받는다. 미리 받아두는 호출이라 던지지 않고 null을 돌린다.
+    // 던지면 아직 기다리지 않은 prefetch가 unhandled rejection이 된다.
+    async function fetchSegmentAudio(segment) {
+      try {
+        const response = await state.apiFetch('/api/voice/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: segment }),
+        });
+        if (!response.ok) return null;
+        return await response.blob();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // 기다리는 동안에만 시계를 건다. 재생 자체는 길 수 있으므로 묶지 않는다.
+    async function awaitSegmentAudio(pending) {
+      clearTimer('speak');
+      state.timers.speak = global.setTimeout(
+        () => recover('음성 재생이 늦어져서 넘어갈게.'),
+        state.config.speakTimeoutMs,
+      );
+      try {
+        return await pending;
+      } finally {
+        clearTimer('speak');
+      }
+    }
+
     async function speak(text, runId) {
       setPhase('speaking');
       setMicEnabled(false);
@@ -422,22 +452,37 @@
         state.config.speakTimeoutMs,
       );
       try {
-        const response = await state.apiFetch('/api/voice/speak', {
+        const response = await state.apiFetch('/api/voice/speak/segments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
         });
+        clearTimer('speak');
         if (runId !== state.runId) return;
-        if (!response.ok) {
-          clearTimer('speak');
+        const data = response.ok ? await response.json().catch(() => ({})) : {};
+        const segments = Array.isArray(data.segments)
+          ? data.segments.filter(segment => typeof segment === 'string' && segment.trim())
+          : [];
+        if (!segments.length) {
           recover('음성을 못 만들었어.');
           return;
         }
-        const blob = await response.blob();
-        clearTimer('speak');
-        if (runId !== state.runId) return;
-        await playAudio(blob);
-        if (runId !== state.runId) return;
+
+        // 지금 조각을 재생하는 동안 다음 조각을 미리 받는다. 합성 대기가 재생에 가려진다.
+        let pending = fetchSegmentAudio(segments[0]);
+        for (let index = 0; index < segments.length; index += 1) {
+          const blob = await awaitSegmentAudio(pending);
+          if (runId !== state.runId) return;
+          if (!blob) {
+            recover('음성을 못 만들었어.');
+            return;
+          }
+          pending = index + 1 < segments.length
+            ? fetchSegmentAudio(segments[index + 1])
+            : null;
+          await playAudio(blob);
+          if (runId !== state.runId) return;
+        }
         state.pendingTurn = null;
         enterCooldown();
       } catch (_) {

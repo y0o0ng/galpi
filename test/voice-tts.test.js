@@ -146,3 +146,47 @@ test('the delivery instruction no longer fights the speed setting', () => {
   // 지시문이 "너무 빠르지 않게"라고 하면 speed를 올려도 서로 상쇄된다.
   assert.doesNotMatch(DEFAULT_INSTRUCTIONS, /빠르지 않게|천천히/);
 });
+
+test('the spoken text is split at sentence ends and tiny pieces are merged', () => {
+  const { splitSpokenSegments } = require('../lib/voice-tts');
+
+  assert.deepEqual(
+    splitSpokenSegments('내일 오전 9시에 일정 하나 있어. 할머니집 가기야. 알림도 걸어둘까?'),
+    ['내일 오전 9시에 일정 하나 있어.', '할머니집 가기야. 알림도 걸어둘까?'],
+  );
+  // 조각 하나짜리 답변은 나누지 않는다.
+  assert.deepEqual(splitSpokenSegments('응.'), ['응.']);
+  assert.deepEqual(splitSpokenSegments('한 문장뿐이야'), ['한 문장뿐이야']);
+  assert.deepEqual(splitSpokenSegments(''), []);
+  // 소수점과 줄임표에서 끊으면 어색하게 읽힌다.
+  assert.deepEqual(
+    splitSpokenSegments('3.5초 정도 걸렸다고 나오네. 음... 그래도 예상보다는 훨씬 빠른 편이야.'),
+    ['3.5초 정도 걸렸다고 나오네.', '음... 그래도 예상보다는 훨씬 빠른 편이야.'],
+  );
+  assert.deepEqual(
+    splitSpokenSegments('버전 3.5를 쓰고 있어서 그런 것 같아. 업그레이드하면 나아질 거야.'),
+    ['버전 3.5를 쓰고 있어서 그런 것 같아.', '업그레이드하면 나아질 거야.'],
+  );
+  // 짧은 답변은 나눠도 빨라지지 않으므로 한 조각으로 둔다.
+  assert.deepEqual(
+    splitSpokenSegments('3.5초 걸렸어. 음... 생각보다 빠르네.'),
+    ['3.5초 걸렸어. 음... 생각보다 빠르네.'],
+  );
+});
+
+test('splitting reuses the one cap so long answers still point at the screen', () => {
+  const { splitSpokenSegments, DEFAULT_MAX_CHARS } = require('../lib/voice-tts');
+  const segments = splitSpokenSegments('가나다라마바사아자차. '.repeat(120));
+
+  assert.ok(segments.length >= 1);
+  assert.equal(segments.at(-1), '자세한 건 화면에 정리해뒀어.');
+  // 상한은 selectSpokenText 한 곳에서만 적용한다. 합쳐도 원문 길이가 되지 않는다.
+  assert.ok(segments.join(' ').length < DEFAULT_MAX_CHARS + 60);
+});
+
+test('the number of TTS calls is bounded no matter how many sentences arrive', () => {
+  const { splitSpokenSegments, MAX_SEGMENTS } = require('../lib/voice-tts');
+  const many = Array.from({ length: 40 }, (_, i) => `${i}번 문장은 조금 길게 적어둔다.`).join(' ');
+
+  assert.ok(splitSpokenSegments(many, { maxChars: 5000 }).length <= MAX_SEGMENTS);
+});

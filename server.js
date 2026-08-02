@@ -3745,6 +3745,24 @@ app.post('/api/voice/turns/:turnId/transcribe', async (req, res) => {
 });
 
 // 반이중 음성 H1. 화면에는 전체 답변이 남고 음성은 앞부분만 읽는다.
+// 읽을 문장을 조각으로 나눠 돌려준다. 오디오는 만들지 않으므로 모델을 부르지 않는다.
+// 클라이언트가 첫 조각부터 재생하면 전체 합성을 기다리지 않는다.
+app.post('/api/voice/speak/segments', (req, res) => {
+  if (!voiceTts.available) {
+    return res.status(503).json({
+      error: '반이중 음성 기능이 비활성화되어 있습니다.',
+      code: 'VOICE_HALFDUPLEX_DISABLED',
+    });
+  }
+  const text = String(req.body?.text || '');
+  if (!text.trim()) {
+    return res.status(400).json({ error: '읽을 내용이 필요합니다.', code: 'VOICE_TTS_EMPTY_TEXT' });
+  }
+  res
+    .set('Cache-Control', 'no-store')
+    .json({ segments: voiceTts.splitSpokenSegments(text) });
+});
+
 app.post('/api/voice/speak', async (req, res) => {
   if (!voiceTts.available) {
     return res.status(503).json({

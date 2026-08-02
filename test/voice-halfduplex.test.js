@@ -134,6 +134,9 @@ function loadClient({
           },
         };
       }
+      if (url.includes('/speak/segments')) {
+        return { ok: true, async json() { return { segments: ['오전 10시에 하나 있어.'] }; } };
+      }
       return { ok: true, async blob() { return new Blob(['RIFF']); } };
     },
   });
@@ -574,4 +577,106 @@ test('with no card showing the same words are ordinary speech', async () => {
   await runTurn(h, '응', 'hd-1');
 
   assert.deepEqual(h.asks, ['응']);
+});
+
+// ─── 조각 재생 파이프라인 (C1) ────────────────────────────────────────────
+
+function segmentHarness(segments) {
+  const events = [];
+  let releaseAudio = [];
+  const h = loadClient({
+    responders: {
+      '/speak/segments': async () => {
+        events.push('segments');
+        return { ok: true, async json() { return { segments }; } };
+      },
+      '/api/voice/speak': async (url, options) => {
+        const text = JSON.parse(options.body).text;
+        events.push(`fetch:${segments.indexOf(text)}`);
+        return { ok: true, async blob() { return new Blob(['RIFF']); } };
+      },
+    },
+  });
+  return { ...h, events, releaseAudio };
+}
+
+async function speakTurn(h) {
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+}
+
+test('the next segment is fetched while the current one plays', async () => {
+  const h = segmentHarness(['첫 문장이야.', '둘째 문장이야.', '셋째 문장이야.']);
+  // 재생 시작을 이벤트로 남겨 fetch와의 순서를 본다.
+  const audio = h.audioElements;
+  await h.client.start();
+  const player = audio[0];
+  const originalSetter = Object.getOwnPropertyDescriptor(player.constructor.prototype, 'src').set;
+  Object.defineProperty(player, 'src', {
+    set(value) {
+      if (h.events.length) h.events.push('play');
+      originalSetter.call(this, value);
+    },
+    get() { return this._src; },
+  });
+
+  await speakTurn(h);
+
+  // 다음 조각 받기를 재생 시작 전에 걸어야 합성 대기가 재생에 가려진다.
+  // fetch:1이 play 앞에 오는 것이 핵심이다. 뒤에 오면 직렬이라 빨라지지 않는다.
+  assert.deepEqual(h.events, [
+    'segments', 'fetch:0', 'fetch:1', 'play', 'fetch:2', 'play', 'play',
+  ]);
+  assert.equal(h.client.getState().phase, 'cooldown');
+});
+
+test('every segment is played on the one element unlocked by the gesture', async () => {
+  const h = segmentHarness(['첫 문장이야.', '둘째 문장이야.']);
+  await h.client.start();
+  await speakTurn(h);
+
+  // iOS 잠금은 요소 단위다. 조각마다 새 Audio를 만들면 두 번째부터 막힌다.
+  assert.equal(h.audioElements.length, 1);
+  // 무음 잠금 해제 1 + 조각 2
+  assert.equal(h.played.length, 3);
+});
+
+test('a segment that fails to synthesize recovers instead of playing the rest', async () => {
+  const h = loadClient({
+    responders: {
+      '/speak/segments': async () => ({
+        ok: true,
+        async json() { return { segments: ['첫 문장이야.', '둘째 문장이야.'] }; },
+      }),
+      '/api/voice/speak': async (url, options) => {
+        const text = JSON.parse(options.body).text;
+        if (text.startsWith('둘째')) return { ok: false, async json() { return {}; } };
+        return { ok: true, async blob() { return new Blob(['RIFF']); } };
+      },
+    },
+  });
+  await h.client.start();
+  await speakTurn(h);
+
+  assert.match(h.toasts.at(-1), /음성을 못 만들었어/);
+  assert.equal(h.client.getState().phase, 'cooldown');
+  h.fireTimer(500);
+  assert.equal(h.client.getState().phase, 'listening');
+  assert.equal(h.tracks[0].enabled, true);
+});
+
+test('an empty segment list recovers instead of sitting silent', async () => {
+  const h = loadClient({
+    responders: {
+      '/speak/segments': async () => ({ ok: true, async json() { return { segments: [] }; } }),
+    },
+  });
+  await h.client.start();
+  await speakTurn(h);
+
+  assert.match(h.toasts.at(-1), /음성을 못 만들었어/);
+  assert.equal(h.calls.filter(call => call.url === '/api/voice/speak').length, 0);
 });
