@@ -3694,6 +3694,20 @@ app.post('/api/voice/session', (req, res) => {
 });
 
 // 반이중 전용 전사. Realtime 라우트와 세션 공간을 공유하지 않는다.
+// H3 문턱을 정할 근거를 모은다. 실제 오전사 표본이 쌓이기 전에는 되묻지 않는다.
+// 전사 내용과 오디오는 남기지 않고 숫자만 적는다. 시각으로 shared-main과 대사한다.
+function logVoiceConfidence(result) {
+  const confidence = result?.confidence;
+  if (!confidence) return;
+  console.log(
+    `🎙️ voice-confidence tokens=${confidence.tokens}`
+    + ` min=${confidence.min.toFixed(3)}`
+    + ` mean=${confidence.mean.toFixed(3)}`
+    + ` low=${confidence.low}`
+    + ` duration=${result.durationMs ?? 'unknown'}ms`,
+  );
+}
+
 app.post('/api/voice/turns/:turnId/transcribe', async (req, res) => {
   try {
     if (!voiceTts.available) {
@@ -3709,6 +3723,7 @@ app.post('/api/voice/turns/:turnId/transcribe', async (req, res) => {
       ...upload,
       turnId: req.params.turnId,
     });
+    logVoiceConfidence(result);
     res
       .set('Cache-Control', 'no-store')
       .json({

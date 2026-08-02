@@ -190,6 +190,8 @@ test('Realtime correction is session-bound, serialized, idempotent, and bounded 
     correctedTranscript: '보정 input-1',
     model: 'gpt-transcribe',
     usage: { total_tokens: 3 },
+    // 테스트 provider는 logprobs를 주지 않으므로 관측값이 없다.
+    confidence: null,
     durationMs: 1000,
     audioSha256: '<hash>',
     duplicate: false,
@@ -334,4 +336,55 @@ test('the service tags an empty correction with the audio hash so turns can be c
       return true;
     },
   );
+});
+
+// ─── 전사 신뢰도 관측 (H3 준비) ───────────────────────────────────────────
+
+test('the provider asks for logprobs and reduces them to numbers only', async () => {
+  const requests = [];
+  const provider = createOpenAITranscriptionProvider({
+    apiKey: 'k',
+    async fetchImpl(url, options) {
+      requests.push(options.body);
+      return {
+        ok: true,
+        async json() {
+          return {
+            text: '내일 오후 세 시에 회의',
+            logprobs: [
+              { token: '내', logprob: -0.0002, bytes: [1] },
+              { token: '일', logprob: -1.5, bytes: [2] },
+              { token: ' 오후', logprob: -0.25, bytes: [3] },
+            ],
+          };
+        },
+      };
+    },
+  });
+
+  const result = await provider({ audio: Buffer.alloc(4), mimeType: 'audio/wav', durationMs: 1500 });
+
+  const included = requests[0].getAll('include[]');
+  assert.deepEqual(included, ['logprobs']);
+  assert.equal(result.confidence.tokens, 3);
+  assert.equal(result.confidence.min, -1.5);
+  // -0.5 아래만 센다. 관측용 표식이고 동작을 바꾸지 않는다.
+  assert.equal(result.confidence.low, 1);
+  assert.ok(Math.abs(result.confidence.mean - (-0.5834)) < 0.001);
+  // 토큰 문자열은 전사 내용이므로 요약에 담기지 않는다.
+  assert.equal(JSON.stringify(result.confidence).includes('내'), false);
+});
+
+test('a response without logprobs still transcribes and reports no confidence', async () => {
+  const provider = createOpenAITranscriptionProvider({
+    apiKey: 'k',
+    async fetchImpl() {
+      return { ok: true, async json() { return { text: '안녕' }; } };
+    },
+  });
+
+  const result = await provider({ audio: Buffer.alloc(4), mimeType: 'audio/wav', durationMs: 900 });
+  assert.equal(result.correctedTranscript, '안녕');
+  // 관측이 없다고 전사가 실패하면 안 된다.
+  assert.equal(result.confidence, null);
 });
