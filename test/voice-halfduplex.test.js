@@ -111,9 +111,9 @@ function loadClient({
     onTranscript: text => transcripts.push(text),
     onAnswer: text => answers.push(text),
     // 실제 앱에서는 sendSingleMessage가 들어와 메인 채팅에 그리고 shared-main에 저장한다.
-    async askAssistant(transcript) {
+    async askAssistant(transcript, onSpeech) {
       asks.push(transcript);
-      if (askAssistant) return askAssistant(transcript);
+      if (askAssistant) return askAssistant(transcript, onSpeech);
       return { ok: true, reply: '오전 10시에 하나 있어.' };
     },
     ...(pendingConfirmation ? { pendingConfirmation } : {}),
@@ -679,4 +679,86 @@ test('an empty segment list recovers instead of sitting silent', async () => {
 
   assert.match(h.toasts.at(-1), /음성을 못 만들었어/);
   assert.equal(h.calls.filter(call => call.url === '/api/voice/speak').length, 0);
+});
+
+// ─── 스트리밍 조각 재생 (C2) ──────────────────────────────────────────────
+
+test('segments that arrive while the answer is generated are spoken in order', async () => {
+  const order = [];
+  const h = loadClient({
+    async askAssistant(transcript, onSpeech) {
+      // 답변이 생성되는 동안 문장이 하나씩 도착한다.
+      onSpeech('첫 문장이야.');
+      onSpeech('둘째 문장이야.');
+      await tick();
+      onSpeech('셋째 문장이야.');
+      return { ok: true, reply: '첫 문장이야. 둘째 문장이야. 셋째 문장이야.' };
+    },
+    responders: {
+      '/speak/segments': async () => {
+        order.push('batch');
+        return { ok: true, async json() { return { segments: ['안 쓰여야 함'] }; } };
+      },
+      '/api/voice/speak': async (url, options) => {
+        order.push(JSON.parse(options.body).text);
+        return { ok: true, async blob() { return new Blob(['RIFF']); } };
+      },
+    },
+  });
+  await h.client.start();
+  await runTurn(h, '내일 일정 알려줘', 'hd-1');
+
+  // 스트리밍 조각이 왔으면 전체를 다시 나누는 경로는 부르지 않는다.
+  assert.deepEqual(order, ['첫 문장이야.', '둘째 문장이야.', '셋째 문장이야.']);
+  assert.equal(h.calls.filter(call => call.url.includes('/speak/segments')).length, 0);
+  assert.equal(h.client.getState().phase, 'cooldown');
+});
+
+test('the microphone closes on the first streamed segment, not after the answer', async () => {
+  let micWhenFirstSegmentArrived = null;
+  const h = loadClient({
+    async askAssistant(transcript, onSpeech) {
+      onSpeech('첫 문장이야.');
+      await tick();
+      // 아직 답변이 끝나지 않았는데도 마이크는 이미 닫혀 있어야 에코가 없다.
+      micWhenFirstSegmentArrived = h.tracks[0].enabled;
+      return { ok: true, reply: '첫 문장이야.' };
+    },
+  });
+  await h.client.start();
+  await runTurn(h, '내일 일정 알려줘', 'hd-1');
+
+  assert.equal(micWhenFirstSegmentArrived, false);
+});
+
+test('an answer with no streamed segments falls back to splitting the whole reply', async () => {
+  const h = loadClient({
+    async askAssistant() { return { ok: true, reply: '오전 10시에 하나 있어.' }; },
+  });
+  await h.client.start();
+  await runTurn(h, '내일 일정 알려줘', 'hd-1');
+
+  // 스트리밍이 없으면 기존 C1 경로가 그대로 돈다.
+  assert.equal(h.calls.filter(call => call.url.includes('/speak/segments')).length, 1);
+  assert.equal(h.client.getState().phase, 'cooldown');
+});
+
+test('a streamed segment that fails to synthesize recovers the loop', async () => {
+  const h = loadClient({
+    async askAssistant(transcript, onSpeech) {
+      onSpeech('첫 문장이야.');
+      return { ok: true, reply: '첫 문장이야.' };
+    },
+    responders: {
+      '/api/voice/speak': async () => ({ ok: false, async json() { return {}; } }),
+    },
+  });
+  await h.client.start();
+  await runTurn(h, '내일 일정 알려줘', 'hd-1');
+
+  assert.match(h.toasts.at(-1), /음성을 못 만들었어/);
+  assert.equal(h.client.getState().phase, 'cooldown');
+  h.fireTimer(500);
+  assert.equal(h.client.getState().phase, 'listening');
+  assert.equal(h.tracks[0].enabled, true);
 });

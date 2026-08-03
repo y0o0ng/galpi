@@ -190,3 +190,44 @@ test('the number of TTS calls is bounded no matter how many sentences arrive', (
 
   assert.ok(splitSpokenSegments(many, { maxChars: 5000 }).length <= MAX_SEGMENTS);
 });
+
+test('the incremental segmenter matches the batch one as text arrives', () => {
+  const { createSpokenSegmenter } = require('../lib/voice-tts');
+  const feed = (chunks, options) => {
+    const segmenter = createSpokenSegmenter(options);
+    const out = [];
+    for (const chunk of chunks) out.push(...segmenter.push(chunk));
+    out.push(...segmenter.end());
+    return out;
+  };
+  const text = '내일 오전 9시에 일정 하나 있어. 할머니집 가기야. 알림도 걸어둘까?';
+  const expected = ['내일 오전 9시에 일정 하나 있어.', '할머니집 가기야. 알림도 걸어둘까?'];
+
+  // 한 글자씩 와도 덩어리로 와도 같은 조각이 나와야 한다.
+  assert.deepEqual(feed([...text]), expected);
+  assert.deepEqual(feed(['내일 오전 9시에 일정 ', '하나 있어. 할머니집 ', '가기야. 알림도 걸어둘까?']), expected);
+  assert.deepEqual(feed([text]), expected);
+});
+
+test('a decimal or ellipsis split across chunks is not mistaken for a sentence end', () => {
+  const { createSpokenSegmenter } = require('../lib/voice-tts');
+  const segmenter = createSpokenSegmenter();
+
+  // "3." 까지만 왔을 때는 소수점인지 알 수 없으므로 내보내지 않는다.
+  assert.deepEqual(segmenter.push('3.'), []);
+  assert.deepEqual(segmenter.push('5초 정도 걸렸다고 나오네'), []);
+  assert.deepEqual(segmenter.push('. 음'), ['3.5초 정도 걸렸다고 나오네.']);
+  assert.deepEqual(segmenter.end(), ['음']);
+});
+
+test('the streamed cap stops reading and points at the screen', () => {
+  const { createSpokenSegmenter } = require('../lib/voice-tts');
+  const segmenter = createSpokenSegmenter({ maxChars: 60 });
+  const out = [];
+  for (const chunk of [...'가나다라마바사아자차카타파하. '.repeat(40)]) out.push(...segmenter.push(chunk));
+  out.push(...segmenter.end());
+
+  assert.equal(out.at(-1), '자세한 건 화면에 정리해뒀어.');
+  // 상한 뒤로는 더 읽지 않는다. 화면에는 전체 답변이 남는다.
+  assert.ok(out.slice(0, -1).join('').length <= 60 + 20);
+});

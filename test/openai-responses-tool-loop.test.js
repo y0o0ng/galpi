@@ -185,3 +185,121 @@ test('Responses tool loop rejects incomplete and empty final responses', async (
     error => error.code === 'INCOMPLETE_MODEL_RESPONSE',
   );
 });
+
+// ─── 스트리밍 (C2) ────────────────────────────────────────────────────────
+
+function streamOf(events) {
+  return (async function* generate() {
+    for (const event of events) yield event;
+  })();
+}
+
+test('streaming forwards text deltas and still returns the completed response', async () => {
+  const deltas = [];
+  const requests = [];
+  const response = {
+    status: 'completed',
+    output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '안녕. 반가워.' }] }],
+  };
+  const result = await runOpenAIResponsesToolLoop({
+    createResponse: async () => { throw new Error('스트리밍이면 부르면 안 된다'); },
+    createResponseStream: async request => {
+      requests.push(request);
+      return streamOf([
+        { type: 'response.created', response: { status: 'in_progress' } },
+        { type: 'response.output_text.delta', delta: '안녕. ' },
+        { type: 'response.output_text.delta', delta: '반가워.' },
+        { type: 'response.completed', response },
+      ]);
+    },
+    onDelta: text => deltas.push(text),
+    model: 'gpt-5.6-terra',
+    input: [],
+    getTools: () => [],
+    executeTool: async () => ({ content: '' }),
+    maxToolRounds: 0,
+  });
+
+  assert.equal(requests[0].stream, true);
+  assert.deepEqual(deltas, ['안녕. ', '반가워.']);
+  assert.equal(result.outputText, '안녕. 반가워.');
+});
+
+test('text streamed before a tool call is reported so it can be dropped', async () => {
+  const deltas = [];
+  let discarded = 0;
+  const withTool = {
+    status: 'completed',
+    output: [
+      { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '찾아볼게.' }] },
+      { type: 'function_call', call_id: 'c1', name: 'web_search', arguments: '{}' },
+    ],
+  };
+  const final = {
+    status: 'completed',
+    output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '결과는 이래.' }] }],
+  };
+  let round = 0;
+  const result = await runOpenAIResponsesToolLoop({
+    createResponse: async () => { throw new Error('스트리밍이면 부르면 안 된다'); },
+    createResponseStream: async () => {
+      round += 1;
+      return round === 1
+        ? streamOf([
+          { type: 'response.output_text.delta', delta: '찾아볼게.' },
+          { type: 'response.completed', response: withTool },
+        ])
+        : streamOf([
+          { type: 'response.output_text.delta', delta: '결과는 이래.' },
+          { type: 'response.completed', response: final },
+        ]);
+    },
+    onDelta: text => deltas.push(text),
+    onDiscardedText: () => { discarded += 1; },
+    model: 'gpt-5.6-terra',
+    input: [],
+    getTools: () => [{ name: 'web_search', description: '', input_schema: { type: 'object', properties: {} } }],
+    executeTool: async () => ({ content: '검색 결과' }),
+    maxToolRounds: 1,
+  });
+
+  // 도구 앞의 텍스트는 최종 답변이 아니다. 알려야 조각을 버릴 수 있다.
+  assert.equal(discarded, 1);
+  assert.deepEqual(deltas, ['찾아볼게.', '결과는 이래.']);
+  assert.equal(result.outputText, '결과는 이래.');
+});
+
+test('without an onDelta the loop keeps using the non-streaming call', async () => {
+  let streamCalls = 0;
+  let plainCalls = 0;
+  const response = {
+    status: 'completed',
+    output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '안녕' }] }],
+  };
+  await runOpenAIResponsesToolLoop({
+    createResponse: async () => { plainCalls += 1; return response; },
+    createResponseStream: async () => { streamCalls += 1; return streamOf([]); },
+    model: 'gpt-5.6-terra',
+    input: [],
+    getTools: () => [],
+    executeTool: async () => ({ content: '' }),
+    maxToolRounds: 0,
+  });
+
+  // 텍스트 채팅은 기존 경로를 그대로 쓴다. 회귀 위험을 만들지 않는다.
+  assert.equal(plainCalls, 1);
+  assert.equal(streamCalls, 0);
+});
+
+test('a stream that ends without a response fails instead of returning nothing', async () => {
+  await assert.rejects(() => runOpenAIResponsesToolLoop({
+    createResponse: async () => ({}),
+    createResponseStream: async () => streamOf([{ type: 'response.output_text.delta', delta: 'x' }]),
+    onDelta: () => {},
+    model: 'gpt-5.6-terra',
+    input: [],
+    getTools: () => [],
+    executeTool: async () => ({ content: '' }),
+    maxToolRounds: 0,
+  }), error => error.code === 'INCOMPLETE_MODEL_RESPONSE');
+});

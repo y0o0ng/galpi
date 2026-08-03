@@ -2944,6 +2944,7 @@ async function generateGptReplyWithTools({
   scheduleToolSession = null,
   onStage = () => {},
   writingStage = 'answer',
+  onSpokenText = null,
 }) {
   const runtime = createChatToolRuntime({
     enableWebTool,
@@ -2959,6 +2960,12 @@ async function generateGptReplyWithTools({
     .slice(0, 64);
   const result = await runOpenAIResponsesToolLoop({
     createResponse: request => openai.responses.create(request),
+    // 음성 턴에서만 스트리밍한다. 텍스트 채팅은 기존 비스트리밍 호출을 그대로 쓴다.
+    ...(onSpokenText ? {
+      createResponseStream: request => openai.responses.create(request),
+      onDelta: onSpokenText.delta,
+      onDiscardedText: onSpokenText.discarded,
+    } : {}),
     model,
     maxOutputTokens,
     input: messages,
@@ -2992,6 +2999,7 @@ async function generateChatReply(model, context, {
   paperToolSession = null,
   scheduleToolSession = null,
   onStage = () => {},
+  onSpokenText = null,
 } = {}) {
   if (model === 'claude') {
     return generateClaudeReplyWithTools({
@@ -3015,6 +3023,7 @@ async function generateChatReply(model, context, {
       paperToolSession,
       scheduleToolSession,
       onStage,
+      onSpokenText,
     });
   }
   throw new Error('지원하지 않는 단일 채팅 모델입니다.');
@@ -3260,6 +3269,11 @@ app.post('/api/chat', async (req, res) => {
 
   const progress = createProgressStream(res, { enabled: wantsProgress === true });
   progress.stage('context');
+  // 음성 턴만 스트리밍한다. 문장이 완성될 때마다 조각을 먼저 보내 읽기 시작하게 한다.
+  // 텍스트 채팅은 기존 비스트리밍 경로와 result 한 번을 그대로 쓴다.
+  const spokenStream = (source === 'voice' && wantsProgress === true && voiceTts.available)
+    ? createSpokenProgressStream(progress)
+    : null;
 
   try {
     const payload = await withSessionChatLock(sessionId, async () => {
@@ -3358,7 +3372,9 @@ app.post('/api/chat', async (req, res) => {
         paperToolSession,
         scheduleToolSession,
         onStage: progress.stage,
+        onSpokenText: spokenStream,
       });
+      spokenStream?.flush();
       if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
 
       const assistantModel = model === 'gpt' ? usedModel : 'Claude';
@@ -3694,6 +3710,31 @@ app.post('/api/voice/session', (req, res) => {
 });
 
 // 반이중 전용 전사. Realtime 라우트와 세션 공간을 공유하지 않는다.
+// 스트리밍으로 도착한 답변을 문장 조각으로 잘라 progress로 흘려보낸다.
+// 도구 호출이 뒤따르면 그 앞의 텍스트는 최종 답변이 아니므로 세어만 두고 버린다.
+function createSpokenProgressStream(progress) {
+  let segmenter = voiceTts.createSpokenSegmenter();
+  let emitted = 0;
+  return {
+    delta(text) {
+      for (const segment of segmenter.push(text)) {
+        emitted += 1;
+        progress.speech(segment);
+      }
+    },
+    discarded() {
+      // 실측에서는 도구 라운드가 텍스트를 내지 않았다. 실제로 생기면 빈도를 봐야 한다.
+      console.warn(`⚠️ 음성 조각 폐기: 도구 호출 앞 텍스트 ${emitted}조각`);
+      segmenter = voiceTts.createSpokenSegmenter();
+      emitted = 0;
+    },
+    flush() {
+      for (const segment of segmenter.end()) progress.speech(segment);
+    },
+    get emitted() { return emitted; },
+  };
+}
+
 // H3 문턱을 정할 근거를 모은다. 실제 오전사 표본이 쌓이기 전에는 되묻지 않는다.
 // 전사 내용과 오디오는 남기지 않고 숫자만 적는다. 시각으로 shared-main과 대사한다.
 function logVoiceConfidence(result) {

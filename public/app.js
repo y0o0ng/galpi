@@ -79,7 +79,7 @@ function apiFetch(url, options = {}) {
   });
 }
 
-async function readProgressResponse(response, onStage = () => {}) {
+async function readProgressResponse(response, onStage = () => {}, onSpeech = null) {
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/x-ndjson')) return response.json();
 
@@ -91,6 +91,9 @@ async function readProgressResponse(response, onStage = () => {}) {
     const event = JSON.parse(line);
     if (event.type === 'stage' && PROGRESS_STAGE_LABELS[event.stage]) {
       onStage(event.stage);
+    } else if (event.type === 'speech') {
+      // 음성만 소비한다. 화면 답변은 아래 result 한 번으로 그린다.
+      onSpeech?.(event.text);
     } else if (event.type === 'result' || event.type === 'error') {
       terminalEvent = event;
     }
@@ -182,7 +185,8 @@ async function init() {
       showToast,
       config: config.halfDuplexVoice,
       // 음성 턴도 텍스트와 같은 경로로 보내 shared-main에 저장되고 메인 채팅에 그려진다.
-      askAssistant: transcript => sendSingleMessage({ overrideText: transcript, source: 'voice' }),
+      askAssistant: (transcript, onSpeech) =>
+        sendSingleMessage({ overrideText: transcript, source: 'voice', onSpeech }),
       // 말로 등록·취소할 때 음성이 새 요청을 만들지 않고 카드 버튼과 같은 경로를 부른다.
       pendingConfirmation: () => window.TaskPanel?.getPendingScheduleConfirmation() || null,
     });
@@ -836,7 +840,11 @@ async function sendSingleMessage(options = {}) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ message: text, model: 'gpt', sessionId, activeNotes, webSearch: !!options.webSearch, source: options.source, progress: true }),
     });
-    const data = await readProgressResponse(res, stage => updateLoadingStage(loadingEl, stage));
+    const data = await readProgressResponse(
+      res,
+      stage => updateLoadingStage(loadingEl, stage),
+      options.onSpeech,
+    );
     loadingEl.remove();
     if (data.error) {
       appendError(data.error);

@@ -389,8 +389,10 @@
         () => recover('답변이 늦어져서 넘어갈게.'),
         state.config.answerTimeoutMs,
       );
+      // 답변이 생성되는 동안 문장이 완성될 때마다 조각이 들어온다. 다 기다리지 않는다.
+      const queue = createSpeechQueue(runId);
       try {
-        const result = await state.askAssistant(transcript);
+        const result = await state.askAssistant(transcript, segment => queue.push(segment));
         clearTimer('answer');
         if (runId !== state.runId) return;
         if (!result?.ok) {
@@ -406,7 +408,20 @@
           return;
         }
         state.onAnswer(reply);
-        await speak(reply, runId);
+
+        // 조각이 하나도 안 왔으면 스트리밍이 없었던 것이다. 기존 경로로 읽는다.
+        if (queue.count === 0) {
+          await speak(reply, runId);
+          return;
+        }
+        const played = await queue.done();
+        if (runId !== state.runId) return;
+        if (!played) {
+          recover('음성을 못 만들었어.');
+          return;
+        }
+        state.pendingTurn = null;
+        enterCooldown();
       } catch (_) {
         clearTimer('answer');
         if (runId === state.runId) recover('답변을 못 만들었어.');
@@ -441,6 +456,42 @@
       } finally {
         clearTimer('speak');
       }
+    }
+
+    // 답변이 도착하는 대로 조각을 받아 순서대로 읽는다. 조각이 들어올 때마다 합성을
+    // 시작하되 재생은 순서를 지킨다. 합성 대기가 앞 조각 재생에 가려진다.
+    function createSpeechQueue(runId) {
+      let chain = Promise.resolve(true);
+      let count = 0;
+      let failed = false;
+
+      return {
+        get count() { return count; },
+        get failed() { return failed; },
+        push(segment) {
+          if (failed || runId !== state.runId) return;
+          // 합성은 도착 즉시 시작하고 재생만 순서를 지킨다. 그래야 대기가 겹친다.
+          const pending = fetchSegmentAudio(segment);
+          count += 1;
+          if (count === 1) {
+            // 첫 조각부터는 시온이 말하는 구간이다. 마이크를 먼저 닫아야 에코가 없다.
+            setPhase('speaking');
+            setMicEnabled(false);
+          }
+          chain = chain.then(async previousOk => {
+            if (!previousOk || failed || runId !== state.runId) return false;
+            const blob = await awaitSegmentAudio(pending);
+            if (runId !== state.runId) return false;
+            if (!blob) {
+              failed = true;
+              return false;
+            }
+            await playAudio(blob);
+            return runId === state.runId;
+          });
+        },
+        done() { return chain; },
+      };
     }
 
     async function speak(text, runId) {
