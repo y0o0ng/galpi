@@ -2,7 +2,7 @@
 
 > Date: 2026-08-01
 >
-> Status: H1·H2·H4·H5와 지연 C1·C2 Pi 배포·실기기 인수 완료. H6 설계 확정·H6a 서버 단일 턴 로컬 구현 완료, H3 미구현
+> Status: H1·H2·H4·H5와 지연 C1·C2 Pi 배포·실기기 인수 완료. H6a 서버 단일 턴 Pi 기술 인수 완료·H6b 잠금화면 인수 전, H3 미구현
 >
 > Scope: 핸즈프리 반이중 음성 대화, 전사 검증·되묻기, 음성 답변 분리, iOS 잠금화면 단축어 입구, 기존 채팅 파이프라인 재사용
 >
@@ -365,7 +365,7 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 
 **H5 Realtime 운영 종료 — 2026-08-03 Pi 배포·실기기 인수 완료.** DB·Vault 백업 `20260803-2019` 뒤 `OPENAI_REALTIME_ENABLED`, `OPENAI_REALTIME_READ_TOOLS_ENABLED`, `OPENAI_REALTIME_CORRECTION_ENABLED`, `OPENAI_REALTIME_FINALIZE_ENABLED`를 모두 `false`로 바꾸고 `VOICE_HALFDUPLEX_ENABLED=true`는 유지했다. 새 PID `182239`, 공개 config의 Realtime·보정·finalize 비활성, 반이중 활성, 반이중 session HTTP 200·`no-store`, 새 시작 이후 warning 0건을 확인했고 사용자가 폰 실기기에서 정상이라고 인수했다. Realtime 코드는 롤백과 기록을 위해 남기며 제거는 별도 컨펌으로 한다. 가장 작은 롤백은 네 Realtime flag를 다시 `true`로 돌리고 서비스를 재시작하는 것이다.
 
-**H6 잠금화면 단축어 음성 입구 — 2026-08-03 설계 확정·H6a 로컬 구현 완료.** PWA를 열지 않고 iOS가 질문을 받아 적고 갈피가 답변을 만든 뒤 iOS가 읽어주는 두 번째 반이중 입구를 만든다. 새 음성 뇌를 만들지 않고, 현재 반이중의 `정확한 텍스트 → 회수·GPT → 대화 저장 → 음성용 답변` 가운데 구간을 공용화한다.
+**H6 잠금화면 단축어 음성 입구 — 2026-08-03 설계 확정·H6a Pi 기술 인수 완료.** PWA를 열지 않고 iOS가 질문을 받아 적고 갈피가 답변을 만든 뒤 iOS가 읽어주는 두 번째 반이중 입구를 만든다. 새 음성 뇌를 만들지 않고, 현재 반이중의 `정확한 텍스트 → 회수·GPT → 대화 저장 → 음성용 답변` 가운데 구간을 공용화한다. 잠금 상태 단일 턴 제품 인수는 H6b로 남아 있다.
 
 ### H6의 목표와 비목표
 
@@ -515,13 +515,17 @@ voice_shortcut_receipts
 
 ### 단축어 단계
 
-**H6a-1 공용 턴 코어 — 2026-08-03 로컬 완료.** 기존 `/api/chat`의 세션 잠금·회수·도구·GPT·저장 구간을 `runSingleChatTurn`으로 한 번만 분리했다. 라우트의 입력 검증·progress·응답·오류 계약은 유지하고, 서버 소유 옵션으로 `voiceTurn`, 일정 후보 허용, topic 자동 저장 허용을 받는다. 기존 PWA가 넘기는 정책은 바꾸지 않았고 로컬 전체 회귀 347/347을 통과했다. 새 route·flag·schema·credential은 아직 없다.
+**H6a-1 공용 턴 코어 — 2026-08-03 구현·Pi 배포 완료.** 기존 `/api/chat`의 세션 잠금·회수·도구·GPT·저장 구간을 `runSingleChatTurn`으로 한 번만 분리했다. 라우트의 입력 검증·progress·응답·오류 계약은 유지하고, 서버 소유 옵션으로 `voiceTurn`, 일정 후보 허용, topic 자동 저장 허용을 받는다. 기존 PWA가 넘기는 정책은 바꾸지 않았고 로컬 전체 회귀 347/347을 통과했다.
 
-**H6a-2 서버 단일 턴 — 2026-08-03 로컬 완료.** schema v11에 활성 Push 구독별 hash-only credential과 durable receipt를 추가했다. 인증된 기존 API에서 `POST /api/voice/shortcut/credentials`로 raw token을 한 번만 발급하고 `DELETE /api/voice/shortcut/credentials/:id`로 폐기한다. exact `POST /api/voice/shortcut/turn`은 기존 전체 `API_TOKEN`과 분리된 bearer만 받고 8KiB JSON·2,000자·UUID·credential/IP별 분당 10회·credential별 동시 1개를 집행한다. H6a에서는 `text`·`requestId` 외 필드를 거절하고 `canContinue:false`로 고정한다.
+**H6a-2 서버 단일 턴 — 2026-08-03 구현·Pi 기술 인수 완료.** schema v11에 활성 Push 구독별 hash-only credential과 durable receipt를 추가했다. 인증된 기존 API에서 `POST /api/voice/shortcut/credentials`로 raw token을 한 번만 발급하고 `DELETE /api/voice/shortcut/credentials/:id`로 폐기한다. exact `POST /api/voice/shortcut/turn`은 기존 전체 `API_TOKEN`과 분리된 bearer만 받고 8KiB JSON·2,000자·UUID·credential/IP별 분당 10회·credential별 동시 1개를 집행한다. H6a에서는 `text`·`requestId` 외 필드를 거절하고 `canContinue:false`로 고정한다.
 
-receipt는 provider 호출 전 `pending`으로 만들고 30초 뒤 최대 3회까지만 crash retry한다. 완료 시 기존 `shared-main` user/assistant 삽입과 receipt의 message ID·`completed` 전환을 같은 SQLite transaction에서 확정한다. 완료 재전송과 동시 중복은 저장 답변을 재생하며 provider와 메시지를 반복하지 않는다. 단축어 턴은 GPT·`shared-main`·`voiceTurn:true`·일정 후보 금지·topic 자동 저장 금지·읽기 전용 지시를 서버가 고정한다. `VOICE_SHORTCUT_ENABLED` 기본값은 `false`이고 Pi에는 아직 배포하지 않았다.
+receipt는 provider 호출 전 `pending`으로 만들고 30초 뒤 최대 3회까지만 crash retry한다. 완료 시 기존 `shared-main` user/assistant 삽입과 receipt의 message ID·`completed` 전환을 같은 SQLite transaction에서 확정한다. 완료 재전송과 동시 중복은 저장 답변을 재생하며 provider와 메시지를 반복하지 않는다. 단축어 턴은 GPT·`shared-main`·`voiceTurn:true`·일정 후보 금지·topic 자동 저장 금지·읽기 전용 지시를 서버가 고정한다. `VOICE_SHORTCUT_ENABLED` 코드 기본값은 `false`이고 운영 Pi에서만 `true`다.
 
 로컬 가짜 provider 통합에서 scoped token만 exact route `200`, 전체 API 우회 `401`, 같은 request 동시 2개 provider 1회, 완료 replay 추가 provider 0회·추가 메시지 0개, request 충돌 `409`, 11번째 분당 요청 `429`, 일정형 발화 task·topic write 0을 확인했다. 전체 순차 회귀는 352/352다.
+
+Pi에서는 DB·Vault 백업 `20260803-2152`, 코드 복구본 `code-h6a-shortcut-pre-20260803-215203.tar.gz`와 권한 600의 별도 `.env` 복구본을 만든 뒤 schema 10→11을 적용했다. 변경 10개 파일의 SHA-256이 로컬과 일치했고 H6a 집중 4/4·전체 순차 348/348, 새 PID `184734`, HTTP 200, 인증 config `shortcutVoice.enabled:true`, warning 이상 journal 0건, SQLite integrity `ok`·외래키 0을 확인했다. 배포 전후 messages/notes/note_chunks/auto-save/task/event/reminder는 `579/36/113/198/12/24/4`로 불변이다.
+
+등록된 iOS Push 구독 중 당일 갱신된 활성 구독 하나에 credential 1개를 발급했다. raw token은 응답에서 한 번만 전달하고 문서·Git·DB 원문에 남기지 않았다. 무토큰과 기존 전체 `API_TOKEN`은 exact 음성 route에서 `401`, scoped token은 인증 뒤 금지 필드 검증 `400`까지 도달했고 일반 `/api/memory`에서는 `401`이었다. 실제 provider 호출은 H6b 실기기용으로 남겨 receipt 0행과 기존 application 행 수를 유지했다.
 
 **H6b 잠금화면 실기기 spike.** iPhone 단축어는 아래 순서만 갖는다.
 

@@ -191,7 +191,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### 핵심 B — 반이중 대화 + 잠금화면 단축어
 
-> H1·H2·H4·H5와 C1·C2는 Pi·iPhone 인수를 마쳤고 H3 되묻기는 표본 부족으로 미구현이다. H6은 등록된 Web Push 기기에 별도 scoped credential을 묶는 읽기 중심 단축어 입구다. H6a 공용 턴 코어와 schema v11 credential·receipt·단일 턴 route는 로컬 구현·전체 회귀를 마쳤고, Pi 배포와 잠금화면 실기기 인수는 아직 열려 있다. 아래 R0~R2 기록은 Realtime을 종료하게 된 구현 이력이며 신규 작업 기준이 아니다.
+> H1·H2·H4·H5와 C1·C2는 Pi·iPhone 인수를 마쳤고 H3 되묻기는 표본 부족으로 미구현이다. H6은 등록된 Web Push 기기에 별도 scoped credential을 묶는 읽기 중심 단축어 입구다. H6a 공용 턴 코어와 schema v11 credential·receipt·단일 턴 route는 Pi 기술 인수를 마쳤다. 운영 flag를 켜고 당일 갱신된 활성 iOS 구독에 credential 1개를 발급했으며 exact route와 일반 API의 권한 분리를 확인했다. 실제 provider 호출·저장 재시도와 잠금화면 10회는 H6b로 남아 있다. 아래 R0~R2 기록은 Realtime을 종료하게 된 구현 이력이며 신규 작업 기준이 아니다.
 
 > R0 GO (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. 사용자 iPhone 홈 화면 PWA에서 5분 연속 한국어·영어 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 R0 기능 GO를 승인했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
 >
@@ -266,7 +266,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [ ] 며칠 뒤 관련 질문 → 그 녹음에서 나온 내용을 꺼내온다
 - [x] H6a-1 기존 `/api/chat`의 회수·GPT·저장 구간을 공용 턴 코어로 분리하고 기존 PWA 계약의 전체 회귀를 통과한다
 - [x] H6a-2 활성 Push 구독 scoped credential·durable receipt·읽기 전용 단일 턴 route를 로컬에서 구현하고 동시 중복·재전송·권한 회귀를 통과한다
-- [ ] H6 Pi 인수에서 scoped token은 연결된 활성 Push 구독과 exact 음성 route에서만 유효하고, 같은 request ID 재시도에도 `shared-main` 메시지가 중복되지 않는다
+- [x] H6a Pi 기술 인수에서 schema v11·운영 flag·활성 iOS 구독 credential을 적용하고 scoped token의 exact route 한정과 일반 API 거절을 확인한다
+- [ ] H6b 실기기에서 실제 단일 턴과 같은 request ID 재시도에도 `shared-main` 메시지가 중복되지 않는다
 - [ ] 잠금 상태 단일 턴 10회 중 9회 이상이 PWA 실행·잠금 해제 없이 받아쓰기→갈피 응답→iOS 낭독을 마친다
 
 > 핵심 포인트: PWA 반이중은 `gpt-transcribe`와 OpenAI TTS, H6 단축어는 Apple 받아쓰기와 텍스트 말하기를 입·귀로 쓴다. 둘 다 같은 회수·GPT·`shared-main` 저장 경로를 쓰고 음성 질문은 topic에 자동 저장하지 않으며, 화면 없는 H6에서는 일정·노트·설정 쓰기를 열지 않는다.
