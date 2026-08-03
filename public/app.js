@@ -854,7 +854,7 @@ async function sendSingleMessage(options = {}) {
     if (Array.isArray(data.webSources) && data.webSources.length > 0) refreshWebUsagePill();
     lastRenderedMsgId = data.messageId || lastRenderedMsgId; // 방금 보낸 건 폴링이 다시 안 그리게
     document.dispatchEvent(new Event('pet:happy'));
-    return { ok: true, reply: data.reply || '' };
+    return { ok: true, reply: data.reply || '', spokenRemaining: data.spokenRemaining || '' };
   } catch (_) {
     loadingEl.remove();
     appendError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');

@@ -54,6 +54,22 @@
     '하지마', '하지마요', '하지말자', '안해', '안할래', '취소', '말자',
   ]);
 
+  // 답변이 길어 3문장에서 멈췄을 때 이어 들으려는 말. 핸즈프리로는 화면을 못 본다.
+  const CONTINUE_WORDS = new Set([
+    '계속', '계속해', '계속해줘', '계속말해줘', '계속읽어줘', '이어서', '이어서말해줘',
+    '더', '더말해줘', '더말해', '더읽어줘', '더들려줘', '더해줘', '나머지', '나머지도',
+  ]);
+
+  function matchContinueIntent(transcript) {
+    const normalized = normalizeCommand(transcript);
+    if (!normalized || normalized.length > MAX_CONFIRM_LENGTH) return false;
+    if (CONTINUE_WORDS.has(normalized)) return true;
+    // "응 계속"처럼 앞에 맞장구가 붙는다.
+    return LEADING_PREFIXES.some(prefix => normalized.length > prefix.length
+      && normalized.startsWith(prefix)
+      && CONTINUE_WORDS.has(normalized.slice(prefix.length)));
+  }
+
   // 앞에 붙는 맞장구와 목적어를 떼고 다시 본다. "응 등록해줘"와 "일정 카드 등록해줄래"가
   // 둘 다 걸려야 한다. 긴 것부터 떼려고 길이 내림차순으로 둔다.
   const LEADING_PREFIXES = [
@@ -132,6 +148,8 @@
       onAnswer: () => {},
       onPhase: () => {},
       pendingConfirmation: () => null,
+      // 답변이 3문장에서 멈췄을 때 아직 안 읽은 나머지.
+      spokenRemaining: '',
       stream: null,
       recorder: null,
       turnSequence: 0,
@@ -373,6 +391,15 @@
     }
 
     async function think(transcript, runId) {
+      // 이어 듣기가 먼저다. 답변을 더 읽어달라는 말은 새 질문이 아니므로
+      // 모델도 저장도 거치지 않고, 확인 카드도 건드리지 않는다.
+      if (state.spokenRemaining && matchContinueIntent(transcript)) {
+        const remaining = state.spokenRemaining;
+        state.spokenRemaining = '';
+        await speak(remaining, runId);
+        return;
+      }
+
       // 확인 카드가 떠 있으면 좁은 어휘를 먼저 본다. 모델 호출도 저장도 하지 않는다.
       const pending = state.pendingConfirmation?.();
       if (pending) {
@@ -392,6 +419,8 @@
         () => recover('답변이 늦어져서 넘어갈게.'),
         state.config.answerTimeoutMs,
       );
+      // 새 질문이므로 앞 답변의 나머지는 버린다.
+      state.spokenRemaining = '';
       // 답변이 생성되는 동안 문장이 완성될 때마다 조각이 들어온다. 다 기다리지 않는다.
       const queue = createSpeechQueue(runId);
       try {
@@ -417,6 +446,7 @@
           await speak(reply, runId);
           return;
         }
+        state.spokenRemaining = String(result.spokenRemaining || '');
         const played = await queue.done();
         if (runId !== state.runId) return;
         if (!played) {
@@ -517,6 +547,7 @@
         const segments = Array.isArray(data.segments)
           ? data.segments.filter(segment => typeof segment === 'string' && segment.trim())
           : [];
+        state.spokenRemaining = String(data.remaining || '');
         if (!segments.length) {
           recover('음성을 못 만들었어.');
           return;

@@ -24,6 +24,7 @@ function silentWav(samples = 8, amplitude = 1000) {
 }
 
 const {
+  SPOKEN_CLOSING,
   DEFAULT_INSTRUCTIONS,
   DEFAULT_MAX_CHARS,
   DEFAULT_SPEED,
@@ -43,7 +44,7 @@ test('a long answer is cut at a sentence boundary and points at the screen', () 
 
   assert.ok(spoken.startsWith('첫 문장이야.'));
   assert.doesNotMatch(spoken, /네 번째/);
-  assert.match(spoken, /화면에 정리해뒀어\.$/);
+  assert.ok(spoken.endsWith(SPOKEN_CLOSING));
 });
 
 test('the spoken cap is enforced in code rather than left to the prompt', () => {
@@ -193,11 +194,11 @@ test('the spoken text is split at sentence ends and tiny pieces are merged', () 
 });
 
 test('splitting reuses the one cap so long answers still point at the screen', () => {
-  const { splitSpokenSegments, DEFAULT_MAX_CHARS } = require('../lib/voice-tts');
+  const { splitSpokenSegments, DEFAULT_MAX_CHARS, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
   const segments = splitSpokenSegments('가나다라마바사아자차. '.repeat(120));
 
   assert.ok(segments.length >= 1);
-  assert.equal(segments.at(-1), '자세한 건 화면에 정리해뒀어.');
+  assert.equal(segments.at(-1), closing);
   // 상한은 selectSpokenText 한 곳에서만 적용한다. 합쳐도 원문 길이가 되지 않는다.
   assert.ok(segments.join(' ').length < DEFAULT_MAX_CHARS + 60);
 });
@@ -253,14 +254,14 @@ test('the streamed cap stops reading and points at the screen', () => {
   const long = feed('첫 문장은 결론이야 이 정도 길이로. 둘째 문장도 결론의 일부야 충분히 길게. '
     + '셋째 문장으로 결론을 닫아 이렇게. 넷째부터는 근거인데 읽히면 안 돼. 다섯째도 마찬가지야 절대로.');
   assert.equal(long.length, MAX_SPOKEN_SEGMENTS + 1);
-  assert.equal(long.at(-1), '자세한 건 화면에 정리해뒀어.');
+  assert.equal(long.at(-1), SPOKEN_CLOSING);
   assert.ok(!long.join(' ').includes('넷째'));
 
   // 마침 상한에서 끝난 답변에 "자세한 건 화면에"를 덧붙이면 거짓말이 된다.
   const exact = feed('첫 문장은 결론이야 이 정도 길이로. 둘째 문장도 결론의 일부야 충분히 길게. '
     + '셋째 문장으로 결론을 닫아 이렇게.');
   assert.equal(exact.length, MAX_SPOKEN_SEGMENTS);
-  assert.ok(!exact.join(' ').includes('화면에 정리해뒀어'));
+  assert.ok(!exact.join(' ').includes(SPOKEN_CLOSING));
 
   // 짧은 답변은 그대로 다 읽는다.
   assert.deepEqual(feed('응.'), ['응.']);
@@ -332,4 +333,25 @@ test('the header is fixed even when the loudness already matches', () => {
   wav.writeUInt32LE(0xFFFFFFFF, 40);
 
   assert.equal(normalizeWavLoudness(wav).readUInt32LE(40), wav.length - 44);
+});
+
+test('the plan hands back what it did not read so it can be continued', () => {
+  const { planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const long = '첫 문장은 결론이야 이 정도 길이로. 둘째도 결론의 일부야 충분히 길게. '
+    + '셋째로 결론을 닫아 이렇게. 넷째는 근거인데 나중에 읽혀야 해. 다섯째도 마찬가지야 정말로.';
+
+  const first = planSpokenSegments(long);
+  assert.equal(first.segments.length, 4);
+  assert.equal(first.segments.at(-1), closing);
+  // 핸즈프리로는 화면을 못 본다. 이어 들을 길을 함께 안내한다.
+  assert.match(closing, /더 들으려면/);
+
+  // 나머지를 그대로 다시 넣으면 이어진다. 서버는 아무것도 기억하지 않는다.
+  const second = planSpokenSegments(first.remaining);
+  assert.ok(second.segments[0].startsWith('넷째'));
+  assert.equal(second.remaining, '');
+  assert.ok(!second.segments.includes(closing));
+
+  // 짧은 답변은 나머지가 없으므로 안내도 붙지 않는다.
+  assert.deepEqual(planSpokenSegments('응.'), { segments: ['응.'], remaining: '' });
 });

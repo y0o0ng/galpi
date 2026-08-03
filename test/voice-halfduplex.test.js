@@ -790,3 +790,47 @@ test('playback that never reports its end still returns the loop to listening', 
   assert.equal(h.client.getState().phase, 'listening');
   assert.equal(h.tracks[0].enabled, true);
 });
+
+test('saying 계속 reads the rest without asking the model again', async () => {
+  const spoken = [];
+  const h = loadClient({
+    async askAssistant(transcript, onSpeech) {
+      // 스트리밍으로 앞 문장을 읽고 나머지는 서버가 함께 돌려준다.
+      onSpeech('긴 답변의 앞부분이야.');
+      return { ok: true, reply: '긴 답변이야.', spokenRemaining: '아직 안 읽은 나머지야 이렇게.' };
+    },
+    responders: {
+      '/speak/segments': async (url, options) => {
+        const text = JSON.parse(options.body).text;
+        return { ok: true, async json() { return { segments: [text], remaining: '' }; } };
+      },
+      '/api/voice/speak': async (url, options) => {
+        spoken.push(JSON.parse(options.body).text);
+        return { ok: true, async blob() { return new Blob(['RIFF']); } };
+      },
+    },
+  });
+  await h.client.start();
+  // 첫 턴은 스트리밍 조각으로 읽고 나머지를 남긴다.
+  h.transcriptQueue.push('긴 질문이야');
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  await runTurn(h, '계속 말해줘', 'hd-2');
+
+  // 이어 듣기는 새 질문이 아니다. 모델도 저장도 거치지 않는다.
+  assert.deepEqual(h.asks, ['긴 질문이야']);
+  assert.ok(spoken.includes('아직 안 읽은 나머지야 이렇게.'));
+});
+
+test('계속 with nothing left is an ordinary question', async () => {
+  const h = loadClient();
+  await h.client.start();
+  await runTurn(h, '계속', 'hd-1');
+
+  // 남은 게 없으면 평범한 발화다. 아무 일도 없는 것보다 답하는 편이 낫다.
+  assert.deepEqual(h.asks, ['계속']);
+});

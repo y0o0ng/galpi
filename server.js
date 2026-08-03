@@ -3385,6 +3385,7 @@ app.post('/api/chat', async (req, res) => {
         onSpokenText: spokenStream,
       });
       spokenStream?.flush();
+      const spokenRemaining = spokenStream?.remaining() || '';
       if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
 
       const assistantModel = model === 'gpt' ? usedModel : 'Claude';
@@ -3433,6 +3434,8 @@ app.post('/api/chat', async (req, res) => {
         usage: model === 'gpt' ? usage : undefined,
         messageId: assistantMessageId,
         scheduleCandidate,
+        // 음성이 "계속"이라고 했을 때 이어 읽을 나머지. 서버는 보관하지 않는다.
+        ...(spokenRemaining ? { spokenRemaining } : {}),
         webSources: webEvidence?.results || [],
         paperFullText: {
           used: paperEvidenceRefs.length > 0,
@@ -3741,6 +3744,8 @@ function createSpokenProgressStream(progress) {
     flush() {
       for (const segment of segmenter.end()) progress.speech(segment);
     },
+    // 아직 읽지 않은 나머지. 사용자가 "계속"이라고 하면 이것부터 이어 읽는다.
+    remaining() { return emitted > 0 ? segmenter.remaining() : ''; },
     get emitted() { return emitted; },
   };
 }
@@ -3811,7 +3816,7 @@ app.post('/api/voice/speak/segments', (req, res) => {
   }
   res
     .set('Cache-Control', 'no-store')
-    .json({ segments: voiceTts.splitSpokenSegments(text) });
+    .json(voiceTts.planSpokenSegments(text));
 });
 
 app.post('/api/voice/speak', async (req, res) => {
