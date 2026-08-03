@@ -191,7 +191,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### 핵심 B — 반이중 대화 + 잠금화면 단축어
 
-> H1·H2·H4·H5와 C1·C2는 Pi·iPhone 인수를 마쳤고 H3 되묻기는 표본 부족으로 미구현이다. H6은 등록된 Web Push 기기에 별도 scoped credential을 묶고 공용 voice-turn core를 재사용하는 읽기 중심 단축어 입구로 설계 확정·미구현 상태다. 아래 R0~R2 기록은 Realtime을 종료하게 된 구현 이력이며 신규 작업 기준이 아니다.
+> H1·H2·H4·H5와 C1·C2는 Pi·iPhone 인수를 마쳤고 H3 되묻기는 표본 부족으로 미구현이다. H6은 등록된 Web Push 기기에 별도 scoped credential을 묶는 읽기 중심 단축어 입구다. H6a-1에서 기존 `/api/chat`의 회수·GPT·저장 구간을 공용 턴 코어로 분리했고, credential·receipt·route와 실기기 인수는 아직 열려 있다. 아래 R0~R2 기록은 Realtime을 종료하게 된 구현 이력이며 신규 작업 기준이 아니다.
 
 > R0 GO (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. 사용자 iPhone 홈 화면 PWA에서 5분 연속 한국어·영어 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 R0 기능 GO를 승인했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
 >
@@ -264,6 +264,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [ ] 폰에서 30초 녹음 → 텍스트로 변환돼 화면에 뜬다
 - [ ] 확인 전에는 저장되지 않고, 확인한 내용만 선택한 대화·메모·할 일 경로로 들어간다
 - [ ] 며칠 뒤 관련 질문 → 그 녹음에서 나온 내용을 꺼내온다
+- [x] H6a-1 기존 `/api/chat`의 회수·GPT·저장 구간을 공용 턴 코어로 분리하고 기존 PWA 계약의 전체 회귀를 통과한다
 - [ ] H6 scoped token은 연결된 활성 Push 구독과 exact 음성 route에서만 유효하고, 같은 request ID 재시도에도 `shared-main` 메시지가 중복되지 않는다
 - [ ] 잠금 상태 단일 턴 10회 중 9회 이상이 PWA 실행·잠금 해제 없이 받아쓰기→갈피 응답→iOS 낭독을 마친다
 

@@ -2962,6 +2962,7 @@ async function generateGptReplyWithTools({
   onStage = () => {},
   writingStage = 'answer',
   onSpokenText = null,
+  voiceTurn = Boolean(onSpokenText),
 }) {
   const runtime = createChatToolRuntime({
     enableWebTool,
@@ -2991,7 +2992,7 @@ async function generateGptReplyWithTools({
       paperToolSession,
       scheduleToolSession,
       includeLanguageRule: true,
-      voiceTurn: Boolean(onSpokenText),
+      voiceTurn,
     }),
     reasoningEffort,
     reasoningContext: 'current_turn',
@@ -3018,6 +3019,7 @@ async function generateChatReply(model, context, {
   scheduleToolSession = null,
   onStage = () => {},
   onSpokenText = null,
+  voiceTurn = Boolean(onSpokenText),
 } = {}) {
   if (model === 'claude') {
     return generateClaudeReplyWithTools({
@@ -3042,6 +3044,7 @@ async function generateChatReply(model, context, {
       scheduleToolSession,
       onStage,
       onSpokenText,
+      voiceTurn,
     });
   }
   throw new Error('지원하지 않는 단일 채팅 모델입니다.');
@@ -3256,6 +3259,178 @@ async function decideCouncilWebEvidence(context, claudeModel, onStage = () => {}
 
 // ─── 채팅 ────────────────────────────────────────────────────────────────────
 
+async function runSingleChatTurn({
+  message,
+  model,
+  sessionId,
+  activeNotes,
+  webSearch,
+  progress,
+  spokenStream = null,
+  voiceTurn = Boolean(spokenStream),
+  allowSchedulePrepare = true,
+  allowAutoTopic = true,
+}) {
+  return withSessionChatLock(sessionId, async () => {
+    hydrateSessionFromDb(sessionId);
+    const history = sessions[sessionId];
+    const requestTime = new Date();
+    const requestCreatedAt = Math.floor(requestTime.getTime() / 1000);
+    const previousMessageCreatedAt = getLastMessageTimestamp(history);
+    const userEntry = { role: 'user', content: message, createdAt: requestCreatedAt };
+    const requestHistory = [...history, userEntry];
+    const modelSnapshot = model === 'gpt'
+      ? resolveChatModelSelection({
+        selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
+        catalogRow: modelCatalogs.get('openai_api'),
+        bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
+        reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+      })
+      : null;
+
+    // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
+    const memoryItems = await readMemoryItems();
+    const {
+      notes: resolvedNotes,
+      pastMessages,
+      queryEmbedding,
+      retrievalContext,
+    } = await getContextNotesForQuestion(
+      message,
+      activeNotes,
+      sessionId,
+      modelSnapshot?.runtimeGeneration
+        ? `chat:${modelSnapshot.runtimeGeneration}`
+        : 'chat',
+    );
+    const baseContext = formatHistoryForModelContext(
+      requestHistory.slice(-HISTORY_CONTEXT_MESSAGES),
+    );
+    let webEvidence = null;
+
+    try {
+      if (webSearch) {
+        progress.stage('web_search');
+        webEvidence = await searchWeb(message);
+      }
+      if (!hasWebEvidenceResults(webEvidence)) webEvidence = null;
+    } catch (err) {
+      if (webSearch) throw err;
+      console.warn('명시적 웹 검색 실패:', err.message);
+    }
+    const context = [
+      ...baseContext.slice(0, -1),
+      {
+        role: 'user',
+        content: buildContextMessage(
+          message,
+          resolvedNotes,
+          memoryItems,
+          pastMessages,
+          webEvidence,
+          requestTime,
+          previousMessageCreatedAt,
+          getActiveScheduleContext(),
+          retrievalContext,
+        ),
+      },
+    ];
+    const allowModelWebTool = (
+      !webSearch &&
+      !hasWebEvidenceResults(webEvidence) &&
+      WEB_SEARCH_ENABLED &&
+      WEB_SEARCH_MODEL_TOOL_ENABLED
+    );
+    const paperToolSession = paperFullTextTools.createSession({
+      notes: resolvedNotes,
+      queryEmbedding,
+    });
+    const scheduleToolSession = allowSchedulePrepare && ASSISTANT_TASKS_ENABLED
+      ? createSchedulePrepareSession(assistantTasks, {
+        capturedAt: requestCreatedAt,
+        clientRequestId: `chat-task:${uuidv4()}`,
+      })
+      : null;
+    progress.stage('answer');
+    const {
+      reply,
+      usedModel,
+      usage,
+      webEvidence: toolWebEvidence,
+      paperEvidenceRefs,
+      paperFullTextUsage,
+      scheduleCandidate,
+    } = await generateChatReply(model, context, {
+      modelSnapshot,
+      sessionId,
+      enableWebTool: allowModelWebTool,
+      paperToolSession,
+      scheduleToolSession,
+      onStage: progress.stage,
+      onSpokenText: spokenStream,
+      voiceTurn,
+    });
+    spokenStream?.flush();
+    const spokenRemaining = spokenStream?.remaining() || '';
+    if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
+
+    const assistantModel = model === 'gpt' ? usedModel : 'Claude';
+    const { userMessageId, assistantMessageId } = dbSaveChatExchange({
+      sessionId,
+      question: message,
+      answer: reply,
+      queryEmbedding,
+      assistantModel,
+      modelSnapshot,
+    });
+    const assistantCreatedAt = Math.floor(Date.now() / 1000);
+    sessions[sessionId] = [
+      ...history,
+      userEntry,
+      {
+        role: 'assistant',
+        content: reply,
+        model: assistantModel,
+        createdAt: assistantCreatedAt,
+      },
+    ].slice(-HISTORY_CONTEXT_MESSAGES);
+
+    if (!scheduleCandidate && allowAutoTopic) {
+      autoAppendTopicNote({
+        question: message,
+        answer: reply,
+        sessionId,
+        userMessageId,
+        assistantMessageId,
+        model: assistantModel,
+        webSources: webEvidence?.results || [],
+      }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
+    }
+
+    return {
+      reply,
+      model: model === 'gpt' ? 'GPT' : 'Claude',
+      modelId: usedModel,
+      modelSelection: modelSnapshot?.selection || null,
+      catalogGeneration: modelSnapshot?.catalogGeneration ?? null,
+      runtimeGeneration: modelSnapshot?.runtimeGeneration || null,
+      reasoningEffort: modelSnapshot?.reasoningEffort || null,
+      usage: model === 'gpt' ? usage : undefined,
+      messageId: assistantMessageId,
+      scheduleCandidate,
+      // 음성이 "계속"이라고 했을 때 이어 읽을 나머지. 서버는 보관하지 않는다.
+      ...(spokenRemaining ? { spokenRemaining } : {}),
+      webSources: webEvidence?.results || [],
+      paperFullText: {
+        used: paperEvidenceRefs.length > 0,
+        evidenceRefs: paperEvidenceRefs,
+        calls: paperFullTextUsage.calls,
+        contextChars: paperFullTextUsage.contextChars,
+      },
+    };
+  });
+}
+
 app.post('/api/chat', async (req, res) => {
   const {
     message, model, sessionId, activeNotes, webSearch, progress: wantsProgress, source,
@@ -3294,164 +3469,18 @@ app.post('/api/chat', async (req, res) => {
     : null;
 
   try {
-    const payload = await withSessionChatLock(sessionId, async () => {
-      hydrateSessionFromDb(sessionId);
-      const history = sessions[sessionId];
-      const requestTime = new Date();
-      const requestCreatedAt = Math.floor(requestTime.getTime() / 1000);
-      const previousMessageCreatedAt = getLastMessageTimestamp(history);
-      const userEntry = { role: 'user', content: message, createdAt: requestCreatedAt };
-      const requestHistory = [...history, userEntry];
-      const modelSnapshot = model === 'gpt'
-        ? resolveChatModelSelection({
-          selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
-          catalogRow: modelCatalogs.get('openai_api'),
-          bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
-          reasoningEffort: GPT_CHAT_REASONING_EFFORT,
-        })
-        : null;
-
-      // 사용자 메모리는 항상, 활성/자동 검색 노트는 질문별 참조로 주입
-      const memoryItems = await readMemoryItems();
-      const {
-        notes: resolvedNotes,
-        pastMessages,
-        queryEmbedding,
-        retrievalContext,
-      } = await getContextNotesForQuestion(
-        message,
-        activeNotes,
-        sessionId,
-        modelSnapshot?.runtimeGeneration
-          ? `chat:${modelSnapshot.runtimeGeneration}`
-          : 'chat',
-      );
-      const baseContext = formatHistoryForModelContext(
-        requestHistory.slice(-HISTORY_CONTEXT_MESSAGES),
-      );
-      let webEvidence = null;
-
-      try {
-        if (webSearch) {
-          progress.stage('web_search');
-          webEvidence = await searchWeb(message);
-        }
-        if (!hasWebEvidenceResults(webEvidence)) webEvidence = null;
-      } catch (err) {
-        if (webSearch) throw err;
-        console.warn('명시적 웹 검색 실패:', err.message);
-      }
-      const context = [
-        ...baseContext.slice(0, -1),
-        {
-          role: 'user',
-          content: buildContextMessage(
-            message,
-            resolvedNotes,
-            memoryItems,
-            pastMessages,
-            webEvidence,
-            requestTime,
-            previousMessageCreatedAt,
-            getActiveScheduleContext(),
-            retrievalContext,
-          ),
-        },
-      ];
-      const allowModelWebTool = (
-        !webSearch &&
-        !hasWebEvidenceResults(webEvidence) &&
-        WEB_SEARCH_ENABLED &&
-        WEB_SEARCH_MODEL_TOOL_ENABLED
-      );
-      const paperToolSession = paperFullTextTools.createSession({
-        notes: resolvedNotes,
-        queryEmbedding,
-      });
-      const scheduleToolSession = ASSISTANT_TASKS_ENABLED
-        ? createSchedulePrepareSession(assistantTasks, {
-          capturedAt: requestCreatedAt,
-          clientRequestId: `chat-task:${uuidv4()}`,
-        })
-        : null;
-      progress.stage('answer');
-      const {
-        reply,
-        usedModel,
-        usage,
-        webEvidence: toolWebEvidence,
-        paperEvidenceRefs,
-        paperFullTextUsage,
-        scheduleCandidate,
-      } = await generateChatReply(model, context, {
-        modelSnapshot,
-        sessionId,
-        enableWebTool: allowModelWebTool,
-        paperToolSession,
-        scheduleToolSession,
-        onStage: progress.stage,
-        onSpokenText: spokenStream,
-      });
-      spokenStream?.flush();
-      const spokenRemaining = spokenStream?.remaining() || '';
-      if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
-
-      const assistantModel = model === 'gpt' ? usedModel : 'Claude';
-      const { userMessageId, assistantMessageId } = dbSaveChatExchange({
-        sessionId,
-        question: message,
-        answer: reply,
-        queryEmbedding,
-        assistantModel,
-        modelSnapshot,
-      });
-      const assistantCreatedAt = Math.floor(Date.now() / 1000);
-      sessions[sessionId] = [
-        ...history,
-        userEntry,
-        {
-          role: 'assistant',
-          content: reply,
-          model: assistantModel,
-          createdAt: assistantCreatedAt,
-        },
-      ].slice(-HISTORY_CONTEXT_MESSAGES);
-
+    const payload = await runSingleChatTurn({
+      message,
+      model,
+      sessionId,
+      activeNotes,
+      webSearch,
+      progress,
+      spokenStream,
+      voiceTurn: Boolean(spokenStream),
       // 음성 출처 턴은 전사 오류가 지식 베이스에 굳지 않도록 topic 자동 저장에서 제외한다.
       // 대화 자체는 기존 경로로 저장하고 명시적 저장만 허용한다.
-      if (!scheduleCandidate && source !== 'voice') {
-        autoAppendTopicNote({
-          question: message,
-          answer: reply,
-          sessionId,
-          userMessageId,
-          assistantMessageId,
-          model: assistantModel,
-          webSources: webEvidence?.results || [],
-        }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
-      }
-
-      return {
-        reply,
-        model: model === 'gpt' ? 'GPT' : 'Claude',
-        modelId: usedModel,
-        modelSelection: modelSnapshot?.selection || null,
-        catalogGeneration: modelSnapshot?.catalogGeneration ?? null,
-        runtimeGeneration: modelSnapshot?.runtimeGeneration || null,
-        reasoningEffort: modelSnapshot?.reasoningEffort || null,
-        usage: model === 'gpt' ? usage : undefined,
-        messageId: assistantMessageId,
-        scheduleCandidate,
-        // 음성이 "계속"이라고 했을 때 이어 읽을 나머지. 서버는 보관하지 않는다.
-        ...(spokenRemaining ? { spokenRemaining } : {}),
-        webSources: webEvidence?.results || [],
-        paperFullText: {
-          used: paperEvidenceRefs.length > 0,
-          evidenceRefs: paperEvidenceRefs,
-          calls: paperFullTextUsage.calls,
-          contextChars: paperFullTextUsage.contextChars,
-        },
-      };
+      allowAutoTopic: source !== 'voice',
     });
     if (!progress.result(payload)) res.json(payload);
   } catch (err) {
