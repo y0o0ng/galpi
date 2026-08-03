@@ -329,7 +329,7 @@ test('repair apply backs up, migrates, applies approved operations, and reaches 
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
-      { version: 9 }, { version: 10 },
+      { version: 9 }, { version: 10 }, { version: 11 },
     ],
   );
   assert.deepEqual(

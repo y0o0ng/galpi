@@ -71,6 +71,8 @@ const {
   isPersistableUserTurn,
 } = require('./lib/realtime-turn-store');
 const { createVoiceTtsService } = require('./lib/voice-tts');
+const { VoiceShortcutError, createVoiceShortcutService } = require('./lib/voice-shortcut');
+const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
 const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
@@ -189,6 +191,7 @@ const VOICE_TTS_MODEL = String(process.env.VOICE_TTS_MODEL || 'gpt-4o-mini-tts')
 const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'echo').trim();
 const VOICE_TTS_INSTRUCTIONS = process.env.VOICE_TTS_INSTRUCTIONS;
 const VOICE_TTS_SPEED = process.env.VOICE_TTS_SPEED;
+const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 const VOICE_SESSION_TTL_MS = 60 * 60 * 1000;
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
@@ -507,6 +510,27 @@ function getClaudeModelForCouncilMode(mode) {
 // ─── 앱 ─────────────────────────────────────────────────────────────────────
 
 const app = express();
+let voiceShortcutTurnHandler = null;
+const voiceShortcutJsonParser = express.json({ limit: '8kb' });
+app.post('/api/voice/shortcut/turn', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  return voiceShortcutJsonParser(req, res, error => {
+    if (error) {
+      const tooLarge = error.type === 'entity.too.large';
+      return res.status(tooLarge ? 413 : 400).json({
+        error: tooLarge ? '음성 요청 본문이 너무 큽니다.' : '올바른 JSON 요청 본문이 필요합니다.',
+        code: tooLarge ? 'SHORTCUT_BODY_TOO_LARGE' : 'SHORTCUT_INVALID_JSON',
+      });
+    }
+    if (!voiceShortcutTurnHandler) {
+      return res.status(503).json({
+        error: '잠금화면 음성 단축어가 준비되지 않았습니다.',
+        code: 'VOICE_SHORTCUT_UNAVAILABLE',
+      });
+    }
+    return voiceShortcutTurnHandler(req, res, next);
+  });
+});
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -754,6 +778,9 @@ const assistantScheduleNoteProjections = createScheduleNoteProjectionStore(db);
 let assistantScheduleNoteProjector = null;
 const assistantPush = createAssistantPushService(db, {
   enabled: ASSISTANT_PUSH_CONFIG.enabled,
+});
+const voiceShortcut = createVoiceShortcutService(db, {
+  enabled: VOICE_SHORTCUT_ENABLED,
 });
 const assistantTasks = createAssistantTaskStore(db, {
   onTaskInactive: (taskId, changedAt) => assistantPush.skipTask(taskId, changedAt),
@@ -1341,6 +1368,7 @@ const saveChatExchangeTransaction = db.transaction(({
   queryEmbedding,
   assistantModel,
   modelSnapshot,
+  onInserted,
 }) => {
   stmtEnsureSession.run(sessionId);
   const userResult = insertMessageRecord({
@@ -1359,10 +1387,12 @@ const saveChatExchangeTransaction = db.transaction(({
     runtimeGeneration: modelSnapshot?.runtimeGeneration || null,
     reasoningEffort: modelSnapshot?.reasoningEffort || null,
   });
-  return {
+  const inserted = {
     userMessageId: userResult.lastInsertRowid,
     assistantMessageId: assistantResult.lastInsertRowid,
   };
+  if (typeof onInserted === 'function') onInserted(inserted);
+  return inserted;
 });
 
 function dbSaveChatExchange(input) {
@@ -2895,12 +2925,18 @@ const VOICE_ANSWER_SYSTEM_PROMPT = `이 답변은 소리로 읽힌다. 화면에
 
 사용자가 특정 항목을 자세히 설명해달라고 명시하면 그 항목만 자세히 답한다.`;
 
+const SHORTCUT_READ_ONLY_SYSTEM_PROMPT = `이 요청은 화면 없는 잠금화면 음성 단축어에서 왔다.
+일정·알림·메모·노트·설정·Codex 작업을 생성, 수정, 삭제하거나 완료했다고 말하지 않는다.
+변경 요청이면 지금은 실행할 수 없고 갈피 화면에서 확인해야 한다고 짧게 답한다.
+읽기와 설명만 수행한다.`;
+
 function buildChatToolInstructions({
   enableWebTool,
   paperToolSession,
   scheduleToolSession,
   includeLanguageRule = false,
   voiceTurn = false,
+  additionalInstructions = '',
 }) {
   return [
     includeLanguageRule ? GPT_LANGUAGE_SYSTEM.content : '',
@@ -2908,6 +2944,7 @@ function buildChatToolInstructions({
     enableWebTool ? CLAUDE_WEB_TOOL_SYSTEM_PROMPT : '',
     paperToolSession?.hasCandidates ? CLAUDE_PAPER_TOOL_SYSTEM_PROMPT : '',
     scheduleToolSession?.systemPrompt || '',
+    additionalInstructions,
   ].filter(Boolean).join('\n\n');
 }
 
@@ -2963,6 +3000,7 @@ async function generateGptReplyWithTools({
   writingStage = 'answer',
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
+  additionalInstructions = '',
 }) {
   const runtime = createChatToolRuntime({
     enableWebTool,
@@ -2993,6 +3031,7 @@ async function generateGptReplyWithTools({
       scheduleToolSession,
       includeLanguageRule: true,
       voiceTurn,
+      additionalInstructions,
     }),
     reasoningEffort,
     reasoningContext: 'current_turn',
@@ -3020,6 +3059,7 @@ async function generateChatReply(model, context, {
   onStage = () => {},
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
+  additionalInstructions = '',
 } = {}) {
   if (model === 'claude') {
     return generateClaudeReplyWithTools({
@@ -3045,6 +3085,7 @@ async function generateChatReply(model, context, {
       onStage,
       onSpokenText,
       voiceTurn,
+      additionalInstructions,
     });
   }
   throw new Error('지원하지 않는 단일 채팅 모델입니다.');
@@ -3270,6 +3311,8 @@ async function runSingleChatTurn({
   voiceTurn = Boolean(spokenStream),
   allowSchedulePrepare = true,
   allowAutoTopic = true,
+  additionalInstructions = '',
+  onExchangeInserted = null,
 }) {
   return withSessionChatLock(sessionId, async () => {
     hydrateSessionFromDb(sessionId);
@@ -3369,6 +3412,7 @@ async function runSingleChatTurn({
       onStage: progress.stage,
       onSpokenText: spokenStream,
       voiceTurn,
+      additionalInstructions,
     });
     spokenStream?.flush();
     const spokenRemaining = spokenStream?.remaining() || '';
@@ -3382,6 +3426,7 @@ async function runSingleChatTurn({
       queryEmbedding,
       assistantModel,
       modelSnapshot,
+      onInserted: onExchangeInserted,
     });
     const assistantCreatedAt = Math.floor(Date.now() / 1000);
     sessions[sessionId] = [
@@ -3901,6 +3946,7 @@ app.get('/api/config', (req, res) => {
       ...realtimeTurnStore.publicConfig(),
     },
     halfDuplexVoice: voiceTts.publicConfig(),
+    shortcutVoice: voiceShortcut.publicConfig(),
     webSearch: {
       enabled: WEB_SEARCH_ENABLED,
       provider: WEB_SEARCH_PROVIDER,
@@ -3931,6 +3977,51 @@ registerAssistantTaskRoutes({
   onTaskMutation: () => assistantScheduleNoteProjector.tick(),
 });
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
+const shortcutRoutes = createVoiceShortcutRoutes({
+  app,
+  service: voiceShortcut,
+  async runTurn({ credential, turn }) {
+    if (!GPT_RESPONSES_ENABLED || !HAS_GPT) {
+      throw new VoiceShortcutError(
+        'GPT 음성 답변이 아직 활성화되지 않았습니다.',
+        'SHORTCUT_GPT_UNAVAILABLE',
+        503,
+      );
+    }
+    try {
+      return await runSingleChatTurn({
+        message: turn.text,
+        model: 'gpt',
+        sessionId: 'shared-main',
+        activeNotes: undefined,
+        webSearch: false,
+        progress: { stage() {} },
+        voiceTurn: true,
+        allowSchedulePrepare: false,
+        allowAutoTopic: false,
+        additionalInstructions: SHORTCUT_READ_ONLY_SYSTEM_PROMPT,
+        onExchangeInserted({ userMessageId, assistantMessageId }) {
+          voiceShortcut.completeRequest({
+            credentialId: credential.id,
+            requestId: turn.requestId,
+            requestSha256: turn.requestSha256,
+            userMessageId,
+            assistantMessageId,
+          });
+        },
+      });
+    } catch (error) {
+      if (error instanceof VoiceShortcutError) throw error;
+      const apiError = formatChatApiError(error, 'gpt');
+      throw new VoiceShortcutError(
+        '음성 답변을 만들지 못했습니다.',
+        'SHORTCUT_TURN_FAILED',
+        apiError.status,
+      );
+    }
+  },
+});
+voiceShortcutTurnHandler = shortcutRoutes.handleTurn;
 
 // ─── 사용자 메모리 ───────────────────────────────────────────────────────────
 

@@ -78,13 +78,13 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
-      { version: 9 }, { version: 10 },
+      { version: 9 }, { version: 10 }, { version: 11 },
     ],
   );
 
@@ -165,7 +165,8 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       WHERE type = 'table' AND name IN (
         'assistant_tasks', 'assistant_task_events', 'assistant_reminders',
         'assistant_push_subscriptions', 'assistant_push_deliveries',
-        'assistant_schedule_note_projections'
+        'assistant_schedule_note_projections', 'assistant_shortcut_credentials',
+        'voice_shortcut_receipts'
       )
       ORDER BY name
     `).all(),
@@ -174,8 +175,10 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       { name: 'assistant_push_subscriptions' },
       { name: 'assistant_reminders' },
       { name: 'assistant_schedule_note_projections' },
+      { name: 'assistant_shortcut_credentials' },
       { name: 'assistant_task_events' },
       { name: 'assistant_tasks' },
+      { name: 'voice_shortcut_receipts' },
     ],
   );
 
@@ -214,6 +217,40 @@ test('schema v10 enforces one receipt per realtime turn and one per final respon
     'SELECT status FROM realtime_turn_receipts WHERE session_id = ? AND input_item_id = ?',
   ).get('voice-1', 'item_2');
   assert.equal(receipt.status, 'correction_pending');
+  db.close();
+});
+
+test('schema v11 scopes shortcut credentials and request receipts', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+  const subscriptionId = db.prepare(`
+    INSERT INTO assistant_push_subscriptions (endpoint, p256dh, auth, status)
+    VALUES ('https://web.push.apple.com/device', 'p256dh', 'auth', 'active')
+  `).run().lastInsertRowid;
+  const credentialId = db.prepare(`
+    INSERT INTO assistant_shortcut_credentials (
+      subscription_id, token_sha256, token_prefix, status
+    ) VALUES (?, ?, 'prefix12', 'active')
+  `).run(subscriptionId, 'a'.repeat(64)).lastInsertRowid;
+  db.prepare(`
+    INSERT INTO voice_shortcut_receipts (
+      credential_id, request_id, request_sha256, conversation_id
+    ) VALUES (?, '00000000-0000-4000-8000-000000000001', ?, ?)
+  `).run(credentialId, 'b'.repeat(64), 'c'.repeat(22));
+
+  assert.throws(() => db.prepare(`
+    INSERT INTO assistant_shortcut_credentials (
+      subscription_id, token_sha256, token_prefix, status
+    ) VALUES (?, ?, 'other123', 'active')
+  `).run(subscriptionId, 'c'.repeat(64)), /UNIQUE/);
+  assert.throws(() => db.prepare(`
+    UPDATE voice_shortcut_receipts SET status = 'completed'
+  `).run(), /CHECK/);
+  assert.throws(() => db.prepare(`
+    INSERT INTO voice_shortcut_receipts (
+      credential_id, request_id, request_sha256, conversation_id
+    ) VALUES (?, '00000000-0000-4000-8000-000000000001', ?, ?)
+  `).run(credentialId, 'b'.repeat(64), 'd'.repeat(22)), /UNIQUE/);
   db.close();
 });
 
