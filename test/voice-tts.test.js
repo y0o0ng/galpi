@@ -239,15 +239,31 @@ test('a decimal or ellipsis split across chunks is not mistaken for a sentence e
 });
 
 test('the streamed cap stops reading and points at the screen', () => {
-  const { createSpokenSegmenter } = require('../lib/voice-tts');
-  const segmenter = createSpokenSegmenter({ maxChars: 60 });
-  const out = [];
-  for (const chunk of [...'가나다라마바사아자차카타파하. '.repeat(40)]) out.push(...segmenter.push(chunk));
-  out.push(...segmenter.end());
+  const { createSpokenSegmenter, MAX_SPOKEN_SEGMENTS } = require('../lib/voice-tts');
+  const feed = text => {
+    const segmenter = createSpokenSegmenter();
+    const out = [];
+    for (const chunk of text) out.push(...segmenter.push(chunk));
+    out.push(...segmenter.end());
+    return out;
+  };
 
-  assert.equal(out.at(-1), '자세한 건 화면에 정리해뒀어.');
-  // 상한 뒤로는 더 읽지 않는다. 화면에는 전체 답변이 남는다.
-  assert.ok(out.slice(0, -1).join('').length <= 60 + 20);
+  // C2 이전에는 selectSpokenText가 3문장에서 끊었다. 스트리밍도 같은 양만 읽어야
+  // 한다. 상한이 없으면 문서 개요를 한참 읽다가 글자 수에서 뚝 끊긴다.
+  const long = feed('첫 문장은 결론이야 이 정도 길이로. 둘째 문장도 결론의 일부야 충분히 길게. '
+    + '셋째 문장으로 결론을 닫아 이렇게. 넷째부터는 근거인데 읽히면 안 돼. 다섯째도 마찬가지야 절대로.');
+  assert.equal(long.length, MAX_SPOKEN_SEGMENTS + 1);
+  assert.equal(long.at(-1), '자세한 건 화면에 정리해뒀어.');
+  assert.ok(!long.join(' ').includes('넷째'));
+
+  // 마침 상한에서 끝난 답변에 "자세한 건 화면에"를 덧붙이면 거짓말이 된다.
+  const exact = feed('첫 문장은 결론이야 이 정도 길이로. 둘째 문장도 결론의 일부야 충분히 길게. '
+    + '셋째 문장으로 결론을 닫아 이렇게.');
+  assert.equal(exact.length, MAX_SPOKEN_SEGMENTS);
+  assert.ok(!exact.join(' ').includes('화면에 정리해뒀어'));
+
+  // 짧은 답변은 그대로 다 읽는다.
+  assert.deepEqual(feed('응.'), ['응.']);
 });
 
 test('quiet and loud segments end up at the same loudness', () => {

@@ -2885,7 +2885,7 @@ function createChatToolRuntime({
 const VOICE_ANSWER_SYSTEM_PROMPT = `이 답변은 소리로 먼저 읽힌다. 맨 앞 2~3문장에 결론을 완결된 형태로 말한다.
 그 두세 문장만 들어도 질문에 대한 답이 되어야 하며, 뒤에 이어질 내용을 예고하는 말로 채우지 않는다.
 그 뒤에 근거와 자세한 내용을 이어서 쓴다. 화면에는 전체가 남으므로 길이를 줄일 필요는 없다.
-앞부분에는 표, 목록 기호, 제목 기호를 쓰지 않는다. 소리로 읽으면 기호가 그대로 읽힌다.`;
+맨 앞 결론은 표나 목록이 아니라 이어지는 문장으로 쓴다. 소리로 들을 때 흐름이 끊기지 않아야 한다.`;
 
 function buildChatToolInstructions({
   enableWebTool,
