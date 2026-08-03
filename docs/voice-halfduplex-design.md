@@ -2,9 +2,9 @@
 
 > Date: 2026-08-01
 >
-> Status: H1·H2·H4·H5와 지연 C1·C2 Pi 배포·실기기 인수 완료. H3 미구현
+> Status: H1·H2·H4·H5와 지연 C1·C2 Pi 배포·실기기 인수 완료. H6 잠금화면 단축어 입구 설계 확정·미구현, H3 미구현
 >
-> Scope: 핸즈프리 반이중 음성 대화, 전사 검증·되묻기, 음성 답변 분리, 기존 채팅 파이프라인 재사용
+> Scope: 핸즈프리 반이중 음성 대화, 전사 검증·되묻기, 음성 답변 분리, iOS 잠금화면 단축어 입구, 기존 채팅 파이프라인 재사용
 >
 > 이 문서는 V4-B 음성의 **새 단일 기준**이다. [Realtime 설계](voice-realtime-design.md)는 R0~R2c-1의 구현·인수 기록으로 보존하되, 이후 신규 작업의 기준으로 삼지 않는다.
 
@@ -365,6 +365,199 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 
 **H5 Realtime 운영 종료 — 2026-08-03 Pi 배포·실기기 인수 완료.** DB·Vault 백업 `20260803-2019` 뒤 `OPENAI_REALTIME_ENABLED`, `OPENAI_REALTIME_READ_TOOLS_ENABLED`, `OPENAI_REALTIME_CORRECTION_ENABLED`, `OPENAI_REALTIME_FINALIZE_ENABLED`를 모두 `false`로 바꾸고 `VOICE_HALFDUPLEX_ENABLED=true`는 유지했다. 새 PID `182239`, 공개 config의 Realtime·보정·finalize 비활성, 반이중 활성, 반이중 session HTTP 200·`no-store`, 새 시작 이후 warning 0건을 확인했고 사용자가 폰 실기기에서 정상이라고 인수했다. Realtime 코드는 롤백과 기록을 위해 남기며 제거는 별도 컨펌으로 한다. 가장 작은 롤백은 네 Realtime flag를 다시 `true`로 돌리고 서비스를 재시작하는 것이다.
 
+**H6 잠금화면 단축어 음성 입구 — 2026-08-03 설계 확정·미구현.** PWA를 열지 않고 iOS가 질문을 받아 적고 갈피가 답변을 만든 뒤 iOS가 읽어주는 두 번째 반이중 입구를 만든다. 새 음성 뇌를 만들지 않고, 현재 반이중의 `정확한 텍스트 → 회수·GPT → 대화 저장 → 음성용 답변` 가운데 구간을 공용화한다.
+
+### H6의 목표와 비목표
+
+목표는 잠긴 iPhone에서 아래 한 번의 왕복을 완결하는 것이다.
+
+```text
+음성 단축어 "시온아" 또는 Siri로 "시온 대화" 실행
+  → iOS 텍스트 받아쓰기
+  → POST /api/voice/shortcut/turn
+  → 갈피 공용 voice-turn core
+  → JSON answer
+  → iOS 텍스트 말하기
+```
+
+- PWA는 열지 않는다. 긴 답변 확인, 과거 기록 열람, 노트 수동 저장, 일정 확인 카드처럼 화면이 필요한 일에만 연다
+- 갈피 웹앱이 백그라운드에서 마이크를 켜거나 자체 호출어를 듣지 않는다. `시온아` 단독 호출은 사용자가 명시적으로 켠 iOS **음성 단축어(Vocal Shortcuts)** 가 맡는다
+- 대안 경로로 Siri를 활성화한 뒤 단축어 이름 `시온 대화`를 말할 수 있다. 일반 Siri 단축어 실행과 `시온아` 단독 호출을 같은 기능으로 오해하지 않는다
+- 첫 버전은 한 번 실행에 질문 1회다. 잠금 상태 단일 턴을 인수한 뒤 같은 실행 안에서만 최대 3턴을 연다
+- iOS `텍스트 말하기`를 사용하므로 첫 버전의 목소리는 현재 OpenAI TTS `echo`와 같지 않다. 음성 파일 반환·재생은 별도 필요성이 확인되기 전에는 만들지 않는다
+- PWA 상시 마이크, 무한 대화 루프, 잠금화면에서의 노트·일정·설정 변경은 범위 밖이다
+
+### 한 파이프라인, 두 입·귀
+
+```text
+PWA:      브라우저 VAD → gpt-transcribe ─┐
+                                           ├→ 공용 voice-turn core
+단축어:   Apple 텍스트 받아쓰기 ──────────┘   회수 → GPT → shared-main 저장
+                                           ├→ PWA: progress 조각 → OpenAI TTS
+                                           └→ 단축어: JSON → Apple 텍스트 말하기
+```
+
+공용화 대상은 transport가 아니라 **텍스트가 확정된 뒤의 한 턴**이다.
+
+- 기존 `/api/chat` 안의 회수·모델·저장 구간을 한 번만 실행하는 공용 함수로 최소 분리한다. 단축어 라우트가 자기 서버의 `/api/chat`을 HTTP로 다시 호출하거나 같은 코드를 복사하지 않는다
+- 공용 함수는 `shared-main` 세션 잠금, 최근 대화, A2 전역 청크, 활성 일정, 웹·논문 읽기 도구, 모델 snapshot, `dbSaveChatExchange`를 그대로 사용한다
+- 음성 여부를 스트리밍 callback 존재로 추론하지 않고 서버가 `voiceTurn: true`로 명시한다. 단축어는 progress stream을 소비하지 않아도 6문장 이내·제목/목록 없음·결론 우선 지시를 받아야 한다
+- PWA는 기존 `source:'voice'` progress와 C2 문장 조각 스트리밍을 유지한다. 단축어의 `URL 콘텐츠 가져오기`는 완성된 JSON을 기다리므로 C2 스트리밍은 재사용하지 않는다
+- 클라이언트가 `source`, 모델, DB session ID, 활성 노트, 웹검색 여부, 도구 목록을 고르지 못한다. 단축어 라우트가 음성 source·GPT·`shared-main`·허용 도구를 서버에서 고정한다
+
+### 기존 기기 등록을 인증의 뿌리로 쓰는 법
+
+현재 일정 알림의 `assistant_push_subscriptions`는 기기 계정이 아니라 서버가 알림을 보낼 Web Push endpoint와 암호화 키의 등록이다. `subscription_id`, `device_label`, 요청 본문의 `deviceId`는 복사할 수 있으므로 그 값만으로 발신 요청을 인증하지 않는다. Web Push의 `p256dh`·`auth`도 다른 프로토콜의 키라 API bearer로 재사용하지 않는다.
+
+대신 활성 Push 구독에 단축어 전용 자격증명을 하나 연결한다.
+
+```sql
+assistant_shortcut_credentials
+  id                    INTEGER PRIMARY KEY
+  subscription_id       INTEGER NOT NULL UNIQUE
+  token_sha256           TEXT NOT NULL UNIQUE
+  token_prefix           TEXT NOT NULL
+  status                 active | revoked
+  created_at             INTEGER NOT NULL
+  last_used_at           INTEGER
+  revoked_at             INTEGER
+  FOREIGN KEY subscription_id
+    REFERENCES assistant_push_subscriptions(id)
+```
+
+- 등록된 iPhone의 인증된 PWA에서 현재 활성 Push 구독에 대해 `시온 단축어 연결`을 명시적으로 실행한다
+- 서버는 최소 32바이트의 무작위 token을 만들고 원문은 그때 한 번만 돌려준다. DB에는 SHA-256과 식별용 짧은 prefix만 저장하고 로그·오류·백업 메타데이터에 원문을 남기지 않는다
+- 단축어는 `Authorization: Bearer <기기 전용 token>`으로 정확히 `/api/voice/shortcut/turn`만 호출한다. 이 token으로 일반 `/api/chat`, 노트, task, Codex, 설정 API를 호출할 수 없다
+- 서버는 token hash와 연결된 Push 구독의 `status='active'`를 함께 확인한다. Push 구독이 `expired`·`revoked`가 되거나 단축어 자격증명을 폐기하면 다음 호출부터 거절한다
+- Push 구독이 재설치·재등록으로 바뀌면 단축어도 다시 연결한다. 결합이 조금 불편해지는 대신 잃어버리거나 폐기한 기기의 음성 입구가 함께 닫힌다
+- Shortcuts 안의 bearer는 내보내기·공유 과정에서 복사될 수 있으므로 하드웨어 attestation으로 부르지 않는다. 단일 route scope, 활성 구독 결합, rate limit, 즉시 revoke가 유출 반경을 줄이는 경계다
+- H6 route도 기존 Tailscale Serve의 private canonical HTTPS 안에만 둔다. scoped token은 Tailscale을 대신해 인터넷 공개를 허용하는 근거가 아니다
+- 기존 전체 `API_TOKEN` middleware에서 단축어 경로만 무인증으로 통과시키지 않는다. exact path에 전용 인증 middleware를 먼저 적용하고, 다른 모든 `/api/` 경로는 기존 전체 token 경계를 유지한다
+- credential당 동시 실행은 1개, 초기 rate limit은 1분에 10회로 둔다. key는 credential ID와 socket 주소를 함께 사용하며 token 원문이나 질문을 rate-limit 로그에 넣지 않는다
+
+사용자에게 보이는 의미는 **등록된 기기의 호출만 받는다**이고, 실제 보안 계약은 **활성 등록에 묶인 별도 비밀을 가진 호출만 받는다**다.
+
+### API 계약
+
+첫 요청:
+
+```http
+POST /api/voice/shortcut/turn
+Authorization: Bearer <scoped-device-token>
+Content-Type: application/json
+```
+
+```json
+{
+  "text": "내일 일정 뭐 있어?",
+  "requestId": "ios-shortcut가 턴마다 만든 UUID"
+}
+```
+
+후속 요청은 서버가 발급한 `conversationId`만 추가한다.
+
+```json
+{
+  "text": "병원에는 몇 시까지 가면 돼?",
+  "requestId": "새 UUID",
+  "conversationId": "opaque-random-id"
+}
+```
+
+응답:
+
+```json
+{
+  "answer": "내일 오후 3시에 병원 예약이 있어.",
+  "conversationId": "opaque-random-id",
+  "canContinue": true,
+  "messageId": 123
+}
+```
+
+- `text`는 NFC 정규화·trim 뒤 1~2,000자, JSON 본문은 8KiB로 제한한다
+- `requestId`는 UUID 한 개이며 credential 안에서 멱등 키다. 같은 ID·같은 본문은 저장된 결과를 재생하고, 같은 ID·다른 본문은 `409`로 거절한다
+- `conversationId`는 DB session ID가 아니다. credential에 묶인 128-bit 이상 난수의 서버 소유 휘발 상태이며 5분 TTL·최대 3턴이다. 다른 credential이 보내거나 만료·상한을 넘기면 새 대화를 요구한다
+- 실제 대화 저장 위치는 항상 `shared-main`이다. Shortcuts가 임의 세션을 읽거나 쓰지 못한다
+- `answer`는 음성 지시로 생성한 완결 답변이며 같은 전문을 assistant 메시지로 저장한다. 첫 버전에서는 별도 화면용/낭독용 LLM을 두 번 호출하지 않는다
+- H6a 단일 턴에서는 `canContinue:false`, H6c를 연 뒤에는 3턴 상한에 닿기 전까지만 `true`다
+- `Cache-Control: no-store`를 붙이고 오류는 token·질문 원문 없이 안정된 code와 짧은 한국어 안내만 돌려준다
+
+네트워크 timeout 뒤 단축어가 같은 `requestId`를 다시 보낼 수 있으므로 저장 멱등성은 메모리에만 두지 않는다.
+
+```sql
+voice_shortcut_receipts
+  credential_id         INTEGER NOT NULL
+  request_id            TEXT NOT NULL
+  request_sha256         TEXT NOT NULL
+  status                 pending | completed
+  conversation_id       TEXT NOT NULL
+  user_message_id        INTEGER
+  assistant_message_id   INTEGER
+  created_at             INTEGER NOT NULL
+  updated_at             INTEGER NOT NULL
+  UNIQUE (credential_id, request_id)
+```
+
+완료 receipt와 user/assistant 메시지 ID 확정은 같은 DB transaction에 둔다. 완료 요청의 재전송은 assistant message에서 답을 다시 읽어 provider 호출과 메시지 삽입을 반복하지 않는다. 프로세스가 provider 응답 전에 죽은 `pending`은 메시지를 만들지 않았음을 확인한 뒤 bounded retry하고, 이미 완료된 행을 추측으로 다시 실행하지 않는다. 프로세스 crash를 가로지르는 provider 호출 exactly-once는 보장하지 않는다. 그 경우 비용 호출은 한 번 더 생길 수 있지만 메시지 저장은 exactly-once여야 한다.
+
+### 대화·저장·권한 경계
+
+- Apple 받아쓰기 결과는 `gpt-transcribe` 보정본이 아니므로 음성 source로 취급한다. user/assistant 대화는 `shared-main`에 남기되 topic 자동 저장·`auto_save_decisions`·`note_chunks` 쓰기는 하지 않는다
+- 원본 오디오는 Apple과 iOS가 처리하고 갈피에는 텍스트만 온다. 갈피 DB·Vault·backup·temp file에 오디오를 저장하지 않는다
+- 활성 일정, 시간, A2 기억, 노트·웹·논문 근거처럼 **읽기 결과**는 기존 경계를 재사용할 수 있다
+- 첫 버전에서는 `schedule_prepare`와 모든 mutation 도구를 제공하지 않는다. 일정·메모·노트·설정·Codex 변경 요청은 실행하지 않고 PWA에서 확인해야 한다고 짧게 답한다
+- H4의 일정 음성 확인은 DOM에 실제 확인 카드가 있을 때만 안전하다. 화면이 없는 단축어가 H4의 승인 handler를 흉내 내거나 `POST /api/tasks`를 직접 호출하지 않는다
+- 나중에 잠금화면 쓰기를 원하면 별도 서버 receipt와 명시적 두 번째 음성 승인을 새 단계로 설계한다. H6의 읽기 입구를 넓혀서 암묵적으로 허용하지 않는다
+
+### 단축어 단계
+
+**H6a 서버 단일 턴.** 공용 voice-turn core, 등록 기기 자격증명, exact route auth, durable request receipt, 읽기 전용 권한을 구현한다. `VOICE_SHORTCUT_ENABLED`의 코드 기본값은 `false`다. 기존 PWA 반이중 경로와 전체 API token 경로는 바뀌지 않아야 한다.
+
+**H6b 잠금화면 실기기 spike.** iPhone 단축어는 아래 순서만 갖는다.
+
+1. `텍스트 말하기`: `응, 말해.`
+2. `텍스트 받아쓰기`: `뭐가 궁금해?`
+3. UUID 생성
+4. `URL 콘텐츠 가져오기`: JSON POST와 scoped bearer
+5. `사전 값 가져오기`: `answer`
+6. `텍스트 말하기`: answer
+
+최초 마이크·네트워크·음성 단축어 권한 확인은 setup으로 분리한다. 일반 Siri 실행과 `시온아` 음성 단축어를 각각 시험하고, 잠금 상태에서 PWA가 열리거나 잠금 해제를 요구하는지 실기기로 판정한다.
+
+**H6c bounded 후속 대화.** H6b를 통과한 뒤 같은 Shortcut 실행 안에서만 `conversationId`를 변수로 유지하고 최대 3턴을 반복한다. `끝`, `됐어`, `그만`은 정규화 후 단축어가 로컬에서 종료해 서버 요청을 만들지 않는다. 5초 동안 수동적으로 기다리는 무한 루프는 만들지 않고 매 답변 뒤 한 번의 명시적 받아쓰기로 다음 턴을 받는다. 다른 실행까지 session을 보존하는 파일·외부 앱은 도입하지 않는다.
+
+### 공식 근거와 실기기 불확실성
+
+- Apple은 Siri 단축어에 대해 “단축어를 실행한 후 Siri가 결과를 알려줍니다”라고 설명하고, 잠긴 상태에서 **앱을 여는** 단축어는 잠금 해제를 요구한다고 구분한다. [Siri로 단축어 실행](https://support.apple.com/ko-kr/guide/shortcuts/apd07c25bb38/ios)
+- `시온아` 단독 문구는 iOS 음성 단축어에 학습시킨다. Apple은 설정 뒤 “생성한 단축어에 대한 문구를 말하기만 하면 됩니다”라고 설명하며 음성 처리는 기기에서 수행된다고 밝힌다. [iPhone 음성 단축어](https://support.apple.com/ko-kr/guide/iphone/iph7f242ea2c/ios)
+- `URL 콘텐츠 가져오기`는 POST와 JSON 요청 본문·변수를 지원한다. [단축어에서 API 요청하기](https://support.apple.com/ko-kr/guide/shortcuts/apd58d46713f/ios)
+- 다만 Apple 문서는 `텍스트 받아쓰기 → 네트워크 POST → 텍스트 말하기` 조합 전체가 모든 잠금 상태와 권한 상태에서 무중단 실행된다고 보장하지 않는다. 최초 권한 뒤 동작, Tailscale 연결 유지, 음성 단축어의 배터리·마이크 표시, 시온 답변이 `시온아`를 말해 자기 자신을 다시 깨우는지까지 실기기에서 확인한다
+
+### H6 통과 기준과 롤백
+
+서버:
+
+- 활성 등록에 연결된 scoped token만 `200`; 누락·오류·폐기 token과 inactive Push 구독은 거절
+- scoped token으로 `/api/chat`, task, note, Codex, 설정 API를 호출한 성공 0회
+- client가 model·source·DB session·tool을 바꾸는 입력은 무시하지 않고 schema에서 거절
+- 완료 receipt 재전송은 추가 provider 호출 0회·추가 메시지 0개, 동시 중복은 provider 1회, 같은 ID·다른 본문은 `409`. crash 뒤 bounded retry에서도 메시지 중복은 0개
+- 정상 한 턴은 receipt 1개와 `shared-main` 메시지 2개를 정확히 남긴다. credential 사용 시각과 기존 hash-only A2 관측 외에 note·note_chunks·auto_save_decisions·task·event·reminder는 불변
+- 일정 생성 발화에서도 task·후보·확인 없는 write 0회
+- credential별 동시 1개·분당 10회, conversation 3턴·5분 상한과 다른 credential의 탈취 session 거절
+- 기존 텍스트 채팅과 PWA 반이중 5턴, C2 progress/TTS, H4 일정 카드가 회귀하지 않음
+
+iPhone:
+
+- 최초 권한 setup을 제외한 잠금 상태 단일 턴 10회 중 9회 이상이 PWA 실행·잠금 해제 없이 받아쓰기→응답→낭독 완료
+- `시온아` 음성 단축어와 Siri 단축어 경로를 따로 계수하고, 답변에 의한 재귀 호출 0회
+- 요청 timeout을 일부러 만든 뒤 같은 `requestId` 재시도에서 대화 중복 0건
+- 3턴 대화 5세트에서 순서·문맥·최대 3턴 종료가 맞고 `끝`·`됐어`·`그만`은 서버 호출 0회
+- 기기 자격증명 폐기 또는 Push 구독 revoke 뒤 다음 호출이 즉시 실패하고 기존 전체 API는 영향 없음
+- 첫 응답 낭독까지 p50/p95를 기록한다. JSON 완성 뒤 낭독이라 C2와 같다고 가정하지 않고, 10회 표본을 본 뒤에만 지연 상한을 확정한다
+
+가장 작은 롤백은 Pi의 `VOICE_SHORTCUT_ENABLED=false`로 exact route를 닫는 것이다. additive credential·receipt 행은 비활성 상태로 남겨 감사·재개에 사용하고, 기존 PWA 반이중·Web Push·전체 API token 경로는 계속 동작해야 한다.
+
 ---
 
 ## 9. 열린 결정
@@ -375,6 +568,8 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 2. **H3 문턱** — 현재 작은 표본에서 정확 전사의 최저 logprob은 -0.024~-0.425, 오류 전사는 -0.652와 -1.356이지만 확정 문턱으로 쓰기엔 부족하다
 3. **침묵·earcon** — 침묵 1200→1000ms와 생각 중 earcon을 각각 별도 실기기 변경으로 열지
 4. **빈 전사 25%** — Realtime 시절 원인은 미규명이다. 클래식에서는 답변 생성 전 빈 전사를 알고 LISTENING으로 복귀하므로 답변까지 유실되지는 않는다
+5. **H6 연결 UX** — 인증된 PWA가 현재 Push 구독에 credential을 발급하고 raw token을 단축어에 한 번 전달하는 최소 UI를 구현 전에 확정한다. 범용 기기·권한 관리 화면으로 확장하지 않는다
+6. **H6 잠금 동작** — 받아쓰기·POST·낭독과 `시온아` 단독 호출의 정확한 잠금화면 동작은 Apple 문구만으로 확정하지 않고 H6b 실기기 결과로 판정한다
 
 ---
 
@@ -384,3 +579,5 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 - 지연 4초는 감수하되 **오답은 감수하지 않는다**
 - 사용자에게 재발화를 요구하는 것은 답변 생성 **전에만** 허용한다. 답변 뒤의 정정 요구는 대화를 망친다
 - 모델 판단에 맡기지 않고 코드로 집행할 수 있는 경계는 코드로 집행한다 (`spoken` 길이, 되묻기 상한, 폐기 규칙)
+- 입·귀 transport가 PWA에서 iOS 단축어로 바뀌어도 회수·모델·저장이라는 뇌는 하나만 둔다
+- 등록 상태는 인증 증명이 아니다. 활성 등록에 묶인 별도 scoped credential을 검증하고, 기기 라벨·요청 body를 신뢰하지 않는다

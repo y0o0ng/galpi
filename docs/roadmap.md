@@ -21,7 +21,7 @@ V4-A 논문 입력구     — 검색·저장·필요한 전문만 읽는다     
 V4.5 비서 기본기     — 저장 무결성·기억 신뢰성·할 일·알림       ← A2 운영 관찰
 V4.5-M 모델 런타임   — 단일 GPT·동적 모델·Codex 모델 설정       ✅ Pi 인수 완료
 DEV-D Docker          — 데이터 경계 분리·개발/CI 재현성           ✅ 1단계 완료
-V4-B 음성            — Realtime 대화 + 확인형 정밀 전사
+V4-B 음성            — 반이중 PWA 대화 + 잠금화면 단축어 입구
 V5   전문 직원       — 딜 스카우트 → 주식 분석 → 후속 역할
 V6   비서의 얼굴     — 화면에 떠있는 시온, 어디서든
 V7   손발(보너스)    — 기기 제어 (정말 나중, 선택)
@@ -164,7 +164,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 입구만 새로 뚫고, 뒷단(저장·회수·임베딩·Codex)은 V2~V3 그대로 재사용. 쉬운 입구(논문)부터 열어 손 풀고, 어려운 입구(음성)로.
 
-> 순서 변경 (2026-07-30): V4-A와 V4.5-M·A2 기반 뒤에 V4-B를 진행한다. V4-B는 OpenAI Realtime WebRTC의 자연 대화와 확인형 정밀 전사를 함께 다루되 `R0 통신 spike → R1 읽기 전용 시온 → R2 기록·승인형 쓰기`로 나눈다. 상세 단일 기준은 [voice-realtime-design.md](voice-realtime-design.md), 저장·task 경계는 [assistant-foundation-design.md](assistant-foundation-design.md)를 따른다.
+> 현재 기준 (2026-08-03): Realtime은 제품 경로에서 종료하고 기록·롤백 코드만 보존한다. 운영 음성은 `브라우저 VAD → gpt-transcribe → 단일 GPT → gpt-4o-mini-tts` 반이중이며, 상세 단일 기준은 [voice-halfduplex-design.md](voice-halfduplex-design.md)다. 잠금화면에서는 PWA를 열지 않고 iOS 받아쓰기·POST·텍스트 말하기를 쓰는 H6 단축어 입구를 같은 문서에 설계했다.
 
 ### 핵심 A — 논문 검색 (반나절×2, 상세는 별도 설계 문서 `paper-search-design.md`)
 > 1차 Pi 인수 완료 (`a70d9d0`, mock 보강 `1d4c704`, 백오프 `78583e9`): 별도 `lib/paper-search.js`, `/api/papers/search`, `/paper` 결과 카드, 10분 캐시, 429/5xx 지수 백오프·timeout 처리와 `node:test` 10개를 추가했다. Pi에서 S2 키 실검색 HTTP 200·결과 10개, 성공 응답 캐시, Playwright 실제 카드 렌더링을 확인했다.
@@ -189,7 +189,9 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 4. (2.5A) **저장 논문 전문 능동 독서** — 안전 다운로드·온디맨드 색인·모델 도구를 Pi에 배포하고 1+1 실제 스모크 인수 완료. 초록으로 부족할 때만 공개 PDF를 1회 색인하고, 모델이 `paper_fulltext_search`/`paper_fulltext_read`로 필요한 섹션·페이지를 최대 2회 검색. 질문당 전문 컨텍스트는 최대 10,000자(목표 약 3,000토큰)
 5. (2.5B, v1이 잘 돌면) 웹 검색 tool 패턴을 복제해 외부 논문 발견 검색을 모델이 자율 호출 — 검색만 자율, 저장은 사용자 클릭 유지
 
-### 핵심 B — Realtime 대화 + 확인형 정밀 전사
+### 핵심 B — 반이중 대화 + 잠금화면 단축어
+
+> H1·H2·H4·H5와 C1·C2는 Pi·iPhone 인수를 마쳤고 H3 되묻기는 표본 부족으로 미구현이다. H6은 등록된 Web Push 기기에 별도 scoped credential을 묶고 공용 voice-turn core를 재사용하는 읽기 중심 단축어 입구로 설계 확정·미구현 상태다. 아래 R0~R2 기록은 Realtime을 종료하게 된 구현 이력이며 신규 작업 기준이 아니다.
 
 > R0 GO (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. 사용자 iPhone 홈 화면 PWA에서 5분 연속 한국어·영어 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 R0 기능 GO를 승인했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
 >
@@ -238,7 +240,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### 보너스 (나중)
 - 화자 구분, 긴 녹음 자동 분할
-- 상시 호출어·상시 마이크, 잠금화면·백그라운드 지속 대화
+- 갈피 자체 상시 호출어·상시 마이크와 PWA 백그라운드 지속 대화. iOS가 듣는 opt-in 음성 단축어 기반 잠금화면 단일 턴은 H6 범위다
 - 논문 전체 PDF를 매 질문에 직접 전송, 자동 OCR, 인용 그래프 (전문검색 2.5A는 필요한 원문 조각만 회수)
 
 ### 통과 기준
@@ -262,8 +264,10 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [ ] 폰에서 30초 녹음 → 텍스트로 변환돼 화면에 뜬다
 - [ ] 확인 전에는 저장되지 않고, 확인한 내용만 선택한 대화·메모·할 일 경로로 들어간다
 - [ ] 며칠 뒤 관련 질문 → 그 녹음에서 나온 내용을 꺼내온다
+- [ ] H6 scoped token은 연결된 활성 Push 구독과 exact 음성 route에서만 유효하고, 같은 request ID 재시도에도 `shared-main` 메시지가 중복되지 않는다
+- [ ] 잠금 상태 단일 턴 10회 중 9회 이상이 PWA 실행·잠금 해제 없이 받아쓰기→갈피 응답→iOS 낭독을 마친다
 
-> 핵심 포인트: Realtime은 자연 대화의 귀와 입, 턴 종료 뒤 `gpt-transcribe`는 기록관, 명시적 정밀 전사는 승인형 입력구다. 세 역할 모두 V4.5의 기억·약속 경계를 우회하지 않으며, 음성을 `isMemo: true`나 rough transcript로 바로 영구 저장하지 않는다.
+> 핵심 포인트: PWA 반이중은 `gpt-transcribe`와 OpenAI TTS, H6 단축어는 Apple 받아쓰기와 텍스트 말하기를 입·귀로 쓴다. 둘 다 같은 회수·GPT·`shared-main` 저장 경로를 쓰고 음성 질문은 topic에 자동 저장하지 않으며, 화면 없는 H6에서는 일정·노트·설정 쓰기를 열지 않는다.
 
 ---
 
