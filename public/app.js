@@ -172,8 +172,8 @@ async function init() {
     if (ensureApiToken(config)) return;
     tasksEnabled = config.tasksEnabled === true;
     initPaperPanel();
-    document.getElementById('model-indicator').textContent =
-      `XION · ${config.gptChatBootstrapModel}`;
+    // 옆의 XION 칩이 비서 이름을 말하므로 라벨은 모델만 남긴다.
+    document.getElementById('model-indicator').textContent = config.gptChatBootstrapModel;
     renderWebUsagePill(config.webSearch);
     window.VoiceRealtime?.init({
       apiFetch,
@@ -427,6 +427,14 @@ function restoreLocalUiHistory() {
   }
 }
 
+// 말풍선은 평문 줄바꿈을 살리려고 white-space를 pre-wrap으로 두는데, 마크다운을 넣으면
+// 블록 사이의 개행까지 빈 줄이 돼 답변이 두 배로 길어진다. 말풍선에서는 pre-wrap을 끄고
+// 대신 문단 안의 의도한 줄바꿈만 breaks로 <br>로 남긴다. 노트·논문 패널은 pre-wrap이
+// 아니라 이 문제가 없으므로 기존 렌더링을 그대로 둔다.
+function renderBubbleMarkdown(text) {
+  return DOMPurify.sanitize(marked.parse(String(text ?? ''), { breaks: true }));
+}
+
 function appendHistoryBubble(content, model, messageId, question, noteSaved = false) {
   const councilData = parseCouncilTranscript(content, model);
   if (councilData) {
@@ -441,7 +449,7 @@ function appendHistoryBubble(content, model, messageId, question, noteSaved = fa
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
-  bubble.innerHTML = DOMPurify.sanitize(marked.parse(content));
+  bubble.innerHTML = renderBubbleMarkdown(content);
 
   group.append(label, bubble);
 
@@ -1038,7 +1046,7 @@ function makeDebateAnswer(modelName, reply, open = true) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
-  bubble.innerHTML = DOMPurify.sanitize(marked.parse(reply));
+  bubble.innerHTML = renderBubbleMarkdown(reply);
 
   details.append(summary, bubble);
   return details;
@@ -1088,7 +1096,7 @@ function makeReview(label, review) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md review-bubble';
-  bubble.innerHTML = DOMPurify.sanitize(marked.parse(review));
+  bubble.innerHTML = renderBubbleMarkdown(review);
 
   details.append(summary, bubble);
   return details;
@@ -1149,7 +1157,7 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
 
     const divBubble = document.createElement('div');
     divBubble.className = 'bubble md divergence-bubble';
-    divBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.divergence));
+    divBubble.innerHTML = renderBubbleMarkdown(data.divergence);
 
     synthSection.append(divLabel, divBubble);
   }
@@ -1161,7 +1169,7 @@ function appendSynthesisSection(body, question, debateData, reviewData, data) {
 
   const synthBubble = document.createElement('div');
   synthBubble.className = 'bubble md synthesis-bubble';
-  synthBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.synthesis));
+  synthBubble.innerHTML = renderBubbleMarkdown(data.synthesis);
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'save-btn icon-save-btn';
@@ -2934,7 +2942,7 @@ function appendAssistantBubble(data) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble md';
-  bubble.innerHTML = DOMPurify.sanitize(marked.parse(data.reply));
+  bubble.innerHTML = renderBubbleMarkdown(data.reply);
 
   const candidateCard = data.scheduleCandidate
     ? window.TaskPanel?.makeScheduleCandidateCard(data.scheduleCandidate)

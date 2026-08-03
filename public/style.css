@@ -24,6 +24,12 @@
   --success:      #34C759;
   --danger:       #FF3B30;
   --council:      #7C6FCD;
+  /* 헤더·입력줄을 본문과 가르는 실선. 검정 기반이면 어두운 배경에서 사라진다. */
+  --hairline:    rgba(0, 0, 0, 0.06);
+  /* 화면 좌우 여백. 헤더·대화·입력줄이 같은 세로선에 서야 한다. */
+  --gutter:      16px;
+  /* 답변 한 줄이 길면 눈이 다음 줄 첫머리를 놓친다. 15px 한글 기준 약 55자. */
+  --reading-width: 600px;
   --font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --shadow-sm:   0 1px 3px rgba(29, 38, 34, 0.06), 0 1px 2px rgba(29, 38, 34, 0.04);
   --shadow-md:   0 4px 12px rgba(29, 38, 34, 0.08), 0 2px 4px rgba(29, 38, 34, 0.04);
@@ -35,6 +41,8 @@
   --bg:          #151A18;
   --header-bg:   rgba(21, 26, 24, 0.90);
   --border:      #323C37;
+  /* 어두운 배경 위에서는 밝은 쪽으로 그어야 보인다. */
+  --hairline:    rgba(255, 255, 255, 0.10);
   --brand-hover: #3A7A64;
   --brand-ink:   #7FB99F;
   --brand-soft:  rgba(127, 185, 159, 0.12);
@@ -85,11 +93,11 @@ html, body {
 
 #header {
   background: var(--header-bg);
-  border-bottom: 1px solid rgba(0,0,0,0.06);
+  border-bottom: 1px solid var(--hairline);
   box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  padding: 10px 16px 10px;
+  padding: 10px var(--gutter);
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -99,8 +107,7 @@ html, body {
 #header-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 10px;
 }
 
 #app-title {
@@ -115,6 +122,19 @@ html, body {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* 툴바 한 줄에 앉으므로 칩도 그 높이에 맞춘다. */
+#header-top .model-chip {
+  padding: 3px 10px 3px 5px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+#header-top .model-logo-icon {
+  width: 18px;
+  height: 18px;
 }
 
 #model-indicator {
@@ -188,13 +208,6 @@ html, body {
 
 #knowledge-panel-toggle {
   display: none;
-}
-
-#toggle-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: wrap;
 }
 
 .model-logo-icon {
@@ -303,10 +316,16 @@ html, body {
 
 /* ── 채팅 영역 ─────────────────────────────────────────── */
 
+/* 넓은 화면에서는 좌우 여백을 키워 읽기 폭에 가둔다. 배경과 경계선은 화면 전체를
+   지나가고 내용만 가운데 열에 서므로, 대화와 입력줄이 같은 세로선을 공유한다. */
+#chat, #input-area {
+  padding-inline: max(var(--gutter), (100% - var(--reading-width)) / 2);
+}
+
 #chat {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 14px 6px;
+  padding-block: 10px 6px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -418,6 +437,7 @@ html, body {
 .save-btn.error { border-color: var(--danger); color: var(--danger); }
 
 .icon-save-btn {
+  position: relative;
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -430,6 +450,13 @@ html, body {
   color: var(--label);
   background: transparent;
   transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out), transform 0.1s var(--ease-spring);
+}
+
+/* 아이콘은 28px로 두되 손가락이 닿는 범위만 44px로 넓힌다. 배치는 그대로다. */
+.icon-save-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
 }
 
 .icon-save-btn:hover:not(:disabled) {
@@ -2833,11 +2860,11 @@ html, body {
 
 #input-area {
   background: var(--header-bg);
-  border-top: 1px solid rgba(0,0,0,0.06);
+  border-top: 1px solid var(--hairline);
   box-shadow: 0 -1px 0 rgba(0,0,0,0.04), 0 -2px 8px rgba(0,0,0,0.03);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  padding: 8px 12px 10px;
+  padding-block: 8px 10px;
   display: flex;
   gap: 8px;
   align-items: flex-end;
@@ -3241,7 +3268,7 @@ body[data-active-model="council"] #send-btn {
   #input-area {
     gap: 6px;
     align-items: flex-end;
-    padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+    padding-block: 8px max(10px, env(safe-area-inset-bottom));
   }
 
   #input {
@@ -3254,7 +3281,8 @@ body[data-active-model="council"] #send-btn {
     height: 44px;
   }
 
-  #voice-realtime-button {
+  #voice-realtime-button,
+  #voice-hd-button {
     width: 44px;
     height: 44px;
   }
@@ -3562,11 +3590,22 @@ body[data-active-model="council"] #send-btn {
 
 /* ── 마크다운 렌더링 ────────────────────────────────────────── */
 
-.bubble.md p { margin: 0 0 5px; }
-.bubble.md p:last-child { margin-bottom: 0; }
-.bubble.md h1,.bubble.md h2,.bubble.md h3 { font-size: 15px; font-weight: 700; margin: 7px 0 3px; }
-.bubble.md ul,.bubble.md ol { padding-left: 18px; margin: 3px 0; }
-.bubble.md li { margin: 1px 0; }
+/* 말풍선의 pre-wrap은 평문용이다. 마크다운은 이미 블록으로 나뉘어 있어서 그대로 두면
+   블록 사이 개행이 빈 줄이 된다. 문단 안의 의도한 줄바꿈은 marked의 breaks가 <br>로 남긴다. */
+.bubble.md { white-space: normal; }
+
+.bubble.md > :first-child { margin-top: 0; }
+.bubble.md > :last-child { margin-bottom: 0; }
+.bubble.md p { margin: 0 0 10px; }
+/* 제목은 아래보다 위를 넓게 둬야 뒤따르는 목록과 한 덩어리로 읽힌다. */
+.bubble.md h1,.bubble.md h2,.bubble.md h3 { font-weight: 700; margin: 18px 0 6px; }
+.bubble.md h1 { font-size: 19px; letter-spacing: -0.01em; }
+.bubble.md h2 { font-size: 17px; letter-spacing: -0.01em; }
+.bubble.md h3 { font-size: 15px; }
+.bubble.md ul,.bubble.md ol { padding-left: 20px; margin: 0 0 10px; }
+.bubble.md li { margin: 0 0 4px; }
+.bubble.md li:last-child { margin-bottom: 0; }
+.bubble.md li > ul,.bubble.md li > ol { margin: 4px 0 0; }
 .bubble.md code {
   background: rgba(0,0,0,0.07);
   border-radius: 4px;
