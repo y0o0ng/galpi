@@ -18,6 +18,9 @@
     speechFactor: 3.5,
     minRms: 0.006,
     audioWatchdogMs: 2500,
+    // 재생이 이만큼 진행되지 않으면 끝난 것으로 보고 넘어간다. timeupdate가
+    // 오는 동안에는 계속 미루므로 긴 조각이 잘리지는 않는다.
+    playbackStallMs: 4000,
   };
 
   const STATES = [
@@ -573,15 +576,28 @@
           resolve();
           return;
         }
-        const finish = () => {
+        // 재생이 끝을 알리지 않으면 턴이 영영 끝나지 않는다. 실기기에서 마지막
+        // 조각 뒤 듣기로 못 돌아간 적이 있어 진행이 멈추면 스스로 넘어간다.
+        let stall = null;
+        const armStall = () => {
+          if (stall) global.clearTimeout(stall);
+          stall = global.setTimeout(finish, state.config.playbackStallMs);
+        };
+        function finish() {
+          if (stall) global.clearTimeout(stall);
+          stall = null;
           player.onended = null;
           player.onerror = null;
+          player.ontimeupdate = null;
           try { global.URL.revokeObjectURL(url); } catch (_) { /* 이미 해제됨 */ }
           resolve();
-        };
+        }
         player.onended = finish;
         player.onerror = finish;
+        // 재생이 진행되는 동안에는 계속 미룬다. 긴 조각도 잘리지 않는다.
+        player.ontimeupdate = armStall;
         player.src = url;
+        armStall();
         const played = player.play?.();
         if (played?.catch) played.catch(finish);
       });

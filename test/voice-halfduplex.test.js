@@ -762,3 +762,31 @@ test('a streamed segment that fails to synthesize recovers the loop', async () =
   assert.equal(h.client.getState().phase, 'listening');
   assert.equal(h.tracks[0].enabled, true);
 });
+
+test('playback that never reports its end still returns the loop to listening', async () => {
+  const h = loadClient();
+  await h.client.start();
+  // 잠금 해제용 무음이 예약한 완료 통지를 먼저 흘려보낸다. 안 그러면 그것이
+  // 아래에서 세운 재생의 onended로 잘못 들어온다.
+  await tick();
+  // ended도 error도 오지 않는 재생을 흉내낸다. WAV 헤더가 길이를 속이면 이렇게 된다.
+  const player = h.audioElements[0];
+  Object.defineProperty(player, 'src', { set(value) { this._src = value; }, get() { return this._src; } });
+
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  // 재생이 끝나지 않는 턴이므로 기다리지 않는다. 기다리면 테스트가 함께 멈춘다.
+  const turn = h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  // 감시 타이머가 없으면 여기서 영영 speaking에 머문다.
+  assert.equal(h.client.getState().phase, 'speaking');
+  assert.equal(h.fireTimer(4000), true);
+  await turn;
+  await tick();
+  assert.equal(h.client.getState().phase, 'cooldown');
+  h.fireTimer(500);
+  assert.equal(h.client.getState().phase, 'listening');
+  assert.equal(h.tracks[0].enabled, true);
+});

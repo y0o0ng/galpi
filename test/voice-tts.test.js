@@ -311,3 +311,25 @@ test('normalizing never clips and leaves non-PCM bytes alone', () => {
   assert.equal(normalizeWavLoudness(mp3), mp3);
   assert.equal(normalizeWavLoudness(Buffer.alloc(10)).length, 10);
 });
+
+test('the streamed wav header is rewritten with its real length', () => {
+  const { normalizeWavLoudness } = require('../lib/voice-tts');
+  const wav = silentWav(400, 6000);
+  // provider는 길이를 모른 채 만들어 0xFFFFFFFF를 적어 보낸다.
+  wav.writeUInt32LE(0xFFFFFFFF, 4);
+  wav.writeUInt32LE(0xFFFFFFFF, 40);
+
+  const fixed = normalizeWavLoudness(wav);
+  // 길이가 거짓이면 재생기가 데이터가 더 온다고 믿고 ended를 쏘지 않는다.
+  assert.equal(fixed.readUInt32LE(4), fixed.length - 8);
+  assert.equal(fixed.readUInt32LE(40), fixed.length - 44);
+});
+
+test('the header is fixed even when the loudness already matches', () => {
+  const { normalizeWavLoudness, TARGET_RMS } = require('../lib/voice-tts');
+  // 목표 음량과 같아 표본은 건드릴 필요가 없는 조각.
+  const wav = silentWav(400, Math.round(TARGET_RMS * 32768));
+  wav.writeUInt32LE(0xFFFFFFFF, 40);
+
+  assert.equal(normalizeWavLoudness(wav).readUInt32LE(40), wav.length - 44);
+});
