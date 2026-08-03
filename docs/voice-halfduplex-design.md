@@ -2,7 +2,7 @@
 
 > Date: 2026-08-01
 >
-> Status: H1·H2·H4와 지연 C1·C2 Pi 배포·실기기 인수 완료. H3·H5 미구현
+> Status: H1·H2·H4·H5와 지연 C1·C2 Pi 배포·실기기 인수 완료. H3 미구현
 >
 > Scope: 핸즈프리 반이중 음성 대화, 전사 검증·되묻기, 음성 답변 분리, 기존 채팅 파이프라인 재사용
 >
@@ -363,7 +363,7 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 
 **저장이 없는 것이 성공의 증거다.** 확인 명령 턴은 모델도 저장도 거치지 않으므로, 등록이 말로 성공하면 `messages`에 아무것도 남지 않고 `assistant_tasks`만 는다. 이 비대칭을 모르면 성공을 수동 클릭으로 잘못 읽는다.
 
-**H5 Realtime 정리.** 반이중과 C2 인수 뒤 Realtime 경로의 운영 flag를 끈다. 코드 제거는 별도 컨펌으로 한다.
+**H5 Realtime 운영 종료 — 2026-08-03 Pi 배포·실기기 인수 완료.** DB·Vault 백업 `20260803-2019` 뒤 `OPENAI_REALTIME_ENABLED`, `OPENAI_REALTIME_READ_TOOLS_ENABLED`, `OPENAI_REALTIME_CORRECTION_ENABLED`, `OPENAI_REALTIME_FINALIZE_ENABLED`를 모두 `false`로 바꾸고 `VOICE_HALFDUPLEX_ENABLED=true`는 유지했다. 새 PID `182239`, 공개 config의 Realtime·보정·finalize 비활성, 반이중 활성, 반이중 session HTTP 200·`no-store`, 새 시작 이후 warning 0건을 확인했고 사용자가 폰 실기기에서 정상이라고 인수했다. Realtime 코드는 롤백과 기록을 위해 남기며 제거는 별도 컨펌으로 한다. 가장 작은 롤백은 네 Realtime flag를 다시 `true`로 돌리고 서비스를 재시작하는 것이다.
 
 ---
 
@@ -371,7 +371,7 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 
 구현 전에 정한다.
 
-1. **Realtime 처리** — H5에서 flag만 끌지, 코드까지 걷을지
+1. **Realtime 코드 제거** — 운영 flag는 껐고 기록·롤백용 코드는 남겼다. 제거는 필요성이 생길 때만 별도 컨펌으로 한다
 2. **H3 문턱** — 현재 작은 표본에서 정확 전사의 최저 logprob은 -0.024~-0.425, 오류 전사는 -0.652와 -1.356이지만 확정 문턱으로 쓰기엔 부족하다
 3. **침묵·earcon** — 침묵 1200→1000ms와 생각 중 earcon을 각각 별도 실기기 변경으로 열지
 4. **빈 전사 25%** — Realtime 시절 원인은 미규명이다. 클래식에서는 답변 생성 전 빈 전사를 알고 LISTENING으로 복귀하므로 답변까지 유실되지는 않는다
