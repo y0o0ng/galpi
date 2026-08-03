@@ -54,14 +54,11 @@
 - 공통 거터는 16px, 본문·입력 읽기 폭은 600px, 모바일 동작 타깃은 44px 이상, 경계선은 테마별 `--hairline`을 쓴다.
 - `test/chat-ui.test.js`는 CSS·소스 계약 회귀용이다. 실제 픽셀은 Playwright로 확인하되 리뷰 서버는 스크래치 데이터만 사용한다.
 
-## 현재 인계 상태 — 2026-08-03
+## 현재 음성 마감 상태 — 2026-08-03
 
-- `main`은 `origin/main`보다 10개 커밋 앞서 있고 아직 push하지 않았다. `.claude/settings.local.json` 변경은 의도적으로 커밋하지 않는다.
-- 워킹 트리의 음성·UI 변경은 사용자 작업이다. 대상은 `server.js`, `lib/voice-tts.js`, `public/{app.js,index.html,style.css,voice-halfduplex.js}`, `test/{voice-tts,voice-halfduplex,chat-ui}.test.js`이며 덮어쓰거나 되돌리지 않는다.
-- 최신 변경은 VAD 고착 복구, 이어 듣기 나머지 보존·한 번에 끝까지 읽기, 매처 어휘 보강, 6문장 음성 프롬프트, UI 8건 정리다. 로컬 347/347, Pi 343/343까지 통과했다. Pi는 PID `180062`(2026-08-03 19:26:23 KST)로 재시작됐고 핵심 6개 배포·4개 서빙 hash 일치, HTTP 200, 새 시작 이후 warning 0건이다. 사용자가 실기기에서 정상이라고 인수했다.
+- VAD 고착 복구, 이어 듣기, 6문장 음성 프롬프트, UI 정리를 Pi와 실기기에서 인수했고 `main`에 push했다. 상세 receipt는 `docs/voice-halfduplex-design.md`와 git에 있다.
 - 정상 길이의 여러 문장을 모두 읽고도 마지막 문장이 `spokenRemaining`에 남을 수 있다. 안내가 없는데 사용자가 직후 우연히 이어 듣기 어휘를 말해야만 중복 재생되므로, 사용자 판단으로 현재 수정하지 않는 낮은 확률 경계로 수용했다.
-- 다음 순서: diff·두 지침 파일 동기화·테스트를 확인하고 현재 변경을 커밋한 뒤 사용자 승인 범위에서 push한다.
-- 실기기 기준선은 messages 579, notes 35, note_chunks 110, assistant_tasks 12, auto_save_decisions 195다. 확인 명령은 저장되지 않으므로 음성 일정 등록 성공 시 message가 아니라 task 증가로 판정한다.
+- `.claude/settings.local.json` 변경은 개인 설정이므로 의도적으로 커밋하지 않는다.
 
 ## 열린 작업
 
