@@ -834,3 +834,130 @@ test('계속 with nothing left is an ordinary question', async () => {
   // 남은 게 없으면 평범한 발화다. 아무 일도 없는 것보다 답하는 편이 낫다.
   assert.deepEqual(h.asks, ['계속']);
 });
+
+test('a noise floor measured on speech does not deafen the loop forever', async () => {
+  // 답변이 "더 들으려면 말해줘"로 닫히면 사용자는 곧바로 말한다. 그 목소리가
+  // 소음 바닥 계산 창에 들어오면 문턱이 목소리 위로 올라가 그 뒤 아무것도 못 잡는다.
+  const h = loadClient({ config: { noiseFrames: 4 } });
+  await h.client.start();
+  assert.equal(h.client.getState().phase, 'listening');
+
+  // 계산 창이 통째로 말소리로 채워진 최악의 경우.
+  for (let index = 0; index < 4; index += 1) h.client.__feedLevel(0.4);
+  // 평소 목소리로는 그 문턱을 못 넘어 조용히 멈춘다. 토스트도 뜨지 않는다.
+  h.client.__feedLevel(0.05);
+  assert.equal(h.client.getState().phase, 'listening');
+  assert.deepEqual(h.toasts, []);
+
+  // 오래 아무것도 못 잡으면 바닥을 다시 잰다. 이번엔 조용한 방을 잰다.
+  assert.ok(h.fireTimer(8000));
+  for (let index = 0; index < 4; index += 1) h.client.__feedLevel(0.001);
+  h.client.__feedLevel(0.05);
+
+  assert.equal(h.client.getState().phase, 'capturing');
+});
+
+test('the noise floor ignores the loud frames so one word does not raise it', async () => {
+  const h = loadClient({ config: { noiseFrames: 5 } });
+  await h.client.start();
+
+  // 조용한 방인데 계산 창 끝에 짧은 소리가 하나 섞였다. 중앙값은 이것에 끌려간다.
+  h.client.__feedLevel(0.001);
+  h.client.__feedLevel(0.001);
+  h.client.__feedLevel(0.4);
+  h.client.__feedLevel(0.4);
+  h.client.__feedLevel(0.4);
+  h.client.__feedLevel(0.05);
+
+  assert.equal(h.client.getState().phase, 'capturing');
+});
+
+test('recalibration stops once a turn is actually captured', async () => {
+  const h = loadClient();
+  await h.client.start();
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  assert.equal(h.client.getState().phase, 'capturing');
+
+  // 잡은 뒤에는 다시 재지 않는다. 말하는 중에 바닥을 재면 그 목소리를 소음으로 배운다.
+  assert.equal(h.fireTimer(8000), false);
+});
+
+test('이어 듣기는 한 번 묻고 끝까지 읽는다', async () => {
+  const bodies = [];
+  const h = loadClient({
+    async askAssistant(transcript, onSpeech) {
+      onSpeech('앞부분이야 이 정도 길이로.');
+      return { ok: true, reply: '긴 답변이야.', spokenRemaining: '아직 안 읽은 나머지야 이렇게.' };
+    },
+    responders: {
+      '/speak/segments': async (url, options) => {
+        const body = JSON.parse(options.body);
+        bodies.push(body);
+        return { ok: true, async json() { return { segments: [body.text], remaining: '' }; } };
+      },
+    },
+  });
+  await h.client.start();
+  h.transcriptQueue.push('긴 질문이야');
+  h.settleNoise();
+  h.client.__feedLevel(0.5);
+  h.fireTimer(120000);
+  await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+  await tick();
+
+  // 실기기에서 `음`이 접두어에 없어 빗나갔던 발화 그대로.
+  await runTurn(h, '음 계속 말해줘.', 'hd-2');
+
+  assert.deepEqual(h.asks, ['긴 질문이야']);
+  // 되묻지 않고 끝까지 읽으라고 서버에 알린다.
+  assert.equal(bodies.at(-1).continued, true);
+  assert.equal(bodies.at(-1).text, '아직 안 읽은 나머지야 이렇게.');
+});
+
+test('첫 답변은 이어 듣기 모드로 읽지 않는다', async () => {
+  const bodies = [];
+  const h = loadClient({
+    askAssistant: async () => ({ ok: true, reply: '평범한 답변이야.' }),
+    responders: {
+      '/speak/segments': async (url, options) => {
+        bodies.push(JSON.parse(options.body));
+        return { ok: true, async json() { return { segments: ['평범한 답변이야.'], remaining: '' }; } };
+      },
+    },
+  });
+  await h.client.start();
+  await runTurn(h, '질문이야', 'hd-1');
+
+  assert.equal(bodies[0].continued, undefined);
+});
+
+test('닫는 말이 시킨 그대로 말하면 이어 듣기가 걸린다', async () => {
+  // `화면에 정리해뒀어. 더 들으려면 말해줘.`라고 해놓고 `말해줘`를 못 알아들으면
+  // 사용자는 시킨 대로 말했는데 새 질문으로 처리된다. 실기기에서 실제로 그랬다.
+  // 어휘를 늘릴 때마다 닫는 말과의 대응이 깨지지 않았는지 여기서 확인한다.
+  for (const said of ['말해줘', '응, 말해줘.', '더 들려줘', '읽어줘']) {
+    const h = loadClient({
+      async askAssistant(transcript, onSpeech) {
+        onSpeech('앞부분이야 이 정도 길이로.');
+        return { ok: true, reply: '긴 답변이야.', spokenRemaining: '아직 안 읽은 나머지야 이렇게.' };
+      },
+      responders: {
+        '/speak/segments': async (url, options) => {
+          const body = JSON.parse(options.body);
+          return { ok: true, async json() { return { segments: [body.text], remaining: '' }; } };
+        },
+      },
+    });
+    await h.client.start();
+    h.transcriptQueue.push('긴 질문이야');
+    h.settleNoise();
+    h.client.__feedLevel(0.5);
+    h.fireTimer(120000);
+    await h.client.__feedTurn({ turnId: 'hd-1', blob: new Blob(['x']), durationMs: 1500 });
+    await tick();
+
+    await runTurn(h, said, 'hd-2');
+    assert.deepEqual(h.asks, ['긴 질문이야'], `"${said}"가 모델로 갔다`);
+  }
+});

@@ -2880,12 +2880,20 @@ function createChatToolRuntime({
   };
 }
 
-// 음성은 답변 앞부분만 읽는다. 문서형 답변의 앞 600자를 자르면 개요를 읽다 끊긴다.
-// 그래서 자르는 대신 결론을 먼저 말하게 해서 앞부분만 들어도 답이 되게 한다.
-const VOICE_ANSWER_SYSTEM_PROMPT = `이 답변은 소리로 먼저 읽힌다. 맨 앞 2~3문장에 결론을 완결된 형태로 말한다.
-그 두세 문장만 들어도 질문에 대한 답이 되어야 하며, 뒤에 이어질 내용을 예고하는 말로 채우지 않는다.
-그 뒤에 근거와 자세한 내용을 이어서 쓴다. 화면에는 전체가 남으므로 길이를 줄일 필요는 없다.
-맨 앞 결론은 표나 목록이 아니라 이어지는 문장으로 쓴다. 소리로 들을 때 흐름이 끊기지 않아야 한다.`;
+// 음성 턴은 문서가 아니라 대화다. 예전에는 "길이를 줄일 필요는 없다"고 시켜놓고
+// 앞 600자만 읽었는데, 그러면 4,000자 답변이 나와 이어 듣기가 8분짜리 낭독이 된다.
+// 자르는 쪽이 아니라 애초에 말할 분량으로 쓰게 한다. 초당 8자로 읽으므로 1,000자면 2분이다.
+// 분량과 구조 금지를 규칙으로 못 박아야 먹는다. "길이를 줄여라" 정도의 서술은
+// 무시당했다. 같은 질문 A/B에서 서술형은 1,605자·제목 5개, 아래 규칙형은 196자·제목 0개였다.
+const VOICE_ANSWER_SYSTEM_PROMPT = `이 답변은 소리로 읽힌다. 화면에 쓰는 글이 아니라 사람에게 하는 말이다.
+
+반드시 지킨다:
+- 전체를 6문장 이내로 쓴다.
+- 제목, 소제목, 번호 목록, 불릿, 표를 쓰지 않는다. 이어지는 문장만 쓴다.
+- 사용자가 물은 것에만 답한다. 묻지 않은 배경, 대안, 다음 단계, 주의사항을 덧붙이지 않는다.
+- 더 말할 거리가 있으면 쏟아내지 말고 어느 쪽을 더 얘기할 수 있는지 한 마디로만 알린다.
+
+사용자가 특정 항목을 자세히 설명해달라고 명시하면 그 항목만 자세히 답한다.`;
 
 function buildChatToolInstructions({
   enableWebTool,
@@ -3724,30 +3732,10 @@ app.post('/api/voice/session', (req, res) => {
 
 // 반이중 전용 전사. Realtime 라우트와 세션 공간을 공유하지 않는다.
 // 스트리밍으로 도착한 답변을 문장 조각으로 잘라 progress로 흘려보낸다.
-// 도구 호출이 뒤따르면 그 앞의 텍스트는 최종 답변이 아니므로 세어만 두고 버린다.
 function createSpokenProgressStream(progress) {
-  let segmenter = voiceTts.createSpokenSegmenter();
-  let emitted = 0;
-  return {
-    delta(text) {
-      for (const segment of segmenter.push(text)) {
-        emitted += 1;
-        progress.speech(segment);
-      }
-    },
-    discarded() {
-      // 실측에서는 도구 라운드가 텍스트를 내지 않았다. 실제로 생기면 빈도를 봐야 한다.
-      console.warn(`⚠️ 음성 조각 폐기: 도구 호출 앞 텍스트 ${emitted}조각`);
-      segmenter = voiceTts.createSpokenSegmenter();
-      emitted = 0;
-    },
-    flush() {
-      for (const segment of segmenter.end()) progress.speech(segment);
-    },
-    // 아직 읽지 않은 나머지. 사용자가 "계속"이라고 하면 이것부터 이어 읽는다.
-    remaining() { return emitted > 0 ? segmenter.remaining() : ''; },
-    get emitted() { return emitted; },
-  };
+  return voiceTts.createSpokenProgressStream(segment => progress.speech(segment), {
+    onDiscarded: emitted => console.warn(`⚠️ 음성 조각 폐기: 도구 호출 앞 텍스트 ${emitted}조각`),
+  });
 }
 
 // H3 문턱을 정할 근거를 모은다. 실제 오전사 표본이 쌓이기 전에는 되묻지 않는다.
@@ -3814,9 +3802,12 @@ app.post('/api/voice/speak/segments', (req, res) => {
   if (!text.trim()) {
     return res.status(400).json({ error: '읽을 내용이 필요합니다.', code: 'VOICE_TTS_EMPTY_TEXT' });
   }
+  // 이어 듣기는 한 번 묻고 끝까지 읽는다. 되묻지 않으므로 나머지도 남지 않는다.
   res
     .set('Cache-Control', 'no-store')
-    .json(voiceTts.planSpokenSegments(text));
+    .json(req.body?.continued === true
+      ? voiceTts.planContinuedSegments(text)
+      : voiceTts.planSpokenSegments(text));
 });
 
 app.post('/api/voice/speak', async (req, res) => {

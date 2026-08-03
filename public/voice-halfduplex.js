@@ -15,9 +15,14 @@
     speakTimeoutMs: 30000,
     // 주변 소음을 재서 문턱을 잡는다. 고정값은 조용한 방과 이동 중을 함께 못 다룬다.
     noiseFrames: 12,
+    // 중앙값은 계산 창에 말소리가 섞이면 통째로 끌려간다. 조용한 쪽만 보고 바닥을 잡는다.
+    noisePercentile: 0.2,
     speechFactor: 3.5,
     minRms: 0.006,
     audioWatchdogMs: 2500,
+    // 문턱을 한 번 높게 잡으면 그 뒤 어떤 말도 넘지 못해 조용히 멈춘다. 듣는 동안
+    // 이만큼 아무것도 못 잡으면 바닥을 다시 잰다.
+    recalibrateMs: 8000,
     // 재생이 이만큼 진행되지 않으면 끝난 것으로 보고 넘어간다. timeupdate가
     // 오는 동안에는 계속 미루므로 긴 조각이 잘리지는 않는다.
     playbackStallMs: 4000,
@@ -58,6 +63,12 @@
   const CONTINUE_WORDS = new Set([
     '계속', '계속해', '계속해줘', '계속말해줘', '계속읽어줘', '이어서', '이어서말해줘',
     '더', '더말해줘', '더말해', '더읽어줘', '더들려줘', '더해줘', '나머지', '나머지도',
+    // 실기기에서 실제로 나온 청유형. `등록해줄래?`가 빗나갔던 것과 같은 종류다.
+    '계속해줄래', '계속말해줄래', '계속읽어줄래', '이어서말해줄래',
+    '더말해줄래', '더들려줄래', '나머지도말해줘', '나머지말해줘', '다말해줘',
+    // 닫는 말이 "더 들으려면 말해줘"라 사람은 그대로 따라 말한다. 우리가 시킨 말을
+    // 우리가 못 알아들으면 안 된다. 아래 테스트가 이 대응을 강제한다.
+    '말해줘', '말해', '말해줄래', '말해주라', '읽어줘', '읽어줄래', '들려줘', '들려줄래',
   ]);
 
   function matchContinueIntent(transcript) {
@@ -75,6 +86,8 @@
   const LEADING_PREFIXES = [
     '응', '어', '네', '예', '그래', '좋아', '아니', '아냐', '아니야',
     '일정카드', '일정', '카드', '그거', '이거', '그', '방금', '아까',
+    // 실기기에서 `음 계속 말해줘`가 이것 하나 때문에 빗나갔다.
+    '음', '좀', '그럼', '그러면',
   ].sort((a, b) => b.length - a.length);
   // 명령 자체의 길이 상한. "등록은 나중에 생각해볼게"가 등록으로 읽히면 안 된다.
   const MAX_CONFIRM_LENGTH = 8;
@@ -211,6 +224,21 @@
       // 재생이 오디오 그래프를 재웠을 수 있으므로 들을 때마다 깨운다.
       void state.recorder?.resume?.();
       armAudioWatchdog();
+      armRecalibrate();
+    }
+
+    // 소음 바닥은 듣기 시작 직후 몇 프레임으로 잡는데, 답변이 "더 들으려면 말해줘"로
+    // 닫히면 그 창에 사람 목소리가 들어오기 쉽다. 목소리를 소음으로 재면 문턱이 목소리
+    // 위로 올라가 그 뒤 아무 말도 못 알아듣고, 문턱은 턴이 끝나야 다시 재므로 영영 멈춘다.
+    // 오래 아무것도 못 잡으면 다시 재서 그런 상태가 남지 않게 한다.
+    function armRecalibrate() {
+      clearTimer('calibrate');
+      state.timers.calibrate = global.setTimeout(() => {
+        if (!state.active || state.phase !== 'listening') return;
+        state.noiseSamples = [];
+        state.threshold = 0;
+        armRecalibrate();
+      }, state.config.recalibrateMs);
     }
 
     // 마이크가 조용히 죽는 것이 이 루프의 최악이다. 다시 들을 때마다 실제로 프레임이
@@ -254,7 +282,7 @@
         state.noiseSamples.push(rms);
         if (state.noiseSamples.length < state.config.noiseFrames) return;
         const sorted = [...state.noiseSamples].sort((a, b) => a - b);
-        const floor = sorted[Math.floor(sorted.length / 2)];
+        const floor = sorted[Math.floor(sorted.length * state.config.noisePercentile)];
         state.threshold = Math.max(floor * state.config.speechFactor, state.config.minRms);
         return;
       }
@@ -284,6 +312,7 @@
       }
       setPhase('capturing');
       clearTimer('idle');
+      clearTimer('calibrate');
       clearTimer('maxTurn');
       state.timers.maxTurn = global.setTimeout(endCapture, state.config.maxTurnMs);
     }
@@ -393,10 +422,12 @@
     async function think(transcript, runId) {
       // 이어 듣기가 먼저다. 답변을 더 읽어달라는 말은 새 질문이 아니므로
       // 모델도 저장도 거치지 않고, 확인 카드도 건드리지 않는다.
+      // 한 번 물었으면 나머지는 끝까지 읽는다. 세 문장씩 끊어 되물으면 핸즈프리로
+      // 듣는 것보다 대답하는 일이 많아진다.
       if (state.spokenRemaining && matchContinueIntent(transcript)) {
         const remaining = state.spokenRemaining;
         state.spokenRemaining = '';
-        await speak(remaining, runId);
+        await speak(remaining, runId, { continued: true });
         return;
       }
 
@@ -527,7 +558,7 @@
       };
     }
 
-    async function speak(text, runId) {
+    async function speak(text, runId, { continued = false } = {}) {
       setPhase('speaking');
       setMicEnabled(false);
       clearTimer('speak');
@@ -539,7 +570,7 @@
         const response = await state.apiFetch('/api/voice/speak/segments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, ...(continued ? { continued: true } : {}) }),
         });
         clearTimer('speak');
         if (runId !== state.runId) return;

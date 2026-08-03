@@ -249,21 +249,20 @@ test('the streamed cap stops reading and points at the screen', () => {
     return out;
   };
 
-  // C2 이전에는 selectSpokenText가 3문장에서 끊었다. 스트리밍도 같은 양만 읽어야
-  // 한다. 상한이 없으면 문서 개요를 한참 읽다가 글자 수에서 뚝 끊긴다.
-  const long = feed('첫 문장은 결론이야 이 정도 길이로. 둘째 문장도 결론의 일부야 충분히 길게. '
-    + '셋째 문장으로 결론을 닫아 이렇게. 넷째부터는 근거인데 읽히면 안 돼. 다섯째도 마찬가지야 절대로.');
+  // 상한이 없으면 문서 개요를 한참 읽다가 글자 수에서 뚝 끊긴다. 상한을 넘으면
+  // 읽기를 멈추고 화면을 가리킨다. 닫는 말도 TTS 호출 하나라 상한 안에 든다.
+  const sentence = '이건 근거 문장인데 실제 답변과 비슷하게 충분히 길게 적는다. ';
+  const long = feed(sentence.repeat(12).trim());
   assert.equal(long.length, MAX_SPOKEN_SEGMENTS + 1);
   assert.equal(long.at(-1), SPOKEN_CLOSING);
-  assert.ok(!long.join(' ').includes('넷째'));
 
-  // 마침 상한에서 끝난 답변에 "자세한 건 화면에"를 덧붙이면 거짓말이 된다.
-  const exact = feed('첫 문장은 결론이야 이 정도 길이로. 둘째 문장도 결론의 일부야 충분히 길게. '
-    + '셋째 문장으로 결론을 닫아 이렇게.');
-  assert.equal(exact.length, MAX_SPOKEN_SEGMENTS);
-  assert.ok(!exact.join(' ').includes(SPOKEN_CLOSING));
+  // 음성 답변은 몇 문장짜리다. 그 길이는 끊지 않고 그대로 다 읽는다.
+  const short = feed('첫 문장은 결론이야 이 정도 길이로. 둘째 문장도 결론의 일부야 충분히 길게. '
+    + '셋째 문장으로 결론을 닫아 이렇게. 넷째 문장까지 읽혀야 정상이다 이렇게.');
+  assert.ok(!short.join(' ').includes(SPOKEN_CLOSING), '짧은 답변에 되묻는 안내가 붙었다');
+  assert.ok(short.join(' ').includes('넷째'), '짧은 답변이 잘렸다');
 
-  // 짧은 답변은 그대로 다 읽는다.
+  // 아주 짧은 답변도 그대로다.
   assert.deepEqual(feed('응.'), ['응.']);
 });
 
@@ -337,21 +336,105 @@ test('the header is fixed even when the loudness already matches', () => {
 
 test('the plan hands back what it did not read so it can be continued', () => {
   const { planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
-  const long = '첫 문장은 결론이야 이 정도 길이로. 둘째도 결론의 일부야 충분히 길게. '
-    + '셋째로 결론을 닫아 이렇게. 넷째는 근거인데 나중에 읽혀야 해. 다섯째도 마찬가지야 정말로.';
+  const sentence = '이건 근거 문장인데 실제 답변과 비슷하게 충분히 길게 적는다. ';
+  const long = `${sentence.repeat(11)}마지막 문장은 여기서 끝난다.`;
 
   const first = planSpokenSegments(long);
-  assert.equal(first.segments.length, 4);
   assert.equal(first.segments.at(-1), closing);
+  assert.ok(first.remaining.length > 0);
   // 핸즈프리로는 화면을 못 본다. 이어 들을 길을 함께 안내한다.
   assert.match(closing, /더 들으려면/);
 
   // 나머지를 그대로 다시 넣으면 이어진다. 서버는 아무것도 기억하지 않는다.
   const second = planSpokenSegments(first.remaining);
-  assert.ok(second.segments[0].startsWith('넷째'));
-  assert.equal(second.remaining, '');
   assert.ok(!second.segments.includes(closing));
+  assert.equal(second.remaining, '');
+  assert.ok(second.segments.join(' ').endsWith('마지막 문장은 여기서 끝난다.'));
 
   // 짧은 답변은 나머지가 없으므로 안내도 붙지 않는다.
   assert.deepEqual(planSpokenSegments('응.'), { segments: ['응.'], remaining: '' });
+});
+
+test('the streamed answer hands back what it did not read, like the batch plan does', () => {
+  const { createSpokenProgressStream, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const sentence = '이건 근거 문장인데 실제 답변과 비슷하게 충분히 길게 적는다. ';
+  const long = `${sentence.repeat(11)}마지막 문장은 여기서 끝난다.`;
+
+  const spoken = [];
+  const stream = createSpokenProgressStream(segment => spoken.push(segment));
+  // 모델은 한 글자씩 흘려보낸다. 문장이 완성될 때마다 조각이 나가야 한다.
+  for (const char of long) stream.delta(char);
+  stream.flush();
+
+  assert.equal(spoken.at(-1), closing);
+  // 나머지를 읽는 시점이 end()보다 늦으면 버퍼가 이미 비어 이어 듣기가 통째로 죽는다.
+  assert.ok(stream.remaining().endsWith('마지막 문장은 여기서 끝난다.'));
+  // 이미 읽은 만큼은 나머지에 다시 들어가지 않는다.
+  assert.ok(stream.remaining().length < long.length - spoken.join('').length + 100);
+});
+
+test('an answer that ends on its own leaves nothing to continue', () => {
+  const { createSpokenProgressStream, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const spoken = [];
+  const stream = createSpokenProgressStream(segment => spoken.push(segment));
+  for (const char of '이건 짧은 답변이야 이 정도로.') stream.delta(char);
+  stream.flush();
+
+  assert.equal(stream.remaining(), '');
+  assert.ok(!spoken.includes(closing));
+});
+
+test('text dropped before a tool call leaves no stale continuation', () => {
+  const { createSpokenProgressStream } = require('../lib/voice-tts');
+  const spoken = [];
+  const stream = createSpokenProgressStream(segment => spoken.push(segment));
+  for (const char of '먼저 이렇게 말하다가 도구를 부른다 이렇게.') stream.delta(char);
+  stream.discarded();
+  for (const char of '진짜 답변은 이거야 이 정도 길이로.') stream.delta(char);
+  stream.flush();
+
+  assert.deepEqual(spoken, ['진짜 답변은 이거야 이 정도 길이로.']);
+  assert.equal(stream.remaining(), '');
+});
+
+test('the continued read finishes the rest instead of asking again', () => {
+  const { planContinuedSegments, planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const rest = '남은 문장을 충분히 길게 적어서 실제 답변과 비슷하게 만든다. '.repeat(40).trim();
+
+  // 기존 모드는 세 문장만 읽고 되묻는다.
+  const capped = planSpokenSegments(rest);
+  assert.ok(capped.remaining.length > 0);
+  assert.equal(capped.segments.at(-1), closing);
+
+  const all = planContinuedSegments(rest);
+  assert.equal(all.remaining, '');
+  assert.ok(!all.segments.includes(closing));
+  // 되묻지 않으므로 한 글자도 빠지면 안 된다.
+  assert.equal(
+    all.segments.join(' ').replace(/\s+/g, ''),
+    rest.replace(/\s+/g, ''),
+  );
+  // 조각마다 TTS를 부르므로 문장 수만큼 쪼개지면 안 된다.
+  assert.ok(all.segments.length < 10, `조각이 너무 많다: ${all.segments.length}`);
+});
+
+test('a short spoken answer is read whole instead of being cut at three sentences', () => {
+  const { planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  // 음성 답변이 몇 문장으로 짧아진 뒤의 실제 길이대로. 예전 3문장 상한은 이런 답변도
+  // 잘라 매번 되묻게 만들었다. 이제는 글자 수만으로 가둔다.
+  const short = '응, 그 방식이 가장 현실적이야. 로봇팔 쪽에 허용된 툴만 열어두면 돼. '
+    + '그러면 내가 그 툴의 이름과 값만 부르면 되고, 위험한 동작은 네 코드가 막는다. '
+    + '펌웨어에 한계각과 속도 제한을 두는 게 좋아. 원점 복귀도 하나 있으면 충분해.';
+  assert.ok(short.length < 600);
+
+  const plan = planSpokenSegments(short);
+  assert.equal(plan.remaining, '');
+  assert.ok(!plan.segments.includes(closing), '짧은 답변에 되묻는 안내가 붙었다');
+  assert.equal(plan.segments.join(' ').replace(/\s+/g, ''), short.replace(/\s+/g, ''));
+
+  // 상한을 넘는 답변은 여전히 끊고 안내한다.
+  const long = short.repeat(6);
+  const capped = planSpokenSegments(long);
+  assert.equal(capped.segments.at(-1), closing);
+  assert.ok(capped.remaining.length > 0);
 });
