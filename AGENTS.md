@@ -7,6 +7,7 @@
 - 잘 모르는 질문엔 "잘 모르겠다"고 답하기 (확신이 안 서거나 자료에 필요한 정보가 없으면 "확신을 갖고 평가하기엔 정보가 부족해"라고 말할 것)
 - 출처를 명시할 것
 - 사실 기반 자료를 찾을 땐 원문이 명시한 어구를 우선시할 것 (사실 근거로는 직접 인용 사용)
+- `sudo npm`·`sudo npx`는 사용하지 말 것
 
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
