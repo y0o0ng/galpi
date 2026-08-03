@@ -2880,14 +2880,23 @@ function createChatToolRuntime({
   };
 }
 
+// 음성은 답변 앞부분만 읽는다. 문서형 답변의 앞 600자를 자르면 개요를 읽다 끊긴다.
+// 그래서 자르는 대신 결론을 먼저 말하게 해서 앞부분만 들어도 답이 되게 한다.
+const VOICE_ANSWER_SYSTEM_PROMPT = `이 답변은 소리로 먼저 읽힌다. 맨 앞 2~3문장에 결론을 완결된 형태로 말한다.
+그 두세 문장만 들어도 질문에 대한 답이 되어야 하며, 뒤에 이어질 내용을 예고하는 말로 채우지 않는다.
+그 뒤에 근거와 자세한 내용을 이어서 쓴다. 화면에는 전체가 남으므로 길이를 줄일 필요는 없다.
+앞부분에는 표, 목록 기호, 제목 기호를 쓰지 않는다. 소리로 읽으면 기호가 그대로 읽힌다.`;
+
 function buildChatToolInstructions({
   enableWebTool,
   paperToolSession,
   scheduleToolSession,
   includeLanguageRule = false,
+  voiceTurn = false,
 }) {
   return [
     includeLanguageRule ? GPT_LANGUAGE_SYSTEM.content : '',
+    voiceTurn ? VOICE_ANSWER_SYSTEM_PROMPT : '',
     enableWebTool ? CLAUDE_WEB_TOOL_SYSTEM_PROMPT : '',
     paperToolSession?.hasCandidates ? CLAUDE_PAPER_TOOL_SYSTEM_PROMPT : '',
     scheduleToolSession?.systemPrompt || '',
@@ -2974,6 +2983,7 @@ async function generateGptReplyWithTools({
       paperToolSession,
       scheduleToolSession,
       includeLanguageRule: true,
+      voiceTurn: Boolean(onSpokenText),
     }),
     reasoningEffort,
     reasoningContext: 'current_turn',
@@ -3816,13 +3826,12 @@ app.post('/api/voice/speak', async (req, res) => {
     return res.status(400).json({ error: '읽을 내용이 필요합니다.', code: 'VOICE_TTS_EMPTY_TEXT' });
   }
   try {
-    const { spoken, body } = await voiceTts.speak(text);
+    const { spoken, audio } = await voiceTts.speak(text);
     res.set('Cache-Control', 'no-store');
     res.set('Content-Type', 'audio/wav');
     // 실제로 읽은 문장을 화면 자막과 맞추기 위해 헤더로 돌려준다. 본문에는 넣지 않는다.
     res.set('X-Galpi-Spoken-Chars', String(spoken.length));
-    for await (const chunk of body) res.write(chunk);
-    res.end();
+    res.send(audio);
   } catch (error) {
     const status = Number.isInteger(error?.status) ? error.status : 500;
     console.warn(`⚠️ 음성 출력 실패: ${error?.code || 'VOICE_TTS_FAILED'}`);

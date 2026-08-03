@@ -388,3 +388,36 @@ test('a response without logprobs still transcribes and reports no confidence', 
   // 관측이 없다고 전사가 실패하면 안 된다.
   assert.equal(result.confidence, null);
 });
+
+test('the proper-noun hint is sent so the assistant name stops drifting', async () => {
+  const requests = [];
+  const provider = createOpenAITranscriptionProvider({
+    apiKey: 'k',
+    async fetchImpl(url, options) {
+      requests.push(options.body);
+      return { ok: true, async json() { return { text: '시온아, 안녕' }; } };
+    },
+  });
+  await provider({ audio: Buffer.alloc(4), mimeType: 'audio/wav', durationMs: 900 });
+
+  // "시온아"가 시오나·지온아·시원아·시훈아로 흩어지던 것을 잡는다.
+  assert.match(requests[0].get('prompt'), /시온/);
+  // 문장을 넣으면 전사가 그쪽으로 끌려간다. 고유명사만 좁게 둔다.
+  assert.ok(requests[0].get('prompt').length < 40);
+});
+
+test('the hint can be cleared without breaking transcription', async () => {
+  const requests = [];
+  const provider = createOpenAITranscriptionProvider({
+    apiKey: 'k',
+    prompt: '',
+    async fetchImpl(url, options) {
+      requests.push(options.body);
+      return { ok: true, async json() { return { text: '안녕' }; } };
+    },
+  });
+  const result = await provider({ audio: Buffer.alloc(4), mimeType: 'audio/wav', durationMs: 900 });
+
+  assert.equal(requests[0].get('prompt'), null);
+  assert.equal(result.correctedTranscript, '안녕');
+});

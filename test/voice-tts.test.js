@@ -3,6 +3,26 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+// 정규화가 다루는 최소한의 유효한 16비트 PCM WAV를 만든다.
+function silentWav(samples = 8, amplitude = 1000) {
+  const buffer = Buffer.alloc(44 + (samples * 2));
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + (samples * 2), 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(16000, 24);
+  buffer.writeUInt32LE(32000, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i += 1) buffer.writeInt16LE(amplitude, 44 + (i * 2));
+  return buffer;
+}
+
 const {
   DEFAULT_INSTRUCTIONS,
   DEFAULT_MAX_CHARS,
@@ -61,12 +81,12 @@ test('the enabled service sends the trimmed text and never leaks the key downstr
     maxChars: 30,
     async fetchImpl(url, options) {
       requests.push({ url, body: JSON.parse(options.body), auth: options.headers.Authorization });
-      return { ok: true, body: (async function* () { yield Buffer.from('RIFF'); })() };
+      return { ok: true, async arrayBuffer() { return silentWav(); } };
     },
   });
 
   const long = '첫 문장이야. 두 번째 문장이야. 세 번째 문장은 잘려야 해.';
-  const { spoken, body } = await service.speak(long);
+  const { spoken, audio } = await service.speak(long);
 
   assert.equal(requests.length, 1);
   assert.equal(requests[0].url, 'http://provider.invalid/v1/audio/speech');
@@ -80,9 +100,7 @@ test('the enabled service sends the trimmed text and never leaks the key downstr
   assert.ok(spoken.length <= 30 + 40);
   assert.doesNotMatch(JSON.stringify(requests[0].body), /server-only-key/);
 
-  const chunks = [];
-  for await (const chunk of body) chunks.push(chunk);
-  assert.equal(Buffer.concat(chunks).toString(), 'RIFF');
+  assert.equal(audio.toString('ascii', 0, 4), 'RIFF');
 });
 
 test('an upstream rejection surfaces a bounded code without the answer text', async () => {
@@ -107,7 +125,7 @@ test('an empty instruction is omitted rather than sent as a blank field', async 
     instructions: '   ',
     async fetchImpl(url, options) {
       requests.push(JSON.parse(options.body));
-      return { ok: true, body: (async function* () { yield Buffer.from('RIFF'); })() };
+      return { ok: true, async arrayBuffer() { return silentWav(); } };
     },
   });
 
@@ -125,7 +143,7 @@ test('the speaking rate is sent and held inside the range the API accepts', asyn
       ...(speed === undefined ? {} : { speed }),
       async fetchImpl(url, options) {
         requests.push(JSON.parse(options.body));
-        return { ok: true, body: (async function* () { yield Buffer.from('RIFF'); })() };
+        return { ok: true, async arrayBuffer() { return silentWav(); } };
       },
     });
     await service.speak('안녕');
@@ -230,4 +248,50 @@ test('the streamed cap stops reading and points at the screen', () => {
   assert.equal(out.at(-1), '자세한 건 화면에 정리해뒀어.');
   // 상한 뒤로는 더 읽지 않는다. 화면에는 전체 답변이 남는다.
   assert.ok(out.slice(0, -1).join('').length <= 60 + 20);
+});
+
+test('quiet and loud segments end up at the same loudness', () => {
+  const { normalizeWavLoudness, TARGET_RMS } = require('../lib/voice-tts');
+  const rmsOf = wav => {
+    const samples = (wav.length - 44) / 2;
+    let sum = 0;
+    for (let i = 0; i < samples; i += 1) {
+      const v = wav.readInt16LE(44 + (i * 2)) / 32768;
+      sum += v * v;
+    }
+    return Math.sqrt(sum / samples);
+  };
+
+  // 조각마다 TTS를 따로 부르면 이렇게 음량이 갈린다. 사용자가 실기기에서 겪었다.
+  const quiet = normalizeWavLoudness(silentWav(400, 3000));
+  const loud = normalizeWavLoudness(silentWav(400, 9000));
+
+  assert.ok(Math.abs(rmsOf(quiet) - TARGET_RMS) < 0.01);
+  assert.ok(Math.abs(rmsOf(loud) - TARGET_RMS) < 0.01);
+  // 두 조각이 같은 크기로 들려야 한 문장만 작게 들리지 않는다.
+  assert.ok(Math.abs(rmsOf(quiet) - rmsOf(loud)) < 0.01);
+});
+
+test('normalizing never clips and leaves non-PCM bytes alone', () => {
+  const { normalizeWavLoudness } = require('../lib/voice-tts');
+  const peakOf = wav => {
+    const samples = (wav.length - 44) / 2;
+    let peak = 0;
+    for (let i = 0; i < samples; i += 1) {
+      peak = Math.max(peak, Math.abs(wav.readInt16LE(44 + (i * 2))));
+    }
+    return peak / 32768;
+  };
+
+  // 거의 무음은 목표까지 끌어올리지 않는다. 이득 상한이 없으면 잡음만 커진다.
+  const nearSilent = normalizeWavLoudness(silentWav(400, 30));
+  assert.ok(peakOf(nearSilent) <= 0.98);
+  assert.ok(peakOf(nearSilent) < 0.02);
+  // 이미 큰 조각을 더 키우다 잘리면 안 된다.
+  assert.ok(peakOf(normalizeWavLoudness(silentWav(400, 32000))) <= 0.98);
+
+  // 16비트 PCM이 아니면 손대지 않는다.
+  const mp3 = Buffer.from('ID3' + 'x'.repeat(80));
+  assert.equal(normalizeWavLoudness(mp3), mp3);
+  assert.equal(normalizeWavLoudness(Buffer.alloc(10)).length, 10);
 });
