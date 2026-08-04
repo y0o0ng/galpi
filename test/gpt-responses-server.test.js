@@ -502,6 +502,10 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   });
   assert.equal(fourth.response.status, 200, JSON.stringify(fourth.body));
   assert.equal(attachmentStatesAtProvider.at(-1), 'attached_temporary');
+  assert.equal(fourth.body.attachmentDocuments.used, false);
+  assert.equal(db.prepare(`
+    SELECT COUNT(*) AS count FROM auto_save_decisions
+  `).get().count, autoSaveDecisionsBeforeLinked);
 
   const fifth = await api(url, '/api/chat', {
     method: 'POST',

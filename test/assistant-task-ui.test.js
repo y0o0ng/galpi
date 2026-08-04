@@ -257,7 +257,7 @@ test('chat schedule candidates remain unpersisted until the existing task API co
   assert.match(server, /createSchedulePrepareSession\(assistantTasks/);
   // 라우트가 출처 정책을 정하고 공통 턴 코어가 일정 후보와 함께 저장을 차단한다.
   assert.match(server, /allowAutoTopic: source !== 'voice'/);
-  assert.match(server, /if \(!scheduleCandidate && allowAutoTopic\) \{[\s\S]*?autoAppendTopicNote/);
+  assert.match(server, /if \(!scheduleCandidate && allowAutoTopic && !attachmentToolSession\.hasCandidates\) \{[\s\S]*?autoAppendTopicNote/);
   assert.match(server, /scheduleCandidate,/);
   assert.match(app, /TaskPanel\?\.makeScheduleCandidateCard\(data\.scheduleCandidate\)/);
   assert.match(app, /if \(candidateCard\) \{[\s\S]*?group\.appendChild\(candidateCard\)[\s\S]*?return;/);

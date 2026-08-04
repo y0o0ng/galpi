@@ -3521,20 +3521,19 @@ async function runSingleChatTurnBody({
       },
     ].slice(-HISTORY_CONTEXT_MESSAGES);
 
-    if (!scheduleCandidate && allowAutoTopic) {
-      // temporary 첨부 근거를 읽은 답변은 서재 승격 승인 없이 영구 topic으로
-      // 굳히지 않는다. 사용자가 답변 저장 버튼을 누르는 명시적 저장은 별도다.
-      if (attachmentEvidenceRefs.length === 0) {
-        autoAppendTopicNote({
-          question: message,
-          answer: reply,
-          sessionId,
-          userMessageId,
-          assistantMessageId,
-          model: assistantModel,
-          webSources: webEvidence?.results || [],
-        }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
-      }
+    // replay 후보가 살아 있으면 모델이 직전 답변만으로 답해 첨부 도구를 다시
+    // 호출하지 않을 수 있다. 그 파생 내용도 temporary 경계 안이므로 후보가
+    // 만료될 때까지 자동 topic 저장을 막는다. 명시적 저장 버튼은 별도다.
+    if (!scheduleCandidate && allowAutoTopic && !attachmentToolSession.hasCandidates) {
+      autoAppendTopicNote({
+        question: message,
+        answer: reply,
+        sessionId,
+        userMessageId,
+        assistantMessageId,
+        model: assistantModel,
+        webSources: webEvidence?.results || [],
+      }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
     }
 
     return {
