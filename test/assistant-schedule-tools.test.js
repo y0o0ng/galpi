@@ -67,6 +67,39 @@ test('schedule prompt forbids context-triggered writes and implicit reminders', 
   assert.match(prompt, /확정할 수 없으면 도구를 호출하지 말고 짧게 되묻는다/);
 });
 
+test('direct schedule mode validates then creates one idempotent task for an explicit shortcut request', () => {
+  const capturedAt = Math.floor(Date.parse('2026-08-04T18:00:00+09:00') / 1000);
+  const calls = [];
+  const store = {
+    prepare(input, options) {
+      calls.push({ method: 'prepare', input, options });
+      return { capturedAt: options.capturedAt, timezone: 'Asia/Seoul', task: input };
+    },
+    create(input) {
+      calls.push({ method: 'create', input });
+      return { task: { id: 7, ...input }, reminder: null, replayed: false };
+    },
+  };
+  const session = createSchedulePrepareSession(store, {
+    capturedAt,
+    clientRequestId: 'shortcut-task:00000000-0000-4000-8000-000000000013',
+    persistImmediately: true,
+  });
+
+  assert.match(session.systemPrompt, /명시적 생성 요청 자체가 최종 승인/);
+  assert.match(session.getToolDefinitions()[0].description, /save it immediately/);
+  const result = session.execute('schedule_prepare', {
+    title: '병원 예약',
+    due: { kind: 'datetime', at: '2026-08-05T09:00:00+09:00' },
+  });
+
+  assert.deepEqual(calls.map(call => call.method), ['prepare', 'create']);
+  assert.equal(JSON.parse(result.content).persisted, true);
+  assert.equal(session.getCandidate().persisted, true);
+  assert.equal(session.getCandidate().created.task.id, 7);
+  assert.equal(calls[1].input.clientRequestId, 'shortcut-task:00000000-0000-4000-8000-000000000013');
+});
+
 test('Claude tool loop returns a final reply while the prepared candidate stays unpersisted', async () => {
   const capturedAt = Math.floor(Date.parse('2026-07-19T12:00:00+09:00') / 1000);
   let prepareCalls = 0;
@@ -111,4 +144,3 @@ test('Claude tool loop returns a final reply while the prepared candidate stays 
   assert.equal(requests[1].tools, undefined);
   assert.equal(session.getCandidate().task.title, '병원 예약');
 });
-

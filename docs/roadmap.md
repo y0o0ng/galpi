@@ -265,13 +265,14 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [ ] 확인 전에는 저장되지 않고, 확인한 내용만 선택한 대화·메모·할 일 경로로 들어간다
 - [ ] 며칠 뒤 관련 질문 → 그 녹음에서 나온 내용을 꺼내온다
 - [x] H6a-1 기존 `/api/chat`의 회수·GPT·저장 구간을 공용 턴 코어로 분리하고 기존 PWA 계약의 전체 회귀를 통과한다
-- [x] H6a-2 활성 Push 구독 scoped credential·durable receipt·읽기 전용 단일 턴 route를 로컬에서 구현하고 동시 중복·재전송·권한 회귀를 통과한다
+- [x] H6a-2 활성 Push 구독 scoped credential·durable receipt·scoped 단일 턴 route를 로컬에서 구현하고 동시 중복·재전송·권한 회귀를 통과한다
 - [x] H6a Pi 기술 인수에서 schema v11·운영 flag·활성 iOS 구독 credential을 적용하고 scoped token의 exact route 한정과 일반 API 거절을 확인한다
 - [x] H6b iPhone에서 실제 단일 턴과 고정 3회 반복·로컬 종료가 PWA 실행 없이 동작하고 topic·일정 쓰기가 0이다
 - [x] 잠금 화면 표시 상태와 디스플레이 소등 상태를 분리했다. 전자는 동작하고 후자는 최소 음성 단축어부터 호출되지 않아 서버 밖 플랫폼 제약으로 수용한다
+- [ ] H6d는 명시적인 새 일정 생성만 기존 validator 뒤 `shortcut-task:<requestId>`로 즉시·멱등 저장하도록 로컬 구현했고 전체 386/386을 통과했다. Pi 배포와 실기기 생성·취소 인수는 남아 있다
 - H6 확대를 닫아 같은 request ID의 iPhone 실기기 재시도와 화면 소등 10회 기준은 더 진행하지 않는다. 서버 멱등성 회귀 테스트는 유지한다
 
-> 핵심 포인트: PWA 반이중은 `gpt-transcribe`와 OpenAI TTS, H6 단축어는 Apple 받아쓰기와 텍스트 말하기를 입·귀로 쓴다. 둘 다 같은 회수·GPT·`shared-main` 저장 경로를 쓰고 음성 질문은 topic에 자동 저장하지 않으며, 화면 없는 H6에서는 일정·노트·설정 쓰기를 열지 않는다.
+> 핵심 포인트: PWA 반이중은 `gpt-transcribe`와 OpenAI TTS, H6 단축어는 Apple 받아쓰기와 텍스트 말하기를 입·귀로 쓴다. 둘 다 같은 회수·GPT·`shared-main` 저장 경로를 쓰고 음성 질문은 topic에 자동 저장하지 않는다. 화면 없는 H6는 명시적인 새 일정 생성만 열고 기존 일정 mutation과 노트·설정 쓰기는 닫는다.
 
 ---
 

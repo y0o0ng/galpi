@@ -1006,6 +1006,8 @@ Pi 배포·인수 완료(2026-07-19, `479ce7a`):
 
 Pi 전체 테스트도 171/171을 통과했다. 운영 DB를 read-only로 연 `prepare` 스모크에서 후보는 유효했고 task 2·event 6·reminder 2·projection 0·note 30이 전후 동일했다. 인증 config·task summary·organizer·push API는 모두 HTTP 200, 서비스는 새 PID로 기동했으며 재시작 이후 error journal은 0건이었다. 실제 Claude 후보 카드→등록은 가짜 운영 일정을 남기지 않기 위해 배포 검증에서 호출하지 않고 다음 실사용 일정으로 확인한다.
 
+2026-08-04 H6d는 PWA의 후보 카드 계약을 바꾸지 않고, 화면 없는 iPhone 단축어의 **명시적인 새 일정 생성 발화만** 최종 승인으로 보는 예외를 열었다. 단축어 scoped route가 같은 `schedule_prepare` validator 뒤 `shortcut-task:<requestId>`로 공용 store를 즉시 호출한다. 기존 일정 수정·완료·취소·삭제와 다른 쓰기는 계속 닫으며 상세 권한·멱등 경계는 `voice-halfduplex-design.md` H6d가 기준이다.
+
 ## 13. C2 이후 확장 경계
 
 반복을 C1의 `recurrence_rule` 한 컬럼으로 얹지 않는다. 반복 master, 회차 완료, 알림 receipt를 분리해야 한다.

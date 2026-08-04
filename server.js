@@ -2976,10 +2976,10 @@ const VOICE_ANSWER_SYSTEM_PROMPT = `이 답변은 소리로 읽힌다. 화면에
 
 사용자가 특정 항목을 자세히 설명해달라고 명시하면 그 항목만 자세히 답한다.`;
 
-const SHORTCUT_READ_ONLY_SYSTEM_PROMPT = `이 요청은 화면 없는 잠금화면 음성 단축어에서 왔다.
-일정·알림·메모·노트·설정·Codex 작업을 생성, 수정, 삭제하거나 완료했다고 말하지 않는다.
-변경 요청이면 지금은 실행할 수 없고 갈피 화면에서 확인해야 한다고 짧게 답한다.
-읽기와 설명만 수행한다.`;
+const SHORTCUT_SCOPED_WRITE_SYSTEM_PROMPT = `이 요청은 화면 없는 잠금화면 음성 단축어에서 왔다.
+마지막 사용자 발화가 명시적으로 새 일정·할 일·알림을 만들거나 등록해달라는 생성 요청일 때만 schedule_prepare를 사용할 수 있다. 이 직접 생성 요청 자체가 최종 승인이다.
+기존 일정의 수정·완료·취소·삭제와 메모·노트·설정·Codex 쓰기는 실행하거나 완료했다고 말하지 않는다. 그런 변경은 갈피 화면에서 확인해야 한다고 짧게 답한다.
+그 밖에는 읽기와 설명만 수행한다.`;
 
 function buildChatToolInstructions({
   enableWebTool,
@@ -3378,6 +3378,8 @@ async function runSingleChatTurnBody({
   spokenStream = null,
   voiceTurn = Boolean(spokenStream),
   allowSchedulePrepare = true,
+  persistScheduleImmediately = false,
+  scheduleClientRequestId = null,
   allowAutoTopic = true,
   additionalInstructions = '',
   onExchangeInserted = null,
@@ -3464,7 +3466,8 @@ async function runSingleChatTurnBody({
     const scheduleToolSession = allowSchedulePrepare && ASSISTANT_TASKS_ENABLED
       ? createSchedulePrepareSession(assistantTasks, {
         capturedAt: requestCreatedAt,
-        clientRequestId: `chat-task:${uuidv4()}`,
+        clientRequestId: scheduleClientRequestId || `chat-task:${uuidv4()}`,
+        persistImmediately: persistScheduleImmediately,
       })
       : null;
     progress.stage('answer');
@@ -4117,9 +4120,11 @@ const shortcutRoutes = createVoiceShortcutRoutes({
         webSearch: false,
         progress: { stage() {} },
         voiceTurn: true,
-        allowSchedulePrepare: false,
+        allowSchedulePrepare: true,
+        persistScheduleImmediately: true,
+        scheduleClientRequestId: `shortcut-task:${turn.requestId}`,
         allowAutoTopic: false,
-        additionalInstructions: SHORTCUT_READ_ONLY_SYSTEM_PROMPT,
+        additionalInstructions: SHORTCUT_SCOPED_WRITE_SYSTEM_PROMPT,
         onExchangeInserted({ userMessageId, assistantMessageId }) {
           voiceShortcut.completeRequest({
             credentialId: credential.id,
