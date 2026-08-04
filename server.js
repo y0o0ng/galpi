@@ -73,6 +73,7 @@ const {
 const { createVoiceTtsService } = require('./lib/voice-tts');
 const { VoiceShortcutError, createVoiceShortcutService } = require('./lib/voice-shortcut');
 const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
+const { AttachmentUploadError, createAttachmentUploadService } = require('./lib/attachment-upload');
 const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
@@ -120,6 +121,7 @@ const {
 const RUNTIME_PATHS = resolveRuntimePaths({ appRoot: __dirname });
 const DATA_DIR = RUNTIME_PATHS.dataDir;
 const DB_PATH = RUNTIME_PATHS.dbPath;
+const ATTACHMENTS_TMP_DIR = RUNTIME_PATHS.attachmentsTmpDir;
 const VAULT_PATH = process.env.VAULT_PATH ? RUNTIME_PATHS.vaultPath : null;
 const CONTEXT_N  = parseInt(process.env.CONTEXT_N  || '10');
 const HISTORY_CONTEXT_MESSAGES = CONTEXT_N * 2; // 최근 10턴 내외를 user/assistant 메시지 쌍으로 전달
@@ -192,6 +194,7 @@ const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'echo').trim();
 const VOICE_TTS_INSTRUCTIONS = process.env.VOICE_TTS_INSTRUCTIONS;
 const VOICE_TTS_SPEED = process.env.VOICE_TTS_SPEED;
 const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
+const ATTACHMENTS_ENABLED = process.env.ATTACHMENTS_ENABLED === 'true';
 const VOICE_SESSION_TTL_MS = 60 * 60 * 1000;
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
@@ -781,6 +784,10 @@ const assistantPush = createAssistantPushService(db, {
 });
 const voiceShortcut = createVoiceShortcutService(db, {
   enabled: VOICE_SHORTCUT_ENABLED,
+});
+const attachmentUploads = createAttachmentUploadService(db, {
+  enabled: ATTACHMENTS_ENABLED,
+  tmpDir: ATTACHMENTS_TMP_DIR,
 });
 const assistantTasks = createAssistantTaskStore(db, {
   onTaskInactive: (taskId, changedAt) => assistantPush.skipTask(taskId, changedAt),
@@ -3947,6 +3954,7 @@ app.get('/api/config', (req, res) => {
     },
     halfDuplexVoice: voiceTts.publicConfig(),
     shortcutVoice: voiceShortcut.publicConfig(),
+    attachments: attachmentUploads.publicConfig(),
     webSearch: {
       enabled: WEB_SEARCH_ENABLED,
       provider: WEB_SEARCH_PROVIDER,
@@ -4022,6 +4030,21 @@ const shortcutRoutes = createVoiceShortcutRoutes({
   },
 });
 voiceShortcutTurnHandler = shortcutRoutes.handleTurn;
+
+app.post('/api/attachments', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const result = await attachmentUploads.upload(req);
+    return res.status(201).json(result);
+  } catch (error) {
+    const known = error instanceof AttachmentUploadError;
+    if (!known) console.warn('⚠️ 첨부 업로드 실패: ATTACHMENT_UPLOAD_FAILED');
+    return res.status(known ? error.status : 500).json({
+      error: known ? error.message : '첨부파일을 저장하지 못했습니다.',
+      code: known ? error.code : 'ATTACHMENT_UPLOAD_FAILED',
+    });
+  }
+});
 
 // ─── 사용자 메모리 ───────────────────────────────────────────────────────────
 
@@ -8371,6 +8394,10 @@ const httpServer = app.listen(PORT, HOST, () => {
     assistantPushDispatcher.start();
     console.log('   Push:     private Web Push dispatcher 실행 중');
   }
+  if (ATTACHMENTS_ENABLED) {
+    attachmentUploads.start();
+    console.log('   첨부:     temporary upload 실행 중');
+  }
 
   if (
     codexStartupRecovery.quarantinedJobs > 0 ||
@@ -8422,6 +8449,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     assistantScheduler.stop();
     assistantScheduleNoteProjector.stop();
     assistantPushDispatcher?.stop();
+    attachmentUploads.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {

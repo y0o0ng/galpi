@@ -1,8 +1,8 @@
 # 갈피 첨부파일 업로드·검색 설계
 
-> Version: 0.2  
-> 상태: 수명주기·상한 설계 보정 / 구현 전  
-> 작성일: 2026-07-28  
+> Version: 0.3
+> 상태: U0a 서버 업로드 기반 로컬 구현 완료 / Pi 미배포
+> 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
 ---
@@ -781,7 +781,38 @@ Markdown과 TXT는 페이지 대신 헤딩 또는 줄 범위를 사용한다.
 
 ## 14. 구현 단계
 
-> 순서 경계: U0~U1은 [단일 GPT·모델 라우팅](chat-model-routing-design.md)의 도구 parity와 입력창 model picker가 안정된 뒤 시작한다. 아직 코드·DB·Pi 구현은 시작하지 않았다.
+> 순서 경계: U0~U1은 [단일 GPT·모델 라우팅](chat-model-routing-design.md)의 도구 parity와 입력창 model picker가 안정된 뒤 시작한다. U0a 서버 기반은 로컬에서 끝났고, 메시지 연결·UI·모델 읽기·Pi 배포는 아직 시작하지 않았다.
+
+### U0a — 서버 업로드 기반 ✅ 로컬 구현 완료 (2026-08-04)
+
+U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명주기 시작점만 먼저 만들었다.
+
+구현:
+
+- schema v12에 콘텐츠 단위 `attachment_blobs`와 사용자 업로드 단위 `attachments`를 분리했다.
+- `POST /api/attachments`는 기존 전역 `/api` 인증을 그대로 사용하고 `ATTACHMENTS_ENABLED=true`일 때만 열린다. 코드와 `.env.example` 기본값은 `false`다.
+- 임시 원본은 `GALPI_DATA_DIR/attachments/tmp`에 서버 생성 ID로 저장하며 `public/`·Vault·backup 경로에 두지 않는다.
+- 한 요청에 `file` 하나만 받고 PDF, MD, TXT, JPEG, PNG, WebP만 허용한다.
+- 확장자와 MIME 조합, PDF·JPEG·PNG·WebP 시그니처, UTF-8 텍스트, 빈 파일, 형식별 크기 상한을 서버에서 검증한다.
+- 쓰는 동안 `.partial`과 mode `0600`을 사용하고 파일 `fsync` 뒤 최종 이름으로 rename한다. 중단·검증 실패 요청은 DB 행과 완성 파일을 남기지 않는다.
+- SHA-256과 MIME이 모두 같은 원본만 blob을 재사용한다. 같은 바이트라도 TXT와 Markdown처럼 의미 형식이 다르면 blob을 합치지 않는다.
+- 메시지에 아직 붙지 않은 `uploaded_unattached` 업로드는 60분 뒤 삭제한다. 같은 blob을 참조하는 살아 있는 업로드가 있으면 원본은 유지하고, 오래된 `.partial`도 같은 주기로 정리한다.
+- `/api/config`에는 활성 여부와 공개 상한만 노출하며 서버 경로·해시·blob ID는 반환하지 않는다.
+
+검증:
+
+- 집중 테스트 11/11: 인증·flag·data directory 격리, 정상 업로드, SHA/MIME 중복 경계, 위장 파일·과대 파일·잘못된 UTF-8 차단, 중단 정리, 60분 orphan 정리, schema v12·runtime path.
+- 전체 회귀 356/356.
+
+아직 하지 않은 것:
+
+- `message_attachments`, `CONTEXT_N` replay snapshot, 메시지 연결과 tombstone
+- 첨부 버튼·진행률·취소·재접속 UI
+- 파싱·모델 입력·다운로드/미리보기 API
+- library 승격·Vault 노트·전문 색인
+- Pi schema 적용과 운영 flag 활성화
+
+다음 단위는 U0b다. 기존 메시지 저장 transaction에 첨부 연결을 포함하고, 연결 시점의 `CONTEXT_N`을 snapshot해 모델 호출 전 만료 경계를 먼저 완성한다. 그 뒤 U0c에서 UI를 붙인다.
 
 ### U0 — 파일 운반과 저장
 

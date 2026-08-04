@@ -78,13 +78,13 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
-      { version: 9 }, { version: 10 }, { version: 11 },
+      { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
     ],
   );
 
@@ -251,6 +251,41 @@ test('schema v11 scopes shortcut credentials and request receipts', () => {
       credential_id, request_id, request_sha256, conversation_id
     ) VALUES (?, '00000000-0000-4000-8000-000000000001', ?, ?)
   `).run(credentialId, 'b'.repeat(64), 'd'.repeat(22)), /UNIQUE/);
+  db.close();
+});
+
+test('schema v12 stores temporary attachment blobs separately from user uploads', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+  const blobId = db.prepare(`
+    INSERT INTO attachment_blobs (
+      sha256, stored_name, stored_path, mime_type, size_bytes
+    ) VALUES (?, 'att_test.txt', '/data/attachments/tmp/att_test.txt', 'text/plain', 4)
+  `).run('a'.repeat(64)).lastInsertRowid;
+  db.prepare(`
+    INSERT INTO attachments (id, blob_id, original_name, kind)
+    VALUES ('att_0123456789abcdef0123456789abcdef', ?, 'note.txt', 'text')
+  `).run(blobId);
+
+  assert.deepEqual(db.prepare(`
+    SELECT a.lifecycle_status AS lifecycleStatus, a.scope,
+           b.storage_scope AS storageScope, b.status
+    FROM attachments a
+    JOIN attachment_blobs b ON b.id = a.blob_id
+  `).get(), {
+    lifecycleStatus: 'uploaded_unattached',
+    scope: 'temporary',
+    storageScope: 'temporary',
+    status: 'ready',
+  });
+  assert.throws(() => db.prepare(`
+    UPDATE attachments SET lifecycle_status = 'unknown'
+  `).run(), /CHECK/);
+  assert.throws(() => db.prepare(`
+    INSERT INTO attachment_blobs (
+      sha256, stored_name, stored_path, mime_type, size_bytes
+    ) VALUES (?, 'att_empty.txt', '/data/attachments/tmp/att_empty.txt', 'text/plain', 0)
+  `).run('b'.repeat(64)), /CHECK/);
   db.close();
 });
 

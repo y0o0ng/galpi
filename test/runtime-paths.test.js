@@ -15,6 +15,7 @@ test('runtime paths keep the native layout when no path environment is configure
   assert.deepEqual(paths, {
     dataDir: appRoot,
     dbPath: path.join(appRoot, 'galpi.db'),
+    attachmentsTmpDir: path.join(appRoot, 'attachments', 'tmp'),
     vaultPath: path.join(appRoot, 'galpi-vault'),
     backupDir: path.join(homeDir, 'backups', 'galpi'),
   });
@@ -35,6 +36,7 @@ test('runtime paths separate database, vault, and backups using configured roots
   assert.equal(paths.dbPath, '/var/lib/galpi/galpi.db');
   assert.equal(path.dirname(`${paths.dbPath}-wal`), paths.dataDir);
   assert.equal(path.dirname(`${paths.dbPath}-shm`), paths.dataDir);
+  assert.equal(paths.attachmentsTmpDir, '/var/lib/galpi/attachments/tmp');
   assert.equal(paths.vaultPath, '/vault');
   assert.equal(paths.backupDir, '/backups');
 });
