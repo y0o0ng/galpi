@@ -455,8 +455,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 ### 첨부·강의 병행 lane
 
 - 일반 첨부 U0~U1은 V4.5-M의 도구 parity와 입력창 model picker가 안정된 뒤 병행할 수 있다. 상세는 [첨부파일 업로드·검색 설계](galpi-attachment-upload-design.md)다.
-- U0a~U0c는 2026-08-04 로컬 구현을 마쳤다. schema v12~13 업로드·message 연결·replay 수명주기와 composer 단일 업로드·취소·공통 카드/tombstone을 구현했다. composer는 위 입력·아래 도구의 두 줄 구조로 정리해 첨부를 `+` 메뉴에 넣고, 빈 입력은 반이중 음성·입력값이 생기면 같은 자리의 전송 버튼을 쓴다. 데스크톱은 전체 폭 하단 바를 없앤 600px floating composer와 40px 제어, 모바일은 safe-area 면과 44px 타깃을 쓴다. 전체 회귀 368/368과 Chromium 1440px·1024px·390px·320px overflow 0을 통과했다. 첨부 원문은 아직 모델에 보내지 않고 flag 기본값은 `false`이며 Pi에는 미배포다. 다음은 U1 PDF·MD·TXT 읽기다.
-- U1a는 schema v14 `attachment_documents/chunks`와 최초 요청 on-demand 파싱을 로컬에 구현했다. MD·TXT 헤딩/줄 범위와 PDF 페이지 범위, hash+parser version 재사용, single-flight, 30초 timeout, 스캔 PDF `needs_ocr`, replay/orphan 청크 삭제를 집행한다. 전체 378개 중 377개와 organizer 격리 7/7을 통과했고 원문은 아직 GPT 입력에 넣지 않는다. 다음은 U1b 관련 청크 회수·bounded 주입이다.
+- U0a~U0c는 schema v12~13 인증 업로드·message 연결·replay 수명주기와 composer 단일 업로드·공통 카드/tombstone을 로컬에 구현했다. 빈 입력은 반이중 음성, 키보드 입력 후에는 같은 주 액션 자리의 전송을 쓴다.
+- U1a~U1b는 schema v14 MD·TXT·PDF on-demand 파싱과 현재/replay 첨부 최대 3개의 `attachment_document_search → read` 도구를 로컬에 구현했다. 답변당 2회·호출당 5,000자·합계 10,000자, 파일명+페이지/줄 출처, 비신뢰 자료 경계, temporary 근거 답변의 자동 topic 저장 제외을 집행한다. 첫 GPT 요청에는 원문을 넣지 않고 도구 선택 뒤 관련 청크만 보내며 로컬 전체 384/384를 통과했다. Pi flag는 `false`이며 다음은 schema 11→14 배포와 iPhone/iPad 문서 질문 인수다.
 - temporary 첨부는 연결 시 현재 `CONTEXT_N`을 `replay_window_turns`로 snapshot한다. 현재 로컬·Pi 값은 사용자 턴 10개이며, origin turn이 창에서 밀려나는 다음 사용자 턴의 모델 호출 전에 만료·비동기 삭제한다.
 - `CONTEXT_N`을 나중에 5로 바꾸면 새 첨부부터 5턴을 쓰며 기존 첨부에는 소급하지 않는다. 자연어 재언급은 수명을 늘리지 않고 명시적 `다시 첨부`만 새 연결을 만든다.
 - library는 명시적 승인 뒤 Vault로 승격하고 자동 만료하지 않는다. 미연결 upload는 60분 orphan TTL로 정리한다.

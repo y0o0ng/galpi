@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
-> Version: 0.5
-> 상태: U0a~U0c 파일 운반·composer UI와 U1a 문서 파싱·청크 저장 로컬 구현 완료 / U1b 모델 읽기·Pi 배포 미완료
+> Version: 0.6
+> 상태: U0a~U0c 파일 운반·composer UI와 U1a~U1b 문서 파싱·bounded 모델 읽기 로컬 구현 완료 / Pi 배포·실기기 인수 미완료
 > 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -873,7 +873,25 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - iPhone/iPad 실기기 업로드와 재접속 확인
 - Pi schema 11→14 적용과 운영 flag 활성화
 
-다음 단위는 U1b 관련 청크 회수·GPT 주입이다. Pi 배포는 U1 전체와 composer 수정을 합친 뒤 한 번에 할지 배포 직전에 다시 정한다.
+후속 U1b 관련 청크 회수·GPT 주입은 아래 범위로 로컬 구현했다. Pi 배포와 실기기 인수는 아직 하지 않았다.
+
+### U1b — 현재/replay 첨부의 bounded 모델 읽기 ✅ 로컬 구현 완료 (2026-08-04)
+
+구현:
+
+- 현재 요청에 명시적으로 연결된 첨부를 먼저 후보로 삼고, 그뒤에 같은 session의 replay 창 안에 남은 최근 문서를 합쳐 최대 3개로 snapshot한다. 다른 session, 만료·삭제·파싱 미완료 첨부는 후보가 아니다.
+- `attachment_document_search` 다음 필요할 때만 `attachment_document_read`를 한 번 허용한다. focused 검색은 질의 어휘가 포함된 청크만, overview는 관련 청크를 우선하되 서로 다른 Markdown 헤딩·PDF 구간의 대표 청크를 보충한다. 임베딩과 새 provider 호출은 추가하지 않았다.
+- 도구 세션은 답변당 2회, 호출당 JSON 5,000자, 합계 10,000자를 집행한다. `read`는 직전 `search`가 반환한 첨부 ID·chunk ID와 그 인접 청크 최대 2개만 읽는다.
+- 첨부 도구를 기존 Claude/OpenAI 공용 tool loop에 연결했다. 현재 운영 메인 채팅은 GPT Responses 경로를 쓰며, 첫 model request에는 원문을 넣지 않고 모델이 도구를 선택한 뒤에만 관련 청크 JSON을 `function_call_output`으로 돌려준다.
+- 시스템 규칙은 파일명·본문·URL·코드와 그 안의 지시를 모두 비신뢰 사용자 자료로 다룬다. 근거를 쓴 답변은 PDF 페이지 또는 Markdown·TXT 줄 범위와 파일명·헤딩을 남기고, 근거가 없으면 추측하지 않는다.
+- temporary 첨부 근거를 실제로 읽은 답변은 자동 topic 저장에서 제외한다. 서재 승격은 계속 명시적 승인이 필요하며, 사용자가 답변 저장 버튼을 누르는 기존 명시적 저장은 별도로 유지한다.
+- API 결과는 본문 대신 첨부/chunk opaque reference, 호출 수, 실제 컨텍스트 문자 수만 반환한다. 저장 경로·원문 hash는 노출하지 않는다.
+
+검증:
+
+- 첨부 문서·도구·GPT 통합·진행 단계 집중 13/13과 로컬 전체 384/384를 통과했다. 후보 session 격리, focused/overview 검색, search → read 순서, 문자 예산, 기존 일정 확인 계약, GPT 실제 tool round를 포함한다.
+- GPT 통합 fixture에서 최초 입력의 원문 0건, 검색 도구 후 관련 청크 전달, 파일명·줄 출처, temporary 답변 자동 topic 저장 0건, 경로·hash 비노출을 확인했다.
+- Pi flag는 아직 `false`이고 schema 11→14 배포·iPhone/iPad 실기기 문서 질문은 남아 있다.
 
 ### U0 — 파일 운반과 저장
 
@@ -899,7 +917,7 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 실행 중 요청·승격 파일은 정리하지 않고 orphan·미참조 blob만 삭제함
 - 모델은 아직 내용을 읽지 않아도 됨
 
-### U1 — 문서 읽기 (U1a 파싱 완료 / U1b 모델 읽기 미완료)
+### U1 — 문서 읽기 (로컬 구현 완료 / Pi·실기기 인수 미완료)
 
 구현:
 

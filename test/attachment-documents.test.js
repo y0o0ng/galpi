@@ -140,6 +140,63 @@ test('temporary Markdown parses once and reuses the exact source and parser vers
   assert.equal(reused.parsedNow, false);
   assert.equal(reused.reused, true);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_chunks').get().count, 2);
+
+  assert.deepEqual(service.listCandidates({
+    sessionId: 'shared-main',
+    attachmentIds: [attachmentId],
+  }).map(candidate => ({
+    attachmentId: candidate.attachmentId,
+    filename: candidate.filename,
+    kind: candidate.kind,
+    chunkCount: candidate.chunkCount,
+  })), [{
+    attachmentId,
+    filename: '로드맵.md',
+    kind: 'markdown',
+    chunkCount: 2,
+  }]);
+  const focused = service.searchDocument({
+    attachmentId,
+    query: '지금 하지 않는 OCR 기능',
+    mode: 'focused',
+  });
+  assert.equal(focused.length, 1);
+  assert.equal(focused[0].heading, '제외');
+  assert.equal(focused[0].lineStart, 7);
+  assert.match(focused[0].text, /이미지와 OCR/);
+
+  const overview = service.searchDocument({
+    attachmentId,
+    query: '전체 요약',
+    mode: 'overview',
+  });
+  assert.deepEqual(overview.map(row => row.heading), ['현재 단계', '제외']);
+  assert.deepEqual(service.readDocument({
+    attachmentId,
+    chunkId: focused[0].chunkId,
+  }).map(row => row.heading), ['현재 단계']);
+
+  const messageId = db.prepare(`
+    INSERT INTO messages (session_id, role, content, created_at)
+    VALUES ('shared-main', 'user', '첨부 연결', 1)
+  `).run().lastInsertRowid;
+  db.prepare(`
+    UPDATE attachments
+    SET session_id = 'shared-main', lifecycle_status = 'attached_temporary'
+    WHERE id = ?
+  `).run(attachmentId);
+  db.prepare(`
+    INSERT INTO message_attachments (
+      message_id, attachment_id, origin_user_turn_index, replay_window_turns
+    ) VALUES (?, ?, 1, 10)
+  `).run(messageId, attachmentId);
+  assert.deepEqual(service.listCandidates({
+    sessionId: 'shared-main',
+  }).map(candidate => candidate.attachmentId), [attachmentId]);
+  assert.deepEqual(service.listCandidates({
+    sessionId: 'other-session',
+    attachmentIds: [attachmentId],
+  }), []);
 });
 
 test('PDF parsing is single-flight and records page-scoped chunks', async t => {

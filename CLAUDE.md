@@ -69,7 +69,7 @@
 - H6의 동일 request ID iPhone 재시도·화면 소등 10회 기준·추가 기기 등록은 더 진행하지 않는다. bounded 3턴은 현재 단축어와 `shared-main`으로 유지하고 별도 server conversation 상태를 추가하지 않는다. 남은 음성 후보인 침묵 1200→1000ms, earcon, H3 되묻기는 각각 필요성이 생길 때만 별도 변경으로 연다.
 - 상시 관찰: 새 `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 10회 표시, 다음 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 - V5-A 딜 스카우트는 수익 모델 불확실성 때문에 2026-08-04 잠정보류했다. 계정 신청·API 키·코드·외부 게시를 시작하지 않으며, 보류를 이유로 V5-B 주식 분석을 자동 착수하지 않는다. 다음 제품 작업은 별도로 선택한다.
-- 첨부 U0a~U0c와 U1a는 로컬 구현 완료·Pi 미배포다. schema v14 `attachment_documents/chunks`가 최초 첨부 요청에서 MD·TXT·PDF를 bounded 파싱하고 동일 hash·parser version을 재사용하며 만료 때 삭제한다. 원문은 아직 모델에 넣지 않고 flag 기본값은 `false`다. 다음은 U1b 관련 청크 회수·GPT 주입이며 library 승격은 승인 뒤에만 한다.
+- 첨부 U0a~U1b는 로컬 구현 완료·Pi 미배포다. schema v14 파싱 뒤 현재/replay 문서에만 `attachment_document_search → read`를 열고, 첫 GPT 요청은 원문 0자·도구 후 관련 근거만 호출당 5,000자·합계 10,000자로 제한한다. temporary 근거 답변은 자동 topic 저장에서 제외하고 library 승격은 승인 뒤에만 한다. flag는 `false`이며 다음은 Pi schema 11→14 배포·iPhone/iPad 인수다.
 
 ## 구조 방향
 

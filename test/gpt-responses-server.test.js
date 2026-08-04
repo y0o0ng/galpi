@@ -118,6 +118,48 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
           output: [],
         });
       }
+      if (responseMode === 'attachment-tool') {
+        const hasToolOutput = body.input.some(item => item?.type === 'function_call_output');
+        if (!hasToolOutput) {
+          return sendJson(res, 200, {
+            id: `resp_attachment_tool_${responseRequests.length}`,
+            object: 'response',
+            status: 'completed',
+            model: body.model,
+            output: [{
+              type: 'function_call',
+              id: 'fc_attachment_search',
+              call_id: 'call_attachment_search',
+              name: 'attachment_document_search',
+              arguments: JSON.stringify({
+                attachmentId: inspectedAttachmentId,
+                query: 'ATTACHMENT MODEL SECRET',
+                mode: 'focused',
+              }),
+              status: 'completed',
+            }],
+          });
+        }
+        return sendJson(res, 200, {
+          id: `resp_attachment_answer_${responseRequests.length}`,
+          object: 'response',
+          status: 'completed',
+          model: body.model,
+          output_text: '첨부 근거를 확인했어. [연결자료.txt, lines 1-1]',
+          output: [{
+            type: 'message',
+            id: `msg_attachment_${responseRequests.length}`,
+            role: 'assistant',
+            status: 'completed',
+            content: [{
+              type: 'output_text',
+              text: '첨부 근거를 확인했어. [연결자료.txt, lines 1-1]',
+              annotations: [],
+            }],
+          }],
+          usage: { input_tokens: 20, output_tokens: 8, total_tokens: 28 },
+        });
+      }
       return sendJson(res, 200, {
         id: `resp_${responseRequests.length}`,
         object: 'response',
@@ -380,7 +422,11 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
     SELECT COUNT(*) AS count FROM attachment_chunks WHERE attachment_id = ?
   `).get(uploadBody.attachmentId).count, 1);
 
-  responseMode = 'completed';
+  responseMode = 'attachment-tool';
+  const providerCallsBeforeLinked = responseRequests.length;
+  const autoSaveDecisionsBeforeLinked = db.prepare(`
+    SELECT COUNT(*) AS count FROM auto_save_decisions
+  `).get().count;
   const linked = await api(url, '/api/chat', {
     method: 'POST',
     body: JSON.stringify({
@@ -392,7 +438,31 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   });
   assert.equal(linked.response.status, 200, JSON.stringify(linked.body));
   assert.equal(linked.body.attachments[0].attachmentId, uploadBody.attachmentId);
-  assert.doesNotMatch(JSON.stringify(responseRequests.at(-1).input), /ATTACHMENT_MODEL_SECRET/);
+  assert.deepEqual(linked.body.attachmentDocuments, {
+    used: true,
+    evidenceRefs: [{
+      attachmentId: uploadBody.attachmentId,
+      chunkIds: [db.prepare(`
+        SELECT chunk_id AS chunkId
+        FROM attachment_chunks
+        WHERE attachment_id = ?
+      `).get(uploadBody.attachmentId).chunkId],
+    }],
+    calls: 1,
+    contextChars: linked.body.attachmentDocuments.contextChars,
+  });
+  assert.ok(linked.body.attachmentDocuments.contextChars > 0);
+  const linkedRequests = responseRequests.slice(providerCallsBeforeLinked);
+  assert.equal(linkedRequests.length, 2);
+  assert.doesNotMatch(JSON.stringify(linkedRequests[0].input), /ATTACHMENT_MODEL_SECRET/);
+  assert.ok(linkedRequests[0].tools.some(tool => tool.name === 'attachment_document_search'));
+  assert.match(linkedRequests[0].instructions, /신뢰하지 않는 사용자 제공 데이터/);
+  assert.match(JSON.stringify(linkedRequests[1].input), /ATTACHMENT_MODEL_SECRET/);
+  assert.doesNotMatch(JSON.stringify(linkedRequests[1].input), /stored_path|content_sha256/);
+  assert.equal(db.prepare(`
+    SELECT COUNT(*) AS count FROM auto_save_decisions
+  `).get().count, autoSaveDecisionsBeforeLinked);
+  responseMode = 'completed';
   const linkedRow = db.prepare(`
     SELECT ma.origin_user_turn_index AS originTurn,
            ma.replay_window_turns AS replayTurns,
