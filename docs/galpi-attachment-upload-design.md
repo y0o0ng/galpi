@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
 > Version: 0.6
-> 상태: U0a~U0c 파일 운반·composer UI와 U1a~U1b 문서 파싱·bounded 모델 읽기 로컬 구현 완료 / Pi 배포·실기기 인수 미완료
+> 상태: U0a~U0c 파일 운반·composer UI와 U1a~U1b 문서 파싱·bounded 모델 읽기 Pi 배포·기술 인수 완료 / iPhone·iPad 실기기 인수 미완료
 > 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -866,16 +866,16 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 전체 378개 중 377개가 통과했고 변경과 무관한 Codex organizer 기동 상태 대기 1건은 격리 재실행 7/7로 통과했다.
 - GPT 서버 통합에서 실패한 첫 채팅은 메시지·연결 0건, 파싱 `ready` 1건으로 남아 재시도에 재사용됐고 provider 입력에는 fixture 원문이 없었다. replay 만료 뒤 document·chunk 0건을 확인했다.
 
-아직 하지 않은 것:
+해당 U1a 시점에 남았던 것:
 
 - 현재 질문의 관련 청크 회수와 모델 입력
 - 인증 다운로드·미리보기, library 승격
 - iPhone/iPad 실기기 업로드와 재접속 확인
-- Pi schema 11→14 적용과 운영 flag 활성화
+- Pi schema 11→14 적용과 운영 flag 활성화(후속 U1b 배포에서 완료)
 
-후속 U1b 관련 청크 회수·GPT 주입은 아래 범위로 로컬 구현했다. Pi 배포와 실기기 인수는 아직 하지 않았다.
+후속 U1b 관련 청크 회수·GPT 주입은 아래 범위로 구현했고 Pi 기술 인수까지 마쳤다. 실기기 인수만 남았다.
 
-### U1b — 현재/replay 첨부의 bounded 모델 읽기 ✅ 로컬 구현 완료 (2026-08-04)
+### U1b — 현재/replay 첨부의 bounded 모델 읽기 ✅ Pi 기술 인수 완료 (2026-08-04)
 
 구현:
 
@@ -891,7 +891,10 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 
 - 첨부 문서·도구·GPT 통합·진행 단계 집중 13/13과 로컬 전체 384/384를 통과했다. 후보 session 격리, focused/overview 검색, search → read 순서, 문자 예산, 기존 일정 확인 계약, GPT 실제 tool round를 포함한다.
 - GPT 통합 fixture에서 최초 입력의 원문 0건, 검색 도구 후 관련 청크 전달, 파일명·줄 출처, temporary 답변 자동 topic 저장 0건, 경로·hash 비노출을 확인했다.
-- Pi flag는 아직 `false`이고 schema 11→14 배포·iPhone/iPad 실기기 문서 질문은 남아 있다.
+- Pi DB·Vault 백업 `20260804-1736`과 코드 복구본 `code-attachment-u1-ui-pre-20260804-173651.tar.gz` 뒤 schema 11→14와 `ATTACHMENTS_ENABLED=true`를 적용했다. 배포 파일 36개·정적 서빙 5개 hash가 로컬과 일치한다.
+- Pi 집중 84/84·전체 순차 384/384, note-index 36/36 finding 0, topic 17/17·Q&A 108/108, SQLite integrity `ok`·FK 0을 통과했다. 인증된 multipart 오류 요청은 415로 닫히고 쓰기 0건이었다.
+- 새 PID `189185`, 시작 시각 `2026-08-04 17:39:27 KST`, `active/running`, HTTP 200, 새 journal warning 0건을 확인했다. 배포 전후 messages/notes/note_chunks/auto-save/retrieval `601/36/113/198/159`, task/event/reminder `13/25/4`, Vault hash `b58c03b7...8fed`는 불변이고 새 첨부 5개 테이블은 모두 0행이다.
+- iPhone·iPad에서 실제 MD·TXT·PDF 업로드, 네 가지 U1 질문, 페이지/줄 출처, replay 후속 질문은 남아 있다.
 
 ### U0 — 파일 운반과 저장
 
@@ -917,7 +920,7 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 실행 중 요청·승격 파일은 정리하지 않고 orphan·미참조 blob만 삭제함
 - 모델은 아직 내용을 읽지 않아도 됨
 
-### U1 — 문서 읽기 (로컬 구현 완료 / Pi·실기기 인수 미완료)
+### U1 — 문서 읽기 (Pi 기술 인수 완료 / 실기기 인수 미완료)
 
 구현:
 
