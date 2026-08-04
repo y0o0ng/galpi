@@ -56,12 +56,24 @@ test('every composer control meets the 44px touch target on mobile', () => {
   // 다른 버튼보다 3px 낮게 앉았다.
   // 모바일 규칙은 여러 블록에 흩어져 있다. 어디에 적혔든 걸리면 된다.
   const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
-  for (const id of ['#send-btn', '#voice-hd-button', '#voice-realtime-button']) {
+  for (const id of ['#send-btn', '#attachment-button', '#voice-hd-button', '#voice-realtime-button']) {
     assert.ok(
       new RegExp(`${id}[^{}]*\\{[^}]*height: 44px`, 's').test(mobile),
       `${id}이 44px 규칙에 없다`,
     );
   }
+});
+
+test('temporary attachments keep one shared renderer and a narrow-screen composer wrap', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  assert.match(html, /id="attachment-input"[^>]*type="file"[^>]*hidden/);
+  assert.match(html, /id="attachment-button"[^>]*aria-label="파일 첨부"[^>]*hidden/);
+  assert.ok(html.indexOf('attachment-ui.js') < html.indexOf('app.js'));
+  assert.match(app, /appendUserBubble\(msg\.content, msg\.attachments\)/);
+  assert.match(app, /attachmentIds: \[draftAttachment\.attachmentId\]/);
+  assert.match(app, /useComposerDraft: true/);
+  assert.match(app, /const usesComposerDraft = options\.overrideText == null \|\| options\.useComposerDraft === true/);
+  assert.match(css, /@media \(max-width: 360px\) \{[\s\S]*?#input-area \{[\s\S]*?flex-wrap: wrap/s);
 });
 
 test('the chat column and the composer share one inline padding rule', () => {

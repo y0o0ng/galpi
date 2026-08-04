@@ -92,6 +92,8 @@
           <p class="voice-hd-note">AI 생성 음성 · 시온이 말하는 동안에는 듣지 않아</p>
         </section>
 
+        <div id="attachment-draft" aria-live="polite" hidden></div>
+
         <div id="input-area">
           <div id="assistant-tools">
             <button id="assistant-tools-toggle" type="button" title="XION 도구" aria-label="XION 도구 열기" aria-controls="assistant-tools-menu" aria-expanded="false">
@@ -113,6 +115,12 @@
               <p id="chat-model-status" aria-live="polite"></p>
             </section>
           </div>
+          <input id="attachment-input" type="file" accept=".pdf,.md,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/plain,text/markdown,image/jpeg,image/png,image/webp" hidden>
+          <button id="attachment-button" type="button" title="파일 첨부" aria-label="파일 첨부" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </button>
           <textarea id="input" placeholder="메시지를 입력하세요" rows="1"></textarea>
           <button id="voice-hd-button" type="button" title="XION 음성 대화" aria-label="XION 음성 대화 시작" aria-pressed="false" hidden>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -209,6 +217,7 @@
   <script src="voice-halfduplex.js"></script>
   <script src="voice-halfduplex-ui.js"></script>
   <script src="paper-panel.js"></script>
+  <script src="attachment-ui.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

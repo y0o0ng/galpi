@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
-> Version: 0.4
-> 상태: U0a·U0b 서버 업로드·replay 수명주기 로컬 구현 완료 / Pi 미배포
+> Version: 0.5
+> 상태: U0a~U0c 파일 운반·composer UI 로컬 구현 완료 / Pi 미배포
 > 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -781,7 +781,7 @@ Markdown과 TXT는 페이지 대신 헤딩 또는 줄 범위를 사용한다.
 
 ## 14. 구현 단계
 
-> 순서 경계: U0~U1은 [단일 GPT·모델 라우팅](chat-model-routing-design.md)의 도구 parity와 입력창 model picker가 안정된 뒤 시작한다. U0a·U0b 서버 기반과 replay 수명주기는 로컬에서 끝났고, UI·모델 읽기·Pi 배포는 아직 시작하지 않았다.
+> 순서 경계: U0~U1은 [단일 GPT·모델 라우팅](chat-model-routing-design.md)의 도구 parity와 입력창 model picker가 안정된 뒤 시작한다. U0a~U0c의 파일 운반·replay 수명주기·composer UI는 로컬에서 끝났고, 모델 읽기·Pi 배포는 아직 시작하지 않았다.
 
 ### U0a — 서버 업로드 기반 ✅ 로컬 구현 완료 (2026-08-04)
 
@@ -823,15 +823,34 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 집중 테스트 16/16: 원자적 연결·rollback, replay snapshot, 경계 직전 유지·경계 호출 전 만료, 명시적 재첨부 연장, 실행 lease와 orphan 정리, 다른 session 차단, 원본 크기·SHA 재검증, history tombstone, 모델 입력 원문 0건.
 - 전체 회귀 360/360.
 
+### U0c — composer 업로드·카드 UI ✅ 로컬 구현 완료 (2026-08-04)
+
+구현:
+
+- `ATTACHMENTS_ENABLED`의 공개 config가 켜진 경우에만 입력창 클립 버튼과 숨은 단일 파일 선택기를 노출한다. PDF, MD, TXT, JPG, PNG, WebP accept 목록과 서버 공개 크기 상한으로 즉시 거절할 수 있는 오류만 브라우저에서 먼저 보여주며 서버 검증을 대체하지 않는다.
+- 브라우저가 Markdown처럼 MIME을 비워 보내는 경우에만 알려진 확장자의 허용 MIME으로 보정하고, 기존 MIME이 있으면 서버의 확장자·MIME·내용 검증에 그대로 맡긴다.
+- `public/attachment-ui.js`가 `empty | uploading | ready | error` draft 상태만 소유한다. 업로드는 기존 `apiFetch`를 사용하므로 전역 API 인증을 그대로 통과하고, 업로드 중 취소는 `AbortController`로 끊는다. 완료 뒤 취소한 `uploaded_unattached` 원본은 별도 삭제 API를 만들지 않고 U0a의 60분 orphan 정리에 맡긴다.
+- 업로드 중 일반 전송은 조용히 진행하지 않고 `잠깐만 기다려줘`로 막는다. 준비된 첨부가 있으면 일반 전송과 composer의 `/web` 전송만 `attachmentIds`를 포함하고, 반이중 음성의 `overrideText` 호출은 draft를 소비하지 않는다.
+- 전송 전 draft는 파일명·종류·크기·`업로드 중 | 전송 전 | 전송 실패` 상태와 44px 취소 버튼을 표시한다. 서버 실패 시 draft를 남겨 같은 attachment ID로 재시도할 수 있고, 성공 응답에서 연결 메타데이터를 받은 뒤에만 composer draft를 비운다.
+- 새 사용자 말풍선과 `/api/sessions/:id` history 복원은 같은 `renderMessageAttachments`를 사용한다. 현재 연결은 `임시 첨부`, replay 만료는 다운로드 동작이 없는 점선 `첨부 만료됨` tombstone으로 그린다. 파일명은 `textContent`만 사용한다.
+- polling은 최신 message ID와 노트 저장 상태뿐 아니라 attachment ID·status·expired signature도 비교한다. 새 메시지가 없어도 서버 수명주기가 바뀌면 history를 다시 그려 tombstone을 반영한다.
+- 390px에서는 기존 한 줄 composer를 유지한다. 360px 이하에서만 도구·모델·클립을 첫 줄, 입력·음성·전송을 다음 줄로 접어 44px 동작 타깃과 입력 폭을 함께 보존한다.
+- 이 단계는 미리보기·다운로드 링크를 만들지 않고 원문을 모델에 넣지 않는다. 카드가 생겼다는 사실과 모델이 파일을 읽었다는 의미를 섞지 않는다.
+
+검증:
+
+- 집중 18/18: flag, 단일 업로드와 빈 MIME 보정, 업로드 중 전송 차단·취소, 공통 카드·만료 tombstone, lifecycle polling signature, 인증 업로드·원자적 메시지 연결 회귀.
+- 전체 회귀 366/366.
+- 격리된 scratch DB·Vault·backup과 실제 Chromium 업로드로 확인했다. 390×844 라이트·다크에서 입력 156.4px, 클립·전송 44px, 문서 가로 overflow 0이었다. 320×700 다크에서는 composer가 두 줄로 접혀 입력 238px, 클립·전송 44px, overflow 0이었다. 새 draft 카드와 history 만료 tombstone을 동시에 렌더링했고 console error는 0건이었다.
+
 아직 하지 않은 것:
 
-- 입력창 클립 버튼, 업로드 진행·취소, 전송 전 첨부 카드
-- 브라우저 history에서 attachment metadata를 실제 카드로 렌더링
 - PDF·MD·TXT 파싱과 현재 질문 모델 입력
 - 인증 다운로드·미리보기, library 승격
+- iPhone/iPad 실기기 업로드와 재접속 확인
 - Pi schema 11→13 적용과 운영 flag 활성화
 
-다음 단위는 U0c다. 기존 composer에 단일 파일 선택·업로드·취소·전송 연결을 붙이고, 새 응답과 재접속 history가 같은 attachment 카드/tombstone renderer를 사용하게 한다.
+다음 단위는 U1 문서 읽기다. Pi 배포는 U1과 묶을지 U0 운반만 먼저 실기기 인수할지 배포 직전에 다시 정한다.
 
 ### U0 — 파일 운반과 저장
 

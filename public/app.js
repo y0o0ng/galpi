@@ -195,6 +195,11 @@ async function init() {
       showToast,
       isAnswering: () => isLoading,
     });
+    window.AttachmentUi?.init({
+      apiFetch,
+      showToast,
+      config: config.attachments,
+    });
   } catch (_) {
     initPaperPanel();
     appendError('서버에 연결할 수 없습니다. node server.js가 실행 중인지 확인해주세요.');
@@ -320,6 +325,7 @@ async function refreshWebUsagePill() {
 
 let lastRenderedMsgId = 0;
 let lastRenderedSaveSignature = '';
+let lastRenderedAttachmentSignature = '';
 let renderedSavedMessageIds = new Set();
 
 function getNoteSaveSignature(messages) {
@@ -362,7 +368,7 @@ function renderMessages(messages) {
     messages.forEach(msg => {
       if (msg.role === 'user') {
         lastUserContent = msg.content;
-        appendUserBubble(msg.content);
+        appendUserBubble(msg.content, msg.attachments);
       } else {
         appendHistoryBubble(msg.content, msg.model, msg.id, lastUserContent, msg.noteSaved);
       }
@@ -371,6 +377,7 @@ function renderMessages(messages) {
     isRestoringHistory = false;
   }
   lastRenderedMsgId = messages.length ? (messages[messages.length - 1].id || 0) : 0;
+  lastRenderedAttachmentSignature = window.AttachmentUi?.getMessageSignature(messages) || '';
   syncRenderedSaveButtons(messages);
 }
 
@@ -397,7 +404,16 @@ async function pollForUpdates() {
     if (!messages || messages.length === 0) return;
     const latestId = messages[messages.length - 1].id || 0;
     const saveSignature = getNoteSaveSignature(messages);
-    if (latestId === lastRenderedMsgId && saveSignature === lastRenderedSaveSignature) return;
+    const attachmentSignature = window.AttachmentUi?.getMessageSignature(messages) || '';
+    if (
+      latestId === lastRenderedMsgId
+      && saveSignature === lastRenderedSaveSignature
+      && attachmentSignature === lastRenderedAttachmentSignature
+    ) return;
+    if (latestId === lastRenderedMsgId && attachmentSignature !== lastRenderedAttachmentSignature) {
+      renderMessages(messages);
+      return;
+    }
     if (latestId === lastRenderedMsgId) {
       syncRenderedSaveButtons(messages);
       return;
@@ -644,10 +660,8 @@ function sendMessage() {
   }
   if (text.startsWith('/web ')) {
     const query = text.slice(5).trim();
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
     if (query) {
-      const opts = { overrideText: query, displayText: `/web ${query}`, webSearch: true };
+      const opts = { overrideText: query, displayText: `/web ${query}`, webSearch: true, useComposerDraft: true };
       sendSingleMessage(opts);
     }
     return;
@@ -830,14 +844,25 @@ async function sendSingleMessage(options = {}) {
   const inputEl = document.getElementById('input');
   const text = (options.overrideText ?? inputEl.value).trim();
   if (!text) return { ok: false, reason: 'empty' };
+  const usesComposerDraft = options.overrideText == null || options.useComposerDraft === true;
+  if (usesComposerDraft && window.AttachmentUi?.requireReadyForSend() === false) {
+    return { ok: false, reason: 'busy' };
+  }
+  const draftAttachment = usesComposerDraft
+    ? window.AttachmentUi?.getReadyAttachment() || null
+    : null;
 
-  if (!options.overrideText) inputEl.value = '';
+  if (usesComposerDraft) inputEl.value = '';
   inputEl.style.height = 'auto';
   isLoading = true;
   document.getElementById('send-btn').disabled = true;
   document.querySelector('.welcome')?.remove();
 
-  appendUserBubble(options.displayText || text);
+  const userGroup = appendUserBubble(
+    options.displayText || text,
+    draftAttachment ? [draftAttachment] : [],
+    draftAttachment ? { transientStatus: 'sending' } : {},
+  );
   const loadingEl = appendLoading(PROGRESS_STAGE_LABELS.context);
   document.dispatchEvent(new Event('pet:thinking'));
 
@@ -846,7 +871,16 @@ async function sendSingleMessage(options = {}) {
     const res = await apiFetch('/api/chat', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, model: 'gpt', sessionId, activeNotes, webSearch: !!options.webSearch, source: options.source, progress: true }),
+      body:    JSON.stringify({
+        message: text,
+        model: 'gpt',
+        sessionId,
+        activeNotes,
+        webSearch: !!options.webSearch,
+        source: options.source,
+        progress: true,
+        ...(draftAttachment ? { attachmentIds: [draftAttachment.attachmentId] } : {}),
+      }),
     });
     const data = await readProgressResponse(
       res,
@@ -855,8 +889,18 @@ async function sendSingleMessage(options = {}) {
     );
     loadingEl.remove();
     if (data.error) {
+      if (draftAttachment) {
+        window.AttachmentUi?.renderMessageAttachments(userGroup, [draftAttachment], { transientStatus: 'error' });
+      }
       appendError(data.error);
       return { ok: false, reason: 'error' };
+    }
+    if (draftAttachment) {
+      const linkedAttachments = Array.isArray(data.attachments) && data.attachments.length > 0
+        ? data.attachments
+        : [draftAttachment];
+      window.AttachmentUi?.renderMessageAttachments(userGroup, linkedAttachments);
+      window.AttachmentUi?.clearAfterSend(draftAttachment.attachmentId);
     }
     appendAssistantBubble({ ...data, question: text });
     if (Array.isArray(data.webSources) && data.webSources.length > 0) refreshWebUsagePill();
@@ -865,13 +909,16 @@ async function sendSingleMessage(options = {}) {
     return { ok: true, reply: data.reply || '', spokenRemaining: data.spokenRemaining || '' };
   } catch (_) {
     loadingEl.remove();
+    if (draftAttachment) {
+      window.AttachmentUi?.renderMessageAttachments(userGroup, [draftAttachment], { transientStatus: 'error' });
+    }
     appendError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
     return { ok: false, reason: 'error' };
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
     // 핸즈프리 음성 턴에서 focus를 잡으면 모바일 키보드가 올라온다.
-    if (!options.overrideText) inputEl.focus();
+    if (usesComposerDraft) inputEl.focus();
   }
 }
 
@@ -2921,16 +2968,18 @@ function showWelcome() {
     </div>`;
 }
 
-function appendUserBubble(text) {
+function appendUserBubble(text, attachments = [], attachmentOptions = {}) {
   const group = document.createElement('div');
   group.className = 'msg-group user';
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.textContent = text;
   group.appendChild(bubble);
+  window.AttachmentUi?.renderMessageAttachments(group, attachments, attachmentOptions);
   getMessages().appendChild(group);
   saveUiMessage('user', text);
   scrollDown();
+  return group;
 }
 
 function appendAssistantBubble(data) {

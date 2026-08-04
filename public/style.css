@@ -322,6 +322,10 @@ html, body {
   padding-inline: max(var(--gutter), (100% - var(--reading-width)) / 2);
 }
 
+#attachment-draft {
+  padding-inline: max(var(--gutter), (100% - var(--reading-width)) / 2);
+}
+
 #chat {
   flex: 1;
   overflow-y: auto;
@@ -2871,6 +2875,126 @@ html, body {
   flex-shrink: 0;
 }
 
+#attachment-draft:not([hidden]) {
+  display: grid;
+  gap: 5px;
+  padding-block: 8px 0;
+  background: var(--header-bg);
+  border-top: 1px solid var(--hairline);
+  box-shadow: 0 -1px 0 rgba(0,0,0,0.04), 0 -2px 8px rgba(0,0,0,0.03);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  flex-shrink: 0;
+}
+
+#attachment-draft:not([hidden]) + #input-area {
+  border-top-color: transparent;
+  box-shadow: none;
+}
+
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  min-height: 52px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--ai-bubble);
+  color: var(--ai-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.attachment-card.is-expired {
+  border-style: dashed;
+  box-shadow: none;
+  opacity: 0.72;
+}
+
+.attachment-card.is-error {
+  border-color: var(--danger);
+}
+
+.attachment-card-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font: 750 10px/1 var(--font);
+  letter-spacing: 0.03em;
+}
+
+.attachment-card-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.attachment-card-name {
+  overflow: hidden;
+  color: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-card-meta {
+  color: var(--label);
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+
+.attachment-card.is-error .attachment-card-meta,
+.attachment-draft-error {
+  color: var(--danger);
+}
+
+.attachment-card-remove {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  margin: -3px -4px -3px 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--label);
+  font: 300 24px/1 var(--font);
+  cursor: pointer;
+}
+
+.attachment-card-remove:hover,
+.attachment-card-remove:focus-visible {
+  background: var(--brand-soft);
+  color: var(--ai-text);
+  outline: none;
+}
+
+.attachment-draft-error {
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.message-attachments {
+  display: grid;
+  gap: 5px;
+  width: min(78%, 420px);
+  margin-top: 4px;
+}
+
+.msg-group.user .message-attachments {
+  align-self: flex-end;
+}
+
 #assistant-tools {
   position: relative;
   flex: 0 0 auto;
@@ -2879,6 +3003,40 @@ html, body {
 #chat-model-control {
   position: relative;
   flex: 0 0 auto;
+}
+
+#attachment-button {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--brand-ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition: background 0.15s var(--ease-out), transform 0.15s var(--ease-spring);
+}
+
+#attachment-button[hidden] {
+  display: none;
+}
+
+#attachment-button:hover,
+#attachment-button:focus-visible {
+  background: var(--brand-soft);
+  outline: none;
+}
+
+#attachment-button:active {
+  transform: scale(0.92);
+}
+
+#attachment-button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 #chat-model-button {
@@ -3281,10 +3439,19 @@ body[data-active-model="council"] #send-btn {
     height: 44px;
   }
 
+  #attachment-button {
+    width: 44px;
+    height: 44px;
+  }
+
   #voice-realtime-button,
   #voice-hd-button {
     width: 44px;
     height: 44px;
+  }
+
+  .message-attachments {
+    width: min(88%, 420px);
   }
 
   #voice-realtime-panel {
@@ -3304,6 +3471,23 @@ body[data-active-model="council"] #send-btn {
   .voice-realtime-disclosure {
     flex: 1 0 100%;
   }
+}
+
+@media (max-width: 360px) {
+  #input-area {
+    flex-wrap: wrap;
+  }
+
+  #assistant-tools { order: 1; }
+  #chat-model-control { order: 2; }
+  #attachment-button { order: 3; }
+  #input {
+    order: 4;
+    flex-basis: calc(100% - 100px);
+  }
+  #voice-hd-button,
+  #voice-realtime-button { order: 5; }
+  #send-btn { order: 6; }
 }
 
 /* ── 토스트 알림 ────────────────────────────────────────── */

@@ -68,7 +68,7 @@
 - H6의 동일 request ID iPhone 재시도·화면 소등 10회 기준·추가 기기 등록은 더 진행하지 않는다. bounded 3턴은 현재 단축어와 `shared-main`으로 유지하고 별도 server conversation 상태를 추가하지 않는다. 남은 음성 후보인 침묵 1200→1000ms, earcon, H3 되묻기는 각각 필요성이 생길 때만 별도 변경으로 연다.
 - 상시 관찰: 새 `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 10회 표시, 다음 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 - V5-A 딜 스카우트는 수익 모델 불확실성 때문에 2026-08-04 잠정보류했다. 계정 신청·API 키·코드·외부 게시를 시작하지 않으며, 보류를 이유로 V5-B 주식 분석을 자동 착수하지 않는다. 다음 제품 작업은 별도로 선택한다.
-- 첨부 U0a·U0b는 로컬 구현 완료·Pi 미배포다. schema v12 업로드와 v13 메시지 연결, `CONTEXT_N` snapshot·실행 lease·모델 호출 전 만료가 있고 원문은 아직 모델에 넣지 않는다. flag 기본값은 `false`다. 다음은 U0c composer 업로드·취소·카드 UI이며 library 승격은 명시적 승인 뒤에만 한다. 강의는 미구현이다.
+- 첨부 U0a~U0c는 로컬 구현 완료·Pi 미배포다. schema v12~13 업로드·메시지 연결·replay 수명주기와 composer 단일 업로드·취소·공통 카드/tombstone이 있고 원문은 아직 모델에 넣지 않는다. flag 기본값은 `false`다. 다음은 U1 PDF·MD·TXT 읽기이며 library 승격은 명시적 승인 뒤에만 한다. 강의는 미구현이다.
 
 ## 구조 방향
 
