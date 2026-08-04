@@ -3414,6 +3414,11 @@ html, body {
   box-shadow: 0 2px 8px var(--brand-shadow);
 }
 
+#voice-hd-button {
+  background: transparent;
+  box-shadow: none;
+}
+
 #send-btn[hidden],
 #voice-hd-button[hidden],
 #voice-realtime-button[hidden] {
@@ -3421,16 +3426,13 @@ html, body {
 }
 
 #send-btn:hover:not(:disabled),
-#voice-hd-button:hover:not(:disabled),
 #voice-realtime-button:hover:not(:disabled),
-#voice-hd-button[aria-pressed="true"],
 #voice-realtime-button[aria-pressed="true"] {
   filter: brightness(1.08);
   transform: scale(1.04);
 }
 
 #send-btn:active:not(:disabled),
-#voice-hd-button:active:not(:disabled),
 #voice-realtime-button:active:not(:disabled) {
   transform: scale(0.91);
 }
@@ -3450,37 +3452,36 @@ html, body {
   box-shadow: none;
 }
 
-.composer-voice-wave {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  width: 22px;
-  height: 22px;
+.composer-voice-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: var(--brand-on);
+  box-shadow: 0 2px 8px var(--brand-shadow);
+  transition: filter 0.2s var(--ease-out), transform 0.15s var(--ease-spring), box-shadow 0.2s;
 }
 
-.composer-voice-wave i {
+.composer-voice-mark .xion-mark-icon {
+  width: 17px;
+  height: 17px;
   display: block;
-  width: 2px;
-  border-radius: 999px;
-  background: currentColor;
 }
 
-.composer-voice-wave i:nth-child(1) { height: 8px; }
-.composer-voice-wave i:nth-child(2) { height: 17px; }
-.composer-voice-wave i:nth-child(3) { height: 22px; }
-.composer-voice-wave i:nth-child(4) { height: 12px; }
-
-#voice-hd-button[aria-pressed="true"] .composer-voice-wave i {
-  animation: composer-wave 0.9s ease-in-out infinite alternate;
+#voice-hd-button:hover:not(:disabled) .composer-voice-mark,
+#voice-hd-button[aria-pressed="true"] .composer-voice-mark {
+  filter: brightness(1.08);
+  transform: scale(1.04);
 }
 
-#voice-hd-button[aria-pressed="true"] .composer-voice-wave i:nth-child(2) { animation-delay: -0.45s; }
-#voice-hd-button[aria-pressed="true"] .composer-voice-wave i:nth-child(3) { animation-delay: -0.2s; }
-#voice-hd-button[aria-pressed="true"] .composer-voice-wave i:nth-child(4) { animation-delay: -0.65s; }
+#voice-hd-button:active:not(:disabled) .composer-voice-mark {
+  transform: scale(0.92);
+}
 
-@keyframes composer-wave {
-  to { transform: scaleY(0.48); }
+#voice-hd-button[aria-pressed="true"] .composer-voice-mark {
+  box-shadow: 0 0 0 3px var(--brand-ring), 0 2px 8px var(--brand-shadow);
 }
 
 body[data-active-model="claude"] #send-btn {
@@ -3556,6 +3557,11 @@ body[data-active-model="council"] #send-btn {
   #voice-realtime-button {
     width: 44px;
     height: 44px;
+  }
+
+  .composer-voice-mark {
+    width: 38px;
+    height: 38px;
   }
 
   .message-attachments {
@@ -4012,6 +4018,5 @@ body[data-active-model="council"] #send-btn {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-hd-dot,
-  .composer-voice-wave i { animation: none !important; }
+  .voice-hd-dot { animation: none !important; }
 }

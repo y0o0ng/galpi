@@ -97,6 +97,20 @@ test('empty input offers half-duplex voice and typed input offers send', () => {
   assert.match(app, /addEventListener\('input',[\s\S]*?updateComposerPrimaryAction\(\)/);
 });
 
+test('half-duplex voice uses the XION mark without shrinking its touch target', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  assert.match(
+    html,
+    /id="voice-hd-button"[\s\S]*?<span class="composer-voice-mark"[^>]*>[\s\S]*?<span class="xion-mark-icon"><\/span>/,
+  );
+  assert.doesNotMatch(html, /composer-voice-wave/);
+  assert.match(css, /\.composer-voice-mark \{[^}]*width: 36px;[^}]*height: 36px/s);
+  assert.match(css, /\.composer-voice-mark \.xion-mark-icon \{[^}]*width: 17px;[^}]*height: 17px/s);
+
+  const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
+  assert.match(mobile, /\.composer-voice-mark \{[^}]*width: 38px;[^}]*height: 38px/s);
+});
+
 test('the chat column and the composer share one inline padding rule', () => {
   // 따로 적어두면 다시 어긋난다. 한 규칙에 묶어 같은 세로선을 강제한다.
   assert.match(
