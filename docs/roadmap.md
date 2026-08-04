@@ -455,7 +455,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 ### 첨부·강의 병행 lane
 
 - 일반 첨부 U0~U1은 V4.5-M의 도구 parity와 입력창 model picker가 안정된 뒤 병행할 수 있다. 상세는 [첨부파일 업로드·검색 설계](galpi-attachment-upload-design.md)다.
-- U0a~U0c는 2026-08-04 로컬 구현을 마쳤다. schema v12~13 업로드·message 연결·replay 수명주기와 composer 단일 업로드·취소·공통 카드/tombstone을 구현했고 전체 회귀 366/366, Chromium 390px·320px overflow 0을 통과했다. 첨부 원문은 아직 모델에 보내지 않고 flag 기본값은 `false`이며 Pi에는 미배포다. 다음은 U1 PDF·MD·TXT 읽기다.
+- U0a~U0c는 2026-08-04 로컬 구현을 마쳤다. schema v12~13 업로드·message 연결·replay 수명주기와 composer 단일 업로드·취소·공통 카드/tombstone을 구현했다. composer는 위 입력·아래 도구의 두 줄 구조로 정리해 첨부를 `+` 메뉴에 넣고, 빈 입력은 반이중 음성·입력값이 생기면 같은 자리의 전송 버튼을 쓴다. 전체 회귀 367/367과 Chromium 390px·320px overflow 0을 통과했다. 첨부 원문은 아직 모델에 보내지 않고 flag 기본값은 `false`이며 Pi에는 미배포다. 다음은 U1 PDF·MD·TXT 읽기다.
 - temporary 첨부는 연결 시 현재 `CONTEXT_N`을 `replay_window_turns`로 snapshot한다. 현재 로컬·Pi 값은 사용자 턴 10개이며, origin turn이 창에서 밀려나는 다음 사용자 턴의 모델 호출 전에 만료·비동기 삭제한다.
 - `CONTEXT_N`을 나중에 5로 바꾸면 새 첨부부터 5턴을 쓰며 기존 첨부에는 소급하지 않는다. 자연어 재언급은 수명을 늘리지 않고 명시적 `다시 첨부`만 새 연결을 만든다.
 - library는 명시적 승인 뒤 Vault로 승격하고 자동 만료하지 않는다. 미연결 upload는 60분 orphan TTL로 정리한다.

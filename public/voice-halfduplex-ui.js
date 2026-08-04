@@ -17,6 +17,7 @@
     const elements = {};
     let core = null;
     let showToast = () => {};
+    let onPhaseChange = () => {};
 
     function el(id) {
       if (!(id in elements)) elements[id] = global.document.getElementById(id);
@@ -39,16 +40,23 @@
       }
       const panel = el('voice-hd-panel');
       if (panel) panel.hidden = phase === 'idle';
+      onPhaseChange(phase);
     }
 
     function init({
       config, apiFetch, showToast: toast = () => {}, askAssistant, pendingConfirmation,
+      onPhaseChange: phaseChange = () => {},
     } = {}) {
       showToast = toast;
+      onPhaseChange = phaseChange;
       core = global.VoiceHalfDuplex;
       const button = el('voice-hd-button');
       if (!core || !config?.halfDuplexEnabled) {
-        if (button) button.hidden = true;
+        if (button) {
+          button.dataset.available = 'false';
+          button.hidden = true;
+        }
+        onPhaseChange('idle');
         return;
       }
 
@@ -68,6 +76,7 @@
       });
 
       if (button) {
+        button.dataset.available = 'true';
         button.hidden = false;
         button.addEventListener('click', () => {
           if (core.getState().active) core.stop();

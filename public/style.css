@@ -2869,10 +2869,48 @@ html, body {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   padding-block: 8px 10px;
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
+  display: block;
   flex-shrink: 0;
+}
+
+#composer-shell {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--ai-bubble);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out);
+}
+
+#composer-shell:focus-within {
+  border-color: var(--brand-border);
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+#composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 50px;
+  padding: 1px 5px 5px 6px;
+}
+
+#composer-tools,
+#composer-primary-action {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+#composer-tools {
+  gap: 2px;
+}
+
+#composer-primary-action {
+  flex: 0 0 44px;
+  justify-content: flex-end;
 }
 
 #attachment-draft:not([hidden]) {
@@ -3006,18 +3044,20 @@ html, body {
 }
 
 #attachment-button {
-  width: 38px;
-  height: 38px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 9px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
-  color: var(--brand-ink);
+  color: var(--ai-text);
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  transition: background 0.15s var(--ease-out), transform 0.15s var(--ease-spring);
+  gap: 9px;
+  font: 600 13px/1 var(--font);
+  text-align: left;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
 }
 
 #attachment-button[hidden] {
@@ -3027,11 +3067,12 @@ html, body {
 #attachment-button:hover,
 #attachment-button:focus-visible {
   background: var(--brand-soft);
+  color: var(--brand-ink);
   outline: none;
 }
 
 #attachment-button:active {
-  transform: scale(0.92);
+  background: var(--brand-soft-strong);
 }
 
 #attachment-button:disabled {
@@ -3045,7 +3086,7 @@ html, body {
   justify-content: center;
   gap: 5px;
   min-width: 0;
-  height: 44px;
+  height: 40px;
   padding: 0 8px;
   border: none;
   border-radius: 10px;
@@ -3211,10 +3252,10 @@ html, body {
 }
 
 #assistant-tools-toggle {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border: none;
-  border-radius: 12px;
+  border-radius: 50%;
   background: transparent;
   color: var(--brand-ink);
   cursor: pointer;
@@ -3239,11 +3280,30 @@ html, body {
 }
 
 .assistant-tools-icon {
-  width: 24px;
-  height: 24px;
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.assistant-tools-icon::before,
+.assistant-tools-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 1px;
   background: currentColor;
-  -webkit-mask: url('/lib/icons/Xion/xion-mark.svg') center / contain no-repeat;
-  mask: url('/lib/icons/Xion/xion-mark.svg') center / contain no-repeat;
+  transform: translate(-50%, -50%);
+}
+
+.assistant-tools-icon::before {
+  width: 16px;
+  height: 2px;
+}
+
+.assistant-tools-icon::after {
+  width: 2px;
+  height: 16px;
 }
 
 #assistant-tools-menu {
@@ -3269,7 +3329,7 @@ html, body {
 
 .assistant-tools-group {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
 }
 
@@ -3315,32 +3375,32 @@ html, body {
 }
 
 #input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   resize: none;
-  border: 1.5px solid var(--border);
-  border-radius: 20px;
-  padding: 8px 14px;
+  border: 0;
+  border-radius: 22px 22px 0 0;
+  padding: 12px 14px 5px;
   font-family: var(--font);
   font-size: 15px;
   line-height: 1.4;
   outline: none;
-  min-height: 40px;
+  min-height: 46px;
   max-height: 130px;
   overflow-y: auto;
-  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out), background 0.25s;
-  background: var(--ai-bubble);
+  background: transparent;
   color: var(--ai-text);
 }
 
 #input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--brand-ring);
+  box-shadow: none;
 }
 
-#send-btn {
-  width: 38px;
-  height: 38px;
+#send-btn,
+#voice-hd-button,
+#voice-realtime-button {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: var(--brand);
@@ -3349,54 +3409,78 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   transition: background 0.2s var(--ease-out), opacity 0.15s, transform 0.15s var(--ease-spring), box-shadow 0.2s;
   box-shadow: 0 2px 8px var(--brand-shadow);
 }
 
-#voice-hd-button,
-#voice-realtime-button {
-  width: 38px;
-  height: 38px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--brand-ink);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.15s var(--ease-out), transform 0.15s var(--ease-spring);
-}
-
+#send-btn[hidden],
 #voice-hd-button[hidden],
 #voice-realtime-button[hidden] {
   display: none;
 }
 
+#send-btn:hover:not(:disabled),
 #voice-hd-button:hover:not(:disabled),
-#voice-hd-button[aria-pressed="true"],
 #voice-realtime-button:hover:not(:disabled),
+#voice-hd-button[aria-pressed="true"],
 #voice-realtime-button[aria-pressed="true"] {
-  background: var(--brand-soft-strong);
+  filter: brightness(1.08);
+  transform: scale(1.04);
 }
 
+#send-btn:active:not(:disabled),
 #voice-hd-button:active:not(:disabled),
 #voice-realtime-button:active:not(:disabled) {
   transform: scale(0.91);
 }
 
+#send-btn:focus-visible,
 #voice-hd-button:focus-visible,
 #voice-realtime-button:focus-visible {
   outline: 2px solid var(--brand-ink);
   outline-offset: 2px;
 }
 
+#send-btn:disabled,
 #voice-hd-button:disabled,
 #voice-realtime-button:disabled {
   cursor: default;
   opacity: 0.45;
+  box-shadow: none;
+}
+
+.composer-voice-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 22px;
+  height: 22px;
+}
+
+.composer-voice-wave i {
+  display: block;
+  width: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.composer-voice-wave i:nth-child(1) { height: 8px; }
+.composer-voice-wave i:nth-child(2) { height: 17px; }
+.composer-voice-wave i:nth-child(3) { height: 22px; }
+.composer-voice-wave i:nth-child(4) { height: 12px; }
+
+#voice-hd-button[aria-pressed="true"] .composer-voice-wave i {
+  animation: composer-wave 0.9s ease-in-out infinite alternate;
+}
+
+#voice-hd-button[aria-pressed="true"] .composer-voice-wave i:nth-child(2) { animation-delay: -0.45s; }
+#voice-hd-button[aria-pressed="true"] .composer-voice-wave i:nth-child(3) { animation-delay: -0.2s; }
+#voice-hd-button[aria-pressed="true"] .composer-voice-wave i:nth-child(4) { animation-delay: -0.65s; }
+
+@keyframes composer-wave {
+  to { transform: scaleY(0.48); }
 }
 
 body[data-active-model="claude"] #send-btn {
@@ -3414,39 +3498,23 @@ body[data-active-model="council"] #send-btn {
   box-shadow: 0 2px 8px var(--brand-shadow);
 }
 
-#send-btn:hover:not(:disabled) {
-  filter: brightness(1.08);
-  transform: scale(1.04);
-}
-
-#send-btn:active:not(:disabled) { transform: scale(0.91); }
-#send-btn:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
-
 @media (max-width: 640px) {
   #input-area {
-    gap: 6px;
-    align-items: flex-end;
     padding-block: 8px max(10px, env(safe-area-inset-bottom));
   }
 
   #input {
-    min-height: 44px;
-    padding: 10px 13px;
+    min-height: 46px;
+    padding: 12px 13px 5px;
   }
 
-  #send-btn {
+  #assistant-tools-toggle {
     width: 44px;
     height: 44px;
   }
 
-  #attachment-button {
-    width: 44px;
-    height: 44px;
-  }
-
-  #voice-realtime-button,
-  #voice-hd-button {
-    width: 44px;
+  #chat-model-button {
+    width: auto;
     height: 44px;
   }
 
@@ -3471,23 +3539,6 @@ body[data-active-model="council"] #send-btn {
   .voice-realtime-disclosure {
     flex: 1 0 100%;
   }
-}
-
-@media (max-width: 360px) {
-  #input-area {
-    flex-wrap: wrap;
-  }
-
-  #assistant-tools { order: 1; }
-  #chat-model-control { order: 2; }
-  #attachment-button { order: 3; }
-  #input {
-    order: 4;
-    flex-basis: calc(100% - 100px);
-  }
-  #voice-hd-button,
-  #voice-realtime-button { order: 5; }
-  #send-btn { order: 6; }
 }
 
 /* ── 토스트 알림 ────────────────────────────────────────── */
@@ -3921,5 +3972,6 @@ body[data-active-model="council"] #send-btn {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-hd-dot { animation: none !important; }
+  .voice-hd-dot,
+  .composer-voice-wave i { animation: none !important; }
 }

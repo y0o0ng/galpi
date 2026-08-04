@@ -163,9 +163,25 @@ function showTokenGate() {
 
 // ─── 초기화 ──────────────────────────────────────────────────────────────────
 
+function updateComposerPrimaryAction() {
+  const input = document.getElementById('input');
+  const voice = document.getElementById('voice-hd-button');
+  const send = document.getElementById('send-btn');
+  if (!input || !voice || !send) return;
+
+  const hasText = input.value.trim().length > 0;
+  const voiceAvailable = voice.dataset.available === 'true';
+  // 대화 중에는 입력값이 생겨도 종료 버튼을 치우지 않는다.
+  const voiceActive = voice.getAttribute('aria-pressed') === 'true';
+  const showVoice = voiceAvailable && (!hasText || voiceActive);
+  voice.hidden = !showVoice;
+  send.hidden = showVoice;
+}
+
 async function init() {
   showWelcome();
   document.body.dataset.activeModel = 'gpt';
+  updateComposerPrimaryAction();
 
   try {
     const config = await apiFetch('/api/config').then(r => r.json());
@@ -189,6 +205,7 @@ async function init() {
         sendSingleMessage({ overrideText: transcript, source: 'voice', onSpeech }),
       // 말로 등록·취소할 때 음성이 새 요청을 만들지 않고 카드 버튼과 같은 경로를 부른다.
       pendingConfirmation: () => window.TaskPanel?.getPendingScheduleConfirmation() || null,
+      onPhaseChange: updateComposerPrimaryAction,
     });
     window.ChatModelPicker?.init({
       apiFetch,
@@ -215,6 +232,7 @@ async function init() {
   document.getElementById('input').addEventListener('input', e => {
     autoResize(e);
     updateCommandPalette(e.target.value);
+    updateComposerPrimaryAction();
   });
 
   document.addEventListener('click', e => {
@@ -263,6 +281,10 @@ function initAssistantTools() {
     setAssistantToolsOpen(menu.hidden);
   });
 
+  document.getElementById('attachment-button')?.addEventListener('click', () => {
+    setAssistantToolsOpen(false);
+  });
+
   document.addEventListener('click', event => {
     if (!event.target.closest('#assistant-tools')) setAssistantToolsOpen(false);
   });
@@ -280,7 +302,7 @@ function setAssistantToolsOpen(open) {
   if (!toggle || !menu) return;
   menu.hidden = !open;
   toggle.setAttribute('aria-expanded', String(open));
-  toggle.setAttribute('aria-label', open ? 'XION 도구 닫기' : 'XION 도구 열기');
+  toggle.setAttribute('aria-label', open ? '도구 및 파일 닫기' : '도구 및 파일 추가');
 }
 
 function runAssistantTool(command) {
@@ -616,6 +638,8 @@ function saveActiveNotes() {
 function sendMessage() {
   const inputEl = document.getElementById('input');
   const text = inputEl.value.trim();
+  // 명령 경로마다 입력값을 비우는 위치는 달라도 한 번의 전송이 끝나면 액션은 재계산한다.
+  queueMicrotask(updateComposerPrimaryAction);
   hideCommandPalette();
   if (text === '/task' || text.startsWith('/task ')) {
     inputEl.value = '';

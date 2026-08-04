@@ -827,21 +827,21 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 
 구현:
 
-- `ATTACHMENTS_ENABLED`의 공개 config가 켜진 경우에만 입력창 클립 버튼과 숨은 단일 파일 선택기를 노출한다. PDF, MD, TXT, JPG, PNG, WebP accept 목록과 서버 공개 크기 상한으로 즉시 거절할 수 있는 오류만 브라우저에서 먼저 보여주며 서버 검증을 대체하지 않는다.
+- `ATTACHMENTS_ENABLED`의 공개 config가 켜진 경우에만 입력창 `+` 메뉴의 `파일 첨부` 항목과 숨은 단일 파일 선택기를 노출한다. PDF, MD, TXT, JPG, PNG, WebP accept 목록과 서버 공개 크기 상한으로 즉시 거절할 수 있는 오류만 브라우저에서 먼저 보여주며 서버 검증을 대체하지 않는다.
 - 브라우저가 Markdown처럼 MIME을 비워 보내는 경우에만 알려진 확장자의 허용 MIME으로 보정하고, 기존 MIME이 있으면 서버의 확장자·MIME·내용 검증에 그대로 맡긴다.
 - `public/attachment-ui.js`가 `empty | uploading | ready | error` draft 상태만 소유한다. 업로드는 기존 `apiFetch`를 사용하므로 전역 API 인증을 그대로 통과하고, 업로드 중 취소는 `AbortController`로 끊는다. 완료 뒤 취소한 `uploaded_unattached` 원본은 별도 삭제 API를 만들지 않고 U0a의 60분 orphan 정리에 맡긴다.
 - 업로드 중 일반 전송은 조용히 진행하지 않고 `잠깐만 기다려줘`로 막는다. 준비된 첨부가 있으면 일반 전송과 composer의 `/web` 전송만 `attachmentIds`를 포함하고, 반이중 음성의 `overrideText` 호출은 draft를 소비하지 않는다.
 - 전송 전 draft는 파일명·종류·크기·`업로드 중 | 전송 전 | 전송 실패` 상태와 44px 취소 버튼을 표시한다. 서버 실패 시 draft를 남겨 같은 attachment ID로 재시도할 수 있고, 성공 응답에서 연결 메타데이터를 받은 뒤에만 composer draft를 비운다.
 - 새 사용자 말풍선과 `/api/sessions/:id` history 복원은 같은 `renderMessageAttachments`를 사용한다. 현재 연결은 `임시 첨부`, replay 만료는 다운로드 동작이 없는 점선 `첨부 만료됨` tombstone으로 그린다. 파일명은 `textContent`만 사용한다.
 - polling은 최신 message ID와 노트 저장 상태뿐 아니라 attachment ID·status·expired signature도 비교한다. 새 메시지가 없어도 서버 수명주기가 바뀌면 history를 다시 그려 tombstone을 반영한다.
-- 390px에서는 기존 한 줄 composer를 유지한다. 360px 이하에서만 도구·모델·클립을 첫 줄, 입력·음성·전송을 다음 줄로 접어 44px 동작 타깃과 입력 폭을 함께 보존한다.
+- composer는 화면 폭과 무관하게 위 입력·아래 도구의 두 줄 구조를 쓴다. 보조 기능과 파일 첨부는 왼쪽 `+` 메뉴로 접고 모델 선택만 아래 왼쪽에 남긴다. 아래 오른쪽의 단일 44px 자리는 빈 입력일 때 반이중 음성, 입력값이 생기면 전송으로 바뀐다. 음성 루프가 이미 동작 중이면 종료 동작을 잃지 않도록 음성 버튼을 유지한다.
 - 이 단계는 미리보기·다운로드 링크를 만들지 않고 원문을 모델에 넣지 않는다. 카드가 생겼다는 사실과 모델이 파일을 읽었다는 의미를 섞지 않는다.
 
 검증:
 
 - 집중 18/18: flag, 단일 업로드와 빈 MIME 보정, 업로드 중 전송 차단·취소, 공통 카드·만료 tombstone, lifecycle polling signature, 인증 업로드·원자적 메시지 연결 회귀.
-- 전체 회귀 366/366.
-- 격리된 scratch DB·Vault·backup과 실제 Chromium 업로드로 확인했다. 390×844 라이트·다크에서 입력 156.4px, 클립·전송 44px, 문서 가로 overflow 0이었다. 320×700 다크에서는 composer가 두 줄로 접혀 입력 238px, 클립·전송 44px, overflow 0이었다. 새 draft 카드와 history 만료 tombstone을 동시에 렌더링했고 console error는 0건이었다.
+- 전체 회귀 367/367.
+- 격리된 scratch DB·Vault·backup과 실제 Chromium 업로드로 새 draft 카드와 history 만료 tombstone, console error 0건을 확인했다. 후속 composer 정리에서는 390×844와 320×700 모두 문서 가로 overflow 0, 빈 입력의 음성 버튼과 입력 뒤 같은 위치의 전송 버튼 44px, `+` 메뉴의 파일 첨부, 라이트·다크 테마를 확인했다.
 
 아직 하지 않은 것:
 

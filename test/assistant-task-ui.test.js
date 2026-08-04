@@ -36,7 +36,7 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.match(html, /class="model-logo-icon xion-mark-icon"[^>]*>[\s\S]*?XION/);
   assert.match(html, /id="chat-model-button"[^>]*aria-haspopup="listbox"[^>]*aria-expanded="false"/);
   assert.match(html, /id="chat-model-options" role="listbox" aria-label="GPT 모델"/);
-  assert.match(html, /id="input" placeholder="메시지를 입력하세요"/);
+  assert.match(html, /id="input" placeholder="시온에게 물어보세요"/);
   assert.doesNotMatch(html, /council-btn|council-mode-toggle|Claude 크레딧/);
   assert.match(html, /id="assistant-tools-toggle"[^>]*aria-controls="assistant-tools-menu"[^>]*aria-expanded="false"/);
   assert.match(html, /id="assistant-tools-menu" aria-label="XION 도구" hidden/);
@@ -45,12 +45,13 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.match(appSource, /function initAssistantTools\(\)/);
   assert.match(appSource, /if \(!command\.endsWith\(' '\)\) sendMessage\(\)/);
   assert.match(appSource, /DOMContentLoaded[\s\S]*initAssistantTools\(\)/);
-  assert.match(css, /#assistant-tools-toggle\s*{[^}]*width: 44px;[^}]*height: 44px/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#assistant-tools-toggle\s*{[^}]*width: 44px;[^}]*height: 44px/s);
   assert.match(css, /#assistant-tools-menu\s*{[^}]*bottom: calc\(100% \+ 10px\)[^}]*max-height:/s);
-  assert.match(css, /#chat-model-button\s*{[^}]*height: 44px;[^}]*border: none/s);
+  assert.match(css, /#chat-model-button\s*{[^}]*height: 40px;[^}]*border: none/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#chat-model-button\s*{[^}]*height: 44px/s);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#chat-model-menu\s*{[^}]*position: fixed/s);
   assert.match(css, /#input\s*{[^}]*min-width: 0/s);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#send-btn\s*{[^}]*width: 44px;[^}]*height: 44px/s);
+  assert.match(css, /#send-btn,\s*#voice-hd-button,\s*#voice-realtime-button\s*{[^}]*width: 44px;[^}]*height: 44px/s);
   assert.match(modelPickerSource, /If-Match/);
   assert.match(modelPickerSource, /appliesFrom|다음 답변부터/);
   assert.ok(notificationIndex > 0 && notificationIndex < taskIndex);

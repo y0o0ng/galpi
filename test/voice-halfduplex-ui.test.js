@@ -41,6 +41,7 @@ function loadUi({ halfDuplexEnabled = true } = {}) {
   ];
   const elements = Object.fromEntries(ids.map(id => [id, fakeElement(id)]));
   const coreCalls = [];
+  const phaseChanges = [];
   let coreState = { phase: 'idle', active: false };
   let hooks = {};
 
@@ -72,24 +73,29 @@ function loadUi({ halfDuplexEnabled = true } = {}) {
       asks.push(transcript);
       return { ok: true, reply: '알겠어.' };
     },
+    onPhaseChange: phase => phaseChanges.push(phase),
   });
 
-  return { elements, coreCalls, asks, ui: fakeWindow.VoiceHalfDuplexUi, hooks };
+  return { elements, coreCalls, asks, phaseChanges, ui: fakeWindow.VoiceHalfDuplexUi, hooks };
 }
 
 test('the panel stays hidden and the button never appears while the flag is off', () => {
-  const { elements, coreCalls } = loadUi({ halfDuplexEnabled: false });
+  const { elements, coreCalls, phaseChanges } = loadUi({ halfDuplexEnabled: false });
 
   assert.equal(elements['voice-hd-button'].hidden, true);
+  assert.equal(elements['voice-hd-button'].dataset.available, 'false');
   assert.deepEqual(coreCalls, []);
+  assert.deepEqual(phaseChanges, ['idle']);
   // 반이중이 꺼져 있으면 기존 Realtime 버튼을 건드리지 않는다.
   assert.equal(elements['voice-realtime-button'].hidden, false);
 });
 
 test('only one microphone button is offered once half-duplex is on', () => {
-  const { elements } = loadUi();
+  const { elements, phaseChanges } = loadUi();
 
   assert.equal(elements['voice-hd-button'].hidden, false);
+  assert.equal(elements['voice-hd-button'].dataset.available, 'true');
+  assert.deepEqual(phaseChanges, ['idle']);
   // 같은 아이콘이 둘이면 어느 쪽이 반이중인지 고를 수 없다.
   assert.equal(elements['voice-realtime-button'].hidden, true);
 });
