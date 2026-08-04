@@ -227,6 +227,53 @@ test('attachment lease rejects cross-session reuse and changed source bytes', as
   );
 });
 
+test('library promotion lease blocks replay expiry and accepts an idempotent library retry', async t => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'attachment-library-lease-'));
+  const tmpDir = path.join(root, 'tmp');
+  await fsp.mkdir(tmpDir, { recursive: true });
+  const db = createDatabase();
+  const attachmentId = 'att_66666666666666666666666666666666';
+  await seedAttachment(db, tmpDir, { id: attachmentId, content: '승격할 문서' });
+  const lifecycle = createAttachmentLifecycleService(db, {
+    enabled: true,
+    tmpDir,
+    replayWindowTurns: 1,
+  });
+  t.after(async () => {
+    db.close();
+    await fsp.rm(root, { recursive: true, force: true });
+  });
+
+  const chatLease = await lifecycle.beginChatRequest({
+    sessionId: 'shared-main',
+    attachmentIds: [attachmentId],
+  });
+  insertTurn(db, lifecycle, { attachmentIds: chatLease.attachmentIds, text: '첫 턴' });
+  chatLease.release();
+  insertTurn(db, lifecycle, { text: '둘째 턴' });
+
+  const promotionLease = await lifecycle.beginLibraryPromotion({
+    sessionId: 'shared-main',
+    attachmentId,
+  });
+  assert.equal(promotionLease.alreadyLibrary, false);
+  assert.equal(lifecycle.isAttachmentActive(attachmentId), true);
+  assert.equal(lifecycle.expireBeforeUpcomingTurn('shared-main').expired, 0);
+  db.prepare(`
+    UPDATE attachments SET scope = 'library', lifecycle_status = 'library'
+    WHERE id = ?
+  `).run(attachmentId);
+  promotionLease.release();
+
+  const retry = await lifecycle.beginLibraryPromotion({ sessionId: 'shared-main', attachmentId });
+  assert.equal(retry.alreadyLibrary, true);
+  assert.equal(lifecycle.isAttachmentActive(attachmentId), false);
+  await assert.rejects(
+    lifecycle.beginLibraryPromotion({ sessionId: 'other-session', attachmentId }),
+    error => error.code === 'ATTACHMENT_SESSION_MISMATCH',
+  );
+});
+
 test('missing attachment lease rolls back both messages and linkage', async t => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'attachment-lifecycle-rollback-'));
   const tmpDir = path.join(root, 'tmp');

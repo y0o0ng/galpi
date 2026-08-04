@@ -43,8 +43,10 @@
   function setupModule() {
     let apiFetch = global.fetch?.bind(global);
     let showToast = () => {};
+    let getSessionId = () => 'shared-main';
     let config = null;
     let controller = null;
+    const promotingIds = new Set();
     let state = { phase: 'empty', attachment: null, file: null, error: '' };
 
     const el = id => global.document.getElementById(id);
@@ -81,8 +83,42 @@
       if (transientStatus === 'sending') return '보내는 중';
       if (transientStatus === 'error') return '전송 실패';
       if (attachment?.expired || attachment?.status === 'expired') return '첨부 만료됨';
+      if (attachment?.status === 'library') return '서재 저장됨';
+      if (attachment?.status === 'promoting') return '서재 저장 중';
       if (attachment?.status === 'uploaded_unattached') return '전송 전';
       return '임시 첨부';
+    }
+
+    async function promoteAttachment(attachment, meta, button) {
+      const attachmentId = String(attachment?.attachmentId || '');
+      if (!attachmentId || promotingIds.has(attachmentId)) return;
+      promotingIds.add(attachmentId);
+      button.disabled = true;
+      button.textContent = '저장 중';
+      meta.textContent = `${humanBytes(attachment?.sizeBytes ?? attachment?.size)} · 서재 저장 중`;
+      try {
+        const response = await apiFetch(`/api/attachments/${encodeURIComponent(attachmentId)}/library`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: getSessionId() }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.status !== 'library') {
+          throw new Error(data.error || '서재에 저장하지 못했어.');
+        }
+        attachment.status = 'library';
+        button.textContent = '저장됨';
+        button.classList.add('is-saved');
+        meta.textContent = `${humanBytes(attachment?.sizeBytes ?? attachment?.size)} · 서재 저장됨`;
+        showToast(data.duplicate ? `이미 서재에 있어: ${data.title}` : `서재에 저장됨: ${data.title}`);
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = '다시 저장';
+        meta.textContent = `${humanBytes(attachment?.sizeBytes ?? attachment?.size)} · 임시 첨부`;
+        showToast(error?.message || '서재에 저장하지 못했어.');
+      } finally {
+        promotingIds.delete(attachmentId);
+      }
     }
 
     function makeCard(attachment, { transientStatus = '', removable = false } = {}) {
@@ -119,6 +155,18 @@
         remove.textContent = '×';
         remove.addEventListener('click', cancel);
         card.appendChild(remove);
+      } else if (
+        !transientStatus
+        && attachment?.status === 'attached_temporary'
+        && kind !== 'image'
+      ) {
+        const save = global.document.createElement('button');
+        save.type = 'button';
+        save.className = 'attachment-card-library';
+        save.textContent = '서재 저장';
+        save.setAttribute('aria-label', `${name.textContent} 서재에 저장`);
+        save.addEventListener('click', () => { void promoteAttachment(attachment, meta, save); });
+        card.appendChild(save);
       }
       return card;
     }
@@ -188,10 +236,16 @@
       renderDraft();
     }
 
-    function init({ config: nextConfig, apiFetch: nextFetch, showToast: nextToast = () => {} } = {}) {
+    function init({
+      config: nextConfig,
+      apiFetch: nextFetch,
+      showToast: nextToast = () => {},
+      getSessionId: nextGetSessionId = () => 'shared-main',
+    } = {}) {
       config = nextConfig || null;
       apiFetch = nextFetch || apiFetch;
       showToast = nextToast;
+      getSessionId = nextGetSessionId;
       const button = el('attachment-button');
       const input = el('attachment-input');
       if (!button || !input || !config?.enabled) {

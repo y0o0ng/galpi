@@ -75,7 +75,7 @@
 - H6의 동일 request ID iPhone 재시도·화면 소등 10회 기준·추가 기기 등록은 더 진행하지 않는다. bounded 3턴은 현재 단축어와 `shared-main`으로 유지하고 별도 server conversation 상태를 추가하지 않는다. 남은 음성 후보인 침묵 1200→1000ms, earcon, H3 되묻기는 각각 필요성이 생길 때만 별도 변경으로 연다.
 - 상시 관찰: 새 `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 10회 표시, 다음 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 - V5-A 딜 스카우트는 수익 모델 불확실성 때문에 2026-08-04 잠정보류했다. 계정 신청·API 키·코드·외부 게시를 시작하지 않으며, 보류를 이유로 V5-B 주식 분석을 자동 착수하지 않는다. 다음 제품 작업은 별도로 선택한다.
-- 첨부 U0a~U1c는 Pi와 iPhone 대표 MD 최초·replay 질문을 인수했다. temporary 후보가 살아 있는 동안 도구 재호출 여부와 무관하게 topic 자동 저장을 막고, 오류 Q&A 1건만 제거해 원본 대화는 보존했다. 향후 원자적 `library` 승격이 끝나면 temporary 차단에서 빠져 일반 서재 회수를 사용한다.
+- 첨부 U0a~U1c는 Pi·iPhone 인수를 마쳤다. U3a는 MD·TXT·PDF의 명시적 `library` 승격, Attachment 노트, 일반 서재 재회수를 로컬 구현했다. library-only 후속 답변은 일반 저장을 허용하고 temporary 후보가 하나라도 살아 있으면 계속 막는다. Pi·iPhone 인수와 Codex 요약·원본 열기·이미지는 남았다.
 
 ## 구조 방향
 

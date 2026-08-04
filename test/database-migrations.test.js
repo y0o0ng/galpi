@@ -78,14 +78,14 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
-      { version: 13 }, { version: 14 },
+      { version: 13 }, { version: 14 }, { version: 15 },
     ],
   );
 
@@ -359,6 +359,40 @@ test('schema v14 stores one bounded parsed document and ordered chunks per attac
   assert.throws(() => db.prepare(`
     UPDATE attachment_chunks SET chunk_index = -1
   `).run(), /CHECK/);
+  db.close();
+});
+
+test('schema v15 links one promoted attachment to one Attachment note', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+  const blobId = db.prepare(`
+    INSERT INTO attachment_blobs (
+      sha256, stored_name, stored_path, mime_type, size_bytes, storage_scope
+    ) VALUES (?, 'library.txt', '/vault/_attachments/library.txt', 'text/plain', 4, 'library')
+  `).run('f'.repeat(64)).lastInsertRowid;
+  const attachmentId = 'att_abcdefabcdefabcdefabcdefabcdefab';
+  db.prepare(`
+    INSERT INTO attachments (
+      id, blob_id, original_name, kind, session_id, scope, lifecycle_status
+    ) VALUES (?, ?, '자료.txt', 'text', 'shared-main', 'library', 'library')
+  `).run(attachmentId, blobId);
+  db.prepare(`
+    INSERT INTO notes (id, filename, title, note_type, archived)
+    VALUES (1, 'attachment.md', '자료', 'attachment', 0)
+  `).run();
+  db.prepare(`
+    INSERT INTO attachment_library_items (attachment_id, note_filename)
+    VALUES (?, 'attachment.md')
+  `).run(attachmentId);
+
+  assert.deepEqual(db.prepare(`
+    SELECT attachment_id AS attachmentId, note_filename AS noteFilename
+    FROM attachment_library_items
+  `).get(), { attachmentId, noteFilename: 'attachment.md' });
+  assert.throws(() => db.prepare(`
+    INSERT INTO attachment_library_items (attachment_id, note_filename)
+    VALUES ('att_11111111111111111111111111111111', 'attachment.md')
+  `).run(), /FOREIGN KEY|UNIQUE/);
   db.close();
 });
 

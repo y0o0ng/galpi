@@ -212,6 +212,23 @@ test('temporary attachment upload validates content, deduplicates blobs, and del
   );
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_documents').get().count, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_chunks').get().count, 0);
+  const retiredPath = path.join(tmpDir, 'retired-after-promotion.txt');
+  await fsp.writeFile(retiredPath, 'already moved to library');
+  db.prepare(`
+    INSERT INTO attachment_blobs (
+      sha256, stored_name, stored_path, mime_type, size_bytes,
+      storage_scope, status, created_at, updated_at
+    ) VALUES (?, ?, ?, 'text/plain', ?, 'temporary', 'deleted', ?, ?)
+  `).run(
+    crypto.createHash('sha256').update('already moved to library').digest('hex'),
+    path.basename(retiredPath),
+    retiredPath,
+    Buffer.byteLength('already moved to library'),
+    Math.floor(currentMs / 1000),
+    Math.floor(currentMs / 1000),
+  );
+  service.cleanupOrphans();
+  await assert.rejects(fsp.access(retiredPath), error => error.code === 'ENOENT');
   assert.deepEqual(await fsp.readdir(tmpDir), []);
 });
 

@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const fs = require('node:fs/promises');
@@ -126,12 +127,12 @@ test('attachment route is authenticated, feature-flagged, and stores only in the
   assert.equal(uploaded.headers.get('cache-control'), 'no-store');
   assert.equal(body.filename, '통합.txt');
 
-  const db = new Database(path.join(appRoot, 'galpi.db'), { readonly: true });
-  t.after(() => db.close());
-  assert.equal(db.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 14);
-  const stored = db.prepare(`
+  const dbPath = path.join(appRoot, 'galpi.db');
+  const writable = new Database(dbPath);
+  assert.equal(writable.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 15);
+  const stored = writable.prepare(`
     SELECT a.id, a.lifecycle_status AS lifecycleStatus,
-           b.stored_path AS storedPath, b.status
+           b.stored_path AS storedPath, b.status, b.sha256
     FROM attachments a JOIN attachment_blobs b ON b.id = a.blob_id
   `).get();
   assert.equal(stored.id, body.attachmentId);
@@ -143,4 +144,75 @@ test('attachment route is authenticated, feature-flagged, and stores only in the
   );
   assert.equal((await fs.readFile(stored.storedPath, 'utf8')), '서버 통합 첨부');
   assert.equal(logs.join('').includes('서버 통합 첨부'), false);
+
+  writable.prepare("INSERT INTO sessions (id) VALUES ('shared-main')").run();
+  const userMessageId = Number(writable.prepare(`
+    INSERT INTO messages (session_id, role, content)
+    VALUES ('shared-main', 'user', '이 문서를 읽어줘')
+  `).run().lastInsertRowid);
+  writable.prepare(`
+    UPDATE attachments
+    SET session_id = 'shared-main', lifecycle_status = 'attached_temporary', attached_at = 1
+    WHERE id = ?
+  `).run(body.attachmentId);
+  writable.prepare(`
+    INSERT INTO message_attachments (
+      message_id, attachment_id, origin_user_turn_index, replay_window_turns
+    ) VALUES (?, ?, 1, 10)
+  `).run(userMessageId, body.attachmentId);
+  writable.prepare(`
+    INSERT INTO attachment_documents (
+      attachment_id, content_sha256, parser_version, parse_status,
+      line_count, char_count, chunk_count, parsed_at
+    ) VALUES (?, ?, 'text-v1', 'ready', 1, 9, 1, 1)
+  `).run(body.attachmentId, stored.sha256);
+  writable.prepare(`
+    INSERT INTO attachment_chunks (
+      chunk_id, attachment_id, chunk_index, line_start, line_end,
+      content, content_sha256
+    ) VALUES ('atch_server_library_0001', ?, 0, 1, 1, '서버 통합 첨부', ?)
+  `).run(body.attachmentId, crypto.createHash('sha256').update('서버 통합 첨부').digest('hex'));
+  writable.close();
+
+  const unauthorizedPromotion = await fetch(`${url}/api/attachments/${body.attachmentId}/library`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'shared-main' }),
+  });
+  assert.equal(unauthorizedPromotion.status, 401);
+  const wrongSession = await fetch(`${url}/api/attachments/${body.attachmentId}/library`, {
+    method: 'POST',
+    headers: { 'X-API-Token': API_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'other-session' }),
+  });
+  assert.equal(wrongSession.status, 409);
+  assert.equal((await wrongSession.json()).code, 'ATTACHMENT_SESSION_MISMATCH');
+
+  const promoted = await fetch(`${url}/api/attachments/${body.attachmentId}/library`, {
+    method: 'POST',
+    headers: { 'X-API-Token': API_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'shared-main' }),
+  });
+  const promotedBody = await promoted.json();
+  assert.equal(promoted.status, 200, JSON.stringify(promotedBody));
+  assert.equal(promotedBody.status, 'library');
+  assert.equal(promotedBody.duplicate, false);
+  assert.equal(Object.hasOwn(promotedBody, 'noteContent'), false);
+
+  const db = new Database(dbPath, { readonly: true });
+  t.after(() => db.close());
+  assert.deepEqual(db.prepare(`
+    SELECT scope, lifecycle_status AS status FROM attachments WHERE id = ?
+  `).get(body.attachmentId), { scope: 'library', status: 'library' });
+  const library = db.prepare(`
+    SELECT li.note_filename AS noteFilename, b.stored_path AS storedPath
+    FROM attachment_library_items li
+    JOIN attachments a ON a.id = li.attachment_id
+    JOIN attachment_blobs b ON b.id = a.blob_id
+    WHERE li.attachment_id = ?
+  `).get(body.attachmentId);
+  assert.equal(library.noteFilename, promotedBody.noteFilename);
+  assert.equal((await fs.readFile(library.storedPath, 'utf8')), '서버 통합 첨부');
+  assert.match(await fs.readFile(path.join(vaultPath, library.noteFilename), 'utf8'), /attachment_state: library/);
+  await assert.rejects(fs.access(stored.storedPath), error => error.code === 'ENOENT');
 });

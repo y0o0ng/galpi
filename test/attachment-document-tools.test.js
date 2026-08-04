@@ -19,6 +19,7 @@ function createService() {
         attachmentId: ATTACHMENT_ID,
         filename: '로드맵.md',
         kind: 'markdown',
+        scope: 'temporary',
         pageCount: null,
         lineCount: 180,
         charCount: 12000,
@@ -61,6 +62,7 @@ test('attachment tools expose only turn candidates and enforce search then bound
   const tools = createAttachmentDocumentTools({ documentService: createService() });
   const session = tools.createSession({ sessionId: 'shared-main' });
   assert.equal(session.hasCandidates, true);
+  assert.equal(session.hasTemporaryCandidates, true);
   assert.deepEqual(session.getToolDefinitions().map(tool => tool.name), [
     'attachment_document_search',
   ]);
@@ -99,6 +101,51 @@ test('attachment tools fail closed for sessions without an active candidate', ()
   const tools = createAttachmentDocumentTools({ documentService: createService() });
   const session = tools.createSession({ sessionId: 'other-session' });
   assert.equal(session.hasCandidates, false);
+  assert.equal(session.hasTemporaryCandidates, false);
   assert.deepEqual(session.candidates, []);
   assert.deepEqual(session.getToolDefinitions(), []);
+});
+
+test('library-only candidates keep document tools without blocking ordinary topic saving', () => {
+  const service = createService();
+  service.listCandidates = ({ libraryNoteFilenames }) => libraryNoteFilenames?.includes('attachment-roadmap.md')
+    ? [{
+      attachmentId: ATTACHMENT_ID,
+      filename: '로드맵.md',
+      kind: 'markdown',
+      scope: 'library',
+      pageCount: null,
+      lineCount: 180,
+      charCount: 12000,
+      chunkCount: 8,
+    }]
+    : [];
+  const tools = createAttachmentDocumentTools({ documentService: service });
+  const session = tools.createSession({
+    sessionId: 'shared-main',
+    libraryNoteFilenames: ['attachment-roadmap.md'],
+  });
+  assert.equal(session.hasCandidates, true);
+  assert.equal(session.hasTemporaryCandidates, false);
+  assert.deepEqual(session.getToolDefinitions().map(tool => tool.name), [
+    'attachment_document_search',
+  ]);
+});
+
+test('a temporary replay still blocks saving when library candidates fill the tool limit', () => {
+  const service = createService();
+  service.listCandidates = () => Array.from({ length: 3 }, (_, index) => ({
+    attachmentId: `att_${String(index + 1).repeat(32)}`,
+    filename: `서재 문서 ${index + 1}.md`,
+    kind: 'markdown',
+    scope: 'library',
+  }));
+  service.hasTemporaryCandidates = () => true;
+  const tools = createAttachmentDocumentTools({ documentService: service });
+  const session = tools.createSession({
+    sessionId: 'shared-main',
+    libraryNoteFilenames: ['one.md', 'two.md', 'three.md'],
+  });
+  assert.equal(session.candidates.length, 3);
+  assert.equal(session.hasTemporaryCandidates, true);
 });

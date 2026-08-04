@@ -3023,6 +3023,41 @@ html, body {
   outline: none;
 }
 
+.attachment-card-library {
+  flex: 0 0 auto;
+  min-width: 68px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font: 650 11px/1 var(--font);
+  cursor: pointer;
+  transition: background 150ms var(--ease-out), color 150ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.attachment-card-library:active {
+  transform: scale(0.97);
+}
+
+.attachment-card-library:focus-visible {
+  outline: 2px solid var(--brand-ink);
+  outline-offset: 2px;
+}
+
+.attachment-card-library:disabled,
+.attachment-card-library.is-saved {
+  cursor: default;
+  opacity: 0.72;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attachment-card-library:not(:disabled):hover {
+    background: var(--brand-soft-strong);
+  }
+}
+
 .attachment-draft-error {
   padding: 0 4px;
   font-size: 11px;

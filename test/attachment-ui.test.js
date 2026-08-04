@@ -74,7 +74,7 @@ class FakeFormData {
   get(name) { return this.values.get(name); }
 }
 
-function loadUi({ enabled = true, apiFetch } = {}) {
+function loadUi({ enabled = true, apiFetch, sessionId = 'shared-main' } = {}) {
   const elements = {
     'attachment-button': fakeElement('attachment-button'),
     'attachment-input': fakeElement('attachment-input'),
@@ -101,6 +101,7 @@ function loadUi({ enabled = true, apiFetch } = {}) {
     },
     apiFetch: apiFetch || (async () => ({ ok: true, json: async () => ({}) })),
     showToast: message => toasts.push(message),
+    getSessionId: () => sessionId,
   });
   return { elements, toasts, ui: fakeWindow.AttachmentUi };
 }
@@ -183,6 +184,49 @@ test('new messages and restored history use the same card and expired tombstone 
   const card = target.children[0].children[0];
   assert.equal(card.classList.contains('is-expired'), true);
   assert.match(card.children[1].children[1].textContent, /첨부 만료됨/);
+});
+
+test('a linked document promotes through one explicit library action and settles in place', async () => {
+  const calls = [];
+  const { ui, toasts } = loadUi({
+    sessionId: 'session-library',
+    apiFetch: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        json: async () => ({
+          status: 'library',
+          duplicate: false,
+          title: '강의 자료',
+        }),
+      };
+    },
+  });
+  const target = fakeElement('message');
+  const attachment = {
+    attachmentId: 'att_ui_library',
+    filename: '강의 자료.md',
+    kind: 'markdown',
+    sizeBytes: 4096,
+    status: 'attached_temporary',
+  };
+
+  ui.renderMessageAttachments(target, [attachment]);
+  const card = target.children[0].children[0];
+  const action = card.children[2];
+  assert.equal(action.textContent, '서재 저장');
+  action.dispatch('click');
+  await settle();
+  await settle();
+
+  assert.equal(calls[0].url, '/api/attachments/att_ui_library/library');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { sessionId: 'session-library' });
+  assert.equal(attachment.status, 'library');
+  assert.equal(action.disabled, true);
+  assert.equal(action.textContent, '저장됨');
+  assert.match(card.children[1].children[1].textContent, /서재 저장됨/);
+  assert.match(toasts[0], /서재에 저장됨/);
 });
 
 test('poll signatures change when attachment lifecycle changes without a new message', () => {

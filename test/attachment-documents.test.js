@@ -193,10 +193,43 @@ test('temporary Markdown parses once and reuses the exact source and parser vers
   assert.deepEqual(service.listCandidates({
     sessionId: 'shared-main',
   }).map(candidate => candidate.attachmentId), [attachmentId]);
+  assert.equal(service.hasTemporaryCandidates({ sessionId: 'shared-main' }), true);
   assert.deepEqual(service.listCandidates({
     sessionId: 'other-session',
     attachmentIds: [attachmentId],
   }), []);
+
+  const libraryNoteFilename = `attachment-${attachmentId.slice(4)}.md`;
+  db.prepare(`
+    INSERT INTO notes (filename, title, note_type, codex_status)
+    VALUES (?, '로드맵', 'attachment', 'processed')
+  `).run(libraryNoteFilename);
+  db.prepare(`
+    UPDATE attachments
+    SET scope = 'library', lifecycle_status = 'library'
+    WHERE id = ?
+  `).run(attachmentId);
+  db.prepare(`
+    INSERT INTO attachment_library_items (attachment_id, note_filename)
+    VALUES (?, ?)
+  `).run(attachmentId, libraryNoteFilename);
+  assert.deepEqual(service.listCandidates({
+    sessionId: 'shared-main',
+    libraryNoteFilenames: [libraryNoteFilename],
+  }).map(candidate => ({
+    attachmentId: candidate.attachmentId,
+    scope: candidate.scope,
+  })), [{ attachmentId, scope: 'library' }]);
+  assert.deepEqual(service.listCandidates({
+    sessionId: 'shared-main',
+    libraryNoteFilenames: ['not-resolved.md'],
+  }), []);
+  assert.equal(service.hasTemporaryCandidates({ sessionId: 'shared-main' }), false);
+  assert.match(service.searchDocument({
+    attachmentId,
+    query: 'OCR',
+    mode: 'focused',
+  })[0].text, /이미지와 OCR/);
 });
 
 test('PDF parsing is single-flight and records page-scoped chunks', async t => {

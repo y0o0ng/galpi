@@ -218,6 +218,7 @@ async function init() {
       apiFetch,
       showToast,
       config: config.attachments,
+      getSessionId: () => sessionId,
     });
   } catch (_) {
     initPaperPanel();

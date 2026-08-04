@@ -909,6 +909,30 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 새 PID `194030`, 시작 시각 `2026-08-04 18:38:58 KST`, HTTP 200, journal warning 0건이다. iPhone에서 원본을 다시 첨부하지 않은 후속 질문은 메시지 2건을 정상 저장했지만 `note_chunks 113`, `auto_save_decisions 198`은 불변이었다. 최종 note-index 36/36 finding 0, topic Q&A 108/108, 복구 계획 `clean`, SQLite integrity `ok`·FK 0을 확인했다.
 - 향후 서재 승격은 새 저장 boolean을 쌓지 않고 기존 lifecycle로 해결한다. `attached_temporary`와 `promoting`은 자동 topic 저장을 계속 막고, Vault copy·fsync·SHA-256·Attachment 노트와 DB 연결이 모두 성공해 `library`가 된 뒤 temporary 후보에서 제외한다. library 자료는 일반 서재 검색/A2 컨텍스트로 회수되므로 후속 답변의 자동 topic 저장을 허용한다. temporary와 library가 섞이면 temporary가 하나라도 있는 동안 차단한다.
 
+### U3a — 명시적 library 승격과 일반 서재 재회수 ✅ 로컬 구현 완료 (2026-08-04)
+
+구현:
+
+- schema v15 `attachment_library_items`가 attachment 하나와 평면 `note_type: attachment` 노트 하나를 1:1로 연결한다. 원본은 `_attachments/YYYY/MM/attlib_<sha-prefix>.<ext>`에 두고, 같은 SHA-256·MIME 원본은 library blob 하나를 재사용한다.
+- 사용자 메시지의 MD·TXT·PDF 카드에만 `서재 저장`을 노출한다. 브라우저는 기존 인증 fetch와 현재 session ID로 `POST /api/attachments/:attachmentId/library`를 호출하며, `저장 중 → 저장됨`을 같은 카드 안에서 표시한다. 이미지 승격은 U2 이후로 미룬다.
+- 승격 중에는 lifecycle의 메모리 lease가 replay 만료와 다른 요청을 막는다. durable 상태는 `attached_temporary`로 유지하다가 Vault 원본·Attachment 노트 검증 뒤 한 DB transaction에서 곧바로 `library`로 바꾼다. 별도 `promoting` 행을 먼저 남기지 않아 서버 중단 뒤 stuck 상태를 만들지 않는다.
+- Vault 파일은 mode `0600`으로 같은 폴더의 임시 파일에 쓰고 file `fsync` 뒤 rename한다. DB commit 전 원본 크기·SHA-256과 노트 본문을 다시 확인한다. 파일 쓰기 뒤 프로세스가 중단돼도 다음 요청은 deterministic 경로의 내용이 정확히 같을 때만 이어가며, 다른 내용이면 collision으로 닫는다.
+- DB transaction은 library blob, Attachment 노트의 `pending` index 상태, attachment 전이, 1:1 link를 함께 확정한다. commit 뒤 참조가 없어진 temporary blob을 지우고, 그 unlink 전에 중단된 파일은 기존 15분 정리 루프가 `deleted`·무참조 blob으로 확인한 뒤 제거한다.
+- 초기 Attachment 노트는 추가 모델 호출 없이 파일명 기반 제목, 파싱 분량·헤딩, 최대 1,600자 미리보기로 결정론적으로 만든다. note embedding은 기존 note-index 경로로 비동기 생성한다. Codex가 더 좋은 제목·요약을 쓰는 단계는 저장 정본과 분리해 U3b로 남긴다.
+- 일반 서재 검색이나 명시 선택으로 Attachment 노트가 이번 턴의 `resolvedNotes`에 들어오면 그 노트와 연결된 기존 `attachment_chunks`만 문서 도구 후보로 연다. 임의의 library attachment ID나 회수되지 않은 노트는 사용할 수 없다.
+- 자동 topic 저장은 새 request boolean이 아니라 도구 세션의 `hasTemporaryCandidates`를 본다. library-only 후보는 저장을 허용하고, 도구 후보 3개가 library로 가득 차도 별도의 temporary replay 검사를 통해 임시 후보가 하나라도 살아 있으면 계속 차단한다.
+
+검증:
+
+- 로컬 전체 회귀 396/396을 통과했다. schema 14→15, 인증·session 격리, source 변조·노트 marker 주입 차단, mode `0600`, blob dedup, exact orphan 재시도, 원자적 DB rollback, UI in-place 상태, library-only 재회수와 mixed temporary 저장 차단을 포함한다.
+
+현재 U3a에서 의도적으로 남긴 것:
+
+- 인증된 원본 열기·다운로드 UI
+- Codex 제목·요약 보강과 실패 재시도
+- U2 이미지 읽기 뒤 이미지 library 승격
+- Pi 배포와 iPhone 실기기 저장·후속 회수 인수
+
 ### U0 — 파일 운반과 저장
 
 구현:
@@ -963,7 +987,7 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 이미지 답변
 - 이미지 원본 링크 표시
 
-### U3 — 서재 저장
+### U3 — 서재 저장 (U3a 로컬 구현, U3b 보강·실기기 인수 남음)
 
 구현:
 
@@ -983,6 +1007,8 @@ Attachment 노트 생성
 → 임베딩 색인
 → 일반 기억 검색 대상 등록
 ```
+
+U3a는 추가 모델 호출 없이 결정론적 제목·요약으로 원자적 정본과 검색 재진입을 먼저 완성한다. Codex 제목·요약 보강, 인증 원본 열기, 이미지는 각각 U3b·U2 이후로 분리한다.
 
 ### U4 — 공통 문서 계층 추출
 
