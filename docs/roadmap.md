@@ -164,7 +164,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 입구만 새로 뚫고, 뒷단(저장·회수·임베딩·Codex)은 V2~V3 그대로 재사용. 쉬운 입구(논문)부터 열어 손 풀고, 어려운 입구(음성)로.
 
-> 현재 기준 (2026-08-03): Realtime은 제품 경로에서 종료하고 기록·롤백 코드만 보존한다. 운영 음성은 `브라우저 VAD → gpt-transcribe → 단일 GPT → gpt-4o-mini-tts` 반이중이며, 상세 단일 기준은 [voice-halfduplex-design.md](voice-halfduplex-design.md)다. 잠금화면에서는 PWA를 열지 않고 iOS 받아쓰기·POST·텍스트 말하기를 쓰는 H6 단축어 입구를 같은 문서에 설계했다.
+> 현재 기준 (2026-08-04): Realtime은 제품 경로에서 종료하고 기록·롤백 코드만 보존한다. 운영 음성은 `브라우저 VAD → gpt-transcribe → 단일 GPT → gpt-4o-mini-tts` 반이중이며, 상세 단일 기준은 [voice-halfduplex-design.md](voice-halfduplex-design.md)다. H6 iPhone 단축어는 잠금 화면이 표시되는 동안 동작하지만 디스플레이 소등 상태에서는 음성 단축어 호출부터 시작되지 않아 이 제약을 수용하고 확대를 종료했다.
 
 ### 핵심 A — 논문 검색 (반나절×2, 상세는 별도 설계 문서 `paper-search-design.md`)
 > 1차 Pi 인수 완료 (`a70d9d0`, mock 보강 `1d4c704`, 백오프 `78583e9`): 별도 `lib/paper-search.js`, `/api/papers/search`, `/paper` 결과 카드, 10분 캐시, 429/5xx 지수 백오프·timeout 처리와 `node:test` 10개를 추가했다. Pi에서 S2 키 실검색 HTTP 200·결과 10개, 성공 응답 캐시, Playwright 실제 카드 렌더링을 확인했다.
@@ -191,7 +191,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 ### 핵심 B — 반이중 대화 + 잠금화면 단축어
 
-> H1·H2·H4·H5와 C1·C2는 Pi·iPhone 인수를 마쳤고 H3 되묻기는 표본 부족으로 미구현이다. H6은 등록된 Web Push 기기에 별도 scoped credential을 묶는 읽기 중심 단축어 입구다. H6a 공용 턴 코어와 schema v11 credential·receipt·단일 턴 route는 Pi 기술 인수를 마쳤다. 운영 flag와 활성 iOS credential을 적용했고, 실제 iPhone 단일·bounded 반복 호출도 정상 동작했다. 총 9개 receipt는 모두 완료·시도 1회이고 topic·일정 쓰기는 0이었다. setup 호출이 섞여 있어 동일 request ID 재시도와 잠금 상태 10회 중 9회 정식 기준은 남아 있다. 아래 R0~R2 기록은 Realtime을 종료하게 된 구현 이력이며 신규 작업 기준이 아니다.
+> H1·H2·H4·H5와 C1·C2는 Pi·iPhone 인수를 마쳤고 H3 되묻기는 표본 부족으로 미구현이다. H6a 공용 턴 코어와 schema v11 credential·receipt·단일 턴 route는 Pi 기술 인수를 마쳤고, iPhone 단일·고정 3회 반복·로컬 종료도 잠금 화면 표시 상태에서 정상 동작했다. 총 9개 receipt는 모두 완료·시도 1회이고 topic·일정 쓰기는 0이었다. 디스플레이 소등 상태에서는 말만 재생하는 최소 음성 단축어도 시작되지 않아 호출 단계 제약으로 확정했다. Siri 대체는 채택하지 않고 H6 확대와 화면 소등 10회 기준은 닫는다. 아래 R0~R2 기록은 Realtime을 종료하게 된 구현 이력이며 신규 작업 기준이 아니다.
 
 > R0 GO (2026-07-30): raw WebRTC unified interface, 서버 전용 SDP proxy, `gpt-realtime-2.1-mini`·`marin`, `gpt-4o-mini-transcribe` 사용자 자막, semantic VAD 끼어들기, 5분 hard cap, mute·종료·상태·부분/완료 transcript UI를 구현하고 Pi 운영 flag를 켰다. 공식 multipart 일반 필드 형식과 socket 주소 기반 rate-limit key로 실제 호출·Tailscale proxy 경계를 보정했다. Mac과 Pi HTTPS에서 `201`, connected peer, open data channel, remote audio, 완료 자막을 확인했고, 로컬 Realtime 7/7·Pi Realtime 7/7·Pi 전체 214/214, DB·Vault·task 불변을 통과했다. 사용자 iPhone 홈 화면 PWA에서 5분 연속 한국어·영어 대화, 끼어들기, mute/unmute, 수동 종료, hard cap 자동 종료·마이크 해제가 모두 정상이라 R0 기능 GO를 승인했다. 정확한 턴·끼어들기 횟수는 별도 계수하지 않았다.
 >
@@ -268,8 +268,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [x] H6a-2 활성 Push 구독 scoped credential·durable receipt·읽기 전용 단일 턴 route를 로컬에서 구현하고 동시 중복·재전송·권한 회귀를 통과한다
 - [x] H6a Pi 기술 인수에서 schema v11·운영 flag·활성 iOS 구독 credential을 적용하고 scoped token의 exact route 한정과 일반 API 거절을 확인한다
 - [x] H6b iPhone에서 실제 단일 턴과 고정 3회 반복·로컬 종료가 PWA 실행 없이 동작하고 topic·일정 쓰기가 0이다
-- [ ] H6b 같은 request ID 재시도에도 `shared-main` 메시지가 중복되지 않는다
-- [ ] 잠금 상태 단일 턴 10회 중 9회 이상이 PWA 실행·잠금 해제 없이 받아쓰기→갈피 응답→iOS 낭독을 마친다
+- [x] 잠금 화면 표시 상태와 디스플레이 소등 상태를 분리했다. 전자는 동작하고 후자는 최소 음성 단축어부터 호출되지 않아 서버 밖 플랫폼 제약으로 수용한다
+- H6 확대를 닫아 같은 request ID의 iPhone 실기기 재시도와 화면 소등 10회 기준은 더 진행하지 않는다. 서버 멱등성 회귀 테스트는 유지한다
 
 > 핵심 포인트: PWA 반이중은 `gpt-transcribe`와 OpenAI TTS, H6 단축어는 Apple 받아쓰기와 텍스트 말하기를 입·귀로 쓴다. 둘 다 같은 회수·GPT·`shared-main` 저장 경로를 쓰고 음성 질문은 topic에 자동 저장하지 않으며, 화면 없는 H6에서는 일정·노트·설정 쓰기를 열지 않는다.
 
@@ -459,6 +459,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - `CONTEXT_N`을 나중에 5로 바꾸면 새 첨부부터 5턴을 쓰며 기존 첨부에는 소급하지 않는다. 자연어 재언급은 수명을 늘리지 않고 명시적 `다시 첨부`만 새 연결을 만든다.
 - library는 명시적 승인 뒤 Vault로 승격하고 자동 만료하지 않는다. 미연결 upload는 60분 orphan TTL로 정리한다.
 - 강의 Phase 0은 개발 없이 지금 검증할 수 있다. 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 시작한다. 상세는 [갈피 강의 노트 설계](Lecture-note-system%20Design.md)다.
+- iPad 음성 단축어·credential은 지금 미리 등록하지 않고, 강의 노트 구현을 시작할 때 강의 캡처 흐름과 함께 필요성을 판단한다.
 - 강의 전체 구현은 V5-B 시작 전 또는 `PAPER_AUTONOMOUS` 관찰 기간에 병행할 수 있다. 거래 DB·worker queue·scheduler budget·API cost ledger를 공유하지 않는다.
 
 ---
@@ -584,6 +585,8 @@ Phase 0 GO는 실행 성공률 95% 이상, raw↔DB reconciliation 100%, 논리 
    - 폰: 홈 화면 웹앱은 V1에 이미 있음 / 더 깊으려면 별도 방법
 2. 떠있는 시온 클릭 → 채팅창 or 음성 입력
 3. 기존 서버(뇌)에 그대로 연결 — UI 껍데기만 새로
+
+노트북 음성 단축어·credential은 지금 등록하지 않는다. V6에서 화면에 떠있는 시온의 형태를 정한 뒤 그 창구에 맞는 음성 입력을 함께 붙인다.
 
 ### 보너스 (나중)
 - 시온 표정·반응 애니메이션, 떠있는 데스크톱 shell 자체의 알림. 일정 Web Push는 V4.5-C에서 먼저 구현한다.

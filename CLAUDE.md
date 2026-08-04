@@ -39,7 +39,7 @@
 
 - Realtime은 2026-08-01 제품 경로에서 접었다. `docs/voice-realtime-design.md`는 R0~R2c-1 기록일 뿐이고 새 작업 기준은 반이중 문서다.
 - 2026-08-03 H5에서 Pi의 Realtime·read tool·correction·finalize 운영 flag를 모두 껐고 반이중만 유지해 실기기 인수했다. Realtime 코드는 기록·롤백용으로 남긴다.
-- H6a 잠금화면 단축어 서버는 Pi 기술 인수를 마쳤고 H6b iPhone 단일·고정 3회 반복·로컬 종료도 첫 실사용에 성공했다. 총 9개 receipt는 모두 완료·시도 1회이며 topic·일정 쓰기는 0이다. 활성 Push 구독 hash-only credential과 exact route만 쓰고 코드 flag 기본값은 `false`, 운영 Pi만 `true`다. 동일 request ID 재시도와 잠금 상태 10회 중 9회 정식 기준은 남아 있다.
+- H6a 서버와 iPhone 단일·고정 3회 반복·로컬 종료는 인수했다. 잠금 화면 표시 중에는 동작하지만 디스플레이 소등 상태에서는 최소 음성 단축어부터 호출되지 않아 플랫폼 제약으로 수용하고 H6 확대를 닫았다. 현재 iPhone route·credential은 유지하되 iPad는 강의 노트, 노트북은 V6 화면 시온 단계까지 등록하지 않는다.
 - 운영 흐름은 브라우저 VAD → `gpt-transcribe` → 기존 단일 GPT 채팅 → `gpt-4o-mini-tts`다. 음성 턴도 `sendSingleMessage`를 통해 `shared-main`에 저장하지만 `source:'voice'`는 topic 자동 저장에서 제외한다. 원본 오디오는 DB·Vault·backup·temp file에 저장하지 않는다.
 - 일정 카드의 음성 등록·취소는 모델이 아니라 좁은 어휘로 카드 버튼과 같은 핸들러를 호출한다. 그 턴은 모델·메시지 저장을 거치지 않는다. 등록·취소가 아닌 발화는 카드를 조용히 취소한 뒤 일반 대화로 보낸다.
 - TTS voice는 `echo`, 기본 speed는 `1.3`, 조각 RMS 목표는 `0.18`이다. WAV의 streaming sentinel 길이는 실제 길이로 정규화하고 재생 진행 감시 타이머를 유지한다.
@@ -56,7 +56,7 @@
 - 공통 거터는 16px, 본문·입력 읽기 폭은 600px, 모바일 동작 타깃은 44px 이상, 경계선은 테마별 `--hairline`을 쓴다.
 - `test/chat-ui.test.js`는 CSS·소스 계약 회귀용이다. 실제 픽셀은 Playwright로 확인하되 리뷰 서버는 스크래치 데이터만 사용한다.
 
-## 현재 음성 상태 — 2026-08-03
+## 현재 음성 상태 — 2026-08-04
 
 - VAD 고착 복구, 이어 듣기, 6문장 음성 프롬프트, UI 정리를 Pi와 실기기에서 인수했고 `main`에 push했다. 상세 receipt는 `docs/voice-halfduplex-design.md`와 git에 있다.
 - 정상 길이의 여러 문장을 모두 읽고도 마지막 문장이 `spokenRemaining`에 남을 수 있다. 안내가 없는데 사용자가 직후 우연히 이어 듣기 어휘를 말해야만 중복 재생되므로, 사용자 판단으로 현재 수정하지 않는 낮은 확률 경계로 수용했다.
@@ -65,7 +65,7 @@
 ## 열린 작업
 
 - H3 되묻기 문턱은 실제 오전사 표본이 더 쌓인 뒤 정한다. 현재 작은 표본에서 정확 전사는 `min logprob -0.024~-0.425`, 오류 전사는 `-0.652`, `-1.356`이었지만 확정 문턱으로 쓰기엔 부족하다. 로그에는 토큰 문자열을 저장하지 않는다.
-- 다음 음성 작업은 H6b 동일 request ID 재시도와 잠금 상태 10회 중 9회 정식 인수다. bounded 3턴은 단축어 고정 반복과 `shared-main`으로 이미 동작하므로 별도 server conversation 상태를 추가하지 않는다. 침묵 1200→1000ms, earcon, H3 되묻기는 각각 별도 변경이며 더 빠른 텍스트 모델로 내리지 않는다.
+- H6의 동일 request ID iPhone 재시도·화면 소등 10회 기준·추가 기기 등록은 더 진행하지 않는다. bounded 3턴은 현재 단축어와 `shared-main`으로 유지하고 별도 server conversation 상태를 추가하지 않는다. 남은 음성 후보인 침묵 1200→1000ms, earcon, H3 되묻기는 각각 필요성이 생길 때만 별도 변경으로 연다.
 - 상시 관찰: 새 `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 10회 표시, 다음 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 - 제품 순서는 V4.5 안정화 → V4-B 음성 마감 → V5-A 딜 스카우트 → V5-B 주식 분석이다. 딜 스카우트는 아직 코드·키·외부 게시를 시작하지 않았고, 주식 LIVE는 별도 승인·정량 gate·Promotion Token 없이는 시작하지 않는다.
 - 첨부·강의는 설계만 있고 미구현이다. temporary 첨부는 연결 당시 replay 사용자 턴 수를 snapshot하고, library 승격은 명시적 승인 뒤에만 한다.
