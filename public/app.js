@@ -13,6 +13,7 @@ const PROGRESS_STAGE_LABELS = Object.freeze({
   web_search: '웹 검색 중…',
   paper_search: '논문 전문 검색 중…',
   paper_read: '논문 전문 읽는 중…',
+  attachment_parse: '첨부 분석 중…',
   attachment_search: '첨부 문서 검색 중…',
   attachment_read: '첨부 문서 읽는 중…',
   schedule_prepare: '일정 확인 중…',

@@ -203,3 +203,16 @@ test('headings step up in size instead of only getting bolder', () => {
   assert.match(css, /\.bubble\.md h2 \{ font-size: 17px/);
   assert.match(css, /\.bubble\.md h3 \{ font-size: 15px/);
 });
+
+test('every progress stage the server can send has a chat label', () => {
+  // 라벨이 없는 단계는 화면에서 조용히 무시돼 진행 표시가 이전 단계에 멈춘 것처럼 보인다.
+  const { VALID_PROGRESS_STAGES } = require('../lib/progress-stream');
+  const labels = app.slice(app.indexOf('PROGRESS_STAGE_LABELS'));
+  const labelled = new Set(
+    [...labels.slice(0, labels.indexOf('});')).matchAll(/^ {2}([a-z_]+):/gm)].map(match => match[1]),
+  );
+  assert.deepEqual([...VALID_PROGRESS_STAGES].filter(stage => !labelled.has(stage)), []);
+  assert.deepEqual([...labelled].filter(stage => !VALID_PROGRESS_STAGES.has(stage)), []);
+  // 큰 첨부의 첫 턴은 파싱이 요청 안에서 끝나므로 그 시간을 따로 알린다.
+  assert.ok(labelled.has('attachment_parse'));
+});

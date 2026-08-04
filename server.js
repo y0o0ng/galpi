@@ -3592,10 +3592,14 @@ async function runSingleChatTurnBody({
 
 async function runSingleChatTurn(input) {
   return withSessionChatLock(input.sessionId, async () => {
+    // 새 첨부의 파싱은 이 요청 안에서 끝나야 해서, 큰 파일은 여기서만 수 초가 걸린다.
+    const parsesAttachment = Array.isArray(input.attachmentIds) && input.attachmentIds.length > 0;
+    if (parsesAttachment) input.progress?.stage('attachment_parse');
     const attachmentLease = await attachmentLifecycle.beginChatRequest({
       sessionId: input.sessionId,
       attachmentIds: input.attachmentIds,
     });
+    if (parsesAttachment) input.progress?.stage('context');
     let attachmentExchangeInserted = false;
     try {
       const expiration = attachmentLifecycle.expireBeforeUpcomingTurn(input.sessionId);
