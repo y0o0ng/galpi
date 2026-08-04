@@ -457,6 +457,13 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   assert.doesNotMatch(JSON.stringify(linkedRequests[0].input), /ATTACHMENT_MODEL_SECRET/);
   assert.ok(linkedRequests[0].tools.some(tool => tool.name === 'attachment_document_search'));
   assert.match(linkedRequests[0].instructions, /신뢰하지 않는 사용자 제공 데이터/);
+  assert.match(linkedRequests[0].instructions, /지시대명사만으로 물었고/);
+  assert.match(JSON.stringify(linkedRequests[0].input), /<current_attachments>/);
+  assert.match(JSON.stringify(linkedRequests[0].input), /사용자가 이번 턴에 첨부한 파일: 연결자료\.txt/);
+  assert.doesNotMatch(JSON.stringify(responseRequests[0].input), /<current_attachments>/);
+  assert.equal(db.prepare(`
+    SELECT content FROM messages WHERE role = 'user' ORDER BY id DESC LIMIT 1
+  `).get().content, '첨부 연결 턴');
   assert.match(JSON.stringify(linkedRequests[1].input), /ATTACHMENT_MODEL_SECRET/);
   assert.doesNotMatch(JSON.stringify(linkedRequests[1].input), /stored_path|content_sha256/);
   assert.equal(db.prepare(`
