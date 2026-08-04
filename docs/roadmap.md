@@ -457,7 +457,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 - 일반 첨부 U0~U1은 V4.5-M의 도구 parity와 입력창 model picker가 안정된 뒤 병행할 수 있다. 상세는 [첨부파일 업로드·검색 설계](galpi-attachment-upload-design.md)다.
 - U0a~U0c는 schema v12~13 인증 업로드·message 연결·replay 수명주기와 composer 단일 업로드·공통 카드/tombstone을 로컬에 구현했다. 빈 입력은 반이중 음성, 키보드 입력 후에는 같은 주 액션 자리의 전송을 쓴다.
-- U1a~U1b는 schema v14 MD·TXT·PDF on-demand 파싱과 현재/replay 첨부 최대 3개의 `attachment_document_search → read`를 Pi에 배포했다. 답변당 2회·호출당 5,000자·합계 10,000자, 파일명+페이지/줄 출처, 비신뢰 자료 경계, temporary 자동 topic 저장 제외를 집행한다. iPhone 실제 MD 84,175 bytes·1,717줄·109청크 최초 질문은 통과했다. replay 후속 답변이 도구를 재호출하지 않아 Q&A 1건이 자동 저장되는 결함은 후보 존재 자체로 저장을 차단하도록 U1c에서 보정했고 로컬 386/386을 통과했다. Pi 배포·exact Q&A 제거·같은 실기기 replay 재확인이 남았다. TXT·PDF·iPad 실측은 핵심 종료 조건으로 강제하지 않고 필요할 때 추가한다.
+- U1a~U1c는 schema v14 MD·TXT·PDF on-demand 파싱과 현재/replay 첨부 최대 3개의 `attachment_document_search → read`를 Pi에 배포했다. iPhone 실제 MD 84,175 bytes·1,717줄·109청크의 최초 질문과 다시 붙이지 않은 replay 후속 질문을 인수했다. 후속 답변이 도구를 재호출하지 않아 자동 저장된 Q&A 1건은 exact guard로 제거하고 원본 메시지를 보존했다. 후보가 살아 있는 동안 자동 topic 저장을 막는 보정은 로컬 386/386·Pi 385/385를 통과했고, 실기기 재검증에서 messages +2와 함께 note_chunks 113·auto-save 198 불변을 확인했다. 향후 `library` 승격 완료 시 temporary 차단에서 빠지고 일반 서재 회수를 사용한다. TXT·PDF·iPad 실측은 필요할 때 추가한다.
 - temporary 첨부는 연결 시 현재 `CONTEXT_N`을 `replay_window_turns`로 snapshot한다. 현재 로컬·Pi 값은 사용자 턴 10개이며, origin turn이 창에서 밀려나는 다음 사용자 턴의 모델 호출 전에 만료·비동기 삭제한다.
 - `CONTEXT_N`을 나중에 5로 바꾸면 새 첨부부터 5턴을 쓰며 기존 첨부에는 소급하지 않는다. 자연어 재언급은 수명을 늘리지 않고 명시적 `다시 첨부`만 새 연결을 만든다.
 - library는 명시적 승인 뒤 Vault로 승격하고 자동 만료하지 않는다. 미연결 upload는 60분 orphan TTL로 정리한다.

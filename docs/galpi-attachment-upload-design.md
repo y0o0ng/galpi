@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
 > Version: 0.7
-> 상태: U0a~U0c 파일 운반·composer UI와 U1a~U1b 문서 파싱·bounded 모델 읽기 Pi 배포·기술 인수 완료 / iPhone 실제 MD 최초 질문 인수 / replay 자동 저장 경계 보정 배포 대기
+> 상태: U0a~U0c 파일 운반·composer UI, U1a~U1c 문서 읽기·replay 저장 경계 Pi 배포 및 iPhone 대표 MD 인수 완료
 > 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -895,16 +895,19 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - Pi 집중 84/84·전체 순차 384/384, note-index 36/36 finding 0, topic 17/17·Q&A 108/108, SQLite integrity `ok`·FK 0을 통과했다. 인증된 multipart 오류 요청은 415로 닫히고 쓰기 0건이었다.
 - 새 PID `189185`, 시작 시각 `2026-08-04 17:39:27 KST`, `active/running`, HTTP 200, 새 journal warning 0건을 확인했다. 배포 전후 messages/notes/note_chunks/auto-save/retrieval `601/36/113/198/159`, task/event/reminder `13/25/4`, Vault hash `b58c03b7...8fed`는 불변이고 새 첨부 5개 테이블은 모두 0행이다.
 - iPhone에서 실제 `Swing Trading Agent Design v2 2.md` 84,175 bytes·1,717줄을 업로드했다. 서버는 54,686자를 109개 청크로 파싱했고 최초 답변은 파일명과 줄 범위를 표시해 정상이라고 사용자가 확인했다. 첨부·blob·link·document는 각 1개만 만들어졌고 SQLite integrity `ok`·FK 0을 유지했다.
-- 같은 파일을 다시 붙이지 않은 replay 후속 질문도 정상 답변했지만, 모델이 직전 assistant 답변만 사용해 첨부 도구를 재호출하지 않자 자동 topic Q&A 1건이 생기는 결함을 발견했다. 임시 첨부의 파생 내용도 같은 수명 경계를 따라야 하므로, 후보 존재 자체로 자동 저장을 막는 회귀 테스트를 추가했다. 수정본은 로컬 전체 386/386을 통과했고 Pi 배포·오류 Q&A 정밀 제거·실기기 replay 재확인을 기다린다.
-- TXT·PDF와 iPad는 parser·HTTP 통합 회귀로 계속 보장하되 실기기에서 별도로 확인하지 않았다. 대표 MD 경로의 재검증이 끝나면 핵심 U1 실기기 인수는 닫고, 형식·기기별 실측은 실제 필요가 생길 때 추가한다.
+- 같은 파일을 다시 붙이지 않은 replay 후속 질문도 정상 답변했지만, 모델이 직전 assistant 답변만 사용해 첨부 도구를 재호출하지 않자 자동 topic Q&A 1건이 생기는 결함을 발견했다. 임시 첨부의 파생 내용도 같은 수명 경계를 따라야 하므로, 후보 존재 자체로 자동 저장을 막는 회귀 테스트를 추가했다.
+- TXT·PDF와 iPad는 parser·HTTP 통합 회귀로 계속 보장하되 실기기에서 별도로 확인하지 않았다. 대표 MD의 최초·replay 경로를 인수했으므로 핵심 U1 실기기 인수는 닫고, 형식·기기별 실측은 실제 필요가 생길 때 추가한다.
 
-### U1c — replay 파생 답변의 temporary 저장 경계 🔧 배포 대기 (2026-08-04)
+### U1c — replay 파생 답변의 temporary 저장 경계 ✅ Pi·iPhone 인수 완료 (2026-08-04)
 
 - 실패 원인은 `attachmentEvidenceRefs.length === 0`만 자동 저장 조건으로 사용한 데 있다. 이 값은 현재 턴의 tool result만 나타내며, replay 후보와 직전 assistant 답변으로부터 파생된 내용을 나타내지 않는다.
-- 저장 차단 기준을 `attachmentToolSession.hasCandidates`로 올린다. 현재/replay 후보가 만료될 때까지 해당 턴의 자동 topic 저장을 보수적으로 막고, 명시적 답변 저장과 library 승격은 그대로 둔다.
+- 저장 차단 기준을 `attachmentToolSession.hasCandidates`로 올렸다. 현재/replay 후보가 만료될 때까지 해당 턴의 자동 topic 저장을 보수적으로 막고, 명시적 답변 저장과 library 승격은 그대로 둔다.
 - 이 정책은 replay 창 동안 첨부와 무관한 질문의 자동 저장도 막을 수 있다. temporary 자료가 assistant history를 통해 섞였는지 안전하게 판별할 수 없으므로, 최대 10 사용자 턴의 과소 저장을 영구 유출 가능성보다 우선한다.
 - 회귀는 후속 턴에서 `attachmentDocuments.used=false`여도 `auto_save_decisions`가 늘지 않아야 한다. 로컬 집중 7/7·전체 386/386을 통과했다.
-- 이미 잘못 저장된 Q&A는 사용자 승인을 받아 메시지 610·611은 보존하고, decision 205와 `qa-bcdd22f5-265d-4959-b7fe-94c88be9fb81`만 exact hash guard로 제거한다.
+- Pi DB·Vault 백업 `20260804-1830`, 코드 복구본 `code-attachment-u1c-pre-20260804-183026.tar.gz` 뒤 8개 배포 파일 hash가 로컬과 일치했고 집중 7/7·전체 385/385를 통과했다. 제거 직전 추가 백업은 `20260804-1837`이다.
+- 이미 잘못 저장된 Q&A는 사용자 승인과 exact input/content/message hash guard 아래 decision 205와 `qa-bcdd22f5-265d-4959-b7fe-94c88be9fb81`만 제거하고 메시지 610·611은 보존했다. 노트 전체 임베딩은 기존 endpoint로 1/1 재생성했다.
+- 새 PID `194030`, 시작 시각 `2026-08-04 18:38:58 KST`, HTTP 200, journal warning 0건이다. iPhone에서 원본을 다시 첨부하지 않은 후속 질문은 메시지 2건을 정상 저장했지만 `note_chunks 113`, `auto_save_decisions 198`은 불변이었다. 최종 note-index 36/36 finding 0, topic Q&A 108/108, 복구 계획 `clean`, SQLite integrity `ok`·FK 0을 확인했다.
+- 향후 서재 승격은 새 저장 boolean을 쌓지 않고 기존 lifecycle로 해결한다. `attached_temporary`와 `promoting`은 자동 topic 저장을 계속 막고, Vault copy·fsync·SHA-256·Attachment 노트와 DB 연결이 모두 성공해 `library`가 된 뒤 temporary 후보에서 제외한다. library 자료는 일반 서재 검색/A2 컨텍스트로 회수되므로 후속 답변의 자동 topic 저장을 허용한다. temporary와 library가 섞이면 temporary가 하나라도 있는 동안 차단한다.
 
 ### U0 — 파일 운반과 저장
 
@@ -930,7 +933,7 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 실행 중 요청·승격 파일은 정리하지 않고 orphan·미참조 blob만 삭제함
 - 모델은 아직 내용을 읽지 않아도 됨
 
-### U1 — 문서 읽기 (Pi 기술 인수 완료 / iPhone 대표 MD 재검증 중)
+### U1 — 문서 읽기 (Pi 기술 인수 및 iPhone 대표 MD 최초·replay 인수 완료)
 
 구현:
 
