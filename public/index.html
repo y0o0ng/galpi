@@ -116,7 +116,9 @@
                 <div id="chat-model-control">
                   <button id="chat-model-button" type="button" aria-haspopup="listbox" aria-controls="chat-model-menu" aria-expanded="false" disabled>
                     <span id="chat-model-button-label">모델</span>
-                    <span class="chat-model-chevron" aria-hidden="true">⌄</span>
+                    <svg class="chat-model-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
                   </button>
                   <section id="chat-model-menu" aria-label="답변 모델 선택" hidden>
                     <div class="chat-model-menu-head">
@@ -130,7 +132,7 @@
               </div>
               <div id="composer-primary-action">
                 <button id="voice-hd-button" type="button" title="XION 음성 대화" aria-label="XION 음성 대화 시작" aria-pressed="false" hidden>
-                  <span class="composer-voice-mark" aria-hidden="true">
+                  <span class="composer-action-disc" aria-hidden="true">
                     <span class="xion-mark-icon"></span>
                   </span>
                 </button>
@@ -142,10 +144,12 @@
                   </svg>
                 </button>
                 <button id="send-btn" title="전송 (Enter)" aria-label="전송" hidden>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                  </svg>
+                  <span class="composer-action-disc" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </span>
                 </button>
               </div>
             </div>

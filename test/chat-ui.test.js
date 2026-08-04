@@ -101,14 +101,77 @@ test('half-duplex voice uses the XION mark without shrinking its touch target', 
   const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
   assert.match(
     html,
-    /id="voice-hd-button"[\s\S]*?<span class="composer-voice-mark"[^>]*>[\s\S]*?<span class="xion-mark-icon"><\/span>/,
+    /id="voice-hd-button"[\s\S]*?<span class="composer-action-disc"[^>]*>[\s\S]*?<span class="xion-mark-icon"><\/span>/,
   );
   assert.doesNotMatch(html, /composer-voice-wave/);
-  assert.match(css, /\.composer-voice-mark \{[^}]*width: 36px;[^}]*height: 36px/s);
-  assert.match(css, /\.composer-voice-mark \.xion-mark-icon \{[^}]*width: 17px;[^}]*height: 17px/s);
+  assert.match(css, /\.composer-action-disc \{[^}]*width: 36px;[^}]*height: 36px/s);
+  assert.match(css, /\.composer-action-disc \.xion-mark-icon \{[^}]*width: 26px;[^}]*height: 26px/s);
 
   const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
-  assert.match(mobile, /\.composer-voice-mark \{[^}]*width: 38px;[^}]*height: 38px/s);
+  assert.match(mobile, /\.composer-action-disc \{[^}]*width: 38px;[^}]*height: 38px/s);
+});
+
+test('voice and send share one disc so the primary action does not jump', () => {
+  // 두 상태가 같은 슬롯을 쓴다. 지름이 다르면 첫 글자를 치는 순간 원이 커지며 밀린다.
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  assert.match(html, /id="send-btn"[\s\S]*?<span class="composer-action-disc"[^>]*>[\s\S]*?<svg/);
+  assert.match(css, /#send-btn,\s*#voice-hd-button \{[^}]*background: transparent;[^}]*box-shadow: none/s);
+  assert.doesNotMatch(css, /body\[data-active-model="[^"]+"\] #send-btn/);
+});
+
+test('turns are spaced wider than the paragraphs inside one answer', () => {
+  // 턴 사이가 문단 사이(10px)보다 좁으면 대화가 하나의 긴 문서처럼 뭉쳐 읽힌다.
+  assert.match(css, /#messages \{[^}]*gap: 20px/s);
+  assert.match(css, /\.bubble\.md p \{[^}]*margin: 0 0 10px/s);
+  // 간격은 #messages 한 곳에서만 준다. .msg-group에 margin이 다시 붙으면 두 값이 더해진다.
+  assert.doesNotMatch(css, /\.msg-group \{[^}]*margin-bottom/s);
+});
+
+test('control radii keep one step instead of three values a pixel apart', () => {
+  // 8·9·10px은 눈으로 구분되지 않는다. 세 값이 공존하면 규칙이 아니라 사고로 읽힌다.
+  assert.doesNotMatch(css, /border-radius: 8px;/);
+  assert.doesNotMatch(css, /border-radius: 9px;/);
+  // 40px 컨트롤은 옆의 원과 같은 가족이 되도록 높이의 절반을 쓴다.
+  assert.match(css, /#chat-model-button \{[^}]*height: 40px;[^}]*border-radius: 20px/s);
+  // #input은 배경이 투명하다. radius를 주면 화면에 안 보이면서 shell 값과만 어긋난다.
+  assert.doesNotMatch(css, /#input \{[^}]*border-radius/s);
+});
+
+test('the composer rows start and end on the same vertical lines', () => {
+  // 위 입력줄 글자선과 아래 도구줄이 어긋나면 두 줄이 다른 상자처럼 보인다.
+  // 버튼 안에서 글리프는 (40-20)/2, 원은 (40-36)/2 들어가므로 좌우 padding이 다르다.
+  assert.match(css, /#input \{[^}]*padding: 11px 14px 4px/s);
+  assert.match(css, /#composer-toolbar \{[^}]*padding: 0 12px 5px 4px/s);
+
+  const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
+  assert.match(mobile, /#input \{[^}]*padding: 12px 18px 5px/s);
+  assert.match(mobile, /#composer-toolbar \{[^}]*padding: 1px 15px 5px 6px/s);
+});
+
+test('the model chevron is drawn, not typed, so its ink centers with the label', () => {
+  // U+2304는 잉크가 em 상자 아래쪽에 몰려 있다. flex 중앙 정렬은 상자를 맞출 뿐이라
+  // 닫힌 상태에서 4.5px 낮게, rotate(180deg)한 열린 상태에서는 그만큼 높게 보였다.
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  assert.doesNotMatch(html, /⌄/);
+  assert.match(html, /<svg class="chat-model-chevron"[^>]*viewBox="0 0 24 24"/);
+  // 잉크 y 9~15는 viewBox 중심 12를 기준으로 대칭이라 180도 뒤집어도 중심이 유지된다.
+  assert.match(html, /class="chat-model-chevron"[\s\S]*?<polyline points="6 9 12 15 18 9">/);
+  assert.match(css, /\.chat-model-chevron \{[^}]*display: block/s);
+  assert.doesNotMatch(css, /\.chat-model-chevron \{[^}]*font-size/s);
+});
+
+test('the codex agent card keeps three type steps, not four half-pixel ones', () => {
+  // 10 / 10.5 / 11 / 11.5px은 위계가 아니라 어긋남으로 읽힌다. 9 · 11 · 17만 쓴다.
+  assert.match(css, /\.schedule-agent-kicker \{[^}]*font-size: 9px;[^}]*font-weight: 700/s);
+  assert.match(css, /\.schedule-agent-head h2 \{[^}]*font-size: 17px/s);
+  for (const rule of [
+    /\.codex-agent-description,\s*\.codex-agent-message \{[^}]*font-size: 11px/s,
+    /\.codex-model-field > span \{[^}]*font-size: 11px/s,
+    /\.codex-model-field select \{[^}]*font: 600 11px/s,
+    /\.schedule-agent-status \{[^}]*font-size: 11px/s,
+    /\.schedule-agent-action \{[^}]*font: 650 11px/s,
+  ]) assert.match(css, rule);
+  assert.match(css, /\.codex-agent-block \{[^}]*padding: 16px/s);
 });
 
 test('the chat column and the composer share one inline padding rule', () => {
