@@ -372,6 +372,13 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   assert.equal(db.prepare(`
     SELECT lifecycle_status AS status FROM attachments WHERE id = ?
   `).get(uploadBody.attachmentId).status, 'uploaded_unattached');
+  assert.deepEqual(db.prepare(`
+    SELECT parse_status AS status, chunk_count AS chunkCount
+    FROM attachment_documents WHERE attachment_id = ?
+  `).get(uploadBody.attachmentId), { status: 'ready', chunkCount: 1 });
+  assert.equal(db.prepare(`
+    SELECT COUNT(*) AS count FROM attachment_chunks WHERE attachment_id = ?
+  `).get(uploadBody.attachmentId).count, 1);
 
   responseMode = 'completed';
   const linked = await api(url, '/api/chat', {
@@ -433,6 +440,12 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   assert.equal(fifth.response.status, 200, JSON.stringify(fifth.body));
   assert.equal(attachmentStatesAtProvider.at(-1), 'deleted');
   await assert.rejects(fs.stat(linkedRow.storedPath), error => error.code === 'ENOENT');
+  assert.equal(db.prepare(`
+    SELECT COUNT(*) AS count FROM attachment_documents WHERE attachment_id = ?
+  `).get(uploadBody.attachmentId).count, 0);
+  assert.equal(db.prepare(`
+    SELECT COUNT(*) AS count FROM attachment_chunks WHERE attachment_id = ?
+  `).get(uploadBody.attachmentId).count, 0);
   const expiredHistory = await api(url, '/api/sessions/shared-main');
   const expiredMessage = expiredHistory.body.messages.find(message => message.content === '첨부 연결 턴');
   assert.equal(expiredMessage.attachments[0].expired, true);

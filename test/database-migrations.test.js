@@ -78,14 +78,14 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
-      { version: 13 },
+      { version: 13 }, { version: 14 },
     ],
   );
 
@@ -318,6 +318,46 @@ test('schema v13 links attachments to one replay-snapshotted user message', () =
   `).get(), { originTurn: 1, replayTurns: 10 });
   assert.throws(() => db.prepare(`
     UPDATE message_attachments SET replay_window_turns = 0
+  `).run(), /CHECK/);
+  db.close();
+});
+
+test('schema v14 stores one bounded parsed document and ordered chunks per attachment', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+  const blobId = db.prepare(`
+    INSERT INTO attachment_blobs (
+      sha256, stored_name, stored_path, mime_type, size_bytes
+    ) VALUES (?, 'att_doc.md', '/data/attachments/tmp/att_doc.md', 'text/markdown', 12)
+  `).run('d'.repeat(64)).lastInsertRowid;
+  const attachmentId = 'att_1234567890abcdef1234567890abcdef';
+  db.prepare(`
+    INSERT INTO attachments (id, blob_id, original_name, kind)
+    VALUES (?, ?, '문서.md', 'markdown')
+  `).run(attachmentId, blobId);
+  db.prepare(`
+    INSERT INTO attachment_documents (
+      attachment_id, content_sha256, parser_version, parse_status,
+      line_count, char_count, chunk_count, parsed_at
+    ) VALUES (?, ?, 'attachment-document-v1:test', 'ready', 2, 12, 1, 1)
+  `).run(attachmentId, 'd'.repeat(64));
+  db.prepare(`
+    INSERT INTO attachment_chunks (
+      chunk_id, attachment_id, chunk_index, heading,
+      line_start, line_end, content, content_sha256
+    ) VALUES ('atch_1234567890abcdef1234567890abcdef', ?, 0, '제목', 2, 2, '본문', ?)
+  `).run(attachmentId, 'e'.repeat(64));
+
+  assert.deepEqual(db.prepare(`
+    SELECT parse_status AS status, line_count AS lineCount,
+           char_count AS charCount, chunk_count AS chunkCount
+    FROM attachment_documents
+  `).get(), { status: 'ready', lineCount: 2, charCount: 12, chunkCount: 1 });
+  assert.throws(() => db.prepare(`
+    UPDATE attachment_documents SET parse_status = 'ready', chunk_count = 0
+  `).run(), /CHECK/);
+  assert.throws(() => db.prepare(`
+    UPDATE attachment_chunks SET chunk_index = -1
   `).run(), /CHECK/);
   db.close();
 });

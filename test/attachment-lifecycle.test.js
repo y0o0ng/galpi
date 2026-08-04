@@ -137,6 +137,21 @@ test('temporary attachment links atomically, snapshots replay turns, and expires
     SELECT origin_user_turn_index AS originTurn, replay_window_turns AS replayTurns
     FROM message_attachments WHERE message_id = ?
   `).get(first.userMessageId), { originTurn: 1, replayTurns: 2 });
+  const sourceSha256 = db.prepare(`
+    SELECT sha256 FROM attachment_blobs WHERE id = ?
+  `).get(blobId).sha256;
+  db.prepare(`
+    INSERT INTO attachment_documents (
+      attachment_id, content_sha256, parser_version, parse_status,
+      line_count, char_count, chunk_count, parsed_at
+    ) VALUES (?, ?, 'test-parser', 'ready', 1, 8, 1, 1)
+  `).run(attachmentId, sourceSha256);
+  db.prepare(`
+    INSERT INTO attachment_chunks (
+      chunk_id, attachment_id, chunk_index, line_start, line_end,
+      content, content_sha256
+    ) VALUES ('atch_11111111111111111111111111111111', ?, 0, 1, 1, 'replay 자료', ?)
+  `).run(attachmentId, crypto.createHash('sha256').update('replay 자료').digest('hex'));
 
   assert.equal(lifecycle.expireBeforeUpcomingTurn('shared-main').expired, 0);
   insertTurn(db, lifecycle, { text: '둘째 턴' });
@@ -168,6 +183,8 @@ test('temporary attachment links atomically, snapshots replay turns, and expires
   });
   assert.equal(db.prepare('SELECT lifecycle_status AS status FROM attachments WHERE id = ?').get(attachmentId).status, 'deleted');
   assert.equal(db.prepare('SELECT status FROM attachment_blobs WHERE id = ?').get(blobId).status, 'ready');
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_documents').get().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_chunks').get().count, 0);
   assert.equal((await fsp.stat(storedPath)).isFile(), true);
   assert.equal(lifecycle.listForSession('shared-main').get(first.userMessageId)[0].expired, true);
 });
@@ -234,4 +251,42 @@ test('missing attachment lease rolls back both messages and linkage', async t =>
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM message_attachments').get().count, 0);
   assert.equal(db.prepare('SELECT lifecycle_status AS status FROM attachments').get().status, 'uploaded_unattached');
+});
+
+test('document preparation runs inside the lease and a failure releases it for retry', async t => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'attachment-lifecycle-prepare-'));
+  const tmpDir = path.join(root, 'tmp');
+  await fsp.mkdir(tmpDir, { recursive: true });
+  const db = createDatabase();
+  const attachmentId = 'att_55555555555555555555555555555555';
+  await seedAttachment(db, tmpDir, { id: attachmentId, content: '준비할 문서' });
+  let calls = 0;
+  const lifecycle = createAttachmentLifecycleService(db, {
+    enabled: true,
+    tmpDir,
+    replayWindowTurns: 10,
+    async prepareAttachment(id) {
+      calls += 1;
+      assert.equal(id, attachmentId);
+      if (calls === 1) throw new Error('parse failed');
+    },
+  });
+  t.after(async () => {
+    db.close();
+    await fsp.rm(root, { recursive: true, force: true });
+  });
+
+  await assert.rejects(
+    lifecycle.beginChatRequest({ sessionId: 'shared-main', attachmentIds: [attachmentId] }),
+    /parse failed/,
+  );
+  assert.equal(lifecycle.isAttachmentActive(attachmentId), false);
+  const lease = await lifecycle.beginChatRequest({
+    sessionId: 'shared-main',
+    attachmentIds: [attachmentId],
+  });
+  assert.equal(calls, 2);
+  assert.equal(lifecycle.isAttachmentActive(attachmentId), true);
+  lease.release();
+  assert.equal(lifecycle.isAttachmentActive(attachmentId), false);
 });

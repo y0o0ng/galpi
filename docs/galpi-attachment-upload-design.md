@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
 > Version: 0.5
-> 상태: U0a~U0c 파일 운반·composer UI 로컬 구현 완료 / Pi 미배포
+> 상태: U0a~U0c 파일 운반·composer UI와 U1a 문서 파싱·청크 저장 로컬 구현 완료 / U1b 모델 읽기·Pi 배포 미완료
 > 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -536,11 +536,17 @@ attachment_documents
 - parser_version
 - parse_status
 - page_count
+- line_count
 - char_count
-- parsed_path
+- chunk_count
+- error_code
+- error_message
 - created_at
 - updated_at
+- parsed_at
 ```
+
+`parse_status`는 `parsing | ready | failed | needs_ocr`만 허용한다. 파싱 본문을 별도 파일로 복제하지 않고 청크를 DB에 두므로 `parsed_path`는 만들지 않는다. `parsing` 중 서버가 재시작되면 다음 기동에서 `failed / parse_interrupted`로 닫는다.
 
 ### 8.5 attachment_chunks
 
@@ -557,9 +563,10 @@ attachment_chunks
 - line_start
 - line_end
 - content
-- content_hash
+- content_sha256
 - embedding
 - created_at
+- updated_at
 ```
 
 ---
@@ -843,14 +850,30 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 전체 회귀 368/368.
 - 격리된 scratch DB·Vault·backup과 실제 Chromium 업로드로 새 draft 카드와 history 만료 tombstone, console error 0건을 확인했다. 후속 composer 정리에서는 1440×900·1024×768 데스크톱의 floating composer와 40px 액션, 390×844·320×700 모바일의 44px 액션, 빈 입력 음성·입력 뒤 전송의 같은 위치 교대, `+` 메뉴의 파일 첨부, overflow 0과 라이트·다크 테마를 확인했다.
 
+### U1a — 문서 파싱과 청크 저장 ✅ 로컬 구현 완료 (2026-08-04)
+
+구현:
+
+- schema v14 `attachment_documents`와 `attachment_chunks`에 parser version·원본 SHA-256·상태·페이지/줄 범위·본문 hash를 저장한다. 임베딩은 아직 만들지 않는다.
+- 최초 첨부 채팅 요청의 기존 lease 안에서 파싱한다. MD·TXT는 fatal UTF-8·NUL·2MiB 경계를 다시 확인하고 Markdown 제목과 줄 범위를 보존한다. PDF는 논문 경로에서 검증된 `extractPdfPages`와 `buildPaperChunks`를 그대로 재사용해 20MiB·100페이지 상한과 페이지 범위를 유지한다. U4 공통 계층 리팩터링은 하지 않았다.
+- 같은 attachment의 동시 파싱은 promise 하나로 직렬화한다. `content_sha256`과 parser version이 같은 `ready` 결과만 재사용하고, 30초 timeout·파서 오류는 `failed`, 텍스트 레이어가 없는 PDF는 `needs_ocr`로 격리한다. OCR은 실행하지 않는다.
+- 파싱 성공 뒤에도 원문과 청크를 GPT 요청에 넣지 않는다. 모델 입력은 U1b까지 0건이며, 이 단계는 운반·파싱 경계만 검증한다.
+- replay 만료와 60분 unattached orphan 정리가 문서·청크를 원본과 함께 삭제한다. 다른 attachment가 같은 blob을 참조하면 그 attachment의 문서 행은 유지한다.
+
+검증:
+
+- U1a·attachment·migration·서버 집중 33/33을 통과했다.
+- 전체 378개 중 377개가 통과했고 변경과 무관한 Codex organizer 기동 상태 대기 1건은 격리 재실행 7/7로 통과했다.
+- GPT 서버 통합에서 실패한 첫 채팅은 메시지·연결 0건, 파싱 `ready` 1건으로 남아 재시도에 재사용됐고 provider 입력에는 fixture 원문이 없었다. replay 만료 뒤 document·chunk 0건을 확인했다.
+
 아직 하지 않은 것:
 
-- PDF·MD·TXT 파싱과 현재 질문 모델 입력
+- 현재 질문의 관련 청크 회수와 모델 입력
 - 인증 다운로드·미리보기, library 승격
 - iPhone/iPad 실기기 업로드와 재접속 확인
-- Pi schema 11→13 적용과 운영 flag 활성화
+- Pi schema 11→14 적용과 운영 flag 활성화
 
-다음 단위는 U1 문서 읽기다. Pi 배포는 U1과 묶을지 U0 운반만 먼저 실기기 인수할지 배포 직전에 다시 정한다.
+다음 단위는 U1b 관련 청크 회수·GPT 주입이다. Pi 배포는 U1 전체와 composer 수정을 합친 뒤 한 번에 할지 배포 직전에 다시 정한다.
 
 ### U0 — 파일 운반과 저장
 
@@ -876,7 +899,7 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 실행 중 요청·승격 파일은 정리하지 않고 orphan·미참조 blob만 삭제함
 - 모델은 아직 내용을 읽지 않아도 됨
 
-### U1 — 문서 읽기
+### U1 — 문서 읽기 (U1a 파싱 완료 / U1b 모델 읽기 미완료)
 
 구현:
 

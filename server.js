@@ -74,6 +74,7 @@ const { createVoiceTtsService } = require('./lib/voice-tts');
 const { VoiceShortcutError, createVoiceShortcutService } = require('./lib/voice-shortcut');
 const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
 const { AttachmentUploadError, createAttachmentUploadService } = require('./lib/attachment-upload');
+const { createAttachmentDocumentService } = require('./lib/attachment-documents');
 const { createAttachmentLifecycleService } = require('./lib/attachment-lifecycle');
 const { parseAiReadable } = require('./lib/note-access');
 const {
@@ -786,10 +787,15 @@ const assistantPush = createAssistantPushService(db, {
 const voiceShortcut = createVoiceShortcutService(db, {
   enabled: VOICE_SHORTCUT_ENABLED,
 });
+const attachmentDocuments = createAttachmentDocumentService(db, {
+  enabled: ATTACHMENTS_ENABLED,
+  tmpDir: ATTACHMENTS_TMP_DIR,
+});
 const attachmentLifecycle = createAttachmentLifecycleService(db, {
   enabled: ATTACHMENTS_ENABLED,
   tmpDir: ATTACHMENTS_TMP_DIR,
   replayWindowTurns: CONTEXT_N,
+  prepareAttachment: attachmentId => attachmentDocuments.ensureParsed(attachmentId),
 });
 const attachmentUploads = createAttachmentUploadService(db, {
   enabled: ATTACHMENTS_ENABLED,

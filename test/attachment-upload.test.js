@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const http = require('node:http');
@@ -167,6 +168,27 @@ test('temporary attachment upload validates content, deduplicates blobs, and del
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachments').get().count, 3);
   assert.equal((await fsp.readdir(tmpDir)).some(name => name.endsWith('.partial')), false);
 
+  const firstSha256 = db.prepare(`
+    SELECT b.sha256
+    FROM attachments a JOIN attachment_blobs b ON b.id = a.blob_id
+    WHERE a.id = ?
+  `).get(first.body.attachmentId).sha256;
+  db.prepare(`
+    INSERT INTO attachment_documents (
+      attachment_id, content_sha256, parser_version, parse_status,
+      line_count, char_count, chunk_count, parsed_at
+    ) VALUES (?, ?, 'test-parser', 'ready', 1, 10, 1, 1)
+  `).run(first.body.attachmentId, firstSha256);
+  db.prepare(`
+    INSERT INTO attachment_chunks (
+      chunk_id, attachment_id, chunk_index, line_start, line_end,
+      content, content_sha256
+    ) VALUES ('atch_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', ?, 0, 1, 1, '임시 청크', ?)
+  `).run(
+    first.body.attachmentId,
+    crypto.createHash('sha256').update('임시 청크').digest('hex'),
+  );
+
   const stalePartial = path.join(tmpDir, 'stale.partial');
   await fsp.writeFile(stalePartial, 'partial');
   const old = new Date(currentMs - (61 * 60 * 1000));
@@ -188,6 +210,8 @@ test('temporary attachment upload validates content, deduplicates blobs, and del
     db.prepare('SELECT status FROM attachment_blobs ORDER BY id').all(),
     [{ status: 'deleted' }, { status: 'deleted' }],
   );
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_documents').get().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_chunks').get().count, 0);
   assert.deepEqual(await fsp.readdir(tmpDir), []);
 });
 
