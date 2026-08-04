@@ -74,6 +74,7 @@ const { createVoiceTtsService } = require('./lib/voice-tts');
 const { VoiceShortcutError, createVoiceShortcutService } = require('./lib/voice-shortcut');
 const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
 const { AttachmentUploadError, createAttachmentUploadService } = require('./lib/attachment-upload');
+const { createAttachmentLifecycleService } = require('./lib/attachment-lifecycle');
 const { parseAiReadable } = require('./lib/note-access');
 const {
   buildSemanticEmbeddingText,
@@ -785,9 +786,15 @@ const assistantPush = createAssistantPushService(db, {
 const voiceShortcut = createVoiceShortcutService(db, {
   enabled: VOICE_SHORTCUT_ENABLED,
 });
+const attachmentLifecycle = createAttachmentLifecycleService(db, {
+  enabled: ATTACHMENTS_ENABLED,
+  tmpDir: ATTACHMENTS_TMP_DIR,
+  replayWindowTurns: CONTEXT_N,
+});
 const attachmentUploads = createAttachmentUploadService(db, {
   enabled: ATTACHMENTS_ENABLED,
   tmpDir: ATTACHMENTS_TMP_DIR,
+  isAttachmentActive: attachmentLifecycle.isAttachmentActive,
 });
 const assistantTasks = createAssistantTaskStore(db, {
   onTaskInactive: (taskId, changedAt) => assistantPush.skipTask(taskId, changedAt),
@@ -1376,6 +1383,7 @@ const saveChatExchangeTransaction = db.transaction(({
   assistantModel,
   modelSnapshot,
   onInserted,
+  attachmentIds = [],
 }) => {
   stmtEnsureSession.run(sessionId);
   const userResult = insertMessageRecord({
@@ -1394,9 +1402,15 @@ const saveChatExchangeTransaction = db.transaction(({
     runtimeGeneration: modelSnapshot?.runtimeGeneration || null,
     reasoningEffort: modelSnapshot?.reasoningEffort || null,
   });
+  const attachments = attachmentLifecycle.attachToUserMessage({
+    sessionId,
+    userMessageId: userResult.lastInsertRowid,
+    attachmentIds,
+  });
   const inserted = {
     userMessageId: userResult.lastInsertRowid,
     assistantMessageId: assistantResult.lastInsertRowid,
+    attachments,
   };
   if (typeof onInserted === 'function') onInserted(inserted);
   return inserted;
@@ -3136,6 +3150,12 @@ function formatChatApiError(err, model) {
   const code = String(err?.code || '').toUpperCase();
   const lower = message.toLowerCase();
 
+  if (code.startsWith('ATTACHMENT_')) {
+    return {
+      status: status >= 400 && status < 600 ? status : 400,
+      message,
+    };
+  }
   if (code === 'MODEL_UNAVAILABLE') {
     return { status: 409, message: '선택한 모델을 현재 사용할 수 없어요. 모델 설정을 확인해주세요.' };
   }
@@ -3307,7 +3327,7 @@ async function decideCouncilWebEvidence(context, claudeModel, onStage = () => {}
 
 // ─── 채팅 ────────────────────────────────────────────────────────────────────
 
-async function runSingleChatTurn({
+async function runSingleChatTurnBody({
   message,
   model,
   sessionId,
@@ -3320,8 +3340,9 @@ async function runSingleChatTurn({
   allowAutoTopic = true,
   additionalInstructions = '',
   onExchangeInserted = null,
+  attachmentIds = [],
+  onAttachmentExchangeInserted = () => {},
 }) {
-  return withSessionChatLock(sessionId, async () => {
     hydrateSessionFromDb(sessionId);
     const history = sessions[sessionId];
     const requestTime = new Date();
@@ -3426,7 +3447,7 @@ async function runSingleChatTurn({
     if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
 
     const assistantModel = model === 'gpt' ? usedModel : 'Claude';
-    const { userMessageId, assistantMessageId } = dbSaveChatExchange({
+    const { userMessageId, assistantMessageId, attachments } = dbSaveChatExchange({
       sessionId,
       question: message,
       answer: reply,
@@ -3434,7 +3455,9 @@ async function runSingleChatTurn({
       assistantModel,
       modelSnapshot,
       onInserted: onExchangeInserted,
+      attachmentIds,
     });
+    onAttachmentExchangeInserted();
     const assistantCreatedAt = Math.floor(Date.now() / 1000);
     sessions[sessionId] = [
       ...history,
@@ -3469,6 +3492,7 @@ async function runSingleChatTurn({
       reasoningEffort: modelSnapshot?.reasoningEffort || null,
       usage: model === 'gpt' ? usage : undefined,
       messageId: assistantMessageId,
+      attachments,
       scheduleCandidate,
       // 음성이 "계속"이라고 했을 때 이어 읽을 나머지. 서버는 보관하지 않는다.
       ...(spokenRemaining ? { spokenRemaining } : {}),
@@ -3480,12 +3504,41 @@ async function runSingleChatTurn({
         contextChars: paperFullTextUsage.contextChars,
       },
     };
+}
+
+async function runSingleChatTurn(input) {
+  return withSessionChatLock(input.sessionId, async () => {
+    const attachmentLease = await attachmentLifecycle.beginChatRequest({
+      sessionId: input.sessionId,
+      attachmentIds: input.attachmentIds,
+    });
+    let attachmentExchangeInserted = false;
+    try {
+      const expiration = attachmentLifecycle.expireBeforeUpcomingTurn(input.sessionId);
+      if (expiration.errors > 0) {
+        console.warn(`⚠️ 만료 첨부 원본 정리 보류: ${expiration.errors}건`);
+      }
+      return await runSingleChatTurnBody({
+        ...input,
+        attachmentIds: attachmentLease.attachmentIds,
+        onAttachmentExchangeInserted() { attachmentExchangeInserted = true; },
+      });
+    } finally {
+      attachmentLease.release();
+      if (!attachmentExchangeInserted && attachmentLease.attachmentIds.length > 0) {
+        const expiration = attachmentLifecycle.expireBeforeUpcomingTurn(input.sessionId);
+        if (expiration.errors > 0) {
+          console.warn(`⚠️ 실패 요청 뒤 만료 첨부 원본 정리 보류: ${expiration.errors}건`);
+        }
+      }
+    }
   });
 }
 
 app.post('/api/chat', async (req, res) => {
   const {
     message, model, sessionId, activeNotes, webSearch, progress: wantsProgress, source,
+    attachmentIds,
   } = req.body;
   if (!message || !model || !sessionId) {
     return res.status(400).json({ error: '필수 항목이 빠졌습니다.' });
@@ -3533,6 +3586,7 @@ app.post('/api/chat', async (req, res) => {
       // 음성 출처 턴은 전사 오류가 지식 베이스에 굳지 않도록 topic 자동 저장에서 제외한다.
       // 대화 자체는 기존 경로로 저장하고 명시적 저장만 허용한다.
       allowAutoTopic: source !== 'voice',
+      attachmentIds,
     });
     if (!progress.result(payload)) res.json(payload);
   } catch (err) {
@@ -7747,9 +7801,11 @@ function appendPaperEvidence(contextMessage, evidence) {
 
 app.get('/api/sessions/:id', (req, res) => {
   const { id } = req.params;
+  const attachmentsByMessage = attachmentLifecycle.listForSession(id);
   const messages = noteSaveState.listSessionMessages(id).map(message => ({
     ...message,
     noteSaved: !!message.noteSaved,
+    attachments: attachmentsByMessage.get(message.id) || [],
   }));
 
   // 인메모리 컨텍스트 복원 (서버 재시작 후 AI가 이전 대화 참고 가능)

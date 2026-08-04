@@ -78,13 +78,14 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
+      { version: 13 },
     ],
   );
 
@@ -286,6 +287,38 @@ test('schema v12 stores temporary attachment blobs separately from user uploads'
       sha256, stored_name, stored_path, mime_type, size_bytes
     ) VALUES (?, 'att_empty.txt', '/data/attachments/tmp/att_empty.txt', 'text/plain', 0)
   `).run('b'.repeat(64)), /CHECK/);
+  db.close();
+});
+
+test('schema v13 links attachments to one replay-snapshotted user message', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+  const messageId = db.prepare(`
+    INSERT INTO messages (session_id, role, content, created_at)
+    VALUES ('attachment-session', 'user', '첨부 질문', 1)
+  `).run().lastInsertRowid;
+  const blobId = db.prepare(`
+    INSERT INTO attachment_blobs (
+      sha256, stored_name, stored_path, mime_type, size_bytes
+    ) VALUES (?, 'att_link.txt', '/data/attachments/tmp/att_link.txt', 'text/plain', 4)
+  `).run('c'.repeat(64)).lastInsertRowid;
+  db.prepare(`
+    INSERT INTO attachments (id, blob_id, original_name, kind)
+    VALUES ('att_abcdef0123456789abcdef0123456789', ?, 'link.txt', 'text')
+  `).run(blobId);
+  db.prepare(`
+    INSERT INTO message_attachments (
+      message_id, attachment_id, position, origin_user_turn_index, replay_window_turns
+    ) VALUES (?, 'att_abcdef0123456789abcdef0123456789', 0, 1, 10)
+  `).run(messageId);
+
+  assert.deepEqual(db.prepare(`
+    SELECT origin_user_turn_index AS originTurn, replay_window_turns AS replayTurns
+    FROM message_attachments
+  `).get(), { originTurn: 1, replayTurns: 10 });
+  assert.throws(() => db.prepare(`
+    UPDATE message_attachments SET replay_window_turns = 0
+  `).run(), /CHECK/);
   db.close();
 });
 

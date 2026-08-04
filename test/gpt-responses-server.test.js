@@ -87,6 +87,8 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
 
   let responseMode = 'completed';
   const responseRequests = [];
+  let inspectedAttachmentId = null;
+  const attachmentStatesAtProvider = [];
   const provider = http.createServer(async (req, res) => {
     const body = await readJson(req);
     if (req.url === '/v1/embeddings') {
@@ -99,6 +101,14 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
     }
     if (req.url === '/v1/responses') {
       responseRequests.push(body);
+      if (inspectedAttachmentId) {
+        const probeDb = new Database(path.join(appRoot, 'galpi.db'), { readonly: true });
+        attachmentStatesAtProvider.push(probeDb.prepare(`
+          SELECT lifecycle_status AS status
+          FROM attachments WHERE id = ?
+        `).get(inspectedAttachmentId)?.status || null);
+        probeDb.close();
+      }
       if (responseMode === 'incomplete') {
         return sendJson(res, 200, {
           id: 'resp_incomplete',
@@ -155,6 +165,8 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
       CODEX_RUNNER_MODE: 'heuristic',
       ASSISTANT_TASKS_ENABLED: 'false',
       WEB_PUSH_ENABLED: 'false',
+      ATTACHMENTS_ENABLED: 'true',
+      CONTEXT_N: '2',
   };
   const startTestServer = () => {
     const processHandle = spawn(process.execPath, ['server.js'], {
@@ -329,5 +341,100 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   assert.equal(recovered.response.status, 200, JSON.stringify(recovered.body));
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, 4);
   assert.doesNotMatch(JSON.stringify(responseRequests.at(-1).input), new RegExp(failedQuestion));
+
+  const form = new FormData();
+  form.set(
+    'file',
+    new Blob(['ATTACHMENT_MODEL_SECRET'], { type: 'text/plain' }),
+    '연결자료.txt',
+  );
+  const uploadResponse = await fetch(`${url}/api/attachments`, {
+    method: 'POST',
+    headers: { 'X-API-Token': API_TOKEN },
+    body: form,
+  });
+  const uploadBody = await uploadResponse.json();
+  assert.equal(uploadResponse.status, 201, JSON.stringify(uploadBody));
+  inspectedAttachmentId = uploadBody.attachmentId;
+
+  responseMode = 'incomplete';
+  const failedAttachment = await api(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: '실패하는 첨부 연결 턴',
+      model: 'gpt',
+      sessionId: 'shared-main',
+      attachmentIds: [uploadBody.attachmentId],
+    }),
+  });
+  assert.equal(failedAttachment.response.status, 502, JSON.stringify(failedAttachment.body));
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM message_attachments').get().count, 0);
+  assert.equal(db.prepare(`
+    SELECT lifecycle_status AS status FROM attachments WHERE id = ?
+  `).get(uploadBody.attachmentId).status, 'uploaded_unattached');
+
+  responseMode = 'completed';
+  const linked = await api(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: '첨부 연결 턴',
+      model: 'gpt',
+      sessionId: 'shared-main',
+      attachmentIds: [uploadBody.attachmentId],
+    }),
+  });
+  assert.equal(linked.response.status, 200, JSON.stringify(linked.body));
+  assert.equal(linked.body.attachments[0].attachmentId, uploadBody.attachmentId);
+  assert.doesNotMatch(JSON.stringify(responseRequests.at(-1).input), /ATTACHMENT_MODEL_SECRET/);
+  const linkedRow = db.prepare(`
+    SELECT ma.origin_user_turn_index AS originTurn,
+           ma.replay_window_turns AS replayTurns,
+           a.lifecycle_status AS status, b.stored_path AS storedPath
+    FROM message_attachments ma
+    JOIN attachments a ON a.id = ma.attachment_id
+    JOIN attachment_blobs b ON b.id = a.blob_id
+    WHERE ma.attachment_id = ?
+  `).get(uploadBody.attachmentId);
+  assert.deepEqual({
+    originTurn: linkedRow.originTurn,
+    replayTurns: linkedRow.replayTurns,
+    status: linkedRow.status,
+  }, { originTurn: 3, replayTurns: 2, status: 'attached_temporary' });
+
+  const history = await api(url, '/api/sessions/shared-main');
+  const linkedMessage = history.body.messages.find(message => message.content === '첨부 연결 턴');
+  assert.equal(linkedMessage.attachments[0].filename, '연결자료.txt');
+  assert.equal(linkedMessage.attachments[0].expired, false);
+
+  const providerCallsBeforeMismatch = responseRequests.length;
+  const mismatch = await api(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: '다른 세션 재사용',
+      model: 'gpt',
+      sessionId: 'other-session',
+      attachmentIds: [uploadBody.attachmentId],
+    }),
+  });
+  assert.equal(mismatch.response.status, 409, JSON.stringify(mismatch.body));
+  assert.equal(responseRequests.length, providerCallsBeforeMismatch);
+
+  const fourth = await api(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message: '넷째 턴', model: 'gpt', sessionId: 'shared-main' }),
+  });
+  assert.equal(fourth.response.status, 200, JSON.stringify(fourth.body));
+  assert.equal(attachmentStatesAtProvider.at(-1), 'attached_temporary');
+
+  const fifth = await api(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message: '다섯째 턴', model: 'gpt', sessionId: 'shared-main' }),
+  });
+  assert.equal(fifth.response.status, 200, JSON.stringify(fifth.body));
+  assert.equal(attachmentStatesAtProvider.at(-1), 'deleted');
+  await assert.rejects(fs.stat(linkedRow.storedPath), error => error.code === 'ENOENT');
+  const expiredHistory = await api(url, '/api/sessions/shared-main');
+  const expiredMessage = expiredHistory.body.messages.find(message => message.content === '첨부 연결 턴');
+  assert.equal(expiredMessage.attachments[0].expired, true);
   db.close();
 });

@@ -128,7 +128,7 @@ test('attachment route is authenticated, feature-flagged, and stores only in the
 
   const db = new Database(path.join(appRoot, 'galpi.db'), { readonly: true });
   t.after(() => db.close());
-  assert.equal(db.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 12);
+  assert.equal(db.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 13);
   const stored = db.prepare(`
     SELECT a.id, a.lifecycle_status AS lifecycleStatus,
            b.stored_path AS storedPath, b.status

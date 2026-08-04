@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
-> Version: 0.3
-> 상태: U0a 서버 업로드 기반 로컬 구현 완료 / Pi 미배포
+> Version: 0.4
+> 상태: U0a·U0b 서버 업로드·replay 수명주기 로컬 구현 완료 / Pi 미배포
 > 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -781,7 +781,7 @@ Markdown과 TXT는 페이지 대신 헤딩 또는 줄 범위를 사용한다.
 
 ## 14. 구현 단계
 
-> 순서 경계: U0~U1은 [단일 GPT·모델 라우팅](chat-model-routing-design.md)의 도구 parity와 입력창 model picker가 안정된 뒤 시작한다. U0a 서버 기반은 로컬에서 끝났고, 메시지 연결·UI·모델 읽기·Pi 배포는 아직 시작하지 않았다.
+> 순서 경계: U0~U1은 [단일 GPT·모델 라우팅](chat-model-routing-design.md)의 도구 parity와 입력창 model picker가 안정된 뒤 시작한다. U0a·U0b 서버 기반과 replay 수명주기는 로컬에서 끝났고, UI·모델 읽기·Pi 배포는 아직 시작하지 않았다.
 
 ### U0a — 서버 업로드 기반 ✅ 로컬 구현 완료 (2026-08-04)
 
@@ -804,15 +804,34 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 집중 테스트 11/11: 인증·flag·data directory 격리, 정상 업로드, SHA/MIME 중복 경계, 위장 파일·과대 파일·잘못된 UTF-8 차단, 중단 정리, 60분 orphan 정리, schema v12·runtime path.
 - 전체 회귀 356/356.
 
+### U0b — 메시지 연결과 replay 수명주기 ✅ 로컬 구현 완료 (2026-08-04)
+
+구현:
+
+- schema v13 `message_attachments`가 사용자 메시지, 첨부 ID, 위치, `origin_user_turn_index`, 연결 당시 `replay_window_turns`를 저장한다.
+- `/api/chat`은 선택적인 `attachmentIds` 배열을 받으며 현재는 한 개만 허용한다. 기존 전역 API 인증이 사용자 경계이고, 최초 연결 뒤에는 같은 `session_id`에서만 명시적 재첨부할 수 있다.
+- 채팅을 시작할 때 원본 경로가 temporary root 안인지, lifecycle·blob 상태, 크기, SHA-256을 다시 검증한다. 실행 중 ID는 메모리 lease로 보호해 60분 orphan 정리와 replay 만료가 원본을 지우지 못하게 한다.
+- 사용자·assistant 메시지와 `message_attachments`, `attachments.session_id`·`attached_temporary` 전이를 한 DB transaction에서 확정한다. 모델 실패나 연결 충돌이면 메시지와 연결이 모두 남지 않고 업로드는 재시도 가능한 `uploaded_unattached`로 유지된다.
+- 사용자 턴 번호는 해당 session의 저장된 user message 수로 계산한다. `origin + replay_window_turns`와 같은 번호의 새 사용자 요청에서, 외부 모델을 호출하기 전에 attachment를 먼저 `expired`로 전환한다.
+- 경계 턴에 같은 ID를 명시적으로 다시 첨부하면 lease가 기존 연결의 만료를 잠시 막고, 새 message 연결과 새 origin snapshot이 수명을 연장한다. 자연어 파일명 언급은 이 경로를 호출하지 않는다.
+- 만료된 attachment는 참조가 없는 temporary blob만 삭제한다. 같은 blob을 쓰는 살아 있는 upload나 library 참조가 있으면 물리 원본은 유지한다.
+- `/api/sessions/:id`는 각 메시지에 파일명·종류·MIME·크기·상태와 `expired` tombstone 정보를 돌려준다. 저장 경로·SHA·blob ID는 노출하지 않는다.
+- 이 단계의 첨부 원문은 모델 요청에 넣지 않는다. 연결·만료가 안정된 뒤 U1 문서 읽기에서만 비신뢰 자료 경계와 함께 주입한다.
+
+검증:
+
+- 집중 테스트 16/16: 원자적 연결·rollback, replay snapshot, 경계 직전 유지·경계 호출 전 만료, 명시적 재첨부 연장, 실행 lease와 orphan 정리, 다른 session 차단, 원본 크기·SHA 재검증, history tombstone, 모델 입력 원문 0건.
+- 전체 회귀 360/360.
+
 아직 하지 않은 것:
 
-- `message_attachments`, `CONTEXT_N` replay snapshot, 메시지 연결과 tombstone
-- 첨부 버튼·진행률·취소·재접속 UI
-- 파싱·모델 입력·다운로드/미리보기 API
-- library 승격·Vault 노트·전문 색인
-- Pi schema 적용과 운영 flag 활성화
+- 입력창 클립 버튼, 업로드 진행·취소, 전송 전 첨부 카드
+- 브라우저 history에서 attachment metadata를 실제 카드로 렌더링
+- PDF·MD·TXT 파싱과 현재 질문 모델 입력
+- 인증 다운로드·미리보기, library 승격
+- Pi schema 11→13 적용과 운영 flag 활성화
 
-다음 단위는 U0b다. 기존 메시지 저장 transaction에 첨부 연결을 포함하고, 연결 시점의 `CONTEXT_N`을 snapshot해 모델 호출 전 만료 경계를 먼저 완성한다. 그 뒤 U0c에서 UI를 붙인다.
+다음 단위는 U0c다. 기존 composer에 단일 파일 선택·업로드·취소·전송 연결을 붙이고, 새 응답과 재접속 history가 같은 attachment 카드/tombstone renderer를 사용하게 한다.
 
 ### U0 — 파일 운반과 저장
 

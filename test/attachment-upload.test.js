@@ -85,11 +85,13 @@ test('temporary attachment upload validates content, deduplicates blobs, and del
   const tmpDir = path.join(root, 'attachments', 'tmp');
   const db = createDatabase();
   let currentMs = Date.parse('2026-08-04T00:00:00Z');
+  const activeAttachmentIds = new Set();
   const service = createAttachmentUploadService(db, {
     enabled: true,
     tmpDir,
     limits: { image: 12 },
     now: () => currentMs,
+    isAttachmentActive: id => activeAttachmentIds.has(id),
   });
   const { server, url } = await startUploadServer(service);
   t.after(async () => {
@@ -170,7 +172,10 @@ test('temporary attachment upload validates content, deduplicates blobs, and del
   const old = new Date(currentMs - (61 * 60 * 1000));
   await fsp.utimes(stalePartial, old, old);
   currentMs += 61 * 60 * 1000;
-  assert.deepEqual(service.cleanupOrphans(), { attachments: 3, blobs: 2, partials: 1 });
+  activeAttachmentIds.add(first.body.attachmentId);
+  assert.deepEqual(service.cleanupOrphans(), { attachments: 2, blobs: 1, partials: 1 });
+  activeAttachmentIds.clear();
+  assert.deepEqual(service.cleanupOrphans(), { attachments: 1, blobs: 1, partials: 0 });
   rows = db.prepare(`
     SELECT lifecycle_status AS lifecycleStatus FROM attachments ORDER BY id
   `).all();
