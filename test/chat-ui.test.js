@@ -52,14 +52,24 @@ test('bubble markdown keeps intentional line breaks when pre-wrap is off', () =>
 });
 
 test('every composer action keeps a 44px touch target', () => {
-  assert.match(
-    css,
-    /#send-btn,\s*#voice-hd-button,\s*#voice-realtime-button \{[^}]*width: 44px;[^}]*height: 44px/s,
-  );
   assert.match(css, /#attachment-button \{[^}]*min-height: 44px/s);
   const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
   assert.match(mobile, /#assistant-tools-toggle \{[^}]*width: 44px;[^}]*height: 44px/s);
   assert.match(mobile, /#chat-model-button \{[^}]*height: 44px/s);
+  assert.match(
+    mobile,
+    /#send-btn,\s*#voice-hd-button,\s*#voice-realtime-button \{[^}]*width: 44px;[^}]*height: 44px/s,
+  );
+});
+
+test('desktop floats the composer without changing the mobile bottom bar', () => {
+  const desktop = allBlocks(css, '@media (min-width: 641px)').join('\n');
+  assert.match(desktop, /#input-area \{[^}]*border-top-color: transparent;[^}]*background: transparent;[^}]*box-shadow: none/s);
+  assert.match(desktop, /#composer-shell \{[^}]*border-radius: 24px;[^}]*box-shadow:/s);
+
+  const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
+  assert.match(mobile, /#input-area \{[^}]*padding-block: 8px max\(10px, env\(safe-area-inset-bottom\)\)/s);
+  assert.match(mobile, /#composer-toolbar \{[^}]*min-height: 50px/s);
 });
 
 test('the two-row composer keeps attachments in the plus menu and one primary action', () => {

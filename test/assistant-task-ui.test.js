@@ -51,7 +51,7 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#chat-model-button\s*{[^}]*height: 44px/s);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#chat-model-menu\s*{[^}]*position: fixed/s);
   assert.match(css, /#input\s*{[^}]*min-width: 0/s);
-  assert.match(css, /#send-btn,\s*#voice-hd-button,\s*#voice-realtime-button\s*{[^}]*width: 44px;[^}]*height: 44px/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#send-btn,\s*#voice-hd-button,\s*#voice-realtime-button\s*{[^}]*width: 44px;[^}]*height: 44px/s);
   assert.match(modelPickerSource, /If-Match/);
   assert.match(modelPickerSource, /appliesFrom|다음 답변부터/);
   assert.ok(notificationIndex > 0 && notificationIndex < taskIndex);

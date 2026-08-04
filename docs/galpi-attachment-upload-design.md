@@ -840,8 +840,8 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 검증:
 
 - 집중 18/18: flag, 단일 업로드와 빈 MIME 보정, 업로드 중 전송 차단·취소, 공통 카드·만료 tombstone, lifecycle polling signature, 인증 업로드·원자적 메시지 연결 회귀.
-- 전체 회귀 367/367.
-- 격리된 scratch DB·Vault·backup과 실제 Chromium 업로드로 새 draft 카드와 history 만료 tombstone, console error 0건을 확인했다. 후속 composer 정리에서는 390×844와 320×700 모두 문서 가로 overflow 0, 빈 입력의 음성 버튼과 입력 뒤 같은 위치의 전송 버튼 44px, `+` 메뉴의 파일 첨부, 라이트·다크 테마를 확인했다.
+- 전체 회귀 368/368.
+- 격리된 scratch DB·Vault·backup과 실제 Chromium 업로드로 새 draft 카드와 history 만료 tombstone, console error 0건을 확인했다. 후속 composer 정리에서는 1440×900·1024×768 데스크톱의 floating composer와 40px 액션, 390×844·320×700 모바일의 44px 액션, 빈 입력 음성·입력 뒤 전송의 같은 위치 교대, `+` 메뉴의 파일 첨부, overflow 0과 라이트·다크 테마를 확인했다.
 
 아직 하지 않은 것:
 
