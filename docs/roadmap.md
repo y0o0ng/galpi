@@ -269,7 +269,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - [x] H6a Pi 기술 인수에서 schema v11·운영 flag·활성 iOS 구독 credential을 적용하고 scoped token의 exact route 한정과 일반 API 거절을 확인한다
 - [x] H6b iPhone에서 실제 단일 턴과 고정 3회 반복·로컬 종료가 PWA 실행 없이 동작하고 topic·일정 쓰기가 0이다
 - [x] 잠금 화면 표시 상태와 디스플레이 소등 상태를 분리했다. 전자는 동작하고 후자는 최소 음성 단축어부터 호출되지 않아 서버 밖 플랫폼 제약으로 수용한다
-- [ ] H6d는 명시적인 새 일정 생성만 기존 validator 뒤 `shortcut-task:<requestId>`로 즉시·멱등 저장하도록 로컬 구현했고 전체 386/386을 통과했다. Pi 배포와 실기기 생성·취소 인수는 남아 있다
+- [x] H6d는 명시적인 새 일정 생성만 기존 validator 뒤 `shortcut-task:<requestId>`로 즉시·멱등 저장하도록 Pi에 배포했다. 실기기에서 KST 기한·알림을 정확히 1회 생성하고 앱 취소 뒤 reminder·월별 projection까지 정상 반영됨을 인수했다
 - H6 확대를 닫아 같은 request ID의 iPhone 실기기 재시도와 화면 소등 10회 기준은 더 진행하지 않는다. 서버 멱등성 회귀 테스트는 유지한다
 
 > 핵심 포인트: PWA 반이중은 `gpt-transcribe`와 OpenAI TTS, H6 단축어는 Apple 받아쓰기와 텍스트 말하기를 입·귀로 쓴다. 둘 다 같은 회수·GPT·`shared-main` 저장 경로를 쓰고 음성 질문은 topic에 자동 저장하지 않는다. 화면 없는 H6는 명시적인 새 일정 생성만 열고 기존 일정 mutation과 노트·설정 쓰기는 닫는다.

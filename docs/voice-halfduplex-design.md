@@ -2,7 +2,7 @@
 
 > Date: 2026-08-01
 >
-> Status: H1·H2·H4·H5와 지연 C1·C2 Pi 배포·실기기 인수 완료. H6a 서버 단일 턴과 H6b iPhone 화면 활성 경로 인수 완료·디스플레이 소등 호출은 플랫폼 제약으로 종료, H6d 단축어 직접 일정 생성 로컬 구현 완료·Pi 미배포, H3 미구현
+> Status: H1·H2·H4·H5와 지연 C1·C2 Pi 배포·실기기 인수 완료. H6a 서버 단일 턴과 H6b iPhone 화면 활성 경로 인수 완료·디스플레이 소등 호출은 플랫폼 제약으로 종료, H6d 단축어 직접 일정 생성 Pi·실기기 인수 완료, H3 미구현
 >
 > Scope: 핸즈프리 반이중 음성 대화, 전사 검증·되묻기, 음성 답변 분리, iOS 잠금화면 단축어 입구, 기존 채팅 파이프라인 재사용
 >
@@ -559,9 +559,13 @@ Apple 문서는 음성 단축어가 기기에서 문구를 듣고 동작을 실�
 
 **H6c bounded 후속 대화.** 현재 단축어는 기존 단일 턴 route를 고정 3회 반복하고, `끝`·`됐어`·`그만`은 API 호출 전에 로컬에서 `단축어 중단`한다. 모든 정상 턴이 `shared-main` 최근 문맥을 읽으므로 별도 `conversationId` 없이도 실제 후속 대화가 이어졌다. 따라서 서버 conversation 상태는 현 단계에 추가하지 않는다. 다른 대화와의 문맥 혼선이나 서버 강제 상한 필요성이 실측될 때만 다시 연다. 무한 반복은 만들지 않고, 3턴이 안정된 뒤에도 분당 10회 제한 안의 명시적 고정 상한만 늘린다.
 
-**H6d 단축어 직접 일정 생성 — 2026-08-04 로컬 구현 완료·Pi 미배포.** H6a의 읽기 전용 차단은 구현 제약이 아니라 초기 권한 선택이었다. 화면 없는 경로에서 후보 카드만 만들면 candidate가 유실되므로, 명시적인 새 일정·할 일·알림 생성 발화 자체를 최종 승인으로 보는 좁은 예외를 열었다. 단축어 라우트는 기존 `schedule_prepare` schema와 `assistantTasks.prepare` validator를 그대로 거친 뒤 `assistantTasks.create`를 즉시 호출한다. request key는 `shortcut-task:<voice shortcut requestId>`로 결정해 같은 receipt 재전송이 provider·message뿐 아니라 task도 중복 생성하지 않는다. 모델은 마지막 `<user_question>`만으로 도구를 선택해야 하며 과거 대화, 활성 일정, 기억, 노트, 웹 결과만으로는 쓰기를 시작하지 않는다. PWA 채팅은 계속 미저장 후보와 카드 확인을 사용한다.
+**H6d 단축어 직접 일정 생성 — 2026-08-04 Pi 배포·실기기 인수 완료.** H6a의 읽기 전용 차단은 구현 제약이 아니라 초기 권한 선택이었다. 화면 없는 경로에서 후보 카드만 만들면 candidate가 유실되므로, 명시적인 새 일정·할 일·알림 생성 발화 자체를 최종 승인으로 보는 좁은 예외를 열었다. 단축어 라우트는 기존 `schedule_prepare` schema와 `assistantTasks.prepare` validator를 그대로 거친 뒤 `assistantTasks.create`를 즉시 호출한다. request key는 `shortcut-task:<voice shortcut requestId>`로 결정해 같은 receipt 재전송이 provider·message뿐 아니라 task도 중복 생성하지 않는다. 모델은 마지막 `<user_question>`만으로 도구를 선택해야 하며 과거 대화, 활성 일정, 기억, 노트, 웹 결과만으로는 쓰기를 시작하지 않는다. PWA 채팅은 계속 미저장 후보와 카드 확인을 사용한다.
 
-새 단위·서버 통합을 포함한 로컬 전체 회귀는 386/386이다. 통합 fixture에서 명시적 생성 1건이 task 1행으로 저장되고, 완료 receipt replay는 provider·message·task를 모두 늘리지 않으며, 같은 request ID의 다른 본문은 `409`, scoped token의 일반 `/api/chat` 우회는 `401`, topic·note chunk 쓰기는 0임을 확인했다. Pi 배포 뒤에는 실제 단축어로 가까운 미래의 폐기 가능한 일정 1건을 생성해 KST 기한·알림·응답 낭독·task/event/reminder 증가를 확인하고 즉시 앱에서 취소한다.
+새 단위·서버 통합을 포함한 로컬 전체 회귀는 386/386이다. 통합 fixture에서 명시적 생성 1건이 task 1행으로 저장되고, 완료 receipt replay는 provider·message·task를 모두 늘리지 않으며, 같은 request ID의 다른 본문은 `409`, scoped token의 일반 `/api/chat` 우회는 `401`, topic·note chunk 쓰기는 0임을 확인했다.
+
+Pi DB·Vault 백업 `20260804-1801`과 코드 복구본 `code-h6d-shortcut-schedule-pre-20260804-180118.tar.gz` 뒤 커밋 `87afbaa`의 변경 파일 10개를 배포했고 로컬·Pi SHA-256이 모두 일치했다. 재시작 전 집중 35/35, Pi native 배포 트리 전체 385/385, 재시작 뒤 핵심 5/5를 통과했다. 로컬 전체와 Pi 전체의 1개 차이는 Pi에 Docker 개발용 runtime-path backup test·script를 배포하지 않고 native 운영본을 유지하기 때문이다. 새 PID `191756`, 시작 시각 `2026-08-04 18:04:32 KST`, `active/running`, HTTP 200, schema 14, shortcut·GPT 활성, warning 이상 journal 0건을 확인했다.
+
+실기기에서는 “내일 오후 3시에 H6d 테스트 일정을 만들고 오후 2시 55분에 알려줘”를 단축어로 호출했다. Apple 받아쓰기 때문에 제목은 `H 육 D 테스트`가 됐지만 task 14는 정확한 KST 기한과 reminder 5를 갖고 한 번만 생성됐다. messages `601→603`, task/event/reminder/receipt `13/25/4/10→14/26/5/11`, 완료 receipt 시도 1회였고 notes/note_chunks/auto-save `36/113/198`은 불변이었다. 사용자가 앱에서 취소한 뒤 task는 version 2 `closed/cancelled`, reminder는 `task_cancelled`, 생성·취소 이벤트는 각각 1건이며 8월 schedule projection generation도 `2/2`로 따라잡았다. SQLite integrity `ok`, 외래키 0, 새 warning 0건이다. 같은 request ID의 실기기 네트워크 재전송은 기존 결정대로 별도 인수하지 않고 서버 회귀를 유지한다.
 
 ### 공식 근거와 실기기 불확실성
 

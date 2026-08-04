@@ -40,7 +40,7 @@
 - Realtime은 2026-08-01 제품 경로에서 접었다. `docs/voice-realtime-design.md`는 R0~R2c-1 기록일 뿐이고 새 작업 기준은 반이중 문서다.
 - 2026-08-03 H5에서 Pi의 Realtime·read tool·correction·finalize 운영 flag를 모두 껐고 반이중만 유지해 실기기 인수했다. Realtime 코드는 기록·롤백용으로 남긴다.
 - H6a 서버와 iPhone 단일·고정 3회 반복·로컬 종료는 인수했다. 잠금 화면 표시 중에는 동작하지만 디스플레이 소등 상태에서는 최소 음성 단축어부터 호출되지 않아 플랫폼 제약으로 수용하고 H6 확대를 닫았다. 현재 iPhone route·credential은 유지하되 iPad는 강의 노트, 노트북은 V6 화면 시온 단계까지 등록하지 않는다.
-- H6d는 단축어의 명시적인 새 일정 생성만 기존 validator 뒤 `shortcut-task:<requestId>`로 즉시·멱등 저장하도록 로컬 구현했다. PWA 카드 확인, 기존 일정 mutation·다른 쓰기 차단, scoped bearer의 exact route 경계는 유지한다. 로컬 386/386 통과, Pi·실기기 인수는 남아 있다.
+- H6d는 단축어의 명시적인 새 일정 생성만 기존 validator 뒤 `shortcut-task:<requestId>`로 즉시·멱등 저장하도록 Pi·실기기 인수했다. PWA 카드 확인, 기존 일정 mutation·다른 쓰기 차단, scoped bearer exact route를 유지하며 생성·알림·취소 projection까지 정상이다.
 - 운영 흐름은 브라우저 VAD → `gpt-transcribe` → 기존 단일 GPT 채팅 → `gpt-4o-mini-tts`다. 음성 턴도 `sendSingleMessage`를 통해 `shared-main`에 저장하지만 `source:'voice'`는 topic 자동 저장에서 제외한다. 원본 오디오는 DB·Vault·backup·temp file에 저장하지 않는다.
 - 일정 카드의 음성 등록·취소는 모델이 아니라 좁은 어휘로 카드 버튼과 같은 핸들러를 호출한다. 그 턴은 모델·메시지 저장을 거치지 않는다. 등록·취소가 아닌 발화는 카드를 조용히 취소한 뒤 일반 대화로 보낸다.
 - TTS voice는 `echo`, 기본 speed는 `1.3`, 조각 RMS 목표는 `0.18`이다. WAV의 streaming sentinel 길이는 실제 길이로 정규화하고 재생 진행 감시 타이머를 유지한다.
