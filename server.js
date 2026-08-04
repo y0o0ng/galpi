@@ -75,6 +75,7 @@ const { VoiceShortcutError, createVoiceShortcutService } = require('./lib/voice-
 const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
 const { AttachmentUploadError, createAttachmentUploadService } = require('./lib/attachment-upload');
 const { createAttachmentDocumentService } = require('./lib/attachment-documents');
+const { createAttachmentImageService } = require('./lib/attachment-images');
 const { createAttachmentDocumentTools } = require('./lib/attachment-document-tools');
 const {
   AttachmentLifecycleError,
@@ -205,6 +206,10 @@ const VOICE_TTS_INSTRUCTIONS = process.env.VOICE_TTS_INSTRUCTIONS;
 const VOICE_TTS_SPEED = process.env.VOICE_TTS_SPEED;
 const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 const ATTACHMENTS_ENABLED = process.env.ATTACHMENTS_ENABLED === 'true';
+// 이미지는 매 턴 원본이 통째로 다시 실려 나가므로 문서보다 짧은 창과 턴 예산을 쓴다.
+const ATTACHMENT_IMAGE_REPLAY_TURNS = 3;
+const ATTACHMENT_IMAGE_MAX_PER_TURN = 8;
+const ATTACHMENT_IMAGE_MAX_TURN_BYTES = 12 * 1024 * 1024;
 const VOICE_SESSION_TTL_MS = 60 * 60 * 1000;
 const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
@@ -806,10 +811,17 @@ const attachmentDocuments = createAttachmentDocumentService(db, {
 const attachmentDocumentTools = createAttachmentDocumentTools({
   documentService: attachmentDocuments,
 });
+const attachmentImages = createAttachmentImageService(db, {
+  enabled: ATTACHMENTS_ENABLED,
+  tmpDir: ATTACHMENTS_TMP_DIR,
+  maxImagesPerTurn: ATTACHMENT_IMAGE_MAX_PER_TURN,
+  maxTurnBytes: ATTACHMENT_IMAGE_MAX_TURN_BYTES,
+});
 const attachmentLifecycle = createAttachmentLifecycleService(db, {
   enabled: ATTACHMENTS_ENABLED,
   tmpDir: ATTACHMENTS_TMP_DIR,
   replayWindowTurns: CONTEXT_N,
+  imageReplayWindowTurns: ATTACHMENT_IMAGE_REPLAY_TURNS,
   prepareAttachment: attachmentId => attachmentDocuments.ensureParsed(attachmentId),
 });
 const attachmentUploads = createAttachmentUploadService(db, {
@@ -3219,6 +3231,10 @@ function formatChatApiError(err, model) {
   if (code === 'MODEL_UNAVAILABLE') {
     return { status: 409, message: '선택한 모델을 현재 사용할 수 없어요. 모델 설정을 확인해주세요.' };
   }
+  // 설계상 이미지 미지원 모델을 조용히 바꾸지 않는다. 사용자가 직접 고르게 한다.
+  if (code === 'MODEL_IMAGE_UNSUPPORTED') {
+    return { status: 409, message };
+  }
   if (code === 'MODEL_CATALOG_UNAVAILABLE') {
     return { status: 503, message: '사용 가능한 GPT 모델 목록을 확인하지 못했어요. 잠시 후 다시 시도해주세요.' };
   }
@@ -3413,12 +3429,29 @@ async function runSingleChatTurnBody({
     const previousMessageCreatedAt = getLastMessageTimestamp(history);
     const userEntry = { role: 'user', content: message, createdAt: requestCreatedAt };
     const requestHistory = [...history, userEntry];
+
+    // 이미지는 도구가 아니라 이 턴의 모델 입력에 직접 실린다. 모델 선택보다 먼저
+    // 확정해야 이미지 입력이 검증된 모델만 고를 수 있다.
+    const turnImages = await attachmentImages.listTurnImages({
+      sessionId,
+      attachmentIds,
+    });
+    if (turnImages.skippedInvalid > 0) {
+      console.warn(`⚠️ 원본 검증 실패로 제외한 이미지 첨부: ${turnImages.skippedInvalid}건`);
+    }
+    if (turnImages.images.length > 0 && model !== 'gpt') {
+      const error = new Error('이미지 첨부는 GPT 채팅에서만 읽을 수 있습니다.');
+      error.code = 'MODEL_IMAGE_UNSUPPORTED';
+      throw error;
+    }
+
     const modelSnapshot = model === 'gpt'
       ? resolveChatModelSelection({
         selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
         catalogRow: modelCatalogs.get('openai_api'),
         bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
         reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+        requireImageInput: turnImages.images.length > 0,
       })
       : null;
 
@@ -3452,22 +3485,32 @@ async function runSingleChatTurnBody({
       if (webSearch) throw err;
       console.warn('명시적 웹 검색 실패:', err.message);
     }
+    const contextMessage = buildContextMessage(
+      message,
+      resolvedNotes,
+      memoryItems,
+      pastMessages,
+      webEvidence,
+      requestTime,
+      previousMessageCreatedAt,
+      getActiveScheduleContext(),
+      retrievalContext,
+      buildTurnAttachmentContext(turnAttachments, turnImages),
+    );
     const context = [
       ...baseContext.slice(0, -1),
       {
         role: 'user',
-        content: buildContextMessage(
-          message,
-          resolvedNotes,
-          memoryItems,
-          pastMessages,
-          webEvidence,
-          requestTime,
-          previousMessageCreatedAt,
-          getActiveScheduleContext(),
-          retrievalContext,
-          buildTurnAttachmentContext(turnAttachments),
-        ),
+        // 이미지가 있는 턴만 멀티모달 배열로 보낸다. 나머지는 기존 문자열 그대로다.
+        content: turnImages.images.length > 0
+          ? [
+            { type: 'input_text', text: contextMessage },
+            ...turnImages.images.map(image => ({
+              type: 'input_image',
+              image_url: image.dataUrl,
+            })),
+          ]
+          : contextMessage,
       },
     ];
     const allowModelWebTool = (
@@ -3548,7 +3591,10 @@ async function runSingleChatTurnBody({
     // replay 후보가 살아 있으면 모델이 직전 답변만으로 답해 첨부 도구를 다시
     // 호출하지 않을 수 있다. 그 파생 내용도 temporary 경계 안이므로 후보가
     // 만료될 때까지 자동 topic 저장을 막는다. 명시적 저장 버튼은 별도다.
-    if (!scheduleCandidate && allowAutoTopic && !attachmentToolSession.hasTemporaryCandidates) {
+    // 이미지는 도구를 거치지 않고 바로 입력에 실리므로 따로 확인한다.
+    const hasTemporaryAttachmentContext = attachmentToolSession.hasTemporaryCandidates
+      || attachmentImages.hasTemporaryImages({ sessionId, attachmentIds });
+    if (!scheduleCandidate && allowAutoTopic && !hasTemporaryAttachmentContext) {
       autoAppendTopicNote({
         question: message,
         answer: reply,
@@ -7920,10 +7966,20 @@ ${question}
 </user_question>`;
 }
 
-function buildTurnAttachmentContext(attachments = []) {
+function buildTurnAttachmentContext(attachments = [], turnImages = null) {
+  const lines = [];
   const names = attachments.map(attachment => attachment?.filename).filter(Boolean);
-  if (names.length === 0) return '';
-  return `<current_attachments>\n사용자가 이번 턴에 첨부한 파일: ${names.join(', ')}\n</current_attachments>`;
+  if (names.length > 0) lines.push(`사용자가 이번 턴에 첨부한 파일: ${names.join(', ')}`);
+  const imageNames = (turnImages?.images || []).map(image => image.filename).filter(Boolean);
+  if (imageNames.length > 0) {
+    lines.push(`이 요청에 함께 보낸 이미지: ${imageNames.join(', ')}`);
+  }
+  // 예산에서 밀린 이미지를 본 것처럼 답하지 않도록 빠졌다는 사실만 알린다.
+  if (turnImages?.omittedForBudget > 0) {
+    lines.push(`이전 턴 이미지 ${turnImages.omittedForBudget}장은 크기 제한으로 이번 요청에 포함하지 않았다. 그 이미지 내용은 알 수 없으니 필요하면 다시 올려달라고 말하라.`);
+  }
+  if (lines.length === 0) return '';
+  return `<current_attachments>\n${lines.join('\n')}\n</current_attachments>`;
 }
 
 function appendPaperEvidence(contextMessage, evidence) {

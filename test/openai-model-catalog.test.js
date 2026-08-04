@@ -8,9 +8,11 @@ const { runDatabaseMigrations } = require('../lib/database-migrations');
 const { createModelCatalogStore } = require('../lib/model-catalog-store');
 const {
   CHAT_SELECTION_AUTO,
+  OPENAI_PROBE_VERSION,
   buildOpenAIChatCatalogView,
   buildOpenAIModelCatalogPayload,
   normalizeAvailableOpenAIModels,
+  probeOpenAIImageInput,
   probeOpenAIResponsesModel,
   refreshOpenAIModelCatalog,
   resolveChatModelSelection,
@@ -69,7 +71,7 @@ test('OpenAI catalog keeps a compatible older active model when a newer probe fa
     models: [{
       id: 'gpt-5.6-terra',
       role: 'balanced',
-      probeVersion: 1,
+      probeVersion: OPENAI_PROBE_VERSION,
       probeStatus: 'compatible',
       probeErrorCode: null,
       probedAt: 10,
@@ -200,6 +202,125 @@ test('chat resolver auto-moves but exact selections must be compatible', () => {
   assert.throws(
     () => resolveChatModelSelection({ selection: 'gpt-5.5-terra', catalogRow }),
     error => error.code === 'MODEL_UNAVAILABLE',
+  );
+});
+
+test('image probe is judged separately so a text-only model stays usable', async () => {
+  const probed = [];
+  const payload = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-5.6-terra' }, { id: 'gpt-5.6-luna' }],
+    probeModel: async () => {},
+    probeImageInput: async modelId => {
+      probed.push(modelId);
+      if (modelId === 'gpt-5.6-luna') {
+        const error = new Error('no image input');
+        error.status = 400;
+        throw error;
+      }
+    },
+    now: () => 30,
+  });
+
+  assert.deepEqual(probed.sort(), ['gpt-5.6-luna', 'gpt-5.6-terra']);
+  const terra = payload.models.find(model => model.id === 'gpt-5.6-terra');
+  const luna = payload.models.find(model => model.id === 'gpt-5.6-luna');
+  assert.equal(terra.imageProbeStatus, 'compatible');
+  assert.equal(luna.imageProbeStatus, 'rejected');
+  // 이미지에서 거부돼도 텍스트 채팅 후보로는 남는다.
+  assert.equal(luna.probeStatus, 'compatible');
+  assert.equal(payload.active.fast, 'gpt-5.6-luna');
+  assert.equal(payload.activeImage.fast, null);
+  assert.equal(payload.activeImage.balanced, 'gpt-5.6-terra');
+});
+
+test('image probe does not run on a model the text probe already rejected', async () => {
+  let imageProbeCalls = 0;
+  const payload = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-5.6-terra' }],
+    probeModel: async () => {
+      throw new Error('rejected');
+    },
+    probeImageInput: async () => { imageProbeCalls += 1; },
+    now: () => 40,
+  });
+  assert.equal(imageProbeCalls, 0);
+  assert.equal(payload.models[0].imageProbeStatus, 'untested');
+  assert.equal(payload.activeImage.balanced, null);
+});
+
+test('image probe sends one image and requires completed text back', async () => {
+  const requests = [];
+  const okClient = {
+    responses: {
+      async create(request) {
+        requests.push(request);
+        return { status: 'completed', model: 'gpt-5.6-terra', output_text: 'ok' };
+      },
+    },
+  };
+  assert.deepEqual(await probeOpenAIImageInput(okClient, 'gpt-5.6-terra'), {
+    modelId: 'gpt-5.6-terra',
+  });
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].store, false);
+  const parts = requests[0].input[0].content;
+  assert.equal(parts.filter(part => part.type === 'input_image').length, 1);
+  assert.match(parts.at(-1).image_url, /^data:image\/png;base64,/);
+
+  const emptyClient = {
+    responses: {
+      async create() {
+        return { status: 'completed', output_text: '   ' };
+      },
+    },
+  };
+  await assert.rejects(
+    () => probeOpenAIImageInput(emptyClient, 'gpt-5.6-terra'),
+    error => error.code === 'MODEL_IMAGE_PROBE_TEXT_MISSING',
+  );
+});
+
+test('image turns resolve only to verified models and never switch silently', () => {
+  const catalogRow = {
+    generation: 7,
+    payload: {
+      active: { balanced: 'gpt-5.7-terra' },
+      activeImage: { balanced: 'gpt-5.6-terra' },
+      models: [
+        { id: 'gpt-5.7-terra', probeStatus: 'compatible', imageProbeStatus: 'rejected' },
+        { id: 'gpt-5.6-terra', probeStatus: 'compatible', imageProbeStatus: 'compatible' },
+      ],
+    },
+  };
+  assert.equal(
+    resolveChatModelSelection({
+      selection: CHAT_SELECTION_AUTO,
+      catalogRow,
+      requireImageInput: true,
+    }).modelId,
+    'gpt-5.6-terra',
+  );
+  // 고정 선택이 이미지를 못 받으면 조용히 다른 모델로 바꾸지 않고 실패한다.
+  assert.throws(
+    () => resolveChatModelSelection({
+      selection: 'gpt-5.7-terra',
+      catalogRow,
+      requireImageInput: true,
+    }),
+    error => error.code === 'MODEL_IMAGE_UNSUPPORTED',
+  );
+  assert.equal(
+    resolveChatModelSelection({ selection: 'gpt-5.7-terra', catalogRow }).modelId,
+    'gpt-5.7-terra',
+  );
+  // 검증 전에는 bootstrap 모델로 흘려보내지 않는다.
+  assert.throws(
+    () => resolveChatModelSelection({
+      selection: CHAT_SELECTION_AUTO,
+      catalogRow: { generation: 0, payload: null },
+      requireImageInput: true,
+    }),
+    error => error.code === 'MODEL_IMAGE_UNSUPPORTED',
   );
 });
 

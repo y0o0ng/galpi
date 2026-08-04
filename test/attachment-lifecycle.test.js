@@ -337,3 +337,81 @@ test('document preparation runs inside the lease and a failure releases it for r
   lease.release();
   assert.equal(lifecycle.isAttachmentActive(attachmentId), false);
 });
+
+test('images take the shorter replay window and expire while a document is still live', async t => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'attachment-lifecycle-image-'));
+  const tmpDir = path.join(root, 'tmp');
+  await fsp.mkdir(tmpDir, { recursive: true });
+  const db = createDatabase();
+  const documentId = 'att_66666666666666666666666666666666';
+  const imageId = 'att_77777777777777777777777777777777';
+  await seedAttachment(db, tmpDir, { id: documentId, content: '문서 자료' });
+  const imageBytes = Buffer.from('이미지 원본');
+  const imageStoredPath = path.join(tmpDir, `${imageId}.png`);
+  await fsp.writeFile(imageStoredPath, imageBytes, { mode: 0o600 });
+  const imageBlobId = Number(db.prepare(`
+    INSERT INTO attachment_blobs (sha256, stored_name, stored_path, mime_type, size_bytes)
+    VALUES (?, ?, ?, 'image/png', ?)
+  `).run(
+    crypto.createHash('sha256').update(imageBytes).digest('hex'),
+    `${imageId}.png`,
+    imageStoredPath,
+    imageBytes.length,
+  ).lastInsertRowid);
+  db.prepare(`
+    INSERT INTO attachments (id, blob_id, original_name, kind)
+    VALUES (?, ?, '사진.png', 'image')
+  `).run(imageId, imageBlobId);
+
+  const lifecycle = createAttachmentLifecycleService(db, {
+    enabled: true,
+    tmpDir,
+    replayWindowTurns: 10,
+    imageReplayWindowTurns: 3,
+    now: () => Date.parse('2026-08-05T00:00:00Z'),
+  });
+  t.after(async () => {
+    db.close();
+    await fsp.rm(root, { recursive: true, force: true });
+  });
+
+  const documentLease = await lifecycle.beginChatRequest({
+    sessionId: 'shared-main',
+    attachmentIds: [documentId],
+  });
+  insertTurn(db, lifecycle, { attachmentIds: [documentId], text: '문서 턴' });
+  documentLease.release();
+
+  const imageLease = await lifecycle.beginChatRequest({
+    sessionId: 'shared-main',
+    attachmentIds: [imageId],
+  });
+  insertTurn(db, lifecycle, { attachmentIds: [imageId], text: '이미지 턴' });
+  imageLease.release();
+
+  assert.deepEqual(db.prepare(`
+    SELECT attachment_id AS attachmentId,
+           origin_user_turn_index AS originTurn,
+           replay_window_turns AS replayTurns
+    FROM message_attachments ORDER BY attachment_id
+  `).all(), [
+    { attachmentId: documentId, originTurn: 1, replayTurns: 10 },
+    { attachmentId: imageId, originTurn: 2, replayTurns: 3 },
+  ]);
+
+  for (const text of ['셋째 턴', '넷째 턴']) {
+    assert.equal(lifecycle.expireBeforeUpcomingTurn('shared-main').expired, 0);
+    insertTurn(db, lifecycle, { text });
+  }
+  const expiration = lifecycle.expireBeforeUpcomingTurn('shared-main');
+  assert.equal(expiration.upcomingUserTurnIndex, 5);
+  assert.equal(expiration.expired, 1);
+  assert.equal(
+    db.prepare('SELECT lifecycle_status AS status FROM attachments WHERE id = ?').get(imageId).status,
+    'deleted',
+  );
+  assert.equal(
+    db.prepare('SELECT lifecycle_status AS status FROM attachments WHERE id = ?').get(documentId).status,
+    'attached_temporary',
+  );
+});
