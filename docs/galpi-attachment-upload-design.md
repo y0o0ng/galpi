@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
 > Version: 0.7
-> 상태: U0a~U0c 파일 운반·composer UI, U1a~U1c 문서 읽기·replay 저장 경계 Pi 배포 및 iPhone 대표 MD 인수 완료
+> 상태: U0a~U0c 파일 운반·composer UI, U1a~U1c 문서 읽기·replay 저장 경계 Pi 배포 및 iPhone 대표 MD 인수 완료, U3a library 승격·재회수 Pi·브라우저 인수 완료
 > 작성일: 2026-08-04
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -909,7 +909,7 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 - 새 PID `194030`, 시작 시각 `2026-08-04 18:38:58 KST`, HTTP 200, journal warning 0건이다. iPhone에서 원본을 다시 첨부하지 않은 후속 질문은 메시지 2건을 정상 저장했지만 `note_chunks 113`, `auto_save_decisions 198`은 불변이었다. 최종 note-index 36/36 finding 0, topic Q&A 108/108, 복구 계획 `clean`, SQLite integrity `ok`·FK 0을 확인했다.
 - 향후 서재 승격은 새 저장 boolean을 쌓지 않고 기존 lifecycle로 해결한다. `attached_temporary`와 `promoting`은 자동 topic 저장을 계속 막고, Vault copy·fsync·SHA-256·Attachment 노트와 DB 연결이 모두 성공해 `library`가 된 뒤 temporary 후보에서 제외한다. library 자료는 일반 서재 검색/A2 컨텍스트로 회수되므로 후속 답변의 자동 topic 저장을 허용한다. temporary와 library가 섞이면 temporary가 하나라도 있는 동안 차단한다.
 
-### U3a — 명시적 library 승격과 일반 서재 재회수 ✅ 로컬 구현 완료 (2026-08-04)
+### U3a — 명시적 library 승격과 일반 서재 재회수 ✅ Pi·브라우저 인수 완료 (2026-08-04)
 
 구현:
 
@@ -926,12 +926,28 @@ U0 전체를 한 번에 열지 않고, 인증된 임시 원본 수신과 수명�
 
 - 로컬 전체 회귀 396/396을 통과했다. schema 14→15, 인증·session 격리, source 변조·노트 marker 주입 차단, mode `0600`, blob dedup, exact orphan 재시도, 원자적 DB rollback, UI in-place 상태, library-only 재회수와 mixed temporary 저장 차단을 포함한다.
 
+Pi 인수(2026-08-04):
+
+- DB·Vault 백업 `20260804-1922`, 코드 복구본 `code-attachment-u3a-pre-20260804-192147.tar.gz` 뒤 배포 파일 11개 hash가 로컬과 일치했다. 파일 복사만 끝나고 재시작이 지연되어 약 3시간 동안 디스크는 v15 코드, 프로세스는 구 코드, DB는 schema 14인 상태로 떠 있었다. 재시작으로 schema 14→15 `attachment_library_links`를 적용했고 새 PID `199780`, 시작 `2026-08-04 22:11:56 KST`, HTTP 200, journal warning 0건을 확인했다.
+- 배포 전후 `messages/notes/note_chunks/auto_save_decisions` `619/36/113/198`은 불변이었고 새 `attachment_library_items`는 0행으로 시작했다.
+- 브라우저 승격 결과는 `scope: library`·`lifecycle_status: library`·`promoted_at` 기록, `_attachments/2026/08/attlib_<sha-prefix>.md` 원본 mode `600`, 크기·SHA-256 일치, `attachments/tmp/` 비움, temporary blob `deleted`, Attachment 노트와 1:1 link, 노트 embedding 생성까지 모두 확인했다. SQLite `integrity ok`·FK 0이다.
+- 승격 뒤 원본을 다시 첨부하지 않은 후속 질문이 일반 서재 회수만으로 문서를 읽고 `[Lecture-note-system Design.md, §…, lines …]` 형식 출처를 남겼다. 즉 library 재회수 경로가 운영에서 동작한다.
+- 실기기 iPhone 저장은 아직 확인하지 않았다. 브라우저 경로로 U3a를 닫고 기기별 실측은 실제 필요가 생길 때 추가한다.
+
+### U3a 후속 — 이번 턴 첨부를 모델에 알리는 경계 (2026-08-04)
+
+- 증상: 첨부를 연결한 첫 턴에 `이건 어떻게 생각해??`처럼 지시대명사만으로 물으면 모델이 문서를 읽지 않고 내용을 붙여달라고 되물었다.
+- 원인은 파싱 경쟁이 아니었다. 파싱은 `beginChatRequest`가 `ensureParsed`를 await하므로 모델 호출 전에 끝나고, 실패 턴에서도 `parse_status ready`가 모델 호출보다 11초 앞섰다. 후보 조회도 정상이었다. 모델에 가는 사용자 턴에 첨부 사실을 알리는 신호가 도구 설명뿐이어서, 직전 다른 문서 맥락이 지시대명사를 가져간 것이다.
+- 수정은 `<context>` 마지막에 `<current_attachments>` 블록으로 이번 턴 첨부 파일명만 넣고, 지시(instruction)는 시스템 프롬프트에만 둔다. 파일명은 업로드 시점 `normalizeOriginalName`이 제어문자를 제거하고 255자로 제한하므로 블록 경계를 깨뜨리지 않는다. 저장되는 메시지 본문과 화면 표시는 바뀌지 않는다.
+- 큰 첨부의 첫 턴은 파싱이 요청 안에서 끝나므로 `attachment_parse` 진행 단계(`첨부 분석 중…`)를 추가해 그 시간을 알린다.
+- 인수: DB·Vault 백업 `20260804-2317`, 코드 복구본 `code-attachment-context-pre-20260804-2317.tar.gz` 뒤 4개 소스와 테스트 2개를 배포해 hash 6/6이 일치했고 Pi 전체 396/396을 통과했다. 새 PID `202562`, 시작 `2026-08-04 23:20:12 KST`, HTTP 200이다. `paper-search-design.md`(464줄·19,124자·32청크)를 새로 첨부하고 `이건 어때? 이건 지금까지의 것 중에 유일하게 너한테 구현된거야.`로 물으니 문서를 읽고 `[paper-search-design.md, §0. 한 줄 요약, lines 9-10]` 등 출처를 남겼다. 같은 파일의 library 승격도 이어서 성공했다.
+
 현재 U3a에서 의도적으로 남긴 것:
 
 - 인증된 원본 열기·다운로드 UI
 - Codex 제목·요약 보강과 실패 재시도
 - U2 이미지 읽기 뒤 이미지 library 승격
-- Pi 배포와 iPhone 실기기 저장·후속 회수 인수
+- iPhone 실기기 저장·후속 회수 인수
 
 ### U0 — 파일 운반과 저장
 

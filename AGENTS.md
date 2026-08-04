@@ -28,9 +28,10 @@
 ## 현재 제품과 운영 경계
 
 - 제품은 `갈피`(`galpi`), 화면 비서는 `시온`(`XION`)이다. Pi 운영 경로는 `/home/pi/galpi`, `galpi.db`, `galpi-vault`, `galpi.service`다.
-- 메인 채팅은 단일 GPT다. 신규 의회 실행은 `410`으로 퇴역했고 기존 의회 대화·transcript·노트의 읽기·검색 호환성만 유지한다. 채팅 `자동`과 Codex 일반은 `gpt-5.6-terra`, Codex 깊은 재처리는 `gpt-5.5`다.
+- 메인 채팅은 단일 GPT다. 신규 의회 실행은 `410`으로 퇴역했고 기존 의회 대화·transcript·노트의 읽기·검색 호환성만 유지한다. 채팅 `자동`은 `gpt-5.6-terra`, Codex 일반은 `gpt-5.6-luna`, Codex 깊은 재처리는 `gpt-5.5`다. Codex 모델의 정본은 `app_settings`이고 기동 로그는 env 기본값을 찍으므로 실제 값은 DB에서 확인한다.
 - A2는 전역 `ready` topic 청크를 보수적으로 최대 8,000자 주입한다. 명시 선택 노트와 비topic 자료는 기존 경로를 유지하고, 관찰에는 질문 원문 대신 `query_sha256`·`runtime_generation`을 쓴다.
 - DB가 대화·task·상태의 정본이다. topic Markdown QA-LOG는 사람에게 보이는 Q&A 정본이고 `note_chunks`는 재생성 가능한 검색 인덱스다. Codex는 허용 마커만 수정하며 `recovery_required` fail-close·원자적 finalization을 유지한다.
+- 첨부가 연결된 턴은 `<context>` 마지막 `<current_attachments>` 블록으로 파일명만 알리고 지시는 시스템 프롬프트에만 둔다. 저장되는 메시지 본문과 화면 표시는 바꾸지 않는다. 새 첨부의 파싱은 채팅 요청 안에서 끝나므로 그동안 `attachment_parse` 단계를 보낸다.
 - 일정은 DB 정본, 활성 일정 대화 컨텍스트, 완료·취소 월별 `schedule_history` projection 구조다. 자연어 요청은 무저장 후보 카드가 되고 `등록`만 기존 task API를 같은 request ID로 호출한다.
 - Docker는 개발·CI 재현성에만 사용한다. Pi는 native `galpi.service`, host Codex, 분리된 DB/WAL/SHM·Vault·backup 경계를 유지한다.
 - 구현·Pi 배포가 끝난 기능의 상세 테스트 수·PID·백업명·hash는 git과 관련 설계 문서에서 찾는다. 이 파일에는 다시 누적하지 않는다.
@@ -75,7 +76,8 @@
 - H6의 동일 request ID iPhone 재시도·화면 소등 10회 기준·추가 기기 등록은 더 진행하지 않는다. bounded 3턴은 현재 단축어와 `shared-main`으로 유지하고 별도 server conversation 상태를 추가하지 않는다. 남은 음성 후보인 침묵 1200→1000ms, earcon, H3 되묻기는 각각 필요성이 생길 때만 별도 변경으로 연다.
 - 상시 관찰: 새 `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 10회 표시, 다음 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 - V5-A 딜 스카우트는 수익 모델 불확실성 때문에 2026-08-04 잠정보류했다. 계정 신청·API 키·코드·외부 게시를 시작하지 않으며, 보류를 이유로 V5-B 주식 분석을 자동 착수하지 않는다. 다음 제품 작업은 별도로 선택한다.
-- 첨부 U0a~U1c는 Pi·iPhone 인수를 마쳤다. U3a는 MD·TXT·PDF의 명시적 `library` 승격, Attachment 노트, 일반 서재 재회수를 로컬 구현했다. library-only 후속 답변은 일반 저장을 허용하고 temporary 후보가 하나라도 살아 있으면 계속 막는다. Pi·iPhone 인수와 Codex 요약·원본 열기·이미지는 남았다.
+- 첨부 U0a~U1c는 Pi·iPhone 인수를, U3a는 Pi·브라우저 인수를 마쳤다. U3a는 MD·TXT·PDF의 명시적 `library` 승격, Attachment 노트, 일반 서재 재회수다. library-only 후속 답변은 일반 저장을 허용하고 temporary 후보가 하나라도 살아 있으면 계속 막는다. iPhone 실기기 저장과 Codex 요약·원본 열기·이미지는 남았다.
+- Codex 정리는 Codex 구독 사용 한도 소진으로 2026-08-08 17:56까지 실패한다. `codex_jobs` 42가 노트 2개를 계속 재시도하지만 `recovery_required`는 0건이고 노트 본문은 건드려지지 않았다. 한도가 회복되면 저절로 풀리므로 코드는 고치지 않는다. 채팅·첨부는 별도 API 키를 쓰므로 영향이 없다.
 
 ## 구조 방향
 
