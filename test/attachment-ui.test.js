@@ -74,7 +74,14 @@ class FakeFormData {
   get(name) { return this.values.get(name); }
 }
 
-function loadUi({ enabled = true, apiFetch, sessionId = 'shared-main' } = {}) {
+function loadUi({
+  enabled = true,
+  apiFetch,
+  sessionId = 'shared-main',
+  maxFilesPerMessage = 1,
+  maxDocumentsPerMessage = 1,
+  maxImageBytesPerMessage = 12 * 1024 * 1024,
+} = {}) {
   const elements = {
     'attachment-button': fakeElement('attachment-button'),
     'attachment-input': fakeElement('attachment-input'),
@@ -94,9 +101,11 @@ function loadUi({ enabled = true, apiFetch, sessionId = 'shared-main' } = {}) {
   fakeWindow.AttachmentUi.init({
     config: {
       enabled,
-      maxFilesPerMessage: 1,
+      maxFilesPerMessage,
+      maxDocumentsPerMessage,
       maxPdfBytes: 20 * 1024 * 1024,
       maxImageBytes: 10 * 1024 * 1024,
+      maxImageBytesPerMessage,
       maxTextBytes: 2 * 1024 * 1024,
     },
     apiFetch: apiFetch || (async () => ({ ok: true, json: async () => ({}) })),
@@ -140,7 +149,8 @@ test('one selected file uploads with the authenticated fetch and becomes the sen
 
   assert.equal(elements['attachment-button'].hidden, false);
   assert.equal(uploadedFile.type, 'text/markdown', '빈 브라우저 MIME은 확장자의 허용 MIME으로 보정한다');
-  assert.equal(ui.getReadyAttachment().attachmentId, 'att_ui_1');
+  assert.deepEqual(
+    Array.from(ui.getReadyAttachments(), item => item.attachmentId), ['att_ui_1']);
   assert.equal(elements['attachment-draft'].hidden, false);
   assert.equal(elements['attachment-draft'].children[0].children[0].textContent, 'MD');
   assert.equal(elements['attachment-draft'].children[0].children[1].children[0].textContent, '강의.md');
@@ -241,4 +251,104 @@ test('poll signatures change when attachment lifecycle changes without a new mes
     attachments: [{ attachmentId: 'att_ui_3', status: 'expired', expired: true }],
   }]);
   assert.notEqual(before, after);
+});
+
+test('여러 이미지를 한 초안에 쌓고 개별로 취소한다', async () => {
+  const uploaded = [];
+  const { elements, ui } = loadUi({
+    maxFilesPerMessage: 6,
+    apiFetch: async (url, options) => {
+      const name = options.body.get('file').name;
+      uploaded.push(name);
+      return {
+        ok: true,
+        json: async () => ({
+          attachmentId: `att_ui_${uploaded.length}`,
+          filename: name,
+          kind: 'image',
+          mimeType: 'image/png',
+          sizeBytes: 10,
+          status: 'uploaded_unattached',
+        }),
+      };
+    },
+  });
+
+  assert.equal(elements['attachment-input'].multiple, true);
+  elements['attachment-input'].files = [
+    new FakeFile(['1'], '하나.png', { type: 'image/png' }),
+    new FakeFile(['2'], '둘.png', { type: 'image/png' }),
+    new FakeFile(['3'], '셋.png', { type: 'image/png' }),
+  ];
+  elements['attachment-input'].dispatch('change');
+  await settle();
+  await settle();
+
+  assert.deepEqual(uploaded, ['하나.png', '둘.png', '셋.png']);
+  assert.deepEqual(
+    Array.from(ui.getReadyAttachments(), item => item.filename),
+    ['하나.png', '둘.png', '셋.png'],
+  );
+  assert.equal(elements['attachment-draft'].children.length, 3);
+  // 한도에 안 찼으면 클립 버튼은 계속 열려 있다.
+  assert.equal(elements['attachment-button'].disabled, false);
+
+  // 두 번째 카드의 취소 버튼만 누른다.
+  elements['attachment-draft'].children[1].children.at(-1).dispatch('click');
+  assert.deepEqual(
+    Array.from(ui.getReadyAttachments(), item => item.filename),
+    ['하나.png', '셋.png'],
+  );
+
+  ui.clearAfterSend(['att_ui_1', 'att_ui_3']);
+  assert.equal(ui.getReadyAttachments().length, 0);
+  assert.equal(elements['attachment-draft'].hidden, true);
+});
+
+test('메시지당 문서 수와 이미지 합계를 붙이는 순간 막는다', async () => {
+  const { elements, ui } = loadUi({
+    maxFilesPerMessage: 6,
+    maxImageBytesPerMessage: 25,
+    apiFetch: async (url, options) => {
+      const file = options.body.get('file');
+      return {
+        ok: true,
+        json: async () => ({
+          attachmentId: `att_ui_${file.name}`,
+          filename: file.name,
+          kind: file.name.endsWith('.png') ? 'image' : 'markdown',
+          mimeType: file.name.endsWith('.png') ? 'image/png' : 'text/markdown',
+          sizeBytes: file.size,
+          status: 'uploaded_unattached',
+        }),
+      };
+    },
+  });
+
+  elements['attachment-input'].files = [new FakeFile(['문서'], '첫.md')];
+  elements['attachment-input'].dispatch('change');
+  await settle();
+  await settle();
+  elements['attachment-input'].files = [new FakeFile(['문서'], '둘.md')];
+  elements['attachment-input'].dispatch('change');
+  await settle();
+  assert.match(elements['attachment-draft'].children.at(-1).textContent, /문서는 한 번에 1개까지/);
+  assert.equal(ui.getReadyAttachments().length, 1);
+
+  elements['attachment-input'].files = [new FakeFile(['0123456789'], '큰1.png', { type: 'image/png' })];
+  elements['attachment-input'].dispatch('change');
+  await settle();
+  await settle();
+  elements['attachment-input'].files = [new FakeFile(['0123456789'], '큰2.png', { type: 'image/png' })];
+  elements['attachment-input'].dispatch('change');
+  await settle();
+  await settle();
+  assert.equal(ui.getReadyAttachments().length, 3);
+
+  // 합계 25바이트를 넘기는 세 번째 이미지는 업로드 자체를 시작하지 않는다.
+  elements['attachment-input'].files = [new FakeFile(['0123456789'], '큰3.png', { type: 'image/png' })];
+  elements['attachment-input'].dispatch('change');
+  await settle();
+  assert.match(elements['attachment-draft'].children.at(-1).textContent, /이미지는 한 번에 합쳐서/);
+  assert.equal(ui.getReadyAttachments().length, 3);
 });

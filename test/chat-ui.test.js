@@ -80,7 +80,7 @@ test('the two-row composer keeps attachments in the plus menu and one primary ac
   assert.ok(html.indexOf('id="attachment-button"') < html.indexOf('id="composer-primary-action"'));
   assert.ok(html.indexOf('attachment-ui.js') < html.indexOf('app.js'));
   assert.match(app, /appendUserBubble\(msg\.content, msg\.attachments\)/);
-  assert.match(app, /attachmentIds: \[draftAttachment\.attachmentId\]/);
+  assert.match(app, /attachmentIds: draftAttachments\.map\(attachment => attachment\.attachmentId\)/);
   assert.match(app, /useComposerDraft: true/);
   assert.match(app, /const usesComposerDraft = options\.overrideText == null \|\| options\.useComposerDraft === true/);
   assert.match(css, /#composer-shell \{[^}]*display: grid/s);

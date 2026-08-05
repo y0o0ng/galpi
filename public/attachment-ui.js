@@ -45,9 +45,11 @@
     let showToast = () => {};
     let getSessionId = () => 'shared-main';
     let config = null;
-    let controller = null;
     const promotingIds = new Set();
-    let state = { phase: 'empty', attachment: null, file: null, error: '' };
+    // 초안은 여러 개다. 각 항목이 자기 업로드 상태와 취소 컨트롤러를 들고 있다.
+    let drafts = [];
+    let draftError = '';
+    let nextDraftKey = 0;
 
     const el = id => global.document.getElementById(id);
 
@@ -57,12 +59,48 @@
       return Number(config?.maxTextBytes || 0);
     }
 
+    function maxFiles() {
+      return Math.max(1, Number(config?.maxFilesPerMessage || 1));
+    }
+
+    function maxDocuments() {
+      return Math.max(1, Number(config?.maxDocumentsPerMessage || 1));
+    }
+
+    function maxImageBytesPerMessage() {
+      return Number(config?.maxImageBytesPerMessage || 0);
+    }
+
+    function draftKind(draft) {
+      return draft.attachment?.kind || kindFromFile(draft.file) || 'text';
+    }
+
+    function draftBytes(draft) {
+      return Number(draft.attachment?.sizeBytes ?? draft.file?.size ?? 0);
+    }
+
+    // 붙이는 순간 막는다. 보내고 나서 조용히 잘리는 것보다 낫다.
     function validateFile(file) {
       const kind = kindFromFile(file);
       if (!kind) return 'PDF, MD, TXT, JPG, PNG, WebP 파일만 첨부할 수 있어.';
       if (!Number(file?.size)) return '빈 파일은 첨부할 수 없어.';
       const limit = limitFor(kind);
       if (limit > 0 && file.size > limit) return `${KIND_LABELS[kind]} 파일은 ${humanBytes(limit)}까지 첨부할 수 있어.`;
+      if (drafts.length >= maxFiles()) return `한 번에 ${maxFiles()}개까지 첨부할 수 있어.`;
+      if (kind !== 'image') {
+        const documents = drafts.filter(draft => draftKind(draft) !== 'image').length;
+        if (documents >= maxDocuments()) {
+          return `문서는 한 번에 ${maxDocuments()}개까지 첨부할 수 있어.`;
+        }
+      } else {
+        const budget = maxImageBytesPerMessage();
+        const used = drafts
+          .filter(draft => draftKind(draft) === 'image')
+          .reduce((sum, draft) => sum + draftBytes(draft), 0);
+        if (budget > 0 && used + file.size > budget) {
+          return `이미지는 한 번에 합쳐서 ${humanBytes(budget)}까지 첨부할 수 있어.`;
+        }
+      }
       return '';
     }
 
@@ -73,8 +111,15 @@
       return new global.File([file], file.name, { type: expectedMime, lastModified: file.lastModified });
     }
 
-    function setState(next) {
-      state = { ...state, ...next };
+    function setDraftError(message) {
+      draftError = message || '';
+      renderDraft();
+    }
+
+    function updateDraft(key, changes) {
+      const draft = drafts.find(item => item.key === key);
+      if (!draft) return;
+      Object.assign(draft, changes);
       renderDraft();
     }
 
@@ -153,7 +198,10 @@
         remove.setAttribute('aria-label', '첨부 취소');
         remove.title = '첨부 취소';
         remove.textContent = '×';
-        remove.addEventListener('click', cancel);
+        remove.addEventListener('click', () => {
+          if (typeof removable === 'function') removable();
+          else cancel();
+        });
         card.appendChild(remove);
       } else if (
         !transientStatus
@@ -172,41 +220,49 @@
     }
 
     function renderDraft() {
-      const draft = el('attachment-draft');
+      const container = el('attachment-draft');
       const button = el('attachment-button');
-      if (button) button.disabled = state.phase === 'uploading';
-      if (!draft) return;
-      draft.replaceChildren();
-      if (state.phase === 'empty') {
-        draft.hidden = true;
+      if (button) button.disabled = drafts.length >= maxFiles();
+      if (!container) return;
+      container.replaceChildren();
+      if (drafts.length === 0 && !draftError) {
+        container.hidden = true;
         return;
       }
 
-      const attachment = state.attachment || state.file;
-      draft.hidden = false;
-      draft.appendChild(makeCard(attachment, {
-        transientStatus: state.phase === 'uploading' ? 'uploading' : state.phase === 'error' ? 'error' : '',
-        removable: true,
-      }));
-      if (state.error) {
+      container.hidden = false;
+      for (const draft of drafts) {
+        container.appendChild(makeCard(draft.attachment || draft.file, {
+          transientStatus: draft.phase === 'uploading' ? 'uploading' : draft.phase === 'error' ? 'error' : '',
+          removable: () => removeDraft(draft.key),
+        }));
+      }
+      if (draftError) {
         const error = global.document.createElement('p');
         error.className = 'attachment-draft-error';
         error.setAttribute('role', 'alert');
-        error.textContent = state.error;
-        draft.appendChild(error);
+        error.textContent = draftError;
+        container.appendChild(error);
       }
     }
 
     async function upload(file) {
       const validationError = validateFile(file);
       if (validationError) {
-        setState({ phase: 'error', attachment: null, file, error: validationError });
+        setDraftError(validationError);
         return;
       }
 
-      controller?.abort();
-      controller = new global.AbortController();
-      setState({ phase: 'uploading', attachment: null, file, error: '' });
+      const key = (nextDraftKey += 1);
+      const draft = {
+        key,
+        phase: 'uploading',
+        file,
+        attachment: null,
+        controller: new global.AbortController(),
+      };
+      drafts = [...drafts, draft];
+      setDraftError('');
       const form = new global.FormData();
       form.append('file', normalizedFile(file));
 
@@ -214,26 +270,33 @@
         const response = await apiFetch('/api/attachments', {
           method: 'POST',
           body: form,
-          signal: controller.signal,
+          signal: draft.controller.signal,
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.attachmentId) throw new Error(data.error || '파일을 업로드하지 못했어.');
-        controller = null;
-        setState({ phase: 'ready', attachment: data, file: null, error: '' });
+        updateDraft(key, { phase: 'ready', attachment: data, controller: null });
       } catch (error) {
         if (error?.name === 'AbortError') return;
-        controller = null;
-        setState({ phase: 'error', attachment: null, file, error: error?.message || '파일을 업로드하지 못했어.' });
+        updateDraft(key, { phase: 'error', controller: null });
+        setDraftError(error?.message || '파일을 업로드하지 못했어.');
       }
     }
 
-    function cancel() {
-      controller?.abort();
-      controller = null;
-      state = { phase: 'empty', attachment: null, file: null, error: '' };
+    function removeDraft(key) {
+      const draft = drafts.find(item => item.key === key);
+      draft?.controller?.abort();
+      drafts = drafts.filter(item => item.key !== key);
       const input = el('attachment-input');
       if (input) input.value = '';
-      renderDraft();
+      setDraftError('');
+    }
+
+    function cancel() {
+      for (const draft of drafts) draft.controller?.abort();
+      drafts = [];
+      const input = el('attachment-input');
+      if (input) input.value = '';
+      setDraftError('');
     }
 
     function init({
@@ -253,21 +316,24 @@
         return;
       }
       button.hidden = false;
+      if (maxFiles() > 1) input.multiple = true;
       button.addEventListener('click', () => input.click());
       input.addEventListener('change', () => {
-        const file = input.files?.[0];
+        const files = [...(input.files || [])];
         input.value = '';
-        if (file) void upload(file);
+        for (const file of files) void upload(file);
       });
       renderDraft();
     }
 
-    function getReadyAttachment() {
-      return state.phase === 'ready' ? state.attachment : null;
+    function getReadyAttachments() {
+      return drafts
+        .filter(draft => draft.phase === 'ready' && draft.attachment)
+        .map(draft => draft.attachment);
     }
 
     function isUploading() {
-      return state.phase === 'uploading';
+      return drafts.some(draft => draft.phase === 'uploading');
     }
 
     function requireReadyForSend() {
@@ -276,9 +342,18 @@
       return false;
     }
 
-    function clearAfterSend(attachmentId) {
-      if (state.attachment?.attachmentId !== attachmentId) return;
-      cancel();
+    function clearAfterSend(attachmentIds) {
+      const sent = new Set(
+        (Array.isArray(attachmentIds) ? attachmentIds : [attachmentIds]).filter(Boolean),
+      );
+      if (sent.size === 0) return;
+      for (const draft of drafts) {
+        if (sent.has(draft.attachment?.attachmentId)) draft.controller?.abort();
+      }
+      drafts = drafts.filter(draft => !sent.has(draft.attachment?.attachmentId));
+      const input = el('attachment-input');
+      if (input) input.value = '';
+      setDraftError('');
     }
 
     function renderMessageAttachments(target, attachments, options = {}) {
@@ -302,7 +377,7 @@
     return {
       clearAfterSend,
       getMessageSignature,
-      getReadyAttachment,
+      getReadyAttachments,
       init,
       isUploading,
       renderMessageAttachments,

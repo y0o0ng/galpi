@@ -876,9 +876,9 @@ async function sendSingleMessage(options = {}) {
   if (usesComposerDraft && window.AttachmentUi?.requireReadyForSend() === false) {
     return { ok: false, reason: 'busy' };
   }
-  const draftAttachment = usesComposerDraft
-    ? window.AttachmentUi?.getReadyAttachment() || null
-    : null;
+  const draftAttachments = usesComposerDraft
+    ? window.AttachmentUi?.getReadyAttachments() || []
+    : [];
 
   if (usesComposerDraft) inputEl.value = '';
   inputEl.style.height = 'auto';
@@ -888,8 +888,8 @@ async function sendSingleMessage(options = {}) {
 
   const userGroup = appendUserBubble(
     options.displayText || text,
-    draftAttachment ? [draftAttachment] : [],
-    draftAttachment ? { transientStatus: 'sending' } : {},
+    draftAttachments,
+    draftAttachments.length > 0 ? { transientStatus: 'sending' } : {},
   );
   const loadingEl = appendLoading(PROGRESS_STAGE_LABELS.context);
   document.dispatchEvent(new Event('pet:thinking'));
@@ -907,7 +907,9 @@ async function sendSingleMessage(options = {}) {
         webSearch: !!options.webSearch,
         source: options.source,
         progress: true,
-        ...(draftAttachment ? { attachmentIds: [draftAttachment.attachmentId] } : {}),
+        ...(draftAttachments.length > 0
+          ? { attachmentIds: draftAttachments.map(attachment => attachment.attachmentId) }
+          : {}),
       }),
     });
     const data = await readProgressResponse(
@@ -917,18 +919,18 @@ async function sendSingleMessage(options = {}) {
     );
     loadingEl.remove();
     if (data.error) {
-      if (draftAttachment) {
-        window.AttachmentUi?.renderMessageAttachments(userGroup, [draftAttachment], { transientStatus: 'error' });
+      if (draftAttachments.length > 0) {
+        window.AttachmentUi?.renderMessageAttachments(userGroup, draftAttachments, { transientStatus: 'error' });
       }
       appendError(data.error);
       return { ok: false, reason: 'error' };
     }
-    if (draftAttachment) {
+    if (draftAttachments.length > 0) {
       const linkedAttachments = Array.isArray(data.attachments) && data.attachments.length > 0
         ? data.attachments
-        : [draftAttachment];
+        : draftAttachments;
       window.AttachmentUi?.renderMessageAttachments(userGroup, linkedAttachments);
-      window.AttachmentUi?.clearAfterSend(draftAttachment.attachmentId);
+      window.AttachmentUi?.clearAfterSend(draftAttachments.map(attachment => attachment.attachmentId));
     }
     appendAssistantBubble({ ...data, question: text });
     if (Array.isArray(data.webSources) && data.webSources.length > 0) refreshWebUsagePill();
@@ -937,8 +939,8 @@ async function sendSingleMessage(options = {}) {
     return { ok: true, reply: data.reply || '', spokenRemaining: data.spokenRemaining || '' };
   } catch (_) {
     loadingEl.remove();
-    if (draftAttachment) {
-      window.AttachmentUi?.renderMessageAttachments(userGroup, [draftAttachment], { transientStatus: 'error' });
+    if (draftAttachments.length > 0) {
+      window.AttachmentUi?.renderMessageAttachments(userGroup, draftAttachments, { transientStatus: 'error' });
     }
     appendError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
     return { ok: false, reason: 'error' };

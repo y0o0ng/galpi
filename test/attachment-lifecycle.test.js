@@ -8,7 +8,10 @@ const path = require('node:path');
 const test = require('node:test');
 const Database = require('better-sqlite3');
 
-const { createAttachmentLifecycleService } = require('../lib/attachment-lifecycle');
+const {
+  createAttachmentLifecycleService,
+  normalizeAttachmentIds,
+} = require('../lib/attachment-lifecycle');
 const { runDatabaseMigrations } = require('../lib/database-migrations');
 
 function createDatabase() {
@@ -413,5 +416,123 @@ test('images take the shorter replay window and expire while a document is still
   assert.equal(
     db.prepare('SELECT lifecycle_status AS status FROM attachments WHERE id = ?').get(documentId).status,
     'attached_temporary',
+  );
+});
+
+test('multi-attachment lease is all or nothing and holds the per-message composition rules', async t => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'attachment-lifecycle-multi-'));
+  const tmpDir = path.join(root, 'tmp');
+  await fsp.mkdir(tmpDir, { recursive: true });
+  const db = createDatabase();
+
+  async function seedImage(id, { filename, sizeBytes = 16 }) {
+    const bytes = Buffer.alloc(sizeBytes, 7);
+    const storedPath = path.join(tmpDir, `${id}.png`);
+    await fsp.writeFile(storedPath, bytes, { mode: 0o600 });
+    const blobId = Number(db.prepare(`
+      INSERT INTO attachment_blobs (sha256, stored_name, stored_path, mime_type, size_bytes)
+      VALUES (?, ?, ?, 'image/png', ?)
+    `).run(
+      crypto.createHash('sha256').update(bytes).digest('hex'),
+      `${id}.png`,
+      storedPath,
+      bytes.length,
+    ).lastInsertRowid);
+    db.prepare(`
+      INSERT INTO attachments (id, blob_id, original_name, kind) VALUES (?, ?, ?, 'image')
+    `).run(id, blobId, filename);
+  }
+
+  const imageA = 'att_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';
+  const imageB = 'att_b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1';
+  const imageC = 'att_c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1';
+  const documentA = 'att_d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1';
+  const documentB = 'att_e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1';
+  await seedImage(imageA, { filename: '1.png' });
+  await seedImage(imageB, { filename: '2.png' });
+  await seedImage(imageC, { filename: '3.png', sizeBytes: 40 });
+  await seedAttachment(db, tmpDir, { id: documentA, content: '문서1', filename: '1.md' });
+  await seedAttachment(db, tmpDir, { id: documentB, content: '문서2', filename: '2.md' });
+
+  const prepared = [];
+  const lifecycle = createAttachmentLifecycleService(db, {
+    enabled: true,
+    tmpDir,
+    replayWindowTurns: 10,
+    maxImageBytesPerMessage: 32,
+    async prepareAttachment(id) { prepared.push(id); },
+    now: () => Date.parse('2026-08-05T00:00:00Z'),
+  });
+  t.after(async () => {
+    db.close();
+    await fsp.rm(root, { recursive: true, force: true });
+  });
+
+  // 문서 1개 + 이미지 여러 장은 통과한다.
+  const lease = await lifecycle.beginChatRequest({
+    sessionId: 'shared-main',
+    attachmentIds: [documentA, imageA, imageB],
+  });
+  assert.deepEqual(lease.attachments.map(item => item.kind), ['text', 'image', 'image']);
+  assert.deepEqual(prepared, [documentA, imageA, imageB]);
+  const turn = insertTurn(db, lifecycle, {
+    attachmentIds: lease.attachmentIds,
+    text: '문서 하나와 사진 둘',
+  });
+  lease.release();
+  assert.deepEqual(
+    turn.attachments.map(item => item.attachmentId),
+    [documentA, imageA, imageB],
+  );
+  assert.deepEqual(db.prepare(`
+    SELECT position, replay_window_turns AS replayTurns
+    FROM message_attachments WHERE message_id = ? ORDER BY position
+  `).all(turn.userMessageId), [
+    { position: 0, replayTurns: 10 },
+    { position: 1, replayTurns: 3 },
+    { position: 2, replayTurns: 3 },
+  ]);
+
+  // 문서 2개는 파싱 대기가 곱해지므로 막는다.
+  await assert.rejects(
+    lifecycle.beginChatRequest({
+      sessionId: 'shared-main',
+      attachmentIds: [documentA, documentB],
+    }),
+    error => error.code === 'ATTACHMENT_DOCUMENT_LIMIT',
+  );
+  // 이미지 합계 상한을 넘겨도 막는다.
+  await assert.rejects(
+    lifecycle.beginChatRequest({
+      sessionId: 'shared-main',
+      attachmentIds: [imageA, imageB, imageC],
+    }),
+    error => error.code === 'ATTACHMENT_IMAGE_BYTES_LIMIT',
+  );
+  // 거부된 요청은 lease를 하나도 남기지 않는다.
+  for (const id of [documentA, documentB, imageA, imageB, imageC]) {
+    assert.equal(lifecycle.isAttachmentActive(id), false);
+  }
+
+  // 다른 요청이 들고 있으면 이번 요청이 잡은 것만 되돌린다.
+  const holder = await lifecycle.beginChatRequest({
+    sessionId: 'shared-main',
+    attachmentIds: [imageB],
+  });
+  await assert.rejects(
+    lifecycle.beginChatRequest({
+      sessionId: 'shared-main',
+      attachmentIds: [imageA, imageB],
+    }),
+    error => error.code === 'ATTACHMENT_BUSY',
+  );
+  assert.equal(lifecycle.isAttachmentActive(imageA), false);
+  assert.equal(lifecycle.isAttachmentActive(imageB), true);
+  holder.release();
+  assert.equal(lifecycle.isAttachmentActive(imageB), false);
+
+  assert.throws(
+    () => normalizeAttachmentIds(new Array(7).fill(imageA)),
+    error => error.code === 'ATTACHMENT_LIMIT',
   );
 });

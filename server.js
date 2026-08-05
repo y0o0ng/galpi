@@ -79,6 +79,9 @@ const { createAttachmentImageService } = require('./lib/attachment-images');
 const { createAttachmentDocumentTools } = require('./lib/attachment-document-tools');
 const {
   AttachmentLifecycleError,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_DOCUMENTS_PER_MESSAGE,
+  MAX_IMAGE_BYTES_PER_MESSAGE,
   createAttachmentLifecycleService,
 } = require('./lib/attachment-lifecycle');
 const {
@@ -828,6 +831,9 @@ const attachmentUploads = createAttachmentUploadService(db, {
   enabled: ATTACHMENTS_ENABLED,
   tmpDir: ATTACHMENTS_TMP_DIR,
   isAttachmentActive: attachmentLifecycle.isAttachmentActive,
+  maxFilesPerMessage: MAX_ATTACHMENTS_PER_MESSAGE,
+  maxDocumentsPerMessage: MAX_DOCUMENTS_PER_MESSAGE,
+  maxImageBytesPerMessage: MAX_IMAGE_BYTES_PER_MESSAGE,
 });
 const attachmentLibrary = createAttachmentLibraryService(db, {
   enabled: ATTACHMENTS_ENABLED,

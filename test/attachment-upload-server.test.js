@@ -103,9 +103,11 @@ test('attachment route is authenticated, feature-flagged, and stores only in the
   const config = await configResponse.json();
   assert.deepEqual(config.attachments, {
     enabled: true,
-    maxFilesPerMessage: 1,
+    maxFilesPerMessage: 6,
+    maxDocumentsPerMessage: 1,
     maxPdfBytes: 20 * 1024 * 1024,
     maxImageBytes: 10 * 1024 * 1024,
+    maxImageBytesPerMessage: 12 * 1024 * 1024,
     maxTextBytes: 2 * 1024 * 1024,
     orphanRetentionMinutes: 60,
   });
