@@ -145,6 +145,40 @@ test('이번 턴 이미지와 replay 창 이미지를 대화 순서대로 함께
   assert.equal(images.hasTemporaryImages({ sessionId: 'shared-main', attachmentIds: [] }), true);
 });
 
+test('이번 턴에 여러 장을 붙이면 사용자가 올린 순서 그대로 간다', async t => {
+  const { tmpDir, db } = await withFixture(t, 'attachment-images-order-');
+  const replayId = 'att_99999999999999999999999999999999';
+  const ids = [
+    'att_0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a',
+    'att_0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b',
+    'att_0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c',
+  ];
+  await seedImage(db, tmpDir, {
+    id: replayId,
+    bytes: Buffer.from('이전 턴'),
+    filename: '이전.png',
+    sessionId: 'shared-main',
+    lifecycleStatus: 'attached_temporary',
+  });
+  attachToTurn(db, { attachmentId: replayId });
+  for (const [index, id] of ids.entries()) {
+    await seedImage(db, tmpDir, {
+      id,
+      bytes: Buffer.from(`이번 ${index}`),
+      filename: `${index + 1}번째.png`,
+    });
+  }
+
+  const images = createAttachmentImageService(db, { enabled: true, tmpDir });
+  const result = await images.listTurnImages({ sessionId: 'shared-main', attachmentIds: ids });
+
+  // 이전 턴 이미지가 먼저, 그다음 이번 턴이 올린 순서대로다.
+  assert.deepEqual(
+    result.images.map(image => image.filename),
+    ['이전.png', '1번째.png', '2번째.png', '3번째.png'],
+  );
+});
+
 test('턴 예산을 넘는 이미지는 오래된 것부터 빼고 개수를 알린다', async t => {
   const { tmpDir, db } = await withFixture(t, 'attachment-images-budget-');
   const ids = [
