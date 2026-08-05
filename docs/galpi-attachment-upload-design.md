@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
 > Version: 0.8
-> 상태: U0a~U0c 파일 운반·composer UI, U1a~U1c 문서 읽기·replay 저장 경계, U3a library 승격·재회수, U2a 비전 입력·U2b 멀티 첨부·이미지 library 승격까지 Pi 배포 및 iPhone 실기기 인수 완료
+> 상태: U0~U2, U3a, 인증된 원본 열기, 이미지 썸네일까지 Pi 배포 및 iPhone 실기기 인수 완료. 남은 것은 U3b(Codex 제목·요약)뿐이고 U4 공통 계층은 실측 결과 보류했다.
 > 작성일: 2026-08-05
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -1058,6 +1058,17 @@ U1부터 계속 미뤄온 항목이다. 문서와 이미지가 같은 경로를 
 - 인수: DB·Vault 백업 `20260805-1832`, 코드 복구본 `code-attachment-original-pre-20260805-1832.tar.gz`(267K) 뒤 7개 파일을 배포해 **hash 7/7**이 일치했고 Pi 전체 **426/426**을 통과했다. 새 PID `211989`, 시작 `2026-08-05 18:51:58 KST`다. 인증 없이 401, 이미지 원본 200에 `Content-Length 971`과 바이트 일치, MD 원본은 `Content-Disposition: attachment`로 내려오고 내용이 일치했다. 승격 뒤 다른 대화 ID로도 200에 바이트가 일치한다.
 - iOS 팝업 차단 폴백은 실기기 확인이 남았다. 단위 테스트는 `fetch` 이전에 `window.open`이 불리는 순서까지만 검증한다.
 
+### U-썸네일 — 이미지 카드 미리보기 ✅ Pi 배포 완료 (2026-08-05)
+
+- 카드의 kind 배지가 이미 36x36에 radius 10px이라 그 자리를 그대로 쓴다. 새 줄·새 크기·새 radius를 만들지 않고 `IMG` 글자만 실제 그림으로 바뀐다. 문서 첨부는 `PDF`·`MD`·`TXT` 글자를 유지한다.
+- 서버에 리사이즈가 없어(ARM 네이티브 의존성을 얹지 않기로 했다) 원본을 한 번은 통째로 받아야 한다. 그 비용을 세 겹으로 줄인다.
+  - 받자마자 캔버스로 긴 변 72px(레티나 2배)까지 줄이고 큰 blob은 즉시 `revokeObjectURL`한다. 전체 해상도 비트맵을 들고 있지 않는다.
+  - `attachmentId`별로 축소본 data URL을 캐시한다(상한 24). 폴링이 카드를 다시 그려도 원본을 다시 받지 않는다.
+  - `IntersectionObserver`로 보일 때만 받아 히스토리 스크롤에서 과거 이미지를 전부 내려받지 않는다.
+- 초안 카드는 로컬 `File`을 이미 들고 있어 네트워크 없이 그린다. 원본을 못 받거나 캔버스가 없으면 글자 배지를 그대로 둔다.
+- **이미지의 `원본` 버튼은 원본을 다시 받는다.** 축소본만 남기는 대신 치르는 비용이다. 반대로 하면 큰 사진 여러 장이 전부 메모리에 남는다.
+- 인수: DB·Vault 백업 `20260805-2025`, 코드 복구본 `code-thumbnail-pre-20260805-2020.tar.gz`(25K) 뒤 3개 파일을 배포해 **hash 3/3**이 일치했고 Pi 전체 **433/433**을 통과했다. 새 PID `216357`, 시작 `2026-08-05 20:29:09 KST`다. iPhone에서 스크롤 지연이 없음을 확인했다.
+
 ### U3 — 서재 저장 (U3a 문서·이미지 승격 인수 완료, U3b 보강 남음)
 
 구현:
@@ -1081,7 +1092,18 @@ Attachment 노트 생성
 
 U3a는 추가 모델 호출 없이 결정론적 제목·요약으로 원자적 정본과 검색 재진입을 먼저 완성한다. Codex 제목·요약 보강, 인증 원본 열기, 이미지는 각각 U3b·U2 이후로 분리한다.
 
-### U4 — 공통 문서 계층 추출
+### U4 — 공통 문서 계층 추출 (2026-08-05 보류)
+
+실측 결과 추출할 중복이 거의 남아 있지 않아 보류했다. 다시 꺼낼 때 이 측정을 반복하지 않도록 남긴다.
+
+- `document-parser`와 PDF `document-chunker`는 **이미 공유돼 있다.** `attachment-documents.js`가 `paper-fulltext`의 `extractPdfPages`·`buildPaperChunks`를 그대로 import한다. 무거운 부분은 유기적으로 해소됐다.
+- `buildTextChunks`(MD·TXT)는 첨부 전용이고 논문 경로에는 없다.
+- `document-ingest`·`document-index`·`document-search`·`document-read`는 정당하게 다르다. 업로드와 Semantic Scholar 다운로드, `note_chunks`와 `attachment_chunks`는 스키마부터 다르다.
+- 이름이 같은 `cleanEvidenceItem`·`fitToolPayload`는 중복이 아니다. 전자는 필드가 완전히 다르고(`paperId/title/section` vs `attachmentId/filename/kind/line 범위`), 후자는 알고리즘이 다르다. 논문판은 `totalRemaining` 예산을 추적하고 `remainingContextChars`를 응답에 실으며 마지막 항목을 while로 깎고, 첨부판은 이진 탐색으로 자르며 예산 필드가 없다. 합치려면 한쪽 의미론을 버려야 하고 그것은 이미 배포돼 도는 회수 동작을 바꾸는 일이다.
+
+즉 6단계 중 2단계는 이미 공유됐고 나머지는 합칠 대상이 아니다. 실제로 그 영역을 수정할 이유가 생겼을 때 회귀 테스트와 함께 다시 본다.
+
+### U4 원안 — 공통 문서 계층 추출
 
 첨부파일 기능이 안정화된 뒤 논문 전문검색과 공통 코드를 정리한다.
 
