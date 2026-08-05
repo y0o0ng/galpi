@@ -76,6 +76,10 @@ const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
 const { AttachmentUploadError, createAttachmentUploadService } = require('./lib/attachment-upload');
 const { createAttachmentDocumentService } = require('./lib/attachment-documents');
 const { createAttachmentImageService } = require('./lib/attachment-images');
+const {
+  AttachmentOriginalError,
+  createAttachmentOriginalService,
+} = require('./lib/attachment-originals');
 const { createAttachmentDocumentTools } = require('./lib/attachment-document-tools');
 const {
   AttachmentLifecycleError,
@@ -820,6 +824,11 @@ const attachmentImages = createAttachmentImageService(db, {
   vaultPath: VAULT_PATH,
   maxImagesPerTurn: ATTACHMENT_IMAGE_MAX_PER_TURN,
   maxTurnBytes: ATTACHMENT_IMAGE_MAX_TURN_BYTES,
+});
+const attachmentOriginals = createAttachmentOriginalService(db, {
+  enabled: ATTACHMENTS_ENABLED,
+  tmpDir: ATTACHMENTS_TMP_DIR,
+  vaultPath: VAULT_PATH,
 });
 const attachmentLifecycle = createAttachmentLifecycleService(db, {
   enabled: ATTACHMENTS_ENABLED,
@@ -4240,6 +4249,41 @@ app.post('/api/attachments', async (req, res) => {
     return res.status(known ? error.status : 500).json({
       error: known ? error.message : '첨부파일을 저장하지 못했습니다.',
       code: known ? error.code : 'ATTACHMENT_UPLOAD_FAILED',
+    });
+  }
+});
+
+app.get('/api/attachments/:attachmentId/original', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const original = await attachmentOriginals.resolveOriginal({
+      attachmentId: req.params.attachmentId,
+      sessionId: req.query?.sessionId,
+    });
+    res.set({
+      'Content-Type': original.mimeType,
+      'Content-Length': String(original.sizeBytes),
+      'Content-Disposition': original.contentDisposition,
+      'X-Content-Type-Options': 'nosniff',
+    });
+    const stream = fsSync.createReadStream(original.storedPath);
+    stream.on('error', () => {
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: '첨부 원본을 읽지 못했습니다.',
+          code: 'ATTACHMENT_ORIGINAL_FAILED',
+        });
+        return;
+      }
+      res.destroy();
+    });
+    return stream.pipe(res);
+  } catch (error) {
+    const known = error instanceof AttachmentOriginalError;
+    if (!known) console.warn('⚠️ 첨부 원본 열기 실패: ATTACHMENT_ORIGINAL_FAILED');
+    return res.status(known ? error.status : 500).json({
+      error: known ? error.message : '첨부 원본을 열지 못했습니다.',
+      code: known ? error.code : 'ATTACHMENT_ORIGINAL_FAILED',
     });
   }
 });

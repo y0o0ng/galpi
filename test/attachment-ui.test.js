@@ -88,6 +88,9 @@ function loadUi({
     'attachment-draft': fakeElement('attachment-draft'),
   };
   const toasts = [];
+  const opened = [];
+  const revoked = [];
+  const popupStub = { closed: false, location: null, close() { this.closed = true; } };
   const fakeWindow = {
     document: {
       getElementById: id => elements[id] || null,
@@ -96,6 +99,9 @@ function loadUi({
     File: FakeFile,
     FormData: FakeFormData,
     AbortController,
+    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL: () => { revoked.push(1); } },
+    setTimeout: (fn) => fn,
+    open: (...args) => { opened.push(args); return popupStub; },
   };
   vm.runInNewContext(source, { window: fakeWindow, console }, { filename: 'attachment-ui.js' });
   fakeWindow.AttachmentUi.init({
@@ -112,7 +118,7 @@ function loadUi({
     showToast: message => toasts.push(message),
     getSessionId: () => sessionId,
   });
-  return { elements, toasts, ui: fakeWindow.AttachmentUi };
+  return { elements, toasts, ui: fakeWindow.AttachmentUi, opened, popupStub };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -223,7 +229,8 @@ test('a linked document promotes through one explicit library action and settles
 
   ui.renderMessageAttachments(target, [attachment]);
   const card = target.children[0].children[0];
-  const action = card.children[2];
+  const action = card.children.find(child => child.className === 'attachment-card-library');
+  assert.ok(action, '서재 저장 버튼이 있어야 한다');
   assert.equal(action.textContent, '서재 저장');
   action.dispatch('click');
   await settle();
@@ -351,4 +358,78 @@ test('메시지당 문서 수와 이미지 합계를 붙이는 순간 막는다'
   await settle();
   assert.match(elements['attachment-draft'].children.at(-1).textContent, /이미지는 한 번에 합쳐서/);
   assert.equal(ui.getReadyAttachments().length, 3);
+});
+
+test('원본 열기는 클릭 시점에 창을 먼저 잡고 인증 fetch로 blob을 보낸다', async () => {
+  const calls = [];
+  const { ui, opened, popupStub } = loadUi({
+    sessionId: 'session-original',
+    apiFetch: async (url) => {
+      calls.push(url);
+      // 창은 fetch가 끝나기 전에 이미 잡혀 있어야 iOS에서 안 막힌다.
+      assert.equal(opened.length, 1, 'fetch 시작 시점에 창이 이미 열려 있어야 한다');
+      return { ok: true, blob: async () => ({ size: 3 }) };
+    },
+  });
+  const target = fakeElement('message');
+  ui.renderMessageAttachments(target, [{
+    attachmentId: 'att_original_1',
+    filename: '사분면 이미지.png',
+    kind: 'image',
+    sizeBytes: 971,
+    status: 'attached_temporary',
+  }]);
+  const card = target.children[0].children[0];
+  const openButton = card.children.find(c => c.className === 'attachment-card-original');
+  assert.ok(openButton, '원본 버튼이 있어야 한다');
+
+  await openButton.dispatch('click');
+  await settle();
+  await settle();
+
+  assert.deepEqual(opened, [['', '_blank']]);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /^\/api\/attachments\/att_original_1\/original\?sessionId=session-original$/);
+  assert.equal(popupStub.location, 'blob:fake');
+  assert.equal(openButton.textContent, '원본');
+  assert.equal(openButton.disabled, false);
+});
+
+test('서재 첨부는 원본만, 만료 첨부는 아무 버튼도 없다', () => {
+  const { ui } = loadUi();
+  const target = fakeElement('message');
+
+  ui.renderMessageAttachments(target, [{
+    attachmentId: 'att_lib', filename: '서재.png', kind: 'image', status: 'library',
+  }]);
+  let classes = target.children[0].children[0].children.map(c => c.className);
+  assert.ok(classes.includes('attachment-card-original'), '서재 첨부에 원본 버튼');
+  assert.ok(!classes.includes('attachment-card-library'), '이미 서재면 저장 버튼은 없다');
+
+  ui.renderMessageAttachments(target, [{
+    attachmentId: 'att_exp', filename: '만료.md', kind: 'markdown', status: 'expired', expired: true,
+  }]);
+  classes = target.children[0].children[0].children.map(c => c.className);
+  assert.ok(!classes.includes('attachment-card-original'), '만료 첨부는 열 수 없다');
+  assert.ok(!classes.includes('attachment-card-library'));
+});
+
+test('원본 열기가 실패하면 열어둔 창을 닫고 알린다', async () => {
+  const { ui, toasts, popupStub } = loadUi({
+    apiFetch: async () => ({ ok: false, json: async () => ({ error: '이 첨부파일은 더 이상 열 수 없습니다.' }) }),
+  });
+  const target = fakeElement('message');
+  ui.renderMessageAttachments(target, [{
+    attachmentId: 'att_fail', filename: '자료.md', kind: 'markdown', status: 'attached_temporary',
+  }]);
+  const openButton = target.children[0].children[0].children.find(
+    c => c.className === 'attachment-card-original',
+  );
+  await openButton.dispatch('click');
+  await settle();
+  await settle();
+
+  assert.equal(popupStub.closed, true, '빈 창을 남겨두지 않는다');
+  assert.match(toasts.at(-1), /더 이상 열 수 없습니다/);
+  assert.equal(openButton.disabled, false);
 });

@@ -176,6 +176,38 @@ test('attachment route is authenticated, feature-flagged, and stores only in the
   `).run(body.attachmentId, crypto.createHash('sha256').update('서버 통합 첨부').digest('hex'));
   writable.close();
 
+  // 임시 첨부 원본 열기: 인증과 대화 경계를 지키고 본문을 그대로 돌려준다.
+  const unauthorizedOriginal = await fetch(
+    `${url}/api/attachments/${body.attachmentId}/original?sessionId=shared-main`,
+  );
+  assert.equal(unauthorizedOriginal.status, 401);
+  const wrongSessionOriginal = await fetch(
+    `${url}/api/attachments/${body.attachmentId}/original?sessionId=other-session`,
+    { headers: { 'X-API-Token': API_TOKEN } },
+  );
+  assert.equal(wrongSessionOriginal.status, 409);
+  assert.equal((await wrongSessionOriginal.json()).code, 'ATTACHMENT_SESSION_MISMATCH');
+
+  const original = await fetch(
+    `${url}/api/attachments/${body.attachmentId}/original?sessionId=shared-main`,
+    { headers: { 'X-API-Token': API_TOKEN } },
+  );
+  assert.equal(original.status, 200);
+  // Express가 text/*에 charset을 붙인다. 업로드에서 UTF-8을 검증하므로 맞는 값이다.
+  assert.match(original.headers.get('content-type'), /^text\/plain(; charset=utf-8)?$/);
+  assert.equal(original.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(original.headers.get('cache-control'), 'no-store');
+  // 텍스트는 브라우저가 렌더하지 않도록 내려받게 하고 한글 이름을 함께 보낸다.
+  assert.match(original.headers.get('content-disposition'), /^attachment;/);
+  assert.match(original.headers.get('content-disposition'), /filename\*=UTF-8''%ED%86%B5%ED%95%A9/);
+  assert.equal(await original.text(), '서버 통합 첨부');
+
+  const missingOriginal = await fetch(
+    `${url}/api/attachments/att_00000000000000000000000000000000/original?sessionId=shared-main`,
+    { headers: { 'X-API-Token': API_TOKEN } },
+  );
+  assert.equal(missingOriginal.status, 404);
+
   const unauthorizedPromotion = await fetch(`${url}/api/attachments/${body.attachmentId}/library`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -200,6 +232,14 @@ test('attachment route is authenticated, feature-flagged, and stores only in the
   assert.equal(promotedBody.status, 'library');
   assert.equal(promotedBody.duplicate, false);
   assert.equal(Object.hasOwn(promotedBody, 'noteContent'), false);
+
+  // 승격 뒤에도 열린다. 서재 자료는 대화와 무관하다.
+  const libraryOriginal = await fetch(
+    `${url}/api/attachments/${body.attachmentId}/original?sessionId=other-session`,
+    { headers: { 'X-API-Token': API_TOKEN } },
+  );
+  assert.equal(libraryOriginal.status, 200);
+  assert.equal(await libraryOriginal.text(), '서버 통합 첨부');
 
   const db = new Database(dbPath, { readonly: true });
   t.after(() => db.close());

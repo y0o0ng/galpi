@@ -46,6 +46,7 @@
     let getSessionId = () => 'shared-main';
     let config = null;
     const promotingIds = new Set();
+    const openingIds = new Set();
     // 초안은 여러 개다. 각 항목이 자기 업로드 상태와 취소 컨트롤러를 들고 있다.
     let drafts = [];
     let draftError = '';
@@ -134,6 +135,52 @@
       return '임시 첨부';
     }
 
+    function downloadObjectUrl(objectUrl, filename) {
+      const link = global.document.createElement('a');
+      link.href = objectUrl;
+      link.download = String(filename || 'attachment');
+      link.click();
+    }
+
+    /**
+     * 인증이 헤더 토큰이라 링크로 바로 못 연다. blob을 받아 object URL로 연다.
+     * iOS는 await 뒤의 window.open을 제스처와 끊어진 것으로 보고 막으므로,
+     * 클릭 시점에 빈 창을 먼저 잡아두고 준비되면 그 창을 보낸다.
+     */
+    async function openOriginal(attachment, button) {
+      const attachmentId = String(attachment?.attachmentId || '');
+      if (!attachmentId || openingIds.has(attachmentId)) return;
+      openingIds.add(attachmentId);
+      const popup = global.open ? global.open('', '_blank') : null;
+      const label = button.textContent;
+      button.disabled = true;
+      button.textContent = '여는 중';
+      let objectUrl = null;
+      try {
+        const response = await apiFetch(
+          `/api/attachments/${encodeURIComponent(attachmentId)}/original`
+          + `?sessionId=${encodeURIComponent(getSessionId())}`,
+        );
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || '원본을 열지 못했어.');
+        }
+        const blob = await response.blob();
+        objectUrl = global.URL.createObjectURL(blob);
+        if (popup && !popup.closed) popup.location = objectUrl;
+        else downloadObjectUrl(objectUrl, attachment?.filename);
+      } catch (error) {
+        popup?.close?.();
+        showToast(error?.message || '원본을 열지 못했어.');
+      } finally {
+        button.disabled = false;
+        button.textContent = label;
+        openingIds.delete(attachmentId);
+        // 새 탭이 blob을 다 읽기 전에 회수하면 안 되므로 여유를 둔다.
+        if (objectUrl) global.setTimeout(() => global.URL.revokeObjectURL(objectUrl), 60000);
+      }
+    }
+
     async function promoteAttachment(attachment, meta, button) {
       const attachmentId = String(attachment?.attachmentId || '');
       if (!attachmentId || promotingIds.has(attachmentId)) return;
@@ -203,14 +250,26 @@
           else cancel();
         });
         card.appendChild(remove);
-      } else if (!transientStatus && attachment?.status === 'attached_temporary') {
-        const save = global.document.createElement('button');
-        save.type = 'button';
-        save.className = 'attachment-card-library';
-        save.textContent = '서재 저장';
-        save.setAttribute('aria-label', `${name.textContent} 서재에 저장`);
-        save.addEventListener('click', () => { void promoteAttachment(attachment, meta, save); });
-        card.appendChild(save);
+      } else if (!transientStatus && !isExpired) {
+        // 원본 열기는 임시·서재 양쪽에서 되고, 서재 저장은 임시일 때만이다.
+        if (['attached_temporary', 'library'].includes(attachment?.status)) {
+          const open = global.document.createElement('button');
+          open.type = 'button';
+          open.className = 'attachment-card-original';
+          open.textContent = '원본';
+          open.setAttribute('aria-label', `${name.textContent} 원본 열기`);
+          open.addEventListener('click', () => { void openOriginal(attachment, open); });
+          card.appendChild(open);
+        }
+        if (attachment?.status === 'attached_temporary') {
+          const save = global.document.createElement('button');
+          save.type = 'button';
+          save.className = 'attachment-card-library';
+          save.textContent = '서재 저장';
+          save.setAttribute('aria-label', `${name.textContent} 서재에 저장`);
+          save.addEventListener('click', () => { void promoteAttachment(attachment, meta, save); });
+          card.appendChild(save);
+        }
       }
       return card;
     }

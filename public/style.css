@@ -3023,7 +3023,8 @@ html, body {
   outline: none;
 }
 
-.attachment-card-library {
+.attachment-card-library,
+.attachment-card-original {
   flex: 0 0 auto;
   min-width: 68px;
   min-height: 44px;
@@ -3037,23 +3038,31 @@ html, body {
   transition: background 150ms var(--ease-out), color 150ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.attachment-card-library:active {
+.attachment-card-original {
+  min-width: 48px;
+}
+
+.attachment-card-library:active,
+.attachment-card-original:active {
   transform: scale(0.97);
 }
 
-.attachment-card-library:focus-visible {
+.attachment-card-library:focus-visible,
+.attachment-card-original:focus-visible {
   outline: 2px solid var(--brand-ink);
   outline-offset: 2px;
 }
 
 .attachment-card-library:disabled,
-.attachment-card-library.is-saved {
+.attachment-card-library.is-saved,
+.attachment-card-original:disabled {
   cursor: default;
   opacity: 0.72;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .attachment-card-library:not(:disabled):hover {
+  .attachment-card-library:not(:disabled):hover,
+  .attachment-card-original:not(:disabled):hover {
     background: var(--brand-soft-strong);
   }
 }
