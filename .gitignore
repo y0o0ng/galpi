@@ -20,3 +20,10 @@ public/lib/icons/Xion/Xion_pet/*.zip
 skills-lock.json
 .agents/
 .claude/skills/
+
+# 트레이딩: 자격증명과 전용 저장소는 절대 커밋하지 않는다
+trading/.env.paper
+trading/.env.live
+trading/data/
+__pycache__/
+*.pyc
