@@ -817,6 +817,7 @@ const attachmentDocumentTools = createAttachmentDocumentTools({
 const attachmentImages = createAttachmentImageService(db, {
   enabled: ATTACHMENTS_ENABLED,
   tmpDir: ATTACHMENTS_TMP_DIR,
+  vaultPath: VAULT_PATH,
   maxImagesPerTurn: ATTACHMENT_IMAGE_MAX_PER_TURN,
   maxTurnBytes: ATTACHMENT_IMAGE_MAX_TURN_BYTES,
 });

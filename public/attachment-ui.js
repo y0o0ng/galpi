@@ -203,11 +203,7 @@
           else cancel();
         });
         card.appendChild(remove);
-      } else if (
-        !transientStatus
-        && attachment?.status === 'attached_temporary'
-        && kind !== 'image'
-      ) {
+      } else if (!transientStatus && attachment?.status === 'attached_temporary') {
         const save = global.document.createElement('button');
         save.type = 'button';
         save.className = 'attachment-card-library';

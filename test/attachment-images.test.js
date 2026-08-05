@@ -86,15 +86,28 @@ async function seedImage(db, tmpDir, {
   return { blobId, storedPath: finalPath };
 }
 
-function attachToTurn(db, { attachmentId, sessionId = 'shared-main', position = 0 }) {
+// attachToUserMessage와 같은 의미로 턴 번호를 매긴다. 사용자 메시지를 먼저 넣고
+// 그 시점의 사용자 턴 수를 origin으로 쓴다.
+function attachToTurn(db, {
+  attachmentId,
+  attachmentIds,
+  sessionId = 'shared-main',
+  replayWindowTurns = 3,
+}) {
+  const ids = attachmentIds || [attachmentId];
   const messageId = Number(db.prepare(`
     INSERT INTO messages (session_id, role, content) VALUES (?, 'user', '턴')
   `).run(sessionId).lastInsertRowid);
-  db.prepare(`
-    INSERT INTO message_attachments (
-      message_id, attachment_id, position, origin_user_turn_index, replay_window_turns
-    ) VALUES (?, ?, ?, 1, 3)
-  `).run(messageId, attachmentId, position);
+  const originUserTurnIndex = db.prepare(`
+    SELECT COUNT(*) AS count FROM messages WHERE session_id = ? AND role = 'user'
+  `).get(sessionId).count;
+  ids.forEach((id, position) => {
+    db.prepare(`
+      INSERT INTO message_attachments (
+        message_id, attachment_id, position, origin_user_turn_index, replay_window_turns
+      ) VALUES (?, ?, ?, ?, ?)
+    `).run(messageId, id, position, originUserTurnIndex, replayWindowTurns);
+  });
   return messageId;
 }
 
@@ -179,6 +192,31 @@ test('이번 턴에 여러 장을 붙이면 사용자가 올린 순서 그대로
   );
 });
 
+test('이전 턴에 여러 장이 붙어 있어도 그 안의 순서가 뒤집히지 않는다', async t => {
+  const { tmpDir, db } = await withFixture(t, 'attachment-images-replay-order-');
+  const first = ['att_1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a', 'att_1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b'];
+  const second = ['att_2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a', 'att_2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b'];
+  for (const [index, id] of [...first, ...second].entries()) {
+    await seedImage(db, tmpDir, {
+      id,
+      bytes: Buffer.from(`이미지 ${index}`),
+      filename: `${index === 0 ? 'A1' : index === 1 ? 'A2' : index === 2 ? 'B1' : 'B2'}.png`,
+      sessionId: 'shared-main',
+      lifecycleStatus: 'attached_temporary',
+    });
+  }
+  attachToTurn(db, { attachmentIds: first, replayWindowTurns: 10 });
+  attachToTurn(db, { attachmentIds: second, replayWindowTurns: 10 });
+
+  const images = createAttachmentImageService(db, { enabled: true, tmpDir });
+  const result = await images.listTurnImages({ sessionId: 'shared-main' });
+  // 오래된 턴부터, 각 턴 안에서는 붙인 순서대로다.
+  assert.deepEqual(
+    result.images.map(image => image.filename),
+    ['A1.png', 'A2.png', 'B1.png', 'B2.png'],
+  );
+});
+
 test('턴 예산을 넘는 이미지는 오래된 것부터 빼고 개수를 알린다', async t => {
   const { tmpDir, db } = await withFixture(t, 'attachment-images-budget-');
   const ids = [
@@ -194,7 +232,8 @@ test('턴 예산을 넘는 이미지는 오래된 것부터 빼고 개수를 알
       sessionId: 'shared-main',
       lifecycleStatus: 'attached_temporary',
     });
-    attachToTurn(db, { attachmentId: id });
+    // 창이 아니라 예산만 시험하도록 셋 다 창 안에 남겨둔다.
+    attachToTurn(db, { attachmentId: id, replayWindowTurns: 10 });
   }
 
   const byBytes = createAttachmentImageService(db, {
@@ -295,4 +334,85 @@ test('서버가 이미지 턴만 멀티모달 입력으로 바꾸고 검증된 �
   );
   // 이미지 미지원은 조용한 모델 교체 대신 사용자에게 보이는 오류로 나간다.
   assert.match(server, /code === 'MODEL_IMAGE_UNSUPPORTED'/);
+});
+
+test('서재로 승격된 이미지는 대화에 계속 보이지만 저장 경계는 풀린다', async t => {
+  const { root, tmpDir, db } = await withFixture(t, 'attachment-images-library-');
+  const libraryDir = path.join(root, 'vault', '_attachments', '2026', '08');
+  await fsp.mkdir(libraryDir, { recursive: true });
+
+  const temporaryId = 'att_30303030303030303030303030303030';
+  const libraryId = 'att_40404040404040404040404040404040';
+  await seedImage(db, tmpDir, {
+    id: temporaryId,
+    bytes: Buffer.from('임시 이미지'),
+    filename: '임시.png',
+    sessionId: 'shared-main',
+    lifecycleStatus: 'attached_temporary',
+  });
+  attachToTurn(db, { attachmentId: temporaryId });
+  await seedImage(db, tmpDir, {
+    id: libraryId,
+    bytes: Buffer.from('서재 이미지'),
+    filename: '서재.png',
+    sessionId: 'shared-main',
+    lifecycleStatus: 'library',
+    storedPath: path.join(libraryDir, 'attlib_abc.png'),
+  });
+  db.prepare("UPDATE attachments SET scope = 'library' WHERE id = ?").run(libraryId);
+  attachToTurn(db, { attachmentId: libraryId });
+
+  const images = createAttachmentImageService(db, {
+    enabled: true,
+    tmpDir,
+    vaultPath: path.join(root, 'vault'),
+  });
+  const result = await images.listTurnImages({ sessionId: 'shared-main' });
+  assert.deepEqual(result.images.map(image => image.filename), ['임시.png', '서재.png']);
+  assert.equal(result.skippedInvalid, 0);
+  // 임시가 하나라도 살아 있으면 계속 막는다.
+  assert.equal(images.hasTemporaryImages({ sessionId: 'shared-main' }), true);
+
+  // 임시가 만료되면 서재 이미지만 남고 저장이 풀린다.
+  db.prepare("UPDATE attachments SET lifecycle_status = 'expired' WHERE id = ?").run(temporaryId);
+  const libraryOnly = await images.listTurnImages({ sessionId: 'shared-main' });
+  assert.deepEqual(libraryOnly.images.map(image => image.filename), ['서재.png']);
+  assert.equal(images.hasTemporaryImages({ sessionId: 'shared-main' }), false);
+
+  // Vault 경로를 모르면 서재 원본을 읽지 않는다.
+  const noVault = createAttachmentImageService(db, { enabled: true, tmpDir });
+  const blocked = await noVault.listTurnImages({ sessionId: 'shared-main' });
+  assert.deepEqual(blocked.images, []);
+  assert.equal(blocked.skippedInvalid, 1);
+});
+
+test('replay 창을 넘긴 서재 이미지는 더 보내지 않는다', async t => {
+  const { root, tmpDir, db } = await withFixture(t, 'attachment-images-window-');
+  const libraryDir = path.join(root, 'vault', '_attachments');
+  await fsp.mkdir(libraryDir, { recursive: true });
+  const libraryId = 'att_50505050505050505050505050505050';
+  await seedImage(db, tmpDir, {
+    id: libraryId,
+    bytes: Buffer.from('오래된 서재 이미지'),
+    filename: '서재.png',
+    sessionId: 'shared-main',
+    lifecycleStatus: 'library',
+    storedPath: path.join(libraryDir, 'attlib_old.png'),
+  });
+  db.prepare("UPDATE attachments SET scope = 'library' WHERE id = ?").run(libraryId);
+  attachToTurn(db, { attachmentId: libraryId });
+
+  const images = createAttachmentImageService(db, {
+    enabled: true,
+    tmpDir,
+    vaultPath: path.join(root, 'vault'),
+  });
+  assert.equal((await images.listTurnImages({ sessionId: 'shared-main' })).images.length, 1);
+
+  // origin 1 + window 3이면 다가오는 4번째 턴부터는 창 밖이다.
+  for (let i = 0; i < 3; i += 1) {
+    db.prepare("INSERT INTO messages (session_id, role, content) VALUES ('shared-main', 'user', '턴')").run();
+  }
+  assert.deepEqual((await images.listTurnImages({ sessionId: 'shared-main' })).images, []);
+  assert.equal(images.hasTemporaryImages({ sessionId: 'shared-main' }), false);
 });

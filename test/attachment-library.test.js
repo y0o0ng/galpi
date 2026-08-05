@@ -300,7 +300,61 @@ test('promotion resumes from exact files left before the database commit', async
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM attachment_library_items').get().count, 1);
 });
 
-test('promotion fails closed for another session, unsupported images, and changed source bytes', async t => {
+test('an image promotes without any parsed document behind it', async t => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'attachment-library-image-'));
+  const tmpDir = path.join(root, 'attachments', 'tmp');
+  const vaultPath = path.join(root, 'vault');
+  await fsp.mkdir(tmpDir, { recursive: true });
+  await fsp.mkdir(vaultPath, { recursive: true });
+  t.after(() => fsp.rm(root, { recursive: true, force: true }));
+  const db = createDatabase();
+  t.after(() => db.close());
+
+  const id = 'att_1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f';
+  const source = await seedReadyDocument(db, tmpDir, {
+    id,
+    content: 'PNG 바이트인 척하는 내용',
+    filename: '서버 구조.png',
+    kind: 'image',
+    mimeType: 'image/png',
+  });
+  const service = createAttachmentLibraryService(db, { enabled: true, tmpDir, vaultPath });
+
+  const result = await service.promote({ attachmentId: id, sessionId: 'shared-main' });
+  assert.equal(result.status, 'library');
+  assert.equal(result.duplicate, false);
+  assert.equal(result.title, '서버 구조');
+
+  const note = await fsp.readFile(path.join(vaultPath, result.noteFilename), 'utf8');
+  assert.match(note, /^document_format: image$/m);
+  assert.match(note, /^parse_status: not_applicable$/m);
+  assert.match(note, /^page_count: null$/m);
+  assert.match(note, /## 원본 이미지/);
+  assert.match(note, /!\[\[attlib_[a-f0-9]{24}\.png\]\]/);
+  // 파싱 산출물이 없으므로 미리보기 구획을 만들지 않는다.
+  assert.doesNotMatch(note, /## 문서 미리보기/);
+  assert.match(note, /<!-- CODEX-SUMMARY-START -->[\s\S]*?<!-- CODEX-SUMMARY-END -->/);
+
+  const promoted = db.prepare(`
+    SELECT a.scope, a.lifecycle_status AS lifecycleStatus, b.storage_scope AS blobScope
+    FROM attachments a JOIN attachment_blobs b ON b.id = a.blob_id WHERE a.id = ?
+  `).get(id);
+  assert.deepEqual(promoted, { scope: 'library', lifecycleStatus: 'library', blobScope: 'library' });
+  assert.equal(db.prepare(`
+    SELECT COUNT(*) AS count FROM attachment_library_items WHERE attachment_id = ?
+  `).get(id).count, 1);
+  // 원본은 Vault 안으로 옮겨지고 임시 사본은 남지 않는다.
+  const libraryPath = path.join(vaultPath, ...result.libraryPath.split('/'));
+  assert.equal((await fsp.stat(libraryPath)).isFile(), true);
+  await assert.rejects(fsp.stat(source.storedPath), error => error.code === 'ENOENT');
+
+  // 같은 이미지를 다시 저장하면 새 노트를 만들지 않는다.
+  const again = await service.promote({ attachmentId: id, sessionId: 'shared-main' });
+  assert.equal(again.duplicate, true);
+  assert.equal(again.noteFilename, result.noteFilename);
+});
+
+test('promotion fails closed for another session and changed source bytes', async t => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'attachment-library-guards-'));
   const tmpDir = path.join(root, 'attachments', 'tmp');
   const vaultPath = path.join(root, 'vault');
@@ -311,23 +365,11 @@ test('promotion fails closed for another session, unsupported images, and change
   t.after(() => db.close());
   const id = 'att_dddddddddddddddddddddddddddddddd';
   const source = await seedReadyDocument(db, tmpDir, { id, content: '원본 문서' });
-  const imageId = 'att_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
-  await seedReadyDocument(db, tmpDir, {
-    id: imageId,
-    content: 'not-a-real-image',
-    filename: '사진.png',
-    kind: 'image',
-    mimeType: 'image/png',
-  });
   const service = createAttachmentLibraryService(db, { enabled: true, tmpDir, vaultPath });
 
   await assert.rejects(
     service.promote({ attachmentId: id, sessionId: 'other-session' }),
     error => error.code === 'ATTACHMENT_SESSION_MISMATCH',
-  );
-  await assert.rejects(
-    service.promote({ attachmentId: imageId, sessionId: 'shared-main' }),
-    error => error.code === 'ATTACHMENT_TYPE_UNSUPPORTED',
   );
   await fsp.writeFile(source.storedPath, '변경된 원본');
   await assert.rejects(
