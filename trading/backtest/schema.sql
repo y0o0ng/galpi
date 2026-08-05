@@ -92,6 +92,33 @@ CREATE TABLE IF NOT EXISTS features_daily (
   PRIMARY KEY (symbol, trade_date, strategy_version, source_version)
 );
 
+-- 후보 랭킹의 결과. 17장의 `signals`다.
+-- signal_id는 (전략 버전, 데이터 버전, 날짜, 종목)에서 결정론적으로 나오므로 같은
+-- 스냅샷을 다시 돌리면 같은 행이 나온다. snapshot_id는 전체를 훑는 값이라 실행이
+-- 감사 지점에서 채울 때만 들어온다.
+CREATE TABLE IF NOT EXISTS signals (
+  signal_id TEXT PRIMARY KEY,
+  trade_date TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  strategy_version TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  snapshot_id TEXT,
+  feature_hash TEXT NOT NULL,
+  regime TEXT NOT NULL CHECK (regime IN ('GREEN', 'YELLOW', 'RED')),
+  score REAL NOT NULL,
+  z_rs63_5 REAL NOT NULL,
+  z_trend_quality60 REAL NOT NULL,
+  rank INTEGER NOT NULL CHECK (rank >= 1),
+  score_population INTEGER NOT NULL,
+  -- 신호 종가와 ATR는 실제 주문 가격 단위다. 진입 지정가 상한과 갭 취소의 기준이다.
+  reference_close REAL NOT NULL CHECK (reference_close > 0),
+  atr14 REAL NOT NULL CHECK (atr14 > 0),
+  reasons TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  UNIQUE (trade_date, symbol, strategy_version, source_version)
+);
+
 CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(trade_date);
+CREATE INDEX IF NOT EXISTS idx_signals_date ON signals(trade_date);
 CREATE INDEX IF NOT EXISTS idx_universe_membership_from ON universe_membership(valid_from);
 CREATE INDEX IF NOT EXISTS idx_earnings_calendar_symbol ON earnings_calendar(symbol, event_at);
