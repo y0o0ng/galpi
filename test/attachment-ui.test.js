@@ -68,6 +68,25 @@ class FakeFile {
   }
 }
 
+class FakeImage {
+  constructor() { this.width = 800; this.height = 600; }
+  set src(value) {
+    this._src = value;
+    setImmediate(() => (value === 'blob:broken' ? this.onerror?.() : this.onload?.()));
+  }
+  get src() { return this._src; }
+}
+
+function fakeCanvas() {
+  const canvas = fakeElement('canvas');
+  canvas.drawn = [];
+  canvas.getContext = () => ({
+    drawImage: (...args) => canvas.drawn.push(args.slice(1)),
+  });
+  canvas.toDataURL = (type) => `data:${type};base64,THUMB_${canvas.width}x${canvas.height}`;
+  return canvas;
+}
+
 function makeBlob(size, type) {
   return {
     size,
@@ -103,14 +122,15 @@ function loadUi({
   const fakeWindow = {
     document: {
       getElementById: id => elements[id] || null,
-      createElement: tag => fakeElement(tag),
+      createElement: tag => (tag === 'canvas' ? fakeCanvas() : fakeElement(tag)),
     },
+    Image: FakeImage,
     File: FakeFile,
     FormData: FakeFormData,
     AbortController,
     URL: {
       createObjectURL: (blob) => { objectUrls.push(blob); return 'blob:fake'; },
-      revokeObjectURL: () => { revoked.push(1); },
+      revokeObjectURL: (url) => { revoked.push(url); },
     },
     setTimeout: (fn) => fn,
     open: (...args) => { opened.push(args); return popupStub; },
@@ -130,7 +150,7 @@ function loadUi({
     showToast: message => toasts.push(message),
     getSessionId: () => sessionId,
   });
-  return { elements, toasts, ui: fakeWindow.AttachmentUi, opened, popupStub, objectUrls };
+  return { elements, toasts, ui: fakeWindow.AttachmentUi, opened, popupStub, objectUrls, revoked };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -400,8 +420,12 @@ test('원본 열기는 클릭 시점에 창을 먼저 잡고 인증 fetch로 blo
   await settle();
 
   assert.deepEqual(opened, [['', '_blank']]);
-  assert.equal(calls.length, 1);
-  assert.match(calls[0], /^\/api\/attachments\/att_original_1\/original\?sessionId=session-original$/);
+  // 이미지 카드는 썸네일도 같은 라우트를 쓴다. 썸네일은 축소본만 남기고 원본을
+  // 버리므로 열기는 새로 받아야 한다.
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.match(call, /^\/api\/attachments\/att_original_1\/original\?sessionId=session-original$/);
+  }
   assert.equal(popupStub.location, 'blob:fake');
   assert.equal(openButton.textContent, '원본');
   assert.equal(openButton.disabled, false);
@@ -484,4 +508,107 @@ test('이미지와 PDF 원본은 원래 타입을 유지한다', async () => {
     await settle();
     assert.equal(objectUrls[0].type, type, `${kind}는 원래 타입을 유지해야 한다`);
   }
+});
+
+const imageAttachment = (overrides = {}) => ({
+  attachmentId: 'att_thumb_1',
+  filename: '사진.png',
+  kind: 'image',
+  sizeBytes: 4096,
+  status: 'attached_temporary',
+  ...overrides,
+});
+
+test('이미지 카드는 배지 자리를 축소 썸네일로 바꾸고 원본 blob은 놓아준다', async () => {
+  let fetches = 0;
+  const { ui, revoked } = loadUi({
+    apiFetch: async () => { fetches += 1; return { ok: true, blob: async () => makeBlob(4096, 'image/png') }; },
+  });
+  const target = fakeElement('message');
+  ui.renderMessageAttachments(target, [imageAttachment()]);
+  await settle(); await settle(); await settle();
+
+  const badge = target.children[0].children[0].children[0];
+  assert.equal(badge.classList.contains('has-thumb'), true);
+  const img = badge.children[0];
+  assert.equal(img.className, 'attachment-card-thumb');
+  // 800x600을 긴 변 72px 기준으로 줄인다.
+  assert.equal(img.src, 'data:image/jpeg;base64,THUMB_72x54');
+  assert.equal(badge.textContent, '');
+  // 축소본만 남기고 큰 원본은 즉시 해제한다.
+  assert.deepEqual(revoked, ['blob:fake']);
+  assert.equal(fetches, 1);
+});
+
+test('다시 그려도 캐시를 써서 원본을 다시 받지 않는다', async () => {
+  let fetches = 0;
+  const { ui } = loadUi({
+    apiFetch: async () => { fetches += 1; return { ok: true, blob: async () => makeBlob(4096, 'image/png') }; },
+  });
+  const target = fakeElement('message');
+  ui.renderMessageAttachments(target, [imageAttachment()]);
+  await settle(); await settle(); await settle();
+  assert.equal(fetches, 1);
+
+  ui.renderMessageAttachments(target, [imageAttachment()]);
+  await settle();
+  assert.equal(fetches, 1, '폴링이 카드를 다시 그려도 재다운로드하지 않는다');
+  assert.equal(target.children[0].children[0].children[0].children[0].src,
+    'data:image/jpeg;base64,THUMB_72x54');
+});
+
+test('만료 이미지와 문서 첨부는 글자 배지를 유지한다', async () => {
+  let fetches = 0;
+  const { ui } = loadUi({
+    apiFetch: async () => { fetches += 1; return { ok: true, blob: async () => makeBlob(1, 'image/png') }; },
+  });
+  const target = fakeElement('message');
+
+  ui.renderMessageAttachments(target, [imageAttachment({
+    attachmentId: 'att_thumb_expired', status: 'expired', expired: true,
+  })]);
+  await settle(); await settle();
+  assert.equal(target.children[0].children[0].children[0].textContent, 'IMG');
+
+  ui.renderMessageAttachments(target, [{
+    attachmentId: 'att_thumb_doc', filename: '자료.md', kind: 'markdown', status: 'attached_temporary',
+  }]);
+  await settle(); await settle();
+  assert.equal(target.children[0].children[0].children[0].textContent, 'MD');
+  assert.equal(fetches, 0, '만료·문서는 원본을 받지 않는다');
+});
+
+test('썸네일 생성이 실패하면 글자 배지로 남는다', async () => {
+  const { ui } = loadUi({
+    apiFetch: async () => ({ ok: false, json: async () => ({ error: '없음' }) }),
+  });
+  const target = fakeElement('message');
+  ui.renderMessageAttachments(target, [imageAttachment({ attachmentId: 'att_thumb_fail' })]);
+  await settle(); await settle(); await settle();
+
+  const badge = target.children[0].children[0].children[0];
+  assert.equal(badge.textContent, 'IMG');
+  assert.equal(badge.classList.contains('has-thumb'), false);
+});
+
+test('초안 이미지는 네트워크 없이 로컬 파일로 그린다', async () => {
+  let fetches = 0;
+  const { elements } = loadUi({
+    apiFetch: async () => {
+      fetches += 1;
+      return { ok: true, json: async () => ({
+        attachmentId: 'att_draft_1', filename: '초안.png', kind: 'image',
+        mimeType: 'image/png', sizeBytes: 10, status: 'uploaded_unattached',
+      }) };
+    },
+  });
+  elements['attachment-input'].files = [new FakeFile(['0123456789'], '초안.png', { type: 'image/png' })];
+  elements['attachment-input'].dispatch('change');
+  await settle(); await settle(); await settle();
+
+  const badge = elements['attachment-draft'].children[0].children[0];
+  assert.equal(badge.classList.contains('has-thumb'), true);
+  assert.equal(badge.children[0].src, 'data:image/jpeg;base64,THUMB_72x54');
+  // 업로드 한 번뿐이고 썸네일 때문에 원본을 다시 받지 않는다.
+  assert.equal(fetches, 1);
 });

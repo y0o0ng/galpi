@@ -19,6 +19,11 @@
     image: 'IMG',
   });
 
+  // 배지 자리가 36px이라 레티나 기준 2배까지만 그린다. 서버에 리사이즈가 없어서
+  // 원본은 한 번 통째로 받지만, 축소본만 남기고 원본 blob은 즉시 놓아준다.
+  const THUMB_PX = 72;
+  const THUMB_CACHE_LIMIT = 24;
+
   function extensionOf(filename) {
     const match = String(filename || '').toLowerCase().match(/\.([^.]+)$/);
     return match?.[1] || '';
@@ -47,6 +52,9 @@
     let config = null;
     const promotingIds = new Set();
     const openingIds = new Set();
+    // 폴링이 카드를 자주 다시 그린다. 캐시가 없으면 그때마다 원본을 다시 받는다.
+    const thumbnails = new Map();
+    const thumbnailLoads = new Set();
     // 초안은 여러 개다. 각 항목이 자기 업로드 상태와 취소 컨트롤러를 들고 있다.
     let drafts = [];
     let draftError = '';
@@ -133,6 +141,112 @@
       if (attachment?.status === 'promoting') return '서재 저장 중';
       if (attachment?.status === 'uploaded_unattached') return '전송 전';
       return '임시 첨부';
+    }
+
+    function loadImageElement(src) {
+      return new Promise((resolve, reject) => {
+        if (!global.Image) {
+          reject(new Error('이미지를 그릴 수 없어.'));
+          return;
+        }
+        const image = new global.Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('이미지를 읽지 못했어.'));
+        image.src = src;
+      });
+    }
+
+    /** 원본을 축소해 작은 data URL만 남긴다. 전체 해상도 비트맵을 들고 있지 않는다. */
+    async function renderThumbnail(objectUrl) {
+      const image = await loadImageElement(objectUrl);
+      const canvas = global.document.createElement('canvas');
+      const longest = Math.max(Number(image.width) || 0, Number(image.height) || 0) || THUMB_PX;
+      const scale = Math.min(1, THUMB_PX / longest);
+      canvas.width = Math.max(1, Math.round((Number(image.width) || THUMB_PX) * scale));
+      canvas.height = Math.max(1, Math.round((Number(image.height) || THUMB_PX) * scale));
+      const context = canvas.getContext?.('2d');
+      if (!context || !canvas.toDataURL) return null;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg', 0.8);
+    }
+
+    function cacheThumbnail(key, dataUrl) {
+      if (thumbnails.has(key)) thumbnails.delete(key);
+      thumbnails.set(key, dataUrl);
+      // data URL 문자열이라 revoke할 게 없다. 개수만 묶어둔다.
+      while (thumbnails.size > THUMB_CACHE_LIMIT) {
+        thumbnails.delete(thumbnails.keys().next().value);
+      }
+    }
+
+    function showThumbnail(badge, dataUrl) {
+      if (!badge || !dataUrl) return;
+      const image = global.document.createElement('img');
+      image.className = 'attachment-card-thumb';
+      image.src = dataUrl;
+      image.alt = '';
+      badge.textContent = '';
+      badge.classList.add('has-thumb');
+      badge.appendChild(image);
+    }
+
+    async function buildThumbnail(key, getObjectUrl) {
+      if (thumbnails.has(key)) return thumbnails.get(key);
+      let objectUrl = null;
+      try {
+        objectUrl = await getObjectUrl();
+        if (!objectUrl) return null;
+        const dataUrl = await renderThumbnail(objectUrl);
+        if (dataUrl) cacheThumbnail(key, dataUrl);
+        return dataUrl;
+      } catch {
+        // 썸네일은 보조 정보다. 실패하면 글자 배지를 그대로 둔다.
+        return null;
+      } finally {
+        if (objectUrl) global.URL.revokeObjectURL(objectUrl);
+      }
+    }
+
+    function loadDraftThumbnail(badge, key, file) {
+      if (thumbnails.has(key)) {
+        showThumbnail(badge, thumbnails.get(key));
+        return;
+      }
+      void buildThumbnail(key, async () => global.URL.createObjectURL(file))
+        .then(dataUrl => showThumbnail(badge, dataUrl));
+    }
+
+    function loadMessageThumbnail(badge, attachment) {
+      const key = String(attachment?.attachmentId || '');
+      if (!key) return;
+      if (thumbnails.has(key)) {
+        showThumbnail(badge, thumbnails.get(key));
+        return;
+      }
+      if (thumbnailLoads.has(key)) return;
+      thumbnailLoads.add(key);
+      const load = () => buildThumbnail(key, async () => {
+        const response = await apiFetch(
+          `/api/attachments/${encodeURIComponent(key)}/original`
+          + `?sessionId=${encodeURIComponent(getSessionId())}`,
+        );
+        if (!response.ok) return null;
+        return global.URL.createObjectURL(await response.blob());
+      })
+        .then(dataUrl => showThumbnail(badge, dataUrl))
+        .finally(() => thumbnailLoads.delete(key));
+
+      // 히스토리를 스크롤할 때 과거 이미지를 전부 받지 않도록 보일 때만 받는다.
+      if (!global.IntersectionObserver) {
+        void load();
+        return;
+      }
+      const observer = new global.IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        observer.disconnect();
+        void load();
+      });
+      observer.observe(badge);
     }
 
     /**
@@ -226,7 +340,12 @@
       }
     }
 
-    function makeCard(attachment, { transientStatus = '', removable = false } = {}) {
+    function makeCard(attachment, {
+      transientStatus = '',
+      removable = false,
+      localFile = null,
+      thumbnailKey = null,
+    } = {}) {
       const card = global.document.createElement('div');
       card.className = 'attachment-card';
       const isExpired = attachment?.expired || attachment?.status === 'expired';
@@ -239,6 +358,13 @@
       badge.className = 'attachment-card-kind';
       badge.textContent = KIND_LABELS[kind] || 'FILE';
       badge.setAttribute('aria-hidden', 'true');
+      // 이미지만 배지 자리를 실제 그림으로 바꾼다. 만료 카드는 원본이 없다.
+      if (kind === 'image' && !isExpired) {
+        if (localFile) loadDraftThumbnail(badge, thumbnailKey, localFile);
+        else if (['attached_temporary', 'library'].includes(attachment?.status)) {
+          loadMessageThumbnail(badge, attachment);
+        }
+      }
 
       const body = global.document.createElement('span');
       body.className = 'attachment-card-body';
@@ -303,6 +429,9 @@
         container.appendChild(makeCard(draft.attachment || draft.file, {
           transientStatus: draft.phase === 'uploading' ? 'uploading' : draft.phase === 'error' ? 'error' : '',
           removable: () => removeDraft(draft.key),
+          // 초안은 로컬 File을 이미 들고 있어 네트워크 없이 그린다.
+          localFile: draft.file || null,
+          thumbnailKey: `draft:${draft.key}`,
         }));
       }
       if (draftError) {
