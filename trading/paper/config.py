@@ -25,7 +25,16 @@ PAPER_ENV_NAMES = ("KIS_PAPER_APP_KEY", "KIS_PAPER_APP_SECRET", "KIS_PAPER_ACCOU
 # 한투 계좌는 종합계좌 8자리와 상품코드 2자리로 나뉜다.
 ACCOUNT_PATTERN = re.compile(r"^(\d{8})-(\d{2})$")
 
-DEFAULT_ENV_FILE = Path(__file__).resolve().parents[1] / ".env.paper"
+# iOS는 .env를 열 앱이 없어 Pages가 잡아채고 서식 문서(zip)로 저장해버린다.
+# 그래서 기본은 .txt다. 점으로 시작하는 이름은 파일 탐색기에서 숨겨지므로
+# 기본으로 쓰지 않는다. 셋 다 .gitignore에 있다.
+CREDENTIAL_FILENAMES = (
+    "paper-credentials.txt",
+    "paper-credentials.env",
+    ".env.paper",
+)
+TRADING_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_ENV_FILE = TRADING_ROOT / CREDENTIAL_FILENAMES[0]
 
 
 class TradingConfigError(Exception):
@@ -80,13 +89,35 @@ def parse_env_file(text: str) -> dict[str, str]:
     return values
 
 
+def decode_env_bytes(raw: bytes) -> str:
+    """편집기가 UTF-8이 아닌 인코딩으로 저장해도 KEY=VALUE를 읽어낸다.
+
+    자격증명 값은 ASCII라 주석의 한글이 깨져도 값은 온전하다. 인코딩 때문에
+    설정을 못 읽는 쪽이 값이 조금 깨져 보이는 쪽보다 나쁘다.
+    """
+    for encoding in ("utf-8", "cp949", "euc-kr"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def _read_env_file(env_file: Path | None) -> dict[str, str]:
+    """지정한 파일을 읽는다. 기본 경로면 보이는 이름과 숨김 이름을 모두 살핀다."""
     if env_file is None:
         return {}
-    try:
-        return parse_env_file(env_file.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
+    candidates = [env_file]
+    if env_file == DEFAULT_ENV_FILE:
+        candidates = [TRADING_ROOT / name for name in CREDENTIAL_FILENAMES]
+    for candidate in candidates:
+        try:
+            values = parse_env_file(decode_env_bytes(candidate.read_bytes()))
+        except FileNotFoundError:
+            continue
+        if any(values.get(name) for name in PAPER_ENV_NAMES):
+            return values
+    return {}
 
 
 def load_paper_config(
