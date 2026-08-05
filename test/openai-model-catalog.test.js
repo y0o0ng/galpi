@@ -9,6 +9,7 @@ const { createModelCatalogStore } = require('../lib/model-catalog-store');
 const {
   CHAT_SELECTION_AUTO,
   OPENAI_PROBE_VERSION,
+  classifyProbeFailure,
   buildOpenAIChatCatalogView,
   buildOpenAIModelCatalogPayload,
   normalizeAvailableOpenAIModels,
@@ -343,4 +344,109 @@ test('chat catalog reports bootstrap fallback before the first successful refres
   });
   assert.equal(view.catalog.status, 'fallback');
   assert.equal(view.resolvedModelId, 'gpt-5.6-terra');
+});
+
+test('transient probe failures retry once and never harden into a rejection', async () => {
+  const attempts = [];
+  const payload = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-5.6-terra' }, { id: 'gpt-5.6-luna' }],
+    probeModel: async modelId => {
+      attempts.push(modelId);
+      if (modelId === 'gpt-5.6-terra' && attempts.filter(id => id === modelId).length === 1) {
+        // 실제로 관측된 흔들림이다. 두 번째 호출이 빈 텍스트를 돌려줬다.
+        const error = new Error('empty');
+        error.code = 'MODEL_PROBE_TEXT_MISSING';
+        throw error;
+      }
+    },
+    probeImageInput: async () => {},
+    now: () => 60,
+  });
+
+  // 같은 refresh 안에서 한 번 더 시도해 살아난다.
+  assert.deepEqual(attempts, ['gpt-5.6-terra', 'gpt-5.6-terra', 'gpt-5.6-luna']);
+  assert.equal(payload.models.find(m => m.id === 'gpt-5.6-terra').probeStatus, 'compatible');
+  assert.equal(payload.activeImage.balanced, 'gpt-5.6-terra');
+});
+
+test('a probe that keeps flaking stays retryable instead of being cached as rejected', async () => {
+  const flaky = async () => {
+    const error = new Error('empty');
+    error.code = 'MODEL_PROBE_TEXT_MISSING';
+    throw error;
+  };
+  const first = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-5.6-terra' }],
+    probeModel: flaky,
+    probeImageInput: async () => {},
+    now: () => 70,
+  });
+  const terra = first.models[0];
+  // rejected로 굳으면 previousProbeForModel이 재사용해 영원히 막힌다.
+  assert.equal(terra.probeStatus, 'untested');
+  assert.equal(terra.probeErrorCode, 'MODEL_PROBE_TEXT_MISSING');
+  assert.equal(first.active.balanced, null);
+
+  let calls = 0;
+  const second = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-5.6-terra' }],
+    previousPayload: first,
+    probeModel: async () => { calls += 1; },
+    probeImageInput: async () => {},
+    now: () => 80,
+  });
+  assert.equal(calls, 1, '다음 refresh가 다시 시도해야 한다');
+  assert.equal(second.models[0].probeStatus, 'compatible');
+  assert.equal(second.activeImage.balanced, 'gpt-5.6-terra');
+});
+
+test('a real capability rejection is hardened and not retried', async () => {
+  const noVision = async () => {
+    const error = new Error('this model does not support image input');
+    error.status = 400;
+    throw error;
+  };
+  const first = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-5.6-terra' }],
+    probeModel: async () => {},
+    probeImageInput: noVision,
+    now: () => 90,
+  });
+  assert.equal(first.models[0].imageProbeStatus, 'rejected');
+  assert.equal(first.activeImage.balanced, null);
+  // 텍스트는 계속 쓴다.
+  assert.equal(first.active.balanced, 'gpt-5.6-terra');
+
+  let imageCalls = 0;
+  const second = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-5.6-terra' }],
+    previousPayload: first,
+    probeModel: async () => {},
+    probeImageInput: async () => { imageCalls += 1; },
+    now: () => 100,
+  });
+  assert.equal(imageCalls, 0, '확정된 거부는 매번 다시 찌르지 않는다');
+  assert.equal(second.models[0].imageProbeStatus, 'rejected');
+});
+
+test('probe failures are split by what they say about the model', () => {
+  const cases = [
+    [{ code: 'MODEL_PROBE_TEXT_MISSING' }, true],
+    [{ status: 429 }, true],
+    [{ status: 503 }, true],
+    [{ status: 401 }, true],
+    [{ name: 'AbortError' }, true],
+    [{ code: 'ECONNRESET' }, true],
+    [{ code: 'INCOMPLETE_MODEL_RESPONSE' }, true],
+    [{ status: 400 }, false],
+    [{ status: 404 }, false],
+    [{ code: 'MODEL_PROBE_TOOL_MISSING' }, false],
+  ];
+  for (const [error, transient] of cases) {
+    assert.equal(
+      classifyProbeFailure(error).transient,
+      transient,
+      `${JSON.stringify(error)} → transient ${transient}`,
+    );
+  }
 });
