@@ -135,6 +135,17 @@
       return '임시 첨부';
     }
 
+    /**
+     * blob: URL로 열면 서버의 Content-Disposition은 아무 효과가 없다. 브라우저는
+     * blob 타입만 보므로 텍스트류를 그대로 넘기면 뷰어가 charset을 잡지 못해
+     * 한글이 깨진다. 여기서 타입을 다시 씌운다. text/plain으로 고정하면 인코딩도
+     * 맞고 HTML로 해석될 여지도 없다.
+     */
+    function viewableBlob(blob, kind) {
+      if (kind === 'image' || kind === 'pdf') return blob;
+      return blob.slice(0, blob.size, 'text/plain; charset=utf-8');
+    }
+
     function downloadObjectUrl(objectUrl, filename) {
       const link = global.document.createElement('a');
       link.href = objectUrl;
@@ -166,7 +177,9 @@
           throw new Error(data.error || '원본을 열지 못했어.');
         }
         const blob = await response.blob();
-        objectUrl = global.URL.createObjectURL(blob);
+        objectUrl = global.URL.createObjectURL(
+          viewableBlob(blob, attachment?.kind || kindFromFile(attachment)),
+        );
         if (popup && !popup.closed) popup.location = objectUrl;
         else downloadObjectUrl(objectUrl, attachment?.filename);
       } catch (error) {

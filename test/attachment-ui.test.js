@@ -68,6 +68,14 @@ class FakeFile {
   }
 }
 
+function makeBlob(size, type) {
+  return {
+    size,
+    type,
+    slice(start, end, nextType) { return makeBlob(end - start, nextType); },
+  };
+}
+
 class FakeFormData {
   constructor() { this.values = new Map(); }
   append(name, value) { this.values.set(name, value); }
@@ -90,6 +98,7 @@ function loadUi({
   const toasts = [];
   const opened = [];
   const revoked = [];
+  const objectUrls = [];
   const popupStub = { closed: false, location: null, close() { this.closed = true; } };
   const fakeWindow = {
     document: {
@@ -99,7 +108,10 @@ function loadUi({
     File: FakeFile,
     FormData: FakeFormData,
     AbortController,
-    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL: () => { revoked.push(1); } },
+    URL: {
+      createObjectURL: (blob) => { objectUrls.push(blob); return 'blob:fake'; },
+      revokeObjectURL: () => { revoked.push(1); },
+    },
     setTimeout: (fn) => fn,
     open: (...args) => { opened.push(args); return popupStub; },
   };
@@ -118,7 +130,7 @@ function loadUi({
     showToast: message => toasts.push(message),
     getSessionId: () => sessionId,
   });
-  return { elements, toasts, ui: fakeWindow.AttachmentUi, opened, popupStub };
+  return { elements, toasts, ui: fakeWindow.AttachmentUi, opened, popupStub, objectUrls };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -368,7 +380,7 @@ test('원본 열기는 클릭 시점에 창을 먼저 잡고 인증 fetch로 blo
       calls.push(url);
       // 창은 fetch가 끝나기 전에 이미 잡혀 있어야 iOS에서 안 막힌다.
       assert.equal(opened.length, 1, 'fetch 시작 시점에 창이 이미 열려 있어야 한다');
-      return { ok: true, blob: async () => ({ size: 3 }) };
+      return { ok: true, blob: async () => makeBlob(3, 'image/png') };
     },
   });
   const target = fakeElement('message');
@@ -432,4 +444,44 @@ test('원본 열기가 실패하면 열어둔 창을 닫고 알린다', async ()
   assert.equal(popupStub.closed, true, '빈 창을 남겨두지 않는다');
   assert.match(toasts.at(-1), /더 이상 열 수 없습니다/);
   assert.equal(openButton.disabled, false);
+});
+
+test('텍스트 원본은 blob 타입을 UTF-8 text/plain으로 다시 씌워 연다', async () => {
+  const { ui, objectUrls } = loadUi({
+    apiFetch: async () => ({ ok: true, blob: async () => makeBlob(40, 'text/markdown; charset=utf-8') }),
+  });
+  const target = fakeElement('message');
+  ui.renderMessageAttachments(target, [{
+    attachmentId: 'att_text_1', filename: '노트.md', kind: 'markdown', status: 'attached_temporary',
+  }]);
+  const button = target.children[0].children[0].children.find(
+    c => c.className === 'attachment-card-original',
+  );
+  await button.dispatch('click');
+  await settle();
+  await settle();
+
+  // blob: URL로 열면 서버 Content-Disposition이 안 걸리므로 타입을 여기서 정해야
+  // 한글이 안 깨진다.
+  assert.equal(objectUrls.length, 1);
+  assert.equal(objectUrls[0].type, 'text/plain; charset=utf-8');
+});
+
+test('이미지와 PDF 원본은 원래 타입을 유지한다', async () => {
+  for (const [kind, type] of [['image', 'image/png'], ['pdf', 'application/pdf']]) {
+    const { ui, objectUrls } = loadUi({
+      apiFetch: async () => ({ ok: true, blob: async () => makeBlob(9, type) }),
+    });
+    const target = fakeElement('message');
+    ui.renderMessageAttachments(target, [{
+      attachmentId: `att_${kind}`, filename: `a.${kind}`, kind, status: 'library',
+    }]);
+    const button = target.children[0].children[0].children.find(
+      c => c.className === 'attachment-card-original',
+    );
+    await button.dispatch('click');
+    await settle();
+    await settle();
+    assert.equal(objectUrls[0].type, type, `${kind}는 원래 타입을 유지해야 한다`);
+  }
 });
