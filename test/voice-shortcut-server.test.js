@@ -14,6 +14,19 @@ const Database = require('better-sqlite3');
 const ROOT = path.resolve(__dirname, '..');
 const API_TOKEN = 'voice-shortcut-admin-token';
 
+// 기한 validator는 과거 시각을 거부한다. 날짜를 고정하면 그 시각이 지난 뒤부터
+// 영구히 실패하므로 실행 시점 기준 "내일 오전 9시 KST"로 만든다.
+function tomorrowMorningKst() {
+  const kstOffsetMs = 9 * 60 * 60 * 1000;
+  const kstTomorrow = new Date(Date.now() + kstOffsetMs + (24 * 60 * 60 * 1000));
+  const year = kstTomorrow.getUTCFullYear();
+  const month = String(kstTomorrow.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(kstTomorrow.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}T09:00:00+09:00`;
+}
+
+const SCHEDULE_DUE_AT = tomorrowMorningKst();
+
 async function availablePort() {
   const server = net.createServer();
   server.listen(0, '127.0.0.1');
@@ -126,7 +139,7 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
             name: 'schedule_prepare',
             arguments: JSON.stringify({
               title: '병원 예약',
-              due: { kind: 'datetime', at: '2026-08-05T09:00:00+09:00' },
+              due: { kind: 'datetime', at: SCHEDULE_DUE_AT },
             }),
             status: 'completed',
           }],
@@ -372,7 +385,7 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
   assert.equal(createdTask.clientRequestId, 'shortcut-task:00000000-0000-4000-8000-000000000013');
   assert.equal(createdTask.title, '병원 예약');
   assert.equal(createdTask.dueKind, 'datetime');
-  assert.equal(createdTask.dueAt, Math.floor(Date.parse('2026-08-05T09:00:00+09:00') / 1000));
+  assert.equal(createdTask.dueAt, Math.floor(Date.parse(SCHEDULE_DUE_AT) / 1000));
   assert.ok(
     db.prepare('SELECT last_used_at AS lastUsedAt FROM assistant_shortcut_credentials').get().lastUsedAt,
   );
