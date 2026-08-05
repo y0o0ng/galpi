@@ -23,6 +23,7 @@
 - 계획·편집 전: `docs/galpi-design-final.md`, `docs/roadmap.md`
 - Pi 운영·복구: `docs/RASPBERRY_PI_RUNBOOK.md`
 - 현재 음성 기준: `docs/voice-halfduplex-design.md`
+- 트레이딩(V5-B): `docs/Swing Trading Agent Design v2 2.md`. 실측·완료 기록은 20.0절이다.
 - 세부 설계는 각 기능 문서를 단일 기준으로 삼고, 이 파일에 상세 이력을 복제하지 않는다.
 
 ## 현재 제품과 운영 경계
@@ -75,7 +76,7 @@
 - H3 되묻기 문턱은 실제 오전사 표본이 더 쌓인 뒤 정한다. 현재 작은 표본에서 정확 전사는 `min logprob -0.024~-0.425`, 오류 전사는 `-0.652`, `-1.356`이었지만 확정 문턱으로 쓰기엔 부족하다. 로그에는 토큰 문자열을 저장하지 않는다.
 - H6의 동일 request ID iPhone 재시도·화면 소등 10회 기준·추가 기기 등록은 더 진행하지 않는다. bounded 3턴은 현재 단축어와 `shared-main`으로 유지하고 별도 server conversation 상태를 추가하지 않는다. 남은 음성 후보인 침묵 1200→1000ms, earcon, H3 되묻기는 각각 필요성이 생길 때만 별도 변경으로 연다.
 - 상시 관찰: 새 `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 10회 표시, 다음 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
-- V5-A 딜 스카우트(쿠팡봇)는 수익 모델 불확실성 때문에 2026-08-04 잠정보류했고, 2026-08-05 사용자가 "진짜 나중"으로 다시 확인했다. 계정 신청·API 키·코드·외부 게시를 시작하지 않는다. 다음 제품 작업을 고를 때 딜 스카우트를 후보로 올리지 않는다. 사용자가 먼저 하겠다고 밝힌 순서는 **트레이딩 봇 또는 강의 노트**다. 둘 중 어느 쪽을 먼저 할지는 아직 정하지 않았다.
+- V5-A 딜 스카우트(쿠팡봇)는 수익 모델 불확실성 때문에 2026-08-04 잠정보류했고, 2026-08-05 사용자가 "진짜 나중"으로 다시 확인했다. 계정 신청·API 키·코드·외부 게시를 시작하지 않는다. 다음 제품 작업을 고를 때 딜 스카우트를 후보로 올리지 않는다. 2026-08-05 **트레이딩 봇 먼저, 강의 노트는 그 모의투자 관찰 기간에 병행**으로 정했다(설계 20.2와 같은 순서).
 - 첨부 U0a~U1c는 Pi·iPhone 인수를, U3a는 Pi·브라우저 인수를 마쳤다. U3a는 MD·TXT·PDF의 명시적 `library` 승격, Attachment 노트, 일반 서재 재회수다. library-only 후속 답변은 일반 저장을 허용하고 temporary 후보가 하나라도 살아 있으면 계속 막는다. iPhone 실기기 저장과 Codex 요약(U3b)은 남았다.
 - 이미지 썸네일까지 2026-08-05 Pi·iPhone 인수해 첨부 트랙은 사실상 닫혔다. 서버 리사이즈가 없어 원본을 한 번 받아 캔버스로 72px까지 줄이고 큰 blob은 즉시 놓아준다. 축소본은 attachmentId별로 캐시(상한 24)하고 IntersectionObserver로 보일 때만 받는다. 이미지의 `원본` 버튼은 원본을 다시 받는데 축소본만 남기는 대신 치르는 비용이다.
 - U4 공통 문서 계층은 2026-08-05 실측 후 보류했다. 파서와 PDF 청커는 이미 `paper-fulltext`에서 import해 공유 중이고, 이름이 같은 `cleanEvidenceItem`·`fitToolPayload`는 필드와 알고리즘이 달라 합치면 배포된 회수 동작이 바뀐다. 근거는 설계 문서 U4 절에 있다.
@@ -84,7 +85,6 @@
 - Pi에는 git이 없고 `/home/pi/galpi`는 git 체크아웃이 아니다. 배포는 바뀐 파일만 복사하고 SHA-256을 대조하는 방식이며, 그 전에 DB·Vault 온라인 백업(`POST /api/backup`)과 코드 복구본 tar를 만든다. `sudo systemctl restart galpi`는 비밀번호가 필요하므로 사용자에게 요청한다.
 - 맥 Obsidian 볼트는 Syncthing 폴더 `galpi-vault`로 `~/galpi-vault`에 **receiveonly** 단방향 미러다. 이관 때 옛 `aic-vault` 폴더가 버려진 `ai-council-vault`를 가리켜 2026-07-18부터 08-05까지 동기화가 끊겨 있었다. 양방향으로 되돌리지 않는다.
 - Codex 정리는 Codex 구독 사용 한도 소진으로 2026-08-08 17:56까지 실패한다. `codex_jobs` 42가 노트 2개를 계속 재시도하지만 `recovery_required`는 0건이고 노트 본문은 건드려지지 않았다. 한도가 회복되면 저절로 풀리므로 코드는 고치지 않는다. 채팅·첨부는 별도 API 키를 쓰므로 영향이 없다.
-
 - V5-B 스윙 트레이딩은 2026-08-05 시작했다. 코드는 `trading/`에 있고 `server.js`에 연결하지 않는다. 언어는 Python이고 표준 라이브러리만 쓴다. 기준 문서는 `docs/Swing Trading Agent Design v2 2.md`이며 실측 기록은 그 문서 20.0절이다.
 - 1단계 격리 완료: PAPER 전용 config는 `KIS_PAPER_*`만 읽고 모의 호스트가 아니면 기동을 거부한다. 저장소는 `trading/data/trading-paper.db` 전용이다. **실전 경로는 구현하지 않는다.** 자격증명은 `trading/paper-credentials.env`(gitignore)에 사용자가 직접 넣고 나는 열지 않는다.
 - 2단계 Capability Matrix 완료: 해외주식 8개 API 중 7개가 모의에서 지원되고 **미체결내역(`TTTS3018R`)만 미지원**이다. 그래서 내부 원장의 주문 상태 머신이 정본이고 체결내역·잔고로 대조한다. 모의 실측 제약은 API 호출 1초 간격, **접근토큰 1분당 1회**(캐시 필수)다.
