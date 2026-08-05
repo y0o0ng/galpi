@@ -1,7 +1,7 @@
 # 갈피 첨부파일 업로드·검색 설계
 
 > Version: 0.8
-> 상태: U0a~U0c 파일 운반·composer UI, U1a~U1c 문서 읽기·replay 저장 경계 Pi 배포 및 iPhone 대표 MD 인수 완료, U3a library 승격·재회수 Pi·브라우저 인수 완료, U2a 비전 입력·U2b 멀티 첨부 로컬 구현 완료(인수 남음)
+> 상태: U0a~U0c 파일 운반·composer UI, U1a~U1c 문서 읽기·replay 저장 경계, U3a library 승격·재회수, U2a 비전 입력·U2b 멀티 첨부·이미지 library 승격까지 Pi 배포 및 iPhone 실기기 인수 완료
 > 작성일: 2026-08-05
 > 대상: 갈피(Galpi) 서버 / 시온(Xion) 채팅 UI / Obsidian Vault
 
@@ -994,7 +994,7 @@ Pi 인수(2026-08-04):
 - 지금 하지 않기로 한 기능은 뭐야?
 ```
 
-### U2 — 이미지 읽기 (U2a 비전 입력·U2b 멀티 첨부 로컬 구현 완료, 인수 남음)
+### U2 — 이미지 읽기 ✅ Pi·iPhone 인수 완료 (2026-08-05)
 
 구현:
 
@@ -1032,14 +1032,22 @@ Pi 인수(2026-08-04):
 
 이 확인에서 **순서 버그를 하나 잡았다.** 3장을 올리고 "보낸 순서대로"를 물었더니 역순으로 답했다. replay를 오래된 것부터 놓으려던 `reverse()`가 배열 전체에 걸려 이미 정방향으로 모은 이번 턴 첨부까지 뒤집고 있었다. replay만 뒤집도록 고치고 회귀 테스트를 넣었다(`b952e80`).
 
-#### 아직 확인하지 못한 것
+#### Pi 배포와 인수 (2026-08-05)
 
-- Pi 배포와 iPhone 실기기 인수는 남았다. 위 확인은 개발 맥 로컬이다.
+Pi에는 git이 설치돼 있지 않고 `/home/pi/galpi`는 git 체크아웃도 아니다. 기존 receipt들과 같이 **바뀐 파일만 복사하고 SHA-256을 대조하는** 방식으로 배포했다.
+
+- DB·Vault 온라인 백업 `galpi-20260805-1715.db`·`vault-20260805-1715.tar.gz`, 코드 복구본 `code-attachment-u2-pre-20260805-1715.tar.gz`(280K) 뒤 소스 8개와 테스트 9개를 배포해 **hash 17/17이 일치**했고 Pi 전체 **419/419**를 통과했다. 새 PID `209714`, 시작 `2026-08-05 17:19:02 KST`다. schema 변경과 의존성 변경은 없다.
+- `/api/config`에 `maxFilesPerMessage 6`, `maxDocumentsPerMessage 1`, `maxImageBytesPerMessage 12MiB`가 나온다.
+- **모델 재probe가 이번 배포의 관문이었다.** `probeVersion` 2로 generation 39→40 refresh를 돌려 `gpt-5.6-sol`·`terra`·`luna` 모두 `text=compatible image=compatible`을 받았고 `activeImage`가 세 role 모두 채워졌다.
+- 실기능: 사분면 이미지에 `빨강, 초록, 파랑, 노랑`으로 정확히 답했고, 첨부 없는 다음 턴에 우하단을 물으니 `노랑`이라 답해 3턴 replay를 확인했다. 서재 저장으로 `attachment-45df….md`(`document_format: image`, `parse_status: not_applicable`)와 `_attachments/2026/08/attlib_….png`가 생겼고, 승격 뒤 다시 물어도 `빨강`으로 답해 library 이미지가 계속 보이는 것을 확인했다.
+- iPhone 실기기 인수 완료.
+
+#### 아직 확인하지 못한 것
 - OpenAI 쪽 실제 이미지·요청 크기 상한을 확인하지 못했다. 8장·12MiB는 보수적 추정치이고 provider 거부는 오류로 매핑한다. 실사용하며 조정한다.
 - 리사이즈 라이브러리를 넣지 않았다. Pi에 네이티브 ARM 빌드 의존성을 새로 얹는 비용 때문이며, 그래서 아이폰 사진 3~4장이면 턴 예산이 찬다.
-- 이미지 library 승격과 인증된 원본 열기는 여전히 열려 있다.
+- 인증된 원본 열기와 Codex 제목·요약 보강(U3b)은 여전히 열려 있다. 이미지 library 승격은 U2와 함께 인수했다.
 
-### U3 — 서재 저장 (U3a 로컬 구현, U3b 보강·실기기 인수 남음)
+### U3 — 서재 저장 (U3a 문서·이미지 승격 인수 완료, U3b 보강 남음)
 
 구현:
 
