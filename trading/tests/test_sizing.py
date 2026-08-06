@@ -17,15 +17,18 @@ sys.path.insert(0, str(TRADING_ROOT))
 from backtest.candidates import Candidate  # noqa: E402
 from backtest.features import Features  # noqa: E402
 from backtest.regime import MAX_EXPOSURE, NEW_ENTRIES, Regime  # noqa: E402
-from backtest.sizing import (  # noqa: E402
-    LIQUIDITY_CAP_FRACTION,
-    MAX_POSITION_WEIGHT,
+from backtest.policy import (  # noqa: E402
+    DEFAULT_PAPER_POLICY,
     PAPER_VALIDATION,
+)
+from backtest.sizing import (  # noqa: E402
     AccountState,
     OpenPosition,
     SizingError,
     size_candidate,
 )
+
+LIMITS = DEFAULT_PAPER_POLICY.limits
 
 TRADE_DATE = "2026-08-06"
 
@@ -237,7 +240,7 @@ class BindingConstraintTest(unittest.TestCase):
         )
         self.assertEqual(
             result.caps.by_capital,
-            int(MAX_POSITION_WEIGHT * 100_000.0 // (1_000.0 + 0.25 * 1.0)),
+            int(LIMITS.max_position_weight * 100_000.0 // (1_000.0 + 0.25 * 1.0)),
         )
         self.assertEqual(result.intent.shares, result.caps.by_capital)
         self.assertEqual(result.intent.binding_constraint, "CAPITAL")
@@ -249,7 +252,7 @@ class BindingConstraintTest(unittest.TestCase):
         self.assertEqual(result.intent.binding_constraint, "LIQUIDITY")
         self.assertEqual(
             result.intent.shares,
-            int(LIQUIDITY_CAP_FRACTION * 100_000.0 // 101.25),
+            int(LIMITS.liquidity_cap_fraction * 100_000.0 // 101.25),
         )
 
     def test_exposure_binds_when_the_book_is_nearly_full(self):
@@ -297,7 +300,7 @@ class GateFactorTest(unittest.TestCase):
             make_candidate(), account(100_000.0), make_regime(), gate_factor=0.0
         )
         self.assertFalse(result)
-        self.assertEqual(result.rejection.reason, "GATE_REDUCED_TO_ZERO")
+        self.assertEqual(result.rejection.reason, "REDUCED_TO_ZERO")
 
 
 class GuardTest(unittest.TestCase):

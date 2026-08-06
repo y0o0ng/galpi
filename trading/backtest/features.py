@@ -25,6 +25,7 @@ SMA_FAST = 50
 SMA_SLOW = 200
 VOL_WINDOW = 20
 DOLLAR_VOLUME_WINDOW = 20
+CORRELATION_WINDOW = 60  # 9.2 하드 한도: 최근 60일 상관
 TRADING_DAYS_PER_YEAR = 252
 
 # 설계 7.2의 "상장 이력 최소 252거래일". 모든 창(200일 SMA, 64일 RS)보다 길어서
@@ -92,6 +93,31 @@ def realized_vol(values: list[float], window: int = VOL_WINDOW) -> float:
         )
     returns = log_returns(values[-(window + 1) :])
     return statistics.stdev(returns) * math.sqrt(TRADING_DAYS_PER_YEAR)
+
+
+def correlation(
+    values: list[float], other: list[float], window: int = CORRELATION_WINDOW
+) -> float:
+    """두 종목 일간 로그수익률의 피어슨 상관(9.2의 "최근 60일 상관").
+
+    한쪽이 완전히 정지한 계열이면 함께 움직인 적이 없으므로 0으로 본다.
+    """
+    needed = window + 1
+    if len(values) < needed or len(other) < needed:
+        raise FeatureUnavailable(
+            "SHORT_HISTORY",
+            f"{window}일 상관에 {min(len(values), len(other))}개뿐입니다",
+        )
+    left = log_returns(values[-needed:])
+    right = log_returns(other[-needed:])
+    mean_left = statistics.fmean(left)
+    mean_right = statistics.fmean(right)
+    cov = sum((a - mean_left) * (b - mean_right) for a, b in zip(left, right))
+    var_left = sum((a - mean_left) ** 2 for a in left)
+    var_right = sum((b - mean_right) ** 2 for b in right)
+    if var_left == 0 or var_right == 0:
+        return 0.0
+    return cov / math.sqrt(var_left * var_right)
 
 
 def trend_quality(values: list[float], window: int = TREND_WINDOW) -> float:

@@ -38,6 +38,7 @@ BARS_CSV_COLUMNS = (
 )
 UNIVERSE_CSV_COLUMNS = ("symbol", "index_name", "valid_from", "valid_to")
 EARNINGS_CSV_COLUMNS = ("symbol", "event_at", "published_at", "confidence")
+SECURITIES_CSV_COLUMNS = ("symbol", "sector")
 
 
 class DataContractError(Exception):
@@ -109,7 +110,7 @@ def register_source(
     `survivorship_biased`의 기본값이 참인 것은 의도다. 편향이 없다는 것은 당시 구성원과
     상장폐지 종목을 모두 갖췄다는 뜻이고, 그건 증명해야 하는 주장이다.
     """
-    if kind not in ("bars", "universe", "earnings"):
+    if kind not in ("bars", "universe", "earnings", "securities"):
         raise DataContractError(f"알 수 없는 데이터 종류입니다: {kind!r}")
     with connection:
         connection.execute(
@@ -296,6 +297,33 @@ def load_earnings_csv(
     )
 
 
+def load_securities_csv(
+    connection: sqlite3.Connection,
+    csv_text: str | Path,
+    source: str,
+    source_version: str,
+) -> int:
+    """종목 분류 CSV를 적재한다. 9.2의 섹터 한도가 이 값을 쓴다."""
+    _assert_registered(connection, source, source_version, "securities")
+    rows = _read_rows(_read_text(csv_text), SECURITIES_CSV_COLUMNS)
+
+    payload = []
+    for row in rows:
+        sector = (row.get("sector") or "").strip()
+        if not sector:
+            raise DataContractError("sector는 비울 수 없습니다.")
+        payload.append(
+            ((row.get("symbol") or "").strip().upper(), sector, source, source_version)
+        )
+
+    return _insert_immutable(
+        connection,
+        "INSERT INTO securities (symbol, sector, source, source_version)"
+        " VALUES (?, ?, ?, ?)",
+        payload,
+    )
+
+
 def _insert_immutable(
     connection: sqlite3.Connection, statement: str, payload: list[tuple]
 ) -> int:
@@ -401,6 +429,14 @@ class PointInTimeSnapshot:
         ).fetchone()
         return row["event_at"] if row and row["event_at"] else None
 
+    def sector(self, symbol: str) -> str | None:
+        """종목의 섹터. 분류를 모르면 None이고, 그때 섹터 한도는 판정할 수 없다."""
+        row = self.connection.execute(
+            "SELECT sector FROM securities WHERE symbol = ? AND source_version = ?",
+            (symbol, self.source_version),
+        ).fetchone()
+        return row["sector"] if row else None
+
     @cached_property
     def snapshot_id(self) -> str:
         """이 스냅샷이 본 데이터의 지문. 설계 19.3의 `data_snapshot_id`다.
@@ -440,6 +476,12 @@ class PointInTimeSnapshot:
                 f"universe|{row['symbol']}|{row['index_name']}|{row['valid_from']}|"
                 f"{row['valid_to'] or ''}\n".encode("utf-8")
             )
+        for row in self.connection.execute(
+            "SELECT symbol, sector FROM securities WHERE source_version = ?"
+            " ORDER BY symbol",
+            (self.source_version,),
+        ):
+            digest.update(f"securities|{row['symbol']}|{row['sector']}\n".encode("utf-8"))
         for row in self.connection.execute(
             "SELECT symbol, event_at, published_at, confidence FROM earnings_calendar"
             " WHERE source_version = ? AND substr(published_at, 1, 10) <= ?"

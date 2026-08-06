@@ -11,7 +11,7 @@
 CREATE TABLE IF NOT EXISTS data_sources (
   source TEXT NOT NULL,
   source_version TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('bars', 'universe', 'earnings')),
+  kind TEXT NOT NULL CHECK (kind IN ('bars', 'universe', 'earnings', 'securities')),
   point_in_time INTEGER NOT NULL DEFAULT 0 CHECK (point_in_time IN (0, 1)),
   survivorship_biased INTEGER NOT NULL DEFAULT 1 CHECK (survivorship_biased IN (0, 1)),
   note TEXT,
@@ -91,6 +91,37 @@ CREATE TABLE IF NOT EXISTS features_daily (
   computed_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
   PRIMARY KEY (symbol, trade_date, strategy_version, source_version)
 );
+
+-- 종목 분류. 17장에 없는 표지만 9.2의 섹터 한도에 필요하다.
+-- 섹터 재분류 이력은 모델링하지 않는다. 재분류가 드물고, 당시 섹터가 필요해지면
+-- universe_membership처럼 valid_from/valid_to를 붙이는 것이 다음 단계다.
+CREATE TABLE IF NOT EXISTS securities (
+  symbol TEXT NOT NULL,
+  sector TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  PRIMARY KEY (symbol, source_version)
+);
+
+-- 사용자가 승인한 한도 한 벌. broker_mode마다 활성 정책은 하나다.
+-- signature는 사용자 키로 만든 위조 방지 서명이 아니라 내용 digest다. 불러올 때마다
+-- 다시 계산해 대조하므로 승인 이후에 값이 바뀌면 기동을 거부한다.
+CREATE TABLE IF NOT EXISTS policy_versions (
+  policy_id TEXT PRIMARY KEY,
+  broker_mode TEXT NOT NULL CHECK (broker_mode = 'PAPER'),
+  strategy_version TEXT NOT NULL,
+  risk_profile TEXT NOT NULL,
+  profile TEXT NOT NULL,
+  limits TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  approved_by TEXT NOT NULL,
+  note TEXT,
+  active INTEGER NOT NULL DEFAULT 0 CHECK (active IN (0, 1)),
+  activated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_policy_active
+  ON policy_versions(broker_mode) WHERE active = 1;
 
 -- 후보 랭킹의 결과. 17장의 `signals`다.
 -- signal_id는 (전략 버전, 데이터 버전, 날짜, 종목)에서 결정론적으로 나오므로 같은
