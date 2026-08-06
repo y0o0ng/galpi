@@ -125,7 +125,8 @@
 - **잘못 만든 구성원 목록은 없는 것보다 나쁘다.** 편출 기록만 빠뜨리면 2012년 구성원이 480개가 되고(생존편향의 모양) 백테스트는 오류 없이 끝나면서 성과가 좋아 보인다. 그물 세 개를 뒀다 — 구성원 수 불변식(SP500 500±6, NDX100 100±1), 구간 겹침·역전, 이력 짝 정합성. `load_universe`는 위반 시 **적재를 거부**하고, `accept_violations_because`로 넘기면 그 사유가 `note`에 남고 `survivorship_biased`가 참이 되어 14.7 판정에서 자동으로 막힌다.
 - EODHD 어댑터 완료(`backtest/eodhd.py`): JSON → `bars_daily`, 단일 배율 가정 실측 확인. **잘린 응답을 조용히 받아들이지 않는다** — 무료 키로 15년을 요청하니 5종목 전부 `gaps`로 걸리고 `warning`이 포착됐다(각 251행, 최근 1년). 유료 티어에서도 심볼별 이력이 짧으면 같은 그물이 작동한다.
 - **만들다 스스로 만든 구멍을 막았다.** 처음 `survivorship_biased=False`로 선언했는데 생존 종목 5개만 받은 적재분에도 "편향 없음"이 붙어 14.7 blocker가 안 걸렸다. 소스의 능력과 적재분의 성질은 다르다. 기본값을 참으로 되돌리고 `missing_universe_symbols`로 구성원 중 바 없는 심볼을 확인한 뒤에만 `delisted_coverage_verified=True`를 넘길 수 있게 했다.
-- 심볼 목록의 `Type`·`Exchange`·`Currency`로 7.2 증권 종류 필터를 판정한다(`Listing.passes_universe_type_filter`). 아직 `securities` 표에 저장하진 않았다 — EDGAR가 쓰는 (symbol, source_version) PK와 충돌하므로 저장 위치는 별도 결정이 필요하다.
+- 심볼 목록의 `Type`·`Exchange`·`Currency`로 7.2 증권 종류 필터를 판정한다(`Listing.passes_universe_type_filter`). 아직 `securities` 표에 저장하진 않았다. **열린 결정:** EDGAR가 섹터를 쓴 행에 EODHD가 Type/Exchange를 더하려면 `securities`의 `(symbol, source_version)` PK와 충돌하고 적재가 불변이라 UPDATE도 못 한다. 선택지는 (a) 두 소스를 합쳐 한 번에 쓰기, (b) `security_listings` 별도 표, (c) PK에 `source` 추가다.
+- EODHD API 키는 `trading/backtest-credentials.env`(gitignore, 권한 600)에 `EODHD_API_KEY=...`로 있다. **무료 키이고 데이터가 최근 1년으로 잘린다.** `backtest/eodhd.py`의 `load_key()`와 `selftest/eodhd_probe.py`가 그 파일과 `EODHD_API_KEY` 환경변수를 찾는다. 값을 화면에 찍지 않는다.
 - 다음은 **실데이터 1년으로 loop 첫 실행**이다. 무료 티어 251행으로는 `min_history_sessions=252`를 못 채우므로 축소 파라미터 정책(`sma_slow`·`min_history_sessions`를 낮춘)으로 돌린다. 이관해둔 `StrategyParameters`가 이걸 가능하게 한다. 통과하면 EOD $19.99를 결제해 15년 가격을 받는다. **결제는 파이프라인이 끝까지 도는 것을 본 뒤에 한다.**
 - 구성원 변경 이력 CSV는 아직 없다. 공고 아카이브에서 만들어야 하고 그것이 남은 유일한 데이터 취득 작업이다.
 
