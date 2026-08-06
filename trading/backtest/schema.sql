@@ -211,6 +211,23 @@ CREATE TABLE IF NOT EXISTS backtest_equity (
   PRIMARY KEY (run_id, trade_date)
 );
 
+-- 홀드아웃 실행 기록. 14.3의 "최신 완결 구간은 최종 홀드아웃"을 지키는 장치다.
+-- 여러 번 보는 것을 막을 수는 없으니 몇 번 봤는지 세어 판정에 드러낸다. 다른 정책으로
+-- 다시 돌리는 것이야말로 홀드아웃을 소모하는 행위이므로 구간 단위로 센다.
+CREATE TABLE IF NOT EXISTS holdout_runs (
+  run_id TEXT PRIMARY KEY,
+  policy_signature TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  trade_count INTEGER NOT NULL,
+  expectancy_r REAL,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_holdout_segment
+  ON holdout_runs(source_version, start_date, end_date);
+
 CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(trade_date);
 CREATE INDEX IF NOT EXISTS idx_signals_date ON signals(trade_date);
 CREATE INDEX IF NOT EXISTS idx_universe_membership_from ON universe_membership(valid_from);
