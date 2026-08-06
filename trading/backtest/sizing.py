@@ -115,6 +115,9 @@ class SizedIntent:
     symbol: str
     shares: int
     original_shares: int  # 19.3 감사 필드: 축소 전 수량
+    # 신호 종가와 ATR는 집행이 갭 취소를 판정할 때 쓴다(10.1).
+    reference_close: float
+    atr14: float
     planned_entry: float
     initial_stop: float
     stop_distance: float
@@ -279,6 +282,8 @@ def size_candidate(
             symbol=candidate.symbol,
             shares=shares,
             original_shares=original_shares,
+            reference_close=candidate.reference_close,
+            atr14=candidate.atr14,
             planned_entry=planned_entry,
             initial_stop=initial_stop,
             stop_distance=stop_distance,
