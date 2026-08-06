@@ -289,9 +289,23 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(view.symbol, "AAA")
         self.assertEqual(view.shares, 10)
         self.assertAlmostEqual(view.market_price, 118.0)
+        self.assertAlmostEqual(view.entry_price, ENTRY)
         self.assertAlmostEqual(view.stop_price, 105.0)
         self.assertEqual(view.sector, "TECH")
-        self.assertAlmostEqual(view.open_risk, 10 * 13.0)
+        # 추적손절이 진입가 위(105 > 100)라 계획 위험을 더 이상 쓰지 않는다.
+        self.assertAlmostEqual(view.open_risk, 0.0)
+
+    def test_a_winner_whose_stop_has_not_trailed_still_uses_its_planned_risk(self):
+        """주가만 오른 포지션은 계획한 만큼만 쓴다. 현재가로 재면 계획보다 커진다."""
+        held = position(highest_close=104.0)  # 아직 +1 ATR 미달이라 손절가 90
+        view = held.as_open_position(104.0)
+        self.assertAlmostEqual(view.stop_price, 90.0)
+        self.assertAlmostEqual(view.open_risk, 10 * 10.0)
+
+    def test_a_loser_uses_only_the_loss_that_is_left(self):
+        held = position()
+        view = held.as_open_position(95.0)
+        self.assertAlmostEqual(view.open_risk, 10 * 5.0)
 
 
 if __name__ == "__main__":

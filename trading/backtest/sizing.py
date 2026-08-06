@@ -41,7 +41,8 @@ class OpenPosition:
     symbol: str
     shares: int
     market_price: float
-    stop_price: float = 0.0
+    entry_price: float
+    stop_price: float
     sector: str | None = None
 
     @property
@@ -50,12 +51,23 @@ class OpenPosition:
 
     @property
     def open_risk(self) -> float:
-        """지금 손절에 걸리면 잃는 금액.
+        """9.2의 "계획된 손절 위험"이 이 포지션에서 아직 쓰고 있는 금액.
 
-        진입가가 아니라 현재가에서 잰다. 추적손절이 진입가 위로 올라간 포지션은 더 이상
-        위험을 쓰고 있지 않으므로, 진입가 기준으로 세면 남은 위험 예산을 과소평가한다.
+        `수량 × max(0, min(현재가, 진입가) - 손절가)`다. 세 경우를 한 식으로 덮는다.
+
+        - 주가가 올랐지만 추적손절이 아직 따라오지 않았다: 진입 시 계획한 위험 그대로다.
+          현재가로 재면 계획보다 커져서, 상승장에서 스스로 신규 진입을 막는다. 9.2의
+          한도 1.25%가 5종목 × 0.25%와 정확히 맞물리는 것은 이 한도가 진입 시점 계획
+          위험의 합이라는 뜻이다.
+        - 주가가 손절가 쪽으로 내려왔다: 남은 손실이 더 작으므로 그만큼만 센다.
+        - 추적손절이 진입가 위로 올라갔다: 0이다. 더 이상 계획 위험을 쓰지 않는다.
+
+        손절가가 진입가 아래인 승자의 **실제** 위험 금액은 이 값보다 크다. 그쪽은 낙폭
+        한도와 일일 손실 한도가 따로 본다.
         """
-        return self.shares * max(self.market_price - self.stop_price, 0.0)
+        return self.shares * max(
+            min(self.market_price, self.entry_price) - self.stop_price, 0.0
+        )
 
 
 @dataclass(frozen=True)

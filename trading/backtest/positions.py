@@ -145,6 +145,7 @@ class Position:
             symbol=self.symbol,
             shares=self.shares,
             market_price=market_price,
+            entry_price=self.entry_price,
             stop_price=self.stop_price,
             sector=sector,
         )

@@ -256,7 +256,7 @@ class BindingConstraintTest(unittest.TestCase):
         )
 
     def test_exposure_binds_when_the_book_is_nearly_full(self):
-        held = (OpenPosition("XXX", 590, 100.0),)  # 59,000달러
+        held = (OpenPosition("XXX", 590, 100.0, 100.0, 90.0),)  # 59,000달러
         result = size_candidate(
             make_candidate(), account(100_000.0, positions=held), make_regime()
         )
@@ -264,7 +264,7 @@ class BindingConstraintTest(unittest.TestCase):
         self.assertEqual(result.intent.shares, 9)
 
     def test_yellow_regime_halves_the_exposure_room(self):
-        held = (OpenPosition("XXX", 490, 100.0),)  # 49,000달러
+        held = (OpenPosition("XXX", 490, 100.0, 100.0, 90.0),)  # 49,000달러
         yellow = size_candidate(
             make_candidate(), account(100_000.0, positions=held), make_regime("YELLOW")
         )
@@ -273,7 +273,7 @@ class BindingConstraintTest(unittest.TestCase):
 
         full = size_candidate(
             make_candidate(),
-            account(100_000.0, positions=(OpenPosition("XXX", 500, 100.0),)),
+            account(100_000.0, positions=(OpenPosition("XXX", 500, 100.0, 100.0, 90.0),)),
             make_regime("YELLOW"),
         )
         self.assertFalse(full)

@@ -406,6 +406,7 @@ def run_backtest(
                     symbol=intent.symbol,
                     shares=intent.shares,
                     market_price=intent.planned_entry,
+                    entry_price=intent.planned_entry,
                     stop_price=intent.initial_stop,
                     sector=snapshot.sector(intent.symbol),
                 )

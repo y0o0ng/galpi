@@ -150,14 +150,14 @@ class PortfolioLimitTest(unittest.TestCase):
         self.assertAlmostEqual(drawdown.intent.reduction_factor, 0.5)
 
     def test_already_held_symbols_are_not_re_entered(self):
-        held = (OpenPosition("AAA", 10, 100.0, 90.0, "TECH"),)
+        held = (OpenPosition("AAA", 10, 100.0, 100.0, 90.0, "TECH"),)
         result = self.evaluate(account(EQUITY, positions=held))
         self.assertFalse(result)
         self.assertEqual(result.rejection.reason, "ALREADY_HELD")
 
     def test_max_positions_makes_candidates_wait(self):
         held = tuple(
-            OpenPosition(f"H{index}", 1, 100.0, 90.0, "ENERGY")
+            OpenPosition(f"H{index}", 1, 100.0, 100.0, 90.0, "ENERGY")
             for index in range(LIMITS.max_positions)
         )
         result = self.evaluate(account(EQUITY, positions=held))
@@ -175,14 +175,14 @@ class PortfolioLimitTest(unittest.TestCase):
     def test_sector_weight_skips_the_candidate(self):
         # TECH에 24,000달러가 있고 25주(2,531달러)를 더하면 25% 상한을 넘는다.
         # DDD는 AAA와 반대로 움직여 상관 상한이 먼저 줄이지 않는다.
-        held = (OpenPosition("DDD", 240, 100.0, 99.0, "TECH"),)
+        held = (OpenPosition("DDD", 240, 100.0, 100.0, 99.0, "TECH"),)
         result = self.evaluate(account(EQUITY, positions=held))
         self.assertFalse(result)
         self.assertEqual(result.rejection.reason, "SECTOR_WEIGHT_EXCEEDED")
 
     def test_a_correlated_peer_is_reduced_before_the_sector_limit_rejects(self):
         """상관 한도의 조치는 축소이므로, 줄여서 섹터 상한 안에 들면 진입한다."""
-        held = (OpenPosition("BBB", 240, 100.0, 99.0, "TECH"),)
+        held = (OpenPosition("BBB", 240, 100.0, 100.0, 99.0, "TECH"),)
         result = self.evaluate(account(EQUITY, positions=held))
         self.assertTrue(result)
         self.assertEqual(result.intent.shares, 9)
@@ -190,15 +190,39 @@ class PortfolioLimitTest(unittest.TestCase):
 
     def test_total_planned_risk_blocks_new_entries(self):
         # 열린 위험 1,100달러 + 신규 250달러 = 1,350달러 > 상한 1,250달러.
-        held = (OpenPosition("CCC", 100, 100.0, 89.0, "ENERGY"),)
+        held = (OpenPosition("CCC", 100, 100.0, 100.0, 89.0, "ENERGY"),)
         result = self.evaluate(account(EQUITY, positions=held))
         self.assertFalse(result)
         self.assertEqual(result.rejection.reason, "TOTAL_PLANNED_RISK_EXCEEDED")
 
+    def test_five_full_risk_positions_exactly_fill_the_total_risk_limit(self):
+        """9.2의 1.25%는 5종목 × 0.25%와 정확히 맞물린다.
+
+        이 등식이 이 한도를 진입 시점 계획 위험의 합으로 읽은 근거다. 현재가로 재면
+        상승장에서 이 합이 커져 동시 보유 5종목에 도달하기 전에 진입이 막힌다.
+        """
+        held = tuple(
+            OpenPosition(f"H{index}", 25, 100.0, 100.0, 90.0, "ENERGY")
+            for index in range(LIMITS.max_positions)
+        )
+        state = account(EQUITY, positions=held)
+        self.assertAlmostEqual(
+            state.open_risk_fraction, LIMITS.max_total_planned_risk, places=12
+        )
+
+    def test_a_rising_price_does_not_inflate_the_planned_risk(self):
+        """주가가 올라도 계획 위험을 넘지 않는다. 손절가가 오르면 줄어든다."""
+        planned = OpenPosition("H0", 25, 100.0, 100.0, 90.0, "ENERGY")
+        risen = OpenPosition("H0", 25, 130.0, 100.0, 90.0, "ENERGY")
+        trailed = OpenPosition("H0", 25, 130.0, 100.0, 115.0, "ENERGY")
+        self.assertAlmostEqual(planned.open_risk, 250.0)
+        self.assertAlmostEqual(risen.open_risk, 250.0)
+        self.assertAlmostEqual(trailed.open_risk, 0.0)
+
     def test_open_risk_ignores_stops_above_the_current_price(self):
         """추적손절이 현재가 위로 올라간 포지션은 위험 예산을 쓰지 않는다."""
         state = account(
-            EQUITY, positions=(OpenPosition("CCC", 100, 100.0, 105.0, "ENERGY"),)
+            EQUITY, positions=(OpenPosition("CCC", 100, 100.0, 100.0, 105.0, "ENERGY"),)
         )
         self.assertAlmostEqual(state.open_risk, 0.0)
         self.assertTrue(self.evaluate(state))
@@ -220,21 +244,21 @@ class CorrelationLimitTest(unittest.TestCase):
         )
 
     def test_same_direction_names_are_correlated(self):
-        found = self.peers((OpenPosition("BBB", 1, 100.0, 90.0, "TECH"),))
+        found = self.peers((OpenPosition("BBB", 1, 100.0, 100.0, 90.0, "TECH"),))
         self.assertEqual(len(found), 1)
         self.assertAlmostEqual(found[0].coefficient, 1.0, places=9)
 
     def test_opposite_direction_names_are_not(self):
-        self.assertEqual(self.peers((OpenPosition("CCC", 1, 100.0, 90.0, "ENERGY"),)), ())
+        self.assertEqual(self.peers((OpenPosition("CCC", 1, 100.0, 100.0, 90.0, "ENERGY"),)), ())
 
     def test_uncomputable_correlation_counts_as_correlated(self):
-        found = self.peers((OpenPosition("SHORT", 1, 100.0, 90.0, "ENERGY"),))
+        found = self.peers((OpenPosition("SHORT", 1, 100.0, 100.0, 90.0, "ENERGY"),))
         self.assertEqual(len(found), 1)
         self.assertIsNone(found[0].coefficient)
 
     def test_correlated_pair_weight_reduces_the_quantity(self):
         # BBB에 24,000달러가 있으므로 쌍 합산 25% 상한까지 1,000달러(9주)만 남는다.
-        held = (OpenPosition("BBB", 240, 100.0, 99.0, "TECH"),)
+        held = (OpenPosition("BBB", 240, 100.0, 100.0, 99.0, "TECH"),)
         result = evaluate_candidate(
             make_candidate(symbol="AAA"),
             account(EQUITY, positions=held),
@@ -247,7 +271,7 @@ class CorrelationLimitTest(unittest.TestCase):
         self.assertEqual(result.intent.binding_constraint, "CORRELATION")
 
     def test_uncorrelated_peer_does_not_cap_anything(self):
-        held = (OpenPosition("CCC", 240, 100.0, 99.5, "ENERGY"),)
+        held = (OpenPosition("CCC", 240, 100.0, 100.0, 99.5, "ENERGY"),)
         result = evaluate_candidate(
             make_candidate(symbol="AAA"),
             account(EQUITY, positions=held),
@@ -259,7 +283,7 @@ class CorrelationLimitTest(unittest.TestCase):
         self.assertEqual(result.intent.binding_constraint, "RISK")
 
     def test_a_full_correlated_pair_rejects(self):
-        held = (OpenPosition("BBB", 249, 100.0, 99.5, "TECH"),)
+        held = (OpenPosition("BBB", 249, 100.0, 100.0, 99.5, "TECH"),)
         result = evaluate_candidate(
             make_candidate(symbol="AAA"),
             account(EQUITY, positions=held),
