@@ -14,23 +14,10 @@ import statistics
 from dataclasses import dataclass
 
 from .data import Bar, PointInTimeSnapshot
+from .policy import STRATEGY_VERSION, StrategyParameters
 
-STRATEGY_VERSION = "core-v2.3"
-
-RS_LOOKBACK = 63
-RS_SKIP = 5
-TREND_WINDOW = 60
-ATR_WINDOW = 14
-SMA_FAST = 50
-SMA_SLOW = 200
-VOL_WINDOW = 20
-DOLLAR_VOLUME_WINDOW = 20
-CORRELATION_WINDOW = 60  # 9.2 하드 한도: 최근 60일 상관
+# 달력 상수다. 지표 파라미터가 아니므로 정책으로 옮기지 않는다.
 TRADING_DAYS_PER_YEAR = 252
-
-# 설계 7.2의 "상장 이력 최소 252거래일". 모든 창(200일 SMA, 64일 RS)보다 길어서
-# 이 조건을 넘긴 종목은 나머지 피처를 모두 계산할 수 있다.
-MIN_HISTORY = 252
 
 
 class FeatureUnavailable(Exception):
@@ -85,7 +72,7 @@ def log_returns(values: list[float]) -> list[float]:
     return [math.log(values[i] / values[i - 1]) for i in range(1, len(values))]
 
 
-def realized_vol(values: list[float], window: int = VOL_WINDOW) -> float:
+def realized_vol(values: list[float], window: int) -> float:
     """최근 `window`개 일간 로그수익률의 연환산 표준편차."""
     if len(values) < window + 1:
         raise FeatureUnavailable(
@@ -95,9 +82,7 @@ def realized_vol(values: list[float], window: int = VOL_WINDOW) -> float:
     return statistics.stdev(returns) * math.sqrt(TRADING_DAYS_PER_YEAR)
 
 
-def correlation(
-    values: list[float], other: list[float], window: int = CORRELATION_WINDOW
-) -> float:
+def correlation(values: list[float], other: list[float], window: int) -> float:
     """두 종목 일간 로그수익률의 피어슨 상관(9.2의 "최근 60일 상관").
 
     한쪽이 완전히 정지한 계열이면 함께 움직인 적이 없으므로 0으로 본다.
@@ -120,7 +105,7 @@ def correlation(
     return cov / math.sqrt(var_left * var_right)
 
 
-def trend_quality(values: list[float], window: int = TREND_WINDOW) -> float:
+def trend_quality(values: list[float], window: int) -> float:
     """연환산 기울기 × R². 한 번의 급등보다 꾸준하고 매끄러운 상승을 선호한다."""
     if len(values) < window:
         raise FeatureUnavailable(
@@ -139,7 +124,7 @@ def trend_quality(values: list[float], window: int = TREND_WINDOW) -> float:
     return slope * TRADING_DAYS_PER_YEAR * r_squared
 
 
-def average_true_range(bars: list[Bar], window: int = ATR_WINDOW) -> float:
+def average_true_range(bars: list[Bar], window: int) -> float:
     """조정가로 TR을 만들고 마지막 바의 배율로 실제 주문 가격 단위로 되돌린다."""
     if len(bars) < window + 1:
         raise FeatureUnavailable("SHORT_HISTORY", f"ATR{window}에 {len(bars)}개뿐입니다")
@@ -156,10 +141,7 @@ def average_true_range(bars: list[Bar], window: int = ATR_WINDOW) -> float:
 
 
 def relative_strength(
-    values: list[float],
-    reference: list[float],
-    lookback: int = RS_LOOKBACK,
-    skip: int = RS_SKIP,
+    values: list[float], reference: list[float], lookback: int, skip: int
 ) -> float:
     """최근 `skip`일을 제외한 `lookback`일 상대모멘텀. 단기 추격과 반전을 줄인다."""
     needed = lookback + 1
@@ -172,22 +154,25 @@ def relative_strength(
     return own - market
 
 
-def compute_features(snapshot: PointInTimeSnapshot, symbol: str) -> Features:
+def compute_features(
+    snapshot: PointInTimeSnapshot, symbol: str, parameters: StrategyParameters
+) -> Features:
     """`as_of` 종가 기준 피처. 계산할 수 없으면 `FeatureUnavailable`을 올린다."""
-    bars = snapshot.bars(symbol, MIN_HISTORY)
+    history = parameters.min_history_sessions
+    bars = snapshot.bars(symbol, history)
     if not bars:
         raise FeatureUnavailable("NO_BARS", f"{symbol}의 바가 없습니다")
-    if len(bars) < MIN_HISTORY:
+    if len(bars) < history:
         raise FeatureUnavailable(
-            "SHORT_HISTORY", f"{symbol}의 상장 이력이 {len(bars)}일입니다 (최소 {MIN_HISTORY}일)"
+            "SHORT_HISTORY", f"{symbol}의 상장 이력이 {len(bars)}일입니다 (최소 {history}일)"
         )
     if bars[-1].trade_date != snapshot.as_of:
         raise FeatureUnavailable(
             "STALE", f"{symbol}의 마지막 바가 {bars[-1].trade_date}입니다 (as_of {snapshot.as_of})"
         )
 
-    reference_bars = snapshot.bars(snapshot.reference_symbol, MIN_HISTORY)
-    if len(reference_bars) < MIN_HISTORY:
+    reference_bars = snapshot.bars(snapshot.reference_symbol, history)
+    if len(reference_bars) < history:
         raise FeatureUnavailable(
             "SHORT_HISTORY",
             f"기준 심볼 {snapshot.reference_symbol}의 이력이 {len(reference_bars)}일입니다",
@@ -209,17 +194,21 @@ def compute_features(snapshot: PointInTimeSnapshot, symbol: str) -> Features:
 
     adjusted = [bar.adj_close for bar in bars]
     reference_adjusted = [bar.adj_close for bar in reference_bars]
-    dollar_volumes = [bar.dollar_volume for bar in bars[-DOLLAR_VOLUME_WINDOW:]]
+    dollar_volumes = [
+        bar.dollar_volume for bar in bars[-parameters.dollar_volume_window :]
+    ]
 
     return Features(
         symbol=symbol,
         trade_date=snapshot.as_of,
-        rs63_5=relative_strength(adjusted, reference_adjusted),
-        trend_quality60=trend_quality(adjusted),
-        atr14=average_true_range(bars),
-        sma50=sma(adjusted, SMA_FAST),
-        sma200=sma(adjusted, SMA_SLOW),
-        realized_vol20=realized_vol(adjusted),
+        rs63_5=relative_strength(
+            adjusted, reference_adjusted, parameters.rs_lookback, parameters.rs_skip
+        ),
+        trend_quality60=trend_quality(adjusted, parameters.trend_window),
+        atr14=average_true_range(bars, parameters.atr_window),
+        sma50=sma(adjusted, parameters.sma_fast),
+        sma200=sma(adjusted, parameters.sma_slow),
+        realized_vol20=realized_vol(adjusted, parameters.vol_window),
         dollar_volume_median20=statistics.median(dollar_volumes),
         bars_used=len(bars),
     )

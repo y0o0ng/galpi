@@ -27,35 +27,22 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from .data import Bar, PointInTimeSnapshot
-from .features import (
+from .features import FeatureUnavailable, Features, compute_features
+from .policy import (
+    DEFAULT_PAPER_POLICY,
     STRATEGY_VERSION,
-    FeatureUnavailable,
-    Features,
-    compute_features,
+    PolicyVersion,
+    StrategyParameters,
 )
 from .regime import Regime
 
 # 데이터 적재가 써야 하는 index_name 값이다. 7.2의 "S&P 500 + Nasdaq-100 당시 구성 종목".
+# 종목 코드 체계는 지표 파라미터가 아니라 데이터 계약이라 정책으로 옮기지 않는다.
 DEFAULT_INDEXES = ("SP500", "NDX100")
 
-MAX_CANDIDATES = 5  # 11.1 "상위 후보 최대 5개", 18장 의사코드의 max_candidates
-MIN_CLOSE = 10.0  # 7.2 가격: 종가 10달러 이상. 실제 주문 가격 기준이다
-MIN_DOLLAR_VOLUME = 50_000_000.0  # 7.2 유동성: 20일 중앙값 달러거래대금
-BREAKOUT_WINDOW = 20  # 7.4 진입 게이트: 직전 20거래일 최고가
-# 7.2 실적: 진입일부터 실적까지 최소 4거래일.
-# 진입일을 포함하고 실적일은 제외해서 센다. 실적 당일 전에 포지션을 며칠 들고 있는지가
-# 이 완충이 재려는 값이기 때문이다. 월요일 진입이면 실적은 금요일 이후여야 한다.
-EARNINGS_MIN_SESSIONS = 4
-
-SCORE_WEIGHT_RS = 0.60
-SCORE_WEIGHT_TREND = 0.40
-
-# 유니버스는 500종목대다. 모집단이 이보다 작으면 시장 횡단면이 아니라 데이터 사고다.
-# 18장의 `DATA_QA_FAILED`와 같은 자리에서 신규 진입을 막는다.
-MIN_SCORE_POPULATION = 30
-
-# 7.3의 신규 진입 열과 10.1의 "하루 진입 최대 2종목"을 합친 값이다.
-MAX_DAILY_ENTRIES = {"GREEN": 2, "YELLOW": 1, "RED": 0}
+# 7.2 실적 완충을 세는 방식: 진입일을 포함하고 실적일은 제외한다. 실적 당일 전에 포지션을
+# 며칠 들고 있는지가 이 완충이 재려는 값이기 때문이다. 월요일 진입이면 실적은 금요일
+# 이후여야 한다. 세션 수 자체는 정책의 `earnings_min_sessions`다.
 
 
 @dataclass(frozen=True)
@@ -142,17 +129,26 @@ def weekdays_between(start: date, end: date) -> int:
     return count
 
 
-def _universe_skip(symbol: str, features: Features, tail: list[Bar]) -> Skip | None:
+def _universe_skip(
+    symbol: str,
+    features: Features,
+    tail: list[Bar],
+    parameters: StrategyParameters,
+) -> Skip | None:
     """7.2의 가격·유동성 필터. 상장 이력·데이터 보유는 피처 계산이 이미 걸렀다."""
     reference_close = tail[-1].raw_close
-    if reference_close < MIN_CLOSE:
-        return Skip(symbol, "PRICE_BELOW_MIN", f"종가 {reference_close:.2f} < {MIN_CLOSE:.0f}")
-    if features.dollar_volume_median20 < MIN_DOLLAR_VOLUME:
+    if reference_close < parameters.min_close:
+        return Skip(
+            symbol,
+            "PRICE_BELOW_MIN",
+            f"종가 {reference_close:.2f} < {parameters.min_close:.0f}",
+        )
+    if features.dollar_volume_median20 < parameters.min_dollar_volume:
         return Skip(
             symbol,
             "LIQUIDITY_BELOW_MIN",
             f"20일 중앙값 달러거래대금 {features.dollar_volume_median20:,.0f}"
-            f" < {MIN_DOLLAR_VOLUME:,.0f}",
+            f" < {parameters.min_dollar_volume:,.0f}",
         )
     return None
 
@@ -162,6 +158,7 @@ def _entry_gate(
     symbol: str,
     features: Features,
     tail: list[Bar],
+    parameters: StrategyParameters,
     require_earnings_calendar: bool,
 ) -> Skip | None:
     """7.4 진입 게이트. 처음 걸린 사유 하나만 남긴다."""
@@ -178,7 +175,8 @@ def _entry_gate(
         return Skip(
             symbol,
             "NO_BREAKOUT",
-            f"종가 {close:.2f} <= 직전 {BREAKOUT_WINDOW}일 최고가 {prior_high:.2f}",
+            f"종가 {close:.2f} <= 직전 {parameters.breakout_window}일 최고가"
+            f" {prior_high:.2f}",
         )
 
     event_at = snapshot.next_earnings(symbol)
@@ -189,11 +187,11 @@ def _entry_gate(
     sessions = weekdays_between(
         next_weekday(snapshot.as_of), date.fromisoformat(event_at[:10])
     )
-    if sessions < EARNINGS_MIN_SESSIONS:
+    if sessions < parameters.earnings_min_sessions:
         return Skip(
             symbol,
             "EARNINGS_TOO_CLOSE",
-            f"{event_at}까지 {sessions}거래일 < {EARNINGS_MIN_SESSIONS}거래일",
+            f"{event_at}까지 {sessions}거래일 < {parameters.earnings_min_sessions}거래일",
         )
     return None
 
@@ -202,13 +200,17 @@ def rank_candidates(
     snapshot: PointInTimeSnapshot,
     regime: Regime,
     *,
+    policy: PolicyVersion = DEFAULT_PAPER_POLICY,
     index_names: tuple[str, ...] = DEFAULT_INDEXES,
-    max_candidates: int = MAX_CANDIDATES,
-    min_population: int = MIN_SCORE_POPULATION,
+    min_population: int | None = None,
     require_earnings_calendar: bool = True,
 ) -> Ranking:
     """`as_of` 종가 기준 상위 후보. RED에서는 후보를 만들지 않는다(18장)."""
-    max_new_entries = MAX_DAILY_ENTRIES[regime.state]
+    parameters = policy.parameters
+    max_candidates = parameters.max_candidates
+    if min_population is None:
+        min_population = parameters.min_score_population
+    max_new_entries = parameters.max_daily_entries(regime.state)
     members: set[str] = set()
     for index_name in index_names:
         members |= snapshot.members(index_name)
@@ -230,12 +232,12 @@ def rank_candidates(
     tails: dict[str, list[Bar]] = {}
     for symbol in sorted(members):
         try:
-            features = compute_features(snapshot, symbol)
+            features = compute_features(snapshot, symbol, parameters)
         except FeatureUnavailable as error:
             skipped.append(Skip(symbol, error.reason, error.detail))
             continue
-        tail = snapshot.bars(symbol, BREAKOUT_WINDOW + 1)
-        skip = _universe_skip(symbol, features, tail)
+        tail = snapshot.bars(symbol, parameters.breakout_window + 1)
+        skip = _universe_skip(symbol, features, tail, parameters)
         if skip is not None:
             skipped.append(skip)
             continue
@@ -259,12 +261,20 @@ def rank_candidates(
     passed: list[tuple[float, str]] = []
     for symbol in sorted(eligible):
         skip = _entry_gate(
-            snapshot, symbol, eligible[symbol], tails[symbol], require_earnings_calendar
+            snapshot,
+            symbol,
+            eligible[symbol],
+            tails[symbol],
+            parameters,
+            require_earnings_calendar,
         )
         if skip is not None:
             skipped.append(skip)
             continue
-        score = SCORE_WEIGHT_RS * z_rs[symbol] + SCORE_WEIGHT_TREND * z_trend[symbol]
+        score = (
+            parameters.score_weight_rs * z_rs[symbol]
+            + parameters.score_weight_trend * z_trend[symbol]
+        )
         passed.append((score, symbol))
 
     # 점수 내림차순, 같으면 종목 코드 순. 같은 입력에 같은 순서가 나와야 한다(3.1).
@@ -285,7 +295,7 @@ def rank_candidates(
                 features=features,
                 reasons=(
                     "SMA_ALIGNED",
-                    f"BREAKOUT_{BREAKOUT_WINDOW}D",
+                    f"BREAKOUT_{parameters.breakout_window}D",
                     f"REGIME_{regime.state}",
                 ),
             )

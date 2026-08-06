@@ -20,15 +20,17 @@ sys.path.insert(0, str(TRADING_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from backtest.costs import CostModel  # noqa: E402
+from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
 from backtest.positions import (  # noqa: E402
-    EARNINGS_EXIT_SESSIONS,
-    MAX_HOLD_SESSIONS,
-    TIME_STOP_SESSIONS,
     Position,
     PositionError,
     adjust_for_corporate_action,
     run_session,
 )
+
+EARNINGS_EXIT_SESSIONS = PARAMS.earnings_exit_sessions
+MAX_HOLD_SESSIONS = PARAMS.max_hold_sessions
+TIME_STOP_SESSIONS = PARAMS.time_stop_sessions
 from test_execution import bar  # noqa: E402
 
 FREE = CostModel(slippage_bps=0.0, spread_bps=0.0, commission_bps=0.0, sell_tax_bps=0.0)
@@ -45,6 +47,7 @@ def position(**changes) -> Position:
         entry_price=ENTRY,
         atr14=ATR,
         highest_close=ENTRY,
+        parameters=PARAMS,
     )
     return replace(base, **changes) if changes else base
 

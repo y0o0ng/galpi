@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import math
 import statistics
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .costs import Stress
 from .features import TRADING_DAYS_PER_YEAR
@@ -230,6 +230,7 @@ def evaluate_gate(
     survivorship_biased: bool,
     out_of_sample: bool = False,
     stressed: Metrics | None = None,
+    neighbourhood: NeighbourhoodReport | None = None,
 ) -> GateReport:
     """14.7의 표를 채우고 판정한다.
 
@@ -249,9 +250,8 @@ def evaluate_gate(
         blockers.append("SECTOR_LIMIT_DISABLED")
     if stressed is None:
         blockers.append("COST_STRESS_MISSING")
-    # 14.4·21.2의 인접 파라미터 안정성은 지표 파라미터를 PolicyVersion으로 옮긴 뒤에만
-    # 돌릴 수 있다. 지금은 모듈 상수라 실행을 여러 번 만들 수 없다.
-    blockers.append("PARAMETER_NEIGHBOURHOOD_NOT_RUN")
+    if neighbourhood is None:
+        blockers.append("PARAMETER_NEIGHBOURHOOD_NOT_RUN")
 
     rows = [
         _judge(
@@ -291,10 +291,10 @@ def evaluate_gate(
         ),
         _judge(
             "parameter_neighbourhood",
-            None,
-            None,
-            None,
-            note="지표 파라미터를 PolicyVersion으로 옮긴 뒤 18/20/22일 등으로 돌린다",
+            None if neighbourhood is None else neighbourhood.collapse_ratio,
+            0.5,
+            0.8,
+            note="최악 인접값 / 중심값. 최소 0.5(붕괴 없음)·목표 0.8(plateau)은 내가 정한 수치다",
         ),
         _judge(
             "min_qty_exception_share",
@@ -319,8 +319,69 @@ def evaluate_gate(
 
 def stress_config(result: BacktestResult, factor: float = 2.0):
     """21.2의 "비용 2배·3배 스트레스" 실행 설정. 비용만 바꾸고 나머지는 그대로 둔다."""
-    from dataclasses import replace
-
     return replace(
         result.config, costs=result.config.costs.stressed(Stress.uniform(factor))
+    )
+
+
+def parameter_variant(config, **changes):
+    """지표 파라미터만 바꾼 실행 설정(21.2의 인접값 안정성).
+
+    정책 id에 변경 내용을 남기므로 서명이 달라진다. 어떤 파라미터로 낸 실행인지 결과
+    기록에서 되찾을 수 있어야 한다.
+    """
+    parameters = replace(config.policy.parameters, **changes)
+    suffix = ",".join(f"{key}={value}" for key, value in sorted(changes.items()))
+    policy = replace(
+        config.policy,
+        parameters=parameters,
+        policy_id=f"{config.policy.policy_id}[{suffix}]",
+    )
+    return replace(config, policy=policy)
+
+
+@dataclass(frozen=True)
+class NeighbourhoodReport:
+    """한 파라미터의 인접값 안정성.
+
+    설계는 "붕괴 없음"과 "넓은 plateau"라고만 하고 수치를 주지 않는다. 여기서는 중심값
+    대비 최악 인접값의 비율(`collapse_ratio`)을 지표로 쓰고, 게이트에서 최소 0.5·목표
+    0.8로 판정한다. 그 두 숫자는 내가 정했다.
+    """
+
+    field: str
+    metric_name: str
+    center_value: object
+    center_metric: float | None
+    neighbours: tuple[tuple[object, float | None], ...]
+
+    @property
+    def collapse_ratio(self) -> float | None:
+        """최악 인접값 / 중심값. 중심값이 0 이하면 비율에 뜻이 없어 None이다."""
+        if self.center_metric is None or self.center_metric <= 0:
+            return None
+        values = [value for _, value in self.neighbours if value is not None]
+        if len(values) != len(self.neighbours) or not values:
+            return None
+        return min(values) / self.center_metric
+
+
+def neighbourhood_report(
+    field: str,
+    center: Metrics,
+    neighbours: dict[object, Metrics],
+    *,
+    center_value: object = None,
+    metric_name: str = "expectancy_r",
+) -> NeighbourhoodReport:
+    """중심 실행과 인접값 실행들의 지표를 모아 붕괴 여부를 볼 수 있게 만든다."""
+    return NeighbourhoodReport(
+        field=field,
+        metric_name=metric_name,
+        center_value=center_value,
+        center_metric=getattr(center, metric_name),
+        neighbours=tuple(
+            (value, getattr(metrics, metric_name))
+            for value, metrics in sorted(neighbours.items(), key=lambda item: str(item[0]))
+        ),
     )

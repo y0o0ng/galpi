@@ -51,19 +51,8 @@ from .candidates import next_weekday, weekdays_between
 from .costs import CostModel
 from .data import Bar
 from .execution import Fill, execute_market_exit, try_stop_exit
-from .sizing import ATR_STOP_MULTIPLE, OpenPosition
-
-TRAILING_STOP_ATR = 3.0  # 7.5 추적손절: 최고 종가 - 3.0 × ATR14
-TRAILING_ACTIVATION_ATR = 1.0  # 7.5: +1 ATR 이상 수익 후
-TIME_STOP_SESSIONS = 20  # 7.5: 20거래일 동안 +1 ATR 미만
-MAX_HOLD_SESSIONS = 40  # 7.5: 최대 보유기간
-
-# 실적 발표 전 몇 세션 남았을 때 청산할지. 0이면 7.5의 문자 그대로 "발표 전 거래일"이다.
-# 미래 휴장일을 모르는 동안은 1로 둔다. 휴장일이 끼면 "발표 전 거래일"이라고 계산한 날이
-# 실제로는 발표 당일이 되어 실적을 그대로 맞는다. 7.5는 "종료까지 청산"이므로 한 세션
-# 일찍 나오는 것은 규칙 위반이 아니고, 실적 갭을 먹는 쪽이 훨씬 나쁘다.
-# 거래소 휴장일 표가 들어오면 0으로 내린다.
-EARNINGS_EXIT_SESSIONS = 1
+from .policy import StrategyParameters
+from .sizing import OpenPosition
 
 
 class PositionError(Exception):
@@ -84,6 +73,9 @@ class Position:
     entry_price: float
     atr14: float
     highest_close: float
+    # 진입 시점에 유효했던 정책의 지표 파라미터. 정책이 바뀌어도 이 포지션의 청산 규칙은
+    # 진입 당시 승인된 규칙을 따른다(1.4).
+    parameters: StrategyParameters
     sessions_held: int = 0
     pending_exit: str | None = None
 
@@ -94,7 +86,9 @@ class Position:
             raise PositionError(f"ATR가 0 이하입니다: {self.atr14}")
 
     @classmethod
-    def from_fill(cls, fill: Fill, atr14: float) -> "Position":
+    def from_fill(
+        cls, fill: Fill, atr14: float, parameters: StrategyParameters
+    ) -> "Position":
         if fill.side != "BUY":
             raise PositionError(f"진입 체결이 아닙니다: {fill.side}")
         return cls(
@@ -104,18 +98,19 @@ class Position:
             entry_price=fill.fill_price,
             atr14=atr14,
             highest_close=fill.fill_price,
+            parameters=parameters,
         )
 
     @property
     def initial_stop(self) -> float:
-        return self.entry_price - ATR_STOP_MULTIPLE * self.atr14
+        return self.entry_price - self.parameters.stop_atr_multiple * self.atr14
 
     @property
     def trailing_active(self) -> bool:
         """최고 종가가 진입가 대비 +1 ATR 이상이면 추적손절로 넘어간다."""
         return (
             self.highest_close - self.entry_price
-            >= TRAILING_ACTIVATION_ATR * self.atr14
+            >= self.parameters.trailing_activation_atr * self.atr14
         )
 
     @property
@@ -127,7 +122,7 @@ class Position:
         """
         if not self.trailing_active:
             return self.initial_stop
-        return self.highest_close - TRAILING_STOP_ATR * self.atr14
+        return self.highest_close - self.parameters.trailing_atr_multiple * self.atr14
 
     @property
     def stop_reason(self) -> str:
@@ -135,7 +130,9 @@ class Position:
 
     def unrealized_r(self, price: float) -> float:
         """진입 기준 위험(2 ATR) 대비 손익 배수."""
-        return (price - self.entry_price) / (ATR_STOP_MULTIPLE * self.atr14)
+        return (price - self.entry_price) / (
+            self.parameters.stop_atr_multiple * self.atr14
+        )
 
     def as_open_position(
         self, market_price: float, sector: str | None = None
@@ -246,7 +243,8 @@ def run_session(
     # 5. 실적 전 청산은 그날 종가에 맞춘다(7.5).
     if (
         next_earnings is not None
-        and _sessions_until(bar.trade_date, next_earnings) <= EARNINGS_EXIT_SESSIONS
+        and _sessions_until(bar.trade_date, next_earnings)
+        <= current.parameters.earnings_exit_sessions
     ):
         fill = execute_market_exit(
             current.symbol, current.shares, bar, costs=costs, price_kind="CLOSE"
@@ -254,11 +252,14 @@ def run_session(
         return SessionResult(current.symbol, None, fill, "EARNINGS")
 
     # 6. 시간 손절과 최대 보유는 다음 시초 청산으로 예약한다.
-    if current.sessions_held >= MAX_HOLD_SESSIONS:
+    if current.sessions_held >= current.parameters.max_hold_sessions:
         return SessionResult(
             current.symbol, replace(current, pending_exit="MAX_HOLD"), None, "MAX_HOLD"
         )
-    if current.sessions_held >= TIME_STOP_SESSIONS and not current.trailing_active:
+    if (
+        current.sessions_held >= current.parameters.time_stop_sessions
+        and not current.trailing_active
+    ):
         return SessionResult(
             current.symbol, replace(current, pending_exit="TIME_STOP"), None, "TIME_STOP"
         )

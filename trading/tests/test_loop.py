@@ -31,7 +31,9 @@ from backtest.data import (  # noqa: E402
 )
 from backtest.loop import BacktestConfig, run_backtest, save_run  # noqa: E402
 from backtest.policy import DEFAULT_PAPER_POLICY  # noqa: E402
-from backtest.positions import MAX_HOLD_SESSIONS  # noqa: E402
+from backtest.policy import DEFAULT_PARAMETERS  # noqa: E402
+
+MAX_HOLD_SESSIONS = DEFAULT_PARAMETERS.max_hold_sessions
 
 VERSION = "v1"
 WARMUP = 300

@@ -34,6 +34,8 @@ from backtest.metrics import (  # noqa: E402
     compute_metrics,
     daily_returns,
     evaluate_gate,
+    neighbourhood_report,
+    parameter_variant,
     stress_config,
 )
 
@@ -433,6 +435,98 @@ class EndToEndTest(unittest.TestCase):
         self.assertIn("SURVIVORSHIP_BIASED", report.blockers)
         self.assertIn("NOT_OUT_OF_SAMPLE", report.blockers)
         self.assertIn("EARNINGS_GATE_DISABLED", report.blockers)
+
+
+class NeighbourhoodTest(unittest.TestCase):
+    """21.2의 인접 파라미터 안정성. 이 이관이 가능하게 만든 것이다."""
+
+    @classmethod
+    def setUpClass(cls):
+        from test_loop import build, config
+
+        cls.connection, cls.dates = build()
+        cls.base_config = config(cls.dates)
+        cls.center = compute_metrics(run_backtest(cls.connection, cls.base_config))
+
+    def sweep(self, field: str, values: tuple) -> dict:
+        return {
+            value: compute_metrics(
+                run_backtest(
+                    self.connection,
+                    parameter_variant(self.base_config, **{field: value}),
+                )
+            )
+            for value in values
+        }
+
+    def test_a_variant_changes_the_policy_signature(self):
+        variant = parameter_variant(self.base_config, breakout_window=18)
+        self.assertEqual(variant.policy.parameters.breakout_window, 18)
+        self.assertNotEqual(
+            variant.policy.signature, self.base_config.policy.signature
+        )
+        self.assertIn("breakout_window=18", variant.policy.policy_id)
+        # 파라미터만 바뀌고 한도·프로필은 그대로다.
+        self.assertEqual(variant.policy.limits, self.base_config.policy.limits)
+        self.assertEqual(variant.policy.profile, self.base_config.policy.profile)
+
+    def test_adjacent_breakout_windows_run_and_report(self):
+        """21.2가 예로 든 18/20/22일을 실제로 돌린다."""
+        neighbours = self.sweep("breakout_window", (18, 22))
+        report = neighbourhood_report(
+            "breakout_window", self.center, neighbours, center_value=20
+        )
+        self.assertEqual(report.field, "breakout_window")
+        self.assertEqual([value for value, _ in report.neighbours], [18, 22])
+        self.assertIsNotNone(report.collapse_ratio)
+        self.assertGreater(report.collapse_ratio, 0.0)
+
+    def test_the_gate_blocker_disappears_once_the_sweep_exists(self):
+        result = run_backtest(self.connection, self.base_config)
+        metrics = compute_metrics(result)
+        stressed = compute_metrics(
+            run_backtest(self.connection, stress_config(result, 2.0))
+        )
+        report = neighbourhood_report(
+            "breakout_window",
+            metrics,
+            self.sweep("breakout_window", (18, 22)),
+            center_value=20,
+        )
+
+        without = evaluate_gate(
+            result, metrics, survivorship_biased=False, out_of_sample=True,
+            stressed=stressed,
+        )
+        self.assertIn("PARAMETER_NEIGHBOURHOOD_NOT_RUN", without.blockers)
+
+        with_sweep = evaluate_gate(
+            result, metrics, survivorship_biased=False, out_of_sample=True,
+            stressed=stressed, neighbourhood=report,
+        )
+        self.assertNotIn("PARAMETER_NEIGHBOURHOOD_NOT_RUN", with_sweep.blockers)
+        self.assertIsNotNone(with_sweep.row("parameter_neighbourhood").value)
+
+    def test_a_collapsing_neighbour_is_visible(self):
+        collapsed = neighbourhood_report(
+            "breakout_window",
+            replace(self.center, expectancy_r=1.0),
+            {
+                18: replace(self.center, expectancy_r=0.1),
+                22: replace(self.center, expectancy_r=0.9),
+            },
+            center_value=20,
+        )
+        self.assertAlmostEqual(collapsed.collapse_ratio, 0.1)
+
+    def test_a_non_positive_center_makes_the_ratio_meaningless(self):
+        report = neighbourhood_report(
+            "breakout_window",
+            replace(self.center, expectancy_r=-0.2),
+            {18: replace(self.center, expectancy_r=0.5)},
+            center_value=20,
+        )
+        self.assertIsNone(report.collapse_ratio)
 
 
 if __name__ == "__main__":

@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS policy_versions (
   risk_profile TEXT NOT NULL,
   profile TEXT NOT NULL,
   limits TEXT NOT NULL,
+  parameters TEXT NOT NULL,
   signature TEXT NOT NULL,
   approved_by TEXT NOT NULL,
   note TEXT,

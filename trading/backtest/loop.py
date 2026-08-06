@@ -32,7 +32,7 @@ import sqlite3
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date
 
-from .candidates import MIN_SCORE_POPULATION, Ranking, rank_candidates
+from .candidates import Ranking, rank_candidates
 from .costs import CostModel
 from .data import Bar, BarCache, PointInTimeSnapshot
 from .execution import Fill, execute_entry
@@ -41,7 +41,7 @@ from .policy import DEFAULT_PAPER_POLICY, PolicyVersion
 from .positions import Position, run_session
 from .regime import Regime, classify_regime
 from .risk import account_gate, evaluate_candidate
-from .sizing import ATR_STOP_MULTIPLE, AccountState, OpenPosition, SizedIntent
+from .sizing import AccountState, OpenPosition, SizedIntent
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,8 @@ class BacktestConfig:
     index_names: tuple[str, ...] | None = None
     require_earnings_calendar: bool = True
     require_sector: bool = True
-    min_population: int = MIN_SCORE_POPULATION
+    # 정책의 `min_score_population`을 쓰려면 None으로 둔다. 작은 픽스처만 낮춘다.
+    min_population: int | None = None
     gate_factor: float = 1.0  # Core-only은 1.0. LLM Gate는 아직 없다
 
 
@@ -184,7 +185,7 @@ def _track_excursion(open_trade: _OpenTrade, bar: Bar) -> None:
     손절이 장중 저가로 판정되므로 MAE도 장중 저가로 잰다.
     """
     position = open_trade.position
-    risk_per_share = ATR_STOP_MULTIPLE * position.atr14
+    risk_per_share = position.parameters.stop_atr_multiple * position.atr14
     high_r = (bar.raw_high - position.entry_price) / risk_per_share
     low_r = (bar.raw_low - position.entry_price) / risk_per_share
     open_trade.mfe_r = max(open_trade.mfe_r, high_r)
@@ -267,7 +268,13 @@ def run_backtest(
                 _count(skip_counts, "NO_EXECUTION_BAR")
                 continue
             _, bar = pair
-            outcome = execute_entry(intent, signal_bar, bar, costs=config.costs)
+            outcome = execute_entry(
+                intent,
+                signal_bar,
+                bar,
+                costs=config.costs,
+                parameters=config.policy.parameters,
+            )
             if not outcome:
                 _count(skip_counts, outcome.cancellation.reason)
                 continue
@@ -279,10 +286,14 @@ def run_backtest(
             fills.append(fill)
             _count(fill_counts, fill.reason)
             open_trade = _OpenTrade(
-                position=Position.from_fill(fill, intent.atr14),
+                position=Position.from_fill(
+                    fill, intent.atr14, config.policy.parameters
+                ),
                 entry_fill=fill,
                 sector=snapshot.sector(intent.symbol),
-                risk_dollars=fill.shares * ATR_STOP_MULTIPLE * intent.atr14,
+                risk_dollars=fill.shares
+                * config.policy.parameters.stop_atr_multiple
+                * intent.atr14,
                 min_qty_exception=intent.min_qty_exception,
             )
             # 진입 당일에도 보호 주문이 살아 있다(11.2). 그 세션까지 바로 돌린다.
@@ -349,7 +360,9 @@ def run_backtest(
         )
 
         try:
-            regime = classify_regime(snapshot, drawdown=drawdown)
+            regime = classify_regime(
+                snapshot, drawdown, config.policy.parameters
+            )
         except FeatureUnavailable as error:
             _count(skip_counts, error.reason)
             curve.append(
@@ -431,6 +444,7 @@ def _rank(
     snapshot: PointInTimeSnapshot, regime: Regime, config: BacktestConfig
 ) -> Ranking:
     kwargs = {
+        "policy": config.policy,
         "min_population": config.min_population,
         "require_earnings_calendar": config.require_earnings_calendar,
     }

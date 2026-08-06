@@ -25,6 +25,7 @@ from backtest.data import (  # noqa: E402
     register_source,
 )
 from backtest.policy import DEFAULT_PAPER_POLICY  # noqa: E402
+from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
 from backtest.risk import account_gate, correlated_peers, evaluate_candidate  # noqa: E402
 from backtest.sizing import OpenPosition  # noqa: E402
 from test_sizing import account, make_candidate, make_regime  # noqa: E402
@@ -241,6 +242,7 @@ class CorrelationLimitTest(unittest.TestCase):
             "AAA",
             positions,
             LIMITS.correlation_threshold if threshold is None else threshold,
+            PARAMS.correlation_window,
         )
 
     def test_same_direction_names_are_correlated(self):

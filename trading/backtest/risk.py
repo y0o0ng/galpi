@@ -33,7 +33,7 @@ from dataclasses import dataclass
 
 from .candidates import Candidate
 from .data import PointInTimeSnapshot
-from .features import CORRELATION_WINDOW, FeatureUnavailable, correlation
+from .features import FeatureUnavailable, correlation
 from .policy import DEFAULT_PAPER_POLICY, PolicyVersion
 from .regime import Regime
 from .sizing import (
@@ -115,25 +115,26 @@ def correlated_peers(
     symbol: str,
     positions: tuple[OpenPosition, ...],
     threshold: float,
+    window: int,
 ) -> tuple[CorrelatedPeer, ...]:
     """60일 로그수익률 상관이 문턱 이상인 보유 포지션.
 
     상관을 계산할 수 없으면(이력 부족·거래일 불일치) 상관으로 본다. 판정 불가를
     무상관으로 처리하면 한도를 조용히 비활성화하는 쪽이라 안전한 방향이 아니다.
     """
-    own_bars = snapshot.bars(symbol, CORRELATION_WINDOW + 1)
+    own_bars = snapshot.bars(symbol, window + 1)
     own_dates = [bar.trade_date for bar in own_bars]
     own_closes = [bar.adj_close for bar in own_bars]
 
     found: list[CorrelatedPeer] = []
     for position in positions:
-        peer_bars = snapshot.bars(position.symbol, CORRELATION_WINDOW + 1)
+        peer_bars = snapshot.bars(position.symbol, window + 1)
         peer_dates = [bar.trade_date for bar in peer_bars]
         coefficient: float | None = None
-        if len(own_dates) == CORRELATION_WINDOW + 1 and peer_dates == own_dates:
+        if len(own_dates) == window + 1 and peer_dates == own_dates:
             try:
                 coefficient = correlation(
-                    own_closes, [bar.adj_close for bar in peer_bars]
+                    own_closes, [bar.adj_close for bar in peer_bars], window
                 )
             except FeatureUnavailable:
                 coefficient = None
@@ -189,10 +190,14 @@ def evaluate_candidate(
             candidate.symbol, "SECTOR_UNKNOWN", "종목 분류가 없어 섹터 한도를 판정할 수 없습니다"
         )
 
-    planned_entry = planned_entry_price(candidate)
+    planned_entry = planned_entry_price(candidate, policy.parameters)
     extra_caps: list[tuple[str, int]] = []
     peers = correlated_peers(
-        snapshot, candidate.symbol, account.positions, limits.correlation_threshold
+        snapshot,
+        candidate.symbol,
+        account.positions,
+        limits.correlation_threshold,
+        policy.parameters.correlation_window,
     )
     if peers:
         # "쌍 합산 25%"이므로 가장 큰 상관 포지션 하나와의 합이 상한을 넘지 않게 한다.

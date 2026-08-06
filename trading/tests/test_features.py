@@ -30,6 +30,7 @@ from backtest.features import (  # noqa: E402
     compute_features,
     save_features,
 )
+from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
 from backtest.regime import classify_regime  # noqa: E402
 
 VERSION = "v1"
@@ -60,7 +61,7 @@ class ConstantPriceTest(unittest.TestCase):
             synthetic.rows("AAA", self.dates, synthetic.constant_closes(DAYS, self.price)),
         )
         snapshot = PointInTimeSnapshot(connection, self.dates[-1], VERSION)
-        self.features = compute_features(snapshot, "AAA")
+        self.features = compute_features(snapshot, "AAA", PARAMS)
 
     def test_atr_is_twice_the_daily_range(self):
         # 고가·저가가 종가의 ±2%면 TR은 항상 고저폭 4%다.
@@ -101,7 +102,7 @@ class GrowthPathTest(unittest.TestCase):
             synthetic.rows("AAA", self.dates, self.closes),
         )
         snapshot = PointInTimeSnapshot(connection, self.dates[-1], VERSION)
-        self.features = compute_features(snapshot, "AAA")
+        self.features = compute_features(snapshot, "AAA", PARAMS)
 
     def test_trend_quality_is_the_annualized_slope(self):
         self.assertAlmostEqual(
@@ -134,9 +135,11 @@ class LookaheadTest(unittest.TestCase):
             flat_spy(dates[:261]), synthetic.rows("AAA", dates[:261], closes[:261])
         )
 
-        with_future = compute_features(PointInTimeSnapshot(full, as_of, VERSION), "AAA")
+        with_future = compute_features(
+            PointInTimeSnapshot(full, as_of, VERSION), "AAA", PARAMS
+        )
         without_future = compute_features(
-            PointInTimeSnapshot(truncated, as_of, VERSION), "AAA"
+            PointInTimeSnapshot(truncated, as_of, VERSION), "AAA", PARAMS
         )
         self.assertEqual(with_future.feature_hash, without_future.feature_hash)
         self.assertEqual(with_future, without_future)
@@ -157,7 +160,7 @@ class SplitTest(unittest.TestCase):
 
     def features_at(self, index: int):
         snapshot = PointInTimeSnapshot(self.connection, self.dates[index], VERSION)
-        return snapshot, compute_features(snapshot, "AAA")
+        return snapshot, compute_features(snapshot, "AAA", PARAMS)
 
     def test_atr_stays_the_same_fraction_of_the_order_price(self):
         for index in (self.split_index - 1, self.split_index, DAYS - 1):
@@ -187,7 +190,7 @@ class UnavailableTest(unittest.TestCase):
         )
         snapshot = PointInTimeSnapshot(connection, dates[-1], VERSION)
         with self.assertRaises(FeatureUnavailable) as caught:
-            compute_features(snapshot, "AAA")
+            compute_features(snapshot, "AAA", PARAMS)
         self.assertEqual(caught.exception.reason, "SHORT_HISTORY")
 
     def test_missing_symbol_is_refused(self):
@@ -195,7 +198,7 @@ class UnavailableTest(unittest.TestCase):
         connection = build(flat_spy(dates))
         snapshot = PointInTimeSnapshot(connection, dates[-1], VERSION)
         with self.assertRaises(FeatureUnavailable) as caught:
-            compute_features(snapshot, "AAA")
+            compute_features(snapshot, "AAA", PARAMS)
         self.assertEqual(caught.exception.reason, "NO_BARS")
 
     def test_stale_symbol_is_refused(self):
@@ -207,7 +210,7 @@ class UnavailableTest(unittest.TestCase):
         )
         snapshot = PointInTimeSnapshot(connection, dates[-1], VERSION)
         with self.assertRaises(FeatureUnavailable) as caught:
-            compute_features(snapshot, "AAA")
+            compute_features(snapshot, "AAA", PARAMS)
         self.assertEqual(caught.exception.reason, "STALE")
 
     def test_calendar_gap_is_refused(self):
@@ -220,7 +223,7 @@ class UnavailableTest(unittest.TestCase):
         )
         snapshot = PointInTimeSnapshot(connection, dates[-1], VERSION)
         with self.assertRaises(FeatureUnavailable) as caught:
-            compute_features(snapshot, "AAA")
+            compute_features(snapshot, "AAA", PARAMS)
         self.assertEqual(caught.exception.reason, "CALENDAR_MISMATCH")
 
 
@@ -234,26 +237,26 @@ class FeatureHashTest(unittest.TestCase):
         self.snapshot = PointInTimeSnapshot(self.connection, self.dates[-1], VERSION)
 
     def test_hash_is_stable_across_recomputation(self):
-        first = compute_features(self.snapshot, "AAA")
+        first = compute_features(self.snapshot, "AAA", PARAMS)
         second = compute_features(
-            PointInTimeSnapshot(self.connection, self.dates[-1], VERSION), "AAA"
+            PointInTimeSnapshot(self.connection, self.dates[-1], VERSION), "AAA", PARAMS
         )
         self.assertEqual(first.feature_hash, second.feature_hash)
         self.assertEqual(len(first.feature_hash), 64)
 
     def test_hash_changes_when_a_feature_changes(self):
-        base = compute_features(self.snapshot, "AAA")
+        base = compute_features(self.snapshot, "AAA", PARAMS)
         other = build(
             flat_spy(self.dates),
             synthetic.rows("AAA", self.dates, synthetic.constant_closes(DAYS, 101.0)),
         )
         moved = compute_features(
-            PointInTimeSnapshot(other, self.dates[-1], VERSION), "AAA"
+            PointInTimeSnapshot(other, self.dates[-1], VERSION), "AAA", PARAMS
         )
         self.assertNotEqual(base.feature_hash, moved.feature_hash)
 
     def test_saved_row_carries_the_hash(self):
-        features = compute_features(self.snapshot, "AAA")
+        features = compute_features(self.snapshot, "AAA", PARAMS)
         save_features(self.connection, VERSION, features)
         row = self.connection.execute("SELECT * FROM features_daily").fetchone()
         self.assertEqual(row["feature_hash"], features.feature_hash)
@@ -287,7 +290,7 @@ class RegimeTest(unittest.TestCase):
         return self.snapshot_for(closes)
 
     def test_green_needs_all_three_conditions(self):
-        regime = classify_regime(self.rising(), drawdown=0.0)
+        regime = classify_regime(self.rising(), 0.0, PARAMS)
         self.assertEqual(regime.state, "GREEN")
         self.assertEqual(regime.max_exposure, 1.00)
         self.assertEqual(regime.new_entries, "allow")
@@ -295,49 +298,49 @@ class RegimeTest(unittest.TestCase):
 
     def test_drawdown_moves_green_to_yellow_then_red(self):
         rising = self.rising()
-        yellow = classify_regime(rising, drawdown=0.06)
+        yellow = classify_regime(rising, 0.06, PARAMS)
         self.assertEqual(yellow.state, "YELLOW")
         self.assertEqual(yellow.max_exposure, 0.50)
         self.assertEqual(yellow.new_entries, "top_only")
         self.assertIn("DD_GE_5", yellow.reasons)
 
-        red = classify_regime(rising, drawdown=0.08)
+        red = classify_regime(rising, 0.08, PARAMS)
         self.assertEqual(red.state, "RED")
         self.assertEqual(red.max_exposure, 0.25)
         self.assertEqual(red.new_entries, "blocked")
         self.assertIn("DD_GE_8", red.reasons)
 
     def test_two_days_below_sma200_is_yellow_and_three_is_red(self):
-        two = classify_regime(self.below_sma_for(2), drawdown=0.0)
+        two = classify_regime(self.below_sma_for(2), 0.0, PARAMS)
         self.assertEqual(two.state, "YELLOW")
         self.assertEqual(two.below_sma200_streak, 2)
         self.assertFalse(two.above_sma200)
         self.assertIn("SPY_BELOW_SMA200", two.reasons)
 
-        three = classify_regime(self.below_sma_for(3), drawdown=0.0)
+        three = classify_regime(self.below_sma_for(3), 0.0, PARAMS)
         self.assertEqual(three.state, "RED")
         self.assertEqual(three.below_sma200_streak, 3)
         self.assertIn("SPY_BELOW_SMA200_3D", three.reasons)
 
     def test_volatility_bands_split_yellow_and_red(self):
-        yellow = classify_regime(self.oscillating(0.0198), drawdown=0.0)
+        yellow = classify_regime(self.oscillating(0.0198), 0.0, PARAMS)
         self.assertEqual(yellow.state, "YELLOW")
         self.assertIn("VOL_GE_30", yellow.reasons)
         self.assertTrue(0.30 <= yellow.realized_vol20 < 0.35)
 
-        red = classify_regime(self.oscillating(0.023), drawdown=0.0)
+        red = classify_regime(self.oscillating(0.023), 0.0, PARAMS)
         self.assertEqual(red.state, "RED")
         self.assertIn("VOL_GE_35", red.reasons)
         self.assertGreaterEqual(red.realized_vol20, 0.35)
 
     def test_negative_drawdown_is_a_caller_error(self):
         with self.assertRaises(ValueError):
-            classify_regime(self.rising(), drawdown=-0.01)
+            classify_regime(self.rising(), -0.01, PARAMS)
 
     def test_short_market_history_is_refused(self):
         short = self.snapshot_for([100.0] * 201)
         with self.assertRaises(FeatureUnavailable) as caught:
-            classify_regime(short, drawdown=0.0)
+            classify_regime(short, 0.0, PARAMS)
         self.assertEqual(caught.exception.reason, "SHORT_HISTORY")
 
 

@@ -19,11 +19,8 @@ import math
 from dataclasses import dataclass
 
 from .candidates import Candidate, Skip
-from .policy import DEFAULT_PAPER_POLICY, PolicyVersion
+from .policy import DEFAULT_PAPER_POLICY, PolicyVersion, StrategyParameters
 from .regime import Regime
-
-ATR_STOP_MULTIPLE = 2.0  # 7.5 초기 손절: Entry - 2.0 × ATR14
-ENTRY_CHASE_ATR = 0.25  # 10.1 최대 추격: 신호 종가 + 0.25 ATR
 
 # 수량 계산의 나눗셈에서 생기는 1e-16 수준의 오차로 한 주가 깎이는 것을 막는다.
 # 1e-9주는 경제적 의미가 없다.
@@ -159,9 +156,11 @@ def _floor_shares(value: float) -> int:
     return int(math.floor(value + SHARE_EPSILON))
 
 
-def planned_entry_price(candidate: Candidate) -> float:
+def planned_entry_price(
+    candidate: Candidate, parameters: StrategyParameters
+) -> float:
     """10.1이 허용하는 최악의 진입가. 자본·비중 계산은 모두 이 가격으로 한다."""
-    return candidate.reference_close + ENTRY_CHASE_ATR * candidate.atr14
+    return candidate.reference_close + parameters.entry_chase_atr * candidate.atr14
 
 
 def reject(symbol: str, reason: str, detail: str, caps: Caps | None = None) -> SizingResult:
@@ -200,13 +199,14 @@ def size_candidate(
             # 어떤 축소 계수도 Core보다 수량을 늘릴 수 없다(5장 권한 모델·8.1).
             raise SizingError(f"{name}는 0~1이어야 합니다: {factor}")
 
-    stop_distance = ATR_STOP_MULTIPLE * candidate.atr14
+    parameters = policy.parameters
+    stop_distance = parameters.stop_atr_multiple * candidate.atr14
     if stop_distance <= 0:
         return reject(candidate.symbol, "INVALID_STOP_DISTANCE", "ATR가 0입니다")
 
     # 실제 체결가는 다음 장에서 정해진다. 그 전에 정할 수 있는 것은 10.1이 허용한
     # 지정가 상한이고, 그 최악의 가격으로 자본 제약을 계산하면 과다 배분이 없다.
-    planned_entry = planned_entry_price(candidate)
+    planned_entry = planned_entry_price(candidate, parameters)
     initial_stop = planned_entry - stop_distance
 
     risk_budget = account.equity * profile.risk_per_trade * risk_budget_factor

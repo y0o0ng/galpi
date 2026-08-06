@@ -31,6 +31,7 @@ from backtest.execution import (  # noqa: E402
     execute_market_exit,
     try_stop_exit,
 )
+from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
 from backtest.sizing import SizedIntent  # noqa: E402
 
 COSTS = CostModel()
@@ -148,6 +149,7 @@ class EntryTest(unittest.TestCase):
             signal_bar or bar(SIGNAL_DATE),
             execution_bar,
             costs=costs,
+            parameters=PARAMS,
         )
 
     def test_open_below_the_limit_fills_at_the_open(self):

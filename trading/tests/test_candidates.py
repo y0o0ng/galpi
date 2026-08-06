@@ -23,10 +23,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import synthetic  # noqa: E402
 from backtest import store  # noqa: E402
 from backtest.candidates import (  # noqa: E402
-    MAX_CANDIDATES,
-    MIN_SCORE_POPULATION,
-    SCORE_WEIGHT_RS,
-    SCORE_WEIGHT_TREND,
     next_weekday,
     rank_candidates,
     save_signals,
@@ -41,7 +37,13 @@ from backtest.data import (  # noqa: E402
     register_source,
 )
 from backtest.features import STRATEGY_VERSION  # noqa: E402
+from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
 from backtest.regime import classify_regime  # noqa: E402
+
+MAX_CANDIDATES = PARAMS.max_candidates
+MIN_SCORE_POPULATION = PARAMS.min_score_population
+SCORE_WEIGHT_RS = PARAMS.score_weight_rs
+SCORE_WEIGHT_TREND = PARAMS.score_weight_trend
 
 VERSION = "v1"
 DAYS = 300
@@ -76,7 +78,7 @@ class Fixture:
 
     def ranking(self, drawdown: float = 0.0, **kwargs):
         snapshot = self.snapshot()
-        regime = classify_regime(snapshot, drawdown=drawdown)
+        regime = classify_regime(snapshot, drawdown, PARAMS)
         kwargs.setdefault("require_earnings_calendar", False)
         return rank_candidates(snapshot, regime, **kwargs)
 

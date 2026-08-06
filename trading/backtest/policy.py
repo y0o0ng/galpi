@@ -23,13 +23,114 @@ import json
 import sqlite3
 from dataclasses import asdict, dataclass, field
 
-from .features import STRATEGY_VERSION
-
 SIGNATURE_SCHEME = "sha256"
+
+# 전략 규칙의 버전. 설계 문서 버전을 따른다. 규칙이 바뀌면 이 값도 바뀌어야 하고,
+# 이 값은 `feature_hash`·`signal_id`·정책 서명에 모두 들어간다.
+STRATEGY_VERSION = "core-v2.3"
 
 
 class PolicyError(Exception):
     """정책이 없거나 저장된 값이 서명과 다를 때 올린다."""
+
+
+@dataclass(frozen=True)
+class StrategyParameters:
+    """설계 7.2~7.5·10.1의 지표 파라미터.
+
+    1.4는 "전략 버전과 지표 파라미터"를 사용자 승인 항목으로 둔다. 그래서 이 값들은
+    모듈 상수가 아니라 서명된 정책의 일부다. 모듈 상수로 두면 두 가지가 불가능하다.
+    14.4·21.2의 인접값 안정성 검증(18/20/22일)을 한 실행에서 여러 번 돌릴 수 없고,
+    어떤 파라미터로 낸 결과인지 정책 서명이 덮지 못한다.
+
+    **함수에 넘기는 것을 잊으면 조용히 기본값이 먹지 않도록** 계산 함수들에서 window
+    기본값을 모두 걷어냈다. 파라미터 없이는 피처를 계산할 수 없다.
+    """
+
+    # 7.4 종목 점수
+    rs_lookback: int = 63
+    rs_skip: int = 5
+    trend_window: int = 60
+    score_weight_rs: float = 0.60
+    score_weight_trend: float = 0.40
+    # 7.5 ATR와 손절
+    atr_window: int = 14
+    stop_atr_multiple: float = 2.0
+    trailing_atr_multiple: float = 3.0
+    trailing_activation_atr: float = 1.0
+    time_stop_sessions: int = 20
+    max_hold_sessions: int = 40
+    # 0이면 7.5의 문자 그대로 "발표 전 거래일"이다. 미래 휴장일을 모르는 동안은 1로 둔다.
+    earnings_exit_sessions: int = 1
+    # 7.2 유니버스와 7.4 진입 게이트
+    sma_fast: int = 50
+    sma_slow: int = 200
+    breakout_window: int = 20
+    min_close: float = 10.0
+    min_dollar_volume: float = 50_000_000.0
+    dollar_volume_window: int = 20
+    min_history_sessions: int = 252
+    earnings_min_sessions: int = 4
+    max_candidates: int = 5
+    # 유니버스는 500종목대다. 이보다 작으면 횡단면이 아니라 데이터 사고다.
+    min_score_population: int = 30
+    # 7.3 시장 상태
+    vol_window: int = 20
+    green_max_vol: float = 0.30
+    red_max_vol: float = 0.35
+    green_max_drawdown: float = 0.05
+    red_min_drawdown: float = 0.08
+    below_sma_red_streak: int = 3
+    # 9.2 상관 한도가 보는 창
+    correlation_window: int = 60
+    # 10.1 진입
+    entry_chase_atr: float = 0.25
+    gap_cancel_atr: float = 1.0
+    max_daily_entries_green: int = 2
+    max_daily_entries_yellow: int = 1
+
+    def __post_init__(self) -> None:
+        if abs(self.score_weight_rs + self.score_weight_trend - 1.0) > 1e-9:
+            raise PolicyError("종목 점수의 가중치 합은 1이어야 합니다.")
+        if self.rs_skip >= self.rs_lookback:
+            raise PolicyError("rs_skip은 rs_lookback보다 작아야 합니다.")
+        if self.sma_fast >= self.sma_slow:
+            raise PolicyError("sma_fast는 sma_slow보다 작아야 합니다.")
+        if self.time_stop_sessions > self.max_hold_sessions:
+            raise PolicyError("시간손절이 최대 보유기간보다 늦을 수 없습니다.")
+        # 이 부등식이 "손절가는 내려가지 않는다"를 보장한다. 활성화 순간의 추적손절가는
+        # `진입가 + (활성화 - 추적) × ATR`이고 초기 손절가는 `진입가 - 손절배수 × ATR`이다.
+        if (
+            self.trailing_atr_multiple - self.trailing_activation_atr
+            > self.stop_atr_multiple + 1e-12
+        ):
+            raise PolicyError(
+                "추적손절 활성화 순간에 손절가가 내려갑니다:"
+                f" {self.trailing_atr_multiple} - {self.trailing_activation_atr}"
+                f" > {self.stop_atr_multiple}"
+            )
+        needed = max(
+            self.sma_slow,
+            self.rs_lookback + 1,
+            self.trend_window,
+            self.atr_window + 1,
+            self.vol_window + 1,
+            self.breakout_window + 1,
+            self.correlation_window + 1,
+        )
+        if self.min_history_sessions < needed:
+            raise PolicyError(
+                f"최소 이력 {self.min_history_sessions}세션으로는 모든 창을 채울 수 없습니다"
+                f" (최소 {needed}세션 필요)"
+            )
+
+    def max_daily_entries(self, regime_state: str) -> int:
+        """7.3의 신규 진입 열과 10.1의 "하루 진입 최대 2종목"을 합친 값."""
+        if regime_state == "GREEN":
+            return self.max_daily_entries_green
+        if regime_state == "YELLOW":
+            return self.max_daily_entries_yellow
+        return 0
 
 
 @dataclass(frozen=True)
@@ -86,6 +187,7 @@ class PolicyVersion:
     policy_id: str
     profile: RiskProfile
     limits: HardLimits = field(default_factory=HardLimits)
+    parameters: StrategyParameters = field(default_factory=StrategyParameters)
     broker_mode: str = "PAPER"
     strategy_version: str = STRATEGY_VERSION
     approved_by: str = "user"
@@ -107,6 +209,7 @@ class PolicyVersion:
                 "approved_by": self.approved_by,
                 "profile": asdict(self.profile),
                 "limits": asdict(self.limits),
+                "parameters": asdict(self.parameters),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -123,11 +226,14 @@ PAPER_VALIDATION = RiskProfile(
     name="PAPER_VALIDATION", risk_per_trade=0.0025, max_exposure=0.60
 )
 
+DEFAULT_PARAMETERS = StrategyParameters()
+
 DEFAULT_PAPER_POLICY = PolicyVersion(
     policy_id="paper-core-v1",
     profile=PAPER_VALIDATION,
     limits=HardLimits(),
-    note="9.1 PAPER_VALIDATION 프로필과 9.2 초기 자동운용 한도",
+    parameters=DEFAULT_PARAMETERS,
+    note="9.1 PAPER_VALIDATION 프로필, 9.2 초기 자동운용 한도, 7.2~7.5 기본 지표 파라미터",
 )
 
 
@@ -142,8 +248,8 @@ def activate_policy(connection: sqlite3.Connection, policy: PolicyVersion) -> st
         connection.execute(
             "INSERT OR REPLACE INTO policy_versions"
             " (policy_id, broker_mode, strategy_version, risk_profile, profile, limits,"
-            "  signature, approved_by, note, active)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+            "  parameters, signature, approved_by, note, active)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
             (
                 policy.policy_id,
                 policy.broker_mode,
@@ -151,6 +257,7 @@ def activate_policy(connection: sqlite3.Connection, policy: PolicyVersion) -> st
                 policy.profile.name,
                 json.dumps(asdict(policy.profile), sort_keys=True),
                 json.dumps(asdict(policy.limits), sort_keys=True),
+                json.dumps(asdict(policy.parameters), sort_keys=True),
                 policy.signature,
                 policy.approved_by,
                 policy.note,
@@ -174,6 +281,7 @@ def load_active_policy(
         policy_id=row["policy_id"],
         profile=RiskProfile(**json.loads(row["profile"])),
         limits=HardLimits(**json.loads(row["limits"])),
+        parameters=StrategyParameters(**json.loads(row["parameters"])),
         broker_mode=row["broker_mode"],
         strategy_version=row["strategy_version"],
         approved_by=row["approved_by"],

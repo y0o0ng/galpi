@@ -32,9 +32,8 @@ from dataclasses import dataclass
 from .candidates import Skip
 from .costs import CostModel
 from .data import Bar
+from .policy import StrategyParameters
 from .sizing import SizedIntent
-
-GAP_CANCEL_ATR = 1.0  # 10.1 갭 제한: 시초가가 신호 종가 대비 +1 ATR 이상이면 취소
 
 
 class ExecutionError(Exception):
@@ -121,6 +120,7 @@ def execute_entry(
     execution_bar: Bar,
     *,
     costs: CostModel,
+    parameters: StrategyParameters,
 ) -> ExecutionResult:
     """다음 정규장에서 시장성 지정가 진입을 시도한다."""
     _assert_forward(signal_bar, execution_bar)
@@ -132,7 +132,9 @@ def execute_entry(
             " 바뀌어 지정가와 수량을 다시 계산해야 합니다",
         )
 
-    gap_threshold = intent.reference_close + GAP_CANCEL_ATR * intent.atr14
+    gap_threshold = (
+        intent.reference_close + parameters.gap_cancel_atr * intent.atr14
+    )
     if execution_bar.raw_open >= gap_threshold:
         return _cancel(
             intent.symbol,
