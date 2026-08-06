@@ -28,6 +28,8 @@ trading/paper-credentials.env
 trading/live-credentials.env
 trading/paper-credentials.txt
 trading/live-credentials.txt
+trading/backtest-credentials.env
+trading/backtest-credentials.txt
 trading/data/
 __pycache__/
 *.pyc
