@@ -26,6 +26,7 @@ from backtest.policy import (  # noqa: E402
     PolicyError,
     PolicyVersion,
     RiskProfile,
+    StrategyParameters,
     activate_policy,
     load_active_policy,
 )
@@ -164,6 +165,31 @@ class PersistenceTest(unittest.TestCase):
                 " risk_profile, profile, limits, signature, approved_by)"
                 " VALUES ('live','LIVE','x','y','{}','{}','sha256:z','user')"
             )
+
+
+class MinHistoryInvariantTest(unittest.TestCase):
+    """창을 줄인 정책이 "조용히 아무것도 안 하는" 실행이 되지 않게 막는다.
+
+    `classify_regime`은 SMA200 아래 연속일을 세려고 `sma_slow + below_sma_red_streak - 1`
+    개의 바가 필요한데 요청 개수는 `min_history_sessions`이다. 그래서 이력 하한이
+    `sma_slow`와 같기만 하면 시장 상태 판정이 전 세션 `SHORT_HISTORY`로 떨어진다.
+    2026-08-06 무료 1년 데이터 실행에서 145세션 전부가 그렇게 빠졌다.
+    """
+
+    def test_history_floor_must_cover_the_sma_streak(self):
+        with self.assertRaises(PolicyError):
+            StrategyParameters(sma_slow=100, min_history_sessions=100)
+
+    def test_history_floor_that_covers_the_streak_is_accepted(self):
+        parameters = StrategyParameters(sma_slow=100, min_history_sessions=102)
+        self.assertEqual(parameters.min_history_sessions, 102)
+
+    def test_default_parameters_still_satisfy_the_invariant(self):
+        parameters = StrategyParameters()
+        self.assertGreaterEqual(
+            parameters.min_history_sessions,
+            parameters.sma_slow + parameters.below_sma_red_streak - 1,
+        )
 
 
 if __name__ == "__main__":

@@ -110,7 +110,11 @@ class StrategyParameters:
                 f" > {self.stop_atr_multiple}"
             )
         needed = max(
-            self.sma_slow,
+            # 시장 상태는 SMA200 아래 연속일을 세므로 SMA 하나보다 더 긴 이력이 필요하다.
+            # `classify_regime`이 요청하는 개수는 `min_history_sessions`이라, 이 관계를
+            # 여기서 막지 않으면 창을 줄인 정책이 전 세션 `SHORT_HISTORY`로 떨어져
+            # 한 건도 거래하지 않는 실행이 조용히 만들어진다(2026-08-06 실측).
+            self.sma_slow + self.below_sma_red_streak - 1,
             self.rs_lookback + 1,
             self.trend_window,
             self.atr_window + 1,
