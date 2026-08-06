@@ -49,7 +49,7 @@ class Fill:
     shares: int
     reference_price: float  # 바에서 나온 비용 전 가격
     fill_price: float  # 슬리피지·스프레드 반영
-    commission: float
+    fees: float  # 수수료와 매도 제세금
     reason: str
 
     @property
@@ -60,8 +60,8 @@ class Fill:
     def cash_delta(self) -> float:
         """계좌 현금 변화. 매수는 음수, 매도는 양수다."""
         if self.side == "BUY":
-            return -(self.notional + self.commission)
-        return self.notional - self.commission
+            return -(self.notional + self.fees)
+        return self.notional - self.fees
 
 
 @dataclass(frozen=True)
@@ -95,7 +95,7 @@ def _make_fill(
         shares=shares,
         reference_price=reference_price,
         fill_price=fill_price,
-        commission=costs.commission_for(shares, fill_price),
+        fees=costs.fees_for(shares, fill_price, side),
         reason=reason,
     )
 

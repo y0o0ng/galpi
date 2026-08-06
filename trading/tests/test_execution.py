@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from backtest.costs import (  # noqa: E402
     BASE_STRESS,
     DESIGN_STRESS,
+    RATE_SOURCE,
     CostError,
     CostModel,
     Stress,
@@ -33,7 +34,7 @@ from backtest.execution import (  # noqa: E402
 from backtest.sizing import SizedIntent  # noqa: E402
 
 COSTS = CostModel()
-FREE = CostModel(slippage_bps=0.0, spread_bps=0.0, commission_bps=0.0)
+FREE = CostModel(slippage_bps=0.0, spread_bps=0.0, commission_bps=0.0, sell_tax_bps=0.0)
 
 SIGNAL_DATE = "2026-08-05"
 EXECUTION_DATE = "2026-08-06"
@@ -96,16 +97,28 @@ class CostModelTest(unittest.TestCase):
         self.assertAlmostEqual(COSTS.fill_price(100.0, "BUY"), 100.06)
         self.assertAlmostEqual(COSTS.fill_price(100.0, "SELL"), 99.94)
 
-    def test_commission_uses_the_notional_with_a_floor(self):
-        self.assertAlmostEqual(COSTS.commission_for(10, 100.0), 2.5)
-        floored = CostModel(commission_bps=1.0, commission_min=1.0)
-        self.assertAlmostEqual(floored.commission_for(1, 100.0), 1.0)
+    def test_commission_is_25bp_each_way(self):
+        self.assertAlmostEqual(COSTS.fees_for(10, 100.0, "BUY"), 2.5)
+        floored = CostModel(commission_bps=1.0, commission_min=1.0, sell_tax_bps=0.0)
+        self.assertAlmostEqual(floored.fees_for(1, 100.0, "BUY"), 1.0)
+
+    def test_selling_adds_the_statutory_tax(self):
+        # 0.00206%는 매도에만 붙는다. 1,000달러에 2.06센트다.
+        self.assertAlmostEqual(COSTS.fees_for(10, 100.0, "SELL"), 2.5 + 0.0206)
+        self.assertAlmostEqual(
+            COSTS.fees_for(10, 100.0, "SELL") - COSTS.fees_for(10, 100.0, "BUY"),
+            0.0206,
+        )
+
+    def test_round_trip_is_dominated_by_commission(self):
+        self.assertAlmostEqual(COSTS.round_trip_bps, 12.0 + 50.0 + 0.206)
+        self.assertAlmostEqual(COSTS.stressed(DESIGN_STRESS).round_trip_bps, 34.0 + 100.412)
 
     def test_design_stress_matches_the_table(self):
         stressed = COSTS.stressed(DESIGN_STRESS)
         # 슬리피지 5bp → 15bp, 스프레드 2bp → 4bp의 절반.
         self.assertAlmostEqual(stressed.one_way_bps, 17.0)
-        self.assertAlmostEqual(stressed.commission_for(10, 100.0), 5.0)
+        self.assertAlmostEqual(stressed.fees_for(10, 100.0, "BUY"), 5.0)
 
     def test_uniform_stress_scales_everything(self):
         doubled = COSTS.stressed(Stress.uniform(2.0))
@@ -113,16 +126,19 @@ class CostModelTest(unittest.TestCase):
         tripled = COSTS.stressed(Stress.uniform(3.0))
         self.assertAlmostEqual(tripled.one_way_bps, 18.0)
 
-    def test_commission_rate_is_not_confirmed_yet(self):
-        """확인되지 않은 비용으로 낸 결과는 성과 판정에 쓸 수 없다."""
-        self.assertFalse(COSTS.confirmed)
+    def test_default_rates_are_the_confirmed_account_rates(self):
+        self.assertAlmostEqual(COSTS.commission_bps, 25.0)
+        self.assertAlmostEqual(COSTS.sell_tax_bps, 0.206)
         self.assertEqual(COSTS.stress, BASE_STRESS)
+        self.assertIn("2026-08-06", RATE_SOURCE)
 
     def test_bad_inputs_are_refused(self):
         with self.assertRaises(CostError):
             COSTS.fill_price(0.0, "BUY")
         with self.assertRaises(CostError):
             COSTS.fill_price(100.0, "HOLD")
+        with self.assertRaises(CostError):
+            COSTS.fees_for(1, 100.0, "HOLD")
 
 
 class EntryTest(unittest.TestCase):
@@ -178,7 +194,7 @@ class EntryTest(unittest.TestCase):
         result = self.execute(bar(open_=100.0, low=99.0), shares=10)
         fill = result.fill
         self.assertAlmostEqual(
-            fill.cash_delta, -(10 * fill.fill_price + fill.commission)
+            fill.cash_delta, -(10 * fill.fill_price + fill.fees)
         )
         self.assertLess(fill.cash_delta, -1000.0)
 
@@ -241,7 +257,7 @@ class MarketExitTest(unittest.TestCase):
         fill = execute_market_exit("AAA", 10, bar(open_=100.0), costs=COSTS)
         self.assertAlmostEqual(fill.fill_price, 100.0 * 0.9994)
         self.assertAlmostEqual(
-            fill.cash_delta, 10 * fill.fill_price - fill.commission
+            fill.cash_delta, 10 * fill.fill_price - fill.fees
         )
 
     def test_unknown_price_kind_is_refused(self):

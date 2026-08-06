@@ -6,10 +6,8 @@
 |스프레드|종목별 추정|2배|
 |수수료·제비용|실제 브로커 요율|2배|
 
-**수수료율은 아직 확인하지 않았다.** `PLACEHOLDER_COMMISSION_BPS`는 사용자 계좌의 실제
-요율로 바꿔야 하는 자리표시자이고, 그때까지 `CostModel.confirmed`가 거짓이다. 확인되지
-않은 비용으로 낸 결과는 12.4의 손익분기 게이트와 14.7의 성과 통과 기준에 쓸 수 없다.
-생존편향 플래그와 같은 이유로 코드가 기억한다.
+수수료와 제세금은 사용자가 계좌 요율표에서 확인한 값이다(`RATE_SOURCE`). 수수료는 왕복
+50bp로 이 모델에서 가장 큰 비용이고, 제세금은 매도 편도에만 붙는다.
 
 스프레드는 10.4가 "종목별 추정"이라고 하지만 일봉에는 호가가 없다. 7.2가 종가 10달러
 이상·20일 중앙값 달러거래대금 5천만 달러 이상만 남기므로 유동성 상위 종목의 평면
@@ -26,8 +24,10 @@ from dataclasses import dataclass, replace
 
 BASIS_POINT = 1e-4
 
-# 사용자 계좌의 실제 요율로 바꿔야 한다. 확인 전에는 보수적으로 높은 쪽을 쓴다.
-PLACEHOLDER_COMMISSION_BPS = 25.0
+# 요율의 출처. 바꿀 때는 언제 어디서 확인했는지 함께 갱신한다.
+RATE_SOURCE = "사용자 계좌 요율표 확인 2026-08-06: 수수료 0.25%, 미국 제세금 매도 0.00206%"
+COMMISSION_BPS = 25.0  # 0.25%, 매수·매도 양방향
+SELL_TAX_BPS = 0.206  # 0.00206%, 매도에만 붙는 제세금
 
 
 class CostError(Exception):
@@ -57,10 +57,9 @@ DESIGN_STRESS = Stress(slippage=3.0, spread=2.0, commission=2.0)
 class CostModel:
     slippage_bps: float = 5.0
     spread_bps: float = 2.0
-    commission_bps: float = PLACEHOLDER_COMMISSION_BPS
+    commission_bps: float = COMMISSION_BPS
     commission_min: float = 0.0
-    # 브로커 요율을 실제 값으로 확인했는가. 기본값이 거짓인 것은 의도다.
-    confirmed: bool = False
+    sell_tax_bps: float = SELL_TAX_BPS
     stress: Stress = BASE_STRESS
 
     @property
@@ -82,9 +81,28 @@ class CostModel:
             return reference_price * (1 - adjustment)
         raise CostError(f"방향은 BUY 또는 SELL이어야 합니다: {side!r}")
 
-    def commission_for(self, shares: int, fill_price: float) -> float:
-        rate = self.commission_bps * self.stress.commission * BASIS_POINT
-        return max(shares * fill_price * rate, self.commission_min)
+    def fees_for(self, shares: int, fill_price: float, side: str) -> float:
+        """수수료와 제비용. 매도에는 제세금이 더 붙는다.
+
+        제세금은 법정 요율이라 우리가 협상할 수 없지만 10.4의 "수수료·제비용" 스트레스를
+        함께 받는다. 미국 SEC 요율은 실제로 연도마다 몇 배씩 바뀌어 왔다.
+        """
+        rate = self.commission_bps * BASIS_POINT
+        if side == "SELL":
+            rate += self.sell_tax_bps * BASIS_POINT
+        elif side != "BUY":
+            raise CostError(f"방향은 BUY 또는 SELL이어야 합니다: {side!r}")
+        return max(
+            shares * fill_price * rate * self.stress.commission, self.commission_min
+        )
+
+    @property
+    def round_trip_bps(self) -> float:
+        """왕복 총 비용. 가격 비용 양방향 + 수수료 양방향 + 매도 제세금."""
+        return (
+            2 * self.one_way_bps
+            + (2 * self.commission_bps + self.sell_tax_bps) * self.stress.commission
+        )
 
     def stressed(self, stress: Stress = DESIGN_STRESS) -> "CostModel":
         return replace(self, stress=stress)
