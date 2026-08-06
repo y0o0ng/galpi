@@ -21,6 +21,7 @@ from backtest import store  # noqa: E402
 from backtest.data import (  # noqa: E402
     BARS_CSV_COLUMNS,
     Bar,
+    BarCache,
     DataContractError,
     PointInTimeSnapshot,
     load_bars_csv,
@@ -239,6 +240,49 @@ class PointInTimeTest(unittest.TestCase):
         self.assertNotEqual(
             PointInTimeSnapshot(connection, dates[-1], VERSION).snapshot_id, first
         )
+
+
+class BarCacheTest(unittest.TestCase):
+    """캐시가 `as_of` 자르는 책임을 SQL에서 파이썬으로 가져왔다.
+
+    두 경로가 어긋나면 미래정보 누출이 조용히 들어온다. 그래서 모든 날짜와 모든 길이에서
+    같은 결과가 나오는지 직접 대조한다.
+    """
+
+    def test_cached_and_direct_reads_agree_everywhere(self):
+        connection, dates = make_db(40)
+        cache = BarCache(connection, VERSION)
+        for as_of in dates:
+            direct = PointInTimeSnapshot(connection, as_of, VERSION)
+            cached = PointInTimeSnapshot(connection, as_of, VERSION, cache=cache)
+            self.assertEqual(direct.bars("SPY"), cached.bars("SPY"))
+            for count in (1, 2, 5, 100):
+                self.assertEqual(
+                    direct.bars("SPY", count), cached.bars("SPY", count)
+                )
+
+    def test_the_cache_never_reaches_past_as_of(self):
+        connection, dates = make_db(40)
+        cache = BarCache(connection, VERSION)
+        # 캐시는 전체를 들고 있다. 자르는 쪽이 틀리면 여기서 잡힌다.
+        self.assertEqual(len(cache.bars("SPY", dates[-1])), 40)
+        for index, as_of in enumerate(dates):
+            bars = cache.bars("SPY", as_of)
+            self.assertEqual(len(bars), index + 1)
+            self.assertTrue(all(bar.trade_date <= as_of for bar in bars))
+
+    def test_unknown_symbols_and_early_dates_are_empty(self):
+        connection, dates = make_db(10)
+        cache = BarCache(connection, VERSION)
+        self.assertEqual(cache.bars("NOPE", dates[-1]), [])
+        self.assertEqual(cache.bars("SPY", "2000-01-03"), [])
+
+    def test_a_mismatched_cache_version_is_refused(self):
+        connection, dates = make_db(10)
+        with self.assertRaises(DataContractError):
+            PointInTimeSnapshot(
+                connection, dates[-1], VERSION, cache=BarCache(connection, "other")
+            )
 
 
 class AdjustmentTest(unittest.TestCase):

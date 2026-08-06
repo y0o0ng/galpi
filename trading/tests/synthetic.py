@@ -79,3 +79,21 @@ def to_csv(*row_groups: list[dict[str, str]]) -> str:
     for group in row_groups:
         writer.writerows(group)
     return buffer.getvalue()
+
+
+def staircase_closes(
+    count: int, start_price: float, step_pct: float, period: int = 5
+) -> list[float]:
+    """`period`마다 한 번 `step_pct`씩 뛰고 나머지는 쉬는 경로.
+
+    매끄러운 지수 성장 경로는 다음 날 시초가가 항상 지정가(신호 종가 + 0.25 ATR) 위라서
+    영원히 미체결이 된다. 실제 모멘텀 종목에는 눌림이 있다. 뛰는 날에만 20일 최고가를
+    넘어 신호가 나고, 그 다음 날 시초가는 신호 종가와 같아 체결된다.
+    """
+    closes = []
+    level = start_price
+    for index in range(count):
+        if index > 0 and index % period == 0:
+            level *= 1 + step_pct
+        closes.append(level)
+    return closes

@@ -149,6 +149,67 @@ CREATE TABLE IF NOT EXISTS signals (
   UNIQUE (trade_date, symbol, strategy_version, source_version)
 );
 
+-- 백테스트 실행 기록. 17장의 `trade_outcomes`·`account_snapshots`와 같은 개념이지만
+-- run_id를 달고 있는 연구 산출물이라 이름을 나눴다. PAPER 운영 원장은 4단계에서
+-- 자기 저장소에 자기 표로 만든다.
+--
+-- survivorship_biased와 require_* 플래그를 행에 함께 남긴다. 어떤 조건으로 낸 숫자인지
+-- 잊으면 그 숫자를 전략 판정에 쓰게 된다.
+CREATE TABLE IF NOT EXISTS backtest_runs (
+  run_id TEXT PRIMARY KEY,
+  source_version TEXT NOT NULL,
+  strategy_version TEXT NOT NULL,
+  policy_id TEXT NOT NULL,
+  policy_signature TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  initial_capital REAL NOT NULL,
+  final_equity REAL NOT NULL,
+  trade_count INTEGER NOT NULL,
+  survivorship_biased INTEGER NOT NULL CHECK (survivorship_biased IN (0, 1)),
+  require_earnings_calendar INTEGER NOT NULL CHECK (require_earnings_calendar IN (0, 1)),
+  require_sector INTEGER NOT NULL CHECK (require_sector IN (0, 1)),
+  cost_stress TEXT NOT NULL,
+  gate_factor REAL NOT NULL,
+  skip_counts TEXT NOT NULL,
+  fill_counts TEXT NOT NULL,
+  exit_counts TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
+CREATE TABLE IF NOT EXISTS backtest_trades (
+  run_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  entry_date TEXT NOT NULL,
+  exit_date TEXT NOT NULL,
+  shares INTEGER NOT NULL,
+  entry_price REAL NOT NULL,
+  exit_price REAL NOT NULL,
+  entry_reason TEXT NOT NULL,
+  exit_reason TEXT NOT NULL,
+  exit_fill_reason TEXT NOT NULL,
+  fees REAL NOT NULL,
+  pnl REAL NOT NULL,
+  return_r REAL NOT NULL,
+  mfe_r REAL NOT NULL,
+  mae_r REAL NOT NULL,
+  sessions_held INTEGER NOT NULL,
+  min_qty_exception INTEGER NOT NULL CHECK (min_qty_exception IN (0, 1)),
+  PRIMARY KEY (run_id, symbol, entry_date)
+);
+
+CREATE TABLE IF NOT EXISTS backtest_equity (
+  run_id TEXT NOT NULL,
+  trade_date TEXT NOT NULL,
+  equity REAL NOT NULL,
+  cash REAL NOT NULL,
+  exposure REAL NOT NULL,
+  drawdown REAL NOT NULL,
+  regime TEXT NOT NULL,
+  open_positions INTEGER NOT NULL,
+  PRIMARY KEY (run_id, trade_date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(trade_date);
 CREATE INDEX IF NOT EXISTS idx_signals_date ON signals(trade_date);
 CREATE INDEX IF NOT EXISTS idx_universe_membership_from ON universe_membership(valid_from);

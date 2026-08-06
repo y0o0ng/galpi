@@ -17,6 +17,7 @@ import hashlib
 import io
 import re
 import sqlite3
+from bisect import bisect_right
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -339,6 +340,42 @@ def _insert_immutable(
     return len(payload)
 
 
+class BarCache:
+    """심볼별 전체 바를 한 번만 읽어 세션마다 재사용한다.
+
+    `as_of` 이후를 자르는 책임이 SQL에서 여기로 오므로, 캐시 경로와 직접 조회 경로가 같은
+    결과를 주는지 테스트로 고정한다. 여기서 새면 미래정보 누출이 조용히 들어온다.
+
+    전체를 들고 있으므로 종목 수 × 기간만큼 메모리를 쓴다. 수십 종목이면 문제없지만
+    유니버스 500종목 × 15년이면 수백 MB가 되므로, 그 규모에서는 창을 미는 방식이 필요하다.
+    캐시를 넘기지 않으면 예전처럼 세션마다 조회한다.
+    """
+
+    def __init__(self, connection: sqlite3.Connection, source_version: str) -> None:
+        self.connection = connection
+        self.source_version = source_version
+        self._bars: dict[str, list[Bar]] = {}
+        self._dates: dict[str, list[str]] = {}
+
+    def _load(self, symbol: str) -> tuple[list[Bar], list[str]]:
+        if symbol not in self._bars:
+            rows = self.connection.execute(
+                "SELECT * FROM bars_daily WHERE symbol = ? AND source_version = ?"
+                " ORDER BY trade_date",
+                (symbol, self.source_version),
+            ).fetchall()
+            self._bars[symbol] = [Bar.from_row(row) for row in rows]
+            self._dates[symbol] = [bar.trade_date for bar in self._bars[symbol]]
+        return self._bars[symbol], self._dates[symbol]
+
+    def bars(self, symbol: str, as_of: str, count: int | None = None) -> list[Bar]:
+        bars, dates = self._load(symbol)
+        end = bisect_right(dates, as_of)
+        if count is None:
+            return bars[:end]
+        return bars[max(0, end - count) : end]
+
+
 class PointInTimeSnapshot:
     """`as_of` 종료 시점에 알 수 있었던 것만 보여주는 조회 창구.
 
@@ -351,11 +388,17 @@ class PointInTimeSnapshot:
         as_of: str,
         source_version: str,
         reference_symbol: str = REFERENCE_SYMBOL,
+        cache: BarCache | None = None,
     ) -> None:
         self.connection = connection
         self.as_of = assert_date(as_of, "as_of")
         self.source_version = source_version
         self.reference_symbol = reference_symbol
+        if cache is not None and cache.source_version != source_version:
+            raise DataContractError(
+                f"캐시의 데이터 버전이 다릅니다: {cache.source_version} != {source_version}"
+            )
+        self.cache = cache
 
         session = connection.execute(
             "SELECT 1 FROM bars_daily"
@@ -381,6 +424,8 @@ class PointInTimeSnapshot:
 
     def bars(self, symbol: str, count: int | None = None) -> list[Bar]:
         """`as_of`까지의 바를 오름차순으로 준다. `count`면 최근 것부터 그 개수만."""
+        if self.cache is not None:
+            return self.cache.bars(symbol, self.as_of, count)
         statement = (
             "SELECT * FROM bars_daily"
             " WHERE symbol = ? AND source_version = ? AND trade_date <= ?"
