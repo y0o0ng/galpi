@@ -53,7 +53,12 @@ from backtest.loop import BacktestConfig, run_backtest, save_run  # noqa: E402
 from backtest.membership import load_universe, reconstruct  # noqa: E402
 from backtest.metrics import compute_metrics  # noqa: E402
 from backtest.policy import DEFAULT_PAPER_POLICY  # noqa: E402
-from backtest.validation import evaluate_gate  # noqa: E402
+from backtest.validation import (  # noqa: E402
+    evaluate_gate,
+    neighbourhood_report,
+    parameter_variant,
+    stress_config,
+)
 
 # 이 적재분의 이름. 같은 이름으로 다시 넣을 수 없다(적재는 불변이다).
 SOURCE_VERSION = "smoke-free-1y-2026-08"
@@ -87,6 +92,18 @@ SMOKE_MIN_POPULATION = 10
 # `classify_regime`이 sma_slow + below_sma_red_streak - 1 = 102개를 요구한다.
 WARMUP_SESSIONS = 105
 
+# 21.2의 인접값 스윕. 설계가 지목한 창들을 양쪽으로 민다.
+#
+# `stop_atr_multiple`은 뺐다. 1.8로 낮추면 `trailing - activation = 2.0 > 1.8`이라
+# "손절가는 내려가지 않는다" 불변식에 걸려 정책이 거부된다. 추적 배수를 함께 낮춰야
+# 하는데 그것은 인접값 하나가 아니라 다른 전략이라 이 스윕에 넣을 수 없다.
+NEIGHBOURHOODS = {
+    "breakout_window": (18, 22),
+    "rs_lookback": (57, 69),
+    "trend_window": (54, 66),
+    "atr_window": (12, 16),
+}
+
 
 def smoke_policy():
     """축소 파라미터를 단 정책. 정책 id에 무엇을 낮췄는지 남긴다."""
@@ -118,9 +135,31 @@ def stage_spy(connection) -> int:
     return 0
 
 
+def pending_symbols(connection) -> list[str]:
+    """아직 바가 없는 유니버스 심볼.
+
+    `load_prices`는 심볼마다 커밋하는데 적재는 불변이다. 호출 한도에 걸려 중간에
+    끊기면 이미 들어간 심볼 때문에 **재실행이 통째로 막힌다.** 그래서 남은 것만 받는다.
+    """
+    loaded = {
+        row["symbol"]
+        for row in connection.execute(
+            "SELECT DISTINCT symbol FROM bars_daily WHERE source_version = ?",
+            (SOURCE_VERSION,),
+        ).fetchall()
+    }
+    return [symbol for symbol in UNIVERSE if symbol not in loaded]
+
+
 def stage_bars(connection) -> int:
     """유니버스 20종목. EODHD 20회로 무료 티어 하루 한도를 다 쓴다."""
-    summary = load_prices(connection, list(UNIVERSE), SOURCE_VERSION, start=WINDOW_START)
+    remaining = pending_symbols(connection)
+    if not remaining:
+        print("유니버스 20종목이 이미 다 적재돼 있습니다.")
+        return 0
+    if len(remaining) < len(UNIVERSE):
+        print(f"이미 있는 {len(UNIVERSE) - len(remaining)}종목은 건너뜁니다.")
+    summary = load_prices(connection, remaining, SOURCE_VERSION, start=WINDOW_START)
     _print_price_summary(summary)
     missing = missing_universe_symbols(
         connection, SOURCE_VERSION, start=WINDOW_START, end=AS_OF
@@ -195,16 +234,15 @@ def stage_universe(connection) -> int:
     return 0
 
 
-def stage_run(connection) -> int:
-    """loop를 돌리고 지표·게이트까지 낸다."""
+def run_config(connection) -> BacktestConfig | None:
+    """실행 설정. 워밍업 뒤부터 마지막 세션까지다."""
     all_sessions = sessions(connection)
     if len(all_sessions) <= WARMUP_SESSIONS:
         print(
             f"{REFERENCE_SYMBOL} 바가 {len(all_sessions)}개뿐입니다."
             f" 워밍업 {WARMUP_SESSIONS}세션 뒤에 남는 구간이 없습니다."
         )
-        return 1
-
+        return None
     config = BacktestConfig(
         source_version=SOURCE_VERSION,
         start=all_sessions[WARMUP_SESSIONS],
@@ -217,6 +255,14 @@ def stage_run(connection) -> int:
     )
     print(f"구간 {config.start} ~ {config.end}, {len(all_sessions) - WARMUP_SESSIONS}세션")
     print(f"정책 {config.policy.policy_id}")
+    return config
+
+
+def stage_run(connection) -> int:
+    """loop를 돌리고 지표·게이트까지 낸다."""
+    config = run_config(connection)
+    if config is None:
+        return 1
 
     result = run_backtest(connection, config)
     save_run(connection, result, f"smoke-{config.start}", survivorship_biased=True)
@@ -241,6 +287,70 @@ def stage_run(connection) -> int:
         print(f"  {key}: {value}")
 
     report = evaluate_gate(result, metrics, survivorship_biased=True)
+    print(f"\n14.7 판정: {report.verdict}")
+    print(f"blocker: {', '.join(report.blockers) or '없음'}")
+    for row in report.rows:
+        print(f"  {row.name:<24} {row.value} → {row.verdict}")
+    return 0
+
+
+def stage_stress(connection) -> int:
+    """21.2의 비용 스트레스와 인접 파라미터 안정성. API 호출은 없다."""
+    config = run_config(connection)
+    if config is None:
+        return 1
+
+    result = run_backtest(connection, config)
+    center = compute_metrics(result)
+    print(f"\n중심 실행: 거래 {center.trade_count}건, 기대값 {center.expectancy_r}")
+
+    print("\n비용 스트레스 (21.2의 균일 배수)")
+    stressed: dict[float, object] = {}
+    for factor in (2.0, 3.0):
+        metrics = compute_metrics(run_backtest(connection, stress_config(result, factor)))
+        stressed[factor] = metrics
+        print(
+            f"  {factor:.0f}배: 거래 {metrics.trade_count}건,"
+            f" 기대값 {metrics.expectancy_r},"
+            f" 수수료 {metrics.fees_paid:,.2f},"
+            f" 최종/초기 {metrics.final_equity / metrics.initial_equity:.4f}"
+        )
+
+    print("\n인접 파라미터")
+    reports = []
+    for field, values in NEIGHBOURHOODS.items():
+        neighbours = {
+            value: compute_metrics(
+                run_backtest(connection, parameter_variant(config, **{field: value}))
+            )
+            for value in values
+        }
+        report = neighbourhood_report(
+            field,
+            center,
+            neighbours,
+            center_value=getattr(config.policy.parameters, field),
+        )
+        reports.append(report)
+        cells = ", ".join(
+            f"{value}={metrics.expectancy_r:.4f}" for value, metrics in neighbours.items()
+        )
+        print(f"  {field:<20} 중심 {report.center_value}: {cells}"
+              f"  붕괴비율 {report.collapse_ratio}")
+
+    # 게이트에는 가장 나쁜 하나를 넘긴다. 한 파라미터만 무너져도 plateau가 아니다.
+    # 중심 기대값이 음수면 `collapse_ratio`가 None이라 비교할 것이 없고, 그때는 아무거나
+    # 넘겨도 판정이 UNDETERMINED다.
+    ranked = [item for item in reports if item.collapse_ratio is not None]
+    worst = min(ranked, key=lambda item: item.collapse_ratio) if ranked else reports[0]
+
+    report = evaluate_gate(
+        result,
+        center,
+        survivorship_biased=True,
+        stressed=stressed[2.0],
+        neighbourhood=worst,
+    )
     print(f"\n14.7 판정: {report.verdict}")
     print(f"blocker: {', '.join(report.blockers) or '없음'}")
     for row in report.rows:
@@ -288,6 +398,7 @@ STAGES = {
     "universe": stage_universe,
     "run": stage_run,
     "status": stage_status,
+    "stress": stage_stress,
 }
 
 
