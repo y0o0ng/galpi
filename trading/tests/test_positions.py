@@ -276,6 +276,20 @@ class CorporateActionTest(unittest.TestCase):
         self.assertEqual(result.position.shares, 20)
         self.assertAlmostEqual(result.position.stop_price, 45.0)
 
+    def test_vendor_rounding_noise_does_not_touch_the_position(self):
+        """벤더가 `adjusted_close`를 소수 4자리로 반올림해 주는 탓에 배당락 사이에도
+        배율이 흔들린다. 그것을 기업행동으로 읽으면 수량이 내림으로 한 주씩 깎이고,
+        1주 포지션은 `PositionError`로 죽는다. 2026-08-07 실데이터 실행에서 CAT이
+        배율 1.0000000808에 그렇게 죽었다.
+        """
+        held = position(shares=1)
+        untouched = adjust_for_corporate_action(
+            held,
+            bar("2026-08-06", scale=1.0),
+            bar("2026-08-07", scale=1.0000000808075578),
+        )
+        self.assertIs(untouched, held)
+
     def test_fractional_shares_are_floored(self):
         # 3:2 분할이면 배율이 2/3이고 5주는 7.5주가 된다. 7주로 내린다.
         held = position(shares=5)

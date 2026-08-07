@@ -31,7 +31,7 @@ from dataclasses import dataclass
 
 from .candidates import Skip
 from .costs import CostModel
-from .data import Bar
+from .data import CORPORATE_ACTION_REL_TOL, Bar
 from .policy import StrategyParameters
 from .sizing import SizedIntent
 
@@ -100,9 +100,14 @@ def _make_fill(
 
 
 def corporate_action_between(signal_bar: Bar, execution_bar: Bar) -> bool:
-    """두 바의 조정 배율이 다르면 그 사이에 분할·배당 조정이 있었다."""
+    """두 바의 조정 배율이 다르면 그 사이에 분할·배당 조정이 있었다.
+
+    벤더 반올림 잡음과 실제 조정을 가르는 문턱은 `CORPORATE_ACTION_REL_TOL`이다.
+    """
     return not math.isclose(
-        signal_bar.price_scale, execution_bar.price_scale, rel_tol=1e-9
+        signal_bar.price_scale,
+        execution_bar.price_scale,
+        rel_tol=CORPORATE_ACTION_REL_TOL,
     )
 
 

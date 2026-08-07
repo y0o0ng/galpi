@@ -41,6 +41,26 @@ UNIVERSE_CSV_COLUMNS = ("symbol", "index_name", "valid_from", "valid_to")
 EARNINGS_CSV_COLUMNS = ("symbol", "event_at", "published_at", "confidence")
 SECURITIES_CSV_COLUMNS = ("symbol", "sector")
 
+# 기업행동으로 볼 조정 배율(`Bar.price_scale`) 변화의 하한. 벤더가 `adjusted_close`를
+# 소수 4자리로 반올림해 주므로 배당락 사이에도 배율이 1e-6 수준으로 흔들린다. 그 잡음을
+# 기업행동으로 읽으면 진입이 통째로 취소되고(`CORPORATE_ACTION`) 보유 수량이 조용히
+# 깎인다. 2026-08-07 실데이터 1년 실행에서 시도한 intent의 80%가 그렇게 취소됐고,
+# 그 취소가 사라지자 이번에는 1주 포지션이 `PositionError`로 죽었다.
+#
+# 실측이 두 덩어리로 갈렸다(21종목 250세션, 배율이 움직인 3,965일).
+#
+#   < 1e-5      3,889일   4자리 반올림 잡음
+#   1e-5 ~ 1e-4     3일
+#   >= 1e-4        73일   실제 배당락 (배당주 19종목 × 분기 4회 = 76에 대응)
+#
+# 1e-4는 왕복 비용 62.2bp의 1/60이라 이보다 작은 조정으로 지정가·수량·손절을 다시
+# 계산해도 결과가 바뀌지 않는다. 대신 배당이 주가의 1bp 미만인 종목의 배당락은 잡히지
+# 않고, 그 크기는 잡아도 의미가 없어 수용한다.
+#
+# 이 값은 전략 손잡이가 아니라 벤더 데이터 계약의 사실이라 `StrategyParameters`가 아니라
+# `price_scale` 옆에 둔다. `DEFAULT_INDEXES`를 정책으로 옮기지 않은 것과 같은 이유다.
+CORPORATE_ACTION_REL_TOL = 1e-4
+
 
 class DataContractError(Exception):
     """데이터가 계약을 만족하지 못할 때 올린다."""

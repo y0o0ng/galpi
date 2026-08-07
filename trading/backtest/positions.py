@@ -49,7 +49,7 @@ from datetime import date
 
 from .candidates import next_weekday, weekdays_between
 from .costs import CostModel
-from .data import Bar
+from .data import CORPORATE_ACTION_REL_TOL, Bar
 from .execution import Fill, execute_market_exit, try_stop_exit
 from .policy import StrategyParameters
 from .sizing import OpenPosition
@@ -170,9 +170,13 @@ def adjust_for_corporate_action(
 
     단주가 생기면 버린다. 실제로는 브로커가 현금으로 정산하지만(cash in lieu) 그 금액은
     한 주 미만이고, 수량을 올리는 쪽은 위험을 늘리므로 내리는 쪽을 택했다.
+
+    **벤더 반올림 잡음을 기업행동으로 읽으면 안 된다.** 배율이 1.00000008로 흔들린 것만으로
+    수량이 내림으로 한 주씩 깎이고 1주 포지션은 `PositionError`로 죽는다. 문턱은
+    진입 취소와 같은 `CORPORATE_ACTION_REL_TOL`이다.
     """
     ratio = bar.price_scale / previous_bar.price_scale
-    if math.isclose(ratio, 1.0, rel_tol=1e-9):
+    if math.isclose(ratio, 1.0, rel_tol=CORPORATE_ACTION_REL_TOL):
         return position
     shares = int(math.floor(position.shares / ratio + 1e-9))
     if shares < 1:

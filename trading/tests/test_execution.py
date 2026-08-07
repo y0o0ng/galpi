@@ -192,6 +192,36 @@ class EntryTest(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(result.cancellation.reason, "CORPORATE_ACTION")
 
+    def test_vendor_rounding_noise_is_not_a_corporate_action(self):
+        """벤더가 `adjusted_close`를 소수 4자리로 반올림해 주는 탓에 배당락 사이에도
+        `raw_close / adj_close`가 미세하게 흔들린다. 그것까지 기업행동으로 읽으면
+        진입이 통째로 취소된다 — 2026-08-07 실데이터 1년 실행에서 시도한 intent의
+        80%가 이 잡음으로 취소됐다. 합성 픽스처는 배율이 정확히 떨어져 안 잡힌다.
+        """
+
+        def rounded_scale(close: float, factor: float) -> float:
+            """벤더가 실제로 주는 값에서 나오는 배율. 반올림이 여기서 들어온다."""
+            return close / round(close * factor, 4)
+
+        # 배당락 사이라 진짜 조정 배율은 두 날 모두 같다.
+        factor = 0.982345
+        signal = bar(SIGNAL_DATE, close=176.49, scale=rounded_scale(176.49, factor))
+        execution = bar(open_=100.0, low=99.0, scale=rounded_scale(100.0, factor))
+        self.assertNotEqual(signal.price_scale, execution.price_scale)
+
+        result = self.execute(execution, signal_bar=signal)
+        self.assertTrue(result)
+        self.assertEqual(result.fill.reason, "OPEN_FILL")
+
+    def test_a_real_dividend_adjustment_still_cancels(self):
+        """분할만이 아니라 배당락도 잡아야 한다. 문턱을 올린 대가를 여기서 고정한다."""
+        signal = bar(SIGNAL_DATE, close=100.0, scale=1.0)
+        # 0.75% 배당락. 실측에서 CVX·XOM·KO의 배당락이 이 크기였다.
+        execution = bar(open_=100.0, low=99.0, scale=1.0075)
+        result = self.execute(execution, signal_bar=signal)
+        self.assertFalse(result)
+        self.assertEqual(result.cancellation.reason, "CORPORATE_ACTION")
+
     def test_cash_delta_includes_the_commission(self):
         result = self.execute(bar(open_=100.0, low=99.0), shares=10)
         fill = result.fill
