@@ -34,6 +34,7 @@
 - DB가 대화·task·상태의 정본이다. topic Markdown QA-LOG는 사람에게 보이는 Q&A 정본이고 `note_chunks`는 재생성 가능한 검색 인덱스다. Codex는 허용 마커만 수정하며 `recovery_required` fail-close·원자적 finalization을 유지한다.
 - 첨부가 연결된 턴은 `<context>` 마지막 `<current_attachments>` 블록으로 파일명만 알리고 지시는 시스템 프롬프트에만 둔다. 저장되는 메시지 본문과 화면 표시는 바꾸지 않는다. 새 첨부의 파싱은 채팅 요청 안에서 끝나므로 그동안 `attachment_parse` 단계를 보낸다.
 - 일정은 DB 정본, 활성 일정 대화 컨텍스트, 완료·취소 월별 `schedule_history` projection 구조다. 자연어 요청은 무저장 후보 카드가 되고 `등록`만 기존 task API를 같은 request ID로 호출한다.
+- **기한이 있는 활성 일정은 살아있는 알림이 항상 하나다.** 사용자가 정했으면 그것이고, 아니면 기본 알림이다(`datetime`은 10분 전, `date`는 당일 09:00 KST, `none`은 없음). `assistant_reminders.origin`이 둘을 가른다. `remove`는 사용자 알림에만 듣고, 기한이 바뀌면 기본 알림만 따라 옮긴다. 이미 지난 시각으로는 만들지 않아서 배포 직후 밀린 알림이 터지지 않는다. 발송 경로는 기존 스케줄러 → `enqueueReminder` → Web Push 그대로다.
 - Docker는 개발·CI 재현성에만 사용한다. Pi는 native `galpi.service`, host Codex, 분리된 DB/WAL/SHM·Vault·backup 경계를 유지한다.
 - 구현·Pi 배포가 끝난 기능의 상세 테스트 수·PID·백업명·hash는 git과 관련 설계 문서에서 찾는다. 이 파일에는 다시 누적하지 않는다.
 
