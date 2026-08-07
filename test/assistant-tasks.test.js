@@ -233,18 +233,27 @@ test('updates preserve reminder on keep and replace or remove it transactionally
     { status: 'cancelled', reason: 'replaced' },
   );
 
+  // 사용자가 정한 시각을 지우면 기본 알림이 그 자리를 받는다. 기한이 있는 활성 일정은
+  // 살아있는 알림이 항상 하나다.
   const removed = store.update(created.task.id, {
     expectedVersion: 3,
     reminderChange: { action: 'remove' },
   });
   assert.equal(removed.task.reminderVersion, 3);
-  assert.equal(removed.reminder, null);
+  assert.equal(removed.reminder.origin, 'auto');
+  assert.equal(
+    db.prepare('SELECT cancellation_reason AS reason FROM assistant_reminders WHERE id = ?')
+      .get(replaced.reminder.id).reason,
+    'removed',
+  );
+  // 기본 알림에는 지울 것이 없어서 같은 요청이 다시 와도 아무 일도 하지 않는다.
   const noOp = store.update(created.task.id, {
     expectedVersion: 4,
     reminderChange: { action: 'remove' },
   });
   assert.equal(noOp.unchanged, true);
   assert.equal(noOp.task.version, 4);
+  assert.equal(noOp.reminder.id, removed.reminder.id);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_task_events').get().count, 4);
   db.close();
 });
@@ -297,6 +306,119 @@ test('optimistic transitions preserve closed history, trash, restore, and idempo
     409,
   );
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM assistant_task_events').get().count, 5);
+  db.close();
+});
+
+test('a due without a reminder gets a default one instead of expiring silently', () => {
+  const db = createDatabase();
+  let now = epoch('2026-07-19T03:00:00Z'); // KST 2026-07-19 12:00
+  const store = createAssistantTaskStore(db, { now: () => now });
+
+  // 시각이 있는 기한은 10분 전.
+  const timed = store.create(taskInput({
+    clientRequestId: 'web-auto-datetime',
+    due: { kind: 'datetime', at: '2026-07-20T18:00:00+09:00' },
+    reminderAt: null,
+  }));
+  assert.equal(timed.reminder.origin, 'auto');
+  assert.equal(timed.reminder.remindAt, epoch('2026-07-20T17:50:00+09:00'));
+
+  // 날짜만 있는 기한은 그날 아침 9시.
+  const dated = store.create(taskInput({
+    clientRequestId: 'web-auto-date',
+    due: { kind: 'date', date: '2026-07-25' },
+    reminderAt: null,
+  }));
+  assert.equal(dated.reminder.origin, 'auto');
+  assert.equal(dated.reminder.remindAt, epoch('2026-07-25T09:00:00+09:00'));
+
+  // 기한이 없으면 잡을 자리가 없다.
+  const undated = store.create(taskInput({
+    clientRequestId: 'web-auto-none',
+    due: { kind: 'none' },
+    reminderAt: null,
+  }));
+  assert.equal(undated.reminder, null);
+
+  // 이미 지난 시각으로는 만들지 않는다. 기한 5분 전에 적은 사람에게 "10분 전"은
+  // 아무것도 알려주지 않는다.
+  const imminent = store.create(taskInput({
+    clientRequestId: 'web-auto-imminent',
+    due: { kind: 'datetime', at: '2026-07-19T12:05:00+09:00' },
+    reminderAt: null,
+  }));
+  assert.equal(imminent.reminder, null);
+  db.close();
+});
+
+test('the default reminder follows the due date but a user reminder does not', () => {
+  const db = createDatabase();
+  let now = epoch('2026-07-19T03:00:00Z');
+  const store = createAssistantTaskStore(db, { now: () => now });
+
+  const auto = store.create(taskInput({
+    clientRequestId: 'web-auto-move',
+    due: { kind: 'datetime', at: '2026-07-20T18:00:00+09:00' },
+    reminderAt: null,
+  }));
+  const moved = store.update(auto.task.id, {
+    expectedVersion: 1,
+    due: { kind: 'datetime', at: '2026-07-22T15:00:00+09:00' },
+    reminderChange: { action: 'keep' },
+  });
+  assert.equal(moved.reminder.origin, 'auto');
+  assert.equal(moved.reminder.remindAt, epoch('2026-07-22T14:50:00+09:00'));
+  assert.equal(
+    db.prepare('SELECT status FROM assistant_reminders WHERE id = ?').get(auto.reminder.id).status,
+    'cancelled',
+  );
+
+  // 사용자가 정한 알림은 절대 시각이라 기한이 바뀌어도 그대로 둔다.
+  const owned = store.create(taskInput({
+    clientRequestId: 'web-user-stays',
+    due: { kind: 'datetime', at: '2026-07-20T18:00:00+09:00' },
+    reminderAt: '2026-07-20T09:00:00+09:00',
+  }));
+  const shifted = store.update(owned.task.id, {
+    expectedVersion: 1,
+    due: { kind: 'datetime', at: '2026-07-23T18:00:00+09:00' },
+    reminderChange: { action: 'keep' },
+  });
+  assert.equal(shifted.reminder.id, owned.reminder.id);
+  assert.equal(shifted.reminder.remindAt, epoch('2026-07-20T09:00:00+09:00'));
+  db.close();
+});
+
+test('a reopened task gets its default reminder back and the scheduler fires it', () => {
+  const db = createDatabase();
+  let now = epoch('2026-07-19T03:00:00Z');
+  const store = createAssistantTaskStore(db, { now: () => now });
+  const scheduler = createAssistantScheduler(db, { now: () => now });
+
+  const task = store.create(taskInput({
+    clientRequestId: 'web-auto-reopen',
+    due: { kind: 'datetime', at: '2026-07-20T18:00:00+09:00' },
+    reminderAt: null,
+  }));
+  store.transition(task.task.id, 'complete', { expectedVersion: 1 });
+  assert.equal(
+    db.prepare(`
+      SELECT COUNT(*) AS count FROM assistant_reminders
+      WHERE task_id = ? AND status IN ('pending', 'fired')
+    `).get(task.task.id).count,
+    0,
+  );
+
+  // 다시 열면 기본 알림도 돌아온다. 그러지 않으면 다시 연 일정만 조용해진다.
+  const reopened = store.transition(task.task.id, 'reopen', { expectedVersion: 2 });
+  assert.equal(reopened.reminder.origin, 'auto');
+  assert.equal(reopened.reminder.remindAt, epoch('2026-07-20T17:50:00+09:00'));
+
+  // 기본 알림도 기존 발송 경로를 그대로 탄다.
+  now = epoch('2026-07-20T17:49:00+09:00');
+  assert.deepEqual(scheduler.tick().firedIds, []);
+  now = epoch('2026-07-20T17:50:00+09:00');
+  assert.deepEqual(scheduler.tick().firedIds, [reopened.reminder.id]);
   db.close();
 });
 

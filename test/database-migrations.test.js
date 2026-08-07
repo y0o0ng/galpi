@@ -78,14 +78,14 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
       { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
-      { version: 13 }, { version: 14 }, { version: 15 },
+      { version: 13 }, { version: 14 }, { version: 15 }, { version: 16 },
     ],
   );
 

@@ -221,6 +221,21 @@
     return field;
   }
 
+  // 알림을 따로 걸지 않아도 서버가 기본 알림을 잡는다. 그 사실을 여기서 말해주지 않으면
+  // 화면이 '알림 없음'이라고 거짓말한다. 규칙은 서버의 `autoRemindAt`과 같아야 한다.
+  function defaultReminderSummary(kind, date, time) {
+    if (kind === 'none' || !date) return '알림 없음';
+    if (kind === 'date') return `기본 알림 ${formatDate(date)} 09:00 KST`;
+    if (!time) return '기본 알림 마감 10분 전';
+    const [hour, minute] = time.split(':').map(Number);
+    const shifted = new Date(Date.UTC(2000, 0, 1, hour, minute - 10));
+    const stamp = `${String(shifted.getUTCHours()).padStart(2, '0')}:${String(shifted.getUTCMinutes()).padStart(2, '0')}`;
+    const sameDay = shifted.getUTCDate() === 1;
+    return sameDay
+      ? `기본 알림 ${formatDate(date)} ${stamp} KST`
+      : `기본 알림 마감 10분 전 (${stamp} KST)`;
+  }
+
   function setDateTimeInputs(task, dueDate, dueTime, reminderDate, reminderTime) {
     if (task?.dueKind === 'date') dueDate.value = task.dueDate;
     if (task?.dueKind === 'datetime') {
@@ -296,7 +311,9 @@
     const reminderEnabled = document.createElement('input');
     reminderEnabled.name = 'reminderEnabled';
     reminderEnabled.type = 'checkbox';
-    reminderEnabled.checked = Boolean(task?.reminder);
+    // 기본 알림은 사용자가 건 것이 아니다. 체크박스가 켜져 있으면 '내가 정한 시각'이라는
+    // 뜻이어야 해서 origin으로 판정한다.
+    reminderEnabled.checked = task?.reminder?.origin === 'user';
     const reminderText = document.createElement('span');
     reminderText.textContent = '알림 사용';
     reminderToggle.append(reminderEnabled, reminderText);
@@ -336,7 +353,7 @@
         ? reminderDate.value && reminderTime.value
           ? `알림 ${formatDate(reminderDate.value)} ${reminderTime.value} KST`
           : '알림 시각 미정'
-        : '알림 없음';
+        : defaultReminderSummary(dueKind.value, dueDate.value, dueTime.value);
       summary.textContent = `${dueText} / ${reminderSummary}`;
       titleCount.textContent = `${codePointLength(title.value)}/200`;
       detailCount.textContent = `${codePointLength(detail.value)}/2000`;
