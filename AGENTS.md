@@ -112,7 +112,7 @@
 - 워크포워드 완료: `validation.py`가 14.4 절차와 14.7 판정을 갖고 `metrics.py`는 측정만 한다. 규칙이 동결이라(14.4 2단계) 파라미터 적합형 워크포워드가 아니고, 홀드아웃 규율과 시간축 안정성 두 가지가 목적이다. **각 fold는 초기 자본에서 새로 시작**해서 앞 fold의 운이 복리되지 않는다. 곡선이 필요한 지표(낙폭·CAGR)는 전 구간 연속 실행에서 따로 낸다.
 - `evaluate_gate`의 `out_of_sample` 불리언을 없앴다. 호출자가 `True`만 넘기면 blocker가 사라지는 구조였다. 이제 `walk_forward` 보고서가 없으면 `NO_WALK_FORWARD`다. 홀드아웃 실행 횟수는 `holdout_runs`에 남기고 2회 이상이면 `HOLDOUT_REUSED`다. **정책과 무관하게 구간 단위로 센다** — 다른 파라미터로 다시 돌리는 것이야말로 홀드아웃 소모다.
 - **fold와 홀드아웃은 각각 최대 보유기간의 두 배 이상이어야 한다.** 40세션 fold로 돌렸을 때 최대보유 청산이 fold를 넘어가서 모든 fold의 청산 거래가 0건이었다. 짧은 구간은 빠른 청산만 표본에 넣는 절단 편향이다. 두 배는 내가 정한 수치다.
-- 이제 남은 blocker는 `SURVIVORSHIP_BIASED`와 `EARNINGS_GATE_DISABLED`뿐이고 **둘 다 코드로 없앨 수 없다.** 14.7 판정에 필요한 나머지는 다 갖췄고 남은 것은 데이터 구매 결정이다.
+- **14.7 판정에 필요한 코드는 다 갖췄고 남은 것은 데이터 구매 결정이다.** `EARNINGS_GATE_DISABLED`는 EDGAR 수집기가 생긴 뒤로 실적 캘린더를 켜고 돌리면 걸리지 않는다. 실제로 남는 blocker는 아래 실데이터 실행 항목을 본다.
 - **데이터는 사는 게 아니라 빌리는 것이다.** EODHD 약관은 해지 후 1개월 내 전 복사본 삭제를 요구하고, Norgate는 구독이 끊기면 DB 접근 불가에 구성원 데이터 export 불가·6개월 고정 약정이다. 12.4의 LIVE 게이트(직전 12개월 실측 고정비 연 25만 원 ≈ $180)를 통과하는 형태는 **"1개월 뽑고 해지"뿐**이다. 계속 구독하면 EODHD All-in-One이 $1,200/년으로 6.6배다. 삭제 의무 때문에 재실행이 불가능하므로 데이터를 붓기 전에 엔진이 완성돼 있어야 하고 지금이 그 상태다.
 - EODHD 플랜은 **서로 배타적**이다. EOD Historical($19.99)은 가격만, Fundamentals($59.99)는 `End Of Day ✗`로 **가격이 아예 없다.** 구성원·실적·섹터는 Fundamentals 쪽이라 Historical 단독으로는 blocker를 하나도 못 없앤다. 상장폐지 가격이 있어도 어느 날 구성원이었는지를 모르면 유니버스를 만들 수 없다.
 - 무료 키 probe(`trading/selftest/eodhd_probe.py`) 결과: 로더 열 계약 ✅, `NDX` 티커 존재 ✅, 폐지 종목 목록 무료 ✅(보통주 32,553개), **과거 구성원 403(무료 불가)**. **무료 티어는 데이터를 최근 1년으로 자른다**(날짜 범위 무시 + `warning` 필드). 그래서 리먼·엔론이 빈 배열로 온 것은 상장폐지 데이터 부재가 아니라 1년 창 밖이라는 뜻이다 — 처음 음성 신호로 읽었다가 정정했다.
@@ -126,9 +126,11 @@
 - EODHD 어댑터 완료(`backtest/eodhd.py`): JSON → `bars_daily`, 단일 배율 가정 실측 확인. **잘린 응답을 조용히 받아들이지 않는다** — 무료 키로 15년을 요청하니 5종목 전부 `gaps`로 걸리고 `warning`이 포착됐다(각 251행, 최근 1년). 유료 티어에서도 심볼별 이력이 짧으면 같은 그물이 작동한다.
 - **만들다 스스로 만든 구멍을 막았다.** 처음 `survivorship_biased=False`로 선언했는데 생존 종목 5개만 받은 적재분에도 "편향 없음"이 붙어 14.7 blocker가 안 걸렸다. 소스의 능력과 적재분의 성질은 다르다. 기본값을 참으로 되돌리고 `missing_universe_symbols`로 구성원 중 바 없는 심볼을 확인한 뒤에만 `delisted_coverage_verified=True`를 넘길 수 있게 했다.
 - 심볼 목록의 `Type`·`Exchange`·`Currency`로 7.2 증권 종류 필터를 판정한다(`Listing.passes_universe_type_filter`). 아직 `securities` 표에 저장하진 않았다. **열린 결정:** EDGAR가 섹터를 쓴 행에 EODHD가 Type/Exchange를 더하려면 `securities`의 `(symbol, source_version)` PK와 충돌하고 적재가 불변이라 UPDATE도 못 한다. 선택지는 (a) 두 소스를 합쳐 한 번에 쓰기, (b) `security_listings` 별도 표, (c) PK에 `source` 추가다.
-- EODHD API 키는 `trading/backtest-credentials.env`(gitignore, 권한 600)에 `EODHD_API_KEY=...`로 있다. **무료 키이고 데이터가 최근 1년으로 잘린다.** `backtest/eodhd.py`의 `load_key()`와 `selftest/eodhd_probe.py`가 그 파일과 `EODHD_API_KEY` 환경변수를 찾는다. 값을 화면에 찍지 않는다.
-- 다음은 **실데이터 1년으로 loop 첫 실행**이다. 무료 티어 251행으로는 `min_history_sessions=252`를 못 채우므로 축소 파라미터 정책(`sma_slow`·`min_history_sessions`를 낮춘)으로 돌린다. 이관해둔 `StrategyParameters`가 이걸 가능하게 한다. 통과하면 EOD $19.99를 결제해 15년 가격을 받는다. **결제는 파이프라인이 끝까지 도는 것을 본 뒤에 한다.**
-- 구성원 변경 이력 CSV는 아직 없다. 공고 아카이브에서 만들어야 하고 그것이 남은 유일한 데이터 취득 작업이다.
+- EODHD API 키는 `trading/backtest-credentials.env`(gitignore, 권한 600)에 `EODHD_API_KEY=...`로 있다. **무료 키이고 데이터가 최근 1년으로 잘린다.** `backtest/eodhd.py`의 `load_key()`와 `selftest/eodhd_probe.py`가 그 파일과 `EODHD_API_KEY` 환경변수를 찾는다. 값을 화면에 찍지 않는다. 하루 20회이고 `eod/{symbol}`이 심볼당 1회라 하루 20종목이 상한이며, 리셋은 `apiRequestsDate`가 UTC 날짜라 **UTC 자정 = 오전 9시 KST**다.
+- 실데이터 1년 loop 첫 실행 완료(2026-08-07). `trading/selftest/first_real_run.py`가 단계별 CLI(`spy`·`edgar`·`universe`·`bars`·`run`·`stress`·`status`)다. SPY 250행 · 유니버스 20종목 5,020행 · EDGAR 실적 1,072행 · SMOKE20 구간 20개로 145세션을 돌렸다. **남은 blocker는 `SURVIVORSHIP_BIASED`·`NO_WALK_FORWARD` 둘뿐이고 둘 다 데이터를 사야 없어진다.** 성과 숫자는 34거래·7개월·편향 유니버스라 읽지 않는다. 상세는 설계 20.0의 "실데이터 1년 첫 실행"이다.
+- **합성 픽스처가 못 잡는 버그가 둘 나왔다.** (1) 창을 줄인 정책은 `min_history_sessions ≥ sma_slow + below_sma_red_streak - 1`이어야 한다. 아니면 `classify_regime`이 전 세션 `SHORT_HISTORY`로 떨어져 조용히 아무것도 하지 않는다. 이제 `__post_init__`이 거부한다. (2) 벤더가 `adjusted_close`를 소수 4자리로 반올림해 배당락 사이에도 `price_scale`이 흔들리는데 `rel_tol=1e-9`가 그것을 기업행동으로 읽어 intent의 80%를 취소했고, 고치자 가려져 있던 포지션 쪽 쌍둥이가 1주 포지션을 `PositionError`로 죽였다. 문턱은 `data.py`의 `CORPORATE_ACTION_REL_TOL = 1e-4` 하나로 모았다.
+- 비용 스트레스가 배수당 0.134R로 **선형이라 `왕복bp/(2a)`를 실측으로 확인했다**(`a ≈ 2.32%`). 비용 전 총 엣지는 대략 +0.05R로 14.7이 요구하는 0.31R에 한참 못 미친다. 34거래 표본이라 판정으로 읽지 않는다. 인접값 붕괴비율은 중심 기대값이 음수라 전부 `None`인데, 그때는 blocker가 아니라 `parameter_neighbourhood` **행이 `UNDETERMINED`로 남아** 판정을 막는다.
+- 다음은 **EOD $19.99 결제와 구성원 변경 이력 CSV**다. 파이프라인이 실데이터에서 끝까지 도는 것을 봤으므로 결제 조건은 충족됐다. 구성원 변경 이력 CSV는 아직 없고 공고 아카이브에서 만들어야 하며, 그것이 남은 유일한 데이터 취득 작업이다.
 
 ## 구조 방향
 
