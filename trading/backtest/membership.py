@@ -50,9 +50,21 @@ MEMBERS_CSV_COLUMNS = ("index_name", "symbol")
 ADD = "add"
 REMOVE = "remove"
 
-# 지수별 기대 구성원 수와 허용 오차. S&P 500은 이중상장 클래스(예: GOOG/GOOGL) 때문에
-# 종목 수가 500을 조금 넘나들고, Nasdaq-100은 정확히 100이다.
-EXPECTED_MEMBERS = {"SP500": (500, 6), "NDX100": (100, 1)}
+# 지수별 기대 구성원 수와 허용 오차. **날짜별로 다르다.**
+#
+# 지수는 회사를 세고 우리 목록은 증권을 센다. 그 차이가 이중상장 클래스(GOOG/GOOGL 등)이고,
+# Nasdaq-100은 2014-12-22에 "NASDAQ revised the index methodology allowing multiple share
+# classes of index participants to be included"로 그 규칙 자체가 바뀌었다. 2008~2013년
+# 재구성은 정확히 100이고 2015년 이후는 101~107이다. 2016-05의 107은 초과분이 전부
+# 이중 클래스 쌍(BATRA/BATRK, DISCA/DISCK, FOX/FOXA, GOOG/GOOGL, LBTYA/LBTYK, LMCA/LMCK)으로
+# 설명된다.
+#
+# **하나의 넓은 밴드로 합치지 않는다.** ±4로 뭉뚱그리면 정확히 100이어야 하는 2008~2013년의
+# 편출 누락을 놓친다. 이 검사의 존재 이유가 그것이다.
+EXPECTED_MEMBERS = {
+    "SP500": ((None, 500, 6),),
+    "NDX100": ((None, 100, 1), ("2014-12-22", 104, 4)),
+}
 
 
 class MembershipError(Exception):
@@ -137,6 +149,32 @@ def parse_members_csv(text: str) -> dict[str, frozenset[str]]:
     return {index: frozenset(values) for index, values in members.items()}
 
 
+def _drop_same_day_reuse(changes: list[Change]) -> list[Change]:
+    """같은 날 같은 심볼의 편출·편입 쌍을 지운다. **심볼 기준 멤버십은 끊기지 않았다.**
+
+    21세기폭스가 디즈니에 인수되며 빠진 2019-03-19에 폭스코퍼레이션이 `FOXA`·`FOX`라는
+    같은 티커로 같은 날 들어왔다. 실체는 바뀌었지만 그 티커는 하루도 지수를 벗어나지
+    않았고, 유니버스가 심볼로 열리는 이상 그것이 우리가 답할 수 있는 사실이다.
+
+    지우지 않으면 뒤로 걷기가 편출을 먼저 만나 "그 이후에도 구성원으로 잡혀 있습니다"로
+    걸린다. 정렬 순서를 바꿔 편입을 먼저 처리하면 구간이 하루짜리로 쪼개져 더 나쁘다.
+    """
+    paired = {
+        (change.date, change.symbol)
+        for change in changes
+        if change.action == ADD
+    } & {
+        (change.date, change.symbol)
+        for change in changes
+        if change.action == REMOVE
+    }
+    return [
+        change
+        for change in changes
+        if (change.date, change.symbol) not in paired
+    ]
+
+
 def reconstruct(
     index_name: str,
     current_members: frozenset[str] | set[str],
@@ -147,7 +185,9 @@ def reconstruct(
 ) -> Reconstruction:
     """오늘의 구성원과 변경 이력으로 구간을 만든다. 모듈 설명의 뒤로 걷기다."""
     relevant = sorted(
-        (change for change in changes if change.index_name == index_name),
+        _drop_same_day_reuse(
+            [change for change in changes if change.index_name == index_name]
+        ),
         key=lambda change: (change.date, change.action, change.symbol),
         reverse=True,
     )
@@ -223,19 +263,37 @@ def _overlap_violations(intervals: list[Interval]) -> list[str]:
     return found
 
 
+def expected_members_on(index_name: str, date: str) -> tuple[int, int] | None:
+    """그 날짜에 기대하는 구성원 수와 허용 오차. 지수 규칙이 바뀐 날을 넘으면 밴드도 바뀐다."""
+    bands = EXPECTED_MEMBERS.get(index_name)
+    if not bands:
+        return None
+    chosen: tuple[int, int] | None = None
+    for effective_from, target, tolerance in bands:
+        if effective_from is None or date >= effective_from:
+            chosen = (target, tolerance)
+    return chosen
+
+
 def count_violations(
     reconstruction: Reconstruction,
     dates: list[str],
     expected: tuple[int, int] | None = None,
 ) -> list[str]:
-    """구성원 수 불변식. 이 검사가 재구성 오류를 잡는 마지막 그물이다."""
-    if expected is None:
-        expected = EXPECTED_MEMBERS.get(reconstruction.index_name)
-    if expected is None:
+    """구성원 수 불변식. 이 검사가 재구성 오류를 잡는 마지막 그물이다.
+
+    `expected`를 주면 모든 날짜에 그 밴드를 쓴다. 주지 않으면 `EXPECTED_MEMBERS`의
+    날짜별 밴드를 쓴다.
+    """
+    if expected is None and EXPECTED_MEMBERS.get(reconstruction.index_name) is None:
         return [f"{reconstruction.index_name}: 기대 구성원 수를 모릅니다"]
-    target, tolerance = expected
     found = []
     for date, count in reconstruction.counts(dates).items():
+        band = expected or expected_members_on(reconstruction.index_name, date)
+        if band is None:
+            found.append(f"{date}: {reconstruction.index_name}의 기대 구성원 수를 모릅니다")
+            continue
+        target, tolerance = band
         if abs(count - target) > tolerance:
             found.append(
                 f"{date}: 구성원 {count}개 (기대 {target}±{tolerance})"
