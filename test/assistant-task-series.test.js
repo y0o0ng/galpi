@@ -939,7 +939,105 @@ test('컨텍스트가 회차와 시리즈 식별자를 준다', () => {
 
   const occurrence = snapshot.tasks.find(task => task.seriesId !== null);
   const single = snapshot.tasks.find(task => task.seriesId === null);
-  assert.match(context, new RegExp(`\\[#${occurrence.id}\\] \\[반복 #${occurrence.seriesId} 매주 월·수·금 19:30\\] 운동`));
+  assert.match(context, new RegExp(`\\[#${occurrence.id}\\] \\[반복 #${occurrence.seriesId} 매주 월·수·금 19:30, 다음 회차 26개\\] 운동`));
   assert.match(context, new RegExp(`\\[#${single.id}\\] 단발`));
   assert.doesNotMatch(context, new RegExp(`\\[#${single.id}\\] \\[반복`));
+});
+
+// --- C2f: 컨텍스트 접기와 월별 노트 압축 ---
+
+const { buildScheduleHistoryNote } = require('../lib/assistant-schedule-notes');
+
+test('컨텍스트는 반복을 회차 하나로 접고 남은 개수를 적는다', () => {
+  const ctx = createContext();
+  ctx.seriesStore.create(seriesInput({}, { freq: 'daily', byWeekday: undefined }));
+  const snapshot = ctx.taskStore.list({ view: 'all', limit: 20 });
+  const context = buildActiveScheduleContext(snapshot);
+
+  // 매일 반복 61회차가 한 줄이다.
+  assert.equal(context.split('\n').filter(line => line.startsWith('- ')).length, 1);
+  assert.match(context, /활성 일정: 1개/);
+  assert.match(context, /\[반복 #1 매일 19:30, 다음 회차 60개\]/);
+  assert.match(context, /반복 일정은 가장 이른 회차 하나만 실린다/);
+  assert.ok(context.length < 6000);
+});
+
+test('월별 노트는 같은 시리즈의 회차를 한 항목으로 묶는다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const closed = [];
+  for (const date of ['2026-08-10', '2026-08-12', '2026-08-14', '2026-08-17']) {
+    const item = ctx.seriesStore.listOccurrences(series.id).find(row => row.occurrenceDate === date);
+    ctx.taskStore.transition(item.id, 'complete', { expectedVersion: 1 });
+    closed.push(ctx.taskStore.get(item.id).task);
+  }
+  const single = ctx.taskStore.create({
+    clientRequestId: 'single-task-c2f',
+    title: '치과',
+    due: { kind: 'date', date: '2026-08-13' },
+  });
+  ctx.taskStore.transition(single.task.id, 'complete', { expectedVersion: 1 });
+
+  const note = buildScheduleHistoryNote({
+    monthKey: '2026-08',
+    tasks: [...closed, ctx.taskStore.get(single.task.id).task],
+    updatedAt: ctx.clock.now,
+  });
+
+  // 회차 넷이 한 줄, 단발은 그대로 자기 줄이다.
+  assert.match(note, /- \*\*반복 4회 · 19:30\*\* · 운동/);
+  assert.match(note, /- 날짜: 10·12·14·17일/);
+  assert.match(note, /- \*\*2026-08-13\*\* · 치과/);
+  assert.equal(note.split('\n').filter(line => line.startsWith('- **')).length, 2);
+});
+
+test('회차만 따로 고친 제목은 묶이지 않는다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const rows = ctx.seriesStore.listOccurrences(series.id);
+  const renamed = rows.find(row => row.occurrenceDate === '2026-08-12');
+  ctx.taskStore.update(renamed.id, { expectedVersion: 1, title: '운동 (헬스장)' });
+
+  const closed = [];
+  for (const date of ['2026-08-10', '2026-08-12', '2026-08-14']) {
+    const item = ctx.seriesStore.listOccurrences(series.id).find(row => row.occurrenceDate === date);
+    const current = ctx.taskStore.get(item.id).task;
+    ctx.taskStore.transition(item.id, 'complete', { expectedVersion: current.version });
+    closed.push(ctx.taskStore.get(item.id).task);
+  }
+  const note = buildScheduleHistoryNote({ monthKey: '2026-08', tasks: closed, updatedAt: ctx.clock.now });
+
+  assert.match(note, /- \*\*반복 2회 · 19:30\*\* · 운동\n {2}- 날짜: 10·14일/);
+  assert.match(note, /- \*\*반복 1회 · 19:30\*\* · 운동 \(헬스장\)/);
+});
+
+test('묶은 노트를 다시 만들어도 같은 글이 나온다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const closed = [];
+  for (const date of ['2026-08-14', '2026-08-10', '2026-08-12']) {
+    const item = ctx.seriesStore.listOccurrences(series.id).find(row => row.occurrenceDate === date);
+    ctx.taskStore.transition(item.id, 'complete', { expectedVersion: 1 });
+    closed.push(ctx.taskStore.get(item.id).task);
+  }
+  const build = tasks => buildScheduleHistoryNote({ monthKey: '2026-08', tasks, updatedAt: ctx.clock.now });
+  // 들어오는 순서가 달라도 결과가 같아야 재생성이 안전하다.
+  assert.equal(build(closed), build([...closed].reverse()));
+  assert.match(build(closed), /- 날짜: 10·12·14일/);
+});
+
+test('취소된 회차는 취소 구역에서 따로 묶인다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const tasks = [];
+  for (const [date, action] of [['2026-08-10', 'complete'], ['2026-08-12', 'cancel'], ['2026-08-14', 'cancel']]) {
+    const item = ctx.seriesStore.listOccurrences(series.id).find(row => row.occurrenceDate === date);
+    ctx.taskStore.transition(item.id, action, { expectedVersion: 1 });
+    tasks.push(ctx.taskStore.get(item.id).task);
+  }
+  const note = buildScheduleHistoryNote({ monthKey: '2026-08', tasks, updatedAt: ctx.clock.now });
+  const completed = note.split('## 취소')[0];
+  const cancelled = note.split('## 취소')[1];
+  assert.match(completed, /- \*\*반복 1회 · 19:30\*\* · 운동/);
+  assert.match(cancelled, /- \*\*반복 2회 · 19:30\*\* · 운동\n {2}- 날짜: 12·14일/);
 });
