@@ -278,17 +278,21 @@
 
     const queueable = Number(state.organize?.queueable) || 0;
     const stranded = Number(state.organize?.stranded) || 0;
+    const waitingJobs = Number(state.organize?.waitingJobs) || 0;
+    const canOrganize = queueable > 0 || waitingJobs > 0;
     if (state.organize) {
       const queue = document.createElement('p');
       queue.className = 'codex-agent-message';
-      if (queueable === 0) {
-        queue.textContent = '정리 대기 중인 노트 없음';
-      } else {
-        queue.textContent = stranded > 0
-          ? `정리 대기 ${queueable}개 · 그중 ${stranded}개는 지난 실패로 멈춰 있어`
-          : `정리 대기 ${queueable}개 · 자동 시작은 ${state.organize.autoQueueThreshold}개부터`;
-        if (stranded > 0) queue.classList.add('warn');
+      const parts = [];
+      // 밀려 있는 job이 먼저다. 실패 뒤 멈춰 있어 새 저장이 있어야 다시 도는 상태다.
+      if (waitingJobs > 0) parts.push(`밀려 있는 정리 ${waitingJobs}건`);
+      if (queueable > 0) {
+        parts.push(stranded > 0
+          ? `대기 노트 ${queueable}개(그중 ${stranded}개는 지난 실패로 멈춤)`
+          : `대기 노트 ${queueable}개 · 자동 시작은 ${state.organize.autoQueueThreshold}개부터`);
       }
+      queue.textContent = parts.length > 0 ? parts.join(' · ') : '정리 대기 중인 노트 없음';
+      if (waitingJobs > 0 || stranded > 0) queue.classList.add('warn');
       block.appendChild(queue);
     }
 
@@ -301,7 +305,7 @@
     );
     const saveButton = button(state.codexSaving ? '저장 중…' : '변경 저장', () => saveCodexModels(block), true);
     refreshButton.disabled = state.codexSaving;
-    organizeButton.disabled = state.organizeRunning || state.codexSaving || queueable === 0;
+    organizeButton.disabled = state.organizeRunning || state.codexSaving || !canOrganize;
     saveButton.disabled = state.codexSaving || models.length === 0;
     actions.append(refreshButton, organizeButton, saveButton);
     block.appendChild(actions);
@@ -611,7 +615,9 @@
       if (!response.ok) throw new Error(data.error || '정리를 시작하지 못했습니다.');
       state.showToast(data.created
         ? `노트 ${data.notes?.length || 0}개 정리를 시작했어`
-        : '정리할 노트가 없어');
+        : data.resumed
+          ? '밀려 있던 정리를 다시 시작했어'
+          : '정리할 노트가 없어');
       state.codexError = '';
     } catch (error) {
       state.codexError = error.message;

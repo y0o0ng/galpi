@@ -1346,6 +1346,9 @@ const stmtGetRecentCodexJobs = db.prepare(`
   ORDER BY created_at DESC, id DESC
   LIMIT ?
 `);
+const stmtCountPendingCodexJobs = db.prepare(
+  "SELECT COUNT(*) AS count FROM codex_jobs WHERE status = 'pending'"
+);
 const stmtGetNextPendingCodexJob = db.prepare(`
   SELECT id, note_filenames_json AS noteFilenamesJson,
          model_selection AS modelSelection, model_id AS modelId,
@@ -5867,6 +5870,8 @@ app.get('/api/organize/status', (_req, res) => {
     // 살아 있는 job 없이 `queued`에 남은 노트. 문턱을 기다리지 않고 바로 돌릴 수 있다.
     queueable: codexQueue.listQueueable().length,
     stranded: codexQueue.countStranded(),
+    // 실패 뒤 `pending`으로 돌아가 worker를 기다리는 job. 새 노트가 없어도 다시 돌릴 수 있다.
+    waitingJobs: stmtCountPendingCodexJobs.get().count,
     notes: stmtGetPendingNotes.all(),
     jobs: stmtGetRecentCodexJobs.all(5).map(({ noteFilenamesJson, ...job }) => ({
       ...job,
@@ -5880,7 +5885,22 @@ app.post('/api/organize/queue', (_req, res) => {
     assertCodexRecoveryCleared();
     const job = createCodexJobFromPending();
     if (!job) {
-      res.json({ success: true, created: false, message: '정리 대기 노트가 없습니다.' });
+      // 실패한 job은 `pending`으로 되돌아가고 그때 worker가 멈춘다. 그 뒤로는 새 저장이
+      // worker를 깨울 때까지 아무도 다시 돌리지 않는다. 새로 만들 노트가 없어도
+      // 밀려 있는 job이 있으면 여기서 깨우는 것이 이 버튼의 일이다.
+      const waiting = stmtGetNextPendingCodexJob.get();
+      if (waiting) {
+        res.json({
+          success: true,
+          created: false,
+          resumed: true,
+          jobId: waiting.id,
+          message: '밀려 있던 정리를 다시 시작합니다.',
+        });
+        kickOrganizeWorker();
+        return;
+      }
+      res.json({ success: true, created: false, resumed: false, message: '정리 대기 노트가 없습니다.' });
       return;
     }
 

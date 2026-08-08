@@ -531,9 +531,12 @@ test('the librarian block can run the queue without waiting for the auto thresho
   assert.match(agentSource, /'\/api\/organize\/queue', \{\s*\n\s*method: 'POST'/);
   assert.match(agentSource, /button\(\s*\n?\s*state\.organizeRunning \? '시작하는 중…' : '대기열 정리'/);
   // 누를 것이 없으면 못 누른다.
-  assert.match(agentSource, /organizeButton\.disabled = state\.organizeRunning \|\| state\.codexSaving \|\| queueable === 0;/);
+  assert.match(agentSource, /organizeButton\.disabled = state\.organizeRunning \|\| state\.codexSaving \|\| !canOrganize;/);
+  // 실패 뒤 멈춰 밀려 있는 job도 이 버튼이 다시 돌린다.
+  assert.match(agentSource, /const canOrganize = queueable > 0 \|\| waitingJobs > 0;/);
+  assert.match(agentSource, /밀려 있는 정리 \$\{waitingJobs\}건/);
   // 지난 실패로 멈춘 노트가 있으면 그 사실을 숫자로 말한다.
-  assert.match(agentSource, /그중 \$\{stranded\}개는 지난 실패로 멈춰 있어/);
+  assert.match(agentSource, /그중 \$\{stranded\}개는 지난 실패로 멈춤/);
   // 정리 상태를 못 읽어도 모델 설정은 계속 쓸 수 있어야 한다.
   assert.match(agentSource, /state\.organize = organizeResponse\.ok/);
 });
