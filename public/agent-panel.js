@@ -22,6 +22,8 @@
     codex: null,
     codexError: '',
     codexSaving: false,
+    organize: null,
+    organizeRunning: false,
   };
 
   const countLabels = [
@@ -274,13 +276,34 @@
     }
     block.appendChild(message);
 
+    const queueable = Number(state.organize?.queueable) || 0;
+    const stranded = Number(state.organize?.stranded) || 0;
+    if (state.organize) {
+      const queue = document.createElement('p');
+      queue.className = 'codex-agent-message';
+      if (queueable === 0) {
+        queue.textContent = '정리 대기 중인 노트 없음';
+      } else {
+        queue.textContent = stranded > 0
+          ? `정리 대기 ${queueable}개 · 그중 ${stranded}개는 지난 실패로 멈춰 있어`
+          : `정리 대기 ${queueable}개 · 자동 시작은 ${state.organize.autoQueueThreshold}개부터`;
+        if (stranded > 0) queue.classList.add('warn');
+      }
+      block.appendChild(queue);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'codex-agent-actions';
     const refreshButton = button('목록 갱신', refreshCodexCatalog);
+    const organizeButton = button(
+      state.organizeRunning ? '시작하는 중…' : '대기열 정리',
+      organizeQueuedNotes,
+    );
     const saveButton = button(state.codexSaving ? '저장 중…' : '변경 저장', () => saveCodexModels(block), true);
     refreshButton.disabled = state.codexSaving;
+    organizeButton.disabled = state.organizeRunning || state.codexSaving || queueable === 0;
     saveButton.disabled = state.codexSaving || models.length === 0;
-    actions.append(refreshButton, saveButton);
+    actions.append(refreshButton, organizeButton, saveButton);
     block.appendChild(actions);
     return block;
   }
@@ -558,11 +581,45 @@
   }
 
   async function loadCodexData() {
-    const response = await state.apiFetch('/api/models/codex');
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Codex 모델 목록을 불러오지 못했습니다.');
+    const [modelResponse, organizeResponse] = await Promise.all([
+      state.apiFetch('/api/models/codex'),
+      state.apiFetch('/api/organize/status'),
+    ]);
+    const data = await modelResponse.json().catch(() => ({}));
+    if (!modelResponse.ok) throw new Error(data.error || 'Codex 모델 목록을 불러오지 못했습니다.');
     state.codex = data;
+    // 정리 대기 상태를 못 읽어도 모델 설정은 계속 쓸 수 있어야 한다.
+    state.organize = organizeResponse.ok
+      ? await organizeResponse.json().catch(() => null)
+      : null;
     return true;
+  }
+
+  // 대기열에 남은 노트를 자동 큐 문턱과 무관하게 지금 돌린다. 재시도 가능한 실패로
+  // `queued`에 갇힌 노트가 다시 job에 들어가는 유일한 사용자 경로다.
+  async function organizeQueuedNotes() {
+    if (state.organizeRunning) return;
+    state.organizeRunning = true;
+    renderSummary();
+    try {
+      const response = await state.apiFetch('/api/organize/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '정리를 시작하지 못했습니다.');
+      state.showToast(data.created
+        ? `노트 ${data.notes?.length || 0}개 정리를 시작했어`
+        : '정리할 노트가 없어');
+      state.codexError = '';
+    } catch (error) {
+      state.codexError = error.message;
+      state.showToast(error.message);
+    } finally {
+      state.organizeRunning = false;
+      await refresh();
+    }
   }
 
   async function loadAgentData() {

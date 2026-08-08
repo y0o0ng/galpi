@@ -133,6 +133,7 @@ const {
   redactCodexNoteNames,
   recoverInterruptedCodexJobs,
   validateOrganizedCodexOutput,
+  createCodexQueueReader,
 } = require('./lib/codex-organizer');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
@@ -1177,6 +1178,7 @@ const stmtGetPendingNotes = db.prepare(`
   WHERE archived = 0 AND ai_readable = 1 AND codex_status = 'pending'
   ORDER BY created_at ASC, id ASC
 `);
+const codexQueue = createCodexQueueReader(db);
 const stmtGetManualCheckNotes = db.prepare(`
   SELECT filename, title, note_type AS noteType, codex_status AS codexStatus,
          updated_at AS updatedAt
@@ -1556,8 +1558,8 @@ function getSavedNoteByMessageId(messageId, noteType = 'topic') {
 
 function createCodexJobRecordFromPending(limit = CODEX_JOB_BATCH_SIZE) {
   const notes = Number.isInteger(limit) && limit > 0
-    ? stmtGetPendingNotes.all().slice(0, limit)
-    : stmtGetPendingNotes.all();
+    ? codexQueue.listQueueable().slice(0, limit)
+    : codexQueue.listQueueable();
   if (notes.length === 0) return null;
 
   const filenames = notes.map(note => note.filename);
@@ -5862,6 +5864,9 @@ app.get('/api/organize/status', (_req, res) => {
     jobBatchSize: CODEX_JOB_BATCH_SIZE,
     runner: codexRunnerHealth,
     ...counts,
+    // 살아 있는 job 없이 `queued`에 남은 노트. 문턱을 기다리지 않고 바로 돌릴 수 있다.
+    queueable: codexQueue.listQueueable().length,
+    stranded: codexQueue.countStranded(),
     notes: stmtGetPendingNotes.all(),
     jobs: stmtGetRecentCodexJobs.all(5).map(({ noteFilenamesJson, ...job }) => ({
       ...job,

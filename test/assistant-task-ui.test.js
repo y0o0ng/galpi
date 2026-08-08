@@ -522,3 +522,18 @@ test('the override tool points at ids from the schedule context, never at titles
   assert.match(toolSource, /기존 일정 조회, 과거 일정 질문, 일정 추천, 수정, 완료, 취소, 삭제 요청에는 호출하지 않는다/);
   assert.match(notesSource, /\[#\$\{task\.id\}\]/);
 });
+
+test('the librarian block can run the queue without waiting for the auto threshold', () => {
+  const agentSource = read('public/agent-panel.js');
+
+  assert.match(agentSource, /state\.apiFetch\('\/api\/organize\/status'\)/);
+  assert.match(agentSource, /async function organizeQueuedNotes\(\)/);
+  assert.match(agentSource, /'\/api\/organize\/queue', \{\s*\n\s*method: 'POST'/);
+  assert.match(agentSource, /button\(\s*\n?\s*state\.organizeRunning \? '시작하는 중…' : '대기열 정리'/);
+  // 누를 것이 없으면 못 누른다.
+  assert.match(agentSource, /organizeButton\.disabled = state\.organizeRunning \|\| state\.codexSaving \|\| queueable === 0;/);
+  // 지난 실패로 멈춘 노트가 있으면 그 사실을 숫자로 말한다.
+  assert.match(agentSource, /그중 \$\{stranded\}개는 지난 실패로 멈춰 있어/);
+  // 정리 상태를 못 읽어도 모델 설정은 계속 쓸 수 있어야 한다.
+  assert.match(agentSource, /state\.organize = organizeResponse\.ok/);
+});

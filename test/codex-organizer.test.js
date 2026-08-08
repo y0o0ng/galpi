@@ -8,6 +8,7 @@ const path = require('node:path');
 const Database = require('better-sqlite3');
 
 const {
+  createCodexQueueReader,
   compactError,
   createCodexRecoveryRequiredError,
   createCodexStorageError,
@@ -213,4 +214,64 @@ test('재시작 복구는 검증이 끝나지 않은 job과 대상 노트를 수
   );
   assert.equal(quarantinedJob.startedAt, 123);
   assert.equal(Number.isInteger(quarantinedJob.finishedAt), true);
+});
+
+// 재시도 가능한 실패는 노트를 `queued`로 되돌리고 job은 `failed`로 끝난다. 새 job이
+// `pending`만 골랐기 때문에 그 노트들은 어느 job에도 다시 들어가지 못하고 갇혔다.
+test('queue reader picks up notes stranded by a failed job', () => {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      note_type TEXT NOT NULL DEFAULT 'topic',
+      archived INTEGER NOT NULL DEFAULT 0,
+      ai_readable INTEGER NOT NULL DEFAULT 1,
+      codex_status TEXT NOT NULL DEFAULT 'pending',
+      created_at INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE codex_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      status TEXT NOT NULL,
+      note_filenames_json TEXT NOT NULL
+    );
+  `);
+  const addNote = db.prepare(`
+    INSERT INTO notes (filename, title, codex_status, archived, ai_readable, created_at)
+    VALUES (@filename, @title, @status, @archived, @aiReadable, @createdAt)
+  `);
+  const note = (filename, status, extra = {}) => addNote.run({
+    filename, title: filename, status, archived: 0, aiReadable: 1, createdAt: 0, ...extra,
+  });
+  const addJob = db.prepare('INSERT INTO codex_jobs (status, note_filenames_json) VALUES (?, ?)');
+
+  note('stranded-a.md', 'queued');
+  note('stranded-b.md', 'queued');
+  note('fresh.md', 'pending');
+  note('running.md', 'queued');
+  note('waiting.md', 'queued');
+  note('done.md', 'processed');
+  note('manual.md', 'needs_manual_check');
+  note('archived.md', 'pending', { archived: 1 });
+  note('private.md', 'pending', { aiReadable: 0 });
+  // 두 노트를 안고 끝난 실패 job. 이것이 갇힘을 만든다.
+  addJob.run('failed', JSON.stringify(['stranded-a.md', 'stranded-b.md']));
+  // 살아 있는 job이 들고 있는 노트는 뺏어오지 않는다.
+  addJob.run('running', JSON.stringify(['running.md']));
+  addJob.run('pending', JSON.stringify(['waiting.md']));
+
+  const queue = createCodexQueueReader(db);
+  assert.deepEqual(
+    queue.listQueueable().map(row => row.filename),
+    ['stranded-a.md', 'stranded-b.md', 'fresh.md'],
+  );
+  assert.equal(queue.countStranded(), 2);
+
+  // 실패 job을 다시 살려두면 그 노트는 대상에서 빠진다.
+  db.prepare("UPDATE codex_jobs SET status = 'pending' WHERE id = 1").run();
+  assert.deepEqual(queue.listQueueable().map(row => row.filename), ['fresh.md']);
+  assert.equal(queue.countStranded(), 0);
+  db.close();
 });
