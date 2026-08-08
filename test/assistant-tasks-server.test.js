@@ -58,7 +58,7 @@ function kstDateTimeAfter(seconds) {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`;
 }
 
-async function startServer(t, enabled, pushEnabled = false) {
+async function startServer(t, enabled, pushEnabled = false, seriesEnabled = false) {
   const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'assistant-tasks-server-'));
   const vaultPath = path.join(appRoot, 'vault');
   await fs.mkdir(vaultPath);
@@ -82,6 +82,7 @@ async function startServer(t, enabled, pushEnabled = false) {
       BACKUP_DIR: path.join(appRoot, 'backups'),
       CODEX_RUNNER_MODE: 'heuristic',
       ASSISTANT_TASKS_ENABLED: enabled ? 'true' : 'false',
+      ASSISTANT_TASK_SERIES_ENABLED: seriesEnabled ? 'true' : 'false',
       WEB_PUSH_ENABLED: pushEnabled ? 'true' : 'false',
       WEB_PUSH_CANONICAL_ORIGIN: 'https://galpi-test.example.ts.net',
       WEB_PUSH_VAPID_SUBJECT: 'mailto:test@example.com',
@@ -337,4 +338,141 @@ test('task routes expose the independent store with JSON, idempotency, and lifec
     { status: 'revoked', endpoint: pushBody.endpoint },
   );
   db.close();
+});
+
+function kstDateAfter(days) {
+  const date = new Date(Date.now() + days * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000);
+  return date.toISOString().slice(0, 10);
+}
+
+test('task series routes stay behind their own flag', async t => {
+  // 일정은 켜져 있고 반복만 꺼진 상태다.
+  const { url } = await startServer(t, true, false, false);
+  const config = await api(url, '/api/config');
+  assert.equal(config.body.tasksEnabled, true);
+  assert.equal(config.body.taskSeriesEnabled, false);
+
+  const unauthorized = await api(url, '/api/task-series', {}, false);
+  assert.equal(unauthorized.response.status, 401);
+
+  const disabled = await api(url, '/api/task-series');
+  assert.equal(disabled.response.status, 503);
+  assert.equal(disabled.body.code, 'TASK_SERIES_DISABLED');
+
+  // 단발 일정 API는 그대로 살아 있다.
+  const tasks = await api(url, '/api/tasks');
+  assert.equal(tasks.response.status, 200);
+});
+
+test('task series routes create, reshape, and end a recurrence behind the flag', async t => {
+  const { url } = await startServer(t, true, false, true);
+  const config = await api(url, '/api/config');
+  assert.equal(config.body.taskSeriesEnabled, true);
+
+  const startDate = kstDateAfter(1);
+  const body = {
+    clientRequestId: 'series-http-0001',
+    title: '아침 운동',
+    recurrence: {
+      freq: 'weekly',
+      byWeekday: [1, 3, 5],
+      startDate,
+      timeKind: 'datetime',
+      timeOfDay: '07:00:00',
+    },
+  };
+  const post = options => api(url, '/api/task-series', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+
+  const created = await post({ body: JSON.stringify(body) });
+  assert.equal(created.response.status, 201);
+  assert.equal(created.body.series.title, '아침 운동');
+  assert.equal(created.body.series.version, 1);
+  assert.ok(created.body.occurrences.length >= 4);
+  const seriesId = created.body.series.id;
+
+  // 같은 요청 재전송은 새 시리즈를 만들지 않는다.
+  const replay = await post({ body: JSON.stringify(body) });
+  assert.equal(replay.response.status, 200);
+  assert.equal(replay.body.replayed, true);
+  assert.equal(replay.body.series.id, seriesId);
+
+  // 같은 ID로 다른 규칙이면 409다.
+  const conflict = await post({
+    body: JSON.stringify({ ...body, recurrence: { ...body.recurrence, timeOfDay: '08:00:00' } }),
+  });
+  assert.equal(conflict.response.status, 409);
+  assert.equal(conflict.body.code, 'SERIES_CREATE_CONFLICT');
+
+  const list = await api(url, '/api/task-series');
+  assert.equal(list.body.series.length, 1);
+  assert.equal(list.body.status, 'active');
+
+  const occurrences = await api(url, `/api/task-series/${seriesId}/occurrences`);
+  assert.equal(occurrences.body.occurrences.length, created.body.occurrences.length);
+
+  // 목록은 시리즈당 회차 하나로 접히고 규칙이 함께 온다.
+  const tasks = await api(url, '/api/tasks?view=all');
+  const shown = tasks.body.tasks.filter(task => task.seriesId === seriesId);
+  assert.equal(shown.length, 1);
+  assert.equal(shown[0].series.freq, 'weekly');
+  assert.ok(shown[0].series.remaining >= 3);
+
+  const patched = await api(url, `/api/task-series/${seriesId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedVersion: 1, recurrence: { timeOfDay: '08:00:00' } }),
+  });
+  assert.equal(patched.response.status, 200);
+  assert.equal(patched.body.series.timeOfDay, '08:00:00');
+  assert.equal(patched.body.series.version, 2);
+
+  const stale = await api(url, `/api/task-series/${seriesId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedVersion: 1, title: '저녁 운동' }),
+  });
+  assert.equal(stale.response.status, 409);
+  assert.equal(stale.body.code, 'SERIES_VERSION_CONFLICT');
+
+  const badRule = await post({
+    body: JSON.stringify({
+      clientRequestId: 'series-http-0002',
+      title: '잘못된 규칙',
+      recurrence: { freq: 'monthly', startDate, timeKind: 'date' },
+    }),
+  });
+  assert.equal(badRule.response.status, 400);
+  assert.equal(badRule.body.code, 'INVALID_RECURRENCE_MONTHDAY');
+
+  const notJson = await api(url, '/api/task-series', { method: 'POST', body: 'nope' });
+  assert.equal(notJson.response.status, 415);
+  assert.equal(notJson.body.code, 'JSON_REQUIRED');
+
+  const brokenJson = await api(url, '/api/task-series', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{',
+  });
+  assert.equal(brokenJson.response.status, 400);
+  assert.equal(brokenJson.body.code, 'INVALID_JSON');
+
+  const missing = await api(url, '/api/task-series/9999/occurrences');
+  assert.equal(missing.response.status, 404);
+  assert.equal(missing.body.code, 'SERIES_NOT_FOUND');
+
+  const ended = await api(url, `/api/task-series/${seriesId}/end`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedVersion: 2 }),
+  });
+  assert.equal(ended.response.status, 200);
+  assert.equal(ended.body.series.status, 'ended');
+  assert.equal(ended.body.occurrences.length, 0);
+
+  const afterEnd = await api(url, '/api/task-series?status=ended');
+  assert.equal(afterEnd.body.series.length, 1);
 });

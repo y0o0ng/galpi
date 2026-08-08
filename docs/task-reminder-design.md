@@ -1096,7 +1096,7 @@ Pi 전체 테스트도 171/171을 통과했다. 운영 DB를 read-only로 연 `p
 |---|---|---|
 |C2a ✅|schema v17, `lib/task-recurrence.js` 순수 규칙 계산기, `lib/assistant-task-series.js` 시리즈 store와 materializer|규칙 4종과 `매월 31일` 건너뛰기, anchor drift 0, materializer 두 번 실행에 회차 증가 0, 과거 회차 생성 0|
 |C2b ✅|회차 `overridden` 표시, 시리즈 규칙 변경 재생성, 놓친 회차 자동 정리|override·완료 회차가 규칙 변경 뒤 불변, downtime 시뮬레이션에서 살아남는 놓친 회차 1개, 종료가 미래 회차만 걷어냄|
-|C2c|`/api/task-series` 5개 route, 목록 접기|HTTP 계약, 생성 멱등, `expectedVersion` 409, flag off 503, 달력 count는 접히지 않음|
+|C2c ✅|`/api/task-series` 5개 route, flag와 scheduler 연결, 목록 접기|HTTP 계약, 생성 멱등, `expectedVersion` 409, flag off 503, 달력 count는 접히지 않음|
 |C2d|`TaskPanel` 반복 작성 카드, 회차 `이번만 \| 이후 전체`, 시리즈 화면|`test/chat-ui.test.js` 계약과 1440×900·390×844 실브라우저|
 |C2e|`schedule_prepare` 반복 확장, `schedule_override_prepare` 신설, 확인 카드|prepare 뒤 DB 행 0개, 후보 1개 상한, 대상 미확정 시 fail-close 되묻기, injection 경계|
 |C2f|`<schedule>` 시리즈 접기와 식별자, 월별 노트 회차 압축|20개·6,000자 상한 유지, 월별 노트 재생성 결정성|
@@ -1108,7 +1108,9 @@ C2b 구현 완료(2026-08-08, 로컬 전체 490/490). override 두 가지는 코
 
 놓친 회차 정리는 `actor_type = 'system'`으로 남고, 사용자가 같은 순간에 그 회차를 건드려 버전이 어긋나면 이번 tick을 건너뛰고 다음 tick에서 다시 본다.
 
-**scheduler tick과 `server.js` 연결은 C2c에서 한다.** 지금은 store만 있고 `materializeDue`·`sweepMissed`를 부르는 자리가 없으므로 C2a·C2b 단독으로는 회차가 자동으로 늘지도 정리되지도 않는다. feature flag도 C2c에서 함께 붙인다.
+C2c 구현 완료(2026-08-08, 로컬 전체 501/501). 여기서 처음으로 기능이 실제로 돈다. `ASSISTANT_TASK_SERIES_ENABLED=true`로 띄운 서버에서 `매일 07:00` 시리즈가 회차 60개를 만들고, `/api/tasks?view=all`이 그것을 회차 하나(`남은 회차 59`)로 접고, 달력은 접지 않고 그날 1건을 세는 것을 확인했다.
+
+**아직 화면은 없다.** `TaskPanel`에 반복 작성 카드와 `이번만 | 이후 전체` 선택이 없어서 지금 반복을 만들고 고치는 길은 API뿐이다. C2d가 그것을 붙인다.
 
 ## 13. C2 — 반복 일정과 회차 override
 
@@ -1205,8 +1207,10 @@ Pi가 꺼져 있는 동안 지나간 회차와 그 알림이 한꺼번에 쌓이
 
 매일 반복 하나가 60행을 만들기 때문에 접지 않으면 목록과 모델 컨텍스트를 통째로 먹는다.
 
-- `list`의 `today | upcoming | inbox | all`은 **시리즈당 가장 이른 미완료 회차 1개만** 노출하고, 그 항목에 시리즈 id·규칙 요약·남은 회차 수를 함께 준다.
+- `list`의 `today | upcoming | inbox | all`은 **시리즈당 가장 이른 미완료 회차 1개만** 노출하고, 그 항목에 `series: { id, freq, byWeekday, byMonthday, timeKind, timeOfDay, status, remaining }`을 함께 준다. 가장 이른 것을 남기므로 놓친 회차가 있으면 그것이 보인다.
+- `summary.counts`와 `preview`도 같은 기준으로 접는다. 목록에 하나만 보이는데 건수가 60이면 화면이 거짓말을 한다.
 - `summary.calendar`의 날짜별 `count`는 **접지 않는다.** 그날 몇 건인지가 달력이 답해야 하는 질문이다.
+- `history`·`trash`는 접지 않는다. 한 달치 완료 회차는 실제 기록이고, 접으면 그것이 사라진다.
 - `<schedule>` 채팅 컨텍스트는 시리즈를 규칙 한 줄 + 다음 회차 하나로 넣는다. 기존 20개·6,000자 상한과 escape 규칙은 그대로다.
 - 시리즈의 전체 회차는 `GET /api/task-series/:id/occurrences`로만 조회한다.
 - 월별 projection은 같은 시리즈의 회차를 한 항목으로 묶고 날짜를 나열한다. 매일 반복이 노트에 30줄로 쌓이지 않게 한다.
@@ -1225,6 +1229,8 @@ GET    /api/task-series/:id/occurrences
 - 생성은 `clientRequestId` + canonical payload SHA-256으로 멱등이고, 수정·종료는 `expectedVersion` 낙관적 동시성으로 다르면 `409`다.
 - 회차 override는 새 endpoint를 만들지 않고 기존 `PATCH /api/tasks/:id`·`/complete`·`/cancel`·`/reopen`을 쓴다.
 - `ASSISTANT_TASK_SERIES_ENABLED = false`면 시리즈 API는 `503 { code: 'TASK_SERIES_DISABLED' }`이고 materializer를 시작하지 않는다. 기존 단발 task 경로는 영향받지 않는다.
+- 반복은 일정 위에 얹히므로 `ASSISTANT_TASKS_ENABLED = false`면 `ASSISTANT_TASK_SERIES_ENABLED`가 `true`여도 함께 꺼진다. `/api/config`는 실제로 적용된 값을 `taskSeriesEnabled`로 노출한다.
+- 회차 생성과 놓친 회차 정리는 기존 30초 scheduler tick의 `beforeFire`에서 발송보다 먼저 돈다. **그 단계가 실패해도 알림 발송은 막지 않는다** — 거기서 던지면 반복 쪽 버그 하나가 모든 일정의 알림을 조용히 멈춘다. 플래그가 꺼져 있으면 tick 응답 모양도 예전과 같게 유지한다.
 
 ### 13.8 시온 자연어 경계
 

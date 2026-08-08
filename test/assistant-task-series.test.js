@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
 
 const { runDatabaseMigrations } = require('../lib/database-migrations');
+const { createAssistantScheduler } = require('../lib/assistant-scheduler');
 const { AssistantTaskError, createAssistantTaskStore } = require('../lib/assistant-tasks');
 const {
   MATERIALIZE_MAX_ROWS,
@@ -611,4 +612,139 @@ test('사용자가 이미 완료한 지난 회차는 정리 대상이 아니다'
   clock.now = epoch('2026-08-15T09:00:00+09:00');
   seriesStore.sweepMissed();
   assert.equal(taskStore.get(first.id).task.status, 'done');
+});
+
+// --- C2c: 목록 접기와 scheduler 연결 ---
+
+test('목록은 시리즈당 가장 이른 회차 하나로 접힌다', () => {
+  const { taskStore, seriesStore } = createContext();
+  seriesStore.create(seriesInput({}, { freq: 'daily', byWeekday: undefined }));
+  taskStore.create({
+    clientRequestId: 'single-task-0004',
+    title: '단발',
+    due: { kind: 'date', date: '2026-08-20' },
+  });
+
+  const all = taskStore.list({ view: 'all' });
+  const occurrences = all.tasks.filter(task => task.seriesId !== null);
+  assert.equal(occurrences.length, 1);
+  assert.equal(occurrences[0].occurrenceDate, '2026-08-10');
+  assert.equal(all.tasks.filter(task => task.seriesId === null).length, 1);
+});
+
+test('접힌 회차에 시리즈 규칙과 남은 회차 수가 실린다', () => {
+  const { taskStore, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+
+  const shown = taskStore.list({ view: 'all' }).tasks.find(task => task.seriesId !== null);
+  assert.deepEqual(shown.series, {
+    id: series.id,
+    freq: 'weekly',
+    byWeekday: '1,3,5',
+    byMonthday: null,
+    timeKind: 'datetime',
+    timeOfDay: '19:30:00',
+    status: 'active',
+    remaining: 26,
+  });
+});
+
+test('단발 일정에는 시리즈가 붙지 않는다', () => {
+  const { taskStore } = createContext();
+  taskStore.create({
+    clientRequestId: 'single-task-0005',
+    title: '단발',
+    due: { kind: 'date', date: '2026-08-11' },
+  });
+  assert.equal(taskStore.list({ view: 'all' }).tasks[0].series, null);
+});
+
+test('놓친 회차가 있으면 그것이 접힌 자리에 보인다', () => {
+  const { clock, taskStore, seriesStore } = createContext();
+  seriesStore.create(seriesInput({}, { freq: 'daily', byWeekday: undefined }));
+
+  clock.now = epoch('2026-08-13T09:00:00+09:00');
+  seriesStore.sweepMissed();
+  const today = taskStore.list({ view: 'today' });
+  assert.equal(today.overdue.length, 1);
+  assert.equal(today.overdue[0].occurrenceDate, '2026-08-12');
+});
+
+test('건수는 접히고 달력의 날짜별 건수는 접히지 않는다', () => {
+  const { taskStore, seriesStore } = createContext();
+  seriesStore.create(seriesInput({}, { freq: 'daily', byWeekday: undefined }));
+
+  const summary = taskStore.summary();
+  // 목록에 보이는 것은 오늘 회차 하나뿐이다.
+  assert.deepEqual(summary.counts, { overdue: 0, today: 1, upcoming: 0, inbox: 0 });
+  assert.equal(summary.preview.length, 1);
+  assert.equal(summary.preview[0].series.remaining, 60);
+  // 달력은 그날 몇 건인지를 답해야 하므로 매일 1건이 그대로 세어진다.
+  assert.ok(summary.week.every(day => day.count === 1));
+});
+
+test('종결된 회차 목록은 접지 않는다', () => {
+  const { taskStore, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  for (const date of ['2026-08-10', '2026-08-12', '2026-08-14']) {
+    const item = seriesStore.listOccurrences(series.id).find(row => row.occurrenceDate === date);
+    taskStore.transition(item.id, 'complete', { expectedVersion: 1 });
+  }
+  assert.equal(taskStore.list({ view: 'history' }).tasks.length, 3);
+});
+
+test('scheduler tick이 회차를 늘리고 놓친 회차를 정리한다', () => {
+  const { db, clock, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput({}, {
+    freq: 'daily', byWeekday: undefined,
+  }));
+  const scheduler = createAssistantScheduler(db, {
+    now: () => clock.now,
+    beforeFire: now => ({
+      cancelled: seriesStore.sweepMissed(now),
+      materialized: seriesStore.materializeDue(now),
+    }),
+  });
+
+  clock.now = epoch('2026-08-14T09:00:00+09:00');
+  const result = scheduler.tick();
+  assert.equal(result.maintenance.cancelled.length, 3);
+  assert.deepEqual(
+    result.maintenance.materialized[0].created.map(task => task.occurrenceDate),
+    ['2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13']
+  );
+  assert.equal(seriesStore.get(series.id).series.materializedThrough, '2026-10-13');
+});
+
+// 반복 쪽 버그 하나가 모든 일정의 알림을 조용히 멈추면 안 된다.
+test('회차 유지보수가 실패해도 알림은 나간다', () => {
+  const { db, clock, taskStore } = createContext();
+  taskStore.create({
+    clientRequestId: 'single-task-0006',
+    title: '단발',
+    due: { kind: 'datetime', at: '2026-08-10T10:00:00+09:00' },
+    reminderAt: '2026-08-10T09:30:00+09:00',
+  });
+  const errors = [];
+  const scheduler = createAssistantScheduler(db, {
+    now: () => clock.now,
+    onError: error => errors.push(error.message),
+    beforeFire: () => { throw new Error('회차 생성 실패'); },
+  });
+
+  clock.now = epoch('2026-08-10T09:30:00+09:00');
+  const result = scheduler.tick();
+  assert.deepEqual(errors, ['회차 생성 실패']);
+  assert.equal(result.maintenance, null);
+  assert.equal(result.firedIds.length, 1);
+});
+
+test('반복이 꺼져 있으면 tick 응답 모양이 예전 그대로다', () => {
+  const { db, clock } = createContext();
+  const scheduler = createAssistantScheduler(db, { now: () => clock.now });
+  assert.deepEqual(scheduler.tick(), {
+    capturedAt: clock.now,
+    firedIds: [],
+    skipped: false,
+  });
 });

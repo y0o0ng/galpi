@@ -42,6 +42,7 @@ const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
+const { createAssistantTaskSeriesStore } = require('./lib/assistant-task-series');
 const { classifyAutoSaveExclusion } = require('./lib/assistant-auto-save');
 const { createSchedulePrepareSession } = require('./lib/assistant-schedule-tools');
 const {
@@ -222,6 +223,9 @@ const PORT         = parseInt(process.env.PORT || '3000');
 const HOST         = process.env.HOST || '127.0.0.1';
 const API_TOKEN    = process.env.API_TOKEN || '';
 const ASSISTANT_TASKS_ENABLED = process.env.ASSISTANT_TASKS_ENABLED === 'true';
+// 반복은 일정 위에 얹히므로 일정 자체가 꺼져 있으면 함께 꺼진다.
+const ASSISTANT_TASK_SERIES_ENABLED = ASSISTANT_TASKS_ENABLED
+  && process.env.ASSISTANT_TASK_SERIES_ENABLED === 'true';
 const ASSISTANT_PUSH_CONFIG = readAssistantPushConfig(process.env, {
   tasksEnabled: ASSISTANT_TASKS_ENABLED,
 });
@@ -867,8 +871,15 @@ const assistantTasks = createAssistantTaskStore(db, {
     }
   },
 });
+const assistantTaskSeries = createAssistantTaskSeriesStore(db, { taskStore: assistantTasks });
 const assistantScheduler = createAssistantScheduler(db, {
   onReminderFired: (reminderId, firedAt) => assistantPush.enqueueReminder(reminderId, firedAt),
+  beforeFire: ASSISTANT_TASK_SERIES_ENABLED
+    ? now => ({
+      cancelled: assistantTaskSeries.sweepMissed(now),
+      materialized: assistantTaskSeries.materializeDue(now),
+    })
+    : null,
   onError(error) {
     console.error(`일정 scheduler 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
   },
@@ -4152,6 +4163,7 @@ app.get('/api/config', (req, res) => {
     codexAutoQueueThreshold: CODEX_AUTO_QUEUE_THRESHOLD,
     codexJobBatchSize: CODEX_JOB_BATCH_SIZE,
     tasksEnabled: ASSISTANT_TASKS_ENABLED,
+    taskSeriesEnabled: ASSISTANT_TASK_SERIES_ENABLED,
     realtimeVoice: {
       ...realtimeSessions.publicConfig(),
       ...realtimeTranscriptions.publicConfig(),
@@ -4187,6 +4199,8 @@ registerAssistantTaskRoutes({
   app,
   store: assistantTasks,
   enabled: ASSISTANT_TASKS_ENABLED,
+  seriesStore: assistantTaskSeries,
+  seriesEnabled: ASSISTANT_TASK_SERIES_ENABLED,
   onTaskMutation: () => assistantScheduleNoteProjector.tick(),
 });
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
@@ -8686,6 +8700,9 @@ const httpServer = app.listen(PORT, HOST, () => {
     assistantScheduleNoteProjector.start();
     console.log('   일정:     scheduler 실행 중 (30초)');
     console.log('   일정 노트: 월별 종결 기록 projection 실행 중');
+    if (ASSISTANT_TASK_SERIES_ENABLED) {
+      console.log('   반복 일정: 회차 생성·놓친 회차 정리를 같은 tick에서 실행 중');
+    }
   }
   if (assistantPushDispatcher) {
     assistantPushDispatcher.start();
