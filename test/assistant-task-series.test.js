@@ -1041,3 +1041,59 @@ test('취소된 회차는 취소 구역에서 따로 묶인다', () => {
   assert.match(completed, /- \*\*반복 1회 · 19:30\*\* · 운동/);
   assert.match(cancelled, /- \*\*반복 2회 · 19:30\*\* · 운동\n {2}- 날짜: 12·14일/);
 });
+
+test('오래전에 시작한 반복도 시온이 만든 후보로 바꿀 수 있다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  // 시리즈가 한 달 동안 돌아서 시작일이 과거로 내려갔다.
+  ctx.clock.now += 30 * 24 * 60 * 60;
+
+  const prepared = ctx.seriesStore.prepareOverride({
+    action: 'series_update',
+    seriesId: series.id,
+    recurrence: { timeOfDay: '08:00:00' },
+  }, { capturedAt: ctx.clock.now });
+
+  // 카드가 그대로 보내는 payload가 적용돼야 한다.
+  const applied = ctx.seriesStore.update(series.id, {
+    expectedVersion: prepared.override.expectedVersion,
+    recurrence: prepared.override.recurrence,
+  });
+  assert.equal(applied.series.timeOfDay, '08:00:00');
+  assert.equal(applied.series.startDate, '2026-08-10');
+});
+
+test('시작일을 실제로 과거로 옮기는 것은 여전히 막는다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  ctx.clock.now += 30 * 24 * 60 * 60;
+  assert.throws(
+    () => ctx.seriesStore.update(series.id, {
+      expectedVersion: 1,
+      recurrence: { startDate: '2026-08-01' },
+    }),
+    error => error instanceof AssistantTaskError && error.code === 'RECURRENCE_START_IN_PAST'
+  );
+});
+
+test('뒤로 옮긴 회차가 있으면 그것이 남는 놓친 회차다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput({}, {
+    freq: 'daily', byWeekday: undefined,
+  }));
+  const rows = ctx.seriesStore.listOccurrences(series.id);
+  const moved = rows.find(row => row.occurrenceDate === '2026-08-11');
+  // 11일 회차만 13일 저녁으로 옮긴다. 회차 날짜는 여전히 11일이다.
+  ctx.taskStore.update(moved.id, {
+    expectedVersion: 1,
+    due: { kind: 'datetime', at: '2026-08-13T22:00:00+09:00' },
+  });
+
+  ctx.clock.now = epoch('2026-08-14T09:00:00+09:00');
+  ctx.seriesStore.sweepMissed();
+
+  const after = ctx.seriesStore.listOccurrences(series.id)
+    .filter(item => item.occurrenceDate <= '2026-08-13' && item.status === 'active');
+  assert.deepEqual(after.map(item => item.occurrenceDate), ['2026-08-11']);
+  assert.equal(ctx.taskStore.get(moved.id).task.status, 'active');
+});
