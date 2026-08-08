@@ -11,6 +11,8 @@ const path = require('node:path');
 const test = require('node:test');
 const Database = require('better-sqlite3');
 
+const { LATEST_SCHEMA_VERSION } = require('../lib/database-migrations');
+
 const ROOT = path.resolve(__dirname, '..');
 const API_TOKEN = 'attachment-admin-token';
 
@@ -131,7 +133,10 @@ test('attachment route is authenticated, feature-flagged, and stores only in the
 
   const dbPath = path.join(appRoot, 'galpi.db');
   const writable = new Database(dbPath);
-  assert.equal(writable.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 16);
+  assert.equal(
+    writable.prepare('SELECT MAX(version) AS version FROM schema_version').get().version,
+    LATEST_SCHEMA_VERSION
+  );
   const stored = writable.prepare(`
     SELECT a.id, a.lifecycle_status AS lifecycleStatus,
            b.stored_path AS storedPath, b.status, b.sha256

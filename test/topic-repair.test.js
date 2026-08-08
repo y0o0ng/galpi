@@ -11,6 +11,7 @@ const {
   applyTopicRepair,
   readTopicRepairPlan,
 } = require('../lib/topic-repair');
+const { LATEST_SCHEMA_VERSION } = require('../lib/database-migrations');
 const { parseApplyArguments } = require('../scripts/apply-topic-repair');
 const { parseTopicNote, sha256 } = require('../lib/topic-store');
 
@@ -326,12 +327,7 @@ test('repair apply backs up, migrates, applies approved operations, and reaches 
   const db = new Database(fixture.dbPath, { readonly: true });
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [
-      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
-      { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
-      { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
-      { version: 13 }, { version: 14 }, { version: 15 }, { version: 16 },
-    ],
+    Array.from({ length: LATEST_SCHEMA_VERSION }, (_, index) => ({ version: index + 1 })),
   );
   assert.deepEqual(
     db.prepare(`

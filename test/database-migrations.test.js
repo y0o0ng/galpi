@@ -78,7 +78,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
@@ -86,6 +86,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
       { version: 13 }, { version: 14 }, { version: 15 }, { version: 16 },
+      { version: 17 },
     ],
   );
 
@@ -393,6 +394,66 @@ test('schema v15 links one promoted attachment to one Attachment note', () => {
     INSERT INTO attachment_library_items (attachment_id, note_filename)
     VALUES ('att_11111111111111111111111111111111', 'attachment.md')
   `).run(), /FOREIGN KEY|UNIQUE/);
+  db.close();
+});
+
+test('schema v17 holds a recurrence master and links occurrences to plain task rows', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+  const insertSeries = db.prepare(`
+    INSERT INTO assistant_task_series (
+      client_request_id, create_payload_sha256, title,
+      freq, by_weekday, by_monthday, start_date, time_kind, time_of_day
+    ) VALUES (?, ?, ?, ?, ?, ?, '2026-08-10', ?, ?)
+  `);
+  const seriesId = insertSeries.run(
+    'series-req-1', 'a'.repeat(64), '운동', 'weekly', '1,3,5', null, 'datetime', '19:30:00'
+  ).lastInsertRowid;
+
+  // 규칙마다 쓰는 필드가 다르다. 섞어 쓰면 적재가 거부된다.
+  assert.throws(() => insertSeries.run(
+    'series-req-2', 'b'.repeat(64), '잘못', 'weekly', null, 15, 'date', null
+  ), /CHECK/);
+  assert.throws(() => insertSeries.run(
+    'series-req-3', 'c'.repeat(64), '잘못', 'monthly', '1,3', 15, 'date', null
+  ), /CHECK/);
+  assert.throws(() => insertSeries.run(
+    'series-req-4', 'd'.repeat(64), '잘못', 'daily', null, null, 'datetime', null
+  ), /CHECK/);
+  assert.throws(() => insertSeries.run(
+    'series-req-5', '0'.repeat(64), '잘못', 'monthly', null, null, 'date', null
+  ), /CHECK/);
+
+  const insertTask = db.prepare(`
+    INSERT INTO assistant_tasks (
+      client_request_id, create_payload_sha256, title,
+      due_kind, due_at, series_id, occurrence_date
+    ) VALUES (?, ?, '운동', 'datetime', 1786000000, ?, ?)
+  `);
+  insertTask.run(`series:${seriesId}:2026-08-10`, 'e'.repeat(64), seriesId, '2026-08-10');
+
+  // 회차는 (series_id, occurrence_date)가 UNIQUE라 materializer가 몇 번 돌아도 늘지 않는다.
+  assert.throws(() => insertTask.run(
+    `series:${seriesId}:2026-08-10-dup`, 'f'.repeat(64), seriesId, '2026-08-10'
+  ), /UNIQUE/);
+
+  assert.deepEqual(db.prepare(`
+    SELECT series_id AS seriesId, occurrence_date AS occurrenceDate, overridden
+    FROM assistant_tasks WHERE series_id IS NOT NULL
+  `).all(), [{ seriesId: Number(seriesId), occurrenceDate: '2026-08-10', overridden: 0 }]);
+
+  // 단발 일정은 세 열이 비어 있고 부분 UNIQUE 인덱스가 걸리지 않는다.
+  const insertSingle = db.prepare(`
+    INSERT INTO assistant_tasks (client_request_id, create_payload_sha256, title)
+    VALUES (?, ?, '단발')
+  `);
+  insertSingle.run('single-1', '1'.repeat(64));
+  insertSingle.run('single-2', '2'.repeat(64));
+  assert.deepEqual(db.prepare(`
+    SELECT COUNT(*) AS count FROM assistant_tasks
+    WHERE series_id IS NULL AND occurrence_date IS NULL AND overridden = 0
+  `).get(), { count: 2 });
+
   db.close();
 });
 

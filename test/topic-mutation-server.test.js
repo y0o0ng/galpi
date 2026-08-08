@@ -10,6 +10,7 @@ const os = require('node:os');
 const path = require('node:path');
 const Database = require('better-sqlite3');
 
+const { LATEST_SCHEMA_VERSION } = require('../lib/database-migrations');
 const { auditTopicStore, parseTopicNote, sha256 } = require('../lib/topic-store');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -433,7 +434,10 @@ test('ai_readable false stays human-visible and is excluded from every server AI
 
   const dbPath = path.join(appRoot, 'galpi.db');
   const db = new Database(dbPath, { readonly: true });
-  assert.equal(db.prepare('SELECT MAX(version) AS version FROM schema_version').get().version, 16);
+  assert.equal(
+    db.prepare('SELECT MAX(version) AS version FROM schema_version').get().version,
+    LATEST_SCHEMA_VERSION
+  );
   assert.deepEqual(
     db.prepare('SELECT filename, ai_readable AS aiReadable FROM notes ORDER BY filename').all(),
     [
