@@ -91,10 +91,18 @@ function validateWikiLinkInner(inner, fileStems, context) {
 
   const fileId = text.slice(0, text.indexOf('|')).trim().replace(/\.md$/, '');
   const title = text.slice(text.indexOf('|') + 1).trim();
-  if (!/^\d{8}-\d{6}-[a-z0-9]{4}$/.test(fileId)) return `${context}: 파일ID 형식 오류`;
   if (!title) return `${context}: 표시 제목 누락`;
-  if (!fileStems.has(fileId)) return `${context}: 대상 파일 없음`;
-  return null;
+
+  // 볼트에 실제로 있는 파일이면 그것이 파일 ID다. 이름 형식을 먼저 보면 대화
+  // 노트의 타임스탬프 이름만 통과하고 `attachment-...`·`xion-schedule-...` 같은
+  // 다른 이름 규칙의 노트로는 링크를 걸 수 없다. 그 노트들도 볼트의 노트다.
+  if (fileStems.has(fileId)) return null;
+
+  // 없는 대상일 때만 사유를 좁혀준다. 이름 규칙 목록으로 가르지 않는다 — 새 노트
+  // 종류가 생길 때마다 여기가 낡아서 정당한 링크를 막는 것이 이 버그의 원인이었다.
+  // 파일 ID에는 공백이 없으므로, 공백이 있으면 제목을 ID 자리에 쓴 것이다.
+  if (/\s/.test(fileId)) return `${context}: 파일ID 자리에 제목이 있음`;
+  return `${context}: 대상 파일 없음`;
 }
 
 function shouldSkipFile(filename) {

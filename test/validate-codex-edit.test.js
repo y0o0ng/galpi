@@ -109,3 +109,78 @@ test('the exemption does not excuse the shared required fields', () => {
   assert.equal(result.ok, false);
   assert.match(result.output, /frontmatter 누락: ai_readable/);
 });
+
+// 볼트에는 대화 노트의 타임스탬프 이름 말고도 `attachment-...`·`xion-schedule-...`이
+// 있다. 이름 형식을 먼저 보면 그 노트들로는 링크를 걸 수 없어서, Codex가 정당한
+// 링크를 쓸 때마다 정리가 통째로 실패했다.
+const LINK_NOTE = (links) => `---
+id: 20260805-171432-hdt1
+title: "논문 검색 서비스"
+note_type: reference
+archived: false
+codex_status: pending
+ai_readable: true
+knowledge_type: reference
+confidence: high
+---
+
+# 논문 검색 서비스
+
+## 🏷️ 주제 태그
+<!-- CODEX-TAGS-START -->
+<!-- CODEX-TAGS-END -->
+
+## 🔗 연결
+<!-- CODEX-LINKS-START -->
+${links}
+<!-- CODEX-LINKS-END -->
+`;
+
+const TARGET_NOTE = (id, title) => `---
+id: ${id}
+title: "${title}"
+note_type: reference
+archived: false
+codex_status: processed
+ai_readable: true
+knowledge_type: reference
+confidence: high
+---
+
+# ${title}
+
+${MARKERS}
+`;
+
+test('links may point at any note that exists, not only timestamp names', () => {
+  const vault = makeVault({
+    '20260805-171432-hdt1.md': LINK_NOTE([
+      '- 82 [[20260804-225404-tzaq|강의 노트]] — 같은 계열',
+      '- 74 [[attachment-06d98a7174d76846de858022ee8b0ce3|첨부 자료]] — 근거',
+      '- 61 [[xion-schedule-2026-08|8월 일정 기록]] — 그때 한 일',
+    ].join('\n')),
+    '20260804-225404-tzaq.md': TARGET_NOTE('20260804-225404-tzaq', '강의 노트'),
+    'attachment-06d98a7174d76846de858022ee8b0ce3.md': TARGET_NOTE('attachment-06d98a7174d76846de858022ee8b0ce3', '첨부 자료'),
+    'xion-schedule-2026-08.md': TARGET_NOTE('xion-schedule-2026-08', '8월 일정 기록'),
+  });
+  const result = validate(vault, ['20260805-171432-hdt1.md']);
+  assert.equal(result.ok, true, result.output);
+});
+
+test('a link to a note that is not there is still caught', () => {
+  const vault = makeVault({
+    '20260805-171432-hdt1.md': LINK_NOTE([
+      '- 82 [[attachment-ffffffffffffffffffffffffffffffff|사라진 첨부]] — 근거',
+      '- 74 [[20260101-000000-zzzz|사라진 대화]] — 근거',
+      '- 61 [[논문 검색 서비스|제목을 ID 자리에]] — 실수',
+    ].join('\n')),
+  });
+  const result = validate(vault, ['20260805-171432-hdt1.md']);
+  assert.equal(result.ok, false);
+  // 제목을 ID 자리에 쓴 실수와 정말로 사라진 노트는 사람이 할 일이 다르다.
+  // 이름 규칙이 아니라 존재 여부로 가른다. 없는 노트는 형식과 무관하게 없는 것이다.
+  assert.match(result.output, /CODEX 링크 1행: 대상 파일 없음/);
+  assert.match(result.output, /CODEX 링크 2행: 대상 파일 없음/);
+  // 파일 ID에는 공백이 없다. 공백이 있으면 제목을 ID 자리에 쓴 것이다.
+  assert.match(result.output, /CODEX 링크 3행: 파일ID 자리에 제목이 있음/);
+});
