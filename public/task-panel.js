@@ -1011,7 +1011,182 @@
     }).format(new Date(epoch * 1000));
   }
 
+  // 후보 카드의 뼈대는 셋이 같다. 다른 것은 무엇을 보여주고 무엇을 부르느냐뿐이다.
+  function candidateShell({ heading, title, detail, rows, confirmLabel, requestId, run }) {
+    const card = document.createElement('article');
+    card.className = 'task-candidate-card';
+    card.setAttribute('aria-label', heading);
+
+    const headingNode = document.createElement('strong');
+    headingNode.className = 'task-candidate-heading';
+    headingNode.textContent = heading;
+    const titleNode = document.createElement('div');
+    titleNode.className = 'task-candidate-title';
+    titleNode.textContent = title;
+    const detailNode = document.createElement('p');
+    detailNode.className = 'task-candidate-detail';
+    detailNode.textContent = detail || '';
+    detailNode.hidden = !detail;
+
+    const meta = document.createElement('div');
+    meta.className = 'task-candidate-meta';
+    rows.forEach(text => {
+      const span = document.createElement('span');
+      span.textContent = text;
+      meta.appendChild(span);
+    });
+
+    const status = document.createElement('p');
+    status.className = 'task-candidate-status';
+    status.setAttribute('aria-live', 'polite');
+    status.textContent = '아직 저장되지 않았어.';
+    const actions = document.createElement('div');
+    actions.className = 'task-candidate-actions';
+
+    function releasePending() {
+      if (state.pendingCandidate?.id === requestId) state.pendingCandidate = null;
+    }
+
+    function runCancel() {
+      releasePending();
+      actions.remove();
+      card.classList.add('is-cancelled');
+      status.textContent = confirmLabel === '등록' ? '등록하지 않았어.' : '적용하지 않았어.';
+    }
+
+    async function runConfirm() {
+      cancel.disabled = true;
+      confirm.disabled = true;
+      confirm.textContent = `${confirmLabel} 중`;
+      status.classList.remove('error');
+      status.textContent = confirmLabel === '등록' ? '일정을 등록하고 있어.' : '변경을 적용하고 있어.';
+      try {
+        await run();
+        releasePending();
+        actions.remove();
+        card.classList.add('is-confirmed');
+        status.textContent = confirmLabel === '등록' ? '일정을 등록했어.' : '변경을 적용했어.';
+        state.showToast(confirmLabel === '등록' ? '일정을 만들었어' : '일정을 바꿨어');
+        state.onChanged?.();
+      } catch (error) {
+        cancel.disabled = false;
+        confirm.disabled = false;
+        confirm.textContent = confirmLabel;
+        status.classList.add('error');
+        status.textContent = error.message;
+        state.showToast(error.message);
+        throw error;
+      }
+    }
+
+    const cancel = actionButton('취소', runCancel);
+    const confirm = actionButton(confirmLabel, runConfirm, true);
+    actions.append(cancel, confirm);
+    card.append(headingNode, titleNode, detailNode, meta, status, actions);
+
+    state.pendingCandidate = { id: requestId, title, confirm: runConfirm, cancel: runCancel };
+    return card;
+  }
+
+  function makeSeriesCandidateCard(candidate) {
+    const input = candidate?.series;
+    const rule = input?.recurrence;
+    if (
+      !state.seriesEnabled || !input
+      || typeof input.clientRequestId !== 'string'
+      || typeof input.title !== 'string'
+      || !rule || typeof rule !== 'object'
+      || !['daily', 'weekdays', 'weekly', 'monthly'].includes(rule.freq)
+    ) return null;
+
+    const payload = JSON.parse(JSON.stringify(input));
+    const label = recurrenceLabel({
+      freq: rule.freq,
+      byWeekday: Array.isArray(rule.byWeekday) ? rule.byWeekday.join(',') : rule.byWeekday,
+      byMonthday: rule.byMonthday,
+      timeKind: rule.timeKind,
+      timeOfDay: rule.timeOfDay,
+    });
+    return candidateShell({
+      heading: '반복 일정 등록 전 확인',
+      title: payload.title,
+      detail: payload.detail,
+      rows: [
+        label,
+        rule.endDate
+          ? `${formatDate(rule.startDate)} ~ ${formatDate(rule.endDate)}`
+          : `${formatDate(rule.startDate)}부터`,
+      ],
+      confirmLabel: '등록',
+      requestId: payload.clientRequestId,
+      run: () => request('/api/task-series', { method: 'POST', body: JSON.stringify(payload) }),
+    });
+  }
+
+  function makeOverrideCandidateCard(candidate) {
+    const input = candidate?.override;
+    if (
+      !state.seriesEnabled || !input
+      || !['skip', 'reschedule', 'series_update', 'end'].includes(input.action)
+      || !Number.isInteger(input.expectedVersion)
+    ) return null;
+
+    const payload = JSON.parse(JSON.stringify(input));
+    // 카드가 부르는 경로는 action에서만 나온다. 서버가 준 문자열을 그대로 주소로
+    // 쓰지 않으므로 카드에 보인 것과 다른 곳을 부를 수 없다.
+    const plans = {
+      skip: {
+        rows: [`${formatDate(payload.occurrenceDate)} 회차`, '이번 회차만 건너뛰기'],
+        run: () => request(`/api/tasks/${payload.taskId}/cancel`, {
+          method: 'POST',
+          body: JSON.stringify({ expectedVersion: payload.expectedVersion }),
+        }),
+      },
+      reschedule: {
+        rows: [
+          `${formatDate(payload.occurrenceDate)} 회차`,
+          payload.due?.kind === 'date'
+            ? `이번 회차만 ${formatDate(payload.due.date)}로`
+            : `이번 회차만 ${formatCandidateDateTime(payload.due?.at)} KST로`,
+        ],
+        run: () => request(`/api/tasks/${payload.taskId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ expectedVersion: payload.expectedVersion, due: payload.due }),
+        }),
+      },
+      series_update: {
+        rows: [`지금 ${payload.recurrenceLabel}`, `이후 전체 ${payload.nextRecurrenceLabel}`],
+        run: () => request(`/api/task-series/${payload.seriesId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            expectedVersion: payload.expectedVersion,
+            recurrence: payload.recurrence,
+          }),
+        }),
+      },
+      end: {
+        rows: [payload.recurrenceLabel, '반복 종료 · 남은 회차 없어짐'],
+        run: () => request(`/api/task-series/${payload.seriesId}/end`, {
+          method: 'POST',
+          body: JSON.stringify({ expectedVersion: payload.expectedVersion }),
+        }),
+      },
+    };
+    const plan = plans[payload.action];
+    return candidateShell({
+      heading: '일정 변경 전 확인',
+      title: payload.title,
+      detail: '',
+      rows: plan.rows,
+      confirmLabel: '적용',
+      requestId: `override:${payload.action}:${payload.taskId ?? payload.seriesId}:${payload.expectedVersion}`,
+      run: plan.run,
+    });
+  }
+
   function makeScheduleCandidateCard(candidate) {
+    if (candidate?.kind === 'series') return makeSeriesCandidateCard(candidate);
+    if (candidate?.kind === 'override') return makeOverrideCandidateCard(candidate);
     const input = candidate?.task;
     if (
       !state.enabled || !state.apiFetch || !input

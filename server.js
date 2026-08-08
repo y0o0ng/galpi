@@ -3562,6 +3562,7 @@ async function runSingleChatTurnBody({
         capturedAt: requestCreatedAt,
         clientRequestId: scheduleClientRequestId || `chat-task:${uuidv4()}`,
         persistImmediately: persistScheduleImmediately,
+        seriesStore: ASSISTANT_TASK_SERIES_ENABLED ? assistantTaskSeries : null,
       })
       : null;
     progress.stage('answer');

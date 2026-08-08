@@ -748,3 +748,198 @@ test('반복이 꺼져 있으면 tick 응답 모양이 예전 그대로다', () 
     skipped: false,
   });
 });
+
+// --- C2e: 시온 자연어 후보 ---
+
+const { createSchedulePrepareSession } = require('../lib/assistant-schedule-tools');
+const { buildActiveScheduleContext } = require('../lib/assistant-schedule-notes');
+
+function session(ctx, overrides = {}) {
+  return createSchedulePrepareSession(ctx.taskStore, {
+    capturedAt: ctx.clock.now,
+    clientRequestId: 'chat-task:c2e',
+    seriesStore: ctx.seriesStore,
+    ...overrides,
+  });
+}
+
+test('반복 생성 후보는 저장하지 않는다', () => {
+  const ctx = createContext();
+  const s = session(ctx);
+  const result = s.execute('schedule_prepare', {
+    title: '아침 운동',
+    recurrence: { freq: 'weekly', byWeekday: [1, 3], startDate: '2026-08-10', timeKind: 'datetime', timeOfDay: '07:00:00' },
+  });
+
+  assert.equal(JSON.parse(result.content).persisted, false);
+  assert.equal(ctx.db.prepare('SELECT COUNT(*) AS c FROM assistant_task_series').get().c, 0);
+  assert.equal(ctx.db.prepare('SELECT COUNT(*) AS c FROM assistant_tasks').get().c, 0);
+
+  const candidate = s.getCandidate();
+  assert.equal(candidate.kind, 'series');
+  assert.deepEqual(candidate.series.recurrence.byWeekday, [1, 3]);
+  // 후보가 생기면 이 답변에서 도구가 닫힌다.
+  assert.deepEqual(s.getToolDefinitions(), []);
+});
+
+test('due와 recurrence를 함께 보내거나 둘 다 빠뜨리면 되묻게 만든다', () => {
+  const ctx = createContext();
+  const both = session(ctx).execute('schedule_prepare', {
+    title: '운동',
+    due: { kind: 'date', date: '2026-08-11' },
+    recurrence: { freq: 'daily', startDate: '2026-08-10', timeKind: 'date' },
+  });
+  assert.equal(both.isError, true);
+
+  const s = session(ctx);
+  const neither = s.execute('schedule_prepare', { title: '운동' });
+  assert.equal(neither.isError, true);
+  // 기한 없는 일정이 조용히 만들어지지 않는다.
+  assert.equal(s.getCandidate(), null);
+});
+
+test('화면 없는 단축어에는 반복도 override도 열지 않는다', () => {
+  const ctx = createContext();
+  const s = session(ctx, { persistImmediately: true });
+  const names = s.getToolDefinitions().map(tool => tool.name);
+  assert.deepEqual(names, ['schedule_prepare']);
+  assert.equal('recurrence' in s.getToolDefinitions()[0].input_schema.properties, false);
+  assert.deepEqual(s.getToolDefinitions()[0].input_schema.required, ['title', 'due']);
+  assert.equal(s.execute('schedule_override_prepare', { action: 'end', seriesId: 1 }).isError, true);
+});
+
+test('반복이 꺼져 있으면 override 도구가 아예 없다', () => {
+  const ctx = createContext();
+  const s = createSchedulePrepareSession(ctx.taskStore, {
+    capturedAt: ctx.clock.now,
+    clientRequestId: 'chat-task:c2e-off',
+  });
+  assert.deepEqual(s.getToolDefinitions().map(tool => tool.name), ['schedule_prepare']);
+  assert.doesNotMatch(s.systemPrompt, /schedule_override_prepare/);
+});
+
+test('회차 건너뛰기 후보는 대상을 확인하고도 저장하지 않는다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const target = ctx.seriesStore.listOccurrences(series.id)
+    .find(item => item.occurrenceDate === '2026-08-12');
+
+  const s = session(ctx);
+  const result = s.execute('schedule_override_prepare', { action: 'skip', taskId: target.id });
+  const body = JSON.parse(result.content);
+  assert.equal(body.persisted, false);
+  assert.equal(body.override.action, 'skip');
+  assert.equal(body.override.occurrenceDate, '2026-08-12');
+  assert.equal(body.override.recurrenceLabel, '매주 월·수·금 19:30');
+  // 후보만 만들었을 뿐 회차는 그대로 살아 있다.
+  assert.equal(ctx.taskStore.get(target.id).task.status, 'active');
+});
+
+test('회차 시각 옮기기 후보는 시리즈의 시각 종류를 지킨다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const target = ctx.seriesStore.listOccurrences(series.id)
+    .find(item => item.occurrenceDate === '2026-08-12');
+
+  const ok = session(ctx).execute('schedule_override_prepare', {
+    action: 'reschedule',
+    taskId: target.id,
+    due: { kind: 'datetime', at: '2026-08-12T21:00:00+09:00' },
+  });
+  assert.equal(JSON.parse(ok.content).override.due.at, '2026-08-12T21:00:00+09:00');
+
+  // 시각이 있는 반복에 날짜만 주면 막힌다.
+  assert.throws(
+    () => session(ctx).execute('schedule_override_prepare', {
+      action: 'reschedule', taskId: target.id, due: { kind: 'date', date: '2026-08-13' },
+    }),
+    error => error instanceof AssistantTaskError && error.code === 'OVERRIDE_DUE_KIND_MISMATCH'
+  );
+});
+
+test('반복이 아닌 일정과 없는 회차는 후보가 되지 않는다', () => {
+  const ctx = createContext();
+  const single = ctx.taskStore.create({
+    clientRequestId: 'single-task-c2e',
+    title: '단발',
+    due: { kind: 'date', date: '2026-08-11' },
+  });
+
+  assert.throws(
+    () => session(ctx).execute('schedule_override_prepare', { action: 'skip', taskId: single.task.id }),
+    error => error instanceof AssistantTaskError && error.code === 'NOT_AN_OCCURRENCE'
+  );
+  assert.throws(
+    () => session(ctx).execute('schedule_override_prepare', { action: 'skip', taskId: 9999 }),
+    error => error instanceof AssistantTaskError && error.code === 'TASK_NOT_FOUND'
+  );
+  assert.throws(
+    () => session(ctx).execute('schedule_override_prepare', { action: 'end', seriesId: 9999 }),
+    error => error instanceof AssistantTaskError && error.code === 'SERIES_NOT_FOUND'
+  );
+});
+
+test('이미 종결된 회차와 종료된 반복은 후보가 되지 않는다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const target = ctx.seriesStore.listOccurrences(series.id)
+    .find(item => item.occurrenceDate === '2026-08-12');
+  ctx.taskStore.transition(target.id, 'complete', { expectedVersion: 1 });
+  assert.throws(
+    () => session(ctx).execute('schedule_override_prepare', { action: 'skip', taskId: target.id }),
+    error => error instanceof AssistantTaskError && error.code === 'OCCURRENCE_NOT_ACTIVE'
+  );
+
+  ctx.seriesStore.end(series.id, { expectedVersion: 1 });
+  assert.throws(
+    () => session(ctx).execute('schedule_override_prepare', { action: 'end', seriesId: series.id }),
+    error => error instanceof AssistantTaskError && error.code === 'SERIES_NOT_EDITABLE'
+  );
+});
+
+test('이후 전체 변경 후보는 지금 규칙과 바뀔 규칙을 함께 보여준다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const result = session(ctx).execute('schedule_override_prepare', {
+    action: 'series_update',
+    seriesId: series.id,
+    recurrence: { timeOfDay: '08:00:00' },
+  });
+  const body = JSON.parse(result.content);
+  assert.equal(body.override.recurrenceLabel, '매주 월·수·금 19:30');
+  assert.equal(body.override.nextRecurrenceLabel, '매주 월·수·금 08:00');
+  assert.equal(body.override.expectedVersion, 1);
+  // 후보일 뿐이라 시리즈는 아직 그대로다.
+  assert.equal(ctx.seriesStore.get(series.id).series.timeOfDay, '19:30:00');
+});
+
+test('한 답변에서 후보는 하나뿐이다', () => {
+  const ctx = createContext();
+  const { series } = ctx.seriesStore.create(seriesInput());
+  const s = session(ctx);
+  s.execute('schedule_override_prepare', { action: 'end', seriesId: series.id });
+  const second = s.execute('schedule_prepare', {
+    title: '다른 일정', due: { kind: 'date', date: '2026-08-20' },
+  });
+  assert.equal(second.isError, true);
+  assert.deepEqual(s.getToolDefinitions(), []);
+});
+
+// 대상을 제목 문자열로 고르면 같은 제목이 둘일 때 조용히 틀린다.
+test('컨텍스트가 회차와 시리즈 식별자를 준다', () => {
+  const ctx = createContext();
+  ctx.seriesStore.create(seriesInput());
+  ctx.taskStore.create({
+    clientRequestId: 'single-task-ctx',
+    title: '단발',
+    due: { kind: 'date', date: '2026-08-11' },
+  });
+  const snapshot = ctx.taskStore.list({ view: 'all' });
+  const context = buildActiveScheduleContext({ capturedAt: ctx.clock.now, tasks: snapshot.tasks });
+
+  const occurrence = snapshot.tasks.find(task => task.seriesId !== null);
+  const single = snapshot.tasks.find(task => task.seriesId === null);
+  assert.match(context, new RegExp(`\\[#${occurrence.id}\\] \\[반복 #${occurrence.seriesId} 매주 월·수·금 19:30\\] 운동`));
+  assert.match(context, new RegExp(`\\[#${single.id}\\] 단발`));
+  assert.doesNotMatch(context, new RegExp(`\\[#${single.id}\\] \\[반복`));
+});

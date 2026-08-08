@@ -483,3 +483,42 @@ test('hidden fields in the task form actually disappear', () => {
   const css = read('public/style.css');
   assert.match(css, /\.task-form \[hidden\] \{\s*\n\s*display: none;/);
 });
+
+test('recurrence and override candidates stay unpersisted until the card is pressed', () => {
+  const taskSource = read('public/task-panel.js');
+  const voiceSource = read('public/voice-halfduplex.js');
+
+  // 카드 종류는 셋이고 각각 자기 API로만 간다.
+  assert.match(taskSource, /if \(candidate\?\.kind === 'series'\) return makeSeriesCandidateCard\(candidate\);/);
+  assert.match(taskSource, /if \(candidate\?\.kind === 'override'\) return makeOverrideCandidateCard\(candidate\);/);
+  assert.match(taskSource, /heading: '반복 일정 등록 전 확인'/);
+  assert.match(taskSource, /heading: '일정 변경 전 확인'/);
+  assert.match(taskSource, /confirmLabel: '적용'/);
+
+  // 부르는 경로는 서버가 준 문자열이 아니라 action에서만 나온다.
+  assert.match(taskSource, /const plans = \{/);
+  assert.match(taskSource, /\/api\/tasks\/\$\{payload\.taskId\}\/cancel/);
+  assert.match(taskSource, /\/api\/task-series\/\$\{payload\.seriesId\}\/end/);
+  assert.doesNotMatch(taskSource, /request\(payload\.(path|url|request)/);
+
+  // 반복이 꺼져 있으면 두 카드 모두 그리지 않는다.
+  assert.match(taskSource, /if \(\s*\n?\s*!state\.seriesEnabled \|\| !input/);
+
+  // 음성이 카드의 주 버튼 이름을 받아야 한다.
+  assert.match(voiceSource, /'적용', '적용해', '적용해줘'/);
+  assert.match(voiceSource, /const COMMAND_STEMS = \['등록', '저장', '적용'\];/);
+});
+
+test('the override tool points at ids from the schedule context, never at titles', () => {
+  const toolSource = read('lib/assistant-schedule-tools.js');
+  const notesSource = read('lib/assistant-schedule-notes.js');
+
+  assert.match(toolSource, /name: 'schedule_override_prepare'/);
+  assert.match(toolSource, /enum: \['skip', 'reschedule', 'series_update', 'end'\]/);
+  assert.match(toolSource, /Take it from the \[#id\] marker in <schedule>/);
+  assert.match(toolSource, /제목만 보고 짐작하지 않으며, 어느 회차인지 하나로 정해지지 않으면 호출하지 말고 되묻는다/);
+  assert.match(toolSource, /둘 중 무엇인지 분명하지 않으면 도구를 호출하지 말고 되묻는다/);
+  // schedule_prepare의 기존 경계는 그대로다.
+  assert.match(toolSource, /기존 일정 조회, 과거 일정 질문, 일정 추천, 수정, 완료, 취소, 삭제 요청에는 호출하지 않는다/);
+  assert.match(notesSource, /\[#\$\{task\.id\}\]/);
+});
