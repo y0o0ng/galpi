@@ -432,3 +432,54 @@ test('a newer candidate replaces the one still waiting', () => {
   panel.makeScheduleCandidateCard({ task: { ...CANDIDATE.task, clientRequestId: 'req-2' } });
   assert.equal(panel.getPendingScheduleConfirmation().id, 'req-2');
 });
+
+test('the recurrence tab and its controls stay behind the series flag', () => {
+  const taskSource = read('public/task-panel.js');
+  const appSource = read('public/app.js');
+  const css = read('public/style.css');
+
+  // 반복 탭은 반복 플래그가 켜져 있을 때만 생긴다.
+  assert.match(taskSource, /\[['"]series['"], ['"]반복['"]\]/);
+  assert.match(taskSource, /\.filter\(\(\[value\]\) => value !== 'series' \|\| state\.seriesEnabled\)/);
+  assert.match(taskSource, /state\.seriesEnabled = state\.enabled && seriesEnabled === true;/);
+  assert.match(appSource, /taskSeriesEnabled = config\.taskSeriesEnabled === true;/);
+  assert.match(appSource, /seriesEnabled: taskSeriesEnabled,/);
+
+  // 규칙 넷이 모두 작성 카드에 있다.
+  assert.match(taskSource, /\['daily', '매일'\], \['weekdays', '평일'\]/);
+  assert.match(taskSource, /\['weekly', '매주 요일'\], \['monthly', '매월 n일'\]/);
+
+  // 회차 날짜 계산은 클라이언트에 두지 않는다. 규칙 엔진이 두 벌이 되면 안 된다.
+  assert.doesNotMatch(taskSource, /occurrenceDatesBetween|nextOccurrenceDates/);
+
+  // 이미 만들어진 단발 일정을 반복으로 바꾸는 길은 열지 않는다.
+  assert.match(taskSource, /const canRecur = !task;/);
+
+  assert.match(css, /\.task-series-badge \{/);
+  assert.match(css, /\.task-weekday \{/);
+});
+
+test('occurrence edits and cancels ask for their scope before they apply', () => {
+  const taskSource = read('public/task-panel.js');
+
+  assert.match(taskSource, /function chooseScope\(actions, \{ thisLabel, seriesLabel, onThis, onSeries \}\)/);
+  assert.match(taskSource, /thisLabel: '이번 회차만',\s*\n\s*seriesLabel: '이후 전체',/);
+  assert.match(taskSource, /thisLabel: '이번 회차 건너뛰기',\s*\n\s*seriesLabel: '반복 종료',/);
+  assert.match(taskSource, /actionButton\('되돌리기', \(\) => actions\.replaceChildren\(\.\.\.previous\)\)/);
+
+  // 이번 회차만 고치는 길은 기존 task API 그대로다.
+  assert.match(taskSource, /onThis: \(\) => renderComposer\(state\.container, task\)/);
+  assert.match(taskSource, /onThis: event => mutateTask\(task, 'cancel', event\.currentTarget\)/);
+  // 이후 전체는 시리즈 API로 간다.
+  assert.match(taskSource, /onSeries: \(\) => openSeriesEditor\(task\.series\.id\)/);
+  assert.match(taskSource, /onSeries: \(\) => endSeries\(task\.series\.id\)/);
+  assert.match(taskSource, /\/api\/task-series\/\$\{series\.id\}\/end/);
+});
+
+// 작성자 스타일의 display는 UA의 `[hidden] { display: none }`을 이긴다.
+// .task-form-field가 display:grid라서 hidden 지정이 한 번도 먹지 않았고,
+// 마감이 '없음'인데도 날짜 칸이 계속 보였다.
+test('hidden fields in the task form actually disappear', () => {
+  const css = read('public/style.css');
+  assert.match(css, /\.task-form \[hidden\] \{\s*\n\s*display: none;/);
+});

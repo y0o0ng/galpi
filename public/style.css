@@ -2181,6 +2181,13 @@ html, body {
   min-width: 0;
 }
 
+/* 작성자 스타일의 display는 UA의 `[hidden] { display: none }`을 이긴다. 그래서
+   .task-form-field·.task-form-grid에 hidden을 지정해도 칸이 계속 보였다.
+   폼 안에서는 hidden이 항상 이기게 한 줄로 못박는다. */
+.task-form [hidden] {
+  display: none;
+}
+
 .task-form-label {
   color: var(--label);
   font-size: 10.5px;
@@ -2239,6 +2246,47 @@ html, body {
   color: var(--ai-text);
   font-size: 11.5px;
   cursor: pointer;
+}
+
+.task-weekday-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.task-weekday {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  color: var(--ai-text);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.task-weekday:has(input:checked) {
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 650;
+}
+
+.task-series-badge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--label);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 17px;
+}
+
+.task-series-ended {
+  color: var(--label);
+  font-size: 10.5px;
 }
 
 .task-form-summary,

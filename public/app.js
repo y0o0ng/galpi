@@ -28,6 +28,7 @@ let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
 let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
 let isRestoringHistory = false;
 let tasksEnabled = false;
+let taskSeriesEnabled = false;
 let taskRefreshTimer = null;
 const slashCommands = [
   { command: '/search ', title: '노트 검색', description: 'vault에서 관련 노트를 찾아 필요한 항목을 선택' },
@@ -190,6 +191,7 @@ async function init() {
     const config = await apiFetch('/api/config').then(r => r.json());
     if (ensureApiToken(config)) return;
     tasksEnabled = config.tasksEnabled === true;
+    taskSeriesEnabled = config.taskSeriesEnabled === true;
     initPaperPanel();
     // 옆의 XION 칩이 비서 이름을 말하므로 라벨은 모델만 남긴다.
     document.getElementById('model-indicator').textContent = config.gptChatBootstrapModel;
@@ -1391,6 +1393,7 @@ function initPaperPanel() {
       showToast,
       onChanged: handleTaskChanged,
       enabled: tasksEnabled,
+      seriesEnabled: taskSeriesEnabled,
     });
     window.NotificationPanel.init({
       apiFetch,
