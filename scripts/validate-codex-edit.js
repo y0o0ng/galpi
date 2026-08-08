@@ -14,9 +14,18 @@ const REQUIRED_FRONTMATTER = [
   'archived',
   'codex_status',
   'ai_readable',
-  'knowledge_type',
-  'confidence',
 ];
+
+// `knowledge_type`·`confidence`는 사람이 쌓는 지식 노트의 성질이다. 에이전트가
+// DB에서 다시 만들어내는 projection 노트에는 그런 값이 없고, 있어야 할 이유도 없다.
+// 이 둘을 모두에게 요구하면 매달 생기는 일정 기록 노트가 영영 정리를 통과하지
+// 못하고 needs_manual_check로 쌓인다. Codex가 그 노트에서 고치는 것은 여전히
+// CODEX-TAGS·CODEX-LINKS 마커뿐이라 아래 마커 검사는 그대로 받는다.
+const KNOWLEDGE_FRONTMATTER = ['knowledge_type', 'confidence'];
+
+function isAgentOwnedNote(frontmatter) {
+  return Boolean(frontmatter?.owner_agent);
+}
 
 const REQUIRED_MARKERS = [
   '<!-- CODEX-TAGS-START -->',
@@ -114,7 +123,10 @@ function validateFile(filename, fileStems) {
       return [];
     }
 
-    REQUIRED_FRONTMATTER.forEach(field => {
+    const required = isAgentOwnedNote(frontmatter)
+      ? REQUIRED_FRONTMATTER
+      : [...REQUIRED_FRONTMATTER, ...KNOWLEDGE_FRONTMATTER];
+    required.forEach(field => {
       if (!(field in frontmatter) || frontmatter[field] === '') {
         warnings.push(`frontmatter 누락: ${field}`);
       }
