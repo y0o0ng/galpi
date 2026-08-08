@@ -338,3 +338,277 @@ test('없는 시리즈 조회는 404다', () => {
     error => error instanceof AssistantTaskError && error.code === 'SERIES_NOT_FOUND' && error.statusCode === 404
   );
 });
+
+// --- C2b: override, 규칙 변경, 놓친 회차 ---
+
+function activeOccurrences(seriesStore, seriesId) {
+  return seriesStore.listOccurrences(seriesId)
+    .filter(item => item.status === 'active')
+    .map(item => item.occurrenceDate);
+}
+
+test('회차를 직접 고치면 손댄 회차로 표시된다', () => {
+  const { taskStore, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  const target = seriesStore.listOccurrences(series.id)
+    .find(item => item.occurrenceDate === '2026-08-19');
+
+  const { task } = taskStore.update(target.id, {
+    expectedVersion: 1,
+    due: { kind: 'datetime', at: '2026-08-19T20:00:00+09:00' },
+  });
+  assert.equal(task.overridden, 1);
+  assert.equal(task.dueAt, epoch('2026-08-19T20:00:00+09:00'));
+});
+
+test('단발 일정은 고쳐도 손댄 표시가 붙지 않는다', () => {
+  const { taskStore } = createContext();
+  const created = taskStore.create({
+    clientRequestId: 'single-task-0002',
+    title: '단발',
+    due: { kind: 'date', date: '2026-08-11' },
+  });
+  const { task } = taskStore.update(created.task.id, {
+    expectedVersion: 1,
+    due: { kind: 'date', date: '2026-08-12' },
+  });
+  assert.equal(task.overridden, 0);
+});
+
+test('규칙을 바꾸면 손대지 않은 미래 회차만 새 규칙으로 다시 생긴다', () => {
+  const { taskStore, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  const before = seriesStore.listOccurrences(series.id);
+
+  // 하나는 시간을 옮기고, 하나는 건너뛰고, 하나는 완료한다.
+  const moved = before.find(item => item.occurrenceDate === '2026-08-19');
+  const skipped = before.find(item => item.occurrenceDate === '2026-08-21');
+  const done = before.find(item => item.occurrenceDate === '2026-08-12');
+  taskStore.update(moved.id, {
+    expectedVersion: 1,
+    due: { kind: 'datetime', at: '2026-08-19T20:00:00+09:00' },
+  });
+  taskStore.transition(skipped.id, 'cancel', { expectedVersion: 1 });
+  taskStore.transition(done.id, 'complete', { expectedVersion: 1 });
+
+  const result = seriesStore.update(series.id, {
+    expectedVersion: 1,
+    recurrence: { timeOfDay: '07:00:00' },
+  });
+  assert.equal(result.unchanged, false);
+  assert.equal(result.series.timeOfDay, '07:00:00');
+
+  const after = new Map(seriesStore.listOccurrences(series.id).map(item => [item.occurrenceDate, item]));
+  // 손대지 않은 회차는 새 시각으로 다시 생겼다.
+  assert.equal(after.get('2026-08-17').dueAt, epoch('2026-08-17T07:00:00+09:00'));
+  // 사용자가 옮긴 회차, 건너뛴 회차, 완료한 회차는 그대로다.
+  assert.equal(after.get('2026-08-19').dueAt, epoch('2026-08-19T20:00:00+09:00'));
+  assert.equal(after.get('2026-08-19').overridden, 1);
+  assert.equal(after.get('2026-08-21').status, 'cancelled');
+  assert.equal(after.get('2026-08-12').status, 'done');
+  // 시각을 앞당기면 오늘 회차가 사라질 수 있다. 지금이 09:00이라 오늘 07:00은
+  // 이미 지났고, 손대지 않은 회차라 지워진 뒤 새 시각으로 다시 만들어지지 않는다.
+  assert.equal(after.has('2026-08-10'), false);
+  assert.deepEqual(
+    [...after.keys()].sort(),
+    before.map(item => item.occurrenceDate).filter(date => date !== '2026-08-10').sort()
+  );
+});
+
+test('시각을 뒤로 미루면 오늘 회차가 그 시각으로 남는다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+
+  seriesStore.update(series.id, { expectedVersion: 1, recurrence: { timeOfDay: '22:00:00' } });
+  const today = seriesStore.listOccurrences(series.id)
+    .find(item => item.occurrenceDate === '2026-08-10');
+  assert.equal(today.status, 'active');
+  assert.equal(today.dueAt, epoch('2026-08-10T22:00:00+09:00'));
+});
+
+test('주기를 바꾸면 회차 날짜가 통째로 갈린다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+
+  seriesStore.update(series.id, {
+    expectedVersion: 1,
+    recurrence: { freq: 'weekly', byWeekday: [2] },
+  });
+  const dates = activeOccurrences(seriesStore, series.id);
+  assert.deepEqual(dates.slice(0, 3), ['2026-08-11', '2026-08-18', '2026-08-25']);
+  assert.ok(dates.every(date => !['2026-08-10', '2026-08-12'].includes(date)));
+});
+
+test('주기를 바꾸면 그 주기가 쓰지 않는 필드는 함께 비워진다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+
+  const result = seriesStore.update(series.id, {
+    expectedVersion: 1,
+    recurrence: { freq: 'monthly', byMonthday: 15 },
+  });
+  assert.equal(result.series.byWeekday, null);
+  assert.equal(result.series.byMonthday, 15);
+  assert.deepEqual(activeOccurrences(seriesStore, series.id).slice(0, 2), ['2026-08-15', '2026-09-15']);
+});
+
+test('주기만 바꾸고 필요한 필드를 빠뜨리면 거부한다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  assert.throws(
+    () => seriesStore.update(series.id, { expectedVersion: 1, recurrence: { freq: 'monthly' } }),
+    error => error instanceof AssistantTaskError && error.code === 'INVALID_RECURRENCE_MONTHDAY'
+  );
+});
+
+test('제목만 바꾸면 회차를 다시 만들지 않는다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  const before = seriesStore.listOccurrences(series.id).map(item => item.id);
+
+  const result = seriesStore.update(series.id, { expectedVersion: 1, title: '아침 운동' });
+  assert.equal(result.series.title, '아침 운동');
+  assert.equal(result.removed, 0);
+  assert.deepEqual(seriesStore.listOccurrences(series.id).map(item => item.id), before);
+});
+
+test('바뀐 것이 없는 수정은 회차도 버전도 건드리지 않는다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  const result = seriesStore.update(series.id, { expectedVersion: 1, title: '운동' });
+  assert.equal(result.unchanged, true);
+  assert.equal(result.series.version, 1);
+});
+
+test('시작일이 과거로 내려간 시리즈도 계속 수정할 수 있다', () => {
+  const { clock, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  clock.now += 30 * 24 * 60 * 60;
+
+  const result = seriesStore.update(series.id, {
+    expectedVersion: 1,
+    recurrence: { timeOfDay: '07:00:00' },
+  });
+  assert.equal(result.series.startDate, '2026-08-10');
+  assert.equal(result.series.timeOfDay, '07:00:00');
+});
+
+test('시리즈 버전이 다르면 409다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  assert.throws(
+    () => seriesStore.update(series.id, { expectedVersion: 7, title: '다른 이름' }),
+    error => error instanceof AssistantTaskError && error.code === 'SERIES_VERSION_CONFLICT' && error.statusCode === 409
+  );
+});
+
+test('반복을 종료하면 미래 회차는 사라지고 지난 기록은 남는다', () => {
+  const { taskStore, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  const done = seriesStore.listOccurrences(series.id)
+    .find(item => item.occurrenceDate === '2026-08-10');
+  taskStore.transition(done.id, 'complete', { expectedVersion: 1 });
+
+  const result = seriesStore.end(series.id, { expectedVersion: 1 });
+  assert.equal(result.series.status, 'ended');
+  assert.equal(result.series.endedAt, MONDAY_0900);
+  assert.equal(result.occurrences.length, 1);
+  assert.equal(result.occurrences[0].occurrenceDate, '2026-08-10');
+  assert.equal(result.occurrences[0].status, 'done');
+});
+
+test('종료한 반복은 더 자라지도 수정되지도 않는다', () => {
+  const { clock, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  seriesStore.end(series.id, { expectedVersion: 1 });
+
+  clock.now += 10 * 24 * 60 * 60;
+  assert.deepEqual(seriesStore.materializeDue(), []);
+  assert.deepEqual(seriesStore.listOccurrences(series.id), []);
+  assert.throws(
+    () => seriesStore.update(series.id, { expectedVersion: 2, title: '다시' }),
+    error => error instanceof AssistantTaskError && error.code === 'SERIES_NOT_EDITABLE'
+  );
+});
+
+test('종료 재요청은 멱등이다', () => {
+  const { seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput());
+  seriesStore.end(series.id, { expectedVersion: 1 });
+  const again = seriesStore.end(series.id, { expectedVersion: 1 });
+  assert.equal(again.unchanged, true);
+  assert.equal(again.series.status, 'ended');
+});
+
+test('며칠 꺼져 있었어도 남는 놓친 회차는 하나다', () => {
+  const { clock, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput({}, {
+    freq: 'daily', byWeekday: undefined,
+  }));
+
+  // 8월 10일 09:00에서 8월 15일 09:00으로 건너뛴다. 10~14일 회차 다섯이 지났다.
+  clock.now = epoch('2026-08-15T09:00:00+09:00');
+  const cancelled = seriesStore.sweepMissed();
+  assert.equal(cancelled.length, 4);
+
+  const past = seriesStore.listOccurrences(series.id)
+    .filter(item => item.occurrenceDate < '2026-08-15');
+  assert.deepEqual(
+    past.filter(item => item.status === 'active').map(item => item.occurrenceDate),
+    ['2026-08-14']
+  );
+  assert.ok(past.filter(item => item.status === 'cancelled').length === 4);
+});
+
+test('놓친 회차 정리는 서버가 한 일로 남는다', () => {
+  const { db, clock, seriesStore } = createContext();
+  seriesStore.create(seriesInput({}, { freq: 'daily', byWeekday: undefined }));
+  clock.now = epoch('2026-08-13T09:00:00+09:00');
+  seriesStore.sweepMissed();
+
+  const actors = db.prepare(`
+    SELECT DISTINCT actor_type AS actorType
+    FROM assistant_task_events WHERE event_type = 'cancelled'
+  `).all();
+  assert.deepEqual(actors, [{ actorType: 'system' }]);
+});
+
+test('아직 오늘 회차 하나만 지났으면 정리하지 않는다', () => {
+  const { clock, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput({}, {
+    freq: 'daily', byWeekday: undefined,
+  }));
+
+  // 하루만 지나면 지난 회차가 8월 10일 하나뿐이라 유예가 남는다.
+  clock.now = epoch('2026-08-11T09:00:00+09:00');
+  assert.deepEqual(seriesStore.sweepMissed(), []);
+  assert.ok(activeOccurrences(seriesStore, series.id).includes('2026-08-10'));
+});
+
+test('정리는 단발 일정과 다른 시리즈를 건드리지 않는다', () => {
+  const { clock, taskStore, seriesStore } = createContext();
+  seriesStore.create(seriesInput({}, { freq: 'daily', byWeekday: undefined }));
+  const single = taskStore.create({
+    clientRequestId: 'single-task-0003',
+    title: '단발',
+    due: { kind: 'date', date: '2026-08-11' },
+  });
+
+  clock.now = epoch('2026-08-15T09:00:00+09:00');
+  seriesStore.sweepMissed();
+  assert.equal(taskStore.get(single.task.id).task.status, 'active');
+});
+
+test('사용자가 이미 완료한 지난 회차는 정리 대상이 아니다', () => {
+  const { clock, taskStore, seriesStore } = createContext();
+  const { series } = seriesStore.create(seriesInput({}, {
+    freq: 'daily', byWeekday: undefined,
+  }));
+  const first = seriesStore.listOccurrences(series.id)
+    .find(item => item.occurrenceDate === '2026-08-10');
+  taskStore.transition(first.id, 'complete', { expectedVersion: 1 });
+
+  clock.now = epoch('2026-08-15T09:00:00+09:00');
+  seriesStore.sweepMissed();
+  assert.equal(taskStore.get(first.id).task.status, 'done');
+});
