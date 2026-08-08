@@ -5970,13 +5970,22 @@ app.post('/api/organize/retry', (req, res) => {
     if (targets.length === 0) {
       return res.json({ success: true, retried: 0, message: '다시 정리할 노트가 없습니다.' });
     }
-    db.transaction(() => {
+    // 노트를 pending으로 되돌리는 것만으로는 아무것도 돌지 않는다. worker는 밀린
+    // job을 찾을 뿐 pending 노트로 job을 만들지 않고, 자동 큐는 문턱을 기다린다.
+    // 되돌리기와 job 생성을 같은 transaction에 둬야 "다시 정리한다"가 실제로 성립한다.
+    const job = db.transaction(() => {
       for (const note of targets) {
         stmtUpdateNoteCodexStatus.run('pending', note.filename);
         stmtClearNoteCodexError.run(note.filename);
       }
+      return createCodexJobRecordFromPending();
     })();
-    res.json({ success: true, retried: targets.length, filenames: targets.map(n => n.filename) });
+    res.json({
+      success: true,
+      retried: targets.length,
+      filenames: targets.map(note => note.filename),
+      jobId: job?.id || null,
+    });
     kickOrganizeWorker();
   } catch (err) {
     res.status(err.code === 'CODEX_RECOVERY_BLOCKED' ? 409 : 500).json({ error: err.message });

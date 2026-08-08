@@ -562,6 +562,11 @@ test('a stalled note shows why it stopped and offers a retry', () => {
   assert.match(serverSource, /reasons: recoveryRequired \|\| !note\.codexLastError/);
   assert.match(serverSource, /codex_status = 'needs_manual_check'/);
 
+  // pending으로 되돌리는 것만으로는 아무것도 돌지 않는다. worker는 밀린 job을 찾을
+  // 뿐이고 자동 큐는 문턱을 기다린다. 되돌리기와 job 생성이 같은 transaction이어야
+  // "다시 정리한다"가 실제로 성립한다.
+  assert.match(serverSource, /return createCodexJobRecordFromPending\(\);\s*\n\s*\}\)\(\);/);
+
   // 같은 이유로 여러 개가 멈추면 한 번에 돌린다.
   assert.match(agentSource, /async function retryStalledNotes\(\)/);
   assert.match(agentSource, /`멈춘 \$\{stalled\}개 다시`/);
