@@ -9,6 +9,7 @@ const Database = require('better-sqlite3');
 
 const {
   createCodexQueueReader,
+  parseCodexValidationWarnings,
   compactError,
   createCodexRecoveryRequiredError,
   createCodexStorageError,
@@ -274,4 +275,34 @@ test('queue reader picks up notes stranded by a failed job', () => {
   assert.deepEqual(queue.listQueueable().map(row => row.filename), ['fresh.md']);
   assert.equal(queue.countStranded(), 0);
   db.close();
+});
+
+// 실패 사유를 노트별로 붙이려면 반드시 redact 이전 원문에 대고 파싱해야 한다.
+// 이름을 `[노트]`로 가린 뒤에는 어느 경고가 어느 노트 것인지 되살릴 수 없다.
+test('validation warnings are attributed to the note that earned them', () => {
+  const stderr = [
+    'Codex validation failed: 2/3 notes need attention.',
+    '',
+    'a.md',
+    '- frontmatter 누락: knowledge_type',
+    '- frontmatter 누락: confidence',
+    '',
+    '/home/pi/galpi-vault/b.md',
+    '- CODEX 링크 2행: 파일ID 형식 오류',
+    '- CODEX 링크 2행: 파일ID 형식 오류',
+  ].join('\n');
+
+  const warnings = parseCodexValidationWarnings({ stderr }, ['a.md', 'b.md', 'c.md']);
+  assert.deepEqual([...warnings.keys()], ['a.md', 'b.md']);
+  assert.deepEqual(warnings.get('a.md'), ['frontmatter 누락: knowledge_type', 'frontmatter 누락: confidence']);
+  // 같은 경고가 두 번 와도 한 번만 든다.
+  assert.deepEqual(warnings.get('b.md'), ['CODEX 링크 2행: 파일ID 형식 오류']);
+  // 지목되지 않은 노트는 자기 사유가 없다.
+  assert.equal(warnings.has('c.md'), false);
+});
+
+test('warning parsing survives an error without a validation block', () => {
+  assert.equal(parseCodexValidationWarnings(new Error('Command failed: node'), ['a.md']).size, 0);
+  assert.equal(parseCodexValidationWarnings('', ['a.md']).size, 0);
+  assert.equal(parseCodexValidationWarnings(null, ['a.md']).size, 0);
 });

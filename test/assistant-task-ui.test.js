@@ -540,3 +540,29 @@ test('the librarian block can run the queue without waiting for the auto thresho
   // 정리 상태를 못 읽어도 모델 설정은 계속 쓸 수 있어야 한다.
   assert.match(agentSource, /state\.organize = organizeResponse\.ok/);
 });
+
+// 검증 실패는 본문을 건드리지 않고 끝난다. 사람이 열어봐야 고칠 것이 없으므로
+// "수동 확인"만 내밀면 할 수 있는 일이 없다. 이유를 보여주고 다시 돌리게 한다.
+test('a stalled note shows why it stopped and offers a retry', () => {
+  const notificationSource = read('public/notification-panel.js');
+  const agentSource = read('public/agent-panel.js');
+  const serverSource = read('server.js');
+
+  assert.match(notificationSource, /notification-reasons/);
+  assert.match(notificationSource, /item\.retryable \? '재정리' : '확인 완료'/);
+  assert.match(notificationSource, /async function retryNote\(item, card\)/);
+  assert.match(notificationSource, /'\/api\/organize\/retry'/);
+  // 다시 돌려도 안 되면 그냥 정리된 것으로 두는 길을 남긴다.
+  assert.match(notificationSource, /settle\.textContent = '정리된 것으로 두기';/);
+
+  // 원본이 위태로운 상태에는 재정리를 주지 않는다.
+  assert.match(serverSource, /retryable: !recoveryRequired && !blocked,/);
+  // 복구가 필요한 노트가 있으면 정리 전체가 멈추므로 재정리를 내밀지 않는다.
+  assert.match(serverSource, /const blocked = hasCodexRecoveryRequired\(\);/);
+  assert.match(serverSource, /reasons: recoveryRequired \|\| !note\.codexLastError/);
+  assert.match(serverSource, /codex_status = 'needs_manual_check'/);
+
+  // 같은 이유로 여러 개가 멈추면 한 번에 돌린다.
+  assert.match(agentSource, /async function retryStalledNotes\(\)/);
+  assert.match(agentSource, /`멈춘 \$\{stalled\}개 다시`/);
+});

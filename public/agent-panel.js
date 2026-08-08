@@ -279,12 +279,14 @@
     const queueable = Number(state.organize?.queueable) || 0;
     const stranded = Number(state.organize?.stranded) || 0;
     const waitingJobs = Number(state.organize?.waitingJobs) || 0;
+    const stalled = (state.organize?.stalledNotes || []).length;
     const canOrganize = queueable > 0 || waitingJobs > 0;
     if (state.organize) {
       const queue = document.createElement('p');
       queue.className = 'codex-agent-message';
       const parts = [];
       // 밀려 있는 job이 먼저다. 실패 뒤 멈춰 있어 새 저장이 있어야 다시 도는 상태다.
+      if (stalled > 0) parts.push(`멈춘 노트 ${stalled}개`);
       if (waitingJobs > 0) parts.push(`밀려 있는 정리 ${waitingJobs}건`);
       if (queueable > 0) {
         parts.push(stranded > 0
@@ -292,7 +294,7 @@
           : `대기 노트 ${queueable}개 · 자동 시작은 ${state.organize.autoQueueThreshold}개부터`);
       }
       queue.textContent = parts.length > 0 ? parts.join(' · ') : '정리 대기 중인 노트 없음';
-      if (waitingJobs > 0 || stranded > 0) queue.classList.add('warn');
+      if (waitingJobs > 0 || stranded > 0 || stalled > 0) queue.classList.add('warn');
       block.appendChild(queue);
     }
 
@@ -307,7 +309,16 @@
     refreshButton.disabled = state.codexSaving;
     organizeButton.disabled = state.organizeRunning || state.codexSaving || !canOrganize;
     saveButton.disabled = state.codexSaving || models.length === 0;
-    actions.append(refreshButton, organizeButton, saveButton);
+    if (stalled > 0) {
+      const retryButton = button(
+        state.organizeRunning ? '시작하는 중…' : `멈춘 ${stalled}개 다시`,
+        retryStalledNotes,
+      );
+      retryButton.disabled = state.organizeRunning || state.codexSaving;
+      actions.append(refreshButton, organizeButton, retryButton, saveButton);
+    } else {
+      actions.append(refreshButton, organizeButton, saveButton);
+    }
     block.appendChild(actions);
     return block;
   }
@@ -601,6 +612,30 @@
 
   // 대기열에 남은 노트를 자동 큐 문턱과 무관하게 지금 돌린다. 재시도 가능한 실패로
   // `queued`에 갇힌 노트가 다시 job에 들어가는 유일한 사용자 경로다.
+  // 같은 이유로 여러 개가 한꺼번에 멈추는 일이 흔하다. 하나씩 누르지 않아도 되게 한다.
+  async function retryStalledNotes() {
+    if (state.organizeRunning) return;
+    state.organizeRunning = true;
+    renderSummary();
+    try {
+      const response = await state.apiFetch('/api/organize/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '재정리를 시작하지 못했습니다.');
+      state.showToast(data.retried > 0 ? `멈춘 노트 ${data.retried}개를 다시 정리해` : '다시 정리할 노트가 없어');
+      state.codexError = '';
+    } catch (error) {
+      state.codexError = error.message;
+      state.showToast(error.message);
+    } finally {
+      state.organizeRunning = false;
+      await refresh();
+    }
+  }
+
   async function organizeQueuedNotes() {
     if (state.organizeRunning) return;
     state.organizeRunning = true;

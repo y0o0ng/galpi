@@ -134,6 +134,7 @@ const {
   recoverInterruptedCodexJobs,
   validateOrganizedCodexOutput,
   createCodexQueueReader,
+  parseCodexValidationWarnings,
 } = require('./lib/codex-organizer');
 
 // ─── 설정 ────────────────────────────────────────────────────────────────────
@@ -1181,7 +1182,7 @@ const stmtGetPendingNotes = db.prepare(`
 const codexQueue = createCodexQueueReader(db);
 const stmtGetManualCheckNotes = db.prepare(`
   SELECT filename, title, note_type AS noteType, codex_status AS codexStatus,
-         updated_at AS updatedAt
+         codex_last_error AS codexLastError, updated_at AS updatedAt
   FROM notes
   WHERE archived = 0 AND codex_status IN ('needs_manual_check', 'recovery_required')
   ORDER BY updated_at DESC, id DESC
@@ -1229,6 +1230,20 @@ const stmtUpdateNoteCodexStatus = db.prepare(`
   UPDATE notes
   SET codex_status = ?, updated_at = strftime('%s','now')
   WHERE filename = ?
+`);
+// 왜 멈췄는지는 그 노트에 붙어 있어야 화면이 사람에게 보여줄 수 있다. 정리에
+// 성공하거나 사용자가 손으로 넘기면 비운다 — 화면이 답할 것은 "지금 왜 멈췄나"다.
+const stmtSetNoteCodexError = db.prepare(`
+  UPDATE notes SET codex_last_error = ? WHERE filename = ?
+`);
+const stmtClearNoteCodexError = db.prepare(`
+  UPDATE notes SET codex_last_error = NULL WHERE filename = ?
+`);
+const stmtGetStalledNotes = db.prepare(`
+  SELECT filename, title, codex_status AS codexStatus, codex_last_error AS codexLastError
+  FROM notes
+  WHERE archived = 0 AND codex_status = 'needs_manual_check'
+  ORDER BY updated_at DESC, id DESC
 `);
 const stmtSetNoteArchived = db.prepare(
   "UPDATE notes SET archived = ?, updated_at = strftime('%s','now') WHERE filename = ?"
@@ -5603,6 +5618,10 @@ function recordNotificationAction(notification, status) {
 // 수동 확인·원본 복구 필요 노트를 시스템 알림 항목으로 변환한다.
 // 같은 노트가 나중에 다시 실패하면 새 알림이 생기도록 상태 변경 시각을 ID에 포함한다.
 function listManualCheckNotifications(options = {}) {
+  // 복구가 필요한 노트가 하나라도 있으면 Codex 정리 전체가 fail-close로 멈춘다.
+  // 그동안은 다른 노트의 재정리도 서버가 거절하므로, 눌러야만 알 수 있는 버튼을
+  // 내밀지 않는다.
+  const blocked = hasCodexRecoveryRequired();
   return stmtGetManualCheckNotes.all()
     .map(note => {
       const recoveryRequired = note.codexStatus === 'recovery_required';
@@ -5614,7 +5633,16 @@ function listManualCheckNotifications(options = {}) {
         note: { filename: note.filename, title: note.title },
         text: recoveryRequired
           ? 'Codex 변경 뒤 원본 snapshot을 자동 복원하지 못했습니다. 백업과 현재 파일을 대조해 복구한 뒤에만 확인 완료를 누르세요.'
-          : 'Codex 자동 정리가 실패했습니다. 옵시디언에서 직접 확인·수정한 뒤 확인 완료를 누르세요.',
+          : blocked
+            ? 'Codex 자동 정리가 아래 이유로 멈췄습니다. 노트 본문은 그대로입니다. 원본 복구가 필요한 노트를 먼저 처리해야 다시 정리할 수 있습니다.'
+            : 'Codex 자동 정리가 아래 이유로 멈췄습니다. 노트 본문은 그대로입니다.',
+        // 검증 실패는 본문을 건드리지 않고 끝나므로 사람이 열어봐야 고칠 것이 없다.
+        // 실제로 할 수 있는 조치는 다시 돌리는 것이고, 원본이 위태로운
+        // recovery_required에는 그 길을 주지 않는다.
+        reasons: recoveryRequired || !note.codexLastError
+          ? []
+          : String(note.codexLastError).split('\n').filter(Boolean).slice(0, 8),
+        retryable: !recoveryRequired && !blocked,
         executable: true,
         ignorable: !recoveryRequired,
         recoveryRequired,
@@ -5765,6 +5793,7 @@ app.post('/api/notifications/:id/approve', async (req, res) => {
         : await syncVaultDb();
       noteSearchCache.delete(filename);
       stmtUpdateNoteCodexStatus.run('processed', filename);
+      stmtClearNoteCodexError.run(filename);
       result = { synced: true, ...sync };
       if (!hasCodexRecoveryRequired() && stmtGetNextPendingCodexJob.get()) {
         kickOrganizeWorker();
@@ -5872,6 +5901,12 @@ app.get('/api/organize/status', (_req, res) => {
     stranded: codexQueue.countStranded(),
     // 실패 뒤 `pending`으로 돌아가 worker를 기다리는 job. 새 노트가 없어도 다시 돌릴 수 있다.
     waitingJobs: stmtCountPendingCodexJobs.get().count,
+    stalledNotes: stmtGetStalledNotes.all().map(note => ({
+      ...note,
+      codexLastError: note.codexLastError
+        ? String(note.codexLastError).split('\n').filter(Boolean).slice(0, 8)
+        : [],
+    })),
     notes: stmtGetPendingNotes.all(),
     jobs: stmtGetRecentCodexJobs.all(5).map(({ noteFilenamesJson, ...job }) => ({
       ...job,
@@ -5911,6 +5946,37 @@ app.post('/api/organize/queue', (_req, res) => {
       status: job.status,
       notes: job.notes,
     });
+    kickOrganizeWorker();
+  } catch (err) {
+    res.status(err.code === 'CODEX_RECOVERY_BLOCKED' ? 409 : 500).json({ error: err.message });
+  }
+});
+
+// 멈춘 노트를 다시 정리 대상으로 되돌린다. 검증 실패는 본문을 건드리지 않고 끝나므로
+// 사람이 열어봐야 고칠 것이 없고, 다시 돌리는 것이 실제로 할 수 있는 유일한 조치다.
+//
+// recovery_required는 여기서 받지 않는다. 그 상태는 원본이 위태롭다는 뜻이라
+// 백업과 대조하기 전에 Codex를 다시 얹으면 안 된다.
+app.post('/api/organize/retry', (req, res) => {
+  try {
+    assertCodexRecoveryCleared();
+    const requested = Array.isArray(req.body?.filenames)
+      ? req.body.filenames.map(name => path.basename(String(name || '').trim())).filter(Boolean)
+      : null;
+    const stalled = stmtGetStalledNotes.all();
+    const targets = requested
+      ? stalled.filter(note => requested.includes(note.filename))
+      : stalled;
+    if (targets.length === 0) {
+      return res.json({ success: true, retried: 0, message: '다시 정리할 노트가 없습니다.' });
+    }
+    db.transaction(() => {
+      for (const note of targets) {
+        stmtUpdateNoteCodexStatus.run('pending', note.filename);
+        stmtClearNoteCodexError.run(note.filename);
+      }
+    })();
+    res.json({ success: true, retried: targets.length, filenames: targets.map(n => n.filename) });
     kickOrganizeWorker();
   } catch (err) {
     res.status(err.code === 'CODEX_RECOVERY_BLOCKED' ? 409 : 500).json({ error: err.message });
@@ -7344,7 +7410,16 @@ async function runNextCodexJobImpl() {
       );
       if (!recoveryRequired) {
         const failedStatus = retryableInfrastructureFailure ? 'queued' : 'needs_manual_check';
-        job.filenames.forEach(filename => stmtUpdateNoteCodexStatus.run(failedStatus, filename));
+        const perNote = parseCodexValidationWarnings(failure, job.filenames);
+        job.filenames.forEach(filename => {
+          stmtUpdateNoteCodexStatus.run(failedStatus, filename);
+          const warnings = perNote.get(filename);
+          // 검증기가 그 노트를 지목하지 않았으면 같은 배치에 묶여 함께 멈춘 것이다.
+          stmtSetNoteCodexError.run(
+            warnings?.length ? warnings.join('\n') : '같은 배치의 다른 노트가 검증에 걸려 함께 멈췄습니다.',
+            filename,
+          );
+        });
       }
       const error = redactCodexJobError(failure, job.filenames);
       failed.push(...job.filenames.map(filename => ({ filename, error })));

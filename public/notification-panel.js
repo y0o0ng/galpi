@@ -88,7 +88,7 @@
     if (item.type === 'merge') return '병합 실행';
     if (item.type === 'split') return '분리 검토';
     if (item.type === 'policy' && item.executable) return '정책 적용';
-    if (item.type === 'manual_check') return '확인 완료';
+    if (item.type === 'manual_check') return item.retryable ? '재정리' : '확인 완료';
     return '검토 완료';
   }
 
@@ -119,6 +119,29 @@
     }
   }
 
+  async function retryNote(item, card) {
+    const filename = item.note?.filename;
+    if (!filename) {
+      state.showToast('이 알림에 노트 정보가 없어');
+      return;
+    }
+    [...card.querySelectorAll('button')].forEach(button => { button.disabled = true; });
+    try {
+      const response = await state.apiFetch('/api/organize/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filenames: [filename] }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '재정리를 시작하지 못했습니다.');
+      state.showToast(data.retried > 0 ? '다시 정리하고 있어' : '다시 정리할 노트가 없어');
+      await refresh();
+    } catch (error) {
+      state.showToast(error.message);
+      [...card.querySelectorAll('button')].forEach(button => { button.disabled = false; });
+    }
+  }
+
   function makeNotificationCard(item) {
     const card = document.createElement('article');
     card.className = `notification-card type-${item.type || 'review'}`;
@@ -140,6 +163,17 @@
     text.className = 'notification-text';
     text.textContent = item.text || '';
 
+    // 왜 멈췄는지 그대로 보여준다. 이유 없이 "수동 확인"만 있으면 사람이 할 수
+    // 있는 일이 없다.
+    const reasons = document.createElement('ul');
+    reasons.className = 'notification-reasons';
+    (Array.isArray(item.reasons) ? item.reasons : []).forEach(reason => {
+      const line = document.createElement('li');
+      line.textContent = reason;
+      reasons.appendChild(line);
+    });
+    reasons.hidden = reasons.childElementCount === 0;
+
     const footer = document.createElement('div');
     footer.className = 'notification-footer';
     const file = document.createElement('span');
@@ -158,9 +192,23 @@
         else state.showToast('이 제안에 노트 정보가 없어');
         return;
       }
+      if (item.type === 'manual_check' && item.retryable) {
+        retryNote(item, card);
+        return;
+      }
       decide(item, 'approve', card);
     });
     actions.appendChild(approve);
+
+    // 다시 돌려도 안 되면 그냥 정리된 것으로 두는 길을 남긴다.
+    if (item.type === 'manual_check' && item.retryable) {
+      const settle = document.createElement('button');
+      settle.type = 'button';
+      settle.className = 'notification-action';
+      settle.textContent = '정리된 것으로 두기';
+      settle.addEventListener('click', () => decide(item, 'approve', card));
+      actions.appendChild(settle);
+    }
 
     if (item.ignorable !== false) {
       const ignore = document.createElement('button');
@@ -171,7 +219,7 @@
       actions.appendChild(ignore);
     }
     footer.append(file, actions);
-    card.append(top, note, text, footer);
+    card.append(top, note, text, reasons, footer);
     return card;
   }
 
