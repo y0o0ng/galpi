@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-18 · 갱신: 2026-07-19
 >
-> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트와 C1e schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection, C1.5 자연어 무저장 후보 카드까지 Pi 배포·운영 인수 완료(2026-07-19) · 로컬/Pi 전체 테스트 171/171 · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중**
+> 상태: **C1d schema v5/v6/v7·최소 PWA·Web Push·일정 에이전트와 C1e schema v8 활성 일정 대화 컨텍스트·월별 종결 노트 projection, C1.5 자연어 무저장 후보 카드까지 Pi 배포·운영 인수 완료(2026-07-19) · 로컬/Pi 전체 테스트 171/171 · 실기기 provider acceptance 1/10, 잠금화면 표시 반복 검증 진행 중 · C2 반복 일정과 회차 override는 2026-08-08 설계 확정, 구현 착수 전**
 >
 > 단일 기준: V4.5-C의 task·reminder 구현 세부사항은 이 문서를 따른다.
 
@@ -21,7 +21,7 @@
 - Web Push는 후속 보너스가 아니라 C1 첫 배포의 필수 전달 채널이다. 다만 task core와 push migration·feature flag·인수 단위는 분리한다.
 - 지식 시트의 첫 탭은 범용 `알림`이며 `전체 | Codex | 시스템 | 최근 저장`만 다룬다. 일정 알림·목록·수정은 `에이전트 > 일정 에이전트` 안에서 처리한다.
 - C1 본체에는 반복, 자연어 후보 추출, 오늘 브리핑, 결과 기록, 외부 캘린더를 넣지 않는다. 별도 C1.5는 단일 Claude가 현재 사용자 질문에서만 무저장 후보를 준비하고, 사용자가 확인한 뒤 기존 task API로 저장하는 자연어 진입만 추가한다.
-- 반복은 회차별 완료를 표현하는 세 번째 테이블이 필요하므로 C2의 별도 schema migration과 컨펌으로 진행한다.
+- 반복은 회차별 완료를 따로 표현해야 하므로 C2의 별도 schema migration과 컨펌으로 진행한다. 2026-08-08에 그 형태를 **반복 master는 새 `assistant_task_series`, 회차는 `series_id`를 가진 평범한 `assistant_tasks` 행**으로 확정했다. 상세는 13절이다.
 
 이 기능은 향후 외부 캘린더를 읽고 일정을 조정할 수 있는 `V5-C 일정 에이전트`와 다르다. 이 문서의 대상은 `V4.5-C 약속 루프`다.
 
@@ -452,7 +452,77 @@ CREATE TABLE assistant_schedule_note_projections (
 - 파일은 평면 vault의 `xion-schedule-YYYY-MM.md`, `note_type=schedule_history`, `owner_agent=schedule`이다. 일정 에이전트는 `XION-SCHEDULE` 본문을 재생성하고, 사서 Codex는 `CODEX-TAGS`·`CODEX-LINKS`만 수정하며 다른 에이전트는 읽기 전용이다. 일반 노트 archive/restore·split/merge mutation은 에이전트 소유 노트를 거부한다.
 - 월 배정은 날짜 기한 → datetime 기한의 KST 월 → 기한이 없으면 `closed_at`의 KST 월 순이다. 완료와 취소는 구역을 분리하고 `deleted`는 제외한다.
 
-### 6.5 불변식
+### 6.5 schema v17 — 반복 시리즈와 회차 연결
+
+C2의 정본 추가분이다. 2026-08-08 기준 운영 schema는 v16이고 v17은 아직 적용 전이다.
+
+```sql
+CREATE TABLE assistant_task_series (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_request_id TEXT NOT NULL UNIQUE,
+  create_payload_sha256 TEXT NOT NULL
+    CHECK (length(create_payload_sha256) = 64),
+  title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 200),
+  detail TEXT NOT NULL DEFAULT '' CHECK (length(detail) <= 2000),
+  freq TEXT NOT NULL
+    CHECK (freq IN ('daily', 'weekdays', 'weekly', 'monthly')),
+  by_weekday TEXT,
+  by_monthday INTEGER,
+  start_date TEXT NOT NULL CHECK (start_date GLOB '????-??-??'),
+  end_date TEXT CHECK (end_date IS NULL OR end_date GLOB '????-??-??'),
+  time_kind TEXT NOT NULL CHECK (time_kind IN ('date', 'datetime')),
+  time_of_day TEXT,
+  reminder_lead_seconds INTEGER
+    CHECK (reminder_lead_seconds IS NULL OR reminder_lead_seconds >= 0),
+  status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'ended')),
+  timezone TEXT NOT NULL DEFAULT 'Asia/Seoul'
+    CHECK (timezone = 'Asia/Seoul'),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  materialized_through TEXT,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  ended_at INTEGER,
+  CHECK (
+    (freq = 'weekly' AND by_weekday IS NOT NULL AND by_monthday IS NULL) OR
+    (freq = 'monthly' AND by_weekday IS NULL AND by_monthday IS NOT NULL
+      AND by_monthday BETWEEN 1 AND 31) OR
+    (freq IN ('daily', 'weekdays') AND by_weekday IS NULL AND by_monthday IS NULL)
+  ),
+  CHECK (
+    (time_kind = 'date' AND time_of_day IS NULL) OR
+    (time_kind = 'datetime' AND time_of_day IS NOT NULL
+      AND time_of_day GLOB '??:??:??')
+  ),
+  CHECK (end_date IS NULL OR end_date >= start_date),
+  CHECK (
+    (status = 'active' AND ended_at IS NULL) OR
+    (status = 'ended' AND ended_at IS NOT NULL)
+  )
+);
+
+ALTER TABLE assistant_tasks
+  ADD COLUMN series_id INTEGER REFERENCES assistant_task_series(id);
+ALTER TABLE assistant_tasks
+  ADD COLUMN occurrence_date TEXT;
+ALTER TABLE assistant_tasks
+  ADD COLUMN overridden INTEGER NOT NULL DEFAULT 0
+  CHECK (overridden IN (0, 1));
+
+CREATE UNIQUE INDEX idx_assistant_tasks_series_occurrence
+  ON assistant_tasks(series_id, occurrence_date)
+  WHERE series_id IS NOT NULL;
+CREATE INDEX idx_assistant_task_series_active
+  ON assistant_task_series(status, materialized_through);
+```
+
+- 기존 표는 재생성하지 않고 열만 붙인다. v16이 `assistant_reminders`에 `origin`을 같은 방식으로 붙인 선례가 있다. SQLite는 추가 열에 `REFERENCES`를 허용하지만 기본값이 `NULL`이어야 하므로 `series_id`는 nullable이다.
+- **`assistant_reminders`는 한 열도 바뀌지 않는다.** 회차마다 task 행이 하나라 `idx_assistant_reminders_one_live_per_task`가 그대로 성립한다.
+- `by_weekday`는 ISO 요일의 오름차순 쉼표 목록이다(`1`=월 … `7`=일, 예: `1,3,5`). DB CHECK는 규칙별로 어느 열이 차 있어야 하는지만 보고, 목록의 실제 형식·범위·중복은 API가 검증한다.
+- **SQLite는 CHECK 식이 `NULL`이면 통과시킨다.** 그래서 규칙이 요구하는 열에는 범위만 적지 않고 `IS NOT NULL`을 함께 적는다. `by_monthday BETWEEN 1 AND 31`만 적으면 `freq = 'monthly'`에 `by_monthday IS NULL`인 행이 그대로 들어온다.
+- `materialized_through`는 그 시리즈의 회차를 어느 KST 날짜까지 만들었는지다. 회차 자체가 정본이고 이 값은 materializer의 진행 표식이다.
+
+### 6.6 불변식
 
 - task당 live reminder는 `pending | fired` 합쳐 최대 하나다.
 - `assistant_tasks`의 현재 행이 정본이고 `assistant_task_events`는 전이 감사 로그다. 같은 결과 상태 재요청은 새 event를 만들지 않는다.
@@ -471,6 +541,16 @@ CREATE TABLE assistant_schedule_note_projections (
 - 새 subscription을 등록해도 이미 fired인 과거 reminder를 backfill하지 않는다. 일정 에이전트의 unresolved reminder는 그대로 조회된다.
 - delivery의 `accepted`는 push service의 HTTP 수락일 뿐 기기 표시·사용자 확인이 아니다. task·reminder 상태는 앱의 ack·complete·snooze 요청만 바꾼다.
 - subscription endpoint는 서버가 요청하는 capability URL이다. HTTPS push-service host allowlist를 적용하고 IP literal·loopback·private address·redirect를 거부해 SSRF 경계를 둔다.
+
+C2가 더하는 불변식은 아래와 같다.
+
+- 회차는 `series_id`와 `occurrence_date`를 함께 가지거나 둘 다 `NULL`이다. 단발 task는 계속 둘 다 `NULL`이다.
+- `(series_id, occurrence_date)`는 UNIQUE다. 회차의 `client_request_id`는 서버가 `series:{seriesId}:{occurrenceDate}`로 만들며, 그래서 materializer가 몇 번 돌아도 회차가 늘지 않는다.
+- 회차는 과거 날짜로 만들지 않는다. materializer는 오늘 이후만 채운다.
+- 시리즈 규칙 변경은 완료·취소된 회차와 `overridden = 1` 회차를 건드리지 않는다. 재생성 대상은 `status = 'active' AND overridden = 0`인 미래 회차뿐이다.
+- 회차를 `PATCH /api/tasks/:id`로 고치면 같은 transaction에서 `overridden = 1`이 된다. 시리즈를 통한 변경은 이 값을 올리지 않는다.
+- 시리즈 종료는 `status = 'ended'`와 미래 미완료 회차 취소를 같은 transaction에서 수행한다.
+- 회차 날짜는 발화·집행 시각이 아니라 `start_date` anchor에서 계산한다. 알림이 늦게 터져도 다음 회차 날짜가 밀리지 않는다.
 
 기존 `server.js`는 `PRAGMA foreign_keys = ON`을 명시하지 않지만 2026-07-18 읽기 전용 확인에서 로컬과 Pi better-sqlite3 연결은 모두 `foreign_keys=1`, `foreign_key_check` 0건이었고 Pi schema는 v4였다. C1은 연결 직후 이를 명시적으로 `ON`으로 설정하고 다시 읽어 `1`이 아니면 시작을 중단한다. store의 부모 존재 검증과 조건부 UPDATE도 그대로 두며, snooze child는 원 reminder와 같은 task에만 연결할 수 있다.
 
@@ -1008,25 +1088,167 @@ Pi 전체 테스트도 171/171을 통과했다. 운영 DB를 read-only로 연 `p
 
 2026-08-04 H6d는 PWA의 후보 카드 계약을 바꾸지 않고, 화면 없는 iPhone 단축어의 **명시적인 새 일정 생성 발화만** 최종 승인으로 보는 예외를 열어 Pi·실기기 인수까지 마쳤다. 단축어 scoped route가 같은 `schedule_prepare` validator 뒤 `shortcut-task:<requestId>`로 공용 store를 즉시 호출한다. 기존 일정 수정·완료·취소·삭제와 다른 쓰기는 계속 닫으며 상세 권한·멱등·배포 receipt는 `voice-halfduplex-design.md` H6d가 기준이다.
 
-## 13. C2 이후 확장 경계
+### C2 — 반복 일정과 회차 override
 
-반복을 C1의 `recurrence_rule` 한 컬럼으로 얹지 않는다. 반복 master, 회차 완료, 알림 receipt를 분리해야 한다.
+설계는 13절이 기준이다. 모든 단계는 `ASSISTANT_TASK_SERIES_ENABLED` 기본 `false` 뒤에 들어가므로 C2a~C2f가 배포돼도 기존 단발 일정 동작은 바뀌지 않는다.
+
+|단계|작업|검증|
+|---|---|---|
+|C2a ✅|schema v17, `lib/task-recurrence.js` 순수 규칙 계산기, `lib/assistant-task-series.js` 시리즈 store와 materializer|규칙 4종과 `매월 31일` 건너뛰기, anchor drift 0, materializer 두 번 실행에 회차 증가 0, 과거 회차 생성 0|
+|C2b|회차 `overridden` 표시, 시리즈 규칙 변경 재생성, 놓친 회차 자동 정리|override·완료 회차가 규칙 변경 뒤 불변, downtime 시뮬레이션에서 살아남는 놓친 회차 1개, 종료가 미래 회차만 취소|
+|C2c|`/api/task-series` 5개 route, 목록 접기|HTTP 계약, 생성 멱등, `expectedVersion` 409, flag off 503, 달력 count는 접히지 않음|
+|C2d|`TaskPanel` 반복 작성 카드, 회차 `이번만 \| 이후 전체`, 시리즈 화면|`test/chat-ui.test.js` 계약과 1440×900·390×844 실브라우저|
+|C2e|`schedule_prepare` 반복 확장, `schedule_override_prepare` 신설, 확인 카드|prepare 뒤 DB 행 0개, 후보 1개 상한, 대상 미확정 시 fail-close 되묻기, injection 경계|
+|C2f|`<schedule>` 시리즈 접기와 식별자, 월별 노트 회차 압축|20개·6,000자 상한 유지, 월별 노트 재생성 결정성|
+|C2g|Pi 배포·인수|배포 전 DB·Vault 백업과 코드 tar, 변경 파일 SHA-256 대조, schema 16→17, `integrity_check=ok`·`foreign_key_check` 0건, 기존 application table 행 수 보존|
+
+C2a 구현 완료(2026-08-08, 로컬 전체 471/471). `lib/task-recurrence.js`는 실제 달력 날짜를 하루씩 걸으며 규칙에 맞는 날만 고르는 순수 함수라 `매월 31일`이 없는 달을 건너뛰는 것이 별도 분기가 아니라 걷는 방식의 결과다. 회차는 `taskStore.create(input, { series })`로 기존 생성 경로를 그대로 타서 검증·이벤트·기본 알림·멱등이 단발 일정과 한 벌이고, 그래서 회차가 `list`·`summary`·달력 count에 코드 변경 없이 들어오는 것을 테스트로 고정했다. `assistant_tasks`의 `series_id`·`occurrence_date`·`overridden`은 `TASK_COLUMNS`에 더해 모든 task 응답에 실린다. 시리즈 검증기는 `assistant-tasks.js`의 `internals`를 가져다 쓴다 — 검증기가 두 벌이 되면 같은 입력을 두 곳이 다르게 판정하고 그 차이는 회차가 하루 어긋난 뒤에야 드러난다.
+
+**scheduler tick과 `server.js` 연결은 C2c에서 한다.** 지금은 store만 있고 `materializeDue`를 부르는 자리가 없으므로 C2a 단독으로는 회차가 자동으로 늘지 않는다. feature flag도 C2c에서 함께 붙인다.
+
+## 13. C2 — 반복 일정과 회차 override
+
+> 결정: 2026-08-08 · 상태: 설계 확정, 구현 착수 전
+
+### 13.0 결정 요약
+
+- 반복 master는 새 `assistant_task_series`, 회차는 `series_id`·`occurrence_date`를 가진 **평범한 `assistant_tasks` 행**, receipt는 지금 그대로의 `assistant_reminders`다. master·회차·receipt는 여전히 셋으로 나뉜다.
+- 회차가 task 행이므로 완료·취소·수정·달력 count·월별 projection·Web Push·`TaskPanel` renderer가 코드 변경 없이 그대로 돈다.
+- **그래서 override는 새 경로가 아니라 기존 API다.** 회차 건너뛰기는 `POST /api/tasks/:id/cancel`, 회차 시간 변경은 `PATCH /api/tasks/:id`다.
+- 규칙은 `매일 | 평일 | 매주 요일 | 매월 n일` 넷이다. 존재하지 않는 날짜의 회차는 만들지 않고 말일로 당기지도 않는다.
+- 회차는 향후 60일 창을 미리 만든다. 그보다 먼 미래 달력에는 반복이 보이지 않는다.
+- 시온의 자연어 override는 C1.5와 같은 **무저장 확인 카드**다. 회차 하나든 시리즈 전체든 사용자가 카드에서 적용을 눌러야 저장한다.
+- 새 기능은 `ASSISTANT_TASK_SERIES_ENABLED` 기본 `false` 뒤에 둔다.
+
+### 13.1 회차를 왜 별도 표가 아니라 task 행으로 두는가
+
+C1 설계는 `assistant_tasks`(master) → `assistant_task_occurrences` → `assistant_reminders`를 적어뒀다. 2026-08-08에 자식 task 행으로 바꿨다.
+
+별도 표를 만들면 치러야 하는 값은 이렇다. `assistant_reminders`의 `idx_assistant_reminders_one_live_per_task` UNIQUE 인덱스를 회차 단위로 재작성해야 하고, `list`·`summary`·달력 count·`<schedule>` 컨텍스트·월별 projection·`TaskPanel`이 전부 "task 아니면 회차" 두 종류를 알아야 한다. 이미 Pi에서 돌고 있는 코드 여섯 자리에 회귀 위험이 붙는다.
+
+자식 task 행이면 그 값이 0이다. 회차마다 task 행이 하나라 알림 UNIQUE 인덱스가 그대로 성립하고, 완료·취소·PATCH·달력·노트·푸시가 회차를 이미 아는 것으로 취급한다. 무엇보다 사용자가 요구한 override 두 가지가 **배포돼 돌아가는 API를 그대로 쓴다.**
+
+이 문서가 원래 금지한 것은 "C1의 task 한 행에 `recurrence_rule` 한 컬럼을 얹어 회차별 완료를 그 한 행으로 표현하는 것"이다. 회차마다 자기 행과 자기 상태·자기 알림을 갖는 이 구조는 그 금지에 걸리지 않는다.
+
+대가는 세 가지고 13.6·13.10에서 다룬다. 행이 늘어나는 것, 목록·컨텍스트에 접기 규칙이 필요한 것, 월별 노트에 회차가 쌓이는 것이다.
+
+### 13.2 규칙과 회차 날짜
+
+|`freq`|추가 필드|회차 날짜|
+|---|---|---|
+|`daily`|없음|`start_date`부터 매일|
+|`weekdays`|없음|`start_date`부터 KST 월~금|
+|`weekly`|`by_weekday` (ISO `1`=월 … `7`=일, 복수)|해당 요일마다|
+|`monthly`|`by_monthday` (1~31)|매달 그 날짜, 없는 달은 회차 없음|
+
+- 회차 날짜는 **`start_date` anchor에서 계산한다.** 알림 발화 시각이나 집행 시각에서 다음 회차를 세지 않으므로 downtime이나 늦은 발화가 회차를 밀지 못한다.
+- `매월 31일`은 2·4·6·9·11월에 회차가 없다. RFC 5545가 존재하지 않는 recurrence instance를 “MUST be ignored”라고 정한 것을 따르고, 말일로 당기는 보정은 하지 않는다.[^rfc5545]
+- `end_date`가 있으면 그날까지 포함이고, 없으면 무기한이다.
+- `time_kind = 'date'`인 시리즈의 회차는 날짜 기한(`due_date`), `'datetime'`이면 `occurrence_date`와 `time_of_day`를 합친 KST 절대 시각(`due_at`)이다.
+- 규칙 전개는 저장소·시계와 분리된 순수 함수 `occurrencesBetween(rule, fromDate, toDate)`가 정본이다. 기대값을 손으로 낼 수 있어야 테스트가 규칙을 지킨다.
+
+### 13.3 회차 생성 (materializer)
 
 ```text
-assistant_tasks             # 반복 master
-  -> assistant_task_occurrences  # 날짜별 open/done/skipped/cancelled 회차
-       -> assistant_reminders    # pending/fired/acknowledged receipt
+서버 시작 직후 1회
+  -> 이후 기존 30초 scheduler tick에 얹어 실행
+
+materialize(seriesId, now)
+  -> 창 끝 = max(오늘 + 60일, **오늘 기준** 다음 4회차의 마지막)
+  -> 시작 = max(오늘, start_date, materialized_through + 1일)
+  -> occurrencesBetween(rule, 시작, 창 끝) · 한 번에 70행 안전 상한
+  -> 각 회차를 client_request_id `series:{id}:{date}`로 생성
+  -> materialized_through 갱신 (상한에 잘렸으면 실제 마지막 날짜까지만)
 ```
 
-C2는 구현 시점의 다음 가용 schema와 별도 컨펌으로 아래만 검토한다. schema v9는 먼저 확정된 V4.5-M 모델 런타임의 additive migration이 사용한다.
+- 회차 생성은 기존 create 경로를 거치므로 `client_request_id` UNIQUE가 멱등을 보장한다. materializer가 몇 번 돌아도, 두 인스턴스가 동시에 돌아도 회차는 늘지 않는다.
+- **과거 회차는 만들지 않는다.** Pi가 며칠 꺼져 있다가 올라와도 지나간 날짜의 회차가 새로 생기지 않는다.
+- 매 tick마다 전체 시리즈를 훑지 않는다. `status = 'active' AND materialized_through < 창 끝`인 시리즈만 대상이라 평소 tick에서는 0행이다.
+- **"다음 4회"는 반드시 오늘에서 센다.** 이미 만들어 둔 지점에서 세면 부를 때마다 창이 그만큼 더 밀려서, 같은 날 `materialize`를 세 번 부르면 회차가 세 번 늘어난다. 창 끝이 오늘과 규칙만 보는 값이라야 멱등이 성립한다. 구현 중 이 순서를 반대로 잡았다가 재실행 테스트가 잡았다.
+- 한 번에 만드는 행의 안전 상한은 70이다. 규칙 넷 중 창을 가장 빽빽하게 채우는 매일 반복이 오늘 포함 61행이라 그 위로 여유를 둔 값이고, 상한에 잘리면 `materialized_through`를 창 끝이 아니라 실제 마지막 날짜로 적어 잘린 뒤쪽을 다음 실행이 이어 만든다.
+- 회차의 알림은 `reminder_lead_seconds`가 있으면 그 시각의 `origin = 'user'` 알림이고, 없으면 C1의 기본 알림 계약(`datetime`은 10분 전, `date`는 당일 09:00 KST)이 그대로 적용된다. 어느 쪽이든 이미 지난 시각으로는 만들지 않는다.
 
-- `매일 | 평일 | 매주`의 제한된 반복
-- 회차 완료와 반복 전체 종료 분리
-- downtime 중 최신 놓친 회차 하나만 표시하고 이전 회차는 skipped 집계
-- fired 시각이 아니라 KST anchor로 다음 회차 계산해 drift 방지
-- schedule version이 바뀌면 이전 미래 회차를 transaction 안에서 취소
+### 13.4 override
 
-매월, n번째 요일, 공휴일, cron, 하루 여러 번은 그 뒤로 미룬다. RFC 5545는 존재하지 않는 날짜에 생긴 recurrence instance를 “MUST be ignored”라고 정한다.[^rfc5545] 전체 RRULE을 흉내 내기보다 지원하는 규칙을 작게 명시하는 편이 안전하다.
+|요청|수단|결과|
+|---|---|---|
+|이번 회차 건너뛰기|`POST /api/tasks/:id/cancel`|회차만 `cancelled/closed`, 알림 취소, 시리즈는 계속|
+|이번 회차만 시간·제목 변경|`PATCH /api/tasks/:id`|회차만 변경되고 `overridden = 1`|
+|이후 전체 변경|`PATCH /api/task-series/:id`|미래 회차 중 `overridden = 0 AND status = 'active'`만 재생성|
+|반복 종료|`POST /api/task-series/:id/end`|`status = 'ended'`, 미래 미완료 회차를 같은 transaction에서 취소|
+|잘못 건너뛴 회차 되살리기|`POST /api/tasks/:id/reopen`|회차가 다시 `active`, 기본 알림도 다시 잡힘|
+
+- **손댄 회차와 이미 종결한 회차는 규칙을 바꿔도 보존한다.** 사용자가 이번 주만 8시로 옮겨둔 회차를 시리즈 시각 변경이 덮어쓰면, 사용자가 방금 한 결정을 조용히 지우는 것이다.
+- 회차 하나를 고치는 경로와 시리즈를 고치는 경로는 API가 다르다. 그래서 UI와 도구는 항상 `이번만 | 이후 전체`를 명시적으로 고르게 한다.
+- 앞의 두 줄은 이미 배포된 API라 C2에서 새로 만들 것이 `overridden` 표시뿐이다.
+
+### 13.5 놓친 회차
+
+Pi가 꺼져 있는 동안 지나간 회차와 그 알림이 한꺼번에 쌓이는 것을 막는다.
+
+- **정책**: 회차의 기한이 지났고 **그보다 나중 회차도 이미 지났으면**, 지난 회차를 `cancelled`(`actor_type = 'system'`)로 자동 종결한다.
+- 그래서 사용자에게 보이는 놓친 회차는 항상 최대 하나다. 원안의 "최신 놓친 회차 하나만 표시하고 이전 회차는 skipped 집계"와 같은 결과다.
+- **새 상태 enum을 만들지 않는 이유**: `assistant_reminders.cancellation_reason`이나 task `status`의 CHECK를 넓히려면 그 표를 재생성해야 한다. `assistant_reminders`는 자기 자신(`snoozed_from_id`)과 `assistant_push_deliveries`의 FK 대상이라 12-step ALTER가 필요하고, 운영 DB에서 치를 값이 아니다. 기존 취소 경로를 쓰면 0이다.
+- 부수 효과가 의도와 맞는다. 월별 노트의 취소 구역에 "그날 못 했다"로 남고, 판정이 "다음 회차도 지났을 때"라 자연히 한 회차만큼 유예가 생겨 어제 회차를 오늘 아침에 완료 표시하는 것은 계속 된다.
+- 단발 task에는 적용하지 않는다. 지금처럼 `overdue`로 남는다.
+
+### 13.6 목록·달력·컨텍스트 접기
+
+매일 반복 하나가 60행을 만들기 때문에 접지 않으면 목록과 모델 컨텍스트를 통째로 먹는다.
+
+- `list`의 `today | upcoming | inbox | all`은 **시리즈당 가장 이른 미완료 회차 1개만** 노출하고, 그 항목에 시리즈 id·규칙 요약·남은 회차 수를 함께 준다.
+- `summary.calendar`의 날짜별 `count`는 **접지 않는다.** 그날 몇 건인지가 달력이 답해야 하는 질문이다.
+- `<schedule>` 채팅 컨텍스트는 시리즈를 규칙 한 줄 + 다음 회차 하나로 넣는다. 기존 20개·6,000자 상한과 escape 규칙은 그대로다.
+- 시리즈의 전체 회차는 `GET /api/task-series/:id/occurrences`로만 조회한다.
+- 월별 projection은 같은 시리즈의 회차를 한 항목으로 묶고 날짜를 나열한다. 매일 반복이 노트에 30줄로 쌓이지 않게 한다.
+
+### 13.7 API
+
+```http
+GET    /api/task-series
+POST   /api/task-series
+PATCH  /api/task-series/:id
+POST   /api/task-series/:id/end
+GET    /api/task-series/:id/occurrences
+```
+
+- 기존 task API와 같은 `requireApiToken` 뒤, 같은 JSON 상한, 같은 `error`·`code` 형식을 쓴다.
+- 생성은 `clientRequestId` + canonical payload SHA-256으로 멱등이고, 수정·종료는 `expectedVersion` 낙관적 동시성으로 다르면 `409`다.
+- 회차 override는 새 endpoint를 만들지 않고 기존 `PATCH /api/tasks/:id`·`/complete`·`/cancel`·`/reopen`을 쓴다.
+- `ASSISTANT_TASK_SERIES_ENABLED = false`면 시리즈 API는 `503 { code: 'TASK_SERIES_DISABLED' }`이고 materializer를 시작하지 않는다. 기존 단발 task 경로는 영향받지 않는다.
+
+### 13.8 시온 자연어 경계
+
+- 반복 **생성**은 기존 `schedule_prepare`에 선택적 `recurrence`를 더한다. 도구를 나누지 않는 이유는, 나누면 "매주 화요일 운동 만들어줘"를 지금처럼 단발 일정으로 잘못 만드는 경로가 그대로 남기 때문이다. 같은 생성 의도는 한 도구가 받는다.
+- **override**는 새 `schedule_override_prepare`다. 동작은 `skip | reschedule | series_update | end` 넷이고, 대상은 회차 `taskId` 또는 `seriesId`다.
+- 두 도구 모두 **저장하지 않는다.** 확인 카드를 만들 뿐이고 사용자가 `적용`을 눌러야 기존 API가 저장한다. 회차 하나든 시리즈 전체든 예외가 없다.
+- **대상이 유일하게 확정되지 않으면 서버가 도구 호출을 거부하고 모델이 되묻는다.** 제목 문자열 매칭으로 대상을 고르지 않으며, `<schedule>` 컨텍스트 줄에 회차·시리즈 식별자를 붙여 모델이 id로 지목하게 한다. 이 fail-close는 모델 정확도에 기대지 않는 부분이다.
+- 조회·완료·삭제는 계속 도구 경계 밖이다.
+
+2026-08-08에 무카드 즉시 override를 검토하고 접었다. 근거는 두 가지다. 첫째, **override의 실패는 조용하다.** 일정을 잘못 만들면 쓸모없는 항목이 화면에 남지만, 잘못 건너뛰면 아무 일도 안 일어나는 것이 결과라서 사용자가 그것을 아는 시점이 일정을 놓친 뒤다. 둘째, override에는 create에 없는 **대상 지목** 단계가 있어서 create의 정확도 관찰이 근거가 되지 못한다. 게다가 그 관찰 자체가 확인 카드로 걸러진 표본이라 걸러낸 오답 수를 우리가 모른다.
+
+### 13.9 UI
+
+- 작성 카드에 반복 선택을 더한다. 규칙 넷과 시각, 선택적 종료일, 선택적 알림 offset이고 제출 전 절대 KST 요약에 다음 회차 몇 개를 함께 보여준다.
+- 회차 카드에는 반복 배지를 붙이고, 수정·취소를 누르면 `이번만 | 이후 전체`를 먼저 고르게 한다.
+- 시리즈 목록·수정·종료 화면을 `TaskPanel` 안에 둔다. 새 최상위 화면을 만들지 않는다.
+- 기존 색·서체·radius·다크모드 token과 44px 모바일 target을 그대로 쓴다. 새 palette·font·component library를 도입하지 않는다.
+
+### 13.10 트레이드오프
+
+- **회차를 미리 만든다**: 행이 늘고 목록·컨텍스트에 접기 규칙이 필요한 대신, 달력·알림·완료·노트가 전부 기존 코드로 돈다.
+- **창이 60일이다**: 그보다 먼 미래로 달력을 넘기면 반복 일정이 비어 보인다. 가상 회차 확장을 만들지 않는 대가이고, 알려진 한계로 남긴다.
+- **놓친 회차를 자동 취소한다**: 며칠 뒤 돌아와 "그날 사실 했다"고 기록할 수는 없어지지만, 알람 세 개가 한꺼번에 터지지 않는다.
+- **`schedule_prepare`를 확장한다**: 배포돼 돌아가는 C1.5 도구 스키마를 건드리는 회귀 표면이 생기지만, 반복 요청이 단발 일정으로 조용히 저장되는 경로를 남기지 않는다.
+- **override에 확인 카드를 유지한다**: 말 한마디로 끝나지 않는 마찰이 남지만, 조용히 실패하는 변경을 승인 없이 저장하지 않는다.
+
+### 13.11 아직 미루는 것
+
+- `N주마다`, 하루 여러 번, `n번째 요일`, 공휴일 인식, cron, 외부 캘린더 읽기·쓰기
+- 60일 창 밖의 가상 회차 확장
+- 무카드 즉시 override (13.8의 근거로 보류)
+
+전체 RRULE을 흉내 내기보다 지원하는 규칙을 작게 명시하는 편이 안전하다.
 
 C1.5는 front Claude가 필요할 때 deterministic `schedule_prepare`를 호출해 **무저장 후보 카드**만 만들고, 사용자가 확인한 뒤 기존 `POST /api/tasks`가 같은 canonical payload를 저장하도록 구현했다. 단순 일정 생성에 두 번째 scheduling LLM은 두지 않는다. 해석 기준 시각은 한 번 캡처하고, 카드에 표시한 canonical KST 값을 승인 시 다시 해석하지 않는다.
 
