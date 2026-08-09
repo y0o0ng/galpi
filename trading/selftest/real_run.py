@@ -24,6 +24,8 @@ EODHD 약관은 해지 후 1개월 안에 가격 복사본을 지우라고 요�
 
     python3 selftest/real_run.py universe   # 호출 없음
     python3 selftest/real_run.py bars       # EODHD 908회 (중단되면 다시 돌려도 된다)
+    python3 selftest/real_run.py remap      # 재사용 티커의 옛 계열을 찾아 받는다
+    python3 selftest/real_run.py universe   # 매핑을 반영해 다시 적재한다
     python3 selftest/real_run.py check      # EODHD 2회
     python3 selftest/real_run.py edgar      # SEC EDGAR, 무료
     python3 selftest/real_run.py status
@@ -41,11 +43,15 @@ sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest import store  # noqa: E402
 from backtest.data import register_source  # noqa: E402
-from backtest.edgar import collect  # noqa: E402
+from backtest.edgar import CIK_OVERRIDES, collect  # noqa: E402
 from backtest.eodhd import (  # noqa: E402
+    REUSE_SUFFIXES,
     EodhdClient,
+    find_reused_series,
     load_prices,
     missing_universe_symbols,
+    parse_reused_csv,
+    reused_csv,
     uncovered_intervals,
     unlisted_symbols,
 )
@@ -114,6 +120,74 @@ def reconstructions() -> list:
     ]
 
 
+REUSED_NAME = "reused-tickers.csv"
+
+
+def reused_mapping() -> dict[tuple[str, str], str]:
+    """`(심볼, 구간 시작) → 벤더 계열`. 없으면 빈 매핑이다.
+
+    **공고 CSV와 따로 둔다.** `universe/*.csv`는 S&P·Nasdaq 공고를 옮긴 공개 기록이고
+    벤더 코드가 섞이면 안 된다. 이 파일은 그 기록을 벤더 계열에 맞추는 별도 층이다.
+    """
+    path = UNIVERSE_DIR / REUSED_NAME
+    return parse_reused_csv(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def reused_rows() -> list:
+    """매핑 파일의 줄 전체. `vendor_name`에 손으로 넣은 줄의 근거가 들어 있다."""
+    from backtest.eodhd import ReusedSeries
+
+    path = UNIVERSE_DIR / REUSED_NAME
+    if not path.exists():
+        return []
+    return [
+        ReusedSeries(
+            symbol=(row.get("symbol") or "").strip().upper(),
+            valid_from=(row.get("valid_from") or "").strip(),
+            vendor_symbol=(row.get("vendor_symbol") or "").strip().upper(),
+            vendor_name=(row.get("vendor_name") or "").strip(),
+            first="",
+            last="",
+        )
+        for row in csv.DictReader(path.read_text(encoding="utf-8").splitlines())
+        if (row.get("symbol") or "").strip()
+    ]
+
+
+def apply_reused(reconstructions: list, mapping: dict[tuple[str, str], str]) -> list:
+    """재사용된 티커의 구간을 벤더 계열 심볼로 바꾼다.
+
+    **다른 회사이므로 다른 심볼이다.** 합치면 한 계열에 두 회사가 섞여 새 회사의 첫
+    252세션이 옛 회사 바로 피처를 계산한다.
+    """
+    from dataclasses import replace as _replace
+
+    if not mapping:
+        return reconstructions
+    changed = 0
+    result = []
+    for reconstruction in reconstructions:
+        intervals = []
+        for interval in reconstruction.intervals:
+            vendor = mapping.get((interval.symbol, interval.valid_from))
+            if vendor:
+                changed += 1
+                intervals.append(_replace(interval, symbol=vendor))
+            else:
+                intervals.append(interval)
+        result.append(_replace(reconstruction, intervals=tuple(intervals)))
+    print(f"재사용 티커 매핑 {changed}구간 적용")
+    return result
+
+
+def reset_universe(connection) -> int:
+    """구성원 적재분만 지운다. 커밋된 CSV에서 언제든 다시 만들 수 있다."""
+    with connection:
+        return connection.execute(
+            "DELETE FROM universe_membership WHERE source_version = ?", (SOURCE_VERSION,)
+        ).rowcount
+
+
 def stage_universe(connection) -> int:
     """커밋된 CSV에서 구간을 만들어 넣는다. **위반이 있으면 거부한다.**
 
@@ -122,9 +196,12 @@ def stage_universe(connection) -> int:
     """
     from backtest.membership import load_universe
 
+    cleared = reset_universe(connection)
+    if cleared:
+        print(f"이전 구성원 적재분 {cleared}구간을 비웠습니다.")
     summary = load_universe(
         connection,
-        reconstructions(),
+        apply_reused(reconstructions(), reused_mapping()),
         "announcements",
         SOURCE_VERSION,
         check_dates=check_dates(),
@@ -176,6 +253,52 @@ def stage_bars(connection) -> int:
     return 0
 
 
+def stage_remap(connection) -> int:
+    """재사용된 티커의 옛 계열을 찾아 매핑 파일을 쓰고 바를 받는다.
+
+    `unlisted_symbols`가 0을 주는데도 구간이 비는 이유가 여기 있었다. 현재 티커는 벤더
+    목록에 멀쩡히 있고 그 시절 회사는 `_OLD` 아래 따로 있다. 이 단계를 돌린 뒤 `universe`를
+    다시 돌려야 매핑이 `universe_membership`에 반영된다.
+    """
+    uncovered = uncovered_intervals(connection, SOURCE_VERSION, end=WINDOW_END)
+    if not uncovered:
+        print("못 덮는 구간이 없습니다.")
+        return 0
+    client = EodhdClient()
+    found, remaining = find_reused_series(
+        client, uncovered, start=BARS_START, end=WINDOW_END
+    )
+    print(f"못 덮는 구간 {len(uncovered)}개 중 {len(found)}개에 옛 계열을 찾았습니다"
+          f" (호출 {client.calls}회)")
+    for item in found:
+        print(f"  {item.symbol:<7}{item.valid_from} → {item.vendor_symbol:<12}"
+              f" {item.first}~{item.last}")
+    if remaining:
+        print(f"\n옛 계열을 못 찾은 구간 {len(remaining)}개:")
+        for item in remaining:
+            print(f"  {item.describe()}")
+
+    # 이미 있는 줄은 그대로 둔다. `_OLD` 규칙으로 못 찾아 손으로 넣은 줄(`TFCFA`·`SUN1`
+    # 처럼 규칙 밖의 코드)과 그 근거가 여기서 지워지면 안 된다.
+    path = UNIVERSE_DIR / REUSED_NAME
+    rows = reused_rows()
+    have = {(row.symbol, row.valid_from) for row in rows}
+    rows.extend(item for item in found if (item.symbol, item.valid_from) not in have)
+    path.write_text(reused_csv(rows), encoding="utf-8")
+    print(f"\n{REUSED_NAME}에 {len(rows)}줄을 썼습니다"
+          f" (기존 {len(have)}줄 보존, 새로 {len(rows) - len(have)}줄).")
+
+    vendor_symbols = sorted({item.vendor_symbol for item in found})
+    pending = pending_symbols(connection, vendor_symbols)
+    if pending:
+        summary = load_prices(
+            connection, pending, SOURCE_VERSION, start=BARS_START, end=WINDOW_END
+        )
+        print(f"옛 계열 {summary['loaded']}/{len(pending)}종목 {summary['rows']:,}행 적재")
+    print("\n`universe`를 다시 돌려야 매핑이 반영됩니다.")
+    return 0
+
+
 def stage_check(connection) -> int:
     """세 그물. 다 비어야 편향 없음을 선언한다."""
     symbols = [s for s in universe_symbols() if s != REFERENCE_SYMBOL]
@@ -219,6 +342,26 @@ def stage_check(connection) -> int:
     )
     print("\n세 검사를 모두 통과해 `survivorship_biased=False`로 선언했습니다.")
     return 0
+
+
+def base_symbol(symbol: str) -> str:
+    """벤더 접미사를 뗀 지수 티커. 이름·CIK는 벤더 규칙과 무관하게 그 티커로 묶여 있다."""
+    for suffix in REUSE_SUFFIXES:
+        if symbol.endswith(suffix):
+            return symbol[: -len(suffix)]
+    return symbol
+
+
+def membership_symbols(connection) -> list[str]:
+    """실제로 적재된 구성원 심볼. 재사용 매핑 뒤에는 CSV의 티커와 다를 수 있다."""
+    return [
+        row["symbol"]
+        for row in connection.execute(
+            "SELECT DISTINCT symbol FROM universe_membership"
+            " WHERE source_version = ? ORDER BY symbol",
+            (SOURCE_VERSION,),
+        ).fetchall()
+    ]
 
 
 def security_names() -> dict[str, str]:
@@ -272,13 +415,23 @@ def stage_edgar(connection) -> int:
     cleared = reset_edgar(connection)
     if any(cleared):
         print(f"이전 적재분을 비웠습니다: 실적 {cleared[0]:,}행, 섹터 {cleared[1]}행")
-    symbols = [s for s in universe_symbols() if s != REFERENCE_SYMBOL]
+    # 구성원 심볼로 돈다. 재사용 매핑 뒤에는 `CEG_OLD`처럼 CSV의 티커와 다르고,
+    # `securities`·`earnings_calendar`는 멤버십과 같은 심볼로 묶여야 한다.
+    symbols = [s for s in membership_symbols(connection) if s != REFERENCE_SYMBOL]
+    # 이름·CIK는 지수 티커로 묶여 있으므로 벤더 접미사를 떼고 찾는다.
+    names = security_names()
+    names.update({s: names[base_symbol(s)] for s in symbols
+                  if s not in names and base_symbol(s) in names})
+    overrides = dict(CIK_OVERRIDES)
+    overrides.update({s: overrides[base_symbol(s)] for s in symbols
+                      if s not in overrides and base_symbol(s) in overrides})
     summary = collect(
         connection,
         symbols,
         SOURCE_VERSION,
         window_start=FLOOR_DATE,
-        security_names=security_names(),
+        overrides=overrides,
+        security_names=names,
         spans=membership_spans(connection),
     )
     counts: dict[str, int] = {}
@@ -340,6 +493,7 @@ def stage_status(connection) -> int:
 STAGES = {
     "universe": stage_universe,
     "bars": stage_bars,
+    "remap": stage_remap,
     "check": stage_check,
     "edgar": stage_edgar,
     "status": stage_status,

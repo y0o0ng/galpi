@@ -346,6 +346,107 @@ def uncovered_intervals(
     return found
 
 
+# 벤더가 재사용된 티커의 **옛** 회사를 담아두는 접미사. 실측으로 확인한 규칙이다 —
+# `CEG_OLD`(CONSTELLATION ENERGY GROUP INC)·`DELL_OLD`(Dell Inc)·`EMC_OLD`(EMC Corporation).
+# 한 티커를 세 회사가 나눠 쓴 경우를 위해 번호가 붙은 것도 본다(`PCS_OLD`·`PCS_OLD1`).
+REUSE_SUFFIXES = ("_OLD", "_OLD1", "_OLD2", "_OLD3")
+
+REUSED_CSV_COLUMNS = ("symbol", "valid_from", "vendor_symbol", "vendor_name")
+
+
+@dataclass(frozen=True)
+class ReusedSeries:
+    """멤버십 구간 하나를 벤더의 어느 계열에서 읽을지."""
+
+    symbol: str
+    valid_from: str
+    vendor_symbol: str
+    vendor_name: str
+    first: str
+    last: str
+
+
+def find_reused_series(
+    client: EodhdClient,
+    uncovered: list[IntervalCoverage],
+    *,
+    start: str,
+    end: str,
+    tolerance_days: int = 10,
+) -> tuple[list[ReusedSeries], list[IntervalCoverage]]:
+    """구간을 못 덮는 심볼마다 `_OLD` 계열을 찾아 **구간을 덮는 것만** 받는다.
+
+    `unlisted_symbols`가 0을 주는데도 구간이 비는 이유가 여기 있었다. 현재 티커는 벤더
+    목록에 멀쩡히 있고, 정작 그 시절 회사는 `_OLD` 아래 따로 있다.
+
+    **찾은 계열을 기본 심볼로 합치지 않는다.** `CEG_OLD`는 2006~2012, 새 `CEG`는 2022~라
+    한 계열로 묶으면 10년 구멍과 가격 점프가 있는 하나가 되고, 새 회사의 첫 252세션이
+    SMA·ATR·모멘텀을 옛 회사 바에서 끌어온다. 다른 회사는 다른 심볼로 둔다.
+    """
+    known = set()
+    for delisted in (False, True):
+        known |= {listing.symbol for listing in client.listings("US", delisted=delisted)}
+
+    found: list[ReusedSeries] = []
+    remaining: list[IntervalCoverage] = []
+    for interval in uncovered:
+        closes_at = min(interval.valid_to, end) if interval.valid_to else end
+        picked = None
+        for suffix in REUSE_SUFFIXES:
+            candidate = f"{interval.symbol}{suffix}"
+            if candidate not in known:
+                continue
+            bars = client.eod(f"{candidate}.US", start, end)
+            if bars.first is None or bars.last is None:
+                continue
+            if bars.first > _shift_days(interval.valid_from, tolerance_days):
+                continue
+            if bars.last < _shift_days(closes_at, -tolerance_days):
+                continue
+            picked = ReusedSeries(
+                symbol=interval.symbol,
+                valid_from=interval.valid_from,
+                vendor_symbol=candidate,
+                vendor_name="",
+                first=bars.first,
+                last=bars.last,
+            )
+            break
+        if picked:
+            found.append(picked)
+        else:
+            remaining.append(interval)
+    return found, remaining
+
+
+def reused_csv(items: list[ReusedSeries]) -> str:
+    lines = [",".join(REUSED_CSV_COLUMNS)]
+    for item in sorted(items, key=lambda value: (value.symbol, value.valid_from)):
+        lines.append(
+            f"{item.symbol},{item.valid_from},{item.vendor_symbol},{item.vendor_name}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def parse_reused_csv(text: str) -> dict[tuple[str, str], str]:
+    """`(심볼, 구간 시작) → 벤더 계열` 매핑."""
+    import csv as _csv
+    import io as _io
+
+    reader = _csv.DictReader(_io.StringIO(text))
+    missing = [name for name in REUSED_CSV_COLUMNS[:3] if name not in (reader.fieldnames or ())]
+    if missing:
+        raise EodhdError("재사용 티커 CSV에 없는 열입니다: " + ", ".join(missing))
+    mapping: dict[tuple[str, str], str] = {}
+    for row in reader:
+        symbol = (row.get("symbol") or "").strip().upper()
+        vendor = (row.get("vendor_symbol") or "").strip().upper()
+        valid_from = (row.get("valid_from") or "").strip()
+        if symbol and vendor and valid_from:
+            mapping[(symbol, valid_from)] = vendor
+    return mapping
+
+
 def missing_universe_symbols(
     connection: sqlite3.Connection,
     source_version: str,
