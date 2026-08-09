@@ -25,6 +25,8 @@ from backtest.eodhd import (  # noqa: E402
     load_prices,
     missing_universe_symbols,
     parse_listings,
+    uncovered_intervals,
+    unlisted_symbols,
 )
 
 VERSION = "v1"
@@ -192,6 +194,110 @@ class UniverseCoverageTest(unittest.TestCase):
             ),
             [],
         )
+
+
+class UnlistedSymbolsTest(unittest.TestCase):
+    """개명한 회사가 조용히 빠지는 것을 적재 전에 잡는 그물."""
+
+    class ListingClient(EodhdClient):
+        def __init__(self, live, dead):
+            self.key = "test"
+            self.interval = 0.0
+            self._last_call = 0.0
+            self.calls = 0
+            self.live, self.dead = live, dead
+
+        def listings(self, exchange="US", delisted=False):
+            codes = self.dead if delisted else self.live
+            self.calls += 1
+            return [
+                Listing(code, code, "NYSE", COMMON_STOCK, "USD", None, delisted)
+                for code in codes
+            ]
+
+    def test_a_renamed_ticker_is_reported(self):
+        client = self.ListingClient(live=["MNST"], dead=["MWW"])
+        # HANS는 어느 쪽에도 없다 — 개명을 아직 안 걸어준 것이다.
+        self.assertEqual(unlisted_symbols(client, ["MNST", "MWW", "HANS"]), ["HANS"])
+
+    def test_the_delisted_list_counts_as_listed(self):
+        """폐지 종목은 상장 목록에 없다. 그것만 보면 폐지 전체가 개명으로 오인된다."""
+        client = self.ListingClient(live=["MNST"], dead=["MWW"])
+        self.assertEqual(unlisted_symbols(client, ["MWW"]), [])
+        self.assertEqual(client.calls, 2)
+
+
+class UncoveredIntervalsTest(unittest.TestCase):
+    """티커 재사용은 바가 **있는데** 다른 회사 것이다. 커버리지로만 보인다."""
+
+    def setUp(self):
+        self.connection = store.connect_memory()
+        from backtest.data import load_universe_csv, register_source
+
+        register_source(self.connection, "announcements", VERSION, "universe")
+        load_universe_csv(
+            self.connection,
+            "symbol,index_name,valid_from,valid_to\n"
+            # 옛 SanDisk 자리. 벤더 계열은 2025년 신설 법인 것이라 구간을 못 덮는다.
+            "SNDK,SP500,2008-01-02,2016-05-12\n"
+            # 정상. 계열이 구간보다 먼저 시작해서 끝까지 간다.
+            "AAPL,SP500,2008-01-02,\n"
+            # 구간 도중에 계열이 끊긴다.
+            "STOPS,SP500,2008-01-02,2016-05-12\n",
+            "announcements",
+            VERSION,
+        )
+
+    def _load(self, payloads):
+        symbols = [name.removesuffix(".US") for name in payloads]
+        load_prices(self.connection, symbols, VERSION, client=FakeClient(payloads))
+
+    def test_a_reused_ticker_shows_up_as_a_late_start(self):
+        self._load(
+            {
+                "SNDK.US": [eod_row("2025-02-13"), eod_row("2026-08-07")],
+                "AAPL.US": [eod_row("2008-01-02"), eod_row("2026-08-07")],
+                "STOPS.US": [eod_row("2008-01-02"), eod_row("2016-05-10")],
+            }
+        )
+        found = uncovered_intervals(self.connection, VERSION, end="2026-08-07")
+        self.assertEqual(
+            [(item.symbol, item.problem) for item in found], [("SNDK", "STARTS_LATE")]
+        )
+
+    def test_a_series_that_stops_mid_interval_is_reported(self):
+        self._load(
+            {
+                "SNDK.US": [eod_row("2008-01-02"), eod_row("2016-05-10")],
+                "AAPL.US": [eod_row("2008-01-02"), eod_row("2026-08-07")],
+                "STOPS.US": [eod_row("2008-01-02"), eod_row("2012-01-03")],
+            }
+        )
+        found = uncovered_intervals(self.connection, VERSION, end="2026-08-07")
+        self.assertEqual(
+            [(item.symbol, item.problem) for item in found], [("STOPS", "ENDS_EARLY")]
+        )
+
+    def test_a_member_with_no_bars_at_all_is_reported(self):
+        self._load({"AAPL.US": [eod_row("2008-01-02"), eod_row("2026-08-07")]})
+        problems = {item.symbol: item.problem for item in
+                    uncovered_intervals(self.connection, VERSION, end="2026-08-07")}
+        self.assertEqual(problems, {"SNDK": "NO_BARS", "STOPS": "NO_BARS"})
+
+    def test_a_back_filled_reuse_is_not_caught(self):
+        """**이 그물이 못 잡는 것을 고정해둔다.**
+
+        벤더가 생존 회사 이력을 구간 전체에 back-fill하면 커버리지는 완벽하다. `MNST`가
+        그랬다. 그것은 다구간 심볼을 이름으로 확인해야 보이고, 이 함수의 일이 아니다.
+        """
+        self._load(
+            {
+                "SNDK.US": [eod_row("1995-01-03"), eod_row("2026-08-07")],
+                "AAPL.US": [eod_row("2008-01-02"), eod_row("2026-08-07")],
+                "STOPS.US": [eod_row("1995-01-03"), eod_row("2026-08-07")],
+            }
+        )
+        self.assertEqual(uncovered_intervals(self.connection, VERSION, end="2026-08-07"), [])
 
 
 class LoadPricesTest(unittest.TestCase):

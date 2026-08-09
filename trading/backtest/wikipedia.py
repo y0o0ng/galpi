@@ -132,6 +132,74 @@ SYMBOL_RENAMES = (
            "Booking Holdings former_name 'Priceline.com Incorporated (1998–2014)'"),
     Rename("NDX100", "NWSA", "2013-06-28", "FOXA",
            "21st Century Fox predecessor 'News Corporation', traded_as FOXA (Class A, 2013–2019)"),
+    # 아래 여덟은 2026-08-09에 **벤더 심볼 목록 대조**로 찾았다. 위 항목들을 찾은 신호는
+    # "편입만 있고 편출 없는 티커"였는데, 이것들은 편출 기록이 멀쩡히 있어서 그 신호에
+    # 걸리지 않았다. EODHD의 US 심볼 목록(상장+폐지)에 아예 없는 티커를 세는 쪽이 더 센
+    # 그물이다. `eodhd.unlisted_symbols`가 그 검사다.
+    Rename("SP500", "CDAY", "2024-02-02", "DAY",
+           "Dayforce former_name 'Ceridian HCM Holding Inc.', 보도자료 'Ceridian to change"
+           " ticker symbol to DAY on NYSE and TSX effective February 1'(2024-02-01)"),
+    Rename("SP500", "RE", "2023-07-11", "EG",
+           "Everest Group former_name 'Everest Re Group, Ltd.', traded_as {{NYSE|EG}}."
+           " 표의 2023-07-10 행이 remove RE와 add EG를 같은 날 적어 그날이 교체일이다"),
+    Rename("SP500", "FRE", "2010-06-17", "FMCC",
+           "Freddie Mac traded_as {{OTCQB|FMCC}}. 본문 'dropped a further 50% on June 16,"
+           " 2010, when the stocks delisted due to falling below minimum share prices for"
+           " the NYSE' — NYSE 폐지 다음 날부터 장외 티커를 쓴다"),
+    Rename("NDX100", "RIMM", "2013-02-04", "BB",
+           "NDX 표 2012-12-24 행이 RIMM을 [[Research in Motion]]으로 적고, 그 문서는"
+           " BlackBerry Limited로 넘어가며 traded_as {{NASDAQ|BB}}다. 본문 'ticker symbols"
+           " on the TSX and NASDAQ already were changed to BB and BBRY respectively on"
+           " February 4, 2013'. **BBRY가 아니라 BB로 보내는 이유**는 벤더 계열이 그쪽에"
+           " 전 이력을 담기 때문이다(BB.US 1999-02-04~현재, BBRY.US는 2018-03-29에 끊긴다)"),
+    Rename("NDX100", "UAUA", "2010-10-01", "UAL",
+           "UAL Corporation traded_as {{NASDAQ was|UAUA}}, successor 'United Airlines"
+           " Holdings, Inc.', fate 'Merged with Continental Airlines'(2010-10-01)."
+           " S&P 구성원 표가 United Airlines Holdings를 {{NasdaqSymbol|UAL}}로 적는다"),
+    Rename("NDX100", "WFMI", "2010-12-20", "WFM",
+           "NDX 표 2008-12-22 행이 WFMI를 [[Whole Foods Market]]으로 적고, 그 문서는"
+           " traded_as {{NASDAQ was|WFM}}에 'The company's ticker symbol on the Nasdaq was"
+           " WFM'이다. 정확한 티커 변경일은 확인하지 못해 **표에서 WFM 사용이 확인되는 가장"
+           " 이른 날짜**(2010-12-20 편입)를 쓴다"),
+    # 아래 둘은 한 쌍이다. `MNST`를 두 회사가 나눠 쓴다.
+    #
+    # NDX 표 원문이 그것을 직접 적는다 — 2008-11-10 행은 `MNST / [[Monster Worldwide]]`,
+    # 2011-12-19 행은 `MNST / [[Monster Beverage|Hansen Natural]]`이다. 뒤엣것은 표가
+    # **오늘의 티커**를 쓴 것이고 당시 티커는 HANS였다. 그래서 한쪽만 고치면 안 된다.
+    # 몬스터 월드와이드를 MWW로 보내지 않으면 그 회사의 구간이 몬스터 베버리지 가격을
+    # 받고, 한센을 MNST로 보내지 않으면 그 구간이 통째로 가격을 잃는다.
+    Rename("NDX100", "HANS", "2012-01-05", "MNST",
+           "Monster Beverage former_name 'Hansen Natural Corporation (1935 - 2012)',"
+           " 본문 'On January 5, 2012 ... change the name of the company from Hansen's"
+           " Natural to Monster Beverage Corporation, under the new ticker MNST'"),
+    # `before`가 2011-12-19보다 앞이어야 한다. 그날 한센이 MNST라는 이름으로 편입되는데
+    # 그 행까지 MWW로 덮으면 두 회사를 반대로 뒤집는다. 세 날 차이다.
+    Rename("NDX100", "MNST", "2011-12-16", "MWW",
+           "S&P 표 2011-12-16 행이 [[Monster Worldwide]]를 MWW로, NDX 표 2008-11-10 행이"
+           " 같은 회사를 MNST로 적는다. 정확한 티커 변경일은 확인하지 못해 **MWW 사용이"
+           " 확인되는 가장 이른 날짜**를 쓴다"),
+)
+
+# 표에 있지만 재구성에서 빼는 행. **지우는 것도 해석이므로 근거를 적는다.**
+#
+# 여기 들어오는 조건은 하나다 — 그 구간의 실체가 어느 벤더 티커에도 없어서 가격을 구할 수
+# 없을 때다. 남겨두면 `missing_universe_symbols`가 영원히 그 심볼을 물고 `SURVIVORSHIP_BIASED`
+# blocker가 안 풀린다. 종목 하나 때문에 전체 판정을 막는 것보다, 빠진 사실을 적어두고
+# 나머지를 판정하는 쪽이 낫다는 판단이다(2026-08-09 사용자 승인).
+#
+# **구성원 수 불변식이 이 구멍을 감시한다.** SP500 허용 오차가 ±6이므로 여기 쌓이는 행이
+# 늘면 `count_violations`가 먼저 걸린다. 조용히 커지지 않는다.
+EXCLUDED_CHANGES = (
+    (
+        "2016-01-19", "SP500", "remove", "ACE",
+        "이 행의 실체는 ACE가 아니라 **옛 The Chubb Corporation**이고 그 가격 계열이"
+        " 벤더에 없다. 표 원문은 'EXR replaces ACE as ACE Ltd acquires Chubb and retains"
+        " the CB ticker, giving up ACE'인데, 여기서 지수를 떠난 것은 피인수된 Chubb Corp"
+        " 이고 ACE Ltd는 CB 티커로 남았다. EODHD `CB.US`는 ACE Ltd의 계열이다 —"
+        " 인수 발표일(2015-07-01)에 거래량만 1.8→17.6M으로 뛰고 종가는 101.68→102.49로"
+        " 평평했다(피인수 기업이면 그날 +25%였어야 한다). `search/Chubb`에 옛 Chubb Corp"
+        " 계열이 없어 2008-01-02~2016-01-19 구간의 가격을 구할 방법이 없다",
+    ),
 )
 
 # 표에 없는 지수 사건. **여기에 넣는 행은 공고가 아니라 우리의 해석이므로 근거를 적는다.**
@@ -287,6 +355,31 @@ def apply_renames(index_name: str, effective: str, symbol: str) -> str:
     return symbol
 
 
+def _drop_excluded(
+    index_name: str,
+    emitted: list[tuple[str, str, str, str]],
+    since: str | None = None,
+) -> list[tuple[str, str, str, str]]:
+    """`EXCLUDED_CHANGES`의 행을 뺀다. **없어진 행은 조용히 넘기지 않는다.**
+
+    표가 고쳐져서 대상 행이 사라지면 제외는 아무 일도 안 하게 되는데, 그때가 바로 근거를
+    다시 봐야 하는 순간이다. 조용히 통과시키면 우리가 무엇을 지우고 있었는지 잊는다.
+    """
+    targets = [
+        (date_, index, action, symbol)
+        for date_, index, action, symbol, _ in EXCLUDED_CHANGES
+        if index == index_name and (since is None or date_ >= since)
+    ]
+    present = set(emitted)
+    missing = [target for target in targets if target not in present]
+    if missing:
+        raise WikipediaError(
+            f"제외하려던 행이 표에 없습니다: {missing}."
+            " 표가 바뀌었으면 EXCLUDED_CHANGES의 근거를 다시 확인하세요."
+        )
+    return [record for record in emitted if record not in set(targets)]
+
+
 def _symbol(text: str) -> str:
     """티커 셀. 클래스 표기의 점은 벤더 표기(`BRK-B`)에 맞춘다."""
     value = clean_cell(text).upper().strip()
@@ -351,6 +444,7 @@ def parse_changes(wikitext: str, index_name: str, *, since: str | None = None) -
                         apply_renames(index_name, effective, symbol),
                     )
                 )
+    emitted = _drop_excluded(index_name, emitted, since)
     emitted.extend(
         (date_, index, action, symbol)
         for date_, index, action, symbol, _ in CORRECTIONS
@@ -485,5 +579,18 @@ def _provenance(pages: list[Page], since: str) -> str:
         )
     lines += ["", "|지수|날짜|동작|심볼|근거|", "|---|---|---|---|---|"]
     for date_, index, action, symbol, evidence in CORRECTIONS:
+        lines.append(f"|{index}|{date_}|{action}|{symbol}|{evidence}|")
+    lines += [
+        "",
+        "## 표에 있지만 우리가 뺀 것",
+        "",
+        "실체의 가격 계열을 어느 벤더 티커에서도 구할 수 없는 구간이다. 남겨두면 그 심볼이",
+        "영원히 `missing_universe_symbols`에 남아 생존편향 blocker가 풀리지 않는다.",
+        "**빠진 만큼 유니버스에 구멍이 있고, 구성원 수 불변식이 그 크기를 감시한다.**",
+        "",
+        "|지수|날짜|동작|심볼|근거|",
+        "|---|---|---|---|---|",
+    ]
+    for date_, index, action, symbol, evidence in EXCLUDED_CHANGES:
         lines.append(f"|{index}|{date_}|{action}|{symbol}|{evidence}|")
     return "\n".join(lines) + "\n"

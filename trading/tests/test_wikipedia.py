@@ -21,6 +21,7 @@ sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest.wikipedia import (  # noqa: E402
     CORRECTIONS,
+    EXCLUDED_CHANGES,
     SYMBOL_RENAMES,
     WikipediaError,
     apply_renames,
@@ -58,6 +59,9 @@ changed its name.<ref>{{cite web |url=https://example.invalid/a.pdf |title=X |da
 |November 17, 2010 || IR || [[Ingersoll-Rand]] || PTV || [[Pactiv]] || Acquired.
 |-
 |December 23, 2013 || FB || [[Facebook]] || TER || [[Teradyne]] || Market cap.
+|-
+|January 19, 2016 || EXR || [[Extra Space Storage]] || ACE  || [[Chubb Limited|Chubb]] || \
+EXR replaces ACE as ACE Ltd acquires Chubb and retains the CB ticker, giving up ACE.
 |}
 """
 
@@ -134,7 +138,7 @@ class TableTest(unittest.TestCase):
     def test_both_table_styles_parse(self):
         _, inline = parse_table(SP_STYLE, "changes")
         _, per_line = parse_table(NDX_STYLE, "changes")
-        self.assertEqual(len(inline), 3)
+        self.assertEqual(len(inline), 4)
         self.assertEqual(len(per_line), 2)
         self.assertEqual(per_line[1][1], "KFT")
 
@@ -201,8 +205,43 @@ class RenameTest(unittest.TestCase):
             self.assertTrue(rename.evidence.strip(), rename)
             parse_date_ok = rename.before
             self.assertRegex(parse_date_ok, r"^\d{4}-\d{2}-\d{2}$")
-        for _, _, _, _, evidence in CORRECTIONS:
+        for _, _, _, _, evidence in CORRECTIONS + EXCLUDED_CHANGES:
             self.assertTrue(evidence.strip())
+
+    def test_the_two_monster_companies_do_not_swap(self):
+        """`MNST`를 두 회사가 나눠 쓰고 두 개명이 **세 날** 차이로 맞물린다.
+
+        몬스터 월드와이드(2008-11-10 편출)는 MWW로, 한센(2009-12-21 편출, 2011-12-19
+        재편입)은 MNST로 가야 한다. `MNST → MWW`의 `before`가 2011-12-19를 넘으면 재편입
+        행까지 MWW가 되어 두 회사가 통째로 뒤바뀐다.
+        """
+        self.assertEqual(apply_renames("NDX100", "2008-11-10", "MNST"), "MWW")
+        self.assertEqual(apply_renames("NDX100", "2009-12-21", "HANS"), "MNST")
+        self.assertEqual(apply_renames("NDX100", "2011-12-19", "MNST"), "MNST")
+
+    def test_a_rename_target_is_a_ticker_the_vendor_still_serves(self):
+        """`RIMM`은 BBRY를 거쳐 BB가 됐다. 중간 티커가 아니라 **전 이력을 든 쪽**으로 보낸다."""
+        self.assertEqual(apply_renames("NDX100", "2012-12-24", "RIMM"), "BB")
+
+
+class ExclusionTest(unittest.TestCase):
+    def test_an_excluded_row_does_not_reach_the_csv(self):
+        lines = parse_changes(SP_STYLE, "SP500").splitlines()
+        self.assertFalse([line for line in lines if line.endswith(",remove,ACE")])
+        # 같은 날 편입된 EXR은 그대로 남는다. 제외는 그 한 행에만 듣는다.
+        self.assertIn("2016-01-19,SP500,add,EXR", lines)
+
+    def test_a_vanished_target_is_refused_not_ignored(self):
+        """표가 고쳐져 대상 행이 사라지면 그때가 근거를 다시 볼 순간이다."""
+        without_ace = SP_STYLE.replace("|January 19, 2016 || EXR", "|January 19, 2016 || EXR2")
+        without_ace = without_ace.replace("|| ACE  ||", "|| ACEX ||")
+        with self.assertRaises(WikipediaError):
+            parse_changes(without_ace, "SP500")
+
+    def test_since_does_not_trip_the_refusal(self):
+        """구간 밖으로 잘린 제외 대상은 없어진 것이 아니라 범위 밖이다."""
+        lines = parse_changes(SP_STYLE, "SP500", since="2020-01-01").splitlines()
+        self.assertFalse([line for line in lines if line.startswith("2016-")])
 
 
 if __name__ == "__main__":

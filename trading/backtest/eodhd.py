@@ -23,6 +23,7 @@ EODHD는 `close`와 `adjusted_close`를 준다. 우리 `load_bars_csv`가 그날
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import sqlite3
 import time
@@ -231,6 +232,120 @@ class EodhdClient:
         )
 
 
+def unlisted_symbols(
+    client: EodhdClient,
+    symbols: list[str] | set[str] | frozenset[str],
+    *,
+    exchange: str = "US",
+) -> list[str]:
+    """벤더 심볼 목록(상장+폐지)에 아예 없는 유니버스 심볼. **적재 전에 부른다.**
+
+    개명한 회사가 유니버스에서 조용히 빠지는 것을 잡는 그물이다. 지금까지 개명을 찾은
+    신호는 "편입만 있고 편출 없는 티커"였는데, 편출 기록이 멀쩡히 있는 개명은 그 신호에
+    안 걸린다. 2026-08-09에 이 검사로 여덟 개(`ACE`·`CDAY`·`FRE`·`HANS`·`RE`·`RIMM`·
+    `UAUA`·`WFMI`)를 더 찾았다.
+
+    호출 2회이고 적재 전에 알 수 있으므로, 900여 종목을 받다가 404로 멈추는 것보다 싸다.
+    """
+    known: set[str] = set()
+    for delisted in (False, True):
+        known |= {listing.symbol for listing in client.listings(exchange, delisted=delisted)}
+    return sorted({str(symbol).strip().upper() for symbol in symbols} - known)
+
+
+NO_BARS = "NO_BARS"
+STARTS_LATE = "STARTS_LATE"
+ENDS_EARLY = "ENDS_EARLY"
+
+
+@dataclass(frozen=True)
+class IntervalCoverage:
+    """멤버십 구간 하나와 그 심볼의 벤더 계열이 얼마나 맞물리는지."""
+
+    symbol: str
+    index_name: str
+    valid_from: str
+    valid_to: str | None
+    first: str | None
+    last: str | None
+    problem: str
+
+    def describe(self) -> str:
+        return (
+            f"{self.symbol} [{self.index_name}] {self.valid_from}~{self.valid_to or ''}"
+            f" 계열 {self.first or '없음'}~{self.last or '없음'} → {self.problem}"
+        )
+
+
+def _shift_days(date: str, days: int) -> str:
+    return (dt.date.fromisoformat(date) + dt.timedelta(days=days)).isoformat()
+
+
+def uncovered_intervals(
+    connection: sqlite3.Connection,
+    source_version: str,
+    *,
+    end: str,
+    tolerance_days: int = 10,
+) -> list[IntervalCoverage]:
+    """벤더 계열이 멤버십 구간을 덮지 못하는 곳. **적재 뒤에 부른다.**
+
+    `missing_universe_symbols`는 바가 **하나도** 없는 심볼만 본다. 그래서 티커가 재사용된
+    경우를 통째로 놓친다 — 벤더는 그 티커의 현재 주인 계열을 아무 불평 없이 주고, 우리는
+    옛 구성원 자리에 **다른 회사 가격**을 넣은 채로 정상 종료한다. 2026-08-09 실측에서
+    `CEG`(2022-01-19~)·`DOW`(2019-03-20~)·`DELL`(2016-08-17~)·`SNDK`(2025-02-13~)·
+    `Q`(2024-12-31~)가 전부 그 모양이었고, 다섯 종목의 구간은 모두 2016년 이전에 끝난다.
+
+    구간 시작보다 계열이 늦게 시작하면 그것이 신호다. **지수에 들어가기 전에 상장돼 있어야
+    하므로 정상적인 종목은 계열이 구간보다 먼저 시작한다.** 반대로 계열이 구간 끝보다 일찍
+    끊기면 뒷부분이 빈 채로 백테스트가 돈다.
+
+    잡지 못하는 한 가지는 벤더가 **생존 회사 이력을 전 구간에 back-fill한** 재사용이다.
+    `MNST`가 그랬다(1995년부터 한 계열이라 커버리지는 완벽한데 2008년 자리의 실체는 몬스터
+    월드와이드다). 그것은 구간이 둘 이상인 심볼을 이름으로 확인해야 보인다.
+    """
+    # 계열의 끝은 심볼당 한 번만 잰다. 구간마다 재면 다구간 심볼에서 바 테이블을 다시 훑는다.
+    rows = connection.execute(
+        "WITH extent AS ("
+        "  SELECT symbol, MIN(trade_date) AS first, MAX(trade_date) AS last"
+        "    FROM bars_daily WHERE source_version = ? GROUP BY symbol"
+        ")"
+        " SELECT m.symbol, m.index_name, m.valid_from, m.valid_to, e.first, e.last"
+        "   FROM universe_membership AS m"
+        "   LEFT JOIN extent AS e ON e.symbol = m.symbol"
+        "  WHERE m.source_version = ?"
+        "  ORDER BY m.symbol, m.index_name, m.valid_from",
+        (source_version, source_version),
+    ).fetchall()
+
+    found: list[IntervalCoverage] = []
+    for row in rows:
+        first, last = row["first"], row["last"]
+        valid_to = row["valid_to"]
+        # 열린 구간은 적재 구간의 끝까지 필요하다.
+        closes_at = min(valid_to, end) if valid_to else end
+        if first is None:
+            problem = NO_BARS
+        elif first > _shift_days(row["valid_from"], tolerance_days):
+            problem = STARTS_LATE
+        elif last < _shift_days(closes_at, -tolerance_days):
+            problem = ENDS_EARLY
+        else:
+            continue
+        found.append(
+            IntervalCoverage(
+                symbol=row["symbol"],
+                index_name=row["index_name"],
+                valid_from=row["valid_from"],
+                valid_to=valid_to,
+                first=first,
+                last=last,
+                problem=problem,
+            )
+        )
+    return found
+
+
 def missing_universe_symbols(
     connection: sqlite3.Connection,
     source_version: str,
@@ -281,6 +396,10 @@ def load_prices(
     그대로 판정에 쓰이게 된다. 편향 없음은 증명해야 하는 주장이므로
     `missing_universe_symbols`로 유니버스 전체가 덮이는지 확인한 뒤
     `delisted_coverage_verified=True`를 넘겨야 한다.
+
+    **`missing_universe_symbols`만으로는 모자란다.** 그것은 바가 하나도 없는 심볼만 보므로,
+    티커가 재사용돼 다른 회사 계열이 들어온 구간은 통과시킨다. `uncovered_intervals`도
+    함께 비어야 한다.
     """
     eodhd = client or EodhdClient()
     register_source(
