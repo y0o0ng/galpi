@@ -1,0 +1,20 @@
+version: 2
+
+# Action을 커밋 SHA로 고정했으므로 사람이 손으로 올릴 수 없다. Dependabot이 SHA와
+# 뒤의 버전 주석을 함께 올려주기 때문에 고정과 갱신이 같이 선다.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # 취약점 알림은 이 설정과 무관하게 오지만, 정기 갱신은 직접 의존성만 연다.
+    # 전이 의존성까지 열면 PR이 쏟아져 정작 봐야 할 것을 놓친다.
+    allow:
+      - dependency-type: direct

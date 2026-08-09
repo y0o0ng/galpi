@@ -13,6 +13,7 @@ const Database = require('better-sqlite3');
 const webPush = require('web-push');
 const { runBackup, listBackups } = require('./scripts/backup');
 const { ensureDataDirectory, resolveRuntimePaths } = require('./lib/runtime-paths');
+const { assertBindIsAuthenticated } = require('./lib/bind-guard');
 const { searchSemanticScholar } = require('./lib/paper-search');
 const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
 const { createPaperNoteSaver } = require('./lib/paper-notes');
@@ -566,6 +567,34 @@ app.post('/api/voice/shortcut/turn', (req, res, next) => {
     return voiceShortcutTurnHandler(req, res, next);
   });
 });
+// 방어층 하나. 토큰을 브라우저 localStorage에 두므로 XSS 하나가 곧 토큰 유출이다.
+// 인라인 스크립트·`eval`·외부 리소스가 없고 marked·DOMPurify도 자체 호스팅이라
+// `script-src 'self'`가 그대로 선다. `style-src`의 `'unsafe-inline'`은 index.html의
+// style 속성 세 개 때문이고, 스크립트 실행과는 무관하다. `blob:`은 첨부 썸네일 캔버스와
+// 음성 재생이 object URL을 쓰기 때문이다.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "media-src 'self' blob:",
+  "connect-src 'self'",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+app.use((_req, res, next) => {
+  res.setHeader('Content-Security-Policy', CSP);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  // `frame-ancestors`를 못 읽는 브라우저를 위한 같은 뜻의 옛 헤더다.
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -603,10 +632,19 @@ function socketRateLimitKey(req) {
 
 function requireApiToken(req, res, next) {
   if (req.originalUrl === '/api/config') return next();
-  if (!API_TOKEN) return next();
+  if (!API_TOKEN) {
+    // 토큰 없는 운용은 loopback 개발에서만 허용한다. `assertBindIsAuthenticated`가
+    // 기동 때 이미 막지만, 리버스 프록시가 외부 요청을 loopback으로 넘기는 배치에서는
+    // 그 검사를 통과하고도 외부에 열린다. 요청 단에서 한 번 더 본다.
+    if (!isLoopbackRequest(req)) {
+      return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
+    }
+    return next();
+  }
   if (!safeTokenEqual(getRequestToken(req), API_TOKEN)) return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
   return next();
 }
+
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -8789,6 +8827,13 @@ async function refreshModelCatalogsInBackground() {
   });
 }
 
+try {
+  assertBindIsAuthenticated(HOST, API_TOKEN);
+} catch (error) {
+  console.error(`\n❌ ${error.message}\n`);
+  process.exit(1);
+}
+
 const httpServer = app.listen(PORT, HOST, () => {
   console.log('\n✅ 갈피 서버 실행 중');
   console.log(`   로컬:     http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
@@ -8799,11 +8844,6 @@ const httpServer = app.listen(PORT, HOST, () => {
   console.log(`   GPT:      ${GPT_MODEL} / deep ${GPT_DEEP_MODEL}`);
   console.log(`   Codex:    ${CODEX_MODEL} / deep ${CODEX_DEEP_MODEL} (job당 ${CODEX_JOB_BATCH_SIZE}개)`);
   console.log(`   컨텍스트: 최근 ${CONTEXT_N}턴 내외 (${HISTORY_CONTEXT_MESSAGES}개 메시지)\n`);
-  if (HOST === '0.0.0.0' && !API_TOKEN) {
-    console.warn('⚠️  경고: 0.0.0.0으로 LAN에 열려 있는데 API_TOKEN이 비어 있습니다.');
-    console.warn('   같은 네트워크의 누구나 API를 호출해 키 크레딧을 쓰고 볼트를 읽을 수 있습니다.');
-    console.warn('   .env에 API_TOKEN을 설정하세요.\n');
-  }
   console.log(`   백업:     ${BACKUP_DIR} (하루 1회 자동, 7일 보관)`);
   if (ASSISTANT_TASKS_ENABLED) {
     assistantScheduler.start();

@@ -33,3 +33,7 @@ trading/backtest-credentials.txt
 trading/data/
 __pycache__/
 *.pyc
+
+# 개인·머신별 설정. Anthropic 문서도 source control에 넣지 않는 파일로 명시한다.
+# allow 규칙이 도구 사용 승인을 생략시키므로 공개 저장소에 배포할 이유가 없다.
+**/.claude/settings.local.json

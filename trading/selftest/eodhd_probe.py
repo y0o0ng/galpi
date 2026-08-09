@@ -24,7 +24,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -104,11 +106,10 @@ def summarise(value: object, limit: int = 300) -> str:
 
 def main() -> int:
     key = load_key()
-    scratch = Path(
-        "/private/tmp/claude-501/-Users-chanyongs21-Desktop-galpi"
-    ) / "eodhd-probe"
+    scratch = Path(os.environ.get("EODHD_PROBE_DIR") or tempfile.gettempdir()) / "eodhd-probe"
     probe = Probe(key, scratch)
-    print(f"키 확인: {key[:4]}...({len(key)}자), 원문 저장 위치 {scratch}")
+    # 키는 길이만 알린다. 앞 몇 자라도 찍으면 로그·스크린샷에 남는다.
+    print(f"키 확인: {len(key)}자, 원문 저장 위치 {scratch}")
     print(f"무료 티어 상한 하루 {FREE_TIER_DAILY_CALLS}회\n")
 
     print("[1] 우리 로더 열 계약과 맞는가 (AAPL.US 일봉)")
