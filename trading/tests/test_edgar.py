@@ -36,6 +36,8 @@ from backtest.edgar import (  # noqa: E402
     earnings_dates_from_block,
     estimate_gap_days,
     CikNameIndex,
+    find_predecessor,
+    name_held_in_window,
     normalize_company_name,
     parse_cik_lookup,
     parse_ticker_map,
@@ -410,9 +412,10 @@ class NameLookupTest(unittest.TestCase):
             return self.payloads[cik].get("earnings", []), self.payloads[cik]
 
     @staticmethod
-    def _submissions(sic, first, last, form="8-K"):
+    def _submissions(sic, first, last, form="8-K", name="X"):
         return {
-            "name": "X",
+            "name": name,
+            "formerNames": [],
             "sic": sic,
             "filings": {"recent": {"filingDate": [first, last], "form": [form, form]}},
         }
@@ -420,8 +423,10 @@ class NameLookupTest(unittest.TestCase):
     def test_the_candidate_outside_the_membership_window_is_dropped(self):
         """실측: Novellus 후보 4개 중 구간에 겹치는 것은 Novellus Systems 하나다."""
         payloads = {
-            "0000836106": self._submissions("3559", "1994-02-14", "2013-02-14"),
-            "0001687472": self._submissions("3559", "2016-10-19", "2018-03-07"),
+            "0000836106": self._submissions("3559", "1994-02-14", "2013-02-14",
+                                            name="NOVELLUS SYSTEMS INC"),
+            "0001687472": self._submissions("3559", "2016-10-19", "2018-03-07",
+                                            name="NOVELLUS SYSTEMS INC"),
         }
         payloads["0000836106"]["earnings"] = ["2009-01-26", "2011-04-19"]
         client = self.FakeClient(payloads)
@@ -435,8 +440,10 @@ class NameLookupTest(unittest.TestCase):
     def test_a_non_filer_is_dropped(self):
         """8-K를 낸 적이 없으면 상장 발행사가 아니다(신탁·자회사·특수목적법인)."""
         payloads = {
-            "0000836106": self._submissions("3559", "1994-02-14", "2013-02-14"),
-            "0001687472": self._submissions("3559", "2007-01-02", "2013-01-02", "S-1"),
+            "0000836106": self._submissions("3559", "1994-02-14", "2013-02-14",
+                                            name="NOVELLUS SYSTEMS INC"),
+            "0001687472": self._submissions("3559", "2007-01-02", "2013-01-02", "S-1",
+                                            name="NOVELLUS SYSTEMS INC"),
         }
         payloads["0000836106"]["earnings"] = ["2009-01-26"]
         payloads["0001687472"]["earnings"] = ["2009-02-02"]
@@ -451,8 +458,10 @@ class NameLookupTest(unittest.TestCase):
         """리먼이 이 모양이다. 후보를 돌려주고 사람이 CIK_OVERRIDES에 넣는다."""
         client = self.FakeClient(
             {
-                "0000806085": self._submissions("6211", "1994-01-07", "2025-08-28"),
-                "0001382976": self._submissions("6211", "2002-01-29", "2019-05-22"),
+                "0000806085": self._submissions("6211", "1994-01-07", "2025-08-28",
+                                            name="LEHMAN BROTHERS HOLDINGS INC"),
+                "0001382976": self._submissions("6211", "2002-01-29", "2019-05-22",
+                                            name="LEHMAN BROTHERS HOLDINGS"),
             }
         )
         index = CikNameIndex(strict={"LEHMAN BROTHERS": {"0000806085", "0001382976"}}, loose={})
@@ -468,7 +477,8 @@ class NameLookupTest(unittest.TestCase):
         이 검사를 건너뛰었을 때 `LEH`가 `LEHMAN BROTHERS INC//`(브로커딜러 자회사,
         구간 내 실적 0건)로 갔다. 지수 구성원은 실적을 발표하는 상장 발행사다.
         """
-        payloads = {"0000728586": self._submissions("6211", "1994-01-07", "2008-05-01")}
+        payloads = {"0000728586": self._submissions("6211", "1994-01-07", "2008-05-01",
+                                                    name="LEHMAN BROTHERS")}
         payloads["0000728586"]["earnings"] = []
         client = self.FakeClient(payloads)
         index = CikNameIndex(strict={"LEHMAN BROTHERS": {"0000728586"}}, loose={})
@@ -482,8 +492,10 @@ class NameLookupTest(unittest.TestCase):
         """`LEHMAN BROTHERS INC//`(브로커딜러 자회사)와 지주회사는 이름으로도 SIC로도
         안 갈린다. **분기 실적 8-K를 내는 쪽이 지수 구성원이다.**"""
         payloads = {
-            "0000806085": self._submissions("6211", "1994-01-04", "2025-08-28"),
-            "0000728586": self._submissions("6211", "1994-01-07", "2008-05-01"),
+            "0000806085": self._submissions("6211", "1994-01-04", "2025-08-28",
+                                            name="LEHMAN BROTHERS HOLDINGS INC"),
+            "0000728586": self._submissions("6211", "1994-01-07", "2008-05-01",
+                                            name="LEHMAN BROTHERS INC"),
         }
         payloads["0000806085"]["earnings"] = ["2008-03-18", "2008-06-16"]
         payloads["0000728586"]["earnings"] = []
@@ -503,8 +515,10 @@ class NameLookupTest(unittest.TestCase):
         `RTN`이 그렇다(`RAYTHEON CO`와 `RAYTHEON CO/`). 사람이 판단할 일이다.
         """
         payloads = {
-            "0000082267": self._submissions("3812", "1994-02-10", "2013-03-25"),
-            "0001047122": self._submissions("3812", "1997-10-06", "2020-04-13"),
+            "0000082267": self._submissions("3812", "1994-02-10", "2013-03-25",
+                                            name="RAYTHEON CO"),
+            "0001047122": self._submissions("3812", "1997-10-06", "2020-04-13",
+                                            name="RAYTHEON CO"),
         }
         payloads["0000082267"]["earnings"] = ["2009-01-28"]
         payloads["0001047122"]["earnings"] = ["2009-01-28", "2015-01-29"]
@@ -517,6 +531,90 @@ class NameLookupTest(unittest.TestCase):
         )
         self.assertIsNone(cik)
         self.assertEqual(len(survivors), 2)
+
+    def test_a_name_the_registrant_held_at_another_time_does_not_count(self):
+        """**이 검사가 없으면 엉뚱한 시대의 법인을 고른다.**
+
+        `DNB`(Dun & Bradstreet)의 후보 `0000030419`는 1994~1998에만 그 이름이었고
+        2008년 구간에는 `R H DONNELLEY CORP`였다. 이름·SIC·제출이력·승계를 다 통과하고
+        여기에만 걸린다.
+        """
+        payload = {
+            "name": "DEX ONE Corp",
+            "formerNames": [
+                {"name": "R H DONNELLEY CORP",
+                 "from": "1998-11-05T00:00:00.000Z", "to": "2010-01-20T00:00:00.000Z"},
+                {"name": "DUN & BRADSTREET CORP",
+                 "from": "1994-06-29T00:00:00.000Z", "to": "1998-07-16T00:00:00.000Z"},
+            ],
+        }
+        span = ("2008-01-02", "2017-04-05")
+        self.assertFalse(name_held_in_window(payload, "Dun & Bradstreet", span))
+        self.assertTrue(name_held_in_window(payload, "R H Donnelley", span))
+        self.assertTrue(
+            name_held_in_window(payload, "Dun & Bradstreet", ("1995-01-01", "1996-01-01"))
+        )
+
+    def test_the_current_name_covers_the_time_after_the_last_rename(self):
+        payload = {
+            "name": "Johnson Controls International plc",
+            "formerNames": [
+                {"name": "TYCO INTERNATIONAL plc",
+                 "from": "2014-11-17T05:00:00.000Z", "to": "2016-09-07T04:00:00.000Z"},
+            ],
+        }
+        self.assertTrue(
+            name_held_in_window(payload, "Tyco International", ("2015-01-02", "2016-01-02"))
+        )
+        self.assertTrue(
+            name_held_in_window(payload, "Johnson Controls", ("2020-01-02", "2021-01-02"))
+        )
+
+    def test_a_registrant_with_no_former_names_holds_its_name_throughout(self):
+        payload = {"name": "GOOGLE INC.", "formerNames": []}
+        self.assertTrue(name_held_in_window(payload, "Google", ("2008-01-02", "2015-01-02")))
+
+    def test_a_predecessor_fills_the_early_window(self):
+        """`GOOGL`이 이 모양이다. 1층은 Alphabet(2015~)을 주고 그 앞은 Google Inc다."""
+        payloads = {
+            "0001288776": self._submissions(
+                "7370", "2004-08-18", "2015-10-22", name="GOOGLE INC."
+            )
+        }
+        payloads["0001288776"]["earnings"] = ["2009-01-22", "2015-10-22"]
+        client = self.FakeClient(payloads)
+        index = CikNameIndex(strict={"GOOGLE": {"0001288776"}}, loose={})
+        self.assertEqual(
+            find_predecessor(
+                client, "Google", index,
+                span=("2008-01-02", "2026-08-08"),
+                successor_cik="0001652044",
+                successor_first="2015-10-22",
+            ),
+            "0001288776",
+        )
+
+    def test_a_company_that_keeps_filing_is_not_a_predecessor(self):
+        """`MPC`(Marathon Petroleum)의 후보 `MARATHON OIL CORP`는 분사 뒤로도 13년을 더 냈다.
+
+        오래 나란히 실적을 내면 개명·재편이 아니라 서로 다른 회사다.
+        """
+        payloads = {
+            "0000101778": self._submissions(
+                "1311", "1994-08-29", "2024-11-06", name="MARATHON OIL CORP"
+            )
+        }
+        payloads["0000101778"]["earnings"] = ["2009-01-22", "2024-11-06"]
+        client = self.FakeClient(payloads)
+        index = CikNameIndex(strict={"MARATHON OIL": {"0000101778"}}, loose={})
+        self.assertIsNone(
+            find_predecessor(
+                client, "Marathon Oil", index,
+                span=("2011-07-01", "2026-08-08"),
+                successor_cik="0001510295",
+                successor_first="2011-08-02",
+            )
+        )
 
     def test_an_unknown_name_asks_for_nothing(self):
         client = self.FakeClient({})

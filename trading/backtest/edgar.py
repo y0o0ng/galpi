@@ -82,6 +82,7 @@ division(10개)은 제조업 하나가 기술·제약·산업재를 다 삼켜 �
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import sqlite3
@@ -502,6 +503,49 @@ def resolve_by_browse(client: "EdgarClient", ticker: str) -> str | None:
     return found.group(1).zfill(10) if found else None
 
 
+def names_in_window(payload: dict, span: tuple[str, str]) -> list[str]:
+    """그 구간 동안 이 등록인이 쓰던 이름들.
+
+    `formerNames`가 `from`·`to`를 들고 있어서 **이름을 시점으로 물을 수 있다.** 현재
+    이름은 마지막 옛 이름이 끝난 뒤부터 쓴 것으로 본다.
+    """
+    start, end = span
+    spans: list[tuple[str, str | None, str]] = []
+    latest = ""
+    for former in payload.get("formerNames") or []:
+        name = str(former.get("name") or "")
+        since = str(former.get("from") or "")[:10]
+        until = str(former.get("to") or "")[:10]
+        if name:
+            spans.append((since, until or None, name))
+            latest = max(latest, until)
+    spans.append((latest, None, str(payload.get("name") or "")))
+    return [
+        name
+        for since, until, name in spans
+        if name and since <= end and (until is None or until >= start)
+    ]
+
+
+def name_held_in_window(payload: dict, name: str, span: tuple[str, str]) -> bool:
+    """**그 구간에 이 등록인이 그 이름이었는가.**
+
+    이 검사가 없으면 이름이 언젠가 스쳤다는 이유로 엉뚱한 시대의 법인을 고른다. 실측:
+    `DNB`(Dun & Bradstreet)의 후보 `0000030419`는 1994~1998에만 `DUN & BRADSTREET CORP`
+    였고 2008년 구간에는 `R H DONNELLEY CORP`였다. `ADT`의 후보 `0000833444`도 `ADT
+    LIMITED`는 1995~1997뿐이고 2012년 구간에는 `TYCO INTERNATIONAL LTD`였다. 둘 다
+    이름·SIC·제출이력·승계로는 통과하고 이 검사에만 걸린다.
+    """
+    strict = normalize_company_name(name)
+    loose = normalize_company_name(name, drop_descriptive=True)
+    for value in names_in_window(payload, span):
+        if normalize_company_name(value) == strict:
+            return True
+        if loose and normalize_company_name(value, drop_descriptive=True) == loose:
+            return True
+    return False
+
+
 def earnings_filings_in_span(
     client: "EdgarClient", cik: str, span: tuple[str, str]
 ) -> int:
@@ -543,10 +587,11 @@ def resolve_by_name(
     survivors: list[CikCandidate] = []
     for cik in ciks:
         try:
-            candidate = candidate_from_submissions(cik, client.submissions(cik))
+            payload = client.submissions(cik)
         except EdgarError:
             continue
-        if candidate.accepts(*span):
+        candidate = candidate_from_submissions(cik, payload)
+        if candidate.accepts(*span) and name_held_in_window(payload, name, span):
             survivors.append(candidate)
     if not survivors:
         return None, []
@@ -560,6 +605,44 @@ def resolve_by_name(
     if len(filers) == 1:
         return filers[0].cik, survivors
     return None, survivors
+
+
+# 선행 법인의 마지막 실적과 후속 법인의 첫 실적이 이만큼 넘게 겹치면 승계가 아니다.
+# 둘이 오래 나란히 실적을 내면 개명·재편이 아니라 서로 다른 회사다. 실측: `MPC`의 후보
+# `MARATHON OIL CORP`는 MPC가 분사한 2011년 뒤로도 13년을 더 냈다.
+SUCCESSION_OVERLAP_DAYS = 400
+
+
+def find_predecessor(
+    client: "EdgarClient",
+    name: str,
+    index: CikNameIndex,
+    *,
+    span: tuple[str, str],
+    successor_cik: str,
+    successor_first: str | None,
+) -> str | None:
+    """구간 앞부분을 채울 **선행 등록인**. 없으면 None이다.
+
+    1층은 티커로 현재 CIK를 주는데, 회사가 지주회사로 재편되면 그 CIK에 과거 제출이 없다
+    (`XOM`·`GOOGL`·`DIS`·`MDT`…). 그러면 그 종목은 구간 앞부분 내내 `EARNINGS_UNKNOWN`으로
+    빠진다. 1층이 준 CIK는 티커 기반이라 믿을 만하므로 **버리지 않고 선행분을 합친다.**
+
+    받아들이는 조건이 `resolve_by_name`보다 하나 더 있다 — 선행이 후속 시작 뒤로도 오래
+    제출하면 승계가 아니라 별개 회사다.
+    """
+    cik, _ = resolve_by_name(client, name, index, span=span)
+    if cik is None or cik == successor_cik:
+        return None
+    if successor_first is None:
+        return cik
+    dates, _ = client.all_earnings_dates(cik, span[0])
+    if not dates:
+        return None
+    overlap = (
+        dt.date.fromisoformat(max(dates)) - dt.date.fromisoformat(successor_first)
+    ).days
+    return cik if overlap <= SUCCESSION_OVERLAP_DAYS else None
 
 
 def collect(
@@ -617,6 +700,25 @@ def collect(
             missing.append(ticker)
             continue
         dates, payload = edgar.all_earnings_dates(cik, window_start)
+        # 구간 앞부분이 비면 선행 등록인을 찾아 **합친다**(바꾸지 않는다). 1층이 준 CIK는
+        # 티커 기반이라 뒷부분은 그쪽이 맞다.
+        floor = (spans or {}).get(ticker, (None, None))[0]
+        if floor and security_names and (not dates or min(dates) > floor):
+            if index is None:
+                index = edgar.cik_lookup()
+            earlier = find_predecessor(
+                edgar,
+                security_names.get(ticker, ""),
+                index,
+                span=spans[ticker],
+                successor_cik=cik,
+                successor_first=min(dates) if dates else None,
+            )
+            if earlier:
+                extra, _ = edgar.all_earnings_dates(earlier, floor)
+                if extra:
+                    dates = sorted(set(dates) | set(extra))
+                    resolved_by[ticker] = "predecessor"
         earnings_rows.extend(build_earnings_rows(ticker, dates))
         sector = sector_from_submissions(payload)
         if sector is not None:
