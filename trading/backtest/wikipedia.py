@@ -493,29 +493,35 @@ class WikipediaClient:
         self._last_call = 0.0
         self.calls = 0
 
+    def _get(self, params: dict, tries: int = 5) -> dict:
+        """API 한 번. 429는 물러섰다가 다시 시도한다.
+
+        판을 200개 넘게 받으면 간격만으로는 부족해 429가 온다. 실측으로 확인했다.
+        """
+        url = f"{WIKI_API}?" + urllib.parse.urlencode(params)
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        for attempt in range(tries):
+            wait = self.interval - (time.monotonic() - self._last_call)
+            if wait > 0:
+                time.sleep(wait)
+            self.calls += 1
+            try:
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    return json.load(response)
+            except urllib.error.HTTPError as error:
+                if error.code != 429 or attempt == tries - 1:
+                    raise WikipediaError(f"HTTP {error.code} {params}") from error
+                time.sleep(5 * (attempt + 1))
+            finally:
+                self._last_call = time.monotonic()
+        raise WikipediaError("도달할 수 없는 경로")
+
     def fetch(self, index_name: str) -> Page:
         title = PAGES[index_name]
-        wait = self.interval - (time.monotonic() - self._last_call)
-        if wait > 0:
-            time.sleep(wait)
-        url = f"{WIKI_API}?" + urllib.parse.urlencode(
-            {
-                "action": "parse",
-                "page": title,
-                "prop": "wikitext|revid",
-                "format": "json",
-                "formatversion": "2",
-            }
-        )
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        self.calls += 1
-        try:
-            with urllib.request.urlopen(request, timeout=120) as response:
-                payload = json.load(response)
-        except urllib.error.HTTPError as error:
-            raise WikipediaError(f"HTTP {error.code} {title}") from error
-        finally:
-            self._last_call = time.monotonic()
+        payload = self._get({
+            "action": "parse", "page": title, "prop": "wikitext|revid",
+            "format": "json", "formatversion": "2",
+        })
         if "parse" not in payload:
             raise WikipediaError(f"{title} 응답에 parse가 없습니다: {payload}")
         return Page(
@@ -524,6 +530,131 @@ class WikipediaClient:
             revision=int(payload["parse"]["revid"]),
             wikitext=payload["parse"]["wikitext"],
         )
+
+    def revision_at(self, index_name: str, when: str) -> tuple[int, str] | None:
+        """그 날짜 이전의 가장 최근 판. `(revid, 판 날짜)`."""
+        payload = self._get({
+            "action": "query", "prop": "revisions", "titles": PAGES[index_name],
+            "rvlimit": 1, "rvstart": f"{when}T00:00:00Z", "rvdir": "older",
+            "rvprop": "ids|timestamp", "format": "json", "formatversion": "2",
+        })
+        pages = (payload.get("query") or {}).get("pages") or []
+        revisions = pages[0].get("revisions") if pages else None
+        if not revisions:
+            return None
+        return int(revisions[0]["revid"]), str(revisions[0]["timestamp"])[:10]
+
+    def fetch_revision(self, revid: int) -> str:
+        payload = self._get({
+            "action": "parse", "oldid": revid, "prop": "wikitext",
+            "format": "json", "formatversion": "2",
+        })
+        if "parse" not in payload:
+            raise WikipediaError(f"판 {revid} 응답에 parse가 없습니다")
+        return payload["parse"]["wikitext"]
+
+
+# --------------------------------------------------------------------------
+# 과거 판 스냅샷 — "Selected changes"가 빠뜨린 사건을 되찾는다
+# --------------------------------------------------------------------------
+#
+# 변경 이력 표는 **사건 목록**이라 빠질 수 있고 제목이 문자 그대로 "Selected changes"다.
+# 반면 구성원 표는 **그 시점의 전체 목록**이라 빠질 수가 없다. 문서의 과거 판에서 그 표를
+# 읽어 연속한 두 판을 비교하면 편입과 편출이 둘 다 나온다.
+#
+# 2026-08-09 실측: 2008~2014 사건 375건 중 **196건이 변경 이력 표에 없었다.** 빠진 편출에
+# 베어스턴스·워싱턴뮤추얼·메릴린치·GM·서킷시티가 들어 있다. 2008년 금융위기의 사망자들이
+# 통째로 빠져 있었고, 그것이 정확히 생존편향이다.
+
+SNAPSHOT_CSV_COLUMNS = ("date", "index_name", "action", "symbol", "source", "revid")
+SNAPSHOT_SOURCE = "snapshot"
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """한 시점의 구성원 목록."""
+
+    index_name: str
+    revid: int
+    date: str
+    symbols: frozenset[str]
+
+
+def constituent_symbols(wikitext: str) -> frozenset[str]:
+    """구성원 표의 티커 집합.
+
+    **행의 첫 칸만 본다.** 셀마다 줄을 바꾸는 서식에서 모든 `|` 줄을 행으로 보면 GICS
+    섹터·본사 같은 다른 칸까지 티커로 줍는다(2022년 판이 503개 대신 572개로 나왔다).
+    행 경계는 `|-`다.
+
+    표를 id로 찾지 않는 이유는 `id="constituents"`가 2019년쯤에야 붙었기 때문이다.
+    대신 티커가 400~600개 나오는 표를 고른다.
+    """
+    best: frozenset[str] = frozenset()
+    for block in re.findall(r"\{\|.*?\n\|\}", wikitext, re.S):
+        found: set[str] = set()
+        fresh = True
+        for line in block.splitlines():
+            if line.startswith("|-"):
+                fresh = True
+                continue
+            if not line.startswith("|") or line.startswith("|+") or line.startswith("|}"):
+                continue
+            if not fresh:
+                continue
+            fresh = False
+            ticker = _snapshot_ticker(line)
+            if ticker:
+                found.add(ticker)
+        if 400 <= len(found) <= 600 and len(found) > len(best):
+            best = frozenset(found)
+    return best
+
+
+_TICKER = re.compile(r"^[A-Z][A-Z0-9]{0,5}([.\-][A-Z])?$")
+
+
+def _snapshot_ticker(line: str) -> str | None:
+    """행의 첫 칸에서 티커를 뽑는다. 판마다 서식이 다르다."""
+    body = line.lstrip("|").strip()
+    found = re.match(r"\{\{[^|}]+\|([^}|]+)\}\}", body)
+    if found:
+        return _symbol(found.group(1))
+    found = re.match(r"\[\[[^\]|]*\|?([^\]|]+)\]\]", body)
+    if found and _TICKER.match(found.group(1).strip().upper()):
+        return _symbol(found.group(1))
+    plain = re.split(r"\|\||\t", body)[0].strip().strip("[]").upper()
+    plain = re.sub(r"\s+", "", plain)
+    return plain.replace(".", "-") if _TICKER.match(plain) else None
+
+
+def snapshot_changes(snapshots: list[Snapshot]) -> list[tuple[str, str, str, str, str, int]]:
+    """연속한 두 스냅샷의 차이를 변경 사건으로 바꾼다.
+
+    **날짜는 뒤쪽 판의 날짜다** — "늦어도 이 날에는 반영돼 있었다". 편입을 늦게 잡으면
+    실제보다 늦게 거래 가능해져 기회를 잃을 뿐이지만, 편출을 늦게 잡으면 실제보다 오래
+    보유하게 된다. 그 불확실성은 `source` 열로 드러내고 판정 전에 좁힐 수 있게 남긴다.
+
+    티커는 개명을 적용한 뒤 비교한다. 안 그러면 개명이 편출+편입 한 쌍으로 잡힌다.
+    """
+    events = []
+    for earlier, later in zip(snapshots, snapshots[1:]):
+        before = {apply_renames(earlier.index_name, earlier.date, value)
+                  for value in earlier.symbols}
+        after = {apply_renames(later.index_name, later.date, value)
+                 for value in later.symbols}
+        for symbol in sorted(after - before):
+            events.append((later.date, later.index_name, "add", symbol, SNAPSHOT_SOURCE, later.revid))
+        for symbol in sorted(before - after):
+            events.append((later.date, later.index_name, "remove", symbol, SNAPSHOT_SOURCE, later.revid))
+    return events
+
+
+def snapshot_changes_csv(events: list[tuple[str, str, str, str, str, int]]) -> str:
+    lines = [",".join(SNAPSHOT_CSV_COLUMNS)]
+    for date_, index, action, symbol, source, revid in sorted(events, reverse=True):
+        lines.append(f"{date_},{index},{action},{symbol},{source},{revid}")
+    return "\n".join(lines) + "\n"
 
 
 # CSV는 저장소에 커밋한다. 공개 자료라 **삭제 의무가 없고**, 어느 판에서 뽑았는지와 함께

@@ -22,6 +22,7 @@ EODHD 약관은 해지 후 1개월 안에 가격 복사본을 지우라고 요�
 
 ## 실행 순서
 
+    python3 selftest/real_run.py snapshots  # 위키 과거 판에서 빠진 사건 복구
     python3 selftest/real_run.py universe   # 호출 없음
     python3 selftest/real_run.py bars       # EODHD 908회 (중단되면 다시 돌려도 된다)
     python3 selftest/real_run.py remap      # 재사용 티커의 옛 계열을 찾아 받는다
@@ -107,11 +108,93 @@ def check_dates() -> list[str]:
     return dates
 
 
+SNAPSHOT_NAME = "sp500-snapshot-changes.csv"
+
+
+def snapshot_changes_rows() -> list:
+    """스냅샷 diff가 낸 변경 사건. 없으면 빈 목록이다."""
+    path = UNIVERSE_DIR / SNAPSHOT_NAME
+    if not path.exists():
+        return []
+    return list(csv.DictReader(path.read_text(encoding="utf-8").splitlines()))
+
+
+def merge_changes(announced: list, snapshot_rows: list) -> tuple[list, int]:
+    """공고 사건에 스냅샷 사건을 **보강**한다. 공고가 우선이다.
+
+    변경 이력 표는 S&P 보도자료를 행마다 인용하므로 효력일이 정확하다. 스냅샷은 "늦어도
+    이 판에는 반영돼 있었다"까지만 안다. 그래서 같은 사건이 양쪽에 있으면 공고를 쓰고,
+    **공고에 없는 것만** 스냅샷에서 가져온다.
+
+    ## 같은 사건인지를 날짜 창으로 가르지 않는다
+
+    위키 편집자가 표를 늦게 고치므로 스냅샷 사건은 효력일보다 뒤에 나타난다. 실측 분포는
+    중앙값 14일·90% 40일인데 꼬리가 길어 `NFLX`가 103일, `ACN`이 148일이었다. 그렇다고
+    창을 넓히면 진짜 재편입(최대 4,946일 차이)까지 같은 사건으로 삼켜버린다.
+
+    대신 **그 사이에 반대 동작이 있었는지**를 본다. 늦게 기록된 같은 사건이면 사이에
+    아무 일도 없고, 재편입이면 사이에 반드시 편출이 있다. 창을 고를 필요가 없어진다.
+    """
+    import datetime as dt
+    from backtest.membership import Change
+
+    def days(value):
+        return dt.date.fromisoformat(value).toordinal()
+
+    opposite = {"add": "remove", "remove": "add"}
+    # 두 소스를 합친 시간선으로 본다. 사이의 반대 동작이 공고에만 있으란 법이 없다.
+    timeline: dict[tuple[str, str], list[tuple[int, str]]] = {}
+    for change in announced:
+        timeline.setdefault((change.index_name, change.symbol), []).append(
+            (days(change.date), change.action)
+        )
+    for row in snapshot_rows:
+        timeline.setdefault((row["index_name"], row["symbol"]), []).append(
+            (days(row["date"]), row["action"])
+        )
+    for events in timeline.values():
+        events.sort()
+
+    announced_at: dict[tuple[str, str, str], list[int]] = {}
+    for change in announced:
+        announced_at.setdefault(
+            (change.index_name, change.action, change.symbol), []
+        ).append(days(change.date))
+
+    def already_announced(index_name, action, symbol, when):
+        events = timeline.get((index_name, symbol), [])
+        for other in announced_at.get((index_name, action, symbol), []):
+            low, high = min(other, when), max(other, when)
+            blocked = any(
+                low < stamp < high and kind == opposite[action] for stamp, kind in events
+            )
+            if not blocked:
+                return True
+        return False
+
+    added = 0
+    merged = list(announced)
+    for row in snapshot_rows:
+        if already_announced(
+            row["index_name"], row["action"], row["symbol"], days(row["date"])
+        ):
+            continue
+        merged.append(
+            Change(date=row["date"], index_name=row["index_name"],
+                   action=row["action"], symbol=row["symbol"])
+        )
+        added += 1
+    return merged, added
+
+
 def reconstructions() -> list:
     members, changes = {}, []
     for index in INDEX_NAMES:
         members.update(parse_members_csv(_read_csv(f"{index.lower()}-members.csv")))
         changes.extend(parse_changes_csv(_read_csv(f"{index.lower()}-changes.csv")))
+    changes, added = merge_changes(changes, snapshot_changes_rows())
+    if added:
+        print(f"스냅샷 사건 {added}건 보강")
     return [
         reconstruct(
             index, members[index], changes, floor_date=FLOOR_DATE, as_of=AS_OF
@@ -227,7 +310,9 @@ def pending_symbols(connection, symbols: list[str]) -> list[str]:
 
 
 def stage_bars(connection) -> int:
-    symbols = universe_symbols()
+    # 적재된 구성원 기준이다. 스냅샷 보강으로 들어온 심볼과 재사용 티커의 벤더 계열은
+    # 공고 CSV에 없으므로, CSV만 보면 그 종목들의 바를 영영 안 받는다.
+    symbols = sorted(set(membership_symbols(connection)) | {REFERENCE_SYMBOL})
     remaining = pending_symbols(connection, symbols)
     if not remaining:
         print(f"{len(symbols)}종목이 이미 다 적재돼 있습니다.")
@@ -245,11 +330,75 @@ def stage_bars(connection) -> int:
     )
     if summary["empty"]:
         print(f"빈 응답 {len(summary['empty'])}종목: {summary['empty']}")
+    if summary.get("failed"):
+        print(f"실패 {len(summary['failed'])}종목:")
+        for symbol, reason in sorted(summary["failed"].items()):
+            print(f"  {symbol:<10}{reason}")
     for symbol, warning in summary["warnings"].items():
         print(f"경고 {symbol}: {warning}")
     # `gaps`는 심볼 이력이 BARS_START보다 늦게 시작하는 것을 센다. 2006년 이후 상장한
     # 회사가 많으므로 여기서는 정상이고, 진짜 판정은 `check`의 구간 커버리지다.
     print(f"{BARS_START}를 못 덮는 심볼 {len(summary['gaps'])}개 (구간 커버리지는 check에서 본다)")
+    return 0
+
+
+def stage_snapshots(_connection) -> int:
+    """문서의 과거 판에서 구성원 목록을 뽑아 빠진 변경 사건을 되찾는다.
+
+    변경 이력 표는 **사건 목록**이라 빠질 수 있고 제목이 "Selected changes"다. 구성원
+    표는 **그 시점의 전체 목록**이라 빠질 수가 없다. 2026-08-09 실측에서 2008~2014
+    사건 375건 중 196건이 변경 이력 표에 없었고, 빠진 편출에 베어스턴스·워싱턴뮤추얼·
+    메릴린치·GM이 들어 있었다.
+
+    스냅샷 자체는 커밋하지 않고 **파생 사건과 판 ID만** 남긴다. 판 ID가 불변이라 언제든
+    같은 결과를 다시 만들 수 있고, 11만 줄 대신 몇백 줄이면 된다.
+    """
+    import datetime as dt
+
+    from backtest.wikipedia import (
+        Snapshot, WikipediaClient, constituent_symbols, snapshot_changes,
+        snapshot_changes_csv,
+    )
+
+    client = WikipediaClient()
+    months, cursor = [], dt.date.fromisoformat(FLOOR_DATE).replace(day=1)
+    last = dt.date.fromisoformat(AS_OF)
+    while cursor <= last:
+        months.append(cursor.isoformat())
+        cursor = (cursor.replace(day=28) + dt.timedelta(days=8)).replace(day=1)
+
+    snapshots, unreadable = [], []
+    for when in months:
+        found = client.revision_at("SP500", when)
+        if not found:
+            continue
+        revid, stamp = found
+        symbols = constituent_symbols(client.fetch_revision(revid))
+        if not symbols:
+            unreadable.append((when, revid))
+            continue
+        snapshots.append(Snapshot("SP500", revid, stamp, symbols))
+        if len(snapshots) % 24 == 0:
+            print(f"  {when} 까지 {len(snapshots)}개 (호출 {client.calls})", flush=True)
+
+    counts = [len(item.symbols) for item in snapshots]
+    print(f"스냅샷 {len(snapshots)}개, 구성원 수 {min(counts)}~{max(counts)}")
+    if unreadable:
+        print(f"표를 못 읽은 판 {len(unreadable)}개: {unreadable[:5]}")
+    # 구성원 수가 크게 벗어나면 파싱이 틀린 것이다. 그 스냅샷으로 만든 diff는 못 믿는다.
+    odd = [item for item in snapshots if not (480 <= len(item.symbols) <= 520)]
+    if odd:
+        print(f"구성원 수가 480~520 밖인 스냅샷 {len(odd)}개 — 파싱을 먼저 확인하세요")
+        for item in odd[:5]:
+            print(f"  {item.date} 판 {item.revid} {len(item.symbols)}개")
+        return 1
+
+    events = snapshot_changes(snapshots)
+    (UNIVERSE_DIR / SNAPSHOT_NAME).write_text(
+        snapshot_changes_csv(events), encoding="utf-8"
+    )
+    print(f"{SNAPSHOT_NAME}에 사건 {len(events)}건을 썼습니다.")
+    print("`universe`를 다시 돌려야 반영됩니다.")
     return 0
 
 
@@ -301,7 +450,8 @@ def stage_remap(connection) -> int:
 
 def stage_check(connection) -> int:
     """세 그물. 다 비어야 편향 없음을 선언한다."""
-    symbols = [s for s in universe_symbols() if s != REFERENCE_SYMBOL]
+    # 적재된 구성원 기준이다. 스냅샷 보강 심볼이 공고 CSV에 없어 CSV만 보면 빠진다.
+    symbols = [s for s in membership_symbols(connection) if s != REFERENCE_SYMBOL]
 
     client = EodhdClient()
     unlisted = unlisted_symbols(client, symbols)
@@ -504,6 +654,7 @@ def stage_status(connection) -> int:
 
 STAGES = {
     "universe": stage_universe,
+    "snapshots": stage_snapshots,
     "bars": stage_bars,
     "remap": stage_remap,
     "check": stage_check,

@@ -522,10 +522,18 @@ def load_prices(
 
     loaded: list[SymbolBars] = []
     empty: list[str] = []
+    failed: dict[str, str] = {}
     warnings: dict[str, str] = {}
     for symbol in sorted({value.strip().upper() for value in symbols}):
         request_symbol = symbol if "." in symbol else f"{symbol}{suffix}"
-        bars = eodhd.eod(request_symbol, start, end)
+        try:
+            bars = eodhd.eod(request_symbol, start, end)
+        except EodhdError as error:
+            # **한 심볼의 실패로 배치를 버리지 않는다.** 900종목을 받다가 404 하나에
+            # 멈추면 그때까지 받은 것이 다음 실행에서 건너뛰기 대상이 되어, 어디까지
+            # 받았는지 사람이 세야 한다. 실패는 모아서 돌려주고 계속 간다.
+            failed[symbol] = str(error)[:120]
+            continue
         if bars.warning:
             warnings[symbol] = bars.warning
         if bars.rows == 0:
@@ -553,6 +561,7 @@ def load_prices(
         "symbols": len(symbols),
         "loaded": len(loaded),
         "empty": empty,
+        "failed": failed,
         "rows": sum(item.rows for item in loaded),
         "dropped": sum(item.dropped for item in loaded),
         "gaps": gaps,

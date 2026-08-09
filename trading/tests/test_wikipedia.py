@@ -21,6 +21,9 @@ sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest.wikipedia import (  # noqa: E402
     CORRECTIONS,
+    Snapshot,
+    constituent_symbols,
+    snapshot_changes,
     EXCLUDED_CHANGES,
     SYMBOL_RENAMES,
     WikipediaError,
@@ -227,6 +230,83 @@ class RenameTest(unittest.TestCase):
     def test_a_rename_target_is_a_ticker_the_vendor_still_serves(self):
         """`RIMM`은 BBRY를 거쳐 BB가 됐다. 중간 티커가 아니라 **전 이력을 든 쪽**으로 보낸다."""
         self.assertEqual(apply_renames("NDX100", "2012-12-24", "RIMM"), "BB")
+
+
+# 구성원 표 픽스처. `constituent_symbols`가 400~600개인 표를 고르므로 그만큼 만든다.
+# 실제 표의 함정만 남겼다 — 셀마다 줄을 바꾸는 서식, 티커 템플릿, 티커처럼 생긴 섹터 칸.
+EXPECTED_TICKERS = [f"T{index:03d}" for index in range(450)]
+
+
+def _per_line_rows():
+    rows = []
+    for ticker in EXPECTED_TICKERS:
+        rows.append("|-")
+        rows.append(f"|{{{{NyseSymbol|{ticker}}}}}")
+        rows.append(f"|[[Company {ticker}]]")
+        rows.append("|IT")          # 티커처럼 생긴 섹터 칸
+        rows.append("|Texas")
+    return "\n".join(rows)
+
+
+def _inline_rows():
+    return "\n".join(
+        f"|-\n|{{{{NyseSymbol|{ticker}}}}}\n|[[Company {ticker}]]|| IT || Texas"
+        for ticker in EXPECTED_TICKERS
+    )
+
+
+PER_LINE_TABLE = '{| class="wikitable"\n! Ticker\n' + _per_line_rows() + "\n|}"
+INLINE_TABLE = '{| class="wikitable"\n! Symbol\n' + _inline_rows() + "\n|}"
+
+
+class SnapshotTest(unittest.TestCase):
+    """과거 판의 구성원 표. "Selected changes"가 빠뜨린 사건을 여기서 되찾는다."""
+
+    def test_only_the_first_cell_of_a_row_is_a_ticker(self):
+        """**이것이 이 파서의 함정이다.**
+
+        셀마다 줄을 바꾸는 서식에서 모든 `|` 줄을 행으로 보면 GICS 섹터·본사 같은 다른
+        칸까지 티커로 줍는다. 2022년 판이 503개 대신 572개로 나왔다.
+        """
+        found = constituent_symbols(PER_LINE_TABLE)
+        self.assertEqual(found, frozenset(EXPECTED_TICKERS))
+        # 섹터 칸의 대문자 낱말이 티커로 들어오면 안 된다.
+        self.assertNotIn("IT", found)
+
+    def test_the_inline_style_parses_too(self):
+        self.assertEqual(constituent_symbols(INLINE_TABLE), frozenset(EXPECTED_TICKERS))
+
+    def test_a_table_that_is_not_the_constituents_list_is_ignored(self):
+        """표를 id로 못 찾는다(2019년쯤에야 붙었다). 400~600개가 나오는 표를 고른다."""
+        self.assertEqual(constituent_symbols("{|\n|- \n| AAPL || Apple\n|}"), frozenset())
+
+    def test_a_diff_becomes_add_and_remove_events(self):
+        earlier = Snapshot("SP500", 1, "2008-06-20", frozenset({"AAA", "BBB"}))
+        later = Snapshot("SP500", 2, "2008-08-30", frozenset({"BBB", "CCC"}))
+        self.assertEqual(
+            snapshot_changes([earlier, later]),
+            [
+                ("2008-08-30", "SP500", "add", "CCC", "snapshot", 2),
+                ("2008-08-30", "SP500", "remove", "AAA", "snapshot", 2),
+            ],
+        )
+
+    def test_the_event_date_is_the_later_revision(self):
+        """"늦어도 이 날에는 반영돼 있었다". 편출을 늦게 잡는 쪽이 보수적이지 않지만,
+        앞쪽 판으로 당기면 실제 구성원이던 기간이 잘려 또 다른 왜곡이 된다."""
+        events = snapshot_changes([
+            Snapshot("SP500", 1, "2009-01-01", frozenset({"AAA"})),
+            Snapshot("SP500", 2, "2009-02-01", frozenset()),
+        ])
+        self.assertEqual(events[0][0], "2009-02-01")
+
+    def test_a_rename_is_not_a_pair_of_events(self):
+        """개명을 그대로 두면 편출+편입 한 쌍으로 잡혀 없는 사건이 두 개 생긴다."""
+        events = snapshot_changes([
+            Snapshot("SP500", 1, "2013-01-01", frozenset({"FB"})),
+            Snapshot("SP500", 2, "2023-01-01", frozenset({"META"})),
+        ])
+        self.assertEqual(events, [])
 
 
 class ExclusionTest(unittest.TestCase):
