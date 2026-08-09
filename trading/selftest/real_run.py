@@ -221,18 +221,88 @@ def stage_check(connection) -> int:
     return 0
 
 
+def security_names() -> dict[str, str]:
+    """티커 → **당시** 회사 이름. 3층 CIK 해석의 단서다.
+
+    같은 티커에 이름이 여럿이면 가장 이른 것을 쓴다. 폐지 종목의 CIK를 찾는 것이 목적이라
+    그 티커가 지수를 떠날 때의 회사가 알고 싶은 쪽이고, 개명이 이미 적용돼 있어서 한 티커에
+    두 회사가 남는 경우는 드물다.
+    """
+    names: dict[str, tuple[str, str]] = {}
+    for index in INDEX_NAMES:
+        for row in csv.DictReader(_read_csv(f"{index.lower()}-changes.csv").splitlines()):
+            name = (row.get("security") or "").strip()
+            symbol, date = row["symbol"].strip().upper(), row["date"]
+            if not name:
+                continue
+            if symbol not in names or date < names[symbol][0]:
+                names[symbol] = (date, name)
+    return {symbol: name for symbol, (_, name) in names.items()}
+
+
+def membership_spans(connection) -> dict[str, tuple[str, str]]:
+    """티커 → 멤버십 전 구간. 3층 후보를 제출 이력으로 검증할 때 쓴다."""
+    rows = connection.execute(
+        "SELECT symbol, MIN(valid_from) AS first, MAX(COALESCE(valid_to, ?)) AS last"
+        "  FROM universe_membership WHERE source_version = ? GROUP BY symbol",
+        (AS_OF, SOURCE_VERSION),
+    ).fetchall()
+    return {row["symbol"]: (row["first"], row["last"]) for row in rows}
+
+
+def reset_edgar(connection) -> tuple[int, int]:
+    """EDGAR 적재분만 지운다. **`bars_daily`는 절대 건드리지 않는다.**
+
+    적재가 불변이라 다시 넣으려면 먼저 비워야 한다. 그래도 되는 이유는 EDGAR가 공짜이고
+    공개 자료라 언제든 같은 값을 다시 만들 수 있어서다. 가격은 그렇지 않다 — 908회 호출과
+    삭제 의무가 걸려 있어서 같은 이유로 지우면 안 된다.
+    """
+    with connection:
+        earnings = connection.execute(
+            "DELETE FROM earnings_calendar WHERE source_version = ?", (SOURCE_VERSION,)
+        ).rowcount
+        securities = connection.execute(
+            "DELETE FROM securities WHERE source_version = ?", (SOURCE_VERSION,)
+        ).rowcount
+    return earnings, securities
+
+
 def stage_edgar(connection) -> int:
     """실적일과 섹터. 공공 자료라 호출 한도·삭제 의무와 무관하다."""
+    cleared = reset_edgar(connection)
+    if any(cleared):
+        print(f"이전 적재분을 비웠습니다: 실적 {cleared[0]:,}행, 섹터 {cleared[1]}행")
     symbols = [s for s in universe_symbols() if s != REFERENCE_SYMBOL]
-    summary = collect(connection, symbols, SOURCE_VERSION, window_start=FLOOR_DATE)
+    summary = collect(
+        connection,
+        symbols,
+        SOURCE_VERSION,
+        window_start=FLOOR_DATE,
+        security_names=security_names(),
+        spans=membership_spans(connection),
+    )
+    counts: dict[str, int] = {}
+    for layer in summary["resolved_by"].values():
+        counts[layer] = counts.get(layer, 0) + 1
     print(
         f"실적 {summary['earnings_rows']:,}행, 섹터 {summary['sectors']}종목,"
         f" 호출 {summary['calls']}회"
     )
+    print(f"2·3층으로 푼 종목: {counts or '없음'}")
+    if summary["ambiguous"]:
+        print(f"\n후보가 여럿이라 고르지 않은 종목 {len(summary['ambiguous'])}개"
+              " — CIK_OVERRIDES에 근거와 함께 넣어야 합니다:")
+        for ticker, candidates in sorted(summary["ambiguous"].items()):
+            print(f"  {ticker}")
+            for item in candidates:
+                print(
+                    f"    {item.cik} {item.name[:44]:<44} SIC={item.sic}"
+                    f" 제출 {item.first_filing}~{item.last_filing}"
+                )
     if summary["missing"]:
-        print(f"CIK를 못 찾은 종목 {len(summary['missing'])}개: {summary['missing']}")
+        print(f"\nCIK를 못 찾은 종목 {len(summary['missing'])}개: {summary['missing']}")
     if summary["gaps"]:
-        print(f"구간 미달 {len(summary['gaps'])}개: {[i.symbol for i in summary['gaps']]}")
+        print(f"\n구간 미달 {len(summary['gaps'])}개: {[i.symbol for i in summary['gaps']]}")
     return 0
 
 

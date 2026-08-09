@@ -160,16 +160,21 @@ class MembersTest(unittest.TestCase):
         )
 
 
+def has_change(lines, prefix):
+    """`security` 열이 뒤에 붙으므로 앞 네 칸으로 견준다."""
+    return any(line.startswith(prefix + ",") for line in lines)
+
+
 class ChangesTest(unittest.TestCase):
     def test_a_row_becomes_one_line_per_change(self):
         lines = parse_changes(SP_STYLE, "SP500").splitlines()
-        self.assertIn("2010-11-17,SP500,add,TT", lines)
-        self.assertIn("2010-11-17,SP500,remove,PTV", lines)
+        self.assertTrue(has_change(lines, "2010-11-17,SP500,add,TT"))
+        self.assertTrue(has_change(lines, "2010-11-17,SP500,remove,PTV"))
 
     def test_an_empty_side_is_skipped(self):
         """분사·상장폐지 행은 편입과 편출 중 한쪽만 있다."""
         lines = parse_changes(NDX_STYLE, "NDX100").splitlines()
-        self.assertIn("2026-08-04,NDX100,remove,EA", lines)
+        self.assertTrue(has_change(lines, "2026-08-04,NDX100,remove,EA"))
         self.assertFalse([line for line in lines if line.startswith("2026-08-04,NDX100,add")])
 
     def test_since_cuts_the_window(self):
@@ -180,7 +185,7 @@ class ChangesTest(unittest.TestCase):
         lines = parse_changes(SP_STYLE, "SP500").splitlines()
         for date_, index, action, symbol, _ in CORRECTIONS:
             if index == "SP500":
-                self.assertIn(f"{date_},{index},{action},{symbol}", lines)
+                self.assertTrue(has_change(lines, f"{date_},{index},{action},{symbol}"))
 
 
 class RenameTest(unittest.TestCase):
@@ -196,8 +201,8 @@ class RenameTest(unittest.TestCase):
 
     def test_the_parsed_rows_carry_the_rename(self):
         lines = parse_changes(SP_STYLE, "SP500").splitlines()
-        self.assertIn("2013-12-23,SP500,add,META", lines)
-        self.assertFalse([line for line in lines if line.endswith(",add,FB")])
+        self.assertTrue(has_change(lines, "2013-12-23,SP500,add,META"))
+        self.assertFalse([line for line in lines if ",add,FB," in line])
 
     def test_every_rename_and_correction_states_its_evidence(self):
         """근거 없는 항목을 넣지 않는다. 이 목록은 공고가 아니라 우리의 해석이다."""
@@ -227,9 +232,9 @@ class RenameTest(unittest.TestCase):
 class ExclusionTest(unittest.TestCase):
     def test_an_excluded_row_does_not_reach_the_csv(self):
         lines = parse_changes(SP_STYLE, "SP500").splitlines()
-        self.assertFalse([line for line in lines if line.endswith(",remove,ACE")])
+        self.assertFalse([line for line in lines if ",remove,ACE," in line])
         # 같은 날 편입된 EXR은 그대로 남는다. 제외는 그 한 행에만 듣는다.
-        self.assertIn("2016-01-19,SP500,add,EXR", lines)
+        self.assertTrue(has_change(lines, "2016-01-19,SP500,add,EXR"))
 
     def test_a_vanished_target_is_refused_not_ignored(self):
         """표가 고쳐져 대상 행이 사라지면 그때가 근거를 다시 볼 순간이다."""

@@ -56,15 +56,39 @@ division(10개)은 제조업 하나가 기술·제약·산업재를 다 삼켜 �
 1. **커버리지를 재서 부족한 종목을 목록으로 돌려준다.** 조용히 넘기지 않는다.
 2. `CIK_OVERRIDES`로 알려진 경우를 고정한다. 자동으로 선행 법인을 찾아주는 API는 없으므로
    발견될 때마다 근거와 함께 추가한다.
+
+## 유니버스 규모에서는 `company_tickers.json` 하나로 모자란다
+
+907종목으로 돌리자 **223종목이 CIK를 못 찾았다.** 그 파일은 10,398개뿐이고 폐지 종목은
+물론 `AEP`·`CMA`·`K`·`HES` 같은 현재 대형주도 없다. `company_tickers_exchange.json`도 같은
+10,398개라 소스를 바꿔서 풀리지 않는다.
+
+**이게 조용한 사고인 이유는 실적·섹터 게이트가 fail-close라서다.** 못 찾은 종목은 영영
+진입 대상이 되지 않고, 그 목록이 폐지 종목 쪽으로 크게 기울어 있다. 즉 가격 데이터에서
+막아낸 생존편향이 실적 게이트를 통해 되돌아온다. 그래서 세 층을 쌓았다.
+
+1. `company_tickers.json` — 현재 등록인의 티커 (684/907)
+2. `browse-edgar?CIK=<티커>` — 그 파일에 없는 현재 등록인 (+58)
+3. **당시 회사 이름** → `cik-lookup-data.txt`(105만 행, 지금까지의 모든 등록인) → 제출
+   이력으로 검증
+
+3층의 이름은 위키 지수 변경 표에서 온다. 벤더 심볼 목록의 이름은 티커의 **현재** 주인을
+가리켜서 못 쓴다 — `EMC`가 "Global X Emerging Markets Great Consumer ETF"로 온다.
+
+**하나로 좁혀지지 않으면 고르지 않는다.** `LEHMAN BROTHERS HOLDINGS`는 이름만으로 신탁
+법인과 지주회사가 갈리지 않아서, 검증을 거쳐도 후보가 둘 남는다. 그런 것은 `ambiguous`로
+돌려주고 사람이 `CIK_OVERRIDES`에 근거와 함께 넣는다.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import statistics
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
@@ -83,7 +107,14 @@ EARNINGS_ITEM = "2.02"
 # 티커가 이력 없는 신설 법인으로 옮겨간 경우의 수동 고정. 발견 근거를 함께 남긴다.
 # XOM: company_tickers.json은 CIK 2115436(ExxonMobil Holdings Corp, 2026-07 이후 제출
 # 28건)을 주지만 실적 이력 125건은 CIK 34088(EXXON MOBIL CORP)에 있다. 2026-08-06 확인.
-CIK_OVERRIDES = {"XOM": "0000034088"}
+CIK_OVERRIDES = {
+    "XOM": "0000034088",
+    # 이름으로는 자회사와 지주회사가 안 갈린다. `LEHMAN BROTHERS INC//`(0000728586,
+    # 옛 이름 `SHEARSON LEHMAN BROTHERS INC`)는 브로커딜러 자회사이고 구간 안의 실적
+    # 제출이 0건이다. 지수 구성원은 `LEHMAN BROTHERS HOLDINGS INC`이고, 그 등록인이
+    # 파산 후 `LEHMAN BROTHERS HOLDINGS INC. PLAN TRUST`로 개명해 옛 이름에 남아 있다.
+    "LEH": "0000806085",
+}
 
 # 분기 발표로 볼 간격의 범위. Item 2.02는 실적 외의 사유로도 제출되므로 이 범위를
 # 벗어난 간격은 분기 주기 추정에서 뺀다. 실측 예: AAPL의 간격 중앙값 91일, 범위 27~98일.
@@ -264,20 +295,31 @@ class EdgarClient:
         self._last_call = 0.0
         self.calls = 0
 
-    def _get(self, url: str) -> object:
+    def _read(self, url: str) -> bytes:
         wait = self.interval - (time.monotonic() - self._last_call)
         if wait > 0:
             time.sleep(wait)
         request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
         self.calls += 1
         try:
-            with urllib.request.urlopen(request, timeout=90) as response:
-                body = response.read()
+            with urllib.request.urlopen(request, timeout=180) as response:
+                return response.read()
         except urllib.error.HTTPError as error:
             raise EdgarError(f"HTTP {error.code}: {url}") from error
         finally:
             self._last_call = time.monotonic()
-        return json.loads(body)
+
+    def _get(self, url: str) -> object:
+        return json.loads(self._read(url))
+
+    def text(self, url: str) -> str:
+        """JSON이 아닌 응답. `browse-edgar`의 atom이 이쪽이다."""
+        # 이름 덤프에 latin-1 바이트가 섞여 있어 utf-8로는 읽히지 않는다.
+        return self._read(url).decode("latin-1")
+
+    def cik_lookup(self) -> "CikNameIndex":
+        """이름 → CIK 색인. 40MB 한 번이고 캐시하지 않는다(실행당 1회 쓴다)."""
+        return parse_cik_lookup(self.text(CIK_LOOKUP_URL))
 
     def ticker_map(self) -> dict[str, Company]:
         return parse_ticker_map(self._get(TICKER_MAP_URL))
@@ -329,6 +371,197 @@ def resolve_cik(
     return (company.cik, False) if company else (None, False)
 
 
+# --------------------------------------------------------------------------
+# 티커→CIK 2·3층. `company_tickers.json`이 유니버스 규모에서 모자라서 만들었다.
+# --------------------------------------------------------------------------
+
+BROWSE_URL = (
+    "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={ticker}"
+    "&type=8-K&dateb=&owner=include&count=1&output=atom"
+)
+CIK_LOOKUP_URL = "https://www.sec.gov/Archives/edgar/cik-lookup-data.txt"
+
+# 법인 형태. 위키는 `Genzyme`, SEC는 `GENZYME CORP`로 적어서 이것을 지우지 않으면
+# 거의 아무것도 안 맞는다. 회사를 가리키는 말이 아니라 등기 형태라 지워도 안전하다.
+_LEGAL_FORM = (
+    r"\b(INC|CORP|CORPORATION|COMPANY|CO|LTD|LIMITED|LLC|LP|PLC|NV|SA|AG|THE)\b"
+)
+# 서술어. 이것까지 지우면 매칭은 늘지만 **다른 회사가 합쳐진다** — `RAYTHEON TECHNOLOGIES`
+# (현 RTX)와 `RAYTHEON CO`가 같은 키가 돼 후보에 섞였다. 그래서 기본이 아니라 폴백이다.
+_DESCRIPTIVE = (
+    r"\b(HOLDINGS?|GROUP|SYSTEMS|TECHNOLOGIES|TECHNOLOGY|INTERNATIONAL|"
+    r"INDUSTRIES|ENTERPRISES|USA|US|NEW)\b"
+)
+
+
+def normalize_company_name(name: str, *, drop_descriptive: bool = False) -> str:
+    """이름 대조용 정규형. 대소문자·구두점·법인 형태를 지운다."""
+    text = re.sub(r"[^A-Z0-9 ]", " ", name.upper())
+    text = re.sub(_LEGAL_FORM, " ", text)
+    if drop_descriptive:
+        text = re.sub(_DESCRIPTIVE, " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+@dataclass(frozen=True)
+class CikNameIndex:
+    """이름 → CIK 색인 두 벌. **엄격한 쪽을 먼저 보고 빈손일 때만 느슨한 쪽을 본다.**
+
+    한 벌만 두면 어느 쪽으로도 진다. 엄격하면 `Lehman Brothers`(위키)가
+    `LEHMAN BROTHERS HOLDINGS INC`(SEC)를 못 찾고, 느슨하면 `Raytheon`이 RTX까지 끌어온다.
+    """
+
+    strict: dict[str, set[str]]
+    loose: dict[str, set[str]]
+
+    def candidates(self, name: str) -> list[str]:
+        hit = self.strict.get(normalize_company_name(name))
+        if not hit:
+            hit = self.loose.get(normalize_company_name(name, drop_descriptive=True))
+        return sorted(hit or ())
+
+
+def parse_cik_lookup(text: str) -> CikNameIndex:
+    """`cik-lookup-data.txt`를 이름 색인으로 바꾼다.
+
+    한 줄이 `회사이름:CIK:`이고 105만 행이다. **현재 등록인만 담는 `company_tickers.json`과
+    달리 지금까지 등록한 모든 법인이 들어 있어** 폐지 회사를 여기서 찾을 수 있다.
+    """
+    strict: dict[str, set[str]] = {}
+    loose: dict[str, set[str]] = {}
+    for line in text.splitlines():
+        parts = line.rsplit(":", 2)
+        if len(parts) != 3 or not parts[1].isdigit():
+            continue
+        cik = parts[1].zfill(10)
+        key = normalize_company_name(parts[0])
+        if key:
+            strict.setdefault(key, set()).add(cik)
+        key = normalize_company_name(parts[0], drop_descriptive=True)
+        if key:
+            loose.setdefault(key, set()).add(cik)
+    if not strict:
+        raise EdgarError("CIK 이름 색인이 비어 있습니다.")
+    return CikNameIndex(strict=strict, loose=loose)
+
+
+@dataclass(frozen=True)
+class CikCandidate:
+    """이름으로 찾은 CIK 후보와 그것을 받아들일지 가른 근거."""
+
+    cik: str
+    name: str
+    sic: str
+    first_filing: str | None
+    last_filing: str | None
+    files_8k: bool
+
+    def overlaps(self, start: str, end: str) -> bool:
+        if self.first_filing is None or self.last_filing is None:
+            return False
+        return self.first_filing <= end and self.last_filing >= start
+
+    def accepts(self, start: str, end: str) -> bool:
+        """**셋을 다 만족해야 받는다.**
+
+        제출 이력이 멤버십 구간과 겹치지 않으면 다른 시대의 동명 법인이고, 8-K를 낸 적이
+        없으면 상장 발행사가 아니며(신탁·자회사·특수목적법인), SIC가 없으면 사업 등록이
+        아니다. 실측에서 `Novellus Systems` 후보 4개가 이 검사로 1개가 됐다.
+        """
+        return bool(self.sic) and self.files_8k and self.overlaps(start, end)
+
+
+def candidate_from_submissions(cik: str, payload: dict) -> CikCandidate:
+    recent = (payload.get("filings") or {}).get("recent") or {}
+    dates = [str(value) for value in (recent.get("filingDate") or []) if value]
+    forms = {str(value) for value in (recent.get("form") or [])}
+    files = (payload.get("filings") or {}).get("files") or []
+    first = min(dates) if dates else None
+    # 아카이브가 있으면 최초 제출은 그쪽에 있다. 메타데이터만 보고 호출하지 않는다.
+    for meta in files:
+        stamp = str(meta.get("filingFrom") or "")
+        if stamp and (first is None or stamp < first):
+            first = stamp
+    return CikCandidate(
+        cik=str(cik).zfill(10),
+        name=str(payload.get("name") or ""),
+        sic=str(payload.get("sic") or ""),
+        first_filing=first,
+        last_filing=max(dates) if dates else None,
+        files_8k=any(form.startswith("8-K") for form in forms),
+    )
+
+
+def resolve_by_browse(client: "EdgarClient", ticker: str) -> str | None:
+    """2층. `browse-edgar`가 `company_tickers.json`에 없는 **현재** 등록인을 푼다.
+
+    실측에서 223개 중 58개가 여기서 풀렸다(`AEP`·`CMA`·`K`·`HES` 등). 폐지 종목은 못 푼다.
+    """
+    body = client.text(BROWSE_URL.format(ticker=urllib.parse.quote(ticker)))
+    found = re.search(r"<cik>(\d+)</cik>", body)
+    return found.group(1).zfill(10) if found else None
+
+
+def earnings_filings_in_span(
+    client: "EdgarClient", cik: str, span: tuple[str, str]
+) -> int:
+    """구간 안의 Item 2.02 제출 건수. 후보를 가르는 마지막 증거다.
+
+    **지주회사·중간 법인·신탁은 분기 실적 8-K를 내지 않는다.** `LEHMAN BROTHERS INC//`
+    (브로커딜러 자회사)와 `LEHMAN BROTHERS HOLDINGS INC`(지수 구성원)는 이름으로도 SIC로도
+    안 갈리지만 실적 제출로는 갈린다. 우리가 어차피 모으는 데이터라 새 소스가 필요 없다.
+    """
+    start, end = span
+    try:
+        dates, _ = client.all_earnings_dates(cik, start)
+    except EdgarError:
+        return 0
+    return sum(1 for date in dates if start <= date <= end)
+
+
+def resolve_by_name(
+    client: "EdgarClient",
+    name: str,
+    index: CikNameIndex,
+    *,
+    span: tuple[str, str],
+    max_candidates: int = 8,
+) -> tuple[str | None, list[CikCandidate]]:
+    """3층. 당시 회사 이름으로 찾고 제출 이력으로 검증한다.
+
+    **하나로 좁혀지지 않으면 고르지 않는다.** 살아남은 후보를 그대로 돌려주므로 호출자가
+    목록을 보고 `CIK_OVERRIDES`에 근거와 함께 넣을 수 있다. 조용히 첫 번째를 고르면
+    `LEHMAN BROTHERS HOLDINGS`의 첫 매치가 신탁 법인(`0001382976`)인 것 같은 사고가 난다.
+
+    후보가 둘 이상 남으면 구간 안의 실적 제출 건수를 센다. **실적을 낸 후보가 정확히
+    하나일 때만 고른다** — 둘 다 실제 발행사면 어느 쪽이 지수 구성원이었는지는 제출
+    기록으로 알 수 없고, 그건 사람이 판단할 일이다.
+    """
+    ciks = index.candidates(name)
+    if not ciks or len(ciks) > max_candidates:
+        return None, []
+    survivors: list[CikCandidate] = []
+    for cik in ciks:
+        try:
+            candidate = candidate_from_submissions(cik, client.submissions(cik))
+        except EdgarError:
+            continue
+        if candidate.accepts(*span):
+            survivors.append(candidate)
+    if not survivors:
+        return None, []
+    # **후보가 하나뿐이어도 실적 제출은 확인한다.** 이 검사를 건너뛰었더니 `LEH`가
+    # `LEHMAN BROTHERS INC//`(브로커딜러 자회사, 구간 내 실적 0건)로 갔다. 지수 구성원은
+    # 실적을 발표하는 상장 발행사이므로, 구간 안에 실적이 하나도 없는 후보는 그 자리의
+    # 회사가 아니다.
+    filers = [
+        item for item in survivors if earnings_filings_in_span(client, item.cik, span)
+    ]
+    if len(filers) == 1:
+        return filers[0].cik, survivors
+    return None, survivors
+
+
 def collect(
     connection: sqlite3.Connection,
     tickers: list[str],
@@ -338,6 +571,8 @@ def collect(
     source: str = "sec-edgar",
     window_start: str | None = None,
     overrides: dict[str, str] | None = None,
+    security_names: dict[str, str] | None = None,
+    spans: dict[str, tuple[str, str]] | None = None,
 ) -> dict[str, object]:
     """티커 목록의 실적일과 섹터를 모아 저장소에 넣는다.
 
@@ -346,16 +581,38 @@ def collect(
 
     `window_start`를 주면 그 구간을 덮지 못하는 종목을 `gaps`로 돌려준다. **그 목록을
     보지 않고 다음 단계로 넘어가면 재편된 회사가 조용히 유니버스에서 빠진다.**
+
+    `security_names`(티커 → 당시 회사 이름)와 `spans`(티커 → 멤버십 구간)를 주면 3층까지
+    쓴다. 주지 않으면 1층만 돌던 예전 동작 그대로다. **못 푼 티커는 조용히 빠지는 게 아니라
+    `missing`·`ambiguous`로 돌아온다** — 그것들이 폐지 종목 쪽으로 기울어 있어서, 놓치면
+    가격에서 막은 생존편향이 실적 게이트로 되돌아온다.
     """
     edgar = client or EdgarClient()
     companies = edgar.ticker_map()
+    index: CikNameIndex | None = None
 
     earnings_rows: list[dict[str, str]] = []
     sectors: dict[str, str] = {}
     missing: list[str] = []
+    ambiguous: dict[str, list[CikCandidate]] = {}
+    resolved_by: dict[str, str] = {}
     coverage: list[Coverage] = []
     for ticker in sorted({value.strip().upper() for value in tickers}):
         cik, pinned = resolve_cik(ticker, companies, overrides)
+        if cik is None:
+            cik = resolve_by_browse(edgar, ticker)
+            if cik:
+                resolved_by[ticker] = "browse"
+        if cik is None and security_names and spans and ticker in spans:
+            if index is None:
+                index = edgar.cik_lookup()
+            cik, survivors = resolve_by_name(
+                edgar, security_names.get(ticker, ""), index, span=spans[ticker]
+            )
+            if cik:
+                resolved_by[ticker] = "name"
+            elif survivors:
+                ambiguous[ticker] = survivors
         if cik is None:
             missing.append(ticker)
             continue
@@ -395,14 +652,20 @@ def collect(
     )
     load_earnings_csv(connection, earnings_csv(earnings_rows), source, source_version)
     load_securities_csv(connection, securities_csv(sectors), source, source_version)
+    # 커버리지는 **그 종목이 구성원이 된 날**을 기준으로 잰다. 전역 시작일과 견주면
+    # 2008년 이후 상장한 회사가 전부 미달로 잡혀(907종목에서 245개) 진짜 구멍이 묻힌다.
+    # 지수에 들어가기 전의 실적일은 애초에 필요하지 않다.
     gaps = [
         item
         for item in coverage
-        if window_start is not None and not item.covers(window_start)
+        if (floor := (spans or {}).get(item.symbol, (window_start, ""))[0]) is not None
+        and not item.covers(floor)
     ]
     return {
         "tickers": len(tickers),
         "missing": missing,
+        "ambiguous": ambiguous,
+        "resolved_by": resolved_by,
         "earnings_rows": len(earnings_rows),
         "sectors": len(sectors),
         "calls": edgar.calls,

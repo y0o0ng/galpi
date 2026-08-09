@@ -424,26 +424,37 @@ def parse_changes(wikitext: str, index_name: str, *, since: str | None = None) -
 
     표는 `효력일 | 편입(티커, 종목) | 편출(티커, 종목) | 사유`다. 한 행이 편입과 편출을
     동시에 담으므로 두 줄로 쪼갠다. 한쪽만 있는 행(분사·상장폐지)도 그대로 받는다.
+
+    **종목명 열을 버리지 않는다.** 그것이 그 티커의 *당시* 회사 이름이고, 폐지 종목의
+    CIK를 찾는 유일하게 믿을 만한 단서다. 벤더 심볼 목록의 이름은 티커의 **현재** 주인을
+    가리켜서 못 쓴다 — `EMC`가 "Global X Emerging Markets Great Consumer ETF", `SHLD`가
+    "Global X Defense Tech ETF"로 온다. 위키 표는 같은 티커를 `EMC Corporation`·
+    `Sears Holdings`로 적는다. 이름을 티커별 파일로 따로 두지 않는 이유는 `MNST`처럼 한
+    티커를 두 회사가 나눠 쓸 때 날짜가 붙어 있어야 갈리기 때문이다.
     """
     _, rows = parse_table(wikitext, CHANGES_TABLE_ID)
     emitted: list[tuple[str, str, str, str]] = []
+    names: dict[tuple[str, str, str, str], str] = {}
     for row in rows:
         if len(row) < 5:
             raise WikipediaError(f"변경 이력 행의 열이 모자랍니다: {row}")
         effective = parse_date(row[0])
         if since is not None and effective < since:
             continue
-        for action, cell in (("add", row[1]), ("remove", row[3])):
+        for action, cell, name_cell in (
+            ("add", row[1], row[2]),
+            ("remove", row[3], row[4]),
+        ):
             symbol = _symbol(cell)
             if symbol:
-                emitted.append(
-                    (
-                        effective,
-                        index_name,
-                        action,
-                        apply_renames(index_name, effective, symbol),
-                    )
+                record = (
+                    effective,
+                    index_name,
+                    action,
+                    apply_renames(index_name, effective, symbol),
                 )
+                emitted.append(record)
+                names.setdefault(record, clean_cell(name_cell).strip())
     emitted = _drop_excluded(index_name, emitted, since)
     emitted.extend(
         (date_, index, action, symbol)
@@ -455,9 +466,9 @@ def parse_changes(wikitext: str, index_name: str, *, since: str | None = None) -
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
-    writer.writerow(("date", "index_name", "action", "symbol"))
+    writer.writerow(("date", "index_name", "action", "symbol", "security"))
     for record in sorted(set(emitted), reverse=True):
-        writer.writerow(record)
+        writer.writerow((*record, names.get(record, "")))
     return buffer.getvalue()
 
 

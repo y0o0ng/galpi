@@ -35,7 +35,11 @@ from backtest.edgar import (  # noqa: E402
     earnings_csv,
     earnings_dates_from_block,
     estimate_gap_days,
+    CikNameIndex,
+    normalize_company_name,
+    parse_cik_lookup,
     parse_ticker_map,
+    resolve_by_name,
     resolve_cik,
     sector_from_submissions,
     securities_csv,
@@ -250,6 +254,10 @@ class CollectTest(unittest.TestCase):
             payload = self.payloads[cik]
             return payload["dates"], payload["submissions"]
 
+        def text(self, url: str) -> str:
+            # 2층은 네트워크로 나간다. 테스트에서는 못 찾은 것으로 둔다.
+            return ""
+
     def test_collect_writes_earnings_and_sectors(self):
         connection = store.connect_memory()
         client = self.FakeClient(
@@ -330,6 +338,195 @@ class CikResolutionTest(unittest.TestCase):
         self.assertIn("XOM", CIK_OVERRIDES)
 
 
+class NameLookupTest(unittest.TestCase):
+    """3층. `company_tickers.json`이 907종목에서 223개를 못 찾아 만든 경로다."""
+
+    DUMP = (
+        "LEHMAN BROTHERS HOLDINGS:0001382976:\n"
+        "LEHMAN BROTHERS HOLDINGS INC:0000806085:\n"
+        "NOVELLUS SYSTEMS INC:0000836106:\n"
+        "NOVELLUS LLC:0001687472:\n"
+        "쓰레기 줄\n"
+        "GENZYME CORP:0000732485:\n"
+    )
+
+    def test_the_legal_form_does_not_change_the_key(self):
+        """위키는 `Genzyme`, SEC는 `GENZYME CORP`로 적는다. 안 지우면 아무것도 안 맞는다."""
+        self.assertEqual(normalize_company_name("Genzyme"), "GENZYME")
+        self.assertEqual(normalize_company_name("GENZYME CORP"), "GENZYME")
+        self.assertEqual(normalize_company_name("EMC Corporation"), "EMC")
+
+    def test_descriptive_words_survive_the_strict_form(self):
+        """`RAYTHEON TECHNOLOGIES`(현 RTX)와 `RAYTHEON CO`는 **다른 회사다.**
+
+        서술어까지 지우면 둘이 같은 키가 되어 후보에 섞인다. 그래서 그 정규형은 기본이
+        아니라 엄격한 쪽이 빈손일 때만 쓰는 폴백이다.
+        """
+        self.assertNotEqual(
+            normalize_company_name("Raytheon Technologies Corp"),
+            normalize_company_name("Raytheon Co"),
+        )
+        self.assertEqual(
+            normalize_company_name("Raytheon Technologies Corp", drop_descriptive=True),
+            normalize_company_name("Raytheon Co", drop_descriptive=True),
+        )
+
+    def test_rows_without_a_cik_are_skipped(self):
+        index = parse_cik_lookup(self.DUMP)
+        self.assertNotIn("쓰레기 줄", index.strict)
+        self.assertEqual(index.candidates("Genzyme"), ["0000732485"])
+
+    def test_the_strict_index_is_tried_first(self):
+        """`Novellus Systems`는 엄격한 쪽에서 정확히 하나로 맞는다.
+
+        느슨한 쪽을 먼저 보면 `NOVELLUS LLC`까지 끌어와 쓸데없이 후보가 는다.
+        """
+        index = parse_cik_lookup(self.DUMP)
+        self.assertEqual(index.candidates("Novellus Systems"), ["0000836106"])
+        # 엄격한 쪽에 맞는 것이 있으면 거기서 끝난다. `Novellus`는 `NOVELLUS LLC`에
+        # 정확히 맞으므로 느슨한 쪽(`Novellus Systems`까지 끌어오는)으로 내려가지 않는다.
+        self.assertEqual(index.candidates("Novellus"), ["0001687472"])
+
+    def test_two_entities_collapse_to_one_key(self):
+        """**이것이 이 경로의 위험이다.**
+
+        `LEHMAN BROTHERS HOLDINGS`(신탁)와 `LEHMAN BROTHERS HOLDINGS INC`(지주회사)는
+        엄격한 정규형에서도 같은 키다. 조용히 첫 번째를 고르면 자신 있게 틀린다.
+        """
+        index = parse_cik_lookup(self.DUMP)
+        self.assertEqual(
+            index.strict["LEHMAN BROTHERS HOLDINGS"], {"0001382976", "0000806085"}
+        )
+
+    class FakeClient(EdgarClient):
+        def __init__(self, payloads):
+            super().__init__(contact="test@example.com", interval=0.0)
+            self.payloads = payloads
+
+        def submissions(self, cik):
+            return self.payloads[cik]
+
+        def all_earnings_dates(self, cik, window_start=None):
+            return self.payloads[cik].get("earnings", []), self.payloads[cik]
+
+    @staticmethod
+    def _submissions(sic, first, last, form="8-K"):
+        return {
+            "name": "X",
+            "sic": sic,
+            "filings": {"recent": {"filingDate": [first, last], "form": [form, form]}},
+        }
+
+    def test_the_candidate_outside_the_membership_window_is_dropped(self):
+        """실측: Novellus 후보 4개 중 구간에 겹치는 것은 Novellus Systems 하나다."""
+        payloads = {
+            "0000836106": self._submissions("3559", "1994-02-14", "2013-02-14"),
+            "0001687472": self._submissions("3559", "2016-10-19", "2018-03-07"),
+        }
+        payloads["0000836106"]["earnings"] = ["2009-01-26", "2011-04-19"]
+        client = self.FakeClient(payloads)
+        index = CikNameIndex(strict={"NOVELLUS SYSTEMS": {"0000836106", "0001687472"}}, loose={})
+        cik, survivors = resolve_by_name(
+            client, "Novellus Systems", index, span=("2008-01-02", "2012-06-05")
+        )
+        self.assertEqual(cik, "0000836106")
+        self.assertEqual(len(survivors), 1)
+
+    def test_a_non_filer_is_dropped(self):
+        """8-K를 낸 적이 없으면 상장 발행사가 아니다(신탁·자회사·특수목적법인)."""
+        payloads = {
+            "0000836106": self._submissions("3559", "1994-02-14", "2013-02-14"),
+            "0001687472": self._submissions("3559", "2007-01-02", "2013-01-02", "S-1"),
+        }
+        payloads["0000836106"]["earnings"] = ["2009-01-26"]
+        payloads["0001687472"]["earnings"] = ["2009-02-02"]
+        client = self.FakeClient(payloads)
+        index = CikNameIndex(strict={"NOVELLUS SYSTEMS": {"0000836106", "0001687472"}}, loose={})
+        cik, _ = resolve_by_name(
+            client, "Novellus Systems", index, span=("2008-01-02", "2012-06-05")
+        )
+        self.assertEqual(cik, "0000836106")
+
+    def test_two_survivors_are_refused_not_guessed(self):
+        """리먼이 이 모양이다. 후보를 돌려주고 사람이 CIK_OVERRIDES에 넣는다."""
+        client = self.FakeClient(
+            {
+                "0000806085": self._submissions("6211", "1994-01-07", "2025-08-28"),
+                "0001382976": self._submissions("6211", "2002-01-29", "2019-05-22"),
+            }
+        )
+        index = CikNameIndex(strict={"LEHMAN BROTHERS": {"0000806085", "0001382976"}}, loose={})
+        cik, survivors = resolve_by_name(
+            client, "Lehman Brothers", index, span=("2008-01-02", "2008-09-16")
+        )
+        self.assertIsNone(cik)
+        self.assertEqual({item.cik for item in survivors}, {"0000806085", "0001382976"})
+
+    def test_a_lone_candidate_still_has_to_file_earnings(self):
+        """**후보가 하나뿐이어도 실적을 확인한다.**
+
+        이 검사를 건너뛰었을 때 `LEH`가 `LEHMAN BROTHERS INC//`(브로커딜러 자회사,
+        구간 내 실적 0건)로 갔다. 지수 구성원은 실적을 발표하는 상장 발행사다.
+        """
+        payloads = {"0000728586": self._submissions("6211", "1994-01-07", "2008-05-01")}
+        payloads["0000728586"]["earnings"] = []
+        client = self.FakeClient(payloads)
+        index = CikNameIndex(strict={"LEHMAN BROTHERS": {"0000728586"}}, loose={})
+        cik, survivors = resolve_by_name(
+            client, "Lehman Brothers", index, span=("2008-01-02", "2008-09-16")
+        )
+        self.assertIsNone(cik)
+        self.assertEqual(len(survivors), 1)
+
+    def test_the_subsidiary_that_files_no_earnings_loses(self):
+        """`LEHMAN BROTHERS INC//`(브로커딜러 자회사)와 지주회사는 이름으로도 SIC로도
+        안 갈린다. **분기 실적 8-K를 내는 쪽이 지수 구성원이다.**"""
+        payloads = {
+            "0000806085": self._submissions("6211", "1994-01-04", "2025-08-28"),
+            "0000728586": self._submissions("6211", "1994-01-07", "2008-05-01"),
+        }
+        payloads["0000806085"]["earnings"] = ["2008-03-18", "2008-06-16"]
+        payloads["0000728586"]["earnings"] = []
+        client = self.FakeClient(payloads)
+        index = CikNameIndex(
+            strict={"LEHMAN BROTHERS": {"0000806085", "0000728586"}}, loose={}
+        )
+        cik, survivors = resolve_by_name(
+            client, "Lehman Brothers", index, span=("2008-01-02", "2008-09-16")
+        )
+        self.assertEqual(cik, "0000806085")
+        self.assertEqual(len(survivors), 2)
+
+    def test_two_real_filers_are_still_refused(self):
+        """둘 다 실적을 내면 어느 쪽이 구성원이었는지는 제출 기록으로 알 수 없다.
+
+        `RTN`이 그렇다(`RAYTHEON CO`와 `RAYTHEON CO/`). 사람이 판단할 일이다.
+        """
+        payloads = {
+            "0000082267": self._submissions("3812", "1994-02-10", "2013-03-25"),
+            "0001047122": self._submissions("3812", "1997-10-06", "2020-04-13"),
+        }
+        payloads["0000082267"]["earnings"] = ["2009-01-28"]
+        payloads["0001047122"]["earnings"] = ["2009-01-28", "2015-01-29"]
+        client = self.FakeClient(payloads)
+        index = CikNameIndex(
+            strict={"RAYTHEON": {"0000082267", "0001047122"}}, loose={}
+        )
+        cik, survivors = resolve_by_name(
+            client, "Raytheon", index, span=("2008-01-02", "2019-07-01")
+        )
+        self.assertIsNone(cik)
+        self.assertEqual(len(survivors), 2)
+
+    def test_an_unknown_name_asks_for_nothing(self):
+        client = self.FakeClient({})
+        self.assertEqual(
+            resolve_by_name(client, "Nowhere", CikNameIndex({}, {}), span=("2008-01-02", "2009-01-02")),
+            (None, []),
+        )
+        self.assertEqual(client.calls, 0)
+
+
 class CoverageTest(unittest.TestCase):
     """커버리지가 부족한 종목을 조용히 넘기면 재편된 회사가 유니버스에서 빠진다."""
 
@@ -364,6 +561,35 @@ class CoverageTest(unittest.TestCase):
         covered = {item.symbol: item.count for item in summary["coverage"]}
         self.assertEqual(covered["BBB"], 1)
         self.assertGreater(covered["AAA"], 30)
+
+    def test_a_late_joiner_is_measured_from_when_it_joined(self):
+        """2008년 이후 상장한 회사를 전역 시작일과 견주면 907종목에서 245개가 미달로 잡힌다.
+
+        지수에 들어가기 전의 실적일은 애초에 필요하지 않다.
+        """
+        connection = store.connect_memory()
+        client = CollectTest.FakeClient(
+            {
+                "0000000001": {
+                    "dates": quarterly(40, start="2011-01-28"),
+                    "submissions": {"sic": "3674"},
+                },
+                # 2020년에 상장해 그때부터 구성원이 된 회사.
+                "0000000002": {
+                    "dates": quarterly(20, start="2020-02-10"),
+                    "submissions": {"sic": "2911"},
+                },
+            }
+        )
+        summary = collect(
+            connection,
+            ["AAA", "BBB"],
+            VERSION,
+            client=client,
+            window_start="2012-01-03",
+            spans={"AAA": ("2012-01-03", "2026-08-08"), "BBB": ("2020-06-01", "2026-08-08")},
+        )
+        self.assertEqual(summary["gaps"], [])
 
     def test_no_window_means_no_gap_report(self):
         connection = store.connect_memory()
