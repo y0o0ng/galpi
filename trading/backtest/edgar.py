@@ -115,6 +115,55 @@ CIK_OVERRIDES = {
     # 제출이 0건이다. 지수 구성원은 `LEHMAN BROTHERS HOLDINGS INC`이고, 그 등록인이
     # 파산 후 `LEHMAN BROTHERS HOLDINGS INC. PLAN TRUST`로 개명해 옛 이름에 남아 있다.
     "LEH": "0000806085",
+    # 아래는 2026-08-09에 손으로 확인했다. 전부 지수를 떠난 회사라 자동 경로가 못 찾았고,
+    # **빠지면 정확히 생존편향이다.** 후보는 SEC 회사 검색으로 찾고 두 가지로 확인했다 —
+    # `formerNames`의 날짜로 **그 멤버십 구간 동안** 그 CIK가 쓰던 이름, 그리고 구간 안의
+    # Item 2.02 제출 건수. 주석의 이름이 그 구간의 이름이다.
+    # `sic`이 비어 자동 검증을 통과하지 못한다. 구간 이름이 `AMERICAN CAPITAL STRATEGIES
+    # LTD`이고 Item 2.02가 5건이다. 검색 후보로 나오는 `AGNC Investment`는 이 회사가
+    # 운용하던 다른 회사라 쓰지 않는다.
+    "ACAS": "0000817473",   # AMERICAN CAPITAL STRATEGIES LTD → AMERICAN CAPITAL, LTD
+    "AET": "0001122304",    # AETNA INC /PA/
+    "AKS": "0000918160",    # AK STEEL HOLDING CORP (현 Cleveland-Cliffs Steel Holding)
+    "BCR": "0000009892",    # BARD C R INC /NJ/
+    "CCE": "0001491675",    # COCA-COLA ENTERPRISES, INC.
+    "CELG": "0000816284",   # CELGENE CORP /DE/
+    "CMCSK": "0001166691",  # COMCAST CORP (K주는 같은 등록인이다)
+    "CVC": "0001053112",    # CABLEVISION SYSTEMS CORP /NY (CSC Holdings는 자회사다)
+    "DAY": "0001725057",    # Ceridian HCM Holding → Dayforce
+    "DISCA": "0001437107",  # Discovery Communications → Warner Bros. Discovery
+    "DWDP": "0001666700",   # DowDuPont Inc. → DuPont de Nemours
+    "ETFC": "0001015780",   # E TRADE FINANCIAL CORP
+    "FDO": "0000034408",    # FAMILY DOLLAR STORES INC
+    "FII": "0001056288",    # FEDERATED INVESTORS INC /PA/ (현 Federated Hermes)
+    "FNM": "0000310522",    # FEDERAL NATIONAL MORTGAGE ASSOCIATION
+    "HAR": "0000800459",    # HARMAN INTERNATIONAL INDUSTRIES INC /DE/
+    "HNZ": "0000046640",    # HEINZ H J CO (현 Kraft Heinz Foods)
+    "HOT": "0000316206",    # STARWOOD HOTEL & RESORTS WORLDWIDE INC
+    "JCP": "0001166126",    # J C PENNEY CO INC (0000077182은 실적을 내지 않는 자회사다)
+    "JDSU": "0000912093",   # JDS UNIPHASE CORP /CA/ (현 Viavi Solutions)
+    "KRFT": "0001545158",   # Kraft Foods Group, Inc. (Mondelez는 나뉜 반대쪽이다)
+    "LLTC": "0000791907",   # LINEAR TECHNOLOGY CORP /CA/
+    "LO": "0001424847",     # LORILLARD, INC.
+    "LXK": "0001001288",    # LEXMARK INTERNATIONAL INC /KY/
+    "MIL": "0000066479",    # MILLIPORE CORP /MA
+    # 검색 1순위인 `0000067686`은 **옛** Monsanto(현 Pharmacia)라 쓰지 않는다.
+    "MON": "0001110783",    # MONSANTO CO /NEW/
+    "NFX": "0000912750",    # NEWFIELD EXPLORATION CO /DE/
+    "RRD": "0000029669",    # RR Donnelley & Sons Co
+    "STRZA": "0001507934",  # Starz
+    "TSS": "0000721683",    # TOTAL SYSTEM SERVICES INC
+    # 검색이 자산유동화 특수목적법인만 돌려준다. 지수 구성원은 지주회사다.
+    "WB": "0000036995",     # WACHOVIA CORP NEW
+    "WCG": "0001279363",    # WELLCARE HEALTH PLANS, INC.
+    "WIN": "0001282266",    # WINDSTREAM CORP → WINDSTREAM HOLDINGS
+    # Altaba는 펀드로 전환해 `sic`이 비었고 그래서 자동 검증을 통과하지 못한다. 명시
+    # 지정은 그 검사를 거치지 않으며, 구간 이름이 `YAHOO INC`이고 Item 2.02가 69건이다.
+    "YHOO": "0001011006",   # YAHOO INC → ALTABA INC.
+    # 아래 둘은 **한 구간 안에서 회사가 바뀌어** 어느 CIK도 구간 전체를 덮지 못한다.
+    # 구간 시작을 덮는 쪽을 골랐고 나머지 절반은 실적을 모른 채로 남는다(fail-close).
+    "AGN": "0000850693",    # ALLERGAN INC. 2015-03-23부터의 Allergan plc(0001578845)는 빠진다
+    "GAS": "0000072020",    # NICOR INC. 2011-12-12부터의 AGL Resources(0001004155)는 빠진다
 }
 
 # 분기 발표로 볼 간격의 범위. Item 2.02는 실적 외의 사유로도 제출되므로 이 범위를
