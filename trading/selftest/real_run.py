@@ -344,8 +344,19 @@ def stage_check(connection) -> int:
     return 0
 
 
-def base_symbol(symbol: str) -> str:
-    """벤더 접미사를 뗀 지수 티커. 이름·CIK는 벤더 규칙과 무관하게 그 티커로 묶여 있다."""
+def base_symbols() -> dict[str, str]:
+    """벤더 계열 → 지수 티커. 이름·CIK는 벤더 규칙과 무관하게 지수 티커로 묶여 있다.
+
+    **접미사를 떼는 것으로는 모자란다.** `SUN1`·`NIHDQ`처럼 `_OLD` 규칙 밖의 코드가 있어서
+    매핑 파일 자체를 뒤집어 쓴다. 접미사 규칙은 매핑에 없는 코드의 폴백으로만 남긴다.
+    """
+    mapping = {vendor: symbol for (symbol, _), vendor in reused_mapping().items()}
+    return mapping
+
+
+def base_symbol(symbol: str, mapping: dict[str, str] | None = None) -> str:
+    if mapping and symbol in mapping:
+        return mapping[symbol]
     for suffix in REUSE_SUFFIXES:
         if symbol.endswith(suffix):
             return symbol[: -len(suffix)]
@@ -419,12 +430,13 @@ def stage_edgar(connection) -> int:
     # `securities`·`earnings_calendar`는 멤버십과 같은 심볼로 묶여야 한다.
     symbols = [s for s in membership_symbols(connection) if s != REFERENCE_SYMBOL]
     # 이름·CIK는 지수 티커로 묶여 있으므로 벤더 접미사를 떼고 찾는다.
+    bases = base_symbols()
     names = security_names()
-    names.update({s: names[base_symbol(s)] for s in symbols
-                  if s not in names and base_symbol(s) in names})
+    names.update({s: names[base_symbol(s, bases)] for s in symbols
+                  if s not in names and base_symbol(s, bases) in names})
     overrides = dict(CIK_OVERRIDES)
-    overrides.update({s: overrides[base_symbol(s)] for s in symbols
-                      if s not in overrides and base_symbol(s) in overrides})
+    overrides.update({s: overrides[base_symbol(s, bases)] for s in symbols
+                      if s not in overrides and base_symbol(s, bases) in overrides})
     summary = collect(
         connection,
         symbols,
