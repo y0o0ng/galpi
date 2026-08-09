@@ -356,8 +356,8 @@ def stage_snapshots(_connection) -> int:
     import datetime as dt
 
     from backtest.wikipedia import (
-        Snapshot, WikipediaClient, constituent_symbols, snapshot_changes,
-        snapshot_changes_csv,
+        Snapshot, WikipediaClient, canonical_spelling, constituent_symbols,
+        snapshot_changes, snapshot_changes_csv,
     )
 
     client = WikipediaClient()
@@ -367,13 +367,30 @@ def stage_snapshots(_connection) -> int:
         months.append(cursor.isoformat())
         cursor = (cursor.replace(day=28) + dt.timedelta(days=8)).replace(day=1)
 
+    # 판 본문을 캐시한다. 판 ID가 불변이라 같은 내용이 다시 오고, 220개를 받는 데 위키
+    # 429 백오프까지 겹쳐 40분이 걸린다. 캐시가 없으면 파싱을 한 줄 고칠 때마다 40분을
+    # 다시 쓴다. `trading/data/`는 gitignore이므로 저장소에는 들어가지 않는다.
+    import json
+
+    cache_path = TRADING_ROOT / "data" / "wiki-revisions.json"
+    cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    if cache:
+        print(f"캐시된 판 {len(cache)}개를 씁니다 ({cache_path.name})")
+
     snapshots, unreadable = [], []
     for when in months:
-        found = client.revision_at("SP500", when)
+        found = client.revision_at("SP500", when) if when not in cache else (
+            cache[when]["revid"], cache[when]["date"]
+        )
         if not found:
             continue
         revid, stamp = found
-        symbols = constituent_symbols(client.fetch_revision(revid))
+        if when not in cache:
+            cache[when] = {"revid": revid, "date": stamp,
+                           "wikitext": client.fetch_revision(revid)}
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps(cache), encoding="utf-8")
+        symbols = constituent_symbols(cache[when]["wikitext"])
         if not symbols:
             unreadable.append((when, revid))
             continue
@@ -393,7 +410,11 @@ def stage_snapshots(_connection) -> int:
             print(f"  {item.date} 판 {item.revid} {len(item.symbols)}개")
         return 1
 
-    events = snapshot_changes(snapshots)
+    # 클래스주 표기의 기준은 현재 구성원 목록이다.
+    spelling = canonical_spelling(
+        parse_members_csv(_read_csv("sp500-members.csv"))["SP500"]
+    )
+    events = snapshot_changes(snapshots, spelling)
     (UNIVERSE_DIR / SNAPSHOT_NAME).write_text(
         snapshot_changes_csv(events), encoding="utf-8"
     )

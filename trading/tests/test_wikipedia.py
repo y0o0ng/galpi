@@ -21,7 +21,9 @@ sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest.wikipedia import (  # noqa: E402
     CORRECTIONS,
+    SNAPSHOT_IGNORED,
     Snapshot,
+    canonical_spelling,
     constituent_symbols,
     snapshot_changes,
     EXCLUDED_CHANGES,
@@ -299,6 +301,44 @@ class SnapshotTest(unittest.TestCase):
             Snapshot("SP500", 2, "2009-02-01", frozenset()),
         ])
         self.assertEqual(events[0][0], "2009-02-01")
+
+    def test_an_excluded_symbol_does_not_leak_back_in(self):
+        """**제외는 한 소스가 아니라 그 심볼에 걸려야 한다.**
+
+        `ACE`는 옛 The Chubb Corporation이라 가격을 구할 수 없어 공고 행에서 뺐는데,
+        구성원 표에는 그대로 있으므로 diff가 같은 심볼을 되살린다.
+        """
+        events = snapshot_changes([
+            Snapshot("SP500", 1, "2016-01-01", frozenset({"ACE", "AAA"})),
+            Snapshot("SP500", 2, "2016-02-01", frozenset({"AAA"})),
+        ])
+        self.assertEqual(events, [])
+
+    def test_when_issued_and_preferred_lines_are_not_index_events(self):
+        """분사 때의 when-issued 라인과 우선주는 구성원 표에 잠깐 나타날 뿐이다."""
+        events = snapshot_changes([
+            Snapshot("SP500", 1, "2012-09-01", frozenset({"AAA"})),
+            Snapshot("SP500", 2, "2012-10-01", frozenset({"AAA", "KRFTV", "SGPPRB"})),
+        ])
+        self.assertEqual(events, [])
+
+    def test_a_spelling_flip_is_not_a_pair_of_events(self):
+        """18년치 손편집이라 클래스주 표기가 흔들린다. 표기 변경은 지수 사건이 아니다."""
+        spelling = canonical_spelling({"BF-B", "BRK-B"})
+        events = snapshot_changes([
+            Snapshot("SP500", 1, "2011-08-01", frozenset({"BFB", "BRKB"})),
+            Snapshot("SP500", 2, "2011-09-01", frozenset({"BF-B", "BRK-B"})),
+        ], spelling)
+        self.assertEqual(events, [])
+        # 현재 구성원이 아닌 옛 클래스주는 정규화가 못 잡으므로 같은 단계 쌍으로 상쇄한다.
+        self.assertEqual(snapshot_changes([
+            Snapshot("SP500", 1, "2010-10-01", frozenset({"VIAB"})),
+            Snapshot("SP500", 2, "2010-11-01", frozenset({"VIA-B"})),
+        ]), [])
+
+    def test_every_ignored_symbol_states_its_evidence(self):
+        for symbol, evidence in SNAPSHOT_IGNORED:
+            self.assertTrue(symbol.strip() and evidence.strip(), symbol)
 
     def test_a_rename_is_not_a_pair_of_events(self):
         """개명을 그대로 두면 편출+편입 한 쌍으로 잡혀 없는 사건이 두 개 생긴다."""

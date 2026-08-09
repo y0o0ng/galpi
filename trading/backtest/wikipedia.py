@@ -174,6 +174,41 @@ SYMBOL_RENAMES = (
            " Natural to Monster Beverage Corporation, under the new ticker MNST'"),
     # `before`가 2011-12-19보다 앞이어야 한다. 그날 한센이 MNST라는 이름으로 편입되는데
     # 그 행까지 MWW로 덮으면 두 회사를 반대로 뒤집는다. 세 날 차이다.
+    # 아래 아홉은 2026-08-10에 **과거 판 스냅샷**이 데려온 옛 티커다.
+    #
+    # `before`는 그 심볼의 **마지막 스냅샷 사건보다 뒤**여야 한다. 처음에 개명 발효일로
+    # 잡았더니 그보다 늦은 사건이 안 걸려 `WFMI`·`WMI`·`MHFI`·`MXB`가 그대로 남았다.
+    # 구성원 표는 개명 뒤에도 한동안 옛 표기를 쓰기 때문이다. 변경 이력 표에는
+    # 없던 종목들이라 지금까지 개명을 걸 일이 없었다. 근거는 위키 infobox와, 그 계열이
+    # 실제로 멤버십 구간을 덮는지 확인한 벤더 실측이다.
+    Rename("SP500", "AOC", "2012-01-01", "AON",
+           "Aon plc의 현재 티커가 AON이고 벤더 계열이 2006-01-03부터 이어진다."
+           " 옛 티커 AOC는 벤더 목록에 없다"),
+    Rename("SP500", "CZN", "2008-07-31", "FTR",
+           "Frontier Communications former_name에 'Citizens Communications'가 있다."
+           " **FYBR가 아니라 FTR이다** — FYBR는 2021년 회생 이후 계열(2021-05-04~)이라"
+           " 그 시절 구간을 못 덮고, FTR가 2006-01-03~2020-04-29로 덮는다"),
+    Rename("SP500", "WMI", "2009-09-01", "WM",
+           "Waste Management traded_as {{NYSE|WM}}, former_name 'USA Waste Services, Inc.'"),
+    Rename("SP500", "LIZ", "2012-05-15", "KATE",
+           "Kate Spade & Company의 옛 이름이 Liz Claiborne이다. 벤더에 KATE가"
+           " 2006-01-03~2017-07-11로 있고 LIZ는 목록에 없다"),
+    Rename("SP500", "MHFI", "2016-06-01", "SPGI",
+           "S&P Global former_name 'The McGraw–Hill Companies, Inc. (1995–2013)',"
+           " traded_as {{nyse|SPGI}}"),
+    Rename("SP500", "WPO", "2013-11-29", "GHC",
+           "Graham Holdings former_name 'The Washington Post Company (1947–2013)',"
+           " traded_as {{NYSE|GHC}}"),
+    Rename("SP500", "MXB", "2010-08-01", "MSCI",
+           "MSCI Inc. traded_as {{nyse|MSCI}}. 벤더의 MXB는 Marnetics Broadband라는"
+           " **다른 회사**이므로 그대로 두면 안 된다"),
+    # `WFMI`는 NDX100에만 걸려 있었다. 스냅샷이 S&P 쪽 편출을 데려오면서 같은 개명이
+    # 그 지수에도 필요해졌다. 개명 규칙이 지수별인 이유가 여기서 다시 드러난다.
+    Rename("SP500", "UA-C", "2017-01-01", "UA",
+           "2016년 Under Armour 클래스 분할에서 Class C가 UA, Class A가 UAA를 받았다."
+           " 구성원 표가 잠깐 `UA-C`로 적었을 뿐 벤더 코드는 UA다"),
+    Rename("SP500", "WFMI", "2011-06-01", "WFM",
+           "Whole Foods Market traded_as {{NASDAQ was|WFM}}. NDX100 항목과 같은 근거다"),
     Rename("NDX100", "MNST", "2011-12-16", "MWW",
            "S&P 표 2011-12-16 행이 [[Monster Worldwide]]를 MWW로, NDX 표 2008-11-10 행이"
            " 같은 회사를 MNST로 적는다. 정확한 티커 변경일은 확인하지 못해 **MWW 사용이"
@@ -628,7 +663,49 @@ def _snapshot_ticker(line: str) -> str | None:
     return plain.replace(".", "-") if _TICKER.match(plain) else None
 
 
-def snapshot_changes(snapshots: list[Snapshot]) -> list[tuple[str, str, str, str, str, int]]:
+# 구성원 표에만 잠깐 나타나는 비구성원 티커. 지수 사건이 아니라 표기 부산물이다.
+# **근거 없이 넣지 않는다** — 벤더 목록에 본선 티커가 따로 있는 것을 확인한 것만 넣는다.
+SNAPSHOT_IGNORED = (
+    ("KRFTV", "Kraft Foods Group 분사 때의 when-issued 라인. 벤더에는 본선 `KRFT`만 있다"),
+    ("NAVIV", "Navient 분사 때의 when-issued 라인. 벤더에는 본선 `NAVI`만 있다"),
+    ("SGPPRB", "Schering-Plough 우선주(`PR`). 7.2가 배제하는 증권 종류다"),
+)
+
+
+def _snapshot_dropped(index_name: str) -> frozenset[str]:
+    """스냅샷 사건에서 뺄 심볼.
+
+    `EXCLUDED_CHANGES`가 공고 행에만 걸려 있으면 **스냅샷으로 다시 새어 들어온다.**
+    `ACE`가 그랬다 — 옛 The Chubb Corporation이라 가격을 구할 수 없어 뺐는데, 구성원
+    표에는 그대로 있으므로 diff가 같은 심볼을 되살렸다. 제외는 한 소스가 아니라 그
+    심볼에 걸려야 한다.
+    """
+    excluded = {symbol for _, index, _, symbol, _ in EXCLUDED_CHANGES if index == index_name}
+    return frozenset(excluded | {symbol for symbol, _ in SNAPSHOT_IGNORED})
+
+
+def _class_key(symbol: str) -> str:
+    """클래스 구분자를 지운 비교용 형태. `BF-B`·`BF.B`·`BFB`가 모두 `BFB`가 된다."""
+    return symbol.replace("-", "").replace(".", "")
+
+
+def canonical_spelling(members: frozenset[str] | set[str]) -> dict[str, str]:
+    """비교용 형태 → 현재 구성원 표기.
+
+    18년치를 손으로 고친 표라 클래스주 표기가 판마다 흔들린다. 그대로 두면 표기가
+    바뀐 판마다 **가짜 편출+편입 쌍**이 생긴다(2012-08-30에 `remove BFB`와 `add BF-B`가
+    같이 나왔다). 지수 사건이 아니라 철자 변경이다.
+
+    기준은 현재 구성원 목록의 표기다. 벤더 조회가 필요 없고, 우리가 이미 신뢰하는
+    소스이며, 같은 회사가 아니면 비교용 형태가 애초에 같아지지 않는다.
+    """
+    return {_class_key(symbol): symbol for symbol in members}
+
+
+def snapshot_changes(
+    snapshots: list[Snapshot],
+    spelling: dict[str, str] | None = None,
+) -> list[tuple[str, str, str, str, str, int]]:
     """연속한 두 스냅샷의 차이를 변경 사건으로 바꾼다.
 
     **날짜는 뒤쪽 판의 날짜다** — "늦어도 이 날에는 반영돼 있었다". 편입을 늦게 잡으면
@@ -637,15 +714,33 @@ def snapshot_changes(snapshots: list[Snapshot]) -> list[tuple[str, str, str, str
 
     티커는 개명을 적용한 뒤 비교한다. 안 그러면 개명이 편출+편입 한 쌍으로 잡힌다.
     """
+    spelling = spelling or {}
+
+    def normalize(index_name: str, when: str, value: str) -> str:
+        renamed = apply_renames(index_name, when, value)
+        return spelling.get(_class_key(renamed), renamed)
+
     events = []
     for earlier, later in zip(snapshots, snapshots[1:]):
-        before = {apply_renames(earlier.index_name, earlier.date, value)
-                  for value in earlier.symbols}
-        after = {apply_renames(later.index_name, later.date, value)
-                 for value in later.symbols}
-        for symbol in sorted(after - before):
+        dropped = _snapshot_dropped(later.index_name)
+        before = {normalize(earlier.index_name, earlier.date, value)
+                  for value in earlier.symbols} - dropped
+        after = {normalize(later.index_name, later.date, value)
+                 for value in later.symbols} - dropped
+        entered, left = after - before, before - after
+        # 표기만 바뀐 것은 사건이 아니다. 현재 구성원에 없는 옛 클래스주는 위 정규화가
+        # 못 잡으므로(`VIA-B`·`NWS-A`), 같은 단계에서 비교용 형태가 같은 편출·편입이
+        # 함께 나오면 그 쌍을 지운다. `_drop_same_day_reuse`와 같은 판단이다.
+        paired = {_class_key(value) for value in entered} & {
+            _class_key(value) for value in left
+        }
+        for symbol in sorted(entered):
+            if _class_key(symbol) in paired:
+                continue
             events.append((later.date, later.index_name, "add", symbol, SNAPSHOT_SOURCE, later.revid))
-        for symbol in sorted(before - after):
+        for symbol in sorted(left):
+            if _class_key(symbol) in paired:
+                continue
             events.append((later.date, later.index_name, "remove", symbol, SNAPSHOT_SOURCE, later.revid))
     return events
 
