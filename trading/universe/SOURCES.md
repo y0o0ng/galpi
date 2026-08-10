@@ -36,7 +36,28 @@
 |NDX100|UAUA|2010-10-01|UAL|UAL Corporation traded_as {{NASDAQ was|UAUA}}, successor 'United Airlines Holdings, Inc.', fate 'Merged with Continental Airlines'(2010-10-01). S&P 구성원 표가 United Airlines Holdings를 {{NasdaqSymbol|UAL}}로 적는다|
 |NDX100|WFMI|2010-12-20|WFM|NDX 표 2008-12-22 행이 WFMI를 [[Whole Foods Market]]으로 적고, 그 문서는 traded_as {{NASDAQ was|WFM}}에 'The company's ticker symbol on the Nasdaq was WFM'이다. 정확한 티커 변경일은 확인하지 못해 **표에서 WFM 사용이 확인되는 가장 이른 날짜**(2010-12-20 편입)를 쓴다|
 |NDX100|HANS|2012-01-05|MNST|Monster Beverage former_name 'Hansen Natural Corporation (1935 - 2012)', 본문 'On January 5, 2012 ... change the name of the company from Hansen's Natural to Monster Beverage Corporation, under the new ticker MNST'|
+|SP500|AOC|2012-01-01|AON|Aon plc의 현재 티커가 AON이고 벤더 계열이 2006-01-03부터 이어진다. 옛 티커 AOC는 벤더 목록에 없다|
+|SP500|CZN|2008-07-31|FTR|Frontier Communications former_name에 'Citizens Communications'가 있다. **FYBR가 아니라 FTR이다** — FYBR는 2021년 회생 이후 계열(2021-05-04~)이라 그 시절 구간을 못 덮고, FTR가 2006-01-03~2020-04-29로 덮는다|
+|SP500|WMI|2009-09-01|WM|Waste Management traded_as {{NYSE|WM}}, former_name 'USA Waste Services, Inc.'|
+|SP500|LIZ|2012-05-15|KATE|Kate Spade & Company의 옛 이름이 Liz Claiborne이다. 벤더에 KATE가 2006-01-03~2017-07-11로 있고 LIZ는 목록에 없다|
+|SP500|MHFI|2016-06-01|SPGI|S&P Global former_name 'The McGraw–Hill Companies, Inc. (1995–2013)', traded_as {{nyse|SPGI}}|
+|SP500|WPO|2013-11-29|GHC|Graham Holdings former_name 'The Washington Post Company (1947–2013)', traded_as {{NYSE|GHC}}|
+|SP500|MXB|2010-08-01|MSCI|MSCI Inc. traded_as {{nyse|MSCI}}. 벤더의 MXB는 Marnetics Broadband라는 **다른 회사**이므로 그대로 두면 안 된다|
+|SP500|UA-C|2017-01-01|UA|2016년 Under Armour 클래스 분할에서 Class C가 UA, Class A가 UAA를 받았다. 구성원 표가 잠깐 `UA-C`로 적었을 뿐 벤더 코드는 UA다|
+|SP500|WFMI|2011-06-01|WFM|Whole Foods Market traded_as {{NASDAQ was|WFM}}. NDX100 항목과 같은 근거다|
 |NDX100|MNST|2011-12-16|MWW|S&P 표 2011-12-16 행이 [[Monster Worldwide]]를 MWW로, NDX 표 2008-11-10 행이 같은 회사를 MNST로 적는다. 정확한 티커 변경일은 확인하지 못해 **MWW 사용이 확인되는 가장 이른 날짜**를 쓴다|
+|SP500|FPL|2010-07-29|NEE|NextEra Energy former_name 'FPL Group'. 벤더 NEE 계열 2006-01-03~현재가 구간(2008-01-02~2010-07-28)을 통째로 덮는다|
+|SP500|GCI|2015-06-30|TGNA|2015년 Gannett 분할에서 방송을 남긴 존속법인이 TEGNA로 개명하고 출판이 새 Gannett으로 분사했다. 벤더 TGNA 계열 2006-01-03~2026-03-20이 구간을 덮고, 분사한 새 Gannett은 GCI_OLD(2015-06-23~)로 따로 있다|
+|SP500|HCN|2018-03-01|WELL|Welltower former_name 'Health Care REIT, Inc.'. 벤더 WELL 계열 2006-01-03~현재가 구간(2009-03-19~2018-02-28)을 덮는다|
+|SP500|HCP|2019-11-30|DOC|Healthpeak Properties의 옛 이름이 HCP, Inc.이고 2019-11 PEAK, 2024-03 DOC로 바뀌었다. 벤더 DOC 계열 2006-01-03~현재가 구간(2008-08-30~)을 덮는다|
+|SP500|PEAK|2024-03-29|DOC|같은 회사의 두 번째 티커 변경이다. 벤더의 PEAK 코드는 2012-10-17~2019-09-16의 **다른 회사**라 그대로 두면 구간이 그 가격을 받는다|
+|SP500|IACI|2008-08-31|IAC|IAC/InterActiveCorp의 현재 벤더 코드가 IAC(2006-01-03~2026-06-03)다. IACI 코드에는 2016-01-04~2016-01-20의 13행짜리 토막만 있다|
+|NDX100|IACI|2009-12-22|IAC|SP500 항목과 같은 회사·같은 근거다. 지수마다 편출일이 달라 규칙을 따로 건다|
+|SP500|LB|2021-08-29|BBWI|Bath & Body Works former_name 'L Brands'. 벤더 BBWI 계열 2006-01-03~현재가 구간(2013-12-29~2021-08-28)을 덮는다|
+|SP500|PX|2018-11-28|LIN|2018년 Praxair와 Linde AG 합병으로 만들어진 Linde plc가 PX 주주의 이력을 잇는다. 벤더 LIN 계열 2006-01-03~현재가 구간을 덮는다|
+|SP500|SAI|2013-10-28|LDOS|2013년 SAIC 분할에서 존속법인이 Leidos로 개명하고 정부서비스가 새 SAIC로 분사했다. 벤더 LDOS 계열 2006-10-13~현재가 구간(2009-12-18~2013-09-20)을 덮는다. LDOS는 2019-08-09에 다시 편입되므로 구간이 둘로 떨어진다|
+|SP500|WLP|2014-12-30|ELV|Elevance Health의 옛 이름이 WellPoint(2014-12 Anthem, 2022-06 Elevance)다. 벤더 WLP 코드에는 2014-09-22~2014-12-02의 두 달짜리 토막만 있고, ELV 계열 2006-01-03~현재가 구간(2008-01-02~2014-12-29)을 덮는다|
+|SP500|ANTM|2022-06-30|ELV|같은 회사의 두 번째 이름이다. ANTM 계열(2006-01-03~2022-06-27)도 구간을 덮지만, 사슬을 한 심볼로 모아야 구간이 끊기지 않는다|
 
 |지수|날짜|동작|심볼|근거|
 |---|---|---|---|---|

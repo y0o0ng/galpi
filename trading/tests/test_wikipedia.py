@@ -229,6 +229,29 @@ class RenameTest(unittest.TestCase):
         self.assertEqual(apply_renames("NDX100", "2009-12-21", "HANS"), "MNST")
         self.assertEqual(apply_renames("NDX100", "2011-12-19", "MNST"), "MNST")
 
+    def test_applying_the_renames_twice_swaps_a_company(self):
+        """**개명은 원래 티커에만 맞는다. 한 번 건 결과에 다시 걸면 안 된다.**
+
+        `HANS`→`MNST`가 만든 2009-12-21 행을 `MNST`→`MWW`가 다시 집어 한센이 몬스터
+        월드와이드가 된다. 그래서 개명은 `csvs` 단계에서 한 번만 걸고, 적재하면서 다시
+        걸지 않는다. 여기서 고정해두지 않으면 "순수 함수니까 두 번 걸어도 되겠지"라는
+        생각이 다시 나온다.
+        """
+        once = apply_renames("NDX100", "2009-12-21", "HANS")
+        self.assertEqual(once, "MNST")
+        self.assertEqual(apply_renames("NDX100", "2009-12-21", once), "MWW")
+
+    def test_a_rename_chain_lands_on_the_current_ticker(self):
+        """개명이 두 단계면 두 규칙을 다 걸어 **현재 티커 하나**로 모은다.
+
+        HCP → PEAK → DOC이 그렇다. 중간에서 멈추면 그 구간이 벤더의 PEAK 코드(2012~2019의
+        다른 회사) 가격을 받는다.
+        """
+        self.assertEqual(apply_renames("SP500", "2008-08-30", "HCP"), "DOC")
+        self.assertEqual(apply_renames("SP500", "2019-11-29", "PEAK"), "DOC")
+        self.assertEqual(apply_renames("SP500", "2014-12-29", "WLP"), "ELV")
+        self.assertEqual(apply_renames("SP500", "2022-06-29", "ANTM"), "ELV")
+
     def test_a_rename_target_is_a_ticker_the_vendor_still_serves(self):
         """`RIMM`은 BBRY를 거쳐 BB가 됐다. 중간 티커가 아니라 **전 이력을 든 쪽**으로 보낸다."""
         self.assertEqual(apply_renames("NDX100", "2012-12-24", "RIMM"), "BB")

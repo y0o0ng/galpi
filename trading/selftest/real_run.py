@@ -24,6 +24,7 @@ EODHD 약관은 해지 후 1개월 안에 가격 복사본을 지우라고 요�
 
 ## 실행 순서
 
+    python3 selftest/real_run.py csvs       # 위키 2회. 개명은 여기서만 걸린다
     python3 selftest/real_run.py snapshots  # 위키 과거 판에서 빠진 사건 복구
     python3 selftest/real_run.py universe   # 호출 없음
     python3 selftest/real_run.py bars       # EODHD 908회 (중단되면 다시 돌려도 된다)
@@ -115,7 +116,11 @@ SNAPSHOT_NAME = "sp500-snapshot-changes.csv"
 
 
 def snapshot_changes_rows() -> list:
-    """스냅샷 diff가 낸 변경 사건. 없으면 빈 목록이다."""
+    """스냅샷 diff가 낸 변경 사건. 없으면 빈 목록이다.
+
+    개명은 `snapshots` 단계가 diff 전에 걸어 CSV에 넣는다. `announced_changes`와 같은
+    이유로 여기서 다시 걸지 않는다.
+    """
     path = UNIVERSE_DIR / SNAPSHOT_NAME
     if not path.exists():
         return []
@@ -191,7 +196,13 @@ def merge_changes(announced: list, snapshot_rows: list) -> tuple[list, int]:
 
 
 def announced_changes() -> list:
-    """공고 색인에서 옮긴 변경 사건. 효력일이 정확한 쪽이다."""
+    """공고 색인에서 옮긴 변경 사건. 효력일이 정확한 쪽이다.
+
+    **개명은 여기서 걸지 않는다.** CSV는 `csvs` 단계가 `apply_renames`를 한 번 걸어
+    만든 것이고, 적재하면서 한 번 더 걸면 **개명 대상이 다른 개명의 출발점인 쌍에서
+    회사가 뒤집힌다.** `HANS`→`MNST`가 만든 2009-12-21 행을 `MNST`→`MWW`가 다시 집어
+    한센을 몬스터월드와이드로 바꿨다. 규칙 하나하나는 원래 티커에만 맞는다.
+    """
     changes = []
     for index in INDEX_NAMES:
         changes.extend(parse_changes_csv(_read_csv(f"{index.lower()}-changes.csv")))
@@ -364,6 +375,30 @@ def stage_bars(connection) -> int:
     # `gaps`는 심볼 이력이 BARS_START보다 늦게 시작하는 것을 센다. 2006년 이후 상장한
     # 회사가 많으므로 여기서는 정상이고, 진짜 판정은 `check`의 구간 커버리지다.
     print(f"{BARS_START}를 못 덮는 심볼 {len(summary['gaps'])}개 (구간 커버리지는 check에서 본다)")
+    return 0
+
+
+def stage_csvs(_connection) -> int:
+    """위키 문서에서 구성원·변경 이력 CSV와 출처 기록을 다시 만든다.
+
+    **개명이 여기서 한 번만 걸린다.** `SYMBOL_RENAMES`에 규칙을 더하면 이 단계를 다시
+    돌려야 반영되고, 적재 쪽에서 다시 걸면 안 된다 — 개명 대상이 다른 개명의 출발점인
+    쌍(`HANS`→`MNST`→`MWW`)에서 회사가 뒤집힌다.
+
+    호출 2회이고 위키는 무료다. 문서가 그 사이 바뀌었으면 새 사건이 함께 들어오므로
+    **줄 수 변화를 찍어 준다.** 이번 변경과 무관한 사건이 섞였는지 눈으로 본다.
+    """
+    from backtest.wikipedia import build_csvs
+
+    result = build_csvs(since=FLOOR_DATE)
+    for name, text in result["files"].items():
+        path = UNIVERSE_DIR / name
+        before = len(path.read_text(encoding="utf-8").splitlines()) if path.exists() else 0
+        path.write_text(text, encoding="utf-8")
+        after = len(text.splitlines())
+        mark = "" if before == after else f"  ← {after - before:+d}줄"
+        print(f"  {name:<28}{after}줄{mark}")
+    print(f"호출 {result['calls']}회. `snapshots`와 `universe`를 다시 돌려야 반영된다.")
     return 0
 
 
@@ -709,6 +744,7 @@ def stage_status(connection) -> int:
 
 
 STAGES = {
+    "csvs": stage_csvs,
     "universe": stage_universe,
     "snapshots": stage_snapshots,
     "bars": stage_bars,

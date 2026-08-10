@@ -350,7 +350,7 @@ date,index_name,action,symbol,security
 2009-12-21,NDX100,remove,PPDI,Pharmaceutical Product Development
 2009-12-21,NDX100,remove,MNST,Hansen Natural
 2009-12-21,NDX100,remove,LBTYA,Liberty Global Class A
-2009-12-21,NDX100,remove,IACI,IAC/InterActiveCorp
+2009-12-21,NDX100,remove,IAC,IAC/InterActiveCorp
 2009-12-21,NDX100,remove,AKAM,Akamai Technologies
 2009-12-21,NDX100,add,VOD,Vodafone
 2009-12-21,NDX100,add,VMED,Virgin Media

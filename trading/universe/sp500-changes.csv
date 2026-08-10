@@ -548,7 +548,7 @@ date,index_name,action,symbol,security
 2013-11-13,SP500,add,CPRI,Michael Kors
 2013-10-29,SP500,remove,DELL,Dell
 2013-10-29,SP500,add,RIG,Transocean
-2013-09-20,SP500,remove,SAI,SAIC
+2013-09-20,SP500,remove,LDOS,SAIC
 2013-09-20,SP500,remove,AMD,Advanced Micro Devices
 2013-09-20,SP500,add,VRTX,Vertex Pharmaceuticals
 2013-09-20,SP500,add,AME,Ametek
@@ -674,9 +674,9 @@ date,index_name,action,symbol,security
 2009-12-18,SP500,remove,CVG,Convergys
 2009-12-18,SP500,remove,CIEN,Ciena
 2009-12-18,SP500,add,V,Visa
-2009-12-18,SP500,add,SAI,SAIC
 2009-12-18,SP500,add,ROST,Ross Stores
 2009-12-18,SP500,add,MJN,Mead Johnson Nutrition
+2009-12-18,SP500,add,LDOS,SAIC
 2009-12-18,SP500,add,CLF,Cliffs Natural Resources
 2009-11-03,SP500,remove,SGP,Schering-Plough
 2009-11-03,SP500,add,BKNG,Priceline.com
