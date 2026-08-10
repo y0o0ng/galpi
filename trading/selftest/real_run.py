@@ -860,6 +860,145 @@ def stage_edgar(connection) -> int:
     return 0
 
 
+# 워크포워드 구간. fold·홀드아웃은 최대 보유(40세션)의 두 배 이상이어야 한다.
+# 252세션(약 1년)이면 그 조건을 넉넉히 넘고, 15년이 fold 여러 개로 갈린다.
+FOLD_SESSIONS = 252
+HOLDOUT_SESSIONS = 252
+
+# 21.2의 인접 파라미터. 스모크와 같은 값을 쓴다 — 무엇이 인접값인지는 데이터가 아니라
+# 전략이 정하는 것이라 적재분이 달라도 같아야 한다.
+NEIGHBOURHOODS = {
+    "breakout_window": (18, 22),
+    "rs_lookback": (57, 69),
+    "trend_window": (54, 66),
+    "atr_window": (12, 16),
+}
+
+
+def stage_run(connection) -> int:
+    """15년 적재분으로 loop를 돌리고 14.7까지 판정한다.
+
+    `first_real_run.py`의 `run`은 20종목 1년 스모크였다. 이쪽은 SP500·NDX100의 당시
+    구성원 전체를 쓰고 **`survivorship_biased=False`로 판정한다** — `check`가 세 그물을
+    통과해 선언한 뒤에만 여기까지 온다.
+    """
+    from dataclasses import asdict
+
+    from backtest.loop import BacktestConfig, run_backtest, save_run
+    from backtest.metrics import compute_metrics
+    from backtest.policy import DEFAULT_PAPER_POLICY
+    from backtest.validation import (
+        evaluate_gate, neighbourhood_report, parameter_variant, plan_walk_forward,
+        run_walk_forward, stress_config,
+    )
+
+    policy = DEFAULT_PAPER_POLICY
+    all_sessions = [
+        row[0] for row in connection.execute(
+            "SELECT DISTINCT trade_date FROM bars_daily"
+            "  WHERE source_version = ? AND symbol = ? AND trade_date >= ?"
+            "  ORDER BY trade_date",
+            (SOURCE_VERSION, REFERENCE_SYMBOL, BARS_START),
+        )
+    ]
+    warmup = policy.parameters.min_history_sessions
+    if len(all_sessions) <= warmup:
+        print(f"{REFERENCE_SYMBOL} 세션이 {len(all_sessions)}개뿐입니다.")
+        return 1
+    config = BacktestConfig(
+        source_version=SOURCE_VERSION,
+        start=all_sessions[warmup],
+        end=all_sessions[-1],
+        policy=policy,
+        index_names=INDEX_NAMES,
+        require_earnings_calendar=True,
+        require_sector=True,
+    )
+    print(f"구간 {config.start} ~ {config.end} ({len(all_sessions) - warmup}세션)")
+    print(f"정책 {config.policy.policy_id}")
+
+    result = run_backtest(connection, config)
+    save_run(connection, result, f"real-{config.start}", survivorship_biased=False)
+    print(f"\n거래 {len(result.trades)}건, 체결 {len(result.fills)}건")
+    _print_counter("건너뛴 이유", result.skip_counts)
+    _print_counter("체결 방식", result.fill_counts)
+    _print_counter("청산 사유", result.exit_counts)
+
+    # 현금 항등식. 이것이 어긋나면 나머지 숫자는 전부 못 믿는다.
+    expected = config.initial_capital + sum(fill.cash_delta for fill in result.fills)
+    actual = result.equity_curve[-1].cash if result.equity_curve else config.initial_capital
+    print(f"\n현금 항등식: 기대 {expected:,.2f} / 실제 {actual:,.2f}"
+          f" — {'일치' if abs(expected - actual) < 1e-6 else '불일치'}")
+    print(f"마지막 자산 {result.final_equity:,.2f}")
+
+    metrics = compute_metrics(result)
+    print("\n지표")
+    for key, value in asdict(metrics).items():
+        print(f"  {key}: {value}")
+
+    print("\n워크포워드")
+    plan = plan_walk_forward(
+        connection, SOURCE_VERSION,
+        parameters=policy.parameters,
+        fold_sessions=FOLD_SESSIONS,
+        holdout_sessions=HOLDOUT_SESSIONS,
+        start=BARS_START,
+        reference_symbol=REFERENCE_SYMBOL,
+    )
+    print(f"  fold {len(plan.folds)}개, 홀드아웃 {plan.holdout.start}~{plan.holdout.end}")
+    walk = run_walk_forward(connection, config, plan)
+    for fold, fold_metrics in walk.fold_metrics:
+        print(f"    {fold.start}~{fold.end}  거래 {fold_metrics.trade_count:>4}"
+              f"  기대값 {fold_metrics.expectancy_r}")
+
+    print("\n비용 스트레스")
+    stressed = compute_metrics(run_backtest(connection, stress_config(result, 2.0)))
+    print(f"  2배: 거래 {stressed.trade_count}건, 기대값 {stressed.expectancy_r}")
+
+    print("\n인접 파라미터")
+    reports = []
+    for field, values in NEIGHBOURHOODS.items():
+        neighbours = {
+            value: compute_metrics(
+                run_backtest(connection, parameter_variant(config, **{field: value}))
+            )
+            for value in values
+        }
+        report = neighbourhood_report(
+            field, metrics, neighbours,
+            center_value=getattr(config.policy.parameters, field),
+        )
+        reports.append(report)
+        cells = ", ".join(f"{value}={item.expectancy_r:.4f}"
+                          for value, item in neighbours.items())
+        print(f"  {field:<18} 중심 {report.center_value}: {cells}"
+              f"  붕괴비율 {report.collapse_ratio}")
+
+    # 게이트에는 가장 나쁜 하나를 넘긴다. 한 파라미터만 무너져도 plateau가 아니다.
+    ranked = [item for item in reports if item.collapse_ratio is not None]
+    neighbourhood = min(ranked, key=lambda item: item.collapse_ratio) if ranked else reports[0]
+
+    report = evaluate_gate(
+        result, metrics,
+        survivorship_biased=False,
+        walk_forward=walk,
+        stressed=stressed,
+        neighbourhood=neighbourhood,
+    )
+    print(f"\n14.7 판정: {report.verdict}")
+    print(f"blocker: {', '.join(report.blockers) or '없음'}")
+    for row in report.rows:
+        print(f"  {row.name:<26} {row.value} → {row.verdict}")
+    return 0
+
+
+def _print_counter(label: str, counts) -> None:
+    if not counts:
+        return
+    items = sorted(counts.items(), key=lambda item: -item[1])
+    print(f"{label}: " + ", ".join(f"{name} {value}" for name, value in items[:8]))
+
+
 def stage_status(connection) -> int:
     for table in (
         "bars_daily",
@@ -899,6 +1038,7 @@ STAGES = {
     "bars": stage_bars,
     "remap": stage_remap,
     "check": stage_check,
+    "run": stage_run,
     "edgar": stage_edgar,
     "status": stage_status,
 }
