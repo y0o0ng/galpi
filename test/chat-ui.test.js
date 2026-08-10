@@ -51,6 +51,14 @@ test('bubble markdown keeps intentional line breaks when pre-wrap is off', () =>
   assert.equal(direct, null, '말풍선이 renderBubbleMarkdown을 우회한다');
 });
 
+test('/archive renders search candidates with the shared note card', () => {
+  assert.match(
+    app,
+    /results\.forEach\(note => wrap\.appendChild\(makeNoteCard\(note\)\)\)/,
+  );
+  assert.doesNotMatch(app, /renderNoteCard\(/);
+});
+
 test('every composer action keeps a 44px touch target', () => {
   assert.match(css, /#attachment-button \{[^}]*min-height: 44px/s);
   const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');

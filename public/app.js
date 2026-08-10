@@ -2197,7 +2197,7 @@ function renderArchiveCandidates(query, results) {
   header.textContent = `"${query}" 보관 후보 ${results.length}개`;
   wrap.appendChild(header);
 
-  results.forEach(note => wrap.appendChild(renderNoteCard(note)));
+  results.forEach(note => wrap.appendChild(makeNoteCard(note)));
 
   group.appendChild(wrap);
   getMessages().appendChild(group);

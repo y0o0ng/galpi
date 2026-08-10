@@ -308,12 +308,20 @@ test('server routes share one mutation path for split, archive/restore, and merg
   assert.equal(archive.response.status, 200, JSON.stringify(archive.body));
   await fs.access(path.join(vaultPath, '_archive', 'target.md'));
 
+  const hiddenSearch = await api(url, '/api/vault/search?q=target');
+  assert.equal(hiddenSearch.response.status, 200, JSON.stringify(hiddenSearch.body));
+  assert.equal(hiddenSearch.body.results.some(note => note.filename === 'target.md'), false);
+
   const restore = await api(url, '/api/notes/restore', {
     method: 'POST',
     body: JSON.stringify({ filename: 'target.md' }),
   });
   assert.equal(restore.response.status, 200, JSON.stringify(restore.body));
   await fs.access(path.join(vaultPath, 'target.md'));
+
+  const restoredSearch = await api(url, '/api/vault/search?q=target');
+  assert.equal(restoredSearch.response.status, 200, JSON.stringify(restoredSearch.body));
+  assert.equal(restoredSearch.body.results.some(note => note.filename === 'target.md'), true);
 
   const merge = await api(url, '/api/notes/merge', {
     method: 'POST',
