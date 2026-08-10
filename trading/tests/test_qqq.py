@@ -25,6 +25,7 @@ from backtest.qqq import (  # noqa: E402
     Holdings,
     QqqError,
     holdings_from,
+    NameObservation,
     normalize,
     parse_filings,
     parse_nport_names,
@@ -174,11 +175,15 @@ class NormalizeTest(unittest.TestCase):
             self.assertEqual(normalize(variant), "APPLE")
 
 
+def seen(symbol: str, date: str = "2010-01-01", action: str = "add") -> tuple:
+    return (NameObservation(date=date, action=action, symbol=symbol),)
+
+
 class ResolveTest(unittest.TestCase):
     def test_the_class_is_tried_first_then_dropped(self):
         """명세는 `Facebook, Inc., Class A`인데 사전은 그냥 `Facebook`이다."""
         resolved, unresolved = resolve_names(
-            ["Facebook, Inc., Class A"], {normalize("Facebook"): "META"}
+            ["Facebook, Inc., Class A"], {normalize("Facebook"): seen("META")}, "2015-01-01"
         )
         self.assertEqual(resolved, {"Facebook, Inc., Class A": "META"})
         self.assertEqual(unresolved, [])
@@ -187,7 +192,8 @@ class ResolveTest(unittest.TestCase):
         """**한 회사가 두 티커를 오가면 안 된다.** 어느 쪽이 `GOOGL`인지 명세는 모른다."""
         resolved, unresolved = resolve_names(
             ["Alphabet Inc., Class A", "Alphabet Inc., Class C"],
-            {normalize("Alphabet"): "GOOGL"},
+            {normalize("Alphabet"): seen("GOOGL")},
+            "2015-01-01",
         )
         self.assertEqual(resolved, {})
         self.assertEqual(len(unresolved), 2)
@@ -196,24 +202,51 @@ class ResolveTest(unittest.TestCase):
         """같은 회사의 옛 이름과 새 이름이 한 티커로 가는 것은 **맞는 결과**다."""
         resolved, _ = resolve_names(
             ["Facebook, Inc., Class A", "Meta Platforms, Inc., Class A"],
-            {normalize("Facebook"): "META", normalize("Meta Platforms Inc"): "META"},
+            {normalize("Facebook"): seen("META"),
+             normalize("Meta Platforms Inc"): seen("META")},
+            "2015-01-01",
         )
         self.assertEqual(set(resolved.values()), {"META"})
 
     def test_an_unknown_name_is_reported_not_guessed(self):
         """못 푼 이름이 곧 우리가 찾던 사라진 회사다. 추측으로 메우면 목적이 사라진다."""
-        resolved, unresolved = resolve_names(["Nobody Ltd."], {})
+        resolved, unresolved = resolve_names(["Nobody Ltd."], {}, "2015-01-01")
         self.assertEqual(resolved, {})
         self.assertEqual(unresolved, ["Nobody Ltd."])
 
     def test_the_fund_itself_is_not_a_holding(self):
         for name in (IGNORED_NAMES[0], f"{IGNORED_NAMES[0]}, Series 1"):
-            resolved, unresolved = resolve_names([name], {})
+            resolved, unresolved = resolve_names([name], {}, "2015-01-01")
             self.assertEqual((resolved, unresolved), ({}, []))
 
     def test_every_override_states_its_evidence(self):
         for name, symbol, evidence in NAME_OVERRIDES:
             self.assertTrue(name.strip() and symbol.strip() and evidence.strip())
+
+
+class TickerOnTest(unittest.TestCase):
+    """**사전이 날짜를 알아야 한다.** `Baker Hughes`가 같은 날 `BHI`로 빠지고 `BKR`로 든다."""
+
+    def observations(self) -> tuple:
+        return (
+            NameObservation(date="2017-07-07", action="remove", symbol="BHI"),
+            NameObservation(date="2017-07-07", action="add", symbol="BKR"),
+        )
+
+    def test_after_the_change_the_add_wins(self):
+        from backtest.qqq import ticker_on
+
+        self.assertEqual(ticker_on(self.observations(), "2022-12-31"), "BKR")
+
+    def test_before_the_change_the_remove_wins(self):
+        from backtest.qqq import ticker_on
+
+        self.assertEqual(ticker_on(self.observations(), "2012-09-30"), "BHI")
+
+    def test_no_observation_gives_nothing(self):
+        from backtest.qqq import ticker_on
+
+        self.assertIsNone(ticker_on((), "2012-09-30"))
 
 
 class ChangesTest(unittest.TestCase):
@@ -222,11 +255,12 @@ class ChangesTest(unittest.TestCase):
                         names=tuple(names))
 
     def test_a_diff_becomes_add_and_remove_events(self):
-        resolved = {"A Corp.": "AAA", "B Corp.": "BBB", "C Corp.": "CCC"}
-        events = snapshot_changes(
+        dictionary = {normalize(name): seen(symbol) for name, symbol in
+                      (("A Corp.", "AAA"), ("B Corp.", "BBB"), ("C Corp.", "CCC"))}
+        events, _ = snapshot_changes(
             [self.snapshot("2012-09-30", ["A Corp.", "B Corp."]),
              self.snapshot("2013-09-30", ["B Corp.", "C Corp."])],
-            resolved,
+            dictionary,
         )
         self.assertEqual(
             [(item[0], item[2], item[3]) for item in events],
@@ -235,12 +269,20 @@ class ChangesTest(unittest.TestCase):
 
     def test_unresolved_names_make_no_events(self):
         """못 푼 이름은 양쪽에서 다 빠지므로 유령 편출을 만들지 않는다."""
-        events = snapshot_changes(
+        events, unresolved = snapshot_changes(
             [self.snapshot("2012-09-30", ["A Corp.", "Mystery Ltd."]),
              self.snapshot("2013-09-30", ["A Corp."])],
-            {"A Corp.": "AAA"},
+            {normalize("A Corp."): seen("AAA")},
         )
         self.assertEqual(events, [])
+        self.assertEqual(unresolved, ["Mystery Ltd."])
+
+    def test_a_class_only_fragment_is_not_a_holding(self):
+        """줄바꿈으로 쪼개진 이름의 꼬리(`Class A`)가 사전의 아무 회사에 붙으면 안 된다."""
+        resolved, unresolved = resolve_names(
+            ["Class A"], {normalize("Some LLC"): seen("LLC")}, "2013-09-30"
+        )
+        self.assertEqual((resolved, unresolved), ({}, []))
 
     def test_the_csv_matches_the_wikipedia_snapshot_contract(self):
         """같은 열 계약이라야 `merge_changes`의 같은 병합 경로를 탄다."""

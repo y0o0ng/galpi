@@ -542,7 +542,6 @@ date,index_name,action,symbol,source,revid
 2015-02-20,SP500,add,ES,snapshot,648083260
 2015-01-27,SP500,remove,WAG,snapshot,644366768
 2015-01-27,SP500,remove,SWY,snapshot,644366768
-2015-01-27,SP500,remove,COV,snapshot,644366768
 2015-01-27,SP500,add,WBA,snapshot,644366768
 2015-01-27,SP500,add,HCA,snapshot,644366768
 2015-01-27,SP500,add,ENDP,snapshot,644366768
@@ -706,7 +705,6 @@ date,index_name,action,symbol,source,revid
 2011-03-30,SP500,add,JOY,snapshot,421482947
 2011-03-30,SP500,add,FFIV,snapshot,421482947
 2011-03-30,SP500,add,CVC,snapshot,421482947
-2011-03-30,SP500,add,COV,snapshot,421482947
 2010-12-07,SP500,remove,PTV,snapshot,401121248
 2010-12-07,SP500,add,TT,snapshot,401121248
 2010-08-31,SP500,remove,SII,snapshot,382049032
@@ -767,7 +765,6 @@ date,index_name,action,symbol,source,revid
 2009-06-10,SP500,remove,UIS,snapshot,295610323
 2009-06-10,SP500,remove,HPC,snapshot,295610323
 2009-06-10,SP500,remove,GM,snapshot,295610323
-2009-06-10,SP500,remove,COV,snapshot,295610323
 2009-06-10,SP500,add,XRAY,snapshot,295610323
 2009-06-10,SP500,add,WYNN,snapshot,295610323
 2009-06-10,SP500,add,SRCL,snapshot,295610323
@@ -836,7 +833,6 @@ date,index_name,action,symbol,source,revid
 2008-08-30,SP500,remove,OMX,snapshot,235265671
 2008-08-30,SP500,remove,LTR,snapshot,235265671
 2008-08-30,SP500,remove,IAC,snapshot,235265671
-2008-08-30,SP500,remove,HET,snapshot,235265671
 2008-08-30,SP500,remove,CFC,snapshot,235265671
 2008-08-30,SP500,remove,CCU,snapshot,235265671
 2008-08-30,SP500,remove,CC,snapshot,235265671

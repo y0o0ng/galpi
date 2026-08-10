@@ -501,7 +501,6 @@ date,index_name,action,symbol,security
 2015-03-12,SP500,remove,PETM,PetSmart
 2015-03-12,SP500,add,SWKS,Skyworks
 2015-01-27,SP500,remove,SWY,Safeway
-2015-01-27,SP500,remove,COV,Covidien
 2015-01-27,SP500,add,HCA,HCA Holdings
 2015-01-27,SP500,add,ENDP,Endo International
 2014-12-05,SP500,remove,BMS,Bemis Company
@@ -639,7 +638,6 @@ date,index_name,action,symbol,security
 2011-03-31,SP500,remove,Q,Qwest Communications
 2011-03-31,SP500,add,EW,Edwards Lifesciences
 2011-02-28,SP500,remove,MFE,McAfee
-2011-02-28,SP500,add,COV,Covidien
 2011-02-25,SP500,remove,AYE,Allegheny Energy
 2011-02-25,SP500,add,JOY,Joy Global
 2011-01-03,SP500,remove,MDP,Meredith Corp

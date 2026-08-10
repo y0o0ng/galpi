@@ -467,13 +467,11 @@ def stage_qqq(_connection) -> int:
     print(f"스냅샷 간격 최대 {worst[0][1]}일 ({worst[0][0]}), 상위 3 {worst}")
 
     dictionary = name_dictionary()
-    names = sorted({name for item in ordered for name in item.names})
-    resolved, unresolved = qqq.resolve_names(names, dictionary)
-    print(f"이름 {len(names)}개 중 {len(resolved)}개 해석, 못 푼 것 {len(unresolved)}개")
+    events, unresolved = qqq.snapshot_changes(ordered, dictionary)
+    names = {name for item in ordered for name in item.names}
+    print(f"이름 {len(names)}개, 못 푼 것 {len(unresolved)}개")
     for name in unresolved:
         print(f"   미해석 {name}")
-
-    events = qqq.snapshot_changes(ordered, resolved)
     # 가격을 구할 수 없어 뺀 심볼은 여기서도 뺀다. 제외는 소스가 아니라 심볼에 걸린다.
     from backtest.wikipedia import EXCLUDED_CHANGES, EXCLUDED_SYMBOLS
 
@@ -493,27 +491,38 @@ def dt_days(value: str) -> int:
     return dt.date.fromisoformat(value).toordinal()
 
 
-def name_dictionary() -> dict[str, str]:
-    """`정규화 이름 → 티커`. 공고 표의 종목명과 벤더 목록 이름을 겹친다.
+def name_dictionary() -> dict[str, tuple]:
+    """`정규화 이름 → 관측들`. 공고 표의 사건 한 줄이 관측 하나다.
 
-    공고 표는 **그 시절 이름**을 담고 벤더 목록은 **현재 주인 이름**을 담아서, 둘을 겹쳐야
-    20년치가 덮인다. 그래도 안 풀리는 것은 `qqq.NAME_OVERRIDES`가 근거와 함께 받는다.
+    공고 표는 **그 시절 이름과 그날의 티커**를 함께 담아서 시간축을 만들 수 있다. 벤더
+    목록은 날짜가 없고 **현재 주인 이름**이라 기준일 오늘로 둔다. 그래도 안 풀리는 것은
+    `qqq.NAME_OVERRIDES`가 근거와 함께 받는다.
+
+    **사전이 날짜를 알아야 하는 이유**는 `Baker Hughes`가 2017-07-07에 `BHI`로 빠지고
+    같은 날 `BKR`로 들어오기 때문이다. 날짜 없이 하나로 붙이면 2022년 보유가 옛 티커로
+    풀려 있지도 않은 편입 사건이 생긴다.
     """
     from backtest.eodhd import EodhdClient
     from backtest import qqq
 
-    dictionary: dict[str, str] = {}
+    observed: dict[str, list] = {}
     for index in INDEX_NAMES:
         for row in csv.DictReader(_read_csv(f"{index.lower()}-changes.csv").splitlines()):
-            if row.get("security"):
-                dictionary.setdefault(qqq.normalize(row["security"]), row["symbol"])
+            if not row.get("security"):
+                continue
+            observed.setdefault(qqq.normalize(row["security"]), []).append(
+                qqq.NameObservation(
+                    date=row["date"], action=row["action"], symbol=row["symbol"]
+                )
+            )
     client = EodhdClient()
     for delisted in (False, True):
         for listing in client.listings("US", delisted=delisted):
             if listing.name:
-                dictionary.setdefault(qqq.normalize(listing.name), listing.symbol)
-    dictionary.update(qqq.override_dictionary())
-    return dictionary
+                observed.setdefault(qqq.normalize(listing.name), []).append(
+                    qqq.NameObservation(date=AS_OF, action="add", symbol=listing.symbol)
+                )
+    return {key: tuple(items) for key, items in observed.items()}
 
 
 def stage_snapshots(_connection) -> int:

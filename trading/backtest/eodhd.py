@@ -383,8 +383,9 @@ def accept_exit_lag(
        티커 재사용이다(`PEAK`·`HET`).
 
     `snapshot_closed`는 `(지수, 심볼, 날짜)`이고 **공고가 이긴 편출은 들어가지 않는다.**
-    심볼은 지수 티커라, 재사용 매핑으로 벤더 계열 심볼이 된 구간은 `index_symbol`로 되돌려
-    맞춘다.
+    심볼은 **소스마다 공간이 다르다** — 공고·위키는 지수 티커를 쓰고, QQQ 보유 명세는
+    이름으로 풀어서 벤더 코드가 나오기도 한다(`TFCF`). 그래서 `index_symbol`로 되돌린
+    형태와 원래 형태를 둘 다 본다. 한쪽만 보면 그 소스가 닫은 구간이 통째로 안 걸린다.
     """
     to_index = index_symbol or (lambda symbol: symbol)
     accepted: list[IntervalCoverage] = []
@@ -394,7 +395,10 @@ def accept_exit_lag(
             item.problem == ENDS_EARLY
             and item.last is not None
             and item.valid_to is not None
-            and (item.index_name, to_index(item.symbol), item.valid_to) in snapshot_closed
+            and (
+                (item.index_name, to_index(item.symbol), item.valid_to) in snapshot_closed
+                or (item.index_name, item.symbol, item.valid_to) in snapshot_closed
+            )
             and item.last >= item.valid_from
         )
         if lagged:

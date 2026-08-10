@@ -358,6 +358,17 @@ NAME_OVERRIDES = (
     ("Liberty Media Corp., Class C", "LMCK", "리버티미디어 시리즈 C. 2014-07 신설"),
     ("Liberty Global PLC Lilac, Class A", "LILA", "리버티글로벌의 LiLAC 트래킹 주식"),
     ("Liberty Global PLC Lilac, Class C", "LILAK", "같은 트래커의 클래스 C"),
+    # 리버티 인터랙티브의 시리즈 A 트래킹 주식은 `LINTA`에서 2015년 `QVCA`가 됐다.
+    # 벤더에 `LINTA`는 아예 없고 `QVCA`가 2006-05-10~2018-04-11로 전 이력을 담는다.
+    ("Liberty Media Corp. - Interactive", "QVCA", "리버티미디어 시절의 인터랙티브 트래커"),
+    ("Liberty Interactive Corp., Class A", "QVCA", "2011년 분리 후 같은 트래커"),
+    ("Liberty Interactive Corp. QVC Group, Class A", "QVCA", "2015년 QVC 그룹 개명 후"),
+    ("Liberty Interactive Corp. QVC Group, Series A", "QVCA", "같은 트래커의 시리즈 표기"),
+    # 아바고가 2016년 브로드컴을 인수하며 `AVGO`와 브로드컴이라는 이름을 함께 가져갔다.
+    # 그래서 2012~2015년 명세의 `Broadcom`은 **다른 회사**(`BRCM`)다. 이름만 보면 두 회사가
+    # 한 티커로 합쳐져 그 해 구성원이 하나 줄어든다.
+    ("Broadcom Corp.", "BRCM", "2016년 인수 전의 Broadcom Corporation"),
+    ("Broadcom Corp., Class A", "BRCM", "같은 회사의 클래스 A 표기"),
 )
 
 # 명세에 있지만 지수 구성원이 아닌 이름. 펀드가 자기 자신을 적은 줄이다.
@@ -365,8 +376,31 @@ IGNORED_NAMES = ("PowerShares QQQ Trust", "Invesco QQQ Trust")
 
 
 def override_dictionary() -> dict[str, str]:
-    """`NAME_OVERRIDES`를 정규화 키 사전으로. 사전에 겹쳐 쓴다."""
-    return {normalize(name): symbol for name, symbol, _ in NAME_OVERRIDES}
+    """`NAME_OVERRIDES`를 **원본 이름 그대로** 쓰는 사전으로.
+
+    정규화 키로 두지 않는 이유는 그것으로는 못 가르는 쌍이 있기 때문이다. `Broadcom Corp.`
+    (2016년 이전의 브로드컴, `BRCM`)와 `Broadcom Inc.`(아바고가 이름을 가져간 뒤, `AVGO`)는
+    정규화하면 둘 다 `BROADCOM`이다. 손으로 확인해 적은 항목이니 적은 이름에만 듣게 한다.
+    """
+    return {override_key(name): symbol for name, symbol, _ in NAME_OVERRIDES}
+
+
+def override_key(name: str) -> str:
+    """오버라이드 대조용 형태. **각주만 떼고 법인 꼬리표는 남긴다.**
+
+    `Ulta Salon ... (a)`와 `(b)`는 같은 이름이라 각주는 떼야 하고, `Broadcom Corp.`와
+    `Broadcom Inc.`는 다른 회사라 꼬리표는 남겨야 한다. 정규화 키는 둘 다 지워서 못 쓴다.
+    """
+    return " ".join(_WHEN_ISSUED.sub(" ", _FOOTNOTE.sub("", name)).split()).upper()
+
+
+@dataclass(frozen=True)
+class NameObservation:
+    """어느 날 이 이름이 어느 티커였는지. 지수 사건 한 줄이 관측 하나다."""
+
+    date: str
+    action: str
+    symbol: str
 
 
 def _unqualified(key: str) -> str:
@@ -374,11 +408,41 @@ def _unqualified(key: str) -> str:
     return " ".join(part for part in key.split() if not part.endswith("CLASS"))
 
 
+def ticker_on(observations: tuple[NameObservation, ...], as_of: str) -> str | None:
+    """그 날짜에 이 이름이 쓰던 티커.
+
+    **이름 사전은 날짜를 알아야 한다.** 처음에는 이름 하나에 티커 하나를 붙였는데,
+    `Baker Hughes`가 2017-07-07에 `BHI`로 빠지고 같은 날 `BKR`로 들어온다. 날짜를 무시하면
+    2022년 보유가 옛 티커 `BHI`로 풀려 있지도 않은 편입 사건이 생긴다. `SYMBOL_RENAMES`·
+    `CIK_OVERRIDES`와 같은 자리에서 같은 교훈을 이름 축으로 다시 만난 것이다.
+
+    두 동작의 뜻이 다르다는 것이 판정을 만든다.
+
+    - `add`는 "그날부터 이 티커"다. 기준일이 그날 이후면 이쪽을 쓴다.
+    - `remove`는 "그날까지 이 티커"다. 기준일이 그날 이전이면 이쪽을 쓴다.
+
+    같은 날 편출·편입이 한 쌍으로 있는 개명(`BHI`→`BKR`)이 이 규칙으로 정확히 갈린다.
+    """
+    if not observations:
+        return None
+    earlier = [item for item in observations if item.date <= as_of]
+    if earlier:
+        when = max(item.date for item in earlier)
+        same_day = [item for item in earlier if item.date == when]
+        adds = [item for item in same_day if item.action == "add"]
+        return (adds or same_day)[0].symbol
+    when = min(item.date for item in observations)
+    same_day = [item for item in observations if item.date == when]
+    removes = [item for item in same_day if item.action == "remove"]
+    return (removes or same_day)[0].symbol
+
+
 def resolve_names(
     names: list[str] | tuple[str, ...],
-    dictionary: dict[str, str],
+    dictionary: dict[str, tuple[NameObservation, ...]],
+    as_of: str,
 ) -> tuple[dict[str, str], list[str]]:
-    """`이름 → 티커`. `(푼 것, 못 푼 이름)`을 준다.
+    """`이름 → 그 기준일의 티커`. `(푼 것, 못 푼 이름)`을 준다.
 
     **못 푼 이름을 추측으로 메우지 않는다.** 이 작업의 목적이 "빠진 구성원 찾기"인데,
     가장 안 풀리는 이름이 바로 그 사라진 회사들이다. 대충 맞춘 티커 하나가 그 회사의
@@ -396,25 +460,40 @@ def resolve_names(
     막아야 할 것은 그것뿐이다. 같은 회사의 옛 이름과 새 이름이 같은 티커로 가는 것
     (`Facebook`과 `Meta Platforms` 둘 다 `META`)은 **맞는 결과**라 막지 않는다.
     """
+    # 접두사로 견준다. 같은 자기 참조가 `PowerShares QQQ Trust, Series 1`로도 적힌다.
+    ignored = tuple(normalize(name) for name in IGNORED_NAMES)
+
     # **키 단위로 판정한다.** 같은 회사의 표기 변형(`Facebook, Inc., Class A`와 그 각주
-    # 붙은 판)은 정규화하면 한 키다. 이름 단위로 세면 그 변형들이 서로를 막아 셋 다
-    # 못 푼 것이 된다.
+    # 붙은 판)은 정규화하면 한 키다. 이름 단위로 세면 그 변형들이 서로를 막는다.
     keys: dict[str, list[str]] = {}
     for name in names:
         keys.setdefault(normalize(name), []).append(name)
 
-    # 접두사로 견준다. 같은 자기 참조가 `PowerShares QQQ Trust, Series 1`로도 적힌다.
-    ignored = tuple(normalize(name) for name in IGNORED_NAMES)
+    # 손으로 적은 것이 먼저다. 원본 이름이 정확히 맞을 때만 듣는다.
+    overrides = override_dictionary()
     exact: dict[str, str] = {}
     fallback: dict[str, str] = {}
     unresolved: list[str] = []
     for key, variants in keys.items():
+        # **클래스만 남은 조각은 종목이 아니다.** 줄바꿈으로 쪼개진 이름의 꼬리가 그대로
+        # 후보가 되면(`Class A`) 회사가 없는데도 사전의 아무 `...LLC`에 붙는다. 실제로
+        # 2013·2014년 판에서 `LLC`라는 없는 티커가 구성원으로 들어갔다.
+        if not _unqualified(key):
+            continue
         if key.startswith(ignored):
             continue
-        if key in dictionary:
-            exact[key] = dictionary[key]
-        elif dictionary.get(_unqualified(key)):
-            fallback[key] = dictionary[_unqualified(key)]
+        named = {overrides[override_key(name)] for name in variants
+                 if override_key(name) in overrides}
+        if len(named) == 1:
+            exact[key] = named.pop()
+            continue
+        symbol = ticker_on(dictionary.get(key, ()), as_of)
+        if symbol:
+            exact[key] = symbol
+            continue
+        symbol = ticker_on(dictionary.get(_unqualified(key), ()), as_of)
+        if symbol:
+            fallback[key] = symbol
         else:
             unresolved.extend(variants)
 
@@ -438,23 +517,32 @@ def resolve_names(
 
 def snapshot_changes(
     snapshots: list[Holdings],
-    resolved: dict[str, str],
-) -> list[tuple[str, str, str, str, str, str]]:
-    """연속한 두 기준일의 차이를 변경 사건으로. `wikipedia.snapshot_changes`와 같은 모양.
+    dictionary: dict[str, tuple[NameObservation, ...]],
+) -> tuple[list[tuple[str, str, str, str, str, str]], list[str]]:
+    """연속한 두 기준일의 차이를 변경 사건으로. `(사건, 못 푼 이름)`.
 
-    **날짜는 뒤쪽 기준일이다.** 그 사이 어느 날 바뀌었는지는 모르고, 늦어도 그날에는
-    반영돼 있었다는 것만 안다. 위키와 달리 기준일 자체는 정확하므로 불확실성의 크기가
-    두 기준일의 간격으로 한정된다.
+    **기준일마다 따로 해석한다.** 한 번 해석해 돌려쓰면 개명이 시간을 잃는다 — 2022년
+    보유가 2010년 티커로 풀린다.
+
+    날짜는 뒤쪽 기준일이다. 그 사이 어느 날 바뀌었는지는 모르고, 늦어도 그날에는 반영돼
+    있었다는 것만 안다. 위키와 달리 기준일 자체는 정확하므로 불확실성이 두 기준일의
+    간격으로 한정된다.
     """
+    tickers: dict[str, frozenset[str]] = {}
+    unresolved: list[str] = []
+    for item in snapshots:
+        resolved, missing = resolve_names(item.names, dictionary, item.as_of)
+        tickers[item.as_of] = frozenset(resolved.values())
+        unresolved.extend(missing)
+
     events: list[tuple[str, str, str, str, str, str]] = []
     for earlier, later in zip(snapshots, snapshots[1:]):
-        before = {resolved[name] for name in earlier.names if name in resolved}
-        after = {resolved[name] for name in later.names if name in resolved}
+        before, after = tickers[earlier.as_of], tickers[later.as_of]
         for symbol in sorted(after - before):
             events.append((later.as_of, "NDX100", "add", symbol, "qqq", later.accession))
         for symbol in sorted(before - after):
             events.append((later.as_of, "NDX100", "remove", symbol, "qqq", later.accession))
-    return events
+    return events, sorted(set(unresolved))
 
 
 CSV_COLUMNS = ("date", "index_name", "action", "symbol", "source", "revid")

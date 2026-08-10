@@ -258,13 +258,13 @@ class InvariantTest(unittest.TestCase):
         self.assertEqual(expected_members_on("NDX100", "2012-01-03"), (100, 1))
 
     def test_the_nasdaq_band_widens_when_the_index_rule_changed(self):
-        """2014-12-22에 Nasdaq이 다중 클래스를 허용했다. 그 전은 정확히 100이다.
+        """2014-04-03에 Nasdaq이 다중 클래스를 허용했다. 그 전은 정확히 100이다.
 
         하나의 넓은 밴드로 합치면 정확히 100이어야 하는 2008~2013년의 편출 누락을
         놓친다. 재구성 실측에서 그 시기는 970개 날짜 전부 정확히 100이었다.
         """
-        self.assertEqual(expected_members_on("NDX100", "2014-12-21"), (100, 1))
-        self.assertEqual(expected_members_on("NDX100", "2014-12-22"), (104, 4))
+        self.assertEqual(expected_members_on("NDX100", "2014-04-02"), (100, 1))
+        self.assertEqual(expected_members_on("NDX100", "2014-04-03"), (104, 4))
 
         before = reconstruct(
             "NDX100",
@@ -274,8 +274,8 @@ class InvariantTest(unittest.TestCase):
             as_of=AS_OF,
         )
         # 같은 104개가 규칙 변경 전에는 위반이고 후에는 아니다.
-        self.assertTrue(count_violations(before, ["2014-12-21"]))
-        self.assertFalse(count_violations(before, ["2014-12-22"]))
+        self.assertTrue(count_violations(before, ["2014-04-02"]))
+        self.assertFalse(count_violations(before, ["2014-04-03"]))
 
     def test_an_unknown_index_cannot_be_validated(self):
         result = reconstruct("RUSSELL", {"A"}, [], floor_date=FLOOR, as_of=AS_OF)
