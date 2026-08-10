@@ -630,7 +630,6 @@ date,index_name,action,symbol,source,revid
 2012-10-11,SP500,remove,SUN,snapshot,517160280
 2012-10-11,SP500,remove,LXK,snapshot,517160280
 2012-10-11,SP500,remove,KFT,snapshot,517160280
-2012-10-11,SP500,remove,DV,snapshot,517160280
 2012-10-11,SP500,add,PNR,snapshot,517160280
 2012-10-11,SP500,add,PETM,snapshot,517160280
 2012-10-11,SP500,add,MDLZ,snapshot,517160280
@@ -671,7 +670,6 @@ date,index_name,action,symbol,source,revid
 2011-12-31,SP500,add,EA,snapshot,468828011
 2011-12-31,SP500,add,DLTR,snapshot,468828011
 2011-12-31,SP500,add,BWA,snapshot,468828011
-2011-11-30,SP500,remove,MI,snapshot,463324544
 2011-11-30,SP500,remove,JNS,snapshot,463324544
 2011-11-30,SP500,remove,ITT,snapshot,463324544
 2011-11-30,SP500,remove,FO,snapshot,463324544
@@ -775,7 +773,6 @@ date,index_name,action,symbol,source,revid
 2009-06-10,SP500,add,SRCL,snapshot,295610323
 2009-06-10,SP500,add,PBCT,snapshot,295610323
 2009-06-10,SP500,add,FTI,snapshot,295610323
-2009-06-10,SP500,add,DV,snapshot,295610323
 2009-06-10,SP500,add,CEPH,snapshot,295610323
 2009-04-16,SP500,remove,TEL,snapshot,284314516
 2009-04-16,SP500,remove,ROH,snapshot,284314516

@@ -126,6 +126,49 @@ class ReconstructTest(unittest.TestCase):
         self.assertNotIn("BACK", result.members_on("2014-01-02"))
         self.assertIn("BACK", result.members_on("2017-01-03"))
 
+    def test_a_same_day_pair_is_cancelled_by_default(self):
+        """같은 날 편출·편입은 그 티커가 하루도 지수를 벗어나지 않았다는 뜻이다."""
+        result = reconstruct(
+            "SP500",
+            {"SAME"},
+            [
+                change("2019-03-19", REMOVE, "SAME"),
+                change("2019-03-19", ADD, "SAME"),
+            ],
+            floor_date=FLOOR,
+            as_of=AS_OF,
+        )
+        self.assertEqual(result.violations, ())
+        intervals = [i for i in result.intervals if i.symbol == "SAME"]
+        self.assertEqual([(i.valid_from, i.valid_to) for i in intervals], [(FLOOR, None)])
+
+    def test_a_declared_identity_change_splits_the_interval(self):
+        """실체가 바뀐 자리는 상쇄하지 않는다. 가격 계열을 갈라야 하기 때문이다.
+
+        21세기폭스가 빠지고 폭스코퍼레이션이 같은 날 같은 티커로 들어온 2019-03-19이
+        그것이다. 한 구간으로 두면 2008~2019년이 2019년 신설 법인의 가격을 받는다.
+        """
+        result = reconstruct(
+            "SP500",
+            {"FOXA"},
+            [
+                change("2019-03-19", REMOVE, "FOXA"),
+                change("2019-03-19", ADD, "FOXA"),
+            ],
+            floor_date=FLOOR,
+            as_of=AS_OF,
+            identity_changes=frozenset({("2019-03-19", "FOXA")}),
+        )
+        self.assertEqual(result.violations, ())
+        intervals = sorted(
+            (i for i in result.intervals if i.symbol == "FOXA"),
+            key=lambda i: i.valid_from,
+        )
+        self.assertEqual(
+            [(i.valid_from, i.valid_to) for i in intervals],
+            [(FLOOR, "2019-03-19"), ("2019-03-19", None)],
+        )
+
     def test_counts_change_over_time(self):
         result = reconstruct(
             "SP500",

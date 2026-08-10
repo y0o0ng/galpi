@@ -73,3 +73,9 @@
 |지수|날짜|동작|심볼|근거|
 |---|---|---|---|---|
 |SP500|2016-01-19|remove|ACE|이 행의 실체는 ACE가 아니라 **옛 The Chubb Corporation**이고 그 가격 계열이 벤더에 없다. 표 원문은 'EXR replaces ACE as ACE Ltd acquires Chubb and retains the CB ticker, giving up ACE'인데, 여기서 지수를 떠난 것은 피인수된 Chubb Corp 이고 ACE Ltd는 CB 티커로 남았다. EODHD `CB.US`는 ACE Ltd의 계열이다 — 인수 발표일(2015-07-01)에 거래량만 1.8→17.6M으로 뛰고 종가는 101.68→102.49로 평평했다(피인수 기업이면 그날 +25%였어야 한다). `search/Chubb`에 옛 Chubb Corp 계열이 없어 2008-01-02~2016-01-19 구간의 가격을 구할 방법이 없다|
+|SP500|2011-07-05|remove|MI|Marshall & Ilsley(2011-07 BMO 인수)의 계열이 벤더에 없다. 이름 검색 'Ilsley'가 0건이고 `MI1`은 Marshall Industries라는 **다른 회사**로 바 0행이다. 현재 `MI`는 NFT Limited(2015-11-25~)라 그대로 두면 다른 회사 가격을 받는다|
+|SP500|2012-10-01|remove|DV|DeVry의 벤더 계열 `DV_OLD`가 2011-03-31부터라 구간 앞 21개월이 빈다. 개명 후 티커인 Adtalem(`ATGE`)은 EODHD US 목록에 아예 없고, 현재 `DV`는 DoubleVerify(2021-04-21~)다. 구간 시작을 못 덮으면 첫 252세션 워밍업이 불가능해 진입 자체가 안 되므로 부분 계열로 남기지 않는다. **짝이 되는 2009-06-10 편입은 스냅샷이 낸 것이라 여기 행으로 넣을 수 없다** — `_snapshot_dropped`가 심볼로 거르므로 이 한 줄이면 양쪽이 다 빠진다|
+|NDX100|2015-07-02|add|LILA|2015-07~2018 리버티글로벌의 LiLAC 트래킹 주식이다. 벤더 이름에 'LiLAC'이 하나도 없고 `LILAV`·`LILKV`는 8행·7행짜리 when-issued 라인이다. 현재 `LILA`는 2018년 분사한 Liberty Latin America(2018-01-02~)로 **다른 실체**다|
+|NDX100|2015-12-21|remove|LILA|위 편입 행과 한 쌍이다|
+|NDX100|2015-07-02|add|LILAK|같은 트래킹 주식의 Class C다. 근거는 `LILA` 항목과 같다|
+|NDX100|2015-12-21|remove|LILAK|위 편입 행과 한 쌍이다|

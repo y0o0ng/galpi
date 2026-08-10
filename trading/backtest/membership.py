@@ -149,17 +149,21 @@ def parse_members_csv(text: str) -> dict[str, frozenset[str]]:
     return {index: frozenset(values) for index, values in members.items()}
 
 
-def _drop_same_day_reuse(changes: list[Change]) -> list[Change]:
+def _drop_same_day_reuse(
+    changes: list[Change],
+    identity_changes: frozenset[tuple[str, str]] = frozenset(),
+) -> list[Change]:
     """같은 날 같은 심볼의 편출·편입 쌍을 지운다. **심볼 기준 멤버십은 끊기지 않았다.**
 
-    21세기폭스가 디즈니에 인수되며 빠진 2019-03-19에 폭스코퍼레이션이 `FOXA`·`FOX`라는
-    같은 티커로 같은 날 들어왔다. 실체는 바뀌었지만 그 티커는 하루도 지수를 벗어나지
-    않았고, 유니버스가 심볼로 열리는 이상 그것이 우리가 답할 수 있는 사실이다.
+    티커 재사용(`GAS` 2011-12-12)이나 개명이 만든 쌍은 그 티커가 하루도 지수를 벗어나지
+    않았다는 뜻이므로 상쇄하는 것이 맞다.
 
-    지우지 않으면 뒤로 걷기가 편출을 먼저 만나 "그 이후에도 구성원으로 잡혀 있습니다"로
-    걸린다. 정렬 순서를 바꿔 편입을 먼저 처리하면 구간이 하루짜리로 쪼개져 더 나쁘다.
+    **`identity_changes`에 적힌 (날짜, 심볼)은 남긴다.** 실체가 다른 회사로 바뀐 자리라
+    가격 계열도 갈라야 하고, 그러려면 구간이 둘이어야 한다. 21세기폭스가 빠지고
+    폭스코퍼레이션이 같은 날 같은 티커로 들어온 2019-03-19이 그것이다 — 상쇄하면 한
+    구간이 되어 2008~2019년이 2019년 신설 법인의 가격을 받는다.
     """
-    paired = {
+    paired = ({
         (change.date, change.symbol)
         for change in changes
         if change.action == ADD
@@ -167,7 +171,7 @@ def _drop_same_day_reuse(changes: list[Change]) -> list[Change]:
         (change.date, change.symbol)
         for change in changes
         if change.action == REMOVE
-    }
+    }) - identity_changes
     return [
         change
         for change in changes
@@ -182,13 +186,23 @@ def reconstruct(
     *,
     floor_date: str,
     as_of: str,
+    identity_changes: frozenset[tuple[str, str]] = frozenset(),
 ) -> Reconstruction:
-    """오늘의 구성원과 변경 이력으로 구간을 만든다. 모듈 설명의 뒤로 걷기다."""
+    """오늘의 구성원과 변경 이력으로 구간을 만든다. 모듈 설명의 뒤로 걷기다.
+
+    `identity_changes`는 같은 날 같은 티커로 **회사가 바뀐** (날짜, 심볼)이다. 상쇄하지
+    않고 구간을 둘로 가른다.
+    """
     relevant = sorted(
         _drop_same_day_reuse(
-            [change for change in changes if change.index_name == index_name]
+            [change for change in changes if change.index_name == index_name],
+            identity_changes,
         ),
-        key=lambda change: (change.date, change.action, change.symbol),
+        # 같은 날 같은 심볼이면 **편입을 먼저** 처리한다. 뒤로 걷는 중이므로 편입이 뒤쪽
+        # 구간의 시작이고, 그것을 닫아야 편출이 앞쪽 구간의 끝이 된다. 편출을 먼저 만나면
+        # 아직 구성원인 심볼이라 "그 이후에도 구성원으로 잡혀 있습니다"로 걸린다.
+        # 심볼이 다르면 순서가 결과를 바꾸지 않는다 — 걷기가 심볼마다 독립이다.
+        key=lambda change: (change.date, change.action == ADD, change.symbol),
         reverse=True,
     )
     working = set(current_members)

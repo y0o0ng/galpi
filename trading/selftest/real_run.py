@@ -65,6 +65,7 @@ from backtest.membership import (  # noqa: E402
     parse_members_csv,
     reconstruct,
 )
+from backtest.wikipedia import identity_changes_for  # noqa: E402
 
 SOURCE_VERSION = "eodhd-15y-2026-08"
 INDEX_NAMES = ("SP500", "NDX100")
@@ -233,7 +234,12 @@ def reconstructions() -> list:
         print(f"스냅샷 사건 {added}건 보강")
     return [
         reconstruct(
-            index, members[index], changes, floor_date=FLOOR_DATE, as_of=AS_OF
+            index,
+            members[index],
+            changes,
+            floor_date=FLOOR_DATE,
+            as_of=AS_OF,
+            identity_changes=identity_changes_for(index),
         )
         for index in INDEX_NAMES
     ]

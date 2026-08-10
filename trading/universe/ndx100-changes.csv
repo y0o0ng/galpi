@@ -218,8 +218,6 @@ date,index_name,action,symbol,security
 2015-12-21,NDX100,remove,WYNN,Wynn Resorts
 2015-12-21,NDX100,remove,VIP,VimpelCom
 2015-12-21,NDX100,remove,SPLS,Staples
-2015-12-21,NDX100,remove,LILAK,Liberty Latin America Class C
-2015-12-21,NDX100,remove,LILA,Liberty Latin America Class A
 2015-12-21,NDX100,remove,GRMN,Garmin
 2015-12-21,NDX100,remove,GMCR,Keurig Green Mountain
 2015-12-21,NDX100,remove,EXPD,Expeditors International
@@ -242,8 +240,6 @@ date,index_name,action,symbol,security
 2015-07-24,NDX100,remove,DTV,DirecTV
 2015-07-24,NDX100,remove,CTRX,Catamaran Corporation
 2015-07-02,NDX100,remove,KRFT,Kraft Foods
-2015-07-02,NDX100,add,LILAK,Liberty Latin America Class C
-2015-07-02,NDX100,add,LILA,Liberty Latin America Class A
 2015-07-02,NDX100,add,KHC,Kraft Heinz
 2015-03-23,NDX100,remove,EQIX,Equinix
 2015-03-23,NDX100,add,WBA,Walgreens Boots Alliance

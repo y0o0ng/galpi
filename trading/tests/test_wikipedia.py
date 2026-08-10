@@ -67,8 +67,15 @@ changed its name.<ref>{{cite web |url=https://example.invalid/a.pdf |title=X |da
 |-
 |January 19, 2016 || EXR || [[Extra Space Storage]] || ACE  || [[Chubb Limited|Chubb]] || \
 EXR replaces ACE as ACE Ltd acquires Chubb and retains the CB ticker, giving up ACE.
+|-
+|October 1, 2012 || || || DV || [[DeVry]] || Market capitalization change.
+|-
+|July 5, 2011 || || || MI || [[Marshall & Ilsley]] || Acquired by [[Bank of Montreal]].
 |}
 """
+# 위 표의 ACE·DV·MI 행은 `EXCLUDED_CHANGES`가 가리키는 행이다. **일부러 둔다** —
+# `_drop_excluded`가 대상 행이 사라지면 예외를 올리므로, 픽스처에서 빼면 그 그물이
+# 테스트를 통과시키지 못한다. 제외를 하나 늘릴 때마다 여기도 한 줄 는다.
 
 # Nasdaq 표의 서식: 셀마다 줄을 바꾸고, 편입·편출 중 한쪽이 비기도 한다.
 NDX_STYLE = """
@@ -104,8 +111,38 @@ NDX_STYLE = """
 |TCOM
 |[[Ctrip]]
 |Weight requirements.<ref>{{Cite press release |title=A |publisher=[[Nasdaq]]}}</ref>
+|-
+|December 21, 2015
+|
+|
+|LILA
+|[[Liberty Latin America|LiLAC Group]]
+|Tracking stock removed.
+|-
+|December 21, 2015
+|
+|
+|LILAK
+|[[Liberty Latin America|LiLAC Group]] Class C
+|Tracking stock removed.
+|-
+|July 2, 2015
+|LILA
+|[[Liberty Latin America|LiLAC Group]]
+|
+|
+|Tracking stock added.
+|-
+|July 2, 2015
+|LILAK
+|[[Liberty Latin America|LiLAC Group]] Class C
+|
+|
+|Tracking stock added.
 |}
 """
+# 위 LiLAC 네 행도 `EXCLUDED_CHANGES`가 가리키는 행이라 일부러 둔다. SP_STYLE의
+# ACE·DV·MI와 같은 이유다.
 
 
 class CellTest(unittest.TestCase):
@@ -143,8 +180,8 @@ class TableTest(unittest.TestCase):
     def test_both_table_styles_parse(self):
         _, inline = parse_table(SP_STYLE, "changes")
         _, per_line = parse_table(NDX_STYLE, "changes")
-        self.assertEqual(len(inline), 4)
-        self.assertEqual(len(per_line), 2)
+        self.assertEqual(len(inline), 6)
+        self.assertEqual(len(per_line), 6)
         self.assertEqual(per_line[1][1], "KFT")
 
     def test_a_missing_table_is_refused(self):
