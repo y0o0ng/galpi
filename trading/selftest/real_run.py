@@ -18,7 +18,9 @@ EODHD 약관은 해지 후 1개월 안에 가격 복사본을 지우라고 요�
 2. `missing_universe_symbols` — 구성원인데 바가 하나도 없는 심볼
 3. `uncovered_intervals` — 바는 있는데 구간을 못 덮는 심볼(티커 재사용)
 
-셋 중 하나라도 남으면 `check`는 선언하지 않고 목록만 준다.
+셋 중 하나라도 남으면 `check`는 선언하지 않고 목록만 준다. 셋째에서 **편출일 지연**은
+`accept_exit_lag`가 갈라내 인정한다 — 스냅샷이 낸 편출 날짜는 효력일이 아니라 상한이라
+회사가 거래를 멈춘 뒤로 구간이 더 이어지고, 그 꼬리에는 바가 없어 못 고른다.
 
 ## 실행 순서
 
@@ -48,6 +50,7 @@ from backtest.edgar import CIK_OVERRIDES, collect  # noqa: E402
 from backtest.eodhd import (  # noqa: E402
     REUSE_SUFFIXES,
     EodhdClient,
+    accept_exit_lag,
     find_reused_series,
     load_prices,
     missing_universe_symbols,
@@ -187,12 +190,34 @@ def merge_changes(announced: list, snapshot_rows: list) -> tuple[list, int]:
     return merged, added
 
 
+def announced_changes() -> list:
+    """공고 색인에서 옮긴 변경 사건. 효력일이 정확한 쪽이다."""
+    changes = []
+    for index in INDEX_NAMES:
+        changes.extend(parse_changes_csv(_read_csv(f"{index.lower()}-changes.csv")))
+    return changes
+
+
+def snapshot_closed_exits() -> set[tuple[str, str, str]]:
+    """스냅샷만으로 닫힌 편출 `(지수, 심볼, 날짜)`.
+
+    `merge_changes`가 공고를 우선하므로, 병합 결과에서 공고를 빼면 남는 것이 스냅샷이
+    혼자 만든 사건이다. 그 편출 날짜만 상한이고, 공고가 이긴 날짜는 효력일이다.
+    """
+    announced = announced_changes()
+    merged, _ = merge_changes(announced, snapshot_changes_rows())
+    return {
+        (change.index_name, change.symbol, change.date)
+        for change in set(merged) - set(announced)
+        if change.action == "remove"
+    }
+
+
 def reconstructions() -> list:
-    members, changes = {}, []
+    members = {}
     for index in INDEX_NAMES:
         members.update(parse_members_csv(_read_csv(f"{index.lower()}-members.csv")))
-        changes.extend(parse_changes_csv(_read_csv(f"{index.lower()}-changes.csv")))
-    changes, added = merge_changes(changes, snapshot_changes_rows())
+    changes, added = merge_changes(announced_changes(), snapshot_changes_rows())
     if added:
         print(f"스냅샷 사건 {added}건 보강")
     return [
@@ -487,10 +512,20 @@ def stage_check(connection) -> int:
     for symbol in missing:
         print(f"   {symbol}")
 
-    uncovered = uncovered_intervals(connection, SOURCE_VERSION, end=WINDOW_END)
+    base = base_symbols()
+    lagged, uncovered = accept_exit_lag(
+        uncovered_intervals(connection, SOURCE_VERSION, end=WINDOW_END),
+        snapshot_closed_exits(),
+        index_symbol=lambda symbol: base_symbol(symbol, base),
+    )
     print(f"3. 구간을 못 덮는 심볼: {len(uncovered)}개")
     for item in uncovered:
         print(f"   {item.describe()}")
+    # 인정분도 전부 찍는다. 문턱이 없으므로 지연이 커지는 것은 눈으로 봐야 보인다.
+    if lagged:
+        print(f"   편출일 지연으로 인정한 구간 {len(lagged)}개 (꼬리에 바가 없어 못 고른다):")
+        for item in sorted(lagged, key=lambda item: -(item.tail_days or 0)):
+            print(f"     {item.tail_days:>4}일 {item.describe()}")
 
     if unlisted or missing or uncovered:
         print(

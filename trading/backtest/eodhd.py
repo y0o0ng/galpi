@@ -30,7 +30,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .data import BARS_CSV_COLUMNS, load_bars_csv, register_source
@@ -256,6 +257,7 @@ def unlisted_symbols(
 NO_BARS = "NO_BARS"
 STARTS_LATE = "STARTS_LATE"
 ENDS_EARLY = "ENDS_EARLY"
+EXIT_LAG = "EXIT_LAG"
 
 
 @dataclass(frozen=True)
@@ -269,6 +271,13 @@ class IntervalCoverage:
     first: str | None
     last: str | None
     problem: str
+
+    @property
+    def tail_days(self) -> int | None:
+        """계열이 끊긴 뒤로 구간이 더 이어진 날 수. 편출일 지연의 크기다."""
+        if self.last is None or self.valid_to is None:
+            return None
+        return (dt.date.fromisoformat(self.valid_to) - dt.date.fromisoformat(self.last)).days
 
     def describe(self) -> str:
         return (
@@ -344,6 +353,55 @@ def uncovered_intervals(
             )
         )
     return found
+
+
+def accept_exit_lag(
+    found: list[IntervalCoverage],
+    snapshot_closed: set[tuple[str, str, str]],
+    *,
+    index_symbol: Callable[[str], str] | None = None,
+) -> tuple[list[IntervalCoverage], list[IntervalCoverage]]:
+    """넘치는 구간 끝 중 **편출일 지연**을 인정해 가른다. `(인정, 남음)`을 준다.
+
+    스냅샷이 낸 편출은 효력일이 아니라 "늦어도 이 판에는 빠져 있었다"는 상한이다. 그래서
+    회사가 이미 거래를 멈춘 뒤로 구간이 며칠~몇 달 더 이어지고, 그 꼬리에 바가 없는 것이
+    맞다. 2026-08-10 실측에서 `ENDS_EARLY` 25개의 계열 끝이 전부 진짜 기업 사건 날짜였다
+    — `AW` 2008-12-05(리퍼블릭 합병) · `MOT` 2011-01-03(분사) · `EDS` 2008-08-25(HP 인수).
+    **넘치는 구간에 바가 없으면 백테스트가 그 종목을 고를 수 없으므로** 결과를 낙관적으로
+    만들지 않는다. 생존편향은 죽은 회사가 목록에서 빠지는 것이지 며칠 더 남는 것이 아니다.
+
+    ## 문턱을 쓰지 않는다
+
+    지연 일수는 11·23·36·58·86·104·247·956·1655로 이어져 자를 자리가 없고, "직전 판
+    날짜 안"으로 좁히면 `AW`·`BDK`·`EDS`·`FO`·`MOT`가 떨어진다 — 위키 표가 직전 판에서도
+    이미 낡아 있기 때문이다. 대신 성질이 다른 두 조건만 본다.
+
+    1. **그 구간을 닫은 것이 스냅샷 사건일 것.** 공고 편출은 효력일이 정확하므로 거기서
+       계열이 일찍 끊기면 상한이 헐거운 것이 아니라 진짜 데이터 구멍이다(`COV`는 코비디엔이
+       2015년까지 거래했는데 벤더 계열이 2012년에 끊긴다).
+    2. **계열이 구간 안까지 닿을 것.** 구간 시작에도 못 닿았으면 지연이 아니라 부재이거나
+       티커 재사용이다(`PEAK`·`HET`).
+
+    `snapshot_closed`는 `(지수, 심볼, 날짜)`이고 **공고가 이긴 편출은 들어가지 않는다.**
+    심볼은 지수 티커라, 재사용 매핑으로 벤더 계열 심볼이 된 구간은 `index_symbol`로 되돌려
+    맞춘다.
+    """
+    to_index = index_symbol or (lambda symbol: symbol)
+    accepted: list[IntervalCoverage] = []
+    remaining: list[IntervalCoverage] = []
+    for item in found:
+        lagged = (
+            item.problem == ENDS_EARLY
+            and item.last is not None
+            and item.valid_to is not None
+            and (item.index_name, to_index(item.symbol), item.valid_to) in snapshot_closed
+            and item.last >= item.valid_from
+        )
+        if lagged:
+            accepted.append(replace(item, problem=EXIT_LAG))
+        else:
+            remaining.append(item)
+    return accepted, remaining
 
 
 # 벤더가 재사용된 티커의 **옛** 회사를 담아두는 접미사. 실측으로 확인한 규칙이다 —

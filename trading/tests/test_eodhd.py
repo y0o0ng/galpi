@@ -20,7 +20,9 @@ from backtest.eodhd import (  # noqa: E402
     COMMON_STOCK,
     EodhdClient,
     EodhdError,
+    IntervalCoverage,
     Listing,
+    accept_exit_lag,
     bars_from_eod,
     load_prices,
     missing_universe_symbols,
@@ -298,6 +300,74 @@ class UncoveredIntervalsTest(unittest.TestCase):
             }
         )
         self.assertEqual(uncovered_intervals(self.connection, VERSION, end="2026-08-07"), [])
+
+
+class AcceptExitLagTest(unittest.TestCase):
+    """구간이 계열보다 며칠 더 가는 것과 아예 다른 회사인 것을 가른다.
+
+    실제 데이터에서 남는 셋이 서로 다른 조건에 걸린다 — `COV`는 공고가 닫았고,
+    `PEAK`·`HET`은 계열이 구간에 닿지도 않는다.
+    """
+
+    def coverage(self, symbol, valid_from, valid_to, first, last, problem="ENDS_EARLY"):
+        return IntervalCoverage(
+            symbol=symbol,
+            index_name="SP500",
+            valid_from=valid_from,
+            valid_to=valid_to,
+            first=first,
+            last=last,
+            problem=problem,
+        )
+
+    def test_a_snapshot_closed_tail_is_accepted(self):
+        # `MOT`. 2011-01-03 분사로 거래가 끝났고 표는 2011-03-30 판에서야 빠졌다.
+        item = self.coverage("MOT", "2008-01-02", "2011-03-30", "2006-01-03", "2011-01-03")
+        accepted, remaining = accept_exit_lag([item], {("SP500", "MOT", "2011-03-30")})
+        self.assertEqual(remaining, [])
+        self.assertEqual([(row.symbol, row.problem) for row in accepted], [("MOT", "EXIT_LAG")])
+        self.assertEqual(accepted[0].tail_days, 86)
+
+    def test_an_announced_exit_stays_a_problem(self):
+        """공고 편출은 효력일이라 상한이 아니다. 거기서 계열이 끊기면 진짜 구멍이다.
+
+        `COV`가 그렇다 — 코비디엔은 2015년 인수까지 거래했는데 벤더 계열이 2012년에
+        끊긴다. 지연으로 인정하면 2년 반의 구멍이 조용히 덮인다.
+        """
+        item = self.coverage("COV", "2011-02-28", "2015-01-27", "2007-06-14", "2012-06-15")
+        accepted, remaining = accept_exit_lag([item], set())
+        self.assertEqual(accepted, [])
+        self.assertEqual([row.problem for row in remaining], ["ENDS_EARLY"])
+
+    def test_a_series_that_never_reaches_the_interval_stays_a_problem(self):
+        """`PEAK`. 계열이 구간 시작 전에 끝난다 — 지연이 아니라 다른 회사다."""
+        item = self.coverage("PEAK", "2019-11-29", "2024-03-28", "2012-10-17", "2019-09-16")
+        accepted, remaining = accept_exit_lag([item], {("SP500", "PEAK", "2024-03-28")})
+        self.assertEqual(accepted, [])
+        self.assertEqual([row.problem for row in remaining], ["ENDS_EARLY"])
+
+    def test_other_problems_are_untouched(self):
+        """늦게 시작하는 계열과 바 없는 심볼은 이 판정의 대상이 아니다."""
+        late = self.coverage("CEG", "2008-01-02", "2012-03-12", "2022-01-19", "2026-08-07",
+                             problem="STARTS_LATE")
+        none = self.coverage("LEH", "2008-01-02", "2008-09-15", None, None, problem="NO_BARS")
+        accepted, remaining = accept_exit_lag(
+            [late, none], {("SP500", "CEG", "2012-03-12"), ("SP500", "LEH", "2008-09-15")}
+        )
+        self.assertEqual(accepted, [])
+        self.assertEqual([row.problem for row in remaining], ["STARTS_LATE", "NO_BARS"])
+
+    def test_a_remapped_symbol_is_matched_by_its_index_ticker(self):
+        """구간 심볼은 벤더 계열(`ADT_OLD`)인데 편출 사건은 지수 티커(`ADT`)로 있다."""
+        item = self.coverage("ADT_OLD", "2008-01-02", "2012-04-02", "2006-01-03", "2012-03-05")
+        accepted, remaining = accept_exit_lag(
+            [item],
+            {("SP500", "ADT", "2012-04-02")},
+            index_symbol=lambda symbol: symbol.removesuffix("_OLD"),
+        )
+        self.assertEqual(remaining, [])
+        self.assertEqual(accepted[0].symbol, "ADT_OLD")
+        self.assertEqual(accepted[0].problem, "EXIT_LAG")
 
 
 class LoadPricesTest(unittest.TestCase):
