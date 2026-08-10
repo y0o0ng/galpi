@@ -24,9 +24,12 @@ from backtest.wikipedia import (  # noqa: E402
     SNAPSHOT_IGNORED,
     Snapshot,
     canonical_spelling,
+    SNAPSHOT_PAGES,
+    SNAPSHOT_TABLE_SIZE,
     constituent_symbols,
     snapshot_changes,
     EXCLUDED_CHANGES,
+    EXCLUDED_SYMBOLS,
     SYMBOL_RENAMES,
     WikipediaError,
     apply_renames,
@@ -71,9 +74,13 @@ EXR replaces ACE as ACE Ltd acquires Chubb and retains the CB ticker, giving up 
 |October 1, 2012 || || || DV || [[DeVry]] || Market capitalization change.
 |-
 |July 5, 2011 || || || MI || [[Marshall & Ilsley]] || Acquired by [[Bank of Montreal]].
+|-
+|January 27, 2015 || || || COV || [[Covidien]] || Acquired by [[Medtronic]].
+|-
+|February 28, 2011 || COV || [[Covidien]] || || || Market capitalization change.
 |}
 """
-# 위 표의 ACE·DV·MI 행은 `EXCLUDED_CHANGES`가 가리키는 행이다. **일부러 둔다** —
+# 위 표의 ACE·DV·MI·COV 행은 `EXCLUDED_CHANGES`가 가리키는 행이다. **일부러 둔다** —
 # `_drop_excluded`가 대상 행이 사라지면 예외를 올리므로, 픽스처에서 빼면 그 그물이
 # 테스트를 통과시키지 못한다. 제외를 하나 늘릴 때마다 여기도 한 줄 는다.
 
@@ -180,7 +187,7 @@ class TableTest(unittest.TestCase):
     def test_both_table_styles_parse(self):
         _, inline = parse_table(SP_STYLE, "changes")
         _, per_line = parse_table(NDX_STYLE, "changes")
-        self.assertEqual(len(inline), 6)
+        self.assertEqual(len(inline), 8)
         self.assertEqual(len(per_line), 6)
         self.assertEqual(per_line[1][1], "KFT")
 
@@ -254,6 +261,8 @@ class RenameTest(unittest.TestCase):
             self.assertRegex(parse_date_ok, r"^\d{4}-\d{2}-\d{2}$")
         for _, _, _, _, evidence in CORRECTIONS + EXCLUDED_CHANGES:
             self.assertTrue(evidence.strip())
+        for _, _, evidence in EXCLUDED_SYMBOLS:
+            self.assertTrue(evidence.strip())
 
     def test_the_two_monster_companies_do_not_swap(self):
         """`MNST`를 두 회사가 나눠 쓰고 두 개명이 **세 날** 차이로 맞물린다.
@@ -296,7 +305,8 @@ class RenameTest(unittest.TestCase):
         self.assertEqual(apply_renames("NDX100", "2012-12-24", "RIMM"), "BB")
 
 
-# 구성원 표 픽스처. `constituent_symbols`가 400~600개인 표를 고르므로 그만큼 만든다.
+# 구성원 표 픽스처. `constituent_symbols`가 크기 창에 드는 표를 고르므로 그만큼 만든다.
+SP500_TABLE_SIZE = {"minimum": 400, "maximum": 600}
 # 실제 표의 함정만 남겼다 — 셀마다 줄을 바꾸는 서식, 티커 템플릿, 티커처럼 생긴 섹터 칸.
 EXPECTED_TICKERS = [f"T{index:03d}" for index in range(450)]
 
@@ -332,17 +342,33 @@ class SnapshotTest(unittest.TestCase):
         셀마다 줄을 바꾸는 서식에서 모든 `|` 줄을 행으로 보면 GICS 섹터·본사 같은 다른
         칸까지 티커로 줍는다. 2022년 판이 503개 대신 572개로 나왔다.
         """
-        found = constituent_symbols(PER_LINE_TABLE)
+        found = constituent_symbols(PER_LINE_TABLE, **SP500_TABLE_SIZE)
         self.assertEqual(found, frozenset(EXPECTED_TICKERS))
         # 섹터 칸의 대문자 낱말이 티커로 들어오면 안 된다.
         self.assertNotIn("IT", found)
 
     def test_the_inline_style_parses_too(self):
-        self.assertEqual(constituent_symbols(INLINE_TABLE), frozenset(EXPECTED_TICKERS))
+        self.assertEqual(constituent_symbols(INLINE_TABLE, **SP500_TABLE_SIZE),
+                         frozenset(EXPECTED_TICKERS))
 
     def test_a_table_that_is_not_the_constituents_list_is_ignored(self):
-        """표를 id로 못 찾는다(2019년쯤에야 붙었다). 400~600개가 나오는 표를 고른다."""
-        self.assertEqual(constituent_symbols("{|\n|- \n| AAPL || Apple\n|}"), frozenset())
+        """표를 id로 못 찾는다(2019년쯤에야 붙었다). 크기 창에 드는 표를 고른다."""
+        self.assertEqual(
+            constituent_symbols("{|\n|- \n| AAPL || Apple\n|}", **SP500_TABLE_SIZE),
+            frozenset(),
+        )
+
+    def test_the_size_window_is_explicit(self):
+        """**기본값을 두지 않는다.** 창이 어긋나면 그 지수의 스냅샷이 조용히 0개가 되고,
+        빠진 스냅샷은 빠진 편출로 이어진다. 창은 지수마다 다르므로 호출자가 준다.
+        """
+        self.assertEqual(SNAPSHOT_TABLE_SIZE["SP500"], (400, 600))
+        self.assertEqual(constituent_symbols(PER_LINE_TABLE, minimum=90, maximum=115),
+                         frozenset())
+
+    def test_only_sp500_has_a_past_constituent_table(self):
+        """NDX100은 위키에 과거 구성원 표가 없다. `backtest/qqq.py`가 그 자리다."""
+        self.assertEqual(set(SNAPSHOT_PAGES), {"SP500"})
 
     def test_a_diff_becomes_add_and_remove_events(self):
         earlier = Snapshot("SP500", 1, "2008-06-20", frozenset({"AAA", "BBB"}))
@@ -429,6 +455,27 @@ class ExclusionTest(unittest.TestCase):
         """구간 밖으로 잘린 제외 대상은 없어진 것이 아니라 범위 밖이다."""
         lines = parse_changes(SP_STYLE, "SP500", since="2020-01-01").splitlines()
         self.assertFalse([line for line in lines if line.startswith("2016-")])
+
+    def test_a_symbol_level_exclusion_needs_no_row_in_the_table(self):
+        """**`HET`은 편출이 스냅샷에만 있다.** 행을 요구하면 담을 수가 없다.
+
+        `EXCLUDED_CHANGES`는 공고 표의 행을 가리키고 그 행이 사라지면 예외를 올린다.
+        스냅샷에만 있는 심볼은 그 목록에 넣는 순간 "행이 표에 없습니다"로 거부된다.
+        `EXCLUDED_SYMBOLS`가 그 자리이고, 표에 행이 없어도 예외를 올리지 않는다.
+        """
+        self.assertIn("HET", {symbol for _, symbol, _ in EXCLUDED_SYMBOLS})
+        self.assertFalse([line for line in parse_changes(SP_STYLE, "SP500").splitlines()
+                          if ",HET," in line])
+
+    def test_a_symbol_level_exclusion_also_drops_a_row_if_one_appears(self):
+        """나중에 공고 표에 그 심볼의 행이 생겨도 되살아나지 않는다."""
+        with_het = SP_STYLE.replace(
+            "|July 5, 2011 || || || MI ||",
+            "|August 30, 2008 || || || HET || [[Harrah's Entertainment|Harrah's]] ||"
+            " Taken private.\n|-\n|July 5, 2011 || || || MI ||",
+        )
+        lines = parse_changes(with_het, "SP500").splitlines()
+        self.assertFalse([line for line in lines if ",HET," in line])
 
 
 if __name__ == "__main__":

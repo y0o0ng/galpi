@@ -70,6 +70,19 @@ PAGES = {
 MEMBERS_TABLE_ID = "constituents"
 CHANGES_TABLE_ID = "changes"
 
+# 과거 판 스냅샷을 뽑을 수 있는 문서. **NDX100은 여기 없다.**
+#
+# 2026-08-10 실측: `List of NASDAQ-100 companies`는 2005-11-17에 만들어진 뒤 2026-04-01
+# 판까지도 24자짜리 리다이렉트였고, 지금의 72,995자 문서는 2026년 중반에 생겼다. 본체인
+# `Nasdaq-100` 문서에는 구성원 표가 **있었던 적이 없다**(2012년 판은 표가 0개, 2017-12
+# 판은 전고점 표 하나, 현재 판도 구성원 표 없음). diff할 과거 전체 목록이 존재하지 않는다.
+#
+# 그래서 NDX100의 스냅샷은 위키가 아니라 EDGAR의 QQQ 보유종목에서 만든다(`backtest/qqq.py`).
+SNAPSHOT_PAGES = {"SP500": "List of S&P 500 companies"}
+
+# 구성원 표로 인정할 티커 수. 문서에는 표가 여럿이라 크기로 고른다.
+SNAPSHOT_TABLE_SIZE = {"SP500": (400, 600)}
+
 MONTHS = {
     "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
     "july": 7, "august": 8, "september": 9, "october": 10, "november": 11,
@@ -333,6 +346,32 @@ EXCLUDED_CHANGES = (
         "2015-12-21", "NDX100", "remove", "LILAK",
         "위 편입 행과 한 쌍이다",
     ),
+    (
+        "2011-02-28", "SP500", "add", "COV",
+        "코비디엔의 벤더 `COV` 계열이 2012-06-15에 끊긴다. 회사는 2015-01 메드트로닉"
+        " 인수까지 거래했으므로 구간(2011-02-28~2015-01-27)의 뒤 2년 반이 **벤더 구멍**"
+        " 이고, 이름 검색으로도 그 시절을 담은 다른 코드가 없다. 2008-01-02~2009-06-05의"
+        " 첫 구간은 계열이 덮으므로 그대로 둔다",
+    ),
+    (
+        "2015-01-27", "SP500", "remove", "COV",
+        "위 편입 행과 한 쌍이다",
+    ),
+)
+
+# 공고 표에 행이 **하나도 없는** 심볼의 제외. `EXCLUDED_CHANGES`는 공고 표의 행을 가리키고
+# 그 행이 사라지면 예외를 올리므로, 스냅샷에만 있는 심볼은 거기에 담을 수 없다.
+#
+# 행이 아니라 심볼에 걸리므로 "행이 사라졌는지" 그물이 없다. 대신 구성원 수 불변식이
+# 그대로 감시하고, 근거를 적는 규칙은 같다.
+EXCLUDED_SYMBOLS = (
+    (
+        "SP500", "HET",
+        "Harrah's Entertainment(2008-01-28 비상장 전환). 벤더 `HET` 계열이 2007-12-27에"
+        " 끝나 구간(2008-01-02~2008-08-30) 안에 바가 **하나도 없다**. 이름 검색에"
+        " 그 시절을 담은 다른 코드가 없고, 비상장 전환은 실패가 아니라 생존편향을"
+        " 만들지 않는다. 편출이 스냅샷에만 있어 `EXCLUDED_CHANGES`로는 담을 수 없다",
+    ),
 )
 
 # 표에 없는 지수 사건. **여기에 넣는 행은 공고가 아니라 우리의 해석이므로 근거를 적는다.**
@@ -549,7 +588,14 @@ def _drop_excluded(
             f"제외하려던 행이 표에 없습니다: {missing}."
             " 표가 바뀌었으면 EXCLUDED_CHANGES의 근거를 다시 확인하세요."
         )
-    return [record for record in emitted if record not in set(targets)]
+    # 심볼 단위 제외는 행이 있을 수도, 없을 수도 있다. 그것이 이 목록의 존재 이유다.
+    by_symbol = {symbol for index, symbol, _ in EXCLUDED_SYMBOLS if index == index_name}
+    dropped = set(targets)
+    return [
+        record
+        for record in emitted
+        if record not in dropped and record[3] not in by_symbol
+    ]
 
 
 def _symbol(text: str) -> str:
@@ -703,10 +749,14 @@ class WikipediaClient:
             wikitext=payload["parse"]["wikitext"],
         )
 
-    def revision_at(self, index_name: str, when: str) -> tuple[int, str] | None:
-        """그 날짜 이전의 가장 최근 판. `(revid, 판 날짜)`."""
+    def revision_at(self, title: str, when: str) -> tuple[int, str] | None:
+        """그 날짜 이전의 가장 최근 판. `(revid, 판 날짜)`.
+
+        **지수가 아니라 문서 제목을 받는다.** 한 지수의 구성원 표가 문서를 옮겨 다녀서
+        시기마다 봐야 할 제목이 다르다(`SNAPSHOT_PAGES`).
+        """
         payload = self._get({
-            "action": "query", "prop": "revisions", "titles": PAGES[index_name],
+            "action": "query", "prop": "revisions", "titles": title,
             "rvlimit": 1, "rvstart": f"{when}T00:00:00Z", "rvdir": "older",
             "rvprop": "ids|timestamp", "format": "json", "formatversion": "2",
         })
@@ -752,7 +802,7 @@ class Snapshot:
     symbols: frozenset[str]
 
 
-def constituent_symbols(wikitext: str) -> frozenset[str]:
+def constituent_symbols(wikitext: str, *, minimum: int, maximum: int) -> frozenset[str]:
     """구성원 표의 티커 집합.
 
     **행의 첫 칸만 본다.** 셀마다 줄을 바꾸는 서식에서 모든 `|` 줄을 행으로 보면 GICS
@@ -760,7 +810,9 @@ def constituent_symbols(wikitext: str) -> frozenset[str]:
     행 경계는 `|-`다.
 
     표를 id로 찾지 않는 이유는 `id="constituents"`가 2019년쯤에야 붙었기 때문이다.
-    대신 티커가 400~600개 나오는 표를 고른다.
+    대신 티커 수가 `minimum`~`maximum`인 표를 고른다. **기본값을 두지 않는다** —
+    지수마다 다른 값이고(`SNAPSHOT_TABLE_SIZE`), 넘기는 것을 잊으면 다른 지수의 창으로
+    조용히 도는 것이 이 함수에서 가장 나쁜 실패다.
     """
     best: frozenset[str] = frozenset()
     for block in re.findall(r"\{\|.*?\n\|\}", wikitext, re.S):
@@ -778,7 +830,7 @@ def constituent_symbols(wikitext: str) -> frozenset[str]:
             ticker = _snapshot_ticker(line)
             if ticker:
                 found.add(ticker)
-        if 400 <= len(found) <= 600 and len(found) > len(best):
+        if minimum <= len(found) <= maximum and len(found) > len(best):
             best = frozenset(found)
     return best
 
@@ -818,6 +870,7 @@ def _snapshot_dropped(index_name: str) -> frozenset[str]:
     심볼에 걸려야 한다.
     """
     excluded = {symbol for _, index, _, symbol, _ in EXCLUDED_CHANGES if index == index_name}
+    excluded |= {symbol for index, symbol, _ in EXCLUDED_SYMBOLS if index == index_name}
     return frozenset(excluded | {symbol for symbol, _ in SNAPSHOT_IGNORED})
 
 

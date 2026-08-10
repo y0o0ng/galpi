@@ -25,7 +25,8 @@ EODHD 약관은 해지 후 1개월 안에 가격 복사본을 지우라고 요�
 ## 실행 순서
 
     python3 selftest/real_run.py csvs       # 위키 2회. 개명은 여기서만 걸린다
-    python3 selftest/real_run.py snapshots  # 위키 과거 판에서 빠진 사건 복구
+    python3 selftest/real_run.py snapshots  # SP500 위키 과거 판에서 빠진 사건 복구
+    python3 selftest/real_run.py qqq        # NDX100은 EDGAR의 QQQ 보유종목에서
     python3 selftest/real_run.py universe   # 호출 없음
     python3 selftest/real_run.py bars       # EODHD 908회 (중단되면 다시 돌려도 된다)
     python3 selftest/real_run.py remap      # 재사용 티커의 옛 계열을 찾아 받는다
@@ -113,19 +114,18 @@ def check_dates() -> list[str]:
     return dates
 
 
-SNAPSHOT_NAME = "sp500-snapshot-changes.csv"
-
-
 def snapshot_changes_rows() -> list:
-    """스냅샷 diff가 낸 변경 사건. 없으면 빈 목록이다.
+    """스냅샷 diff가 낸 변경 사건. **지수마다 파일이 하나씩이다.**
 
     개명은 `snapshots` 단계가 diff 전에 걸어 CSV에 넣는다. `announced_changes`와 같은
     이유로 여기서 다시 걸지 않는다.
     """
-    path = UNIVERSE_DIR / SNAPSHOT_NAME
-    if not path.exists():
-        return []
-    return list(csv.DictReader(path.read_text(encoding="utf-8").splitlines()))
+    rows: list = []
+    for index in INDEX_NAMES:
+        path = UNIVERSE_DIR / snapshot_name(index)
+        if path.exists():
+            rows.extend(csv.DictReader(path.read_text(encoding="utf-8").splitlines()))
+    return rows
 
 
 def merge_changes(announced: list, snapshot_rows: list) -> tuple[list, int]:
@@ -408,6 +408,114 @@ def stage_csvs(_connection) -> int:
     return 0
 
 
+def stage_qqq(_connection) -> int:
+    """QQQ 보유종목에서 NDX100의 과거 구성원 사건을 만든다.
+
+    NDX100은 위키에 과거 구성원 표가 없어서 `snapshots`가 못 다룬다(`SNAPSHOT_PAGES`의
+    주석). 대신 나스닥100을 완전복제하는 Invesco QQQ Trust의 SEC 제출을 쓴다 — 공개·무료에
+    삭제 의무가 없고, 기준일이 감사받은 회계연도 말이라 위키의 "늦어도 이 판"보다 정확하다.
+
+    **문서를 캐시한다.** 49건에 11MB이고, 파서를 한 줄 고칠 때마다 다시 받을 이유가 없다.
+    `trading/data/`는 gitignore이므로 저장소에는 파생 사건만 들어간다.
+    """
+    import json
+
+    from backtest.edgar import EdgarClient
+    from backtest import qqq
+
+    client = EdgarClient()
+    cache_path = TRADING_ROOT / "data" / "qqq-filings.json"
+    cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    filings = qqq.parse_filings(client._get(qqq.SUBMISSIONS_URL))
+    print(f"보유 명세 제출 {len(filings)}건, 캐시 {len(cache)}건")
+    for filing in filings:
+        if filing.accession in cache:
+            continue
+        raw = client._read(filing.url)
+        cache[filing.accession] = {
+            "form": filing.form, "filed": filing.filed, "document": filing.document,
+            "body": raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw,
+        }
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(cache), encoding="utf-8")
+
+    snapshots, dropped = {}, []
+    for filing in filings:
+        item = cache.get(filing.accession)
+        if not item:
+            continue
+        try:
+            holdings = qqq.holdings_from(filing, item["body"])
+        except qqq.QqqError as error:
+            dropped.append((filing.report_date, filing.form, str(error)))
+            continue
+        # 같은 기준일에 둘이면 구조화된 NPORT를 쓴다.
+        current = snapshots.get(holdings.as_of)
+        if current is None or holdings.form == "NPORT-P":
+            snapshots[holdings.as_of] = holdings
+    print(f"쓸 수 있는 스냅샷 {len(snapshots)}개, 버린 판 {len(dropped)}개")
+    for item in dropped:
+        print(f"   버림 {item[0]} {item[1]}")
+
+    ordered = [snapshots[key] for key in sorted(snapshots)]
+    # **간격을 찍는다.** 연 1회 구간에서는 같은 해에 들어왔다 나간 종목이 안 잡힌다.
+    gaps = [
+        (later.as_of, (dt_days(later.as_of) - dt_days(earlier.as_of)))
+        for earlier, later in zip(ordered, ordered[1:])
+    ]
+    worst = sorted(gaps, key=lambda item: -item[1])[:3]
+    print(f"스냅샷 간격 최대 {worst[0][1]}일 ({worst[0][0]}), 상위 3 {worst}")
+
+    dictionary = name_dictionary()
+    names = sorted({name for item in ordered for name in item.names})
+    resolved, unresolved = qqq.resolve_names(names, dictionary)
+    print(f"이름 {len(names)}개 중 {len(resolved)}개 해석, 못 푼 것 {len(unresolved)}개")
+    for name in unresolved:
+        print(f"   미해석 {name}")
+
+    events = qqq.snapshot_changes(ordered, resolved)
+    # 가격을 구할 수 없어 뺀 심볼은 여기서도 뺀다. 제외는 소스가 아니라 심볼에 걸린다.
+    from backtest.wikipedia import EXCLUDED_CHANGES, EXCLUDED_SYMBOLS
+
+    excluded = {symbol for _, index, _, symbol, _ in EXCLUDED_CHANGES if index == "NDX100"}
+    excluded |= {symbol for index, symbol, _ in EXCLUDED_SYMBOLS if index == "NDX100"}
+    events = [item for item in events if item[3] not in excluded]
+
+    name = snapshot_name("NDX100")
+    (UNIVERSE_DIR / name).write_text(qqq.snapshot_changes_csv(events), encoding="utf-8")
+    print(f"{name}에 사건 {len(events)}건을 썼습니다. `universe`를 다시 돌리세요.")
+    return 0
+
+
+def dt_days(value: str) -> int:
+    import datetime as dt
+
+    return dt.date.fromisoformat(value).toordinal()
+
+
+def name_dictionary() -> dict[str, str]:
+    """`정규화 이름 → 티커`. 공고 표의 종목명과 벤더 목록 이름을 겹친다.
+
+    공고 표는 **그 시절 이름**을 담고 벤더 목록은 **현재 주인 이름**을 담아서, 둘을 겹쳐야
+    20년치가 덮인다. 그래도 안 풀리는 것은 `qqq.NAME_OVERRIDES`가 근거와 함께 받는다.
+    """
+    from backtest.eodhd import EodhdClient
+    from backtest import qqq
+
+    dictionary: dict[str, str] = {}
+    for index in INDEX_NAMES:
+        for row in csv.DictReader(_read_csv(f"{index.lower()}-changes.csv").splitlines()):
+            if row.get("security"):
+                dictionary.setdefault(qqq.normalize(row["security"]), row["symbol"])
+    client = EodhdClient()
+    for delisted in (False, True):
+        for listing in client.listings("US", delisted=delisted):
+            if listing.name:
+                dictionary.setdefault(qqq.normalize(listing.name), listing.symbol)
+    dictionary.update(qqq.override_dictionary())
+    return dictionary
+
+
 def stage_snapshots(_connection) -> int:
     """문서의 과거 판에서 구성원 목록을 뽑아 빠진 변경 사건을 되찾는다.
 
@@ -421,10 +529,7 @@ def stage_snapshots(_connection) -> int:
     """
     import datetime as dt
 
-    from backtest.wikipedia import (
-        Snapshot, WikipediaClient, canonical_spelling, constituent_symbols,
-        snapshot_changes, snapshot_changes_csv,
-    )
+    from backtest.wikipedia import SNAPSHOT_PAGES, WikipediaClient
 
     client = WikipediaClient()
     months, cursor = [], dt.date.fromisoformat(FLOOR_DATE).replace(day=1)
@@ -433,59 +538,87 @@ def stage_snapshots(_connection) -> int:
         months.append(cursor.isoformat())
         cursor = (cursor.replace(day=28) + dt.timedelta(days=8)).replace(day=1)
 
+    # **위키로 스냅샷을 뜰 수 있는 지수만 돈다.** NDX100은 과거 구성원 표가 아예 없어서
+    # 여기 없고, 대신 `qqq` 단계가 EDGAR에서 같은 일을 한다.
+    for index in SNAPSHOT_PAGES:
+        if snapshots_for_index(index, months, client):
+            return 1
+    print("`universe`를 다시 돌려야 반영됩니다.")
+    return 0
+
+
+# 구성원 수가 이 밖이면 파싱이 틀린 것이다. 그 스냅샷으로 만든 diff는 못 믿는다.
+# 불변식(`EXPECTED_MEMBERS`)보다 느슨하게 잡는다 — 위키 편집자의 반영 지연이 몇 종목을
+# 흔드는 것은 정상이고, 여기서 걸러야 할 것은 **표를 잘못 읽은 판**이다.
+SNAPSHOT_COUNT_BAND = {"SP500": (480, 520)}
+
+
+def snapshot_name(index_name: str) -> str:
+    return f"{index_name.lower()}-snapshot-changes.csv"
+
+
+def snapshots_for_index(index: str, months: list[str], client) -> int:
+    """한 지수의 과거 판을 모아 사건 CSV를 쓴다. 0이면 성공."""
+    import json
+
+    from backtest.wikipedia import (
+        SNAPSHOT_PAGES, SNAPSHOT_TABLE_SIZE, Snapshot, canonical_spelling,
+        constituent_symbols, snapshot_changes, snapshot_changes_csv,
+    )
+
+
     # 판 본문을 캐시한다. 판 ID가 불변이라 같은 내용이 다시 오고, 220개를 받는 데 위키
     # 429 백오프까지 겹쳐 40분이 걸린다. 캐시가 없으면 파싱을 한 줄 고칠 때마다 40분을
     # 다시 쓴다. `trading/data/`는 gitignore이므로 저장소에는 들어가지 않는다.
-    import json
-
     cache_path = TRADING_ROOT / "data" / "wiki-revisions.json"
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
-    if cache:
-        print(f"캐시된 판 {len(cache)}개를 씁니다 ({cache_path.name})")
+    minimum, maximum = SNAPSHOT_TABLE_SIZE[index]
+    print(f"[{index}] 캐시된 판 {len(cache)}개 ({cache_path.name})")
 
     snapshots, unreadable = [], []
     for when in months:
-        found = client.revision_at("SP500", when) if when not in cache else (
-            cache[when]["revid"], cache[when]["date"]
-        )
-        if not found:
-            continue
-        revid, stamp = found
         if when not in cache:
+            found = client.revision_at(SNAPSHOT_PAGES[index], when)
+            if not found:
+                continue
+            revid, stamp = found
             cache[when] = {"revid": revid, "date": stamp,
                            "wikitext": client.fetch_revision(revid)}
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             cache_path.write_text(json.dumps(cache), encoding="utf-8")
-        symbols = constituent_symbols(cache[when]["wikitext"])
+        entry = cache[when]
+        symbols = constituent_symbols(entry["wikitext"], minimum=minimum, maximum=maximum)
         if not symbols:
-            unreadable.append((when, revid))
+            unreadable.append((when, entry["revid"]))
             continue
-        snapshots.append(Snapshot("SP500", revid, stamp, symbols))
+        snapshots.append(Snapshot(index, entry["revid"], entry["date"], symbols))
         if len(snapshots) % 24 == 0:
             print(f"  {when} 까지 {len(snapshots)}개 (호출 {client.calls})", flush=True)
 
+    if not snapshots:
+        print(f"[{index}] 읽은 스냅샷이 없습니다 — 문서 제목과 표 크기 창을 확인하세요")
+        return 1
     counts = [len(item.symbols) for item in snapshots]
-    print(f"스냅샷 {len(snapshots)}개, 구성원 수 {min(counts)}~{max(counts)}")
+    print(f"[{index}] 스냅샷 {len(snapshots)}개, 구성원 수 {min(counts)}~{max(counts)}")
     if unreadable:
-        print(f"표를 못 읽은 판 {len(unreadable)}개: {unreadable[:5]}")
-    # 구성원 수가 크게 벗어나면 파싱이 틀린 것이다. 그 스냅샷으로 만든 diff는 못 믿는다.
-    odd = [item for item in snapshots if not (480 <= len(item.symbols) <= 520)]
+        print(f"[{index}] 표를 못 읽은 판 {len(unreadable)}개: {unreadable[:5]}")
+    low, high = SNAPSHOT_COUNT_BAND[index]
+    odd = [item for item in snapshots if not (low <= len(item.symbols) <= high)]
     if odd:
-        print(f"구성원 수가 480~520 밖인 스냅샷 {len(odd)}개 — 파싱을 먼저 확인하세요")
+        print(f"[{index}] 구성원 수가 {low}~{high} 밖인 스냅샷 {len(odd)}개"
+              f" — 파싱을 먼저 확인하세요")
         for item in odd[:5]:
             print(f"  {item.date} 판 {item.revid} {len(item.symbols)}개")
         return 1
 
     # 클래스주 표기의 기준은 현재 구성원 목록이다.
     spelling = canonical_spelling(
-        parse_members_csv(_read_csv("sp500-members.csv"))["SP500"]
+        parse_members_csv(_read_csv(f"{index.lower()}-members.csv"))[index]
     )
     events = snapshot_changes(snapshots, spelling)
-    (UNIVERSE_DIR / SNAPSHOT_NAME).write_text(
-        snapshot_changes_csv(events), encoding="utf-8"
-    )
-    print(f"{SNAPSHOT_NAME}에 사건 {len(events)}건을 썼습니다.")
-    print("`universe`를 다시 돌려야 반영됩니다.")
+    name = snapshot_name(index)
+    (UNIVERSE_DIR / name).write_text(snapshot_changes_csv(events), encoding="utf-8")
+    print(f"[{index}] {name}에 사건 {len(events)}건을 썼습니다.")
     return 0
 
 
@@ -751,6 +884,7 @@ def stage_status(connection) -> int:
 
 STAGES = {
     "csvs": stage_csvs,
+    "qqq": stage_qqq,
     "universe": stage_universe,
     "snapshots": stage_snapshots,
     "bars": stage_bars,
