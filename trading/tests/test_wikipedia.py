@@ -251,6 +251,8 @@ class RenameTest(unittest.TestCase):
         self.assertEqual(apply_renames("SP500", "2019-11-29", "PEAK"), "DOC")
         self.assertEqual(apply_renames("SP500", "2014-12-29", "WLP"), "ELV")
         self.assertEqual(apply_renames("SP500", "2022-06-29", "ANTM"), "ELV")
+        # ACT는 옛 Allergan Inc(AGN_OLD)가 아니라 액타비스가 개명한 AGN으로 간다.
+        self.assertEqual(apply_renames("SP500", "2013-01-30", "ACT"), "AGN")
 
     def test_a_rename_target_is_a_ticker_the_vendor_still_serves(self):
         """`RIMM`은 BBRY를 거쳐 BB가 됐다. 중간 티커가 아니라 **전 이력을 든 쪽**으로 보낸다."""

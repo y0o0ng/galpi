@@ -523,10 +523,8 @@ date,index_name,action,symbol,source,revid
 2015-07-30,SP500,add,AAP,snapshot,673815087
 2015-06-29,SP500,remove,ZMH,snapshot,669156533
 2015-06-29,SP500,remove,LO,snapshot,669156533
-2015-06-29,SP500,remove,ACT,snapshot,669156533
 2015-06-29,SP500,add,ZBH,snapshot,669156533
 2015-06-29,SP500,add,QRVO,snapshot,669156533
-2015-06-29,SP500,add,AGN,snapshot,669156533
 2015-04-29,SP500,remove,WIN,snapshot,659948745
 2015-04-29,SP500,add,O,snapshot,659948745
 2015-03-31,SP500,remove,PETM,snapshot,654387069
@@ -534,7 +532,6 @@ date,index_name,action,symbol,source,revid
 2015-03-31,SP500,remove,DNR,snapshot,654387069
 2015-03-31,SP500,remove,CFN,snapshot,654387069
 2015-03-31,SP500,remove,AVP,snapshot,654387069
-2015-03-31,SP500,remove,AGN,snapshot,654387069
 2015-03-31,SP500,add,SWKS,snapshot,654387069
 2015-03-31,SP500,add,SLG,snapshot,654387069
 2015-03-31,SP500,add,HSIC,snapshot,654387069
@@ -623,7 +620,6 @@ date,index_name,action,symbol,source,revid
 2013-02-27,SP500,add,PVH,snapshot,540829941
 2013-01-30,SP500,remove,WPI,snapshot,535613028
 2013-01-30,SP500,remove,FII,snapshot,535613028
-2013-01-30,SP500,add,ACT,snapshot,535613028
 2013-01-30,SP500,add,ABBV,snapshot,535613028
 2012-12-29,SP500,remove,TIE,snapshot,530268767
 2012-12-29,SP500,remove,RRD,snapshot,530268767
