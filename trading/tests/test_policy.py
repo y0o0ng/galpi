@@ -76,6 +76,43 @@ class ImmutabilityTest(unittest.TestCase):
             )
 
 
+class FreezeTest(unittest.TestCase):
+    """**`paper-core-v1`은 동결됐다(2026-08-11 사용자 결정).**
+
+    2026-08-10 15년 판정의 기준선이고 그 실행이 `trading/runs/`에 남아 있다. 규칙이 열둘
+    겹쳐 귀속이 안 되므로 다음 단계는 베이스라인에서 하나씩 얹는 ablation이고, 그러려면
+    **비교의 기준이 움직이면 안 된다.**
+
+    위 `SignatureTest`는 서명이 한 실행 안에서 안정적인지만 본다. 기본값을 하나 고치면
+    서명이 바뀌어도 그 테스트는 통과한다. 여기서 값을 못 박아 **기준선이 조용히 움직이는
+    것**을 막는다.
+
+    ablation은 이 정책을 고치지 말고 `parameter_variant`나 새 `PolicyVersion`으로 만든다.
+    정말 기준선을 옮겨야 하면 이 상수와 아래 근거를 함께 고치고, 옛 서명으로 낸 보고서는
+    더 이상 비교 대상이 아니라는 것을 알고 하는 것이다.
+    """
+
+    # 2026-08-10 실행 `paper-core-v1-2007-01-04-2026-08-07`의 서명.
+    # 판정 FAIL·blocker 없음, 기대값 -0.046R, 518거래.
+    FROZEN = "sha256:9e06ee99a9086073d88b20a8a47457a8c6c27942eacb6e52b582508927450208"
+
+    def test_the_baseline_policy_is_frozen(self):
+        self.assertEqual(DEFAULT_PAPER_POLICY.policy_id, "paper-core-v1")
+        self.assertEqual(DEFAULT_PAPER_POLICY.strategy_version, "core-v2.3")
+        self.assertEqual(DEFAULT_PAPER_POLICY.signature, self.FROZEN)
+
+    def test_a_variant_does_not_disturb_the_baseline(self):
+        """ablation은 사본으로 한다. 원본이 그대로여야 비교가 성립한다."""
+        variant = dataclasses.replace(
+            DEFAULT_PAPER_POLICY,
+            parameters=dataclasses.replace(
+                DEFAULT_PAPER_POLICY.parameters, atr_window=12
+            ),
+        )
+        self.assertNotEqual(variant.signature, self.FROZEN)
+        self.assertEqual(DEFAULT_PAPER_POLICY.signature, self.FROZEN)
+
+
 class SignatureTest(unittest.TestCase):
     def test_signature_is_stable_and_covers_the_numbers(self):
         first = DEFAULT_PAPER_POLICY.signature
