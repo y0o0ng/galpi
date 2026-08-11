@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 TRADING_ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +72,8 @@ from backtest.wikipedia import identity_changes_for  # noqa: E402
 SOURCE_VERSION = "eodhd-15y-2026-08"
 INDEX_NAMES = ("SP500", "NDX100")
 UNIVERSE_DIR = TRADING_ROOT / "universe"
+# 실행 보고서. **커밋한다** — 판정의 감사 기록이고 삭제 의무 대상이 아니다.
+RUNS_DIR = TRADING_ROOT / "runs"
 
 # 변경 이력이 시작되는 날. 그 이전의 구성원 여부는 알 수 없다.
 FLOOR_DATE = "2008-01-02"
@@ -885,11 +888,12 @@ def stage_run(connection) -> int:
     from dataclasses import asdict
 
     from backtest.loop import BacktestConfig, run_backtest, save_run
+    from backtest.report import judgment_json, judgment_markdown, judgment_payload
     from backtest.metrics import compute_metrics
     from backtest.policy import DEFAULT_PAPER_POLICY
     from backtest.validation import (
         evaluate_gate, neighbourhood_report, parameter_variant, plan_walk_forward,
-        run_walk_forward, stress_config,
+        record_holdout_run, run_walk_forward, stress_config,
     )
 
     policy = DEFAULT_PAPER_POLICY
@@ -917,8 +921,10 @@ def stage_run(connection) -> int:
     print(f"구간 {config.start} ~ {config.end} ({len(all_sessions) - warmup}세션)")
     print(f"정책 {config.policy.policy_id}")
 
+    # 같은 설정을 다시 돌리면 같은 이름으로 덮어쓴다. 탐색 실행이 파일로 쌓이지 않는다.
+    run_id = f"{config.policy.policy_id}-{config.start}-{config.end}"
     result = run_backtest(connection, config)
-    save_run(connection, result, f"real-{config.start}", survivorship_biased=False)
+    save_run(connection, result, run_id, survivorship_biased=False)
     print(f"\n거래 {len(result.trades)}건, 체결 {len(result.fills)}건")
     _print_counter("건너뛴 이유", result.skip_counts)
     _print_counter("체결 방식", result.fill_counts)
@@ -950,6 +956,20 @@ def stage_run(connection) -> int:
     for fold, fold_metrics in walk.fold_metrics:
         print(f"    {fold.start}~{fold.end}  거래 {fold_metrics.trade_count:>4}"
               f"  기대값 {fold_metrics.expectancy_r}")
+
+    # **홀드아웃을 본 사실을 남긴다.** 이걸 안 부르면 `holdout_run_count`가 계속 None이라
+    # `HOLDOUT_REUSED`가 영영 안 걸린다. `run_id`에 정책 서명을 넣어 같은 정책 재실행은
+    # 같은 행을 덮어쓰게 한다 — 소모하는 것은 다시 출력하는 것이 아니라 다른 규칙으로
+    # 다시 보는 것이다.
+    holdout = next((item for item in walk.fold_metrics if item[0].is_holdout), None)
+    if holdout is not None:
+        seen = record_holdout_run(
+            connection, f"holdout-{policy.signature}", holdout[0], policy,
+            SOURCE_VERSION, holdout[1],
+        )
+        walk = replace(walk, holdout_run_count=seen)
+        print(f"  홀드아웃 {holdout[0].start}~{holdout[0].end} 관측 {seen}회"
+              f" (기대값 {holdout[1].expectancy_r})")
 
     print("\n비용 스트레스")
     stressed = compute_metrics(run_backtest(connection, stress_config(result, 2.0)))
@@ -989,6 +1009,17 @@ def stage_run(connection) -> int:
     print(f"blocker: {', '.join(report.blockers) or '없음'}")
     for row in report.rows:
         print(f"  {row.name:<26} {row.value} → {row.verdict}")
+
+    # **DB만으로는 판정이 남지 않는다.** `backtest_runs`는 설정과 카운트만 담고,
+    # `trading/data/`는 gitignore라 DB를 지우면 결론이 사라진다. 가격이 아니라 파생
+    # 지표라 삭제 의무 대상도 아니므로 저장소에 남긴다.
+    kept = dict(walk_forward=walk, stressed=stressed, neighbourhood=neighbourhood)
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    markdown = judgment_markdown(result, metrics, report, run_id=run_id, **kept)
+    (RUNS_DIR / f"{run_id}.md").write_text(markdown, encoding="utf-8")
+    payload = judgment_payload(result, metrics, report, **kept)
+    (RUNS_DIR / f"{run_id}.json").write_text(judgment_json(payload), encoding="utf-8")
+    print(f"\n보고서: {RUNS_DIR.name}/{run_id}.md · {run_id}.json")
     return 0
 
 
