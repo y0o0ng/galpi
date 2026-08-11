@@ -81,6 +81,102 @@ test('paper candidates include only unique active paper notes and are capped at 
   assert.deepEqual(candidates.map(item => item.paperId), ['one', 'two', 'three']);
 });
 
+test('paper candidates order S2, verified alternate, then arXiv PDF sources', () => {
+  const note = paperNote('sources');
+  note.metadata.alternate_pdf_url = 'https://alternate.example/sources.pdf';
+  note.metadata.arxiv_id = '2401.01234';
+
+  const [candidate] = collectPaperCandidates([note]);
+
+  assert.deepEqual(candidate.sourceUrls, [
+    'https://papers.example/sources.pdf',
+    'https://alternate.example/sources.pdf',
+    'https://arxiv.org/pdf/2401.01234',
+  ]);
+});
+
+test('full-text indexing falls back from an S2 DNS failure to the verified alternate URL', async () => {
+  const note = paperNote('fallback');
+  note.metadata.alternate_pdf_url = 'https://alternate.example/fallback.pdf';
+  note.metadata.arxiv_id = '2401.01234';
+  const attempts = [];
+  let indexedSourceUrl = null;
+  const tools = createPaperFullTextTools({
+    fullTextService: {
+      getDocument: () => null,
+      indexPaper: async input => {
+        indexedSourceUrl = input.sourceUrl;
+        return {
+          paperId: input.paperId,
+          status: 'ready',
+          parserVersion: PAPER_PARSER_VERSION,
+          chunkCount: 1,
+          embeddingCount: 1,
+          indexedNow: true,
+        };
+      },
+      searchPaper: () => [{
+        chunkId: 'fallback-chunk',
+        section: 'Methods',
+        pageStart: 1,
+        pageEnd: 1,
+        text: 'fallback evidence',
+      }],
+      readPaper: () => [],
+      getPaperChunks: () => [],
+    },
+    downloadPdf: async sourceUrl => {
+      attempts.push(sourceUrl);
+      if (attempts.length === 1) {
+        throw Object.assign(new Error('DNS failed'), { code: 'pdf_dns_failed' });
+      }
+      return { sourceUrl, pdf: Buffer.from('%PDF-1.7 mock') };
+    },
+  });
+
+  const result = await tools.createSession({ notes: [note] }).execute('paper_fulltext_search', {
+    paperId: 'fallback',
+    query: 'method details',
+    mode: 'focused',
+  });
+
+  assert.equal(result.payload.success, true);
+  assert.deepEqual(attempts, [
+    'https://papers.example/fallback.pdf',
+    'https://alternate.example/fallback.pdf',
+  ]);
+  assert.equal(indexedSourceUrl, 'https://alternate.example/fallback.pdf');
+});
+
+test('full-text source fallback does not bypass a private-host rejection', async () => {
+  const note = paperNote('blocked');
+  note.metadata.alternate_pdf_url = 'https://alternate.example/blocked.pdf';
+  const attempts = [];
+  const tools = createPaperFullTextTools({
+    fullTextService: {
+      getDocument: () => null,
+      indexPaper: async () => assert.fail('private-host failures must not reach indexing'),
+      searchPaper: () => [],
+      readPaper: () => [],
+      getPaperChunks: () => [],
+    },
+    downloadPdf: async sourceUrl => {
+      attempts.push(sourceUrl);
+      throw Object.assign(new Error('private host'), { code: 'private_pdf_host' });
+    },
+  });
+
+  const result = await tools.createSession({ notes: [note] }).execute('paper_fulltext_search', {
+    paperId: 'blocked',
+    query: 'method details',
+    mode: 'focused',
+  });
+
+  assert.equal(result.payload.success, false);
+  assert.equal(result.payload.code, 'private_pdf_host');
+  assert.deepEqual(attempts, ['https://papers.example/blocked.pdf']);
+});
+
 test('tool session enforces search-then-read order and hard character budgets', async () => {
   const { tools, searchModes } = createFixture();
   const session = tools.createSession({ notes: [paperNote()], queryEmbedding: [1, 0] });

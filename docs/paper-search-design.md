@@ -320,7 +320,7 @@ paper_fulltext_read({
 
 저장 시 모든 PDF를 처리하지 않는다. 전문 도구의 첫 호출 때만 `ensurePaperIndex()`를 실행한다.
 
-1. paper 노트의 `open_access_pdf_url`, 없으면 검증된 `arxiv_id`에서 공개 PDF URL 결정
+1. paper 노트의 후보를 `open_access_pdf_url`(S2 기본) → `alternate_pdf_url`(사용자가 확인한 대체) → 검증된 `arxiv_id` 순서로 결정하고 중복 URL 제거
 2. HTTP(S), 공개 호스트, PDF Content-Type, 리다이렉트, 최대 20MB, 최대 100페이지, timeout 검증
 3. 임시 파일에 내려받고 SHA-256 계산
 4. 텍스트·페이지·제목 구조 추출
@@ -405,9 +405,12 @@ Phase B 구현은 `paper_documents`에 source SHA/path, parser version, 상태, 
 
 **Phase C Pi 배포·스모크 인수 (`6bd1f57`, 2026-07-15):** `lib/paper-fulltext-download.js`가 URL·DNS·모든 redirect를 검사하고 검증된 DNS 주소를 실제 HTTP(S) 연결에 고정한다. `lib/paper-fulltext-tools.js`는 현재 요청에서 회수된 활성 paper 노트 최대 3편만 후보로 만들고, search 응답에 실제 포함된 chunkId만 두 번째 read에 허용한다. 단일 Claude와 의회 첫 Claude가 같은 2라운드 도구 실행기를 사용하며, 의회 GPT 비평·심층 수정에는 브라우저가 원문을 재전송하지 않고 paperId/chunkId 참조를 서버가 DB에서 재검증해 같은 evidence를 공유한다. Pi 전체 `node:test` 47개를 통과했다. 실제 Claude에서 초록 질문은 도구 0회·0자, 전문 질문은 search 1회·4,999자로 데이터셋·평가 지표·비교 기준을 §5.1/§5.2·PDF p.10 근거와 함께 반환했다. 인덱스는 38페이지·104,235자·97청크·97임베딩, `ready`다.
 
+**죽은 S2 원문 경로 fallback Pi 인수(2026-08-11):** S2가 준 `www.business.unr.edu` PDF가 Pi에서 `pdf_dns_failed`/`ENOTFOUND`였고 같은 논문의 사용자가 확인한 University of Houston 경로는 기존 안전 다운로더를 통과했다. 원래 S2 주소를 보존한 채 paper 노트의 `alternate_pdf_url`을 두 번째 후보로 추가하고, DNS·timeout·일반 연결·HTTP 실패에서만 `S2 → 대체 → arXiv` 순으로 다음 후보를 시도한다. URL/SSRF·PDF 형식·크기·파싱 실패의 fail-close는 유지한다. 브라우저 외부 링크는 첫 URL의 실패를 감지할 수 없으므로 저장 논문 상세의 `원문 PDF`는 대체 URL이 있으면 그것을 우선 연다. 로컬 전체 548/548, Pi 집중 13/13을 통과했고 실제 운영 색인은 S2 `ENOTFOUND` 뒤 대체 경로에서 28페이지·77,794자·70청크·70임베딩 `ready`가 됐다. 같은 운영 검색에서 전문 청크 4개를 반환했고 성공한 대체 URL은 `paper_documents.source_url`에 남았다.
+
 ### 11.9 실패·보안 경계
 
 - 공개 PDF가 없음: 초록 기반으로만 답하고 `전문 미확보` 안내
+- S2 기본 URL의 DNS·timeout·일반 연결·HTTP 실패는 다음 대체 URL로 넘어간다. URL/SSRF·PDF 형식·크기 오류와 다운로드 뒤 파싱 실패는 fallback으로 우회하지 않는다.
 - 다운로드/파싱 실패: paper 노트는 정상 유지하고 색인 상태와 오류만 기록한다. 다음 전문 요청에서 재시도하며, 반복 실패 cooldown/backoff는 Pi 운영 로그에서 필요성이 확인될 때 추가한다.
 - 텍스트가 거의 없음: `needs_ocr`; 자동 OCR·전체 Claude 전송으로 몰래 우회하지 않음
 - SSRF 방어: DNS 해석과 모든 redirect 단계에서 loopback·사설·link-local 주소 차단

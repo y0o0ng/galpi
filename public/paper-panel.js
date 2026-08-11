@@ -30,7 +30,11 @@
   }
 
   function paperFullTextUrl(paper) {
-    return normalizeExternalUrl(paper?.openAccessPdfUrl) || arxivPdfUrl(paper?.arxivId);
+    const alternateUrl = normalizeExternalUrl(paper?.alternatePdfUrl)
+      || normalizeExternalUrl(paper?.alternate_pdf_url);
+    const openAccessUrl = normalizeExternalUrl(paper?.openAccessPdfUrl)
+      || normalizeExternalUrl(paper?.open_access_pdf_url);
+    return alternateUrl || openAccessUrl || arxivPdfUrl(paper?.arxivId) || arxivPdfUrl(paper?.arxiv_id);
   }
 
   function makeExternalLink(url, label) {
@@ -247,7 +251,7 @@
       content.appendChild(makeSectionHead('논문', null, loadSavedPapers));
 
       const metadata = data.note.metadata || {};
-      const fullTextUrl = normalizeExternalUrl(metadata.open_access_pdf_url) || arxivPdfUrl(metadata.arxiv_id);
+      const fullTextUrl = paperFullTextUrl(metadata);
       const sourceUrl = normalizeExternalUrl(metadata.url);
       const actions = makePaperActions(fullTextUrl, sourceUrl);
       actions.prepend(state.contextNotes.makeToggle({
