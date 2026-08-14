@@ -30,7 +30,7 @@ from backtest.data import (  # noqa: E402
     register_source,
 )
 from backtest.loop import BacktestConfig, run_backtest, save_run  # noqa: E402
-from backtest.policy import DEFAULT_PAPER_POLICY  # noqa: E402
+from core.core1 import PAPER_CORE_V1  # noqa: E402
 from backtest.policy import DEFAULT_PARAMETERS  # noqa: E402
 
 MAX_HOLD_SESSIONS = DEFAULT_PARAMETERS.max_hold_sessions
@@ -110,6 +110,22 @@ def config(dates: list[str], **changes) -> BacktestConfig:
     return replace(base, **changes) if changes else base
 
 
+class ModeValidationTest(unittest.TestCase):
+    """모르는 모드는 기동에서 거부한다.
+
+    오타가 조용히 `CORE`로 읽히면 어떤 규칙으로 낸 결과인지 알 수 없게 되고, 보고서의
+    provenance는 설정값을 그대로 찍으므로 거짓 기록이 남는다.
+    """
+
+    def test_an_unknown_entry_mode_is_refused(self):
+        with self.assertRaises(ValueError):
+            BacktestConfig(source_version="v", start="a", end="b", entry_mode="RS")
+
+    def test_an_unknown_exit_mode_is_refused(self):
+        with self.assertRaises(ValueError):
+            BacktestConfig(source_version="v", start="a", end="b", exit_mode="FIXED")
+
+
 class RunTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -139,13 +155,13 @@ class RunTest(unittest.TestCase):
         self.assertLessEqual(max(by_date.values()), 2, msg=str(by_date))
 
     def test_never_more_than_five_positions(self):
-        limit = DEFAULT_PAPER_POLICY.limits.max_positions
+        limit = PAPER_CORE_V1.limits.max_positions
         self.assertLessEqual(
             max(point.open_positions for point in self.result.equity_curve), limit
         )
 
     def test_exposure_stays_inside_the_profile_cap(self):
-        cap = DEFAULT_PAPER_POLICY.profile.max_exposure
+        cap = PAPER_CORE_V1.profile.max_exposure
         for point in self.result.equity_curve:
             self.assertLessEqual(point.exposure / point.equity, cap + 1e-9)
 
@@ -251,6 +267,112 @@ class ExitPathTest(unittest.TestCase):
         self.assertIn("REGIME_RED", result.skip_counts)
 
 
+class MarketLabelTest(unittest.TestCase):
+    """시장 라벨은 게이팅과 무관하게 항상 남는다.
+
+    어떤 시장에서 벌었는지는 실행이 끝난 뒤에 묻게 되는데, 그때 라벨이 없으면 자산
+    곡선만으로는 다시 만들 수 없다. CORE 모드에서도 기록되어야 기준선을 시장 상태별로
+    접을 수 있다.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.connection, cls.dates = build()
+        cls.result = run_backtest(cls.connection, config(cls.dates))
+
+    def test_a_core_run_still_records_the_market_label(self):
+        self.assertEqual(self.result.config.regime_mode, "CORE")
+        labels = {point.market_regime for point in self.result.equity_curve}
+        self.assertTrue(labels)
+        self.assertNotIn("UNKNOWN", labels)
+        for label in labels:
+            trend, _, volatility = label.partition("/")
+            self.assertIn(trend, ("BULL", "CORRECTION", "RECOVERY", "BEAR"))
+            self.assertIn(volatility, ("LOW_VOL", "HIGH_VOL"))
+
+    def test_the_gating_state_is_kept_separately(self):
+        """두 열이 서로 다른 것을 가리킨다. 하나로 합치면 둘 중 하나를 잃는다."""
+        states = {point.regime for point in self.result.equity_curve}
+        self.assertTrue(states <= {"GREEN", "YELLOW", "RED", "UNKNOWN"}, msg=str(states))
+
+    def test_the_label_survives_into_the_database(self):
+        save_run(self.connection, self.result, "run-label", survivorship_biased=True)
+        rows = self.connection.execute(
+            "SELECT market_regime FROM backtest_equity WHERE run_id = 'run-label'"
+        ).fetchall()
+        self.assertEqual(len(rows), len(self.result.equity_curve))
+        self.assertTrue(all(row["market_regime"] for row in rows))
+
+
+class DelistingTest(unittest.TestCase):
+    """거래를 멈춘 종목은 **재개를 기다리지 않고** 그 자리에서 끝난다.
+
+    기다리면 두 가지가 망가진다. 슬롯이 영구 점유되어 신규 진입이 막히고(2026-08-14
+    실측: 13.6년 정지), 몇 년 뒤 같은 티커를 물려받은 **다른 회사 주가로 청산**된다.
+    """
+
+    def run_with(self, status: str, scenario: str = "LAST_CLOSE"):
+        connection, dates = build()
+        stop_date = dates[WARMUP + 10]
+        connection.execute(
+            "INSERT INTO delistings"
+            " (symbol, source_version, last_trade_date, status, evidence)"
+            " VALUES (?, ?, ?, ?, '테스트')",
+            ("TRENDA", VERSION, stop_date, status),
+        )
+        connection.commit()
+        result = run_backtest(
+            connection, config(dates, unresolved_exit_price=scenario)
+        )
+        return result, stop_date
+
+    def test_a_delisted_position_exits_at_the_last_traded_price(self):
+        result, stop_date = self.run_with("DELISTED")
+        closed = [t for t in result.trades if t.exit_reason == "DELISTED_EXIT"]
+        self.assertTrue(closed, msg=str(result.exit_counts))
+        for trade in closed:
+            self.assertEqual(trade.symbol, "TRENDA")
+            self.assertEqual(trade.exit_date, stop_date)
+            self.assertGreater(trade.exit_price, 0.0)
+        # 그 뒤로 같은 종목을 다시 들고 있지 않다.
+        self.assertNotIn("TRENDA", {p.symbol for p in result.open_positions})
+
+    def test_an_unresolved_position_follows_the_scenario(self):
+        """경계조건이 결과를 얼마나 흔드는지 재려면 두 끝이 실제로 달라야 한다."""
+        last_close, _ = self.run_with("UNRESOLVED", "LAST_CLOSE")
+        zero, _ = self.run_with("UNRESOLVED", "ZERO")
+        for result in (last_close, zero):
+            self.assertTrue(
+                [t for t in result.trades if t.exit_reason == "UNRESOLVED_EXIT"]
+            )
+        recovered = sum(
+            t.pnl for t in last_close.trades if t.exit_reason == "UNRESOLVED_EXIT"
+        )
+        wiped = sum(t.pnl for t in zero.trades if t.exit_reason == "UNRESOLVED_EXIT")
+        self.assertGreater(recovered, wiped)
+        self.assertLess(zero.final_equity, last_close.final_equity)
+
+    def test_the_cash_identity_survives_a_terminal_exit(self):
+        """바 없이 만든 체결도 현금 항등식을 지켜야 한다. 아니면 지표 전체를 못 믿는다."""
+        for status in ("DELISTED", "UNRESOLVED"):
+            with self.subTest(status=status):
+                result, _ = self.run_with(status)
+                last = result.equity_curve[-1]
+                self.assertAlmostEqual(
+                    last.cash,
+                    CAPITAL + sum(fill.cash_delta for fill in result.fills),
+                    places=6,
+                )
+
+    def test_a_zero_exit_charges_no_fees(self):
+        result, _ = self.run_with("UNRESOLVED", "ZERO")
+        wiped = [f for f in result.fills if f.reason == "UNRESOLVED_EXIT"]
+        self.assertTrue(wiped)
+        for fill in wiped:
+            self.assertEqual(fill.fill_price, 0.0)
+            self.assertEqual(fill.fees, 0.0)
+
+
 class PersistenceTest(unittest.TestCase):
     def test_saved_run_keeps_the_conditions(self):
         connection, dates = build()
@@ -261,7 +383,7 @@ class PersistenceTest(unittest.TestCase):
         self.assertEqual(row["run_id"], "run-1")
         self.assertEqual(row["survivorship_biased"], 1)
         self.assertEqual(row["require_earnings_calendar"], 0)
-        self.assertEqual(row["policy_signature"], DEFAULT_PAPER_POLICY.signature)
+        self.assertEqual(row["policy_signature"], PAPER_CORE_V1.signature)
         self.assertAlmostEqual(row["final_equity"], result.final_equity)
         self.assertIn("SMA_NOT_ALIGNED", row["skip_counts"])
 

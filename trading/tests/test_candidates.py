@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import synthetic  # noqa: E402
 from backtest import store  # noqa: E402
 from backtest.candidates import (  # noqa: E402
+    RS_ONLY_ENTRY,
     next_weekday,
     rank_candidates,
     save_signals,
@@ -321,6 +322,56 @@ class EarningsGateTest(unittest.TestCase):
         self.assertEqual(weekdays_between(date(2026, 8, 10), date(2026, 8, 10)), 0)
         # 주말은 세지 않는다.
         self.assertEqual(weekdays_between(date(2026, 8, 7), date(2026, 8, 11)), 2)
+
+
+class RsOnlyEntryTest(unittest.TestCase):
+    """`RS_ONLY`는 7.4 게이트를 끄고 7.2 유니버스는 남긴다.
+
+    Jegadeesh–Titman식 실험에서 "승자를 산다"를 문자 그대로 두는 연구 모드다. 무엇이
+    남고 무엇이 빠지는지가 이 실험의 전제이므로 값으로 고정한다.
+    """
+
+    def setUp(self):
+        self.fixture = build(full_universe())
+        self.ranking = self.fixture.ranking(entry_mode=RS_ONLY_ENTRY)
+
+    def test_the_gate_reasons_disappear(self):
+        counts = self.ranking.skip_counts()
+        self.assertNotIn("SMA_NOT_ALIGNED", counts)
+        self.assertNotIn("NO_BREAKOUT", counts)
+
+    def test_the_universe_filter_still_runs(self):
+        """가격·유동성은 진입 조건이 아니라 무엇을 거래 대상으로 보느냐의 정의다."""
+        skips = {skip.symbol: skip.reason for skip in self.ranking.skipped}
+        self.assertEqual(skips["CHEAP"], "PRICE_BELOW_MIN")
+        self.assertEqual(skips["THIN"], "LIQUIDITY_BELOW_MIN")
+
+    def test_everything_eligible_is_ranked(self):
+        """게이트가 없으니 모집단은 전부 후보 아니면 `BELOW_TOP_N`이다."""
+        counts = self.ranking.skip_counts()
+        self.assertEqual(
+            counts["BELOW_TOP_N"], self.ranking.score_population - MAX_CANDIDATES
+        )
+
+    def test_imminent_earnings_no_longer_block_entry(self):
+        fixture, top = EarningsGateTest().make(4)
+        blocked = fixture.ranking(require_earnings_calendar=True)
+        self.assertEqual(blocked.candidates, ())
+        allowed = fixture.ranking(
+            require_earnings_calendar=True, entry_mode=RS_ONLY_ENTRY
+        )
+        self.assertEqual(allowed.candidates[0].symbol, top)
+
+    def test_the_candidate_does_not_claim_a_gate_it_never_passed(self):
+        """`signals`에 거짓 근거가 남으면 나중에 게이트가 켜져 있었다고 읽는다."""
+        reasons = self.ranking.candidates[0].reasons
+        self.assertIn(f"RS_ONLY_TOP_{MAX_CANDIDATES}", reasons)
+        self.assertNotIn("SMA_ALIGNED", reasons)
+        self.assertIn("REGIME_GREEN", reasons)
+
+    def test_an_unknown_mode_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.fixture.ranking(entry_mode="RS")
 
 
 class SignalPersistenceTest(unittest.TestCase):

@@ -52,7 +52,7 @@ from backtest.eodhd import load_prices, missing_universe_symbols  # noqa: E402
 from backtest.loop import BacktestConfig, run_backtest, save_run  # noqa: E402
 from backtest.membership import load_universe, reconstruct  # noqa: E402
 from backtest.metrics import compute_metrics  # noqa: E402
-from backtest.policy import DEFAULT_PAPER_POLICY  # noqa: E402
+from core.core1 import PAPER_CORE_V1  # noqa: E402
 from backtest.validation import (  # noqa: E402
     evaluate_gate,
     neighbourhood_report,
@@ -107,12 +107,12 @@ NEIGHBOURHOODS = {
 
 def smoke_policy():
     """축소 파라미터를 단 정책. 정책 id에 무엇을 낮췄는지 남긴다."""
-    parameters = replace(DEFAULT_PAPER_POLICY.parameters, **REDUCED_PARAMETERS)
+    parameters = replace(PAPER_CORE_V1.parameters, **REDUCED_PARAMETERS)
     suffix = ",".join(f"{key}={value}" for key, value in sorted(REDUCED_PARAMETERS.items()))
     return replace(
-        DEFAULT_PAPER_POLICY,
+        PAPER_CORE_V1,
         parameters=parameters,
-        policy_id=f"{DEFAULT_PAPER_POLICY.policy_id}[{suffix}]",
+        policy_id=f"{PAPER_CORE_V1.policy_id}[{suffix}]",
         note="무료 1년 데이터 스모크 실행. 창 길이만 줄였고 한도는 그대로다",
     )
 

@@ -24,7 +24,7 @@ from backtest.data import (  # noqa: E402
     load_securities_csv,
     register_source,
 )
-from backtest.policy import DEFAULT_PAPER_POLICY  # noqa: E402
+from core.core1 import PAPER_CORE_V1  # noqa: E402
 from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
 from backtest.risk import account_gate, correlated_peers, evaluate_candidate  # noqa: E402
 from backtest.sizing import OpenPosition  # noqa: E402
@@ -32,7 +32,7 @@ from test_sizing import account, make_candidate, make_regime  # noqa: E402
 
 VERSION = "v1"
 DAYS = 80
-LIMITS = DEFAULT_PAPER_POLICY.limits
+LIMITS = PAPER_CORE_V1.limits
 EQUITY = 100_000.0
 
 # 하루씩 번갈아 오르내리는 경로. BBB는 AAA와 같은 방향, CCC는 정확히 반대다.

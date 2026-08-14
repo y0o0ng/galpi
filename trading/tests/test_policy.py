@@ -20,7 +20,6 @@ sys.path.insert(0, str(TRADING_ROOT))
 from backtest import store  # noqa: E402
 from backtest.features import STRATEGY_VERSION  # noqa: E402
 from backtest.policy import (  # noqa: E402
-    DEFAULT_PAPER_POLICY,
     PAPER_VALIDATION,
     HardLimits,
     PolicyError,
@@ -30,6 +29,7 @@ from backtest.policy import (  # noqa: E402
     activate_policy,
     load_active_policy,
 )
+from core.core1 import PAPER_CORE_V1  # noqa: E402
 
 
 class LimitValuesTest(unittest.TestCase):
@@ -62,9 +62,9 @@ class LimitValuesTest(unittest.TestCase):
 class ImmutabilityTest(unittest.TestCase):
     def test_limits_cannot_be_raised_at_runtime(self):
         for target, field, value in (
-            (DEFAULT_PAPER_POLICY.limits, "max_position_weight", 0.99),
-            (DEFAULT_PAPER_POLICY.profile, "risk_per_trade", 0.05),
-            (DEFAULT_PAPER_POLICY, "policy_id", "sneaky"),
+            (PAPER_CORE_V1.limits, "max_position_weight", 0.99),
+            (PAPER_CORE_V1.profile, "risk_per_trade", 0.05),
+            (PAPER_CORE_V1, "policy_id", "sneaky"),
         ):
             with self.assertRaises(dataclasses.FrozenInstanceError):
                 setattr(target, field, value)
@@ -97,45 +97,45 @@ class FreezeTest(unittest.TestCase):
     FROZEN = "sha256:9e06ee99a9086073d88b20a8a47457a8c6c27942eacb6e52b582508927450208"
 
     def test_the_baseline_policy_is_frozen(self):
-        self.assertEqual(DEFAULT_PAPER_POLICY.policy_id, "paper-core-v1")
-        self.assertEqual(DEFAULT_PAPER_POLICY.strategy_version, "core-v2.3")
-        self.assertEqual(DEFAULT_PAPER_POLICY.signature, self.FROZEN)
+        self.assertEqual(PAPER_CORE_V1.policy_id, "paper-core-v1")
+        self.assertEqual(PAPER_CORE_V1.strategy_version, "core-v2.3")
+        self.assertEqual(PAPER_CORE_V1.signature, self.FROZEN)
 
     def test_a_variant_does_not_disturb_the_baseline(self):
         """ablation은 사본으로 한다. 원본이 그대로여야 비교가 성립한다."""
         variant = dataclasses.replace(
-            DEFAULT_PAPER_POLICY,
+            PAPER_CORE_V1,
             parameters=dataclasses.replace(
-                DEFAULT_PAPER_POLICY.parameters, atr_window=12
+                PAPER_CORE_V1.parameters, atr_window=12
             ),
         )
         self.assertNotEqual(variant.signature, self.FROZEN)
-        self.assertEqual(DEFAULT_PAPER_POLICY.signature, self.FROZEN)
+        self.assertEqual(PAPER_CORE_V1.signature, self.FROZEN)
 
 
 class SignatureTest(unittest.TestCase):
     def test_signature_is_stable_and_covers_the_numbers(self):
-        first = DEFAULT_PAPER_POLICY.signature
-        again = dataclasses.replace(DEFAULT_PAPER_POLICY).signature
+        first = PAPER_CORE_V1.signature
+        again = dataclasses.replace(PAPER_CORE_V1).signature
         self.assertEqual(first, again)
         self.assertTrue(first.startswith("sha256:"))
 
         # 주석만 바뀌면 같은 정책이다.
-        renoted = dataclasses.replace(DEFAULT_PAPER_POLICY, note="다른 메모")
+        renoted = dataclasses.replace(PAPER_CORE_V1, note="다른 메모")
         self.assertEqual(renoted.signature, first)
 
         # 한도가 바뀌면 다른 정책이다.
         loosened = dataclasses.replace(
-            DEFAULT_PAPER_POLICY, limits=HardLimits(max_position_weight=0.20)
+            PAPER_CORE_V1, limits=HardLimits(max_position_weight=0.20)
         )
         self.assertNotEqual(loosened.signature, first)
 
         # 승인자가 바뀌면 다른 정책이다.
-        reapproved = dataclasses.replace(DEFAULT_PAPER_POLICY, approved_by="someone")
+        reapproved = dataclasses.replace(PAPER_CORE_V1, approved_by="someone")
         self.assertNotEqual(reapproved.signature, first)
 
     def test_canonical_text_is_sorted_json(self):
-        payload = json.loads(DEFAULT_PAPER_POLICY.canonical_text)
+        payload = json.loads(PAPER_CORE_V1.canonical_text)
         self.assertEqual(payload["broker_mode"], "PAPER")
         self.assertEqual(payload["strategy_version"], STRATEGY_VERSION)
         self.assertEqual(payload["profile"]["name"], "PAPER_VALIDATION")
@@ -147,10 +147,10 @@ class PersistenceTest(unittest.TestCase):
         self.connection = store.connect_memory()
 
     def test_activate_then_load_round_trip(self):
-        activate_policy(self.connection, DEFAULT_PAPER_POLICY)
+        activate_policy(self.connection, PAPER_CORE_V1)
         loaded = load_active_policy(self.connection)
-        self.assertEqual(loaded, DEFAULT_PAPER_POLICY)
-        self.assertEqual(loaded.signature, DEFAULT_PAPER_POLICY.signature)
+        self.assertEqual(loaded, PAPER_CORE_V1)
+        self.assertEqual(loaded.signature, PAPER_CORE_V1.signature)
 
     def test_missing_policy_is_an_error_not_a_default(self):
         with self.assertRaises(PolicyError):
@@ -158,7 +158,7 @@ class PersistenceTest(unittest.TestCase):
 
     def test_tampered_limits_refuse_to_load(self):
         """DB에서 한도를 올려도 서명이 맞지 않아 기동하지 않는다."""
-        activate_policy(self.connection, DEFAULT_PAPER_POLICY)
+        activate_policy(self.connection, PAPER_CORE_V1)
         raised = dataclasses.asdict(HardLimits(max_total_planned_risk=0.50))
         with self.connection:
             self.connection.execute(
@@ -170,7 +170,7 @@ class PersistenceTest(unittest.TestCase):
         self.assertIn("서명", str(caught.exception))
 
     def test_activating_a_new_policy_retires_the_old_one(self):
-        activate_policy(self.connection, DEFAULT_PAPER_POLICY)
+        activate_policy(self.connection, PAPER_CORE_V1)
         tighter = PolicyVersion(
             policy_id="paper-core-v2",
             profile=PAPER_VALIDATION,
@@ -187,7 +187,7 @@ class PersistenceTest(unittest.TestCase):
         )
 
     def test_two_active_policies_cannot_coexist(self):
-        activate_policy(self.connection, DEFAULT_PAPER_POLICY)
+        activate_policy(self.connection, PAPER_CORE_V1)
         with self.assertRaises(sqlite3.IntegrityError):
             self.connection.execute(
                 "INSERT INTO policy_versions (policy_id, broker_mode, strategy_version,"

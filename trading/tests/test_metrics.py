@@ -42,6 +42,7 @@ def curve(equities: list[float], drawdowns: list[float] | None = None) -> tuple:
                 exposure=0.0,
                 drawdown=drawdown,
                 regime="GREEN",
+                market_regime="BULL/LOW_VOL",
                 open_positions=0,
             )
         )

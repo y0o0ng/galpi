@@ -19,7 +19,8 @@ import math
 from dataclasses import dataclass
 
 from .candidates import Candidate, Skip
-from .policy import DEFAULT_PAPER_POLICY, PolicyVersion, StrategyParameters
+from .policy import PolicyVersion, StrategyParameters
+from core.core1 import PAPER_CORE_V1
 from .regime import Regime
 
 # 수량 계산의 나눗셈에서 생기는 1e-16 수준의 오차로 한 주가 깎이는 것을 막는다.
@@ -174,7 +175,7 @@ def size_candidate(
     account: AccountState,
     regime: Regime,
     *,
-    policy: PolicyVersion = DEFAULT_PAPER_POLICY,
+    policy: PolicyVersion = PAPER_CORE_V1,
     gate_factor: float = 1.0,
     risk_budget_factor: float = 1.0,
     quantity_factor: float = 1.0,

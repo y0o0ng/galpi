@@ -70,6 +70,214 @@ def entry_funnel(skip_counts: dict[str, int] | None) -> list[tuple[str, int, flo
 
 
 @dataclass(frozen=True)
+class PeriodRow:
+    """구간 하나의 성적. 연도별로도 레짐별로도 같은 열을 쓴다.
+
+    **`max_drawdown`은 그 구간 안에서 다시 잰 값이다.** `Metrics.max_drawdown`은 전 구간
+    고점 기준이라 같은 이름의 다른 숫자이고, 섞어 읽으면 2011년 낙폭이 2008년 고점에서
+    잰 값으로 보인다. 구간 시작 자산(직전 구간의 마지막 자산)을 첫 고점으로 놓아서
+    구간 첫날의 하락도 낙폭에 든다.
+    """
+
+    label: str
+    sessions: int
+    total_return: float | None
+    trade_count: int
+    max_drawdown: float
+    profit_factor: float | None
+
+
+def _session_returns(result: BacktestResult) -> list[float]:
+    """세션별 자산 수익률. 자산 곡선과 **항상 같은 길이**다.
+
+    `metrics.daily_returns`는 직전 자산이 0 이하인 세션을 건너뛰어 길이가 줄 수 있다.
+    여기서는 곡선의 점과 하나씩 짝지어야 하므로 그 자리에 0.0을 넣어 자리를 지킨다.
+    """
+    previous = result.config.initial_capital
+    returns: list[float] = []
+    for point in result.equity_curve:
+        returns.append(point.equity / previous - 1 if previous > 0 else 0.0)
+        previous = point.equity
+    return returns
+
+
+def _profit_factor(trades: list[Trade]) -> float | None:
+    gross_profit = sum(trade.pnl for trade in trades if trade.pnl > 0)
+    gross_loss = -sum(trade.pnl for trade in trades if trade.pnl < 0)
+    # 손실이 없으면 나눌 것이 없다. 무한대를 만들지 않는다(`compute_metrics`와 같은 규칙).
+    return gross_profit / gross_loss if gross_loss > 0 else None
+
+
+def _drawdown(equities: list[float], peak: float) -> float:
+    worst = 0.0
+    for equity in equities:
+        peak = max(peak, equity)
+        if peak > 0:
+            worst = max(worst, 1 - equity / peak)
+    return worst
+
+
+def period_performance(result: BacktestResult) -> list[PeriodRow]:
+    """연도별 성적. **19.6년을 한 줄로 요약하면 시간축이 사라진다.**
+
+    전 구간 기대값 하나로는 "꾸준히 조금씩 졌다"와 "한 해에 몰아서 졌다"를 구별할 수
+    없는데 그 둘은 다음에 할 일이 다르다. 워크포워드 fold와 목적이 겹치지만 fold는 정책
+    구간이라 달력에 맞지 않고 거래 수·기대값만 준다.
+
+    거래는 **청산일** 기준으로 센다. 손익이 확정되는 해에 붙어야 그 해의 수익률·PF와
+    같은 사건을 가리킨다. 그래서 해를 넘겨 들고 있는 거래는 청산한 해에만 나온다.
+    """
+    if not result.equity_curve:
+        return []
+
+    trades_by_year: dict[str, list[Trade]] = {}
+    for trade in result.trades:
+        trades_by_year.setdefault(trade.exit_date[:4], []).append(trade)
+
+    grouped: dict[str, list[float]] = {}
+    for point in result.equity_curve:
+        grouped.setdefault(point.trade_date[:4], []).append(point.equity)
+
+    rows: list[PeriodRow] = []
+    start_equity = result.config.initial_capital
+    for year in sorted(grouped):
+        equities = grouped[year]
+        trades = trades_by_year.get(year, [])
+        rows.append(
+            PeriodRow(
+                label=year,
+                sessions=len(equities),
+                total_return=equities[-1] / start_equity - 1
+                if start_equity > 0
+                else None,
+                trade_count=len(trades),
+                max_drawdown=_drawdown(equities, start_equity),
+                profit_factor=_profit_factor(trades),
+            )
+        )
+        start_equity = equities[-1]
+    return rows
+
+
+# 상태 순서. 앞이 7.3의 CORE 분류기, 뒤가 MARKET 분류기의 추세 2×2 × 변동성이다. 없는
+# 상태는 표에서 빠지고, 판정에 실패한 세션은 `UNKNOWN`으로 곡선에 남아 마지막에 붙는다.
+_REGIME_ORDER = (
+    "GREEN",
+    "YELLOW",
+    "RED",
+    *(
+        f"{trend}/{vol}"
+        for trend in ("BULL", "CORRECTION", "RECOVERY", "BEAR")
+        for vol in ("LOW_VOL", "HIGH_VOL")
+    ),
+    "UNKNOWN",
+)
+
+
+def regime_performance(
+    result: BacktestResult, *, key: str = "market"
+) -> list[PeriodRow]:
+    """레짐별 성적. `key`가 `market`이면 시장 라벨, `gating`이면 그날 게이팅한 상태다.
+
+    **기본이 시장 라벨인 이유는 그것이 항상 있기 때문이다.** 게이팅 상태는 `regime_mode`에
+    따라 뜻이 달라지지만 시장 라벨은 어느 실행에서도 같은 것을 가리켜서 실행끼리 견줄 수
+    있다.
+
+    **레짐 세션은 연속이 아니다.** 상태가 오가므로 수익률·낙폭은 그 상태의 세션만
+    이어붙인 가상 곡선에서 잰다. 그리고 포지션은 레짐 경계를 넘어 들고 가므로
+    수익률(세션 기준)과 PF(그 상태에서 **진입한** 거래 기준)는 같은 거래를 보지 않는다.
+    두 열은 각각 "그 상태로 지낸 날들이 어땠나"와 "그 상태에서 산 것이 어땠나"다.
+    """
+    if not result.equity_curve:
+        return []
+    if key not in ("market", "gating"):
+        raise ValueError(f"모르는 레짐 열입니다: {key}")
+
+    def label_of(point) -> str:
+        return point.regime if key == "gating" else point.market_regime
+
+    regime_on = {point.trade_date: label_of(point) for point in result.equity_curve}
+    trades_by_regime: dict[str, list[Trade]] = {}
+    for trade in result.trades:
+        state = regime_on.get(trade.entry_date, "UNKNOWN")
+        trades_by_regime.setdefault(state, []).append(trade)
+
+    grouped: dict[str, list[float]] = {}
+    returns = _session_returns(result)
+    for point, session_return in zip(result.equity_curve, returns):
+        grouped.setdefault(label_of(point), []).append(session_return)
+
+    rows: list[PeriodRow] = []
+    order = [state for state in _REGIME_ORDER if state in grouped]
+    order += [state for state in sorted(grouped) if state not in _REGIME_ORDER]
+    for state in order:
+        equity = 1.0
+        equities: list[float] = []
+        for session_return in grouped[state]:
+            equity *= 1 + session_return
+            equities.append(equity)
+        trades = trades_by_regime.get(state, [])
+        rows.append(
+            PeriodRow(
+                label=state,
+                sessions=len(equities),
+                total_return=equity - 1,
+                trade_count=len(trades),
+                max_drawdown=_drawdown(equities, 1.0),
+                profit_factor=_profit_factor(trades),
+            )
+        )
+    return rows
+
+
+# 시장이 아니라 데이터 사정으로 끝난 청산. 손익 기여를 따로 재야 한다.
+DATA_EXIT_REASONS = ("DELISTED_EXIT", "UNRESOLVED_EXIT")
+
+
+@dataclass(frozen=True)
+class DataExit:
+    reason: str
+    count: int
+    total_pnl: float
+    symbols: tuple[str, ...]
+
+
+def data_exits(trades: tuple[Trade, ...] | list[Trade]) -> list[DataExit]:
+    """상장폐지·정체불명으로 끝난 거래. **반드시 따로 보여준다.**
+
+    이 거래들의 손익은 전략이 번 것이 아니라 데이터 처리 가정이 만든 것이다. 특히
+    `UNRESOLVED_EXIT`은 경계조건(마지막 종가 ↔ 0원)에 따라 값이 통째로 달라지므로,
+    그 크기를 모르면 나머지 숫자를 얼마나 믿어야 할지 알 수 없다.
+
+    **작으면 파고들 필요가 없고 크면 그 심볼만 손으로 본다** — 979개가 아니라 몇 개다.
+    """
+    rows = []
+    for reason in DATA_EXIT_REASONS:
+        items = [trade for trade in trades if trade.exit_reason == reason]
+        if items:
+            rows.append(
+                DataExit(
+                    reason=reason,
+                    count=len(items),
+                    total_pnl=sum(item.pnl for item in items),
+                    symbols=tuple(sorted({item.symbol for item in items})),
+                )
+            )
+    return rows
+
+
+def _gating_differs(market: list[PeriodRow], gating: list[PeriodRow]) -> bool:
+    """게이팅 상태가 시장 라벨과 다른 것을 가리키는가.
+
+    `MARKET` 모드에서는 둘이 같은 객체에서 나오므로 표가 완전히 겹친다. 같은 표를 두 번
+    그리면 읽는 사람이 서로 다른 두 축이라고 오해한다.
+    """
+    return [(row.label, row.sessions) for row in market] != [
+        (row.label, row.sessions) for row in gating
+    ]
+
+
+@dataclass(frozen=True)
 class ExitAnatomy:
     """청산 사유 하나의 해부. **`mfe_r`이 핵심이다.**
 
@@ -122,6 +330,8 @@ def judgment_payload(
 ) -> dict:
     """실행 간 diff용 JSON. 마크다운과 같은 재료를 구조로만 남긴다."""
     config = result.config
+    market = regime_performance(result)
+    gating = regime_performance(result, key="gating")
     payload: dict = {
         "source_version": config.source_version,
         "policy_id": config.policy.policy_id,
@@ -132,6 +342,11 @@ def judgment_payload(
         "index_names": list(config.index_names),
         "require_earnings_calendar": config.require_earnings_calendar,
         "require_sector": config.require_sector,
+        "entry_mode": config.entry_mode,
+        "exit_mode": config.exit_mode,
+        "regime_mode": config.regime_mode,
+        "unresolved_exit_price": config.unresolved_exit_price,
+        "data_exits": [asdict(row) for row in data_exits(result.trades)],
         "verdict": gate.verdict,
         "blockers": list(gate.blockers),
         "metrics": asdict(metrics),
@@ -143,7 +358,12 @@ def judgment_payload(
             for reason, count, share in entry_funnel(result.skip_counts)
         ],
         "exit_anatomy": [asdict(row) for row in exit_anatomy(result.trades)],
+        "period_performance": [asdict(row) for row in period_performance(result)],
+        "regime_performance": [asdict(row) for row in market],
     }
+    # 게이팅 상태가 시장 라벨과 같으면(MARKET 모드) 같은 표를 두 번 남기지 않는다.
+    if _gating_differs(market, gating):
+        payload["gating_performance"] = [asdict(row) for row in gating]
     if stressed is not None:
         payload["stressed_metrics"] = asdict(stressed)
     if walk_forward is not None:
@@ -223,6 +443,10 @@ def judgment_markdown(
         f"|정책 서명|`{config.policy.signature}`|",
         f"|구간|{config.start} ~ {config.end} ({metrics.sessions:,}세션)|",
         f"|유니버스|{', '.join(config.index_names)}|",
+        # 진입·청산 모드는 정책 서명 밖이라 여기서 찍지 않으면 어디에도 남지 않는다.
+        f"|진입 모드|`{config.entry_mode}`|",
+        f"|청산 모드|`{config.exit_mode}`|",
+        f"|레짐 모드|`{config.regime_mode}`|",
         f"|실적 캘린더 요구|{'예' if config.require_earnings_calendar else '아니오'}|",
         f"|섹터 요구|{'예' if config.require_sector else '아니오'}|",
         "",
@@ -271,6 +495,56 @@ def judgment_markdown(
             "",
         ]
 
+    periods = period_performance(result)
+    if periods:
+        lines += [
+            "## 연도별 성과",
+            "",
+            "**전 구간 숫자 하나로는 시간축이 안 보인다** — 꾸준히 조금씩 진 것과 한 해에"
+            " 몰아서 진 것은 다음에 할 일이 다르다. 낙폭은 그 해 안에서 다시 잰 값이라"
+            " 위의 전 구간 최대낙폭과 다른 숫자이고, 거래는 청산한 해에 센다.",
+            "",
+            "|연도|세션|수익률|거래|MDD|PF|",
+            "|---|---|---|---|---|---|",
+        ]
+        for row in periods:
+            lines.append(
+                f"|{row.label}|{row.sessions:,}|{_share(row.total_return)}"
+                f"|{row.trade_count:,}|{_share(row.max_drawdown)}"
+                f"|{_number(row.profit_factor)}|"
+            )
+        lines.append("")
+
+    def regime_table(rows: list[PeriodRow], heading: str, note: str) -> list[str]:
+        block = [heading, "", note, "", "|레짐|세션|수익률|진입 거래|MDD|PF|",
+                 "|---|---|---|---|---|---|"]
+        for row in rows:
+            block.append(
+                f"|`{row.label}`|{row.sessions:,}|{_share(row.total_return)}"
+                f"|{row.trade_count:,}|{_share(row.max_drawdown)}"
+                f"|{_number(row.profit_factor)}|"
+            )
+        return block + [""]
+
+    regimes = regime_performance(result)
+    if regimes:
+        lines += regime_table(
+            regimes,
+            "## 시장 상태별 성과",
+            "계좌를 보지 않는 시장 라벨이라 **실행끼리 견줄 수 있다.** 레짐 세션은 연속이"
+            " 아니라 그 상태의 날만 이어붙인 곡선에서 잰다. 포지션은 경계를 넘어 들고"
+            " 가므로 **수익률은 그 상태로 지낸 날들이, PF는 그 상태에서 진입한 거래가**"
+            " 어땠는지로 서로 다른 것을 본다.",
+        )
+        gating = regime_performance(result, key="gating")
+        if _gating_differs(regimes, gating):
+            lines += regime_table(
+                gating,
+                "## 게이트 상태별 성과",
+                "위와 같은 세션을 **그날 실제로 게이팅한 상태**로 다시 접은 것이다."
+                " 시장이 아니라 규칙이 무엇을 허용했는지를 본다.",
+            )
+
     funnel = entry_funnel(result.skip_counts)
     if funnel:
         lines += [
@@ -286,6 +560,31 @@ def judgment_markdown(
         for reason, count, share in funnel:
             lines.append(f"|`{reason}`|{count:,}|{_share(share)}|")
         lines.append("")
+
+    data_rows = data_exits(result.trades)
+    if data_rows:
+        affected = sum(row.total_pnl for row in data_rows)
+        lines += [
+            "## 데이터 사정으로 끝난 청산",
+            "",
+            "**이 손익은 전략이 번 것이 아니라 데이터 처리 가정이 만든 것이다.**"
+            f" 미해결 청산가는 `{config.unresolved_exit_price}` 시나리오이고, 명시적"
+            " 폐지는 시나리오와 무관하게 마지막 실제 거래 가격이다.",
+            "",
+            "|사유|거래|손익|종목|",
+            "|---|---|---|---|",
+        ]
+        for row in data_rows:
+            shown = ", ".join(f"`{symbol}`" for symbol in row.symbols[:12])
+            if len(row.symbols) > 12:
+                shown += f" 외 {len(row.symbols) - 12}개"
+            lines.append(f"|`{row.reason}`|{row.count:,}|{row.total_pnl:+,.0f}|{shown}|")
+        lines += [
+            "",
+            f"합계 {affected:+,.0f} · 이 거래들을 빼면 순손익은"
+            f" **{net - affected:+,.0f}** (전체 {net:+,.0f})",
+            "",
+        ]
 
     anatomy = exit_anatomy(result.trades)
     if anatomy:
