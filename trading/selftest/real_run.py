@@ -73,7 +73,9 @@ SOURCE_VERSION = "eodhd-15y-2026-08"
 INDEX_NAMES = ("SP500", "NDX100")
 UNIVERSE_DIR = TRADING_ROOT / "universe"
 # 실행 보고서. **커밋한다** — 판정의 감사 기록이고 삭제 의무 대상이 아니다.
+# 실험별로 나눈다. 러너 하나가 실험 하나이고, 비교 세트가 한 폴더에 모여야 읽을 수 있다.
 RUNS_DIR = TRADING_ROOT / "runs"
+EXPERIMENT = "baseline"
 
 # 변경 이력이 시작되는 날. 그 이전의 구성원 여부는 알 수 없다.
 FLOOR_DATE = "2008-01-02"
@@ -890,13 +892,14 @@ def stage_run(connection) -> int:
     from backtest.loop import BacktestConfig, run_backtest, save_run
     from backtest.report import judgment_json, judgment_markdown, judgment_payload
     from backtest.metrics import compute_metrics
-    from backtest.policy import DEFAULT_PAPER_POLICY
+    from core import CORE1
     from backtest.validation import (
         evaluate_gate, neighbourhood_report, parameter_variant, plan_walk_forward,
         record_holdout_run, run_walk_forward, stress_config,
     )
 
-    policy = DEFAULT_PAPER_POLICY
+    core = CORE1
+    policy = core.policy
     all_sessions = [
         row[0] for row in connection.execute(
             "SELECT DISTINCT trade_date FROM bars_daily"
@@ -913,10 +916,10 @@ def stage_run(connection) -> int:
         source_version=SOURCE_VERSION,
         start=all_sessions[warmup],
         end=all_sessions[-1],
-        policy=policy,
         index_names=INDEX_NAMES,
-        require_earnings_calendar=True,
-        require_sector=True,
+        # 규칙은 코어 파일이 정한다. 여기서 따로 조립하면 기준선이 실험과 다른 엔진
+        # 설정으로 돌 수 있고, 그러면 견줄 수가 없다.
+        **core.run_kwargs(),
     )
     print(f"구간 {config.start} ~ {config.end} ({len(all_sessions) - warmup}세션)")
     print(f"정책 {config.policy.policy_id}")
@@ -1014,12 +1017,13 @@ def stage_run(connection) -> int:
     # `trading/data/`는 gitignore라 DB를 지우면 결론이 사라진다. 가격이 아니라 파생
     # 지표라 삭제 의무 대상도 아니므로 저장소에 남긴다.
     kept = dict(walk_forward=walk, stressed=stressed, neighbourhood=neighbourhood)
-    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    out = RUNS_DIR / EXPERIMENT
+    out.mkdir(parents=True, exist_ok=True)
     markdown = judgment_markdown(result, metrics, report, run_id=run_id, **kept)
-    (RUNS_DIR / f"{run_id}.md").write_text(markdown, encoding="utf-8")
+    (out / f"{run_id}.md").write_text(markdown, encoding="utf-8")
     payload = judgment_payload(result, metrics, report, **kept)
-    (RUNS_DIR / f"{run_id}.json").write_text(judgment_json(payload), encoding="utf-8")
-    print(f"\n보고서: {RUNS_DIR.name}/{run_id}.md · {run_id}.json")
+    (out / f"{run_id}.json").write_text(judgment_json(payload), encoding="utf-8")
+    print(f"\n보고서: {RUNS_DIR.name}/{EXPERIMENT}/{run_id}.md · {run_id}.json")
     return 0
 
 
@@ -1061,8 +1065,46 @@ def stage_status(connection) -> int:
     return 0
 
 
+def stage_delistings(connection) -> int:
+    """거래를 멈춘 구성원을 찾아 `delistings`에 적재한다. EODHD 2회.
+
+    **루프가 직접 판정하면 미래를 본다.** "오늘 이후로 바가 없다"는 그 시점에 알 수 없는
+    사실이라, 여기서 날짜로 기록해두고 루프는 `마지막 거래일 <= as_of`만 묻는다.
+
+    이 표는 공개 목록에서 언제든 다시 만들 수 있어 지우고 다시 써도 된다.
+    """
+    from backtest.eodhd import (
+        EodhdClient,
+        find_delistings,
+        load_key,
+        save_delistings,
+    )
+
+    client = EodhdClient(load_key())
+    known = {
+        listing.symbol for listing in client.listings("US", delisted=True)
+    }
+    print(f"벤더 폐지 목록 {len(known):,}개")
+    found = find_delistings(
+        connection, SOURCE_VERSION, known_delisted=known,
+        reference_symbol=REFERENCE_SYMBOL, end=WINDOW_END,
+    )
+    save_delistings(connection, SOURCE_VERSION, found)
+
+    by_status: dict[str, list] = {}
+    for item in found:
+        by_status.setdefault(item.status, []).append(item)
+    for status, items in sorted(by_status.items()):
+        print(f"  {status}: {len(items)}개")
+    # 미해결은 수가 적고 손으로 볼 후보다. 전부 찍는다.
+    for item in sorted(by_status.get("UNRESOLVED", []), key=lambda x: x.symbol):
+        print(f"    {item.symbol:<10} 마지막 거래 {item.last_trade_date}  {item.evidence}")
+    return 0
+
+
 STAGES = {
     "csvs": stage_csvs,
+    "delistings": stage_delistings,
     "qqq": stage_qqq,
     "universe": stage_universe,
     "snapshots": stage_snapshots,

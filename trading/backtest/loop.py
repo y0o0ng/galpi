@@ -21,8 +21,9 @@
   다음 세션으로 넘기지 않고 `NO_FILL`로 세어 남긴다.
 - 하루 진입 상한은 **intent 개수**로 센다. 체결 수로 세려면 미리 알 수 없는 체결을
   전제해야 하므로, 상한만큼 만들고 그중 몇 개가 체결되는지는 결과로 둔다.
-- 보유 종목의 오늘 바가 없으면(거래정지·상장폐지) 그 세션은 그대로 들고 간다.
-  `POSITION_STALE`로 세고, 상장폐지 데이터는 아직 없다는 사실을 여기서도 확인한다.
+- 보유 종목의 오늘 바가 없으면 나이만 먹이고 들고 간다(`POSITION_STALE`). 청산할 때가
+  됐는데 팔 수 없으면 `EXIT_PENDING_UNTRADEABLE`이고, 거래를 멈춘 것이 `delistings`로
+  확인되면 재개를 기다리지 않고 그 자리에서 끝낸다. 상세는 `positions`의 상태 기계다.
 """
 
 from __future__ import annotations
@@ -35,11 +36,24 @@ from datetime import date
 from .candidates import Ranking, rank_candidates
 from .costs import CostModel
 from .data import Bar, BarCache, PointInTimeSnapshot
-from .execution import Fill, execute_entry
+from .execution import Fill, execute_entry, execute_terminal_exit
 from .features import FeatureUnavailable
-from .policy import DEFAULT_PAPER_POLICY, PolicyVersion
-from .positions import Position, run_session
-from .regime import Regime, classify_regime
+from .modes import (
+    CORE_ENTRY,
+    CORE_EXITS,
+    CORE_REGIME,
+    ENTRY_MODES,
+    EXIT_MODES,
+    LAST_CLOSE_EXIT,
+    MARKET_REGIME,
+    REGIME_MODES,
+    UNRESOLVED_EXIT_PRICES,
+    ZERO_EXIT,
+)
+from .policy import PolicyVersion
+from core.core1 import PAPER_CORE_V1
+from .positions import Position, hold_untraded, run_session
+from .regime import Regime, classify_market_regime, classify_regime
 from .risk import account_gate, evaluate_candidate
 from .sizing import AccountState, OpenPosition, SizedIntent
 
@@ -50,7 +64,7 @@ class BacktestConfig:
     start: str
     end: str
     initial_capital: float = 100_000.0
-    policy: PolicyVersion = DEFAULT_PAPER_POLICY
+    policy: PolicyVersion = PAPER_CORE_V1
     costs: CostModel = field(default_factory=CostModel)
     index_names: tuple[str, ...] | None = None
     require_earnings_calendar: bool = True
@@ -58,6 +72,32 @@ class BacktestConfig:
     # 정책의 `min_score_population`을 쓰려면 None으로 둔다. 작은 픽스처만 낮춘다.
     min_population: int | None = None
     gate_factor: float = 1.0  # Core-only은 1.0. LLM Gate는 아직 없다
+    # 진입·청산 모드. **정책이 아니라 설정에 둔다** — `StrategyParameters`에 필드를 더하면
+    # `canonical_text`가 바뀌어 동결된 `paper-core-v1`의 서명까지 달라지고, 그 서명으로
+    # 낸 2026-08-10 기준선 보고서가 비교 대상에서 빠진다. 대신 실행 보고서가 두 값을
+    # 찍어서 어떤 규칙으로 낸 숫자인지 남긴다.
+    entry_mode: str = CORE_ENTRY
+    exit_mode: str = CORE_EXITS
+    regime_mode: str = CORE_REGIME
+    # 정체불명 계열을 얼마로 청산할지. **판정이 아니라 경계조건이다** — 어떤 값이 맞는지
+    # 알 수 없으므로 마지막 종가(회수 100%)와 0원(회수 0%)으로 양끝을 재고, 보고서가
+    # 그 사이의 손익 기여를 찍는다. 명시적 폐지는 이 값과 무관하게 마지막 거래 가격이다.
+    unresolved_exit_price: str = LAST_CLOSE_EXIT
+    # 무작위 진입 모드의 추첨 번호. 규칙이 아니라 실행 조건이라 코어가 아니라 여기 있다 —
+    # 시드 하나는 표본 하나일 뿐이고, 여러 번 뽑아야 분포가 된다.
+    random_seed: int = 0
+
+    def __post_init__(self) -> None:
+        if self.entry_mode not in ENTRY_MODES:
+            raise ValueError(f"모르는 진입 모드입니다: {self.entry_mode}")
+        if self.exit_mode not in EXIT_MODES:
+            raise ValueError(f"모르는 청산 모드입니다: {self.exit_mode}")
+        if self.regime_mode not in REGIME_MODES:
+            raise ValueError(f"모르는 레짐 모드입니다: {self.regime_mode}")
+        if self.unresolved_exit_price not in UNRESOLVED_EXIT_PRICES:
+            raise ValueError(
+                f"모르는 미해결 청산가입니다: {self.unresolved_exit_price}"
+            )
 
 
 @dataclass(frozen=True)
@@ -94,7 +134,11 @@ class EquityPoint:
     cash: float
     exposure: float
     drawdown: float
+    # 그날 실제로 게이팅한 상태. `regime_mode`에 따라 뜻이 다르다.
     regime: str
+    # 계좌를 보지 않는 시장 라벨. **게이팅과 무관하게 항상 남긴다** — 어떤 시장에서
+    # 벌었는지는 실행이 끝난 뒤에 묻게 되는데 그때는 다시 만들 수 없다.
+    market_regime: str
     open_positions: int
 
 
@@ -178,6 +222,35 @@ def _close_trade(
     )
 
 
+def _terminal_fill(
+    snapshot: PointInTimeSnapshot,
+    open_trade: _OpenTrade,
+    record: tuple[str, str],
+    config: BacktestConfig,
+) -> Fill:
+    """거래가 끝난 종목의 청산. 바가 없으므로 가격을 여기서 정한다.
+
+    **명시적 폐지는 마지막 실제 거래 가격 하나다.** 정체불명만 경계조건을 따르는데,
+    맞는 값을 모르기 때문이지 폐지가 확실하다는 뜻이 아니다.
+    """
+    last_trade_date, status = record
+    bars = snapshot.bars(open_trade.position.symbol, 1)
+    last_close = bars[-1].raw_close if bars else open_trade.position.entry_price
+    if status == "DELISTED":
+        price, reason = last_close, "DELISTED_EXIT"
+    else:
+        price = 0.0 if config.unresolved_exit_price == ZERO_EXIT else last_close
+        reason = "UNRESOLVED_EXIT"
+    return execute_terminal_exit(
+        open_trade.position.symbol,
+        open_trade.position.shares,
+        last_trade_date,
+        price,
+        reason,
+        costs=config.costs,
+    )
+
+
 def _track_excursion(open_trade: _OpenTrade, bar: Bar) -> None:
     """MFE·MAE를 R 단위로 갱신한다.
 
@@ -230,9 +303,38 @@ def run_backtest(
         # 1. 보유 포지션의 하루.
         for symbol in sorted(open_trades):
             open_trade = open_trades[symbol]
+
+            # 거래를 멈춘 것이 확인된 종목은 **재개를 기다리지 않는다.** 몇 년 뒤 같은
+            # 티커가 다시 나타나도 그건 옛 포지션의 재개가 아니다.
+            record = snapshot.delisting(symbol)
+            if record is not None:
+                fill = _terminal_fill(snapshot, open_trade, record, config)
+                cash += fill.cash_delta
+                fills.append(fill)
+                trades.append(
+                    _close_trade(
+                        open_trade, fill, fill.reason,
+                        open_trade.position.sessions_held,
+                    )
+                )
+                _count(exit_counts, fill.reason)
+                _count(fill_counts, fill.reason)
+                del open_trades[symbol]
+                continue
+
             pair = _bars_for(snapshot, symbol)
             if pair is None:
-                _count(skip_counts, "POSITION_STALE")
+                # 바가 없다는 것 자체는 청산 신호가 아니다. 나이만 먹인다.
+                result = hold_untraded(
+                    open_trade.position, trade_date, exit_mode=config.exit_mode
+                )
+                open_trade.position = result.position
+                _count(
+                    skip_counts,
+                    "EXIT_PENDING_UNTRADEABLE"
+                    if result.position.exit_pending_untradeable
+                    else "POSITION_STALE",
+                )
                 continue
             previous_bar, bar = pair
             result = run_session(
@@ -241,6 +343,7 @@ def run_backtest(
                 previous_bar,
                 costs=config.costs,
                 next_earnings=next_earnings(symbol),
+                exit_mode=config.exit_mode,
             )
             if result.closed:
                 _track_excursion(open_trade, bar)
@@ -303,6 +406,7 @@ def run_backtest(
                 signal_bar,
                 costs=config.costs,
                 next_earnings=next_earnings(intent.symbol),
+                exit_mode=config.exit_mode,
             )
             _track_excursion(open_trade, bar)
             if result.closed:
@@ -359,15 +463,33 @@ def run_backtest(
             prior_week_pnl_fraction=prior_week_pnl,
         )
 
+        # **시장 라벨은 게이팅과 무관하게 항상 낸다.** `MARKET`은 계좌를 인자로 받지
+        # 않는다 — 낙폭을 넘기는 순간 손실이 진입을 막고 진입이 없어 손실이 회복되지
+        # 않는 고리가 닫힌다.
+        market: Regime | None = None
+        error: FeatureUnavailable | None = None
         try:
-            regime = classify_regime(
-                snapshot, drawdown, config.policy.parameters
-            )
-        except FeatureUnavailable as error:
+            market = classify_market_regime(snapshot, config.policy.parameters)
+        except FeatureUnavailable as caught:
+            error = caught
+        market_label = market.state if market is not None else "UNKNOWN"
+
+        regime = market
+        if config.regime_mode == CORE_REGIME:
+            regime, error = None, None
+            try:
+                regime = classify_regime(
+                    snapshot, drawdown, config.policy.parameters
+                )
+            except FeatureUnavailable as caught:
+                error = caught
+
+        if regime is None:
             _count(skip_counts, error.reason)
             curve.append(
                 EquityPoint(
-                    trade_date, equity, cash, exposure, drawdown, "UNKNOWN", len(open_trades)
+                    trade_date, equity, cash, exposure, drawdown, "UNKNOWN",
+                    market_label, len(open_trades),
                 )
             )
             previous_equity = equity
@@ -375,7 +497,8 @@ def run_backtest(
 
         curve.append(
             EquityPoint(
-                trade_date, equity, cash, exposure, drawdown, regime.state, len(open_trades)
+                trade_date, equity, cash, exposure, drawdown, regime.state,
+                market_label, len(open_trades),
             )
         )
         previous_equity = equity
@@ -426,6 +549,30 @@ def run_backtest(
             )
             reserved_cash -= intent.shares * intent.planned_entry
 
+    # 런이 끝나도 팔지 못한 포지션은 열린 채로 두지 않는다. 열어두면 손익 기여를 잴 수
+    # 없어서 "이 미해결이 결과를 얼마나 흔드는가"에 답할 수 없다. 시나리오 가격으로
+    # 끝내고 `UNRESOLVED_EXIT`으로 남긴다.
+    for symbol in sorted(open_trades):
+        open_trade = open_trades[symbol]
+        if not open_trade.position.exit_pending_untradeable:
+            continue
+        snapshot = PointInTimeSnapshot(
+            connection, sessions[-1], config.source_version, cache=cache
+        )
+        fill = _terminal_fill(
+            snapshot, open_trade, (sessions[-1], "UNRESOLVED"), config
+        )
+        cash += fill.cash_delta
+        fills.append(fill)
+        trades.append(
+            _close_trade(
+                open_trade, fill, fill.reason, open_trade.position.sessions_held
+            )
+        )
+        _count(exit_counts, fill.reason)
+        _count(fill_counts, fill.reason)
+        del open_trades[symbol]
+
     return BacktestResult(
         config=config,
         trades=tuple(trades),
@@ -447,6 +594,8 @@ def _rank(
         "policy": config.policy,
         "min_population": config.min_population,
         "require_earnings_calendar": config.require_earnings_calendar,
+        "entry_mode": config.entry_mode,
+        "random_seed": config.random_seed,
     }
     if config.index_names is not None:
         kwargs["index_names"] = config.index_names
@@ -522,8 +671,9 @@ def save_run(
         )
         connection.executemany(
             "INSERT OR REPLACE INTO backtest_equity"
-            " (run_id, trade_date, equity, cash, exposure, drawdown, regime, open_positions)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            " (run_id, trade_date, equity, cash, exposure, drawdown, regime,"
+            "  market_regime, open_positions)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     run_id,
@@ -533,6 +683,7 @@ def save_run(
                     point.exposure,
                     point.drawdown,
                     point.regime,
+                    point.market_regime,
                     point.open_positions,
                 )
                 for point in result.equity_curve

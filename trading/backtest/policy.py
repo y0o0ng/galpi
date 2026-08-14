@@ -128,11 +128,16 @@ class StrategyParameters:
                 f" (최소 {needed}세션 필요)"
             )
 
-    def max_daily_entries(self, regime_state: str) -> int:
-        """7.3의 신규 진입 열과 10.1의 "하루 진입 최대 2종목"을 합친 값."""
-        if regime_state == "GREEN":
+    def max_daily_entries(self, new_entries: str) -> int:
+        """7.3의 신규 진입 열과 10.1의 "하루 진입 최대 2종목"을 합친 값.
+
+        **상태 이름이 아니라 그 상태가 허용하는 것을 본다.** 이름으로 가르면 레짐
+        분류기를 바꾸는 순간 여기가 조용히 0을 돌려주고, 한 건도 거래하지 않는 실행이
+        오류 없이 만들어진다.
+        """
+        if new_entries == "allow":
             return self.max_daily_entries_green
-        if regime_state == "YELLOW":
+        if new_entries == "top_only":
             return self.max_daily_entries_yellow
         return 0
 
@@ -232,13 +237,8 @@ PAPER_VALIDATION = RiskProfile(
 
 DEFAULT_PARAMETERS = StrategyParameters()
 
-DEFAULT_PAPER_POLICY = PolicyVersion(
-    policy_id="paper-core-v1",
-    profile=PAPER_VALIDATION,
-    limits=HardLimits(),
-    parameters=DEFAULT_PARAMETERS,
-    note="9.1 PAPER_VALIDATION 프로필, 9.2 초기 자동운용 한도, 7.2~7.5 기본 지표 파라미터",
-)
+# 정책 **인스턴스**는 여기 없다. 한 벌의 규칙(정책 + 진입·청산 모드)은 코어이고 코어는
+# `core/` 아래 파일 하나씩이다. 기준선은 `core.core1.PAPER_CORE_V1`이다.
 
 
 def activate_policy(connection: sqlite3.Connection, policy: PolicyVersion) -> str:

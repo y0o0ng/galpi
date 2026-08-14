@@ -28,12 +28,14 @@ from datetime import date, timedelta
 
 from .data import Bar, PointInTimeSnapshot
 from .features import FeatureUnavailable, Features, compute_features
-from .policy import (
-    DEFAULT_PAPER_POLICY,
-    STRATEGY_VERSION,
-    PolicyVersion,
-    StrategyParameters,
+from .modes import (  # noqa: F401  (재수출)
+    CORE_ENTRY,
+    ENTRY_MODES,
+    RANDOM_ENTRY,
+    RS_ONLY_ENTRY,
 )
+from .policy import STRATEGY_VERSION, PolicyVersion, StrategyParameters
+from core.core1 import PAPER_CORE_V1
 from .regime import Regime
 
 # 데이터 적재가 써야 하는 index_name 값이다. 7.2의 "S&P 500 + Nasdaq-100 당시 구성 종목".
@@ -43,6 +45,10 @@ DEFAULT_INDEXES = ("SP500", "NDX100")
 # 7.2 실적 완충을 세는 방식: 진입일을 포함하고 실적일은 제외한다. 실적 당일 전에 포지션을
 # 며칠 들고 있는지가 이 완충이 재려는 값이기 때문이다. 월요일 진입이면 실적은 금요일
 # 이후여야 한다. 세션 수 자체는 정책의 `earnings_min_sessions`다.
+
+# 진입 모드는 `modes`에 있다. `RS_ONLY`는 7.4 게이트만 끄고 **7.2 유니버스 필터(가격·
+# 유동성·이력)는 끄지 않는다.** 그쪽은 진입 조건이 아니라 무엇을 거래 대상으로 보느냐의
+# 정의다.
 
 
 @dataclass(frozen=True)
@@ -89,6 +95,18 @@ class Ranking:
         for skip in self.skipped:
             counts[skip.reason] = counts.get(skip.reason, 0) + 1
         return counts
+
+
+def random_score(seed: int, as_of: str, symbol: str) -> float:
+    """`[0, 1)`의 결정론적 난수. 같은 입력에 항상 같은 값이다(3.1).
+
+    **RNG 상태를 들고 다니지 않는다.** 상태를 쓰면 종목을 훑는 순서나 걸러진 개수가
+    바뀔 때 같은 시드에서 다른 결과가 나온다. 해시는 그런 것에 영향받지 않는다.
+
+    미래를 보지 않는다 — 입력이 시드·날짜·종목뿐이다.
+    """
+    digest = hashlib.sha256(f"{seed}|{as_of}|{symbol}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") / 2**64
 
 
 def zscores(values: dict[str, float]) -> dict[str, float]:
@@ -200,23 +218,34 @@ def rank_candidates(
     snapshot: PointInTimeSnapshot,
     regime: Regime,
     *,
-    policy: PolicyVersion = DEFAULT_PAPER_POLICY,
+    policy: PolicyVersion = PAPER_CORE_V1,
     index_names: tuple[str, ...] = DEFAULT_INDEXES,
     min_population: int | None = None,
     require_earnings_calendar: bool = True,
+    entry_mode: str = CORE_ENTRY,
+    random_seed: int = 0,
 ) -> Ranking:
-    """`as_of` 종가 기준 상위 후보. RED에서는 후보를 만들지 않는다(18장)."""
+    """`as_of` 종가 기준 상위 후보. RED에서는 후보를 만들지 않는다(18장).
+
+    `entry_mode`가 `RS_ONLY`면 7.4 진입 게이트를 통째로 건너뛴다. 유니버스 필터와 z-score
+    모집단, 레짐 판정은 그대로다. Jegadeesh–Titman식 실험에서 "승자를 산다"를 문자 그대로
+    두려는 연구용 모드이고, 이때 후보는 유니버스 안 점수 상위 `max_candidates`개다.
+    """
+    if entry_mode not in ENTRY_MODES:
+        raise ValueError(f"모르는 진입 모드입니다: {entry_mode}")
     parameters = policy.parameters
     max_candidates = parameters.max_candidates
     if min_population is None:
         min_population = parameters.min_score_population
-    max_new_entries = parameters.max_daily_entries(regime.state)
+    max_new_entries = parameters.max_daily_entries(regime.new_entries)
     members: set[str] = set()
     for index_name in index_names:
         members |= snapshot.members(index_name)
 
     skipped: list[Skip] = []
-    if regime.state == "RED":
+    # **상태 이름이 아니라 그 상태가 허용하는 것을 본다.** 레짐 분류기를 바꿔도 여기가
+    # 그대로 맞아야 한다. `CORE`에서는 RED가 유일한 `blocked`라 동작이 같다.
+    if regime.new_entries == "blocked":
         return Ranking(
             as_of=snapshot.as_of,
             regime_state=regime.state,
@@ -224,7 +253,7 @@ def rank_candidates(
             score_population=0,
             candidates=(),
             skipped=(),
-            halt_reason="REGIME_RED",
+            halt_reason=f"REGIME_{regime.state}",
         )
 
     eligible: dict[str, Features] = {}
@@ -260,25 +289,39 @@ def rank_candidates(
 
     passed: list[tuple[float, str]] = []
     for symbol in sorted(eligible):
-        skip = _entry_gate(
-            snapshot,
-            symbol,
-            eligible[symbol],
-            tails[symbol],
-            parameters,
-            require_earnings_calendar,
-        )
-        if skip is not None:
-            skipped.append(skip)
-            continue
+        if entry_mode == CORE_ENTRY:
+            skip = _entry_gate(
+                snapshot,
+                symbol,
+                eligible[symbol],
+                tails[symbol],
+                parameters,
+                require_earnings_calendar,
+            )
+            if skip is not None:
+                skipped.append(skip)
+                continue
+        # `RANDOM`은 점수만 무작위다. z-score는 계산된 그대로 기록에 남겨 나중에
+        # "무작위가 무엇을 골랐나"를 볼 수 있게 한다.
         score = (
-            parameters.score_weight_rs * z_rs[symbol]
+            random_score(random_seed, snapshot.as_of, symbol)
+            if entry_mode == RANDOM_ENTRY
+            else parameters.score_weight_rs * z_rs[symbol]
             + parameters.score_weight_trend * z_trend[symbol]
         )
         passed.append((score, symbol))
 
     # 점수 내림차순, 같으면 종목 코드 순. 같은 입력에 같은 순서가 나와야 한다(3.1).
     passed.sort(key=lambda item: (-item[0], item[1]))
+
+    # 후보에 붙는 사유는 실제로 확인한 것만 적는다. `RS_ONLY`에서 `SMA_ALIGNED`를 달면
+    # `signals`에 거짓 근거가 남고, 나중에 그 행을 보고 게이트가 켜져 있었다고 읽는다.
+    if entry_mode == CORE_ENTRY:
+        entry_reasons = ("SMA_ALIGNED", f"BREAKOUT_{parameters.breakout_window}D")
+    elif entry_mode == RANDOM_ENTRY:
+        entry_reasons = (f"RANDOM_SEED_{random_seed}",)
+    else:
+        entry_reasons = (f"RS_ONLY_TOP_{max_candidates}",)
 
     candidates: list[Candidate] = []
     for index, (score, symbol) in enumerate(passed[:max_candidates], start=1):
@@ -293,11 +336,7 @@ def rank_candidates(
                 reference_close=tails[symbol][-1].raw_close,
                 atr14=features.atr14,
                 features=features,
-                reasons=(
-                    "SMA_ALIGNED",
-                    f"BREAKOUT_{parameters.breakout_window}D",
-                    f"REGIME_{regime.state}",
-                ),
+                reasons=entry_reasons + (f"REGIME_{regime.state}",),
             )
         )
     for score, symbol in passed[max_candidates:]:

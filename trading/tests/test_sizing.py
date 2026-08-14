@@ -17,10 +17,8 @@ sys.path.insert(0, str(TRADING_ROOT))
 from backtest.candidates import Candidate  # noqa: E402
 from backtest.features import Features  # noqa: E402
 from backtest.regime import MAX_EXPOSURE, NEW_ENTRIES, Regime  # noqa: E402
-from backtest.policy import (  # noqa: E402
-    DEFAULT_PAPER_POLICY,
-    PAPER_VALIDATION,
-)
+from backtest.policy import PAPER_VALIDATION  # noqa: E402
+from core.core1 import PAPER_CORE_V1  # noqa: E402
 from backtest.sizing import (  # noqa: E402
     AccountState,
     OpenPosition,
@@ -28,7 +26,7 @@ from backtest.sizing import (  # noqa: E402
     size_candidate,
 )
 
-LIMITS = DEFAULT_PAPER_POLICY.limits
+LIMITS = PAPER_CORE_V1.limits
 
 TRADE_DATE = "2026-08-06"
 

@@ -34,7 +34,8 @@ from dataclasses import dataclass
 from .candidates import Candidate
 from .data import PointInTimeSnapshot
 from .features import FeatureUnavailable, correlation
-from .policy import DEFAULT_PAPER_POLICY, PolicyVersion
+from .policy import PolicyVersion
+from core.core1 import PAPER_CORE_V1
 from .regime import Regime
 from .sizing import (
     AccountState,
@@ -67,7 +68,7 @@ class AccountGate:
 
 
 def account_gate(
-    account: AccountState, policy: PolicyVersion = DEFAULT_PAPER_POLICY
+    account: AccountState, policy: PolicyVersion = PAPER_CORE_V1
 ) -> AccountGate:
     """일일·주간 손실과 낙폭에 따른 차단·축소를 판정한다."""
     limits = policy.limits
@@ -155,7 +156,7 @@ def evaluate_candidate(
     regime: Regime,
     snapshot: PointInTimeSnapshot,
     *,
-    policy: PolicyVersion = DEFAULT_PAPER_POLICY,
+    policy: PolicyVersion = PAPER_CORE_V1,
     gate: AccountGate | None = None,
     gate_factor: float = 1.0,
     require_sector: bool = True,
