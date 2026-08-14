@@ -889,6 +889,7 @@ def stage_run(connection) -> int:
     """
     from dataclasses import asdict
 
+    from backtest.holdout import holdout_metadata, research_sessions
     from backtest.loop import BacktestConfig, run_backtest, save_run
     from backtest.report import judgment_json, judgment_markdown, judgment_payload
     from backtest.metrics import compute_metrics
@@ -900,6 +901,9 @@ def stage_run(connection) -> int:
 
     core = CORE1
     policy = core.policy
+    # **이 실행은 홀드아웃을 보는 것이 목적이다.** 연구 러너와 달리 명시적으로 opt-in하고,
+    # 그 사실이 보고서 메타데이터에 `HOLDOUT_CONSUMED = true`로 남는다.
+    holdout_note = holdout_metadata(consumed=True)
     all_sessions = [
         row[0] for row in connection.execute(
             "SELECT DISTINCT trade_date FROM bars_daily"
@@ -908,6 +912,7 @@ def stage_run(connection) -> int:
             (SOURCE_VERSION, REFERENCE_SYMBOL, BARS_START),
         )
     ]
+    all_sessions = research_sessions(all_sessions, consume_holdout=True)
     warmup = policy.parameters.min_history_sessions
     if len(all_sessions) <= warmup:
         print(f"{REFERENCE_SYMBOL} 세션이 {len(all_sessions)}개뿐입니다.")
@@ -923,6 +928,7 @@ def stage_run(connection) -> int:
     )
     print(f"구간 {config.start} ~ {config.end} ({len(all_sessions) - warmup}세션)")
     print(f"정책 {config.policy.policy_id}")
+    print(f"홀드아웃 {holdout_note['HOLDOUT_START']}부터 · HOLDOUT_CONSUMED = true")
 
     # 같은 설정을 다시 돌리면 같은 이름으로 덮어쓴다. 탐색 실행이 파일로 쌓이지 않는다.
     run_id = f"{config.policy.policy_id}-{config.start}-{config.end}"
@@ -1021,7 +1027,7 @@ def stage_run(connection) -> int:
     out.mkdir(parents=True, exist_ok=True)
     markdown = judgment_markdown(result, metrics, report, run_id=run_id, **kept)
     (out / f"{run_id}.md").write_text(markdown, encoding="utf-8")
-    payload = judgment_payload(result, metrics, report, **kept)
+    payload = judgment_payload(result, metrics, report, holdout=holdout_note, **kept)
     (out / f"{run_id}.json").write_text(judgment_json(payload), encoding="utf-8")
     print(f"\n보고서: {RUNS_DIR.name}/{EXPERIMENT}/{run_id}.md · {run_id}.json")
     return 0

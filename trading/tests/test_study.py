@@ -21,8 +21,10 @@ from backtest.study import (  # noqa: E402
     TOP_LABEL,
     Forward,
     Study,
+    bucket_sizes,
     deciles,
     random_spread,
+    random_stats,
 )
 
 
@@ -50,6 +52,32 @@ class DecileTest(unittest.TestCase):
     def test_zero_buckets_is_a_caller_error(self):
         with self.assertRaises(ValueError):
             deciles(["A"], 0)
+
+
+class BucketSizeTest(unittest.TestCase):
+    """**무작위 표본이 이 크기를 그대로 쓴다.** 배정과 어긋나면 비교가 기운다."""
+
+    def test_the_size_matches_what_deciles_actually_assigned(self):
+        for count in (100, 103, 520, 523, 7):
+            with self.subTest(count=count):
+                assigned = deciles([f"S{i:03d}" for i in range(count)], 10)
+                actual = [
+                    sum(1 for value in assigned.values() if value == bucket)
+                    for bucket in range(1, 11)
+                ]
+                self.assertEqual(bucket_sizes(count, 10), actual)
+
+    def test_flooring_would_undercount_the_top_bucket(self):
+        """`523 // 10`은 52지만 D1은 실제로 53종목이다. 그 한 종목이 이 함수의 이유다."""
+        self.assertEqual(bucket_sizes(523, 10)[0], 53)
+        self.assertNotEqual(bucket_sizes(523, 10)[0], 523 // 10)
+
+    def test_the_sizes_add_up_to_the_population(self):
+        self.assertEqual(sum(bucket_sizes(523, 10)), 523)
+
+    def test_zero_buckets_is_a_caller_error(self):
+        with self.assertRaises(ValueError):
+            bucket_sizes(10, 0)
 
 
 class StudyTest(unittest.TestCase):
@@ -121,6 +149,99 @@ class StudyTest(unittest.TestCase):
         study = Study((21,))
         study.add_date([], {21: 0.0})
         self.assertEqual(study.dates, 0)
+
+
+class RandomFamilyTest(unittest.TestCase):
+    """크기가 다른 두 무작위 벌이 섞이지 않는지 본다."""
+
+    def rows(self) -> list[Forward]:
+        # 평균 0.10. 값을 손으로 낼 수 있게 넷만 둔다.
+        return [
+            row("A", 4.0, 0.40),
+            row("B", 3.0, 0.20),
+            row("C", 2.0, 0.00),
+            row("D", 1.0, -0.20),
+        ]
+
+    def test_the_two_families_are_kept_apart(self):
+        study = Study((21,), buckets=2, top_n=1)
+        rows = self.rows()
+        study.add_date(
+            rows,
+            {21: 0.0},
+            random_picks={0: rows[:2]},      # 2종목 벌: 평균 0.30, 초과 +0.20
+            random_top_picks={0: rows[:1]},  # 1종목 벌: 0.40, 초과 +0.30
+        )
+        self.assertAlmostEqual(study.random_draws[(0, 21)].mean, 0.20)
+        self.assertAlmostEqual(study.random_top_draws[(0, 21)].mean, 0.30)
+
+    def test_the_top_family_is_empty_when_not_asked_for(self):
+        """기존 호출자는 D1 벌만 넘긴다. 그때 TOP 벌이 조용히 채워지면 안 된다."""
+        study = Study((21,), buckets=2, top_n=1)
+        rows = self.rows()
+        study.add_date(rows, {21: 0.0}, random_picks={0: rows[:2]})
+        self.assertEqual(study.random_top_draws, {})
+        self.assertIsNone(random_stats(study, 21, top=True))
+
+    def test_a_narrower_family_spreads_wider(self):
+        """**크기를 맞추는 이유가 이것이다.**
+
+        같은 유니버스에서 뽑아도 좁은 표본이 더 흩어진다. 1종목 벌의 폭이 2종목 벌보다
+        넓지 않다면 크기를 맞추는 일 자체가 뜻이 없다.
+        """
+        study = Study((21,), buckets=2, top_n=1)
+        rows = self.rows()
+        study.add_date(
+            rows,
+            {21: 0.0},
+            random_picks={0: rows[:2], 1: rows[2:]},
+            random_top_picks={0: rows[:1], 1: rows[3:]},
+        )
+        wide = random_stats(study, 21)
+        narrow = random_stats(study, 21, top=True)
+        self.assertLess(
+            wide.maximum - wide.minimum, narrow.maximum - narrow.minimum
+        )
+
+
+class RandomStatsTest(unittest.TestCase):
+    def study(self) -> Study:
+        study = Study((21,), buckets=2, top_n=1)
+        rows = [row("A", 2.0, 0.30), row("B", 1.0, -0.10)]
+        # 초과수익 -0.20 / 0.00 / +0.20.
+        study.add_date(
+            rows,
+            {21: 0.0},
+            random_top_picks={0: [rows[0]], 1: rows, 2: [rows[1]]},
+        )
+        return study
+
+    def test_the_full_distribution_is_reported(self):
+        stats = random_stats(self.study(), 21, top=True)
+        self.assertEqual(stats.count, 3)
+        self.assertAlmostEqual(stats.minimum, -0.20)
+        self.assertAlmostEqual(stats.median, 0.0)
+        self.assertAlmostEqual(stats.maximum, 0.20)
+        self.assertAlmostEqual(stats.mean, 0.0)
+        self.assertAlmostEqual(stats.stdev, statistics.stdev([-0.20, 0.0, 0.20]))
+
+    def test_a_single_seed_has_no_spread(self):
+        """시드 하나는 표본 하나다. 흩어짐을 0으로 적으면 좁다는 뜻이 되어버린다."""
+        study = Study((21,), buckets=2, top_n=1)
+        rows = [row("A", 2.0, 0.30), row("B", 1.0, -0.10)]
+        study.add_date(rows, {21: 0.0}, random_top_picks={0: [rows[0]]})
+        self.assertIsNone(random_stats(study, 21, top=True).stdev)
+
+    def test_beating_every_sample_means_outside_the_distribution(self):
+        stats = random_stats(self.study(), 21, top=True)
+        self.assertEqual(stats.beaten_by(0.50), 3)
+        self.assertEqual(stats.beaten_by(0.0), 1)
+        self.assertEqual(stats.beaten_by(-0.90), 0)
+        self.assertEqual(stats.beaten_by(None), 0)
+
+    def test_the_spread_helper_still_reads_the_d1_family(self):
+        """기존 표가 TOP 벌을 잘못 집어가면 안 된다."""
+        self.assertIsNone(random_spread(self.study(), 21))
 
 
 if __name__ == "__main__":
