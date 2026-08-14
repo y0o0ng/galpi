@@ -16,6 +16,7 @@ from pathlib import Path
 TRADING_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TRADING_ROOT))
 
+from backtest import store  # noqa: E402
 from paper import db  # noqa: E402
 from paper.config import (  # noqa: E402
     PAPER_BASE_URL,
@@ -120,6 +121,51 @@ class ConfigIsolationTest(unittest.TestCase):
             )
             self.assertEqual(config.app_key, "fromenv")
             self.assertEqual(config.account_prefix, "11111111")
+
+
+class LateColumnTest(unittest.TestCase):
+    """나중에 붙인 열은 기존 DB에도 들어가야 한다.
+
+    `CREATE TABLE IF NOT EXISTS`는 이미 있는 표를 건드리지 않는다. **DB를 지우고 다시
+    만들 수는 없다** — `bars_daily`는 908회 호출로 받았고 삭제 의무가 걸려 있다.
+    """
+
+    def opened(self, tmp: str):
+        return store.connect(tmp)
+
+    def test_an_old_database_gains_the_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # 열이 없던 시절의 표를 손으로 만든다.
+            path = store.resolve_backtest_db_path(tmp)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            old = sqlite3.connect(path)
+            old.execute(
+                "CREATE TABLE backtest_equity (run_id TEXT NOT NULL,"
+                " trade_date TEXT NOT NULL, equity REAL NOT NULL, cash REAL NOT NULL,"
+                " exposure REAL NOT NULL, drawdown REAL NOT NULL, regime TEXT NOT NULL,"
+                " open_positions INTEGER NOT NULL, PRIMARY KEY (run_id, trade_date))"
+            )
+            old.execute(
+                "INSERT INTO backtest_equity VALUES"
+                " ('old', '2020-01-02', 1.0, 1.0, 0.0, 0.0, 'GREEN', 0)"
+            )
+            old.commit()
+            old.close()
+
+            connection = self.opened(tmp)
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(backtest_equity)")
+            }
+            self.assertIn("market_regime", columns)
+            # 옛 행은 NULL로 남는다. 그 실행이 이 값을 기록하지 않았다는 사실 그대로다.
+            row = connection.execute(
+                "SELECT market_regime FROM backtest_equity WHERE run_id = 'old'"
+            ).fetchone()
+            self.assertIsNone(row["market_regime"])
+            # 두 번 열어도 같다.
+            self.assertEqual(store.add_missing_columns(connection), [])
+            connection.close()
 
 
 class StorageIsolationTest(unittest.TestCase):

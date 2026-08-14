@@ -99,6 +99,36 @@ def _make_fill(
     )
 
 
+def execute_terminal_exit(
+    symbol: str,
+    shares: int,
+    trade_date: str,
+    reference_price: float,
+    reason: str,
+    *,
+    costs: CostModel,
+) -> Fill:
+    """바 없이 끝내는 청산. 상장폐지와 정체불명 계열이 여기로 온다.
+
+    **바가 없으므로 가격을 호출자가 준다.** 폐지는 마지막 실제 거래 가격이고, 정체불명은
+    민감도 시나리오가 정하는 값(마지막 종가 또는 0)이다. 0원 청산에서는 수수료도 0이
+    되는데, 팔 것이 없으니 그것이 맞다.
+    """
+    if reference_price < 0:
+        raise ExecutionError(f"청산 가격이 음수입니다: {reference_price}")
+    fill_price = costs.fill_price(reference_price, "SELL") if reference_price else 0.0
+    return Fill(
+        symbol=symbol,
+        trade_date=trade_date,
+        side="SELL",
+        shares=shares,
+        reference_price=reference_price,
+        fill_price=fill_price,
+        fees=costs.fees_for(shares, fill_price, "SELL") if fill_price else 0.0,
+        reason=reason,
+    )
+
+
 def corporate_action_between(signal_bar: Bar, execution_bar: Bar) -> bool:
     """두 바의 조정 배율이 다르면 그 사이에 분할·배당 조정이 있었다.
 

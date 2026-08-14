@@ -31,10 +31,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
+from itertools import groupby
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from .data import BARS_CSV_COLUMNS, load_bars_csv, register_source
+from .data import (
+    BARS_CSV_COLUMNS,
+    IDENTITY_MAX_GAP_SESSIONS,
+    load_bars_csv,
+    register_source,
+)
 
 BASE_URL = "https://eodhd.com/api"
 KEY_NAMES = ("EODHD_API_KEY", "EODHD_TOKEN")
@@ -534,6 +540,117 @@ def missing_universe_symbols(
         (source_version, end, start),
     ).fetchall()
     return [row["symbol"] for row in rows]
+
+
+@dataclass(frozen=True)
+class Delisting:
+    symbol: str
+    last_trade_date: str
+    status: str
+    evidence: str
+
+
+def find_delistings(
+    connection: sqlite3.Connection,
+    source_version: str,
+    *,
+    known_delisted: set[str],
+    reference_symbol: str = "SPY",
+    end: str | None = None,
+) -> list[Delisting]:
+    """거래를 멈춘 구성원을 찾는다. **거래일 달력은 기준 심볼이 준다.**
+
+    두 가지를 잡는다.
+
+    1. **계열이 끝난 것** — 마지막 바가 구간 끝보다 앞선다. 벤더 폐지 목록에 있으면
+       `DELISTED`, 없으면 `UNRESOLVED`다.
+    2. **계열 중간이 크게 끊긴 것** — `IDENTITY_MAX_GAP_SESSIONS`를 넘는 공백 뒤의 바는
+       같은 회사가 아닐 수 있다(`MER`·`JAVA`). 그 앞 바에서 끊고 `UNRESOLVED`로 둔다.
+       확신할 수 없는 것을 확신한 척하지 않는 쪽이 안전하다 — 어차피 민감도가 그 크기를
+       재준다.
+
+    2번이 1번보다 우선한다. 계열이 나중에 이어지더라도 우리가 들고 있던 회사는 그
+    공백에서 끝났을 수 있기 때문이다.
+    """
+    sessions = [
+        row["trade_date"]
+        for row in connection.execute(
+            "SELECT trade_date FROM bars_daily"
+            " WHERE symbol = ? AND source_version = ?"
+            "   AND (? IS NULL OR trade_date <= ?)"
+            " ORDER BY trade_date",
+            (reference_symbol, source_version, end, end),
+        )
+    ]
+    if not sessions:
+        raise EodhdError(f"{reference_symbol}의 거래일 달력이 비어 있습니다.")
+    index = {date: position for position, date in enumerate(sessions)}
+    last_session = sessions[-1]
+
+    rows = connection.execute(
+        "SELECT b.symbol, b.trade_date FROM bars_daily AS b"
+        " WHERE b.source_version = ? AND (? IS NULL OR b.trade_date <= ?)"
+        "   AND b.symbol IN ("
+        "     SELECT DISTINCT symbol FROM universe_membership WHERE source_version = ?"
+        "   )"
+        " ORDER BY b.symbol, b.trade_date",
+        (source_version, end, end, source_version),
+    ).fetchall()
+
+    found: list[Delisting] = []
+    for symbol, group in groupby(rows, key=lambda row: row["symbol"]):
+        dates = [row["trade_date"] for row in group if row["trade_date"] in index]
+        if not dates:
+            continue
+        boundary = next(
+            (
+                before
+                for before, after in zip(dates, dates[1:])
+                if index[after] - index[before] - 1 > IDENTITY_MAX_GAP_SESSIONS
+            ),
+            None,
+        )
+        if boundary is not None:
+            found.append(
+                Delisting(
+                    symbol,
+                    boundary,
+                    "UNRESOLVED",
+                    f"{IDENTITY_MAX_GAP_SESSIONS}세션을 넘는 공백 뒤에 계열이 이어짐",
+                )
+            )
+        elif dates[-1] < last_session:
+            delisted = symbol in known_delisted
+            found.append(
+                Delisting(
+                    symbol,
+                    dates[-1],
+                    "DELISTED" if delisted else "UNRESOLVED",
+                    "벤더 폐지 목록" if delisted else "계열 종료, 벤더는 현역으로 표시",
+                )
+            )
+    return found
+
+
+def save_delistings(
+    connection: sqlite3.Connection, source_version: str, items: list[Delisting]
+) -> int:
+    """`delistings`를 다시 쓴다. 벤더 목록에서 언제든 같은 값을 만들 수 있어 지워도 된다."""
+    with connection:
+        connection.execute(
+            "DELETE FROM delistings WHERE source_version = ?", (source_version,)
+        )
+        connection.executemany(
+            "INSERT INTO delistings"
+            " (symbol, source_version, last_trade_date, status, evidence)"
+            " VALUES (?, ?, ?, ?, ?)",
+            [
+                (item.symbol, source_version, item.last_trade_date, item.status,
+                 item.evidence)
+                for item in items
+            ],
+        )
+    return len(items)
 
 
 def load_prices(

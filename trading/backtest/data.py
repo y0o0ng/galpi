@@ -61,6 +61,20 @@ SECURITIES_CSV_COLUMNS = ("symbol", "sector")
 # `price_scale` 옆에 둔다. `DEFAULT_INDEXES`를 정책으로 옮기지 않은 것과 같은 이유다.
 CORPORATE_ACTION_REL_TOL = 1e-4
 
+# 이 세션 수를 넘는 공백 뒤에 다시 나타난 바는 **같은 security로 인정하지 않는다.**
+#
+# `MER`은 메릴린치 구간이 2008-12-31에 끝나는데 같은 벤더 티커에 2018-08-28부터 다른
+# 계열이 붙어 있다. 그 가격으로 옛 포지션을 청산하면 다른 회사 주가로 손익을 내는 것이다.
+#
+# **이 상수는 전략 파라미터가 아니다.** 매매 결정에는 쓰이지 않고 오직 "이게 같은
+# 회사인가"만 판정한다. `max_hold` 같은 전략 값으로 이 판정을 하면 K=21과 K=42가 같은
+# 티커를 다른 회사로 읽게 되어, 보유기간의 효과를 비교하려는 실험에 데이터 정합성
+# 처리가 섞여 들어간다.
+#
+# 21세션은 대략 한 달이다. 실측에서 6~20세션까지 내리면 400건 넘게 딸려 오고, 21로
+# 두면 15년 유니버스에서 심볼 20개가 걸린다. 걸린 심볼은 보고서가 이름으로 찍는다.
+IDENTITY_MAX_GAP_SESSIONS = 21
+
 
 class DataContractError(Exception):
     """데이터가 계약을 만족하지 못할 때 올린다."""
@@ -493,6 +507,20 @@ class PointInTimeSnapshot:
             (symbol, self.source_version, self.as_of, self.as_of),
         ).fetchone()
         return row["event_at"] if row and row["event_at"] else None
+
+    def delisting(self, symbol: str) -> tuple[str, str] | None:
+        """`(마지막 거래일, status)`. 아직 안 멈췄거나 기록이 없으면 None이다.
+
+        **`as_of` 이후의 폐지는 보이지 않는다.** 벤더의 폐지 목록은 "오늘 기준"이라
+        그대로 쓰면 미래를 보는 것이 된다. 여기서 날짜로 잘라내면 `t` 시점에 이미
+        참인 사실만 남는다 — 그 종목은 그날 이전에 거래를 멈췄다.
+        """
+        row = self.connection.execute(
+            "SELECT last_trade_date, status FROM delistings"
+            " WHERE symbol = ? AND source_version = ? AND last_trade_date <= ?",
+            (symbol, self.source_version, self.as_of),
+        ).fetchone()
+        return (row["last_trade_date"], row["status"]) if row else None
 
     def sector(self, symbol: str) -> str | None:
         """종목의 섹터. 분류를 모르면 None이고, 그때 섹터 한도는 판정할 수 없다."""

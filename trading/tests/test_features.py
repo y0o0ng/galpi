@@ -14,6 +14,7 @@ import statistics
 import sqlite3
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 TRADING_ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +32,11 @@ from backtest.features import (  # noqa: E402
     save_features,
 )
 from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
-from backtest.regime import classify_regime  # noqa: E402
+from backtest.regime import (  # noqa: E402
+    TRENDS,
+    classify_market_regime,
+    classify_regime,
+)
 
 VERSION = "v1"
 DAYS = 300
@@ -336,6 +341,84 @@ class RegimeTest(unittest.TestCase):
     def test_negative_drawdown_is_a_caller_error(self):
         with self.assertRaises(ValueError):
             classify_regime(self.rising(), -0.01, PARAMS)
+
+
+class MarketRegimeTest(RegimeTest):
+    """`MARKET` 분류기. 시장만 보고 라벨을 붙인다.
+
+    가장 중요한 것은 `test_the_account_cannot_reach_this_classifier`다. 계좌 낙폭이
+    상태에 들어가면 손실 → 방어 → 진입 없음 → 자산 정지 → 낙폭 영구 고정의 고리가
+    닫히고, 2026-08-10 기준선과 2026-08-14 첫 J/K 실행이 둘 다 그것으로 죽었다.
+    """
+
+    # 세 구간 계단 경로. 정확히 252바를 주면 SMA50은 마지막 50개, SMA200은 마지막 200개라
+    # 두 평균을 손으로 낼 수 있다. `(먼 과거 152, 중간 90, 최근 10)`이다.
+    TREND_PATHS = {
+        # SMA50 122.0 · SMA200 110.5 · 종가 130 → 둘 다 위
+        "BULL": (100.0, 120.0, 130.0),
+        # SMA50 146.0 · SMA200 124.0 · 종가 130 → 50 아래, 200 위
+        "CORRECTION": (100.0, 150.0, 130.0),
+        # SMA50 104.0 · SMA200 126.0 · 종가 120 → 50 위, 200 아래
+        "RECOVERY": (150.0, 100.0, 120.0),
+        # SMA50 118.0 · SMA200 134.5 · 종가 110 → 둘 다 아래
+        "BEAR": (150.0, 120.0, 110.0),
+    }
+
+    def trend_path(self, name: str) -> PointInTimeSnapshot:
+        far, middle, recent = self.TREND_PATHS[name]
+        return self.snapshot_for([far] * 152 + [middle] * 90 + [recent] * 10)
+
+    def test_the_four_trend_states_are_the_two_moving_averages(self):
+        for expected in self.TREND_PATHS:
+            with self.subTest(trend=expected):
+                regime = classify_market_regime(self.trend_path(expected), PARAMS)
+                self.assertEqual(regime.trend, expected)
+                self.assertTrue(regime.state.startswith(expected + "/"))
+
+    def test_every_trend_label_is_reachable(self):
+        """네 칸이 다 나와야 2×2다. 하나가 영영 비면 축이 하나뿐인 것과 같다."""
+        labels = {
+            classify_market_regime(self.trend_path(name), PARAMS).trend
+            for name in self.TREND_PATHS
+        }
+        self.assertEqual(labels, set(TRENDS))
+
+    def test_the_account_cannot_reach_this_classifier(self):
+        """**낙폭을 인자로 받지 않는다.** 받지 않는 것이 요점이다."""
+        import inspect
+
+        signature = inspect.signature(classify_market_regime)
+        self.assertNotIn("drawdown", signature.parameters)
+        self.assertEqual(
+            classify_market_regime(self.rising(), PARAMS).drawdown, 0.0
+        )
+
+    def test_nothing_is_blocked_or_capped(self):
+        """레짐은 라벨이다. 막는 것은 레짐의 일이 아니다."""
+        for snapshot in (self.rising(), self.trend_path("BEAR")):
+            regime = classify_market_regime(snapshot, PARAMS)
+            self.assertEqual(regime.new_entries, "allow")
+            self.assertEqual(regime.max_exposure, 1.0)
+            self.assertEqual(PARAMS.max_daily_entries(regime.new_entries), 2)
+
+    def test_the_volatility_axis_uses_green_max_vol(self):
+        calm = classify_market_regime(self.rising(), PARAMS)
+        self.assertEqual(calm.volatility, "LOW_VOL")
+        wild = classify_market_regime(self.oscillating(0.023), PARAMS)
+        self.assertEqual(wild.volatility, "HIGH_VOL")
+        self.assertGreaterEqual(wild.realized_vol20, PARAMS.green_max_vol)
+        # 문턱을 올리면 같은 경로가 저변동이 된다. 이름이 아니라 값이 축을 정한다.
+        lenient = replace(PARAMS, green_max_vol=1.0)
+        self.assertEqual(
+            classify_market_regime(self.oscillating(0.023), lenient).volatility,
+            "LOW_VOL",
+        )
+
+    def test_the_core_classifier_is_untouched(self):
+        """동결된 core-1은 옛 분류기를 그대로 쓴다. 여기가 바뀌면 서명 없이 기준선이 바뀐다."""
+        regime = classify_regime(self.rising(), 0.08, PARAMS)
+        self.assertEqual(regime.state, "RED")
+        self.assertEqual(regime.new_entries, "blocked")
 
     def test_short_market_history_is_refused(self):
         short = self.snapshot_for([100.0] * 201)

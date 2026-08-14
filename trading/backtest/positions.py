@@ -39,6 +39,42 @@
 
 11.2가 체결 직후 보호 주문을 설정하므로 진입 당일 바에도 손절을 검사한다. 그 저가가
 우리 체결보다 앞선 시각일 수 있어 실제보다 자주 손절된다. 보수적인 방향이라 그대로 둔다.
+
+## 바가 없는 세션 — 상태 기계
+
+`sessions_held`는 **시장 달력 기준으로 매일 증가한다.** 바가 있는 날만 세면 거래정지된
+포지션이 영영 늙지 않아 만기가 오지 않는다(2026-08-14 실측: `jt-k42`가 다섯 칸을 그렇게
+물려 13.6년을 얼어 있었다).
+
+    ACTIVE ──청산 조건 + 거래가능──────────→ 정상 청산
+           ──청산 조건 + 거래불가──────────→ EXIT_PENDING_UNTRADEABLE
+           ──명시적 폐지·era 종료──────────→ DELISTED_EXIT (재개를 기다리지 않는다)
+    EXIT_PENDING_UNTRADEABLE
+           ──같은 security 거래재개────────→ 첫 실제 가격(시초가)으로 청산
+           ──명시적 폐지──────────────────→ DELISTED_EXIT
+           ──런 끝까지 미해결──────────────→ UNRESOLVED_EXIT (민감도 시나리오)
+
+**바가 없다는 것 자체는 청산 신호가 아니다.** K=21인데 8~15일째만 정지면 16일째 그냥
+ACTIVE로 돌아오고 21일째 정상 청산한다. 18~25일째 정지면 21일째에 만기가 왔지만 팔 수
+없으므로 `EXIT_PENDING_UNTRADEABLE`로 가고 26일째 첫 가격에 나간다.
+
+**같은 security인지는 전략 파라미터로 판정하지 않는다.** `IDENTITY_MAX_GAP_SESSIONS`가
+그 일을 하고, `max_hold`로 그것을 대신하면 K=21과 K=42가 같은 티커를 다른 회사로 읽어
+보유기간 비교에 데이터 정합성 처리가 섞인다.
+
+## FIXED_HOLD — 연구용 청산 모드
+
+Jegadeesh–Titman(1993)식 J/K 실험을 위한 모드다. **K세션 뒤 청산 하나만 남기고** 손절·
+추적손절·시간손절·실적 청산을 전부 끈다. K는 `max_hold_sessions`이고 청산 사유는 그대로
+`MAX_HOLD`다 — 새 어휘를 만들지 않는다. 규칙 자체가 최대 보유이기 때문이다.
+
+**왜 규칙을 끄는 모드가 필요한가.** 보유기간 K의 기여를 재려면 K만 달라야 한다. 손절이
+살아 있으면 "K일 보유"가 아니라 "손절 아니면 K일"이라 두 규칙의 합을 재게 되고, core-1
+청산과 견줄 때 무엇이 차이를 만들었는지 귀속할 수 없다.
+
+**손절가는 없어지지 않는다.** `stop_price`는 9.2의 열린 위험 회계(현재가 − 손절가)에
+계속 쓰인다. 진입 조건과 수량 계산을 세 런에서 같게 두려는 것이다. 다만 규칙이 같아도
+**실현되는 진입은 갈린다** — 손절로 비었을 자리가 차 있으면 다음 후보가 못 들어온다.
 """
 
 from __future__ import annotations
@@ -51,6 +87,7 @@ from .candidates import next_weekday, weekdays_between
 from .costs import CostModel
 from .data import CORPORATE_ACTION_REL_TOL, Bar
 from .execution import Fill, execute_market_exit, try_stop_exit
+from .modes import CORE_EXITS, EXIT_MODES, FIXED_HOLD_EXITS  # noqa: F401  (재수출)
 from .policy import StrategyParameters
 from .sizing import OpenPosition
 
@@ -78,6 +115,13 @@ class Position:
     parameters: StrategyParameters
     sessions_held: int = 0
     pending_exit: str | None = None
+    # 청산할 때가 됐는데 거래가 불가능한 상태. **가짜 체결을 만들지 않는다** — 상태만
+    # 바뀌고 현금은 안 움직이며, 거래가 재개되면 그때 첫 실제 가격으로 나간다.
+    untradeable_since: str | None = None
+
+    @property
+    def exit_pending_untradeable(self) -> bool:
+        return self.untradeable_since is not None
 
     def __post_init__(self) -> None:
         if self.shares < 1:
@@ -197,6 +241,45 @@ def _sessions_until(as_of: str, event_at: str) -> int:
     return weekdays_between(next_weekday(as_of), date.fromisoformat(event_at[:10]))
 
 
+def _due_exit(position: Position, exit_mode: str) -> str | None:
+    """오늘 종가 기준으로 청산할 때가 됐는가. 사유 또는 None."""
+    if position.sessions_held >= position.parameters.max_hold_sessions:
+        return "MAX_HOLD"
+    if (
+        exit_mode != FIXED_HOLD_EXITS
+        and position.sessions_held >= position.parameters.time_stop_sessions
+        and not position.trailing_active
+    ):
+        return "TIME_STOP"
+    return None
+
+
+def hold_untraded(
+    position: Position, trade_date: str, *, exit_mode: str = CORE_EXITS
+) -> SessionResult:
+    """바가 없는 세션. **나이만 먹이고 체결은 만들지 않는다.**
+
+    바가 없다는 것 자체는 청산 신호가 아니다. 청산할 때가 됐는데 팔 수가 없을 때만
+    `EXIT_PENDING_UNTRADEABLE`로 넘어간다.
+    """
+    if exit_mode not in EXIT_MODES:
+        raise PositionError(f"모르는 청산 모드입니다: {exit_mode}")
+    current = replace(position, sessions_held=position.sessions_held + 1)
+    if current.exit_pending_untradeable:
+        return SessionResult(current.symbol, current, None, current.pending_exit)
+
+    reason = current.pending_exit or _due_exit(current, exit_mode)
+    if reason is None:
+        return SessionResult(current.symbol, current, None, None)
+    # 팔 때가 됐는데 시장이 없다. 상태만 바꾸고 현금은 그대로 둔다.
+    return SessionResult(
+        current.symbol,
+        replace(current, pending_exit=reason, untradeable_since=trade_date),
+        None,
+        reason,
+    )
+
+
 def run_session(
     position: Position,
     bar: Bar,
@@ -204,14 +287,31 @@ def run_session(
     *,
     costs: CostModel,
     next_earnings: str | None = None,
+    exit_mode: str = CORE_EXITS,
 ) -> SessionResult:
-    """포지션의 한 세션을 처리한다. 순서는 모듈 설명의 1~6번이다."""
+    """포지션의 한 세션을 처리한다. 순서는 모듈 설명의 1~6번이다.
+
+    `exit_mode`가 `FIXED_HOLD`면 3·5번(손절·실적)과 시간손절을 건너뛰고 최대 보유만
+    남는다. 순서는 그대로다.
+    """
+    if exit_mode not in EXIT_MODES:
+        # 오타가 조용히 CORE로 읽히면 어떤 규칙으로 낸 결과인지 알 수 없게 된다.
+        raise PositionError(f"모르는 청산 모드입니다: {exit_mode}")
     if bar.trade_date <= previous_bar.trade_date:
         raise PositionError(
             f"직전 바({previous_bar.trade_date})보다 뒤인 바여야 합니다: {bar.trade_date}"
         )
 
+    fixed_hold = exit_mode == FIXED_HOLD_EXITS
     current = adjust_for_corporate_action(position, previous_bar, bar)
+
+    # 거래가 재개됐다. 밀려 있던 청산을 **첫 실제 거래 가능 가격**으로 내보낸다.
+    # 같은 security인지는 호출자가 이미 판정했다(`delistings`).
+    if current.exit_pending_untradeable:
+        fill = execute_market_exit(
+            current.symbol, current.shares, bar, costs=costs, price_kind="OPEN"
+        )
+        return SessionResult(current.symbol, None, fill, current.pending_exit)
 
     # 2. 전날 종가에 정해진 청산은 오늘 시초가로 나간다.
     if current.pending_exit is not None:
@@ -221,11 +321,12 @@ def run_session(
         return SessionResult(current.symbol, None, fill, current.pending_exit)
 
     # 3. 어제 종가에 정해진 손절가로 오늘 바를 본다. 오늘 종가를 반영하기 전이다.
-    stop_fill = try_stop_exit(
-        current.symbol, current.shares, current.stop_price, bar, costs=costs
-    )
-    if stop_fill is not None:
-        return SessionResult(current.symbol, None, stop_fill, current.stop_reason)
+    if not fixed_hold:
+        stop_fill = try_stop_exit(
+            current.symbol, current.shares, current.stop_price, bar, costs=costs
+        )
+        if stop_fill is not None:
+            return SessionResult(current.symbol, None, stop_fill, current.stop_reason)
 
     # 4. 오늘 종가 반영. 최고 종가가 오르면 추적손절가도 함께 오른다.
     current = replace(
@@ -238,7 +339,11 @@ def run_session(
     # 진입 때 일정을 몰랐던 경우다. 이 경로가 도는 것 자체가 신호이므로 사유를 구분한다.
     # 종가로 나가는 것은 오늘 종가가 "늦은 것을 알아챈 뒤 처음 오는 행동 지점"이기
     # 때문이다. 어제 종가에 알았다면 아래 5번이 먼저 걸렸을 것이다.
-    if next_earnings is not None and next_earnings[:10] <= bar.trade_date:
+    if (
+        not fixed_hold
+        and next_earnings is not None
+        and next_earnings[:10] <= bar.trade_date
+    ):
         fill = execute_market_exit(
             current.symbol, current.shares, bar, costs=costs, price_kind="CLOSE"
         )
@@ -246,7 +351,8 @@ def run_session(
 
     # 5. 실적 전 청산은 그날 종가에 맞춘다(7.5).
     if (
-        next_earnings is not None
+        not fixed_hold
+        and next_earnings is not None
         and _sessions_until(bar.trade_date, next_earnings)
         <= current.parameters.earnings_exit_sessions
     ):
@@ -256,16 +362,10 @@ def run_session(
         return SessionResult(current.symbol, None, fill, "EARNINGS")
 
     # 6. 시간 손절과 최대 보유는 다음 시초 청산으로 예약한다.
-    if current.sessions_held >= current.parameters.max_hold_sessions:
+    reason = _due_exit(current, exit_mode)
+    if reason is not None:
         return SessionResult(
-            current.symbol, replace(current, pending_exit="MAX_HOLD"), None, "MAX_HOLD"
-        )
-    if (
-        current.sessions_held >= current.parameters.time_stop_sessions
-        and not current.trailing_active
-    ):
-        return SessionResult(
-            current.symbol, replace(current, pending_exit="TIME_STOP"), None, "TIME_STOP"
+            current.symbol, replace(current, pending_exit=reason), None, reason
         )
 
     return SessionResult(current.symbol, current, None, None)

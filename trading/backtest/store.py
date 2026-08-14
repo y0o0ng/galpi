@@ -42,6 +42,32 @@ def resolve_backtest_db_path(data_dir: Path | str = DEFAULT_DATA_DIR) -> Path:
     return path
 
 
+# 나중에 추가된 열. `CREATE TABLE IF NOT EXISTS`는 이미 있는 표를 건드리지 않으므로
+# 기존 DB에는 손으로 붙여야 한다. **DB를 지우고 다시 만들 수는 없다** — `bars_daily`는
+# 908회 호출로 받은 3.8M행이고 삭제 의무가 걸려 있다.
+#
+# 마이그레이션 틀을 만들지 않고 목록 하나로 두는 이유는 지금 필요한 것이 이것뿐이기
+# 때문이다. 전부 nullable이라 옛 행은 NULL로 남고, 그것이 "그 실행은 이 값을 기록하지
+# 않았다"는 사실 그대로다.
+LATE_COLUMNS = (("backtest_equity", "market_regime", "TEXT"),)
+
+
+def add_missing_columns(connection: sqlite3.Connection) -> list[str]:
+    """`LATE_COLUMNS` 중 없는 것만 붙인다. 몇 번 불러도 같다."""
+    added = []
+    for table, column, kind in LATE_COLUMNS:
+        existing = {
+            row["name"]
+            for row in connection.execute(f"PRAGMA table_info({table})")
+        }
+        if existing and column not in existing:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+            added.append(f"{table}.{column}")
+    if added:
+        connection.commit()
+    return added
+
+
 def connect(
     data_dir: Path | str = DEFAULT_DATA_DIR, schema_path: Path = SCHEMA_PATH
 ) -> sqlite3.Connection:
@@ -53,6 +79,7 @@ def connect(
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA foreign_keys=ON")
     connection.executescript(Path(schema_path).read_text(encoding="utf-8"))
+    add_missing_columns(connection)
     return connection
 
 
