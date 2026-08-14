@@ -199,6 +199,23 @@ CREATE TABLE IF NOT EXISTS backtest_trades (
   PRIMARY KEY (run_id, symbol, entry_date)
 );
 
+-- 거래를 멈춘 종목. **적재 단계에서 정하고 루프는 조회만 한다.**
+--
+-- 루프가 "오늘 이후로 바가 없다"를 직접 보면 미래를 보는 것이 된다. 여기서 날짜로
+-- 기록해두면 `last_trade_date <= as_of`만 물어도 되고, 그건 그 시점에 이미 참인 사실이다.
+--
+-- `status`는 둘이다. `DELISTED`는 벤더 폐지 목록이 확인해준 것이고, `UNRESOLVED`는
+-- 계열이 끊겼는데 이유를 모르는 것이다. 후자는 런을 막지 않고 따로 세어 보고서에
+-- 손익 기여를 찍는다 — 그 기여가 작으면 파고들 필요가 없고, 크면 그 심볼만 손으로 본다.
+CREATE TABLE IF NOT EXISTS delistings (
+  symbol TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  last_trade_date TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('DELISTED', 'UNRESOLVED')),
+  evidence TEXT NOT NULL,
+  PRIMARY KEY (symbol, source_version)
+);
+
 CREATE TABLE IF NOT EXISTS backtest_equity (
   run_id TEXT NOT NULL,
   trade_date TEXT NOT NULL,
@@ -206,7 +223,12 @@ CREATE TABLE IF NOT EXISTS backtest_equity (
   cash REAL NOT NULL,
   exposure REAL NOT NULL,
   drawdown REAL NOT NULL,
+  -- 그날 실제로 게이팅한 상태. regime_mode가 무엇이냐에 따라 뜻이 다르다.
   regime TEXT NOT NULL,
+  -- 계좌를 보지 않는 시장 라벨. **게이팅과 무관하게 항상 남긴다** — 어떤 시장에서
+  -- 벌었는지는 실행이 끝난 뒤에 묻게 되는데 그때는 다시 만들 수 없다. 이 열이 생기기
+  -- 전에 저장된 실행은 NULL이다.
+  market_regime TEXT,
   open_positions INTEGER NOT NULL,
   PRIMARY KEY (run_id, trade_date)
 );

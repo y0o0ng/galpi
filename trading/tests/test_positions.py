@@ -22,6 +22,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from backtest.costs import CostModel  # noqa: E402
 from backtest.policy import DEFAULT_PARAMETERS as PARAMS  # noqa: E402
 from backtest.positions import (  # noqa: E402
+    FIXED_HOLD_EXITS,
+    hold_untraded,
     Position,
     PositionError,
     adjust_for_corporate_action,
@@ -193,6 +195,134 @@ class TimeExitTest(unittest.TestCase):
         self.assertEqual(result.reason, "TIME_STOP")
         self.assertEqual(result.fill.reason, "OPEN_EXIT")
         self.assertAlmostEqual(result.fill.reference_price, 95.0)
+
+
+class FixedHoldTest(unittest.TestCase):
+    """`FIXED_HOLD`는 K세션 만기 하나만 남긴다.
+
+    보유기간 K의 기여를 재려면 K만 달라야 한다. 손절이 살아 있으면 "K일 보유"가 아니라
+    "손절 아니면 K일"이라 core-1 청산과 견줄 때 무엇이 차이를 만들었는지 귀속할 수 없다.
+    """
+
+    def fixed(self, pos, current, **kwargs):
+        return session(pos, current, exit_mode=FIXED_HOLD_EXITS, **kwargs)
+
+    def test_a_stop_does_not_fire(self):
+        """손절가 90을 뚫고 80까지 내려가도 들고 간다."""
+        result = self.fixed(position(), bar("2026-08-07", open_=95.0, low=80.0, close=85.0))
+        self.assertFalse(result.closed)
+        self.assertIsNone(result.reason)
+
+    def test_a_trailing_stop_does_not_fire(self):
+        winner = position(sessions_held=5, highest_close=130.0)
+        result = self.fixed(winner, bar("2026-08-07", open_=120.0, low=100.0, close=110.0))
+        self.assertFalse(result.closed)
+
+    def test_the_time_stop_does_not_fire(self):
+        stalled = position(sessions_held=TIME_STOP_SESSIONS - 1, highest_close=102.0)
+        result = self.fixed(stalled, bar("2026-08-07", open_=101.0, close=101.0))
+        self.assertFalse(result.closed)
+        self.assertIsNone(result.position.pending_exit)
+
+    def test_earnings_does_not_close_the_position(self):
+        """core-1에서 최대 청산 사유였던 규칙이다. 여기서는 실적을 통과해 들고 간다."""
+        for earnings in ("2026-08-11", "2026-08-06"):
+            with self.subTest(earnings=earnings):
+                result = self.fixed(
+                    position(),
+                    bar("2026-08-07", open_=101.0, close=102.0),
+                    next_earnings=earnings,
+                )
+                self.assertFalse(result.closed)
+
+    def test_the_holding_period_still_ends_the_trade(self):
+        """K세션째 종가에 예약하고 다음 시초가에 나간다. 사유는 그대로 `MAX_HOLD`다."""
+        old = position(sessions_held=MAX_HOLD_SESSIONS - 1, highest_close=101.0)
+        scheduled = self.fixed(old, bar("2026-08-07", open_=101.0, close=101.0))
+        self.assertEqual(scheduled.reason, "MAX_HOLD")
+
+        executed = run_session(
+            scheduled.position,
+            bar("2026-08-10", open_=99.0, low=98.0, close=100.0),
+            bar("2026-08-07", open_=101.0, close=101.0),
+            costs=FREE,
+            exit_mode=FIXED_HOLD_EXITS,
+        )
+        self.assertTrue(executed.closed)
+        self.assertEqual(executed.fill.reason, "OPEN_EXIT")
+
+    def test_an_unknown_mode_is_refused(self):
+        """오타가 조용히 CORE로 읽히면 어떤 규칙으로 낸 결과인지 알 수 없다."""
+        with self.assertRaises(PositionError):
+            session(position(), bar("2026-08-07"), exit_mode="FIXED")
+
+
+class UntradeableTest(unittest.TestCase):
+    """바가 없는 세션의 상태 기계.
+
+    **바가 없다는 것 자체는 청산 신호가 아니다.** 그런데 나이는 먹어야 한다 — 바가 있는
+    날만 세면 거래정지된 포지션이 영영 만기를 맞지 않아 슬롯을 영구 점유한다
+    (2026-08-14 실측: `jt-k42`가 다섯 칸을 그렇게 물려 13.6년을 얼어 있었다).
+    """
+
+    def test_a_missing_bar_ages_the_position_but_does_not_exit(self):
+        held = position(sessions_held=5)
+        result = hold_untraded(held, "2026-08-07")
+        self.assertFalse(result.closed)
+        self.assertEqual(result.position.sessions_held, 6)
+        self.assertFalse(result.position.exit_pending_untradeable)
+        self.assertIsNone(result.reason)
+
+    def test_a_halt_inside_the_holding_period_resolves_itself(self):
+        """K=21인데 8~15일만 정지면 16일째 그냥 ACTIVE다. 21일째 정상 청산한다."""
+        held = position(sessions_held=7)
+        for day in range(8, 16):
+            held = hold_untraded(held, f"2026-08-{day:02d}").position
+        self.assertEqual(held.sessions_held, 15)
+        self.assertFalse(held.exit_pending_untradeable)
+
+    def test_an_exit_that_cannot_trade_becomes_pending(self):
+        """만기가 왔는데 팔 수가 없다. **가짜 체결을 만들지 않는다.**"""
+        due = position(sessions_held=MAX_HOLD_SESSIONS - 1)
+        result = hold_untraded(due, "2026-08-07")
+        self.assertFalse(result.closed)
+        self.assertTrue(result.position.exit_pending_untradeable)
+        self.assertEqual(result.position.untradeable_since, "2026-08-07")
+        self.assertEqual(result.reason, "MAX_HOLD")
+
+    def test_a_pending_exit_stays_pending_while_untradeable(self):
+        due = position(sessions_held=MAX_HOLD_SESSIONS - 1)
+        pending = hold_untraded(due, "2026-08-07").position
+        later = hold_untraded(pending, "2026-08-10").position
+        self.assertTrue(later.exit_pending_untradeable)
+        self.assertEqual(later.untradeable_since, "2026-08-07")
+        self.assertEqual(later.sessions_held, MAX_HOLD_SESSIONS + 1)
+
+    def test_resuming_exits_at_the_first_tradable_price(self):
+        """재개일 시초가가 첫 실제 거래 가능 가격이다."""
+        due = position(sessions_held=MAX_HOLD_SESSIONS - 1)
+        pending = hold_untraded(due, "2026-08-07").position
+        resumed = run_session(
+            pending,
+            bar("2026-08-20", open_=88.0, low=80.0, close=90.0),
+            bar("2026-08-06", open_=ENTRY),
+            costs=FREE,
+        )
+        self.assertTrue(resumed.closed)
+        self.assertEqual(resumed.reason, "MAX_HOLD")
+        self.assertEqual(resumed.fill.reason, "OPEN_EXIT")
+        self.assertAlmostEqual(resumed.fill.reference_price, 88.0)
+
+    def test_the_holding_clock_does_not_decide_identity(self):
+        """`sessions_held`는 매매 상태기계 전용이다.
+
+        같은 티커를 다른 회사가 물려받았는지는 `IDENTITY_MAX_GAP_SESSIONS`가 판정한다.
+        `max_hold`로 그것을 대신하면 K=21과 K=42가 같은 티커를 다른 회사로 읽어서,
+        보유기간의 효과를 비교하려는 실험에 데이터 정합성 처리가 섞여 들어간다.
+        """
+        import backtest.positions as positions
+
+        self.assertFalse(hasattr(positions, "IDENTITY_MAX_GAP_SESSIONS"))
 
 
 class EarningsExitTest(unittest.TestCase):
