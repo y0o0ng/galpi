@@ -26,6 +26,7 @@ from selftest.slot_capacity_run import (  # noqa: E402
     PORTFOLIO_STAGE_REASONS,
     core_name,
     planned,
+    read_as,
     run_id_for,
 )
 
@@ -202,6 +203,31 @@ class PlanTest(unittest.TestCase):
                 name = core_name(hold, slots, random=True)
                 for seed in range(10):
                     self.assertIn((name, seed), jobs)
+
+
+class RescueReadingTest(unittest.TestCase):
+    """**`rescue_interaction`의 해석 함정을 값으로 잠근다.**
+
+    이 지표는 두 팔이 모두 나빠질 때도 양수가 된다 — K84가 회복해서가 아니라 K42가 더
+    크게 나빠지기만 해도 그렇다. 부호만 보고 "긴 K가 구제됐다"로 읽는 것이 이 실험에서
+    가장 하기 쉬운 잘못된 결론이라 표가 직접 가려내게 한다.
+    """
+
+    def test_both_arms_falling_is_not_a_rescue(self):
+        """가장 중요한 칸이다. 실제 관측이 전부 여기 해당한다."""
+        self.assertEqual(read_as(-0.080, -0.034, +0.046), "덜 나빠짐")
+        self.assertEqual(read_as(-0.150, -0.041, +0.109), "덜 나빠짐")
+
+    def test_a_rescue_requires_the_long_arm_to_actually_rise(self):
+        self.assertEqual(read_as(-0.050, +0.030, +0.080), "회복")
+        self.assertEqual(read_as(+0.010, +0.030, +0.020), "회복")
+
+    def test_a_negative_interaction_is_plain_deterioration(self):
+        self.assertEqual(read_as(-0.075, -0.085, -0.010), "악화")
+
+    def test_a_zero_interaction_is_not_a_rescue(self):
+        """경계에서 유리하게 읽지 않는다."""
+        self.assertEqual(read_as(-0.05, -0.05, 0.0), "악화")
 
 
 class SkipReasonTest(unittest.TestCase):

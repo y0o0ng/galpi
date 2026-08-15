@@ -306,6 +306,20 @@ def total_return_of(run: dict) -> float | None:
 METRICS = (("총수익", total_return_of), ("노출 일치 격차", gap_of))
 
 
+def read_as(gain42: float, gain84: float, rescue: float) -> str:
+    """`rescue_interaction` 한 줄을 어떻게 읽어야 하는가.
+
+    **차이값은 두 팔이 모두 나빠질 때도 양수가 된다.** K84가 좋아져서가 아니라 K42가 더
+    크게 나빠지기만 해도 그렇다. 부호만 보고 "긴 K가 구제됐다"로 읽는 것을 막으려고
+    두 팔의 부호를 함께 판정해 표에 찍는다.
+    """
+    if rescue <= 0:
+        return "악화"
+    if gain84 > 0:
+        return "회복"
+    return "덜 나빠짐"
+
+
 def rs_run(runs: dict, hold: int, slots: int, scenario: str = LAST_CLOSE_EXIT):
     return runs.get(run_id_for(core_name(hold, slots, random=False), scenario, 0))
 
@@ -405,12 +419,22 @@ def stage_report(_connection) -> int:
 
     lines += ["", "## 3. Rescue interaction — 긴 K가 특별히 더 도움받는가", "",
               "`slot_gain_K(S) = M(K,S) − M(K,S5)`이고"
-              " `rescue_interaction(S) = slot_gain_K84(S) − slot_gain_K42(S)`다."
-              " **양수여야 슬롯이 긴 K에 특별히 더 도움이 된 것이다**(기준 C).", ""]
+              " `rescue_interaction(S) = slot_gain_K84(S) − slot_gain_K42(S)`다"
+              "(기준 C).", "",
+              "**차이값 하나만 보면 안 된다.** 이 지표는 두 팔이 **모두 나빠질 때도**"
+              " 양수가 된다 — K84가 회복해서가 아니라 K42가 더 크게 나빠지기만 해도"
+              " 그렇다. 그래서 부호만 보고 \"긴 K가 구제됐다\"로 읽으면 틀린다."
+              " 아래 `읽는 법` 열이 두 팔의 부호를 같이 찍는다.", "",
+              "|읽는 법|뜻|",
+              "|---|---|",
+              "|**회복**|K84 gain > 0이고 rescue > 0. 긴 K가 실제로 좋아졌다|",
+              "|**덜 나빠짐**|두 gain이 모두 ≤ 0인데 rescue > 0. 구제가 아니다|",
+              "|악화|rescue ≤ 0. 긴 K가 슬롯에서 덜 도움받았다|",
+              ""]
     for label, getter in METRICS:
         lines += [f"**{label}**", "",
-                  "|슬롯|K42 값|K42 gain|K84 값|K84 gain|**rescue**|무작위 rescue 중앙|무작위 분포에서|",
-                  "|---|---|---|---|---|---|---|---|"]
+                  "|슬롯|K42 값|K42 gain|K84 값|K84 gain|**rescue**|**읽는 법**|무작위 rescue 중앙|무작위 분포에서|",
+                  "|---|---|---|---|---|---|---|---|---|"]
         base42, base84 = rs_run(runs, 42, BASE_SLOTS), rs_run(runs, 84, BASE_SLOTS)
         for slots in SLOT_LADDER:
             if slots == BASE_SLOTS or not base42 or not base84:
@@ -440,7 +464,7 @@ def stage_report(_connection) -> int:
             lines.append(
                 f"|**{slots}**|{_pct(getter(cell42))}|{_pct(gain42)}"
                 f"|{_pct(getter(cell84))}|{_pct(gain84)}|**{_pct(rescue)}**"
-                f"|{median}|{beaten}|"
+                f"|**{read_as(gain42, gain84, rescue)}**|{median}|{beaten}|"
             )
         lines.append("")
 
