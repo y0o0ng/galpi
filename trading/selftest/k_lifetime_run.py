@@ -146,6 +146,11 @@ def regime_detail(result, closes: dict[str, float]) -> list[dict]:
 
     **수익률과 기대값은 같은 거래를 보지 않는다.** 수익률은 그 상태로 지낸 날들의 것이고
     기대값은 그 상태에서 **진입한** 거래의 것이다. 포지션은 레짐 경계를 넘어 들고 간다.
+
+    **`gap`은 레짐 간에 더해지지 않는다.** 각 상태의 세션만 골라 따로 복리한 차이라서
+    전체 격차의 귀속이 아니다. "어디서 가장 크게 벌어졌나"는 답하지만 "손실의 몇 %가
+    어디서 났나"는 답하지 못한다 — 그건 일별 산술 초과수익이나 로그수익 기여로 따로
+    분해해야 한다.
     """
     curve = result.equity_curve
     if len(curve) < 2:
@@ -381,7 +386,12 @@ def stage_report(_connection) -> int:
             cells.append(_pct(run["metrics"]["total_return"], 0) if run else "—")
         lines.append(f"|**{hold}**|" + "|".join(cells) + "|")
 
-    lines += ["", "## 5. 레짐별 (진입 시점 라벨 · 게이트는 넣지 않았다)", ""]
+    lines += ["", "## 5. 레짐별 (진입 시점 라벨 · 게이트는 넣지 않았다)", "",
+              "**레짐별 격차를 전체 격차의 귀속으로 읽지 않는다.** 각 값은 그 상태의 세션만"
+              " 골라 따로 복리한 `전략 − 노출일치`라서 **레짐 간에 더해지지 않는다.** 여기서"
+              " 읽을 수 있는 것은 \"벤치마크 대비 악화가 어디서 가장 크게 관찰되나\"이지"
+              " \"손실의 몇 %가 어디서 났나\"가 아니다. 후자는 일별 산술 초과수익이나"
+              " 로그수익 기여로 별도 분해를 해야 한다.", ""]
     for hold in HOLDS:
         run = runs.get(run_id_for(rs_core(hold), LAST_CLOSE_EXIT, 0))
         if not run or not run.get("regime_detail"):
