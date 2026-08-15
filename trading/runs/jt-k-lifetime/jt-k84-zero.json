@@ -1,0 +1,662 @@
+{
+  "benchmark": [
+    {
+      "cagr": 0.018958403682875158,
+      "label": "일별 노출 일치",
+      "max_drawdown": 0.1028320229164501,
+      "sharpe": 0.5337467735128568,
+      "total_return": 0.41692728014353686
+    },
+    {
+      "cagr": 0.021650404004421198,
+      "label": "평균 노출 18.5% 고정",
+      "max_drawdown": 0.1248389024260409,
+      "sharpe": 0.598635047341163,
+      "total_return": 0.48802267772665386
+    },
+    {
+      "cagr": 0.10443676633029009,
+      "label": "100% 보유",
+      "max_drawdown": 0.5518910727654843,
+      "sharpe": 0.5986350473411631,
+      "total_return": 5.3168788121334325
+    }
+  ],
+  "blockers": [
+    "NO_WALK_FORWARD",
+    "EARNINGS_GATE_DISABLED",
+    "COST_STRESS_MISSING",
+    "PARAMETER_NEIGHBOURHOOD_NOT_RUN"
+  ],
+  "core": "jt-k84",
+  "data_exits": [
+    {
+      "count": 7,
+      "reason": "DELISTED_EXIT",
+      "symbols": [
+        "APC_OLD",
+        "CSRA",
+        "GMCR",
+        "KRFT",
+        "SCG",
+        "TSS",
+        "WFM"
+      ],
+      "total_pnl": 393.79004466862307
+    },
+    {
+      "count": 1,
+      "reason": "UNRESOLVED_EXIT",
+      "symbols": [
+        "MIL"
+      ],
+      "total_pnl": -11796.925035675
+    }
+  ],
+  "end": "2025-08-06",
+  "entry_funnel": [
+    {
+      "count": 2037584,
+      "reason": "BELOW_TOP_N",
+      "share": 0.8737016150056943
+    },
+    {
+      "count": 190364,
+      "reason": "LIQUIDITY_BELOW_MIN",
+      "share": 0.0816267374689554
+    },
+    {
+      "count": 64776,
+      "reason": "PRICE_BELOW_MIN",
+      "share": 0.02777549088214712
+    },
+    {
+      "count": 16039,
+      "reason": "MAX_POSITIONS_REACHED",
+      "share": 0.006877409816270805
+    },
+    {
+      "count": 11092,
+      "reason": "SHORT_HISTORY",
+      "share": 0.004756171187859329
+    },
+    {
+      "count": 5626,
+      "reason": "ALREADY_HELD",
+      "share": 0.0024123890283895225
+    },
+    {
+      "count": 3515,
+      "reason": "STALE",
+      "share": 0.001507207151580016
+    },
+    {
+      "count": 2694,
+      "reason": "CALENDAR_MISMATCH",
+      "share": 0.0011551681554357223
+    },
+    {
+      "count": 250,
+      "reason": "SCORE_POPULATION_TOO_SMALL",
+      "share": 0.00010719823268705663
+    },
+    {
+      "count": 140,
+      "reason": "DAILY_LOSS_LIMIT",
+      "share": 6.003101030475171e-05
+    },
+    {
+      "count": 24,
+      "reason": "SECTOR_UNKNOWN",
+      "share": 1.0291030337957436e-05
+    },
+    {
+      "count": 9,
+      "reason": "DAILY_ENTRY_CAP",
+      "share": 3.859136376734039e-06
+    },
+    {
+      "count": 7,
+      "reason": "NO_FILL",
+      "share": 3.0015505152375855e-06
+    },
+    {
+      "count": 4,
+      "reason": "CORPORATE_ACTION",
+      "share": 1.715171722992906e-06
+    },
+    {
+      "count": 2,
+      "reason": "NO_EXECUTION_BAR",
+      "share": 8.57585861496453e-07
+    },
+    {
+      "count": 2,
+      "reason": "GAP_LIMIT",
+      "share": 8.57585861496453e-07
+    }
+  ],
+  "entry_mode": "RS_ONLY",
+  "exit_anatomy": [
+    {
+      "avg_mae_r": -2.3966058476586314,
+      "avg_mfe_r": 3.084938848959244,
+      "avg_return_r": 0.45589026810223293,
+      "avg_sessions": 84.0,
+      "count": 254,
+      "reason": "MAX_HOLD",
+      "share": 0.9694656488549618,
+      "total_pnl": 25648.608814002262
+    },
+    {
+      "avg_mae_r": -0.7297096578211256,
+      "avg_mfe_r": 1.3934226526244073,
+      "avg_return_r": 0.3197180680007933,
+      "avg_sessions": 31.0,
+      "count": 7,
+      "reason": "DELISTED_EXIT",
+      "share": 0.026717557251908396,
+      "total_pnl": 393.79004466862307
+    },
+    {
+      "avg_mae_r": -0.5588506481117538,
+      "avg_mfe_r": 1.3521285981013293,
+      "avg_return_r": -147.17116407041738,
+      "avg_sessions": 41.0,
+      "count": 1,
+      "reason": "UNRESOLVED_EXIT",
+      "share": 0.003816793893129771,
+      "total_pnl": -11796.925035675
+    }
+  ],
+  "exit_counts": {
+    "DELISTED_EXIT": 7,
+    "MAX_HOLD": 254,
+    "UNRESOLVED_EXIT": 1
+  },
+  "exit_mode": "FIXED_HOLD",
+  "experiment": "jt-k-lifetime",
+  "fill_counts": {
+    "DELISTED_EXIT": 7,
+    "LIMIT_FILL": 35,
+    "OPEN_EXIT": 254,
+    "OPEN_FILL": 232,
+    "UNRESOLVED_EXIT": 1
+  },
+  "gate_rows": [
+    {
+      "higher_is_better": true,
+      "minimum": 200,
+      "name": "trade_count",
+      "note": "워크포워드 보고서가 있으면 fold 전체의 표본 밖 거래 수를 센다",
+      "target": 400,
+      "value": 262,
+      "verdict": "PASS"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 0.0,
+      "name": "expectancy_r",
+      "note": "",
+      "target": 0.2,
+      "value": -0.11120995991009412,
+      "verdict": "FAIL"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 0.6,
+      "name": "sharpe",
+      "note": "무위험수익률 0이라 상한으로 읽는다",
+      "target": 0.9,
+      "value": 0.1797737595741049,
+      "verdict": "FAIL"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 0.9,
+      "name": "sortino",
+      "note": "무위험수익률 0이라 상한으로 읽는다",
+      "target": 1.3,
+      "value": 0.22658626472948035,
+      "verdict": "FAIL"
+    },
+    {
+      "higher_is_better": false,
+      "minimum": 0.15,
+      "name": "max_drawdown",
+      "note": "",
+      "target": 0.1,
+      "value": 0.1658778127394992,
+      "verdict": "FAIL"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 1.15,
+      "name": "profit_factor",
+      "note": "",
+      "target": 1.35,
+      "value": 1.1861850533117544,
+      "verdict": "PASS"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 0.6,
+      "name": "calmar",
+      "note": "",
+      "target": 1.0,
+      "value": 0.053487651472612155,
+      "verdict": "FAIL"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 1.0,
+      "name": "cost_stress_breakeven",
+      "note": "비용 2배에서 손익분기 이상(14.7). 목표는 양의 CAGR",
+      "target": null,
+      "value": null,
+      "verdict": "UNDETERMINED"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": null,
+      "name": "cost_stress_cagr",
+      "note": "비용 2배에서도 CAGR > 0이면 희망 기준",
+      "target": 0.0,
+      "value": null,
+      "verdict": "UNDETERMINED"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 0.5,
+      "name": "parameter_neighbourhood",
+      "note": "최악 인접값 / 중심값. 최소 0.5(붕괴 없음)·목표 0.8(plateau)은 내가 정한 수치다",
+      "target": 0.8,
+      "value": null,
+      "verdict": "UNDETERMINED"
+    },
+    {
+      "higher_is_better": true,
+      "minimum": 0.6,
+      "name": "fold_stability",
+      "note": "기대값이 양수인 fold 비율. 최소 0.6·목표 0.8은 내가 정한 수치다",
+      "target": 0.8,
+      "value": null,
+      "verdict": "UNDETERMINED"
+    },
+    {
+      "higher_is_better": false,
+      "minimum": 0.4,
+      "name": "min_qty_exception_share",
+      "note": "9.1.1: 이 비율을 지속 초과하면 위험 프로필을 REVIEW로 올린다",
+      "target": null,
+      "value": 0.0,
+      "verdict": "PASS"
+    }
+  ],
+  "index_names": [
+    "SP500",
+    "NDX100"
+  ],
+  "max_hold_sessions": 84,
+  "metrics": {
+    "avg_exposure": 0.1854373373218147,
+    "avg_hold_sessions": 82.41984732824427,
+    "avg_loss_r": -3.335554024557908,
+    "avg_win_r": 2.7419865865048774,
+    "cagr": 0.008872414634849557,
+    "calmar": 0.053487651472612155,
+    "exit_mix": {
+      "DELISTED_EXIT": 7,
+      "MAX_HOLD": 254,
+      "UNRESOLVED_EXIT": 1
+    },
+    "expectancy_r": -0.11120995991009412,
+    "fees_paid": 5264.1907585054905,
+    "final_equity": 117814.54887970547,
+    "gross_loss": 76512.44592197637,
+    "gross_profit": 90757.91974497226,
+    "initial_equity": 100000.0,
+    "max_drawdown": 0.1658778127394992,
+    "min_qty_exception_share": 0.0,
+    "profit_factor": 1.1861850533117544,
+    "sessions": 4677,
+    "sharpe": 0.1797737595741049,
+    "sortino": 0.22658626472948035,
+    "total_return": 0.1781454887970546,
+    "trade_count": 262,
+    "turnover": 0.57136826132518,
+    "win_rate": 0.5305343511450382
+  },
+  "period_performance": [
+    {
+      "label": "2007",
+      "max_drawdown": 0.0,
+      "profit_factor": null,
+      "sessions": 250,
+      "total_return": 0.0,
+      "trade_count": 0
+    },
+    {
+      "label": "2008",
+      "max_drawdown": 0.09557804011804072,
+      "profit_factor": 0.33317197717750946,
+      "sessions": 253,
+      "total_return": -0.0590053874935873,
+      "trade_count": 10
+    },
+    {
+      "label": "2009",
+      "max_drawdown": 0.029441446489303247,
+      "profit_factor": 1.0187715063110236,
+      "sessions": 252,
+      "total_return": 0.021138709189661542,
+      "trade_count": 15
+    },
+    {
+      "label": "2010",
+      "max_drawdown": 0.14996614438611766,
+      "profit_factor": 0.25624075666849033,
+      "sessions": 252,
+      "total_return": -0.08036234518032837,
+      "trade_count": 16
+    },
+    {
+      "label": "2011",
+      "max_drawdown": 0.06613491498662438,
+      "profit_factor": 0.9316235925416545,
+      "sessions": 252,
+      "total_return": -0.02767245729590051,
+      "trade_count": 15
+    },
+    {
+      "label": "2012",
+      "max_drawdown": 0.0427398079034893,
+      "profit_factor": 1.0086650666561763,
+      "sessions": 250,
+      "total_return": 0.013385218102714314,
+      "trade_count": 15
+    },
+    {
+      "label": "2013",
+      "max_drawdown": 0.020991519182248064,
+      "profit_factor": 5.683250176890673,
+      "sessions": 252,
+      "total_return": 0.060262693013793056,
+      "trade_count": 15
+    },
+    {
+      "label": "2014",
+      "max_drawdown": 0.04214986097281359,
+      "profit_factor": 1.1882571696127342,
+      "sessions": 252,
+      "total_return": 0.01264661049107385,
+      "trade_count": 15
+    },
+    {
+      "label": "2015",
+      "max_drawdown": 0.03521139752708968,
+      "profit_factor": 1.3448082669873018,
+      "sessions": 252,
+      "total_return": 0.012043706833194223,
+      "trade_count": 16
+    },
+    {
+      "label": "2016",
+      "max_drawdown": 0.024343649229027098,
+      "profit_factor": 3.6290019166357625,
+      "sessions": 252,
+      "total_return": 0.02141914130787259,
+      "trade_count": 16
+    },
+    {
+      "label": "2017",
+      "max_drawdown": 0.02576977206241582,
+      "profit_factor": 2.020343269352015,
+      "sessions": 251,
+      "total_return": 0.05313628315718377,
+      "trade_count": 16
+    },
+    {
+      "label": "2018",
+      "max_drawdown": 0.04589011237317553,
+      "profit_factor": 1.3493267359797,
+      "sessions": 251,
+      "total_return": -0.005536356502670703,
+      "trade_count": 16
+    },
+    {
+      "label": "2019",
+      "max_drawdown": 0.02837753272362764,
+      "profit_factor": 1.4539601927023584,
+      "sessions": 252,
+      "total_return": 0.05178137284703932,
+      "trade_count": 14
+    },
+    {
+      "label": "2020",
+      "max_drawdown": 0.14407244304391154,
+      "profit_factor": 3.7973690392665063,
+      "sessions": 253,
+      "total_return": 0.05402342672996885,
+      "trade_count": 15
+    },
+    {
+      "label": "2021",
+      "max_drawdown": 0.04843991200362907,
+      "profit_factor": 0.5473318967416434,
+      "sessions": 252,
+      "total_return": -0.010393456259682243,
+      "trade_count": 15
+    },
+    {
+      "label": "2022",
+      "max_drawdown": 0.06585014133163347,
+      "profit_factor": 0.22853461529387806,
+      "sessions": 251,
+      "total_return": -0.061302103931629714,
+      "trade_count": 15
+    },
+    {
+      "label": "2023",
+      "max_drawdown": 0.02266203411949641,
+      "profit_factor": 3.069077045881017,
+      "sessions": 250,
+      "total_return": 0.0917502767279279,
+      "trade_count": 15
+    },
+    {
+      "label": "2024",
+      "max_drawdown": 0.06765367561987312,
+      "profit_factor": 0.7504610434890971,
+      "sessions": 252,
+      "total_return": -0.010534907822731254,
+      "trade_count": 14
+    },
+    {
+      "label": "2025",
+      "max_drawdown": 0.044654011132678306,
+      "profit_factor": 2.6257425365657987,
+      "sessions": 148,
+      "total_return": 0.04637433665304136,
+      "trade_count": 9
+    }
+  ],
+  "policy_id": "research-jt-k84",
+  "policy_signature": "sha256:f875c071e92fad42955edc66f4f5dc369520f2bbdc1eb49a040e361f6d2bcad0",
+  "regime_detail": [
+    {
+      "benchmark_return": -0.218761778742124,
+      "expectancy_r": 0.5249723542693818,
+      "gap": 0.02868245826695437,
+      "profit_factor": 1.6229496140707618,
+      "regime": "BEAR/HIGH_VOL",
+      "sessions": 583,
+      "strategy_return": -0.19007932047516962,
+      "trade_count": 30
+    },
+    {
+      "benchmark_return": -0.1415107377690813,
+      "expectancy_r": 0.067576162932343,
+      "gap": 0.024338132801814405,
+      "profit_factor": 0.7318894150403088,
+      "regime": "BEAR/LOW_VOL",
+      "sessions": 156,
+      "strategy_return": -0.11717260496726689,
+      "trade_count": 10
+    },
+    {
+      "benchmark_return": 0.10505882366620889,
+      "expectancy_r": -0.27442593490576234,
+      "gap": 0.03772581575501355,
+      "profit_factor": 0.48371865321805585,
+      "regime": "BULL/HIGH_VOL",
+      "sessions": 176,
+      "strategy_return": 0.14278463942122244,
+      "trade_count": 7
+    },
+    {
+      "benchmark_return": 1.1037249256326507,
+      "expectancy_r": 0.5459246681711567,
+      "gap": -0.17028427437361549,
+      "profit_factor": 1.475639672349827,
+      "regime": "BULL/LOW_VOL",
+      "sessions": 2780,
+      "strategy_return": 0.9334406512590352,
+      "trade_count": 145
+    },
+    {
+      "benchmark_return": 0.02661009332012254,
+      "expectancy_r": -24.37123732418466,
+      "gap": 0.019123772520365012,
+      "profit_factor": 0.058250398579921335,
+      "regime": "CORRECTION/HIGH_VOL",
+      "sessions": 139,
+      "strategy_return": 0.04573386584048755,
+      "trade_count": 6
+    },
+    {
+      "benchmark_return": -0.22228661648503112,
+      "expectancy_r": 0.2710197011164657,
+      "gap": -0.036952075639278825,
+      "profit_factor": 1.2314501090700158,
+      "regime": "CORRECTION/LOW_VOL",
+      "sessions": 554,
+      "strategy_return": -0.25923869212430994,
+      "trade_count": 41
+    },
+    {
+      "benchmark_return": 0.10916139003308523,
+      "expectancy_r": 2.0504384850467763,
+      "gap": -0.16360332503312913,
+      "profit_factor": 5.58959987832659,
+      "regime": "RECOVERY/HIGH_VOL",
+      "sessions": 192,
+      "strategy_return": -0.054441935000043906,
+      "trade_count": 12
+    },
+    {
+      "benchmark_return": 0.026207103748730365,
+      "expectancy_r": -1.117243883232309,
+      "gap": -0.008090008168717633,
+      "profit_factor": 0.26781663839388303,
+      "regime": "RECOVERY/LOW_VOL",
+      "sessions": 96,
+      "strategy_return": 0.018117095580012732,
+      "trade_count": 11
+    }
+  ],
+  "regime_mode": "MARKET",
+  "regime_performance": [
+    {
+      "label": "BULL/LOW_VOL",
+      "max_drawdown": 0.056150859826237576,
+      "profit_factor": 1.475639672349827,
+      "sessions": 2781,
+      "total_return": 0.9334406512590352,
+      "trade_count": 145
+    },
+    {
+      "label": "BULL/HIGH_VOL",
+      "max_drawdown": 0.011965798064106803,
+      "profit_factor": 0.48371865321805585,
+      "sessions": 176,
+      "total_return": 0.14278463942122244,
+      "trade_count": 7
+    },
+    {
+      "label": "CORRECTION/LOW_VOL",
+      "max_drawdown": 0.2604425984828409,
+      "profit_factor": 1.2314501090700158,
+      "sessions": 554,
+      "total_return": -0.25923869212430994,
+      "trade_count": 41
+    },
+    {
+      "label": "CORRECTION/HIGH_VOL",
+      "max_drawdown": 0.018255540574611984,
+      "profit_factor": 0.058250398579921335,
+      "sessions": 139,
+      "total_return": 0.04573386584048755,
+      "trade_count": 6
+    },
+    {
+      "label": "RECOVERY/LOW_VOL",
+      "max_drawdown": 0.022042124317498635,
+      "profit_factor": 0.26781663839388303,
+      "sessions": 96,
+      "total_return": 0.018117095580012732,
+      "trade_count": 11
+    },
+    {
+      "label": "RECOVERY/HIGH_VOL",
+      "max_drawdown": 0.15728031185872748,
+      "profit_factor": 5.58959987832659,
+      "sessions": 192,
+      "total_return": -0.054441935000043906,
+      "trade_count": 12
+    },
+    {
+      "label": "BEAR/LOW_VOL",
+      "max_drawdown": 0.12893045712851825,
+      "profit_factor": 0.7318894150403088,
+      "sessions": 156,
+      "total_return": -0.11717260496726689,
+      "trade_count": 10
+    },
+    {
+      "label": "BEAR/HIGH_VOL",
+      "max_drawdown": 0.23739449162469972,
+      "profit_factor": 1.6229496140707618,
+      "sessions": 583,
+      "total_return": -0.19007932047516962,
+      "trade_count": 30
+    }
+  ],
+  "require_earnings_calendar": false,
+  "require_sector": true,
+  "run_id": "jt-k84-zero",
+  "seed": 0,
+  "skip_counts": {
+    "ALREADY_HELD": 5626,
+    "BELOW_TOP_N": 2037584,
+    "CALENDAR_MISMATCH": 2694,
+    "CORPORATE_ACTION": 4,
+    "DAILY_ENTRY_CAP": 9,
+    "DAILY_LOSS_LIMIT": 140,
+    "GAP_LIMIT": 2,
+    "LIQUIDITY_BELOW_MIN": 190364,
+    "MAX_POSITIONS_REACHED": 16039,
+    "NO_EXECUTION_BAR": 2,
+    "NO_FILL": 7,
+    "PRICE_BELOW_MIN": 64776,
+    "SCORE_POPULATION_TOO_SMALL": 250,
+    "SECTOR_UNKNOWN": 24,
+    "SHORT_HISTORY": 11092,
+    "STALE": 3515
+  },
+  "source_version": "eodhd-15y-2026-08",
+  "start": "2007-01-04",
+  "strategy_version": "core-v2.3",
+  "unresolved_exit_price": "ZERO",
+  "verdict": "UNDETERMINED"
+}

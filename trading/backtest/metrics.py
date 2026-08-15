@@ -56,6 +56,13 @@ class Metrics:
     avg_exposure: float
     min_qty_exception_share: float | None
     exit_mix: dict[str, int]
+    # 연 회전율. 매수 체결 금액 합을 평균 자산과 연수로 나눈다. **K를 바꾸면 자리가 늦게
+    # 비어 회전이 줄고 비용도 줄므로, K 비교에서는 이것이 없으면 "덜 사서 덜 냈다"와
+    # "잘 골랐다"를 구별할 수 없다.**
+    turnover: float | None = None
+    # 실제 평균 보유 세션. 만기 청산만 있어도 폐지·정지로 일찍 끝나는 거래가 있어서
+    # `max_hold_sessions`와 같지 않다.
+    avg_hold_sessions: float | None = None
 
     @property
     def has_sample(self) -> bool:
@@ -92,6 +99,24 @@ def _annualized_sortino(returns: list[float]) -> float | None:
     if downside == 0:
         return None
     return statistics.fmean(returns) / downside * math.sqrt(TRADING_DAYS_PER_YEAR)
+
+
+def _turnover(result: BacktestResult, sessions: int) -> float | None:
+    """연 회전율. 산 금액 합 / 평균 자산 / 연수.
+
+    **매수만 센다.** 롱 온리라 결국 같은 것을 팔지만, 구간 끝에 열려 있는 자리는 팔지
+    않았으므로 매도로 세면 그만큼 빠진다. 산 것을 세면 그 자리도 회전에 든다.
+    """
+    if sessions <= 0 or not result.equity_curve:
+        return None
+    average_equity = statistics.fmean(
+        point.equity for point in result.equity_curve if point.equity > 0
+    )
+    if average_equity <= 0:
+        return None
+    bought = sum(fill.notional for fill in result.fills if fill.side == "BUY")
+    years = sessions / TRADING_DAYS_PER_YEAR
+    return bought / average_equity / years if years > 0 else None
 
 
 def compute_metrics(result: BacktestResult) -> Metrics:
@@ -153,4 +178,8 @@ def compute_metrics(result: BacktestResult) -> Metrics:
         else 0.0,
         min_qty_exception_share=exception_entries / entries if entries else None,
         exit_mix=exits,
+        turnover=_turnover(result, sessions),
+        avg_hold_sessions=statistics.fmean(trade.sessions_held for trade in trades)
+        if trades
+        else None,
     )

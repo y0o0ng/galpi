@@ -27,11 +27,28 @@ from core import (  # noqa: E402
     JT_CORE_EXIT,
     JT_K21,
     JT_K42,
+    JT_K63,
+    JT_K84,
     JT_RANDOM_K42,
+    JT_RANDOM_K63,
+    JT_RANDOM_K84,
 )
 from core.definition import RULE_FIELDS, CoreDefinition  # noqa: E402
 
-RESEARCH_CORES = (JT_K21, JT_K42, JT_CORE_EXIT, JT_RANDOM_K42)
+RESEARCH_CORES = (
+    JT_K21,
+    JT_K42,
+    JT_K63,
+    JT_K84,
+    JT_CORE_EXIT,
+    JT_RANDOM_K42,
+    JT_RANDOM_K63,
+    JT_RANDOM_K84,
+)
+
+# K 신호 수명 실험의 짝. 각 K와 그 K의 대조군이다.
+K_PAIRS = ((42, JT_K42, JT_RANDOM_K42), (63, JT_K63, JT_RANDOM_K63),
+           (84, JT_K84, JT_RANDOM_K84))
 
 
 def account(drawdown: float) -> AccountState:
@@ -49,7 +66,8 @@ class RegistryTest(unittest.TestCase):
     def test_every_core_is_registered_under_its_own_name(self):
         for name, core in CORES.items():
             self.assertEqual(name, core.name)
-        self.assertEqual(len(CORES), 5)
+        # 기준선 하나 + 연구 코어들. 이 테스트가 아는 것보다 많이 등록되면 걸린다.
+        self.assertEqual(len(CORES), len(RESEARCH_CORES) + 1)
 
     def test_cores_have_distinct_signatures(self):
         signatures = {core.signature for core in CORES.values()}
@@ -200,6 +218,28 @@ class RandomControlTest(unittest.TestCase):
         """파라미터가 같아도 서명이 갈려야 보고서를 구별한다."""
         self.assertNotEqual(JT_RANDOM_K42.signature, JT_K42.signature)
 
+    def test_every_k_has_a_control_that_differs_only_in_the_ranking(self):
+        """**K마다 대조군이 따로 있어야 한다.**
+
+        K를 늘리면 무작위 선택도 같이 좋아질 수 있다(장기 보유·시장 표류·회전 감소).
+        같은 K의 무작위와 견주지 않으면 "보유기간이 좋아진 것"과 "랭킹이 좋아진 것"을
+        가를 수 없다.
+        """
+        for hold, rs, control in K_PAIRS:
+            with self.subTest(hold=hold):
+                self.assertEqual(
+                    asdict(control.policy.parameters), asdict(rs.policy.parameters)
+                )
+                self.assertEqual(control.policy.parameters.max_hold_sessions, hold)
+                self.assertEqual(control.exit_mode, rs.exit_mode)
+                self.assertEqual(control.regime_mode, rs.regime_mode)
+                self.assertEqual(
+                    control.require_earnings_calendar, rs.require_earnings_calendar
+                )
+                self.assertEqual(control.entry_mode, "RANDOM")
+                self.assertEqual(rs.entry_mode, "RS_ONLY")
+                self.assertNotEqual(control.signature, rs.signature)
+
 
 class SingleDifferenceTest(unittest.TestCase):
     """비교하려는 두 코어는 딱 하나만 달라야 한다."""
@@ -213,6 +253,22 @@ class SingleDifferenceTest(unittest.TestCase):
         self.assertEqual(JT_K21.policy.parameters.max_hold_sessions, 21)
         self.assertEqual(JT_K42.policy.parameters.max_hold_sessions, 42)
         self.assertEqual(JT_K21.exit_mode, JT_K42.exit_mode)
+
+    def test_the_k_ladder_differs_only_in_the_holding_period(self):
+        """K=42·63·84는 `max_hold_sessions` 하나만 다르다.
+
+        이것이 깨지면 "K를 늘렸더니 좋아졌다"를 K에 귀속할 수 없다.
+        """
+        for hold, rs, _ in K_PAIRS:
+            with self.subTest(hold=hold):
+                self.assertEqual(rs.policy.parameters.max_hold_sessions, hold)
+                self.assertEqual(self.differences(JT_K42, rs) - {"max_hold_sessions"}, set())
+                self.assertEqual(rs.entry_mode, JT_K42.entry_mode)
+                self.assertEqual(rs.exit_mode, JT_K42.exit_mode)
+
+    def test_the_ladder_stops_where_the_signal_study_stopped(self):
+        """신호 연구가 잰 가장 긴 지평이 +84다. 그 밖은 근거가 없다."""
+        self.assertEqual(max(hold for hold, _, _ in K_PAIRS), 84)
 
     def test_the_core_exit_run_differs_from_k42_only_in_the_exit(self):
         """K 코어와 core-1 청산의 대비가 성립하려면 진입이 같아야 한다."""
