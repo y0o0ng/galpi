@@ -11,9 +11,14 @@
 |`jt-k42`|RS-only|42세션 만기만|
 |`jt-core-exit`|RS-only|7.5 전부 (최대보유 40)|
 |`jt-random-k42`|무작위 (jt-k42 대조군)|42세션 만기만|
+|`jt-k63`|RS-only|63세션 만기만|
+|`jt-k84`|RS-only|84세션 만기만|
+|`jt-random-k63`|무작위 (jt-k63 대조군)|63세션 만기만|
+|`jt-random-k84`|무작위 (jt-k84 대조군)|84세션 만기만|
 
-`core1`은 동결된 기준선이다(`core1.py` 참고). 나머지 셋은 2026-08-14 J/K 실험용 연구
-코어이고 낙폭 게이트가 해제돼 있어 **PAPER·LIVE에 쓰지 않는다.**
+`core1`은 동결된 기준선이다(`core1.py` 참고). 나머지는 J/K 실험용 연구 코어이고 낙폭
+게이트가 해제돼 있어 **PAPER·LIVE에 쓰지 않는다.** K=21/42와 대조군은 2026-08-14,
+K=63/84와 그 대조군은 2026-08-15 신호 수명 실험에서 왔다.
 """
 
 from __future__ import annotations
@@ -23,10 +28,25 @@ from .definition import CoreDefinition
 from .jt_core_exit import JT_CORE_EXIT
 from .jt_k21 import JT_K21
 from .jt_k42 import JT_K42
+from .jt_k63 import JT_K63
+from .jt_k84 import JT_K84
 from .jt_random_k42 import JT_RANDOM_K42
+from .jt_random_k63 import JT_RANDOM_K63
+from .jt_random_k84 import JT_RANDOM_K84
 
 CORES: dict[str, CoreDefinition] = {
-    core.name: core for core in (CORE1, JT_K21, JT_K42, JT_CORE_EXIT, JT_RANDOM_K42)
+    core.name: core
+    for core in (
+        CORE1,
+        JT_K21,
+        JT_K42,
+        JT_K63,
+        JT_K84,
+        JT_CORE_EXIT,
+        JT_RANDOM_K42,
+        JT_RANDOM_K63,
+        JT_RANDOM_K84,
+    )
 }
 
 __all__ = [
@@ -35,7 +55,11 @@ __all__ = [
     "JT_CORE_EXIT",
     "JT_K21",
     "JT_K42",
+    "JT_K63",
+    "JT_K84",
     "JT_RANDOM_K42",
+    "JT_RANDOM_K63",
+    "JT_RANDOM_K84",
     "PAPER_CORE_V1",
     "CoreDefinition",
 ]

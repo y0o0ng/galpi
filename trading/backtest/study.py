@@ -50,6 +50,8 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass, field
 
+from .control import RandomStats
+
 # 상위군 라벨. `TOP5`는 전략이 실제로 사는 수라 십분위와 별도로 둔다.
 TOP_LABEL = "TOP5"
 ALL_LABEL = "ALL"
@@ -213,47 +215,16 @@ class Study:
                     )
 
 
-@dataclass(frozen=True)
-class RandomStats:
-    """한 지평에서 무작위 시드들이 낸 초과수익의 분포."""
-
-    count: int
-    minimum: float
-    median: float
-    maximum: float
-    mean: float
-    # 시드가 하나뿐이면 흩어짐을 낼 수 없다.
-    stdev: float | None
-    values: tuple[float, ...]
-
-    def beaten_by(self, actual: float | None) -> int:
-        """실제 값이 이긴 무작위 표본 수. **`N/N`이어야 분포 밖이다.**"""
-        if actual is None:
-            return 0
-        return sum(1 for value in self.values if actual > value)
-
-
 def random_stats(study: Study, horizon: int, *, top: bool = False) -> RandomStats | None:
     """무작위 시드들의 초과수익 분포. 시드가 없으면 None이다.
 
     `top=True`면 `top_n` 크기로 뽑은 벌을 본다 — TOP5는 TOP5 크기 분포와만 견준다.
     """
     table = study.random_top_draws if top else study.random_draws
-    values = sorted(
+    return RandomStats.of(
         cell.mean
         for (_, other), cell in table.items()
         if other == horizon and cell.mean is not None
-    )
-    if not values:
-        return None
-    return RandomStats(
-        count=len(values),
-        minimum=values[0],
-        median=statistics.median(values),
-        maximum=values[-1],
-        mean=statistics.fmean(values),
-        stdev=statistics.stdev(values) if len(values) > 1 else None,
-        values=tuple(values),
     )
 
 

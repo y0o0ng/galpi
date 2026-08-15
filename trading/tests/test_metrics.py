@@ -20,6 +20,7 @@ from backtest.loop import (  # noqa: E402
     EquityPoint,
     Trade,
 )
+from backtest.execution import Fill  # noqa: E402
 from backtest.metrics import compute_metrics, daily_returns  # noqa: E402
 
 CAPITAL = 100_000.0
@@ -50,7 +51,8 @@ def curve(equities: list[float], drawdowns: list[float] | None = None) -> tuple:
 
 
 def trade(pnl: float, return_r: float, *, symbol="AAA", exit_reason="MAX_HOLD",
-          fees: float = 5.0, min_qty_exception: bool = False) -> Trade:
+          fees: float = 5.0, min_qty_exception: bool = False,
+          sessions_held: int = 10) -> Trade:
     return Trade(
         symbol=symbol,
         entry_date="2026-01-01",
@@ -66,8 +68,22 @@ def trade(pnl: float, return_r: float, *, symbol="AAA", exit_reason="MAX_HOLD",
         return_r=return_r,
         mfe_r=max(return_r, 0.0),
         mae_r=min(return_r, 0.0),
-        sessions_held=10,
+        sessions_held=sessions_held,
         min_qty_exception=min_qty_exception,
+    )
+
+
+def buy(notional: float) -> Fill:
+    """매수 체결 하나. 회전율은 체결 금액에서 나온다."""
+    return Fill(
+        symbol="AAA",
+        trade_date="2026-01-01",
+        side="BUY",
+        shares=1,
+        reference_price=notional,
+        fill_price=notional,
+        fees=0.0,
+        reason="OPEN_FILL",
     )
 
 
@@ -77,6 +93,7 @@ def make_result(
     *,
     require_earnings_calendar: bool = True,
     require_sector: bool = True,
+    fills: tuple = (),
 ) -> BacktestResult:
     config = BacktestConfig(
         source_version="v1",
@@ -91,7 +108,7 @@ def make_result(
         trades=tuple(trades),
         equity_curve=curve(equities),
         open_positions=(),
-        fills=(),
+        fills=tuple(fills),
         skip_counts={},
         fill_counts={},
         exit_counts={},
@@ -204,6 +221,56 @@ class MetricValueTest(unittest.TestCase):
             )
         )
         self.assertAlmostEqual(metrics.min_qty_exception_share, 0.5)
+
+    def test_turnover_is_bought_notional_over_equity_per_year(self):
+        """자산 100,000이 그대로일 때 200,000어치를 샀으면 2배 회전이다.
+
+        세션 수로 연율화하므로 같은 매수라도 구간이 길면 연 회전율은 낮다.
+        """
+        sessions = 4
+        result = make_result(
+            [CAPITAL] * sessions,
+            (trade(0.0, 0.0),),
+            fills=(buy(120_000.0), buy(80_000.0)),
+        )
+        years = sessions / TRADING_DAYS_PER_YEAR
+        self.assertAlmostEqual(
+            compute_metrics(result).turnover, 200_000.0 / CAPITAL / years
+        )
+
+    def test_only_buys_count_toward_turnover(self):
+        """**구간 끝에 열려 있는 자리는 팔지 않았다.** 매도로 세면 그만큼 빠진다."""
+        sold = Fill(
+            symbol="AAA", trade_date="2026-01-02", side="SELL", shares=1,
+            reference_price=90_000.0, fill_price=90_000.0, fees=0.0,
+            reason="MAX_HOLD",
+        )
+        bought = make_result([CAPITAL] * 4, (), fills=(buy(100_000.0),))
+        both = make_result([CAPITAL] * 4, (), fills=(buy(100_000.0), sold))
+        self.assertAlmostEqual(
+            compute_metrics(bought).turnover, compute_metrics(both).turnover
+        )
+
+    def test_no_fills_means_no_turnover(self):
+        self.assertAlmostEqual(compute_metrics(make_result([CAPITAL] * 4)).turnover, 0.0)
+
+    def test_average_hold_is_measured_not_assumed(self):
+        """**만기 청산만 있어도 `max_hold_sessions`와 같지 않다.**
+
+        폐지·정지로 일찍 끝나는 거래가 있어서 실제 평균은 K보다 짧다. 규칙값을 그대로
+        적으면 K 비교에서 "실제로 얼마나 들고 있었나"를 못 본다.
+        """
+        result = make_result(
+            [CAPITAL] * 4,
+            (
+                trade(10.0, 1.0, sessions_held=42),
+                trade(-5.0, -0.5, sessions_held=8, exit_reason="DELISTED_EXIT"),
+            ),
+        )
+        self.assertAlmostEqual(compute_metrics(result).avg_hold_sessions, 25.0)
+
+    def test_no_trades_means_no_average_hold(self):
+        self.assertIsNone(compute_metrics(make_result([CAPITAL] * 4)).avg_hold_sessions)
 
     def test_an_empty_run_does_not_crash(self):
         metrics = compute_metrics(make_result([], ()))
