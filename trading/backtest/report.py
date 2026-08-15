@@ -327,6 +327,7 @@ def judgment_payload(
     walk_forward: WalkForwardReport | None = None,
     stressed: Metrics | None = None,
     neighbourhood: NeighbourhoodReport | None = None,
+    holdout: dict | None = None,
 ) -> dict:
     """실행 간 diff용 JSON. 마크다운과 같은 재료를 구조로만 남긴다."""
     config = result.config
@@ -366,6 +367,10 @@ def judgment_payload(
         payload["gating_performance"] = [asdict(row) for row in gating]
     if stressed is not None:
         payload["stressed_metrics"] = asdict(stressed)
+    # 홀드아웃을 봤는지가 결과 자체에 남는다. 파일만 보고도 "이 숫자는 표본 밖 구간을
+    # 소모한 것인가"를 답할 수 있어야 한다.
+    if holdout is not None:
+        payload["holdout"] = dict(holdout)
     if walk_forward is not None:
         payload["walk_forward"] = {
             "positive_fold_share": walk_forward.positive_fold_share,

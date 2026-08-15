@@ -12,8 +12,9 @@
 않고, `record_holdout_run`을 부르지 않는다.
 
 **경계는 코어마다 같아야 한다.** K가 다르면 `plan_walk_forward`의 최소 구간 조건도 달라
-지므로, 경계는 각 코어의 정책이 아니라 **동결된 `core1`으로 한 번 계산한다.** 홀드아웃은
-정책이 아니라 달력 위의 한 구간이다.
+지므로, 경계는 각 코어의 정책이 아니다. 홀드아웃은 정책이 아니라 달력 위의 한 구간이고,
+그 날짜는 `backtest/holdout.py`의 `HOLDOUT_START` 하나가 정본이다. 동결된 `core1`으로 낸
+`plan_walk_forward` 값은 상수와 어긋나지 않는지 확인하는 데만 쓴다.
 
 ## 판정은 `UNDETERMINED`가 맞다
 
@@ -36,6 +37,11 @@ TRADING_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest import store  # noqa: E402
+from backtest.holdout import (  # noqa: E402
+    HOLDOUT_START,
+    check_derived_holdout,
+    research_sessions,
+)
 from backtest.loop import BacktestConfig, run_backtest, save_run  # noqa: E402
 from backtest.metrics import compute_metrics  # noqa: E402
 from backtest.modes import LAST_CLOSE_EXIT, UNRESOLVED_EXIT_PRICES  # noqa: E402
@@ -76,7 +82,12 @@ RANDOM_SEEDS = tuple(range(10))
 
 
 def research_window(connection) -> tuple[str, str, str]:
-    """`(시작, 끝, 홀드아웃 시작)`. 끝은 홀드아웃 시작 직전 세션이다."""
+    """`(시작, 끝, 홀드아웃 시작)`. 끝은 `HOLDOUT_START` 직전 세션이다.
+
+    경계는 `backtest/holdout.py`의 상수가 정한다. `plan_walk_forward`가 내는 값은 적재분
+    마지막 세션에서 거꾸로 센 것이라 바를 더 받으면 움직이므로, 여기서는 **상수와 어긋나지
+    않는지 확인하는 데만** 쓴다.
+    """
     baseline = PAPER_CORE_V1.parameters
     plan = plan_walk_forward(
         connection,
@@ -96,11 +107,12 @@ def research_window(connection) -> tuple[str, str, str]:
             (REFERENCE_SYMBOL, SOURCE_VERSION, BARS_START),
         )
     ]
-    holdout_start = plan.holdout.start
+    check_derived_holdout(plan.holdout.start)
+    research = research_sessions(sessions)
     return (
-        sessions[baseline.min_history_sessions],
-        sessions[sessions.index(holdout_start) - 1],
-        holdout_start,
+        research[baseline.min_history_sessions],
+        research[-1],
+        HOLDOUT_START,
     )
 
 
