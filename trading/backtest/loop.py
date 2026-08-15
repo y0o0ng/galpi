@@ -140,6 +140,10 @@ class EquityPoint:
     # 벌었는지는 실행이 끝난 뒤에 묻게 되는데 그때는 다시 만들 수 없다.
     market_regime: str
     open_positions: int
+    # 그날 열려 있는 계획 위험의 자산 대비 비율. **슬롯 수를 바꾸면 자리가 얼마나 찼는가와
+    # 위험 예산을 얼마나 썼는가가 갈린다** — 자리가 다 차도 예산이 남을 수 있고 그 반대도
+    # 된다. 실행이 끝난 뒤에는 다시 만들 수 없어서 여기 남긴다.
+    open_risk_fraction: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -489,7 +493,7 @@ def run_backtest(
             curve.append(
                 EquityPoint(
                     trade_date, equity, cash, exposure, drawdown, "UNKNOWN",
-                    market_label, len(open_trades),
+                    market_label, len(open_trades), account.open_risk_fraction,
                 )
             )
             previous_equity = equity
@@ -498,7 +502,7 @@ def run_backtest(
         curve.append(
             EquityPoint(
                 trade_date, equity, cash, exposure, drawdown, regime.state,
-                market_label, len(open_trades),
+                market_label, len(open_trades), account.open_risk_fraction,
             )
         )
         previous_equity = equity

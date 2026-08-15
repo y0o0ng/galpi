@@ -15,10 +15,14 @@
 |`jt-k84`|RS-only|84세션 만기만|
 |`jt-random-k63`|무작위 (jt-k63 대조군)|63세션 만기만|
 |`jt-random-k84`|무작위 (jt-k84 대조군)|84세션 만기만|
+|`jt-{,random-}k{42,84}-s{10,20}`|RS-only / 무작위|같은 K, 슬롯만 나눔 (`jt_slots.py`)|
 
 `core1`은 동결된 기준선이다(`core1.py` 참고). 나머지는 J/K 실험용 연구 코어이고 낙폭
 게이트가 해제돼 있어 **PAPER·LIVE에 쓰지 않는다.** K=21/42와 대조군은 2026-08-14,
-K=63/84와 그 대조군은 2026-08-15 신호 수명 실험에서 왔다.
+K=63/84와 그 대조군은 2026-08-15 신호 수명 실험에서 왔다. `-s10`·`-s20`은 같은 날
+슬롯 용량 실험에서 왔고 **총 계획 위험을 고정한 채 슬롯 수와 거래당 위험을 한 묶음으로
+바꾼다** — 처치가 단위라 여덟 칸이 `jt_slots.py` 한 파일에 있다. `-s5` 칸은 규칙이
+`jt-k42`·`jt-k84`와 정확히 같아서 따로 만들지 않았다.
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ from .jt_k84 import JT_K84
 from .jt_random_k42 import JT_RANDOM_K42
 from .jt_random_k63 import JT_RANDOM_K63
 from .jt_random_k84 import JT_RANDOM_K84
+from .jt_slots import SLOT_CORES
 
 CORES: dict[str, CoreDefinition] = {
     core.name: core
@@ -46,6 +51,7 @@ CORES: dict[str, CoreDefinition] = {
         JT_RANDOM_K42,
         JT_RANDOM_K63,
         JT_RANDOM_K84,
+        *SLOT_CORES,
     )
 }
 
@@ -61,5 +67,6 @@ __all__ = [
     "JT_RANDOM_K63",
     "JT_RANDOM_K84",
     "PAPER_CORE_V1",
+    "SLOT_CORES",
     "CoreDefinition",
 ]
