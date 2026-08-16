@@ -58,15 +58,56 @@ J126 + SMA200 신규진입 gate + K42 + S5 + 현재 sizing/execution/costs
 SMA200`)가 된 **최초 종가**에 청산을 **예약**하고, **다음 거래가능 session의 OPEN**에
 청산한다.
 
-### 판정 시점과 체결 시점을 분리한다
+### 예약 위치 — loop의 어디에서 표시하는가
+
+**`positions.run_session`이 예약하지 않는다.** `run_session`은 그날 **장중** 처리이고 그
+시점에는 오늘 시장 종가를 아직 모른다. 오늘 시장 정보를 포지션의 장중 처리보다 앞으로
+끌어오면 look-ahead다.
+
+정확한 순서는 이렇다 (`backtest/loop.py`의 세 단계).
 
 ```
-t일 종가:   SPY adj close <= SMA200  →  pending_exit = MARKET_TREND_BREAK 예약
-t+1 시초:   execute_market_exit(price_kind="OPEN")
+t일 1단계  기존 포지션 처리 완료          run_session / hold_untraded
+t일 2단계  전일 pending entry 체결 완료   execute_entry
+t일 3단계  마크·자산 → classify_market_regime(...) → regime 확정
+           ↓ 그 직후, ranking 전에
+           모든 open position을 순회해서
+             exit_mode == signal-invalidation
+             AND market.above_sma200 == false
+             AND position.pending_exit is None
+           이면  pending_exit = MARKET_TREND_BREAK
+           ↓
+           ranking · 게이트 · 다음 intent
+
+t+1일 1단계  기존 pending-exit 경로로 OPEN 체결
 ```
 
-**오늘 종가로 판정하고 오늘 종가로 체결하지 않는다.** 이 경로는 `MAX_HOLD`가 쓰는 것과 **정확히 같다** — `positions.run_session` 6번이 예약하고 다음
-세션 2번이 시초로 내보낸다. 새 체결 경로를 만들지 않는다.
+**같은 market-level invalidation을 모두가 받는다** — 오늘 새로 체결된 포지션도, 오늘
+개별 종목 바가 없는 stale 포지션도(그쪽은 1단계에서 `hold_untraded`를 지나 `pending_exit`이
+`None`인 상태로 온다).
+
+`market`을 판정할 수 없는 세션(`FeatureUnavailable`)에는 **아무 표시도 하지 않는다.**
+`gate_new_entries`는 `above_sma200` 필드를 건드리지 않으므로 게이트 적용 전후로 같은 값이다.
+
+**표시가 그날 자산곡선을 바꾸지 않는다** — 마크와 자산은 3단계 시작에서 이미 계산됐고,
+청산은 `t+1`에만 일어난다.
+
+### 전일 pending entry는 사후 취소하지 않는다
+
+```
+t-1 종가:  entry intent 생성 (그때는 SPY > SMA200이었다)
+t일:       기존 규칙대로 entry 실행 (갭 취소·미체결 판정 그대로)
+t일 종가:  market break 판정
+t+1 시초:  MARKET_TREND_BREAK 청산
+```
+
+**이미 승인된 pending entry를 오늘 장 마감 후 시장이 내려갔다는 이유로 취소하지 않는다.**
+그러면 **exit intervention이 entry execution까지 바꾸게 되고** 처치가 둘이 된다. 그런
+포지션은 하루 들고 다음 시초에 나간다 — 규칙의 정직한 결과다.
+
+**오늘 종가로 판정하고 오늘 종가로 체결하지 않는다.** 체결은 `MAX_HOLD`와 **같은
+pending-exit 경로**를 쓴다(`run_session` 2번이 시초로 내보낸다). **새 체결 경로를 만들지
+않는다.**
 
 ### 거래 불가능하면 기존 상태 기계를 따른다
 
@@ -100,8 +141,12 @@ PR #16이 쓰는 **canonical helper `classify_market_regime(...).above_sma200`�
 경우에 사유를 `MARKET_TREND_BREAK`로 덮으면 진단 표가 "이 exit이 보유를 줄였다"고 거짓말을
 한다.
 
-그리고 이 규칙은 **market break가 보유기간을 늘릴 수 없다**는 것도 보장한다 — 이미
-예약된 청산을 미루지 않기 때문이다. **단축했을 때만 새 사유가 붙는다.**
+그리고 이 규칙은 **market break가 예약을 미룰 수 없다**는 것도 보장한다 — 이미 예약된
+청산을 덮지 않기 때문이다.
+
+**다만 "예약이 더 이르다"와 "체결이 더 이르다"는 다르다.** 거래정지·미체결·폐지로 체결이
+원래 K42 deadline 뒤로 밀릴 수 있으므로, **실제 단축 여부는 §8의 체결 기준으로 따로
+센다.**
 
 ---
 
@@ -165,31 +210,62 @@ T = B − F        (노출 타이밍의 몫)
 
 처치가 **실제로 무엇을 했는지** 재는 표다.
 
-- `MARKET_TREND_BREAK` 청산 건수와 비중
-- **실제로 K42보다 보유기간을 단축한 거래 수** (§4의 precedence 때문에
-  `MARKET_TREND_BREAK`로 기록된 거래는 정의상 전부 여기 해당한다)
-- **단축 세션 분포** (평균 · 중앙 · 최소 · 최대)
-- 거래 수 · 진입 수 · 노출 · 비용의 변화
-- **exit reason 분포** 전체 (control은 `MAX_HOLD` 442 · `DELISTED_EXIT` 2 ·
-  `UNRESOLVED_EXIT` 1)
+> **`MARKET_TREND_BREAK`를 "정의상 실제 단축"으로 읽지 않는다.** `pending_exit is None`은
+> **그 순간 `MAX_HOLD`가 아직 예약되지 않았다**는 것만 보장한다. 거래정지·미체결·폐지로
+> 실제 체결이 **원래 K42 deadline 뒤로** 밀릴 수 있다. 그래서 신호와 체결을 갈라 센다.
+
+|지표|정의|
+|---|---|
+|`market_break_signals_scheduled`|`pending_exit = MARKET_TREND_BREAK`를 표시한 횟수|
+|`MARKET_TREND_BREAK` fills|그 사유로 실제 청산된 거래 수|
+|**`fills before original K42 deadline`**|그중 체결 시점 `sessions_held < max_hold_sessions`인 것 — **이것만 "actual K42 shortening"이라고 부른다**|
+|`untradeable-delayed market-break exits`|`EXIT_PENDING_UNTRADEABLE`를 거친 market-break 청산|
+|`sessions remaining to K42 at signal`|표시 시점의 `max_hold_sessions − sessions_held` 분포|
+|`signal→fill delay sessions`|표시부터 체결까지 걸린 세션 분포|
+
+**`sessions_held < max_hold_sessions`로 판정하는 이유.** `hold_untraded`는
+`exit_pending_untradeable`면 원래 사유를 그대로 들고 나이만 먹인다. 그래서 표시가 30세션에
+있었고 20세션 거래정지가 끼면 체결 시 `sessions_held`가 50이 되고 **K42 deadline은 이미
+지난 것**이다. 그 경우를 단축으로 세면 진단이 거짓말한다.
+
+그리고 **거래 수 · 진입 수 · 노출 · 비용의 변화**와 **exit reason 분포 전체**를 낸다
+(control은 `MAX_HOLD` 442 · `DELISTED_EXIT` 2 · `UNRESOLVED_EXIT` 1).
 
 ---
 
 ## 9. 판정 우선순위 — 결과 전에 고정
 
-|순위|label|조건|처리|
-|---|---|---|---|
-|**1**|`CURRENT_ECONOMIC_GATE_PASS`|challenger가 현재 numeric economic gate **전체** 통과 — `G > 0` · `total > 0` · `expectancy > 0` · `PF ≥ 1.15` · **`Sharpe ≥ 0.60`** · `MDD ≤ 15%`|**signal exit 유지**|
-|**2**|`PROMOTE_EXIT`|전체 gate는 미달이지만 `ΔG > 0` AND `ΔS > 0` AND `Sharpe_challenger >= Sharpe_control`, 그리고 control이 이미 통과하던 `G > 0` · `expectancy > 0` · `PF ≥ 1.15` · `MDD ≤ 15%`를 **하나도 깨지 않음**|**signal exit 유지**|
-|**3**|`RISK_ONLY`|`ΔG ≤ 0` 또는 `ΔS ≤ 0`인데 risk metric만 의미 있게 개선|**alpha stack에 넣지 않는다.** risk-overlay 후보 메모만 남긴다|
-|**4**|`FAIL`|나머지|**fixed K42 유지**|
+### 9.1 strategy gate는 별도 flag다 — component 판정과 섞지 않는다
 
-**1번이 2번보다 우선한다.** 개별 metric 하나를 최적화하지 않고 최종 strategy
-qualification을 우선한다 — PR #18의 판정 철학과 같다.
+```
+CURRENT_ECONOMIC_GATE_PASS =
+    G > 0 AND total > 0 AND expectancy > 0
+    AND PF >= 1.15 AND Sharpe >= 0.60 AND MDD <= 15%
+```
 
-> **`Sharpe ≥ 0.60`이 현재 유일한 명확한 미달이다.** control이 0.46이다. 그래서 순위 2가
-> `Sharpe_challenger >= Sharpe_control`을 요구한다 — 상대 edge를 올려도 Sharpe를 떨어뜨리면
-> 최종 목표에서는 후퇴다.
+**이것은 challenger가 최종 전략 자격을 갖췄는지를 재는 flag이지 component 승격 조건이
+아니다.** 로드맵 §4의 최종 경제 게이트와 같은 값이고 문턱을 낮추지 않는다.
+
+**이 flag만으로 component를 승격시키지 않는다.** 이번 연구 질문은 **fixed K42 대비 marginal
+improvement**이므로, gate를 통과했더라도 `ΔS`·`ΔG`가 악화된 exit은 "이 exit이 기여했다"는
+뜻이 아니다.
+
+### 9.2 component verdict — 결과 전에 고정
+
+|label|조건|처리|
+|---|---|---|
+|**A** `PROMOTE_EXIT_AND_GATE_PASS`|`CURRENT_ECONOMIC_GATE_PASS` AND `ΔG > 0` AND `ΔS > 0`|**signal exit 유지.** 최종 자격과 marginal 기여가 함께 확인됐다|
+|**B** `PROMOTE_EXIT`|gate는 미달이지만 `ΔG > 0` AND `ΔS > 0` AND `Sharpe_ch >= Sharpe_ctl`, 그리고 control이 이미 통과하던 `G > 0` · `expectancy > 0` · `PF ≥ 1.15` · `MDD ≤ 15%`를 **하나도 깨지 않음**|**signal exit 유지**|
+|**C** `RISK_ONLY`|위 marginal 조건은 실패하지만 **Sharpe 상승 · MDD 감소 · Sortino 상승 · Calmar 상승 중 하나 이상**|**alpha stack에 넣지 않는다.** risk-overlay 후보 메모만 남긴다|
+|**D** `FAIL`|나머지|**fixed K42 유지**|
+
+**`CURRENT_ECONOMIC_GATE_PASS`는 A의 조건 중 하나일 뿐이고 단독 승격 사유가 아니다.**
+gate를 통과했는데 `ΔS ≤ 0` 또는 `ΔG ≤ 0`이면 A가 아니라 C나 D로 간다 — 그 경우 "게이트를
+넘은 것은 control이 이미 하던 일이지 이 exit이 한 일이 아니다"가 정확한 읽기다.
+
+> **`Sharpe ≥ 0.60`이 현재 유일한 명확한 미달이다**(control 0.46). 그래서 B가
+> `Sharpe_ch >= Sharpe_ctl`을 요구한다 — 상대 edge를 올려도 Sharpe를 떨어뜨리면 최종
+> 목표에서는 후퇴다.
 
 ---
 
