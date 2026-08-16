@@ -34,6 +34,7 @@ from core import (  # noqa: E402
     JT_RANDOM_K84,
 )
 from core.definition import RULE_FIELDS, CoreDefinition  # noqa: E402
+from core.jt_slots import SLOT_CORES  # noqa: E402
 
 RESEARCH_CORES = (
     JT_K21,
@@ -66,8 +67,10 @@ class RegistryTest(unittest.TestCase):
     def test_every_core_is_registered_under_its_own_name(self):
         for name, core in CORES.items():
             self.assertEqual(name, core.name)
-        # 기준선 하나 + 연구 코어들. 이 테스트가 아는 것보다 많이 등록되면 걸린다.
-        self.assertEqual(len(CORES), len(RESEARCH_CORES) + 1)
+        # 기준선 하나 + 연구 코어들 + 슬롯 격자. 이 테스트가 아는 것보다 많이 등록되면
+        # 걸린다. 슬롯 코어의 한도 불변식은 `test_slots.py`가 따로 잠근다 — 여기 목록에
+        # 넣으면 "낙폭 한도만 완화됐다"는 엄격한 검사가 `max_positions` 때문에 깨진다.
+        self.assertEqual(len(CORES), len(RESEARCH_CORES) + len(SLOT_CORES) + 1)
 
     def test_cores_have_distinct_signatures(self):
         signatures = {core.signature for core in CORES.values()}
@@ -88,7 +91,7 @@ class ResearchCoreTest(unittest.TestCase):
         포지션이 없으면 자산이 안 움직이고 낙폭도 안 내려가서 영구 잠금이 된다. 연구
         코어에서 이걸 풀지 않으면 실험이 "어느 규칙이 먼저 7%를 찍었나"가 된다.
         """
-        for core in RESEARCH_CORES:
+        for core in RESEARCH_CORES + SLOT_CORES:
             with self.subTest(core=core.name):
                 gate = account_gate(account(0.50), core.policy)
                 self.assertFalse(gate.blocked)
@@ -119,7 +122,7 @@ class ResearchCoreTest(unittest.TestCase):
 
     def test_the_regime_cannot_lock_the_run_up(self):
         """레짐 낙폭이 두 번째 문이었다. `MARKET`은 계좌를 아예 안 본다."""
-        for core in RESEARCH_CORES:
+        for core in RESEARCH_CORES + SLOT_CORES:
             with self.subTest(core=core.name):
                 self.assertEqual(core.regime_mode, "MARKET")
         self.assertEqual(CORE1.regime_mode, "CORE")

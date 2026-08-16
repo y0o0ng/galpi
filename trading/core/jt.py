@@ -64,6 +64,7 @@ from backtest.policy import (
     PAPER_VALIDATION,
     HardLimits,
     PolicyVersion,
+    RiskProfile,
 )
 
 # 낙폭은 정의상 1을 넘을 수 없다. 1.01은 "이 조치는 절대 발동하지 않는다"는 뜻이다.
@@ -89,12 +90,23 @@ MOMENTUM_PARAMETERS = replace(
 )
 
 
-def jt_policy(policy_id: str, note: str, **parameter_changes) -> PolicyVersion:
-    """JT 코어의 정책. 프로필은 기준선과 같고 한도만 연구용이다."""
+def jt_policy(
+    policy_id: str,
+    note: str,
+    *,
+    profile: RiskProfile = PAPER_VALIDATION,
+    limits: HardLimits = RESEARCH_LIMITS,
+    **parameter_changes,
+) -> PolicyVersion:
+    """JT 코어의 정책. 기본 프로필은 기준선과 같고 한도만 연구용이다.
+
+    `profile`·`limits`를 넘기는 곳은 슬롯 용량 실험뿐이다(`jt_slots.py`). 거기서는
+    슬롯 수와 거래당 위험이 **한 묶음으로** 움직여야 해서 둘 다 바꿔야 한다.
+    """
     return PolicyVersion(
         policy_id=policy_id,
-        profile=PAPER_VALIDATION,
-        limits=RESEARCH_LIMITS,
+        profile=profile,
+        limits=limits,
         parameters=replace(MOMENTUM_PARAMETERS, **parameter_changes),
         note=note,
     )
