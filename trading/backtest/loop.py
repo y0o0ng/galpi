@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date
 
@@ -269,10 +270,32 @@ def _track_excursion(open_trade: _OpenTrade, bar: Bar) -> None:
     open_trade.mae_r = min(open_trade.mae_r, low_r)
 
 
+# 관찰자가 "이 후보는 포트폴리오 게이트를 통과했다"를 적는 표식. 거부 사유와 같은 칸에
+# 들어가므로 엔진의 어떤 사유 이름과도 겹치지 않아야 한다.
+#
+# **체결된 거래와 같지 않다.** 게이트를 통과한 주문도 다음 날 `NO_FILL`·`GAP_LIMIT`·
+# `NO_EXECUTION_BAR`으로 빠질 수 있다. "진입"이라고 부르면 진단 표가 체결 수를 말하는
+# 것처럼 읽힌다.
+ACCEPTED = "ACCEPTED"
+
+
 def run_backtest(
-    connection: sqlite3.Connection, config: BacktestConfig
+    connection: sqlite3.Connection,
+    config: BacktestConfig,
+    *,
+    observer: Callable[[str, int, str, str], None] | None = None,
 ) -> BacktestResult:
-    """구간을 하루씩 굴린다. 같은 입력에 같은 결과가 나와야 한다(3.1)."""
+    """구간을 하루씩 굴린다. 같은 입력에 같은 결과가 나와야 한다(3.1).
+
+    `observer`는 **읽기 전용 관찰자**다. 후보 하나가 어떻게 끝났는지를
+    `(날짜, 랭크, 종목, 결과)`로 받는다 — 결과는 `ACCEPTED`(게이트 통과)이거나 거부
+    사유다. `ACCEPTED`는 체결이 아니라 주문 수락이다.
+    기본값 `None`이면 아무것도 하지 않으므로 실행 결과에 영향이 없다.
+
+    **이것이 있는 이유는 랭크가 여기서만 살아 있기 때문이다.** `Candidate.rank`는
+    포트폴리오 게이트를 지나면서 버려지고, `skip_counts`에는 사유별 합계만 남는다.
+    "슬롯이 꽉 차서 놓친 후보가 몇 위였나"는 나중에 다시 만들어낼 수 없다.
+    """
     sessions = _sessions_in_range(connection, config)
     # 세션마다 같은 252바를 다시 읽으면 실행이 수십 배 느려진다. 캐시가 as_of를 자르는
     # 책임을 지므로 캐시 경로와 직접 조회 경로가 같은지는 데이터 계약 테스트가 지킨다.
@@ -520,6 +543,14 @@ def run_backtest(
         for candidate in ranking.candidates:
             if len(pending) >= ranking.max_new_entries:
                 _count(skip_counts, "DAILY_ENTRY_CAP")
+                if observer is not None:
+                    for remaining in ranking.candidates[candidate.rank - 1 :]:
+                        observer(
+                            trade_date,
+                            remaining.rank,
+                            remaining.symbol,
+                            "DAILY_ENTRY_CAP",
+                        )
                 break
             working = replace(
                 account, cash=reserved_cash, positions=tuple(reserved)
@@ -536,8 +567,17 @@ def run_backtest(
             )
             if not outcome:
                 _count(skip_counts, outcome.rejection.reason)
+                if observer is not None:
+                    observer(
+                        trade_date,
+                        candidate.rank,
+                        candidate.symbol,
+                        outcome.rejection.reason,
+                    )
                 continue
             intent = outcome.intent
+            if observer is not None:
+                observer(trade_date, candidate.rank, candidate.symbol, ACCEPTED)
             signal_bars = snapshot.bars(candidate.symbol, 1)
             pending.append((intent, signal_bars[-1]))
             # 같은 날 다음 후보는 이 예약을 반영한 계좌를 본다.
