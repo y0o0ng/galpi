@@ -244,9 +244,37 @@ SPY 매수보유는 **opportunity-cost reference로만** 보고 **promotion crit
 |**C** `RISK_ONLY`|`ΔS ≤ 0`인데 MDD·Sharpe·Calmar만 개선|현재의 낮은 수익 문제를 해결하지 못하므로 **alpha stack에서 탈락.** risk overlay 후보로만 기록|
 |**D** `FAIL`|전체 economics와 matched gap 모두 개선 없음|**SMA200 market gate 종료.** alternate SMA · volatility · BULL-only 탐색 **금지**|
 
-### Phase 2 — 종목 absolute momentum (PR #17)
+### Phase 2 — 종목 absolute momentum (PR #17 신호) — **종료**
 
-시장 게이트가 의미는 있지만 허들을 못 넘을 때만 쓴다.
+시장 게이트가 의미는 있지만 허들을 못 넘을 때만 쓴다. **PR #16이 정확히 그 경우다** —
+label은 `ECONOMICS_AND_RELATIVE_IMPROVED`(경우 2)이고 격차는 +4.99%로 양수가 됐지만
+Sharpe 0.46으로 최종 게이트에 미달했다.
+
+> **2026-08-16 결과 — Phase 2 종료.** PR #17이 `NON_BINDING`으로 끝났다. 유효 paired
+> 날짜 3,385일 중 **TOP5 구성이 바뀐 날이 0일**이라 HARD A 실패이고
+> `DO_NOT_PROMOTE_ABS_TO_PORTFOLIO`다. **ABS 포트폴리오 PR을 열지 않았으므로 뒤 번호가
+> 밀리지 않는다** — 다음은 #18이다. 상세는 `runs/absolute-momentum-signal/README.md`.
+>
+> **문턱·horizon·ranking weight 변경도, SMA/breakout 대안도 열지 않는다.**
+>
+> **2026-08-16 결정 — Phase 2는 두 PR로 나눴다.** 알파 개입은 여전히 **하나**이고 예산을
+> 늘리는 것이 아니다. 하나의 개입을 신호 층과 포트폴리오 층으로 나눠 검증하되, **신호
+> 층에서 실패하면 포트폴리오 백테스트를 하지 않는다.** 실제로 그렇게 끝났다.
+>
+> **2026-08-16 결정 — ungated 팔을 열지 않는다.** 이 문서의 이전 판은 "market gate 없이
+> ABS 단독을 보고 joint도 한 번"이라고 적었으나 **채택하지 않는다.** PR #16의 경우 2가
+> "SMA200을 유지한 채 다음 alpha construction으로 간다"이므로 control은
+> **`J126 + SMA200` 하나**다. `SMA200 vs ABS vs joint interaction`은 새 연구이고 이번
+> 질문이 아니다.
+>
+> 그래서 §3의 **"두 필터가 독립적으로 기여하는 증거가 있을 때만 둘 다"**는 여기서
+> **"ABS가 이미 승격된 SMA200 구조 위에서 추가 marginal contribution을 보여야 한다"**로
+> 적용한다.
+>
+> **Phase 2의 역할은 "마이너스 전략을 살리는 것"이 아니다.** 이미 양의 matched-SPY
+> edge를 가진 구조에서 **상대 edge를 추가로 개선하면서 현재 경제성을 훼손하지 않는가**를
+> 묻는다. 그래서 판정이 Phase 1보다 엄격하다 — 상세는
+> `runs/absolute-momentum-signal/README.md`다.
 
 RS는 상대적 신호다. 시장이 −30%인데 어떤 종목이 −10%면 그게 RS winner가 된다. 그래서
 두 번째 질문은 **"시장보다 강한 것뿐 아니라 이 종목 자체도 상승 추세여야 하지 않는가"**다.
@@ -261,7 +289,13 @@ ABS(126,5)(i,t) = log(P[i, t-5] / P[i, t-126])
 Moskowitz·Ooi·Pedersen의 time-series momentum과 연결된 개념이지만, 그 논문은 주로 선물·
 다자산이라 **우리의 126,5 조건은 논문 복제가 아니라 adaptation이다.**
 
-**하나만으로 충분하면 하나만 쓴다.** 두 필터가 독립적으로 기여하는 증거가 있을 때만 둘 다.
+**하나만으로 충분하면 하나만 쓴다.** ABS는 `J126 + SMA200` 위에서 **추가** marginal
+contribution을 보여야 살아남는다.
+
+**필터 위치는 `candidate eligibility` → `RS 정렬` → `TOP5`다.** 기존 RS TOP5를 뽑고 ABS
+미달만 지우는 방식이 아니다 — ABS 음수인 RS 2등이 빠지면 ABS 양수인 RS 6등이 새 TOP5에
+들어온다. **다만 ABS 양수 후보가 5개 미만이면 그날 TOP5는 5개 미만이고 ABS 음수 종목으로
+backfill하지 않는다.**
 
 ### Phase 3 — Signal Invalidation Exit (PR #18)
 
@@ -407,10 +441,11 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |PR|이름|질문|상태|
 |---|---|---|---|
 |14|Funnel 종료|변환 실패 위치를 특정할 수 있는가|**INCONCLUSIVE · 종료**|
-|15|Market condition signal|RS alpha가 market uptrend에 집중되는가|다음|
-|16|Market entry gate|시장 게이트가 실제 portfolio economics를 개선하는가|—|
-|17|Candidate absolute momentum|relative + absolute가 둘 다 필요한가|조건부|
-|18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|조건부|
+|15|Market condition signal|RS alpha가 market uptrend에 집중되는가|**`PROMOTE_TO_PR16`**|
+|16|Market entry gate|시장 게이트가 실제 portfolio economics를 개선하는가|**`ECONOMICS_AND_RELATIVE_IMPROVED` · 경우 2**|
+|17|Candidate ABS **신호**|ABS-positive 후보에서 다시 뽑은 TOP5가 +42 excess를 높이는가|**`NON_BINDING` · `DO_NOT_PROMOTE`**|
+|—|Candidate ABS **포트폴리오**|—|**NOT OPENED** (#17이 `DO_NOT_PROMOTE`)|
+|18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|**다음**|
 |19|Risk semantics|hard stop인가 volatility sizing인가|—|
 |20|FIP quality|마지막 momentum quality filter|조건부|
 |21|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
@@ -418,7 +453,8 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|—|
 |—|Holdout consumption 인프라|`holdout_consumptions` append-only 추적 (§7 C3-3)|전략 freeze 전 별도 PR|
 
-**"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.**
+**"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.** **PR #17이 `DO_NOT_PROMOTE`로 끝나 ABS 포트폴리오 PR을 열지 않았으므로 번호가 밀리지
+않는다** — 다음은 #18이다. **알파 개입 수는 여전히 넷이고 그중 둘을 썼다.**
 
 ---
 
