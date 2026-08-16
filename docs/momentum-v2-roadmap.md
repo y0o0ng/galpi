@@ -152,6 +152,38 @@ after-cost exposure-matched SPY gap > 0
 
 matched-SPY를 못 이긴 것은 **"아직 전략 아님"**으로 본다.
 
+### 최종 합격 기준과 component marginal contribution은 다른 층이다 (2026-08-16 결정)
+
+위 primary는 **최종 전략의 합격 기준**이고 **그대로 유지한다.** 다만 그것을 **개별
+component의 승격 판정에 그대로 쓰면 메커니즘과 metric이 어긋날 수 있다.**
+
+**노출 일치 벤치마크는 정의상 타이밍을 상쇄한다.** 전략이 시장 게이트로 노출을 끄면
+벤치마크도 같이 꺼지므로, 격차는 *선택 능력*만 재고 *타이밍 능력*은 보지 못한다. PR #13이
+이미 그 현상을 보였다 — "노출 일치 격차는 +1.88%p 개선됐지만 그중 87%가 벤치마크 쪽이다."
+market-timing 처치에서는 그 효과가 훨씬 커진다.
+
+그래서 **최종 게이트는 그대로 두고**, component 판정에서는 전체 경제 변화를 두 경로로
+분해한다.
+
+```
+S = after-cost strategy return
+B = exposure-matched SPY return
+G = S − B
+
+ΔS = S_gate − S_control
+ΔB = B_gate − B_control
+ΔG = G_gate − G_control
+
+ΔS = ΔB + ΔG        (G ≡ S − B이므로 정의상 정확히 닫힌다. 잔차가 없다)
+```
+
+게이트의 전체 경제적 변화가 **노출·타이밍 경로(ΔB)**에서 왔는지 **matched-SPY 상대
+경로(ΔG)**에서 왔는지 가른다.
+
+**이 분해는 최종 합격 기준을 완화하지 않는다.** 최종 전략은 여전히 `G > 0`을 요구한다.
+분해는 component를 alpha stack에 넣을지, timing overlay 후보로 **보존**할지를 가르는 데만
+쓴다.
+
 ---
 
 ## 5. Phase별 계약
@@ -183,6 +215,34 @@ matched-SPY를 못 이긴 것은 **"아직 전략 아님"**으로 본다.
 **PR #16 — Market Gate Portfolio Translation.** J126 / TOP5 / K42 / S5 / 현재 sizing /
 현재 execution 전부 고정. **신규 진입 허용 여부만** 바꾼다. 기존 포지션은 게이트가 꺼져도
 K42까지 들고 간다 — 그래야 entry timing 효과만 잰다.
+
+> **PR #15 결과가 PR #16의 질문을 바꿨다.** J126은 `SPY <= SMA200`에서도 signal-level
+> excess가 **+0.507%로 양수**다(J63은 −1.640%로 반전). 그래서 이 게이트는 **나쁜 거래를
+> 제거하는 처치가 아니라 여전히 양의 alpha를 가진 구간을 포기하는 처치**다.
+>
+> 정확한 질문은 이것이다.
+>
+> > J126이 SMA200 아래에서도 양의 signal edge를 갖는 상황에서, 그 구간의 신규진입을
+> > 포기하는 것이 현재 K42/S5 포트폴리오의 **after-cost economics를 개선하는가?**
+> > 그리고 개선이 있다면 그것이 **노출·타이밍 기여(ΔB)**인지 **matched-SPY 상대
+> > 기여(ΔG)**인지 분해한다.
+>
+> **"나쁜 DOWN 거래를 제거한다"라고 쓰지 않는다.**
+
+**사전등록 secondary** — total return / CAGR · MDD · Sharpe · Calmar · average exposure ·
+exposure reduction · **100% SPY 매수보유 비교**.
+
+SPY 매수보유는 **opportunity-cost reference로만** 보고 **promotion criterion으로 쓰지
+않는다.**
+
+**결과 해석 label — 결과 전에 고정한다.**
+
+|label|조건|처리|
+|---|---|---|
+|**A** `ECONOMICS_AND_RELATIVE_IMPROVED`|`ΔS > 0` AND `ΔG > 0`|SMA200 gate를 다음 momentum strategy construction 단계에 **유지**. **이 label은 `ΔB > 0`을 요구하지 않으므로 "타이밍이 좋아졌다"로 읽지 않는다** — `ΔB`는 따로 본다|
+|**B** `TIMING_BENEFIT_ONLY`|`ΔS > 0` · `ΔG ≤ 0` · MDD 감소 + Sharpe 상승 + Calmar 상승 + exposure 감소|**alpha conversion 개선으로 보지 않는다.** alpha stack에 자동 승격하지 않고 `PARKED_TIMING_OVERLAY_CANDIDATE`로 **보존**한다. 향후 alpha strategy가 경제성 허들을 통과했을 때 risk/timing overlay 단계에서 다시 검토|
+|**C** `RISK_ONLY`|`ΔS ≤ 0`인데 MDD·Sharpe·Calmar만 개선|현재의 낮은 수익 문제를 해결하지 못하므로 **alpha stack에서 탈락.** risk overlay 후보로만 기록|
+|**D** `FAIL`|전체 economics와 matched gap 모두 개선 없음|**SMA200 market gate 종료.** alternate SMA · volatility · BULL-only 탐색 **금지**|
 
 ### Phase 2 — 종목 absolute momentum (PR #17)
 

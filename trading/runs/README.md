@@ -32,6 +32,7 @@
 |`j126-portfolio-translation/`|#13|포트폴리오|J126 신호 우위가 포트폴리오로 번역되는가|**되지 않는다.** 개발 기준선은 J63 유지|
 |`signal-to-portfolio-funnel/`|#14|진단|우위가 어느 단계에서 사라지는가|**`NO_CLEAR_STAGE` · `INCONCLUSIVE`**|
 |`market-condition-signal/`|#15|신호|RS alpha가 `SPY > SMA200`에 집중되는가 (**confirmatory re-cut**)|`PROMOTE_TO_PR16` · 연도 `CONCENTRATED`|
+|`market-gate-portfolio/`|#16|포트폴리오|SMA200 신규진입 게이트가 economics를 개선하는가|`ECONOMICS_AND_RELATIVE_IMPROVED` · 최종 게이트는 여전히 미달|
 
 ## 폴더를 층별 하위 디렉터리로 옮기지 않은 이유
 
