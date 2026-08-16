@@ -56,7 +56,7 @@ from core.core1 import PAPER_CORE_V1
 from .positions import Position, hold_untraded, run_session
 from .regime import Regime, classify_market_regime, classify_regime
 from .risk import account_gate, evaluate_candidate
-from .sizing import AccountState, OpenPosition, SizedIntent
+from .sizing import AccountState, Caps, OpenPosition, SizedIntent
 
 
 @dataclass(frozen=True)
@@ -178,8 +178,69 @@ class _OpenTrade:
     mae_r: float = 0.0
 
 
+@dataclass(frozen=True)
+class _Pending:
+    """어제 만들어 오늘 집행할 주문 하나.
+
+    `intent`·`signal_bar`가 집행이 쓰는 전부이고 나머지 셋은 **관찰자만 읽는다.** 신호일과
+    랭크와 상한은 intent를 만든 자리에서만 알 수 있는데, 그 자리와 집행 자리가 하루
+    떨어져 있어서 여기에 실어 옮기지 않으면 다시 만들어낼 수 없다.
+    """
+
+    intent: SizedIntent
+    signal_bar: Bar
+    signal_date: str
+    rank: int
+    caps: Caps | None
+
+
+@dataclass(frozen=True)
+class EntryEvent:
+    """게이트를 통과한 주문 하나가 다음 세션에서 어떻게 끝났는가. 읽기 전용 관찰이다.
+
+    **`fill`이 있으면 포지션이 열렸고, 없으면 `cancel_reason`이 이유다.** 둘 다 있는
+    경우는 없다 — `INSUFFICIENT_CASH`는 체결가가 나온 뒤에 걸리지만 포지션은 열리지
+    않았으므로 취소로 적는다.
+
+    이것이 있는 이유는 `SizedIntent`와 `Caps`가 여기서만 살아 있기 때문이다. 게이트를
+    지나면 수량·손절폭·계획 위험·구속 제약이 전부 버려지고, 결과에는 체결된 주식 수만
+    남는다. "어느 상한이 수량을 정했나"는 나중에 다시 만들어낼 수 없고, 진단용으로 다시
+    계산하면 그 계산이 엔진과 갈릴 자리가 생긴다.
+    """
+
+    signal_date: str
+    rank: int
+    intent: SizedIntent
+    caps: Caps | None
+    execution_date: str
+    fill: Fill | None
+    cancel_reason: str | None
+
+
 def _count(counter: dict[str, int], key: str) -> None:
     counter[key] = counter.get(key, 0) + 1
+
+
+def _observe_entry(
+    entry_observer: "Callable[[EntryEvent], None] | None",
+    order: "_Pending",
+    execution_date: str,
+    fill: Fill | None,
+    cancel_reason: str | None,
+) -> None:
+    if entry_observer is None:
+        return
+    entry_observer(
+        EntryEvent(
+            signal_date=order.signal_date,
+            rank=order.rank,
+            intent=order.intent,
+            caps=order.caps,
+            execution_date=execution_date,
+            fill=fill,
+            cancel_reason=cancel_reason,
+        )
+    )
 
 
 def _sessions_in_range(
@@ -284,6 +345,7 @@ def run_backtest(
     config: BacktestConfig,
     *,
     observer: Callable[[str, int, str, str], None] | None = None,
+    entry_observer: Callable[[EntryEvent], None] | None = None,
 ) -> BacktestResult:
     """구간을 하루씩 굴린다. 같은 입력에 같은 결과가 나와야 한다(3.1).
 
@@ -295,6 +357,14 @@ def run_backtest(
     **이것이 있는 이유는 랭크가 여기서만 살아 있기 때문이다.** `Candidate.rank`는
     포트폴리오 게이트를 지나면서 버려지고, `skip_counts`에는 사유별 합계만 남는다.
     "슬롯이 꽉 차서 놓친 후보가 몇 위였나"는 나중에 다시 만들어낼 수 없다.
+
+    `entry_observer`는 그 다음 칸을 본다 — 게이트를 통과한 주문이 **다음 세션에서**
+    체결됐는지 취소됐는지를 `EntryEvent` 하나로 받는다. 수량 계산 결과와 상한이 여기
+    실려 나가므로 진단이 sizing을 다시 계산할 필요가 없다. 마찬가지로 읽기 전용이고
+    `None`이면 아무 일도 하지 않는다.
+
+    **구간 마지막 세션에 만든 주문은 이벤트가 없다.** 집행할 다음 세션이 없기 때문이다.
+    관찰자를 쓰는 쪽이 `ACCEPTED` 수와 이벤트 수의 차이로 그 건수를 센다.
     """
     sessions = _sessions_in_range(connection, config)
     # 세션마다 같은 252바를 다시 읽으면 실행이 수십 배 느려진다. 캐시가 as_of를 자르는
@@ -308,7 +378,7 @@ def run_backtest(
     prior_week_pnl = 0.0
 
     open_trades: dict[str, _OpenTrade] = {}
-    pending: list[tuple[SizedIntent, Bar]] = []
+    pending: list[_Pending] = []
     trades: list[Trade] = []
     fills: list[Fill] = []
     curve: list[EquityPoint] = []
@@ -392,26 +462,41 @@ def run_backtest(
                 _track_excursion(open_trade, bar)
 
         # 2. 어제 만든 intent를 오늘 집행한다. 미체결은 하루만 살고 사라진다.
-        for intent, signal_bar in pending:
+        for order in pending:
+            intent = order.intent
             pair = _bars_for(snapshot, intent.symbol)
             if pair is None:
                 _count(skip_counts, "NO_EXECUTION_BAR")
+                _observe_entry(
+                    entry_observer, order, trade_date, None, "NO_EXECUTION_BAR"
+                )
                 continue
             _, bar = pair
             outcome = execute_entry(
                 intent,
-                signal_bar,
+                order.signal_bar,
                 bar,
                 costs=config.costs,
                 parameters=config.policy.parameters,
             )
             if not outcome:
                 _count(skip_counts, outcome.cancellation.reason)
+                _observe_entry(
+                    entry_observer,
+                    order,
+                    trade_date,
+                    None,
+                    outcome.cancellation.reason,
+                )
                 continue
             fill = outcome.fill
             if cash + fill.cash_delta < 0:
                 _count(skip_counts, "INSUFFICIENT_CASH")
+                _observe_entry(
+                    entry_observer, order, trade_date, None, "INSUFFICIENT_CASH"
+                )
                 continue
+            _observe_entry(entry_observer, order, trade_date, fill, None)
             cash += fill.cash_delta
             fills.append(fill)
             _count(fill_counts, fill.reason)
@@ -430,7 +515,7 @@ def run_backtest(
             result = run_session(
                 open_trade.position,
                 bar,
-                signal_bar,
+                order.signal_bar,
                 costs=config.costs,
                 next_earnings=next_earnings(intent.symbol),
                 exit_mode=config.exit_mode,
@@ -579,7 +664,15 @@ def run_backtest(
             if observer is not None:
                 observer(trade_date, candidate.rank, candidate.symbol, ACCEPTED)
             signal_bars = snapshot.bars(candidate.symbol, 1)
-            pending.append((intent, signal_bars[-1]))
+            pending.append(
+                _Pending(
+                    intent=intent,
+                    signal_bar=signal_bars[-1],
+                    signal_date=trade_date,
+                    rank=candidate.rank,
+                    caps=outcome.caps,
+                )
+            )
             # 같은 날 다음 후보는 이 예약을 반영한 계좌를 본다.
             reserved.append(
                 OpenPosition(
