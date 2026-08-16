@@ -797,7 +797,7 @@ def _verdict(primary: dict, ndx: dict | None) -> list[str]:
         )
     lines += ["", f"### 최종 판정 — **{verdicts['verdict']}**", ""]
     if verdicts["verdict"] == PROMOTE:
-        lines += ["PR #18(ABS Portfolio Translation)을 **사용자 승인 후에만** 연다."
+        lines += ["**ABS Portfolio Translation**을 **사용자 승인 후에만** 연다."
                   " 이 판정은 \"ABS가 신호 층에서 살아남았다\"까지이고 **포트폴리오"
                   " economics는 아직 재지 않았다.**", ""]
     else:

@@ -213,8 +213,8 @@ SMA200 게이트가 이미 켜져 있으므로 **ABS가 거의 아무 일도 안
 
 **5%는 promotion threshold가 아니라 해석 label일 뿐이다.**
 
-**단 `NON_BINDING`이면 처치가 실제로 아무것도 바꾸지 않았으므로 PR #18로 승격하지
-않는다.** `LOW_BINDING`이라도 신호 증거가 강하면 자동 탈락시키지 않는다.
+**단 `NON_BINDING`이면 처치가 실제로 아무것도 바꾸지 않았으므로 ABS Portfolio
+Translation으로 승격하지 않는다.** `LOW_BINDING`이라도 신호 증거가 강하면 자동 탈락시키지 않는다.
 
 **`LOW_BINDING`에 추가 promotion threshold를 만들지 않는다.** 대신 희소한 몇 날짜에
 의존하는지가 드러나도록 다음을 보고한다.
@@ -277,7 +277,7 @@ ABS-positive pool effect**인지 구분하는 것이다. 랭킹과 무관하게 
 
 ---
 
-## 11. PR #18 승격 규칙 — 결과 전에 고정
+## 11. ABS Portfolio Translation 승격 규칙 — 결과 전에 고정
 
 |기준|조건|
 |---|---|
@@ -327,12 +327,12 @@ portfolio backtest · 새 `CoreDefinition` · sizing 변경 · exit 변경 · SM
 J/K/슬롯 변경 · ABS 문턱 사다리 · ABS horizon 사다리 · FIP · hard stop · dynamic exit ·
 holdout 소모.
 
-**결과가 좋아도 PR #18을 자동 구현하지 않는다.** 결과를 보여주고 **사용자 승인을
+**결과가 좋아도 ABS Portfolio Translation을 자동 구현하지 않는다.** 결과를 보여주고 **사용자 승인을
 기다린다.**
 
 ---
 
-## 14. PR #18 판정 철학 — 지금 미리 기록한다
+## 14. ABS Portfolio Translation 판정 철학 — 지금 미리 기록한다
 
 **PR #16의 market-timing용 6-label을 그대로 재사용하지 않는다.** ABS는 market-timing
 intervention이 아니라 **candidate-selection intervention**이라 핵심이 matched-SPY relative
