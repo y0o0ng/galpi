@@ -186,5 +186,5 @@
     "DELISTED_EXIT": 2
   },
   "sessions": 4677,
-  "gate_blocked_sessions": 1027
+  "below_sma200_sessions": 1027
 }

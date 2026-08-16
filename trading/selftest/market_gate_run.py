@@ -21,7 +21,7 @@ PR #15가 잰 값이다 — J63은 `SPY <= SMA200`에서 alpha가 **-1.640%**로
 현상을 보였다 — "격차 +1.88%p 개선 중 87%가 벤치마크 쪽". market-timing 처치에서는 그
 효과가 훨씬 커진다.
 
-    S = 세후 전략 총수익
+    S = 비용 후 전략 총수익
     B = 노출 일치 SPY 총수익
     G = S - B
 
@@ -80,6 +80,7 @@ SLUGS = {CONTROL: "control", CHALLENGER: "gated"}
 
 # 벤치마크 표의 줄 위치. `benchmark_table`이 세 줄을 이 순서로 낸다.
 MATCHED = 0  # 일별 노출 일치
+FIXED_EXPOSURE = 1  # 평균 노출 고정
 BUY_AND_HOLD = 2  # 100% 보유
 
 # §5 사전등록 label. 결과를 보고 바꾸지 않는다.
@@ -178,8 +179,11 @@ def stage_run(connection, core_key: str, scenario: str) -> int:
         "skip_counts": result.skip_counts,
         "exit_counts": result.exit_counts,
         "sessions": len(result.equity_curve),
-        # 게이트가 실제로 며칠을 닫았는가. control에서는 0이어야 한다.
-        "gate_blocked_sessions": sum(
+        # **시장이 SMA200 아래였던 세션 수다. 게이트가 막은 수가 아니다.**
+        # 시장 라벨은 두 팔에서 같으므로 이 값도 두 팔에서 같다 — 그래서 control과 비교하면
+        # "게이트가 며칠을 닫았나"가 아니라 "그런 날이 며칠이었나"를 읽는다. 실제 차단 수는
+        # `REGIME_*` halt로 따로 센다(`gate_halted_sessions`).
+        "below_sma200_sessions": sum(
             1
             for point in result.equity_curve
             if point.market_regime not in ("UNKNOWN",)
@@ -196,6 +200,19 @@ def stage_run(connection, core_key: str, scenario: str) -> int:
           f" · 격차 {metrics.total_return - matched:+.2%}")
     print(f"  → {path.name}")
     return 0
+
+
+def gate_halted_sessions(run: dict) -> int:
+    """게이트가 **실제로** 랭킹을 멈춘 세션 수. `REGIME_*` halt를 센다.
+
+    `below_sma200_sessions`와 다르다 — 그쪽은 시장이 SMA200 아래였던 날 수이고 두 팔에서
+    같다. 이쪽은 처치가 실제로 작동한 횟수라 control에서 0이어야 한다.
+    """
+    return sum(
+        count
+        for key, count in run["skip_counts"].items()
+        if key.startswith("REGIME_")
+    )
 
 
 def _above_sma200(market_regime: str) -> bool:
@@ -219,7 +236,17 @@ def decompose(control: dict, gated: dict) -> dict:
 
     s_control, b_control, g_control = arm(control)
     s_gate, b_gate, g_gate = arm(gated)
+    # 보조 분해. `F`는 평균 노출을 고정한 SPY이고 `T = B − F`가 **노출 타이밍**의 몫이다.
+    # `B`를 통째로 "타이밍"이라고 부르면 평균 노출 수준 변화까지 타이밍으로 읽게 된다.
+    f_control = control["benchmark"][FIXED_EXPOSURE]["total_return"]
+    f_gate = gated["benchmark"][FIXED_EXPOSURE]["total_return"]
     return {
+        "F_control": f_control,
+        "F_gate": f_gate,
+        "delta_F": f_gate - f_control,
+        "T_control": b_control - f_control,
+        "T_gate": b_gate - f_gate,
+        "delta_T": (b_gate - f_gate) - (b_control - f_control),
         "S_control": s_control,
         "S_gate": s_gate,
         "B_control": b_control,
@@ -475,7 +502,7 @@ def _decomposition(control: dict, gated: dict) -> list[str]:
              " 못한다. 그래서 전체 변화를 두 경로로 가른다.", "",
              "|값|게이트 없음|SMA200 게이트|**Δ**|",
              "|---|---|---|---|",
-             f"|`S` 세후 전략 총수익|{_pct(delta['S_control'])}|{_pct(delta['S_gate'])}"
+             f"|`S` 비용 후 전략 총수익|{_pct(delta['S_control'])}|{_pct(delta['S_gate'])}"
              f"|**{_pct(delta['delta_S'])}**|",
              f"|`B` 노출 일치 SPY|{_pct(delta['B_control'])}|{_pct(delta['B_gate'])}"
              f"|**{_pct(delta['delta_B'])}**|",
@@ -544,11 +571,13 @@ def _gate_activity(control: dict, gated: dict) -> list[str]:
     lines = ["## 4. 게이트가 실제로 무엇을 했는가", "",
              "|항목|게이트 없음|SMA200 게이트|", "|---|---|---|"]
     sessions = gated["sessions"]
-    blocked = gated["gate_blocked_sessions"]
+    below = gated["below_sma200_sessions"]
     lines += [
         f"|세션|{control['sessions']:,}|{sessions:,}|",
-        f"|`SPY <= SMA200` 세션|{control['gate_blocked_sessions']:,}"
-        f"|{blocked:,} ({blocked / sessions:.1%})|",
+        f"|`SPY <= SMA200` 세션 (시장 사실)|{control['below_sma200_sessions']:,}"
+        f"|{below:,} ({below / sessions:.1%})|",
+        f"|**게이트가 실제로 멈춘 세션** (`REGIME_*`)|"
+        f"**{gate_halted_sessions(control):,}**|**{gate_halted_sessions(gated):,}**|",
         f"|진입|{control['capacity']['entries']:,}|{gated['capacity']['entries']:,}|",
         f"|진입/년|{_num(control['capacity']['entries_per_year'], 1)}"
         f"|{_num(gated['capacity']['entries_per_year'], 1)}|",
@@ -574,14 +603,10 @@ def _gate_activity(control: dict, gated: dict) -> list[str]:
             f"|`{reason}`|{control['skip_counts'].get(reason, 0):,}"
             f"|{gated['skip_counts'].get(reason, 0):,}|"
         )
-    gate_halts = sum(
-        count
-        for key, count in gated["skip_counts"].items()
-        if key.startswith("REGIME_")
-    )
-    lines += [f"|`REGIME_*` (게이트 차단)|"
-              f"{sum(c for k, c in control['skip_counts'].items() if k.startswith('REGIME_')):,}"
-              f"|**{gate_halts:,}**|", "",
+    lines += ["",
+              "**두 줄은 다른 것을 센다.** `SPY <= SMA200` 세션은 **시장의 사실**이라 두"
+              " 팔에서 같고, 게이트가 멈춘 세션은 **처치가 실제로 작동한 횟수**라 control에서"
+              " 0이다. 앞의 값을 게이트 효과로 읽지 않는다.", "",
               f"게이트 표식은 `{TREND_GATE_BLOCKED}`이고 상태 이름은 바꾸지 않는다 —"
               " 레짐별 성과표를 control과 그대로 견줄 수 있다.", ""]
     return lines
@@ -656,11 +681,37 @@ def _verdict(control: dict, gated: dict) -> list[str]:
         lines += ["**alpha stack 승격이 아니다.** 사용자 검토 없이 alternate SMA ·"
                   " volatility gate · BULL-only 같은 대안을 열지 않는다.", ""]
 
-    lines += ["### `ΔB`는 label과 따로 읽는다", "",
+    lines += ["### `ΔB`는 label과 따로 읽고, `ΔB`를 타이밍 자체로 읽지도 않는다", "",
               f"`ΔB = {_pct(delta['delta_B'])}`. **승격 label은 `ΔS > 0`과 `ΔG > 0`만"
               " 요구하고 `ΔB`의 부호를 요구하지 않는다.** 그래서 이 label을 \"타이밍이"
               " 좋아졌다\"로 읽지 않는다 — 이름을 `ECONOMICS_AND_RELATIVE_IMPROVED`로 둔"
               " 이유가 그것이다.",
+              "",
+              "**그리고 `ΔB` 자체도 타이밍이 아니다.** 벤치마크 표에 이미 있는 \"평균 노출"
+              " 고정\" 줄(`F`)로 한 번 더 가른다. **새 promotion criterion이 아니라 기존"
+              " secondary의 해석 정정이다.**",
+              "",
+              "```",
+              "F = 평균 노출 고정 SPY",
+              "T = B − F        (노출 타이밍의 몫)",
+              "ΔB = ΔF + ΔT     (T ≡ B − F이므로 정의상 닫힌다)",
+              "```",
+              "",
+              "|값|게이트 없음|SMA200 게이트|Δ|",
+              "|---|---|---|---|",
+              f"|`B` 일별 노출 일치|{_pct(delta['B_control'])}|{_pct(delta['B_gate'])}"
+              f"|**{_pct(delta['delta_B'])}**|",
+              f"|`F` 평균 노출 고정|{_pct(delta['F_control'])}|{_pct(delta['F_gate'])}"
+              f"|**{_pct(delta['delta_F'])}**|",
+              f"|`T = B − F` 타이밍|{_pct(delta['T_control'])}|{_pct(delta['T_gate'])}"
+              f"|**{_pct(delta['delta_T'])}**|",
+              "",
+              f"**`ΔB`의 음수는 대부분 평균 노출 수준이 낮아진 것(`ΔF ="
+              f" {_pct(delta['delta_F'])}`)에서 오고, 타이밍 몫(`ΔT ="
+              f" {_pct(delta['delta_T'])}`)은 오히려 소폭 양수다.** 그래서 \"노출·타이밍"
+              " 기여가 음수다\"라고 쓰지 않고 **\"exposure-path benchmark contribution이"
+              f" {_pct(delta['delta_B'])}였고 matched-SPY relative component가"
+              f" {_pct(delta['delta_G'])}였다\"**라고 적는다.",
               ""]
 
     control_final = final_gate(control)
