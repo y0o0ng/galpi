@@ -31,6 +31,7 @@
 |`signal-j-study/`|#12|신호|형성기간 J가 TOP5 초과수익을 어떻게 바꾸는가|구조가 있고 긴 J가 우세. challenger는 J126 하나|
 |`j126-portfolio-translation/`|#13|포트폴리오|J126 신호 우위가 포트폴리오로 번역되는가|**되지 않는다.** 개발 기준선은 J63 유지|
 |`signal-to-portfolio-funnel/`|#14|진단|우위가 어느 단계에서 사라지는가|**`NO_CLEAR_STAGE` · `INCONCLUSIVE`**|
+|`market-condition-signal/`|#15|신호|RS alpha가 `SPY > SMA200`에 집중되는가 (**confirmatory re-cut**)|`PROMOTE_TO_PR16` · 연도 `CONCENTRATED`|
 
 ## 폴더를 층별 하위 디렉터리로 옮기지 않은 이유
 
