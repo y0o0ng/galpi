@@ -48,13 +48,14 @@ from .modes import (
     LAST_CLOSE_EXIT,
     MARKET_REGIME,
     REGIME_MODES,
+    SIGNAL_INVALIDATION_EXITS,
     TREND_GATE_REGIME,
     UNRESOLVED_EXIT_PRICES,
     ZERO_EXIT,
 )
 from .policy import PolicyVersion
 from core.core1 import PAPER_CORE_V1
-from .positions import Position, hold_untraded, run_session
+from .positions import Position, hold_untraded, run_session, schedule_market_break
 from .regime import Regime, classify_market_regime, classify_regime, gate_new_entries
 from .risk import account_gate, evaluate_candidate
 from .sizing import AccountState, Caps, OpenPosition, SizedIntent
@@ -218,6 +219,24 @@ class EntryEvent:
     cancel_reason: str | None
 
 
+@dataclass(frozen=True)
+class MarketBreakEvent:
+    """진입 가설의 반증을 **표시한** 순간 하나. 읽기 전용 관찰이다(PR #18).
+
+    **표시와 체결은 다르다.** 표시는 그 순간 `MAX_HOLD`가 아직 예약되지 않았다는 것만
+    뜻하고, 거래정지·폐지로 실제 체결은 원래 K42 deadline 뒤로 밀리거나 아예 다른 사유로
+    덮일 수 있다. 그 갈림을 나중에 세려면 표시 시점의 `sessions_held`가 필요한데 그 값은
+    여기서만 살아 있다 — `Trade`에는 청산 시점 값만 남는다.
+
+    `(symbol, entry_date)`가 그 포지션의 열쇠다.
+    """
+
+    signal_date: str
+    symbol: str
+    entry_date: str
+    sessions_held: int
+
+
 def _count(counter: dict[str, int], key: str) -> None:
     counter[key] = counter.get(key, 0) + 1
 
@@ -347,6 +366,7 @@ def run_backtest(
     *,
     observer: Callable[[str, int, str, str], None] | None = None,
     entry_observer: Callable[[EntryEvent], None] | None = None,
+    break_observer: Callable[[MarketBreakEvent], None] | None = None,
 ) -> BacktestResult:
     """구간을 하루씩 굴린다. 같은 입력에 같은 결과가 나와야 한다(3.1).
 
@@ -366,6 +386,10 @@ def run_backtest(
 
     **구간 마지막 세션에 만든 주문은 이벤트가 없다.** 집행할 다음 세션이 없기 때문이다.
     관찰자를 쓰는 쪽이 `ACCEPTED` 수와 이벤트 수의 차이로 그 건수를 센다.
+
+    `break_observer`는 `SIGNAL_INVALIDATION` 청산에서 **진입 가설의 반증을 표시한** 순간만
+    받는다. 이미 예약이 있어 표시하지 않은 경우는 오지 않는다. 셋 다 읽기 전용이고
+    `None`이면 실행 결과가 같다.
     """
     sessions = _sessions_in_range(connection, config)
     # 세션마다 같은 252바를 다시 읽으면 실행이 수십 배 느려진다. 캐시가 as_of를 자르는
@@ -619,6 +643,31 @@ def run_backtest(
             )
         )
         previous_equity = equity
+
+        # **진입 가설의 반증은 여기서 표시한다.** 시장 종가를 알 수 있는 가장 이른
+        # 시점이고, 실제 청산은 다음 세션 시초의 기존 pending-exit 경로가 한다. 위 1단계는
+        # 이미 지났으므로 오늘 새로 체결된 포지션과 오늘 바가 없는 포지션이 같은 표시를
+        # 받는다. `market`은 계좌를 보지 않는 시장 라벨이라 게이트 적용 전후로 같다.
+        if (
+            config.exit_mode == SIGNAL_INVALIDATION_EXITS
+            and market is not None
+            and not market.above_sma200
+        ):
+            for open_trade in open_trades.values():
+                # 이미 예약이 있으면 덮지 않는다(사전등록 §4). 관찰자는 **실제로 표시된**
+                # 것만 받아야 신호 수와 체결 수를 갈라 셀 수 있다.
+                if open_trade.position.pending_exit is not None:
+                    continue
+                open_trade.position = schedule_market_break(open_trade.position)
+                if break_observer is not None:
+                    break_observer(
+                        MarketBreakEvent(
+                            signal_date=trade_date,
+                            symbol=open_trade.position.symbol,
+                            entry_date=open_trade.position.entry_date,
+                            sessions_held=open_trade.position.sessions_held,
+                        )
+                    )
 
         ranking = _rank(snapshot, regime, config)
         for reason, count in ranking.skip_counts().items():

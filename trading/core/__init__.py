@@ -18,6 +18,7 @@
 |`jt-{,random-}k{42,84}-s{10,20}`|RS-only / 무작위|같은 K, 슬롯만 나눔 (`jt_slots.py`)|
 |`jt-j126-k42`|RS-only (J=126)|`jt-k42`에서 `rs_lookback`만 바꾼 challenger|
 |`jt-j126-k42-sma200`|RS-only (J=126)|`jt-j126-k42`에서 **`regime_mode`만** 바꾼 시장 게이트 challenger|
+|`jt-j126-k42-sma200-exit`|RS-only (J=126)|앞의 것에서 **`exit_mode`만** 바꾼 신호 반증 청산 challenger|
 
 `core1`은 동결된 기준선이다(`core1.py` 참고). 나머지는 J/K 실험용 연구 코어이고 낙폭
 게이트가 해제돼 있어 **PAPER·LIVE에 쓰지 않는다.** K=21/42와 대조군은 2026-08-14,
@@ -34,6 +35,7 @@ from .definition import CoreDefinition
 from .jt_core_exit import JT_CORE_EXIT
 from .jt_j126_k42 import JT_J126_K42
 from .jt_j126_k42_sma200 import JT_J126_K42_SMA200
+from .jt_j126_k42_sma200_exit import JT_J126_K42_SMA200_EXIT
 from .jt_k21 import JT_K21
 from .jt_k42 import JT_K42
 from .jt_k63 import JT_K63
@@ -54,6 +56,7 @@ CORES: dict[str, CoreDefinition] = {
         JT_CORE_EXIT,
         JT_J126_K42,
         JT_J126_K42_SMA200,
+        JT_J126_K42_SMA200_EXIT,
         JT_RANDOM_K42,
         JT_RANDOM_K63,
         JT_RANDOM_K84,
@@ -67,6 +70,7 @@ __all__ = [
     "JT_CORE_EXIT",
     "JT_J126_K42",
     "JT_J126_K42_SMA200",
+    "JT_J126_K42_SMA200_EXIT",
     "JT_K21",
     "JT_K42",
     "JT_K63",
