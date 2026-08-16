@@ -140,17 +140,36 @@ def average_true_range(bars: list[Bar], window: int) -> float:
     return statistics.fmean(true_ranges) * bars[-1].price_scale
 
 
+def absolute_momentum(values: list[float], lookback: int, skip: int) -> float:
+    """최근 `skip`일을 제외한 `lookback`일 **자기** 수익률.
+
+    `relative_strength`의 자기 항이다. **따로 구현하지 않고 여기서 한 번만 정의한다** —
+    복제하면 언젠가 한쪽만 바뀌고, 그러면 "같은 형성기간"이라고 부르던 두 신호가 조용히
+    다른 것을 재게 된다.
+    """
+    needed = lookback + 1
+    if len(values) < needed:
+        raise FeatureUnavailable(
+            "SHORT_HISTORY", f"ABS{lookback}_{skip}에 {len(values)}개뿐입니다"
+        )
+    return math.log(values[-(skip + 1)] / values[-(lookback + 1)])
+
+
 def relative_strength(
     values: list[float], reference: list[float], lookback: int, skip: int
 ) -> float:
-    """최근 `skip`일을 제외한 `lookback`일 상대모멘텀. 단기 추격과 반전을 줄인다."""
+    """최근 `skip`일을 제외한 `lookback`일 상대모멘텀. 단기 추격과 반전을 줄인다.
+
+    **자기 항에서 시장 항을 뺀 것이다.** 두 항 모두 `absolute_momentum`이라 RS와 ABS가
+    같은 산술을 공유한다.
+    """
     needed = lookback + 1
     if len(values) < needed or len(reference) < needed:
         raise FeatureUnavailable(
             "SHORT_HISTORY", f"RS{lookback}_{skip}에 {min(len(values), len(reference))}개뿐입니다"
         )
-    own = math.log(values[-(skip + 1)] / values[-(lookback + 1)])
-    market = math.log(reference[-(skip + 1)] / reference[-(lookback + 1)])
+    own = absolute_momentum(values, lookback, skip)
+    market = absolute_momentum(reference, lookback, skip)
     return own - market
 
 
