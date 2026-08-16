@@ -416,13 +416,17 @@ class ScopeTest(unittest.TestCase):
     def source(self) -> str:
         return (TRADING_ROOT / "selftest" / "market_condition_signal.py").read_text()
 
-    def test_no_new_core_is_registered(self):
-        from core import CORES
+    def test_this_runner_registers_no_core(self):
+        """**PR #15가 코어를 만들지 않았다**는 주장이다.
 
-        self.assertNotIn("market-condition", " ".join(CORES))
-        self.assertEqual(
-            sorted(name for name in CORES if "sma" in name.lower()), []
-        )
+        저장소 전역에 코어가 없다고 주장하면 안 된다 — 나중 PR이 정당하게 코어를 더하면
+        이 테스트가 자기 PR과 무관한 이유로 깨진다. 실제로 PR #16이 시장 게이트 코어를
+        더했다. 확인할 것은 **이 러너가 코어를 만들거나 등록하지 않는다**는 것이다.
+        """
+        source = self.source()
+        self.assertNotIn("CoreDefinition", source)
+        self.assertNotIn("jt_policy", source)
+        self.assertNotIn("CORES[", source)
 
     def test_the_runner_never_runs_a_portfolio_backtest(self):
         """**포트폴리오 실험이 아니다.** 백테스트를 부르면 scope violation이다."""

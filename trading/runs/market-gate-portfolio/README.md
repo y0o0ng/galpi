@@ -111,7 +111,7 @@ stack에 넣을지 timing overlay 후보로 보존할지를 가르는 데만 쓴
 
 |label|조건|처리|
 |---|---|---|
-|**A** `ALPHA_AND_TIMING_IMPROVED`|`ΔS > 0` AND `ΔG > 0`|SMA200 gate를 다음 momentum strategy construction 단계에 **유지**|
+|**A** `ECONOMICS_AND_RELATIVE_IMPROVED`|`ΔS > 0` AND `ΔG > 0`|SMA200 gate를 다음 momentum strategy construction 단계에 **유지**. **이 label은 `ΔB > 0`을 요구하지 않으므로 "타이밍이 좋아졌다"로 읽지 않는다** — `ΔB`는 따로 본다|
 |**B** `TIMING_BENEFIT_ONLY`|`ΔS > 0` · `ΔG ≤ 0` · MDD 감소 + Sharpe 상승 + Calmar 상승 + exposure 감소|**alpha conversion 개선으로 보지 않는다.** alpha stack에 자동 승격하지 않고 `PARKED_TIMING_OVERLAY_CANDIDATE`로 **보존**한다. 향후 alpha strategy가 경제성 허들을 통과했을 때 risk/timing overlay 단계에서 다시 검토|
 |**C** `RISK_ONLY`|`ΔS ≤ 0`인데 MDD·Sharpe·Calmar만 개선|현재의 낮은 수익 문제를 해결하지 못하므로 **alpha stack에서 탈락.** risk overlay 후보로만 기록|
 |**D** `FAIL`|전체 economics와 matched gap 모두 개선 없음|**SMA200 market gate 종료**|
@@ -121,6 +121,49 @@ BULL-only 탐색을 하지 않는다.** 사용자 검토 없이 다음 대안을
 
 **`B`는 실패가 아니라 보존이다.** 다만 **alpha stack 승격은 아니다** — 그 구분을 흐리면
 "게이트가 전략을 살렸다"는 문장이 만들어진다.
+
+### 잔여 칸 둘 — **결과 전에 채웠다**
+
+위 A~D는 `(ΔS, ΔG, 위험)` 공간을 **완전히 덮지 않는다.** 구현하면서 발견했고 **어떤 실행도
+하기 전에** 채운다. 둘 다 **alpha stack 승격이 아니다.**
+
+|label|조건|왜 A~D에 없었나|처리|
+|---|---|---|---|
+|**B′** `TIMING_BENEFIT_UNCONFIRMED`|`ΔS > 0` · `ΔG ≤ 0` · **위험 네 항목이 다 개선되지는 않음**|B는 네 항목 전부를 요구한다. 일부만 개선된 칸이 비어 있었다|총수익은 올랐지만 overlay 근거가 B보다 약하다. **기록만** 남긴다|
+|**C′** `RELATIVE_ONLY`|`ΔS ≤ 0` · **`ΔG > 0`**|C는 `ΔS ≤ 0`에 `ΔG ≤ 0`을 전제했고 D도 "둘 다 개선 없음"이다. 총수익은 나빠졌는데 상대 위치만 좋아진 칸이 비어 있었다|**현재의 낮은 수익 문제를 해결하지 못하므로 alpha stack 승격이 아니다**|
+
+**승격하는 label은 `A` 하나뿐이라는 원래 구조는 바뀌지 않았다.** 잔여 칸을 채운 것은
+분류를 완결시킨 것이지 문턱을 낮춘 것이 아니다.
+
+세부 조건도 문구 그대로 구현했다 — **B는 네 항목 전부**(MDD 감소 + Sharpe 상승 +
+Calmar 상승 + exposure 감소), **C는 위험 품질 세 항목**(MDD/Sharpe/Calmar)이다.
+
+### label 이름에 대한 주의
+
+`A`의 조건은 **`ΔS > 0` AND `ΔG > 0`뿐이고 `ΔB > 0`을 요구하지 않는다.** 그래서 `ΔB < 0`
+(타이밍 기여가 **음수**)이면서도 `A`가 나올 수 있다. 이름을 `ALPHA_AND_TIMING_IMPROVED`로
+두면 그 경우를 "타이밍이 좋아졌다"로 읽게 되므로 **`ECONOMICS_AND_RELATIVE_IMPROVED`로
+바꿨다.** `ΔB`는 label과 별개로 항상 따로 보고한다.
+
+---
+
+## 5.5 다음 단계 규칙 — **결과 전에 고정**
+
+label과 **로드맵 §4의 최종 경제 게이트**(after-cost exposure-matched SPY gap > 0 및 최소
+조건)를 함께 읽어 다음 행동을 정한다.
+
+|경우|조건|다음 단계|
+|---|---|---|
+|**1**|`A` **AND** gated 팔이 최종 경제 게이트 통과|**불필요한 추가 alpha filter를 열지 않는다.** Phase 2(`ABS`)·Phase 6(FIP)로 자동 진행하지 않는다|
+|**2**|`A` **인데** 최종 경제 게이트 미달|**SMA200을 유지한 채** 다음 alpha construction으로 간다. 이후 Phase는 gated 구조 위에서 쌓는다|
+|**3**|그 외 **모든** label|**SMA200은 alpha stack에서 제외한다.** timing/risk 후보로 보존할 수는 있으나, **다음 alpha construction은 ungated J126에서 시작한다**|
+
+**경우 3에서 "보존"과 "alpha stack 포함"을 섞지 않는다.** 보존은 나중에 risk/timing
+overlay 단계에서 다시 볼 수 있다는 뜻일 뿐, 다음 Phase의 기준선이 된다는 뜻이 아니다.
+
+**경우 1이 나와도 "전략이 완성됐다"가 아니다.** Phase 7(Reality Hardening) · Phase 8
+(Robustness) · Phase 9가 그대로 남아 있고, 연구 코어는 `require_earnings_calendar=False`라
+14.7 게이트에서 여전히 `UNDETERMINED`다.
 
 ---
 

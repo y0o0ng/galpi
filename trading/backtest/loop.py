@@ -48,13 +48,14 @@ from .modes import (
     LAST_CLOSE_EXIT,
     MARKET_REGIME,
     REGIME_MODES,
+    TREND_GATE_REGIME,
     UNRESOLVED_EXIT_PRICES,
     ZERO_EXIT,
 )
 from .policy import PolicyVersion
 from core.core1 import PAPER_CORE_V1
 from .positions import Position, hold_untraded, run_session
-from .regime import Regime, classify_market_regime, classify_regime
+from .regime import Regime, classify_market_regime, classify_regime, gate_new_entries
 from .risk import account_gate, evaluate_candidate
 from .sizing import AccountState, Caps, OpenPosition, SizedIntent
 
@@ -595,6 +596,10 @@ def run_backtest(
                 )
             except FeatureUnavailable as caught:
                 error = caught
+        elif config.regime_mode == TREND_GATE_REGIME and regime is not None:
+            # `MARKET`과 같은 라벨을 쓰고 **신규 진입만** 닫는다. 보유 포지션은 위 1단계가
+            # 이미 굴렸으므로 게이트가 닫혀도 만기까지 간다.
+            regime = gate_new_entries(regime)
 
         if regime is None:
             _count(skip_counts, error.reason)

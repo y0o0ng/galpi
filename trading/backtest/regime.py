@@ -31,7 +31,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .data import PointInTimeSnapshot
 from .features import FeatureUnavailable, realized_vol, sma
@@ -176,4 +176,31 @@ def classify_market_regime(
         reasons=(trend, volatility),
         trend=trend,
         volatility=volatility,
+    )
+
+
+# `SPY <= SMA200`에서 신규 진입을 막았다는 표식. 상태 이름에 섞지 않고 사유로만 남긴다 —
+# 이름을 바꾸면 레짐별 성과표가 `MARKET` 실행과 견줄 수 없게 된다.
+TREND_GATE_BLOCKED = "SPY_BELOW_SMA200_GATE"
+
+
+def gate_new_entries(regime: Regime) -> Regime:
+    """`SPY <= SMA200`이면 **신규 진입만** 막는다. PR #16의 처치가 이 함수 하나다.
+
+    **바꾸는 것이 `new_entries` 하나뿐인 것이 요점이다.** 익스포저 상한(`max_exposure`)도
+    상태 이름도 그대로 두므로 `MARKET` 실행과 레짐별 성과표를 그대로 견줄 수 있고, 두 실행의
+    차이를 진입 타이밍 하나에 귀속할 수 있다.
+
+    **청산은 건드리지 않는다.** 게이트가 닫혀도 보유 포지션은 `positions.run_session`이
+    그대로 굴려 K세션 만기까지 간다. 청산까지 바꾸면 진입 효과와 청산 효과가 섞인다.
+
+    **계좌를 인자로 받지 않는다.** 낙폭이 들어가면 손실 → 방어 → 진입 없음 → 자산 정지 →
+    낙폭 영구 고정의 고리가 닫힌다(7.3의 자기 잠금).
+    """
+    if regime.above_sma200:
+        return regime
+    return replace(
+        regime,
+        new_entries="blocked",
+        reasons=regime.reasons + (TREND_GATE_BLOCKED,),
     )

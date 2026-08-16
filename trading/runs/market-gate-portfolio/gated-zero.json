@@ -1,0 +1,190 @@
+{
+  "run_id": "gated-zero",
+  "experiment": "market-gate-portfolio",
+  "core": "jt-j126-k42-sma200",
+  "arm": "SMA200 게이트",
+  "scenario": "ZERO",
+  "regime_mode": "TREND_GATE",
+  "policy_signature": "sha256:d8ea5d4a7f58f524ec2d507d3d59860ee8dc89cfe24cfc9835f92ded14de3ca5",
+  "rs_lookback": 126,
+  "max_hold_sessions": 42,
+  "window": [
+    "2007-01-04",
+    "2025-08-06"
+  ],
+  "holdout": {
+    "HOLDOUT_START": "2025-08-07",
+    "HOLDOUT_CONSUMED": false
+  },
+  "metrics": {
+    "trade_count": 445,
+    "expectancy_r": 0.13201240498707725,
+    "profit_factor": 1.2959615839809429,
+    "win_rate": 0.5280898876404494,
+    "total_return": 0.30541212886449,
+    "cagr": 0.01446382074424224,
+    "max_drawdown": 0.16439608973272168,
+    "sharpe": 0.2873966760074847,
+    "sortino": 0.36409124919944313,
+    "calmar": 0.08798153756429242,
+    "avg_exposure": 0.16390018931535089,
+    "turnover": 0.988957078194223,
+    "fees_paid": 9684.217310320386,
+    "avg_hold_sessions": 41.811235955056176
+  },
+  "benchmark": [
+    {
+      "label": "일별 노출 일치",
+      "total_return": 0.4289760281211854
+    },
+    {
+      "label": "평균 노출 16.4% 고정",
+      "total_return": 0.4227435127977126
+    },
+    {
+      "label": "100% 보유",
+      "total_return": 5.3168788121334325
+    }
+  ],
+  "capacity": {
+    "max_positions": 5,
+    "risk_per_trade": 0.0025,
+    "max_total_planned_risk": 0.0125,
+    "risk_budget_product": 0.0125,
+    "sessions": 4677,
+    "entries": 450,
+    "entries_per_year": 24.246311738293777,
+    "avg_open_positions": 3.994440880906564,
+    "slot_utilization": 0.7988881761813128,
+    "sessions_at_full_capacity": 3400,
+    "fraction_sessions_at_full_capacity": 0.7269617276031645,
+    "max_positions_reached": 7695,
+    "max_positions_reached_per_opportunity": 0.45323359641889505,
+    "candidate_opportunities": 16978,
+    "avg_planned_risk_utilization": 0.24243423513321993,
+    "p95_planned_risk_utilization": 0.690904786769229,
+    "peak_planned_risk_utilization": 0.9788124161021942,
+    "portfolio_stage_skips": {
+      "MAX_POSITIONS_REACHED": 7695,
+      "ALREADY_HELD": 8570,
+      "DAILY_ENTRY_CAP": 137,
+      "DAILY_LOSS_LIMIT": 80,
+      "SECTOR_UNKNOWN": 18,
+      "GAP_LIMIT": 4,
+      "NO_FILL": 17,
+      "NO_EXECUTION_BAR": 1,
+      "CORPORATE_ACTION": 6
+    }
+  },
+  "regime_detail": [
+    {
+      "regime": "BEAR/HIGH_VOL",
+      "sessions": 583,
+      "trade_count": 3,
+      "expectancy_r": -2.378744413964105,
+      "profit_factor": 0.0909627304597345,
+      "strategy_return": -0.09451888160698685,
+      "benchmark_return": -0.11265456837102528,
+      "gap": 0.018135686764038428
+    },
+    {
+      "regime": "BEAR/LOW_VOL",
+      "sessions": 156,
+      "trade_count": 3,
+      "expectancy_r": 1.6354646751545296,
+      "profit_factor": null,
+      "strategy_return": -0.10101151624157467,
+      "benchmark_return": -0.0907675478904989,
+      "gap": -0.010243968351075772
+    },
+    {
+      "regime": "BULL/HIGH_VOL",
+      "sessions": 176,
+      "trade_count": 31,
+      "expectancy_r": 1.3987023511593628,
+      "profit_factor": 6.379268814914626,
+      "strategy_return": 0.1483437073039362,
+      "benchmark_return": 0.08144924735231207,
+      "gap": 0.06689445995162413
+    },
+    {
+      "regime": "BULL/LOW_VOL",
+      "sessions": 2780,
+      "trade_count": 313,
+      "expectancy_r": 0.20300773917033924,
+      "profit_factor": 1.2595686288520247,
+      "strategy_return": 1.125242420683866,
+      "benchmark_return": 1.0602532966433866,
+      "gap": 0.0649891240404794
+    },
+    {
+      "regime": "CORRECTION/HIGH_VOL",
+      "sessions": 139,
+      "trade_count": 19,
+      "expectancy_r": 0.903298763757035,
+      "profit_factor": 3.6972741138843177,
+      "strategy_return": 0.02652475863457293,
+      "benchmark_return": 0.020469436342340996,
+      "gap": 0.006055322292231935
+    },
+    {
+      "regime": "CORRECTION/LOW_VOL",
+      "sessions": 554,
+      "trade_count": 67,
+      "expectancy_r": -0.9010514000853935,
+      "profit_factor": 0.8715858533621581,
+      "strategy_return": -0.33297603344677973,
+      "benchmark_return": -0.21942705661653283,
+      "gap": -0.1135489768302469
+    },
+    {
+      "regime": "RECOVERY/HIGH_VOL",
+      "sessions": 192,
+      "trade_count": 4,
+      "expectancy_r": -0.5982236297210878,
+      "profit_factor": 0.343583103126372,
+      "strategy_return": -0.030130913068969423,
+      "benchmark_return": 5.1768408660723964e-05,
+      "gap": -0.030182681477630147
+    },
+    {
+      "regime": "RECOVERY/LOW_VOL",
+      "sessions": 96,
+      "trade_count": 5,
+      "expectancy_r": -0.06503479947125472,
+      "profit_factor": 0.8442190219762882,
+      "strategy_return": -0.010513755038534689,
+      "benchmark_return": -0.002082681857787483,
+      "gap": -0.008431073180747206
+    }
+  ],
+  "skip_counts": {
+    "SCORE_POPULATION_TOO_SMALL": 223,
+    "REGIME_BEAR/LOW_VOL": 156,
+    "REGIME_BEAR/HIGH_VOL": 583,
+    "REGIME_RECOVERY/HIGH_VOL": 192,
+    "REGIME_RECOVERY/LOW_VOL": 96,
+    "PRICE_BELOW_MIN": 35376,
+    "LIQUIDITY_BELOW_MIN": 145741,
+    "STALE": 2365,
+    "SHORT_HISTORY": 8764,
+    "BELOW_TOP_N": 1588660,
+    "DAILY_ENTRY_CAP": 137,
+    "CALENDAR_MISMATCH": 2163,
+    "ALREADY_HELD": 8570,
+    "MAX_POSITIONS_REACHED": 7695,
+    "NO_FILL": 17,
+    "SECTOR_UNKNOWN": 18,
+    "DAILY_LOSS_LIMIT": 80,
+    "CORPORATE_ACTION": 6,
+    "GAP_LIMIT": 4,
+    "NO_EXECUTION_BAR": 1
+  },
+  "exit_counts": {
+    "MAX_HOLD": 442,
+    "UNRESOLVED_EXIT": 1,
+    "DELISTED_EXIT": 2
+  },
+  "sessions": 4677,
+  "gate_blocked_sessions": 1027
+}

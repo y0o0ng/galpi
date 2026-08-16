@@ -27,7 +27,10 @@ EXIT_MODES = (CORE_EXITS, FIXED_HOLD_EXITS)
 # 7.3의 GREEN/YELLOW/RED를 내는 `CORE`와, 시장만 보고 라벨을 붙이는 `MARKET`.
 CORE_REGIME = "CORE"
 MARKET_REGIME = "MARKET"
-REGIME_MODES = (CORE_REGIME, MARKET_REGIME)
+# `MARKET`과 같은 라벨을 붙이되 `SPY <= SMA200`에서 **신규 진입만** 막는다. 익스포저
+# 상한도 청산도 건드리지 않으므로 `MARKET`과의 차이가 정확히 하나다(PR #16 Phase 1).
+TREND_GATE_REGIME = "TREND_GATE"
+REGIME_MODES = (CORE_REGIME, MARKET_REGIME, TREND_GATE_REGIME)
 
 # 정체불명 계열의 청산가 경계조건. 회수 100%와 0%다.
 LAST_CLOSE_EXIT = "LAST_CLOSE"

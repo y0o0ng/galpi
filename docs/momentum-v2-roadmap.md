@@ -239,7 +239,7 @@ SPY 매수보유는 **opportunity-cost reference로만** 보고 **promotion crit
 
 |label|조건|처리|
 |---|---|---|
-|**A** `ALPHA_AND_TIMING_IMPROVED`|`ΔS > 0` AND `ΔG > 0`|SMA200 gate를 다음 momentum strategy construction 단계에 **유지**|
+|**A** `ECONOMICS_AND_RELATIVE_IMPROVED`|`ΔS > 0` AND `ΔG > 0`|SMA200 gate를 다음 momentum strategy construction 단계에 **유지**. **이 label은 `ΔB > 0`을 요구하지 않으므로 "타이밍이 좋아졌다"로 읽지 않는다** — `ΔB`는 따로 본다|
 |**B** `TIMING_BENEFIT_ONLY`|`ΔS > 0` · `ΔG ≤ 0` · MDD 감소 + Sharpe 상승 + Calmar 상승 + exposure 감소|**alpha conversion 개선으로 보지 않는다.** alpha stack에 자동 승격하지 않고 `PARKED_TIMING_OVERLAY_CANDIDATE`로 **보존**한다. 향후 alpha strategy가 경제성 허들을 통과했을 때 risk/timing overlay 단계에서 다시 검토|
 |**C** `RISK_ONLY`|`ΔS ≤ 0`인데 MDD·Sharpe·Calmar만 개선|현재의 낮은 수익 문제를 해결하지 못하므로 **alpha stack에서 탈락.** risk overlay 후보로만 기록|
 |**D** `FAIL`|전체 economics와 matched gap 모두 개선 없음|**SMA200 market gate 종료.** alternate SMA · volatility · BULL-only 탐색 **금지**|
