@@ -244,17 +244,22 @@ SPY 매수보유는 **opportunity-cost reference로만** 보고 **promotion crit
 |**C** `RISK_ONLY`|`ΔS ≤ 0`인데 MDD·Sharpe·Calmar만 개선|현재의 낮은 수익 문제를 해결하지 못하므로 **alpha stack에서 탈락.** risk overlay 후보로만 기록|
 |**D** `FAIL`|전체 economics와 matched gap 모두 개선 없음|**SMA200 market gate 종료.** alternate SMA · volatility · BULL-only 탐색 **금지**|
 
-### Phase 2 — 종목 absolute momentum (PR #17 신호 · PR #18 포트폴리오)
+### Phase 2 — 종목 absolute momentum (PR #17 신호) — **종료**
 
 시장 게이트가 의미는 있지만 허들을 못 넘을 때만 쓴다. **PR #16이 정확히 그 경우다** —
 label은 `ECONOMICS_AND_RELATIVE_IMPROVED`(경우 2)이고 격차는 +4.99%로 양수가 됐지만
 Sharpe 0.46으로 최종 게이트에 미달했다.
 
-> **2026-08-16 결정 — Phase 2는 두 PR로 나눈다.** 알파 개입은 여전히 **하나**이고
-> 예산을 늘리는 것이 아니다. 하나의 개입을 **신호 층(PR #17)과 포트폴리오 층(PR #18)**
-> 으로 나눠 검증한다. **PR #17이 사전등록 기준을 통과하고 사용자가 승인해야만 PR #18을
-> 연다.** PR #17이 실패하면 포트폴리오 백테스트를 하지 않는다. 뒤 Phase의 PR 번호는
-> 하나씩 밀린다.
+> **2026-08-16 결과 — Phase 2 종료.** PR #17이 `NON_BINDING`으로 끝났다. 유효 paired
+> 날짜 3,385일 중 **TOP5 구성이 바뀐 날이 0일**이라 HARD A 실패이고
+> `DO_NOT_PROMOTE_ABS_TO_PORTFOLIO`다. **ABS 포트폴리오 PR을 열지 않았으므로 뒤 번호가
+> 밀리지 않는다** — 다음은 #18이다. 상세는 `runs/absolute-momentum-signal/README.md`.
+>
+> **문턱·horizon·ranking weight 변경도, SMA/breakout 대안도 열지 않는다.**
+>
+> **2026-08-16 결정 — Phase 2는 두 PR로 나눴다.** 알파 개입은 여전히 **하나**이고 예산을
+> 늘리는 것이 아니다. 하나의 개입을 신호 층과 포트폴리오 층으로 나눠 검증하되, **신호
+> 층에서 실패하면 포트폴리오 백테스트를 하지 않는다.** 실제로 그렇게 끝났다.
 >
 > **2026-08-16 결정 — ungated 팔을 열지 않는다.** 이 문서의 이전 판은 "market gate 없이
 > ABS 단독을 보고 joint도 한 번"이라고 적었으나 **채택하지 않는다.** PR #16의 경우 2가
@@ -292,7 +297,7 @@ contribution을 보여야 살아남는다.
 들어온다. **다만 ABS 양수 후보가 5개 미만이면 그날 TOP5는 5개 미만이고 ABS 음수 종목으로
 backfill하지 않는다.**
 
-### Phase 3 — Signal Invalidation Exit (PR #19)
+### Phase 3 — Signal Invalidation Exit (PR #18)
 
 **예전 CORE exit를 그대로 되살리는 것은 금지.** `runs/jt-jk/`가 이미 반증했다 —
 `jt-core-exit`(RS-only + CORE exits 전부)는 총수익 **−23.07%** · 기대값 −0.075다.
@@ -309,7 +314,7 @@ backfill하지 않는다.**
 Control은 fixed K42. **dynamic exit가 못 이기면 그냥 K42를 쓴다.** 고정 보유기간도 완결된
 exit rule이다.
 
-### Phase 4 — 위험의 의미를 바로잡는다 (PR #20)
+### Phase 4 — 위험의 의미를 바로잡는다 (PR #19)
 
 지금까지 묻혀 있던 문제다. 현재 sizing은 `shares ∝ 0.25% equity / 2ATR`이고
 `planned_risk = shares × 2ATR`로 R을 계산한다. **그런데 `FIXED_HOLD` 모드는 K 만기 청산만
@@ -345,7 +350,7 @@ Barroso·Santa-Clara와 Moreira·Muir의 volatility management 결과가 있지�
 
 **sizing은 alpha 제조기가 아니라 마지막 risk allocator다.**
 
-### Phase 6 — 마지막 카드 하나 (PR #21)
+### Phase 6 — 마지막 카드 하나 (PR #20)
 
 여기까지 와도 matched-SPY를 못 넘으면 **J나 K로 돌아가지 않는다.** 딱 하나의 momentum
 quality filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
@@ -360,7 +365,7 @@ quality filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
 **이것이 마지막 alpha filter다.** 실패하면 `Long-only cross-sectional momentum strategy
 construction = CLOSED`를 선언한다.
 
-### Phase 7 — Reality Hardening (PR #22)
+### Phase 7 — Reality Hardening (PR #21)
 
 여기까지 통과한 후보는 아직 백테스트 아이디어다. 실전 제약을 전부 켠다.
 
@@ -372,7 +377,7 @@ stale price.
 **LLM은 아직 없다.** Quant Core가 혼자 돈을 벌지 못하는데 LLM을 붙여 구조를 구제하려 하면
 원인을 영영 알 수 없어진다.
 
-### Phase 8 — Robustness gate (PR #23)
+### Phase 8 — Robustness gate (PR #22)
 
 "더 좋은 숫자 찾기"가 아니라 **망가뜨려 보는** 단계다.
 
@@ -389,7 +394,7 @@ stale price.
 
 **여기서 실패하면 파라미터를 고쳐 다시 제출하지 않는다. 직전 단계로 탈락.**
 
-### Phase 9 — Frozen Historical Sanity Check (PR #24)
+### Phase 9 — Frozen Historical Sanity Check (PR #23)
 
 **이것은 formal OOS 판결이 아니다.** `2025-08-07` 이후 구간은 이미 signal-layer 연구에서
 관찰됐으므로 `CONTAMINATED_FOR_FORMAL_OOS`로 취급한다(§7 C3-3). 그래서 이 Phase의 이름은
@@ -438,18 +443,18 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |14|Funnel 종료|변환 실패 위치를 특정할 수 있는가|**INCONCLUSIVE · 종료**|
 |15|Market condition signal|RS alpha가 market uptrend에 집중되는가|**`PROMOTE_TO_PR16`**|
 |16|Market entry gate|시장 게이트가 실제 portfolio economics를 개선하는가|**`ECONOMICS_AND_RELATIVE_IMPROVED` · 경우 2**|
-|17|Candidate ABS **신호**|ABS-positive 후보에서 다시 뽑은 TOP5가 +42 excess를 높이는가|**다음**|
-|18|Candidate ABS **포트폴리오**|그 우위가 `J126+SMA200` 위에서 economics를 훼손 없이 개선하는가|#17 통과 시|
-|19|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|조건부|
-|20|Risk semantics|hard stop인가 volatility sizing인가|—|
-|21|FIP quality|마지막 momentum quality filter|조건부|
-|22|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
-|23|Robustness|folds/random/cost stress에서 버티는가|—|
-|24|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|—|
+|17|Candidate ABS **신호**|ABS-positive 후보에서 다시 뽑은 TOP5가 +42 excess를 높이는가|**`NON_BINDING` · `DO_NOT_PROMOTE`**|
+|—|Candidate ABS **포트폴리오**|—|**NOT OPENED** (#17이 `DO_NOT_PROMOTE`)|
+|18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|**다음**|
+|19|Risk semantics|hard stop인가 volatility sizing인가|—|
+|20|FIP quality|마지막 momentum quality filter|조건부|
+|21|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
+|22|Robustness|folds/random/cost stress에서 버티는가|—|
+|23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|—|
 |—|Holdout consumption 인프라|`holdout_consumptions` append-only 추적 (§7 C3-3)|전략 freeze 전 별도 PR|
 
-**"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.** Phase 2가 두 PR로
-나뉘면서 #19 이후 번호가 하나씩 밀렸다 — **알파 개입 수는 여전히 넷이다.**
+**"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.** **PR #17이 `DO_NOT_PROMOTE`로 끝나 ABS 포트폴리오 PR을 열지 않았으므로 번호가 밀리지
+않는다** — 다음은 #18이다. **알파 개입 수는 여전히 넷이고 그중 둘을 썼다.**
 
 ---
 
