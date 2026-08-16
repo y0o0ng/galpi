@@ -1090,10 +1090,21 @@ def _distributions(sizing: dict) -> list[str]:
     differ = distributions_differ(
         sizing.get(BASELINE, {}), sizing.get(CHALLENGER, {})
     )
+    verdict = (
+        "중앙값 차이가 문턱을 넘었다"
+        if differ
+        else "중앙값 차이가 문턱에서 지지되지 않았다"
+    )
     lines += [
         f"사전등록한 문턱은 두 축(정규화 ATR · 진입 notional 비중) 중 하나의 중앙값이"
         f" 상대적으로 **{DISTRIBUTION_TOLERANCE:.0%} 이상** 다른 것이다."
-        f" 판정: **{'분포가 다르다' if differ else '분포 차이가 문턱 미만이다'}**.",
+        f" 판정: **{verdict}**.",
+        "",
+        "**문턱 미달을 \"차이가 없다\"의 증명으로 읽지 않는다.** 이 판정이 말하는 것은"
+        f" \"J63/J126의 전체 sizing 분포 차이가 사전등록한 {DISTRIBUTION_TOLERANCE:.0%}"
+        " median 기준에서 지지되지 않았다\"까지이고, 그것은 차이가 존재하지 않는다는 뜻이"
+        " 아니다. 중앙값 하나로 재는 문턱이라 꼬리에 있는 차이는 애초에 잡지 못한다"
+        " (§20.3이 그 꼬리를 따로 본다).",
         "",
     ]
     return lines
@@ -1187,6 +1198,8 @@ def _data_exit(closed: dict, filled: dict, zero: dict, traces: dict) -> list[str
     lines = ["## 12. data-exit 거래의 sizing 위치 (§16)", "",
              "폐지·정체불명으로 끝난 거래가 그 J 전체 체결 분포의 어디에 있는가."
              " **J당 한 자릿수 표본이므로 일반적인 분포 결론으로 확장하지 않는다.**", "",
+             "**이 표가 답하는 것은 위치뿐이다.** 아래 §19의 ZERO 손실 **규모** 차이는"
+             " 이 표로 설명되지 않는다 — 위치가 같아도 건당 손실 크기는 다를 수 있다.", "",
              "|값|J63|J63 백분위|J126|J126 백분위|", "|---|---|---|---|---|"]
     axes = {
         "정규화 ATR": ("atr_fraction", lambda v: f"{v * 100:.3f}%"),
@@ -1455,13 +1468,18 @@ def _yes_no(value, detail: str) -> str:
 
 
 def _median_verdict(sizing: dict, key: str) -> str:
+    """**문턱 미달은 "차이 없음"이 아니라 "이 기준에서 지지되지 않음"이다.**"""
     left = sizing.get(BASELINE, {}).get(key, {}).get("median")
     right = sizing.get(CHALLENGER, {}).get(key, {}).get("median")
     if left in (None, 0) or right is None:
         return "—"
     relative = right / left - 1
-    verdict = "**예**" if abs(relative) >= DISTRIBUTION_TOLERANCE else "**아니오**"
-    return f"{verdict} (중앙 {relative:+.1%} 상대)"
+    if abs(relative) >= DISTRIBUTION_TOLERANCE:
+        return f"**문턱을 넘었다** (중앙 {relative:+.1%} 상대)"
+    return (
+        f"**문턱에서 지지되지 않았다** (중앙 {relative:+.1%} 상대,"
+        f" 문턱 {DISTRIBUTION_TOLERANCE:.0%}) — 차이가 없다는 뜻이 아니다"
+    )
 
 
 def _data_exit_verdict(stages: dict) -> str:
@@ -1544,7 +1562,15 @@ def _zero_side(zero: dict, traces: dict) -> list[str]:
             ]
             cells.append(f"{_money(sum(row['pnl'] for row in rows))} ({len(rows)}건)")
         lines.append(f"|{label}|" + "|".join(cells) + "|")
-    lines.append("")
+
+    lines += ["",
+              "**여기서 말할 수 있는 것과 없는 것을 가른다.** data-exit 거래가"
+              " low-vol · high-notional 꼬리에 위치하는 **구조**는 J63과 J126 **모두에서**"
+              " 관찰됐다(§12). 따라서 그 구조 자체는 J126 고유 현상이 아니다."
+              " **다만 J126의 더 큰 ZERO 손실 규모는 이 진단만으로 설명되지 않는다** —"
+              " 위치가 같아도 건당 손실 크기가 왜 다른지는 재지 않았고, 표본이 9건·6건이라"
+              " 이 진단으로 답할 수 있는 질문도 아니다.",
+              ""]
     return lines
 
 
