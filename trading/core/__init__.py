@@ -16,6 +16,7 @@
 |`jt-random-k63`|무작위 (jt-k63 대조군)|63세션 만기만|
 |`jt-random-k84`|무작위 (jt-k84 대조군)|84세션 만기만|
 |`jt-{,random-}k{42,84}-s{10,20}`|RS-only / 무작위|같은 K, 슬롯만 나눔 (`jt_slots.py`)|
+|`jt-j126-k42`|RS-only (J=126)|`jt-k42`에서 `rs_lookback`만 바꾼 challenger|
 
 `core1`은 동결된 기준선이다(`core1.py` 참고). 나머지는 J/K 실험용 연구 코어이고 낙폭
 게이트가 해제돼 있어 **PAPER·LIVE에 쓰지 않는다.** K=21/42와 대조군은 2026-08-14,
@@ -30,6 +31,7 @@ from __future__ import annotations
 from .core1 import CORE1, PAPER_CORE_V1
 from .definition import CoreDefinition
 from .jt_core_exit import JT_CORE_EXIT
+from .jt_j126_k42 import JT_J126_K42
 from .jt_k21 import JT_K21
 from .jt_k42 import JT_K42
 from .jt_k63 import JT_K63
@@ -48,6 +50,7 @@ CORES: dict[str, CoreDefinition] = {
         JT_K63,
         JT_K84,
         JT_CORE_EXIT,
+        JT_J126_K42,
         JT_RANDOM_K42,
         JT_RANDOM_K63,
         JT_RANDOM_K84,
@@ -59,6 +62,7 @@ __all__ = [
     "CORE1",
     "CORES",
     "JT_CORE_EXIT",
+    "JT_J126_K42",
     "JT_K21",
     "JT_K42",
     "JT_K63",
