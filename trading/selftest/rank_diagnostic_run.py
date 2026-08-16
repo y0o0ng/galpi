@@ -333,18 +333,25 @@ def stage_report(_connection) -> int:
                   " 정의이고 배당 포함이다.", "",
                   "**일별 TOP5와 forward 수익률은 강하게 겹친다. 관측 수를 독립 표본 수로"
                   " 읽지 않는다.** 이 진단에서 p-value를 만들지 않았다.", "",
-                  "|랭크|" + "|".join(f"+{h} 평균|+{h} 중앙" for h in HORIZONS) + "|관측|",
-                  "|---|" + "---|" * (2 * len(HORIZONS) + 1)]
+                  "|랭크|" + "|".join(f"+{h} 평균|+{h} 중앙" for h in HORIZONS)
+                  + f"|관측(+{HORIZONS[0]})|관측(+{HORIZONS[-1]})|",
+                  "|---|" + "---|" * (2 * len(HORIZONS) + 2)]
         for rank in range(1, TOP_N + 1):
             cells = []
-            count = None
             for horizon in HORIZONS:
                 item = signal["rank_forward"].get(f"{rank}|{horizon}")
                 cells += [_pct(item["mean"]) if item else "—",
                           _pct(item["median"]) if item else "—"]
-                if item:
-                    count = item["count"]
-            lines.append(f"|**{rank}**|" + "|".join(cells) + f"|{count:,}|")
+            # **관측 수는 지평마다 다르다.** 구간 끝에서는 +84를 잴 수 없어 +21보다 적다.
+            # 한 칸만 싣고 "관측"이라고 적으면 어느 지평 것인지 알 수 없다.
+            counts = [
+                signal["rank_forward"].get(f"{rank}|{horizon}", {}).get("count")
+                for horizon in (HORIZONS[0], HORIZONS[-1])
+            ]
+            lines.append(
+                f"|**{rank}**|" + "|".join(cells)
+                + "|" + "|".join(f"{c:,}" if c else "—" for c in counts) + "|"
+            )
 
     if traces:
         lines += ["", "## Evidence — Q2·Q3. 실제 진입의 랭크 분포", "",
