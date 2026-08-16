@@ -414,15 +414,27 @@ class TrimTest(unittest.TestCase):
         self.assertEqual(len(trimmed_by_return(self.rows(99))), 99)
         self.assertEqual(trimmed_by_return([]), [])
 
-    def test_it_trims_by_absolute_return_so_both_tails_go(self):
-        """**절대값 상위**다. 큰 승자만 빼면 평균이 한쪽으로 기운다."""
+    def test_either_tail_can_be_the_one_that_is_dropped(self):
+        """**양쪽 각각 1%가 아니라 절대값이 큰 전체 1%다.**
+
+        그래서 100건이면 한 건만 빠지고, 그 한 건은 양·음 어느 쪽이든 절대값이 가장 큰
+        것이다. 큰 승자만 빼는 한쪽 trim이면 평균이 한 방향으로 기운다.
+        """
         rows = self.rows(100)
-        rows[0]["pnl"] = -5000.0  # 가장 큰 손실
-        rows[99]["pnl"] = 4000.0  # 가장 큰 이익
+        rows[0]["pnl"] = -5000.0  # 절대값 최대 (손실 쪽)
+        rows[99]["pnl"] = 4000.0  # 그 다음 (이익 쪽)
         kept = trimmed_by_return(rows)
         self.assertEqual(len(kept), 99)
         self.assertNotIn(-5000.0, [row["pnl"] for row in kept])
         self.assertIn(4000.0, [row["pnl"] for row in kept])
+
+        # 부호를 뒤집으면 빠지는 쪽도 뒤집힌다 — 후보는 절대값으로만 정해진다.
+        flipped = self.rows(100)
+        flipped[0]["pnl"] = -4000.0
+        flipped[99]["pnl"] = 5000.0
+        kept = trimmed_by_return(flipped)
+        self.assertNotIn(5000.0, [row["pnl"] for row in kept])
+        self.assertIn(-4000.0, [row["pnl"] for row in kept])
 
 
 class AlignmentPatternTest(unittest.TestCase):
