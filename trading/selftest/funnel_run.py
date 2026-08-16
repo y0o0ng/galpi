@@ -737,6 +737,7 @@ def stage_report(_connection) -> int:
     verdict_lines, verdict = _verdict(stages, closed, universe, sizing)
     lines += verdict_lines
     lines += _zero_side(zero, traces)
+    lines += _exploratory(closed)
     lines += _next_steps(verdict)
     return _write(lines)
 
@@ -874,20 +875,18 @@ def _survival(traces: dict, stages: dict) -> list[str]:
         left = cancels.get(BASELINE, {}).get(reason, 0)
         right = cancels.get(CHALLENGER, {}).get(reason, 0)
         lines.append(f"|`{reason}`|{left:,}|{right:,}|{right - left:+,}|")
-    for core in SIGNALS:
-        if core not in stages:
-            continue
-        orphan = sum(
+    orphans = {
+        core: sum(
             1
             for row in stages[core]["ACCEPTED"]
             if "entry_date" not in row and "fill_cancel_reason" not in row
         )
-        if orphan:
-            lines.append(
-                f"|`NO_EXECUTION_SESSION` ({LABELS[core]})|{orphan:,}|—|—|"
-            )
-    lines += ["", "구간 마지막 세션에 만든 주문은 집행할 다음 세션이 없어"
-              " `NO_EXECUTION_SESSION`으로 따로 센다. 엔진 사유가 아니라 구간 경계다.", ""]
+        for core in stages
+    }
+    left, right = orphans.get(BASELINE, 0), orphans.get(CHALLENGER, 0)
+    lines.append(f"|`NO_EXECUTION_SESSION`|{left:,}|{right:,}|{right - left:+,}|")
+    lines += ["", "`NO_EXECUTION_SESSION`은 엔진 사유가 아니라 구간 경계다 — 구간 마지막"
+              " 세션에 만든 주문은 집행할 다음 세션이 없다.", ""]
 
     lines += ["### 남아 있는 포지션", "",
               "|항목|J63|J126|", "|---|---|---|"]
@@ -1213,7 +1212,7 @@ def _data_exit(closed: dict, filled: dict, zero: dict, traces: dict) -> list[str
             cells += [
                 fmt(point) if point is not None else "—",
                 (
-                    f"{percentile_of(everything, point):.0f}th"
+                    f"{percentile_of(everything, point):.0f}백분위"
                     if point is not None and everything
                     else "—"
                 ),
@@ -1387,7 +1386,8 @@ def _verdict(stages: dict, closed: dict, universe: dict, sizing: dict):
          _median_verdict(sizing, "entry_notional_weight")),
         ("I", "실제 sizing 구속 제약이 무엇인가",
          " · ".join(f"{LABELS[core]} {dominant[core]}" for core in dominant) or "—"),
-        ("J", "data-exit 거래가 큰 notional·낮은 변동성 꼬리에 있는가", "§12 표 참고"),
+        ("J", "data-exit 거래가 큰 notional·낮은 변동성 꼬리에 있는가",
+         _data_exit_verdict(stages)),
         ("K", "신호 우위의 가장 큰 소실이 어느 단계 사이인가",
          _largest_drop(deltas)),
         ("L", "현재 증거로 sizing을 다음 개입 대상으로 올릴 수 있는가",
@@ -1409,12 +1409,43 @@ def _verdict(stages: dict, closed: dict, universe: dict, sizing: dict):
               f" (사전등록 문턱 {DISTRIBUTION_TOLERANCE:.0%})",
               "",
               f"### PATTERN **{pattern}**", "",
+              *_registration_gap(deltas, pattern),
               "## 18. 최종 답 (§30)", "",
               f"**Q1. J126의 신호 우위가 가장 크게 사라지는 단계는 어디인가 →"
               f" `{pattern}`**", "",
               f"**Q2. 다음 research intervention으로 sizing ablation을 올릴 근거가 있는가 →"
               f" `{answer}`**", ""]
     return lines, {"pattern": pattern, "answer": answer, "deltas": deltas}
+
+
+def _registration_gap(deltas: dict, pattern: str) -> list[str]:
+    """사전등록한 규칙이 이 데이터를 어떻게 다뤘는지 있는 그대로 적는다.
+
+    **규칙을 결과 보고 고치지 않는다.** 대신 규칙이 무엇을 못 잡는지를 남긴다 — 그것을
+    적지 않으면 다음 사람이 `NO_CLEAR_STAGE`를 "층 사이에 아무 일도 없었다"로 읽는다.
+    """
+    top5, raw = deltas.get("top5_excess"), deltas.get("raw_return")
+    realized_r, dollar = deltas.get("realized_r"), deltas.get("dollar_per_trade")
+    if pattern != "NO_CLEAR_STAGE" or None in (top5, raw, realized_r, dollar):
+        return []
+    if top5 <= 0 or raw <= 0:
+        return []
+    return [
+        "**사전등록 규칙의 한계를 그대로 적는다.** 이 판정은 `classify_pattern`이"
+        " **부호만** 보기 때문에 나왔다 — PATTERN S가 요구하는 \"R 또는 달러에서 축소·역전\"을"
+        " 코드는 역전(`≤ 0`)으로만 구현했다. 이번 데이터는 정확히 그 틈에 떨어졌다:"
+        f" raw 층 delta `{_pct(raw)}`가 R 층에서 `{_num(realized_r)}`,"
+        f" 달러 층에서 `{_money(dollar)}`로 **부호는 유지한 채 크기만 무너진다.**",
+        "",
+        "**그래도 규칙을 고치지 않았다.** 결과를 본 뒤 문턱을 고치면 사전등록이 아무것도"
+        " 보증하지 못한다. 크기 변화는 아래 §20에 **탐색적 후속 진단**으로 따로 뒀고 A~L"
+        " 판정과 섞지 않았다.",
+        "",
+        "**그러므로 `NO_CLEAR_STAGE`를 \"층 사이에 아무 일도 없었다\"로 읽지 않는다.**"
+        " 읽을 수 있는 것은 \"사전등록한 부호 기준으로는 collapse point를 지목할 수"
+        " 없다\"까지다.",
+        "",
+    ]
 
 
 def _yes_no(value, detail: str) -> str:
@@ -1433,8 +1464,36 @@ def _median_verdict(sizing: dict, key: str) -> str:
     return f"{verdict} (중앙 {relative:+.1%} 상대)"
 
 
+def _data_exit_verdict(stages: dict) -> str:
+    """§22 J. data-exit가 큰 notional·낮은 변동성 쪽에 있는가를 백분위로 답한다.
+
+    **표본이 J당 한 자릿수다.** 위치를 적을 뿐 분포 결론으로 확장하지 않는다.
+    """
+    parts = []
+    for core in SIGNALS:
+        filled = stages.get(core, {}).get("FILLED", [])
+        exits = [
+            row for row in stages.get(core, {}).get("CLOSED", [])
+            if row.get("exit_reason") in DATA_EXIT_REASONS
+        ]
+        if not exits or not filled:
+            continue
+        cells = []
+        for key, name in (("entry_notional_weight", "notional"), ("atr_fraction", "ATR")):
+            everything = sizing_series(filled)[key]
+            point = _median(sizing_series(exits)[key])
+            place = percentile_of(everything, point)
+            if place is not None:
+                cells.append(f"{name} {place:.0f}백분위")
+        parts.append(f"{LABELS[core]} {len(exits)}건 · " + " · " .join(cells))
+    return " / ".join(parts) or "—"
+
+
 def _largest_drop(deltas: dict) -> str:
-    """단위가 같은 세 층 안에서만 감소폭을 견준다."""
+    """**단위가 같은 세 층 안에서만** 감소폭을 견준다.
+
+    `delta`가 층마다 얼마나 줄었는지를 본다. 음수면 그 구간에서 오히려 벌어진 것이다.
+    """
     steps = [
         ("TOP5 → ACCEPTED", _delta(deltas.get("accepted_excess"), deltas.get("top5_excess"))),
         ("ACCEPTED → FILLED",
@@ -1444,10 +1503,10 @@ def _largest_drop(deltas: dict) -> str:
     if not usable:
         return "—"
     name, value = max(usable, key=lambda item: item[1])
-    tail = (
-        " (FILLED 이후 층은 단위가 달라 같은 척도로 견주지 않는다)"
+    detail = " · ".join(f"{step} {_pct(amount)}" for step, amount in usable)
+    return (
+        f"**{name}** ({detail}) — FILLED 이후 층은 단위가 달라 같은 척도로 견주지 않는다"
     )
-    return f"{name} {_pct(value)}{tail}"
 
 
 def _zero_side(zero: dict, traces: dict) -> list[str]:
@@ -1489,8 +1548,158 @@ def _zero_side(zero: dict, traces: dict) -> list[str]:
     return lines
 
 
+TAIL_SIZE = 10
+
+
+def _exploratory(closed: dict) -> list[str]:
+    """**사전등록이 아니다.** 결과를 본 뒤 추가한 후속 진단이라 A~L·PATTERN과 섞지 않는다.
+
+    사전 기준을 소급해 바꾸지 않고 새 기준을 만들지 않는다. 여기서 재는 것은 셋이다 —
+    R이 퍼센트 수익률에서 어떤 산술로 만들어지는가, 층 사이에서 **크기**가 어떻게 변하는가,
+    그리고 raw 수익률의 상위 꼬리가 어떤 변동성 대역에 있는가.
+    """
+    lines = ["## 20. 탐색적 후속 진단 (사전등록 아님)", "",
+             "**이 절은 결과를 본 뒤 추가했다.** 위 A~L 판정과 PATTERN 결과를 바꾸지 않고"
+             " 새 기준을 소급 추가하지도 않았다. 여기 있는 것은 부호가 아니라 **크기**가"
+             " 어디서 변하는지에 대한 관찰이다.", "",
+             "### 20.1 R은 퍼센트 수익률을 정규화 손절폭으로 나눈 값이다", "",
+             "`planned_risk = shares × stop_distance`이고 `entry_notional ≈ shares ×"
+             " 진입가`이므로 산술적으로 다음이 성립한다.", "",
+             "```",
+             "R = pnl / planned_risk ≈ (pnl / entry_notional) / (stop_distance / 진입가)",
+             "  = net_notional_return / stop_fraction",
+             "```",
+             "",
+             "**가정이 아니라 측정이다.** 아래가 그 항등식이 실제로 얼마나 맞는지다"
+             " (차이는 `planned_risk`가 계획 진입가를, notional이 실제 체결가를 쓰기"
+             " 때문이다).", "",
+             "|값|J63|J126|", "|---|---|---|"]
+    for label, extract, fmt in (
+        ("실제 R 평균", lambda rows: _fmean([r["return_r"] for r in rows]), _num),
+        (
+            "`net / stop_fraction` 평균",
+            lambda rows: _fmean(
+                [
+                    (r["pnl"] / r["entry_notional"]) / (r["stop_distance"] / r["planned_entry"])
+                    for r in rows
+                    if r.get("entry_notional") and r.get("planned_entry")
+                ]
+            ),
+            _num,
+        ),
+        (
+            "`stop_fraction` 중앙",
+            lambda rows: _median(
+                [
+                    r["stop_distance"] / r["planned_entry"]
+                    for r in rows
+                    if r.get("planned_entry")
+                ]
+            ),
+            lambda v: "—" if v is None else f"{v * 100:.3f}%",
+        ),
+    ):
+        values = {core: extract(closed.get(core, [])) for core in SIGNALS}
+        lines.append(
+            f"|{label}|{fmt(values.get(BASELINE))}|{fmt(values.get(CHALLENGER))}|"
+        )
+
+    lines += ["", "### 20.2 층 사이에서 크기가 어떻게 변하는가", "",
+              "**단위가 다른 층을 뺄 수는 없지만 각 층의 J126/J63 배율은 무차원이다.**"
+              " 아래는 그 배율이고, 사전등록 판정을 바꾸지 않는 **표현 보조**다. 분모가"
+              " 0 근처면 배율이 불안정해지므로 J63 값과 함께 읽는다.", "",
+              "|층|J63|J126|J126 / J63|", "|---|---|---|---|"]
+    for label, extract, fmt in (
+        ("raw 거래 수익률", lambda rows: _fmean(raw_returns(rows)), _pct),
+        ("net-notional 수익률", lambda rows: _fmean(net_notional_returns(rows)), _pct),
+        ("실현 R", lambda rows: _fmean([r["return_r"] for r in rows]), _num),
+        (
+            "거래당 달러",
+            lambda rows: (
+                sum(r["pnl"] for r in rows) / len(rows) if rows else None
+            ),
+            _money,
+        ),
+    ):
+        left = extract(closed.get(BASELINE, []))
+        right = extract(closed.get(CHALLENGER, []))
+        ratio = (right / left) if left not in (None, 0) and right is not None else None
+        lines.append(
+            f"|{label}|{fmt(left)}|{fmt(right)}"
+            f"|{'—' if ratio is None else f'{ratio:.2f}×'}|"
+        )
+
+    lines += ["", f"### 20.3 raw 수익률 상위 {TAIL_SIZE}거래는 어느 변동성 대역에 있는가",
+              "",
+              "평균 raw 수익률이 꼬리에 얼마나 의존하는지, 그리고 그 꼬리의 정규화 손절폭이"
+              " 전체와 다른지를 본다. **표본이 J당"
+              f" {TAIL_SIZE}건이므로 일반적인 결론으로 확장하지 않는다.**", "",
+              "|값|J63|J126|", "|---|---|---|"]
+    for label, extract, fmt in (
+        (
+            "전체 raw 평균",
+            lambda rows: _fmean(raw_returns(rows)),
+            _pct,
+        ),
+        (
+            f"상위 {TAIL_SIZE}건이 그 평균에 넣는 몫",
+            lambda rows: (
+                sum(
+                    row["exit_price"] / row["entry_price"] - 1
+                    for row in _tail(rows)
+                )
+                / len(rows)
+                if rows
+                else None
+            ),
+            _pct,
+        ),
+        (
+            f"상위 {TAIL_SIZE}건 `stop_fraction` 중앙",
+            lambda rows: _median(
+                [row["stop_distance"] / row["planned_entry"] for row in _tail(rows)]
+            ),
+            lambda v: "—" if v is None else f"{v * 100:.3f}%",
+        ),
+        (
+            "전체 `stop_fraction` 중앙",
+            lambda rows: _median(
+                [
+                    row["stop_distance"] / row["planned_entry"]
+                    for row in rows
+                    if row.get("planned_entry")
+                ]
+            ),
+            lambda v: "—" if v is None else f"{v * 100:.3f}%",
+        ),
+        (
+            f"상위 {TAIL_SIZE}건이 R 평균에 넣는 몫",
+            lambda rows: (
+                sum(row["return_r"] for row in _tail(rows)) / len(rows)
+                if rows
+                else None
+            ),
+            _num,
+        ),
+    ):
+        lines.append(
+            f"|{label}|{fmt(extract(closed.get(BASELINE, [])))}"
+            f"|{fmt(extract(closed.get(CHALLENGER, [])))}|"
+        )
+    lines.append("")
+    return lines
+
+
+def _tail(rows: list[dict]) -> list[dict]:
+    """raw 수익률 상위 `TAIL_SIZE`건."""
+    usable = [row for row in rows if row.get("entry_price") and "exit_price" in row]
+    return sorted(
+        usable, key=lambda row: row["exit_price"] / row["entry_price"], reverse=True
+    )[:TAIL_SIZE]
+
+
 def _next_steps(verdict: dict) -> list[str]:
-    lines = ["## 20. 다음 개입 결정 (§23)", "",
+    lines = ["## 21. 다음 개입 결정 (§23)", "",
              "**이 PR 안에서 sizing을 바꾸지 않았다.** equal weight · fixed notional ·"
              " 비중 cap · ATR cap · 변동성 floor·ceiling · risk parity 변경을 실행하지"
              " 않았다. 이 PR은 범인을 찾는 PR이지 고치는 PR이 아니다.", ""]
@@ -1511,8 +1720,20 @@ def _next_steps(verdict: dict) -> list[str]:
     else:
         lines += [
             "판정이 `INCONCLUSIVE`이므로 **특정 구성요소를 범인으로 지목하지 않는다.**"
-            " 다음 질문은 이 표에서 부호가 유지되는 층이 어디까지인지를 더 좁히는 것이고,"
-            " 그 전에 sizing ablation을 열지 않는다.",
+            " sizing ablation을 지금 열지 않는다.",
+            "",
+            "다만 §20의 탐색적 관찰은 다음 질문의 **후보**로 기록해 둔다 — 사전등록된 결론이"
+            " 아니라 다음 PR에서 따로 사전등록해야 할 가설이다.",
+            "",
+            "> 현재 수량 규칙은 실측상 거의 순수한 inverse-normalized-vol 가중이고"
+            " (`RISK`가 구속, Spearman ρ ≈ -1), R은 산술적으로 퍼센트 수익률을 정규화"
+            " 손절폭으로 나눈 값이다. 그리고 raw 수익률 평균은 소수의 고변동 꼬리 거래가"
+            " 만든다. **이 셋이 함께 성립하면 퍼센트 우위가 R·달러로 옮겨가지 못하는"
+            " 구조적 이유가 된다.**",
+            "",
+            "**아직 측정하지 않은 것을 분명히 한다.** 이 구조가 실제로 변환 손실을 만드는지는"
+            " 재지 않았다 — 그러려면 수량 규칙을 실제로 한 번 바꿔봐야 하고, 그것이 다음"
+            " PR의 단일 ablation이다. 꼬리 관찰은 J당 10건이라 그 자체로는 근거가 약하다.",
             "",
         ]
     return lines

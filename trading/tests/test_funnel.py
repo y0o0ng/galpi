@@ -29,6 +29,8 @@ from selftest.funnel_run import (  # noqa: E402
     HORIZON,
     PATTERNS,
     SIGNALS,
+    TAIL_SIZE,
+    _tail,
     classify_pattern,
     describe,
     distributions_differ,
@@ -277,6 +279,32 @@ class StatisticsTest(unittest.TestCase):
     def test_spearman_needs_a_sample(self):
         self.assertIsNone(spearman([1.0], [1.0]))
         self.assertIsNone(spearman([1.0, 2.0, 3.0], [1.0, 1.0, 1.0]))
+
+
+class TailTest(unittest.TestCase):
+    """§21.3 탐색적 진단의 꼬리. **사전등록 판정을 바꾸지 않는 관찰이다.**"""
+
+    def rows(self) -> list[dict]:
+        return [
+            {"entry_price": 100.0, "exit_price": 100.0 + step, "stop_distance": 1.0,
+             "planned_entry": 100.0, "return_r": float(step)}
+            for step in range(30)
+        ]
+
+    def test_the_tail_is_the_best_raw_returns(self):
+        tail = _tail(self.rows())
+        self.assertEqual(len(tail), TAIL_SIZE)
+        self.assertEqual(tail[0]["exit_price"], 129.0)
+        self.assertEqual(tail[-1]["exit_price"], 120.0)
+
+    def test_a_row_without_a_fill_is_not_in_the_tail(self):
+        rows = self.rows() + [{"outcome": ACCEPTED, "rank": 1}]
+        for row in _tail(rows):
+            self.assertIn("exit_price", row)
+
+    def test_a_short_sample_gives_what_it_has(self):
+        self.assertEqual(len(_tail(self.rows()[:3])), 3)
+        self.assertEqual(_tail([]), [])
 
 
 class ScopeTest(unittest.TestCase):
