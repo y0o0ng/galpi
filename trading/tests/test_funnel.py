@@ -10,6 +10,7 @@ PR #13의 재현을 깨뜨리고, 그러면 진단과 실험이 서로 다른 �
 
 from __future__ import annotations
 
+import statistics
 import sys
 import unittest
 from pathlib import Path
@@ -22,6 +23,8 @@ import test_loop  # noqa: E402
 from backtest.loop import ACCEPTED, EntryEvent, run_backtest  # noqa: E402
 from core import CORES  # noqa: E402
 from selftest.funnel_run import (  # noqa: E402
+    ALIGNMENT_PATTERNS,
+    ALIGNMENT_TRIM,
     BASELINE,
     CHALLENGER,
     DATA_EXIT_REASONS,
@@ -31,6 +34,10 @@ from selftest.funnel_run import (  # noqa: E402
     SIGNALS,
     TAIL_SIZE,
     _tail,
+    alignment_rows,
+    alignment_stats,
+    allocation_weighted_mean,
+    classify_alignment,
     classify_pattern,
     describe,
     distributions_differ,
@@ -45,6 +52,7 @@ from selftest.funnel_run import (  # noqa: E402
     spearman,
     stages_of,
     trace_path,
+    trimmed_by_return,
 )
 
 
@@ -307,6 +315,238 @@ class TailTest(unittest.TestCase):
         self.assertEqual(_tail([]), [])
 
 
+class AllocationWeightedMeanTest(unittest.TestCase):
+    """§20.4 정렬 진단의 산술. **포트폴리오 수익률이 아니라 정렬 진단이다.**"""
+
+    def test_the_worked_example(self):
+        """수익 10%·0%에 가중치 1·3이면 (0.1×1 + 0×3) / 4 = 0.025."""
+        self.assertAlmostEqual(
+            allocation_weighted_mean([0.10, 0.00], [1.0, 3.0]), 0.025
+        )
+
+    def test_equal_weights_give_the_arithmetic_mean(self):
+        """**가중치가 모두 같으면 산술평균이어야 한다.** 아니면 가중이 뭔가를 더 하고 있다."""
+        returns = [0.10, -0.04, 0.02, 0.31, -0.15]
+        for weight in (1.0, 7.5, 0.001):
+            self.assertAlmostEqual(
+                allocation_weighted_mean(returns, [weight] * len(returns)),
+                statistics.fmean(returns),
+            )
+
+    def test_no_weight_means_no_answer(self):
+        """합이 0이거나 표본이 없으면 나눌 것이 없다. 0을 지어내지 않는다."""
+        self.assertIsNone(allocation_weighted_mean([], []))
+        self.assertIsNone(allocation_weighted_mean([0.1, 0.2], [0.0, 0.0]))
+
+    def test_mismatched_lengths_are_refused(self):
+        """짝이 어긋나면 조용히 zip으로 잘리는 대신 터진다."""
+        with self.assertRaises(ValueError):
+            allocation_weighted_mean([0.1, 0.2], [1.0])
+
+    def test_a_heavy_loser_pulls_the_weighted_mean_below_the_equal_mean(self):
+        """정렬 격차의 부호가 무엇을 뜻하는지 값으로 잠근다."""
+        returns, weights = [0.10, -0.10], [1.0, 9.0]
+        self.assertAlmostEqual(statistics.fmean(returns), 0.0)
+        self.assertLess(allocation_weighted_mean(returns, weights), 0.0)
+
+
+class AlignmentRowTest(unittest.TestCase):
+    def row(self, **changes) -> dict:
+        base = {
+            "entry_notional": 4000.0,
+            "equity_at_signal": 100_000.0,
+            "planned_entry": 100.0,
+            "atr14": 2.0,
+            "pnl": 40.0,
+        }
+        base.update(changes)
+        return base
+
+    def test_a_row_missing_any_piece_is_not_an_observation(self):
+        self.assertEqual(len(alignment_rows([self.row()])), 1)
+        for key in ("entry_notional", "equity_at_signal", "planned_entry", "pnl"):
+            partial = self.row()
+            del partial[key]
+            self.assertEqual(alignment_rows([partial]), [])
+
+    def test_the_stats_come_out_of_the_existing_trace_fields(self):
+        stats = alignment_stats([self.row(), self.row(pnl=-40.0)])
+        self.assertEqual(stats["count"], 2)
+        self.assertAlmostEqual(stats["equal_trade_mean"], 0.0)
+        self.assertAlmostEqual(stats["median_weight"], 0.04)
+        self.assertAlmostEqual(stats["median_atr_fraction"], 0.02)
+
+    def test_the_gap_is_weighted_minus_equal(self):
+        stats = alignment_stats(
+            [self.row(pnl=400.0), self.row(entry_notional=8000.0, pnl=-800.0)]
+        )
+        self.assertAlmostEqual(
+            stats["alignment_gap"],
+            stats["allocation_weighted_mean"] - stats["equal_trade_mean"],
+        )
+
+
+class TrimTest(unittest.TestCase):
+    """**사전에 1% 하나만 고른다.** 결과를 보고 늘리지 않는다."""
+
+    def rows(self, count: int) -> list[dict]:
+        return [
+            {
+                "entry_notional": 1000.0,
+                "equity_at_signal": 100_000.0,
+                "planned_entry": 100.0,
+                "atr14": 2.0,
+                "pnl": float(index),
+            }
+            for index in range(count)
+        ]
+
+    def test_the_fraction_is_one_percent(self):
+        self.assertAlmostEqual(ALIGNMENT_TRIM, 0.01)
+
+    def test_it_drops_exactly_the_pre_registered_share(self):
+        """500건이면 5건, 514건이면 5건(내림)이다."""
+        self.assertEqual(len(trimmed_by_return(self.rows(500))), 495)
+        self.assertEqual(len(trimmed_by_return(self.rows(514))), 509)
+
+    def test_a_small_sample_loses_nothing(self):
+        """뺄 것이 1건도 안 되면 아무것도 빼지 않는다."""
+        self.assertEqual(len(trimmed_by_return(self.rows(99))), 99)
+        self.assertEqual(trimmed_by_return([]), [])
+
+    def test_it_trims_by_absolute_return_so_both_tails_go(self):
+        """**절대값 상위**다. 큰 승자만 빼면 평균이 한쪽으로 기운다."""
+        rows = self.rows(100)
+        rows[0]["pnl"] = -5000.0  # 가장 큰 손실
+        rows[99]["pnl"] = 4000.0  # 가장 큰 이익
+        kept = trimmed_by_return(rows)
+        self.assertEqual(len(kept), 99)
+        self.assertNotIn(-5000.0, [row["pnl"] for row in kept])
+        self.assertIn(4000.0, [row["pnl"] for row in kept])
+
+
+class AlignmentPatternTest(unittest.TestCase):
+    """X1/X2/X3는 **탐색적 해석 범위**이고 사전등록 판정과 분리돼 있다."""
+
+    def stats(self, **changes) -> dict:
+        base = {
+            "rho_weight_return": -0.4,
+            "rho_atr_return": 0.4,
+            "alignment_gap": -0.005,
+        }
+        base.update(changes)
+        return {BASELINE: dict(base), CHALLENGER: dict(base)}
+
+    def test_x1_needs_every_dilution_sign_together(self):
+        verdict = classify_alignment(
+            self.stats(), {"equal": 0.008, "weighted": 0.001}, self.stats()
+        )
+        self.assertEqual(verdict, "X1")
+
+    def test_a_single_wrong_sign_drops_x1(self):
+        for key, value in (
+            ("rho_weight_return", 0.4),
+            ("rho_atr_return", -0.4),
+            ("alignment_gap", 0.005),
+        ):
+            stats = self.stats(**{key: value})
+            self.assertNotEqual(
+                classify_alignment(
+                    stats, {"equal": 0.008, "weighted": 0.001}, stats
+                ),
+                "X1",
+                key,
+            )
+
+    def test_x2_is_a_weak_relation_that_survives_weighting(self):
+        stats = self.stats(rho_weight_return=0.01, rho_atr_return=-0.01,
+                           alignment_gap=0.0001)
+        self.assertEqual(
+            classify_alignment(stats, {"equal": 0.008, "weighted": 0.009}, stats),
+            "X2",
+        )
+
+    def test_a_sign_flip_under_trimming_is_always_x3(self):
+        """**몇 건이 만든 관계면 X1로 올리지 않는다.**"""
+        full = self.stats()
+        flipped = self.stats(alignment_gap=+0.005)
+        self.assertEqual(
+            classify_alignment(full, {"equal": 0.008, "weighted": 0.001}, flipped),
+            "X3",
+        )
+
+    def test_a_missing_number_never_claims_dilution(self):
+        for key in ("rho_weight_return", "rho_atr_return", "alignment_gap"):
+            stats = self.stats(**{key: None})
+            self.assertEqual(
+                classify_alignment(stats, {"equal": 0.008, "weighted": 0.001}, stats),
+                "X3",
+            )
+        self.assertEqual(
+            classify_alignment(
+                self.stats(), {"equal": None, "weighted": None}, self.stats()
+            ),
+            "X3",
+        )
+
+    def test_every_verdict_is_one_of_the_three(self):
+        for rho_weight in (-0.4, 0.0, 0.4):
+            for rho_atr in (-0.4, 0.0, 0.4):
+                for gap in (-0.005, 0.0, 0.005):
+                    stats = self.stats(
+                        rho_weight_return=rho_weight,
+                        rho_atr_return=rho_atr,
+                        alignment_gap=gap,
+                    )
+                    for weighted in (0.001, 0.009):
+                        self.assertIn(
+                            classify_alignment(
+                                stats, {"equal": 0.008, "weighted": weighted}, stats
+                            ),
+                            ALIGNMENT_PATTERNS,
+                        )
+
+
+class VerdictIsolationTest(unittest.TestCase):
+    """**탐색적 진단이 사전등록 판정을 건드리면 안 된다.**"""
+
+    def test_the_alignment_verdict_never_feeds_the_registered_pattern(self):
+        """`classify_pattern`은 정렬 진단의 값을 인자로 받지도 않는다."""
+        import inspect
+
+        signature = inspect.signature(classify_pattern)
+        self.assertEqual(list(signature.parameters), ["deltas", "differ"])
+
+    def test_the_registered_verdict_still_reads_this_run_the_same_way(self):
+        """이 PR의 실제 층 값에서 판정이 `NO_CLEAR_STAGE`·`INCONCLUSIVE`로 남는다.
+
+        **탐색적 절을 더한 뒤에도 공식 결론이 그대로여야 한다.** 값은 결과 문서의 것이다.
+        """
+        measured = {
+            "top5_excess": 0.005487,
+            "accepted_excess": 0.003539,
+            "filled_excess": 0.007343,
+            "raw_return": 0.009104,
+            "realized_r": 0.0035,
+            "dollar_per_trade": 5.88,
+        }
+        for differ in (True, False):
+            self.assertEqual(classify_pattern(measured, differ), "NO_CLEAR_STAGE")
+            self.assertEqual(next_intervention("NO_CLEAR_STAGE"), "INCONCLUSIVE")
+
+    def test_the_threshold_was_not_relaxed(self):
+        """5% 문턱을 결과 보고 낮추지 않았다."""
+        self.assertAlmostEqual(DISTRIBUTION_TOLERANCE, 0.05)
+
+    def test_no_criterion_was_added_to_the_registered_set(self):
+        """A~L 열두 개다. M·N을 소급 추가하지 않는다."""
+        self.assertEqual(len(PATTERNS), 4)
+        self.assertEqual(
+            set(PATTERNS),
+            {"ADMISSION", "EXECUTION_EXIT", "SIZING", "NO_CLEAR_STAGE"},
+        )
+
+
 class ScopeTest(unittest.TestCase):
     """**이번 PR은 두 코어만 읽는다.** 목록이 늘면 실험이 다른 것이 된다."""
 
@@ -347,6 +587,27 @@ class ScopeTest(unittest.TestCase):
 
     def test_data_exits_are_the_engine_reasons(self):
         self.assertEqual(DATA_EXIT_REASONS, ("DELISTED_EXIT", "UNRESOLVED_EXIT"))
+
+    def test_the_alignment_diagnostic_adds_no_run_core_or_policy(self):
+        """**§20.4는 기존 trace를 다시 집계할 뿐이다.**
+
+        실행 목록·코어 목록·정책이 그대로여야 새 백테스트를 돌리지 않았다고 말할 수 있다.
+        """
+        self.assertEqual(len(planned()), 4)
+        self.assertEqual(SIGNALS, ("jt-k42", "jt-j126-k42"))
+        for core in SIGNALS:
+            self.assertIn(core, CORES)
+
+    def test_the_alignment_diagnostic_reads_only_existing_trace_fields(self):
+        """새 observer event 없이 계산된다 — trace에 이미 있는 필드만 쓴다."""
+        row = {
+            "entry_notional": 4000.0,
+            "equity_at_signal": 100_000.0,
+            "planned_entry": 100.0,
+            "atr14": 2.0,
+            "pnl": 40.0,
+        }
+        self.assertEqual(alignment_stats([row])["count"], 1)
 
 
 class EntryObserverTest(unittest.TestCase):

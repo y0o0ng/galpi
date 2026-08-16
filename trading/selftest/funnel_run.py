@@ -109,6 +109,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 import sys
 from pathlib import Path
@@ -147,6 +148,13 @@ HORIZON = 42
 TOP_N = 5
 # §15 변동성 귀속. J별로 나누면 칸의 뜻이 갈리므로 **둘을 합친 분포**에서 경계를 만든다.
 VOL_BUCKETS = 5
+
+# §12의 outlier robustness. **하나만 고르고 결과를 보고 늘리지 않는다.**
+ALIGNMENT_TRIM = 0.01
+# §11의 선택적 요약. 전략 규칙이 아니라 표를 읽기 위한 구간이다.
+RETURN_BANDS = ((0.0, 0.2, "하위 20%"), (0.2, 0.8, "중간 60%"), (0.8, 1.0, "상위 20%"))
+# 탐색적 정렬 진단의 해석 범위. §14의 X1/X2/X3다.
+ALIGNMENT_PATTERNS = ("X1", "X2", "X3")
 
 # 거래가 끝난 것이 가격 경로가 아니라 데이터 종료인 청산. `positions`의 상태 기계가 낸다.
 DATA_EXIT_REASONS = ("DELISTED_EXIT", "UNRESOLVED_EXIT")
@@ -277,6 +285,75 @@ def percentile_of(values: list[float], point: float | None) -> float | None:
     if point is None or not values:
         return None
     return 100.0 * sum(1 for value in values if value <= point) / len(values)
+
+
+def allocation_weighted_mean(returns: list[float], weights: list[float]) -> float | None:
+    """`Σ(w·r) / Σw`.
+
+    **이것은 포트폴리오 수익률이 아니다.** 서로 다른 날짜의 거래를 정적으로 모아 "비중이
+    큰 거래가 평균적으로 어떤 퍼센트 수익률을 냈는가"만 재는 **정렬 진단**이다. 자본이
+    시간에 따라 굴러가지 않고 동시 보유도 재현하지 않으므로 counterfactual·백테스트
+    수익률로 부르지 않는다.
+    """
+    if len(returns) != len(weights):
+        raise ValueError(
+            f"수익률과 가중치 개수가 다릅니다: {len(returns)} != {len(weights)}"
+        )
+    total = sum(weights)
+    if not returns or total <= 0:
+        return None
+    return sum(weight * value for weight, value in zip(weights, returns)) / total
+
+
+def alignment_rows(rows: list[dict]) -> list[dict]:
+    """정렬 진단이 쓸 수 있는 거래. 네 값이 모두 있어야 한 관측이 된다."""
+    return [
+        row
+        for row in rows
+        if row.get("entry_notional")
+        and row.get("equity_at_signal")
+        and row.get("planned_entry")
+        and "pnl" in row
+    ]
+
+
+def trimmed_by_return(
+    rows: list[dict], fraction: float = ALIGNMENT_TRIM
+) -> list[dict]:
+    """net-notional 수익률 **절대값 상위 `fraction`**을 뺀 표본.
+
+    **사전에 1% 하나만 고른다.** 결과를 보고 2%·5%·10%를 덧붙이지 않는다. 개수는
+    내림이라 표본이 100건 미만이면 아무것도 빼지 않는다 — 뺄 것이 1건도 안 되는데
+    억지로 하나를 빼면 그 하나가 진단을 좌우한다.
+    """
+    usable = alignment_rows(rows)
+    count = math.floor(len(usable) * fraction)
+    if count <= 0:
+        return list(usable)
+    ordered = sorted(
+        usable, key=lambda row: abs(row["pnl"] / row["entry_notional"]), reverse=True
+    )
+    return ordered[count:]
+
+
+def alignment_stats(rows: list[dict]) -> dict:
+    """§6~9의 값 한 벌. 전부 기존 trace에 이미 있는 값에서 나온다."""
+    usable = alignment_rows(rows)
+    returns = [row["pnl"] / row["entry_notional"] for row in usable]
+    weights = [row["entry_notional"] / row["equity_at_signal"] for row in usable]
+    normalized_atr = [row["atr14"] / row["planned_entry"] for row in usable]
+    equal = _fmean(returns)
+    weighted = allocation_weighted_mean(returns, weights)
+    return {
+        "count": len(usable),
+        "equal_trade_mean": equal,
+        "allocation_weighted_mean": weighted,
+        "alignment_gap": _delta(equal, weighted),
+        "rho_weight_return": spearman(weights, returns),
+        "rho_atr_return": spearman(normalized_atr, returns),
+        "median_weight": _median(weights),
+        "median_atr_fraction": _median(normalized_atr),
+    }
 
 
 def spearman(xs: list[float], ys: list[float]) -> float | None:
@@ -1159,8 +1236,11 @@ def _volatility_buckets(filled: dict, closed: dict) -> list[str]:
               "경계(ATR14 / 계획 진입가): "
               + " · ".join(f"{edge * 100:.3f}%" for edge in edges),
               "",
-              "|칸|J|거래|raw 평균|raw 중앙|R 평균|총 달러|평균 notional 비중|data-exit|",
-              "|---|---|---|---|---|---|---|---|---|"]
+              "**`net 평균` 열은 결과를 본 뒤 더한 측정이다.** 칸 경계와 칸 수는 그대로이고"
+              " 판정에 쓰이지 않는다 — §20.4의 정렬 진단과 함께 읽으라고 붙였다.", "",
+              "|칸|J|거래|raw 평균|raw 중앙|net 평균|R 평균|총 달러|평균 notional 비중|data-exit|",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+    grouped: dict[tuple[int, str], list[dict]] = {}
     for bucket in range(1, VOL_BUCKETS + 1):
         for core in SIGNALS:
             group = []
@@ -1170,8 +1250,9 @@ def _volatility_buckets(filled: dict, closed: dict) -> list[str]:
                     continue
                 if bucket_of(row["atr14"] / entry) == bucket:
                     group.append(row)
+            grouped[(bucket, core)] = group
             if not group:
-                lines.append(f"|Q{bucket}|{LABELS[core]}|0|—|—|—|—|—|—|")
+                lines.append(f"|Q{bucket}|{LABELS[core]}|0|—|—|—|—|—|—|—|")
                 continue
             raws = raw_returns(group)
             weights = [
@@ -1185,12 +1266,27 @@ def _volatility_buckets(filled: dict, closed: dict) -> list[str]:
             lines.append(
                 f"|Q{bucket}|{LABELS[core]}|{len(group):,}|{_pct(_fmean(raws))}"
                 f"|{_pct(_median(raws))}"
+                f"|{_pct(_fmean(net_notional_returns(group)))}"
                 f"|{_num(_fmean([r['return_r'] for r in group if 'return_r' in r]))}"
                 f"|{_money(sum(r['pnl'] for r in group if 'pnl' in r))}"
                 f"|{_share(_fmean(weights))}|{data_exit}|"
             )
     lines += ["", "Q1이 가장 낮은 정규화 변동성이다. **칸마다 표본이 작으므로 한 칸의"
-              " 값을 일반 결론으로 확장하지 않는다.**", ""]
+              " 값을 일반 결론으로 확장하지 않는다.**", "",
+              "**칸별 J126 − J63 (결과를 본 뒤 더한 측정)**", "",
+              "|칸|raw delta|net delta|", "|---|---|---|"]
+    for bucket in range(1, VOL_BUCKETS + 1):
+        left, right = grouped.get((bucket, BASELINE), []), grouped.get(
+            (bucket, CHALLENGER), []
+        )
+        lines.append(
+            f"|Q{bucket}"
+            f"|{_pct(_delta(_fmean(raw_returns(left)), _fmean(raw_returns(right))))}"
+            f"|{_pct(_delta(_fmean(net_notional_returns(left)), _fmean(net_notional_returns(right))))}|"
+        )
+    lines += ["",
+              "**Q1·Q5 한 칸만 보고 결론을 내지 않는다.** 이 표는 §20.4의 정렬 진단과"
+              " 함께 읽는 보조 자료다.", ""]
     return lines
 
 
@@ -1713,7 +1809,243 @@ def _exploratory(closed: dict) -> list[str]:
             f"|{fmt(extract(closed.get(CHALLENGER, [])))}|"
         )
     lines.append("")
+    lines += _alignment(closed)
     return lines
+
+
+def classify_alignment(stats: dict, advantages: dict, trimmed: dict) -> str:
+    """§14의 X1/X2/X3. **탐색적 해석 범위이지 사전등록 판정이 아니다.**
+
+    `classify_pattern`과 완전히 분리돼 있다 — 이 함수의 결과는 A~L에도 PATTERN A/E/S/N
+    에도 들어가지 않고 Q1·Q2를 바꾸지 않는다.
+    """
+    challenger = stats.get(CHALLENGER) or {}
+    rho_weight = challenger.get("rho_weight_return")
+    rho_atr = challenger.get("rho_atr_return")
+    gap = challenger.get("alignment_gap")
+    equal = advantages.get("equal")
+    weighted = advantages.get("weighted")
+    if None in (rho_weight, rho_atr, gap, equal, weighted):
+        return "X3"
+
+    # trim에서 방향이 뒤집히면 몇 건이 만든 관계다. 지표를 더 보기 전에 X3다.
+    for key in ("rho_weight_return", "alignment_gap"):
+        full = challenger.get(key)
+        cut = (trimmed.get(CHALLENGER) or {}).get(key)
+        if full is None or cut is None:
+            return "X3"
+        if (full > 0) != (cut > 0):
+            return "X3"
+
+    dilution = (
+        rho_weight < 0
+        and rho_atr > 0
+        and gap < 0
+        and equal > 0
+        and weighted < equal
+    )
+    if dilution:
+        return "X1"
+    # 관계가 약하고 가중 후에도 우위가 유지되면 희석 근거가 없다.
+    if abs(rho_weight) < 0.1 and equal > 0 and weighted >= equal:
+        return "X2"
+    return "X3"
+
+
+def _alignment(closed: dict) -> list[str]:
+    """§20.4. **결과를 본 뒤 추가한 탐색적 진단이다.**
+
+    기존 LAST_CLOSE trace의 체결 거래를 다시 집계할 뿐 새 실행·새 코어·수량 변경이 없다.
+    """
+    stats = {core: alignment_stats(closed.get(core, [])) for core in SIGNALS}
+    cut = {
+        core: alignment_stats(trimmed_by_return(closed.get(core, [])))
+        for core in SIGNALS
+    }
+    advantages = {
+        "equal": _delta(
+            stats[BASELINE]["equal_trade_mean"], stats[CHALLENGER]["equal_trade_mean"]
+        ),
+        "weighted": _delta(
+            stats[BASELINE]["allocation_weighted_mean"],
+            stats[CHALLENGER]["allocation_weighted_mean"],
+        ),
+    }
+    trimmed_advantages = {
+        "equal": _delta(
+            cut[BASELINE]["equal_trade_mean"], cut[CHALLENGER]["equal_trade_mean"]
+        ),
+        "weighted": _delta(
+            cut[BASELINE]["allocation_weighted_mean"],
+            cut[CHALLENGER]["allocation_weighted_mean"],
+        ),
+    }
+    verdict = classify_alignment(stats, advantages, cut)
+
+    lines = [
+        "### 20.4 allocation × return 정렬 진단", "",
+        "**이 분석은 PR #14의 사전등록된 A~L / PATTERN 판정 이후 결과를 보고 추가한"
+        " 탐색적 진단이며, 공식 `NO_CLEAR_STAGE / INCONCLUSIVE` 결론을 변경하지 않는다.**",
+        "",
+        "**새 실행을 돌리지 않았다.** 기존 LAST_CLOSE trace의 체결 거래를 다시 집계할"
+        " 뿐이고 수량·위험·손절·슬롯·체결·청산을 하나도 바꾸지 않았다.", "",
+        "묻는 것: **실제 체결된 거래에서 높은 퍼센트 수익률을 낸 거래일수록 실제 포지션"
+        " 비중이 작았는가**, 그리고 **그 관계가 J126에서 더 강한가**. 아직 causal claim이"
+        " 아니다.", "",
+        "#### Evidence 1 — 순위 상관 (Spearman)", "",
+        "|J|ρ(비중, net 수익률)|ρ(정규화 ATR, net 수익률)|관측|",
+        "|---|---|---|---|",
+    ]
+    for core in SIGNALS:
+        cell = stats[core]
+        lines.append(
+            f"|**{LABELS[core]}**|{_num(cell['rho_weight_return'])}"
+            f"|{_num(cell['rho_atr_return'])}|{cell['count']:,}|"
+        )
+    pooled = alignment_stats(
+        [row for core in SIGNALS for row in closed.get(core, [])]
+    )
+    lines.append(
+        f"|합침|{_num(pooled['rho_weight_return'])}"
+        f"|{_num(pooled['rho_atr_return'])}|{pooled['count']:,}|"
+    )
+    lines += ["",
+              "ρ < 0이면 **큰 포지션일수록 낮은 퍼센트 수익률을 냈다는 연관**이고, ρ > 0이면"
+              " 그 반대다. 0 근처면 단조 관계가 뚜렷하지 않다. **formal p-value를 만들지"
+              " 않았고 상관을 인과로 쓰지 않는다.**", ""]
+
+    lines += ["#### Evidence 2 — 동일가중 vs 배분가중 평균", "",
+              "`allocation_weighted_mean = Σ(wᵢ·rᵢ) / Σwᵢ` (`wᵢ` = 진입 notional / 신호"
+              " 시점 자산, `rᵢ` = pnl / 진입 notional).", "",
+              "**이것을 포트폴리오 수익률·counterfactual·백테스트 수익률이라고 부르지"
+              " 않는다.** 서로 다른 날짜의 거래를 정적으로 모은 정렬 진단일 뿐이다.", "",
+              "|J|동일가중 net 수익|배분가중 net 수익|정렬 격차|관측|",
+              "|---|---|---|---|---|"]
+    for core in SIGNALS:
+        cell = stats[core]
+        lines.append(
+            f"|**{LABELS[core]}**|{_pct(cell['equal_trade_mean'])}"
+            f"|{_pct(cell['allocation_weighted_mean'])}"
+            f"|**{_pct(cell['alignment_gap'])}**|{cell['count']:,}|"
+        )
+    lines += ["",
+              "격차 < 0이면 비중이 큰 거래가 평균적으로 더 낮은 수익률을 가져 **배분이"
+              " 거래 단위 퍼센트 수익률과 반대 방향으로 정렬된 관측**이다. > 0이면 반대이고"
+              " 0 근처면 뚜렷한 정렬 효과가 없다.", ""]
+
+    lines += ["#### Evidence 3 — 가중 후 J126 우위가 어떻게 변하는가", "",
+              "|비교|값|", "|---|---|",
+              f"|J126 − J63 동일가중 우위|**{_pct(advantages['equal'])}**|",
+              f"|J126 − J63 배분가중 우위|**{_pct(advantages['weighted'])}**|",
+              f"|가중이 지운 몫|{_pct(_delta(advantages['equal'], advantages['weighted']))}|",
+              ""]
+
+    lines += [f"#### Evidence 4 — outlier robustness (절대값 상위"
+              f" {ALIGNMENT_TRIM:.0%} 제거)", "",
+              "**trim은 사전에 1% 하나만 골랐다.** 결과를 보고 2%·5%·10%를 추가로 탐색하지"
+              " 않았다. net-notional 수익률 **절대값** 상위 1%(내림)를 뺀 표본이다.", "",
+              "|J|관측|ρ(비중, net)|동일가중|배분가중|정렬 격차|",
+              "|---|---|---|---|---|---|"]
+    for core in SIGNALS:
+        cell = cut[core]
+        lines.append(
+            f"|**{LABELS[core]}**|{cell['count']:,}|{_num(cell['rho_weight_return'])}"
+            f"|{_pct(cell['equal_trade_mean'])}"
+            f"|{_pct(cell['allocation_weighted_mean'])}"
+            f"|**{_pct(cell['alignment_gap'])}**|"
+        )
+    lines += ["",
+              f"|비교 (trimmed)|값|", "|---|---|",
+              f"|J126 − J63 동일가중 우위|{_pct(trimmed_advantages['equal'])}|",
+              f"|J126 − J63 배분가중 우위|{_pct(trimmed_advantages['weighted'])}|",
+              ""]
+
+    lines += _return_bands(closed)
+
+    lines += ["#### 탐색적 해석 — X1 / X2 / X3", "",
+              "|패턴|뜻|", "|---|---|",
+              "|**X1**|희석 가설과 일관: ρ(비중,수익) < 0 · ρ(ATR,수익) > 0 · 정렬 격차 < 0"
+              " · 가중 후 J126 우위 축소|",
+              "|**X2**|희석 근거 없음: 상관이 약하고 가중 후에도 우위 유지|",
+              "|**X3**|혼재하거나 trim에서 방향이 뒤집힘 — INCONCLUSIVE|",
+              "",
+              f"### 판정 **{verdict}**", ""]
+    lines += _alignment_reading(verdict)
+    return lines
+
+
+def _return_bands(closed: dict) -> list[str]:
+    """§11의 선택적 요약. **새 cutoff를 전략 규칙처럼 해석하지 않는다.**"""
+    lines = ["#### Evidence 5 — net 수익률 구간별 비중 (보조)", "",
+             "**이 구간은 표를 읽기 위한 것이지 전략 규칙이 아니다.** 각 J 안에서 net"
+             " 수익률로 정렬해 나눴다.", "",
+             "|J|구간|거래|비중 중앙|정규화 ATR 중앙|",
+             "|---|---|---|---|---|"]
+    for core in SIGNALS:
+        usable = alignment_rows(closed.get(core, []))
+        if not usable:
+            continue
+        ordered = sorted(usable, key=lambda row: row["pnl"] / row["entry_notional"])
+        for low, high, label in RETURN_BANDS:
+            start = int(len(ordered) * low)
+            end = int(len(ordered) * high)
+            band = ordered[start:end]
+            if not band:
+                continue
+            weights = [
+                row["entry_notional"] / row["equity_at_signal"] for row in band
+            ]
+            atr = [row["atr14"] / row["planned_entry"] for row in band]
+            lines.append(
+                f"|{LABELS[core]}|{label}|{len(band):,}|{_share(_median(weights))}"
+                f"|{_median(atr) * 100:.3f}%|"
+            )
+    lines += ["",
+              "**Interpretation — 왜 Evidence 1과 Evidence 2가 서로 다른 얘기를 하는가.**"
+              " 이 표에서 양쪽 꼬리(하위 20%·상위 20%)가 중간 60%보다 **비중이 낮고 정규화"
+              " ATR이 높다.** 즉 배분과 수익률의 관계가 단조가 아니라 U자다. Spearman은"
+              " 단조 관계만 보므로 ρ ≈ 0이 나오고, 가중 평균은 크기를 보므로 격차가 생긴다."
+              " **두 지표가 어긋나는 것이 아니라 서로 다른 것을 재고 있다** — 그래서 아래"
+              " 판정이 X1도 X2도 아니다.",
+              ""]
+    return lines
+
+
+def _alignment_reading(verdict: str) -> list[str]:
+    """판정별로 **어디까지 말할 수 있는지**를 못박는다."""
+    if verdict == "X1":
+        return [
+            "**Hypothesis (증명 아님).** J126의 퍼센트 수익률 우위 일부가 high-vol ·"
+            " low-notional 거래에 위치하고, 현재 inverse-normalized-vol 배분이 그 우위를"
+            " 달러 층에서 약화시킬 **수 있다**는 가설과 일관된 탐색적 관측이다.",
+            "",
+            "**\"증명\"·\"범인 확인\"이라고 쓰지 않는다.** 실제 개입을 아직 돌리지 않았다.",
+            "",
+            "**다음 단계는 최대 여기까지다:** allocation dilution 가설이 탐색적으로"
+            " 강화됐고, 다음 **별도** PR에서 단 하나의 sizing ablation을 사전등록할 후보가"
+            " 생겼다. **이 PR에서 sizing을 바꾸지 않는다.**",
+            "",
+        ]
+    if verdict == "X2":
+        return [
+            "**Interpretation.** 비중–수익률 상관이 약하고 가중 후에도 J126 우위가"
+            " 유지된다. inverse-vol 배분이 J126의 번역 실패를 설명한다는 가설은 **약화**된다.",
+            "",
+            "**sizing intervention 근거가 부족하다.**",
+            "",
+        ]
+    return [
+        "**Interpretation.** 지표마다 방향이 다르거나 trim에서 크게 뒤집힌다. allocation"
+        " 설명은 **INCONCLUSIVE**이고 **sizing ablation 근거로 승격하지 않는다.**",
+        "",
+        "**두 방향의 증거가 같이 있다는 것을 그대로 남긴다.** 순위 상관은 어느 쪽으로도"
+        " 거의 0이고 부호가 희석 가설과 반대다. 반면 배분가중은 J126 우위를 실제로"
+        " 압축하고, trim 뒤에는 부호까지 바뀐다. 한쪽만 인용해 결론을 만들지 않는다 —"
+        " 그리고 trim이 방향을 바꾼다는 것 자체가 **소수 거래에 기댄 관계**라는 신호다.",
+        "",
+        "**sizing intervention 근거가 부족하다.**",
+        "",
+    ]
 
 
 def _tail(rows: list[dict]) -> list[dict]:
