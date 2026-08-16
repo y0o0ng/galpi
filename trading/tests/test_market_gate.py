@@ -456,7 +456,9 @@ class PartitionTest(unittest.TestCase):
 class DecompositionTest(unittest.TestCase):
     """`ΔS = ΔB + ΔG`는 `G ≡ S − B`의 결과다. **잔차가 0이어야 한다.**"""
 
-    def run_payload(self, strategy: float, matched: float) -> dict:
+    def run_payload(
+        self, strategy: float, matched: float, fixed: float | None = None
+    ) -> dict:
         return {
             "metrics": {
                 "total_return": strategy,
@@ -467,7 +469,8 @@ class DecompositionTest(unittest.TestCase):
             },
             "benchmark": [
                 {"label": "일별 노출 일치", "total_return": matched},
-                {"label": "평균 노출 고정", "total_return": matched},
+                {"label": "평균 노출 고정",
+                 "total_return": matched if fixed is None else fixed},
                 {"label": "100% 보유", "total_return": 5.0},
             ],
         }
@@ -480,6 +483,30 @@ class DecompositionTest(unittest.TestCase):
         self.assertAlmostEqual(
             delta["delta_S"], delta["delta_B"] + delta["delta_G"], places=12
         )
+
+    def test_the_exposure_path_also_splits_exactly(self):
+        """`ΔB = ΔF + ΔT`. **`T ≡ B − F`의 결과이지 발견이 아니다.**
+
+        정의상 닫히는 식이지만 잠가 두는 이유는, `F`를 다른 벤치마크 줄에서 읽으면
+        `ΔB`가 조용히 두 조각으로 안 갈리기 때문이다.
+        """
+        delta = decompose(
+            self.run_payload(0.3563, 0.4646, fixed=0.4648),
+            self.run_payload(0.4784, 0.4285, fixed=0.4237),
+        )
+        self.assertAlmostEqual(
+            delta["delta_B"], delta["delta_F"] + delta["delta_T"], places=12
+        )
+        self.assertAlmostEqual(delta["T_control"], 0.4646 - 0.4648, places=12)
+        self.assertAlmostEqual(delta["T_gate"], 0.4285 - 0.4237, places=12)
+
+    def test_fixed_exposure_is_the_second_benchmark_row(self):
+        """행 순서가 바뀌면 `T`가 조용히 다른 벤치마크에서 계산된다."""
+        delta = decompose(
+            self.run_payload(0.1, 0.4, fixed=0.35),
+            self.run_payload(0.1, 0.4, fixed=0.35),
+        )
+        self.assertAlmostEqual(delta["F_control"], 0.35)
 
     def test_the_pieces_are_what_they_say(self):
         delta = decompose(
