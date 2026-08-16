@@ -795,6 +795,37 @@ def _evidence_section(primary: dict, ndx: dict | None) -> list[str]:
               "**Evidence의 직접 해석까지만 적는다.**", "",
               interpretation, ""]
 
+    # **conditioning의 "형태"가 두 J에서 다르다.** 평균만 보면 뭉뚱그려진다.
+    control_down = control["groups"][DOWN]["mean"]
+    challenger_down = challenger["groups"][DOWN]["mean"]
+    if control_down is not None and challenger_down is not None:
+        lines += [
+            "**다만 conditioning의 형태는 두 J에서 다르다.** J63은 DOWN에서 alpha가"
+            f" 음수로 반전되는 반면({_pct(control_down)}), J126은 DOWN에서도 양의 alpha가"
+            f" 남는다({_pct(challenger_down)}). 따라서 **J126에 대한 SMA200 gate의 경제적"
+            " 효과는 signal study만으로 방향을 확정할 수 없으며 PR #16에서 직접 검증해야"
+            " 한다.**",
+            "",
+            "**이 차이가 PR #16의 질문을 바꾼다.** J126에서 `SPY <= SMA200` 신규진입을"
+            " 완전히 차단하면 신호 층에서 이미 양수인 구간을 통째로 버리는 것이다. 그래서"
+            " PR #16은 \"나쁜 거래를 제거한다\"는 실험이 아니라 **\"더 약하지만 여전히 양의"
+            " alpha를 가진 DOWN 구간을 포기했을 때 자본 효율·MDD·after-cost"
+            " benchmark-relative economics가 전체적으로 좋아지는가\"**를 묻는 실험이다.",
+            "",
+        ]
+        down_years = [
+            value
+            for value in (row[DOWN] for row in challenger["by_year"].values())
+            if value is not None
+        ]
+        if down_years:
+            lines += [
+                f"**DOWN의 평균 자체도 안정적이지 않다.** 연도별 J126 DOWN이"
+                f" {_pct(min(down_years))} ~ {_pct(max(down_years))}로 흩어져 있어"
+                f" 전체 평균 {_pct(challenger_down)}를 상시적인 양의 edge로 읽지 않는다.",
+                "",
+            ]
+
     # 사전등록 판정과 연도 집중도가 다른 방향을 가리키면 그것을 숨기지 않는다.
     if label == "CONCENTRATED":
         lines += [
@@ -829,6 +860,7 @@ def _evidence_section(primary: dict, ndx: dict | None) -> list[str]:
               "- **중첩 표본이다** — 관측 수를 독립 표본 수로 읽지 않았고 p-value를"
               " 만들지 않았다",
               "- 무작위 20시드는 coarse control이고 formal test가 아니다",
+              _stale_limitation(primary),
               ""]
 
     lines += ["## 11. Pre-registered verdict", "",
@@ -858,6 +890,28 @@ def _evidence_section(primary: dict, ndx: dict | None) -> list[str]:
               " diagnostic이지 단독 promotion veto가 아니다 — 시장 상태 효과는 본질적으로"
               " 드문 위기 구간과 연결될 수 있다.", ""]
     return lines
+
+
+def _stale_limitation(primary: dict) -> str:
+    """stale/frozen forward 비중. **버그가 아니라 last-close freeze가 작동한 결과다.**
+
+    이것을 이유로 stale을 제거해 다시 분석하지 않는다 — 그 순간 또 다른 연구가 되고,
+    빼는 것 자체가 생존편향이다.
+    """
+    challenger = primary["by_j"][str(J_PRIMARY)]
+    groups = challenger["groups"]
+    stale = groups[UP]["stale"] + groups[DOWN]["stale"]
+    observations = groups[UP]["observations"] + groups[DOWN]["observations"]
+    if not observations:
+        return "- stale 비중을 셀 표본이 없다"
+    return (
+        f"- **stale/frozen forward 비중이 높다** — TOP5 +{HORIZON} 관측 {observations:,}개"
+        f" 중 {stale:,}개({stale / observations:.1%})가 마지막 거래 종가로 고정됐다."
+        " 이는 기존 PR #12와 **동일한 last-close freeze 정의를 재사용한 결과**이며 이번"
+        " re-cut만의 현상이 아니다(aggregate checksum이 그것을 보인다). 다만 **절대"
+        " 수익률 수준을 해석할 때 유의한다.** 거래가 멈춘 종목을 빼면 그것이 정확히"
+        " 생존편향이므로 제거해 재분석하지 않는다"
+    )
 
 
 def _interpretation(control: dict, challenger: dict) -> str:
