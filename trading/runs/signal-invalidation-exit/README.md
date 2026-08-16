@@ -223,6 +223,33 @@ T = B − F        (노출 타이밍의 몫)
 |`sessions remaining to K42 at signal`|표시 시점의 `max_hold_sessions − sessions_held` 분포|
 |`signal→fill delay sessions`|표시부터 체결까지 걸린 세션 분포|
 
+### 예약된 신호의 최종 outcome은 넷으로 갈린다
+
+**"market break가 먼저 찍혔으면 최종적으로도 `MARKET_TREND_BREAK`로 기록된다"는 일반화를
+하지 않는다.** loop 1단계에서 **delisting 판정이 `run_session`·`hold_untraded`보다 먼저**이고
+`_terminal_fill`이 최종 사유를 `DELISTED_EXIT` 또는 `UNRESOLVED_EXIT`로 기록한다. 예약된
+market break는 그 자리에서 **선점(preempt)된다.**
+
+|outcome|뜻|
+|---|---|
+|**1** normal `MARKET_TREND_BREAK` fill|다음 세션 시초에 정상 체결|
+|**2** untradeable-delayed `MARKET_TREND_BREAK` fill|`EXIT_PENDING_UNTRADEABLE`를 거쳐 재개 후 체결|
+|**3** `DELISTED_EXIT` preemption|예약됐으나 폐지 판정이 먼저 와서 최종 사유가 덮였다|
+|**4** `UNRESOLVED_EXIT` preemption|예약됐으나 미해결로 끝나 구간 끝에서 시나리오 가격으로 청산됐다|
+
+추가 지표로 **`market_break_signals_terminally_preempted`**를 낸다 — 그중 `DELISTED_EXIT`
+건수와 `UNRESOLVED_EXIT` 건수를 **따로** 센다.
+
+**3·4는 `MARKET_TREND_BREAK` fill로도, `actual K42 shortening`으로도 세지 않는다.**
+그 거래의 청산가와 시점을 정한 것은 market break가 아니라 폐지·미해결 처리이기 때문이다.
+
+따라서 항등식은 이렇게 닫힌다.
+
+```
+market_break_signals_scheduled
+  = normal fills + untradeable-delayed fills + DELISTED preempted + UNRESOLVED preempted
+```
+
 **`sessions_held < max_hold_sessions`로 판정하는 이유.** `hold_untraded`는
 `exit_pending_untradeable`면 원래 사유를 그대로 들고 나이만 먹인다. 그래서 표시가 30세션에
 있었고 20세션 거래정지가 끼면 체결 시 `sessions_held`가 50이 되고 **K42 deadline은 이미
