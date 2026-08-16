@@ -34,7 +34,12 @@ from core import (  # noqa: E402
     JT_RANDOM_K84,
 )
 from core.definition import RULE_FIELDS, CoreDefinition  # noqa: E402
+from core.jt_j126_k42 import JT_J126_K42  # noqa: E402
 from core.jt_slots import SLOT_CORES  # noqa: E402
+
+# **J를 바꾸는 코어는 여기 적힌 것뿐이다.** PR #12 신호 연구가 challenger를 하나로
+# 줄였고, 목록을 명시로 두어야 새 J가 조용히 끼지 못한다.
+J_VARIANTS = {JT_J126_K42.name: 126}
 
 RESEARCH_CORES = (
     JT_K21,
@@ -70,7 +75,9 @@ class RegistryTest(unittest.TestCase):
         # 기준선 하나 + 연구 코어들 + 슬롯 격자. 이 테스트가 아는 것보다 많이 등록되면
         # 걸린다. 슬롯 코어의 한도 불변식은 `test_slots.py`가 따로 잠근다 — 여기 목록에
         # 넣으면 "낙폭 한도만 완화됐다"는 엄격한 검사가 `max_positions` 때문에 깨진다.
-        self.assertEqual(len(CORES), len(RESEARCH_CORES) + len(SLOT_CORES) + 1)
+        self.assertEqual(
+            len(CORES), len(RESEARCH_CORES) + len(SLOT_CORES) + len(J_VARIANTS) + 1
+        )
 
     def test_cores_have_distinct_signatures(self):
         signatures = {core.signature for core in CORES.values()}
@@ -150,12 +157,22 @@ class ResearchCoreTest(unittest.TestCase):
                 self.assertEqual(core.policy.parameters.score_weight_trend, 0.0)
                 self.assertEqual(core.entry_mode, "RS_ONLY")
 
-    def test_j_and_skip_are_the_frozen_baseline_values(self):
-        """J=63·skip=5는 core-1의 값 그대로다. 이번 실험에서 바꾸는 것이 아니다."""
+    def test_skip_is_the_frozen_baseline_value_everywhere(self):
+        """**skip=5는 어떤 실험에서도 바꾸지 않는다.** J와 달리 예외가 없다."""
         for core in CORES.values():
             with self.subTest(core=core.name):
-                self.assertEqual(core.policy.parameters.rs_lookback, 63)
                 self.assertEqual(core.policy.parameters.rs_skip, 5)
+
+    def test_only_declared_variants_move_the_formation_horizon(self):
+        """J=63은 core-1의 값이고, 바꾸는 코어는 `J_VARIANTS`에 적힌 것뿐이다.
+
+        PR #12 신호 연구가 challenger를 J126 하나로 줄였다. 목록을 명시로 두지 않으면
+        새 J가 조용히 끼어들어 "J를 바꾸는 실험은 하나뿐"이라는 전제가 깨진다.
+        """
+        for core in CORES.values():
+            with self.subTest(core=core.name):
+                expected = J_VARIANTS.get(core.name, 63)
+                self.assertEqual(core.policy.parameters.rs_lookback, expected)
 
 
 class RunKwargsTest(unittest.TestCase):
