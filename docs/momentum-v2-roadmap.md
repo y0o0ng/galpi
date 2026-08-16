@@ -54,7 +54,7 @@ PR #9~#14에서 확인한 것을 착각 없이 적는다.
 |슬롯|5|
 |실행|t일 종가 신호 → t+1 이후 체결|
 |유니버스·유동성·PIT|현재 구현 그대로|
-|홀드아웃|`HOLDOUT_START = 2025-08-07` 이후 봉인 유지|
+|홀드아웃|`HOLDOUT_START = 2025-08-07`. Phase 1~8은 **물리적으로 잘린 달력만** 쓴다. 그 구간은 `CONTAMINATED_FOR_FORMAL_OOS`다 (§7 C3)|
 
 **J126을 주 신호로 두는 이유.** 개발 표본에서 signal-level forward excess 증거가 가장 좋았다
 (ALL TOP5 +42: J63 +0.48% · J126 +1.03%, 두 유니버스·여섯 지평·common anchor·위상 안정성).
@@ -300,10 +300,13 @@ stale price.
 
 **여기서 실패하면 파라미터를 고쳐 다시 제출하지 않는다. 직전 단계로 탈락.**
 
-### Phase 9 — 홀드아웃을 한 번 연다 (PR #23)
+### Phase 9 — Frozen Historical Sanity Check (PR #23)
 
-전략을 코드·hash·config까지 완전히 freeze한 뒤 처음으로 `2025-08-07` 이후를 연다.
-**튜닝 데이터가 아니라 판결 데이터다.**
+**이것은 formal OOS 판결이 아니다.** `2025-08-07` 이후 구간은 이미 signal-layer 연구에서
+관찰됐으므로 `CONTAMINATED_FOR_FORMAL_OOS`로 취급한다(§7 C3-3). 그래서 이 Phase의 이름은
+`ONE-SHOT HOLDOUT`이 아니라 **Frozen Historical Sanity Check**다.
+
+전략을 코드·hash·config까지 완전히 freeze한 뒤 그 구간에서 **명백한 붕괴가 없는지만** 본다.
 
 |기준|값|
 |---|---|
@@ -314,15 +317,24 @@ stale price.
 |MDD|dev 대비 비정상 폭증 없음|
 |거래 수 부족|`PASS`가 아니라 `INSUFFICIENT_SAMPLE`|
 
-**홀드아웃이 나빴다고 규칙을 고쳐 다시 돌리면 그 순간 홀드아웃은 개발 데이터다.** 그
-전략 버전은 실패로 기록하고 끝.
+**여기를 통과해도 "out-of-sample 검증을 통과했다"고 쓰지 않는다.** 읽을 수 있는 것은
+"개발 구간 밖에서도 구조가 무너지지는 않았다"까지다.
 
-> ⚠️ **이 Phase에는 미해결 구조 문제가 있다. 아래 §7 C3을 반드시 먼저 읽는다.**
+**결과가 나빴다고 규칙을 고쳐 다시 돌리면** 그 전략 버전은 실패로 기록하고 끝이다.
+재실행은 `holdout_consumptions`에 **새 행으로** 남는다(덮어쓰지 않는다).
 
-### Phase 10 — Shadow → PAPER
+> **진짜 OOS 판결은 Phase 10이다.** 최종 전략을 freeze한 이후 **새로 쌓이는 forward
+> shadow data**가 판결을 담당한다.
 
-기존 운영 설계로 돌아간다(연구 → Shadow → `PAPER_AUTONOMOUS` → 제한적 LIVE). 여기까지 온
-Quant 전략에 LLM을 붙인다.
+### Phase 10 — Shadow → PAPER · **진짜 OOS 판결**
+
+기존 운영 설계로 돌아간다(연구 → Shadow → `PAPER_AUTONOMOUS` → 제한적 LIVE).
+
+**formal OOS 판결은 여기서 난다.** 최종 전략을 완전히 freeze한 이후 **새로 쌓이는 forward
+shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것이 아니라, 아직 존재하지 않는
+데이터를 기다리는 것이다. 그것만이 오염될 수 없다.
+
+여기까지 온 Quant 전략에 LLM을 붙인다.
 
 **LLM은 alpha engine이 아니라 risk layer로 시작한다** — 좋은 종목을 더 찾는 게 아니라
 실적·기업행동·회계 이상·비정상 위험 때문에 **검증된 거래를 줄이거나 막는** 역할이다.
@@ -343,7 +355,8 @@ Quant 전략에 LLM을 붙인다.
 |20|FIP quality|마지막 momentum quality filter|조건부|
 |21|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
 |22|Robustness|folds/random/cost stress에서 버티는가|—|
-|23|ONE-SHOT HOLDOUT|처음 보는 데이터에서도 살아남는가|—|
+|23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|—|
+|—|Holdout consumption 인프라|`holdout_consumptions` append-only 추적 (§7 C3-3)|전략 freeze 전 별도 PR|
 
 **"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.**
 
@@ -359,10 +372,23 @@ Quant 전략에 LLM을 붙인다.
 PR #13은 "개발 기준선은 J63을 유지한다"로 끝났다. §1이 **baseline(J63)**과 **alpha under
 test(J126)**를 분리해 해소했다. **"기준선을 J126으로 바꿨다"고 쓰지 않는다.**
 
-### C2. PR #15의 결과가 이미 저장소에 부분적으로 있다 ⚠️
+### C2. PR #15의 결과가 이미 저장소에 부분적으로 있다 — **결정: 수용** ✅
 
-`runs/signal-j-study/all.json`의 `by_j["126"]["by_regime"]`에 **8개 레짐 상태별 +42
-초과수익이 이미 저장돼 있다.** 그리고 `classify_market_regime`의 정의상
+> **결정(2026-08-16).** 수용한다. **PR #15는 discovery가 아니라 confirmatory market
+> re-cut이다.** 헤드라인 분할 자체는 새 발견이 아니므로 그렇게 부르지 않는다. PR #15의
+> 가치는 아래 다섯 가지에 둔다 — 이것들은 충분히 독립적인 확인 작업이다.
+>
+> 1. **J63 frozen control 대조**
+> 2. **같은 크기 무작위 대조군**
+> 3. **시간 안정성** (비중첩 위상)
+> 4. **연도 분포** (한두 해가 만든 결과인지)
+> 5. **NDX100 replication**
+>
+> 사전등록은 여전히 한다 — 무엇을 primary로 볼지, 어떤 결과에서 PR #16으로 갈지를 미리
+> 정하는 것이 목적이다. **"새로 발견했다"고 쓰지 않는다.**
+
+**근거.** `runs/signal-j-study/all.json`의 `by_j["126"]["by_regime"]`에 **8개 레짐 상태별
++42 초과수익이 이미 저장돼 있다.** 그리고 `classify_market_regime`의 정의상
 
 ```
 BULL, CORRECTION  ⟺  SPY > SMA200
@@ -372,41 +398,90 @@ RECOVERY, BEAR    ⟺  SPY ≤ SMA200
 이므로 **PR #15의 헤드라인 분할은 이미 발표된 숫자의 산술이다.** 게다가 `CLAUDE.md`가 이미
 한 칸을 공개하고 있다 — "`RECOVERY/HIGH_VOL`에서 J189 −2.77% · J126 −0.55%".
 
-**결론: PR #15는 "발견"이 아니라 명시적 confirmatory re-cut이다.** 사전등록은 여전히 의미가
-있지만(무엇을 primary로 볼지, 어떤 결과에서 PR #16으로 갈지) **"새로 발견했다"고 쓰면
-안 된다.**
+`all.json`이 갖고 있지 **않은** 것이 위 다섯 가지다. J별 `by_regime`은 있지만 이 축으로
+접은 표도, 두 집단의 위상 분해도, 집단별 무작위 대조군도, 표본 수·연도 분포도 없다.
 
-PR #15가 실제로 더할 수 있는 새 정보는 이것들이다.
+### C3. 홀드아웃 계약 — **정정과 결정** ⚠️
 
-- J63 frozen control과의 대조 (all.json은 J별 by_regime을 갖고 있으나 이 축으로 접은 표는 없다)
-- 두 집단의 **비중첩 위상 안정성**
-- 같은 크기 **무작위 대조군**
-- 집단별 **표본 수·연도 분포** (한두 해가 만든 결과인지)
-- NDX100 재현
+#### C3-0. 먼저 이 문서의 이전 서술을 정정한다
 
-### C3. "ONE-SHOT HOLDOUT"이 현재 코드로는 보장되지 않는다 ⚠️
+이 문서의 최초 판(2026-08-16, `ae6ea73`)은 **"계수기가 정책 서명별이라 새 코어를 만들면
+홀드아웃이 자동으로 처음이 된다"**고 적었다. **그것은 틀렸다.** `holdout_run_count`는
+정책 서명이 아니라 **구간 단위**로 센다.
 
-세 가지가 겹쳐 있다.
+```sql
+SELECT COUNT(*) FROM holdout_runs
+ WHERE source_version = ? AND start_date = ? AND end_date = ?
+```
 
-1. `holdout_runs` 표에 행이 **1개**뿐이고 그것은 `paper-core-v1` 서명이다. 그런데
-   `CLAUDE.md`는 **홀드아웃이 두 번 소모됐다**고 기록한다 — 2026-08-14 신호 연구는
-   백테스트가 아니라 계수기에 잡히지 않았다.
-2. `evaluate_gate`는 `holdout_run_count > 1`일 때만 `HOLDOUT_REUSED`를 단다. 위 1 때문에
-   **실제로는 재사용인데 blocker가 뜨지 않는다.**
-3. **계수기가 정책 서명별이다.** Momentum v2가 Phase 1~6에서 새 코어를 여러 개 만들면
-   **각 코어가 공짜로 "처음 여는 홀드아웃"이 된다.** 이건 정확히 이 로드맵이 막으려는
-   multiple-comparisons 누수다.
+`WHERE`에 `policy_signature`가 없다. `run_id`에만 정책 서명이 들어가는데 그 목적은
+정반대다 — 같은 정책 재실행은 `INSERT OR REPLACE`로 덮어써 1회로 남고(새로 뽑는 정보가
+없다), **다른 정책이면 새 행이 되어 2회가 되며 `HOLDOUT_REUSED`가 붙는다.**
+`record_holdout_run`의 docstring이 그렇게 설명하고 있다.
 
-**결정이 필요하다. 두 갈래다.**
+**즉 "새 코어가 홀드아웃을 공짜로 다시 연다"는 구멍은 존재하지 않는다.**
 
-- **(a) 홀드아웃 보호를 실험 계열 단위로 바꾼다.** Phase 9 전에 작은 PR로
-  `record_holdout_run`을 정책 서명이 아니라 **연구 계열(Momentum v2 전체)** 기준으로
-  세도록 고친다. 그러면 "네 번의 알파 개입 전체에 홀드아웃 한 번"이 코드 불변식이 된다.
-- **(b) 홀드아웃이 이미 오염됐음을 받아들인다.** 설계 문서와 `CLAUDE.md`는 이미 **"진짜
-  경제적 검증은 앞으로의 paper·live shadow 데이터의 몫"**이라고 적고 있다. 이 경우 Phase 9는
-  "판결"이 아니라 "마지막 sanity check"로 격하되고, 진짜 판결은 Phase 10의 shadow 기간이 된다.
+#### C3-1. 실제 구멍은 둘이다
 
-**추천은 (a) + (b) 병행이다.** (a)로 남은 오염을 막고, 판결의 무게는 (b)에 둔다.
+|경로|잡히는가|
+|---|---|
+|새 코어가 홀드아웃 백테스트|**잡힌다**|
+|같은 정책 + **엔진만** 변경|**안 잡힌다** — `run_id`가 같아 덮어쓴다|
+|**신호 층 연구**가 홀드아웃 가격을 읽음|**안 잡힌다** — 호출부가 `real_run.py` 하나뿐이다|
+
+그래서 2026-08-14 J 신호 연구가 홀드아웃을 소모했는데 표에 안 남았고, **현재 1행인데 실제
+소모는 최소 2회**다. `CLAUDE.md`가 이미 "엔진 변경도 세지 못한다"고 적고 있었다.
+
+#### C3-2. 채택하지 않은 설계
+
+`holdout_runs`에 `consumer` 컬럼을 더해 **같은 consumer의 실행을 하나로 덮어쓰는** 방식을
+검토했으나 **채택하지 않는다.** 같은 연구 계열이 홀드아웃을 반복해서 보는 것을 **숨길 수
+있기 때문**이다. 덮어쓰기는 감사 로그의 성질이 아니다.
+
+#### C3-3. 결정 — 설계 원칙 (2026-08-16)
+
+**1. `holdout_runs`는 그대로 둔다.** 기존 백테스트 실행 감사 로그 역할을 유지한다.
+
+**2. 연구 데이터 소비 추적은 별도 개념으로 설계한다 — `holdout_consumptions`, append-only.**
+
+**3. consumption이 남길 최소 필드**
+
+|필드|뜻|
+|---|---|
+|`research_family`|연구 계열 (예: `momentum-v2`)|
+|`purpose`|무엇을 보려고 열었는가|
+|`source_version`|적재분|
+|`start_date` · `end_date`|본 구간|
+|`question_id`|실행·질문을 식별할 hash 또는 id|
+|`created_at`|timestamp|
+
+**4. append-only다.** 같은 `research_family`가 같은 구간을 다시 보더라도 기존 행을
+**overwrite하지 않고 새 consumption으로 기록한다.** 반복 관찰이 기록에서 사라지면 안 된다.
+
+**5. 더 중요한 불변식은 애초에 못 읽게 하는 것이다.** Phase 1~8의 개발 러너는
+**`HOLDOUT_START` 이전에서 물리적으로 잘린 calendar/data view만** 사용한다. 계수는 사후
+기록이고, 차단이 본체다.
+
+> 이 불변식은 **이미 상당 부분 구현돼 있다** — `backtest/holdout.py`의
+> `research_sessions`가 달력 자체를 자르고, `assert_no_holdout`이 결과에 홀드아웃 날짜가
+> 섞이면 예외를 올리며, 넘어가려면 `consume_holdout=True`를 명시해야 하고 그때
+> `holdout_metadata`가 `HOLDOUT_CONSUMED = true`를 산출물에 남긴다. **빠진 것은 그
+> 경로를 모든 러너가 일관되게 쓰도록 강제하는 부분이다** — 실제로 `signal_study.py`가
+> 한 번 샜고 그것이 `holdout.py` docstring에 기록돼 있다.
+
+**6. 홀드아웃 접근은 explicit한 별도 경로에서만 가능하게 한다.** 기본 경로로는 닿을 수
+없어야 한다.
+
+**7. `2025-08-07` 이후 historical 구간은 `CONTAMINATED_FOR_FORMAL_OOS`로 취급한다.**
+이미 signal-layer 연구에서 관찰됐으므로 **formal OOS라고 부르지 않는다.**
+
+**8. Phase 9의 역할을 낮춘다.** `ONE-SHOT HOLDOUT` → **Frozen Historical Sanity Check**.
+
+**9. 진짜 OOS 판결은 최종 전략을 완전히 freeze한 이후 새로 쌓이는 forward shadow
+data가 담당한다.** 설계 문서와 `CLAUDE.md`가 이미 그렇게 말하고 있다.
+
+**10. 지금 이 인프라를 구현하지 않는다.** 이 문서의 문구만 고친다.
+**holdout-consumption 인프라는 전략 freeze 전에 별도 infrastructure PR로 진행한다.**
 
 ### C4. Primary metric이 게이트에 없다
 
