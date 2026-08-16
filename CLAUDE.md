@@ -25,6 +25,7 @@
 - Pi 운영·복구: `docs/RASPBERRY_PI_RUNBOOK.md`
 - 현재 음성 기준: `docs/voice-halfduplex-design.md`
 - 트레이딩(V5-B): `docs/Swing Trading Agent Design v2 2.md`. 실측·완료 기록은 20.0절이다.
+- 트레이딩 전략 구축 계약: `docs/momentum-v2-roadmap.md`. **연구 예산·종료 조건·Phase별 사전등록이 여기 있다.** 실험 산출물 색인은 `trading/runs/README.md`다.
 - 세부 설계는 각 기능 문서를 단일 기준으로 삼고, 이 파일에 상세 이력을 복제하지 않는다.
 
 ## 현재 제품과 운영 경계
@@ -144,6 +145,14 @@
 - **관찰자는 결과를 바꾸지 않는다.** `run_backtest`의 `entry_observer`는 읽기 전용이고 `observer=None`과 켠 실행의 거래·체결·자산곡선·스킵·지표가 같다는 것을 `test_funnel.py`가 잠근다. **진단용 sizing 계산기를 만들지 않는다** — 엔진의 `SizedIntent`·`Caps`를 그 자리에서 읽는다. 복제하면 그 복제본이 엔진과 갈릴 자리가 생긴다.
 - **배분이 좋은 퍼센트 수익률을 작은 포지션에 몰아줬는가 — 답은 X3(mixed)다**(2026-08-16 탐색적 정렬 진단, `results.md` §20.4, 사전등록 아님이고 공식 판정을 바꾸지 않는다). 순위 상관은 거의 0이고 부호가 희석 가설과 **반대**다(ρ(비중,net) J63 +0.058 · J126 +0.003, ρ(ATR,net) -0.057 · -0.005). 반면 배분가중은 우위를 압축한다 — J126 − J63이 동일가중 +0.78%p → 배분가중 +0.13%p이고, 절대값 상위 1% trim에서는 +0.29%p → **-0.28%p**로 부호가 바뀐다. **두 지표가 어긋나는 것이 아니라 서로 다른 것을 잰다** — 수익률 양쪽 꼬리가 중간보다 비중이 낮고 정규화 ATR이 높아 관계가 단조가 아니라 U자라서, Spearman은 단조만 보고 가중평균은 크기를 본다. **한쪽만 인용해 결론을 만들지 않고 sizing ablation 근거로 승격하지 않는다.**
 - **`allocation_weighted_mean`을 포트폴리오 수익률로 부르지 않는다.** `Σ(w·r)/Σw`는 서로 다른 날짜의 거래를 정적으로 모은 **정렬 진단**이다. 자본이 시간에 따라 굴러가지 않고 동시 보유도 재현하지 않으므로 counterfactual·백테스트 수익률이 아니다. equal weight·fixed notional 재실행은 하지 않았다.
+- **다음 작업은 `docs/momentum-v2-roadmap.md`가 정한다.** 우리는 모멘텀 전략을 만든 것이 아니라 **모멘텀 신호를 분리·검증**했고, 그것을 돈 버는 전략으로 조립하는 단계는 아직 시작하지 않았다. 알파 개입은 **네 번까지만** 허용한다 — 시장 상태 → 종목 absolute momentum → signal-aligned exit → FIP quality. 넷을 다 써도 `after-cost exposure-matched SPY gap ≤ 0`이면 long-only cross-sectional momentum 단독 전략은 **종료**한다. **J·K·슬롯·랭크 cutoff 재탐색 금지.** 각 Phase는 독립 PR + 사전등록 + 사용자 승인이고 **결과를 보고 자동 진행하지 않는다.**
+- **동결하는 것은 전략이 아니라 알파 신호다.** 주 알파는 `RS(126,5)`, frozen control은 `RS(63,5)`다. **이것은 PR #13의 "개발 기준선은 J63 유지"를 뒤집지 않는다** — 포트폴리오 비교의 **기준선(baseline)**은 J63이고, 조립 대상인 **동결 알파(alpha under test)**가 J126이다. 두 역할을 한 단어로 합쳐 "기준선을 J126으로 바꿨다"고 쓰지 않는다.
+- **모든 전략 실험의 primary는 `after-cost exposure-matched SPY gap > 0` 하나다.** 총수익만 보면 착시가 크다 — `jt-k42`는 18.6년 총수익 +35.4%(CAGR 1.65%)인데 같은 기간 SPY 매수보유가 **+531.7%**이고, 설계 14.7 게이트에서 Sharpe 0.375·Sortino 0.525·Calmar 0.176으로 **하드 최소를 셋 미달**한다. **matched-SPY를 못 이긴 것은 "아직 전략 아님"이다.**
+- **PR #15의 결과는 이미 저장소에 부분적으로 있다.** `runs/signal-j-study/all.json`의 `by_j["126"]["by_regime"]`이 8개 레짐 상태별 +42 초과수익을 들고 있고, `classify_market_regime` 정의상 `BULL`·`CORRECTION`이 SPY > SMA200, `RECOVERY`·`BEAR`가 SPY ≤ SMA200이다. 그래서 **PR #15는 "발견"이 아니라 명시적 confirmatory re-cut이다.** 새로 더할 수 있는 것은 J63 대조·위상 안정성·무작위 대조군·집단별 표본 수와 연도 분포·NDX100 재현이다.
+- **"one-shot 홀드아웃"은 현재 코드로 보장되지 않는다.** `holdout_runs`에 행이 1개(`paper-core-v1` 서명)뿐인데 `CLAUDE.md`는 두 번 소모됐다고 적고, `evaluate_gate`는 `> 1`에서만 `HOLDOUT_REUSED`를 단다. 더 큰 문제는 **계수기가 정책 서명별이라 새 코어를 만들면 홀드아웃이 자동으로 "처음"이 된다** — 로드맵이 막으려는 multiple-comparisons 누수 그 자체다. Phase 9 전에 계수 단위를 **연구 계열**로 바꾸거나, 홀드아웃이 이미 오염됐음을 받아들이고 진짜 판결을 paper·shadow로 넘겨야 한다. 상세는 로드맵 §7 C3이다.
+- **연구 코어는 구조적으로 `UNDETERMINED`를 벗어날 수 없다.** JT 코어는 전부 `require_earnings_calendar=False`라 `EARNINGS_GATE_DISABLED` blocker가 항상 붙는다. Phase 1~6의 1차 합격선은 **게이트 verdict와 다른 층**이고 blocker가 사라지는 것은 Phase 7(Reality Hardening)이다.
+- **`FIXED_HOLD`에서 2ATR는 실제 손절선이 아니다.** PR #14의 실측 exit 분포가 `MAX_HOLD` 505 · `DELISTED_EXIT` 8 · `UNRESOLVED_EXIT` 1로 **손절 청산이 0건**이다. 그래서 "거래당 0.25% 위험"은 엄밀히 틀린 표현이고 0.25%는 volatility normalization unit이다. **실행하지 않는 stop으로 "0.25% risk"라고 부르는 전략을 PAPER로 올리지 않는다.** Phase 4에서 hard stop(구조 A)과 volatility scaling(구조 B) 중 하나를 고른다.
+- **`jt-core-exit`(-23.07%)를 "2ATR stop이 나쁘다"의 증거로 인용하지 않는다.** 그것은 stop·트레일링·20일 time stop·실적 청산이 **한 묶음**인 결과다. 2ATR stop 단독 효과는 아직 재지 않았다.
 - 다음 후보: **수량 규칙 ablation은 아직 열지 않는다.** 퍼널이 부호는 모든 층에서 유지되는데 R·달러에서 크기가 무너지는 것을 보였고 구속 제약이 `RISK`임을 확인했지만, 정렬 진단이 X3이라 배분 희석 가설이 지지되지 않았다. **현재 증거만으로 sizing ablation을 다음 PR로 승격하지 않는다** — 실제 수량 규칙 변경은 이 메커니즘을 인과적으로 검증하는 방법이 될 수 있지만 **별도의 독립적인 근거가 더 생겼을 때** 새 연구 질문으로 사전등록한다. 그래서 다음 축은 열려 있다 · `jt-k42`에 비용 스트레스와 인접값을 돌려 blocker 둘을 없앤다 · `RX` 하나를 손으로 확정하면 민감도 아티팩트가 사라진다 · BULL-only 게이트와 레짐 조건부 J는 여전히 별도 PR이다.
 - 미해결로 남긴 것: 정체불명 계열 23개(`MER`·`JAVA`·`RX`…), CIK 3개(`FMCN`·`LMCA`·`LMCK`), 섹터 11개(`ACAS`·`YHOO`). 섹터 게이트가 fail-close라 그 종목들은 진입이 막힌다. 외국 발행사(20-F/6-K)와 주 인가 은행은 실적일을 만들 수 없는데, **결과를 낙관적으로 만들지 않고 기회만 좁히므로** 14.7 판정을 막지 않는다.
 
