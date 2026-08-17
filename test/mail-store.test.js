@@ -244,3 +244,33 @@ test('due accounts respect per-account scheduling and drop out on auth failure',
   assert.equal(store.claimAuthAlert(naver.id), true);
   db.close();
 });
+
+test('a second account for the same provider is refused with a readable reason', () => {
+  const { db, store } = createStore();
+  const first = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+
+  // 자격증명이 provider당 한 세트라 두 번째 계정은 결국 첫 계정의 사서함을 읽는다.
+  // v1 범위는 Gmail 1 + Naver 1이다.
+  assert.throws(
+    () => store.registerAccount({ provider: 'naver', address: 'other@naver.com' }),
+    error => {
+      assert.equal(error.code, 'MAIL_PROVIDER_ACCOUNT_LIMIT');
+      assert.match(error.message, /me@naver\.com/);
+      return true;
+    },
+  );
+
+  // 같은 주소를 다시 등록하는 것은 여전히 멱등이다.
+  assert.equal(store.registerAccount({ provider: 'naver', address: 'me@naver.com' }).id, first.id);
+
+  // 다른 provider는 막히지 않는다. 둘을 합쳐 최대 두 계정이다.
+  const gmail = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+  assert.equal(store.listAccounts().length, 2);
+
+  // store를 우회해도 DB가 막는다.
+  assert.throws(() => db.prepare(`
+    INSERT INTO mail_accounts (provider, address) VALUES ('gmail', 'sneaky@gmail.com')
+  `).run(), /UNIQUE/);
+  void gmail;
+  db.close();
+});

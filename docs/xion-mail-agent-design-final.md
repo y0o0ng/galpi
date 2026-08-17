@@ -57,7 +57,7 @@ UI                 = 최소한의 개입으로 확인·수정·피드백
 ### Mail Agent가 해야 하는 것
 
 - 새 메일 자동 감지
-- 여러 계정 통합
+- 여러 계정 통합 (v1은 Gmail 1개 + Naver 1개, 20.3)
 - 중요한 내용 요약
 - 행동 필요 여부 판단
 - 마감일 / 일정 후보 추출
@@ -1987,6 +1987,17 @@ refresh token / Naver app password
 
 복구 시 credential이 백업에서 자동 복원되지 않아 재인증이 필요해도 이를 허용한다. **복구 편의보다 credential이 백업 여러 벌에 퍼지지 않는 것을 우선한다.**
 
+### 계정 수는 provider당 하나다
+
+자격증명이 provider당 한 세트(`MAIL_GMAIL_*` · `NAVER_MAIL_*`)이므로, 같은 provider의 두 번째 계정을 등록해도 **결국 첫 계정의 사서함을 읽는다.** 조용히 틀리는 대신 등록 단계에서 막는다.
+
+```text
+v1 범위      Gmail 1개 + Naver 1개, 합쳐서 최대 2계정
+막는 방법    mail_accounts(provider) UNIQUE 인덱스 + store의 MAIL_PROVIDER_ACCOUNT_LIMIT
+```
+
+다계정을 열려면 그 인덱스를 지우는 마이그레이션과 **account-scoped credential mapping**이 함께 필요하다. MAIL-1에서는 account-scoped secret manager나 credential 표를 만들지 않는다.
+
 ---
 
 # 21. 보존 정책 (Retention)
@@ -2214,8 +2225,11 @@ Notification card
 ✓ baseline sync 억제
 ✓ Provider isolation
 ✓ worker overlap guard
-✓ 계정 상태 UI
+✓ GET /api/mail/status (계정별 커서·상태)
+✓ 계정 등록·활성화 CLI (scripts/register-mail-account.js)
 ```
+
+**MAIL-1에 화면은 없다.** 계정 상태를 사람이 보는 방법은 status API와 CLI이고, 에이전트 탭 Mail 블록은 알림 탭 작업과 함께 MAIL-3에서 만든다. MAIL-1의 값은 동기화 정확성이지 화면이 아니다.
 
 ### 필수 검증 시나리오
 
@@ -2301,6 +2315,7 @@ Push는 아직 켜지 않고 **decision-only 기간**으로 검증한다. `메�
 ## Phase 3 — Notification UX
 
 ```text
+✓ 에이전트 탭 Mail Agent 블록 (MAIL-1에서 미룬 화면)
 ✓ Immediate delivery
 ✓ Batch window + flush
 ✓ Quiet hours

@@ -160,20 +160,32 @@ test('the mailbox is always opened read-only and messages come back normalized',
   );
 });
 
-test('the raw body is downloaded only when something asks for a digest', async () => {
-  const client = createFakeClient({
+test('the raw body is downloaded only for mail that has no Message-ID', async () => {
+  const withId = createFakeClient({
     mailbox: { exists: 1, uidNext: 102, uidValidity: '0' },
     messages: [envelopeRow(101)],
   });
+  const kept = await fetchMailbox(withId, { state: { baselineComplete: 1, imapLastUid: 100 } });
 
-  const result = await fetchMailbox(client, { state: { baselineComplete: 1, imapLastUid: 100 } });
+  // Message-ID가 있으면 본문을 받을 이유가 없다.
+  assert.deepEqual(withId.calls.downloads, []);
+  assert.equal(kept.messages[0].rawDigest, null);
 
-  // 헤더만 훑는 동안에는 본문을 받지 않는다. Message-ID가 없는 메일에서만 필요하다.
-  assert.deepEqual(client.calls.downloads, []);
+  const withoutId = createFakeClient({
+    mailbox: { exists: 1, uidNext: 102, uidValidity: '0' },
+    // envelope와 헤더 양쪽에 없어야 진짜로 Message-ID가 없는 메일이다.
+    // envelope만 비우면 헤더에서 주워오므로 이 경로를 타지 않는다.
+    messages: [envelopeRow(101, {
+      envelope: { messageId: null },
+      headers: Buffer.from('', 'latin1'),
+    })],
+  });
+  const fallback = await fetchMailbox(withoutId, { state: { baselineComplete: 1, imapLastUid: 100 } });
 
-  const digest = await result.messages[0].loadRawDigest();
-  assert.match(digest, /^[0-9a-f]{64}$/);
-  assert.deepEqual(client.calls.downloads, [101]);
+  // digest는 연결을 쥐고 있는 이 블록 안에서 값으로 채워 내보낸다. lazy closure로
+  // 내보내면 호출 시점이 logout 뒤가 된다.
+  assert.deepEqual(withoutId.calls.downloads, [101]);
+  assert.match(fallback.messages[0].rawDigest, /^[0-9a-f]{64}$/);
 });
 
 test('a sync connects, reads read-only, and always logs out', async () => {
@@ -193,10 +205,16 @@ test('a sync connects, reads read-only, and always logs out', async () => {
     mailbox: { exists: 1, uidNext: 102, uidValidity: '0' },
     onFetch() { throw new Error('boom'); },
   });
+  // 오류는 Mail Agent가 아는 계약으로 정규화돼 나간다. 그래야 agent가 재시도할지
+  // 계정을 세울지 고를 수 있다.
   await assert.rejects(
     () => createNaverProvider({ createClient: () => failing })
       .sync({ credentials: {}, state: { baselineComplete: 1, imapLastUid: 100 } }),
-    /boom/,
+    error => {
+      assert.equal(error.code, 'MAIL_IMAP_FATAL');
+      assert.equal(error.retryable, false);
+      return true;
+    },
   );
   assert.equal(failing.calls.loggedOut, 1);
 });

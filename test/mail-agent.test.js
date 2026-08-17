@@ -189,14 +189,12 @@ test('gmail commits the history cursor only after its messages are stored', asyn
 });
 
 test('a message without Message-ID falls back to a digest fingerprint', async () => {
-  let digestCalls = 0;
   const { db, store, agent } = setup({
     naverResults: [{
       mode: 'incremental', reason: 'CURSOR', mailbox: 'INBOX', uidValidity: '0', uidNext: 102,
-      messages: [imapMessage(101, {
-        messageId: null,
-        async loadRawDigest() { digestCalls += 1; return 'a'.repeat(64); },
-      })],
+      // provider가 연결을 쥐고 있는 동안 채워 보낸 값이다. agent는 여기서 다시
+      // 받아오지 않는다 — 그 시점은 이미 logout 뒤다.
+      messages: [imapMessage(101, { messageId: null, rawDigest: 'a'.repeat(64) })],
       highestUid: 101,
     }],
   });
@@ -204,7 +202,6 @@ test('a message without Message-ID falls back to a digest fingerprint', async ()
   store.completeBaseline(account.id);
 
   await agent.tick(1000);
-  assert.equal(digestCalls, 1, '본문은 Message-ID가 없을 때만 받는다');
   const row = db.prepare('SELECT identity_kind AS kind FROM mail_messages').get();
   assert.equal(row.kind, 'fingerprint');
   db.close();
@@ -299,5 +296,35 @@ test('accounts are only touched when their own schedule is due', async () => {
 
   await agent.tick(1300);
   assert.equal(calls.naver, 2);
+  db.close();
+});
+
+test('stopping the worker ends the schedule instead of leaving a timer behind', async t => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const page = {
+    mode: 'incremental', reason: 'CURSOR', mailbox: 'INBOX', uidValidity: '0',
+    uidNext: 102, messages: [], highestUid: null,
+  };
+  const { db, store, agent, calls } = setup({ naverResults: [page] });
+  const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  store.completeBaseline(account.id);
+
+  assert.equal(agent.isRunning(), false);
+  agent.start();
+  assert.equal(agent.isRunning(), true);
+  // start()는 즉시 한 번 돈다.
+  await Promise.resolve();
+  const afterStart = calls.naver;
+
+  // 종료 뒤에는 시간이 흘러도 새 tick이 시작되지 않는다. SIGTERM 경로에서
+  // server.js가 이 stop()을 부른다.
+  assert.equal(agent.stop(), true);
+  assert.equal(agent.isRunning(), false);
+  t.mock.timers.tick(300_000);
+  await Promise.resolve();
+  assert.equal(calls.naver, afterStart);
+
+  // 이미 멈춘 worker를 다시 멈추는 것은 아무 일도 하지 않는다.
+  assert.equal(agent.stop(), false);
   db.close();
 });

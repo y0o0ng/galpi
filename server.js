@@ -8957,6 +8957,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     assistantScheduleNoteProjector.stop();
     assistantPushDispatcher?.stop();
     attachmentUploads.stop();
+    mailAgent?.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {
