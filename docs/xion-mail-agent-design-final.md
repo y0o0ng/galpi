@@ -4,7 +4,7 @@
 >
 > **설계 기준:** 구현 편의보다 사용감, 신뢰성, 조용한 자동화를 우선한다. 개발 과정에서 약간의 추가 복잡성이 생기더라도 사용자가 매일 쓸 때 거슬리지 않는 구조를 선택한다. 다만 사용감에 의미 없는 과설계는 하지 않는다.
 >
-> Verified: 2026-08-17 — galpi `main` 실측 대조 후 설계 확정(코드 미수정)
+> Verified: 2026-08-17 — galpi `main` 실측 대조 후 설계 확정(코드 미수정). 같은 날 MIME parser 대조 실측(10.1)과 Google OAuth 게시 계약(20.1)을 반영했다.
 
 ---
 
@@ -1130,7 +1130,51 @@ hasAttachments
 
 절단이 일어난 경우 그 사실을 모델에 알리고, 절단 때문에 판단이 불가능하면 10.3의 보수적 경로를 탄다.
 
-**MIME parser dependency가 필요하다.** ImapFlow만으로 파싱이 끝난다고 가정하지 않는다. `mailparser` / `PostalMime` 등 검증된 라이브러리를 구현 직전에 비교해 **하나만** 선택한다. 이 설계에서는 필요 capability(멀티파트 분해, 헤더 디코딩, charset 변환, HTML/text 파트 선택)만 계약하고 특정 라이브러리를 고정하지 않는다.
+### MIME parser — `postal-mime` (2026-08-17 실측 후 확정)
+
+ImapFlow만으로 파싱이 끝난다고 가정하지 않는다. Gmail MIME과 Naver raw source를 모두 다룰 파서가 필요하고, **`postal-mime` + 자체 HTML→text**로 확정했다.
+
+같은 바이트로 `mailparser@3.9.15`와 `postal-mime@3.0.0`을 8개 fixture에 견줬다(네이버형 EUC-KR + quoted-printable · Gmail형 UTF-8 multipart/alternative · RFC2231 한글 첨부명 · References 스레드 헤더 · Message-ID 없음 · 중첩 multipart/related · charset 미선언 · 213KB HTML 전용). **계약한 capability 넷(멀티파트 분해 · RFC2047 헤더 디코딩 · charset 변환 · 파트 선택)은 둘 다 통과했고 결과가 같았다.**
+
+갈린 곳과 선택 근거:
+
+```text
+의존성        mailparser 27개 5.8M   postal-mime 1개 372K
+HTML→text     내장                  없음 (HTML 전용 메일에서 text = undefined)
+213KB 파싱    60~194ms              2~4ms
+inline 이미지 HTML에 base64 data: URI 주입   cid: 유지
+라이선스      MIT                   MIT-0
+```
+
+- **읽기 전용 앱이 발송 라이브러리를 끌고 오지 않는다.** `mailparser`의 의존성에는 `nodemailer` 전체가 들어 있다. v1 계약이 "메일을 보내지 않는다"인데 발송 스택을 설치하고 시작할 이유가 없다.
+- **inline 이미지를 base64로 HTML에 주입하지 않는다.** `mailparser`는 `cid:` 참조를 `data:` URI로 치환해 뉴스레터 몇 통이면 문자열이 MB 단위로 부푼다.
+- **HTML→text 품질은 자체 변환이 우리 용도에서 더 나았다.** `mailparser`는 표 셀을 공백 없이 붙이고(`셀1셀2`), **트래킹 픽셀 URL을 본문 텍스트에 남긴다.** 후자는 19절의 "외부 tracking image 자동 로딩 금지"와 방향이 어긋난다 — 이미지를 받지 않아도 추적 URL이 LLM 컨텍스트로 들어간다.
+
+자체 HTML→text가 지켜야 할 것(약 40줄):
+
+```text
+- script / style / head / noscript / template 은 내용까지 제거
+- 주석 제거
+- <a href>는 링크 텍스트를 남기고 URL을 [.] 로 뒤에 붙인다
+- td/th 경계는 공백, 블록 태그 경계는 줄바꿈
+- 엔티티 디코딩 (&amp; &#x...; &#...;)
+- 공백·빈 줄 정규화
+```
+
+**이 변환기는 우리가 유지보수한다.** 이상한 HTML에서 출력이 나빠질 수 있지만 이 출력은 **LLM 입력이지 화면 렌더링이 아니다.** 실패는 "텍스트가 지저분해짐"으로 끝나고 안전 경로에 있지 않다. 그래서 이 트레이드오프를 받는다. `postal-mime`이 HTML 전용 메일에서 `text`를 주지 않으므로 **fallback 적용을 테스트로 잠근다** — 안 그러면 광고·뉴스레터 대부분이 빈 본문으로 분석된다.
+
+### charset 미선언 메일 보정
+
+fixture 실측에서 **`Content-Type`에 charset이 없는 EUC-KR 메일은 두 파서 모두 깨졌다.** 자동 감지가 없다. 파서를 바꿔도 해결되지 않으므로 raw 단계에서 보정한다.
+
+```text
+charset 선언이 없고
+  AND 본문에 0x7F 초과 바이트가 있고
+  AND 엄격 UTF-8 디코딩에 실패하면
+→ Content-Type에 charset=euc-kr 을 표기한 뒤 파싱한다
+```
+
+`multipart/*`는 파트별로 판단해야 하므로 이 보정에서 제외한다. fixture 8개 전수에서 **오탐 0건**이었다(정상 UTF-8 · multipart · charset 선언 있는 메일은 건드리지 않음). 한국어 메일 환경에서만 의미 있는 좁은 규칙이며, 여기서 문자셋 자동 감지 라이브러리를 도입하지 않는다.
 
 ## 10.2 출력
 
@@ -1718,21 +1762,72 @@ latency
 
 `gmail.readonly`는 현재 Google에서 Restricted scope로 분류된다. 최소 권한 원칙을 유지한다.
 
-### 운영 상태 주의
+### 게시 상태와 인증 상태는 다른 축이다
 
-Google OAuth consent screen이 `Testing` 상태이고 계정이 외부 test user로 동작하는 경우, 일반적으로 authorization/refresh token이 7일 뒤 만료될 수 있다. Mail Agent가 매주 재인증을 요구하면 자동확인 UX가 무너진다.
-
-### fallback 우선순위
+이 둘을 섞으면 판단이 틀린다.
 
 ```text
-1. 개인용 Google Cloud OAuth 앱을 올바른 production 운영 상태로 만들 수 있는지 확인
-2. 실제 계정으로 장기 refresh token 유지 여부를 검증
-3. 그래도 운영이 불가능할 때에만 Gmail IMAP 대안을 검토
+publishing status   Testing / In production   ← 7일 만료가 붙어 있는 축
+verification status 미인증 / 인증 완료          ← 경고 화면과 사용자 상한이 붙는 축
 ```
 
-**"7일 문제가 있으니 Gmail REST를 버리고 IMAP/app password로 간다"고 결정하지 않는다.** Gmail REST + `historyId`를 고른 이유(21.1)는 그대로 유효하며, IMAP 전환은 1·2가 모두 막혔을 때의 마지막 수단이다.
+`Testing`에서는 "Authorizations by a test user will expire seven days from the time of consent. If your OAuth client requests an `offline` access type and receives a refresh token, that token will also expire." Mail Agent가 매주 재인증을 요구하면 자동확인 UX가 무너지므로 **`In production`으로 게시한다.**
 
-Phase 1 착수 전에 실제 Gmail 계정으로 OAuth 운영 형태를 검증한다. Restricted scope verification의 정확한 적용 조건은 구현 시점에 Google 공식 문서를 다시 확인한다. **확실하지 않은 내용을 이 설계 문서에서 단정하지 않는다.**
+### 인증은 제출하지 않는다 (2026-08-17 확인)
+
+`In production`으로 전환하면 "앱을 인증해야 합니다. 검토를 위해 앱을 제출하세요" 배너가 뜬다. **이것은 막힌 상태가 아니라 권유이며, 제출하지 않는다.**
+
+Google의 restricted scope 인증 문서가 면제 사유를 직접 적어놨다.
+
+> "if you are the only user of your app or if your app is used by only a few users, all of whom are known personally to you"
+
+그리고 그 경우의 정상 동작도 명시돼 있다.
+
+> "comfortable with advancing through the unverified app screen and granting your personal accounts access to your app"
+
+대가는 두 가지뿐이고 사용자 1명인 우리에게는 둘 다 무해하다 — 동의 화면의 "확인되지 않은 앱" 경고, 그리고 "A user cap restricts the number of Google Accounts able to grant access to your unverified app".
+
+**제출하면 안 되는 이유는 CASA다.** restricted scope는 제출 시 "Every app that requests access to Google users' restricted data and has the ability to access data from or through a third-party server must go through a security assessment."가 걸린다. 개인정보처리방침 URL·도메인 소유 확인·시연 영상에 더해 유료 third-party 감사가 붙고, 개인 프로젝트가 감당할 종류가 아니다. 지금 제출하지 않아도 잃는 것이 없다.
+
+### OAuth 클라이언트 유형 — 웹 애플리케이션
+
+```text
+유형: 웹 애플리케이션 (데스크톱 앱 아님)
+리디렉션 URI:
+  https://developers.google.com/oauthplayground   ← 토큰 수명 검증용
+  https://<갈피 호스트>/api/mail/oauth/callback   ← 실제 운영 콜백 (구현 시 추가)
+```
+
+`데스크톱 앱`을 고르지 않는 이유는 둘이다. 콘솔에서 **리디렉션 URI를 지정할 수 없어** OAuth Playground로 토큰 수명을 검증할 수 없고, 갈피는 Pi에서 도는 서버 앱이라 어차피 서버 콜백 URI가 필요하다. 두 용도 모두 웹 애플리케이션 하나로 덮인다.
+
+client secret은 20.3의 credential 경계를 그대로 따른다 — DB·Vault·git에 넣지 않는다.
+
+### 남은 검증과 fallback 우선순위
+
+```text
+1. [확인됨] 개인용 앱을 In production으로 게시할 수 있고 인증 제출은 필요 없다
+2. [진행 중] 실제 계정으로 장기 refresh token 유지 여부 검증 (동의 후 7~10일)
+3. [미개시] 2가 실패할 때에만 Gmail IMAP 대안을 검토
+```
+
+**"7일 문제가 있으니 Gmail REST를 버리고 IMAP/app password로 간다"고 결정하지 않는다.** Gmail REST + `historyId`를 고른 이유(22.5)는 그대로 유효하며, IMAP 전환은 1·2가 모두 막혔을 때의 마지막 수단이다.
+
+2번 검증 방법은 Playground에서 `gmail.readonly` 동의(경고 화면에서 `고급` → `이동`) 후 refresh token을 받아두고, **7~10일 뒤 같은 refresh token으로 갱신이 되는지 확인**하는 것이다. 공식 문서는 7일 만료를 `Testing` 상태에 붙여 설명하지만 서드파티 자료 중에는 인증 상태에 붙인다고 쓴 것도 있어, **실측 전까지 이 문서는 어느 쪽도 단정하지 않는다.**
+
+### publish 이후에도 재인증이 필요해지는 경우
+
+게시에 성공해도 refresh token은 영구하지 않다. 공식 문서가 열거한 무효화 사유 중 우리에게 해당되는 것은 다음이다.
+
+```text
+- "The user changed passwords and the refresh token contains Gmail scopes"
+    → 구글 비밀번호 변경 시 Gmail scope 토큰은 끊긴다
+- "The refresh token has not been used for six months"
+    → 5분 폴링이라 해당 없음
+- "The user account has exceeded a maximum number of granted (live) refresh tokens"
+    → 같은 클라이언트로 반복 재동의하면 오래된 것이 밀려난다. 테스트에서 동의를 반복하지 않는다
+```
+
+그래서 18절의 `auth_required` + 1회성 재인증 안내 경로는 없앨 수 있는 것이 아니라, **주 단위가 아니라 드물게 일어나게 만드는 것**이 목표다.
 
 ## 20.2 Naver
 
@@ -1895,9 +1990,12 @@ source = 'mail'
 
 ```text
 Naver IMAP   = ImapFlow 같은 검증된 IMAP client 1개
-MIME 파싱    = mailparser / PostalMime 등 중 구현 직전에 하나만 선택
+MIME 파싱    = postal-mime (확정, 의존성 0개 · MIT-0)
+HTML→text    = 자체 구현 (10.1). 별도 라이브러리를 추가하지 않는다
 Gmail        = Gmail REST 호출 + OAuth에 필요한 최소 Google auth client
 ```
+
+`html-to-text`를 따로 넣지 않는 이유는 10.1에 있다 — 그것만 추가해도 패키지가 14개로 늘고, 산출물이 우리 용도에서 더 낫지도 않았다.
 
 Gmail 때문에 전체 Google API framework를 도입할지는 구현 직전 bundle/코드량을 비교하고 더 단순한 쪽을 고른다. Provider 동작 계약에는 영향을 주지 않는다.
 
@@ -2012,7 +2110,7 @@ Notification card
 ## Phase 2 — Analysis + Attention
 
 ```text
-✓ Normalizer (MIME/HTML→text/길이 절단)
+✓ Normalizer (postal-mime / 자체 HTML→text / charset 보정 / 길이 절단)
 ✓ Safety Gate
 ✓ Hint extraction
 ✓ 분석 큐 (pending/analyzing/failed + lease + backoff + 상한)
@@ -2037,6 +2135,8 @@ Push는 아직 켜지 않고 **decision-only 기간**으로 검증한다. `메�
 7. datetime deadline → KST 해석 정확
 8. preference와 현재 내용 충돌 → 분석은 정상, 라우팅만 억제
 9. 초대형 본문 → 절단 후에도 파이프라인 정상
+10. HTML 전용 메일 → 본문이 비지 않는다 (postal-mime의 `text` 부재 fallback)
+11. charset 미선언 EUC-KR 메일 → 한글이 깨지지 않는다, 정상 UTF-8 메일은 보정되지 않는다
 ```
 
 ### fixture 회귀 게이트 (Phase 2 통과 기준)
@@ -2347,13 +2447,18 @@ Mail Agent는 새 application architecture를 만들지 않고 이 연결부에 
 - `users.history.list`는 지정한 `startHistoryId` 이후의 mailbox 변경 이력을 반환하며 `messageAdded` 변경을 조회할 수 있다. `labelId`로 대상 라벨을 제한할 수 있다.
 - 오래되거나 유효하지 않은 `startHistoryId`는 HTTP 404를 반환할 수 있으며 Google은 이 경우 full sync를 수행하도록 안내한다.
 - `gmail.readonly`는 현재 Restricted scope다.
-- OAuth 앱이 `Testing` 상태인 경우 외부 test user의 authorization/refresh token 수명이 7일로 제한될 수 있다.
+- OAuth 앱이 `Testing` 상태인 경우 외부 test user의 authorization/refresh token 수명이 7일로 제한될 수 있다 — "Authorizations by a test user will expire seven days from the time of consent."
+- **restricted scope 인증에는 개인 사용 면제가 명시돼 있다** — "if you are the only user of your app or if your app is used by only a few users, all of whom are known personally to you". 그 경우 "advancing through the unverified app screen"이 정상 경로이며 "A user cap restricts the number of Google Accounts able to grant access to your unverified app"만 적용된다.
+- **인증을 제출하면 CASA가 붙는다** — "Every app that requests access to Google users' restricted data and has the ability to access data from or through a third-party server must go through a security assessment."
+- refresh token 무효화 사유에는 "The user changed passwords and the refresh token contains Gmail scopes", "The refresh token has not been used for six months", "The user account has exceeded a maximum number of granted (live) refresh tokens"가 포함된다.
 - Gmail Push Notification의 mailbox watch는 만료되며 Google은 `watch`를 최소 7일 이내에, 하루 한 번 갱신할 것을 권장한다.
 
 ```text
 https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list
 https://developers.google.com/workspace/gmail/api/auth/scopes
 https://developers.google.com/workspace/gmail/api/guides/push
+https://developers.google.com/identity/protocols/oauth2
+https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification
 https://support.google.com/cloud/answer/15549945
 https://support.google.com/cloud/answer/13464323
 ```
@@ -2391,6 +2496,13 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 13. **로그 privacy와 retention.** 원문·제목·주소를 기본 로그에서 빼고, 무한 보존을 기본값에서 제거했다(OPEN/SNOOZED Attention은 삭제 대상 아님).
 14. **OAuth fallback 순서.** "7일 문제 → 즉시 IMAP 전환"을 제거하고 production 운영 확인 → 실계정 검증 → 그래도 불가할 때만 IMAP 검토로 바꿨다.
 
+**2026-08-17 후속 실측으로 추가 확정된 것:**
+
+15. **MIME parser = `postal-mime` + 자체 HTML→text.** 8개 fixture 대조 실측으로 골랐고 근거·수치·자체 변환기 계약을 10.1에 남겼다. `mailparser`를 쓰지 않는 이유는 품질이 아니라 읽기 전용 앱에 발송 스택(`nodemailer`)을 끌고 오는 것과 inline 이미지를 base64로 HTML에 주입하는 동작이다.
+16. **charset 미선언 EUC-KR 보정.** 두 파서 모두 깨지는 것을 확인하고 raw 단계 보정 규칙을 계약했다(오탐 0/8).
+17. **OAuth 게시 계약.** `In production` 게시는 되고 **인증 제출은 하지 않는다**를 공식 문서 인용과 함께 20.1에 고정했다. 게시 상태와 인증 상태를 다른 축으로 갈랐다.
+18. **OAuth 클라이언트 유형 = 웹 애플리케이션.** 데스크톱 앱은 리디렉션 URI를 지정할 수 없어 토큰 수명 검증이 불가능하고, 운영에도 서버 콜백이 필요하다.
+
 ## 33.2 의도적으로 후속 Phase에 남긴 것
 
 - **thread 단위 Attention 묶기** — `thread_ref` 자리만 만들고 동작은 Phase 4(27절).
@@ -2406,10 +2518,10 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 
 ## 33.3 구현 직전 다시 확인해야 할 외부 사실
 
-1. **Google OAuth publishing status와 restricted scope verification 요건.** `Testing` 상태의 refresh token 7일 만료가 실제 이 계정에 적용되는지, 개인용 앱을 production으로 운영할 때 어떤 검증이 요구되는지는 공식 문서와 실계정으로 확인한다. **이 문서는 그 조건을 단정하지 않는다.** Phase 1 착수 전 확인 대상이다.
+1. **[진행 중] Gmail refresh token 장기 유지.** `In production` 게시와 인증 면제는 확인됐다(20.1). 남은 것은 **게시 후 새로 받은 refresh token이 7일을 넘겨 갱신되는지**뿐이다. 공식 문서는 7일 만료를 `Testing` 상태에 붙이지만 서드파티 자료 중에는 인증 상태에 붙인다고 쓴 것도 있어, **실측 전까지 어느 쪽도 단정하지 않는다.** 이것이 실패하면 20.1 fallback 3번(Gmail IMAP)이 열린다. **Phase 1(MAIL-1) 착수 전 확인 대상이다.**
 2. **Gmail `users.history.list`의 `labelId` 필터 동작.** 라벨 필터가 `messageAdded` 기록을 정확히 INBOX로 좁히는지, fetch 후 라벨 재확인이 여전히 필요한지 실제 응답으로 확인한다(현재 설계는 두 겹 모두 유지).
 3. **Naver IMAP 접속 정책.** 앱 비밀번호 발급 절차, 동시 접속/로그인 빈도 제한, `UIDVALIDITY` 변경 실제 사례를 확인한다. 5분마다 연결·종료가 제한에 걸리는지 실제로 재본다.
-4. **MIME parser 선택.** `mailparser` / `PostalMime` 등의 유지보수 상태, 의존성 크기, charset 처리 범위를 비교해 하나만 고른다.
+4. **실제 메일로 파서 재확인.** 파서 선택은 끝났지만(10.1) 대조에 쓴 것은 합성 fixture다. 실계정의 진짜 메일 — 특히 네이버 발송 메일과 한국 기업 뉴스레터 — 에서 charset·본문 정제 결과를 다시 본다. **여기서 문제가 나와도 파서를 다시 고르는 것이 아니라 전처리를 고친다.**
 5. **Gmail auth client 선택.** 전체 Google API framework 도입 대신 최소 OAuth client로 충분한지 bundle/코드량으로 비교한다.
 6. **구현 시작 시점의 `LATEST_SCHEMA_VERSION`.** 2026-08-17 기준 18이며, 그 사이 다른 기능이 migration을 추가했을 수 있으므로 반드시 다시 확인하고 다음 version을 쓴다.
 7. **Web Push payload 크기 한도.** 미리보기 `표시` 모드의 요약 길이가 payload 한도 안에 드는지 실제 전송으로 확인한다.
