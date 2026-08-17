@@ -297,7 +297,26 @@ contribution을 보여야 살아남는다.
 들어온다. **다만 ABS 양수 후보가 5개 미만이면 그날 TOP5는 5개 미만이고 ABS 음수 종목으로
 backfill하지 않는다.**
 
-### Phase 3 — Signal Invalidation Exit (PR #18)
+### Phase 3 — Signal Invalidation Exit (PR #18) — **종료**
+
+> **2026-08-17 결과 — Phase 3 종료.** label은 **`RISK_ONLY`**다. `ΔS = -15.57%p` ·
+> `ΔG = -6.42%p`로 두 marginal 조건이 모두 반대 방향이고, 개선된 것은 MDD 하나뿐이다
+> (12.0% → 10.6%). Sharpe는 0.46 → 0.37로 떨어졌다. **alpha stack에 넣지 않는다**
+> — `PARKED_RISK_OVERLAY_CANDIDATE`로 보존하고 fixed K42를 유지한다. 상세는
+> `runs/signal-invalidation-exit/results.md`.
+>
+> 처치는 실제로 작동했다 — 표시 180건이 전부 다음 세션 시초에 체결됐고 평균 31세션을
+> 잘라냈다. **문제는 그것이 수익을 깎았다는 것이다.** 거래가 445 → 529로 늘고 평균
+> 보유가 41.8 → 31.1로 줄면서 비용이 $10,993 → $12,556으로 올랐다.
+>
+> **`ΔB = -9.15%p`가 `ΔS`의 절반 이상이다.** 시장이 SMA200 아래일 때 나가면 노출이
+> 줄고(16.4% → 15.1%) 벤치마크도 함께 낮아진다. 그래서 **"전략이 −15.57%p 나빠졌다"와
+> "고른 종목이 나빠졌다"는 다르다** — 후자에 해당하는 것은 `ΔG = -6.42%p`다.
+>
+> **confirmation days · buffer · alternate SMA · ATR threshold를 열지 않는다.** 사전등록
+> §5의 금지 목록이고 결과가 나쁘다고 확장하지 않는다.
+>
+> **알파 개입 셋을 썼다.** 남은 것은 FIP 하나다.
 
 **예전 CORE exit를 그대로 되살리는 것은 금지.** `runs/jt-jk/`가 이미 반증했다 —
 `jt-core-exit`(RS-only + CORE exits 전부)는 총수익 **−23.07%** · 기대값 −0.075다.
@@ -445,8 +464,8 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |16|Market entry gate|시장 게이트가 실제 portfolio economics를 개선하는가|**`ECONOMICS_AND_RELATIVE_IMPROVED` · 경우 2**|
 |17|Candidate ABS **신호**|ABS-positive 후보에서 다시 뽑은 TOP5가 +42 excess를 높이는가|**`NON_BINDING` · `DO_NOT_PROMOTE`**|
 |—|Candidate ABS **포트폴리오**|—|**NOT OPENED** (#17이 `DO_NOT_PROMOTE`)|
-|18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|**다음**|
-|19|Risk semantics|hard stop인가 volatility sizing인가|—|
+|18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|**`RISK_ONLY`** — fixed K42 유지|
+|19|Risk semantics|hard stop인가 volatility sizing인가|**다음**|
 |20|FIP quality|마지막 momentum quality filter|조건부|
 |21|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
 |22|Robustness|folds/random/cost stress에서 버티는가|—|
@@ -454,7 +473,7 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |—|Holdout consumption 인프라|`holdout_consumptions` append-only 추적 (§7 C3-3)|전략 freeze 전 별도 PR|
 
 **"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.** **PR #17이 `DO_NOT_PROMOTE`로 끝나 ABS 포트폴리오 PR을 열지 않았으므로 번호가 밀리지
-않는다** — 다음은 #18이다. **알파 개입 수는 여전히 넷이고 그중 둘을 썼다.**
+않는다** — 다음은 #18이다. **알파 개입 수는 여전히 넷이고 PR #18까지 셋을 썼다.**
 
 ---
 

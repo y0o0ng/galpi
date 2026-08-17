@@ -22,7 +22,11 @@ ENTRY_MODES = (CORE_ENTRY, RS_ONLY_ENTRY, RANDOM_ENTRY)
 # 7.5 청산을 다 보는 `CORE`와, K세션 만기 하나만 남기는 `FIXED_HOLD`.
 CORE_EXITS = "CORE"
 FIXED_HOLD_EXITS = "FIXED_HOLD"
-EXIT_MODES = (CORE_EXITS, FIXED_HOLD_EXITS)
+# `FIXED_HOLD`에 **시장 신호 반증 청산** 하나를 더한 것. K세션 만기는 그대로이고 손절·
+# 트레일링·시간손절·실적 청산은 여전히 없다. 시장 판정은 포지션이 아니라 loop가 하므로
+# (그날 종가를 장중 처리보다 앞에 끌어오면 look-ahead다) 예약만 loop가 찍는다(PR #18).
+SIGNAL_INVALIDATION_EXITS = "SIGNAL_INVALIDATION"
+EXIT_MODES = (CORE_EXITS, FIXED_HOLD_EXITS, SIGNAL_INVALIDATION_EXITS)
 
 # 7.3의 GREEN/YELLOW/RED를 내는 `CORE`와, 시장만 보고 라벨을 붙이는 `MARKET`.
 CORE_REGIME = "CORE"

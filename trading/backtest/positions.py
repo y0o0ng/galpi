@@ -87,7 +87,12 @@ from .candidates import next_weekday, weekdays_between
 from .costs import CostModel
 from .data import CORPORATE_ACTION_REL_TOL, Bar
 from .execution import Fill, execute_market_exit, try_stop_exit
-from .modes import CORE_EXITS, EXIT_MODES, FIXED_HOLD_EXITS  # noqa: F401  (재수출)
+from .modes import (  # noqa: F401  (재수출)
+    CORE_EXITS,
+    EXIT_MODES,
+    FIXED_HOLD_EXITS,
+    SIGNAL_INVALIDATION_EXITS,
+)
 from .policy import StrategyParameters
 from .sizing import OpenPosition
 
@@ -246,7 +251,7 @@ def _due_exit(position: Position, exit_mode: str) -> str | None:
     if position.sessions_held >= position.parameters.max_hold_sessions:
         return "MAX_HOLD"
     if (
-        exit_mode != FIXED_HOLD_EXITS
+        exit_mode == CORE_EXITS
         and position.sessions_held >= position.parameters.time_stop_sessions
         and not position.trailing_active
     ):
@@ -302,7 +307,7 @@ def run_session(
             f"직전 바({previous_bar.trade_date})보다 뒤인 바여야 합니다: {bar.trade_date}"
         )
 
-    fixed_hold = exit_mode == FIXED_HOLD_EXITS
+    fixed_hold = exit_mode in (FIXED_HOLD_EXITS, SIGNAL_INVALIDATION_EXITS)
     current = adjust_for_corporate_action(position, previous_bar, bar)
 
     # 거래가 재개됐다. 밀려 있던 청산을 **첫 실제 거래 가능 가격**으로 내보낸다.
@@ -369,3 +374,24 @@ def run_session(
         )
 
     return SessionResult(current.symbol, current, None, None)
+
+
+# 시장 신호가 반증됐다는 표식. `MAX_HOLD`와 같은 예약 경로를 쓰므로 새 체결 경로가 없다.
+MARKET_TREND_BREAK = "MARKET_TREND_BREAK"
+
+
+def schedule_market_break(position: Position) -> Position:
+    """진입 가설이 깨졌으니 다음 거래가능 시초에 나가도록 **예약만** 한다(PR #18).
+
+    **이 함수는 시장을 보지 않는다.** 판정은 loop가 그날 종가에 하고(그때가 시장 종가를
+    알 수 있는 가장 이른 시점이다) 여기서는 표식만 찍는다. 포지션의 장중 처리보다 앞으로
+    시장 정보를 끌어오면 look-ahead다.
+
+    **이미 예약이 있으면 덮지 않는다.** 같은 종가에 `MAX_HOLD`가 먼저 예약됐다면 청산일이
+    어느 쪽이든 다음 시초로 같다 — market break가 보유기간을 단축하지 않았으므로 사유를
+    덮으면 진단이 "이 청산이 보유를 줄였다"고 거짓말한다. 덮지 않는 규칙은 market break가
+    이미 잡힌 청산을 **미룰 수 없다**는 것도 함께 보장한다.
+    """
+    if position.pending_exit is not None:
+        return position
+    return replace(position, pending_exit=MARKET_TREND_BREAK)
