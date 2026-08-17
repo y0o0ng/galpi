@@ -40,6 +40,11 @@ const { registerModelRuntimeRoutes } = require('./lib/model-runtime-routes');
 const { registerAssistantTaskRoutes } = require('./lib/assistant-task-routes');
 const { readAssistantPushConfig } = require('./lib/assistant-push-config');
 const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
+const { createMailStore } = require('./lib/mail/store');
+const { createMailAgent } = require('./lib/mail/agent');
+const { createNaverProvider } = require('./lib/mail/naver');
+const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
+const { registerMailRoutes } = require('./lib/mail/routes');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
@@ -216,6 +221,18 @@ const VOICE_TTS_VOICE = String(process.env.VOICE_TTS_VOICE || 'echo').trim();
 const VOICE_TTS_INSTRUCTIONS = process.env.VOICE_TTS_INSTRUCTIONS;
 const VOICE_TTS_SPEED = process.env.VOICE_TTS_SPEED;
 const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
+// MAIL-1 Provider 동기화. 실계정 인수 전까지 false 유지.
+const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
+// 자격증명은 DB·Vault에 넣지 않는다. 백업에 복제되면 안 되기 때문이다(설계 20.3).
+const MAIL_GMAIL_CREDENTIALS = {
+  clientId: process.env.MAIL_GMAIL_CLIENT_ID,
+  clientSecret: process.env.MAIL_GMAIL_CLIENT_SECRET,
+  refreshToken: process.env.MAIL_GMAIL_REFRESH_TOKEN,
+};
+const MAIL_NAVER_CREDENTIALS = {
+  user: process.env.NAVER_MAIL_USER,
+  pass: process.env.NAVER_MAIL_APP_PASSWORD,
+};
 const ATTACHMENTS_ENABLED = process.env.ATTACHMENTS_ENABLED === 'true';
 // 이미지는 매 턴 원본이 통째로 다시 실려 나가므로 문서보다 짧은 창과 턴 예산을 쓴다.
 const ATTACHMENT_IMAGE_REPLAY_TURNS = 3;
@@ -855,6 +872,27 @@ const assistantPush = createAssistantPushService(db, {
 const voiceShortcut = createVoiceShortcutService(db, {
   enabled: VOICE_SHORTCUT_ENABLED,
 });
+const mailStore = createMailStore(db);
+// 플래그가 꺼져 있으면 worker도 provider도 만들지 않는다. 표만 비어 있는 상태가 된다.
+const mailAgent = MAIL_AGENT_ENABLED
+  ? createMailAgent({
+    store: mailStore,
+    providers: {
+      naver: createNaverProvider(),
+      gmail: createGmailProvider({
+        tokenSource: createGoogleTokenSource({ credentials: MAIL_GMAIL_CREDENTIALS }),
+      }),
+    },
+    credentials: account => (account.provider === 'gmail' ? {} : MAIL_NAVER_CREDENTIALS),
+    // 오류 코드만 남긴다. 제목·발신자·주소는 로그에 넣지 않는다(설계 19절).
+    onError: (error, account) => {
+      console.error(`Mail sync 오류: account=${account?.id ?? '-'} ${error?.code || error?.name || 'UNKNOWN'}`);
+    },
+    onAuthRequired: account => {
+      console.warn(`Mail 재인증 필요: account=${account.id} provider=${account.provider}`);
+    },
+  })
+  : null;
 const attachmentDocuments = createAttachmentDocumentService(db, {
   enabled: ATTACHMENTS_ENABLED,
   tmpDir: ATTACHMENTS_TMP_DIR,
@@ -4263,6 +4301,7 @@ registerAssistantTaskRoutes({
   onTaskMutation: () => assistantScheduleNoteProjector.tick(),
 });
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
+registerMailRoutes({ app, store: mailStore, config: { enabled: MAIL_AGENT_ENABLED } });
 const shortcutRoutes = createVoiceShortcutRoutes({
   app,
   service: voiceShortcut,
@@ -8861,6 +8900,10 @@ const httpServer = app.listen(PORT, HOST, () => {
   if (ATTACHMENTS_ENABLED) {
     attachmentUploads.start();
     console.log('   첨부:     temporary upload 실행 중');
+  }
+  if (mailAgent) {
+    mailAgent.start();
+    console.log('   메일:     Provider 동기화 worker 실행 중 (30초 tick, 계정별 5분)');
   }
 
   if (
