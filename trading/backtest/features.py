@@ -155,6 +155,48 @@ def absolute_momentum(values: list[float], lookback: int, skip: int) -> float:
     return math.log(values[-(skip + 1)] / values[-(lookback + 1)])
 
 
+def information_discreteness(values: list[float], lookback: int, skip: int) -> float:
+    """Frog-in-the-Pan의 정보 이산성. **같은 momentum이 어떤 경로로 쌓였는가**(PR #20).
+
+        ID = sign(PRET) × (n_neg − n_pos) / (n_pos + n_neg)
+
+    `PRET`은 `absolute_momentum(values, lookback, skip)`이고 **여기서 다시 계산하지
+    않는다** — 복제하면 "RS와 같은 formation interval"이라던 주장이 언젠가 조용히 깨진다.
+    부호는 그 두 endpoint **사이**의 일별 수익률에서 센다.
+
+    |ID|뜻|
+    |---|---|
+    |음수|continuous — 부호가 `PRET` 방향으로 자주 반복됐다|
+    |양수|discrete — 몇 번의 큰 움직임이 누적을 만들었다|
+
+    **크기로 가중하지 않는다.** 부호의 빈도만 본다 — 크기를 넣으면 RS의 magnitude 정보와
+    역할이 겹쳐 ablation의 뜻이 흐려진다.
+
+    **`sign(PRET)` 인자가 방향을 지운다.** 작은 양의 날을 자주 쌓은 winner도, 작은 음의
+    날을 자주 쌓은 loser도 똑같이 음수가 된다.
+
+    변화가 없는 날(`n_zero`)은 **분모에서 뺀다.** 거래가 뜸한 종목이 정보 경로가 매끄러운
+    것처럼 보이면 안 된다. 부호 있는 날이 하나도 없으면 잴 것이 없으므로 0이다.
+
+    입력은 **조정 종가**여야 한다. 분할·배당이 섞이면 재는 것이 정보 경로가 아니라
+    기업행동이 된다.
+    """
+    pret = absolute_momentum(values, lookback, skip)
+    # `absolute_momentum`이 보는 두 끝점 사이의 구간. 같은 인덱스 산술을 쓴다.
+    window = values[-(lookback + 1) : len(values) - skip]
+    positive = negative = 0
+    for previous, current in zip(window, window[1:]):
+        if current > previous:
+            positive += 1
+        elif current < previous:
+            negative += 1
+    signed = positive + negative
+    if signed == 0:
+        return 0.0
+    direction = 0.0 if pret == 0 else math.copysign(1.0, pret)
+    return direction * (negative - positive) / signed
+
+
 def relative_strength(
     values: list[float], reference: list[float], lookback: int, skip: int
 ) -> float:

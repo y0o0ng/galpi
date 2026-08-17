@@ -443,6 +443,37 @@ filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
 **이것이 마지막 alpha filter다.** 실패하면 `Long-only cross-sectional momentum strategy
 construction = CLOSED`를 선언한다.
 
+> **2026-08-17 결과 — Phase 6 종료. `FIP_SIGNAL_REJECTED`(사전등록 §26의 A).**
+> Stage A HARD 다섯 중 **넷이 PASS이고 D가 FAIL**이라 Stage B를 열지 않았다. 상세는
+> `runs/fip-quality/results.md`.
+>
+> |기준|조건|결과|판정|
+> |---|---|---|---|
+> |A|`NON_BINDING`이 아닐 것|**BINDING** (21.7%)|PASS|
+> |B|`mean(D) > 0`|**+0.055%**|PASS|
+> |C|`median(D) >= 0`|+0.000%|PASS|
+> |D|위상 양수 비율 ≥ 60%|**59.5%** (25/42)|**FAIL**|
+> |E|NDX100 `mean(D) >= 0`|+0.002%|PASS|
+>
+> **ABS와 달리 필터는 실제로 걸렸다** — 3,385일 중 21.7%에서 TOP5 구성이 바뀌었고 후보
+> 교체율이 5.0%다(PR #17은 구성 변경 0일이었다). 그래서 이번 `FAIL`은 "안 걸려서 모른다"가
+> 아니라 **걸렸는데 기여가 문턱에 못 미쳤다**이다.
+>
+> **효과 크기가 작다.** `mean(D) = +0.055%`는 control `+1.188%` 대비 미미하고, NDX100은
+> `+0.002%`로 사실상 0이다. 양수 `D` 날짜가 11.7%뿐인 것은 78%의 날짜에서 TOP5가 아예
+> 바뀌지 않아 `D_t = 0`이기 때문이다.
+>
+> **D가 한 위상 차이로 갈렸다(25/42 = 59.5% vs 최소 60%).** 그래도 문턱을 옮기지 않는다 —
+> 사전등록 문턱을 결과를 본 뒤 고치면 이 로드맵의 계약 전체가 무의미해진다. **다른
+> threshold · window · quality filter를 열지 않는다.**
+>
+> ```
+> momentum alpha intervention 4/4 consumed
+> standalone momentum alpha construction terminated
+> ```
+>
+> **Phase 7로 가지 않는다.**
+
 ### Phase 7 — Reality Hardening (PR #21)
 
 여기까지 통과한 후보는 아직 백테스트 아이디어다. 실전 제약을 전부 켠다.
@@ -525,10 +556,10 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |—|Candidate ABS **포트폴리오**|—|**NOT OPENED** (#17이 `DO_NOT_PROMOTE`)|
 |18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|**`RISK_ONLY`** — fixed K42 유지|
 |19|Risk semantics|hard stop인가 volatility sizing인가|**`VOLATILITY_SCALED_POSITION`** — fixed K42 유지|
-|20|FIP quality|마지막 momentum quality filter|**다음** (남은 alpha 개입 하나)|
-|21|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
-|22|Robustness|folds/random/cost stress에서 버티는가|—|
-|23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|—|
+|20|FIP quality|마지막 momentum quality filter|**`FIP_SIGNAL_REJECTED`** — Stage A D 미달 · **종료**|
+|21|Reality hardening|비용·실적·delisting·체결을 견디는가|**열지 않음** (§8 종료)|
+|22|Robustness|folds/random/cost stress에서 버티는가|**열지 않음** (§8 종료)|
+|23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|**열지 않음** (§8 종료)|
 |—|Holdout consumption 인프라|`holdout_consumptions` append-only 추적 (§7 C3-3)|전략 freeze 전 별도 PR|
 
 **"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.** **PR #17이 `DO_NOT_PROMOTE`로 끝나 ABS 포트폴리오 PR을 열지 않았으므로 번호가 밀리지

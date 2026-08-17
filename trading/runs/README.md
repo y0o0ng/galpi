@@ -36,6 +36,7 @@
 |`absolute-momentum-signal/`|#17|신호|`ABS(126,5)>0` 후보 조건이 TOP5 +42 excess를 높이는가|**`NON_BINDING`** — 3,385일 중 구성 변경 0일 · `DO_NOT_PROMOTE`|
 |`signal-invalidation-exit/`|#18|포트폴리오|시장 추세가 깨질 때 나가는 것이 fixed K42보다 나은가|**`RISK_ONLY`** — `ΔS -15.57%p` · MDD만 개선 · **fixed K42 유지**|
 |`risk-semantics/`|#19|포트폴리오|sizing의 2ATR를 실제 hard stop으로 집행해야 하는가|**`VOLATILITY_SCALED_POSITION`** — `ΔG -34.09%p` · 손절 472건 전부 1R 초과 · **fixed K42 유지**|
+|`fip-quality/`|#20|신호|`ID(126,5) < 0` 후보 조건이 TOP5 +42 excess를 높이는가|**`FIP_SIGNAL_REJECTED`** — BINDING이지만 위상 59.5% < 60%로 D 미달 · **alpha 4/4 소진 · 종료**|
 
 ## 폴더를 층별 하위 디렉터리로 옮기지 않은 이유
 
