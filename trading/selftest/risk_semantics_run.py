@@ -51,7 +51,11 @@ from backtest.benchmark import benchmark_table  # noqa: E402
 from backtest.holdout import holdout_metadata  # noqa: E402
 from backtest.loop import BacktestConfig, EntryEvent, Trade, run_backtest  # noqa: E402
 from backtest.metrics import compute_metrics  # noqa: E402
-from backtest.modes import LAST_CLOSE_EXIT, UNRESOLVED_EXIT_PRICES  # noqa: E402
+from backtest.modes import (  # noqa: E402
+    HARD_STOP_EXITS as HARD_STOP_MODE,
+    LAST_CLOSE_EXIT,
+    UNRESOLVED_EXIT_PRICES,
+)
 from core import CORES  # noqa: E402
 from selftest.k_lifetime_run import reference_closes, regime_detail  # noqa: E402
 # **PR #16의 분해·게이트와 PR #18의 kept 판정을 그대로 쓴다.** 복제하면 정의가 갈린다.
@@ -886,10 +890,43 @@ def _consequence(label: str) -> list[str]:
             "**B이므로 semantic cleanup을 한다**(사전등록 §14). 목표는 다음 거짓 표현을"
             " 없애는 것 하나다.", "",
             "> \"0.25%가 실제 거래당 최대손실 위험이다\"", "",
-            "**행동 변화 없는 이름·문서 정리만 한다.** 공유 dataclass field"
-            "(`planned_risk` · `open_risk` · `risk_dollars` · `return_r`)를 대규모로"
-            " rename해야 한다면 이번 PR에서 억지로 하지 않고 compatibility plan을"
-            " 제시한다. 이미 배포된 실행 산출물은 소급 수정하지 않는다.", "",
+            "### 12.1 범위는 코어가 아니라 `exit_mode`가 정한다", "",
+            "**\"JT 코어는 손절을 집행하지 않는다\"로 일반화하지 않는다.** `jt_policy`를"
+            " 쓰는 코어 중에도 `jt-core-exit`은 `CORE_EXITS`라 초기·추적·시간·실적 청산을"
+            " 실제로 집행한다.", "",
+            "|`exit_mode`|집행되는 손절|`risk_per_trade = 0.25%`의 뜻|",
+            "|---|---|---|",
+            "|`CORE` (`core1` · `jt-core-exit`)|초기 2ATR · 추적 · 시간 · 실적"
+            "|**planned stop risk**|",
+            f"|`{HARD_STOP_MODE}` (`{CHALLENGER}`)|초기 2ATR만|planned stop risk|",
+            "|`FIXED_HOLD` · `SIGNAL_INVALIDATION`|**없음**"
+            "|**volatility sizing budget**|",
+            "",
+            f"**현재 살아남은 strategy candidate `{CONTROL}`는 마지막 칸이다.**"
+            " 거기서 `2ATR`는 실제 stop boundary가 아니라 position scale 단위다."
+            " `paper-core-v1`·`jt-core-exit`을 설명할 때의 \"계획 stop risk\"는 그대로"
+            " 맞는 표현이므로 지우지 않는다.", "",
+            "### 12.2 `FIXED_HOLD` 계열의 위험 회계는 legacy volatility-budget accounting이다",
+            "",
+            "집행되는 손절이 없어도 공유 아키텍처에는 이 이름들이 그대로 남아 있다.", "",
+            "```",
+            "planned_risk · planned_risk_fraction · open_risk · risk_dollars",
+            "max_total_planned_risk · TOTAL_PLANNED_RISK_EXCEEDED · return_r",
+            "```",
+            "",
+            "**`FIXED_HOLD` 계열에서 이 값들을 \"실제 stop-defined loss risk\"로 읽지"
+            " 않는다.** `2ATR` 기반 position scale과 그 합의 portfolio budget을 나타내는"
+            " **legacy volatility-budget accounting**이고, 집행되는 손절선도 최대손실"
+            " 한도도 뜻하지 않는다. `TOTAL_PLANNED_RISK_EXCEEDED`도 \"손실 한도를"
+            " 넘었다\"가 아니라 \"volatility budget 합계가 한도에 닿았다\"로 읽는다 —"
+            " **control에서 이 사유는 실제 결과를 구속하지 않았다**(§9의 skip 사유에"
+            " 나타나지 않는다).", "",
+            "### 12.3 바꾸지 않은 것", "",
+            "**이름은 이번 PR에서 바꾸지 않았다.** `paper-core-v1`·DB 스키마·배포된"
+            " 산출물·과거 보고서가 같은 field를 공유하므로 rename은 별도 PR의"
+            " compatibility plan이다. `risk.py`의 행동도 `max_total_planned_risk` 계산도"
+            " 그대로다 — 바꾼 것은 **읽는 법**뿐이다. 이미 배포된 실행 산출물도 소급"
+            " 수정하지 않는다.", "",
             "**중요한 것은 하나다** — PAPER 후보 전략 설명에서 **실제 집행되지 않는 stop을"
             " 실제 loss cap처럼 부르지 않는 것.**", ""]
 

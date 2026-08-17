@@ -733,24 +733,51 @@ class ScopeTest(unittest.TestCase):
                 self.assertNotIn(word, source, word)
 
     def test_no_sizing_slot_or_hold_change(self):
+        """**설정하는 자리를 막는다.** 단순 언급이 아니라 대입·생성자를 찾는다 —
+        §12의 legacy accounting 설명이 이 이름들을 정당하게 **인용**하기 때문이다.
+        """
         for source in (self.SOURCE, self.CORE_SOURCE):
-            for word in ("risk_per_trade", "max_position_weight", "max_positions=",
-                         "max_candidates=", "RiskProfile", "HardLimits"):
+            for word in ("risk_per_trade=", "max_position_weight=", "max_positions=",
+                         "max_candidates=", "RiskProfile(", "HardLimits("):
                 self.assertNotIn(word, source, word)
 
+    def test_the_two_arms_share_every_sizing_and_slot_value(self):
+        """문자열 검사보다 이쪽이 본질이다 — 값이 실제로 같은가."""
+        control, stop = CORES[CONTROL].policy, CORES[CHALLENGER].policy
+        self.assertEqual(control.profile, stop.profile)
+        self.assertEqual(control.limits, stop.limits)
+        self.assertEqual(control.parameters, stop.parameters)
+
     def test_the_runner_defines_no_core(self):
-        """**러너가 규칙을 만들지 않는다.** 코어 하나가 파일 하나다."""
-        for word in ("CoreDefinition", "jt_policy", "StrategyParameters"):
+        """**러너가 규칙을 만들지 않는다.** 코어 하나가 파일 하나다.
+
+        호출 자리를 찾는다 — §12.1이 `jt_policy`를 **설명하려고** 이름을 인용한다.
+        """
+        for word in ("CoreDefinition(", "jt_policy(", "StrategyParameters("):
             self.assertNotIn(word, self.SOURCE, word)
+        self.assertEqual(sorted(ARMS), sorted(key for key in ARMS if key in CORES))
 
     def test_the_holdout_is_not_consumed(self):
         self.assertNotIn("consume_holdout", self.SOURCE)
         self.assertIn("consumed=False", self.SOURCE)
 
-    def test_no_fip_abs_or_market_break_revival(self):
+    def test_no_fip_or_abs_revival(self):
         for word in ("absolute_momentum", "information_discreteness", "fip",
-                     "SIGNAL_INVALIDATION", "trend_quality"):
+                     "trend_quality"):
             self.assertNotIn(word, self.SOURCE, word)
+
+    def test_the_market_break_exit_is_not_retested(self):
+        """**PR #18의 청산을 다시 시험하지 않는다.**
+
+        문자열로 찾지 않는다 — §12.1 표가 그 모드를 "손절을 집행하지 않는 칸"으로
+        **인용**하기 때문에 raw substring 검사는 자기 설명에 걸린다. 실제로 중요한 것은
+        **그 모드로 도는 팔이 없다**는 것이다.
+        """
+        for key in ARMS:
+            with self.subTest(core=key):
+                self.assertNotEqual(
+                    CORES[key].exit_mode, SIGNAL_INVALIDATION_EXITS
+                )
 
 
 class DisclaimerTest(unittest.TestCase):
@@ -808,7 +835,7 @@ class SemanticCleanupTest(unittest.TestCase):
     def test_the_canonical_note_lives_in_one_place(self):
         """**코어마다 다시 설명하지 않는다.** `jt.py`가 모든 JT 연구 코어의 뿌리다."""
         text = (TRADING_ROOT / "core" / "jt.py").read_text(encoding="utf-8")
-        self.assertIn("volatility normalization unit", text)
+        self.assertIn("volatility sizing budget", text)
         self.assertIn("runs/risk-semantics/results.md", text)
 
     def test_the_shared_field_names_were_not_renamed(self):
@@ -825,6 +852,45 @@ class SemanticCleanupTest(unittest.TestCase):
         )
         self.assertIn("open_risk", dir(OpenPosition))
         self.assertIn("return_r", {field.name for field in fields(Trade)})
+
+    def test_the_note_does_not_generalize_to_every_jt_core(self):
+        """**"JT 코어는 손절을 집행하지 않는다"는 틀린 일반화다.**
+
+        `jt-core-exit`은 `jt_policy`를 쓰면서도 `CORE_EXITS`라 초기·추적·시간·실적 청산을
+        실제로 집행한다. 정본 설명이 그 예외를 이름으로 들고 있어야 한다.
+        """
+        self.assertEqual(CORES["jt-core-exit"].exit_mode, CORE_EXITS)
+        text = (TRADING_ROOT / "core" / "jt.py").read_text(encoding="utf-8")
+        self.assertIn("jt-core-exit", text)
+        self.assertIn("틀린 일반화", text)
+
+    def test_the_scope_split_matches_the_actual_exit_modes(self):
+        """문서가 가른 두 칸이 실제 `exit_mode`와 맞는가."""
+        executes = {CORE_EXITS, HARD_STOP_EXITS}
+        for name, core in CORES.items():
+            with self.subTest(core=name):
+                if name in ("core1", "jt-core-exit", CHALLENGER):
+                    self.assertIn(core.exit_mode, executes)
+                else:
+                    self.assertNotIn(core.exit_mode, executes)
+
+    def test_the_legacy_accounting_names_are_documented(self):
+        """`FIXED_HOLD` 계열에서 이 이름들을 실제 손절 위험으로 읽지 않는다는 설명."""
+        text = (TRADING_ROOT / "core" / "jt.py").read_text(encoding="utf-8")
+        self.assertIn("legacy\nvolatility-budget accounting", text)
+        for name in ("planned_risk", "open_risk", "risk_dollars",
+                     "max_total_planned_risk", "TOTAL_PLANNED_RISK_EXCEEDED"):
+            self.assertIn(name, text, name)
+
+    def test_the_risk_engine_behaviour_was_not_touched(self):
+        """**의미만 고쳤다.** 한도 값과 계산은 그대로다."""
+        from backtest.policy import HardLimits
+
+        self.assertEqual(HardLimits().max_total_planned_risk, 0.0125)
+        self.assertEqual(
+            CORES[CONTROL].policy.limits.max_total_planned_risk,
+            CORES[CHALLENGER].policy.limits.max_total_planned_risk,
+        )
 
     def test_the_prior_pr_control_artifact_is_available_for_the_check(self):
         """**대조할 것이 없으면 불변 주장을 값으로 뒷받침할 수 없다.**"""

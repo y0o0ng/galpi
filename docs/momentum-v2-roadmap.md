@@ -355,6 +355,25 @@ exit rule이다.
 > `수량 × 2ATR`라 비용을 포함하지 않는다. `GAP_FILL`은 중앙 1.223 · 최대 4.778이다.
 > **그래서 A가 살아남았더라도 0.25%를 "maximum loss"라고 부를 수는 없었다.**
 >
+> **범위는 코어가 아니라 `exit_mode`가 정한다.** "JT 코어는 손절을 집행하지 않는다"로
+> 일반화하지 않는다 — `jt-core-exit`은 `jt_policy`를 쓰면서도 `CORE_EXITS`라 초기·추적·
+> 시간·실적 청산을 **실제로 집행한다.** 정확한 구분은 이것이다.
+>
+> - `CORE`(`core1` · `jt-core-exit`) · `FIXED_HOLD_HARD_STOP` → **planned stop risk**
+> - `FIXED_HOLD` · `SIGNAL_INVALIDATION` → **volatility sizing budget**
+>
+> 현재 살아남은 후보 `jt-j126-k42-sma200`이 뒤쪽이다. `paper-core-v1`·`jt-core-exit`에
+> 대한 기존 "계획 stop risk" 설명은 **그 정책에서 맞는 표현이므로 지우지 않는다.**
+>
+> **`FIXED_HOLD` 계열의 위험 회계는 legacy volatility-budget accounting이다.**
+> `planned_risk` · `planned_risk_fraction` · `open_risk` · `risk_dollars` ·
+> `max_total_planned_risk` · `TOTAL_PLANNED_RISK_EXCEEDED` · `return_r`은 이름이 그대로
+> 남아 있지만, 그 계열에서는 **`2ATR` 기반 position scale과 portfolio budget**을 나타낼
+> 뿐 집행되는 손절선도 최대손실 한도도 뜻하지 않는다. `TOTAL_PLANNED_RISK_EXCEEDED`도
+> "손실 한도 초과"가 아니라 "volatility budget 합계가 한도에 닿음"으로 읽는다 — control에서
+> 이 사유는 실제 결과를 구속하지 않았다. **이름·`risk.py` 행동·`max_total_planned_risk`
+> 계산은 바꾸지 않았고** rename은 별도 PR의 compatibility plan이다.
+>
 > **알파 개입 예산은 그대로 셋을 썼다.** Phase 4는 alpha 개입이 아니라 의미 정정이므로
 > 남은 것은 여전히 FIP 하나다.
 
