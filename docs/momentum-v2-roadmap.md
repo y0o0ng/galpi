@@ -413,8 +413,25 @@ Barroso·Santa-Clara와 Moreira·Muir의 volatility management 결과가 있지�
 
 ### Phase 6 — 마지막 카드 하나 (PR #20)
 
-여기까지 와도 matched-SPY를 못 넘으면 **J나 K로 돌아가지 않는다.** 딱 하나의 momentum
-quality filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
+여기까지 와도 **§4 전체 경제성 허들을 통과하지 못하면** 마지막 alpha intervention으로
+FIP를 한 번 시험한다. 그때도 **J나 K로 돌아가지 않는다.** 딱 하나의 momentum quality
+filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
+
+> **2026-08-17 contract repair — trigger 문구를 §3과 일치시켰다.** 이 문단의 이전 판은
+> "여기까지 와도 **matched-SPY를 못 넘으면**"이라고 적었는데 그것은 §3·§8의 종료 계약과
+> 어긋난다. **현재 후보는 이미 matched-SPY를 넘었다** — PR #16 이후 `G = +4.99%`다.
+> 그런데 §4의 전체 허들은 아직 통과하지 못했다(**Sharpe 0.46 < 0.60**). 옛 문구를 그대로
+>두면 "matched-SPY를 넘었으니 Phase 6은 안 한다"로 읽혀 **네 번째 alpha 카드가 쓰이지도
+> 않은 채 사라진다.**
+>
+> §3이 정한 것은 **"네 alpha family를 다 써도 경제성 허들을 못 넘으면 종료"**이고, §8의
+> 종료 조건도 `after-cost exposure-matched SPY gap ≤ 0`이 아니라 네 개입 소진을 기준으로
+> 한다. 그래서 trigger를 **§4 전체 허들**로 맞춘다.
+>
+> **이것은 결과를 보고 골대를 옮기는 것이 아니다.** PR #20의 어떤 결과도 계산하기 전에,
+> 서로 모순이던 두 문장을 일치시키는 contract repair다. **허들 값 자체는 하나도 바꾸지
+> 않았다** — `G > 0` · total > 0 · expectancy > 0 · PF ≥ 1.15 · Sharpe ≥ 0.6 · MDD ≤ 15%
+> 그대로다.
 
 현재 RS는 "얼마나 올랐나"를 보고, ID는 **"어떤 경로로 올랐나"**를 본다. Da·Gurun·Warachka는
 같은 누적 momentum이라도 작은 상승이 지속적으로 쌓인 종목이 큰 몇 번의 jump로 오른 종목보다
