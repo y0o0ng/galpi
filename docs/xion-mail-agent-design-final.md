@@ -1839,17 +1839,21 @@ Google의 restricted scope 인증 문서가 면제 사유를 직접 적어놨다
 
 client secret은 20.3의 credential 경계를 그대로 따른다 — DB·Vault·git에 넣지 않는다.
 
-### 남은 검증과 fallback 우선순위
+### 7일 만료는 `In production`에서 해소된다
+
+공식 문서의 7일 규칙은 **`Testing` 게시 상태의 test user**에 붙어 있다 — "Authorizations by a **test user** will expire seven days from the time of consent." `In production`으로 게시한 시점에 이 조항의 적용 대상이 아니게 되고, **인증(verification) 여부는 이 축과 무관하다**(경고 화면과 사용자 상한만 따라온다).
+
+따라서 Gmail 경로에 남은 구조적 위험은 없다.
 
 ```text
 1. [확인됨] 개인용 앱을 In production으로 게시할 수 있고 인증 제출은 필요 없다
-2. [진행 중] 실제 계정으로 장기 refresh token 유지 여부 검증 (동의 후 7~10일)
-3. [미개시] 2가 실패할 때에만 Gmail IMAP 대안을 검토
+2. [확인됨] 7일 만료는 Testing 전용 조항이므로 게시 후에는 적용되지 않는다
+3. [미개시] 1·2가 모두 무너질 때에만 Gmail IMAP 대안을 검토
 ```
 
 **"7일 문제가 있으니 Gmail REST를 버리고 IMAP/app password로 간다"고 결정하지 않는다.** Gmail REST + `historyId`를 고른 이유(22.5)는 그대로 유효하며, IMAP 전환은 1·2가 모두 막혔을 때의 마지막 수단이다.
 
-2번 검증 방법은 Playground에서 `gmail.readonly` 동의(경고 화면에서 `고급` → `이동`) 후 refresh token을 받아두고, **7~10일 뒤 같은 refresh token으로 갱신이 되는지 확인**하는 것이다. 공식 문서는 7일 만료를 `Testing` 상태에 붙여 설명하지만 서드파티 자료 중에는 인증 상태에 붙인다고 쓴 것도 있어, **실측 전까지 이 문서는 어느 쪽도 단정하지 않는다.**
+게시 직후 받은 refresh token으로 8일 이후 한 번 갱신해 보는 것은 **비용이 0인 확인**이라 하되, MAIL-1 착수를 여기에 걸지 않는다. 이 확인이 실패하는 경우에만 3번이 열린다.
 
 ### 토큰 갱신 계약
 
@@ -2505,7 +2509,7 @@ Mail Agent는 새 application architecture를 만들지 않고 이 연결부에 
 - `users.history.list`는 지정한 `startHistoryId` 이후의 mailbox 변경 이력을 반환하며 `messageAdded` 변경을 조회할 수 있다. `labelId`로 대상 라벨을 제한할 수 있다.
 - 오래되거나 유효하지 않은 `startHistoryId`는 HTTP 404를 반환할 수 있으며 Google은 이 경우 full sync를 수행하도록 안내한다.
 - `gmail.readonly`는 현재 Restricted scope다.
-- OAuth 앱이 `Testing` 상태인 경우 외부 test user의 authorization/refresh token 수명이 7일로 제한될 수 있다 — "Authorizations by a test user will expire seven days from the time of consent."
+- 7일 만료는 **`Testing` 게시 상태의 test user에 한정된 조항**이다 — "Authorizations by a test user will expire seven days from the time of consent." `In production`으로 게시하면 적용되지 않으며, 인증(verification) 완료 여부와는 다른 축이다.
 - **restricted scope 인증에는 개인 사용 면제가 명시돼 있다** — "if you are the only user of your app or if your app is used by only a few users, all of whom are known personally to you". 그 경우 "advancing through the unverified app screen"이 정상 경로이며 "A user cap restricts the number of Google Accounts able to grant access to your unverified app"만 적용된다.
 - **인증을 제출하면 CASA가 붙는다** — "Every app that requests access to Google users' restricted data and has the ability to access data from or through a third-party server must go through a security assessment."
 - refresh token 무효화 사유에는 "The user changed passwords and the refresh token contains Gmail scopes", "The refresh token has not been used for six months", "The user account has exceeded a maximum number of granted (live) refresh tokens"가 포함된다.
@@ -2579,7 +2583,7 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 
 ## 33.3 구현 직전 다시 확인해야 할 외부 사실
 
-1. **[진행 중] Gmail refresh token 장기 유지.** `In production` 게시와 인증 면제는 확인됐다(20.1). 남은 것은 **게시 후 새로 받은 refresh token이 7일을 넘겨 갱신되는지**뿐이다. 공식 문서는 7일 만료를 `Testing` 상태에 붙이지만 서드파티 자료 중에는 인증 상태에 붙인다고 쓴 것도 있어, **실측 전까지 어느 쪽도 단정하지 않는다.** 이것이 실패하면 20.1 fallback 3번(Gmail IMAP)이 열린다. **Phase 1(MAIL-1) 착수 전 확인 대상이다.**
+1. **[확인됨 — 착수 조건 아님] Gmail OAuth.** 게시·인증 면제·7일 조항의 적용 범위가 모두 정리됐다(20.1). 8일 이후 refresh 한 번은 비용 0의 확인으로 남기되 **MAIL-1 착수를 여기에 걸지 않는다.** 실패할 경우에만 20.1 fallback 3번이 열린다.
 2. **Gmail `users.history.list`의 `labelId` 필터 동작.** 라벨 필터가 `messageAdded` 기록을 정확히 INBOX로 좁히는지, fetch 후 라벨 재확인이 여전히 필요한지 실제 응답으로 확인한다(현재 설계는 두 겹 모두 유지).
 3. **[일부 확인] Naver IMAP.** 인증 전 CAPABILITY·TLS는 실측했다(6.2). 남은 것은 실계정으로만 볼 수 있는 것들이다 — **인증 후 CAPABILITY에 `IDLE`이 나타나는지**, 연속 로그인이 빈도 제한에 걸리는지, `EXAMINE` + `BODY.PEEK`가 실제로 `\Seen`을 안 바꾸는지, 최근 메일의 `Message-ID` 보유율(identity fallback 빈도)과 charset 분포(10.1 보정 규칙의 실제 적용 빈도), 폴더의 `SPECIAL-USE` 속성. 측정 스크립트는 준비돼 있고 자격증명은 사용자 터미널에서만 다룬다.
 4. **실제 메일로 파서 재확인.** 파서 선택은 끝났지만(10.1) 대조에 쓴 것은 합성 fixture다. 실계정의 진짜 메일 — 특히 네이버 발송 메일과 한국 기업 뉴스레터 — 에서 charset·본문 정제 결과를 다시 본다. **여기서 문제가 나와도 파서를 다시 고르는 것이 아니라 전처리를 고친다.**
