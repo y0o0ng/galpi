@@ -752,6 +752,10 @@ Provider별 메시지를 공통 구조로 정규화한다.
 
 `identityKey`는 **계정 범위에서 유일**하며 dedup의 유일한 기준이다. `locator`는 재분석·원문 열기를 위해 저장하지만 identity로 쓰지 않는다.
 
+**identity는 provider가 아니라 `agent.js`가 계산한다.** `gmail.js`/`naver.js`는 가져오기만 맡는다는 책임 경계(22절)가 한 이유이고, 두 provider가 반드시 같은 규칙을 써야 한다는 것이 다른 이유다. provider마다 복사해 두면 한쪽만 고쳐지는 순간 같은 메일이 두 행이 된다.
+
+**digest 없이 fingerprint를 만들지 않는다.** `from|subject|date`만으로 접으면 같은 발신자가 같은 제목으로 보내는 정기 메일이 한 행으로 뭉친다. 재료가 모자라면 identity를 추측해 만들지 말고 거절한다 — 조용히 잘못 합치는 것보다 그 메일을 못 넣는 편이 낫다.
+
 HTML 원문과 본문 텍스트는 **DB에 장기 저장하지 않는다**(21절). 다시 필요하면 locator로 Provider에서 읽는다.
 
 ---
