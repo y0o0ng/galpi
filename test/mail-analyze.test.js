@@ -406,3 +406,48 @@ test('a truncated body tells the model it was cut', async () => {
   assert.equal(hints.bodyTruncated, true);
   db.close();
 });
+
+test('a deleted mail is skipped terminally instead of burning five retries', async () => {
+  // 사라진 메일은 다시 시도해도 결과가 같다. 좌초 목록에 남으면 사람이 할 일이 없는
+  // 항목이 쌓이고, 그러면 그 목록을 아무도 안 보게 된다.
+  const gone = new Error('message gone');
+  gone.code = 'MAIL_MESSAGE_GONE';
+  const calls = [];
+  const { db, store, account, analyzer, clock } = createHarness({
+    raw: gone,
+    callModel: async request => { calls.push(request); return goodDecision(); },
+  });
+  const message = seed(store, account);
+
+  const { results } = await analyzer.tick(clock.value);
+  assert.equal(results[0].outcome, 'skipped');
+  assert.equal(results[0].reason, 'MAIL_MESSAGE_GONE');
+  assert.equal(calls.length, 0, '원문을 못 읽었으면 모델도 부르지 않는다');
+
+  const summary = store.analysisSummary();
+  assert.equal(summary.skipped, 1);
+  assert.equal(summary.failed, 0);
+  assert.equal(summary.pending, 0);
+  assert.deepEqual(store.listStrandedAnalysis(), []);
+  assert.equal(store.requeueFailedAnalysis(clock.value), 0);
+  assert.equal(
+    db.prepare('SELECT analysis_state AS s FROM mail_messages WHERE id = ?').get(message.id).s,
+    'skipped',
+  );
+  db.close();
+});
+
+test('a stale locator stays retryable, unlike a mail that is really gone', async () => {
+  // 재번호 뒤 UID는 다음 resync가 고쳐준다. 이것까지 terminal로 만들면 고칠 수 있는
+  // 메일을 영영 분석하지 않게 된다.
+  const stale = new Error('renumbered');
+  stale.code = 'MAIL_LOCATOR_STALE';
+  stale.retryable = true;
+  const { db, store, account, analyzer, clock } = createHarness({ raw: stale });
+  seed(store, account);
+
+  const { results } = await analyzer.tick(clock.value);
+  assert.equal(results[0].outcome, 'pending');
+  assert.equal(store.analysisSummary().skipped, 0);
+  db.close();
+});

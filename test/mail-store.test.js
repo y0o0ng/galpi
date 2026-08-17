@@ -510,3 +510,47 @@ test('a mail that turned out not to be ours is skipped, not stranded', () => {
   assert.equal(store.requeueFailedAnalysis(clock.value), 0);
   db.close();
 });
+
+test('an account that is not active never lets the analysis worker touch its provider', () => {
+  // 인증이 끊긴 계정의 pending을 계속 집으면 매 tick 실패하며 재시도 상한을 태우고
+  // 좌초로 남는다. 사람이 할 일은 재인증인데 화면에는 분석 실패로 보인다.
+  for (const status of ['auth_required', 'disabled', 'error']) {
+    const { db, store, clock } = createStore();
+    const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+    const message = seedMessage(store, account, { key: status });
+
+    store.setAccountStatus(account.id, status, clock.value);
+    assert.deepEqual(store.claimAnalysisJobs(clock.value), [], `${status}: 집으면 안 된다`);
+
+    // 행은 버리지도 실패시키지도 않는다. 그대로 pending으로 기다린다.
+    const row = db.prepare('SELECT * FROM mail_messages WHERE id = ?').get(message.id);
+    assert.equal(row.analysis_state, 'pending', status);
+    assert.equal(row.analysis_attempt_count, 0, `${status}: 시도 횟수를 태우지 않는다`);
+    assert.equal(store.analysisSummary().pending, 1, status);
+
+    // 다시 켜면 별도 장치 없이 그 자리에서 재개된다.
+    store.setAccountStatus(account.id, 'active', clock.value);
+    const [claimed] = store.claimAnalysisJobs(clock.value);
+    assert.equal(claimed.id, message.id, status);
+    assert.equal(claimed.attemptCount, 1, status);
+    db.close();
+  }
+});
+
+test('one dead account does not stop analysis for a healthy one', () => {
+  const { db, store, clock } = createStore();
+  const naver = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  const gmail = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+  const stuck = seedMessage(store, naver, { key: 'stuck' });
+  const healthy = seedMessage(store, gmail, { key: 'healthy' });
+
+  store.setAccountStatus(naver.id, 'auth_required', clock.value);
+  const claimed = store.claimAnalysisJobs(clock.value, { limit: 5 });
+
+  assert.deepEqual(claimed.map(job => job.id), [healthy.id]);
+  assert.equal(
+    db.prepare('SELECT analysis_state AS s FROM mail_messages WHERE id = ?').get(stuck.id).s,
+    'pending',
+  );
+  db.close();
+});
