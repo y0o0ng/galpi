@@ -127,12 +127,14 @@
 
 **loop 1단계에서 폐지 판정이 `run_session`보다 먼저**이고 `_terminal_fill`이 최종 사유를 덮는다. 예약된 market break는 그 자리에서 선점된다 — **fill로도 단축으로도 세지 않는다.**
 
+**선점은 두 팔의 terminal-exit 건수 차이로 추론하지 않는다.** 예약된 `MarketBreakEvent`와 그 포지션의 최종 `Trade`를 직접 매칭해 센다(위 표). 이번 실행에서는 `DELISTED_EXIT`·`UNRESOLVED_EXIT` 선점이 모두 **0건**이었다.
+
+아래 표는 참고용 분포다. **양 팔의 건수 차이는 조기 청산이 이후 포트폴리오 경로와 진입 집합을 바꾼 결과일 수 있으므로 preemption의 증거가 아니다.**
+
 |사유|fixed K42|신호 반증 청산|
 |---|---|---|
 |`DELISTED_EXIT`|2|5|
 |`UNRESOLVED_EXIT`|1|1|
-
-**선점 건수는 control 대비 감소분으로 읽는다** — challenger에서 그 종목이 market break로 먼저 나갔으면 폐지 청산 자체가 사라진다.
 
 ### exit reason 분포
 
@@ -169,9 +171,9 @@
 
 ## 7. 사전등록 판정
 
-### 7.1 `CURRENT_ECONOMIC_GATE_PASS` (별도 flag)
+### 7.1 `CURRENT_ECONOMIC_MINIMUMS_PASS` (별도 flag)
 
-**최종 전략 자격을 재는 flag이지 component 승격 조건이 아니다.** 로드맵 §4의 최종 경제 게이트와 같은 값이다.
+**component 승격 조건이 아니다.** 그리고 **최종 전략 합격 판정도 아니다** — 로드맵 §4에서 **이 러너가 직접 재는 numeric economic subset**이고, **random ranking 대비 우위**와 **ZERO 시나리오 구조적 붕괴 없음**은 여기 들어 있지 않다. 사전등록 §9.1은 이것을 `CURRENT_ECONOMIC_GATE_PASS`라고 불렀는데 그 이름이 범위를 넘어서므로 표기만 좁혔다 — **판정과 문턱은 그대로다.**
 
 |조건|fixed K42|신호 반증 청산|
 |---|---|---|

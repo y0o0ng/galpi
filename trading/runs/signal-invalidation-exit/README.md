@@ -270,8 +270,17 @@ CURRENT_ECONOMIC_GATE_PASS =
     AND PF >= 1.15 AND Sharpe >= 0.60 AND MDD <= 15%
 ```
 
-**이것은 challenger가 최종 전략 자격을 갖췄는지를 재는 flag이지 component 승격 조건이
-아니다.** 로드맵 §4의 최종 경제 게이트와 같은 값이고 문턱을 낮추지 않는다.
+**이것은 component 승격 조건이 아니다.** 문턱을 낮추지 않는다.
+
+> **2026-08-17 표기 정정 — 판정은 바꾸지 않는다.** 위 두 줄은 원래 "challenger가 **최종
+> 전략 자격**을 갖췄는지를 재는 flag이고 로드맵 §4의 **최종 경제 게이트와 같은 값**"이라고
+> 적었는데 **부정확하다.** §4의 최종 합격선에는 위 여섯 줄 말고도 **random ranking 대비
+> 우위**와 **ZERO 시나리오에서 구조적 붕괴 없음**이 있고 **이 러너는 그 둘을 재지
+> 않는다.** 그래서 이 flag은 §4의 **numeric economic subset**이지 최종 전략 합격 판정이
+> 아니다. 보고서는 이것을 **`CURRENT_ECONOMIC_MINIMUMS_PASS`**로 적는다. **사전등록한
+> 여섯 조건도, 아래 §9.2의 label 정의도, 이번 판정도 그대로다** — 이번 challenger는
+> `ΔS < 0` AND `ΔG < 0`이라 이름과 무관하게 `RISK_ONLY`다. 사전등록 문구를 지우지 않고
+> 정정을 덧붙인다.
 
 **이 flag만으로 component를 승격시키지 않는다.** 이번 연구 질문은 **fixed K42 대비 marginal
 improvement**이므로, gate를 통과했더라도 `ΔS`·`ΔG`가 악화된 exit은 "이 exit이 기여했다"는

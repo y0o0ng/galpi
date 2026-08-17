@@ -22,7 +22,7 @@ pending-exit 경로가 한다. 오늘 시장 정보를 포지션의 장중 처�
 
 ## 판정과 진단을 갈라 놓는다
 
-`ΔS = ΔB + ΔG` 분해와 최종 경제 게이트는 **PR #16의 헬퍼를 그대로 부른다** — 복제하면
+`ΔS = ΔB + ΔG` 분해와 경제 최소조건 표는 **PR #16의 헬퍼를 그대로 부른다** — 복제하면
 두 실험의 정의가 갈린다.
 
 **`MARKET_TREND_BREAK`를 "정의상 실제 단축"으로 읽지 않는다.** 예약된 신호는 넷으로
@@ -100,6 +100,13 @@ PROMOTES = frozenset({LABEL_PROMOTE_AND_GATE, LABEL_PROMOTE})
 
 # B가 "control이 이미 통과하던 것을 깨지 않았는가"를 볼 때 쓰는 항목.
 CONTROL_KEPT = ("gap", "expectancy_r", "profit_factor", "max_drawdown")
+
+# 사전등록 §9.1의 flag을 보고서에 적는 이름. **범위를 넘지 않게 좁힌 표기다** —
+# `final_gate`가 재는 것은 로드맵 §4의 **numeric subset 여섯 줄**이고 `random ranking
+# 대비 우위`와 `ZERO 시나리오 구조적 붕괴 없음`은 이 러너가 재지 않는다. §9.1의
+# `CURRENT_ECONOMIC_GATE_PASS`라는 이름은 그 둘까지 포함한 최종 합격 판정으로 읽히므로
+# 표기만 바꿨다. **문턱도 판정도 그대로다.**
+ECONOMIC_MINIMUMS_FLAG = "CURRENT_ECONOMIC_MINIMUMS_PASS"
 
 
 def run_id_for(core: str, scenario: str) -> str:
@@ -211,9 +218,10 @@ def mechanism(
     **`MARKET_TREND_BREAK` 건수를 단축 건수로 읽지 않는다.** 표시는 그 순간 `MAX_HOLD`가
     아직 예약되지 않았다는 것만 뜻한다.
 
-    - 표시→체결이 **한 세션**이면 정상 체결이다. 예약된 청산은 다음 세션 시초에 나가므로
-      그보다 늦었다는 것은 **그 세션에 바가 없어 `EXIT_PENDING_UNTRADEABLE`를 거쳤다**는
-      뜻이다. 그래서 지연 판정에 별도 표식이 필요 없다.
+    - 표시→체결이 **정확히 한 세션**이면 정상 체결이다. 예약된 청산은 다음 세션 시초에
+      나가므로 그보다 늦었다는 것은 **그 세션에 바가 없어 `EXIT_PENDING_UNTRADEABLE`를
+      거쳤다**는 뜻이다. 그래서 지연 판정에 별도 표식이 필요 없다. **`delay < 1`은 정상
+      상태가 아니라 계약 위반이므로 세지 않고 멈춘다.**
     - `DELISTED_EXIT`·`UNRESOLVED_EXIT`로 끝난 것은 **선점**이다. 청산가와 시점을 정한
       것이 market break가 아니므로 fill로도 `actual K42 shortening`으로도 세지 않는다.
     - `actual K42 shortening`은 **체결 시점** `sessions_held < max_hold`인 것만이다.
@@ -253,8 +261,16 @@ def mechanism(
                 f" {event.symbol} {event.entry_date}"
             )
         delay = index[trade.exit_date] - index[event.signal_date]
+        if delay < 1:
+            # 계약은 "종가에 예약 → **다음** 세션 시초 체결"이다. 같은 날이나 그 전에
+            # 체결됐다면 표시가 체결보다 늦게 관찰된 것이고, 조용히 정상으로 세면
+            # 진단이 그 순서 오류를 덮는다.
+            raise AssertionError(
+                f"market break 체결이 표시보다 앞섭니다(delay={delay}):"
+                f" {event.symbol} {event.signal_date} → {trade.exit_date}"
+            )
         delays.append(delay)
-        if delay <= 1:
+        if delay == 1:
             outcomes["normal_fills"] += 1
         else:
             outcomes["untradeable_delayed_fills"] += 1
@@ -331,9 +347,13 @@ def classify_component(
 ) -> str:
     """§9.2의 A~D. **결과를 본 뒤 바꾸지 않는다**(테스트가 잠근다).
 
-    **`CURRENT_ECONOMIC_GATE_PASS`는 A의 조건 중 하나일 뿐 단독 승격 사유가 아니다.**
-    게이트를 통과했는데 `ΔS`나 `ΔG`가 악화됐으면 그 통과는 control이 이미 하던 일이지
+    `gate_pass`는 사전등록 §9.1의 flag이고 **A의 조건 중 하나일 뿐 단독 승격 사유가
+    아니다.** 통과했는데 `ΔS`나 `ΔG`가 악화됐으면 그 통과는 control이 이미 하던 일이지
     이 청산이 한 일이 아니다.
+
+    **그 flag은 최종 전략 합격 판정이 아니다** — `final_gate`가 재는 것은 로드맵 §4의
+    numeric subset 여섯 줄이고 random ranking 대비 우위와 ZERO 구조적 붕괴 없음은 빠져
+    있다. 그래서 보고서는 `CURRENT_ECONOMIC_MINIMUMS_PASS`로 적는다.
     """
     ds, dg = delta.get("delta_S"), delta.get("delta_G")
     if ds is None or dg is None:
@@ -350,7 +370,7 @@ def classify_component(
 
 def treatment(label: str) -> str:
     return {
-        LABEL_PROMOTE_AND_GATE: "**signal exit를 유지한다.** 최종 전략 자격과 fixed K42"
+        LABEL_PROMOTE_AND_GATE: "**signal exit를 유지한다.** 경제 최소조건 통과와 fixed K42"
         " 대비 marginal 기여가 **함께** 확인됐다.",
         LABEL_PROMOTE: "**signal exit를 유지한다.** 최종 게이트는 아직 미달이지만 fixed"
         " K42 대비 marginal 기여가 확인됐고 control이 통과하던 것을 깨지 않았다.",
@@ -587,15 +607,20 @@ def _mechanism(control: dict, challenger: dict) -> list[str]:
               "**loop 1단계에서 폐지 판정이 `run_session`보다 먼저**이고 `_terminal_fill`이"
               " 최종 사유를 덮는다. 예약된 market break는 그 자리에서 선점된다 —"
               " **fill로도 단축으로도 세지 않는다.**", "",
+              "**선점은 두 팔의 terminal-exit 건수 차이로 추론하지 않는다.** 예약된"
+              " `MarketBreakEvent`와 그 포지션의 최종 `Trade`를 직접 매칭해 센다(위 표)."
+              f" 이번 실행에서는 `DELISTED_EXIT`·`UNRESOLVED_EXIT` 선점이 모두"
+              f" **{mechanism['market_break_signals_terminally_preempted']}건**이었다.", "",
+              "아래 표는 참고용 분포다. **양 팔의 건수 차이는 조기 청산이 이후 포트폴리오"
+              " 경로와 진입 집합을 바꾼 결과일 수 있으므로 preemption의 증거가 아니다.**",
+              "",
               "|사유|fixed K42|신호 반증 청산|", "|---|---|---|"]
     for reason in TERMINAL_REASONS:
         lines.append(
             f"|`{reason}`|{control_terminal.get(reason, 0):,}"
             f"|{terminal.get(reason, 0):,}|"
         )
-    lines += ["",
-              "**선점 건수는 control 대비 감소분으로 읽는다** — challenger에서 그 종목이"
-              " market break로 먼저 나갔으면 폐지 청산 자체가 사라진다.", ""]
+    lines.append("")
 
     lines += ["### exit reason 분포", "", "|사유|fixed K42|신호 반증 청산|",
               "|---|---|---|"]
@@ -661,9 +686,13 @@ def _verdict(control: dict, challenger: dict) -> list[str]:
     label = classify_component(delta, gate["pass"], sharpe_ok, kept, risk)
 
     lines = ["## 7. 사전등록 판정", "",
-             "### 7.1 `CURRENT_ECONOMIC_GATE_PASS` (별도 flag)", "",
-             "**최종 전략 자격을 재는 flag이지 component 승격 조건이 아니다.** 로드맵 §4의"
-             " 최종 경제 게이트와 같은 값이다.", "",
+             f"### 7.1 `{ECONOMIC_MINIMUMS_FLAG}` (별도 flag)", "",
+             "**component 승격 조건이 아니다.** 그리고 **최종 전략 합격 판정도 아니다** —"
+             " 로드맵 §4에서 **이 러너가 직접 재는 numeric economic subset**이고,"
+             " **random ranking 대비 우위**와 **ZERO 시나리오 구조적 붕괴 없음**은 여기"
+             " 들어 있지 않다. 사전등록 §9.1은 이것을 `CURRENT_ECONOMIC_GATE_PASS`라고"
+             " 불렀는데 그 이름이 범위를 넘어서므로 표기만 좁혔다 —"
+             " **판정과 문턱은 그대로다.**", "",
              "|조건|fixed K42|신호 반증 청산|", "|---|---|---|"]
     for left, right in zip(control_gate["rows"], gate["rows"]):
         lines.append(
@@ -691,7 +720,7 @@ def _verdict(control: dict, challenger: dict) -> list[str]:
 
     lines += ["", f"### label — **{label}**", "", treatment(label), ""]
     if gate["pass"] and label not in PROMOTES:
-        lines += ["> **게이트를 통과했지만 승격이 아니다.** `ΔS` 또는 `ΔG`가 악화됐으므로"
+        lines += ["> **최소조건을 통과했지만 승격이 아니다.** `ΔS` 또는 `ΔG`가 악화됐으므로"
                   " 게이트를 넘은 것은 **control이 이미 하던 일이지 이 청산이 한 일이"
                   " 아니다.** 이번 질문은 fixed K42 대비 marginal improvement다.", ""]
     if label not in PROMOTES:

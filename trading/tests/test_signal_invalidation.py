@@ -44,8 +44,10 @@ from backtest.positions import (  # noqa: E402
 )
 from core import CORES  # noqa: E402
 from core.definition import RULE_FIELDS  # noqa: E402
+from selftest.market_gate_run import FINAL_GATE_MINIMUMS  # noqa: E402
 from selftest.signal_invalidation_run import (  # noqa: E402
     ARMS,
+    ECONOMIC_MINIMUMS_FLAG,
     CHALLENGER,
     COMPONENT_LABELS,
     CONTROL,
@@ -502,6 +504,45 @@ class MechanismTest(unittest.TestCase):
             sum(outcomes.values()), got["market_break_signals_scheduled"]
         )
 
+    def test_a_same_session_fill_is_a_contract_violation(self):
+        """**계약은 "종가 예약 → 다음 세션 시초 체결"이다.** `delay == 0`은 정상이 아니다.
+
+        조용히 정상으로 세면 표시와 체결의 순서가 뒤집힌 것을 진단이 덮는다.
+        """
+        with self.assertRaises(AssertionError):
+            mechanism(
+                [_event("AAA", "2026-03-05", 10)],
+                (_trade("AAA", "2026-03-05", MARKET_TREND_BREAK, 10),),
+                SESSIONS,
+                MAX_HOLD,
+            )
+
+    def test_a_fill_before_the_signal_is_a_contract_violation(self):
+        with self.assertRaises(AssertionError):
+            mechanism(
+                [_event("AAA", "2026-03-05", 10)],
+                (_trade("AAA", "2026-03-03", MARKET_TREND_BREAK, 10),),
+                SESSIONS,
+                MAX_HOLD,
+            )
+
+    def test_exactly_one_session_is_the_only_normal_delay(self):
+        """`delay == 1`만 정상이고 `delay > 1`은 전부 untradeable 지연이다."""
+        for delay, normal, delayed in ((1, 1, 0), (2, 0, 1), (5, 0, 1)):
+            with self.subTest(delay=delay):
+                got = mechanism(
+                    [_event("AAA", "2026-03-05", 10)],
+                    (_trade("AAA", SESSIONS[SESSIONS.index("2026-03-05") + delay],
+                            MARKET_TREND_BREAK, 10),),
+                    SESSIONS,
+                    MAX_HOLD,
+                )
+                self.assertEqual(got["outcomes"]["normal_fills"], normal)
+                self.assertEqual(
+                    got["outcomes"]["untradeable_delayed_fills"], delayed
+                )
+                self.assertEqual(got["signal_to_fill_delay"]["min"], delay)
+
     def test_an_unexpected_reason_stops_instead_of_lying(self):
         """사전등록이 outcome을 넷만 열어 뒀다. 다섯째는 조용히 넘어가지 않는다."""
         with self.assertRaises(AssertionError):
@@ -586,9 +627,10 @@ class LabelTest(unittest.TestCase):
                 )
 
     def test_the_gate_alone_never_promotes(self):
-        """**`CURRENT_ECONOMIC_GATE_PASS`는 단독 승격 사유가 아니다**(§9.1).
+        """**§9.1의 경제 최소조건 flag은 단독 승격 사유가 아니다.**
 
-        게이트를 통과했는데 `ΔS ≤ 0`이면 그것은 control이 이미 하던 일이다.
+        통과했는데 `ΔS ≤ 0`이면 그것은 control이 이미 하던 일이다. 그리고 그 flag은
+        **최종 전략 합격 판정도 아니다**(`EconomicMinimumsTest` 참고).
         """
         for ds, dg in ((-0.05, 0.02), (0.05, -0.02), (-0.05, -0.02), (0.0, 0.0)):
             with self.subTest(deltas=(ds, dg)):
@@ -699,6 +741,40 @@ class RiskDirectionTest(unittest.TestCase):
             set(risk_directions(control, other)),
             {"sharpe_up", "max_drawdown_down", "sortino_up", "calmar_up"},
         )
+
+
+class EconomicMinimumsTest(unittest.TestCase):
+    """**§9.1의 flag은 numeric subset이지 최종 전략 합격 판정이 아니다.**
+
+    로드맵 §4의 최종 합격선에는 **random ranking 대비 우위**와 **ZERO 시나리오에서
+    구조적 붕괴 없음**도 있는데 `final_gate`는 그 둘을 재지 않는다. 이름이 그것까지
+    포함한다고 읽히면 보고서가 못 잰 것을 잰 것처럼 말하게 된다.
+    """
+
+    def test_the_flag_is_named_as_a_subset(self):
+        self.assertEqual(ECONOMIC_MINIMUMS_FLAG, "CURRENT_ECONOMIC_MINIMUMS_PASS")
+
+    def test_it_measures_exactly_the_six_numeric_rows(self):
+        self.assertEqual(
+            [name for name, _, _ in FINAL_GATE_MINIMUMS],
+            ["gap", "total_return", "expectancy_r", "profit_factor", "sharpe",
+             "max_drawdown"],
+        )
+
+    def test_random_and_zero_robustness_are_not_in_it(self):
+        """이 러너는 무작위 대조군도 ZERO 붕괴 여부도 게이트로 재지 않는다."""
+        names = {name for name, _, _ in FINAL_GATE_MINIMUMS}
+        self.assertNotIn("random", names)
+        self.assertNotIn("zero", names)
+
+    def test_the_report_does_not_call_it_the_final_gate(self):
+        """사전등록 이름은 정정 문구에서만 인용하고 **보고서 표기로 쓰지 않는다.**"""
+        source = (TRADING_ROOT / "selftest" / "signal_invalidation_run.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("최종 경제 게이트와 같은 값", source)
+        self.assertNotIn("최종 전략 자격", source)
+        self.assertNotIn("CURRENT_ECONOMIC_GATE_PASS", ECONOMIC_MINIMUMS_FLAG)
 
 
 class ScopeTest(unittest.TestCase):
