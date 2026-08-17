@@ -274,3 +274,32 @@ test('a second account for the same provider is refused with a readable reason',
   void gmail;
   db.close();
 });
+
+test('re-enabling an account retries now instead of waiting out the old schedule', () => {
+  const { db, store, clock } = createStore(1000);
+  const account = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+
+  store.markAccountError(account.id, {
+    status: 'auth_required', errorCode: 'MAIL_AUTH_REQUIRED', nextSyncAt: 1300,
+  }, 1000);
+  assert.equal(store.claimAuthAlert(account.id, 1000), true);
+
+  clock.value = 1100;
+  store.setAccountStatus(account.id, 'active');
+
+  const reenabled = store.getAccount(account.id);
+  // 자격증명을 고치고 되살렸는데 옛 일정 때문에 몇 분을 더 기다리면, 고쳐진 건지
+  // 아직 깨진 건지 사람이 알 수 없다. 지금 다시 시도한다.
+  assert.equal(reenabled.status, 'active');
+  assert.equal(reenabled.nextSyncAt, 1100);
+  assert.deepEqual(store.listDueAccounts(1100).map(a => a.id), [account.id]);
+
+  // 지난 실패의 흔적도 함께 지운다. 남겨두면 성공할 때까지 화면이 옛 오류를 보여준다.
+  assert.equal(reenabled.lastErrorCode, null);
+  assert.equal(reenabled.authAlertSentAt, null);
+
+  // 끄는 방향은 일정을 건드리지 않는다. 다시 켤 때 판단하면 된다.
+  store.setAccountStatus(account.id, 'disabled');
+  assert.equal(store.getAccount(account.id).nextSyncAt, 1100);
+  db.close();
+});
