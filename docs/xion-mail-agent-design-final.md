@@ -600,15 +600,65 @@ imap_last_uid
 ```text
 IMAP connect → EXAMINE(read-only) → BODY.PEEK
  ↓
-현재 UIDVALIDITY 확인
+리셋 신호 확인 (아래)
  ↓
-저장값과 동일한가
+정상인가
  ├─ YES → imap_last_uid 이후 UID fetch
  └─ NO  → 최근 안전 구간 resync (identity dedup이 중복을 막는다)
-          + 새 UIDVALIDITY / last_uid 커밋
+          + 새 커서 커밋
 ```
 
 Gmail과 동일하게, **저장이 끝난 뒤에만** `imap_last_uid`를 전진시킨다.
+
+### `UIDVALIDITY`를 리셋 감지에 쓸 수 없다 (2026-08-17 실계정 실측)
+
+**네이버는 `UIDVALIDITY`를 `0`으로 보낸다.** RFC 3501은 이 값을 0이 아닌 32비트 정수로 요구하지만 실제 응답은 0이고, 5회 반복 접속에서 모두 같았다. ImapFlow는 서버가 이 응답 코드를 보내지 않으면 필드를 설정하지 않으므로(기본값을 만들지 않는다) 이 `0`은 **서버가 실제로 보낸 값**이다.
+
+결과는 하나다. **`저장값 != 현재값`으로 재번호를 감지하는 경로가 네이버에서는 영원히 발동하지 않는다.** 항상 `0 == 0`이다.
+
+그래서 리셋 신호를 다른 것으로 잡는다.
+
+```text
+1. uidNext 역행     현재 uidNext <= 저장된 imap_last_uid  → 번호가 되감겼다
+2. UIDVALIDITY 변화 0이 아닌 값으로 바뀌면 그때는 표준대로 판정한다
+3. 최종 방어선      identity_key dedup — 무엇을 놓쳐도 중복 저장은 일어나지 않는다
+```
+
+**3번이 실제 안전장치다.** 1·2는 불필요한 재수집을 줄이는 최적화일 뿐이고, 재번호를 못 알아채도 최악의 결과는 "이미 저장한 메일을 다시 읽어 identity로 버린다"이지 중복 알림이 아니다. 7절에서 locator와 identity를 가른 결정이 여기서 값을 한다 — **UID를 dedup 키로 썼다면 네이버에서는 이 상황을 감지할 방법 자체가 없었다.**
+
+`mail_sync_state.imap_uid_validity`는 그대로 저장한다(현재는 `"0"`). 값이 언젠가 바뀌면 2번이 작동한다.
+
+### 서버 capability — 인증 후에도 동일 (2026-08-17 실측)
+
+인증 후 CAPABILITY가 인증 전 광고와 **같았다.** `IDLE`이 로그인 후에 나타나는 서버들이 있어 열어뒀던 가능성은 닫혔다.
+
+```text
+APPENDLIMIT AUTH=PLAIN CHILDREN ID IMAP4rev1 LIST-EXTENDED
+LITERAL+ MOVE QUOTA SASL-IR SPECIAL-USE UIDPLUS UNSELECT
+
+IDLE X · CONDSTORE X · QRESYNC X · SORT X · THREAD X
+```
+
+폴더 구조도 확인했다. **시스템 폴더는 영문 이름이고 `SPECIAL-USE` 속성이 정상 동작한다.**
+
+```text
+INBOX             \Inbox
+Sent Messages     \Sent      ← 28절에서 이름 추측 없이 찾을 수 있다
+Drafts            \Drafts
+Deleted Messages  \Trash
+그 밖에 사용자 폴더(SNS · 내게쓴메일함 · 청구·결제 · 카페 · 프로모션)는 속성이 없다
+```
+
+### 실측 성능
+
+```text
+로그인            315ms
+헤더 40통 조회    2,390ms
+본문 1통(76KB)    167ms
+연속 접속 5회     376~416ms, 실패 0건 (빈도 제한 징후 없음)
+```
+
+5분마다 `연결 → EXAMINE → fetch → 종료`하는 구조가 비용 면에서 문제없다.
 
 ### 서버 capability 실측 (2026-08-17, 인증 전 광고)
 
@@ -638,7 +688,7 @@ APPENDLIMIT 40MB  메시지 크기 상한의 참고값
 UIDPLUS           UIDNEXT 등 커서 보조
 ```
 
-인증 전 광고이므로 **인증 후 CAPABILITY가 달라질 수 있다.** 특히 `IDLE`은 로그인 후에만 광고하는 서버도 있으므로 실계정 실측에서 다시 확인한다(33.3).
+이 목록은 인증 후에도 동일했다(아래 실측).
 
 ### 연결 방식
 
@@ -1212,6 +1262,8 @@ charset 선언이 없고
 ```
 
 `multipart/*`는 파트별로 판단해야 하므로 이 보정에서 제외한다. fixture 8개 전수에서 **오탐 0건**이었다(정상 UTF-8 · multipart · charset 선언 있는 메일은 건드리지 않음). 한국어 메일 환경에서만 의미 있는 좁은 규칙이며, 여기서 문자셋 자동 감지 라이브러리를 도입하지 않는다.
+
+**이 규칙이 실제로 얼마나 자주 걸리는지는 아직 모른다.** 실계정 최근 40통에서 단일 파트 12통은 `utf-8` 11 · `iso-8859-1` 1이었고 **charset 미선언은 0건, EUC-KR도 0건**이었다. 나머지 28통은 multipart라 최상위에 charset이 없는 것이 정상이고 실제 charset은 자식 파트에 있는데 **그 층은 재지 않았다.** 그러므로 이 표본은 "보정이 불필요하다"를 뜻하지 않고 "빈도를 아직 재지 않았다"를 뜻한다. 규칙 자체는 10줄이고 오탐이 없으므로 유지하되, **빈도를 근거로 중요성을 주장하지 않는다.**
 
 ## 10.2 출력
 
@@ -2158,7 +2210,9 @@ Notification card
 4. cursor commit 전에 실패 주입 → replay 후 중복 0건
 5. Gmail startHistoryId invalid/404 → safe resync, 중복 0건
 6. Naver 신규 메일 감지
-7. Naver UIDVALIDITY 변경 → resync → 기존 메일 중복 생성 0건
+7. Naver 커서 리셋 → resync → 기존 메일 중복 생성 0건.
+   **실제 서버로는 재현할 수 없다** — 네이버가 `UIDVALIDITY`를 항상 `0`으로 주기 때문이다(6.2).
+   저장된 `imap_last_uid`를 `uidNext`보다 크게 만들어 역행 신호를 주입하는 방식으로 검증한다.
 8. 메일 수신 → 폰에서 먼저 읽음 → 다음 sync에서도 감지
 9. 서버 재시작 후 중복 처리 없음
 10. poll을 동시에 두 번 호출 → overlap 방지
@@ -2391,6 +2445,8 @@ Naver   표준 thread id 없음 → v1은 메시지 단위 유지
 
 단, 이 기능 때문에 Phase 1 구현을 복잡하게 만들지 않는다. v1에서는 `mail_attention.thread_ref` 자리를 만들어 두는 것까지만 하고, 그 값을 읽어 동작을 바꾸는 로직은 Phase 4에서 넣는다.
 
+**네이버 쪽 재료가 생각보다 얇다.** 실계정 최근 40통에서 `References` 헤더를 가진 메일이 **0/40**이었다(6.2 실측). 서버가 `THREAD` 확장도 주지 않으므로 네이버에서 스레드를 묶을 근거가 사실상 없다. 다만 이 표본은 공지·광고성 메일에 치우쳐 있어 사람이 주고받는 메일이 적었을 수 있으므로, **"네이버는 스레드를 못 묶는다"로 단정하지 않고** Phase 4에서 실제 대화형 메일로 다시 본다.
+
 ---
 
 # 28. 내가 답장하면 Attention 자동 완료 — 후속
@@ -2404,6 +2460,8 @@ Phase 3~4에서 SENT 관찰 경로를 **별도로** 추가해:
 - 해당 Attention이 응답 대기 성격이면
 → 자동 DONE 후보
 ```
+
+네이버 쪽 보낸메일함은 **이름이 아니라 `SPECIAL-USE` 속성으로 찾는다.** 실측에서 경로가 한글이 아니라 `"Sent Messages"`였고 속성이 `\Sent`로 정상이었다(6.2). 이름을 하드코딩하면 계정 언어 설정이나 네이버 UI 변경에 그대로 깨진다.
 
 메일 외부 상태를 수정하지 않으므로 안전한 발전 방향이다. 단 이 경로를 열면 6.1의 SENT 제외 계약에 예외가 생기는 것이므로, **분석 파이프라인이 아니라 Attention 해소 전용 관찰 경로**로 분리해서 넣는다.
 
@@ -2566,7 +2624,9 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 18. **OAuth 클라이언트 유형 = 웹 애플리케이션.** 데스크톱 앱은 리디렉션 URI를 지정할 수 없어 토큰 수명 검증이 불가능하고, 운영에도 서버 콜백이 필요하다.
 19. **토큰 갱신 계약.** access token 3600초 만료를 전제로 선제 갱신·single-flight를 정하고, **`invalid_grant`를 재시도 금지 + `auth_required` 전환**으로 갈랐다. 이것을 네트워크 오류처럼 다루면 인증 문제가 사용자에게 영영 안 보인다.
 20. **Naver 메일함 보호를 두 겹으로.** `BODY.PEEK` 하나에 의존하던 것을 **`EXAMINE`(read-only) 열기 + PEEK**로 바꿨다. 구조가 1차 방어라 PEEK를 빠뜨린 fetch 한 줄이 사고가 되지 않는다.
-21. **Naver capability 실측 반영.** `IDLE`·`CONDSTORE`·`SORT`/`THREAD`가 없음을 확인해, "IDLE 제외"와 "UID 커서"가 우리 선호가 아니라 서버 제약임을 명시했다.
+21. **Naver capability 실측 반영.** `IDLE`·`CONDSTORE`·`SORT`/`THREAD`가 없음을 확인해, "IDLE 제외"와 "UID 커서"가 우리 선호가 아니라 서버 제약임을 명시했다. 인증 후에도 같았다.
+22. **`UIDVALIDITY` 리셋 감지 경로를 교체했다.** 네이버가 `0`을 보내 표준 비교가 영영 발동하지 않는 것을 실측으로 확인하고, `uidNext` 역행 신호 + identity dedup 최종 방어선으로 바꿨다. **7절에서 locator와 identity를 가른 결정이 없었다면 이 상황은 감지할 방법이 없었다.**
+23. **`EXAMINE` + `BODY.PEEK`가 실제로 안전함을 확인했다.** 안읽은 메일 76KB를 받고도 플래그가 `[]` 그대로였다.
 
 ## 33.2 의도적으로 후속 Phase에 남긴 것
 
@@ -2585,7 +2645,7 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 
 1. **[확인됨 — 착수 조건 아님] Gmail OAuth.** 게시·인증 면제·7일 조항의 적용 범위가 모두 정리됐다(20.1). 8일 이후 refresh 한 번은 비용 0의 확인으로 남기되 **MAIL-1 착수를 여기에 걸지 않는다.** 실패할 경우에만 20.1 fallback 3번이 열린다.
 2. **Gmail `users.history.list`의 `labelId` 필터 동작.** 라벨 필터가 `messageAdded` 기록을 정확히 INBOX로 좁히는지, fetch 후 라벨 재확인이 여전히 필요한지 실제 응답으로 확인한다(현재 설계는 두 겹 모두 유지).
-3. **[일부 확인] Naver IMAP.** 인증 전 CAPABILITY·TLS는 실측했다(6.2). 남은 것은 실계정으로만 볼 수 있는 것들이다 — **인증 후 CAPABILITY에 `IDLE`이 나타나는지**, 연속 로그인이 빈도 제한에 걸리는지, `EXAMINE` + `BODY.PEEK`가 실제로 `\Seen`을 안 바꾸는지, 최근 메일의 `Message-ID` 보유율(identity fallback 빈도)과 charset 분포(10.1 보정 규칙의 실제 적용 빈도), 폴더의 `SPECIAL-USE` 속성. 측정 스크립트는 준비돼 있고 자격증명은 사용자 터미널에서만 다룬다.
+3. **[확인됨] Naver IMAP.** CAPABILITY(인증 전·후 동일) · TLS · 폴더 `SPECIAL-USE` · `UIDVALIDITY=0` · `EXAMINE`+`PEEK` 무변경 · 연속 접속 5회 무제한 · 성능을 모두 실측했다(6.2). 최근 40통에서 `Message-ID` 보유율은 **40/40**이라 fingerprint fallback은 드물게만 쓰인다(그래도 유지한다 — 0건이 아니라 이 표본에서 0건이다). **남은 것은 multipart 자식 파트의 charset 분포뿐**이고(10.1) 이것은 파서 선택이나 착수를 막지 않는다.
 4. **실제 메일로 파서 재확인.** 파서 선택은 끝났지만(10.1) 대조에 쓴 것은 합성 fixture다. 실계정의 진짜 메일 — 특히 네이버 발송 메일과 한국 기업 뉴스레터 — 에서 charset·본문 정제 결과를 다시 본다. **여기서 문제가 나와도 파서를 다시 고르는 것이 아니라 전처리를 고친다.**
 5. **Gmail auth client 선택.** 전체 Google API framework 도입 대신 최소 OAuth client로 충분한지 bundle/코드량으로 비교한다.
 6. **구현 시작 시점의 `LATEST_SCHEMA_VERSION`.** 2026-08-17 기준 18이며, 그 사이 다른 기능이 migration을 추가했을 수 있으므로 반드시 다시 확인하고 다음 version을 쓴다.
