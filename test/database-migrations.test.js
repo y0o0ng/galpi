@@ -78,7 +78,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
@@ -86,7 +86,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
       { version: 13 }, { version: 14 }, { version: 15 }, { version: 16 },
-      { version: 17 }, { version: 18 },
+      { version: 17 }, { version: 18 }, { version: 19 },
     ],
   );
 
@@ -567,5 +567,80 @@ test('topic chunk store hashes new content, excludes source_missing, and restore
     indexStatus: 'ready',
     embedding: null,
   });
+  db.close();
+});
+
+test('schema v19 makes identity the only dedup key and keeps locators separate', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+
+  const accountId = db.prepare(`
+    INSERT INTO mail_accounts (provider, address) VALUES ('naver', 'me@naver.com')
+  `).run().lastInsertRowid;
+
+  // 켜짐/꺼짐의 정본은 status 하나다. enabled 열이 따로 생기면 안 된다.
+  const accountColumns = db.prepare('PRAGMA table_info(mail_accounts)').all().map(c => c.name);
+  assert.equal(accountColumns.includes('enabled'), false);
+
+  const insertMessage = db.prepare(`
+    INSERT INTO mail_messages (
+      account_id, provider, identity_kind, identity_key,
+      imap_uid_validity, imap_uid, received_at
+    ) VALUES (?, 'naver', ?, ?, ?, ?, 1786949400)
+  `);
+  insertMessage.run(accountId, 'rfc_message_id', '<a@example.com>', '0', 101);
+
+  // 같은 메일을 다시 만나면 UID가 달라도 identity로 막힌다. 네이버는 UIDVALIDITY가
+  // 늘 '0'이라 재번호를 감지할 수 없으므로 이 제약이 유일한 방어선이다.
+  assert.throws(
+    () => insertMessage.run(accountId, 'rfc_message_id', '<a@example.com>', '0', 55001),
+    /UNIQUE/,
+  );
+
+  // 반대로 UID가 같아도 identity가 다르면 별개 메일이다. UID는 dedup 키가 아니다.
+  insertMessage.run(accountId, 'fingerprint', 'f'.repeat(64), '0', 101);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_messages').get().n, 2);
+
+  // 기한은 종류마다 채우는 열이 다르다. 날짜만 있는데 시각을 만들어내면 거부된다.
+  const insertDeadline = db.prepare(`
+    INSERT INTO mail_messages (
+      account_id, provider, identity_kind, identity_key, received_at,
+      deadline_kind, deadline_date, deadline_at
+    ) VALUES (?, 'gmail', 'gmail_message', ?, 1786949400, ?, ?, ?)
+  `);
+  insertDeadline.run(accountId, 'g1', 'date', '2026-08-19', null);
+  assert.throws(() => insertDeadline.run(accountId, 'g2', 'date', '2026-08-19', 1786949400), /CHECK/);
+  assert.throws(() => insertDeadline.run(accountId, 'g3', 'none', '2026-08-19', null), /CHECK/);
+  assert.throws(() => insertDeadline.run(accountId, 'g4', 'datetime', '2026-08-19', 1786949400), /CHECK/);
+
+  // analyzing인데 lease가 없으면 회수할 수 없는 좌초 행이 된다. 그 조합을 막는다.
+  const messageId = db.prepare('SELECT id FROM mail_messages LIMIT 1').get().id;
+  assert.throws(
+    () => db.prepare('UPDATE mail_messages SET analysis_state = ? WHERE id = ?').run('analyzing', messageId),
+    /CHECK/,
+  );
+  db.prepare(`
+    UPDATE mail_messages SET analysis_state = 'analyzing', analysis_lease_until = 1786949460 WHERE id = ?
+  `).run(messageId);
+
+  // 메시지 행에는 전달 상태 열이 없다. 기기별 상태는 mail_push_deliveries가 든다.
+  const messageColumns = db.prepare('PRAGMA table_info(mail_messages)').all().map(c => c.name);
+  assert.equal(messageColumns.includes('push_status'), false);
+  assert.equal(messageColumns.includes('next_push_attempt_at'), false);
+
+  // snooze 재알림은 notify_seq로 갈린다. 같은 회차만 중복이 막힌다.
+  const subscriptionId = db.prepare(`
+    INSERT INTO assistant_push_subscriptions (endpoint, p256dh, auth)
+    VALUES ('https://web.push.apple.com/x', 'p', 'a')
+  `).run().lastInsertRowid;
+  const insertDelivery = db.prepare(`
+    INSERT INTO mail_push_deliveries (
+      target_kind, target_id, notify_seq, subscription_id, next_attempt_at, expires_at
+    ) VALUES ('attention', 1, ?, ?, 1786949400, 1787035800)
+  `);
+  insertDelivery.run(1, subscriptionId);
+  assert.throws(() => insertDelivery.run(1, subscriptionId), /UNIQUE/);
+  insertDelivery.run(2, subscriptionId);
+
   db.close();
 });
