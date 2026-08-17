@@ -584,9 +584,9 @@ test('schema v19 makes identity the only dedup key and keeps locators separate',
 
   const insertMessage = db.prepare(`
     INSERT INTO mail_messages (
-      account_id, provider, identity_kind, identity_key,
+      account_id, identity_kind, identity_key,
       imap_uid_validity, imap_uid, received_at
-    ) VALUES (?, 'naver', ?, ?, ?, ?, 1786949400)
+    ) VALUES (?, ?, ?, ?, ?, 1786949400)
   `);
   insertMessage.run(accountId, 'rfc_message_id', '<a@example.com>', '0', 101);
 
@@ -601,12 +601,18 @@ test('schema v19 makes identity the only dedup key and keeps locators separate',
   insertMessage.run(accountId, 'fingerprint', 'f'.repeat(64), '0', 101);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_messages').get().n, 2);
 
+  const messageColumns = db.prepare('PRAGMA table_info(mail_messages)').all().map(c => c.name);
+
   // 기한은 종류마다 채우는 열이 다르다. 날짜만 있는데 시각을 만들어내면 거부된다.
+  // provider 열이 없다. 계정이 이미 정하고 있어서 여기에 또 두면 네이버 계정에
+  // gmail 메시지가 들어간 행을 DB가 막을 수 없다.
+  assert.equal(messageColumns.includes('provider'), false);
+
   const insertDeadline = db.prepare(`
     INSERT INTO mail_messages (
-      account_id, provider, identity_kind, identity_key, received_at,
+      account_id, identity_kind, identity_key, received_at,
       deadline_kind, deadline_date, deadline_at
-    ) VALUES (?, 'gmail', 'gmail_message', ?, 1786949400, ?, ?, ?)
+    ) VALUES (?, 'gmail_message', ?, 1786949400, ?, ?, ?)
   `);
   insertDeadline.run(accountId, 'g1', 'date', '2026-08-19', null);
   assert.throws(() => insertDeadline.run(accountId, 'g2', 'date', '2026-08-19', 1786949400), /CHECK/);
@@ -624,7 +630,6 @@ test('schema v19 makes identity the only dedup key and keeps locators separate',
   `).run(messageId);
 
   // 메시지 행에는 전달 상태 열이 없다. 기기별 상태는 mail_push_deliveries가 든다.
-  const messageColumns = db.prepare('PRAGMA table_info(mail_messages)').all().map(c => c.name);
   assert.equal(messageColumns.includes('push_status'), false);
   assert.equal(messageColumns.includes('next_push_attempt_at'), false);
 

@@ -9,6 +9,9 @@ const { createMailStore } = require('../lib/mail/store');
 
 function createDatabase() {
   const db = new Database(':memory:');
+  // 운영은 server.js에서 foreign_keys를 켜고 실패하면 기동을 거부한다. 테스트가
+  // 그것 없이 돌면 운영이 거부하는 행을 통과시킨다.
+  db.pragma('foreign_keys = ON');
   db.exec(`
     CREATE TABLE messages (
       id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL,
@@ -70,13 +73,12 @@ test('registering an account is idempotent and creates its cursor row', () => {
   db.close();
 });
 
-test('the same message arriving twice is stored once even when its UID changed', () => {
+test('rediscovering a message keeps one row but moves its locator to the current UID', () => {
   const { db, store } = createStore();
   const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
 
   const base = {
     accountId: account.id,
-    provider: 'naver',
     identityKind: 'rfc_message_id',
     identityKey: '<interview@aitrainer.example.com>',
     imapUidValidity: '0',
@@ -87,12 +89,13 @@ test('the same message arriving twice is stored once even when its UID changed',
   const first = store.saveMessage({ ...base, imapUid: 16575 });
   assert.equal(first.inserted, true);
 
-  // UIDVALIDITY가 늘 '0'인 네이버에서는 재번호를 감지할 수 없다. 그래도 identity가
-  // 같으면 같은 메일이므로 두 번째 저장은 조용히 무시된다 — replay가 안전한 이유다.
+  // 재번호 뒤 resync에서 같은 메일을 새 UID로 다시 만난 상황이다. 행은 하나로 유지하되
+  // locator는 지금 좌표로 옮겨야 한다 — 옛 UID를 들고 있으면 나중에 본문을 다시 읽는
+  // 재분석·원문 열기가 사라진 좌표를 찾아가 조용히 실패한다.
   const replay = store.saveMessage({ ...base, imapUid: 42 });
   assert.equal(replay.inserted, false);
   assert.equal(replay.message.id, first.message.id);
-  assert.equal(replay.message.imapUid, 16575, 'locator는 최초 저장값을 유지한다');
+  assert.equal(replay.message.imapUid, 42, 'locator는 현재 UID로 갱신된다');
   assert.equal(store.countMessages(account.id), 1);
 
   // 반대로 UID가 같아도 identity가 다르면 다른 메일이다.
@@ -104,16 +107,71 @@ test('the same message arriving twice is stored once even when its UID changed',
   db.close();
 });
 
+test('rediscovery refreshes the locator without reopening judgement state', () => {
+  const { db, store } = createStore();
+  const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+
+  const base = {
+    accountId: account.id,
+    identityKind: 'rfc_message_id',
+    identityKey: '<notice@korea.ac.kr>',
+    imapUidValidity: '0',
+    receivedAt: 1786949400,
+  };
+  const saved = store.saveMessage({ ...base, imapUid: 100, isBaseline: true });
+  assert.equal(saved.message.analysisState, 'skipped');
+
+  // 최초 연결에서 baseline으로 들어온 과거 메일이 resync에서 다시 잡혔다.
+  // locator만 움직이고 분석 큐로는 올라오지 않아야 한다 — 올라오면 몇 달 치 과거
+  // 메일이 재번호 한 번에 전부 알림이 된다.
+  const again = store.saveMessage({ ...base, imapUid: 777, isBaseline: false });
+  assert.equal(again.inserted, false);
+  assert.equal(again.message.imapUid, 777);
+  assert.equal(again.message.isBaseline, 1, 'baseline 표시는 유지된다');
+  assert.equal(again.message.analysisState, 'skipped', '분석 큐로 승격되지 않는다');
+  db.close();
+});
+
+test('a message belongs to whatever provider its account has', () => {
+  const { db, store } = createStore();
+  const naver = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  const gmail = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+
+  // provider는 계정이 정한다. 메시지가 따로 들고 있으면 둘이 어긋난 행을 만들 수 있고
+  // DB는 그걸 막을 방법이 없다 — mail_accounts.enabled를 두지 않은 것과 같은 이유다.
+  const columns = db.prepare('PRAGMA table_info(mail_messages)').all().map(c => c.name);
+  assert.equal(columns.includes('provider'), false);
+
+  const saved = store.saveMessage({
+    accountId: naver.id, identityKind: 'rfc_message_id',
+    identityKey: '<a@example.com>', imapUid: 1, receivedAt: 1786949400,
+  });
+  assert.equal(saved.message.provider, 'naver');
+
+  const other = store.saveMessage({
+    accountId: gmail.id, identityKind: 'gmail_message',
+    identityKey: 'g1', gmailMessageId: 'g1', receivedAt: 1786949400,
+  });
+  assert.equal(other.message.provider, 'gmail');
+
+  // 없는 계정으로는 저장할 수 없다. 운영과 같은 foreign_keys 설정에서 확인한다.
+  assert.throws(() => store.saveMessage({
+    accountId: 9999, identityKind: 'gmail_message',
+    identityKey: 'ghost', receivedAt: 1786949400,
+  }), /FOREIGN KEY/);
+  db.close();
+});
+
 test('baseline messages land outside the analysis queue', () => {
   const { db, store } = createStore();
   const account = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
 
   const old = store.saveMessage({
-    accountId: account.id, provider: 'gmail', identityKind: 'gmail_message',
+    accountId: account.id, identityKind: 'gmail_message',
     identityKey: 'g-old', gmailMessageId: 'g-old', receivedAt: 1786000000, isBaseline: true,
   });
   const fresh = store.saveMessage({
-    accountId: account.id, provider: 'gmail', identityKind: 'gmail_message',
+    accountId: account.id, identityKind: 'gmail_message',
     identityKey: 'g-new', gmailMessageId: 'g-new', receivedAt: 1786949400,
   });
 
@@ -135,7 +193,7 @@ test('cursors move only when asked and keep the raw UIDVALIDITY naver sends', ()
   const naver = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
 
   store.saveMessage({
-    accountId: gmail.id, provider: 'gmail', identityKind: 'gmail_message',
+    accountId: gmail.id, identityKind: 'gmail_message',
     identityKey: 'g1', gmailMessageId: 'g1', receivedAt: 1786949400,
   });
   // 저장만으로는 커서가 움직이지 않는다. 커서는 "여기까지 확실히 저장했다"는 뜻이라

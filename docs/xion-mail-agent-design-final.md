@@ -721,8 +721,7 @@ Provider별 메시지를 공통 구조로 정규화한다.
 
 ```js
 {
-  provider: "gmail",           // 'gmail' | 'naver'
-  accountId: 1,
+  accountId: 1,                    // provider는 계정이 정한다 (8.3)
 
   identityKind: "gmail_message",   // gmail_message | rfc_message_id | fingerprint
   identityKey: "18f0c1...",        // 계정 안에서 유일
@@ -845,8 +844,8 @@ CREATE TABLE mail_sync_state (
 ```sql
 CREATE TABLE mail_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- provider 열은 두지 않는다 (8.8)
     account_id INTEGER NOT NULL,
-    provider TEXT NOT NULL CHECK (provider IN ('gmail', 'naver')),
 
     identity_kind TEXT NOT NULL
       CHECK (identity_kind IN ('gmail_message', 'rfc_message_id', 'fingerprint')),
@@ -931,7 +930,20 @@ CREATE INDEX idx_mail_messages_thread
 
 **본문 컬럼은 없다.** 원문·본문 텍스트는 저장하지 않고, 재분석이나 원문 열기가 필요하면 `gmail_message_id` 또는 `imap_uid_validity + imap_uid`로 다시 읽는다.
 
+**`provider` 컬럼도 없다.** 계정이 이미 provider를 정하고 있어서 메시지가 따로 들면 같은 사실의 정본이 둘이 되고, 둘이 어긋난 행(네이버 계정에 gmail 메시지)을 DB가 막을 방법이 없다. `mail_accounts.enabled`를 두지 않은 것과 같은 이유다. 필요하면 `account_id`로 조인해 읽는다.
+
 `push_status` / `next_push_attempt_at` 같은 메시지 단위 전달 상태 컬럼은 **두지 않는다**. 전달은 기기별로 갈리므로 메시지 행 하나로 표현할 수 없다(8.6).
+
+### 재발견 시 locator를 갱신한다
+
+같은 identity를 다시 만나면 **행은 하나로 유지하되 locator는 현재 좌표로 옮긴다.**
+
+```text
+갱신함      gmail_message_id · imap_uid_validity · imap_uid · updated_at
+갱신 안 함  identity · is_baseline · analysis_* · category 등 판단 결과 · notification_*
+```
+
+갱신하지 않으면 재번호 뒤 resync에서 행이 **죽은 UID를 계속 들고 있게 되고**, 본문을 다시 읽어야 하는 재분석과 원문 열기가 사라진 좌표를 찾아가 조용히 실패한다. 반대로 판단 상태까지 건드리면 baseline으로 들어온 과거 메일이 재발견 한 번으로 분석 큐에 올라와 **몇 달 치가 전부 알림이 된다.** 그래서 두 묶음을 명확히 가른다.
 
 ### Deadline 계약
 
