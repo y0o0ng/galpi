@@ -372,7 +372,7 @@ def treatment(label: str) -> str:
     return {
         LABEL_PROMOTE_AND_GATE: "**signal exit를 유지한다.** 경제 최소조건 통과와 fixed K42"
         " 대비 marginal 기여가 **함께** 확인됐다.",
-        LABEL_PROMOTE: "**signal exit를 유지한다.** 최종 게이트는 아직 미달이지만 fixed"
+        LABEL_PROMOTE: "**signal exit를 유지한다.** 경제 최소조건은 아직 미달이지만 fixed"
         " K42 대비 marginal 기여가 확인됐고 control이 통과하던 것을 깨지 않았다.",
         LABEL_RISK_ONLY: "**alpha stack에 넣지 않는다.** marginal 조건을 만족하지 못했다."
         " risk-overlay 후보 메모만 남긴다.",
