@@ -501,7 +501,7 @@ V5는 **밖에 나가 일하는 전문 직원**이다 — 외부 데이터 수�
 
 ### 단계 (설계 문서 24절 Phase 1~4와 같다)
 
-- **MAIL-1 — Provider durable sync**: Gmail `historyId`(INBOX 한정) · Naver IMAP UID locator · message identity dedup · cursor 복구 · baseline 억제 · overlap guard. **여기를 통과하기 전에 LLM을 붙이지 않는다.**
+- **MAIL-1 — Provider durable sync** ✅ **실계정 인수 완료(2026-08-17)**: Gmail `historyId`(INBOX 한정) · Naver IMAP UID locator · message identity dedup · cursor 복구 · baseline 억제 · overlap guard. 실계정에서 확인한 것은 폰에서 먼저 읽은 메일의 감지 · baseline 상한(3,564통 중 200통) · 재시작 후 중복 0건 · 읽음 상태 무변경 · Gmail OAuth 갱신 · SENT 제외(커서는 전진하고 저장은 0통)다. **여기를 통과하기 전에 LLM을 붙이지 않는다.**
 - **MAIL-2 — 분석 큐 + Attention**: 정규화 · safety gate · durable 분석 상태(lease·backoff·상한·좌초 복구) · LLM 판단 · provenance · Attention 생성. 고정 fixture 회귀 게이트가 통과 기준이다.
 - **MAIL-3 — 알림 UX**: Immediate/Batch/Silent · quiet hours · snooze 재알림 · 기기별 delivery · 알림 탭 메일 필터 · 잠금화면 미리보기(기본 숨김).
 - **MAIL-4 — 피드백/검색**: sender·domain·category preference · 라우팅 억제 · 메일 검색 · thread 단위 Attention.
@@ -515,12 +515,12 @@ V5는 **밖에 나가 일하는 전문 직원**이다 — 외부 데이터 수�
 
 ### 통과 기준
 
-- [ ] 읽음 여부와 무관하게 새 메일을 잡고, 최초 연결이 과거 메일로 울리지 않는다
-- [ ] cursor 손상·서버 재시작·중복 poll에서 중복 생성 0건, `UIDVALIDITY` 변경 후에도 0건
-- [ ] 분석이 실패해도 좌초하지 않고 사람이 에이전트 탭에서 복구할 수 있다
-- [ ] Push가 전부 실패해도 Attention이 남고, 기기 둘의 성공·재시도가 각각 표현된다
-- [ ] 메일 본문에 심은 가짜 지시문이 tool 호출·외부 행동으로 이어지지 않는다
-- [ ] 미리보기 숨김에서 잠금화면에 발신자·제목 노출 0건
+- [x] 읽음 여부와 무관하게 새 메일을 잡고, 최초 연결이 과거 메일로 울리지 않는다 — **MAIL-1 실계정 인수 2026-08-17**
+- [x] cursor 손상·서버 재시작·중복 poll에서 중복 생성 0건 — 재시작을 끼운 실계정 sync에서 중복 identity 0건. `UIDVALIDITY` 변경은 네이버가 항상 `0`을 주어 실서버로 재현할 수 없고 커서 주입 테스트로 검증했다
+- [ ] 분석이 실패해도 좌초하지 않고 사람이 에이전트 탭에서 복구할 수 있다 — MAIL-2
+- [ ] Push가 전부 실패해도 Attention이 남고, 기기 둘의 성공·재시도가 각각 표현된다 — MAIL-3
+- [ ] 메일 본문에 심은 가짜 지시문이 tool 호출·외부 행동으로 이어지지 않는다 — MAIL-2
+- [ ] 미리보기 숨김에서 잠금화면에 발신자·제목 노출 0건 — MAIL-3
 
 ---
 
