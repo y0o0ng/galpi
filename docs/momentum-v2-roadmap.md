@@ -413,8 +413,25 @@ Barroso·Santa-Clara와 Moreira·Muir의 volatility management 결과가 있지�
 
 ### Phase 6 — 마지막 카드 하나 (PR #20)
 
-여기까지 와도 matched-SPY를 못 넘으면 **J나 K로 돌아가지 않는다.** 딱 하나의 momentum
-quality filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
+여기까지 와도 **§4 전체 경제성 허들을 통과하지 못하면** 마지막 alpha intervention으로
+FIP를 한 번 시험한다. 그때도 **J나 K로 돌아가지 않는다.** 딱 하나의 momentum quality
+filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
+
+> **2026-08-17 contract repair — trigger 문구를 §3과 일치시켰다.** 이 문단의 이전 판은
+> "여기까지 와도 **matched-SPY를 못 넘으면**"이라고 적었는데 그것은 §3·§8의 종료 계약과
+> 어긋난다. **현재 후보는 이미 matched-SPY를 넘었다** — PR #16 이후 `G = +4.99%`다.
+> 그런데 §4의 전체 허들은 아직 통과하지 못했다(**Sharpe 0.46 < 0.60**). 옛 문구를 그대로
+>두면 "matched-SPY를 넘었으니 Phase 6은 안 한다"로 읽혀 **네 번째 alpha 카드가 쓰이지도
+> 않은 채 사라진다.**
+>
+> §3이 정한 것은 **"네 alpha family를 다 써도 경제성 허들을 못 넘으면 종료"**이고, §8의
+> 종료 조건도 `after-cost exposure-matched SPY gap ≤ 0`이 아니라 네 개입 소진을 기준으로
+> 한다. 그래서 trigger를 **§4 전체 허들**로 맞춘다.
+>
+> **이것은 결과를 보고 골대를 옮기는 것이 아니다.** PR #20의 어떤 결과도 계산하기 전에,
+> 서로 모순이던 두 문장을 일치시키는 contract repair다. **허들 값 자체는 하나도 바꾸지
+> 않았다** — `G > 0` · total > 0 · expectancy > 0 · PF ≥ 1.15 · Sharpe ≥ 0.6 · MDD ≤ 15%
+> 그대로다.
 
 현재 RS는 "얼마나 올랐나"를 보고, ID는 **"어떤 경로로 올랐나"**를 본다. Da·Gurun·Warachka는
 같은 누적 momentum이라도 작은 상승이 지속적으로 쌓인 종목이 큰 몇 번의 jump로 오른 종목보다
@@ -425,6 +442,37 @@ quality filter만 허용한다: **Information Discreteness / Frog-in-the-Pan**.
 
 **이것이 마지막 alpha filter다.** 실패하면 `Long-only cross-sectional momentum strategy
 construction = CLOSED`를 선언한다.
+
+> **2026-08-17 결과 — Phase 6 종료. `FIP_SIGNAL_REJECTED`(사전등록 §26의 A).**
+> Stage A HARD 다섯 중 **넷이 PASS이고 D가 FAIL**이라 Stage B를 열지 않았다. 상세는
+> `runs/fip-quality/results.md`.
+>
+> |기준|조건|결과|판정|
+> |---|---|---|---|
+> |A|`NON_BINDING`이 아닐 것|**BINDING** (21.7%)|PASS|
+> |B|`mean(D) > 0`|**+0.055%**|PASS|
+> |C|`median(D) >= 0`|+0.000%|PASS|
+> |D|위상 양수 비율 ≥ 60%|**59.5%** (25/42)|**FAIL**|
+> |E|NDX100 `mean(D) >= 0`|+0.002%|PASS|
+>
+> **ABS와 달리 필터는 실제로 걸렸다** — 3,385일 중 21.7%에서 TOP5 구성이 바뀌었고 후보
+> 교체율이 5.0%다(PR #17은 구성 변경 0일이었다). 그래서 이번 `FAIL`은 "안 걸려서 모른다"가
+> 아니라 **걸렸는데 기여가 문턱에 못 미쳤다**이다.
+>
+> **효과 크기가 작다.** `mean(D) = +0.055%`는 control `+1.188%` 대비 미미하고, NDX100은
+> `+0.002%`로 사실상 0이다. 양수 `D` 날짜가 11.7%뿐인 것은 78%의 날짜에서 TOP5가 아예
+> 바뀌지 않아 `D_t = 0`이기 때문이다.
+>
+> **D가 한 위상 차이로 갈렸다(25/42 = 59.5% vs 최소 60%).** 그래도 문턱을 옮기지 않는다 —
+> 사전등록 문턱을 결과를 본 뒤 고치면 이 로드맵의 계약 전체가 무의미해진다. **다른
+> threshold · window · quality filter를 열지 않는다.**
+>
+> ```
+> momentum alpha intervention 4/4 consumed
+> standalone momentum alpha construction terminated
+> ```
+>
+> **Phase 7로 가지 않는다.**
 
 ### Phase 7 — Reality Hardening (PR #21)
 
@@ -508,10 +556,10 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |—|Candidate ABS **포트폴리오**|—|**NOT OPENED** (#17이 `DO_NOT_PROMOTE`)|
 |18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|**`RISK_ONLY`** — fixed K42 유지|
 |19|Risk semantics|hard stop인가 volatility sizing인가|**`VOLATILITY_SCALED_POSITION`** — fixed K42 유지|
-|20|FIP quality|마지막 momentum quality filter|**다음** (남은 alpha 개입 하나)|
-|21|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
-|22|Robustness|folds/random/cost stress에서 버티는가|—|
-|23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|—|
+|20|FIP quality|마지막 momentum quality filter|**`FIP_SIGNAL_REJECTED`** — Stage A D 미달 · **종료**|
+|21|Reality hardening|비용·실적·delisting·체결을 견디는가|**열지 않음** (§8 종료)|
+|22|Robustness|folds/random/cost stress에서 버티는가|**열지 않음** (§8 종료)|
+|23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|**열지 않음** (§8 종료)|
 |—|Holdout consumption 인프라|`holdout_consumptions` append-only 추적 (§7 C3-3)|전략 freeze 전 별도 PR|
 
 **"조건부"는 앞 단계가 허들을 넘으면 하지 않는다는 뜻이다.** **PR #17이 `DO_NOT_PROMOTE`로 끝나 ABS 포트폴리오 PR을 열지 않았으므로 번호가 밀리지
