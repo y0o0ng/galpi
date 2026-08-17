@@ -207,7 +207,14 @@ Push 전달이 전부 실패해도 Attention은 남는다. **Push 실패가 Atte
 - 보관
 - 삭제
 
-Gmail은 읽기 전용 scope를 사용하고, Naver IMAP에서는 본문을 가져올 때 `BODY.PEEK[]`로 읽어 `\Seen` 플래그가 변경되지 않도록 구현한다.
+Gmail은 읽기 전용 scope를 사용한다. Naver IMAP은 **두 겹으로 막는다.**
+
+```text
+1차 (구조)  메일함을 항상 read-only로 연다 → SELECT가 아니라 EXAMINE
+2차 (명령)  본문은 BODY.PEEK[] 로 읽는다
+```
+
+1차가 본질이다. `EXAMINE`으로 열면 프로토콜 수준에서 영구 상태 변경이 불가능하므로, **PEEK를 빠뜨린 fetch가 한 줄 섞여 들어가도 사용자의 읽음 상태가 바뀌지 않는다.** PEEK만 믿으면 그 한 줄이 곧 사고다. ImapFlow에서는 `getMailboxLock(path, { readOnly: true })`가 `EXAMINE`으로 나간다(2026-08-17 라이브러리 코드 확인).
 
 Mail Agent는 Gmail/Naver 앱과 경쟁하는 메일 클라이언트가 아니라 **옆에서 관찰하는 비서**다.
 
@@ -591,7 +598,7 @@ imap_last_uid
 동작:
 
 ```text
-IMAP connect (BODY.PEEK)
+IMAP connect → EXAMINE(read-only) → BODY.PEEK
  ↓
 현재 UIDVALIDITY 확인
  ↓
@@ -603,9 +610,39 @@ IMAP connect (BODY.PEEK)
 
 Gmail과 동일하게, **저장이 끝난 뒤에만** `imap_last_uid`를 전진시킨다.
 
+### 서버 capability 실측 (2026-08-17, 인증 전 광고)
+
+`imap.naver.com:993`에 붙어 서버가 광고하는 CAPABILITY를 그대로 받았다. TLS 1.3, 인증서 `*.mail.naver.com`(DigiCert).
+
+```text
+IMAP4rev1 LITERAL+ SASL-IR ID CHILDREN UIDPLUS LIST-EXTENDED
+SPECIAL-USE UNSELECT QUOTA MOVE AUTH=PLAIN APPENDLIMIT=41943040
+```
+
+없는 것이 설계에 더 중요하다.
+
+```text
+IDLE 없음                 → 서버 푸시 대기가 불가능하다. 폴링이 유일한 방법이다
+CONDSTORE / QRESYNC 없음  → modseq 기반 증분 동기화가 불가능하다. UID 커서가 유일하다
+SORT / THREAD 없음        → 서버가 스레드를 묶어주지 않는다 (27절의 근거)
+AUTH=PLAIN 뿐            → OAuth 경로가 없다. TLS 위 앱 비밀번호가 유일하다
+```
+
+**"IDLE을 v1 범위에서 뺀다"는 우리가 고른 단순화가 아니라 서버가 주지 않는 기능이다.** 마찬가지로 UID 기반 증분 동기화는 선호가 아니라 유일한 선택지다.
+
+있는 것 중 쓸 자리가 있는 것:
+
+```text
+SPECIAL-USE       보낸메일함을 한글 이름 추측 없이 \Sent 속성으로 찾을 수 있다 (28절)
+APPENDLIMIT 40MB  메시지 크기 상한의 참고값
+UIDPLUS           UIDNEXT 등 커서 보조
+```
+
+인증 전 광고이므로 **인증 후 CAPABILITY가 달라질 수 있다.** 특히 `IDLE`은 로그인 후에만 광고하는 서버도 있으므로 실계정 실측에서 다시 확인한다(33.3).
+
 ### 연결 방식
 
-v1은 매 sync tick마다 `연결 → fetch → 종료`하는 단순 구조로 시작한다. persistent connection과 IMAP `IDLE`은 v1 범위 밖이며, 실제 로그인 제한이나 안정성 문제가 관찰되면 그때 별도로 바꾼다.
+v1은 매 sync tick마다 `연결 → EXAMINE → fetch → 종료`하는 단순 구조로 시작한다. `IDLE`이 광고되지 않으므로 persistent connection의 이점도 작다. 실제 로그인 빈도 제한이나 안정성 문제가 관찰되면 그때 별도로 바꾼다.
 
 ---
 
@@ -1814,6 +1851,27 @@ client secret은 20.3의 credential 경계를 그대로 따른다 — DB·Vault�
 
 2번 검증 방법은 Playground에서 `gmail.readonly` 동의(경고 화면에서 `고급` → `이동`) 후 refresh token을 받아두고, **7~10일 뒤 같은 refresh token으로 갱신이 되는지 확인**하는 것이다. 공식 문서는 7일 만료를 `Testing` 상태에 붙여 설명하지만 서드파티 자료 중에는 인증 상태에 붙인다고 쓴 것도 있어, **실측 전까지 이 문서는 어느 쪽도 단정하지 않는다.**
 
+### 토큰 갱신 계약
+
+access token은 게시 상태와 무관하게 **3600초**로 만료된다(2026-08-17 실계정 확인). 이것은 `Testing`/`In production`을 가르는 값이 아니라 일상적으로 다뤄야 하는 조건이다.
+
+```text
+- access token은 메모리에만 둔다 (20.3)
+- 만료 몇 분 전에 선제 갱신한다. 만료된 뒤 401을 보고 갱신하지 않는다
+- 갱신은 single-flight다 — 30초 worker tick과 5분 sync가 겹쳐도 동시에 여러 번 refresh하지 않는다
+- refresh grant는 보통 새 refresh token을 주지 않는다. 응답에 있을 때만 교체한다
+```
+
+**`invalid_grant`는 재시도하지 않는다.** 이것이 이 절에서 가장 중요한 규칙이다. 네트워크 오류처럼 backoff 재시도로 다루면 Google을 계속 때리면서 **인증 문제를 영영 사용자에게 알리지 않게 된다.** 즉시 계정을 `status='auth_required'`로 바꾸고 18절의 1회성 알림 경로로 보낸다.
+
+```text
+재시도 O    네트워크 오류 · 5xx · 429 · timeout
+재시도 X    invalid_grant · invalid_client · unauthorized_client
+            → status = 'auth_required', auth_alert_sent_at 기록, 해당 계정 sync 중단
+```
+
+다른 계정은 계속 돈다(18절 Provider isolation).
+
 ### publish 이후에도 재인증이 필요해지는 경우
 
 게시에 성공해도 refresh token은 영구하지 않다. 공식 문서가 열거한 무효화 사유 중 우리에게 해당되는 것은 다음이다.
@@ -1989,7 +2047,7 @@ source = 'mail'
 ## 22.4 의존성
 
 ```text
-Naver IMAP   = ImapFlow 같은 검증된 IMAP client 1개
+Naver IMAP   = ImapFlow (1.7.1 기준 패키지 24개 · MIT). `readOnly: true`가 EXAMINE으로 나가는 것을 확인했다
 MIME 파싱    = postal-mime (확정, 의존성 0개 · MIT-0)
 HTML→text    = 자체 구현 (10.1). 별도 라이브러리를 추가하지 않는다
 Gmail        = Gmail REST 호출 + OAuth에 필요한 최소 Google auth client
@@ -2502,6 +2560,9 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 16. **charset 미선언 EUC-KR 보정.** 두 파서 모두 깨지는 것을 확인하고 raw 단계 보정 규칙을 계약했다(오탐 0/8).
 17. **OAuth 게시 계약.** `In production` 게시는 되고 **인증 제출은 하지 않는다**를 공식 문서 인용과 함께 20.1에 고정했다. 게시 상태와 인증 상태를 다른 축으로 갈랐다.
 18. **OAuth 클라이언트 유형 = 웹 애플리케이션.** 데스크톱 앱은 리디렉션 URI를 지정할 수 없어 토큰 수명 검증이 불가능하고, 운영에도 서버 콜백이 필요하다.
+19. **토큰 갱신 계약.** access token 3600초 만료를 전제로 선제 갱신·single-flight를 정하고, **`invalid_grant`를 재시도 금지 + `auth_required` 전환**으로 갈랐다. 이것을 네트워크 오류처럼 다루면 인증 문제가 사용자에게 영영 안 보인다.
+20. **Naver 메일함 보호를 두 겹으로.** `BODY.PEEK` 하나에 의존하던 것을 **`EXAMINE`(read-only) 열기 + PEEK**로 바꿨다. 구조가 1차 방어라 PEEK를 빠뜨린 fetch 한 줄이 사고가 되지 않는다.
+21. **Naver capability 실측 반영.** `IDLE`·`CONDSTORE`·`SORT`/`THREAD`가 없음을 확인해, "IDLE 제외"와 "UID 커서"가 우리 선호가 아니라 서버 제약임을 명시했다.
 
 ## 33.2 의도적으로 후속 Phase에 남긴 것
 
@@ -2520,7 +2581,7 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 
 1. **[진행 중] Gmail refresh token 장기 유지.** `In production` 게시와 인증 면제는 확인됐다(20.1). 남은 것은 **게시 후 새로 받은 refresh token이 7일을 넘겨 갱신되는지**뿐이다. 공식 문서는 7일 만료를 `Testing` 상태에 붙이지만 서드파티 자료 중에는 인증 상태에 붙인다고 쓴 것도 있어, **실측 전까지 어느 쪽도 단정하지 않는다.** 이것이 실패하면 20.1 fallback 3번(Gmail IMAP)이 열린다. **Phase 1(MAIL-1) 착수 전 확인 대상이다.**
 2. **Gmail `users.history.list`의 `labelId` 필터 동작.** 라벨 필터가 `messageAdded` 기록을 정확히 INBOX로 좁히는지, fetch 후 라벨 재확인이 여전히 필요한지 실제 응답으로 확인한다(현재 설계는 두 겹 모두 유지).
-3. **Naver IMAP 접속 정책.** 앱 비밀번호 발급 절차, 동시 접속/로그인 빈도 제한, `UIDVALIDITY` 변경 실제 사례를 확인한다. 5분마다 연결·종료가 제한에 걸리는지 실제로 재본다.
+3. **[일부 확인] Naver IMAP.** 인증 전 CAPABILITY·TLS는 실측했다(6.2). 남은 것은 실계정으로만 볼 수 있는 것들이다 — **인증 후 CAPABILITY에 `IDLE`이 나타나는지**, 연속 로그인이 빈도 제한에 걸리는지, `EXAMINE` + `BODY.PEEK`가 실제로 `\Seen`을 안 바꾸는지, 최근 메일의 `Message-ID` 보유율(identity fallback 빈도)과 charset 분포(10.1 보정 규칙의 실제 적용 빈도), 폴더의 `SPECIAL-USE` 속성. 측정 스크립트는 준비돼 있고 자격증명은 사용자 터미널에서만 다룬다.
 4. **실제 메일로 파서 재확인.** 파서 선택은 끝났지만(10.1) 대조에 쓴 것은 합성 fixture다. 실계정의 진짜 메일 — 특히 네이버 발송 메일과 한국 기업 뉴스레터 — 에서 charset·본문 정제 결과를 다시 본다. **여기서 문제가 나와도 파서를 다시 고르는 것이 아니라 전처리를 고친다.**
 5. **Gmail auth client 선택.** 전체 Google API framework 도입 대신 최소 OAuth client로 충분한지 bundle/코드량으로 비교한다.
 6. **구현 시작 시점의 `LATEST_SCHEMA_VERSION`.** 2026-08-17 기준 18이며, 그 사이 다른 기능이 migration을 추가했을 수 있으므로 반드시 다시 확인하고 다음 version을 쓴다.
