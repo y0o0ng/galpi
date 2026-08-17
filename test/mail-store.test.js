@@ -303,3 +303,210 @@ test('re-enabling an account retries now instead of waiting out the old schedule
   assert.equal(store.getAccount(account.id).nextSyncAt, 1100);
   db.close();
 });
+
+// ── 분석 큐 (설계 9.2) ────────────────────────────────────────────────────────
+
+function seedMessage(store, account, overrides = {}) {
+  return store.saveMessage({
+    accountId: account.id,
+    identityKind: 'rfc_message_id',
+    identityKey: `<${overrides.key || 'a'}@example.com>`,
+    imapUid: 100,
+    imapUidValidity: '0',
+    receivedAt: 1786949400,
+    subject: '면접 일정',
+    ...overrides,
+  }).message;
+}
+
+test('a claim is atomic, so two overlapping workers never take the same mail', () => {
+  const { db, store, clock } = createStore();
+  const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  seedMessage(store, account, { key: 'one' });
+
+  const first = store.claimAnalysisJobs(clock.value, { limit: 5 });
+  const second = store.claimAnalysisJobs(clock.value, { limit: 5 });
+
+  assert.equal(first.length, 1);
+  assert.equal(second.length, 0);
+  assert.equal(first[0].attemptCount, 1);
+  assert.equal(first[0].leaseUntil, clock.value + 180);
+  assert.equal(first[0].provider, 'naver');
+  assert.equal(first[0].imapUid, 100);
+  db.close();
+});
+
+test('a worker killed mid-analysis loses its lease and the mail comes back', () => {
+  const { db, store, clock } = createStore();
+  const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  seedMessage(store, account, { key: 'crash' });
+
+  const [claimed] = store.claimAnalysisJobs(clock.value, { leaseSeconds: 60 });
+  assert.equal(store.analysisSummary().analyzing, 1);
+
+  // 여기서 프로세스가 죽었다고 친다. lease가 끝나기 전에는 아무도 못 집는다.
+  clock.value += 59;
+  assert.equal(store.claimAnalysisJobs(clock.value).length, 0);
+
+  clock.value += 2;
+  const [again] = store.claimAnalysisJobs(clock.value);
+  assert.equal(again.id, claimed.id);
+  assert.equal(again.attemptCount, 2);
+
+  // 회수된 뒤 늦게 돌아온 옛 worker는 남의 판단을 덮지 못한다.
+  const stale = store.completeAnalysis(claimed.id, {
+    leaseUntil: claimed.leaseUntil, category: 'info', notificationMode: 'silent',
+  }, clock.value);
+  assert.equal(stale.settled, false);
+  assert.equal(store.analysisSummary().analyzing, 1);
+  db.close();
+});
+
+test('retryable failures back off and the cap ends in failed, not in a silent drop', () => {
+  const { db, store, clock } = createStore();
+  const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  const message = seedMessage(store, account, { key: 'flaky' });
+
+  const backoffs = [];
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const [job] = store.claimAnalysisJobs(clock.value);
+    assert.equal(job.attemptCount, attempt);
+    const outcome = store.failAnalysis(job.id, {
+      leaseUntil: job.leaseUntil,
+      errorCode: 'MAIL_LLM_FAILED',
+      attemptCount: job.attemptCount,
+    }, clock.value);
+    assert.equal(outcome.changed, true);
+    if (attempt < 5) {
+      assert.equal(outcome.state, 'pending');
+      backoffs.push(outcome.nextAttemptAt - clock.value);
+      // backoff가 지나기 전에는 후보가 아니다.
+      assert.equal(store.claimAnalysisJobs(clock.value).length, 0);
+      clock.value = outcome.nextAttemptAt;
+    } else {
+      assert.equal(outcome.state, 'failed');
+    }
+  }
+
+  assert.deepEqual(backoffs, [60, 120, 240, 480]);
+  assert.equal(store.analysisSummary().failed, 1);
+
+  // failed는 버린 것이 아니라 사람이 보는 상태다. 되돌리면 시도 횟수도 같이 풀린다.
+  const stranded = store.listStrandedAnalysis();
+  assert.equal(stranded.length, 1);
+  assert.equal(stranded[0].id, message.id);
+  assert.equal(stranded[0].attemptCount, 5);
+  assert.equal(stranded[0].lastError, 'MAIL_LLM_FAILED');
+
+  assert.equal(store.requeueFailedAnalysis(clock.value), 1);
+  const [revived] = store.claimAnalysisJobs(clock.value);
+  assert.equal(revived.id, message.id);
+  assert.equal(revived.attemptCount, 1);
+  db.close();
+});
+
+test('a finished judgement carries its provenance and its attention in one transaction', () => {
+  const { db, store, clock } = createStore();
+  const account = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+  seedMessage(store, account, { key: 'interview', threadId: 't-1' });
+
+  const [job] = store.claimAnalysisJobs(clock.value);
+  const result = store.completeAnalysis(job.id, {
+    leaseUntil: job.leaseUntil,
+    analyzerModel: 'gpt-5.6-luna',
+    analyzerPromptVersion: 'mail-analysis-v1',
+    category: 'action_required',
+    importance: 0.91,
+    summary: '면접 가능 시간 선택 요청',
+    actionText: '8월 19일까지 가능한 면접 시간을 회신해야 함',
+    deadlineKind: 'date',
+    deadlineDate: '2026-08-19',
+    notificationMode: 'immediate',
+    decisionReason: '채용 관련 메일이며 명시된 기한이 존재함',
+    decisionConfidence: 0.92,
+    attentionReason: 'action_required',
+    threadRef: 't-1',
+  }, clock.value);
+
+  assert.equal(result.settled, true);
+  assert.equal(result.attention.reasonKind, 'action_required');
+  assert.equal(result.attention.state, 'open');
+  assert.equal(result.attention.threadRef, 't-1');
+  assert.equal(result.attention.notifySeq, 1);
+
+  const row = db.prepare('SELECT * FROM mail_messages WHERE id = ?').get(job.id);
+  assert.equal(row.analysis_state, 'done');
+  assert.equal(row.analysis_lease_until, null);
+  assert.equal(row.analyzer_model, 'gpt-5.6-luna');
+  assert.equal(row.analyzer_prompt_version, 'mail-analysis-v1');
+  assert.equal(row.analyzed_at, clock.value);
+  // 날짜만 말한 메일에 23:59를 만들어 붙이지 않는다.
+  assert.equal(row.deadline_kind, 'date');
+  assert.equal(row.deadline_date, '2026-08-19');
+  assert.equal(row.deadline_at, null);
+  db.close();
+});
+
+test('a datetime deadline stores an epoch and never a bare date', () => {
+  const { db, store, clock } = createStore();
+  const account = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+  seedMessage(store, account, { key: 'meeting' });
+
+  const [job] = store.claimAnalysisJobs(clock.value);
+  store.completeAnalysis(job.id, {
+    leaseUntil: job.leaseUntil,
+    category: 'important',
+    notificationMode: 'batch',
+    deadlineKind: 'datetime',
+    // 모델이 날짜 문자열을 함께 보내도 datetime 행에는 들어가지 않는다.
+    deadlineDate: '2026-08-19',
+    deadlineAt: 1787184000,
+  }, clock.value);
+
+  const row = db.prepare('SELECT * FROM mail_messages WHERE id = ?').get(job.id);
+  assert.equal(row.deadline_kind, 'datetime');
+  assert.equal(row.deadline_date, null);
+  assert.equal(row.deadline_at, 1787184000);
+  db.close();
+});
+
+test('a category or attention reason the schema does not know is refused before the write', () => {
+  const { db, store, clock } = createStore();
+  const account = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+  seedMessage(store, account, { key: 'bogus' });
+  const [job] = store.claimAnalysisJobs(clock.value);
+
+  assert.throws(
+    () => store.completeAnalysis(job.id, { leaseUntil: job.leaseUntil, category: 'spam' }, clock.value),
+    /category/,
+  );
+  assert.throws(
+    () => store.completeAnalysis(job.id, { leaseUntil: job.leaseUntil, notificationMode: 'shout' }, clock.value),
+    /알림 모드/,
+  );
+  assert.throws(
+    () => store.completeAnalysis(job.id, { leaseUntil: job.leaseUntil, attentionReason: 'because' }, clock.value),
+    /Attention/,
+  );
+  // 거부됐으므로 lease는 그대로다. 다음 정산이 여전히 가능하다.
+  assert.equal(store.analysisSummary().analyzing, 1);
+  db.close();
+});
+
+test('a mail that turned out not to be ours is skipped, not stranded', () => {
+  const { db, store, clock } = createStore();
+  const account = store.registerAccount({ provider: 'gmail', address: 'me@gmail.com' });
+  seedMessage(store, account, { key: 'trashed' });
+
+  const [job] = store.claimAnalysisJobs(clock.value);
+  assert.equal(store.skipAnalysis(job.id, {
+    leaseUntil: job.leaseUntil, errorCode: 'MAIL_MESSAGE_EXCLUDED',
+  }, clock.value), true);
+
+  const summary = store.analysisSummary();
+  assert.equal(summary.skipped, 1);
+  assert.equal(summary.failed, 0);
+  // 되살리기는 failed만 건드린다. 의도적으로 건너뛴 것을 다시 큐에 넣지 않는다.
+  assert.equal(store.requeueFailedAnalysis(clock.value), 0);
+  db.close();
+});

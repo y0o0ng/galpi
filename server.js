@@ -42,6 +42,7 @@ const { readAssistantPushConfig } = require('./lib/assistant-push-config');
 const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createMailStore } = require('./lib/mail/store');
 const { createMailAgent } = require('./lib/mail/agent');
+const { createMailAnalyzer } = require('./lib/mail/analyze');
 const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
@@ -233,6 +234,9 @@ const MAIL_NAVER_CREDENTIALS = {
   user: process.env.NAVER_MAIL_USER,
   pass: process.env.NAVER_MAIL_APP_PASSWORD,
 };
+// 메일 분석은 고빈도 분류라 채팅 모델을 상속하지 않는다. 채팅 자동 모델을 바꿨다고
+// 메일 판단까지 같이 흔들리면 fixture 게이트가 무엇을 재는지 알 수 없게 된다.
+const MAIL_ANALYZER_MODEL = process.env.MAIL_ANALYZER_MODEL || 'gpt-5.6-luna';
 const ATTACHMENTS_ENABLED = process.env.ATTACHMENTS_ENABLED === 'true';
 // 이미지는 매 턴 원본이 통째로 다시 실려 나가므로 문서보다 짧은 창과 턴 예산을 쓴다.
 const ATTACHMENT_IMAGE_REPLAY_TURNS = 3;
@@ -874,16 +878,60 @@ const voiceShortcut = createVoiceShortcutService(db, {
 });
 const mailStore = createMailStore(db);
 // 플래그가 꺼져 있으면 worker도 provider도 만들지 않는다. 표만 비어 있는 상태가 된다.
+// provider는 동기화와 분석이 같은 인스턴스를 쓴다 — Gmail token source를 따로 만들면
+// 토큰을 두 번 갈면서 서로의 만료를 모른다.
+const mailProviders = MAIL_AGENT_ENABLED
+  ? {
+    naver: createNaverProvider(),
+    gmail: createGmailProvider({
+      tokenSource: createGoogleTokenSource({ credentials: MAIL_GMAIL_CREDENTIALS }),
+    }),
+  }
+  : null;
+const mailCredentialsFor = account => (account.provider === 'gmail' ? {} : MAIL_NAVER_CREDENTIALS);
+// 분석은 모델이 있어야 돈다. 키가 없으면 동기화만 하고 메일은 pending으로 쌓인다 —
+// 판단 없이 알림을 내보내는 것보다 낫고, 키가 생기면 쌓인 것부터 그대로 처리된다.
+const mailAnalyzer = MAIL_AGENT_ENABLED && HAS_GPT
+  ? createMailAnalyzer({
+    store: mailStore,
+    providers: mailProviders,
+    credentials: mailCredentialsFor,
+    model: MAIL_ANALYZER_MODEL,
+    // 메일 본문은 신뢰할 수 없는 외부 입력이다. tool을 주지 않고 구조화된 판단만 받는다.
+    callModel: async ({ model, system, input, schema, schemaName }) => {
+      const response = await openai.responses.create({
+        model,
+        input: [
+          { role: 'system', content: system },
+          { role: 'user', content: input },
+        ],
+        store: false,
+        text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } },
+      });
+      if (response?.status && response.status !== 'completed') {
+        const error = new Error(`메일 분석 응답이 완료되지 않았습니다: ${response.status}`);
+        error.code = 'MAIL_ANALYSIS_INCOMPLETE';
+        throw error;
+      }
+      const text = extractSmallResponseText(response);
+      if (!text) {
+        const error = new Error('메일 분석 응답이 비어 있습니다.');
+        error.code = 'MAIL_ANALYSIS_EMPTY';
+        throw error;
+      }
+      return JSON.parse(text);
+    },
+    onError: (error, context) => {
+      console.error(`Mail 분석 오류: message=${context?.mailMessageId ?? '-'} ${error?.code || error?.name || 'UNKNOWN'}`);
+    },
+  })
+  : null;
 const mailAgent = MAIL_AGENT_ENABLED
   ? createMailAgent({
     store: mailStore,
-    providers: {
-      naver: createNaverProvider(),
-      gmail: createGmailProvider({
-        tokenSource: createGoogleTokenSource({ credentials: MAIL_GMAIL_CREDENTIALS }),
-      }),
-    },
-    credentials: account => (account.provider === 'gmail' ? {} : MAIL_NAVER_CREDENTIALS),
+    providers: mailProviders,
+    analyzer: mailAnalyzer,
+    credentials: mailCredentialsFor,
     // 오류 코드만 남긴다. 제목·발신자·주소는 로그에 넣지 않는다(설계 19절).
     onError: (error, account) => {
       console.error(`Mail sync 오류: account=${account?.id ?? '-'} ${error?.code || error?.name || 'UNKNOWN'}`);
@@ -4301,7 +4349,13 @@ registerAssistantTaskRoutes({
   onTaskMutation: () => assistantScheduleNoteProjector.tick(),
 });
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
-registerMailRoutes({ app, store: mailStore, config: { enabled: MAIL_AGENT_ENABLED } });
+registerMailRoutes({
+  app,
+  store: mailStore,
+  config: { enabled: MAIL_AGENT_ENABLED },
+  // 되돌린 즉시 한 바퀴 돌린다. 다음 주기를 기다리면 눌러놓고 아무 일도 안 일어난다.
+  onRequeued: () => { void mailAgent?.tick(); },
+});
 const shortcutRoutes = createVoiceShortcutRoutes({
   app,
   service: voiceShortcut,

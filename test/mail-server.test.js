@@ -122,7 +122,14 @@ test('turning the flag on starts the worker and opens the status route', async t
 
   const { response, body } = await api(url, '/api/mail/status');
   assert.equal(response.status, 200);
-  assert.deepEqual(body, { success: true, enabled: true, accounts: [] });
+  assert.deepEqual(body, {
+    success: true,
+    enabled: true,
+    accounts: [],
+    // 분석 큐는 비어 있어도 항상 보인다. 좌초 개수가 0인 것과 화면에 안 나오는 것은 다르다.
+    analysis: { pending: 0, analyzing: 0, done: 0, failed: 0, skipped: 0 },
+    stranded: [],
+  });
 
   // 계정이 없어도 worker는 돈다. 첫 tick이 아무 계정도 집지 않을 뿐이다.
   assert.equal(logs.join('').includes('Provider 동기화 worker 실행 중'), true);

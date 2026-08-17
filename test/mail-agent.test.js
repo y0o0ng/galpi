@@ -56,7 +56,7 @@ function imapMessage(uid, overrides = {}) {
   };
 }
 
-function setup({ now = 1000, naverResults = [], gmailResults = [] } = {}) {
+function setup({ now = 1000, naverResults = [], gmailResults = [], analyzer = null } = {}) {
   const db = createDatabase();
   const clock = { value: now };
   const store = createMailStore(db, { now: () => clock.value });
@@ -88,6 +88,7 @@ function setup({ now = 1000, naverResults = [], gmailResults = [] } = {}) {
   const agent = createMailAgent({
     store,
     providers,
+    analyzer,
     now: () => clock.value,
     syncIntervalSeconds: 300,
     credentials: account => { calls.credentials.push(account.id); return { user: 'u', pass: 'p' }; },
@@ -326,5 +327,54 @@ test('stopping the worker ends the schedule instead of leaving a timer behind', 
 
   // 이미 멈춘 worker를 다시 멈추는 것은 아무 일도 하지 않는다.
   assert.equal(agent.stop(), false);
+  db.close();
+});
+
+// ── 분석 단계 격리 (설계 22.2) ────────────────────────────────────────────────
+
+test('the analysis step runs even when every account failed to sync', async () => {
+  // 동기화가 통째로 죽어도 이미 저장된 메일의 판단은 계속 나와야 한다.
+  const analysisTicks = [];
+  const { db, store, agent, clock } = setup({
+    naverResults: [Object.assign(new Error('down'), { retryable: true })],
+    analyzer: { async tick(now) { analysisTicks.push(now); return { results: [{ outcome: 'done' }] }; } },
+  });
+  store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+
+  const result = await agent.tick();
+  assert.equal(result.results[0].outcome, 'retry');
+  assert.deepEqual(analysisTicks, [clock.value]);
+  assert.equal(result.analysis.results[0].outcome, 'done');
+  db.close();
+});
+
+test('an exploding analyzer is reported but never stops the next sync', async () => {
+  const { db, store, agent, errors, clock } = setup({
+    naverResults: [{ mode: 'incremental', messages: [], highestUid: 5 }],
+    analyzer: { async tick() { throw new Error('analyzer exploded'); } },
+  });
+  store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+
+  const first = await agent.tick();
+  assert.equal(first.analysis, null);
+  assert.deepEqual(errors.map(e => e.message), ['analyzer exploded']);
+
+  // tick이 예외로 끝나지 않았으므로 overlap guard가 풀려 다음 tick이 정상적으로 돈다.
+  clock.value += 300;
+  const second = await agent.tick();
+  assert.equal(second.skipped, false);
+  assert.equal(second.results[0].mode, 'incremental');
+  db.close();
+});
+
+test('an agent with no analyzer keeps working exactly as MAIL-1 did', async () => {
+  const { db, store, agent } = setup({
+    naverResults: [{ mode: 'incremental', messages: [], highestUid: 5 }],
+  });
+  store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+
+  const result = await agent.tick();
+  assert.equal(result.analysis, null);
+  assert.equal(result.results[0].mode, 'incremental');
   db.close();
 });
