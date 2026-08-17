@@ -37,6 +37,7 @@ from core.definition import RULE_FIELDS, CoreDefinition  # noqa: E402
 from core.jt_j126_k42 import JT_J126_K42  # noqa: E402
 from core.jt_j126_k42_sma200 import JT_J126_K42_SMA200  # noqa: E402
 from core.jt_j126_k42_sma200_exit import JT_J126_K42_SMA200_EXIT  # noqa: E402
+from core.jt_j126_k42_sma200_stop import JT_J126_K42_SMA200_STOP  # noqa: E402
 from core.jt_slots import SLOT_CORES  # noqa: E402
 
 # **J를 바꾸는 코어는 여기 적힌 것뿐이다.** PR #12 신호 연구가 challenger를 하나로
@@ -47,6 +48,7 @@ J_VARIANTS = {
     JT_J126_K42.name: 126,
     JT_J126_K42_SMA200.name: 126,
     JT_J126_K42_SMA200_EXIT.name: 126,
+    JT_J126_K42_SMA200_STOP.name: 126,
 }
 
 RESEARCH_CORES = (

@@ -18,6 +18,23 @@
 20일 달러거래대금 $50M · 이력 252세션)와 레짐, 그리고 9.2 리스크 한도다. 그것들은 진입
 신호가 아니라 각각 거래 대상의 정의와 위험 예산이다.
 
+## 0.25%는 집행되는 손절 위험이 아니다 (PR #19)
+
+JT 연구 코어는 전부 `FIXED_HOLD` 계열이라 **손절을 집행하지 않는다.** 그래서
+`RiskProfile.risk_per_trade = 0.25%`와 `planned_risk = 수량 × 2 ATR`는 **수량을 정하는
+volatility normalization unit**이지 거래당 실제 최대손실이 아니다. 이 파일을 쓰는 코어들의
+문서에서 그것을 **"거래당 위험"이라고 부르지 않는다.**
+
+PR #19가 그 2ATR를 실제 initial hard stop으로 집행해 한 번 쟀고 판정은
+`VOLATILITY_SCALED_POSITION`이다 — 상세는 `runs/risk-semantics/results.md`.
+
+**이름이 남아 있는 것은 일부러 그대로 뒀다.** `planned_risk`·`open_risk`·`risk_dollars`·
+`return_r`은 `paper-core-v1`과 공유하는 dataclass field라 지금 바꾸면 배포된 실행
+산출물·스키마·과거 보고서가 함께 흔들린다. 이름 정리는 별도 PR의 compatibility plan이다.
+
+**`paper-core-v1`은 다르다.** 그쪽은 `CORE` 청산이라 2ATR 손절을 실제로 집행하므로 설계
+9.1의 "거래당 계획 위험 0.25%"는 그 정책에서 맞는 표현이다.
+
 ## 계좌 낙폭을 규칙에서 뺀다 (2026-08-14 사용자 승인)
 
 **문이 둘이었고 처음엔 하나만 닫았다.**

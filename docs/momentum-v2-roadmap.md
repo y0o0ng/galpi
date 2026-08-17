@@ -333,7 +333,30 @@ backfill하지 않는다.**
 Control은 fixed K42. **dynamic exit가 못 이기면 그냥 K42를 쓴다.** 고정 보유기간도 완결된
 exit rule이다.
 
-### Phase 4 — 위험의 의미를 바로잡는다 (PR #19)
+### Phase 4 — 위험의 의미를 바로잡는다 (PR #19) — **VOLATILITY_SCALED_POSITION**
+
+> **2026-08-17 결과 — 구조 B를 골랐다.** 2ATR를 실제 initial hard stop으로 집행하면
+> 전략이 무너진다. `S` +47.84% → **+0.95%**(`ΔS` −46.89%p) · `G` +4.99% → **−29.10%**
+> (`ΔG` −34.09%p) · Sharpe 0.46 → **0.03** · PF 1.47 → **1.00** · MDD 12.0% → 12.5%.
+> 사전등록 여덟 조건 중 다섯이 실패했다. 상세는 `runs/risk-semantics/results.md`.
+>
+> **처치가 작동하지 않은 것이 아니다.** 손절이 472건으로 청산의 63.8%를 차지했고 평균
+> 보유가 41.8 → 23.4세션으로 줄었다. 거래가 445 → 740으로 늘어 비용이 $10,993 →
+> $13,853이 됐다. **"작동 안 했다"와 "작동했는데 손해였다"를 섞지 않는다.**
+>
+> **그래서 `2ATR`와 0.25%는 position-size volatility normalization unit이다.** fixed
+> K42를 유지하고 hard-stop 코어(`jt-j126-k42-sma200-stop`)는 기록·재현용으로만 남긴다.
+> **1.5 / 2.5 / 3ATR 재탐색 · trailing stop 대안 · stop confirmation을 열지 않는다** —
+> 사전등록 §13 B의 금지 목록이다.
+>
+> **실현 손실은 hard stop이 있어도 planned stop risk를 넘었다 — 472건 전부(100%)다.**
+> `STOP_FILL`조차 중앙 1.079배인데 이것은 갭이 아니라 **산술**이다. 손절가에서 정확히
+> 체결돼도 주당 손실은 `2ATR`이고 비용이 그 **위에** 얹히는데 planned stop risk는
+> `수량 × 2ATR`라 비용을 포함하지 않는다. `GAP_FILL`은 중앙 1.223 · 최대 4.778이다.
+> **그래서 A가 살아남았더라도 0.25%를 "maximum loss"라고 부를 수는 없었다.**
+>
+> **알파 개입 예산은 그대로 셋을 썼다.** Phase 4는 alpha 개입이 아니라 의미 정정이므로
+> 남은 것은 여전히 FIP 하나다.
 
 지금까지 묻혀 있던 문제다. 현재 sizing은 `shares ∝ 0.25% equity / 2ATR`이고
 `planned_risk = shares × 2ATR`로 R을 계산한다. **그런데 `FIXED_HOLD` 모드는 K 만기 청산만
@@ -465,8 +488,8 @@ shadow data**가 판결 데이터다 — 과거 구간을 다시 자르는 것�
 |17|Candidate ABS **신호**|ABS-positive 후보에서 다시 뽑은 TOP5가 +42 excess를 높이는가|**`NON_BINDING` · `DO_NOT_PROMOTE`**|
 |—|Candidate ABS **포트폴리오**|—|**NOT OPENED** (#17이 `DO_NOT_PROMOTE`)|
 |18|Signal invalidation exit|신호가 깨질 때 나가는 것이 K42보다 나은가|**`RISK_ONLY`** — fixed K42 유지|
-|19|Risk semantics|hard stop인가 volatility sizing인가|**다음**|
-|20|FIP quality|마지막 momentum quality filter|조건부|
+|19|Risk semantics|hard stop인가 volatility sizing인가|**`VOLATILITY_SCALED_POSITION`** — fixed K42 유지|
+|20|FIP quality|마지막 momentum quality filter|**다음** (남은 alpha 개입 하나)|
 |21|Reality hardening|비용·실적·delisting·체결을 견디는가|—|
 |22|Robustness|folds/random/cost stress에서 버티는가|—|
 |23|Frozen historical sanity check|개발 구간 밖에서 구조가 무너지지 않는가 (**formal OOS 아님**)|—|
