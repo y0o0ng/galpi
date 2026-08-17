@@ -218,3 +218,41 @@ test('a sync connects, reads read-only, and always logs out', async () => {
   );
   assert.equal(failing.calls.loggedOut, 1);
 });
+
+test('a stored UID is re-read read-only and comes back as raw bytes', async () => {
+  const client = createFakeClient({ mailbox: { exists: 10, uidNext: 20, uidValidity: '0' } });
+  const provider = createNaverProvider({ createClient: () => client });
+
+  const body = await provider.fetchRaw(
+    { imapUid: 7, imapUidValidity: '0' },
+    { credentials: { user: 'me', pass: 'p' } },
+  );
+
+  assert.equal(body.raw.toString('latin1'), 'raw-body-of-7');
+  // IMAP flag는 provider 분류가 아니다. Gmail 라벨 자리에 섞지 않는다.
+  assert.deepEqual(body.labels, []);
+  assert.deepEqual(client.calls.locks.at(-1).options, { readOnly: true });
+  assert.equal(client.calls.locks.at(-1).released, true);
+  assert.equal(client.calls.loggedOut, 1);
+});
+
+test('a renumbered mailbox refuses the stale UID instead of reading a different mail', async () => {
+  // 같은 UID가 다른 메일을 가리키는데 그냥 읽으면 엉뚱한 메일을 분석해 놓고 성공으로 끝난다.
+  const client = createFakeClient({ mailbox: { exists: 10, uidNext: 20, uidValidity: '99' } });
+  const provider = createNaverProvider({ createClient: () => client });
+
+  await assert.rejects(
+    () => provider.fetchRaw({ imapUid: 7, imapUidValidity: '42' }, { credentials: {} }),
+    error => error.code === 'MAIL_LOCATOR_STALE' && error.retryable === true,
+  );
+  assert.equal(client.calls.downloads.length, 0);
+  assert.equal(client.calls.locks.at(-1).released, true);
+});
+
+test("naver's '0' UIDVALIDITY never blocks a re-read by itself", async () => {
+  const client = createFakeClient({ mailbox: { exists: 10, uidNext: 20, uidValidity: '0' } });
+  const provider = createNaverProvider({ createClient: () => client });
+
+  const body = await provider.fetchRaw({ imapUid: 3, imapUidValidity: '' }, { credentials: {} });
+  assert.equal(body.raw.toString('latin1'), 'raw-body-of-3');
+});

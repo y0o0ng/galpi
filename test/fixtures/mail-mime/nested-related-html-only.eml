@@ -1,0 +1,36 @@
+From: 뉴스레터 <news@shop.example.com>
+To: me@gmail.com
+Subject: 이번 주 소식
+Date: Mon, 17 Aug 2026 14:00:00 +0900
+Message-ID: <nested-related-001@shop.example.com>
+List-Unsubscribe: <https://shop.example.com/unsub?u=abc>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/related; boundary="inner"
+
+--inner
+Content-Type: text/html; charset=UTF-8
+
+<html>
+<head><style>.a{color:red}</style><title>숨은 제목</title></head>
+<body>
+<!-- 숨은 주석 -->
+<script>alert('nope')</script>
+<p>이번 주 특가를 확인하세요.</p>
+<table><tr><td>상품</td><td>가격</td></tr><tr><td>노트북</td><td>1,200,000원</td></tr></table>
+<p><a href="https://shop.example.com/sale">특가 보기</a></p>
+<img src="https://track.example.com/open?id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" width="1" height="1">
+<p>&lt;재고&gt; 소진 시 &amp;nbsp; 종료&#33;</p>
+</body>
+</html>
+--inner
+Content-Type: image/png
+Content-ID: <logo@shop>
+Content-Disposition: inline; filename="logo.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgo=
+--inner--
+--outer--

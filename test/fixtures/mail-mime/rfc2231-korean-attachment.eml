@@ -1,0 +1,21 @@
+From: 학사지원팀 <academic@example.ac.kr>
+To: me@naver.com
+Subject: 수강신청 안내
+Date: Mon, 17 Aug 2026 11:00:00 +0900
+Message-ID: <rfc2231-001@example.ac.kr>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix-boundary"
+
+--mix-boundary
+Content-Type: text/plain; charset=UTF-8
+
+첨부된 안내문을 확인하세요.
+--mix-boundary
+Content-Type: application/pdf
+Content-Disposition: attachment;
+ filename*0*=UTF-8''%EC%88%98%EA%B0%95;
+ filename*1*=%EC%8B%A0%EC%B2%AD.pdf
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQK
+--mix-boundary--

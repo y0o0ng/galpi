@@ -262,3 +262,44 @@ test('a normalized message keeps the headers the store needs', async () => {
   assert.match(call.url, /format=metadata/);
   assert.match(call.url, /metadataHeaders=Message-ID/);
 });
+
+test('fetching a raw body asks for format=raw and comes back as bytes', async () => {
+  const raw = Buffer.from('Subject: 원문\r\n\r\n본문입니다\r\n', 'utf8');
+  const fetchImpl = createFakeFetch([
+    tokenRoute(),
+    {
+      match: url => url.includes('/messages/m1'),
+      reply: jsonResponse({ id: 'm1', labelIds: ['INBOX'], raw: raw.toString('base64url') }),
+    },
+  ]);
+  const provider = createGmailProvider({ fetch: fetchImpl, tokenSource: createSource(fetchImpl) });
+
+  const body = await provider.fetchRaw('m1');
+  assert.ok(body.raw.equals(raw));
+  assert.deepEqual(body.labels, ['INBOX']);
+  assert.match(fetchImpl.calls.at(-1).url, /format=raw/);
+});
+
+test('a mail moved to trash after we stored it is refused instead of analyzed', async () => {
+  const fetchImpl = createFakeFetch([
+    tokenRoute(),
+    {
+      match: url => url.includes('/messages/m1'),
+      reply: jsonResponse({ id: 'm1', labelIds: ['TRASH'], raw: 'aGk=' }),
+    },
+  ]);
+  const provider = createGmailProvider({ fetch: fetchImpl, tokenSource: createSource(fetchImpl) });
+
+  await assert.rejects(() => provider.fetchRaw('m1'), error => error.code === 'MAIL_MESSAGE_EXCLUDED');
+});
+
+test('a deleted message is a message-level 404, not an expired history cursor', async () => {
+  // 같은 404를 커서 만료로 읽으면 재분석 실패 하나가 계정 전체 resync를 부른다.
+  const fetchImpl = createFakeFetch([
+    tokenRoute(),
+    { match: url => url.includes('/messages/m1'), reply: jsonResponse({}, 404) },
+  ]);
+  const provider = createGmailProvider({ fetch: fetchImpl, tokenSource: createSource(fetchImpl) });
+
+  await assert.rejects(() => provider.fetchRaw('m1'), error => error.code === 'MAIL_MESSAGE_GONE');
+});

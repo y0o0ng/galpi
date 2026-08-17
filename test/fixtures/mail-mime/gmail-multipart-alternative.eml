@@ -1,0 +1,23 @@
+From: 채용팀 <recruiting@example.com>
+To: me@gmail.com
+Subject: =?UTF-8?B?66m07KCRIOyDgeuLtCDsi5zqsIQg7ISg7YOd?=
+Date: Mon, 17 Aug 2026 10:00:00 +0900
+Message-ID: <gmail-alt-001@example.com>
+List-Unsubscribe: <mailto:unsub@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="alt-boundary"
+
+--alt-boundary
+Content-Type: text/plain; charset=UTF-8
+
+안녕하세요.
+8월 19일까지 가능한 면접 시간을 회신해 주세요.
+
+--
+채용팀 드림
+소속: 예시주식회사
+--alt-boundary
+Content-Type: text/html; charset=UTF-8
+
+<html><body><p>안녕하세요.</p><p>8월 19일까지 가능한 면접 시간을 회신해 주세요.</p></body></html>
+--alt-boundary--

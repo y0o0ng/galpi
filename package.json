@@ -15,6 +15,7 @@
     "apply:topic-repair": "node scripts/apply-topic-repair.js",
     "remove:topic-qa": "node scripts/remove-topic-qa.js",
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
+    "eval:mail-fixtures": "node scripts/evaluate-mail-fixtures.js",
     "report:retrieval-shadow": "node scripts/report-retrieval-shadow.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
@@ -34,6 +35,7 @@
     "marked": "^18.0.4",
     "openai": "^4.77.0",
     "pdf-parse": "^2.4.5",
+    "postal-mime": "^3.0.0",
     "uuid": "^11.0.3",
     "web-push": "^3.6.7",
     "zod": "^3.25.76"

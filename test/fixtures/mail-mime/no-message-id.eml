@@ -1,0 +1,7 @@
+From: alerts@service.example.com
+To: me@naver.com
+Subject: 결제가 완료되었습니다
+Date: Mon, 17 Aug 2026 13:00:00 +0900
+Content-Type: text/plain; charset=UTF-8
+
+9,900원이 결제되었습니다.
