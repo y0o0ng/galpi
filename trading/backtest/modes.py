@@ -26,7 +26,17 @@ FIXED_HOLD_EXITS = "FIXED_HOLD"
 # 트레일링·시간손절·실적 청산은 여전히 없다. 시장 판정은 포지션이 아니라 loop가 하므로
 # (그날 종가를 장중 처리보다 앞에 끌어오면 look-ahead다) 예약만 loop가 찍는다(PR #18).
 SIGNAL_INVALIDATION_EXITS = "SIGNAL_INVALIDATION"
-EXIT_MODES = (CORE_EXITS, FIXED_HOLD_EXITS, SIGNAL_INVALIDATION_EXITS)
+# `FIXED_HOLD`에 **초기 손절 하나만** 더한 것. 이름이 `HARD_STOP`이 아니라
+# `FIXED_HOLD_HARD_STOP`인 이유는 K세션 만기가 그대로 살아 있기 때문이다. 추적손절·
+# 시간손절·실적 청산은 여전히 없고, 장중 검사는 진입 시점에 고정된 `initial_stop`만
+# 읽는다 — `stop_price`는 +1 ATR 뒤 추적손절로 변하므로 그것을 쓰면 처치가 둘이 된다(PR #19).
+HARD_STOP_EXITS = "FIXED_HOLD_HARD_STOP"
+EXIT_MODES = (
+    CORE_EXITS,
+    FIXED_HOLD_EXITS,
+    SIGNAL_INVALIDATION_EXITS,
+    HARD_STOP_EXITS,
+)
 
 # 7.3의 GREEN/YELLOW/RED를 내는 `CORE`와, 시장만 보고 라벨을 붙이는 `MARKET`.
 CORE_REGIME = "CORE"

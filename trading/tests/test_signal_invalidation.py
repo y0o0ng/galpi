@@ -130,11 +130,11 @@ class ExitModeTest(unittest.TestCase):
         return session(pos, current, exit_mode=SIGNAL_INVALIDATION_EXITS, **kwargs)
 
     def test_the_new_mode_is_registered(self):
+        # PR #19가 `FIXED_HOLD_HARD_STOP`을 더했다. 전체 집합은 그쪽 테스트가 잠그고
+        # 여기서는 **이 PR의 모드가 등록돼 있다는 것과 기존 둘이 그대로라는 것**만 본다.
         self.assertIn(SIGNAL_INVALIDATION_EXITS, EXIT_MODES)
-        self.assertEqual(
-            set(EXIT_MODES),
-            {CORE_EXITS, FIXED_HOLD_EXITS, SIGNAL_INVALIDATION_EXITS},
-        )
+        self.assertIn(CORE_EXITS, EXIT_MODES)
+        self.assertIn(FIXED_HOLD_EXITS, EXIT_MODES)
 
     def test_a_stop_does_not_fire(self):
         result = self.fixed(position(), bar("2026-08-07", open_=95.0, low=80.0, close=85.0))

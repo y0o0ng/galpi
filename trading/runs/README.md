@@ -35,6 +35,7 @@
 |`market-gate-portfolio/`|#16|포트폴리오|SMA200 신규진입 게이트가 economics를 개선하는가|`ECONOMICS_AND_RELATIVE_IMPROVED` · 최종 게이트는 여전히 미달|
 |`absolute-momentum-signal/`|#17|신호|`ABS(126,5)>0` 후보 조건이 TOP5 +42 excess를 높이는가|**`NON_BINDING`** — 3,385일 중 구성 변경 0일 · `DO_NOT_PROMOTE`|
 |`signal-invalidation-exit/`|#18|포트폴리오|시장 추세가 깨질 때 나가는 것이 fixed K42보다 나은가|**`RISK_ONLY`** — `ΔS -15.57%p` · MDD만 개선 · **fixed K42 유지**|
+|`risk-semantics/`|#19|포트폴리오|sizing의 2ATR를 실제 hard stop으로 집행해야 하는가|**`VOLATILITY_SCALED_POSITION`** — `ΔG -34.09%p` · 손절 472건 전부 1R 초과 · **fixed K42 유지**|
 
 ## 폴더를 층별 하위 디렉터리로 옮기지 않은 이유
 

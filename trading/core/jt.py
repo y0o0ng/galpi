@@ -18,6 +18,51 @@
 20일 달러거래대금 $50M · 이력 252세션)와 레짐, 그리고 9.2 리스크 한도다. 그것들은 진입
 신호가 아니라 각각 거래 대상의 정의와 위험 예산이다.
 
+## 0.25%가 무엇인지는 `exit_mode`가 정한다 (PR #19)
+
+**"JT 코어는 손절을 집행하지 않는다"는 틀린 일반화다.** 이 파일의 `jt_policy`를 쓰는
+코어 중에도 `jt-core-exit`은 `CORE_EXITS`라 초기·추적·시간·실적 청산을 **실제로
+집행한다.** 그래서 범위를 `exit_mode`로 가른다.
+
+|`exit_mode`|집행되는 손절|`risk_per_trade = 0.25%`의 뜻|
+|---|---|---|
+|`CORE`(`core1` · `jt-core-exit`)|초기 2ATR · 추적 · 시간 · 실적|**planned stop risk**. 설계 9.1의 표현이 맞다|
+|`FIXED_HOLD_HARD_STOP`(`jt-j126-k42-sma200-stop`)|초기 2ATR만|planned stop risk. 다만 실현 손실은 1R을 넘는다(아래)|
+|`FIXED_HOLD` · `SIGNAL_INVALIDATION`|**없음**|**volatility sizing budget**. 실제 최대손실이 아니다|
+
+**현재 살아남은 momentum strategy 후보(`jt-j126-k42-sma200`)는 마지막 칸이다.** 거기서
+`2ATR`는 실제 stop boundary가 아니라 position scale을 정하는 단위이고, 그 코어들의 문서에서
+0.25%를 **"거래당 위험"이라고 부르지 않는다.** `jt-core-exit`·`paper-core-v1`을 설명할
+때의 "계획 stop risk"는 그대로 맞는 표현이므로 고치지 않는다.
+
+PR #19가 그 `2ATR`를 실제 initial hard stop으로 집행해 한 번 쟀고 판정은
+`VOLATILITY_SCALED_POSITION`이다 — 상세는 `runs/risk-semantics/results.md`.
+
+## `FIXED_HOLD` 계열의 위험 회계는 legacy volatility-budget accounting이다
+
+집행되는 손절이 없어도 공유 아키텍처에는 이 이름들이 그대로 남아 있다.
+
+    planned_risk · planned_risk_fraction · open_risk · risk_dollars
+    max_total_planned_risk · TOTAL_PLANNED_RISK_EXCEEDED · return_r
+
+**`FIXED_HOLD` 계열에서 이 값들을 "실제 stop-defined loss risk"로 읽지 않는다.** 이것들은
+`2ATR` 기반 position scale과 그 합의 portfolio budget을 나타내는 **legacy
+volatility-budget accounting**이고, 집행되는 손절선도 최대손실 한도도 뜻하지 않는다.
+`TOTAL_PLANNED_RISK_EXCEEDED`도 "손실 한도를 넘었다"가 아니라 "volatility budget 합계가
+한도에 닿았다"로 읽는다 — 현재 control에서 이 사유는 실제 결과를 구속하지 않았다.
+
+**이름은 PR #19에서 바꾸지 않았다.** `paper-core-v1`·DB 스키마·배포된 산출물·과거 보고서가
+같은 이름을 공유하므로 rename은 별도 PR의 compatibility plan이다. `risk.py`의 행동도
+`max_total_planned_risk` 계산도 그대로다 — 이번에 바꾼 것은 **읽는 법**뿐이다.
+
+## planned stop risk도 최대손실이 아니다
+
+`CORE`·`FIXED_HOLD_HARD_STOP`처럼 손절을 **집행하는** 코어에서도 0.25%는 실현 최대손실의
+상한이 아니다. PR #19 실측에서 초기 손절 청산 472건이 **전부** planned stop risk를 넘었다
+— `STOP_FILL`조차 중앙 1.079배인데 갭이 아니라 산술이다. 손절가에서 정확히 체결돼도 주당
+손실이 `2ATR`이고 비용이 그 **위에** 얹히는데 `planned_risk = 수량 × 2ATR`에는 비용이 없다.
+그래서 허용되는 표현은 `planned stop risk`이고 `guaranteed max loss`가 아니다.
+
 ## 계좌 낙폭을 규칙에서 뺀다 (2026-08-14 사용자 승인)
 
 **문이 둘이었고 처음엔 하나만 닫았다.**

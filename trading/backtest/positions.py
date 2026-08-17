@@ -75,6 +75,19 @@ Jegadeesh–Titman(1993)식 J/K 실험을 위한 모드다. **K세션 뒤 청산
 **손절가는 없어지지 않는다.** `stop_price`는 9.2의 열린 위험 회계(현재가 − 손절가)에
 계속 쓰인다. 진입 조건과 수량 계산을 세 런에서 같게 두려는 것이다. 다만 규칙이 같아도
 **실현되는 진입은 갈린다** — 손절로 비었을 자리가 차 있으면 다음 후보가 못 들어온다.
+
+## FIXED_HOLD_HARD_STOP — 2ATR가 실제 손절선인가를 재는 모드
+
+`FIXED_HOLD`에 **초기 손절 하나만** 더한다(PR #19). K세션 만기는 그대로이고 추적손절·
+시간손절·실적 청산은 여전히 없다. 살아 있는 청산 사유는 `INITIAL_STOP`과 `MAX_HOLD`
+둘뿐이다.
+
+**장중 검사는 `initial_stop`만 읽는다.** `stop_price`는 최고 종가가 진입가 +1 ATR을
+넘으면 추적손절로 바뀌므로, 그것을 읽으면 "초기 손절만 집행한다"는 실험이 조용히 "초기
+손절 + 추적손절"이 된다. 어느 손절가를 읽을지는 `_active_stop`이 모드별로 한 곳에서 정한다.
+
+**체결 모델은 기존 `try_stop_exit`을 그대로 쓴다** — 시초가가 손절가 아래면 `GAP_FILL`,
+장중 저가가 닿으면 `STOP_FILL`이다. 새 체결 경로를 만들지 않는다.
 """
 
 from __future__ import annotations
@@ -91,6 +104,7 @@ from .modes import (  # noqa: F401  (재수출)
     CORE_EXITS,
     EXIT_MODES,
     FIXED_HOLD_EXITS,
+    HARD_STOP_EXITS,
     SIGNAL_INVALIDATION_EXITS,
 )
 from .policy import StrategyParameters
@@ -246,6 +260,24 @@ def _sessions_until(as_of: str, event_at: str) -> int:
     return weekdays_between(next_weekday(as_of), date.fromisoformat(event_at[:10]))
 
 
+def _active_stop(position: Position, exit_mode: str) -> tuple[float, str] | None:
+    """이 모드가 오늘 바에 대고 검사할 손절가와 사유. 손절이 없는 모드면 None이다.
+
+    **모드마다 어느 손절가를 읽는지 여기 한 곳에서 정한다.** `CORE`는 추적손절까지
+    반영된 `stop_price`이고, `FIXED_HOLD_HARD_STOP`은 진입 시점에 고정된 `initial_stop`
+    하나다(PR #19 사전등록 §3).
+
+    **`HARD_STOP_EXITS`에서 `stop_price`를 쓰면 처치가 둘이 된다.** 최고 종가가 진입가
+    +1 ATR을 넘는 순간 `stop_price`가 추적손절로 바뀌므로, 그것을 읽으면 "초기 손절만
+    집행한다"는 실험이 조용히 "초기 손절 + 추적손절"이 된다.
+    """
+    if exit_mode == CORE_EXITS:
+        return position.stop_price, position.stop_reason
+    if exit_mode == HARD_STOP_EXITS:
+        return position.initial_stop, "INITIAL_STOP"
+    return None
+
+
 def _due_exit(position: Position, exit_mode: str) -> str | None:
     """오늘 종가 기준으로 청산할 때가 됐는가. 사유 또는 None."""
     if position.sessions_held >= position.parameters.max_hold_sessions:
@@ -297,7 +329,8 @@ def run_session(
     """포지션의 한 세션을 처리한다. 순서는 모듈 설명의 1~6번이다.
 
     `exit_mode`가 `FIXED_HOLD`면 3·5번(손절·실적)과 시간손절을 건너뛰고 최대 보유만
-    남는다. 순서는 그대로다.
+    남는다. `FIXED_HOLD_HARD_STOP`은 거기에 3번을 **초기 손절로만** 되살린다. 순서는
+    어느 모드에서도 그대로다.
     """
     if exit_mode not in EXIT_MODES:
         # 오타가 조용히 CORE로 읽히면 어떤 규칙으로 낸 결과인지 알 수 없게 된다.
@@ -307,7 +340,8 @@ def run_session(
             f"직전 바({previous_bar.trade_date})보다 뒤인 바여야 합니다: {bar.trade_date}"
         )
 
-    fixed_hold = exit_mode in (FIXED_HOLD_EXITS, SIGNAL_INVALIDATION_EXITS)
+    # 실적 청산은 `CORE`에만 있다. 연구 모드 셋은 전부 끈다.
+    core_exits = exit_mode == CORE_EXITS
     current = adjust_for_corporate_action(position, previous_bar, bar)
 
     # 거래가 재개됐다. 밀려 있던 청산을 **첫 실제 거래 가능 가격**으로 내보낸다.
@@ -326,12 +360,14 @@ def run_session(
         return SessionResult(current.symbol, None, fill, current.pending_exit)
 
     # 3. 어제 종가에 정해진 손절가로 오늘 바를 본다. 오늘 종가를 반영하기 전이다.
-    if not fixed_hold:
+    active_stop = _active_stop(current, exit_mode)
+    if active_stop is not None:
+        stop_price, stop_reason = active_stop
         stop_fill = try_stop_exit(
-            current.symbol, current.shares, current.stop_price, bar, costs=costs
+            current.symbol, current.shares, stop_price, bar, costs=costs
         )
         if stop_fill is not None:
-            return SessionResult(current.symbol, None, stop_fill, current.stop_reason)
+            return SessionResult(current.symbol, None, stop_fill, stop_reason)
 
     # 4. 오늘 종가 반영. 최고 종가가 오르면 추적손절가도 함께 오른다.
     current = replace(
@@ -345,7 +381,7 @@ def run_session(
     # 종가로 나가는 것은 오늘 종가가 "늦은 것을 알아챈 뒤 처음 오는 행동 지점"이기
     # 때문이다. 어제 종가에 알았다면 아래 5번이 먼저 걸렸을 것이다.
     if (
-        not fixed_hold
+        core_exits
         and next_earnings is not None
         and next_earnings[:10] <= bar.trade_date
     ):
@@ -356,7 +392,7 @@ def run_session(
 
     # 5. 실적 전 청산은 그날 종가에 맞춘다(7.5).
     if (
-        not fixed_hold
+        core_exits
         and next_earnings is not None
         and _sessions_until(bar.trade_date, next_earnings)
         <= current.parameters.earnings_exit_sessions

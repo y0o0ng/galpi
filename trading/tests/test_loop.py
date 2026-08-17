@@ -48,8 +48,17 @@ CAPITAL = 100_000.0
 
 
 def build(
-    days: int = TOTAL, earnings_csv: str | None = None, spy_closes=None
+    days: int = TOTAL,
+    earnings_csv: str | None = None,
+    spy_closes=None,
+    trend_closes=None,
 ) -> tuple[sqlite3.Connection, list[str]]:
+    """합성 픽스처. `spy_closes`·`trend_closes`는 `(일수, ...)` → 종가 목록이다.
+
+    `trend_closes(days, start_price, step)`는 랭킹 상위가 되는 종목의 경로를 바꾼다.
+    기본값은 계단식 상승이고, 손절이 실제로 걸리는 실행을 만들려면 하락 꼬리가 붙은
+    경로가 필요하다(PR #19).
+    """
     dates = synthetic.sessions(days)
     connection = store.connect_memory()
     for kind in ("bars", "universe", "securities"):
@@ -75,7 +84,9 @@ def build(
             synthetic.rows(
                 symbol,
                 dates,
-                synthetic.staircase_closes(days, 50.0, step),
+                trend_closes(days, 50.0, step)
+                if trend_closes
+                else synthetic.staircase_closes(days, 50.0, step),
                 range_pct=TREND_RANGE,
             )
         )
