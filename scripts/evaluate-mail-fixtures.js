@@ -77,10 +77,14 @@ function parseArgs(argv) {
     model: process.env.MAIL_ANALYZER_MODEL || 'gpt-5.6-luna',
     only: null,
     runs: MIN_GATE_RUNS,
+    // 이 모델은 temperature와 seed를 거부한다. 흔들림에 손댈 수 있는 손잡이는
+    // reasoning.effort 하나뿐이라 그것만 인자로 연다.
+    reasoning: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--model') args.model = argv[i + 1];
     if (argv[i] === '--only') args.only = argv[i + 1];
+    if (argv[i] === '--reasoning') args.reasoning = argv[i + 1];
     if (argv[i] === '--runs') args.runs = Math.max(1, Number.parseInt(argv[i + 1], 10) || MIN_GATE_RUNS);
   }
   return args;
@@ -163,6 +167,7 @@ async function runOnce(fixtures, args, openai, latencies) {
         input: [{ role: 'system', content: system }, { role: 'user', content: input }],
         store: false,
         text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } },
+        ...(args.reasoning ? { reasoning: { effort: args.reasoning } } : {}),
       });
       latencies.push(Date.now() - started);
       return JSON.parse(response.output_text);
@@ -227,7 +232,7 @@ async function main() {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const latencies = [];
-  console.log(`model=${args.model} prompt_version=${PROMPT_VERSION} fixtures=${fixtures.length} runs=${args.runs}`);
+  console.log(`model=${args.model} prompt_version=${PROMPT_VERSION} fixtures=${fixtures.length} runs=${args.runs} reasoning=${args.reasoning || '기본'}`);
   console.log('\n── 사전등록 hard gate ──');
   for (const [label] of HARD_GATE) console.log(`  · ${label}`);
   if (args.only) console.log('\n  (--only 실행이라 gate를 판정하지 않는다. 진단용이다.)');
