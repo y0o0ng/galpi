@@ -822,12 +822,42 @@ html, body {
 /* 에이전트 요약 카드. 패널이 350px 고정 폭이라 2열이 물리적으로 안 들어가므로
    데스크톱과 모바일이 같은 1열을 쓴다. 카드 하나가 통째로 버튼이라 모바일 타깃이
    쪼개지지 않고, 복구 버튼은 카드가 아니라 상세 화면에 둔다. */
-.agent-cards {
+/* XION 홈. 첫 화면은 `확인할 것` → `오늘` → 에이전트 순이고, 각 영역은 있을 때만
+   그려진다(설계 9절). 카드 상자를 겹쳐 쌓지 않으려고 영역 자체에는 테두리를 주지
+   않고 제목과 간격으로만 가른다. */
+.home-section {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  margin-bottom: 18px;
 }
 
-.agent-card {
+.home-section:last-child {
+  margin-bottom: 0;
+}
+
+.home-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+.home-section-note {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--label);
+}
+
+.home-attention,
+.home-today {
   display: grid;
   gap: 4px;
   width: 100%;
@@ -842,30 +872,141 @@ html, body {
   transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
 }
 
-[data-theme="dark"] .agent-card {
+[data-theme="dark"] .home-attention,
+[data-theme="dark"] .home-today {
   background: rgba(255, 255, 255, 0.035);
 }
 
-.agent-card:hover {
+.home-attention:hover,
+.home-today:hover {
   border-color: var(--label);
 }
 
-.agent-card-head {
+.home-attention-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.agent-card-title {
-  font-size: 17px;
+.home-attention-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.home-attention-source {
+  font-size: 9px;
+  font-weight: 650;
+  color: var(--label);
+}
+
+.home-attention-title {
+  font-size: 11px;
   font-weight: 700;
 }
 
-.agent-card-status {
-  display: inline-flex;
+.home-attention-meta,
+.home-today-meta {
+  font-size: 11px;
+  color: var(--label);
+}
+
+.home-today {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.home-today-title {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.home-more:hover {
+  color: inherit;
+}
+
+.home-note,
+.home-empty {
+  margin: 0;
+  font-size: 11px;
+  color: var(--label);
+}
+
+.home-empty {
+  margin-bottom: 18px;
+}
+
+.home-empty.danger {
+  color: #ff3b30;
+}
+
+.home-skeleton {
+  display: grid;
+  gap: 10px;
+}
+
+.home-agents {
+  display: grid;
+  gap: 2px;
+}
+
+/* 에이전트 줄. 정상이면 한 줄이고, 개입이 필요할 때만 이유 한 줄이 더 붙는다. */
+.home-agent {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.home-agent:hover {
+  border-color: var(--border);
+}
+
+.home-agent-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+}
+
+.home-agent-title {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.home-agent-status,
+.home-agent-reason {
+  font-size: 11px;
+  color: var(--label);
+}
+
+.home-agent-reason {
+  padding-left: 15px;
 }
 
 .agent-card-dot {
@@ -879,16 +1020,6 @@ html, body {
 .agent-card-dot.warn { background: #ff9f0a; }
 .agent-card-dot.danger { background: #ff3b30; }
 .agent-card-dot.off { background: var(--hairline); }
-
-.agent-card-metric {
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.agent-card-detail {
-  font-size: 11px;
-  color: var(--label);
-}
 
 .schedule-agent-block {
   display: grid;

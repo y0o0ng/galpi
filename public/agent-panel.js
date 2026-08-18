@@ -29,7 +29,13 @@
     mailRequeueRunning: false,
     mailSettings: null,
     mailSettingsSaving: false,
+    attention: [],
+    attentionError: '',
   };
+
+  // 첫 화면에 펼치는 Attention 수. 지식 패널이 350px 고정이고 메일 항목 하나가
+  // 100px 안팎이라, 세 장을 펼치면 `오늘`이 첫 화면 밖으로 밀린다(설계 8절).
+  const HOME_ATTENTION_LIMIT = 2;
 
   const countLabels = [
     ['overdue', '지연'],
@@ -116,20 +122,15 @@
     state.container.appendChild(empty);
   }
 
-  // 카드 자리를 그대로 잡아둔다. 예전 블록 스켈레톤(390px)을 쓰면 로딩 중에만
+  // 홈 자리를 그대로 잡아둔다. 예전 블록 스켈레톤(390px)을 쓰면 로딩 중에만
   // 화면이 세 배로 길어졌다가 줄어든다.
   function renderLoading() {
     state.container.replaceChildren();
-    const cards = document.createElement('div');
-    cards.className = 'agent-cards';
-    for (let index = 0; index < 3; index += 1) {
-      const skeleton = document.createElement('div');
-      skeleton.className = 'agent-card schedule-agent-skeleton';
-      skeleton.setAttribute('aria-label', '에이전트 상태를 불러오는 중');
-      skeleton.innerHTML = '<span></span><span></span>';
-      cards.appendChild(skeleton);
-    }
-    state.container.appendChild(cards);
+    const skeleton = document.createElement('div');
+    skeleton.className = 'home-skeleton schedule-agent-skeleton';
+    skeleton.setAttribute('aria-label', '홈을 불러오는 중');
+    skeleton.innerHTML = '<span></span><span></span>';
+    state.container.appendChild(skeleton);
   }
 
   function renderError(message) {
@@ -591,45 +592,43 @@
   // 카드 전체가 button 하나다. 안에 또 버튼을 넣으면 중첩이 되고 모바일 타깃도 잘게
   // 쪼개지므로, 복구 버튼은 카드가 아니라 상세 화면에 둔다. 개입이 필요한 상태는
   // 카드에서 상태점과 문구로만 알린다.
-  function makeAgentCard({ title, tone = 'ok', status, metric, detail, onOpen, ariaLabel }) {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'agent-card';
-    if (ariaLabel) card.setAttribute('aria-label', ariaLabel);
-    card.addEventListener('click', onOpen);
+  /**
+   * 에이전트 한 줄. 홈에서 정상인 에이전트는 이름과 상태까지만 차지한다. 개입이
+   * 필요한 상태(warn·danger)일 때만 이유 한 줄을 더 편다(설계 6·7절). 운영 세부값은
+   * 상세의 몫이라 여기에 오지 않는다.
+   */
+  function makeAgentRow({ title, tone = 'ok', status, metric, onOpen, ariaLabel }) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'home-agent';
+    if (ariaLabel) row.setAttribute('aria-label', ariaLabel);
+    row.addEventListener('click', onOpen);
 
     const head = document.createElement('span');
-    head.className = 'agent-card-head';
-    const heading = document.createElement('span');
-    heading.className = 'agent-card-title';
-    heading.textContent = title;
-    const statusWrap = document.createElement('span');
-    statusWrap.className = 'schedule-agent-status agent-card-status';
+    head.className = 'home-agent-head';
     const dot = document.createElement('span');
     dot.className = `agent-card-dot ${tone}`;
+    const heading = document.createElement('span');
+    heading.className = 'home-agent-title';
+    heading.textContent = title;
     const statusText = document.createElement('span');
+    statusText.className = 'home-agent-status';
     statusText.textContent = status;
-    statusWrap.append(dot, statusText);
-    head.append(heading, statusWrap);
-    card.appendChild(head);
+    head.append(dot, heading, statusText);
+    row.appendChild(head);
 
-    const metricLine = document.createElement('span');
-    metricLine.className = 'agent-card-metric';
-    metricLine.textContent = metric;
-    card.appendChild(metricLine);
-
-    if (detail) {
-      const detailLine = document.createElement('span');
-      detailLine.className = 'agent-card-detail';
-      detailLine.textContent = detail;
-      card.appendChild(detailLine);
+    if (metric && (tone === 'warn' || tone === 'danger')) {
+      const reason = document.createElement('span');
+      reason.className = 'home-agent-reason';
+      reason.textContent = metric;
+      row.appendChild(reason);
     }
-    return card;
+    return row;
   }
 
-  function makeScheduleCard() {
+  function makeScheduleRow() {
     if (!state.enabled) {
-      return makeAgentCard({
+      return makeAgentRow({
         title: '일정',
         tone: 'off',
         status: '꺼짐',
@@ -638,34 +637,30 @@
       });
     }
     if (state.scheduleError || !state.summary) {
-      return makeAgentCard({
+      return makeAgentRow({
         title: '일정',
         tone: 'danger',
         status: '오류',
         metric: state.scheduleError || '일정 요약을 불러오지 못했어',
-        detail: '눌러서 다시 시도',
         onOpen: refresh,
       });
     }
     const counts = state.summary.counts || {};
     const overdue = Number(counts.overdue) || 0;
     const next = state.summary.nextReminder;
-    return makeAgentCard({
+    return makeAgentRow({
       title: '일정',
       tone: overdue > 0 ? 'warn' : 'ok',
       status: overdue > 0 ? `지연 ${overdue}` : '정상',
       metric: `오늘 ${Number(counts.today) || 0} · 지연 ${overdue} · 예정 ${Number(counts.upcoming) || 0}`,
-      detail: next
-        ? `다음 알림 ${formatDateTime(next.remindAt)} · ${next.title || '제목 없는 일정'}`
-        : '예정된 알림 없음',
       onOpen: openSchedule,
       ariaLabel: '일정 에이전트 열기',
     });
   }
 
-  function makeMailCard() {
+  function makeMailRow() {
     if (state.mail?.disabled) {
-      return makeAgentCard({
+      return makeAgentRow({
         title: 'Mail',
         tone: 'off',
         status: '꺼짐',
@@ -675,12 +670,11 @@
       });
     }
     if (state.mailError || !state.mail) {
-      return makeAgentCard({
+      return makeAgentRow({
         title: 'Mail',
         tone: 'danger',
         status: '오류',
         metric: state.mailError || 'Mail 상태를 불러오지 못했어',
-        detail: '눌러서 다시 시도',
         onOpen: refresh,
       });
     }
@@ -696,27 +690,25 @@
     else if (broken.length) { tone = 'danger'; status = '오류'; }
     else if (stranded > 0) { tone = 'warn'; status = `멈춤 ${stranded}`; }
     else if (!accounts.length) tone = 'off';
-    return makeAgentCard({
+    return makeAgentRow({
       title: 'Mail',
       tone,
       status,
       metric: accounts.length
         ? accounts.map(account => `${account.provider === 'gmail' ? 'Gmail' : 'Naver'} ${account.status === 'active' ? '●' : '○'}`).join(' · ')
         : '등록된 계정 없음',
-      detail: `분석 대기 ${Number(analysis.pending) || 0}${stranded > 0 ? ` · 멈춤 ${stranded}` : ''}`,
       onOpen: openMail,
       ariaLabel: 'Mail 에이전트 열기',
     });
   }
 
-  function makeCodexCard() {
+  function makeCodexRow() {
     if (!state.organize) {
-      return makeAgentCard({
+      return makeAgentRow({
         title: '사서 Codex',
         tone: 'danger',
         status: '오류',
         metric: state.codexError || 'Codex 상태를 불러오지 못했어',
-        detail: '눌러서 다시 시도',
         onOpen: refresh,
       });
     }
@@ -732,25 +724,176 @@
     if (recovery > 0) { tone = 'danger'; status = `복구 필요 ${recovery}`; }
     else if (!runnerOk) { tone = 'danger'; status = 'CLI 확인 필요'; }
     else if (stalled > 0) { tone = 'warn'; status = `멈춤 ${stalled}`; }
-    return makeAgentCard({
+    return makeAgentRow({
       title: '사서 Codex',
       tone,
       status,
       metric: `대기 ${queueable} · 멈춤 ${stalled}`,
-      detail: state.codexError || '모델 설정과 대기열 정리',
       onOpen: openCodex,
       ariaLabel: '사서 Codex 열기',
     });
   }
 
-  // 첫 화면은 카드만 세운다. 상세 데이터는 카드를 눌렀을 때 그 화면이 쓴다 .
-  // 에이전트가 늘어도 여는 비용이 카드 수만큼만 는다.
+  const REASON_LABELS = {
+    action_required: '행동 필요',
+    attachment_check: '첨부 확인 필요',
+    low_confidence: '확인 필요',
+  };
+
+  function formatDeadline(item) {
+    if (item.deadlineKind === 'date' && item.deadlineDate) return `${item.deadlineDate}까지`;
+    if (item.deadlineKind === 'datetime' && Number.isSafeInteger(item.deadlineAt)) {
+      return `${new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }).format(new Date(item.deadlineAt * 1000))}까지`;
+    }
+    return '';
+  }
+
+  function makeHomeSection(titleText, extra) {
+    const section = document.createElement('section');
+    section.className = 'home-section';
+    const head = document.createElement('div');
+    head.className = 'home-section-head';
+    const title = document.createElement('strong');
+    title.className = 'home-section-title';
+    title.textContent = titleText;
+    head.appendChild(title);
+    if (extra) {
+      const note = document.createElement('span');
+      note.className = 'home-section-note';
+      note.textContent = extra;
+      head.appendChild(note);
+    }
+    section.appendChild(head);
+    return section;
+  }
+
+  /**
+   * 홈의 Attention 항목. **알림 탭 카드의 복제가 아니다**. 요약과 완료·나중에 버튼은
+   * 빼고 배지·제목·기한까지만 둔다. 처리는 알림 탭이 맡는다(설계 2·4절).
+   */
+  function makeAttentionItem(item) {
+    const entry = document.createElement('button');
+    entry.type = 'button';
+    entry.className = 'home-attention';
+    entry.setAttribute('aria-label', `${item.title || '제목 없음'} 알림 열기`);
+    entry.addEventListener('click', openMailAttention);
+
+    const top = document.createElement('span');
+    top.className = 'home-attention-top';
+    const badge = document.createElement('span');
+    badge.className = 'home-attention-badge';
+    badge.textContent = REASON_LABELS[item.reasonKind] || '메일';
+    const source = document.createElement('span');
+    source.className = 'home-attention-source';
+    source.textContent = item.provider === 'gmail' ? 'Gmail' : 'Naver';
+    top.append(badge, source);
+
+    const subject = document.createElement('span');
+    subject.className = 'home-attention-title';
+    subject.textContent = item.title || '(제목 없음)';
+    entry.append(top, subject);
+
+    const deadline = formatDeadline(item);
+    if (deadline || item.action) {
+      const meta = document.createElement('span');
+      meta.className = 'home-attention-meta';
+      meta.textContent = [deadline, item.action].filter(Boolean).join(' · ');
+      entry.appendChild(meta);
+    }
+    return entry;
+  }
+
+  function makeAttentionSection() {
+    // 메일이 꺼져 있으면 이 영역 자체를 만들지 않는다. 빈 카드로 자리를 채우지 않는다.
+    if (state.mail?.disabled) return null;
+    if (state.attentionError) {
+      const section = makeHomeSection('확인할 것');
+      const failed = document.createElement('p');
+      failed.className = 'home-empty danger';
+      failed.textContent = '확인할 것을 불러오지 못했어';
+      section.appendChild(failed);
+      return section;
+    }
+    if (!state.attention.length) return null;
+    const hidden = state.attention.length - HOME_ATTENTION_LIMIT;
+    const section = makeHomeSection('확인할 것', `${state.attention.length}건`);
+    state.attention.slice(0, HOME_ATTENTION_LIMIT)
+      .forEach(item => section.appendChild(makeAttentionItem(item)));
+    if (hidden > 0) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'home-more';
+      more.textContent = `+${hidden}건 더`;
+      more.addEventListener('click', openMailAttention);
+      section.appendChild(more);
+    }
+    return section;
+  }
+
+  function makeTodaySection() {
+    if (!state.enabled || state.scheduleError || !state.summary) return null;
+    const counts = state.summary.counts || {};
+    const overdue = Number(counts.overdue) || 0;
+    const today = Number(counts.today) || 0;
+    const preview = Array.isArray(state.summary.preview) ? state.summary.preview : [];
+    const next = state.summary.nextReminder;
+    if (!overdue && !today && !next) return null;
+
+    const section = makeHomeSection('오늘', overdue > 0 ? `지연 ${overdue}` : '');
+    preview.slice(0, 2).forEach(task => {
+      const entry = document.createElement('button');
+      entry.type = 'button';
+      entry.className = 'home-today';
+      entry.setAttribute('aria-label', `${task.title || '제목 없는 일정'} 열기`);
+      entry.addEventListener('click', () => openTasks({ view: 'today' }));
+      const title = document.createElement('span');
+      title.className = 'home-today-title';
+      title.textContent = task.title || '제목 없는 일정';
+      const meta = document.createElement('span');
+      meta.className = 'home-today-meta';
+      meta.textContent = task.bucket === 'overdue'
+        ? '지연'
+        : task.dueKind === 'datetime' ? formatDateTime(task.dueAt) : '오늘';
+      entry.append(title, meta);
+      section.appendChild(entry);
+    });
+    if (next) {
+      const line = document.createElement('p');
+      line.className = 'home-note';
+      line.textContent = `다음 알림 ${formatDateTime(next.remindAt)}`;
+      section.appendChild(line);
+    }
+    return section;
+  }
+
+  // 홈의 정상 상태는 정보가 적은 상태다. 확인할 것도 오늘 할 일도 없으면 조용히 끝낸다.
+  function makeQuietLine() {
+    const line = document.createElement('p');
+    line.className = 'home-empty';
+    line.textContent = '오늘은 따로 확인할 일이 없어.';
+    return line;
+  }
+
+  // 첫 화면은 브리핑이다. `확인할 것`과 `오늘`이 먼저 오고 에이전트 상태가 뒤에 온다.
+  // 상세 데이터는 줄을 눌렀을 때 그 화면이 쓴다. 에이전트가 늘어도 여는 비용이
+  // 줄 수만큼만 는다.
   function renderSummary() {
     state.container.replaceChildren();
-    const cards = document.createElement('div');
-    cards.className = 'agent-cards';
-    cards.append(makeScheduleCard(), makeMailCard(), makeCodexCard());
-    state.container.appendChild(cards);
+    const attention = makeAttentionSection();
+    const today = makeTodaySection();
+    if (attention) state.container.appendChild(attention);
+    if (today) state.container.appendChild(today);
+    if (!attention && !today) state.container.appendChild(makeQuietLine());
+
+    const agents = makeHomeSection('에이전트');
+    const rows = document.createElement('div');
+    rows.className = 'home-agents';
+    rows.append(makeScheduleRow(), makeMailRow(), makeCodexRow());
+    agents.appendChild(rows);
+    state.container.appendChild(agents);
   }
 
   // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
@@ -1007,6 +1150,18 @@
     return true;
   }
 
+  // 홈의 `확인할 것`은 알림 탭과 같은 응답을 읽는다. 메일 전용 API를 따로 만들지
+  // 않는다(설계 3절). `snoozed`는 서버가 애초에 주지 않는다. 사용자가 지금 안 보겠다고
+  // 한 것을 홈 최상단에 다시 올리지 않는다(설계 4절).
+  async function loadHomeAttention() {
+    const response = await state.apiFetch('/api/notifications');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || '확인할 것을 불러오지 못했습니다.');
+    state.attention = (Array.isArray(data.notifications) ? data.notifications : [])
+      .filter(item => item.source === 'mail');
+    return true;
+  }
+
   async function loadCodexStatus() {
     const response = await state.apiFetch('/api/organize/status');
     const data = await response.json().catch(() => ({}));
@@ -1200,6 +1355,13 @@
     refresh();
   }
 
+  // 홈은 무엇을 봐야 하는지만 말한다. 완료·미루기는 알림 탭이 맡으므로 그쪽 메일
+  // 필터를 열어준다(설계 2절).
+  function openMailAttention() {
+    global.PaperPanel?.open('notifications');
+    global.NotificationPanel?.show('mail');
+  }
+
   async function refresh() {
     if (!state.initialized) return;
     if (state.mode === 'tasks') {
@@ -1235,12 +1397,16 @@
       return;
     }
     renderLoading();
-    // 한 에이전트가 죽어도 나머지 카드는 살아 있어야 한다.
-    const [scheduleResult, codexResult, mailResult] = await Promise.allSettled([
+    // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
+    const [scheduleResult, codexResult, mailResult, attentionResult] = await Promise.allSettled([
       state.enabled ? loadScheduleSummary() : Promise.resolve(false),
       loadCodexStatus(),
       loadMailData(),
+      loadHomeAttention(),
     ]);
+    state.attentionError = attentionResult.status === 'rejected'
+      ? attentionResult.reason.message
+      : '';
     state.scheduleError = scheduleResult.status === 'rejected'
       ? scheduleResult.reason.message
       : '';

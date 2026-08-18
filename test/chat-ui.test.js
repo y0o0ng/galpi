@@ -182,39 +182,58 @@ test('the codex agent card keeps three type steps, not four half-pixel ones', ()
   assert.match(css, /\.codex-agent-block \{[^}]*padding: 16px/s);
 });
 
-test('the agent summary cards reuse the panel type scale and stay one column', () => {
+test('the home reuses the panel type scale and stays one column', () => {
   // 지식 패널은 데스크톱에서 350px 고정 폭이라 2열이 물리적으로 안 들어간다.
-  // 그래서 카드는 데스크톱과 모바일이 같은 1열을 쓰고, 그리드 컬럼을 만들지 않는다.
+  // 그래서 홈은 데스크톱과 모바일이 같은 1열을 쓰고, 그리드 컬럼을 만들지 않는다.
   assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 350px;/);
-  assert.match(css, /\.agent-cards \{[^}]*display: grid/s);
-  assert.doesNotMatch(css, /\.agent-cards \{[^}]*grid-template-columns/s);
+  assert.match(css, /\.home-agents \{[^}]*display: grid/s);
+  assert.doesNotMatch(css, /\.home-agents \{[^}]*grid-template-columns/s);
 
-  // 9 · 11 · 17만 쓴다. 카드 때문에 새 단계를 만들지 않는다.
-  assert.match(css, /\.agent-card-title \{[^}]*font-size: 17px/s);
-  assert.match(css, /\.agent-card-metric \{[^}]*font-size: 11px/s);
-  assert.match(css, /\.agent-card-detail \{[^}]*font-size: 11px/s);
+  // 9 · 11 · 17만 쓴다. 홈 때문에 새 단계를 만들지 않는다.
+  assert.match(css, /\.home-section-title \{[^}]*font-size: 9px/s);
+  assert.match(css, /\.home-attention-title \{[^}]*font-size: 11px/s);
+  assert.match(css, /\.home-agent-title \{[^}]*font-size: 11px/s);
 
-  // 패널 카드 모서리는 12px 하나다.
-  assert.match(css, /\.agent-card \{[^}]*border-radius: 12px/s);
-  // 390px은 상세 블록의 값이다. 카드가 그 높이를 물려받으면 접는 의미가 없다.
-  assert.doesNotMatch(css, /\.agent-card \{[^}]*min-height/s);
+  // 카드 모서리는 12px, 그 안의 일반 컨트롤은 10px 하나씩이다.
+  assert.match(css, /\.home-attention,\n\.home-today \{[^}]*border-radius: 12px/s);
+  assert.match(css, /\.home-agent \{[^}]*border-radius: 10px/s);
+  // 390px은 상세 블록의 값이다. 홈이 그 높이를 물려받으면 접는 의미가 없다.
+  assert.doesNotMatch(css, /\.home-agent \{[^}]*min-height/s);
 });
 
-test('an agent card is one button, so mobile gets one target instead of several', () => {
+test('the home briefing comes before the agent status, and never outranks itself', () => {
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  // 카드 안에 버튼을 또 넣으면 중첩이 되고 타깃이 잘게 쪼개진다. 복구 버튼은 상세에 둔다.
-  assert.match(panel, /card = document\.createElement\('button'\)/);
-  assert.match(panel, /card\.addEventListener\('click', onOpen\)/);
-  assert.doesNotMatch(panel, /card\.appendChild\(button\(/);
+  const render = panel.slice(panel.indexOf('function renderSummary()'));
+  const body = render.slice(0, render.indexOf('\n  }'));
+  // 홈이 답하는 질문은 "지금 뭘 봐야 하는가"다. 에이전트 운영 상태가 그 앞에 오면
+  // 순서가 뒤집힌다.
+  assert.ok(body.indexOf('makeAttentionSection') < body.indexOf('makeTodaySection'));
+  assert.ok(body.indexOf('makeTodaySection') < body.indexOf('makeScheduleRow'));
+
+  // 홈은 알림 탭과 같은 응답을 읽는다. 메일 전용 목록 API를 따로 부르지 않는다.
+  assert.match(panel, /item\.source === 'mail'/);
+  // 상태 변경은 알림 탭의 몫이다. 홈에서 완료·미루기를 부르면 책임이 두 곳이 된다.
+  assert.doesNotMatch(panel, /\/api\/mail\/attention/);
+
+  // 정상 에이전트의 운영 세부값이 첫 화면을 채우지 않는다.
+  assert.match(panel, /tone === 'warn' \|\| tone === 'danger'/);
+});
+
+test('an agent row is one button, so mobile gets one target instead of several', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  // 줄 안에 버튼을 또 넣으면 중첩이 되고 타깃이 잘게 쪼개진다. 복구 버튼은 상세에 둔다.
+  assert.match(panel, /row = document\.createElement\('button'\)/);
+  assert.match(panel, /row\.addEventListener\('click', onOpen\)/);
+  assert.doesNotMatch(panel, /row\.appendChild\(button\(/);
 });
 
 test('the summary screen reads status only, and details load their own agent', () => {
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
   // 카드가 쓰는 runner는 organize/status에도 있다. 요약이 모델 카탈로그까지
   // 부르면 에이전트가 늘 때마다 여는 비용이 그만큼 는다.
-  assert.match(panel, /loadScheduleSummary\(\) : Promise\.resolve\(false\),\s*loadCodexStatus\(\),\s*loadMailData\(\),/s);
+  assert.match(panel, /loadScheduleSummary\(\) : Promise\.resolve\(false\),\s*loadCodexStatus\(\),\s*loadMailData\(\),\s*loadHomeAttention\(\),/s);
   assert.doesNotMatch(panel, /loadCodexData\(\),\s*loadMailData/s);
-  // 한 에이전트가 죽어도 나머지 카드는 살아 있어야 한다.
+  // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
   assert.match(panel, /Promise\.allSettled\(\[\s*state\.enabled \? loadScheduleSummary/s);
 });
 

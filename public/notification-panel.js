@@ -376,8 +376,13 @@
     }
   }
 
-  function show() {
-    if (state.initialized) refresh();
+  // 홈에서 열 때만 필터를 지정한다. 인자가 없으면 사용자가 마지막에 고른 필터를 둔다.
+  function show(filter) {
+    if (!state.initialized) return;
+    // selectFilter는 이미 받아둔 목록만 다시 그린다. 홈에서 곧바로 열면 그 목록이
+    // 비어 있을 수 있으므로 필터를 세운 뒤 항상 다시 읽는다.
+    if (filter) selectFilter(filter);
+    refresh();
   }
 
   function init({ apiFetch, showToast, onSplit, openNote }) {
