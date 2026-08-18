@@ -27,6 +27,8 @@
     mail: null,
     mailError: '',
     mailRequeueRunning: false,
+    mailSettings: null,
+    mailSettingsSaving: false,
   };
 
   const countLabels = [
@@ -751,6 +753,48 @@
     state.container.appendChild(cards);
   }
 
+  // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
+  // 있으면 서버에 민감 내용을 payload에 넣는 분기가 존재하게 된다(설계 13.1).
+  function makeMailSettings() {
+    const section = document.createElement('section');
+    section.className = 'schedule-agent-section';
+    const heading = document.createElement('h3');
+    heading.textContent = '알림';
+    section.appendChild(heading);
+
+    if (!state.mailSettings) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message';
+      message.textContent = '설정을 불러오지 못했어.';
+      section.appendChild(message);
+      return section;
+    }
+
+    const { notificationsEnabled, quietHours } = state.mailSettings;
+    const summary = document.createElement('p');
+    summary.className = 'codex-agent-message';
+    summary.textContent = notificationsEnabled
+      ? `Push 켜짐 · 방해 금지 ${quietHours.enabled ? `${quietHours.start}~${quietHours.end}` : '꺼짐'}`
+      : 'Push 꺼짐 · 판단과 Attention은 그대로 쌓여';
+    section.appendChild(summary);
+
+    const actions = document.createElement('div');
+    actions.className = 'codex-agent-actions';
+    const togglePush = button(
+      notificationsEnabled ? 'Push 끄기' : 'Push 켜기',
+      () => saveMailSettings({ notificationsEnabled: !notificationsEnabled }),
+    );
+    const toggleQuiet = button(
+      quietHours.enabled ? '방해 금지 끄기' : '방해 금지 켜기',
+      () => saveMailSettings({ quietHours: { ...quietHours, enabled: !quietHours.enabled } }),
+    );
+    togglePush.disabled = state.mailSettingsSaving;
+    toggleQuiet.disabled = state.mailSettingsSaving;
+    actions.append(togglePush, toggleQuiet);
+    section.appendChild(actions);
+    return section;
+  }
+
   function makeDetailHead(titleText, ariaLabel) {
     const head = document.createElement('div');
     head.className = 'schedule-agent-workspace-head';
@@ -860,6 +904,8 @@
       + ` · 완료 ${Number(analysis.done) || 0} · 멈춤 ${failed} · 건너뜀 ${Number(analysis.skipped) || 0}`;
     if (failed > 0) queue.classList.add('warn');
     block.appendChild(queue);
+
+    block.appendChild(makeMailSettings());
 
     // 좌초한 분석은 열어봐야 고칠 것이 없다. 사람이 할 수 있는 일은 다시 돌리는 것뿐이라
     // 사유 코드까지만 보여주고 제목·발신자는 싣지 않는다(설계 19절).
@@ -981,6 +1027,36 @@
     if (!response.ok) throw new Error(data.error || 'Mail 상태를 불러오지 못했습니다.');
     state.mail = data;
     return true;
+  }
+
+  async function loadMailSettings() {
+    const response = await state.apiFetch('/api/mail/settings');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return false;
+    state.mailSettings = data.settings || null;
+    return true;
+  }
+
+  async function saveMailSettings(patch) {
+    if (state.mailSettingsSaving) return;
+    state.mailSettingsSaving = true;
+    renderMailDetail();
+    try {
+      const response = await state.apiFetch('/api/mail/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '설정을 저장하지 못했습니다.');
+      state.mailSettings = data.settings;
+      state.showToast('알림 설정을 바꿨어');
+    } catch (error) {
+      state.showToast(error.message);
+    } finally {
+      state.mailSettingsSaving = false;
+      renderMailDetail();
+    }
   }
 
   async function requeueMailAnalysis() {
@@ -1153,8 +1229,8 @@
       return;
     }
     if (state.mode === 'mail') {
-      const result = await Promise.allSettled([loadMailData()]);
-      state.mailError = result[0].status === 'rejected' ? result[0].reason.message : '';
+      const [mail] = await Promise.allSettled([loadMailData(), loadMailSettings()]);
+      state.mailError = mail.status === 'rejected' ? mail.reason.message : '';
       renderMailDetail();
       return;
     }

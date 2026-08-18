@@ -232,3 +232,56 @@ test('snooze refuses a wake time that is not in the future', () => {
   assert.equal(attentionRow(db, attentionId).state, 'open');
   db.close();
 });
+
+// ── 알림 설정 (설계 4.1) ──────────────────────────────────────────────────────
+// preview 설정은 없앴으므로(13.1) 사용자가 만지는 값은 둘뿐이다.
+
+test('mail settings start at the values the design fixed', () => {
+  const { db, store } = setup();
+  assert.deepEqual(store.getMailSettings(), {
+    notificationsEnabled: true,
+    quietHours: { enabled: true, start: '23:00', end: '07:00' },
+  });
+  db.close();
+});
+
+test('settings round-trip through app_settings without a table of their own', () => {
+  const { db, store } = setup();
+  store.saveMailSettings({
+    notificationsEnabled: false,
+    quietHours: { enabled: true, start: '22:30', end: '08:00' },
+  });
+
+  assert.deepEqual(store.getMailSettings(), {
+    notificationsEnabled: false,
+    quietHours: { enabled: true, start: '22:30', end: '08:00' },
+  });
+  // 기존 표를 공유한다. 메일 전용 표를 만들지 않는다.
+  const keys = db.prepare("SELECT key FROM app_settings WHERE key LIKE 'mail.%' ORDER BY key").all();
+  assert.deepEqual(keys.map(k => k.key), ['mail.notifications_enabled', 'mail.quiet_hours']);
+  db.close();
+});
+
+test('a broken shape is refused instead of stored', () => {
+  const { db, store } = setup();
+  for (const bad of [
+    { notificationsEnabled: 'yes' },
+    { quietHours: { enabled: true, start: '25:00', end: '07:00' } },
+    { quietHours: { enabled: true, start: '23:00' } },
+    { quietHours: { enabled: 'on', start: '23:00', end: '07:00' } },
+    { quietHours: 'off' },
+  ]) {
+    assert.throws(() => store.saveMailSettings(bad), /설정/, JSON.stringify(bad));
+  }
+  // 거부됐으므로 기본값 그대로다.
+  assert.equal(store.getMailSettings().notificationsEnabled, true);
+  db.close();
+});
+
+test('a stored value that went bad falls back instead of silencing push', () => {
+  const { db, store } = setup();
+  db.prepare("INSERT INTO app_settings (key, value_json) VALUES ('mail.quiet_hours', '{oops')").run();
+  // 깨진 설정 때문에 알림이 영영 안 나가면 안 된다. 기본값으로 읽는다.
+  assert.deepEqual(store.getMailSettings().quietHours, { enabled: true, start: '23:00', end: '07:00' });
+  db.close();
+});

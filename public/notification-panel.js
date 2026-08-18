@@ -142,6 +142,109 @@
     }
   }
 
+  function formatDeadline(item) {
+    if (item.deadlineKind === 'date' && item.deadlineDate) return `${item.deadlineDate}까지`;
+    if (item.deadlineKind === 'datetime' && Number.isSafeInteger(item.deadlineAt)) {
+      return `${new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }).format(new Date(item.deadlineAt * 1000))}까지`;
+    }
+    return '';
+  }
+
+  const REASON_LABELS = {
+    action_required: '행동 필요',
+    attachment_check: '첨부 확인 필요',
+    low_confidence: '확인 필요',
+  };
+
+  /**
+   * 메일 카드. **받은편지함이 아니다** — 제목·요약·행동·기한까지만 보여주고 본문은
+   * 담지 않는다(설계 23). 메일 원문은 provider 앱/웹에서 연다.
+   */
+  function makeMailCard(item) {
+    const card = document.createElement('article');
+    card.className = 'notification-card type-mail_attention';
+
+    const top = document.createElement('div');
+    top.className = 'notification-card-top';
+    const badge = document.createElement('span');
+    badge.className = 'notification-badge';
+    badge.textContent = REASON_LABELS[item.reasonKind] || '메일';
+    const source = document.createElement('span');
+    source.className = 'notification-source';
+    source.textContent = item.provider === 'gmail' ? 'Gmail' : 'Naver';
+    top.append(badge, source);
+
+    const who = document.createElement('div');
+    who.className = 'notification-note';
+    who.textContent = item.sender || '보낸사람 없음';
+    const subject = document.createElement('div');
+    subject.className = 'notification-text';
+    subject.textContent = item.title || '(제목 없음)';
+
+    card.append(top, who, subject);
+
+    if (item.text) {
+      const summary = document.createElement('div');
+      summary.className = 'notification-text mail-summary';
+      summary.textContent = item.text;
+      card.appendChild(summary);
+    }
+    const deadline = formatDeadline(item);
+    if (item.action || deadline) {
+      const line = document.createElement('div');
+      line.className = 'notification-reasons mail-action';
+      const entry = document.createElement('li');
+      entry.textContent = [deadline, item.action].filter(Boolean).join(' · ');
+      line.appendChild(entry);
+      card.appendChild(line);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'notification-actions';
+    actions.append(
+      makeMailAction('완료', () => mailAction(item, 'done')),
+      makeMailAction('나중에', () => mailAction(item, 'snooze')),
+    );
+    card.appendChild(actions);
+    return card;
+  }
+
+  function makeMailAction(label, onClick) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'notification-action';
+    button.textContent = label;
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
+  // 기본 미루기는 3시간이다. 사용자가 시각을 고르는 UI는 아직 만들지 않는다 —
+  // 값이 필요해지면 그때 연다.
+  const SNOOZE_SECONDS = 3 * 60 * 60;
+
+  async function mailAction(item, kind) {
+    try {
+      const response = await state.apiFetch(`/api/mail/attention/${item.attentionId}/${kind}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(kind === 'snooze'
+          ? { until: Math.floor(Date.now() / 1000) + SNOOZE_SECONDS }
+          : {}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '처리하지 못했습니다.');
+      state.showToast(kind === 'done' ? '완료로 표시했어' : '3시간 뒤에 다시 알려줄게');
+      // 목록에서 즉시 빼서 화면과 서버가 어긋나 보이지 않게 한다.
+      state.notifications = state.notifications.filter(entry => entry.id !== item.id);
+      renderItems();
+    } catch (error) {
+      state.showToast(error.message);
+    }
+  }
+
   function makeNotificationCard(item) {
     const card = document.createElement('article');
     card.className = `notification-card type-${item.type || 'review'}`;
@@ -240,7 +343,9 @@
       content.appendChild(emptyState('표시할 알림이 없습니다.'));
       return;
     }
-    items.forEach(item => content.appendChild(makeNotificationCard(item)));
+    items.forEach(item => content.appendChild(
+      item.source === 'mail' ? makeMailCard(item) : makeNotificationCard(item),
+    ));
   }
 
   function selectFilter(filter) {
@@ -283,7 +388,7 @@
       || typeof showToast !== 'function'
       || typeof onSplit !== 'function'
       || typeof openNote !== 'function'
-      || !el.panel || !el.refresh || !el.content || el.tabs.length !== 4
+      || !el.panel || !el.refresh || !el.content || el.tabs.length !== 5
     ) {
       throw new TypeError('알림 패널 초기화 인자가 올바르지 않습니다.');
     }

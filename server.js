@@ -48,7 +48,6 @@ const {
   buildMailSendOptions,
   createMailPushService,
 } = require('./lib/mail/push');
-const { DEFAULT_QUIET_HOURS } = require('./lib/mail/quiet-hours');
 const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
@@ -937,8 +936,9 @@ const mailAnalyzer = MAIL_AGENT_ENABLED && HAS_GPT
 const mailPushService = MAIL_AGENT_ENABLED && ASSISTANT_PUSH_CONFIG.enabled
   ? createMailPushService(db, {
     enabled: true,
-    // 설정 계층은 MAIL-3 뒤 단계에서 붙인다. 지금은 설계 기본값이다.
-    settings: () => ({ notificationsEnabled: true, quietHours: DEFAULT_QUIET_HOURS }),
+    // 설정은 app_settings가 정본이다. 매번 읽어서 사용자가 바꾸면 다음 tick부터
+    // 바로 듣게 한다 — 서버 재시작을 기다리게 하지 않는다.
+    settings: () => mailStore.getMailSettings(),
   })
   : null;
 const mailPushDispatcher = mailPushService
@@ -5892,7 +5892,12 @@ app.get('/api/notifications', async (_req, res) => {
     const taskNotifications = ASSISTANT_TASKS_ENABLED
       ? assistantTasks.listFiredNotifications()
       : [];
-    const notifications = [...taskNotifications, ...listManualCheckNotifications(), ...codex];
+    // 메일 Attention도 같은 shape으로 합류한다. 알림 탭이 메일 전용 polling API를
+    // 하나 더 치지 않게 한다(설계 22.3). 플래그가 꺼져 있으면 표가 비어 있을 뿐이다.
+    const mailNotifications = MAIL_AGENT_ENABLED ? mailStore.listAttentionNotifications() : [];
+    const notifications = [
+      ...taskNotifications, ...mailNotifications, ...listManualCheckNotifications(), ...codex,
+    ];
     const recentSaves = listRecentSaves();
     res.json({
       success: true,

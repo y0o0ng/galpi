@@ -269,3 +269,49 @@ test('every progress stage the server can send has a chat label', () => {
   // 큰 첨부의 첫 턴은 파싱이 요청 안에서 끝나므로 그 시간을 따로 알린다.
   assert.ok(labelled.has('attachment_parse'));
 });
+
+test('the notification panel gains a mail filter without losing the others', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  const panel = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
+  const filters = [...html.matchAll(/data-notification-filter="([a-z]+)"/g)].map(m => m[1]);
+  assert.deepEqual(filters, ['all', 'codex', 'system', 'mail', 'saves']);
+  // 가드가 탭 수를 고정한다. 버튼만 늘리고 가드를 안 고치면 패널이 통째로 죽는다.
+  assert.match(panel, /el\.tabs\.length !== 5/);
+});
+
+test('mail cards never render the mail body, only what the design allows', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
+  // 알림 탭은 받은편지함이 아니다(설계 23). 카드는 제목·요약·행동·기한까지다.
+  assert.match(panel, /function makeMailCard/);
+  assert.doesNotMatch(panel, /item\.body/);
+  // 카드 본문만 본다. 패널 다른 곳의 정적 스켈레톤 마크업은 데이터가 아니라 위험하지 않다.
+  const cardSource = panel.slice(panel.indexOf('function makeMailCard'), panel.indexOf('function makeMailAction'));
+  assert.ok(cardSource.length > 200, 'makeMailCard 본문을 못 찾았다');
+  assert.equal(cardSource.includes('innerHTML'), false);
+  assert.match(cardSource, /textContent/);
+  // 완료·나중에는 서버 상태를 바꾸는 유일한 경로다.
+  assert.match(panel, /\/api\/mail\/attention\/\$\{item\.attentionId\}\/\$\{kind\}/);
+});
+
+test('the two consumers of /api/notifications still split task from the rest', () => {
+  // 메일이 합류하면서 일정 블록에 새면 안 되고, 알림 탭에서 빠져도 안 된다.
+  const agent = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  const panel = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
+  assert.match(agent, /filter\(item => item\.type === 'task_reminder'\)/);
+  assert.match(panel, /filter\(item => item\.type !== 'task_reminder'\)/);
+});
+
+test('the service worker shows fixed text and never reads mail content', () => {
+  const sw = fs.readFileSync(path.join(ROOT, 'public/sw.js'), 'utf8');
+  assert.match(sw, /payload\.type === 'mail_attention'/);
+  assert.match(sw, /XION 메일 알림/);
+  assert.match(sw, /XION 일정 알림/);
+  // payload가 담지 않는 값을 SW가 읽으려 하면 안 된다.
+  for (const forbidden of ['payload.subject', 'payload.sender', 'payload.summary', 'payload.count', 'payload.body']) {
+    assert.equal(sw.includes(forbidden), false, forbidden);
+  }
+  // 회차를 tag에 넣지 않으면 snooze 재알림이 이전 알림을 덮어쓴다.
+  assert.match(sw, /notifySeq/);
+  // 서버 API를 다시 부르지 않는다. 잠금화면 문구는 payload만으로 정해진다.
+  assert.equal(sw.includes('fetch('), false);
+});

@@ -101,11 +101,14 @@ test('minimal PWA has stable scope and a push-only service worker', () => {
     assert.ok(fs.existsSync(path.join(ROOT, `public/lib/icons/Xion/xion-app-icon-${size}.png`)));
   }
   assert.match(worker, /addEventListener\('push'/);
-  assert.match(worker, /showNotification\('XION 일정 알림'/);
+  // 메일 알림이 붙으면서 분기가 생겼다. 잠그는 것은 여전히 일정 쪽 문구·tag가
+  // 그대로라는 것이다 — MAIL-3가 배포된 일정 Push를 바꾸지 않는다.
+  assert.match(worker, /'XION 일정 알림'/);
+  assert.match(worker, /확인할 일정이 있어\. 앱에서 내용을 확인해줘\./);
   assert.match(worker, /icon: '\/lib\/icons\/Xion\/xion-app-icon-192\.png'/);
   assert.match(worker, /badge: '\/lib\/icons\/Xion\/xion-mark\.svg'/);
   assert.doesNotMatch(worker, /Claude_code_pet/);
-  assert.match(worker, /tag: `task-reminder:\$\{reminderId\}`/);
+  assert.match(worker, /`task-reminder:\$\{safeInt\(payload\.reminderId\) \?\? 'unknown'\}`/);
   assert.match(worker, /addEventListener\('notificationclick'/);
   assert.match(worker, /\?panel=agents&taskView=reminders/);
   assert.match(worker, /current\.navigate\(target\.href\)/);

@@ -11,6 +11,7 @@ function createFakeApp() {
   return {
     get(path, handler) { routes.set(`GET ${path}`, handler); },
     post(path, handler) { routes.set(`POST ${path}`, handler); },
+    put(path, handler) { routes.set(`PUT ${path}`, handler); },
     async call(key, req = {}) {
       req.params = req.params || {};
       const handler = routes.get(key);
@@ -38,6 +39,15 @@ function createFakeStore(accounts = [], states = new Map(), overrides = {}) {
     analysisSummary: () => EMPTY_ANALYSIS,
     listStrandedAnalysis: () => [],
     requeueFailedAnalysis: () => 0,
+    getMailSettings: () => ({
+      notificationsEnabled: true,
+      quietHours: { enabled: true, start: '23:00', end: '07:00' },
+    }),
+    saveMailSettings: patch => ({
+      notificationsEnabled: true,
+      quietHours: { enabled: true, start: '23:00', end: '07:00' },
+      ...patch,
+    }),
     findAttentionById: () => ({ id: 1, state: 'open', notifySeq: 1, snoozedUntil: null }),
     resolveAttention: () => ({ changed: true, state: 'done' }),
     snoozeAttention: (id, until) => ({ changed: true, state: 'snoozed', snoozedUntil: until }),
