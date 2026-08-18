@@ -254,18 +254,15 @@ Attention 생성
 시온 Push
 ```
 
-알림 미리보기가 `표시`일 때의 예:
+Push는 어떤 경우에도 메일 내용을 싣지 않는다(13.1). 잠금화면에는 고정 문구만 뜬다.
 
 ```text
-📧 답변이 필요한 메일
+📧 XION 메일 알림
 
-AI Trainer 지원 관련 메일이 왔어.
-8월 19일까지 면접 가능 시간을 선택해야 해.
+확인할 메일이 있어. 앱에서 내용을 확인해줘.
 ```
 
-기본값인 `숨김`에서는 13.1의 무내용 문구만 나간다.
-
-알림을 누르면 알림 탭의 해당 Attention 카드로 이동한다(19절 — 별도 메일 상세 페이지를 만들지 않는다).
+무엇이 왔는지는 앱을 열어야 보인다. 알림을 누르면 알림 탭의 해당 Attention 카드로 이동한다(19절 — 별도 메일 상세 페이지를 만들지 않는다).
 
 ---
 
@@ -368,7 +365,6 @@ Recent Decisions
 - Mail Agent On/Off
 - 계정 연결/해제
 - 알림 전체 On/Off
-- **알림 미리보기(숨김 / 표시, 기본 숨김)**
 - Quiet Hours(기본 23:00~07:00 KST, 끌 수 있음)
 - 저장된 Preference 확인/삭제
 
@@ -1509,49 +1505,63 @@ Mail Push가 실패해도 Attention Queue와 `mail_messages`가 정본이므로 
 
 ---
 
-## 13.1 잠금화면 프라이버시 — 미리보기 정책
+## 13.1 잠금화면 프라이버시 — Push는 메일 내용을 전달하지 않는다
 
-현재 갈피 Push는 **내용 없는 알림**이 기본이다(`public/sw.js`가 제목·본문을 고정 문구로 표시한다). 메일의 발신자·제목·요약을 잠금화면에 띄우는 것은 별도의 privacy policy 결정이므로 설정으로 둔다.
+**불변식:** Mail Push는 "XION에 확인할 메일이 있다"는 사실과 앱 안의 대상 위치만 전달한다. 메일에서 파생된 어떤 내용도 payload에 싣지 않는다.
 
-```text
-알림 미리보기
-- 숨김 (기본)
-- 표시
+처음에는 `알림 미리보기(숨김 / 표시)` 설정을 두고 기본을 `숨김`으로 했다. **2026-08-18 설정 자체를 없앴다.** 이유는 기본값의 문제가 아니라 코드 경로의 문제다 — `표시` 모드가 있으면 서버에 "민감 내용을 payload에 넣는 분기"가 존재하고, 그 분기가 존재하는 한 설정 읽기 버그·구버전 SW 캐시·payload 로깅 어디서든 샌다. 분기를 없애면 샐 경로가 없다.
+
+### payload v1 — 허용 key는 정확히 여섯이다
+
+```json
+{
+  "version": 1,
+  "type": "mail_attention",
+  "targetKind": "attention",
+  "targetId": 12,
+  "notifySeq": 1,
+  "url": "/?panel=notifications&notification=mail&mail=12"
+}
 ```
 
-`숨김`:
+`targetKind`가 `batch`면 `targetId`는 `mail_notification_batches.id`이고 `url`은 `/?panel=notifications&notification=mail`이다. batch에서 특정 메일 하나로 이동하지 않는다.
+
+```text
+허용   version · type · targetKind · targetId · notifySeq · url
+금지   sender · senderName · senderAddress · subject · summary · body · action ·
+       deadline · category · importance · confidence · provider · messageId ·
+       thread · attachment · **batch count** · 그 밖의 메일 파생 metadata
+```
+
+**batch 개수도 넣지 않는다.** count를 허용하면 "민감 내용은 안 넣지만 일부 메일 파생 metadata는 허용"이라는 애매한 경계가 생긴다. 개수를 빼야 "메일에서 파생된 정보는 payload에 하나도 없다"는 판정 가능한 불변식이 된다. batch의 가치는 개수 표시가 아니라 Push N개를 1개로 줄이는 것이고, 개수는 앱을 연 뒤 서버에서 조회해 보여주면 된다.
+
+### 잠금화면 문구는 고정이다
 
 ```text
 제목: XION 메일 알림
-본문: 확인할 메일이 있어.
+본문: 확인할 메일이 있어. 앱에서 내용을 확인해줘.
 ```
 
-`표시`일 때만 제한된 내용을 넣는다.
+`attention`과 `batch`가 같은 문구를 쓴다. `targetKind`로 문구를 바꾸지 않는다.
 
-```text
-포함 가능
-- 누가 보냈는지
-- 무엇에 관한 메일인지 (요약 1~2줄)
-- 내가 무엇을 해야 하는지
-- 마감일이 있는지
-
-절대 제외
-- 메일 본문 전체
-- 첨부 내용
-- 장황한 모델 설명
-- 중요도 점수 / 내부 분류 카테고리명
-```
-
-메일 원문 전체는 어떤 설정에서도 Push payload에 넣지 않는다.
-
-Service Worker는 payload의 `type`으로 분기한다.
+### Service Worker의 역할
 
 ```text
 task_reminder    기존 일정 알림 (동작 불변)
-mail_attention   메일 알림 (미리보기 정책에 따라 문구 결정)
+mail_attention   메일 알림 (고정 문구)
 ```
 
-미리보기 문구는 **서버가 payload에 담아 보내고** service worker는 그대로 표시한다. 표시 여부 판단을 클라이언트에 두면 설정이 꺼져 있어도 내용이 payload에 실려 나간다.
+SW가 하는 일은 `type` 확인 · 고정 문구 표시 · `payload.url`로 deep-link 셋뿐이다. 메일 내용을 조회하거나 조합하거나 미리보기를 만들지 않는다. `tag`는 payload에 담지 않고 SW가 `targetKind`·`targetId`·`notifySeq`로 조립한다(`mail-attention:attention:12:1`) — 회차를 넣지 않으면 snooze 재알림이 이전 알림을 덮어쓴다.
+
+### 테스트로 잠그는 것
+
+개별 필드 부재만 확인하면 기존 필드에 내용을 끼워 넣는 것을 못 잡는다. 세 겹으로 본다.
+
+```text
+1. key 집합이 허용 목록과 정확히 일치 (attention·batch 둘 다)
+2. 직렬화된 payload 문자열에 그 메일의 발신자·제목·요약이 하나도 나타나지 않음
+3. targetId·notifySeq는 정수, url은 `/`로 시작하는 상대 경로
+```
 
 ---
 
@@ -2087,7 +2097,7 @@ public/index.html             # 알림 탭에 `메일` 필터 버튼 1개 추가
 public/agent-panel.js         # Mail Agent 블록
 public/notification-panel.js  # 메일 카드 + 탭 가드 수정
 public/app.js                 # Push deep-link에서 mail filter/focus
-public/sw.js                  # payload.type 분기 + 미리보기 문구 표시
+public/sw.js                  # payload.type 분기 (문구는 타입별 고정)
 test/                         # 아래 계약 테스트
 ```
 
@@ -2322,7 +2332,7 @@ Push는 아직 켜지 않고 **decision-only 기간**으로 검증한다. `메�
 ✓ Snooze wake + 재알림
 ✓ mail_push_deliveries + 공유 delivery loop
 ✓ 알림 탭 메일 필터 / Attention 카드
-✓ sw.js type 분기 + 미리보기 정책
+✓ sw.js type 분기 + 고정 문구
 ✓ /?panel=notifications&notification=mail&mail=<id> deep-link
 ```
 
@@ -2337,8 +2347,8 @@ Push는 아직 켜지 않고 **decision-only 기간**으로 검증한다. `메�
 6. 기기 2대 → 하나 성공/하나 retry가 각각 표현됨
 7. 구독 410 → 해당 구독 expired, 남은 delivery 정리, 다른 기기 영향 없음
 8. Push transport 전부 실패 → Attention은 그대로 남음
-9. 미리보기 숨김 → 잠금화면에 발신자/제목 노출 0건
-10. 미리보기 표시 → 요약/마감만 노출, 본문 전체 노출 0건
+9. Push payload의 key 집합이 허용 목록과 정확히 일치 (attention·batch 둘 다)
+10. payload 문자열에 발신자·제목·요약·본문·개수가 하나도 나타나지 않음
 11. silent → Push 없음, 검색/기록은 가능
 12. DONE/SNOOZED 처리 후 알림 탭 상태 즉시 일치
 ```
@@ -2403,7 +2413,6 @@ few-shot preference (11.4)
 ✓ 에이전트 탭 상태 화면 + 대기열 다시 처리
 ✓ 알림 탭 메일 필터와 Attention 카드
 ✓ 기존 구독/transport/delivery loop 재사용 + mail delivery 도메인 분리
-✓ 알림 미리보기 숨김/표시 (기본 숨김)
 ✓ 간단한 자연어 feedback
 ✓ 첨부 판단 불가 시 "첨부 확인 필요" Attention fallback
 
@@ -2640,7 +2649,7 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 6. **Batch를 값으로 정의.** `mail_notification_batches` + 15분 window + flush 시 요약 알림 1건. "짧은 시간 안에" 같은 표현을 없앴다.
 7. **Quiet hours를 별도 큐 없이 표현.** delivery의 `next_attempt_at`을 해제 시각으로 잡는다. Attention은 즉시 OPEN.
 8. **Snooze 동작 확정.** OPEN 복귀 + Push 재알림 둘 다 하고, `notify_seq`로 과거 delivery와 새 delivery를 구분한다.
-9. **잠금화면 프라이버시.** `알림 미리보기` 설정을 두고 기본을 `숨김`으로 했다. 문구 결정은 서버가 하고 SW는 표시만 한다.
+9. **잠금화면 프라이버시.** 처음에는 `알림 미리보기` 설정(기본 `숨김`)을 두었으나 **2026-08-18 설정 자체를 없앴다.** 설정이 있으면 서버 코드에 "민감 내용을 payload에 넣는 분기"가 존재하고, 그 분기가 있는 한 설정 읽기 버그 하나로 샌다. 지금 계약은 payload가 routing metadata만 담는 것이고, 민감 내용을 넣을 코드 경로가 아예 없다(13.1).
 10. **LLM 입력·provenance·KST.** MIME 파싱과 HTML→text 정제, 16,000자 상한, `analyzer_model`/`analyzer_prompt_version`, Asia/Seoul 명시를 계약에 넣었다.
 11. **Preference 적용 시점.** 기본은 라우팅 단계 억제, `skip_analysis`만 pre-LLM bypass로 분리해 "선호 우선"과 "선호가 판단을 고정하지 않는다"의 충돌을 없앴다.
 12. **코드 구조·UI 영향 범위.** `lib/mail/` 다섯 파일로 확정하고 flat `lib/mail-*.js`와 `src/` 안을 제거했다. 알림 탭 4→5 가드, `/api/notifications` 합류, 별도 Mail Detail 페이지 없음을 명시했다.
@@ -2680,4 +2689,4 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 4. **실제 메일로 파서 재확인.** 파서 선택은 끝났지만(10.1) 대조에 쓴 것은 합성 fixture다. 실계정의 진짜 메일 — 특히 네이버 발송 메일과 한국 기업 뉴스레터 — 에서 charset·본문 정제 결과를 다시 본다. **여기서 문제가 나와도 파서를 다시 고르는 것이 아니라 전처리를 고친다.**
 5. **Gmail auth client 선택.** 전체 Google API framework 도입 대신 최소 OAuth client로 충분한지 bundle/코드량으로 비교한다.
 6. **구현 시작 시점의 `LATEST_SCHEMA_VERSION`.** 2026-08-17 기준 18이며, 그 사이 다른 기능이 migration을 추가했을 수 있으므로 반드시 다시 확인하고 다음 version을 쓴다.
-7. **Web Push payload 크기 한도.** 미리보기 `표시` 모드의 요약 길이가 payload 한도 안에 드는지 실제 전송으로 확인한다.
+7. ~~**Web Push payload 크기 한도.**~~ **불필요해졌다.** 미리보기 `표시` 모드를 없애면서 payload가 고정 6개 키가 되어 크기가 상수다(13.1).

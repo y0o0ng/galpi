@@ -205,6 +205,10 @@ test('dispatcher sends only an opaque reminder reference and records provider ac
   assert.equal(calls[0].payload.includes('비공개 일정 제목'), false);
   assert.equal(calls[0].payload.includes('외부 전송 금지 상세'), false);
   assert.equal(calls[0].delivery.urgency, 'high');
+  // 도메인 hook을 주지 않은 호출자는 topic과 ttl까지 예전 그대로여야 한다. 기본값이
+  // 어긋나면 배포된 일정 Push가 조용히 바뀐다.
+  assert.equal(calls[0].delivery.topic, `task-${reminder.id}`);
+  assert.equal(typeof calls[0].delivery.ttl, 'number');
   assert.equal(
     db.prepare('SELECT status FROM assistant_push_deliveries').get().status,
     'accepted',

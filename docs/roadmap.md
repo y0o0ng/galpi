@@ -503,7 +503,7 @@ V5는 **밖에 나가 일하는 전문 직원**이다 — 외부 데이터 수�
 
 - **MAIL-1 — Provider durable sync** ✅ **실계정 인수 완료(2026-08-17)**: Gmail `historyId`(INBOX 한정) · Naver IMAP UID locator · message identity dedup · cursor 복구 · baseline 억제 · overlap guard. 실계정에서 확인한 것은 폰에서 먼저 읽은 메일의 감지 · baseline 상한(3,564통 중 200통) · 재시작 후 중복 0건 · 읽음 상태 무변경 · Gmail OAuth 갱신 · SENT 제외(커서는 전진하고 저장은 0통)다. **여기를 통과하기 전에 LLM을 붙이지 않는다.**
 - **MAIL-2 — 분석 큐 + Attention** ✅ **로컬 실계정 인수 완료(2026-08-18)**: 정규화 · safety gate · durable 분석 상태(lease·backoff·상한·좌초 복구) · LLM 판단 · provenance · Attention 생성. 고정 fixture 게이트는 `mail-analysis-v3` · `gpt-5.6-luna` · 18 fixtures × 5회에서 **safety 0/90 위반**으로 통과했다. 실계정에서 확인한 것은 v3 하향 조정(공지 → `silent`) · `immediate` 경로 · date/datetime 기한 KST 정확 · 상대 표현("내일 오전 10시") 해석 · 전달된 실제 HTML 공고 파싱 · 첨부 fallback(10.4) · Attention 생성 · **본문 재조회 후 읽음 무변경(`\Seen=false`)** · Gmail/Naver 양쪽 본문 재조회다. **Push는 켜지 않은 decision-only다.** **2026-08-18 Pi 배포·인수 완료**: 23개 파일 SHA-256 일치 · schema v18→v19 · 기존 데이터 무회귀(노트 46 · 메시지 707 · 일정 84) · **baseline 400통 전부 `skipped`로 LLM 호출 0** · Gmail refresh token Pi 첫 사용 성공 · Pi에서 `mail-analysis-v3` 분석 4건 정상 · 에이전트 탭 카드 실물 확인. **Pi가 정본이고 로컬은 꺼둔다.** **남은 관찰**: 판단이 run-to-run으로 흔들린다. 같은 발신자의 인증번호 3통이 `action_required/immediate` · `important/immediate` · `info/silent`로 갈렸다. **OTP 건은 사용자 판단으로 수용했고**(어차피 바로 확인한다), 흔들림 자체는 `github-notification`·`huge-newsletter`에도 있다. `reasoning.effort`와 Terra 승격은 둘 다 실측으로 막혔다(AGENTS.md 참조). MAIL-3의 batch 묶기로 라우팅 층에서 흡수한다.
-- **MAIL-3 — 알림 UX**: Immediate/Batch/Silent · quiet hours · snooze 재알림 · 기기별 delivery · 알림 탭 메일 필터 · 잠금화면 미리보기(기본 숨김).
+- **MAIL-3 — 알림 UX**: Immediate/Batch/Silent · quiet hours · snooze 재알림 · 기기별 delivery · 알림 탭 메일 필터 · **Push payload는 routing metadata만**(설계 13.1). 잠금화면 미리보기 설정은 2026-08-18 없앴다 — 설정이 있으면 민감 내용을 payload에 넣는 코드 경로가 존재하고 그 경로가 있는 한 버그 하나로 샌다.
 - **MAIL-4 — 피드백/검색**: sender·domain·category preference · 라우팅 억제 · 메일 검색 · thread 단위 Attention.
 
 ### 경계
@@ -520,7 +520,7 @@ V5는 **밖에 나가 일하는 전문 직원**이다 — 외부 데이터 수�
 - [ ] 분석이 실패해도 좌초하지 않고 사람이 에이전트 탭에서 복구할 수 있다 — MAIL-2. 코드와 화면은 있다(`failAnalysis` 상한 → `failed`, 에이전트 탭 Mail 상세의 `멈춘 N개 다시`, `POST /api/mail/analysis/requeue`)이고 오프라인 테스트가 lease 회수·backoff·상한·requeue를 값으로 잠근다. **실계정에서는 일부러 재현하지 않았다** — 진짜 메일을 실패 상태로 밀어넣어야 해서 얻는 것보다 잃는 것이 크다. 실제 좌초가 한 번 생겼을 때 복구까지 확인하고 닫는다
 - [ ] Push가 전부 실패해도 Attention이 남고, 기기 둘의 성공·재시도가 각각 표현된다 — MAIL-3
 - [x] 메일 본문에 심은 가짜 지시문이 tool 호출·외부 행동으로 이어지지 않는다 — **MAIL-2 2026-08-18**. tool을 아예 주지 않는 구조가 보장하고 `test/mail-analyze.test.js`가 잠근다. 판단이 흔들리는지는 fixture 게이트가 따로 재고 `mail-analysis-v3`에서 5/5 안전이었다. `v2`에서 6/10으로 흔들린 원인은 injection 추종이 아니라 "긴급하다고 적힌 메일"과 "실제로 긴급한 메일"을 가르는 기준이 없던 것이었고(지시줄을 뺀 프로브도 같은 승격), 설계 19절 근거 규칙을 넣어 닫았다
-- [ ] 미리보기 숨김에서 잠금화면에 발신자·제목 노출 0건 — MAIL-3
+- [ ] Push payload의 key 집합이 허용 목록(`version`·`type`·`targetKind`·`targetId`·`notifySeq`·`url`)과 정확히 일치하고, 직렬화된 문자열에 발신자·제목·요약·개수가 하나도 나타나지 않는다 — MAIL-3. 개별 필드 부재만 보면 기존 필드에 내용을 끼워 넣는 것을 못 잡는다
 
 ---
 
