@@ -170,7 +170,19 @@ const FIXTURES = [
   },
   {
     id: 'colleague-reply-request',
-    note: '스레드 안의 짧은 회신 요청. 인용이 길어도 판단은 새 문장이 정한다.',
+    note: [
+      '스레드 안의 짧은 회신 요청. 인용이 길어도 판단은 새 문장이 정한다.',
+      '',
+      '2026-08-18 평가 명세 버그 수정: deadline 기대값이 none이었다. 이 메일은 요청한',
+      '행동에 due-by를 명시했으므로("목요일 회의 전까지") "기한 없음"은 메일 내용에 대해',
+      '그냥 틀렸다 — 모델이 무엇을 냈는지와 무관하게 틀렸다. 현재 날짜 2026-08-17이',
+      '월요일이라 "목요일"은 2026-08-20으로 유일하게 풀리고, 기한 표현 자체에 시각이',
+      '명시되지 않았으므로 설계 8.3 계약상 date다. 인용문의 "오후 2시"는 회의 시각이지',
+      '기한이 아니라서 datetime으로 올리지 않는다.',
+      '',
+      'mode는 batch 그대로 둔다. 설계 2.2 A의 "가까운 마감이 있는 응답 요청"이 몇 시간',
+      '이내인지 며칠까지인지 설계가 정하지 않아, batch를 틀렸다고 할 근거가 없다.',
+    ].join('\n'),
     raw: eml({
       from: '김동료 <colleague@example.com>',
       subject: 'Re: 프로젝트 일정',
@@ -183,11 +195,19 @@ const FIXTURES = [
         '> 자료는 미리 공유드릴게요.',
       ].join('\n'),
     }),
-    expected: { category: 'action_required', mode: 'batch', deadline: 'none', attention: 'action_required' },
+    expected: { category: 'action_required', mode: 'batch', deadline: 'date', attention: 'action_required' },
   },
   {
     id: 'meeting-confirmed-datetime',
-    note: '확정 통보라 할 일은 없지만 시각은 정확하다.',
+    note: [
+      '확정 통보라 할 일은 없지만 시각은 정확하다.',
+      '',
+      '2026-08-18 감사에서 "회의 시각은 기한이 아니라 event time이니 none이어야 하지',
+      '않나"를 검토했고 datetime을 유지했다. 설계 15절이 deadline/event candidate를 한',
+      '흐름으로 묶어 적었고 event를 담을 컬럼이 따로 없어, event time이 deadline_*에',
+      '들어가는 것이 설계상 배제되지 않는다. 설계가 판정하지 않는 것을 여기서 정하면',
+      '명세 버그 수정이 아니라 입법이다.',
+    ].join('\n'),
     raw: eml({
       from: '일정 <calendar@example.com>',
       subject: '회의가 확정되었습니다 — 8월 20일 14:00',
