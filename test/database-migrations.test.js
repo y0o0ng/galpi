@@ -638,14 +638,23 @@ test('schema v19 makes identity the only dedup key and keeps locators separate',
     INSERT INTO assistant_push_subscriptions (endpoint, p256dh, auth)
     VALUES ('https://web.push.apple.com/x', 'p', 'a')
   `).run().lastInsertRowid;
+  // expires_at은 created_at(= 삽입 시각) 이후여야 한다는 CHECK가 있으므로 현재 시각에서
+  // 잡는다. 고정 epoch을 쓰면 그 시각을 지나는 순간 이 테스트가 영구히 깨진다.
+  const expiresAt = Math.floor(Date.now() / 1000) + 86_400;
   const insertDelivery = db.prepare(`
     INSERT INTO mail_push_deliveries (
       target_kind, target_id, notify_seq, subscription_id, next_attempt_at, expires_at
-    ) VALUES ('attention', 1, ?, ?, 1786949400, 1787035800)
+    ) VALUES ('attention', 1, ?, ?, 1786949400, ?)
   `);
-  insertDelivery.run(1, subscriptionId);
-  assert.throws(() => insertDelivery.run(1, subscriptionId), /UNIQUE/);
-  insertDelivery.run(2, subscriptionId);
+  insertDelivery.run(1, subscriptionId, expiresAt);
+  assert.throws(() => insertDelivery.run(1, subscriptionId, expiresAt), /UNIQUE/);
+  insertDelivery.run(2, subscriptionId, expiresAt);
+
+  // 그 CHECK 자체도 잠근다. 이미 지난 만료 시각은 처음부터 들어가지 못한다.
+  assert.throws(
+    () => insertDelivery.run(3, subscriptionId, Math.floor(Date.now() / 1000) - 60),
+    /CHECK/,
+  );
 
   db.close();
 });
