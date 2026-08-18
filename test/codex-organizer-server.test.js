@@ -81,8 +81,11 @@ async function availablePort() {
   return port;
 }
 
+// 상한이 10초다. 실제 서버를 띄우는 테스트 파일이 8개라 node --test가 병렬로
+// 돌리면 기동이 느려지고, 짧은 상한은 부하 때문에 빨개진다. 서버가 먼저 죽으면
+// 아래 exitCode 검사가 즉시 잡으므로 상한을 늘려도 실패가 늦게 드러나지 않는다.
 async function waitForServer(child, url, logs) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`테스트 서버가 일찍 종료됐습니다: ${logs.join('')}`);
     }
@@ -120,8 +123,10 @@ async function api(url, pathname, options = {}) {
   return { response, body };
 }
 
+// 기동 대기와 같은 이유로 넉넉하다. 상한이 1초였는데 runner 사전 점검은 실제
+// 프로세스를 띄우므로 부하가 걸리면 그 안에 안 끝난다.
 async function waitForRunnerHealth(child, url, logs, expectedOk) {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`runner 상태 확인 전 서버가 종료됐습니다: ${logs.join('')}`);
     }
@@ -133,7 +138,7 @@ async function waitForRunnerHealth(child, url, logs, expectedOk) {
 }
 
 async function waitForJobStatus(child, url, logs, jobId, expectedStatus) {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`job 상태 확인 전 서버가 종료됐습니다: ${logs.join('')}`);
     }
@@ -146,7 +151,7 @@ async function waitForJobStatus(child, url, logs, jobId, expectedStatus) {
 }
 
 async function waitForDatabaseState(child, databasePath, logs, label, predicate) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`${label} 확인 전 서버가 종료됐습니다: ${logs.join('')}`);
     }
@@ -163,7 +168,7 @@ async function waitForDatabaseState(child, databasePath, logs, label, predicate)
 }
 
 async function waitForFile(child, filepath, logs) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`파일 생성 확인 전 서버가 종료됐습니다: ${logs.join('')}`);
     }

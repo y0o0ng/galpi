@@ -23,8 +23,11 @@ async function availablePort() {
   return port;
 }
 
+// 상한이 10초다. 실제 서버를 띄우는 테스트 파일이 8개라 node --test가 병렬로
+// 돌리면 기동이 느려지고, 짧은 상한은 부하 때문에 빨개진다. 서버가 먼저 죽으면
+// 아래 exitCode 검사가 즉시 잡으므로 상한을 늘려도 실패가 늦게 드러나지 않는다.
 async function waitForServer(child, url, logs) {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`테스트 서버가 일찍 종료됐습니다: ${logs.join('')}`);
     }
