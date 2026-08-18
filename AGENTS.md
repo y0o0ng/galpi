@@ -77,8 +77,10 @@
 
 ## 열린 작업
 
-### 메일 — 다음은 MAIL-3
+### 메일 — 다음은 MAIL-3 C11(Pi 배포·실기기 인수)
 
+- **MAIL-3의 C7~C10은 2026-08-18 구현·로컬 실물 확인까지 끝났다.** 알림 탭 메일 카드의 `완료`·`나중에`가 실제 API를 왕복해 상태·화면을 바꾸는 것과 에이전트 탭 설정 왕복까지 브라우저로 확인했다. **남은 것은 C11 하나다.** **로컬 schema는 v20인데 Pi는 v19라** C11에서 migration을 함께 올린다(Pi `mail_push_deliveries` 0행이라 이관 위험은 없다).
+- **메일 UI를 스크래치로 확인할 때는 계정 행을 `status='disabled'`로 넣고 `OPENAI_API_KEY`를 비운다.** 그래야 `MAIL_AGENT_ENABLED=true`로 띄워도 동기화와 LLM 호출이 0이다. `/api/notifications`의 메일 합류가 그 플래그 뒤에 있어서 끄고는 화면을 볼 수 없다.
 - **MAIL-2는 2026-08-18 Pi 배포·인수까지 마쳤다.** 계약·스키마·단계·실측은 `docs/xion-mail-agent-design-final.md`와 `docs/roadmap.md`의 독립 트랙 `MAIL-1~4`에 있다(`V5-C`는 외부 캘린더 에이전트가 쓰는 다른 이름이다). 코드로 잠긴 계약은 `lib/mail/*`와 `test/mail-*.test.js`가 정본이다. 아래는 코드 밖 사실만이다.
 - **Pi가 메일의 정본이고 로컬은 `MAIL_AGENT_ENABLED=false`다.** 둘 다 켜면 커서가 갈리고 같은 새 메일을 양쪽이 분석해 LLM 호출과 Attention이 두 벌이 된다.
 - **`MAIL_AGENT_ENABLED=true`인 환경에서는 서버를 띄우는 순간 실계정 메일이 동기화·분석되고 OpenAI 호출이 나간다.** 문법 확인은 `node --check`로 끝내고, 서버를 띄우면 PID를 잡아 반드시 종료한다.
