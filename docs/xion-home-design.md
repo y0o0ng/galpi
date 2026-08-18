@@ -21,7 +21,7 @@ XION 홈은 **기존 정본을 읽어 편집해 내놓는 read-only projection**
 머리 한 줄과 세 영역만 만든다.
 
 0. **머리** - KST 기준 인사와 오늘 날짜. 화면이 무엇을 보는 자리인지 알려주는 최소한이다
-1. **Needs Attention** — 후속 행동이 남은 것
+1. **Needs Attention** — 후속 행동이 남은 것. 메일 Attention과 **울린 일정 알림**이 한 자리에 온다
 2. **오늘** — 오늘 일정·마감과 다음 알림
 3. **에이전트 상태** — 세 줄 축약과 개입 필요 강조
 
@@ -47,6 +47,17 @@ XION 홈은 **기존 정본을 읽어 편집해 내놓는 read-only projection**
 
 `알릴 가치가 있다`(`notification_mode`)와 `잊으면 안 될 후속 행동이 있다`(Attention)는 독립된 축이다.
 홈 최상단은 **후자만** 보여준다.
+
+두 종류가 이 자리를 공유한다. 메일 Attention과 **울린 일정 알림**(`type = 'task_reminder'`)은
+사용자 입장에서 같은 뜻이라 한 목록이어야 한다. 순서는 **일정 알림이 위**다. 그것은 시각이
+이미 지난 것이고 메일 기한은 며칠 뒤일 수 있다.
+
+이 합류가 두 가지를 정한다.
+
+- **접힌 나머지는 홈에서 편다.** 알림 탭은 일정 알림을 빼고 보여주므로(`type !== 'task_reminder'`)
+  그쪽으로 보내면 접힌 일정 알림을 볼 수 있는 곳이 없어진다.
+- **`오늘`은 이미 올라간 일정을 다시 보여주지 않는다.** 알림이 울린 일정은 `확인할 것`으로
+  승격된 것이라, 같은 일정이 두 자리에 뜨면 편집된 브리핑이 아니라 같은 목록의 반복이 된다.
 
 - 대상: `mail_attention`의 `action_required` · `attachment_check` · `low_confidence`
 - **Attention 없는 `important/batch` 메일은 승격하지 않는다.** `listAttentionNotifications`가
@@ -113,6 +124,7 @@ Attention도 오늘 일정도 없으면 빈 카드를 여러 장 만들지 않�
 
 - [ ] 홈은 기존 정본만 읽고 별도 상태를 저장하지 않는다 (서버 변경 0줄)
 - [ ] active Mail Attention이 있으면 Needs Attention에 보인다
+- [ ] 울린 일정 알림이 메일보다 위에 오고, 그 일정은 `오늘`에서 중복되지 않는다
 - [ ] Attention 없는 batch·immediate 메일은 Needs Attention으로 승격되지 않는다
 - [ ] silent 메일은 홈에 나오지 않는다
 - [ ] `snoozed` Attention은 홈에 나오지 않는다

@@ -226,6 +226,11 @@ test('the home briefing comes before the agent status, and never outranks itself
 
   // 홈은 알림 탭과 같은 응답을 읽는다. 메일 전용 목록 API를 따로 부르지 않는다.
   assert.match(panel, /item\.source === 'mail'/);
+  // 메일 Attention과 울린 일정 알림이 한 자리에 오고, 급한 일정 알림이 위다.
+  assert.match(
+    panel,
+    /items\.filter\(item => item\.type === 'task_reminder'\),\s*\.\.\.items\.filter\(item => item\.source === 'mail'\),/s,
+  );
   // 상태 변경은 알림 탭의 몫이다. 홈에서 완료·미루기를 부르면 책임이 두 곳이 된다.
   assert.doesNotMatch(panel, /\/api\/mail\/attention/);
 

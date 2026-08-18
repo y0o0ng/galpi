@@ -31,6 +31,7 @@
     mailSettingsSaving: false,
     attention: [],
     attentionError: '',
+    attentionExpanded: false,
   };
 
   // 첫 화면에 펼치는 Attention 수. 지식 패널이 350px 고정이고 메일 항목 하나가
@@ -799,44 +800,53 @@
   }
 
   /**
-   * 홈의 Attention 항목. **알림 탭 카드의 복제가 아니다**. 요약과 완료·나중에 버튼은
-   * 빼고 배지·제목·기한까지만 둔다. 처리는 알림 탭이 맡는다(설계 2·4절).
+   * 홈의 Attention 항목. **알림 탭 카드의 복제가 아니다**. 요약과 처리 버튼은 빼고
+   * 배지·제목·시각까지만 둔다. 처리는 각 책임 화면이 맡는다(설계 2·4절).
+   *
+   * 메일 Attention과 울린 일정 알림이 같은 목록에 들어온다. 둘 다 "잊으면 안 될
+   * 후속 행동이 남았다"는 같은 뜻이라 사용자에게는 한 자리여야 한다.
    */
   function makeAttentionItem(item) {
+    const isTask = item.type === 'task_reminder';
     const entry = document.createElement('button');
     entry.type = 'button';
     entry.className = 'home-attention';
-    entry.setAttribute('aria-label', `${item.title || '제목 없음'} 알림 열기`);
-    entry.addEventListener('click', openMailAttention);
+    entry.setAttribute('aria-label', `${item.title || '제목 없음'} ${isTask ? '일정' : '알림'} 열기`);
+    entry.addEventListener('click', isTask
+      ? () => openTasks({ view: 'today', focusReminders: true })
+      : openMailAttention);
 
     const top = document.createElement('span');
     top.className = 'home-attention-top';
     const badge = document.createElement('span');
     badge.className = 'home-attention-badge';
-    badge.textContent = REASON_LABELS[item.reasonKind] || '메일';
-    const source = document.createElement('span');
-    source.className = 'home-attention-source';
-    source.textContent = item.provider === 'gmail' ? 'Gmail' : 'Naver';
-    top.append(badge, source);
+    badge.textContent = isTask ? '일정 알림' : (REASON_LABELS[item.reasonKind] || '메일');
+    top.appendChild(badge);
+    if (!isTask) {
+      const source = document.createElement('span');
+      source.className = 'home-attention-source';
+      source.textContent = item.provider === 'gmail' ? 'Gmail' : 'Naver';
+      top.appendChild(source);
+    }
 
     const subject = document.createElement('span');
     subject.className = 'home-attention-title';
-    subject.textContent = item.title || '(제목 없음)';
+    subject.textContent = item.title || (isTask ? '제목 없는 일정' : '(제목 없음)');
     entry.append(top, subject);
 
-    const deadline = formatDeadline(item);
-    if (deadline || item.action) {
-      const meta = document.createElement('span');
-      meta.className = 'home-attention-meta';
-      meta.textContent = [deadline, item.action].filter(Boolean).join(' · ');
-      entry.appendChild(meta);
+    const meta = isTask
+      ? formatDateTime(item.remindAt)
+      : [formatDeadline(item), item.action].filter(Boolean).join(' · ');
+    if (meta) {
+      const line = document.createElement('span');
+      line.className = 'home-attention-meta';
+      line.textContent = meta;
+      entry.appendChild(line);
     }
     return entry;
   }
 
   function makeAttentionSection() {
-    // 메일이 꺼져 있으면 이 영역 자체를 만들지 않는다. 빈 카드로 자리를 채우지 않는다.
-    if (state.mail?.disabled) return null;
     if (state.attentionError) {
       const section = makeHomeSection('확인할 것');
       const failed = document.createElement('p');
@@ -848,14 +858,21 @@
     if (!state.attention.length) return null;
     const hidden = state.attention.length - HOME_ATTENTION_LIMIT;
     const section = makeHomeSection('확인할 것', `${state.attention.length}건`);
-    state.attention.slice(0, HOME_ATTENTION_LIMIT)
-      .forEach(item => section.appendChild(makeAttentionItem(item)));
+    const shown = state.attentionExpanded
+      ? state.attention
+      : state.attention.slice(0, HOME_ATTENTION_LIMIT);
+    shown.forEach(item => section.appendChild(makeAttentionItem(item)));
+    // 나머지는 여기서 편다. 알림 탭은 일정 알림을 빼고 보여주므로 그쪽으로 보내면
+    // 접힌 일정 알림을 볼 수 있는 곳이 없어진다.
     if (hidden > 0) {
       const more = document.createElement('button');
       more.type = 'button';
       more.className = 'home-more';
-      more.textContent = `+${hidden}건 더`;
-      more.addEventListener('click', openMailAttention);
+      more.textContent = state.attentionExpanded ? '접기' : `+${hidden}건 더`;
+      more.addEventListener('click', () => {
+        state.attentionExpanded = !state.attentionExpanded;
+        renderSummary();
+      });
       section.appendChild(more);
     }
     return section;
@@ -866,9 +883,16 @@
     const counts = state.summary.counts || {};
     const overdue = Number(counts.overdue) || 0;
     const today = Number(counts.today) || 0;
-    const preview = Array.isArray(state.summary.preview) ? state.summary.preview : [];
+    // 알림이 울린 일정은 이미 `확인할 것`에 올라가 있다. 같은 일정을 두 자리에
+    // 보여주면 편집된 브리핑이 아니라 같은 목록의 반복이 된다.
+    const promoted = new Set(state.attention
+      .filter(item => item.type === 'task_reminder')
+      .map(item => item.taskId));
+    const preview = (Array.isArray(state.summary.preview) ? state.summary.preview : [])
+      .filter(task => !promoted.has(task.taskId));
     const next = state.summary.nextReminder;
     if (!overdue && !today && !next) return null;
+    if (!preview.length && !next) return null;
 
     const section = makeHomeSection('오늘', overdue > 0 ? `지연 ${overdue}` : '');
     preview.slice(0, 2).forEach(task => {
@@ -1182,12 +1206,18 @@
   // 홈의 `확인할 것`은 알림 탭과 같은 응답을 읽는다. 메일 전용 API를 따로 만들지
   // 않는다(설계 3절). `snoozed`는 서버가 애초에 주지 않는다. 사용자가 지금 안 보겠다고
   // 한 것을 홈 최상단에 다시 올리지 않는다(설계 4절).
+  //
+  // 울린 일정 알림을 메일 앞에 둔다. 그것은 시각이 이미 지난 것이고 메일 기한은
+  // 며칠 뒤일 수 있다. 같은 목록 안에서는 급한 쪽이 위여야 한다.
   async function loadHomeAttention() {
     const response = await state.apiFetch('/api/notifications');
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || '확인할 것을 불러오지 못했습니다.');
-    state.attention = (Array.isArray(data.notifications) ? data.notifications : [])
-      .filter(item => item.source === 'mail');
+    const items = Array.isArray(data.notifications) ? data.notifications : [];
+    state.attention = [
+      ...items.filter(item => item.type === 'task_reminder'),
+      ...items.filter(item => item.source === 'mail'),
+    ];
     return true;
   }
 
