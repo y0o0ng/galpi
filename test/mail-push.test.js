@@ -67,8 +67,9 @@ function setup({ subscriptions = 2, enabled = true, settings } = {}) {
   return { db, clock, service };
 }
 
-// mail_messages 없이 Attention 행만 만든다. 이 파일은 전달만 검증한다.
-function seedAttention(db, { state = 'open', notifySeq = 1 } = {}) {
+// 메일 한 통을 만들고, 요청하면 그 메일의 Attention도 만든다. Push 대상은 언제나
+// 메일이고 Attention은 있을 수도 없을 수도 있다(schema v20).
+function seedMail(db, { attention = true, state = 'open', notifySeq = 1 } = {}) {
   const accountId = db.prepare(`
     INSERT INTO mail_accounts (provider, address) VALUES ('naver', 'me@naver.com')
   `).run().lastInsertRowid;
@@ -76,7 +77,8 @@ function seedAttention(db, { state = 'open', notifySeq = 1 } = {}) {
     INSERT INTO mail_messages (account_id, identity_kind, identity_key, received_at)
     VALUES (?, 'rfc_message_id', '<a@example.com>', ?)
   `).run(accountId, NOW - 600).lastInsertRowid;
-  return db.prepare(`
+  if (!attention) return { messageId, attentionId: null };
+  const attentionId = db.prepare(`
     INSERT INTO mail_attention (mail_message_id, state, notify_seq, snoozed_until, resolved_at)
     VALUES (?, ?, ?, ?, ?)
   `).run(
@@ -84,6 +86,7 @@ function seedAttention(db, { state = 'open', notifySeq = 1 } = {}) {
     state === 'snoozed' ? NOW + 3600 : null,
     state === 'done' ? NOW : null,
   ).lastInsertRowid;
+  return { messageId, attentionId };
 }
 
 function makeDispatcher(service, transport, clock) {
@@ -108,28 +111,28 @@ function recordingTransport(reply = () => ({ statusCode: 201 })) {
   };
 }
 
-test('one attention fans out to every active device exactly once', () => {
+test('one mail fans out to every active device exactly once', () => {
   const { db, clock, service } = setup({ subscriptions: 2 });
-  const attentionId = seedAttention(db);
+  const { messageId } = seedMail(db);
 
-  const first = service.enqueue({ targetKind: 'attention', targetId: attentionId, notifySeq: 1 }, clock.value);
+  const first = service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
   assert.deepEqual(first, { subscriptions: 2, created: 2 });
 
   // 같은 tick이 재실행돼도 같은 회차가 다시 들어가지 않는다.
-  const again = service.enqueue({ targetKind: 'attention', targetId: attentionId, notifySeq: 1 }, clock.value);
+  const again = service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
   assert.equal(again.created, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_push_deliveries').get().n, 2);
 
   // 회차가 오르면 새 delivery다. snooze 재알림이 이 경로를 쓴다.
-  const next = service.enqueue({ targetKind: 'attention', targetId: attentionId, notifySeq: 2 }, clock.value);
+  const next = service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 2 }, clock.value);
   assert.equal(next.created, 2);
   db.close();
 });
 
 test('one device accepting does not settle the other', async () => {
   const { db, clock, service } = setup({ subscriptions: 2 });
-  seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: 1, notifySeq: 1 }, clock.value);
+  const { messageId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
 
   // 첫 기기는 201, 둘째는 503이라 재시도로 남는다.
   const transport = recordingTransport(index => (index === 1
@@ -148,8 +151,8 @@ test('one device accepting does not settle the other', async () => {
 
 test('the payload the transport sees is the routing-only contract', async () => {
   const { db, clock, service } = setup({ subscriptions: 1 });
-  seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: 1, notifySeq: 1 }, clock.value);
+  const { messageId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
 
   const transport = recordingTransport();
   await makeDispatcher(service, transport, clock).tick();
@@ -158,7 +161,7 @@ test('the payload the transport sees is the routing-only contract', async () => 
   assert.deepEqual(Object.keys(payload).sort(), ['notifySeq', 'targetId', 'targetKind', 'type', 'url', 'version']);
   assert.equal(payload.type, 'mail_attention');
   // topic은 payload가 아니라 헤더다. 대상별로 갈려야 이전 알림을 합칠 수 있다.
-  assert.equal(transport.calls[0].delivery.topic, 'mail-attention-1');
+  assert.equal(transport.calls[0].delivery.topic, `mail-message-${messageId}`);
   assert.equal(transport.calls[0].delivery.urgency, 'normal');
   assert.ok(transport.calls[0].delivery.ttl > 0);
   db.close();
@@ -166,8 +169,8 @@ test('the payload the transport sees is the routing-only contract', async () => 
 
 test('a dead subscription expires alone and leaves the other device working', async () => {
   const { db, clock, service } = setup({ subscriptions: 2 });
-  seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: 1, notifySeq: 1 }, clock.value);
+  const { messageId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
 
   const transport = recordingTransport(index => (index === 1
     ? Object.assign(new Error('gone'), { statusCode: 410 })
@@ -183,8 +186,8 @@ test('a dead subscription expires alone and leaves the other device working', as
 
 test('a worker killed mid-send loses its lease and the delivery comes back', () => {
   const { db, clock, service } = setup({ subscriptions: 1 });
-  seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: 1, notifySeq: 1 }, clock.value);
+  const { messageId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
 
   const claim = service.claim(clock.value);
   assert.ok(claim);
@@ -204,8 +207,8 @@ test('a worker killed mid-send loses its lease and the delivery comes back', () 
 
 test('a target the user already handled is skipped instead of sent', async () => {
   const { db, clock, service } = setup({ subscriptions: 1 });
-  const attentionId = seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: attentionId, notifySeq: 1 }, clock.value);
+  const { messageId, attentionId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
 
   // claim 전에 완료 처리된 경우.
   db.prepare("UPDATE mail_attention SET state = 'done', resolved_at = ? WHERE id = ?").run(clock.value, attentionId);
@@ -220,11 +223,11 @@ test('a target the user already handled is skipped instead of sent', async () =>
 
 test('a stale notify_seq never rings after a newer round exists', async () => {
   const { db, clock, service } = setup({ subscriptions: 1 });
-  const attentionId = seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: attentionId, notifySeq: 1 }, clock.value);
+  const { messageId, attentionId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
   // snooze wake가 회차를 올린 상태.
   db.prepare('UPDATE mail_attention SET notify_seq = 2 WHERE id = ?').run(attentionId);
-  service.enqueue({ targetKind: 'attention', targetId: attentionId, notifySeq: 2 }, clock.value);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 2 }, clock.value);
 
   const transport = recordingTransport();
   await makeDispatcher(service, transport, clock).tick();
@@ -261,8 +264,8 @@ test('quiet hours delay the push without delaying the attention', () => {
     settings: () => ({ notificationsEnabled: true, quietHours: { enabled: true, start: '23:00', end: '07:00' } }),
   });
   clock.value = night;
-  seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: 1, notifySeq: 1 }, night);
+  const { messageId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, night);
 
   const row = db.prepare('SELECT next_attempt_at AS at, expires_at AS exp FROM mail_push_deliveries').get();
   const morning = Math.floor(Date.parse('2026-08-19T07:00:00+09:00') / 1000);
@@ -280,9 +283,9 @@ test('turning mail notifications off stops delivery without touching attention',
     subscriptions: 2,
     settings: () => ({ notificationsEnabled: false, quietHours: { enabled: false } }),
   });
-  seedAttention(db);
+  const { messageId } = seedMail(db);
 
-  const result = service.enqueue({ targetKind: 'attention', targetId: 1, notifySeq: 1 }, clock.value);
+  const result = service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
   assert.deepEqual(result, { subscriptions: 0, created: 0, suppressed: 'NOTIFICATIONS_OFF' });
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_push_deliveries').get().n, 0);
   // Attention은 그대로 남는다. Push를 끈 것이지 판단을 끈 것이 아니다.
@@ -292,13 +295,34 @@ test('turning mail notifications off stops delivery without touching attention',
 
 test('a delivery past its ttl expires instead of ringing late', () => {
   const { db, clock, service } = setup({ subscriptions: 1 });
-  seedAttention(db);
-  service.enqueue({ targetKind: 'attention', targetId: 1, notifySeq: 1 }, clock.value);
+  const { messageId } = seedMail(db);
+  service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
 
   clock.value += 24 * 60 * 60 + 60;
   assert.equal(service.claim(clock.value), null);
   const row = db.prepare('SELECT status, last_error_code AS code FROM mail_push_deliveries').get();
   assert.equal(row.status, 'expired');
   assert.equal(row.code, 'DELIVERY_TTL_EXPIRED');
+  db.close();
+});
+
+test('a mail with no attention still gets its push', async () => {
+  // notification_mode와 Attention은 서로 다른 축이다. `important/batch`처럼 알릴
+  // 가치는 있지만 후속 행동은 없는 메일이 정상 경로이고, 그것이 v20의 이유다.
+  const { db, clock, service } = setup({ subscriptions: 1 });
+  const { messageId, attentionId } = seedMail(db, { attention: false });
+  assert.equal(attentionId, null);
+
+  const result = service.enqueue({ targetKind: 'message', targetId: messageId, notifySeq: 1 }, clock.value);
+  assert.deepEqual(result, { subscriptions: 1, created: 1 });
+
+  const transport = recordingTransport();
+  await makeDispatcher(service, transport, clock).tick();
+
+  assert.equal(transport.calls.length, 1);
+  assert.equal(db.prepare('SELECT status FROM mail_push_deliveries').get().status, 'accepted');
+  assert.equal(JSON.parse(transport.calls[0].payload).targetId, messageId);
+  // Attention이 없다고 해서 만들어내지 않는다. Attention은 후속 행동의 정본이다.
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_attention').get().n, 0);
   db.close();
 });

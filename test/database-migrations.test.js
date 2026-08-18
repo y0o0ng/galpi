@@ -7,6 +7,7 @@ const Database = require('better-sqlite3');
 const { sha256 } = require('../lib/content-hash');
 const {
   LATEST_SCHEMA_VERSION,
+  migrations,
   runDatabaseMigrations,
 } = require('../lib/database-migrations');
 const { createTopicChunkStore } = require('../lib/topic-chunk-store');
@@ -78,7 +79,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
@@ -86,7 +87,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
       { version: 13 }, { version: 14 }, { version: 15 }, { version: 16 },
-      { version: 17 }, { version: 18 }, { version: 19 },
+      { version: 17 }, { version: 18 }, { version: 19 }, { version: 20 },
     ],
   );
 
@@ -641,10 +642,11 @@ test('schema v19 makes identity the only dedup key and keeps locators separate',
   // expires_at은 created_at(= 삽입 시각) 이후여야 한다는 CHECK가 있으므로 현재 시각에서
   // 잡는다. 고정 epoch을 쓰면 그 시각을 지나는 순간 이 테스트가 영구히 깨진다.
   const expiresAt = Math.floor(Date.now() / 1000) + 86_400;
+  // 대상 이름은 v20이 message로 바꿨다. 여기서 보는 것은 회차별 유일성이다.
   const insertDelivery = db.prepare(`
     INSERT INTO mail_push_deliveries (
       target_kind, target_id, notify_seq, subscription_id, next_attempt_at, expires_at
-    ) VALUES ('attention', 1, ?, ?, 1786949400, ?)
+    ) VALUES ('message', 1, ?, ?, 1786949400, ?)
   `);
   insertDelivery.run(1, subscriptionId, expiresAt);
   assert.throws(() => insertDelivery.run(1, subscriptionId, expiresAt), /UNIQUE/);
@@ -656,5 +658,99 @@ test('schema v19 makes identity the only dedup key and keeps locators separate',
     /CHECK/,
   );
 
+  db.close();
+});
+
+test('schema v20 moves individual push targets from attention to the mail itself', () => {
+  const db = createLegacyDatabase();
+  runDatabaseMigrations(db);
+
+  // 대상은 이제 메일이다. attention은 값으로 남아 있지 않다.
+  assert.throws(
+    () => db.prepare(`
+      INSERT INTO mail_push_deliveries (target_kind, target_id, subscription_id, next_attempt_at, expires_at)
+      VALUES ('attention', 1, 1, 0, 0)
+    `).run(),
+    /CHECK|FOREIGN KEY/,
+  );
+
+  const accountId = db.prepare(`
+    INSERT INTO mail_accounts (provider, address) VALUES ('naver', 'me@naver.com')
+  `).run().lastInsertRowid;
+  const messageId = db.prepare(`
+    INSERT INTO mail_messages (account_id, identity_kind, identity_key, received_at)
+    VALUES (?, 'rfc_message_id', '<a@example.com>', 1786949400)
+  `).run(accountId).lastInsertRowid;
+  const subscriptionId = db.prepare(`
+    INSERT INTO assistant_push_subscriptions (endpoint, p256dh, auth)
+    VALUES ('https://web.push.apple.com/x', 'p', 'a')
+  `).run().lastInsertRowid;
+  const expiresAt = Math.floor(Date.now() / 1000) + 86_400;
+
+  // Attention이 없어도 메일 자체를 대상으로 알릴 수 있다. 이것이 v20의 목적이다 —
+  // notification_mode와 Attention은 서로 다른 축이고 한쪽이 다른 쪽을 강제하지 않는다.
+  db.prepare(`
+    INSERT INTO mail_push_deliveries (target_kind, target_id, notify_seq, subscription_id, next_attempt_at, expires_at)
+    VALUES ('message', ?, 1, ?, 0, ?)
+  `).run(messageId, subscriptionId, expiresAt);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_attention').get().n, 0);
+
+  // 회차별 유일성은 그대로다. snooze 재알림이 이 값으로 갈린다.
+  assert.throws(() => db.prepare(`
+    INSERT INTO mail_push_deliveries (target_kind, target_id, notify_seq, subscription_id, next_attempt_at, expires_at)
+    VALUES ('message', ?, 1, ?, 0, ?)
+  `).run(messageId, subscriptionId, expiresAt), /UNIQUE/);
+  db.prepare(`
+    INSERT INTO mail_push_deliveries (target_kind, target_id, notify_seq, subscription_id, next_attempt_at, expires_at)
+    VALUES ('message', ?, 2, ?, 0, ?)
+  `).run(messageId, subscriptionId, expiresAt);
+  db.close();
+});
+
+test('the v20 rebuild keeps what it can read and drops only what it cannot', () => {
+  // v19까지 올린 뒤 옛 모양의 delivery를 넣고 v20을 적용한다. 세 갈래를 값으로 잠근다 —
+  // 해석 가능한 attention은 전부 보존, orphan attention은 폐기, batch는 그대로.
+  const db = createLegacyDatabase();
+  const upto19 = migrations.filter(m => m.version <= 19);
+  db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))");
+  for (const migration of upto19) {
+    db.transaction(() => {
+      migration.up(db);
+      db.prepare('INSERT INTO schema_version (version, name) VALUES (?, ?)').run(migration.version, migration.name);
+    })();
+  }
+
+  const accountId = db.prepare("INSERT INTO mail_accounts (provider, address) VALUES ('naver', 'me@naver.com')").run().lastInsertRowid;
+  const messageId = db.prepare(`
+    INSERT INTO mail_messages (account_id, identity_kind, identity_key, received_at)
+    VALUES (?, 'rfc_message_id', '<a@example.com>', 1786949400)
+  `).run(accountId).lastInsertRowid;
+  const attentionId = db.prepare('INSERT INTO mail_attention (mail_message_id) VALUES (?)').run(messageId).lastInsertRowid;
+  const batchId = db.prepare('INSERT INTO mail_notification_batches (opened_at, due_at) VALUES (1, 2)').run().lastInsertRowid;
+  const subscriptionId = db.prepare(`
+    INSERT INTO assistant_push_subscriptions (endpoint, p256dh, auth) VALUES ('https://web.push.apple.com/x', 'p', 'a')
+  `).run().lastInsertRowid;
+  const expiresAt = Math.floor(Date.now() / 1000) + 86_400;
+  const insert = db.prepare(`
+    INSERT INTO mail_push_deliveries (target_kind, target_id, notify_seq, subscription_id, status, next_attempt_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, 0, ?)
+  `);
+  insert.run('attention', attentionId, 1, subscriptionId, 'accepted', expiresAt);
+  // 참조할 Attention이 없는 delivery. 이것만 버린다.
+  insert.run('attention', 9999, 1, subscriptionId, 'accepted', expiresAt);
+  insert.run('batch', batchId, 1, subscriptionId, 'pending', expiresAt);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_push_deliveries').get().n, 3);
+
+  runDatabaseMigrations(db);
+
+  const rows = db.prepare('SELECT target_kind AS kind, target_id AS id, status FROM mail_push_deliveries ORDER BY target_kind, target_id').all();
+  assert.deepEqual(rows, [
+    { kind: 'batch', id: batchId, status: 'pending' },
+    // attention → message로 변환됐다. 버린 것은 mail_attention이 아니라 해석할 수
+    // 없는 전달 기록 하나뿐이다.
+    { kind: 'message', id: messageId, status: 'accepted' },
+  ]);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_attention').get().n, 1);
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, 20);
   db.close();
 });

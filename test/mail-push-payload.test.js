@@ -17,8 +17,8 @@ test('the allowed key list is exactly the six the design fixed', () => {
   assert.deepEqual([...MAIL_PUSH_PAYLOAD_KEYS].sort(), ALLOWED);
 });
 
-test('an attention payload carries routing metadata and nothing else', () => {
-  const raw = buildMailPushPayload({ targetKind: 'attention', targetId: 12, notifySeq: 1 });
+test('a message payload carries routing metadata and nothing else', () => {
+  const raw = buildMailPushPayload({ targetKind: 'message', targetId: 12, notifySeq: 1 });
   assert.equal(typeof raw, 'string');
   const payload = JSON.parse(raw);
 
@@ -27,7 +27,7 @@ test('an attention payload carries routing metadata and nothing else', () => {
 
   assert.equal(payload.version, 1);
   assert.equal(payload.type, 'mail_attention');
-  assert.equal(payload.targetKind, 'attention');
+  assert.equal(payload.targetKind, 'message');
   assert.equal(payload.targetId, 12);
   assert.equal(payload.notifySeq, 1);
   assert.equal(payload.url, '/?panel=notifications&notification=mail&mail=12');
@@ -51,7 +51,7 @@ test('nothing derived from the mail reaches the payload', () => {
     '2026-08-19', '0.91',
   ];
   for (const target of [
-    { targetKind: 'attention', targetId: 12, notifySeq: 3 },
+    { targetKind: 'message', targetId: 12, notifySeq: 3 },
     { targetKind: 'batch', targetId: 7, notifySeq: 1 },
   ]) {
     const raw = buildMailPushPayload(target);
@@ -66,7 +66,7 @@ test('nothing derived from the mail reaches the payload', () => {
 });
 
 test('the values keep the shape the service worker relies on', () => {
-  const payload = JSON.parse(buildMailPushPayload({ targetKind: 'attention', targetId: 9, notifySeq: 2 }));
+  const payload = JSON.parse(buildMailPushPayload({ targetKind: 'message', targetId: 9, notifySeq: 2 }));
   assert.ok(Number.isSafeInteger(payload.targetId));
   assert.ok(Number.isSafeInteger(payload.notifySeq));
   // 절대 URL을 허용하면 same-origin 검증이 있어도 외부 origin이 payload에 들어온다.
@@ -76,10 +76,10 @@ test('the values keep the shape the service worker relies on', () => {
 
 test('a target the contract does not know is refused, not guessed', () => {
   for (const bad of [
-    { targetKind: 'message', targetId: 1, notifySeq: 1 },
-    { targetKind: 'attention', targetId: 0, notifySeq: 1 },
-    { targetKind: 'attention', targetId: 1, notifySeq: 0 },
-    { targetKind: 'attention', targetId: 1.5, notifySeq: 1 },
+    { targetKind: 'attention', targetId: 1, notifySeq: 1 },
+    { targetKind: 'message', targetId: 0, notifySeq: 1 },
+    { targetKind: 'message', targetId: 1, notifySeq: 0 },
+    { targetKind: 'message', targetId: 1.5, notifySeq: 1 },
   ]) {
     assert.throws(() => buildMailPushPayload(bad), /payload/, JSON.stringify(bad));
   }
@@ -87,6 +87,6 @@ test('a target the contract does not know is refused, not guessed', () => {
 
 test('the payload stays small enough that size is never a question', () => {
   // 고정 6키라 크기가 상수다. 큰 targetId를 넣어도 한도 근처에 가지 않는다.
-  const raw = buildMailPushPayload({ targetKind: 'attention', targetId: 9_007_199_254_740_991, notifySeq: 999 });
+  const raw = buildMailPushPayload({ targetKind: 'message', targetId: 9_007_199_254_740_991, notifySeq: 999 });
   assert.ok(Buffer.byteLength(raw, 'utf8') < 200, `payload가 ${Buffer.byteLength(raw, 'utf8')}바이트다`);
 });
