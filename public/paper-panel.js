@@ -9,7 +9,7 @@
     showToast: null,
     icons: null,
     contextNotes: null,
-    activeTab: 'notifications',
+    activeTab: 'agents',
   };
 
   const backIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
@@ -437,7 +437,9 @@
 
     state.initialized = true;
     loadSavedPapers();
-    setTab('notifications');
+    // 기본으로 여는 탭은 XION 홈이다. 여기서 다른 탭을 세우면 index.html의
+    // active 표시와 어긋난 채로 화면만 바뀐다.
+    setTab(state.activeTab);
   }
 
   global.PaperPanel = { init, open, close, search, loadSavedPapers };

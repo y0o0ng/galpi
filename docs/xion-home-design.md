@@ -61,7 +61,9 @@ XION 홈은 **기존 정본을 읽어 편집해 내놓는 read-only projection**
 ## 5. 탭
 
 다섯 번째 탭을 추가하지 않는다. 기존 `에이전트` 탭의 **라벨만** `XION`으로 바꾸고, 탭 줄의
-**맨 왼쪽**으로 옮긴다. 패널을 열었을 때 기본으로 선택되는 탭은 `알림` 그대로다.
+**맨 왼쪽**으로 옮기고, 패널을 열었을 때 **기본으로 선택되는 탭**으로 삼는다. 기본 탭은
+`index.html`의 `active`·`hidden`과 `paper-panel.js`의 `state.activeTab` 두 곳이 함께 정한다.
+한쪽만 바꾸면 표시와 화면이 어긋난다.
 
 **`data-panel-tab="agents"` 키는 그대로 둔다.** `public/app.js`의 딥링크 파싱과 `public/sw.js`의
 일정 알림 fallback URL(`/?panel=agents&taskView=reminders`)이 그 값을 쓰고, 사용자 기기에 이미

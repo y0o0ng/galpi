@@ -29,7 +29,7 @@ test('notification, task, and agent modules load before the panel shell and expo
   const paperIndex = html.indexOf('<script src="paper-panel.js"></script>');
   const appIndex = html.indexOf('<script src="app.js"></script>');
 
-  assert.match(html, /data-panel-tab="notifications"[^>]*class="[^"]*active|class="knowledge-tab active" data-panel-tab="notifications"/);
+  assert.match(html, /class="knowledge-tab active" data-panel-tab="agents"/);
   assert.match(html, /id="notification-panel-content" class="notification-body" aria-live="polite"/);
   assert.match(html, /id="agent-panel-content" aria-live="polite"/);
   assert.match(html, /aria-label="기본 답변 비서 XION"/);
