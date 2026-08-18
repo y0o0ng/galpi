@@ -24,6 +24,9 @@
     codexSaving: false,
     organize: null,
     organizeRunning: false,
+    mail: null,
+    mailError: '',
+    mailRequeueRunning: false,
   };
 
   const countLabels = [
@@ -111,16 +114,20 @@
     state.container.appendChild(empty);
   }
 
+  // 카드 자리를 그대로 잡아둔다. 예전 블록 스켈레톤(390px)을 쓰면 로딩 중에만
+  // 화면이 세 배로 길어졌다가 줄어든다.
   function renderLoading() {
     state.container.replaceChildren();
-    const count = state.enabled ? 2 : 1;
-    for (let index = 0; index < count; index += 1) {
+    const cards = document.createElement('div');
+    cards.className = 'agent-cards';
+    for (let index = 0; index < 3; index += 1) {
       const skeleton = document.createElement('div');
-      skeleton.className = 'schedule-agent-block schedule-agent-skeleton';
-      skeleton.setAttribute('aria-label', '에이전트 설정을 불러오는 중');
-      skeleton.innerHTML = '<span></span><span></span><span></span>';
-      state.container.appendChild(skeleton);
+      skeleton.className = 'agent-card schedule-agent-skeleton';
+      skeleton.setAttribute('aria-label', '에이전트 상태를 불러오는 중');
+      skeleton.innerHTML = '<span></span><span></span>';
+      cards.appendChild(skeleton);
     }
+    state.container.appendChild(cards);
   }
 
   function renderError(message) {
@@ -164,7 +171,7 @@
     const deep = block.querySelector('select[name="deepModel"]')?.value;
     if (!general || !deep) return;
     state.codexSaving = true;
-    renderSummary();
+    renderCodexDetail();
     try {
       const response = await state.apiFetch('/api/settings/codex-models', {
         method: 'PUT',
@@ -189,14 +196,14 @@
       await loadCodexData().catch(() => {});
     } finally {
       state.codexSaving = false;
-      renderSummary();
+      renderCodexDetail();
     }
   }
 
   async function refreshCodexCatalog() {
     if (state.codexSaving) return;
     state.codexSaving = true;
-    renderSummary();
+    renderCodexDetail();
     try {
       const response = await state.apiFetch('/api/models/refresh', {
         method: 'POST',
@@ -213,7 +220,7 @@
       state.showToast(error.message);
     } finally {
       state.codexSaving = false;
-      renderSummary();
+      renderCodexDetail();
     }
   }
 
@@ -395,14 +402,14 @@
       const response = await state.apiFetch(`/api/tasks/summary?calendarCenter=${encodeURIComponent(center)}`);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || '날짜를 불러오지 못했습니다.');
-      if (state.mode !== 'summary') return;
+      if (state.mode !== 'schedule') return;
       state.summary = data;
       state.calendarLoading = false;
-      renderSummary();
+      renderScheduleDetail();
     } catch (error) {
       state.showToast(error.message);
       state.calendarLoading = false;
-      if (state.mode === 'summary') renderSummary();
+      if (state.mode === 'schedule') renderScheduleDetail();
     } finally {
       state.calendarLoading = false;
     }
@@ -576,23 +583,299 @@
     return block;
   }
 
+  // 카드 하나. 데이터를 인자로 받아 DOM만 돌려준다. 패널 바깥(V6 등)에서 그대로
+  // 가져다 쓸 수 있게 전역 state를 읽지 않는다.
+  //
+  // 카드 전체가 button 하나다. 안에 또 버튼을 넣으면 중첩이 되고 모바일 타깃도 잘게
+  // 쪼개지므로, 복구 버튼은 카드가 아니라 상세 화면에 둔다. 개입이 필요한 상태는
+  // 카드에서 상태점과 문구로만 알린다.
+  function makeAgentCard({ title, tone = 'ok', status, metric, detail, onOpen, ariaLabel }) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'agent-card';
+    if (ariaLabel) card.setAttribute('aria-label', ariaLabel);
+    card.addEventListener('click', onOpen);
+
+    const head = document.createElement('span');
+    head.className = 'agent-card-head';
+    const heading = document.createElement('span');
+    heading.className = 'agent-card-title';
+    heading.textContent = title;
+    const statusWrap = document.createElement('span');
+    statusWrap.className = 'schedule-agent-status agent-card-status';
+    const dot = document.createElement('span');
+    dot.className = `agent-card-dot ${tone}`;
+    const statusText = document.createElement('span');
+    statusText.textContent = status;
+    statusWrap.append(dot, statusText);
+    head.append(heading, statusWrap);
+    card.appendChild(head);
+
+    const metricLine = document.createElement('span');
+    metricLine.className = 'agent-card-metric';
+    metricLine.textContent = metric;
+    card.appendChild(metricLine);
+
+    if (detail) {
+      const detailLine = document.createElement('span');
+      detailLine.className = 'agent-card-detail';
+      detailLine.textContent = detail;
+      card.appendChild(detailLine);
+    }
+    return card;
+  }
+
+  function makeScheduleCard() {
+    if (!state.enabled) {
+      return makeAgentCard({
+        title: '일정',
+        tone: 'off',
+        status: '꺼짐',
+        metric: '일정 기능이 꺼져 있어',
+        onOpen: () => {},
+      });
+    }
+    if (state.scheduleError || !state.summary) {
+      return makeAgentCard({
+        title: '일정',
+        tone: 'danger',
+        status: '오류',
+        metric: state.scheduleError || '일정 요약을 불러오지 못했어',
+        detail: '눌러서 다시 시도',
+        onOpen: refresh,
+      });
+    }
+    const counts = state.summary.counts || {};
+    const overdue = Number(counts.overdue) || 0;
+    const next = state.summary.nextReminder;
+    return makeAgentCard({
+      title: '일정',
+      tone: overdue > 0 ? 'warn' : 'ok',
+      status: overdue > 0 ? `지연 ${overdue}` : '정상',
+      metric: `오늘 ${Number(counts.today) || 0} · 지연 ${overdue} · 예정 ${Number(counts.upcoming) || 0}`,
+      detail: next
+        ? `다음 알림 ${formatDateTime(next.remindAt)} · ${next.title || '제목 없는 일정'}`
+        : '예정된 알림 없음',
+      onOpen: openSchedule,
+      ariaLabel: '일정 에이전트 열기',
+    });
+  }
+
+  function makeMailCard() {
+    if (state.mail?.disabled) {
+      return makeAgentCard({
+        title: 'Mail',
+        tone: 'off',
+        status: '꺼짐',
+        metric: 'MAIL_AGENT_ENABLED가 꺼져 있어',
+        onOpen: openMail,
+        ariaLabel: 'Mail 에이전트 열기',
+      });
+    }
+    if (state.mailError || !state.mail) {
+      return makeAgentCard({
+        title: 'Mail',
+        tone: 'danger',
+        status: '오류',
+        metric: state.mailError || 'Mail 상태를 불러오지 못했어',
+        detail: '눌러서 다시 시도',
+        onOpen: refresh,
+      });
+    }
+    const accounts = Array.isArray(state.mail.accounts) ? state.mail.accounts : [];
+    const analysis = state.mail.analysis || {};
+    const stranded = Number(analysis.failed) || 0;
+    // 재인증은 사람이 직접 해야 풀린다. 분석 좌초보다 먼저 알린다.
+    const authRequired = accounts.filter(account => account.status === 'auth_required');
+    const broken = accounts.filter(account => account.status === 'error' || account.status === 'disabled');
+    let tone = 'ok';
+    let status = accounts.length ? '정상' : '계정 없음';
+    if (authRequired.length) { tone = 'danger'; status = '재인증 필요'; }
+    else if (broken.length) { tone = 'danger'; status = '오류'; }
+    else if (stranded > 0) { tone = 'warn'; status = `멈춤 ${stranded}`; }
+    else if (!accounts.length) tone = 'off';
+    return makeAgentCard({
+      title: 'Mail',
+      tone,
+      status,
+      metric: accounts.length
+        ? accounts.map(account => `${account.provider === 'gmail' ? 'Gmail' : 'Naver'} ${account.status === 'active' ? '●' : '○'}`).join(' · ')
+        : '등록된 계정 없음',
+      detail: `분석 대기 ${Number(analysis.pending) || 0}${stranded > 0 ? ` · 멈춤 ${stranded}` : ''}`,
+      onOpen: openMail,
+      ariaLabel: 'Mail 에이전트 열기',
+    });
+  }
+
+  function makeCodexCard() {
+    if (!state.organize) {
+      return makeAgentCard({
+        title: '사서 Codex',
+        tone: 'danger',
+        status: '오류',
+        metric: state.codexError || 'Codex 상태를 불러오지 못했어',
+        detail: '눌러서 다시 시도',
+        onOpen: refresh,
+      });
+    }
+    const queueable = Number(state.organize.queueable) || 0;
+    const stalled = (state.organize.stalledNotes || []).length;
+    const recovery = Number(state.organize.recoveryRequired) || 0;
+    // runner는 organize/status에도 들어 있다. 카드 때문에 모델 카탈로그까지
+    // 부르지 않는다. 그것은 상세에서만 필요하다.
+    const runnerOk = state.organize.runner?.ok === true;
+    let tone = 'ok';
+    let status = 'CLI 정상';
+    // 복구 필요는 원본이 위태로운 상태라 fail-close로 정리 전체가 멈춘다. 제일 위다.
+    if (recovery > 0) { tone = 'danger'; status = `복구 필요 ${recovery}`; }
+    else if (!runnerOk) { tone = 'danger'; status = 'CLI 확인 필요'; }
+    else if (stalled > 0) { tone = 'warn'; status = `멈춤 ${stalled}`; }
+    return makeAgentCard({
+      title: '사서 Codex',
+      tone,
+      status,
+      metric: `대기 ${queueable} · 멈춤 ${stalled}`,
+      detail: state.codexError || '모델 설정과 대기열 정리',
+      onOpen: openCodex,
+      ariaLabel: '사서 Codex 열기',
+    });
+  }
+
+  // 첫 화면은 카드만 세운다. 상세 데이터는 카드를 눌렀을 때 그 화면이 쓴다 .
+  // 에이전트가 늘어도 여는 비용이 카드 수만큼만 는다.
   function renderSummary() {
     state.container.replaceChildren();
-    if (state.enabled) {
-      if (state.scheduleError) {
-        const block = document.createElement('section');
-        block.className = 'schedule-agent-block schedule-agent-error';
-        const title = document.createElement('strong');
-        title.textContent = '일정 요약을 불러오지 못했습니다.';
-        const detail = document.createElement('p');
-        detail.textContent = state.scheduleError;
-        block.append(title, detail, button('일정 다시 시도', refresh));
-        state.container.appendChild(block);
-      } else if (state.summary) {
-        state.container.appendChild(makeScheduleBlock(state.summary));
-      }
+    const cards = document.createElement('div');
+    cards.className = 'agent-cards';
+    cards.append(makeScheduleCard(), makeMailCard(), makeCodexCard());
+    state.container.appendChild(cards);
+  }
+
+  function makeDetailHead(titleText, ariaLabel) {
+    const head = document.createElement('div');
+    head.className = 'schedule-agent-workspace-head';
+    const back = button('<', openSummary);
+    back.classList.add('schedule-agent-back');
+    back.setAttribute('aria-label', ariaLabel);
+    back.title = ariaLabel;
+    const title = document.createElement('strong');
+    title.textContent = titleText;
+    head.append(back, title);
+    return head;
+  }
+
+  // 달력·counts·미리보기는 통째로 일정 상세가 된다. 요약에서 내려온 것이지 새로
+  // 만든 화면이 아니다. `일정 추가`·`전체 일정` 버튼도 그대로 붙어 있다.
+  function renderScheduleDetail() {
+    state.container.replaceChildren();
+    const workspace = document.createElement('section');
+    workspace.className = 'schedule-agent-workspace';
+    workspace.appendChild(makeDetailHead('일정 에이전트', '에이전트 요약으로 돌아가기'));
+    if (!state.enabled) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message warn';
+      message.textContent = '일정 기능이 꺼져 있어.';
+      workspace.appendChild(message);
+    } else if (state.scheduleError || !state.summary) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message danger';
+      message.textContent = state.scheduleError || '일정 요약을 불러오지 못했습니다.';
+      const retry = button('다시 시도', refresh);
+      retry.classList.add('codex-agent-retry');
+      workspace.append(message, retry);
+    } else {
+      workspace.appendChild(makeScheduleBlock(state.summary));
     }
-    state.container.appendChild(makeCodexBlock());
+    state.container.appendChild(workspace);
+  }
+
+  function renderCodexDetail() {
+    state.container.replaceChildren();
+    const workspace = document.createElement('section');
+    workspace.className = 'schedule-agent-workspace';
+    workspace.append(makeDetailHead('사서 Codex', '에이전트 요약으로 돌아가기'), makeCodexBlock());
+    state.container.appendChild(workspace);
+  }
+
+  function renderMailDetail() {
+    state.container.replaceChildren();
+    const workspace = document.createElement('section');
+    workspace.className = 'schedule-agent-workspace';
+    workspace.append(makeDetailHead('Mail 에이전트', '에이전트 요약으로 돌아가기'), makeMailBlock());
+    state.container.appendChild(workspace);
+  }
+
+  // 운영과 복구만 둔다. 사용자가 실제로 처리할 Attention은 알림 탭의 몫이고
+  // 여기에 두 번째 받은편지함을 만들지 않는다(설계 23절).
+  function makeMailBlock() {
+    const block = document.createElement('section');
+    block.className = 'codex-agent-block';
+    const description = document.createElement('p');
+    description.className = 'codex-agent-description';
+    description.textContent = '메일 동기화와 분석 상태야. 확인할 메일 자체는 알림 탭에 있어.';
+    block.appendChild(description);
+
+    if (state.mail?.disabled) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message warn';
+      message.textContent = 'MAIL_AGENT_ENABLED가 꺼져 있어 동기화와 분석이 돌지 않아.';
+      block.appendChild(message);
+      return block;
+    }
+    if (state.mailError || !state.mail) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message danger';
+      message.textContent = state.mailError || 'Mail 상태를 불러오지 못했습니다.';
+      const retry = button('다시 시도', refresh);
+      retry.classList.add('codex-agent-retry');
+      block.append(message, retry);
+      return block;
+    }
+
+    const accounts = Array.isArray(state.mail.accounts) ? state.mail.accounts : [];
+    if (accounts.length === 0) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message warn';
+      message.textContent = '등록된 계정이 없어. scripts/register-mail-account.js로 등록해줘.';
+      block.appendChild(message);
+    }
+    accounts.forEach(account => {
+      const line = document.createElement('p');
+      line.className = 'codex-agent-message';
+      const label = account.provider === 'gmail' ? 'Gmail' : 'Naver';
+      const parts = [`${label} ${account.address}`, account.status];
+      if (account.lastSyncAt) parts.push(`마지막 동기화 ${formatDateTime(account.lastSyncAt)}`);
+      if (account.lastErrorCode) parts.push(account.lastErrorCode);
+      parts.push(`메시지 ${account.messages}`);
+      line.textContent = parts.join(' · ');
+      if (account.status !== 'active') line.classList.add(account.status === 'auth_required' ? 'danger' : 'warn');
+      block.appendChild(line);
+    });
+
+    const analysis = state.mail.analysis || {};
+    const failed = Number(analysis.failed) || 0;
+    const queue = document.createElement('p');
+    queue.className = 'codex-agent-message';
+    queue.textContent = `분석 대기 ${Number(analysis.pending) || 0} · 진행 ${Number(analysis.analyzing) || 0}`
+      + ` · 완료 ${Number(analysis.done) || 0} · 멈춤 ${failed} · 건너뜀 ${Number(analysis.skipped) || 0}`;
+    if (failed > 0) queue.classList.add('warn');
+    block.appendChild(queue);
+
+    // 좌초한 분석은 열어봐야 고칠 것이 없다. 사람이 할 수 있는 일은 다시 돌리는 것뿐이라
+    // 사유 코드까지만 보여주고 제목·발신자는 싣지 않는다(설계 19절).
+    if (failed > 0) {
+      const actions = document.createElement('div');
+      actions.className = 'codex-agent-actions';
+      const requeue = button(
+        state.mailRequeueRunning ? '되돌리는 중…' : `멈춘 ${failed}개 다시`,
+        requeueMailAnalysis,
+        true,
+      );
+      requeue.disabled = state.mailRequeueRunning;
+      actions.appendChild(requeue);
+      block.appendChild(actions);
+    }
+    return block;
   }
 
   async function loadCodexData() {
@@ -616,7 +899,7 @@
   async function retryStalledNotes() {
     if (state.organizeRunning) return;
     state.organizeRunning = true;
-    renderSummary();
+    renderCodexDetail();
     try {
       const response = await state.apiFetch('/api/organize/retry', {
         method: 'POST',
@@ -639,7 +922,7 @@
   async function organizeQueuedNotes() {
     if (state.organizeRunning) return;
     state.organizeRunning = true;
-    renderSummary();
+    renderCodexDetail();
     try {
       const response = await state.apiFetch('/api/organize/queue', {
         method: 'POST',
@@ -659,6 +942,66 @@
       state.showToast(error.message);
     } finally {
       state.organizeRunning = false;
+      await refresh();
+    }
+  }
+
+  // 카드에 필요한 것만 읽는다. 요약 화면이 세 에이전트의 상세 데이터를 전부 끌어오면
+  // 에이전트가 늘 때마다 여는 비용이 그만큼 는다.
+  async function loadScheduleSummary() {
+    const requestId = ++state.requestId;
+    const query = state.summary?.calendarCenter
+      ? `?calendarCenter=${encodeURIComponent(state.summary.calendarCenter)}`
+      : '';
+    const response = await state.apiFetch(`/api/tasks/summary${query}`);
+    const summary = await response.json().catch(() => ({}));
+    if (requestId !== state.requestId) return false;
+    if (!response.ok) throw new Error(summary.error || '일정 요약을 불러오지 못했습니다.');
+    state.summary = summary;
+    return true;
+  }
+
+  async function loadCodexStatus() {
+    const response = await state.apiFetch('/api/organize/status');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Codex 상태를 불러오지 못했습니다.');
+    state.organize = data;
+    return true;
+  }
+
+  // 플래그가 꺼진 것은 오류가 아니다. 503을 실패로 다루면 카드가 빨갛게 뜨고
+  // 사람이 고칠 것이 없는데 고치려 들게 된다.
+  async function loadMailData() {
+    const response = await state.apiFetch('/api/mail/status');
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 503 && data.code === 'MAIL_AGENT_DISABLED') {
+      state.mail = { disabled: true };
+      return true;
+    }
+    if (!response.ok) throw new Error(data.error || 'Mail 상태를 불러오지 못했습니다.');
+    state.mail = data;
+    return true;
+  }
+
+  async function requeueMailAnalysis() {
+    if (state.mailRequeueRunning) return;
+    state.mailRequeueRunning = true;
+    renderMailDetail();
+    try {
+      const response = await state.apiFetch('/api/mail/analysis/requeue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '분석 대기열을 되돌리지 못했습니다.');
+      state.showToast(data.requeued > 0 ? `멈춘 분석 ${data.requeued}개를 다시 넣었어` : '되돌릴 분석이 없어');
+      state.mailError = '';
+    } catch (error) {
+      state.mailError = error.message;
+      state.showToast(error.message);
+    } finally {
+      state.mailRequeueRunning = false;
       await refresh();
     }
   }
@@ -763,10 +1106,27 @@
     refresh();
   }
 
+  function openSchedule() {
+    state.mode = 'schedule';
+    renderScheduleDetail();
+    refresh();
+  }
+
+  function openCodex() {
+    state.mode = 'codex';
+    renderCodexDetail();
+    refresh();
+  }
+
+  function openMail() {
+    state.mode = 'mail';
+    renderMailDetail();
+    refresh();
+  }
+
   async function refresh() {
     if (!state.initialized) return;
-    if (state.mode === 'summary') renderLoading();
-    if (state.mode !== 'summary') {
+    if (state.mode === 'tasks') {
       try {
         if (!state.enabled || !await loadAgentData()) return;
         renderWorkspaceReminders();
@@ -776,15 +1136,43 @@
       }
       return;
     }
-    const [scheduleResult, codexResult] = await Promise.allSettled([
-      state.enabled ? loadAgentData() : Promise.resolve(false),
-      loadCodexData(),
+    // 상세 화면은 자기 데이터만 다시 읽는다. 한 에이전트를 보는 동안 나머지 API를
+    // 부를 이유가 없다.
+    if (state.mode === 'schedule') {
+      const result = await Promise.allSettled([
+        state.enabled ? loadAgentData() : Promise.resolve(false),
+      ]);
+      state.scheduleError = result[0].status === 'rejected' ? result[0].reason.message : '';
+      renderScheduleDetail();
+      return;
+    }
+    if (state.mode === 'codex') {
+      const result = await Promise.allSettled([loadCodexData()]);
+      state.codexError = result[0].status === 'rejected' ? result[0].reason.message : '';
+      renderCodexDetail();
+      return;
+    }
+    if (state.mode === 'mail') {
+      const result = await Promise.allSettled([loadMailData()]);
+      state.mailError = result[0].status === 'rejected' ? result[0].reason.message : '';
+      renderMailDetail();
+      return;
+    }
+    renderLoading();
+    // 한 에이전트가 죽어도 나머지 카드는 살아 있어야 한다.
+    const [scheduleResult, codexResult, mailResult] = await Promise.allSettled([
+      state.enabled ? loadScheduleSummary() : Promise.resolve(false),
+      loadCodexStatus(),
+      loadMailData(),
     ]);
     state.scheduleError = scheduleResult.status === 'rejected'
       ? scheduleResult.reason.message
       : '';
     state.codexError = codexResult.status === 'rejected'
       ? codexResult.reason.message
+      : '';
+    state.mailError = mailResult.status === 'rejected'
+      ? mailResult.reason.message
       : '';
     renderSummary();
   }

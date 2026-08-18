@@ -819,6 +819,77 @@ html, body {
   min-width: 0;
 }
 
+/* 에이전트 요약 카드. 패널이 350px 고정 폭이라 2열이 물리적으로 안 들어가므로
+   데스크톱과 모바일이 같은 1열을 쓴다. 카드 하나가 통째로 버튼이라 모바일 타깃이
+   쪼개지지 않고, 복구 버튼은 카드가 아니라 상세 화면에 둔다. */
+.agent-cards {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.46);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+[data-theme="dark"] .agent-card {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.agent-card:hover {
+  border-color: var(--label);
+}
+
+.agent-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-card-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.agent-card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.agent-card-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--label);
+}
+
+.agent-card-dot.ok { background: #34c759; }
+.agent-card-dot.warn { background: #ff9f0a; }
+.agent-card-dot.danger { background: #ff3b30; }
+.agent-card-dot.off { background: var(--hairline); }
+
+.agent-card-metric {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.agent-card-detail {
+  font-size: 11px;
+  color: var(--label);
+}
+
 .schedule-agent-block {
   display: grid;
   gap: 15px;

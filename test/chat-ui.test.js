@@ -182,6 +182,51 @@ test('the codex agent card keeps three type steps, not four half-pixel ones', ()
   assert.match(css, /\.codex-agent-block \{[^}]*padding: 16px/s);
 });
 
+test('the agent summary cards reuse the panel type scale and stay one column', () => {
+  // 지식 패널은 데스크톱에서 350px 고정 폭이라 2열이 물리적으로 안 들어간다.
+  // 그래서 카드는 데스크톱과 모바일이 같은 1열을 쓰고, 그리드 컬럼을 만들지 않는다.
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 350px;/);
+  assert.match(css, /\.agent-cards \{[^}]*display: grid/s);
+  assert.doesNotMatch(css, /\.agent-cards \{[^}]*grid-template-columns/s);
+
+  // 9 · 11 · 17만 쓴다. 카드 때문에 새 단계를 만들지 않는다.
+  assert.match(css, /\.agent-card-title \{[^}]*font-size: 17px/s);
+  assert.match(css, /\.agent-card-metric \{[^}]*font-size: 11px/s);
+  assert.match(css, /\.agent-card-detail \{[^}]*font-size: 11px/s);
+
+  // 패널 카드 모서리는 12px 하나다.
+  assert.match(css, /\.agent-card \{[^}]*border-radius: 12px/s);
+  // 390px은 상세 블록의 값이다. 카드가 그 높이를 물려받으면 접는 의미가 없다.
+  assert.doesNotMatch(css, /\.agent-card \{[^}]*min-height/s);
+});
+
+test('an agent card is one button, so mobile gets one target instead of several', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  // 카드 안에 버튼을 또 넣으면 중첩이 되고 타깃이 잘게 쪼개진다. 복구 버튼은 상세에 둔다.
+  assert.match(panel, /card = document\.createElement\('button'\)/);
+  assert.match(panel, /card\.addEventListener\('click', onOpen\)/);
+  assert.doesNotMatch(panel, /card\.appendChild\(button\(/);
+});
+
+test('the summary screen reads status only, and details load their own agent', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  // 카드가 쓰는 runner는 organize/status에도 있다. 요약이 모델 카탈로그까지
+  // 부르면 에이전트가 늘 때마다 여는 비용이 그만큼 는다.
+  assert.match(panel, /loadScheduleSummary\(\) : Promise\.resolve\(false\),\s*loadCodexStatus\(\),\s*loadMailData\(\),/s);
+  assert.doesNotMatch(panel, /loadCodexData\(\),\s*loadMailData/s);
+  // 한 에이전트가 죽어도 나머지 카드는 살아 있어야 한다.
+  assert.match(panel, /Promise\.allSettled\(\[\s*state\.enabled \? loadScheduleSummary/s);
+});
+
+test('the mail card treats a disabled flag as off, not as an error', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  // 503을 실패로 다루면 카드가 빨갛게 뜨고, 사람이 고칠 것이 없는데 고치려 들게 된다.
+  assert.match(panel, /MAIL_AGENT_DISABLED[\s\S]{0,120}state\.mail = \{ disabled: true \}/);
+  // 확인할 메일 자체는 알림 탭의 몫이다. 여기에 두 번째 받은편지함을 만들지 않는다.
+  assert.doesNotMatch(panel, /\/api\/mail\/attention/);
+  assert.match(panel, /\/api\/mail\/analysis\/requeue/);
+});
+
 test('the chat column and the composer share one inline padding rule', () => {
   // 따로 적어두면 다시 어긋난다. 한 규칙에 묶어 같은 세로선을 강제한다.
   assert.match(
