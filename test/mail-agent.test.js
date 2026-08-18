@@ -416,3 +416,33 @@ test('an agent with no push service keeps working as it did before', async () =>
   assert.equal(result.results[0].mode, 'incremental');
   db.close();
 });
+
+test('due snooze wakes in the same tick and re-notifies once', async () => {
+  const enqueued = [];
+  const { db, store, agent, clock } = setup({
+    naverResults: [{ mode: 'incremental', messages: [], highestUid: 5 }],
+    pushService: {
+      routePending: () => ({ routed: 0, immediate: 0, batched: 0, suppressed: 0 }),
+      flushDueBatches: () => ({ flushed: 0, empty: 0, created: 0 }),
+      enqueue: target => { enqueued.push(target); return { subscriptions: 1, created: 1 }; },
+    },
+  });
+  const account = store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  const messageId = store.saveMessage({
+    accountId: account.id,
+    identityKind: 'rfc_message_id',
+    identityKey: '<snoozed@example.com>',
+    receivedAt: clock.value - 600,
+  }, clock.value).message.id;
+  const attentionId = db.prepare('INSERT INTO mail_attention (mail_message_id) VALUES (?)').run(messageId).lastInsertRowid;
+  store.snoozeAttention(attentionId, clock.value + 60, clock.value);
+
+  clock.value += 61;
+  const result = await agent.tick();
+
+  assert.deepEqual(result.wakes, { woken: 1 });
+  // 회차가 오른 채로 재알림이 나간다. 회차만 오르고 알림이 없으면 사용자는 영영 못 받는다.
+  assert.deepEqual(enqueued, [{ targetKind: 'message', targetId: messageId, notifySeq: 2 }]);
+  assert.equal(db.prepare('SELECT state FROM mail_attention WHERE id = ?').get(attentionId).state, 'open');
+  db.close();
+});

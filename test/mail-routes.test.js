@@ -12,6 +12,7 @@ function createFakeApp() {
     get(path, handler) { routes.set(`GET ${path}`, handler); },
     post(path, handler) { routes.set(`POST ${path}`, handler); },
     async call(key, req = {}) {
+      req.params = req.params || {};
       const handler = routes.get(key);
       if (!handler) throw new Error(`등록되지 않은 route: ${key}`);
       let status = 200;
@@ -37,6 +38,9 @@ function createFakeStore(accounts = [], states = new Map(), overrides = {}) {
     analysisSummary: () => EMPTY_ANALYSIS,
     listStrandedAnalysis: () => [],
     requeueFailedAnalysis: () => 0,
+    findAttentionById: () => ({ id: 1, state: 'open', notifySeq: 1, snoozedUntil: null }),
+    resolveAttention: () => ({ changed: true, state: 'done' }),
+    snoozeAttention: (id, until) => ({ changed: true, state: 'snoozed', snoozedUntil: until }),
     ...overrides,
   };
 }
@@ -159,4 +163,96 @@ test('the status route surfaces stranded analysis as a count and a code, not as 
   const serialized = JSON.stringify(response.body);
   assert.equal(serialized.includes('subject'), false);
   assert.equal(serialized.includes('sender'), false);
+});
+
+test('attention actions stay closed while the flag is off', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({ app, store: createFakeStore(), config: { enabled: false } });
+
+  for (const key of ['POST /api/mail/attention/:id/done', 'POST /api/mail/attention/:id/snooze']) {
+    const response = await app.call(key, { params: { id: '1' } });
+    assert.equal(response.status, 503);
+    assert.equal(response.body.code, 'MAIL_AGENT_DISABLED');
+  }
+});
+
+test('done is idempotent and reports what actually changed', async () => {
+  const app = createFakeApp();
+  const store = createFakeStore([], new Map(), {
+    resolveAttention: () => ({ changed: false, state: 'done' }),
+  });
+  registerMailRoutes({ app, store, config: { enabled: true } });
+
+  const response = await app.call('POST /api/mail/attention/:id/done', { params: { id: '7' } });
+  assert.equal(response.status, 200);
+  // 두 번 눌러도 오류가 아니다. 바뀐 것이 없다는 사실만 알린다.
+  assert.deepEqual(response.body, { success: true, changed: false, state: 'done' });
+});
+
+test('an unknown attention is a 404, not a silent success', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({
+    app, store: createFakeStore([], new Map(), { findAttentionById: () => null }), config: { enabled: true },
+  });
+
+  const response = await app.call('POST /api/mail/attention/:id/done', { params: { id: '99' } });
+  assert.equal(response.status, 404);
+  assert.equal(response.body.code, 'MAIL_ATTENTION_NOT_FOUND');
+});
+
+test('a bad id is refused before the store is touched', async () => {
+  const app = createFakeApp();
+  let looked = 0;
+  registerMailRoutes({
+    app,
+    store: createFakeStore([], new Map(), { findAttentionById: () => { looked += 1; return null; } }),
+    config: { enabled: true },
+  });
+
+  for (const id of ['0', '-1', 'abc', '']) {
+    const response = await app.call('POST /api/mail/attention/:id/done', { params: { id } });
+    assert.equal(response.status, 400, id);
+    assert.equal(response.body.code, 'MAIL_INVALID_ATTENTION');
+  }
+  assert.equal(looked, 0);
+});
+
+test('snoozing something already finished is a conflict, not a quiet no-op', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({
+    app,
+    store: createFakeStore([], new Map(), {
+      snoozeAttention: () => ({ changed: false, state: 'done' }),
+    }),
+    config: { enabled: true },
+  });
+
+  const response = await app.call('POST /api/mail/attention/:id/snooze', {
+    params: { id: '3' }, body: { until: 1787000000 },
+  });
+  assert.equal(response.status, 409);
+  assert.equal(response.body.code, 'MAIL_ATTENTION_NOT_SNOOZABLE');
+  assert.equal(response.body.state, 'done');
+});
+
+test('a snooze time the store refuses comes back as the store said', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({
+    app,
+    store: createFakeStore([], new Map(), {
+      snoozeAttention: () => {
+        const error = new Error('snooze 시각은 현재보다 뒤여야 합니다.');
+        error.code = 'MAIL_INVALID_SNOOZE';
+        error.statusCode = 400;
+        throw error;
+      },
+    }),
+    config: { enabled: true },
+  });
+
+  const response = await app.call('POST /api/mail/attention/:id/snooze', {
+    params: { id: '3' }, body: { until: 1 },
+  });
+  assert.equal(response.status, 400);
+  assert.equal(response.body.code, 'MAIL_INVALID_SNOOZE');
 });
