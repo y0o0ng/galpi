@@ -825,6 +825,23 @@ html, body {
 /* XION 홈. 첫 화면은 `확인할 것` → `오늘` → 에이전트 순이고, 각 영역은 있을 때만
    그려진다(설계 9절). 카드 상자를 겹쳐 쌓지 않으려고 영역 자체에는 테두리를 주지
    않고 제목과 간격으로만 가른다. */
+/* 홈 머리. 알림 패널 머리와 같은 문법(작은 키커 + 17px 제목)을 쓴다. */
+.home-head {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 18px;
+}
+
+.home-greeting {
+  font-size: 11px;
+  color: var(--label);
+}
+
+.home-date {
+  font-size: 17px;
+  font-weight: 700;
+}
+
 .home-section {
   display: grid;
   gap: 8px;

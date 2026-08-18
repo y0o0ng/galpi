@@ -751,6 +751,34 @@
     return '';
   }
 
+  // 인사는 KST 시각으로 고른다. 브라우저 timezone을 쓰면 같은 순간에 기기마다
+  // 다른 인사가 나온다. 이 제품의 시각 기준은 한 곳뿐이다.
+  function greeting(now = new Date()) {
+    const hour = Number(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Seoul', hour: 'numeric', hour12: false,
+    }).format(now));
+    if (hour < 5) return '늦은 밤이야';
+    if (hour < 11) return '좋은 아침';
+    if (hour < 17) return '좋은 오후';
+    if (hour < 22) return '좋은 저녁';
+    return '늦은 밤이야';
+  }
+
+  function makeHomeHead() {
+    const head = document.createElement('div');
+    head.className = 'home-head';
+    const hello = document.createElement('span');
+    hello.className = 'home-greeting';
+    hello.textContent = greeting();
+    const date = document.createElement('strong');
+    date.className = 'home-date';
+    date.textContent = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long',
+    }).format(new Date());
+    head.append(hello, date);
+    return head;
+  }
+
   function makeHomeSection(titleText, extra) {
     const section = document.createElement('section');
     section.className = 'home-section';
@@ -882,6 +910,7 @@
   // 줄 수만큼만 는다.
   function renderSummary() {
     state.container.replaceChildren();
+    state.container.appendChild(makeHomeHead());
     const attention = makeAttentionSection();
     const today = makeTodaySection();
     if (attention) state.container.appendChild(attention);

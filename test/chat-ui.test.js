@@ -201,6 +201,20 @@ test('the home reuses the panel type scale and stays one column', () => {
   assert.doesNotMatch(css, /\.home-agent \{[^}]*min-height/s);
 });
 
+test('XION sits first among the knowledge tabs and opens with the date', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  const order = [...html.matchAll(/data-panel-tab="([a-z]+)"/g)].map(match => match[1]);
+  assert.deepEqual(order, ['agents', 'notifications', 'notes', 'papers']);
+
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  const render = panel.slice(panel.indexOf('function renderSummary()'));
+  // 머리는 첫 줄이다. 인사와 날짜가 확인할 것 뒤로 가면 화면이 다시 목록처럼 읽힌다.
+  assert.ok(render.indexOf('makeHomeHead') < render.indexOf('makeAttentionSection'));
+  // 인사는 KST로 고른다. 브라우저 timezone을 쓰면 기기마다 다른 인사가 나온다.
+  assert.match(panel, /function greeting[\s\S]*?timeZone: 'Asia\/Seoul'/);
+  assert.match(css, /\.home-date \{[^}]*font-size: 17px/s);
+});
+
 test('the home briefing comes before the agent status, and never outranks itself', () => {
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
   const render = panel.slice(panel.indexOf('function renderSummary()'));
