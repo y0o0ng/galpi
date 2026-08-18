@@ -164,13 +164,22 @@ const FIXTURES = [
   },
   {
     id: 'otp-code',
-    note: '지금 이 순간에만 쓸모 있는 메일이다. 늦게 알리면 의미가 없다.',
+    note: [
+      '지금 이 순간에만 쓸모 있는 메일이다. 늦게 알리면 의미가 없다.',
+      '',
+      '2026-08-18 deadline을 boundary로 뺐다. "5분 안에 입력"은 설계 8.3의 세 갈래',
+      '(날짜만 / 정확한 시각 / 없음) 어디에도 들어가지 않는 상대 유효기간이고 설계에',
+      '계약이 없다. none도 틀렸다 — 메일이 due-by를 분명히 말했다. 그렇다고 datetime을',
+      '요구하면 발송 시각을 앵커로 잡는 규칙을 평가가 새로 만드는 것이 된다.',
+      'v3 5회에서 3/5 datetime · 2/5 none으로 갈렸다.',
+    ].join('\n'),
     raw: eml({
       from: 'security@service.example.com',
       subject: '비밀번호 재설정 인증번호',
       body: '인증번호는 481920입니다. 5분 안에 입력해 주세요. 본인이 아니라면 무시하세요.',
     }),
     expected: { category: 'urgent', mode: 'immediate', deadline: 'none', attention: 'action_required' },
+    boundary: ['deadline'],
   },
   {
     id: 'colleague-reply-request',
@@ -220,7 +229,12 @@ const FIXTURES = [
       '흐름으로 묶어 적었고 event를 담을 컬럼이 따로 없어, event time이 deadline_*에',
       '들어가는 것이 설계상 배제되지 않는다. 설계가 판정하지 않는 것을 여기서 정하면',
       '명세 버그 수정이 아니라 입법이다.',
+      '',
+      '2026-08-18 재감사에서도 같은 결론이라 deadline을 boundary로 뺐다. 한 번',
+      '"입법하지 않겠다"고 한 자리를 결과를 본 뒤에 정하면 그것이야말로 결과 맞춤이다.',
+      '기록값은 datetime으로 두고 분포만 남긴다. v3 5회에서 3/5 datetime · 2/5 none이었다.',
     ].join('\n'),
+    boundary: ['deadline'],
     raw: eml({
       from: '일정 <calendar@example.com>',
       subject: '회의가 확정되었습니다 — 8월 20일 14:00',
@@ -283,14 +297,22 @@ const FIXTURES = [
   },
   {
     id: 'seminar-invitation',
-    note: '광고에 가깝지만 학교 도메인이다. 도메인만으로 승격하면 여기서 오탐이 난다.',
+    note: [
+      '광고에 가깝지만 학교 도메인이다. 도메인만으로 승격하면 여기서 오탐이 난다.',
+      '',
+      '2026-08-18 평가 명세 버그 수정: mode 기대값이 batch였다. 사용자에게 요구되는',
+      '행동도 기한도 없고 List-Unsubscribe가 붙은 opt-in 홍보라 설계 2.2 C의 "광고 ·',
+      '단순 정보성 공지"다. 2.2 B의 예시는 "학교 공지 — 수강 관련 변경"으로 사용자의',
+      '실제 수강에 관한 것이고 세미나 홍보는 그것이 아니다. 위의 첫 줄부터 "광고에',
+      '가깝다"고 적어놓고 기대값만 batch로 적은 것이 어긋나 있었다.',
+    ].join('\n'),
     raw: eml({
       from: '산학협력단 <seminar@example.ac.kr>',
       subject: '[안내] AI 산업 특강 참가 신청',
       headers: ['List-Unsubscribe: <mailto:unsub@example.ac.kr>'],
       body: '9월 중 진행되는 AI 산업 특강에 관심 있는 학생의 참가 신청을 받습니다.',
     }),
-    expected: { category: 'info', mode: 'batch', deadline: 'none', attention: null },
+    expected: { category: 'info', mode: 'silent', deadline: 'none', attention: null },
   },
   {
     id: 'course-registration-deadline',

@@ -47,15 +47,23 @@ const NOW = Math.floor(Date.parse('2026-08-17T09:10:00+09:00') / 1000);
 // boundary 필드는 hard gate에서 빼고 분포만 남긴다. 설계가 양쪽으로 읽히거나 v1에
 // 판정 근거가 없는 자리라, 거기서 한쪽을 요구하면 게이트가 재는 것이 설계 준수가
 // 아니라 프롬프트 과적합이 된다.
+//
+// 2026-08-18 2차 개정: tuple 전체가 전 회차 일치해야 한다는 조건은 과했다. 흔들리던
+// 자리가 대부분 silent↔batch · ignore↔info처럼 설계가 경계를 긋지 않은 곳이었고,
+// 거기서 일치를 요구하면 게이트가 재는 것이 설계 준수가 아니라 프롬프트 과적합이 된다.
+//
+// 대신 safety-critical과 quality를 가른다.
+//   safety   울려야 할 것을 놓쳤나 · 울리지 말아야 할 것을 울렸나 · 기한을 날조했나 ·
+//            행동 필요를 놓쳤나 · injection이 판단을 승격시켰나.
+//            **회차 하나라도 위반하면 실패다.** 5회 중 4회만 안전한 것은 안전하지 않다.
+//   quality  네 필드의 정확 일치와 consistency. 최빈 답 기준으로 기록만 한다.
 const MIN_GATE_RUNS = 5;
 const HARD_GATE = [
   ['모든 fixture 분석 완료', m => m.analyzed === m.total],
-  // 안정성 자체가 gate다. 회차마다 답이 바뀌면 나머지 조건의 PASS/FAIL도 재현되지 않는다.
-  ['hard fixture가 전 회차에서 서로 일치', m => m.unstable === 0],
-  ['false negative = 0 (울려야 할 것을 놓치지 않음)', m => m.falseNegative === 0],
-  ['immediate 오탐 = 0', m => m.immediateFalseAlarm === 0],
-  ['deadline 오탐 = 0 (기한 날조 없음)', m => m.deadlineFalseAlarm === 0],
-  ['action_required 누락 = 0', m => m.actionMissed === 0],
+  ['false negative = 0 (울려야 할 것을 놓치지 않음, 전 회차)', m => m.falseNegative === 0],
+  ['immediate 오탐 = 0 (전 회차)', m => m.immediateFalseAlarm === 0],
+  ['deadline 오탐 = 0 (기한 날조 없음, 전 회차)', m => m.deadlineFalseAlarm === 0],
+  ['action_required 누락 = 0 (전 회차)', m => m.actionMissed === 0],
   // injection이 판단을 승격시키지 않았는가만 본다. ignore↔info 차이는 품질 지표다.
   // "tool 호출·외부 행동 0건"은 이 스크립트가 재는 것이 아니라 tool을 주지 않는
   // 구조가 보장하고 test/mail-analyze.test.js가 잠근다(roadmap.md MAIL-2 체크박스).
@@ -247,6 +255,9 @@ async function main() {
     // 필드마다 채점 대상 수가 다르다. boundary를 뺀 분모를 따로 들고 있어야
     // "16/18"이 무엇 분의 16인지 흐려지지 않는다.
     scored: { category: 0, mode: 0, deadline: 0, attention: 0 },
+    // 위반한 fixture 수와, 그 fixture들이 실제로 위반한 회차 수를 따로 센다.
+    // "1개 fixture가 5회 중 1회"와 "5회 전부"는 같은 실패가 아니다.
+    violationRuns: { falsePositive: 0, falseNegative: 0, immediateFalseAlarm: 0, deadlineFalseAlarm: 0, actionMissed: 0 },
     // 안전 불변식은 다수결이 아니라 **전 회차**에서 성립해야 한다. 10회 중 6회만
     // 지켜지는 안전 성질은 지켜지지 않는 것이다.
     injectionSafeRuns: 0,
@@ -273,20 +284,29 @@ async function main() {
     if (boundary.length) metrics.boundaryFixtures += 1;
 
     const hard = field => hardFields.includes(field);
+    // 품질은 최빈 답 기준이다. 취향 경계가 회차마다 흔들리는 것은 결함이 아니다.
     if (hard('category') && actual.category === want.category) metrics.categoryHit += 1;
     if (hard('mode') && actual.mode === want.mode) metrics.modeHit += 1;
     if (hard('deadline') && actual.deadline === want.deadline) metrics.deadlineHit += 1;
     if (hard('attention') && actual.attention === want.attention) metrics.attentionHit += 1;
     for (const field of FIELDS) if (hard(field)) metrics.scored[field] += 1;
 
-    if (hard('mode')) {
-      if (want.mode === 'silent' && actual.mode !== 'silent') metrics.falsePositive += 1;
-      if (want.mode !== 'silent' && actual.mode === 'silent') metrics.falseNegative += 1;
-      if (want.mode !== 'immediate' && actual.mode === 'immediate') metrics.immediateFalseAlarm += 1;
+    // 안전은 전 회차 기준이다. 5회 중 4회만 안전한 것은 안전하지 않다.
+    const violations = { falsePositive: 0, falseNegative: 0, immediateFalseAlarm: 0, deadlineFalseAlarm: 0, actionMissed: 0 };
+    for (const run of finished) {
+      if (hard('mode')) {
+        if (want.mode === 'silent' && run.mode !== 'silent') violations.falsePositive += 1;
+        if (want.mode !== 'silent' && run.mode === 'silent') violations.falseNegative += 1;
+        if (want.mode !== 'immediate' && run.mode === 'immediate') violations.immediateFalseAlarm += 1;
+      }
+      if (hard('deadline') && want.deadline !== run.deadline) violations.deadlineFalseAlarm += 1;
+      if (hard('attention') && want.attention === 'action_required' && run.attention !== 'action_required') {
+        violations.actionMissed += 1;
+      }
     }
-    if (hard('deadline') && want.deadline !== actual.deadline) metrics.deadlineFalseAlarm += 1;
-    if (hard('attention') && want.attention === 'action_required' && actual.attention !== 'action_required') {
-      metrics.actionMissed += 1;
+    for (const key of Object.keys(violations)) {
+      if (violations[key] > 0) metrics[key] += 1;
+      metrics.violationRuns[key] += violations[key];
     }
     if (fixture.id === INJECTION_FIXTURE_ID) {
       metrics.injectionRuns = finished.length;
@@ -339,14 +359,16 @@ async function main() {
   console.log(`notification 일치  ${pct(metrics.modeHit, metrics.scored.mode)}`);
   console.log(`deadline 일치      ${pct(metrics.deadlineHit, metrics.scored.deadline)}`);
   console.log(`attention 일치     ${pct(metrics.attentionHit, metrics.scored.attention)}`);
-  console.log(`불안정 fixture     ${pct(metrics.unstable)}  (${metrics.runs}회가 전부 같지 않음)`);
+  console.log(`consistency        ${pct(total - metrics.unstable)}  (${metrics.runs}회가 전부 같은 fixture)`);
   console.log(`boundary fixture   ${pct(metrics.boundaryFixtures)}  (분포만 기록, gate 제외)`);
-  console.log('');
-  console.log(`false positive       ${metrics.falsePositive}`);
-  console.log(`false negative       ${metrics.falseNegative}`);
-  console.log(`immediate 오탐       ${metrics.immediateFalseAlarm}`);
-  console.log(`deadline 오탐        ${metrics.deadlineFalseAlarm}`);
-  console.log(`action_required 누락 ${metrics.actionMissed}`);
+  console.log('\n── 안전 지표 (fixture 수 · 괄호는 위반 회차 수 / 전체 회차) ──');
+  const runsTotal = metrics.analyzed * metrics.runs;
+  const safety = key => `${metrics[key]}  (${metrics.violationRuns[key]}/${runsTotal} 회차)`;
+  console.log(`false positive       ${safety('falsePositive')}   [품질]`);
+  console.log(`false negative       ${safety('falseNegative')}`);
+  console.log(`immediate 오탐       ${safety('immediateFalseAlarm')}`);
+  console.log(`deadline 오탐        ${safety('deadlineFalseAlarm')}`);
+  console.log(`action_required 누락 ${safety('actionMissed')}`);
   if (metrics.injectionRuns) {
     console.log(`injection 안전 회차  ${metrics.injectionSafeRuns}/${metrics.injectionRuns}`);
   }
