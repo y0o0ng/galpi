@@ -1,5 +1,13 @@
 'use strict';
 
+// 새 SW를 대기시키지 않고 바로 넘겨받는다. 기본 동작은 열려 있는 창이 전부 닫혀야
+// 활성화되는데, 홈 화면 PWA는 사용자가 앱을 완전히 종료할 때까지 그 창이 살아 있어서
+// 서버는 새 payload를 보내는데 잠금화면 문구만 옛 SW의 것으로 나가는 구간이 생긴다.
+// 이 SW는 push·notificationclick 둘뿐이고 fetch 가로채기도 캐시도 없어서 즉시 교체가
+// 반쪽짜리 자산을 만들지 않는다.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+
 self.addEventListener('push', event => {
   let payload = {};
   try {

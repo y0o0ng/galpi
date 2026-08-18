@@ -314,4 +314,7 @@ test('the service worker shows fixed text and never reads mail content', () => {
   assert.match(sw, /notifySeq/);
   // 서버 API를 다시 부르지 않는다. 잠금화면 문구는 payload만으로 정해진다.
   assert.equal(sw.includes('fetch('), false);
+  // 새 문구가 배포돼도 옛 SW가 계속 잡고 있으면 잠금화면은 옛 문구로 나간다.
+  assert.match(sw, /addEventListener\('install', \(\) => self\.skipWaiting\(\)\)/);
+  assert.match(sw, /clients\.claim\(\)/);
 });
