@@ -43,6 +43,12 @@ const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createMailStore } = require('./lib/mail/store');
 const { createMailAgent } = require('./lib/mail/agent');
 const { createMailAnalyzer } = require('./lib/mail/analyze');
+const {
+  buildMailPushPayload,
+  buildMailSendOptions,
+  createMailPushService,
+} = require('./lib/mail/push');
+const { DEFAULT_QUIET_HOURS } = require('./lib/mail/quiet-hours');
 const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
@@ -926,11 +932,36 @@ const mailAnalyzer = MAIL_AGENT_ENABLED && HAS_GPT
     },
   })
   : null;
+// 구독과 transport는 일정과 공유하고 delivery 표만 도메인별로 나눈다(설계 8.6).
+// Push 설정이 꺼져 있으면 라우팅도 하지 않는다 — 보낼 곳이 없는데 큐만 쌓인다.
+const mailPushService = MAIL_AGENT_ENABLED && ASSISTANT_PUSH_CONFIG.enabled
+  ? createMailPushService(db, {
+    enabled: true,
+    // 설정 계층은 MAIL-3 뒤 단계에서 붙인다. 지금은 설계 기본값이다.
+    settings: () => ({ notificationsEnabled: true, quietHours: DEFAULT_QUIET_HOURS }),
+  })
+  : null;
+const mailPushDispatcher = mailPushService
+  ? createAssistantPushDispatcher(mailPushService, {
+    transport: createWebPushTransport(webPush, {
+      subject: ASSISTANT_PUSH_CONFIG.subject,
+      publicKey: ASSISTANT_PUSH_CONFIG.publicKey,
+      privateKey: ASSISTANT_PUSH_CONFIG.privateKey,
+    }),
+    // payload와 send option만 도메인이 정한다. 전달 루프는 일정과 같은 것을 쓴다.
+    buildPayload: claim => buildMailPushPayload(claim),
+    buildSendOptions: buildMailSendOptions,
+    onError(error) {
+      console.error(`Mail push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    },
+  })
+  : null;
 const mailAgent = MAIL_AGENT_ENABLED
   ? createMailAgent({
     store: mailStore,
     providers: mailProviders,
     analyzer: mailAnalyzer,
+    pushService: mailPushService,
     credentials: mailCredentialsFor,
     // 오류 코드만 남긴다. 제목·발신자·주소는 로그에 넣지 않는다(설계 19절).
     onError: (error, account) => {
@@ -8946,6 +8977,10 @@ const httpServer = app.listen(PORT, HOST, () => {
     if (ASSISTANT_TASK_SERIES_ENABLED) {
       console.log('   반복 일정: 회차 생성·놓친 회차 정리를 같은 tick에서 실행 중');
     }
+  }
+  if (mailPushDispatcher) {
+    mailPushDispatcher.start();
+    console.log('   메일 알림: Push dispatcher 실행 중');
   }
   if (assistantPushDispatcher) {
     assistantPushDispatcher.start();

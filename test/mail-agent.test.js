@@ -56,7 +56,7 @@ function imapMessage(uid, overrides = {}) {
   };
 }
 
-function setup({ now = 1000, naverResults = [], gmailResults = [], analyzer = null } = {}) {
+function setup({ now = 1000, naverResults = [], gmailResults = [], analyzer = null, pushService = null } = {}) {
   const db = createDatabase();
   const clock = { value: now };
   const store = createMailStore(db, { now: () => clock.value });
@@ -89,6 +89,7 @@ function setup({ now = 1000, naverResults = [], gmailResults = [], analyzer = nu
     store,
     providers,
     analyzer,
+    pushService,
     now: () => clock.value,
     syncIntervalSeconds: 300,
     credentials: account => { calls.credentials.push(account.id); return { user: 'u', pass: 'p' }; },
@@ -375,6 +376,43 @@ test('an agent with no analyzer keeps working exactly as MAIL-1 did', async () =
 
   const result = await agent.tick();
   assert.equal(result.analysis, null);
+  assert.equal(result.results[0].mode, 'incremental');
+  db.close();
+});
+
+test('routing and batch flush are isolated from each other and from sync', async () => {
+  // 한 단계가 터져도 나머지가 돈다. 라우팅이 죽었다고 batch가 영영 안 닫히면
+  // 사용자는 이유 없이 알림을 못 받는다.
+  const calls = [];
+  const errors = [];
+  const { db, store, agent } = setup({
+    naverResults: [{ mode: 'incremental', messages: [], highestUid: 5 }],
+    analyzer: { async tick() { calls.push('analysis'); return { results: [] }; } },
+    pushService: {
+      routePending() { calls.push('route'); throw new Error('routing exploded'); },
+      flushDueBatches() { calls.push('flush'); return { flushed: 1, empty: 0, created: 2 }; },
+    },
+  });
+  store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+  const agentWithErrors = agent;
+
+  const result = await agentWithErrors.tick();
+  assert.deepEqual(calls, ['analysis', 'route', 'flush']);
+  assert.equal(result.routing, null, '터진 단계는 값이 없다');
+  assert.deepEqual(result.batches, { flushed: 1, empty: 0, created: 2 });
+  assert.equal(result.results[0].mode, 'incremental');
+  db.close();
+});
+
+test('an agent with no push service keeps working as it did before', async () => {
+  const { db, store, agent } = setup({
+    naverResults: [{ mode: 'incremental', messages: [], highestUid: 5 }],
+  });
+  store.registerAccount({ provider: 'naver', address: 'me@naver.com' });
+
+  const result = await agent.tick();
+  assert.equal(result.routing, null);
+  assert.equal(result.batches, null);
   assert.equal(result.results[0].mode, 'incremental');
   db.close();
 });
