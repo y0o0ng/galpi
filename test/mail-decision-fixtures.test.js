@@ -36,6 +36,19 @@ test('every expected value stays inside the schema contract', () => {
     assert.ok(attentions.has(expected.attention), `${id}: attention`);
   }
 
+  // boundary는 hard gate에서 빠지는 자리다. 오타 하나면 조용히 채점에서 사라지므로
+  // 필드 이름과 상한을 잠근다 — 전부 boundary인 세트는 아무것도 재지 않는다.
+  const fields = new Set(['category', 'mode', 'deadline', 'attention']);
+  let boundaryFixtures = 0;
+  for (const { id, boundary } of FIXTURES) {
+    if (boundary === undefined) continue;
+    assert.ok(Array.isArray(boundary) && boundary.length, `${id}: boundary는 비어 있지 않은 배열`);
+    for (const field of boundary) assert.ok(fields.has(field), `${id}: 모르는 boundary 필드 ${field}`);
+    assert.ok(boundary.length < fields.size, `${id}: 전 필드를 boundary로 뺄 수 없다`);
+    boundaryFixtures += 1;
+  }
+  assert.ok(boundaryFixtures <= 3, 'boundary가 늘면 게이트가 재는 것이 줄어든다');
+
   // 세트가 한쪽으로 쏠리면 "전부 silent"라고 답해도 점수가 잘 나온다.
   const modeCounts = new Map();
   for (const { expected } of FIXTURES) {

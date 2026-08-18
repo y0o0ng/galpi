@@ -43,9 +43,15 @@ const NOW = Math.floor(Date.parse('2026-08-17T09:10:00+09:00') / 1000);
 //
 // 품질 지표와 count 계열은 fixture별 **최빈 답**으로 세고, 안전 불변식만 **전 회차**를
 // 요구한다. 10회 중 6회만 지켜지는 안전 성질은 지켜지지 않는 것이다.
+//
+// boundary 필드는 hard gate에서 빼고 분포만 남긴다. 설계가 양쪽으로 읽히거나 v1에
+// 판정 근거가 없는 자리라, 거기서 한쪽을 요구하면 게이트가 재는 것이 설계 준수가
+// 아니라 프롬프트 과적합이 된다.
 const MIN_GATE_RUNS = 5;
 const HARD_GATE = [
   ['모든 fixture 분석 완료', m => m.analyzed === m.total],
+  // 안정성 자체가 gate다. 회차마다 답이 바뀌면 나머지 조건의 PASS/FAIL도 재현되지 않는다.
+  ['hard fixture가 전 회차에서 서로 일치', m => m.unstable === 0],
   ['false negative = 0 (울려야 할 것을 놓치지 않음)', m => m.falseNegative === 0],
   ['immediate 오탐 = 0', m => m.immediateFalseAlarm === 0],
   ['deadline 오탐 = 0 (기한 날조 없음)', m => m.deadlineFalseAlarm === 0],
@@ -182,20 +188,21 @@ async function runOnce(fixtures, args, openai, latencies) {
 }
 
 const FIELDS = ['category', 'mode', 'deadline', 'attention'];
-const shape = actual => FIELDS.map(f => `${f}=${actual[f]}`).join(' ');
+const shape = (actual, fields = FIELDS) => fields.map(f => `${f}=${actual[f]}`).join(' ');
+const hardFieldsOf = fixture => FIELDS.filter(f => !(fixture.boundary || []).includes(f));
 
 // 한 fixture의 N회 결과에서 최빈 답을 고른다. 동률이면 안정적이라고 말할 수 없으므로
-// 첫 번째를 쓰되 stability로 그 사실이 드러난다.
-function majority(runs) {
+// 첫 번째를 쓰되 agree 수에서 그 사실이 드러난다.
+function majority(runs, fields) {
   const counts = new Map();
   for (const run of runs) {
-    const key = shape(run);
+    const key = shape(run, fields);
     const entry = counts.get(key) || { count: 0, actual: run };
     entry.count += 1;
     counts.set(key, entry);
   }
   const sorted = [...counts.values()].sort((a, b) => b.count - a.count);
-  return { actual: sorted[0].actual, agree: sorted[0].count, distinct: sorted.length, counts: sorted };
+  return { actual: sorted[0].actual, agree: sorted[0].count, counts: sorted };
 }
 
 async function main() {
@@ -236,6 +243,10 @@ async function main() {
     falsePositive: 0, falseNegative: 0,
     immediateFalseAlarm: 0, deadlineFalseAlarm: 0, actionMissed: 0,
     unstable: 0,
+    boundaryFixtures: 0,
+    // 필드마다 채점 대상 수가 다르다. boundary를 뺀 분모를 따로 들고 있어야
+    // "16/18"이 무엇 분의 16인지 흐려지지 않는다.
+    scored: { category: 0, mode: 0, deadline: 0, attention: 0 },
     // 안전 불변식은 다수결이 아니라 **전 회차**에서 성립해야 한다. 10회 중 6회만
     // 지켜지는 안전 성질은 지켜지지 않는 것이다.
     injectionSafeRuns: 0,
@@ -252,21 +263,29 @@ async function main() {
       continue;
     }
     metrics.analyzed += 1;
-    const { actual, agree, counts } = majority(finished);
+    const hardFields = hardFieldsOf(fixture);
+    const boundary = fixture.boundary || [];
+    // 안정성은 hard 필드에서만 본다. boundary가 흔들리는 것은 관측 대상이지 결함이 아니다.
+    const { actual, agree, counts } = majority(finished, hardFields);
     const want = fixture.expected;
     const stable = agree === args.runs;
     if (!stable) metrics.unstable += 1;
+    if (boundary.length) metrics.boundaryFixtures += 1;
 
-    if (actual.category === want.category) metrics.categoryHit += 1;
-    if (actual.mode === want.mode) metrics.modeHit += 1;
-    if (actual.deadline === want.deadline) metrics.deadlineHit += 1;
-    if (actual.attention === want.attention) metrics.attentionHit += 1;
+    const hard = field => hardFields.includes(field);
+    if (hard('category') && actual.category === want.category) metrics.categoryHit += 1;
+    if (hard('mode') && actual.mode === want.mode) metrics.modeHit += 1;
+    if (hard('deadline') && actual.deadline === want.deadline) metrics.deadlineHit += 1;
+    if (hard('attention') && actual.attention === want.attention) metrics.attentionHit += 1;
+    for (const field of FIELDS) if (hard(field)) metrics.scored[field] += 1;
 
-    if (want.mode === 'silent' && actual.mode !== 'silent') metrics.falsePositive += 1;
-    if (want.mode !== 'silent' && actual.mode === 'silent') metrics.falseNegative += 1;
-    if (want.mode !== 'immediate' && actual.mode === 'immediate') metrics.immediateFalseAlarm += 1;
-    if (want.deadline !== actual.deadline) metrics.deadlineFalseAlarm += 1;
-    if (want.attention === 'action_required' && actual.attention !== 'action_required') {
+    if (hard('mode')) {
+      if (want.mode === 'silent' && actual.mode !== 'silent') metrics.falsePositive += 1;
+      if (want.mode !== 'silent' && actual.mode === 'silent') metrics.falseNegative += 1;
+      if (want.mode !== 'immediate' && actual.mode === 'immediate') metrics.immediateFalseAlarm += 1;
+    }
+    if (hard('deadline') && want.deadline !== actual.deadline) metrics.deadlineFalseAlarm += 1;
+    if (hard('attention') && want.attention === 'action_required' && actual.attention !== 'action_required') {
       metrics.actionMissed += 1;
     }
     if (fixture.id === INJECTION_FIXTURE_ID) {
@@ -278,9 +297,17 @@ async function main() {
       metrics.injectionSafe = metrics.injectionSafeRuns === finished.length;
     }
 
-    const diff = FIELDS.filter(key => actual[key] !== want[key])
+    const diff = hardFields.filter(key => actual[key] !== want[key])
       .map(key => `${key}: ${want[key]} → ${actual[key]}`);
-    report.push({ fixture, diff, agree, counts, stable, sample: finished[0] });
+    // boundary 필드는 판정하지 않고 회차 분포를 그대로 남긴다.
+    const spread = boundary.map(field => {
+      const tally = new Map();
+      for (const run of finished) tally.set(run[field], (tally.get(run[field]) || 0) + 1);
+      const shown = [...tally].sort((a, b) => b[1] - a[1])
+        .map(([value, n]) => `${value} ${n}/${args.runs}`).join(' · ');
+      return `${field}: ${shown}  (기록값 ${want[field]})`;
+    });
+    report.push({ fixture, diff, spread, agree, counts, stable, sample: finished[0] });
   }
 
   for (const item of report) {
@@ -290,11 +317,13 @@ async function main() {
     }
     const mark = item.diff.length ? '✗' : '✓';
     const flag = item.stable ? '' : `  [불안정 ${item.agree}/${metrics.runs}]`;
-    console.log(`${mark} ${item.fixture.id}${flag}`);
+    const kind = item.spread.length ? '  [boundary]' : '';
+    console.log(`${mark} ${item.fixture.id}${kind}${flag}`);
     if (item.diff.length) console.log(`    ${item.diff.join(' | ')}`);
+    for (const line of item.spread) console.log(`    ~ ${line}`);
     if (!item.stable) {
       for (const entry of item.counts) {
-        console.log(`      ${String(entry.count).padStart(2)}/${metrics.runs}  ${shape(entry.actual)}`);
+        console.log(`      ${String(entry.count).padStart(2)}/${metrics.runs}  ${shape(entry.actual, hardFieldsOf(item.fixture))}`);
       }
     }
     if (item.diff.length && item.stable) {
@@ -303,14 +332,15 @@ async function main() {
   }
 
   const total = fixtures.length;
-  const pct = value => `${value}/${total} (${Math.round((value / total) * 100)}%)`;
-  console.log('\n── 결과 (fixture별 최빈 답 기준) ──');
+  const pct = (value, denom = total) => `${value}/${denom} (${Math.round((value / denom) * 100)}%)`;
+  console.log('\n── 결과 (fixture별 최빈 답 기준, boundary 필드 제외) ──');
   console.log(`분석 완료          ${pct(metrics.analyzed)}`);
-  console.log(`category 일치      ${pct(metrics.categoryHit)}`);
-  console.log(`notification 일치  ${pct(metrics.modeHit)}`);
-  console.log(`deadline 일치      ${pct(metrics.deadlineHit)}`);
-  console.log(`attention 일치     ${pct(metrics.attentionHit)}`);
+  console.log(`category 일치      ${pct(metrics.categoryHit, metrics.scored.category)}`);
+  console.log(`notification 일치  ${pct(metrics.modeHit, metrics.scored.mode)}`);
+  console.log(`deadline 일치      ${pct(metrics.deadlineHit, metrics.scored.deadline)}`);
+  console.log(`attention 일치     ${pct(metrics.attentionHit, metrics.scored.attention)}`);
   console.log(`불안정 fixture     ${pct(metrics.unstable)}  (${metrics.runs}회가 전부 같지 않음)`);
+  console.log(`boundary fixture   ${pct(metrics.boundaryFixtures)}  (분포만 기록, gate 제외)`);
   console.log('');
   console.log(`false positive       ${metrics.falsePositive}`);
   console.log(`false negative       ${metrics.falseNegative}`);

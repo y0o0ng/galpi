@@ -13,6 +13,10 @@
 //   mode       정책 적용 **후**의 notification mode. 모델 원값이 아니다.
 //   deadline   none | date | datetime
 //   attention  이 메일이 Attention에 남아야 하는가 (남는다면 어떤 사유로)
+//
+// boundary 필드는 설계가 양쪽 다 읽히게 써놨거나 v1에 판정 근거가 없어서 어느 답도
+// 틀렸다고 할 수 없는 자리다. 기대값은 기록용으로 남기되 hard gate에서 빼고 분포만
+// 남긴다. 프롬프트로 한쪽에 못박으면 그것은 fixture의 답을 맞추는 것이다.
 
 const RECEIVED = 'Mon, 17 Aug 2026 09:00:00 +0900';
 
@@ -180,9 +184,18 @@ const FIXTURES = [
       '명시되지 않았으므로 설계 8.3 계약상 date다. 인용문의 "오후 2시"는 회의 시각이지',
       '기한이 아니라서 datetime으로 올리지 않는다.',
       '',
-      'mode는 batch 그대로 둔다. 설계 2.2 A의 "가까운 마감이 있는 응답 요청"이 몇 시간',
-      '이내인지 며칠까지인지 설계가 정하지 않아, batch를 틀렸다고 할 근거가 없다.',
+      '2026-08-18 mode를 boundary로 뺐다. 이 메일은 설계 2.2 A의 "중요한 사람이 명확하게',
+      '답변을 요구한 경우"(→immediate)와 B의 "즉시 울릴 필요는 없음"(→batch)에 동시에',
+      '걸린다. 어느 쪽인지는 발신자가 사용자에게 "중요한 사람"인지에 달렸는데 v1에는',
+      '그 정보가 없다(senderKnown은 과거 수신 여부일 뿐 중요도가 아니다). v3에서 10회',
+      '측정하니 5/10 batch · 4/10 immediate · 1/10 immediate로 갈렸고, 이것은 모델의',
+      '결함이 아니라 판정 근거가 없다는 정직한 반응이다. 프롬프트로 한쪽에 못박으면',
+      '그것은 이 fixture의 답을 맞추는 것이다.',
+      '',
+      'expected.mode는 기록용으로 batch를 남기되 hard gate에서는 제외하고 분포만 남긴다.',
     ].join('\n'),
+    // hard gate에서 빼고 분포만 기록하는 필드.
+    boundary: ['mode'],
     raw: eml({
       from: '김동료 <colleague@example.com>',
       subject: 'Re: 프로젝트 일정',
@@ -281,7 +294,21 @@ const FIXTURES = [
   },
   {
     id: 'course-registration-deadline',
-    note: '학교 공지 중 실제로 놓치면 손해인 것. seminar-invitation과 갈려야 한다.',
+    note: [
+      '학교 공지 중 실제로 놓치면 손해인 것. seminar-invitation과 갈려야 한다.',
+      '',
+      '2026-08-18 평가 명세 버그 수정: mode 기대값이 immediate였다. 설계 2.2 B의 예시',
+      '블록이 "학교 공지 — 수강 관련 변경"을 batch 예시로 직접 들고 있고, 이 메일이',
+      '문자 그대로 그것이다. 설계 2.2 A의 여섯 항목 어디에도 걸리지 않는다 — 마감이',
+      '8일 뒤라 "가까운 마감"이 아니고, 누구에게 답을 보내는 것이 아니라 포털에서',
+      '사용자가 처리하는 일이라 "응답 요청"도 아니다.',
+      '',
+      '모델을 튜닝해서 immediate를 내게 만들 수도 있었지만 그것은 설계를 거스르는',
+      '방향으로 프롬프트를 과적합시키는 것이다. v2와 v3에서 각각 10/10 batch였고',
+      '그중 v3은 이 예시 블록을 프롬프트에 넣은 뒤였다.',
+      '',
+      '나머지 세 필드는 그대로다. 모델과도 일치하고 설계와도 부딪히지 않는다.',
+    ].join('\n'),
     raw: eml({
       from: '학사지원팀 <academic@example.ac.kr>',
       subject: '2학기 수강신청 정정 기간 안내',
@@ -290,7 +317,7 @@ const FIXTURES = [
         '정정 기간이 지나면 학기 중 변경이 불가능하니 반드시 확인하세요.',
       ].join('\n'),
     }),
-    expected: { category: 'action_required', mode: 'immediate', deadline: 'date', attention: 'action_required' },
+    expected: { category: 'action_required', mode: 'batch', deadline: 'date', attention: 'action_required' },
   },
   {
     id: 'euckr-undeclared-notice',
