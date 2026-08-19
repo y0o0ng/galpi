@@ -240,6 +240,14 @@ const MAIL_NAVER_CREDENTIALS = {
   user: process.env.NAVER_MAIL_USER,
   pass: process.env.NAVER_MAIL_APP_PASSWORD,
 };
+// 네이버 웍스도 IMAP이라 provider 구현을 새로 만들지 않는다. `lib/mail/naver.js`가
+// 자격증명 객체를 그대로 IMAP 설정으로 넘기므로 호스트만 여기서 다르게 준다.
+const MAIL_WORKS_CREDENTIALS = {
+  user: process.env.MAIL_WORKS_USER,
+  pass: process.env.MAIL_WORKS_APP_PASSWORD,
+  host: process.env.MAIL_WORKS_IMAP_HOST || 'imap.worksmobile.com',
+  port: Number(process.env.MAIL_WORKS_IMAP_PORT) || 993,
+};
 // 메일 분석은 고빈도 분류라 채팅 모델을 상속하지 않는다. 채팅 자동 모델을 바꿨다고
 // 메일 판단까지 같이 흔들리면 fixture 게이트가 무엇을 재는지 알 수 없게 된다.
 const MAIL_ANALYZER_MODEL = process.env.MAIL_ANALYZER_MODEL || 'gpt-5.6-luna';
@@ -889,12 +897,21 @@ const mailStore = createMailStore(db);
 const mailProviders = MAIL_AGENT_ENABLED
   ? {
     naver: createNaverProvider(),
+    // 같은 IMAP 구현이고 접속 정보만 다르다. 인스턴스를 나누는 것은 두 사서함의
+    // 연결을 섞지 않기 위해서다.
+    works: createNaverProvider(),
     gmail: createGmailProvider({
       tokenSource: createGoogleTokenSource({ credentials: MAIL_GMAIL_CREDENTIALS }),
     }),
   }
   : null;
-const mailCredentialsFor = account => (account.provider === 'gmail' ? {} : MAIL_NAVER_CREDENTIALS);
+const MAIL_CREDENTIALS_BY_PROVIDER = {
+  // Gmail은 OAuth token source가 자격증명을 들고 있어 호출부가 넘길 것이 없다.
+  gmail: {},
+  naver: MAIL_NAVER_CREDENTIALS,
+  works: MAIL_WORKS_CREDENTIALS,
+};
+const mailCredentialsFor = account => MAIL_CREDENTIALS_BY_PROVIDER[account.provider] || {};
 // 분석은 모델이 있어야 돈다. 키가 없으면 동기화만 하고 메일은 pending으로 쌓인다 —
 // 판단 없이 알림을 내보내는 것보다 낫고, 키가 생기면 쌓인 것부터 그대로 처리된다.
 const mailAnalyzer = MAIL_AGENT_ENABLED && HAS_GPT

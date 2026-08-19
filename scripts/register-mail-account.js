@@ -7,6 +7,7 @@
 //   node scripts/register-mail-account.js list
 //   node scripts/register-mail-account.js add naver me@naver.com
 //   node scripts/register-mail-account.js add gmail me@gmail.com
+//   node scripts/register-mail-account.js add works me@korea.ac.kr
 //   node scripts/register-mail-account.js disable 2
 //   node scripts/register-mail-account.js enable 2
 //
@@ -45,6 +46,7 @@ function openDatabase() {
 }
 
 function formatAccount(account, state) {
+  // Gmail만 historyId를 쓴다. 네이버와 웍스는 같은 IMAP 커서다.
   const cursor = account.provider === 'gmail'
     ? `historyId=${state?.gmailHistoryId ?? '-'}`
     : `uid=${state?.imapLastUid ?? '-'} validity=${state?.imapUidValidity ?? '-'}`;
@@ -73,7 +75,7 @@ function main() {
     console.log([
       '사용법:',
       '  node scripts/register-mail-account.js list',
-      '  node scripts/register-mail-account.js add <gmail|naver> <주소>',
+      '  node scripts/register-mail-account.js add <gmail|naver|works> <주소>',
       '  node scripts/register-mail-account.js disable <계정 ID>',
       '  node scripts/register-mail-account.js enable <계정 ID>',
     ].join('\n'));

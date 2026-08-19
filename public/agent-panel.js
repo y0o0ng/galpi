@@ -698,7 +698,7 @@
       tone,
       status,
       metric: accounts.length
-        ? accounts.map(account => `${account.provider === 'gmail' ? 'Gmail' : 'Naver'} ${account.status === 'active' ? '●' : '○'}`).join(' · ')
+        ? accounts.map(account => `${providerLabel(account.provider)} ${account.status === 'active' ? '●' : '○'}`).join(' · ')
         : '등록된 계정 없음',
       onOpen: openMail,
       ariaLabel: 'Mail 에이전트 열기',
@@ -736,6 +736,11 @@
       ariaLabel: '사서 Codex 열기',
     });
   }
+
+  // provider 표시 이름. 세 번째 provider가 생기면서 `gmail이냐 아니냐`의 이진 분기가
+  // 틀린 답을 내게 됐다(웍스가 `Naver`로 보였다). 이름은 한 곳에서만 정한다.
+  const PROVIDER_LABELS = { gmail: 'Gmail', naver: 'Naver', works: 'Works' };
+  const providerLabel = provider => PROVIDER_LABELS[provider] || provider || '메일';
 
   const REASON_LABELS = {
     action_required: '행동 필요',
@@ -827,7 +832,7 @@
     if (!isTask) {
       const source = document.createElement('span');
       source.className = 'home-attention-source';
-      source.textContent = item.provider === 'gmail' ? 'Gmail' : 'Naver';
+      source.textContent = providerLabel(item.provider);
       top.appendChild(source);
     }
 
@@ -1134,7 +1139,7 @@
     accounts.forEach(account => {
       const line = document.createElement('p');
       line.className = 'codex-agent-message';
-      const label = account.provider === 'gmail' ? 'Gmail' : 'Naver';
+      const label = providerLabel(account.provider);
       const parts = [`${label} ${account.address}`, account.status];
       if (account.lastSyncAt) parts.push(`마지막 동기화 ${formatDateTime(account.lastSyncAt)}`);
       if (account.lastErrorCode) parts.push(account.lastErrorCode);

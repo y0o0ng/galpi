@@ -153,6 +153,11 @@
     return '';
   }
 
+  // provider 표시 이름. 세 번째 provider가 생기면서 `gmail이냐 아니냐`의 이진 분기가
+  // 틀린 답을 내게 됐다(웍스가 `Naver`로 보였다). 이름은 한 곳에서만 정한다.
+  const PROVIDER_LABELS = { gmail: 'Gmail', naver: 'Naver', works: 'Works' };
+  const providerLabel = provider => PROVIDER_LABELS[provider] || provider || '메일';
+
   const REASON_LABELS = {
     action_required: '행동 필요',
     attachment_check: '첨부 확인 필요',
@@ -174,7 +179,7 @@
     badge.textContent = REASON_LABELS[item.reasonKind] || '메일';
     const source = document.createElement('span');
     source.className = 'notification-source';
-    source.textContent = item.provider === 'gmail' ? 'Gmail' : 'Naver';
+    source.textContent = providerLabel(item.provider);
     top.append(badge, source);
 
     const who = document.createElement('div');

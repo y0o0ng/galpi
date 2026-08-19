@@ -79,7 +79,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
     [
@@ -87,7 +87,7 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
       { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
       { version: 13 }, { version: 14 }, { version: 15 }, { version: 16 },
-      { version: 17 }, { version: 18 }, { version: 19 }, { version: 20 },
+      { version: 17 }, { version: 18 }, { version: 19 }, { version: 20 }, { version: 21 },
     ],
   );
 
@@ -751,6 +751,67 @@ test('the v20 rebuild keeps what it can read and drops only what it cannot', () 
     { kind: 'message', id: messageId, status: 'accepted' },
   ]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_attention').get().n, 1);
-  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, 20);
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, 21);
+  db.close();
+});
+
+test('schema v21 widens the provider check without cutting the children loose', () => {
+  // `mail_accounts`는 메시지·커서·선호가 참조하는 **부모 표**다. v20에서 재작성한
+  // delivery는 자식이 없는 잎이었지만 이것은 다르다. 재작성이 자식을 끊으면 메일
+  // 전체가 고아가 되므로, 데이터가 그대로 붙어 있는지를 값으로 잠근다.
+  const db = createLegacyDatabase();
+  const upto20 = migrations.filter(m => m.version <= 20);
+  db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))");
+  for (const migration of upto20) {
+    db.transaction(() => {
+      migration.up(db);
+      db.prepare('INSERT INTO schema_version (version, name) VALUES (?, ?)').run(migration.version, migration.name);
+    })();
+  }
+
+  const accountId = db.prepare(`
+    INSERT INTO mail_accounts (provider, address, status, next_sync_at, last_sync_at, last_error_code)
+    VALUES ('naver', 'me@naver.com', 'auth_required', 111, 222, 'MAIL_AUTH_FAILED')
+  `).run().lastInsertRowid;
+  const messageId = db.prepare(`
+    INSERT INTO mail_messages (account_id, identity_kind, identity_key, received_at, subject)
+    VALUES (?, 'rfc_message_id', '<keep@example.com>', 1786949400, '남아 있어야 하는 메일')
+  `).run(accountId).lastInsertRowid;
+  db.prepare('INSERT INTO mail_sync_state (account_id, imap_last_uid) VALUES (?, 16613)').run(accountId);
+  db.prepare(`
+    INSERT INTO mail_preferences (account_id, preference_type, target, action)
+    VALUES (?, 'sender', 'news@example.com', 'suppress_notification')
+  `).run(accountId);
+
+  runDatabaseMigrations(db);
+
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, 21);
+  // 부모 행이 값 그대로 살아 있다.
+  assert.deepEqual(db.prepare(`
+    SELECT id, provider, address, status, next_sync_at AS nextSyncAt,
+           last_sync_at AS lastSyncAt, last_error_code AS lastErrorCode
+    FROM mail_accounts
+  `).all(), [{
+    id: accountId, provider: 'naver', address: 'me@naver.com', status: 'auth_required',
+    nextSyncAt: 111, lastSyncAt: 222, lastErrorCode: 'MAIL_AUTH_FAILED',
+  }]);
+  // 자식이 여전히 그 부모를 가리킨다.
+  assert.equal(db.prepare('SELECT account_id AS id FROM mail_messages WHERE id = ?').get(messageId).id, accountId);
+  assert.equal(db.prepare('SELECT imap_last_uid AS uid FROM mail_sync_state WHERE account_id = ?').get(accountId).uid, 16613);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_preferences WHERE account_id = ?').get(accountId).n, 1);
+  assert.equal(db.pragma('foreign_key_check').length, 0);
+
+  // 세 번째 provider가 들어간다. 그것이 이 마이그레이션의 목적이다.
+  db.prepare("INSERT INTO mail_accounts (provider, address) VALUES ('works', 'me@korea.ac.kr')").run();
+  // 모르는 값은 여전히 막힌다. CHECK를 없앤 것이 아니라 넓힌 것이다.
+  assert.throws(
+    () => db.prepare("INSERT INTO mail_accounts (provider, address) VALUES ('outlook', 'me@outlook.com')").run(),
+    /CHECK/,
+  );
+  // provider당 하나라는 규칙도 그대로다.
+  assert.throws(
+    () => db.prepare("INSERT INTO mail_accounts (provider, address) VALUES ('works', 'other@korea.ac.kr')").run(),
+    /UNIQUE/,
+  );
   db.close();
 });

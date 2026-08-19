@@ -331,6 +331,16 @@ test('mail cards never render the mail body, only what the design allows', () =>
   assert.match(panel, /\/api\/mail\/attention\/\$\{item\.attentionId\}\/\$\{kind\}/);
 });
 
+test('provider names come from one table, so a third provider is not mislabelled', () => {
+  // `gmail이냐 아니냐`의 이진 분기는 provider가 둘일 때만 맞다. 웍스가 붙으면서
+  // 그 분기가 웍스를 `Naver`로 표시했다.
+  for (const file of ['public/notification-panel.js', 'public/agent-panel.js']) {
+    const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    assert.match(source, /const PROVIDER_LABELS = \{ gmail: 'Gmail', naver: 'Naver', works: 'Works' \}/, file);
+    assert.doesNotMatch(source, /=== 'gmail' \? 'Gmail' : 'Naver'/, file);
+  }
+});
+
 test('turning a sender quiet is one narrow action, not a rule editor', () => {
   const panel = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
   const agent = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
