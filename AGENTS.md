@@ -77,14 +77,15 @@
 
 ## 열린 작업
 
-### 메일 — 다음은 MAIL-4
+### 메일 — 다음은 MAIL-4의 나머지(메일 검색 · thread Attention · 대화 생성 경로)
 
-- **MAIL-1~3은 2026-08-19 Pi 배포·실기기 인수까지 모두 닫혔다.** 운영 schema는 **v20**이고 Pi에서 메일 Push가 실제로 돈다. 계약·스키마·단계·실측은 `docs/xion-mail-agent-design-final.md`와 `docs/roadmap.md`의 독립 트랙 `MAIL-1~4`에 있다(`V5-C`는 외부 캘린더 에이전트가 쓰는 다른 이름이다). 코드로 잠긴 계약은 `lib/mail/*`와 `test/mail-*.test.js`가 정본이다. 아래는 코드 밖 사실만이다.
+- **MAIL-1~3과 MAIL-4의 preference·라우팅 억제는 2026-08-19 Pi 배포·실기기 인수까지 닫혔다.** 운영 schema는 **v20**이고 Pi에서 메일 Push가 실제로 돈다.
+- **알림 선호를 만드는 곳은 알림 카드의 `알림 끄기` 하나이고 범위는 발신자 주소 하나다.** 규칙 편집기를 만들지 않는다(설계 11). 확인·되돌리기만 에이전트 탭 Mail 상세에 있다. **`always_notify`·`skip_analysis`는 저장 통로가 없어 라우팅이 승격하지 않는다** — 대화 생성 경로를 열 때 함께 연다. 계약·스키마·단계·실측은 `docs/xion-mail-agent-design-final.md`와 `docs/roadmap.md`의 독립 트랙 `MAIL-1~4`에 있다(`V5-C`는 외부 캘린더 에이전트가 쓰는 다른 이름이다). 코드로 잠긴 계약은 `lib/mail/*`와 `test/mail-*.test.js`가 정본이다. 아래는 코드 밖 사실만이다.
 - **메일 UI를 스크래치로 확인할 때는 계정 행을 `status='disabled'`로 넣고 `OPENAI_API_KEY`를 비운다.** 그래야 `MAIL_AGENT_ENABLED=true`로 띄워도 동기화와 LLM 호출이 0이다. `/api/notifications`의 메일 합류가 그 플래그 뒤에 있어서 끄고는 화면을 볼 수 없다.
 - **Pi가 메일의 정본이고 로컬은 `MAIL_AGENT_ENABLED=false`다.** 둘 다 켜면 커서가 갈리고 같은 새 메일을 양쪽이 분석해 LLM 호출과 Attention이 두 벌이 된다.
 - **`MAIL_AGENT_ENABLED=true`인 환경에서는 서버를 띄우는 순간 실계정 메일이 동기화·분석되고 OpenAI 호출이 나간다.** 문법 확인은 `node --check`로 끝내고, 서버를 띄우면 PID를 잡아 반드시 종료한다.
 - **자격증명은 Pi `.env`(`chmod 600`, 백업 대상 아님)와 로컬 `.env` 양쪽에 있다.** **Google OAuth 앱은 `In production`으로 게시하되 인증은 제출하지 않는다**(개인 사용 면제, 제출하면 restricted scope라 CASA가 붙는다). 분석 모델은 `MAIL_ANALYZER_MODEL` 기본 `gpt-5.6-luna`이고 채팅 자동 모델을 상속하지 않는다.
-- **판단은 run-to-run으로 흔들리고 모델·파라미터로는 못 고친다.** OTP 건은 사용자 판단으로 수용했지만(어차피 바로 확인한다) 흔들림 자체는 `github-notification`·`huge-newsletter`에도 있다. 흔들리는 자리가 대부분 설계가 경계를 긋지 않은 곳이라 판단 층에서 없애려 하면 과적합이 된다. **흡수 장치인 batch 묶기는 MAIL-3에서 배포됐고, 이제 실제 알림에서 흔들림이 얼마나 드러나는지가 관찰 대상이다.** 발신자별 "안 울려도 된다"는 `mail_preferences`의 sender `suppress_notification`이 설계된 자리다(MAIL-4).
+- **판단은 run-to-run으로 흔들리고 모델·파라미터로는 못 고친다.** OTP 건은 사용자 판단으로 수용했지만(어차피 바로 확인한다) 흔들림 자체는 `github-notification`·`huge-newsletter`에도 있다. 흔들리는 자리가 대부분 설계가 경계를 긋지 않은 곳이라 판단 층에서 없애려 하면 과적합이 된다. **흡수 장치인 batch 묶기는 MAIL-3에서 배포됐고, 이제 실제 알림에서 흔들림이 얼마나 드러나는지가 관찰 대상이다.** **두 번째 흡수 장치인 발신자 억제도 MAIL-4에서 배포됐다** — 흔들리는 발신자는 사용자가 카드에서 조용히 시킬 수 있고, 그래도 판단과 Attention은 남는다.
 - **막힌 길 둘. 다시 시도하지 않는다.** `reasoning.effort`(`none`은 consistency를 올리지만 상대 표현 기한을 놓쳐 safety를 깬다. 이 모델은 `temperature`·`seed`를 거부한다)와 **Terra 승격**(hard safety 셋을 깨고 상대 기한에 시각을 지어낸다). 근거 수치는 `docs/roadmap.md`에 있다. 비교는 `npm run eval:mail-fixtures -- --runs N [--model M] [--reasoning X]`.
 - **게이트가 통과한 것은 세 번째 계약이다.** 결과를 본 뒤에 판정 규칙과 fixture 기대값이 움직였다는 사실을 잊지 않는다. 규칙의 정본은 `scripts/evaluate-mail-fixtures.js` 주석이다.
 
