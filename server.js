@@ -51,6 +51,7 @@ const {
 const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
+const { createMailSearchSession } = require('./lib/mail/search-tool');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
@@ -3118,6 +3119,7 @@ function createChatToolRuntime({
   paperToolSession = null,
   attachmentToolSession = null,
   scheduleToolSession = null,
+  mailSearchSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3131,6 +3133,7 @@ function createChatToolRuntime({
       ...(paperToolSession?.getToolDefinitions() || []),
       ...(attachmentToolSession?.getToolDefinitions() || []),
       ...(scheduleToolSession?.getToolDefinitions() || []),
+      ...(mailSearchSession?.getToolDefinitions() || []),
     ],
     executeTool: async toolUse => {
       if (toolUse.name === 'web_search') {
@@ -3180,6 +3183,15 @@ function createChatToolRuntime({
           onStage(writingStage);
         }
       }
+      if (toolUse.name === 'mail_search') {
+        if (!mailSearchSession) return { isError: true, content: '현재 요청에서는 메일 검색을 쓸 수 없습니다.' };
+        onStage(progressStageForTool(toolUse.name));
+        try {
+          return mailSearchSession.execute(toolUse.name, toolUse.input);
+        } finally {
+          onStage(writingStage);
+        }
+      }
       return { isError: true, content: '허용되지 않은 도구입니다.' };
     },
     result() {
@@ -3191,6 +3203,7 @@ function createChatToolRuntime({
         attachmentEvidenceRefs: attachmentToolSession?.getEvidenceRefs() || [],
         attachmentDocumentUsage: attachmentToolSession?.getUsage() || { calls: 0, contextChars: 0 },
         scheduleCandidate: scheduleToolSession?.getCandidate() || null,
+        mailSearchUsage: mailSearchSession?.getUsage() || { calls: 0 },
       };
     },
   };
@@ -3221,6 +3234,7 @@ function buildChatToolInstructions({
   paperToolSession,
   attachmentToolSession,
   scheduleToolSession,
+  mailSearchSession,
   includeLanguageRule = false,
   voiceTurn = false,
   additionalInstructions = '',
@@ -3232,6 +3246,7 @@ function buildChatToolInstructions({
     paperToolSession?.hasCandidates ? CLAUDE_PAPER_TOOL_SYSTEM_PROMPT : '',
     attachmentToolSession?.hasCandidates ? ATTACHMENT_DOCUMENT_TOOL_SYSTEM_PROMPT : '',
     scheduleToolSession?.systemPrompt || '',
+    mailSearchSession?.systemPrompt || '',
     additionalInstructions,
   ].filter(Boolean).join('\n\n');
 }
@@ -3244,6 +3259,7 @@ async function generateClaudeReplyWithTools({
   paperToolSession = null,
   attachmentToolSession = null,
   scheduleToolSession = null,
+  mailSearchSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3252,6 +3268,7 @@ async function generateClaudeReplyWithTools({
     paperToolSession,
     attachmentToolSession,
     scheduleToolSession,
+    mailSearchSession,
     onStage,
     writingStage,
   });
@@ -3265,6 +3282,7 @@ async function generateClaudeReplyWithTools({
       paperToolSession,
       attachmentToolSession,
       scheduleToolSession,
+      mailSearchSession,
     }),
     maxToolRounds: 2,
     getTools: runtime.getTools,
@@ -3288,6 +3306,7 @@ async function generateGptReplyWithTools({
   paperToolSession = null,
   attachmentToolSession = null,
   scheduleToolSession = null,
+  mailSearchSession = null,
   onStage = () => {},
   writingStage = 'answer',
   onSpokenText = null,
@@ -3299,6 +3318,7 @@ async function generateGptReplyWithTools({
     paperToolSession,
     attachmentToolSession,
     scheduleToolSession,
+    mailSearchSession,
     onStage,
     writingStage,
   });
@@ -3323,6 +3343,7 @@ async function generateGptReplyWithTools({
       paperToolSession,
       attachmentToolSession,
       scheduleToolSession,
+      mailSearchSession,
       includeLanguageRule: true,
       voiceTurn,
       additionalInstructions,
@@ -3351,6 +3372,7 @@ async function generateChatReply(model, context, {
   paperToolSession = null,
   attachmentToolSession = null,
   scheduleToolSession = null,
+  mailSearchSession = null,
   onStage = () => {},
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
@@ -3365,6 +3387,7 @@ async function generateChatReply(model, context, {
       paperToolSession,
       attachmentToolSession,
       scheduleToolSession,
+      mailSearchSession,
       onStage,
     });
   }
@@ -3379,6 +3402,7 @@ async function generateChatReply(model, context, {
       paperToolSession,
       attachmentToolSession,
       scheduleToolSession,
+      mailSearchSession,
       onStage,
       onSpokenText,
       voiceTurn,
@@ -3742,6 +3766,11 @@ async function runSingleChatTurnBody({
         seriesStore: ASSISTANT_TASK_SERIES_ENABLED ? assistantTaskSeries : null,
       })
       : null;
+    // 메일은 매 턴 컨텍스트에 주입하지 않는다. 사용자가 물어서 모델이 이 도구를
+    // 부른 턴에만 들어온다(설계 4).
+    const mailSearchSession = MAIL_AGENT_ENABLED
+      ? createMailSearchSession(mailStore)
+      : null;
     progress.stage('answer');
     const {
       reply,
@@ -3760,6 +3789,7 @@ async function runSingleChatTurnBody({
       paperToolSession,
       attachmentToolSession,
       scheduleToolSession,
+      mailSearchSession,
       onStage: progress.stage,
       onSpokenText: spokenStream,
       voiceTurn,
