@@ -331,6 +331,37 @@ test('mail cards never render the mail body, only what the design allows', () =>
   assert.match(panel, /\/api\/mail\/attention\/\$\{item\.attentionId\}\/\$\{kind\}/);
 });
 
+test('turning a sender quiet is one narrow action, not a rule editor', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
+  const agent = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+
+  // 만드는 곳은 카드 하나이고 범위는 발신자 하나다(설계 3.4·11.3). 도메인·분류를
+  // 사용자가 고르는 UI를 만들면 그게 규칙 편집기다.
+  assert.match(panel, /preferenceType: 'sender'/);
+  assert.match(panel, /action: 'suppress_notification'/);
+  assert.doesNotMatch(panel, /preferenceType: 'domain'|preferenceType: 'category'/);
+  // 이름이 아니라 주소로 좁힌다. 표시용 sender에는 이름이 들어 있을 수 있다.
+  assert.match(panel, /target: item\.senderAddress/);
+
+  // 확인하고 되돌리는 자리는 Mail 상세다. 거기서도 만들지는 않는다.
+  assert.match(agent, /function makeMailPreferences/);
+  assert.match(agent, /\/api\/mail\/preferences\/\$\{id\}/);
+  assert.match(agent, /method: 'DELETE'/);
+  assert.doesNotMatch(agent, /method: 'POST'[\s\S]{0,200}\/api\/mail\/preferences/);
+});
+
+test('a suppressed sender keeps its judgement, so routing is the only layer that changes', () => {
+  const push = fs.readFileSync(path.join(ROOT, 'lib/mail/push.js'), 'utf8');
+  // 선호는 라우팅 단계에서만 듣는다(설계 11.1). 분석·Attention 경로를 건드리면
+  // "알림은 껐지만 나중에 검색은 되는" 계약이 깨진다.
+  assert.match(push, /function effectiveMode/);
+  assert.match(push, /action === 'suppress_notification'/);
+  // 좁은 순서를 정하는 쿼리는 store 한 곳이다. 여기서 다시 만들지 않는다.
+  assert.doesNotMatch(push, /FROM mail_preferences/);
+  // 집행하지 않는 action을 임의로 승격하지 않는다.
+  assert.doesNotMatch(push, /'always_notify'|'skip_analysis'/);
+});
+
 test('the two consumers of /api/notifications still split task from the rest', () => {
   // 메일이 합류하면서 일정 블록에 새면 안 되고, 알림 탭에서 빠져도 안 된다.
   const agent = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');

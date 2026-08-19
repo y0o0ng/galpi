@@ -12,6 +12,7 @@ const Database = require('better-sqlite3');
 
 const { runDatabaseMigrations } = require('../lib/database-migrations');
 const { BATCH_WINDOW_SECONDS, createMailPushService } = require('../lib/mail/push');
+const { createMailStore } = require('../lib/mail/store');
 
 const NOW = Math.floor(Date.parse('2026-08-18T14:00:00+09:00') / 1000); // quiet hours 밖
 
@@ -56,12 +57,15 @@ function setup({ subscriptions = 1, settings } = {}) {
       .run(`https://web.push.apple.com/device-${i}`);
   }
   db.prepare("INSERT INTO mail_accounts (provider, address) VALUES ('naver', 'me@naver.com')").run();
+  // 선호 조회는 store가 소유한다. 라우팅은 그 결과만 받는다(설계 11.1).
+  const store = createMailStore(db, { now: () => clock.value });
   const service = createMailPushService(db, {
     enabled: true,
     now: () => clock.value,
     settings: settings || (() => ({ notificationsEnabled: true, quietHours: { enabled: false } })),
+    preferences: input => store.findMatchingPreferences(input),
   });
-  return { db, clock, service };
+  return { db, clock, service, store };
 }
 
 let seed = 0;
@@ -257,6 +261,73 @@ test('a mode the contract does not know is left alone, not guessed', () => {
 
   assert.equal(service.routePending(clock.value).routed, 0);
   assert.equal(stateOf(db, id).state, 'pending');
+  assert.equal(deliveryCount(db), 0);
+  db.close();
+});
+
+// ── Preference 적용 (설계 11.1·11.3) ─────────────────────────────────────────
+// Preference는 **알림 라우팅** 선호다. 의미 판단을 지우지 않으므로 category와
+// Attention은 그대로 남고 마지막 라우팅 단계만 달라진다.
+
+function analysedMailFrom(db, { mode, sender, category = 'info' }) {
+  seed += 1;
+  return db.prepare(`
+    INSERT INTO mail_messages (
+      account_id, identity_kind, identity_key, received_at,
+      analysis_state, category, notification_mode, sender_address
+    ) VALUES (1, 'rfc_message_id', ?, ?, 'done', ?, ?, ?)
+  `).run(`<p${seed}@example.com>`, NOW - 600, category, mode, sender).lastInsertRowid;
+}
+
+test('a suppressed sender is routed quiet without losing its judgement', () => {
+  const { db, clock, service } = setup();
+  db.prepare(`
+    INSERT INTO mail_preferences (account_id, preference_type, target, action)
+    VALUES (NULL, 'sender', 'news@example.com', 'suppress_notification')
+  `).run();
+  const suppressed = analysedMailFrom(db, { mode: 'immediate', sender: 'news@example.com' });
+  const other = analysedMailFrom(db, { mode: 'immediate', sender: 'boss@example.com' });
+
+  const result = service.routePending(clock.value);
+  assert.deepEqual(result, { routed: 2, immediate: 1, batched: 0, suppressed: 1 });
+  assert.equal(stateOf(db, suppressed).state, 'suppressed');
+  assert.equal(stateOf(db, other).state, 'enqueued');
+  // 억제는 알림만 끈다. 판단은 그대로 남아서 나중에 찾을 수 있다.
+  assert.equal(
+    db.prepare('SELECT category FROM mail_messages WHERE id = ?').get(suppressed).category,
+    'info',
+  );
+  assert.equal(deliveryCount(db), 1, '억제된 메일은 전달을 만들지 않는다');
+  db.close();
+});
+
+test('a domain rule catches the sender it covers, and a sender rule is narrower', () => {
+  const { db, clock, service } = setup();
+  db.prepare(`
+    INSERT INTO mail_preferences (account_id, preference_type, target, action)
+    VALUES (NULL, 'domain', 'ads.example.com', 'suppress_notification')
+  `).run();
+  const byDomain = analysedMailFrom(db, { mode: 'immediate', sender: 'anyone@ads.example.com' });
+  const untouched = analysedMailFrom(db, { mode: 'immediate', sender: 'anyone@ads.example.org' });
+
+  service.routePending(clock.value);
+  assert.equal(stateOf(db, byDomain).state, 'suppressed');
+  assert.equal(stateOf(db, untouched).state, 'enqueued');
+  db.close();
+});
+
+test('a preference the routing layer does not enforce leaves the mode alone', () => {
+  const { db, clock, service } = setup();
+  // always_notify·skip_analysis는 저장 통로가 아직 없다. 행이 생겨도 라우팅이
+  // 임의로 승격하지 않는다.
+  db.prepare(`
+    INSERT INTO mail_preferences (account_id, preference_type, target, action)
+    VALUES (NULL, 'sender', 'boss@example.com', 'always_notify')
+  `).run();
+  const id = analysedMailFrom(db, { mode: 'silent', sender: 'boss@example.com' });
+
+  service.routePending(clock.value);
+  assert.equal(stateOf(db, id).state, 'suppressed', 'silent 그대로');
   assert.equal(deliveryCount(db), 0);
   db.close();
 });

@@ -12,6 +12,7 @@ function createFakeApp() {
     get(path, handler) { routes.set(`GET ${path}`, handler); },
     post(path, handler) { routes.set(`POST ${path}`, handler); },
     put(path, handler) { routes.set(`PUT ${path}`, handler); },
+    delete(path, handler) { routes.set(`DELETE ${path}`, handler); },
     async call(key, req = {}) {
       req.params = req.params || {};
       const handler = routes.get(key);
@@ -48,6 +49,9 @@ function createFakeStore(accounts = [], states = new Map(), overrides = {}) {
       quietHours: { enabled: true, start: '23:00', end: '07:00' },
       ...patch,
     }),
+    listPreferences: () => [],
+    addPreference: () => ({ created: true, preference: { id: 1 } }),
+    removePreference: () => ({ removed: true }),
     findAttentionById: () => ({ id: 1, state: 'open', notifySeq: 1, snoozedUntil: null }),
     resolveAttention: () => ({ changed: true, state: 'done' }),
     snoozeAttention: (id, until) => ({ changed: true, state: 'snoozed', snoozedUntil: until }),
@@ -265,4 +269,68 @@ test('a snooze time the store refuses comes back as the store said', async () =>
   });
   assert.equal(response.status, 400);
   assert.equal(response.body.code, 'MAIL_INVALID_SNOOZE');
+});
+
+// ── 선호 route (설계 8.5·11) ──────────────────────────────────────────────────
+
+test('preference routes stay closed while the flag is off', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({ app, store: createFakeStore(), config: { enabled: false } });
+  for (const key of [
+    'GET /api/mail/preferences',
+    'POST /api/mail/preferences',
+    'DELETE /api/mail/preferences/:id',
+  ]) {
+    const response = await app.call(key, { params: { id: '1' }, body: {} });
+    assert.equal(response.status, 503, key);
+    assert.equal(response.body.code, 'MAIL_AGENT_DISABLED');
+  }
+});
+
+test('saving the same preference twice is not an error', async () => {
+  const app = createFakeApp();
+  let calls = 0;
+  registerMailRoutes({
+    app,
+    store: createFakeStore([], new Map(), {
+      addPreference: () => ({ created: calls++ === 0, preference: { id: 7 } }),
+    }),
+    config: { enabled: true },
+  });
+  const body = { preferenceType: 'sender', target: 'news@example.com', action: 'suppress_notification' };
+  const first = await app.call('POST /api/mail/preferences', { body });
+  assert.equal(first.status, 201);
+  assert.equal(first.body.created, true);
+  const second = await app.call('POST /api/mail/preferences', { body });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.created, false);
+  assert.equal(second.body.preference.id, 7);
+});
+
+test('an invalid preference is refused with its code, and a missing one is a 404', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({
+    app,
+    store: createFakeStore([], new Map(), {
+      addPreference: () => {
+        const error = new Error('지원하지 않는 preference 종류입니다.');
+        error.code = 'MAIL_INVALID_PREFERENCE';
+        error.statusCode = 400;
+        throw error;
+      },
+      removePreference: () => ({ removed: false }),
+    }),
+    config: { enabled: true },
+  });
+  const bad = await app.call('POST /api/mail/preferences', { body: { preferenceType: 'nope' } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.code, 'MAIL_INVALID_PREFERENCE');
+
+  const missing = await app.call('DELETE /api/mail/preferences/:id', { params: { id: '99' } });
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.code, 'MAIL_PREFERENCE_NOT_FOUND');
+
+  const malformed = await app.call('DELETE /api/mail/preferences/:id', { params: { id: 'abc' } });
+  assert.equal(malformed.status, 400);
+  assert.equal(malformed.body.code, 'MAIL_INVALID_PREFERENCE');
 });

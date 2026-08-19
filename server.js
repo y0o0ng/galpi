@@ -939,6 +939,8 @@ const mailPushService = MAIL_AGENT_ENABLED && ASSISTANT_PUSH_CONFIG.enabled
     // 설정은 app_settings가 정본이다. 매번 읽어서 사용자가 바꾸면 다음 tick부터
     // 바로 듣게 한다 — 서버 재시작을 기다리게 하지 않는다.
     settings: () => mailStore.getMailSettings(),
+    // 선호도 같다. 방금 끈 발신자가 다음 tick부터 조용해진다.
+    preferences: input => mailStore.findMatchingPreferences(input),
   })
   : null;
 const mailPushDispatcher = mailPushService

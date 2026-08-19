@@ -32,6 +32,8 @@
     attention: [],
     attentionError: '',
     attentionExpanded: false,
+    mailPreferences: null,
+    mailPreferenceSaving: false,
   };
 
   // 첫 화면에 펼치는 Attention 수. 지식 패널이 350px 고정이고 메일 항목 하나가
@@ -991,6 +993,56 @@
     return section;
   }
 
+  const PREFERENCE_LABELS = {
+    sender: '발신자',
+    domain: '도메인',
+    category: '분류',
+  };
+
+  /**
+   * 알림을 끈 목록(설계 8.5·11). 만드는 곳은 알림 카드이고 여기는 확인하고 되돌리는
+   * 자리다. 사용자가 규칙을 조립하게 하지 않으므로 편집기를 만들지 않는다.
+   *
+   * 지금 보이는 것은 억제 선호뿐이다. `always_notify`·`skip_analysis`는 사용자가
+   * 명시적으로 말해야 저장되는 값이고 그 통로가 아직 없다.
+   */
+  function makeMailPreferences() {
+    const section = document.createElement('section');
+    section.className = 'schedule-agent-section';
+    const heading = document.createElement('h3');
+    heading.textContent = '알림 끈 발신자';
+    section.appendChild(heading);
+
+    if (!state.mailPreferences) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message';
+      message.textContent = '목록을 불러오지 못했어.';
+      section.appendChild(message);
+      return section;
+    }
+    const suppressed = state.mailPreferences.filter(item => item.action === 'suppress_notification');
+    if (!suppressed.length) {
+      const message = document.createElement('p');
+      message.className = 'codex-agent-message';
+      message.textContent = '아직 없어. 알림 탭 메일 카드의 `알림 끄기`로 만들 수 있어.';
+      section.appendChild(message);
+      return section;
+    }
+
+    for (const item of suppressed) {
+      const row = document.createElement('div');
+      row.className = 'codex-agent-actions';
+      const label = document.createElement('p');
+      label.className = 'codex-agent-message';
+      label.textContent = `${PREFERENCE_LABELS[item.preferenceType] || item.preferenceType} · ${item.target}`;
+      const remove = button('되돌리기', () => removeMailPreference(item.id));
+      remove.disabled = state.mailPreferenceSaving;
+      row.append(label, remove);
+      section.appendChild(row);
+    }
+    return section;
+  }
+
   function makeDetailHead(titleText, ariaLabel) {
     const head = document.createElement('div');
     head.className = 'schedule-agent-workspace-head';
@@ -1102,6 +1154,7 @@
     block.appendChild(queue);
 
     block.appendChild(makeMailSettings());
+    block.appendChild(makeMailPreferences());
 
     // 좌초한 분석은 열어봐야 고칠 것이 없다. 사람이 할 수 있는 일은 다시 돌리는 것뿐이라
     // 사유 코드까지만 보여주고 제목·발신자는 싣지 않는다(설계 19절).
@@ -1249,6 +1302,32 @@
     if (!response.ok) return false;
     state.mailSettings = data.settings || null;
     return true;
+  }
+
+  async function loadMailPreferences() {
+    const response = await state.apiFetch('/api/mail/preferences');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return false;
+    state.mailPreferences = Array.isArray(data.preferences) ? data.preferences : [];
+    return true;
+  }
+
+  async function removeMailPreference(id) {
+    if (state.mailPreferenceSaving) return;
+    state.mailPreferenceSaving = true;
+    renderMailDetail();
+    try {
+      const response = await state.apiFetch(`/api/mail/preferences/${id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '되돌리지 못했습니다.');
+      state.showToast('다시 알릴게');
+      await loadMailPreferences();
+    } catch (error) {
+      state.showToast(error.message);
+    } finally {
+      state.mailPreferenceSaving = false;
+      renderMailDetail();
+    }
   }
 
   async function saveMailSettings(patch) {
@@ -1450,7 +1529,9 @@
       return;
     }
     if (state.mode === 'mail') {
-      const [mail] = await Promise.allSettled([loadMailData(), loadMailSettings()]);
+      const [mail] = await Promise.allSettled([
+        loadMailData(), loadMailSettings(), loadMailPreferences(),
+      ]);
       state.mailError = mail.status === 'rejected' ? mail.reason.message : '';
       renderMailDetail();
       return;

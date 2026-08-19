@@ -208,6 +208,12 @@
       makeMailAction('완료', () => mailAction(item, 'done')),
       makeMailAction('나중에', () => mailAction(item, 'snooze')),
     );
+    // 규칙 편집기를 사용자에게 관리시키지 않는다(설계 11). 사용자가 "이건 알림
+    // 필요 없다"고 느끼는 자리가 여기라서, 가장 좁은 범위(발신자 하나)를 그 자리에서
+    // 만든다. 판단과 Attention은 그대로 남고 다음부터 알림만 조용해진다.
+    if (item.senderAddress) {
+      actions.appendChild(makeMailAction('알림 끄기', () => suppressSender(item)));
+    }
     card.appendChild(actions);
     return card;
   }
@@ -240,6 +246,28 @@
       // 목록에서 즉시 빼서 화면과 서버가 어긋나 보이지 않게 한다.
       state.notifications = state.notifications.filter(entry => entry.id !== item.id);
       renderItems();
+    } catch (error) {
+      state.showToast(error.message);
+    }
+  }
+
+  // 알림만 끈다. 이 발신자의 메일은 계속 분석되고 기록되며 Attention도 그대로
+  // 생긴다(설계 11.1). 되돌리는 곳은 에이전트 탭 Mail 상세다.
+  async function suppressSender(item) {
+    try {
+      const response = await state.apiFetch('/api/mail/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: item.accountId ?? null,
+          preferenceType: 'sender',
+          target: item.senderAddress,
+          action: 'suppress_notification',
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '알림 설정을 바꾸지 못했습니다.');
+      state.showToast(`${item.senderAddress}는 이제 알리지 않을게`);
     } catch (error) {
       state.showToast(error.message);
     }
