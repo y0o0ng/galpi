@@ -2,7 +2,7 @@
 
 > 기존 `에이전트` 탭의 첫 화면을 운영 상태 목록에서 사용자 브리핑으로 바꾼다.
 >
-> 상태: 2026-08-19 설계 확정, 구현 착수 전. 선행 조건이던 MAIL-3 알림 합류는 인수 완료다.
+> 상태: 2026-08-19 v1 구현·Pi 배포·실기기 인수 완료. 통과 기준은 10절에 표시했다.
 
 ---
 
@@ -48,6 +48,13 @@ XION 홈은 **기존 정본을 읽어 편집해 내놓는 read-only projection**
 `알릴 가치가 있다`(`notification_mode`)와 `잊으면 안 될 후속 행동이 있다`(Attention)는 독립된 축이다.
 홈 최상단은 **후자만** 보여준다.
 
+- 대상: `mail_attention`의 `action_required` · `attachment_check` · `low_confidence`
+- **Attention 없는 `important/batch` 메일은 승격하지 않는다.** `listAttentionNotifications`가
+  `mail_attention` 조인이라 구조적으로 나올 수 없다.
+- **silent 메일은 홈에 나오지 않는다.** 같은 이유로 보장된다.
+- **`snoozed`는 v1에서 보여주지 않는다.** `나중에`는 사용자가 지금 안 보겠다고 말한 것이고,
+  홈 최상단에 다시 올리면 스누즈가 무의미해진다. 지금 API도 `state = 'open'`만 준다.
+
 두 종류가 이 자리를 공유한다. 메일 Attention과 **울린 일정 알림**(`type = 'task_reminder'`)은
 사용자 입장에서 같은 뜻이라 한 목록이어야 한다. 순서는 **일정 알림이 위**다. 그것은 시각이
 이미 지난 것이고 메일 기한은 며칠 뒤일 수 있다.
@@ -58,13 +65,6 @@ XION 홈은 **기존 정본을 읽어 편집해 내놓는 read-only projection**
   그쪽으로 보내면 접힌 일정 알림을 볼 수 있는 곳이 없어진다.
 - **`오늘`은 이미 올라간 일정을 다시 보여주지 않는다.** 알림이 울린 일정은 `확인할 것`으로
   승격된 것이라, 같은 일정이 두 자리에 뜨면 편집된 브리핑이 아니라 같은 목록의 반복이 된다.
-
-- 대상: `mail_attention`의 `action_required` · `attachment_check` · `low_confidence`
-- **Attention 없는 `important/batch` 메일은 승격하지 않는다.** `listAttentionNotifications`가
-  `mail_attention` 조인이라 구조적으로 나올 수 없다.
-- **silent 메일은 홈에 나오지 않는다.** 같은 이유로 보장된다.
-- **`snoozed`는 v1에서 보여주지 않는다.** `나중에`는 사용자가 지금 안 보겠다고 말한 것이고,
-  홈 최상단에 다시 올리면 스누즈가 무의미해진다. 지금 API도 `state = 'open'`만 준다.
 
 `최근 Mail 알림`(Attention 없는 batch·immediate)을 보여주려면 새 read endpoint가 필요하다.
 그 순간 홈은 두 번째 알림 패널로 미끄러지기 시작하므로, 필요가 실제로 드러난 뒤에 연다.
@@ -122,19 +122,19 @@ Attention도 오늘 일정도 없으면 빈 카드를 여러 장 만들지 않�
 
 ## 10. 통과 기준
 
-- [ ] 홈은 기존 정본만 읽고 별도 상태를 저장하지 않는다 (서버 변경 0줄)
-- [ ] active Mail Attention이 있으면 Needs Attention에 보인다
-- [ ] 울린 일정 알림이 메일보다 위에 오고, 그 일정은 `오늘`에서 중복되지 않는다
-- [ ] Attention 없는 batch·immediate 메일은 Needs Attention으로 승격되지 않는다
-- [ ] silent 메일은 홈에 나오지 않는다
-- [ ] `snoozed` Attention은 홈에 나오지 않는다
-- [ ] 오늘 영역이 `/api/tasks/summary`와 일치한다
-- [ ] 한 소스가 실패해도 나머지 영역이 렌더된다
-- [ ] 정상 에이전트의 운영 세부값이 첫 화면을 채우지 않는다
-- [ ] 개입이 필요한 상태는 첫 화면에서 드러난다
-- [ ] 기존 상세·복구 기능과 알림·노트·논문 탭이 회귀하지 않는다
-- [ ] `/?panel=agents` 딥링크와 `sw.js`의 일정 fallback URL이 그대로 동작한다
-- [ ] 모바일 첫 화면에서 운영 상태보다 Attention·오늘이 먼저 나온다
+- [x] 홈은 기존 정본만 읽고 별도 상태를 저장하지 않는다 (서버 변경 0줄)
+- [x] active Mail Attention이 있으면 Needs Attention에 보인다
+- [x] 울린 일정 알림이 메일보다 위에 오고, 그 일정은 `오늘`에서 중복되지 않는다
+- [x] Attention 없는 batch·immediate 메일은 Needs Attention으로 승격되지 않는다
+- [x] silent 메일은 홈에 나오지 않는다
+- [x] `snoozed` Attention은 홈에 나오지 않는다
+- [x] 오늘 영역이 `/api/tasks/summary`와 일치한다
+- [x] 한 소스가 실패해도 나머지 영역이 렌더된다
+- [x] 정상 에이전트의 운영 세부값이 첫 화면을 채우지 않는다
+- [x] 개입이 필요한 상태는 첫 화면에서 드러난다
+- [x] 기존 상세·복구 기능과 알림·노트·논문 탭이 회귀하지 않는다
+- [x] `/?panel=agents` 딥링크와 `sw.js`의 일정 fallback URL이 그대로 동작한다
+- [x] 모바일 첫 화면에서 운영 상태보다 Attention·오늘이 먼저 나온다
 
 ## 11. 하지 않는 것
 

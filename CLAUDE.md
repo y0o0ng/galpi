@@ -24,6 +24,7 @@
 - 계획·편집 전: `docs/galpi-design-final.md`, `docs/roadmap.md`
 - Pi 운영·복구: `docs/RASPBERRY_PI_RUNBOOK.md`
 - 현재 음성 기준: `docs/voice-halfduplex-design.md`
+- XION 통합 홈(지식 패널 첫 화면): `docs/xion-home-design.md`
 - 트레이딩(V5-B): `docs/Swing Trading Agent Design v2 2.md`. 실측·완료 기록은 20.0절이다.
 - 트레이딩 전략 구축 계약: `docs/momentum-v2-roadmap.md`. **연구 예산·종료 조건·Phase별 사전등록이 여기 있다.** 실험 산출물 색인은 `trading/runs/README.md`다.
 - 메일 에이전트(독립 트랙 MAIL-1~4): `docs/xion-mail-agent-design-final.md`. 스키마·Phase·통과 기준이 전부 그 문서에 있다.
@@ -77,9 +78,11 @@
 
 ## 열린 작업
 
-### 메일 — 다음은 MAIL-4의 나머지(thread Attention · 대화 생성 경로)
+### 메일 — 다음은 대화 생성 경로 하나
 
-- **MAIL-1~3과 MAIL-4의 preference·라우팅 억제·메일 검색은 2026-08-19 Pi 배포·인수까지 닫혔다.** 운영 schema는 **v20**이고 Pi에서 메일 Push가 실제로 돈다.
+- **MAIL-1~4는 2026-08-19 Pi 배포·인수까지 닫혔다. 남은 것은 대화 생성 경로 하나다.** 운영 schema는 **v21**이고 Pi에서 메일 Push가 실제로 돈다.
+- **메일 계정은 셋이다 — Gmail · 네이버 · 네이버 웍스(학교 메일).** 웍스는 같은 IMAP 구현에 호스트만 다르고(`MAIL_WORKS_IMAP_HOST`, 기본 `imap.worksmobile.com`), 자격증명은 provider당 한 세트라 **provider마다 계정 하나**라는 제약이 그대로다.
+- **thread 묶기는 Attention 축에서만 한다.** 같은 스레드의 후속 메일이 살아 있는 Attention을 갱신할 뿐 **알림은 메일마다 그대로 울린다**. 라우팅까지 묶는 것은 v20이 갈라놓은 두 축을 다시 잇는 결정이라 실제로 거슬리는 사례가 나온 뒤에 연다.
 - **메일은 평소 대화 컨텍스트에 들어가지 않는다.** 검색은 채팅 도구 `mail_search`이고 사용자가 물어 모델이 부른 턴에만 결과가 들어온다. 일정의 활성 블록처럼 매 턴 주입하지 않는다. 본문을 저장하지 않으므로 본문 검색은 이 도구로 답할 수 없다.
 - **알림 선호를 만드는 곳은 알림 카드의 `알림 끄기` 하나이고 범위는 발신자 주소 하나다.** 규칙 편집기를 만들지 않는다(설계 11). 확인·되돌리기만 에이전트 탭 Mail 상세에 있다. **`always_notify`·`skip_analysis`는 저장 통로가 없어 라우팅이 승격하지 않는다** — 대화 생성 경로를 열 때 함께 연다. 계약·스키마·단계·실측은 `docs/xion-mail-agent-design-final.md`와 `docs/roadmap.md`의 독립 트랙 `MAIL-1~4`에 있다(`V5-C`는 외부 캘린더 에이전트가 쓰는 다른 이름이다). 코드로 잠긴 계약은 `lib/mail/*`와 `test/mail-*.test.js`가 정본이다. 아래는 코드 밖 사실만이다.
 - **메일 UI를 스크래치로 확인할 때는 계정 행을 `status='disabled'`로 넣고 `OPENAI_API_KEY`를 비운다.** 그래야 `MAIL_AGENT_ENABLED=true`로 띄워도 동기화와 LLM 호출이 0이다. `/api/notifications`의 메일 합류가 그 플래그 뒤에 있어서 끄고는 화면을 볼 수 없다.
@@ -99,7 +102,7 @@
 
 - **첨부는 U3b(Codex 제목·요약)만 남았다.** U0~U2 · U3a · 인증된 원본 열기 · 이미지 썸네일은 Pi·iPhone 인수를 마쳤고 U4 공통 문서 계층은 실측 후 보류했다. 상세와 보류 근거는 `docs/galpi-attachment-upload-design.md`에 있다.
 - **C2 반복 일정은 구현·Pi 배포까지 끝났다**(schema v17, `lib/assistant-task-series.js`, `ASSISTANT_TASK_SERIES_ENABLED`). 플래그가 Pi `.env`에만 `true`이고 **`.env.example`에는 키 자체가 없어** 새로 세팅하면 이 기능이 있는 줄 모른다. 계약은 `docs/task-reminder-design.md` 12·13절이다.
-- **에이전트 탭은 요약 카드 3장 + 에이전트별 상세다.** 지식 패널이 데스크톱에서 350px 고정 폭이라(`grid-template-columns: minmax(0, 1fr) 350px`) 2열은 물리적으로 안 들어가고 모바일과 같은 1열을 쓴다. **XION 통합 홈(C)이 기다리던 의존은 풀렸다** — 최상단 `Needs Attention` 카드가 기다리던 메일 Attention의 `/api/notifications` 합류(설계 22.3)가 MAIL-3에서 들어갔다. 열지 말지는 MAIL-4와 함께 따로 정한다.
+- **지식 패널의 첫 화면은 `XION` 홈이다**(탭 줄 맨 왼쪽, 기본 선택). `확인할 것` → `오늘` → 에이전트 상태 순서이고 기존 정본만 읽는 projection이라 서버 상태가 없다. 계약은 `docs/xion-home-design.md`다. **탭 키는 `agents`로 남겨둔다** — 설치된 Service Worker와 지난 알림이 `/?panel=agents` 링크를 들고 있다. 기본 탭은 `index.html`의 `active`·`hidden`과 `paper-panel.js`의 `state.activeTab` **두 곳**이 함께 정한다. 지식 패널이 데스크톱에서 350px 고정 폭이라(`grid-template-columns: minmax(0, 1fr) 350px`) 2열은 물리적으로 안 들어가고 모바일과 같은 1열을 쓴다.
 - 상시 관찰: `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 표시, 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 
 ### 운영
