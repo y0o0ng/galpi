@@ -29,7 +29,7 @@
     "busboy": "^1.6.0",
     "dompurify": "^3.4.7",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "imapflow": "^1.7.1",
     "marked": "^18.0.4",
