@@ -285,3 +285,77 @@ test('a stored value that went bad falls back instead of silencing push', () => 
   assert.deepEqual(store.getMailSettings().quietHours, { enabled: true, start: '23:00', end: '07:00' });
   db.close();
 });
+
+// ── thread 묶기 (설계 27) ────────────────────────────────────────────────────
+// 같은 스레드의 후속 메일이 Attention을 새로 만들지 않고 살아 있는 것을 갱신한다.
+// **묶는 것은 Attention뿐이다.** 알림 라우팅은 v20에서 갈라놓은 다른 축이라
+// 이 변경이 건드리지 않는다.
+
+let threadSeed = 0;
+function analyseInto(store, db, accountId, { threadRef, reason = 'action_required', subject }) {
+  threadSeed += 1;
+  const messageId = db.prepare(`
+    INSERT INTO mail_messages (
+      account_id, identity_kind, identity_key, received_at, analysis_state,
+      analysis_lease_until, subject, thread_id
+    ) VALUES (?, 'rfc_message_id', ?, ?, 'analyzing', ?, ?, ?)
+  `).run(accountId, `<t${threadSeed}@example.com>`, NOW - 600, NOW + 600, subject, threadRef)
+    .lastInsertRowid;
+  return store.completeAnalysis(messageId, {
+    leaseUntil: NOW + 600,
+    category: 'action_required',
+    notificationMode: 'immediate',
+    summary: subject,
+    attentionReason: reason,
+    threadRef,
+  });
+}
+
+test('a follow-up in the same thread updates the living attention instead of adding one', () => {
+  const { db, store, account } = setup();
+  const first = analyseInto(store, db, account.id, { threadRef: 'thread-1', subject: '첫 메일' });
+  const second = analyseInto(store, db, account.id, { threadRef: 'thread-1', subject: '후속 메일' });
+
+  assert.equal(db.prepare('SELECT count(*) c FROM mail_attention').get().c, 1, '한 스레드에 하나');
+  assert.equal(second.attention.id, first.attention.id, '같은 Attention을 돌려준다');
+  // 카드가 스레드의 최신 상태를 보여줘야 하므로 대상 메일을 옮긴다.
+  const row = db.prepare('SELECT mail_message_id AS messageId FROM mail_attention WHERE id = ?')
+    .get(first.attention.id);
+  assert.equal(
+    db.prepare('SELECT subject FROM mail_messages WHERE id = ?').get(row.messageId).subject,
+    '후속 메일',
+  );
+  db.close();
+});
+
+test('grouping never revives what the user already finished or hid', () => {
+  const { db, store, account } = setup();
+  const first = analyseInto(store, db, account.id, { threadRef: 'thread-2', subject: '첫 메일' });
+  store.resolveAttention(first.attention.id);
+
+  // 끝낸 스레드에 새 메일이 오면 그것은 새로운 후속 행동이다. 되살리지 않는다.
+  const second = analyseInto(store, db, account.id, { threadRef: 'thread-2', subject: '다음 메일' });
+  assert.notEqual(second.attention.id, first.attention.id);
+  assert.equal(db.prepare('SELECT count(*) c FROM mail_attention').get().c, 2);
+  assert.equal(attentionRow(db, first.attention.id).state, 'done', '끝난 것은 끝난 채로');
+
+  // 미뤄둔 것은 살아 있으므로 묶되, 사용자가 정한 시각을 앞당기지 않는다.
+  const snoozeTarget = analyseInto(store, db, account.id, { threadRef: 'thread-3', subject: 'A' });
+  store.snoozeAttention(snoozeTarget.attention.id, NOW + 3600);
+  const followUp = analyseInto(store, db, account.id, { threadRef: 'thread-3', subject: 'B' });
+  assert.equal(followUp.attention.id, snoozeTarget.attention.id);
+  assert.deepEqual(attentionRow(db, snoozeTarget.attention.id), {
+    state: 'snoozed', notifySeq: 1, snoozedUntil: NOW + 3600, resolvedAt: null,
+  });
+  db.close();
+});
+
+test('mail without a thread reference is never grouped with another', () => {
+  const { db, store, account } = setup();
+  // 네이버는 표준 thread id가 없어 전부 NULL이다. NULL끼리 묶으면 남남인 메일이
+  // 한 Attention에 들어간다.
+  analyseInto(store, db, account.id, { threadRef: null, subject: '무관한 메일 1' });
+  analyseInto(store, db, account.id, { threadRef: null, subject: '무관한 메일 2' });
+  assert.equal(db.prepare('SELECT count(*) c FROM mail_attention').get().c, 2);
+  db.close();
+});
