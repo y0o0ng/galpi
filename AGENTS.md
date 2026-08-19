@@ -77,9 +77,10 @@
 
 ## 열린 작업
 
-### 메일 — 다음은 MAIL-4의 나머지(메일 검색 · thread Attention · 대화 생성 경로)
+### 메일 — 다음은 MAIL-4의 나머지(thread Attention · 대화 생성 경로)
 
-- **MAIL-1~3과 MAIL-4의 preference·라우팅 억제는 2026-08-19 Pi 배포·실기기 인수까지 닫혔다.** 운영 schema는 **v20**이고 Pi에서 메일 Push가 실제로 돈다.
+- **MAIL-1~3과 MAIL-4의 preference·라우팅 억제·메일 검색은 2026-08-19 Pi 배포·인수까지 닫혔다.** 운영 schema는 **v20**이고 Pi에서 메일 Push가 실제로 돈다.
+- **메일은 평소 대화 컨텍스트에 들어가지 않는다.** 검색은 채팅 도구 `mail_search`이고 사용자가 물어 모델이 부른 턴에만 결과가 들어온다. 일정의 활성 블록처럼 매 턴 주입하지 않는다. 본문을 저장하지 않으므로 본문 검색은 이 도구로 답할 수 없다.
 - **알림 선호를 만드는 곳은 알림 카드의 `알림 끄기` 하나이고 범위는 발신자 주소 하나다.** 규칙 편집기를 만들지 않는다(설계 11). 확인·되돌리기만 에이전트 탭 Mail 상세에 있다. **`always_notify`·`skip_analysis`는 저장 통로가 없어 라우팅이 승격하지 않는다** — 대화 생성 경로를 열 때 함께 연다. 계약·스키마·단계·실측은 `docs/xion-mail-agent-design-final.md`와 `docs/roadmap.md`의 독립 트랙 `MAIL-1~4`에 있다(`V5-C`는 외부 캘린더 에이전트가 쓰는 다른 이름이다). 코드로 잠긴 계약은 `lib/mail/*`와 `test/mail-*.test.js`가 정본이다. 아래는 코드 밖 사실만이다.
 - **메일 UI를 스크래치로 확인할 때는 계정 행을 `status='disabled'`로 넣고 `OPENAI_API_KEY`를 비운다.** 그래야 `MAIL_AGENT_ENABLED=true`로 띄워도 동기화와 LLM 호출이 0이다. `/api/notifications`의 메일 합류가 그 플래그 뒤에 있어서 끄고는 화면을 볼 수 없다.
 - **Pi가 메일의 정본이고 로컬은 `MAIL_AGENT_ENABLED=false`다.** 둘 다 켜면 커서가 갈리고 같은 새 메일을 양쪽이 분석해 LLM 호출과 Attention이 두 벌이 된다.
