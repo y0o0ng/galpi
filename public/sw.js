@@ -13,30 +13,43 @@ self.addEventListener('push', event => {
   try {
     payload = event.data?.json() || {};
   } catch { /* 일반 문구로 표시 */ }
-  // 메일 payload는 routing metadata만 담는다(설계 13.1). 문구는 여기서 고정이고
-  // SW가 내용을 조회하거나 조합하지 않는다. type이 없는 옛 payload는 일정으로 읽어
-  // 배포된 구버전 SW와 새 서버가 섞여도 일정 알림이 깨지지 않게 한다.
-  const isMail = payload.type === 'mail_attention';
+  // payload는 routing metadata만 담는다(설계 13.1 · 뉴스 11.5). 문구는 여기서
+  // 고정이고 SW가 내용을 조회하거나 조합하지 않는다. type이 없는 옛 payload는
+  // 일정으로 읽어, 배포된 구버전 SW와 새 서버가 섞여도 일정 알림이 깨지지 않는다.
   const safeInt = value => (Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null);
-  const fallbackUrl = isMail
-    ? '/?panel=notifications&notification=mail'
-    : '/?panel=agents&taskView=reminders';
+  const kinds = {
+    mail_attention: {
+      heading: 'XION 메일 알림',
+      body: '확인할 메일이 있어. 앱에서 내용을 확인해줘.',
+      fallbackUrl: '/?panel=notifications&notification=mail',
+      // 회차를 tag에 넣지 않으면 snooze 재알림이 이전 알림을 덮어쓴다.
+      tag: () => `mail-attention:${payload.targetKind || 'message'}:${safeInt(payload.targetId) ?? 'unknown'}:${safeInt(payload.notifySeq) ?? 1}`,
+    },
+    // 재확인은 알림이 아니라 시온이 먼저 거는 말이다. 주제도 질문도 싣지 않으므로
+    // 문구는 무엇을 물어보는지 밝히지 않는다.
+    news_review: {
+      heading: '시온',
+      body: '물어볼 게 하나 있어.',
+      fallbackUrl: '/',
+      tag: () => `news-review:${safeInt(payload.candidateId) ?? 'unknown'}`,
+    },
+  };
+  const kind = kinds[payload.type] || {
+    heading: 'XION 일정 알림',
+    body: '확인할 일정이 있어. 앱에서 내용을 확인해줘.',
+    fallbackUrl: '/?panel=agents&taskView=reminders',
+    tag: () => `task-reminder:${safeInt(payload.reminderId) ?? 'unknown'}`,
+  };
   const url = typeof payload.url === 'string' && payload.url.startsWith('/')
     ? payload.url
-    : fallbackUrl;
-  // 회차를 tag에 넣지 않으면 snooze 재알림이 이전 알림을 덮어쓴다.
-  const tag = isMail
-    ? `mail-attention:${payload.targetKind || 'message'}:${safeInt(payload.targetId) ?? 'unknown'}:${safeInt(payload.notifySeq) ?? 1}`
-    : `task-reminder:${safeInt(payload.reminderId) ?? 'unknown'}`;
+    : kind.fallbackUrl;
   event.waitUntil(self.registration.showNotification(
-    isMail ? 'XION 메일 알림' : 'XION 일정 알림',
+    kind.heading,
     {
-      body: isMail
-        ? '확인할 메일이 있어. 앱에서 내용을 확인해줘.'
-        : '확인할 일정이 있어. 앱에서 내용을 확인해줘.',
+      body: kind.body,
       icon: '/lib/icons/Xion/xion-app-icon-192.png',
       badge: '/lib/icons/Xion/xion-mark.svg',
-      tag,
+      tag: kind.tag(),
       renotify: false,
       data: { url },
     },

@@ -68,6 +68,17 @@ const { createNewsCollector } = require('./lib/news/collect');
 const { createNewsAnalyzer } = require('./lib/news/analyze');
 const { registerNewsRoutes } = require('./lib/news/routes');
 const { createNewsSearchSession } = require('./lib/news/search-tool');
+const {
+  buildNewsPushPayload,
+  buildNewsSendOptions,
+  createNewsPushService,
+} = require('./lib/news/push');
+const {
+  CANDIDATE_TTL_SECONDS: NEWS_CANDIDATE_TTL_SECONDS,
+  initialReviewAfter,
+  pickReviewTarget,
+  reviewQuestion,
+} = require('./lib/news/review');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
@@ -1004,6 +1015,32 @@ const newsStore = createNewsStore(db, {
     ? NEWS_SEARCH_MONTHLY_CREDIT_LIMIT
     : undefined,
 });
+// 재확인 질문의 전달. 구독과 transport는 일정·메일과 공유하고 상태표만 도메인이
+// 갖는다(설계 11.5). Push 설정이 꺼져 있으면 만들지 않는다 — 보낼 곳이 없는데
+// 큐만 쌓인다.
+const newsPushService = NEWS_AGENT_ENABLED && ASSISTANT_PUSH_CONFIG.enabled
+  ? createNewsPushService(db, {
+    enabled: true,
+    // 조용한 시간은 사용자가 한 번 정하는 값이다. 뉴스용을 따로 만들면 같은
+    // 뜻의 설정이 두 개가 되고, 한쪽만 바꾼 사용자는 밤에 울리는 이유를 못 찾는다.
+    quietHours: () => mailStore.getMailSettings().quietHours,
+  })
+  : null;
+const newsPushDispatcher = newsPushService
+  ? createAssistantPushDispatcher(newsPushService, {
+    transport: createWebPushTransport(webPush, {
+      subject: ASSISTANT_PUSH_CONFIG.subject,
+      publicKey: ASSISTANT_PUSH_CONFIG.publicKey,
+      privateKey: ASSISTANT_PUSH_CONFIG.privateKey,
+    }),
+    buildPayload: buildNewsPushPayload,
+    buildSendOptions: buildNewsSendOptions,
+    onError(error) {
+      console.error(`News push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    },
+  })
+  : null;
+
 // 수집 worker. 관심 목록은 매 tick마다 노트에서 다시 읽는다 — 기동 시점의 목록을
 // 붙들면 사용자가 방금 등록한 관심이 재시작 전까지 수집되지 않는다.
 // **여기에 LLM은 없다.** 판단은 N4b이고, 그 전에 실제 표본으로 threshold를 정한다.
@@ -2314,6 +2351,80 @@ async function writeNewsContextNote({ actions, source = 'user', now = Math.floor
     ).catch(() => {});
     return { interests, contentSha256 };
   });
+}
+
+// 재확인 orchestration (설계 11).
+//
+// **사용자 메시지를 처리한 뒤에만 돈다.** 독립 스케줄러에 걸지 않는 이유는 몇 주
+// 동안 앱을 안 쓰는 사람에게 "아직 관심 있어?"를 푸시하는 것이 이 기능의 최악의
+// 실패이기 때문이다. 조용한 사용자에게는 아무 일도 일어나지 않는다.
+function loadUserMessagesSince(sinceSeconds) {
+  // 사용자 발화만 본다. 시온이 먼저 꺼낸 주제는 관심의 근거가 아니고, proactive
+  // 질문 자체가 "최근에 언급됐다"로 읽히면 그 관심은 영영 재확인되지 않는다.
+  return db.prepare(`
+    SELECT content FROM messages
+    WHERE session_id = 'shared-main' AND role = 'user' AND created_at >= ?
+    ORDER BY id DESC LIMIT 200
+  `).all(Math.floor(sinceSeconds));
+}
+
+async function runNewsReviewAfterTurn() {
+  if (!NEWS_AGENT_ENABLED) return null;
+  const now = Math.floor(Date.now() / 1000);
+  newsStore.expireStaleCandidates(NEWS_CANDIDATE_TTL_SECONDS, now);
+
+  const { interests } = await readNewsContextNote();
+  if (!interests.length) return null;
+  const open = newsStore.openReviewCandidates();
+  const target = pickReviewTarget({
+    interests,
+    now,
+    loadUserMessagesSince,
+    openInterestIds: new Set(open.map(item => item.interestId)),
+  });
+  if (!target) return null;
+
+  // 계속 이야기하는 주제에는 묻지 않고 미룬다. 노트가 정본이라 연장도 노트에 쓴다.
+  if (target.action === 'extend') {
+    await writeNewsContextNote({
+      actions: [{
+        op: 'update',
+        interestId: target.interest.interestId,
+        reviewAfter: target.reviewAfter,
+      }],
+      source: 'user',
+      now,
+    });
+    return { action: 'extended', interestId: target.interest.interestId };
+  }
+
+  const question = reviewQuestion(target.interest);
+  const candidate = newsStore.createReviewCandidate({
+    interestId: target.interest.interestId,
+    question,
+    at: now,
+  });
+  if (!candidate) return null;
+
+  // 정본은 이 메시지와 candidate다. Push는 전달 채널일 뿐이라 실패해도 둘은 남는다.
+  stmtEnsureSession.run('shared-main');
+  const inserted = insertMessageRecord({
+    sessionId: 'shared-main',
+    role: 'assistant',
+    content: question,
+    model: 'news-review',
+  });
+  const linked = newsStore.linkProactiveMessage({
+    messageId: Number(inserted.lastInsertRowid),
+    candidateId: candidate.id,
+    interestId: target.interest.interestId,
+    at: now,
+  });
+  if (!linked) return null;
+
+  newsPushService?.enqueueCandidate(candidate.id, now);
+  void newsPushDispatcher?.tick();
+  return { action: 'asked', candidateId: candidate.id, interestId: target.interest.interestId };
 }
 
 assistantScheduleNoteProjector = createScheduleNoteProjector(assistantScheduleNoteProjections, {
@@ -4025,6 +4136,7 @@ async function runSingleChatTurnBody({
     // 다시 만들거나 없는 주제를 지우려 든다.
     let newsInterestSession = null;
     let newsSearchSession = null;
+    let newsOpenCandidate = null;
     if (NEWS_AGENT_ENABLED) {
       try {
         // 노트를 한 번만 읽어 두 세션이 나눠 쓴다. 조회도 관심 이름이 있어야
@@ -4035,10 +4147,29 @@ async function runSingleChatTurnBody({
           apply: ({ actions }) => writeNewsContextNote({ actions, source: 'user' }),
         });
         newsSearchSession = createNewsSearchSession(newsStore, { interests });
+        // 시온이 먼저 물어둔 질문이 살아 있으면 그 사실만 bounded context로 알린다
+        // (설계 11.6). 새 도구를 주지 않는다 — 답을 반영하는 통로는 이미 있는
+        // news_interest_prepare 하나다.
+        const [candidate] = newsStore.openReviewCandidates();
+        if (candidate) {
+          const interest = interests.find(item => item.interestId === candidate.interestId);
+          if (interest) newsOpenCandidate = { ...candidate, topic: interest.topic };
+        }
       } catch (error) {
         console.error(`관심 노트를 읽지 못했습니다: ${error?.code || error?.message || 'UNKNOWN'}`);
       }
     }
+    const newsProactiveInstruction = newsOpenCandidate
+      ? [
+        '<news_proactive>',
+        `interest: ${newsOpenCandidate.topic}`,
+        `question: ${newsOpenCandidate.question}`,
+        '</news_proactive>',
+        '시온이 먼저 물어둔 질문이 위에 있다. 사용자의 이번 말이 그 답이면 news_interest_prepare로 반영한다.',
+        '계속 보겠다는 답이면 state를 subscribed로, 그만 보겠다는 답이면 action을 remove로 부른다.',
+        '이번 말이 그 질문과 무관하면 도구를 부르지 말고 평범한 대화로 답한다.',
+      ].join('\n')
+      : '';
     progress.stage('answer');
     const {
       reply,
@@ -4064,7 +4195,9 @@ async function runSingleChatTurnBody({
       onStage: progress.stage,
       onSpokenText: spokenStream,
       voiceTurn,
-      additionalInstructions,
+      additionalInstructions: [additionalInstructions, newsProactiveInstruction]
+        .filter(Boolean)
+        .join('\n\n') || undefined,
     });
     spokenStream?.flush();
     const spokenRemaining = spokenStream?.remaining() || '';
@@ -4082,6 +4215,20 @@ async function runSingleChatTurnBody({
       attachmentIds,
     });
     onAttachmentExchangeInserted();
+    // 답을 받았는가. 모델이 그 관심에 도구를 부른 것이 곧 답이다 — 자연어를 다시
+    // 해석하지 않고 이미 validator를 통과한 상태 변경만 근거로 삼는다(설계 11.6).
+    if (newsOpenCandidate) {
+      const answered = (newsInterestSession?.getSaved() || [])
+        .some(item => item.topic === newsOpenCandidate.topic);
+      if (answered) {
+        newsStore.settleReviewCandidate({ id: newsOpenCandidate.id, state: 'resolved' });
+      }
+    }
+    // 이번 턴이 끝났으니 다음 재확인이 필요한지 본다. 사용자가 지금 앱을 쓰고
+    // 있다는 사실 자체가 이 검사의 조건이다(설계 11.3).
+    void runNewsReviewAfterTurn().catch(error => {
+      console.error(`뉴스 재확인 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    });
     const assistantCreatedAt = Math.floor(Date.now() / 1000);
     sessions[sessionId] = [
       ...history,
@@ -9325,6 +9472,10 @@ const httpServer = app.listen(PORT, HOST, () => {
     newsCollector.start();
     console.log(`   뉴스:     수집 worker 실행 중 (15분 tick, 관심별 6시간, 월 ${newsStore.monthlyCreditLimit} credits)`);
   }
+  if (newsPushDispatcher) {
+    newsPushDispatcher.start();
+    console.log('   뉴스:     재확인 Push dispatcher 실행 중');
+  }
   if (newsAnalyzer) {
     newsAnalyzer.start();
     console.log(`   뉴스:     판단 worker 실행 중 (60초 tick, ${newsAnalyzer.model}, ${newsAnalyzer.promptVersion})`);
@@ -9384,6 +9535,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     mailAgent?.stop();
     newsCollector?.stop();
     newsAnalyzer?.stop();
+    newsPushDispatcher?.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {

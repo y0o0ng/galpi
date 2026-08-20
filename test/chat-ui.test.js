@@ -425,9 +425,15 @@ test('the two consumers of /api/notifications still split task from the rest', (
 
 test('the service worker shows fixed text and never reads mail content', () => {
   const sw = fs.readFileSync(path.join(ROOT, 'public/sw.js'), 'utf8');
-  assert.match(sw, /payload\.type === 'mail_attention'/);
+  // 종류는 payload.type으로 가르고 문구는 SW 안에 고정돼 있다. 분기 표현식의
+  // 모양이 아니라 그 사실을 잰다 — 종류가 셋이 되면서 `===` 두 번이 표가 됐다.
+  assert.match(sw, /kinds\[payload\.type\]/);
+  assert.match(sw, /mail_attention:/);
+  assert.match(sw, /news_review:/);
   assert.match(sw, /XION 메일 알림/);
   assert.match(sw, /XION 일정 알림/);
+  // 재확인 Push는 무엇을 물어보는지 밝히지 않는다(뉴스 설계 11.5).
+  assert.match(sw, /'물어볼 게 하나 있어\.'/);
   // payload가 담지 않는 값을 SW가 읽으려 하면 안 된다.
   for (const forbidden of ['payload.subject', 'payload.sender', 'payload.summary', 'payload.count', 'payload.body']) {
     assert.equal(sw.includes(forbidden), false, forbidden);
