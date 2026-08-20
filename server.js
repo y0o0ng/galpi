@@ -63,6 +63,8 @@ const {
   parseNewsContextNote,
 } = require('./lib/news-interest-note');
 const { createNewsInterestSession } = require('./lib/news-interest-tool');
+const { createNewsStore } = require('./lib/news/store');
+const { createNewsCollector } = require('./lib/news/collect');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
@@ -243,6 +245,9 @@ const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
 // News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
 const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
+// 뉴스 검색은 채팅 웹 검색과 크레딧을 나눠 쓴다. 하위 한도가 없으면 폴링이
+// 사용자의 채팅 검색을 굶긴다.
+const NEWS_SEARCH_MONTHLY_CREDIT_LIMIT = Number.parseInt(process.env.NEWS_SEARCH_MONTHLY_CREDIT_LIMIT || '200', 10);
 // 자격증명은 DB·Vault에 넣지 않는다. 백업에 복제되면 안 되기 때문이다(설계 20.3).
 const MAIL_GMAIL_CREDENTIALS = {
   clientId: process.env.MAIL_GMAIL_CLIENT_ID,
@@ -986,6 +991,29 @@ const mailPushDispatcher = mailPushService
     buildSendOptions: buildMailSendOptions,
     onError(error) {
       console.error(`Mail push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    },
+  })
+  : null;
+const newsStore = createNewsStore(db, {
+  monthlyCreditLimit: Number.isInteger(NEWS_SEARCH_MONTHLY_CREDIT_LIMIT)
+    ? NEWS_SEARCH_MONTHLY_CREDIT_LIMIT
+    : undefined,
+});
+// 수집 worker. 관심 목록은 매 tick마다 노트에서 다시 읽는다 — 기동 시점의 목록을
+// 붙들면 사용자가 방금 등록한 관심이 재시작 전까지 수집되지 않는다.
+// **여기에 LLM은 없다.** 판단은 N4b이고, 그 전에 실제 표본으로 threshold를 정한다.
+const newsCollector = NEWS_AGENT_ENABLED
+  ? createNewsCollector({
+    store: newsStore,
+    search: (query, options) => searchWeb(query, options),
+    async loadInterests() {
+      const { interests } = await readNewsContextNote();
+      // 아직 아무 관심도 없으면 검색을 아예 하지 않는다.
+      return interests;
+    },
+    // 질의 문자열은 로그에 넣지 않는다. 사용자가 무엇에 관심 있는지가 곧 개인정보다.
+    onError(error) {
+      console.error(`뉴스 수집 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
     },
   })
   : null;
@@ -9210,6 +9238,10 @@ const httpServer = app.listen(PORT, HOST, () => {
     mailAgent.start();
     console.log('   메일:     Provider 동기화 worker 실행 중 (30초 tick, 계정별 5분)');
   }
+  if (newsCollector) {
+    newsCollector.start();
+    console.log(`   뉴스:     수집 worker 실행 중 (15분 tick, 관심별 6시간, 월 ${newsStore.monthlyCreditLimit} credits)`);
+  }
 
   if (
     codexStartupRecovery.quarantinedJobs > 0 ||
@@ -9263,6 +9295,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     assistantPushDispatcher?.stop();
     attachmentUploads.stop();
     mailAgent?.stop();
+    newsCollector?.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {

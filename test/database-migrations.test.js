@@ -79,16 +79,15 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
 
   const first = runDatabaseMigrations(db);
   assert.equal(first.currentVersion, LATEST_SCHEMA_VERSION);
-  assert.deepEqual(first.applied.map(item => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+  // 레거시 DB는 1부터 최신까지 빠짐없이 순서대로 올라와야 한다. 번호를 손으로
+  // 적어두면 마이그레이션이 붙을 때마다 이 줄이 낡아서 진짜 계약을 가린다.
+  assert.deepEqual(
+    first.applied.map(item => item.version),
+    Array.from({ length: LATEST_SCHEMA_VERSION }, (unused, index) => index + 1),
+  );
   assert.deepEqual(
     db.prepare('SELECT version FROM schema_version ORDER BY version').all(),
-    [
-      { version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
-      { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 },
-      { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 },
-      { version: 13 }, { version: 14 }, { version: 15 }, { version: 16 },
-      { version: 17 }, { version: 18 }, { version: 19 }, { version: 20 }, { version: 21 },
-    ],
+    Array.from({ length: LATEST_SCHEMA_VERSION }, (unused, index) => ({ version: index + 1 })),
   );
 
   const chunk = db.prepare(`
@@ -751,7 +750,7 @@ test('the v20 rebuild keeps what it can read and drops only what it cannot', () 
     { kind: 'message', id: messageId, status: 'accepted' },
   ]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM mail_attention').get().n, 1);
-  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, 21);
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, LATEST_SCHEMA_VERSION);
   db.close();
 });
 
@@ -785,7 +784,7 @@ test('schema v21 widens the provider check without cutting the children loose', 
 
   runDatabaseMigrations(db);
 
-  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, 21);
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v, LATEST_SCHEMA_VERSION);
   // 부모 행이 값 그대로 살아 있다.
   assert.deepEqual(db.prepare(`
     SELECT id, provider, address, status, next_sync_at AS nextSyncAt,
