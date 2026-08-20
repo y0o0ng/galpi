@@ -87,7 +87,9 @@
 ### 뉴스 — 설계만 합의됐다, 착수 전
 
 - **`docs/xion-news-agent-design.md`가 단일 기준이고 로드맵 독립 트랙 `뉴스`에 순서가 있다.**
-- **N0·N2는 로컬 검증까지만 됐다. Pi 미배포이고 실제 대화로 인수하지 않았다.** 관심 노트 계약은 `lib/news-interest-note.js`, 등록 도구는 `lib/news-interest-tool.js`이고 `NEWS_AGENT_ENABLED` 기본 `false` 뒤에 있다. **켜면 사용자가 `계속 알려줘`라고 말한 순간 `xion-news-context.md`가 볼트에 생긴다** — 확인 카드가 없고 취소는 대화(`그만 봐줘`)로만 된다.
+- **v1(N0·N2·N4·N5)이 코드로는 다 섰다. 로컬 검증까지이고 Pi 미배포·미인수다.** 관심 노트는 `lib/news-interest-note.js`, 등록 도구는 `lib/news-interest-tool.js`, 수집·판단·조회·홈은 `lib/news/*`다. 전체가 `NEWS_AGENT_ENABLED` 기본 `false` 뒤에 있다.
+- **켜면 사용자가 `계속 알려줘`라고 말한 순간 `xion-news-context.md`가 볼트에 생긴다** — 확인 카드가 없고 취소는 대화(`그만 봐줘`)로만 된다. 관심이 하나라도 있으면 15분마다 Tavily 뉴스 검색이 나가고 판단 LLM이 돈다. **관심이 0개면 검색도 LLM도 0회다.**
+- **Pi 인수 때 정할 것 둘이 남아 있다.** `lib/news/analyze.js`의 `SURFACE_THRESHOLD`는 근거 없는 잠정값이고, 원문 fetch는 그 threshold가 정해질 때 함께 연다. 설계 13절이 요구하는 표본 30~50건은 **로컬에서 못 만든다** — `TAVILY_API_KEY`가 Pi에만 있다.
 - **v1은 사용자가 직접 말한 관심만 다룬다**(hot path `expressed`·`subscribed` → RSS/API 수집 → 홈 조건부 브리핑). 먼저 묻기는 v1.1, 대화에서 관심을 추론하는 background batch는 v2다.
 - **v2를 여는 조건이 메일 관측이다.** background 추론만이 사용자가 요청하지 않은 상태를 LLM이 스스로 만드는 경로라, 메일의 판단 흔들림 관측이 끝나기 전에는 열지 않는다. 두 트랙은 병행한다.
 - **전달·큐 인프라는 새로 만들지 않는다** — 공유 Push dispatcher · `lib/mail/quiet-hours.js` · 메일 분석 큐 상태 기계 · `PROMPT_VERSION` 기록을 그대로 쓴다.

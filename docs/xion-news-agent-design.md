@@ -712,7 +712,9 @@ Web Push 발송
 
 이 메시지는 일반 assistant 답변과 구분 가능한 provenance를 가져야 한다.
 
-**`messages` 스키마는 건드리지 않는다.** 대신 뉴스 전용 표 하나를 둔다(schema **v22** — 현재 최신은 v21이다).
+**`messages` 스키마는 건드리지 않는다.** 대신 뉴스 전용 표 하나를 둔다.
+
+**뉴스 표는 전부 schema v22 하나에서 만든다.** 단계마다 나눠 만들지 않는 이유는 메일 v19가 이미 값을 치렀기 때문이다 — SQLite는 나중에 `CHECK`나 `FOREIGN KEY`를 붙이려면 표를 통째로 다시 만들어야 해서, 한 기능의 스키마를 단계별로 쪼개면 재작성 마이그레이션이 생긴다. 그래서 N4가 쓰는 기사·연결·수집 커서·검색 예산과 함께 아래 둘도 v22에서 빈 채로 만들어지고, v1.1이 올 때까지 아무도 쓰지 않는다.
 
 ```text
 news_proactive_messages(
@@ -908,6 +910,8 @@ novelty: 0..1
 importance: 0..1
 reason: 짧은 설명
 ```
+
+**원문 fetch는 threshold와 함께 열린다.** 17.1절이 원문을 relevance 높은 후보에만 가져오라고 하는데 그 "높은"을 정할 값이 아직 없다. 기준 없이 전부 가져오면 비용만 늘고 판단은 그대로다. 그래서 v1의 판단 재료는 제목·요약문·출처·발행 시각까지이고, 표본으로 threshold를 정하는 그 순간에 둘이 함께 열린다.
 
 importance에는 규칙 하나를 명시한다(12.2절).
 
@@ -1170,7 +1174,7 @@ v2에서 background batch가 들어오면 다음이 더해진다.
 - 결정적 최근 언급 검사 (11.2절)
 - 사용자 활동에 종속된 review candidate (11.3절)
 - `shared-main` proactive assistant message
-- `news_proactive_messages` (schema v22)
+- `news_proactive_messages`·`news_review_candidates` (표는 v22에서 이미 만들어져 있다)
 - review candidate용 Web Push — 기존 dispatcher와 quiet hours 재사용 (1절)
 - candidate resolution
 
@@ -1302,7 +1306,7 @@ v1의 hot path가 `expressed`를 쌓은 뒤에야 의미가 생기므로 뒤에 
 - 결정적 최근 언급 검사
 - 사용자 활동에 종속된 candidate 생성
 - `shared-main` proactive assistant message
-- `news_proactive_messages` (schema v22)
+- `news_proactive_messages`·`news_review_candidates` (표는 v22에서 이미 만들어져 있다)
 - Web Push delivery
 - candidate resolution
 
@@ -1402,8 +1406,9 @@ v1의 hot path가 `expressed`를 쌓은 뒤에야 의미가 생기므로 뒤에 
 1. **News Context Note의 정본 위치** — 관심 본문은 Markdown, cursor·worker 상태·proactive 표는 DB. 7.2절이 그 둘이 원자적이지 않다는 사실과 순서를 정했다.
 2. **proactive chat의 전달 제한** — `lib/mail/quiet-hours.js`를 그대로 쓴다(1절). 범용 priority/notification framework를 만들지 않는다.
 3. **News Agent에 사용할 모델** — `gpt-5.6-luna`에서 시작한다(1절). 비용 측정 뒤에 키운다.
-4. **proactive message의 provenance 위치** — `news_proactive_messages`, schema v22. `messages`는 건드리지 않는다(11.4절).
-5. **review 판정 시점** — 사용자 활동에 종속시킨다. v2에서 batch 성공 직후로 옮긴다(11.3절).
+4. **proactive message의 provenance 위치** — `news_proactive_messages`. `messages`는 건드리지 않는다(11.4절).
+5. **뉴스 표의 schema 번호** — 전부 v22 하나다. 단계별로 쪼개면 나중에 표 재작성이 생긴다(11.4절).
+6. **review 판정 시점** — 사용자 활동에 종속시킨다. v2에서 batch 성공 직후로 옮긴다(11.3절).
 
 ### 남은 것
 
