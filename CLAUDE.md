@@ -86,7 +86,8 @@
 
 ### 뉴스 — 설계만 합의됐다, 착수 전
 
-- **`docs/xion-news-agent-design.md`가 단일 기준이고 로드맵 독립 트랙 `뉴스`에 순서가 있다.** 코드는 아직 없다.
+- **`docs/xion-news-agent-design.md`가 단일 기준이고 로드맵 독립 트랙 `뉴스`에 순서가 있다.**
+- **N0·N2는 로컬 검증까지만 됐다. Pi 미배포이고 실제 대화로 인수하지 않았다.** 관심 노트 계약은 `lib/news-interest-note.js`, 등록 도구는 `lib/news-interest-tool.js`이고 `NEWS_AGENT_ENABLED` 기본 `false` 뒤에 있다. **켜면 사용자가 `계속 알려줘`라고 말한 순간 `xion-news-context.md`가 볼트에 생긴다** — 확인 카드가 없고 취소는 대화(`그만 봐줘`)로만 된다.
 - **v1은 사용자가 직접 말한 관심만 다룬다**(hot path `expressed`·`subscribed` → RSS/API 수집 → 홈 조건부 브리핑). 먼저 묻기는 v1.1, 대화에서 관심을 추론하는 background batch는 v2다.
 - **v2를 여는 조건이 메일 관측이다.** background 추론만이 사용자가 요청하지 않은 상태를 LLM이 스스로 만드는 경로라, 메일의 판단 흔들림 관측이 끝나기 전에는 열지 않는다. 두 트랙은 병행한다.
 - **전달·큐 인프라는 새로 만들지 않는다** — 공유 Push dispatcher · `lib/mail/quiet-hours.js` · 메일 분석 큐 상태 기계 · `PROMPT_VERSION` 기록을 그대로 쓴다.
@@ -100,7 +101,7 @@
 ### 첨부 · 일정 · 화면
 
 - **첨부는 U3b(Codex 제목·요약)만 남았다.** U0~U2 · U3a · 인증된 원본 열기 · 이미지 썸네일은 Pi·iPhone 인수를 마쳤고 U4 공통 문서 계층은 실측 후 보류했다. 상세와 보류 근거는 `docs/galpi-attachment-upload-design.md`에 있다.
-- **C2 반복 일정은 구현·Pi 배포까지 끝났다**(schema v17, `lib/assistant-task-series.js`, `ASSISTANT_TASK_SERIES_ENABLED`). 플래그가 Pi `.env`에만 `true`이고 **`.env.example`에는 키 자체가 없어** 새로 세팅하면 이 기능이 있는 줄 모른다. 계약은 `docs/task-reminder-design.md` 12·13절이다.
+- **C2 반복 일정은 구현·Pi 배포까지 끝났다**(schema v17, `lib/assistant-task-series.js`, `ASSISTANT_TASK_SERIES_ENABLED`). 플래그는 Pi `.env`에만 `true`이고 `.env.example`에는 `false`로 있다. 계약은 `docs/task-reminder-design.md` 12·13절이다.
 - **지식 패널의 첫 화면은 `XION` 홈이다**(탭 줄 맨 왼쪽, 기본 선택). `확인할 것` → `오늘` → 에이전트 상태 순서이고 기존 정본만 읽는 projection이라 서버 상태가 없다. 계약은 `docs/xion-home-design.md`다. **탭 키는 `agents`로 남겨둔다** — 설치된 Service Worker와 지난 알림이 `/?panel=agents` 링크를 들고 있다. 기본 탭은 `index.html`의 `active`·`hidden`과 `paper-panel.js`의 `state.activeTab` **두 곳**이 함께 정한다. 지식 패널이 데스크톱에서 350px 고정 폭이라(`grid-template-columns: minmax(0, 1fr) 350px`) 2열은 물리적으로 안 들어가고 모바일과 같은 1열을 쓴다.
 - 상시 관찰: `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 표시, 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 

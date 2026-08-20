@@ -19,6 +19,7 @@ const PROGRESS_STAGE_LABELS = Object.freeze({
   schedule_prepare: '일정 확인 중…',
   mail_search: '메일 찾는 중…',
   mail_preference: '알림 규칙 바꾸는 중…',
+  news_interest: '관심사 챙기는 중…',
   answer: '답변 작성 중…',
   council_draft: 'Claude 초안 작성 중…',
   council_critique: 'GPT 검증 중…',

@@ -54,6 +54,15 @@ const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailBodyReader } = require('./lib/mail/body');
 const { createMailSearchSession } = require('./lib/mail/search-tool');
 const { createMailPreferenceSession } = require('./lib/mail/preference-tool');
+const {
+  NOTE_FILENAME: NEWS_NOTE_FILENAME,
+  NOTE_TITLE: NEWS_NOTE_TITLE,
+  NOTE_TYPE: NEWS_NOTE_TYPE,
+  OWNER_AGENT: NEWS_OWNER_AGENT,
+  applyInterestActions,
+  parseNewsContextNote,
+} = require('./lib/news-interest-note');
+const { createNewsInterestSession } = require('./lib/news-interest-tool');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
@@ -232,6 +241,8 @@ const VOICE_TTS_SPEED = process.env.VOICE_TTS_SPEED;
 const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 // MAIL-1 Provider 동기화. 실계정 인수 전까지 false 유지.
 const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
+// News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
+const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 자격증명은 DB·Vault에 넣지 않는다. 백업에 복제되면 안 되기 때문이다(설계 20.3).
 const MAIL_GMAIL_CREDENTIALS = {
   clientId: process.env.MAIL_GMAIL_CLIENT_ID,
@@ -2165,6 +2176,74 @@ async function writeAssistantScheduleNoteProjection({ monthKey, tasks, updatedAt
   });
 }
 
+// 관심 노트의 읽기·쓰기 경로 (설계 8·9). 일정 노트와 같은 원자적 finalization을
+// 쓰되, projection이 아니라 **살아있는 상태 노트**라 이전 본문을 읽어 그 위에 action을
+// 적용한다. 읽기와 적용과 쓰기가 같은 topicMutations 잠금 안에 있어야 두 턴이 겹쳐도
+// 한쪽이 다른 쪽의 관심을 지우지 않고, expectedContent가 그것을 한 번 더 잠근다.
+async function readNewsContextNote() {
+  const filepath = path.join(VAULT_PATH, NEWS_NOTE_FILENAME);
+  try {
+    const raw = await fs.readFile(filepath, 'utf8');
+    return { raw, interests: parseNewsContextNote(raw) };
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { raw: '', interests: [] };
+    throw error;
+  }
+}
+
+async function writeNewsContextNote({ actions, source = 'user', now = Math.floor(Date.now() / 1000) }) {
+  const filename = NEWS_NOTE_FILENAME;
+  const filepath = path.join(VAULT_PATH, filename);
+
+  return topicMutations.run(async () => {
+    const existing = stmtGetNoteByFilename.get(filename);
+    if (existing?.codexStatus === 'recovery_required') {
+      throw new Error(`복구 승인 전에는 관심 노트를 갱신할 수 없습니다: ${filename}`);
+    }
+
+    let previousRaw = null;
+    try {
+      previousRaw = await fs.readFile(filepath, 'utf8');
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+
+    const { interests, content } = applyInterestActions({
+      raw: previousRaw || '',
+      actions,
+      now,
+      source,
+    });
+    const contentSha256 = noteContentSha256({
+      filename,
+      title: NEWS_NOTE_TITLE,
+      noteType: NEWS_NOTE_TYPE,
+      raw: content,
+    });
+
+    await topicMutations.commit({
+      changes: [{ filepath, expectedContent: previousRaw, nextContent: content }],
+      applyDatabase() {
+        dbUpsertNote({
+          filename,
+          title: NEWS_NOTE_TITLE,
+          noteType: NEWS_NOTE_TYPE,
+          codexStatus: 'pending',
+          contentSha256,
+          ownerAgent: NEWS_OWNER_AGENT,
+        });
+      },
+    });
+
+    generateAndStoreEmbedding(
+      filename,
+      buildSemanticEmbeddingText(NEWS_NOTE_TITLE, content),
+      contentSha256,
+    ).catch(() => {});
+    return { interests, contentSha256 };
+  });
+}
+
 assistantScheduleNoteProjector = createScheduleNoteProjector(assistantScheduleNoteProjections, {
   project: writeAssistantScheduleNoteProjection,
   onError(error, item) {
@@ -3140,6 +3219,7 @@ function createChatToolRuntime({
   scheduleToolSession = null,
   mailSearchSession = null,
   mailPreferenceSession = null,
+  newsInterestSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3155,6 +3235,7 @@ function createChatToolRuntime({
       ...(scheduleToolSession?.getToolDefinitions() || []),
       ...(mailSearchSession?.getToolDefinitions() || []),
       ...(mailPreferenceSession?.getToolDefinitions() || []),
+      ...(newsInterestSession?.getToolDefinitions() || []),
     ],
     executeTool: async toolUse => {
       if (toolUse.name === 'web_search') {
@@ -3224,6 +3305,17 @@ function createChatToolRuntime({
           onStage(writingStage);
         }
       }
+      if (toolUse.name === 'news_interest_prepare') {
+        if (!newsInterestSession) {
+          return { isError: true, content: '현재 요청에서는 관심사를 바꿀 수 없습니다.' };
+        }
+        onStage(progressStageForTool(toolUse.name));
+        try {
+          return await newsInterestSession.execute(toolUse.name, toolUse.input);
+        } finally {
+          onStage(writingStage);
+        }
+      }
       return { isError: true, content: '허용되지 않은 도구입니다.' };
     },
     result() {
@@ -3237,6 +3329,7 @@ function createChatToolRuntime({
         scheduleCandidate: scheduleToolSession?.getCandidate() || null,
         mailSearchUsage: mailSearchSession?.getUsage() || { calls: 0 },
         mailPreferencesSaved: mailPreferenceSession?.getSaved() || [],
+        newsInterestsSaved: newsInterestSession?.getSaved() || [],
       };
     },
   };
@@ -3269,6 +3362,7 @@ function buildChatToolInstructions({
   scheduleToolSession,
   mailSearchSession,
   mailPreferenceSession,
+  newsInterestSession,
   includeLanguageRule = false,
   voiceTurn = false,
   additionalInstructions = '',
@@ -3282,6 +3376,7 @@ function buildChatToolInstructions({
     scheduleToolSession?.systemPrompt || '',
     mailSearchSession?.systemPrompt || '',
     mailPreferenceSession?.systemPrompt || '',
+    newsInterestSession?.systemPrompt || '',
     additionalInstructions,
   ].filter(Boolean).join('\n\n');
 }
@@ -3296,6 +3391,7 @@ async function generateClaudeReplyWithTools({
   scheduleToolSession = null,
   mailSearchSession = null,
   mailPreferenceSession = null,
+  newsInterestSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3306,6 +3402,7 @@ async function generateClaudeReplyWithTools({
     scheduleToolSession,
     mailSearchSession,
     mailPreferenceSession,
+    newsInterestSession,
     onStage,
     writingStage,
   });
@@ -3321,6 +3418,7 @@ async function generateClaudeReplyWithTools({
       scheduleToolSession,
       mailSearchSession,
       mailPreferenceSession,
+      newsInterestSession,
     }),
     maxToolRounds: 2,
     getTools: runtime.getTools,
@@ -3346,6 +3444,7 @@ async function generateGptReplyWithTools({
   scheduleToolSession = null,
   mailSearchSession = null,
   mailPreferenceSession = null,
+  newsInterestSession = null,
   onStage = () => {},
   writingStage = 'answer',
   onSpokenText = null,
@@ -3359,6 +3458,7 @@ async function generateGptReplyWithTools({
     scheduleToolSession,
     mailSearchSession,
     mailPreferenceSession,
+    newsInterestSession,
     onStage,
     writingStage,
   });
@@ -3385,6 +3485,7 @@ async function generateGptReplyWithTools({
       scheduleToolSession,
       mailSearchSession,
       mailPreferenceSession,
+      newsInterestSession,
       includeLanguageRule: true,
       voiceTurn,
       additionalInstructions,
@@ -3415,6 +3516,7 @@ async function generateChatReply(model, context, {
   scheduleToolSession = null,
   mailSearchSession = null,
   mailPreferenceSession = null,
+  newsInterestSession = null,
   onStage = () => {},
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
@@ -3431,6 +3533,7 @@ async function generateChatReply(model, context, {
       scheduleToolSession,
       mailSearchSession,
       mailPreferenceSession,
+      newsInterestSession,
       onStage,
     });
   }
@@ -3447,6 +3550,7 @@ async function generateChatReply(model, context, {
       scheduleToolSession,
       mailSearchSession,
       mailPreferenceSession,
+      newsInterestSession,
       onStage,
       onSpokenText,
       voiceTurn,
@@ -3820,6 +3924,22 @@ async function runSingleChatTurnBody({
     const mailPreferenceSession = MAIL_AGENT_ENABLED
       ? createMailPreferenceSession(mailStore)
       : null;
+    // 관심 등록도 사용자가 그 턴에 직접 말했을 때만 일어난다. 프롬프트에는 현재
+    // topic만 실어 모델이 대상을 맞추게 하고, 실제 적용은 잠금 안에서 다시 읽는다.
+    // 노트를 못 읽으면 도구를 주지 않는다 — 목록 없이 부르면 이미 추적 중인 주제를
+    // 다시 만들거나 없는 주제를 지우려 든다.
+    let newsInterestSession = null;
+    if (NEWS_AGENT_ENABLED) {
+      try {
+        const { interests } = await readNewsContextNote();
+        newsInterestSession = createNewsInterestSession({
+          interests,
+          apply: ({ actions }) => writeNewsContextNote({ actions, source: 'user' }),
+        });
+      } catch (error) {
+        console.error(`관심 노트를 읽지 못했습니다: ${error?.code || error?.message || 'UNKNOWN'}`);
+      }
+    }
     progress.stage('answer');
     const {
       reply,
@@ -3840,6 +3960,7 @@ async function runSingleChatTurnBody({
       scheduleToolSession,
       mailSearchSession,
       mailPreferenceSession,
+      newsInterestSession,
       onStage: progress.stage,
       onSpokenText: spokenStream,
       voiceTurn,
