@@ -294,3 +294,150 @@ test('Push가 꺼져 있으면 delivery를 만들지 않는다', () => {
   assert.equal(service.claim(NOW), null);
   db.close();
 });
+
+// ── 회귀: 최초 관심 표현이 "최근 언급"으로 다시 세어지면 안 된다 ──────────
+//
+// last_seen은 **사용자가 실제로 그 관심을 말한 마지막 시점**이다. 그 값을 만든
+// 발화가 다음 review에서 다시 잡히면 관심이 영영 재확인되지 않고, 더 나쁘게는
+// 연장이 last_seen을 오늘로 바꿔 "오늘 말했다"는 거짓 기록이 남는다.
+
+const { applyInterestActions, parseNewsContextNote } = require('../lib/news-interest-note');
+const { kstDateToEpoch } = require('../lib/news/review');
+
+const EXPRESSED_AT = Math.floor(Date.parse('2026-07-01T05:00:00Z') / 1000); // 14:00 KST
+const REVIEW_DAY = Math.floor(Date.parse('2026-07-31T05:00:00Z') / 1000);
+
+// 서버의 loadUserMessagesSince와 같은 의미: created_at >= since 인 user 메시지.
+function messageLoader(messages) {
+  return since => messages.filter(item => item.createdAt >= since);
+}
+
+function noteWithExpressedInterest() {
+  const { content } = applyInterestActions({
+    raw: '',
+    now: EXPRESSED_AT,
+    source: 'user',
+    actions: [{
+      op: 'add', topic: '로컬 LLM', state: 'expressed',
+      reason: '요즘 로컬 LLM에 관심 있어', reviewAfter: initialReviewAfter(EXPRESSED_AT),
+    }],
+  });
+  return content;
+}
+
+test('관심을 만든 그 발화를 나중에 최근 언급으로 다시 세지 않는다', () => {
+  const interests = parseNewsContextNote(noteWithExpressedInterest());
+  assert.equal(interests[0].lastSeen, '2026-07-01');
+
+  const load = messageLoader([
+    // 관심을 만든 바로 그 발화. 이것 말고는 관련 발화가 없다.
+    { content: '요즘 로컬 LLM에 관심 있어', createdAt: EXPRESSED_AT },
+    { content: '오늘 점심 뭐 먹지', createdAt: EXPRESSED_AT + 3600 },
+    { content: '주말에 자전거 탈까', createdAt: REVIEW_DAY - 3600 },
+  ]);
+
+  const target = pickReviewTarget({ interests, now: REVIEW_DAY, loadUserMessagesSince: load });
+  assert.equal(target.action, 'ask', '30일 동안 조용했으므로 물어야 한다');
+});
+
+test('스캔은 last_seen 다음 날부터 본다', () => {
+  const interests = parseNewsContextNote(noteWithExpressedInterest());
+  const seen = [];
+  pickReviewTarget({
+    interests,
+    now: REVIEW_DAY,
+    loadUserMessagesSince: since => { seen.push(since); return []; },
+  });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0], kstDateToEpoch('2026-07-01') + DAY, 'last_seen 당일은 이미 센 것이다');
+});
+
+test('last_seen 다음 날 이후의 언급은 그대로 잡는다', () => {
+  const interests = parseNewsContextNote(noteWithExpressedInterest());
+  const load = messageLoader([
+    { content: '요즘 로컬 LLM에 관심 있어', createdAt: EXPRESSED_AT },
+    { content: '로컬 LLM 뭐가 제일 빠르지?', createdAt: EXPRESSED_AT + 5 * DAY },
+  ]);
+  const target = pickReviewTarget({ interests, now: REVIEW_DAY, loadUserMessagesSince: load });
+  assert.equal(target.action, 'extend');
+});
+
+test('review 연장이 last_seen을 오늘로 바꾸지 않는다', () => {
+  const note = noteWithExpressedInterest();
+  const before = parseNewsContextNote(note)[0];
+
+  // review가 쓰는 mutation. 예정일만 미루고 언급 기록은 건드리지 않는다.
+  const { interests } = applyInterestActions({
+    raw: note,
+    now: REVIEW_DAY,
+    source: 'user',
+    actions: [{ op: 'reschedule', interestId: before.interestId, reviewAfter: '2026-08-14' }],
+  });
+
+  assert.equal(interests[0].reviewAfter, '2026-08-14');
+  assert.equal(interests[0].lastSeen, before.lastSeen, 'last_seen은 그대로다');
+  assert.equal(interests[0].state, before.state);
+  assert.equal(interests[0].topic, before.topic);
+});
+
+test('reschedule은 예정일 말고는 아무것도 못 바꾼다', () => {
+  const note = noteWithExpressedInterest();
+  const id = parseNewsContextNote(note)[0].interestId;
+  const { interests } = applyInterestActions({
+    raw: note,
+    now: REVIEW_DAY,
+    source: 'user',
+    actions: [{
+      op: 'reschedule', interestId: id, reviewAfter: '2026-08-14',
+      state: 'subscribed', topic: '다른 주제', reason: '몰래 바꾸기',
+    }],
+  });
+  assert.equal(interests[0].state, 'expressed');
+  assert.equal(interests[0].topic, '로컬 LLM');
+  assert.equal(interests[0].reason, '요즘 로컬 LLM에 관심 있어');
+});
+
+test('사용자가 다시 말하면 last_seen은 그때 갱신된다', () => {
+  const note = noteWithExpressedInterest();
+  const id = parseNewsContextNote(note)[0].interestId;
+  const { interests } = applyInterestActions({
+    raw: note, now: REVIEW_DAY, source: 'user',
+    actions: [{ op: 'update', interestId: id, reason: '아직 관심 있어' }],
+  });
+  assert.equal(interests[0].lastSeen, '2026-07-31');
+});
+
+// ── 회귀: 열린 질문이 하나뿐이라는 것은 DB가 보장해야 한다 ──────────────────
+
+test('DB를 직접 우회해도 열린 질문이 둘이 되지 않는다', () => {
+  const db = createDatabase();
+  const store = createNewsStore(db, { now: () => NOW });
+  store.createReviewCandidate({ interestId: 'news-b202', question: '질문 하나' });
+
+  assert.throws(
+    () => db.prepare(`
+      INSERT INTO news_review_candidates (interest_id, question, created_at)
+      VALUES ('news-b202', '우회 질문', ?)
+    `).run(NOW),
+    /UNIQUE/,
+  );
+  assert.equal(store.openReviewCandidates().length, 1);
+  db.close();
+});
+
+test('질문이 끝난 뒤에는 같은 관심에 새 질문을 만들 수 있다', () => {
+  const db = createDatabase();
+  const store = createNewsStore(db, { now: () => NOW });
+  const first = store.createReviewCandidate({ interestId: 'news-b202', question: '질문 하나' });
+
+  for (const state of ['resolved', 'dismissed', 'expired']) {
+    const open = store.openReviewCandidates()[0];
+    assert.ok(open, `${state} 전에는 열린 질문이 있어야 한다`);
+    assert.equal(store.settleReviewCandidate({ id: open.id, state }), true);
+    assert.ok(store.createReviewCandidate({ interestId: 'news-b202', question: `${state} 뒤 질문` }));
+  }
+  // 끝난 질문들은 그대로 남아 있다.
+  assert.ok(db.prepare('SELECT COUNT(*) AS n FROM news_review_candidates').get().n > 3);
+  assert.equal(first.interestId, 'news-b202');
+  db.close();
+});

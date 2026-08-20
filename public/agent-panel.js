@@ -955,8 +955,7 @@
       // 왜 가져왔는지가 제목 바로 아래 있다. 이것이 없으면 추천 피드다(설계 15).
       const why = document.createElement('span');
       why.className = 'home-news-why';
-      const topics = Array.isArray(article.topics) ? article.topics.join(' · ') : '';
-      why.textContent = [topics, article.source].filter(Boolean).join(' · ');
+      why.textContent = [article.topic, article.source].filter(Boolean).join(' · ');
 
       entry.append(title, why);
       section.appendChild(entry);

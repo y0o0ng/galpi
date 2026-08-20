@@ -259,6 +259,9 @@ const VOICE_SHORTCUT_ENABLED = process.env.VOICE_SHORTCUT_ENABLED === 'true';
 const MAIL_AGENT_ENABLED = process.env.MAIL_AGENT_ENABLED === 'true';
 // News N2 관심 등록. v1은 사용자가 직접 말한 관심만 다룬다(설계 6.1).
 const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
+// 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
+// 못한 문턱으로 홈 판정이 시작된다. 문턱을 실데이터로 정한 뒤에 켠다.
+const NEWS_SURFACE_ENABLED = process.env.NEWS_SURFACE_ENABLED === 'true';
 // 뉴스 검색은 채팅 웹 검색과 크레딧을 나눠 쓴다. 하위 한도가 없으면 폴링이
 // 사용자의 채팅 검색을 굶긴다.
 const NEWS_SEARCH_MONTHLY_CREDIT_LIMIT = Number.parseInt(process.env.NEWS_SEARCH_MONTHLY_CREDIT_LIMIT || '200', 10);
@@ -2387,8 +2390,10 @@ async function runNewsReviewAfterTurn() {
   // 계속 이야기하는 주제에는 묻지 않고 미룬다. 노트가 정본이라 연장도 노트에 쓴다.
   if (target.action === 'extend') {
     await writeNewsContextNote({
+      // 미루기는 언급이 아니다. `update`를 쓰면 last_seen이 오늘로 바뀌어
+      // "사용자가 오늘 말했다"는 거짓 기록이 남는다.
       actions: [{
-        op: 'update',
+        op: 'reschedule',
         interestId: target.interest.interestId,
         reviewAfter: target.reviewAfter,
       }],
@@ -4833,7 +4838,7 @@ registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUS
 registerNewsRoutes({
   app,
   store: newsStore,
-  config: { enabled: NEWS_AGENT_ENABLED },
+  config: { enabled: NEWS_AGENT_ENABLED, surfaceEnabled: NEWS_SURFACE_ENABLED },
   // 관심 이름의 정본은 노트다. 라우트가 매번 읽어 기사에 이름을 붙인다.
   async loadInterests() {
     const { interests } = await readNewsContextNote();
@@ -9471,6 +9476,9 @@ const httpServer = app.listen(PORT, HOST, () => {
   if (newsCollector) {
     newsCollector.start();
     console.log(`   뉴스:     수집 worker 실행 중 (15분 tick, 관심별 6시간, 월 ${newsStore.monthlyCreditLimit} credits)`);
+  }
+  if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
+    console.log('   뉴스:     홈 노출 꺼짐 (문턱 미확정, NEWS_SURFACE_ENABLED)');
   }
   if (newsPushDispatcher) {
     newsPushDispatcher.start();

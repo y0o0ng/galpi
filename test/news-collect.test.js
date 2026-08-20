@@ -165,7 +165,8 @@ test('다시 수집해도 기사가 늘지 않고 분석 상태는 그대로다'
   await collectNews({ interests: INTERESTS, search, store, now: NOW });
   const claimed = store.claimForAnalysis({ limit: 1 });
   store.completeAnalysis({
-    id: claimed[0].id, leaseUntil: claimed[0].leaseUntil,
+    articleId: claimed[0].articleId, interestId: claimed[0].interestId,
+    leaseUntil: claimed[0].leaseUntil,
     relevance: 0.8, summary: '요약', promptVersion: 'test-v1', analyzerModel: 'test',
   });
 
@@ -287,18 +288,19 @@ test('상한을 넘긴 기사는 failed로 목록에 남고 사람이 다시 돌
     assert.equal(rows.length, 1, `시도 ${attempt + 1}에서 가져와야 한다`);
     assert.equal(rows[0].attemptCount, attempt + 1);
     state = stepStore.failAnalysis({
-      id: rows[0].id, leaseUntil: rows[0].leaseUntil, code: 'BOOM', attemptCount: rows[0].attemptCount,
+      articleId: rows[0].articleId, interestId: rows[0].interestId,
+      leaseUntil: rows[0].leaseUntil, code: 'BOOM', attemptCount: rows[0].attemptCount,
     });
     assert.equal(state, attempt + 1 >= MAX_ANALYSIS_ATTEMPTS ? 'failed' : 'pending');
   }
   assert.equal(store.analysisCounts().failed, 1);
   // 조용히 사라지지 않는다.
-  assert.equal(db.prepare("SELECT analysis_error_code AS c FROM news_articles").get().c, 'BOOM');
+  assert.equal(db.prepare("SELECT analysis_error_code AS c FROM news_article_interests").get().c, 'BOOM');
 
   assert.equal(store.requeueFailedAnalysis(), 1);
   assert.equal(store.analysisCounts().pending, 1);
   assert.equal(
-    db.prepare('SELECT analysis_attempt_count AS n FROM news_articles').get().n,
+    db.prepare('SELECT analysis_attempt_count AS n FROM news_article_interests').get().n,
     0,
     '재처리는 시도 횟수를 되돌린다',
   );

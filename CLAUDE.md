@@ -84,12 +84,15 @@
 - **`MAIL_AGENT_ENABLED=true`로 서버를 띄우면 그 순간 실계정 메일이 동기화·분석되고 OpenAI 호출이 나간다.** 문법 확인은 `node --check`로 끝내고, 띄웠으면 PID를 잡아 반드시 종료한다. **Pi가 정본이고 로컬은 `false`다.**
 - **관측 대상 둘**: 실제 알림에서 판단 흔들림이 얼마나 드러나는지(흡수 장치인 batch 묶기와 발신자 억제는 이미 배포됐다), 그리고 본문 열기의 IMAP 연결이 동기화 tick과 부딪히는지.
 
-### 뉴스 — 설계만 합의됐다, 착수 전
+### 뉴스 — v1·v1.1 구현했다, Pi 배포·인수 전
 
 - **`docs/xion-news-agent-design.md`가 단일 기준이고 로드맵 독립 트랙 `뉴스`에 순서가 있다.**
-- **v1(N0·N2·N4·N5)이 코드로는 다 섰다. 로컬 검증까지이고 Pi 미배포·미인수다.** 관심 노트는 `lib/news-interest-note.js`, 등록 도구는 `lib/news-interest-tool.js`, 수집·판단·조회·홈은 `lib/news/*`다. 전체가 `NEWS_AGENT_ENABLED` 기본 `false` 뒤에 있다.
+- **v1(N0·N2·N4·N5)과 v1.1(N3)이 코드로 다 섰다. 로컬 검증까지이고 Pi 미배포·미인수다.** 관심 노트는 `lib/news-interest-note.js`, 등록 도구는 `lib/news-interest-tool.js`, 수집·판단·조회·홈·재확인은 `lib/news/*`다. schema는 **v22**이고 뉴스 표는 전부 거기서 한 번에 만든다.
 - **켜면 사용자가 `계속 알려줘`라고 말한 순간 `xion-news-context.md`가 볼트에 생긴다** — 확인 카드가 없고 취소는 대화(`그만 봐줘`)로만 된다. 관심이 하나라도 있으면 15분마다 Tavily 뉴스 검색이 나가고 판단 LLM이 돈다. **관심이 0개면 검색도 LLM도 0회다.**
-- **Pi 인수 때 정할 것 둘이 남아 있다.** `lib/news/analyze.js`의 `SURFACE_THRESHOLD`는 근거 없는 잠정값이고, 원문 fetch는 그 threshold가 정해질 때 함께 연다. 설계 13절이 요구하는 표본 30~50건은 **로컬에서 못 만든다** — `TAVILY_API_KEY`가 Pi에만 있다.
+- **플래그가 둘이다.** `NEWS_AGENT_ENABLED`가 수집·판단·조회·재확인을 열고, 홈의 `알아둘 것`만 `NEWS_SURFACE_ENABLED`가 따로 연다. 표본을 모으려면 수집을 켜야 하는데 그러면 아직 정하지 못한 `SURFACE_THRESHOLD`가 홈 판정을 시작하기 때문이다. **둘 다 기본 `false`이고, 홈은 문턱을 정한 뒤에 켠다.**
+- **판단은 (기사, 관심) 쌍에 속한다.** 같은 기사가 두 관심에 걸리면 판단도 둘이다. 기사에 하나만 두면 한쪽 기준 이유가 다른 쪽 설명으로 새어 사용자에게 틀린 이유를 말한다. dedupe는 기사 단위 그대로다.
+- **`last_seen`은 사용자가 실제로 말한 시점이다.** 시스템이 재확인 예정일을 미뤄도 바뀌지 않으므로, 미루기는 `update`가 아니라 `reschedule` op를 쓴다.
+- **Pi 인수 때 정할 것 셋.** `SURFACE_THRESHOLD`(잠정값) · 원문 fetch(문턱과 함께 연다) · 11.2절 최근 언급 매칭이 너무 엄격한 문제. 설계 13절이 요구하는 표본 30~50건은 **로컬에서 못 만든다** — `TAVILY_API_KEY`가 Pi에만 있다.
 - **v1은 사용자가 직접 말한 관심만 다룬다**(hot path `expressed`·`subscribed` → RSS/API 수집 → 홈 조건부 브리핑). 먼저 묻기는 v1.1, 대화에서 관심을 추론하는 background batch는 v2다.
 - **v2를 여는 조건이 메일 관측이다.** background 추론만이 사용자가 요청하지 않은 상태를 LLM이 스스로 만드는 경로라, 메일의 판단 흔들림 관측이 끝나기 전에는 열지 않는다. 두 트랙은 병행한다.
 - **전달·큐 인프라는 새로 만들지 않는다** — 공유 Push dispatcher · `lib/mail/quiet-hours.js` · 메일 분석 큐 상태 기계 · `PROMPT_VERSION` 기록을 그대로 쓴다.

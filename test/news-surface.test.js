@@ -18,6 +18,7 @@ const { runDatabaseMigrations } = require('../lib/database-migrations');
 const { createNewsStore } = require('../lib/news/store');
 const { SURFACE_THRESHOLD } = require('../lib/news/analyze');
 const { NEWS_SEARCH_TOOL, createNewsSearchSession } = require('../lib/news/search-tool');
+const { registerNewsRoutes } = require('../lib/news/routes');
 
 const ROOT = path.resolve(__dirname, '..');
 const NOW = Math.floor(Date.parse('2026-08-20T03:00:00Z') / 1000);
@@ -51,32 +52,36 @@ function createDatabase() {
   return db;
 }
 
-function insertArticle(db, { id, interestId = 'news-a13f', relevance = 0.9, importance = 0.8, title = '기사', publishedAt = NOW }) {
+// 판단은 (기사, 관심) 쌍에 붙는다. 기사 행은 기사 사실만 든다.
+function insertArticle(db, {
+  id, interestId = 'news-a13f', relevance = 0.9, importance = 0.8,
+  title = '기사', publishedAt = NOW, reason = '이 관심과 직접 관련이 있다.',
+}) {
   db.prepare(`
     INSERT INTO news_articles (
       id, identity_key, canonical_url, url, title, source, published_at,
-      first_seen_at, last_seen_at, analysis_state, relevance, novelty, importance,
-      summary, judgment_reason, prompt_version, analyzer_model, analyzed_at
-    ) VALUES (
-      @id, @key, @url, @url, @title, 'example.com', @publishedAt,
-      @now, @now, 'done', @relevance, 0.5, @importance,
-      '요약 문장.', '이 관심과 직접 관련이 있다.', 'news-analysis-v1', 'test', @now
-    )
+      first_seen_at, last_seen_at
+    ) VALUES (@id, @key, @url, @url, @title, 'example.com', @publishedAt, @now, @now)
   `).run({
     id,
     key: String(id).padStart(64, '0'),
     url: `https://example.com/${id}`,
     title,
     publishedAt,
-    relevance,
-    importance,
     now: NOW,
   });
   if (interestId) {
     db.prepare(`
-      INSERT INTO news_article_interests (article_id, interest_id, query, first_seen_at)
-      VALUES (?, ?, '질의', ?)
-    `).run(id, interestId, NOW);
+      INSERT INTO news_article_interests (
+        article_id, interest_id, query, first_seen_at, analysis_state,
+        relevance, novelty, importance, summary, judgment_reason,
+        prompt_version, analyzer_model, analyzed_at
+      ) VALUES (
+        @id, @interestId, '질의', @now, 'done',
+        @relevance, 0.5, @importance, '요약 문장.', @reason,
+        'news-analysis-v1', 'test', @now
+      )
+    `).run({ id, interestId, relevance, importance, reason, now: NOW });
   }
 }
 
@@ -138,7 +143,7 @@ test('조회 결과가 신뢰 경계 안에 들어가고 가져온 이유가 함
     ).trim(),
   );
   assert.equal(payload[0].가져온이유, '이 관심과 직접 관련이 있다.');
-  assert.deepEqual(payload[0].관심사, ['OpenAI Responses API']);
+  assert.equal(payload[0].관심사, 'OpenAI Responses API');
   db.close();
 });
 
@@ -211,4 +216,64 @@ test('뉴스 카드가 기존 홈 카드와 같은 값을 쓴다', () => {
   // hover와 다크 배경은 기존 카드와 공유한다.
   assert.match(css, /\.home-news:hover\s*{/s);
   assert.match(css, /\[data-theme="dark"\][^{]*\.home-news\s*{/s);
+});
+
+// ── 문턱이 정해지기 전에는 홈만 조용하다 ──────────────────────────────────
+//
+// 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 실데이터로 정하지 못한
+// SURFACE_THRESHOLD가 홈 판정을 시작한다. 그 둘을 떼는 것이 이 스위치다.
+
+function fakeApp() {
+  const routes = { get: {}, post: {} };
+  return {
+    get(path, handler) { routes.get[path] = handler; },
+    post(path, handler) { routes.post[path] = handler; },
+    routes,
+  };
+}
+
+function fakeRes() {
+  const captured = {};
+  return {
+    captured,
+    status(code) { captured.status = code; return this; },
+    json(body) { captured.body = body; return this; },
+  };
+}
+
+async function briefingWith(db, config) {
+  const app = fakeApp();
+  registerNewsRoutes({
+    app,
+    store: createNewsStore(db, { now: () => NOW }),
+    config,
+    loadInterests: async () => INTERESTS,
+  });
+  const res = fakeRes();
+  await app.routes.get['/api/news/briefing']({}, res);
+  return res.captured;
+}
+
+test('surface가 꺼져 있으면 문턱을 넘은 기사도 홈에 올리지 않는다', async () => {
+  const db = createDatabase();
+  insertArticle(db, { id: 1, relevance: 0.9, importance: 0.8 });
+
+  const off = await briefingWith(db, { enabled: true, surfaceEnabled: false });
+  assert.deepEqual(off.body.articles, []);
+  assert.equal(off.body.surfaceEnabled, false);
+  // 수집·판단은 계속 돈다. 그 사실은 그대로 보인다.
+  assert.equal(off.body.counts.done, 1);
+
+  const on = await briefingWith(db, { enabled: true, surfaceEnabled: true });
+  assert.equal(on.body.articles.length, 1);
+  assert.equal(on.body.surfaceEnabled, true);
+  db.close();
+});
+
+test('뉴스 자체가 꺼져 있으면 503이고 surface 값과 무관하다', async () => {
+  const db = createDatabase();
+  const off = await briefingWith(db, { enabled: false, surfaceEnabled: true });
+  assert.equal(off.status, 503);
+  assert.equal(off.body.code, 'NEWS_AGENT_DISABLED');
+  db.close();
 });

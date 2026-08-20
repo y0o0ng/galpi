@@ -137,10 +137,11 @@ test('판단이 프롬프트 버전과 모델과 함께 저장된다', async () 
   assert.equal(outcomes.length, 1);
   assert.equal(outcomes[0].outcome, 'done');
 
+  // 판단은 (기사, 관심) 쌍에 붙는다.
   const row = db.prepare(`
     SELECT analysis_state AS state, relevance, novelty, importance, summary,
            judgment_reason AS reason, prompt_version AS promptVersion, analyzer_model AS analyzerModel
-    FROM news_articles
+    FROM news_article_interests
   `).get();
   assert.equal(row.state, 'done');
   assert.equal(row.relevance, 0.9);
