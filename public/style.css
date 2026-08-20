@@ -890,12 +890,14 @@ html, body {
 }
 
 [data-theme="dark"] .home-attention,
-[data-theme="dark"] .home-today {
+[data-theme="dark"] .home-today,
+[data-theme="dark"] .home-news {
   background: rgba(255, 255, 255, 0.035);
 }
 
 .home-attention:hover,
-.home-today:hover {
+.home-today:hover,
+.home-news:hover {
   border-color: var(--label);
 }
 
@@ -941,6 +943,34 @@ html, body {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 뉴스 카드는 `오늘`과 같은 상자를 쓰되 두 줄이라 세로로 쌓는다. 새 모서리
+   값이나 새 배경을 만들지 않는다 — 카드가 세 종류로 보이면 홈이 대시보드가 된다. */
+.home-news {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.46);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.home-news-title {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 왜 가져왔는지. 제목보다 약하게 두되 지우지 않는다 — 이 줄이 없으면 추천 피드다. */
+.home-news-why {
+  font-size: 11px;
+  color: var(--label);
 }
 
 .home-more {

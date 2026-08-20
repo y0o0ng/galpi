@@ -34,11 +34,16 @@
     attentionExpanded: false,
     mailPreferences: null,
     mailPreferenceSaving: false,
+    news: null,
   };
 
   // 첫 화면에 펼치는 Attention 수. 지식 패널이 350px 고정이고 메일 항목 하나가
   // 100px 안팎이라, 세 장을 펼치면 `오늘`이 첫 화면 밖으로 밀린다(설계 8절).
   const HOME_ATTENTION_LIMIT = 2;
+
+  // 뉴스는 `확인할 것`도 `오늘`도 아니다. 후속 행동이 없는 읽을거리라 첫 화면을
+  // 차지하면 안 된다(설계 14.4). 그래서 둘 뒤에 오고 개수도 적게 든다.
+  const HOME_NEWS_LIMIT = 3;
 
   const countLabels = [
     ['overdue', '지연'],
@@ -928,6 +933,37 @@
     return section;
   }
 
+  // 새 소식이 없으면 영역 자체를 만들지 않는다(설계 14.2). 빈 카드를 띄워
+  // "오늘은 뉴스가 없어"라고 말하는 것은 정보가 아니라 장식이다.
+  function makeNewsSection() {
+    const articles = Array.isArray(state.news?.articles) ? state.news.articles : [];
+    if (!articles.length) return null;
+
+    const section = makeHomeSection('알아둘 것');
+    articles.slice(0, HOME_NEWS_LIMIT).forEach(article => {
+      const entry = document.createElement('a');
+      entry.className = 'home-news';
+      entry.href = article.url;
+      entry.target = '_blank';
+      entry.rel = 'noopener noreferrer';
+      entry.setAttribute('aria-label', `${article.title} 열기`);
+
+      const title = document.createElement('span');
+      title.className = 'home-news-title';
+      title.textContent = article.title;
+
+      // 왜 가져왔는지가 제목 바로 아래 있다. 이것이 없으면 추천 피드다(설계 15).
+      const why = document.createElement('span');
+      why.className = 'home-news-why';
+      const topics = Array.isArray(article.topics) ? article.topics.join(' · ') : '';
+      why.textContent = [topics, article.source].filter(Boolean).join(' · ');
+
+      entry.append(title, why);
+      section.appendChild(entry);
+    });
+    return section;
+  }
+
   // 홈의 정상 상태는 정보가 적은 상태다. 확인할 것도 오늘 할 일도 없으면 조용히 끝낸다.
   function makeQuietLine() {
     const line = document.createElement('p');
@@ -944,9 +980,14 @@
     state.container.appendChild(makeHomeHead());
     const attention = makeAttentionSection();
     const today = makeTodaySection();
+    const news = makeNewsSection();
     if (attention) state.container.appendChild(attention);
     if (today) state.container.appendChild(today);
+    // 조용한 줄의 기준은 여전히 `확인할 것`과 `오늘`이다. 뉴스가 있다고 해서
+    // "확인할 일이 없다"가 거짓이 되지는 않는다. 뉴스에는 할 일이 없다.
     if (!attention && !today) state.container.appendChild(makeQuietLine());
+    // 뉴스는 둘 뒤에 온다. 무조건 위로 올라오지 않는다(설계 14.4).
+    if (news) state.container.appendChild(news);
 
     const agents = makeHomeSection('에이전트');
     const rows = document.createElement('div');
@@ -1287,6 +1328,19 @@
     return true;
   }
 
+  // 플래그가 꺼진 것은 오류가 아니다. 메일과 같은 이유로 503을 실패로 다루지 않는다.
+  async function loadNewsBriefing() {
+    const response = await state.apiFetch('/api/news/briefing');
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 503 && data.code === 'NEWS_AGENT_DISABLED') {
+      state.news = null;
+      return true;
+    }
+    if (!response.ok) throw new Error(data.error || '뉴스를 불러오지 못했습니다.');
+    state.news = data;
+    return true;
+  }
+
   async function loadCodexStatus() {
     const response = await state.apiFetch('/api/organize/status');
     const data = await response.json().catch(() => ({}));
@@ -1556,6 +1610,9 @@
       loadCodexStatus(),
       loadMailData(),
       loadHomeAttention(),
+      // 뉴스가 죽어도 나머지 영역은 그대로다. 실패하면 영역이 없을 뿐이라
+      // 따로 오류 상태를 만들지 않는다.
+      loadNewsBriefing().catch(() => { state.news = null; }),
     ]);
     state.attentionError = attentionResult.status === 'rejected'
       ? attentionResult.reason.message
