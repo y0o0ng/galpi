@@ -2735,6 +2735,62 @@ html, body {
   flex-shrink: 0;
 }
 
+/* 메일 카드는 제목 줄 자체가 본문을 여는 버튼이다(설계 10.2). 버튼처럼 보이는
+   장식을 더하지 않고 눌리는 영역만 넓힌다. */
+.mail-open {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mail-open:hover .notification-note {
+  color: var(--primary);
+}
+
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.mail-body {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--hairline);
+}
+
+.mail-body-text {
+  max-height: 260px;
+  overflow-y: auto;
+  color: var(--ai-text);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.mail-body-message,
+.mail-body-attachment {
+  margin-top: 7px;
+  color: var(--label);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.mail-body-message.error {
+  color: var(--danger);
+}
+
 .notification-action {
   flex-shrink: 0;
   min-height: 28px;
@@ -2782,6 +2838,12 @@ html, body {
   .notification-panel-refresh,
   .task-view-tab {
     min-height: 44px;
+  }
+
+  /* 메일 카드는 액션이 넷이라 좁은 화면에서 좌우 여백만 줄인다. 글자 크기는
+     패널의 작은 글자 한 단계(11px)를 그대로 쓴다. */
+  .notification-actions .notification-action {
+    padding: 0 8px;
   }
 
   .schedule-agent-back,

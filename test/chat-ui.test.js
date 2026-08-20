@@ -384,6 +384,37 @@ test('a suppressed sender keeps its judgement, so routing is the only layer that
   assert.doesNotMatch(push, /skip_analysis/);
 });
 
+test('a mail card opens its body from the provider and never from a stored one', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8');
+
+  // 본문은 저장돼 있지 않다(설계 23). 카드가 여는 것은 그때 읽어오는 경로 하나다.
+  assert.match(panel, /\/api\/mail\/messages\/\$\{item\.mailMessageId\}\/body/);
+  // HTML을 그리지 않는다. 그리면 원격 이미지·추적 픽셀이 들어올 구멍이 생긴다.
+  assert.match(panel, /text\.textContent = data\.body/);
+  const renderBody = panel.slice(panel.indexOf('function renderBody'));
+  assert.doesNotMatch(renderBody.slice(0, renderBody.indexOf('\n  }')), /innerHTML/);
+  // 제목 줄 자체가 여는 버튼이고 상태를 스크린리더에 알린다.
+  assert.match(panel, /aria-expanded/);
+  assert.match(css, /\.mail-body-text \{[\s\S]{0,200}white-space: pre-wrap;/);
+});
+
+test('a mail becomes a schedule only through the candidate card the user confirms', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
+
+  // 카드는 후보만 만든다. 저장은 사용자가 `등록`을 눌러야 기존 task API에서
+  // 일어난다(설계 15) — 알림 탭이 /api/tasks를 직접 부르지 않는다.
+  assert.match(panel, /TaskPanel\?\.makeScheduleCandidateCard/);
+  assert.doesNotMatch(panel, /'\/api\/tasks'/);
+  // 같은 메일은 같은 멱등키라 두 번 눌러도 일정이 둘이 되지 않는다.
+  assert.match(panel, /clientRequestId: `mail-attention:\$\{item\.attentionId\}`/);
+  // 기한이 없거나 지난 메일에는 버튼 자체가 없다. 눌러도 실패할 버튼을 만들지 않는다.
+  assert.match(panel, /if \(scheduleCandidateFrom\(item\)\)/);
+  assert.match(panel, /item\.deadlineAt > now/);
+  // 알림은 기본 알림에 맡긴다. 카드가 알림 시각을 지어내지 않는다.
+  assert.match(panel, /reminderAt: null/);
+});
+
 test('the two consumers of /api/notifications still split task from the rest', () => {
   // 메일이 합류하면서 일정 블록에 새면 안 되고, 알림 탭에서 빠져도 안 된다.
   const agent = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');

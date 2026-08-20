@@ -51,6 +51,7 @@ const {
 const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
+const { createMailBodyReader } = require('./lib/mail/body');
 const { createMailSearchSession } = require('./lib/mail/search-tool');
 const { createMailPreferenceSession } = require('./lib/mail/preference-tool');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
@@ -4465,6 +4466,14 @@ registerMailRoutes({
   app,
   store: mailStore,
   config: { enabled: MAIL_AGENT_ENABLED },
+  // 본문은 저장하지 않으므로 화면이 열 때마다 Provider에서 읽는다(설계 23).
+  bodyReader: MAIL_AGENT_ENABLED
+    ? createMailBodyReader({
+      store: mailStore,
+      providers: mailProviders,
+      credentials: mailCredentialsFor,
+    })
+    : null,
   // 되돌린 즉시 한 바퀴 돌린다. 다음 주기를 기다리면 눌러놓고 아무 일도 안 일어난다.
   onRequeued: () => { void mailAgent?.tick(); },
 });

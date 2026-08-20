@@ -554,3 +554,24 @@ test('one dead account does not stop analysis for a healthy one', () => {
   );
   db.close();
 });
+
+test('a message hands back the coordinates a body read needs, not a body', () => {
+  const { db, store } = createStore();
+  const account = store.registerAccount({ provider: 'works', address: 'me@korea.ac.kr' });
+  const message = seedMessage(store, account, {
+    key: 'locator', imapUid: 4211, imapUidValidity: '7', senderAddress: 'prof@korea.ac.kr',
+  });
+
+  const locator = store.findMessageLocator(message.id);
+  // 자격증명은 provider가 아니라 계정 단위로 풀리므로 주소·상태가 함께 와야 한다.
+  assert.equal(locator.provider, 'works');
+  assert.equal(locator.accountAddress, 'me@korea.ac.kr');
+  assert.equal(locator.accountStatus, 'active');
+  assert.equal(locator.imapUid, 4211);
+  assert.equal(locator.imapUidValidity, '7');
+  assert.equal(locator.gmailMessageId, null);
+  // 본문 컬럼은 없다(설계 23). 좌표를 주는 것이지 본문을 주는 것이 아니다.
+  assert.equal('body' in locator, false);
+  assert.equal(store.findMessageLocator(message.id + 999), null);
+  db.close();
+});

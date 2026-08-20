@@ -334,3 +334,88 @@ test('an invalid preference is refused with its code, and a missing one is a 404
   assert.equal(malformed.status, 400);
   assert.equal(malformed.body.code, 'MAIL_INVALID_PREFERENCE');
 });
+
+test('the body route reads through the reader and never caches what it hands back', async () => {
+  const app = createFakeApp();
+  const reads = [];
+  registerMailRoutes({
+    app,
+    store: createFakeStore(),
+    config: { enabled: true },
+    bodyReader: {
+      read(id) {
+        reads.push(id);
+        return Promise.resolve({
+          body: '정정 기간은 8월 21일까지입니다.',
+          bodySource: 'text', bodyLength: 19, truncated: false,
+          attachments: [{ filename: 'notice.pdf', size: 9 }],
+        });
+      },
+    },
+  });
+
+  const response = await app.call('GET /api/mail/messages/:id/body', { params: { id: '7' } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(reads, [7]);
+  assert.equal(response.body.success, true);
+  assert.match(response.body.body, /8월 21일/);
+  assert.deepEqual(response.body.attachments, [{ filename: 'notice.pdf', size: 9 }]);
+});
+
+test('a body read that fails keeps its own status and code', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({
+    app,
+    store: createFakeStore(),
+    config: { enabled: true },
+    bodyReader: {
+      read() {
+        const error = new Error('계정 재인증이 필요합니다.');
+        error.code = 'MAIL_ACCOUNT_AUTH_REQUIRED';
+        error.statusCode = 409;
+        return Promise.reject(error);
+      },
+    },
+  });
+
+  const response = await app.call('GET /api/mail/messages/:id/body', { params: { id: '7' } });
+  assert.equal(response.status, 409);
+  assert.equal(response.body.code, 'MAIL_ACCOUNT_AUTH_REQUIRED');
+});
+
+test('an unexpected provider failure is bounded, without leaking the mail into the answer', async () => {
+  const app = createFakeApp();
+  registerMailRoutes({
+    app,
+    store: createFakeStore(),
+    config: { enabled: true },
+    bodyReader: { read() { return Promise.reject(new Error('IMAP 연결 실패: me@korea.ac.kr')); } },
+  });
+
+  const response = await app.call('GET /api/mail/messages/:id/body', { params: { id: '7' } });
+  assert.equal(response.status, 502);
+  assert.equal(response.body.code, 'MAIL_BODY_FAILED');
+  // upstream 문구를 그대로 흘리지 않는다. 주소가 섞여 있을 수 있다(설계 19).
+  assert.equal(response.body.error, '본문을 읽지 못했습니다.');
+});
+
+test('the body route refuses a bad id and stays closed while the flag is off', async () => {
+  const app = createFakeApp();
+  const reads = [];
+  registerMailRoutes({
+    app,
+    store: createFakeStore(),
+    config: { enabled: true },
+    bodyReader: { read(id) { reads.push(id); return Promise.resolve({ body: '' }); } },
+  });
+  const bad = await app.call('GET /api/mail/messages/:id/body', { params: { id: '0' } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.code, 'MAIL_INVALID_MESSAGE');
+  assert.deepEqual(reads, []);
+
+  const closed = createFakeApp();
+  registerMailRoutes({ app: closed, store: createFakeStore(), config: { enabled: false }, bodyReader: { read() {} } });
+  const off = await closed.call('GET /api/mail/messages/:id/body', { params: { id: '7' } });
+  assert.equal(off.status, 503);
+  assert.equal(off.body.code, 'MAIL_AGENT_DISABLED');
+});

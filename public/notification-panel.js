@@ -165,8 +165,9 @@
   };
 
   /**
-   * 메일 카드. **받은편지함이 아니다** — 제목·요약·행동·기한까지만 보여주고 본문은
-   * 담지 않는다(설계 23). 메일 원문은 provider 앱/웹에서 연다.
+   * 메일 카드. **받은편지함이 아니다** — 목록에 서 있는 것은 제목·요약·행동·기한이고,
+   * 본문은 사용자가 그 메일을 눌렀을 때만 Provider에서 읽어온다(설계 10.2·23).
+   * 저장된 본문을 꺼내는 것이 아니라서 카드가 사라지면 본문도 함께 사라진다.
    */
   function makeMailCard(item) {
     const card = document.createElement('article');
@@ -182,14 +183,21 @@
     source.textContent = providerLabel(item.provider);
     top.append(badge, source);
 
+    // 메일을 누르면 본문이 열린다(설계 10.2·23). 본문은 저장돼 있지 않아서 그때
+    // Provider에서 읽어오고, 접었다 펴는 동안에는 이미 읽은 것을 다시 읽지 않는다.
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'mail-open';
+    open.setAttribute('aria-expanded', 'false');
     const who = document.createElement('div');
     who.className = 'notification-note';
     who.textContent = item.sender || '보낸사람 없음';
     const subject = document.createElement('div');
     subject.className = 'notification-text';
     subject.textContent = item.title || '(제목 없음)';
+    open.append(who, subject);
 
-    card.append(top, who, subject);
+    card.append(top, open);
 
     if (item.text) {
       const summary = document.createElement('div');
@@ -207,12 +215,23 @@
       card.appendChild(line);
     }
 
+    const body = document.createElement('div');
+    body.className = 'mail-body';
+    body.hidden = true;
+    card.appendChild(body);
+    open.addEventListener('click', () => toggleBody(item, open, body));
+
     const actions = document.createElement('div');
     actions.className = 'notification-actions';
     actions.append(
       makeMailAction('완료', () => mailAction(item, 'done')),
       makeMailAction('나중에', () => mailAction(item, 'snooze')),
     );
+    // 기한이 있는 메일만 일정이 될 수 있다. 지난 기한은 task API가 거절하므로
+    // 눌러도 실패할 버튼을 만들지 않는다(설계 15).
+    if (scheduleCandidateFrom(item)) {
+      actions.appendChild(makeMailAction('일정 등록', () => openScheduleCandidate(item, card, actions)));
+    }
     // 규칙 편집기를 사용자에게 관리시키지 않는다(설계 11). 사용자가 "이건 알림
     // 필요 없다"고 느끼는 자리가 여기라서, 가장 좁은 범위(발신자 하나)를 그 자리에서
     // 만든다. 판단과 Attention은 그대로 남고 다음부터 알림만 조용해진다.
@@ -230,6 +249,122 @@
     button.textContent = label;
     button.addEventListener('click', onClick);
     return button;
+  }
+
+  /**
+   * 본문 열기(설계 10.2·23). 본문 컬럼이 없으므로 이 버튼이 Provider 왕복 하나다.
+   * 그래서 한 번 읽은 것은 카드가 살아 있는 동안 다시 읽지 않고, 카드가 사라지면
+   * 본문도 함께 사라진다 — 어디에도 저장하지 않는다.
+   */
+  async function toggleBody(item, trigger, body) {
+    if (!body.hidden) {
+      body.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    body.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    if (body.dataset.loaded === 'true' || body.dataset.loading === 'true') return;
+
+    body.dataset.loading = 'true';
+    body.replaceChildren(makeBodyMessage('본문을 읽는 중이야…'));
+    try {
+      const response = await state.apiFetch(`/api/mail/messages/${item.mailMessageId}/body`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '본문을 읽지 못했습니다.');
+      body.replaceChildren(...renderBody(data));
+      body.dataset.loaded = 'true';
+    } catch (error) {
+      // 다시 눌러볼 수 있게 loaded로 표시하지 않는다.
+      body.replaceChildren(makeBodyMessage(error.message, true));
+    } finally {
+      delete body.dataset.loading;
+    }
+  }
+
+  function makeBodyMessage(text, isError = false) {
+    const message = document.createElement('p');
+    message.className = isError ? 'mail-body-message error' : 'mail-body-message';
+    message.textContent = text;
+    return message;
+  }
+
+  function renderBody(data) {
+    const nodes = [];
+    const text = document.createElement('p');
+    // HTML은 그리지 않는다. 텍스트로만 넣어서 원격 이미지·추적 픽셀이 들어올
+    // 구멍을 만들지 않는다(설계 19·21).
+    text.className = 'mail-body-text';
+    text.textContent = data.body || '(본문 없음)';
+    nodes.push(text);
+    if (data.truncated) {
+      nodes.push(makeBodyMessage(`앞 ${data.body.length}자만 보여주고 있어 (원본 ${data.bodyLength}자).`));
+    }
+    // 이름과 크기까지다. 여는 것은 첨부 트랙의 일이다.
+    for (const attachment of data.attachments || []) {
+      const line = document.createElement('p');
+      line.className = 'mail-body-attachment';
+      const size = Number.isFinite(attachment.size) ? ` (${Math.max(1, Math.round(attachment.size / 1024))}KB)` : '';
+      line.textContent = `${attachment.filename || '이름 없는 첨부'}${size}`;
+      nodes.push(line);
+    }
+    return nodes;
+  }
+
+  /**
+   * 메일에서 일정 후보를 만든다(설계 15). 판단이 이미 뽑아둔 기한을 그대로 쓰므로
+   * 모델을 다시 부르지 않는다. 만드는 것은 후보일 뿐이고 저장은 사용자가 `등록`을
+   * 눌러야 기존 task API에서 일어난다 — Mail Agent가 별도 생성 경로를 만들지 않는다.
+   */
+  function scheduleCandidateFrom(item) {
+    const now = Math.floor(Date.now() / 1000);
+    let due = null;
+    if (item.deadlineKind === 'date' && item.deadlineDate) {
+      if (item.deadlineDate >= kstDateOf(now)) due = { kind: 'date', date: item.deadlineDate };
+    } else if (item.deadlineKind === 'datetime' && Number.isSafeInteger(item.deadlineAt)) {
+      if (item.deadlineAt > now) due = { kind: 'datetime', at: kstDateTimeOf(item.deadlineAt) };
+    }
+    if (!due) return null;
+    return {
+      task: {
+        // 같은 메일은 같은 키다. 두 번 눌러도 일정이 둘이 되지 않는다.
+        clientRequestId: `mail-attention:${item.attentionId}`,
+        title: item.title || '(제목 없음)',
+        detail: [item.sender, item.text, item.action].filter(Boolean).join(' · '),
+        due,
+        // 알림은 기본 알림에 맡긴다. 기한이 있는 일정은 서버가 하나를 붙인다.
+        reminderAt: null,
+      },
+    };
+  }
+
+  function kstDateOf(epochSeconds) {
+    return kstParts(epochSeconds).date;
+  }
+
+  function kstDateTimeOf(epochSeconds) {
+    const parts = kstParts(epochSeconds);
+    return `${parts.date}T${parts.time}:00+09:00`;
+  }
+
+  function kstParts(epochSeconds) {
+    const shifted = new Date((Number(epochSeconds) + 9 * 60 * 60) * 1000);
+    const pad = value => String(value).padStart(2, '0');
+    return {
+      date: `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`,
+      time: `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`,
+    };
+  }
+
+  function openScheduleCandidate(item, card, actions) {
+    if (card.querySelector('.task-candidate-card')) return;
+    const candidate = scheduleCandidateFrom(item);
+    const cardNode = candidate ? global.TaskPanel?.makeScheduleCandidateCard(candidate) : null;
+    if (!cardNode) {
+      state.showToast('일정 후보를 만들지 못했어');
+      return;
+    }
+    card.insertBefore(cardNode, actions);
   }
 
   // 기본 미루기는 3시간이다. 사용자가 시각을 고르는 UI는 아직 만들지 않는다 —

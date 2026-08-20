@@ -244,7 +244,12 @@ test('task reminders use the dedicated renderer and never enter Codex decisions'
   assert.match(agentPanel, /filter\(item => item\.type === 'task_reminder'\)/);
   assert.match(agentPanel, /TaskPanel\.makeReminderCard\(item\)/);
   assert.match(notificationPanel, /filter\(item => item\.type !== 'task_reminder'\)/);
-  assert.doesNotMatch(notificationPanel, /TaskPanel/);
+  // 리마인더를 그리는 쪽은 에이전트 탭 하나다. 알림 탭이 그 렌더러나 목록을
+  // 가져다 쓰면 같은 일정이 두 화면에 서게 된다.
+  assert.doesNotMatch(notificationPanel, /TaskPanel\.makeReminderCard|TaskPanel\.render|TaskPanel\.refresh/);
+  // 예외는 일정 후보 카드뿐이다. 메일에서 일정을 만드는 자리가 알림 탭 카드인데,
+  // 거기서도 같은 컴포넌트를 써야 저장이 기존 task API 한 경로로 남는다(설계 15).
+  assert.match(notificationPanel, /TaskPanel\?\.makeScheduleCandidateCard/);
   assert.doesNotMatch(taskPanel, /\/api\/notifications\/.+\/(?:approve|ignore)/);
   assert.match(taskPanel, /\/api\/reminders\/\$\{item\.reminderId\}\/acknowledge/);
   assert.match(taskPanel, /\/api\/reminders\/\$\{item\.reminderId\}\/snooze/);
