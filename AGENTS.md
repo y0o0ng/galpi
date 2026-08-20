@@ -84,6 +84,14 @@
 - **`MAIL_AGENT_ENABLED=true`로 서버를 띄우면 그 순간 실계정 메일이 동기화·분석되고 OpenAI 호출이 나간다.** 문법 확인은 `node --check`로 끝내고, 띄웠으면 PID를 잡아 반드시 종료한다. **Pi가 정본이고 로컬은 `false`다.**
 - **관측 대상 둘**: 실제 알림에서 판단 흔들림이 얼마나 드러나는지(흡수 장치인 batch 묶기와 발신자 억제는 이미 배포됐다), 그리고 본문 열기의 IMAP 연결이 동기화 tick과 부딪히는지.
 
+### 뉴스 — 설계만 합의됐다, 착수 전
+
+- **`docs/xion-news-agent-design.md`가 단일 기준이고 로드맵 독립 트랙 `뉴스`에 순서가 있다.** 코드는 아직 없다.
+- **v1은 사용자가 직접 말한 관심만 다룬다**(hot path `expressed`·`subscribed` → RSS/API 수집 → 홈 조건부 브리핑). 먼저 묻기는 v1.1, 대화에서 관심을 추론하는 background batch는 v2다.
+- **v2를 여는 조건이 메일 관측이다.** background 추론만이 사용자가 요청하지 않은 상태를 LLM이 스스로 만드는 경로라, 메일의 판단 흔들림 관측이 끝나기 전에는 열지 않는다. 두 트랙은 병행한다.
+- **전달·큐 인프라는 새로 만들지 않는다** — 공유 Push dispatcher · `lib/mail/quiet-hours.js` · 메일 분석 큐 상태 기계 · `PROMPT_VERSION` 기록을 그대로 쓴다.
+- **`messages` 스키마는 건드리지 않는다.** proactive 표시는 v1.1에서 schema v22의 `news_proactive_messages`로 들어가고 `UNIQUE(candidate_id)`가 중복 발송을 잠근다.
+
 ### 음성
 
 - H3 되묻기 문턱은 실제 오전사 표본이 더 쌓인 뒤 정한다. 작은 표본에서 정확 전사는 `min logprob -0.024~-0.425`, 오류 전사는 `-0.652`·`-1.356`이었지만 확정 문턱으로 쓰기엔 부족하다. 로그에는 토큰 문자열을 저장하지 않는다.
