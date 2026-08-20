@@ -316,18 +316,40 @@ test('a domain rule catches the sender it covers, and a sender rule is narrower'
   db.close();
 });
 
-test('a preference the routing layer does not enforce leaves the mode alone', () => {
+test('an always-notify sender is lifted one step, never straight to a ring', () => {
   const { db, clock, service } = setup();
-  // always_notify·skip_analysis는 저장 통로가 아직 없다. 행이 생겨도 라우팅이
-  // 임의로 승격하지 않는다.
   db.prepare(`
     INSERT INTO mail_preferences (account_id, preference_type, target, action)
-    VALUES (NULL, 'sender', 'boss@example.com', 'always_notify')
+    VALUES (NULL, 'domain', 'korea.ac.kr', 'always_notify')
   `).run();
-  const id = analysedMailFrom(db, { mode: 'silent', sender: 'boss@example.com' });
+  // 조용히 묻힐 공지가 batch까지 올라온다. 도메인 하나 때문에 폰이 울리지는 않는다.
+  const notice = analysedMailFrom(db, { mode: 'silent', sender: 'notice@korea.ac.kr', category: 'info' });
+  // 모델이 스스로 급하다고 본 것만 즉시 알림이 된다(설계 11.1).
+  const urgent = analysedMailFrom(db, { mode: 'silent', sender: 'prof@korea.ac.kr', category: 'urgent' });
+  const untouched = analysedMailFrom(db, { mode: 'silent', sender: 'ads@example.com', category: 'info' });
 
   service.routePending(clock.value);
-  assert.equal(stateOf(db, id).state, 'suppressed', 'silent 그대로');
+  assert.equal(stateOf(db, notice).state, 'batched');
+  assert.equal(stateOf(db, urgent).state, 'enqueued');
+  assert.equal(stateOf(db, untouched).state, 'suppressed');
+  db.close();
+});
+
+test('silence wins over always-notify, so what the user muted stays muted', () => {
+  const { db, clock, service } = setup();
+  db.prepare(`
+    INSERT INTO mail_preferences (account_id, preference_type, target, action)
+    VALUES (NULL, 'domain', 'korea.ac.kr', 'always_notify')
+  `).run();
+  db.prepare(`
+    INSERT INTO mail_preferences (account_id, preference_type, target, action)
+    VALUES (NULL, 'sender', 'spam@korea.ac.kr', 'suppress_notification')
+  `).run();
+  const muted = analysedMailFrom(db, { mode: 'immediate', sender: 'spam@korea.ac.kr', category: 'urgent' });
+
+  service.routePending(clock.value);
+  // 껐는데 울리면 알림 전체를 못 믿게 된다.
+  assert.equal(stateOf(db, muted).state, 'suppressed');
   assert.equal(deliveryCount(db), 0);
   db.close();
 });

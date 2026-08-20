@@ -1004,18 +1004,25 @@
     category: '분류',
   };
 
+  const PREFERENCE_ACTION_LABELS = {
+    suppress_notification: '알림 끔',
+    always_notify: '꼭 알림',
+    skip_analysis: '분석 안 함',
+  };
+
   /**
-   * 알림을 끈 목록(설계 8.5·11). 만드는 곳은 알림 카드이고 여기는 확인하고 되돌리는
-   * 자리다. 사용자가 규칙을 조립하게 하지 않으므로 편집기를 만들지 않는다.
+   * 알림 규칙 목록(설계 8.5·11). 만드는 곳은 알림 카드의 `알림 끄기` 한 동작과
+   * 사용자가 직접 말한 대화뿐이고, 여기는 그것을 확인하고 되돌리는 자리다.
+   * 사용자가 규칙을 조립하게 하지 않으므로 편집기를 만들지 않는다.
    *
-   * 지금 보이는 것은 억제 선호뿐이다. `always_notify`·`skip_analysis`는 사용자가
-   * 명시적으로 말해야 저장되는 값이고 그 통로가 아직 없다.
+   * action으로 거르지 않는다. 대화로 만든 `always_notify`·`skip_analysis`가 여기
+   * 안 보이면 만든 사람이 그것을 지울 자리가 없어진다.
    */
   function makeMailPreferences() {
     const section = document.createElement('section');
     section.className = 'schedule-agent-section';
     const heading = document.createElement('h3');
-    heading.textContent = '알림 끈 발신자';
+    heading.textContent = '메일 알림 규칙';
     section.appendChild(heading);
 
     if (!state.mailPreferences) {
@@ -1025,21 +1032,22 @@
       section.appendChild(message);
       return section;
     }
-    const suppressed = state.mailPreferences.filter(item => item.action === 'suppress_notification');
-    if (!suppressed.length) {
+    if (!state.mailPreferences.length) {
       const message = document.createElement('p');
       message.className = 'codex-agent-message';
-      message.textContent = '아직 없어. 알림 탭 메일 카드의 `알림 끄기`로 만들 수 있어.';
+      message.textContent = '아직 없어. 알림 탭 메일 카드의 `알림 끄기`나 대화로 만들 수 있어.';
       section.appendChild(message);
       return section;
     }
 
-    for (const item of suppressed) {
+    for (const item of state.mailPreferences) {
       const row = document.createElement('div');
       row.className = 'codex-agent-actions';
       const label = document.createElement('p');
       label.className = 'codex-agent-message';
-      label.textContent = `${PREFERENCE_LABELS[item.preferenceType] || item.preferenceType} · ${item.target}`;
+      const scope = PREFERENCE_LABELS[item.preferenceType] || item.preferenceType;
+      const effect = PREFERENCE_ACTION_LABELS[item.action] || item.action;
+      label.textContent = `${scope} · ${item.target} · ${effect}`;
       const remove = button('되돌리기', () => removeMailPreference(item.id));
       remove.disabled = state.mailPreferenceSaving;
       row.append(label, remove);
@@ -1325,7 +1333,7 @@
       const response = await state.apiFetch(`/api/mail/preferences/${id}`, { method: 'DELETE' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || '되돌리지 못했습니다.');
-      state.showToast('다시 알릴게');
+      state.showToast('규칙을 지웠어');
       await loadMailPreferences();
     } catch (error) {
       state.showToast(error.message);

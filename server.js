@@ -52,6 +52,7 @@ const { createNaverProvider } = require('./lib/mail/naver');
 const { createGmailProvider, createGoogleTokenSource } = require('./lib/mail/gmail');
 const { registerMailRoutes } = require('./lib/mail/routes');
 const { createMailSearchSession } = require('./lib/mail/search-tool');
+const { createMailPreferenceSession } = require('./lib/mail/preference-tool');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
@@ -3137,6 +3138,7 @@ function createChatToolRuntime({
   attachmentToolSession = null,
   scheduleToolSession = null,
   mailSearchSession = null,
+  mailPreferenceSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3151,6 +3153,7 @@ function createChatToolRuntime({
       ...(attachmentToolSession?.getToolDefinitions() || []),
       ...(scheduleToolSession?.getToolDefinitions() || []),
       ...(mailSearchSession?.getToolDefinitions() || []),
+      ...(mailPreferenceSession?.getToolDefinitions() || []),
     ],
     executeTool: async toolUse => {
       if (toolUse.name === 'web_search') {
@@ -3209,6 +3212,17 @@ function createChatToolRuntime({
           onStage(writingStage);
         }
       }
+      if (toolUse.name === 'mail_preference_set') {
+        if (!mailPreferenceSession) {
+          return { isError: true, content: '현재 요청에서는 알림 규칙을 바꿀 수 없습니다.' };
+        }
+        onStage(progressStageForTool(toolUse.name));
+        try {
+          return mailPreferenceSession.execute(toolUse.name, toolUse.input);
+        } finally {
+          onStage(writingStage);
+        }
+      }
       return { isError: true, content: '허용되지 않은 도구입니다.' };
     },
     result() {
@@ -3221,6 +3235,7 @@ function createChatToolRuntime({
         attachmentDocumentUsage: attachmentToolSession?.getUsage() || { calls: 0, contextChars: 0 },
         scheduleCandidate: scheduleToolSession?.getCandidate() || null,
         mailSearchUsage: mailSearchSession?.getUsage() || { calls: 0 },
+        mailPreferencesSaved: mailPreferenceSession?.getSaved() || [],
       };
     },
   };
@@ -3252,6 +3267,7 @@ function buildChatToolInstructions({
   attachmentToolSession,
   scheduleToolSession,
   mailSearchSession,
+  mailPreferenceSession,
   includeLanguageRule = false,
   voiceTurn = false,
   additionalInstructions = '',
@@ -3264,6 +3280,7 @@ function buildChatToolInstructions({
     attachmentToolSession?.hasCandidates ? ATTACHMENT_DOCUMENT_TOOL_SYSTEM_PROMPT : '',
     scheduleToolSession?.systemPrompt || '',
     mailSearchSession?.systemPrompt || '',
+    mailPreferenceSession?.systemPrompt || '',
     additionalInstructions,
   ].filter(Boolean).join('\n\n');
 }
@@ -3277,6 +3294,7 @@ async function generateClaudeReplyWithTools({
   attachmentToolSession = null,
   scheduleToolSession = null,
   mailSearchSession = null,
+  mailPreferenceSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3286,6 +3304,7 @@ async function generateClaudeReplyWithTools({
     attachmentToolSession,
     scheduleToolSession,
     mailSearchSession,
+    mailPreferenceSession,
     onStage,
     writingStage,
   });
@@ -3300,6 +3319,7 @@ async function generateClaudeReplyWithTools({
       attachmentToolSession,
       scheduleToolSession,
       mailSearchSession,
+      mailPreferenceSession,
     }),
     maxToolRounds: 2,
     getTools: runtime.getTools,
@@ -3324,6 +3344,7 @@ async function generateGptReplyWithTools({
   attachmentToolSession = null,
   scheduleToolSession = null,
   mailSearchSession = null,
+  mailPreferenceSession = null,
   onStage = () => {},
   writingStage = 'answer',
   onSpokenText = null,
@@ -3336,6 +3357,7 @@ async function generateGptReplyWithTools({
     attachmentToolSession,
     scheduleToolSession,
     mailSearchSession,
+    mailPreferenceSession,
     onStage,
     writingStage,
   });
@@ -3361,6 +3383,7 @@ async function generateGptReplyWithTools({
       attachmentToolSession,
       scheduleToolSession,
       mailSearchSession,
+      mailPreferenceSession,
       includeLanguageRule: true,
       voiceTurn,
       additionalInstructions,
@@ -3390,6 +3413,7 @@ async function generateChatReply(model, context, {
   attachmentToolSession = null,
   scheduleToolSession = null,
   mailSearchSession = null,
+  mailPreferenceSession = null,
   onStage = () => {},
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
@@ -3405,6 +3429,7 @@ async function generateChatReply(model, context, {
       attachmentToolSession,
       scheduleToolSession,
       mailSearchSession,
+      mailPreferenceSession,
       onStage,
     });
   }
@@ -3420,6 +3445,7 @@ async function generateChatReply(model, context, {
       attachmentToolSession,
       scheduleToolSession,
       mailSearchSession,
+      mailPreferenceSession,
       onStage,
       onSpokenText,
       voiceTurn,
@@ -3788,6 +3814,11 @@ async function runSingleChatTurnBody({
     const mailSearchSession = MAIL_AGENT_ENABLED
       ? createMailSearchSession(mailStore)
       : null;
+    // 규칙 저장은 사용자가 그 턴에 직접 말했을 때만 일어난다. 도구 자체는 메일이
+    // 켜져 있으면 늘 있고, 부를 조건은 프롬프트가 정한다.
+    const mailPreferenceSession = MAIL_AGENT_ENABLED
+      ? createMailPreferenceSession(mailStore)
+      : null;
     progress.stage('answer');
     const {
       reply,
@@ -3807,6 +3838,7 @@ async function runSingleChatTurnBody({
       attachmentToolSession,
       scheduleToolSession,
       mailSearchSession,
+      mailPreferenceSession,
       onStage: progress.stage,
       onSpokenText: spokenStream,
       voiceTurn,

@@ -358,6 +358,13 @@ test('turning a sender quiet is one narrow action, not a rule editor', () => {
   assert.match(agent, /\/api\/mail\/preferences\/\$\{id\}/);
   assert.match(agent, /method: 'DELETE'/);
   assert.doesNotMatch(agent, /method: 'POST'[\s\S]{0,200}\/api\/mail\/preferences/);
+
+  // 목록은 action으로 거르지 않는다. 대화로 만든 규칙이 여기 안 보이면 만든 사람이
+  // 그것을 지울 자리가 없다.
+  assert.doesNotMatch(agent, /mailPreferences\.filter/);
+  for (const label of ['suppress_notification', 'always_notify', 'skip_analysis']) {
+    assert.match(agent, new RegExp(`${label}: '`), label);
+  }
 });
 
 test('a suppressed sender keeps its judgement, so routing is the only layer that changes', () => {
@@ -368,8 +375,13 @@ test('a suppressed sender keeps its judgement, so routing is the only layer that
   assert.match(push, /action === 'suppress_notification'/);
   // 좁은 순서를 정하는 쿼리는 store 한 곳이다. 여기서 다시 만들지 않는다.
   assert.doesNotMatch(push, /FROM mail_preferences/);
-  // 집행하지 않는 action을 임의로 승격하지 않는다.
-  assert.doesNotMatch(push, /'always_notify'|'skip_analysis'/);
+  // 억제가 승격을 이긴다. 껐는데 울리면 알림 전체를 못 믿게 된다.
+  assert.match(push, /suppress_notification'\)\) return 'silent'/);
+  // 승격은 한 칸이다. 도메인 하나를 통째로 즉시 알림으로 만들지 않는다(설계 11.1).
+  assert.match(push, /always_notify/);
+  assert.match(push, /category === 'urgent' \|\| message\.category === 'action_required'/);
+  // 분석 bypass는 라우팅의 일이 아니다. 그것은 analyze.js가 LLM 앞에서 처리한다.
+  assert.doesNotMatch(push, /skip_analysis/);
 });
 
 test('the two consumers of /api/notifications still split task from the rest', () => {
