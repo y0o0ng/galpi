@@ -65,6 +65,7 @@ const {
 const { createNewsInterestSession } = require('./lib/news-interest-tool');
 const { createNewsStore } = require('./lib/news/store');
 const { createNewsCollector } = require('./lib/news/collect');
+const { createNewsAnalyzer } = require('./lib/news/analyze');
 const { createAssistantPushDispatcher, createAssistantPushService } = require('./lib/assistant-push');
 const { createAssistantScheduler } = require('./lib/assistant-scheduler');
 const { createAssistantTaskStore } = require('./lib/assistant-tasks');
@@ -248,6 +249,8 @@ const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 뉴스 검색은 채팅 웹 검색과 크레딧을 나눠 쓴다. 하위 한도가 없으면 폴링이
 // 사용자의 채팅 검색을 굶긴다.
 const NEWS_SEARCH_MONTHLY_CREDIT_LIMIT = Number.parseInt(process.env.NEWS_SEARCH_MONTHLY_CREDIT_LIMIT || '200', 10);
+// 채팅 자동 모델을 상속하지 않는다. 메일 분석과 같은 이유로 판단 모델은 따로 고른다.
+const NEWS_ANALYZER_MODEL = process.env.NEWS_ANALYZER_MODEL || 'gpt-5.6-luna';
 // 자격증명은 DB·Vault에 넣지 않는다. 백업에 복제되면 안 되기 때문이다(설계 20.3).
 const MAIL_GMAIL_CREDENTIALS = {
   clientId: process.env.MAIL_GMAIL_CLIENT_ID,
@@ -1014,6 +1017,45 @@ const newsCollector = NEWS_AGENT_ENABLED
     // 질의 문자열은 로그에 넣지 않는다. 사용자가 무엇에 관심 있는지가 곧 개인정보다.
     onError(error) {
       console.error(`뉴스 수집 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    },
+  })
+  : null;
+// 판단 worker. 기사 제목·요약문은 신뢰할 수 없는 외부 입력이라 tool을 주지 않고
+// 구조화된 판단만 받는다(설계 12.2).
+const newsAnalyzer = NEWS_AGENT_ENABLED && HAS_GPT
+  ? createNewsAnalyzer({
+    store: newsStore,
+    model: NEWS_ANALYZER_MODEL,
+    async loadInterests() {
+      const { interests } = await readNewsContextNote();
+      return interests;
+    },
+    callModel: async ({ model, system, input, schema, schemaName }) => {
+      const response = await openai.responses.create({
+        model,
+        input: [
+          { role: 'system', content: system },
+          { role: 'user', content: input },
+        ],
+        store: false,
+        text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } },
+      });
+      if (response?.status && response.status !== 'completed') {
+        const error = new Error(`뉴스 판단 응답이 완료되지 않았습니다: ${response.status}`);
+        error.code = 'NEWS_ANALYSIS_INCOMPLETE';
+        throw error;
+      }
+      const text = extractSmallResponseText(response);
+      if (!text) {
+        const error = new Error('뉴스 판단 응답이 비어 있습니다.');
+        error.code = 'NEWS_ANALYSIS_EMPTY';
+        throw error;
+      }
+      return JSON.parse(text);
+    },
+    // 제목·요약문은 로그에 넣지 않는다. 사용자가 무엇을 보는지가 곧 개인정보다.
+    onError: (error, context) => {
+      console.error(`뉴스 판단 오류: article=${context?.articleId ?? '-'} ${error?.code || error?.name || 'UNKNOWN'}`);
     },
   })
   : null;
@@ -9242,6 +9284,10 @@ const httpServer = app.listen(PORT, HOST, () => {
     newsCollector.start();
     console.log(`   뉴스:     수집 worker 실행 중 (15분 tick, 관심별 6시간, 월 ${newsStore.monthlyCreditLimit} credits)`);
   }
+  if (newsAnalyzer) {
+    newsAnalyzer.start();
+    console.log(`   뉴스:     판단 worker 실행 중 (60초 tick, ${newsAnalyzer.model}, ${newsAnalyzer.promptVersion})`);
+  }
 
   if (
     codexStartupRecovery.quarantinedJobs > 0 ||
@@ -9296,6 +9342,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     attachmentUploads.stop();
     mailAgent?.stop();
     newsCollector?.stop();
+    newsAnalyzer?.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {
