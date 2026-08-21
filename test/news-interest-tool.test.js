@@ -209,3 +209,62 @@ test('다른 이름으로는 실행되지 않는다', async () => {
   const result = await session.execute('schedule_prepare', { action: 'add', topic: 'Zigbee' });
   assert.equal(result.isError, true);
 });
+
+test('모델이 만든 검색어가 노트에 저장되고 이름은 사용자 말 그대로 남는다', async () => {
+  const store = createFakeNoteStore();
+  const session = createSession(store);
+
+  payload(await call(session, {
+    action: 'add',
+    topic: '로봇 하드웨어 관련 신기술 뉴스',
+    state: 'subscribed',
+    reason: '로봇 하드웨어 관련 신기술 뉴스 있으면 지속적으로 알려줘',
+    search_query: 'humanoid robot hardware and actuators: new product launches',
+  }));
+
+  const [stored] = store.interests();
+  // 검색은 생성된 질의가, 이름과 판단 근거는 사용자 발화가 든다.
+  assert.equal(stored.query, 'humanoid robot hardware and actuators: new product launches');
+  assert.equal(stored.topic, '로봇 하드웨어 관련 신기술 뉴스');
+  assert.equal(stored.reason, '로봇 하드웨어 관련 신기술 뉴스 있으면 지속적으로 알려줘');
+});
+
+test('검색어를 안 내면 지금까지의 동작 그대로다', async () => {
+  const store = createFakeNoteStore();
+  const session = createSession(store);
+
+  payload(await call(session, {
+    action: 'add', topic: 'Zigbee', state: 'expressed', reason: '지그비 쪽 좀 재밌네',
+  }));
+
+  const [stored] = store.interests();
+  assert.equal(stored.query, undefined);
+  assert.ok(!/^query:/m.test(store.raw), '빈 query 줄을 만들지 않는다');
+});
+
+test('같은 관심을 다시 말하면 새 검색어만 덮고 항목은 하나로 남는다', async () => {
+  const store = createFakeNoteStore();
+
+  payload(await call(createSession(store), {
+    action: 'add', topic: '로봇 하드웨어', state: 'expressed',
+    reason: '관심 있어', search_query: 'robot hardware',
+  }));
+  const [before] = store.interests();
+
+  payload(await call(createSession(store), {
+    action: 'add', topic: '로봇 하드웨어', state: 'subscribed',
+    reason: '계속 알려줘', search_query: 'humanoid robot actuators and components',
+  }));
+
+  const stored = store.interests();
+  assert.equal(stored.length, 1, '같은 주제를 두 번 말해도 항목은 하나다');
+  assert.equal(stored[0].query, 'humanoid robot actuators and components');
+  assert.equal(stored[0].state, 'subscribed', '상태는 위로만 움직인다');
+  assert.equal(stored[0].interestId, before.interestId, 'id는 그대로다');
+});
+
+test('검색어는 도구 스키마에서 선택 입력이다', () => {
+  const schema = NEWS_INTEREST_TOOL.input_schema;
+  assert.ok(schema.properties.search_query, '입력이 있다');
+  assert.ok(!schema.required.includes('search_query'), '필수가 아니다');
+});

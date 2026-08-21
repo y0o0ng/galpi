@@ -234,3 +234,50 @@ test('noop은 아무것도 바꾸지 않는다', () => {
   assert.equal(after.interests.length, 1);
   assert.equal(after.interests[0].topic, 'Zigbee');
 });
+
+test('생성된 검색어는 노트에 보이는 자리에 남고 다시 읽힌다', () => {
+  const { content } = noteWith([addAction('로봇 하드웨어 관련 신기술 뉴스', 'subscribed', {
+    query: 'humanoid robot hardware and robotics components: new product launches',
+  })]);
+  // 사람이 볼 수 있어야 "왜 이런 게 왔지"를 되짚는다.
+  assert.match(content, /^query: humanoid robot hardware and robotics components: new product launches$/m);
+
+  const [interest] = parseNewsContextNote(content);
+  assert.equal(interest.query, 'humanoid robot hardware and robotics components: new product launches');
+  // 이름은 사용자가 말한 그대로 남는다.
+  assert.equal(interest.topic, '로봇 하드웨어 관련 신기술 뉴스');
+});
+
+test('검색어가 없는 관심은 줄 자체가 생기지 않는다', () => {
+  const { content } = noteWith([addAction('Zigbee')]);
+  assert.ok(!/^query:/m.test(content), '빈 query 줄을 만들지 않는다');
+  assert.equal(parseNewsContextNote(content)[0].query, undefined);
+});
+
+test('검색어는 수집이 자르는 길이를 넘지 않는다', () => {
+  const long = 'robot '.repeat(60);
+  const { content } = noteWith([addAction('로봇', 'expressed', { query: long })]);
+  const saved = parseNewsContextNote(content)[0].query;
+  // 자른 자리가 공백이면 다시 읽을 때 trim돼 180보다 짧아질 수 있다. 잠그는 것은
+  // 상한이지 정확한 길이가 아니다 — normalize.js가 180에서 자르므로 그보다 길면 안 된다.
+  assert.ok(saved.length <= 180, `${saved.length}자`);
+  assert.ok(saved.length < long.trim().length, '실제로 잘렸다');
+});
+
+test('update는 준 것만 덮고 이름과 id는 그대로 둔다', () => {
+  const first = noteWith([addAction('로봇 하드웨어', 'expressed', { query: 'robot hardware' })]);
+  const [before] = parseNewsContextNote(first.content);
+
+  const second = applyInterestActions({
+    raw: first.content,
+    actions: [{ op: 'update', interestId: before.interestId, query: 'humanoid robot actuators' }],
+    now: NOW,
+    source: 'user',
+  });
+  const [after] = parseNewsContextNote(second.content);
+
+  assert.equal(after.query, 'humanoid robot actuators');
+  assert.equal(after.topic, before.topic);
+  assert.equal(after.interestId, before.interestId);
+  assert.equal(after.state, before.state);
+});

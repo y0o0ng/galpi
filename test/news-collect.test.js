@@ -117,9 +117,22 @@ test('발행 시각은 파싱되면 epoch, 아니면 원문만 남긴다', () =>
   assert.deepEqual(parsePublishedAt(''), { publishedAt: null, publishedRaw: null });
 });
 
-test('질의는 topic 하나이고 별칭을 엮지 않는다', () => {
+test('질의는 하나이고 별칭을 엮지 않는다', () => {
   assert.equal(buildQuery({ topic: 'OpenAI  Responses API', aliases: ['오픈AI', 'responses'] }), 'OpenAI Responses API');
   assert.equal(buildQuery({ topic: '   ' }), '');
+});
+
+test('등록할 때 만든 검색어가 있으면 그것으로 찾고, 없으면 topic으로 찾는다', () => {
+  // topic은 사람이 읽는 이름이고 query가 검색어다. 사용자가 말한 이름이 검색에서
+  // 약해도(`피지컬 AI 관련 정보`) 수집은 query를 쓴다.
+  assert.equal(
+    buildQuery({ topic: '로봇 하드웨어 관련 신기술 뉴스', query: 'humanoid robot hardware new products' }),
+    'humanoid robot hardware new products',
+  );
+  // 없거나 비어 있으면 지금까지의 동작 그대로다.
+  assert.equal(buildQuery({ topic: '로봇 하드웨어' }), '로봇 하드웨어');
+  assert.equal(buildQuery({ topic: '로봇 하드웨어', query: '  ' }), '로봇 하드웨어');
+  assert.equal(buildQuery({ topic: '로봇 하드웨어', query: null }), '로봇 하드웨어');
 });
 
 test('한 번의 수집 안에서 같은 기사는 한 번만 남는다', () => {
