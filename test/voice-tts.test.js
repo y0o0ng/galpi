@@ -493,3 +493,44 @@ test('링크가 없는 답변은 글자 하나 바뀌지 않는다', () => {
   // 짧은 조각을 붙이는 기존 동작은 그대로다. 재는 것은 내용이 온전한가다.
   assert.equal(planSpokenSegments(plain).segments.join(' '), plain);
 });
+
+test('스킴 없는 주소도 읽지 않는다', () => {
+  const cases = [
+    '출처는 www.axios.com 이야.',
+    '출처는 axios.com 이야.',
+    '기사(출처: cnet.com)를 봐.',
+    '뉴스는 news.naver.com 에 있어.',
+    '자세한 건 anthropic.com/news 봐.',
+  ];
+  for (const text of cases) {
+    const spoken = selectSpokenText(text);
+    assert.doesNotMatch(spoken, /www\.|axios\.com|cnet\.com|naver\.com|anthropic\.com/, text);
+  }
+});
+
+test('꺾쇠로 감싼 주소는 찌꺼기를 남기지 않는다', () => {
+  const spoken = selectSpokenText('출처 <https://www.axios.com/a/b> 확인해.');
+  assert.doesNotMatch(spoken, /https?:|axios|[<>]/);
+  assert.match(spoken, /출처/);
+  assert.match(spoken, /확인해/);
+});
+
+test('주소가 아닌 점은 그대로 둔다', () => {
+  // 버전·소수점·파일 이름이 주소로 오인되면 답이 훼손된다.
+  for (const text of ['gpt-5.6-terra 를 써.', '3.5 정도야.', '설정.json 파일 봐.', '오후 3시야.']) {
+    assert.equal(selectSpokenText(text), text, text);
+  }
+});
+
+test('스트리밍 중 스킴 없는 주소가 조각에 걸쳐 와도 새지 않는다', () => {
+  const segmenter = createSpokenSegmenter();
+  const out = [];
+  for (const chunk of ['출처는 www.axi', 'os.com 이야. ', '자세한 건 cnet', '.com 봐. ', '끝이야. ']) {
+    out.push(...segmenter.push(chunk));
+  }
+  out.push(...segmenter.end());
+  const joined = out.join(' | ');
+  assert.doesNotMatch(joined, /axios\.com|cnet\.com|www\./, joined);
+  assert.match(joined, /출처는/);
+  assert.match(joined, /끝이야/);
+});
