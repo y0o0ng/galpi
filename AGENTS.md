@@ -3,6 +3,7 @@
 ## 기본 규칙
 
 - 저장할 프로젝트 인계 사항은 이 파일에 남긴다. 완료된 배포 이력과 수치는 상세 설계 문서·git에 두고 여기에는 현재 계약과 다음 작업만 유지한다.
+- **항목이 닫히면 그 자리에서 한 줄로 줄이거나 지운다.** 남기는 한 줄은 `무엇이 닫혔고 정본이 어디인가`뿐이다. 배경·근거·함정·실측은 설계 문서와 git에 이미 있고, 여기에 두면 다음 작업을 찾는 사람이 매번 끝난 일을 먼저 읽는다. **줄이기 전에 그 줄의 내용이 설계 문서에 실제로 있는지 확인한다** — 없으면 먼저 옮기고 줄인다. 닫힌 뒤에도 다른 작업의 판단을 바꾸는 계약만 예외로 남긴다.
 - `AGENTS.md`와 `CLAUDE.md`는 제목을 제외한 내용을 동일하게 유지한다. 하나를 고치면 다른 파일도 반영하고 커밋 전 차이를 확인한다.
 - git 커밋 메시지·PR 본문·이슈 등 저장소에 남는 어디에도 `Co-Authored-By: Claude`나
   `Generated with Claude Code` 같은 AI 표기를 넣지 않는다.
@@ -117,7 +118,7 @@
 - **C2 반복 일정은 구현·Pi 배포까지 끝났다**(schema v17, `lib/assistant-task-series.js`, `ASSISTANT_TASK_SERIES_ENABLED`). 플래그는 Pi `.env`에만 `true`이고 `.env.example`에는 `false`로 있다. 계약은 `docs/task-reminder-design.md` 12·13절이다.
 - **지식 패널의 첫 화면은 `XION` 홈이다**(탭 줄 맨 왼쪽, 기본 선택). `확인할 것` → `오늘` → 에이전트 상태 순서이고 기존 정본만 읽는 projection이라 서버 상태가 없다. 계약은 `docs/xion-home-design.md`다. **탭 키는 `agents`로 남겨둔다** — 설치된 Service Worker와 지난 알림이 `/?panel=agents` 링크를 들고 있다. 기본 탭은 `index.html`의 `active`·`hidden`과 `paper-panel.js`의 `state.activeTab` **두 곳**이 함께 정한다. 지식 패널이 데스크톱에서 350px 고정 폭이라(`grid-template-columns: minmax(0, 1fr) 350px`) 2열은 물리적으로 안 들어가고 모바일과 같은 1열을 쓴다.
 - **대시보드는 채팅과 분리된 별도 창이고 아직 착수하지 않는다.** 착수 조건은 상시 확인 대상이 늘어나는 것인데 지금은 없다(V5-B가 `server.js`에 안 붙는 것이 계약이다). **그때까지 홈은 350px 안에 남고, "홈이 허전하다"를 패널 확장이나 카드 추가로 읽지 않는다.** 계약은 `docs/roadmap.md`의 V6 절이다.
-- **홈 날씨는 모양만 정하고 만들지 않았다** — 머리줄 확장, 텍스트 + 이모지, 아이콘 아님. 뉴스 `알아둘 것`을 며칠 써본 뒤에 판단한다. 계약과 근거는 `docs/xion-home-design.md` 12절이다.
+- **홈 날씨는 2026-08-22 Pi 배포·실기기 인수로 닫혔다.** 정본은 `docs/xion-weather-design.md`이고(구현 기록 29절·관측 30절) 코드는 `lib/weather.js`·`lib/weather-routes.js`, 계약은 `test/weather*.test.js`다. 홈 쪽 파장은 `docs/xion-home-design.md` 12절이다.
 - 상시 관찰: `chat:gpt-single-v1:a2`의 과회수·최신성·abstention, Web Push 잠금화면 표시, 실제 일정 생성의 KST 기한·알림·월별 projection. 승인 없는 가짜 운영 task는 만들지 않는다.
 
 ### 운영
