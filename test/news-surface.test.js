@@ -324,3 +324,44 @@ test('프롬프트가 이유를 묻는 후속 질문에 답하는 법을 알려�
   // 알릴 때 이유를 함께 말한다.
   assert.match(session.systemPrompt, /왜 가져왔는지/);
 });
+
+// ── 여러 낱말 질의가 통짜 부분문자열로 헛돌지 않는다 ──────────────────────
+//
+// LIKE %전체 질의%는 그 순서 그대로 붙어 있어야 맞는다. 실제로 "OpenAI 안전"이
+// 0건이었고, 모델은 그것을 "그런 기사는 없다"로 옮겼다.
+
+test('낱말이 여기저기 흩어져 있어도 찾는다', () => {
+  const db = createDatabase();
+  const store = createNewsStore(db, { now: () => NOW });
+  insertArticle(db, {
+    id: 1,
+    title: 'OpenAI blinks first in AI safety standoff',
+    reason: '두 회사의 안전 정책과 모델 개발 속도에 직접 관련이 있다.',
+  });
+
+  // 제목(영어)과 이유(한국어)에 낱말이 나뉘어 있다.
+  assert.equal(store.searchArticles({ query: 'OpenAI 안전' }).length, 1);
+  assert.equal(store.searchArticles({ query: '안전 OpenAI' }).length, 1, '순서는 상관없다');
+  assert.equal(store.searchArticles({ query: 'OpenAI  모델   개발' }).length, 1);
+  // 하나라도 없으면 안 걸린다. 아무거나 주워오지 않는다.
+  assert.equal(store.searchArticles({ query: 'OpenAI 김치찌개' }).length, 0);
+  db.close();
+});
+
+test('와일드카드는 낱말로 쪼개도 여전히 막힌다', () => {
+  const db = createDatabase();
+  const store = createNewsStore(db, { now: () => NOW });
+  insertArticle(db, { id: 1, title: '평범한 기사' });
+  assert.equal(store.searchArticles({ query: '%' }).length, 0);
+  assert.equal(store.searchArticles({ query: '% %' }).length, 0);
+  assert.equal(store.searchArticles({ query: '_ _' }).length, 0);
+  db.close();
+});
+
+test('프롬프트가 이유를 되물을 때 필터 없이 부르라고 말한다', () => {
+  const session = createNewsSearchSession(createNewsStore(createDatabase(), { now: () => NOW }), {
+    interests: INTERESTS,
+  });
+  assert.match(session.systemPrompt, /필터 없이/);
+  assert.match(session.systemPrompt, /가져온 이유/);
+});

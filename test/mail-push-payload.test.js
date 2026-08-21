@@ -90,3 +90,37 @@ test('the payload stays small enough that size is never a question', () => {
   const raw = buildMailPushPayload({ targetKind: 'message', targetId: 9_007_199_254_740_991, notifySeq: 999 });
   assert.ok(Buffer.byteLength(raw, 'utf8') < 200, `payload가 ${Buffer.byteLength(raw, 'utf8')}바이트다`);
 });
+
+// ── Topic 헤더는 진짜 base64여야 한다 ────────────────────────────────────
+//
+// RFC 8030의 Topic은 URL-safe base64다. base64 문자열의 길이는 4로 나눈 나머지가
+// 1일 수 없는데, `mail-batch-${id}` 같은 뜻 있는 문자열은 id 자릿수가 바뀌는 순간
+// 그 금지 길이에 들어간다. 실제로 Apple이 `mail-batch-10`(13자)을 400
+// BadWebPushTopic으로 거절해 알림이 조용히 사라졌다.
+
+const { normalizePushTopic } = require('../lib/assistant-push');
+
+test('정규화한 topic은 어떤 입력에서도 base64 길이 규칙을 깨지 않는다', () => {
+  const inputs = [
+    'mail-batch-8', 'mail-batch-10', 'mail-batch-11', 'mail-message-1325',
+    'task-1', 'task-1234', 'news-review-1', 'news-review-12345',
+    'a', '', '아주 긴 한글 주제 이름이 들어와도 상관없다',
+  ];
+  for (const input of inputs) {
+    const topic = normalizePushTopic(input);
+    if (!input) { assert.equal(topic, undefined); continue; }
+    assert.notEqual(topic.length % 4, 1, `${input} → ${topic} (len ${topic.length})`);
+    assert.ok(topic.length <= 32);
+    assert.match(topic, /^[A-Za-z0-9_-]+$/, `${input} → ${topic}`);
+  }
+});
+
+test('같은 대상은 같은 topic으로 합쳐지고 다른 대상은 갈린다', () => {
+  assert.equal(normalizePushTopic('mail-batch-11'), normalizePushTopic('mail-batch-11'));
+  assert.notEqual(normalizePushTopic('mail-batch-11'), normalizePushTopic('mail-batch-12'));
+  // 회차가 다르면 이전 알림을 덮지 않는다(설계 MAIL-3).
+  assert.notEqual(
+    normalizePushTopic('mail-message-1325:1'),
+    normalizePushTopic('mail-message-1325:2'),
+  );
+});

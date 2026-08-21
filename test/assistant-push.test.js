@@ -10,6 +10,7 @@ const {
   AssistantPushError,
   createAssistantPushDispatcher,
   createAssistantPushService,
+  normalizePushTopic,
 } = require('../lib/assistant-push');
 const { createAssistantTaskStore } = require('../lib/assistant-tasks');
 
@@ -207,7 +208,10 @@ test('dispatcher sends only an opaque reminder reference and records provider ac
   assert.equal(calls[0].delivery.urgency, 'high');
   // 도메인 hook을 주지 않은 호출자는 topic과 ttl까지 예전 그대로여야 한다. 기본값이
   // 어긋나면 배포된 일정 Push가 조용히 바뀐다.
-  assert.equal(calls[0].delivery.topic, `task-${reminder.id}`);
+  // topic은 이제 dispatcher가 base64로 정규화한다 — Apple이 임의 문자열 길이를
+  // 거절하기 때문이다(BadWebPushTopic). 값 자체가 아니라 대상별로 갈리는지를 잰다.
+  assert.equal(calls[0].delivery.topic, normalizePushTopic(`task-${reminder.id}`));
+  assert.notEqual(calls[0].delivery.topic, normalizePushTopic(`task-${reminder.id + 1}`));
   assert.equal(typeof calls[0].delivery.ttl, 'number');
   assert.equal(
     db.prepare('SELECT status FROM assistant_push_deliveries').get().status,

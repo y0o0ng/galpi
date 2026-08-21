@@ -1008,8 +1008,9 @@ const mailPushDispatcher = mailPushService
     // payload와 send option만 도메인이 정한다. 전달 루프는 일정과 같은 것을 쓴다.
     buildPayload: claim => buildMailPushPayload(claim),
     buildSendOptions: buildMailSendOptions,
-    onError(error) {
-      console.error(`Mail push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    onError(error, context) {
+      const detail = context?.httpStatus ? ` http${context.httpStatus} · ${context.reason || '-'}` : '';
+      console.error(`Mail push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}${detail}`);
     },
   })
   : null;
@@ -1038,8 +1039,9 @@ const newsPushDispatcher = newsPushService
     }),
     buildPayload: buildNewsPushPayload,
     buildSendOptions: buildNewsSendOptions,
-    onError(error) {
-      console.error(`News push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    onError(error, context) {
+      const detail = context?.httpStatus ? ` http${context.httpStatus} · ${context.reason || '-'}` : '';
+      console.error(`News push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}${detail}`);
     },
   })
   : null;
@@ -1193,8 +1195,9 @@ const assistantPushDispatcher = ASSISTANT_PUSH_CONFIG.enabled
       publicKey: ASSISTANT_PUSH_CONFIG.publicKey,
       privateKey: ASSISTANT_PUSH_CONFIG.privateKey,
     }),
-    onError(error) {
-      console.error(`Push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}`);
+    onError(error, context) {
+      const detail = context?.httpStatus ? ` http${context.httpStatus} · ${context.reason || '-'}` : '';
+      console.error(`Push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}${detail}`);
     },
   })
   : null;

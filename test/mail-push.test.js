@@ -161,7 +161,14 @@ test('the payload the transport sees is the routing-only contract', async () => 
   assert.deepEqual(Object.keys(payload).sort(), ['notifySeq', 'targetId', 'targetKind', 'type', 'url', 'version']);
   assert.equal(payload.type, 'mail_attention');
   // topic은 payload가 아니라 헤더다. 대상별로 갈려야 이전 알림을 합칠 수 있다.
-  assert.equal(transport.calls[0].delivery.topic, `mail-message-${messageId}`);
+  // 값은 dispatcher가 base64로 정규화한다(Apple BadWebPushTopic). 재는 것은
+  // 대상별로 갈리는가다.
+  const { normalizePushTopic } = require('../lib/assistant-push');
+  assert.equal(transport.calls[0].delivery.topic, normalizePushTopic(`mail-message-${messageId}`));
+  assert.notEqual(
+    transport.calls[0].delivery.topic,
+    normalizePushTopic(`mail-message-${messageId + 1}`),
+  );
   assert.equal(transport.calls[0].delivery.urgency, 'normal');
   assert.ok(transport.calls[0].delivery.ttl > 0);
   db.close();
