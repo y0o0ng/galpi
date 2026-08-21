@@ -3662,14 +3662,12 @@ html, body {
 }
 
 @media (max-width: 640px) {
-  body.model-picker-open::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: rgba(21, 26, 24, 0.28);
-    z-index: 300;
-  }
-
+  /* 전체 화면 딤을 두지 않는다. `#input-area`의 backdrop-filter가 스택 컨텍스트를
+     만들어서, 그 안의 이 메뉴는 z-index를 아무리 올려도 `body::before`로 만든 딤
+     위로 못 올라간다. 딤이 28%라 메뉴는 보이지만 탭은 전부 딤이 먹고, 가상 요소라
+     이벤트 target이 body가 되어 바깥 클릭으로 읽혀 메뉴가 닫혔다.
+     딤은 장식이고 그 장식이 기능을 막고 있었다. 메뉴는 그림자와 고정 위치만으로
+     충분히 떠 보인다. */
   #chat-model-menu {
     position: fixed;
     left: 8px;

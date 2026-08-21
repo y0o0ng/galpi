@@ -446,3 +446,20 @@ test('the service worker shows fixed text and never reads mail content', () => {
   assert.match(sw, /addEventListener\('install', \(\) => self\.skipWaiting\(\)\)/);
   assert.match(sw, /clients\.claim\(\)/);
 });
+
+test('모델 메뉴가 조상의 스택 컨텍스트에 갇힌 채 전체 화면 딤에 덮이지 않는다', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8');
+  const picker = fs.readFileSync(path.join(ROOT, 'public/model-picker.js'), 'utf8');
+
+  // `#input-area`의 backdrop-filter는 새 스택 컨텍스트를 만든다. 그래서 그 안에 있는
+  // `#chat-model-menu`의 z-index는 루트에서 통하지 않고, `body::before`로 만든 딤이
+  // 메뉴 위에 깔린다. 딤은 가상 요소라 탭의 target이 body가 되어 바깥 클릭으로
+  // 읽히고, 항목을 눌러도 선택 대신 메뉴가 닫혔다. 모바일에서만 나던 버그다.
+  assert.match(css, /#input-area\s*{[^}]*backdrop-filter/s);
+  assert.doesNotMatch(css, /body\.model-picker-open/);
+  // 딤이 없으니 그 클래스를 붙이던 코드도 남기지 않는다.
+  assert.doesNotMatch(picker, /model-picker-open/);
+
+  // 메뉴 자체는 그대로 모바일에서 화면 하단에 고정된다.
+  assert.match(css, /#chat-model-menu\s*{[^}]*position: fixed/s);
+});

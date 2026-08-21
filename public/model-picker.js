@@ -26,7 +26,6 @@
     if (!state.panel || state.panel.hidden) return;
     state.panel.hidden = true;
     state.button.setAttribute('aria-expanded', 'false');
-    document.body.classList.remove('model-picker-open');
     if (restoreFocus) (state.returnFocus || state.button).focus();
   }
 
@@ -35,7 +34,6 @@
     state.returnFocus = document.activeElement;
     state.panel.hidden = false;
     state.button.setAttribute('aria-expanded', 'true');
-    document.body.classList.add('model-picker-open');
     const selected = state.options.querySelector('[aria-selected="true"]');
     (selected || state.options.querySelector('button'))?.focus();
   }
