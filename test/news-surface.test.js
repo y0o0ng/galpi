@@ -152,9 +152,12 @@ test('추적 중이 아닌 주제를 물으면 지금 지켜보는 것을 알려
   const store = createNewsStore(db, { now: () => NOW });
   const session = createNewsSearchSession(store, { interests: INTERESTS });
 
+  // 오류로 끝내지 않는다. 모델이 그것을 "그런 기사는 없다"로 옮겨 사용자 자기
+  // 데이터를 거짓으로 부인하게 되기 때문이다. 재는 것은 지켜보는 것을 알려주는가다.
   const result = session.execute(NEWS_SEARCH_TOOL.name, { topic: '한 번도 말 안 한 주제' });
-  assert.equal(result.isError, true);
+  assert.equal(result.isError, undefined);
   assert.match(result.content, /OpenAI Responses API/);
+  db.close();
 });
 
 test('LIKE 와일드카드가 전건 조회가 되지 않는다', () => {
@@ -276,4 +279,48 @@ test('뉴스 자체가 꺼져 있으면 503이고 surface 값과 무관하다', 
   assert.equal(off.status, 503);
   assert.equal(off.body.code, 'NEWS_AGENT_DISABLED');
   db.close();
+});
+
+// ── "왜 이 기사를 가져왔어?"가 빈손으로 끝나지 않는다 ────────────────────
+//
+// 이유는 앞선 턴의 도구 결과 안에만 있었고 대화에는 남지 않는다. 그래서 다음
+// 턴의 모델은 기사를 **다시 찾아야** 하는데, 추적 중이 아닌 topic을 넘기면
+// 지금까지는 오류로 끝나 "그런 기사 없다"는 거짓 부인이 됐다.
+
+test('추적 중이 아닌 주제를 넘겨도 빈손으로 끝나지 않는다', () => {
+  const db = createDatabase();
+  const store = createNewsStore(db, { now: () => NOW });
+  insertArticle(db, { id: 1, title: 'OpenAI blinks first in AI safety standoff' });
+
+  const session = createNewsSearchSession(store, { interests: INTERESTS });
+  const result = session.execute(NEWS_SEARCH_TOOL.name, { topic: 'AI 안전' });
+
+  assert.equal(result.isError, undefined, '오류로 끝내지 않는다');
+  assert.match(result.content, /OpenAI blinks first/);
+  // 그 주제를 지켜보고 있다고 오해하게 두지는 않는다.
+  assert.match(result.content, /추적 중인 주제가 아니라/);
+  db.close();
+});
+
+test('추적 중이 아닌 주제 + 걸리는 기사가 없으면 그 사실만 알린다', () => {
+  const db = createDatabase();
+  const store = createNewsStore(db, { now: () => NOW });
+  const session = createNewsSearchSession(store, { interests: INTERESTS });
+  const result = session.execute(NEWS_SEARCH_TOOL.name, { topic: '한 번도 말 안 한 주제' });
+
+  assert.equal(result.isError, undefined);
+  assert.match(result.content, /찾은 기사 0건/);
+  assert.match(result.content, /OpenAI Responses API/, '지금 지켜보는 것은 알려준다');
+  db.close();
+});
+
+test('프롬프트가 이유를 묻는 후속 질문에 답하는 법을 알려준다', () => {
+  const session = createNewsSearchSession(createNewsStore(createDatabase(), { now: () => NOW }), {
+    interests: INTERESTS,
+  });
+  // 직전에 알린 기사의 이유를 물으면 제목으로 다시 찾는다.
+  assert.match(session.systemPrompt, /제목/);
+  assert.match(session.systemPrompt, /가져온 이유/);
+  // 알릴 때 이유를 함께 말한다.
+  assert.match(session.systemPrompt, /왜 가져왔는지/);
 });

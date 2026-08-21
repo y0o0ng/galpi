@@ -438,3 +438,58 @@ test('a short spoken answer is read whole instead of being cut at three sentence
   assert.equal(capped.segments.at(-1), closing);
   assert.ok(capped.remaining.length > 0);
 });
+
+// ── 링크는 화면에만 남고 소리로는 읽히지 않는다 ──────────────────────────
+//
+// 음성 턴도 같은 텍스트가 화면에 저장되므로 모델에게 "링크를 쓰지 마라"라고 시키면
+// 사용자가 원문으로 들어갈 길이 사라진다. 그래서 화면 텍스트는 그대로 두고
+// **소리로 가는 텍스트에서만** 벗긴다.
+
+const { planSpokenSegments, createSpokenSegmenter } = require('../lib/voice-tts');
+
+test('말할 때는 링크가 표시 글자만 남는다', () => {
+  const answer = '안전 문제로 개발을 멈췄대. [Axios 기사](https://www.axios.com/2026/08/19/openai-astra) 참고해.';
+  const spoken = selectSpokenText(answer);
+  assert.match(spoken, /Axios 기사/);
+  assert.doesNotMatch(spoken, /https?:/);
+  assert.doesNotMatch(spoken, /axios\.com/);
+  assert.doesNotMatch(spoken, /[[\]()]/);
+});
+
+test('맨 URL도 읽지 않는다', () => {
+  const spoken = selectSpokenText('여기 봐 https://www.cnet.com/tech/anthropic-claude 이렇게.');
+  assert.doesNotMatch(spoken, /https?:|cnet\.com/);
+  assert.match(spoken, /여기 봐/);
+  assert.match(spoken, /이렇게/);
+});
+
+test('URL의 점 때문에 조각이 잘못 갈리지 않는다', () => {
+  const { segments } = planSpokenSegments(
+    'OpenAI가 개발을 멈췄어. [Axios](https://www.axios.com/a/b) 여기 있어. 끝.',
+    { maxChars: 600 },
+  );
+  const joined = segments.join(' | ');
+  assert.doesNotMatch(joined, /https?:|axios\.com/);
+  // "www.axios.com"의 점들이 문장 끝으로 오인되면 조각이 여섯 개쯤 된다.
+  assert.ok(segments.length <= 3, `조각이 너무 많다: ${segments.length} (${joined})`);
+});
+
+test('스트리밍 중 링크가 조각에 걸쳐 도착해도 새지 않는다', () => {
+  const segmenter = createSpokenSegmenter();
+  const out = [];
+  // 링크가 여러 delta로 쪼개져 온다.
+  for (const chunk of ['안전 문제로 멈췄대. ', '[Axios 기사](https://www.', 'axios.com/2026/08/19/x)', ' 이거 봐. ', '끝이야. ']) {
+    out.push(...segmenter.push(chunk));
+  }
+  out.push(...segmenter.end());
+  const joined = out.join(' | ');
+  assert.doesNotMatch(joined, /https?:|axios\.com/);
+  assert.match(joined, /Axios 기사/);
+});
+
+test('링크가 없는 답변은 글자 하나 바뀌지 않는다', () => {
+  const plain = '오후 3시야. 우산 챙겨. 내일은 맑을 거래.';
+  assert.equal(selectSpokenText(plain), plain);
+  // 짧은 조각을 붙이는 기존 동작은 그대로다. 재는 것은 내용이 온전한가다.
+  assert.equal(planSpokenSegments(plain).segments.join(' '), plain);
+});
