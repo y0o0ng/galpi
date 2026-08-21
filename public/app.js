@@ -32,6 +32,7 @@ let councilDraftMode = 'compressed'; // 'compressed' | 'full' | 'deep'
 let activeNotes      = loadStoredActiveNotes(); // 활성 참조 노트 목록
 let isRestoringHistory = false;
 let tasksEnabled = false;
+let weatherEnabled = false;
 let taskSeriesEnabled = false;
 let taskRefreshTimer = null;
 const slashCommands = [
@@ -195,6 +196,7 @@ async function init() {
     const config = await apiFetch('/api/config').then(r => r.json());
     if (ensureApiToken(config)) return;
     tasksEnabled = config.tasksEnabled === true;
+    weatherEnabled = config.weatherEnabled === true;
     taskSeriesEnabled = config.taskSeriesEnabled === true;
     initPaperPanel();
     // 옆의 XION 칩이 비서 이름을 말하므로 라벨은 모델만 남긴다.
@@ -1416,6 +1418,7 @@ function initPaperPanel() {
       enabled: tasksEnabled,
       pushClient: window.PushClient,
       showToast,
+      weatherEnabled,
     });
     window.PaperPanel.init({
       apiFetch,

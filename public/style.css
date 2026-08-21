@@ -832,9 +832,37 @@ html, body {
   margin-bottom: 18px;
 }
 
+/* 인사와 온도가 한 줄을 나눠 쓴다. 좌우 2열로 나누지 않는 이유는 패널이 350px
+   고정이라 오른쪽 열에서 브리핑 문구가 감기기 때문이다(설계 20절). */
+.home-head-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .home-greeting {
   font-size: 11px;
   color: var(--label);
+}
+
+/* 새 글자 크기·굵기를 만들지 않는다. 홈은 9px·11px·17px과 650·700만 쓴다. */
+.home-weather-now {
+  flex: none;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+/* 문구는 최대 두 줄이다. 세 줄이 되면 머리가 `확인할 것`을 첫 화면 밖으로 민다. */
+.home-weather-message {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--label);
+  font-size: 11px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .home-date {

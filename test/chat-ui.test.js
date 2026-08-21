@@ -215,6 +215,49 @@ test('XION sits first among the knowledge tabs and opens with the date', () => {
   assert.match(css, /\.home-date \{[^}]*font-size: 17px/s);
 });
 
+test('the home head carries the weather without becoming a weather card', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  // 날씨는 날짜와 같은 성격의 오늘의 주변 맥락이라 머리줄에만 붙는다. 새 카드나
+  // 새 홈 섹션을 만들면 홈이 다시 목록이 된다(설계 1·20절).
+  assert.doesNotMatch(panel, /makeHomeSection\('날씨'/);
+  const render = panel.slice(panel.indexOf('function renderSummary()'));
+  assert.doesNotMatch(render.slice(0, render.indexOf('\n  }')), /weather/i);
+
+  // 인사와 온도가 한 줄을 나눠 쓴다. 좌우 2열로 나누면 350px 패널에서 문구가 감긴다.
+  assert.match(css, /\.home-head-top \{[^}]*justify-content: space-between/s);
+  // 새 글자 크기를 만들지 않는다. 홈은 9px·11px·17px만 쓴다.
+  assert.match(css, /\.home-weather-now \{[^}]*font-size: 11px/s);
+  assert.match(css, /\.home-weather-message \{[^}]*font-size: 11px/s);
+  // 문구는 최대 두 줄이다. 세 줄이 되면 `확인할 것`이 첫 화면 밖으로 밀린다.
+  assert.match(css, /\.home-weather-message \{[^}]*-webkit-line-clamp: 2/s);
+});
+
+test('the weather never blocks the first home render, and never explains itself', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  // 위치 획득이 최대 5초다. allSettled 배열에 넣으면 홈 전체가 그만큼 늦어진다(설계 19절).
+  const settled = panel.slice(panel.indexOf('Promise.allSettled(['));
+  assert.doesNotMatch(settled.slice(0, settled.indexOf(']')), /refreshWeather|\/api\/weather/);
+  // 먼저 렌더하고 도착하면 머리 노드만 바꾼다.
+  assert.match(panel, /renderSummary\(\);\s*\/\/[^\n]*\n\s*void refreshWeather\(state\.requestId\)/);
+  assert.match(panel, /head\.replaceWith\(makeHomeHead\(\)\)/);
+
+  // 주석은 계약을 설명하는 자리다. 재는 것은 코드여야 한다.
+  const code = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  // 홈 브리핑 하나 때문에 위치를 계속 따라다니지 않는다(설계 4절).
+  assert.equal(code.includes('watchPosition'), false);
+  assert.match(code, /navigator\.geolocation\.getCurrentPosition\(/);
+  // 마지막 좌표 한 건뿐이고 키는 기존 관례를 따른다(설계 5절).
+  assert.match(code, /LOCATION_KEY = 'councilLastLocation'/);
+
+  // 실패는 문구 없이 숨김이다. 홈은 diagnostics 화면이 아니다(설계 21절).
+  for (const forbidden of ['날씨 확인 중', '위치를 찾을 수 없', '기상청', '날씨를 불러오지 못']) {
+    assert.equal(code.includes(forbidden), false, forbidden);
+  }
+  // 홈이 60초마다 refresh하므로 캐시가 없으면 기상청을 시간당 60번 부른다(설계 22절).
+  assert.match(panel, /Date\.now\(\) - state\.weatherAt < WEATHER_CACHE_MS/);
+});
+
 test('the home briefing comes before the agent status, and never outranks itself', () => {
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
   const render = panel.slice(panel.indexOf('function renderSummary()'));

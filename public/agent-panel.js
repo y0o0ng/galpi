@@ -35,6 +35,9 @@
     mailPreferences: null,
     mailPreferenceSaving: false,
     news: null,
+    weatherEnabled: false,
+    weather: null,
+    weatherAt: 0,
   };
 
   // 첫 화면에 펼치는 Attention 수. 지식 패널이 350px 고정이고 메일 항목 하나가
@@ -44,6 +47,19 @@
   // 뉴스는 `확인할 것`도 `오늘`도 아니다. 후속 행동이 없는 읽을거리라 첫 화면을
   // 차지하면 안 된다(설계 14.4). 그래서 둘 뒤에 오고 개수도 적게 든다.
   const HOME_NEWS_LIMIT = 3;
+
+  // 홈은 60초마다 자동 refresh한다. 캐시가 없으면 기상청을 시간당 60번 부른다.
+  // 그래서 이 15분은 선택이 아니다(설계 22절).
+  const WEATHER_CACHE_MS = 15 * 60 * 1000;
+  // 격자가 5km 단위라 GPS급 정밀도가 필요 없다. 고정밀을 강제로 깨워 전력과
+  // 응답 시간을 더 쓰지 않는다(설계 4절).
+  const LOCATION_OPTIONS = { enableHighAccuracy: false, timeout: 5000, maximumAge: WEATHER_CACHE_MS };
+  // `council` 접두사는 제품명이 갈피로 바뀐 뒤에도 기존 키가 일부러 유지하는
+  // 관례다. 날씨만 다른 접두사를 쓰면 저장소에 규칙이 둘이 된다(설계 5절).
+  const LOCATION_KEY = 'councilLastLocation';
+  // 위치 자체의 보존기간이 아니라 **잘못된 지역 날씨를 자신 있게 보여주지 않기
+  // 위한 fallback 제한**이다. 좌표 행은 다음 성공 때까지 그대로 남는다.
+  const LOCATION_FALLBACK_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
   const countLabels = [
     ['overdue', '지연'],
@@ -777,18 +793,44 @@
     return '늦은 밤이야';
   }
 
+  /**
+   * 인사 + 온도 / 날짜 / 생활 문구의 3행. **새 카드도 새 섹션도 만들지 않는다.**
+   * 날씨는 날짜와 같은 성격의 오늘의 주변 맥락이라 머리줄에만 붙는다(설계 1·20절).
+   *
+   * 좌우 2열로 나누지 않는다. 지식 패널이 데스크톱에서 350px 고정이라 오른쪽 열이
+   * 실질 200px가 되고 그 폭에서 브리핑 문구가 감겨 머리가 3줄 이상으로 커진다.
+   */
   function makeHomeHead() {
     const head = document.createElement('div');
     head.className = 'home-head';
+
+    const top = document.createElement('div');
+    top.className = 'home-head-top';
     const hello = document.createElement('span');
     hello.className = 'home-greeting';
     hello.textContent = greeting();
+    top.appendChild(hello);
+    if (state.weather) {
+      const now = document.createElement('span');
+      now.className = 'home-weather-now';
+      now.textContent = `${state.weather.icon} ${state.weather.temperature}°`;
+      top.appendChild(now);
+    }
+
     const date = document.createElement('strong');
     date.className = 'home-date';
     date.textContent = new Intl.DateTimeFormat('ko-KR', {
       timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long',
     }).format(new Date());
-    head.append(hello, date);
+    head.append(top, date);
+
+    // 실패는 문구 없이 숨김이다. 홈은 diagnostics 화면이 아니다(설계 21절).
+    if (state.weather?.message) {
+      const message = document.createElement('p');
+      message.className = 'home-weather-message';
+      message.textContent = state.weather.message;
+      head.appendChild(message);
+    }
     return head;
   }
 
@@ -1340,6 +1382,92 @@
     return true;
   }
 
+  // --- 날씨 -----------------------------------------------------------------
+  //
+  // **홈 렌더의 대기 대상이 아니다.** 위치 획득이 최대 5초라 `Promise.allSettled`
+  // 배열에 넣으면 홈 전체가 그만큼 늦어진다. 먼저 렌더하고 도착하면 머리줄만
+  // 갱신한다(설계 19절).
+
+  function readLastLocation() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LOCATION_KEY) || 'null');
+      if (!Number.isFinite(saved?.lat) || !Number.isFinite(saved?.lon)) return null;
+      // `capturedAt`이 없으면 나이를 잴 수 없다. `NaN > MAX`는 false라, 없는 채로
+      // 두면 언제 찍힌지 모르는 좌표가 stale 검사를 그냥 통과한다.
+      if (!Number.isFinite(saved.capturedAt)) return null;
+      return saved;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveLastLocation(location) {
+    try {
+      localStorage.setItem(LOCATION_KEY, JSON.stringify(location));
+    } catch {
+      // 저장이 막혀도 이번 조회는 그대로 쓴다.
+    }
+  }
+
+  /**
+   * `getCurrentPosition()`만 쓴다. **`watchPosition()`은 쓰지 않는다.** 홈 브리핑
+   * 하나 때문에 위치를 계속 따라다니게 되고, 그건 v1이 만들지 않기로 한 것이다.
+   *
+   * 위치 이력은 어디에도 쌓이지 않는다. 마지막 좌표 한 건만 기기에 남는다(설계 5·6절).
+   */
+  function currentLocation() {
+    return new Promise(resolve => {
+      const fallback = () => {
+        const saved = readLastLocation();
+        // 너무 오래된 좌표로 다른 동네 날씨를 자신 있게 보여주지 않는다.
+        if (!saved || Date.now() - saved.capturedAt > LOCATION_FALLBACK_MAX_AGE_MS) return resolve(null);
+        resolve({ lat: saved.lat, lon: saved.lon });
+      };
+      if (!navigator.geolocation?.getCurrentPosition) return fallback();
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const location = {
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            capturedAt: Date.now(),
+          };
+          saveLastLocation(location);
+          resolve({ lat: location.lat, lon: location.lon });
+        },
+        fallback,
+        LOCATION_OPTIONS,
+      );
+    });
+  }
+
+  // 실패하면 영역이 없을 뿐이라 오류 상태를 만들지 않는다. 위치 권한을 거부했을
+  // 때도 toast를 반복해 띄우지 않는다(설계 21절).
+  async function refreshWeather(requestId) {
+    if (!state.weatherEnabled) return;
+    if (state.weather && Date.now() - state.weatherAt < WEATHER_CACHE_MS) return;
+    let briefing = null;
+    try {
+      const location = await currentLocation();
+      if (!location) return;
+      const query = `?lat=${encodeURIComponent(location.lat)}&lon=${encodeURIComponent(location.lon)}`;
+      const response = await state.apiFetch(`/api/weather${query}`);
+      if (!response.ok) return;
+      briefing = await response.json();
+      if (!Number.isFinite(briefing?.temperature)) return;
+    } catch {
+      return;
+    }
+    // 늦게 온 응답이 이미 다른 화면을 덮지 않게 기존 staleness 가드를 같이 쓴다.
+    if (requestId !== state.requestId) return;
+    state.weather = briefing;
+    state.weatherAt = Date.now();
+    if (state.mode !== 'summary') return;
+    // `renderSummary()`는 전부 다시 그리므로 스크롤이 튄다. 머리 노드만 바꾼다.
+    const head = state.container.querySelector('.home-head');
+    if (head) head.replaceWith(makeHomeHead());
+  }
+
   async function loadCodexStatus() {
     const response = await state.apiFetch('/api/organize/status');
     const data = await response.json().catch(() => ({}));
@@ -1626,6 +1754,8 @@
       ? mailResult.reason.message
       : '';
     renderSummary();
+    // 기다리지 않고 던진다. 도착하면 머리 노드만 교체한다(설계 19절).
+    void refreshWeather(state.requestId);
   }
 
   function show() {
@@ -1633,7 +1763,7 @@
     refresh();
   }
 
-  function init({ apiFetch, enabled, pushClient, showToast }) {
+  function init({ apiFetch, enabled, pushClient, showToast, weatherEnabled }) {
     if (state.initialized) return;
     const container = document.getElementById('agent-panel-content');
     if (
@@ -1650,6 +1780,7 @@
     }
     state.apiFetch = apiFetch;
     state.enabled = enabled === true;
+    state.weatherEnabled = weatherEnabled === true;
     state.pushClient = pushClient;
     state.pushState = pushClient.getState();
     state.showToast = showToast;

@@ -67,6 +67,8 @@ const { createNewsStore } = require('./lib/news/store');
 const { createNewsCollector } = require('./lib/news/collect');
 const { createNewsAnalyzer } = require('./lib/news/analyze');
 const { registerNewsRoutes } = require('./lib/news/routes');
+const { createWeatherService } = require('./lib/weather');
+const { registerWeatherRoutes } = require('./lib/weather-routes');
 const { createNewsSearchSession } = require('./lib/news/search-tool');
 const {
   buildNewsPushPayload,
@@ -262,6 +264,11 @@ const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
 // 못한 문턱으로 홈 판정이 시작된다. 문턱을 실데이터로 정한 뒤에 켠다.
 const NEWS_SURFACE_ENABLED = process.env.NEWS_SURFACE_ENABLED === 'true';
+// XION 홈 머리줄의 날씨. 기상청 단기예보 하나만 쓰고 판단은 결정론적 규칙이라
+// LLM을 부르지 않는다(설계 0절). 키는 브라우저로 절대 나가지 않는다.
+const KMA_SERVICE_KEY = process.env.KMA_SERVICE_KEY || '';
+// 키가 없으면 켜진 척하지 않는다. 502로 답하면 사람이 고칠 것을 엉뚱한 데서 찾는다.
+const WEATHER_ENABLED = process.env.WEATHER_ENABLED === 'true' && Boolean(KMA_SERVICE_KEY.trim());
 // 뉴스 검색은 채팅 웹 검색과 크레딧을 나눠 쓴다. 하위 한도가 없으면 폴링이
 // 사용자의 채팅 검색을 굶긴다.
 const NEWS_SEARCH_MONTHLY_CREDIT_LIMIT = Number.parseInt(process.env.NEWS_SEARCH_MONTHLY_CREDIT_LIMIT || '200', 10);
@@ -4812,6 +4819,7 @@ app.get('/api/config', (req, res) => {
       usage: getCurrentWebSearchUsage(),
       softLimit: WEB_SEARCH_MONTHLY_CREDIT_SOFT_LIMIT,
     },
+    weatherEnabled: WEATHER_ENABLED,
     requiresApiToken: !!API_TOKEN,
     hasClaude:   HAS_CLAUDE,
     hasGpt:      HAS_GPT,
@@ -4847,6 +4855,13 @@ registerNewsRoutes({
     const { interests } = await readNewsContextNote();
     return interests;
   },
+});
+
+// 서버 상태도 DB도 없다. 요청 중에 좌표를 격자로 바꿔 기상청에 묻고 끝난다.
+registerWeatherRoutes({
+  app,
+  config: { enabled: WEATHER_ENABLED },
+  service: WEATHER_ENABLED ? createWeatherService({ serviceKey: KMA_SERVICE_KEY }) : null,
 });
 
 registerMailRoutes({
@@ -9482,6 +9497,9 @@ const httpServer = app.listen(PORT, HOST, () => {
   }
   if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
     console.log('   뉴스:     홈 노출 꺼짐 (문턱 미확정, NEWS_SURFACE_ENABLED)');
+  }
+  if (process.env.WEATHER_ENABLED === 'true' && !WEATHER_ENABLED) {
+    console.log('   날씨:     KMA_SERVICE_KEY가 없어 꺼짐 (공공데이터포털 Decoding key)');
   }
   if (newsPushDispatcher) {
     newsPushDispatcher.start();
