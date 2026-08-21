@@ -194,12 +194,14 @@ test('한 번 판단한 기사를 다시 판단하지 않는다', async () => {
   db.close();
 });
 
-test('노출 문턱은 잠정값이고 두 축을 함께 본다', () => {
+test('노출 문턱은 세 축을 함께 본다', () => {
   assert.ok(meetsSurfaceThreshold(decision()));
   assert.ok(!meetsSurfaceThreshold(decision({ relevance: 0.2 })));
   assert.ok(!meetsSurfaceThreshold(decision({ importance: 0.1 })));
-  // 값이 코드 한 곳에만 있어야 Pi 실데이터로 고칠 때 여기만 고친다.
-  assert.deepEqual(Object.keys(SURFACE_THRESHOLD).sort(), ['importance', 'relevance']);
+  // 실데이터에서 나온 구멍이다 — 주제가 맞고 중요해도 기존 내용의 해설이면 올리지 않는다.
+  assert.ok(!meetsSurfaceThreshold(decision({ relevance: 0.75, novelty: 0.2, importance: 0.4 })));
+  // 값이 코드 한 곳에만 있어야 표본이 쌓였을 때 여기만 고친다.
+  assert.deepEqual(Object.keys(SURFACE_THRESHOLD).sort(), ['importance', 'novelty', 'relevance']);
 });
 
 test('판단 오류 로그에 제목과 요약문이 실리지 않는다', async () => {

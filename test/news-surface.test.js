@@ -54,7 +54,7 @@ function createDatabase() {
 
 // 판단은 (기사, 관심) 쌍에 붙는다. 기사 행은 기사 사실만 든다.
 function insertArticle(db, {
-  id, interestId = 'news-a13f', relevance = 0.9, importance = 0.8,
+  id, interestId = 'news-a13f', relevance = 0.9, novelty = 0.7, importance = 0.8,
   title = '기사', publishedAt = NOW, reason = '이 관심과 직접 관련이 있다.',
 }) {
   db.prepare(`
@@ -78,22 +78,25 @@ function insertArticle(db, {
         prompt_version, analyzer_model, analyzed_at
       ) VALUES (
         @id, @interestId, '질의', @now, 'done',
-        @relevance, 0.5, @importance, '요약 문장.', @reason,
+        @relevance, @novelty, @importance, '요약 문장.', @reason,
         'news-analysis-v1', 'test', @now
       )
-    `).run({ id, interestId, relevance, importance, reason, now: NOW });
+    `).run({ id, interestId, relevance, novelty, importance, reason, now: NOW });
   }
 }
 
 test('문턱을 넘은 기사만 브리핑 후보가 된다', () => {
   const db = createDatabase();
   const store = createNewsStore(db, { now: () => NOW });
-  insertArticle(db, { id: 1, relevance: 0.9, importance: 0.8 });
-  insertArticle(db, { id: 2, relevance: 0.2, importance: 0.9 });
-  insertArticle(db, { id: 3, relevance: 0.9, importance: 0.1 });
+  insertArticle(db, { id: 1, relevance: 0.9, novelty: 0.8, importance: 0.8 });
+  insertArticle(db, { id: 2, relevance: 0.2, novelty: 0.8, importance: 0.9 });
+  insertArticle(db, { id: 3, relevance: 0.9, novelty: 0.8, importance: 0.1 });
+  // 주제가 맞고 중요해도 기존 내용의 해설이면 올리지 않는다.
+  insertArticle(db, { id: 4, relevance: 0.75, novelty: 0.2, importance: 0.4 });
 
   const rows = store.briefingArticles({
     minRelevance: SURFACE_THRESHOLD.relevance,
+    minNovelty: SURFACE_THRESHOLD.novelty,
     minImportance: SURFACE_THRESHOLD.importance,
   });
   assert.deepEqual(rows.map(row => row.id), [1]);
