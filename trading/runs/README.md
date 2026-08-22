@@ -3,7 +3,8 @@
 **폴더 하나가 질문 하나다.** 각 폴더의 `README.md`가 무엇을 물었고 무엇이 답이었는지 적고,
 이 파일은 그 목록을 PR 번호·층·상태로 잇는다.
 
-전략 구축 계약은 `docs/trading/momentum-v2-roadmap.md`이고, 실측·완료 기록의 정본은
+전략 구축 계약은 family마다 하나다 — `docs/trading/momentum-v2-roadmap.md`(CLOSED/FROZEN)와
+`docs/trading/strategies/quality-value-roadmap.md`. 실측·완료 기록의 정본은
 `docs/trading/strategies/Swing Trading Agent Design v2 2.md` 20.0절이다.
 
 ## 층을 구분해서 읽는다
@@ -13,6 +14,7 @@
 |**신호(signal)**|포트폴리오 없이 신호만. 슬롯·수량·비용·청산을 뺀 자리에서 forward excess를 본다|
 |**포트폴리오(portfolio)**|슬롯·수량·비용·체결·청산이 붙은 실제 실행|
 |**진단(diagnostic)**|둘 사이가 어디서 끊기는지|
+|**데이터(data)**|수익률을 보기 전에, 그 숫자를 과거 시점 기준으로 만들 수 있는지|
 
 **신호 층 결과를 포트폴리오 결론으로 읽지 않는다.** PR #10·#11·#13·#14가 반복해서 보여준
 것이 정확히 그 번역 실패다.
@@ -36,6 +38,7 @@
 |`absolute-momentum-signal/`|#17|신호|`ABS(126,5)>0` 후보 조건이 TOP5 +42 excess를 높이는가|**`NON_BINDING`** — 3,385일 중 구성 변경 0일 · `DO_NOT_PROMOTE`|
 |`signal-invalidation-exit/`|#18|포트폴리오|시장 추세가 깨질 때 나가는 것이 fixed K42보다 나은가|**`RISK_ONLY`** — `ΔS -15.57%p` · MDD만 개선 · **fixed K42 유지**|
 |`risk-semantics/`|#19|포트폴리오|sizing의 2ATR를 실제 hard stop으로 집행해야 하는가|**`VOLATILITY_SCALED_POSITION`** — `ΔG -34.09%p` · 손절 472건 전부 1R 초과 · **fixed K42 유지**|
+|`qv-data-audit/`|—|데이터|**`quality-value` Phase 0.** PIT fundamentals를 과거 시점 기준으로 재현할 수 있는가|사전등록 완료 · 미실행|
 |`fip-quality/`|#20|신호|`ID(126,5) < 0` 후보 조건이 TOP5 +42 excess를 높이는가|**`FIP_SIGNAL_REJECTED`** — BINDING이지만 위상 59.5% < 60%로 D 미달 · **alpha 4/4 소진 · 종료**|
 
 ## 폴더를 층별 하위 디렉터리로 옮기지 않은 이유
