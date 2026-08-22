@@ -410,6 +410,11 @@ historical_usable_session(filing) <= formation session인 annual 10-K
 
 Quarterly TTM, 10-Q, 8-K preliminary earnings는 이번 factor에 넣지 않는다.
 
+**이 배제는 accounting factor 입력(Quality·Book Equity)에만 적용된다.** Market Equity
+denominator의 shares는 회계 factor가 아니라 **stock-state 입력**이므로 별도 규칙(§4.4.1)을
+따른다. 12월 결산이 아닌 발행사는 10-K에 12월 instant가 아예 없어서, 이 구분이 없으면
+`B/M`을 만들 수 없다.
+
 ### 4.2 Gross Profitability
 
 경제적 정의:
@@ -482,6 +487,99 @@ execution security
 - 같은 issuer가 portfolio에서 두 자리를 차지하면 data-contract failure다.
 - split/share-class/corporate action이 반영된 point-in-time common shares를 써야 한다.
 - 오늘의 SharesOutstanding을 과거 전체에 복사하는 것은 금지한다.
+
+### 4.4.1 ME shares source — 무엇을 어디서 읽는가
+
+**정찰(`trading/runs/qv-data-audit/PROBE-me-source.md`) 결과를 계약으로 고정한다.**
+
+**shares 정본은 raw XBRL instance다.** SEC `companyfacts` / `companyconcept` API를 shares/ME
+정본으로 쓰지 않는다. 그 API가 돌려주는 fact에는 dimension이 없어 multi-class를 분해할 수
+없고, 비차원 값의 의미가 발행사마다 다르다(한쪽은 전체 합계, 한쪽은 Class A만, 한쪽은 404).
+**결과가 아쉽다고 이 경로를 되살리지 않는다.**
+
+허용하는 form은 넷이다.
+
+```text
+10-K   10-K/A   10-Q   10-Q/A
+```
+
+모든 shares fact는 다음을 전부 만족해야 사용할 수 있다.
+
+```text
+raw XBRL instance에서 읽는다
+formation 시점에 이미 usable한 filing에서만 읽는다
+acceptance_datetime을 보존한다
+historical_usable_session(filing) 이전에는 사용하지 않는다 (§3.2)
+accession · form · acceptance_datetime · instant · axis/member · provenance가 역추적된다
+```
+
+12월 shares 선택 규칙은 이렇다.
+
+```text
+formation 시점까지 usable한 filing들 중,
+t-1년 12월 마지막 거래일 이하인 shares instant 가운데
+가장 늦은 instant를 쓴다.
+
+tie-break (같은 instant가 여러 filing에 있을 때, 순서대로):
+  1. acceptance_datetime이 가장 늦은 filing
+  2. 그래도 같으면 accession 사전순 마지막
+```
+
+**tie-break를 결과를 보고 정하지 않는다.** 값이 서로 다른데 위 규칙으로 하나가 정해지지
+않으면 그 issuer-year는 `MISSING`이고, 조용히 아무거나 고르지 않는다.
+
+#### derived member를 실제 class로 등록하지 않는다
+
+`EquivalentClassAMember`처럼 conversion-equivalent · derived · memorandum 성격의 member는
+실제 share class가 아니다. Berkshire 인스턴스에는 Class A · Class B와 함께 이 member가 있고,
+`StatementClassOfStockAxis`의 member를 전부 더하면 같은 지분을 두 번 센다.
+
+```text
+member를 이름 패턴으로 일괄 합산하는 구현을 금지한다.
+실제 outstanding ordinary class임이 원문으로 확인된 member만
+명시적 mapping/whitelist로 identity에 연결한다.
+알 수 없는 member는 조용히 포함하지 않고 unresolved/missing으로 기록한다.
+```
+
+### 4.4.2 비상장 ordinary class — 버리지도, 값을 지어내지도 않는다
+
+상장되지 않은 ordinary class를 **그냥 빼면 안 된다.** consolidated Book Equity는 그 지분을
+포함하는데 ME denominator에서만 빠지면 `B/M`이 체계적으로 높아지고, 그 왜곡은 multi-class
+발행사에만 걸리므로 V 랭크가 한쪽으로 기운다. 반대로 시장가격이 없다고 **임의 가격을 만들지도
+않는다.**
+
+```text
+1. listed ordinary class
+   ME_class = shares × 그 class의 raw close
+   valuation_method = OBSERVED_MARKET_PRICE
+
+2. unlisted ordinary class 중, 그 시점에 유효한 SEC filing·charter 등 신뢰 가능한 원문으로
+   특정 listed ordinary class에 대한 고정된 직접 conversion ratio가 확인되는 경우
+   ME_class = shares × conversion_ratio × reference listed class의 raw close
+   valuation_method = CONVERSION_VALUE_PROXY
+
+3. unlisted ordinary class인데 방어 가능한 fixed conversion ratio가 없는 경우
+   가격을 추정하지 않는다
+   그 issuer의 ME = MISSING → Value/QV ranking 불가
+   단 coverage denominator에서 제거하지 않고 missing reason으로 센다
+```
+
+세 가지를 금지한다.
+
+```text
+unlisted라는 이유로 조용히 제외
+비슷해 보인다는 이유로 listed class 가격을 대입
+결과를 보고 conversion mapping을 추가
+```
+
+Alphabet Class B는 **실제 법적 1:1 conversion 권리가 원문으로 확인되는 경우에만** Class A의
+conversion value proxy를 쓸 수 있다. **`CONVERSION_VALUE_PROXY`는 관측된 시장가격이 아니므로**
+`valuation_method`와 provenance를 결과 artifact까지 끌고 간다. 두 방법을 섞어 하나의 ME로
+보고하면서 어느 쪽인지 지우지 않는다.
+
+conversion ratio는 시간에 따라 바뀔 수 있다. **현재 ratio를 과거에 소급하지 않는다.**
+
+---
 
 ### 4.5 Cross-sectional score — rank 수학을 고정한다
 
@@ -1445,6 +1543,11 @@ assumption → prereg → implementation → result → interpretation → user 
 - [ ] current SIC가 historical missing을 조용히 대체하지 않는가
 - [ ] source version이 결과 artifact에 기록되는가
 - [ ] point-in-time common shares/ME source의 field semantics가 filing과 대조됐는가
+- [ ] shares를 raw XBRL instance에서 읽었고 companyfacts API를 정본으로 쓰지 않았는가
+- [ ] 12월 shares instant 선택과 tie-break가 결과 전에 고정된 규칙대로인가
+- [ ] derived/equivalent member가 실제 share class로 등록되지 않았는가
+- [ ] 비상장 ordinary class가 조용히 제외되거나 임의 가격을 받지 않았는가
+- [ ] `valuation_method`가 결과 artifact까지 보존되는가
 - [ ] coverage denominator가 Q/V missing 이전 PIT issuer universe로 고정됐는가
 - [ ] future-perturbation sentinel에서 과거 formation snapshot hash가 exact match인가
 - [ ] sentinel이 filing/share/split/share-class/membership/price 미래 경계를 모두 건드리는가

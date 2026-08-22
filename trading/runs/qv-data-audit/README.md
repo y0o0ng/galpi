@@ -98,11 +98,36 @@ QV core signature에 들어간다(§4.7).
 |`StockholdersEquity` XBRL fallback 순서|§4.3|
 |preferred stock · deferred tax 태그 mapping|§4.3|
 |historical SIC 복원 경로|§3.4 — filing 시점 submission header 우선|
-|point-in-time common shares / ME source|§3.1 우선순위 1→2→3 · **정찰 결과 `PROBE-me-source.md` 8.7의 다섯 규칙을 여기서 고정한다**|
+|point-in-time common shares / ME source|§3.1 우선순위 1→2→3. **정찰이 열어둔 다섯 중 (1)(2)(3)(4)(5)는 로드맵 §4.4.1·§4.4.2로 확정됐다**(아래 3.5)|
 |multi-class issuer aggregation + execution-security rule|§6 작업 6|
 
 **issuer custom tag를 이름 유사도로 자동 연결하지 않는다**(§4.2). 표준 taxonomy와 filing
 원문으로 회계적 동일성이 확인된 mapping만 넣는다.
+
+### 3.5 ME shares — 정찰 뒤 확정된 계약
+
+정본은 로드맵 §4.4.1·§4.4.2다. **여기서 다시 정하지 않고 Phase 0이 지켜야 할 형태로만
+옮겨 적는다.** 정찰 기록은 `PROBE-me-source.md`다.
+
+```text
+정본 source      raw XBRL instance          (companyfacts / companyconcept API 금지)
+허용 form        10-K · 10-K/A · 10-Q · 10-Q/A
+usable 경계      historical_usable_session(filing) <= formation session
+12월 instant     t-1년 12월 마지막 거래일 이하 중 가장 늦은 instant
+tie-break        acceptance_datetime 늦은 쪽 → accession 사전순 마지막 → 정해지지 않으면 MISSING
+member           원문 확인된 실제 ordinary class만 whitelist. derived/equivalent 제외
+                 알 수 없는 member는 unresolved/missing
+비상장 class     OBSERVED_MARKET_PRICE | CONVERSION_VALUE_PROXY | MISSING (셋 중 하나)
+                 조용한 제외 금지 · 임의 가격 금지 · 결과 보고 mapping 추가 금지
+보존             accession · form · acceptance_datetime · instant · axis/member
+                 · valuation_method · provenance
+```
+
+**`§4.1`의 10-Q 배제는 accounting factor 입력에만 적용된다.** ME용 shares는 stock-state
+입력이라 10-Q 계열을 읽는다. 12월 결산이 아닌 발행사는 10-K에 12월 instant가 없다.
+
+**coverage 영향**: 위 규칙으로 ME가 `MISSING`이 된 issuer-year는 **denominator에서 빠지지
+않는다.** missing reason으로 세고 Gate C는 본구현 전수에서만 판정한다.
 
 ### 3.3 이미 고정돼 있어 여기서 손대지 않는 것
 
@@ -215,8 +240,9 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 |4. shares / ME 본구현|미착수|
 |5. formation snapshot · sentinel · coverage|미착수|
 
-정찰이 열어둔 빈칸 둘(`10-Q를 shares source로 허용하는지`, `상장되지 않은 ordinary class 처리`)은
-로드맵에 규칙이 없다. **본구현 착수 전에 정한다.**
+정찰이 열어둔 빈칸 둘은 **로드맵 §4.4.1·§4.4.2로 확정됐다**(위 3.5). 10-Q 계열은 ME shares
+source로 허용하고, 비상장 ordinary class는 `OBSERVED_MARKET_PRICE` / `CONVERSION_VALUE_PROXY` /
+`MISSING` 셋 중 하나로만 처리한다.
 
 ## 8. 결과
 
