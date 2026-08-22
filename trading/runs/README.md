@@ -3,8 +3,8 @@
 **폴더 하나가 질문 하나다.** 각 폴더의 `README.md`가 무엇을 물었고 무엇이 답이었는지 적고,
 이 파일은 그 목록을 PR 번호·층·상태로 잇는다.
 
-전략 구축 계약은 `docs/momentum-v2-roadmap.md`이고, 실측·완료 기록의 정본은
-`docs/Swing Trading Agent Design v2 2.md` 20.0절이다.
+전략 구축 계약은 `docs/trading/momentum-v2-roadmap.md`이고, 실측·완료 기록의 정본은
+`docs/trading/strategies/Swing Trading Agent Design v2 2.md` 20.0절이다.
 
 ## 층을 구분해서 읽는다
 

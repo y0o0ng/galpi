@@ -3,7 +3,7 @@
 > **결과를 계산하기 전에 작성한 사전등록 문서다.** 결과를 본 뒤 이 문서의 판정 기준을
 > 고치지 않는다.
 
-로드맵은 `docs/momentum-v2-roadmap.md`이고 이 PR은 그 **Phase 3**이다. 알파 개입 네 번 중
+로드맵은 `docs/trading/momentum-v2-roadmap.md`이고 이 PR은 그 **Phase 3**이다. 알파 개입 네 번 중
 **세 번째**다(시장 상태 = 유지 · absolute momentum = 종료).
 
 ---

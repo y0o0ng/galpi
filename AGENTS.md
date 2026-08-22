@@ -26,8 +26,10 @@
 - Pi 운영·복구: `docs/RASPBERRY_PI_RUNBOOK.md`
 - 현재 음성 기준: `docs/voice-halfduplex-design.md`
 - XION 통합 홈(지식 패널 첫 화면): `docs/xion-home-design.md`
-- 트레이딩(V5-B): `docs/Swing Trading Agent Design v2 2.md`. 실측·완료 기록은 20.0절이다.
-- 트레이딩 전략 구축 계약: `docs/momentum-v2-roadmap.md`. **연구 예산·종료 조건·Phase별 사전등록이 여기 있다.** 실험 산출물 색인은 `trading/runs/README.md`다.
+- 트레이딩(V5-B): `docs/trading/strategies/Swing Trading Agent Design v2 2.md`. 실측·완료 기록은 20.0절이다.
+- 트레이딩 전략 구축 계약: 전략 family마다 로드맵이 하나다. **연구 예산·종료 조건·Phase별 사전등록이 거기 있다.** 실험 산출물 색인은 `trading/runs/README.md`다.
+  - `momentum-v2` (CLOSED/FROZEN): `docs/trading/momentum-v2-roadmap.md`
+  - `quality-value` (구현 승인 전): `docs/trading/strategies/quality-value-roadmap.md`
 - 메일 에이전트(독립 트랙 MAIL-1~4): `docs/xion-mail-agent-design-final.md`. 스키마·Phase·통과 기준이 전부 그 문서에 있다.
 - 세부 설계는 각 기능 문서를 단일 기준으로 삼고, 이 파일에 상세 이력을 복제하지 않는다.
 
@@ -100,7 +102,7 @@
 - **이름과 검색어는 다른 칸이다**(설계 12.1). topic은 사람이 읽는 이름이고 수집이 던지는 것은 `query`다. 하나였을 때 사용자가 말한 대로 적으면 검색이 넓어지고(`피지컬 AI 관련 정보` → 국내 일반지·보도자료·스팸) 검색이 되게 고치면 노트가 읽기 나빠졌다. `reason`은 여전히 검색에 안 쓰이고 판단 프롬프트에만 들어간다.
 - **검색어 생성은 등록하는 그 턴 한 번뿐이다.** `news_interest_prepare`의 선택 입력 `search_query`라 **추가 LLM 호출이 없다.** 언어는 고정하지 않고 그 주제가 주로 보도되는 언어로 모델이 고른다. **없으면 topic으로 돌아 무회귀다.** 생성된 질의는 노트에 보이는 자리에 남긴다 — 안 보이면 사용자가 말하지 않은 문자열이 조용히 수집을 정한다.
 - **필터는 만들지 않는다.** `searchTavilyWeb`이 언어·국가·도메인 필터를 넘길 자리가 없어서, 지금 만들면 안 쓰이는 값이 쌓인다. provider를 바꿀 때 함께 연다.
-- **예산 천장이 관심 2개에서 닿는다.** 관심 1개가 6시간 주기로 월 120회인데 한도가 200이라 2개면 월 240회다. 한도에 걸리면 실패로 적지 않고 조용히 미루기만 해서(`collect.js`의 `budget: true`) 눈치채기 어렵다.
+- **뉴스 검색 예산은 Pi가 `700`이고 `.env.example`이 `200`이다.** 관심 1개가 6시간 주기로 월 120회이므로 Pi의 현재 관심 3개는 월 360회로 여유가 있다. **한도에 걸리면 실패로 적지 않고 조용히 미루기만 하므로**(`collect.js`의 `budget: true`) 관심을 크게 늘릴 때는 한도부터 확인한다.
 - **아직 정하지 못한 것 둘.** 원문 fetch(문턱이 생겼어도 별도 결정이라 안 열었다) · 11.2절 최근 언급 매칭이 너무 엄격한 문제. 둘 다 30~50건 표본이 필요하다.
 - **v1은 사용자가 직접 말한 관심만 다룬다**(hot path `expressed`·`subscribed` → RSS/API 수집 → 홈 조건부 브리핑). 먼저 묻기는 v1.1, 대화에서 관심을 추론하는 background batch는 v2다.
 - **v2를 여는 조건이 메일 관측이다.** background 추론만이 사용자가 요청하지 않은 상태를 LLM이 스스로 만드는 경로라, 메일의 판단 흔들림 관측이 끝나기 전에는 열지 않는다. 두 트랙은 병행한다.
@@ -139,7 +141,7 @@
 
 ### V5-B 스윙 트레이딩
 
-- 코드는 `trading/`이고 `server.js`에 연결하지 않는다. Python 표준 라이브러리만 쓴다. 기준 문서는 `docs/Swing Trading Agent Design v2 2.md`이고 **실측·완료 기록은 20.0절, 실험별 결과는 `trading/runs/<실험>/README.md`에 있다. 여기에 다시 쓰지 않는다.**
+- 코드는 `trading/`이고 `server.js`에 연결하지 않는다. Python 표준 라이브러리만 쓴다. 기준 문서는 `docs/trading/strategies/Swing Trading Agent Design v2 2.md`이고 **실측·완료 기록은 20.0절, 실험별 결과는 `trading/runs/<실험>/README.md`에 있다. 여기에 다시 쓰지 않는다.**
 - **실전 경로는 구현하지 않는다.** PAPER config는 `KIS_PAPER_*`만 읽고 모의 호스트가 아니면 기동을 거부한다. 자격증명은 `trading/paper-credentials.env`(gitignore)에 사용자가 직접 넣고 나는 열지 않는다.
 - **`bars_daily`는 지우지 않는다** — 적재분 `eodhd-15y-2026-08`은 908회 호출이고 EODHD 삭제 의무(해지 후 1개월) 대상이다. `edgar`·`delistings`·`universe` 단계는 공개 자료라 언제든 다시 만든다.
 - **한 벌의 규칙이 코어이고 코어 하나가 파일 하나다**(`trading/core/`). `CoreDefinition.run_kwargs()`가 규칙 설정의 유일한 통로이고 `RULE_FIELDS`에 없는 것은 규칙이 아니다. `paper-core-v1`은 동결이고(`FreezeTest`) 변형은 새 코어로 만든다. **다만 서명은 엔진을 덮지 않아서** 옛 보고서의 숫자를 지금 엔진과 견주지 않는다.
@@ -154,7 +156,7 @@
 - **control과 challenger는 `policy_id`만 다르고 행동 규칙은 전부 같다.** 서명을 공유하면 `record_holdout_run`이 두 팔을 같은 행으로 덮어쓴다.
 - **`FIXED_HOLD` 계열의 위험 회계는 legacy volatility-budget accounting이다.** `planned_risk`·`open_risk`·`return_r` 같은 이름이 남아 있지만 집행되는 손절선도 최대손실 한도도 아니다. **0.25%가 무엇인지는 코어가 아니라 `exit_mode`가 정한다** — `CORE`·`FIXED_HOLD_HARD_STOP`은 planned stop risk이고 `FIXED_HOLD`·`SIGNAL_INVALIDATION`은 volatility sizing budget이다. 정본 설명은 `core/jt.py` 한 곳이다.
 - **연구 코어는 구조적으로 `UNDETERMINED`를 벗어날 수 없다.** JT 코어는 전부 `require_earnings_calendar=False`라 `EARNINGS_GATE_DISABLED` blocker가 항상 붙는다.
-- **`momentum-v2`는 2026-08-17 종료됐다.** 알파 개입 네 번(시장 상태 · 종목 absolute momentum · signal-aligned exit · FIP quality)을 전부 쓰고 §4 경제성 허들을 통과하지 못해 로드맵 §8의 종료 조건이 발동했다. Phase 7~9를 열지 않는다. **다시 열지 않는 축**: J/K·슬롯·랭크 cutoff 재탐색 · sizing ablation · BULL-only 게이트 · 레짐 조건부 J · alternate SMA·ATR threshold·confirmation days·buffer · 1.5/2.5/3ATR·trailing stop·stop confirmation · FIP threshold/window/quality filter. 각 종료 근거는 `docs/momentum-v2-roadmap.md`의 Phase별 절과 해당 `runs/*/README.md`에 있다.
+- **`momentum-v2`는 2026-08-17 종료됐다.** 알파 개입 네 번(시장 상태 · 종목 absolute momentum · signal-aligned exit · FIP quality)을 전부 쓰고 §4 경제성 허들을 통과하지 못해 로드맵 §8의 종료 조건이 발동했다. Phase 7~9를 열지 않는다. **다시 열지 않는 축**: J/K·슬롯·랭크 cutoff 재탐색 · sizing ablation · BULL-only 게이트 · 레짐 조건부 J · alternate SMA·ATR threshold·confirmation days·buffer · 1.5/2.5/3ATR·trailing stop·stop confirmation · FIP threshold/window/quality filter. 각 종료 근거는 `docs/trading/momentum-v2-roadmap.md`의 Phase별 절과 해당 `runs/*/README.md`에 있다.
 - 미해결로 남긴 것: 정체불명 계열 23개(`MER`·`JAVA`·`RX`…), CIK 3개(`FMCN`·`LMCA`·`LMCK`), 섹터 11개(`ACAS`·`YHOO`). 섹터 게이트가 fail-close라 그 종목들은 진입이 막힌다. 외국 발행사와 주 인가 은행은 실적일을 만들 수 없는데, **결과를 낙관적으로 만들지 않고 기회만 좁히므로** 14.7 판정을 막지 않는다.
 
 ## 구조 방향

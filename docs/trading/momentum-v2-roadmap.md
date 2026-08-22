@@ -4,7 +4,7 @@
 > 그만둘지를 미리 못박는다. 각 Phase는 **독립 PR + 사전등록 + 사용자 검토 후 승인**으로만
 > 진행하고, 결과를 보고 로드맵을 확장하지 않는다.
 
-기준 문서는 `docs/Swing Trading Agent Design v2 2.md`이고 실측 기록은 그 20.0절이다. 이
+기준 문서는 `strategies/Swing Trading Agent Design v2 2.md`이고 실측 기록은 그 20.0절이다. 이
 문서는 그것을 대체하지 않고 **연구 예산과 종료 조건**을 추가한다.
 
 ---

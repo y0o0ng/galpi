@@ -3,7 +3,7 @@
 > **결과를 계산하기 전에 작성한 사전등록 문서다.** 결과를 본 뒤 이 문서의 판정 기준을
 > 고치지 않는다.
 
-로드맵은 `docs/momentum-v2-roadmap.md`이고 이 PR은 그 **Phase 4**다.
+로드맵은 `docs/trading/momentum-v2-roadmap.md`이고 이 PR은 그 **Phase 4**다.
 
 **이것은 alpha 개입이 아니다.** 알파 개입 예산 네 번(시장 상태 · 종목 absolute momentum ·
 signal-aligned exit · FIP) 중 셋을 썼고 남은 하나는 FIP다. Phase 4는 **이미 쓰고 있는

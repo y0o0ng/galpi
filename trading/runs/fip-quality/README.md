@@ -3,7 +3,7 @@
 > **결과를 계산하기 전에 작성한 사전등록 문서다.** 결과를 본 뒤 이 문서의 판정 기준을
 > 고치지 않는다. **Stage A와 Stage B의 규칙을 Stage A 결과가 나오기 전에 전부 적는다.**
 
-로드맵은 `docs/momentum-v2-roadmap.md`이고 이 PR은 그 **Phase 6**이다. 알파 개입 예산
+로드맵은 `docs/trading/momentum-v2-roadmap.md`이고 이 PR은 그 **Phase 6**이다. 알파 개입 예산
 네 번 중 **마지막 카드**다.
 
 |개입|결과|
