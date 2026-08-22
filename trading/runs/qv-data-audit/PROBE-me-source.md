@@ -137,10 +137,128 @@ Gate C 판정                     30건 수동 audit 실행
 
 ---
 
-## 8. 결과
-
-<!-- 실행 후 채운다. §2의 승인 규칙과 §3의 여섯 축은 그때 고치지 않는다. -->
+## 8. 결과 — 2026-08-22
 
 ```text
-판정        (미실행)
+판정        SEC_ROUTE_VIABLE
 ```
+
+**§2의 승인 규칙과 §3의 여섯 축을 고치지 않았다.** 아래는 "표본에서 몇 개 맞았다"가 아니라
+여섯 축 각각에 systematic blocker가 있는지의 판정이다. **Gate C(95%)는 여기서 판정하지 않았고
+본구현 전수에서만 판정한다.**
+
+### 8.1 API 경로는 구조적으로 불충분하다 — P1·P2·P3 기각
+
+`companyfacts` / `companyconcept`가 돌려주는 fact의 키는 다음이 전부다.
+
+```text
+['accn', 'end', 'filed', 'form', 'fp', 'frame', 'fy', 'val']
+```
+
+**dimension(axis)이 없다.** §4에서 미리 의심한 blocker가 실제로 존재한다. 더 나쁜 것은
+비차원 값의 **의미가 발행사마다 다르다**는 점이다.
+
+|issuer|`us-gaap:CommonStockSharesOutstanding`|`dei:EntityCommonStockSharesOutstanding`|
+|---|---|---|
+|Apple (단일 class)|fact 144개 · 분기 instant|fact 70개|
+|Alphabet|`12,088,000,000` = **A+B+C 합계**|**HTTP 404**|
+|Berkshire|**HTTP 404**|fact 7개 · **2011에서 끊김** · 값이 **Class A만**|
+
+Alphabet의 합계에는 **상장되지 않은 Class B**가 섞여 있어 한 가격에 곱하면 ME가 부풀고,
+Berkshire는 A와 B의 가격이 1,500배 넘게 차이 나므로 합계를 써도 class를 몰라도 파탄난다.
+`비차원 값 = 전체 합계`라는 규칙조차 세울 수 없다.
+
+### 8.2 raw XBRL instance 경로는 살아 있다 — P4 채택
+
+Berkshire FY2025 10-K(`accn 0001193125-26-083899`)의 인스턴스를 직접 파싱한 결과:
+
+```text
+CommonStockSharesOutstanding  instant=2023-12-31            567,775  ClassA
+CommonStockSharesOutstanding  instant=2023-12-31      1,310,561,508  ClassB
+CommonStockSharesOutstanding  instant=2024-12-31            547,562  ClassA
+CommonStockSharesOutstanding  instant=2024-12-31      1,335,992,139  ClassB
+```
+
+`StatementClassOfStockAxis`로 class가 갈리고 **instant가 정확히 12월 31일**이다.
+
+**오래된 연도도 막히지 않는다.** inline XBRL 도입 이전인 2012-02-27 제출 10-K는 독립 인스턴스
+`brka-20111231.xml`을 갖고 있고, 같은 축으로 **2008-12-31 instant까지** 나온다.
+
+### 8.3 여섯 축 판정
+
+|축|판정|근거|
+|---|---|---|
+|as-of date|**성립**|instant가 실제 날짜로 붙는다. 단 8.4 참조|
+|class scope|**성립**|`StatementClassOfStockAxis` member로 갈린다 (raw instance 한정)|
+|split basis|**성립**|8.5 참조. PIT 규칙 자체가 단위를 지켜준다|
+|issuer aggregation|**조건부 성립**|8.6의 member whitelist가 필요하다|
+|provenance|**성립**|accession → 인스턴스 파일 → fact로 역추적된다|
+|오래된 연도|**성립**|2008-12-31 instant 확인|
+
+`acceptanceDateTime`은 `submissions`에 실제로 존재한다(2012년 filing에도 있다). §3.2의
+`historical_usable_session`을 만들 수 있다.
+
+### 8.4 12월 결산이 아닌 발행사는 10-K에 12월 instant가 없다
+
+Apple FY2011 10-K(`aapl-20110924.xml`)에는 **12-31 instant fact가 0개**다. 9월 결산이라
+대차대조표 instant가 9월이다. Apple의 12월 수량은 **10-Q**에 있고 instant도 `2019-12-28`처럼
+정확히 말일이 아니다.
+
+즉 ME용 shares는 10-K만으로 못 모은다. **이것은 blocker가 아니라 규칙이 필요한 지점이다**
+(8.7 (3)(4)).
+
+### 8.5 split은 PIT 규칙이 이미 막아준다
+
+Apple 2020-08 4:1 split을 사이에 두고 `2019-12` instant를 찾으면:
+
+```text
+10-Q filed 2020-01-29   2019-12-28   4,384,959,000   ← split 이전 단위
+10-K filed 2020-10-30   (없음)
+10-Q filed 2021-01-28   (없음)
+```
+
+**당시 filing만 그 시점 수량을 들고 있고, 이후 filing은 그 instant를 아예 갖지 않는다.**
+formation 시점에 usable했던 filing에서 읽는다는 PIT 규칙을 지키면 raw close와 단위가 자동으로
+맞는다. 소급 조정본을 잘못 집는 경로가 구조적으로 생기지 않는다.
+
+### 8.6 발견한 함정 — 파생 member를 합산하면 이중계산이다
+
+Berkshire 인스턴스에는 이런 fact가 같이 있다.
+
+```text
+CommonStockSharesOutstanding  instant=2025-12-31   1,438,223  EquivalentClassAMember
+```
+
+Class B를 **A 환산한 메모 값**이다. `StatementClassOfStockAxis`의 member를 전부 더하면
+같은 지분을 두 번 센다. **member를 whitelist로 고정해야 하고, 발견되지 않은 member는 조용히
+포함하지 않고 missing으로 센다.**
+
+### 8.7 본구현 전에 고정해야 하는 규칙
+
+probe가 만들어낸 새 규칙이다. **여기서 정하지 않고 목록만 남긴다** — 정하는 자리는 Phase 0
+본구현 prereg이고, 그때 filing 원문 대조와 함께 `accounting_definition_version`에 박는다.
+
+```text
+(1) shares 정본은 raw XBRL instance다. companyfacts API를 ME 정본으로 쓰지 않는다.
+(2) StatementClassOfStockAxis member whitelist. Equivalent*/파생 member 제외.
+(3) 12월 shares instant 선택 규칙:
+    formation 시점 usable한 filing들 중 instant <= 12월 마지막 거래일인 가장 늦은 instant
+(4) 10-Q를 shares source로 허용하는지 명시.
+    §4.1의 10-Q 배제는 accounting factor 입력에 대한 것이고 ME용 수량은 다른 입력이다.
+    로드맵이 이 구분을 적지 않았다.
+(5) 상장되지 않은 ordinary class 처리. Alphabet Class B는 가격이 없다.
+    §4.4의 "가능한 범위에서 class별 market equity를 합산"이 이 경우를 정하지 않는다.
+```
+
+**(4)와 (5)는 로드맵의 진짜 빈칸이다.** 내가 임의로 메우지 않는다.
+
+### 8.8 이 probe가 하지 않은 것
+
+```text
+Gate C 95% 판정          multi-class 비중 실측       coverage_start 결정
+전수 인스턴스 파싱        production ingestion        수익률 계산
+```
+
+표본은 §5의 적대적 10개 중 Apple·Alphabet·Berkshire 세 곳까지만 실제로 밟았다. **여섯 축
+전부에서 blocker 유무가 갈렸고 P4가 세 곳 모두에서 성립했으므로 더 밟지 않고 멈췄다.**
+나머지 일곱은 본구현 전수에서 자연히 검사된다.

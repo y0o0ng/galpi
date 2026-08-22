@@ -98,7 +98,7 @@ QV core signature에 들어간다(§4.7).
 |`StockholdersEquity` XBRL fallback 순서|§4.3|
 |preferred stock · deferred tax 태그 mapping|§4.3|
 |historical SIC 복원 경로|§3.4 — filing 시점 submission header 우선|
-|point-in-time common shares / ME source|§3.1 우선순위 1→2→3|
+|point-in-time common shares / ME source|§3.1 우선순위 1→2→3 · **정찰 결과 `PROBE-me-source.md` 8.7의 다섯 규칙을 여기서 고정한다**|
 |multi-class issuer aggregation + execution-security rule|§6 작업 6|
 
 **issuer custom tag를 이름 유사도로 자동 연결하지 않는다**(§4.2). 표준 taxonomy와 filing
@@ -204,9 +204,23 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 
 ---
 
-## 7. 결과
+## 7. 진행
 
-<!-- 실행 후 채운다. 이 위의 어떤 문턱도 그때 고치지 않는다. -->
+|단계|상태|
+|---|---|
+|**정찰 — ME source** (`PROBE-me-source.md`)|**`SEC_ROUTE_VIABLE`** (2026-08-22). raw XBRL instance 경로가 여섯 축을 전부 통과했고 API 경로는 기각됐다|
+|1. identity 계층|미착수|
+|2. submissions ingestion|미착수|
+|3. companyfacts / accounting mapping|미착수|
+|4. shares / ME 본구현|미착수|
+|5. formation snapshot · sentinel · coverage|미착수|
+
+정찰이 열어둔 빈칸 둘(`10-Q를 shares source로 허용하는지`, `상장되지 않은 ordinary class 처리`)은
+로드맵에 규칙이 없다. **본구현 착수 전에 정한다.**
+
+## 8. 결과
+
+<!-- 전수 실행 후 채운다. 이 위의 어떤 문턱도 그때 고치지 않는다. -->
 
 ```text
 판정        (미실행)
