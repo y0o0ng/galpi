@@ -403,6 +403,46 @@ class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
 
 
 class QVIdentityConstraintTest(QVIdentityFixture, unittest.TestCase):
+    def test_non_pit_securities_source_cannot_register_an_issuer(self):
+        register_source(
+            self.connection,
+            SOURCE,
+            VERSION,
+            "securities",
+            point_in_time=False,
+            survivorship_biased=False,
+            note="current-only identity fixture",
+        )
+
+        with self.assertRaises(QVIdentityError):
+            self.issuer("issuer-non-pit", "8080808")
+        self.assertEqual(
+            self.connection.execute(
+                "SELECT COUNT(*) AS n FROM qv_issuers"
+            ).fetchone()["n"],
+            0,
+        )
+
+    def test_survivorship_biased_securities_source_cannot_register_an_issuer(self):
+        register_source(
+            self.connection,
+            SOURCE,
+            VERSION,
+            "securities",
+            point_in_time=True,
+            survivorship_biased=True,
+            note="survivorship-biased identity fixture",
+        )
+
+        with self.assertRaises(QVIdentityError):
+            self.issuer("issuer-biased", "9090909")
+        self.assertEqual(
+            self.connection.execute(
+                "SELECT COUNT(*) AS n FROM qv_issuers"
+            ).fetchone()["n"],
+            0,
+        )
+
     def test_active_class_period_overlap_is_rejected(self):
         self.issuer("issuer-overlap", "1111111")
         self.share_class(

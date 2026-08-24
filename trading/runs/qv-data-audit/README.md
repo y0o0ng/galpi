@@ -297,6 +297,20 @@ npm test
   949 tests · PASS
 ```
 
+### PIT source guard review fix — 2026-08-24
+
+`_assert_identity_source()`가 이제 `kind='securities'`뿐 아니라 `point_in_time=1`과
+`survivorship_biased=0`도 요구한다. non-PIT source와 survivorship-biased source가
+`register_issuer()`에서 각각 거부되고 행을 남기지 않는 regression 두 개를 추가했다.
+
+```text
+QV identity focused  21 tests · PASS
+trading 전체          1,129 tests · PASS
+npm                   949 tests · PASS
+```
+
+기존 momentum `snapshot_id()` exact-match regression도 그대로 통과했다.
+
 QV 테이블과 실제 fixture 행을 넣기 전후의 기존 `PointInTimeSnapshot.snapshot_id()`는 exact match였다.
 기존 DB fixture의 `securities` 행도 보존됐고 새 QV 표 셋은 빈 상태로 생성됐다. 따라서 frozen momentum
 snapshot 입력, `RULE_FIELDS`, core/policy와 `features_daily`에는 영향이 없다.

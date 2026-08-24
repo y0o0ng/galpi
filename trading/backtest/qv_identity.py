@@ -122,12 +122,13 @@ def _assert_identity_source(
 ) -> None:
     row = connection.execute(
         "SELECT 1 FROM data_sources"
-        " WHERE source = ? AND source_version = ? AND kind = 'securities'",
+        " WHERE source = ? AND source_version = ? AND kind = 'securities'"
+        " AND point_in_time = 1 AND survivorship_biased = 0",
         (source, source_version),
     ).fetchone()
     if row is None:
         raise QVIdentityError(
-            f"QV identity 출처가 securities kind로 선언되지 않았습니다: "
+            f"QV identity 출처가 PIT·비생존편향 securities로 선언되지 않았습니다: "
             f"{source}/{source_version}"
         )
 
