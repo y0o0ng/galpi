@@ -234,7 +234,7 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 |단계|상태|
 |---|---|
 |**정찰 — ME source** (`PROBE-me-source.md`)|**`SEC_ROUTE_VIABLE`** (2026-08-22). raw XBRL instance 경로가 여섯 축을 전부 통과했고 API 경로는 기각됐다|
-|1. identity 계층|미착수|
+|1. identity 계층|**구현 완료** (2026-08-24). `schema.sql`의 QV 전용 세 테이블과 `qv_identity.py`, fixture·회귀 테스트가 정본이다|
 |2. submissions ingestion|미착수|
 |3. companyfacts / accounting mapping|미착수|
 |4. shares / ME 본구현|미착수|
@@ -244,7 +244,79 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 source로 허용하고, 비상장 ordinary class는 `OBSERVED_MARKET_PRICE` / `CONVERSION_VALUE_PROXY` /
 `MISSING` 셋 중 하나로만 처리한다.
 
-## 8. 결과
+## 8. identity 계층 구현 receipt — 2026-08-24
+
+### 구현된 계약
+
+- 내부 정본은 `issuer_id`이고 CIK는 10자리 SEC external identifier다. CIK를 PK로 쓰지 않는다.
+- 기존 `securities`와 `data_sources` CHECK는 바꾸지 않았다. identity source는 기존
+  `kind='securities'`로 등록하고 각 QV 행의 `source` · `source_version` · `provenance`를 보존한다.
+- `qv_share_classes`의 구간은 `[effective_from, effective_to)`다. 같은 `class_id`의 비중첩 행으로
+  ticker/XBRL member history를 표현하며, 같은 ticker의 서로 다른 issuer 재사용도 비중첩 구간으로
+  분리한다.
+- axis/member는 exact explicit mapping만 조회한다. derived/equivalent 이름 규칙이나 유사도 mapping은
+  없다. 등록되지 않은 member는 `UnresolvedIdentityError`다.
+- 같은 시점의 class · symbol · member 중복과 손상된 중복 조회는 하나를 고르지 않고 각각
+  `QVIdentityError` / `AmbiguousIdentityError`로 fail-close한다.
+- valuation은 `OBSERVED_MARKET_PRICE` · `CONVERSION_VALUE_PROXY` · `MISSING` 셋뿐이다. proxy는
+  같은 issuer의 active listed ordinary reference class, 양수 fixed ratio, 원문 accession을 요구한다.
+  관계 구간이 subject/reference class history 전체로 덮이지 않거나 현재 ratio를 과거에 소급하면
+  등록할 수 없다. `MISSING`은 coverage용 사유를 반드시 가진다.
+- 여러 listed security가 같은 issuer를 가리켜도 `resolve_symbols_to_issuers()` 결과에는 issuer가
+  한 번만 나온다.
+
+기간 중첩처럼 다른 행을 봐야 하는 불변식은 `qv_identity.py`의 등록 경로가 잠근다. 단일 행의 날짜,
+CIK, method/ratio/accession/missing-reason 형태는 SQLite `CHECK`도 잠근다. DB를 외부에서 직접 오염해
+중복 행을 만들더라도 조회 경로는 ambiguity로 멈춘다.
+
+### 테스트
+
+지정한 아홉 fixture는 모두 통과했다.
+
+1. single-class issuer
+2. Alphabet listed A/C + unlisted convertible B
+3. Berkshire A/B가 가격 단위 차이와 무관하게 각자의 observed-price class를 유지
+4. `EquivalentClassAMember` 미등록
+5. ticker rename
+6. old ticker reuse / issuer change
+7. one issuer / multiple listed classes의 rank unit 1개
+8. unknown member fail-close
+9. conversion ratio effective-date 경계
+
+추가로 active period/symbol/issuer 불변식, invalid conversion payload, 다른 issuer reference,
+listed-class proxy 금지, 명시적 `MISSING`, 손상된 ambiguity, 기존 DB additive migration을 검사했다.
+
+```text
+python3 -m unittest trading.tests.test_qv_identity
+  19 tests · PASS
+
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,127 tests · PASS
+
+npm test
+  949 tests · PASS
+```
+
+QV 테이블과 실제 fixture 행을 넣기 전후의 기존 `PointInTimeSnapshot.snapshot_id()`는 exact match였다.
+기존 DB fixture의 `securities` 행도 보존됐고 새 QV 표 셋은 빈 상태로 생성됐다. 따라서 frozen momentum
+snapshot 입력, `RULE_FIELDS`, core/policy와 `features_daily`에는 영향이 없다.
+
+### 새로 발견된 unresolved / ambiguous 사례
+
+실제 전수 identity ingest는 이번 단계에 포함하지 않았으므로 **새로 발견된 실제 발행사 사례는 없다.**
+fixture에서는 미등록 derived/unknown member와 손상된 동일시점 ticker 중복이 각각 unresolved/ambiguous로
+멈추는 것을 확인했다. issuer-level effective history, 한 CIK의 의미상 issuer 분기, 비고정 conversion,
+현재 schema로 구분할 수 없는 ticker reuse 사례가 실제 submissions ingest에서 나오면 규칙을 추가하지
+않고 별도 설계 확장 대상으로 보고한다.
+
+### 이번 단계에서 하지 않은 것
+
+submissions/raw XBRL/shares ingestion, 12월 instant 선택, accounting mapping, class별 ME 합산,
+formation snapshot, coverage/`coverage_start`/Gate C, factor·portfolio·수익률 계산은 전부 미착수다.
+`CIK_OVERRIDES`도 옮기거나 수정하지 않았다. 다음 submissions ingestion은 이 identity API를 runtime
+정본으로 쓰되, 실데이터가 위 모델로 표현되는지 먼저 확인하는 단계다.
+
+## 9. 결과
 
 <!-- 전수 실행 후 채운다. 이 위의 어떤 문턱도 그때 고치지 않는다. -->
 

@@ -103,6 +103,84 @@ CREATE TABLE IF NOT EXISTS securities (
   PRIMARY KEY (symbol, source_version)
 );
 
+-- Quality + Value 전용 issuer/share-class identity. 기존 securities는 momentum의
+-- immutable snapshot 입력이므로 확장하지 않는다. issuer_id가 내부 정본이고 CIK는 SEC
+-- filing을 잇는 외부 식별자일 뿐이다.
+CREATE TABLE IF NOT EXISTS qv_issuers (
+  issuer_id TEXT NOT NULL,
+  cik TEXT NOT NULL
+    CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  resolution_method TEXT NOT NULL CHECK (length(trim(resolution_method)) > 0),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (issuer_id, source_version),
+  UNIQUE (cik, source_version)
+) WITHOUT ROWID;
+
+-- class_id는 ticker와 분리된 share-class identity다. 같은 class_id의 비중첩 행으로
+-- ticker rename과 XBRL member history를 표현한다. 구간은 [effective_from, effective_to)다.
+CREATE TABLE IF NOT EXISTS qv_share_classes (
+  class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  symbol TEXT,
+  xbrl_axis TEXT,
+  xbrl_member TEXT,
+  is_ordinary_common INTEGER NOT NULL CHECK (is_ordinary_common IN (0, 1)),
+  is_listed INTEGER NOT NULL CHECK (is_listed IN (0, 1)),
+  effective_from TEXT NOT NULL
+    CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  effective_to TEXT
+    CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (class_id, effective_from, source_version),
+  FOREIGN KEY (issuer_id, source_version)
+    REFERENCES qv_issuers(issuer_id, source_version),
+  CHECK (effective_to IS NULL OR effective_to > effective_from),
+  CHECK ((xbrl_axis IS NULL) = (xbrl_member IS NULL)),
+  CHECK (is_listed = 0 OR symbol IS NOT NULL)
+) WITHOUT ROWID;
+
+-- valuation 관계도 PIT 구간이다. CONVERSION_VALUE_PROXY는 관측 가격이 아니며 원문
+-- accession과 fixed direct ratio를 반드시 보존한다. MISSING은 coverage 분모에 남길
+-- 명시적 사유를 요구한다.
+CREATE TABLE IF NOT EXISTS qv_class_valuation (
+  class_id TEXT NOT NULL,
+  valuation_method TEXT NOT NULL CHECK (
+    valuation_method IN ('OBSERVED_MARKET_PRICE', 'CONVERSION_VALUE_PROXY', 'MISSING')
+  ),
+  reference_class_id TEXT,
+  conversion_ratio REAL,
+  effective_from TEXT NOT NULL
+    CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  effective_to TEXT
+    CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source_accession TEXT,
+  missing_reason TEXT,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (class_id, effective_from, source_version),
+  CHECK (effective_to IS NULL OR effective_to > effective_from),
+  CHECK (
+    (valuation_method = 'OBSERVED_MARKET_PRICE'
+      AND reference_class_id IS NULL AND conversion_ratio IS NULL
+      AND missing_reason IS NULL)
+    OR
+    (valuation_method = 'CONVERSION_VALUE_PROXY'
+      AND reference_class_id IS NOT NULL AND reference_class_id <> class_id
+      AND conversion_ratio > 0 AND source_accession IS NOT NULL
+      AND length(trim(source_accession)) > 0
+      AND missing_reason IS NULL)
+    OR
+    (valuation_method = 'MISSING'
+      AND reference_class_id IS NULL AND conversion_ratio IS NULL
+      AND missing_reason IS NOT NULL AND length(trim(missing_reason)) > 0)
+  )
+) WITHOUT ROWID;
+
 -- 사용자가 승인한 한도 한 벌. broker_mode마다 활성 정책은 하나다.
 -- signature는 사용자 키로 만든 위조 방지 서명이 아니라 내용 digest다. 불러올 때마다
 -- 다시 계산해 대조하므로 승인 이후에 값이 바뀌면 기동을 거부한다.
@@ -254,3 +332,10 @@ CREATE INDEX IF NOT EXISTS idx_bars_daily_date ON bars_daily(trade_date);
 CREATE INDEX IF NOT EXISTS idx_signals_date ON signals(trade_date);
 CREATE INDEX IF NOT EXISTS idx_universe_membership_from ON universe_membership(valid_from);
 CREATE INDEX IF NOT EXISTS idx_earnings_calendar_symbol ON earnings_calendar(symbol, event_at);
+CREATE INDEX IF NOT EXISTS idx_qv_share_classes_symbol
+  ON qv_share_classes(source_version, symbol, effective_from, effective_to);
+CREATE INDEX IF NOT EXISTS idx_qv_share_classes_member
+  ON qv_share_classes(source_version, issuer_id, xbrl_axis, xbrl_member,
+                       effective_from, effective_to);
+CREATE INDEX IF NOT EXISTS idx_qv_class_valuation_active
+  ON qv_class_valuation(source_version, class_id, effective_from, effective_to);
