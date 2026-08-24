@@ -51,6 +51,41 @@ def resolve_backtest_db_path(data_dir: Path | str = DEFAULT_DATA_DIR) -> Path:
 # 않았다"는 사실 그대로다.
 LATE_COLUMNS = (("backtest_equity", "market_regime", "TEXT"),)
 
+_QV_FILINGS_TABLE_START = "CREATE TABLE IF NOT EXISTS qv_sec_filings ("
+_QV_FILINGS_TABLE_END = ") WITHOUT ROWID;"
+_QV_FILINGS_EASTERN_COLUMN = """  acceptance_eastern_date TEXT
+    CHECK (acceptance_eastern_date IS NULL OR acceptance_eastern_date GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+"""
+_QV_FILINGS_EASTERN_NULL_CHECK = (
+    "  CHECK ((acceptance_datetime IS NULL) = (acceptance_eastern_date IS NULL)),\n"
+)
+_QV_FILINGS_CURRENT_BOUNDARY_CHECK = """  CHECK (historical_usable_session IS NULL OR
+    historical_usable_session > acceptance_eastern_date),
+"""
+_QV_FILINGS_CA801B0_BOUNDARY_CHECK = """  CHECK (historical_usable_session IS NULL OR
+    historical_usable_session > substr(acceptance_datetime, 1, 10)),
+"""
+_QV_FILINGS_CA801B0_COLUMNS = (
+    "cik",
+    "accession",
+    "form",
+    "filed_date",
+    "report_date",
+    "acceptance_datetime",
+    "historical_usable_session",
+    "filing_sic",
+    "sic_status",
+    "primary_document",
+    "submissions_file",
+    "calendar_source",
+    "calendar_source_version",
+    "source",
+    "source_version",
+    "provenance",
+    "ingested_at",
+)
+
 
 def add_missing_columns(connection: sqlite3.Connection) -> list[str]:
     """`LATE_COLUMNS` 중 없는 것만 붙인다. 몇 번 불러도 같다."""
@@ -68,6 +103,142 @@ def add_missing_columns(connection: sqlite3.Connection) -> list[str]:
     return added
 
 
+def _normalized_table_sql(sql: str) -> str:
+    normalized = " ".join(sql.split()).casefold().rstrip(";")
+    return normalized.replace("create table if not exists", "create table", 1)
+
+
+def _qv_filings_ddls(schema_sql: str) -> tuple[str, str]:
+    """현재 DDL과 바로 전 ca801b0 DDL만 결정론적으로 구성한다."""
+    start = schema_sql.find(_QV_FILINGS_TABLE_START)
+    if start < 0:
+        raise BacktestStorageError("schema.sql에 qv_sec_filings DDL이 없습니다")
+    end = schema_sql.find(_QV_FILINGS_TABLE_END, start)
+    if end < 0:
+        raise BacktestStorageError("schema.sql의 qv_sec_filings DDL이 끝나지 않았습니다")
+    end += len(_QV_FILINGS_TABLE_END)
+    current = schema_sql[start:end]
+
+    expected_once = (
+        _QV_FILINGS_EASTERN_COLUMN,
+        _QV_FILINGS_EASTERN_NULL_CHECK,
+        _QV_FILINGS_CURRENT_BOUNDARY_CHECK,
+    )
+    if any(current.count(fragment) != 1 for fragment in expected_once):
+        raise BacktestStorageError(
+            "현재 qv_sec_filings DDL에서 Eastern migration 경계를 확인할 수 없습니다"
+        )
+    ca801b0 = current.replace(_QV_FILINGS_EASTERN_COLUMN, "", 1)
+    ca801b0 = ca801b0.replace(_QV_FILINGS_EASTERN_NULL_CHECK, "", 1)
+    ca801b0 = ca801b0.replace(
+        _QV_FILINGS_CURRENT_BOUNDARY_CHECK,
+        _QV_FILINGS_CA801B0_BOUNDARY_CHECK,
+        1,
+    )
+    return current, ca801b0
+
+
+def _upgrade_ca801b0_qv_sec_filings(
+    connection: sqlite3.Connection, schema_sql: str
+) -> bool:
+    """ca801b0의 QV filing 표만 현재 Eastern-date 표현으로 원자적 수리한다."""
+    table = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+        ("qv_sec_filings",),
+    ).fetchone()
+    if table is None:
+        return False
+
+    current_ddl, ca801b0_ddl = _qv_filings_ddls(schema_sql)
+    actual = _normalized_table_sql(table["sql"])
+    if actual == _normalized_table_sql(current_ddl):
+        return False
+    if actual != _normalized_table_sql(ca801b0_ddl):
+        raise BacktestStorageError(
+            "알 수 없는 qv_sec_filings schema라 자동 migration하지 않습니다"
+        )
+    if connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        ("qv_sec_filings_ca801b0",),
+    ).fetchone():
+        raise BacktestStorageError(
+            "qv_sec_filings_ca801b0 임시 표가 이미 있어 migration하지 않습니다"
+        )
+
+    # ingestion과 서로 다른 시간대 규칙을 만들지 않기 위해 같은 구현을 재사용한다.
+    from .qv_submissions import (  # noqa: PLC0415
+        _acceptance_eastern_date,
+        _historical_usable_session,
+    )
+
+    insert_columns = (
+        "cik",
+        "accession",
+        "form",
+        "filed_date",
+        "report_date",
+        "acceptance_datetime",
+        "acceptance_eastern_date",
+        "historical_usable_session",
+        "filing_sic",
+        "sic_status",
+        "primary_document",
+        "submissions_file",
+        "calendar_source",
+        "calendar_source_version",
+        "source",
+        "source_version",
+        "provenance",
+        "ingested_at",
+    )
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        old_rows = connection.execute(
+            f"SELECT {', '.join(_QV_FILINGS_CA801B0_COLUMNS)}"
+            " FROM qv_sec_filings"
+        ).fetchall()
+        repaired_rows = []
+        for row in old_rows:
+            eastern_date = _acceptance_eastern_date(row["acceptance_datetime"])
+            usable_session = _historical_usable_session(
+                connection,
+                eastern_date,
+                row["calendar_source"],
+                row["calendar_source_version"],
+            )
+            repaired_rows.append(
+                tuple(
+                    eastern_date
+                    if column == "acceptance_eastern_date"
+                    else usable_session
+                    if column == "historical_usable_session"
+                    else row[column]
+                    for column in insert_columns
+                )
+            )
+
+        connection.execute(
+            "ALTER TABLE qv_sec_filings RENAME TO qv_sec_filings_ca801b0"
+        )
+        connection.execute("DROP INDEX IF EXISTS idx_qv_sec_filings_usable")
+        connection.execute(
+            current_ddl.replace(
+                "CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1
+            )
+        )
+        connection.executemany(
+            f"INSERT INTO qv_sec_filings ({', '.join(insert_columns)})"
+            f" VALUES ({', '.join('?' for _ in insert_columns)})",
+            repaired_rows,
+        )
+        connection.execute("DROP TABLE qv_sec_filings_ca801b0")
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    return True
+
+
 def connect(
     data_dir: Path | str = DEFAULT_DATA_DIR, schema_path: Path = SCHEMA_PATH
 ) -> sqlite3.Connection:
@@ -78,7 +249,9 @@ def connect(
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA foreign_keys=ON")
-    connection.executescript(Path(schema_path).read_text(encoding="utf-8"))
+    schema_sql = Path(schema_path).read_text(encoding="utf-8")
+    _upgrade_ca801b0_qv_sec_filings(connection, schema_sql)
+    connection.executescript(schema_sql)
     add_missing_columns(connection)
     return connection
 

@@ -354,6 +354,11 @@ formation snapshot, coverage/`coverage_start`/Gate C, factor·portfolio·수익�
 - 같은 `(cik, accession, source_version)` 재적재는 UPDATE/REPLACE하지 않고 전체 insert를
   거부한다. 각 row는 recent/archive filename, complete submission URL, target CIK, calendar와
   source/version을 deterministic provenance로 남긴다. `data_sources` schema와 kind는 바꾸지 않았다.
+- `store.connect()`는 바로 전 ca801b0의 `qv_sec_filings` DDL만 정확히 식별해 transaction 안에서
+  현재 표로 rebuild한다. 기존 row의 UTC acceptance는 같은 `America/New_York` 변환으로 Eastern
+  date를 채우고, row에 저장된 calendar source/version의 첫 다음 SPY 세션을 다시 계산한다. 기존
+  `source_version`·provenance·`ingested_at`은 그대로 보존하며, acceptance 누락과 calendar coverage
+  끝은 NULL로 남는다. fresh/current DB는 no-op이고 알려지지 않은 표 형태는 추정하지 않고 거부한다.
 
 ### 실제 SEC read-only smoke
 
@@ -372,14 +377,18 @@ API acceptance `2026-07-31T10:01:02.000Z`와 complete submission header의
 아래는 이번 구현 뒤 로컬에서 실제 실행한 결과다. GitHub CI 결과가 아니다.
 
 ```text
+python3 -m unittest \
+  trading.tests.test_qv_submissions.QVSecFilingsMigrationTest
+  3 tests · PASS
+
 python3 -m unittest trading.tests.test_qv_submissions
-  45 tests · PASS
+  48 tests · PASS
 
 python3 -m unittest trading.tests.test_qv_identity
   21 tests · PASS
 
 python3 -m unittest discover -s trading/tests -p 'test_*.py'
-  1,174 tests · PASS
+  1,177 tests · PASS
 
 npm test
   949 tests · PASS

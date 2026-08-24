@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -32,6 +33,52 @@ SOURCE = "sec-edgar-qv"
 SOURCE_VERSION = "sec-submissions-fixture-v1"
 CALENDAR_SOURCE = "synthetic-calendar"
 CALENDAR_VERSION = "calendar-fixture-v1"
+
+CA801B0_QV_SEC_FILINGS_DDL = """
+CREATE TABLE qv_sec_filings (
+  cik TEXT NOT NULL
+    CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  form TEXT NOT NULL CHECK (form IN ('10-K', '10-K/A', '10-Q', '10-Q/A')),
+  filed_date TEXT NOT NULL
+    CHECK (filed_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  report_date TEXT
+    CHECK (report_date IS NULL OR report_date GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  acceptance_datetime TEXT
+    CHECK (acceptance_datetime IS NULL OR acceptance_datetime GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]Z'),
+  historical_usable_session TEXT
+    CHECK (historical_usable_session IS NULL OR historical_usable_session GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  filing_sic TEXT
+    CHECK (filing_sic IS NULL OR
+      (length(filing_sic) = 4 AND filing_sic NOT GLOB '*[^0-9]*')),
+  sic_status TEXT NOT NULL CHECK (sic_status IN ('EXACT', 'MISSING', 'AMBIGUOUS')),
+  primary_document TEXT,
+  submissions_file TEXT NOT NULL CHECK (length(trim(submissions_file)) > 0),
+  calendar_source TEXT NOT NULL CHECK (length(trim(calendar_source)) > 0),
+  calendar_source_version TEXT NOT NULL
+    CHECK (length(trim(calendar_source_version)) > 0),
+  source TEXT NOT NULL CHECK (length(trim(source)) > 0),
+  source_version TEXT NOT NULL CHECK (length(trim(source_version)) > 0),
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  ingested_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  PRIMARY KEY (cik, accession, source_version),
+  CHECK (acceptance_datetime IS NOT NULL OR historical_usable_session IS NULL),
+  CHECK (historical_usable_session IS NULL OR
+    historical_usable_session > substr(acceptance_datetime, 1, 10)),
+  CHECK (
+    (sic_status = 'EXACT' AND filing_sic IS NOT NULL)
+    OR
+    (sic_status IN ('MISSING', 'AMBIGUOUS') AND filing_sic IS NULL)
+  )
+) WITHOUT ROWID;
+
+CREATE INDEX idx_qv_sec_filings_usable
+  ON qv_sec_filings(source_version, cik, historical_usable_session,
+                    acceptance_datetime, accession);
+"""
 
 
 def submissions_block(
@@ -712,6 +759,216 @@ class HistoricalSicLookupTest(QVSubmissionsFixture, unittest.TestCase):
             self.connection, "320193", "2024-01-08", SOURCE_VERSION
         )
         self.assertEqual((result.form, result.filing_sic), ("10-Q", "7372"))
+
+
+class QVSecFilingsMigrationTest(unittest.TestCase):
+    def _create_ca801b0_database(self, data_dir: Path) -> None:
+        connection = store.connect(data_dir)
+        connection.close()
+
+        connection = sqlite3.connect(data_dir / store.BACKTEST_DB_NAME)
+        connection.executescript(
+            "DROP INDEX idx_qv_sec_filings_usable;"
+            "DROP TABLE qv_sec_filings;"
+            + CA801B0_QV_SEC_FILINGS_DDL
+        )
+        connection.executemany(
+            "INSERT INTO bars_daily"
+            " (symbol, trade_date, raw_open, raw_high, raw_low, raw_close,"
+            "  raw_volume, adj_open, adj_high, adj_low, adj_close, source,"
+            "  source_version)"
+            " VALUES ('SPY', ?, 100, 101, 99, 100, 1000,"
+            "  100, 101, 99, 100, ?, ?)",
+            [
+                (date, CALENDAR_SOURCE, CALENDAR_VERSION)
+                for date in ("2024-01-09", "2024-01-10", "2024-01-11")
+            ],
+        )
+        connection.executemany(
+            "INSERT INTO qv_sec_filings"
+            " (cik, accession, form, filed_date, report_date,"
+            "  acceptance_datetime, historical_usable_session, filing_sic,"
+            "  sic_status, primary_document, submissions_file, calendar_source,"
+            "  calendar_source_version, source, source_version, provenance,"
+            "  ingested_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    "0000000001",
+                    "0000000001-24-000001",
+                    "10-K",
+                    "2024-01-09",
+                    "2023-12-31",
+                    "2024-01-09T18:00:00.000000Z",
+                    "2024-01-10",
+                    "3674",
+                    EXACT,
+                    "normal.htm",
+                    "CIK0000000001.json",
+                    CALENDAR_SOURCE,
+                    CALENDAR_VERSION,
+                    SOURCE,
+                    SOURCE_VERSION,
+                    "fixture://normal",
+                    101,
+                ),
+                (
+                    "0000000001",
+                    "0000000001-24-000002",
+                    "10-Q",
+                    "2024-01-10",
+                    "2023-12-31",
+                    "2024-01-10T01:30:00.000000Z",
+                    "2024-01-11",
+                    "3674",
+                    EXACT,
+                    "rollover.htm",
+                    "CIK0000000001.json",
+                    CALENDAR_SOURCE,
+                    CALENDAR_VERSION,
+                    SOURCE,
+                    SOURCE_VERSION,
+                    "fixture://rollover",
+                    102,
+                ),
+                (
+                    "0000000001",
+                    "0000000001-24-000003",
+                    "10-Q/A",
+                    "2024-01-11",
+                    "2023-12-31",
+                    None,
+                    None,
+                    None,
+                    MISSING,
+                    "missing.htm",
+                    "CIK0000000001.json",
+                    CALENDAR_SOURCE,
+                    CALENDAR_VERSION,
+                    SOURCE,
+                    SOURCE_VERSION,
+                    "fixture://missing",
+                    103,
+                ),
+            ],
+        )
+        connection.commit()
+        connection.close()
+
+    def test_ca801b0_file_database_is_rebuilt_and_repaired_idempotently(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            self._create_ca801b0_database(data_dir)
+
+            connection = store.connect(data_dir)
+            columns = [
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(qv_sec_filings)")
+            ]
+            self.assertIn("acceptance_eastern_date", columns)
+            rows = {
+                row["accession"]: dict(row)
+                for row in connection.execute(
+                    "SELECT * FROM qv_sec_filings ORDER BY accession"
+                )
+            }
+            self.assertEqual(len(rows), 3)
+
+            normal = rows["0000000001-24-000001"]
+            self.assertEqual(normal["acceptance_eastern_date"], "2024-01-09")
+            self.assertEqual(normal["historical_usable_session"], "2024-01-10")
+
+            rollover = rows["0000000001-24-000002"]
+            self.assertEqual(rollover["acceptance_eastern_date"], "2024-01-09")
+            self.assertEqual(rollover["historical_usable_session"], "2024-01-10")
+            self.assertEqual(rollover["source_version"], SOURCE_VERSION)
+            self.assertEqual(rollover["provenance"], "fixture://rollover")
+            self.assertEqual(rollover["ingested_at"], 102)
+
+            missing = rows["0000000001-24-000003"]
+            self.assertIsNone(missing["acceptance_datetime"])
+            self.assertIsNone(missing["acceptance_eastern_date"])
+            self.assertIsNone(missing["historical_usable_session"])
+
+            schema_before = connection.execute(
+                "SELECT sql FROM sqlite_master"
+                " WHERE type = 'table' AND name = 'qv_sec_filings'"
+            ).fetchone()["sql"]
+            self.assertIn(
+                "historical_usable_session > acceptance_eastern_date",
+                schema_before,
+            )
+            self.assertNotIn("substr(acceptance_datetime", schema_before)
+            stored_before = [
+                tuple(row)
+                for row in connection.execute(
+                    "SELECT * FROM qv_sec_filings ORDER BY accession"
+                )
+            ]
+            connection.close()
+
+            connection = store.connect(data_dir)
+            schema_after = connection.execute(
+                "SELECT sql FROM sqlite_master"
+                " WHERE type = 'table' AND name = 'qv_sec_filings'"
+            ).fetchone()["sql"]
+            stored_after = [
+                tuple(row)
+                for row in connection.execute(
+                    "SELECT * FROM qv_sec_filings ORDER BY accession"
+                )
+            ]
+            self.assertEqual(schema_after, schema_before)
+            self.assertEqual(stored_after, stored_before)
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT 1 FROM sqlite_master"
+                    " WHERE type = 'table' AND name = 'qv_sec_filings_ca801b0'"
+                ).fetchone()
+            )
+            connection.close()
+
+    def test_fresh_file_database_is_current_and_second_connect_is_a_noop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            connection = store.connect(data_dir)
+            schema_before = connection.execute(
+                "SELECT sql FROM sqlite_master"
+                " WHERE type = 'table' AND name = 'qv_sec_filings'"
+            ).fetchone()["sql"]
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(qv_sec_filings)")
+            }
+            self.assertIn("acceptance_eastern_date", columns)
+            self.assertIn(
+                "historical_usable_session > acceptance_eastern_date",
+                schema_before,
+            )
+            connection.close()
+
+            connection = store.connect(data_dir)
+            schema_after = connection.execute(
+                "SELECT sql FROM sqlite_master"
+                " WHERE type = 'table' AND name = 'qv_sec_filings'"
+            ).fetchone()["sql"]
+            self.assertEqual(schema_after, schema_before)
+            connection.close()
+
+    def test_unknown_qv_sec_filings_shape_fails_visibly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            connection = store.connect(data_dir)
+            connection.execute(
+                "ALTER TABLE qv_sec_filings ADD COLUMN unexpected_column TEXT"
+            )
+            connection.commit()
+            connection.close()
+
+            with self.assertRaisesRegex(
+                store.BacktestStorageError, "알 수 없는 qv_sec_filings schema"
+            ):
+                store.connect(data_dir)
 
 
 class ExistingContractRegressionTest(QVSubmissionsFixture, unittest.TestCase):
