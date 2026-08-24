@@ -420,16 +420,77 @@ denominator의 shares는 회계 factor가 아니라 **stock-state 입력**이므
 경제적 정의:
 
 ```text
-Gross Profit = Revenue - Cost of Goods Sold
-GPA = Gross Profit / Total Assets
+Revenue      = consolidated total revenue
+Gross Profit = consolidated total revenue - Cost of Goods Sold
+GPA          = Gross Profit / Total Assets
 ```
 
 - `Total Assets <= 0`은 invalid.
 - Gross Profit이 음수인 것은 허용한다.
-- direct `GrossProfit`과 `Revenue - COGS`가 둘 다 존재할 때 어떤 것을 정본으로 쓸지는
-  Phase 0 accounting mapping audit에서 정하고 **return 계산 전에 freeze**한다.
 - issuer custom tag를 이름 유사도로 자동 연결하지 않는다. 표준 taxonomy와 filing 원문으로
   회계적으로 같은 항목임을 확인할 수 있는 mapping만 허용한다.
+
+#### 4.2.1 accounting mapping — CLOSED / FROZEN
+
+**이 절이 열어두었던 `direct GrossProfit vs Revenue − COGS` 결정은 닫혔다.** 정찰 근거는
+`trading/runs/qv-data-audit/PROBE-gross-profit-mapping.md`이고, Phase 0이 지켜야
+할 형태는 `trading/runs/qv-data-audit/README.md` §3.6이다. **결과를 본 뒤 아래를 되돌리지
+않는다.**
+
+```text
+canonical Revenue    consolidated total revenue
+canonical GP         consolidated total revenue - COGS   (항상 이 식 하나)
+direct GrossProfit   canonical source 아님. diagnostic 전용
+tie-out              exact equality. tolerance 없음
+fact 선택            연결 손익계산서 role 안의 무차원 standard-taxonomy fact만
+dimension-only COGS  MISSING. member 합산 금지
+```
+
+**Revenue는 consolidated total revenue다.** issuer-defined net sales나 COGS와 직접
+대응되는 좁은 revenue를 canonical Revenue로 쓰지 않는다. 이 선택은 §0.2가 근거로 든
+Novy-Marx 계열의 `REVT − COGS` 정의에 가까운 경제적 신호를 재현하기 위한 것이다. 따라서
+**membership fee나 금융자회사 revenue처럼 직접 대응 COGS가 없는 수익이 분자에 포함될 수
+있다는 사실을 의도적으로 받아들인다.** 결과를 보고 net-sales 정의로 되돌리지 않는다.
+
+**canonical 값은 언제나 `total revenue − COGS`다.** `us-gaap:GrossProfit` 직접 fact는
+canonical source가 아니다. direct fact가 있는 해는 direct를, 없는 해는 reconstruction을
+쓰는 식의 **정의 전환을 허용하지 않는다** — 그렇게 하면 같은 발행사가 연도에 따라 다른
+정의로 계산된다.
+
+**direct `GrossProfit`은 validation / diagnostic evidence로만 쓴다.** 같은 연결 손익계산서
+context에서 비교 가능하면 `direct GrossProfit == total revenue − COGS`를 **exact equality**로
+검사하고 **tolerance를 두지 않는다.** 작은 차이가 나와도 `0.1%`·`0.5%` 같은 문턱을 임의로
+만들지 말고 단위·기간·부호·statement scope·중단사업·rounding provenance부터 조사한다.
+
+**diagnostic mismatch는 canonical 값을 무효로 만들지 않는다.** total revenue와 COGS가
+명확히 식별되면 canonical reconstruction이 그대로 정본이고, mismatch는 명시적인
+diagnostic/audit 상태로 보존한다. 반대로 **total revenue 또는 COGS 자체의 statement 의미가
+ambiguous하면** 그것은 별개의 mapping failure이므로 fail-close한다.
+
+**fact 선택은 presentation linkbase / filing statement structure를 쓴다.**
+
+```text
+formation까지 usable한 annual 10-K family filing 선택
+        ↓
+그 accession의 consolidated income statement role 식별
+        ↓
+그 role 안의 standard-taxonomy · 무차원 total revenue / COGS fact 사용
+        ↓
+Gross Profit = total revenue - COGS
+```
+
+연결 손익계산서 role을 신뢰성 있게 특정할 수 없으면 **추측하지 않고** unresolved/missing으로
+둔다. 주석·segment·geographic subtotal·중단사업처럼 **role 밖의 fact는 이름이 같아도
+canonical 후보가 아니다.** `fy`·`fp`·`frame`이나 companyfacts의 태그 이름만으로 statement
+의미를 추측하지 않는다.
+
+**consolidated COGS가 무차원 fact로 없고 dimension member에만 있으면 `MISSING`이다.**
+member를 합산해 consolidated COGS를 재구성하지 않는다. coverage를 올리려고 member
+whitelist·issuer별 합산 예외·derived member 추정·사후 mapping을 추가하지 않는다. 해당
+issuer-year는 denominator에서 조용히 빠지지 않고 missing reason으로 남는다(§6 데이터 gate).
+
+`Total Assets` · `Book Equity` · preferred stock · deferred tax mapping은 **이 결정에
+포함되지 않는다.** §4.3과 Phase 0 README §3.2에 open으로 남아 있다.
 
 ### 4.3 Book Equity
 

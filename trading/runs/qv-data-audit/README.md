@@ -94,7 +94,7 @@ QV core signature에 들어간다(§4.7).
 
 |칸|근거|
 |---|---|
-|`GrossProfit` 직접 태그 vs `Revenue − COGS`|§4.2가 Phase 0으로 넘긴 결정|
+|~~`GrossProfit` 직접 태그 vs `Revenue − COGS`~~|**CLOSED / FROZEN** (2026-08-25). canonical은 `consolidated total revenue − COGS`다. 계약은 아래 3.6, 정찰은 `PROBE-gross-profit-mapping.md`|
 |`StockholdersEquity` XBRL fallback 순서|§4.3|
 |preferred stock · deferred tax 태그 mapping|§4.3|
 |historical SIC 복원 경로|§3.4 — filing 시점 submission header 우선|
@@ -103,6 +103,9 @@ QV core signature에 들어간다(§4.7).
 
 **issuer custom tag를 이름 유사도로 자동 연결하지 않는다**(§4.2). 표준 taxonomy와 filing
 원문으로 회계적 동일성이 확인된 mapping만 넣는다.
+
+**`Total Assets` · `StockholdersEquity` · preferred · deferred tax는 아직 open이다.**
+Gross Profit이 닫혔다고 회계 mapping 전체가 닫힌 것이 아니다.
 
 ### 3.5 ME shares — 정찰 뒤 확정된 계약
 
@@ -128,6 +131,41 @@ member           원문 확인된 실제 ordinary class만 whitelist. derived/eq
 
 **coverage 영향**: 위 규칙으로 ME가 `MISSING`이 된 issuer-year는 **denominator에서 빠지지
 않는다.** missing reason으로 세고 Gate C는 본구현 전수에서만 판정한다.
+
+### 3.6 Gross Profit accounting mapping — 정찰 뒤 확정된 계약
+
+정본은 로드맵 §4.2·§4.2.1이다. **여기서 다시 정하지 않고 Phase 0이 지켜야 할 형태로만
+옮겨 적는다.** 정찰 기록은 `PROBE-gross-profit-mapping.md`다.
+
+```text
+canonical Revenue    consolidated total revenue
+                     issuer-defined net sales · COGS 대응 좁은 revenue 사용 금지
+canonical GP         consolidated total revenue - COGS   (연도마다 정의를 바꾸지 않는다)
+direct GrossProfit   canonical source 아님. validation / diagnostic 전용
+tie-out              같은 연결 손익계산서 context에서 exact equality. tolerance 없음
+mismatch 처리        canonical을 무효로 만들지 않는다. diagnostic/audit 상태로 보존
+fail-close           total revenue 또는 COGS 자체의 statement 의미가 ambiguous할 때
+fact 선택            그 accession의 연결 손익계산서 role 안의
+                     standard-taxonomy · 무차원 fact만
+role 불명            추측 금지. unresolved / missing
+role 밖 fact         주석 · segment · geographic subtotal · 중단사업은 이름이 같아도 후보 아님
+fy / fp / frame      statement 의미 추정에 쓰지 않는다
+dimension-only COGS  MISSING. member 합산 · whitelist · issuer별 예외 · derived member 추정 금지
+보존                 accession · form · acceptance_datetime · historical_usable_session
+                     · statement role · concept · start · end · unit · value · 선택 경로
+```
+
+**Revenue 범위는 의도적인 선택이다.** membership fee나 금융자회사 revenue처럼 직접 대응
+COGS가 없는 수익이 분자에 들어갈 수 있다는 것을 받아들인 결과다. 로드맵 §0.2가 근거로 든
+Novy-Marx 계열의 `REVT − COGS`에 가까운 신호를 재현하기 위해서다. **결과를 보고 net-sales
+정의로 되돌리지 않는다.**
+
+**coverage 영향**: 위 규칙으로 GP가 `MISSING`이 된 issuer-year는 **denominator에서 빠지지
+않는다.** missing reason으로 세고, Gate A·B는 본구현 전수에서만 판정한다. **정찰의 발행사별
+숫자를 coverage 추정치로 쓰지 않는다.**
+
+**이 결정에 포함되지 않은 것**: `Total Assets` · Book Equity · preferred stock · deferred
+tax mapping은 그대로 open이다(위 3.2).
 
 ### 3.3 이미 고정돼 있어 여기서 손대지 않는 것
 
@@ -236,7 +274,7 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 |**정찰 — ME source** (`PROBE-me-source.md`)|**`SEC_ROUTE_VIABLE`** (2026-08-22). raw XBRL instance 경로가 여섯 축을 전부 통과했고 API 경로는 기각됐다|
 |1. identity 계층|**구현 완료** (2026-08-24). `schema.sql`의 QV 전용 세 테이블과 `qv_identity.py`, fixture·회귀 테스트가 정본이다|
 |2. submissions ingestion|**`CLOSED / PASS`** (2026-08-24). `qv_sec_filings`와 `qv_submissions.py`, network-free fixture가 정본이다|
-|3. companyfacts / accounting mapping|다음 단계|
+|3. companyfacts / accounting mapping|**진행 중.** Gross Profit mapping은 **CLOSED / FROZEN** (2026-08-25, 위 3.6 · 로드맵 §4.2.1). `Total Assets` · Book Equity mapping과 실제 ingestion 구현은 아직 open이다|
 |4. shares / ME 본구현|미착수|
 |5. formation snapshot · sentinel · coverage|미착수|
 
