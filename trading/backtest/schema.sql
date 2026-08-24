@@ -181,6 +181,49 @@ CREATE TABLE IF NOT EXISTS qv_class_valuation (
   )
 ) WITHOUT ROWID;
 
+-- Quality + Value 전용 SEC filing 원장. CIK는 이 row의 filing-time SIC를 찾는
+-- target registrant이고 issuer identity가 아니다. issuer_id를 두지 않아 submissions
+-- ingestion이 SEC registrant를 내부 issuer로 승격하지 못하게 한다.
+CREATE TABLE IF NOT EXISTS qv_sec_filings (
+  cik TEXT NOT NULL
+    CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  form TEXT NOT NULL CHECK (form IN ('10-K', '10-K/A', '10-Q', '10-Q/A')),
+  filed_date TEXT NOT NULL
+    CHECK (filed_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  report_date TEXT
+    CHECK (report_date IS NULL OR report_date GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  acceptance_datetime TEXT
+    CHECK (acceptance_datetime IS NULL OR acceptance_datetime GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]Z'),
+  historical_usable_session TEXT
+    CHECK (historical_usable_session IS NULL OR historical_usable_session GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  filing_sic TEXT
+    CHECK (filing_sic IS NULL OR
+      (length(filing_sic) = 4 AND filing_sic NOT GLOB '*[^0-9]*')),
+  sic_status TEXT NOT NULL CHECK (sic_status IN ('EXACT', 'MISSING', 'AMBIGUOUS')),
+  primary_document TEXT,
+  submissions_file TEXT NOT NULL CHECK (length(trim(submissions_file)) > 0),
+  calendar_source TEXT NOT NULL CHECK (length(trim(calendar_source)) > 0),
+  calendar_source_version TEXT NOT NULL
+    CHECK (length(trim(calendar_source_version)) > 0),
+  source TEXT NOT NULL CHECK (length(trim(source)) > 0),
+  source_version TEXT NOT NULL CHECK (length(trim(source_version)) > 0),
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  ingested_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  PRIMARY KEY (cik, accession, source_version),
+  CHECK (acceptance_datetime IS NOT NULL OR historical_usable_session IS NULL),
+  CHECK (historical_usable_session IS NULL OR
+    historical_usable_session > substr(acceptance_datetime, 1, 10)),
+  CHECK (
+    (sic_status = 'EXACT' AND filing_sic IS NOT NULL)
+    OR
+    (sic_status IN ('MISSING', 'AMBIGUOUS') AND filing_sic IS NULL)
+  )
+) WITHOUT ROWID;
+
 -- 사용자가 승인한 한도 한 벌. broker_mode마다 활성 정책은 하나다.
 -- signature는 사용자 키로 만든 위조 방지 서명이 아니라 내용 digest다. 불러올 때마다
 -- 다시 계산해 대조하므로 승인 이후에 값이 바뀌면 기동을 거부한다.
@@ -339,3 +382,6 @@ CREATE INDEX IF NOT EXISTS idx_qv_share_classes_member
                        effective_from, effective_to);
 CREATE INDEX IF NOT EXISTS idx_qv_class_valuation_active
   ON qv_class_valuation(source_version, class_id, effective_from, effective_to);
+CREATE INDEX IF NOT EXISTS idx_qv_sec_filings_usable
+  ON qv_sec_filings(source_version, cik, historical_usable_session,
+                    acceptance_datetime, accession);

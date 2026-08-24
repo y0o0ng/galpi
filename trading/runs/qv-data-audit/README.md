@@ -235,8 +235,8 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 |---|---|
 |**정찰 — ME source** (`PROBE-me-source.md`)|**`SEC_ROUTE_VIABLE`** (2026-08-22). raw XBRL instance 경로가 여섯 축을 전부 통과했고 API 경로는 기각됐다|
 |1. identity 계층|**구현 완료** (2026-08-24). `schema.sql`의 QV 전용 세 테이블과 `qv_identity.py`, fixture·회귀 테스트가 정본이다|
-|2. submissions ingestion|미착수|
-|3. companyfacts / accounting mapping|미착수|
+|2. submissions ingestion|**`CLOSED / PASS`** (2026-08-24). `qv_sec_filings`와 `qv_submissions.py`, network-free fixture가 정본이다|
+|3. companyfacts / accounting mapping|다음 단계|
 |4. shares / ME 본구현|미착수|
 |5. formation snapshot · sentinel · coverage|미착수|
 
@@ -312,7 +312,7 @@ npm                   949 tests · PASS
 기존 momentum `snapshot_id()` exact-match regression도 그대로 통과했다.
 
 QV 테이블과 실제 fixture 행을 넣기 전후의 기존 `PointInTimeSnapshot.snapshot_id()`는 exact match였다.
-기존 DB fixture의 `securities` 행도 보존됐고 새 QV 표 셋은 빈 상태로 생성됐다. 따라서 frozen momentum
+기존 DB fixture의 `securities` 행도 보존됐고 당시 새 QV identity 표 셋은 빈 상태로 생성됐다. 따라서 frozen momentum
 snapshot 입력, `RULE_FIELDS`, core/policy와 `features_daily`에는 영향이 없다.
 
 ### 새로 발견된 unresolved / ambiguous 사례
@@ -327,10 +327,77 @@ fixture에서는 미등록 derived/unknown member와 손상된 동일시점 tick
 
 submissions/raw XBRL/shares ingestion, 12월 instant 선택, accounting mapping, class별 ME 합산,
 formation snapshot, coverage/`coverage_start`/Gate C, factor·portfolio·수익률 계산은 전부 미착수다.
-`CIK_OVERRIDES`도 옮기거나 수정하지 않았다. 다음 submissions ingestion은 이 identity API를 runtime
-정본으로 쓰되, 실데이터가 위 모델로 표현되는지 먼저 확인하는 단계다.
+`CIK_OVERRIDES`도 옮기거나 수정하지 않았다. 후속 submissions ingestion도 CIK를 issuer로 승격하지
+않고 raw SEC registrant layer로 분리했다.
 
-## 9. 결과
+## 9. submissions ingestion receipt — 2026-08-24
+
+### 구현된 계약
+
+- `qv_sec_filings`의 PK는 `(cik, accession, source_version)`이다. CIK는 10자리 target
+  registrant이고 `issuer_id` FK는 없다. 동일 accession의 multi-registrant row를 서로 다른 CIK로
+  보존할 수 있다.
+- SEC `filings.recent`와 `filings.files` archive를 모두 읽고 `10-K` · `10-K/A` · `10-Q` ·
+  `10-Q/A`만 저장한다. required column과 존재하는 optional column의 길이가 다르면 filter 전에
+  fail-close한다.
+- `acceptanceDateTime`은 날짜 이동 없이 고정 폭 `YYYY-MM-DDTHH:MM:SS.ffffffZ`로 보존한다.
+  동일 calendar date는 사용할 수 없고, 지정한 source/version의 SPY 세션 중 그 날짜보다 엄격히
+  뒤인 첫 세션만 `historical_usable_session`이 된다. 이 `>` 경계는 ingestion과 SQLite `CHECK`
+  양쪽에 있다. acceptance가 없거나 calendar coverage 뒤면 NULL이며 filed date fallback은 없다.
+- complete submission의 `FILER` 아래 `COMPANY DATA`만 읽는다. target CIK의 distinct bracket SIC가
+  하나면 `EXACT`, 없으면 `MISSING`, 둘 이상이면 `AMBIGUOUS`다. current submissions top-level SIC와
+  `securities.sector`는 읽지 않는다.
+- `historical_sic()`은 formation까지 usable한 row를 `acceptance_datetime DESC, accession DESC`로
+  하나만 고른다. 그 row가 MISSING/AMBIGUOUS면 오래된 EXACT로 fallback하지 않는다. 10-Q 계열도
+  historical classification의 최신 filing 후보에 포함된다.
+- 같은 `(cik, accession, source_version)` 재적재는 UPDATE/REPLACE하지 않고 전체 insert를
+  거부한다. 각 row는 recent/archive filename, complete submission URL, target CIK, calendar와
+  source/version을 deterministic provenance로 남긴다. `data_sources` schema와 kind는 바꾸지 않았다.
+
+### 실제 SEC read-only smoke
+
+AAPL `CIK0000320193` 한 건으로 unit test와 분리해 실행했다. recent에서 허용 form 45개,
+`CIK0000320193-submissions-001.json`에서 87개를 같은 parser가 읽었고, 최근 accession
+`0000320193-26-000020`의 complete submission에서 target-CIK SIC `3571`을 `EXACT`로 찾았다.
+
+API acceptance `2026-07-31T10:01:02.000Z`와 complete submission header의
+`20260731060102`는 시각 표기가 달랐지만 SEC calendar date `2026-07-31`은 같았다. 따라서
+UTC 변환으로 날짜를 옮기지 않고 API acceptance calendar date 다음 SPY session을 쓰는 계약을
+유지한다. smoke는 unit test의 네트워크 의존성이 아니다.
+
+### 검증
+
+아래는 이번 구현 뒤 로컬에서 실제 실행한 결과다. GitHub CI 결과가 아니다.
+
+```text
+python3 -m unittest trading.tests.test_qv_submissions
+  42 tests · PASS
+
+python3 -m unittest trading.tests.test_qv_identity
+  21 tests · PASS
+
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,171 tests · PASS
+
+npm test
+  949 tests · PASS
+```
+
+filing row 삽입 전후 기존 `PointInTimeSnapshot.snapshot_id()`는 exact match였다. 기존
+`securities` column, `features_daily`, `RULE_FIELDS`, `paper-core-v1`과 momentum-v2 코어·정책
+파일은 수정하지 않았다.
+
+### 새로 발견된 unresolved / ambiguous 사례와 범위 밖
+
+live smoke의 단일 target CIK에서는 unresolved/ambiguous SIC가 발견되지 않았다. fixture의 target
+CIK missing·distinct SIC ambiguity는 값을 추정하지 않고 상태로 남았다. 실제 전수 ingest는 아직
+실행하지 않았으므로 전체 SEC history의 unresolved/ambiguous 사례가 없다고 말할 근거는 없다.
+
+companyfacts/accounting tag mapping, raw XBRL shares, issuer ME, formation snapshot, coverage와
+Gate A~H, factor·portfolio·수익률 계산은 전부 하지 않았다. 다음 단계는 **companyfacts ingestion +
+accounting tag mapping audit**다.
+
+## 10. 결과
 
 <!-- 전수 실행 후 채운다. 이 위의 어떤 문턱도 그때 고치지 않는다. -->
 

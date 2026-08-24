@@ -102,6 +102,9 @@ REQUEST_INTERVAL_SECONDS = 0.15
 TICKER_MAP_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 ARCHIVE_URL = "https://data.sec.gov/submissions/{name}"
+COMPLETE_SUBMISSION_URL = (
+    "https://www.sec.gov/Archives/edgar/data/{cik}/{accession_compact}/{accession}.txt"
+)
 
 EARNINGS_ITEM = "2.02"
 
@@ -380,6 +383,17 @@ class EdgarClient:
             raise EdgarError(f"submissions 응답이 객체가 아닙니다: {cik}")
         return payload
 
+    def submissions_archive(self, name: str) -> dict:
+        """`filings.files`가 가리키는 과거 submissions JSON 하나."""
+        payload = self._get(ARCHIVE_URL.format(name=name))
+        if not isinstance(payload, dict):
+            raise EdgarError(f"submissions archive 응답이 객체가 아닙니다: {name}")
+        return payload
+
+    def complete_submission_text(self, cik: str, accession: str) -> str:
+        """filing-time SEC header가 든 complete submission 원문."""
+        return self.text(complete_submission_url(cik, accession))
+
     def all_earnings_dates(
         self, cik: str, window_start: str | None = None
     ) -> tuple[list[str], dict]:
@@ -406,6 +420,23 @@ class EdgarClient:
             if isinstance(archive, dict):
                 dates.extend(earnings_dates_from_block(archive))
         return sorted(set(dates)), payload
+
+
+def complete_submission_url(cik: str, accession: str) -> str:
+    """SEC Archives complete submission URL을 결정론적으로 만든다."""
+    normalized_cik = str(cik).strip()
+    if not normalized_cik.isdigit():
+        raise EdgarError(f"complete submission CIK가 숫자가 아닙니다: {cik!r}")
+    normalized_accession = str(accession).strip()
+    if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", normalized_accession):
+        raise EdgarError(
+            f"complete submission accession 형식이 잘못됐습니다: {accession!r}"
+        )
+    return COMPLETE_SUBMISSION_URL.format(
+        cik=str(int(normalized_cik)),
+        accession_compact=normalized_accession.replace("-", ""),
+        accession=normalized_accession,
+    )
 
 
 def resolve_cik(

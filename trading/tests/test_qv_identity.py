@@ -643,7 +643,12 @@ class QVSnapshotRegressionTest(unittest.TestCase):
                 }
                 self.assertEqual(
                     qv_tables,
-                    {"qv_issuers", "qv_share_classes", "qv_class_valuation"},
+                    {
+                        "qv_issuers",
+                        "qv_share_classes",
+                        "qv_class_valuation",
+                        "qv_sec_filings",
+                    },
                 )
                 for table in qv_tables:
                     self.assertEqual(
