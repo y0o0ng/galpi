@@ -197,6 +197,9 @@ CREATE TABLE IF NOT EXISTS qv_sec_filings (
   acceptance_datetime TEXT
     CHECK (acceptance_datetime IS NULL OR acceptance_datetime GLOB
       '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]Z'),
+  acceptance_eastern_date TEXT
+    CHECK (acceptance_eastern_date IS NULL OR acceptance_eastern_date GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   historical_usable_session TEXT
     CHECK (historical_usable_session IS NULL OR historical_usable_session GLOB
       '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
@@ -214,9 +217,10 @@ CREATE TABLE IF NOT EXISTS qv_sec_filings (
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
   ingested_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
   PRIMARY KEY (cik, accession, source_version),
+  CHECK ((acceptance_datetime IS NULL) = (acceptance_eastern_date IS NULL)),
   CHECK (acceptance_datetime IS NOT NULL OR historical_usable_session IS NULL),
   CHECK (historical_usable_session IS NULL OR
-    historical_usable_session > substr(acceptance_datetime, 1, 10)),
+    historical_usable_session > acceptance_eastern_date),
   CHECK (
     (sic_status = 'EXACT' AND filing_sic IS NOT NULL)
     OR

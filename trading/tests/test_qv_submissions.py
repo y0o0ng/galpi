@@ -243,6 +243,7 @@ class ColumnarParsingTest(unittest.TestCase):
         )
         self.assertIsNone(rows[0].report_date)
         self.assertIsNone(rows[0].acceptance_datetime)
+        self.assertIsNone(rows[0].acceptance_eastern_date)
         self.assertIsNone(rows[0].primary_document)
 
     def test_present_optional_column_length_mismatch_is_rejected(self):
@@ -475,6 +476,51 @@ class IngestionTest(QVSubmissionsFixture, unittest.TestCase):
             stored["acceptance_datetime"], "2024-01-05T08:00:00.000000Z"
         )
         self.assertEqual(stored["historical_usable_session"], "2024-01-08")
+
+    def test_winter_utc_rollover_uses_the_eastern_acceptance_date(self):
+        self.add_calendar("2024-01-10", "2024-01-11")
+        row = filing(
+            "0000320193-24-000001",
+            filed="2024-01-09",
+            accepted="2024-01-10T01:30:00.000Z",
+        )
+        self.ingest(self.client("320193", [row]), "320193")
+        stored = self.connection.execute(
+            "SELECT acceptance_eastern_date, historical_usable_session"
+            " FROM qv_sec_filings"
+        ).fetchone()
+        self.assertEqual(stored["acceptance_eastern_date"], "2024-01-09")
+        self.assertEqual(stored["historical_usable_session"], "2024-01-10")
+
+    def test_summer_utc_rollover_uses_the_eastern_acceptance_date(self):
+        self.add_calendar("2024-07-09", "2024-07-10", "2024-07-11")
+        row = filing(
+            "0000320193-24-000001",
+            filed="2024-07-09",
+            accepted="2024-07-10T02:30:00.000Z",
+        )
+        self.ingest(self.client("320193", [row]), "320193")
+        stored = self.connection.execute(
+            "SELECT acceptance_eastern_date, historical_usable_session"
+            " FROM qv_sec_filings"
+        ).fetchone()
+        self.assertEqual(stored["acceptance_eastern_date"], "2024-07-09")
+        self.assertEqual(stored["historical_usable_session"], "2024-07-10")
+
+    def test_summer_dst_offset_is_not_a_fixed_winter_offset(self):
+        self.add_calendar("2024-07-09", "2024-07-10", "2024-07-11")
+        row = filing(
+            "0000320193-24-000001",
+            filed="2024-07-10",
+            accepted="2024-07-10T04:30:00.000Z",
+        )
+        self.ingest(self.client("320193", [row]), "320193")
+        stored = self.connection.execute(
+            "SELECT acceptance_eastern_date, historical_usable_session"
+            " FROM qv_sec_filings"
+        ).fetchone()
+        self.assertEqual(stored["acceptance_eastern_date"], "2024-07-10")
+        self.assertEqual(stored["historical_usable_session"], "2024-07-11")
 
     def test_friday_after_close_and_weekend_use_next_regular_session(self):
         rows = [
@@ -717,16 +763,18 @@ class ExistingContractRegressionTest(QVSubmissionsFixture, unittest.TestCase):
             self.connection.execute(
                 "INSERT INTO qv_sec_filings"
                 " (cik, accession, form, filed_date, report_date,"
-                "  acceptance_datetime, historical_usable_session, filing_sic,"
+                "  acceptance_datetime, acceptance_eastern_date,"
+                "  historical_usable_session, filing_sic,"
                 "  sic_status, primary_document, submissions_file, calendar_source,"
                 "  calendar_source_version, source, source_version, provenance)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     "0000320193",
                     "0000320193-24-000001",
                     "10-K",
                     "2024-01-05",
                     "2023-12-31",
+                    None,
                     None,
                     None,
                     "3674",
@@ -746,10 +794,11 @@ class ExistingContractRegressionTest(QVSubmissionsFixture, unittest.TestCase):
             self.connection.execute(
                 "INSERT INTO qv_sec_filings"
                 " (cik, accession, form, filed_date, report_date,"
-                "  acceptance_datetime, historical_usable_session, filing_sic,"
+                "  acceptance_datetime, acceptance_eastern_date,"
+                "  historical_usable_session, filing_sic,"
                 "  sic_status, primary_document, submissions_file, calendar_source,"
                 "  calendar_source_version, source, source_version, provenance)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     "0000320193",
                     "0000320193-24-000001",
@@ -757,6 +806,7 @@ class ExistingContractRegressionTest(QVSubmissionsFixture, unittest.TestCase):
                     "2024-01-05",
                     "2023-12-31",
                     "2024-01-05T08:00:00.000000Z",
+                    "2024-01-05",
                     "2024-01-05",
                     "3674",
                     EXACT,

@@ -1,8 +1,8 @@
 """Quality + Value의 SEC submissions raw-CIK/PIT 원장.
 
-이 모듈은 recent/archive filing metadata, acceptance 이후 첫 SPY 세션, complete
-submission header의 filing-time SIC만 다룬다. CIK를 issuer로 승격하거나 accounting
-fact, shares, formation snapshot, factor와 수익률을 계산하지 않는다.
+이 모듈은 recent/archive filing metadata, SEC/Eastern acceptance date 이후 첫 SPY
+세션, complete submission header의 filing-time SIC만 다룬다. CIK를 issuer로 승격하거나
+accounting fact, shares, formation snapshot, factor와 수익률을 계산하지 않는다.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from .edgar import EdgarClient, complete_submission_url
 
@@ -32,6 +33,7 @@ _CIK_LINE = re.compile(r"CENTRAL INDEX KEY:\s*(\d+)", re.IGNORECASE)
 _SIC_LINE = re.compile(
     r"STANDARD INDUSTRIAL CLASSIFICATION:.*\[(\d{4})\]", re.IGNORECASE
 )
+_SEC_TIMEZONE = ZoneInfo("America/New_York")
 
 
 class QVSubmissionsError(Exception):
@@ -45,6 +47,7 @@ class SubmissionRow:
     filed_date: str
     report_date: str | None
     acceptance_datetime: str | None
+    acceptance_eastern_date: str | None
     primary_document: str | None
     submissions_file: str
 
@@ -131,6 +134,16 @@ def normalize_acceptance_datetime(value: object | None) -> str | None:
     return f"{day}T{clock}.{(fraction or '0').ljust(6, '0')}Z"
 
 
+def _acceptance_eastern_date(acceptance_datetime: str | None) -> str | None:
+    """UTC acceptance instant가 속한 실제 America/New_York calendar date."""
+    if acceptance_datetime is None:
+        return None
+    accepted_utc = datetime.fromisoformat(
+        acceptance_datetime.removesuffix("Z") + "+00:00"
+    )
+    return accepted_utc.astimezone(_SEC_TIMEZONE).date().isoformat()
+
+
 def _column(block: dict, name: str, *, required: bool, count: int | None) -> list:
     if name not in block:
         if required:
@@ -194,6 +207,7 @@ def parse_submission_rows(
                     filed_date=str(filed_date),
                     report_date=report_date,
                     acceptance_datetime=acceptance,
+                    acceptance_eastern_date=_acceptance_eastern_date(acceptance),
                     primary_document=primary_document,
                     submissions_file=submissions_file,
                 )
@@ -270,17 +284,17 @@ def parse_filing_sic(complete_submission: str, target_cik: object) -> FilingSic:
 
 def _historical_usable_session(
     connection: sqlite3.Connection,
-    acceptance_datetime: str | None,
+    acceptance_eastern_date: str | None,
     calendar_source: str,
     calendar_source_version: str,
 ) -> str | None:
-    if acceptance_datetime is None:
+    if acceptance_eastern_date is None:
         return None
     row = connection.execute(
         "SELECT MIN(trade_date) AS trade_date FROM bars_daily"
         " WHERE symbol = 'SPY' AND source = ? AND source_version = ?"
         " AND trade_date > ?",
-        (calendar_source, calendar_source_version, acceptance_datetime[:10]),
+        (calendar_source, calendar_source_version, acceptance_eastern_date),
     ).fetchone()
     return row["trade_date"] if row and row["trade_date"] else None
 
@@ -372,7 +386,7 @@ def ingest_submissions(
         sic = parse_filing_sic(header, normalized_cik)
         usable_session = _historical_usable_session(
             connection,
-            row.acceptance_datetime,
+            row.acceptance_eastern_date,
             calendar_source,
             calendar_source_version,
         )
@@ -384,6 +398,7 @@ def ingest_submissions(
                 row.filed_date,
                 row.report_date,
                 row.acceptance_datetime,
+                row.acceptance_eastern_date,
                 usable_session,
                 sic.filing_sic,
                 sic.status,
@@ -409,10 +424,11 @@ def ingest_submissions(
             connection.executemany(
                 "INSERT INTO qv_sec_filings"
                 " (cik, accession, form, filed_date, report_date,"
-                "  acceptance_datetime, historical_usable_session, filing_sic,"
+                "  acceptance_datetime, acceptance_eastern_date,"
+                "  historical_usable_session, filing_sic,"
                 "  sic_status, primary_document, submissions_file, calendar_source,"
                 "  calendar_source_version, source, source_version, provenance)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 payload,
             )
     except sqlite3.IntegrityError as error:

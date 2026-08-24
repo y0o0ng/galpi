@@ -340,10 +340,11 @@ formation snapshot, coverage/`coverage_start`/Gate C, factor·portfolio·수익�
 - SEC `filings.recent`와 `filings.files` archive를 모두 읽고 `10-K` · `10-K/A` · `10-Q` ·
   `10-Q/A`만 저장한다. required column과 존재하는 optional column의 길이가 다르면 filter 전에
   fail-close한다.
-- `acceptanceDateTime`은 날짜 이동 없이 고정 폭 `YYYY-MM-DDTHH:MM:SS.ffffffZ`로 보존한다.
-  동일 calendar date는 사용할 수 없고, 지정한 source/version의 SPY 세션 중 그 날짜보다 엄격히
-  뒤인 첫 세션만 `historical_usable_session`이 된다. 이 `>` 경계는 ingestion과 SQLite `CHECK`
-  양쪽에 있다. acceptance가 없거나 calendar coverage 뒤면 NULL이며 filed date fallback은 없다.
+- `acceptanceDateTime`은 고정 폭 UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ`로 보존하고,
+  `zoneinfo.ZoneInfo('America/New_York')`로 `acceptance_eastern_date`를 따로 파생한다. 동일 Eastern
+  calendar date는 사용할 수 없고, 지정한 source/version의 SPY 세션 중 그 날짜보다 엄격히 뒤인
+  첫 세션만 `historical_usable_session`이 된다. 이 `>` 경계는 ingestion과 SQLite `CHECK` 양쪽에
+  있다. acceptance가 없거나 calendar coverage 뒤면 NULL이며 filed date fallback은 없다.
 - complete submission의 `FILER` 아래 `COMPANY DATA`만 읽는다. target CIK의 distinct bracket SIC가
   하나면 `EXACT`, 없으면 `MISSING`, 둘 이상이면 `AMBIGUOUS`다. current submissions top-level SIC와
   `securities.sector`는 읽지 않는다.
@@ -361,9 +362,10 @@ AAPL `CIK0000320193` 한 건으로 unit test와 분리해 실행했다. recent�
 `0000320193-26-000020`의 complete submission에서 target-CIK SIC `3571`을 `EXACT`로 찾았다.
 
 API acceptance `2026-07-31T10:01:02.000Z`와 complete submission header의
-`20260731060102`는 시각 표기가 달랐지만 SEC calendar date `2026-07-31`은 같았다. 따라서
-UTC 변환으로 날짜를 옮기지 않고 API acceptance calendar date 다음 SPY session을 쓰는 계약을
-유지한다. smoke는 unit test의 네트워크 의존성이 아니다.
+`20260731060102`는 시각 표기가 달랐지만 이 **특정 표본에서는** UTC와 Eastern calendar date가
+모두 `2026-07-31`이었다. 이 smoke는 UTC/Eastern rollover 사례를 검증하지 않았다. rollover 계약은
+겨울 `2024-01-10T01:30Z → 2024-01-09 EST`와 여름 DST fixture를 `America/New_York` 변환으로
+검증한다. smoke는 unit test의 네트워크 의존성이 아니다.
 
 ### 검증
 
@@ -371,13 +373,13 @@ UTC 변환으로 날짜를 옮기지 않고 API acceptance calendar date 다음 
 
 ```text
 python3 -m unittest trading.tests.test_qv_submissions
-  42 tests · PASS
+  45 tests · PASS
 
 python3 -m unittest trading.tests.test_qv_identity
   21 tests · PASS
 
 python3 -m unittest discover -s trading/tests -p 'test_*.py'
-  1,171 tests · PASS
+  1,174 tests · PASS
 
 npm test
   949 tests · PASS
