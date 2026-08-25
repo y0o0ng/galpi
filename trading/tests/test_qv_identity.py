@@ -648,6 +648,7 @@ class QVSnapshotRegressionTest(unittest.TestCase):
                         "qv_share_classes",
                         "qv_class_valuation",
                         "qv_sec_filings",
+                        "qv_accounting_filings",
                     },
                 )
                 for table in qv_tables:

@@ -405,7 +405,7 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 |**정찰 — ME source** (`PROBE-me-source.md`)|**`SEC_ROUTE_VIABLE`** (2026-08-22). raw XBRL instance 경로가 여섯 축을 전부 통과했고 API 경로는 기각됐다|
 |1. identity 계층|**구현 완료** (2026-08-24). `schema.sql`의 QV 전용 세 테이블과 `qv_identity.py`, fixture·회귀 테스트가 정본이다|
 |2. submissions ingestion|**`CLOSED / PASS`** (2026-08-24). `qv_sec_filings`와 `qv_submissions.py`, network-free fixture가 정본이다|
-|3. companyfacts / accounting mapping|**진행 중.** Gross Profit(위 3.6 · 로드맵 §4.2.1) · Total Assets(위 3.7 · 로드맵 §4.2.2) · Book Equity(위 3.8 · 로드맵 §4.3.1)가 모두 **CLOSED / FROZEN**이다 (2026-08-25). **실제 accounting ingestion과 parser 구현은 아직 open이다** — mapping이 닫힌 것과 단계가 끝난 것은 다르다|
+|3. companyfacts / accounting mapping|**진행 중.** mapping은 셋 다 **CLOSED / FROZEN**이고(위 3.6·3.7·3.8 · 로드맵 §4.2.1·§4.2.2·§4.3.1), **raw-XBRL parser와 accounting ingestion도 구현을 마쳤다**(아래 10). **아직 open**: production 전수 accounting ingest와 coverage audit은 실행하지 않았다|
 |4. shares / ME 본구현|미착수|
 |5. formation snapshot · sentinel · coverage|미착수|
 
@@ -577,7 +577,132 @@ companyfacts/accounting tag mapping, raw XBRL shares, issuer ME, formation snaps
 Gate A~H, factor·portfolio·수익률 계산은 전부 하지 않았다. 다음 단계는 **companyfacts ingestion +
 accounting tag mapping audit**다.
 
-## 10. 결과
+## 10. Step 3 accounting ingestion 구현 receipt — 2026-08-25
+
+> **상태: accounting parser/ingestion implementation complete;
+> production population ingest / coverage audit not yet run.**
+> S&P500 전수 accounting ingest를 실행하지 않았고 Gate A~H를 판정하지 않았다.
+> 수익률·QV rank·B/M·coverage를 0번 계산했다.
+
+기준 commit은 `cc70cb42d417b920c7221d4ad995a36b92c4c61e`(Book Equity 계약 동결)이다.
+
+### 구현된 모듈
+
+|파일|책임|
+|---|---|
+|`trading/backtest/qv_xbrl.py`|**DB를 모르는 순수 파서.** instance·presentation linkbase·FilingSummary를 XML root/content로 판정하고 fact·context·presentation graph·report로만 바꾼다. QName은 prefix가 아니라 **namespace URI + local name**이다|
+|`trading/backtest/qv_accounting.py`|동결 계약 적용 · `qv_accounting_filings` 적재 · PIT filing selector · `preferred_tier_transitions` 파생 helper|
+|`trading/backtest/edgar.py`|`accession_dir_url` · `accession_index` · `accession_file_bytes` **셋만** 추가. 기존 `text()`의 latin-1 의미는 그대로다|
+|`trading/backtest/schema.sql`|`qv_accounting_filings` 한 표 추가|
+
+### 책임 경계
+
+```text
+raw SEC accession XBRL   accounting source of truth
+qv_sec_filings           filing / PIT source of truth
+qv_accounting_filings    canonical 값 + 그 값을 만든 selected fact provenance만
+```
+
+**generic XBRL warehouse를 만들지 않았다** — `xbrl_facts`·`xbrl_contexts`·`xbrl_dimensions`·
+`xbrl_presentation_edges` 같은 표가 없고 raw XML 본문을 DB에 넣지 않는다. companyfacts를
+canonical accounting source로 쓰지 않는다.
+
+### statement role 선택
+
+`FilingSummary`가 **선언한** report 종류로 statement와 non-statement를 먼저 가른다.
+최근 filing은 `MenuCategory == "Statements"`, `MenuCategory`가 없는 초기 XBRL filing은
+`LongName`의 `{sort} - {kind} - {title}` 중 kind를 쓴다. **제목 유사도를 쓰지 않는다.**
+
+```text
+연결 대차대조표 role  = statement report 중 그 presentation role이
+                       target CIK · DPE instant · 무차원 us-gaap:Assets fact의 개념을 담은 것
+연결 손익계산서 role  = statement report 중 그 role이
+                       target CIK · 연간 duration · 무차원 revenue-family fact의 개념을 담은 것
+후보 0개 -> UNRESOLVED_STATEMENT_ROLE · 2개 이상 -> AMBIGUOUS_STATEMENT_ROLE (임의 선택 없음)
+```
+
+### 계약 준수
+
+```text
+Gross Profit   canonical = total revenue - COGS. direct us-gaap:GrossProfit은 diagnostic only
+               tolerance 없음 · mismatch여도 canonical reconstruction 유지
+               revenue/COGS는 presentation 구조의 total로만 고르고 component 합산 금지
+Total Assets   canonical = us-gaap:Assets · Assets == LiabilitiesAndStockholdersEquity exact
+               mismatch -> fail-close · unavailable은 mismatch가 아님 · fallback 없음
+Book Equity    = Parent SE - Preferred · DT/ITC contribution은 언제나 0
+               direct StockholdersEquity 우선 · 없으면 IncludingNCI - MinorityInterest
+               redeemable NCI / temporary equity 증거가 있으면 fallback fail-close
+               preferred는 liquidation -> par/carrying · ZERO는 shares 0 또는 요소 부재 추론
+               존재 판정에만 차원 fact를 보고 값 합산은 금지
+NCI tie-out    raw XBRL decimals에서 파생한 반폭. decimals 없거나 INF면 exact 요구
+               direct 경로 mismatch는 진단 · 복원 경로는 순환 검증하지 않고 PARENT_RECONSTRUCTED
+period anchor  dei:DocumentPeriodEndDate canonical · report_date는 cross-check
+               불일치 -> PERIOD_CROSSCHECK_MISMATCH -> canonical outputs fail-close
+```
+
+금액은 전부 `Decimal`이고 DB에는 **REAL이 아니라 lossless decimal 문자열**로 넣는다.
+
+### 검증 — 실제 실행 결과
+
+```text
+python3 -m unittest trading.tests.test_qv_xbrl trading.tests.test_qv_accounting
+  93 tests · PASS
+python3 -m unittest trading.tests.test_qv_submissions trading.tests.test_qv_identity
+  69 tests · PASS
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,270 tests · PASS
+npm test
+  949 tests · PASS
+```
+
+**unit test는 전부 network-free다.** fixture는 `trading/tests/fixtures/qv_xbrl/`의 빌더가
+만든 작은 XML이고 실제 filing을 복사하지 않았다.
+
+기존 `test_qv_identity`의 "기존 DB에 QV 표가 비어 생긴다" 회귀에서 기대 표 집합에
+`qv_accounting_filings`를 더했다. 그 테스트의 불변식(모두 존재하고 모두 0행)은 그대로다.
+
+### 실제 SEC read-only smoke — unit test와 별개다
+
+임시 경로에서 4개 probe anchor로 실행했다. production DB에 넣지 않았고 수익률·coverage를
+계산하지 않았다.
+
+|anchor|결과|
+|---|---|
+|**COST** `0000909832-19-000019`|revenue `152,703,000,000` · COGS `132,886,000,000` · **GP `19,817,000,000`** · **주석 role의 `GrossProfit` 16,465는 canonical에도 diagnostic에도 들어오지 않았다** · Assets `45,400,000,000` VALIDATED · BE `15,243,000,000`|
+|**CAT** `0000018230-26-000008`|revenue `67,589,000,000` · **COGS `44,752,000,000`(`CostOfRevenue`)** — **세그먼트 주석의 `CostOfGoodsAndServicesSold` 49,000,000은 배제됐다** · GP `22,837,000,000` · parent SE는 direct가 없어 `INCLUDING_NCI_MINUS_NCI`로 `21,318,000,000`|
+|**NEE** `0000753308-26-000015`|**Assets `212,721,000,000`** — **co-registrant FPL의 `105,158,000,000`이 들어오지 않았다** · tie-out VALIDATED · parent SE `54,608,000,000` DIRECT · NCI tie-out VALIDATED · BE `54,608,000,000`|
+|**TSLA** `0001564590-17-003118`|대차대조표 role에서 parent SE `4,752,911,000` DIRECT · Assets `22,664,076,000` VALIDATED. **equity roll-forward의 `IncludingNCI` 5,905,125,000은 canonical 후보가 되지 않았다.** revenue/COGS는 아래 구조 한계로 `AMBIGUOUS`|
+
+### smoke가 드러낸 것 — 사용자 결정이 필요한 둘
+
+**둘 다 조용히 우회하지 않고 명시 상태로 남겼다.**
+
+1. **presentation의 total은 보통 components의 *형제*다.** Tesla FY2016 손익계산서는
+   `RevenuesAbstract` 아래에 components와 `Revenues`(총계)를 **같은 레벨**로 두고
+   `order`로만 마지막에 놓는다. 계약 §13.1 규칙 2(“하나가 다른 후보들의 presentation
+   조상”)가 성립하지 않아 규칙 3대로 `REVENUE_UNRESOLVED`가 된다. **총계 식별에 계산
+   linkbase를 쓸지, `order`를 쓸지는 새 구조 규칙이라 여기서 정하지 않았다.**
+2. **utility 표준 revenue 개념이 목록에 없다.** NEE 손익계산서는
+   `us-gaap:RegulatedAndUnregulatedOperatingRevenue` `27,412,000,000`을 쓰는데 정찰이
+   문서화한 revenue 계열에 없어 income-statement role이 `UNRESOLVED_STATEMENT_ROLE`이다.
+   **concept family를 넓히는 것은 semantic 결정이라 임의로 하지 않았다.**
+
+### 이번 단계에서 하지 않은 것
+
+```text
+production S&P500 전수 accounting ingest        미실행
+coverage_start · Gate A~H 판정                  하지 않음
+shares / ME / B-M / GPA / QV rank / portfolio   미구현
+returns · run-card 결과                          0회
+PAPER/LIVE DB 변경                               없음
+data_sources.kind CHECK 확장                     하지 않음 (새 fundamentals kind 없음)
+store.py 변경                                    없음 (additive CREATE TABLE로 충분)
+```
+
+---
+
+## 11. 결과
+
 
 <!-- 전수 실행 후 채운다. 이 위의 어떤 문턱도 그때 고치지 않는다. -->
 

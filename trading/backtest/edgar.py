@@ -105,6 +105,7 @@ ARCHIVE_URL = "https://data.sec.gov/submissions/{name}"
 COMPLETE_SUBMISSION_URL = (
     "https://www.sec.gov/Archives/edgar/data/{cik}/{accession_compact}/{accession}.txt"
 )
+ACCESSION_DIR_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession_compact}"
 
 EARNINGS_ITEM = "2.02"
 
@@ -394,6 +395,23 @@ class EdgarClient:
         """filing-time SEC header가 든 complete submission 원문."""
         return self.text(complete_submission_url(cik, accession))
 
+    def accession_index(self, cik: str, accession: str) -> dict:
+        """accession archive 디렉터리의 index metadata."""
+        payload = self._get(accession_dir_url(cik, accession) + "/index.json")
+        if not isinstance(payload, dict):
+            raise EdgarError(f"accession index 응답이 객체가 아닙니다: {accession}")
+        return payload
+
+    def accession_file_bytes(self, cik: str, accession: str, name: str) -> bytes:
+        """accession 안의 파일 하나를 raw bytes로 읽는다.
+
+        XML/XBRL은 자체 인코딩 선언을 가지므로 `text()`의 latin-1 디코딩을 태우지 않는다.
+        """
+        clean = str(name).strip()
+        if not clean or "/" in clean or "\\" in clean or clean.startswith("."):
+            raise EdgarError(f"accession 파일 이름이 잘못됐습니다: {name!r}")
+        return self._read(accession_dir_url(cik, accession) + "/" + clean)
+
     def all_earnings_dates(
         self, cik: str, window_start: str | None = None
     ) -> tuple[list[str], dict]:
@@ -420,6 +438,20 @@ class EdgarClient:
             if isinstance(archive, dict):
                 dates.extend(earnings_dates_from_block(archive))
         return sorted(set(dates)), payload
+
+
+def accession_dir_url(cik: str, accession: str) -> str:
+    """SEC Archives accession 디렉터리 URL을 결정론적으로 만든다."""
+    normalized_cik = str(cik).strip()
+    if not normalized_cik.isdigit():
+        raise EdgarError(f"accession CIK가 숫자가 아닙니다: {cik!r}")
+    normalized_accession = str(accession).strip()
+    if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", normalized_accession):
+        raise EdgarError(f"accession 형식이 잘못됐습니다: {accession!r}")
+    return ACCESSION_DIR_URL.format(
+        cik=str(int(normalized_cik)),
+        accession_compact=normalized_accession.replace("-", ""),
+    )
 
 
 def complete_submission_url(cik: str, accession: str) -> str:

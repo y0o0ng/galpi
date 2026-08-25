@@ -372,6 +372,91 @@ CREATE TABLE IF NOT EXISTS holdout_runs (
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 
+-- Quality + Value의 canonical accounting observation. raw filing 전체를 warehouse하지
+-- 않고, 동결된 회계 계약이 고른 값과 그 값을 만든 fact의 provenance만 남긴다. CIK는 raw SEC
+-- registrant key이고 issuer_id가 아니다 — issuer join은 qv_identity가 따로 한다.
+CREATE TABLE IF NOT EXISTS qv_accounting_filings (
+  cik TEXT NOT NULL
+    CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  filing_source_version TEXT NOT NULL CHECK (length(trim(filing_source_version)) > 0),
+  accounting_source TEXT NOT NULL CHECK (length(trim(accounting_source)) > 0),
+  accounting_source_version TEXT NOT NULL
+    CHECK (length(trim(accounting_source_version)) > 0),
+  accounting_definition_version TEXT NOT NULL
+    CHECK (length(trim(accounting_definition_version)) > 0),
+
+  fiscal_period_end TEXT
+    CHECK (fiscal_period_end IS NULL OR fiscal_period_end GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  period_crosscheck_status TEXT NOT NULL,
+  income_statement_role TEXT,
+  balance_sheet_role TEXT,
+
+  -- canonical 금액은 REAL이 아니라 lossless decimal 문자열이다.
+  revenue_value TEXT CHECK (revenue_value IS NULL OR revenue_value GLOB '-[0-9]*'
+    OR revenue_value GLOB '[0-9]*'),
+  revenue_status TEXT NOT NULL,
+  cogs_value TEXT CHECK (cogs_value IS NULL OR cogs_value GLOB '-[0-9]*'
+    OR cogs_value GLOB '[0-9]*'),
+  cogs_status TEXT NOT NULL,
+  gross_profit_value TEXT CHECK (gross_profit_value IS NULL
+    OR gross_profit_value GLOB '-[0-9]*' OR gross_profit_value GLOB '[0-9]*'),
+  gross_profit_status TEXT NOT NULL,
+  direct_gross_profit_value TEXT CHECK (direct_gross_profit_value IS NULL
+    OR direct_gross_profit_value GLOB '-[0-9]*'
+    OR direct_gross_profit_value GLOB '[0-9]*'),
+  gross_profit_tieout_status TEXT NOT NULL,
+
+  assets_value TEXT CHECK (assets_value IS NULL OR assets_value GLOB '-[0-9]*'
+    OR assets_value GLOB '[0-9]*'),
+  assets_status TEXT NOT NULL,
+  assets_tieout_status TEXT NOT NULL,
+
+  parent_se_value TEXT CHECK (parent_se_value IS NULL OR parent_se_value GLOB '-[0-9]*'
+    OR parent_se_value GLOB '[0-9]*'),
+  parent_se_status TEXT NOT NULL,
+  parent_se_path TEXT CHECK (parent_se_path IS NULL OR
+    parent_se_path IN ('DIRECT_PARENT_SE', 'INCLUDING_NCI_MINUS_NCI')),
+  nci_tieout_status TEXT NOT NULL,
+
+  preferred_value TEXT CHECK (preferred_value IS NULL OR preferred_value GLOB '-[0-9]*'
+    OR preferred_value GLOB '[0-9]*'),
+  preferred_status TEXT NOT NULL,
+  preferred_tier TEXT CHECK (preferred_tier IS NULL OR
+    preferred_tier IN ('LIQUIDATION', 'PAR_CARRYING', 'ZERO')),
+
+  book_equity_value TEXT CHECK (book_equity_value IS NULL
+    OR book_equity_value GLOB '-[0-9]*' OR book_equity_value GLOB '[0-9]*'),
+  book_equity_status TEXT NOT NULL,
+
+  revenue_provenance TEXT,
+  cogs_provenance TEXT,
+  direct_gp_provenance TEXT,
+  assets_provenance TEXT,
+  assets_tieout_provenance TEXT,
+  parent_se_provenance TEXT,
+  nci_tieout_provenance TEXT,
+  preferred_provenance TEXT,
+  bundle_provenance TEXT NOT NULL CHECK (length(trim(bundle_provenance)) > 0),
+  diagnostics TEXT NOT NULL,
+
+  ingested_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  PRIMARY KEY (cik, accession, accounting_source_version,
+               accounting_definition_version),
+  FOREIGN KEY (cik, accession, filing_source_version)
+    REFERENCES qv_sec_filings(cik, accession, source_version),
+  CHECK (revenue_status <> 'RESOLVED' OR revenue_value IS NOT NULL),
+  CHECK (cogs_status <> 'RESOLVED' OR cogs_value IS NOT NULL),
+  CHECK (gross_profit_status <> 'RESOLVED' OR gross_profit_value IS NOT NULL),
+  CHECK (assets_status <> 'RESOLVED' OR assets_value IS NOT NULL),
+  CHECK (parent_se_status <> 'RESOLVED' OR
+    (parent_se_value IS NOT NULL AND parent_se_path IS NOT NULL)),
+  CHECK (preferred_status <> 'RESOLVED' OR
+    (preferred_value IS NOT NULL AND preferred_tier IS NOT NULL)),
+  CHECK (book_equity_status <> 'RESOLVED' OR book_equity_value IS NOT NULL)
+) WITHOUT ROWID;
+
 CREATE INDEX IF NOT EXISTS idx_holdout_segment
   ON holdout_runs(source_version, start_date, end_date);
 
@@ -389,3 +474,6 @@ CREATE INDEX IF NOT EXISTS idx_qv_class_valuation_active
 CREATE INDEX IF NOT EXISTS idx_qv_sec_filings_usable
   ON qv_sec_filings(source_version, cik, historical_usable_session,
                     acceptance_datetime, accession);
+CREATE INDEX IF NOT EXISTS idx_qv_accounting_period
+  ON qv_accounting_filings(accounting_source_version, accounting_definition_version,
+                           cik, fiscal_period_end);
