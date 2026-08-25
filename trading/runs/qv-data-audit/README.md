@@ -95,6 +95,7 @@ QV core signature에 들어간다(§4.7).
 |칸|근거|
 |---|---|
 |~~`GrossProfit` 직접 태그 vs `Revenue − COGS`~~|**CLOSED / FROZEN** (2026-08-25). canonical은 `consolidated total revenue − COGS`다. 계약은 아래 3.6, 정찰은 `PROBE-gross-profit-mapping.md`|
+|~~`Total Assets` XBRL mapping~~|**CLOSED / FROZEN** (2026-08-25). canonical은 `us-gaap:Assets` 하나다. 계약은 아래 3.7, 정찰은 `PROBE-total-assets-mapping.md`|
 |`StockholdersEquity` XBRL fallback 순서|§4.3|
 |preferred stock · deferred tax 태그 mapping|§4.3|
 |historical SIC 복원 경로|§3.4 — filing 시점 submission header 우선|
@@ -104,8 +105,8 @@ QV core signature에 들어간다(§4.7).
 **issuer custom tag를 이름 유사도로 자동 연결하지 않는다**(§4.2). 표준 taxonomy와 filing
 원문으로 회계적 동일성이 확인된 mapping만 넣는다.
 
-**`Total Assets` · `StockholdersEquity` · preferred · deferred tax는 아직 open이다.**
-Gross Profit이 닫혔다고 회계 mapping 전체가 닫힌 것이 아니다.
+**`StockholdersEquity` · preferred · deferred tax는 아직 open이다.** Gross Profit과
+Total Assets가 닫혔다고 회계 mapping 전체가 닫힌 것이 아니다. Book Equity 계열은 그대로 남아 있다.
 
 ### 3.5 ME shares — 정찰 뒤 확정된 계약
 
@@ -166,6 +167,53 @@ Novy-Marx 계열의 `REVT − COGS`에 가까운 신호를 재현하기 위해�
 
 **이 결정에 포함되지 않은 것**: `Total Assets` · Book Equity · preferred stock · deferred
 tax mapping은 그대로 open이다(위 3.2).
+
+### 3.7 Total Assets accounting mapping — 정찰 뒤 확정된 계약
+
+정본은 로드맵 §4.2·§4.2.2다. **여기서 다시 정하지 않고 Phase 0이 지켜야 할 형태로만
+옮겨 적는다.** 정찰 기록은 `PROBE-total-assets-mapping.md`다.
+
+```text
+canonical concept   us-gaap:Assets
+                    issuer custom 태그 · 이름 유사도 mapping · fallback hierarchy 금지
+fact 선택            그 accession의 연결 대차대조표 Statement role 안의
+                    무차원(dimensionless) fact만
+role + 무차원        둘 다 필요하다. Statement role만으로는 부족
+role 불명            추측 금지. unresolved / missing
+role 밖 fact         Disclosure · 주석 · segment · guarantor · VIE · disposal은
+                    개념이 us-gaap:Assets여도 후보 아님
+period anchor       dei:DocumentPeriodEndDate            (canonical)
+cross-check         qv_sec_filings.report_date           (불일치 -> MISSING / UNRESOLVED)
+금지                 report_date 단독 canonical · accession 내 최신 instant 추정
+                    · fy / fp / frame을 period-end source나 quality filter로 사용
+validation          Assets == LiabilitiesAndStockholdersEquity, exact. tolerance 없음
+  계산 가능 + exact      VALIDATED
+  계산 가능 + mismatch   fail-close (TIEOUT_MISMATCH)
+  계산 불가              TIEOUT_UNAVAILABLE / UNVERIFIED  (mismatch와 합치지 않는다)
+fallback            금지 -> MISSING
+                    AssetsCurrent + AssetsNoncurrent 및 component 합산 금지
+dimension-only      금지 -> MISSING. member 합산 · whitelist · issuer별 예외
+                    · parent/subsidiary/guarantor 조합 · elimination 계산 · derived 추정 금지
+Total Assets <= 0   invalid (아래 3.3 그대로)
+보존                accession · form · acceptance_datetime · historical_usable_session
+                    · statement role · concept · instant · unit · value
+                    · anchor 출처와 cross-check 결과 · tie-out 상태 · provenance
+```
+
+**`Statement` role과 무차원 조건은 둘 다 필요하다.** 정찰에서 결합 10-K의 Statement role
+대차대조표 안에 co-registrant 자회사의 총자산이 함께 있는 사례를 찾았다. role만 걸면 그것이
+후보로 들어온다.
+
+**"tie-out 계산 불가"는 실패가 아니다.** mismatch와 다른 상태로 보존한다. 이 Phase의 freeze는
+**상태 계약만** 고정하고, unavailable의 빈도와 coverage 해석은 본구현 전수에서 판정한다.
+
+**coverage 영향**: 위 규칙으로 Total Assets가 `MISSING`이 된 issuer-year는 **denominator에서
+빠지지 않는다.** missing reason으로 세고, Gate A·B는 본구현 전수에서만 판정한다. **정찰의
+발행사별 숫자를 coverage 추정치로 쓰지 않는다.**
+
+**이 결정에 포함되지 않은 것**: Book Equity · `StockholdersEquity` fallback · preferred stock ·
+deferred tax mapping은 그대로 open이다(위 3.2). companyfacts ingestion·presentation parser·
+raw XBRL parser·accounting schema 구현도 이 결정에 포함되지 않는다.
 
 ### 3.3 이미 고정돼 있어 여기서 손대지 않는 것
 
@@ -274,7 +322,7 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 |**정찰 — ME source** (`PROBE-me-source.md`)|**`SEC_ROUTE_VIABLE`** (2026-08-22). raw XBRL instance 경로가 여섯 축을 전부 통과했고 API 경로는 기각됐다|
 |1. identity 계층|**구현 완료** (2026-08-24). `schema.sql`의 QV 전용 세 테이블과 `qv_identity.py`, fixture·회귀 테스트가 정본이다|
 |2. submissions ingestion|**`CLOSED / PASS`** (2026-08-24). `qv_sec_filings`와 `qv_submissions.py`, network-free fixture가 정본이다|
-|3. companyfacts / accounting mapping|**진행 중.** Gross Profit mapping은 **CLOSED / FROZEN** (2026-08-25, 위 3.6 · 로드맵 §4.2.1). `Total Assets` · Book Equity mapping과 실제 ingestion 구현은 아직 open이다|
+|3. companyfacts / accounting mapping|**진행 중.** Gross Profit(위 3.6 · 로드맵 §4.2.1)과 Total Assets(위 3.7 · 로드맵 §4.2.2)가 **CLOSED / FROZEN**이다 (2026-08-25). Book Equity · preferred · deferred tax mapping과 실제 ingestion 구현은 아직 open이다|
 |4. shares / ME 본구현|미착수|
 |5. formation snapshot · sentinel · coverage|미착수|
 

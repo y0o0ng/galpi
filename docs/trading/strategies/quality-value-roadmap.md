@@ -489,8 +489,87 @@ member를 합산해 consolidated COGS를 재구성하지 않는다. coverage를 
 whitelist·issuer별 합산 예외·derived member 추정·사후 mapping을 추가하지 않는다. 해당
 issuer-year는 denominator에서 조용히 빠지지 않고 missing reason으로 남는다(§6 데이터 gate).
 
-`Total Assets` · `Book Equity` · preferred stock · deferred tax mapping은 **이 결정에
-포함되지 않는다.** §4.3과 Phase 0 README §3.2에 open으로 남아 있다.
+`Book Equity` · preferred stock · deferred tax mapping은 **이 결정에 포함되지 않는다.**
+§4.3과 Phase 0 README §3.2에 open으로 남아 있다. GPA denominator인 `Total Assets`는
+§4.2.2에서 따로 닫혔다.
+
+#### 4.2.2 Total Assets mapping — CLOSED / FROZEN
+
+**GPA denominator의 mapping도 닫혔다.** 정찰 근거는
+`trading/runs/qv-data-audit/PROBE-total-assets-mapping.md`이고, Phase 0이 지켜야 할 형태는
+`trading/runs/qv-data-audit/README.md` §3.7이다. **결과를 본 뒤 아래를 되돌리지 않는다.**
+
+```text
+canonical concept   us-gaap:Assets                       (fallback hierarchy 없음)
+fact 선택            연결 대차대조표 Statement role 안의 무차원 fact만
+period anchor       dei:DocumentPeriodEndDate            (canonical)
+cross-check         qv_sec_filings.report_date           (불일치하면 MISSING / UNRESOLVED)
+validation          Assets == LiabilitiesAndStockholdersEquity, exact. tolerance 없음
+                    mismatch -> fail-close
+                    계산 불가 -> mismatch와 합치지 않고 별도 상태
+fallback            금지 -> MISSING
+dimension-only      금지 -> MISSING. member 합산 금지
+Total Assets <= 0   invalid (§4.2 그대로)
+```
+
+**canonical concept은 `us-gaap:Assets` 하나다.** issuer custom Assets 태그, 이름 유사도
+mapping, 임의 fallback hierarchy를 쓰지 않는다.
+
+**fact 선택은 filing의 presentation structure를 쓴다.**
+
+```text
+formation까지 usable한 annual 10-K family filing 선택
+        ↓
+그 accession의 연결 대차대조표 Statement role 식별
+        ↓
+그 role 안의 무차원 us-gaap:Assets 만 후보
+        ↓
+canonical fiscal-period-end instant와 일치하는 fact 선택
+```
+
+**Statement role만으로는 충분하지 않다.** 같은 Statement role 안에 co-registrant·자회사·
+guarantor·segment 값이 함께 있을 수 있으므로 **무차원 조건을 반드시 함께 강제한다.**
+role을 신뢰성 있게 특정할 수 없으면 추측하지 않고 unresolved/missing으로 둔다.
+Disclosure·주석·segment·guarantor·VIE·disposal처럼 **role 밖의 fact는 개념이
+`us-gaap:Assets`여도 canonical 후보가 아니다.** `fy`·`fp`·`frame`으로 statement 의미를
+추측하지 않는다.
+
+**회계기간 앵커의 정본은 `dei:DocumentPeriodEndDate`다.** `qv_sec_filings.report_date`는
+정본이 아니라 cross-check다.
+
+```text
+dei:DocumentPeriodEndDate == qv_sec_filings.report_date   -> 정상
+불일치                                                     -> MISSING / UNRESOLVED
+```
+
+둘이 어긋날 때 **조용히 한쪽을 고르지 않는다.** `submissions.reportDate`를 단독 정본으로
+쓰지 않고, accession 안에서 **가장 늦은 instant를 회계연도 말로 추정하지 않으며**,
+companyfacts의 `fy`·`fp`·`frame`을 period-end source로 쓰지 않는다.
+
+**가능한 경우 `Assets == LiabilitiesAndStockholdersEquity` exact tie-out을 필수 검증으로
+쓴다. tolerance를 두지 않는다.** 세 상태를 반드시 구분한다.
+
+```text
+계산 가능 + exact      -> VALIDATED
+계산 가능 + mismatch   -> fail-close (TIEOUT_MISMATCH 등 명시 상태)
+계산 불가              -> TIEOUT_UNAVAILABLE / UNVERIFIED  (mismatch와 합치지 않는다)
+```
+
+**"tie-out 계산 불가"를 자동으로 mismatch라고 부르지 않는다.** 이 계약은 상태만 고정하고,
+unavailable의 빈도와 최종 coverage 해석은 본구현 전수에서 본다. `0.1%`·`0.5%` 같은 문턱을
+새로 만들지 않는다.
+
+**canonical context에 `us-gaap:Assets`가 없으면 `MISSING`이다.**
+`AssetsCurrent + AssetsNoncurrent`나 유동자산·유형자산·영업권 등의 component 합산을
+canonical fallback으로 쓰지 않는다. 정찰 표본에서 `us-gaap:Assets` 결손이 0건이었고
+component 합산은 계산 가능 구간 자체가 좁고 정확하지도 않았다. **없는 문제를 위해 새 hierarchy를
+만들지 않는다.**
+
+**무차원 consolidated `us-gaap:Assets`가 없고 dimension member에만 있으면 `MISSING`이다.**
+member 합산으로 consolidated Assets를 재구성하지 않는다. member whitelist·issuer별 합산
+예외·parent/subsidiary/guarantor member 조합·elimination member 계산·derived member 추정·
+coverage를 올리기 위한 사후 mapping을 만들지 않는다. 해당 issuer-year는 denominator에서
+조용히 빠지지 않고 missing reason으로 남는다(§6 데이터 gate).
 
 ### 4.3 Book Equity
 
