@@ -23,17 +23,18 @@ from .qv_xbrl import (
     InstanceDocument,
     PresentationDocument,
     PresentationRole,
+    QName,
     QVXbrlError,
     candidate_xml_names,
     is_dei,
     is_us_gaap,
+    is_usd,
     looks_like_instance,
     looks_like_presentation,
     normalize_cik,
     parse_filing_summary,
     parse_instance,
     parse_presentation,
-    sha256,
 )
 
 ACCOUNTING_DEFINITION_VERSION = "qv-accounting-v1"
@@ -44,7 +45,6 @@ FILING_SUMMARY_NAME = "FilingSummary.xml"
 ANNUAL_FORMS = ("10-K", "10-K/A")
 MIN_ANNUAL_DAYS = 340
 MAX_ANNUAL_DAYS = 400
-USD = "iso4217:USD"
 
 RESOLVED = "RESOLVED"
 MISSING = "MISSING"
@@ -56,6 +56,8 @@ ROUNDING_COMPATIBLE = "ROUNDING_COMPATIBLE"
 TIEOUT_MISMATCH = "TIEOUT_MISMATCH"
 TIEOUT_UNAVAILABLE = "TIEOUT_UNAVAILABLE"
 TIEOUT_EXACT = "TIEOUT_EXACT"
+# validation 입력 자체가 모호한 경우. 단순 missing/unavailable과 합치지 않는다.
+TIEOUT_INPUT_AMBIGUOUS = "TIEOUT_INPUT_AMBIGUOUS"
 
 DIRECT_PARENT_SE = "DIRECT_PARENT_SE"
 INCLUDING_NCI_MINUS_NCI = "INCLUDING_NCI_MINUS_NCI"
@@ -87,6 +89,8 @@ REVENUE_LOCALS = frozenset(
         "SalesRevenueServicesNet",
         "RevenueNotFromContractWithCustomer",
         "RevenueFromCollaborativeArrangementExcludingRevenueFromContractWithCustomer",
+        # 규제 유틸리티의 표준 total operating revenues. issuer 예외가 아니라 표준 개념이다.
+        "RegulatedAndUnregulatedOperatingRevenue",
     }
 )
 COGS_LOCALS = frozenset(
@@ -296,11 +300,11 @@ def _fact_provenance(
 ) -> dict:
     fact = bound.fact
     return {
-        "concept_namespace": fact.namespace,
-        "concept_local_name": fact.local_name,
+        "concept_namespace": fact.concept.namespace,
+        "concept_local_name": fact.concept.local,
         "raw_value": fact.raw_value,
         "value": decimal_text(fact.value),
-        "unit": fact.unit,
+        "unit": fact.unit.as_json() if fact.unit else None,
         "unit_id": fact.unit_id,
         "decimals": fact.decimals,
         "precision": fact.precision,
@@ -309,8 +313,8 @@ def _fact_provenance(
         "instant": bound.context.instant,
         "start": bound.context.start,
         "end": bound.context.end,
-        "dimensions": [list(pair) for pair in bound.context.dimensions],
-        "typed_dimensions": list(bound.context.typed_dimensions),
+        "dimensions": bound.context.dimensions_json(),
+        "typed_dimensions": [q.as_json() for q in bound.context.typed_dimensions],
         "instance_file": bound.instance_file,
         "instance_sha256": bound.instance_sha256,
         "statement_role": role,
@@ -323,11 +327,11 @@ def _fact_provenance(
 
 
 def _standard(bound: BoundFact, local: str | frozenset[str]) -> bool:
-    if not is_us_gaap(bound.fact.namespace):
+    if not is_us_gaap(bound.fact.concept.namespace):
         return False
     if isinstance(local, str):
-        return bound.fact.local_name == local
-    return bound.fact.local_name in local
+        return bound.fact.concept.local == local
+    return bound.fact.concept.local in local
 
 
 def _target_dimensionless(bound: BoundFact, cik: str) -> bool:
@@ -335,29 +339,46 @@ def _target_dimensionless(bound: BoundFact, cik: str) -> bool:
 
 
 def _usd_monetary(bound: BoundFact) -> bool:
-    return bound.fact.unit == USD and bound.fact.value is not None
+    """ISO4217 namespace의 USD인가. `iso4217:USD` 문자열 비교를 쓰지 않는다."""
+    return is_usd(bound.fact.unit) and bound.fact.value is not None
+
+
+def _unit_key(unit) -> tuple | None:
+    """unit의 **semantic measure**만 본다. 같은 측정단위를 다른 id로 선언한 것은 같은 unit이다."""
+    if unit is None:
+        return None
+    return (unit.numerator, unit.denominator)
+
+
+def _semantic_signature(bound: BoundFact) -> tuple:
+    """same-semantic duplicate로 dedupe할 수 있는 조건 전체.
+
+    context id나 instance 파일이 반복된 것 자체는 문제가 아니다. 그러나 개념·entity·
+    기간·dimension·unit·값·`decimals` 중 **하나라도 다르면** 같은 fact가 아니다.
+    """
+    return (
+        bound.fact.concept,
+        bound.context.cik,
+        bound.context.instant,
+        bound.context.start,
+        bound.context.end,
+        bound.context.dimensions,
+        bound.context.typed_dimensions,
+        _unit_key(bound.fact.unit),
+        decimal_text(bound.fact.value),
+        bound.fact.decimals,
+    )
 
 
 def _unique_value(bounds: list[BoundFact]) -> tuple[BoundFact | None, str]:
-    """같은 의미 범위의 후보에서 값이 유일해야 canonical이다.
+    """같은 의미 범위의 후보가 semantic하게 유일해야 canonical이다.
 
-    exact duplicate(값·decimals 동일)는 dedupe하고, 값이 갈리면 AMBIGUOUS다.
-    최신 context id·사전순·first/last 같은 임의 규칙으로 고르지 않는다.
+    exact duplicate는 dedupe하고, 값·`decimals`·unit·기간·dimension 중 하나라도 갈리면
+    AMBIGUOUS다. 최신 context id·사전순·first/last 같은 임의 규칙으로 고르지 않는다.
     """
     if not bounds:
         return None, MISSING
-    signature = {
-        (
-            decimal_text(b.fact.value),
-            b.fact.decimals,
-            b.fact.unit,
-            b.context.instant,
-            b.context.start,
-            b.context.end,
-        )
-        for b in bounds
-    }
-    if len({s[0] for s in signature}) > 1:
+    if len({_semantic_signature(b) for b in bounds}) > 1:
         return None, AMBIGUOUS
     return bounds[0], RESOLVED
 
@@ -453,7 +474,7 @@ def _select_balance_sheet_role(
         if found is None:
             continue
         concepts = found[0].concepts()
-        if any((b.fact.namespace, b.fact.local_name) in concepts for b in assets):
+        if any(b.fact.concept in concepts for b in assets):
             candidates.append(role)
     if len(candidates) == 1:
         return candidates[0], None
@@ -502,7 +523,7 @@ def _select_income_role(
         if found is None:
             continue
         concepts = found[0].concepts()
-        if any((b.fact.namespace, b.fact.local_name) in concepts for b in revenue):
+        if any(b.fact.concept in concepts for b in revenue):
             candidates.append(role)
     if len(candidates) == 1:
         return candidates[0], None
@@ -521,15 +542,15 @@ def _structural_total(
     """
     if not bounds:
         return None, MISSING
-    by_concept: dict[tuple[str, str], list[BoundFact]] = {}
+    by_concept: dict[QName, list[BoundFact]] = {}
     for b in bounds:
-        by_concept.setdefault((b.fact.namespace, b.fact.local_name), []).append(b)
+        by_concept.setdefault(b.fact.concept, []).append(b)
     if len(by_concept) == 1:
         return _unique_value(next(iter(by_concept.values())))
     tops = []
     for concept, group in by_concept.items():
         others = set(by_concept) - {concept}
-        if all(concept in role.ancestors(*other) for other in others):
+        if all(concept in role.ancestors(other) for other in others):
             tops.append((concept, group))
     if len(tops) == 1:
         return _unique_value(tops[0][1])
@@ -587,7 +608,7 @@ def _role_context(bundle: AccessionBundle, role: str | None):
 def _in_role(role_obj: PresentationRole | None, bound: BoundFact) -> bool:
     if role_obj is None:
         return False
-    return (bound.fact.namespace, bound.fact.local_name) in role_obj.concepts()
+    return bound.fact.concept in role_obj.concepts()
 
 
 def _resolve_income(bundle, result, facts, start, dpe, role):
@@ -699,7 +720,12 @@ def _resolve_assets(bundle, result, facts, dpe, role):
         result.diagnostics["assets"] = f"ASSETS_{status}"
         return
     lse, lse_status = _unique_value(at_instant(LIABILITIES_AND_SE_LOCAL))
-    if lse is None:
+    if lse_status == AMBIGUOUS:
+        # validation 입력이 모호하면 검증했다고 말할 수 없다. unavailable과 합치지 않는다.
+        result.assets_tieout_status = TIEOUT_INPUT_AMBIGUOUS
+        result.assets_status = UNRESOLVED
+        result.diagnostics["assets"] = "LSE_AMBIGUOUS"
+    elif lse is None:
         result.assets_tieout_status = TIEOUT_UNAVAILABLE
         result.assets_value = decimal_text(assets.fact.value)
         result.assets_status = RESOLVED
@@ -856,6 +882,12 @@ def _nci_tieout(result, bundle, direct, incl, nci, role, pre_file, pre_sha):
 
 
 def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre_sha):
+    """preferred hierarchy는 liquidation -> par/carrying이고 ZERO는 그보다 앞선다.
+
+    `AMBIGUOUS`는 `MISSING`과 다르다 — 상위 tier가 모호하면 하위 tier로 내려가지 않는다.
+    dimension fact는 **존재 evidence로만** 보고 값을 합산하지 않는다.
+    """
+
     def at_instant(local, *, dimensionless=True):
         return [
             b
@@ -867,35 +899,73 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
             and _in_role(role_obj, b)
         ]
 
+    def unresolved(reason):
+        result.preferred_status = PREF_UNRESOLVED
+        result.diagnostics["preferred"] = reason
+
     liq, liq_status = _unique_value(
         [b for b in at_instant(PREFERRED_LIQUIDATION_LOCALS) if _usd_monetary(b)]
     )
     par, par_status = _unique_value(
         [b for b in at_instant(frozenset({PREFERRED_VALUE_LOCAL})) if _usd_monetary(b)]
     )
-    shares = [
+
+    dimensionless_shares = [
+        b for b in at_instant(PREFERRED_SHARE_LOCALS) if b.fact.value is not None
+    ]
+    any_shares = [
         b
-        for b in at_instant(PREFERRED_SHARE_LOCALS)
+        for b in at_instant(PREFERRED_SHARE_LOCALS, dimensionless=False)
         if b.fact.value is not None
     ]
-    zero_shares = bool(shares) and all(b.fact.value == 0 for b in shares)
-    positive_shares = any(b.fact.value is not None and b.fact.value > 0 for b in shares)
+    zero_share_fact = any(b.fact.value == 0 for b in dimensionless_shares)
+    positive_share_fact = any(b.fact.value > 0 for b in any_shares)
+
+    # 존재 evidence는 차원까지 본다. 값은 합산하지 않는다.
     element_present = bool(
         at_instant(frozenset({PREFERRED_VALUE_LOCAL}), dimensionless=False)
-        or (role_obj is not None
+        or at_instant(PREFERRED_LIQUIDATION_LOCALS, dimensionless=False)
+        or (
+            role_obj is not None
             and any(
-                is_us_gaap(ns) and local == PREFERRED_VALUE_LOCAL
-                for ns, local in role_obj.concepts()
-            ))
+                is_us_gaap(q.namespace) and q.local == PREFERRED_VALUE_LOCAL
+                for q in role_obj.concepts()
+            )
+        )
     )
     nonzero_amount = any(
-        b.fact.value not in (None, 0) for b in ([liq] if liq else []) + ([par] if par else [])
+        b is not None and b.fact.value not in (None, 0) for b in (liq, par)
     )
 
-    if zero_shares and nonzero_amount:
-        result.preferred_status = PREF_UNRESOLVED
-        result.diagnostics["preferred"] = "CONTRADICTORY_ZERO_SHARES_AND_AMOUNT"
+    if zero_share_fact and positive_share_fact:
+        return unresolved("CONTRADICTORY_ZERO_AND_POSITIVE_SHARES")
+    if zero_share_fact and nonzero_amount:
+        return unresolved("CONTRADICTORY_ZERO_SHARES_AND_AMOUNT")
+
+    # explicit zero-share evidence는 단순 zero monetary fact보다 우선한다.
+    if zero_share_fact and not positive_share_fact:
+        result.preferred_value = "0"
+        result.preferred_status = RESOLVED
+        result.preferred_tier = ZERO
+        result.provenance["preferred_provenance"] = {
+            "reason": "explicit zero preferred shares evidence",
+            "role": role,
+            "shares_facts": [
+                _fact_provenance(
+                    b,
+                    role=role,
+                    presentation_file=pre_file,
+                    presentation_sha256=pre_sha,
+                    summary=bundle.summary,
+                    reason="zero preferred shares",
+                )
+                for b in dimensionless_shares
+            ],
+        }
         return
+
+    if liq_status == AMBIGUOUS:
+        return unresolved("LIQUIDATION_AMBIGUOUS")
     if liq is not None:
         result.preferred_value = decimal_text(liq.fact.value)
         result.preferred_status = RESOLVED
@@ -909,6 +979,9 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
             reason="liquidation preference tier",
         )
         return
+
+    if par_status == AMBIGUOUS:
+        return unresolved("PAR_CARRYING_AMBIGUOUS")
     if par is not None:
         result.preferred_value = decimal_text(par.fact.value)
         result.preferred_status = RESOLVED
@@ -922,16 +995,8 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
             reason="par / carrying tier",
         )
         return
-    if zero_shares:
-        result.preferred_value = "0"
-        result.preferred_status = RESOLVED
-        result.preferred_tier = ZERO
-        result.provenance["preferred_provenance"] = {
-            "reason": "explicit zero preferred shares evidence",
-            "role": role,
-        }
-        return
-    if not element_present and not positive_shares:
+
+    if not element_present and not positive_share_fact:
         result.preferred_value = "0"
         result.preferred_status = RESOLVED
         result.preferred_tier = ZERO
@@ -942,12 +1007,8 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
             "role": role,
         }
         return
-    result.preferred_status = PREF_UNRESOLVED
-    result.diagnostics["preferred"] = (
-        "PREFERRED_PRESENT_BUT_NO_USABLE_DIMENSIONLESS_AMOUNT"
-        if element_present or positive_shares
-        else f"liq={liq_status} par={par_status}"
-    )
+
+    unresolved("PREFERRED_PRESENT_BUT_NO_USABLE_DIMENSIONLESS_AMOUNT")
 
 
 def _resolve_book_equity(result: AccountingResult) -> None:
@@ -1114,12 +1175,18 @@ def accounting_for_formation(
 
     **고른 filing의 accounting이 실패했다고 더 오래된 filing으로 물러나지 않는다.**
     filing을 먼저 PIT 규칙으로 고른 뒤 그 filing의 상태를 그대로 돌려준다.
+
+    canonical fiscal-period-end는 언제나 `dei:DocumentPeriodEndDate`다. DPE가 풀리지 않아
+    `fiscal_period_end`가 NULL인 row도 **같은 회계연도의 후보로 남기기 위해서만**
+    `qv_sec_filings.report_date`를 guard로 본다. report_date를 canonical period로
+    승격하지 않고 `fiscal_period_end`를 채우지도 않는다.
     """
     normalized = normalize_cik(cik)
     if normalized is None:
         raise QVAccountingError(f"cik가 10자리 숫자가 아닙니다: {cik!r}")
     return connection.execute(
-        "SELECT a.*, f.form, f.acceptance_datetime, f.historical_usable_session"
+        "SELECT a.*, f.form, f.acceptance_datetime, f.historical_usable_session,"
+        " f.report_date"
         " FROM qv_accounting_filings AS a"
         " JOIN qv_sec_filings AS f"
         "   ON f.cik = a.cik AND f.accession = a.accession"
@@ -1130,8 +1197,12 @@ def accounting_for_formation(
         "   AND f.form IN (?, ?)"
         "   AND f.historical_usable_session IS NOT NULL"
         "   AND f.historical_usable_session <= ?"
-        "   AND a.fiscal_period_end IS NOT NULL"
-        "   AND CAST(substr(a.fiscal_period_end, 1, 4) AS INTEGER) = ?"
+        "   AND ("
+        "        (a.fiscal_period_end IS NOT NULL"
+        "         AND CAST(substr(a.fiscal_period_end, 1, 4) AS INTEGER) = ?)"
+        "     OR (a.fiscal_period_end IS NULL AND f.report_date IS NOT NULL"
+        "         AND CAST(substr(f.report_date, 1, 4) AS INTEGER) = ?)"
+        "   )"
         " ORDER BY f.acceptance_datetime DESC, f.accession DESC LIMIT 1",
         (
             normalized,
@@ -1140,6 +1211,7 @@ def accounting_for_formation(
             accounting_definition_version,
             *ANNUAL_FORMS,
             formation_session,
+            int(fiscal_period_end_year),
             int(fiscal_period_end_year),
         ),
     ).fetchone()
@@ -1153,10 +1225,13 @@ def preferred_tier_transitions(
     저장 primitive는 accession별 tier뿐이고 이 진단은 순수 함수로 파생한다.
     값을 바꾸거나 backfill하지 않는다.
     """
-    ordered = sorted((year, tier) for year, tier in observations)
+    ordered = sorted((int(year), tier) for year, tier in observations)
     unstable: list[int] = []
     swap = {LIQUIDATION, PAR_CARRYING}
-    for (_, previous), (year, current) in zip(ordered, ordered[1:]):
+    for (previous_year, previous), (year, current) in zip(ordered, ordered[1:]):
+        if year != previous_year + 1:
+            # 중간 회계연도가 비면 인접이 아니다. 건너뛴 구간을 transition이라 부르지 않는다.
+            continue
         if previous in swap and current in swap and previous != current:
             unstable.append(year)
     return tuple(unstable)

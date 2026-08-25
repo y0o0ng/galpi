@@ -670,7 +670,7 @@ npm test
 |---|---|
 |**COST** `0000909832-19-000019`|revenue `152,703,000,000` · COGS `132,886,000,000` · **GP `19,817,000,000`** · **주석 role의 `GrossProfit` 16,465는 canonical에도 diagnostic에도 들어오지 않았다** · Assets `45,400,000,000` VALIDATED · BE `15,243,000,000`|
 |**CAT** `0000018230-26-000008`|revenue `67,589,000,000` · **COGS `44,752,000,000`(`CostOfRevenue`)** — **세그먼트 주석의 `CostOfGoodsAndServicesSold` 49,000,000은 배제됐다** · GP `22,837,000,000` · parent SE는 direct가 없어 `INCLUDING_NCI_MINUS_NCI`로 `21,318,000,000`|
-|**NEE** `0000753308-26-000015`|**Assets `212,721,000,000`** — **co-registrant FPL의 `105,158,000,000`이 들어오지 않았다** · tie-out VALIDATED · parent SE `54,608,000,000` DIRECT · NCI tie-out VALIDATED · BE `54,608,000,000`|
+|**NEE** `0000753308-26-000015`|**Assets `212,721,000,000`** — **co-registrant FPL의 `105,158,000,000`이 들어오지 않았다** · tie-out VALIDATED · parent SE `54,608,000,000` DIRECT · NCI tie-out VALIDATED · BE `54,608,000,000`. revenue는 아래 review fix로 `27,412,000,000`이 됐다|
 |**TSLA** `0001564590-17-003118`|대차대조표 role에서 parent SE `4,752,911,000` DIRECT · Assets `22,664,076,000` VALIDATED. **equity roll-forward의 `IncludingNCI` 5,905,125,000은 canonical 후보가 되지 않았다.** revenue/COGS는 아래 구조 한계로 `AMBIGUOUS`|
 
 ### smoke가 드러낸 것 — 사용자 결정이 필요한 둘
@@ -684,8 +684,8 @@ npm test
    linkbase를 쓸지, `order`를 쓸지는 새 구조 규칙이라 여기서 정하지 않았다.**
 2. **utility 표준 revenue 개념이 목록에 없다.** NEE 손익계산서는
    `us-gaap:RegulatedAndUnregulatedOperatingRevenue` `27,412,000,000`을 쓰는데 정찰이
-   문서화한 revenue 계열에 없어 income-statement role이 `UNRESOLVED_STATEMENT_ROLE`이다.
-   **concept family를 넓히는 것은 semantic 결정이라 임의로 하지 않았다.**
+   문서화한 revenue 계열에 없어 income-statement role이 `UNRESOLVED_STATEMENT_ROLE`이었다.
+   **아래 review fix에서 사용자 승인으로 이 표준 개념을 revenue family에 넣어 해소됐다.**
 
 ### 이번 단계에서 하지 않은 것
 
@@ -698,6 +698,49 @@ PAPER/LIVE DB 변경                               없음
 data_sources.kind CHECK 확장                     하지 않음 (새 fundamentals kind 없음)
 store.py 변경                                    없음 (additive CREATE TABLE로 충분)
 ```
+
+---
+
+## 10.1 review fix receipt — 2026-08-25
+
+`0bc9dfc32c3c081137fdf2c5fe0ab0a442a23ce7` 리뷰에서 나온 여덟 가지를 고쳤다. **경제적 회계
+계약을 다시 열지 않았고**, Tesla sibling-total 문제도 이번에 결정하지 않았다.
+
+|#|고친 것|
+|---|---|
+|1|**QName을 URI+local로 완전히 정규화했다.** concept뿐 아니라 **dimension axis·member·typed axis·unit measure**까지 그 요소 시점의 namespace 선언으로 푼다. 모르는 prefix는 raw 문자열로 남기지 않고 `namespace=None`인 명시적 unresolved다. USD 판정도 `iso4217:USD` 문자열 비교가 아니라 **ISO4217 namespace URI + `USD`** 의미 비교다|
+|2|**exact duplicate 계약을 잠갔다.** dedupe 조건에 concept·entity·기간·dimension·**semantic unit measure**·값·**`decimals`**를 모두 넣었다. 값이 같아도 `decimals`가 다르면 `AMBIGUOUS`다 — 첫 번째를 골라 NCI tolerance를 계산하지 않는다. 같은 측정단위를 다른 unit id로 선언한 것은 여전히 exact duplicate다|
+|3|**ambiguous validation 입력을 unavailable로 rescue하지 않는다.** `LiabilitiesAndStockholdersEquity`가 `AMBIGUOUS`면 `TIEOUT_INPUT_AMBIGUOUS` + `assets_status=UNRESOLVED` + `diagnostics.assets=LSE_AMBIGUOUS`다. MISSING일 때만 `TIEOUT_UNAVAILABLE`로 Assets를 유지한다|
+|4|**preferred hierarchy에서 `AMBIGUOUS`와 `MISSING`을 분리했다.** liquidation이 모호하면 par로 내려가지 않고 `PREF_UNRESOLVED`, par가 모호하면 ZERO로 내려가지 않는다|
+|5|**explicit zero-share evidence가 zero monetary fact보다 우선한다.** `SharesIssued == 0` + `PreferredStockValue == 0`은 `PAR_CARRYING`이 아니라 `ZERO`다. zero share와 nonzero amount가 함께면 contradiction, zero share와 positive share가 함께여도 contradiction이다. **차원 fact는 존재 evidence로만 보고 합산하지 않는다**|
+|6|**`PREF_TIER_UNSTABLE`은 실제 인접 회계연도만이다.** `2018 -> 2020`처럼 중간 연도가 비면 transition이 아니다|
+|7|**`us-gaap:RegulatedAndUnregulatedOperatingRevenue`를 revenue family에 넣었다.** 표준 US-GAAP 개념이고 정의상 total operating revenues다. **issuer 예외나 NEE whitelist가 아니다**|
+|8|**DPE mapping failure 때문에 older filing으로 물러나지 않는다.** 이전에는 `fiscal_period_end IS NOT NULL`이 SQL 앞에 있어 DPE가 안 풀린 최신 10-K/A가 후보에서 사라지고 older original이 선택될 수 있었다. 이제 **같은 회계연도 후보로 남기기 위해서만** `report_date`를 guard로 본다. **canonical fiscal-period-end는 여전히 `dei:DocumentPeriodEndDate` 하나이고 `report_date`로 채우지 않는다**|
+
+### 검증 — 실제 실행 결과
+
+```text
+python3 -m unittest trading.tests.test_qv_xbrl trading.tests.test_qv_accounting
+  112 tests · PASS
+python3 -m unittest trading.tests.test_qv_submissions trading.tests.test_qv_identity
+  69 tests · PASS
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,289 tests · PASS
+npm test
+  949 tests · PASS
+```
+
+### 실제 SEC read-only smoke 재실행
+
+|anchor|결과|
+|---|---|
+|**COST**|변화 없음. GP `19,817,000,000` · 주석 `GrossProfit` 여전히 배제|
+|**CAT**|변화 없음. COGS `44,752,000,000` · 세그먼트 `49,000,000` 여전히 배제 · GP `22,837,000,000`|
+|**NEE**|**income role과 revenue가 resolve됐다** — `27,412,000,000`. Assets `212,721,000,000`으로 co-registrant 여전히 배제. COGS는 유틸리티 손익계산서에 표준 COGS 개념이 없어 `MISSING`이고 이는 계약대로다|
+|**TSLA**|**의도적으로 그대로 `REVENUE_UNRESOLVED`다.** sibling-total 문제는 이번 fix에서 건드리지 않았다. Assets `22,664,076,000` VALIDATED · parent SE `4,752,911,000` DIRECT · equity roll-forward 여전히 배제|
+
+**production 전수 accounting ingest와 coverage audit은 여전히 실행하지 않았다.**
+수익률·QV rank·B/M·coverage를 0번 계산했다.
 
 ---
 

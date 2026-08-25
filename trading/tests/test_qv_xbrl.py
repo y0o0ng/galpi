@@ -11,10 +11,14 @@ TRADING_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest.qv_xbrl import (  # noqa: E402
+    ISO4217_NS,
+    USD_QNAME,
+    QName,
     QVXbrlError,
     candidate_xml_names,
     is_dei,
     is_us_gaap,
+    is_usd,
     looks_like_instance,
     looks_like_presentation,
     normalize_cik,
@@ -22,6 +26,7 @@ from backtest.qv_xbrl import (  # noqa: E402
     parse_instance,
     parse_presentation,
     resolve_locator,
+    resolve_qname,
 )
 from tests.fixtures.qv_xbrl import builder as B  # noqa: E402
 
@@ -29,6 +34,8 @@ CIK = "0000320193"
 OTHER_CIK = "0000037634"
 AXIS = "us-gaap:LegalEntityAxis"
 MEMBER = "acme:SubsidiaryMember"
+AXIS_QNAME = QName(B.US_GAAP_NS, "LegalEntityAxis")
+MEMBER_QNAME = QName(B.CUSTOM_NS, "SubsidiaryMember")
 
 
 def _index(names):
@@ -75,7 +82,7 @@ class ContextTest(unittest.TestCase):
             [B.fact("us-gaap", "Assets", "c1", "100")],
         )
         self.assertFalse(doc.contexts[0].dimensionless)
-        self.assertEqual(doc.contexts[0].dimensions, ((AXIS, MEMBER),))
+        self.assertEqual(doc.contexts[0].dimensions, ((AXIS_QNAME, MEMBER_QNAME),))
 
     def test_typed_dimension_is_not_dimensionless(self):
         doc = self._doc(
@@ -83,7 +90,9 @@ class ContextTest(unittest.TestCase):
             [B.fact("us-gaap", "Assets", "c1", "100")],
         )
         self.assertFalse(doc.contexts[0].dimensionless)
-        self.assertEqual(doc.contexts[0].typed_dimensions, ("acme:TypedAxis",))
+        self.assertEqual(
+            doc.contexts[0].typed_dimensions, (QName(B.CUSTOM_NS, "TypedAxis"),)
+        )
 
     def test_entity_cik_is_normalized(self):
         doc = self._doc(
@@ -122,10 +131,11 @@ class FactTest(unittest.TestCase):
             "i.xml",
         )
         by_local = {f.local_name: f for f in doc.facts}
-        self.assertEqual(by_local["Assets"].unit, "iso4217:USD")
+        self.assertEqual(by_local["Assets"].unit.simple_measure, USD_QNAME)
+        self.assertTrue(is_usd(by_local["Assets"].unit))
         self.assertEqual(by_local["Assets"].value, Decimal("86038000000"))
         self.assertEqual(by_local["Assets"].decimals, "-6")
-        self.assertEqual(by_local["CommonStockSharesOutstanding"].unit, "xbrli:shares")
+        self.assertFalse(is_usd(by_local["CommonStockSharesOutstanding"].unit))
         self.assertEqual(by_local["CommonStockSharesOutstanding"].decimals, "INF")
 
     def test_decimal_value_is_not_float(self):
@@ -179,6 +189,75 @@ class FactTest(unittest.TestCase):
         }
         self.assertEqual(by_cik[CIK], Decimal("212721000000"))
         self.assertEqual(by_cik[OTHER_CIK], Decimal("105158000000"))
+
+
+class QNameNormalizationTest(unittest.TestCase):
+    """QName-valued 값은 전부 prefix와 무관하게 namespace URI로 정규화된다."""
+
+    def _doc(self, *, currency_prefix, gaap_prefix):
+        return parse_instance(
+            B.instance(
+                [
+                    B.context(
+                        "c1",
+                        cik=CIK,
+                        instant="2023-12-31",
+                        dimensions=((f"{gaap_prefix}:LegalEntityAxis", MEMBER),),
+                    )
+                ],
+                [B.fact(gaap_prefix, "Assets", "c1", "100")],
+                currency_prefix=currency_prefix,
+                gaap_prefix=gaap_prefix,
+            ),
+            "i.xml",
+        )
+
+    def test_currency_prefix_alias_is_the_same_monetary_unit(self):
+        canonical = self._doc(currency_prefix="iso4217", gaap_prefix="us-gaap")
+        alias = self._doc(currency_prefix="currency", gaap_prefix="us-gaap")
+        self.assertTrue(is_usd(canonical.facts[0].unit))
+        self.assertTrue(is_usd(alias.facts[0].unit))
+        self.assertEqual(
+            canonical.facts[0].unit.simple_measure, alias.facts[0].unit.simple_measure
+        )
+
+    def test_taxonomy_prefix_alias_is_the_same_concept_and_axis(self):
+        canonical = self._doc(currency_prefix="iso4217", gaap_prefix="us-gaap")
+        alias = self._doc(currency_prefix="iso4217", gaap_prefix="gaap")
+        self.assertEqual(canonical.facts[0].concept, alias.facts[0].concept)
+        self.assertEqual(canonical.contexts[0].dimensions, alias.contexts[0].dimensions)
+        self.assertEqual(
+            alias.contexts[0].dimensions[0][0], QName(B.US_GAAP_NS, "LegalEntityAxis")
+        )
+
+    def test_unknown_prefix_is_explicit_unresolved_not_raw_text(self):
+        qname = resolve_qname("zzz:Thing", {})
+        self.assertIsNotNone(qname)
+        self.assertFalse(qname.resolved)
+        self.assertIsNone(qname.namespace)
+        self.assertEqual(qname.local, "Thing")
+
+    def test_default_namespace_qname_resolves(self):
+        qname = resolve_qname("USD", {"": ISO4217_NS})
+        self.assertEqual(qname, USD_QNAME)
+
+    def test_unresolved_dimension_is_not_dimensionless(self):
+        doc = parse_instance(
+            B.instance(
+                [
+                    B.context(
+                        "c1",
+                        cik=CIK,
+                        instant="2023-12-31",
+                        dimensions=(("zzz:UnknownAxis", "zzz:UnknownMember"),),
+                    )
+                ],
+                [B.fact("us-gaap", "Assets", "c1", "100")],
+            ),
+            "i.xml",
+        )
+        self.assertFalse(doc.contexts[0].dimensionless)
+        self.assertFalse(doc.contexts[0].dimensions[0][0].resolved)
 
 
 class DocumentShapeTest(unittest.TestCase):
@@ -237,21 +316,23 @@ class PresentationTest(unittest.TestCase):
         role = doc.roles[0]
         self.assertEqual(role.role, "http://x/role/BS")
         self.assertEqual([a.order for a in role.arcs], ["1", "2"])
-        self.assertIn((B.US_GAAP_NS, "Assets"), role.concepts())
+        self.assertIn(QName(B.US_GAAP_NS, "Assets"), role.concepts())
 
     def test_ancestors(self):
         doc, _ = self._doc()
         role = doc.roles[0]
         self.assertIn(
-            (B.US_GAAP_NS, "Assets"), role.ancestors(B.US_GAAP_NS, "AssetsCurrent")
+            QName(B.US_GAAP_NS, "Assets"),
+            role.ancestors(QName(B.US_GAAP_NS, "AssetsCurrent")),
         )
         self.assertNotIn(
-            (B.US_GAAP_NS, "AssetsCurrent"), role.ancestors(B.US_GAAP_NS, "Assets")
+            QName(B.US_GAAP_NS, "AssetsCurrent"),
+            role.ancestors(QName(B.US_GAAP_NS, "Assets")),
         )
 
     def test_unknown_prefix_locator_is_not_guessed(self):
-        self.assertEqual(resolve_locator("x.xsd#zzz_Assets", {}), (None, None))
-        self.assertEqual(resolve_locator("x.xsd#noUnderscore", {}), (None, None))
+        self.assertIsNone(resolve_locator("x.xsd#zzz_Assets", {}))
+        self.assertIsNone(resolve_locator("x.xsd#noUnderscore", {}))
 
 
 class FilingSummaryTest(unittest.TestCase):

@@ -5,6 +5,8 @@ from __future__ import annotations
 US_GAAP_NS = "http://fasb.org/us-gaap/2023"
 DEI_NS = "http://xbrl.sec.gov/dei/2023"
 CUSTOM_NS = "http://example.com/20231231"
+ISO4217_NS = "http://www.xbrl.org/2003/iso4217"
+XBRLI_NS = "http://www.xbrl.org/2003/instance"
 SCHEMA = "acme-20231231.xsd"
 
 CIK_SCHEME = "http://www.sec.gov/CIK"
@@ -65,17 +67,26 @@ def fact(
     return f"<{prefix}:{local} {' '.join(attrs)}>{value}</{prefix}:{local}>"
 
 
-def instance(contexts: list[str], facts: list[str], *, extra_units: str = "") -> bytes:
+def instance(
+    contexts: list[str],
+    facts: list[str],
+    *,
+    extra_units: str = "",
+    currency_prefix: str = "iso4217",
+    gaap_prefix: str = "us-gaap",
+) -> bytes:
+    """`currency_prefix`/`gaap_prefix`로 prefix alias를 바꿔도 semantic identity는 같아야 한다."""
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
-        '<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"'
+        f'<xbrli:xbrl xmlns:xbrli="{XBRLI_NS}"'
         ' xmlns:xbrldi="http://xbrl.org/2006/xbrldi"'
         ' xmlns:link="http://www.xbrl.org/2003/linkbase"'
-        f' xmlns:us-gaap="{US_GAAP_NS}"'
+        f' xmlns:{gaap_prefix}="{US_GAAP_NS}"'
         f' xmlns:dei="{DEI_NS}"'
+        f' xmlns:{currency_prefix}="{ISO4217_NS}"'
         f' xmlns:acme="{CUSTOM_NS}">'
         '<xbrli:unit id="usd">'
-        "<xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
+        f"<xbrli:measure>{currency_prefix}:USD</xbrli:measure></xbrli:unit>"
         '<xbrli:unit id="shares">'
         "<xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>"
         f"{extra_units}"

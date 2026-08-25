@@ -4,15 +4,16 @@
 presentation graph · FilingSummary report로만 바꾼다. 회계 계약(무엇이 Revenue인지,
 어떤 role이 연결 대차대조표인지)은 `qv_accounting.py`가 정한다.
 
-QName은 prefix 문자열이 아니라 **namespace URI + local name**으로 다룬다. issuer custom
-prefix 이름에 의존하지 않는다.
+**모든 QName은 prefix 문자열이 아니라 `QName(namespace_uri, local)`이다.** concept뿐 아니라
+dimension axis·member·typed axis·unit measure까지 그 요소 시점의 namespace 선언으로 푼다.
+풀 수 없는 prefix는 raw 문자열로 조용히 남기지 않고 `namespace=None`인 **명시적 unresolved**
+QName이 된다.
 """
 
 from __future__ import annotations
 
 import hashlib
 import io
-import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -21,6 +22,7 @@ XBRLI_NS = "http://www.xbrl.org/2003/instance"
 LINK_NS = "http://www.xbrl.org/2003/linkbase"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 XBRLDI_NS = "http://xbrl.org/2006/xbrldi"
+ISO4217_NS = "http://www.xbrl.org/2003/iso4217"
 
 # 공식 US-GAAP taxonomy namespace. 연도가 붙으므로 접두로 판정한다.
 US_GAAP_NAMESPACE_PREFIXES = (
@@ -32,19 +34,74 @@ DEI_NAMESPACE_PREFIXES = (
     "http://xbrl.us/dei/",
 )
 
-_INSTANT_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
 
 class QVXbrlError(Exception):
     """raw XBRL 원자료가 파싱 계약을 만족하지 못할 때 올린다."""
 
 
-def is_us_gaap(namespace: str) -> bool:
+@dataclass(frozen=True, order=True)
+class QName:
+    """namespace URI + local name. prefix 문자열은 identity가 아니다."""
+
+    namespace: str | None
+    local: str
+
+    @property
+    def resolved(self) -> bool:
+        return self.namespace is not None
+
+    def __str__(self) -> str:
+        return f"{{{self.namespace}}}{self.local}" if self.namespace else f"?:{self.local}"
+
+    def as_json(self) -> list[str | None]:
+        return [self.namespace, self.local]
+
+
+USD_QNAME = QName(ISO4217_NS, "USD")
+SHARES_QNAME = QName(XBRLI_NS, "shares")
+
+
+@dataclass(frozen=True)
+class Unit:
+    """unit measure를 QName으로 푼 형태. `iso4217:USD` 문자열 비교를 쓰지 않는다."""
+
+    unit_id: str
+    numerator: tuple[QName, ...]
+    denominator: tuple[QName, ...]
+
+    @property
+    def simple_measure(self) -> QName | None:
+        if len(self.numerator) == 1 and not self.denominator:
+            return self.numerator[0]
+        return None
+
+    @property
+    def resolved(self) -> bool:
+        return all(q.resolved for q in self.numerator + self.denominator)
+
+    def as_json(self) -> dict:
+        return {
+            "unit_id": self.unit_id,
+            "numerator": [q.as_json() for q in self.numerator],
+            "denominator": [q.as_json() for q in self.denominator],
+        }
+
+
+def is_usd(unit: Unit | None) -> bool:
+    """ISO4217 namespace의 `USD` 단일 measure인가. prefix alias와 무관하다."""
+    return unit is not None and unit.simple_measure == USD_QNAME
+
+
+def is_us_gaap(namespace: str | None) -> bool:
     """공식 US-GAAP taxonomy namespace인가. prefix 문자열로 판정하지 않는다."""
+    if namespace is None:
+        return False
     return any(str(namespace).startswith(p) for p in US_GAAP_NAMESPACE_PREFIXES)
 
 
-def is_dei(namespace: str) -> bool:
+def is_dei(namespace: str | None) -> bool:
+    if namespace is None:
+        return False
     return any(str(namespace).startswith(p) for p in DEI_NAMESPACE_PREFIXES)
 
 
@@ -60,6 +117,23 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def resolve_qname(lexical: str | None, prefixes: dict[str, str]) -> QName | None:
+    """`prefix:local` 또는 default-namespace `local`을 QName으로 푼다.
+
+    prefix를 모르면 `namespace=None`인 **명시적 unresolved** QName이다. raw 문자열을
+    semantic identity로 쓰지 않는다.
+    """
+    clean = str(lexical or "").strip()
+    if not clean:
+        return None
+    if ":" in clean:
+        prefix, local = clean.split(":", 1)
+        if not local:
+            return None
+        return QName(prefixes.get(prefix), local)
+    return QName(prefixes.get(""), clean)
+
+
 @dataclass(frozen=True)
 class Context:
     context_id: str
@@ -68,8 +142,8 @@ class Context:
     instant: str | None
     start: str | None
     end: str | None
-    dimensions: tuple[tuple[str, str], ...]
-    typed_dimensions: tuple[str, ...]
+    dimensions: tuple[tuple[QName, QName], ...]
+    typed_dimensions: tuple[QName, ...]
 
     @property
     def dimensionless(self) -> bool:
@@ -79,14 +153,16 @@ class Context:
     def cik(self) -> str | None:
         return normalize_cik(self.entity_identifier)
 
+    def dimensions_json(self) -> list[list[list[str | None]]]:
+        return [[axis.as_json(), member.as_json()] for axis, member in self.dimensions]
+
 
 @dataclass(frozen=True)
 class Fact:
-    namespace: str
-    local_name: str
+    concept: QName
     context_id: str
     unit_id: str | None
-    unit: str | None
+    unit: Unit | None
     raw_value: str
     value: Decimal | None
     decimals: str | None
@@ -94,17 +170,19 @@ class Fact:
     source_file: str
 
     @property
-    def qname(self) -> str:
-        return f"{{{self.namespace}}}{self.local_name}"
+    def namespace(self) -> str | None:
+        return self.concept.namespace
+
+    @property
+    def local_name(self) -> str:
+        return self.concept.local
 
 
 @dataclass(frozen=True)
 class PresentationArc:
     role: str
-    parent_namespace: str | None
-    parent_local: str | None
-    child_namespace: str | None
-    child_local: str | None
+    parent: QName | None
+    child: QName | None
     order: str | None
 
 
@@ -114,27 +192,24 @@ class PresentationRole:
     arcs: tuple[PresentationArc, ...]
     source_file: str
 
-    def concepts(self) -> frozenset[tuple[str, str]]:
-        out: set[tuple[str, str]] = set()
+    def concepts(self) -> frozenset[QName]:
+        out: set[QName] = set()
         for arc in self.arcs:
-            if arc.parent_namespace and arc.parent_local:
-                out.add((arc.parent_namespace, arc.parent_local))
-            if arc.child_namespace and arc.child_local:
-                out.add((arc.child_namespace, arc.child_local))
+            if arc.parent is not None:
+                out.add(arc.parent)
+            if arc.child is not None:
+                out.add(arc.child)
         return frozenset(out)
 
-    def ancestors(self, namespace: str, local: str) -> frozenset[tuple[str, str]]:
-        """(namespace, local)의 presentation 조상 집합. 순환은 방문 집합으로 막는다."""
-        parents: dict[tuple[str, str], set[tuple[str, str]]] = {}
+    def ancestors(self, concept: QName) -> frozenset[QName]:
+        """presentation 조상 집합. 순환은 방문 집합으로 막는다."""
+        parents: dict[QName, set[QName]] = {}
         for arc in self.arcs:
-            if not (arc.parent_namespace and arc.child_namespace):
+            if arc.parent is None or arc.child is None:
                 continue
-            child = (arc.child_namespace, arc.child_local)
-            parents.setdefault(child, set()).add(
-                (arc.parent_namespace, arc.parent_local)
-            )
-        seen: set[tuple[str, str]] = set()
-        stack = list(parents.get((namespace, local), ()))
+            parents.setdefault(arc.child, set()).add(arc.parent)
+        seen: set[QName] = set()
+        stack = list(parents.get(concept, ()))
         while stack:
             node = stack.pop()
             if node in seen:
@@ -213,40 +288,67 @@ def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
-def _split_qname(tag: str) -> tuple[str | None, str]:
+def _split_tag(tag: str) -> QName:
     if tag.startswith("{") and "}" in tag:
         end = tag.index("}")
-        return tag[1:end], tag[end + 1 :]
-    return None, tag
+        return QName(tag[1:end], tag[end + 1 :])
+    return QName(None, tag)
 
 
-def _parse_xml(data: bytes, source_file: str) -> tuple[ET.Element, list[tuple[str, str]]]:
-    """root element와 문서에 선언된 prefix->namespace 목록을 함께 돌려준다."""
-    prefixes: list[tuple[str, str]] = []
-    root: ET.Element | None = None
+def _walk(data: bytes, source_file: str):
+    """(event, element, in-scope prefix map)을 흘린다.
+
+    QName-valued 값은 **그 요소 시점의 namespace 선언**으로 풀어야 하므로 스코프를 쌓는다.
+    """
+    stack: list[dict[str, str]] = [{}]
+    pending: list[tuple[str, str]] = []
     try:
-        for event, payload in ET.iterparse(io.BytesIO(data), events=("start-ns", "start")):
+        for event, payload in ET.iterparse(
+            io.BytesIO(data), events=("start-ns", "end-ns", "start", "end")
+        ):
             if event == "start-ns":
-                prefixes.append((payload[0], payload[1]))
-            elif root is None:
-                root = payload
-        if root is not None:
-            # iterparse는 start 이벤트에서 자식을 채우지 않으므로 전체를 다시 읽는다.
-            root = ET.fromstring(data)
+                pending.append(payload)
+            elif event == "start":
+                scope = dict(stack[-1])
+                scope.update(dict(pending))
+                pending = []
+                stack.append(scope)
+                yield "start", payload, scope
+            elif event == "end":
+                yield "end", payload, stack[-1]
+                if len(stack) > 1:
+                    stack.pop()
     except ET.ParseError as error:
-        raise QVXbrlError(f"XML을 파싱할 수 없습니다: {source_file} ({error})") from error
-    if root is None:
-        raise QVXbrlError(f"XML root가 없습니다: {source_file}")
-    return root, prefixes
+        raise QVXbrlError(
+            f"XML을 파싱할 수 없습니다: {source_file} ({error})"
+        ) from error
+
+
+def _parse_xml(data: bytes, source_file: str) -> tuple[ET.Element, dict[str, str]]:
+    """root element와 root에서 in-scope인 prefix map."""
+    scope: dict[str, str] = {}
+    for event, _element, element_scope in _walk(data, source_file):
+        if event == "start":
+            scope = element_scope
+            break
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError as error:
+        raise QVXbrlError(
+            f"XML을 파싱할 수 없습니다: {source_file} ({error})"
+        ) from error
+    return root, scope
 
 
 def looks_like_instance(data: bytes, source_file: str) -> bool:
     """파일명이 아니라 XML root로 instance 여부를 판정한다."""
     try:
-        root, _ = _parse_xml(data, source_file)
+        for event, element, _ in _walk(data, source_file):
+            if event == "start":
+                return element.tag == f"{{{XBRLI_NS}}}xbrl"
     except QVXbrlError:
         return False
-    return root.tag == f"{{{XBRLI_NS}}}xbrl"
+    return False
 
 
 def looks_like_presentation(data: bytes, source_file: str) -> bool:
@@ -270,136 +372,183 @@ def _decimal_or_none(raw: str) -> Decimal | None:
         return None
 
 
-def parse_instance(data: bytes, source_file: str) -> InstanceDocument:
-    """XBRL instance에서 context와 fact를 뽑는다."""
-    root, prefixes = _parse_xml(data, source_file)
-    if root.tag != f"{{{XBRLI_NS}}}xbrl":
-        raise QVXbrlError(f"XBRL instance root가 아닙니다: {source_file}")
+def _context_from(element: ET.Element, scope: dict[str, str]) -> Context:
+    context_id = (element.get("id") or "").strip()
+    entity = element.find(f"{{{XBRLI_NS}}}entity")
+    scheme = identifier = None
+    dims: list[tuple[QName, QName]] = []
+    typed: list[QName] = []
+    holders: list[ET.Element] = []
+    if entity is not None:
+        ident = entity.find(f"{{{XBRLI_NS}}}identifier")
+        if ident is not None:
+            scheme = ident.get("scheme")
+            identifier = (ident.text or "").strip()
+        segment = entity.find(f"{{{XBRLI_NS}}}segment")
+        if segment is not None:
+            holders.append(segment)
+    scenario = element.find(f"{{{XBRLI_NS}}}scenario")
+    if scenario is not None:
+        holders.append(scenario)
+    for holder in holders:
+        for member in holder.findall(f"{{{XBRLDI_NS}}}explicitMember"):
+            axis = resolve_qname(member.get("dimension"), scope)
+            value = resolve_qname(member.text, scope)
+            if axis is not None and value is not None:
+                dims.append((axis, value))
+        for member in holder.findall(f"{{{XBRLDI_NS}}}typedMember"):
+            axis = resolve_qname(member.get("dimension"), scope)
+            if axis is not None:
+                typed.append(axis)
 
-    contexts: list[Context] = []
-    for node in root.findall(f"{{{XBRLI_NS}}}context"):
-        context_id = (node.get("id") or "").strip()
-        if not context_id:
-            continue
-        entity = node.find(f"{{{XBRLI_NS}}}entity")
-        scheme = identifier = None
-        dims: list[tuple[str, str]] = []
-        typed: list[str] = []
-        if entity is not None:
-            ident = entity.find(f"{{{XBRLI_NS}}}identifier")
-            if ident is not None:
-                scheme = ident.get("scheme")
-                identifier = (ident.text or "").strip()
-            segment = entity.find(f"{{{XBRLI_NS}}}segment")
-            for holder in (segment,):
-                if holder is None:
-                    continue
-                for member in holder.findall(f"{{{XBRLDI_NS}}}explicitMember"):
-                    axis = (member.get("dimension") or "").strip()
-                    dims.append((axis, (member.text or "").strip()))
-                for member in holder.findall(f"{{{XBRLDI_NS}}}typedMember"):
-                    typed.append((member.get("dimension") or "").strip())
-        scenario = node.find(f"{{{XBRLI_NS}}}scenario")
-        if scenario is not None:
-            for member in scenario.findall(f"{{{XBRLDI_NS}}}explicitMember"):
-                axis = (member.get("dimension") or "").strip()
-                dims.append((axis, (member.text or "").strip()))
-            for member in scenario.findall(f"{{{XBRLDI_NS}}}typedMember"):
-                typed.append((member.get("dimension") or "").strip())
-
-        period = node.find(f"{{{XBRLI_NS}}}period")
-        instant = start = end = None
-        if period is not None:
-            instant_node = period.find(f"{{{XBRLI_NS}}}instant")
-            start_node = period.find(f"{{{XBRLI_NS}}}startDate")
-            end_node = period.find(f"{{{XBRLI_NS}}}endDate")
-            if instant_node is not None and instant_node.text:
-                instant = instant_node.text.strip()
-            if start_node is not None and start_node.text:
-                start = start_node.text.strip()
-            if end_node is not None and end_node.text:
-                end = end_node.text.strip()
-        contexts.append(
-            Context(
-                context_id=context_id,
-                entity_scheme=scheme,
-                entity_identifier=identifier,
-                instant=instant,
-                start=start,
-                end=end,
-                dimensions=tuple(sorted(dims)),
-                typed_dimensions=tuple(sorted(typed)),
-            )
-        )
-
-    units: dict[str, str] = {}
-    for node in root.findall(f"{{{XBRLI_NS}}}unit"):
-        unit_id = (node.get("id") or "").strip()
-        if not unit_id:
-            continue
-        measures = [
-            (m.text or "").strip()
-            for m in node.iter(f"{{{XBRLI_NS}}}measure")
-            if (m.text or "").strip()
-        ]
-        divide = node.find(f"{{{XBRLI_NS}}}divide")
-        if divide is not None and len(measures) >= 2:
-            units[unit_id] = f"{measures[0]}/{measures[1]}"
-        elif measures:
-            units[unit_id] = measures[0]
-
-    facts: list[Fact] = []
-    for node in root:
-        namespace, local = _split_qname(node.tag)
-        if namespace in (XBRLI_NS, LINK_NS) or namespace is None:
-            continue
-        context_ref = (node.get("contextRef") or "").strip()
-        if not context_ref:
-            continue
-        if node.get(f"{{{XBRLI_NS}}}nil") == "true" or node.get("nil") == "true":
-            continue
-        raw = (node.text or "").strip()
-        unit_ref = (node.get("unitRef") or "").strip() or None
-        facts.append(
-            Fact(
-                namespace=namespace,
-                local_name=local,
-                context_id=context_ref,
-                unit_id=unit_ref,
-                unit=units.get(unit_ref) if unit_ref else None,
-                raw_value=raw,
-                value=_decimal_or_none(raw) if unit_ref else None,
-                decimals=(node.get("decimals") or "").strip() or None,
-                precision=(node.get("precision") or "").strip() or None,
-                source_file=source_file,
-            )
-        )
-
-    return InstanceDocument(
-        source_file=source_file,
-        sha256=sha256(data),
-        prefixes=tuple(sorted(set(prefixes))),
-        contexts=tuple(contexts),
-        facts=tuple(facts),
+    period = element.find(f"{{{XBRLI_NS}}}period")
+    instant = start = end = None
+    if period is not None:
+        node = period.find(f"{{{XBRLI_NS}}}instant")
+        if node is not None and node.text:
+            instant = node.text.strip()
+        node = period.find(f"{{{XBRLI_NS}}}startDate")
+        if node is not None and node.text:
+            start = node.text.strip()
+        node = period.find(f"{{{XBRLI_NS}}}endDate")
+        if node is not None and node.text:
+            end = node.text.strip()
+    return Context(
+        context_id=context_id,
+        entity_scheme=scheme,
+        entity_identifier=identifier,
+        instant=instant,
+        start=start,
+        end=end,
+        dimensions=tuple(sorted(dims)),
+        typed_dimensions=tuple(sorted(typed)),
     )
 
 
-def resolve_locator(href: str, prefix_map: dict[str, str]) -> tuple[str | None, str | None]:
-    """presentation locator href의 fragment를 (namespace, local)로 푼다.
+def _measures(holder: ET.Element | None, scope: dict[str, str]) -> tuple[QName, ...]:
+    if holder is None:
+        return ()
+    out = []
+    for node in holder.findall(f"{{{XBRLI_NS}}}measure"):
+        qname = resolve_qname(node.text, scope)
+        if qname is not None:
+            out.append(qname)
+    return tuple(out)
+
+
+def _unit_from(element: ET.Element, scope: dict[str, str]) -> Unit | None:
+    unit_id = (element.get("id") or "").strip()
+    if not unit_id:
+        return None
+    divide = element.find(f"{{{XBRLI_NS}}}divide")
+    if divide is not None:
+        return Unit(
+            unit_id=unit_id,
+            numerator=_measures(divide.find(f"{{{XBRLI_NS}}}unitNumerator"), scope),
+            denominator=_measures(divide.find(f"{{{XBRLI_NS}}}unitDenominator"), scope),
+        )
+    return Unit(unit_id=unit_id, numerator=_measures(element, scope), denominator=())
+
+
+def _fact_from(element: ET.Element, tag: QName, source_file: str) -> Fact | None:
+    context_ref = (element.get("contextRef") or "").strip()
+    if not context_ref:
+        return None
+    if element.get(f"{{{XBRLI_NS}}}nil") == "true" or element.get("nil") == "true":
+        return None
+    unit_ref = (element.get("unitRef") or "").strip() or None
+    raw = (element.text or "").strip()
+    return Fact(
+        concept=tag,
+        context_id=context_ref,
+        unit_id=unit_ref,
+        unit=None,
+        raw_value=raw,
+        value=_decimal_or_none(raw) if unit_ref else None,
+        decimals=(element.get("decimals") or "").strip() or None,
+        precision=(element.get("precision") or "").strip() or None,
+        source_file=source_file,
+    )
+
+
+def parse_instance(data: bytes, source_file: str) -> InstanceDocument:
+    """XBRL instance에서 context와 fact를 뽑는다. QName은 전부 URI+local로 푼다."""
+    contexts: list[Context] = []
+    units: dict[str, Unit] = {}
+    staged: list[Fact] = []
+    root_prefixes: dict[str, str] = {}
+    root_seen = False
+    depth = 0
+
+    for event, element, scope in _walk(data, source_file):
+        if event == "start":
+            depth += 1
+            if not root_seen:
+                if element.tag != f"{{{XBRLI_NS}}}xbrl":
+                    raise QVXbrlError(f"XBRL instance root가 아닙니다: {source_file}")
+                root_seen = True
+                root_prefixes = dict(scope)
+            continue
+
+        depth -= 1
+        if depth != 1:
+            continue
+
+        tag = _split_tag(element.tag)
+        if tag == QName(XBRLI_NS, "context"):
+            contexts.append(_context_from(element, scope))
+        elif tag == QName(XBRLI_NS, "unit"):
+            unit = _unit_from(element, scope)
+            if unit is not None:
+                units[unit.unit_id] = unit
+        elif tag.namespace is not None and tag.namespace not in (XBRLI_NS, LINK_NS):
+            fact = _fact_from(element, tag, source_file)
+            if fact is not None:
+                staged.append(fact)
+        element.clear()
+
+    if not root_seen:
+        raise QVXbrlError(f"XML root가 없습니다: {source_file}")
+
+    facts = tuple(
+        Fact(
+            concept=f.concept,
+            context_id=f.context_id,
+            unit_id=f.unit_id,
+            unit=units.get(f.unit_id) if f.unit_id else None,
+            raw_value=f.raw_value,
+            value=f.value,
+            decimals=f.decimals,
+            precision=f.precision,
+            source_file=f.source_file,
+        )
+        for f in staged
+    )
+    return InstanceDocument(
+        source_file=source_file,
+        sha256=sha256(data),
+        prefixes=tuple(sorted(root_prefixes.items())),
+        contexts=tuple(contexts),
+        facts=facts,
+    )
+
+
+def resolve_locator(href: str, prefix_map: dict[str, str]) -> QName | None:
+    """presentation locator href의 fragment를 QName으로 푼다.
 
     fragment는 `{prefix}_{LocalName}` 형태이고, prefix는 instance가 선언한 것과 같다.
-    알 수 없는 prefix면 (None, None)이다 — 추정하지 않는다.
+    알 수 없는 prefix면 None이다 — 추정하지 않는다.
     """
     if "#" not in str(href):
-        return None, None
+        return None
     fragment = str(href).rsplit("#", 1)[-1].strip()
     if "_" not in fragment:
-        return None, None
+        return None
     prefix, local = fragment.split("_", 1)
     namespace = prefix_map.get(prefix)
     if not namespace or not local:
-        return None, None
-    return namespace, local
+        return None
+    return QName(namespace, local)
 
 
 def parse_presentation(
@@ -413,31 +562,22 @@ def parse_presentation(
     roles: list[PresentationRole] = []
     for link in root.findall(f"{{{LINK_NS}}}presentationLink"):
         role = (link.get(f"{{{XLINK_NS}}}role") or "").strip()
-        locators: dict[str, tuple[str | None, str | None]] = {}
+        locators: dict[str, QName | None] = {}
         for loc in link.findall(f"{{{LINK_NS}}}loc"):
             label = (loc.get(f"{{{XLINK_NS}}}label") or "").strip()
             href = loc.get(f"{{{XLINK_NS}}}href") or ""
             if label:
                 locators[label] = resolve_locator(href, prefix_map)
-        arcs: list[PresentationArc] = []
-        for arc in link.findall(f"{{{LINK_NS}}}presentationArc"):
-            source = (arc.get(f"{{{XLINK_NS}}}from") or "").strip()
-            target = (arc.get(f"{{{XLINK_NS}}}to") or "").strip()
-            parent = locators.get(source, (None, None))
-            child = locators.get(target, (None, None))
-            arcs.append(
-                PresentationArc(
-                    role=role,
-                    parent_namespace=parent[0],
-                    parent_local=parent[1],
-                    child_namespace=child[0],
-                    child_local=child[1],
-                    order=(arc.get("order") or "").strip() or None,
-                )
+        arcs = tuple(
+            PresentationArc(
+                role=role,
+                parent=locators.get((arc.get(f"{{{XLINK_NS}}}from") or "").strip()),
+                child=locators.get((arc.get(f"{{{XLINK_NS}}}to") or "").strip()),
+                order=(arc.get("order") or "").strip() or None,
             )
-        roles.append(
-            PresentationRole(role=role, arcs=tuple(arcs), source_file=source_file)
+            for arc in link.findall(f"{{{LINK_NS}}}presentationArc")
         )
+        roles.append(PresentationRole(role=role, arcs=arcs, source_file=source_file))
     return PresentationDocument(
         source_file=source_file, sha256=sha256(data), roles=tuple(roles)
     )
@@ -455,20 +595,19 @@ def parse_filing_summary(data: bytes, source_file: str) -> FilingSummaryDocument
             return None
         return found.text.strip() or None
 
-    reports: list[SummaryReport] = []
-    for node in root.iter("Report"):
-        reports.append(
-            SummaryReport(
-                role=child_text(node, "Role"),
-                long_name=child_text(node, "LongName"),
-                short_name=child_text(node, "ShortName"),
-                report_type=child_text(node, "ReportType"),
-                menu_category=child_text(node, "MenuCategory"),
-                html_file_name=child_text(node, "HtmlFileName"),
-                xml_file_name=child_text(node, "XmlFileName"),
-                instance=(node.get("instance") or "").strip() or None,
-            )
+    reports = tuple(
+        SummaryReport(
+            role=child_text(node, "Role"),
+            long_name=child_text(node, "LongName"),
+            short_name=child_text(node, "ShortName"),
+            report_type=child_text(node, "ReportType"),
+            menu_category=child_text(node, "MenuCategory"),
+            html_file_name=child_text(node, "HtmlFileName"),
+            xml_file_name=child_text(node, "XmlFileName"),
+            instance=(node.get("instance") or "").strip() or None,
         )
+        for node in root.iter("Report")
+    )
     input_files = tuple(
         (node.text or "").strip()
         for node in root.iter("File")
@@ -477,12 +616,14 @@ def parse_filing_summary(data: bytes, source_file: str) -> FilingSummaryDocument
     return FilingSummaryDocument(
         source_file=source_file,
         sha256=sha256(data),
-        reports=tuple(reports),
+        reports=reports,
         input_files=input_files,
     )
 
 
-def candidate_xml_names(index_payload: dict, summary: FilingSummaryDocument | None) -> tuple[str, ...]:
+def candidate_xml_names(
+    index_payload: dict, summary: FilingSummaryDocument | None
+) -> tuple[str, ...]:
     """accession index에서 instance/linkbase 후보 XML 파일명을 고른다.
 
     FilingSummary가 report 파일이라고 **선언한** 이름만 제외한다. 파일명 규칙으로 의미를

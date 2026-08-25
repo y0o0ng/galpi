@@ -31,6 +31,7 @@ from backtest.qv_accounting import (  # noqa: E402
     RESOLVED,
     ROUNDING_COMPATIBLE,
     TIEOUT_EXACT,
+    TIEOUT_INPUT_AMBIGUOUS,
     TIEOUT_MISMATCH,
     TIEOUT_UNAVAILABLE,
     UNRESOLVED,
@@ -99,6 +100,7 @@ def build_files(
     facts: list[str],
     roles: dict[str, list[tuple[str, str]]],
     reports: list[dict] | None = None,
+    extra_units: str = "",
 ) -> dict[str, bytes]:
     if reports is None:
         reports = [
@@ -131,7 +133,7 @@ def build_files(
         "FilingSummary.xml": B.filing_summary(
             reports, input_files=[INSTANCE_NAME, PRESENTATION_NAME]
         ),
-        INSTANCE_NAME: B.instance(contexts, facts),
+        INSTANCE_NAME: B.instance(contexts, facts, extra_units=extra_units),
         PRESENTATION_NAME: B.presentation(roles),
     }
 
@@ -370,6 +372,86 @@ class GrossProfitTest(unittest.TestCase):
         self.assertEqual(result.gross_profit_value, "30")
 
 
+class ExactDuplicatePolicyTest(unittest.TestCase):
+    """같은 semantic candidate에서 decimals/unit이 갈리면 첫 번째를 고르지 않는다."""
+
+    def _files(self, equity_facts):
+        return build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+            ]
+            + equity_facts,
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=["Assets", "StockholdersEquity"],
+            ),
+        )
+
+    def test_exact_duplicate_across_context_ids_is_deduped(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "StockholdersEquity", "i", "100", decimals="-6"),
+                    B.fact("us-gaap", "StockholdersEquity", "i2", "100", decimals="-6"),
+                ]
+            )
+        )
+        self.assertEqual(result.parent_se_value, "100")
+        self.assertEqual(result.parent_se_status, RESOLVED)
+
+    def test_same_value_different_decimals_is_ambiguous(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "StockholdersEquity", "i", "100", decimals="-6"),
+                    B.fact("us-gaap", "StockholdersEquity", "i2", "100", decimals="-3"),
+                ]
+            )
+        )
+        self.assertNotEqual(result.parent_se_status, RESOLVED)
+        self.assertIsNone(result.parent_se_value)
+
+    def test_same_semantic_unit_declared_twice_is_still_one_fact(self):
+        """같은 측정단위를 다른 unit id로 선언한 것은 exact duplicate다."""
+        files = build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "100", decimals="-6"),
+                B.fact("us-gaap", "StockholdersEquity", "i2", "100",
+                       unit="usd2", decimals="-6"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=["Assets", "StockholdersEquity"],
+            ),
+            extra_units='<xbrli:unit id="usd2">'
+            "<xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>",
+        )
+        result = resolve(files)
+        self.assertEqual(result.parent_se_value, "100")
+        self.assertEqual(result.parent_se_status, RESOLVED)
+
+    def test_non_usd_unit_is_not_a_monetary_candidate(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "StockholdersEquity", "i", "100",
+                           unit="shares", decimals="-6"),
+                ]
+            )
+        )
+        self.assertNotEqual(result.parent_se_status, RESOLVED)
+        self.assertIsNone(result.parent_se_value)
+
+
 class TotalAssetsTest(unittest.TestCase):
     def _files(self, extra_facts=None, extra_contexts=None, balance=None):
         return build_files(
@@ -448,6 +530,21 @@ class TotalAssetsTest(unittest.TestCase):
         self.assertEqual(result.assets_tieout_status, TIEOUT_MISMATCH)
         self.assertEqual(result.assets_status, UNRESOLVED)
         self.assertIsNone(result.assets_value)
+
+    def test_ambiguous_lse_does_not_rescue_assets(self):
+        """validation 입력이 모호하면 unavailable로 내려가 Assets를 살리지 않는다."""
+        files = self._files(
+            extra_facts=[
+                B.fact("us-gaap", "LiabilitiesAndStockholdersEquity", "i", "500"),
+                B.fact("us-gaap", "LiabilitiesAndStockholdersEquity", "i2", "501"),
+            ],
+            extra_contexts=[B.context("i2", cik=CIK, instant=DPE)],
+        )
+        result = resolve(files)
+        self.assertEqual(result.assets_tieout_status, TIEOUT_INPUT_AMBIGUOUS)
+        self.assertEqual(result.assets_status, UNRESOLVED)
+        self.assertIsNone(result.assets_value)
+        self.assertEqual(result.diagnostics["assets"], "LSE_AMBIGUOUS")
 
     def test_missing_lse_is_unavailable_not_mismatch(self):
         result = resolve(self._files())
@@ -794,6 +891,125 @@ class PreferredTest(unittest.TestCase):
         self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
         self.assertIn("CONTRADICTORY", result.diagnostics["preferred"])
 
+    def test_ambiguous_liquidation_does_not_fall_back_to_par(self):
+        files = build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "1000"),
+                B.fact("us-gaap", "PreferredStockLiquidationPreferenceValue", "i", "100"),
+                B.fact("us-gaap", "PreferredStockLiquidationPreferenceValue", "i2", "200"),
+                B.fact("us-gaap", "PreferredStockValue", "i", "10"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=[
+                    "Assets",
+                    "StockholdersEquity",
+                    "PreferredStockLiquidationPreferenceValue",
+                    "PreferredStockValue",
+                ],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+        self.assertEqual(result.diagnostics["preferred"], "LIQUIDATION_AMBIGUOUS")
+        self.assertIsNone(result.preferred_value)
+        self.assertEqual(result.book_equity_status, UNRESOLVED)
+
+    def test_ambiguous_par_does_not_fall_back_to_zero(self):
+        files = build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "1000"),
+                B.fact("us-gaap", "PreferredStockValue", "i", "10"),
+                B.fact("us-gaap", "PreferredStockValue", "i2", "20"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=["Assets", "StockholdersEquity", "PreferredStockValue"],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+        self.assertEqual(result.diagnostics["preferred"], "PAR_CARRYING_AMBIGUOUS")
+
+    def test_zero_shares_with_zero_par_is_zero_not_par_carrying(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "PreferredStockValue", "i", "0"),
+                    B.fact("us-gaap", "PreferredStockSharesIssued", "i", "0",
+                           unit="shares", decimals="INF"),
+                ],
+                ["PreferredStockValue", "PreferredStockSharesIssued"],
+            )
+        )
+        self.assertEqual(result.preferred_tier, ZERO)
+        self.assertEqual(result.preferred_value, "0")
+
+    def test_conflicting_zero_and_positive_share_evidence(self):
+        files = build_files(
+            contexts=base_contexts(),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "1000"),
+                B.fact("us-gaap", "PreferredStockSharesIssued", "i", "0",
+                       unit="shares", decimals="INF"),
+                B.fact("us-gaap", "PreferredStockSharesOutstanding", "i", "4000000",
+                       unit="shares", decimals="INF"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=[
+                    "Assets",
+                    "StockholdersEquity",
+                    "PreferredStockSharesIssued",
+                    "PreferredStockSharesOutstanding",
+                ],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+        self.assertIn("CONTRADICTORY", result.diagnostics["preferred"])
+
+    def test_dimensioned_share_evidence_blocks_absence_zero(self):
+        """차원 fact는 존재 evidence로만 본다. 합산하지 않고 ZERO도 아니다."""
+        files = build_files(
+            contexts=base_contexts(
+                [
+                    B.context("clsA", cik=CIK, instant=DPE,
+                              dimensions=((CLASS_AXIS, "acme:SeriesAMember"),))
+                ]
+            ),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "1000"),
+                B.fact("us-gaap", "PreferredStockSharesIssued", "clsA", "4000000",
+                       unit="shares", decimals="INF"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=["Assets", "StockholdersEquity", "PreferredStockSharesIssued"],
+            ),
+        )
+        result = resolve(files)
+        self.assertNotEqual(result.preferred_tier, ZERO)
+        self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+
     def test_tier_transitions_helper(self):
         self.assertEqual(
             preferred_tier_transitions(
@@ -803,6 +1019,18 @@ class PreferredTest(unittest.TestCase):
         )
         self.assertEqual(
             preferred_tier_transitions([(2018, ZERO), (2019, LIQUIDATION)]), ()
+        )
+
+    def test_non_adjacent_fiscal_years_are_not_a_transition(self):
+        """2018 -> 2020처럼 중간 회계연도가 비면 인접이 아니다."""
+        self.assertEqual(
+            preferred_tier_transitions([(2018, PAR_CARRYING), (2020, LIQUIDATION)]), ()
+        )
+        self.assertEqual(
+            preferred_tier_transitions(
+                [(2018, PAR_CARRYING), (2019, LIQUIDATION), (2021, PAR_CARRYING)]
+            ),
+            (2019,),
         )
 
 
@@ -1181,6 +1409,76 @@ class FormationSelectorTest(unittest.TestCase):
         self.assertEqual(row["accession"], broken)
         self.assertEqual(row["revenue_status"], MISSING)
         self.assertIsNone(row["revenue_value"])
+
+    def test_dpe_failed_amendment_does_not_fall_back_to_older_filing(self):
+        """최신 usable filing의 DPE가 안 풀려도 older original로 물러나지 않는다."""
+        amendment = "0000320193-24-000002"
+        _seed_filing(self.connection)
+        _seed_filing(
+            self.connection,
+            accession=amendment,
+            form="10-K/A",
+            acceptance="2024-03-01T21:00:00.000000Z",
+            usable="2024-03-04",
+            report_date=DPE,
+        )
+        no_dpe = build_files(
+            contexts=base_contexts(),
+            facts=[
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"], balance=["Assets"]
+            ),
+        )
+        self._ingest_all({ACCESSION: _default_files(), amendment: no_dpe})
+        row = self._select("2024-06-28")
+        self.assertIsNotNone(row)
+        self.assertEqual(row["accession"], amendment)
+        self.assertIsNone(row["fiscal_period_end"])
+        self.assertEqual(row["revenue_status"], MISSING)
+        self.assertIsNone(row["book_equity_value"])
+
+    def test_ambiguous_dpe_amendment_also_blocks_older_fallback(self):
+        amendment = "0000320193-24-000002"
+        _seed_filing(self.connection)
+        _seed_filing(
+            self.connection,
+            accession=amendment,
+            form="10-K/A",
+            acceptance="2024-03-01T21:00:00.000000Z",
+            usable="2024-03-04",
+            report_date=DPE,
+        )
+        ambiguous_dpe = build_files(
+            contexts=base_contexts([B.context("dpe2", cik=CIK, start=START, end=DPE)]),
+            facts=[
+                _dei_period(),
+                '<dei:DocumentPeriodEndDate contextRef="dpe2">2023-12-30'
+                "</dei:DocumentPeriodEndDate>",
+                B.fact("us-gaap", "Assets", "i", "500"),
+            ],
+            roles=simple_roles(income=[], balance=["Assets"]),
+        )
+        self._ingest_all({ACCESSION: _default_files(), amendment: ambiguous_dpe})
+        row = self._select("2024-06-28")
+        self.assertEqual(row["accession"], amendment)
+        self.assertIsNone(row["fiscal_period_end"])
+
+    def test_report_date_is_never_promoted_to_fiscal_period_end(self):
+        _seed_filing(self.connection, report_date="2023-12-31")
+        no_dpe = build_files(
+            contexts=base_contexts(),
+            facts=[B.fact("us-gaap", "Assets", "i", "500")],
+            roles=simple_roles(income=[], balance=["Assets"]),
+        )
+        self._ingest_all({ACCESSION: no_dpe})
+        row = self._select("2024-06-28")
+        self.assertEqual(row["accession"], ACCESSION)
+        self.assertIsNone(row["fiscal_period_end"])
+        self.assertEqual(row["report_date"], "2023-12-31")
 
     def test_ten_q_never_enters_selection(self):
         _seed_filing(self.connection)
