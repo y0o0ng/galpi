@@ -1474,3 +1474,236 @@ issuer-specific whitelist 제안                             하지 않음
   custom 사용 빈도는 측정하지 않았다.
 - §21.3의 다섯 발행사도 **최근 10-K 한 건**만 확인했다. 과거 연도에 우선주가 있었는지는 보지 않았다.
 - Compustat 항목 정의는 §16의 한계 그대로 확인하지 못했다.
+
+---
+
+## 26. NCI tie-out rounding follow-up — 2026-08-25
+
+> **§1~§25는 그대로 둔다.** 이 절은 §24-E(validation policy) 하나를 결정하기 위한 추가
+> 정찰이다. READ-ONLY이고 **수익률·QV rank·B/M·coverage Gate를 0번 계산했다.**
+> 코드·schema·테스트·로드맵·README를 바꾸지 않았다.
+
+조사 기준 `main`은 **`0bd9612624a9a3ceb1e558c7533d674f8d35eb7e`**
+(`research(qv): Book Equity mapping의 남은 회계 의미를 재검증한다`)이고 `origin/main`과
+로컬 `HEAD`가 같았다.
+
+**묻는 것 하나**
+
+> `SE(i) == SE(p) + NCI`의 mismatch 중, 정상적인 반올림과 실제 scope 오류를
+> **filing이 선언한 metadata만으로** deterministic하게 구분할 수 있는가?
+
+### Evidence
+
+§6.1의 9건 각각에 대해 **선택된 accession의 raw XBRL instance**를 직접 파싱했다.
+rendered HTML이 아니라 instance의 fact 속성을 읽었다.
+
+|case|instance 파일|SE(i) `decimals`|SE(p) `decimals`|NCI `decimals`|`precision`|`unitRef`|`scale`|
+|---|---|---|---|---|---|---|---|
+|CMCSA 2024-12-31|`cmcsa-20241231_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|CMCSA 2025-12-31|`cmcsa-20251231_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|GE 2020-12-31|`ge-20201231_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|GE 2023-12-31|`ge-20231231_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|GE 2024-12-31|`ge-20241231_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|PFE 2019-12-31|`pfe-12312019x10kshell_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|PFE 2021-12-31|`pfe-20211231_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|PFE 2022-12-31|`pfe-20221231_htm.xml`|`-6`|`-6`|`-6`|없음|`usd`|없음|
+|**TSLA 2016-12-31**|`tsla-20161231.xml`|**`-3`**|**`-3`**|**`-3`**|없음|`U_iso4217USD`|없음|
+
+fact 선택은 **무차원 · `context`의 `instant`가 회계연도 말인 것**으로 한정했고, 세 개념
+각각에서 값과 `decimals`가 유일했다(중복 없음).
+
+### Raw XBRL precision/decimals findings
+
+**`decimals`의 규범적 의미.** XBRL 2.1 명세는 `@decimals`를 "Correct to *n* Decimal Places"로
+정의하고 `decimals="INF"`를 정확한 값으로 둔다
+(<https://www.xbrl.org/Specification/XBRL-2.1/REC-2003-12-31/XBRL-2.1-REC-2003-12-31+corrected-errata-2013-02-20.html> §4.6.7.2).
+따라서 `decimals="-6"`인 fact의 참값은 `[v − 5×10⁵, v + 5×10⁵]` 안에 있다.
+
+**결정적 확인 — 반올림은 rendering이 아니라 fact 자체에 있다.**
+
+```text
+9건 × 3개념 = 27개 raw fact 전부가 10^(-decimals) 로 정확히 나누어떨어진다.
+  예: CMCSA SE(i) = 86,038,000,000  decimals=-6  -> 10^6 로 나누어떨어짐
+      TSLA  SE(p) =  4,752,911,000  decimals=-3  -> 10^3 로 나누어떨어짐
+```
+
+즉 **발행사가 instance에 써 넣은 값 자체가 이미 반올림된 금액**이고, HTML이 백만 단위로
+보여서 그렇게 보이는 것이 아니다. §6.1이 "표시 반올림"이라고 적은 것을 여기서
+**"fact-level 반올림"으로 정정한다** — 결론은 같지만 근거의 성격이 다르다.
+
+**`decimals`가 다른 중복 fact는 실재한다.** 같은 9개 filing 안에서 concept+context가 같은데
+`decimals`가 다른 fact를 **56건** 찾았다.
+
+```text
+CMCSA Goodwill      ctx=c-23  ->  58,200,000,000 @ -8   ·  58,209,000,000 @ -6
+PFE   Assets        ctx=FI2019Q4 -> 167,000,000,000 @ -9  ·  167,489,000,000 @ -6
+GE    DefinedBenefitPlanBenefitObligation -> 76,298,000,000 @ -3  ·  같은 값 @ -6
+CMCSA CommonStockSharesOutstanding -> 3,778,302,017 @ INF  ·  3,778,000,000 @ -6
+```
+
+**다만 그중 `SE(i)`·`SE(p)`·`NCI` 세 개념에 걸린 것은 0건이다.** 이 현상은 본문·MD&A가 같은
+숫자를 낮은 정밀도로 다시 태깅할 때 생기므로, **이미 FROZEN된 "연결 대차대조표 role 안의
+fact만"(§4.2.2·§24-F) 제약이 이 모호성을 함께 제거한다.**
+
+**적용 가능성 독립 표본.** 9건과 별개로, tie-out이 계산 가능한 관측에서 **발행사 × 시대
+(2010~2013 / 2014~2018 / 2019~2026)마다 결정론적으로 첫 accession을 뽑아 49건**을 raw
+instance로 검사했다.
+
+```text
+표본 accession                    49
+파싱 실패                          0
+세 개념이 무차원·회계연도 말에 모두 존재   49 / 49
+decimals 누락                      0
+decimals = "INF"                   0
+precision 속성 사용                 0
+세 개념의 decimals가 서로 다름       0
+같은 개념에 decimals 다른 중복 fact   0
+decimals 분포                      -6 × 42 · -5 × 6 · -3 × 1
+exact                             48
+MISMATCH                           1   (TSLA 2016-12-31)
+```
+
+**세 개념의 `decimals`가 한 accession 안에서 항상 같았다**는 점이 특히 중요하다. 구간 산술이
+개념별로 다른 정밀도를 섞을 필요가 없다.
+
+### Eight rounding cases
+
+Candidate B의 판정식은 filing이 선언한 값만 쓴다.
+
+```text
+hw(f) = 10^(-decimals(f)) / 2          (decimals="INF" 또는 누락이면 hw = 0)
+ROUNDING_COMPATIBLE  iff  |SE(i) − (SE(p) + NCI)|  ≤  hw(SE(i)) + hw(SE(p)) + hw(NCI)
+```
+
+|case|`decimals` i/p/n|gap|허용 반폭 합|배율|판정|
+|---|---|---|---|---|---|
+|CMCSA 2024-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+|CMCSA 2025-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+|GE 2020-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+|GE 2023-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+|GE 2024-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+|PFE 2019-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+|PFE 2021-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+|PFE 2022-12-31|-6/-6/-6|1,000,000|1,500,000|0.67×|`ROUNDING_COMPATIBLE`|
+
+**8건 전부가 발행사 자신이 선언한 `decimals`로 설명된다.** 세 값이 각각 최대 $500,000까지
+반올림될 수 있으므로 항등식은 최대 $1,500,000까지 어긋날 수 있고, 관측된 어긋남은
+$1,000,000이다. **고정 $1M 문턱도, 비율 문턱도 쓰지 않았다.**
+
+### Tesla scope-error control
+
+```text
+TSLA 2016-12-31   decimals = -3 / -3 / -3
+  gap        = 367,039,000
+  허용 반폭 합 =         1,500
+  배율        =   244,692.67×      ->  TIEOUT_MISMATCH
+```
+
+**같은 규칙에서 Tesla는 허용폭의 24만 배를 넘어 차단된다.** 그리고 그 차이는 §6.2에서
+확인한 `RedeemableNoncontrollingInterestEquityCarryingAmount = 367,039,000`과 **정확히
+일치한다.** 즉 이 mismatch는 반올림이 아니라 scope 오류이고, 규칙이 그것을 그렇게 분류한다.
+
+**Tesla가 `decimals="-3"`이라는 점이 우연히 유리하게 작용한 것이 아니다.** 만약 Tesla가
+`-6`이었다면 허용폭은 1,500,000이 되지만 gap 367,039,000은 여전히 **245배** 넘는다.
+분리 여유는 정밀도 선택에 의존하지 않는다.
+
+### Candidate validation policies
+
+|후보|규칙|8건|Tesla|새 tuning knob|issuer 독립성|
+|---|---|---|---|---|---|
+|**A — exact only**|`gap == 0`이 아니면 fail-close|**8건 전부 실패**(관측 261건의 3.1%)|차단|없음|독립|
+|**B — filing-declared precision**|위 구간 산술|**8건 통과**|**244,693× 초과로 차단**|**없음** — 값이 fact의 `decimals`에서만 나온다|**독립** — 발행사 이름·업종을 쓰지 않는다|
+|**C — diagnostic only**|canonical 값은 유지하고 상태만 기록|통과(무판정)|**통과(무판정)** — scope 오류를 막지 못한다|없음|독립|
+
+**INTERPRETATION**
+
+- **A는 정상적인 회계 표시를 오류로 분류한다.** 8건은 발행사가 백만 단위로 보고했기 때문에
+  생긴 것이고, 어떤 회계적 문제도 아니다.
+- **C는 §6.2의 실제 위험을 막지 못한다.** Tesla형 mezzanine 혼입은 `SE(i) − NCI` 복원값을
+  7.7% 부풀리는데, 진단만 남기면 그 값이 그대로 쓰인다.
+- **B는 임의 문턱이 아니다.** `decimals`는 발행사가 instance에 선언한 값이고, 반폭은 XBRL
+  명세가 정의한 의미에서 기계적으로 파생된다. 결과를 보고 조정할 자리가 없다.
+- **B는 자동으로 보수적으로 퇴화한다.** `decimals`가 누락되거나 `INF`이면 `hw = 0`이 되어
+  **그 fact에 대해서는 A와 같아진다.** 별도 예외 처리가 필요 없다.
+
+### Recommendation
+
+**Candidate B를 추천한다.** 단 적용 범위를 두 가지로 좁힌다.
+
+**(1) 이미 FROZEN된 role 제약 위에서만 평가한다.** 세 fact는 §24-F대로 **연결 대차대조표
+role의 무차원 fact**여야 한다. 이 제약이 없으면 §26의 56건처럼 낮은 정밀도 중복 fact가
+후보가 되어 구간 산술이 모호해진다.
+
+**(2) mismatch의 귀결은 값의 출처에 따라 다르다.** 이것이 A/B/C만으로는 표현되지 않는다.
+
+```text
+parent SE 를 direct fact 에서 얻은 경우
+    tie-out 은 진단이다. mismatch 여도 direct parent 값을 버리지 않는다
+    -> TIEOUT_MISMATCH 상태만 보존
+
+parent SE 를 SE(i) − NCI 로 복원한 경우
+    tie-out 은 그 복원의 전제다. mismatch 면 복원을 신뢰할 수 없다
+    -> fail-close (MISSING / UNRESOLVED)
+```
+
+**Tesla FY2016이 바로 이 구분이 필요한 사례다.** 그 filing에는 direct
+`StockholdersEquity = 4,752,911,000`이 있으므로 **canonical 값을 잃을 이유가 없다.**
+tie-out mismatch가 무효화하는 것은 `SE(i) − NCI = 5,119,950,000`이라는 **복원 경로**뿐이다.
+A나 C를 그대로 적용하면 이 구분을 못 한다 — A는 멀쩡한 direct 값을 버리고, C는 위험한
+복원값을 통과시킨다.
+
+**세 상태를 그대로 유지한다**(§14-3·§24-E의 요구).
+
+```text
+gap == 0                          VALIDATED
+gap ≤ 허용 반폭 합                  ROUNDING_COMPATIBLE     (VALIDATED 와 구분해 센다)
+gap  > 허용 반폭 합                 TIEOUT_MISMATCH
+세 fact 중 하나라도 없음             TIEOUT_UNAVAILABLE      (mismatch 와 합치지 않는다)
+```
+
+`ROUNDING_COMPATIBLE`을 `VALIDATED`에 합치지 않는 이유는, 그 빈도가 늘어나면 정밀도 저하가
+factor에 미치는 영향을 별도로 볼 수 있어야 하기 때문이다. **이 정찰은 그 영향을 측정하지
+않았다.**
+
+### Revised 24-E user decision
+
+**§24-E의 "지금 정하지 말 것"을 갱신한다.** 거기서 단 조건 —
+
+> "tolerance를 열려면 임의 문턱이 아니라 filing이 선언한 표시 단위(`decimals` 속성 /
+> `RoundingOption`)에서 파생돼야 한다는 조건을 함께 정한다. **그 조건의 성립 여부는 이번
+> follow-up에서도 확인하지 않았다.**"
+
+— 이 조건이 **성립함을 이번에 확인했다.** 따라서 결정을 열 수 있다.
+
+**이 선택지가 존재하는 이유**: 8건이 `decimals="-6"`으로 완전히 설명되고, Tesla가 동일
+규칙에서 244,693× 초과로 차단되며, 독립 표본 49건에서 `decimals` 누락·`INF`·개념 간 불일치·
+중복 충돌이 **0건**이었다.
+
+```text
+(A) exact only. mismatch 는 fail-close
+(B) filing 이 선언한 decimals 에서 파생한 구간 산술로 ROUNDING_COMPATIBLE 을 인정
+(C) 진단으로만 기록하고 canonical 값은 항상 유지
+```
+
+**tradeoff**: (A)는 관측 261건 중 8건(3.1%)을 회계적 근거 없이 잃는다. (C)는 Tesla형
+scope 오류를 통과시킨다. (B)는 둘 다 피하지만 **구현이 companyfacts로는 불가능하고 raw
+XBRL instance의 `decimals`를 읽어야 한다** — 이미 `PROBE-me-source.md` §8.2가 shares에 대해
+채택했고 §24-F가 role 판정을 위해 요구하는 것과 같은 경로다.
+
+**추천 (B)**, 위 Recommendation의 제약 (1)·(2)와 함께.
+
+**추천 이유**: `decimals`는 우리가 고른 문턱이 아니라 **발행사가 그 fact에 대해 선언한
+정확도**다. 이 lineage가 Gross Profit·Total Assets에서 일관되게 거부해 온 것은 "임의
+tolerance"였지 "filing이 선언한 정밀도"가 아니다. 그리고 (B)는 `decimals`가 없거나 `INF`일 때
+자동으로 (A)로 퇴화하므로 **보수적인 쪽이 기본값이다.**
+
+**남은 한계**
+
+- 독립 표본은 **49 accession**이고 tie-out 가능 관측 261건 전수가 아니다. `decimals` 누락·
+  `INF`·개념 간 불일치가 **전수에서 0건이라고 말할 근거는 없다.**
+- 세 fact가 실제로 연결 대차대조표 role에 속하는지는 이번에도 **role 필터를 적용해 확인하지
+  않았다.** 무차원 · 회계연도 말 instant로만 걸렀다. §26의 56건 중복 사례는 role 필터가 왜
+  필요한지를 보여줄 뿐, 그 필터를 여기서 검증한 것은 아니다.
+- `ROUNDING_COMPATIBLE`로 통과한 값이 factor에 주는 영향(정밀도 저하가 rank에 미치는 효과)은
+  측정하지 않았다. **수익률·rank를 계산하지 않았기 때문이다.**
+- XBRL 2.1 명세 본문은 페이지 요약으로 확인했고 §4.6.7.2 원문을 축자 인용하지 못했다.
