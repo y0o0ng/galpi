@@ -744,6 +744,79 @@ npm test
 
 ---
 
+## 10.2 mechanical correctness fix receipt — 2026-08-25
+
+`630bf85fa595014a9047ef06a6287be228dae8be` 리뷰의 네 가지를 고쳤다. **경제적 회계 정의를
+바꾸지 않았고**, Tesla sibling-total과 NEE COGS도 이번에 손대지 않았다. schema·roadmap·
+`store.py`·`qv_identity.py`·`qv_submissions.py`·`edgar.py`는 변경하지 않았다.
+
+|#|고친 것|
+|---|---|
+|A|**ambiguous direct Parent SE는 fallback하지 않는다.** 전에는 `direct is not None`만 봐서 direct tier가 `AMBIGUOUS`인데도 `IncludingNCI − NCI`로 내려갈 수 있었다. 이제 **`MISSING`일 때만** fallback이고, 모호하면 `parent_se_status=AMBIGUOUS` · `parent_se_path=NULL` · `diagnostics.parent_se=DIRECT_PARENT_SE_AMBIGUOUS`로 fail-close한다|
+|B|**preferred ZERO가 ambiguity와 positive evidence를 삼키지 않는다.** zero-share 분기를 tier ambiguity 검사 **뒤로** 옮겼다. liquidation/par가 모호하면 ZERO로도 하위 tier로도 내려가지 않는다. contradiction 판정의 positive monetary evidence에 **같은 role·target CIK·DPE의 차원 fact 양수 금액**을 포함한다 — 존재/모순 판정에만 쓰고 **합산하지 않는다**|
+|C|**NCI tie-out의 ambiguous 입력을 unavailable로 부르지 않는다.** `IncludingNCI`나 `MinorityInterest`가 `AMBIGUOUS`면 `TIEOUT_INPUT_AMBIGUOUS`다. 실제 부재만 `TIEOUT_UNAVAILABLE`이다. direct 경로에서 tie-out은 진단이므로 **canonical direct parent 값은 그대로 유지한다**|
+|D|**QName-valued child를 child 자신의 namespace scope로 푼다.** 전에는 context/unit의 end 시점 scope로 descendant를 해석해 **child-local `xmlns:` 선언을 놓쳤다.** 이제 `explicitMember` · `typedMember` · `measure`의 in-scope 선언을 walk 중에 따로 모아 그 요소의 scope로 resolve한다|
+
+### 새 regression
+
+```text
+FIX A  ambiguous direct parent(값 다름)가 fallback되지 않음
+       ambiguous direct parent(decimals 다름)도 동일
+FIX B  zero shares + ambiguous liquidation -> PREF_UNRESOLVED (ZERO 금지)
+       zero shares + 차원 양수 PreferredStockValue -> contradiction (ZERO·합산 금지)
+FIX C  ambiguous IncludingNCI -> TIEOUT_INPUT_AMBIGUOUS, direct parent 값 유지
+FIX D  child-local xmlns의 explicitMember axis/member resolve
+       child-local xmlns의 unit measure -> is_usd True
+       child-local xmlns의 typedMember axis resolve
+```
+
+### 검증 — 실제 로컬 실행 결과 (이 저장소에 GitHub CI는 없다)
+
+```text
+python3 -m unittest trading.tests.test_qv_xbrl trading.tests.test_qv_accounting
+  120 tests · PASS
+python3 -m unittest trading.tests.test_qv_submissions trading.tests.test_qv_identity
+  69 tests · PASS
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,297 tests · PASS
+npm test
+  949 tests · PASS
+```
+
+### 실제 SEC read-only smoke 재실행 — 네 anchor 모두 기대대로
+
+```text
+COST  revenue 152,703,000,000 · COGS 132,886,000,000 · GP 19,817,000,000 · 주석 GP 배제 유지
+CAT   COGS 44,752,000,000 (세그먼트 49,000,000 배제 유지) · GP 22,837,000,000
+NEE   revenue 27,412,000,000 resolve 유지 · Assets 212,721,000,000 (co-registrant 배제 유지)
+      COGS 는 MISSING 이고 이번에 utility COGS를 새로 만들지 않았다
+TSLA  Assets 22,664,076,000 · direct parent SE 4,752,911,000 · roll-forward 배제 유지
+      revenue 는 sibling-total 때문에 여전히 REVENUE_UNRESOLVED 이고 이번에 바꾸지 않았다
+```
+
+### OPEN DESIGN ISSUE — annual-period cutoff
+
+`qv_accounting.py`의 `MIN_ANNUAL_DAYS = 340` · `MAX_ANNUAL_DAYS = 400`은 **이번 fix에서
+바꾸지 않았다.** 근거를 실제로 찾아보면 이렇다.
+
+```text
+로드맵 §4.1        "annual 10-K"     — 일수 범위 없음
+README §3.3        "annual 10-K only" — 일수 범위 없음
+PROBE-gross-profit-mapping.md §2   "duration 340~400일"
+                                   -> 정찰 **임시 추출 스크립트의 필터**로만 기록돼 있다
+```
+
+즉 이 cutoff는 **어떤 CLOSED/FROZEN 계약에서도 유래하지 않았고, probe의 scratch 추출
+규칙이 구현으로 넘어온 것**이다.
+
+```text
+판정: implementation-added heuristic / OPEN DESIGN ISSUE
+```
+
+**결과를 보고 조정하지 않는다.** 이 항목은 설계자와 별도로 닫는다.
+
+---
+
 ## 11. 결과
 
 

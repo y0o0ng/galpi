@@ -783,7 +783,11 @@ def _resolve_equity(bundle, result, facts, dpe, role):
     incl, incl_status = _unique_value(monetary(at_instant(SE_INCLUDING_NCI_LOCAL)))
     nci, nci_status = _unique_value(monetary(at_instant(MINORITY_INTEREST_LOCAL)))
 
-    if direct is not None:
+    if direct_status == AMBIGUOUS:
+        # direct tier가 모호하면 하위 tier로 내려가지 않는다. MISSING일 때만 fallback이다.
+        result.parent_se_status = AMBIGUOUS
+        result.diagnostics["parent_se"] = "DIRECT_PARENT_SE_AMBIGUOUS"
+    elif direct is not None:
         result.parent_se_value = decimal_text(direct.fact.value)
         result.parent_se_status = RESOLVED
         result.parent_se_path = DIRECT_PARENT_SE
@@ -796,7 +800,16 @@ def _resolve_equity(bundle, result, facts, dpe, role):
             reason="direct parent stockholders' equity",
         )
         result.nci_tieout_status = _nci_tieout(
-            result, bundle, direct, incl, nci, role, pre_file, pre_sha
+            result,
+            bundle,
+            direct,
+            incl,
+            nci,
+            incl_status,
+            nci_status,
+            role,
+            pre_file,
+            pre_sha,
         )
     else:
         mezz = [
@@ -845,7 +858,16 @@ def _resolve_equity(bundle, result, facts, dpe, role):
     _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre_sha)
 
 
-def _nci_tieout(result, bundle, direct, incl, nci, role, pre_file, pre_sha):
+def _nci_tieout(
+    result, bundle, direct, incl, nci, incl_status, nci_status, role, pre_file, pre_sha
+):
+    """direct parent 경로의 진단. **ambiguity는 부재가 아니다.**
+
+    입력이 모호하면 `TIEOUT_INPUT_AMBIGUOUS`이고, 그래도 direct parent canonical 값은
+    유지한다 — 이 경로에서 tie-out은 진단이다.
+    """
+    if AMBIGUOUS in (incl_status, nci_status):
+        return TIEOUT_INPUT_AMBIGUOUS
     if incl is None or nci is None:
         return TIEOUT_UNAVAILABLE
     gap = abs(incl.fact.value - (direct.fact.value + nci.fact.value))
@@ -922,9 +944,16 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
     positive_share_fact = any(b.fact.value > 0 for b in any_shares)
 
     # 존재 evidence는 차원까지 본다. 값은 합산하지 않는다.
+    amount_facts_any = [
+        b
+        for b in (
+            at_instant(frozenset({PREFERRED_VALUE_LOCAL}), dimensionless=False)
+            + at_instant(PREFERRED_LIQUIDATION_LOCALS, dimensionless=False)
+        )
+        if _usd_monetary(b)
+    ]
     element_present = bool(
-        at_instant(frozenset({PREFERRED_VALUE_LOCAL}), dimensionless=False)
-        or at_instant(PREFERRED_LIQUIDATION_LOCALS, dimensionless=False)
+        amount_facts_any
         or (
             role_obj is not None
             and any(
@@ -933,17 +962,23 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
             )
         )
     )
-    nonzero_amount = any(
-        b is not None and b.fact.value not in (None, 0) for b in (liq, par)
-    )
+    # 무차원 canonical amount뿐 아니라 **차원 fact의 양수 금액도** positive evidence다.
+    positive_amount_evidence = any(b.fact.value > 0 for b in amount_facts_any)
 
     if zero_share_fact and positive_share_fact:
         return unresolved("CONTRADICTORY_ZERO_AND_POSITIVE_SHARES")
-    if zero_share_fact and nonzero_amount:
+
+    # 상위 tier가 모호하면 하위 tier로도 ZERO로도 내려가지 않는다. ZERO보다 먼저 본다.
+    if liq_status == AMBIGUOUS:
+        return unresolved("LIQUIDATION_AMBIGUOUS")
+    if par_status == AMBIGUOUS:
+        return unresolved("PAR_CARRYING_AMBIGUOUS")
+
+    if zero_share_fact and positive_amount_evidence:
         return unresolved("CONTRADICTORY_ZERO_SHARES_AND_AMOUNT")
 
     # explicit zero-share evidence는 단순 zero monetary fact보다 우선한다.
-    if zero_share_fact and not positive_share_fact:
+    if zero_share_fact:
         result.preferred_value = "0"
         result.preferred_status = RESOLVED
         result.preferred_tier = ZERO
@@ -964,8 +999,6 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
         }
         return
 
-    if liq_status == AMBIGUOUS:
-        return unresolved("LIQUIDATION_AMBIGUOUS")
     if liq is not None:
         result.preferred_value = decimal_text(liq.fact.value)
         result.preferred_status = RESOLVED
@@ -980,8 +1013,6 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
         )
         return
 
-    if par_status == AMBIGUOUS:
-        return unresolved("PAR_CARRYING_AMBIGUOUS")
     if par is not None:
         result.preferred_value = decimal_text(par.fact.value)
         result.preferred_status = RESOLVED

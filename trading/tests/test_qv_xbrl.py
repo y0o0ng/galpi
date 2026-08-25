@@ -260,6 +260,85 @@ class QNameNormalizationTest(unittest.TestCase):
         self.assertFalse(doc.contexts[0].dimensions[0][0].resolved)
 
 
+class ChildLocalNamespaceTest(unittest.TestCase):
+    """QName-valued 값은 **그 값을 가진 요소 자신의** in-scope 선언으로 푼다.
+
+    root에만 선언이 있다고 가정하면 child-local `xmlns:`를 놓친다.
+    """
+
+    def test_child_local_declarations_on_explicit_member(self):
+        raw = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<xbrli:xbrl xmlns:xbrli="{B.XBRLI_NS}"'
+            ' xmlns:xbrldi="http://xbrl.org/2006/xbrldi"'
+            f' xmlns:us-gaap="{B.US_GAAP_NS}">'
+            '<xbrli:unit id="usd">'
+            '<xbrli:measure xmlns:iso4217="http://www.xbrl.org/2003/iso4217">'
+            "iso4217:USD</xbrli:measure></xbrli:unit>"
+            '<xbrli:context id="c1"><xbrli:entity>'
+            '<xbrli:identifier scheme="http://www.sec.gov/CIK">0000320193</xbrli:identifier>'
+            "<xbrli:segment>"
+            '<xbrldi:explicitMember'
+            f' xmlns:g="{B.US_GAAP_NS}" xmlns:c="{B.CUSTOM_NS}"'
+            ' dimension="g:LegalEntityAxis">c:SubsidiaryMember</xbrldi:explicitMember>'
+            "</xbrli:segment></xbrli:entity>"
+            "<xbrli:period><xbrli:instant>2023-12-31</xbrli:instant></xbrli:period>"
+            "</xbrli:context>"
+            '<us-gaap:Assets contextRef="c1" unitRef="usd" decimals="-6">1</us-gaap:Assets>'
+            "</xbrli:xbrl>"
+        ).encode("utf-8")
+        doc = parse_instance(raw, "i.xml")
+        axis, member = doc.contexts[0].dimensions[0]
+        self.assertEqual(axis, QName(B.US_GAAP_NS, "LegalEntityAxis"))
+        self.assertEqual(member, QName(B.CUSTOM_NS, "SubsidiaryMember"))
+        self.assertTrue(axis.resolved and member.resolved)
+
+    def test_child_local_declaration_on_unit_measure(self):
+        raw = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<xbrli:xbrl xmlns:xbrli="{B.XBRLI_NS}"'
+            f' xmlns:us-gaap="{B.US_GAAP_NS}">'
+            '<xbrli:unit id="usd"><xbrli:measure'
+            f' xmlns:currency="{ISO4217_NS}">currency:USD</xbrli:measure></xbrli:unit>'
+            '<xbrli:context id="c1"><xbrli:entity>'
+            '<xbrli:identifier scheme="http://www.sec.gov/CIK">0000320193</xbrli:identifier>'
+            "</xbrli:entity>"
+            "<xbrli:period><xbrli:instant>2023-12-31</xbrli:instant></xbrli:period>"
+            "</xbrli:context>"
+            '<us-gaap:Assets contextRef="c1" unitRef="usd" decimals="-6">1</us-gaap:Assets>'
+            "</xbrli:xbrl>"
+        ).encode("utf-8")
+        doc = parse_instance(raw, "i.xml")
+        self.assertTrue(is_usd(doc.facts[0].unit))
+        self.assertEqual(doc.facts[0].unit.simple_measure, USD_QNAME)
+
+    def test_child_local_typed_dimension(self):
+        raw = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<xbrli:xbrl xmlns:xbrli="{B.XBRLI_NS}"'
+            ' xmlns:xbrldi="http://xbrl.org/2006/xbrldi"'
+            f' xmlns:us-gaap="{B.US_GAAP_NS}">'
+            '<xbrli:unit id="usd">'
+            f'<xbrli:measure xmlns:iso4217="{ISO4217_NS}">iso4217:USD</xbrli:measure>'
+            "</xbrli:unit>"
+            '<xbrli:context id="c1"><xbrli:entity>'
+            '<xbrli:identifier scheme="http://www.sec.gov/CIK">0000320193</xbrli:identifier>'
+            "<xbrli:segment>"
+            f'<xbrldi:typedMember xmlns:t="{B.CUSTOM_NS}" dimension="t:TypedAxis">'
+            "<t:v>x</t:v></xbrldi:typedMember>"
+            "</xbrli:segment></xbrli:entity>"
+            "<xbrli:period><xbrli:instant>2023-12-31</xbrli:instant></xbrli:period>"
+            "</xbrli:context>"
+            '<us-gaap:Assets contextRef="c1" unitRef="usd" decimals="-6">1</us-gaap:Assets>'
+            "</xbrli:xbrl>"
+        ).encode("utf-8")
+        doc = parse_instance(raw, "i.xml")
+        self.assertFalse(doc.contexts[0].dimensionless)
+        self.assertEqual(
+            doc.contexts[0].typed_dimensions, (QName(B.CUSTOM_NS, "TypedAxis"),)
+        )
+
+
 class DocumentShapeTest(unittest.TestCase):
     def test_instance_and_presentation_are_detected_by_content(self):
         instance = B.instance(

@@ -24,6 +24,16 @@ XLINK_NS = "http://www.w3.org/1999/xlink"
 XBRLDI_NS = "http://xbrl.org/2006/xbrldi"
 ISO4217_NS = "http://www.xbrl.org/2003/iso4217"
 
+# QName-valued attribute/text를 가진 요소. 이 값들은 **그 요소 자신의** in-scope
+# namespace 선언으로 풀어야 한다. 부모 scope로 풀면 child-local 선언을 놓친다.
+_QNAME_BEARING_TAGS = frozenset(
+    {
+        f"{{{XBRLDI_NS}}}explicitMember",
+        f"{{{XBRLDI_NS}}}typedMember",
+        f"{{{XBRLI_NS}}}measure",
+    }
+)
+
 # 공식 US-GAAP taxonomy namespace. 연도가 붙으므로 접두로 판정한다.
 US_GAAP_NAMESPACE_PREFIXES = (
     "http://fasb.org/us-gaap/",
@@ -372,7 +382,18 @@ def _decimal_or_none(raw: str) -> Decimal | None:
         return None
 
 
-def _context_from(element: ET.Element, scope: dict[str, str]) -> Context:
+def _scope_for(
+    element: ET.Element, scopes: dict[int, dict[str, str]], fallback: dict[str, str]
+) -> dict[str, str]:
+    """그 요소 자신의 in-scope namespace map. 없으면 부모 scope로 떨어진다."""
+    return scopes.get(id(element), fallback)
+
+
+def _context_from(
+    element: ET.Element,
+    scope: dict[str, str],
+    scopes: dict[int, dict[str, str]],
+) -> Context:
     context_id = (element.get("id") or "").strip()
     entity = element.find(f"{{{XBRLI_NS}}}entity")
     scheme = identifier = None
@@ -392,12 +413,13 @@ def _context_from(element: ET.Element, scope: dict[str, str]) -> Context:
         holders.append(scenario)
     for holder in holders:
         for member in holder.findall(f"{{{XBRLDI_NS}}}explicitMember"):
-            axis = resolve_qname(member.get("dimension"), scope)
-            value = resolve_qname(member.text, scope)
+            member_scope = _scope_for(member, scopes, scope)
+            axis = resolve_qname(member.get("dimension"), member_scope)
+            value = resolve_qname(member.text, member_scope)
             if axis is not None and value is not None:
                 dims.append((axis, value))
         for member in holder.findall(f"{{{XBRLDI_NS}}}typedMember"):
-            axis = resolve_qname(member.get("dimension"), scope)
+            axis = resolve_qname(member.get("dimension"), _scope_for(member, scopes, scope))
             if axis is not None:
                 typed.append(axis)
 
@@ -425,18 +447,26 @@ def _context_from(element: ET.Element, scope: dict[str, str]) -> Context:
     )
 
 
-def _measures(holder: ET.Element | None, scope: dict[str, str]) -> tuple[QName, ...]:
+def _measures(
+    holder: ET.Element | None,
+    scope: dict[str, str],
+    scopes: dict[int, dict[str, str]],
+) -> tuple[QName, ...]:
     if holder is None:
         return ()
     out = []
     for node in holder.findall(f"{{{XBRLI_NS}}}measure"):
-        qname = resolve_qname(node.text, scope)
+        qname = resolve_qname(node.text, _scope_for(node, scopes, scope))
         if qname is not None:
             out.append(qname)
     return tuple(out)
 
 
-def _unit_from(element: ET.Element, scope: dict[str, str]) -> Unit | None:
+def _unit_from(
+    element: ET.Element,
+    scope: dict[str, str],
+    scopes: dict[int, dict[str, str]],
+) -> Unit | None:
     unit_id = (element.get("id") or "").strip()
     if not unit_id:
         return None
@@ -444,10 +474,16 @@ def _unit_from(element: ET.Element, scope: dict[str, str]) -> Unit | None:
     if divide is not None:
         return Unit(
             unit_id=unit_id,
-            numerator=_measures(divide.find(f"{{{XBRLI_NS}}}unitNumerator"), scope),
-            denominator=_measures(divide.find(f"{{{XBRLI_NS}}}unitDenominator"), scope),
+            numerator=_measures(
+                divide.find(f"{{{XBRLI_NS}}}unitNumerator"), scope, scopes
+            ),
+            denominator=_measures(
+                divide.find(f"{{{XBRLI_NS}}}unitDenominator"), scope, scopes
+            ),
         )
-    return Unit(unit_id=unit_id, numerator=_measures(element, scope), denominator=())
+    return Unit(
+        unit_id=unit_id, numerator=_measures(element, scope, scopes), denominator=()
+    )
 
 
 def _fact_from(element: ET.Element, tag: QName, source_file: str) -> Fact | None:
@@ -479,6 +515,8 @@ def parse_instance(data: bytes, source_file: str) -> InstanceDocument:
     root_prefixes: dict[str, str] = {}
     root_seen = False
     depth = 0
+    # QName-valued 요소의 in-scope 선언. 부모의 end 시점에는 이미 pop됐으므로 미리 모은다.
+    qname_scopes: dict[int, dict[str, str]] = {}
 
     for event, element, scope in _walk(data, source_file):
         if event == "start":
@@ -491,20 +529,23 @@ def parse_instance(data: bytes, source_file: str) -> InstanceDocument:
             continue
 
         depth -= 1
+        if element.tag in _QNAME_BEARING_TAGS:
+            qname_scopes[id(element)] = scope
         if depth != 1:
             continue
 
         tag = _split_tag(element.tag)
         if tag == QName(XBRLI_NS, "context"):
-            contexts.append(_context_from(element, scope))
+            contexts.append(_context_from(element, scope, qname_scopes))
         elif tag == QName(XBRLI_NS, "unit"):
-            unit = _unit_from(element, scope)
+            unit = _unit_from(element, scope, qname_scopes)
             if unit is not None:
                 units[unit.unit_id] = unit
         elif tag.namespace is not None and tag.namespace not in (XBRLI_NS, LINK_NS):
             fact = _fact_from(element, tag, source_file)
             if fact is not None:
                 staged.append(fact)
+        qname_scopes.clear()
         element.clear()
 
     if not root_seen:

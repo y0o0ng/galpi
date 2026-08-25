@@ -681,6 +681,60 @@ class ParentEquityTest(unittest.TestCase):
         self.assertEqual(result.parent_se_value, "4752911000")
         self.assertEqual(result.parent_se_path, DIRECT_PARENT_SE)
 
+    def test_ambiguous_direct_parent_does_not_fall_back(self):
+        """direct tier가 모호하면 IncludingNCI - NCI로 내려가지 않는다."""
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "StockholdersEquity", "i", "100"),
+                    B.fact("us-gaap", "StockholdersEquity", "i2", "101"),
+                    B.fact(
+                        "us-gaap",
+                        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+                        "i",
+                        "120",
+                    ),
+                    B.fact("us-gaap", "MinorityInterest", "i", "20"),
+                ],
+                [
+                    "StockholdersEquity",
+                    "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+                    "MinorityInterest",
+                ],
+                extra_contexts=[B.context("i2", cik=CIK, instant=DPE)],
+            )
+        )
+        self.assertEqual(result.parent_se_status, AMBIGUOUS)
+        self.assertIsNone(result.parent_se_value)
+        self.assertIsNone(result.parent_se_path)
+        self.assertEqual(result.diagnostics["parent_se"], "DIRECT_PARENT_SE_AMBIGUOUS")
+        self.assertEqual(result.book_equity_status, UNRESOLVED)
+
+    def test_direct_parent_ambiguous_by_decimals_does_not_fall_back(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "StockholdersEquity", "i", "100", decimals="-6"),
+                    B.fact("us-gaap", "StockholdersEquity", "i2", "100", decimals="-3"),
+                    B.fact(
+                        "us-gaap",
+                        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+                        "i",
+                        "120",
+                    ),
+                    B.fact("us-gaap", "MinorityInterest", "i", "20"),
+                ],
+                [
+                    "StockholdersEquity",
+                    "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+                    "MinorityInterest",
+                ],
+                extra_contexts=[B.context("i2", cik=CIK, instant=DPE)],
+            )
+        )
+        self.assertEqual(result.parent_se_status, AMBIGUOUS)
+        self.assertIsNone(result.parent_se_path)
+
     def test_equity_rollforward_including_nci_is_not_a_candidate(self):
         """equity roll-forward도 Statement지만 대차대조표 role이 아니라 후보가 아니다."""
         result = resolve(
@@ -748,6 +802,36 @@ class NciTieoutTest(unittest.TestCase):
     def test_infinite_decimals_requires_exact(self):
         result = self._result("86038000000", "85560000000", "477000000", "INF")
         self.assertEqual(result.nci_tieout_status, TIEOUT_MISMATCH)
+
+    def test_ambiguous_nci_input_is_not_called_unavailable(self):
+        """ambiguity는 부재가 아니다. direct parent canonical 값은 유지한다."""
+        files = build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "300"),
+                B.fact("us-gaap", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest", "i", "320"),
+                B.fact("us-gaap", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest", "i2", "321"),
+                B.fact("us-gaap", "MinorityInterest", "i", "20"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=[
+                    "Assets",
+                    "StockholdersEquity",
+                    "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+                    "MinorityInterest",
+                ],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.parent_se_value, "300")
+        self.assertEqual(result.parent_se_path, DIRECT_PARENT_SE)
+        self.assertEqual(result.nci_tieout_status, TIEOUT_INPUT_AMBIGUOUS)
+        self.assertNotEqual(result.nci_tieout_status, TIEOUT_UNAVAILABLE)
 
     def test_no_including_nci_is_unavailable(self):
         files = build_files(
@@ -1009,6 +1093,71 @@ class PreferredTest(unittest.TestCase):
         result = resolve(files)
         self.assertNotEqual(result.preferred_tier, ZERO)
         self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+
+    def test_zero_shares_does_not_swallow_ambiguous_liquidation(self):
+        """zero-share ZERO가 상위 tier ambiguity를 삼키면 안 된다."""
+        files = build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "1000"),
+                B.fact("us-gaap", "PreferredStockSharesIssued", "i", "0",
+                       unit="shares", decimals="INF"),
+                B.fact("us-gaap", "PreferredStockLiquidationPreferenceValue", "i", "100"),
+                B.fact("us-gaap", "PreferredStockLiquidationPreferenceValue", "i2", "200"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=[
+                    "Assets",
+                    "StockholdersEquity",
+                    "PreferredStockSharesIssued",
+                    "PreferredStockLiquidationPreferenceValue",
+                ],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+        self.assertEqual(result.diagnostics["preferred"], "LIQUIDATION_AMBIGUOUS")
+        self.assertNotEqual(result.preferred_tier, ZERO)
+
+    def test_zero_shares_with_dimensioned_positive_amount_is_contradictory(self):
+        """차원 fact의 양수 금액도 positive evidence다. 합산하지 않고 ZERO도 아니다."""
+        files = build_files(
+            contexts=base_contexts(
+                [
+                    B.context("clsA", cik=CIK, instant=DPE,
+                              dimensions=((CLASS_AXIS, "acme:SeriesAEsopMember"),))
+                ]
+            ),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "1000"),
+                B.fact("us-gaap", "PreferredStockSharesIssued", "i", "0",
+                       unit="shares", decimals="INF"),
+                B.fact("us-gaap", "PreferredStockValue", "clsA", "756000000"),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=[
+                    "Assets",
+                    "StockholdersEquity",
+                    "PreferredStockSharesIssued",
+                    "PreferredStockValue",
+                ],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+        self.assertIn("CONTRADICTORY", result.diagnostics["preferred"])
+        self.assertNotEqual(result.preferred_tier, ZERO)
+        self.assertIsNone(result.preferred_value)
 
     def test_tier_transitions_helper(self):
         self.assertEqual(
