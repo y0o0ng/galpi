@@ -96,8 +96,8 @@ QV core signature에 들어간다(§4.7).
 |---|---|
 |~~`GrossProfit` 직접 태그 vs `Revenue − COGS`~~|**CLOSED / FROZEN** (2026-08-25). canonical은 `consolidated total revenue − COGS`다. 계약은 아래 3.6, 정찰은 `PROBE-gross-profit-mapping.md`|
 |~~`Total Assets` XBRL mapping~~|**CLOSED / FROZEN** (2026-08-25). canonical은 `us-gaap:Assets` 하나다. 계약은 아래 3.7, 정찰은 `PROBE-total-assets-mapping.md`|
-|`StockholdersEquity` XBRL fallback 순서|§4.3|
-|preferred stock · deferred tax 태그 mapping|§4.3|
+|~~`StockholdersEquity` XBRL fallback 순서~~|**CLOSED / FROZEN** (2026-08-25). direct `us-gaap:StockholdersEquity` 우선, 없으면 `IncludingNCI − MinorityInterest`. 계약은 아래 3.8|
+|~~preferred stock · deferred tax 태그 mapping~~|**CLOSED / FROZEN** (2026-08-25). preferred는 `liquidation → par/carrying`, **deferred tax / ITC 항은 이번 lineage에서 항상 0**이다. 계약은 아래 3.8, 정찰은 `PROBE-book-equity-mapping.md`|
 |historical SIC 복원 경로|§3.4 — filing 시점 submission header 우선|
 |point-in-time common shares / ME source|§3.1 우선순위 1→2→3. **정찰이 열어둔 다섯 중 (1)(2)(3)(4)(5)는 로드맵 §4.4.1·§4.4.2로 확정됐다**(아래 3.5)|
 |multi-class issuer aggregation + execution-security rule|§6 작업 6|
@@ -105,8 +105,8 @@ QV core signature에 들어간다(§4.7).
 **issuer custom tag를 이름 유사도로 자동 연결하지 않는다**(§4.2). 표준 taxonomy와 filing
 원문으로 회계적 동일성이 확인된 mapping만 넣는다.
 
-**`StockholdersEquity` · preferred · deferred tax는 아직 open이다.** Gross Profit과
-Total Assets가 닫혔다고 회계 mapping 전체가 닫힌 것이 아니다. Book Equity 계열은 그대로 남아 있다.
+**Gross Profit · Total Assets · Book Equity 셋이 모두 닫혔다.** 그러나 **회계 mapping이
+닫힌 것과 실제 ingestion·parser 구현은 다르다** — 후자는 그대로 open이다(아래 7).
 
 ### 3.5 ME shares — 정찰 뒤 확정된 계약
 
@@ -165,8 +165,8 @@ Novy-Marx 계열의 `REVT − COGS`에 가까운 신호를 재현하기 위해�
 않는다.** missing reason으로 세고, Gate A·B는 본구현 전수에서만 판정한다. **정찰의 발행사별
 숫자를 coverage 추정치로 쓰지 않는다.**
 
-**이 결정에 포함되지 않은 것**: `Total Assets` · Book Equity · preferred stock · deferred
-tax mapping은 그대로 open이다(위 3.2).
+**이 결정에 포함되지 않은 것**: `Total Assets`는 아래 3.7에서, Book Equity · preferred stock ·
+deferred tax mapping은 아래 3.8에서 각각 따로 닫혔다.
 
 ### 3.7 Total Assets accounting mapping — 정찰 뒤 확정된 계약
 
@@ -212,8 +212,91 @@ Total Assets <= 0   invalid (아래 3.3 그대로)
 발행사별 숫자를 coverage 추정치로 쓰지 않는다.**
 
 **이 결정에 포함되지 않은 것**: Book Equity · `StockholdersEquity` fallback · preferred stock ·
-deferred tax mapping은 그대로 open이다(위 3.2). companyfacts ingestion·presentation parser·
-raw XBRL parser·accounting schema 구현도 이 결정에 포함되지 않는다.
+deferred tax mapping은 이 결정의 범위 밖이고 **아래 3.8에서 따로 닫혔다.** companyfacts
+ingestion·presentation parser·raw XBRL parser·accounting schema 구현도 이 결정에 포함되지 않는다.
+
+### 3.8 Book Equity accounting mapping — 정찰 뒤 확정된 계약
+
+정본은 로드맵 §4.3·§4.3.1이다. **여기서 다시 정하지 않고 Phase 0이 지켜야 할 형태로만
+옮겨 적는다.** 정찰 기록은 `PROBE-book-equity-mapping.md`다.
+
+```text
+canonical BE        Parent Stockholders' Equity - Preferred Stock
+DT / ITC            이번 lineage에서 항상 0. "when available" 로 되돌리지 않는다
+                    -> 문헌 원형에서 한 항을 제거한 의도적 축소 정의다 (아래 참고)
+공통 context        formation까지 usable한 annual 10-K family filing (위 3.1)
+                    -> 그 accession의 연결 대차대조표 role -> fiscal-end instant -> 무차원
+period anchor       dei:DocumentPeriodEndDate (canonical)
+                    qv_sec_filings.report_date (cross-check) · 불일치 -> MISSING / UNRESOLVED
+금지                 report_date 단독 canonical · accession 내 최신 instant 추정
+                    · fy / fp / frame 으로 period 추정 · 후속 filing 값의 과거 backfill
+
+Parent SE 1순위      us-gaap:StockholdersEquity (direct)
+Parent SE 2순위      StockholdersEquityIncluding...NCI - MinorityInterest
+                    두 fact가 같은 accession · role · instant · unit · 무차원일 때만
+                    MinorityInterest 부재를 NCI=0 으로 추정하지 않는다 -> MISSING
+scope guard         redeemable NCI / temporary equity 증거가 있으면 2순위 fail-close
+                    (PARENT_EQUITY_SCOPE_AMBIGUOUS)
+금지 fallback        Assets - Liabilities · common equity + preferred · component 합산
+                    · equity roll-forward ending balance · custom reconstruction
+                    · 오늘 companyfacts 값 · issuer별 예외
+
+preferred 순위       liquidation preference value -> par / carrying value
+                    redemption tier 사용 안 함 · prose/manual 복원 금지
+                    미래 filing의 liquidation 을 과거 accession 에 backfill 금지
+preferred ZERO      SharesIssued == 0 · SharesOutstanding == 0
+                    · 연결 대차대조표 role 에 PreferredStockValue 요소가 차원 포함해서도 부재
+                      (numeric fact 가 아니라 표시 완결성에 기반한 inference 임을 명시)
+preferred 예외       존재 판정에 한해 같은 role 의 차원 fact 존재 여부를 본다
+                    값 합산 · member whitelist · elimination · derived total 은 금지
+                    요소는 차원에만 있고 무차원 금액을 못 정하면 ZERO 가 아니라 PREF_UNRESOLVED
+모순 증거            PreferredStockValue == 0 인데 SharesIssued > 0 이면 ZERO 아님 -> 위 순위 적용
+진단                 인접 회계연도에서 tier 가 바뀌면 PREF_TIER_UNSTABLE 보존
+                    값 변경 · fail-close · smoothing · carry-forward · tier 통일 금지
+
+tie-out             SE(i) == Parent SE + MinorityInterest 를 raw XBRL decimals 로 판정
+  hw(f)             = 10^(-decimals(f)) / 2 · decimals 없거나 "INF" 이면 0
+  gap == 0                              VALIDATED
+  0 < gap <= hw 합                       ROUNDING_COMPATIBLE   (VALIDATED 와 합치지 않는다)
+  gap > hw 합                            TIEOUT_MISMATCH
+  independent fact 하나라도 부재           TIEOUT_UNAVAILABLE
+  금지                                   $1M · 백분율 · 0.1% · 0.5% · issuer별 tolerance
+                                        · 관측을 본 뒤 문턱 조정
+  direct parent 경로                     mismatch 여도 direct 값을 버리지 않는다 (진단)
+  복원 경로                              같은 식으로 재검사하지 않는다. 가짜 VALIDATED 금지
+                                        TIEOUT_UNAVAILABLE / PARENT_RECONSTRUCTED 로 명시하고
+                                        그 자체로 복원을 무효화하지 않는다
+
+statement scope     generic Statement role 로 충분하지 않다. 연결 대차대조표를 특정한다
+                    equity roll-forward 도 Statement 다. role 종류만 보고 허용하지 않는다
+                    role 특정 불가 -> MISSING / UNRESOLVED
+
+최종                Parent SE 또는 Preferred 가 unresolved -> BE MISSING / UNRESOLVED
+                    Preferred = ZERO 확정 -> BE = Parent SE
+                    Book Equity <= 0 -> Value ranking 제외 (아래 3.3 그대로)
+보존                accession · form · acceptance_datetime · historical_usable_session
+                    · DocumentPeriodEndDate 와 report_date cross-check 결과 · statement role
+                    · parent source path(DIRECT_PARENT_SE | INCLUDING_NCI_MINUS_NCI)
+                    · concept · value · unit · dimension · raw decimals · validation 상태
+                    · preferred 상태와 tier(LIQUIDATION | PAR_CARRYING | ZERO) · 선택 concept
+                    · PREF_TIER_UNSTABLE · accounting_definition_version · missing 사유
+```
+
+**DT / ITC 제외는 의도적인 축소다.** 문헌 원형(Fama/French · Novy-Marx)에는
+`+ Deferred Taxes / Investment Tax Credit when available` 항이 있고, **이번 lineage는 그 항을
+뺀 다른 정의다.** 이것을 원형과 같다고 적지 않는다. 이유는 그 수량을 issuer-independent한
+결정론적 규칙으로 복원할 수 없기 때문이다 — 표준 개념부터 DTA 차감·관할 netting 후 값이고,
+custom 값은 환급채권이나 규제자산이 섞이며, 세금 라인이 아예 없는 발행사도 있고, 부분 가산은
+서로 다른 BE 정의를 한 cross-section에 섞는다. **명확해 보이는 발행사만 골라 더하지 않고,
+표준 태그가 있을 때만 더하지도 않으며, DT 결손으로 issuer-year를 MISSING으로 만들지도
+않는다.** 언제나 `DT/ITC contribution = 0`이다.
+
+**coverage 영향**: 위 규칙으로 Book Equity가 `MISSING`이 된 issuer-year는 **denominator에서
+빠지지 않는다.** missing reason으로 세고, Gate A·B는 본구현 전수에서만 판정한다. **정찰의
+발행사별 숫자를 coverage 추정치로 쓰지 않는다.**
+
+**이 결정에 포함되지 않은 것**: companyfacts/raw XBRL ingestion · presentation parser ·
+decimals 구간 계산 코드 · preferred parser · schema/DDL · 상태 enum 구현은 전부 open이다.
 
 ### 3.3 이미 고정돼 있어 여기서 손대지 않는 것
 
@@ -322,7 +405,7 @@ research_id = quality-value    phase = 0    hypothesis_status = testing
 |**정찰 — ME source** (`PROBE-me-source.md`)|**`SEC_ROUTE_VIABLE`** (2026-08-22). raw XBRL instance 경로가 여섯 축을 전부 통과했고 API 경로는 기각됐다|
 |1. identity 계층|**구현 완료** (2026-08-24). `schema.sql`의 QV 전용 세 테이블과 `qv_identity.py`, fixture·회귀 테스트가 정본이다|
 |2. submissions ingestion|**`CLOSED / PASS`** (2026-08-24). `qv_sec_filings`와 `qv_submissions.py`, network-free fixture가 정본이다|
-|3. companyfacts / accounting mapping|**진행 중.** Gross Profit(위 3.6 · 로드맵 §4.2.1)과 Total Assets(위 3.7 · 로드맵 §4.2.2)가 **CLOSED / FROZEN**이다 (2026-08-25). Book Equity · preferred · deferred tax mapping과 실제 ingestion 구현은 아직 open이다|
+|3. companyfacts / accounting mapping|**진행 중.** Gross Profit(위 3.6 · 로드맵 §4.2.1) · Total Assets(위 3.7 · 로드맵 §4.2.2) · Book Equity(위 3.8 · 로드맵 §4.3.1)가 모두 **CLOSED / FROZEN**이다 (2026-08-25). **실제 accounting ingestion과 parser 구현은 아직 open이다** — mapping이 닫힌 것과 단계가 끝난 것은 다르다|
 |4. shares / ME 본구현|미착수|
 |5. formation snapshot · sentinel · coverage|미착수|
 

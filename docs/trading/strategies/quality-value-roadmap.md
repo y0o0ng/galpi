@@ -490,8 +490,7 @@ whitelist·issuer별 합산 예외·derived member 추정·사후 mapping을 추
 issuer-year는 denominator에서 조용히 빠지지 않고 missing reason으로 남는다(§6 데이터 gate).
 
 `Book Equity` · preferred stock · deferred tax mapping은 **이 결정에 포함되지 않는다.**
-§4.3과 Phase 0 README §3.2에 open으로 남아 있다. GPA denominator인 `Total Assets`는
-§4.2.2에서 따로 닫혔다.
+그것들은 §4.3.1에서, GPA denominator인 `Total Assets`는 §4.2.2에서 각각 따로 닫혔다.
 
 #### 4.2.2 Total Assets mapping — CLOSED / FROZEN
 
@@ -573,20 +572,199 @@ coverage를 올리기 위한 사후 mapping을 만들지 않는다. 해당 issue
 
 ### 4.3 Book Equity
 
-경제적 정의는 Novy-Marx/Fama-French 계열과 맞춘다.
+이번 lineage의 canonical 정의:
 
 ```text
-Book Equity
-  = Stockholders' Equity
-  + Deferred Taxes / Investment Tax Credit when available
-  - Preferred Stock when available
+Book Equity = Parent Stockholders' Equity - Preferred Stock
 ```
-
-Stockholders' Equity 자체의 XBRL fallback hierarchy와 preferred/deferred-tax tag mapping은
-Phase 0에서 filing 원문과 대조해 고정한다.
 
 - `Book Equity <= 0`은 Value ranking에서 제외한다.
 - 결과를 본 뒤 negative BE를 다른 방식으로 살리지 않는다.
+
+#### 4.3.1 accounting mapping — CLOSED / FROZEN
+
+**이 절이 열어두었던 `StockholdersEquity` fallback 순서 · preferred · deferred-tax mapping
+결정은 닫혔다.** 정찰 근거는 `trading/runs/qv-data-audit/PROBE-book-equity-mapping.md`이고,
+Phase 0이 지켜야 할 형태는 `trading/runs/qv-data-audit/README.md` §3.8이다. **결과를 본 뒤
+아래를 되돌리지 않는다.**
+
+```text
+canonical BE       Parent Stockholders' Equity - Preferred Stock
+DT / ITC           이번 lineage에서 항상 0. when available 로 되돌리지 않는다
+공통 context       formation까지 usable한 annual 10-K family filing (README §3.1)
+                   -> 그 accession의 연결 대차대조표 role
+                   -> canonical fiscal-period-end instant
+                   -> 무차원 fact
+period anchor      dei:DocumentPeriodEndDate (canonical)
+                   qv_sec_filings.report_date (cross-check) · 불일치 -> MISSING / UNRESOLVED
+Parent SE 1순위     us-gaap:StockholdersEquity                     (direct)
+Parent SE 2순위     StockholdersEquityIncluding...NCI - MinorityInterest
+                   두 fact가 같은 accession · role · instant · unit · 무차원일 때만
+scope guard        redeemable NCI / temporary equity 증거가 있으면 2순위 fail-close
+금지 fallback      Assets - Liabilities · common equity + preferred · component 합산
+                   · equity roll-forward ending balance · custom reconstruction
+preferred 순위      liquidation preference value -> par / carrying value
+preferred ZERO     SharesIssued == 0 · SharesOutstanding == 0
+                   · 연결 대차대조표 role에 PreferredStockValue 요소가 차원 포함해서도 부재
+tie-out            SE(i) == Parent SE + NCI 를 raw XBRL decimals 로 판정
+                   VALIDATED / ROUNDING_COMPATIBLE / TIEOUT_MISMATCH / TIEOUT_UNAVAILABLE
+```
+
+##### DT / ITC 제외는 의도적인 경제적 정의 축소다
+
+**이 정의를 Fama/French·Novy-Marx 원형과 같다고 쓰지 않는다.** 원형에는
+`+ Deferred Taxes / Investment Tax Credit when available` 항이 있고, **이번 lineage는 그 항을
+제거한 축소 정의다.** 이유는 그 수량을 SEC/XBRL에서 issuer-independent한 결정론적 규칙으로
+복원할 수 없기 때문이다. 정찰이 확인한 것은 이렇다.
+
+- 표준 `us-gaap:DeferredIncomeTaxLiabilitiesNet`은 정의상 **DTA를 차감하고 관할별 netting을
+  거친** 표시 금액이라 원형의 credit 잔액과 같지 않다.
+- DTA 포지션 발행사에는 같은 개념이 대칭적으로 존재하지 않는다.
+- Caterpillar의 custom 값은 **이연법인세자산 + 환급채권의 결합**이고, Southern Company의
+  custom 값은 **규제자산·규제부채**다. 둘 다 원형 수량이 아니다.
+- 대차대조표에 세금 라인이 아예 없는 발행사가 있다.
+- custom 동일성 판정에 구조화된 신호가 없어 **issuer별 회계 해석으로 퇴화**한다.
+- 부분 가산은 업종·공시방식에 따라 **서로 다른 BE 정의를 한 cross-section에 섞는다.**
+
+따라서 **DT/ITC가 명확해 보이는 발행사만 골라 더하지 않고**, 표준 태그가 있을 때만 더하지도
+않으며, custom whitelist를 만들지 않고, **DT 결손을 이유로 issuer-year를 MISSING으로 만들지도
+않는다.** 언제나 `DT/ITC contribution = 0`이다.
+
+##### Parent Stockholders' Equity
+
+**1순위는 direct `us-gaap:StockholdersEquity`다.** selected accession · 연결 대차대조표 role ·
+canonical fiscal-end instant · 무차원 · USD monetary이고 scope가 지배주주지분으로 명확할 때
+그대로 쓴다. **equity roll-forward Statement · Disclosure · 주석 · guarantor · 자회사 ·
+co-registrant · segment의 동일 concept은 후보가 아니다.**
+
+**direct가 없을 때만 2순위를 쓴다.**
+
+```text
+Parent SE = StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest
+          - MinorityInterest
+```
+
+두 fact가 **같은 accession · 같은 연결 대차대조표 role · 같은 instant · 같은 unit · 무차원**일
+때만 성립한다. **`MinorityInterest`가 없다고 NCI를 0으로 추정하지 않는다** — `IncludingNCI`만
+있고 `MinorityInterest`가 없으면 MISSING / UNRESOLVED다.
+
+**scope guard**: 선택된 대차대조표 scope에 redeemable NCI / temporary equity가 있어
+`IncludingNCI`의 범위가 `parent + 통상 NCI`와 다를 수 있으면 **2순위를 쓰지 않는다.**
+`us-gaap:RedeemableNoncontrollingInterestEquityCarryingAmount`나 `TemporaryEquity` 계열이 그
+증거다. 이때는 `PARENT_EQUITY_SCOPE_AMBIGUOUS`로 fail-close한다. **equity roll-forward의
+`IncludingNCI`를 가져와 redeemable NCI까지 포함시키는 것을 금지한다.**
+
+**쓰지 않는 fallback**: `Assets - Liabilities` · `common equity + preferred` · issuer custom
+reconstruction · component 합산 · equity roll-forward ending balance · 오늘 companyfacts 값 ·
+issuer별 예외. 특히 `Assets - Liabilities`는 SFAS 160 이후 **NCI를 포함한 총자본**으로
+기울고, 정찰에서 NCI가 있는 관측 중 지배주주지분과 일치한 사례가 **0건**이었다.
+**결과가 아쉽다고 이 fallback을 되살리지 않는다.**
+
+##### Preferred Stock
+
+```text
+1. liquidation preference value 가 있으면 그것
+2. 없으면 par / carrying value
+3. 둘 다 신뢰성 있게 얻지 못했는데 우선주 존재 증거가 있으면 PREF_UNRESOLVED -> BE MISSING
+```
+
+**문헌의 redemption tier는 이번 lineage에서 쓰지 않는다.** 우선주 redemption value에 해당하는
+신뢰할 표준 XBRL 개념이 없고, 상환조건을 산문에서 issuer-by-issuer로 해석해야 하기 때문이다.
+**prose parsing이나 manual whitelist로 redemption tier를 복원하지 않는다.** 상위 tier가
+태깅되지 않았다는 이유로 **미래 filing의 liquidation value를 과거 accession에 backfill하지
+않는다.**
+
+**`PREF_TIER_UNSTABLE`**: 같은 발행사의 인접 회계연도에서 사용 가능한 tier가
+`par/carrying ↔ liquidation`으로 바뀌면 그 진단을 반드시 보존한다. **이 상태로 값을 바꾸지
+않고, fail-close하지 않으며, 과거 값을 미래 tier로 재작성하지 않고, smoothing·carry-forward·
+backfill을 하지 않으며, 결과를 보고 더 안정적으로 보이는 tier 하나로 통일하지 않는다.**
+각 연도는 그 시점 selected filing에서 결정론적으로 얻을 수 있는 위 순서를 그대로 쓴다.
+
+**ZERO 판정은 연결 대차대조표 role을 기준으로 한다.**
+
+```text
+PreferredStockSharesIssued == 0
+PreferredStockSharesOutstanding == 0
+연결 대차대조표 role 전체에 us-gaap:PreferredStockValue 요소가 차원 포함해서도 부재
+```
+
+마지막 규칙은 **"0이라는 numeric fact"가 아니라 감사받은 연결 대차대조표의 표시 완결성에
+기반한 ZERO inference**다. 그 성격을 그대로 적는다.
+
+**companyfacts에 우선주 태그가 없다는 이유만으로 ZERO라고 하지 않는다.** 정찰에서 P&G의
+실제 우선주 `756,000,000`이 **종류별 차원 fact로만 존재해** 무차원 조회에서 사라지는 반례를
+확인했다.
+
+**금액 계산에 쓰는 canonical fact는 무차원이 원칙이다. 단 하나의 예외는 우선주가 존재하는지
+판정할 때 같은 대차대조표 role의 차원 fact 존재 여부까지 보는 것이다.** 이것은 **차원 member
+값을 합산해 금액을 만드는 것이 아니다.** dimensional preferred 값 합산 · class/member
+whitelist 재구성 · elimination 계산 · issuer별 member 조합 · derived total은 전부 금지한다.
+따라서 P&G처럼 요소는 차원으로 존재하는데 canonical 무차원 금액을 정할 수 없으면 **ZERO가
+아니라 `PREF_UNRESOLVED`다.**
+
+**모순되는 증거는 ZERO가 아니다.** `PreferredStockValue == 0`이면서
+`PreferredStockSharesIssued > 0`이면 우선주가 실재하므로 위 순서를 적용하고, usable한 금액을
+얻지 못하면 `PREF_UNRESOLVED`다.
+
+##### NCI tie-out validation
+
+`SE(i) == Parent SE + MinorityInterest`를 **raw XBRL instance가 선언한 `decimals`**로 판정한다.
+**임의 tolerance를 쓰지 않는다.**
+
+```text
+hw(f) = 10^(-decimals(f)) / 2        decimals가 유한 정수일 때
+hw(f) = 0                            decimals가 없거나 "INF"일 때
+
+gap = |SE(i) - (Parent SE + MinorityInterest)|
+
+gap == 0                                   VALIDATED
+0 < gap <= hw(SEi) + hw(SEp) + hw(NCI)     ROUNDING_COMPATIBLE
+gap  > 허용 반폭 합                          TIEOUT_MISMATCH
+independent fact 중 하나라도 없음            TIEOUT_UNAVAILABLE
+```
+
+**`ROUNDING_COMPATIBLE`을 `VALIDATED`에 합치지 않는다.** 고정 `$1M`·백분율·`0.1%`·`0.5%` 같은
+임의 cutoff와 issuer별 tolerance를 만들지 않고, 관측된 mismatch를 본 뒤 문턱을 조정하지 않는다.
+
+**direct parent 경로에서 tie-out은 진단이다.** direct `us-gaap:StockholdersEquity`가
+canonical인데 `SE(i)`·`MinorityInterest`도 independent fact로 있으면 위 판정을 계산하되,
+`TIEOUT_MISMATCH`여도 **direct parent 값을 버리지 않는다.** direct parent가 명확히 있는데 다른
+scope의 `IncludingNCI`가 어긋난다고 해서 멀쩡한 값을 지우지 않는다.
+
+**복원 경로에서는 순환 검증을 하지 않는다.** `Parent SE = SE(i) - NCI`로 복원한 경우 같은 식을
+다시 검사하는 것은 항등식이라 독립 검증이 아니다. **가짜 `VALIDATED exact` 상태를 만들지
+않는다.** 이 경로의 신뢰성은 위 scope guard가 책임지고, 상태는 `TIEOUT_UNAVAILABLE` 또는
+`PARENT_RECONSTRUCTED`로 명시한다. **이 `TIEOUT_UNAVAILABLE`만으로 복원을 무효화하지 않는다** —
+그렇게 하면 2순위 자체가 항상 불가능해진다. 반대로 복원 입력이 모호하거나 scope guard가
+실패하면 fail-close한다.
+
+##### statement scope
+
+**generic `Statement` role만으로 충분하지 않고 반드시 연결 대차대조표를 특정한다.**
+`StockholdersEquity` · `StockholdersEquityIncluding...NCI` · `MinorityInterest`의 canonical
+monetary value는 selected accession · 연결 대차대조표 role · fiscal-end instant · 무차원에서만
+가져온다. **equity roll-forward도 `Statement`이므로 role 종류만 보고 허용하지 않는다.**
+role을 신뢰성 있게 특정할 수 없으면 MISSING / UNRESOLVED다.
+
+##### 최종 계산과 보존
+
+```text
+Book Equity = Parent Stockholders' Equity - Preferred Stock
+Parent SE 또는 Preferred 가 unresolved -> Book Equity MISSING / UNRESOLVED
+Preferred = ZERO 확정                  -> Book Equity = Parent SE
+Book Equity <= 0                       -> Value ranking 제외 (기존 규칙 유지)
+```
+
+negative BE를 살리려고 DT를 다시 더하거나 preferred를 무시하거나 다른 equity fallback을 열거나
+issuer별 예외를 만들지 않는다.
+
+구현이 최소한 보존해야 할 provenance는 selected accession · form · `acceptance_datetime` ·
+`historical_usable_session` · `dei:DocumentPeriodEndDate`와 `report_date` cross-check 결과 ·
+statement role · parent equity의 source path(`DIRECT_PARENT_SE` / `INCLUDING_NCI_MINUS_NCI`)와
+concept·value·unit·dimension·raw `decimals`·validation 상태 · preferred의 zero/present/unresolved
+상태와 tier(`LIQUIDATION` / `PAR_CARRYING` / `ZERO`)·선택 concept·value·instant·dimension 상태·
+`PREF_TIER_UNSTABLE` 진단 · Book Equity의 `accounting_definition_version`·component 상태·최종
+값 또는 missing 사유다. **정확한 schema/DDL은 이 결정에 포함되지 않는다.**
 
 ### 4.4 Market Equity와 Book-to-Market — ranking unit은 security가 아니라 issuer다
 
