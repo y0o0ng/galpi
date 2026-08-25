@@ -872,3 +872,605 @@ Gross Profit · Total Assets · shares/ME · SIC 계약 변경    없음
   않고** `submissions.reportDate`를 앵커로 썼다. 그 앵커의 실패율(369/370)은
   `PROBE-total-assets-mapping.md` §6.1에 있고, **본구현에서는 §4.2.2 계약대로
   `dei:DocumentPeriodEndDate`가 정본이다.**
+
+---
+
+## 17. Targeted follow-up scope — 2026-08-25
+
+> **§1~§16은 그대로 둔다.** 이번 follow-up은 그 조사가 남긴 불확실성 셋만 다시 판다.
+> 여전히 READ-ONLY이고 **수익률·QV rank·B/M·coverage Gate를 0번 계산했다.**
+> 로드맵·README·코드·schema·테스트를 바꾸지 않았고 Book Equity 계약을 freeze하지 않는다.
+
+조사 기준 `main`은 그대로 **`ab99d7430058e161c5b721ac4d1151932769eb3a`**
+(`research(qv): Book Equity accounting mapping 정찰 결과를 기록한다`)이고, `origin/main`과
+로컬 `HEAD`가 같으며 충돌하는 새 CLOSED/FROZEN 결정은 없다.
+
+```text
+A. filing-original-confirmed custom Deferred Tax / ITC fact를 deterministic하게 쓸 수 있는가
+B. preferred의 redemption -> liquidation -> par/carrying hierarchy를 원문에서 얼마나 재현하는가
+C. preferred 관련 fact가 전혀 없을 때 Preferred = 0 이라고 안전하게 판정할 수 있는가
+```
+
+---
+
+## 18. custom-tag 계약 해석 — 기존 §8.2의 과잉 독해를 정정한다
+
+로드맵 §4.2의 실제 문구는 이것이다.
+
+> "issuer custom tag를 이름 유사도로 자동 연결하지 않는다. 표준 taxonomy와 filing 원문으로
+> 회계적으로 같은 항목임을 확인할 수 있는 mapping만 허용한다."
+
+Phase 0 README §3.2도 같다 — "표준 taxonomy와 filing 원문으로 회계적 동일성이 확인된
+mapping만 넣는다."
+
+**이 문구는 custom tag 자체를 금지하지 않는다.** 금지 대상은 **이름 유사도에 의한 자동
+연결**이고, 문장 후반은 원문으로 동일성이 확인되는 mapping을 **명시적으로 허용**한다.
+
+따라서 §8.2의 다음 문장은 **계약을 과하게 읽은 것이므로 여기서 정정한다.**
+
+> (§8.2) "§4.2가 issuer custom tag의 이름 유사도 mapping을 금지하므로 CAT와 SO의 custom
+> 부분은 계약상 사용할 수 없다."
+
+**정정**: 계약이 막은 것이 아니다. **CAT·SO의 custom 개념이 문헌 수량과 다른 것을 재고
+있다는 사실이 막는다** — 그 근거는 §19가 filing 원문에서 직접 확인한다.
+
+세 경로를 섞지 않고 구분한다.
+
+|경로|정의|계약상 지위|
+|---|---|---|
+|**FUZZY_NAME_MAPPING**|custom 개념 이름이 비슷하다는 이유로 자동 연결|**금지** (§4.2 전반부)|
+|**FILING_ORIGINAL_CONFIRMED_EQUIVALENT**|filing의 presentation·definition·calculation·회계정책 본문으로 경제적 동일성이 확인됨|**계약상 허용 가능** (§4.2 후반부). 다만 production 재현성은 별도 문제(§19.3)|
+|**ISSUER_SPECIFIC_MANUAL_WHITELIST**|"CAT은 이 태그, SO는 저 태그"를 사람이 누적|이번 lineage에서 **금지 후보**. §4.2가 명시로 막지는 않지만 §6.1의 결정론 요구와 충돌|
+
+**핵심 질문은 계약 해석이 아니라 이것이다** — `FILING_ORIGINAL_CONFIRMED_EQUIVALENT`가
+**매 formation마다 수백 issuer에 자동 적용되는 generic rule인가, 아니면 이름만 바꾼
+manual whitelist인가.** §19.3이 이 질문에 답한다.
+
+---
+
+## 19. Deferred Tax / ITC custom-concept evidence
+
+### 19.1 EVIDENCE — 대차대조표 세금 라인 전수 스캔
+
+표본 31개 CIK 각각의 **가장 최근 10-K**에서, `FilingSummary`의 `" - Statement - "` role 중
+연결 대차대조표를 찾아 `Tax`가 든 요소를 전부 뽑았다(`NetOfTax`·AOCI 제외).
+
+```text
+대차대조표에 세금 라인이 아예 0개          5 / 31   AAPL · AMZN · AVGO · COST · DHR
+us-gaap 개념만 사용                        22 / 31
+custom namespace 개념을 사용                4 / 31   CAT · NEE · PFE · SO
+```
+
+실제 라인:
+
+```text
+CAT   0000018230-26-000008 R5.htm
+        cat:NoncurrentDeferredAndRefundableIncomeTaxes    2,882      <- 유일한 세금 라인
+SO    0000092122-26-000006 R8.htm
+        us-gaap:DeferredIncomeTaxLiabilitiesNet          12,133
+        us-gaap:AccumulatedDeferredInvestmentTaxCredit    2,002
+        so:DeferredCreditsRelatedToIncomeTaxes            4,712
+        so:DeferredChargesRelatedToIncomeTaxes              948
+PFE   0000078003-26-000026 R5.htm
+        us-gaap:DeferredIncomeTaxLiabilitiesNet           2,401
+        pfe:DeferredTaxAssetsNetAndOtherTaxAssetsNoncurrent 9,699   <- 자산 쪽 결합 라인
+NEE   0000753308-26-000015 R6.htm
+        us-gaap:DeferredIncomeTaxLiabilitiesNet          12,359     (+ FPL 10,156 은 차원)
+        nee:AccruedInterestAndTaxes                       1,185
+UNP   us-gaap:DeferredIncomeTaxLiabilitiesNet            13,421
+VZ    us-gaap:DeferredIncomeTaxLiabilitiesNet            48,717
+CMCSA us-gaap:DeferredIncomeTaxLiabilitiesNet            27,788
+MSFT  us-gaap:DeferredIncomeTaxLiabilitiesNet             3,054
+PG    us-gaap:DeferredIncomeTaxLiabilitiesNet             5,760
+```
+
+### 19.2 EVIDENCE — custom 개념의 XBRL definition 원문
+
+filing에 실린 요소 정의를 그대로 옮긴다.
+
+**CAT** — `cat:NoncurrentDeferredAndRefundableIncomeTaxes` · `balance=debit` · `period=instant`
+
+> "Include the following two items 1) The noncurrent portion of the aggregate tax effects as
+> of the balance sheet date of all future tax deductions arising from temporary differences
+> between tax basis and generally accepted accounting principles basis recognition of assets,
+> liabilities, revenues and expenses ... after deducting the allocated valuation allowance, if
+> any ... 2) Carrying amount due more than one year of the balance sheet date (or one
+> operating cycle, if longer) from tax authorities as of the balance sheet date representing
+> refunds of overpayments or recoveries based on agreed-upon resolutions of disputes."
+
+**SO** — `so:DeferredChargesRelatedToIncomeTaxes` · `balance=debit`
+
+> "Noncurrent **regulatory assets** associated with deferred income tax liabilities that are
+> expected to be recovered from customers through the ratemaking process."
+
+**SO** — `so:DeferredCreditsRelatedToIncomeTaxes` · `balance=credit`
+
+> "Noncurrent **regulatory liabilities** associated with deferred income tax liabilities.
+> Regulatory liabilities represent probable future reductions in revenues associated with
+> amounts that are expected to be credited to customers through the ratemaking process."
+
+표준 개념 정의도 같은 filing에서 확보했다.
+
+**`us-gaap:DeferredIncomeTaxLiabilitiesNet`** · `balance=credit` · `period=instant`
+
+> "Amount, after deferred tax asset, of deferred tax liability attributable to taxable
+> differences **with jurisdictional netting**."
+
+**`us-gaap:AccumulatedDeferredInvestmentTaxCredit`** · `balance=credit` · `period=instant`
+
+> "The noncurrent portion of the reserve for accumulated deferred investment tax credits as
+> of the balance sheet date. This is the remaining investment credit, which will reduce the
+> cost of services collected from **ratepayers** by a ratable portion over the investment's
+> regulatory life."
+
+### INTERPRETATION
+
+**CAT의 custom 개념은 문헌 수량이 아니다.** 정의가 두 항목의 **결합**임을 스스로 밝히고 있고
+(① 비유동 이연법인세 **자산**, ② 세무당국으로부터 받을 **환급채권**), `balance=debit`이다.
+문헌의 `Deferred Taxes / Investment Tax Credit`는 자본에 **더하는** credit 성격의 잔액이다.
+**부호도 구성도 다르다.**
+
+**SO의 두 custom 개념도 문헌 수량이 아니다.** 둘 다 **regulatory asset/liability**이고,
+요금 산정 과정에서 고객에게 회수·환원될 금액이다. 이연법인세 잔액 자체가 아니라 그것에
+연동된 규제회계 항목이다. **반면 SO가 사용하는 표준 `DeferredIncomeTaxLiabilitiesNet`과
+`AccumulatedDeferredInvestmentTaxCredit`는 문헌 취지에 맞는 항목이다.**
+
+**그러나 표준 개념조차 문헌 수량과 같지 않다.** `DeferredIncomeTaxLiabilitiesNet`의 정의가
+"after deferred tax asset ... with jurisdictional netting"이라고 말한다. 즉
+
+- **이미 DTA를 차감한 뒤의 순부채**이고, 순자산 포지션인 발행사는 이 개념 대신 다른 것을
+  보고한다. PFE가 그 예로, 부채 쪽 표준 `2,401`과 자산 쪽 custom `9,699`가 **동시에** 있다.
+- **관할별 netting이 들어간 표시 금액**이라 총액도 순액도 아니다.
+
+**따라서 "표준 라인이 있을 때만 더한다"는 규칙은 DTL 포지션 발행사에게만 자본을 더해주고
+DTA 포지션 발행사에게는 아무것도 더하지 않는 비대칭 규칙이 된다.** §8.3이 측정한 크기
+(UNP 자본의 최대 107%, VZ 46~62%)를 생각하면 이 비대칭은 무시할 수 없다.
+
+### 19.3 PRODUCTION VIABILITY
+
+**§18의 핵심 질문에 답한다.**
+
+위 판정에 도달하기 위해 실제로 한 일은 이것이다 — 각 발행사의 대차대조표 role을 찾고,
+custom 요소의 **산문 정의를 읽고**, 그것이 ① 이연법인세인지 ② 환급채권·규제자산이 섞였는지
+③ 부호가 문헌과 맞는지를 **회계 판단으로** 가렸다.
+
+**이 과정을 자동화할 구조적 신호가 없다.**
+
+- `balance` 속성(debit/credit)은 부분 신호일 뿐이다. CAT의 debit은 걸러내지만
+  `so:DeferredCreditsRelatedToIncomeTaxes`는 `credit`이면서도 문헌 수량이 아니다.
+- 요소 이름은 §4.2가 명시로 금지한 신호다.
+- 정의 텍스트는 기계가 읽을 수는 있지만 **"이것이 TXDITC인가"를 판정하는 구조화된 플래그가
+  아니다.** 판정은 매번 사람의 회계 해석이다.
+- calculation linkbase가 있어도 "무엇의 합인가"만 말하지 **문헌 수량과 같은가**는 말하지 않는다.
+
+즉 `FILING_ORIGINAL_CONFIRMED_EQUIVALENT`는 **이 항목에 한해서는 이름만 바꾼
+issuer-by-issuer manual 판단**이다. 매 formation마다 수백 issuer에 재현 가능한 generic
+rule이 아니다.
+
+**판정**
+
+```text
+DT_ROUTE_NOT_RELIABLY_RECONSTRUCTABLE
+```
+
+근거를 다시 정리한다.
+
+1. 대차대조표에 세금 라인이 **아예 없는 발행사가 5/31**이다(AAPL·AMZN·AVGO·COST·DHR).
+2. custom 개념을 쓰는 4/31 중 **확인한 셋 모두 문헌 수량이 아니었다**(CAT 1개 · SO 2개).
+3. 표준 `DeferredIncomeTaxLiabilitiesNet`도 정의상 **DTA 차감 후 · 관할 netting 후**의
+   표시 금액이라 문헌의 credit 잔액과 같지 않고, DTA 포지션 발행사에서 비대칭이 생긴다.
+4. ITC 표준 개념은 정의 자체가 **ratepayer**를 전제하는 규제 유틸리티 개념이다(NEE·SO만).
+5. custom 동일성 확인은 자동화 신호가 없어 **manual 판단**이다.
+
+**`DT_ROUTE_MANUAL_ONLY`가 아니라 `NOT_RELIABLY_RECONSTRUCTABLE`로 적는 이유**는, manual로
+해도 (3)의 비대칭이 남기 때문이다. 사람이 다 읽어도 문헌 수량이 복원되지 않는다.
+
+---
+
+## 20. Preferred hierarchy follow-up
+
+### 20.1 EVIDENCE — 다섯 발행사의 회계연도 말 fact 전개
+
+```text
+AVGO
+  2019-11-03  liq/sh=1,000  liqValue=3,737,500,000  par/sh=0.001  issued=3,737,500  PSValue=0
+  2020-11-01  liq/sh=1,000  liqValue=3,738,000,000  par/sh=0.001  issued=4,000,000  PSValue=0
+  2021-10-31  liq/sh=1,000  liqValue=3,737,000,000  par/sh=0.001  issued=4,000,000  PSValue=0
+  2022-10-30  liq/sh=1,000  liqValue=0              par/sh=0.001  issued=0          PSValue=0
+  2023-10-29~ (liq 태그 소멸)                        par/sh=0.001  issued=0          PSValue=0
+
+GE
+  2018-12-31  (liqValue 없음)                        outstanding=5,939,875  PSValue=6,000,000
+  2019-12-31  (liqValue 없음)                        outstanding=5,939,875  PSValue=6,000,000
+  2020-12-31  (liqValue 없음)                        outstanding=5,939,875  PSValue=6,000,000
+  2021-12-31  liqValue=5,935,000,000  par/sh=1       outstanding=5,939,875  PSValue=6,000,000
+  2022-12-31  liqValue=5,795,000,000  par/sh=1       outstanding=5,795,444  PSValue=6,000,000
+  2023-12-31~ PSValue=0
+
+DHR   2019 PSValue=1,599,600,000 (issued 1,650,000) · 2020~21 3,268,000,000 · 2022 1,668,000,000 · 2023 0
+BDX   2017~2022 PSValue=2,000,000 · 2023 PSValue=0
+PFE   2019 PSValue=17,000,000 (issued 431) · 2020~ issued=0 · PSValue=0
+```
+
+### 20.2 redemption
+
+**표준 taxonomy에 우선주 redemption value 개념이 없다는 것을 다시 확인했다.** 표본 31개
+CIK 전체에서 `Redemption`이 이름에 든 개념은 셋뿐이고 **전부 우선주가 아니다.**
+
+```text
+us-gaap:TemporaryEquityRedemptionValue                          (CAT — redeemable NCI)
+us-gaap:RedeemableNoncontrollingInterestEquityRedemptionValue
+us-gaap:SharesSubjectToMandatoryRedemptionSettlementTermsAmountNoncurrent
+```
+
+**INTERPRETATION**: 문헌 hierarchy의 1순위는 XBRL fact로 존재하지 않는다. 상환조건은 우선주
+주석의 **산문**에 있으므로 §19.3과 같은 이유로 **deterministic하게 얻을 수 없다.**
+
+### 20.3 liquidation
+
+`PreferredStockLiquidationPreferenceValue`는 표본 30개 발행사 중 **2개**(AVGO·GE)에만 있다.
+
+**AVGO는 우선주가 존재한 모든 해에 태깅했다.** FY2022에 소멸하면서 값이 0이 되고 FY2023부터는
+태그 자체가 사라진다. **일관적이다.**
+
+**GE는 그렇지 않다.** FY2018~2020에도 우선주 5,939,875주가 그대로 있었는데
+`PreferredStockLiquidationPreferenceValue`가 **없다.** FY2021에 처음 나타나 `5,935,000,000`을
+보고한다.
+
+```text
+같은 상품 · 같은 주식 수 · 다른 태깅
+  FY2020 문헌 hierarchy 적용 -> par/carrying     6,000,000   차감
+  FY2021 문헌 hierarchy 적용 -> liquidation  5,935,000,000   차감
+  차감액 배율                                        약 989배
+GE FY2020 parent equity 35,552,000,000 대비 -> 차감액이 자본의 0.02% -> 16.7% 로 점프
+```
+
+**INTERPRETATION**: 이것이 §6.4의 질문 5(`"higher-priority value unavailable"과 "does not
+exist"를 구분할 수 있는가`)에 대한 직접적인 답이다. **구분할 수 없다.** GE FY2020의
+liquidation preference는 경제적으로 존재했지만 태깅되지 않았다. XBRL만 보면 "없다"와
+"안 붙였다"가 같아 보인다.
+
+따라서 문헌 hierarchy를 기계적으로 적용하면 **차감액이 발행사의 태깅 습관에 따라 3자릿수
+배율로 흔들린다.** 이는 §7.3의 AVGO 사례(par만 쓰면 15.7% 과대)가 보여준 것과 **반대 방향의
+같은 문제**다 — AVGO는 "낮은 tier만 쓰면 과소차감", GE는 "tier 가용성이 연도마다 바뀌어
+같은 상품의 차감액이 점프".
+
+### 20.4 par / carrying
+
+`PreferredStockValue`가 무엇을 담는지가 발행사마다 다르다.
+
+```text
+GE   6,000,000        par $1 × 5,939,875 주 수준          <- par
+BDX  2,000,000        par 수준                            <- par
+PFE  17,000,000       431주에 대한 stated value           <- stated value
+DHR  1,599,600,000 / 3,268,000,000 / 1,668,000,000        <- 발행가액(carrying) 수준
+AVGO 0                par $0.001 × 400만 주 ≈ $4,000      <- par (반올림으로 0)
+```
+
+**INTERPRETATION**: 문헌의 3순위는 "carrying value"인데, `PreferredStockValue` 하나가
+어떤 발행사에서는 par이고 어떤 발행사에서는 carrying이다. **AVGO처럼 par가 극단적으로 작으면
+같은 개념이 경제적으로 무의미한 값을 담는다.** §6.4의 질문 3·4에 대해 이 정찰이 말할 수 있는
+것은 **"문헌 fallback 의미상 써야 한다"와 "경제적으로 터무니없다"가 실제로 충돌한다**는
+사실까지이고, 어느 쪽을 택할지는 §24-C의 결정이다.
+
+### 20.5 unresolved cases
+
+```text
+PREF_LIQUIDATION_AVAILABLE          AVGO FY2019~2022 · GE FY2021~2022
+PREF_PAR_OR_CARRYING_AVAILABLE      GE FY2018~2020 · BDX · PFE FY2019 · DHR FY2019~2022
+PREF_ZERO_CONFIRMED                 AVGO FY2022~ · PFE FY2020~ · DHR FY2023 (issued/outstanding = 0)
+PREF_PRESENT_BUT_VALUE_UNRESOLVED   GE FY2018~2020   <- 우선주 실재. 상위 tier가 태깅만 안 됨
+PREF_REDEMPTION_AVAILABLE           0건
+```
+
+---
+
+## 21. Preferred ZERO vs UNKNOWN follow-up
+
+### 21.1 EVIDENCE — §7.2의 "14/31"은 개념 범위가 좁았다
+
+§7.2는 `us-gaap:PreferredStockValue` 하나만 보고 "태그가 아예 없는 발행사 14/31"이라고 적었다.
+**preferred 계열 전체**(금액·수권주식수·발행주식수·유통주식수·주당액면·청산우선·전환·
+temporary/redeemable·배당)를 10-K 전 fact로 다시 세면 다르다.
+
+```text
+preferred 계열 개념이 하나도 없는 발행사      5 / 31   HD · KO · MSFT · UNP · XOM
+개념이 1개뿐                                  AAPL (PreferredStockSharesAuthorized 만)
+금액·유통 태그 없이 배당·전환 관련만          PG (4개)
+수권 + 유통주식수만                           SBUX (2개)
+```
+
+### 21.2 EVIDENCE — P&G가 Z1을 반증한다
+
+P&G FY2026 10-K(`0000080424-26-000103`)의 연결 대차대조표(`R6.htm`,
+`"9952154 - Statement - Consolidated Balance Sheets"`)에는 `us-gaap:PreferredStockValue`가
+**두 번** 나온다.
+
+```text
+us-gaap:PreferredStockValue    "Preferred stock"     756 / 777     <- 실재하는 ESOP 우선주
+us-gaap:PreferredStockValue    "Preferred stock"       0 /   0     <- 발행되지 않은 다른 종류
+parenthetical:
+    PreferredStockParOrStatedValuePerShare  $1        PreferredStockSharesAuthorized       600
+    PreferredStockParOrStatedValuePerShare  $1        PreferredStockSharesAuthorized 200,000,000
+```
+
+**그런데 companyfacts에는 P&G의 `PreferredStockValue`가 한 건도 없다**(§7.2). 두 fact 모두
+종류별 축(class-of-stock)으로 **차원이 붙어 있어** 무차원만 돌려주는 companyfacts에서 사라진다.
+
+```text
+P&G 우선주 756,000,000 · 지배주주 포함 자본 54,311,000,000  ->  자본의 1.4%
+"태그 없음 -> ZERO" 규칙을 적용했을 때의 false-zero        =  756,000,000
+```
+
+**INTERPRETATION**: **Candidate Z1(우선주 관련 fact가 없으면 ZERO)은 반증됐다.** 더 좁게
+"무차원 `PreferredStockValue`가 없으면 ZERO"로 바꿔도 P&G에서 똑같이 틀린다. ESOP 우선주는
+오래된 대형주에 흔한 구조이므로 **개별 사례가 아니라 계열 문제**로 본다.
+
+### 21.3 EVIDENCE — 진짜 0인 다섯은 어떻게 보이는가
+
+HD·KO·MSFT·UNP·XOM의 최근 10-K에서 **연결 대차대조표와 그 parenthetical 전체**를 확인했다.
+
+```text
+MSFT 0001193125-26-323660  R4.htm / R5.htm   Preferred 요소 0개
+KO   0001628280-26-010047  R5.htm            Preferred 요소 0개
+XOM  0000034088-26-000045  R5.htm / R6.htm   Preferred 요소 0개
+UNP  0000100885-26-000037  R6.htm / R7.htm   Preferred 요소 0개
+HD   0001628280-26-019436  R3.htm / R4.htm   Preferred 요소 0개
+```
+
+**INTERPRETATION**: 이 다섯은 **대차대조표 어디에도 우선주 요소가 없다**(차원 포함). 미국
+GAAP에서 유통 중인 우선주는 대차대조표에 표시해야 하므로, **완결된 감사받은 대차대조표에
+그 라인이 없다는 것**은 P&G형 false-zero와 구조적으로 다르다. 다만 이것은 **"0이라는 fact"가
+아니라 "표시 완결성 가정에서 도출한 추론"**이다. 그 성격을 그대로 적어 둔다.
+
+**긍정적 0 증거**(추론이 아닌 fact)는 따로 존재한다.
+
+```text
+AVGO FY2022~   PreferredStockSharesIssued = 0 · SharesOutstanding = 0 · liqValue = 0
+PFE  FY2020~   PreferredStockSharesIssued = 0 · SharesOutstanding = 0
+DHR  FY2023    PreferredStockSharesIssued = 0 · SharesOutstanding = 0 · PSValue = 0
+SBUX 전 기간    PreferredStockSharesOutstanding 태그 존재
+```
+
+### 21.4 ZERO 후보 비교
+
+|후보|규칙|false-zero 위험|missing 영향|자동화|issuer별 판단|
+|---|---|---|---|---|---|
+|**Z1**|preferred 관련 fact가 하나도 없으면 ZERO|**높다 — P&G에서 756,000,000 (§21.2)**|작다|가능|불필요|
+|**Z2**|`SharesIssued/Outstanding == 0`이 명시된 경우만 ZERO. 나머지 태그 부재는 UNKNOWN|낮다|**크다 — HD·KO·MSFT·UNP·XOM 등 우선주가 실제로 없는 대형주가 대거 UNKNOWN**|가능|불필요|
+|**Z3**|연결 대차대조표 role에 `PreferredStockValue` 요소가 **차원 포함해서도** 없으면 ZERO|낮다 — P&G는 차원 fact가 잡혀 ZERO가 되지 않는다|작다|**가능하지만 차원 fact 읽기가 필요**|불필요|
+|**Z4**|preferred 증거가 하나라도 있으면 hierarchy, 정말 아무 증거도 없으면 ZERO|Z1과 같다. P&G는 배당 fact가 있어 hierarchy로 가지만 **금액을 못 구해 UNRESOLVED**|중간|가능|불필요|
+
+**INTERPRETATION**: **Z3만이 §21.2의 반례를 구조적으로 막으면서 §21.3의 다섯을 살린다.**
+다만 Z3은 `Total Assets` 계약(§4.2.2)이 채택한 "무차원만 읽는다"를 **preferred 존재 판정에
+한해** 넘어서야 한다. 값을 차원에서 합산하자는 것이 아니라 **존재 여부를 판정할 때만 차원
+fact를 본다**는 뜻이고, 둘은 다른 요구다.
+
+---
+
+## 22. Revised deterministic candidate mappings
+
+> **PROPOSED ARCHITECTURE**다. 네 후보 모두 §12와 같은 뼈대(formation까지 usable한 filing →
+> 연결 **대차대조표** Statement role → instant == `dei:DocumentPeriodEndDate`)를 쓴다.
+
+### 후보 B′ — parent equity only (§12 후보 B의 갱신판)
+
+```text
+BE = parent stockholders' equity
+     parent fact 있으면 그것
+     없으면 IncludingNCI - MinorityInterest, 단 redeemable NCI / temporary equity fact가
+     있으면 fail-close (§6.2)
+DT/ITC 항 · preferred 차감을 쓰지 않는다
+```
+
+- **갱신 사유**: §19가 DT 경로를 닫았으므로 이 후보의 상대적 지위가 올라갔다.
+- **남는 결함**: AVGO형 우선주(자본의 15.7%)와 P&G형 ESOP 우선주(1.4%)를 차감하지 않는다.
+
+### 후보 C′ — parent equity − preferred, DT 제외 (§12 후보 C의 갱신판)
+
+```text
+BE = parent SE - preferred
+preferred:
+  대차대조표 role에 PreferredStockValue 요소가 차원 포함해서도 없음   -> ZERO      (Z3)
+  SharesIssued 또는 SharesOutstanding == 0 이 명시                    -> ZERO
+  liquidation preference value 가 있음                               -> 그 값 차감
+  liquidation 없고 par/carrying 금액만 있음                           -> §24-C 결정 대상
+  우선주 실재 증거는 있는데 금액을 특정 불가                           -> PREF_UNRESOLVED
+DT/ITC 항을 쓰지 않는다
+```
+
+- **갱신 사유**: §20.3의 GE와 §21.2의 P&G가 규칙 형태를 바꿨다.
+- **남는 결함**: GE FY2018~2020형(상위 tier 미태깅)을 구조적으로 해결하지 못한다.
+
+### 후보 E — 후보 C′ + preferred 금액을 tier로 고정하지 않고 **일관성 우선**
+
+```text
+preferred 차감액 = liquidation preference value 가 있으면 그것,
+                   없으면 par/carrying 금액
+단, 같은 issuer의 인접 연도에서 tier가 바뀌면 그 연도들을 PREF_TIER_UNSTABLE 로 표시하고
+    coverage 보고에 별도로 센다 (값은 그대로 쓰되 진단을 남긴다)
+```
+
+- **장점**: GE형 점프를 **숨기지 않고 드러낸다.**
+- **단점**: 값 자체는 여전히 점프한다. 진단일 뿐 해결이 아니다.
+- 새 tuning knob: 없음(문턱이 아니라 상태 표시).
+
+### 후보 F — Book Equity 자체를 이번 lineage에서 열지 않는다
+
+```text
+Value 축을 B/M 이 아닌 다른 정의로 바꾸거나, QV 대신 Quality 단독으로 축소
+```
+
+- **이것은 mapping 결정이 아니라 전략 범위 결정이다.** 로드맵 §1.3 대안 B(Quality만 또는
+  Value만)가 이미 control로 계산하도록 되어 있으므로 **형식상 가능한 선택지**이지만,
+  §0의 primary hypothesis(50:50 결합)를 바꾸는 것이라 **여기서 추천하지 않고 존재만 적는다.**
+
+---
+
+## 23. Revised recommendation
+
+**§13의 "단일 후보를 지금 freeze할 수 없다"는 판정은 유지한다.** 다만 이번 follow-up이
+불확실성 셋 중 **둘을 확정적으로 닫았다.**
+
+**확정된 것**
+
+1. **`DT_ROUTE_NOT_RELIABLY_RECONSTRUCTABLE`** (§19.3). custom 경로는 계약이 막은 것이 아니라
+   **확인해 보니 문헌 수량이 아니었고**, 표준 경로도 정의상 문헌 수량이 아니다. 이 항을
+   문헌대로 재현할 방법이 표본에 없다.
+2. **Candidate Z1은 반증됐다** (§21.2). "preferred 태그 없음 → 0"은 P&G에서 756,000,000의
+   false-zero를 만든다. **Z3(대차대조표 role에 차원 포함 요소 부재)만이 반례를 막는다.**
+
+**여전히 열려 있는 것**
+
+3. preferred hierarchy는 **tier 가용성이 태깅 습관의 함수**라 기계적 적용이 같은 상품의
+   차감액을 989배 바꾼다(§20.3 GE). 이것은 데이터로 해결되지 않고 **정책 선택**이다.
+
+**잠정 선두 후보는 후보 C′**이고, GE형 불안정을 숨기지 않으려면 **후보 E의 진단 표시를 함께**
+두는 것이 낫다고 본다. 다만 §24-A는 **§4.3의 경제적 정의를 축소하는 결정**이므로 내가
+정할 수 없다.
+
+---
+
+## 24. Revised user decisions
+
+§14의 여섯을 여섯 그대로 두지 않고, 이번 evidence로 **성격이 바뀐 것만** 갱신한다.
+번호는 §14와 대응시키되 알파벳으로 다시 붙인다.
+
+### 24-A. Deferred Tax / ITC 항 — §14-1의 갱신
+
+**이 선택지가 존재하는 이유**: §19가 custom 경로까지 닫았고, 표준 경로도 정의상 문헌 수량이
+아님을 taxonomy 원문으로 확인했다.
+
+```text
+(a) 이번 lineage에서 DT/ITC 항을 쓰지 않는다.  BE = SE - preferred
+    -> §4.3의 경제적 정의를 축소하고 그 사실을 문서에 명시
+(b) 표준 DeferredIncomeTaxLiabilitiesNet 이 있을 때만 가산
+(c) DT 항을 못 구하면 그 issuer-year를 MISSING
+```
+
+**tradeoff**: (b)는 §19.2의 정의(`after deferred tax asset ... jurisdictional netting`)상
+**DTL 포지션 발행사에게만 자본을 더해주는 비대칭 규칙**이고, 크기가 자본의 최대 107%다.
+(c)는 대차대조표에 세금 라인이 없는 5/31과 custom만 있는 CAT를 통째로 잃는다.
+
+**추천 (a).** **§14-1과 같은 추천이지만 근거가 바뀌었다** — 전에는 "가용성이 업종과
+상관되어 편향"이라는 통계적 근거였고, 지금은 **"표준 개념조차 문헌 수량이 아니다"라는
+회계 정의 근거**다. 후자가 더 강하다.
+
+### 24-B. parent Stockholders' Equity fallback — §14-2 유지
+
+**갱신 없음.** §6.2의 Tesla 근거가 그대로다.
+
+```text
+(c) IncludingNCI - MinorityInterest 로 복원하되
+    redeemable NCI / temporary equity fact가 있으면 fail-close
+```
+
+**추천 (c) 유지.**
+
+### 24-C. preferred 차감 tier — §14-4의 갱신
+
+**이 선택지가 존재하는 이유**: §20.3의 GE가 **같은 상품의 차감액을 989배 바꾸는 tier 불안정**을
+보여줬고, §20.2가 redemption tier의 부재를 재확인했다.
+
+```text
+(a) liquidation 있으면 liquidation, 없으면 par/carrying   (문헌 순서 그대로)
+(b) liquidation 있으면 liquidation, 없으면 PREF_UNRESOLVED (par로 내려가지 않는다)
+(c) 항상 par/carrying 만 쓴다                              (tier를 쓰지 않는다)
+(d) (a) + tier가 인접 연도에 바뀌면 PREF_TIER_UNSTABLE 진단 표시   (후보 E)
+```
+
+**tradeoff**: (a)는 GE에서 차감액이 점프한다. (b)는 GE FY2018~2020과 BDX·PFE·DHR가 전부
+UNRESOLVED가 되어 우선주 보유 issuer-year를 대거 잃는다. (c)는 AVGO에서 15.7% 과대계상하고
+**문헌 취지를 정면으로 버린다.** (d)는 (a)의 값을 쓰되 불안정을 드러낸다.
+
+**추천 (d).** 이유: **(a)의 점프를 없앨 방법이 데이터에 없다**는 것이 §20.3의 결론이므로,
+남은 선택은 "점프를 모른 채 쓰기"와 "점프를 표시하며 쓰기"뿐이다. 후자가 낫다. **§14-4의
+추천(a)에서 진단 표시를 추가하는 쪽으로 갱신한다.**
+
+### 24-D. preferred ZERO / UNKNOWN — §14-5의 **철회 및 교체**
+
+**이 선택지가 존재하는 이유**: §21.2가 §14-5의 추천을 직접 반증했다.
+
+> **§14-5의 추천을 철회한다.** 거기서 "우선주 관련 **어떤** 태그도 없을 때만 ZERO"를
+> 조건부로 추천했는데, **P&G는 태그가 있으면서도 금액이 차원에만 있어** 그 조건이
+> false-zero를 막지 못한다.
+
+```text
+(Z1) preferred 관련 fact가 없으면 ZERO                            -> 반증됨. 채택 불가
+(Z2) SharesIssued/Outstanding == 0 명시된 경우만 ZERO             -> HD·KO·MSFT·UNP·XOM 등이 UNKNOWN
+(Z3) 연결 대차대조표 role에 PreferredStockValue 요소가
+     차원 포함해서도 없으면 ZERO                                   -> P&G 차단 · 다섯 발행사 생존
+(Z4) 증거가 하나라도 있으면 hierarchy, 없으면 ZERO                 -> Z1과 같은 취약점
+```
+
+**추천 (Z3).** 이유: **§21.2의 반례를 구조적으로 막는 유일한 후보**이고, §21.3의 다섯은
+살린다. 다만 이것은 **"존재 판정에 한해 차원 fact를 읽는다"**는 새 요구를 만든다.
+**값을 차원에서 합산하자는 것이 아니다** — 그 금지는 그대로다. 이 구분을 계약 문구에
+명시해야 한다.
+
+### 24-E. validation policy — §14-3 유지, 판단 근거 보강
+
+**갱신 없음.** `SE(i) == SE(p) + NCI`를 exact로 걸면 백만 단위 반올림에서 3.1%가 깨진다(§6.1).
+
+**추천: 지금 정하지 말 것.** tolerance를 열려면 임의 문턱이 아니라 filing이 선언한 표시
+단위(`decimals` 속성 / `RoundingOption`)에서 파생돼야 한다는 조건을 함께 정한다. **그 조건의
+성립 여부는 이번 follow-up에서도 확인하지 않았다.**
+
+### 24-F. 연결 대차대조표 role 강제 — §14-6 유지, 요구 강화
+
+**갱신**: §21.2 때문에 요구가 하나 늘었다.
+
+```text
+(a) 연결 대차대조표 role을 강제한다
+    + 값은 무차원 fact만 사용한다
+    + 단 preferred 존재 판정에 한해 차원 fact의 존재 여부를 본다   <- 신규
+```
+
+**추천 (a).** evidence가 강제한다.
+
+---
+
+## 25. Additional source URLs / accessions
+
+### 이번 follow-up에서 새로 사용한 근거
+
+|주장|근거|
+|---|---|
+|`cat:NoncurrentDeferredAndRefundableIncomeTaxes`가 이연법인세자산 + 환급채권의 결합이고 `balance=debit`|`0000018230-26-000008` `R5.htm` 요소 정의 블록|
+|`so:DeferredChargesRelatedToIncomeTaxes` = 규제자산 · `so:DeferredCreditsRelatedToIncomeTaxes` = 규제부채|`0000092122-26-000006` `R8.htm` 요소 정의 블록|
+|`us-gaap:DeferredIncomeTaxLiabilitiesNet` = "after deferred tax asset ... with jurisdictional netting" · `credit`|`0000092122-26-000006` `R8.htm` 요소 정의 블록|
+|`us-gaap:AccumulatedDeferredInvestmentTaxCredit`가 ratepayer 전제의 규제 개념 · `credit`|`0000092122-26-000006` `R8.htm` 요소 정의 블록|
+|PFE가 자산 쪽 custom `pfe:DeferredTaxAssetsNetAndOtherTaxAssetsNoncurrent`와 부채 쪽 표준을 동시에 씀|`0000078003-26-000026` `R5.htm`|
+|대차대조표에 세금 라인이 0개인 5개 발행사|`0000320193-25-000079` · `0001018724-26-000004` · `0001730168-25-000121` · `0000909832-25-000101` · `0000313616-26-000062`|
+|P&G 우선주 756이 차원 fact로만 존재|`0000080424-26-000103` `R6.htm` 및 그 parenthetical|
+|HD·KO·MSFT·UNP·XOM 대차대조표에 Preferred 요소 0개|`0001628280-26-019436` · `0001628280-26-010047` · `0001193125-26-323660` · `0000100885-26-000037` · `0000034088-26-000045`|
+|GE가 FY2021부터만 liquidation preference를 태깅|`0000040545-21-000011`~`0000040545-23-000015` 계열 회계연도 말 fact|
+|AVGO의 tier 전개와 FY2022 소멸|`0001730168-19-000144` · `-20-000226` · `-21-000153` · `-22-000118`|
+|DHR가 우선주를 발행가액 수준으로 계상|`0000313616-20-000041` · `-21-000045` · `-22-000061`|
+
+### 계약 문구
+
+```text
+docs/trading/strategies/quality-value-roadmap.md   §4.2 (custom tag 문구) · §4.3
+trading/runs/qv-data-audit/README.md               §3.2 (같은 문구)
+```
+
+### 이번 follow-up이 하지 않은 것
+
+```text
+수익률 · QV rank · B/M · coverage Gate                     0회
+production 구현 · schema · tests · roadmap · README 수정    없음
+Book Equity 계약 freeze                                    하지 않음
+issuer-specific whitelist 제안                             하지 않음
+```
+
+**추가 한계**
+
+- custom 개념의 **calculation linkbase**를 직접 파싱하지 않았다. 요소 정의·`balance`·
+  `period` 속성과 대차대조표 표시 위치까지만 확인했다. calculation을 봐도 §19.3의 결론
+  (구조화된 동일성 플래그가 없다)이 바뀔 것으로 보지는 않지만, **확인하지 않은 것은 확인하지
+  않았다고 적는다.**
+- 대차대조표 세금 라인 스캔은 각 CIK의 **가장 최근 10-K 한 건**만 봤다. 전 기간·전 accession의
+  custom 사용 빈도는 측정하지 않았다.
+- §21.3의 다섯 발행사도 **최근 10-K 한 건**만 확인했다. 과거 연도에 우선주가 있었는지는 보지 않았다.
+- Compustat 항목 정의는 §16의 한계 그대로 확인하지 못했다.
