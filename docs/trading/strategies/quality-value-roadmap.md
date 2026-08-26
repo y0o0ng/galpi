@@ -469,10 +469,37 @@ ambiguous하면** 그것은 별개의 mapping failure이므로 fail-close한다.
 
 **fact 선택은 presentation linkbase / filing statement structure를 쓴다.**
 
+**annual duration context 선택도 CLOSED / FROZEN이다.** 정찰 근거는
+`trading/runs/qv-data-audit/PROBE-annual-period-mapping.md`다. 선택된 `10-K` 또는
+`10-K/A` accession에서 `dei:DocumentPeriodEndDate`를 canonical period end로 삼고, 다음
+구조로 current annual duration start를 고정한다.
+
+```text
+FilingSummary가 현재 parser 계약상 Statement로 인정한 report role
+        ↓
+target CIK · dimensionless · USD · end == DocumentPeriodEndDate인
+standard US-GAAP revenue-family duration fact가 presentation graph에 있는 role
+        ↓
+candidate role이 정확히 하나여야 함
+        ↓
+그 role 안 eligible revenue fact의 unique longest-duration start
+```
+
+고정 minimum/maximum duration day cutoff는 없다. role이 없거나 둘 이상인 경우, eligible
+standard revenue가 없는 경우, longest duration에서 서로 다른 start가 동률인 경우는
+추정하지 않고 unresolved/missing으로 둔다. `DocumentFiscalPeriodFocus` ·
+`DocumentFiscalYearFocus` · companyfacts `fy`/`fp`/`frame` · value/concept 우선순위로 start를
+만들지 않는다.
+
+`10-KT`는 이 production accounting lineage의 허용 form에 추가하지 않는다. 또한
+`LongName=Statement`지만 `MenuCategory=Uncategorized`인 FilingSummary metadata conflict는
+현재 parser 분류대로 fail-close하며, 이번 freeze는 LongName fallback이나 issuer/year 예외를
+승인하지 않는다.
+
 ```text
 formation까지 usable한 annual 10-K family filing 선택
         ↓
-그 accession의 consolidated income statement role 식별
+그 accession의 unique consolidated income statement role과 annual duration start 식별
         ↓
 그 role 안의 standard-taxonomy · 무차원 total revenue / COGS fact 사용
         ↓

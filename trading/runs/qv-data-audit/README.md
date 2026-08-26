@@ -151,6 +151,14 @@ fact 선택            그 accession의 연결 손익계산서 role 안의
 role 불명            추측 금지. unresolved / missing
 role 밖 fact         주석 · segment · geographic subtotal · 중단사업은 이름이 같아도 후보 아님
 fy / fp / frame      statement 의미 추정에 쓰지 않는다
+annual period        FilingSummary Statement role 중 target CIK · dimensionless · USD · end=DPE인
+                     standard revenue-family fact가 연결된 role이 정확히 하나여야 함
+                     그 role 안 eligible revenue fact의 unique longest-duration start
+day cutoff           없음. 340~400 및 다른 fixed/분포 기반 threshold 금지
+period fail-close    role missing/ambiguous · eligible standard revenue 없음
+                     · longest duration의 서로 다른 start 동률
+form / metadata      10-K · 10-K/A만. 10-KT 추가 금지
+                     FilingSummary metadata conflict는 현재 parser 분류대로 fail-close
 dimension-only COGS  MISSING. member 합산 · whitelist · issuer별 예외 · derived member 추정 금지
 보존                 accession · form · acceptance_datetime · historical_usable_session
                      · statement role · concept · start · end · unit · value · 선택 경로
@@ -794,10 +802,9 @@ TSLA  Assets 22,664,076,000 · direct parent SE 4,752,911,000 · roll-forward �
       revenue 는 sibling-total 때문에 여전히 REVENUE_UNRESOLVED 이고 이번에 바꾸지 않았다
 ```
 
-### OPEN DESIGN ISSUE — annual-period cutoff
+### CLOSED / FROZEN — annual duration context
 
-`qv_accounting.py`의 `MIN_ANNUAL_DAYS = 340` · `MAX_ANNUAL_DAYS = 400`은 **이번 fix에서
-바꾸지 않았다.** 근거를 실제로 찾아보면 이렇다.
+`340~400일`은 canonical accounting 의미가 아니었다. 근거를 실제로 찾아보면 이렇다.
 
 ```text
 로드맵 §4.1        "annual 10-K"     — 일수 범위 없음
@@ -807,13 +814,24 @@ PROBE-gross-profit-mapping.md §2   "duration 340~400일"
 ```
 
 즉 이 cutoff는 **어떤 CLOSED/FROZEN 계약에서도 유래하지 않았고, probe의 scratch 추출
-규칙이 구현으로 넘어온 것**이다.
+규칙이 구현으로 넘어온 것**이다. 이를 닫기 위해
+`PROBE-annual-period-mapping.md`에서 heterogeneous 30 issuer의 원본 `10-K` 241건과 별도
+transition stress `10-KT` 3건, 총 244 accession을 조사했다.
 
 ```text
-판정: implementation-added heuristic / OPEN DESIGN ISSUE
+판정: Candidate B — statement-revenue structural longest-duration / CLOSED / FROZEN
 ```
 
-**결과를 보고 조정하지 않는다.** 이 항목은 설계자와 별도로 닫는다.
+canonical annual start는 현재 parser가 Statement로 인정한 role 중 target CIK · dimensionless ·
+USD · `end == DocumentPeriodEndDate`인 standard US-GAAP revenue-family duration fact가 연결된
+role이 정확히 하나일 때만, 그 role 안 eligible fact의 **unique longest-duration start**로 고른다.
+고정 day cutoff는 없고 role missing/ambiguity, eligible standard revenue 부재, longest-start
+동률은 fail-close한다.
+
+이 period selector와 그 period 안의 consolidated Revenue structural-total selector는 별개다.
+따라서 Tesla sibling-total은 해결하지 않는다. `10-KT`는 production 허용 form에 추가하지 않고,
+2021 FilingSummary metadata conflict도 LongName fallback 없이 현재 parser semantics대로
+fail-close한다. 결과를 보고 threshold·issuer/year 예외·custom revenue rescue를 추가하지 않는다.
 
 ---
 
