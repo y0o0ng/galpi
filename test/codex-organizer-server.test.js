@@ -802,6 +802,11 @@ test('Codex serializes current mutations and skips an archived tail target', asy
   assert.ok(tailFilename);
 
   await waitForFile(child, runnerSignalPath, logs);
+  let searchSettled = false;
+  const searchPromise = api(url, '/api/vault/search?q=Organizer').then(result => {
+    searchSettled = true;
+    return result;
+  });
   let currentArchiveSettled = false;
   let tailArchiveSettled = false;
   const currentArchivePromise = api(url, '/api/notes/archive', {
@@ -819,10 +824,17 @@ test('Codex serializes current mutations and skips an archived tail target', asy
     return result;
   });
   await new Promise(resolve => setTimeout(resolve, 75));
+  assert.equal(searchSettled, true, 'AI note reads must not wait for the Codex mutation queue.');
   assert.equal(currentArchiveSettled, false, '현재 파일 mutation은 Codex snapshot 처리 뒤까지 기다려야 한다.');
   assert.equal(tailArchiveSettled, false, '후속 파일 mutation도 현재 Codex job 뒤까지 기다려야 한다.');
 
-  const [currentArchive, tailArchive] = await Promise.all([currentArchivePromise, tailArchivePromise]);
+  const [concurrentSearch, currentArchive, tailArchive] = await Promise.all([
+    searchPromise,
+    currentArchivePromise,
+    tailArchivePromise,
+  ]);
+  assert.equal(concurrentSearch.response.status, 200, JSON.stringify(concurrentSearch.body));
+  assert.ok(concurrentSearch.body.results.some(note => note.filename === tailFilename));
   assert.equal(currentArchive.response.status, 200, JSON.stringify(currentArchive.body));
   assert.equal(tailArchive.response.status, 200, JSON.stringify(tailArchive.body));
 

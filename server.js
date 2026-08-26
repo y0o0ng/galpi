@@ -1297,7 +1297,9 @@ const stmtUpsertNote = db.prepare(`
 const stmtGetNoteByFilename = db.prepare(`
   SELECT filename, title, note_type AS noteType, archived,
          codex_status AS codexStatus, ai_readable AS aiReadable,
-         owner_agent AS ownerAgent, updated_at AS updatedAt
+         owner_agent AS ownerAgent, content_sha256 AS contentSha256,
+         indexed_sha256 AS indexedSha256, index_status AS indexStatus,
+         updated_at AS updatedAt
   FROM notes
   WHERE filename = ?
   LIMIT 1
@@ -8257,19 +8259,24 @@ function isAiReadableNoteState(note) {
 }
 
 async function readAiStableNoteValue(filename, readValue) {
-  return topicMutations.run(async () => {
-    const before = stmtGetNoteByFilename.get(filename);
-    if (!isAiReadableNoteState(before)) return null;
-    const value = await readValue();
-    const after = stmtGetNoteByFilename.get(filename);
-    if (
-      !value ||
-      !isAiReadableNoteState(after) ||
-      after.codexStatus !== before.codexStatus ||
-      after.updatedAt !== before.updatedAt
-    ) return null;
-    return value;
-  });
+  // Codex는 외부 runner가 파일 snapshot을 가진 동안 mutation queue를 유지한다.
+  // AI 읽기까지 그 queue에 넣으면 채팅 전체가 runner 시간만큼 멈춘다. 파일 변경은
+  // atomic rename이고 running 상태는 읽기 금지이므로, 앞뒤 DB fingerprint가 같을
+  // 때만 값을 쓰는 optimistic read로 fail-close한다.
+  const before = stmtGetNoteByFilename.get(filename);
+  if (!isAiReadableNoteState(before)) return null;
+  const value = await readValue();
+  const after = stmtGetNoteByFilename.get(filename);
+  if (
+    !value ||
+    !isAiReadableNoteState(after) ||
+    after.codexStatus !== before.codexStatus ||
+    after.contentSha256 !== before.contentSha256 ||
+    after.indexedSha256 !== before.indexedSha256 ||
+    after.indexStatus !== before.indexStatus ||
+    after.updatedAt !== before.updatedAt
+  ) return null;
+  return value;
 }
 
 function searchPastMessages(queryEmbedding, currentSessionId, limit = 2) {
