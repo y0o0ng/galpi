@@ -889,6 +889,43 @@ class PreferredTest(unittest.TestCase):
         self.assertEqual(result.preferred_value, "3738000000")
         self.assertEqual(result.book_equity_value, "20136000000")
 
+    def test_resolved_liquidation_survives_ambiguous_par_decimals(self):
+        files = build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "5000000000"),
+                B.fact(
+                    "us-gaap",
+                    "PreferredStockLiquidationPreferenceValue",
+                    "i",
+                    "3738000000",
+                ),
+                B.fact(
+                    "us-gaap", "PreferredStockValue", "i", "0", decimals="-6"
+                ),
+                B.fact(
+                    "us-gaap", "PreferredStockValue", "i2", "0", decimals="-3"
+                ),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=[
+                    "Assets",
+                    "StockholdersEquity",
+                    "PreferredStockLiquidationPreferenceValue",
+                    "PreferredStockValue",
+                ],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.preferred_status, RESOLVED)
+        self.assertEqual(result.preferred_tier, LIQUIDATION)
+        self.assertEqual(result.preferred_value, "3738000000")
+
     def test_ge_shape_par_carrying_when_no_liquidation(self):
         result = resolve(
             self._files(
@@ -974,6 +1011,8 @@ class PreferredTest(unittest.TestCase):
         )
         self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
         self.assertIn("CONTRADICTORY", result.diagnostics["preferred"])
+        self.assertIsNone(result.preferred_tier)
+        self.assertIsNone(result.preferred_value)
 
     def test_ambiguous_liquidation_does_not_fall_back_to_par(self):
         files = build_files(
@@ -1002,7 +1041,35 @@ class PreferredTest(unittest.TestCase):
         self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
         self.assertEqual(result.diagnostics["preferred"], "LIQUIDATION_AMBIGUOUS")
         self.assertIsNone(result.preferred_value)
+        self.assertIsNone(result.preferred_tier)
         self.assertEqual(result.book_equity_status, UNRESOLVED)
+
+    def test_ambiguous_zero_par_decimals_does_not_fall_back_to_zero(self):
+        files = build_files(
+            contexts=base_contexts([B.context("i2", cik=CIK, instant=DPE)]),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+                B.fact("us-gaap", "StockholdersEquity", "i", "1000"),
+                B.fact(
+                    "us-gaap", "PreferredStockValue", "i", "0", decimals="-6"
+                ),
+                B.fact(
+                    "us-gaap", "PreferredStockValue", "i2", "0", decimals="-3"
+                ),
+            ],
+            roles=simple_roles(
+                income=["Revenues", "CostOfRevenue"],
+                balance=["Assets", "StockholdersEquity", "PreferredStockValue"],
+            ),
+        )
+        result = resolve(files)
+        self.assertEqual(result.preferred_status, PREF_UNRESOLVED)
+        self.assertEqual(result.diagnostics["preferred"], "PAR_CARRYING_AMBIGUOUS")
+        self.assertIsNone(result.preferred_tier)
+        self.assertIsNone(result.preferred_value)
 
     def test_ambiguous_par_does_not_fall_back_to_zero(self):
         files = build_files(

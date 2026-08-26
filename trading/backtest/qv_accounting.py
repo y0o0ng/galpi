@@ -968,14 +968,16 @@ def _resolve_preferred(bundle, result, facts, dpe, role, role_obj, pre_file, pre
     if zero_share_fact and positive_share_fact:
         return unresolved("CONTRADICTORY_ZERO_AND_POSITIVE_SHARES")
 
-    # 상위 tier가 모호하면 하위 tier로도 ZERO로도 내려가지 않는다. ZERO보다 먼저 본다.
+    # liquidation이 모호하면 하위 tier로도 ZERO로도 내려가지 않는다. ZERO보다 먼저 본다.
     if liq_status == AMBIGUOUS:
         return unresolved("LIQUIDATION_AMBIGUOUS")
-    if par_status == AMBIGUOUS:
-        return unresolved("PAR_CARRYING_AMBIGUOUS")
 
     if zero_share_fact and positive_amount_evidence:
         return unresolved("CONTRADICTORY_ZERO_SHARES_AND_AMOUNT")
+
+    # liquidation이 없을 때만 par/carrying tier의 ambiguity를 판정한다.
+    if liq_status == MISSING and par_status == AMBIGUOUS:
+        return unresolved("PAR_CARRYING_AMBIGUOUS")
 
     # explicit zero-share evidence는 단순 zero monetary fact보다 우선한다.
     if zero_share_fact:

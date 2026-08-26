@@ -817,6 +817,32 @@ PROBE-gross-profit-mapping.md §2   "duration 340~400일"
 
 ---
 
+## 10.3 preferred hierarchy precedence fix receipt — 2026-08-26
+
+`f3e9248978b6a56ff43d1bb36a0644cc071bc95e` 리뷰의 tier precedence 한 곳만 고쳤다.
+liquidation이 `RESOLVED`면 lower-tier par/carrying ambiguity가 그 값을 무효화하지 않는다.
+liquidation이 `MISSING`일 때만 par/carrying 상태를 검사하고, liquidation 자체가
+`AMBIGUOUS`면 계속 fallback 없이 `PREF_UNRESOLVED`다. zero-share와 positive preferred
+evidence의 contradiction 및 dimension fact의 existence-only 계약도 그대로다.
+
+```text
+resolved liquidation 3,738,000,000 + par 0(decimals -6/-3)
+  -> RESOLVED / LIQUIDATION / 3,738,000,000
+liquidation MISSING + par 0(decimals -6/-3)
+  -> PREF_UNRESOLVED, ZERO fallback 없음
+liquidation 100/200 conflict + par 10
+  -> PREF_UNRESOLVED, par fallback 없음
+zero shares + positive resolved liquidation
+  -> contradiction / PREF_UNRESOLVED, ZERO 금지
+```
+
+로컬 실제 실행 결과는 accounting/XBRL 122 PASS, submissions/identity 69 PASS, trading 전체
+1,299 PASS, npm 949 PASS다. SEC smoke는 accounting 의미와 source assumption을 바꾸지 않아
+재실행하지 않았다. production ingest · coverage · rank · B/M · returns는 전부 0회다.
+340~400 annual-period heuristic · Tesla sibling-total · NEE COGS는 변경하지 않았다.
+
+---
+
 ## 11. 결과
 
 
