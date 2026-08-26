@@ -496,6 +496,57 @@ standard revenue가 없는 경우, longest duration에서 서로 다른 start가
 현재 parser 분류대로 fail-close하며, 이번 freeze는 LongName fallback이나 issuer/year 예외를
 승인하지 않는다.
 
+**consolidated total revenue의 multi-candidate 식별도 CLOSED / FROZEN이다.** 정찰 근거는
+`trading/runs/qv-data-audit/PROBE-revenue-total-selection.md`다. eligible canonical revenue
+fact의 범위는 위와 같다 — target CIK · 무차원 · ISO4217 USD · selected annual start/end ·
+selected income Statement role · standard US-GAAP revenue family · 실제로 보고된 fact.
+
+```text
+eligible standard revenue concept가 정확히 하나
+        ↓
+기존 unique-value 규칙으로 resolve한다. calculation 관계를 요구하지 않는다
+
+eligible standard revenue concept가 둘 이상
+        ↓
+selected presentation Statement role URI와 **정확히 같은** calculation extended-link role의
+effective summation-item graph만 본다
+        ↓
+eligible 후보 중 calculation source이면서
+다른 모든 eligible 후보의 transitive ancestor인 후보를 찾는다
+        ↓
+그런 후보가 정확히 하나면 그 **이미 보고된 standard fact**가 canonical total Revenue
+0개 또는 2개 이상이면 REVENUE_UNRESOLVED
+```
+
+**presentation ancestor 규칙으로 multi-candidate total을 정하지 않는다.** 실제 filing은 총계를
+components의 **형제**로 두는 경우가 많아 그 규칙이 구조적으로 답을 내지 못한다.
+
+**transitive path의 custom intermediate concept는 관계 evidence로만 통과한다.** custom fact를
+canonical Revenue로 승격하지 않고, children을 합산해 Revenue를 만들지도 않는다. calculation
+graph는 **어느 보고된 standard fact가 total identity인가**를 식별하는 근거이지 없는 fact를
+계산하는 공식이 아니다.
+
+**calculation arithmetic은 canonical selection의 조건이 아니다.** contributor가 부족하거나
+raw 합이 root와 정확히 맞지 않아도 canonical Revenue를 다른 concept로 바꾸지 않는다. 이
+lineage는 formal XBRL Calculations validation engine을 만들지 않는다.
+
+**effective relationship semantics를 적용한다.** raw `calculationArc`의 존재 자체를 근거로
+세지 않고 extended-link role · arcrole · `order` · `weight` · `use` · `priority`를 보존해
+equivalent relationships의 highest-priority prohibition/override를 반영한다. prohibited
+관계는 graph에 들어가지 않는다.
+
+**calculation 관계는 standalone linkbase와 issuer schema에 embedded된 `calculationLink`
+둘 다에서 읽는다.** 파일명 접미사만으로 의미를 정하지 않는다.
+
+**role URI는 exact equality만 허용한다.** 제목 유사도 · `LongName` · role 꼬리 · 순서 ·
+"가장 비슷한 role" fallback을 쓰지 않는다. 정찰에서 같은 revenue concept가 note/detail
+calculation role에도 재사용되는 사례를 확인했고, exact-role 제한이 없으면 그 graph가 섞인다.
+
+**`totalLabel`·presentation `order`·값 크기·concept 우선순위는 canonical selector가 아니다.**
+`preferredLabel`의 공식 의미는 그 occurrence에서 쓸 label role이지 grand-total identity가
+아니며, 정찰 표본에서 같은 revenue section의 custom subtotal과 standard grand total이 **둘 다**
+`totalLabel`을 쓰는 사례를 확인했다.
+
 ```text
 formation까지 usable한 annual 10-K family filing 선택
         ↓

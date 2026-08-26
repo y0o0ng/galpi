@@ -148,6 +148,18 @@ mismatch 처리        canonical을 무효로 만들지 않는다. diagnostic/au
 fail-close           total revenue 또는 COGS 자체의 statement 의미가 ambiguous할 때
 fact 선택            그 accession의 연결 손익계산서 role 안의
                      standard-taxonomy · 무차원 fact만
+revenue 후보 1개      기존 unique-value 규칙. calculation 관계를 요구하지 않는다
+revenue 후보 2개+     selected Statement role URI와 **exact equality**인 calculation role의
+                     effective summation-item graph에서, eligible 후보 중 다른 모든 eligible
+                     후보의 transitive ancestor인 후보가 정확히 하나일 때 그 보고된 standard
+                     fact가 canonical total Revenue. 0개·2개 이상은 REVENUE_UNRESOLVED
+custom intermediate  transitive path의 evidence로만 통과. canonical 승격·합산 금지
+calculation source   standalone linkbase와 issuer XSD embedded calculationLink 둘 다
+effective 관계        arcrole · role · order · weight · use · priority 보존.
+                     equivalent 관계의 highest-priority prohibition/override 반영
+arithmetic           canonical selection 조건 아님. mismatch가 concept를 바꾸지 않는다
+금지 selector         totalLabel · presentation order · 값 크기 · concept 우선순위
+                     · role 제목 유사도 · component 합산으로 Revenue 생성
 role 불명            추측 금지. unresolved / missing
 role 밖 fact         주석 · segment · geographic subtotal · 중단사업은 이름이 같아도 후보 아님
 fy / fp / frame      statement 의미 추정에 쓰지 않는다
@@ -173,8 +185,46 @@ Novy-Marx 계열의 `REVT − COGS`에 가까운 신호를 재현하기 위해�
 않는다.** missing reason으로 세고, Gate A·B는 본구현 전수에서만 판정한다. **정찰의 발행사별
 숫자를 coverage 추정치로 쓰지 않는다.**
 
+#### 3.6.1 calculation-root revenue freeze receipt — 2026-08-26
+
+정찰 근거는 `PROBE-revenue-total-selection.md`이고 **이 문서에서 다시 정하지 않는다.**
+
+```text
+고정 표본            직전 annual-period probe의 원본 10-K 241 accession 재사용
+분석 가능            228 (기존 annual role/context 계약으로 resolve된 것)
+multi-candidate      17
+single-candidate     211  (control)
+
+Candidate 0  presentation ancestor      resolved 0 / ambiguous 17
+Candidate A  exact-role calc root       resolved 17 · correct 17 · wrong 0
+Candidate B  totalLabel                 correct 17
+Candidate C  calc + totalLabel          correct 17
+```
+
+**B/C를 채택하지 않은 이유**는 `totalLabel`이 subtotal에도 정상적으로 쓰이기 때문이다.
+Tesla FY2016은 같은 revenue section에서 custom **Total automotive revenue** subtotal과
+standard **Total revenues** grand total에 **둘 다** `totalLabel`을 쓴다. C는 표본에서 A보다
+wrong을 하나도 더 줄이지 못했다.
+
+**Tesla FY2016(`0001564590-17-003118`)이 transitive custom intermediate의 정본 사례다.**
+
+```text
+presentation   SalesRevenueGoodsNet 과 Revenues 가 sibling  -> ancestor 규칙으로 ambiguous
+calculation    Revenues -> (custom) SalesRevenueAutomotive -> SalesRevenueGoodsNet
+결과            Revenue = 7,000,132,000  (Revenues), custom intermediate는 evidence only
+```
+
+**exact-role 제한이 실제로 필요하다.** 정찰에서 PFE·XOM 일부 revenue concept가 note/detail
+calculation role에도 재사용되는 것을 확인했고, role을 느슨하게 잡으면 그 graph가 섞인다.
+
+**arithmetic과 identity를 분리한다.** multi 17 중 direct arithmetic bind가 가능한 15건에서
+exact raw Decimal 일치는 14건이었다(PFE 2건은 current annual dimensionless contributor 부족,
+Tesla FY2018은 raw sum mismatch). 그럼에도 calculation-root total identity는 ground truth와
+일치했다. **arithmetic mismatch는 canonical Revenue를 다른 concept로 바꾸는 근거가 아니다.**
+
 **이 결정에 포함되지 않은 것**: `Total Assets`는 아래 3.7에서, Book Equity · preferred stock ·
-deferred tax mapping은 아래 3.8에서 각각 따로 닫혔다.
+deferred tax mapping은 아래 3.8에서 각각 따로 닫혔다. **COGS selector는 그대로 두며 이 규칙을
+COGS에 확장하지 않는다.**
 
 ### 3.7 Total Assets accounting mapping — 정찰 뒤 확정된 계약
 
