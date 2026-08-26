@@ -23,6 +23,7 @@ from backtest.qv_xbrl import (  # noqa: E402
     looks_like_instance,
     looks_like_presentation,
     normalize_cik,
+    merge_calculation_roles,
     parse_calculation,
     parse_filing_summary,
     parse_instance,
@@ -69,9 +70,14 @@ def calculation_xml(roles, *, embedded_in_schema=False):
                 f'xlink:arcrole="{arc.get("arcrole", SUMMATION_ITEM_ARCROLE)}"',
                 f'xlink:from="{labels[arc["parent"]]}"',
                 f'xlink:to="{labels[arc["child"]]}"',
-                f'order="{arc.get("order", index + 1)}"',
-                f'weight="{arc.get("weight", "1")}"',
             ]
+            # 값이 None이면 속성 자체를 생략한다 (schema default / required 누락 검증용).
+            order = arc.get("order", index + 1)
+            if order is not None:
+                attrs.append(f'order="{order}"')
+            weight = arc.get("weight", "1")
+            if weight is not None:
+                attrs.append(f'weight="{weight}"')
             if "use" in arc:
                 attrs.append(f'use="{arc["use"]}"')
             if "priority" in arc:
@@ -566,6 +572,192 @@ class CalculationTest(unittest.TestCase):
         self.assertIn(
             QName(B.CUSTOM_NS, "Mid"), role.descendants(QName(B.US_GAAP_NS, "Revenues"))
         )
+
+    # --- FIX B: typed semantic attribute equivalence ---
+
+    def test_missing_order_defaults_to_semantic_one(self):
+        """`order` 누락은 schema default 1이라 `order="1"` prohibition과 equivalent다."""
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": None,
+                    "weight": "1",
+                    "priority": "0",
+                },
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1",
+                    "weight": "1",
+                    "use": "prohibited",
+                    "priority": "2",
+                },
+            ]
+        )
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_decimal_lexical_variants_are_semantically_equal(self):
+        """`1`과 `1.0`은 같은 decimal 값이다. raw 문자열로 비교하지 않는다."""
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1",
+                    "weight": "1",
+                    "priority": "0",
+                },
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1.0",
+                    "weight": "1.0",
+                    "use": "prohibited",
+                    "priority": "2",
+                },
+            ]
+        )
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_malformed_priority_is_not_silently_zero(self):
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "weight": "1",
+                    "priority": "abc",
+                }
+            ]
+        )
+        arc = role.arcs[0]
+        self.assertIn("priority", arc.malformed)
+        self.assertIsNone(arc.priority)
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_invalid_use_is_not_treated_as_optional(self):
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "weight": "1",
+                    "use": "whatever",
+                }
+            ]
+        )
+        arc = role.arcs[0]
+        self.assertIn("use", arc.malformed)
+        self.assertIsNone(arc.use)
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_missing_weight_is_not_effective_evidence(self):
+        role, _ = self._role(
+            [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+              "weight": None}]
+        )
+        self.assertIn("weight", role.arcs[0].malformed)
+        self.assertEqual(role.effective_arcs(), ())
+        self.assertEqual(role.sources(), frozenset())
+
+    def test_zero_weight_is_not_effective_evidence(self):
+        role, _ = self._role(
+            [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+              "weight": "0"}]
+        )
+        self.assertIn("weight", role.arcs[0].malformed)
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_malformed_order_is_not_raw_string_identity(self):
+        role, _ = self._role(
+            [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+              "order": "not-a-number", "weight": "1"}]
+        )
+        arc = role.arcs[0]
+        self.assertIn("order", arc.malformed)
+        self.assertIsNone(arc.order)
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_malformed_arc_fails_close_for_its_concept_pair(self):
+        """같은 (parent, child)에 malformed arc가 있으면 그 관계 전체가 non-effective다."""
+        role, _ = self._role(
+            [
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                 "weight": "1", "order": "1"},
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                 "weight": "1", "order": "2", "use": "bogus"},
+            ]
+        )
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_malformed_arc_does_not_poison_other_pairs(self):
+        role, _ = self._role(
+            [
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                 "weight": "1"},
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueServicesNet",
+                 "weight": "0"},
+            ]
+        )
+        effective = role.effective_arcs()
+        self.assertEqual(len(effective), 1)
+        self.assertEqual(effective[0].child, QName(B.US_GAAP_NS, "SalesRevenueNet"))
+
+    # --- FIX A: DTS 단위 base-set network ---
+
+    def test_merge_joins_arcs_from_separate_documents(self):
+        doc1 = parse_calculation(
+            calculation_xml({IS_ROLE: [
+                {"parent": "us-gaap_Revenues", "child": "acme_Subtotal"}]}),
+            "a_cal.xml", PREFIXES,
+        )
+        doc2 = parse_calculation(
+            calculation_xml({IS_ROLE: [
+                {"parent": "acme_Subtotal", "child": "us-gaap_SalesRevenueGoodsNet"}]},
+                embedded_in_schema=True),
+            "a.xsd", PREFIXES,
+        )
+        merged = merge_calculation_roles([doc1.roles[0], doc2.roles[0]])
+        self.assertEqual(merged.source_files, ("a_cal.xml", "a.xsd"))
+        self.assertIn(
+            QName(B.US_GAAP_NS, "SalesRevenueGoodsNet"),
+            merged.descendants(QName(B.US_GAAP_NS, "Revenues")),
+        )
+
+    def test_merge_applies_prohibition_across_documents(self):
+        doc1 = parse_calculation(
+            calculation_xml({IS_ROLE: [
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                 "order": "1", "weight": "1", "priority": "0"}]}),
+            "a_cal.xml", PREFIXES,
+        )
+        doc2 = parse_calculation(
+            calculation_xml({IS_ROLE: [
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                 "order": "1", "weight": "1", "use": "prohibited", "priority": "2"}]}),
+            "b_cal.xml", PREFIXES,
+        )
+        merged = merge_calculation_roles([doc1.roles[0], doc2.roles[0]])
+        self.assertEqual(merged.effective_arcs(), ())
+
+    def test_merge_rejects_different_roles(self):
+        doc1 = parse_calculation(
+            calculation_xml({IS_ROLE: [
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}]}),
+            "a_cal.xml", PREFIXES,
+        )
+        doc2 = parse_calculation(
+            calculation_xml({NOTE_ROLE: [
+                {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}]}),
+            "b_cal.xml", PREFIXES,
+        )
+        with self.assertRaises(QVXbrlError):
+            merge_calculation_roles([doc1.roles[0], doc2.roles[0]])
+
+    def test_merge_of_nothing_is_none(self):
+        self.assertIsNone(merge_calculation_roles([]))
 
     def test_document_without_calculation_link_raises(self):
         raw = B.presentation({IS_ROLE: [("us-gaap_Abstract", "us-gaap_Revenues")]})

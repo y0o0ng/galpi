@@ -233,16 +233,25 @@ class PresentationRole:
 
 @dataclass(frozen=True)
 class CalculationArc:
-    """`calculationArc` 하나. `use`/`priority`는 effective 관계 판정에 쓴다."""
+    """`calculationArc` 하나.
+
+    `order`·`weight`·`priority`·`use`는 **raw lexical이 아니라 typed semantic 값**으로 둔다.
+    XBRL effective-relationship equivalence는 post-schema-validation 값으로 비교해야 하므로
+    `order="1"`과 `order="1.0"`은 같은 값이다. float를 쓰지 않는다.
+
+    필수 속성이 없거나 형식이 잘못됐으면 `malformed`에 남기고 **effective 관계로 승격하지
+    않는다.** malformed를 기본값으로 조용히 바꾸지 않는다.
+    """
 
     role: str
     arcrole: str | None
     parent: QName | None
     child: QName | None
-    order: str | None
-    weight: str | None
-    use: str
-    priority: int
+    order: Decimal | None
+    weight: Decimal | None
+    use: str | None
+    priority: int | None
+    malformed: tuple[str, ...]
 
     @property
     def is_summation_item(self) -> bool:
@@ -252,36 +261,57 @@ class CalculationArc:
     def resolved(self) -> bool:
         return self.parent is not None and self.child is not None
 
+    @property
+    def usable(self) -> bool:
+        return not self.malformed
+
     def equivalence_key(self) -> tuple:
         """XBRL 2.1 §3.5.3.9.7의 equivalent relationship 키.
 
         `use`와 `priority`는 exempt다. `order`·`weight`는 non-exempt semantic attribute라
-        키에 들어간다.
+        typed 값으로 키에 들어간다.
         """
         return (self.role, self.arcrole, self.parent, self.child, self.order, self.weight)
 
 
 @dataclass(frozen=True)
 class CalculationRole:
+    """하나의 exact role URI에 속한 arc 전체.
+
+    **한 accession의 같은 role arc는 문서가 나뉘어 있어도 하나의 base-set network다.**
+    prohibition·override·transitive reachability를 문서별로 계산하지 않는다.
+    """
+
     role: str
     arcs: tuple[CalculationArc, ...]
-    source_file: str
+    source_files: tuple[str, ...]
+
+    def unusable_pairs(self) -> frozenset[tuple[QName, QName]]:
+        """malformed arc가 하나라도 붙은 (parent, child). 그 관계는 fail-close한다."""
+        return frozenset(
+            (arc.parent, arc.child)
+            for arc in self.arcs
+            if arc.is_summation_item and arc.resolved and not arc.usable
+        )
 
     def effective_arcs(self) -> tuple[CalculationArc, ...]:
         """equivalent 관계에서 highest-priority prohibition을 반영한 effective 관계.
 
-        raw arc의 존재 자체를 근거로 세지 않는다. resolved QName이고 arcrole이
-        `summation-item`인 것만 남는다.
+        raw arc의 존재 자체를 근거로 세지 않는다. resolved QName · `summation-item` ·
+        malformed 없음인 것만 남는다.
         """
+        unusable = self.unusable_pairs()
         groups: dict[tuple, list[CalculationArc]] = {}
         for arc in self.arcs:
-            if not arc.resolved or not arc.is_summation_item:
+            if not arc.resolved or not arc.is_summation_item or not arc.usable:
+                continue
+            if (arc.parent, arc.child) in unusable:
                 continue
             groups.setdefault(arc.equivalence_key(), []).append(arc)
         effective: list[CalculationArc] = []
         for group in groups.values():
-            top = max(arc.priority for arc in group)
-            winners = [arc for arc in group if arc.priority == top]
+            top = max(arc.priority or 0 for arc in group)
+            winners = [arc for arc in group if (arc.priority or 0) == top]
             if any(arc.use == "prohibited" for arc in winners):
                 continue
             effective.append(winners[0])
@@ -305,6 +335,28 @@ class CalculationRole:
             seen.add(node)
             stack.extend(children.get(node, ()))
         return frozenset(seen)
+
+
+def merge_calculation_roles(roles: list[CalculationRole]) -> CalculationRole | None:
+    """같은 exact role URI의 arc를 **DTS 범위에서 하나의 network로** 합친다.
+
+    문서 순서로 precedence를 만들지 않는다. standalone/embedded 같은 tier도 없다.
+    """
+    if not roles:
+        return None
+    uris = {r.role for r in roles}
+    if len(uris) != 1:
+        raise QVXbrlError(f"서로 다른 role을 합칠 수 없습니다: {sorted(uris)}")
+    arcs: list[CalculationArc] = []
+    files: list[str] = []
+    for role in roles:
+        arcs.extend(role.arcs)
+        files.extend(role.source_files)
+    return CalculationRole(
+        role=uris.pop(),
+        arcs=tuple(arcs),
+        source_files=tuple(dict.fromkeys(files)),
+    )
 
 
 @dataclass(frozen=True)
@@ -477,11 +529,64 @@ def looks_like_calculation(data: bytes, source_file: str) -> bool:
     return bool(_calculation_links(root))
 
 
-def _int_or_zero(value: str | None) -> int:
-    try:
-        return int(str(value).strip())
-    except (TypeError, ValueError):
-        return 0
+DEFAULT_ARC_ORDER = Decimal("1")
+_ARC_USE_VALUES = frozenset({"optional", "prohibited"})
+
+
+def _arc_semantics(element: ET.Element) -> tuple[Decimal | None, Decimal | None, str | None, int | None, tuple[str, ...]]:
+    """`calculationArc` 속성을 typed semantic 값으로 정규화한다.
+
+    `order` 누락은 schema default `1`이다. `weight`는 required non-zero decimal이고,
+    `priority` 누락은 `0`, `use` 누락은 `optional`이다. **형식이 잘못된 값을 기본값으로
+    조용히 바꾸지 않고** malformed로 남긴다.
+    """
+    malformed: list[str] = []
+
+    raw_order = element.get("order")
+    if raw_order is None or not raw_order.strip():
+        order = DEFAULT_ARC_ORDER
+    else:
+        try:
+            order = Decimal(raw_order.strip())
+        except InvalidOperation:
+            order = None
+            malformed.append("order")
+
+    raw_weight = element.get("weight")
+    if raw_weight is None or not raw_weight.strip():
+        weight = None
+        malformed.append("weight")
+    else:
+        try:
+            weight = Decimal(raw_weight.strip())
+        except InvalidOperation:
+            weight = None
+            malformed.append("weight")
+        else:
+            if weight == 0:
+                weight = None
+                malformed.append("weight")
+
+    raw_use = element.get("use")
+    if raw_use is None or not raw_use.strip():
+        use = "optional"
+    elif raw_use.strip() in _ARC_USE_VALUES:
+        use = raw_use.strip()
+    else:
+        use = None
+        malformed.append("use")
+
+    raw_priority = element.get("priority")
+    if raw_priority is None or not raw_priority.strip():
+        priority = 0
+    else:
+        try:
+            priority = int(raw_priority.strip())
+        except ValueError:
+            priority = None
+            malformed.append("priority")
+
+    return order, weight, use, priority, tuple(malformed)
 
 
 def parse_calculation(
@@ -503,20 +608,22 @@ def parse_calculation(
             if label:
                 locators[label] = resolve_locator(href, prefix_map)
         for arc in link.findall(f"{{{LINK_NS}}}calculationArc"):
+            order, weight, use, priority, malformed = _arc_semantics(arc)
             by_role.setdefault(role, []).append(
                 CalculationArc(
                     role=role,
                     arcrole=(arc.get(f"{{{XLINK_NS}}}arcrole") or "").strip() or None,
                     parent=locators.get((arc.get(f"{{{XLINK_NS}}}from") or "").strip()),
                     child=locators.get((arc.get(f"{{{XLINK_NS}}}to") or "").strip()),
-                    order=(arc.get("order") or "").strip() or None,
-                    weight=(arc.get("weight") or "").strip() or None,
-                    use=(arc.get("use") or "optional").strip() or "optional",
-                    priority=_int_or_zero(arc.get("priority")),
+                    order=order,
+                    weight=weight,
+                    use=use,
+                    priority=priority,
+                    malformed=malformed,
                 )
             )
     roles = tuple(
-        CalculationRole(role=role, arcs=tuple(arcs), source_file=source_file)
+        CalculationRole(role=role, arcs=tuple(arcs), source_files=(source_file,))
         for role, arcs in sorted(by_role.items())
     )
     return CalculationDocument(

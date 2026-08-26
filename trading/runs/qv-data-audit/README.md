@@ -1077,6 +1077,59 @@ preferred hierarchy/ZERO · NCI tie-out. **PFE FY2023의 `assets AMBIGUOUS`는 v
 
 ---
 
+## 10.7 calculation effective-network mechanical fix — 2026-08-26
+
+`b67c98e39a62c7affa54a17f5ad06ddf0e12c093`의 mechanical correctness fix다. **Revenue 경제
+정의와 selector 설계를 다시 열지 않았고** `qv-accounting-v3` ·
+`ACCOUNTING_CONTRACT_COMMIT = 5936298bc1a3aa7971f97c032b564b8f8294ae01`도 그대로다.
+schema·roadmap·COGS selector·annual period는 변경하지 않았다.
+
+|#|고친 것|
+|---|---|
+|A|**같은 exact role의 arc는 DTS 범위에서 하나의 base-set network다.** 전에는 `calculation_role()`이 첫 문서의 role을 즉시 돌려줘서, 같은 role arc가 standalone linkbase와 issuer XSD embedded `calculationLink`에 나뉘면 나머지를 버렸다. 이제 accession 안의 모든 문서에서 그 role의 arc를 모아 **prohibition·override·transitive reachability를 merged set에서** 계산한다. 파일 순서 precedence나 standalone/XSD tier를 만들지 않는다|
+|B|**effective relationship 속성을 typed semantic 값으로 비교한다.** `order` 누락은 schema default `Decimal("1")`, `weight`는 required non-zero Decimal, `priority` 누락은 `0`, `use` 누락은 `optional`이다. `order="1"`과 `order="1.0"`은 같은 값이다. **float를 쓰지 않는다**|
+|—|**malformed는 fail-close다.** 잘못된 `order`·`weight`·`priority`·`use`를 기본값으로 조용히 바꾸지 않고 `malformed`로 남기며, 그 `(parent, child)` 관계 전체를 effective network에서 제외한다. malformed prohibition이 사라져 관계가 되살아나는 fail-open도 막는다|
+
+### 새 regression
+
+```text
+parser   order 누락 == semantic 1 · "1" vs "1.0" decimal 동치 · malformed priority/use/order
+         missing weight · zero weight · malformed가 같은 pair를 fail-close
+         malformed가 다른 pair를 오염시키지 않음
+         merge: 문서 분할 transitive · 문서 분할 prohibition · 다른 role merge 거부 · 빈 merge
+accounting  A1 문서 둘로 나뉜 transitive path -> Revenue resolve
+            A2 문서 둘로 나뉜 prohibition -> 관계 소멸 -> unresolved
+            A3 두 번째 문서의 다른 role은 섞이지 않음
+            selected role의 malformed arc -> multi-candidate Revenue fail-close
+```
+
+### 검증 — 로컬 실제 실행 (이 저장소에 GitHub CI는 없다)
+
+```text
+python3 -m unittest trading.tests.test_qv_xbrl trading.tests.test_qv_accounting
+  180 tests · PASS
+python3 -m unittest trading.tests.test_qv_submissions trading.tests.test_qv_identity
+  69 tests · PASS
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,357 tests · PASS
+npm test
+  949 tests · PASS
+```
+
+### 실제 SEC read-only smoke — `b67c98e`와 결과가 동일하다
+
+```text
+TSLA FY2016   7,000,132,000  calculation-root      TSLA FY2018  21,461,268,000  calculation-root
+PFE  FY2023  58,496,000,000  calculation-root      WMT  FY2026 713,163,000,000  calculation-root
+XOM  FY2025 332,238,000,000  single candidate      COST FY2019 152,703,000,000  single candidate
+NEE  FY2025  27,412,000,000  single candidate      CAT  FY2025  67,589,000,000  single candidate
+```
+
+**NEE COGS는 계속 `MISSING`이다.** production DB를 쓰지 않았고 전수 ingest · coverage Gate ·
+QV rank · B/M · 수익률은 0회다.
+
+---
+
 ## 11. 결과
 
 

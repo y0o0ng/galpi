@@ -125,9 +125,14 @@ def calculation_xml(roles, *, embedded_in_schema=False):
                 f'xlink:arcrole="{arc.get("arcrole", SUMMATION_ITEM)}"',
                 f'xlink:from="{labels[arc["parent"]]}"',
                 f'xlink:to="{labels[arc["child"]]}"',
-                f'order="{arc.get("order", index + 1)}"',
-                f'weight="{arc.get("weight", "1")}"',
             ]
+            # 값이 None이면 속성 자체를 생략한다 (schema default / required 누락 검증용).
+            order = arc.get("order", index + 1)
+            if order is not None:
+                attrs.append(f'order="{order}"')
+            weight = arc.get("weight", "1")
+            if weight is not None:
+                attrs.append(f'weight="{weight}"')
             if "use" in arc:
                 attrs.append(f'use="{arc["use"]}"')
             if "priority" in arc:
@@ -167,6 +172,7 @@ def build_files(
     extra_units: str = "",
     calculation: dict | None = None,
     calculation_embedded: bool = False,
+    calculation_docs: list[dict] | None = None,
 ) -> dict[str, bytes]:
     if reports is None:
         reports = [
@@ -206,6 +212,10 @@ def build_files(
         name = SCHEMA_NAME if calculation_embedded else CALCULATION_NAME
         files[name] = calculation_xml(
             calculation, embedded_in_schema=calculation_embedded
+        )
+    for doc in calculation_docs or []:
+        files[doc["name"]] = calculation_xml(
+            doc["roles"], embedded_in_schema=doc.get("embedded", False)
         )
     return files
 
@@ -772,7 +782,8 @@ class CalculationRootRevenueTest(unittest.TestCase):
     """multi-candidate consolidated total Revenue는 exact-role calculation root로 정한다."""
 
     def _files(self, revenue_facts, revenue_locals, *, calculation=None,
-               calculation_embedded=False, income_arcs=None, extra_contexts=None):
+               calculation_embedded=False, income_arcs=None, extra_contexts=None,
+               calculation_docs=None):
         return build_files(
             contexts=base_contexts(extra_contexts),
             facts=[
@@ -788,6 +799,7 @@ class CalculationRootRevenueTest(unittest.TestCase):
             ),
             calculation=calculation,
             calculation_embedded=calculation_embedded,
+            calculation_docs=calculation_docs,
         )
 
     def test_a_tesla_transitive_custom_intermediate(self):
@@ -1011,6 +1023,109 @@ class CalculationRootRevenueTest(unittest.TestCase):
                          "order": "1", "weight": "1", "priority": "0"},
                         {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
                          "order": "1", "weight": "1", "use": "prohibited", "priority": "3"},
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertIsNone(result.revenue_value)
+
+    def test_a1_transitive_path_split_across_two_documents(self):
+        """같은 exact role의 arc가 문서 둘로 나뉘어도 하나의 network다."""
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "SalesRevenueGoodsNet", "d", "5589007000"),
+                    B.fact("us-gaap", "Revenues", "d", "7000132000"),
+                ],
+                ["SalesRevenueGoodsNet", "Revenues"],
+                calculation_docs=[
+                    {
+                        "name": "acme-20231231_cal.xml",
+                        "roles": {IS_ROLE: [
+                            {"parent": "us-gaap_Revenues",
+                             "child": "acme_SalesRevenueAutomotive"}]},
+                    },
+                    {
+                        "name": SCHEMA_NAME,
+                        "embedded": True,
+                        "roles": {IS_ROLE: [
+                            {"parent": "acme_SalesRevenueAutomotive",
+                             "child": "us-gaap_SalesRevenueGoodsNet"}]},
+                    },
+                ],
+            )
+        )
+        self.assertEqual(result.revenue_status, RESOLVED)
+        self.assertEqual(result.revenue_value, "7000132000")
+
+    def test_a2_prohibition_split_across_documents(self):
+        """prohibition도 문서별이 아니라 merged base-set에서 계산한다."""
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation_docs=[
+                    {
+                        "name": "acme-20231231_cal.xml",
+                        "roles": {IS_ROLE: [
+                            {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                             "order": "1", "weight": "1", "priority": "0"}]},
+                    },
+                    {
+                        "name": "acme-20231231_cal2.xml",
+                        "roles": {IS_ROLE: [
+                            {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                             "order": "1", "weight": "1", "use": "prohibited",
+                             "priority": "2"}]},
+                    },
+                ],
+            )
+        )
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertIsNone(result.revenue_value)
+
+    def test_a3_unrelated_role_in_second_document_is_not_mixed_in(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation_docs=[
+                    {
+                        "name": "acme-20231231_cal.xml",
+                        "roles": {IS_ROLE: [
+                            {"parent": "us-gaap_Revenues",
+                             "child": "us-gaap_SalesRevenueNet"}]},
+                    },
+                    {
+                        "name": "acme-20231231_cal2.xml",
+                        "roles": {NOTE_ROLE: [
+                            {"parent": "us-gaap_SalesRevenueNet",
+                             "child": "us-gaap_Revenues"}]},
+                    },
+                ],
+            )
+        )
+        self.assertEqual(result.revenue_value, "100")
+
+    def test_malformed_arc_in_selected_role_fails_close(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                         "weight": "0"}
                     ]
                 },
             )

@@ -19,6 +19,7 @@ from .edgar import EdgarError
 from .qv_xbrl import (
     CalculationDocument,
     CalculationRole,
+    merge_calculation_roles,
     Context,
     Fact,
     FilingSummaryDocument,
@@ -217,13 +218,20 @@ class AccessionBundle:
                     return candidate, doc.source_file, doc.sha256
         return None
 
-    def calculation_role(self, role: str) -> tuple[CalculationRole, str, str] | None:
-        """**exact role URI equality**만 허용한다. 제목·꼬리·순서로 잇지 않는다."""
-        for doc in self.calculations:
-            for candidate in doc.roles:
-                if candidate.role == role:
-                    return candidate, doc.source_file, doc.sha256
-        return None
+    def calculation_role(self, role: str) -> CalculationRole | None:
+        """**exact role URI equality**로 찾되 accession 안의 모든 문서를 합친다.
+
+        같은 role의 arc가 standalone linkbase와 issuer XSD embedded `calculationLink`에
+        나뉘어 있어도 **하나의 base-set network**다. 첫 문서만 보고 나머지를 버리지 않고,
+        문서 순서로 precedence를 만들지도 않는다. 제목·꼬리·순서로 role을 잇지 않는다.
+        """
+        matches = [
+            candidate
+            for doc in self.calculations
+            for candidate in doc.roles
+            if candidate.role == role
+        ]
+        return merge_calculation_roles(matches)
 
     def prefix_map(self) -> dict[str, str]:
         merged: dict[str, str] = {}
@@ -613,10 +621,9 @@ def _revenue_total(
         selected, status = _unique_value(next(iter(by_concept.values())))
         return selected, status, "income-statement role · dimensionless · single candidate"
 
-    found = bundle.calculation_role(role)
-    if found is None:
+    calc_role = bundle.calculation_role(role)
+    if calc_role is None:
         return None, AMBIGUOUS, "no exact-role calculation graph"
-    calc_role = found[0]
     sources = calc_role.sources()
     concepts = set(by_concept)
     roots = [
