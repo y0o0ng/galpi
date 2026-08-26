@@ -993,6 +993,90 @@ coverage · rank · B/M · returns 실행은 전부 0회다.
 
 ---
 
+## 10.6 calculation-root revenue implementation receipt — 2026-08-26
+
+docs freeze는 `5936298bc1a3aa7971f97c032b564b8f8294ae01`이고 **implementation SHA는 git
+history가 정본**이다. 계약 정본은 로드맵 §4.2.1과 위 §3.6·§3.6.1이다.
+
+```text
+ACCOUNTING_DEFINITION_VERSION = qv-accounting-v3
+ACCOUNTING_CONTRACT_COMMIT    = 5936298bc1a3aa7971f97c032b564b8f8294ae01
+```
+
+**v1/v2 row를 다시 쓰지 않았다.** write는 `qv-accounting-v3`만 허용하고, historical read는
+`accounting_for_formation(..., accounting_definition_version="qv-accounting-v1"/"v2")`로 그대로
+가능하다. **schema는 바꾸지 않았다** — `calculation_arcs`·`calculation_roles`·`taxonomy_network`
+같은 표를 만들지 않았고 raw calculation 원문도 DB에 넣지 않는다.
+
+### 구현
+
+- `qv_xbrl.py`에 `CalculationArc` · `CalculationRole` · `CalculationDocument` ·
+  `parse_calculation()` · `looks_like_calculation()`을 additive로 추가했다. locator fragment는
+  기존 원칙대로 `QName(namespace URI, local)`로 풀고 unresolved는 조용히 문자열로 쓰지 않는다.
+- **effective relationship**: raw `calculationArc` 존재를 세지 않는다. `role` · `arcrole` ·
+  `order` · `weight` · `use` · `priority`를 보존하고, equivalent 관계(= exempt인 `use`/
+  `priority`를 뺀 나머지가 같은 관계)에서 **highest-priority prohibition**이 있으면 그 관계를
+  graph에서 제외한다. `order`가 다르면 equivalent가 아니라는 것도 회귀로 잠갔다.
+- **source discovery**: standalone linkbase와 issuer XSD embedded `calculationLink`를 둘 다
+  읽는다. accession 후보에 `.xsd`를 포함하고 **파일 내용/root로 판정**한다. generic DTS
+  engine을 만들지 않았다.
+- `qv_accounting.py`에는 Revenue 전용 `_revenue_total()`만 추가했다. **COGS selector는 기존
+  `_structural_total()` 그대로**이고 이 규칙을 COGS로 확장하지 않았다. result/provenance
+  schema도 넓히지 않았고 `selection_reason`만 새 의미를 담는다.
+
+### 새 regression
+
+```text
+parser   standalone / XSD-embedded · ordinary summation-item · transitive custom intermediate
+         prohibition · priority override · order 차이는 non-equivalent · 비-summation arcrole
+         unresolved locator는 source evidence 아님 · role URI 보존 · 순환 · calculationLink 부재
+accounting  A transitive custom intermediate(Tesla 모양)   B direct two-candidate root
+            C calculation role 없음 -> unresolved          D role URI mismatch -> unresolved
+            E multiple/zero root -> unresolved             F 값이 같아도 root가 identity
+            G arithmetic mismatch가 selector를 안 바꿈      H contributor 부족해도 합산 안 함
+            I single candidate는 calculation 불필요        J note role graph 무시
+            embedded XSD calculation · prohibited root arc · bundle에 calc file hash 보존
+            presentation ancestor는 더 이상 Revenue selector가 아님(COGS는 유지)
+```
+
+### 검증 — 로컬 실제 실행 (이 저장소에 GitHub CI는 없다)
+
+```text
+python3 -m unittest trading.tests.test_qv_xbrl trading.tests.test_qv_accounting
+  163 tests · PASS
+python3 -m unittest trading.tests.test_qv_submissions trading.tests.test_qv_identity
+  69 tests · PASS
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,340 tests · PASS
+npm test
+  949 tests · PASS
+```
+
+### 실제 SEC read-only smoke (production DB 미사용)
+
+|accession|revenue|선택 경로|
+|---|---|---|
+|**TSLA FY2016** `0001564590-17-003118`|**7,000,132,000** (`Revenues`)|**calculation-root** — custom `SalesRevenueAutomotive`를 거친 transitive|
+|**TSLA FY2018** `0001564590-19-003165`|**21,461,268,000** (`Revenues`)|calculation-root. **raw 합 mismatch가 concept를 바꾸지 않았다**|
+|**PFE FY2023** `0000078003-24-000039`|**58,496,000,000** (`Revenues`)|calculation-root. v2에서는 `REVENUE_AMBIGUOUS`였다|
+|**WMT FY2026** `0000104169-26-000055`|**713,163,000,000** (`Revenues`)|calculation-root. 좁은 net sales 706,413이 아니라 **consolidated total**|
+|**XOM FY2025** `0000034088-26-000045`|332,238,000,000|single candidate (control)|
+|**COST FY2019** `0000909832-19-000019`|152,703,000,000|single candidate. GP 19,817,000,000 유지|
+|**NEE FY2025** `0000753308-26-000015`|27,412,000,000|single candidate. **COGS는 여전히 `MISSING`**|
+|**CAT FY2025** `0000018230-26-000008`|67,589,000,000|single candidate. GP 22,837,000,000 유지|
+
+**component 합산으로 Revenue를 만든 경우는 0건이다.**
+
+**변하지 않은 것**: NEE COGS `MISSING` · FilingSummary metadata conflict fail-close ·
+annual duration structural selector · COST 주석 GP 배제 · CAT 세그먼트 COGS 배제 ·
+NEE co-registrant Assets 배제 · Total Assets tie-out · Parent SE fallback/ambiguity ·
+preferred hierarchy/ZERO · NCI tie-out. **PFE FY2023의 `assets AMBIGUOUS`는 v2에서도 같았고
+이번 변경과 무관하다**(직접 대조 확인).
+
+**production 전수 accounting ingest · coverage Gate · QV rank · B/M · 수익률은 0회다.**
+
+---
+
 ## 11. 결과
 
 

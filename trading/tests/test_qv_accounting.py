@@ -97,6 +97,67 @@ def _dei_period(context_id: str = "dpe", *, end: str = DPE) -> str:
     )
 
 
+CALCULATION_NAME = "acme-20231231_cal.xml"
+SCHEMA_NAME = "acme-20231231.xsd"
+SUMMATION_ITEM = "http://www.xbrl.org/2003/arcrole/summation-item"
+
+
+def calculation_xml(roles, *, embedded_in_schema=False):
+    """role -> [arc dict]. `builder.py`를 건드리지 않으려고 여기서 만든다."""
+    links = []
+    for role, arcs in roles.items():
+        labels = {}
+        locs = []
+        for arc in arcs:
+            for fragment in (arc["parent"], arc["child"]):
+                if fragment in labels:
+                    continue
+                label = f"loc_{len(labels)}"
+                labels[fragment] = label
+                locs.append(
+                    f'<link:loc xlink:type="locator" xlink:href="{SCHEMA_NAME}#{fragment}"'
+                    f' xlink:label="{label}"/>'
+                )
+        arc_xml = []
+        for index, arc in enumerate(arcs):
+            attrs = [
+                'xlink:type="arc"',
+                f'xlink:arcrole="{arc.get("arcrole", SUMMATION_ITEM)}"',
+                f'xlink:from="{labels[arc["parent"]]}"',
+                f'xlink:to="{labels[arc["child"]]}"',
+                f'order="{arc.get("order", index + 1)}"',
+                f'weight="{arc.get("weight", "1")}"',
+            ]
+            if "use" in arc:
+                attrs.append(f'use="{arc["use"]}"')
+            if "priority" in arc:
+                attrs.append(f'priority="{arc["priority"]}"')
+            arc_xml.append(f"<link:calculationArc {' '.join(attrs)}/>")
+        links.append(
+            f'<link:calculationLink xlink:type="extended" xlink:role="{role}">'
+            + "".join(locs)
+            + "".join(arc_xml)
+            + "</link:calculationLink>"
+        )
+    body = "".join(links)
+    if embedded_in_schema:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"'
+            ' xmlns:link="http://www.xbrl.org/2003/linkbase"'
+            ' xmlns:xlink="http://www.w3.org/1999/xlink">'
+            f"<xsd:annotation><xsd:appinfo>{body}</xsd:appinfo></xsd:annotation>"
+            "</xsd:schema>"
+        ).encode("utf-8")
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<link:linkbase xmlns:link="http://www.xbrl.org/2003/linkbase"'
+        ' xmlns:xlink="http://www.w3.org/1999/xlink">'
+        + body
+        + "</link:linkbase>"
+    ).encode("utf-8")
+
+
 def build_files(
     *,
     contexts: list[str],
@@ -104,6 +165,8 @@ def build_files(
     roles: dict[str, list[tuple[str, str]]],
     reports: list[dict] | None = None,
     extra_units: str = "",
+    calculation: dict | None = None,
+    calculation_embedded: bool = False,
 ) -> dict[str, bytes]:
     if reports is None:
         reports = [
@@ -132,13 +195,19 @@ def build_files(
                 "ShortName": "Segment",
             },
         ]
-    return {
+    files = {
         "FilingSummary.xml": B.filing_summary(
             reports, input_files=[INSTANCE_NAME, PRESENTATION_NAME]
         ),
         INSTANCE_NAME: B.instance(contexts, facts, extra_units=extra_units),
         PRESENTATION_NAME: B.presentation(roles),
     }
+    if calculation:
+        name = SCHEMA_NAME if calculation_embedded else CALCULATION_NAME
+        files[name] = calculation_xml(
+            calculation, embedded_in_schema=calculation_embedded
+        )
+    return files
 
 
 def base_contexts(extra: list[str] | None = None) -> list[str]:
@@ -432,7 +501,7 @@ class AnnualDurationSelectionTest(unittest.TestCase):
         self.assertEqual(result.income_statement_role, IS_ROLE)
         self.assertNotIn("annual_period", result.diagnostics)
         self.assertEqual(result.revenue_status, AMBIGUOUS)
-        self.assertEqual(result.diagnostics["revenue"], "REVENUE_AMBIGUOUS")
+        self.assertTrue(result.diagnostics["revenue"].startswith("REVENUE_AMBIGUOUS"))
 
 
 class GrossProfitTest(unittest.TestCase):
@@ -589,7 +658,8 @@ class GrossProfitTest(unittest.TestCase):
         self.assertIsNone(result.revenue_value)
         self.assertEqual(result.gross_profit_status, MISSING)
 
-    def test_structural_total_is_used_when_hierarchy_resolves_it(self):
+    def test_presentation_hierarchy_alone_no_longer_resolves_revenue(self):
+        """multi-candidate Revenue는 calculation-root로만 정해진다 (로드맵 §4.2.1)."""
         files = build_files(
             contexts=base_contexts(),
             facts=[
@@ -611,8 +681,11 @@ class GrossProfitTest(unittest.TestCase):
             },
         )
         result = resolve(files)
-        self.assertEqual(result.revenue_value, "100")
-        self.assertEqual(result.gross_profit_value, "30")
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertIsNone(result.revenue_value)
+        self.assertIn("no exact-role calculation graph", result.diagnostics["revenue"])
+        # COGS는 기존 presentation 구조 selector 그대로다.
+        self.assertEqual(result.cogs_value, "70")
 
 
 class ExactDuplicatePolicyTest(unittest.TestCase):
@@ -693,6 +766,272 @@ class ExactDuplicatePolicyTest(unittest.TestCase):
         )
         self.assertNotEqual(result.parent_se_status, RESOLVED)
         self.assertIsNone(result.parent_se_value)
+
+
+class CalculationRootRevenueTest(unittest.TestCase):
+    """multi-candidate consolidated total Revenue는 exact-role calculation root로 정한다."""
+
+    def _files(self, revenue_facts, revenue_locals, *, calculation=None,
+               calculation_embedded=False, income_arcs=None, extra_contexts=None):
+        return build_files(
+            contexts=base_contexts(extra_contexts),
+            facts=[
+                _dei_period(),
+                B.fact("us-gaap", "CostOfRevenue", "d", "60"),
+                B.fact("us-gaap", "Assets", "i", "500"),
+            ]
+            + revenue_facts,
+            roles=simple_roles(
+                income=revenue_locals + ["CostOfRevenue"],
+                balance=["Assets"],
+                income_arcs=income_arcs,
+            ),
+            calculation=calculation,
+            calculation_embedded=calculation_embedded,
+        )
+
+    def test_a_tesla_transitive_custom_intermediate(self):
+        """Revenues -> custom subtotal -> SalesRevenueGoodsNet. custom은 evidence only."""
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "SalesRevenueGoodsNet", "d", "5589007000"),
+                    B.fact("us-gaap", "Revenues", "d", "7000132000"),
+                ],
+                ["SalesRevenueGoodsNet", "Revenues"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "acme_SalesRevenueAutomotive"},
+                        {"parent": "acme_SalesRevenueAutomotive",
+                         "child": "us-gaap_SalesRevenueGoodsNet"},
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_status, RESOLVED)
+        self.assertEqual(result.revenue_value, "7000132000")
+        self.assertIn(
+            "calculation-root",
+            result.provenance["revenue_provenance"]["selection_reason"],
+        )
+
+    def test_b_direct_two_candidate_root(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax",
+                           "d", "80"),
+                ],
+                ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues",
+                         "child": "us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax"}
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_value, "100")
+
+    def test_c_no_calculation_role_is_unresolved(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+            )
+        )
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertIsNone(result.revenue_value)
+        self.assertIn("no exact-role calculation graph", result.diagnostics["revenue"])
+
+    def test_d_calculation_role_uri_mismatch_is_unresolved(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    NOTE_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertIsNone(result.revenue_value)
+
+    def test_e_multiple_roots_is_unresolved(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "acme_A"},
+                        {"parent": "us-gaap_SalesRevenueNet", "child": "acme_B"},
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertIn("calculation root count=0", result.diagnostics["revenue"])
+
+    def test_f_exact_equal_values_do_not_collapse(self):
+        """값이 같아도 concept identity는 calculation root가 정한다."""
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "100"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_status, RESOLVED)
+        self.assertEqual(
+            result.provenance["revenue_provenance"]["concept_local_name"], "Revenues"
+        )
+
+    def test_g_arithmetic_mismatch_does_not_change_identity(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                    B.fact("us-gaap", "SalesRevenueServicesNet", "d", "5"),
+                ],
+                ["Revenues", "SalesRevenueNet", "SalesRevenueServicesNet"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"},
+                        {"parent": "us-gaap_Revenues",
+                         "child": "us-gaap_SalesRevenueServicesNet"},
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_value, "100")
+        self.assertEqual(result.revenue_status, RESOLVED)
+
+    def test_h_missing_contributor_does_not_create_a_sum(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"},
+                        {"parent": "us-gaap_Revenues",
+                         "child": "us-gaap_SalesRevenueServicesNet"},
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_value, "100")
+
+    def test_i_single_candidate_needs_no_calculation(self):
+        result = resolve(
+            self._files(
+                [B.fact("us-gaap", "Revenues", "d", "100")],
+                ["Revenues"],
+            )
+        )
+        self.assertEqual(result.revenue_value, "100")
+        self.assertIn(
+            "single candidate",
+            result.provenance["revenue_provenance"]["selection_reason"],
+        )
+
+    def test_j_note_role_calculation_graph_is_ignored(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    NOTE_ROLE: [
+                        {"parent": "us-gaap_SalesRevenueNet", "child": "us-gaap_Revenues"}
+                    ],
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}
+                    ],
+                },
+            )
+        )
+        self.assertEqual(result.revenue_value, "100")
+
+    def test_embedded_schema_calculation_is_used(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}
+                    ]
+                },
+                calculation_embedded=True,
+            )
+        )
+        self.assertEqual(result.revenue_value, "100")
+
+    def test_prohibited_root_arc_removes_the_root(self):
+        result = resolve(
+            self._files(
+                [
+                    B.fact("us-gaap", "Revenues", "d", "100"),
+                    B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+                ],
+                ["Revenues", "SalesRevenueNet"],
+                calculation={
+                    IS_ROLE: [
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                         "order": "1", "weight": "1", "priority": "0"},
+                        {"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet",
+                         "order": "1", "weight": "1", "use": "prohibited", "priority": "3"},
+                    ]
+                },
+            )
+        )
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertIsNone(result.revenue_value)
+
+    def test_calculation_file_hash_is_in_bundle_provenance(self):
+        files = self._files(
+            [
+                B.fact("us-gaap", "Revenues", "d", "100"),
+                B.fact("us-gaap", "SalesRevenueNet", "d", "80"),
+            ],
+            ["Revenues", "SalesRevenueNet"],
+            calculation={
+                IS_ROLE: [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}]
+            },
+        )
+        bundle = fetch_bundle(FakeClient(files), CIK, ACCESSION)
+        self.assertIn(CALCULATION_NAME, bundle.file_hashes)
+        self.assertEqual(len(bundle.file_hashes[CALCULATION_NAME]), 64)
 
 
 class TotalAssetsTest(unittest.TestCase):
@@ -1643,10 +1982,10 @@ class IngestionTest(unittest.TestCase):
         )
 
     def test_row_is_written_with_canonical_values(self):
-        self.assertEqual(ACCOUNTING_DEFINITION_VERSION, "qv-accounting-v2")
+        self.assertEqual(ACCOUNTING_DEFINITION_VERSION, "qv-accounting-v3")
         self.assertEqual(
             ACCOUNTING_CONTRACT_COMMIT,
-            "b9358e1e1ac05acfb1737852b58962eb443f39de",
+            "5936298bc1a3aa7971f97c032b564b8f8294ae01",
         )
         self.assertEqual(self._ingest(), 1)
         row = self.connection.execute("SELECT * FROM qv_accounting_filings").fetchone()
@@ -1658,9 +1997,10 @@ class IngestionTest(unittest.TestCase):
         bundle = json.loads(row["bundle_provenance"])
         self.assertEqual(bundle["contract_commit"], ACCOUNTING_CONTRACT_COMMIT)
 
-    def test_v1_definition_label_cannot_be_written_by_v2_implementation(self):
-        with self.assertRaises(QVAccountingError):
-            self._ingest(definition="qv-accounting-v1")
+    def test_superseded_definition_labels_cannot_be_written_by_v3(self):
+        for superseded in ("qv-accounting-v1", "qv-accounting-v2"):
+            with self.assertRaises(QVAccountingError):
+                self._ingest(definition=superseded)
         count = self.connection.execute(
             "SELECT COUNT(*) AS n FROM qv_accounting_filings"
         ).fetchone()["n"]

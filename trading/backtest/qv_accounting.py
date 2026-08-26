@@ -17,6 +17,8 @@ from decimal import Decimal
 
 from .edgar import EdgarError
 from .qv_xbrl import (
+    CalculationDocument,
+    CalculationRole,
     Context,
     Fact,
     FilingSummaryDocument,
@@ -29,17 +31,19 @@ from .qv_xbrl import (
     is_dei,
     is_us_gaap,
     is_usd,
+    looks_like_calculation,
     looks_like_instance,
     looks_like_presentation,
     normalize_cik,
+    parse_calculation,
     parse_filing_summary,
     parse_instance,
     parse_presentation,
 )
 
-ACCOUNTING_DEFINITION_VERSION = "qv-accounting-v2"
+ACCOUNTING_DEFINITION_VERSION = "qv-accounting-v3"
 # 이 semantic version이 뜻하는 frozen contract의 기준 commit. code hash와 혼동하지 않는다.
-ACCOUNTING_CONTRACT_COMMIT = "b9358e1e1ac05acfb1737852b58962eb443f39de"
+ACCOUNTING_CONTRACT_COMMIT = "5936298bc1a3aa7971f97c032b564b8f8294ae01"
 
 FILING_SUMMARY_NAME = "FilingSummary.xml"
 ANNUAL_FORMS = ("10-K", "10-K/A")
@@ -184,6 +188,7 @@ class AccessionBundle:
     summary: FilingSummaryDocument | None
     instances: list[InstanceDocument] = field(default_factory=list)
     presentations: list[PresentationDocument] = field(default_factory=list)
+    calculations: list[CalculationDocument] = field(default_factory=list)
     file_hashes: dict[str, str] = field(default_factory=dict)
     index_names: tuple[str, ...] = ()
 
@@ -207,6 +212,14 @@ class AccessionBundle:
 
     def presentation_role(self, role: str) -> tuple[PresentationRole, str, str] | None:
         for doc in self.presentations:
+            for candidate in doc.roles:
+                if candidate.role == role:
+                    return candidate, doc.source_file, doc.sha256
+        return None
+
+    def calculation_role(self, role: str) -> tuple[CalculationRole, str, str] | None:
+        """**exact role URI equality**만 허용한다. 제목·꼬리·순서로 잇지 않는다."""
+        for doc in self.calculations:
             for candidate in doc.roles:
                 if candidate.role == role:
                     return candidate, doc.source_file, doc.sha256
@@ -277,12 +290,16 @@ def fetch_bundle(client, cik: str, accession: str) -> AccessionBundle:
             hashes[name] = doc.sha256
     prefix_map = bundle.prefix_map()
     for name, raw in raw_by_name.items():
-        if name in hashes and any(d.source_file == name for d in bundle.instances):
+        if any(d.source_file == name for d in bundle.instances):
             continue
         if looks_like_presentation(raw, name):
             doc = parse_presentation(raw, name, prefix_map)
             bundle.presentations.append(doc)
             hashes[name] = doc.sha256
+        if looks_like_calculation(raw, name):
+            calc = parse_calculation(raw, name, prefix_map)
+            bundle.calculations.append(calc)
+            hashes[name] = calc.sha256
     bundle.file_hashes = hashes
     return bundle
 
@@ -574,6 +591,54 @@ def _structural_total(
     return None, AMBIGUOUS
 
 
+def _revenue_total(
+    bundle: AccessionBundle, role: str, bounds: list[BoundFact]
+) -> tuple[BoundFact | None, str, str]:
+    """canonical consolidated total Revenue를 고른다 (로드맵 §4.2.1).
+
+    후보 concept이 하나면 기존 unique-value 규칙 그대로이고 calculation 관계를 요구하지
+    않는다. 둘 이상이면 **selected Statement role과 exact equality인** calculation role의
+    effective summation-item graph에서, eligible 후보 중 다른 모든 eligible 후보의
+    transitive ancestor인 후보가 정확히 하나일 때만 그 **이미 보고된 standard fact**를 쓴다.
+
+    presentation ancestor·`totalLabel`·order·값 크기·concept 우선순위로 고르지 않고,
+    component를 합산해 Revenue를 만들지 않는다.
+    """
+    if not bounds:
+        return None, MISSING, "no eligible revenue fact"
+    by_concept: dict[QName, list[BoundFact]] = {}
+    for b in bounds:
+        by_concept.setdefault(b.fact.concept, []).append(b)
+    if len(by_concept) == 1:
+        selected, status = _unique_value(next(iter(by_concept.values())))
+        return selected, status, "income-statement role · dimensionless · single candidate"
+
+    found = bundle.calculation_role(role)
+    if found is None:
+        return None, AMBIGUOUS, "no exact-role calculation graph"
+    calc_role = found[0]
+    sources = calc_role.sources()
+    concepts = set(by_concept)
+    roots = [
+        concept
+        for concept in concepts
+        if concept in sources
+        and (concepts - {concept}) <= calc_role.descendants(concept)
+    ]
+    if len(roots) != 1:
+        return (
+            None,
+            AMBIGUOUS,
+            f"calculation root count={len(roots)}",
+        )
+    selected, status = _unique_value(by_concept[roots[0]])
+    return (
+        selected,
+        status,
+        "income-statement role · dimensionless · effective calculation-root total",
+    )
+
+
 def resolve_accounting(
     bundle: AccessionBundle, *, report_date: str | None
 ) -> AccountingResult:
@@ -650,7 +715,7 @@ def _resolve_income(bundle, result, facts, start, dpe, role):
             and _in_role(role_obj, b)
         ]
 
-    revenue, rev_status = _structural_total(role_obj, annual(REVENUE_LOCALS))
+    revenue, rev_status, rev_reason = _revenue_total(bundle, role, annual(REVENUE_LOCALS))
     result.revenue_status = rev_status
     if revenue is not None:
         result.revenue_value = decimal_text(revenue.fact.value)
@@ -660,10 +725,10 @@ def _resolve_income(bundle, result, facts, start, dpe, role):
             presentation_file=pre_file,
             presentation_sha256=pre_sha,
             summary=bundle.summary,
-            reason="income-statement role · dimensionless · structural total",
+            reason=rev_reason,
         )
     else:
-        result.diagnostics["revenue"] = f"REVENUE_{rev_status}"
+        result.diagnostics["revenue"] = f"REVENUE_{rev_status}: {rev_reason}"
 
     cogs, cogs_status = _structural_total(role_obj, annual(COGS_LOCALS))
     result.cogs_status = cogs_status

@@ -23,6 +23,8 @@ LINK_NS = "http://www.xbrl.org/2003/linkbase"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 XBRLDI_NS = "http://xbrl.org/2006/xbrldi"
 ISO4217_NS = "http://www.xbrl.org/2003/iso4217"
+XSD_NS = "http://www.w3.org/2001/XMLSchema"
+SUMMATION_ITEM_ARCROLE = "http://www.xbrl.org/2003/arcrole/summation-item"
 
 # QName-valued attribute/text를 가진 요소. 이 값들은 **그 요소 자신의** in-scope
 # namespace 선언으로 풀어야 한다. 부모 scope로 풀면 child-local 선언을 놓친다.
@@ -230,6 +232,89 @@ class PresentationRole:
 
 
 @dataclass(frozen=True)
+class CalculationArc:
+    """`calculationArc` 하나. `use`/`priority`는 effective 관계 판정에 쓴다."""
+
+    role: str
+    arcrole: str | None
+    parent: QName | None
+    child: QName | None
+    order: str | None
+    weight: str | None
+    use: str
+    priority: int
+
+    @property
+    def is_summation_item(self) -> bool:
+        return self.arcrole == SUMMATION_ITEM_ARCROLE
+
+    @property
+    def resolved(self) -> bool:
+        return self.parent is not None and self.child is not None
+
+    def equivalence_key(self) -> tuple:
+        """XBRL 2.1 §3.5.3.9.7의 equivalent relationship 키.
+
+        `use`와 `priority`는 exempt다. `order`·`weight`는 non-exempt semantic attribute라
+        키에 들어간다.
+        """
+        return (self.role, self.arcrole, self.parent, self.child, self.order, self.weight)
+
+
+@dataclass(frozen=True)
+class CalculationRole:
+    role: str
+    arcs: tuple[CalculationArc, ...]
+    source_file: str
+
+    def effective_arcs(self) -> tuple[CalculationArc, ...]:
+        """equivalent 관계에서 highest-priority prohibition을 반영한 effective 관계.
+
+        raw arc의 존재 자체를 근거로 세지 않는다. resolved QName이고 arcrole이
+        `summation-item`인 것만 남는다.
+        """
+        groups: dict[tuple, list[CalculationArc]] = {}
+        for arc in self.arcs:
+            if not arc.resolved or not arc.is_summation_item:
+                continue
+            groups.setdefault(arc.equivalence_key(), []).append(arc)
+        effective: list[CalculationArc] = []
+        for group in groups.values():
+            top = max(arc.priority for arc in group)
+            winners = [arc for arc in group if arc.priority == top]
+            if any(arc.use == "prohibited" for arc in winners):
+                continue
+            effective.append(winners[0])
+        return tuple(effective)
+
+    def sources(self) -> frozenset[QName]:
+        """effective 관계에서 summation concept(= `from`)인 concept."""
+        return frozenset(arc.parent for arc in self.effective_arcs() if arc.parent)
+
+    def descendants(self, concept: QName) -> frozenset[QName]:
+        """effective summation-item graph의 transitive 하위 concept. 순환은 방문 집합이 막는다."""
+        children: dict[QName, set[QName]] = {}
+        for arc in self.effective_arcs():
+            children.setdefault(arc.parent, set()).add(arc.child)
+        seen: set[QName] = set()
+        stack = list(children.get(concept, ()))
+        while stack:
+            node = stack.pop()
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.extend(children.get(node, ()))
+        return frozenset(seen)
+
+
+@dataclass(frozen=True)
+class CalculationDocument:
+    source_file: str
+    sha256: str
+    roles: tuple[CalculationRole, ...]
+
+
+@dataclass(frozen=True)
 class SummaryReport:
     role: str | None
     long_name: str | None
@@ -370,6 +455,73 @@ def looks_like_presentation(data: bytes, source_file: str) -> bool:
     if root.tag != f"{{{LINK_NS}}}linkbase":
         return False
     return root.find(f"{{{LINK_NS}}}presentationLink") is not None
+
+
+def _calculation_links(root: ET.Element) -> list[ET.Element]:
+    """문서 어디에 있든 `calculationLink`를 찾는다.
+
+    standalone linkbase의 자식일 수도, issuer XSD의 `annotation/appinfo` 안일 수도 있다.
+    파일명 접미사로 판정하지 않는다.
+    """
+    return list(root.iter(f"{{{LINK_NS}}}calculationLink"))
+
+
+def looks_like_calculation(data: bytes, source_file: str) -> bool:
+    """standalone linkbase든 XSD embedded든 `calculationLink`가 실제로 있는지로 판정한다."""
+    try:
+        root, _ = _parse_xml(data, source_file)
+    except QVXbrlError:
+        return False
+    if root.tag not in (f"{{{LINK_NS}}}linkbase", f"{{{XSD_NS}}}schema"):
+        return False
+    return bool(_calculation_links(root))
+
+
+def _int_or_zero(value: str | None) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+def parse_calculation(
+    data: bytes, source_file: str, prefix_map: dict[str, str]
+) -> CalculationDocument:
+    """`calculationLink`에서 role별 arc를 뽑는다. standalone과 XSD embedded를 함께 다룬다."""
+    root, _ = _parse_xml(data, source_file)
+    links = _calculation_links(root)
+    if not links:
+        raise QVXbrlError(f"calculationLink가 없습니다: {source_file}")
+
+    by_role: dict[str, list[CalculationArc]] = {}
+    for link in links:
+        role = (link.get(f"{{{XLINK_NS}}}role") or "").strip()
+        locators: dict[str, QName | None] = {}
+        for loc in link.findall(f"{{{LINK_NS}}}loc"):
+            label = (loc.get(f"{{{XLINK_NS}}}label") or "").strip()
+            href = loc.get(f"{{{XLINK_NS}}}href") or ""
+            if label:
+                locators[label] = resolve_locator(href, prefix_map)
+        for arc in link.findall(f"{{{LINK_NS}}}calculationArc"):
+            by_role.setdefault(role, []).append(
+                CalculationArc(
+                    role=role,
+                    arcrole=(arc.get(f"{{{XLINK_NS}}}arcrole") or "").strip() or None,
+                    parent=locators.get((arc.get(f"{{{XLINK_NS}}}from") or "").strip()),
+                    child=locators.get((arc.get(f"{{{XLINK_NS}}}to") or "").strip()),
+                    order=(arc.get("order") or "").strip() or None,
+                    weight=(arc.get("weight") or "").strip() or None,
+                    use=(arc.get("use") or "optional").strip() or "optional",
+                    priority=_int_or_zero(arc.get("priority")),
+                )
+            )
+    roles = tuple(
+        CalculationRole(role=role, arcs=tuple(arcs), source_file=source_file)
+        for role, arcs in sorted(by_role.items())
+    )
+    return CalculationDocument(
+        source_file=source_file, sha256=sha256(data), roles=roles
+    )
 
 
 def _decimal_or_none(raw: str) -> Decimal | None:
@@ -668,7 +820,8 @@ def candidate_xml_names(
     """accession index에서 instance/linkbase 후보 XML 파일명을 고른다.
 
     FilingSummary가 report 파일이라고 **선언한** 이름만 제외한다. 파일명 규칙으로 의미를
-    추정하지 않고, 남은 후보의 실제 XML root/content로 판정한다.
+    추정하지 않고, 남은 후보의 실제 XML root/content로 판정한다. `.xsd`도 후보에 넣는다 —
+    issuer schema 안에 `calculationLink`가 embedded될 수 있다.
 
     `InputFiles`로 좁히지 않는다. 그것은 발행사가 **제출한** 파일 목록이라, inline XBRL
     filing에서 SEC renderer가 만든 추출 instance(`*_htm.xml`)가 빠진다.
@@ -682,7 +835,8 @@ def candidate_xml_names(
         for item in items
         if isinstance(item, dict)
     ]
-    xml_names = [n for n in names if n.lower().endswith(".xml")]
+    # `.xsd`도 후보다 — issuer schema에 calculationLink가 embedded될 수 있다.
+    xml_names = [n for n in names if n.lower().endswith((".xml", ".xsd"))]
     if summary is not None:
         declared_reports = {
             name for report in summary.reports for name in report.report_file_names

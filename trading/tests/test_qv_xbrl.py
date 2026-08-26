@@ -12,6 +12,7 @@ sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest.qv_xbrl import (  # noqa: E402
     ISO4217_NS,
+    SUMMATION_ITEM_ARCROLE,
     USD_QNAME,
     QName,
     QVXbrlError,
@@ -22,11 +23,13 @@ from backtest.qv_xbrl import (  # noqa: E402
     looks_like_instance,
     looks_like_presentation,
     normalize_cik,
+    parse_calculation,
     parse_filing_summary,
     parse_instance,
     parse_presentation,
     resolve_locator,
     resolve_qname,
+    looks_like_calculation,
 )
 from tests.fixtures.qv_xbrl import builder as B  # noqa: E402
 
@@ -40,6 +43,68 @@ MEMBER_QNAME = QName(B.CUSTOM_NS, "SubsidiaryMember")
 
 def _index(names):
     return {"directory": {"item": [{"name": n} for n in names]}}
+
+
+def calculation_xml(roles, *, embedded_in_schema=False):
+    """role -> [arc dict]. `builder.py`를 건드리지 않으려고 여기서 만든다."""
+    links = []
+    for role, arcs in roles.items():
+        labels = {}
+        locs = []
+        for arc in arcs:
+            for fragment in (arc["parent"], arc["child"]):
+                if fragment in labels:
+                    continue
+                label = f"loc_{len(labels)}"
+                labels[fragment] = label
+                locs.append(
+                    f'<link:loc xlink:type="locator"'
+                    f' xlink:href="acme-20231231.xsd#{fragment}"'
+                    f' xlink:label="{label}"/>'
+                )
+        arc_xml = []
+        for index, arc in enumerate(arcs):
+            attrs = [
+                'xlink:type="arc"',
+                f'xlink:arcrole="{arc.get("arcrole", SUMMATION_ITEM_ARCROLE)}"',
+                f'xlink:from="{labels[arc["parent"]]}"',
+                f'xlink:to="{labels[arc["child"]]}"',
+                f'order="{arc.get("order", index + 1)}"',
+                f'weight="{arc.get("weight", "1")}"',
+            ]
+            if "use" in arc:
+                attrs.append(f'use="{arc["use"]}"')
+            if "priority" in arc:
+                attrs.append(f'priority="{arc["priority"]}"')
+            arc_xml.append(f"<link:calculationArc {' '.join(attrs)}/>")
+        links.append(
+            f'<link:calculationLink xlink:type="extended" xlink:role="{role}">'
+            + "".join(locs)
+            + "".join(arc_xml)
+            + "</link:calculationLink>"
+        )
+    body = "".join(links)
+    if embedded_in_schema:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"'
+            ' xmlns:link="http://www.xbrl.org/2003/linkbase"'
+            ' xmlns:xlink="http://www.w3.org/1999/xlink">'
+            f"<xsd:annotation><xsd:appinfo>{body}</xsd:appinfo></xsd:annotation>"
+            "</xsd:schema>"
+        ).encode("utf-8")
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<link:linkbase xmlns:link="http://www.xbrl.org/2003/linkbase"'
+        ' xmlns:xlink="http://www.w3.org/1999/xlink">'
+        + body
+        + "</link:linkbase>"
+    ).encode("utf-8")
+
+
+PREFIXES = {"us-gaap": B.US_GAAP_NS, "acme": B.CUSTOM_NS}
+IS_ROLE = "http://acme.com/role/IncomeStatement"
+NOTE_ROLE = "http://acme.com/role/SegmentDetails"
 
 
 class NamespaceTest(unittest.TestCase):
@@ -339,6 +404,176 @@ class ChildLocalNamespaceTest(unittest.TestCase):
         )
 
 
+class CalculationTest(unittest.TestCase):
+    """effective summation-item graph. raw arc 존재를 근거로 세지 않는다."""
+
+    def _role(self, arcs, *, role=IS_ROLE, embedded=False):
+        raw = calculation_xml({role: arcs}, embedded_in_schema=embedded)
+        doc = parse_calculation(raw, "c.xml", PREFIXES)
+        return doc.roles[0], doc
+
+    def test_standalone_linkbase_is_detected_and_parsed(self):
+        raw = calculation_xml(
+            {IS_ROLE: [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}]}
+        )
+        self.assertTrue(looks_like_calculation(raw, "c.xml"))
+        doc = parse_calculation(raw, "c.xml", PREFIXES)
+        self.assertEqual(doc.roles[0].role, IS_ROLE)
+
+    def test_xsd_embedded_calculation_link_is_detected_and_parsed(self):
+        raw = calculation_xml(
+            {IS_ROLE: [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}]},
+            embedded_in_schema=True,
+        )
+        self.assertTrue(looks_like_calculation(raw, "acme-20231231.xsd"))
+        doc = parse_calculation(raw, "acme-20231231.xsd", PREFIXES)
+        role = doc.roles[0]
+        self.assertEqual(role.role, IS_ROLE)
+        self.assertIn(QName(B.US_GAAP_NS, "Revenues"), role.sources())
+
+    def test_ordinary_summation_item(self):
+        role, _ = self._role(
+            [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}]
+        )
+        self.assertEqual(len(role.effective_arcs()), 1)
+        self.assertEqual(role.sources(), frozenset({QName(B.US_GAAP_NS, "Revenues")}))
+        self.assertIn(
+            QName(B.US_GAAP_NS, "SalesRevenueNet"),
+            role.descendants(QName(B.US_GAAP_NS, "Revenues")),
+        )
+
+    def test_transitive_through_custom_intermediate(self):
+        role, _ = self._role(
+            [
+                {"parent": "us-gaap_Revenues", "child": "acme_SalesRevenueAutomotive"},
+                {"parent": "acme_SalesRevenueAutomotive", "child": "us-gaap_SalesRevenueGoodsNet"},
+            ]
+        )
+        descendants = role.descendants(QName(B.US_GAAP_NS, "Revenues"))
+        self.assertIn(QName(B.CUSTOM_NS, "SalesRevenueAutomotive"), descendants)
+        self.assertIn(QName(B.US_GAAP_NS, "SalesRevenueGoodsNet"), descendants)
+
+    def test_prohibited_equivalent_relationship_is_excluded(self):
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1",
+                    "weight": "1",
+                    "priority": "0",
+                },
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1",
+                    "weight": "1",
+                    "use": "prohibited",
+                    "priority": "2",
+                },
+            ]
+        )
+        self.assertEqual(role.effective_arcs(), ())
+        self.assertEqual(role.sources(), frozenset())
+
+    def test_higher_priority_optional_overrides_lower_priority_prohibition(self):
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1",
+                    "weight": "1",
+                    "use": "prohibited",
+                    "priority": "1",
+                },
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1",
+                    "weight": "1",
+                    "priority": "5",
+                },
+            ]
+        )
+        self.assertEqual(len(role.effective_arcs()), 1)
+
+    def test_prohibition_with_different_order_is_not_equivalent(self):
+        """`order`는 non-exempt라 값이 다르면 equivalent 관계가 아니다."""
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "1",
+                    "weight": "1",
+                },
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "order": "2",
+                    "weight": "1",
+                    "use": "prohibited",
+                    "priority": "9",
+                },
+            ]
+        )
+        self.assertEqual(len(role.effective_arcs()), 1)
+
+    def test_non_summation_arcrole_is_not_effective(self):
+        role, _ = self._role(
+            [
+                {
+                    "parent": "us-gaap_Revenues",
+                    "child": "us-gaap_SalesRevenueNet",
+                    "arcrole": "http://www.xbrl.org/2003/arcrole/parent-child",
+                }
+            ]
+        )
+        self.assertEqual(role.effective_arcs(), ())
+
+    def test_unresolved_locator_is_not_source_evidence(self):
+        role, _ = self._role(
+            [{"parent": "zzz_Revenues", "child": "us-gaap_SalesRevenueNet"}]
+        )
+        self.assertEqual(role.effective_arcs(), ())
+        self.assertEqual(role.sources(), frozenset())
+
+    def test_role_uri_is_preserved_per_link(self):
+        raw = calculation_xml(
+            {
+                IS_ROLE: [{"parent": "us-gaap_Revenues", "child": "us-gaap_SalesRevenueNet"}],
+                NOTE_ROLE: [
+                    {"parent": "us-gaap_SalesRevenueNet", "child": "us-gaap_Revenues"}
+                ],
+            }
+        )
+        doc = parse_calculation(raw, "c.xml", PREFIXES)
+        roles = {r.role: r for r in doc.roles}
+        self.assertEqual(set(roles), {IS_ROLE, NOTE_ROLE})
+        self.assertEqual(
+            roles[NOTE_ROLE].sources(),
+            frozenset({QName(B.US_GAAP_NS, "SalesRevenueNet")}),
+        )
+
+    def test_cycle_does_not_hang_descendants(self):
+        role, _ = self._role(
+            [
+                {"parent": "us-gaap_Revenues", "child": "acme_Mid"},
+                {"parent": "acme_Mid", "child": "us-gaap_Revenues"},
+            ]
+        )
+        self.assertIn(
+            QName(B.CUSTOM_NS, "Mid"), role.descendants(QName(B.US_GAAP_NS, "Revenues"))
+        )
+
+    def test_document_without_calculation_link_raises(self):
+        raw = B.presentation({IS_ROLE: [("us-gaap_Abstract", "us-gaap_Revenues")]})
+        self.assertFalse(looks_like_calculation(raw, "p.xml"))
+        with self.assertRaises(QVXbrlError):
+            parse_calculation(raw, "p.xml", PREFIXES)
+
+
 class DocumentShapeTest(unittest.TestCase):
     def test_instance_and_presentation_are_detected_by_content(self):
         instance = B.instance(
@@ -473,6 +708,16 @@ class FilingSummaryTest(unittest.TestCase):
 
 
 class CandidateFileTest(unittest.TestCase):
+    def test_issuer_schema_is_a_candidate_for_embedded_calculation(self):
+        summary = parse_filing_summary(
+            B.filing_summary([{"Role": "r", "LongName": "1 - Statement - BS"}]),
+            "FilingSummary.xml",
+        )
+        names = candidate_xml_names(
+            _index(["acme-20231231_htm.xml", "acme-20231231.xsd"]), summary
+        )
+        self.assertIn("acme-20231231.xsd", names)
+
     def test_declared_report_files_are_excluded(self):
         summary = parse_filing_summary(
             B.filing_summary(
