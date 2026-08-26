@@ -1139,6 +1139,12 @@ def ingest_accounting(
     ):
         if not str(value or "").strip():
             raise QVAccountingError(f"{name}는 비울 수 없습니다.")
+    if accounting_definition_version != ACCOUNTING_DEFINITION_VERSION:
+        raise QVAccountingError(
+            "현재 accounting implementation은 "
+            f"{ACCOUNTING_DEFINITION_VERSION!r}만 새로 적재할 수 있습니다: "
+            f"{accounting_definition_version!r}"
+        )
 
     rows = connection.execute(
         "SELECT accession, form, report_date FROM qv_sec_filings"

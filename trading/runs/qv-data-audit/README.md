@@ -919,6 +919,30 @@ production accounting ingest · coverage · rank · B/M · returns는 전부 0�
 
 ---
 
+## 10.5 accounting definition write provenance fix — 2026-08-26
+
+`ingest_accounting()`은 이제 caller가 넘긴 `accounting_definition_version`이 현재 구현 상수
+`qv-accounting-v2`와 정확히 같을 때만 새 row를 만든다. 빈 문자열 거부도 유지한다. 따라서 v2
+계산을 `qv-accounting-v1`이나 unknown/future label로 저장할 수 없고, 정상 row의 definition
+version과 `bundle_provenance.contract_commit=b9358e1e1ac05acfb1737852b58962eb443f39de`가
+모순되지 않는다.
+
+read 경로인 `accounting_for_formation()`은 바꾸지 않았다. network-free로 수동 seed한 v1 row를
+`accounting_definition_version="qv-accounting-v1"`로 명시 조회할 수 있음을 회귀로 잠갔다.
+
+```text
+XBRL + accounting  137 PASS
+submissions + identity  69 PASS
+trading 전체  1,314 PASS
+npm  949 PASS
+```
+
+모두 실제 로컬 실행 결과이며 GitHub CI 독립 재현을 뜻하지 않는다. SEC smoke는 extraction
+semantics/source handling을 바꾸지 않아 재실행하지 않았다. schema 변경과 production ingest ·
+coverage · rank · B/M · returns 실행은 전부 0회다.
+
+---
+
 ## 11. 결과
 
 

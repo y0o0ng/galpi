@@ -1626,7 +1626,12 @@ class IngestionTest(unittest.TestCase):
     def tearDown(self):
         self.connection.close()
 
-    def _ingest(self, files=None, version=ACCOUNTING_SOURCE_VERSION):
+    def _ingest(
+        self,
+        files=None,
+        version=ACCOUNTING_SOURCE_VERSION,
+        definition=ACCOUNTING_DEFINITION_VERSION,
+    ):
         return ingest_accounting(
             self.connection,
             FakeClient(files or _default_files()),
@@ -1634,6 +1639,7 @@ class IngestionTest(unittest.TestCase):
             filing_source_version=FILING_SOURCE_VERSION,
             accounting_source=ACCOUNTING_SOURCE,
             accounting_source_version=version,
+            accounting_definition_version=definition,
         )
 
     def test_row_is_written_with_canonical_values(self):
@@ -1649,6 +1655,57 @@ class IngestionTest(unittest.TestCase):
         self.assertEqual(row["assets_value"], "500")
         self.assertEqual(row["book_equity_value"], "300")
         self.assertEqual(row["accounting_definition_version"], ACCOUNTING_DEFINITION_VERSION)
+        bundle = json.loads(row["bundle_provenance"])
+        self.assertEqual(bundle["contract_commit"], ACCOUNTING_CONTRACT_COMMIT)
+
+    def test_v1_definition_label_cannot_be_written_by_v2_implementation(self):
+        with self.assertRaises(QVAccountingError):
+            self._ingest(definition="qv-accounting-v1")
+        count = self.connection.execute(
+            "SELECT COUNT(*) AS n FROM qv_accounting_filings"
+        ).fetchone()["n"]
+        self.assertEqual(count, 0)
+
+    def test_unknown_definition_label_cannot_be_written(self):
+        with self.assertRaises(QVAccountingError):
+            self._ingest(definition="qv-accounting-v99")
+        count = self.connection.execute(
+            "SELECT COUNT(*) AS n FROM qv_accounting_filings"
+        ).fetchone()["n"]
+        self.assertEqual(count, 0)
+
+    def test_historical_v1_row_remains_explicitly_readable(self):
+        self.connection.execute(
+            "INSERT INTO qv_accounting_filings"
+            " (cik, accession, filing_source_version, accounting_source,"
+            " accounting_source_version, accounting_definition_version,"
+            " fiscal_period_end, period_crosscheck_status, revenue_status, cogs_status,"
+            " gross_profit_status, gross_profit_tieout_status, assets_status,"
+            " assets_tieout_status, parent_se_status, nci_tieout_status,"
+            " preferred_status, book_equity_status, bundle_provenance, diagnostics)"
+            " VALUES (?, ?, ?, ?, ?, 'qv-accounting-v1', ?, 'OK', 'MISSING', 'MISSING',"
+            " 'MISSING', 'TIEOUT_UNAVAILABLE', 'MISSING', 'TIEOUT_UNAVAILABLE',"
+            " 'MISSING', 'TIEOUT_UNAVAILABLE', 'MISSING', 'MISSING', '{}', '{}')",
+            (
+                CIK,
+                ACCESSION,
+                FILING_SOURCE_VERSION,
+                ACCOUNTING_SOURCE,
+                ACCOUNTING_SOURCE_VERSION,
+                DPE,
+            ),
+        )
+        row = accounting_for_formation(
+            self.connection,
+            cik=CIK,
+            fiscal_period_end_year=2023,
+            formation_session="2024-06-28",
+            filing_source_version=FILING_SOURCE_VERSION,
+            accounting_source_version=ACCOUNTING_SOURCE_VERSION,
+            accounting_definition_version="qv-accounting-v1",
+        )
+        self.assertIsNotNone(row)
+        self.assertEqual(row["accounting_definition_version"], "qv-accounting-v1")
 
     def test_reingest_same_version_is_rejected(self):
         self._ingest()
