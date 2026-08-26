@@ -37,14 +37,12 @@ from .qv_xbrl import (
     parse_presentation,
 )
 
-ACCOUNTING_DEFINITION_VERSION = "qv-accounting-v1"
+ACCOUNTING_DEFINITION_VERSION = "qv-accounting-v2"
 # 이 semantic version이 뜻하는 frozen contract의 기준 commit. code hash와 혼동하지 않는다.
-ACCOUNTING_CONTRACT_COMMIT = "cc70cb42d417b920c7221d4ad995a36b92c4c61e"
+ACCOUNTING_CONTRACT_COMMIT = "b9358e1e1ac05acfb1737852b58962eb443f39de"
 
 FILING_SUMMARY_NAME = "FilingSummary.xml"
 ANNUAL_FORMS = ("10-K", "10-K/A")
-MIN_ANNUAL_DAYS = 340
-MAX_ANNUAL_DAYS = 400
 
 RESOLVED = "RESOLVED"
 MISSING = "MISSING"
@@ -483,53 +481,72 @@ def _select_balance_sheet_role(
     return None, AMBIGUOUS_STATEMENT_ROLE
 
 
-def _annual_period(bundle: AccessionBundle, dpe: str) -> tuple[str | None, str | None]:
-    """DPE에서 끝나는 연간 duration의 시작일. 여러 개면 ambiguous."""
-    starts = set()
-    for b in bundle.bound_facts():
-        ctx = b.context
-        if ctx.cik != bundle.cik or not ctx.dimensionless:
+def _eligible_revenue_duration_facts(
+    bundle: AccessionBundle, dpe: str
+) -> list[tuple[BoundFact, int]]:
+    eligible = []
+    for bound in bundle.bound_facts():
+        context = bound.context
+        if not (
+            _standard(bound, REVENUE_LOCALS)
+            and _target_dimensionless(bound, bundle.cik)
+            and _usd_monetary(bound)
+            and context.start
+            and context.end == dpe
+        ):
             continue
-        if ctx.end != dpe or not ctx.start:
+        duration = _days(context.start, context.end)
+        if duration is None or duration <= 0:
             continue
-        span = _days(ctx.start, ctx.end)
-        if span is None or not (MIN_ANNUAL_DAYS <= span <= MAX_ANNUAL_DAYS):
-            continue
-        starts.add(ctx.start)
-    if len(starts) == 1:
-        return starts.pop(), None
-    if not starts:
-        return None, "ANNUAL_PERIOD_MISSING"
-    return None, f"ANNUAL_PERIOD_AMBIGUOUS:{sorted(starts)}"
+        eligible.append((bound, duration))
+    return eligible
 
 
 def _select_income_role(
-    bundle: AccessionBundle, start: str, dpe: str
+    bundle: AccessionBundle, dpe: str
 ) -> tuple[str | None, str | None]:
-    revenue = [
-        b
-        for b in bundle.bound_facts()
-        if _standard(b, REVENUE_LOCALS)
-        and _target_dimensionless(b, bundle.cik)
-        and b.context.start == start
-        and b.context.end == dpe
-        and _usd_monetary(b)
-    ]
+    revenue = [bound for bound, _ in _eligible_revenue_duration_facts(bundle, dpe)]
     if not revenue:
         return None, UNRESOLVED_STATEMENT_ROLE
-    candidates = []
+    candidates = set()
     for role in _statement_roles(bundle):
         found = bundle.presentation_role(role)
         if found is None:
             continue
         concepts = found[0].concepts()
         if any(b.fact.concept in concepts for b in revenue):
-            candidates.append(role)
+            candidates.add(role)
     if len(candidates) == 1:
-        return candidates[0], None
+        return candidates.pop(), None
     if not candidates:
         return None, UNRESOLVED_STATEMENT_ROLE
     return None, AMBIGUOUS_STATEMENT_ROLE
+
+
+def _annual_period(
+    bundle: AccessionBundle, dpe: str, role: str
+) -> tuple[str | None, str | None]:
+    """Unique Statement role 안 revenue fact의 unique longest-duration start."""
+    found = bundle.presentation_role(role)
+    if found is None:
+        return None, "ANNUAL_PERIOD_MISSING"
+    concepts = found[0].concepts()
+    eligible = [
+        (bound, duration)
+        for bound, duration in _eligible_revenue_duration_facts(bundle, dpe)
+        if bound.fact.concept in concepts
+    ]
+    if not eligible:
+        return None, "ANNUAL_PERIOD_MISSING"
+    longest = max(duration for _, duration in eligible)
+    starts = {
+        bound.context.start
+        for bound, duration in eligible
+        if duration == longest and bound.context.start is not None
+    }
+    if len(starts) == 1:
+        return starts.pop(), None
+    return None, f"ANNUAL_PERIOD_AMBIGUOUS:{sorted(starts)}"
 
 
 def _structural_total(
@@ -579,15 +596,15 @@ def resolve_accounting(
     if bs_reason:
         result.diagnostics["balance_sheet_role"] = bs_reason
 
-    start, period_reason = _annual_period(bundle, dpe)
-    if period_reason:
-        result.diagnostics["annual_period"] = period_reason
-    is_role = None
-    if start:
-        is_role, is_reason = _select_income_role(bundle, start, dpe)
-        if is_reason:
-            result.diagnostics["income_statement_role"] = is_reason
+    is_role, is_reason = _select_income_role(bundle, dpe)
+    if is_reason:
+        result.diagnostics["income_statement_role"] = is_reason
     result.income_statement_role = is_role
+    start = None
+    if is_role:
+        start, period_reason = _annual_period(bundle, dpe, is_role)
+        if period_reason:
+            result.diagnostics["annual_period"] = period_reason
 
     _resolve_income(bundle, result, facts, start, dpe, is_role)
     _resolve_assets(bundle, result, facts, dpe, bs_role)

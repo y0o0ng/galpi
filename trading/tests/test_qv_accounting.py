@@ -14,8 +14,10 @@ sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest import store  # noqa: E402
 from backtest.qv_accounting import (  # noqa: E402
+    ACCOUNTING_CONTRACT_COMMIT,
     ACCOUNTING_DEFINITION_VERSION,
     AMBIGUOUS,
+    AMBIGUOUS_STATEMENT_ROLE,
     DIRECT_PARENT_SE,
     INCLUDING_NCI_MINUS_NCI,
     LIQUIDATION,
@@ -54,6 +56,7 @@ DPE = "2023-12-31"
 START = "2023-01-01"
 BS_ROLE = "http://acme.com/role/ConsolidatedBalanceSheets"
 IS_ROLE = "http://acme.com/role/ConsolidatedStatementsOfIncome"
+SECOND_IS_ROLE = "http://acme.com/role/ConsolidatedStatementsOfOperations"
 EQUITY_ROLE = "http://acme.com/role/ConsolidatedStatementsOfEquity"
 NOTE_ROLE = "http://acme.com/role/SegmentDetails"
 LEGAL_ENTITY_AXIS = "us-gaap:LegalEntityAxis"
@@ -87,9 +90,9 @@ class FakeClient:
         return self.files[name]
 
 
-def _dei_period(context_id: str = "dpe") -> str:
+def _dei_period(context_id: str = "dpe", *, end: str = DPE) -> str:
     return (
-        f'<dei:DocumentPeriodEndDate contextRef="{context_id}">{DPE}'
+        f'<dei:DocumentPeriodEndDate contextRef="{context_id}">{end}'
         "</dei:DocumentPeriodEndDate>"
     )
 
@@ -190,6 +193,246 @@ class HalfWidthTest(unittest.TestCase):
         self.assertEqual(decimal_text(Decimal("1E+11")), "100000000000")
         self.assertEqual(decimal_text(Decimal("-1791000000")), "-1791000000")
         self.assertIsNone(decimal_text(None))
+
+
+class AnnualDurationSelectionTest(unittest.TestCase):
+    def _resolve(
+        self,
+        *,
+        dpe: str,
+        contexts: list[str],
+        facts: list[str],
+        roles: dict[str, list[tuple[str, str]]],
+        reports: list[dict] | None = None,
+    ):
+        dpe_context_start = f"{int(dpe[:4]) - 1:04d}-01-01"
+        files = build_files(
+            contexts=[B.context("dpe", cik=CIK, start=dpe_context_start, end=dpe)]
+            + contexts,
+            facts=[_dei_period(end=dpe)] + facts,
+            roles=roles,
+            reports=reports,
+        )
+        return resolve(files, report_date=dpe)
+
+    def _single_statement_result(self, *, start: str, end: str):
+        return self._resolve(
+            dpe=end,
+            contexts=[B.context("annual", cik=CIK, start=start, end=end)],
+            facts=[B.fact("us-gaap", "Revenues", "annual", "100")],
+            roles={IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))]},
+        )
+
+    def test_orcl_same_dpe_unrelated_note_context_does_not_pollute_period(self):
+        dpe = "2020-05-31"
+        result = self._resolve(
+            dpe=dpe,
+            contexts=[
+                B.context("annual", cik=CIK, start="2019-06-01", end=dpe),
+                B.context("note", cik=CIK, start="2019-06-02", end=dpe),
+            ],
+            facts=[
+                B.fact("us-gaap", "Revenues", "annual", "100"),
+                B.fact(
+                    "us-gaap",
+                    "RightOfUseAssetObtainedInExchangeForOperatingLeaseLiability",
+                    "note",
+                    "5",
+                ),
+            ],
+            roles={
+                IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))],
+                NOTE_ROLE: [
+                    (
+                        us("LeasesAbstract"),
+                        us("RightOfUseAssetObtainedInExchangeForOperatingLeaseLiability"),
+                    )
+                ],
+            },
+        )
+        self.assertEqual(result.income_statement_role, IS_ROLE)
+        self.assertEqual(
+            result.provenance["revenue_provenance"]["start"], "2019-06-01"
+        )
+        self.assertNotIn("annual_period", result.diagnostics)
+
+    def test_52_week_statement_revenue_selects_363_day_period(self):
+        result = self._single_statement_result(start="2023-01-01", end="2023-12-30")
+        self.assertEqual(
+            result.provenance["revenue_provenance"]["start"], "2023-01-01"
+        )
+
+    def test_53_week_statement_revenue_selects_370_day_period(self):
+        result = self._single_statement_result(start="2021-12-26", end="2022-12-31")
+        self.assertEqual(
+            result.provenance["revenue_provenance"]["start"], "2021-12-26"
+        )
+
+    def test_structural_selector_has_no_fixed_minimum_days(self):
+        result = self._single_statement_result(start="2023-04-01", end="2023-12-31")
+        self.assertEqual(
+            result.provenance["revenue_provenance"]["start"], "2023-04-01"
+        )
+
+    def test_period_candidates_require_target_dimensionless_usd_facts(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[
+                B.context("annual", cik=CIK, start="2023-04-01", end=DPE),
+                B.context("other", cik=OTHER_CIK, start=START, end=DPE),
+                B.context(
+                    "dimensioned",
+                    cik=CIK,
+                    start="2023-02-01",
+                    end=DPE,
+                    dimensions=((LEGAL_ENTITY_AXIS, "acme:SubsidiaryMember"),),
+                ),
+                B.context("shares", cik=CIK, start="2023-03-01", end=DPE),
+            ],
+            facts=[
+                B.fact("us-gaap", "Revenues", "annual", "100"),
+                B.fact("us-gaap", "Revenues", "other", "200"),
+                B.fact("us-gaap", "Revenues", "dimensioned", "300"),
+                B.fact("us-gaap", "Revenues", "shares", "400", unit="shares"),
+            ],
+            roles={IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))]},
+        )
+        self.assertEqual(
+            result.provenance["revenue_provenance"]["start"], "2023-04-01"
+        )
+
+    def test_unparseable_and_nonpositive_durations_are_ineligible(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[
+                B.context("annual", cik=CIK, start="2023-04-01", end=DPE),
+                B.context("malformed", cik=CIK, start="not-a-date", end=DPE),
+                B.context("reversed", cik=CIK, start="2024-01-01", end=DPE),
+            ],
+            facts=[
+                B.fact("us-gaap", "Revenues", "annual", "100"),
+                B.fact("us-gaap", "Revenues", "malformed", "200"),
+                B.fact("us-gaap", "Revenues", "reversed", "300"),
+            ],
+            roles={IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))]},
+        )
+        self.assertEqual(
+            result.provenance["revenue_provenance"]["start"], "2023-04-01"
+        )
+
+    def test_longest_statement_revenue_beats_quarterly_revenue(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[
+                B.context("annual", cik=CIK, start=START, end=DPE),
+                B.context("quarter", cik=CIK, start="2023-10-01", end=DPE),
+            ],
+            facts=[
+                B.fact("us-gaap", "Revenues", "annual", "100"),
+                B.fact("us-gaap", "Revenues", "quarter", "25"),
+            ],
+            roles={IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))]},
+        )
+        self.assertEqual(result.revenue_value, "100")
+        self.assertEqual(result.provenance["revenue_provenance"]["start"], START)
+
+    def test_distinct_longest_start_tie_fails_close(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[
+                B.context("annual_a", cik=CIK, start="2023-01-01", end=DPE),
+                B.context("annual_b", cik=CIK, start="20230101", end=DPE),
+            ],
+            facts=[
+                B.fact("us-gaap", "Revenues", "annual_a", "100"),
+                B.fact("us-gaap", "Revenues", "annual_b", "100"),
+            ],
+            roles={IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))]},
+        )
+        self.assertIsNone(result.revenue_value)
+        self.assertTrue(
+            result.diagnostics["annual_period"].startswith("ANNUAL_PERIOD_AMBIGUOUS")
+        )
+
+    def test_multiple_statement_roles_fail_close_before_duration_choice(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[B.context("annual", cik=CIK, start=START, end=DPE)],
+            facts=[B.fact("us-gaap", "Revenues", "annual", "100")],
+            roles={
+                IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))],
+                SECOND_IS_ROLE: [(us("OperationsAbstract"), us("Revenues"))],
+            },
+            reports=[
+                {
+                    "Role": IS_ROLE,
+                    "MenuCategory": "Statements",
+                    "LongName": "1 - Statement - Consolidated Statements Of Income",
+                },
+                {
+                    "Role": SECOND_IS_ROLE,
+                    "MenuCategory": "Statements",
+                    "LongName": "2 - Statement - Consolidated Statements Of Operations",
+                },
+            ],
+        )
+        self.assertIsNone(result.income_statement_role)
+        self.assertEqual(
+            result.diagnostics["income_statement_role"], AMBIGUOUS_STATEMENT_ROLE
+        )
+        self.assertIsNone(result.revenue_value)
+
+    def test_custom_revenue_does_not_define_annual_period(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[B.context("annual", cik=CIK, start=START, end=DPE)],
+            facts=[B.fact("acme", "SubscriptionRevenue", "annual", "100")],
+            roles={IS_ROLE: [("acme_IncomeStatementAbstract", "acme_SubscriptionRevenue")]},
+        )
+        self.assertIsNone(result.income_statement_role)
+        self.assertEqual(
+            result.diagnostics["income_statement_role"], "UNRESOLVED_STATEMENT_ROLE"
+        )
+        self.assertIsNone(result.revenue_value)
+
+    def test_filing_summary_category_conflict_is_not_rescued_by_long_name(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[B.context("annual", cik=CIK, start=START, end=DPE)],
+            facts=[B.fact("us-gaap", "Revenues", "annual", "100")],
+            roles={IS_ROLE: [(us("IncomeStatementAbstract"), us("Revenues"))]},
+            reports=[
+                {
+                    "Role": IS_ROLE,
+                    "MenuCategory": "Uncategorized",
+                    "LongName": "1 - Statement - Consolidated Statements Of Income",
+                }
+            ],
+        )
+        self.assertIsNone(result.income_statement_role)
+        self.assertEqual(
+            result.diagnostics["income_statement_role"], "UNRESOLVED_STATEMENT_ROLE"
+        )
+
+    def test_tesla_sibling_total_remains_unresolved_after_period_selection(self):
+        result = self._resolve(
+            dpe=DPE,
+            contexts=[B.context("annual", cik=CIK, start=START, end=DPE)],
+            facts=[
+                B.fact("us-gaap", "SalesRevenueGoodsNet", "annual", "60"),
+                B.fact("us-gaap", "SalesRevenueServicesNet", "annual", "40"),
+            ],
+            roles={
+                IS_ROLE: [
+                    (us("IncomeStatementAbstract"), us("SalesRevenueGoodsNet")),
+                    (us("IncomeStatementAbstract"), us("SalesRevenueServicesNet")),
+                ]
+            },
+        )
+        self.assertEqual(result.income_statement_role, IS_ROLE)
+        self.assertNotIn("annual_period", result.diagnostics)
+        self.assertEqual(result.revenue_status, AMBIGUOUS)
+        self.assertEqual(result.diagnostics["revenue"], "REVENUE_AMBIGUOUS")
 
 
 class GrossProfitTest(unittest.TestCase):
@@ -1394,6 +1637,11 @@ class IngestionTest(unittest.TestCase):
         )
 
     def test_row_is_written_with_canonical_values(self):
+        self.assertEqual(ACCOUNTING_DEFINITION_VERSION, "qv-accounting-v2")
+        self.assertEqual(
+            ACCOUNTING_CONTRACT_COMMIT,
+            "b9358e1e1ac05acfb1737852b58962eb443f39de",
+        )
         self.assertEqual(self._ingest(), 1)
         row = self.connection.execute("SELECT * FROM qv_accounting_filings").fetchone()
         self.assertEqual(row["revenue_value"], "100")

@@ -861,6 +861,64 @@ zero shares + positive resolved liquidation
 
 ---
 
+## 10.4 structural annual-duration implementation receipt — 2026-08-26
+
+docs freeze는 `b9358e1e1ac05acfb1737852b58962eb443f39de`이고, Phase 2 implementation은
+**이 receipt를 포함한 바로 다음 implementation commit**이다(git history와 완료 보고 SHA가
+정본). `ACCOUNTING_DEFINITION_VERSION`은 `qv-accounting-v2`로 올렸고
+`ACCOUNTING_CONTRACT_COMMIT`은 위 docs freeze SHA를 가리킨다. 기존 v1 row를 update/replace하지
+않았고 schema도 바꾸지 않았다.
+
+production selector에서 `MIN_ANNUAL_DAYS=340` · `MAX_ANNUAL_DAYS=400`을 제거했다. 이제
+FilingSummary가 현재 parser 계약상 Statement로 인정한 role 중 eligible standard revenue fact가
+연결된 role이 정확히 하나일 때, 그 role 안 fact의 unique longest-duration start를 annual
+start로 쓴다. target CIK · dimensionless · USD · `end=DPE` · parse 가능한 양의 duration만
+eligible이고 fixed day threshold는 없다. role missing/ambiguity, eligible revenue 부재,
+longest-start 동률은 fail-close한다.
+
+### network-free regression — 실제 로컬 실행
+
+```text
+ORCL same-DPE unrelated note pollution 배제
+52-week 363일 · 53-week 370일 선택
+10-K unit fixture의 274일 period 선택 (10-KT 허용 의미 아님)
+annual + quarterly revenue 중 longest 선택
+longest distinct-start tie -> ANNUAL_PERIOD_AMBIGUOUS
+eligible revenue가 있는 Statement role 둘 -> AMBIGUOUS_STATEMENT_ROLE
+standard revenue 없음 -> unresolved
+target CIK · dimensionless · USD와 valid positive duration 조건
+LongName=Statement + MenuCategory=Uncategorized conflict -> fail-close 유지
+Tesla sibling revenue total -> period/role 선택 뒤에도 REVENUE_AMBIGUOUS 유지
+
+python3 -m unittest trading.tests.test_qv_xbrl trading.tests.test_qv_accounting
+  134 tests · PASS
+python3 -m unittest trading.tests.test_qv_submissions trading.tests.test_qv_identity
+  69 tests · PASS
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,311 tests · PASS
+npm test
+  949 tests · PASS
+```
+
+위 숫자는 이 implementation에서 실제 로컬로 실행한 결과다. GitHub CI가 독립 재현했다는
+뜻이 아니다.
+
+### 실제 SEC read-only smoke — production DB 미사용
+
+|anchor|결과|
+|---|---|
+|**ORCL FY2020** `0001564590-20-030125`|annual start `2019-06-01`; same-DPE unrelated note context 때문에 ambiguity가 생기지 않음; revenue `39,068,000,000` RESOLVED|
+|**CAT** `0000018230-26-000008`|annual start `2025-01-01`; COGS `44,752,000,000`, GP `22,837,000,000`; note/segment contamination 배제 유지|
+|**COST** `0000909832-19-000019`|363일 annual start `2018-09-03`; GP `19,817,000,000`; note GrossProfit 배제 유지|
+|**TSLA FY2016** `0001564590-17-003118`|income role과 annual period 선택 성공; sibling-total은 의도대로 `REVENUE_AMBIGUOUS`; Assets `22,664,076,000`, parent SE `4,752,911,000` 유지|
+|**NEE** `0000753308-26-000015`|annual start `2025-01-01`; revenue `27,412,000,000` RESOLVED; COGS는 계약대로 `MISSING`; Assets `212,721,000,000` 유지|
+
+FilingSummary 2021 metadata conflict는 LongName fallback 없이 계속 fail-close하고, 허용 form은
+`10-K` · `10-K/A`뿐이다. `10-KT`, Tesla sibling-total, NEE utility COGS는 추가하지 않았다.
+production accounting ingest · coverage · rank · B/M · returns는 전부 0회다.
+
+---
+
 ## 11. 결과
 
 
