@@ -732,3 +732,767 @@ A 단독을 택하면 그 관측들은 존재 자체가 사라져 그런 재검�
 
 **Candidate D는 채택하지 않는다.** 진단 목적으로 `TreasuryStockCommonShares`가 같은
 class·instant에 있을 때 direct outstanding과 대조하는 것까지만 의미가 있다.
+
+---
+
+# Follow-up — December shares selector의 freshness boundary (2026-08-27)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 본문과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. coverage Gate C · `coverage_start` ·
+> formation rank · B/M · returns는 이번에도 계산하지 않았다.
+
+시작 main: `eb739d7378b28483dbab8af41bd3108bb0e209d2`
+(`research(qv): PIT share-count mapping을 검증한다` — 위 본문을 커밋한 그 지점이고
+`origin/main`도 같았다.)
+
+**이번에 다시 열지 않은 것.** 승인된 Candidate C의 방향(`us-gaap:CommonStockSharesOutstanding`
+우선, 그 class에서 구조적으로 absent일 때만 `dei:EntityCommonStockSharesOutstanding`)은
+그대로 두고 재비교하지 않았다. `AMBIGUOUS`인 A를 이유로 B로 내려가지 않는다는 규칙,
+issued − treasury 재구성 금지, companyfacts 금지, dimension shape 규칙(dimensionless =
+전 class 총계 · class fact는 exact axis/member · derived/aggregate member 제외)도 고정으로 뒀다.
+
+## F1. 이번 질문 하나
+
+> **December t-1 shares selector가 과거의 stale share count를 조용히 재사용하지 않도록
+> 어떤 freshness boundary를 둘 것인가?**
+
+§7.11이 남긴 구멍이다. `December 이하 latest instant`만 보면 그 concept을 오래전에 그만
+쓴 발행사에서 `MISSING`이 아니라 **그럴듯한 옛 숫자**가 나온다. §11의 미해결 1번이다.
+
+## F2. 가장 중요한 방법 수정 — 10-K-only를 버렸다
+
+§2.3이 스스로 적어둔 한계를 이번에 없앴다. **production contract가 허용하는 네 form을 전부
+넣었다**: `10-K` · `10-K/A` · `10-Q` · `10-Q/A`. 각 formation에서 `historical_usable_session`이
+그 formation 이하인 filing만 쓰고 acceptance 이후 정보만 썼다. §14 통계의 10-K-only 숫자를
+그대로 재사용하지 않았다.
+
+표본은 §2.1의 20개 발행사와 early/middle/recent 세 formation(`2013` · `2018` · `2026`)을
+그대로 재사용했다. **새 성과 표본을 고르지 않았다.**
+
+| formation | formation session | December session (t-1) |
+|---|---|---|
+| 2013 | 2013-06-28 | 2012-12-31 |
+| 2018 | 2018-06-29 | 2017-12-29 |
+| 2026 | 2026-06-30 | 2025-12-31 |
+
+세션 달력은 본구현과 같은 `bars_daily` SPY `eodhd/eodhd-15y-2026-08`이다.
+
+### F2.1 실제로 읽은 양
+
+| 항목 | 수 |
+|---|---|
+| `filed_date >= 2009-01-01`인 K/Q family filing | 1,321 |
+| 그중 2026 formation까지 usable | **1,303** (10-Q 955 · 10-K 323 · 10-K/A 21 · 10-Q/A 4) |
+| instance를 실제로 파싱한 accession | **1,248** |
+| XBRL instance가 없는 accession | 55 |
+| 뽑은 direct outstanding fact | **8,758** (A 6,622 · B 2,136) |
+
+instance는 `qv_xbrl.parse_instance()`로 그대로 읽었고 `entity` identifier가 대상 CIK가 아닌
+fact는 버렸다. **XBRL이 없는 55건은 결함이 아니다** — 2009~2011 phase-in 이전 filing,
+XBRL을 붙이지 않은 Part III 성격의 `10-K/A`, 그리고 신설 발행사의 첫 10-K
+(ABBV `0001047469-13-002827`, NWS `0001193125-13-373501`)다. ABBV 첫 10-K는 accession
+디렉터리에 `.xml`이 한 개도 없음을 원문에서 확인했다.
+
+> **파서 함정 하나.** `index.json`이 일부 accession에서 파일 목록을 전부 주지 않는다.
+> Apple FY2021 10-K(`0000320193-21-000105`)의 `index.json`은 item이 4개뿐인데 실제 filing에는
+> 문서가 88개 있고 `aapl-20210925_htm.xml`도 있다. `-index.html`로 다시 읽는 fallback을
+> 넣기 전에는 이 filing들이 통째로 `NO_XBRL`로 빠졌다. **본구현에서 accession 파일 목록을
+> `index.json` 하나로만 판정하면 안 된다.**
+
+## F3. 관측 단위 — 124개 (§5의 104와 다른 이유)
+
+관측 단위는 §2.2와 같은 (issuer, formation, class scope)다. 이번에는 pool이 10-Q까지 넓어져
+**§5에 없던 class scope가 더 드러났다.** §5의 104행을 재현한 것이 아니라 같은 표본을 더 넓은
+filing pool로 다시 센 것이다.
+
+- `dimensionless`는 §4.1 그대로 **총계**로 본다. 그 발행사에 class-dimensional direct
+  outstanding fact가 하나라도 있으면 `dimensionless`를 class 관측으로 세지 않았다.
+- derived/aggregate member(`EquivalentClassAMember` · `CommonClassB1AndB2Member`)는 제외했다.
+- 남은 124개가 아래 표의 행이다.
+
+**새로 드러난 scope의 정체가 이번 연구의 절반이다.** 대부분이 **같은 class의 옛 member 표기**다.
+
+| issuer | 한 class를 가리키는 member 표기들 | 각 표기가 쓰인 instant 구간 |
+|---|---|---|
+| CMCSA (Class A Special) | `ClassSpecialCommonStockMember` | 2007-12-31 .. 2011-09-30 |
+| | `CommonClassASpecialMember` | 2008-12-31 .. 2010-03-31 |
+| | `ClassASpecialCommonStockMember` | 2008-12-31 .. 2012-03-31 |
+| | `ClassaSpecialCommonStockMember` | 2009-12-31 .. 2017-12-31 |
+| V (Class C) | `ClassCCommonStockMember` | 2008-09-30 .. 2016-06-21 |
+| | `CommonClassCMember` | 2010-09-30 .. 2026-04-21 |
+| V (Class B → B1/B2) | `CommonClassBMember` | 2008-09-30 .. 2024-01-17 |
+| | `CommonClassB1Member` / `CommonClassB2Member` | 2023-09-30 .. 2026-04-21 |
+
+**이것은 freshness가 아니라 identity 문제다.** §4.4.1이 이미 요구하는 명시적 axis/member 등록이
+정본이고, 등록되지 않은 표기는 관측이 되면 안 된다. 다만 **freshness rule이 이 표기들을 어떻게
+다루는지가 아래 결과를 지배하므로** 여기 적어 둔다.
+
+## F4. Candidate 정의
+
+결과를 보기 전에 고정했고 결과를 본 뒤 조건을 바꾸지 않았다.
+
+```text
+S0  baseline        instant <= December last session 중 latest instant. staleness 제한 없음.
+                    tier 판정도 현재의 naive 해석 그대로 — 그 class에 A fact가
+                    usable filing 어디엔가 하나라도 있으면 A tier로 본다.
+
+S1  calendar-year   January 1 of t-1 <= instant <= December last session of t-1 인
+                    관측만 eligible. 일수 knob 없음.
+
+S2  annual-presence formation 시점 가장 최근 usable 10-K family accession에
+                    그 class scope의 해당 concept이 존재해야 그 tier가 active.
+                    실제 December 관측 선택은 K/Q 전체 pool에서 한다.
+
+S3  = S1 AND S2
+
+S4  absolute day cap   diagnostic only. 366 / 400 / 456 / 731일.
+```
+
+**hierarchy와 freshness의 결합**(작업지시 §12)은 이렇게 구현했다.
+
+```text
+S0     : "A가 없다" = history 전체에 A fact가 없다        (현재 naive 해석)
+S1~S4  : "A가 없다" = freshness boundary 안에 usable A가 없다
+
+어느 candidate에서든
+    eligible fresh A 있음        -> A 사용
+    eligible fresh A가 AMBIGUOUS -> fail-close. B로 내려가지 않는다.
+    eligible fresh A 없음        -> 그때만 B를 본다. B도 같은 freshness rule을 만족해야 한다.
+```
+
+`AMBIGUOUS` 판정은 §13의 현재 contract 그대로다 — **같은 instant에 값 또는 `decimals`가
+다른 fact가 있으면 AMBIGUOUS**이고, 더 정밀한 값으로 임의 해결하지 않았다.
+
+## F5. 결과 표 — 124개 관측
+
+`A` = `us-gaap:CommonStockSharesOutstanding`, `B` = `dei:EntityCommonStockSharesOutstanding`.
+`FAIL_CLOSE` = 그 candidate의 freshness rule을 만족하는 관측이 A·B 어디에도 없어 멈춘 것,
+`NO_INSTANT` = December 이하 instant 자체가 없는 것, `AMBIGUOUS` = §13 contract대로 fail-close.
+December session은 F2의 표대로 formation에서 결정된다.
+
+| issuer | formation | class scope | S0 baseline | S1 calendar-year | S2 annual-presence | S3 combined |
+|---|---|---|---|---|---|---|
+| AAPL | 2013 | dimensionless | A 2012-12-29 938,973,000 | A 2012-12-29 938,973,000 | A 2012-12-29 938,973,000 | A 2012-12-29 938,973,000 |
+| AAPL | 2018 | dimensionless | A 2017-09-30 5,126,201,000 | A 2017-09-30 5,126,201,000 | A 2017-09-30 5,126,201,000 | A 2017-09-30 5,126,201,000 |
+| AAPL | 2026 | dimensionless | A 2025-12-27 14,702,703,000 | A 2025-12-27 14,702,703,000 | A 2025-12-27 14,702,703,000 | A 2025-12-27 14,702,703,000 |
+| GOOGL | 2018 | CapitalClassCMember | A 2017-09-30 349,473,000 | A 2017-09-30 349,473,000 | A 2017-09-30 349,473,000 | A 2017-09-30 349,473,000 |
+| GOOGL | 2018 | CommonClassAMember | A 2017-09-30 298,263,000 | A 2017-09-30 298,263,000 | A 2017-09-30 298,263,000 | A 2017-09-30 298,263,000 |
+| GOOGL | 2018 | CommonClassBMember | A 2017-09-30 47,054,000 | A 2017-09-30 47,054,000 | A 2017-09-30 47,054,000 | A 2017-09-30 47,054,000 |
+| GOOGL | 2026 | CapitalClassCMember | A 2025-12-31 5,429,000,000 | A 2025-12-31 5,429,000,000 | A 2025-12-31 5,429,000,000 | A 2025-12-31 5,429,000,000 |
+| GOOGL | 2026 | CommonClassAMember | A 2025-12-31 5,822,000,000 | A 2025-12-31 5,822,000,000 | A 2025-12-31 5,822,000,000 | A 2025-12-31 5,822,000,000 |
+| GOOGL | 2026 | CommonClassBMember | A 2025-12-31 837,000,000 | A 2025-12-31 837,000,000 | A 2025-12-31 837,000,000 | A 2025-12-31 837,000,000 |
+| BRK | 2013 | CommonClassAMember | A 2012-12-31 894,955 | A 2012-12-31 894,955 | A 2012-12-31 894,955 | A 2012-12-31 894,955 |
+| BRK | 2013 | CommonClassBMember | A 2012-12-31 1,121,985,472 | A 2012-12-31 1,121,985,472 | A 2012-12-31 1,121,985,472 | A 2012-12-31 1,121,985,472 |
+| BRK | 2018 | CommonClassAMember | A 2017-09-30 754,684 | A 2017-09-30 754,684 | A 2017-09-30 754,684 | A 2017-09-30 754,684 |
+| BRK | 2018 | CommonClassBMember | A 2017-09-30 1,335,048,578 | A 2017-09-30 1,335,048,578 | A 2017-09-30 1,335,048,578 | A 2017-09-30 1,335,048,578 |
+| BRK | 2026 | CommonClassAMember | A 2025-12-31 515,835 | A 2025-12-31 515,835 | A 2025-12-31 515,835 | A 2025-12-31 515,835 |
+| BRK | 2026 | CommonClassBMember | A 2025-12-31 1,383,582,639 | A 2025-12-31 1,383,582,639 | A 2025-12-31 1,383,582,639 | A 2025-12-31 1,383,582,639 |
+| NVDA | 2013 | dimensionless | A 2012-01-29 612,191,412 | A 2012-01-29 612,191,412 | A 2012-01-29 612,191,412 | A 2012-01-29 612,191,412 |
+| NVDA | 2018 | dimensionless | A 2017-01-29 585,000,000 | A 2017-01-29 585,000,000 | A 2017-01-29 585,000,000 | A 2017-01-29 585,000,000 |
+| NVDA | 2026 | dimensionless | A 2025-01-26 24,477,000,000 | A 2025-01-26 24,477,000,000 | A 2025-01-26 24,477,000,000 | A 2025-01-26 24,477,000,000 |
+| TSLA | 2013 | dimensionless | A 2012-12-31 114,214,274 | A 2012-12-31 114,214,274 | A 2012-12-31 114,214,274 | A 2012-12-31 114,214,274 |
+| TSLA | 2018 | dimensionless | A 2017-09-30 168,017,000 | A 2017-09-30 168,017,000 | A 2017-09-30 168,017,000 | A 2017-09-30 168,017,000 |
+| TSLA | 2026 | dimensionless | A 2025-12-31 3,751,000,000 | A 2025-12-31 3,751,000,000 | B 2025-10-16 3,325,819,167 | B 2025-10-16 3,325,819,167 |
+| XOM | 2013 | dimensionless | A 2012-09-30 4,559,342,639 | A 2012-09-30 4,559,342,639 | B 2012-09-30 4,559,342,639 | B 2012-09-30 4,559,342,639 |
+| XOM | 2018 | dimensionless | A 2017-09-30 4,237,000,000 | A 2017-09-30 4,237,000,000 | A 2017-09-30 4,237,000,000 | A 2017-09-30 4,237,000,000 |
+| XOM | 2026 | dimensionless | A 2025-12-31 4,179,000,000 | A 2025-12-31 4,179,000,000 | A 2025-12-31 4,179,000,000 | A 2025-12-31 4,179,000,000 |
+| WMT | 2013 | dimensionless | A 2012-01-31 3,418,000,000 | A 2012-01-31 3,418,000,000 | B 2012-11-30 3,345,237,845 | B 2012-11-30 3,345,237,845 |
+| WMT | 2018 | dimensionless | A 2012-01-31 3,418,000,000 | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 |
+| WMT | 2026 | dimensionless | A 2012-01-31 3,418,000,000 | B 2025-12-02 7,970,166,964 | B 2025-12-02 7,970,166,964 | B 2025-12-02 7,970,166,964 |
+| INTC | 2013 | dimensionless | A 2012-12-29 4,944,000,000 | A 2012-12-29 4,944,000,000 | A 2012-12-29 4,944,000,000 | A 2012-12-29 4,944,000,000 |
+| INTC | 2018 | dimensionless | A 2017-09-30 4,680,000,000 | A 2017-09-30 4,680,000,000 | A 2017-09-30 4,680,000,000 | A 2017-09-30 4,680,000,000 |
+| INTC | 2026 | dimensionless | A 2025-12-27 4,994,000,000 | A 2025-12-27 4,994,000,000 | A 2025-12-27 4,994,000,000 | A 2025-12-27 4,994,000,000 |
+| ABBV | 2013 | dimensionless | NO_INSTANT | NO_INSTANT | NO_INSTANT | NO_INSTANT |
+| ABBV | 2018 | dimensionless | B 2017-10-24 1,596,429,740 | B 2017-10-24 1,596,429,740 | B 2017-10-24 1,596,429,740 | B 2017-10-24 1,596,429,740 |
+| ABBV | 2026 | dimensionless | B 2025-10-27 1,767,384,632 | B 2025-10-27 1,767,384,632 | B 2025-10-27 1,767,384,632 | B 2025-10-27 1,767,384,632 |
+| FOX | 2026 | CommonClassAMember | A 2025-12-31 200,553,435 | A 2025-12-31 200,553,435 | A 2025-12-31 200,553,435 | A 2025-12-31 200,553,435 |
+| FOX | 2026 | CommonClassBMember | A 2025-12-31 224,702,222 | A 2025-12-31 224,702,222 | A 2025-12-31 224,702,222 | A 2025-12-31 224,702,222 |
+| META | 2013 | CommonClassAMember | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS |
+| META | 2013 | CommonClassBMember | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS |
+| META | 2018 | CommonClassAMember | A 2017-09-30 2,385,000,000 | A 2017-09-30 2,385,000,000 | A 2017-09-30 2,385,000,000 | A 2017-09-30 2,385,000,000 |
+| META | 2018 | CommonClassBMember | A 2017-09-30 521,000,000 | A 2017-09-30 521,000,000 | A 2017-09-30 521,000,000 | A 2017-09-30 521,000,000 |
+| META | 2026 | CommonClassAMember | A 2025-12-31 2,187,000,000 | A 2025-12-31 2,187,000,000 | A 2025-12-31 2,187,000,000 | A 2025-12-31 2,187,000,000 |
+| META | 2026 | CommonClassBMember | A 2025-12-31 343,000,000 | A 2025-12-31 343,000,000 | A 2025-12-31 343,000,000 | A 2025-12-31 343,000,000 |
+| F | 2013 | CommonClassBMember | B 2012-10-26 70,852,076 | B 2012-10-26 70,852,076 | B 2012-10-26 70,852,076 | B 2012-10-26 70,852,076 |
+| F | 2013 | CommonStockMember | B 2012-10-26 3,741,809,920 | B 2012-10-26 3,741,809,920 | B 2012-10-26 3,741,809,920 | B 2012-10-26 3,741,809,920 |
+| F | 2018 | CommonClassBMember | B 2017-10-19 70,852,076 | B 2017-10-19 70,852,076 | FAIL_CLOSE | FAIL_CLOSE |
+| F | 2018 | CommonStockMember | B 2017-10-19 3,901,450,116 | B 2017-10-19 3,901,450,116 | FAIL_CLOSE | FAIL_CLOSE |
+| F | 2026 | CommonClassBMember | B 2025-10-21 70,852,076 | B 2025-10-21 70,852,076 | B 2025-10-21 70,852,076 | B 2025-10-21 70,852,076 |
+| F | 2026 | CommonStockMember | B 2025-10-21 3,913,646,490 | B 2025-10-21 3,913,646,490 | B 2025-10-21 3,913,646,490 | B 2025-10-21 3,913,646,490 |
+| CMCSA | 2013 | ClassASpecialCommonStockMember | A 2012-03-31 577,031,322 | A 2012-03-31 577,031,322 | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2013 | ClassSpecialCommonStockMember | A 2011-09-30 622,816,473 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2013 | ClassaSpecialCommonStockMember | A 2012-12-31 507,769,463 | A 2012-12-31 507,769,463 | A 2012-12-31 507,769,463 | A 2012-12-31 507,769,463 |
+| CMCSA | 2013 | CommonClassAMember | A 2012-12-31 2,122,278,635 | A 2012-12-31 2,122,278,635 | A 2012-12-31 2,122,278,635 | A 2012-12-31 2,122,278,635 |
+| CMCSA | 2013 | CommonClassASpecialMember | A 2010-03-31 745,871,969 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2013 | CommonClassBMember | A 2012-12-31 9,444,375 | A 2012-12-31 9,444,375 | A 2012-12-31 9,444,375 | A 2012-12-31 9,444,375 |
+| CMCSA | 2018 | ClassASpecialCommonStockMember | A 2012-03-31 577,031,322 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2018 | ClassSpecialCommonStockMember | A 2011-09-30 622,816,473 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2018 | ClassaSpecialCommonStockMember | A 2016-12-31 0 | FAIL_CLOSE | A 2016-12-31 0 | FAIL_CLOSE |
+| CMCSA | 2018 | CommonClassAMember | A 2017-09-30 4,664,327,455 | A 2017-09-30 4,664,327,455 | A 2017-09-30 4,664,327,455 | A 2017-09-30 4,664,327,455 |
+| CMCSA | 2018 | CommonClassASpecialMember | A 2010-03-31 745,871,969 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2018 | CommonClassBMember | A 2017-09-30 9,444,375 | A 2017-09-30 9,444,375 | A 2017-09-30 9,444,375 | A 2017-09-30 9,444,375 |
+| CMCSA | 2026 | ClassASpecialCommonStockMember | A 2012-03-31 577,031,322 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2026 | ClassSpecialCommonStockMember | A 2011-09-30 622,816,473 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2026 | ClassaSpecialCommonStockMember | A 2017-12-31 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2026 | CommonClassAMember | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS |
+| CMCSA | 2026 | CommonClassASpecialMember | A 2010-03-31 745,871,969 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| CMCSA | 2026 | CommonClassBMember | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS |
+| NWS | 2018 | CommonClassAMember | A 2017-09-30 382,976,281 | A 2017-09-30 382,976,281 | A 2017-09-30 382,976,281 | A 2017-09-30 382,976,281 |
+| NWS | 2018 | CommonClassBMember | A 2017-09-30 199,630,240 | A 2017-09-30 199,630,240 | A 2017-09-30 199,630,240 | A 2017-09-30 199,630,240 |
+| NWS | 2018 | SeriesCommonStockMember | A 2017-06-30 0 | A 2017-06-30 0 | A 2017-06-30 0 | A 2017-06-30 0 |
+| NWS | 2026 | CommonClassAMember | A 2025-12-31 371,777,267 | A 2025-12-31 371,777,267 | A 2025-12-31 371,777,267 | A 2025-12-31 371,777,267 |
+| NWS | 2026 | CommonClassBMember | A 2025-12-31 185,853,935 | A 2025-12-31 185,853,935 | A 2025-12-31 185,853,935 | A 2025-12-31 185,853,935 |
+| NWS | 2026 | SeriesCommonStockMember | A 2025-06-30 0 | A 2025-06-30 0 | A 2025-06-30 0 | A 2025-06-30 0 |
+| UA | 2013 | CommonClassAMember | A 2012-12-31 83,461,106 | A 2012-12-31 83,461,106 | A 2012-12-31 83,461,106 | A 2012-12-31 83,461,106 |
+| UA | 2013 | ConvertibleCommonStockMember | A 2012-12-31 21,300,000 | A 2012-12-31 21,300,000 | A 2012-12-31 21,300,000 | A 2012-12-31 21,300,000 |
+| UA | 2018 | CommonClassAMember | A 2017-09-30 185,128,757 | A 2017-09-30 185,128,757 | A 2017-09-30 185,128,757 | A 2017-09-30 185,128,757 |
+| UA | 2018 | CommonClassCMember | A 2017-09-30 222,050,824 | A 2017-09-30 222,050,824 | A 2017-09-30 222,050,824 | A 2017-09-30 222,050,824 |
+| UA | 2018 | ConvertibleCommonStockMember | A 2017-09-30 34,450,000 | A 2017-09-30 34,450,000 | A 2017-09-30 34,450,000 | A 2017-09-30 34,450,000 |
+| UA | 2026 | CommonClassAMember | A 2025-12-31 188,834,386 | A 2025-12-31 188,834,386 | A 2025-12-31 188,834,386 | A 2025-12-31 188,834,386 |
+| UA | 2026 | CommonClassCMember | A 2025-12-31 202,487,254 | A 2025-12-31 202,487,254 | A 2025-12-31 202,487,254 | A 2025-12-31 202,487,254 |
+| UA | 2026 | ConvertibleCommonStockMember | A 2025-12-31 34,450,000 | A 2025-12-31 34,450,000 | A 2025-12-31 34,450,000 | A 2025-12-31 34,450,000 |
+| V | 2013 | ClassCCommonStockMember | A 2011-03-31 64,000,000 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2013 | ClassCSeriesICommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2013 | ClassCSeriesIIICommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2013 | ClassCSeriesIVCommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2013 | CommonClassAMember | A 2012-12-31 530,000,000 | A 2012-12-31 530,000,000 | A 2012-12-31 530,000,000 | A 2012-12-31 530,000,000 |
+| V | 2013 | CommonClassBMember | A 2012-12-31 245,000,000 | A 2012-12-31 245,000,000 | A 2012-12-31 245,000,000 | A 2012-12-31 245,000,000 |
+| V | 2013 | CommonClassCMember | A 2012-12-31 29,000,000 | A 2012-12-31 29,000,000 | A 2012-12-31 29,000,000 | A 2012-12-31 29,000,000 |
+| V | 2018 | ClassCCommonStockMember | A 2016-06-21 550,000 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2018 | ClassCSeriesICommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2018 | ClassCSeriesIIICommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2018 | ClassCSeriesIVCommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2018 | CommonClassAMember | A 2017-09-30 1,818,000,000 | A 2017-09-30 1,818,000,000 | A 2017-09-30 1,818,000,000 | A 2017-09-30 1,818,000,000 |
+| V | 2018 | CommonClassBMember | A 2017-09-30 245,000,000 | A 2017-09-30 245,000,000 | A 2017-09-30 245,000,000 | A 2017-09-30 245,000,000 |
+| V | 2018 | CommonClassCMember | A 2017-09-30 13,000,000 | A 2017-09-30 13,000,000 | A 2017-09-30 13,000,000 | A 2017-09-30 13,000,000 |
+| V | 2026 | ClassCCommonStockMember | A 2016-06-21 550,000 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2026 | ClassCSeriesICommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2026 | ClassCSeriesIIICommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2026 | ClassCSeriesIVCommonStockMember | A 2009-09-30 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2026 | CommonClassAMember | A 2025-12-31 1,683,000,000 | A 2025-12-31 1,683,000,000 | A 2025-12-31 1,683,000,000 | A 2025-12-31 1,683,000,000 |
+| V | 2026 | CommonClassB1Member | A 2025-12-31 5,000,000 | A 2025-12-31 5,000,000 | A 2025-12-31 5,000,000 | A 2025-12-31 5,000,000 |
+| V | 2026 | CommonClassB2Member | A 2025-12-31 120,000,000 | A 2025-12-31 120,000,000 | A 2025-12-31 120,000,000 | A 2025-12-31 120,000,000 |
+| V | 2026 | CommonClassBMember | A 2023-12-31 245,000,000 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| V | 2026 | CommonClassCMember | A 2025-12-31 9,000,000 | A 2025-12-31 9,000,000 | A 2025-12-31 9,000,000 | A 2025-12-31 9,000,000 |
+| V | 2026 | CommonStockMember | A 2023-12-31 1,836,000,000 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| MA | 2013 | CommonClassAMember | A 2012-12-31 118,405,075 | A 2012-12-31 118,405,075 | A 2012-12-31 118,405,075 | A 2012-12-31 118,405,075 |
+| MA | 2013 | CommonClassBMember | A 2012-12-31 4,838,840 | A 2012-12-31 4,838,840 | A 2012-12-31 4,838,840 | A 2012-12-31 4,838,840 |
+| MA | 2013 | CommonStockAdditionalSeriesMember | A 2010-12-31 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| MA | 2018 | CommonClassAMember | A 2017-09-30 1,045,000,000 | A 2017-09-30 1,045,000,000 | A 2017-09-30 1,045,000,000 | A 2017-09-30 1,045,000,000 |
+| MA | 2018 | CommonClassBMember | A 2017-09-30 15,000,000 | A 2017-09-30 15,000,000 | A 2017-09-30 15,000,000 | A 2017-09-30 15,000,000 |
+| MA | 2018 | CommonStockAdditionalSeriesMember | A 2010-12-31 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| MA | 2026 | CommonClassAMember | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS |
+| MA | 2026 | CommonClassBMember | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS | AMBIGUOUS |
+| MA | 2026 | CommonStockAdditionalSeriesMember | A 2010-12-31 0 | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE |
+| NKE | 2013 | CommonClassAMember | A 2012-11-30 180,000,000 | A 2012-11-30 180,000,000 | A 2012-11-30 180,000,000 | A 2012-11-30 180,000,000 |
+| NKE | 2013 | CommonClassBMember | A 2012-11-30 716,000,000 | A 2012-11-30 716,000,000 | A 2012-11-30 716,000,000 | A 2012-11-30 716,000,000 |
+| NKE | 2018 | CommonClassAMember | A 2017-11-30 329,000,000 | A 2017-11-30 329,000,000 | A 2017-11-30 329,000,000 | A 2017-11-30 329,000,000 |
+| NKE | 2018 | CommonClassBMember | A 2017-11-30 1,295,000,000 | A 2017-11-30 1,295,000,000 | A 2017-11-30 1,295,000,000 | A 2017-11-30 1,295,000,000 |
+| NKE | 2026 | CommonClassAMember | A 2025-11-30 289,000,000 | A 2025-11-30 289,000,000 | A 2025-11-30 289,000,000 | A 2025-11-30 289,000,000 |
+| NKE | 2026 | CommonClassBMember | A 2025-11-30 1,191,000,000 | A 2025-11-30 1,191,000,000 | A 2025-11-30 1,191,000,000 | A 2025-11-30 1,191,000,000 |
+| COST | 2013 | dimensionless | A 2012-11-25 434,824,000 | A 2012-11-25 434,824,000 | A 2012-11-25 434,824,000 | A 2012-11-25 434,824,000 |
+| COST | 2018 | dimensionless | A 2017-11-26 439,185,000 | A 2017-11-26 439,185,000 | A 2017-11-26 439,185,000 | A 2017-11-26 439,185,000 |
+| COST | 2026 | dimensionless | A 2025-11-23 443,919,000 | A 2025-11-23 443,919,000 | A 2025-11-23 443,919,000 | A 2025-11-23 443,919,000 |
+| HD | 2013 | dimensionless | A 2012-10-28 1,496,000,000 | A 2012-10-28 1,496,000,000 | A 2012-10-28 1,496,000,000 | A 2012-10-28 1,496,000,000 |
+| HD | 2018 | dimensionless | A 2017-10-29 1,168,000,000 | A 2017-10-29 1,168,000,000 | A 2017-10-29 1,168,000,000 | A 2017-10-29 1,168,000,000 |
+| HD | 2026 | dimensionless | A 2025-11-02 995,000,000 | A 2025-11-02 995,000,000 | A 2025-11-02 995,000,000 | A 2025-11-02 995,000,000 |
+
+## F6. 통계
+
+**이 숫자는 Gate C가 아니다.** 20개 적대적 표본의 구조 비교이고 coverage 추정이 아니다.
+
+| 지표 | S0 baseline | S1 calendar-year | S2 annual-presence | S3 combined |
+|---|---|---|---|---|
+| resolved | 117 | 90 | 88 | 87 |
+| — A tier | 109 | 80 | 77 | 76 |
+| — B tier | 8 | 10 | 11 | 11 |
+| `AMBIGUOUS` (fail-close, B 금지) | 6 | 6 | 6 | 6 |
+| fail-close missing | 1 | 28 | 30 | 31 |
+| — fresh A 없고 B fact 자체가 없음 | 0 | 10 | 10 | 10 |
+| — 양쪽에 관측은 있으나 fresh가 없음 | 0 | 17 | 19 | 20 |
+| — December 이하 instant 자체가 없음 | 1 | 1 | 1 | 1 |
+| **선택된 값의 age > 366일** | **28** | **0** | **0** | **0** |
+| age median (일) | 90 | 33 | 31 | 31 |
+| age max (일) | **5,936** | 339 | 363 | 339 |
+
+`AMBIGUOUS` 6건은 네 candidate에서 **완전히 같은 집합**이다(META 2013 A/B, CMCSA 2026 A/B,
+MA 2026 A/B). **freshness rule은 ambiguity를 만들지도 없애지도 않는다.**
+
+### F6.1 A stale-only 때문에 fresh B가 막히는 사례
+
+작업지시 §12가 명시적으로 세라고 한 failure다.
+
+```text
+S0 (history 전체로 "A가 있다"를 판정)  -> 2건   WMT 2018 · WMT 2026
+S1 / S2 / S3 (boundary 안에서 판정)   -> 0건
+```
+
+두 건 모두 **A는 stale-only인데 같은 formation에 fresh B가 실제로 있었다.** boundary를
+hierarchy **앞**에 두면 사라지고, 뒤에 두면 남는다. F10에서 다시 쓴다.
+
+### F6.2 10-Q가 실제로 무엇을 고쳤나
+
+§2.3이 "10-K-only라 staleness가 부풀어 있다"고 적었는데, **stale trap에 대해서는 거의 틀렸다.**
+
+| 비교 | 값 |
+|---|---|
+| 같은 표본을 10-K family만으로 S0 실행했을 때 age > 366일 | 30 |
+| 10-K + 10-Q 전량으로 S0 실행했을 때 age > 366일 | **28** |
+| 10-Q 추가가 없앤 stale case | **2** (둘 다 F 2026, 1,430일 → 71일) |
+| 10-Q 추가로 instant가 더 최근이 된 관측 | 64 |
+| 10-K family만으로는 아예 해결되지 않던 관측 | 8 |
+
+**10-Q는 instant의 최신성을 크게 개선하지만(64건) 조용한 stale trap은 2건밖에 못 고친다.**
+stale trap의 원인이 "그 분기 filing이 표본에 없어서"가 아니라 **"그 발행사·그 class가 그
+concept·그 member 표기를 아예 그만 썼기 때문"**이기 때문이다.
+
+## F7. WMT — motivating failure는 10-Q를 넣어도 그대로다
+
+`us-gaap:CommonStockSharesOutstanding`을 class/dimensionless context에 태깅한 WMT filing은
+**1,303개 usable filing 전체에서 세 개뿐**이다.
+
+| instant | value | `decimals` | accession | form | acceptance |
+|---|---|---|---|---|---|
+| 2009-01-31 | 3,925,000,000 | -6 | 0001193125-10-071652 | 10-K | 2010-03-30 |
+| 2010-01-31 | 3,786,000,000 | -6 | 0001193125-10-071652 · 0001193125-11-083157 | 10-K | 2010-03-30 · 2011-03-30 |
+| 2011-01-31 | 3,516,000,000 | -6 / INF | 0001193125-11-083157 · 0001193125-12-134679 | 10-K | 2011-03-30 · 2012-03-27 |
+| 2012-01-31 | **3,418,000,000** | INF | 0001193125-12-134679 | 10-K | 2012-03-27 |
+
+**2012-03-27 이후 14년 동안 한 번도 없다.** 같은 기간 DEI fact는 70개이고 가장 최근이
+2026-05-27이다.
+
+원문 대조(§15 요구):
+
+- WMT FY2012 10-K rendered `R4.htm`(`0001193125-12-134679`)의 대차대조표 부기에
+  `Common stock, shares outstanding 3,418,000,000 / 3,516,000,000`이 있고 element는
+  `us-gaap_CommonStockSharesOutstanding`이다. **값 자체는 옳다.**
+- WMT FY2026 10-K rendered `R1.htm`(`0000104169-26-000055`)의 표지는
+  `Entity Common Stock, Shares Outstanding 7,972,402,501`이다.
+
+결과:
+
+| formation | S0 | S1 | S2 | S3 |
+|---|---|---|---|---|
+| 2013 | A 2012-01-31 3,418,000,000 | A 2012-01-31 3,418,000,000 | B 2012-11-30 3,345,237,845 | B 2012-11-30 3,345,237,845 |
+| 2018 | **A 2012-01-31 3,418,000,000** (2,159일) | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 |
+| 2026 | **A 2012-01-31 3,418,000,000** (5,083일) | B 2025-12-02 7,970,166,964 | B 2025-12-02 7,970,166,964 | B 2025-12-02 7,970,166,964 |
+
+**2026 formation의 오차는 단순한 낡음이 아니다.** 2024-02 3:1 split 이전 단위의 수량을
+split 이후 raw close에 곱하게 되므로 ME가 약 2.3배 축소되고, `B/M`은 그만큼 부풀어
+**WMT가 value 랭크 상위로 잘못 올라간다.** 값이 그럴듯해서 어떤 검증도 울리지 않는다.
+
+### F7.1 WMT 사례에서 새로 드러난 것 — dimension shape가 진짜 원인의 절반이다
+
+WMT FY2026 10-K instance(`wmt-20260131_htm.xml`)를 직접 열어보면
+`us-gaap:CommonStockSharesOutstanding`이 **살아 있다.**
+
+```text
+CommonStockSharesOutstanding  instant=2023-01-31  8,080,000,000  StatementEquityComponentsAxis / CommonStockMember
+CommonStockSharesOutstanding  instant=2024-01-31  8,054,000,000  StatementEquityComponentsAxis / CommonStockMember
+CommonStockSharesOutstanding  instant=2025-01-31  8,024,000,000  StatementEquityComponentsAxis / CommonStockMember
+CommonStockSharesOutstanding  instant=2026-01-31  7,969,000,000  StatementEquityComponentsAxis / CommonStockMember
+```
+
+**class 축도 dimensionless도 아니고 자본변동표 축이다.** 즉 WMT는 concept을 버린 것이 아니라
+**context shape를 옮겼다.** 표본 전체에서 이 모양이 적지 않다.
+
+| A fact의 dimension shape | 수 |
+|---|---|
+| class axis 단독 | 3,286 |
+| dimensionless | 1,121 |
+| **그 밖의 축(자본변동표 축 등)** | **2,215** |
+
+가장 많은 조합이 `StatementEquityComponentsAxis / CommonStockMember` 1,804개다.
+
+**이번 연구는 dimension shape 계약을 CLOSED로 받고 시작했으므로 여기서 바꾸지 않았다.**
+다만 두 가지는 기록해 둔다.
+
+1. 이 shape를 관측으로 인정했다면 WMT 2026의 S0는 `2012-01-31`이 아니라 `2025-10-31`이
+   됐을 것이다(28개 stale 관측 중 **이 완화로 달라지는 것은 WMT 2026 하나뿐**이다).
+2. 그래도 **freshness boundary는 여전히 필요하다.** 나머지 27개 stale 관측은 완화해도
+   더 최근 관측이 생기지 않는다(F8).
+
+**둘은 독립한 결정이고, 이번 결론이 dimension shape 결정을 대신하지 않는다.**
+
+## F8. S0의 stale 28건 전수
+
+`age`는 December session − 선택된 instant다. `완화 shape`는 F7.1의 자본변동표 축·복수 축까지
+인정했을 때 더 최근 관측이 생기는지다.
+
+| issuer | formation | class scope | S0 선택 | value | age(일) | S1/S2/S3 | 완화 shape로 개선? |
+|---|---|---|---|---|---|---|---|
+| WMT | 2018 | dimensionless | A 2012-01-31 | 3,418,000,000 | 2,159 | 전부 B로 교정 | 아니오 |
+| WMT | 2026 | dimensionless | A 2012-01-31 | 3,418,000,000 | 5,083 | 전부 B로 교정 | **예** (2025-10-31) |
+| CMCSA | 2013 | ClassSpecialCommonStockMember | A 2011-09-30 | 622,816,473 | 458 | 전부 fail-close | 아니오 |
+| CMCSA | 2013 | CommonClassASpecialMember | A 2010-03-31 | 745,871,969 | 1,006 | 전부 fail-close | 아니오 |
+| CMCSA | 2018 | ClassASpecialCommonStockMember | A 2012-03-31 | 577,031,322 | 2,099 | 전부 fail-close | 아니오 |
+| CMCSA | 2018 | ClassSpecialCommonStockMember | A 2011-09-30 | 622,816,473 | 2,282 | 전부 fail-close | 아니오 |
+| CMCSA | 2018 | CommonClassASpecialMember | A 2010-03-31 | 745,871,969 | 2,830 | 전부 fail-close | 아니오 |
+| CMCSA | 2026 | ClassASpecialCommonStockMember | A 2012-03-31 | 577,031,322 | 5,023 | 전부 fail-close | 아니오 |
+| CMCSA | 2026 | ClassSpecialCommonStockMember | A 2011-09-30 | 622,816,473 | 5,206 | 전부 fail-close | 아니오 |
+| CMCSA | 2026 | ClassaSpecialCommonStockMember | A 2017-12-31 | 0 | 2,922 | 전부 fail-close | 아니오 |
+| CMCSA | 2026 | CommonClassASpecialMember | A 2010-03-31 | 745,871,969 | 5,754 | 전부 fail-close | 아니오 |
+| V | 2013 | ClassCCommonStockMember | A 2011-03-31 | 64,000,000 | 641 | 전부 fail-close | 아니오 |
+| V | 2013 | ClassCSeriesICommonStockMember | A 2009-09-30 | 0 | 1,188 | 전부 fail-close | 아니오 |
+| V | 2013 | ClassCSeriesIIICommonStockMember | A 2009-09-30 | 0 | 1,188 | 전부 fail-close | 아니오 |
+| V | 2013 | ClassCSeriesIVCommonStockMember | A 2009-09-30 | 0 | 1,188 | 전부 fail-close | 아니오 |
+| V | 2018 | ClassCCommonStockMember | A 2016-06-21 | 550,000 | 556 | 전부 fail-close | 아니오 |
+| V | 2018 | ClassCSeriesICommonStockMember | A 2009-09-30 | 0 | 3,012 | 전부 fail-close | 아니오 |
+| V | 2018 | ClassCSeriesIIICommonStockMember | A 2009-09-30 | 0 | 3,012 | 전부 fail-close | 아니오 |
+| V | 2018 | ClassCSeriesIVCommonStockMember | A 2009-09-30 | 0 | 3,012 | 전부 fail-close | 아니오 |
+| V | 2026 | ClassCCommonStockMember | A 2016-06-21 | 550,000 | 3,480 | 전부 fail-close | 아니오 |
+| V | 2026 | ClassCSeriesICommonStockMember | A 2009-09-30 | 0 | 5,936 | 전부 fail-close | 아니오 |
+| V | 2026 | ClassCSeriesIIICommonStockMember | A 2009-09-30 | 0 | 5,936 | 전부 fail-close | 아니오 |
+| V | 2026 | ClassCSeriesIVCommonStockMember | A 2009-09-30 | 0 | 5,936 | 전부 fail-close | 아니오 |
+| V | 2026 | CommonClassBMember | A 2023-12-31 | 245,000,000 | 731 | 전부 fail-close | 아니오 |
+| V | 2026 | CommonStockMember | A 2023-12-31 | 1,836,000,000 | 731 | 전부 fail-close | 아니오 |
+| MA | 2013 | CommonStockAdditionalSeriesMember | A 2010-12-31 | 0 | 731 | 전부 fail-close | 아니오 |
+| MA | 2018 | CommonStockAdditionalSeriesMember | A 2010-12-31 | 0 | 2,555 | 전부 fail-close | 아니오 |
+| MA | 2026 | CommonStockAdditionalSeriesMember | A 2010-12-31 | 0 | 5,479 | 전부 fail-close | 아니오 |
+
+**28건 중 26건이 "은퇴했거나 옛 표기인 class scope"다.** WMT 2건만이 살아 있는 class에서
+값이 낡은 경우다. 세 freshness candidate 모두 28건 전부를 잘라낸다.
+
+**살아 있는 ordinary class를 잃은 건은 S1에서 0건이다.**
+
+## F9. Ford / AbbVie — S2가 깨지는 지점
+
+**Ford**: `us-gaap:CommonStockSharesOutstanding`을 한 번도 쓰지 않는다는 §12.4 결론은 10-Q까지
+넣은 이번에도 유지된다. B tier로 세 formation 모두 정상 해결된다 — **S0·S1에서는.**
+
+**S2에서 Ford 2018이 통째로 사라진다.** 원인은 Ford가 아니라 `10-K/A`다.
+
+```text
+formation 2018-06-29 시점 가장 최근 usable 10-K family accession
+    = 0000037996-18-000025   10-K/A   filed 2018-03-28
+    이 accession의 파일 목록에 .xml이 하나도 없다 (원문 index.json 확인)
+    -> direct outstanding fact 0개 -> A도 B도 active가 아님
+    -> Ford 2018의 살아 있는 두 class(CommonStock, ClassB)가 fail-close missing
+```
+
+**TSLA 2026도 같은 함정을 다른 모양으로 밟는다.**
+
+```text
+formation 2026-06-30 시점 가장 최근 usable 10-K family accession
+    = 0001104659-26-053166   10-K/A   filed 2026-04-30
+    이 accession에는 DEI 표지 fact 하나뿐이다 (instant 2026-01-23)
+    -> A tier가 active가 아니게 되어 S2는 2025-12-31 A 대신 2025-10-16 B를 고른다
+```
+
+TSLA는 실제로 FY2025 10-K과 이후 10-Q에서 A를 정상 태깅한다. **S2가 틀린 것이다.**
+
+표본 56개 (issuer, formation) 중 가장 최근 usable annual accession이 `10-K/A`인 경우가
+이렇게 존재하고, Part III 보충이나 재제출은 XBRL이 없거나 표지만 있는 것이 정상이다.
+**`10-K family의 가장 최근 accession`이라는 정의 자체가 이 함정을 구조적으로 만든다.**
+
+> **정의를 고쳐 다시 돌리지 않았다.** 작업지시 §10이 "S1이나 S2 결과를 본 뒤 조건을
+> 변경하지 않는다"고 못박았고, 결과를 보고 `10-K만` 또는 `fact가 있는 가장 최근 annual`로
+> 바꾸는 것은 정확히 그 금지다. 이 실패는 숨기지 않고 그대로 센다.
+
+**AbbVie**: 세 candidate 모두 같다. 2018·2026은 B tier로 정상 해결되고
+(`2017-10-24 1,596,429,740` · `2025-10-27 1,767,384,632`), **2013은 네 candidate 전부
+`NO_INSTANT`다.** freshness 때문이 아니라 AbbVie의 첫 10-K(2013-03-15)에 XBRL이 없고
+그 다음 10-Q의 표지 instant가 이미 December 2012보다 뒤이기 때문이다. **구조적 결측이고
+어떤 freshness rule도 이것을 만들거나 고치지 않는다.**
+
+## F10. non-calendar fiscal year — S1이 systematic false missing을 만드는가
+
+**만들지 않는다.** 비12월 결산 발행사가 S1에서 잃은 살아 있는 class는 0이다.
+
+| issuer | 회계연도 말 | S1 결과 (관측 3 formation 합) |
+|---|---|---|
+| AAPL | 9월 | A 3 |
+| V | 9월 | A 10 · 나머지 14는 전부 은퇴 scope |
+| COST | 8/9월 | A 3 |
+| NWS | 6월 | A 6 |
+| FOX | 6월 | A 2 |
+| NKE | 5월 | A 6 |
+| NVDA | 1월 | A 3 |
+| HD | 1/2월 | A 3 |
+| WMT | 1월 | A 1 · B 2 |
+| UA | 12월 → 3월 (결산 변경) | A 8 |
+
+이유는 구조적이다. **calendar-year boundary는 회계연도와 무관하게 "t-1년 중에 보고된
+share state"만 요구**하는데, 어떤 결산월이든 t-1년 안에 최소 한 번은 대차대조표 instant
+또는 표지 instant가 찍힌다. 1월 결산(NVDA·HD·WMT)은 그해 1월 말 instant가 t-1년 안에
+들어오고, 52/53주 발행사(AAPL 2025-12-27 · INTC 2025-12-27 · HD 2025-11-02)도 마찬가지다.
+
+**S1이 만드는 가장 낡은 관측은 339일이다.** 그 상한이 회계연도 구조에서 자동으로 나온다는
+점이 중요하다 — 일수를 정해서 얻은 것이 아니다.
+
+한 가지는 정직하게 적는다. **S1은 "그 해 안이지만 그 해 초의" 관측을 막지 않는다.**
+NVDA 2013·2018·2026은 각각 1월 말 A instant(337·335·339일)를 고르고 같은 formation에
+11월 DEI 표지가 있다. WMT 2013도 A `2012-01-31`(3,418,000,000)을 고르고 11월 DEI
+`3,345,237,845`가 있다(차이 2.2%). **이것은 freshness 결함이 아니라 Candidate C의
+"A 우선" 자체가 만드는 성질**이고, A가 재무제표 instant라 December 정렬이 낫다는 §8.3의
+근거와 맞바꾼 것이다. 이번 연구는 그 hierarchy를 다시 열지 않는다.
+
+## F11. hierarchy와 freshness의 정확한 결합 (작업지시 §12)
+
+**결론: boundary는 hierarchy보다 앞에 있어야 한다.** "A가 없다"의 의미가 갈리는 지점이다.
+
+| "A가 없다"의 의미 | WMT 2018 | WMT 2026 |
+|---|---|---|
+| history 전체에 A fact가 없다 (S0) | A 2012-01-31 3,418,000,000 · **B 영구 차단** | A 2012-01-31 3,418,000,000 · **B 영구 차단** |
+| boundary 안에 usable A가 없다 (S1~) | B 2017-11-29 2,962,381,445 | B 2025-12-02 7,970,166,964 |
+
+**stale A 때문에 fresh B가 막히는 구조는 S0에서 2건, S1/S2/S3에서 0건이다.**
+Candidate C를 채택하면서 boundary를 hierarchy 뒤에 두면 WMT형 발행사는 **B가 있어도 영원히
+옛 A를 쓴다.** 그래서 결합 순서는 이렇게 고정돼야 한다.
+
+```text
+1. 그 class scope에서 A의 eligible-fresh 집합을 만든다.
+2. 비어 있지 않으면 A를 쓴다.
+     같은 instant에 값·decimals가 갈리면 AMBIGUOUS -> fail-close. B로 내려가지 않는다.
+3. 비어 있을 때만 B의 eligible-fresh 집합을 본다. B도 같은 boundary를 만족해야 한다.
+4. 둘 다 비면 그 issuer-year는 MISSING이다. 옛 값을 쓰지 않는다.
+```
+
+2번의 `AMBIGUOUS`가 `fact 없음`과 다르다는 `User decision` 1번 주석은 이번에도 지켰다.
+6건의 `AMBIGUOUS`는 네 candidate에서 모두 fail-close이고 **B로 내려간 건은 0이다.**
+
+## F12. Candidate S4 — absolute day cap (diagnostic only)
+
+같은 hierarchy에 boundary만 일수 상한으로 바꿔 돌렸다. **추천 후보로 쓰지 않는다.**
+
+| cutoff | resolved | AMBIGUOUS | fail-close | S1과 다른 관측 |
+|---|---|---|---|---|
+| 366일 | 91 | 6 | 27 | 1 |
+| 400일 | 91 | 6 | 27 | 1 |
+| 456일 | 91 | 6 | 27 | 1 |
+| 731일 | 97 | 6 | 21 | 7 |
+| (S1) | 90 | 6 | 28 | — |
+
+**366 · 400 · 456이 결과가 완전히 같다.** 이 표본은 그 구간 안에서 숫자를 식별하지 못한다.
+S0의 age 분포에도 `339 · 363` 다음이 `458`이라 넓은 빈 구간이 있다. 즉 **여러 cutoff를
+훑어 가장 coverage 좋은 값을 고르는 일이 가능하고, 그래서 하면 안 된다.**
+
+366일 계열이 S1과 다른 단 하나는 CMCSA 2018 `ClassaSpecialCommonStockMember`
+(A 2016-12-31, 값 0, 363일)를 **되살린다**는 것이다. 은퇴 표기이므로 되살리는 쪽이 나쁘다.
+731일은 은퇴 scope 7개를 되살린다.
+
+**외부 accounting/reporting semantic으로 독립 정당화되는 일수 근거를 찾지 못했다.**
+`365`나 `366`은 "1년"이라는 직관에서 오는 숫자이지 SEC 보고 규칙이 정하는 경계가 아니다.
+반면 `January 1 of t-1 ~ December last session of t-1`은 **December denominator의 정의 자체**에서
+나온다. 그래서 S4는 추천하지 않는다.
+
+## F13. 이번에 새로 드러난 반례들
+
+1. **`10-K/A`가 annual-presence guard를 무력화한다** (F9). Ford 2018은 살아 있는 두 class를
+   잃고 TSLA 2026은 더 정확한 A 대신 B를 고른다. S2·S3의 구조적 결함이다.
+2. **member 표기 변경이 은퇴 class처럼 보인다** (F3). CMCSA Class A Special은 네 가지 표기,
+   Visa Class C는 두 가지 표기를 갖는다. **freshness rule이 이것을 대부분 잘라내지만
+   그것은 부수 효과이지 해법이 아니다** — 해법은 §4.4.1의 명시적 axis/member 등록이다.
+3. **S1도 옛 표기를 완전히 막지는 못한다.** CMCSA 2013에서 `ClassASpecialCommonStockMember`
+   (A 2012-03-31, 577,031,322)와 `ClassaSpecialCommonStockMember`(A 2012-12-31, 507,769,463)가
+   **둘 다 in-year라 둘 다 통과한다.** 같은 class를 두 번 세게 된다. S2·S3는 이 한 건을 잡지만
+   그 대가가 Ford 2018이다. **이 잔여 결함의 정본 해결은 identity 등록이지 freshness가 아니다.**
+4. **`decimals` duplicate의 모양이 10-Q 때문에 달라진다** (§13은 열지 않지만 증거는 남긴다).
+   CMCSA FY2025 10-K(`0001628280-26-004994`)은 같은 instant에 `INF 3,594,768,252`와
+   `-6 3,595,000,000`을 함께 담고, 뒤이은 10-Q(`0001628280-26-026805`)는 `INF`만 담는다.
+   반대로 META 2013은 10-K이 `INF 1,671,277,621`, 뒤의 10-Q가 `-6 1,671,000,000`이다.
+   **roadmap §4.4.1의 `acceptance가 가장 늦은 filing` tie-break를 그대로 쓰면 META에서
+   반올림값이 정밀값을 이긴다.** 이번 연구는 §13 contract대로 6건 전부 `AMBIGUOUS`로 두고
+   해결하지 않았다. **이 반례는 decimals 결정에 넘긴다.**
+5. **`index.json`이 accession 파일 목록을 다 주지 않는 경우가 있다** (F2.1).
+6. **direct outstanding fact의 3분의 1이 class 축 밖에 있다** (F7.1).
+
+## F14. ground truth 확인 범위
+
+정직하게 적는다. **124개 행 전부를 사람이 rendered SEC 출력과 1:1 대조하지 않았다.**
+§9와 같은 기준이다.
+
+사람이 원문과 직접 대조한 것:
+
+| 대상 | 대조한 원문 | 결과 |
+|---|---|---|
+| WMT FY2012 A 값 | `0001193125-12-134679` rendered `R4.htm` | `Common stock, shares outstanding 3,418,000,000 / 3,516,000,000`, element `us-gaap_CommonStockSharesOutstanding` |
+| WMT FY2026 표지 | `0000104169-26-000055` rendered `R1.htm` | `Entity Common Stock, Shares Outstanding 7,972,402,501` |
+| WMT FY2026 A의 실제 위치 | `wmt-20260131_htm.xml` instance | `StatementEquityComponentsAxis / CommonStockMember`, instant 2023-01-31 ~ 2026-01-31 |
+| AAPL 2025-12-27 값 | `0000320193-26-000006` rendered `R4.htm` | `14,702,703 and 14,773,260 shares issued and outstanding` (천 단위) |
+| Ford FY2017 `10-K/A` | `0000037996-18-000025` index.json | `.htm`·`.pdf`만 있고 XBRL 파일 0개 |
+| TSLA FY2025 `10-K/A` | `0001104659-26-053166` 추출 fact | DEI 표지 fact 1개뿐 |
+| ABBV 첫 10-K | `0001047469-13-002827` index.json | `.xml` 0개 |
+| CMCSA `decimals` duplicate | `0001628280-26-004994` · `0001628280-26-026805` 추출 fact | INF/-6 공존 → 후속 10-Q는 INF만 |
+
+filing 원장으로 확인한 것(사람이 rendered 출력을 열지는 않았다):
+
+- WMT의 A fact가 1,303개 usable filing 중 세 accession에만 있다는 것
+- CMCSA·Visa의 member 표기별 instant 구간 (F3 표)
+- Visa `CommonClassBMember`의 마지막 관측이 A `2023-12-31` · B `2024-01-17`이고
+  B1/B2는 `2023-09-30`부터라는 것
+
+나머지 행은 **구조 분류(concept · instant · axis/member · status)만 검증했고 값의 경제적
+정확성을 개별 확인하지 않았다.** §6·F6 통계는 그 전제에서 읽어야 한다.
+
+## F15. 선택된 관측의 provenance — S1 기준 90건
+
+작업지시 §15가 요구한 항목이다. **추천 candidate(S1)가 실제로 고른 관측만** 싣는다.
+S0 대비 달라진 지점은 F5의 결과 표에서 candidate별로 바로 비교된다.
+
+| issuer | formation | class scope | Dec session | concept | instant | value | form | accession | report_date | acceptance (UTC) | usable session |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| AAPL | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-29 | 938,973,000 | 10-Q | 0001193125-13-022339 | 2012-12-29 | 2013-01-24T22:01:37Z | 2013-01-25 |
+| AAPL | 2018 | dimensionless | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 5,126,201,000 | 10-K | 0000320193-17-000070 | 2017-09-30 | 2017-11-03T12:01:37Z | 2017-11-06 |
+| AAPL | 2026 | dimensionless | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-27 | 14,702,703,000 | 10-Q | 0000320193-26-000006 | 2025-12-27 | 2026-01-30T11:01:32Z | 2026-02-02 |
+| GOOGL | 2018 | CapitalClassCMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 349,473,000 | 10-Q | 0001652044-17-000042 | 2017-09-30 | 2017-10-26T21:49:09Z | 2017-10-27 |
+| GOOGL | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 298,263,000 | 10-Q | 0001652044-17-000042 | 2017-09-30 | 2017-10-26T21:49:09Z | 2017-10-27 |
+| GOOGL | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 47,054,000 | 10-Q | 0001652044-17-000042 | 2017-09-30 | 2017-10-26T21:49:09Z | 2017-10-27 |
+| GOOGL | 2026 | CapitalClassCMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 5,429,000,000 | 10-K | 0001652044-26-000018 | 2025-12-31 | 2026-02-05T02:56:03Z | 2026-02-05 |
+| GOOGL | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 5,822,000,000 | 10-K | 0001652044-26-000018 | 2025-12-31 | 2026-02-05T02:56:03Z | 2026-02-05 |
+| GOOGL | 2026 | CommonClassBMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 837,000,000 | 10-K | 0001652044-26-000018 | 2025-12-31 | 2026-02-05T02:56:03Z | 2026-02-05 |
+| BRK | 2013 | CommonClassAMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 894,955 | 10-K | 0001193125-13-087679 | 2012-12-31 | 2013-03-01T21:10:21Z | 2013-03-04 |
+| BRK | 2013 | CommonClassBMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 1,121,985,472 | 10-K | 0001193125-13-087679 | 2012-12-31 | 2013-03-01T21:10:21Z | 2013-03-04 |
+| BRK | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 754,684 | 10-Q | 0001193125-17-332829 | 2017-09-30 | 2017-11-03T20:17:23Z | 2017-11-06 |
+| BRK | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 1,335,048,578 | 10-Q | 0001193125-17-332829 | 2017-09-30 | 2017-11-03T20:17:23Z | 2017-11-06 |
+| BRK | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 515,835 | 10-K | 0001193125-26-083899 | 2025-12-31 | 2026-03-02T11:02:28Z | 2026-03-03 |
+| BRK | 2026 | CommonClassBMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 1,383,582,639 | 10-K | 0001193125-26-083899 | 2025-12-31 | 2026-03-02T11:02:28Z | 2026-03-03 |
+| NVDA | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-01-29 | 612,191,412 | 10-K | 0001045810-12-000013 | 2012-01-29 | 2012-03-13T20:56:38Z | 2012-03-14 |
+| NVDA | 2018 | dimensionless | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-01-29 | 585,000,000 | 10-K | 0001045810-17-000027 | 2017-01-29 | 2017-03-01T22:30:49Z | 2017-03-02 |
+| NVDA | 2026 | dimensionless | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-01-26 | 24,477,000,000 | 10-K | 0001045810-25-000023 | 2025-01-26 | 2025-02-26T21:48:33Z | 2025-02-27 |
+| TSLA | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 114,214,274 | 10-K | 0001193125-13-096241 | 2012-12-31 | 2013-03-07T22:10:43Z | 2013-03-08 |
+| TSLA | 2018 | dimensionless | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 168,017,000 | 10-Q | 0001564590-17-021343 | 2017-09-30 | 2017-11-02T23:56:36Z | 2017-11-03 |
+| TSLA | 2026 | dimensionless | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 3,751,000,000 | 10-K | 0001628280-26-003952 | 2025-12-31 | 2026-01-29T01:55:03Z | 2026-01-29 |
+| XOM | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-09-30 | 4,559,342,639 | 10-Q | 0000034088-12-000050 | 2012-11-06 | 2012-11-06T17:14:21Z | 2012-11-07 |
+| XOM | 2018 | dimensionless | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 4,237,000,000 | 10-Q | 0000034088-17-000052 | 2017-09-30 | 2017-11-01T19:51:48Z | 2017-11-02 |
+| XOM | 2026 | dimensionless | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 4,179,000,000 | 10-K | 0000034088-26-000045 | 2025-12-31 | 2026-02-18T21:06:52Z | 2026-02-19 |
+| WMT | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-01-31 | 3,418,000,000 | 10-K | 0001193125-12-134679 | 2012-01-31 | 2012-03-27T21:22:22Z | 2012-03-28 |
+| WMT | 2018 | dimensionless | 2017-12-29 | dei:EntityCommonStockSharesOutstanding | 2017-11-29 | 2,962,381,445 | 10-Q | 0000104169-17-000081 | 2017-10-31 | 2017-12-01T21:29:29Z | 2017-12-04 |
+| WMT | 2026 | dimensionless | 2025-12-31 | dei:EntityCommonStockSharesOutstanding | 2025-12-02 | 7,970,166,964 | 10-Q | 0000104169-25-000191 | 2025-10-31 | 2025-12-03T21:45:34Z | 2025-12-04 |
+| INTC | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-29 | 4,944,000,000 | 10-K | 0001193125-13-065416 | 2012-12-29 | 2013-02-19T22:06:31Z | 2013-02-20 |
+| INTC | 2018 | dimensionless | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 4,680,000,000 | 10-Q | 0000050863-17-000048 | 2017-09-30 | 2017-10-26T20:30:26Z | 2017-10-27 |
+| INTC | 2026 | dimensionless | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-27 | 4,994,000,000 | 10-K | 0000050863-26-000011 | 2025-12-27 | 2026-01-22T23:43:06Z | 2026-01-23 |
+| ABBV | 2018 | dimensionless | 2017-12-29 | dei:EntityCommonStockSharesOutstanding | 2017-10-24 | 1,596,429,740 | 10-Q | 0001551152-17-000035 | 2017-09-30 | 2017-11-07T16:27:57Z | 2017-11-08 |
+| ABBV | 2026 | dimensionless | 2025-12-31 | dei:EntityCommonStockSharesOutstanding | 2025-10-27 | 1,767,384,632 | 10-Q | 0001551152-25-000049 | 2025-09-30 | 2025-11-04T19:05:49Z | 2025-11-05 |
+| FOX | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 200,553,435 | 10-Q | 0001628280-26-005285 | 2025-12-31 | 2026-02-04T14:18:20Z | 2026-02-05 |
+| FOX | 2026 | CommonClassBMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 224,702,222 | 10-Q | 0001628280-26-005285 | 2025-12-31 | 2026-02-04T14:18:20Z | 2026-02-05 |
+| META | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 2,385,000,000 | 10-Q | 0001326801-17-000053 | 2017-09-30 | 2017-11-02T20:37:43Z | 2017-11-03 |
+| META | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 521,000,000 | 10-Q | 0001326801-17-000053 | 2017-09-30 | 2017-11-02T20:37:43Z | 2017-11-03 |
+| META | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 2,187,000,000 | 10-K | 0001628280-26-003942 | 2025-12-31 | 2026-01-29T00:13:46Z | 2026-01-29 |
+| META | 2026 | CommonClassBMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 343,000,000 | 10-K | 0001628280-26-003942 | 2025-12-31 | 2026-01-29T00:13:46Z | 2026-01-29 |
+| F | 2013 | CommonClassBMember | 2012-12-31 | dei:EntityCommonStockSharesOutstanding | 2012-10-26 | 70,852,076 | 10-Q | 0000037996-12-000049 | 2012-09-30 | 2012-11-02T11:33:11Z | 2012-11-05 |
+| F | 2013 | CommonStockMember | 2012-12-31 | dei:EntityCommonStockSharesOutstanding | 2012-10-26 | 3,741,809,920 | 10-Q | 0000037996-12-000049 | 2012-09-30 | 2012-11-02T11:33:11Z | 2012-11-05 |
+| F | 2018 | CommonClassBMember | 2017-12-29 | dei:EntityCommonStockSharesOutstanding | 2017-10-19 | 70,852,076 | 10-Q | 0000037996-17-000092 | 2017-09-30 | 2017-10-26T11:35:06Z | 2017-10-27 |
+| F | 2018 | CommonStockMember | 2017-12-29 | dei:EntityCommonStockSharesOutstanding | 2017-10-19 | 3,901,450,116 | 10-Q | 0000037996-17-000092 | 2017-09-30 | 2017-10-26T11:35:06Z | 2017-10-27 |
+| F | 2026 | CommonClassBMember | 2025-12-31 | dei:EntityCommonStockSharesOutstanding | 2025-10-21 | 70,852,076 | 10-Q | 0000037996-25-000186 | 2025-09-30 | 2025-10-23T19:12:04Z | 2025-10-24 |
+| F | 2026 | CommonStockMember | 2025-12-31 | dei:EntityCommonStockSharesOutstanding | 2025-10-21 | 3,913,646,490 | 10-Q | 0000037996-25-000186 | 2025-09-30 | 2025-10-23T19:12:04Z | 2025-10-24 |
+| CMCSA | 2013 | ClassASpecialCommonStockMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-03-31 | 577,031,322 | 10-Q | 0001193125-12-203863 | 2012-03-31 | 2012-05-02T17:55:44Z | 2012-05-03 |
+| CMCSA | 2013 | ClassaSpecialCommonStockMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 507,769,463 | 10-K | 0001193125-13-067658 | 2012-12-31 | 2013-02-20T23:48:53Z | 2013-02-21 |
+| CMCSA | 2013 | CommonClassAMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 2,122,278,635 | 10-K | 0001193125-13-067658 | 2012-12-31 | 2013-02-20T23:48:53Z | 2013-02-21 |
+| CMCSA | 2013 | CommonClassBMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 9,444,375 | 10-K | 0001193125-13-067658 | 2012-12-31 | 2013-02-20T23:48:53Z | 2013-02-21 |
+| CMCSA | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 4,664,327,455 | 10-Q | 0001166691-17-000031 | 2017-09-30 | 2017-10-26T19:54:55Z | 2017-10-27 |
+| CMCSA | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 9,444,375 | 10-Q | 0001166691-17-000031 | 2017-09-30 | 2017-10-26T19:54:55Z | 2017-10-27 |
+| NWS | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 382,976,281 | 10-Q | 0001193125-17-339122 | 2017-09-30 | 2017-11-10T00:02:27Z | 2017-11-10 |
+| NWS | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 199,630,240 | 10-Q | 0001193125-17-339122 | 2017-09-30 | 2017-11-10T00:02:27Z | 2017-11-10 |
+| NWS | 2018 | SeriesCommonStockMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-06-30 | 0 | 10-K | 0001193125-17-257248 | 2017-06-30 | 2017-08-14T20:10:24Z | 2017-08-15 |
+| NWS | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 371,777,267 | 10-Q | 0001564708-26-000029 | 2025-12-31 | 2026-02-06T12:02:31Z | 2026-02-09 |
+| NWS | 2026 | CommonClassBMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 185,853,935 | 10-Q | 0001564708-26-000029 | 2025-12-31 | 2026-02-06T12:02:31Z | 2026-02-09 |
+| NWS | 2026 | SeriesCommonStockMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-06-30 | 0 | 10-K | 0001564708-25-000419 | 2025-06-30 | 2025-08-06T11:03:06Z | 2025-08-07 |
+| UA | 2013 | CommonClassAMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 83,461,106 | 10-K | 0001336917-13-000011 | 2012-12-31 | 2013-02-25T13:06:11Z | 2013-02-26 |
+| UA | 2013 | ConvertibleCommonStockMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 21,300,000 | 10-K | 0001336917-13-000011 | 2012-12-31 | 2013-02-25T13:06:11Z | 2013-02-26 |
+| UA | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 185,128,757 | 10-Q | 0001336917-17-000049 | 2017-09-30 | 2017-11-08T22:34:24Z | 2017-11-09 |
+| UA | 2018 | CommonClassCMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 222,050,824 | 10-Q | 0001336917-17-000049 | 2017-09-30 | 2017-11-08T22:34:24Z | 2017-11-09 |
+| UA | 2018 | ConvertibleCommonStockMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 34,450,000 | 10-Q | 0001336917-17-000049 | 2017-09-30 | 2017-11-08T22:34:24Z | 2017-11-09 |
+| UA | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 188,834,386 | 10-Q | 0001336917-26-000027 | 2025-12-31 | 2026-02-06T14:04:57Z | 2026-02-09 |
+| UA | 2026 | CommonClassCMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 202,487,254 | 10-Q | 0001336917-26-000027 | 2025-12-31 | 2026-02-06T14:04:57Z | 2026-02-09 |
+| UA | 2026 | ConvertibleCommonStockMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 34,450,000 | 10-Q | 0001336917-26-000027 | 2025-12-31 | 2026-02-06T14:04:57Z | 2026-02-09 |
+| V | 2013 | CommonClassAMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 530,000,000 | 10-Q | 0001384108-13-000004 | 2012-12-31 | 2013-02-06T21:17:56Z | 2013-02-07 |
+| V | 2013 | CommonClassBMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 245,000,000 | 10-Q | 0001384108-13-000004 | 2012-12-31 | 2013-02-06T21:17:56Z | 2013-02-07 |
+| V | 2013 | CommonClassCMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 29,000,000 | 10-Q | 0001384108-13-000004 | 2012-12-31 | 2013-02-06T21:17:56Z | 2013-02-07 |
+| V | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 1,818,000,000 | 10-K | 0001403161-17-000044 | 2017-09-30 | 2017-11-17T01:07:25Z | 2017-11-17 |
+| V | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 245,000,000 | 10-K | 0001403161-17-000044 | 2017-09-30 | 2017-11-17T01:07:25Z | 2017-11-17 |
+| V | 2018 | CommonClassCMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 13,000,000 | 10-K | 0001403161-17-000044 | 2017-09-30 | 2017-11-17T01:07:25Z | 2017-11-17 |
+| V | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 1,683,000,000 | 10-Q | 0001403161-26-000045 | 2025-12-31 | 2026-01-29T23:08:26Z | 2026-01-30 |
+| V | 2026 | CommonClassB1Member | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 5,000,000 | 10-Q | 0001403161-26-000045 | 2025-12-31 | 2026-01-29T23:08:26Z | 2026-01-30 |
+| V | 2026 | CommonClassB2Member | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 120,000,000 | 10-Q | 0001403161-26-000045 | 2025-12-31 | 2026-01-29T23:08:26Z | 2026-01-30 |
+| V | 2026 | CommonClassCMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-12-31 | 9,000,000 | 10-Q | 0001403161-26-000045 | 2025-12-31 | 2026-01-29T23:08:26Z | 2026-01-30 |
+| MA | 2013 | CommonClassAMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 118,405,075 | 10-K | 0001141391-13-000003 | 2012-12-31 | 2013-02-14T22:02:29Z | 2013-02-15 |
+| MA | 2013 | CommonClassBMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-12-31 | 4,838,840 | 10-K | 0001141391-13-000003 | 2012-12-31 | 2013-02-14T22:02:29Z | 2013-02-15 |
+| MA | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 1,045,000,000 | 10-Q | 0001141391-17-000152 | 2017-09-30 | 2017-10-31T14:23:17Z | 2017-11-01 |
+| MA | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-09-30 | 15,000,000 | 10-Q | 0001141391-17-000152 | 2017-09-30 | 2017-10-31T14:23:17Z | 2017-11-01 |
+| NKE | 2013 | CommonClassAMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-11-30 | 180,000,000 | 10-Q | 0001193125-13-008172 | 2012-11-30 | 2013-01-09T21:16:23Z | 2013-01-10 |
+| NKE | 2013 | CommonClassBMember | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-11-30 | 716,000,000 | 10-Q | 0001193125-13-008172 | 2012-11-30 | 2013-01-09T21:16:23Z | 2013-01-10 |
+| NKE | 2018 | CommonClassAMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-11-30 | 329,000,000 | 10-Q | 0000320187-18-000007 | 2017-11-30 | 2018-01-05T21:11:45Z | 2018-01-08 |
+| NKE | 2018 | CommonClassBMember | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-11-30 | 1,295,000,000 | 10-Q | 0000320187-18-000007 | 2017-11-30 | 2018-01-05T21:11:45Z | 2018-01-08 |
+| NKE | 2026 | CommonClassAMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-11-30 | 289,000,000 | 10-Q | 0000320187-25-000151 | 2025-11-30 | 2025-12-30T21:20:45Z | 2025-12-31 |
+| NKE | 2026 | CommonClassBMember | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-11-30 | 1,191,000,000 | 10-Q | 0000320187-25-000151 | 2025-11-30 | 2025-12-30T21:20:45Z | 2025-12-31 |
+| COST | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-11-25 | 434,824,000 | 10-Q | 0001193125-12-512914 | 2012-11-25 | 2012-12-21T21:05:04Z | 2012-12-24 |
+| COST | 2018 | dimensionless | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-11-26 | 439,185,000 | 10-Q | 0000909832-17-000022 | 2017-11-26 | 2017-12-21T00:55:05Z | 2017-12-21 |
+| COST | 2026 | dimensionless | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-11-23 | 443,919,000 | 10-Q | 0000909832-25-000169 | 2025-11-23 | 2025-12-17T22:12:42Z | 2025-12-18 |
+| HD | 2013 | dimensionless | 2012-12-31 | us-gaap:CommonStockSharesOutstanding | 2012-10-28 | 1,496,000,000 | 10-Q | 0000354950-12-000035 | 2012-10-28 | 2012-11-21T21:06:49Z | 2012-11-23 |
+| HD | 2018 | dimensionless | 2017-12-29 | us-gaap:CommonStockSharesOutstanding | 2017-10-29 | 1,168,000,000 | 10-Q | 0000354950-17-000046 | 2017-10-29 | 2017-11-20T23:13:00Z | 2017-11-21 |
+| HD | 2026 | dimensionless | 2025-12-31 | us-gaap:CommonStockSharesOutstanding | 2025-11-02 | 995,000,000 | 10-Q | 0001628280-25-053868 | 2025-11-02 | 2025-11-24T22:52:00Z | 2025-11-25 |
+
+## F16. 이번에 결정하지 않은 것
+
+작업지시 §13·§14대로 그대로 열어 둔다.
+
+1. **`decimals` duplicate는 OPEN이다.** `INF` exact vs `-6` rounded 충돌은 현재 contract대로
+   `AMBIGUOUS`로 뒀고 "더 정밀한 값"으로 임의 해결하지 않았다. `AMBIGUOUS`인 A를 B로
+   내리지도 않았다. F13-4가 이 결정에 넘기는 새 증거다.
+2. **은퇴한 class의 책임은 OPEN이다.** freshness candidate가 Visa 옛 `CommonClassBMember`와
+   CMCSA 옛 Class A Special 표기를 실제로 제거하지만, **"staleness가 class retirement를
+   해결했다"고 결론 내리지 않는다.** 이중 계상을 막는 정본은 identity의 `effective_to`와
+   명시적 axis/member 등록이고, freshness는 그것을 대신하지 못한다(F13-3의 CMCSA 2013이
+   반례다).
+3. **dimension shape는 이번 계약에서 CLOSED로 받았다.** F7.1이 드러낸
+   `StatementEquityComponentsAxis` 관측(A fact의 33%)을 인정할지는 **별도 결정**이고,
+   이번 추천은 그 결정과 독립적으로 성립한다(27/28 stale 관측은 완화해도 그대로다).
+
+## User decision — follow-up
+
+추천: **B — measurement-calendar-year boundary (S1).**
+
+```text
+January 1 of t-1  <=  share instant  <=  December last regular session of t-1
+```
+
+이 조건을 만족하는 direct observation만 eligible로 보고, **hierarchy 판정보다 먼저** 적용한다.
+즉 Candidate C의 "A가 구조적으로 absent일 때만 B"에서 **`absent`를 history 전체가 아니라
+이 boundary 안에서 판정한다.**
+
+작업지시 §18의 기준별로 적는다.
+
+- **silent wrong stale observation을 막는가**: 막는다. S0의 28건을 **전부** 잘라내고
+  age > 366일인 관측이 0이 된다. 그중 WMT 2건은 fresh B로 정확히 교정되고 26건은
+  fail-close된다. **살아 있는 ordinary class를 잃은 건은 0이다.**
+- **numeric tuning knob가 필요한가**: 필요 없다. 일수가 없다. F12에서 366·400·456이
+  구분되지 않는다는 것을 확인했으므로, 숫자를 쓰는 순간 그 숫자는 증거가 아니라 선택이 된다.
+- **December denominator 의미와 맞는가**: 가장 잘 맞는다. denominator가 "t-1년 12월 말의
+  issuer market equity"이므로 그 share state가 t-1년 안에서 보고된 것이어야 한다는 조건은
+  **정의를 다시 쓴 것이지 새 가정이 아니다.**
+- **10-Q / non-calendar issuer와 맞는가**: 맞는다(F10). 비12월 결산 10개 발행사에서
+  systematic false missing이 0이고 52/53주 발행사도 정상이다. 최대 age 339일이 회계연도
+  구조에서 자동으로 나온다.
+- **deterministic한가**: 완전히 결정론적이다. instant와 December session만 비교한다.
+  발행사 이름·결과 숫자·whitelist가 들어가지 않는다.
+- **fail-close가 가능한가**: 가능하다. eligible 집합이 비면 `MISSING`이고 옛 값을 쓰지 않는다.
+  `AMBIGUOUS`는 그대로 fail-close이며 B로 내려가지 않는다.
+- **Candidate C hierarchy와 자연스럽게 결합되는가**: 결합된다. 오히려 **결합 순서를
+  고쳐야 한다는 것이 이번 연구의 핵심 발견**이다(F11). boundary가 hierarchy 뒤에 있으면
+  WMT형 발행사에서 stale A가 fresh B를 영원히 막는다.
+
+**C(annual-presence guard)를 추천하지 않는 이유**를 분명히 적는다. S2가 잡는 것이 S1보다
+많지도 않다 — 둘 다 age > 366일 관측을 0으로 만든다. S2가 추가로 잡는 것은 CMCSA 2013의
+옛 표기 **한 건**이고, 그 대가로 **Ford 2018의 살아 있는 두 class를 통째로 잃고 TSLA 2026에서
+더 나쁜 tier를 고른다.** 원인은 발행사가 아니라 `10-K/A`라는 구조라서 표본을 늘리면
+같은 실패가 늘어난다. **D(둘 다)는 그 대가를 그대로 물려받는다.**
+
+**E(외부 semantic으로 정당화된 fixed age rule)도 추천하지 않는다.** 그런 근거를 찾지 못했고
+(F12), 이 표본에서 366~456일이 구분되지 않는다.
+
+**F(증거 부족)로 닫지 않는 이유**: 이번 표본은 20개 적대적 발행사 × 3 formation × 124 관측을
+**1,303개 usable filing 전량**으로 돌린 것이고, S0의 실패가 10-Q 부족 때문이 아니라는 것까지
+확인했다(F6.2). boundary의 필요성 자체는 충분히 재현됐다.
+
+**함께 기억할 것 셋.**
+
+1. **이 추천은 coverage 때문이 아니다.** S1은 S0보다 resolved가 27건 적다. 그 27건은
+   전부 은퇴·옛 표기 scope이고, 하나도 잃으면 안 되는 살아 있는 class가 아니다.
+2. **S1의 잔여 결함은 identity가 닫는다.** 같은 class의 두 표기가 둘 다 in-year면 S1은
+   둘 다 통과시킨다(F13-3). §4.4.1의 명시적 axis/member 등록이 정본이다.
+3. **dimension shape 결정은 여전히 남아 있다**(F7.1·F16-3). 이 추천은 그 결정과 독립이지만,
+   그 결정을 하지 않으면 WMT처럼 concept을 자본변동표 축으로 옮긴 발행사에서
+   A tier가 조용히 비게 된다.
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
