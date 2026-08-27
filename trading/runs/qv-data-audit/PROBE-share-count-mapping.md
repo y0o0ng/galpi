@@ -1496,3 +1496,759 @@ January 1 of t-1  <=  share instant  <=  December last regular session of t-1
    A tier가 조용히 비게 된다.
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+
+---
+
+# Follow-up 2 — direct outstanding fact의 dimension scope (2026-08-28)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 두 절과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. coverage Gate · `coverage_start` ·
+> formation rank · B/M · returns는 이번에도 계산하지 않았다.
+
+시작 main: `9c6b447e6f7acdb5220c5dcce2ede1cef8a05bee`
+(`research(qv): share-count freshness boundary를 검증한다` — 바로 위 절을 커밋한 지점이고
+`origin/main`도 같았다.)
+
+**이번에 다시 열지 않은 것.** share source(raw XBRL instance) · 허용 form 네 가지 ·
+A/B hierarchy와 `AMBIGUOUS` fail-close · measurement-calendar-year freshness boundary와
+그것을 hierarchy보다 먼저 적용한다는 순서 · `decimals` consolidation 규칙 ·
+retired class의 정본은 identity `effective_to`라는 것 · economic class와 XBRL alias를
+분리하는 identity 모델 · issued−treasury·companyfacts·current-shares backfill·derived member 금지.
+
+## G1. 이번 질문 하나
+
+> **direct outstanding fact의 XBRL context가 어떤 dimension shape일 때
+> actual ordinary share class의 PIT share count로 인정할 수 있는가?**
+
+Follow-up 1의 F7.1이 남긴 것이다. WMT는 `us-gaap:CommonStockSharesOutstanding`을 버린 것이
+아니라 **context shape를 자본변동표 축으로 옮겼고**, 그런 fact가 A tier 전체의 3분의 1이었다.
+그 shape를 인정할지는 freshness와 독립한 별도 결정이라 그때 열지 않았다.
+
+## G2. 방법과 데이터
+
+Follow-up 1이 쓴 **1,303개 usable K/Q family filing 캐시를 그대로 재사용**했고, dimension
+분석에 필요한 필드를 넣어 instance를 다시 파싱했다. 표본(20 발행사 × formation 2013·2018·2026)은
+바꾸지 않았다.
+
+| 항목 | 값 |
+|---|---|
+| 2026 formation까지 usable한 filing | 1,303 (10-Q 955 · 10-K 323 · 10-K/A 21 · 10-Q/A 4) |
+| instance를 실제로 파싱한 accession | 1,248 |
+| 뽑은 direct outstanding fact | **8,758** (A 6,622 · B 2,136) |
+| context의 unique explicit dimension **set** | **205** |
+| explicit dimension 개수 | 0개 1,775 · 1개 5,879 · 2개 1,104 · 3개 이상 **0** |
+| typed dimension을 쓴 fact | **0** |
+| context entity identifier가 대상 CIK가 아닌 fact | **0** |
+
+**첫 dimension 하나가 아니라 context의 전체 explicit dimension set을 보존해 집계했다.**
+axis/member QName은 §19 계약대로 standard는 `us-gaap`/`dei` family로, 그 밖은 raw namespace
+URI 그대로 두고, 원 URI는 provenance로 전부 보존했다.
+
+> `entity identifier` 오염이 0이라는 것이 곧 안전을 뜻하지 않는다. **법인 범위 오염은
+> identifier가 아니라 dimension으로 들어온다**(G9).
+
+## G3. 공식 semantics — 근거 원문
+
+### G3.1 SEC EDGAR XBRL Guide
+
+출처: [SEC EDGAR XBRL Guide 2026-05-15](https://www.sec.gov/files/edgar/filer-information/specifications/xbrl-guide-2026-05-15.pdf)
+(§3.2.3·§3.2.4·§6.4.1·§6.4.2는 이 문서 §3.1에 이미 인용했다. 이번에 추가로 읽은 절이다.)
+
+**§3.1 Expected Facts in the Required Context** (p.15)
+
+> "The context of the fact will have: 1. an entity identifier matching the filing CIK, and
+> 2. either a. no taxonomy-defined dimensions, or b. a dimension from a standard taxonomy …"
+
+> "For example, some expected facts for multi-series filers expect a context with an explicit
+> member of `dei:LegalEntityAxis` and otherwise identical to the Required Context."
+
+**§5.7 Custom Domain Member Declarations** (p.104) — dimensionless의 의미를 못박는 절이다.
+
+> "Do not declare "Total" domain members. The domain default member of an explicit axis serves
+> that purpose … In the WXY example, if there were a fact that represented (say) the total market
+> capitalization of common classes A and B combined for the reporting period, **that fact would be
+> in the Required Context, with no Class of Stock member at all.**"
+
+**§6.3.3 Contexts for different reporting assumptions** (p.118)
+
+> "An instance containing multiple reports about the same entity for the same periods under
+> different reporting assumptions must distinguish the facts in different reports using
+> `i:context` elements whose `xbrldi:explicitMember` elements have a dimension attribute of
+> `StatementScenarioAxis` in a standard namespace."
+
+**§7.13 Statements of Changes in Shareholder Equity** (p.141) — 자본변동표의 축 순서다.
+
+> "These axes (if present) are shown on the columns, in this nesting order:
+> a. Legal Entity (`LegalEntityAxis`) b. Equity Components (`StatementEquityComponentsAxis`)
+> c. Partner Capital Components (`PartnerCapitalComponentsAxis`) d. Class of Stock
+> (`StatementClassOfStockAxis`) e. (All other axes present) f. Unit"
+
+**§3.2.4 Note 3** (p.55, 재인용)
+
+> "The presence of members on axes other than `StatementClassOfStockAxis` or
+> `ClassesOfShareCapitalAxis` does not change which of the three cases is being represented
+> in an instance."
+
+세 가지가 여기서 나온다.
+
+1. **class 범위를 정하는 축은 class-of-stock 축 둘뿐이다**(§3.2.3·§3.2.4 Note 3·§6.4.2).
+2. **class 축 member가 없는 fact는 "class 정보 없음"이 아니라 전 class 총계다**(§5.7·§6.4.1).
+3. **자본변동표에서 `StatementEquityComponentsAxis`와 `StatementClassOfStockAxis`는 공존하는
+   서로 다른 축이다**(§7.13). 앞의 것이 class를 대신하지 않는다.
+
+### G3.2 taxonomy definition
+
+출처: `https://xbrl.fasb.org/us-gaap/2025/elts/us-gaap-doc-2025.xml` ·
+`https://xbrl.fasb.org/srt/2025/elts/srt-doc-2025.xml` (documentation label role).
+
+| element | documentation |
+|---|---|
+| `us-gaap:StatementClassOfStockAxis` | "Information by the different classes of stock of the entity." |
+| `us-gaap:ClassOfStockDomain` | "Share of stock differentiated by the voting rights the holder receives. Examples include, but are not limited to, common stock, redeemable preferred stock, nonredeemable preferred stock, and convertible stock." |
+| `us-gaap:StatementEquityComponentsAxis` | **"Information by component of equity."** |
+| `us-gaap:EquityComponentDomain` | **"Components of equity are the parts of the total Equity balance including that which is allocated to common, preferred, treasury stock, retained earnings, etc."** |
+| `us-gaap:CommonStockMember` | **"Stock that is subordinate to all other stock of the issuer."** |
+| `us-gaap:CommonStockIncludingAdditionalPaidInCapitalMember` | "Common stock held by shareholders with par value plus amounts in excess of par value or issuance value (in cases of no-par value stock)." |
+| `us-gaap:CommonClassAMember` | "Classification of common stock representing ownership interest in a corporation." |
+| `us-gaap:CommonClassBMember` | "Classification of common stock that has different rights than Common Class A, representing ownership interest in a corporation." |
+| `us-gaap:CommonStockSharesOutstanding` | "Number of shares of common stock outstanding. Common stock represent the ownership interest in a corporation." |
+| `srt:StatementScenarioAxis` | "Information by scenario reported, distinguishing information from actual fact. Includes, but is not limited to, pro forma and forecast. **Excludes actual facts.**" |
+| `srt:ConsolidatedEntitiesAxis` | "Information by consolidated entity or group of entities." |
+| `srt:SubsidiariesMember` | "Entity in which controlling financial interest is held. …" |
+
+**`CommonStockMember`의 정의가 이번 판정의 핵심이다.** "Stock that is subordinate to all other
+stock of the issuer" — **발행사의 보통주 전체**이지 그중 한 class가 아니다. 표준 라벨도
+`Common Stock [Member]`이고 `StatementEquityComponentsAxis`의 표준 라벨은
+`Equity Components [Axis]`다. **class 축의 라벨은 `Class of Stock [Axis]`로 따로 있다.**
+
+## G4. dimension shape 전수 분류
+
+### G4.1 shape category
+
+`freshness 통과`는 세 formation의 measurement-calendar-year boundary와 usable 조건을 모두
+만족한 fact다. **coverage 비율이 아니라 구조 분포다.**
+
+| category | 전체 fact | freshness 통과 |
+|---|---|---|
+| dimensionless — 그 시점 class가 1개인 발행사 | 1,647 | 223 |
+| dimensionless — class가 2개 이상인 발행사 | 128 | 12 |
+| class 축 단독 | 4,759 | 609 |
+| `StatementEquityComponentsAxis` 단독 | 1,110 | 86 |
+| `dei:EntityListingsInstrumentAxis` 단독 | 2 | 0 |
+| 그 밖 single axis | 8 | 0 |
+| explicit dimension 2개 | 1,104 | 120 |
+| **합계** | **8,758** | **1,050** |
+
+### G4.2 상위 shape (전체 fact 기준)
+
+| fact | A | B | 발행사 | filing | dimension set |
+|---|---|---|---|---|---|
+| 1,934 | 1,357 | 577 | 10 | 581 | `ClassOfStock/CommonClassA` |
+| 1,775 | 1,121 | 654 | 18 | 683 | `[]` |
+| 1,730 | 1,160 | 570 | 10 | 571 | `ClassOfStock/CommonClassB` |
+| 728 | 728 | 0 | 5 | 132 | `EquityComponents/CommonStock` |
+| 501 | 501 | 0 | 4 | 83 | `ClassOfStock/CommonClassA` + `EquityComponents/CommonStock` |
+| 428 | 428 | 0 | 3 | 71 | `ClassOfStock/CommonClassB` + `EquityComponents/CommonStock` |
+| 377 | 275 | 102 | 2 | 103 | `ClassOfStock/CommonClassC` |
+| 330 | 330 | 0 | 4 | 60 | `EquityComponents/CommonStockIncludingAdditionalPaidInCapital` |
+| 221 | 157 | 64 | 1 | 64 | `ClassOfStock/ConvertibleCommonStock` |
+| 74 | 12 | 62 | 2 | 68 | `ClassOfStock/CommonStock` |
+
+나머지 195개 shape는 issuer-extension member가 taxonomy 연도마다 다른 namespace URI를 갖기
+때문에 쪼개진 것이 대부분이다(G15).
+
+### G4.3 axis 전수
+
+| axis | fact | 발행사 | namespace | 관측된 member |
+|---|---|---|---|---|
+| `StatementClassOfStockAxis` | 5,849 | 11 | us-gaap | `CommonClassA` 2,438 · `CommonClassB` 2,164 · `CommonClassC` 450 · `ConvertibleCommonStock` 294 · `CapitalClassC` 130 · `CommonStock` 77 · `EquivalentClassA` 68 · `ClassaSpecialCommonStock` 59 … |
+| `StatementEquityComponentsAxis` | 2,199 | 13 | us-gaap | `CommonStock` 1,804 · `CommonStockIncludingAdditionalPaidInCapital` 343 · `Outstanding`(ext) 32 · `CommonClassB` 8 · `CommonClassA` 8 · `TreasuryStock` 4 |
+| `CumulativeEffectPeriodOfAdoptionAxis` | 12 | 1 | srt | `CumulativeEffectPeriodOfAdoptionAdjustedBalance` |
+| `LegalEntityAxis` | 12 | 1 | dei | `Subsidiaries` |
+| `SubsequentEventTypeAxis` | 6 | 1 | us-gaap | `SubsequentEvent` |
+| `BusinessAcquisitionAxis` | 5 | 1 | us-gaap | `Allerganplc`(ext) |
+| `StatementScenarioAxis` | 2 | 2 | us-gaap | `ScenarioPreviouslyReported` |
+| `dei:EntityListingsInstrumentAxis` | 2 | 1 | dei | `ClassA`(ext) · `ClassB`(ext) |
+
+`ClassesOfShareCapitalAxis`는 이 표본에 **한 번도 나오지 않는다.**
+
+## G5. dimension의 semantic 분류
+
+**axis 이름 패턴으로 자동 추정하지 않았다.** taxonomy definition(G3.2) + Guide 절(G3.1) +
+filing 원문(G8·G9)을 근거로 붙였다.
+
+| axis | 분류 | 근거 |
+|---|---|---|
+| `us-gaap:StatementClassOfStockAxis` | **CLASS_IDENTIFYING** | taxonomy "Information by the different classes of stock of the entity" · Guide §6.4.2 |
+| `us-gaap:ClassesOfShareCapitalAxis` | **CLASS_IDENTIFYING** | Guide §3.2.3 case 3 · §6.4.1 (표본 미출현) |
+| `dei:EntityListingsInstrumentAxis` | **CLASS_IDENTIFYING** | 등록증권(instrument)별 축. BRK 2009 표지가 Class A/B 수량을 여기에 실었다(G9.5) |
+| `us-gaap:StatementEquityComponentsAxis` | **STATEMENT_SCOPE** | taxonomy "Information by component of equity" · domain "parts of the total Equity balance … common, preferred, treasury stock, retained earnings" · Guide §7.13이 class 축과 별개 축으로 둔다 |
+| `dei:LegalEntityAxis` | **ENTITY_SCOPE** | Guide §3.1·§3.2.5·§3.2.7 (series·branch·plan 구분) · §7.13 최상위 열 축 |
+| `us-gaap:BusinessAcquisitionAxis` | **ENTITY_SCOPE** | 피취득기업 범위. ABBV 원문에서 Allergan plc 수량(G9.2) |
+| `srt:StatementScenarioAxis` | **OTHER (non-actual)** | taxonomy "distinguishing information from actual fact … Excludes actual facts" · Guide §6.3.3 |
+| `us-gaap:SubsequentEventTypeAxis` | **OTHER (period marker)** | 보고기간 이후 사건 표시. instant가 이미 그 날짜를 들고 있다 |
+| `srt:CumulativeEffectPeriodOfAdoptionAxis` | **STATEMENT_SCOPE** | 회계기준 채택 조정 후 잔액 열 |
+
+**같은 member local name이 축에 따라 뜻이 정반대인 사례가 실제로 있다**(G8.3). 그래서 분류는
+member가 아니라 **(axis, member) 쌍**, 그것도 발행사 단위로만 성립한다.
+
+## G6. ground truth class universe — 표지 case로 확정한다
+
+Guide §3.2.3이 표지의 `dei:EntityCommonStockSharesOutstanding` 배치를 case 1/2/3으로 강제하므로,
+**표지 자체가 "그 시점에 유통 중인 보통주 class가 몇 개인가"의 공식 답이다.** 각
+(issuer, formation)마다 December measurement date에 instant가 가장 가까운 usable filing의
+표지 case를 ground truth로 썼다. **candidate 결과를 ground truth로 쓰지 않았다.**
+
+표본 20 발행사 × 3 formation 중 실재하는 56개 (issuer, formation)에서 나온
+**ground truth class-formation 관측은 94개**다. 대표 확인:
+
+| issuer | formation | 표지 accession | ground truth class |
+|---|---|---|---|
+| GOOGL | 2026 | 0001652044-26-000018 (10-K) | A · B · C |
+| CMCSA | 2013 | 0001193125-13-067658 (10-K) | A · **A Special** · B |
+| CMCSA | 2018 · 2026 | 0001166691-18-000004 · 0001628280-26-004994 | A · B (A Special 소멸) |
+| V | 2013 · 2018 | 0001384108-13-000004 · 0001403161-18-000009 | A · B · C |
+| V | 2026 | 0001403161-26-000045 (10-Q) | A · **B1** · **B2** · C (옛 B 소멸) |
+| F | 전 formation | 0000037996-{13,18,26}-… | Common Stock · Class B |
+| UA | 2013 | 0001336917-13-000011 | A · Convertible |
+| UA | 2018 · 2026 | 0001336917-18-000009 · 0001336917-26-000027 | A · C · Convertible |
+| WMT · AAPL · NVDA · TSLA · XOM · INTC · ABBV · COST · HD | 전 formation | (각 표지) | case 1 = class 1개 |
+
+## G7. dimensionless 판정 (Case A / Case B)
+
+### G7.1 Case B — class가 2개 이상이면 dimensionless는 총계다
+
+**공식 근거는 Guide §5.7이다**: 두 class 합계를 나타내는 fact는 "Required Context, with no Class
+of Stock member at all"에 놓인다. **원문 tie-out으로도 정확히 맞는다.**
+
+| issuer | instant | dimensionless | class children 합 | 일치 |
+|---|---|---|---|---|
+| GOOGL | 2025-12-31 | 12,088,000,000 | A 5,822,000,000 + B 837,000,000 + C 5,429,000,000 = 12,088,000,000 | **정확히 일치** |
+| NKE (표지 tier) | 2012-11-30 | 895,711,770 | A 179,784,496 + B 715,927,274 = 895,711,770 | **정확히 일치** |
+
+freshness를 통과한 multi-class dimensionless fact는 12건이고(GOOGL 8 · NKE 4)
+**전부 총계다. 어느 candidate도 이것을 class로 매핑하지 않는다.** GOOGL 2026에서 이 값을
+Class A로 읽으면 **2.08배 과대**가 된다.
+
+### G7.2 Case A — class가 정확히 1개일 때만 sole class로 쓴다
+
+Guide §3.2.3 case 1이 "zero, one … class"의 경우에 dimensionless를 요구하므로, **class가 하나면
+총계와 그 class가 같다.** 조건은 "class 축 fact가 안 보인다"가 아니라 **"identity에 등록된 실제
+ordinary class가 정확히 하나"**여야 한다 — 이미 §4.1이 적어둔 그대로이고, G7.1이 그 이유다.
+
+freshness 통과 dimensionless fact 223건이 여기 해당하고, 이 표본에서 반례는 없었다.
+
+## G8. `StatementEquityComponentsAxis` 집중 검증
+
+전체 2,199 fact(발행사 13곳). 단순 count로 끝내지 않고 다섯 가지를 원문으로 확인했다.
+
+### G8.1 무엇이 태깅돼 있는가 — 자본변동표 roll-forward 행이다
+
+WMT FY2026 10-K rendered `R6.htm`(`0000104169-26-000055`)의 열 구성은
+`Total | Total Walmart Shareholders' Equity | Common Stock | Capital in Excess of Par Value |
+Retained Earnings | Accumulated Other Comprehensive Loss | Nonredeemable Noncontrolling Interest`이고,
+행은 `Beginning balances (in shares) at Jan. 31, 2023 … 8,080`이다. element documentation은
+`us-gaap_CommonStockSharesOutstanding`이다.
+
+즉 이 축의 fact는 **"보통주 자본 열의 기초·기말 주식수"**이지 class별 유통주식수 보고가 아니다.
+taxonomy 정의(G3.2)와 정확히 일치한다.
+
+### G8.2 single-class 발행사 — 값은 맞지만 계열이 오염돼 있다
+
+같은 filing 안에서는 dimensionless 값과 일치한다(INTC 38/38, COST 38/40, AAPL 13/16, XOM 14/14).
+**그러나 같은 instant가 뒤 filing에서 다른 값으로 다시 나온다**(G14). 이 축은 filing마다 비교연도
+3개의 기초·기말 잔액을 함께 실어 **소급 재작성 표면이 표지·대차대조표 부기보다 훨씬 넓다.**
+
+### G8.3 multi-class 발행사 — aggregate다
+
+META는 class A/B와 `EquityComponents/CommonStock`을 **같은 instant에 함께** 보고하고 합이 정확히 맞는다.
+
+| instant | Class A | Class B | A+B | `EquityComponents/CommonStock` |
+|---|---|---|---|---|
+| 2024-12-31 | 2,190,000,000 | 344,000,000 | 2,534,000,000 | **2,534,000,000** |
+| 2025-06-30 | 2,173,000,000 | 343,000,000 | 2,516,000,000 | **2,516,000,000** |
+| 2025-12-31 | 2,187,000,000 | 343,000,000 | 2,530,000,000 | **2,530,000,000** |
+
+표본의 7개 instant 전부 정확히 일치한다. **multi-class에서 이 shape는 총계이고 class가 아니다.**
+
+### G8.4 같은 (axis, member)가 발행사마다 다른 뜻인 사례 — class 축에서도 일어난다
+
+`StatementClassOfStockAxis` + `us-gaap:CommonStockMember`:
+
+| issuer | instant | 값 | 뜻 |
+|---|---|---|---|
+| **F** | 2026-02-06 (표지) | 3,918,623,149 | **실제 class**. Ford의 보통주는 Class B와 구분되는 별도 class다 |
+| **V** | 2023-12-31 | 1,836,000,000 | **총계**. A 1,582,000,000 + B 245,000,000 + C 9,000,000 = 1,836,000,000 정확히 일치 |
+
+**표준 axis · 표준 member · 같은 concept인데 한쪽은 class, 한쪽은 합계다.**
+member 이름으로 판정하는 어떤 전역 규칙도 이 둘을 동시에 맞힐 수 없다.
+
+### G8.5 class-specific member가 자본 축 아래 있는 사례
+
+NKE는 2009~2013 filing에서 `EquityComponents/CommonClassAMember` · `.../CommonClassBMember`를 쓴다
+(각 8건). class 정보를 담고 있지만 **class 축이 아니다.** 이후 NKE는 `ClassOfStock` + `EquityComponents`
+2축 조합으로 옮겼다(G9.1).
+
+### G8.6 zero/retired component가 같은 shape로 존재하는 사례
+
+HD FY2011 10-K(`0000354950-12-000003`)는 `EquityComponents/TreasuryStockMember`에
+`CommonStockSharesOutstanding`을 태깅한다.
+
+| instant | 값 | 같은 시점 HD 실제 유통주식수 |
+|---|---|---|
+| 2009-02-01 | 11,000,000 | 1,696,000,000 |
+| 2012-01-29 | 196,000,000 | 1,537,000,000 |
+
+**자기주식 수량이다.** 축 이름만 믿고 member를 검증하지 않으면 유통주식수 자리에 자기주식이 들어간다.
+`CommonStockIncludingAdditionalPaidInCapitalMember`(343건)도 결합 열이라 같은 성질이다.
+
+## G9. 복수 dimension context 집중 검증
+
+explicit dimension이 2개인 fact는 1,104개(3개 이상은 0개)다. freshness 통과분 120건의 내역:
+
+| 조합 | 건수 |
+|---|---|
+| `ClassOfStock` + `EquityComponents` | 116 |
+| `ClassOfStock` + `SubsequentEventType` | 2 |
+| `CumulativeEffectPeriodOfAdoption` + `EquityComponents` | 2 |
+
+### G9.1 class 축 + 자본 축 — 유일하게 "무해해 보이는" 조합
+
+NKE · NWS · UA · FOX가 자본변동표를 class별로 쪼갠 것이다. class 축이 identity를 들고 있고
+자본 축은 열 표시다. **그런데 무해하지 않다** — G11.2의 정밀도 역행이 정확히 이 조합에서 나온다.
+
+### G9.2 class 축 밖의 법인 범위 — Alphabet과 AbbVie
+
+**Alphabet FY2015 10-K(`0001652044-16-000012`) 표지**, rendered `R1.htm` 원문 확인:
+
+```text
+Class A Common Stock   Entity Common Stock, Shares Outstanding   292,580,627
+Class B Common Stock   Entity Common Stock, Shares Outstanding    50,199,837
+Class C Capital Stock  Entity Common Stock, Shares Outstanding   345,539,303
+Google Inc.            Entity Common Stock, Shares Outstanding             0
+```
+
+마지막 행의 context는 `dei:LegalEntityAxis / SubsidiariesMember` 하나뿐이다.
+**이 dimension을 "직교하니 무시"하면 그 fact는 class 없는 total이 되고, Alphabet의 유통주식수가
+0이 된다.** 같은 filing은 `LegalEntity/Subsidiaries` + class 축 2축 fact도
+(A 286,560,000 · B 53,213,000 · C 340,399,000, instant 2014-12-31) 함께 싣는다.
+
+**AbbVie**: `BusinessAcquisitionAxis / AllerganplcMember`에 `CommonStockSharesOutstanding`
+**330,000,000** (instant 2020-05-08, 5개 filing). AbbVie 자신의 유통주식수는 같은 시기 약
+1.77십억이다. **다른 회사의 주식수다.** AbbVie는 `us-gaap:CommonStockSharesOutstanding`을
+자기 자신에 대해서는 한 번도 쓰지 않으므로(§12.4), 축을 가리지 않는 규칙은 AbbVie의 A tier를
+**다른 회사 숫자로 채운다.**
+
+### G9.3 non-actual scope
+
+`StatementScenarioAxis / ScenarioPreviouslyReportedMember`: INTC 2006-12-30 5,766,000,000 ·
+COST 2007-09-02 437,013,000. taxonomy가 "Excludes actual facts"라고 못박은 축이다.
+
+### G9.4 period marker
+
+Ford는 표지 수량을 `ClassOfStock/CommonStock` + `SubsequentEventType/SubsequentEvent`로 싣는다
+(2023-01-30 3,915,329,785 · 2024-02-02 3,902,781,032 · 2025-02-03 3,892,595,628).
+**값 자체는 그 instant의 실제 수량이다.** 이 축은 무해하지만, **무해함이 축 이름에서 나오지 않고
+발행사별 확인에서 나온다**는 점이 중요하다.
+
+### G9.5 class 축 밖의 class-identifying 축
+
+BRK 2009 10-Q(`0001157523-09-005813`) 표지는 `dei:EntityListingsInstrumentAxis`의
+extension member `ClassAMember`·`ClassBMember`에 수량을 싣는다(1,057,259 · 14,834,062,
+instant 2009-07-31). **표준 class 축이 아니지만 실제 class를 특정한다.**
+표본에서 2건뿐이고 세 formation의 freshness 창 밖이라 이번 결과에는 영향이 없다.
+
+## G10. Candidate 정의
+
+결과를 보기 전에 고정했고, 결과를 본 뒤 조건을 늘리지 않았다. 다섯 candidate 모두
+**dimensionless 규칙(G7)과 CLOSED된 freshness·hierarchy·decimals 규칙을 공유**하고
+dimension shape만 다르다.
+
+```text
+D0  strict                class 축 단독 + exact 등록 member. 그 밖 shape는 unusable.
+D1  axis whitelist        표준 axis whitelist{class 축, EquityComponents 축} 안에서
+                          member를 alias로 등록할 수 있게 한다. single dimension만.
+D2  one-pair alias        축 종류를 가리지 않되 exact (axis, member) 쌍이 PIT alias로
+                          등록됐을 때만 사용. unknown alias는 fail-close. single dimension만.
+D3  full-set alias        alias key가 context의 전체 explicit dimension set이다.
+D4  identifying subset    context에서 CLASS_IDENTIFYING dimension 하나를 찾아 class를 정하고,
+                          나머지 dimension이 허용된 직교 축이면 무시한다.
+                          허용 직교 축은 결과를 보기 전에 {EquityComponents, SubsequentEventType}로 고정했다.
+```
+
+**등록(registration)은 candidate가 아니라 사람이 한다.** 이 연구의 alias 등록은 G6의 표지
+ground truth와 G8·G9의 원문 확인으로만 만들었고, candidate 출력으로 만들지 않았다.
+
+## G11. 결과 표 — ground truth class-formation 94개
+
+`FAIL_CLOSE` = 그 candidate가 그 class에 쓸 수 있는 fact를 하나도 인정하지 못한 것.
+December session은 formation에서 결정된다(2013 → 2012-12-31, 2018 → 2017-12-29, 2026 → 2025-12-31).
+
+| issuer | formation | GT class | D0 strict | D1 axis-whitelist | D2 pair-alias | D3 full-set alias | D4 identifying-subset | 선택 fact의 dimension set (D3 기준) |
+|---|---|---|---|---|---|---|---|---|
+| AAPL | 2013 | SOLE | A 2012-12-29 938,973,000 | A 2012-12-29 938,973,000 | A 2012-12-29 938,973,000 | A 2012-12-29 938,973,000 | A 2012-12-29 938,973,000 | [] |
+| AAPL | 2018 | SOLE | A 2017-09-30 5,126,201,000 | A 2017-09-30 5,126,201,000 | A 2017-09-30 5,126,201,000 | A 2017-09-30 5,126,201,000 | A 2017-09-30 5,126,201,000 | [] |
+| AAPL | 2026 | SOLE | A 2025-12-27 14,702,703,000 | A 2025-12-27 14,702,703,000 | A 2025-12-27 14,702,703,000 | A 2025-12-27 14,702,703,000 | A 2025-12-27 14,702,703,000 | [] |
+| GOOGL | 2018 | A | A 2017-09-30 298,263,000 | A 2017-09-30 298,263,000 | A 2017-09-30 298,263,000 | A 2017-09-30 298,263,000 | A 2017-09-30 298,263,000 | ClassOfStock/CommonClassA |
+| GOOGL | 2018 | B | A 2017-09-30 47,054,000 | A 2017-09-30 47,054,000 | A 2017-09-30 47,054,000 | A 2017-09-30 47,054,000 | A 2017-09-30 47,054,000 | ClassOfStock/CommonClassB |
+| GOOGL | 2018 | C | A 2017-09-30 349,473,000 | A 2017-09-30 349,473,000 | A 2017-09-30 349,473,000 | A 2017-09-30 349,473,000 | A 2017-09-30 349,473,000 | ClassOfStock/CapitalClassC |
+| GOOGL | 2026 | A | A 2025-12-31 5,822,000,000 | A 2025-12-31 5,822,000,000 | A 2025-12-31 5,822,000,000 | A 2025-12-31 5,822,000,000 | A 2025-12-31 5,822,000,000 | ClassOfStock/CommonClassA |
+| GOOGL | 2026 | B | A 2025-12-31 837,000,000 | A 2025-12-31 837,000,000 | A 2025-12-31 837,000,000 | A 2025-12-31 837,000,000 | A 2025-12-31 837,000,000 | ClassOfStock/CommonClassB |
+| GOOGL | 2026 | C | A 2025-12-31 5,429,000,000 | A 2025-12-31 5,429,000,000 | A 2025-12-31 5,429,000,000 | A 2025-12-31 5,429,000,000 | A 2025-12-31 5,429,000,000 | ClassOfStock/CapitalClassC |
+| BRK | 2013 | A | A 2012-12-31 894,955 | A 2012-12-31 894,955 | A 2012-12-31 894,955 | A 2012-12-31 894,955 | A 2012-12-31 894,955 | ClassOfStock/CommonClassA |
+| BRK | 2013 | B | A 2012-12-31 1,121,985,472 | A 2012-12-31 1,121,985,472 | A 2012-12-31 1,121,985,472 | A 2012-12-31 1,121,985,472 | A 2012-12-31 1,121,985,472 | ClassOfStock/CommonClassB |
+| BRK | 2018 | A | A 2017-09-30 754,684 | A 2017-09-30 754,684 | A 2017-09-30 754,684 | A 2017-09-30 754,684 | A 2017-09-30 754,684 | ClassOfStock/CommonClassA |
+| BRK | 2018 | B | A 2017-09-30 1,335,048,578 | A 2017-09-30 1,335,048,578 | A 2017-09-30 1,335,048,578 | A 2017-09-30 1,335,048,578 | A 2017-09-30 1,335,048,578 | ClassOfStock/CommonClassB |
+| BRK | 2026 | A | A 2025-12-31 515,835 | A 2025-12-31 515,835 | A 2025-12-31 515,835 | A 2025-12-31 515,835 | A 2025-12-31 515,835 | ClassOfStock/CommonClassA |
+| BRK | 2026 | B | A 2025-12-31 1,383,582,639 | A 2025-12-31 1,383,582,639 | A 2025-12-31 1,383,582,639 | A 2025-12-31 1,383,582,639 | A 2025-12-31 1,383,582,639 | ClassOfStock/CommonClassB |
+| NVDA | 2013 | SOLE | A 2012-01-29 612,191,412 | A 2012-01-29 612,191,412 | A 2012-01-29 612,191,412 | A 2012-01-29 612,191,412 | A 2012-01-29 612,191,412 | [] |
+| NVDA | 2018 | SOLE | A 2017-01-29 585,000,000 | A 2017-01-29 585,000,000 | A 2017-01-29 585,000,000 | A 2017-01-29 585,000,000 | A 2017-01-29 585,000,000 | [] |
+| NVDA | 2026 | SOLE | A 2025-01-26 24,477,000,000 | A 2025-10-26 24,305,000,000 | A 2025-10-26 24,305,000,000 | A 2025-10-26 24,305,000,000 | A 2025-01-26 24,477,000,000 | EquityComponents/CommonStock |
+| TSLA | 2013 | SOLE | A 2012-12-31 114,214,274 | A 2012-12-31 114,214,274 | A 2012-12-31 114,214,274 | A 2012-12-31 114,214,274 | A 2012-12-31 114,214,274 | [] |
+| TSLA | 2018 | SOLE | A 2017-09-30 168,017,000 | A 2017-09-30 168,017,000 | A 2017-09-30 168,017,000 | A 2017-09-30 168,017,000 | A 2017-09-30 168,017,000 | [] |
+| TSLA | 2026 | SOLE | A 2025-12-31 3,751,000,000 | A 2025-12-31 3,751,000,000 | A 2025-12-31 3,751,000,000 | A 2025-12-31 3,751,000,000 | A 2025-12-31 3,751,000,000 | [] |
+| XOM | 2013 | SOLE | A 2012-09-30 4,559,342,639 | A 2012-09-30 4,559,342,639 | A 2012-09-30 4,559,342,639 | A 2012-09-30 4,559,342,639 | A 2012-09-30 4,559,342,639 | [] |
+| XOM | 2018 | SOLE | A 2017-09-30 4,237,000,000 | A 2017-09-30 4,237,000,000 | A 2017-09-30 4,237,000,000 | A 2017-09-30 4,237,000,000 | A 2017-09-30 4,237,000,000 | [] |
+| XOM | 2026 | SOLE | A 2025-12-31 4,179,000,000 | A 2025-12-31 4,179,000,000 | A 2025-12-31 4,179,000,000 | A 2025-12-31 4,179,000,000 | A 2025-12-31 4,179,000,000 | [] |
+| WMT | 2013 | SOLE | A 2012-01-31 3,418,000,000 | A 2012-01-31 3,418,000,000 | A 2012-01-31 3,418,000,000 | A 2012-01-31 3,418,000,000 | A 2012-01-31 3,418,000,000 | [] |
+| WMT | 2018 | SOLE | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 | B 2017-11-29 2,962,381,445 | [] |
+| WMT | 2026 | SOLE | B 2025-12-02 7,970,166,964 | A 2025-10-31 7,972,000,000 | A 2025-10-31 7,972,000,000 | A 2025-10-31 7,972,000,000 | B 2025-12-02 7,970,166,964 | EquityComponents/CommonStock |
+| INTC | 2013 | SOLE | A 2012-12-29 4,944,000,000 | A 2012-12-29 4,944,000,000 | A 2012-12-29 4,944,000,000 | A 2012-12-29 4,944,000,000 | A 2012-12-29 4,944,000,000 | [] |
+| INTC | 2018 | SOLE | A 2017-09-30 4,680,000,000 | A 2017-09-30 4,680,000,000 | A 2017-09-30 4,680,000,000 | A 2017-09-30 4,680,000,000 | A 2017-09-30 4,680,000,000 | [] |
+| INTC | 2026 | SOLE | A 2025-12-27 4,994,000,000 | A 2025-12-27 4,994,000,000 | A 2025-12-27 4,994,000,000 | A 2025-12-27 4,994,000,000 | A 2025-12-27 4,994,000,000 | [] |
+| ABBV | 2013 | SOLE | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE | FAIL_CLOSE | — |
+| ABBV | 2018 | SOLE | B 2017-10-24 1,596,429,740 | B 2017-10-24 1,596,429,740 | B 2017-10-24 1,596,429,740 | B 2017-10-24 1,596,429,740 | B 2017-10-24 1,596,429,740 | [] |
+| ABBV | 2026 | SOLE | B 2025-10-27 1,767,384,632 | B 2025-10-27 1,767,384,632 | B 2025-10-27 1,767,384,632 | B 2025-10-27 1,767,384,632 | B 2025-10-27 1,767,384,632 | [] |
+| FOX | 2026 | A | A 2025-12-31 200,553,435 | A 2025-12-31 200,553,435 | A 2025-12-31 200,553,435 | A 2025-12-31 201,000,000 | A 2025-12-31 201,000,000 | ClassOfStock/CommonClassA + EquityComponents/CommonStock |
+| FOX | 2026 | B | A 2025-12-31 224,702,222 | A 2025-12-31 224,702,222 | A 2025-12-31 224,702,222 | A 2025-12-31 224,000,000 | A 2025-12-31 224,000,000 | ClassOfStock/CommonClassB + EquityComponents/CommonStock |
+| META | 2013 | A | A 2012-12-31 1,671,000,000 | A 2012-12-31 1,671,000,000 | A 2012-12-31 1,671,000,000 | A 2012-12-31 1,671,000,000 | A 2012-12-31 1,671,000,000 | ClassOfStock/CommonClassA |
+| META | 2013 | B | A 2012-12-31 701,000,000 | A 2012-12-31 701,000,000 | A 2012-12-31 701,000,000 | A 2012-12-31 701,000,000 | A 2012-12-31 701,000,000 | ClassOfStock/CommonClassB |
+| META | 2018 | A | A 2017-09-30 2,385,000,000 | A 2017-09-30 2,385,000,000 | A 2017-09-30 2,385,000,000 | A 2017-09-30 2,385,000,000 | A 2017-09-30 2,385,000,000 | ClassOfStock/CommonClassA |
+| META | 2018 | B | A 2017-09-30 521,000,000 | A 2017-09-30 521,000,000 | A 2017-09-30 521,000,000 | A 2017-09-30 521,000,000 | A 2017-09-30 521,000,000 | ClassOfStock/CommonClassB |
+| META | 2026 | A | A 2025-12-31 2,187,000,000 | A 2025-12-31 2,187,000,000 | A 2025-12-31 2,187,000,000 | A 2025-12-31 2,187,000,000 | A 2025-12-31 2,187,000,000 | ClassOfStock/CommonClassA |
+| META | 2026 | B | A 2025-12-31 343,000,000 | A 2025-12-31 343,000,000 | A 2025-12-31 343,000,000 | A 2025-12-31 343,000,000 | A 2025-12-31 343,000,000 | ClassOfStock/CommonClassB |
+| F | 2013 | COMMON | B 2012-10-26 3,741,809,920 | B 2012-10-26 3,741,809,920 | B 2012-10-26 3,741,809,920 | B 2012-10-26 3,741,809,920 | B 2012-10-26 3,741,809,920 | ClassOfStock/CommonStock |
+| F | 2013 | B | B 2012-10-26 70,852,076 | B 2012-10-26 70,852,076 | B 2012-10-26 70,852,076 | B 2012-10-26 70,852,076 | B 2012-10-26 70,852,076 | ClassOfStock/CommonClassB |
+| F | 2018 | COMMON | B 2017-10-19 3,901,450,116 | B 2017-10-19 3,901,450,116 | B 2017-10-19 3,901,450,116 | B 2017-10-19 3,901,450,116 | B 2017-10-19 3,901,450,116 | ClassOfStock/CommonStock |
+| F | 2018 | B | B 2017-10-19 70,852,076 | B 2017-10-19 70,852,076 | B 2017-10-19 70,852,076 | B 2017-10-19 70,852,076 | B 2017-10-19 70,852,076 | ClassOfStock/CommonClassB |
+| F | 2026 | COMMON | B 2025-10-21 3,913,646,490 | B 2025-10-21 3,913,646,490 | B 2025-10-21 3,913,646,490 | B 2025-10-21 3,913,646,490 | B 2025-10-21 3,913,646,490 | ClassOfStock/CommonStock |
+| F | 2026 | B | B 2025-10-21 70,852,076 | B 2025-10-21 70,852,076 | B 2025-10-21 70,852,076 | B 2025-10-21 70,852,076 | B 2025-10-21 70,852,076 | ClassOfStock/CommonClassB |
+| CMCSA | 2013 | A | A 2012-12-31 2,122,278,635 | A 2012-12-31 2,122,278,635 | A 2012-12-31 2,122,278,635 | A 2012-12-31 2,122,278,635 | A 2012-12-31 2,122,278,635 | ClassOfStock/CommonClassA |
+| CMCSA | 2013 | ASPECIAL | A 2012-12-31 507,769,463 | A 2012-12-31 507,769,463 | A 2012-12-31 507,769,463 | A 2012-12-31 507,769,463 | A 2012-12-31 507,769,463 | ClassOfStock/ClassaSpecialCommonStock |
+| CMCSA | 2013 | B | A 2012-12-31 9,444,375 | A 2012-12-31 9,444,375 | A 2012-12-31 9,444,375 | A 2012-12-31 9,444,375 | A 2012-12-31 9,444,375 | ClassOfStock/CommonClassB |
+| CMCSA | 2018 | A | A 2017-09-30 4,664,327,455 | A 2017-09-30 4,664,327,455 | A 2017-09-30 4,664,327,455 | A 2017-09-30 4,664,327,455 | A 2017-09-30 4,664,327,455 | ClassOfStock/CommonClassA |
+| CMCSA | 2018 | B | A 2017-09-30 9,444,375 | A 2017-09-30 9,444,375 | A 2017-09-30 9,444,375 | A 2017-09-30 9,444,375 | A 2017-09-30 9,444,375 | ClassOfStock/CommonClassB |
+| CMCSA | 2026 | A | A 2025-12-31 3,594,768,252 | A 2025-12-31 3,594,768,252 | A 2025-12-31 3,594,768,252 | A 2025-12-31 3,594,768,252 | A 2025-12-31 3,594,768,252 | ClassOfStock/CommonClassA |
+| CMCSA | 2026 | B | A 2025-12-31 9,444,375 | A 2025-12-31 9,444,375 | A 2025-12-31 9,444,375 | A 2025-12-31 9,444,375 | A 2025-12-31 9,444,375 | ClassOfStock/CommonClassB |
+| NWS | 2018 | A | A 2017-09-30 382,976,281 | A 2017-09-30 382,976,281 | A 2017-09-30 382,976,281 | A 2017-09-30 382,976,281 | A 2017-09-30 382,976,281 | ClassOfStock/CommonClassA |
+| NWS | 2018 | B | A 2017-09-30 199,630,240 | A 2017-09-30 199,630,240 | A 2017-09-30 199,630,240 | A 2017-09-30 199,630,240 | A 2017-09-30 199,630,240 | ClassOfStock/CommonClassB |
+| NWS | 2026 | A | A 2025-12-31 371,777,267 | A 2025-12-31 371,777,267 | A 2025-12-31 371,777,267 | A 2025-12-31 372,000,000 | A 2025-12-31 372,000,000 | ClassOfStock/CommonClassA + EquityComponents/CommonStock |
+| NWS | 2026 | B | A 2025-12-31 185,853,935 | A 2025-12-31 185,853,935 | A 2025-12-31 185,853,935 | A 2025-12-31 186,000,000 | A 2025-12-31 186,000,000 | ClassOfStock/CommonClassB + EquityComponents/CommonStock |
+| UA | 2013 | A | A 2012-12-31 83,461,106 | A 2012-12-31 83,461,106 | A 2012-12-31 83,461,106 | A 2012-12-31 83,461,106 | A 2012-12-31 83,461,106 | ClassOfStock/CommonClassA |
+| UA | 2013 | CONV | A 2012-12-31 21,300,000 | A 2012-12-31 21,300,000 | A 2012-12-31 21,300,000 | A 2012-12-31 21,300,000 | A 2012-12-31 21,300,000 | ClassOfStock/ConvertibleCommonStock |
+| UA | 2018 | A | A 2017-09-30 185,128,757 | A 2017-09-30 185,128,757 | A 2017-09-30 185,128,757 | A 2017-09-30 185,128,757 | A 2017-09-30 185,128,757 | ClassOfStock/CommonClassA |
+| UA | 2018 | C | A 2017-09-30 222,050,824 | A 2017-09-30 222,050,824 | A 2017-09-30 222,050,824 | A 2017-09-30 222,050,824 | A 2017-09-30 222,050,824 | ClassOfStock/CommonClassC |
+| UA | 2018 | CONV | A 2017-09-30 34,450,000 | A 2017-09-30 34,450,000 | A 2017-09-30 34,450,000 | A 2017-09-30 34,450,000 | A 2017-09-30 34,450,000 | ClassOfStock/ConvertibleCommonStock |
+| UA | 2026 | A | A 2025-12-31 188,834,386 | A 2025-12-31 188,834,386 | A 2025-12-31 188,834,386 | A 2025-12-31 188,834,386 | A 2025-12-31 188,834,386 | ClassOfStock/CommonClassA |
+| UA | 2026 | C | A 2025-12-31 202,487,254 | A 2025-12-31 202,487,254 | A 2025-12-31 202,487,254 | A 2025-12-31 202,487,254 | A 2025-12-31 202,487,254 | ClassOfStock/CommonClassC |
+| UA | 2026 | CONV | A 2025-12-31 34,450,000 | A 2025-12-31 34,450,000 | A 2025-12-31 34,450,000 | A 2025-12-31 34,450,000 | A 2025-12-31 34,450,000 | ClassOfStock/ConvertibleCommonStock |
+| V | 2013 | A | A 2012-12-31 530,000,000 | A 2012-12-31 530,000,000 | A 2012-12-31 530,000,000 | A 2012-12-31 530,000,000 | A 2012-12-31 530,000,000 | ClassOfStock/CommonClassA |
+| V | 2013 | B | A 2012-12-31 245,000,000 | A 2012-12-31 245,000,000 | A 2012-12-31 245,000,000 | A 2012-12-31 245,000,000 | A 2012-12-31 245,000,000 | ClassOfStock/CommonClassB |
+| V | 2013 | C | A 2012-12-31 29,000,000 | A 2012-12-31 29,000,000 | A 2012-12-31 29,000,000 | A 2012-12-31 29,000,000 | A 2012-12-31 29,000,000 | ClassOfStock/CommonClassC |
+| V | 2018 | A | A 2017-09-30 1,818,000,000 | A 2017-09-30 1,818,000,000 | A 2017-09-30 1,818,000,000 | A 2017-09-30 1,818,000,000 | A 2017-09-30 1,818,000,000 | ClassOfStock/CommonClassA |
+| V | 2018 | B | A 2017-09-30 245,000,000 | A 2017-09-30 245,000,000 | A 2017-09-30 245,000,000 | A 2017-09-30 245,000,000 | A 2017-09-30 245,000,000 | ClassOfStock/CommonClassB |
+| V | 2018 | C | A 2017-09-30 13,000,000 | A 2017-09-30 13,000,000 | A 2017-09-30 13,000,000 | A 2017-09-30 13,000,000 | A 2017-09-30 13,000,000 | ClassOfStock/CommonClassC |
+| V | 2026 | A | A 2025-12-31 1,683,000,000 | A 2025-12-31 1,683,000,000 | A 2025-12-31 1,683,000,000 | A 2025-12-31 1,683,000,000 | A 2025-12-31 1,683,000,000 | ClassOfStock/CommonClassA |
+| V | 2026 | B1 | A 2025-12-31 5,000,000 | A 2025-12-31 5,000,000 | A 2025-12-31 5,000,000 | A 2025-12-31 5,000,000 | A 2025-12-31 5,000,000 | ClassOfStock/CommonClassB1 |
+| V | 2026 | B2 | A 2025-12-31 120,000,000 | A 2025-12-31 120,000,000 | A 2025-12-31 120,000,000 | A 2025-12-31 120,000,000 | A 2025-12-31 120,000,000 | ClassOfStock/CommonClassB2 |
+| V | 2026 | C | A 2025-12-31 9,000,000 | A 2025-12-31 9,000,000 | A 2025-12-31 9,000,000 | A 2025-12-31 9,000,000 | A 2025-12-31 9,000,000 | ClassOfStock/CommonClassC |
+| MA | 2013 | A | A 2012-12-31 118,405,075 | A 2012-12-31 118,405,075 | A 2012-12-31 118,405,075 | A 2012-12-31 118,405,075 | A 2012-12-31 118,405,075 | ClassOfStock/CommonClassA |
+| MA | 2013 | B | A 2012-12-31 4,838,840 | A 2012-12-31 4,838,840 | A 2012-12-31 4,838,840 | A 2012-12-31 4,838,840 | A 2012-12-31 4,838,840 | ClassOfStock/CommonClassB |
+| MA | 2018 | A | A 2017-09-30 1,045,000,000 | A 2017-09-30 1,045,000,000 | A 2017-09-30 1,045,000,000 | A 2017-09-30 1,045,000,000 | A 2017-09-30 1,045,000,000 | ClassOfStock/CommonClassA |
+| MA | 2018 | B | A 2017-09-30 15,000,000 | A 2017-09-30 15,000,000 | A 2017-09-30 15,000,000 | A 2017-09-30 15,000,000 | A 2017-09-30 15,000,000 | ClassOfStock/CommonClassB |
+| MA | 2026 | A | A 2025-12-31 887,000,000 | A 2025-12-31 887,000,000 | A 2025-12-31 887,000,000 | A 2025-12-31 887,000,000 | A 2025-12-31 887,000,000 | ClassOfStock/CommonClassA |
+| MA | 2026 | B | A 2025-12-31 7,000,000 | A 2025-12-31 7,000,000 | A 2025-12-31 7,000,000 | A 2025-12-31 7,000,000 | A 2025-12-31 7,000,000 | ClassOfStock/CommonClassB |
+| NKE | 2013 | A | A 2012-11-30 180,000,000 | A 2012-11-30 180,000,000 | A 2012-11-30 180,000,000 | A 2012-11-30 180,000,000 | A 2012-11-30 180,000,000 | ClassOfStock/CommonClassA |
+| NKE | 2013 | B | A 2012-11-30 716,000,000 | A 2012-11-30 716,000,000 | A 2012-11-30 716,000,000 | A 2012-11-30 716,000,000 | A 2012-11-30 716,000,000 | ClassOfStock/CommonClassB |
+| NKE | 2018 | A | A 2017-11-30 329,000,000 | A 2017-11-30 329,000,000 | A 2017-11-30 329,000,000 | A 2017-11-30 329,000,000 | A 2017-11-30 329,000,000 | ClassOfStock/CommonClassA |
+| NKE | 2018 | B | A 2017-11-30 1,295,000,000 | A 2017-11-30 1,295,000,000 | A 2017-11-30 1,295,000,000 | A 2017-11-30 1,295,000,000 | A 2017-11-30 1,295,000,000 | ClassOfStock/CommonClassB |
+| NKE | 2026 | A | A 2025-11-30 289,000,000 | A 2025-11-30 289,000,000 | A 2025-11-30 289,000,000 | A 2025-11-30 289,000,000 | A 2025-11-30 289,000,000 | ClassOfStock/CommonClassA + EquityComponents/CommonStock |
+| NKE | 2026 | B | A 2025-11-30 1,191,000,000 | A 2025-11-30 1,191,000,000 | A 2025-11-30 1,191,000,000 | A 2025-11-30 1,191,000,000 | A 2025-11-30 1,191,000,000 | ClassOfStock/CommonClassB + EquityComponents/CommonStock |
+| COST | 2013 | SOLE | A 2012-11-25 434,824,000 | A 2012-11-25 434,824,000 | A 2012-11-25 434,824,000 | A 2012-11-25 434,824,000 | A 2012-11-25 434,824,000 | [] |
+| COST | 2018 | SOLE | A 2017-11-26 439,185,000 | A 2017-11-26 439,185,000 | A 2017-11-26 439,185,000 | A 2017-11-26 439,185,000 | A 2017-11-26 439,185,000 | [] |
+| COST | 2026 | SOLE | A 2025-11-23 443,919,000 | A 2025-11-23 443,919,000 | A 2025-11-23 443,919,000 | A 2025-11-23 443,919,000 | A 2025-11-23 443,919,000 | EquityComponents/CommonStock |
+| HD | 2013 | SOLE | A 2012-10-28 1,496,000,000 | A 2012-10-28 1,496,000,000 | A 2012-10-28 1,496,000,000 | A 2012-10-28 1,496,000,000 | A 2012-10-28 1,496,000,000 | [] |
+| HD | 2018 | SOLE | A 2017-10-29 1,168,000,000 | A 2017-10-29 1,168,000,000 | A 2017-10-29 1,168,000,000 | A 2017-10-29 1,168,000,000 | A 2017-10-29 1,168,000,000 | [] |
+| HD | 2026 | SOLE | A 2025-11-02 995,000,000 | A 2025-11-02 995,000,000 | A 2025-11-02 995,000,000 | A 2025-11-02 995,000,000 | A 2025-11-02 995,000,000 | [] |
+
+### G11.1 통계
+
+| 지표 | D0 | D1 | D2 | D3 | D4 |
+|---|---|---|---|---|---|
+| ground truth class 해결 | 93 / 94 | 93 / 94 | 93 / 94 | 93 / 94 | 93 / 94 |
+| — A tier | 83 | 84 | 84 | 84 | 83 |
+| — B tier | 10 | 9 | 9 | 9 | 10 |
+| `AMBIGUOUS` | 0 | 0 | 0 | 0 | 0 |
+| fail-close missing | 1 | 1 | 1 | 1 | 1 |
+| ground truth에 없는 class 산출 | 2 | 2 | 2 | 2 | 2 |
+| 거절한 fact(사유별) | shape 206 · 미등록 member 11 · multi-class total 12 | 미등록 member 37 · shape 120 · multi-class total 12 | 미등록 member 37 · multi-dim 120 · multi-class total 12 | 미등록 member 37 · 미등록 alias 2 · multi-class total 12 | identifying dim 없음 88 · 미등록 member 11 · multi-class total 12 |
+
+**다섯 candidate의 coverage가 같다.** 유일한 미해결은 ABBV 2013이고 이유는 dimension이 아니라
+AbbVie 첫 10-K에 XBRL이 없다는 구조적 결측이다(Follow-up 1 F9). ground truth에 없는 2건은
+NWS `SeriesCommonStockMember`(2018·2026)로 **값이 0**이라 ME에 기여하지 않는다.
+
+**즉 이 결정은 coverage로 가릴 수 없다.** 가르는 것은 (1) 어떤 값이 선택되는가와
+(2) structural gate가 잘못된 fact를 얼마나 막는가 둘뿐이다.
+
+### G11.2 candidate 간 선택이 갈리는 6개 관측 — 전부 자본 축 때문이다
+
+| issuer | formation | class | D0 | D1 · D2 | D3 · D4 | 판정 |
+|---|---|---|---|---|---|---|
+| WMT | 2026 | SOLE | **B 2025-12-02 7,970,166,964** (표지, exact) | A 2025-10-31 7,972,000,000 (자본 축, `decimals -6`) | = D0 | **D0이 낫다.** 자본 축을 받으면 A tier가 이겨서 60일 더 오래되고 백만 단위로 반올림된 값이 December denominator가 된다 |
+| NVDA | 2026 | SOLE | A 2025-01-26 24,477,000,000 | **A 2025-10-26 24,305,000,000** | = D0 | **D1·D2가 낫다.** NVDA는 부기 부분을 10-K에만 싣고 분기 수량은 자본변동표에만 있다 |
+| FOX | 2026 | A | **A 2025-12-31 200,553,435** (`INF`) | = D0 | A 2025-12-31 201,000,000 (`-6`) | **D3·D4가 나쁘다** |
+| FOX | 2026 | B | **A 2025-12-31 224,702,222** (`INF`) | = D0 | A 2025-12-31 224,000,000 (`-6`) | 〃 |
+| NWS | 2026 | A | **A 2025-12-31 371,777,267** (`INF`) | = D0 | A 2025-12-31 372,000,000 (`-6`) | 〃 |
+| NWS | 2026 | B | **A 2025-12-31 185,853,935** (`INF`) | = D0 | A 2025-12-31 186,000,000 (`-6`) | 〃 |
+
+**FOX·NWS 역행의 기전을 정확히 적는다.** 2월 10-Q(`0001628280-26-005285`)는 같은 instant에
+class 축 단독 `INF` 정확값과 class+자본 2축 `-6` 반올림값을 **함께** 싣는다. 같은 accession
+안이라면 CLOSED된 rounding-interval consolidation이 `INF`를 고른다. 그런데 5월 10-Q
+(`0001628280-26-033172`)는 그 instant에 대해 **2축 `-6` fact만** 싣고, CLOSED된 cross-accession
+tie-break(`acceptance DESC`)가 그 filing을 먼저 고른다. **결과적으로 5월의 반올림값이 2월의
+정확값을 이긴다.** D0·D1·D2는 2축 fact를 아예 인정하지 않으므로 이 경로가 생기지 않는다.
+
+이것은 dimension-scope 결정과 CLOSED된 tie-break의 상호작용이지 tie-break 자체의 문제가 아니다.
+
+## G12. structural gate만으로 충분한가 — naive 변형 진단
+
+위 결과가 다섯 candidate에서 같은 이유는 **등록이 모든 일을 하고 있기 때문**이다. 그래서
+등록을 뺀 naive 변형을 따로 돌려 **gate 자체의 방어력**을 쟀다. 세 formation의 freshness 통과
+fact만 대상이다.
+
+| naive gate | class로 받은 fact | 그중 실제 class | **class가 아닌데 받은 fact** | 내역 |
+|---|---|---|---|---|
+| D1n — 축 whitelist만, member 등록 없음 | 695 | 648 | **47** | 자본 구성요소 27 · 합계 15 · derived 5 |
+| D2n — single dimension이면 무조건 | 695 | 648 | **47** | 〃 |
+| D4n — class 축이 있으면 나머지 dimension 전부 무시 | 790 | 766 | **24** | 자본 구성요소 13 · derived 5 · 합계 6 |
+
+D1n·D2n이 class로 받아버린 대표 fact:
+
+| issuer | instant | 값 | dimension | 실제 뜻 |
+|---|---|---|---|---|
+| HD | 2012-01-29 | 196,000,000 | `EquityComponents/TreasuryStock` | 자기주식 (실제 유통 1,537,000,000) |
+| META | 2012-12-31 | 2,372,000,000 | `EquityComponents/CommonStock` | A+B 합계 |
+| INTC | 2012-12-29 | 4,944,000,000 | `EquityComponents/CommonStockIncludingAdditionalPaidInCapital` | 결합 자본 열 |
+| V | 2025-03-31 | 125,000,000 | `ClassOfStock/CommonClassB1AndB2` | B1+B2 합계 |
+| BRK | 2025-03-31 | 1,438,223 | `ClassOfStock/EquivalentClassA` | Class B의 A 환산 memo |
+| NKE | 2012-05-31 | 90,000,000 / 368,000,000 | `EquityComponents/CommonClassA` · `.../CommonClassB` | 자본 열 |
+
+D4n은 class 축이 identity를 들고 있는 만큼 덜 틀리지만, **class 축이 없는 context에서 dimension을
+전부 무시해 총계로 만드는 경로**가 새로 생긴다. INTC의
+`CumulativeEffectPeriodOfAdoption` + `EquityComponents` fact(2025-03-29, 4,362,000,000)가
+두 dimension을 모두 잃고 INTC의 issuer total로 들어간다. G9.2의 Alphabet `Google Inc.` 행이
+바로 이 경로이며, Alphabet은 multi-class라 total 규칙에 막혔을 뿐이다 — **single-class 발행사에
+공동등록 자회사가 있으면 막을 것이 없다.**
+
+**결론은 분명하다. axis 이름 whitelist도, "class 축이 있으면 나머지는 직교" 규칙도,
+그 자체로는 structural evidence가 되지 못한다.** 방어하는 것은 언제나 **exact alias 등록**이다.
+G9.2의 Alphabet `Google Inc. = 0`과 AbbVie `Allergan plc = 330,000,000`은 세 formation의
+freshness 창 밖이라 위 숫자에는 안 잡히지만, 같은 gate가 그 fact들도 그대로 통과시킨다.
+
+## G13. 이번에 새로 드러난 것 — 소급 재작성은 shape를 가리지 않는다
+
+**`PROBE-me-source.md` §8.5의 "split은 PIT 규칙이 이미 막아준다"는 이 표본에서 성립하지 않는다.**
+그 절은 "당시 filing만 그 시점 수량을 들고 있고 이후 filing은 그 instant를 아예 갖지 않는다"고
+적었는데, **자본변동표와 비교연도 부기는 옛 instant를 다시 싣고 split 비율로 소급 조정한다.**
+
+같은 (issuer, shape, instant)에 값이 1.5배 이상 어긋나는 조합이 **표본 전체에서 71개** 나왔다.
+
+| shape | 건수 | 대표 |
+|---|---|---|
+| `EquityComponents/CommonStock` | 21 | NVDA 2022-01-30 : 2,506,000,000 (2024-02-21 수리) → **25,064,000,000** (2025-02-26 수리, 10:1 split 소급) |
+| class 축 단독 | 31 | GOOGL 2021-12-31 Class A : 300,737,000 → **6,015,000,000** (20:1) · MA 2012-12-31 Class A : 118,405,075 → **1,184,050,750** (10:1) |
+| class 축 + 자본 축 | 6 | NKE 2013-05-31 Class B : 716,000,000 → 1,433,000,000 (2:1) |
+| `EquityComponents/CommonClassA·B` | 6 | NKE 2010-05-31 |
+| dimensionless | 7 | AAPL 2013-09-28 : 899,213,000 → **6,294,494,000** (7:1) · TSLA 2019-12-31 : 181,000,000 → 905,000,000 (5:1) |
+
+**소급 조정은 dimensionless·class 축·자본 축 전부에서 일어난다. dimension scope 결정으로 막을 수
+있는 문제가 아니다.** 다만 자본 축은 filing마다 비교연도 3개의 기초·기말 잔액을 다시 실으므로
+**노출 표면이 가장 넓다**(21건, 그리고 NVDA는 같은 instant가 4년에 걸쳐 12개 filing에 반복된다).
+
+같은 검사에서 **filer 단위 오류**도 드러났다.
+
+| issuer | shape | instant | 값 | 오류 |
+|---|---|---|---|---|
+| COST | `EquityComponents/CommonStock` | 2018-09-02 · 2018-11-25 · 2019-09-01 · 2019-11-24 | 438,189,000 → **438,189,000,000** | 10-Q `0000909832-19-000033` 한 건에서만 1,000배. `decimals`·unit은 그대로 |
+| UA | `ClassOfStock/CommonClassA` | 2011-06-30 · 2011-12-31 | 39,669,162 → **78,338,324,000** | 2:1 split 소급과 1,000배 단위 오류가 겹쳤다 |
+
+**COST 오류는 자본 축에만 있고 UA 오류는 class 축에 있다.** 어느 shape도 filer 오류에서 자유롭지
+않지만, **cross-accession tie-break가 `acceptance DESC`라서 나중에 들어온 잘못된 값이 이긴다**는
+점은 공통이다.
+
+> **이것은 이번 연구가 닫는 문제가 아니다.** split basis / 소급 재작성 처리와
+> cross-accession tie-break는 별도 OPEN decision이고, 여기서는 증거만 남긴다.
+> **다만 `PROBE-me-source.md` §8.5의 근거가 이 표본에서 반증됐다는 사실은 기록해야 한다.**
+
+## G14. QName contract를 문자 그대로 적용한 결과
+
+§19 계약(standard는 `us-gaap`/`dei` family, issuer extension은 raw namespace URI exact)을
+그대로 적용해 집계했다. 두 가지가 드러났다.
+
+**1. issuer-extension namespace URI는 filing 기간마다 바뀐다.** 표본에서 비표준 namespace URI가
+**154개**이고, 같은 member local name이 다음처럼 쪼개진다.
+
+| extension member local | 서로 다른 namespace URI 수 | 예 |
+|---|---|---|
+| `CapitalClassCMember` (Alphabet Class C) | **43** | `http://www.google.com/20150930` |
+| `EquivalentClassAMember` (Berkshire) | 34 | `http://www.berkshirehathaway.com/20171231` |
+| `ClassaSpecialCommonStockMember` (Comcast) | 17 | `http://www.comcast.com/20120630` |
+| `ClassCCommonStockMember` (Visa) | 9 | `http://usa.visa.com/20090630` |
+| `SeriesCommonStockMember` (News Corp) | 9 | `http://newscorp.com/20170630` |
+| `CommonClassB1Member` (Visa) | 9 | `http://wwww.visa.com/20240331` |
+
+**raw URI를 alias identity key로 쓰면 Alphabet Class C 하나에 alias row가 43개 필요하고,
+분기마다 하나씩 늘어난다.** 그 registry는 원리상 완성될 수 없고, 미등록 alias는 fail-close이므로
+**새 분기 filing이 들어올 때마다 그 class가 조용히 사라진다.**
+
+이미 이 문서 §10이 권고한 `ext:<발행사 CIK>` family token이 이 데이터가 지지하는 해법이다.
+raw URI는 provenance로 계속 보존한다.
+
+**2. `srt` family가 계약에 없다.** 표본의 `CumulativeEffectPeriodOfAdoptionAxis`는
+`http://fasb.org/srt/2020-01-31` … `http://fasb.org/srt/2025`의 **5개 URI**로 나타난다.
+`srt`는 표준 namespace인데 family 목록에 없어서 지금 계약대로면 issuer extension처럼 취급되고
+taxonomy 연도마다 다른 축으로 세어진다. `LegalEntityAxis`·`StatementScenarioAxis`도 최신
+taxonomy에서는 `srt`에 있다(이 표본에서는 `dei`·`us-gaap` 판이 나왔다).
+
+> **어느 것도 이번 결정을 바꾸지 않는다.** 다만 alias row의 key를 정할 때 반드시 함께 정해야 한다.
+
+## G15. ground truth 확인 범위
+
+**94개 행 전부를 사람이 rendered SEC 출력과 1:1 대조하지 않았다.** §9·F14와 같은 기준이다.
+
+사람이 원문(rendered 또는 raw instance)과 직접 대조한 것:
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| WMT FY2026 자본변동표 | `0000104169-26-000055` rendered `R6.htm` | 열이 `Total · Total Walmart Shareholders' Equity · Common Stock · Capital in Excess of Par Value · Retained Earnings · AOCI · Nonredeemable NCI`, 행이 `Beginning balances (in shares) at Jan. 31, 2023 = 8,080`(백만), element `us-gaap_CommonStockSharesOutstanding` |
+| Alphabet FY2015 표지 | `0001652044-16-000012` rendered `R1.htm` | `Class A 292,580,627 · Class B 50,199,837 · Class C 345,539,303 · Google Inc. 0` |
+| Comcast FY2012 표지 | `0001193125-13-067658` rendered `R1.htm` | `Class A Common Stock [Member] · ClassA Special Common Stock [Member] · Class B Common Stock [Member]` 세 열 |
+| Visa FY2026 Q1 표지 | `0001403161-26-000045` rendered `R1.htm` | `Class A 1,681,093,942 · Class B-1 4,835,384 · Class B-2 120,338,948 · Class C 8,904,197`. 옛 Class B 없음 |
+| Berkshire FY2025 | `0001193125-26-083899` rendered `R4.htm` | `Equivalent Class A [Member]`가 `Net earnings per average equivalent` 행에 붙는다 — EPS 분모 memo |
+| Alphabet 2025-12-31 tie-out | raw instance | dimensionless 12,088,000,000 = A 5,822,000,000 + B 837,000,000 + C 5,429,000,000 |
+| META tie-out | raw instance | `EquityComponents/CommonStock` = Class A + Class B, 7개 instant 전부 정확히 일치 |
+| Visa tie-out | raw instance | `ClassOfStock/CommonStock` = A+B+C · `CommonClassB1AndB2` = B1+B2, 각 instant 정확히 일치 |
+| NKE 2012-11-30 tie-out | raw instance | 표지 dimensionless 895,711,770 = A 179,784,496 + B 715,927,274 |
+| HD 자기주식 | `0000354950-12-000003` raw instance | `EquityComponents/TreasuryStock`에 `CommonStockSharesOutstanding` |
+| AbbVie Allergan | `0001551152-20-000023` 외 4건 raw instance | `BusinessAcquisition/Allerganplc` 330,000,000 |
+| taxonomy 정의 | `us-gaap-doc-2025.xml` · `srt-doc-2025.xml` | G3.2 표 |
+| Guide 절 | `xbrl-guide-2026-05-15.pdf` p.15·55·104·118·141 | G3.1 인용 |
+
+나머지 행은 **구조 분류(concept · instant · 전체 dimension set · semantic · status)만 검증했고
+값의 경제적 정확성을 개별 확인하지 않았다.**
+
+## G16. 이번에 결정하지 않은 것
+
+1. **split basis / 소급 재작성**(G13)은 OPEN이다. `PROBE-me-source.md` §8.5의 근거가
+   반증됐다는 사실만 기록하고 처리 규칙은 정하지 않았다.
+2. **cross-accession tie-break**(`acceptance DESC`)가 반올림값·오류값을 이기게 하는 문제(G11.2·G13)는
+   `decimals` OPEN decision과 함께 봐야 한다. 여기서 바꾸지 않았다.
+3. **alias key의 namespace 표현**(G14)은 이번 추천과 독립이지만 alias row를 만들 때 함께 정해야 한다.
+4. **`dei:EntityListingsInstrumentAxis`**(G9.5)를 class-identifying 축으로 등록할지는 열어 둔다.
+   표본에서 2건뿐이고 세 formation의 freshness 창 밖이라 판정에 쓸 근거가 얇다.
+5. **retired class**는 여전히 identity `effective_to`의 책임이다. 이번 dimension 결정이
+   그것을 대신하지 않는다.
+
+## User decision — dimension scope
+
+추천: **A — strict class-axis + dimensionless only (D0).**
+그리고 §18이 물은 alias row의 최소 identity는 **A — one exact axis/member**다.
+
+```text
+direct outstanding fact를 actual ordinary class의 PIT share count로 인정하는 shape는 둘뿐이다.
+
+  (1) explicit dimension이 하나도 없는 context
+        -> 그 시점 identity에 등록된 ordinary-common class가 정확히 1개일 때만
+           그 class의 수량으로 쓴다. 2개 이상이면 총계이므로 어떤 class에도 배분하지 않는다.
+
+  (2) explicit dimension이 정확히 하나이고, 그 축이 class-of-stock 축이며,
+      그 (axis, member)가 그 발행사·그 시점에 PIT alias로 등록돼 있을 때
+
+그 밖의 모든 shape는 unusable이고 fail-close다.
+```
+
+§23이 요구한 기준별로 적는다.
+
+- **actual economic class identity를 정확히 보존하는가.** 보존한다. 공식 semantics가
+  class 범위를 정하는 축을 class-of-stock 축으로 한정하고(Guide §3.2.3·§3.2.4 Note 3·§6.4.2),
+  class 축 없는 fact를 총계로 정의한다(§5.7·§6.4.1). D0는 그 정의를 그대로 옮긴 것이다.
+- **multi-class double count를 막는가.** 막는다. dimensionless를 class에 배분하지 않고
+  (GOOGL 2025-12-31에서 2.08배 과대를 막는다), 자본 축 aggregate도 받지 않는다
+  (META `EquityComponents/CommonStock` = A+B, 7개 instant 정확히 일치). 합계 member는
+  class 축에 있어도 등록되지 않으므로 막힌다(V `CommonClassB1AndB2`·`CommonStockMember`).
+- **subsidiary / segment / entity scope 오염을 막는가.** 막는다. `LegalEntityAxis`·
+  `BusinessAcquisitionAxis`·`StatementScenarioAxis`가 붙은 context는 shape 자체로 탈락한다.
+  Alphabet 표지의 `Google Inc. = 0`과 AbbVie의 `Allergan plc = 330,000,000`이 D0에서
+  구조적으로 들어올 수 없다. **D4의 "직교 축은 무시" 규칙은 이 두 축이 직교가 아님을
+  증명해야 하는데, 증명해야 할 목록이 열려 있다.**
+- **issuer-specific numeric exception이 필요한가.** 필요 없다. 규칙은 shape와 등록 여부만 본다.
+  발행사 이름·숫자·whitelist가 들어가지 않는다.
+- **taxonomy 연도 변화에 안정적인가.** 안정적이다. 판정에 쓰는 것은 `us-gaap` family +
+  local name이고 URI 연도는 provenance로만 남는다. 다만 **issuer-extension member의
+  namespace 표현은 G14대로 따로 정해야 한다** — 그 결정은 다섯 candidate 전부에 똑같이 걸린다.
+- **alias history / retirement와 자연스럽게 결합하는가.** 결합한다. 한 class에 여러
+  (axis, member) alias를 기간별로 매다는 이미 승인된 모델이 그대로 쓰인다 —
+  Comcast Class A Special의 표기 4개, Visa Class C의 표기 2개, Berkshire 2009 표기가
+  전부 alias row로 표현되고, 은퇴는 class의 `effective_to`가 정한다.
+- **구현 복잡도.** 가장 낮다. alias key가 `(axis, member)` 한 쌍이고 축이 두 개로 고정된다.
+  D3는 alias key가 dimension **집합**이라 registry가 shape 수만큼 늘고(표본에서 205개),
+  D4는 축마다 "직교인가"를 증명해 유지해야 한다.
+- **deterministic fail-close인가.** 그렇다. 미등록 member·미허용 shape·multi-class
+  dimensionless는 전부 값 없이 멈춘다. 조용히 다른 값으로 대체되지 않는다.
+
+**coverage로 고른 것이 아니라는 점을 분명히 한다.** 다섯 candidate 모두 ground truth class
+94개 중 93개를 해결했고 유일한 결측(ABBV 2013)은 dimension과 무관하다. 갈린 것은 **어떤 값이
+선택되는가** 6건뿐이고, 그중 **4건(FOX·NWS 2026)에서 D3·D4가 정확값 대신 백만 단위 반올림값을
+고른다.** 나머지 2건은 서로 반대 방향이다 — WMT 2026은 D0가 더 정확한 표지 값을 쓰고(D1·D2는
+60일 더 오래되고 반올림된 자본 축 값을 A tier로 올린다), NVDA 2026은 D1·D2가 더 최신
+instant를 얻는다. **1승 1패에 4패다.**
+
+**B(축 whitelist)를 추천하지 않는 이유.** 축 이름은 structural evidence가 아니다.
+`StatementEquityComponentsAxis` 아래에는 자기주식(HD)·결합 자본 열(INTC·V·META)·합계(META·V)가
+같이 들어 있고, 방어하는 것은 축이 아니라 member 등록이다(G12에서 등록을 빼면 47건이 통과한다).
+등록을 요구하는 순간 B는 C의 부분집합이 되고, 축 목록만 남아 `dei:EntityListingsInstrumentAxis`
+같은 실제 class 축을 놓친다.
+
+**C(one-pair alias, 축 무제한)를 추천하지 않는 이유는 조금 다르다.** C는 D0보다 표현력이 넓고
+NVDA 2026 한 건을 개선한다. 하지만 자본 축 member를 "이 발행사는 class가 하나니까 그 class"로
+등록하는 것은 **alias 자체의 성질이 아니라 class universe에 의존하는 매핑**이다 — 그 발행사가
+class를 하나 더 만드는 순간 같은 alias가 조용히 합계로 바뀐다. 게다가 그 계열은 소급 재작성
+표면이 가장 넓고(G13에서 21건) filer 단위 오류도 그 축에서 나왔다(COST 1,000배).
+**얻는 것이 관측 1건이고 잃는 것이 그 구조적 위험이면 지금은 열지 않는 쪽이 맞다.**
+
+**D(full dimension-set alias)를 추천하지 않는 이유.** §13이 요구한 대로 실제 반례를 찾았는데,
+**2축 context가 추가로 만들어내는 class 관측이 0이다.** freshness를 통과한 2축 fact 120건은
+전부 이미 1축 class fact가 같은 class를 커버하는 경우였고, 대신 G11.2의 정밀도 역행 4건을
+만들었다. **필요를 증명하는 반례가 없으므로 채택하지 않는다.**
+
+**E(identifying subset + 직교 규칙)를 추천하지 않는 이유.** D와 같은 정밀도 역행을 그대로 안으면서,
+"어떤 축이 무해한가"를 축마다 증명해야 한다. 이 표본만으로도 무해하지 않은 축이 셋
+(`LegalEntityAxis`·`BusinessAcquisitionAxis`·`StatementScenarioAxis`) 나왔고, 목록은 발행사가
+새 축을 쓸 때마다 늘어난다. **허용 목록을 나중에 넓히는 압력이 구조적으로 생기는 규칙이다.**
+
+**F(증거 부족)로 닫지 않는 이유.** 공식 semantics가 이 질문에 직접 답하고(Guide §3.2.3·§3.2.4
+Note 3·§5.7·§6.4.1·§6.4.2 + taxonomy 정의), 표본에서 각 shape의 실제 의미를 tie-out과
+rendered 원문으로 확인했다. 판단에 필요한 것은 다 나왔다.
+
+**함께 기억할 것 셋.**
+
+1. **`us-gaap:CommonStockSharesOutstanding`이 있다고 그것이 class 수량인 것은 아니다.**
+   같은 concept이 자기주식(HD)·합계(META·V)·다른 회사(ABBV)·비실제 시나리오(INTC·COST)에도
+   붙는다. 판정하는 것은 concept이 아니라 **context**다.
+2. **`CommonStockMember`는 축에 따라 뜻이 갈리고, class 축 위에서도 발행사마다 갈린다**
+   (F는 class, V는 합계). member 이름 기반 규칙을 만들지 않는다.
+3. **WMT의 A tier 공백은 dimension scope로 메우지 않는다.** 이미 승인된 A→B hierarchy가
+   더 정확한 표지 값을 준다(2025-12-02 7,970,166,964, exact). 자본 축을 열면 오히려
+   더 오래되고 반올림된 값이 A tier로 올라온다.
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
