@@ -2252,3 +2252,554 @@ rendered 원문으로 확인했다. 판단에 필요한 것은 다 나왔다.
    더 오래되고 반올림된 값이 A tier로 올라온다.
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+
+---
+
+# Follow-up 3 — split basis / retrospective restatement (2026-08-28)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 세 절과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. Gate · `coverage_start` · B/M · rank ·
+> returns는 이번에도 계산하지 않았고 production DB에 쓰지 않았다.
+
+시작 main: `637caf04bb8accbb91486dc543e8ba23b6d749d2`
+(`research(qv): share-count dimension scope를 검증한다` — 바로 위 절을 커밋한 지점이고
+`origin/main`도 같았다.)
+
+**이번에 다시 열지 않은 것.** December class price = `bars_daily.raw_close`(조정가 금지) ·
+share source = raw XBRL instance · 허용 form 네 가지 · A/B hierarchy와 `AMBIGUOUS` fail-close ·
+measurement-calendar-year freshness boundary(hierarchy보다 먼저) · dimension scope D0 ·
+identity의 economic class ↔ XBRL alias 분리와 `effective_to` 정본 · QName alias key ·
+한 accession 안의 `decimals` interval consolidation · companyfacts·issued−treasury·
+조정가 ME·발행사 숫자 whitelist 금지.
+
+## H1. 이번 질문 하나
+
+> **SEC filing이 과거 instant의 shares를 stock split에 맞춰 소급 재작성했을 때,
+> December t-1 raw price와 같은 share basis를 어떻게 보장할 것인가?**
+
+Follow-up 2의 G13이 남긴 것이다. 같은 `(issuer, shape, instant)`에 값이 배수로 어긋나는 조합이
+71개였고, `PROBE-me-source.md` §8.5의 "split은 PIT 규칙이 이미 막아준다"가 그 표본에서
+반증됐다는 사실만 기록하고 처리 규칙은 열어 뒀다.
+
+**보장해야 하는 것은 하나다.**
+
+```text
+ME = shares_on_December_price_basis × December_raw_close
+```
+
+## H2. 가설의 공식 근거 — SAB Topic 4.C
+
+§9가 세운 가설("filing 안의 과거 주식수는 그 filing이 발행되는 시점의 split basis로 표현된다")은
+추측이 아니라 SEC 공식 해석이다.
+
+출처: [SEC Codification of Staff Accounting Bulletins, Topic 4: Equity Accounts](https://www.sec.gov/interps/account/sabcodet4.htm),
+**C. Change In Capital Structure**
+
+> "**Facts**: A capital structure change to a stock dividend, stock split or reverse split occurs
+> after the date of the latest reported balance sheet but before the release of the financial
+> statements or the effective date of the registration statement, whichever is later.
+> **Question**: What effect must be given to such a change?
+> **Interpretive Response**: **Such changes in the capital structure must be given retroactive
+> effect in the balance sheet.** An appropriately cross-referenced note should disclose the
+> retroactive treatment, explain the change made and state the date the change became effective."
+
+**filing 원문에서도 그대로 확인된다.**
+
+| filing | 인용 |
+|---|---|
+| Mastercard FY2013 10-K `0001141391-14-000003` (제출 2014-02-14, ex-date 2014-01-22 **이후**) | "The number of shares and per share amounts below have been **retroactively restated** to reflect the ten-for-one stock split of the Company's **Class A and Class B** common shares, which was effected in the form of a common stock dividend distributed on January 21, 2014." |
+| NVIDIA FY2022 10-K `0001045810-22-000036` (제출 2022-03-18, ex-date 2021-07-20 이후) | "On July 19, 2021, we executed a four-for-one stock split … **All share, equity award, and per share amounts and related shareholders' equity balances presented herein have been retroactively adjusted to reflect the Stock Split.**" |
+| Berkshire FY2009 10-K `0001193125-10-043450` (제출 2010-03-01, ex-date 2010-01-21 이후) | "Adjusted for the **50-for-1 Class B stock split** that became effective on January 21, 2010." · "Net earnings per Class B common share is equal to one-fifteen-hundredth (1/1,500) of such amount … after giving effect to the 50-for-1 Class B stock split" |
+
+세 가지가 여기서 확정된다.
+
+1. **share amount의 basis는 fact instant가 아니라 filing 시점이다.**
+2. **split은 발행사가 아니라 class에 적용된다** — MA는 "Class A and Class B", BRK는 "Class B" 한쪽뿐이다.
+3. **A tier(재무제표)만의 이야기다.** B tier(표지 `dei:EntityCommonStockSharesOutstanding`)는
+   instant가 filing 직전 날짜라 소급 대상이 되지 않는다. 표본에서 표지 fact가 뒤 filing에
+   재보고된 사례는 **0건**이다.
+
+## H3. explicit split-event source — EODHD Historical Splits
+
+현재 credential로 **READ-ONLY** 확인했다. `eodhd.py`·`data.py`·schema·DB는 건드리지 않았다.
+
+```text
+endpoint   GET https://eodhd.com/api/splits/{SYMBOL}.US?from=1990-01-01&to=2026-08-28&fmt=json
+필드       date (ex-date) · split ("7.000000/1.000000" 형식)
+조회일     2026-08-28
+현재 plan  접근 가능. 1990년대 이벤트까지 내려온다(HD 1990-07-06, NKE 1990-10-08 확인)
+```
+
+표본 20 발행사의 class별 상장 심볼 26개를 조회해 **이벤트 후보 55개**를 얻었다. 각 이벤트는
+`symbol · ex_date · ratio · source(EODHD splits API) · 조회일`로 기록했다.
+
+**단, 이 feed는 그대로 쓸 수 없다.** 다음 절이 이유다.
+
+## H4. vendor split feed는 share-count event 목록이 아니다
+
+**가장 중요한 발견이다.** EODHD `splits`가 주는 것은 **가격 조정 계수**이고, 그 안에는
+주식수를 전혀 바꾸지 않는 기업행동이 섞여 있다.
+
+| issuer | vendor 이벤트 | 실제 성격 | 그 class의 주식수 변화 |
+|---|---|---|---|
+| UA (UAA) | 2016-04-08 ×2 | **Class C 신주 배당**(A·B 보유자에게 C 1주씩) | Class A 181,646,468 → 183,141,109 = **×1.008 (변화 없음)** |
+| CMCSA | 2026-01-05 ×1.067 | Versant 분사 | Class A 3,634,450,130 → 3,588,401,619 = **×0.987 (변화 없음)** |
+| UA (UA) | 2016-06-13 ×1.0071 | Class C 관련 조정 | Class C 217,591,109 → 219,454,106 = **×1.009 (변화 없음)** |
+| F | 1998·2000 세 건 | 분사·자본재편 계수 | (표본 구간 밖) |
+| GOOG/GOOGL | 2014-03-27 ×2.002 · 2014-04-03 ×1.998 · 2015-04-27 ×1.0027 | Class C 배당과 집단소송 합의 조정 | Alphabet CIK 이전이라 관측 불가 |
+
+**UA 2016-04-08이 결정적이다.** 가격은 실제로 반토막 났고(88.82 → 43.54, ×2.04) vendor는 2:1
+split이라고 적지만, **Class A의 주식수는 그대로다.** 늘어난 것은 새로 만들어진 Class C다.
+이 계수를 Class A 주식수에 곱하면 정확히 2배 틀린다.
+
+> 이것은 §6이 금지한 `raw_close/adj_close` 추론과 같은 종류의 함정이다.
+> **가격이 반토막 났다는 사실은 주식수가 두 배가 됐다는 증거가 아니다.**
+
+그래서 이 연구는 vendor 이벤트를 **후보**로만 쓰고, **승인은 그 class 자신의 SEC 주식수
+증거로만** 했다. 판정 기준은 이렇다.
+
+```text
+ex_date 이전에 '보고된' 마지막 관측  vs  ex_date 이후에 '보고된' 첫 관측   (SAB 4.C: 보고 시점이 basis를 정한다)
+표지(B tier)를 1순위 증거로 쓴다 — instant가 보고일에 붙어 있어 basis 전환을 직접 보여준다
+
+관측 비율 ≈ 1                     -> NO_SHARE_EFFECT   (주식수를 바꾸지 않는 이벤트)
+관측 비율 ≈ vendor 비율            -> SHARE_SPLIT_CONFIRMED
+그 밖                              -> UNRESOLVED
+그 시점에 class가 없으면            -> NO_EVIDENCE
+```
+
+**비상장 class에는 vendor 이벤트가 아예 없다.** 그래서 같은 날 같은 발행사의 상장 class 비율을
+**후보로만** 빌려오고, 승인은 그 비상장 class 자신의 SEC 표지 관측으로만 했다.
+**발행사 단위 자동 전파는 하지 않았다.**
+
+## H5. class-level 판정 결과
+
+| issuer | class | 상장 심볼 | ex-date | vendor 비율 | SEC 주식수 증거 (표지 tier B 우선) | 판정 |
+|---|---|---|---|---|---|---|
+| BRK | A | BRK-A | 2010-01-21 | — | 2009-10-29 1,056,884 → 2010-02-18 1,103,764 = ×1.044 | 주식수 변화 없음 · 원문 확인 |
+| BRK | B | BRK-B | 2010-01-21 | ×50 | 2009-10-29 14,845,356 → 2010-02-18 814,349,921 = ×54.856 | **주식수 split 확정** · 원문 확인 |
+| UA | A | UAA | 2012-07-10 | ×2 | 2012-04-30 41,032,837 → 2012-07-31 82,662,728 = ×2.015 | **주식수 split 확정** |
+| UA | C | UA | 2012-07-10 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| UA | CONV | 비상장 | 2012-07-10 | — | 2012-04-30 11,100,000 → 2012-07-31 21,800,000 = ×1.964 | **주식수 split 확정** |
+| NKE | A | 비상장 | 2012-12-26 | — | 2012-08-31 89,892,248 → 2012-11-30 179,784,496 = ×2.000 | **주식수 split 확정** |
+| NKE | B | NKE | 2012-12-26 | ×2 | 2012-08-31 360,660,170 → 2012-11-30 715,927,274 = ×1.985 | **주식수 split 확정** |
+| MA | A | MA | 2014-01-22 | ×10 | 2013-10-24 115,800,964 → 2014-02-06 1,141,285,340 = ×9.856 | **주식수 split 확정** |
+| MA | ADDLSERIES | 비상장 | 2014-01-22 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| MA | B | 비상장 | 2014-01-22 | — | 2013-10-24 4,576,623 → 2014-02-06 45,255,390 = ×9.888 | **주식수 split 확정** |
+| GOOGL | A | GOOGL | 2014-03-27 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | B | 비상장 | 2014-03-27 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | C | GOOG | 2014-03-27 | ×2.002 | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | A | GOOGL | 2014-04-03 | ×1.9981 | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | B | 비상장 | 2014-04-03 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | C | GOOG | 2014-04-03 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| UA | A | UAA | 2014-04-15 | ×2 | 2014-01-31 85,828,707 → 2014-04-30 173,959,046 = ×2.027 | **주식수 split 확정** |
+| UA | C | UA | 2014-04-15 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| UA | CONV | 비상장 | 2014-04-15 | — | 2014-01-31 20,000,000 → 2014-04-30 39,155,000 = ×1.958 | **주식수 split 확정** |
+| AAPL | SOLE | AAPL | 2014-06-09 | ×7 | 2014-04-11 861,381,000 → 2014-07-11 5,987,867,000 = ×6.951 | **주식수 split 확정** |
+| V | A | V | 2015-03-19 | ×4 | 2015-01-23 490,962,259 → 2015-04-27 1,957,430,803 = ×3.987 | **주식수 split 확정** |
+| V | B | 비상장 | 2015-03-19 | — | 2015-01-23 245,513,385 → 2015-04-27 245,513,385 = ×1.000 | 주식수 변화 없음 |
+| V | B1 | 비상장 | 2015-03-19 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| V | B2 | 비상장 | 2015-03-19 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| V | C | 비상장 | 2015-03-19 | — | 2015-01-23 21,762,506 → 2015-04-27 21,198,427 = ×0.974 | 주식수 변화 없음 |
+| V | CSERIESI | 비상장 | 2015-03-19 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| V | CSERIESIII | 비상장 | 2015-03-19 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| V | CSERIESIV | 비상장 | 2015-03-19 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | A | GOOGL | 2015-04-27 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | B | 비상장 | 2015-04-27 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| GOOGL | C | GOOG | 2015-04-27 | ×1.0027 | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| NKE | A | 비상장 | 2015-12-24 | — | 2015-10-01 177,457,876 → 2016-01-04 353,251,752 = ×1.991 | **주식수 split 확정** |
+| NKE | B | NKE | 2015-12-24 | ×2 | 2015-10-01 674,735,884 → 2016-01-04 1,349,896,678 = ×2.001 | **주식수 split 확정** |
+| UA | A | UAA | 2016-04-08 | ×2 | 2016-01-31 181,646,468 → 2016-03-31 183,141,109 = ×1.008 | 주식수 변화 없음 |
+| UA | C | UA | 2016-04-08 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| UA | CONV | 비상장 | 2016-04-08 | — | 2016-01-31 34,450,000 → 2016-03-31 34,450,000 = ×1.000 | 주식수 변화 없음 |
+| UA | A | UAA | 2016-06-13 | — | 2016-03-31 183,141,109 → 2016-06-30 183,388,910 = ×1.001 | 주식수 변화 없음 |
+| UA | C | UA | 2016-06-13 | ×1.0071 | 2016-03-31 217,591,109 → 2016-06-30 219,454,106 = ×1.009 | 주식수 변화 없음 |
+| UA | CONV | 비상장 | 2016-06-13 | — | 2016-03-31 34,450,000 → 2016-06-30 34,450,000 = ×1.000 | 주식수 변화 없음 |
+| CMCSA | A | CMCSA | 2017-02-21 | ×2 | 2016-12-31 2,366,357,318 → 2017-03-31 4,733,512,494 = ×2.000 | **주식수 split 확정** |
+| CMCSA | ASPECIAL | CMCSK | 2017-02-21 | ×2 | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| CMCSA | B | 비상장 | 2017-02-21 | — | 2016-12-31 9,444,375 → 2017-03-31 9,444,375 = ×1.000 | 주식수 변화 없음 |
+| AAPL | SOLE | AAPL | 2020-08-31 | ×4 | 2020-07-17 4,275,634,000 → 2020-10-16 17,001,802,000 = ×3.976 | **주식수 split 확정** |
+| TSLA | SOLE | TSLA | 2020-08-31 | ×5 | 2020-07-20 186,361,726 → 2020-10-20 947,900,733 = ×5.086 | **주식수 split 확정** |
+| NVDA | SOLE | NVDA | 2021-07-20 | ×4 | 2021-05-21 623,000,000 → 2021-08-13 2,500,000,000 = ×4.013 | **주식수 split 확정** |
+| GOOGL | A | GOOGL | 2022-07-18 | ×20 | 2022-04-19 300,763,622 → 2022-07-22 5,996,000,000 = ×19.936 | **주식수 split 확정** |
+| GOOGL | B | 비상장 | 2022-07-18 | — | 2022-04-19 44,359,838 → 2022-07-22 885,000,000 = ×19.950 | **주식수 split 확정** |
+| GOOGL | C | GOOG | 2022-07-18 | ×20 | 2022-04-19 313,376,417 → 2022-07-22 6,163,000,000 = ×19.666 | **주식수 split 확정** |
+| TSLA | SOLE | TSLA | 2022-08-25 | ×3 | 2022-07-19 1,044,490,015 → 2022-10-18 3,157,752,449 = ×3.023 | **주식수 split 확정** |
+| WMT | SOLE | WMT | 2024-02-26 | ×3 | 2023-11-28 2,692,233,703 → 2024-03-13 8,058,048,674 = ×2.993 | **주식수 split 확정** |
+| NVDA | SOLE | NVDA | 2024-06-10 | ×10 | 2024-05-24 2,460,000,000 → 2024-08-23 24,530,000,000 = ×9.972 | **주식수 split 확정** |
+| CMCSA | A | CMCSA | 2026-01-05 | ×1.067 | 2025-10-15 3,634,450,130 → 2026-01-15 3,588,401,619 = ×0.987 | 주식수 변화 없음 |
+| CMCSA | ASPECIAL | CMCSK | 2026-01-05 | — | 관측 없음 (그 시점 class 미존재) | 증거 없음 |
+| CMCSA | B | 비상장 | 2026-01-05 | — | 2025-10-15 9,444,375 → 2026-01-15 9,444,375 = ×1.000 | 주식수 변화 없음 |
+
+**판정 분포**: 주식수 split 확정 22 · 주식수 변화 없음 11 · 증거 없음 20(대부분 "그 시점에
+class가 존재하지 않음") · UNRESOLVED 0(BRK B는 원문으로 해소).
+
+### H5.1 class마다 다르다는 것이 실측으로 확인됐다
+
+| 사례 | 결과 |
+|---|---|
+| **BRK 2010-01-21 50:1** | **Class B만** split. Class A는 그대로(×1.044, BNSF 인수분). 원문이 "50-for-1 Class B stock split"으로 명시 |
+| **CMCSA 2017-02-21 2:1** | Class A는 ×2.000, **Class B는 ×1.000**. Comcast Class B는 정관상 9,444,375주 고정이다 |
+| **V 2015-03-19 4:1** | Class A는 ×3.987, **Class B·C는 ×1.000**. Visa의 B/C는 주식수가 아니라 전환비율이 조정된다 |
+| **GOOGL 2022-07-18 20:1** | A ×19.94 · **비상장 B ×19.95** · C ×19.67 — **비상장 class도 split됐고, 그 증거는 SEC 표지에서 나온다** |
+| **MA 2014-01-22 10:1** | A ×9.856 · **비상장 B ×9.888**. 원문이 "Class A and Class B"로 명시 |
+| **NKE 2012·2015 2:1** | 상장 Class B와 **비상장 Class A 모두** split |
+
+**즉 "비상장이라 모른다"는 일반화는 틀렸다.** 비상장 ordinary class도 표지에 수량이 실리므로
+(Guide §3.2.3 case 2) split 여부를 SEC 원문만으로 판정할 수 있다. 이 표본에서 비상장 class의
+split 판정이 불가능했던 경우는 **그 class가 그 시점에 존재하지 않았을 때뿐**이다.
+
+## H6. price validation — `raw_close`는 그날의 실제 거래 단위를 보존한다
+
+§20 확인이다. `bars_daily`(`eodhd/eodhd-15y-2026-08`)에서 대표 split 전후 세션을 직접 읽었다.
+
+| symbol | ex-date | 직전 세션 `raw_close` | 직후 세션 `raw_close` | raw 비율 | 같은 구간 `adj_close` |
+|---|---|---|---|---|---|
+| AAPL | 2014-06-09 (×7) | 2014-06-06 **645.57** | 2014-06-09 **93.70** | 6.89 | 20.22 → 20.54 (연속) |
+| AAPL | 2020-08-31 (×4) | 2020-08-28 499.23 | 2020-08-31 129.04 | 3.87 | 121.06 → 125.17 |
+| NVDA | 2021-07-20 (×4) | 2021-07-19 751.19 | 2021-07-20 186.12 | 4.04 | 18.72 → 18.55 |
+| NVDA | 2024-06-10 (×10) | 2024-06-07 1,208.88 | 2024-06-10 121.79 | 9.93 | 120.68 → 121.58 |
+| TSLA | 2020-08-31 (×5) | 2020-08-28 2,213.40 | 2020-08-31 498.32 | 4.44 | 147.56 → 166.11 |
+| MA | 2014-01-22 (×10) | 2014-01-21 818.48 | 2014-01-22 83.30 | 9.83 | 75.81 → 77.15 |
+| GOOGL | 2022-07-18 (×20) | 2022-07-15 2,235.55 | 2022-07-18 109.03 | 20.50 | 110.80 → 108.07 |
+| NKE | 2012-12-26 (×2) | 2012-12-24 105.60 | 2012-12-26 51.33 | 2.06 | 22.06 → 21.44 |
+| WMT | 2024-02-26 (×3) | 2024-02-23 175.56 | 2024-02-26 59.60 | 2.95 | 57.05 → 58.11 |
+| BRK-B | 2010-01-21 (×50) | 2010-01-20 3,476.00 | 2010-01-21 72.72 | 47.80 | 69.52 → 72.72 |
+| **CMCSA** | **2026-01-05 (vendor ×1.067)** | 2026-01-02 29.54 | 2026-01-05 28.13 | **1.05** | 26.69 → 27.12 |
+
+**`raw_close`는 split 즉시 단위가 바뀐다.** 따라서 December ME의 shares도 December 세션의
+regime으로 표현돼 있어야 한다. `adj_close`는 split을 통과해 연속이므로 진단으로만 쓰고
+ME 후보로 쓰지 않는다(계약 그대로). 마지막 행은 H4의 반례로, **가격 계수가 움직였지만 주식수는
+움직이지 않은** 경우다.
+
+## H7. 평가 격자와 후보 정의
+
+**표본(20 발행사)은 그대로 두고 formation 연도를 전부 열었다.** Follow-up 1·2가 쓴
+`2013 · 2018 · 2026` 세 개만으로는 **December와 formation 사이에 split이 들어오는 경우가
+한 번도 없어** 이 질문을 시험할 수 없다. §16이 지목한 anchors(AAPL·GOOGL·NVDA·TSLA·MA·NKE)의
+split은 전부 다른 formation에 붙는다. 그래서 **`2010`부터 `2026`까지 17개 formation을 모두**
+평가했다. 결과를 보고 고른 것이 아니라 격자 전체를 연 것이다.
+
+```text
+formation session   그 해 6월 마지막 정규 세션
+December session    t-1년 12월 마지막 정규 세션
+freshness           Jan 1 of t-1 <= instant <= December session      (CLOSED)
+dimension           D0                                              (CLOSED)
+hierarchy           fresh A -> A, 없으면 B                           (CLOSED)
+decimals            한 accession 안은 interval consolidation          (CLOSED)
+cross-accession     acceptance DESC -> accession DESC                (CLOSED, 이번에 바꾸지 않는다)
+```
+
+class-formation 관측은 **525개**다. 그중 관측 창(t-1년 1월 1일 ~ formation)에 그 class의
+이벤트가 하나라도 있는 관측은 **52개**다.
+
+후보는 다섯이다.
+
+```text
+P0  현재 baseline        split basis guard 없음
+P1  filing <= December   source filing의 historical_usable_session이 December 이하인 fact만
+P2  same split regime    regime(filing 보고일) == regime(December session) 인 fact만.
+                         값을 변환하지 않는다. 같은 regime의 다른 fact를 찾고, 없으면 MISSING.
+                         구간 안에 판정 불가(UNRESOLVED/증거 없음) 이벤트가 있으면 fail-close.
+P3  ratio normalization  P0 선택을 유지하되 확정된 class-level ratio로 December basis로 변환.
+                         ratio를 모르면 fail-close.
+P4  first-report lineage 선택된 instant에서 '최초로 usable하게 보고된' fact를 쓴다.
+```
+
+## H8. 결과 — basis가 갈리는 11개 관측
+
+525개 중 후보 사이에 **basis 판정이 갈리는 관측은 11개**다. `⚠`는 선택된 값의 basis가
+December raw price의 basis와 다르다는 뜻이다.
+
+| issuer | class | formation | Dec session | raw close | 창 안의 event | P0 instant / 보고 filing | P0 | P1 | P2 | P3 | P4 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| NKE | A | 2013 | 2012-12-31 | — | 2012-12-26 split ×2 | 2012-11-30 / 2013-01-09 10-Q 0001193125-13-008172 | 180,000,000 | **90,000,000** ⚠ | 180,000,000 | 180,000,000 (×1) | 180,000,000 |
+| NKE | B | 2013 | 2012-12-31 | 51.60 | 2012-12-26 split ×2 | 2012-11-30 / 2013-01-09 10-Q 0001193125-13-008172 | 716,000,000 | **361,000,000** ⚠ | 716,000,000 | 716,000,000 (×1) | 716,000,000 |
+| MA | A | 2014 | 2013-12-31 | 835.46 | 2014-01-22 split ×10 | 2013-12-31 / 2014-05-01 10-Q 0001141391-14-000017 | **1,148,838,370** ⚠ | 115,796,250 | 115,796,250 | 114,883,837 (×1/10) | **1,148,838,370** ⚠ |
+| MA | B | 2014 | 2013-12-31 | — | 2014-01-22 split ×10 | 2013-12-31 / 2014-05-01 10-Q 0001141391-14-000017 | **45,350,070** ⚠ | 4,577,623 | 4,577,623 | 4,535,007 (×1/10) | **45,350,070** ⚠ |
+| UA | A | 2014 | 2013-12-31 | 90.19 | 2014-04-15 split ×2 | 2013-12-31 / 2014-05-06 10-Q 0001336917-14-000020 | **171,628,708** ⚠ | 85,302,799 | 85,814,354 | 85,814,354 (×1/2) | 85,814,354 |
+| UA | CONV | 2014 | 2013-12-31 | — | 2014-04-15 split ×2 | 2013-12-31 / 2014-05-06 10-Q 0001336917-14-000020 | **40,000,000** ⚠ | 20,325,000 | 20,000,000 | 20,000,000 (×1/2) | 20,000,000 |
+| NKE | A | 2016 | 2015-12-31 | — | 2015-12-24 split ×2 | 2015-11-30 / 2016-01-06 10-Q 0000320187-16-000242 | 353,000,000 | **177,000,000** ⚠ | 353,000,000 | 353,000,000 (×1) | 353,000,000 |
+| NKE | B | 2016 | 2015-12-31 | 62.50 | 2015-12-24 split ×2 | 2015-11-30 / 2016-01-06 10-Q 0000320187-16-000242 | 1,354,000,000 | **677,000,000** ⚠ | 1,354,000,000 | 1,354,000,000 (×1) | 1,354,000,000 |
+| UA | C | 2016 | 2015-12-31 | — | 2016-04-08 NO_EVIDENCE · 2016-06-13 주식수 변화 없음 | 2015-12-31 / 2016-04-29 10-Q 0001336917-16-000077 | 216,096,468 ? | 0 | 0 | **FAIL_CLOSE** | 0 |
+| NVDA | SOLE | 2022 | 2021-12-31 | 294.11 | 2021-07-20 split ×4 | 2021-01-31 / 2022-03-18 10-K 0001045810-22-000036 | 2,479,000,000 | **620,000,000** ⚠ | 2,479,000,000 | 2,479,000,000 (×1) | **620,000,000** ⚠ |
+| NVDA | SOLE | 2025 | 2024-12-31 | 134.29 | 2024-06-10 split ×10 | 2024-01-28 / 2025-02-26 10-K 0001045810-25-000023 | 24,643,000,000 | **2,464,000,000** ⚠ | 24,643,000,000 | 24,643,000,000 (×1) | **2,464,000,000** ⚠ |
+
+나머지 514개에서는 다섯 후보가 모두 같은 basis를 고른다(선택 instant는 P1만 자주 다르다, H9.2).
+
+## H9. 통계
+
+### H9.1 후보 비교 (class-formation 관측 525개)
+
+| 지표 | P0 current | P1 filing≤Dec | P2 same-regime | P3 ratio-normalize | P4 first-report |
+|---|---|---|---|---|---|
+| **correct basis** | 515 | 513 | **520** | 519 | 516 |
+| **wrong basis** | **4** | **6** | **0** | **0** | **4** |
+| unknown basis | 1 | 0 | 0 | 0 | 0 |
+| fail-close (판정 불가 이벤트) | 0 | 0 | 0 | 1 | 0 |
+| missing | 5 | 6 | 5 | 5 | 5 |
+| ambiguous | 0 | 0 | 0 | 0 | 0 |
+
+`missing` 5건은 전부 dimension·split과 무관한 구조적 결측이다(ABBV 2013 첫 10-K에 XBRL 없음,
+Ford 2010·FOX 2019는 그 시점에 usable filing이 없음).
+
+### H9.2 각 후보가 틀리는 방식
+
+- **P0**: split이 **December와 formation 사이**에 있을 때 틀린다. 그 사이에 제출된 filing이
+  December 이전 instant를 **post-split basis로 소급 재작성**하고, `acceptance DESC` tie-break가
+  그 filing을 고른다. MA 2014(A·B) · UA 2014(A·CONV) 4건.
+- **P1**: split이 **관측 instant와 December 사이**에 있을 때 틀린다. December 이전 filing만 쓰면
+  그 값은 **pre-split basis**인데 December 가격은 post-split이다. NKE 2013·2016(A·B) ·
+  NVDA 2022·2025 6건. **P0보다 많다.**
+- **P4**: 두 실패를 모두 물려받는다. December instant를 **처음** 보고한 filing이 이미 split
+  이후일 수 있고(MA FY2013 10-K는 제출 2014-02-14로 ex-date 2014-01-22 뒤다), 반대로 처음 보고가
+  split 이전이면 P1과 같은 실패가 난다(NVDA). **단순함이 정확도를 주지 않는다.**
+- **P2 · P3**: 0건.
+
+### H9.3 P2가 치르는 비용
+
+| 지표 | 값 |
+|---|---|
+| P0와 **같은 instant**를 고른 관측 | 518 / 520 |
+| P0보다 과거 instant를 고른 관측 | **2** (MA A·B 2014, 92일) |
+| P0 대비 늘어난 missing | **0** |
+| P0 대비 늘어난 ambiguous | **0** |
+
+**P1과 대조된다.** P1은 520개 중 **290개**에서 instant가 달라지고 중앙값 **92일**, 최대 **275일**
+더 과거를 고른다. December denominator의 최신성을 크게 잃으면서 정확도는 더 나쁘다.
+
+## H10. basis 오류가 ME에 미치는 크기
+
+상장 class에서 December `raw_close`를 곱한 실제 값이다.
+
+| issuer | class | formation | Dec `raw_close` | P0 ME | P1 ME | P2 ME | P3 ME | 실제 시가총액 대비 |
+|---|---|---|---|---|---|---|---|---|
+| MA | A | 2014 | 835.46 | **$959.8B** ⚠ | $96.7B | $96.7B | $96.0B | Mastercard의 2013년 말 시가총액은 약 $97B. **P0는 10배** |
+| UA | A | 2014 | 90.19 | **$15.5B** ⚠ | $7.69B | $7.74B | $7.74B | **P0는 2배** |
+| NKE | B | 2013 | 51.60 | $36.9B | **$18.6B** ⚠ | $36.9B | $36.9B | **P1은 1/2** |
+| NKE | B | 2016 | 62.50 | $84.6B | **$42.3B** ⚠ | $84.6B | $84.6B | **P1은 1/2** |
+| NVDA | SOLE | 2022 | 294.11 | $729.1B | **$182.4B** ⚠ | $729.1B | $729.1B | NVIDIA의 2021년 말 시가총액은 약 $733B. **P1·P4는 1/4** |
+| NVDA | SOLE | 2025 | 134.29 | $3,309B | **$330.9B** ⚠ | $3,309B | $3,309B | NVIDIA의 2024년 말 시가총액은 약 $3.3T. **P1·P4는 1/10** |
+
+**이 오차는 조용하다.** 값이 그럴듯한 자릿수이고 어떤 검증도 울리지 않으며, `B/M`을 통해
+value 랭크를 통째로 뒤집는다. MA 2014는 ME가 10배 부풀어 **B/M이 1/10이 되고 value 랭크
+최하위로 밀린다.** NVDA 2025는 P1에서 ME가 1/10이 되어 **거꾸로 value 최상위로 올라온다.**
+
+## H11. split로 설명되는 변화와 설명되지 않는 변화 (§17)
+
+같은 `(class, instant)`에 값이 다른 조합이 **197개**다. `decimals` 구간만으로 판정했고
+임의 tolerance를 만들지 않았다.
+
+| 분류 | 건수 | 뜻 |
+|---|---|---|
+| `ROUNDING_COMPATIBLE` | **140** | `decimals` 구간이 겹친다. 충돌이 아니라 정밀도 차이다 (예: CMCSA A `2,122,278,635(INF)` vs `2,122,000,000(-6)`) |
+| `EXACT_RATIO` | **6** | 양쪽 `decimals=INF`이고 확정 split 비율과 정확히 일치 (MA A `118,405,075 → 1,184,050,750 = ×10`) |
+| `WITHIN_DISCLOSED_PRECISION` | **16** | 확정 split 비율이 양쪽의 `decimals` 구간 안에서 성립 (AAPL `899,213,000(-3) → 6,294,494,000(-3) = ×7`) |
+| `SPLIT_RATIO_MISMATCH` | **13** | split 방향은 맞지만 크기가 공시 정밀도 밖 |
+| `UNKNOWN_EVENT` | **4** | 구간 안에 판정 불가 이벤트가 있다 |
+| `UNEXPLAINED_NO_EVENT` | **18** | 구간에 이벤트가 없는데 값이 다르다 |
+
+**split-basis 규칙을 적용해도 남는 것이 22건(`SPLIT_RATIO_MISMATCH` 13 + `UNEXPLAINED_NO_EVENT`
+18 중 rounding 밖의 것들)이다.** §17이 요구한 대로 이 잔여를 그대로 보고한다.
+
+### H11.1 `SPLIT_RATIO_MISMATCH` — 임의 tolerance를 만들지 않는다
+
+| issuer | class | instant | 먼저 보고 | 나중 보고 | 관측 비율 / 확정 비율 | 성격 |
+|---|---|---|---|---|---|---|
+| GOOGL | A | 2021-12-31 | 300,737,000 (`-3`) | 6,015,000,000 (`-3`) | ×20.0009 / ×20 | 나중 값이 실제로는 백만 단위인데 `decimals=-3`으로 태깅됐다. **filer의 `decimals` 오기** |
+| GOOGL | B · C | 2021-12-31 | 44,665,000 · 316,719,000 | 893,000,000 · 6,334,000,000 | ×19.9933 · ×19.9988 | 〃 |
+| CMCSA | A | 2014·2015·2016-12-31 | 2,131,137,862 등 | 4,272,000,000 등 | ×2.0037~2.0046 / ×2 | **0.2% (약 470만 주) 실질 차이.** 반올림으로 설명되지 않는다 |
+| UA | A · CONV | 2011-06-30 등 | 39,669,162 등 | 78,338,324,000 등 | ×1974.79 · ×2000 | **1,000배 filer 단위 오류**가 split과 겹쳤다 |
+
+**여기에 "2% 이내면 같다" 같은 규칙을 만들지 않는다.** §18대로 상태를 나눠 남기고,
+`SPLIT_RATIO_MISMATCH`가 남은 조합은 fail-close 대상으로 취급해야 하는지를 별도 결정으로 넘긴다.
+
+### H11.2 `UNEXPLAINED_NO_EVENT` 18건 전수
+
+| issuer | class | instant | 먼저 보고 | 나중 보고 | 비율 |
+|---|---|---|---|---|---|
+| AAPL | SOLE | 2009-06-27 | 895,816,758 (`0`, 2009-07-22) | 895,735,210 (`0`, 2009-07-22) | ×0.9999 |
+| COST | SOLE | 2016-08-28 | 437,524,000 (`-3`, 2016-10-11) | 437,542,000 (`-3`, 2016-12-16) | ×1.0000 |
+| HD | SOLE | 2011-01-30 | 1,623,000,000 (`-6`, 2011-03-24) | 1,537,000,000 (`-6`, 2012-05-24) | **×0.9470** |
+| TSLA | SOLE | 2014-12-31 | 125,687,607 (`INF`, 2015-02-26) | 125,688,000 (`INF`, 2016-02-24) | ×1.0000 |
+| UA | A | 2012-06-30 | 82,499,396,000 (`-3`, 2012-08-03) | 82,499,396 (`0`, 2013-08-06) | **×0.0010** |
+| UA | A | 2014-09-30 | 174,528,423 (`INF`, 2014-11-05) | 176,021,944 (`0`, 2015-11-04) | ×1.0086 |
+| UA | A | 2015-12-31 | 181,646,468 (`INF`, 2016-02-19) | 181,629,641 (`0`, 2017-02-23) | ×0.9999 |
+| UA | A | 2016-03-31 | 183,141,109 (`0`, 2016-04-29) | 180,115,884 (`0`, 2017-05-09) | ×0.9835 |
+| UA | A | 2016-12-31 | 183,814,911 (`INF`, 2017-02-23) | 181,629,641 (`0`, 2017-05-09) | ×0.9881 |
+| UA | A | 2017-03-31 | 183,814,911 (`0`, 2017-05-09) | 184,667,304 (`INF`, 2018-05-09) | ×1.0046 |
+| UA | A | 2017-12-31 | 185,257,423 (`0`, 2018-02-28) | 185,685,853 (`INF`, 2019-05-09) | ×1.0023 |
+| UA | C | 2016-03-31 | 217,591,109 (`0`, 2016-04-29) | 215,815,884 (`0`, 2017-05-09) | ×0.9918 |
+| UA | C | 2016-12-31 | 220,174,048 (`0`, 2017-02-23) | 216,079,641 (`0`, 2017-05-09) | ×0.9814 |
+| UA | C | 2017-03-31 | 220,174,048 (`0`, 2017-05-09) | 221,148,991 (`INF`, 2018-05-09) | ×1.0044 |
+| UA | CONV | 2012-06-30 | 21,900,000,000 (`-3`, 2012-08-03) | 21,900,000 (`0`, 2013-08-06) | **×0.0010** |
+| UA | CONV | 2014-09-30 | 38,750,000 (`INF`, 2014-11-05) | 37,675,000 (`0`, 2015-11-04) | ×0.9723 |
+| UA | CONV | 2016-03-31 | 34,450,000 (`0`, 2016-04-29) | 35,700,000 (`0`, 2017-05-09) | ×1.0363 |
+| V | B | 2008-09-30 | 245,513,385 (`0`, 2009-07-30) | 245,000,000 (`-6`, 2009-11-20) | ×0.9979 |
+
+**세 덩어리다.** (1) UA·COST의 1,000배 단위 오류(Follow-up 2 G13에서 이미 별도 OPEN으로 남긴 것),
+(2) UA가 2016~2017년에 instant를 한 칸씩 밀려 태깅한 것으로 보이는 계열, (3) HD 2011-01-30의
+5.3% 차이. **어느 것도 split로 설명되지 않으며 split-basis 규칙이 고칠 대상이 아니다.**
+generic cross-accession conflict 정책은 이번에 만들지 않는다.
+
+## H12. rounding / fractional (§18)
+
+split 소급 재작성이 비율과 정확히 맞는지는 **`decimals`가 선언한 정밀도로만** 판정했다.
+
+- `EXACT_RATIO` 6건: 양쪽이 `INF`이고 정확히 일치. **fractional 잔여가 없다** —
+  MA `118,405,075 × 10 = 1,184,050,750` · UA `85,814,354 × 2 = 171,628,708`.
+- `WITHIN_DISCLOSED_PRECISION` 16건: 한쪽이 반올림이라 구간으로만 확인된다.
+  NVDA `2,506,000,000(-6) × 10` 구간 `[25,055,000,000, 25,065,000,000]`에
+  `25,064,000,000(-6)`이 들어간다.
+- `SPLIT_RATIO_MISMATCH` 13건: 구간 밖. **여기에 백분율 tolerance를 만들지 않는다.**
+
+표본의 확정 split은 전부 정수 또는 단순 분수 비율이었고 fractional share / cash-in-lieu가
+주식수 자체를 흐린 사례는 없었다. **`DISCLOSED_FRACTIONAL_DIFFERENCE`로 분류해야 할 건은
+0건**이고, 대신 `decimals` 오기(GOOGL)와 filer 단위 오류(UA)가 그 자리를 차지했다.
+
+## H13. point-in-time (§19)
+
+**미래 이벤트를 쓰지 않는다는 것을 코드 수준에서 확인했다.**
+
+P2·P3가 참조하는 구간은 항상 `(min(filing 보고일, December), max(filing 보고일, December)]`이고
+두 끝점 모두 formation 이하다. 따라서 참조되는 이벤트의 `ex_date`는 언제나 formation 이하다.
+**격자 525개 관측에서 formation 이후 `ex_date` 이벤트를 참조한 사례는 0건이다.**
+
+**"이미 effective된 과거 split을 historical basis normalization에 쓰는 것"은 허용 가능하다고
+판정한다.** 근거는 두 가지다.
+
+1. formation 시점에 그 split은 **이미 공개된 사실**이다(가격에도, filing 본문에도 있다).
+   미래 정보가 아니다.
+2. December 가격 자체가 그 regime으로 관측된 것이므로, **basis를 맞추는 일은 새 정보를 쓰는
+   것이 아니라 단위를 맞추는 것**이다.
+
+다만 **완전한 split DB를 오늘 조회한다는 사실 자체가 PIT를 깨지 않도록**, 구현에서는
+`ex_date <= formation`(더 좁게는 `ex_date <= December` 또는 `<= filing 보고일`) 필터를 코드
+불변식으로 두어야 한다. 이 연구의 하네스가 그렇게 돼 있다.
+
+## H14. ground truth 확인 범위
+
+**525개 관측 전부를 사람이 원문과 1:1 대조하지 않았다.** §9·F14·G15와 같은 기준이다.
+
+사람이 원문과 직접 대조한 것:
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| SAB Topic 4.C | `https://www.sec.gov/interps/account/sabcodet4.htm` | H2 인용 |
+| Mastercard 10:1 소급·class 범위 | FY2013 10-K `0001141391-14-000003` 본문 | "retroactively restated … Class A and Class B" |
+| NVIDIA 4:1 소급 | FY2022 10-K `0001045810-22-000036` 본문 | "All share … balances presented herein have been retroactively adjusted" |
+| Berkshire 50:1 Class B 한정 | FY2009 10-K `0001193125-10-043450` 본문 | "50-for-1 Class B stock split" |
+| split 전후 raw 가격 | `bars_daily` 11개 종목 세션 직접 조회 | H6 표 |
+| vendor split feed 필드·깊이 | EODHD `/api/splits/{SYMBOL}.US`, 조회일 2026-08-28 | H3 |
+| UA Class C 배당이 Class A 주식수를 안 바꾼다 | UA 10-Q/10-K raw instance 시계열 | Class A 181,646,468 → 183,141,109 |
+| Comcast Versant 분사가 주식수를 안 바꾼다 | CMCSA raw instance + 표지 | Class A ×0.987 · Class B ×1.000 |
+
+나머지는 **SEC raw instance의 fact 시계열(표지 tier 우선)과 `bars_daily`로 기계 검증**했고,
+개별 값의 경제적 정확성을 사람이 다시 확인하지는 않았다. `실제 시가총액 대비`(H10) 비교는
+공개적으로 알려진 시가총액 규모와의 자릿수 대조이며, 별도 벤더 시가총액 데이터를 쓰지 않았다.
+
+## H15. 이번에 결정하지 않은 것
+
+1. **`PROBE-me-source.md` §8.5는 이 연구로 확정적으로 반증됐다.** 그 절은
+   "당시 filing만 그 시점 수량을 들고 있고, 이후 filing은 그 instant를 아예 갖지 않는다.
+   formation 시점에 usable했던 filing에서 읽는다는 PIT 규칙을 지키면 raw close와 단위가
+   자동으로 맞는다. 소급 조정본을 잘못 집는 경로가 구조적으로 생기지 않는다"고 적었다.
+   **MA formation 2014에서 정확히 그 경로가 생겨 ME가 10배가 된다**(H8·H10).
+   Follow-up 2 G13이 fact 수준에서 처음 반증했고, 이번에 ME 수준에서 재현했다.
+   **§8.5의 결론은 더 이상 근거로 쓸 수 없다.**
+2. **cross-accession tie-break(`acceptance DESC`)는 이번에 바꾸지 않았다.** 이 연구는
+   그 tie-break를 그대로 두고 eligible 집합만 좁힌다. 다만 H11이 보여주듯 그 규칙은
+   반올림값·오류값도 이기게 하므로 `decimals` OPEN decision과 함께 봐야 한다.
+3. **`SPLIT_RATIO_MISMATCH`·`UNEXPLAINED_NO_EVENT` 잔여 22건의 처리 정책**은 만들지 않았다.
+4. **신설 class의 `effective_from`**: UA Class C는 2016-04-07 배당으로 생겼는데 이후 filing이
+   2015-12-31 instant에 216,096,468주를 소급 표시한다. **December 2015 가격에는 Class C가
+   존재하지 않았으므로 그 관측은 ME에 들어가면 안 된다.** 이것은 identity의 `effective_from`
+   책임이고 split-basis 규칙이 대신 막아준 것은 우연이다(H8의 UA C 2016 행).
+5. **비상장 class 가격**(로드맵 §4.4.2의 `CONVERSION_VALUE_PROXY`)은 이 연구 범위 밖이다.
+   Visa Class B/C처럼 **주식수는 그대로 두고 전환비율이 조정되는 class**가 있다는 사실은
+   그 결정에 직접 영향을 주므로 여기 기록한다.
+
+## User decision — split basis
+
+추천: **P2 — same split-regime, fail-close.**
+
+```text
+share fact를 December denominator에 쓸 수 있는 조건 (freshness · D0 · hierarchy 뒤에 붙는다)
+
+    그 fact를 보고한 filing의 보고일과 December measurement session 사이에
+    그 economic class의 share-basis를 바꾼 이벤트가 하나도 없어야 한다.
+
+    - filing이 December보다 앞이든 뒤든 같은 규칙이다.
+    - 값을 변환하지 않는다. 같은 regime의 다른 eligible fact를 찾고, 없으면 MISSING이다.
+    - 구간 안에 판정 불가(UNRESOLVED / 증거 없음) 이벤트가 있으면 fail-close한다.
+    - same-day ordering이 확실하지 않으면 fail-close한다.
+
+이벤트 목록은 vendor feed가 아니라 class-level SEC 증거로 승인한 것만 쓴다 (H4).
+```
+
+§22가 요구한 기준별로 적는다.
+
+- **December raw price와 shares basis를 보장하는가.** 보장한다. SAB Topic 4.C가
+  "share amount의 basis = filing 시점"을 정하므로, `regime(filing) == regime(December)`는
+  그 정의를 그대로 옮긴 조건이다. 격자 525개에서 **wrong basis 0건**이고, P0가 틀린 4건과
+  P1이 틀린 6건을 모두 잡는다.
+- **PIT를 지키는가.** 지킨다. 참조 구간의 두 끝점이 모두 formation 이하라 formation 이후
+  이벤트를 볼 수 없다(H13, 위반 0건).
+- **class-level split 차이를 보존하는가.** 보존한다. 이벤트가 class에 붙는다.
+  BRK 2010(Class B만) · CMCSA 2017(Class A만) · V 2015(Class A만) · GOOGL 2022(A·B·C 모두) ·
+  MA 2014(A·B 모두)가 전부 다르게 처리되고, **비상장 class도 SEC 표지 증거로 판정된다.**
+- **arbitrary numerical threshold가 없는가.** 규칙 자체에는 없다 — "이벤트가 있는가/없는가"만
+  본다. **비율의 크기를 쓰지 않는다.** (이벤트를 *승인*하는 단계에서 SEC 증거와 vendor 비율을
+  대조하지만, 그것은 데이터 검증이고 selector의 손잡이가 아니다. 그리고 그 대조는 사람이
+  원문으로 재확인할 수 있다.)
+- **silent wrong ME보다 fail-close를 우선하는가.** 우선한다. 판정 불가 이벤트가 걸리면 값을
+  만들지 않는다. **그 대가가 이 격자에서 0건이다** — P0 대비 missing이 늘지 않는다(H9.3).
+- **source/provenance를 감사할 수 있는가.** 있다. 각 이벤트가
+  `class · ex_date · vendor 비율 · SEC 증거(표지 instant·값·보고일) · 판정`으로 남고(H5),
+  선택된 fact는 accession·form·보고일까지 그대로 남는다.
+- **Step 4에 필요한 최소 복잡도인가.** 그렇다. 필요한 것은 **class-level 이벤트 표 하나와
+  구간 포함 검사**뿐이다. 비율을 곱하지 않으므로 반올림·fractional 처리를 만들 필요가 없고,
+  §18이 경고한 tolerance가 아예 등장하지 않는다.
+
+**P3(ratio normalization)를 추천하지 않는 이유는 정확도가 아니다.** P3도 wrong basis 0건이고
+MA 2014에서는 오히려 P2보다 92일 최신인 instant를 지킨다(P2 `2013-09-30`, P3 `2013-12-31`).
+그런데 P3는 **곱셈을 하는 순간 세 가지를 추가로 떠안는다.**
+
+1. **비율의 정확도 문제가 selector 안으로 들어온다.** H11.1에서 확정 split인데도 공시 정밀도
+   밖으로 어긋나는 조합이 13개다(CMCSA 0.2%, GOOGL `decimals` 오기). 곱한 값이 원문 어디에도
+   없는 수가 되고, 그 차이를 어떻게 볼지 정하려면 결국 tolerance를 만들게 된다.
+2. **비율 자체가 vendor에서 온다.** H4가 보였듯 vendor feed에는 주식수를 안 바꾸는 이벤트가
+   섞여 있고, 비율을 **쓰는** 순간 그 오염이 값에 곱해진다. P2는 비율을 쓰지 않고
+   "있었나 없었나"만 보므로 오염의 영향이 한 단계 약하다.
+3. **얻는 것이 이 격자에서 관측 2건의 instant 92일**이다. 위험 대비 이득이 작다.
+
+**P3는 버리지 않고 P2의 상위 옵션으로 남길 만하다.** P2가 fail-close하거나 지나치게 과거
+instant로 밀리는 것이 실제로 문제가 되면, 그때 확정 비율이 `EXACT_RATIO`인 경우에만 여는
+방식으로 다시 열 수 있다. **지금 열 근거는 없다.**
+
+**P1을 추천하지 않는 이유는 분명하다.** §11이 예고한 실패가 실제로 나온다 —
+split이 관측 instant와 December 사이에 있으면 December 이전 filing의 값은 pre-split이고
+December 가격은 post-split이다. **wrong basis가 6건으로 P0(4건)보다 많고**, 게다가
+520개 중 290개에서 instant를 중앙값 92일 더 과거로 밀어 December denominator의 최신성을
+크게 잃는다. **basis alignment를 보장하지 못하므로 §11의 조건대로 탈락이다.**
+
+**P4를 추천하지 않는 이유.** P0의 실패(MA 2014)와 P1의 실패(NVDA 2022·2025)를 **둘 다**
+물려받는다. December instant를 처음 보고한 filing이 이미 split 이후일 수 있기 때문이다.
+단순함이 정확도를 주지 않는다는 것을 이 격자가 보여준다.
+
+**P0를 그대로 두지 않는 이유.** MA 2014에서 ME가 $96B → $960B가 되고 어떤 검증도 울리지 않는다.
+드물지만(525개 중 4건) 조용하고 크다.
+
+**함께 기억할 것 넷.**
+
+1. **vendor의 `splits`는 가격 조정 계수이지 주식수 이벤트가 아니다.** UA 2016-04-08은
+   가격이 정확히 반토막 났는데 Class A 주식수는 그대로다. **이벤트 표는 반드시 class별
+   SEC 주식수 증거로 승인해야 한다.**
+2. **split은 발행사가 아니라 class에 붙는다.** 한 class만 split한 사례가 셋(BRK·CMCSA·V)이고,
+   비상장 class가 함께 split한 사례도 셋(GOOGL·MA·NKE)이다. **symbol → issuer 자동 전파는 금지다.**
+3. **표지(B tier) fact는 소급되지 않는다.** 이 문제는 A tier 고유다. 표본에서 표지 fact가
+   뒤 filing에 재보고된 사례는 0건이다.
+4. **`PROBE-me-source.md` §8.5는 폐기해야 한다**(H15-1). 그 절의 "PIT 규칙이 split을 자동으로
+   막아준다"가 이 연구의 근거가 아니라 반례다.
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
