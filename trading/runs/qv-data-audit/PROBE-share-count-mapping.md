@@ -2803,3 +2803,619 @@ December 가격은 post-split이다. **wrong basis가 6건으로 P0(4건)보다 
    막아준다"가 이 연구의 근거가 아니라 반례다.
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+
+# Follow-up 3 correction — tier basis and event discovery (2026-08-28)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 네 절과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. Gate · `coverage_start` · B/M · rank ·
+> returns는 이번에도 계산하지 않았고 production DB에 쓰지 않았다.
+>
+> **바로 위 `User decision — split basis`(P2 추천)는 이 correction 이전 연구다.** 그 추천은
+> 두 가지를 검증하지 않은 채 쓰였다 — (1) A tier와 B tier의 basis anchor가 같은가,
+> (2) "이벤트가 없었다"를 무엇으로 판정하는가. 이 절이 그 둘을 검증한다. 위 절은 지우거나
+> 고치지 않았고, 이 절이 어느 부분을 확인하고 어느 부분을 뒤집는지 아래에 명시한다.
+
+시작 main: `dabbec08d0a54f9c3c812ace339aa40d939f0ba6`
+(`research(qv): share-count split basis를 검증한다` — 바로 위 절을 커밋한 지점이고
+`origin/main`도 같았다.)
+
+**이번에 다시 열지 않은 것.** December ME price = `raw_close` · freshness 경계
+(`Jan 1(t-1) <= instant <= December 마지막 정규 세션`) · dimension scope D0 · A→B hierarchy와
+`AMBIGUOUS` fail-close(A ambiguous일 때 B fallback 금지) · economic class ↔ XBRL alias 분리 ·
+retirement = identity `effective_to` · QName 계약(parser raw URI+local · alias key standard
+family+local · extension `ext:<CIK>`+local) · 한 accession 안의 `decimals` interval
+consolidation · issued−treasury와 companyfacts 금지 · 발행사 단위 split 전파 금지.
+**split basis guard 자체가 필요한가도 다시 논의하지 않았다** — P0/P1/P4 탈락은 그대로다.
+
+## I1. 이번 질문 둘
+
+> **결함 A.** A tier(`us-gaap:CommonStockSharesOutstanding`)와 B tier
+> (`dei:EntityCommonStockSharesOutstanding`)는 basis anchor가 다른가?
+> Follow-up 3의 P2는 **모든 fact에서** `regime(filing) == regime(December)`를 요구한다.
+>
+> **결함 B.** vendor feed에 row가 없다는 사실만으로 "이 class의 share basis를 바꾼 이벤트가
+> 없었다"를 판정할 수 있는가?
+
+## I2. B tier의 공식 semantics — 1차 자료
+
+H2는 A tier의 anchor를 SAB Topic 4.C로 확정했다. B tier는 "표지 fact라 소급되지 않는다"고만
+적고 근거를 달지 않았다. 이번에 1차 자료를 직접 읽었다.
+
+**(1) Form 10-K 표지 요구사항.** 출처: [Form 10-K](https://www.sec.gov/files/form10-k.pdf),
+표지 (APPLICABLE ONLY TO CORPORATE REGISTRANTS)
+
+> "Indicate the number of shares outstanding of each of the registrant's classes of common
+> stock, **as of the latest practicable date**."
+
+**(2) Form 10-Q 표지 요구사항.** 출처: [Form 10-Q](https://www.sec.gov/files/form10-q.pdf),
+표지 APPLICABLE ONLY TO CORPORATE ISSUERS
+
+> "Indicate the number of shares outstanding of each of the issuer's classes of common stock,
+> **as of the latest practicable date**."
+
+**(3) dei element documentation.** 출처: SEC rendered filing의 element documentation
+(`https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/R1.htm`, 조회 2026-08-28)
+
+> "Indicate number of shares or other units outstanding of each of registrant's classes of
+> capital or common stock or other ownership interests, **if and as stated on cover of related
+> periodic report.** Where multiple classes or units exist define each class/interest by adding
+> class of stock items such as Common Class A [Member], Common Class B [Member] …"
+
+**(4) EDGAR XBRL Guide §3.1.15·§3.2.3.** B fact의 context 성격을 규정한다.
+
+> "A context that has period type instant, no taxonomy-defined dimensions, and a date equal to
+> or after the end date of the period of the required context is called a **Subsequent Event
+> (se) context**." (§3.1.15)
+> · §3.2.3의 세 case 모두 period가 "An instant on or after the end of the required context"이고
+> "The validations apply to a subsequent event (se) context as defined above in 3.1.15."
+
+**세 자료가 함께 말하는 것.** B는 **재무제표 금액이 아니라 표지 진술**이고, 그 instant는
+회계기간 말이 아니라 "latest practicable date"다. SAB Topic 4.C가 소급 효과를 요구하는 대상은
+`"the balance sheet"`이므로 문면상 표지는 그 대상이 아니다.
+
+**따라서 작업지시 §4의 P2-B 가설은 합리적이다** — B의 basis anchor는 fact instant다.
+**그런데 실측이 이 가설을 반증한다.** I4가 그것이다.
+
+## I3. 실측 (1) — B tier fact는 소급 재보고되지 않는다
+
+H2가 "표본에서 표지 fact가 뒤 filing에 재보고된 사례는 0건"이라고 적은 것을 정량화했다.
+같은 `(issuer, economic class, instant)`를 몇 개의 accession이 보고했는지 tier별로 셌다.
+
+| tier | 고유 (class, instant) | 2개 이상 accession이 보고 | 그중 값이 다른 것 |
+|---|---|---|---|
+| A `us-gaap:CommonStockSharesOutstanding` | 1,829 | **611 (33.4%)** | **138** |
+| B `dei:EntityCommonStockSharesOutstanding` | 2,054 | **10 (0.5%)** | **0** |
+
+**A tier의 소급 재작성은 예외가 아니라 구조다.** 같은 instant를 다시 보고한 611건 중 138건에서
+값이 바뀐다. B tier는 애초에 같은 instant가 두 filing에 나오는 일이 거의 없고(표지 날짜가
+filing마다 다르기 때문이다), 나온 10건도 값이 전부 같다.
+
+**그래서 B의 anchor 문제는 "재보고"가 아니라 "최초 보고"의 문제로 좁혀진다.** 두 anchor는
+**split ex-date가 표지 instant와 filing 보고일 사이에 정확히 들어올 때만** 갈린다.
+
+## I4. 실측 (2) — counterexample shape가 실제로 있고, 가설을 반증한다
+
+작업지시 §4가 찾으라고 한 shape를 20 발행사의 usable K/Q family 전체에서 검색했다.
+
+```text
+B fact instant  <  split ex-date  <=  filing acceptance  <=  formation
+```
+
+**실제로 있다. 2건이다.**
+
+| issuer | class | tier | B fact instant | split ex-date | filing 보고일 | 값 | accession |
+|---|---|---|---|---|---|---|---|
+| NKE | A | B | **2012-11-30** | 2012-12-26 (×2) | **2013-01-09** | 179,784,496 (`INF`) | `0001193125-13-008172` |
+| NKE | B | B | **2012-11-30** | 2012-12-26 (×2) | **2013-01-09** | 715,927,274 (`INF`) | 〃 |
+
+(같은 검색의 A tier hit는 195건, 그중 확정 split이 106건이다. A tier에서는 이 shape가 흔하고,
+그것이 바로 SAB 4.C 소급 재작성이다.)
+
+**그 값이 어느 basis인가.** NKE Class A의 표지 시계열이 답한다.
+
+| instant | 값 | 보고일 |
+|---|---|---|
+| 2012-07-19 | 89,892,248 | 2012-07-24 |
+| 2012-08-31 | 89,892,248 | 2012-10-09 |
+| **2012-11-30** | **179,784,496** | **2013-01-09** |
+| 2013-02-28 | 177,957,876 | 2013-04-04 |
+
+`179,784,496 = 2 × 89,892,248`이다. **instant가 split 이전인데 값은 post-split basis다.**
+
+**원문이 그대로 말한다.** NIKE FY2013 Q2 10-Q `0001193125-13-008172`
+(`d433378d10q.htm`, 제출 2013-01-09) 표지:
+
+> "Shares of Common Stock outstanding **as of November 30, 2012** were:
+> Class A **179,784,496** Class B **715,927,274**"
+
+같은 문서 주석:
+
+> "On November 15, 2012 the Company announced a two-for-one split of both NIKE Class A and
+> Class B Common shares. The stock split was a 100 percent stock dividend payable on
+> December 24, 2012 to shareholders of record at the close of business December 10, 2012.
+> Common stock began trading at the split-adjusted price on December 26, 2012.
+> **All share numbers and per share amounts presented reflect the stock split.**"
+
+**"All share numbers … presented"에 표지가 포함된다.** 표지가 밝힌 날짜(11-30)는 split 이전인데
+숫자는 split 이후 단위다.
+
+> **이것이 이번 correction의 핵심이다.** B tier의 basis anchor는 **fact instant가 아니라
+> filing이다.** 작업지시 §4가 예상한 방향(universal filing-anchor가 잘못 통과시킨다)과
+> **반대다.** 여기서 잘못 판단하는 쪽은 instant anchor다.
+
+## I5. 두 anchor의 전수 대조
+
+확정 share-basis event 23건 각각에 대해, ex-date 전후 ±260일의 B tier 관측을 모두 꺼내
+값의 basis(관측 수준의 도약으로 판정)와 두 anchor의 예측을 비교했다.
+
+| | 값 |
+|---|---|
+| 검사한 (class, event) | 23 |
+| 검사한 B tier 관측 | 129 |
+| 두 anchor의 예측이 갈리는 관측 | **2** (NKE A·B 2012-11-30) |
+| 그중 **instant anchor**가 맞은 것 | **0** |
+| 그중 **filing anchor**가 맞은 것 | **2** |
+| 둘 다 틀린 것 | 0 |
+
+나머지 127건에서는 표지 instant와 filing 보고일이 split ex-date의 같은 쪽에 있어 두 anchor가
+같은 답을 준다. **표지 instant는 보통 보고일 며칠 전이므로 두 anchor가 갈릴 창이 좁다.**
+NKE는 표지 instant를 "latest practicable date"가 아니라 **분기 말(required context의 끝)**로
+잡아서 그 창이 40일로 벌어진 경우다. Guide §3.2.3이 "An instant **on or after** the end of the
+required context"를 허용하므로 이것은 규정 위반이 아니라 허용된 선택이다.
+
+**가설이 참이려면 나와야 했던 반대 shape** — 표지 instant는 split 이후인데 값이 pre-split basis
+— 는 **0건**이다. 구조적으로도 나올 수 없다: 표지 instant ≤ 보고일이므로 instant가 split 이후면
+보고일도 split 이후다.
+
+**결론.** `P2-B`(instant anchor)를 지지하는 관측은 이 표본에 하나도 없고, 반증하는 관측이 2건이다.
+
+## I6. tier-specific P2/P3 재계산 — 같은 525 격자
+
+정의는 작업지시 §4·§5 그대로다.
+
+```text
+P2-A   A tier fact:  regime(source filing 보고일) == regime(December session)
+P2-B   B tier fact:  regime(fact instant)          == regime(December session)
+P3-A   변환 origin = filing 보고일
+P3-B   변환 origin = fact instant
+```
+
+격자·freshness·D0·hierarchy·`decimals` consolidation·tie-break는 위 절과 같다.
+**`correct/wrong basis` 판정의 진실값은 I4·I5가 실증한 실제 anchor(=보고일)로 매긴다.**
+
+| 지표 | P2 universal | **P2 tier-specific** | P3 universal | **P3 tier-specific** |
+|---|---|---|---|---|
+| correct basis | 520 | **520** | 519 | **519** |
+| wrong basis | 0 | **0** | 0 | **0** |
+| unknown basis | 0 | 0 | 0 | 0 |
+| fail-close | 0 | 0 | 1 | 1 |
+| missing | 5 | 5 | 5 | 5 |
+| ambiguous | 0 | 0 | 0 | 0 |
+
+**universal filing-anchor와 결과가 다른 관측은 525개 중 0개다.** 작업지시 §10이 요구한
+"결과가 다른 관측 전수 기록"의 답은 **없음**이다.
+
+### I6.1 왜 0인가 — hierarchy가 가린다
+
+| | 값 |
+|---|---|
+| P2가 A tier fact를 고른 관측 | **458** |
+| P2가 B tier fact를 고른 관측 | **62** |
+| 아무것도 못 고른 관측(구조적 결측) | 5 |
+
+**A→B hierarchy가 A를 먼저 쓰기 때문에**, tier 차이가 결과에 닿으려면 그 관측에서 A tier가
+비어 있어야 한다. eligible pool 안에서 두 anchor의 판정이 갈리는 B fact는 3개뿐이고,
+
+| issuer | class | formation | B instant | 보고일 | filing anchor | instant anchor |
+|---|---|---|---|---|---|---|
+| NKE | A | 2013 | 2012-11-30 | 2013-01-09 | `SAME` | `CONVERTIBLE`(배제) |
+| NKE | B | 2013 | 2012-11-30 | 2013-01-09 | `SAME` | `CONVERTIBLE`(배제) |
+| UA | C | 2017 | 2016-03-31 | 2016-04-29 | `SAME` | `UNKNOWN`(fail-close) |
+
+**세 관측 모두 A tier fact가 이미 이겨서** 최종 선택이 바뀌지 않는다.
+
+### I6.2 A tier가 없다고 가정한 반사실 — 여기서 차이가 드러난다
+
+같은 525 격자에서 B tier만 쓰도록 강제했다(A tier 결측 발행사에서 실제로 일어나는 상황이다 —
+F7.1·G11이 기록한 Ford·AbbVie가 그 예다).
+
+| 지표 | universal filing anchor | **tier-specific (B=instant)** |
+|---|---|---|
+| correct basis | **517** | **515** |
+| wrong basis | 0 | 0 |
+| unknown basis | 0 | 0 |
+| missing | 8 | **10** |
+
+| 갈리는 관측 | universal | tier-specific |
+|---|---|---|
+| NKE A formation 2013 (dec 2012-12-31) | `OK` inst=2012-11-30 **179,784,496** (basis 맞음) | **`MISSING`** |
+| NKE B formation 2013 (dec 2012-12-31) | `OK` inst=2012-11-30 **715,927,274** (basis 맞음) | **`MISSING`** |
+
+**tier-specific P2-B는 정확도를 하나도 개선하지 않고 정확한 관측 2개를 `MISSING`으로 버린다.**
+이것이 작업지시 §4가 요구한 regression scenario다. 방향은 fail-close 쪽이라 **조용히 틀리지는
+않지만**, 근거가 틀린 계약이므로 얻는 것 없이 coverage만 잃는다.
+
+### I6.3 same-day ordering
+
+작업지시 §4의 fail-close 조건을 검사했다. 표본에서
+
+| 검사 | 건수 |
+|---|---|
+| fact instant == ex-date | **0** |
+| filing 보고일 == ex-date | **0** |
+| December measurement session == ex-date | **0** |
+
+**한 번도 발생하지 않았다.** same-day fail-close 규칙은 이 표본에서 **한 번도 집행되지 않았고
+따라서 검증되지 않았다.** 계약으로 남기더라도 "표본이 지지한다"고 쓸 수 없다.
+
+## I7. 결함 A의 결론
+
+| | 결론 | 근거 |
+|---|---|---|
+| **A tier basis anchor** | **source filing release/acceptance** — Follow-up 3 그대로 유지 | SAB Topic 4.C(H2) · 같은 instant 재보고 611건 중 138건 값 변경(I3) · MA·NVDA·BRK 원문(H2) |
+| **B tier basis anchor** | **source filing release/acceptance** — 작업지시 §4의 instant anchor 가설은 **반증됐다** | NKE 10-Q 표지 원문(I4) · 두 anchor 대조 2:0(I5) · 반대 shape 0건 · 반사실에서 −2 correct(I6.2) |
+
+**따라서 tier-specific P2/P3를 도입할 근거가 없다.** 두 tier의 anchor는 같고, Follow-up 3의
+universal filing-anchor 계약이 옳다. **다만 그 계약의 이유가 Follow-up 3이 적은 것과 다르다** —
+"B는 소급되지 않으니 문제가 안 된다"가 아니라, **B도 filing 시점 basis로 표현되기 때문**이다.
+
+> **함께 기억할 것.** 표지 숫자를 "그 날짜의 실제 주식수"로 읽으면 안 된다. **표지가 밝힌
+> 날짜와 그 숫자의 단위는 다른 시점에 속할 수 있다.** NKE 2012-11-30이 그 사례다.
+
+## I8. 결함 B — event discovery의 완전성
+
+### I8.1 vendor feed의 구조적 맹점 — 정량
+
+EODHD `splits` 전수(20 발행사 · 상장 심볼 26개)는 **63행**이다. 확정된 share-basis event
+23건이 그 안에서 어떻게 발견되는지 셌다.
+
+| | 건수 |
+|---|---|
+| 확정 share-basis event | **23** |
+| 그 class **자신의** 심볼에 vendor row가 있음 | **17** |
+| **자기 row가 없음** | **6** |
+
+자기 row가 없는 6건은 전부 비상장 class다.
+
+| issuer | class | ex-date | 비율 | 같은 날 vendor row가 있는 형제 |
+|---|---|---|---|---|
+| GOOGL | B | 2022-07-18 | ×20 | A, C |
+| MA | **B** | 2014-01-22 | ×10 | **A 뿐** |
+| NKE | **A** | 2012-12-26 | ×2 | **B 뿐** |
+| NKE | **A** | 2015-12-24 | ×2 | **B 뿐** |
+| UA | CONV | 2012-07-10 | ×2 | A |
+| UA | CONV | 2014-04-15 | ×2 | A |
+
+**6건 모두 같은 날 상장 형제의 row가 있어서 후보로 건져졌다. 그것은 계약이 아니라 운이다.**
+
+- 표본 41개 class 중 **상장 심볼이 아예 없는 class가 15개(36.6%)**다
+  (`CMCSA:B · F:B · GOOGL:B · MA:ADDLSERIES · MA:B · META:B · NKE:A · UA:CONV · V:B · V:B1 ·
+  V:B2 · V:C · V:CSERIESI · V:CSERIESIII · V:CSERIESIV`).
+  **이 class들에 대해 vendor discovery의 recall은 정의상 0이다.**
+- **비상장 class가 단독으로, 또는 상장 형제와 다른 날/다른 비율로 basis를 바꾸면 후보 자체가
+  생기지 않는다.** 그 shape는 이 표본에 **없지만**, 없다는 것이 불가능하다는 뜻은 아니다.
+  **이 표본은 그 경우를 반증도 입증도 하지 못한다.**
+
+### I8.2 형제 전파는 답이 아니라 후보다 — 같은 날 class마다 판정이 갈린다
+
+| issuer | ex-date | class별 판정 |
+|---|---|---|
+| **BRK** | 2010-01-21 | A = 변화 없음 · **B = split ×50** |
+| **CMCSA** | 2017-02-21 | **A = split ×2** · B = 변화 없음 · ASPECIAL = 증거 없음 |
+| **V** | 2015-03-19 | **A = split ×4** · B·C = 변화 없음 · B1·B2·CSERIES* = 증거 없음 |
+| MA | 2014-01-22 | **A = split ×10 · B = split ×10** · ADDLSERIES = 증거 없음 |
+| UA | 2012-07-10 · 2014-04-15 | **A = split ×2 · CONV = split ×2** · C = 증거 없음 |
+| UA | 2016-04-08 | A = 변화 없음 · CONV = 변화 없음 · C = 증거 없음 |
+| CMCSA | 2026-01-05 | A = 변화 없음 · B = 변화 없음 · ASPECIAL = 증거 없음 |
+
+**한 날짜에 class마다 답이 다르다.** vendor row의 존재는 "이 발행사에서 뭔가 있었다"까지만
+말하고, "이 class의 basis가 바뀌었다"는 말하지 않는다. `MA` 행과 `BRK` 행이 정반대다 —
+**하나는 형제로 전파해야 맞고 하나는 전파하면 틀린다. feed만 보고는 어느 쪽인지 알 수 없다.**
+
+상장 class가 둘 이상인 발행사에서 **같은 날 한쪽 심볼에만 row가 있는 경우가 9건**이다
+(BRK 2010 · CMCSA 2026 · GOOGL 2014-03-27·2014-04-03·2015-04-27 · UA 2012·2014·2016-04·2016-06).
+
+### I8.3 reverse split은 이 표본에서 한 번도 검증되지 않았다
+
+vendor feed 63행 중 **비율 < 1인 행은 0건**이다. 확정 event 23건도 전부 정방향이다.
+**reverse split 경로는 코드로도 데이터로도 이 연구에서 시험되지 않았다.**
+
+### I8.4 share-count 도약을 discovery로 쓸 수 없다 — 전환·교환이 같은 모양이다
+
+B tier 연속 관측 2,014쌍의 비율 분포다. **이것은 진단 스캔이지 approval 규칙이 아니다.**
+
+| 비율 구간 | 쌍 |
+|---|---|
+| < 0.5 | 2 |
+| 0.5 ~ 0.83 | 10 |
+| 0.83 ~ 0.95 | 33 |
+| **0.95 ~ 1.05** | **1,924** |
+| 1.05 ~ 1.20 | 19 |
+| 1.20 ~ 2.0 | 6 |
+| ≥ 2.0 | 20 |
+
+`[0.83, 1.20]` 밖의 도약 **38건** 중 **vendor 후보가 구간 안에 전혀 없는 것이 17건**이다.
+전수를 열어 보면 **하나도 share-basis event가 아니다.**
+
+| 성격 | 건수 | 사례 | 원문 근거 |
+|---|---|---|---|
+| **class 간 전환**(1:1, basis 불변) | 4 | MA B 2010-04→07 (19,977,657 → 12,023,551) · 2010-07→10 · 2015 · 2020 | MA FY2010 Q2 10-Q `0001193125-10-174782` 대차대조표: Class A `109,793,439 → 118,813,127` 증가와 Class B `19,977,657 → 12,025,947` 감소가 대응 |
+| **class 간 전환**(1:1, basis 불변) | 4 | META A 2012 ×1.63·×1.53 · META B 2012 ×0.73·×0.65 | META FY2012 Q3 10-Q `0001326801-12-000006`: "Shares of our Class B common stock are convertible into an **equivalent number** of shares of our Class A common stock and generally convert … upon transfer." |
+| **교환 제안 / 전환비율 조정** | 7 | V B1 2024-04→07 (×0.0197) · V C 6건 | Visa FY2024 Q3 10-Q `0001403161-24-000041`: 자본변동표에 "**Class B-1 common stock exchange offer**" · "Conversions to class A common stock" · "Recovery through **conversion rate adjustment**" |
+| **창(窓) 정렬 artifact** | 2 | NKE A·B 2012-08-31 → 2012-11-30 (×2.00) | vendor row는 있다(2012-12-26). instant 구간 `(2012-08-31, 2012-11-30]` 밖일 뿐이다 — **I4가 밝힌 filing anchor 때문에 값이 instant보다 먼저 움직인다** |
+
+**두 방향 모두 막힌다.**
+
+1. **basis event가 아닌데 주식수가 크게 움직인다** — Visa Class B-1은 한 분기에 ×0.0197이 된다.
+   숫자만 보면 50:1 reverse split과 구별되지 않는다.
+2. **basis event인데 주식수가 안 움직인다** — 형제 class가 split해도 이 class는 그대로다
+   (BRK A · CMCSA B · V B·C).
+
+> **§6이 세운 명제가 확인된다.** vendor row의 부재는 class-level share-basis event의 부재를
+> 증명하지 못하고, share-count series의 도약도 그것을 증명하지 못한다.
+> **둘 다 discovery signal이지 판정이 아니다.**
+
+## I9. approval과 discovery의 분리 — 지금 approval은 임의 tolerance에 매달려 있다
+
+작업지시 §8이 요구한 분리를 Follow-up 3의 하네스에 적용해 봤다. **위 절의 event 표는
+`±5%` 백분율 tolerance로 만들어졌다** — 관측 비율이 1에서 5% 이내면 `NO_SHARE_EFFECT`,
+vendor 비율에서 5% 이내면 `SHARE_SPLIT_CONFIRMED`, 나머지는 `UNRESOLVED`.
+
+Follow-up 3의 `User decision`은 "**arbitrary numerical threshold가 없는가** … 규칙 자체에는
+없다 — '이벤트가 있는가/없는가'만 본다"고 적었고, 괄호에서 "그것은 데이터 검증이고 selector의
+손잡이가 아니다"라고 덧붙였다. **selector에 손잡이가 없다는 것은 맞다. 그러나 selector가
+읽는 event 표 자체가 그 손잡이로 만들어진다.** 민감도는 이렇다.
+
+| tolerance | SHARE_SPLIT_CONFIRMED | NO_SHARE_EFFECT | UNRESOLVED | 판정이 바뀐 event |
+|---|---|---|---|---|
+| ±1% | 15 | 8 | **11** | **10 / 34** |
+| ±2% | 21 | 9 | 4 | 3 / 34 |
+| **±5% (Follow-up 3이 쓴 값)** | **22** | **11** | **1** | — |
+| ±10% | 23 | 11 | 0 | 1 / 34 |
+
+**±1%에서 MA 2014 A·B가 `UNRESOLVED`가 된다.** 그 event가 바로 P0의 $96B → $960B 오류를
+막아 주던 근거다(H10). tolerance를 한 칸 조이면 **P2는 그 관측에서 fail-close로 바뀐다.**
+
+반대로 **±10%에서는 BRK B 2010이 기계적으로 `SHARE_SPLIT_CONFIRMED`가 되는데, 그것은
+맞는 답을 틀린 이유로 얻은 것이다.** 관측 비율 ×54.86과 vendor ×50의 9.7% 차이는 반올림이
+아니라 **2010-02-12 BNSF 인수 대가로 발행된 B주**다. Follow-up 3은 이것을 원문
+(`0001193125-10-043450`)으로 덮는 수동 `OVERRIDE`로 처리했다 — **즉 표본에서 가장 큰 event
+하나는 이미 기계 판정이 실패했고 사람이 원문으로 메꿨다.**
+
+> **결론.** 지금의 event 표는 `DISCOVERY`(vendor row)와 `APPROVAL`(주식수 비율이 대략 맞는가)을
+> 섞어 놓았고, approval은 임의 백분율에 의존하며 그 백분율에 대해 **안정적이지 않다.**
+> 작업지시 §8이 금지한 바로 그 형태다.
+
+## I10. 새로 찾은 discovery source — SEC XBRL의 split ratio 태그
+
+**§7의 후보 C·D를 실제로 시험했다.** 발행사 자신의 XBRL instance에 split 비율이 태깅돼 있는지
+확인했다. 확정 split 23건 각각에 대해 **ex-date 이후 첫 filing**의 raw instance를 읽고
+concept local name에 `Split`이 들어간 fact를 전부 꺼냈다(16개 filing, `UA 2012-08-03`은
+그 filing에 XBRL instance가 없다).
+
+| issuer | form | 보고일 | ex-date | 확정 비율 | XBRL split 태그 | class 차원 | 값 |
+|---|---|---|---|---|---|---|---|
+| AAPL | 10-Q | 2014-07-23 | 2014-06-09 | ×7 | `StockholdersEquityNoteStockSplitConversionRatio1` | 없음 | 7 |
+| AAPL | 10-K | 2020-10-29 | 2020-08-31 | ×4 | 〃 | 없음 | 4 |
+| **BRK** | 10-K | 2010-03-01 | 2010-01-21 | ×50 | `StockSplitConversionRate` | **`class=CommonClassBMember`** | 50 |
+| CMCSA | 10-Q | 2017-04-27 | 2017-02-21 | ×2 | `…ConversionRatio1` | **없음** | 2 |
+| GOOGL | 10-Q | 2022-07-26 | 2022-07-18 | ×20 | `…ConversionRatio1` | `SubsequentEventTypeAxis` | 20 |
+| **MA** | 10-K | 2014-02-14 | 2014-01-22 | ×10 | **숫자 태그 없음 (`StockSplitPolicyPolicyTextBlock` 텍스트뿐)** | — | — |
+| **NKE** | 10-Q | 2013-01-09 | 2012-12-26 | ×2 | `StockholdersEquityNoteStockSplitConversionRatio` | **`class=CommonClassAMember` · `class=CommonClassBMember`** | 2 |
+| NKE | 10-Q | 2016-01-06 | 2015-12-24 | ×2 | `…ConversionRatio1` | **없음** | 2 |
+| NVDA | 10-Q | 2021-08-20 | 2021-07-20 | ×4 | `…ConversionRatio1` | 없음 | 4 |
+| NVDA | 10-Q | 2024-08-28 | 2024-06-10 | ×10 | `…ConversionRatio1` (+ `StockSplitIndividualShareholderAdditionalSharesOfCommonStock`=9) | 없음 | 10 |
+| TSLA | 10-Q | 2020-10-26 | 2020-08-31 | ×5 | `…ConversionRatio1` | 없음 | 5 |
+| **TSLA** | 10-Q | 2022-10-24 | 2022-08-25 | ×3 | `…ConversionRatio1` | 없음 | **3, 5 (두 값)** |
+| **UA** | 10-Q | 2014-05-06 | 2014-04-15 | ×2 | `StockIssuedDuringPeriodSharesStockSplits` | 없음 | **1.00 (비율이 아니다)** |
+| **V** | 10-Q | 2015-04-30 | 2015-03-19 | ×4 | `…ConversionRatio1` | **`class=CommonClassAMember`** | 4 |
+| WMT | 10-K | 2024-03-15 | 2024-02-26 | ×3 | `…ConversionRatio1` | `SubsequentEventTypeAxis` | 3 |
+
+**얻은 것.**
+
+- **15개 filing 중 14개에 숫자 split 태그가 있다.** vendor보다 훨씬 나은 1차 discovery 신호다.
+- **class 차원이 붙은 3건이 전부 class 판정이 중요한 사례와 정확히 일치한다** —
+  BRK는 `CommonClassBMember`만(실제로 B만 split), V는 `CommonClassAMember`만(실제로 A만),
+  NKE 2013은 A·B 둘 다(실제로 둘 다). **여기서는 SEC 태그가 class-level 정답을 그대로 준다.**
+
+**막히는 것.**
+
+- **class 차원이 없는 경우가 다수이고, 그중 CMCSA 2017·GOOGL 2022는 multi-class 발행사다.**
+  CMCSA 2017은 실제로 **Class A만** split인데 태그는 dimensionless `2`뿐이다.
+  **dimensionless를 "모든 class"로 읽으면 Class B에 ×2를 잘못 적용한다** — §6.4.1의 함정이
+  여기서도 그대로 재현된다.
+- **MA 2014에는 숫자 태그가 아예 없다.** 텍스트 블록에 "Class A and Class B"가 산문으로만 있다.
+  **표본에서 ME 오차가 가장 큰 event(10배)가 기계 판정 불가다.**
+- **concept이 최소 3종(`…ConversionRatio1`, `…ConversionRatio`, `StockSplitConversionRate`)이고
+  시대·filer마다 다르다.** `StockIssuedDuringPeriodSharesStockSplits`(UA)는 이름은 비슷한데
+  비율이 아니고, `StockSplitIndividualShareholderAdditionalSharesOfCommonStock`(NVDA)은 `9`라
+  ×10과 헷갈린다. **concept 이름 규칙으로 고르면 오답을 집는다.**
+- **TSLA 2022 filing 하나에 `3`과 `5`가 같이 있다**(2022년과 2020년 split). 한 filing에서
+  값 하나를 고르는 규칙이 필요하다.
+- **effective/ex-date가 이 태그에 없다.** 비율만 있고 날짜는 산문이나 다른 태그에 있다.
+
+### I10.1 전수 스캔 — SEC 태그도 완전하지 않다
+
+위 16개는 "split이 있었다고 이미 아는" filing만 본 것이라 낙관 편향이 있다. **20 발행사의
+usable filing 1,321개 전부**를 다시 훑어 concept local name에 `Split`이 들어간 fact를 모았다.
+
+| | 값 |
+|---|---|
+| 스캔한 filing | **1,321** |
+| instance 파싱 성공 | 1,185 |
+| XBRL instance 없음 | 136 |
+| 세 ratio concept의 숫자 fact | **109** |
+| 그중 **class 차원이 붙은 것** | **27 (24.8%)** |
+| ratio 태그가 하나라도 있는 발행사 | **9 / 20** |
+
+**결정적인 줄은 이것이다.**
+
+| | 발행사 |
+|---|---|
+| 확정 share-basis event가 있는 발행사 | AAPL · BRK · CMCSA · GOOGL · **MA** · NKE · NVDA · TSLA · **UA** · V · WMT (11) |
+| ratio 태그가 있는 발행사 | AAPL · BRK · CMCSA · GOOGL · NKE · NVDA · TSLA · V · WMT (9) |
+| **event는 있는데 ratio 태그가 전 기간에 하나도 없는 발행사** | **MA · UA (2)** |
+
+**MA(×10)와 UA(×2 두 번)는 전체 filing 이력 어디에도 숫자 split 비율 태그가 없다.**
+**SEC ratio-tag discovery의 발행사 단위 recall은 9/11이다.** 두 source 어느 쪽도 완전하지 않다.
+
+### I10.2 vendor false-negative는 이 표본에서 발견되지 않았다 — 그러나 결론은 바뀌지 않는다
+
+SEC 태그를 독립 증거로 삼아 "vendor가 놓친 event"를 찾았다. 발행사 자신의 vendor row와
+±400일·비율 대조에 실패한 태그가 **20개(고유 조합 8개)**인데, **전수를 열어 보면 하나도
+새 event가 아니다.**
+
+| 성격 | 사례 | 왜 대조에 실패했나 |
+|---|---|---|
+| **다른 회사의 split 비율** | BRK `0.443332` 차원 `…EquityMethodInvesteeNameAxis=TheKraftHeinzCompanyMember` (7 fact) | **등록인이 아니라 지분법 피투자회사(Kraft Heinz)의 비율이다.** 발행사 event로 읽으면 **없는 event를 만든다** |
+| **과거 split의 재공시** | BRK `50` `class=CommonClassBMember` (2011-02-28 10-K) · NKE `2` (2014-07-25 10-K) · V `4` `class=CommonClassAMember` (2016-11-15 10-K) · TSLA `5` (2022-10-24 10-Q) | **같은 비율이 몇 년 뒤 filing에도 계속 실린다. 태그에 effective date가 없다** |
+| **비율의 다른 표현** | GOOGL `0.05` (2022-02-01 10-K, `SubsequentEventTypeAxis`) | ×20의 역수 형태 |
+
+**두 가지가 여기서 확정된다.**
+
+1. **이 표본에서 vendor feed가 놓친 share-basis event는 발견되지 않았다.** §7이 요구한
+   silent false-negative의 **실례는 찾지 못했다.** 정직하게 기록한다.
+2. **그러나 그것이 vendor 부재를 `NO_SHARE_BASIS_EVENT_CONFIRMED`로 쓸 근거가 되지는 못한다.**
+   반증 도구로 쓴 SEC 태그 자체의 recall이 9/11이고, **vendor가 구조적으로 못 보는 15개
+   비상장 class를 SEC 태그도 대부분 못 본다**(전체 109 fact 중 class 차원이 붙은 것이
+   27개뿐이다). **두 source가 겹치는 사각이 그대로 남아 있으므로, "못 찾았다"를 "없다"로
+   읽을 수 없다.**
+3. **naive하게 쓰면 반대 방향 오류가 난다.** 태그 존재만으로 event를 만들면 Kraft Heinz
+   비율이 Berkshire의 event가 되고, 2011·2014·2016년 재공시가 **그 해의 새 event**가 된다.
+   **effective date 없는 비율 태그는 discovery 신호이지 event가 아니다.**
+
+## I11. absence semantics — §9에 대한 답
+
+**"vendor row가 없음"을 `NO_SHARE_BASIS_EVENT_CONFIRMED`로 쓸 수 없다**(I8.1·I8.2).
+그러면 P2가 요구하는 "구간에 이벤트가 하나도 없다"를 무엇으로 채울 것인가.
+
+최소 계약은 **세 상태가 아니라 네 상태**여야 한다. 세 상태로는 "확인했는데 없다"와
+"확인한 적이 없다"가 같은 칸에 들어간다.
+
+```text
+EVENT_CONFIRMED                    이 class의 share basis를 바꾼 event다 (명시 공시로 승인)
+NO_SHARE_BASIS_EVENT               candidate는 있었으나 이 class의 basis는 안 바꿨다 (명시 근거로 승인)
+UNRESOLVED                         candidate는 있는데 이 class 적용 여부를 정할 수 없다  -> fail-close
+NOT_SEARCHED                       이 (class, 구간)에 대해 discovery를 돌린 적이 없다   -> fail-close
+```
+
+**`NOT_SEARCHED`가 핵심이다.** P2가 "구간에 event가 없다"를 안전하게 쓰려면
+**그 (class, 구간)이 discovery source에서 실제로 조회됐다는 기록**이 있어야 하고, 그 기록이
+없을 때 기본값은 "없음"이 아니라 **fail-close**여야 한다. 지금 하네스는 조회 실패·미조회·
+"정말 없음"을 모두 빈 목록으로 되돌려주므로 **셋을 구분할 수 없다.**
+
+**그리고 그 discovery source가 무엇인지가 아직 없다.** I8이 vendor를 배제했고, I10이
+SEC XBRL을 유망하지만 불완전한 것으로 만들었다. **비상장 class 15/36.6%에 대해 `NOT_SEARCHED`가
+아닌 상태를 만들 결정적 경로가 지금 없다.**
+
+## I12. §7의 후보 A~E에 대한 판정
+
+| 후보 | 판정 | 근거 |
+|---|---|---|
+| **A. vendor candidates only** | **탈락** | 확정 event 23건 중 6건에 자기 row 없음 · 41 class 중 15개는 recall 0 · 같은 날 class마다 판정이 갈림(BRK·CMCSA·V) (I8.1·I8.2) |
+| **B. vendor + SEC explicit disclosure** | **불충분** | vendor가 후보를 만들지 못하는 class에서는 SEC를 언제 열어볼지조차 정해지지 않는다 — discovery의 시작점이 여전히 vendor다 |
+| **C. SEC를 primary discovery, vendor는 corroboration** | **방향은 맞지만 지금은 불완전** | 전수 스캔에서 **발행사 단위 recall 9/11 — MA·UA는 전 기간에 숫자 태그가 없다.** class 차원은 109 fact 중 27개뿐이라 multi-class 적용 범위를 못 정한다(CMCSA 2017·GOOGL 2022). concept 3종 · **태그에 effective date가 없어 과거 split 재공시가 새 event로 읽힌다** · 피투자회사 비율이 같은 concept으로 섞여 든다(BRK/Kraft Heinz) (I10·I10.1·I10.2) |
+| **D. 다른 deterministic source** | **미확인** | 8-K Item 5.03 · 정관 개정 · SAB 4.C가 요구하는 주석("An appropriately cross-referenced note should disclose the retroactive treatment, explain the change made and **state the date the change became effective**")은 **의무 공시라 존재는 보장되지만 구조화돼 있지 않다.** 이번에 텍스트 파이프라인을 만들지 않았다 |
+| **E. 현재 evidence로 complete discovery를 보장할 수 없음** | **이것이 이번 결론이다** | 위 넷. **두 source의 사각이 겹친다** — vendor가 못 보는 비상장 class 15개를 SEC class-차원 태그도 대부분 못 본다 |
+
+## I13. ground truth 확인 범위
+
+**525개 관측 전부를 사람이 원문과 1:1 대조하지 않았다.** §9·F14·G15·H14와 같은 기준이다.
+
+이번에 사람이 원문과 직접 대조한 것:
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| 10-K 표지 주식수 요구사항 | `https://www.sec.gov/files/form10-k.pdf` | I2 인용 ("as of the latest practicable date") |
+| 10-Q 표지 주식수 요구사항 | `https://www.sec.gov/files/form10-q.pdf` | I2 인용 |
+| `dei:EntityCommonStockSharesOutstanding` 정의 | NVDA `0001045810-26-000021`의 `R1.htm` element documentation, 조회 2026-08-28 | I2 인용 ("if and as stated on cover of related periodic report") |
+| Guide §3.1.15 se context · §3.2.3 | `xbrl-guide-2026-05-15.pdf` | I2 인용 |
+| **NKE 표지가 split 이전 날짜에 post-split 숫자를 싣는다** | NKE `0001193125-13-008172` `d433378d10q.htm` 본문 | **I4 인용 — 이 correction의 핵심 반례** |
+| MA Class B 감소가 전환임 | MA `0001193125-10-174782` 대차대조표 | I8.4 |
+| META Class B가 1:1 전환임 | META `0001326801-12-000006` 본문 | I8.4 인용 |
+| Visa Class B-1 교환 제안 | V `0001403161-24-000041` 자본변동표 | I8.4 인용 |
+| split ratio XBRL 태그 (표적) | 16개 filing raw instance 직접 파싱, 조회 2026-08-28 | I10 표 |
+| split ratio XBRL 태그 (전수) | 1,321 filing raw instance 직접 파싱, 조회 2026-08-28 | I10.1·I10.2. **대조 실패 20건은 사람이 전수로 성격을 확인했다** |
+
+나머지는 SEC raw instance의 fact 시계열과 `bars_daily`로 기계 검증했다.
+**I8.4의 도약 스캔에 쓴 `[0.83, 1.20]` 구간, I5의 `±260일` 창, I10.2의 `±400일` 대조 창은
+전부 진단용 절단값이고 어떤 계약에도 들어가지 않는다.** I9의 tolerance 표도 기존 하네스의
+민감도 측정이지 새 문턱 제안이 아니다.
+
+## I14. 이번에 결정하지 않은 것
+
+1. **`NOT_SEARCHED`를 포함한 4-state event ledger의 스키마**는 만들지 않았다. 상태 이름과
+   fail-close 방향만 제안한다.
+2. **SEC split 태그 파이프라인**(concept 3종의 정규화 · dimensionless의 multi-class 적용 규칙 ·
+   effective date 결합 · 한 filing 안 복수 값 처리 · 등록인/피투자회사 구분 · 재공시 제거)은
+   설계하지 않았다. **MA·UA처럼 태그가 없는 발행사를 위한 텍스트 경로도 만들지 않았다.**
+3. **reverse split**은 표본에 0건이라 어떤 경로도 검증되지 않았다(I8.3).
+4. **`SPLIT_RATIO_MISMATCH`·`UNEXPLAINED_NO_EVENT` 잔여 22건**(H11)의 처리 정책은 여전히 열려 있다.
+5. **cross-accession tie-break(`acceptance DESC`)**는 이번에도 바꾸지 않았다.
+6. **UA Class C `effective_from`**(H15-4)은 identity 책임 그대로 남는다.
+7. **비상장 class 가격**(`CONVERSION_VALUE_PROXY`)은 범위 밖이다. 다만 I8.4의 Visa
+   "conversion rate adjustment"가 그 결정에 직접 닿는다.
+
+## User decision — correction
+
+추천: **C — event discovery completeness가 부족해 아직 freeze 불가.**
+
+§11의 두 조건을 각각 판정한다.
+
+**조건 1 — A/B tier별 basis anchor가 공식 semantics와 일치하는가: 만족한다. 단 tier-specific이
+아니라 universal로 만족한다.**
+
+- A tier의 anchor는 filing이다(SAB Topic 4.C, H2). 이번에 정량으로 재확인했다 — 같은 instant
+  재보고 611건 중 138건에서 값이 바뀐다(I3).
+- **B tier의 anchor도 filing이다.** 작업지시 §4가 세운 instant-anchor 가설은 표지 원문으로
+  반증됐다 — NKE는 "as of November 30, 2012"라고 쓰고 post-split 숫자를 실었고, 같은 문서가
+  "All share numbers … presented reflect the stock split"이라고 밝힌다(I4).
+  전수 대조에서 두 anchor가 갈리는 2건 모두 filing anchor가 맞았고 instant anchor는 0건이다(I5).
+- **따라서 tier-specific P2/P3(A·B)는 추천하지 않는다.** 525 격자에서 universal과 결과가
+  같고(차이 0건), A tier를 뺀 반사실에서는 **정확한 관측 2개를 `MISSING`으로 잃기만 한다**(I6.2).
+
+**조건 2 — "no class-level event"를 silent false-negative 없이 판정할 production
+source-of-truth 경로가 있는가: 없다.**
+
+- vendor feed는 **41 class 중 15개(36.6%)에 대해 recall이 0**이고, 확정 event 23건 중 6건은
+  자기 row 없이 상장 형제 덕에 우연히 건져졌다(I8.1).
+- 형제 전파는 답이 아니다. 같은 날 class마다 판정이 갈리는 사례가 7개 발행사-날짜에 있고,
+  **MA는 전파해야 맞고 BRK는 전파하면 틀린다**(I8.2).
+- share-count 도약으로 대신할 수 없다. 후보 없는 큰 도약 17건이 전부 전환·교환이고, 반대로
+  basis event인데 주식수가 안 변하는 class도 넷이다(I8.4).
+- SEC XBRL split 태그는 **가장 유망한 경로이고 이번에 처음 확인했지만**, 1,321 filing 전수에서
+  **발행사 단위 recall이 9/11이다 — MA와 UA는 숫자 비율 태그가 전 기간에 하나도 없다**(I10.1).
+  class 차원은 109 fact 중 27개뿐이고, 태그에 effective date가 없어 **과거 split 재공시와
+  피투자회사 비율이 새 event로 잘못 읽힌다**(I10.2).
+- **SEC 태그를 독립 증거로 삼아 vendor false-negative를 찾았으나 이 표본에서는 나오지 않았다.**
+  실례가 없다는 것을 정직하게 기록한다. **그러나 반증 도구 자체의 recall이 9/11이고 두 source의
+  사각이 겹치므로, "못 찾았다"가 "없다"가 되지 않는다**(I10.2).
+- **`NOT_SEARCHED`와 "정말 없음"을 구분하는 상태가 지금 없다**(I11). 그것이 없으면 P2의
+  "이벤트가 하나도 없다"는 항상 조용히 참이 된다.
+
+**§11이 요구한 대로 둘 중 하나라도 증명 못 하면 C다. 조건 2를 증명하지 못했으므로 C로 끝낸다.**
+
+> **위 절의 P2 추천을 철회하지 않는다.** P2는 여전히 P0·P1·P4보다 낫고 이 격자에서 wrong basis
+> 0건이다. **그러나 P2를 freeze할 수 없다** — P2의 정확도는 event 표가 완전하다는 가정 위에
+> 서 있고, 이 correction이 그 가정을 지지하는 증거가 없음을 보였다. **P2가 틀리는 방식은
+> "wrong basis"가 아니라 "없는 event를 없다고 믿고 통과시키는 것"이고, 그 실패는
+> 이 격자의 어떤 지표에도 나타나지 않는다.**
+
+**freeze 전에 필요한 것 셋.**
+
+1. **event ledger에 `NOT_SEARCHED`를 넣고 기본값을 fail-close로 둔다**(I11).
+   "조회한 적 없음"이 "없음"으로 읽히는 경로를 코드에서 없앤다.
+2. **discovery를 SEC 명시 공시로 옮기고 vendor는 corroboration으로 강등한다**(I10·I12-C).
+   최소한 `StockholdersEquityNoteStockSplitConversionRatio1`·`…ConversionRatio`·
+   `StockSplitConversionRate` 세 concept을 명시 등록하되, 세 가지를 함께 풀어야 쓸 수 있다 —
+   (a) **class 차원이 없으면 multi-class 발행사에서 `UNRESOLVED`로 둔다.** dimensionless를
+   "모든 class"로 읽으면 CMCSA 2017에서 Class B에 ×2를 잘못 곱한다.
+   (b) **태그에 effective date가 없으므로 비율만으로 event를 만들지 않는다.** 안 그러면
+   BRK 2011·NKE 2014·V 2016의 재공시가 그 해의 새 event가 된다.
+   (c) **등록인 자신의 비율인지 확인한다.** BRK의 `0.443332`는 Kraft Heinz의 비율이다.
+   **그리고 이것을 다 해도 MA·UA는 태그가 없어 다른 경로가 필요하다**(I10.1).
+3. **approval에서 백분율 tolerance를 없앤다**(I9). 지금 event 표는 `±5%`로 만들어졌고
+   `±1%`면 34건 중 10건이 뒤집힌다. **명시 공시(비율·class 적용 범위·effective date)로 승인하고,
+   share-count series는 corroboration으로만 쓰고, 명시 근거가 없으면 `UNRESOLVED`로 남긴다.**
+
+**이 correction도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
