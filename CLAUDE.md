@@ -83,6 +83,10 @@
 
 ## 열린 작업
 
+### 장기기억 연구
+
+- **R3-P0-A feasibility measurement는 닫혔다.** 정본은 `docs/memory-r3-p0-a-receipt.md`이고 P0-B paired answer generation은 아직 시작하지 않았다.
+
 ### 메일 — 닫혔다, 관측만 남았다
 
 - **MAIL-1~4와 카드의 본문 열기·일정 등록까지 2026-08-20 Pi 배포·실기기 인수로 닫혔다.** 계약과 실측은 `docs/xion-mail-agent-design-final.md`와 `docs/roadmap.md`의 독립 트랙 `MAIL-1~4`에 있고(`V5-C`는 외부 캘린더 에이전트가 쓰는 다른 이름이다), 코드로 잠긴 계약은 `lib/mail/*`와 `test/mail-*.test.js`가 정본이다. **운영 사실(스크래치 확인법·자격증명·분석 모델·막힌 길)은 로드맵의 `메일 운영 사실` 항목에 모아뒀다.**
