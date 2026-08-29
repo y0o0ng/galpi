@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   buildGlobalShadowRetrieval,
   buildShadowRetrieval,
@@ -618,7 +620,7 @@ test('global shadow drops weak automatic tails but preserves explicit note evide
   assert.ok(explicit.chunks.some(chunk => chunk.chunkId === 'weak-tail'));
 });
 
-test('shadow service records identifiers without content and isolates trace failures', () => {
+test('shadow service preserves unknown versus observed active-note telemetry', () => {
   const inserted = [];
   let recordError = null;
   const service = createAssistantRetrievalShadow({
@@ -649,10 +651,19 @@ test('shadow service records identifiers without content and isolates trace fail
   assert.equal(inserted.length, 1);
   assert.equal(inserted[0].latencyMs, 2);
   assert.match(inserted[0].querySha256, /^[a-f0-9]{64}$/);
-  assert.equal(inserted[0].activeNotesJson, '[]');
+  assert.equal(inserted[0].activeNotesJson, null);
   assert.deepEqual(retrieval, retrievalBeforeRecord);
   assert.doesNotMatch(inserted[0].chunksJson, /민감한|배포 노트/);
   assert.doesNotMatch(JSON.stringify(inserted[0]), /배포 노트/);
+
+  service.record({
+    sessionId: 'session-1',
+    mode: 'chat',
+    query: 'active note 없음',
+    activeNotes: [],
+    retrieval: { notes: [], chunks: [] },
+  });
+  assert.equal(inserted[1].activeNotesJson, '[]');
 
   service.record({
     sessionId: 'session-1',
@@ -665,13 +676,13 @@ test('shadow service records identifiers without content and isolates trace fail
       chunks: [],
     },
   });
-  assert.deepEqual(JSON.parse(inserted[1].activeNotesJson), ['private-topic.md']);
-  assert.deepEqual(JSON.parse(inserted[1].notesJson), [{
+  assert.equal(inserted[2].activeNotesJson, '["private-topic.md"]');
+  assert.deepEqual(JSON.parse(inserted[2].notesJson), [{
     filename: 'output-topic.md',
     explicit: false,
   }]);
-  assert.doesNotMatch(inserted[1].activeNotesJson, /민감한 제목|민감한 본문|다른 질문/);
-  assert.notEqual(inserted[1].activeNotesJson, inserted[1].notesJson);
+  assert.doesNotMatch(inserted[2].activeNotesJson, /민감한 제목|민감한 본문|다른 질문/);
+  assert.notEqual(inserted[2].activeNotesJson, inserted[2].notesJson);
 
   const failingService = createAssistantRetrievalShadow({
     getChunksByNote: () => [],
@@ -680,6 +691,14 @@ test('shadow service records identifiers without content and isolates trace fail
   });
   assert.equal(failingService.record({ mode: 'chat' }), false);
   assert.equal(recordError.message, 'db unavailable');
+});
+
+test('production retrieval trace wiring explicitly records resolved active-note input', () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(
+    serverSource,
+    /assistantRetrievalShadow\.record\(\{[\s\S]*?query: question,[\s\S]*?activeNotes: active,[\s\S]*?retrieval: shadowRetrieval,/,
+  );
 });
 
 test('shadow service accepts an async global candidate provider', async () => {
