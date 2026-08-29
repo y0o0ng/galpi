@@ -85,7 +85,7 @@
 
 ### 장기기억 연구
 
-- **R3-P0-A feasibility measurement는 닫혔다.** 정본은 `docs/memory-r3-p0-a-receipt.md`이고 P0-B paired answer generation은 아직 시작하지 않았다.
+- **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 
