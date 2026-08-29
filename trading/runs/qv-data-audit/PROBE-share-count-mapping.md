@@ -5222,3 +5222,550 @@ required field 넷 중
    전환비율 조정이다. **action text를 raw로 보존하고 `UNRESOLVED`로 둘 수 있어야 한다**(L7).
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+
+# Follow-up 6 — share / valuation regime boundary (2026-08-30)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 여덟 절과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. Gate · `coverage_start` · B/M · rank ·
+> returns는 이번에도 계산하지 않았고 production DB에 쓰지 않았다. `eodhd.py`를 수정하지 않았고
+> scratch에서 read-only 호출만 했다.
+
+시작 main: `d853725ac45a487ae4adf5cb3a809fea017ef73b`
+(`docs(memory): add XION research corpus`). 마지막 QV 커밋은
+`2f113ed research(qv): corporate-action disclosure extraction을 검증한다`이고,
+**그 뒤 `c323d15`·`d853725`는 `lib/assistant-retrieval-shadow.js` · `test/assistant-retrieval.test.js` ·
+`docs/Memory research/**`만 건드렸다.** `git log 2f113ed..HEAD -- trading/ docs/trading/`이 비어 있음을
+확인했고, memory 파일을 수정·정리·revert하지 않았다.
+
+**이번에 다시 열지 않은 것.** ME 정의(listed = shares × December `raw_close`, unlisted은
+fixed direct conversion mapping이 있을 때만 proxy, 그 외 MISSING, `adjusted_close` 금지) ·
+share fact source와 A→B hierarchy · freshness · D0 · **share basis anchor = source filing
+acceptance/release regime** · Follow-up 5의 DISCOVERY 계약 · `CLOSURE`/`SEARCH`와 amendment
+evidence-only · event ledger 두 축 · vendor 부재를 no-event로 쓰는 것 금지 · vendor ratio나
+share-count jump만으로 승인 금지 · issuer-wide 전파 금지 · percentage tolerance 금지 ·
+P3 normalization.
+
+## M1. 이번 질문 하나
+
+> **confirmed class-level share-basis event에 대해, 어느 시점부터 December ME의 per-share
+> valuation unit이 post-action basis라고 말할 수 있는가?**
+
+이것을 `VALUATION_REGIME_BOUNDARY`라고 부른다.
+**SEC legal/effective date와 raw market-price basis change date를 같은 것으로 가정하지 않는다.**
+
+## M2. 두 종류의 시간을 분리한다
+
+Follow-up 5가 뽑은 role-labeled date를 그대로 쓰되, **하나의 `event_date`로 뭉개지 않는다.**
+
+```text
+SEC 공시 쪽        DECLARED · RECORD · DISTRIBUTION/PAYMENT · EFFECTIVE · TRADING_SPLIT_ADJUSTED
+market/vendor 쪽   vendor split_date · 그 이상의 첫 정규 세션 · 그 주변 raw bar
+```
+
+**Follow-up 5의 결과를 재현했고 더 강해졌다.** confirmed 16 event의 listed class 17행에서
+SEC `EFFECTIVE`/`DISTRIBUTION`과 market boundary의 차이는 이렇다.
+
+| 차이(일) | 건수 |
+|---|---|
+| **0** | **1** (BRK 2010만) |
+| 1 | 6 |
+| 2 | 1 |
+| 3 | 6 |
+| 4 | 1 |
+| **−18** | **1 (오염 — M8.2)** |
+
+**17건 중 16건에서 SEC의 share-side 날짜는 market boundary보다 1~4일 앞선다.**
+
+## M3. semantic target과 그 source
+
+§5의 target은 **"raw market price가 post-action per-share basis로 표현된 첫 정규 세션"**이다.
+법적 효력일 자체가 아니라 **ME에서 곱하는 `raw_close`의 단위가 바뀐 첫 세션**이다.
+
+> **그래서 SEC `EFFECTIVE`는 이 target의 답이 아니다.** SAB 4.C가 규율하는 것은
+> **주식수(share-side) basis**이고, `raw_close`의 단위는 거래소가 split-adjusted 거래를 시작한
+> 세션에 바뀐다. **두 날짜는 구조적으로 다른 사건이고 이 표본에서 16/17이 실제로 다르다.**
+
+## M4. §6 EODHD split source — READ ONLY 확인
+
+현재 credential로 직접 호출했다(조회일 **2026-08-30**).
+
+| endpoint | 결과 |
+|---|---|
+| `GET https://eodhd.com/api/splits/{SYMBOL}.US` | **HTTP 200 · 사용 가능** |
+| `GET https://eodhd.com/api/calendar/splits` | **HTTP 403 Forbidden — 이 plan에서 사용 불가** |
+
+**작업지시 §6이 적은 필드명과 실제 응답이 다르다.**
+
+```text
+작업지시가 가정한 필드   split_date · old_shares · new_shares
+실제 응답 필드           date · split      (split은 "new/old" 문자열)
+
+예)  AAPL  {"date": "2014-06-09", "split": "7.000000/1.000000"}
+     AIG   {"date": "2009-07-01", "split": "1.000000/20.000000"}   <- reverse
+     GE    {"date": "2021-08-02", "split": "1.000000/8.000000"}    <- reverse
+```
+
+`old_shares`/`new_shares`는 이 endpoint가 주지 않는다. **`split` 문자열의 분자/분모가 new/old다**
+(AIG `1/20` = 1-for-20 reverse로 확인).
+
+**vendor row는 market-boundary candidate / corroboration으로만 썼다.** SEC가 승인하지 않은
+event를 vendor row 하나로 승격한 곳은 없다.
+
+## M5. §7 confirmed 16 event — listed boundary 전수
+
+`boundary session`은 `bars_daily`(SPY) 정규 세션 달력에서 `vendor split_date` 이상의 첫 세션이다.
+표본의 모든 `split_date`가 이미 정규 세션이라 둘이 같다.
+
+| issuer | class | listed | SEC EFFECTIVE | SEC DISTRIB | SEC TRADING | vendor split_date | new/old | boundary session |
+|---|---|---|---|---|---|---|---|---|
+| AAPL | SOLE | O | 2014-06-06 | — | — | 2014-06-09 | 7/1 | 2014-06-09 |
+| AAPL | SOLE | O | 2020-08-28 | — | — | 2020-08-31 | 4/1 | 2020-08-31 |
+| BRK | B | O | **2010-01-21** | — | — | 2010-01-21 | 50/1 | 2010-01-21 |
+| CMCSA | A | O | — | 2017-02-17 | — | 2017-02-21 | 2/1 | 2017-02-21 |
+| GOOGL | A | O | 2022-07-15 | — | — | 2022-07-18 | 20/1 | 2022-07-18 |
+| GOOGL | **B** | **—** | 2022-07-15 | — | — | **없음** | — | **없음** |
+| GOOGL | C | O | 2022-07-15 | — | — | 2022-07-18 | 20/1 | 2022-07-18 |
+| MA | A | O | — | 2014-01-21 | — | 2014-01-22 | 10/1 | 2014-01-22 |
+| MA | **B** | **—** | — | 2014-01-21 | — | **없음** | — | **없음** |
+| NKE | **A** | **—** | — | 2012-12-24 | **2012-12-26** | **없음** | — | **없음** |
+| NKE | B | O | — | 2012-12-24 | **2012-12-26** | 2012-12-26 | 2/1 | 2012-12-26 |
+| NKE | **A** | **—** | — | 2015-12-23 | **2015-12-24** | **없음** | — | **없음** |
+| NKE | B | O | — | 2015-12-23 | **2015-12-24** | 2015-12-24 | 2/1 | 2015-12-24 |
+| NVDA | SOLE | O | — | — | — | 2021-07-20 | 4/1 | 2021-07-20 |
+| NVDA | SOLE | O | — | 2024-06-07 | — | 2024-06-10 | 10/1 | 2024-06-10 |
+| TSLA | SOLE | O | — | — | — | 2020-08-31 | 5/1 | 2020-08-31 |
+| TSLA | SOLE | O | — | — | — | 2022-08-25 | 3/1 | 2022-08-25 |
+| UA | A | O | 2012-07-09 | 2012-07-09 | — | 2012-07-10 | 2/1 | 2012-07-10 |
+| UA | **CONV** | **—** | 2012-07-09 | 2012-07-09 | — | **없음** | — | **없음** |
+| UA | A | O | 2014-04-14 | 2014-04-14 | — | 2014-04-15 | 2/1 | 2014-04-15 |
+| UA | **CONV** | **—** | 2014-04-14 | 2014-04-14 | — | **없음** | — | **없음** |
+| V | A | O | — | 2015-03-18 | **2015-03-19** | 2015-03-19 | 4/1 | 2015-03-19 |
+| WMT | SOLE | O | 2024-02-23 | — | — | 2024-02-26 | 3/1 | 2024-02-26 |
+
+**두 source가 모두 있는 event에서 `SEC TRADING == vendor split_date`가 3/3으로 일치한다**
+(NKE 2012 · NKE 2015 · V 2015). **불일치는 0건이다.**
+
+**availability는 크게 다르다.**
+
+| source | listed 17행 중 사용 가능 |
+|---|---|
+| SEC `EFFECTIVE` | **8** |
+| SEC `TRADING` | **3** |
+| vendor `split_date` | **17** |
+
+## M6. §8 raw price diagnostic — 승인이 아니라 진단
+
+각 listed class에서 boundary 직전 세션 · boundary 세션 · 그 다음 세션의 `raw_close`를 직접 읽었다.
+
+| issuer | class | boundary | prev raw | **boundary raw** | prev/bound | 승인 ratio | prev adj | bound adj |
+|---|---|---|---|---|---|---|---|---|
+| AAPL | SOLE | 2014-06-09 | 645.57 | **93.70** | 6.89 | ×7 | 20.22 | 20.54 |
+| AAPL | SOLE | 2020-08-31 | 499.23 | **129.04** | 3.87 | ×4 | 121.06 | 125.17 |
+| BRK | B | 2010-01-21 | 3,476.00 | **72.72** | 47.80 | ×50 | 69.52 | 72.72 |
+| CMCSA | A | 2017-02-21 | 75.32 | **37.89** | 1.99 | ×2 | 27.43 | 27.60 |
+| GOOGL | A | 2022-07-18 | 2,235.55 | **109.03** | 20.50 | ×20 | 110.80 | 108.07 |
+| GOOGL | C | 2022-07-18 | 2,255.34 | **109.91** | 20.52 | ×20 | 111.78 | 108.95 |
+| MA | A | 2014-01-22 | 818.48 | **83.30** | 9.83 | ×10 | 75.81 | 77.15 |
+| NKE | B | 2012-12-26 | 105.60 | **51.33** | 2.06 | ×2 | 22.06 | 21.44 |
+| NKE | B | 2015-12-24 | 128.71 | **63.18** | 2.04 | ×2 | 55.75 | 54.74 |
+| NVDA | SOLE | 2021-07-20 | 751.19 | **186.12** | 4.04 | ×4 | 18.72 | 18.55 |
+| NVDA | SOLE | 2024-06-10 | 1,208.88 | **121.79** | 9.93 | ×10 | 120.68 | 121.58 |
+| TSLA | SOLE | 2020-08-31 | 2,213.40 | **498.32** | 4.44 | ×5 | 147.56 | 166.11 |
+| TSLA | SOLE | 2022-08-25 | 891.29 | **296.07** | 3.01 | ×3 | 297.10 | 296.07 |
+| UA | A | 2012-07-10 | 95.35 | **48.49** | 1.97 | ×2 | 11.92 | 12.12 |
+| UA | A | 2014-04-15 | 105.55 | **54.19** | 1.95 | ×2 | 26.39 | 27.09 |
+| V | A | 2015-03-19 | 267.67 | **66.81** | 4.01 | ×4 | 61.81 | 61.71 |
+| WMT | SOLE | 2024-02-26 | 175.56 | **59.60** | 2.95 | ×3 | 57.05 | 58.11 |
+
+**17/17에서 boundary 세션의 `raw_close`가 이미 post-action 단위이고, 방향이 승인된 ratio와
+경제적으로 일관된다.** `adj_close`는 같은 구간에서 연속이다.
+
+> **tolerance rule을 만들지 않았다.** TSLA 2020은 `4.44` vs `×5`로 11% 떨어져 있는데
+> **그날 실제로 주가가 올랐기 때문**이다. **numeric closeness는 진단이고 boundary 판정은
+> source semantics로 한다.**
+
+## M7. §9·§14 — R0~R4를 520 observation에서 평가
+
+```text
+R0  SEC EFFECTIVE만            (Follow-up 5 결과 때문에 baseline/control)
+R1  explicit TRADING만
+R2  SEC 승인 event + vendor split_date
+R3  conservative transition interval  [min(EFFECTIVE, DISTRIBUTION), market boundary]
+R4  vendor split_date, 없으면 explicit TRADING, 둘 다 없으면 fail-close
+```
+
+**판정의 truth는 M6이 검증한 market boundary다.** 그리고 CLOSED 계약대로
+**`UNRESOLVED` candidate가 하나라도 있으면 그 observation은 fail-close다** — 다른 fact로
+조용히 갈아타지 않는다.
+
+| 지표 | R0 | R1 | R2 | R3 | **R4** |
+|---|---|---|---|---|---|
+| correct basis | 508 | 503 | 513 | 512 | **515** |
+| **wrong basis** | **0** | **0** | **0** | **0** | **0** |
+| unknown basis | 0 | 0 | 0 | 0 | 0 |
+| **fail-close** | 12 | 17 | 7 | 8 | **5** |
+| missing | 0 | 0 | 0 | 0 | 0 |
+
+**어떤 정책도 wrong basis를 만들지 않는다. 차이는 전부 fail-close 양이다.**
+
+| 정책 | fail-close | listed | unlisted |
+|---|---|---|---|
+| R0 | 12 | **9** | 3 |
+| R1 | 17 | **12** | 5 |
+| R2 | 7 | **0** | 7 |
+| R3 | 8 | **3** | 5 |
+| **R4** | **5** | **0** | **5** |
+
+- **R0이 listed 9건을 잃는 이유는 SEC `EFFECTIVE`가 없기 때문이다**(MA · NKE×2 · NVDA×2 ·
+  TSLA×2 · V×2). **가장 흔한 발행사들이 effective date를 안 쓴다.**
+- **R1은 listed 12건을 잃는다** — `TRADING`을 명시한 event가 16 중 3뿐이다.
+- **R2·R4는 listed를 하나도 잃지 않는다.** 남는 fail-close는 전부 unlisted다.
+- **R4가 R2보다 나은 지점은 NKE A(비상장) 2건**이다. vendor row가 없지만 원문이
+  `began trading at the split-adjusted price on December 26, 2012`를 명시해 그 날짜로 닫힌다.
+
+### M7.1 §15가 지목한 기존 failure
+
+| 관측 | R2 | R4 |
+|---|---|---|
+| MA A f2014 (P0가 10배 틀렸던 것) | **correct** (inst 2013-09-30) | **correct** |
+| MA B f2014 | fail-close | fail-close |
+| UA A f2014 | **correct** (inst 2013-12-31) | **correct** |
+| UA CONV f2014 | fail-close | fail-close |
+| NKE A f2013 | fail-close | **correct** |
+| NKE B f2013 (P1이 1/2로 틀렸던 것) | **correct** | **correct** |
+| NKE A f2016 | fail-close | **correct** |
+| NKE B f2016 | **correct** | **correct** |
+| NVDA f2022 (P1·P4가 1/4로 틀렸던 것) | **correct** | **correct** |
+| NVDA f2025 (P1·P4가 1/10로 틀렸던 것) | **correct** | **correct** |
+
+**여섯 기존 failure 전부 `correct` 아니면 `fail-close`이고 wrong basis는 하나도 없다.**
+
+### M7.2 PIT
+
+`(lo, hi]` 구간에 실제로 걸린 boundary 참조는 **16건**이고, **그중 formation 이후 날짜를 참조한
+것은 0건**이다. 다만 **split feed를 오늘 조회하면 미래 event도 함께 오므로**,
+구현에서는 `split_date <= formation` 필터를 코드 불변식으로 두어야 한다(Follow-up 3 H13과 같다).
+
+## M8. §10 date_cluster_raw의 역할
+
+**date_cluster 자체를 canonical boundary로 쓰지 않는다.** 이번에 두 가지를 확인했다.
+
+### M8.1 어떤 role이 basis transition과 구조적으로 무관한가
+
+| role | basis transition과의 관계 | transition endpoint로 쓸 수 있나 |
+|---|---|---|
+| `DECLARED` | 이사회 선언일. **이 시점에는 주식수도 가격 단위도 안 바뀐다** | **안 된다** |
+| `RECORD` | 배당 수령 자격 확정일. **주식은 아직 구 단위로 거래된다** | **안 된다** |
+| `DISTRIBUTION` / `PAYMENT` | 주식이 실제로 교부된다 → **share-side 전환** | interval의 **시작** |
+| `EFFECTIVE` | 법적 효력(정관 개정/배당 효력) → 표본에서 `DISTRIBUTION`과 같거나 인접 | interval의 **시작** |
+| `TRADING_SPLIT_ADJUSTED` | **`raw_close` 단위가 바뀐 첫 세션** | **valuation boundary 그 자체** |
+
+> **`DECLARED`·`RECORD`를 "더 이르니까 안전하다"는 이유로 transition 시작으로 넣지 않았다.**
+> 그 두 시점에는 주식수도 가격 단위도 바뀌지 않으므로 interval을 앞으로 늘리기만 하고
+> 근거 없이 fail-close를 키운다.
+
+### M8.2 date_cluster는 action에 묶어야 한다 — 실제 오염 사례
+
+M2 표의 `−18일` 한 건이 그것이다. NVDA 2024 10-Q의 후보 block 합집합(E2)에서
+`DISTRIBUTION 2024-06-28`이 나왔는데, 원문은
+
+> "On June 7, 2024, we increased our **quarterly cash dividend** to $0.01 per share on a
+> post-Stock Split basis to all shareholders of record on June 11, 2024. Our **quarterly cash
+> dividend was paid on June 28, 2024.**"
+
+**split이 아니라 현금배당의 지급일·기준일이다.** 같은 문서·같은 후보 집합 안에 다른
+기업행동의 날짜가 섞인다.
+
+> **결론: `date_cluster_raw`는 문서 단위가 아니라 action span 단위로 묶여야 한다.**
+> Follow-up 5의 E2(문서 안 후보 block 합집합)를 그대로 date source로 쓰면
+> **다른 기업행동의 날짜가 role에 들어온다.**
+
+## M9. §11·§12 unlisted ordinary class
+
+**listed sibling의 `split_date`를 자동 전파하지 않았다.** 각 unlisted anchor에서
+그 class 자신의 판정과 같은 날 상장 sibling의 판정을 나란히 놓았다.
+
+| issuer | unlisted class | ex-date | **그 class 판정** | 같은 날 상장 sibling | 같은 비율? |
+|---|---|---|---|---|---|
+| GOOGL | B | 2022-07-18 | **SPLIT ×20** | A ×20 · C ×20 | 예 |
+| MA | B | 2014-01-22 | **SPLIT ×10** | A ×10 | 예 |
+| NKE | A | 2012-12-26 | **SPLIT ×2** | B ×2 | 예 |
+| NKE | A | 2015-12-24 | **SPLIT ×2** | B ×2 | 예 |
+| UA | CONV | 2012-07-10 | **SPLIT ×2** | A ×2 | 예 |
+| UA | CONV | 2014-04-15 | **SPLIT ×2** | A ×2 | 예 |
+| **V** | **B** | 2015-03-19 | **NO_SHARE_EFFECT** | **A ×4** | — |
+| **V** | **C** | 2015-03-19 | **NO_SHARE_EFFECT** | **A ×4** | — |
+| **CMCSA** | **B** | 2017-02-21 | **NO_SHARE_EFFECT** | **A ×2** | — |
+| UA | CONV | 2016-04-08 · 2016-06-13 | NO_SHARE_EFFECT | A 무영향 | — |
+| CMCSA | B | 2026-01-05 | NO_SHARE_EFFECT | A 무영향 | — |
+
+> **U0(sibling 전파)는 세 anchor에서 즉시 반증된다** — V B · V C · CMCSA B는 상장 sibling이
+> ×4 / ×2로 split하는 동안 **자기 주식수는 그대로다.**
+
+### M9.1 U0~U3 — unlisted 146 observation
+
+| 지표 | U0 sibling 전파 | U1 shared-action | U3 fail-close |
+|---|---|---|---|
+| correct basis | 146 | **146** | 139 |
+| wrong basis | 0 | **0** | 0 |
+| fail-close | 0 | **0** | **7** |
+
+**숫자로는 U0와 U1이 같다.** 이유는 P2가 **가장 늦은 instant**를 고르고 그 fact는 거의 항상
+event 이후 filing에서 오기 때문이다 — **U0의 과잉 배제가 선택 결과까지 가지 않는다.**
+
+**그러나 fact 수준에서는 이미 갈린다.** U0가 `DIFFERENT`라고 배제하지만 U1은 `SAME`인
+후보 fact가 **4개**(V B 2 · V C 2)다. **선택에 닿지 않은 것은 설계가 아니라 배치의 결과다.**
+
+## M10. §13 non-simple event — 여기서 silent wrong이 생긴다
+
+### M10.1 Visa 2015 — 주식수는 그대로, 전환비율이 바뀐다
+
+원문(Follow-up 4 J4):
+
+> "Holders of **class B and C common stock did not receive a stock dividend.** Instead, the
+> **conversion rate for class B common stock increased to 1.6483** shares of class A common stock
+> per share of class B common stock, and the **conversion rate for class C common stock increased
+> to 4.0**."
+
+**unlisted class의 ME는 `shares × conversion_ratio × reference raw_close`다.** 이 event에서
+`shares`는 안 바뀌고 `reference raw_close`는 ×1/4가 되며 `conversion_ratio`는 ×4가 된다.
+**세 항 중 둘이 같은 순간에 반대로 움직인다.**
+
+Class B 주식수 `245,513,385`로 실제 December 가격을 곱한 값이다.
+
+| December | V `raw_close` | 전환비율 0.412075 (split 이전) | 전환비율 1.6483 (split 이후) |
+|---|---|---|---|
+| 2014-12-31 (split 이전) | 262.20 | **$26.5B** ← 맞다 | $106.1B (**4배 과대**) |
+| 2015-12-31 (split 이후) | 77.55 | **$7.8B** (**1/4로 과소**) | **$31.4B** ← 맞다 |
+
+> **conversion ratio가 PIT가 아니면 ME가 조용히 4배 틀린다.** 그리고 그 오류는
+> **share selector 어디에도 나타나지 않는다** — 주식수는 정확하고 가격도 정확하다.
+> **unlisted class의 valuation regime boundary는 share-side가 아니라 conversion-ratio side에 있다.**
+
+**주의.** Visa의 class B 전환비율은 소송 escrow에 따라 변하는 값이므로,
+로드맵 §4.4.2가 요구하는 `fixed direct conversion ratio` 요건을 만족하는지 **자체가 별도 판단**이다.
+만족하지 못하면 그 class는 `CONVERSION_VALUE_PROXY`가 아니라 `MISSING`이다.
+
+### M10.2 CMCSA 2017 — 단일 배수로 표현되지 않는다
+
+Follow-up 4 J4.1이 확정한 대로, 배당이 **Class A 주식으로 Class A·B 보유분 모두에** 지급돼
+Class A의 실제 소급 배수가 `2`가 아니라 `2.00399`(= `2×A + B`)다.
+**Class B 자신의 주식수는 `9,444,375`로 불변이다.**
+
+> **U0는 이 event를 "issuer-wide ×2"로 읽고 Class B의 basis가 바뀌었다고 주장한다. 틀렸다.**
+
+## M11. §16 boundary-adjacent stress — 진단표
+
+event 후보가 걸리는 **249 observation**에서, `filing acceptance`·`December session` 중
+어느 것이든 **어떤 boundary 후보(SEC EFFECTIVE/DISTRIBUTION/TRADING 또는 vendor)**와
+가장 가까운 거리를 전수로 계산했다.
+
+| issuer | class | formation | 가장 가까운 endpoint | 그 날짜 | 경계 role | 경계 날짜 | **간격(일)** |
+|---|---|---|---|---|---|---|---|
+| NKE | A | 2013 | December session | 2012-12-31 | SEC TRADING | 2012-12-26 | **5** |
+| NKE | B | 2013 | December session | 2012-12-31 | SEC TRADING | 2012-12-26 | **5** |
+| NKE | A | 2016 | December session | 2015-12-31 | SEC TRADING | 2015-12-24 | **7** |
+| NKE | B | 2016 | December session | 2015-12-31 | SEC TRADING | 2015-12-24 | **7** |
+| GOOGL | A | 2023 | filing acceptance | 2022-07-26 | vendor | 2022-07-18 | **8** |
+| GOOGL | C | 2023 | filing acceptance | 2022-07-26 | vendor | 2022-07-18 | **8** |
+| NVDA | SOLE | 2025 | filing acceptance | 2024-05-29 | SEC DISTRIB | 2024-06-07 | **9** |
+| GOOGL | B | 2023 | filing acceptance | 2022-07-26 | SEC EFFECTIVE | 2022-07-15 | **11** |
+| NKE | A · B | 2017 | filing acceptance | 2016-01-06 | SEC TRADING | 2015-12-24 | **13** |
+| WMT | SOLE | 2025 | filing acceptance | 2024-03-15 | vendor | 2024-02-26 | **18** |
+
+간격 분포: **최소 5일** · 중앙값 1,111일 · 10일 이하 **7건** · 30일 이하 23건.
+
+> **이것이 R0~R4가 wrong basis를 하나도 만들지 않은 이유다.** SEC 날짜와 market boundary의
+> 차이는 1~4일인데 **격자에서 가장 가까운 endpoint-경계 간격이 5일이다.**
+> **여유가 하루다.** 12월 마지막 세션이 이틀만 앞이었다면 NKE 2013에서 R0/R1과 R2/R4가 갈린다.
+> **"3일 이내" 같은 숫자를 selector rule로 쓰지 않는다. 이 표는 edge-case 발견용이다.**
+
+## M12. §17 reverse split CONTROL — 525 grid 통계에 합치지 않는다
+
+| control | SEC 날짜(역할) | vendor split_date | new/old | boundary | prev raw | bound raw | prev/bound |
+|---|---|---|---|---|---|---|---|
+| **AIG** | `EFFECTIVE` 2009-06-30 | 2009-07-01 | 1/20 | 2009-07-01 | 1.16 | 18.08 | 0.064 |
+| **BTU** | `EFFECTIVE` 2015-09-30 | **없음 (0 rows)** | — | **없음** | — | — | — |
+| **GE** | `TRADING` **2021-08-02** | **2021-08-02** | 1/8 | 2021-08-02 | 12.95 | 100.60 | 0.129 |
+| SIRI | (날짜 없음) | 2024-09-10 | 1/10 | 2024-09-10 | 2.67 | 27.38 | 0.098 |
+
+**forward와 같은 계약이 그대로 성립한다.**
+
+1. **GE에서 `SEC TRADING == vendor split_date`가 또 한 번 정확히 일치한다.** forward 3/3에
+   reverse 1/1이 더해진다.
+2. **AIG는 `EFFECTIVE`가 market boundary보다 하루 앞이다** — forward의 1~4일 패턴과 같다.
+3. **BTU가 결정적이다.** SEC는 "completed a **1-for-15 reverse stock split** … **on September 30,
+   2015**"로 명시하는데 **vendor `splits` 응답이 빈 배열이고, `bars_daily`의 BTU 시계열조차
+   2017-04-03부터 시작한다**(파산·재상장으로 이전 이력이 없다).
+   **→ vendor market boundary가 구조적으로 존재하지 않을 수 있다.** R2 단독이면 무한정
+   unresolved이고, **SEC `TRADING`/`EFFECTIVE` fallback이 있어야 닫힌다.**
+4. **SIRI는 별도 diagnostic이다.** 원문이 split이 아니라
+   "conversion of Old Sirius shares into SplitCo common stock on a one-for-ten basis"이고
+   SEC 날짜 role이 없다. vendor row는 있고 가격도 1/10로 끊긴다.
+   **SEC 승인 없이 vendor row만으로 승격하지 않는다는 계약이 여기서 실제로 작동한다.**
+
+## M13. §18 provenance
+
+이번 연구가 모든 boundary evidence에 함께 보존한 항목이다.
+
+```text
+class / symbol            (issuer, class_id label, listed symbol 또는 없음)
+source type               SEC filing 본문 | EODHD splits API | bars_daily
+source URL / API          accession + document name | GET /api/splits/{SYMBOL}.US | (source, source_version)
+retrieval date            SEC: Follow-up 5 파싱 시점 | EODHD: 2026-08-30
+SEC accession             해당 event의 K/Q accession
+raw source date role      DECLARED / RECORD / DISTRIBUTION / EFFECTIVE / TRADING (원문 문구 그대로)
+market split_date         vendor date (원문 문자열 split = new/old 포함)
+calendar source/version   ("eodhd", "eodhd-15y-2026-08") — bars_daily의 SPY 정규 세션 달력
+derived first session     그 달력에서 split_date 이상의 첫 세션
+```
+
+**vendor 날짜를 SEC provenance처럼 쓰지 않았다.** M5 표에서 두 열이 끝까지 분리돼 있고,
+승인(event 존재·action·class)은 전부 SEC 쪽에서만 왔다.
+
+## M14. ground truth 확인 범위
+
+**§9·F14·G15·H14·I13·J9·K9·L14와 같은 기준이다. 520 observation 전부를 사람이 원문과
+1:1 대조하지 않았다.**
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| EODHD splits/calendar endpoint 가용성·필드 | 실제 credential로 직접 호출, 2026-08-30 | M4 |
+| confirmed 16 event의 SEC date role | Follow-up 5가 사람이 읽은 결과를 그대로 사용 | M5 |
+| boundary 전후 `raw_close`·`adj_close` | `bars_daily` 직접 조회 17 class-event | M6 |
+| Visa class B/C 전환비율 문구 | Follow-up 4 J4의 인용을 그대로 사용 | M10.1 |
+| CMCSA `2×A + B` | Follow-up 4 J4.1을 그대로 인용, 재계산하지 않았다 | M10.2 |
+| NVDA 현금배당 날짜 오염 | NVDA 2024 10-Q 후보 block 원문 | M8.2 |
+| reverse CONTROL 4건 | Follow-up 5가 읽은 원문 + 이번 vendor/price 조회 | M12 |
+
+**기계로만 검증한 것**: 520 observation의 R0~R4·U0~U3 판정, 249 observation의 stress 거리,
+PIT 위반 0건.
+
+**정직하게 적을 한계 다섯.**
+
+1. **`truth`가 vendor split_date다.** M6의 가격 불연속이 독립 corroboration이지만,
+   **가격과 split feed는 같은 vendor·같은 source_version에서 온다.** 완전히 독립된 제3의
+   market boundary source로 검증하지 않았다.
+2. **`SEC TRADING == vendor` 일치는 4건(forward 3 + reverse 1)뿐이다.** 두 source가 항상
+   일치한다고 말할 표본이 아니다.
+3. **wrong basis 0건은 M11이 보여주듯 5일 여유의 결과다.** 정책 간 정확도 차이가 이 격자에서
+   드러나지 않았을 뿐이다.
+4. **unlisted의 U0와 U1이 숫자로 같다.** U0의 오류는 fact 4개와 event 3건에서만 드러나고
+   선택 결과에는 닿지 않았다.
+5. **M10.1의 Visa 수치는 시연이다.** 실제 PIT 전환비율 시계열을 구축하지 않았고
+   `0.412075`는 `1.6483/4`로 역산한 값이다.
+
+## M15. 이번에 결정하지 않은 것 (§20)
+
+1. prose class-name → `class_id` mapping schema
+2. production event extractor
+3. event/coverage ledger DDL
+4. P3 normalization
+5. **`CONVERSION_VALUE_PROXY`의 실제 PIT conversion mapping 구축** — M10.1이 그 필요성을
+   수치로 보였지만 mapping 자체를 만들지 않았다
+6. unexplained cross-accession conflicts
+7. Gate C · `coverage_start` · B/M · rank · returns
+
+## User decision — share / valuation regime boundary
+
+### listed class: **C — SEC-approved event + vendor market boundary** (종결 분기로 E를 포함한다)
+
+```text
+VALUATION_REGIME_BOUNDARY(listed class, confirmed event)
+
+  event 존재 · action · 영향 class는 SEC 명시 공시로만 승인한다 (기존 CLOSED 계약 그대로)
+
+  boundary는 그 class 자신의 상장 심볼에서 받는다
+      1) vendor split_date  (그 이상의 첫 정규 세션 = boundary)
+         calendar는 ME가 쓰는 것과 같은 (source, source_version)
+         PIT 불변식: split_date <= formation 인 row만 본다
+      2) SEC 원문이 TRADING_SPLIT_ADJUSTED를 명시하면 corroboration으로 대조한다
+         불일치 -> UNRESOLVED
+      3) vendor row가 없으면(BTU형) 명시된 SEC TRADING date로 닫는다
+      4) 둘 다 없으면 UNRESOLVED -> fail-close
+
+  SEC EFFECTIVE / DISTRIBUTION 을 valuation boundary로 쓰지 않는다.
+  그 둘은 share-side 날짜이고 이 표본에서 17건 중 16건이 market boundary와 1~4일 다르다.
+```
+
+§19 기준별로 적는다.
+
+- **1. `raw_close`의 실제 unit과 맞는가.** 맞는다. boundary 세션의 `raw_close`가 이미
+  post-action 단위임을 17/17에서 직접 확인했고(M6), `SEC TRADING`이 있는 4건(forward 3 +
+  reverse GE 1)에서 vendor와 **정확히 일치**한다. **반대로 `EFFECTIVE`는 16/17에서 틀린 날짜다.**
+- **2. SEC event approval 계약을 훼손하지 않는가.** 훼손하지 않는다. **vendor는 이미 승인된
+  event의 boundary만 공급하고 승인에는 관여하지 않는다.** SIRI가 그 분리를 실제로 시험한다 —
+  vendor row가 있고 가격도 1/10로 끊기지만 SEC 승인이 없어 event가 되지 않는다(M12-4).
+- **3. listed/unlisted 차이를 보존하는가.** 보존한다. 이 계약은 **그 class 자신의 상장 심볼**에서만
+  boundary를 받는다. 심볼이 없으면 unlisted 계약으로 넘어간다.
+- **4. arbitrary time/price tolerance가 없는가.** 없다. 가격은 진단으로만 썼고 boundary는
+  날짜 자체다. `±N일` window도 백분율도 쓰지 않았다.
+- **5. PIT인가.** 그렇다. 격자에서 formation 이후 boundary 참조는 0건이고(M7.2),
+  `split_date <= formation` 필터를 코드 불변식으로 요구한다.
+- **6. silent wrong보다 fail-close인가.** 그렇다. 520 격자에서 **wrong basis 0 · fail-close 5**이고,
+  기존 P0·P1 failure 여섯 건이 전부 `correct` 아니면 `fail-close`다(M7.1).
+- **7. 최소 복잡도인가.** 그렇다. 필요한 것은 **class별 boundary 날짜 하나와 구간 포함 검사**뿐이고,
+  ME가 이미 쓰는 같은 달력·같은 vendor version을 재사용한다.
+
+**A(SEC date only)를 추천하지 않는 이유는 정확도가 아니라 semantic이다.** `EFFECTIVE`는
+share-side 날짜라 §5의 target이 아니고, 게다가 16 event 중 8건에만 존재해 listed 9 observation을
+잃는다. **B(explicit trading date hierarchy)는 방향이 옳지만 16 중 3건에만 존재해 listed 12건을
+잃는다** — 단독 계약으로는 못 쓰고, C 안의 corroboration·fallback으로 살린다.
+**D(conservative interval)는 가장 보수적이고 wrong basis도 0이지만, share-side 날짜가 없는
+발행사(NVDA 2022 · TSLA 2021 · TSLA 2023)에서 interval 시작을 만들 수 없어 listed 3건을 더 잃는다.**
+얻는 안전이 이 격자에서 0이다.
+
+> **다만 D의 아이디어는 버리지 않는다.** M11이 보여주듯 **가장 가까운 endpoint-경계 간격이 5일**이고
+> share-side와 market-side가 1~4일 벌어져 있다. **둘 사이에 endpoint가 떨어지는 관측이 실제로
+> 생기면 C는 답을 하나로 정해버린다.** 그때는 D의 interval fail-close가 옳다.
+> **`[DISTRIBUTION/EFFECTIVE, market boundary]` 구간에 filing acceptance나 December session이
+> 들어오면 `UNRESOLVED`로 두는 안전장치를 C 위에 얹는 것을 권한다** — 이 격자에서 비용이 0이다.
+
+### unlisted ordinary class: **B — explicit shared-action reference boundary** (그 외 fail-close)
+
+```text
+unlisted class의 share-side boundary
+
+  다음을 SEC 원문이 전부 명시할 때만 reference listed class의 market boundary를 공유한다
+      1) 그 unlisted class가 reference class와 같은 action에 명시적으로 포함된다
+      2) 같은 basis 변환(같은 비율)을 받는다
+      3) 두 class의 conversion relation이 action 전후로 명확하다
+  하나라도 아니면 UNRESOLVED -> fail-close
+
+  listed sibling의 split_date를 자동 전파하지 않는다.
+```
+
+- **A(sibling propagation)는 세 anchor에서 직접 반증된다.** V B · V C · CMCSA B는 상장 sibling이
+  ×4 / ×2로 split하는 동안 **자기 주식수가 그대로다**(M9). 숫자로는 U0와 U1이 146/146으로 같지만
+  그것은 P2가 가장 늦은 instant를 고르는 덕에 과잉 배제가 선택까지 안 갔기 때문이고,
+  **fact 수준에서는 이미 4개가 잘못 배제된다.**
+- **B는 GOOGL B · MA B · NKE A · UA CONV를 원문 근거로 닫는다** — 넷 다 "Class A and Class B",
+  "both … Class A and Class B", "Class A, Class B, and Class C"처럼 unlisted class를 문장 안에서
+  이름으로 부른다. **NKE A는 vendor row가 없지만 원문의 `TRADING` 날짜로 닫힌다.**
+- **C(conversion-regime boundary)를 지금 채택하지 않는다.** 필요하다는 것은 M10.1이 수치로
+  보였지만 — Visa Class B에서 **전환비율이 PIT가 아니면 December ME가 조용히 4배 틀린다**
+  ($31.4B vs $7.8B) — **이번 연구는 새 conversion mapping을 만들지 않았다.**
+- **D(fail-close/mixed)는 B의 종결 분기로 이미 들어 있다.** 명시 근거가 없으면 unresolved다.
+
+> **반드시 함께 기억할 것.** **B는 unlisted class의 share-side boundary만 정한다.**
+> `CONVERSION_VALUE_PROXY`를 쓰는 class의 **valuation-side boundary는 conversion ratio 쪽에
+> 있고 아직 열려 있다.** M10.1의 4배 오차는 주식수도 가격도 정확한 상태에서 발생하므로
+> **share selector의 어떤 지표에도 나타나지 않는다.**
+> 그 계약이 정해지기 전까지 `CONVERSION_VALUE_PROXY` class는 valuation 쪽에서 fail-close해야 하고,
+> 로드맵 §4.4.2의 `fixed direct conversion ratio` 요건을 만족하지 못하면 애초에 `MISSING`이다
+> (Visa class B/C가 그 요건을 만족하는지 자체가 별도 판단이다).
+
+### 함께 기억할 것 넷
+
+1. **SEC `EFFECTIVE`와 market boundary는 다른 사건이다.** 17건 중 16건이 1~4일 다르고
+   같은 날인 것은 BRK 하나뿐이다. **하나를 다른 하나로 쓰면 안 된다.**
+2. **`SEC TRADING`이 있으면 그것이 정답이다.** vendor와 4/4 일치(forward 3 · reverse GE 1).
+   다만 16 event 중 3건에만 있다.
+3. **vendor feed는 없을 수 있다.** BTU는 SEC가 `1-for-15 … on September 30, 2015`로 명시하는데
+   vendor `splits`가 빈 배열이고 `bars_daily`의 시계열조차 2017년부터다.
+   **fallback 없는 vendor 단독 계약은 그런 발행사에서 영구 unresolved다.**
+4. **여유가 5일이다.** M11의 stress 표에서 가장 가까운 endpoint-경계 간격이 NKE 2013의 5일이고,
+   SEC와 market의 차이는 1~4일이다. **이 격자에서 정책 간 wrong basis 차이가 0인 것은
+   설계의 결과가 아니라 배치의 결과다.**
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
