@@ -240,6 +240,6 @@ Traffic represents current development-stage organic usage and is not assumed to
 
 - P0-B paired answer generation / `ΔA`: **not executed**
 - synthetic production invocation으로 새 telemetry row 생성: **not executed** — normal user data write를 만들지 않기 위해 의도적으로 생략했다.
-- GitHub CI: **확인되지 않음**
+- GitHub CI: commit `306e484f0c968cbe65110038c4558f2f26fc1af6`의 [Docker workflow run 33259547321](https://github.com/y0o0ng/galpi/actions/runs/33259547321) **success** — native `npm test`, container test, linux/amd64·linux/arm64 runtime build
 
-Local/Pi PASS로 기록됐으며 GitHub CI에서 독립적으로 재현된 것은 확인되지 않았다.
+Local/Pi PASS와 GitHub CI의 독립 재현 성공을 확인했다.
