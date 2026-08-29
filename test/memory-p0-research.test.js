@@ -7,13 +7,18 @@ const os = require('node:os');
 const path = require('node:path');
 const Database = require('better-sqlite3');
 const {
+  CURRENT_GATE_RESULTS,
   D0_CLASSIFICATIONS,
+  QUERY_RESOLUTION,
   buildD0Sensitivity,
+  buildCurrentInvocationSensitivity,
   buildOnlineEligibleVolume,
   classifyVisibleRetrieval,
   formatMemoryP0Report,
   mostRecentCompleteKstWindow,
+  parseActiveNotesTelemetry,
   parseRegularApiChatA2Mode,
+  resolveCurrentInvocationQueries,
 } = require('../lib/memory-p0-research');
 const { sha256 } = require('../lib/content-hash');
 const {
@@ -21,6 +26,7 @@ const {
   openResearchDatabase,
   parseArguments,
   parseAsOf,
+  runCurrentInvocationD0Research,
   runMemoryP0Research,
 } = require('../scripts/measure-memory-p0-a');
 
@@ -60,6 +66,41 @@ function insertTrace(db, {
       context_chars, latency_ms, error, created_at
     ) VALUES (?, ?, ?, '[]', ?, ?, 1, ?, ?)
   `).run(sessionId, mode, queryHash, JSON.stringify(chunks), contextChars, error, createdAt);
+}
+
+function createCurrentResolverDatabase() {
+  const db = createTraceDatabase();
+  db.exec(`
+    CREATE TABLE messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      embedding TEXT,
+      runtime_generation TEXT,
+      created_at INTEGER NOT NULL
+    );
+  `);
+  return db;
+}
+
+function insertChatPair(db, {
+  sessionId = 'shared-main',
+  query,
+  embedding = [1, 0],
+  runtimeGeneration = 'gpt-single-v1',
+  createdAt,
+}) {
+  db.prepare(`
+    INSERT INTO messages (
+      session_id, role, content, embedding, runtime_generation, created_at
+    ) VALUES (?, 'user', ?, ?, NULL, ?)
+  `).run(sessionId, query, embedding ? JSON.stringify(embedding) : null, createdAt);
+  db.prepare(`
+    INSERT INTO messages (
+      session_id, role, content, embedding, runtime_generation, created_at
+    ) VALUES (?, 'assistant', 'answer', NULL, ?, ?)
+  `).run(sessionId, runtimeGeneration, createdAt);
 }
 
 test('P0.1 uses the latest 28 complete KST calendar days', () => {
@@ -135,6 +176,102 @@ test('P0.1 counts repeated eligible invocations without query-hash deduplication
   assert.equal(report.contextChars.average, 66.67);
   assert.equal(report.scope, 'regular /api/chat A2 eligible retrieval invocations');
   db.close();
+});
+
+test('current trace resolver uses exact session/hash/runtime/time intervals per invocation', () => {
+  const db = createCurrentResolverDatabase();
+  const window = mostRecentCompleteKstWindow(AS_OF);
+  const firstAt = window.startEpoch + 100;
+  const repeatedQuery = '같은 질문';
+  insertTrace(db, {
+    mode: 'chat:gpt-single-v1:a2',
+    queryHash: sha256(repeatedQuery),
+    createdAt: firstAt,
+  });
+  insertChatPair(db, { query: repeatedQuery, createdAt: firstAt + 2 });
+  insertTrace(db, {
+    mode: 'chat:gpt-single-v1:a2',
+    queryHash: sha256(repeatedQuery),
+    createdAt: firstAt + 10,
+  });
+  insertChatPair(db, { query: repeatedQuery, createdAt: firstAt + 12 });
+
+  const resolved = resolveCurrentInvocationQueries(db, { asOf: AS_OF });
+  assert.deepEqual(resolved.counts, {
+    RESOLVED: 2,
+    AMBIGUOUS: 0,
+    MISSING: 0,
+  });
+  assert.equal(resolved.invocations.length, 2);
+  assert.ok(resolved.invocations.every(item => item.status === QUERY_RESOLUTION.RESOLVED));
+  assert.equal(new Set(resolved.invocations.map(item => item.messageId)).size, 2);
+  db.close();
+});
+
+test('current trace resolver does not guess ambiguous or missing query mappings', () => {
+  const db = createCurrentResolverDatabase();
+  const window = mostRecentCompleteKstWindow(AS_OF);
+  const at = window.startEpoch + 100;
+  const ambiguousQuery = '중복 후보';
+  insertTrace(db, {
+    mode: 'chat:gpt-single-v1:a2',
+    queryHash: sha256(ambiguousQuery),
+    createdAt: at,
+  });
+  insertChatPair(db, { query: ambiguousQuery, createdAt: at + 1 });
+  insertChatPair(db, { query: ambiguousQuery, createdAt: at + 2 });
+  insertTrace(db, {
+    mode: 'chat:gpt-single-v1:a2',
+    queryHash: sha256('다음 질문'),
+    createdAt: at + 10,
+  });
+  insertChatPair(db, { query: '다른 내용', createdAt: at + 11 });
+
+  const result = resolveCurrentInvocationQueries(db, { asOf: AS_OF });
+  assert.equal(result.invocations[0].status, QUERY_RESOLUTION.AMBIGUOUS);
+  assert.equal(result.invocations[0].query, undefined);
+  assert.equal(result.invocations[1].status, QUERY_RESOLUTION.MISSING);
+  assert.equal(result.invocations[1].query, undefined);
+  assert.deepEqual(result.counts, {
+    RESOLVED: 0,
+    AMBIGUOUS: 1,
+    MISSING: 1,
+  });
+  db.close();
+});
+
+test('same-second cross-table boundaries are ambiguous rather than treated as exact', () => {
+  const db = createCurrentResolverDatabase();
+  const window = mostRecentCompleteKstWindow(AS_OF);
+  const at = window.startEpoch + 100;
+  insertTrace(db, {
+    mode: 'chat:gpt-single-v1:a2',
+    queryHash: sha256('경계 질문'),
+    createdAt: at,
+  });
+  insertChatPair(db, { query: '경계 질문', createdAt: at });
+
+  const result = resolveCurrentInvocationQueries(db, { asOf: AS_OF });
+  assert.equal(result.invocations[0].status, QUERY_RESOLUTION.AMBIGUOUS);
+  db.close();
+});
+
+test('active-note telemetry distinguishes historical unknown from exact empty', () => {
+  assert.deepEqual(parseActiveNotesTelemetry(null), {
+    observed: false,
+    state: 'UNKNOWN',
+    identifiers: null,
+  });
+  assert.deepEqual(parseActiveNotesTelemetry('[]'), {
+    observed: true,
+    state: 'OBSERVED',
+    identifiers: [],
+  });
+  assert.deepEqual(parseActiveNotesTelemetry('["topic.md"]'), {
+    observed: true,
+    state: 'OBSERVED',
+    identifiers: ['topic.md'],
+  });
 });
 
 function visible(chunks, context, score = 1) {
@@ -292,6 +429,78 @@ test('D0 keeps final scorer thresholds fixed so gating is the only policy differ
   assert.equal(report.breakdown.SAME_VISIBLE_CONTEXT, 1);
 });
 
+test('D0 replays repeated query invocations independently at their own PIT cutoffs', async () => {
+  const baseCase = {
+    comparable: true,
+    query: '반복 질문',
+    querySha256: sha256('반복 질문'),
+    queryEmbedding: [1, 0],
+    activeNotes: [],
+    activeNoteStateApproximate: true,
+    noteCandidates: [{ filename: 'gate.md', title: '게이트', score: 0.9 }],
+    chunks: [{
+      chunkId: 'late-global',
+      noteFilename: 'outside.md',
+      noteTitle: '전역',
+      content: 'Q: 반복 질문\nA: later evidence',
+      embedding: [1, 0],
+      createdAt: 15,
+    }],
+  };
+  const report = await buildD0Sensitivity({
+    sourceRuns: 2,
+    uniqueQueries: 1,
+    cases: [
+      { ...baseCase, traceId: 1, createdAt: 10 },
+      { ...baseCase, traceId: 2, createdAt: 20 },
+    ],
+  });
+
+  assert.equal(report.comparableQueries, 2);
+  assert.equal(report.breakdown.SAME_VISIBLE_CONTEXT, 1);
+  assert.equal(report.breakdown.ACTIVATION_CHANGE, 1);
+  assert.deepEqual(report.forwardedToP0B.cases.map(item => item.traceId), [2]);
+});
+
+test('current invocation bounds retain unresolved cases and fail close on PIT uncertainty', () => {
+  const base = {
+    eligibleRuns: 181,
+    resolutionCounts: { RESOLVED: 181, AMBIGUOUS: 0, MISSING: 0 },
+    replayedResolved: 181,
+    sensitiveResolved: 3,
+    approximateActiveNoteStateCount: 181,
+  };
+  const pit = buildCurrentInvocationSensitivity(base);
+  assert.equal(pit.bounds.lowerPossibleSensitiveCount, 3);
+  assert.equal(pit.bounds.upperPossibleSensitiveCount, 3);
+  assert.equal(pit.bounds.pitUpperPossibleSensitiveCount, 181);
+  assert.equal(pit.gate.result, CURRENT_GATE_RESULTS.INDETERMINATE_PIT);
+
+  const red = buildCurrentInvocationSensitivity({
+    ...base,
+    approximateActiveNoteStateCount: 0,
+  });
+  assert.equal(red.gate.result, CURRENT_GATE_RESULTS.RED_PROVEN_NO_P0B);
+
+  const resolution = buildCurrentInvocationSensitivity({
+    ...base,
+    resolutionCounts: { RESOLVED: 166, AMBIGUOUS: 10, MISSING: 5 },
+    replayedResolved: 166,
+    approximateActiveNoteStateCount: 0,
+  });
+  assert.equal(resolution.bounds.upperPossibleSensitiveCount, 18);
+  assert.equal(resolution.gate.result, CURRENT_GATE_RESULTS.RED_PROVEN_NO_P0B);
+
+  const boundary = buildCurrentInvocationSensitivity({
+    ...base,
+    resolutionCounts: { RESOLVED: 164, AMBIGUOUS: 10, MISSING: 7 },
+    replayedResolved: 164,
+    approximateActiveNoteStateCount: 0,
+  });
+  assert.equal(boundary.bounds.upperPossibleSensitiveCount, 20);
+  assert.equal(boundary.gate.result, CURRENT_GATE_RESULTS.INDETERMINATE_RESOLUTION);
+});
+
 function createResearchFixture(root) {
   const dbPath = path.join(root, 'galpi.db');
   const vaultPath = path.join(root, 'vault');
@@ -324,6 +533,7 @@ function createResearchFixture(root) {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       embedding TEXT,
+      runtime_generation TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE TABLE notes (
@@ -355,6 +565,11 @@ function createResearchFixture(root) {
     VALUES ('shared-main', 'user', ?, ?, ?)
   `).run(question, JSON.stringify([1, 0]), traceAt - 1);
   db.prepare(`
+    INSERT INTO messages (
+      session_id, role, content, runtime_generation, created_at
+    ) VALUES ('shared-main', 'assistant', 'historical answer', 'gpt-single-v1', ?)
+  `).run(traceAt - 1);
+  db.prepare(`
     INSERT INTO notes (filename, title, note_type, embedding)
     VALUES ('topic.md', 'Topic', 'topic', ?)
   `).run(JSON.stringify([1, 0]));
@@ -371,13 +586,23 @@ function createResearchFixture(root) {
     chunks: [{ chunkId: 'qa-1', noteFilename: 'topic.md' }],
     contextChars: 100,
   });
+  const currentTraceAt = Date.parse('2026-08-10T12:00:00+09:00') / 1000;
   insertTrace(db, {
     mode: 'chat:gpt-single-v1:a2',
     queryHash,
-    createdAt: Date.parse('2026-08-10T12:00:00+09:00') / 1000,
+    createdAt: currentTraceAt,
     chunks: [{ chunkId: 'qa-1', noteFilename: 'topic.md' }],
     contextChars: 100,
   });
+  db.prepare(`
+    INSERT INTO messages (session_id, role, content, embedding, created_at)
+    VALUES ('shared-main', 'user', ?, ?, ?)
+  `).run(question, JSON.stringify([1, 0]), currentTraceAt + 1);
+  db.prepare(`
+    INSERT INTO messages (
+      session_id, role, content, runtime_generation, created_at
+    ) VALUES ('shared-main', 'assistant', 'current answer', 'gpt-single-v1', ?)
+  `).run(currentTraceAt + 1);
   db.close();
   return { dbPath, vaultPath };
 }
@@ -411,6 +636,33 @@ test('research execution keeps DB and Vault bytes unchanged and default output p
   assert.match(output, /Galpi persistent state is read-only/);
 });
 
+test('current invocation follow-up keeps DB and Vault bytes unchanged', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'galpi-p0-current-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { dbPath, vaultPath } = createResearchFixture(root);
+  const dbBefore = fs.readFileSync(dbPath);
+  const vaultFile = path.join(vaultPath, 'topic.md');
+  const vaultBefore = fs.readFileSync(vaultFile);
+  const db = openResearchDatabase(dbPath);
+
+  const report = await runCurrentInvocationD0Research({
+    db,
+    vaultPath,
+    asOf: AS_OF,
+    baselineCommit: 'f0d825311708b19e23d899f46cc40f53baed3222',
+  });
+  assert.equal(report.currentInvocationD0.eligibleRuns, 1);
+  assert.equal(report.currentInvocationD0.resolution.RESOLVED, 1);
+  assert.equal(report.currentInvocationD0.embeddings.stored, 1);
+  assert.equal(report.currentInvocationD0.embeddings.externalApiBatches, 0);
+  assert.equal(report.safety.connectionChanges, 0);
+  assert.equal(report.safety.answerGeneration, false);
+  db.close();
+
+  assert.deepEqual(fs.readFileSync(dbPath), dbBefore);
+  assert.deepEqual(fs.readFileSync(vaultFile), vaultBefore);
+});
+
 test('P0 CLI keeps review explicit and documents the external embedding effect', () => {
   assert.equal(parseAsOf('2026-08-29'), AS_OF);
   const options = parseArguments([
@@ -427,8 +679,10 @@ test('P0 CLI keeps review explicit and documents the external embedding effect',
   assert.equal(options.embedMissing, true);
   assert.equal(options.review, true);
   assert.equal(options.limit, 77);
+  assert.equal(options.currentInvocationD0, false);
   assert.throws(() => parseArguments(['--limit', '101']), /1~100/);
   assert.match(helpText(), /기본 출력에는 질문·노트 본문·파일명이 없습니다/);
   assert.match(helpText(), /외부 호출을 수행하지만 저장하지 않습니다/);
   assert.match(helpText(), /P0-B answer generation은 이 명령의 범위가 아닙니다/);
+  assert.match(helpText(), /--current-invocation-d0/);
 });

@@ -637,6 +637,7 @@ test('shadow service records identifiers without content and isolates trace fail
     queryEmbedding: [1, 0],
     rankedCandidates: [{ filename: 'deploy.md', title: '배포', score: 0.9 }],
   });
+  const retrievalBeforeRecord = structuredClone(retrieval);
 
   assert.equal(service.record({
     sessionId: 'session-1',
@@ -648,8 +649,29 @@ test('shadow service records identifiers without content and isolates trace fail
   assert.equal(inserted.length, 1);
   assert.equal(inserted[0].latencyMs, 2);
   assert.match(inserted[0].querySha256, /^[a-f0-9]{64}$/);
+  assert.equal(inserted[0].activeNotesJson, '[]');
+  assert.deepEqual(retrieval, retrievalBeforeRecord);
   assert.doesNotMatch(inserted[0].chunksJson, /민감한|배포 노트/);
   assert.doesNotMatch(JSON.stringify(inserted[0]), /배포 노트/);
+
+  service.record({
+    sessionId: 'session-1',
+    mode: 'chat',
+    query: '다른 질문',
+    activeNotes: [{ filename: 'private-topic.md', title: '민감한 제목', body: '민감한 본문' }],
+    retrieval: {
+      context: '',
+      notes: [{ filename: 'output-topic.md', explicit: false }],
+      chunks: [],
+    },
+  });
+  assert.deepEqual(JSON.parse(inserted[1].activeNotesJson), ['private-topic.md']);
+  assert.deepEqual(JSON.parse(inserted[1].notesJson), [{
+    filename: 'output-topic.md',
+    explicit: false,
+  }]);
+  assert.doesNotMatch(inserted[1].activeNotesJson, /민감한 제목|민감한 본문|다른 질문/);
+  assert.notEqual(inserted[1].activeNotesJson, inserted[1].notesJson);
 
   const failingService = createAssistantRetrievalShadow({
     getChunksByNote: () => [],

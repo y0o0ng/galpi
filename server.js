@@ -848,6 +848,7 @@ db.exec(`
     context_chars INTEGER NOT NULL DEFAULT 0,
     latency_ms INTEGER NOT NULL DEFAULT 0,
     error TEXT,
+    active_notes_json TEXT,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
   CREATE TABLE IF NOT EXISTS auto_save_decisions (
@@ -1316,10 +1317,10 @@ const stmtUpdateMessageEmbedding = db.prepare(
 const stmtInsertRetrievalShadowRun = db.prepare(`
   INSERT INTO assistant_retrieval_shadow_runs (
     session_id, mode, query_sha256, notes_json, chunks_json,
-    context_chars, latency_ms, error
+    context_chars, latency_ms, error, active_notes_json
   ) VALUES (
     @sessionId, @mode, @querySha256, @notesJson, @chunksJson,
-    @contextChars, @latencyMs, @error
+    @contextChars, @latencyMs, @error, @activeNotesJson
   )
 `);
 const assistantRetrievalShadow = createAssistantRetrievalShadow({
@@ -8329,6 +8330,7 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
     sessionId,
     mode: `${mode}:${ASSISTANT_RETRIEVAL_A2_ENABLED ? 'a2' : 'a1b'}`,
     query: question,
+    activeNotes: active,
     retrieval: shadowRetrieval,
     latencyMs: Date.now() - shadowStartedAt,
     error: shadowError,

@@ -102,6 +102,24 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
       .all()
       .some(column => column.name === 'query_sha256'),
   );
+  assert.ok(
+    db.prepare('PRAGMA table_info(assistant_retrieval_shadow_runs)')
+      .all()
+      .some(column => column.name === 'active_notes_json'),
+  );
+  db.prepare(`
+    INSERT INTO assistant_retrieval_shadow_runs (
+      mode, notes_json, chunks_json, active_notes_json
+    ) VALUES ('chat:gpt-single-v1:a2', '[]', '[]', '[]')
+  `).run();
+  assert.deepEqual(
+    db.prepare(`
+      SELECT active_notes_json AS activeNotesJson
+      FROM assistant_retrieval_shadow_runs
+      ORDER BY id ASC
+    `).all(),
+    [{ activeNotesJson: '[]' }],
+  );
   assert.deepEqual(
     db.prepare(`
       SELECT content_sha256 AS contentSha256, indexed_sha256 AS indexedSha256,
@@ -189,6 +207,26 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
   assert.equal(
     db.prepare('SELECT COUNT(*) AS count FROM schema_version').get().count,
     LATEST_SCHEMA_VERSION,
+  );
+  db.close();
+});
+
+test('schema v23 keeps historical active-note telemetry unknown instead of backfilling empty', () => {
+  const db = createLegacyDatabase();
+  db.prepare(`
+    INSERT INTO assistant_retrieval_shadow_runs (
+      mode, notes_json, chunks_json
+    ) VALUES ('chat:gpt-single-v1:a2', '[]', '[]')
+  `).run();
+
+  runDatabaseMigrations(db);
+
+  assert.equal(
+    db.prepare(`
+      SELECT active_notes_json AS activeNotesJson
+      FROM assistant_retrieval_shadow_runs
+    `).get().activeNotesJson,
+    null,
   );
   db.close();
 });

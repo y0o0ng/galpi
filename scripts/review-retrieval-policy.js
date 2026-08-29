@@ -421,8 +421,11 @@ module.exports = {
   buildHistoricalReplayCorpus,
   buildPolicyReview,
   formatReview,
+  loadChunks,
+  loadNotes,
   main,
   parseArguments,
+  parseEmbedding,
   rankReplayNoteCandidates,
 };
 
