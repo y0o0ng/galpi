@@ -18,6 +18,7 @@
     "eval:mail-fixtures": "node scripts/evaluate-mail-fixtures.js",
     "report:retrieval-shadow": "node scripts/report-retrieval-shadow.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
+    "research:memory-p0": "node scripts/measure-memory-p0-a.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
     "smoke:openai-responses": "node scripts/smoke-openai-responses.js",
     "mcp:obsidian": "node scripts/galpi-mcp.mjs"

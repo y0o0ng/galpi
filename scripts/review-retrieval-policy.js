@@ -9,9 +9,11 @@ const {
   rankNoteCandidates,
 } = require('../lib/assistant-retrieval');
 const { buildRetrievalShadowReport } = require('../lib/assistant-retrieval-report');
+const { sha256 } = require('../lib/content-hash');
 const { resolveRuntimePaths } = require('../lib/runtime-paths');
 
 const ROOT = path.resolve(__dirname, '..');
+const EMBEDDING_MODEL = 'text-embedding-3-small';
 
 function parseArguments(argv) {
   const options = {
@@ -127,16 +129,10 @@ function loadChunks(db) {
 }
 
 function retrievePolicy({ query, queryEmbedding, notes, chunks, legacy }) {
-  const noteCandidates = rankNoteCandidates({
+  const noteCandidates = rankReplayNoteCandidates({
     query,
     queryEmbedding,
     notes,
-    limit: 8,
-    keywordWeight: 0.35,
-    embeddingWeight: 0.65,
-    keywordNormalizer: 30,
-    minEmbeddingScore: 0.08,
-    minKeywordScore: 2,
   });
   return buildGlobalShadowRetrieval({
     query,
@@ -166,7 +162,26 @@ function retrievePolicy({ query, queryEmbedding, notes, chunks, legacy }) {
   }));
 }
 
-async function buildPolicyReview(db, vaultPath, limit, { embedMissing = null } = {}) {
+function rankReplayNoteCandidates({ query, queryEmbedding, notes }) {
+  return rankNoteCandidates({
+    query,
+    queryEmbedding,
+    notes,
+    limit: 8,
+    keywordWeight: 0.35,
+    embeddingWeight: 0.65,
+    keywordNormalizer: 30,
+    minEmbeddingScore: 0.08,
+    minKeywordScore: 2,
+  });
+}
+
+async function buildHistoricalReplayCorpus(
+  db,
+  vaultPath,
+  limit,
+  { embedMissing = null, embeddingModel = EMBEDDING_MODEL } = {},
+) {
   const oldReport = buildRetrievalShadowReport({
     db,
     includeReview: true,
@@ -175,37 +190,57 @@ async function buildPolicyReview(db, vaultPath, limit, { embedMissing = null } =
   const notes = loadNotes(db, vaultPath);
   const chunks = loadChunks(db);
   const getMessage = db.prepare('SELECT content, embedding FROM messages WHERE id = ?');
+  const getTraceNotes = db.prepare(`
+    SELECT notes_json AS notesJson
+    FROM assistant_retrieval_shadow_runs
+    WHERE id = ?
+  `);
   const messages = new Map(oldReport.reviews.map(review => [
     review.messageId,
     review.messageId ? getMessage.get(review.messageId) : null,
   ]));
   const generatedEmbeddings = new Map();
+  let generatedEmbeddingCount = 0;
+  let embeddingFailures = 0;
   if (typeof embedMissing === 'function') {
     const missing = oldReport.reviews.filter(review => {
       const message = messages.get(review.messageId);
       return message?.content && !parseEmbedding(message.embedding);
     });
     if (missing.length > 0) {
-      const embeddings = await embedMissing(missing.map(review => (
-        messages.get(review.messageId).content
-      )));
+      const embeddings = await embedMissing(
+        missing.map(review => messages.get(review.messageId).content),
+      );
       missing.forEach((review, index) => {
         const embedding = embeddings[index];
-        if (Array.isArray(embedding)) generatedEmbeddings.set(review.messageId, embedding);
+        if (Array.isArray(embedding) && embedding.every(Number.isFinite)) {
+          generatedEmbeddings.set(review.messageId, embedding);
+          generatedEmbeddingCount += 1;
+        } else {
+          embeddingFailures += 1;
+        }
       });
     }
   }
-  let missingEmbeddings = 0;
 
-  const reviews = oldReport.reviews.map(review => {
+  let missingEmbeddings = 0;
+  const cases = oldReport.reviews.map(review => {
     const message = messages.get(review.messageId);
     const queryEmbedding = parseEmbedding(message?.embedding)
       || generatedEmbeddings.get(review.messageId)
       || null;
     if (!message?.content || !queryEmbedding) {
       missingEmbeddings += 1;
-      return { ...review, replacement: null };
+      return {
+        review,
+        traceIds: review.traceIds,
+        createdAt: review.createdAt,
+        messageId: review.messageId,
+        querySha256: message?.content ? sha256(message.content) : null,
+        comparable: false,
+      };
     }
+
     const temporalChunks = chunks.filter(chunk => (
       Number(chunk.createdAt) < review.createdAt
     ));
@@ -219,14 +254,68 @@ async function buildPolicyReview(db, vaultPath, limit, { embedMissing = null } =
         ? { ...note, body: topicBodies.get(note.filename) || '' }
         : note
     ));
-    const input = {
+    const representativeTraceId = review.traceIds.at(-1);
+    const traceNotes = parseTraceNotes(getTraceNotes.get(representativeTraceId)?.notesJson);
+    const activeNotes = traceNotes
+      .filter(note => note?.explicit === true && note.filename)
+      .map(note => ({ filename: note.filename, title: note.filename }));
+
+    return {
+      review,
+      traceIds: review.traceIds,
+      createdAt: review.createdAt,
+      messageId: review.messageId,
+      querySha256: sha256(message.content),
       query: message.content,
       queryEmbedding,
+      activeNotes,
+      activeNoteStateApproximate: true,
       notes: temporalNotes,
+      noteCandidates: rankReplayNoteCandidates({
+        query: message.content,
+        queryEmbedding,
+        notes: temporalNotes,
+      }),
       chunks: temporalChunks,
+      comparable: true,
+    };
+  });
+
+  return {
+    sourceRuns: oldReport.runs,
+    uniqueQueries: cases.length,
+    comparableQueries: cases.filter(item => item.comparable).length,
+    missingEmbeddings,
+    generatedEmbeddingCount,
+    embeddingFailures,
+    embeddingModel,
+    cases,
+  };
+}
+
+function parseTraceNotes(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function buildPolicyReview(db, vaultPath, limit, { embedMissing = null } = {}) {
+  const corpus = await buildHistoricalReplayCorpus(db, vaultPath, limit, { embedMissing });
+  const reviews = corpus.cases.map(item => {
+    if (!item.comparable) {
+      return { ...item.review, replacement: null };
+    }
+    const input = {
+      query: item.query,
+      queryEmbedding: item.queryEmbedding,
+      notes: item.notes,
+      chunks: item.chunks,
     };
     return {
-      ...review,
+      ...item.review,
       baseline: retrievePolicy({ ...input, legacy: true }),
       replacement: retrievePolicy({ ...input, legacy: false }),
     };
@@ -238,10 +327,10 @@ async function buildPolicyReview(db, vaultPath, limit, { embedMissing = null } =
       !== JSON.stringify(review.replacement.map(item => item.chunkId))
   ));
   return {
-    sourceRuns: oldReport.runs,
+    sourceRuns: corpus.sourceRuns,
     uniqueQueries: reviews.length,
     comparableQueries: comparable.length,
-    missingEmbeddings,
+    missingEmbeddings: corpus.missingEmbeddings,
     baseline: {
       selectedQueries: comparable.filter(review => review.baseline.length > 0).length,
       selectedChunks: comparable.reduce((sum, review) => sum + review.baseline.length, 0),
@@ -304,8 +393,9 @@ async function main(argv = process.argv.slice(2)) {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     embedMissing = async inputs => {
       const response = await client.embeddings.create({
-        model: 'text-embedding-3-small',
+        model: EMBEDDING_MODEL,
         input: inputs.map(input => String(input || '').slice(0, 8000)),
+        encoding_format: 'float',
       });
       return [...response.data]
         .sort((left, right) => left.index - right.index)
@@ -326,7 +416,15 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-module.exports = { buildPolicyReview, formatReview, main, parseArguments };
+module.exports = {
+  EMBEDDING_MODEL,
+  buildHistoricalReplayCorpus,
+  buildPolicyReview,
+  formatReview,
+  main,
+  parseArguments,
+  rankReplayNoteCandidates,
+};
 
 if (require.main === module) {
   main().catch(error => {
