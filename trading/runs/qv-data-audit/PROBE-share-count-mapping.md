@@ -3419,3 +3419,784 @@ source-of-truth 경로가 있는가: 없다.**
    share-count series는 corroboration으로만 쓰고, 명시 근거가 없으면 `UNRESOLVED`로 남긴다.**
 
 **이 correction도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+
+# Follow-up 4 — corporate-action discovery completeness (2026-08-29)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 다섯 절과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. Gate · `coverage_start` · B/M · rank ·
+> returns는 이번에도 계산하지 않았고 production DB에 쓰지 않았다.
+
+시작 main: `71025861d07521f88c21b8c88360280ec6f3c604`
+(`research(qv): share-count tier basis와 event discovery를 검증한다` — 바로 위 절을 커밋한
+지점이고 `origin/main`도 같았다.)
+
+**이번에 다시 열지 않은 것.** share basis anchor(A·B 모두 source filing acceptance/release
+regime) · P0/P1/P4 탈락 · P2가 유일한 후보라는 것 · event ledger의 두 축 분리
+(search coverage `NOT_SEARCHED`/`COMPLETE`/`INCOMPLETE`, event classification
+`SHARE_BASIS_CHANGE_CONFIRMED`/`NO_SHARE_BASIS_EFFECT_CONFIRMED`/`UNRESOLVED`) · selector의
+fail-close 방향 · vendor row 부재를 `NO EVENT`로 쓰지 않는다 · share-count 도약으로 event를
+판정하지 않는다 · issuer-wide class 전파 금지 · percentage tolerance 금지.
+
+## J1. 이번 질문 하나
+
+> **어떤 source set을 어떤 범위까지 성공적으로 조사해야 `(class_id, date interval)`을
+> `COMPLETE`라고 선언할 수 있는가?**
+
+## J2. 공시 의무의 지도 — 무엇이 강제이고 무엇이 아닌가
+
+**completeness의 핵심은 "흔히 나온다"가 아니라 "침묵이 정보인가"다.** 자발적 공시나 조건부
+공시는 **없다고 해서 event가 없었다는 뜻이 아니므로** absence를 증명하는 데 쓸 수 없다.
+그래서 각 form을 그 기준으로만 갈랐다.
+
+### J2.1 강제 — 침묵이 정보다
+
+**(1) Regulation S-X §210.3-04 — 자본계정 변동 분석.**
+출처: [17 CFR 210.3-04](https://www.govinfo.gov/content/pkg/CFR-2024-title17-vol3/xml/CFR-2024-title17-vol3-sec210-3-04.xml)
+
+> "An analysis of the changes in each caption of stockholders' equity and noncontrolling interests
+> presented in the balance sheets **shall be given in a note or separate statement.** This analysis
+> shall be presented in the form of a reconciliation of the beginning balance to the ending balance
+> for each period ... **Also, state separately the adjustments to the balance at the beginning of
+> the earliest period presented for items which were retroactively applied to periods prior to that
+> period.** With respect to any dividends, state the amount per share and in the aggregate **for
+> each class of shares.**"
+
+세 가지가 여기서 나온다 — 자본계정 변동은 **반드시** 주석이나 별도 보고서로 나오고,
+**소급 적용된 항목은 별도로 표시**해야 하며, 배당은 **class별로** 적어야 한다.
+
+**(2) Regulation S-X §210.10-01(a)(7) — 그것이 10-Q에도 적용된다.**
+출처: [17 CFR 210.10-01](https://www.govinfo.gov/content/pkg/CFR-2024-title17-vol3/xml/CFR-2024-title17-vol3-sec210-10-01.xml)
+
+> "Provide the information required by **§ 210.3-04** for the current and comparative year-to-date
+> periods, with subtotals for each interim period."
+
+**(3) SAB Topic 4.C — 대차대조표일 이후·공표 이전의 자본구조 변경.**
+출처: [SAB Codification Topic 4](https://www.sec.gov/interps/account/sabcodet4.htm) (H2에서 인용)
+
+> "**Such changes in the capital structure must be given retroactive effect in the balance sheet.**
+> An appropriately cross-referenced note should disclose the retroactive treatment, explain the
+> change made and **state the date the change became effective.**"
+
+**이 셋의 합집합이 정확히 K/Q family다.** 그리고 둘은 서로 다른 시점을 맡는다 — J4.2가 그 분업을
+실측으로 보인다.
+
+### J2.2 조건부 — 침묵이 정보가 아니다
+
+**8-K Item 5.03.** 출처: [Form 8-K](https://www.sec.gov/files/form8-k.pdf)
+
+> "If a registrant with a class of equity securities registered under Section 12 of the Exchange Act
+> **amends its articles of incorporation or bylaws and a proposal for the amendment was not disclosed
+> in a proxy statement or information statement filed by the registrant,** disclose the following
+> information: (i) the effective date of the amendment; and (ii) a description of the provision
+> adopted or changed by amendment ..."
+
+**조건이 둘이고 둘 다 자주 깨진다.**
+
+1. **정관 개정이 있어야 한다.** 수권주식이 충분한 상태에서 stock dividend 형태로 하는 forward
+   split은 정관을 고치지 않으므로 Item 5.03 의무가 아예 없다.
+2. **proxy에 이미 나왔으면 면제된다.** 규칙이 명시적으로 proxy 경로를 대체재로 인정한다.
+
+**8-K Item 3.03(Material Modification to Rights of Security Holders).**
+
+> "If the constituent instruments defining the rights of the holders of any class of **registered**
+> securities of the registrant have been materially modified ..."
+
+**등록된 class에만 걸린다.** 비상장·미등록 class는 대상이 아니다. split이 권리를 "materially
+modify"하는지도 별개 판단이다.
+
+**8-K Item 8.01(Other Events).**
+
+> "The registrant **may, at its option,** disclose under this Item 8.01 any events, with respect to
+> which information is not otherwise called for by this Form, that the registrant deems of importance
+> to security holders."
+
+**완전한 자발이다.**
+
+**Schedule 14A Item 11·12.** 출처: [17 CFR 240.14a-101](https://www.govinfo.gov/content/pkg/CFR-2024-title17-vol4/xml/CFR-2024-title17-vol4-sec240-14a-101.xml)
+
+> Item 11: "**If action is to be taken** with respect to the authorization or issuance of any
+> securities otherwise than for exchange for outstanding securities of the registrant ..."
+> Item 12: "**If action is to be taken** with respect to the modification of any class of securities
+> of the registrant ..."
+
+**주주 승인이 필요할 때만 존재한다.** 승인이 필요 없는 split에는 proxy가 없다.
+
+### J2.3 강제이지만 EDGAR에 없다 — Rule 10b-17
+
+출처: [17 CFR 240.10b-17](https://www.govinfo.gov/content/pkg/CFR-2024-title17-vol4/xml/CFR-2024-title17-vol4-sec240-10b-17.xml)
+
+> "(a) It shall constitute a 'manipulative or deceptive device or contrivance' ... for any issuer of
+> a class of securities **publicly traded** ... to fail to give notice ... of the following actions
+> ... (2) **A stock split or reverse split** ..."
+> "(b) Notice shall be deemed to have been given ... only if: (1) Given to the **National Association
+> of Securities Dealers, Inc.**, no later than 10 days prior to the record date ... and such notice
+> includes: ... (iii) Date of record ...; (iv) Date of payment or distribution ...;
+> (v)(b) In the same security, **the amount of the security outstanding immediately prior to and
+> immediately following the dividend or distribution and the rate** of the dividend or distribution ...
+> (3) Given in accordance with procedures of the **national securities exchange** ... which contain
+> requirements substantially comparable ..."
+
+**우리가 원하는 정보가 정확히 여기 있다** — 이전·이후 주식수와 비율, 기준일, 지급일.
+**그런데 수신처가 FINRA(구 NASD)나 거래소이지 SEC EDGAR가 아니다.** 그리고 **"publicly traded"
+class에만 걸리므로 비상장 class에는 통지 의무가 없다.**
+
+> **이것이 vendor feed의 정체다.** EODHD 같은 vendor가 파는 split feed의 상류가 이 통지다.
+> **Follow-up 3의 I8이 실측으로 발견한 두 성질** — 비상장 class에 recall 0(41 class 중 15개),
+> 가격 조정 계수와 주식수 변동이 섞임 — **이 그대로 이 규칙의 문언에서 예측된다.**
+> vendor feed는 "SEC 공시의 요약"이 아니라 **거래소 통지 파이프의 하류**다.
+
+### J2.4 요약 표
+
+| source | 의무인가 | 침묵이 정보인가 | class를 명시하는가 | 비상장 class를 덮는가 |
+|---|---|---|---|---|
+| **10-K / 10-Q (S-X 3-04 · 10-01(a)(7) · SAB 4.C)** | **의무** | **예** | **예 — "for each class of shares"** | **예** |
+| 8-K Item 5.03 | 정관 개정이 있고 proxy에 없을 때만 | 아니오 | 개정 내용에 따라 | 개정 대상이면 |
+| 8-K Item 3.03 | 등록 class의 권리가 실질 변경될 때만 | 아니오 | 예 | **아니오(미등록 제외)** |
+| 8-K Item 8.01 | **자발** | **아니오** | 문안에 따라 | 문안에 따라 |
+| DEF 14A Item 11·12 | 주주 승인이 필요할 때만 | 아니오 | 예 | 대상이면 |
+| Rule 10b-17 통지 | 의무 | — | 부분 | **아니오("publicly traded"만)** |
+| **EDGAR 어디에도 없음** | — | — | — | — |
+
+**절대적 결론 하나.** `COMPLETE`를 선언하려면 **침묵이 정보인 source**만 쓸 수 있다.
+그런 SEC source는 **K/Q family 하나뿐이다.** 8-K·proxy는 후보를 더 일찍 올려줄 수 있어도
+**없다는 사실로 아무것도 증명하지 못하므로 completeness의 근거가 될 수 없다.**
+
+## J3. timing — K/Q만 보면 formation 전에 놓치는가
+
+**§6이 요구한 나란히 놓기다.** 20 발행사 전체 form의 submissions 원장(전 form 55,224건)을
+새로 받아, 확정 event 16건(고유 `(발행사, ex-date)`)마다 직전·직후 K/Q를 붙였다.
+
+| issuer | ex-date | 직전 K/Q | **ex 이후 첫 K/Q** | 지연(일) | 그 사이 8-K | 그 사이 proxy |
+|---|---|---|---|---|---|---|
+| AAPL | 2014-06-09 | 2014-04-24 10-Q | **2014-07-23** 10-Q | 44 | 6 | 0 |
+| AAPL | 2020-08-31 | 2020-07-30 10-Q | **2020-10-29** 10-K | 59 | 3 | 0 |
+| BRK | 2010-01-21 | 2009-11-06 10-Q | **2010-03-01** 10-K | 39 | 7 | 2 |
+| CMCSA | 2017-02-21 | 2017-02-03 10-K | **2017-04-27** 10-Q | 65 | 5 | 0 |
+| GOOGL | 2022-07-18 | 2022-04-27 10-Q | **2022-07-26** 10-Q | 8 | 4 | 0 |
+| MA | 2014-01-22 | 2013-10-31 10-Q | **2014-02-14** 10-K | 23 | 3 | 0 |
+| NKE | 2012-12-26 | 2012-10-09 10-Q | **2013-01-09** 10-Q | 14 | 3 | 0 |
+| NKE | 2015-12-24 | 2015-10-06 10-Q | **2016-01-06** 10-Q | 13 | 4 | 0 |
+| NVDA | 2021-07-20 | 2021-05-26 10-Q | **2021-08-20** 10-Q | 31 | 4 | 0 |
+| NVDA | 2024-06-10 | 2024-05-29 10-Q | **2024-08-28** 10-Q | 79 | 3 | 0 |
+| TSLA | 2020-08-31 | 2020-07-28 10-Q | **2020-10-26** 10-Q | 56 | 6 | 5 |
+| TSLA | 2022-08-25 | 2022-07-25 10-Q | **2022-10-24** 10-Q | 60 | 4 | 1 |
+| UA | 2012-07-10 | 2012-05-04 10-Q | **2012-08-03** 10-Q | 24 | 5 | 0 |
+| UA | 2014-04-15 | 2014-02-21 10-K | **2014-05-06** 10-Q | 21 | 2 | 2 |
+| V | 2015-03-19 | 2015-01-29 10-Q | **2015-04-30** 10-Q | 42 | 5 | 0 |
+| WMT | 2024-02-26 | 2023-11-30 10-Q | **2024-03-15** 10-K | 18 | 4 | 0 |
+
+**지연은 8~79일이다.** 그 자체로는 "늦다"고 말할 수 없다 — 기준은 `formation 전인가` 하나다.
+
+### J3.1 "관련 formation" 을 느슨하게 잡으면 실패로 보인다
+
+`ex_date <= formation`인 모든 formation을 관련이라고 두면 **2건이 실패로 나온다.**
+
+| issuer | ex-date | formation | formation session | ex 이후 첫 K/Q |
+|---|---|---|---|---|
+| AAPL | 2014-06-09 | 2014 | 2014-06-30 | 2014-07-23 (**23일 늦다**) |
+| NVDA | 2024-06-10 | 2024 | 2024-06-28 | 2024-08-28 (**61일 늦다**) |
+
+**그런데 이 둘은 P2 interval에 애초에 들어가지 않는다.** formation 2014의 December는
+2013-12-31이고, 2014-06-09 event가 어떤 후보 fact의 구간에 들어가려면 **그 fact를 보고한
+filing이 `[2014-06-09, 2014-06-30]`에 있어야 한다.** AAPL의 K/Q는 2014-04-24 다음이
+2014-07-23이라 그 창에 filing이 없다. NVDA도 같다(2024-05-29 다음이 2024-08-28).
+
+### J3.2 실제로 P2 interval에 걸리는 조합만 세면 실패는 0이다
+
+각 `(class, formation)`의 후보 fact 전부에 대해 `(min(filing 보고일, December),
+max(filing 보고일, December)]` 구간을 만들고, 그 안에 ex-date가 들어가는 조합만 골랐다.
+**525 격자에서 23개다.**
+
+| issuer | class | formation | December | ex-date | case | 걸린 fact의 최초 filing | ex 이후 첫 K/Q | formation session | 발견? |
+|---|---|---|---|---|---|---|---|---|---|
+| UA | A | 2013 | 2012-12-31 | 2012-07-10 | 2 | 2012-02-25 | 2012-08-03 | 2013-06-28 | 예 |
+| UA | CONV | 2013 | 2012-12-31 | 2012-07-10 | 2 | 2012-02-25 | 2012-08-03 | 2013-06-28 | 예 |
+| NKE | A | 2013 | 2012-12-31 | 2012-12-26 | 2 | 2012-04-06 | 2013-01-09 | 2013-06-28 | 예 |
+| NKE | B | 2013 | 2012-12-31 | 2012-12-26 | 2 | 2012-04-06 | 2013-01-09 | 2013-06-28 | 예 |
+| **MA** | **A** | **2014** | 2013-12-31 | 2014-01-22 | **1** | **2014-02-14** | **2014-02-14** | 2014-06-30 | 예 |
+| **MA** | **B** | **2014** | 2013-12-31 | 2014-01-22 | **1** | **2014-02-14** | **2014-02-14** | 2014-06-30 | 예 |
+| **UA** | **A** | **2014** | 2013-12-31 | 2014-04-15 | **1** | **2014-05-06** | **2014-05-06** | 2014-06-30 | 예 |
+| UA | A | 2015 | 2014-12-31 | 2014-04-15 | 2 | 2014-02-21 | 2014-05-06 | 2015-06-30 | 예 |
+| **UA** | **CONV** | **2014** | 2013-12-31 | 2014-04-15 | **1** | **2014-05-06** | **2014-05-06** | 2014-06-30 | 예 |
+| UA | CONV | 2015 | 2014-12-31 | 2014-04-15 | 2 | 2014-02-21 | 2014-05-06 | 2015-06-30 | 예 |
+| AAPL | SOLE | 2015 | 2014-12-31 | 2014-06-09 | 2 | 2014-01-28 | 2014-07-23 | 2015-06-30 | 예 |
+| **V** | **A** | **2015** | 2014-12-31 | 2015-03-19 | **1** | **2015-04-30** | **2015-04-30** | 2015-06-30 | 예 |
+| V | A | 2016 | 2015-12-31 | 2015-03-19 | 2 | 2015-01-29 | 2015-04-30 | 2016-06-30 | 예 |
+| NKE | A | 2016 | 2015-12-31 | 2015-12-24 | 2 | 2015-01-07 | 2016-01-06 | 2016-06-30 | 예 |
+| NKE | B | 2016 | 2015-12-31 | 2015-12-24 | 2 | 2015-01-07 | 2016-01-06 | 2016-06-30 | 예 |
+| AAPL | SOLE | 2021 | 2020-12-31 | 2020-08-31 | 2 | 2020-01-28 | 2020-10-29 | 2021-06-30 | 예 |
+| TSLA | SOLE | 2021 | 2020-12-31 | 2020-08-31 | 2 | 2020-02-13 | 2020-10-26 | 2021-06-30 | 예 |
+| NVDA | SOLE | 2022 | 2021-12-31 | 2021-07-20 | 2 | 2021-02-26 | 2021-08-20 | 2022-06-30 | 예 |
+| GOOGL | A·B·C | 2023 | 2022-12-30 | 2022-07-18 | 2 | 2022-02-02 | 2022-07-26 | 2023-06-30 | 예 (3건) |
+| TSLA | SOLE | 2023 | 2022-12-30 | 2022-08-25 | 2 | 2022-02-05 | 2022-10-24 | 2023-06-30 | 예 |
+| NVDA | SOLE | 2025 | 2024-12-31 | 2024-06-10 | 2 | 2024-02-21 | 2024-08-28 | 2025-06-30 | 예 |
+
+**case 분포: case 1(filing > December) 5건 · case 2(filing ≤ December) 18건. K/Q-only로
+formation 전에 발견 불가한 조합은 0건이다.**
+
+### J3.3 case 1은 우연이 아니다 — 구조적으로 자기가 자기를 공시한다
+
+**case 1 다섯 줄에서 `걸린 fact의 최초 filing`과 `ex 이후 첫 K/Q`가 같은 날짜다.**
+MA `2014-02-14` · UA A·CONV `2014-05-06` · V `2015-04-30`.
+
+우연이 아니라 정의상 그렇다.
+
+```text
+case 1은 filing 보고일 > December 인 경우이고 interval = (December, filing 보고일] 이다.
+그 안의 event E는 E <= filing 보고일 이다.
+즉 그 fact를 보고한 filing 자신이 E 이후에 나온 K/Q다.
+그리고 그 fact의 instant <= December < E 이므로
+E는 '그 filing이 보고한 대차대조표일 이후, 그 filing 공표 이전'에 일어났다
+    -> SAB Topic 4.C의 사실관계 그대로다 -> 소급 효과 + effective date를 밝힌 주석이 의무다
+```
+
+> **case 1에서는 basis가 의심되는 바로 그 filing이 자기 basis가 왜 바뀌었는지를 스스로
+> 공시할 의무를 진다.** P0가 조용히 10배 틀렸던 MA 2014가 정확히 이 구조다 —
+> **틀린 값을 준 filing이 같은 문서 안에서 정답의 근거를 들고 있었다.**
+
+### J3.4 case 2는 SAB 4.C가 아니라 S-X 3-04가 맡는다
+
+`ex 이후 첫 K/Q`의 대차대조표일과 ex-date를 비교하면 **16건 중 8건에서 ex-date가 대차대조표일보다
+앞선다.** 즉 그 8건에서 split은 `subsequent event`가 아니라 **그 filing이 보고하는 기간 안의
+사건**이고, **SAB 4.C는 문언상 그 filing을 구속하지 않는다.**
+
+| ex-date와 `ex 이후 첫 K/Q`의 대차대조표일 | 건수 | event |
+|---|---|---|
+| ex-date > 대차대조표일 — **subsequent event, SAB 4.C 사실관계** | **8** | BRK · GOOGL · MA · NKE(2회) · UA(2회) · WMT |
+| ex-date <= 대차대조표일 — **보고 기간 안의 사건** | **8** | AAPL(2회) · CMCSA · NVDA(2회) · TSLA(2회) · V |
+
+**그 8건을 맡는 것이 S-X 3-04다.** 기간 안에 자본계정이 바뀌었으므로 변동 분석에 나와야 하고,
+10-Q에는 §210.10-01(a)(7)이 같은 요구를 그대로 옮긴다.
+
+> **두 규칙이 ex-date의 위치를 나눠 맡아 빈틈 없이 덮는다.** 어느 쪽이든 **K/Q family 안이다.**
+> Follow-up 3 correction이 "SAB 4.C가 의무 공시라 존재는 보장된다"고만 적고 넘어간 자리에,
+> **왜 그것만으로는 절반이고 나머지 절반을 무엇이 맡는지**가 이제 들어간다.
+
+## J4. class applicability — 강제 경로가 class를 명시하는가
+
+**§8이 지목한 anchor 전부를 `ex 이후 첫 K/Q` 원문에서 직접 읽었다.** XBRL 태그가 아니라
+사람이 읽는 본문이다.
+
+| anchor | 원문 인용 (`ex 이후 첫 K/Q`) | effective date | ratio | **affected class** |
+|---|---|---|---|---|
+| **BRK 2010** `0001193125-10-043450` 10-K | "Adjusted for the **50-for-1 Class B stock split** that became effective on **January 21, 2010**." · "**The Class B stock split had no effect on the number of equivalent Class A common shares outstanding.**" | 2010-01-21 | 50 | **B만 — A는 영향 없음이 명시된다** |
+| **CMCSA 2017** `0001166691-17-000009` 10-Q | "On January 24, 2017, our Board of Directors approved a **two-for-one stock split** in the form of a 100% stock dividend that was **distributed on February 17, 2017** to shareholders of record as of February 8, 2017. The stock split was in the form of one additional share for every share held and was **payable in shares of Class A common stock on the existing Class A common stock and Class B common stock.**" | 2017-02-17 | 2 | **A로 지급 · A와 B 보유분에 대해** |
+| **V 2015** `0001403161-15-000007` 10-Q | "In January 2015, Visa's board of directors declared a **four-for-one split of its class A common stock** ... received a dividend of three additional shares on **March 18, 2015** ... Trading began on a split-adjusted basis on March 19, 2015. **Holders of class B and C common stock did not receive a stock dividend. Instead, the conversion rate for class B common stock increased to 1.6483** shares of class A ... **and the conversion rate for class C common stock increased to 4.0** ..." | 2015-03-18 | 4 | **A만 · B·C는 전환비율만 조정** |
+| **MA 2014** `0001141391-14-000003` 10-K | "The number of shares and per share amounts below have been **retroactively restated** to reflect the **ten-for-one stock split of the Company's Class A and Class B common shares**, which was effected in the form of a common stock dividend **distributed on January 21, 2014**." | 2014-01-21 | 10 | **A와 B 둘 다** |
+| **NKE 2012** `0001193125-13-008172` 10-Q | "On November 15, 2012 the Company announced a **two-for-one split of both NIKE Class A and Class B Common shares.** The stock split was a 100 percent stock dividend **payable on December 24, 2012** ... Common stock began trading at the split-adjusted price on **December 26, 2012**." | 2012-12-24 / 26 | 2 | **A와 B 둘 다** |
+| **NKE 2015** `0000320187-16-000242` 10-Q | "On November 19, 2015, the Company announced a **two-for-one split of both NIKE Class A and Class B Common Stock** ... **payable on December 23, 2015** ... began trading at the split-adjusted price on **December 24, 2015**." | 2015-12-23 / 24 | 2 | **A와 B 둘 다** |
+| **GOOGL 2022** `0001652044-22-000071` 10-Q | "the Board of Directors had approved and declared a **20-for-one stock split** in the form of a one-time special stock dividend **on each share of the company's Class A, Class B, and Class C stock.** The Stock Split had a record date of July 1, 2022 and an **effective date of July 15, 2022.**" | 2022-07-15 | 20 | **A·B·C 전부** |
+| **UA 2012** `0001193125-12-335302` 10-Q | "On June 11, 2012 the Board of Directors declared a **two-for-one stock split of the Company's Class A and Class B common stock**, which was effected in the form of a 100% common stock dividend **distributed on July 9, 2012.**" | 2012-07-09 | 2 | **A와 B 둘 다** |
+| **UA 2014** `0001336917-14-000020` 10-Q | "On March 17, 2014 the Board of Directors declared a **two-for-one stock split of the Company's Class A and Class B common stock** ... **distributed on April 14, 2014.**" | 2014-04-14 | 2 | **A와 B 둘 다** |
+
+**16건 전부에서 `ex 이후 첫 K/Q`가 event를 공시한다. recall 16/16이다.**
+그리고 **명시 범위가 Follow-up 3이 vendor·XBRL로는 만들 수 없었던 판정을 그대로 준다.**
+
+- **BRK**: vendor는 `BRK-B` row만 주고 Class A row가 없다. 그것만으로는 "A는 split 안 함"과
+  "A는 vendor가 안 실었을 뿐"을 구분할 수 없었다. **원문은 A가 영향 없음을 명시한다.**
+- **V**: B·C가 split되지 않고 **전환비율이 조정됐다**는 것이 원문에 있다. 이것은 로드맵
+  §4.4.2의 `CONVERSION_VALUE_PROXY`가 필요로 하는 바로 그 숫자다(1.6483 · 4.0).
+- **MA**: **XBRL 숫자 비율 태그가 전 기간에 하나도 없는 발행사**(Follow-up 3 I10.1)인데
+  **본문에는 비율·날짜·class가 다 있다.** 비상장 Class B도 문장 안에 들어 있다.
+- **NKE·UA**: 비상장 class(NKE A · UA "Class B")가 상장 class와 **같은 문장**에서 이름으로 불린다.
+
+> **비상장 class 문제가 여기서 풀린다.** vendor는 상장 심볼이 있어야 row를 만들고(J2.3의
+> Rule 10b-17 "publicly traded"), XBRL class 차원은 109 fact 중 27개뿐이었다. **본문은 class를
+> 이름으로 부르므로 상장 여부와 무관하다.**
+
+### J4.1 CMCSA — Follow-up 3의 미해결 잔여 하나가 원문으로 풀린다
+
+H11.1은 CMCSA Class A `2014·2015·2016-12-31`에서 관측 비율이 `×2.0037~2.0046`이라
+`×2`와 어긋나고 "**0.2% 실질 차이. 반올림으로 설명되지 않는다**"며 `SPLIT_RATIO_MISMATCH`로
+남겼다. 위 원문이 답이다 — 배당이 **Class A 주식으로, Class A와 Class B 보유분 모두에** 지급됐다.
+
+```text
+Class A 소급 재작성 값 4,742,159,011
+      = 2 x 2,366,357,318 (Class A)  +  9,444,375 (Class B)
+      = 4,732,714,636              +  9,444,375
+차이 9,444,375주는 정확히 Class B 발행주식수다.
+```
+
+**세 가지가 여기서 나온다.**
+
+1. **잔여가 데이터 오류가 아니라 실제 기업행동이었다.** 임의 tolerance를 만들지 않고 원문을
+   찾은 것이 옳았다.
+2. **"영향받는 class"는 하나가 아니라 둘로 갈린다** — 주식이 **늘어나는 class**(A)와
+   그 배당을 **받는 class**(A·B). 비율 하나로 표현할 수 없는 구조다.
+3. **P3(ratio normalization)에 대한 새 반대 근거다.** P3는 여기서 `×2`를 곱하는데
+   실제 재작성 배수는 `×2.00399`다. **P2는 곱하지 않으므로 영향이 없다.**
+
+### J4.2 명시되지 않으면 어떻게 하는가 — 실제 사례가 있다
+
+keyword가 울렸지만 event가 아닌 것 중 **가장 중요한 것이 META 2016~2017이다.**
+`0001326801-17-000007`(2017-02-03 10-K) 등 7개 filing에 이런 문장이 있다.
+
+> "our board of directors intends to issue two shares of the Class C capital stock as a one-time
+> **stock dividend** for each share of Class A and Class B common stock outstanding **as of a record
+> date to be determined by our board of directors** ... For accounting purposes, we expect this
+> transaction will be **treated as a stock split** in the form of a dividend ... **there can be no
+> assurance as to the timing of such dates.**"
+
+**비율(three-for-one 상당)도 있고 class(A·B)도 있는데 effective date가 없다.**
+그리고 이 Reclassification은 **2017년 9월에 철회돼 실제로 일어나지 않았다.**
+
+> **effective date가 명시 승인 요건에 반드시 들어가야 하는 이유가 이것이다.**
+> 비율과 class만으로 승인하면 **일어나지 않은 event가 ledger에 들어간다.**
+> META는 `UNRESOLVED`(effective date 없음)로 남아야 하고, 철회가 확인되면
+> `NO_SHARE_BASIS_EFFECT_CONFIRMED`가 된다.
+
+### J4.3 이름을 `class_id`로 옮기는 문제는 identity 층에 남는다
+
+원문은 class를 **사람이 읽는 이름**으로 부른다. registry의 `class_id`와 1:1이 아니다.
+
+| 원문의 이름 | 시점 | registry label | 문제 |
+|---|---|---|---|
+| UA "**Class B** common stock" | 2012·2014 | `CONV` | 이름이 다르다 |
+| UA "Class C" | 2016~ | `C` | **2012년의 "Class B"와 2016년의 "Class C"는 다른 class다** |
+| CMCSA "Class A Special" | ~2015 | `ASPECIAL` | 이름이 다르다 |
+| V "class B" → "class B-1 / B-2" | 2024 교환 후 | `B` → `B1`·`B2` | 시점에 따라 갈라진다 |
+
+**이것은 이미 CLOSED인 economic class ↔ XBRL alias 분리와 같은 문제이고, 같은 해법이 필요하다** —
+**PIT 구간을 가진 명시 등록.** XBRL member alias 옆에 **prose class-name alias**가 붙어야 하며,
+`effective_from/to`를 그대로 따른다. **이름 유사도로 매칭하지 않는다.**
+매칭 실패는 `UNRESOLVED`다.
+
+## J5. `COMPLETE`의 정의 — §9에 대한 답
+
+**임의 window를 만들지 않는다.** 아래 정의의 모든 경계는 **P2 interval 자체**와
+**J2.1의 강제 공시 규칙**에서 나온다.
+
+```text
+COMPLETE(class_id, (lo, hi], formation)  <=>  CLOSURE 와 SEARCH 를 둘 다 만족
+
+  lo = min(그 관측의 후보 fact들의 filing 보고일, December measurement session)
+  hi = max(그 관측의 후보 fact들의 filing 보고일, December measurement session)
+       (두 끝점 모두 formation 이하다 — PIT는 이미 보장돼 있다)
+
+  CLOSURE
+      G := 그 issuer의 K/Q family filing 중
+           acceptance_eastern_date >= hi 인 최초 filing
+      G가 존재하고  G.acceptance_eastern_date <= formation
+
+  SEARCH
+      acceptance_eastern_date 가 (lo, G.acceptance] 안에 있는
+      그 issuer의 K/Q family filing을 하나도 빠짐없이
+      성공적으로 가져와 전문 검색했다
+      (하나라도 fetch/parse 실패면 INCOMPLETE)
+```
+
+**왜 이 창이고 다른 창이 아닌가.**
+
+```text
+E를 (lo, hi] 안의 share-basis event라 하자.
+
+1. acceptance < E 인 filing은 E를 공시할 수 없다 (아직 일어나지 않았다).
+   -> 하한이 lo 여도 충분하다. E > lo 이므로 E를 공시할 수 있는 filing은 전부 acceptance > lo 다.
+
+2. E를 공시할 의무를 지는 filing은 'acceptance >= E 인 최초 K/Q'다.
+   - E가 그 filing의 대차대조표일 이후면      -> SAB Topic 4.C (소급 + effective date 주석)
+   - E가 그 filing의 보고 기간 안이면          -> S-X 3-04 (자본계정 변동 분석, class별)
+                                                 10-Q는 S-X 10-01(a)(7)이 그대로 요구한다
+   두 경우가 ex-date의 위치를 남김없이 나눈다 (J3.4가 8:8로 실측한다).
+
+3. E <= hi <= G.acceptance 이므로 그 filing은 반드시 (lo, G.acceptance] 안에 있다.
+   -> 상한이 G 여도 충분하다.
+
+4. G가 formation을 넘으면, E = hi 인 최악의 경우를 formation 시점에 확인할 방법이 없다.
+   -> INCOMPLETE -> fail-close.  이것이 CLOSURE 조건이다.
+```
+
+**§9의 후보 A·B·C에 대한 판정.**
+
+| 후보 | 판정 | 근거 |
+|---|---|---|
+| **A. interval 안의 모든 relevant filing + 직전 filing + 직후 confirming filing** | **채택(정제형)** | 위 정의가 A의 정제형이다. "직전 filing"은 불필요하다 — 그 filing은 E보다 앞서므로 E를 공시할 수 없다(위 1). "직후 confirming filing"이 `G`이고, **왜 하나면 충분한지가 SAB 4.C·S-X 3-04로 설명된다** |
+| **B. event-specific forms only** | **탈락** | Item 5.03은 정관 개정 + proxy 미공시일 때만이고, Item 8.01은 자발이다(J2.2). **표본 8개 anchor 중 BRK·MA·NKE는 5.03 없이 자발 Item 8.01로만 8-K를 냈다.** 침묵이 정보가 아니므로 absence를 못 만든다 |
+| **C. 다른 deterministic window** | **불필요** | 달력 기반 `±N일` 같은 창은 N이 임의다. 위 정의는 N을 쓰지 않는다 |
+
+### J5.1 525 격자에서 이 정의를 돌린 결과
+
+| 판정 | 관측 |
+|---|---|
+| **COMPLETE** | **520** |
+| **INCOMPLETE** | **0** |
+| N/A (후보 fact 자체가 없음 — 구조적 결측) | 5 |
+
+`N/A` 5건은 Follow-up 3의 `missing` 5건과 같다(ABBV 2013 첫 10-K에 XBRL 없음 ·
+Ford 2010 · FOX 2019에 usable filing 없음). **share-basis와 무관하다.**
+
+**창의 크기.**
+
+| | 값 |
+|---|---|
+| COMPLETE 관측 하나가 덮는 K/Q 수 | 최소 **1** · 중앙값 **5** · 최대 **7** |
+| 격자 전체에서 조회해야 하는 **고유** K/Q accession | **1,225** |
+| 20 발행사의 전체 K/Q accession | 1,959 |
+
+**창이 관측마다 크게 겹치므로 실제 조회 대상은 그 발행사 K/Q의 63%다.**
+그리고 **그 1,225건은 QV가 이미 `qv_sec_filings`에 적재하는 바로 그 filing들이다**(J7).
+
+### J5.2 왜 4-state가 아니라 2축인가
+
+Follow-up 3 correction의 I11은 `EVENT_CONFIRMED / NO_SHARE_BASIS_EVENT / UNRESOLVED /
+NOT_SEARCHED` 4-state를 제안했다. **이번 작업지시가 정한 2축 분리가 더 낫고, 이 연구가 그 이유를
+보인다.**
+
+```text
+search coverage      NOT_SEARCHED / COMPLETE / INCOMPLETE     <- (class, interval)에 붙는다
+event classification CONFIRMED / NO_EFFECT / UNRESOLVED       <- (class, event)에 붙는다
+```
+
+**둘의 단위가 다르기 때문이다.** coverage는 구간의 성질이고 classification은 개별 event의
+성질이다. 한 구간이 `COMPLETE`이면서 그 안에 `UNRESOLVED` event를 담을 수 있다 —
+META 2016(J4.2)이 정확히 그 모양이다. **4-state로 합치면 그 상태를 표현할 수 없다.**
+
+## J6. unstructured text — 후보를 빠짐없이 올릴 수 있는가
+
+**§10대로 surface recall만 평가한다. keyword hit를 approval로 쓰지 않는다.**
+
+### J6.1 표현 변형별 recall (확정 event 16건의 `ex 이후 첫 K/Q` 본문)
+
+| 표현 | recall |
+|---|---|
+| **`stock split`** | **16 / 16** |
+| **`N-for-one` 계열** (`two-for-one`, `20-for-one`, …) | **16 / 16** |
+| `reclassification` | 16 / 16 |
+| `stock dividend` | 15 / 16 (WMT 2024는 0) |
+| `retroactively adjusted/restated` | 11 / 16 |
+| `split of its/the/our …` | 10 / 16 |
+| `recapitalization` | 8 / 16 |
+| `reverse split` | 7 / 16 |
+| `share dividend` | 6 / 16 |
+| `100% stock dividend` | 5 / 16 |
+| `reverse stock split` | 4 / 16 |
+| `split-adjusted` | 3 / 16 |
+| `conversion rate adjustment` | 2 / 16 |
+
+**`stock split` 하나로 16/16이다.** `stock dividend`만 쓰면 WMT를 놓친다.
+`reclassification`도 16/16이지만 **문서당 22~299회** 울린다 — "reclassified to conform to
+current presentation" 같은 정형 문구라서다. **recall이 높다고 쓸 수 있는 것이 아니다.**
+
+### J6.2 precision — event가 없는 K/Q에서는 얼마나 울리는가
+
+표본 기간에 확정 share-basis event가 **없는** 발행사 6곳(XOM·HD·COST·INTC·META·ABBV)의
+2010년 이후 K/Q **386건**을 같은 방식으로 훑었다.
+
+| issuer | 검사 K/Q | `stock split`이 울린 건 | 비율 |
+|---|---|---|---|
+| COST | 69 | 0 | 0% |
+| INTC | 67 | 0 | 0% |
+| XOM | 68 | 0 | 0% |
+| HD | 67 | 2 | 3% |
+| ABBV | 56 | 2 | 4% |
+| META | 59 | 7 | 12% |
+| **합계** | **386** | **11** | **2.8%** |
+
+**97.2%의 filing은 `stock split`이 한 번도 안 나온다.** 즉 강제 경로 위에서 keyword surface는
+희소하고, 승인 단계가 실제로 읽어야 할 후보는 적다.
+
+**울린 11건의 성격을 전수 확인했다.**
+
+| 성격 | 건수 | 예 |
+|---|---|---|
+| **주식보상 plan의 반희석 조항**(가정법, 항상 exhibit 안) | 4 | HD `2012-05-24`·`2013-05-29`: "In the event of any stock dividend, stock split, … or other change in the capital structure" · ABBV `2026-05-08` · META `2020-04-30` |
+| **XBRL 분류 안내문**(taxonomy 설명 텍스트) | 1 | ABBV `2024-02-20`: "revisions for stock splits, reverse stock splits, stock dividends, or other changes in capital structure" |
+| **제안됐으나 실행되지 않은 기업행동** | 6 | META `2016-04-28` ~ `2017-07-27` Class C Reclassification (J4.2) |
+
+**앞의 둘은 문법으로 걸러진다** — 가정법(`in the event of`)이고 **effective date가 없다.**
+**세 번째는 걸러지면 안 되고 `UNRESOLVED`로 남아야 한다.** 실제로 일어나지 않았으므로
+최종 판정은 `NO_SHARE_BASIS_EFFECT_CONFIRMED`인데, **그 판정을 내리려면 철회 공시를 읽어야 한다.**
+
+### J6.3 그래서 approval에 필요한 것
+
+```text
+승인에 필요한 네 가지 (하나라도 없으면 UNRESOLVED)
+    explicit effective date        <- META를 걸러내는 것이 이것이다
+    explicit affected class        <- registry class_id로 매핑까지 끝나야 한다 (J4.3)
+    explicit ratio / action        <- 비율 또는 "one additional share for every share held"
+    원문 provenance                <- accession · form · acceptance · 문서명 · 인용문
+
+keyword hit 자체는 approval이 아니다. 후보를 올릴 뿐이다.
+share-count series는 corroboration으로만 쓴다.
+percentage tolerance를 만들지 않는다.
+```
+
+**이 연구는 그 추출기를 만들지 않았다.** 16건을 사람이 읽어 네 가지가 전부 원문에 있음을
+확인했을 뿐이다. **추출기가 없는 동안 모든 후보는 `UNRESOLVED`이고 selector는 fail-close한다** —
+이것이 안전한 기본값이고, 그 대가는 J8이 적는다.
+
+## J6b. source set별 recall — §7·§12
+
+**§7이 요구한 표다.** `첫 SEC 공시`는 20 발행사 전 form에서 ex-date 기준 ±220일 창의
+후보 filing(총 483건)을 전문 검색해 찾았고, **아래 세 건은 자동 판정이 옛 split의 재공시를
+집어서 사람이 원문으로 고쳤다**(J6b.1).
+
+| issuer | ex-date | **첫 SEC 공시** | form | items | acceptance | K/Q보다 앞선 일수 | S1 | S2 | S3 |
+|---|---|---|---|---|---|---|---|---|---|
+| BRK | 2010-01-21 | `0001193125-09-222271` | 8-K | 1.01,**8.01**,9.01 | 2009-11-03 | 118 | 예 | 예 | 예 |
+| UA | 2012-07-10 | `0001193125-12-266373` | 8-K | **5.03**,8.01,9.01 | 2012-06-11 | 53 | 예 | 예 | 예 |
+| NKE | 2012-12-26 | `0000320187-12-000158` | 8-K | **8.01**,9.01 | 2012-11-15 | 55 | 예 | 예 | 예 |
+| MA | 2014-01-22 | `0001193125-13-468488` | 8-K | **8.01**,9.01 | 2013-12-10 | 66 | 예 | 예 | 예 |
+| UA | 2014-04-15 | `0001336917-14-000011` | 8-K | **5.03**,8.01 | 2014-03-17 | 50 | 예 | 예 | 예 |
+| AAPL | 2014-06-09 | `0001193125-14-154883` | 8-K | **7.01**,9.01 | 2014-04-23 | 91 | 예 | 예 | 예 |
+| V | 2015-03-19 | `0001193125-15-025534` | 8-K | 2.02,**8.01**,9.01 | 2015-01-29 | 91 | 예 | 예 | 예 |
+| NKE | 2015-12-24 | `0000320187-15-000226` | 8-K | **8.01**,9.01 | 2015-11-19 | 48 | 예 | 예 | 예 |
+| CMCSA | 2017-02-21 | `0001104659-17-004122` | 8-K | **2.02**,9.01 | 2017-01-26 | 91 | 예 | 예 | 예 |
+| AAPL | 2020-08-31 | `0000320193-20-000060` | 8-K | **2.02**,9.01 | 2020-07-30 | 91 | 예 | 예 | 예 |
+| TSLA | 2020-08-31 | `0001564590-20-039353` | 8-K | **8.01**,9.01 | 2020-08-11 | 76 | 예 | 예 | 예 |
+| NVDA | 2021-07-20 | `0001045810-21-000056` | 8-K | **8.01**,9.01 | 2021-05-21 | 91 | 예 | 예 | 예 |
+| GOOGL | 2022-07-18 | `0001652044-22-000015` | 8-K | 2.02,**8.01**,9.01 | 2022-02-01 | 175 | 예 | 예 | 예 |
+| TSLA | 2022-08-25 | `0001564590-22-011875` | 8-K | **8.01** | 2022-03-28 | 210 | 예 | 예 | 예 |
+| WMT | 2024-02-26 | `0000104169-24-000004` | 8-K | **7.01**,9.01 | 2024-01-30 | 45 | 예 | 예 | 예 |
+| NVDA | 2024-06-10 | `0001045810-24-000113` | 8-K | 2.02,**8.01**,9.01 | 2024-05-22 | 98 | 예 | 예 | 예 |
+
+**16건 전부 첫 SEC 공시가 8-K다.** 그런데 **items를 보라.**
+
+| 첫 공시 8-K가 쓴 item | 건수 |
+|---|---|
+| **Item 8.01 (자발)** | **9** |
+| **Item 2.02 (실적 발표에 얹음)** | 2 |
+| **Item 7.01 (Reg FD, 자발)** | 2 |
+| **Item 5.03 (정관 개정)** | **2** (UA 2012 · UA 2014) |
+| Item 1.01 (중요 계약 — BNSF 합병) | 1 |
+
+> **Item 5.03을 구조적 trigger로 쓰면 16건 중 14건을 놓친다.** J2.2가 form instruction 문언에서
+> 예측한 것이 그대로 나온다 — 수권주식이 충분한 stock-dividend 방식 split은 정관을 안 고치므로
+> 5.03 의무가 없고, 나머지는 **자발 item으로만 나온다.**
+
+### J6b.1 자동 판정이 틀린 세 건 — 옛 split의 재공시
+
+`선언/승인 어휘 + N-for-one 비율`로 첫 공시를 자동 판정하면 **세 건이 엉뚱한 filing을 집는다.**
+
+| event | 자동 판정이 집은 filing | 실제 내용 |
+|---|---|---|
+| UA `2014-04-15` | 10-K `0001336917-14-000008` (2014-02-21) | "On **June 11, 2012** the Board of Directors declared a two-for-one stock split …" — **2012년 split의 재공시** |
+| NKE `2015-12-24` | 10-K `0000320187-15-000113` (2015-07-23) | "On **November 15, 2012**, we announced a two-for-one stock split …" — **2012년 split의 재공시** |
+| TSLA `2022-08-25` | 10-Q `0000950170-22-006034` (2022-04-23) | "…as adjusted to give effect to the **five-for-one** stock split effected … **in August 2020**" — **2020년 split의 재공시** |
+
+> **Follow-up 3 correction의 I10.2가 XBRL 태그에서 발견한 함정이 텍스트에서도 똑같이 난다.**
+> 비율과 선언 어휘만으로는 **새 event와 옛 event의 재공시가 구별되지 않는다.**
+> **구별하는 것은 effective date 하나다.** 세 건 모두 본문이 옛 날짜를 명시하고 있어서
+> 사람이 즉시 잡아냈다 — J6.3이 effective date를 승인 필수 요건에 넣는 이유가 여기서도 나온다.
+
+### J6b.2 source set별 판정
+
+| source set | 모든 확정 event를 formation 이전에 발견 가능? | `COMPLETE`를 선언할 수 있는가 |
+|---|---|---|
+| **S1 = K/Q family** | **16/16 · P2 interval 조합 23/23** (J3.2·J4) | **가능** — 강제이고 class별이며 침묵이 정보다 (J2.1) |
+| **S2 = K/Q + 8-K** | 16/16 (평균 **91일** 더 이르다) | **불가능** — 8-K가 없다는 사실이 event 부재를 뜻하지 않는다. 첫 공시 16건 중 **14건이 자발/조건부 item**이다 |
+| **S3 = K/Q + 8-K + proxy** | 16/16 | **불가능** — proxy는 주주 승인이 필요할 때만 존재한다 (Schedule 14A "**If action is to be taken**") |
+| **S4 = 최소 필요 set** | — | **S1이다** |
+
+**S2·S3는 recall을 늘리지 않는다. 앞당길 뿐이다.** 그리고 **앞당김은 이 문제에 필요하지 않다** —
+기준은 `formation 이전인가` 하나이고 S1이 이미 23/23으로 만족한다(J3.2).
+
+> **자발 source를 completeness 규칙에 넣으면 규칙이 약해진다.** 강제 source만으로 `COMPLETE`를
+> 정의하면 "찾지 못했다 = 없다"가 성립하지만, 자발 source를 섞는 순간 그 등식이 깨진다.
+> **8-K·proxy는 corroboration과 조기 경보로 쓸 수 있어도 absence의 근거가 될 수 없다.**
+
+## J7. `qv_sec_filings`와의 통합 — §11
+
+**현재 계약을 읽었다.** `trading/backtest/schema.sql`의 `qv_sec_filings`는
+
+```sql
+form TEXT NOT NULL CHECK (form IN ('10-K', '10-K/A', '10-Q', '10-Q/A'))
+```
+
+로 form을 네 개에 **CHECK로 못박고**, 주석이 그 의미를 이렇게 적는다.
+
+> "Quality + Value 전용 SEC filing 원장. CIK는 이 row의 filing-time SIC를 찾는 target
+> registrant이고 issuer identity가 아니다. issuer_id를 두지 않아 submissions ingestion이
+> SEC registrant를 내부 issuer로 승격하지 못하게 한다."
+
+그리고 모든 row가 `filing_sic`·`sic_status`(§3.4 formation 시점 SIC)와
+`historical_usable_session`(§3.2 acceptance 이후 첫 세션)을 함께 들고 있다.
+`qv_submissions.ALLOWED_FORMS`도 같은 넷이다.
+
+### J7.1 K/Q로 충분하면 이 계약을 건드릴 이유가 없다
+
+**J5의 정의가 요구하는 filing 목록은 `qv_sec_filings`가 이미 가진 것과 정확히 같다.**
+필요한 필드도 이미 다 있다 — `accession`·`form`·`acceptance_eastern_date`·
+`historical_usable_session`. **새 form family도, CHECK 완화도, 새 ingestion 경로도 필요 없다.**
+
+새로 필요한 것은 **읽기 관계 하나와 새 테이블 두 개**뿐이다(스키마는 이번에 만들지 않는다).
+
+```text
+corporate-action 후보/판정 ledger   (class_id, event, effective date, ratio, 판정, 원문 provenance)
+    -> 근거 filing을 qv_sec_filings의 (cik, accession)으로 참조한다
+
+search coverage ledger              (class_id, lo, hi, formation, closing accession, 판정)
+    -> 창 안에서 실제로 조회·검색한 accession 집합을 함께 남긴다
+       (NOT_SEARCHED와 '검색했는데 없음'을 구분하는 것이 이 테이블의 존재 이유다)
+```
+
+### J7.2 만약 8-K/proxy가 필요했다면 — 그래도 넓히지 않는 것이 맞다
+
+이번 결론은 필요 없다는 쪽이지만, 작업지시가 요구한 tradeoff를 적는다.
+
+| 선택 | 얻는 것 | 잃는 것 |
+|---|---|---|
+| **`qv_sec_filings`의 form CHECK를 넓힌다** | 테이블 하나로 끝난다 | **`qv_sec_filings`의 의미가 깨진다.** 지금 모든 row는 "accounting fact를 읽어도 되는 filing"이고 `filing_sic`·`historical_usable_session`이 그 계약에 묶여 있다. 8-K row가 섞이면 **회계 fact source로 잘못 쓰일 조용한 경로가 생긴다.** CHECK 하나 푸는 것이 §3.2·§3.4 계약을 동시에 흔든다 |
+| **별도 corporate-action filing/discovery ledger** | 기존 계약 무손상 · 두 원장의 목적이 이름으로 갈린다 · 8-K/proxy를 넣어도 회계 경로에 안 닿는다 | 발행사별 submissions를 두 번 훑는다(같은 `submissions` JSON이라 추가 API 비용은 없다) |
+
+**작업지시의 기본값과 같은 결론이다 — 별도 경로를 둔다.**
+**그리고 이번 결론(K/Q로 충분)에서는 별도 원장에 담을 filing 목록조차 `qv_sec_filings`를
+그대로 읽으면 되므로, 새로 만드는 것은 event·coverage 두 ledger뿐이다.**
+
+## J8. 이 결론이 서 있지 못하는 자리
+
+**정직하게 적는다.**
+
+1. **추출기가 없다.** J4의 16건은 **사람이 읽었다.** "explicit effective date · class · ratio를
+   본문에서 결정론적으로 뽑는다"는 코드가 없고, 그것 없이는 `COMPLETE`인 구간의 후보가 전부
+   `UNRESOLVED`가 되어 **P2가 사실상 모든 곳에서 fail-close한다.** `COMPLETE`를 선언할 수 있다는
+   것과 P2를 켤 수 있다는 것은 다르다.
+2. **reverse split 관측이 0이다.** 규칙 쪽은 대칭이다 — SAB 4.C가 "stock dividend, stock split
+   **or reverse split**"을 함께 적고 S-X 3-04는 자본계정 변동 전부를 덮는다. **하지만 실측이
+   없다.** 이 표본으로 reverse split 경로가 동작한다고 말할 수 없다.
+3. **`INCOMPLETE` 관측이 0이라 fail-close 경로가 한 번도 집행되지 않았다.** 20개 대형
+   발행사는 전부 정시 제출자다. **연체 제출자·상장폐지 직전 발행사에서 `CLOSURE`가 깨지는
+   모습을 이 표본은 보여주지 못한다.**
+4. **recall 16/16은 "우리가 아는 event"에 대한 것이다.** Follow-up 3 correction의 I10.2와 같은
+   한계다 — **아무도 모르는 event를 놓쳤는지는 이 표본으로 알 수 없다.** 이번 근거의 힘은
+   통계가 아니라 **규정 문언**(J2.1)에서 나온다. 통계는 그 문언이 실제 filing에서 지켜지는지를
+   16건에서 확인한 것뿐이다.
+5. **표본이 20 발행사·전부 대형주다.** S&P 500 전체, 특히 소형·비정시 제출자에서 같은지는
+   확인하지 않았다.
+6. **`class_id` prose 매핑이 없다**(J4.3). 이름→class 등록이 없으면 J4의 명시 class 정보를
+   쓸 수 없다.
+
+## J9. ground truth 확인 범위
+
+**§9·F14·G15·H14·I13과 같은 기준이다. 525 관측 전부를 사람이 원문과 1:1 대조하지 않았다.**
+
+이번에 사람이 원문과 직접 대조한 것:
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| Regulation S-X 3-04 | `CFR-2024-title17-vol3-sec210-3-04` (govinfo), 조회 2026-08-29 | J2.1 인용 |
+| Regulation S-X 10-01(a)(7) | `CFR-2024-title17-vol3-sec210-10-01`, 조회 2026-08-29 | J2.1 인용 |
+| Form 8-K Item 5.03 · 3.03 · 8.01 | `https://www.sec.gov/files/form8-k.pdf`, 조회 2026-08-29 | J2.2 인용 |
+| Schedule 14A Item 11 · 12 | `CFR-2024-title17-vol4-sec240-14a-101`, 조회 2026-08-29 | J2.2 인용 |
+| Exchange Act Rule 10b-17 | `CFR-2024-title17-vol4-sec240-10b-17`, 조회 2026-08-29 | J2.3 인용 |
+| SAB Topic 4.C | `https://www.sec.gov/interps/account/sabcodet4.htm` | H2에서 인용한 것을 재사용 |
+| **확정 event 16건의 `ex 이후 첫 K/Q` 공시 본문** | 각 accession의 primary document 직접 파싱 | **J4 표 — 16건 전부 사람이 읽었다** |
+| CMCSA Class A 소급 재작성 산식 | 10-Q `0001166691-17-000009` 본문 + 주식수 | J4.1 (`2A + B` 정확 일치) |
+| META Class C Reclassification 철회 | 10-K `0001326801-17-000007` 등 7 filing 본문 | J4.2 — effective date 부재 |
+| keyword 오탐 11건 | 6 발행사 386 K/Q 중 울린 것 전수 | J6.2 — 사람이 성격을 확인했다 |
+
+기계로만 검증한 것: 전 form submissions 원장(20 발행사), `bite.py`의 P2 interval 계산,
+`coverage.py`의 `CLOSURE`/`SEARCH` 판정, `phrases.py`의 표현별 recall.
+
+**J6의 `stock split` 같은 표현 목록은 후보를 올리는 surface이고 계약이 아니다.**
+J3의 `±220일` 스캔 창과 J6.2의 발행사 6곳 선택은 **진단용 절단이고 어떤 계약에도 안 들어간다.**
+
+## J10. 이번에 결정하지 않은 것
+
+1. **event·coverage ledger의 스키마**는 만들지 않았다(작업지시 §11대로). 참조 관계와
+   두 테이블의 존재 이유만 적었다.
+2. **명시 공시 추출기**(effective date · class · ratio 파싱)를 설계하지 않았다.
+3. **prose class-name alias 등록**(J4.3)을 설계하지 않았다. identity 층의 책임이다.
+4. **`SPLIT_RATIO_MISMATCH` 잔여**는 CMCSA 하나가 J4.1로 풀렸고 나머지는 여전히 열려 있다
+   (GOOGL `decimals` 오기 · UA 1,000배 단위 오류 — H11.1).
+5. **cross-accession tie-break(`acceptance DESC`)**는 이번에도 바꾸지 않았다.
+6. **Visa Class B·C의 전환비율**(J4 표의 1.6483 · 4.0)은 로드맵 §4.4.2 `CONVERSION_VALUE_PROXY`
+   입력이지만 이번 범위 밖이다. **다만 그 값이 강제 경로 본문에 있다는 사실은 기록해 둔다.**
+7. **S&P 500 전체로의 확장 검증**을 하지 않았다.
+
+## J11. 결과 요약 — §12
+
+| 지표 | 값 |
+|---|---|
+| 확정 class-level share-basis event | **23** (고유 `(발행사, ex-date)` **16**) |
+| 첫 SEC 공시가 8-K인 event | **16 / 16** |
+| 그중 **자발·조건부 item에만 실린 것** | **14 / 16** (Item 8.01 · 7.01 · 2.02 · 1.01) |
+| Item 5.03에 실린 것 | **2 / 16** (UA 2012 · UA 2014) |
+| **S1(K/Q) recall — formation 이전 발견** | **16 / 16**, P2 interval 조합 **23 / 23** |
+| S2(+8-K) recall | 16 / 16 (평균 91일 조기) |
+| S3(+proxy) recall | 16 / 16 |
+| **최소 source set** | **S1 = K/Q family** |
+| `ex 이후 첫 K/Q`가 **effective date·ratio·affected class를 모두 명시** | **16 / 16** |
+| **class scope가 `UNRESOLVED`로 남은 event** | **0 / 23** |
+| 525 격자 coverage 판정 | `COMPLETE` **520** · `INCOMPLETE` **0** · N/A 5 |
+| 격자 전체가 요구하는 고유 K/Q accession | **1,225** (20 발행사 전체 K/Q의 63%) |
+| keyword `stock split` recall (event 있는 K/Q) | **16 / 16** |
+| keyword `stock split` 오탐률 (event 없는 K/Q 386건) | **11건 = 2.8%** |
+
+## User decision — corporate-action discovery completeness
+
+추천: **A — K/Q family만으로 `COMPLETE`를 선언할 수 있다.**
+
+```text
+COMPLETE(class_id, (lo, hi], formation)  <=>  CLOSURE 와 SEARCH
+
+  CLOSURE   G := 그 issuer의 K/Q family filing 중 acceptance >= hi 인 최초 filing
+            G가 존재하고 G.acceptance <= formation
+  SEARCH    acceptance가 (lo, G.acceptance] 안인 그 issuer의 K/Q family filing을
+            하나도 빠짐없이 성공적으로 가져와 전문 검색했다
+
+  둘 중 하나라도 아니면 INCOMPLETE -> selector fail-close
+  조회한 적이 없으면 NOT_SEARCHED   -> selector fail-close
+
+  8-K / proxy / vendor feed는 corroboration과 조기 경보로만 쓴다.
+  이들의 부재는 event 부재의 근거가 되지 않는다.
+```
+
+§13의 조건별로 적는다.
+
+- **formation 시점 PIT를 지키는가.** 지킨다. `lo`·`hi`가 정의상 formation 이하이고 `CLOSURE`가
+  `G <= formation`을 명시적으로 요구한다. **미래 filing을 보면 조건이 성립하지 않는 것이 아니라
+  `INCOMPLETE`가 된다** — 즉 fail-close 쪽으로 틀린다(J5).
+- **listed·unlisted class를 모두 덮는가.** 덮는다. S-X 3-04가 "**for each class of shares**"를
+  요구하고, 실제로 비상장 class가 상장 class와 같은 문장에서 이름으로 불린다 —
+  MA Class B · NKE Class A · UA Class B · V class B·C · GOOGL Class B(J4).
+  **vendor가 구조적으로 못 보는 자리가 여기서 메워진다.** Rule 10b-17이 "publicly traded"
+  class에만 걸리는 것이 vendor 사각의 원인이었고(J2.3), K/Q는 그 제한이 없다.
+- **reverse split을 포함할 수 있는가.** **규칙 쪽은 그렇다** — SAB 4.C가
+  "stock dividend, stock split **or reverse split**"을 함께 적고 S-X 3-04는 자본계정 변동 전부를
+  덮는다. **그러나 이 표본에 관측이 0건이라 실측 근거가 없다**(J8-2).
+- **class-specific applicability를 보존하는가.** 보존한다. 한 class만 split한 BRK 2010과
+  V 2015에서 원문이 **영향받지 않은 class를 명시**하고("The Class B stock split had no effect on
+  the number of equivalent Class A common shares" · "Holders of class B and C common stock did not
+  receive a stock dividend"), 두 class 모두 split한 MA·NKE·UA·GOOGL도 그대로 나온다.
+  **23건 중 class scope가 `UNRESOLVED`인 것은 0건이다.**
+  그리고 CMCSA 2017에서는 **비율 하나로 표현할 수 없는 구조**(Class A로 지급 · A와 B 보유분에)까지
+  원문이 밝혀, Follow-up 3의 `SPLIT_RATIO_MISMATCH` 잔여 하나를 풀었다(J4.1).
+- **vendor absence에 의존하지 않는가.** 의존하지 않는다. **이 정의에 vendor가 등장하지 않는다.**
+- **arbitrary numeric threshold가 없는가.** 없다. 창의 두 끝점은 P2 interval과
+  `첫 K/Q accepted >= hi`로 정해지고 **달력 상수도 백분율도 쓰지 않는다.** 승인 요건도
+  `explicit effective date · class · ratio · provenance`의 유무이지 크기가 아니다.
+- **Step 4에 필요한 최소 범위인가.** 그렇다. **필요한 filing이 `qv_sec_filings`가 이미 적재하는
+  바로 그 넷이고**, form CHECK도 `ALLOWED_FORMS`도 건드리지 않는다(J7.1). 격자 전체 조회 대상이
+  고유 accession 1,225건으로 유계다.
+
+**B·C를 추천하지 않는 이유는 recall이 아니라 논리다.** S2·S3도 16/16이고 평균 91일 더 이르다.
+**그런데 completeness는 "찾았다"가 아니라 "없으면 없는 것이다"를 요구한다.**
+8-K Item 8.01은 문언 그대로 자발이고(`may, at its option`), Item 5.03은 정관 개정이 있고
+proxy에 안 나왔을 때만이며, proxy Item 11·12는 `If action is to be taken`일 때만이다.
+**표본의 첫 공시 16건 중 14건이 자발·조건부 item에만 실렸다.** 자발 source를 completeness
+규칙에 넣으면 그 규칙은 "안 나왔다"를 근거로 쓸 수 없게 된다.
+
+**D를 추천하지 않는 이유.** `COMPLETE`의 **결정론적** 정의가 실제로 나왔고
+(`qv_sec_filings`의 acceptance만으로 계산된다), 525 격자에서 `INCOMPLETE` 0건으로 돌았다.
+**"SEC filing만으로 deterministic COMPLETE를 보장 못 한다"는 이번 증거와 맞지 않는다.**
+
+> **다만 A는 `COMPLETE`를 선언할 수 있다는 뜻이지 P2를 freeze할 수 있다는 뜻이 아니다.**
+> 두 축 중 **search coverage 축만 이번에 닫혔다.** event classification 축은 그대로 열려 있고,
+> 그것이 닫히기 전에는 모든 후보가 `UNRESOLVED`라 P2는 사실상 모든 곳에서 fail-close한다.
+
+**P2 freeze까지 남은 것 셋.**
+
+1. **명시 공시 추출기.** `explicit effective date · affected class · ratio/action · provenance`를
+   K/Q 본문에서 결정론적으로 뽑아야 한다. **effective date가 핵심 판별자다** — 그것이 없으면
+   META 2016의 미실행 Reclassification이 event가 되고(J4.2), 옛 split의 재공시가 새 event가
+   된다(J6b.1). **후보 부담은 작다** — 강제 경로 위에서 `stock split`은 event 없는 K/Q의
+   2.8%에서만 울린다(J6.2).
+2. **prose class-name → `class_id` PIT 등록**(J4.3). UA의 "Class B"는 registry `CONV`이고
+   2016년의 "Class C"와 다른 class다. XBRL member alias와 같은 방식의 명시 등록이 필요하고,
+   매칭 실패는 `UNRESOLVED`다.
+3. **`INCOMPLETE`·reverse split 경로의 실측.** 이 표본은 정시 제출 대형주 20곳이라
+   `CLOSURE` 실패도 reverse split도 한 번도 나오지 않았다. 두 경로는 **코드로만 존재하고
+   데이터로 확인되지 않은 상태**다.
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
