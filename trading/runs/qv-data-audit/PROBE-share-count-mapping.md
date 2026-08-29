@@ -4564,3 +4564,661 @@ SEARCH    바뀌지 않는다 — (lo, G.acceptance] 안의
 > **좁아지는 것은 `CLOSURE`의 자격 하나뿐이다.**
 
 **이 correction도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+
+# Follow-up 5 — explicit corporate-action disclosure extraction (2026-08-29)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 일곱 절과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. Gate · `coverage_start` · B/M · rank ·
+> returns는 이번에도 계산하지 않았고 production DB에 쓰지 않았다. **production extractor를
+> 구현하지 않았고 enum/schema도 만들지 않았다.**
+
+시작 main: `6b3087c2227b5ac2aa4a436ba013d1e2b9ae682e`
+(`research(qv): amendment를 CLOSURE에서 제외해야 하는지 검증한다`)
+
+**병렬 작업.** 작업 시작 시점에 로컬 `main`이 `d7b59a4 research(memory): measure R3 P0-A
+feasibility` 하나만큼 `origin/main`보다 앞서 있었다. 그 커밋은 `lib/` · `scripts/` · `test/` ·
+`package.json`만 건드리고 QV 파일을 하나도 건드리지 않는다. **수정·revert하지 않았고 이번
+QV 커밋에 섞지 않았다.**
+
+**이번에 다시 열지 않은 것.** A/B tier의 filing-basis anchor · P0/P1/P4 탈락 · P2가 유일 후보이고
+아직 freeze 전 · P3 normalization · search coverage와 event classification의 두 축 분리 ·
+`COMPLETE`의 source-of-truth가 K/Q family라는 것 · `CLOSURE`는 original `10-K`/`10-Q`만 ·
+`SEARCH`는 네 form 전부 · amendment는 evidence이되 closure 아님 · 8-K/proxy/vendor는
+corroboration only · `acceptance_eastern_date`가 시간 정본 · percentage tolerance 금지 ·
+share-count jump만으로 approval 금지 · issuer-wide class 전파 금지 ·
+**prose class-name → `class_id` 매핑은 OPEN이고 이번에 손대지 않았다.**
+
+## L1. 이번 질문 하나
+
+> **K/Q family 전문을 `COMPLETE`하게 검색했을 때, 어떤 결정론적 extraction 계약이면
+> share-basis corporate-action 후보를 빠뜨리지 않고 surface하면서
+> old-event 재공시 · boilerplate · 미실행 proposal을 구분할 수 있는가?**
+
+`class_id` resolution은 하지 않는다. raw disclosure까지만 본다.
+
+## L2. 두 단계를 절대 합치지 않는다
+
+```text
+Stage 1  DISCOVERY CANDIDATE
+         K/Q 원문에서 corporate-action 가능성이 있는 문맥(span)을 surface한다.
+         keyword hit 자체는 event가 아니다.
+
+Stage 2  STRUCTURED DISCLOSURE EXTRACTION
+         span에서 raw field만 뽑는다.
+             action_type_raw · effective_date_raw · ratio_or_action_raw
+             affected_class_names_raw[] · disclosure_status_raw
+             accession · form · acceptance_datetime · document_name · source span
+         affected_class_names_raw는 문자열 그대로다. class_id로 바꾸지 않는다.
+```
+
+이번 연구의 label은 **research label**이고 production enum이 아니다.
+
+```text
+EXTRACTABLE    필요한 explicit field가 원문에 전부 있고 결정론적으로 뽑힌다
+INSUFFICIENT   candidate는 맞지만 required field가 하나 이상 없다
+NON_EVENT      원문상 명시적으로 share-basis event가 아니다
+```
+
+## L3. Stage 1 — 후보 표면은 좁다
+
+**대상은 Follow-up 4·correction이 정한 `COMPLETE SEARCH` 집합 그대로다.**
+`acceptance_eastern_date`만 써서 다시 계산했고(§17), `CLOSURE`는 original `10-K`/`10-Q`만
+인정했다(Follow-up 4 correction).
+
+| | 값 |
+|---|---|
+| 관측 | 520 (`INCOMPLETE` 0) |
+| **검색 대상 고유 K/Q accession** | **1,225** |
+| form 분포 | `10-Q` 897 · `10-K` 306 · `10-K/A` 19 · `10-Q/A` 3 |
+
+**후보 단위는 임의 window가 아니라 HTML block-level 경계다**(§9). `p`·`div`·`td`·`tr`·`li`·
+`h1~h6`·`table` 등 block 태그로만 자르고, **문장 수·토큰 수 cutoff를 쓰지 않는다.**
+
+known positive 16건의 문서에서 block 총수 대비 후보 block 수는 이렇다.
+
+| event | 문서 block 수 | **후보 block** |
+|---|---|---|
+| NVDA 2021 | 2,689 | **1** |
+| CMCSA 2017 · NKE 2015 · UA 2014 | 5,202 / 4,301 / 1,224 | **2** |
+| AAPL 2014 · NKE 2012 · NVDA 2024 | 3,451 / 3,882 / 3,020 | **3** |
+| BRK 2010 | 6,890 | **4** |
+| AAPL 2020 | 3,826 | **5** |
+| WMT 2024 | 4,337 | **6** |
+| GOOGL 2022 · MA 2014 · V 2015 | 3,956 / 5,961 / 2,773 | **7** |
+| UA 2012 | 12,336 | **12** |
+| TSLA 2022 | 3,867 | **14** |
+| TSLA 2020 | 4,051 | **18** |
+
+**16/16에서 후보가 나오고, 문서당 1~18 block이다.** 사람이 읽어야 할 양이 아니라
+기계가 field를 뽑아야 할 양으로도 작다.
+
+### L3.1 표현군 census — `stock split` 하나로는 안 된다
+
+§8이 요구한 의미군을 전부 따로 세었다. 열은 span이 실제로 무엇이었는지다.
+
+| 표현군 | true current event | old-event 재공시 | proposed (META) | boilerplate 등 | **16 anchor recall** |
+|---|---|---|---|---|---|
+| **`stock split`** | 84 | 37 | 42 | 5 | **16/16** |
+| **`N-for-one` / `N-for-1`** | 50 | 19 | 9 | — | **16/16** |
+| `effected / effective` | 42 | 12 | 4 | — | 12/16 |
+| `stock dividend` | 36 | 28 | 66 | 9 | 11/16 |
+| `declared / approved / distributed` | 18 | 12 | 17 | 6 | 9/16 |
+| `reclassification` | 5 | 11 | 32 | 3 | 3/16 |
+| `recapitalization` | 3 | 8 | 6 | 4 | 3/16 |
+| `share dividend` | 3 | 1 | — | — | 3/16 |
+| `split-up / subdivision` | 3 | 4 | 11 | 7 | 2/16 |
+| `additional share for each share held` | 2 | — | — | — | 2/16 |
+| `reverse split` | 1 | 4 | 2 | — | 1/16 |
+| `combination / consolidation of shares` | 1 | 4 | — | 2 | 1/16 |
+| `reverse stock split` | — | 2 | 6 | 1 | **0/16** |
+| **`one-for-N` / `1-for-N`** | — | — | — | — | **0/16** |
+
+**forward split만 보면 `stock split`과 `N-for-one` 두 군이 각각 16/16이다.**
+`reverse stock split`과 `one-for-N`은 이 표본에서 **0/16**이다 — reverse event가 없기 때문이다.
+
+> **그런데 forward 표본만 보고 표현군을 고르면 안 된다** —
+> §16의 CONTROL이 이유를 보인다. **Sirius XM의 10:1 주식수 변경은 본문에 split이라는 단어가
+> 없고 `one-for-ten`이라는 비율 표현으로만 나온다**(L12). forward split 표본만 보고 고른
+> 표현 집합은 reverse/consolidation 계열을 통째로 놓친다.
+> **그래서 표현군은 action 명사와 비율 형태를 함께 켜야 하고, 그 근거는 16 anchor가 아니라
+> CONTROL에서 나온다.**
+
+## L4. Stage 2 — known positive 16건의 field 추출
+
+**날짜는 전부 '역할 문구'에 앵커해서 뽑았다. 근접도·최근접 heuristic을 쓰지 않았다.**
+
+```text
+EFFECTIVE     "effective date of X" · "became effective on X" · "was effected on X"
+              "On X, the Company effected" · "completed a … split … on X" · "the X 1-for-15 … split"
+DISTRIBUTION  "distributed on X" · "payable on X" · "paid on X" · "distribution date of X"
+RECORD        "record date of X" · "(share|stock)holders of record … X"
+TRADING       "began trading … on a split-adjusted basis on X"
+DECLARED      "On X, the Board … declared/approved/announced"
+```
+
+| event | ratio/action | class raw | **date role** |
+|---|---|---|---|
+| BRK 2010 | `50-for-1` | `Class B` (+ Class A 영향 없음 명시) | **EFFECTIVE** |
+| UA 2012 | `two-for-one` · `100% common stock dividend` | `Class A and Class B common stock` | **EFFECTIVE** · DECLARED · DISTRIBUTION |
+| NKE 2012 | `two-for-one` · `100 percent stock dividend` | `Class A and Class B` | DECLARED · DISTRIBUTION · RECORD · TRADING |
+| MA 2014 | `ten-for-one` | `the Company's Class A and Class B common shares` | DECLARED · DISTRIBUTION |
+| UA 2014 | `two-for-one` · `100% common stock dividend` | `Class A and Class B common stock` | **EFFECTIVE** · DECLARED · DISTRIBUTION |
+| AAPL 2014 | `seven-for-one` | `its common stock` | **EFFECTIVE** · DECLARED · RECORD |
+| V 2015 | `four-for-one` · `dividend of three additional shares` | `its class A common stock` · `class B` · `class C common stock` | DISTRIBUTION · RECORD · TRADING |
+| NKE 2015 | `two-for-one` · `100 percent stock dividend` | `Class A and Class B` | DECLARED · DISTRIBUTION · RECORD · TRADING |
+| CMCSA 2017 | `two-for-one` · `100% stock dividend` · `one additional share for every share held and was payable in shares of Class …` | `Class A common stock` · `Class B common stock` | DECLARED · DISTRIBUTION · RECORD |
+| AAPL 2020 | `four-for-one` | `Common Stock` (문단이 아니라 **절 제목**에서만) | **EFFECTIVE** · DECLARED · RECORD |
+| TSLA 2020 | `five-for-one` · `dividend of four additional shares` | `our common stock` | DECLARED · RECORD |
+| NVDA 2021 | `four-for-one` · `three additional shares of common stock for every share held on the record date` | `our common stock` | DECLARED · RECORD |
+| GOOGL 2022 | `20-for-one` | `Class A, Class B` · `Class C` | **EFFECTIVE** · DECLARED · RECORD |
+| TSLA 2022 | `three-for-one` · `five-for-one` · `dividend of two additional shares` | `our common stock` | DECLARED · RECORD |
+| WMT 2024 | `3-for-1` | `its common stock` | **EFFECTIVE** · DECLARED |
+| NVDA 2024 | `ten-for-one` · `received nine additional shares` | `our issued common stock` | DECLARED · DISTRIBUTION · RECORD |
+
+| field | 결과 |
+|---|---|
+| **candidate discovery** | **16 / 16** |
+| **ratio/action 추출** | **16 / 16** |
+| **raw affected-class 추출** | **16 / 16** |
+| **explicit EFFECTIVE 날짜** | **7 / 16** |
+
+## L5. §9 context boundary — 넓혀도 effective date는 안 나온다
+
+```text
+E0  hit 문장            (문장 경계)
+E1  hit block           (HTML block-level 경계)
+E2  그 문서의 후보 block 전체 합집합
+E3  primary document 전문
+```
+
+| boundary | 날짜 하나라도 | **EFFECTIVE 역할** | ratio/action | class raw |
+|---|---|---|---|---|
+| **E0** | 15/16 | **7/16** | **16/16** | **16/16** |
+| **E1** | 16/16 | **7/16** | 15/16 | 13/16 |
+| **E2** | 16/16 | **7/16** | **16/16** | **16/16** |
+
+**E0 → E1 → E2로 넓혀도 `EFFECTIVE`는 7/16에서 움직이지 않는다.**
+class는 13 → 16, ratio는 15 → 16으로 나아진다.
+
+**E3는 오히려 나쁘다.** 같은 16개 문서에서
+
+| | E2 | **E3** |
+|---|---|---|
+| 추출된 날짜 총수 | 48 | **134** |
+| 추출된 class 문구 총수 | 53 | **115** |
+
+MA 2014는 날짜가 2개 → **23개**가 되고 GOOGL 2022는 class 문구가 4개 → 10개가 된다.
+**전문을 읽으면 혼입만 늘고 빠진 field는 그대로다.**
+
+> **§9의 답: `E2`(문서 안 후보 block의 합집합)가 최선이고, 그 경계는 HTML block 구조에서
+> 나오므로 숫자 cutoff가 필요 없다.** `E3`는 추천하지 않는다.
+> **그리고 어느 경계도 effective date 문제를 풀지 못한다 — 그것은 context 문제가 아니라
+> 원문에 없는 문제다.**
+
+**절 제목이 실제로 일한 사례가 하나 있다.** AAPL 2020의 공시 문단은
+"On August 28, 2020, the Company effected a **four-for-one stock split** to shareholders of record
+as of August 24, 2020"이고 **class를 한 번도 부르지 않는다.** 바로 앞 block이 절 제목
+`Common Stock Split`이고, **거기서만 class scope가 나온다.** block 하나(E1)만 읽으면 class가
+비고, 같은 문서의 후보 block을 합치면(E2) 제목이 들어와 채워진다.
+
+## L6. effective date — 여기서 막힌다
+
+### L6.1 9/16은 effective date를 아예 말하지 않는다
+
+| event | 원문이 주는 날짜 역할 |
+|---|---|
+| MA 2014 | DECLARED · DISTRIBUTION |
+| TSLA 2020 · TSLA 2022 · NVDA 2021 | DECLARED · RECORD |
+| NVDA 2024 | DECLARED · DISTRIBUTION · RECORD |
+| CMCSA 2017 | DECLARED · DISTRIBUTION · RECORD |
+| V 2015 | DISTRIBUTION · RECORD · TRADING |
+| NKE 2012 · NKE 2015 | DECLARED · DISTRIBUTION · RECORD · TRADING |
+
+**NKE는 한 문단에 날짜가 네 개다** — 선언 11/15, 기준일 12/10, 지급일 12/24, 분할가 거래 개시
+12/26. **원문은 그중 무엇이 share-basis regime 전환일인지 말하지 않는다.**
+§10이 금지한 "가장 가까운 날짜" 같은 heuristic 없이는 고를 수 없다.
+→ **`INSUFFICIENT`.**
+
+### L6.2 명시된 7건조차 그 날짜가 price-basis 전환일이 아니다
+
+| event | 원문의 EFFECTIVE 날짜 | 실제 price-basis 전환일 | 차이 |
+|---|---|---|---|
+| BRK 2010 | 2010-01-21 | 2010-01-21 | **0일** |
+| UA 2012 | 2012-07-09 | 2012-07-10 | 1일 |
+| UA 2014 | 2014-04-14 | 2014-04-15 | 1일 |
+| AAPL 2014 | 2014-06-06 | 2014-06-09 | 3일 |
+| AAPL 2020 | 2020-08-28 | 2020-08-31 | 3일 |
+| GOOGL 2022 | 2022-07-15 | 2022-07-18 | 3일 |
+| WMT 2024 | 2024-02-23 | 2024-02-26 | 3일 |
+
+**7건 중 6건이 어긋난다(1~3일).** 원문의 "effective"는 **주식수 basis가 바뀐 날**이고,
+`raw_close`의 단위가 바뀌는 날은 **그 다음 정규 세션**이다(Follow-up 3 H6).
+**즉 추출한 `effective_date_raw`는 P2가 쓰는 regime 경계와 같은 값이 아니다.**
+
+> P2의 구간 판정에서 1~3일 차이가 실제로 결과를 바꾸는 일은 드물지만,
+> **`effective_date_raw`를 그대로 regime 경계로 쓰는 계약을 지금 freeze하면 그 어긋남이
+> 조용히 들어간다.** 이 연구는 그 둘을 같은 것으로 취급하지 않는다.
+
+## L7. §11 ratio / action semantics — 하나의 배수로 정규화되지 않는다
+
+**16/16에서 ratio/action 문구가 나온다.** 형태는 다섯 가지다.
+
+| 형태 | 예 | 건수 |
+|---|---|---|
+| `N-for-one` / `N-for-1` | `two-for-one` · `50-for-1` · `3-for-1` · `20-for-one` | 16 |
+| `100% stock dividend` | `100 percent stock dividend` · `100% common stock dividend` | 5 |
+| `dividend of N additional shares` | `dividend of three additional shares` | 4 |
+| `N additional share(s) for each/every share held` | CMCSA · NVDA 2021 | 2 |
+| `received N additional shares` | NVDA 2024 (`received nine additional shares`) | 1 |
+
+**세 가지가 단일 배수 정규화를 막는다.**
+
+1. **CMCSA 2017.** 원문은 "one additional share for every share held and was **payable in shares
+   of Class A common stock on the existing Class A common stock and Class B common stock**"이다.
+   **주식수가 늘어나는 class(A)와 배당을 받는 class(A·B)가 다르다.** Follow-up 4 J4.1이 실측한
+   대로 Class A의 실제 소급 배수는 `2`가 아니라 `2.00399`(= `2×A + B`)다.
+   **비율 하나로 이 event를 표현할 수 없다.** action text를 raw로 보존하고 `UNRESOLVED`로
+   둘 수 있어야 한다.
+2. **V 2015.** Class A는 `four-for-one`인데 **class B·C는 배당을 받지 않고 전환비율만
+   1.6483·4.0으로 올랐다.** 한 event 안에 서로 다른 종류의 변화가 있다.
+3. **TSLA 2022 문서에 비율이 둘이다** — `three-for-one`(2022 event)과 `five-for-one`(2020 event).
+   **비율만으로는 어느 event인지 정해지지 않는다.** 반드시 같은 span의 날짜와 묶여야 한다.
+
+**P3용 conversion factor는 이번에 만들지 않았다**(§11·§19).
+
+## L8. §12 class wording — raw까지만, semantic shape는 사람이 판정
+
+**수집한 raw 문구를 사람이 네 shape로 판정했다. `class_id`로 자동 매핑하지 않았다.**
+
+| shape | 뜻 | 건수 | 예 |
+|---|---|---|---|
+| `EXACT_ONE` | 정확히 한 class를 지목 | **2** | BRK `Class B` (+ "Class A ... had no effect" 명시) · V `its class A common stock` (+ "Holders of class B and C ... did not receive") |
+| `EXPLICIT_MULTI` | 둘 이상을 명시 | **6** | UA 2012·2014 `Class A and Class B common stock` · NKE 2012·2015 `Class A and Class B` · MA `Class A and Class B common shares` · GOOGL `Class A, Class B, and Class C stock` |
+| `ALL_COMMON` | class 한정 없이 `common stock` | **7** | AAPL 2014 `its common stock` · AAPL 2020 `Common Stock`(절 제목) · TSLA 2020·2022 `our common stock` · NVDA 2021 `our common stock` · NVDA 2024 `our issued common stock` · WMT 2024 `its common stock` |
+| `SPLIT_ROLE` | 늘어나는 class와 받는 class가 다름 | **1** | CMCSA 2017 |
+
+**`ALL_COMMON` 7건이 이 계약의 숨은 의존이다.** `our common stock`은 **그 시점에 common class가
+정확히 하나일 때만** 모호하지 않다. 이 표본에서는 7건 모두 단일 class 발행사(AAPL·TSLA·NVDA·WMT)라
+문제가 없지만, **multi-class 발행사가 `our common stock`이라고 쓰면 shape는 `AMBIGUOUS`이고
+`UNRESOLVED`여야 한다.** 판정 근거는 텍스트가 아니라 **identity 층의 class universe**다
+(Follow-up 2 G7의 dimensionless 계약과 같은 자리).
+
+**raw 문구가 registry 이름과 다르다는 것도 그대로 확인됐다.**
+UA의 원문 `Class B common stock`은 registry의 `CONV`이고, UA가 2016년에 만든 `Class C`와
+다른 class다. **string equality·fuzzy·ordinal 매칭을 하지 않았고 이번에 해결하지도 않았다**(§12·§19).
+
+## L9. §13 issuer / investee scope
+
+같은 문서 안에서 registrant 자신의 event가 아닌 언급을 무엇으로 가르는지 조사했다.
+
+| 근거 | 신호 | 이 표본에서 |
+|---|---|---|
+| **문서 종류** | primary document vs exhibit | **가장 강한 구분자** — L10 |
+| **주어** | `the Company` · `we` · `our` · `the registrant` | 16 anchor의 후보 block 전부에서 registrant 주어가 나온다 |
+| **plan 어휘** | `the Plan` · `Award` · `Participant` · `the Committee` · `equity incentive` | TSLA 2022의 old-event span이 `PLAN` scope로 잡힌다 |
+| **investee 어휘** | `equity method` · `investee` · `joint venture` · `subsidiary` · 회사명 | Follow-up 3 I10.2의 BRK/Kraft Heinz XBRL 오염과 같은 자리 |
+
+**issuer scope가 명시적이지 않으면 `INSUFFICIENT`다**(§13). 다만 **이 표본에서 텍스트 쪽
+investee 오염 사례는 나오지 않았다** — XBRL 태그에서는 났지만(BRK `0.443332` Kraft Heinz),
+본문 후보 span에서는 registrant 주어가 항상 있었다. **없다는 것을 증명한 것이 아니라
+이 표본에서 관측되지 않았다는 뜻이다.**
+
+## L10. §7 false-positive anchor 전수 재분류
+
+Follow-up 4 J6.2의 11건(event 없는 K/Q에서 `stock split`이 울린 것)과
+J6b.1의 old-event 재공시 3건을 block 단위로 다시 열었다. **후보 span 145개**가 나온다.
+
+| | primary document | **exhibit(비-primary)** |
+|---|---|---|
+| false positive span | **8** | **90** |
+| old-event 재공시 span | **8** | **39** |
+
+> **첫 번째 구분자는 문서 종류다.** false-positive span의 **92%(90/98)가 exhibit**에 있다 —
+> 주식보상 plan 문서(EX-10.x)의 반희석 조항과 XBRL taxonomy 설명문이다.
+> **primary document로 좁히면 후보 표면이 그만큼 사라진다.** 이것은 문턱이 아니라
+> 문서 구조에 근거한 구분이다.
+
+### L10.1 A · B — 가정법 boilerplate와 taxonomy 설명문
+
+exhibit span 90개 중 status가 `HYPOTHETICAL`이거나 아무 status도 없는 것이 대부분이다.
+전형 문구는 이렇다.
+
+> HD `0000354950-12-...` EX-10: "**In the event of** any stock dividend, stock split, combination
+> or exchange of shares, recapitalization or other change in the capital structure of the Company …"
+> ABBV `0001551152-24-...`: "revisions for stock splits, reverse stock splits, stock dividends,
+> or other changes in capital structure" (XBRL 분류 안내문)
+
+**이들은 날짜가 없고 가정법이다.** required field(effective date)가 없으므로
+`INSUFFICIENT`이고, 문서 종류·가정법 어휘로 `NON_EVENT`까지 갈 수 있다.
+
+### L10.2 C — 실행되지 않은 proposal (META Class C Reclassification)
+
+**primary document에 남는 false-positive span 8개는 전부 META다.**
+
+| accession | block | status | **날짜** |
+|---|---|---|---|
+| `0001326801-16-000067` b1200 | | `INTENDED` `NO_ASSURANCE` | **없음** |
+| `0001326801-16-000067` b1967 | | `ANNOUNCED` `NO_ASSURANCE` | **없음** |
+| `0001326801-16-000082` b1287 · b1292 · b2408 | | `ANNOUNCED` `INTENDED` `NO_ASSURANCE` / `DECLARED` | **없음** |
+| `0001326801-17-000024` b1049 · b1054 · b1957 | | 〃 | **없음** |
+
+원문:
+
+> "our board of directors **intends to** issue two shares of the Class C capital stock as a
+> one-time stock dividend for each share of Class A and Class B common stock outstanding.
+> **The record and payment dates for this dividend will be determined by our board of directors
+> in its discretion and there can be no assurance as to the timing of such dates.**"
+
+**8개 span 전부 날짜가 하나도 없다.** required field 규칙 하나로 `CONFIRMED`가 될 수 없다.
+**따로 'proposal 탐지기'를 만들 필요가 없다** — effective date를 required로 두면 자동으로 걸린다.
+
+### L10.3 D — old-event 재공시는 텍스트로 못 가른다. 날짜로 가른다
+
+old-event 재공시 span은 **field가 전부 채워져 있다.** 현재 event와 텍스트로 구별되지 않는다.
+
+| filing | 접수일 | 추출된 날짜 | 접수일과의 간격 |
+|---|---|---|---|
+| UA `0001336917-14-000008` 10-K b597 | 2014-02-21 | DECLARED 2012-06-11 · DISTRIBUTION 2012-07-09 | **620일 · 592일** |
+| NKE `0000320187-15-000113` 10-K b959 | 2015-07-23 | DECLARED 2012-11-15 · RECORD 2012-12-10 · DISTRIBUTION 2012-12-24 · TRADING 2012-12-26 | **980 · 955 · 941 · 939일** |
+| TSLA `0000950170-22-006034` 10-Q b1950 | 2022-04-22 | (날짜 없음) scope=`PLAN` | — |
+
+> **§7이 요구한 설명이 이것이다.** old-event 재공시가 `NON_EVENT`가 되는 이유는 문체가 아니라
+> **추출된 날짜가 그 관측의 `(lo, hi]` 구간 밖이기 때문**이다. 판정은 temporal linking이고,
+> 그것은 **추출된 날짜가 있어야만 가능하다.** L6의 9/16이 여기서 두 번째로 아프다 —
+> **날짜가 없으면 old-event와 새 event를 가를 방법도 없다.**
+
+TSLA의 old-event span은 날짜조차 없지만 `PLAN` scope로 잡힌다(CEO 보상 약정 문맥).
+
+## L11. §15 negative scan — `COMPLETE SEARCH` 전수 분류
+
+**1,225 accession 전부를 훑었다.** 문턱으로 후보를 잘라내지 않았다.
+
+| | 값 |
+|---|---|
+| searched accession | **1,225** (파싱 실패 0) |
+| candidate accession | **1,000** (전체 문서 기준) · **349** (primary document만) |
+| **candidate span** | **7,482** |
+| ├ primary document | **714 (9.5%)** |
+| └ exhibit | **6,768 (90.5%)** |
+
+**후보의 90.5%가 exhibit에 있다.** L10이 14개 anchor에서 본 비율(92%)이 전수에서도 그대로다.
+
+### L11.1 span 전수 분류
+
+| 분류 | span | primary | exhibit |
+|---|---|---|---|
+| `INSUFFICIENT_NO_DATE` — 날짜가 하나도 없다 | **5,128** | 421 | 4,707 |
+| `HYPOTHETICAL_BOILERPLATE` — 가정법 반희석 조항 | 1,384 | 5 | 1,379 |
+| `UNRELATED_ENTITY_OR_PLAN` — registrant 주어 없이 plan/investee 문맥 | 358 | 98 | 260 |
+| `PROPOSAL_NO_DATE` — `INTENDED`/`NO_ASSURANCE` + 날짜 없음 | 173 | 40 | 133 |
+| `DATE_PRESENT_NO_KNOWN_EVENT` | 153 | 55 | 98 |
+| `OLD_EVENT_REDISCLOSURE` — 날짜가 알려진 event지만 오래됐다 | 143 | 49 | 94 |
+| **`TRUE_CURRENT_EVENT`** | **107** | 34 | 73 |
+| `TRUE_EVENT_INSUFFICIENT_FIELDS` — event는 맞는데 ratio/class 결손 | 36 | 12 | 24 |
+
+**분류 규칙에 숫자 문턱이 없다.** 문서 종류 · 가정법 어휘 · 주어 scope · **날짜의 유무와 값**만 쓴다.
+
+### L11.2 `DATE_PRESENT_NO_KNOWN_EVENT` 153건을 끝까지 열었다
+
+**이 칸이 유일하게 '모르는 event'가 숨을 수 있는 자리다.** 전수를 세분했다.
+
+| 세분 | primary | exhibit |
+|---|---|---|
+| **알려진 event의 선(先)공시** — ex-date 이전에 이미 공시 | 22 | 34 |
+| `ratio/action` 없음 — 현금배당 · 자사주매입 · 주주 수 등 잡음 | 22 | 46 |
+| 2009 이전 event의 재공시(표본 밖) | 3 | 3 |
+| **그 밖 — 사람이 확인** | 8 | 15 |
+
+**세 가지가 여기서 나온다.**
+
+1. **선(先)공시 56건은 오히려 좋은 소식이다.** AAPL `10-Q 2020-07-30`은 ex-date(08-31)보다
+   32일 먼저 "announced a four-for-one split … to shareholders of record as of … August 24, 2020"을
+   싣고, GOOGL `10-K 2022-02-01`·NVDA `10-Q 2021-05-26`·`10-Q 2024-05-29`·TSLA·V도 같다.
+   **강제 K/Q 경로가 ex-date 전에도 event를 올린다.** 다만 그 시점 공시는 승인 조건부라
+   `NO_ASSURANCE`·`INTENDED`를 달고 있어 `CONFIRMED`가 되면 안 된다 — L10.2의 META와 같은 규칙이
+   그대로 작동한다.
+2. **`ratio/action`이 없는 68건은 전부 share-basis와 무관하다** — WMT의 현금배당 증액
+   ("declared an annual dividend for fiscal 2012 of $1.46 per share"), Ford의 자사주매입·
+   전환권 종료·주주 수 등이다. `declared/approved/distributed` 표현군이 날짜와 함께 잡은 것이고,
+   **ratio/action을 required로 두면 자동으로 걸러진다.**
+3. **'그 밖' 23건은 전부 UA 하나의 공시다**(고유 문장 2개 · accession 7개).
+
+> **UA `10-Q 2016-04-29`:** "On March 16, 2016, the Board of Directors approved the issuance of the
+> Company's **new Class C non-voting common stock**. The Class C stock was **issued through a stock
+> dividend on a one-for-one basis to all existing holders of the Company's Class A and Class B
+> common stock**"
+
+**이것이 Follow-up 3이 vendor feed로는 못 풀던 바로 그 사건이다.** H4·H5는 UA `2016-04-08`에
+vendor가 `×2`를 실었지만 Class A 주식수는 `181,646,468 → 183,141,109`(×1.008)로 그대로여서
+`NO_SHARE_EFFECT`로 판정했고, **왜 그런지는 주식수 시계열로만 추론했다.**
+**본문은 이유를 직접 말한다 — 새 class를 1:1로 배당한 것이지 기존 class를 쪼갠 것이 아니다.**
+가격은 조정되지만 기존 class의 share basis는 바뀌지 않는다.
+
+> **§15의 결론: 전수 7,482 span 어디에도 '알려지지 않은 share-basis event'는 없었다.**
+> 모두 (a) 알려진 event의 현재·선·과거 공시, (b) 2009 이전 event, (c) 새 class 배당 1건,
+> (d) ratio 없는 잡음, (e) 가정법 boilerplate로 해소된다.
+> **다만 이것은 detector가 완전하다는 증명이 아니라 이 표본에서 반증이 나오지 않았다는 뜻이다**
+> (Follow-up 3 I10.2와 같은 한계).
+
+### L11.3 required field를 켜면 남는 양
+
+`ratio/action` + `날짜` + `registrant scope`를 required로 두고 primary document로 좁히면,
+**7,482 span 중 사람이나 승인 규칙이 실제로 다뤄야 할 span은 primary 기준 150건 남짓**이다
+(`TRUE_CURRENT_EVENT` 34 + `OLD_EVENT_REDISCLOSURE` 49 + `DATE_PRESENT_NO_KNOWN_EVENT` 55 +
+`TRUE_EVENT_INSUFFICIENT_FIELDS` 12). **1,225 filing에 걸쳐 150건이면 문턱 없이 감당된다.**
+
+## L12. §16 reverse-split CONTROL
+
+**선정 기준을 결과보다 먼저 고정했다.** (스크래치 `CONTROL_CRITERIA.md`에 원문이 남아 있다.)
+
+```text
+1. 미국 등록인이고 EDGAR에 10-K/10-Q를 제출한다
+2. reverse split의 effective date가 2009-01-01 ~ 2026-06-30
+3. 시대를 넷으로 나눠 각 1개: 2009-2012 / 2013-2016 / 2017-2021 / 2022-2026
+4. 기존 QV 20 issuer와 겹치지 않는다
+5. 네 비율이 서로 다르다
+6. 고른 뒤 결과를 보고 교체하지 않는다. 확인 실패면 '선정 실패'로 그대로 보고한다
+7. CONTROL 결과를 525-grid 통계에 합치지 않는다
+```
+
+고정한 넷: **AIG(2009-2012) · Peabody Energy BTU(2013-2016) · GE(2017-2021) ·
+Sirius XM SIRI(2022-2026).**
+
+| control | 대역 filing | 후보 span | **EFFECTIVE span** | 결과 |
+|---|---|---|---|---|
+| **AIG** | 16 | 10 | **3** | **EXTRACTABLE** |
+| **BTU** | 16 | 30 | **16** | **EXTRACTABLE** |
+| **GE** | 20 | 4 | **0** | **INSUFFICIENT** |
+| **SIRI** | 18 | 6 | **0** | **선정 실패 + INSUFFICIENT** |
+
+**AIG** — `10-K 0001047469-10-001465`:
+> "as adjusted for the **one-for-twenty reverse split** of AIG's Common Stock **effective
+> June 30, 2009**"
+→ ratio `one-for-twenty` · EFFECTIVE `2009-06-30` · class `common stock`. **필드가 다 나온다.**
+
+**BTU** — `10-Q 0001064728-15-000098`:
+> "Pursuant to the authorization provided at a special meeting of the Company's stockholders held
+> on September 16, 2015, the Company **completed a 1-for-15 reverse stock split** of the shares of
+> the Company's common stock **on September 30, 2015** (the Reverse Stock Split). As a result …
+> **every 15 shares** of issued and outstanding common stock …"
+→ ratio `1-for-15` · EFFECTIVE `2015-09-30` · class `common stock` · status `COMPLETED`·`RETROACTIVE`.
+
+**BTU는 proposal 단계도 함께 보여준다.** 같은 발행사의 `10-Q 2015-08-07`은
+> "the Board … approved **seeking shareholder approval** to implement a reverse stock split …
+> **at a ratio to be determined later** … **there can be no assurance**"
+→ **비율이 범위(`one-for-eight` ~ `one-for-20`)이고 날짜가 없다.** → `INSUFFICIENT`.
+**META와 같은 모양이 reverse 계열에서도 그대로 재현된다.**
+
+**GE** — `10-Q 0000040545-21-000064`:
+> "we announced that we would proceed with the **1-for-8 reverse stock split**, as approved by
+> shareholders, and filed an amendment to our certificate of incorporation **to effectuate the
+> reverse stock split after the close of trading on July 30, 2021**. GE common stock **began
+> trading on a split-adjusted basis on August 2, 2021**."
+→ ratio `1-for-8` · class `common stock` · **TRADING 날짜만 있고 EFFECTIVE 역할이 없다.**
+**L6.1의 9/16과 정확히 같은 모양이다.**
+
+**SIRI — 선정 실패다.** 2024년 거래는 지주사 재편이고 본문은 split이 아니라 전환으로 적는다.
+> "All share and per share amounts have been adjusted to reflect the **conversion of Old Sirius
+> shares into SplitCo common stock on a one-for-ten basis.**"
+→ **`split` 단어가 없고 `one-for-ten` 비율 표현으로만 잡힌다. 날짜도 action type도 없다.**
+기준 6에 따라 교체하지 않고 그대로 보고한다.
+
+> **CONTROL이 준 것 셋.**
+> 1. **추출기 shape는 reverse wording에 그대로 적용된다** — `one-for-N`·`1-for-N`이 잡히고
+>    `completed … on X`가 EFFECTIVE로 잡힌다(AIG·BTU).
+> 2. **effective date 결손은 forward 전용 문제가 아니다** — GE가 4/4 중 하나로 같은 구멍을 낸다.
+> 3. **표현군을 forward 표본으로 고르면 안 된다** — SIRI는 `stock split`·`reverse split` 어느
+>    쪽에도 안 걸리고 **비율 표현으로만 surface된다.**
+
+## L13. §14 amendment
+
+`SEARCH` 대상 1,225건에 `10-K/A` 19 · `10-Q/A` 3이 들어 있다. **Follow-up 4 correction의 계약을
+그대로 유지했다** — amendment는 evidence로 읽되 `CLOSURE`가 아니고, **amendment의 접수일이
+event의 effective date를 재정의하지 않는다.**
+
+이번 후보 분류에서도 amendment는 특별 취급하지 않았다. 다만 L10.3의 old-event 판정이
+amendment에 그대로 걸린다 — **원 filing 내용을 그대로 재제출한 amendment의 span은 추출된 날짜가
+과거이므로 새 event가 되지 않는다.**
+
+## L14. ground truth 확인 범위
+
+**§9·F14·G15·H14·I13·J9·K9와 같은 기준이다. 520 관측 전부를 사람이 원문과 1:1 대조하지 않았다.**
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| known positive 16건의 후보 span과 field | 각 accession primary document 직접 파싱 | L4 표 — **16건 전부 사람이 읽었다** |
+| false-positive 11건 · old-event 3건의 span 145개 | 각 accession 전체 문서 직접 파싱 | L10 — **primary 16 span은 사람이 전수로 읽었다** |
+| CONTROL 4개 | AIG·BTU·GE·SIRI의 대역 K/Q primary document | L12 — **인용문 전부 사람이 읽었다** |
+| effective date와 ex-date의 차이 | Follow-up 3이 확정한 ex-date와 대조 | L6.2 |
+| CMCSA의 `2×A + B` | Follow-up 4 J4.1을 그대로 인용 | L7 — 이번에 다시 계산하지 않았다 |
+
+**기계로만 검증한 것**: 1,225 accession의 후보 span 7,482개 분류(L11), 표현군 count(L3.1),
+E0~E3 field count(L5). **다만 L11.2의 `DATE_PRESENT_NO_KNOWN_EVENT` 153건은 세분 결과를
+사람이 전수로 읽었고, 그중 '그 밖' 23건(UA 공시 1건)은 원문을 직접 확인했다.**
+
+**이번 연구가 쓴 정규식은 전부 '역할 문구' 앵커이고 숫자 문턱이 없다.**
+`text[:1800]` 같은 저장 길이 제한은 스크래치 파일 크기 문제이고 판정에 쓰이지 않는다.
+**L3의 block 경계는 HTML block-level 태그이지 문장 수·토큰 수가 아니다.**
+
+**정직하게 적을 한계 넷.**
+
+1. **추출기는 연구용이다.** 정규식 집합은 이 표본을 보며 두 번 고쳤다
+   (`3-for-1` 같은 숫자 비율, `completed … on X` 형태). **표본 밖에서 같은 recall이 나온다는
+   보장이 없다.** 다만 두 수정 모두 *표현 형태*를 넓힌 것이고 문턱을 조정한 것이 아니다.
+2. **`EFFECTIVE` 7/16은 이 정규식 집합 기준이다.** 더 넓은 패턴이 몇 건을 더 건질 가능성은
+   남아 있다. **그러나 NKE·V·CMCSA는 사람이 읽어도 effective date라는 말이 없다** — 그 셋은
+   패턴 문제가 아니다.
+3. **표본이 20 발행사 + CONTROL 4개다.** S&P 500 전체, 특히 소형주에서 같은지 확인하지 않았다.
+4. **텍스트 investee 오염 사례가 0건**인 것은 없다는 증명이 아니다(L9).
+
+## L15. 이번에 결정하지 않은 것 (§19)
+
+1. prose class-name → `class_id` PIT mapping schema — **손대지 않았다.**
+2. event ledger SQL schema · production enum
+3. production extractor 구현
+4. P2 final freeze
+5. P3 normalization · conversion factor
+6. `SPLIT_RATIO_MISMATCH`·`UNEXPLAINED_NO_EVENT` 잔여 22건
+7. `CONVERSION_VALUE_PROXY` (V 2015의 1.6483·4.0을 raw로 기록만 했다)
+8. Gate C · `coverage_start` · B/M · rank · returns
+
+## User decision — explicit corporate-action disclosure extraction
+
+추천: **B — candidate discovery는 freeze 가능하지만 structured extraction의 일부 field가
+아직 불충분하다.**
+
+§18이 A에 요구한 항목별로 적는다.
+
+| 요구 | 결과 |
+|---|---|
+| known positive 16/16 candidate discovery | **충족 (16/16)** |
+| **effective date extraction 16/16** | **미충족 — 7/16** |
+| action/ratio extraction 16/16 | **충족 (16/16)** |
+| raw affected-class scope extraction 16/16 | **충족 (16/16)** |
+| old-event 3건을 새 event로 승격하지 않음 | **충족** — 단, **추출된 날짜에 의존한다**(L10.3) |
+| META 미실행 proposal을 confirmed로 승격하지 않음 | **충족** — 8 span 전부 날짜 0개(L10.2) |
+| boilerplate를 confirmed로 승격하지 않음 | **충족** — 92%가 exhibit이고 가정법·무날짜(L10.1) |
+| reverse-split controls에서 같은 구조가 작동 | **부분 충족** — AIG·BTU는 EXTRACTABLE, **GE는 forward와 똑같이 effective date가 없다**, SIRI는 선정 실패(L12) |
+
+**A가 아닌 이유는 하나로 좁혀진다.**
+
+> **네 required field 중 셋은 16/16이고, `effective_date_raw`만 7/16이다.**
+> 그리고 그 결손은 **context를 넓혀서 해결되지 않는다** — E0·E1·E2 모두 7/16이고
+> E3는 혼입만 늘린다(L5). **원문에 없는 것이다.**
+
+**C가 아닌 이유.** "K/Q prose가 너무 비정형적"이라는 진단은 증거와 맞지 않는다.
+후보 표면은 문서당 block 1~18개로 매우 희소하고(L3), ratio·class는 16/16이며,
+boilerplate·proposal·old-event는 **문서 종류 · 가정법 어휘 · 날짜 부재 · temporal linking**이라는
+**결정론적이고 문턱 없는** 규칙으로 갈린다(L10). **문제는 산문의 비정형성이 아니라
+특정 field 하나가 원문에 자주 없다는 것이다.** 진단이 다르면 다음 작업도 달라진다.
+
+### freeze할 수 있는 것 (discovery 계약)
+
+```text
+DISCOVERY
+  단위      HTML block-level 경계 (p·div·td·tr·li·h1~h6·table …)
+            문장 수·토큰 수 cutoff를 쓰지 않는다
+  범위      COMPLETE SEARCH 대상 K/Q family의 문서
+            primary document와 exhibit을 반드시 구분해 기록한다
+  표현군    action 명사와 비율 형태를 함께 켠다
+            stock split · reverse (stock) split · stock/share dividend
+            split-up/subdivision · combination/consolidation of shares
+            recapitalization · reclassification
+            N-for-one / N-for-1 · one-for-N / 1-for-N
+            additional share(s) for each/every share held
+  성질      candidate는 event가 아니다. 문턱으로 잘라내지 않는다.
+```
+
+**비율 형태를 반드시 포함해야 하는 근거는 forward 표본이 아니라 CONTROL이다** —
+SIRI의 10:1 주식수 변경은 `split`이라는 단어 없이 `one-for-ten`으로만 나온다(L12).
+
+### freeze할 수 없는 것 (extraction 계약)
+
+```text
+required field 넷 중
+    ratio_or_action_raw          16/16   OK
+    affected_class_names_raw[]   16/16   OK  (단 semantic shape 판정은 identity 층 의존)
+    disclosure_status_raw        OK      (COMPLETED/RETROACTIVE/INTENDED/NO_ASSURANCE/HYPOTHETICAL)
+    effective_date_raw            7/16   **부족**
+```
+
+**effective date가 왜 부족한지 두 층이다.**
+
+1. **9/16은 effective date를 아예 말하지 않는다.** 대신 DECLARED·RECORD·DISTRIBUTION·TRADING을
+   섞어 주고 **어느 것이 share-basis 전환일인지 지목하지 않는다.** NKE는 한 문단에 네 개다.
+   §10이 금지한 "가장 가까운 날짜" 없이는 못 고른다 → `INSUFFICIENT`.
+2. **명시된 7건조차 그 날짜가 P2가 쓰는 경계와 다르다.** 6/7에서 1~3일 어긋난다 —
+   원문의 "effective"는 주식수 basis 전환일이고 `raw_close` 단위는 그 다음 정규 세션에 바뀐다(L6.2).
+
+### 그래서 다음에 결정해야 할 것
+
+**이 연구는 답을 고르지 않는다. 선택지가 셋이고 성격이 다르다는 것까지만 적는다.**
+
+1. **`effective_date_raw`를 required에서 빼고 `date_cluster_raw`(역할 라벨이 붙은 날짜 집합)를
+   required로 둔다.** 그러면 16/16이 된다. 대신 **어느 날짜가 regime 경계인지를 정하는 규칙이
+   따로 필요하고, 그 규칙은 텍스트 밖에서 와야 한다.**
+2. **regime 경계를 텍스트가 아니라 다른 정본에서 가져온다.** Follow-up 3 H6이 `raw_close`의
+   단위가 ex-date에 바뀐다는 것을 이미 실측했다. **다만 CLOSED 계약은 share-count jump와
+   vendor ratio만으로 event를 *승인*하는 것을 금지한다** — 존재·비율·class는 명시 공시로
+   승인하고 **경계 날짜만** 다른 정본에서 받는 것이 그 금지에 걸리는지는 **별도 결정이다.**
+   이번에 그 선을 넘지 않았다.
+3. **effective date가 없으면 그대로 `UNRESOLVED`로 두고 fail-close한다.** 가장 안전하지만
+   **16 anchor 중 9건이 fail-close되고, 그중 MA 2014·CMCSA 2017처럼 P0가 조용히 10배·0.2%
+   틀리던 관측이 포함된다.** 즉 P2의 실효 coverage가 크게 준다.
+
+**셋 중 무엇을 고르든 그것은 extraction 계약이 아니라 regime-boundary 계약이다.**
+그 결정 전에는 `event classification` 축을 freeze할 수 없다.
+
+### 함께 기억할 것 넷
+
+1. **후보 표면은 걱정할 만큼 넓지 않다.** 문서당 block 1~18개이고, event 없는 K/Q의 97.2%는
+   `stock split`이 한 번도 안 나온다(Follow-up 4 J6.2). **문턱을 만들 이유가 없다.**
+2. **false positive의 92%가 exhibit에 있다.** primary document 구분은 문턱이 아니라 문서
+   구조이고, 가장 강한 단일 구분자다(L10).
+3. **old-event 재공시는 문체로 못 가른다.** field가 전부 채워져 있고 **날짜만 다르다**(L10.3).
+   **날짜 추출이 실패하면 old-event 방어도 함께 실패한다** — effective date 결손이 두 번 아프다.
+4. **비율 하나로 정규화되지 않는 event가 실재한다.** CMCSA 2017은 늘어나는 class와 받는 class가
+   다르고 실제 배수가 `2`가 아니라 `2.00399`이며, V 2015는 한 event 안에서 A는 split, B·C는
+   전환비율 조정이다. **action text를 raw로 보존하고 `UNRESOLVED`로 둘 수 있어야 한다**(L7).
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
