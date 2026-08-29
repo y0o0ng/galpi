@@ -4200,3 +4200,367 @@ proxy에 안 나왔을 때만이며, proxy Item 11·12는 `If action is to be ta
    데이터로 확인되지 않은 상태**다.
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+
+# Follow-up 4 correction — amendment closure (2026-08-29)
+
+> **Status: RESEARCH EVIDENCE ONLY.** 위 여섯 절과 같다. 설계 승인·freeze가 아니고 production
+> code/schema/test/roadmap의 의미를 바꾸지 않는다. Gate · `coverage_start` · B/M · rank ·
+> returns는 이번에도 계산하지 않았고 production DB에 쓰지 않았다.
+
+시작 main: `62ad111861991f0a71ecd4133578240a6f86478f`
+(`research(qv): corporate-action discovery completeness를 검증한다` — 바로 위 절을 커밋한
+지점이고 `origin/main`도 같았다.)
+
+**이번에 다시 열지 않은 것.** K/Q의 강제 공시를 completeness source로 쓰는 방향 ·
+search coverage와 event classification의 두 축 분리 · A/B tier의 filing-basis anchor ·
+P0/P1/P4 탈락 · P2를 아직 freeze하지 않는다는 것. **source-set 결론(S1 = K/Q family)도 그대로다.**
+이 절은 그 안에서 **closing filing의 자격 하나만** 좁힌다.
+
+## K1. 이번 질문 하나
+
+> **`CLOSURE`의 `G`로 10-K/A · 10-Q/A를 인정해도 되는가?**
+
+Follow-up 4의 J5는 이렇게 적었다.
+
+```text
+G := 그 issuer의 K/Q family filing 중 acceptance_eastern_date >= hi 인 최초 filing
+```
+
+`K/Q family`는 `qv_submissions.ALLOWED_FORMS`와 `schema.sql`의 `qv_sec_filings.form` CHECK가
+정한 넷이다 — `10-K · 10-K/A · 10-Q · 10-Q/A`. **amendment가 그 안에 들어 있다.**
+
+`CLOSURE`가 요구하는 성질은 하나다 — **`G`가 `(lo, hi]` 안의 event를 공시할 의무를 진다.**
+J5는 그 의무의 근거로 SAB Topic 4.C와 S-X 3-04를 들었다. **둘 다 재무제표에 붙는 의무다.**
+amendment가 재무제표를 들고 오지 않으면 그 근거가 성립하지 않는다.
+
+## K2. Rule 12b-15와 Form 10-K/A · 10-Q/A의 공식 semantics
+
+**(1) Exchange Act Rule 12b-15.**
+출처: [17 CFR 240.12b-15](https://www.govinfo.gov/content/pkg/CFR-2024-title17-vol4/xml/CFR-2024-title17-vol4-sec240-12b-15.xml)
+
+> "All amendments must be filed under cover of the form amended, marked with the letter 'A' to
+> designate the document as an amendment, e.g., '10-K/A' ... Amendments filed pursuant to this
+> section **must set forth the complete text of each item as amended.** Amendments must be
+> numbered sequentially and be filed separately for each statement or report amended."
+
+**"each item as amended"** — 고친 item만이다. **원 filing 전체를 다시 내라는 요구가 아니고,
+원 filing 이후의 사건을 반영하라는 요구는 어디에도 없다.**
+
+**(2) Form 10-K General Instruction G(3) — 재무제표 없는 amendment가 제도적으로 정상이다.**
+출처: [Form 10-K](https://www.sec.gov/files/form10-k.pdf)
+
+> "if such definitive proxy statement or information statement is not filed with the Commission in
+> the l20-day period ... **the Items comprising the Part III information must be filed as part of
+> the Form 10-K, or as an amendment to the Form l0-K,** not later than the end of the 120-day period."
+
+**Part III만 담은 10-K/A는 규정이 예정한 정상 형태다.** 그 문서에는 재무제표가 아예 없다.
+같은 Form의 General Instruction A(4)는 Article 12 S-X 명세서도 30일 안에 amendment로
+낼 수 있게 한다.
+
+> **여기서 `CLOSURE`의 전제가 깨진다.** S-X 3-04는 "자본계정 변동 분석을 주석이나 별도
+> 보고서로 낼 것"을 요구하고 SAB 4.C는 "소급 효과와 effective date 주석"을 요구하는데,
+> **재무제표가 없는 문서에는 걸 곳이 없다.** amendment가 `hi` 이후라는 사실만으로는
+> event 부재를 닫지 못한다.
+
+## K3. 표본의 amendment를 실제로 읽었다 — 25건 전수
+
+20 발행사의 K/Q family에 amendment는 **62건**이다. 그중 **연구 시대(2009 이후)에 노출 구간을
+가진 23건 + 후보 fact를 공급한 2건 = 25건**의 원문을 직접 읽었다.
+
+**결과: 25건 중 재무제표를 재작성하면서 원 filing 이후 사건을 반영한 것은 0건이다.**
+
+| 성격 | 건수 | 사례 |
+|---|---|---|
+| **Part III만**(General Instruction G(3)) | **8** | TSLA 10-K/A 2020·2021·2022·2025·2026 · MA 2010 · GOOGL 2016 · META 2016 |
+| **증명서·동의서·exhibit만** | **8** | UA 2013 · WMT 2013 · COST 2013·2015 · META 2015 · GOOGL 2019 · XOM 2011 · ABBV 2013 |
+| **XBRL detail-tagged footnote만**(Reg S-T 405(a)(2) 유예) | **1** | TSLA 10-K/A 2012 |
+| **비연결 JV의 S-X 3-09 재무제표 추가** | **4** | F 10-K/A 2015·2016·2017·2018 (Changan Ford) |
+| MD&A 표 오류 정정 | 1 | COST 10-K/A 2016 |
+| Part II Item 4 주주총회 집계 정정 | 1 | AAPL 10-Q/A 2009 |
+| 기타 exhibit 정정 | 1 | MA 10-K/A 2011 |
+| **회계기준 소급 채택에 따른 재무제표 재작성** | **1** | **AAPL 10-K/A 2010-01-25** |
+
+**원문이 스스로 그렇게 말한다.**
+
+| filing | 인용 |
+|---|---|
+| **GOOGL 10-K/A** `0001193125-19-028757` | "this Amendment No. 1 does not modify or update in any way the financial position, results of operations, cash flows, or other disclosures in, or exhibits to, the Original Form 10-K, **nor does it reflect events occurring after the filing of the Original Form 10-K.**" |
+| **TSLA 10-K/A** `0001193125-12-137560` | "The purpose of this Amendment No. 1 ... is to furnish detail-tagged footnotes in Exhibit 101 ... This Amendment No. 1 does not otherwise change or update the disclosures set forth in the Form 10-K as originally filed and **does not otherwise reflect events occurring after the original filing of the Form 10-K.**" |
+| **XOM 10-K/A** `0001193125-11-050134` | "This Amendment No. 1 is being filed **solely for the purpose of inserting the conformed signature of independent auditors** ... **Except for these corrections, there have been no changes in any of the financial or other information contained in the report.** For convenience, the entire Annual Report on Form 10-K, as amended, is being re-filed." |
+| **UA 10-K/A** `0001336917-13-000013` | "**solely to correct typographical errors in the certifications** ... Except as described above, the Amendment **does not modify or update the disclosures** presented in, or exhibits to, the Original Filing. The Original Filing as corrected is hereby refiled in its entirety." |
+| **TSLA 10-K/A** `0001564590-21-022604` | "The Original Form 10-K **omitted Part III, Items 10 … 14** … **in reliance on General Instruction G(3)** to Form 10-K" |
+| **META 10-K/A** `0001326801-16-000063` | "The **sole purpose** of this Amendment No. 1 is to include the information required by **Items 10 through 14 of Part III** of Form 10-K." |
+
+> **XOM과 UA가 특히 위험하다.** 둘 다 "전체를 다시 낸다(refiled in its entirety)"라서
+> **문서에 재무제표가 그대로 들어 있다.** 기계적으로 보면 자본 주석도 있고 대차대조표도 있다
+> (XOM `자본 주석` 59회 · `대차대조표` 363회, UA 43회 · 149회). **그런데 explanatory note가
+> "재무 정보에는 아무 변화가 없다"고 못박는다.** 즉 **재무제표의 존재는 그 문서가 새 사건을
+> 반영했다는 증거가 아니다.** form 이름으로도 본문 유무로도 가를 수 없고, explanatory note를
+> 읽어야만 안다.
+
+### K3.1 유일한 재작성 amendment도 `CLOSURE`를 못 준다
+
+**AAPL 10-K/A `0001193125-10-012091`(2010-01-25)** 하나만 실제로 재무제표를 재작성했다 —
+수익인식 회계기준의 소급 채택 때문이다.
+
+> "As amended by this Form 10-K/A, the Form 10-K reflects the Company's **retrospective adoption**
+> of the ... amended accounting standards related to revenue recognition ..."
+> "**This Form 10-K/A speaks as of September 26, 2009, unless otherwise noted.**"
+
+**`speaks as of September 26, 2009`가 결정적이다.** `CLOSURE`가 `G`에게 요구하는 것은
+**자기 접수일 시점으로 구간을 닫아주는 것**인데, 이 문서는 **원 대차대조표일 시점으로 말한다고
+스스로 밝힌다.** 재작성 amendment조차 closing filing의 성질을 갖지 않는다.
+
+> **부수 관측(이번에 열지 않는다).** 이 amendment는 `2009-09-26`·`2009-10-16` instant의
+> share fact를 공급하고, filing-basis anchor 계약상 그 basis는 접수일 `2010-01-25` 시점으로
+> 읽힌다. 그런데 문서는 `speaks as of 2009-09-26`이라고 적는다. **anchor 계약은 CLOSED이므로
+> 다시 열지 않고, 관측만 K10에 남긴다.**
+
+## K4. 525 격자에서 C0 vs C1
+
+```text
+C0 (현재)  G := 최초 10-K / 10-K/A / 10-Q / 10-Q/A  with acceptance >= hi
+C1 (엄격)  G := 최초 10-K / 10-Q                     with acceptance >= hi
+SEARCH     두 정의 모두 (lo, G.acceptance] 안의 K/K-A/Q/Q-A를 전부 검색한다 (좁히지 않는다)
+```
+
+**acceptance-date 규약 두 가지로 각각 돌렸다**(왜 둘인지는 K6).
+
+| | C0 (amendment 인정) | C1 (original만) |
+|---|---|---|
+| **COMPLETE** | **520** | **520** |
+| **INCOMPLETE** | **0** | **0** |
+| closing accession이 바뀐 관측 | — | **0** |
+| **amendment 때문에 C0만 COMPLETE** | — | **0** |
+| C0 closing form 분포 | `10-Q` 350 · `10-K` 170 · **amendment 0** | `10-Q` 350 · `10-K` 170 |
+
+**두 규약 모두에서 결과가 같다.** §3이 요구한 "기존 `G`가 10-K/A 또는 10-Q/A였던 관측 전수"의
+답은 **0건**이다.
+
+**C1의 비용은 이 격자에서 0이다** — `COMPLETE`가 하나도 줄지 않고 closing accession도 하나도
+바뀌지 않는다.
+
+## K5. 0은 계약이 아니라 격자 배치의 결과다
+
+**왜 0인지를 구조로 설명해야 한다.** 그러지 않으면 "표본에서 안 났으니 괜찮다"가 된다.
+
+`hi = max(후보 fact의 filing 보고일, December session)`이므로 `hi`는 둘 중 하나다.
+
+| `hi`의 정체 | 관측 | `G`가 amendment가 될 수 있는가 |
+|---|---|---|
+| **후보 fact의 filing 보고일** | **394 / 520** | **구조적으로 불가**(그 filing 자신이 `acceptance >= hi`를 등호로 만족해 `G`가 된다). 단 **그 fact가 amendment에서 온 것이면 가능하다** — K5.2 |
+| **December session** | **126 / 520** | **가능** — December와 다음 K/Q 사이에 amendment가 끼면 그것이 `G`가 된다 |
+
+### K5.1 December 뒤의 창이 실제로 얼마나 넓은가
+
+126개 관측이 쓰는 `(issuer, December)` 조합 **309개**를 전수로 봤다.
+
+| | 값 |
+|---|---|
+| December 이후 첫 K/Q family filing이 **amendment**인 조합 | **0 / 309** |
+| December → 다음 K/Q family filing 간격 | 최소 **3일** · 중앙값 **47일** · 최대 **91일** |
+
+**중앙값 47일짜리 창이 매년 열려 있는데 이 표본에서는 한 번도 amendment가 거기 떨어지지
+않았다.** 그것이 전부다. 20 발행사가 전부 정시 제출 대형주라서 amendment가 주로 원 filing
+직후(며칠 안)나 Part III 기한(연차 후 120일)에 몰린 결과다.
+
+### K5.2 amendment가 `hi`를 만드는 두 번째 경로 — 후보 fact 13건
+
+**후보 fact 4,555개 중 13개가 amendment에서 왔다**(`10-K/A` 12 · `10-Q/A` 1, 관측 11개).
+
+| issuer | class | formation | form | 보고일 | accession | instant |
+|---|---|---|---|---|---|---|
+| AAPL | SOLE | 2010 | 10-K/A | 2010-01-25 | `0001193125-10-012091` | 2009-09-26 · 2009-10-16 |
+| TSLA | SOLE | 2013 | 10-K/A | 2012-03-28 | `0001193125-12-137560` | 2012-01-31 |
+| TSLA | SOLE | 2021 | 10-K/A | 2020-04-28 | `0001564590-20-018984` | 2020-02-07 |
+| TSLA | SOLE | 2022 | 10-K/A | 2021-04-30 | `0001564590-21-022604` | 2021-02-01 |
+| TSLA | SOLE | 2023 | 10-K/A | 2022-04-29 | `0001564590-22-016871` | 2022-01-31 |
+| TSLA | SOLE | 2026 | 10-K/A | 2025-04-30 | `0001104659-25-042659` | 2025-01-22 |
+| UA | A · CONV | 2013 · 2014 | 10-K/A | 2013-02-25 | `0001336917-13-000013` | 2012-12-31 · 2013-01-31 |
+| WMT | SOLE | 2014 | 10-Q/A | 2013-10-21 | `0000104169-13-000039` | 2013-10-17 |
+| XOM | SOLE | 2012 | 10-K/A | 2011-02-28 | `0001193125-11-050134` | 2011-01-31 |
+
+**그 fact가 후보 중 보고일이 가장 늦었다면 `hi`가 그 amendment의 접수일이 되고, `G`는 등호로
+그 amendment 자신이 된다.** 13건 모두 뒤에 더 늦은 original filing이 있어서 그렇게 되지 않았고,
+**P2가 최종 선택한 fact 520개 중 amendment에서 온 것은 0개다.** 그러나 이 경로는 살아 있다.
+
+### K5.3 amendment가 `G`가 될 수 있는 날짜 구간의 총량
+
+62개 amendment 각각에 대해 **`hi`가 그 안에 있으면 C0가 그 amendment로 닫게 되는 구간**
+`(직전 K/Q family filing 접수일, 그 amendment 접수일]`을 계산했다.
+
+| | 값 |
+|---|---|
+| 노출 구간이 **0일이 아닌** amendment | **56 / 62** |
+| 노출 구간 총합 | **2,037일** (중앙값 25일 · 최대 182일) |
+| 그중 연구 시대(2009~) | **23건 · 732일** |
+
+**넓은 것 몇 개**(2009 이후): COST `10-Q/A` 2015-08-31 **88일** · TSLA `10-K/A` 2020-04-28
+**75일** · F `10-K/A` 2016·2017·2018 각 **48일** · GOOGL `10-K/A` 2016-03-29 **47일** ·
+WMT `10-Q/A` 2013-10-21 **46일** · MA `10-K/A` 2010-04-22 **63일**.
+
+**격자의 실제 `hi`가 이 구간 안에 들어간 적은 0건이다.** 그러나 여러 건이 **구간 경계에
+정확히 붙어 있다** — TSLA `hi=2021-04-28`은 노출 구간 `(2021-04-28, 2021-04-30]`의 **하한
+바로 그 날**이고, 같은 모양이 TSLA 2022·2025·2026과 COST 2015에도 있다. META는 `hi=2016-04-28`,
+노출 구간 상한은 `2016-04-27`로 **하루 차이**다.
+
+> **즉 C0가 이 격자에서 무사한 이유는 "amendment가 closing filing이 되지 않는다"는 성질이
+> 아니라, `hi`들이 우연히 노출 구간 밖에 떨어졌기 때문이다. 하루 단위의 여유다.**
+
+## K6. acceptance-date 규약이 다르면 그 하루가 실제로 넘어간다
+
+**이번에 부수적으로 발견했고, 그 자체가 K5의 실증이다.**
+
+| 층 | 쓰는 값 |
+|---|---|
+| `qv_sec_filings.acceptance_eastern_date` · `qv_submissions._acceptance_eastern_date` | **America/New_York 변환** |
+| Follow-up 3·4의 연구 하네스 (`sp.py`의 `acc_date = acceptance[:10]`) | **UTC 절단** |
+
+20 발행사 K/Q family **1,959건 중 150건(7.7%)**에서 두 값이 하루 다르다
+(장 마감 후 20:00 ET 이후 접수분).
+
+**한쪽만 Eastern으로 바꾸면**(ledger는 Eastern, fact의 `hi`는 UTC 절단) 결과가 이렇게 바뀐다.
+
+| | C0 | C1 |
+|---|---|---|
+| COMPLETE | 494 | 490 |
+| INCOMPLETE | **26** | **30** |
+| **amendment 때문에 C0만 COMPLETE** | — | **4** |
+
+그 4건이 전부 **TSLA의 Part III 전용 `10-K/A`**다(formation 2021 · 2022 · 2025 · 2026).
+
+```text
+TSLA formation 2021 · hi=2021-04-28
+    C0 -> G = 10-K/A 2021-04-30  (Part III만, General Instruction G(3))  <= formation  -> COMPLETE
+    C1 -> G = 10-Q  2021-07-27                                            >  formation  -> INCOMPLETE
+```
+
+> **이 4건은 규약을 섞어서 생긴 artifact이고 실제 결함이 아니다** — 양쪽을 같은 규약으로
+> 맞추면 K4처럼 0건으로 돌아온다. **그러나 그것이 정확히 K5의 논점이다.**
+> **날짜 하루가 어긋나는 것만으로 C0의 closing filing이 "Part III만 담은 10-K/A"가 된다.**
+> 그 문서에는 재무제표가 없고, 따라서 S-X 3-04도 SAB 4.C도 걸 곳이 없다.
+
+**규약 불일치 자체는 이 correction의 범위 밖이라 고치지 않는다. K10에 열린 항목으로 남긴다.**
+
+## K7. synthetic regression — 작업지시가 요구한 shape
+
+실제 발행사 달력을 본뜬 **가상 원장**이다. 실제 데이터가 아니다.
+
+```text
+가상 발행사 SYN (12월 결산)
+    2022-04-25  10-Q     FY2022 Q1  <- 후보 share fact를 준 original Q
+    2022-07-25  10-Q     FY2022 Q2
+    2022-10-24  10-Q     FY2022 Q3
+    2023-01-09  10-Q/A   Q3의 증명서 exhibit만 수정. subsequent events 반영 안 함
+    2023-07-05  10-K     FY2022 연차 — 연체 제출
+
+    December  = 2022-12-30      formation = 2023-06-30
+    후보 fact의 filing 보고일 = 2022-10-24   ->  interval (lo, hi] = (2022-10-24, 2022-12-30]
+    실제 share-basis event   = 2022-11-14  x2   ->  interval 안이다
+```
+
+| | `G` | `G <= formation`? | 판정 |
+|---|---|---|---|
+| **C0** | `10-Q/A` **2023-01-09** | 예 | **`COMPLETE`** ← **틀렸다** |
+| **C1** | `10-K` **2023-07-05** | 아니오 | **`INCOMPLETE` → fail-close** ← 옳다 |
+
+**C0가 왜 틀렸는가.** `10-Q/A`는 Rule 12b-15의 "each item as amended"에 따라 증명서 item만
+담고, GOOGL·TSLA 원문의 표준 문구대로 **"does not reflect events occurring after the filing of
+the Original"이다. 2022-11-14의 event를 공시할 의무가 없다.** 그런데 C0는 그 문서가
+`hi` 뒤에 있다는 사실만으로 구간을 닫는다.
+
+**기대와 일치한다** — 작업지시가 예고한 그대로다.
+
+## K8. `SEARCH`는 좁히지 않는다 — amendment는 evidence로 남는다
+
+**C1은 `CLOSURE`의 자격만 좁히고 `SEARCH` 범위는 그대로다.** amendment가 실제로 event를
+공시했다면(예: 전체 재제출형 XOM·UA) 그 증거는 그대로 쓴다. 다만 **그 문서의 침묵을
+absence의 근거로 쓰지 않는다.**
+
+| | 값 |
+|---|---|
+| `SEARCH` 창 안에 amendment가 하나라도 있는 관측 | **47 / 520** |
+| 창 안에 등장하는 고유 amendment accession | **22** (`10-K/A` 19 · `10-Q/A` 3) |
+| 격자 전체의 고유 조회 대상 K/Q accession | **1,225** (C0·C1 동일) |
+
+**C1로 바꿔도 조회 부담이 늘지 않는다** — 이 격자에서 `G`가 하나도 안 바뀌므로 창도 같다.
+
+## K9. ground truth 확인 범위
+
+**§9·F14·G15·H14·I13·J9와 같은 기준이다. 525 관측 전부를 사람이 원문과 1:1 대조하지 않았다.**
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| Exchange Act Rule 12b-15 | `CFR-2024-title17-vol4-sec240-12b-15` (govinfo), 조회 2026-08-29 | K2 인용 |
+| Form 10-K General Instruction G(3) · A(4) | `https://www.sec.gov/files/form10-k.pdf`, 조회 2026-08-29 | K2 인용 |
+| **amendment 25건의 explanatory note** | 각 accession의 primary document 직접 파싱 | **K3 — 25건 전부 사람이 읽었다** |
+| AAPL 10-K/A의 `speaks as of` 문구 | `0001193125-10-012091` 본문 | K3.1 인용 |
+| acceptance-date 규약 차이 | `qv_submissions._acceptance_eastern_date`를 직접 호출해 1,959건 대조 | K6 (150건 불일치) |
+
+기계로만 검증한 것: 전 form submissions 원장(20 발행사)의 amendment 62건 분류,
+`c0c1b.py`의 C0/C1 판정(두 규약), `hazard.py`의 `hi` 유형 분해, `expose.py`의 노출 구간.
+
+**K7의 원장은 합성이다.** 실제 발행사 데이터가 아니며 어떤 통계에도 들어가지 않는다.
+K5.3의 `2009-01-01` 시대 절단은 진단용이고 계약에 안 들어간다.
+
+## K10. 이번에 결정하지 않은 것
+
+1. **acceptance-date 규약 통일**(K6). 연구 하네스는 `acceptance[:10]`(UTC 절단)을 쓰고
+   `qv_sec_filings`는 `acceptance_eastern_date`를 쓴다. **1,959건 중 150건이 하루 다르다.**
+   Follow-up 3·4의 숫자가 그 규약 위에서 계산됐다는 사실을 기록해 둔다.
+   **production 계약은 이미 Eastern이므로 계약 변경이 아니라 하네스 정합 문제다.**
+2. **재작성 amendment의 filing-basis anchor**(K3.1). AAPL 10-K/A는 `speaks as of` 원 대차대조표일이라고
+   밝히는데 anchor 계약은 접수일 regime으로 읽는다. **anchor는 CLOSED이므로 열지 않는다.**
+3. **`qv_sec_filings`의 form CHECK와 `ALLOWED_FORMS`는 건드리지 않는다.** amendment는 여전히
+   적재·검색 대상이고, 이번 correction은 **`CLOSURE`의 자격만** 좁힌다. J7의 통합 결론
+   (기존 원장을 그대로 읽고 event·coverage ledger 둘만 새로 둔다) 그대로다.
+4. **`INCOMPLETE` 경로의 실측은 여전히 0건이다**(J8-3). C1로 좁혀도 이 표본에서는
+   fail-close가 한 번도 집행되지 않는다.
+5. **amendment가 실제로 event를 처음 공시한 사례**는 이 표본에 없다. C1이 evidence로서의
+   amendment를 버리지 않는 것은 규정 논리이지 실측이 아니다.
+
+## User decision — amendment closure
+
+추천: **B — `CLOSURE`는 original `10-K` · `10-Q`만 인정한다.**
+
+```text
+CLOSURE   G := 그 issuer의 filing 중 form이 '10-K' 또는 '10-Q'이고
+               acceptance_eastern_date >= hi 인 최초 filing
+          G가 존재하고 G.acceptance_eastern_date <= formation
+
+SEARCH    바뀌지 않는다 — (lo, G.acceptance] 안의
+          10-K · 10-K/A · 10-Q · 10-Q/A를 전부 성공적으로 가져와 검색한다
+
+즉 amendment는 evidence가 될 수 있지만 absence를 닫는 filing이 아니다.
+```
+
+- **규정이 그렇게 말한다.** Rule 12b-15는 "**each item as amended**"만 요구하고 원 filing 이후
+  사건의 반영을 요구하지 않는다. Form 10-K General Instruction G(3)은 **재무제표가 전혀 없는
+  Part III 전용 10-K/A**를 정상 형태로 예정한다. `CLOSURE`의 근거인 S-X 3-04와 SAB 4.C는
+  **재무제표에 붙는 의무**라 그런 문서에는 걸 곳이 없다(K2).
+- **표본이 그것을 확인한다.** 읽은 25건 중 **원 filing 이후 사건을 반영한 것은 0건**이고,
+  여러 건이 "**nor does it reflect events occurring after the filing of the Original**"이라고
+  명시한다(K3). 유일한 재작성 amendment조차 "**speaks as of**" 원 대차대조표일이라고 밝힌다(K3.1).
+- **form 이름으로도 본문 유무로도 가를 수 없다.** XOM·UA는 전체를 재제출해 재무제표를 그대로
+  담고 있지만 explanatory note가 "재무 정보 변화 없음"이라고 못박는다(K3).
+  **그래서 개별 판독이 아니라 form 자격으로 잘라야 한다.**
+- **비용이 0이다.** 525 격자에서 `COMPLETE` 520 유지, `INCOMPLETE` 0 유지, closing accession
+  변경 0건, 조회 대상 1,225건 동일(K4·K8).
+- **이득은 규정으로 뒷받침되는 구멍 하나를 닫는 것이다.** synthetic regression에서
+  **C0는 잘못 `COMPLETE`, C1은 `INCOMPLETE` → fail-close**다(K7).
+- **지금 0인 것은 여유가 아니다.** amendment가 closing filing이 될 수 있는 날짜 구간이
+  56개 amendment에 걸쳐 **2,037일**(2009 이후 23건 · 732일) 열려 있고, 실제 `hi` 여러 개가
+  그 경계에 **하루 차이**로 붙어 있다(K5.3). **규약을 하루 어긋나게 하는 것만으로
+  TSLA의 Part III 전용 10-K/A가 4개 관측의 closing filing이 된다**(K6).
+
+**A를 추천하지 않는 이유.** A는 "amendment도 `hi` 뒤에 있으면 닫는다"인데, **그 문서가 event를
+공시할 의무를 지는지를 form이 보장하지 않는다.** completeness는 J2가 세운 기준 그대로
+**침묵이 정보여야** 성립하고, Rule 12b-15 아래 amendment의 침묵은 정보가 아니다.
+**표본에서 아직 사고가 안 났다는 것은 A의 근거가 되지 못한다** — K5가 그 0이 구조가 아니라
+배치의 결과임을 보인다.
+
+> **이 correction은 Follow-up 4의 source-set 결론(S1 = K/Q family)을 바꾸지 않는다.**
+> `SEARCH`는 여전히 네 form 전부를 훑고 `qv_sec_filings`도 그대로다.
+> **좁아지는 것은 `CLOSURE`의 자격 하나뿐이다.**
+
+**이 correction도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
