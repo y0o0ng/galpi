@@ -6879,3 +6879,491 @@ chain이 실제로 존재하고, **O5·O6에서 그것이 문자 그대로 작�
    **문서 identity나 문자 동일성으로 비교하면 근거 없이 fail-close한다.**
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+# Follow-up 9 — prose share-class identity mapping (2026-08-30)
+
+**Status: RESEARCH EVIDENCE ONLY.** SEC prose에서 나온 사람이 읽는 class 이름을 stable
+`class_id`로 PIT·fail-close하게 resolve하기 위한 최소 semantic contract만 정한다.
+**production code · schema · tests · roadmap을 수정하지 않았고 production DB에 쓰지 않았다.**
+factor·ME·coverage·Gate·B/M·rank·returns로 범위를 넓히지 않았다.
+
+> **절 접두어가 `P`가 아니라 `Q`다.** 작업지시 §12가 정책 이름으로 `P0/P1/P2`를 쓰기 때문에
+> 절 번호와 섞이지 않게 한 칸 건너뛴다.
+
+## Q1. 이번 질문 하나
+
+> **`affected_class_names_raw = ["Class B common stock"]`처럼 사람용 이름이 왔을 때,
+> 어떤 explicit evidence와 어떤 비교 규칙이 있을 때만
+> `issuer + prose name + PIT time → stable class_id`로 resolve해도 되는가?**
+
+## Q2. §4 세 층을 분리한다 — 이 표본에서 셋이 실제로 어긋난다
+
+```text
+ECONOMIC CLASS   stable class_id                      예) UA CONV
+XBRL ALIAS       axis/member QName alias              예) ConvertibleCommonStockMember
+PROSE ALIAS      SEC 본문·charter·표지의 사람용 이름   예) "Class B Convertible Common Stock"
+```
+
+**UA가 셋이 전부 다른 이름인 사례다.** 그리고 **UA에는 `CommonClassBMember`가 아예 없다** —
+prose는 `Class B`인데 XBRL member는 `ConvertibleCommonStockMember`다.
+**이름 유사도로 이었다면 UA는 영원히 연결되지 않는다.**
+
+## Q3. §5 anchor의 raw prose alias 전수
+
+**표본을 넓히지 않았다.** Follow-up 7·8이 쓴 anchor의 10-K 본문과 표지에서 **실제로 관측된
+문자열만** 모았다. 본문은 이미 받아둔 24개 10-K, 표지는 `R1.htm` 렌더링이다.
+
+| issuer | economic class | 관측된 prose alias (본문 · 표지) |
+|---|---|---|
+| **UA** | **CONV** | `Class B Convertible Common Stock` · `Class B Convertible Stock` · `Class B Common Stock` · `Class B common stock` · `Class B Stock` |
+| UA | A | `Class A Common Stock` · `Class A common stock` · `Class A Stock` · `Class A` |
+| UA | C | `Class C Common Stock` · `Class C common stock` · `Class C shares` · `Class C` |
+| **CMCSA** | A | `Class A common stock` · `Class A Common Stock` · `Class A Common stock` · `Class A stock` · `Class A shares` · `Class A common shares` · `Class A` |
+| **CMCSA** | **ASPECIAL** | `Class A Special common stock` · `Class A Special Common Stock` · `Class A Special` · **`ClassA Special Common Stock`**(표지) |
+| CMCSA | B | `Class B common stock` · `Class B Common Stock` · `Class B` |
+| **V** | B | `class B common stock` · `Class B common stock` · `class B` |
+| **V** | B1 | `class B-1 common stock` · `Class B-1 common stock` · `class B-1` |
+| **V** | B2 | `class B-2 common stock` · `Class B-2 common stock` |
+| V | A · C | `class A common stock` … · `class C common stock` … |
+| **NKE** | **A** | `Class A Common Stock` · `Class A` · **`Class A Convertible Common Stock`**(표지) |
+| NKE | B | `Class B Common Stock` · `Class B Common shares` · `Class B Shares` · `Class B common` · `Class B` |
+| **GOOGL** | **C** | `Class C capital stock` · `Class C Capital Stock` · `Class C stock` · `Class C shares` · `Class C` |
+| GOOGL | A · B | `Class A common stock` … · `Class B common stock` … |
+| **F** | **COMMON** | `Common Stock` |
+| F | B | `Class B Stock` · `Class B stock` · `Class B` |
+| MA | A · B | `Class A common stock` … · `Class B common stock` · `Class B common shares` · `Class B Common stock` … |
+
+**관측 alias 총 82개다**(본문 79 + 표지에서만 나온 3).
+
+**§9에 대한 답은 예다.** **UA CONV 하나가 prose alias 다섯 개로 불린다.**
+`many prose aliases -> one class`를 허용해야 하고, **alias를 class identity 자체로 쓸 수 없다.**
+
+**세 가지를 함께 기록한다.**
+
+- **GOOGL Class C는 `capital stock`이지 `common stock`이 아니다.** 그리고 2016~2019 10-K는
+  `Class C capital stock`, 2023 이후는 `Class C stock`으로 **표현 자체가 바뀐다.**
+- **NKE Class A의 표지 label이 `Class A Convertible Common Stock`이다.** UA의 CONV는
+  `Class B Convertible Common Stock`이다. **`Convertible`이라는 수식어가 발행사마다 다른
+  글자에 붙는다.**
+- **F는 `Class B Stock`이고 `common`이 없다.** 그리고 다른 class 이름이 `Common Stock`이다.
+
+## Q4. §7 N0~N4 비교 — 실제 82개 alias에 적용
+
+`N4`(fuzzy/token similarity/embedding/LLM)는 **구현하지 않았다.** 원리상 production 후보가
+아니고, 아래 N0~N3만으로 판단이 갈린다.
+
+```text
+N0  raw exact               원문 문자열 그대로
+N1  presentation-only       NFKC · trim · 내부 공백 1칸 · casefold
+                            (구두점 · 하이픈 · 서수 · 단어는 보존)
+N2  legal-word strip        N1 + "common stock/capital stock/common shares/convertible/
+                            common/stock/shares" 제거
+N3  punct/ordinal           N2 + "class" 제거 · 하이픈 제거 · 공백 제거
+```
+
+**issuer-scoped 결과** (같은 issuer 안에서 한 키가 두 economic class로 가면 충돌):
+
+| 정규화 | 키 수 | 정당한 병합 | **class 충돌** | 퇴화 키 |
+|---|---|---|---|---|
+| N0 raw exact | 82 | 0 | **0** | — |
+| **N1 presentation** | **60** | **22** | **0** | **없음** |
+| N2 legal-word strip | 21 | 61 | 0 | **`F` → `''`** |
+| N3 punct/ordinal | 21 | 61 | 0 | **`F` → `''`** |
+
+> **N2·N3는 Ford의 `Common Stock`을 빈 문자열로 만든다.** legal word를 다 떼면 **generic
+> 이름을 가진 class는 표현할 자체가 남지 않는다.** 이 표본에서는 빈 키가 하나뿐이라 충돌로
+> 세지 않았지만, **generic-name class가 둘인 발행사에서는 즉시 silent collision이다.**
+> **N2·N3를 canonical 비교 키로 쓰지 않는다.**
+
+**전역(issuer 무시) 결과 — §8 검증:**
+
+| 정규화 | 다중 매핑 키 | 최악 키 |
+|---|---|---|
+| N0 | 14 | `Class A` → **6개** (issuer, class) |
+| N1 | 13 | `class a` → **6개** |
+| N2 | 3 | `class b` → **7개** |
+| N3 | 3 | `b` → **7개** |
+
+> **alias mapping은 반드시 issuer-scoped다.** 전역 `Class B`는 이 anchor set만으로도
+> **7개의 서로 다른 economic class**를 가리킨다. XBRL 쪽도 같다 —
+> **`CommonClassBMember`가 BRK·CMCSA·F·FOX·GOOGL·MA·META·NKE·V 아홉 발행사에서 각각 다른
+> class를 뜻한다.**
+
+### Q4.1 어떤 정규화도 고치지 못하는 것 — Comcast의 공백 결손
+
+Comcast 표지 label은 **`ClassA Special Common Stock`**이다. `Class`와 `A` 사이 공백이 없다.
+XBRL member도 같은 결손을 갖는다 — **`ClassaSpecialCommonStockMember`**(소문자 `a`).
+문서 전체에는 이 class의 member 이름이 **넷**이다.
+
+```text
+ClassaSpecialCommonStockMember   ClassASpecialCommonStockMember
+CommonClassASpecialMember        ClassSpecialCommonStockMember   <- A가 아예 없다
+```
+
+**N0~N3 어느 것도 `Class A Special Common Stock`과 `ClassA Special Common Stock`을 합치지 못한다.**
+
+| 정규화 | 결과 |
+|---|---|
+| N0 | `'Class A Special Common Stock'` vs `'ClassA Special Common Stock'` → 갈림 |
+| N1 | `'class a special common stock'` vs `'classa special common stock'` → 갈림 |
+| N2 | `'class a special'` vs `'classa special'` → 갈림 |
+| N3 | `'aspecial'` vs `'classaspecial'` → 갈림 |
+
+> **정규화는 발행사의 오타를 고치지 못한다.** 더 공격적으로 밀면(공백 전부 제거) 합쳐지지만,
+> **그 순간 `Class A` + `Special`과 `ClassA` + `Special`의 구분도 함께 사라진다.**
+> **따라서 실제 alias는 명시 등록으로만 닫힌다** — 이것이 P1을 P2보다 앞세우는 직접 근거다.
+
+## Q5. §6 무엇이 충분한 bridge인가 — 네 후보를 원문으로 시험
+
+### Q5.1 B0 raw name similarity — 반증된다
+
+**UA가 즉시 반증한다.** prose `Class B ...` ↔ XBRL `ConvertibleCommonStockMember`는
+**문자 유사도가 0에 가깝다.** 반대로 유사도가 높다고 이으면 UA에 존재하지도 않는
+`CommonClassBMember`를 찾게 된다.
+
+**그리고 prose 스캔 자체가 가짜 class 이름을 만든다.** MA 2025 10-K에서 `Class C`가 4회
+잡히는데 **전부 `ATM Operators **Class C**omplaint`의 단어 경계 실패다.** Mastercard에
+Class C는 없다. **B0/P2 계열은 이 문자열을 그대로 삼킨다.**
+
+### Q5.2 XBRL label linkbase — canonical bridge가 아니다
+
+**같은 accession의 label linkbase를 직접 읽었다**(`ua-20191231_lab.xml`).
+
+| member | role | label |
+|---|---|---|
+| `ConvertibleCommonStockMember` | `label`(표준) | **`Class A Common Stock And Class B Convertible Common Stock [Member]`** |
+| `ConvertibleCommonStockMember` | `terseLabel` | `Class A Common Stock And Class B Convertible Common Stock` |
+| `ConvertibleCommonStockMember` | `terseLabel` | `Class B Convertible Common Stock` |
+| `CommonClassAMember` | `terseLabel` | `Class A Common Stock` |
+
+> **한 member의 표준 label이 두 class를 한 문장에 담는다.** 표준 label을 bridge로 쓰면
+> UA의 `ConvertibleCommonStockMember`가 **`Class A`와도 연결된다.** 치명적이다.
+
+**Comcast는 다른 방식으로 나쁘다.** `CommonClassAMember`의 `terseLabel`이 대차대조표 캡션 전체다.
+
+> `Class A common stock, $0.01 par value—authorized, 7,500,000,000 shares; issued,
+> 4,651,093,045 and 4,842,108,959; outstanding, 3,778,302,017 and 3,969,317,931`
+
+**label은 발행사가 쓰는 표시 문자열이지 class 이름이 아니다. corroboration까지다.**
+
+### Q5.3 B1 — 표지(cover page) fact set이 가장 강한 bridge다
+
+**표지는 class 축 member마다 구조화된 fact를 함께 준다.** `R1.htm` 렌더링을 직접 읽었다.
+
+| issuer | class | 표지 행 이름 | `Security12b/12gTitle` | `TradingSymbol` | `EntityCommonStockSharesOutstanding` |
+|---|---|---|---|---|---|
+| GOOGL | A | `Class A` | `Class A Common Stock, $0.001 par value` | `GOOGL` | 5,833,000,000 |
+| GOOGL | C | `Class C` | `Class C Capital Stock, $0.001 par value` | `GOOG` | 5,497,000,000 |
+| **GOOGL** | **B** | `Class B` | **없음** | **없음** | 860,000,000 |
+| NKE | **B** | `Class B Common Stock` | **`Class B Common Stock`** | **`NKE`** | 1,188,015,740 |
+| **NKE** | **A** | `Class A Common Stock` | **없음** | **없음** | 288,887,752 |
+| MA | A | `Class A Common Stock` | `Class A Common Stock, par value $0.0001` | `MA` | 904,889,521 |
+| **MA** | **B** | `Class B Common Stock` | **없음** | **없음** | 6,818,985 |
+| **UA** | **CONV** | `Class B Convertible Common Stock` | **없음** | **없음** | 34,450,000 |
+| **CMCSA** | **B** | `Class B Common Stock` | **없음** | **없음** | 9,444,375 |
+| **F** | **B** | `Class B Stock` | **없음** | **없음** | 70,852,076 |
+| **V** | **B-1** | `Class B-1 common stock` | **`Class B-1 common stock, par value $0.0001`(12g)** | 없음 | 4,835,384 |
+| **V** | **B-2** | `Class B-2 common stock` | **`Class B-2 common stock, par value $0.0001`(12g)** | 없음 | 120,338,948 |
+
+**세 가지가 여기서 나온다.**
+
+1. **비상장 ordinary class가 표지에 전부 나타난다** — prose 행 이름 + 주식수로. **`CONVERSION_VALUE_PROXY`가
+   필요로 하는 바로 그 class들이다.**
+2. **NKE가 이름 추정을 그 자리에서 반증한다.** **상장 class가 `Class B`이고 `Class A`가 비상장이다.**
+   표지의 `Title of 12(b) Security = Class B Common Stock, Trading Symbol NKE`가 명시한다.
+   **"A가 상장"이라는 서수/이름 휴리스틱(B4)은 여기서 즉시 틀린다.**
+3. **bridge의 강도가 두 등급으로 갈린다.**
+   - **강한 등급**: `dei:Security12bTitle` / `Security12gTitle` — **발행사가 단언한 fact 값**이다.
+     상장 class와 12(g) 등록 class(V B-1·B-2·C)가 갖는다.
+   - **약한 등급**: 표지 presentation group의 **label** — 미등록 class(UA CONV · CMCSA B ·
+     GOOGL B · META B · F B · MA B)는 이것뿐이다.
+
+> **불편하지만 정직하게 적는다. 강한 bridge는 우리가 덜 필요한 class에 있고, 약한 bridge가
+> 우리가 가장 필요한 class에 있다.** 다만 Q5.2의 함정은 **표지 group의 label을 쓰면 피한다** —
+> UA의 문제 label은 표준 label이었고, 표지 group에 렌더링된 것은 단일 class label
+> `Class B Convertible Common Stock`이었다. **element의 기본 label이 아니라 표지 group에서
+> 쓰인 label을 봐야 한다.**
+
+**이 bridge는 새 계약이 아니다.** **Follow-up 2 G6이 이미 `ground truth class universe`를
+표지 case로 확정했고(CLOSED)**, 여기서는 그 표지에서 prose 이름을 함께 읽을 뿐이다.
+
+**표지에도 entity scope 함정이 있다.** Comcast 2014 표지에는 **`NBCUniversal Media, LLC [Member]`
+(CIK 0000902739)** 블록이 함께 있다. §2.1이 이미 버린 그 오염이 표지에서도 나온다.
+**registrant CIK가 아닌 블록은 배제해야 한다**(§15의 subsidiary/investee 실패 조건).
+
+### Q5.4 B2 — PIT identity chain
+
+한 source로 안 될 때 formation 시점에 usable한 explicit chain으로 잇는다.
+**Follow-up 8이 만든 governing-snapshot chain이 그대로 쓰인다** — charter의 class 정의 문구가
+prose 이름을 그대로 담는다(예: Comcast 2009 charter의 `Class A Special Common Stock`).
+**later filing을 과거로 소급하지 않는다는 조건은 Follow-up 8 O7·N9와 같다.**
+
+### Q5.5 B3 value/count equality · B4 ordinal/name heuristic — 둘 다 금지
+
+- **B3**: 표지에서 CMCSA Class B가 `9,444,375`주인데, **J4.1에서 이 숫자가 Class A 소급
+  재작성 잔여와 정확히 같았다.** 값 일치는 **다른 층의 우연**일 수 있다. corroboration까지다.
+- **B4**: NKE(상장이 B) · UA(prose B ↔ member `Convertible...`) · V(2024 이후 `class B` 부재)
+  **세 anchor가 각각 독립적으로 반증한다.**
+
+**코드에 이미 같은 계약이 잠겨 있다** — `trading/tests/test_qv_identity.py`의
+`test_unknown_member_fails_closed_without_name_similarity`가
+`ClassACommonStockMember`에 `ClassACommonSharesMember`를 물어보면 `UnresolvedIdentityError`를
+내도록 잠근다. **prose alias도 같은 자리에 있어야 한다.**
+
+## Q6. §10 같은 alias가 시간에 따라 다른 class를 가리키는가 — 그렇다
+
+**Visa가 결정적이다.**
+
+| 시기 | `class B common stock`의 의미 |
+|---|---|
+| 2008 ~ 2024-05 | **단일 class**(내부 `B`) |
+| 2024-05 exchange 이후 | **B-1·B-2를 아우르는 총칭** |
+
+2024 10-K 본문이 스스로 그렇게 쓴다.
+
+> "Visa may, but is under no obligation to, conduct a successive exchange offer if (i) one year
+> has passed since the initial exchange offer for **the next preceding class of class B common
+> stock**"
+
+그리고 **같은 10-K 표지에는 `class B` 행이 없다** — `Class A` · `Class B-1` · `Class B-2` ·
+`Class C` 넷뿐이다. 그런데 **본문에는 `class B common stock`이 13회 남아 있다**(전환권 서술 등).
+
+> **그러므로 2024 이후 source의 `class B common stock`은 단일 `class_id`로 resolve되면 안 된다.**
+> **`AMBIGUOUS -> fail-close`이고 tie-break하지 않는다.** 그리고 이것을 표현하려면
+> **alias에 `[effective_from, effective_to)` PIT 구간이 필요하다.**
+
+**CMCSA도 같은 구조다.** `class a special ...` 계열 alias는 **2015-12-11에 economic 구간이
+끝난다**(Follow-up 8 O5). 그 이후 filing에 그 이름이 나오면 **과거 서술**이지 active class가 아니다.
+
+**UA는 반대 사례다.** prose `Class B ...`는 전 구간 `CONV` 하나이고, `Class C`는 2016년에
+생겨 겹치지 않는다. **다만 ticker `UA`는 2016년에 Class A에서 Class C로 옮겨갔다** —
+`bars_daily`에서 `UAA`가 2006-01-03부터, `UA`가 2016-03-23부터인 것이 그 흔적이다.
+**symbol 층의 함정이지 prose alias의 함정이 아니고, 이미
+`test_ticker_rename_uses_class_history_not_current_ticker`가 잠근다.**
+
+## Q7. §11 alias 구간의 두 시간
+
+Follow-up 7 N2·Follow-up 8 O2와 같은 분리를 그대로 쓴다.
+
+```text
+ECONOMIC EFFECTIVE TIME   그 이름이 실제로 그 class를 가리킨 기간
+EVIDENCE USABILITY TIME   그 mapping을 증명하는 source가 공개돼 쓸 수 있게 된 시점
+```
+
+**UA가 이 분리를 수치로 보여준다.** prose `Class B Convertible Common Stock`은 **2005년 IPO부터**
+그 class를 가리켰지만, **그것을 class 축 member에 묶어 증명하는 표지 fact는 2011-08-05
+10-Q가 처음이다**(그 이전 filing에는 `R1.htm` 자체가 없다 — XBRL 표지 태깅 이전).
+
+> **economic 구간은 2005년부터인데 usable 구간은 2011-08-05부터다.** 6년 차이다.
+> **later evidence로 2010년 filing의 이름을 조용히 푸는 것이 lookahead다.**
+
+권고 규칙:
+
+```text
+usable(alias mapping, source document) iff
+    mapping evidence의 historical_usable_session <= (그 source/formation의 cutoff)
+  AND source의 semantic date ∈ alias의 economic interval
+```
+
+**두 조건은 AND이고 서로를 대체하지 않는다.**
+
+## Q8. §12 P0 / P1 / P2 비교
+
+| 정책 | 이 표본에서 | 판정 |
+|---|---|---|
+| **P0** `ACCESSION_LOCAL_ONLY` | **가장 보수적이고 실제로 작동한다** — 표지 bridge가 filing마다 있으므로 매번 그 filing 안에서 풀 수 있다. 다만 **표지가 없는 filing**(2011 이전 UA)에서는 아무것도 못 푼다. | 안전, 비용 큼 |
+| **P1** `EXPLICIT PIT ALIAS REGISTRY` | 한 번 확인한 bridge를 issuer-scoped PIT relation으로 등록하고 exact key lookup. **`ClassA Special` 같은 오타를 명시 등록으로만 닫을 수 있고**(Q4.1), XBRL alias 계약과 구조가 같다. 위험은 구간·knowledge time을 잘못 여는 것인데 **Q7의 AND 조건이 막는다.** | **추천** |
+| **P2** `NAME HEURISTIC` | **세 anchor가 독립적으로 반증한다**(NKE 상장이 B · UA member 이름 · V 2024 총칭). 게다가 `Class Complaint` 같은 가짜 이름을 삼킨다. | **control 전용** |
+
+**P0와 P1은 배타가 아니다.** **P1의 등록 근거가 곧 P0가 쓰는 그 accession-local bridge다.**
+차이는 **재사용 여부**뿐이고, 재사용에 필요한 안전장치가 PIT 구간이다.
+
+## Q9. §13 provenance — alias마다 보존해야 할 것
+
+**정확한 SQL DDL은 만들지 않았다**(§18).
+
+```text
+class_id                     stable economic class
+issuer_id                    alias는 반드시 issuer-scoped다 (Q4 전역 충돌 7개)
+raw_prose_name               원문 문자열 그대로 (ClassA Special 같은 오타 포함)
+comparison_key               N1 결과 (정규화 단계도 함께 기록)
+effective_from / to          economic interval  (V B는 2024에 닫힌다)
+source_accession             bridge를 준 accession
+source_form                  10-K | 10-Q | 8-K | EX-3.x charter
+acceptance_datetime          filing index 기준
+historical_usable_session    acceptance에서 파생 (Q7)
+source_document              문서 파일명 (예: R1.htm / 표지 group)
+exact_source_span            인용 원문
+bridge_type                  COVER_TITLE_FACT | COVER_GROUP_LABEL | GOVERNING_INSTRUMENT
+bridge_provenance            어느 fact/label/조항에서 왔는지
+source / source_version      calendar·price와 같은 축
+```
+
+**`bridge_type`을 반드시 남긴다.** Q5.3이 보인 대로 **`Security12bTitle` fact와 표지 group
+label은 증거 강도가 다르고, 강한 쪽이 없는 class가 정확히 우리가 쓰려는 class들이다.**
+그것을 지우면 나중에 "이 alias가 fact로 확인된 것인지 label로 확인된 것인지" 복원할 수 없다.
+
+## Q10. §14 어디에 둘 것인가 — S1(별도 relation)
+
+| 후보 | 평가 |
+|---|---|
+| **S0** `qv_share_classes`에 `prose_name` 컬럼 추가 | **탈락.** PK가 `(class_id, effective_from, source_version)`이라 **alias 하나당 identity row를 복제**해야 한다. UA CONV는 alias가 5개이므로 economic class row가 5배로 늘고, `resolve_member`·`_active_class_by_id`의 `_one_class`가 **정상 상태에서 `AmbiguousIdentityError`를 낸다.** |
+| **S1** 별도 `qv_share_class_prose_aliases` relation | **추천.** many aliases → one class가 row로 자연스럽고, PIT 구간·alias별 provenance·`bridge_type`을 alias 단위로 갖는다. **CLOSED인 "XBRL alias를 economic class row에서 분리"를 그대로 지킨다.** |
+| **S2** XBRL·prose alias를 `type` 컬럼 하나로 묶은 generic table | **탈락.** 두 층의 **비교 규칙이 근본적으로 다르다** — QName은 exact match가 정본이고(코드가 이미 그렇다) prose는 N1 정규화 키가 필요하다. 한 테이블에 두면 **어느 행에 어떤 비교를 적용할지 `type` 분기로만 결정**되고, 그 분기를 틀리면 QName에 정규화가 걸려 조용히 잘못 매칭된다. `bridge_type`·`comparison_key` 같은 prose 전용 컬럼도 XBRL 행에서 영영 NULL이다. |
+
+## Q11. §15 fail-close 조건
+
+```text
+1. alias 등록이 없다                                      -> UNRESOLVED
+2. 같은 issuer·같은 시점에 같은 키가 >1 class로 간다        -> AMBIGUOUS (tie-break 금지)
+3. alias의 economic interval이 불명확하다                  -> UNRESOLVED
+4. bridge evidence가 historical cutoff 이후다              -> UNRESOLVED (lookahead 차단)
+5. generic "common stock"이 여러 class를 뜻할 수 있다       -> AMBIGUOUS
+      (Follow-up 2 G7의 dimensionless 계약과 같은 자리)
+6. proposed / 미발효 class와 active class가 섞인다          -> UNRESOLVED (J4.2 META Class C)
+7. source가 subsidiary/investee class를 말한다             -> 배제 (표지의 NBCUniversal 블록)
+8. 근거가 이름 유사도뿐이다                                 -> UNRESOLVED
+```
+
+**5번과 8번은 이 표본에서 실제로 발화한다** — Visa 2024의 `class B common stock`(5번)과
+MA의 `Class Complaint`(8번)다.
+
+## Q12. §16 diagnostic — UA 17 class-year
+
+**전체 census를 다시 돌리지 않았다.** Follow-up 7 N15에서 `IDENTITY_UNRESOLVED`였던
+**UA CONV 17 class-year에만** 추천 정책을 적용했다.
+
+**bridge 가용 시점을 실측했다.** UA 표지에 `Class B Convertible Common Stock` 행이 있는
+가장 이른 filing은 **10-Q `0001193125-11-210817`(accepted 2011-08-05)**이고,
+10-K로는 `0001193125-12-078826`(accepted 2012-02-25)이다. **그 이전 filing에는 `R1.htm`이 없다.**
+
+| formation | December D | PIT-usable bridge (acceptance ≤ 그해 6월) | 판정 |
+|---|---|---|---|
+| 2010 | 2009-12-31 | **없음** | **UNRESOLVED** |
+| 2011 | 2010-12-31 | **없음** (가장 이른 것이 2011-08-05) | **UNRESOLVED** |
+| 2012 ~ 2026 | | 2011-08-05 이후 매 filing | **RESOLVED** (15) |
+
+```text
+resolved     15
+unresolved    2   (formation 2010 · 2011 — bridge 자체가 아직 없다)
+ambiguous     0
+```
+
+> **17 중 15가 풀린다.** 그리고 **못 푸는 2개는 정책이 보수적이어서가 아니라 그 시점에
+> 증거가 존재하지 않아서**다. Q7의 lookahead 금지가 정확히 그 둘을 막는다.
+
+**controls에서 silent mis-resolution 0을 확인했다.**
+
+| control | 검증 | 결과 |
+|---|---|---|
+| **CMCSA** | A / A Special / B가 N1 issuer-scoped에서 갈리는가 | **충돌 0.** 다만 `ClassA Special`은 정규화로 합쳐지지 않아 **별도 alias로 등록해야** 하고, 등록 전에는 `UNRESOLVED`다(silent 아님) |
+| **V** | B / B-1 / B-2가 갈리는가 | **문자 수준 충돌 0.** 2024 이후 `class B`는 Q6대로 `AMBIGUOUS -> fail-close` |
+| **NKE** | 상장이 B인데 A로 잘못 풀리는가 | **0.** 표지 `Security12bTitle`이 `Class B Common Stock`을 명시 |
+| **GOOGL** | A/B/C clean positive control | **충돌 0** |
+| **F** | generic `Common Stock`과 `Class B Stock` 공존 | **N1에서 0.** **N2·N3에서는 `Common Stock`이 빈 키가 되어 위험** |
+
+**Gate C · `coverage_start` · B/M · rank · returns는 계산하지 않았다.**
+
+## Q13. ground truth 확인 범위
+
+**§9·F14·G15·H14·I13·J9·K9·L14·M14·N16·O14와 같은 기준이다.**
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| 본문 prose alias | 이미 받아둔 24개 10-K 전수 스캔 | Q3 |
+| 표지 class label·title·symbol·shares | 7 anchor × 대표 3개 filing의 `R1.htm` | Q5.3 |
+| XBRL label linkbase | `ua-20191231_lab.xml` · `cmcsa-20241231_lab.xml` | Q5.2 |
+| XBRL member 이름 | 이 문서의 기존 표에서 발행사별로 추출 | Q4 |
+| UA bridge 가용 시점 | UA 10-K 18건 + 10-Q 7건의 `R1.htm` 유무 | Q12 |
+| Visa 총칭 용법 | 2024 10-K 본문 | Q6 |
+| MA false positive | 2025 10-K 본문 4건 전수 | Q5.1 |
+
+**정직하게 적을 한계 다섯.**
+
+1. **alias 목록은 이 24개 10-K와 21개 표지에서 관측된 것뿐이다.** 8-K·proxy·charter 본문의
+   표현은 스캔하지 않았다. **82개는 하한이지 전수가 아니다.**
+2. **alias → class 라벨은 사람이 준 ground truth다**(§14 선례와 같다). 기계가 재현하는 방법을
+   만들지 않았다.
+3. **`class 충돌 0`은 이 anchor set의 결과다.** 20 issuer 전체나 S&P 500으로 넓히면
+   같은 issuer 안에서 충돌하는 키가 나올 수 있다. **없다는 것을 증명하지 않았다.**
+4. **UA formation 2010·2011의 `UNRESOLVED`는 표지 경로 기준이다.** charter(B2)나 다른
+   explicit bridge로 더 이른 근거를 만들 수 있는지는 이번에 찾지 않았다.
+5. **표지 group label이 항상 단일 class를 가리킨다는 것을 증명하지 않았다.** UA에서
+   표준 label은 두 class를 담았고 표지 group label은 단일이었다 — **관측이지 보장이 아니다.**
+
+## Q14. §18 이번에 결정하지 않은 것
+
+1. exact SQL DDL · `qv_share_class_xbrl_aliases` DDL
+2. production event extractor · legal-instrument ingest
+3. conversion schema redesign
+4. shares observation storage · cross-accession share conflict
+5. Gate C · B/M · rank · returns
+6. **prose alias 자동 추출기** — Q13-2대로 사람이 읽는 것으로 대신했다
+
+## User decision — prose share-class identity mapping
+
+### 추천: **B — issuer-scoped explicit PIT prose-alias relation + 최소 presentation normalization + fail-close**
+
+```text
+PROSE_ALIAS_RESOLVE(issuer, prose name, as_of)
+
+  1) alias는 반드시 issuer-scoped다
+        전역 "Class B"는 이 anchor set에서만 7개 class를 가리킨다
+        lookup key = (issuer_id, comparison_key, as_of)
+
+  2) comparison_key는 N1까지만 쓴다
+        NFKC · trim · 내부 공백 1칸 · casefold
+        구두점 · 하이픈 · 서수 · 단어는 보존한다
+        N2/N3(legal-word strip · 공백 제거)는 generic 이름을 빈 키로 만든다 -> 금지
+        N4(fuzzy/embedding/LLM)는 후보가 아니다
+
+  3) 등록은 explicit bridge가 있을 때만 한다
+        COVER_TITLE_FACT      dei:Security12bTitle / Security12gTitle  (fact 값, 가장 강함)
+        COVER_GROUP_LABEL     표지 presentation group의 class 축 label
+                              (element 기본 label을 쓰지 않는다 — UA는 두 class를 담는다)
+        GOVERNING_INSTRUMENT  charter/articles의 class 정의 문구
+        raw name similarity · value equality · ordinal 추정은 bridge가 아니다
+
+  4) alias는 PIT 구간을 갖는다  [effective_from, effective_to)
+        같은 issuer·같은 시점에 같은 키가 >1 active class -> AMBIGUOUS -> fail-close
+        tie-break 하지 않는다
+
+  5) 사용 조건은 두 축의 AND다
+        bridge evidence의 historical_usable_session <= 대상 cutoff
+        source의 semantic date ∈ alias economic interval
+
+  6) 저장은 별도 relation이다 (S1)
+        qv_share_classes에 컬럼을 붙이지 않는다 (identity row 복제 -> 정상 상태 Ambiguous)
+        XBRL alias와 한 테이블로 합치지 않는다 (비교 규칙이 다르다)
+
+  7) registrant CIK가 아닌 표지 블록은 배제한다 (NBCUniversal형)
+```
+
+**§17 기준으로 적는다.**
+
+- **A(accession-local only)를 단독으로 고르지 않는다.** 안전하지만 **같은 명시 bridge를 매
+  filing 다시 풀어야 하고**, 무엇보다 **`ClassA Special` 같은 오타 alias는 재사용 없이는
+  매번 새로 만나는 문제**가 된다. **다만 A는 B의 등록 근거 그 자체이므로 버리지 않는다** —
+  B는 A를 재사용 가능하게 만든 것이다.
+- **C(generic semantic/name canonicalization)를 고르지 않는다.** N2·N3가 **Ford의
+  `Common Stock`을 빈 문자열로 만들고**, 그러고도 **Comcast의 공백 결손은 못 고친다.**
+  **얻는 것 없이 잃기만 한다.**
+- **D(전부 포기)를 고르지 않는다.** B는 이 표본에서 **UA 17 중 15를 원문 근거로 닫는다.**
+  D를 고르면 그 15를 근거 없이 버리고, Follow-up 7 N15의 `IDENTITY_UNRESOLVED` 17이
+  영구 고정된다.
+
+### 함께 기억할 것 다섯
+
+1. **prose 이름과 XBRL member 이름은 닮을 의무가 없다.** UA는 prose가 `Class B ...`인데
+   member가 `ConvertibleCommonStockMember`이고, **UA에 `CommonClassBMember`는 존재하지 않는다.**
+2. **label을 bridge로 쓰면 안 된다.** UA `ConvertibleCommonStockMember`의 표준 label은
+   **`Class A Common Stock And Class B Convertible Common Stock`**으로 **두 class를 담는다.**
+3. **정규화는 오타를 고치지 못한다.** Comcast 표지의 `ClassA Special Common Stock`은
+   **N0~N3 어느 단계에서도** `Class A Special Common Stock`과 합쳐지지 않는다.
+   **명시 등록만이 답이다.**
+4. **같은 이름이 시간에 따라 다른 것을 뜻한다.** Visa의 `class B common stock`은 2024
+   exchange 이후 **B-1·B-2를 아우르는 총칭**이 되고, **그해 표지에는 `class B` 행이 없다.**
+   **PIT 구간 없이는 조용히 틀린다.**
+5. **서수·이름으로 상장 class를 추정하지 않는다.** **NKE는 상장이 `Class B`이고
+   `Class A`가 비상장이다.** 표지 `Security12bTitle`이 그것을 명시한다.
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
