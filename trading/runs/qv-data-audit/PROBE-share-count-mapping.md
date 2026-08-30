@@ -6354,3 +6354,528 @@ CONVERSION_VALUE_PROXY(unlisted ordinary class, formation)
    conversion 연구가 아니라 prose class-name 매핑이다.**
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+# Follow-up 8 — conversion legal-interval continuity (2026-08-30)
+
+**Status: RESEARCH EVIDENCE ONLY.** Follow-up 7이 확인한 fixed direct conversion mapping을
+December valuation에 쓸 때 **"그 ratio가 D 시점에도 여전히 유효했다"**를 어떤 mandatory
+evidence chain으로 말할 수 있는지만 검증한다. **production code · schema · tests · roadmap을
+바꾸지 않았고 production DB에 쓰지 않았다.** 새 ratio 의미 연구·Gate·B/M·rank·returns로
+범위를 넓히지 않았다.
+
+## O1. 이번 질문 하나
+
+> **`evidence at t0 says ratio = R`이라고 해서 `[t0, ∞)`로 자동 열어도 되는가?**
+
+**답은 아니오다.** 이 표본에서 **`NOT FOUND`를 `NO CHANGE PROVEN`으로 읽은 판정이 실제로
+있었고**(Follow-up 7의 META), 그 사이에 **charter가 세 번 교체됐다.**
+
+## O2. §2 공식 규정 — 원문 직접 확인
+
+**eCFR API로 title 17을 직접 받았다**(issue date `2026-08-17`, `up_to_date_as_of 2026-08-27`).
+블로그·법무법인 요약은 쓰지 않았다.
+
+| 규정 | 출처 | 조회 |
+|---|---|---|
+| **17 CFR 229.601** (Reg S-K Item 601) | `https://www.ecfr.gov/api/versioner/v1/full/2026-08-17/title-17.xml?part=229&section=229.601` | 2026-08-30 |
+| **17 CFR 240.12b-23** (Incorporation by reference) | 같은 API, `part=240&section=240.12b-23` | 2026-08-30 |
+| **17 CFR 249.308** (Form 8-K) | 같은 API, `part=249&section=249.308` | 2026-08-30 |
+| **Form 8-K Item 5.03** 본문 | `https://www.sec.gov/files/form8-k.pdf` (249.308은 form 본문을 담지 않는다) | 2026-08-30 |
+
+### O2.1 Item 601(b)(3)(i) — mandatory closure의 근거
+
+> "**(3)(i) Articles of incorporation.** The articles of incorporation of the registrant or
+> instruments corresponding thereto **as currently in effect and any amendments thereto**.
+> **Whenever the registrant files an amendment to its articles of incorporation, it must file a
+> complete copy of the articles as amended.** However, if such amendment is being reported on
+> Form 8-K (§ 249.308 of this chapter), the registrant is required to file **only the text of the
+> amendment** as a Form 8-K exhibit. In such case, **a complete copy of the articles of
+> incorporation as amended must be filed as an exhibit to the next Securities Act registration
+> statement or periodic report filed by the registrant to which this exhibit requirement applies.**"
+
+**`to which this exhibit requirement applies`가 핵심이고, 그 범위는 exhibit table이 정한다.**
+XML의 표 셀을 form 컬럼에 그대로 매핑해 읽었다.
+
+```text
+(3)(i) Articles of incorporation
+  S-1 X | S-3 - | SF-1 X | SF-3 X | S-4 X | S-8 - | S-11 X | F-1 X | F-3 -
+  F-4 X | 10 X | 8-K X | 10-D X | **10-Q X** | **10-K X** | ABS-EE -
+```
+
+> **10-Q와 10-K 둘 다 X다.** 그래서 charter amendment 뒤 complete copy가 실려야 하는
+> `next periodic report`가 **분기마다** 오고, **그 form이 정확히 `qv_sec_filings`가 이미 허용하는
+> `10-K / 10-K/A / 10-Q / 10-Q/A`다.** 새 filing corpus를 열지 않고 closure를 만들 수 있다.
+
+Exhibit Table Instruction 2가 한 갈래를 더 만든다.
+
+> "The 'X' designation indicates the documents which are required to be filed with each form
+> **even if filed previously with another document**, *Provided, However*, that such previously
+> filed documents **may be incorporated by reference** to satisfy the filing requirements."
+
+### O2.2 Rule 12b-23(c) — incorporation by reference의 modification 의무
+
+> "**(c) Exhibits.** Any document or part thereof filed with the Commission ... may be incorporated
+> by reference as an exhibit to any statement or report ... **If any modification has occurred in
+> the text of any document incorporated by reference since the filing thereof, the registrant must
+> file with the reference a statement containing the text of any such modification and the date
+> thereof.**"
+
+> **두 갈래가 모두 닫힌다.** charter가 그대로면 incorporation by reference가 유효하고,
+> 바뀌었으면 **601(b)(3)(i)의 complete copy** 또는 **12b-23(c)의 modification statement(본문+날짜)**가
+> 다음 K/Q에 반드시 나타난다. **어느 쪽이든 증거는 다음 periodic report의 exhibit index에 있다.**
+
+### O2.3 Form 8-K Item 5.03 — proxy exception이 명문이다
+
+> "**Item 5.03 Amendments to Articles of Incorporation or Bylaws; Change in Fiscal Year.**
+> 1. If a registrant with a class of equity securities registered under Section 12 of the Exchange
+> Act (15 U.S.C. 78l) amends its articles of incorporation or bylaws **and a proposal for the
+> amendment was not disclosed in a proxy statement or information statement filed by the
+> registrant**, disclose the following information: (i) the effective date of the amendment; and
+> (ii) a description of the provision adopted or changed by amendment and, if applicable, the
+> previous provision."
+> "**Instructions to Item 5.03.** 1. Refer to Item 601(b)(3) of Regulation S-K (17 CFR 229.601(b)(3))
+> regarding the filing of exhibits to this Item 5.03."
+
+> **§2C가 요구한 검증의 답이다. `absence of Item 5.03` ≠ `no charter amendment`.**
+> proxy/information statement로 제안된 amendment는 **애초에 Item 5.03 의무가 없다.**
+
+## O3. §5 NOT FOUND vs NO CHANGE PROVEN — 이 표본에서 실제로 갈렸다
+
+**Follow-up 7은 META Class B를 2012 charter 하나로 `2013~2026` 전체 ELIGIBLE로 놨다.**
+그 사이에 무슨 일이 있었는지 10-K exhibit index로 추적했다.
+
+| META 10-K | Exhibit 3.1이 가리키는 current-in-effect charter |
+|---|---|
+| 2013-02-01 ~ **2020-01-30** | 10-Q, 3.1, **July 31, 2012** |
+| **2021-01-28** | 10-Q, 3.1, **October 30, 2020** |
+| **2022-02-03** ~ 2024-02-02 | 8-K, 3.1, **October 28, 2021** |
+| **2025-01-30** · 2026-01-29 | 10-Q, 3.1, **August 1, 2024** (`including all amendments thereto`) |
+
+> **charter가 세 번 교체됐다.** Follow-up 7이 읽은 것은 첫 줄 하나뿐이다.
+> **결론은 우연히 맞았지만 근거는 `NOT FOUND`였다.**
+
+## O4. §10 META primary regression — 네 snapshot 전수
+
+`clause_sha`는 `3.8 Conversion of Class B Common Stock` 조항의 정규화 문자열 SHA-256 앞 12자다.
+**production용 fuzzy matcher를 만들지 않았고**(§14), SAME/CHANGED 라벨은 사람이 원문을 읽고 줬다.
+
+| snapshot | form / accession | acceptance | conversion clause | ratio | clause_sha | label |
+|---|---|---|---|---|---|---|
+| 2012-07-31 | 10-Q EX-3.1 `0001193125-12-325997` | 2012-07-31 16:39:19 | "3.8 Conversion of Class B Common Stock. (a) **Voluntary Conversion**. Each share of Class B Common Stock shall be convertible into **one (1)** fully paid and nonassessable share of Class A Common Stock at the option of the holder thereof at any time" | **1** | `5e21b7c8bd97` | 기준 |
+| **2020-10-30** | 10-Q EX-3.1 `0001326801-20-000084` | 2020-10-30 | 같은 문장 | **1** | `5e21b7c8bd97` | **SAME (문자 동일)** |
+| **2021-10-28** | 8-K EX-3.1 `0001326801-21-000071` | 2021-10-28 | 같은 문장, 절 번호만 `3.8` → `3.8.` | **1** | `9bc2c8ff6955` | **SAME (semantics)** |
+| **2024-08-01** | 10-Q EX-3.1 `0001326801-24-000069` | 2024-08-01 | 같은 문장 | **1** | `9bc2c8ff6955` | **SAME (문자 동일)** |
+
+**두 문서는 governing snapshot이 아니라 periodic description이라 제외했다** — 10-K의
+`EX-3.3 DESCRIPTION OF CAPITAL STOCK`(2020-01-30 14,416자 · 2022-02-03 14,693자)이다.
+본문이 스스로 그렇게 말한다.
+
+> "The description is intended as a summary, and is **qualified in its entirety by reference to our
+> restated certificate of incorporation** ... copies of which have been filed as exhibits to this
+> Annual Report on Form 10-K."
+
+그리고 **이 description의 명칭 변화가 amendment의 흔적을 남긴다** — 2020년은
+`our restated certificate`, 2022년은 `our **amended and** restated certificate`다.
+**그러나 §7대로 periodic prose만으로 governing instrument 변경을 확정하지 않았다.**
+
+### O4.1 META가 C1을 실증적으로 반증한다
+
+**2020-10-30 charter 교체 구간의 8-K를 전수 확인했다**(2020-01-01 ~ 2021-03-31, 10건).
+
+```text
+2020-01-29  2.02 8.01 9.01      2020-07-30  2.02 9.01
+2020-02-03  5.02 9.01           2020-10-29  2.02 9.01
+2020-03-09  5.02 9.01           2021-01-27  2.02 8.01 9.01
+2020-03-13  5.02 9.01
+2020-03-26  5.02 9.01
+2020-04-29  2.02 9.01
+2020-05-29  5.07 9.01
+```
+
+> **Item 5.03이 하나도 없다.** charter는 교체됐고 complete copy는 **10-Q exhibit로만** 나타났다.
+> **event-search 단독(C1)은 이 교체를 놓친다.** Item 5.03의 proxy exception이 이론적 구멍이
+> 아니라 이 표본에서 실제로 벌어진 일이다.
+
+## O5. §6 나머지 anchor 전수 continuity ledger
+
+### Alphabet / Google Class B — reference Class A
+
+| snapshot | accession | acceptance | clause | label |
+|---|---|---|---|---|
+| Google Inc charter | `0001193125-11-032930` | 2011-02-11 17:13:29 | "shall be convertible into **one (1)** ... share of Class A Common Stock" | 기준 |
+| Google Inc charter | `0001193125-12-312575` | 2012-07-24 17:29:19 | 같은 문장 | **SAME** |
+| Alphabet charter | `0001193125-15-336577` | 2015-10-02 16:17:13 | 같은 문장 | **SAME** |
+| Alphabet charter | `0001193125-22-167375` | 2022-06-03 16:34:03 | 같은 문장 | **SAME** |
+
+10-K 포인터: 2016~2022 → `8-K October 2, 2015` · **2023~2026 → `8-K June 3, 2022`**.
+**2022 교체가 20-for-1 split(2022-07-15) 직전이고, ratio는 1:1 그대로다** — Follow-up 7 N8의
+TYPE A와 일치한다.
+
+### Ford Class B — reference Common Stock
+
+**포인터가 2009~2026 전 구간 불변이다.**
+
+> "Exhibit **3-A** Restated Certificate of Incorporation, dated **August 2, 2000**. Filed as
+> Exhibit 3-A to our Annual Report on Form 10-K for the year ended December 31, 2000.
+> Exhibit **3-A-1** Certificate of Designations of Series A Junior Participating Preferred Stock
+> filed on **September 11, 2009**."
+
+**chain이 정확히 두 요소다.** 3-A-1(`0001140361-09-020642` EX-3.1, 17,254자)을 직접 읽었다 —
+`Series A Junior Participating Preferred Stock`을 창설하는 Certificate of Designations이고
+**`convert` 문자열이 0회다.** Class B → Common 전환권을 건드리지 않는다. **SAME.**
+
+### Comcast Class B — known-change regression (§11)
+
+**governing instrument 원문이 변경을 직접 보여준다.**
+
+| snapshot | accession | clause | label |
+|---|---|---|---|
+| 2009-08-06 10-Q EX-3.1 | `0001193125-09-166759` | "Each share of Class B Common Stock shall be convertible at the option of the holder thereof into **one share of Class A Common Stock or one share of Class A Special Common Stock**." | 기준 |
+| **2015-12-15 8-K EX-3.1** | `0000950103-15-009516` | "Each share of Class B Common Stock shall be convertible at the option of the holder thereof into **one share of Class A Common Stock**." | **CHANGED** |
+
+10-K 포인터: 2009 → `10-K FY2005` · 2010~2015 → `10-Q Q2 2009` · **2016~2025 → `8-K December 15, 2015`**.
+
+> **regression 통과다.** 포인터가 reclassification 직후 첫 10-K(2016-02-05)에서 바뀌고,
+> clause 비교가 `CHANGED`를 준다. **C0처럼 "찾을 때까지 열어두는" 정책은 재조회 의무 자체가
+> 없어서 이 변경을 놓칠 수 있다.**
+
+**다만 C1은 여기서는 통과한다** — Comcast가 8-K에 Item 5.03을 **자발적으로** 넣었다
+(보고 항목: `3.01 · 3.02 · 3.03 · 5.03 · 5.07 · 7.01 · 9.01`). **의무가 아니라 관행이다.**
+§2C의 proxy exception이 그대로 적용되는 사안(DEF 14A `0001193125-15-372748`, 2015-11-10)이므로
+**C1은 이 통과를 근거로 신뢰할 수 없다.** META가 반대 사례를 준다.
+
+### Mastercard Class B — known-change regression (§11)
+
+**포인터가 여섯 번 움직인다.** 10-K exhibit index의 registrant 항목(`3.1(a)`)만 읽었다
+(같은 index에 자회사 `MasterCard International Incorporated` charter가 따로 있어 혼동하기 쉽다).
+
+| 10-K | 가리키는 charter |
+|---|---|
+| 2009-02-19 | 10-Q filed **August** 2008 |
+| 2010-02-18 | 10-Q filed **July 3(1)**, 2009 |
+| 2011-02-24 ~ 2016-02-12 | 8-K filed **September** 2010 |
+| **2017-02-15** ~ 2021-02-12 | 8-K filed **September 29, 2016** |
+| **2022-02-11** | 8-K filed **June 23, 2021** |
+| **2023-02-14** ~ 2025-02-12 | 8-K filed **June 24, 2022** |
+| **2026-02-11** | 8-K filed **June 26, 2025** (명칭도 `Amended and Restated` → `Restated`) |
+
+**complete charter 다섯 개의 `4.3(D) Conversion` 조항을 전부 읽었다.**
+
+| snapshot | accession | clause | label |
+|---|---|---|---|
+| 2009-07-31 10-Q EX-3.1 (95,395자) | `0001193125-09-159733` | "convert all or any portion of such holder's shares of Class B Common Stock into **an equal number** of fully paid and nonassessable shares of Class A Common Stock" (단, `commencing with the date that is the fourth anniversary of the ... Initial Public Offering` 조건 포함) | 기준 |
+| 2010-09-23 8-K EX-3.1 | `0001193125-10-215123` | 같은 `an equal number`, 4주년 조건 삭제 | **SAME (ratio)** |
+| 2016-09-29 8-K EX-3.1 | `0001141391-16-000220` | 같은 문장 | **SAME** |
+| 2021-06-23 8-K EX-3.1 | `0001141391-21-000115` | 같은 문장, 하위 항목 `(A)`→`(a)` | **SAME** |
+| 2022-06-24 8-K EX-3.1 | `0001141391-22-000137` | 같은 문장 | **SAME** |
+| 2025-06-26 8-K EX-3.1 | `0001141391-25-000154` | 같은 문장, `written notice`→`notice` | **SAME** |
+
+**부분 instrument도 하나 읽었다.** 2009-06-09 8-K EX-3.1(`0001193125-09-128024`, 6,537자)은
+complete charter가 아니라 **Certificate of Amendment**이고, 스스로 범위를 명시한다.
+
+> "**Sections 6.1 (A) and 6.4 (B)** of the Amended and Restated Certificate of Incorporation
+> will be amended to, respectively: • Increase the maximum size of the Board of Directors ..."
+
+**전환 조항은 4.3(D)다. 이 amendment는 닿지 않는다 → SAME.**
+
+> **MA regression의 결론이 중요하다.** Follow-up 7이 관측한 "2009 vs 2014 wording 변화"는
+> **ratio 변화가 아니라 행사 시기·수량 제한의 변화**였다. **continuity contract는 charter 교체를
+> 여섯 번 전부 잡아내면서 clause 라벨은 `SAME`으로 정확히 준다.** 잡아내는 것과 틀렸다고 말하는
+> 것은 다르다.
+
+### Nike Class A — reference Class B
+
+| snapshot | accession | clause | label |
+|---|---|---|---|
+| 2005-10-03 10-Q EX-3 | `0000320187-05-000124` | "each share of Class A Common Stock shall be convertible into **a** fully paid and nonassessable **share of the Class B Common Stock**" | 기준 |
+| 2013-01-09 10-Q EX-3.1 | `0001193125-13-008172` | 같은 문장 | **SAME** |
+| 2016-01-06 10-Q EX-3.1 | `0000320187-16-000242` | 같은 문장 | **SAME** |
+
+**두 교체가 2012-12·2015-12 split과 붙어 있다**(수권주식수 개정). **ratio는 불변이다.**
+
+## O6. §9 current-in-effect checkpoint가 정말 closure인가 — 실물로 확인
+
+**"exhibit index에 3.1이 있다"만으로 PASS하지 않았다.** 네 갈래를 실제로 갈랐다.
+
+| 갈래 | 이 표본의 사례 |
+|---|---|
+| **새 full charter를 직접 file** | META 2020-10-30 · 2024-08-01 10-Q · NKE 2013-01-09 · 2016-01-06 10-Q · MA 2009-07-31 10-Q |
+| **older charter를 incorporate by reference** | 나머지 거의 모든 10-K/10-Q (form·file number·exhibit 번호·날짜를 명시) |
+| **base + amendment chain** | **Ford** `3-A`(2000) + `3-A-1`(2009) · **Comcast** `3.1` + `3.1.1 Certificate of a Change of Registered Office Provider`(2024 10-K부터) |
+| **`as amended` complete copy** | **NKE** `Restated Articles of Incorporation, **as amended**` · **META 2024** `(including all amendments thereto)` |
+
+**601(b)(3)(i)가 문자 그대로 작동하는 것을 직접 관측했다.** NKE의 Q2 10-Q는 2012~2026년 내내
+`3.1 ... (incorporated by reference ...)`을 싣는데 **`2013-01-09`와 `2016-01-06` 두 건만**
+그 참조가 없다 — **정확히 그 두 번이 새 charter를 complete copy로 직접 file한 해다.**
+
+**incorporated-by-reference인 경우 source accession까지 따라갔다.** 위 ledger의 모든 snapshot이
+그렇게 도달한 문서다. **broken link · missing document · ambiguous chain은 이 anchor set에서
+나오지 않았다.**
+
+## O7. §13 December / formation PIT semantics — checkpoint가 실제로 제때 온다
+
+`D = Dec(t-1)` · `formation = June t`다. **post-D checkpoint는 formation 전에 도착해야 한다.**
+
+| issuer | post-D checkpoint | 제출 시기 | formation 전? |
+|---|---|---|---|
+| GOOGL · META · F · CMCSA · MA | **연간 10-K** | 1월 말 ~ 2월 중순 | ✅ |
+| **NKE** | **Q2 10-Q** (11/30 분기) | **1월 초** | ✅ |
+
+> **NKE가 예외를 만든다.** 5월 결산이라 **FY 10-K가 7월에 나와 formation(6월)보다 늦다.**
+> 그러나 **10-Q도 exhibit (3)(i)를 요구하므로**(O2.1 표) **1월 초 Q2 10-Q가 그대로 checkpoint가 된다.**
+> 실측: `2012-01-05` ~ `2025-01-03` 매년 제출, acceptance는 전부 그해 1월이다.
+> **exhibit 요구가 10-K에만 걸렸다면 NKE는 checkpoint를 만들 수 없었다.**
+
+**GROUND_TRUTH와 USABLE_EVIDENCE는 계속 분리했다.** 이번 연구는 formation 이후 filing도
+읽었지만(예: 2026-01-29 META 10-K), **historical selector가 쓸 evidence로는
+`acceptance ≤ formation`인 것만 인정한다.** Follow-up 7 N10과 같은 계약이다.
+
+## O8. §12 proposal / temporary / non-effective
+
+**proposal 발견은 legal interval 종료가 아니다.** Follow-up 4 J4.2의 META Class C
+Reclassification이 이미 그 반례다 — 비율과 class는 있었고 **2017년 9월에 철회돼 일어나지 않았다.**
+**반대로 proposal이 없었다는 것도 no-change proof가 아니다** — Item 5.03의 proxy exception과
+META 2020의 실측이 그것을 막는다.
+
+> **따라서 proposal은 `AMENDMENT CANDIDATE`로만 올리고, 종료는 final governing instrument 또는
+> explicit effective evidence로만 확정한다. 근거가 없으면 `UNRESOLVED`다.**
+
+## O9. §14 same-clause continuity — 문자 동일이 아니라 legal semantics다
+
+**이 표본에서 문자만 다르고 뜻이 같은 변화가 실제로 세 번 나온다.**
+
+| 사례 | 문자 차이 | 판정 |
+|---|---|---|
+| META 2021-10-28 | 절 번호 `3.8` → `3.8.` | **SAME** |
+| MA 2021-06-23 | 하위 항목 `(A)` → `(a)` | **SAME** |
+| MA 2025-06-26 | `written notice` → `notice` | **SAME** |
+| MA 2016-09-29 | 본문에 페이지 번호 `323,386.4 4`가 섞임 | **SAME** (조판 artifact) |
+
+> **문자 동일성을 계약으로 쓰면 이 넷이 전부 `CHANGED`가 되어 근거 없이 fail-close한다.**
+> 반대로 자동 semantic matcher를 만들면 §14가 금지한 fuzzy matching이 된다.
+> **이번 연구의 라벨은 전부 사람이 원문을 읽고 준 ground truth이고, extractor 설계는 별도다.**
+
+## O10. §8 C0~C3 비교
+
+| 정책 | 이 anchor set에서의 결과 | 판정 |
+|---|---|---|
+| **C0** open until discovered change | 재조회 의무가 없다. **Follow-up 7의 META가 정확히 이것이었고 charter 3회 교체를 못 봤다.** | **control 전용** |
+| **C1** event search only | **META 2020-10-30 교체를 놓친다** — 해당 15개월간 Item 5.03 8-K가 0건이다. Item 5.03 본문이 proxy exception을 명문화한다. | **FAIL** |
+| **C2** current-in-effect checkpoint | 이 표본의 **모든 교체를 잡는다**(META 3 · GOOGL 1 · MA 6 · CMCSA 2 · NKE 2). mandatory 근거는 601(b)(3)(i) + 12b-23(c)다. **남는 구멍: D와 checkpoint 사이에 일어난 변경을 D에 소급 적용한다.** | 통과, 구멍 있음 |
+| **C3** bracketed checkpoint | C2의 구멍을 닫는다. **이 anchor set에서 추가 비용 0** — pre-D checkpoint가 87 class-year 전부에서 존재한다. | **추천** |
+
+**C2의 구멍이 이 표본에서 발현되지 않은 이유는 배치다.** anchor의 charter 교체는 전부
+6월·9월·10월·12월 중순이고 **`1월 1일 ~ 10-K 제출일` 창에 떨어진 교체가 하나도 없다.**
+**설계가 막은 것이 아니라 마주치지 않았을 뿐이다** — M11·N7과 같은 종류의 한계다.
+
+**C3에서 bracket을 고르는 규칙을 명시한다.**
+
+```text
+pre-D  checkpoint = as-of <= D 인 governing snapshot 중 가장 늦은 것
+post-D checkpoint = as-of >= D 이면서 acceptance <= formation 인 것 중 가장 이른 것
+```
+
+**`가장 늦은 pre-D`가 중요하다.** CMCSA formation 2016(`D = 2015-12-31`)에서 그냥 "직전 연간
+10-K"를 쓰면 2015-02-27 10-K → 2009 charter(이중 reference)가 잡혀 post-D와 어긋난다.
+**`가장 늦은` 규칙을 쓰면 2015-12-15 8-K charter(effective 2015-12-11 ≤ D)가 잡혀 일치한다.**
+
+**그리고 비교 대상은 문서 identity가 아니라 clause다.** NKE formation 2013·2016은
+pre-D가 옛 charter, post-D가 새 charter로 **문서가 다르지만 clause가 같다.**
+**문서 identity로 비교하면 근거 없이 3 class-year를 잃는다.**
+
+## O11. §15 `effective_to = NULL`을 언제 허용하는가
+
+| 후보 | 판정 |
+|---|---|
+| **A.** 최신까지 checkpoint chain이 완전할 때만 research/current mapping에 NULL 허용, **historical formation에는 formation-bounded closure를 따로 요구** | **추천** |
+| B. 절대 NULL 금지 | 과하다. 현재 유효한 mapping은 실제로 끝이 없고, NULL을 금지하면 매 조회마다 가짜 종료일을 지어내야 한다 |
+| **C.** first explicit instrument 이후 change 발견 전까지 NULL | **이것이 C0이고 Follow-up 7의 META 오류 그 자체다.** silent wrong 경로다 |
+
+> **A의 핵심은 NULL의 의미를 두 축으로 가르는 것이다.** `현재 상태 mapping`의 NULL은
+> "지금까지 checkpoint chain이 완전하다"는 뜻이고, **historical formation의 사용 가능 여부는
+> 그 NULL이 아니라 formation별 bracket이 정한다.** 하나의 NULL이 두 질문에 답하게 두면
+> **"오늘 유효하다"가 "2015년에도 유효했다"로 조용히 바뀐다.**
+
+## O12. §16 `qv_class_valuation` implication — N14에 근거가 하나 더 붙는다
+
+**schema를 수정하지 않았고 DDL도 만들지 않았다. design requirement만 적는다.**
+
+현재 한 행은 `class_id · valuation_method · reference_class_id · conversion_ratio ·
+effective_from/to · source_accession · missing_reason · source · source_version · provenance`다.
+
+| 이번에 필요해진 것 | 현재 표현 가능? |
+|---|---|
+| legal_effective_from / to | ⚠ `effective_from/to` 하나가 legal·usability 두 뜻을 겸한다 (N14 그대로) |
+| evidence usable time | ❌ acceptance·`historical_usable_session` 칼럼이 없다 |
+| **continuity checkpoint accession** | ❌ **`source_accession`이 하나뿐이다** |
+| checkpoint의 as-of | ❌ 없다 |
+| clause 라벨(SAME/CHANGED/AMBIGUOUS)과 근거 span | ❌ 없다 |
+
+> **이번 연구가 새로 보탠 지적은 셋째다.** C3는 한 `(class, D)`마다 **최소 두 개의 checkpoint
+> accession**과 그 각각의 as-of를 보존해야 하는데, **`source_accession` 단일 칼럼으로는
+> "ratio가 적힌 문서" 하나만 남고 "그 ratio가 D에도 유효했음을 닫아준 문서 둘"이 사라진다.**
+> 그러면 나중에 이 행이 `NO CHANGE PROVEN`이었는지 `NOT FOUND`였는지 복원할 수 없다 —
+> **이번 follow-up이 META에서 겪은 문제가 그대로 데이터에 굳는다.**
+>
+> 또 하나: **canonical checkpoint의 상당수가 8-K exhibit인데** `qv_sec_filings`의 CHECK는
+> form을 `10-K / 10-K/A / 10-Q / 10-Q/A`로 제한한다. **다만 O2.1이 보인 대로 closure를 만드는
+> `next periodic report`는 K/Q이므로, 8-K를 그 표에 추가할 필요는 없다** — §3의 CLOSED대로
+> **조용히 넓히지 않고**, 별도 legal-instrument source가 필요한지만 설계 implication으로 남긴다.
+
+## O13. §17 impact — Follow-up 7 ELIGIBLE 87개에 C3를 적용
+
+**20 issuer census를 처음부터 재계산하지 않았다.** Follow-up 7 N15에서 `ELIGIBLE`이던
+fixed/direct class-year에만 적용했다.
+
+| issuer | class | 구간 | class-year | 읽은 governing snapshot | 결과 |
+|---|---|---|---|---|---|
+| GOOGL | B | 2016~2026 | 11 | 4 | **stays eligible** |
+| META | B | 2013~2026 | 14 | 4 | **stays eligible** |
+| F | B | 2010~2026 | 17 | 2 (base + designations) | **stays eligible** |
+| CMCSA | B | 2016~2026 | 11 | 3 | **stays eligible** |
+| MA | B | 2010~2026 | 17 | 6 (complete 5 + amendment 1) | **stays eligible** |
+| NKE | A | 2010~2026 | 17 | 3 | **stays eligible** |
+| **합계** | | | **87** | **22** | |
+
+```text
+stays eligible              87
+becomes interval incomplete  0
+becomes unresolved           0
+```
+
+> **판정은 하나도 안 바뀌었지만 근거는 전부 바뀌었다.** 87개 중 **META 14개는 `NOT FOUND`에
+> 서 있었고** 이제 네 snapshot의 bracket 위에 선다. **결과를 보고 rule을 조정하지 않았다** —
+> C1을 탈락시킨 근거(META 2020)는 87개를 유지하려는 방향과 무관하게 먼저 관측됐다.
+
+**Gate C · `coverage_start` · B/M · rank · returns는 계산하지 않았다.**
+
+## O14. ground truth 확인 범위
+
+**§9·F14·G15·H14·I13·J9·K9·L14·M14·N16과 같은 기준이다. 87 class-year 전부를 사람이
+1:1 대조하지 않았다.**
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| Reg S-K 601(b)(3)(i) · exhibit table | eCFR API XML 셀을 form 컬럼에 매핑 | O2.1 |
+| Rule 12b-23(c) | eCFR API 전문 | O2.2 |
+| Form 8-K Item 5.03 | SEC `form8-k.pdf` 본문 | O2.3 |
+| governing snapshot 22건의 전환 조항 | EDGAR 원문 직접 조회 | O4·O5 |
+| 10-K exhibit index charter 포인터 | 6 issuer × 전 연도 직접 조회 | O3·O5 |
+| META 8-K item 전수 (2020-01~2021-03) | 10건 본문 직접 조회 | O4.1 |
+| CMCSA 8-K item 목록 | `0000950103-15-009516` 본문 | O5 |
+| NKE Q2 10-Q charter 포인터 15건 | 직접 조회 | O7 |
+
+**정직하게 적을 한계 다섯.**
+
+1. **anchor 6개만 봤다.** Follow-up 7의 `INELIGIBLE`·`INTERVAL_INCOMPLETE`·`IDENTITY_UNRESOLVED`
+   class-year(59개)에는 continuity rule을 적용하지 않았다. 그쪽은 이미 다른 이유로 막혀 있다.
+2. **checkpoint 포인터를 전 연도 자동 추출하려 했으나 발행사별 index 형식 차이로 실패했고,
+   결국 사람이 읽었다.** 따라서 **연도별 포인터 표에 누락이 있을 수 있다** — 특히 MA의
+   2009·2010 10-K 포인터는 같은 index에 자회사(`MasterCard International Incorporated`) charter가
+   함께 있어 처음에 잘못 읽었고, registrant 항목(`3.1(a)`)으로 고쳐 다시 읽었다.
+3. **`C2의 구멍이 발현되지 않았다`는 이 배치의 결과다.** `1월 1일 ~ 10-K 제출일` 창에 charter
+   교체가 떨어지는 관측이 이 표본에 없었을 뿐이고, 없다는 것을 증명하지 않았다.
+4. **Ford `3-A-1`은 제목이 아니라 본문을 읽었지만**(`convert` 0회), **2000년 base charter 이후
+   EDGAR에 나타나지 않은 주(州) 차원 개정이 있었는지는 확인할 수 없다.** SEC corpus 안에서만
+   닫았다는 뜻이다.
+5. **clause 라벨은 사람 판정이다.** O9의 네 사례를 `SAME`으로 부른 것은 판단이고,
+   그 판단을 기계가 재현하는 방법은 이번에 만들지 않았다.
+
+## O15. §19 이번에 하지 않은 것
+
+1. fixed/direct 7요건 재논의 · Visa formula 지원
+2. prose class-name → `class_id` · XBRL alias DDL · event ledger DDL
+3. production SEC legal-instrument ingest · `qv_class_valuation` DDL
+4. shares storage · cross-accession share conflict
+5. Gate C · `coverage_start` · B/M · rank · returns
+6. **checkpoint 자동 추출기** — O14-2가 보인 대로 사람이 읽는 것으로 대신했다
+
+## User decision — conversion legal-interval continuity
+
+### 추천: **C — pre/post bracketing checkpoint까지 요구한다**
+
+```text
+CONVERSION_CONTINUITY(unlisted class, December D, formation F)
+
+  governing snapshot 만 checkpoint가 된다
+      SEC-filed current-in-effect charter / articles / complete amended-restated instrument
+      periodic prose(10-K/10-Q 본문 · Exhibit 4.x description)는 checkpoint가 아니다
+      proposal(DEF/PRE 14A · 14C)은 checkpoint가 아니라 AMENDMENT CANDIDATE다
+
+  두 checkpoint를 모두 요구한다
+      pre-D  = as-of <= D 인 snapshot 중 가장 늦은 것
+      post-D = as-of >= D 이면서 acceptance <= F 인 것 중 가장 이른 것
+      둘 중 하나라도 없으면 UNRESOLVED -> fail-close
+
+  비교 대상은 문서 identity가 아니라 conversion clause다
+      subject -> reference 방향 · ratio · reference class 단수성을 함께 본다
+      SAME -> ratio R 확정
+      CHANGED / AMBIGUOUS -> UNRESOLVED -> fail-close
+
+  그 사이 구간의 amendment candidate를 전수 검색한다
+      8-K Item 5.03 · proxy/information statement · amendment exhibit
+      해소되지 않은 candidate가 하나라도 있으면 UNRESOLVED
+      (candidate가 0건인 것을 no-change proof로 쓰지 않는다 — closure는 checkpoint가 준다)
+
+  checkpoint를 찾는 곳은 mandatory exhibit chain이다
+      Reg S-K 601(b)(3)(i): amendment 뒤 complete copy가 next periodic report에 실린다
+      Rule 12b-23(c):       incorporate by reference면 modification text+date를 함께 file한다
+      exhibit table:        (3)(i)는 10-Q와 10-K 모두에 요구된다
+      -> qv_sec_filings의 기존 K/Q form 계약을 넓히지 않고 닫을 수 있다
+
+  effective_to = NULL 은 현재 상태 mapping에만 허용한다
+      historical formation의 사용 가능 여부는 NULL이 아니라 위 bracket이 정한다
+```
+
+**§18의 일곱 기준으로 적는다.**
+
+1. **absence-of-evidence를 no-change로 착각하지 않는가.** 않는다. closure를 **candidate를 못
+   찾은 것**이 아니라 **mandatory checkpoint가 current-in-effect를 단언한 것**에서 얻는다.
+   **A(event search alone)는 이 기준에서 탈락한다** — META 2020-10-30 교체 구간에 Item 5.03이 0건이다.
+2. **mandatory SEC filing obligation에 근거하는가.** 근거한다. 601(b)(3)(i)의 complete-copy 의무와
+   12b-23(c)의 modification-statement 의무가 두 갈래를 모두 덮고, exhibit table이 10-Q·10-K
+   양쪽에 그 의무를 건다.
+3. **PIT인가.** 그렇다. post-D checkpoint에 `acceptance <= formation`을 강제한다. 실측으로
+   **calendar 결산 5개는 1~2월 10-K, NKE는 1월 초 Q2 10-Q**가 6월 formation 전에 도착한다.
+4. **known change를 잡는가.** 잡는다. **CMCSA 2015-12-11**은 governing instrument 문구가
+   `Class A or Class A Special` → `Class A`로 바뀌고 포인터가 2016-02-05 10-K에서 이동한다.
+   **MA는 charter 교체 6회를 전부 잡으면서 clause는 정확히 `SAME`으로 라벨한다.**
+5. **arbitrary year/window/tolerance가 없는가.** 없다. 창은 `[pre-D, post-D]` 두 checkpoint가
+   정하고, 그 위치는 **발행사의 실제 filing calendar**가 정한다. `±N일`도 백분율도 없다.
+6. **최소 복잡도인가.** 그렇다. 필요한 것은 **checkpoint 두 개와 clause 한 번의 사람 비교**이고,
+   **새 filing corpus·새 표·새 매처를 만들지 않는다.**
+7. **silent wrong보다 fail-close인가.** 그렇다. **B(단일 checkpoint)의 남은 구멍이 정확히
+   silent wrong**이다 — D와 checkpoint 사이의 교체를 D에 소급 적용한다. C가 그것을 `UNRESOLVED`로
+   바꾸고, **이 anchor set에서 그 대가가 0 class-year다.**
+
+**D(SEC corpus만으로는 증명 불가 → 전부 MISSING)를 고르지 않는 이유**는 O2가 보인 mandatory
+chain이 실제로 존재하고, **O5·O6에서 그것이 문자 그대로 작동하는 것을 22개 snapshot으로
+관측했기 때문이다.** D를 고르면 근거 있는 87 class-year를 근거 없이 버린다.
+
+### Follow-up 7 supersede
+
+**Follow-up 7 N15의 META Class B `2013~2026 ELIGIBLE` 판정은 근거가 부족했다.**
+2012-07-31 charter 하나로 14 class-year를 열었고, **그 구간에 charter가 세 번 교체된 것을
+보지 않았다.** 판정 자체는 이번 bracket 검증으로 유지되지만, **당시의 근거는 `NOT FOUND`이지
+`NO CHANGE PROVEN`이 아니었다.** N16의 한계 5가 그것을 미리 적어두었고, 이번에 닫았다.
+
+**같은 성격의 잔여가 하나 더 있다.** Follow-up 7은 **MA·NKE·CMCSA·F·GOOGL의 continuity도
+검증하지 않았다.** 이번에 22개 snapshot으로 닫았다. **N15 표의 숫자는 바꾸지 않는다** —
+판정이 같기 때문이고, 결과를 보고 되돌린 것이 아니다.
+
+### 함께 기억할 것 다섯
+
+1. **`NOT FOUND`와 `NO CHANGE PROVEN`은 다르다.** 이 표본에서 실제로 갈렸고, 갈린 자리가
+   **Follow-up 7의 META 14 class-year**다.
+2. **8-K Item 5.03은 완전한 discovery source가 아니다.** 규정 본문이 **proxy로 제안된
+   amendment를 면제**하고, **META 2020은 Item 5.03 없이 charter를 교체했다.**
+3. **closure는 exhibit index가 준다.** `Reg S-K 601(b)(3)(i)` + `Rule 12b-23(c)` + exhibit table의
+   `10-Q X · 10-K X`가 합쳐져, **charter가 바뀌면 다음 K/Q에 complete copy나 modification
+   statement가 반드시 나타난다.** **새 filing corpus를 열 필요가 없다.**
+4. **checkpoint 주기는 발행사 결산이 정한다.** **NKE는 5월 결산이라 10-K가 formation보다 늦고,
+   1월 초 Q2 10-Q만이 유효한 post-D checkpoint다.** 연간 10-K만 가정하면 NKE 17 class-year가
+   통째로 닫히지 않는다.
+5. **비교 대상은 문서가 아니라 조항이다.** 이 표본에서 **문자만 다르고 뜻이 같은 변화가 네 번**
+   (`3.8`→`3.8.` · `(A)`→`(a)` · `written notice`→`notice` · 조판 페이지번호 혼입) 나온다.
+   **문서 identity나 문자 동일성으로 비교하면 근거 없이 fail-close한다.**
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
