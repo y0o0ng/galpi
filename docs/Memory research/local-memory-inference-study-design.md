@@ -702,3 +702,37 @@ instrumentation failures and the window contains only the current coherent
 ledger/instrumentation contract. The report surfaces both current and
 observed contract versions. P0 invokes no local model and changes no
 production memory or retrieval decision.
+
+## Pilot P1-A local runtime bring-up
+
+P1-A is an offline synthetic-fixture smoke path. It sends the tracked
+PilotCase fixture to a separately running OpenAI-compatible llama.cpp
+HTTP endpoint, validates the returned JSON outside the model, constructs
+a `LOCAL_ONLY` PilotResult, and runs the result through the shared result
+validator. The command neither downloads nor manages a runtime, and it
+does not read or write the production database, Vault, memory path, or
+`server.js` flow.
+
+Start the runtime separately, record its exact version/artifact, then run:
+
+```bash
+npm run research:memory-inference-smoke -- \
+  --endpoint http://127.0.0.1:8080/v1 \
+  --model local-model-id \
+  --artifact ggml-org/Qwen3.5-0.8B-GGUF:Q8_0 \
+  --quantization Q8_0 \
+  --runtime-version llama.cpp-version-or-commit
+```
+
+The JSON stdout report records the Galpi commit and bounded model,
+artifact, quantization, runtime, runner, prompt, task, and output-schema
+versions. Repository-tracked input remains synthetic; private replay
+fixtures continue to use the ignored P0 path and are rejected by this
+tracked-fixture smoke command. Hard-gated cases are labeled capability
+probes and never counted as LOCAL-FIRST completion opportunities.
+
+P1-A is plumbing and capability evidence only. Latency observed on an
+Intel Mac during bring-up is a development observation and is not final
+evidence that an always-on target device is operationally feasible. It
+does not freeze a model family, prompt, threshold, deadline, or hardware
+acceptance criterion.
