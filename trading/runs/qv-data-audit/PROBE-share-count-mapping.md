@@ -5785,3 +5785,572 @@ unlisted class의 share-side boundary
    설계의 결과가 아니라 배치의 결과다.**
 
 **이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
+# Follow-up 7 — PIT conversion-value mapping (2026-08-30)
+
+**Status: RESEARCH EVIDENCE ONLY.** 로드맵 §4.4.2가 `CONVERSION_VALUE_PROXY`에 요구하는
+`reliable fixed direct conversion ratio`의 뜻과 PIT 계약을 정하기 위한 연구다.
+**production code · schema · tests · roadmap을 바꾸지 않았고 production DB에 쓰지 않았다.**
+기존 520/525 격자 수치와 M6~M12 결과도 바꾸지 않았다.
+
+## N1. 이번 질문 하나
+
+> **어떤 원문 증거가 있을 때만 unlisted ordinary class의 conversion relation을
+> `(reference_class_id, conversion_ratio, legal effective interval)`로 확정해
+> `CONVERSION_VALUE_PROXY`에 쓸 수 있는가? 그리고 그 mapping을 historical formation에서
+> 언제부터 쓸 수 있는가?**
+
+## N2. §4 두 종류의 시간 — 이 표본에서 실제로 벌어진다
+
+```text
+LEGAL EFFECTIVE INTERVAL   conversion right/rate가 법적으로 유효한 기간
+KNOWLEDGE / USABILITY TIME 그것을 증명하는 SEC 원문이 공개돼 backtest에서 쓸 수 있게 된 시점
+```
+
+**둘이 다르다는 것을 이 표본이 직접 보여준다.** Comcast Reclassification이 가장 선명하다.
+
+| 축 | 값 | 근거 |
+|---|---|---|
+| legal effective | **2015-12-11 close of business** | 8-K 본문 "the New Articles and the Reclassification became effective as of the close of business that day" |
+| acceptance | **2015-12-14 17:42:38** | `0000950103-15-009516` filing index |
+| filing date | **2015-12-15** | 같은 index |
+
+**세 날짜가 전부 다르다.** 그리고 acceptance가 filing date보다 **하루 앞**이다 — K6이 지적한
+acceptance 규약 문제가 이 accession에서 실제로 발생한다(17:30 이후 접수 → 다음 영업일 filing date).
+Visa FY2014 10-K도 같다: accepted `2014-11-20 18:57:50`, filed `2014-11-21`.
+
+> **`historical_usable_session`은 filing date가 아니라 acceptance에서 파생해야 한다**(§3.2 CLOSED와 같은 자리).
+> 이 표본에서 그 차이가 하루씩 실제로 존재한다.
+
+## N3. §5 source-of-truth 후보 — S0가 필요하다는 것이 실측으로 나왔다
+
+| family | 이 표본에서 관측된 것 | 판정 |
+|---|---|---|
+| **S0** SEC-filed governing instrument (certificate/charter/amendment) | **Alphabet·Google Inc·Facebook·Ford에서 ratio가 여기에만 있거나 여기서 확정된다** | **canonical** |
+| **S1** 10-K/10-Q 본문의 explicit conversion-right 공시 | MA·NKE·UA·CMCSA·Ford 표지에서 ratio가 본문에 있다 | **canonical** |
+| **S2** 8-K / proxy 등 explicit transaction 공시 | Comcast Reclassification, Visa 2015 rate 조정 | **canonical (event/interval boundary용)** |
+| S3 issuer website / IR 요약 | 사용하지 않았다 | corroboration only |
+| S4 vendor / secondary | 사용하지 않았다 | corroboration only |
+
+**S1만으로는 부족하다는 반례가 GOOGL이다.** Alphabet 10-K는 전환의 **방향과 촉발조건만** 말하고
+**비율을 말하지 않는다.**
+
+> "Shares of Class B common stock may be converted **at any time at the option of the stockholder**
+> and **automatically convert upon sale or transfer** to Class A common stock."
+> — `0001652044-16-000012` · `-19-000004` · `-23-000016` · `-25-000014` 전부 같은 문장
+
+비율은 charter에만 있다.
+
+> "Each share of Class B Common Stock shall be convertible into **one (1)** fully paid and
+> nonassessable share of Class A Common Stock at the option of the holder thereof at any time
+> upon written notice to the transfer agent of the Corporation."
+> — Alphabet EX-3.1 `0001193125-15-336577` (accepted 2015-10-02 16:17:13)
+
+**같은 문장이 Google Inc charter(`0001193125-11-032930` 2011-02-11 · `0001193125-12-312575`
+2012-07-24)와 Alphabet 2022 charter(`0001193125-22-167375` 2022-06-03)에도 글자 그대로 있다.**
+**따라서 S1만 보는 계약(후보 B)은 Alphabet에서 ratio를 만들지 못한다.**
+
+## N4. §6 `fixed direct conversion` 7요건 — anchor별 판정
+
+| # | 요건 | GOOGL B | META B | F B | CMCSA B | MA B | NKE A | UA CONV | V B | V C |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | subject가 actual ordinary common | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2 | reference가 같은 issuer의 listed ordinary common | ✅ A | ✅ A | ✅ Common | **❌ A / A Special 둘** | ✅ A | ✅ **B** | ✅ A | ✅ A | ✅ A |
+| 3 | 1주 → reference 몇 주인지 explicit | ✅ S0 | ✅ S0 | ✅ S0+표지 | ✅ | ✅ S1 | ✅ S1 | ✅ S1 | ✅ 수치는 있다 | ⚠ 2015 이후만 |
+| 4 | interval 안에서 deterministic | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **❌** | ⚠ |
+| 5 | holder/board 재량 없이 계산 가능 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **❌** | ⚠ |
+| 6 | litigation/escrow/formula에 의존하지 않음 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **❌** | ✅ |
+| 7 | security price·future event에 연동되지 않음 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **❌** | ✅ |
+
+**요건 5의 해석을 하나 고정한다.** UA·GOOGL·META·F의 전환은 **holder의 선택이나 transfer로
+촉발**되지만 **비율 자체에는 재량이 없다.** §6이 막으려는 것은 **ratio의 재량**이지 trigger의
+재량이 아니다. **trigger 재량을 ratio 재량으로 읽으면 1:1 charter 전부가 탈락하고 §4.4.2의
+`CONVERSION_VALUE_PROXY`가 구조적으로 빈 규칙이 된다.**
+
+## N5. §7 unlisted anchor 전수 — 원문 표
+
+`raw wording`은 원문 그대로다. `usable_from`은 acceptance 기준이다.
+
+| issuer | class | ref listed | source form | accession | acceptance | raw conversion wording | ratio | ratio type | fixed? | direct? | contingent? | eligible? |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **GOOGL** | B | A (`GOOGL`) | **EX-3.1 charter (S0)** | `0001193125-15-336577` | 2015-10-02 16:17:13 | "shall be convertible into **one (1)** fully paid and nonassessable share of Class A Common Stock at the option of the holder thereof at any time" | **1** | explicit integer | ✅ | ✅ | ❌ | **YES** |
+| GOOGL(Google Inc) | B | A | EX-3.01 charter (S0) | `0001193125-11-032930` · `0001193125-12-312575` | 2011-02-11 17:13:29 · 2012-07-24 17:29:19 | 동일 문장 | **1** | explicit integer | ✅ | ✅ | ❌ | YES |
+| **META** | B | A (`META`) | **EX-3.1 charter (S0)** | `0001193125-12-325997` | 2012-07-31 16:39:19 | "3.8 Conversion of Class B Common Stock. (a) **Voluntary Conversion**. Each share of Class B Common Stock shall be convertible into **one (1)** fully paid and nonassessable share of Class A Common Stock at the option of the holder thereof at any time" | **1** | explicit integer | ✅ | ✅ | ❌ | **YES** |
+| META | B | A | 10-K (S1) | `0001326801-25-000017` | 2025-01-30 | "convertible into **an equivalent number of shares** of our Class A common stock and generally convert into shares of our Class A common stock upon transfer" | (1) | **share-count equivalence** | ⚠ S1 단독은 약하다 | ✅ | ❌ | S0로 확정 |
+| **F** | B | Common (`F`) | **EX-3.A restated certificate (S0)** + 10-K 표지 | `0000037996-01-000014` | 2001-03-22 | "shares of Class B Stock may be converted at any time into **an equal number of shares of Common Stock** for the purpose of effecting the sale or other disposition of such shares" | **1** | equal-number | ✅ | ✅ | ❌ | **YES** |
+| F | B | Common | EX-4.B description (S1) | `0000037996-20-000010` | 2020-02-05 12:01:22 | "A holder of shares of Class B Stock can convert those shares into **an equal number of shares of Common Stock** for the purpose of selling or disposing of those shares" | 1 | equal-number | ✅ | ✅ | ❌ | YES (corroboration) |
+| **CMCSA** | B | **A 또는 A Special** | 10-K (S1) | `0001193125-09-033975` · `0001193125-14-047522` | 2009-02-20 · 2014-02-12 | "Our Class B common stock is convertible, **share for share, into Class A or Class A Special common stock**, subject to certain restrictions." | 1 | share-for-share | ✅ | **❌ ref 2개** | ❌ | **NO (~2015)** |
+| CMCSA | B | A (`CMCSA`) | 10-K (S1) | `0001166691-20-000008` · `0001166691-25-000011` | 2020-01-30 · 2025-01-31 | "The Class B common stock can be converted, **on a share for share basis, into Class A common stock**." | 1 | share-for-share | ✅ | ✅ | ❌ | **YES (2016~)** |
+| **MA** | B | A (`MA`) | 10-K (S1) | `0001141391-14-000003` | 2014-02-14 11:26:02 | "Shares of Class B common stock are convertible **on a one-for-one basis** into shares of Class A common stock." | **1** | one-for-one | ✅ | ✅ | ❌ | **YES** |
+| **NKE** | A | **B** (`NKE`) | 10-K (S1) | `0000320187-14-000097` | 2014-07-25 16:22:20 | "The Class A Common Stock is not publicly traded but **each share is convertible upon request of the holder into one share of Class B Common Stock**." | **1** | one share | ✅ | ✅ | ❌ | **YES** |
+| **UA** | CONV | A (`UAA`) | 10-K (S1) | `0001336917-14-000008` | 2014-02-21 15:05:19 | "the shares automatically convert into shares of Class A Common Stock **on a one-for-one basis**" | **1** | one-for-one | ✅ | ✅ | ❌ | **ratio는 OK · identity 미해결** |
+| **V** | B | A (`V`) | 10-K (S1) | `0001193125-09-239249` | 2009-11-20 | "the conversion rate applicable to the Company's class B common stock outstanding **was reduced to 0.7143** class A shares" | **0.7143** | **escrow 조정 변수** | **❌** | ✅ | **✅** | **NO** |
+| V | B | A | 10-K (S1) | `0001403161-14-000017` | 2014-11-20 18:57:50 | "Conversion rate of class B common stock to class A common stock after deposits **0.4121**" · "Effective price per share calculated using the **volume-weighted average price of the Company's class A common stock** over a pricing period in accordance with the Company's current certificate of incorporation" | **0.4121** | **VWAP 공식** | **❌** | ✅ | **✅** | **NO** |
+| V | C | A | 10-Q (S1) | `0001403161-15-000007` | (Follow-up 4 J4 인용) | "the conversion rate for class C common stock **increased to 4.0**" | 4.0 | split 조정 | ⚠ | ✅ | ❌ | **interval 미완성** |
+
+**BRK를 대조군으로 함께 적는다.** A·B 둘 다 상장이라 이 census에 들어가지 않지만
+**fixed direct ratio가 1:1이 아닐 수 있다는 증거**다.
+
+> "Each share of Class A common stock is convertible, at the option of the holder,
+> **into 1,500 shares of Class B common stock**. **Class B common stock is not convertible
+> into Class A common stock.**"
+> — `0001193125-17-056969` · `0001564590-22-007322` · `0001193125-26-083899`
+
+**전환은 단방향이다.** `reference_class_id`는 대칭 관계가 아니고 역수를 취해 뒤집을 수 없다.
+
+## N6. §8 대비 확인 — 여섯 개를 전부 원문으로 봤다
+
+### A. Alphabet B — 1:1이 맞지만 근거가 10-K에 없다
+
+- **법적으로 direct 1:1이다.** charter가 `one (1)`을 명시한다.
+- **holder의 선택**(voluntary)과 **transfer 시 자동** 둘 다다. 비율은 두 경우 모두 1:1이다.
+- **기간 전체에서 1:1이다.** Google Inc 2011·2012 charter, Alphabet 2015·2022 charter가 같은 문장이다.
+- **split 전후에도 ratio가 1:1로 유지된다.** 2022-07-15 20-for-1이 **A·B·C 전부**에 적용됐고
+  (J4의 `0001652044-22-000071` 원문), split 직전인 2022-06-03 charter도 여전히 `one (1)`이다.
+- **"1:1처럼 보인다"로 승인하지 않았다.** 승인 근거는 charter 문장이다.
+
+### B. Mastercard B — A와 direct 1:1, transfer 제약은 ratio를 흔들지 않는다
+
+- "convertible **on a one-for-one basis**"가 2009·2014·2020·2025 10-K에 모두 있다.
+- **transfer/ownership 제약은 존재한다** — "Entities eligible to hold ... are defined in our
+  amended and restated certificate of incorporation (generally our principal or affiliate customers),
+  and they are **restricted from retaining ownership of shares of Class A common stock**."
+  2009년에는 "conversion transactions ... **in amounts and at times to be designated by the Company**,
+  ... **subject to annual aggregate and other limits**"였고, "**After May 31, 2010**, holders ...
+  will have the option to convert **all** of their shares ... **without aggregate amounts or similar limitations**."
+- **그러나 이 제약은 전부 "언제·얼마나" 전환할 수 있는지에 걸리고, 1주가 몇 주가 되는지에는 걸리지 않는다.**
+  ratio는 전 구간 1이다.
+- **split은 A와 B에 같은 비율로 적용됐다**(J4의 MA 2014 "ten-for-one stock split of the Company's
+  **Class A and Class B** common shares"). 따라서 ratio 자체가 유지된다 — N7의 TYPE A다.
+
+### C. Nike A — explicit direct conversion이고, reference가 Class B다
+
+- "each share is convertible upon request of the holder into **one share of Class B Common Stock**"
+  (2009·2014·2020·2025 동일) · "Each share of Class A Common Stock is convertible into one share of
+  Class B Common Stock" (재무제표 주석).
+- **transfer 시 자동이 아니라 holder request다.** 그래도 ratio는 deterministic 1이다.
+- **reference가 Class A가 아니라 Class B다.** 상장 심볼 `NKE`가 Class B이므로 방향이 맞다.
+  **"unlisted는 항상 Class A를 참조한다"는 가정이 여기서 깨진다.**
+
+### D. Under Armour — ratio는 명확한데 class identity가 막는다
+
+- ratio는 전 기간 "**on a one-for-one basis**"로 명시된다(2009·2014·2020·2025).
+- **그러나 원문이 부르는 이름은 `Class B Convertible Common Stock`이고 registry label은 `CONV`다.**
+  그리고 **UA가 2016년에 만든 `Class C`는 2012년의 "Class B"와 다른 class다**(L8·J4.3).
+- 2020·2025 10-K에는 관계가 하나 더 있다 — "the Class B common stock automatically converts to
+  Class A common stock, **which would also result in the conversion of our Class C common stock into
+  Class A common stock**." **Class C는 상장(`UA`, 2016-03-23~)이고 Class A도 상장(`UAA`)이다.**
+- **이번 연구는 fuzzy resolution을 하지 않는다.** explicit source가 어느 economic class를
+  말하는지만 기록하고 `IDENTITY_UNRESOLVED`로 둔다.
+
+### E. Visa B / C — 핵심 negative control, 구조적으로 부적격
+
+**세 문장이 각각 독립적으로 실격시킨다.**
+
+1. **escrow 연동** — "when Visa funds the Escrow Account, the shares of class B common stock ...
+   are subject to dilution through **an adjustment to the conversion rate**" (FY2009).
+2. **가격 연동 공식** — "**Effective price per share calculated using the volume-weighted average
+   price of the Company's class A common stock over a pricing period** in accordance with the
+   Company's current certificate of incorporation" (FY2014). **§6-7 위반이 원문에 있다.**
+3. **미래 사건 연동** — "any amounts remaining in the escrow account **after the date on which all
+   of the covered litigation is resolved** will be released back to us and that **the conversion rate
+   ... will be adjusted in favor of the holders**. The adjustment would be **through a formula based
+   on the released escrow amount and the market price of our class A common stock**." (FY2009)
+
+**그리고 애초에 전환 자체가 막혀 있었다** — "The class B common stock is **not convertible or
+transferable until the date on** ..." (FY2014).
+
+**"fixed direct conversion ratio 요건을 만족하는 기간이 실제로 존재하는가?"에 대한 답은 아니오다.**
+비율은 escrow 입금마다 바뀌고 그 값이 VWAP에 의존한다. 관측된 값만 해도
+`0.7143`(FY2009) → `0.4121`(FY2014) → `1.6483`(2015 split 이후, J4) 이고,
+2024년에는 class B가 **B-1 / B-2로 갈라져** 각각 따로 하향 조정된다
+("downward adjustments of the **class B-1 and B-2** common stock conversion rates during the period",
+`0001403161-24-000058`).
+
+> **Visa를 살리기 위한 예외를 만들지 않는다.** interval을 아무리 잘게 잘라도 다음 escrow 입금
+> 시점을 formation 시점에 알 수 없으므로 PIT freeze가 불가능하다. **`MISSING`이 맞다.**
+
+**Class C는 별개로 판정한다.** escrow 조정 대상이 아니고 2015 split 때 `4.0`으로 올랐다는
+원문이 있다(J4). **그러나 2015 이전 구간의 rate를 이번에 확인하지 않았다.**
+§14의 gap 규칙에 따라 현재 rate를 과거로 backfill하지 않으므로 **`INTERVAL_INCOMPLETE`다.**
+
+### F. Comcast B — 여기서 진짜 문제가 드러난다: reference가 하나가 아니다
+
+**2015-12-11 이전 원문은 전환 대상을 둘로 준다.**
+
+> "Our Class B common stock is convertible, **share for share, into Class A or Class A Special
+> common stock**, subject to certain restrictions."
+> — `0001193125-09-033975`(2009) · `0001193125-14-047522`(2014)
+
+**그리고 두 class는 같은 날 다른 가격에 거래됐다.** `bars_daily` 직접 조회다.
+
+| trade_date | `CMCSA` raw_close | `CMCSK` raw_close | 차이 |
+|---|---|---|---|
+| 2012-12-31 | 37.3599 | 35.92 | **+4.01%** |
+| 2013-12-31 | 51.9699 | 49.88 | **+4.19%** |
+| 2014-12-31 | 58.01 | 57.565 | +0.77% |
+| 2015-12-10 | 59.6701 | 59.69 | −0.03% |
+
+> **`reference_class_id`를 어느 쪽으로 잡느냐가 ME를 4% 넘게 바꾼다.** ratio는 1로 확정돼 있는데
+> **곱할 가격이 둘이다.** 이것은 ratio 문제가 아니라 **reference 문제**이고, 지금 schema는
+> `reference_class_id`를 **하나만** 받는다. **원문이 둘을 주면 `UNRESOLVED`가 맞다.**
+
+**2015-12-11에 이 모호성이 사라진다.**
+
+> "the shareholders of Comcast approved a proposal to amend and restate the Company's Amended and
+> Restated Articles of Incorporation ... in order to **reclassify each issued share of Class A Special
+> common stock into one share of Class A common stock** ... the New Articles and the Reclassification
+> **became effective as of the close of business** that day. As result of the Reclassification,
+> **there are no longer outstanding any shares of Class A Special common stock** ... NASDAQ has
+> notified Comcast that trading of the Class A Special common stock **has ceased as of the close of
+> business on December 11, 2015**."
+> — 8-K `0000950103-15-009516`, accepted 2015-12-14 17:42:38
+
+**`bars_daily`의 `CMCSK` 시계열이 정확히 `2015-12-11`에 끝난다**(n=2,504, 2006-01-03 ~ 2015-12-11).
+**vendor 가격이 SEC 원문과 독립적으로 같은 날짜를 확인해준다.**
+
+2016 formation 이후 원문은 단수다 — "The Class B common stock can be converted, **on a share for
+share basis, into Class A common stock**." (`0001166691-20-000008` · `0001166691-25-000011`)
+
+## N7. §9 ratio change event — Visa 2015 전수 분리
+
+| 축 | 값 | 근거 |
+|---|---|---|
+| old ratio (class B) | **0.4121** | FY2014 10-K `0001403161-14-000017` |
+| new ratio (class B) | **1.6483** | 2015 10-Q `0001403161-15-000007` (J4) |
+| old ratio (class C) | **미확인** | 이번에 확인하지 않았다 |
+| new ratio (class C) | **4.0** | 같은 10-Q |
+| legal effective date | **2015-03-18** (dividend 지급일) | "received a dividend of three additional shares on March 18, 2015" |
+| first public disclosure | 2015 Q2 10-Q | 같은 accession |
+| **reference listed class market boundary** | **2015-03-19** | "Trading began on a split-adjusted basis on March 19, 2015" + vendor `split_date` (M5) |
+| **subject shares boundary** | **없음** | class B·C 주식수 불변 (M9 `NO_SHARE_EFFECT`) |
+
+**`0.4121 × 4 = 1.6484`이고 원문은 `1.6483`이다.** 반올림 차이이며 **원문 값을 쓰고 역산하지 않는다**
+(M14의 `0.412075`가 역산값이었던 것과 같은 이유다).
+
+> **conversion valuation boundary는 셋 중 무엇인가?**
+>
+> **reference market boundary(2015-03-19)다.** 이유는 semantic이지 편의가 아니다.
+> `ME_unlisted = shares × ratio × reference의 December raw_close`인데
+> **`raw_close`의 단위를 바꾸는 것은 reference class의 market boundary**이고(M2·M6 CLOSED),
+> **`ratio`는 그 단위 변화를 상쇄하기 위해 바뀐다.** 두 항이 같은 사건의 양면이므로
+> **같은 경계에서 함께 넘어가야 곱이 보존된다.**
+>
+> `legal effective date`(2015-03-18)를 쓰면 **하루 동안 새 ratio × 옛 단위 가격**이 곱해져
+> ME가 4배 틀린다. **"split date니까 아마 그날"이 아니라, 곱의 단위 정합이 근거다.**
+>
+> **다만 이 표본에서 두 날짜는 하루 차이이고 12월 valuation session이 그 사이에 없다.**
+> 따라서 **이 격자에서는 선택의 비용이 0이다.** 설계로 0인 것이 아니라 배치로 0이다(M11과 같은 한계).
+
+## N8. §10 split과 conversion ratio의 독립성 — 세 모양이 다 관측된다
+
+| type | 모양 | 관측 | ratio |
+|---|---|---|---|
+| **TYPE A** | subject·reference 둘 다 같은 비율로 split | **GOOGL 2022 ×20 (A·B·C)** · MA 2014 ×10 (A·B) · NKE 2012·2015 ×2 (A·B) · UA 2012·2014 ×2 (A·B) | **불변** (1 → 1) |
+| **TYPE B** | reference만 basis 변화, subject 주식수 불변 | **V 2015 (A ×4, B·C 불변)** | **반대 방향으로 변경** (0.4121 → 1.6483) |
+| **TYPE C** | subject/reference 관계 자체 변경 | **CMCSA 2015-12-11 Reclassification** (ref 후보 2개 → 1개) · **V 2024 B → B-1/B-2** | **새 legal interval 필요** |
+
+> **issuer-wide multiplier 하나로 처리할 수 없다는 것이 여기서 확정된다.**
+> GOOGL 2022와 V 2015는 둘 다 "그 issuer의 split"이지만 **ratio에 대한 효과가 정반대다.**
+> TYPE 판정은 `event × class` 단위이지 issuer 단위가 아니다 — **M9가 shares 쪽에서 보인 것과 같은 구조다.**
+
+## N9. §11 historical usability / lookahead
+
+**legal interval만 맞으면 충분하지 않다.** 이 표본에서 legal effective가 evidence acceptance보다
+**수년 앞서는 경우가 실제로 있다.**
+
+- **Alphabet Class B의 1:1은 Google Inc 시절부터 법적으로 유효했다.** 그러나 **Alphabet(CIK 1652044)
+  이름으로 그것을 증명하는 charter는 2015-10-02에야 접수됐다.** 2015 이전 formation에서
+  Alphabet accession을 근거로 쓰면 lookahead다. **그 구간의 근거는 Google Inc charter
+  (`0001193125-11-032930`, accepted 2011-02-11)여야 한다.**
+- **Ford Class B의 1:1은 2001-03-22 restated certificate에 있다.** EX-4.B description(2020-02-05)은
+  같은 내용을 **19년 뒤에** 다시 적은 것이다. **2010 formation에서 2020 accession을 쓰면 lookahead다.**
+
+따라서 계약을 이렇게 둔다.
+
+```text
+usable_at(formation, mapping) iff
+    historical_usable_session(source accession) <= formation      (acceptance에서 파생, §3.2)
+  AND December valuation instant ∈ [legal_effective_from, legal_effective_to)
+```
+
+**두 조건은 AND이고 서로를 대체하지 않는다.** 앞은 knowledge 축, 뒤는 legal 축이다.
+
+## N10. §12 retrospective disclosure — GROUND TRUTH와 USABLE DATA를 가른다
+
+**later filing이 과거부터 존재한 conversion right를 명확히 기술하는 사례가 이 표본에 있다.**
+Ford EX-4.B(2020)와 Alphabet 10-K(2016~)가 그것이다. 둘 다 **그 이전부터 유효했던 권리**를 적는다.
+
+> **그 filing을 formation 이전으로 소급해 쓸 수 없다.** §3.2의 acceptance 불변식과 정확히 같은 이유다.
+> **그러나 research ground truth로는 쓸 수 있다** — 이번 연구가 실제로 그렇게 했다.
+> Ford 2020 EX-4.B를 읽고 "1:1이 맞다"를 확인한 뒤, **historical selector가 쓸 근거는 2001 charter로 따로 찾았다.**
+
+**두 용도를 문서에 분리해 적는 것이 이 계약의 핵심이다.** 하나의 표에 섞으면 나중에
+"우리가 이미 확인했다"가 "그때 알 수 있었다"로 조용히 바뀐다.
+
+## N11. §13 amendment / restatement — 두 축을 합치지 않는다
+
+Comcast Reclassification이 그대로 예제다.
+
+```text
+old interval 종료   legal effective 2015-12-11 close of business   <- legal 축
+new interval 개시   legal effective 2015-12-11 close of business   <- legal 축
+historical 사용 가능  acceptance 2015-12-14 17:42:38 이후            <- knowledge 축
+```
+
+**interval boundary는 acceptance가 아니라 legal effective date다.** 그러나 **그 새 interval을
+historical backtest에서 쓰려면 formation이 acceptance 이후여야 한다.**
+이 사례에서는 두 축이 3일 차이이고 다음 12월 valuation session(2015-12-31)이 둘 다 지난 뒤라
+**이 격자에서 비용이 0이다.** 다시 말하지만 배치의 결과다.
+
+## N12. §14 interval completeness — 현재 ratio를 gap에 backfill하지 않는다
+
+**V Class C가 실제 gap 사례다.**
+
+```text
+ratio evidence   [2015-03-19, ?)   = 4.0        (원문 확인)
+ratio evidence   [?, 2015-03-19)   = 미확인      <- 이번에 열지 않았다
+```
+
+**여기에 4.0을 backfill하면 2015 이전 전 구간이 조용히 4배 틀린다.**
+§14 규칙대로 그 구간은 `MISSING interval`이고, 그래서 V Class C는 `INTERVAL_INCOMPLETE`다.
+
+**연속성 없는 구간을 자동으로 채우지 않는다**는 규칙이 이 표본에서 실제로 무언가를 막는다는 뜻이다.
+
+## N13. §15 provenance — 보존해야 할 항목
+
+이번 연구가 anchor마다 실제로 들고 다닌 것이다. **정확한 SQL DDL은 만들지 않았다**(§19).
+
+```text
+subject_class_id              unlisted ordinary class
+reference_class_id            같은 issuer의 listed ordinary class (단수여야 한다)
+conversion_ratio              원문 수치 그대로 (역산 금지)
+ratio_semantics               explicit-integer | one-for-one | share-for-share | equal-number
+                              | escrow-adjusted | split-adjusted
+legal_effective_from / to     원문이 말하는 법적 유효 구간
+source_accession              그 근거 accession
+source_form                   EX-3.x charter | 10-K | 10-Q | 8-K | EX-4.x description
+acceptance_datetime           filing index 기준 (filing date가 아니다)
+historical_usable_session     acceptance에서 파생 (§3.2)
+source_document               문서 파일명
+exact_source_span             인용 문장 원문
+governing_instrument_ref      S1이 charter를 지시하면 그 charter accession
+source / source_version       calendar·price와 같은 축
+retrieval_date                2026-08-30
+mapping_status                ELIGIBLE | INELIGIBLE | INTERVAL_INCOMPLETE | IDENTITY_UNRESOLVED
+missing_reason                위 셋일 때 필수
+```
+
+**`ratio_semantics`를 따로 두는 이유가 META다.** 10-K는 "**an equivalent number of shares**"라고
+쓰는데 charter는 "**one (1)**"이라고 쓴다. **둘 다 1이지만 근거의 강도가 다르다.**
+semantics를 지우고 `1.0`만 남기면 **어느 것이 charter 확정이고 어느 것이 서술 문구인지 사라진다.**
+
+## N14. §16 현재 `qv_class_valuation` fit check — **표현할 수 없다**
+
+**결론만 적는다. schema는 수정하지 않았다.**
+
+현재 구조는 이렇다(`trading/backtest/schema.sql` · `qv_identity.ClassValuation`).
+
+```text
+class_id · valuation_method · reference_class_id · conversion_ratio
+effective_from · effective_to · source_accession · missing_reason
+source · source_version · provenance
+```
+
+| 이번 semantics | 현재 표현 가능? | 근거 |
+|---|---|---|
+| **legal interval** | ⚠ **부분** | `effective_from/to`가 하나뿐이다 |
+| **knowledge / usability time** | **❌ 불가** | acceptance·`historical_usable_session` 칼럼이 없다 |
+| reference class 단수성 | ✅ | `reference_class_id` 하나 + CHECK |
+| ratio 값 | ✅ | `conversion_ratio > 0` |
+| ratio semantics | ❌ | 칼럼 없음 — `provenance` 자유텍스트에 섞인다 |
+| exact source span | ❌ | 칼럼 없음 |
+| missing 사유 | ✅ | `missing_reason` |
+
+**세 가지를 지적한다.**
+
+1. **`effective_from/to` 하나가 두 의미를 겸하고 있다.** `valuation_at(connection, class_id, as_of,
+   source_version)`은 `as_of` **하나**로 조회한다. **legal 축과 knowledge 축이 다를 때 어느 것으로
+   질의하는지 코드가 말하지 않는다.** N9가 보인 대로 Alphabet은 두 축이 4년, Ford는 19년 벌어진다.
+   **지금 구조로 legal interval을 넣으면 lookahead가 열리고, usability interval을 넣으면
+   legal 질문에 답할 수 없다.**
+2. **`source_accession`은 있는데 `acceptance_datetime`이 없다.** accession에서 acceptance를 다시
+   찾아와야 하고, **`qv_sec_filings`는 form을 `10-K/10-K/A/10-Q/10-Q/A` 넷으로 제한하므로
+   charter가 실린 8-K accession을 그 표로 해석할 수 없다.** N3이 보인 대로 **canonical 근거의
+   상당수가 8-K exhibit이다.**
+3. **`CHECK`가 `conversion_ratio > 0`만 본다.** Visa처럼 값 자체는 양수인데 **deterministic이
+   아닌** 경우를 막지 못한다. 막는 것은 schema가 아니라 등록 절차여야 한다.
+
+> **권고는 "지금 고치자"가 아니라 "지금 넣지 말자"다.** 이 semantics를 현재 두 칼럼에 밀어넣으면
+> **의미가 섞인 채로 데이터가 쌓이고 나중에 어느 행이 legal이고 어느 행이 usable인지 복원할 수 없다.**
+> 실제 DDL 변경은 §19대로 이번 범위 밖이다.
+
+## N15. §17 20-issuer impact — class/year · issuer/year diagnostic
+
+**격자는 H7과 같다** — 20 발행사 × formation `2010`~`2026`(17개).
+**unlisted ordinary class는 11개**이고 class-formation 관측은 **146개**다.
+
+> **이 146이 M9.1의 `unlisted 146 observation`과 정확히 일치한다.** 독립적으로 재구성한 수가
+> 맞은 것이므로 **같은 class universe를 보고 있다는 corroboration이다.** 증명은 아니다.
+
+| issuer | class | formation 구간 | n | 판정 | 사유 |
+|---|---|---|---|---|---|
+| GOOGL | B | 2016~2026 | 11 | **ELIGIBLE** | S0 charter 1:1, ref = Class A (listed) |
+| META | B | 2013~2026 | 14 | **ELIGIBLE** | S0 charter 1:1, ref = Class A (listed) |
+| F | B | 2010~2026 | 17 | **ELIGIBLE** | S0 restated certificate 1:1, ref = Common (listed) |
+| CMCSA | B | 2010~2015 | 6 | **INELIGIBLE** | reference 후보 2개(A / A Special), 가격 4% 상이 |
+| CMCSA | B | 2016~2026 | 11 | **ELIGIBLE** | A Special 소멸(2015-12-11) 후 reference 단수 |
+| MA | B | 2010~2026 | 17 | **ELIGIBLE** | S1 `one-for-one`, ref = Class A (listed) |
+| NKE | A | 2010~2026 | 17 | **ELIGIBLE** | S1 `one share`, ref = **Class B** (listed) |
+| UA | CONV | 2010~2026 | 17 | **IDENTITY_UNRESOLVED** | prose `Class B` ≠ registry `CONV`; 2016 `Class C`는 다른 class |
+| V | B | 2010~2024 | 15 | **INELIGIBLE** | escrow·VWAP 공식 연동, 미전환기 존재 |
+| V | B-1 | 2025~2026 | 2 | **INELIGIBLE** | 같은 구조 승계 |
+| V | B-2 | 2025~2026 | 2 | **INELIGIBLE** | 같은 구조 승계 |
+| V | C | 2010~2026 | 17 | **INTERVAL_INCOMPLETE** | 2015 이후 `4.0`만 확인, 이전 구간 미확인 |
+
+| 판정 | class/year | 비율 |
+|---|---|---|
+| **ELIGIBLE** | **87** | 59.6% |
+| INELIGIBLE | 25 | 17.1% |
+| IDENTITY_UNRESOLVED | 17 | 11.6% |
+| INTERVAL_INCOMPLETE | 17 | 11.6% |
+| 합계 | **146** | 100% |
+
+**issuer/year diagnostic** — unlisted ordinary class를 가진 **8개 발행사만**이 분모다.
+**Gate C를 계산하지 않았고 B/M · rank · returns도 계산하지 않았다.**
+
+| issuer | issuer-year | conversion mapping 때문에 `MISSING` |
+|---|---|---|
+| CMCSA | 17 | **6** (2010~2015) |
+| F | 17 | 0 |
+| GOOGL | 11 | 0 |
+| MA | 17 | 0 |
+| META | 14 | 0 |
+| NKE | 17 | 0 |
+| UA | 17 | **17** |
+| V | 17 | **17** |
+| **합계** | **127** | **40 (31.5%)** |
+
+> **issuer 하나가 통째로 막히는 방식이 둘이다.** **V는 ratio가 구조적으로 부적격**이라 영구적이고,
+> **UA는 ratio가 멀쩡한데 identity 층이 막는다** — 후자는 prose class-name 매핑이 열리면 풀린다.
+> **`CONVERSION_VALUE_PROXY`의 남은 실패 대부분이 valuation 문제가 아니라 identity 문제라는 뜻이다.**
+
+## N16. ground truth 확인 범위
+
+**§9·F14·G15·H14·I13·J9·K9·L14·M14와 같은 기준이다. 146 관측 전부를 사람이 원문과 1:1 대조하지 않았다.**
+
+| 대상 | 원문 | 결과 |
+|---|---|---|
+| 6 anchor의 conversion wording | 발행사별 10-K 4개(early/mid/recent) 직접 조회, 총 24건 | N5 |
+| Alphabet · Google Inc · Facebook charter | EX-3.x 원문 직접 조회 4건 | N3·N5 |
+| Ford restated certificate + EX-4.B | `0000037996-01-000014-0002.txt` · `f12312019exhibit4-b.htm` | N5 |
+| Comcast Reclassification | 8-K `0000950103-15-009516` 원문 | N6-F |
+| `CMCSA` / `CMCSK` 가격 | `bars_daily` 직접 조회 | N6-F |
+| Visa conversion rate 값 | FY2009 · FY2014 10-K 원문 + Follow-up 4 J4 인용 | N5·N7 |
+| BRK 1,500:1 대조군 | 10-K 3건 원문 | N5 |
+| acceptance datetime | EDGAR filing index 직접 조회 12건 | N2·N5 |
+
+**정직하게 적을 한계 다섯.**
+
+1. **발행사별로 10-K을 4개만 읽었다.** 중간 연도에 문구가 바뀌었을 가능성을 배제하지 않았다.
+   특히 **MA의 2009 → 2014 사이에 문구가 실제로 바뀌었다**(conversion transaction 제한 →
+   무제한). 다른 발행사에도 비슷한 변화가 있을 수 있다.
+2. **V Class C의 2015 이전 rate를 확인하지 않았다.** `INTERVAL_INCOMPLETE` 판정의 근거가
+   "없다"가 아니라 "이번에 찾지 않았다"이다.
+3. **formation 활동 구간(GOOGL 2016~ · META 2013~)은 재구성이다.** 146이 M9.1과 일치한 것이
+   방증이지만 probe의 원래 격자 행을 그대로 대조하지는 않았다.
+4. **CMCSA 2010~2015 `INELIGIBLE` 판정은 보수적 선택이다.** 원문이 `A 또는 A Special`을 주고
+   두 가격이 다르다는 것까지가 실측이고, **"그러므로 UNRESOLVED"는 이번 연구의 판단이다.**
+   전환 실적이 어느 쪽으로 갔는지는 조사하지 않았다.
+5. **META를 `ELIGIBLE`로 놓은 근거는 charter 한 건이다.** 2012-07-31 이후 charter 개정
+   (`0001326801-20-000084` 2020 · `0001326801-21-000071` 2021 · `0001326801-24-000069` 2024)의
+   본문을 읽지 않았다. **1:1이 유지됐다고 가정하지 않았고, 그 구간을 확인하지 않았다고 적는다.**
+
+## N17. 이번에 결정하지 않은 것 (§19)
+
+1. prose class-name → `class_id` schema
+2. `qv_share_class_xbrl_aliases` exact DDL
+3. event ledger DDL
+4. production extractor · production identity ingest
+5. shares observation storage
+6. unexplained cross-accession conflict
+7. Gate C · `coverage_start`
+8. B/M · rank · returns
+9. **`qv_class_valuation` 실제 schema 변경** — N14가 필요성을 보였지만 이번에 만들지 않았다
+
+## User decision — PIT conversion-value mapping
+
+### 추천: **A — SEC-filed governing/legal evidence의 fixed direct ratio만 허용하고 PIT usability를 별도로 강제한다**
+
+```text
+CONVERSION_VALUE_PROXY(unlisted ordinary class, formation)
+
+  1) evidence는 SEC-filed explicit disclosure만 쓴다
+        S0 governing instrument (certificate / charter / amendment / 법적 효력 exhibit)
+        S1 10-K · 10-Q 본문의 explicit conversion-right 공시
+        S2 8-K · proxy 등 explicit transaction 공시   (interval boundary용)
+     S3 issuer website · S4 vendor는 corroboration으로만 쓰고 단독 근거로 쓰지 않는다
+
+  2) reference_class_id는 단수여야 한다
+        같은 issuer의 listed ordinary common class 하나
+        원문이 둘 이상을 주면 (CMCSA ~2015형) UNRESOLVED -> fail-close
+        reference가 Class A라고 가정하지 않는다 (NKE는 Class B다)
+
+  3) ratio는 원문 수치를 그대로 쓴다
+        explicit-integer | one-for-one | share-for-share | equal-number 만 fixed로 인정
+        역산하지 않는다 (0.4121 x 4 를 1.6483으로 쓰지 않는다)
+        ratio_semantics를 함께 보존한다
+
+  4) 다음은 fixed로 인정하지 않는다 -> MISSING
+        economically equivalent · voting equivalence · derived equivalent shares
+        liquidation equivalence · approximate ratio · board discretion
+        litigation / escrow adjustment · security price 연동 공식 (V형)
+        transfer 조건만 보고 추정한 것
+
+  5) PIT usability (두 조건 AND)
+        historical_usable_session(source accession) <= formation      (acceptance 파생)
+        December valuation instant  in  [legal_effective_from, legal_effective_to)
+
+  6) interval은 자동으로 잇지 않는다
+        근거 없는 구간은 MISSING interval
+        현재 ratio를 과거 gap에 backfill하지 않는다 (V C형)
+
+  7) ratio change event의 conversion valuation boundary는
+        reference listed class의 market boundary다  (Follow-up 6 계약 그대로)
+        legal effective date나 임의 +/-N일 window를 쓰지 않는다
+
+  8) class identity가 미해결이면 ratio가 맞아도 UNRESOLVED -> fail-close
+        prose class-name -> class_id는 아직 OPEN이다 (UA형)
+```
+
+**A를 고른 이유는 coverage가 아니라 실측이다.**
+
+- **B(periodic filing의 descriptive wording으로 충분)를 단독으로 쓸 수 없다.** **Alphabet 10-K에는
+  비율이 없다**(N3). B만 쓰면 GOOGL Class B가 전 구간 `MISSING`이 되고, 이 표본에서 **11 class-year**를
+  잃는다. **S0를 canonical에 넣는 것이 A의 핵심이고, 그것이 실제로 무언가를 살린다.**
+- **C(formula/contingent도 deterministic하게 계산 가능하면 허용)를 채택하지 않는다.** Visa가
+  반증이다. **rate가 escrow 입금과 class A VWAP에 의존하므로 formation 시점에 다음 값을 알 수 없다.**
+  "계산 가능"이 "PIT로 계산 가능"을 뜻하지 않는다. **C를 열면 이 표본에서 유일하게 늘어나는 것이
+  Visa 19 class-year인데, 그것이 정확히 silent wrong이 나는 자리다.**
+- **D(proxy 자체를 포기하고 전부 MISSING)는 비용이 크고 근거가 없다.** A에서 **87/146 (59.6%)이
+  원문으로 닫힌다.** D를 고르면 그 87을 근거 없이 버리고, §4.4.2가 경고한 **multi-class 발행사만
+  `B/M`이 체계적으로 높아지는 왜곡**을 그대로 남긴다.
+- **A의 비용이 이 격자에서 40 issuer-year(8개 다중 class 발행사의 31.5%)다.** 그중 **17이 UA이고
+  valuation이 아니라 identity 때문**이라, prose class-name 매핑이 열리면 되찾는다.
+
+### 함께 기억할 것 다섯
+
+1. **비율은 10-K에 없을 수 있다.** Alphabet은 4개 회계연도 10-K 전부가 방향과 촉발조건만 말하고
+   **`one (1)`은 charter에만 있다.** **S1 전용 계약은 이 발행사에서 조용히 실패한다.**
+2. **reference가 하나라는 보장이 없다.** Comcast Class B는 2015-12-11까지 **`Class A 또는
+   Class A Special`** 둘로 전환됐고 **두 가격이 같은 날 4% 넘게 달랐다.** ratio가 1로 확정돼
+   있어도 **곱할 가격이 둘이면 ME가 정해지지 않는다.**
+3. **reference가 항상 Class A인 것도 아니다.** **NKE는 Class A(비상장) → Class B(상장)다.**
+   방향을 이름으로 추정하면 뒤집힌다. 그리고 **BRK는 1,500:1 단방향**이라 역수로 뒤집을 수도 없다.
+4. **legal 시간과 knowledge 시간이 이 표본에서 최대 19년 벌어진다**(Ford: 2001 charter vs
+   2020 EX-4.B). **하나의 `effective_from/to`로 둘을 표현하면 lookahead가 열리거나 legal 질문에
+   답할 수 없어진다** — 현재 `qv_class_valuation`이 정확히 그 상태다(N14).
+5. **남은 실패의 절반은 valuation이 아니라 identity다.** 막힌 40 issuer-year 중 **17(UA)이 ratio는
+   1:1로 명확한데 prose 이름과 `class_id`가 연결되지 않아서 막힌다.** **다음에 열어야 할 것은
+   conversion 연구가 아니라 prose class-name 매핑이다.**
+
+**이 follow-up도 research 결과일 뿐 아직 CLOSED/FROZEN 계약이 아니다.**
