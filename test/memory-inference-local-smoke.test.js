@@ -123,6 +123,9 @@ test('synthetic fixture completes case to local inference to validated LOCAL_ONL
   assert.equal(report.summary.localFirstCompletionOpportunities, 1);
   assert.equal(fake.requests.length, 3);
   assert.ok(fake.requests.every(request => request.url === '/v1/chat/completions'));
+  assert.ok(fake.requests.every(request => (
+    request.body.chat_template_kwargs?.enable_thinking === false
+  )));
 
   for (const run of report.runs) {
     assert.equal(validatePilotResult(run.result), run.result);
