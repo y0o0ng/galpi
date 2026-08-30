@@ -162,6 +162,7 @@ function taskResult(executorType, overrides = {}) {
 }
 
 function pilotResult(policyType, executorType, overrides = {}) {
+  const localFirst = policyType === POLICY_TYPES.LOCAL_FIRST;
   return {
     contractVersion: RESULT_CONTRACT_VERSION,
     caseId: 'synthetic-case-001',
@@ -175,11 +176,13 @@ function pilotResult(policyType, executorType, overrides = {}) {
     },
     directResult: taskResult(executorType),
     escalation: {
-      decision: ESCALATION_DECISIONS.NOT_APPLICABLE,
+      decision: localFirst
+        ? ESCALATION_DECISIONS.NOT_ESCALATED
+        : ESCALATION_DECISIONS.NOT_APPLICABLE,
       reasonCode: ESCALATION_REASONS.NONE,
       result: null,
     },
-    policyOutcome: POLICY_OUTCOMES.SUCCESS,
+    policyOutcome: localFirst ? POLICY_OUTCOMES.SUCCESS : POLICY_OUTCOMES.NOT_RUN,
     error: { state: ERROR_STATES.NONE, code: null },
     ...overrides,
   };
@@ -404,6 +407,59 @@ test('result envelope represents deterministic, local, cloud, and hybrid policie
   );
 });
 
+test('result envelope rejects collapsed direct-task and selective-policy outcomes', () => {
+  for (const [policyType, executorType] of [
+    [POLICY_TYPES.DETERMINISTIC_CONTROL, EXECUTOR_TYPES.DETERMINISTIC],
+    [POLICY_TYPES.LOCAL_ONLY, EXECUTOR_TYPES.LOCAL],
+    [POLICY_TYPES.CLOUD_ONLY, EXECUTOR_TYPES.CLOUD],
+  ]) {
+    assert.throws(
+      () => validatePilotResult(pilotResult(policyType, executorType, {
+        policyOutcome: POLICY_OUTCOMES.SUCCESS,
+      })),
+      /NOT_RUN/,
+    );
+  }
+
+  assert.throws(
+    () => validatePilotResult(pilotResult(POLICY_TYPES.LOCAL_FIRST, EXECUTOR_TYPES.LOCAL, {
+      escalation: {
+        decision: ESCALATION_DECISIONS.NOT_APPLICABLE,
+        reasonCode: ESCALATION_REASONS.NONE,
+        result: null,
+      },
+    })),
+    /NOT_ESCALATED/,
+  );
+  assert.throws(
+    () => validatePilotResult(pilotResult(POLICY_TYPES.LOCAL_FIRST, EXECUTOR_TYPES.LOCAL, {
+      policyOutcome: POLICY_OUTCOMES.NOT_RUN,
+    })),
+    /policyOutcome/,
+  );
+  assert.throws(
+    () => validatePilotResult(pilotResult(POLICY_TYPES.LOCAL_FIRST, EXECUTOR_TYPES.LOCAL, {
+      directResult: taskResult(EXECUTOR_TYPES.LOCAL, {
+        structuredOutput: '{malformed',
+        schemaStatus: SCHEMA_STATUSES.INVALID,
+        taskOutcome: TASK_OUTCOMES.UNKNOWN,
+        error: { state: ERROR_STATES.VALIDATION_ERROR, code: 'INVALID_SCHEMA' },
+      }),
+    })),
+    /FAILURE/,
+  );
+  assert.throws(
+    () => validatePilotResult(pilotResult(POLICY_TYPES.LOCAL_FIRST, EXECUTOR_TYPES.LOCAL, {
+      escalation: {
+        decision: ESCALATION_DECISIONS.ESCALATED,
+        reasonCode: ESCALATION_REASONS.LOCAL_ERROR,
+        result: null,
+      },
+    })),
+    /result가 필요/,
+  );
+});
+
 test('deterministic-control registry supports registered and NONE_JUSTIFIED definitions', () => {
   const registry = createControlRegistry([
     {
@@ -482,8 +538,22 @@ test('frequency report counts daily incidence without evaluation-set weighting o
   assert.equal(report.coverage.status, COVERAGE_STATUSES.INCOMPLETE);
   assert.equal(report.coverage.extrapolatedMissingIncidence, false);
   assert.equal(report.instrumentationFailures.available, false);
+  assert.deepEqual(report.observationContract, {
+    current: {
+      ledgerSchemaVersion: 1,
+      instrumentationVersion: 'xion-local-memory-inference-p0-v1',
+    },
+    observed: [{
+      ledgerSchemaVersion: 1,
+      instrumentationVersion: 'xion-local-memory-inference-p0-v1',
+      rows: 3,
+    }],
+    coherent: true,
+    matchesCurrent: true,
+  });
   const output = formatMemoryInferencePilotReport(report);
   assert.match(output, /synthetic\/private replay evaluation cases excluded/);
+  assert.match(output, /xion-local-memory-inference-p0-v1/);
   assert.match(output, /INCOMPLETE/);
   db.close();
 });
@@ -511,6 +581,72 @@ test('frequency report CLI requires an exact window and independent evidence for
     () => parseArguments(['--since', '2026-09-01', '--until', '2026-09-08', '--coverage', 'complete']),
     /instrumentation-failures/,
   );
+  assert.throws(
+    () => parseArguments([
+      '--since', '2026-09-01',
+      '--until', '2026-09-08',
+      '--coverage', 'complete',
+      '--instrumentation-failures', '1',
+    ]),
+    /정확히 0/,
+  );
   assert.throws(() => parseArguments(['--since', '2026-09-01']), /모두 필요/);
-  assert.match(helpText(), /기본값은 INCOMPLETE/);
+  assert.match(helpText(), /정확히 0/);
+});
+
+test('frequency report refuses COMPLETE for failures or mixed observation contracts', () => {
+  const db = createLedgerDatabase();
+  const insert = insertObservationStatement(db);
+  insert.run(persistedObservation(eligibleObservation()));
+  assert.throws(() => buildMemoryInferencePilotReport({
+    db,
+    startEpoch: parseKstDate('2026-09-01', 'date'),
+    endEpoch: parseKstDate('2026-09-02', 'date'),
+    coverageStatus: COVERAGE_STATUSES.COMPLETE,
+    instrumentationFailureCount: 1,
+  }), /정확히 0/);
+  db.close();
+
+  const mixedDb = new Database(':memory:');
+  mixedDb.exec(`
+    CREATE TABLE research_memory_inference_observations (
+      id INTEGER PRIMARY KEY,
+      workload_type TEXT NOT NULL,
+      occurred_at INTEGER NOT NULL,
+      opportunity INTEGER NOT NULL,
+      hard_gated INTEGER NOT NULL,
+      local_eligible INTEGER NOT NULL,
+      executed INTEGER NOT NULL,
+      ledger_schema_version INTEGER NOT NULL,
+      instrumentation_version TEXT NOT NULL
+    );
+  `);
+  const occurredAt = parseKstDate('2026-09-01', 'date') + 60;
+  const mixedInsert = mixedDb.prepare(`
+    INSERT INTO research_memory_inference_observations (
+      workload_type, occurred_at, opportunity, hard_gated,
+      local_eligible, executed, ledger_schema_version, instrumentation_version
+    ) VALUES (?, ?, 1, 0, 1, 0, ?, ?)
+  `);
+  mixedInsert.run(WORKLOAD_TYPES.WRITE_CANDIDATE_TRIAGE, occurredAt, 1,
+    'xion-local-memory-inference-p0-v1');
+  mixedInsert.run(WORKLOAD_TYPES.WRITE_CANDIDATE_TRIAGE, occurredAt, 2,
+    'xion-local-memory-inference-future-v2');
+
+  const incomplete = buildMemoryInferencePilotReport({
+    db: mixedDb,
+    startEpoch: parseKstDate('2026-09-01', 'date'),
+    endEpoch: parseKstDate('2026-09-02', 'date'),
+  });
+  assert.equal(incomplete.observationContract.coherent, false);
+  assert.equal(incomplete.observationContract.matchesCurrent, false);
+  assert.equal(incomplete.observationContract.observed.length, 2);
+  assert.throws(() => buildMemoryInferencePilotReport({
+    db: mixedDb,
+    startEpoch: parseKstDate('2026-09-01', 'date'),
+    endEpoch: parseKstDate('2026-09-02', 'date'),
+    coverageStatus: COVERAGE_STATUSES.COMPLETE,
+    instrumentationFailureCount: 0,
+  }), /observation contract/);
+  mixedDb.close();
 });

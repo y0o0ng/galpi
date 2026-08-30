@@ -697,6 +697,8 @@ The default report is `INCOMPLETE` because the ledger alone cannot prove
 service/logging coverage or recover failed telemetry writes. It never
 estimates missing incidence, and synthetic/private replay composition is
 never included in observed-production frequency. `COMPLETE` may be
-declared only with an independently reviewed instrumentation-failure
-count. P0 invokes no local model and changes no production memory or
-retrieval decision.
+declared only when an independent log review found exactly zero
+instrumentation failures and the window contains only the current coherent
+ledger/instrumentation contract. The report surfaces both current and
+observed contract versions. P0 invokes no local model and changes no
+production memory or retrieval decision.

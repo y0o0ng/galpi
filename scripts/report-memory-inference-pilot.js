@@ -78,9 +78,9 @@ function parseArguments(argv) {
   if (
     !options.help
     && options.coverageStatus === COVERAGE_STATUSES.COMPLETE
-    && options.instrumentationFailureCount === null
+    && options.instrumentationFailureCount !== 0
   ) {
-    throw new Error('complete coverage를 선언하려면 --instrumentation-failures 확인값이 필요합니다.');
+    throw new Error('complete coverage를 선언하려면 --instrumentation-failures가 독립 검토 결과 정확히 0이어야 합니다.');
   }
   return options;
 }
@@ -94,13 +94,14 @@ function helpText() {
     '  --since <YYYY-MM-DD>                포함할 첫 KST 날짜',
     '  --until <YYYY-MM-DD>                제외할 KST 날짜',
     '  --coverage <complete|incomplete>    window coverage (기본: incomplete)',
-    '  --instrumentation-failures <N>      독립 로그 검토로 확인한 실패 수',
+    '  --instrumentation-failures <N>      독립 로그 검토로 확인한 실패 수(COMPLETE는 정확히 0)',
     '  --json                              JSON 출력',
     '  -h, --help                          도움말',
     '',
     '이 명령은 observed-production ledger만 readonly/query_only로 집계합니다.',
     'synthetic/private replay case는 production frequency에 포함하지 않습니다.',
     'ledger만으로 coverage를 증명할 수 없어 기본값은 INCOMPLETE이며 누락 incidence를 추정하지 않습니다.',
+    'COMPLETE는 실패 수가 정확히 0이고 window의 observation contract가 current version으로 일관될 때만 허용됩니다.',
   ].join('\n');
 }
 
