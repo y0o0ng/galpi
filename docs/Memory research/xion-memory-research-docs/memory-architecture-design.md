@@ -11137,13 +11137,14 @@ observation window length
 이 값은 current production traffic의 feasibility input이지
 memory quality 자체의 score가 아니다.
 
-### P0.2 Historical evidence-set sensitivity
+### P0.2 Historical retrieval-context sensitivity
 
 기존 A1b 77-query replay를 우선 재사용한다.
 
 ```text
-ΔE = fraction of comparable queries
-     whose retrieved evidence set differs between candidate policies
+ΔR = retrieval-context-sensitive fraction
+     = fraction of comparable queries
+       whose final bounded retrieval context differs between candidate policies
 ```
 
 현재 `review:retrieval-policy` 계열처럼
@@ -11157,30 +11158,70 @@ evidence-set difference
 answer-level decision sensitivity
 ```
 
-ΔE는 upper funnel signal이다.
+ΔR은 upper funnel signal이다.
+초기 working name `ΔE`는 §53.4에 따라 `ΔR`로 supersede한다.
 
 ### P0.3 Preliminary answer sensitivity
 
-ΔE case에 대해서만 same-budget paired generation을 수행한다.
+ΔR case에 대해서만 same-budget paired generation을 수행한다.
 
 ```text
-ΔA = fraction of ΔE cases
-     whose answer materially differs
+ΔA = materially answer-sensitive fraction among all ΔR cases
 ```
 
-`materially differs`의 exact rubric은 **paired answers를 보기 전에 preregister**한다.
-최소한 style/wording-only 차이는 제외하고,
-다음과 같은 memory-dependent output 차이를 대상으로 해야 한다.
+Primary label은 다음 3-state다.
+
+```text
+MATERIAL_CHANGE
+NO_MATERIAL_CHANGE
+INDETERMINATE
+```
+
+`MATERIAL_CHANGE`는 D0-dependent answer difference가 사용자 관점에서
+다음 중 하나를 실질적으로 바꿀 때만 붙인다.
 
 ```text
 factual claim / remembered state
-recommendation or chosen option
-uncertainty / ambiguity handling
+recommendation / chosen option / ranking / priority
+epistemic handling: assert / hedge / unresolved / clarification-needed
 planned action / intervention
-material rationale that changes downstream behavior
+material rationale that changes downstream judgment/action even when the conclusion is the same
 ```
 
-rubric 자체를 결과를 본 뒤 움직이지 않는다.
+다음은 material로 세지 않는다.
+
+```text
+style / wording / tone
+formatting / verbosity
+semantically equivalent paraphrase
+harmless elaboration
+same conclusion explained at greater length
+memory-independent peripheral expression differences
+```
+
+Materiality는 어느 arm이 더 맞거나 더 좋은지를 평가하지 않는다.
+P0 feasibility question은:
+
+> **Does the retrieval-context difference propagate into a material downstream answer difference?**
+
+이다. Correctness / policy winner는 후속 R3 question이다.
+
+모든 `ΔR` case를 denominator에 남긴다.
+
+```text
+M = MATERIAL_CHANGE
+N = NO_MATERIAL_CHANGE
+U = INDETERMINATE
+T = M + N + U
+
+ΔA_lower = M / T
+ΔA_upper = (M + U) / T
+```
+
+이 bounds를 informative-case throughput에도 그대로 전파한다.
+lower / upper가 같은 feasibility gate 영역에 있으면 판정할 수 있고,
+gate boundary를 가로지르면 P0는 indeterminate로 남는다.
+Rubric과 uncertainty handling은 answer를 보기 전에 고정하며 결과를 본 뒤 움직이지 않는다.
 
 ### P0.4 Informative-case throughput
 
@@ -11188,19 +11229,19 @@ Feasibility denominator:
 
 ```text
 Projected informative cases / 28 days
-= E × ΔE × ΔA × 28
+= E × ΔR × ΔA × 28
 ```
 
 여기서:
 
 ```text
 E  = eligible requests / day
-ΔE = evidence-set-sensitive fraction
-ΔA = materially answer-sensitive fraction among ΔE cases
+ΔR = retrieval-context-sensitive fraction
+ΔA = materially answer-sensitive fraction among ΔR cases
 ```
 
 Activation rate를 별도 곱수로 중복 적용하지 않는다.
-Eligibility/ΔE 정의 안에 실제 comparison funnel을 명시한다.
+Eligibility/ΔR 정의 안에 실제 comparison funnel을 명시한다.
 
 ### P0.5 User-accepted preregistered gate
 
@@ -11236,9 +11277,9 @@ P0 종료 시 최소 다음을 한 번의 read-only research receipt에 남긴�
 observation window
 E
 historical comparable-query N
-ΔE
+ΔR
 paired-generation N
-ΔA
+ΔA lower / upper
 projected informative cases / 28d
 GREEN / AMBER / RED result
 resulting R3 queue disposition
@@ -11678,16 +11719,18 @@ R3의 목적은 모든 knob를 최적화하는 것이 아니다.
 
 # 53. R3-P0 Measurement Contract — Code Reality Check
 
-> 상태: **P0 MEASUREMENT CONTRACT — ACCEPTED FEASIBILITY GATE, IMPLEMENTATION HANDOFF READY**
+> 상태: **P0-A COMPLETE — CURRENT RESULT `INDETERMINATE_PIT`; PROSPECTIVE EXACT-WINDOW / P0-B CONTRACT ACCEPTED**
 >
-> 기준 Galpi `main`: `71025861d07521f88c21b8c88360280ec6f3c604`.
+> 최초 code-reality 기준 Galpi `main`: `71025861d07521f88c21b8c88360280ec6f3c604`.
+>
+> prospective protocol current-code 재확인 기준 Galpi `main`: `b28f4aaf5aa65f294609929f992034d267af9286`.
 >
 > 목적: §52의 P0를 실제 current Galpi trace/replay 코드에 연결하면서,
 > 기존 도구를 잘못 해석해 feasibility 숫자를 오염시키지 않도록 측정 계약을 고정한다.
 
 ## 53.1 Current-code finding — default shadow report does not measure current A2 traffic
 
-현재 regular text-chat retrieval trace는 `getContextNotesForQuestion(...)`에서 기록되고,
+현재 regular `/api/chat` retrieval trace는 `getContextNotesForQuestion(...)`에서 기록되고,
 mode는 개념적으로:
 
 ```text
@@ -11708,27 +11751,87 @@ mode LIKE '%:a1b'
 
 > **Do not use the default A1b report as current F1 / P0 online traffic.**
 
-P0.1은 명시적으로 current text-chat A2 modes를 집계해야 한다.
+P0.1은 명시적으로 current regular `/api/chat` A2 modes를 집계해야 한다.
 
 Scope:
 
 ```text
-include: regular text-chat retrieval invocations ending in :a2
-exclude: retired council replays, manual preview calls, unrelated modes
+include:
+- regular /api/chat A2 retrieval invocations ending in :a2
+- typed chat
+- half-duplex voice that uses the same /api/chat A2 path
+
+exclude:
+- separate realtime/voice retrieval paths
+- retired council replays
+- manual preview/eval calls
+- unrelated modes
 ```
 
-Realtime/voice context lookup은 current trace path와 동일하게 기록되지 않을 수 있으므로
-P0 v1의 traffic scope는 **regular text chat**으로 고정한다.
-Voice memory evaluation은 별도 instrumentation이 생기기 전까지 P0 denominator에 조용히 섞지 않는다.
+`public/app.js`의 half-duplex flow는 transcript를 `sendSingleMessage({ source: 'voice' })`로
+같은 `/api/chat`에 보내고, `server.js`의 typed chat과 같은
+`runSingleChatTurnBody → getContextNotesForQuestion(...)` A2 path를 탄다.
+따라서 이 half-duplex invocation은 regular `/api/chat` traffic에 포함한다.
+별도 Realtime/voice retrieval path는 같은 것으로 간주하거나 denominator에 조용히 섞지 않는다.
 
-## 53.2 P0.1 fixed observation window
+## 53.2 Prospective exact 28-day observation window
 
 Accepted feasibility gate가 28-day throughput을 사용하므로
-online volume도 moving denominator를 피하기 위해 다음으로 고정한다.
+online volume도 moving denominator를 피하기 위해 28 calendar-day half-open window로 고정한다.
+
+최초 P0-A와 current invocation-weighted follow-up은
+`docs/memory-r3-p0-a-receipt.md`에 기록된 historical measurement이며,
+historical active-note input을 복원할 수 없어 결과는 `INDETERMINATE_PIT`다.
+P0-B는 시작하지 않았다.
+
+Future trace에는 exact input filename 목록을 뜻하는 nullable `active_notes_json` telemetry가
+2026-08-30 00:05:40 KST service restart부터 operational하다.
+Historical rows는 `NULL`이고 backfill하지 않았다.
+
+Exact D0 remeasurement는 telemetry가 operational해진 뒤 첫 번째 완전한 28 calendar-day window를 사용한다.
+Preregistered first window:
 
 ```text
-observation window = most recent 28 complete calendar days
-E = eligible regular-text-chat A2 retrieval invocations / 28
+2026-08-31 00:00 KST <= trace < 2026-09-28 00:00 KST
+```
+
+Window rules:
+
+```text
+timezone = KST
+request-count early stop = forbidden
+move window after seeing results = forbidden
+extend end after outage to obtain "28 observed days" = forbidden
+repeated query = count every actual invocation; no dedupe
+```
+
+Exact sensitive invocation count를 `S`라고 한다.
+
+```text
+E = eligible regular /api/chat A2 retrieval invocations / 28
+S = exact ΔR-sensitive invocation count in the same complete window
+```
+
+다음 point rule은 coverage가 complete해 exact `S`를 셀 수 있을 때 적용한다.
+Coverage gap이 있으면 아래 point rule보다 `Coverage-gap rule`의 bounds를 먼저 적용한다.
+
+```text
+S < 20
+→ even ΔA = 100% yields fewer than 20 informative cases
+→ RED_PROVEN
+→ do not execute P0-B
+
+S >= 20
+→ ΔA can change the feasibility gate
+→ execute P0-B on the full ΔR census
+```
+
+기존 gate 자체는 바꾸지 않는다.
+
+```text
+GREEN >= 50 informative cases / 28d
+AMBER = 20..49 informative cases / 28d
+RED < 20 informative cases / 28d
 ```
 
 함께 보고:
@@ -11746,8 +11849,29 @@ saturated runs
 같은 query text가 여러 번 실제 사용되었다면 각각 별도 eligible request다.
 F1 volume에서는 query hash로 deduplicate하지 않는다.
 
-Logging outage / mode discontinuity가 window를 오염시키면
-그 기간을 임의로 삭제해서 rate를 높이지 말고 coverage caveat를 명시한다.
+### Coverage-gap rule
+
+28-day calendar window는 사전에 고정한다.
+Known or plausible telemetry/logging coverage gap이 생겨도 해당 기간을 임의로 제외하지 않는다.
+
+```text
+if a conservative bound on missed eligible/sensitive cases can be built:
+  propagate the uncertainty through the feasibility gate
+
+if no defensible conservative bound can be built:
+  status = INDETERMINATE_COVERAGE
+
+if lower and upper bounds remain in the same gate region:
+  gate disposition may be made
+
+if coverage uncertainty can cross a gate boundary:
+  status = INDETERMINATE_COVERAGE
+  do not declare GREEN / AMBER / RED from this window
+  remeasure on the next clean complete 28-day window
+```
+
+Outage 뒤로 현재 window의 끝을 늘리지 않는다.
+Accepted cutoff는 false precision을 정당화하지 않는다.
 
 ## 53.3 Current-code finding — existing `changedQueries` is NOT D0 sensitivity
 
@@ -11891,7 +12015,7 @@ P0를 한 번에 큰 tool로 만들지 않는다.
 ### P0-A — zero/low-cost read-only measurement first
 
 ```text
-P0.1 online E over fixed 28-day text-chat A2 window
+P0.1 online E over fixed 28-day regular /api/chat A2 window
 P0.2 historical D0 ΔR over the existing replayable query corpus
 ```
 
@@ -11899,11 +12023,207 @@ No production mutation.
 No new learned model.
 No answer generation required.
 
-Output determines how many historical cases actually require P0-B.
+최초 historical P0-A와 current-traffic follow-up의 결과는
+`docs/memory-r3-p0-a-receipt.md`의 `INDETERMINATE_PIT`다.
+Future exact-window remeasurement가 §53.2의 `S`와 P0-B trigger를 결정한다.
 
-### P0-B — paired answer sensitivity only for ΔR cases
+### P0-B trigger and census
 
-Only if P0-A finds reader-visible retrieval differences:
+§53.2의 exact-window `S < 20`이면 `RED_PROVEN`이고 P0-B를 실행하지 않는다.
+`S >= 20`이면 preregistered 28-day window의 **모든 exact ΔR case**를
+primary analysis에 사용한다.
+
+```text
+sampling = none
+sequential sampling = none
+primary gate early stopping = none
+same protocol for every exact ΔR case = required
+```
+
+P0-B를 시작한 뒤 case가 많다는 이유로 일부만 보는 것으로 바꾸지 않는다.
+비용/규모 때문에 census가 불가능해지면 실행 전에 protocol을 다시 열어 사용자 결정을 받는다.
+
+### Experiment-time answer-stack snapshot
+
+P0-B 시작 직전에 experiment-time production answer stack 하나를 freeze한다.
+최소 기록:
+
+```text
+exact model identifier / resolved production model
+prompt/runtime version or relevant commit/config
+reasoning setting
+tool policy
+generation parameters
+deterministic controls supported/used
+history-window policy
+final memory budget
+```
+
+모든 case, 모든 replicate, 양 D0 arm에 같은 snapshot을 사용한다.
+28-day request 각각의 당시 production model은 복원하지 않는다.
+P0-B 도중 production model/config이 바뀌어도 시작 시 freeze한 snapshot으로 끝까지 수행한다.
+
+따라서 ΔA가 뜻하는 것은:
+
+> **At the current experiment-time XION answer stack, how often does the D0 retrieval difference observed under the organic request distribution produce a material answer difference?**
+
+이다. Exact historical production answer reproduction을 주장하지 않는다.
+
+### Canonical target and conversation-history replay
+
+각 case는 resolved target user message identity를 canonical anchor로 먼저 가져야 한다.
+같은 session에서 그 target보다 canonical DB ordering상 앞선 message만 historical prefix로 사용하고,
+그 prefix에 P0-B 시작 시 freeze한 experiment-time production history-window policy를 적용한다.
+
+```text
+historical message content/state
++ experiment-time production bounded-history policy
+→ replay history
+```
+
+양 D0 arm에는 동일 history를 공급한다.
+
+금지:
+
+```text
+target 뒤의 future messages
+post-request summaries
+full session injection
+timestamp-only guess for ambiguous ordering
+```
+
+Message identity와 current production의 canonical DB order를 기준으로 replay한다.
+Same-second ordering을 포함해 target identity/order를 확정할 수 없으면 임의 선택하지 않는다.
+Required history를 faithful하게 재구성하지 못하고 그 차이가 answer materiality에 영향을 줄 수 있으면
+`INDETERMINATE_HISTORY_REPLAY`로 남기고 denominator에서 제거하지 않는다.
+
+### Tool / external-context replay
+
+P0-B generation 중 live tool execution은 금지한다.
+
+정확히 재현 가능한 historical read-only tool result 또는 기타 non-memory context만:
+
+```text
+freeze once
+→ supply identically to both D0 arms
+```
+
+할 수 있다. 과거 tool state/result를 faithful하게 재구성할 수 없고
+그 정보가 answer materiality에 영향을 줄 수 있으면
+`INDETERMINATE_TOOL_REPLAY`로 남기고 denominator에서 제거하지 않는다.
+
+Write/action side effect는 절대 재실행하지 않는다.
+
+```text
+task/reminder mutation
+mail send
+external action
+other durable/side-effecting operation
+```
+
+### Independent generation and stability
+
+각 ΔR case에서 같은 frozen model/input/runtime conditions로 independent generation을 수행한다.
+
+```text
+HARD-GATED: 2 generations
+GLOBAL-SOFT-PRIOR: 2 generations
+```
+
+먼저 within-arm stability를 본다.
+같은 retrieval arm의 두 generation이 material하게 다르면
+`INDETERMINATE_NONDETERMINISM`이다.
+
+두 arm이 각각 internally stable할 때만 네 cross-arm replicate pair comparison의
+materiality consistency를 판정한다.
+
+```text
+all cross-arm comparisons material
+→ MATERIAL_CHANGE
+
+all cross-arm comparisons no-material
+→ NO_MATERIAL_CHANGE
+
+mixed cross-arm result
+→ INDETERMINATE_NONDETERMINISM
+```
+
+Primary P0-B에서는 adaptive third generation, retry, majority voting을 하지 않는다.
+Temperature 0 / fixed seed 등 provider가 제공하는 deterministic controls는 사용할 수 있지만,
+empirical replicate stability를 대체하지 않는다.
+
+### Primary blind human adjudication
+
+Primary materiality adjudicator는 사용자 본인이다.
+
+판정 전에 adjudicator가 보는 것:
+
+```text
+original request
+required non-memory context
+two neutrally labeled answer groups, such as X / Y
+two replicates inside each group
+```
+
+판정 전 숨기는 것:
+
+```text
+HARD-GATED / GLOBAL-SOFT-PRIOR arm identity
+retrieval contents / scores
+policy identity
+```
+
+Human adjudication은 §52.2의 materiality와 within-arm stability만 판정한다.
+Correctness나 어느 policy가 더 좋은지는 판정하지 않는다.
+확신 있게 분류할 수 없으면 억지 binary label 대신 `INDETERMINATE`로 남기고
+reason을 `INDETERMINATE_ADJUDICATION`으로 기록한다.
+
+LLM-as-judge는 후속 diagnostic/shadow audit으로 사용할 수 있지만:
+
+```text
+not primary P0 gate authority
+must not overwrite human labels
+judge agreement must not change the gate
+```
+
+### Labels, reasons, and bounds
+
+모든 ΔR case는 §52.2의 `MATERIAL_CHANGE | NO_MATERIAL_CHANGE | INDETERMINATE`
+중 하나를 받고 denominator에 남는다.
+
+Indeterminate reason은 적어도 다음을 구분 가능하게 기록한다.
+
+```text
+INDETERMINATE_NONDETERMINISM
+INDETERMINATE_ADJUDICATION
+INDETERMINATE_TOOL_REPLAY
+INDETERMINATE_HISTORY_REPLAY
+```
+
+Coverage는 case label이 아니라 window-level `INDETERMINATE_COVERAGE`다.
+Reason taxonomy는 diagnostic이며 새 scalar score나 weighting을 만들지 않는다.
+
+```text
+M = MATERIAL_CHANGE
+N = NO_MATERIAL_CHANGE
+U = INDETERMINATE
+T = M + N + U = S  # complete exact-coverage census
+
+ΔA_lower = M / T
+ΔA_upper = (M + U) / T
+
+informative-case lower = M
+informative-case upper = M + U
+```
+
+Coverage gap을 bounds로 처리한 window에서는 `T = S`라는 false point equality를 주장하지 않는다.
+놓쳤을 수 있는 eligible/sensitive case uncertainty를 별도 window-level bound로 gate까지 전파한다.
+Lower / upper가 같은 GREEN / AMBER / RED 영역에 있으면 판정할 수 있다.
+Gate boundary를 가로지르면 P0는 indeterminate로 남는다.
+
+### P0-B mutation boundary
+
+양 arm에서 허용되는 유일한 차이는 D0 retrieval context다.
 
 ```text
 same historical request
@@ -11915,45 +12235,60 @@ same final memory budget
 only D0 retrieval context differs
 ```
 
-Then estimate:
-
-```text
-ΔA = materially answer-sensitive fraction among ΔR cases
-```
-
-Material-difference rubric is preregistered in §52.2.
-Style-only differences do not count.
-
-P0-B must not perform normal conversation/topic/task writes.
+P0-B는 live tool execution, normal conversation/topic/task writes,
+그 밖의 production mutation을 수행하지 않는다.
 Generated outputs are research artifacts only unless separately approved.
 
-## 53.8 P0-A completion receipt
+## 53.8 P0 receipts
 
-Before implementing P0-B, P0-A must produce a compact receipt containing:
+완료된 historical P0-A receipt는 `docs/memory-r3-p0-a-receipt.md`이며 소급 수정하지 않는다.
+Future exact-window remeasurement receipt에는 최소 다음을 남긴다.
 
 ```text
 baseline commit
-production DB observation window
+exact KST half-open observation window
 included mode pattern(s)
 excluded modes
 eligible runs
 E / day
 activation / abstention
 errors / missing hashes / saturation
-historical comparable query count
+active_notes_json exact / unknown counts
 D0 ΔR count/rate
 activation-change count
 membership-change count
 order-only-change count
 point-in-time caveats
-number of cases forwarded to P0-B
+coverage gaps and conservative bounds, if any
+S
+S < 20 → RED_PROVEN / no P0-B
+or S >= 20 → census P0-B required
 ```
 
-No GREEN/AMBER/RED classification is made until `ΔA` exists.
+If `S < 20`, ΔA 없이도 RED가 proven이므로 P0-B를 실행하지 않는다.
+If `S >= 20`, P0-B completion receipt에는 최소 다음을 추가한다.
+
+```text
+frozen answer-stack snapshot fields from §53.7
+census case count T and, when coverage is complete, confirmation that T = S
+M / N / U
+indeterminate reason counts
+ΔA_lower / ΔA_upper
+informative-case lower / upper
+GREEN / AMBER / RED or indeterminate result
+human adjudication completion
+live tool execution = none
+production mutations = none
+resulting R3 queue disposition
+```
+
+Materiality receipt는 correctness나 policy winner를 선언하지 않는다.
 
 ## 53.9 Minimal-change implementation rule
 
 P0 is research instrumentation, not a production memory feature.
+`active_notes_json` exact-input telemetry는 P0-A follow-up에서 필요한 최소 field로 이미 배포됐다.
+이번 prospective/P0-B 계약은 새 telemetry field, schema, runtime behavior를 추가하지 않는다.
 
 Prefer:
 
@@ -11978,16 +12313,29 @@ new long-lived telemetry field unless P0 proves it is necessary
 If existing scripts need reusable extraction helpers,
 refactor only the minimum necessary and preserve current CLI/output compatibility.
 
-## 53.10 P0-A go/no-go
+## 53.10 P0 go/no-go and next user decision
 
-Implementation may proceed without another product decision.
-
-Next user decision occurs only if:
+현재 protocol choice는 닫혔고 P0-B는 아직 시작하지 않았다.
 
 ```text
-P0 measurement cannot resolve GREEN / AMBER / RED without changing a semantic/product contract
-OR
-P0-B material-difference rubric proves ambiguous in a way that changes the result
+complete first exact window
+→ apply coverage rule
+→ S < 20: RED_PROVEN, no P0-B
+→ S >= 20: execute census P0-B under §53.7
+→ propagate M/N/U bounds to the accepted gate
 ```
 
-Otherwise the preregistered §52 gate controls the queue disposition.
+`INDETERMINATE_COVERAGE`이면 현재 window를 늘이거나 일부를 버리지 않고
+다음 clean complete 28-day window에서 같은 계약으로 재측정한다.
+
+다음 사용자 결정이 필요한 경우는:
+
+```text
+census cost/scale makes the accepted protocol infeasible before execution
+OR
+a newly discovered semantic/result-affecting choice is not fixed by this contract
+```
+
+그 밖에는 preregistered §52 gate가 queue disposition을 통제한다.
+P0는 policy correctness/winner를 결정하지 않으며,
+R3 retrieval/context policy winner와 후속 lane의 empirical choices는 계속 OPEN이다.
