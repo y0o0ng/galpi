@@ -190,6 +190,40 @@ def bars_from_eod(symbol: str, payload: object) -> SymbolBars:
     )
 
 
+@dataclass(frozen=True)
+class SplitEvent:
+    """vendor가 준 split 사건 하나. 상장 market boundary 해석에만 쓴다.
+
+    SEC가 사건을 증명하고 vendor는 **상장 시장 가격 경계**만 준다. vendor row가
+    SEC 승인을 대신하지 않는다.
+    """
+
+    symbol: str
+    split_date: str
+    raw_split: str
+
+
+def parse_splits(symbol: str, payload: object) -> list[SplitEvent]:
+    """`/api/splits/{SYMBOL}` 응답을 그대로 보존해 파싱한다.
+
+    실제 응답 필드는 `date`와 `split`("new/old" 문자열)이다. 비율을 여기서
+    숫자로 정규화하지 않는다 — 원문 보존이 계약이다.
+    """
+    if not isinstance(payload, list):
+        raise EodhdError(f"{symbol} splits 응답이 목록이 아닙니다.")
+    out: list[SplitEvent] = []
+    for row in payload:
+        if not isinstance(row, dict):
+            raise EodhdError(f"{symbol} splits 항목이 객체가 아닙니다.")
+        date = str(row.get("date", "")).strip()
+        raw = str(row.get("split", "")).strip()
+        if not date or not raw:
+            raise EodhdError(f"{symbol} splits 항목에 date/split이 없습니다: {row!r}")
+        out.append(SplitEvent(symbol=symbol, split_date=date, raw_split=raw))
+    out.sort(key=lambda item: (item.split_date, item.raw_split))
+    return out
+
+
 class EodhdClient:
     def __init__(
         self,
@@ -231,6 +265,10 @@ class EodhdClient:
         if end:
             params["to"] = end
         return bars_from_eod(symbol, self._get(f"eod/{symbol}", **params))
+
+    def splits(self, symbol: str) -> list[SplitEvent]:
+        """공식 historical splits endpoint. 이 계약이 필요로 하는 최소한만 연다."""
+        return parse_splits(symbol, self._get(f"splits/{symbol}"))
 
     def listings(self, exchange: str = "US", delisted: bool = False) -> list[Listing]:
         params = {"delisted": "1"} if delisted else {}

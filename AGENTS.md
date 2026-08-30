@@ -30,7 +30,7 @@
 - 트레이딩(V5-B): `docs/trading/strategies/Swing Trading Agent Design v2 2.md`. 실측·완료 기록은 20.0절이다.
 - 트레이딩 전략 구축 계약: 전략 family마다 로드맵이 하나다. **연구 예산·종료 조건·Phase별 사전등록이 거기 있다.** 실험 산출물 색인은 `trading/runs/README.md`다.
   - `momentum-v2` (CLOSED/FROZEN): `docs/trading/momentum-v2-roadmap.md`
-  - `quality-value` (Phase 0 진행 중 — identity·submissions 완료, 다음 companyfacts/accounting mapping): `docs/trading/strategies/quality-value-roadmap.md`
+  - `quality-value` (Phase 0 진행 중 — Step 4 PIT shares/ME까지 구현했고 다음은 Step 5다): `docs/trading/strategies/quality-value-roadmap.md`. **Step 4 구현 정본은 `docs/trading/strategies/qv-step4-shares-me-design.md`이고 P2 same-regime selector·C3 continuity·identity manifest가 거기서 얼어붙었다.**
 - 메일 에이전트(독립 트랙 MAIL-1~4): `docs/xion-mail-agent-design-final.md`. 스키마·Phase·통과 기준이 전부 그 문서에 있다.
 - 세부 설계는 각 기능 문서를 단일 기준으로 삼고, 이 파일에 상세 이력을 복제하지 않는다.
 

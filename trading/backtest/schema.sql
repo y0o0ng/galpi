@@ -124,14 +124,14 @@ CREATE TABLE IF NOT EXISTS qv_share_classes (
   class_id TEXT NOT NULL,
   issuer_id TEXT NOT NULL,
   symbol TEXT,
-  xbrl_axis TEXT,
-  xbrl_member TEXT,
   is_ordinary_common INTEGER NOT NULL CHECK (is_ordinary_common IN (0, 1)),
   is_listed INTEGER NOT NULL CHECK (is_listed IN (0, 1)),
   effective_from TEXT NOT NULL
     CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   effective_to TEXT
     CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  usable_from_session TEXT NOT NULL
+    CHECK (usable_from_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   source TEXT NOT NULL,
   source_version TEXT NOT NULL,
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
@@ -139,46 +139,7 @@ CREATE TABLE IF NOT EXISTS qv_share_classes (
   FOREIGN KEY (issuer_id, source_version)
     REFERENCES qv_issuers(issuer_id, source_version),
   CHECK (effective_to IS NULL OR effective_to > effective_from),
-  CHECK ((xbrl_axis IS NULL) = (xbrl_member IS NULL)),
   CHECK (is_listed = 0 OR symbol IS NOT NULL)
-) WITHOUT ROWID;
-
--- valuation 관계도 PIT 구간이다. CONVERSION_VALUE_PROXY는 관측 가격이 아니며 원문
--- accession과 fixed direct ratio를 반드시 보존한다. MISSING은 coverage 분모에 남길
--- 명시적 사유를 요구한다.
-CREATE TABLE IF NOT EXISTS qv_class_valuation (
-  class_id TEXT NOT NULL,
-  valuation_method TEXT NOT NULL CHECK (
-    valuation_method IN ('OBSERVED_MARKET_PRICE', 'CONVERSION_VALUE_PROXY', 'MISSING')
-  ),
-  reference_class_id TEXT,
-  conversion_ratio REAL,
-  effective_from TEXT NOT NULL
-    CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
-  effective_to TEXT
-    CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
-  source_accession TEXT,
-  missing_reason TEXT,
-  source TEXT NOT NULL,
-  source_version TEXT NOT NULL,
-  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
-  PRIMARY KEY (class_id, effective_from, source_version),
-  CHECK (effective_to IS NULL OR effective_to > effective_from),
-  CHECK (
-    (valuation_method = 'OBSERVED_MARKET_PRICE'
-      AND reference_class_id IS NULL AND conversion_ratio IS NULL
-      AND missing_reason IS NULL)
-    OR
-    (valuation_method = 'CONVERSION_VALUE_PROXY'
-      AND reference_class_id IS NOT NULL AND reference_class_id <> class_id
-      AND conversion_ratio > 0 AND source_accession IS NOT NULL
-      AND length(trim(source_accession)) > 0
-      AND missing_reason IS NULL)
-    OR
-    (valuation_method = 'MISSING'
-      AND reference_class_id IS NULL AND conversion_ratio IS NULL
-      AND missing_reason IS NOT NULL AND length(trim(missing_reason)) > 0)
-  )
 ) WITHOUT ROWID;
 
 -- Quality + Value 전용 SEC filing 원장. CIK는 이 row의 filing-time SIC를 찾는
@@ -457,6 +418,402 @@ CREATE TABLE IF NOT EXISTS qv_accounting_filings (
   CHECK (book_equity_status <> 'RESOLVED' OR book_equity_value IS NOT NULL)
 ) WITHOUT ROWID;
 
+-- ── QV Step 4: identity alias · evidence · shares · events · ME ────────────────
+-- 설계 정본은 docs/trading/strategies/qv-step4-shares-me-design.md 다.
+-- alias는 economic class가 아니다. 여러 alias가 한 class를 가리킬 수 있고,
+-- 같은 시점 같은 키가 두 class로 가면 fail-close다.
+
+-- 매핑마다 구조화된 SEC 증거. usable_from_session은 REQUIRED 증거의 최대값에서
+-- 파생하며 손으로 덮어쓰지 않는다. CORROBORATING은 사용 가능 시점을 늦추지 않는다.
+CREATE TABLE IF NOT EXISTS qv_identity_evidence (
+  relation_kind TEXT NOT NULL CHECK (relation_kind IN (
+    'SHARE_CLASS', 'XBRL_ALIAS', 'PROSE_ALIAS', 'CONVERSION_RELATION')),
+  relation_key TEXT NOT NULL CHECK (length(trim(relation_key)) > 0),
+  evidence_ordinal INTEGER NOT NULL CHECK (evidence_ordinal >= 0),
+  source_kind TEXT NOT NULL CHECK (source_kind IN ('KQ_FILING', 'SEC_EVIDENCE_DOCUMENT')),
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),
+  evidence_role TEXT NOT NULL CHECK (length(trim(evidence_role)) > 0),
+  locator TEXT,
+  dependency TEXT NOT NULL CHECK (dependency IN ('REQUIRED', 'CORROBORATING')),
+  resolved_usable_session TEXT
+    CHECK (resolved_usable_session IS NULL OR resolved_usable_session GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (relation_kind, relation_key, evidence_ordinal, source_version)
+) WITHOUT ROWID;
+
+-- PIT XBRL QName alias. axis/member 둘 다 정규화 키로 저장하고 raw QName을
+-- provenance로 남긴다. local-name-only 추론은 하지 않는다.
+CREATE TABLE IF NOT EXISTS qv_share_class_xbrl_aliases (
+  class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  axis_key TEXT NOT NULL CHECK (length(trim(axis_key)) > 0),
+  member_key TEXT NOT NULL CHECK (length(trim(member_key)) > 0),
+  raw_axis_namespace TEXT,
+  raw_axis_local TEXT NOT NULL CHECK (length(trim(raw_axis_local)) > 0),
+  raw_member_namespace TEXT,
+  raw_member_local TEXT NOT NULL CHECK (length(trim(raw_member_local)) > 0),
+  effective_from TEXT NOT NULL
+    CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  effective_to TEXT
+    CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  usable_from_session TEXT NOT NULL
+    CHECK (usable_from_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (class_id, axis_key, member_key, effective_from, source_version),
+  FOREIGN KEY (issuer_id, source_version)
+    REFERENCES qv_issuers(issuer_id, source_version),
+  CHECK (effective_to IS NULL OR effective_to > effective_from)
+) WITHOUT ROWID;
+
+-- PIT prose alias. comparison_key는 N1(NFKC·trim·공백 1칸·casefold)까지만이다.
+-- COVER_GROUP_LABEL은 단독 canonical bridge가 될 수 없다.
+CREATE TABLE IF NOT EXISTS qv_share_class_prose_aliases (
+  class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  raw_prose_name TEXT NOT NULL CHECK (length(trim(raw_prose_name)) > 0),
+  comparison_key TEXT NOT NULL CHECK (length(trim(comparison_key)) > 0),
+  bridge_type TEXT NOT NULL CHECK (bridge_type IN (
+    'SECURITY_TITLE_FACT', 'GOVERNING_INSTRUMENT', 'COVER_GROUP_LABEL')),
+  effective_from TEXT NOT NULL
+    CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  effective_to TEXT
+    CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  usable_from_session TEXT NOT NULL
+    CHECK (usable_from_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (class_id, comparison_key, bridge_type, effective_from, source_version),
+  FOREIGN KEY (issuer_id, source_version)
+    REFERENCES qv_issuers(issuer_id, source_version),
+  CHECK (effective_to IS NULL OR effective_to > effective_from)
+) WITHOUT ROWID;
+
+-- qv_sec_filings를 넓히지 않기 위한 좁은 SEC 증거 문서 원장. 본문/HTML은 넣지 않는다.
+CREATE TABLE IF NOT EXISTS qv_sec_evidence_documents (
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),
+  form TEXT NOT NULL CHECK (length(trim(form)) > 0),
+  document_role TEXT NOT NULL CHECK (document_role IN ('PRIMARY', 'EXHIBIT')),
+  acceptance_datetime TEXT NOT NULL
+    CHECK (acceptance_datetime GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]Z'),
+  acceptance_eastern_date TEXT NOT NULL
+    CHECK (acceptance_eastern_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  historical_usable_session TEXT NOT NULL
+    CHECK (historical_usable_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source_url TEXT NOT NULL CHECK (length(trim(source_url)) > 0),
+  document_sha256 TEXT NOT NULL CHECK (length(document_sha256) = 64),
+  calendar_source TEXT NOT NULL,
+  calendar_source_version TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (cik, accession, document_name, source_version),
+  CHECK (historical_usable_session > acceptance_eastern_date)
+) WITHOUT ROWID;
+
+-- accession 단위 주식수 관측 원장. 범용 XBRL 창고가 아니다.
+CREATE TABLE IF NOT EXISTS qv_share_observations (
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  fact_ordinal INTEGER NOT NULL CHECK (fact_ordinal >= 0),
+  form TEXT NOT NULL CHECK (form IN ('10-K', '10-K/A', '10-Q', '10-Q/A')),
+  acceptance_datetime TEXT NOT NULL,
+  historical_usable_session TEXT NOT NULL
+    CHECK (historical_usable_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  concept_tier TEXT NOT NULL CHECK (concept_tier IN ('A', 'B')),
+  concept_namespace TEXT NOT NULL,
+  concept_local TEXT NOT NULL,
+  fact_instant TEXT NOT NULL
+    CHECK (fact_instant GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  share_value_text TEXT NOT NULL CHECK (length(trim(share_value_text)) > 0),
+  decimals TEXT,
+  unit_id TEXT,
+  context_id TEXT NOT NULL,
+  raw_axis_namespace TEXT,
+  raw_axis_local TEXT,
+  raw_member_namespace TEXT,
+  raw_member_local TEXT,
+  axis_key TEXT,
+  member_key TEXT,
+  dimension_shape TEXT NOT NULL CHECK (dimension_shape IN (
+    'DIMENSIONLESS', 'SINGLE_CLASS_AXIS', 'UNUSABLE')),
+  issuer_id TEXT,
+  class_id TEXT,
+  mapping_status TEXT NOT NULL CHECK (mapping_status IN (
+    'RESOLVED', 'UNRESOLVED', 'AMBIGUOUS', 'UNUSABLE_SHAPE')),
+  duplicate_status TEXT NOT NULL CHECK (duplicate_status IN (
+    'UNIQUE', 'CONSOLIDATED', 'AMBIGUOUS')),
+  duplicate_group TEXT,
+  source_file TEXT NOT NULL,
+  instance_sha256 TEXT NOT NULL CHECK (length(instance_sha256) = 64),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  identity_source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (cik, accession, fact_ordinal, source_version, identity_source_version),
+  CHECK (mapping_status <> 'RESOLVED' OR (issuer_id IS NOT NULL AND class_id IS NOT NULL))
+) WITHOUT ROWID;
+
+-- 기업행동 탐색 coverage. class 효과 판정과 절대 합치지 않는다.
+CREATE TABLE IF NOT EXISTS qv_share_basis_searches (
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  anchor_accession TEXT NOT NULL CHECK (length(trim(anchor_accession)) > 0),
+  valuation_date TEXT NOT NULL
+    CHECK (valuation_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  formation_session TEXT NOT NULL
+    CHECK (formation_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  interval_lo TEXT NOT NULL,
+  interval_hi TEXT NOT NULL,
+  closure_accession TEXT,
+  closure_acceptance_eastern_date TEXT,
+  coverage TEXT NOT NULL CHECK (coverage IN ('NOT_SEARCHED', 'COMPLETE', 'INCOMPLETE')),
+  incomplete_reason TEXT,
+  searched_accessions TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (cik, anchor_accession, valuation_date, formation_session, source_version),
+  CHECK (coverage <> 'COMPLETE' OR closure_accession IS NOT NULL),
+  CHECK (coverage <> 'INCOMPLETE' OR incomplete_reason IS NOT NULL)
+) WITHOUT ROWID;
+
+-- 발견/추출된 원시 공시 후보. 처분(disposition)은 class 효과가 아니다.
+CREATE TABLE IF NOT EXISTS qv_share_basis_candidates (
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),
+  block_ordinal INTEGER NOT NULL CHECK (block_ordinal >= 0),
+  document_role TEXT NOT NULL CHECK (document_role IN ('PRIMARY', 'EXHIBIT')),
+  discovery_family TEXT NOT NULL CHECK (length(trim(discovery_family)) > 0),
+  source_span TEXT NOT NULL CHECK (length(trim(source_span)) > 0),
+  raw_action TEXT,
+  raw_ratio TEXT,
+  raw_class_names TEXT NOT NULL,
+  raw_disclosure_status TEXT NOT NULL,
+  role_dates TEXT NOT NULL,
+  disposition TEXT NOT NULL CHECK (disposition IN (
+    'CURRENT_EVENT', 'EXCLUDED_NOT_IMPLEMENTED', 'EXCLUDED_OUT_OF_WINDOW', 'UNRESOLVED')),
+  disposition_reason TEXT NOT NULL CHECK (length(trim(disposition_reason)) > 0),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (cik, accession, document_name, block_ordinal, source_version)
+) WITHOUT ROWID;
+
+-- 대상 class에 대한 semantic 효과 판정.
+CREATE TABLE IF NOT EXISTS qv_share_basis_class_effects (
+  class_id TEXT NOT NULL,
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL,
+  document_name TEXT NOT NULL,
+  block_ordinal INTEGER NOT NULL,
+  effect TEXT NOT NULL CHECK (effect IN (
+    'SHARE_BASIS_CHANGE_CONFIRMED', 'NO_SHARE_BASIS_EFFECT_CONFIRMED', 'UNRESOLVED')),
+  effect_reason TEXT NOT NULL CHECK (length(trim(effect_reason)) > 0),
+  ratio_text TEXT,
+  share_side_transition_date TEXT,
+  share_side_transition_role TEXT
+    CHECK (share_side_transition_role IS NULL OR
+           share_side_transition_role IN ('EFFECTIVE', 'DISTRIBUTION')),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  identity_source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (class_id, cik, accession, document_name, block_ordinal,
+               source_version, identity_source_version),
+  CHECK (effect <> 'SHARE_BASIS_CHANGE_CONFIRMED' OR
+    (ratio_text IS NOT NULL AND share_side_transition_date IS NOT NULL
+     AND share_side_transition_role IS NOT NULL))
+) WITHOUT ROWID;
+
+-- vendor split 원장. 상장 market boundary 해석에만 쓴다. 기업행동 프레임워크가 아니다.
+CREATE TABLE IF NOT EXISTS qv_vendor_split_events (
+  symbol TEXT NOT NULL CHECK (length(trim(symbol)) > 0),
+  split_date TEXT NOT NULL
+    CHECK (split_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  raw_split TEXT NOT NULL CHECK (length(trim(raw_split)) > 0),
+  retrieved_at TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (symbol, split_date, source_version)
+) WITHOUT ROWID;
+
+-- P2 same-regime 선택 결과. formation·class 단위 정답이다.
+CREATE TABLE IF NOT EXISTS qv_class_share_resolutions (
+  formation_session TEXT NOT NULL
+    CHECK (formation_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  valuation_date TEXT NOT NULL
+    CHECK (valuation_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  selector_path TEXT NOT NULL CHECK (selector_path IN ('A', 'B_FALLBACK', 'MISSING')),
+  selected_accession TEXT,
+  selected_fact_ordinal INTEGER,
+  share_value_text TEXT,
+  fact_instant TEXT,
+  regime_status TEXT NOT NULL CHECK (regime_status IN (
+    'SAME_REGIME', 'DIFFERENT_REGIME', 'UNRESOLVED', 'NO_CANDIDATE')),
+  search_coverage TEXT NOT NULL CHECK (search_coverage IN (
+    'NOT_SEARCHED', 'COMPLETE', 'INCOMPLETE')),
+  missing_reason TEXT,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  identity_source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (formation_session, valuation_date, class_id,
+               source_version, identity_source_version),
+  CHECK (
+    (selector_path = 'MISSING' AND share_value_text IS NULL
+      AND selected_accession IS NULL AND missing_reason IS NOT NULL)
+    OR
+    (selector_path IN ('A', 'B_FALLBACK') AND share_value_text IS NOT NULL
+      AND selected_accession IS NOT NULL AND selected_fact_ordinal IS NOT NULL
+      AND fact_instant IS NOT NULL AND missing_reason IS NULL
+      AND regime_status = 'SAME_REGIME')
+  )
+) WITHOUT ROWID;
+
+-- 법적/경제적 고정 직접 전환 관계. formation 안전성의 답이 아니다.
+CREATE TABLE IF NOT EXISTS qv_class_conversion_relations (
+  relation_id TEXT NOT NULL CHECK (length(trim(relation_id)) > 0),
+  subject_class_id TEXT NOT NULL,
+  reference_class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  conversion_ratio_text TEXT NOT NULL CHECK (length(trim(conversion_ratio_text)) > 0),
+  ratio_semantics TEXT NOT NULL CHECK (ratio_semantics IN (
+    'EXPLICIT_INTEGER', 'ONE_FOR_ONE', 'SHARE_FOR_SHARE', 'EQUAL_NUMBER')),
+  effective_from TEXT NOT NULL
+    CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  effective_to TEXT
+    CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  usable_from_session TEXT NOT NULL
+    CHECK (usable_from_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (relation_id, effective_from, source_version),
+  FOREIGN KEY (issuer_id, source_version)
+    REFERENCES qv_issuers(issuer_id, source_version),
+  CHECK (subject_class_id <> reference_class_id),
+  CHECK (effective_to IS NULL OR effective_to > effective_from)
+) WITHOUT ROWID;
+
+-- formation 시점의 valuation 답. 법적 관계 표와 분리한다.
+CREATE TABLE IF NOT EXISTS qv_class_valuation_resolutions (
+  formation_session TEXT NOT NULL
+    CHECK (formation_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  valuation_date TEXT NOT NULL
+    CHECK (valuation_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  valuation_method TEXT NOT NULL CHECK (valuation_method IN (
+    'OBSERVED_MARKET_PRICE', 'CONVERSION_VALUE_PROXY', 'MISSING')),
+  price_symbol TEXT,
+  price_date TEXT,
+  raw_close_text TEXT,
+  price_source_version TEXT,
+  relation_id TEXT,
+  conversion_ratio_text TEXT,
+  reference_class_id TEXT,
+  c3_pre_accession TEXT,
+  c3_pre_document TEXT,
+  c3_post_accession TEXT,
+  c3_post_document TEXT,
+  continuity_status TEXT NOT NULL CHECK (continuity_status IN (
+    'NOT_REQUIRED', 'CONFIRMED', 'UNRESOLVED')),
+  amendment_search_status TEXT NOT NULL CHECK (amendment_search_status IN (
+    'NOT_REQUIRED', 'COMPLETE', 'UNRESOLVED')),
+  evidence_cutoff_session TEXT,
+  missing_reason TEXT,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  identity_source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (formation_session, valuation_date, class_id,
+               source_version, identity_source_version),
+  CHECK (
+    (valuation_method = 'OBSERVED_MARKET_PRICE'
+      AND price_symbol IS NOT NULL AND raw_close_text IS NOT NULL
+      AND relation_id IS NULL AND missing_reason IS NULL
+      AND continuity_status = 'NOT_REQUIRED')
+    OR
+    (valuation_method = 'CONVERSION_VALUE_PROXY'
+      AND relation_id IS NOT NULL AND conversion_ratio_text IS NOT NULL
+      AND reference_class_id IS NOT NULL AND raw_close_text IS NOT NULL
+      AND c3_pre_accession IS NOT NULL AND c3_post_accession IS NOT NULL
+      AND continuity_status = 'CONFIRMED'
+      AND amendment_search_status = 'COMPLETE'
+      AND missing_reason IS NULL)
+    OR
+    (valuation_method = 'MISSING' AND missing_reason IS NOT NULL
+      AND raw_close_text IS NULL)
+  )
+) WITHOUT ROWID;
+
+-- class 단위 시가총액. Decimal 문자열로 보존한다.
+CREATE TABLE IF NOT EXISTS qv_class_market_equity (
+  formation_session TEXT NOT NULL,
+  valuation_date TEXT NOT NULL,
+  class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('RESOLVED', 'MISSING')),
+  market_equity_text TEXT,
+  share_value_text TEXT,
+  conversion_ratio_text TEXT,
+  raw_close_text TEXT,
+  price_symbol TEXT,
+  valuation_method TEXT NOT NULL,
+  selector_path TEXT NOT NULL,
+  missing_reason TEXT,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  identity_source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (formation_session, valuation_date, class_id,
+               source_version, identity_source_version),
+  CHECK (
+    (status = 'RESOLVED' AND market_equity_text IS NOT NULL AND missing_reason IS NULL)
+    OR
+    (status = 'MISSING' AND market_equity_text IS NULL AND missing_reason IS NOT NULL)
+  )
+) WITHOUT ROWID;
+
+-- issuer 단위 시가총액. active ordinary class가 하나라도 미해결이면 전체 MISSING이다.
+CREATE TABLE IF NOT EXISTS qv_issuer_market_equity (
+  formation_session TEXT NOT NULL,
+  valuation_date TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('RESOLVED', 'MISSING')),
+  market_equity_text TEXT,
+  class_count INTEGER NOT NULL CHECK (class_count >= 0),
+  resolved_class_count INTEGER NOT NULL CHECK (resolved_class_count >= 0),
+  component_class_ids TEXT NOT NULL,
+  missing_reason TEXT,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  identity_source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (formation_session, valuation_date, issuer_id,
+               source_version, identity_source_version),
+  CHECK (
+    (status = 'RESOLVED' AND market_equity_text IS NOT NULL AND missing_reason IS NULL
+      AND resolved_class_count = class_count AND class_count > 0)
+    OR
+    (status = 'MISSING' AND market_equity_text IS NULL AND missing_reason IS NOT NULL)
+  )
+) WITHOUT ROWID;
+
 CREATE INDEX IF NOT EXISTS idx_holdout_segment
   ON holdout_runs(source_version, start_date, end_date);
 
@@ -466,14 +823,24 @@ CREATE INDEX IF NOT EXISTS idx_universe_membership_from ON universe_membership(v
 CREATE INDEX IF NOT EXISTS idx_earnings_calendar_symbol ON earnings_calendar(symbol, event_at);
 CREATE INDEX IF NOT EXISTS idx_qv_share_classes_symbol
   ON qv_share_classes(source_version, symbol, effective_from, effective_to);
-CREATE INDEX IF NOT EXISTS idx_qv_share_classes_member
-  ON qv_share_classes(source_version, issuer_id, xbrl_axis, xbrl_member,
-                       effective_from, effective_to);
-CREATE INDEX IF NOT EXISTS idx_qv_class_valuation_active
-  ON qv_class_valuation(source_version, class_id, effective_from, effective_to);
 CREATE INDEX IF NOT EXISTS idx_qv_sec_filings_usable
   ON qv_sec_filings(source_version, cik, historical_usable_session,
                     acceptance_datetime, accession);
 CREATE INDEX IF NOT EXISTS idx_qv_accounting_period
   ON qv_accounting_filings(accounting_source_version, accounting_definition_version,
                            cik, fiscal_period_end);
+
+CREATE INDEX IF NOT EXISTS idx_qv_xbrl_alias_lookup
+  ON qv_share_class_xbrl_aliases(source_version, issuer_id, axis_key, member_key,
+                                 effective_from, effective_to);
+CREATE INDEX IF NOT EXISTS idx_qv_prose_alias_lookup
+  ON qv_share_class_prose_aliases(source_version, issuer_id, comparison_key,
+                                  effective_from, effective_to);
+CREATE INDEX IF NOT EXISTS idx_qv_share_observations_lookup
+  ON qv_share_observations(source_version, identity_source_version, class_id,
+                           fact_instant, historical_usable_session);
+CREATE INDEX IF NOT EXISTS idx_qv_evidence_documents_usable
+  ON qv_sec_evidence_documents(source_version, cik, historical_usable_session);
+CREATE INDEX IF NOT EXISTS idx_qv_conversion_relations_subject
+  ON qv_class_conversion_relations(source_version, subject_class_id,
+                                   effective_from, effective_to);

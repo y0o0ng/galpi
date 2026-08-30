@@ -17,28 +17,28 @@ from backtest.data import (  # noqa: E402
     load_bars_csv,
     register_source,
 )
+from backtest import qv_conversion  # noqa: E402
 from backtest.qv_identity import (  # noqa: E402
-    CONVERSION_VALUE_PROXY,
-    MISSING,
-    OBSERVED_MARKET_PRICE,
     AmbiguousIdentityError,
     QVIdentityError,
     UnresolvedIdentityError,
     active_classes,
     get_issuer,
     get_issuer_by_cik,
-    register_class_valuation,
     register_issuer,
     register_share_class,
     resolve_member,
+    resolve_prose_name,
     resolve_symbol,
     resolve_symbols_to_issuers,
-    valuation_at,
 )
+from backtest.qv_manifest import prose_key  # noqa: E402
 
 SOURCE = "sec-qv-identity"
 VERSION = "qv-identity-fixture-v1"
 AXIS = "us-gaap:StatementClassOfStockAxis"
+USG = "http://fasb.org/us-gaap/2024"
+USABLE = "2000-01-03"
 
 
 class QVIdentityFixture:
@@ -82,49 +82,111 @@ class QVIdentityFixture:
         effective_from: str = "2000-01-01",
         effective_to: str | None = None,
         ordinary: bool = True,
+        usable_from_session: str = USABLE,
     ):
-        return register_share_class(
+        result = register_share_class(
             self.connection,
             class_id=class_id,
             issuer_id=issuer_id,
             symbol=symbol,
-            xbrl_axis=AXIS if member else None,
-            xbrl_member=member,
             is_ordinary_common=ordinary,
             is_listed=listed,
             effective_from=effective_from,
             effective_to=effective_to,
+            usable_from_session=usable_from_session,
             source=SOURCE,
             source_version=VERSION,
             provenance=f"fixture://class/{class_id}/{effective_from}",
         )
+        if member:
+            self.xbrl_alias(
+                class_id, issuer_id, member,
+                effective_from=effective_from, effective_to=effective_to,
+                usable_from_session=usable_from_session,
+            )
+        return result
 
-    def valuation(
+    def xbrl_alias(
         self,
         class_id: str,
-        method: str,
+        issuer_id: str,
+        member_local: str,
         *,
-        reference: str | None = None,
-        ratio: float | None = None,
         effective_from: str = "2000-01-01",
         effective_to: str | None = None,
-        accession: str | None = None,
-        missing_reason: str | None = None,
+        usable_from_session: str = USABLE,
     ):
-        return register_class_valuation(
+        """alias는 economic class가 아니라 별도 관계다."""
+        self.connection.execute(
+            "INSERT INTO qv_share_class_xbrl_aliases"
+            " (class_id, issuer_id, axis_key, member_key,"
+            "  raw_axis_namespace, raw_axis_local, raw_member_namespace, raw_member_local,"
+            "  effective_from, effective_to, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                class_id, issuer_id, AXIS, f"us-gaap:{member_local}",
+                USG, "StatementClassOfStockAxis", USG, member_local,
+                effective_from, effective_to, usable_from_session,
+                SOURCE, VERSION, f"fixture://alias/{class_id}/{member_local}",
+            ),
+        )
+        self.connection.commit()
+
+    def prose_alias(
+        self,
+        class_id: str,
+        issuer_id: str,
+        raw_name: str,
+        *,
+        bridge_type: str = "SECURITY_TITLE_FACT",
+        effective_from: str = "2000-01-01",
+        effective_to: str | None = None,
+        usable_from_session: str = USABLE,
+    ):
+        self.connection.execute(
+            "INSERT INTO qv_share_class_prose_aliases"
+            " (class_id, issuer_id, raw_prose_name, comparison_key, bridge_type,"
+            "  effective_from, effective_to, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                class_id, issuer_id, raw_name, prose_key(raw_name), bridge_type,
+                effective_from, effective_to, usable_from_session,
+                SOURCE, VERSION, f"fixture://prose/{class_id}",
+            ),
+        )
+        self.connection.commit()
+
+    def conversion_relation(
+        self,
+        relation_id: str,
+        subject: str,
+        reference: str,
+        issuer_id: str,
+        *,
+        ratio: str = "1",
+        semantics: str = "ONE_FOR_ONE",
+        effective_from: str = "2000-01-01",
+        effective_to: str | None = None,
+        usable_from_session: str = USABLE,
+    ):
+        return qv_conversion.register_relation(
             self.connection,
-            class_id=class_id,
-            valuation_method=method,
+            relation_id=relation_id,
+            subject_class_id=subject,
             reference_class_id=reference,
-            conversion_ratio=ratio,
+            issuer_id=issuer_id,
+            conversion_ratio_text=ratio,
+            ratio_semantics=semantics,
             effective_from=effective_from,
             effective_to=effective_to,
-            source_accession=accession,
-            missing_reason=missing_reason,
+            usable_from_session=usable_from_session,
             source=SOURCE,
             source_version=VERSION,
-            provenance=f"fixture://valuation/{class_id}/{effective_from}",
+            provenance=f"fixture://relation/{relation_id}",
         )
+
 
 class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
     def test_single_class_issuer(self):
@@ -136,7 +198,6 @@ class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
             member="CommonStockMember",
             listed=True,
         )
-        self.valuation("class-aapl-common", OBSERVED_MARKET_PRICE)
 
         resolved = resolve_symbol(self.connection, "aapl", "2020-06-30", VERSION)
         self.assertEqual(resolved.issuer.issuer_id, "issuer-aapl")
@@ -169,14 +230,9 @@ class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
             member="ClassBCommonStockMember",
             listed=False,
         )
-        self.valuation("alphabet-a", OBSERVED_MARKET_PRICE)
-        self.valuation("alphabet-c", OBSERVED_MARKET_PRICE)
-        self.valuation(
-            "alphabet-b",
-            CONVERSION_VALUE_PROXY,
-            reference="alphabet-a",
-            ratio=1.0,
-            accession="0001652044-20-000008",
+        self.conversion_relation(
+            "rel-alphabet-b", "alphabet-b", "alphabet-a", "issuer-alphabet",
+            ratio="1", semantics="ONE_FOR_ONE",
         )
 
         classes = active_classes(
@@ -189,71 +245,72 @@ class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
         self.assertEqual({item.class_id for item in classes}, {
             "alphabet-a", "alphabet-b", "alphabet-c"
         })
-        proxy = valuation_at(self.connection, "alphabet-b", "2020-06-30", VERSION)
-        self.assertEqual(proxy.valuation_method, CONVERSION_VALUE_PROXY)
-        self.assertEqual(proxy.reference_class_id, "alphabet-a")
-        self.assertEqual(proxy.conversion_ratio, 1.0)
-        self.assertTrue(proxy.source_accession)
+        relation = qv_conversion.active_relation(
+            self.connection,
+            subject_class_id="alphabet-b",
+            valuation_date="2019-12-31",
+            formation_session="2020-06-30",
+            source_version=VERSION,
+        )
+        self.assertIsNotNone(relation)
+        self.assertEqual(relation["reference_class_id"], "alphabet-a")
+        self.assertEqual(relation["conversion_ratio_text"], "1")
+        # 상장 class에는 가짜 영구 OBSERVED 행을 만들지 않는다.
+        self.assertIsNone(
+            qv_conversion.active_relation(
+                self.connection, subject_class_id="alphabet-a",
+                valuation_date="2019-12-31", formation_session="2020-06-30",
+                source_version=VERSION,
+            )
+        )
 
     def test_berkshire_a_and_b_keep_their_own_observed_price_identity(self):
-        self.issuer("issuer-berkshire", "1067983")
-        for class_id, symbol, member, price_evidence in (
-            ("berkshire-a", "BRK.A", "ClassACommonStockMember", "raw-close~600000"),
-            ("berkshire-b", "BRK.B", "ClassBCommonStockMember", "raw-close~400"),
+        issuer = self.issuer("issuer-berkshire", "1067983")
+        for class_id, symbol, member in (
+            ("berkshire-a", "BRK.A", "ClassACommonStockMember"),
+            ("berkshire-b", "BRK.B", "ClassBCommonStockMember"),
         ):
-            register_share_class(
-                self.connection,
-                class_id=class_id,
-                issuer_id="issuer-berkshire",
-                symbol=symbol,
-                xbrl_axis=AXIS,
-                xbrl_member=member,
-                is_ordinary_common=True,
-                is_listed=True,
-                effective_from="2000-01-01",
-                effective_to=None,
-                source=SOURCE,
-                source_version=VERSION,
-                provenance=f"fixture://berkshire/{price_evidence}",
+            self.share_class(
+                class_id, issuer.issuer_id, symbol=symbol, member=member, listed=True
             )
-            self.valuation(class_id, OBSERVED_MARKET_PRICE)
 
+        active = active_classes(
+            self.connection, issuer.issuer_id, "2020-06-30", VERSION
+        )
+        self.assertEqual(
+            {item.class_id for item in active}, {"berkshire-a", "berkshire-b"}
+        )
+        # 각 class가 자기 심볼을 그대로 들고 있다. 하나로 합치지 않는다.
+        self.assertEqual(
+            {item.class_id: item.symbol for item in active},
+            {"berkshire-a": "BRK.A", "berkshire-b": "BRK.B"},
+        )
+        # 상장 class에는 전환 관계를 만들지 않는다.
         for class_id in ("berkshire-a", "berkshire-b"):
-            relation = valuation_at(self.connection, class_id, "2020-06-30", VERSION)
-            self.assertEqual(relation.valuation_method, OBSERVED_MARKET_PRICE)
-            self.assertIsNone(relation.reference_class_id)
-            self.assertIsNone(relation.conversion_ratio)
+            self.assertIsNone(
+                qv_conversion.active_relation(
+                    self.connection, subject_class_id=class_id,
+                    valuation_date="2019-12-31", formation_session="2020-06-30",
+                    source_version=VERSION,
+                )
+            )
 
     def test_equivalent_class_a_member_is_not_an_actual_class(self):
-        self.issuer("issuer-berkshire", "1067983")
+        issuer = self.issuer("issuer-berkshire", "1067983")
         self.share_class(
-            "berkshire-a",
-            "issuer-berkshire",
-            symbol="BRK.A",
-            member="ClassACommonStockMember",
-            listed=True,
+            "berkshire-a", issuer.issuer_id, symbol="BRK.A",
+            member="ClassACommonStockMember", listed=True,
         )
-        self.share_class(
-            "berkshire-b",
-            "issuer-berkshire",
-            symbol="BRK.B",
-            member="ClassBCommonStockMember",
-            listed=True,
-        )
-
+        # 파생/등가 member는 alias로도 등록되지 않는다.
         with self.assertRaises(UnresolvedIdentityError):
             resolve_member(
-                self.connection,
-                "issuer-berkshire",
-                AXIS,
-                "EquivalentClassAMember",
-                "2020-06-30",
-                VERSION,
+                self.connection, "issuer-berkshire", AXIS,
+                "us-gaap:EquivalentClassAMember", "2020-06-30", VERSION,
             )
         self.assertEqual(
             self.connection.execute(
-                "SELECT COUNT(*) AS n FROM qv_share_classes"
-                " WHERE xbrl_member = 'EquivalentClassAMember'"
+                "SELECT COUNT(*) AS n FROM qv_share_class_xbrl_aliases"
+                " WHERE raw_member_local = 'EquivalentClassAMember'"
             ).fetchone()["n"],
             0,
         )
@@ -362,47 +419,35 @@ class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
     def test_conversion_ratio_effective_date_boundary(self):
         self.issuer("issuer-convertible", "7654321")
         self.share_class(
-            "convertible-a",
-            "issuer-convertible",
-            symbol="CVA",
-            member="ClassACommonStockMember",
-            listed=True,
+            "convertible-a", "issuer-convertible", symbol="CVA",
+            member="ClassACommonStockMember", listed=True,
         )
         self.share_class(
-            "convertible-b",
-            "issuer-convertible",
-            symbol=None,
-            member="ClassBCommonStockMember",
-            listed=False,
+            "convertible-b", "issuer-convertible", symbol=None,
+            member="ClassBCommonStockMember", listed=False,
         )
-        self.valuation(
-            "convertible-b",
-            CONVERSION_VALUE_PROXY,
-            reference="convertible-a",
-            ratio=1.0,
-            effective_to="2020-01-01",
-            accession="0007654321-19-000001",
+        self.conversion_relation(
+            "rel-b-old", "convertible-b", "convertible-a", "issuer-convertible",
+            ratio="1", effective_to="2020-01-01",
         )
-        self.valuation(
-            "convertible-b",
-            CONVERSION_VALUE_PROXY,
-            reference="convertible-a",
-            ratio=1.5,
-            effective_from="2020-01-01",
-            accession="0007654321-20-000001",
+        self.conversion_relation(
+            "rel-b-new", "convertible-b", "convertible-a", "issuer-convertible",
+            ratio="1.5", semantics="EXPLICIT_INTEGER", effective_from="2020-01-01",
         )
 
-        self.assertEqual(
-            valuation_at(self.connection, "convertible-b", "2019-12-31", VERSION).conversion_ratio,
-            1.0,
+        before = qv_conversion.active_relation(
+            self.connection, subject_class_id="convertible-b",
+            valuation_date="2019-12-31", formation_session="2020-06-30",
+            source_version=VERSION,
         )
-        self.assertEqual(
-            valuation_at(self.connection, "convertible-b", "2020-01-01", VERSION).conversion_ratio,
-            1.5,
+        after = qv_conversion.active_relation(
+            self.connection, subject_class_id="convertible-b",
+            valuation_date="2020-01-01", formation_session="2020-06-30",
+            source_version=VERSION,
         )
+        self.assertEqual(before["conversion_ratio_text"], "1")
+        self.assertEqual(after["conversion_ratio_text"], "1.5")
 
-
-class QVIdentityConstraintTest(QVIdentityFixture, unittest.TestCase):
     def test_non_pit_securities_source_cannot_register_an_issuer(self):
         register_source(
             self.connection,
@@ -506,13 +551,15 @@ class QVIdentityConstraintTest(QVIdentityFixture, unittest.TestCase):
             )
 
     def test_invalid_conversion_payload_is_rejected_by_schema(self):
+        # 전환 비율은 lossless Decimal 문자열이고 subject != reference여야 한다.
         with self.assertRaises(sqlite3.IntegrityError):
             self.connection.execute(
-                "INSERT INTO qv_class_valuation"
-                " (class_id, valuation_method, reference_class_id, conversion_ratio,"
-                " effective_from, source_accession, source, source_version, provenance)"
-                " VALUES ('bad', 'CONVERSION_VALUE_PROXY', 'ref', 0, '2020-01-01',"
-                " 'accession', ?, ?, 'fixture://bad')",
+                "INSERT INTO qv_class_conversion_relations"
+                " (relation_id, subject_class_id, reference_class_id, issuer_id,"
+                "  conversion_ratio_text, ratio_semantics, effective_from,"
+                "  usable_from_session, source, source_version, provenance)"
+                " VALUES ('bad', 'same', 'same', 'iss', '1', 'ONE_FOR_ONE',"
+                " '2020-01-01', '2020-01-02', ?, ?, 'fixture://bad')",
                 (SOURCE, VERSION),
             )
 
@@ -520,26 +567,16 @@ class QVIdentityConstraintTest(QVIdentityFixture, unittest.TestCase):
         self.issuer("issuer-one", "2222222")
         self.issuer("issuer-two", "3333333")
         self.share_class(
-            "one-unlisted",
-            "issuer-one",
-            symbol=None,
-            member="ClassBCommonStockMember",
-            listed=False,
+            "one-unlisted", "issuer-one", symbol=None,
+            member="ClassBCommonStockMember", listed=False,
         )
         self.share_class(
-            "two-listed",
-            "issuer-two",
-            symbol="TWO",
-            member="ClassACommonStockMember",
-            listed=True,
+            "two-listed", "issuer-two", symbol="TWO",
+            member="ClassACommonStockMember", listed=True,
         )
-        with self.assertRaises(QVIdentityError):
-            self.valuation(
-                "one-unlisted",
-                CONVERSION_VALUE_PROXY,
-                reference="two-listed",
-                ratio=1.0,
-                accession="0002222222-20-000001",
+        with self.assertRaises(qv_conversion.QVConversionError):
+            self.conversion_relation(
+                "rel-cross", "one-unlisted", "two-listed", "issuer-one",
             )
 
     def test_listed_class_cannot_receive_conversion_proxy(self):
@@ -549,38 +586,26 @@ class QVIdentityConstraintTest(QVIdentityFixture, unittest.TestCase):
             ("listed-b", "LSB", "ClassBCommonStockMember"),
         ):
             self.share_class(
-                class_id,
-                "issuer-listed",
-                symbol=symbol,
-                member=member,
-                listed=True,
+                class_id, "issuer-listed", symbol=symbol, member=member, listed=True
             )
-        with self.assertRaises(QVIdentityError):
-            self.valuation(
-                "listed-b",
-                CONVERSION_VALUE_PROXY,
-                reference="listed-a",
-                ratio=1.0,
-                accession="0004444444-20-000001",
+        with self.assertRaises(qv_conversion.QVConversionError):
+            self.conversion_relation(
+                "rel-listed", "listed-b", "listed-a", "issuer-listed",
             )
 
-    def test_unlisted_class_without_ratio_is_explicit_missing(self):
+    def test_unlisted_class_without_relation_has_no_active_relation(self):
         self.issuer("issuer-missing", "5555555")
         self.share_class(
-            "missing-b",
-            "issuer-missing",
-            symbol=None,
-            member="ClassBCommonStockMember",
-            listed=False,
+            "missing-b", "issuer-missing", symbol=None,
+            member="ClassBCommonStockMember", listed=False,
         )
-        relation = self.valuation(
-            "missing-b",
-            MISSING,
-            missing_reason="NO_DEFENSIBLE_FIXED_CONVERSION_RATIO",
-        )
-        self.assertEqual(relation.valuation_method, MISSING)
-        self.assertEqual(
-            relation.missing_reason, "NO_DEFENSIBLE_FIXED_CONVERSION_RATIO"
+        # 법적 관계가 없으면 그냥 없다. 가짜 MISSING 행을 identity 층에 만들지 않는다.
+        self.assertIsNone(
+            qv_conversion.active_relation(
+                self.connection, subject_class_id="missing-b",
+                valuation_date="2019-12-31", formation_session="2020-06-30",
+                source_version=VERSION,
+            )
         )
 
     def test_corrupt_overlapping_symbol_rows_fail_closed_as_ambiguous(self):
@@ -592,15 +617,13 @@ class QVIdentityConstraintTest(QVIdentityFixture, unittest.TestCase):
         ):
             self.connection.execute(
                 "INSERT INTO qv_share_classes"
-                " (class_id, issuer_id, symbol, xbrl_axis, xbrl_member,"
-                " is_ordinary_common, is_listed, effective_from, source,"
+                " (class_id, issuer_id, symbol, is_ordinary_common, is_listed,"
+                " effective_from, usable_from_session, source,"
                 " source_version, provenance)"
-                " VALUES (?, ?, 'DUP', ?, ?, 1, 1, '2020-01-01', ?, ?, ?)",
+                " VALUES (?, ?, 'DUP', 1, 1, '2020-01-01', '2020-01-02', ?, ?, ?)",
                 (
                     class_id,
                     issuer_id,
-                    AXIS,
-                    member,
                     SOURCE,
                     VERSION,
                     f"fixture://corrupt/{class_id}",
@@ -646,8 +669,21 @@ class QVSnapshotRegressionTest(unittest.TestCase):
                     {
                         "qv_issuers",
                         "qv_share_classes",
-                        "qv_class_valuation",
+                        "qv_share_class_xbrl_aliases",
+                        "qv_share_class_prose_aliases",
+                        "qv_identity_evidence",
                         "qv_sec_filings",
+                        "qv_sec_evidence_documents",
+                        "qv_share_observations",
+                        "qv_share_basis_searches",
+                        "qv_share_basis_candidates",
+                        "qv_share_basis_class_effects",
+                        "qv_vendor_split_events",
+                        "qv_class_share_resolutions",
+                        "qv_class_conversion_relations",
+                        "qv_class_valuation_resolutions",
+                        "qv_class_market_equity",
+                        "qv_issuer_market_equity",
                         "qv_accounting_filings",
                     },
                 )
@@ -706,12 +742,11 @@ class QVSnapshotRegressionTest(unittest.TestCase):
             class_id="spy-trust-unit",
             issuer_id="issuer-spy",
             symbol="SPY",
-            xbrl_axis=None,
-            xbrl_member=None,
             is_ordinary_common=True,
             is_listed=True,
             effective_from="1993-01-29",
             effective_to=None,
+            usable_from_session="1993-02-01",
             source=SOURCE,
             source_version=version,
             provenance="fixture://class/spy",

@@ -239,6 +239,117 @@ def _upgrade_ca801b0_qv_sec_filings(
     return True
 
 
+# ── QV Step 4 identity/valuation migration ────────────────────────────────────
+# 알려진 legacy 스키마 하나만 인식한다. 범용 migration 틀을 만들지 않는다.
+# 정책은 "비어 있을 때만 재구축"이다. 행이 하나라도 있으면 추론·변환하지 않고 멈춘다.
+_STEP4_LEGACY_TABLES = ("qv_share_classes", "qv_class_valuation")
+_STEP4_RETIRED_TABLES = ("qv_class_valuation",)
+_STEP4_NEW_TABLES = (
+    "qv_share_classes",
+    "qv_share_class_xbrl_aliases",
+    "qv_share_class_prose_aliases",
+    "qv_identity_evidence",
+    "qv_class_conversion_relations",
+    "qv_class_valuation_resolutions",
+)
+_STEP4_LEGACY_SHARE_CLASSES_DDL = """CREATE TABLE IF NOT EXISTS qv_share_classes (
+  class_id TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  symbol TEXT,
+  xbrl_axis TEXT,
+  xbrl_member TEXT,
+  is_ordinary_common INTEGER NOT NULL CHECK (is_ordinary_common IN (0, 1)),
+  is_listed INTEGER NOT NULL CHECK (is_listed IN (0, 1)),
+  effective_from TEXT NOT NULL
+    CHECK (effective_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  effective_to TEXT
+    CHECK (effective_to IS NULL OR effective_to GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (class_id, effective_from, source_version),
+  FOREIGN KEY (issuer_id, source_version)
+    REFERENCES qv_issuers(issuer_id, source_version),
+  CHECK (effective_to IS NULL OR effective_to > effective_from),
+  CHECK ((xbrl_axis IS NULL) = (xbrl_member IS NULL)),
+  CHECK (is_listed = 0 OR symbol IS NOT NULL)
+) WITHOUT ROWID;"""
+
+
+def _table_sql(connection: sqlite3.Connection, name: str) -> str | None:
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+    ).fetchone()
+    return row["sql"] if row is not None else None
+
+
+def _schema_table_ddl(schema_sql: str, name: str) -> str:
+    start = schema_sql.find(f"CREATE TABLE IF NOT EXISTS {name} (")
+    if start < 0:
+        raise BacktestStorageError(f"schema.sql에 {name} DDL이 없습니다")
+    end = schema_sql.find(") WITHOUT ROWID;", start)
+    if end < 0:
+        raise BacktestStorageError(f"schema.sql의 {name} DDL이 끝나지 않았습니다")
+    return schema_sql[start : end + len(") WITHOUT ROWID;")]
+
+
+def _row_count(connection: sqlite3.Connection, name: str) -> int:
+    return int(connection.execute(f"SELECT count(*) AS n FROM {name}").fetchone()["n"])
+
+
+def _migrate_step4_identity(
+    connection: sqlite3.Connection, schema_sql: str
+) -> bool:
+    """legacy identity/valuation 표를 Step-4 스키마로 원자적 재구축한다.
+
+    행이 하나라도 있으면 `BacktestStorageError`로 멈추고 아무것도 바꾸지 않는다.
+    알 수 없는 스키마도 fail-close다. bars_daily 등 무관한 표는 건드리지 않는다.
+    """
+    legacy_sc = _table_sql(connection, "qv_share_classes")
+    if legacy_sc is None:
+        return False  # 새 DB. executescript가 그대로 만든다.
+
+    target_sc = _schema_table_ddl(schema_sql, "qv_share_classes")
+    if _normalized_table_sql(legacy_sc) == _normalized_table_sql(target_sc):
+        return False  # 이미 새 스키마다.
+
+    if _normalized_table_sql(legacy_sc) != _normalized_table_sql(
+        _STEP4_LEGACY_SHARE_CLASSES_DDL
+    ):
+        raise BacktestStorageError(
+            "알 수 없는 qv_share_classes schema라 Step-4 migration을 하지 않습니다"
+        )
+
+    present = [
+        name for name in _STEP4_LEGACY_TABLES if _table_sql(connection, name) is not None
+    ]
+    nonempty = {name: _row_count(connection, name) for name in present}
+    nonempty = {name: n for name, n in nonempty.items() if n}
+    if nonempty:
+        detail = ", ".join(f"{name}={n}" for name, n in sorted(nonempty.items()))
+        raise BacktestStorageError(
+            "legacy QV identity/valuation 표에 행이 있어 Step-4 migration을 하지 않습니다: "
+            f"{detail}"
+        )
+
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("DROP INDEX IF EXISTS idx_qv_share_classes_member")
+        connection.execute("DROP INDEX IF EXISTS idx_qv_share_classes_symbol")
+        connection.execute("DROP INDEX IF EXISTS idx_qv_class_valuation_active")
+        for name in _STEP4_RETIRED_TABLES:
+            connection.execute(f"DROP TABLE IF EXISTS {name}")
+        connection.execute("DROP TABLE qv_share_classes")
+        connection.execute(
+            target_sc.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    return True
+
+
 def connect(
     data_dir: Path | str = DEFAULT_DATA_DIR, schema_path: Path = SCHEMA_PATH
 ) -> sqlite3.Connection:
@@ -251,6 +362,7 @@ def connect(
     connection.execute("PRAGMA foreign_keys=ON")
     schema_sql = Path(schema_path).read_text(encoding="utf-8")
     _upgrade_ca801b0_qv_sec_filings(connection, schema_sql)
+    _migrate_step4_identity(connection, schema_sql)
     connection.executescript(schema_sql)
     add_missing_columns(connection)
     return connection

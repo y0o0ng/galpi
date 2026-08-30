@@ -846,6 +846,11 @@ concept·value·unit·dimension·raw `decimals`·validation 상태 · preferred�
 
 ### 4.4 Market Equity와 Book-to-Market — ranking unit은 security가 아니라 issuer다
 
+> **Step 4(PIT shares → issuer ME)의 구현 정본은
+> `docs/trading/strategies/qv-step4-shares-me-design.md`다.** 아래 §4.4~§4.4.2는 factor
+> 정의이고, identity manifest · 주식수 관측 · 기업행동 탐색 · 전환 continuity ·
+> ME 산출의 CLOSED 계약은 그 문서에 있다.
+
 `B/M`의 denominator는 **formation 직전 12월 마지막 거래일의 issuer market equity**를 사용한다.
 
 ```text
@@ -909,20 +914,43 @@ historical_usable_session(filing) 이전에는 사용하지 않는다 (§3.2)
 accession · form · acceptance_datetime · instant · axis/member · provenance가 역추적된다
 ```
 
-12월 shares 선택 규칙은 이렇다.
+12월 shares 선택 규칙은 **P2 same-regime selector**이고, 정본은
+`docs/trading/strategies/qv-step4-shares-me-design.md` §7이다. 아래 요약은 그 문서를
+가리키는 포인터이지 별도 계약이 아니다.
 
 ```text
-formation 시점까지 usable한 filing들 중,
-t-1년 12월 마지막 거래일 이하인 shares instant 가운데
-가장 늦은 instant를 쓴다.
+후보 자격   raw XBRL only · 허용 K/Q form
+            historical_usable_session <= formation
+            S1 freshness: Jan 1(t-1) <= instant <= December D
+            D0 dimension 계약 · exact PIT identity alias
 
-tie-break (같은 instant가 여러 filing에 있을 때, 순서대로):
-  1. acceptance_datetime이 가장 늦은 filing
-  2. 그래도 같으면 accession 사전순 마지막
+tier        fresh A(us-gaap:CommonStockSharesOutstanding)가 구조적으로 존재하면
+            A tier가 관측을 소유한다. 모호하거나 쓸 수 없는 A는 B fallback을
+            허용하지 않는다. A가 구조적으로 없을 때만
+            B(dei:EntityCommonStockSharesOutstanding)를 본다.
+
+same-regime  후보 filing의 basis에서 D까지
+             coverage != COMPLETE            -> 사용 불가
+             적용 가능한 UNRESOLVED 효과      -> 사용 불가
+             확인된 적용 가능 basis 변경      -> 다른 regime
+             COMPLETE + 미해결/변경 없음      -> same regime
+
+선택        same-regime 후보 중 가장 늦은 instant
+            같은 instant면 acceptance_datetime DESC -> accession 사전순 DESC
 ```
+
+**더 새로운 다른-regime 후보가 있어도 실패하지 않는다** — 더 오래된 same-regime 후보로
+물러선다. **더 새로운 후보를 비율로 정규화하는 것은 금지다**(`shares * split ratio` 합성 없음).
 
 **tie-break를 결과를 보고 정하지 않는다.** 값이 서로 다른데 위 규칙으로 하나가 정해지지
 않으면 그 issuer-year는 `MISSING`이고, 조용히 아무거나 고르지 않는다.
+
+**기업행동 판정은 탐색 coverage와 class 효과를 분리한다.** `COMPLETE + 사건 없음`은
+`INCOMPLETE + 후보 없음`과 다르고, `NO_SHARE_BASIS_EFFECT_CONFIRMED`는 침묵·vendor
+데이터·가격 패턴·형제 class 거동에서 추론되지 않는다. share-side 전환일은 action에
+연결된 `EFFECTIVE`/`DISTRIBUTION`만 쓰고 `DECLARED`/`RECORD`는 금지다. 상장 market
+boundary는 별개 사실이며 vendor와 explicit SEC trading이 충돌하면 `UNRESOLVED`다
+(설계 §5·§6).
 
 #### derived member를 실제 class로 등록하지 않는다
 
@@ -974,6 +1002,14 @@ conversion value proxy를 쓸 수 있다. **`CONVERSION_VALUE_PROXY`는 관측�
 보고하면서 어느 쪽인지 지우지 않는다.
 
 conversion ratio는 시간에 따라 바뀔 수 있다. **현재 ratio를 과거에 소급하지 않는다.**
+
+**법적 전환 관계와 formation 시점 valuation은 서로 다른 표다**(설계 §8·§10).
+법적 관계가 있어도 PIT 증거나 continuity 증명이 없으면 그 formation의 valuation은
+`MISSING`이다. historical formation은 **항상 C3 bracket**을 요구한다 — December D를
+사이에 둔 pre/post governing snapshot이 둘 다 있어야 하고, 조항 semantics(방향·비율·
+단일 reference)가 같아야 하며, 그 사이의 미해결 amendment 후보가 하나라도 있으면
+unresolved다. **`effective_to = NULL`은 historical 증명이 아니다**(설계 §9).
+비상장 class에 상장 형제의 market boundary를 자동 전파하지 않는다(설계 §6).
 
 ---
 

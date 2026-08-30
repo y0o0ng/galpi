@@ -1130,6 +1130,64 @@ QV rank · B/M · 수익률은 0회다.
 
 ---
 
+## 10.8 Step 4 shares/ME 구현 receipt — 2026-08-30
+
+**구현 정본은 `docs/trading/strategies/qv-step4-shares-me-design.md`다.** 여기에는
+무엇이 얼어붙었고 무엇이 대체됐는지만 적는다. **수익률을 계산하지 않았고 Gate 판정도
+하지 않았다.**
+
+### 얼어붙은 것
+
+| 계약 | 자리 |
+|---|---|
+| identity manifest bundle(4파일)과 `identity_source_version` | 설계 §1 · `trading/qv/identity/` · `qv_manifest.py` |
+| economic class와 XBRL/prose alias 분리 | 설계 §1.4 · `qv_share_class_*_aliases` |
+| REQUIRED 증거 최대값에서 파생하는 `usable_from_session` | 설계 §1.2 · `qv_identity_evidence` |
+| D0 dimension 계약과 accession 안 중복 병합 | 설계 §4 · `qv_shares.py` |
+| 탐색 coverage와 class 효과의 분리 | 설계 §5 · `qv_share_basis_*` |
+| share-side 전환일과 상장 market boundary 분리 | 설계 §6 · `qv_boundary.py` |
+| **P2 same-regime selector** | 설계 §7 · `qv_selector.py` · `qv_class_share_resolutions` |
+| 법적 전환 관계와 formation valuation 분리 | 설계 §8·§10 · 두 개의 표 |
+| **C3 continuity bracket** | 설계 §9 · `qv_conversion.assess_continuity` |
+| class/issuer ME(Decimal) | 설계 §11 · `qv_class_market_equity` · `qv_issuer_market_equity` |
+
+### 대체된 것
+
+- **로드맵 §4.4.1의 단순 December selector**는 P2 same-regime selector로 대체됐다.
+- **`qv_share_classes`의 `xbrl_axis`/`xbrl_member`**는 제거됐고 alias 표가 유일한
+  semantic 소스다.
+- **`qv_class_valuation`은 RETIRED다.** 이름을 새 의미로 재사용하지 않았다.
+
+**probe 파일은 다시 쓰지 않았다.** 초기 결론이 대체된 자리는 설계 문서 §14가 가리킨다.
+
+### migration
+
+기존 `backtest.db`를 지우지 않는다. 알려진 legacy 스키마를 정확히 탐지하고, 영향 표가
+**전부 비어 있을 때만** 원자적으로 재구축한다. 행이 하나라도 있으면 `BacktestStorageError`로
+멈추고 아무것도 바꾸지 않는다. 알 수 없는 스키마도 fail-close다.
+`bars_daily` 등 무관한 데이터는 보존된다.
+
+### 검증
+
+```text
+python3 -m unittest tests.test_qv_step4          -> 83 tests OK
+python3 -m unittest tests.test_qv_identity       -> 21 tests OK
+python3 -m unittest discover -s tests -p "test_*.py" -> 1440 tests OK
+```
+
+fixture는 전부 network-free다. split fixture 하나가 **P2가 막으려는 10배 ME 오류**를
+재현하고 그것이 실제로 막히는지 확인한다.
+
+### 아직 하지 않은 것
+
+- manifest는 원문으로 확인한 anchor(UA · CMCSA · NKE · GOOGL)만 담는다. 나머지 발행사
+  등록은 **코드 변경이 아니라 증거 입력**이다.
+- 사건 탐색·boundary·C3의 **실제 SEC 문서 수집 파이프라인**은 이번 범위 밖이다.
+  계약과 판정 함수만 구현했고 입력은 호출자가 준다.
+- **Gate C/F/H는 판정하지 않았다.** Step 4는 그 gate가 쓸 상태 필드를 노출할 뿐이다.
+
+---
+
 ## 11. 결과
 
 
