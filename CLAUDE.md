@@ -23,6 +23,7 @@
 ## 먼저 읽을 문서
 
 - 계획·편집 전: `docs/galpi-design-final.md`, `docs/roadmap.md`
+- XION 장기기억 연구 정본: `docs/Memory research/xion-memory-research-docs/memory-architecture-design.md`. Survey와 brainstorm은 supporting/non-canonical 자료이며 architecture 판단은 design 문서가 우선한다.
 - Pi 운영·복구: `docs/RASPBERRY_PI_RUNBOOK.md`
 - 현재 음성 기준: `docs/voice-halfduplex-design.md`
 - XION 통합 홈(지식 패널 첫 화면): `docs/xion-home-design.md`
