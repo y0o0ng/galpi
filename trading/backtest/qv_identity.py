@@ -37,6 +37,7 @@ class Issuer:
     issuer_id: str
     cik: str
     resolution_method: str
+    usable_from_session: str
     source: str
     source_version: str
     provenance: str
@@ -139,6 +140,7 @@ def register_issuer(
     issuer_id: str,
     cik: str,
     resolution_method: str,
+    usable_from_session: str,
     source: str,
     source_version: str,
     provenance: str,
@@ -147,6 +149,7 @@ def register_issuer(
     issuer_id = _required(issuer_id, "issuer_id")
     cik = _normalize_cik(cik)
     resolution_method = _required(resolution_method, "resolution_method")
+    usable_from_session = _date(usable_from_session, "usable_from_session")
     source = _required(source, "source")
     source_version = _required(source_version, "source_version")
     provenance = _required(provenance, "provenance")
@@ -154,38 +157,55 @@ def register_issuer(
     with connection:
         connection.execute(
             "INSERT INTO qv_issuers"
-            " (issuer_id, cik, resolution_method, source, source_version, provenance)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (issuer_id, cik, resolution_method, source, source_version, provenance),
+            " (issuer_id, cik, resolution_method, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (issuer_id, cik, resolution_method, usable_from_session,
+             source, source_version, provenance),
         )
     return get_issuer(connection, issuer_id, source_version)
 
 
 def get_issuer(
-    connection: sqlite3.Connection, issuer_id: str, source_version: str
+    connection: sqlite3.Connection,
+    issuer_id: str,
+    source_version: str,
+    *,
+    usable_by: str | None = None,
 ) -> Issuer:
-    row = connection.execute(
-        "SELECT * FROM qv_issuers WHERE issuer_id = ? AND source_version = ?",
-        (issuer_id, source_version),
-    ).fetchone()
+    """issuer 매핑 하나. `usable_by`를 주면 그때 아직 못 쓰는 매핑은 보이지 않는다."""
+    statement = "SELECT * FROM qv_issuers WHERE issuer_id = ? AND source_version = ?"
+    params: list[object] = [issuer_id, source_version]
+    if usable_by is not None:
+        statement += " AND usable_from_session <= ?"
+        params.append(_date(usable_by, "usable_by"))
+    row = connection.execute(statement, params).fetchone()
     if row is None:
         raise UnresolvedIdentityError(
             f"issuer mapping이 없습니다: {issuer_id}/{source_version}"
+            + (f" (usable_by={usable_by})" if usable_by else "")
         )
     return _issuer_from_row(row)
 
 
 def get_issuer_by_cik(
-    connection: sqlite3.Connection, cik: str, source_version: str
+    connection: sqlite3.Connection,
+    cik: str,
+    source_version: str,
+    *,
+    usable_by: str | None = None,
 ) -> Issuer:
     normalized = _normalize_cik(cik)
-    row = connection.execute(
-        "SELECT * FROM qv_issuers WHERE cik = ? AND source_version = ?",
-        (normalized, source_version),
-    ).fetchone()
+    statement = "SELECT * FROM qv_issuers WHERE cik = ? AND source_version = ?"
+    params: list[object] = [normalized, source_version]
+    if usable_by is not None:
+        statement += " AND usable_from_session <= ?"
+        params.append(_date(usable_by, "usable_by"))
+    row = connection.execute(statement, params).fetchone()
     if row is None:
         raise UnresolvedIdentityError(
             f"CIK mapping이 없습니다: {normalized}/{source_version}"
+            + (f" (usable_by={usable_by})" if usable_by else "")
         )
     return _issuer_from_row(row)
 

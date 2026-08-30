@@ -63,6 +63,7 @@ class ValuationResolution:
     c3_post_document: str | None = None
     continuity_status: str = qv_conversion.CONTINUITY_NOT_REQUIRED
     amendment_search_status: str = qv_conversion.AMENDMENT_NOT_REQUIRED
+    amendment_searched_accessions: str | None = None
     evidence_cutoff_session: str | None = None
     missing_reason: str | None = None
 
@@ -178,11 +179,23 @@ def resolve_valuation(
     reference = _active_class(
         connection, relation["reference_class_id"], valuation_date, identity_source_version
     )
-    if reference is None or not reference["is_listed"]:
+    if (
+        reference is None
+        or not reference["is_listed"]
+        or not reference["is_ordinary_common"]
+        or reference["issuer_id"] != active["issuer_id"]
+    ):
         return ValuationResolution(
             class_id, issuer_id, MISSING,
             relation_id=relation["relation_id"],
-            missing_reason="reference class가 D에 상장 ordinary class가 아니다",
+            missing_reason="reference class가 D에 같은 issuer의 상장 ordinary class가 아니다",
+        )
+    if reference["usable_from_session"] > formation_session:
+        # subject만 PIT로 보고 reference를 그냥 받으면 lookahead가 열린다.
+        return ValuationResolution(
+            class_id, issuer_id, MISSING,
+            relation_id=relation["relation_id"],
+            missing_reason="reference class identity가 formation 시점에 아직 usable하지 않다",
         )
     close = _raw_close(
         connection, reference["symbol"], valuation_date, price_source, price_source_version
@@ -206,6 +219,7 @@ def resolve_valuation(
         c3_post_document=continuity.post.document_name if continuity.post else None,
         continuity_status=continuity.status,
         amendment_search_status=continuity.amendment_status,
+        amendment_searched_accessions=json.dumps(list(continuity.searched_accessions)),
         evidence_cutoff_session=formation_session,
     )
 
@@ -228,9 +242,10 @@ def store_valuation(
             "  price_symbol, price_date, raw_close_text, price_source_version,"
             "  relation_id, conversion_ratio_text, reference_class_id,"
             "  c3_pre_accession, c3_pre_document, c3_post_accession, c3_post_document,"
-            "  continuity_status, amendment_search_status, evidence_cutoff_session,"
+            "  continuity_status, amendment_search_status, amendment_searched_accessions,"
+            "  evidence_cutoff_session,"
             "  missing_reason, source, source_version, identity_source_version, provenance)"
-            " VALUES (" + ", ".join("?" * 24) + ")",
+            " VALUES (" + ", ".join("?" * 25) + ")",
             (
                 formation_session, valuation_date, resolution.class_id,
                 resolution.issuer_id, resolution.valuation_method,
@@ -241,6 +256,7 @@ def store_valuation(
                 resolution.c3_pre_accession, resolution.c3_pre_document,
                 resolution.c3_post_accession, resolution.c3_post_document,
                 resolution.continuity_status, resolution.amendment_search_status,
+                resolution.amendment_searched_accessions,
                 resolution.evidence_cutoff_session, resolution.missing_reason,
                 source, source_version, identity_source_version, provenance,
             ),

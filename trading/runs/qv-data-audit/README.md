@@ -1188,6 +1188,40 @@ fixture는 전부 network-free다. split fixture 하나가 **P2가 막으려는 
 
 ---
 
+## 10.9 Step 4 correctness fix receipt — 2026-08-30
+
+**정본은 그대로 `docs/trading/strategies/qv-step4-shares-me-design.md`다.** 이번 수정은
+얼어붙은 fail-close 계약을 코드가 실제로 강제하도록 고친 것이고 **semantic 결정을 새로
+열지 않았다.** 수익률·랭킹·Gate는 여전히 계산하지 않는다.
+
+| # | 고친 것 | 계약 |
+|---|---|---|
+| 1 | 형제가 긍정으로 지목됐다는 이유로 `NO_SHARE_BASIS_EFFECT_CONFIRMED`를 주던 것 | 명시 부정 진술이 있을 때만. 없으면 `UNRESOLVED` (설계 §5.4) |
+| 2 | 빈 amendment 목록에서 continuity `CONFIRMED`가 나오던 것 | 명시 `COMPLETE` 탐색 receipt를 요구 (설계 §9) |
+| 3 | class 해석 실패한 fresh A가 선택기 시야에서 사라져 B로 내려가던 것 | 구조적 A 존재를 class 해석 **전에** 판정 (설계 §7) |
+| 4 | `formation 이전 마지막 split`을 묵시적으로 고르던 것 | 후보 단일 또는 SEC trading 정확 일치일 때만. 그 밖에는 `UNRESOLVED` (설계 §6) |
+| 5 | metadata만으로 탐색 `COMPLETE`가 되던 것 | 문서 처리 증명 필수. 저장 경계가 강제 (설계 §5.1) |
+| 6 | issuer 매핑만 구조화 증거가 면제되던 것 | 같은 증거·파생 usability·PIT 조회 (설계 §1.2) |
+| 7 | 전환 관계의 usability가 호출자 인자였고 reference PIT를 안 보던 것 | 증거에서 파생 · reference도 formation까지 usable해야 함 (설계 §8·§10) |
+
+**스키마 변화 셋** — `qv_issuers.usable_from_session` ·
+`qv_share_basis_searches.processed_accessions`/`failed_accessions` ·
+`qv_class_valuation_resolutions.amendment_searched_accessions`. 전부 Step-4에서 새로
+생긴 표이거나 비어 있는 표라, 기존 known-schema 정책 그대로 **비어 있을 때만** 원자적으로
+다시 만들고 행이 있으면 `BacktestStorageError`로 멈춘다. `bars_daily`는 보존된다.
+
+### 검증
+
+```text
+python3 -m unittest tests.test_qv_step4 tests.test_qv_identity  -> 129 tests OK
+python3 -m unittest discover -s tests -p "test_*.py"            -> 1465 tests OK
+```
+
+일곱 실패 계열이 전부 regression으로 잠겼고, BRK 2010과 Visa 2015의 **실제 공시 문구**가
+명시 부정 증거의 두 문법 형태를 각각 시험한다.
+
+---
+
 ## 11. 결과
 
 

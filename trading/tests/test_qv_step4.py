@@ -62,8 +62,9 @@ class Step4Fixture:
         )
         self.connection.execute(
             "INSERT INTO qv_issuers"
-            " (issuer_id, cik, resolution_method, source, source_version, provenance)"
-            " VALUES (?, ?, 'SEC_REGISTRANT_CIK', 'manifest', ?, 'fixture')",
+            " (issuer_id, cik, resolution_method, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, 'SEC_REGISTRANT_CIK', '2015-01-02', 'manifest', ?, 'fixture')",
             (ISSUER, CIK, self.identity_version),
         )
         self.connection.commit()
@@ -141,18 +142,50 @@ class Step4Fixture:
         )
         return obs, usable
 
+    def relation_evidence(self, accession="0001234567-16-000001",
+                          acceptance="2016-02-10T21:00:00.000000Z"):
+        """전환 관계의 canonical SEC 증거. usable은 여기서 파생된다."""
+        seed_filing(
+            self.connection, cik=CIK, accession=accession, form="10-K",
+            acceptance_datetime=acceptance, source=SHARES_SOURCE,
+            source_version=SHARES_VERSION,
+        )
+        return [{
+            "source_kind": "KQ_FILING", "cik": CIK, "accession": accession,
+            "document_name": "d.htm", "evidence_role": "CONVERSION_RIGHT_DISCLOSURE",
+            "dependency": "REQUIRED",
+        }]
+
+    def register_relation(self, relation_id, subject, reference, *, ratio="1",
+                          semantics="ONE_FOR_ONE", effective_from="2015-01-01",
+                          effective_to=None, evidence=None, acceptance=None):
+        return qv_conversion.register_relation(
+            self.connection, relation_id=relation_id, subject_class_id=subject,
+            reference_class_id=reference, issuer_id=ISSUER,
+            conversion_ratio_text=ratio, ratio_semantics=semantics,
+            effective_from=effective_from, effective_to=effective_to,
+            evidence=evidence if evidence is not None else self.relation_evidence(
+                **({"acceptance": acceptance} if acceptance else {})
+            ),
+            filings_source_version=SHARES_VERSION,
+            source="manifest", source_version=self.identity_version,
+            provenance="fixture",
+        )
+
     def mark_search(self, accession, coverage, *, valuation_date="2020-12-31",
                     formation="2021-06-30", closure="0000000000-21-000001"):
         self.connection.execute(
             "INSERT OR REPLACE INTO qv_share_basis_searches"
             " (cik, anchor_accession, valuation_date, formation_session, interval_lo,"
             "  interval_hi, closure_accession, closure_acceptance_eastern_date, coverage,"
-            "  incomplete_reason, searched_accessions, source, source_version, provenance)"
-            " VALUES (?, ?, ?, ?, '2020-01-01', ?, ?, '2021-02-10', ?, ?, '[]',"
+            "  incomplete_reason, searched_accessions, processed_accessions,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, ?, ?, '2020-01-01', ?, ?, '2021-02-10', ?, ?, '[]', ?,"
             "         'fixture', ?, 'fixture')",
             (CIK, accession, valuation_date, formation, valuation_date,
              closure if coverage == "COMPLETE" else None, coverage,
-             None if coverage == "COMPLETE" else "fixture", EVENTS_VERSION),
+             None if coverage == "COMPLETE" else "fixture",
+             "[]" if coverage == "COMPLETE" else None, EVENTS_VERSION),
         )
         self.connection.commit()
 
@@ -262,6 +295,60 @@ class MigrationTest(unittest.TestCase):
         )
         connection.close()
 
+    def _previous_step4_db(self, *, rows=False):
+        """4c79a74 시점 Step-4 스키마 DB. 그 뒤 컬럼이 늘었다."""
+        import subprocess
+        old = subprocess.run(
+            ["git", "show", "4c79a74:trading/backtest/schema.sql"],
+            capture_output=True, text=True,
+            cwd=str(Path(__file__).resolve().parents[2]),
+        ).stdout
+        if not old:
+            self.skipTest("이전 스키마를 git에서 읽을 수 없다")
+        tmp = tempfile.mkdtemp()
+        connection = sqlite3.connect(Path(tmp) / store.BACKTEST_DB_NAME)
+        connection.executescript(old)
+        connection.executemany(
+            "INSERT INTO bars_daily (symbol, trade_date, raw_open, raw_high, raw_low,"
+            " raw_close, raw_volume, adj_open, adj_high, adj_low, adj_close, source,"
+            " source_version) VALUES ('SPY', ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 's', 'v')",
+            [(f"2020-01-{i:02d}",) for i in range(1, 29)],
+        )
+        if rows:
+            connection.execute(
+                "INSERT INTO qv_issuers VALUES ('i', '0000000001', 'm', 's', 'v', 'p')"
+            )
+        connection.commit()
+        connection.close()
+        return tmp
+
+    def test_changed_empty_step4_tables_are_rebuilt(self):
+        connection = store.connect(self._previous_step4_db())
+        columns = lambda name: {
+            row["name"] for row in connection.execute(f"PRAGMA table_info({name})")
+        }
+        self.assertIn("usable_from_session", columns("qv_issuers"))
+        self.assertIn("processed_accessions", columns("qv_share_basis_searches"))
+        self.assertIn(
+            "amendment_searched_accessions",
+            columns("qv_class_valuation_resolutions"),
+        )
+        self.assertEqual(
+            connection.execute("SELECT count(*) AS n FROM bars_daily").fetchone()["n"], 28
+        )
+        connection.close()
+
+    def test_changed_step4_table_with_rows_fails_closed(self):
+        tmp = self._previous_step4_db(rows=True)
+        with self.assertRaises(BacktestStorageError):
+            store.connect(tmp)
+        connection = sqlite3.connect(Path(tmp) / store.BACKTEST_DB_NAME)
+        connection.row_factory = sqlite3.Row
+        self.assertEqual(
+            connection.execute("SELECT count(*) AS n FROM qv_issuers").fetchone()["n"], 1
+        )
+        connection.close()
+
     def test_unknown_schema_fails_closed(self):
         tmp = self.legacy_db(unknown=True)
         with self.assertRaises(BacktestStorageError):
@@ -298,7 +385,8 @@ class ManifestTest(unittest.TestCase):
         return {
             "issuers.jsonl": [
                 {"issuer_id": ISSUER, "cik": CIK,
-                 "resolution_method": "SEC_REGISTRANT_CIK", "provenance": "fixture"}
+                 "resolution_method": "SEC_REGISTRANT_CIK", "provenance": "fixture",
+                 "evidence": evidence}
             ],
             "share_classes.jsonl": [
                 {"class_id": "cls-a", "issuer_id": ISSUER, "symbol": "AAA",
@@ -521,6 +609,71 @@ class ManifestEvidenceTest(Step4Fixture, unittest.TestCase):
             "2020-12-31", self.identity_version, usable_by="2021-06-30",
         )
         self.assertEqual(resolved.class_id, "cls-a")
+
+    def test_issuer_row_without_required_evidence_is_rejected(self):
+        rows = {
+            "issuers.jsonl": [
+                {"issuer_id": ISSUER, "cik": CIK,
+                 "resolution_method": "SEC_REGISTRANT_CIK", "provenance": "fixture"}
+            ],
+            "share_classes.jsonl": [],
+            "xbrl_aliases.jsonl": [],
+            "prose_aliases.jsonl": [],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            for name in qv_manifest.MANIFEST_FILES:
+                (base / name).write_text(
+                    "\n".join(json.dumps(r) for r in rows[name])
+                    + ("\n" if rows[name] else ""),
+                    encoding="utf-8",
+                )
+            with self.assertRaises(qv_manifest.QVManifestError):
+                qv_manifest.load_manifest(base)
+
+    def test_issuer_mapping_is_hidden_before_its_evidence_is_usable(self):
+        from backtest import qv_identity
+        self.connection.execute("DELETE FROM qv_issuers")
+        self.connection.execute(
+            "INSERT INTO qv_issuers"
+            " (issuer_id, cik, resolution_method, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, 'SEC_REGISTRANT_CIK', '2021-02-11', 'manifest', ?, 'fixture')",
+            (ISSUER, CIK, self.identity_version),
+        )
+        self.connection.commit()
+        for lookup in (
+            lambda by: qv_identity.get_issuer(
+                self.connection, ISSUER, self.identity_version, usable_by=by
+            ),
+            lambda by: qv_identity.get_issuer_by_cik(
+                self.connection, CIK, self.identity_version, usable_by=by
+            ),
+        ):
+            with self.assertRaises(qv_identity.UnresolvedIdentityError):
+                lookup("2020-06-30")
+            self.assertEqual(lookup("2021-06-30").issuer_id, ISSUER)
+
+    def test_issuer_usability_is_derived_from_required_evidence(self):
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-000001", form="10-K",
+            acceptance_datetime="2021-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        late = seed_filing(
+            self.connection, cik=CIK, accession="0001234567-24-000001", form="10-K",
+            acceptance_datetime="2024-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        usable, _ = qv_manifest.resolve_usable_from_session(
+            self.connection,
+            [
+                self.evidence("REQUIRED", "0001234567-21-000001"),
+                self.evidence("CORROBORATING", "0001234567-24-000001"),
+            ],
+            SHARES_VERSION,
+        )
+        self.assertNotEqual(usable, late)
 
     def test_cover_group_label_is_not_a_standalone_canonical_bridge(self):
         from backtest import qv_identity
@@ -781,6 +934,48 @@ class TierAndSameRegimeTest(Step4Fixture, unittest.TestCase):
         self.assertEqual(result.selector_path, "MISSING")
         self.assertEqual(result.regime_status, "DIFFERENT_REGIME")
 
+    def test_unattributable_fresh_a_blocks_b_fallback(self):
+        """class alias를 못 푼 fresh A가 있으면 B로 내려가지 않는다."""
+        self.setup_class_a()
+        self.ingest("0001234567-21-000001", [
+            # alias 등록이 없는 member -> class_id NULL
+            {"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+             "instant": "2020-12-31", "value": "111", "decimals": "INF",
+             "member": (USG, "CommonClassZMember")},
+            {"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+             "instant": "2020-12-31", "value": "999", "decimals": "INF",
+             "member": (USG, "CommonClassAMember")},
+        ])
+        self.mark_search("0001234567-21-000001", "COMPLETE")
+        result = self.resolve()
+        self.assertEqual(result.selector_path, "MISSING")
+        self.assertNotEqual(result.selector_path, "B_FALLBACK")
+        self.assertIn("class를 확정하지 못한 fresh A", result.missing_reason)
+
+    def test_other_class_usable_a_does_not_block_this_class_b(self):
+        """다른 class로 명시적으로 풀린 A는 이 class의 구조적 A가 아니다."""
+        self.setup_class_a()
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        self.ingest("0001234567-21-000001", [
+            {"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+             "instant": "2020-12-31", "value": "111", "decimals": "INF",
+             "member": (USG, "CommonClassAMember")},
+            {"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+             "instant": "2020-12-31", "value": "222", "decimals": "INF",
+             "member": (USG, "CommonClassBMember")},
+        ])
+        self.mark_search("0001234567-21-000001", "COMPLETE")
+        target = qv_selector.resolve_class_shares(
+            self.connection, class_id="cls-b", issuer_id=ISSUER, cik=CIK,
+            formation_session=self.FORMATION, valuation_date=self.D,
+            shares_source_version=SHARES_VERSION, events_source_version=EVENTS_VERSION,
+            identity_source_version=self.identity_version,
+        )
+        self.assertEqual(target.selector_path, "B_FALLBACK")
+        self.assertEqual(target.share_value_text, "222")
+        # cls-a는 자기 A를 그대로 쓴다.
+        self.assertEqual(self.resolve().selector_path, "A")
+
     def test_class_retired_before_d_is_excluded_from_the_universe(self):
         self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
         self.add_class("cls-old", listed=False, effective_from="2015-01-01",
@@ -814,11 +1009,19 @@ class TierAndSameRegimeTest(Step4Fixture, unittest.TestCase):
 
 
 class EventSearchTest(Step4Fixture, unittest.TestCase):
-    def coverage(self, *, anchor="2021-02-11", d="2021-12-31", formation="2022-06-30"):
+    def coverage(self, *, anchor="2021-02-11", d="2021-12-31", formation="2022-06-30",
+                 processed=None, failed=()):
+        """processed를 주지 않으면 필수 accession을 전부 처리한 것으로 본다."""
+        if processed is None:
+            _closure, processed = qv_events.required_accessions(
+                self.connection, cik=CIK, anchor_acceptance_eastern_date=anchor,
+                valuation_date=d, filings_source_version=SHARES_VERSION,
+            )
         return qv_events.compute_search_coverage(
             self.connection, cik=CIK, anchor_acceptance_eastern_date=anchor,
             valuation_date=d, formation_session=formation,
             filings_source_version=SHARES_VERSION,
+            processed_accessions=tuple(processed), failed_accessions=tuple(failed),
         )
 
     def test_missing_closure_is_incomplete(self):
@@ -868,6 +1071,124 @@ class EventSearchTest(Step4Fixture, unittest.TestCase):
         complete = self.coverage()
         self.assertEqual(complete.coverage, "COMPLETE")
         self.assertIsNone(complete.incomplete_reason)
+
+
+    def test_metadata_complete_but_unread_accession_is_incomplete(self):
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-00000M", form="10-Q",
+            acceptance_datetime="2021-06-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-22-000001", form="10-K",
+            acceptance_datetime="2022-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        # 필수 accession 하나를 처리하지 못했다.
+        result = self.coverage(processed=["0001234567-22-000001"])
+        self.assertEqual(result.coverage, "INCOMPLETE")
+        self.assertIn("처리되지 않았다", result.incomplete_reason)
+
+    def test_required_document_read_failure_is_incomplete(self):
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-22-000001", form="10-K",
+            acceptance_datetime="2022-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        result = self.coverage(failed=[("0001234567-22-000001", "HTTP 404")])
+        self.assertEqual(result.coverage, "INCOMPLETE")
+        self.assertIn("읽지 못했다", result.incomplete_reason)
+
+    def test_complete_search_cannot_be_persisted_without_processing_proof(self):
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-22-000001", form="10-K",
+            acceptance_datetime="2022-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        good = self.coverage()
+        self.assertEqual(good.coverage, "COMPLETE")
+        forged = qv_events.SearchCoverage(
+            "COMPLETE", good.interval_lo, good.interval_hi, good.closure_accession,
+            good.closure_acceptance_eastern_date, good.searched_accessions,
+            (), (), None,
+        )
+        with self.assertRaises(qv_events.QVEventsError):
+            qv_events.store_search(
+                self.connection, forged, cik=CIK,
+                anchor_accession="0001234567-21-000001",
+                valuation_date="2021-12-31", formation_session="2022-06-30",
+                source="qv", source_version=EVENTS_VERSION, provenance="fixture",
+            )
+
+    def test_production_search_path_marks_read_failure_incomplete(self):
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-00000M", form="10-Q",
+            acceptance_datetime="2021-06-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-22-000001", form="10-K",
+            acceptance_datetime="2022-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+
+        def loader(accession):
+            if accession == "0001234567-21-00000M":
+                raise OSError("문서를 받지 못했다")
+            return [("d.htm", "PRIMARY", b"<p>no event here</p>")]
+
+        coverage, _candidates = qv_events.run_share_basis_search(
+            self.connection, cik=CIK, anchor_accession="0001234567-21-000001",
+            anchor_acceptance_eastern_date="2021-02-11", valuation_date="2021-12-31",
+            formation_session="2022-06-30", filings_source_version=SHARES_VERSION,
+            load_documents=loader, source="qv", source_version=EVENTS_VERSION,
+            provenance="fixture",
+        )
+        self.assertEqual(coverage.coverage, "INCOMPLETE")
+        row = self.connection.execute(
+            "SELECT coverage, processed_accessions FROM qv_share_basis_searches"
+        ).fetchone()
+        self.assertEqual(row["coverage"], "INCOMPLETE")
+
+    def test_production_search_path_completes_and_extracts(self):
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-00000M", form="10-Q",
+            acceptance_datetime="2021-06-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-22-000001", form="10-K",
+            acceptance_datetime="2022-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+
+        def loader(accession):
+            return [(
+                "d.htm", "PRIMARY",
+                b"<p>the Company effected a two-for-one stock split of its common"
+                b" stock, with an effective date of July 15, 2021.</p>",
+            )]
+
+        coverage, candidates = qv_events.run_share_basis_search(
+            self.connection, cik=CIK, anchor_accession="0001234567-21-000001",
+            anchor_acceptance_eastern_date="2021-02-11", valuation_date="2021-12-31",
+            formation_session="2022-06-30", filings_source_version=SHARES_VERSION,
+            load_documents=loader, source="qv", source_version=EVENTS_VERSION,
+            provenance="fixture",
+        )
+        self.assertEqual(coverage.coverage, "COMPLETE")
+        self.assertEqual(
+            set(coverage.processed_accessions), set(coverage.searched_accessions)
+        )
+        self.assertTrue(candidates)
+        self.assertEqual(candidates[0].disposition, "CURRENT_EVENT")
+        row = self.connection.execute(
+            "SELECT coverage, processed_accessions FROM qv_share_basis_searches"
+        ).fetchone()
+        self.assertEqual(row["coverage"], "COMPLETE")
+        self.assertEqual(
+            json.loads(row["processed_accessions"]), list(coverage.processed_accessions)
+        )
 
 
 class CandidateDispositionTest(unittest.TestCase):
@@ -989,7 +1310,8 @@ class ClassEffectTest(Step4Fixture, unittest.TestCase):
         self.assertEqual(result.effect, "UNRESOLVED")
         self.assertNotEqual(result.effect, "NO_SHARE_BASIS_EFFECT_CONFIRMED")
 
-    def test_explicit_other_class_scope_confirms_no_effect(self):
+    def test_sibling_named_but_target_merely_omitted_is_unresolved(self):
+        """형제가 긍정으로 지목됐다는 사실은 negative 증거가 아니다."""
         self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
         self.add_class("cls-b", listed=False, member="CommonClassBMember")
         self.add_prose("cls-a", "Class A stock")
@@ -998,7 +1320,59 @@ class ClassEffectTest(Step4Fixture, unittest.TestCase):
             " company's Class A stock, with an effective date of July 15, 2022.</p>"
         )
         result = self.effect(candidate, class_id="cls-b")
-        self.assertEqual(result.effect, "NO_SHARE_BASIS_EFFECT_CONFIRMED")
+        self.assertEqual(result.effect, "UNRESOLVED")
+        self.assertNotEqual(result.effect, "NO_SHARE_BASIS_EFFECT_CONFIRMED")
+        self.assertIn("명시 진술이 없다", result.effect_reason)
+
+    def test_explicit_negative_statement_confirms_no_effect(self):
+        """BRK 2010 실제 문구 — 목적어 자리에 영향받지 않는 class가 온다."""
+        self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        self.add_prose("cls-a", "Class A common shares")
+        self.add_prose("cls-b", "Class B stock")
+        candidate = self.candidate(
+            "<p>Adjusted for the 50-for-1 Class B stock split that became effective on"
+            " January 21, 2022. The Class B stock split had no effect on the number of"
+            " equivalent Class A common shares outstanding.</p>"
+        )
+        self.assertEqual(
+            self.effect(candidate, class_id="cls-a").effect,
+            "NO_SHARE_BASIS_EFFECT_CONFIRMED",
+        )
+        self.assertEqual(
+            self.effect(candidate, class_id="cls-b").effect,
+            "SHARE_BASIS_CHANGE_CONFIRMED",
+        )
+
+    def test_explicit_negative_subject_form_confirms_no_effect(self):
+        """V 2015 실제 문구 — 주어 자리에 영향받지 않는 class가 온다."""
+        self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        self.add_prose("cls-a", "class A common stock")
+        self.add_prose("cls-b", "class B common stock")
+        candidate = self.candidate(
+            "<p>In January 2022, the board of directors declared a four-for-one split of"
+            " its class A common stock. Holders of class B common stock did not receive"
+            " a stock dividend. The split was distributed on March 18, 2022.</p>"
+        )
+        self.assertEqual(
+            self.effect(candidate, class_id="cls-b").effect,
+            "NO_SHARE_BASIS_EFFECT_CONFIRMED",
+        )
+
+    def test_all_common_scope_applies_to_every_active_common_class(self):
+        self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        candidate = self.candidate(
+            "<p>On March 2, 2022 the Company effected a two-for-one stock split of its"
+            " common stock, with an effective date of July 15, 2022.</p>"
+        )
+        self.assertTrue(candidate.all_common_scope)
+        for class_id in ("cls-a", "cls-b"):
+            self.assertEqual(
+                self.effect(candidate, class_id=class_id).effect,
+                "SHARE_BASIS_CHANGE_CONFIRMED",
+            )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1039,7 +1413,8 @@ class MarketBoundaryTest(Step4Fixture, unittest.TestCase):
         self.vendor("AAA", "2022-07-18")
         result = self.resolve(sec="2022-07-19")
         self.assertEqual(result.status, "UNRESOLVED")
-        self.assertIn("경계가 다르다", result.reason)
+        self.assertEqual(result.basis, "CONFLICT")
+        self.assertIn("일치하는 vendor row가 없다", result.reason)
 
     def test_sec_trading_is_a_fallback_when_vendor_is_absent(self):
         result = self.resolve(sec="2022-07-18")
@@ -1052,6 +1427,30 @@ class MarketBoundaryTest(Step4Fixture, unittest.TestCase):
     def test_vendor_split_after_formation_is_not_visible(self):
         self.vendor("AAA", "2023-07-18")
         self.assertEqual(self.resolve(formation="2022-12-30").status, "UNRESOLVED")
+
+    def test_two_vendor_splits_without_sec_anchor_is_unresolved(self):
+        """옛 사건을 평가하는데 나중 split을 조용히 고르지 않는다."""
+        self.vendor("AAA", "2019-06-10", "7.000000/1.000000")
+        self.vendor("AAA", "2022-07-18", "20.000000/1.000000")
+        result = self.resolve(formation="2022-12-30")
+        self.assertEqual(result.status, "UNRESOLVED")
+        self.assertEqual(result.basis, "AMBIGUOUS_VENDOR")
+        self.assertIn("유일하게 정할 수 없다", result.reason)
+
+    def test_two_vendor_splits_disambiguated_by_sec_trading_date(self):
+        self.vendor("AAA", "2019-06-10", "7.000000/1.000000")
+        self.vendor("AAA", "2022-07-18", "20.000000/1.000000")
+        earlier = self.resolve(sec="2019-06-10", formation="2022-12-30")
+        self.assertEqual(earlier.status, "RESOLVED")
+        self.assertEqual(earlier.boundary_session, "2019-06-10")
+        self.assertEqual(earlier.basis, "VENDOR_CORROBORATED")
+
+    def test_sec_trading_matching_no_vendor_row_is_unresolved(self):
+        self.vendor("AAA", "2019-06-10", "7.000000/1.000000")
+        self.vendor("AAA", "2022-07-18", "20.000000/1.000000")
+        result = self.resolve(sec="2019-01-02", formation="2022-12-30")
+        self.assertEqual(result.status, "UNRESOLVED")
+        self.assertEqual(result.basis, "CONFLICT")
 
     def test_mismatch_interval_guard_blocks_anchor_or_d(self):
         ok, reason = qv_boundary.guard_mismatch(
@@ -1092,9 +1491,21 @@ class ConversionContinuityTest(Step4Fixture, unittest.TestCase):
             clause_status=clause_status,
         )
 
-    def assess(self, snapshots, amendments=(), d="2020-12-31", formation="2021-06-30"):
+    def assess(self, snapshots, amendments=(), d="2020-12-31", formation="2021-06-30",
+               search=None):
         return qv_conversion.assess_continuity(
-            list(snapshots), list(amendments), valuation_date=d, formation_session=formation
+            list(snapshots), list(amendments), valuation_date=d,
+            formation_session=formation,
+            amendment_search=(
+                search
+                if search is not None
+                else qv_conversion.NOT_SEARCHED_AMENDMENTS
+            ),
+        )
+
+    def complete_search(self, *accessions):
+        return qv_conversion.AmendmentSearch(
+            qv_conversion.AMENDMENT_COMPLETE, tuple(accessions), "events-v1",
         )
 
     def test_both_checkpoints_are_required(self):
@@ -1106,13 +1517,53 @@ class ConversionContinuityTest(Step4Fixture, unittest.TestCase):
         self.assertEqual(only_post.status, "UNRESOLVED")
         self.assertIn("pre checkpoint", only_post.reason)
 
-    def test_same_clause_across_the_bracket_confirms_continuity(self):
+    def test_same_clause_with_complete_search_confirms_continuity(self):
+        result = self.assess(
+            [
+                self.snapshot("a", "2015-10-02", "2015-10-05"),
+                self.snapshot("b", "2021-01-05", "2021-01-06"),
+            ],
+            search=self.complete_search("amd-scan-1", "amd-scan-2"),
+        )
+        self.assertEqual(result.status, "CONFIRMED")
+        self.assertEqual(result.amendment_status, "COMPLETE")
+        self.assertEqual(result.searched_accessions, ("amd-scan-1", "amd-scan-2"))
+
+    def test_same_clause_without_search_proof_is_unresolved(self):
+        """후보가 0건이라는 사실만으로 closure를 주지 않는다."""
         result = self.assess([
             self.snapshot("a", "2015-10-02", "2015-10-05"),
             self.snapshot("b", "2021-01-05", "2021-01-06"),
         ])
+        self.assertEqual(result.status, "UNRESOLVED")
+        self.assertEqual(result.amendment_status, "NOT_SEARCHED")
+        self.assertIn("COMPLETE로 증명되지 않았다", result.reason)
+
+    def test_complete_search_with_zero_candidates_confirms(self):
+        result = self.assess(
+            [
+                self.snapshot("a", "2015-10-02", "2015-10-05"),
+                self.snapshot("b", "2021-01-05", "2021-01-06"),
+            ],
+            [],
+            search=self.complete_search(),
+        )
         self.assertEqual(result.status, "CONFIRMED")
-        self.assertEqual(result.amendment_status, "COMPLETE")
+
+    def test_incomplete_search_with_zero_candidates_is_unresolved(self):
+        result = self.assess(
+            [
+                self.snapshot("a", "2015-10-02", "2015-10-05"),
+                self.snapshot("b", "2021-01-05", "2021-01-06"),
+            ],
+            [],
+            search=qv_conversion.AmendmentSearch(
+                qv_conversion.AMENDMENT_INCOMPLETE, (), "events-v1",
+                "필요한 문서를 읽지 못했다",
+            ),
+        )
+        self.assertEqual(result.status, "UNRESOLVED")
+        self.assertIn("필요한 문서를 읽지 못했다", result.reason)
 
     def test_changed_clause_is_unresolved(self):
         result = self.assess([
@@ -1155,6 +1606,7 @@ class ConversionContinuityTest(Step4Fixture, unittest.TestCase):
                 "amd-1", "ex3-2.htm", "2018-06-01", resolved=False,
                 touches_conversion=False, reason="실행 여부 불명",
             )],
+            search=self.complete_search("amd-1"),
         )
         self.assertEqual(result.status, "UNRESOLVED")
         self.assertEqual(result.amendment_status, "UNRESOLVED")
@@ -1176,25 +1628,15 @@ class ConversionContinuityTest(Step4Fixture, unittest.TestCase):
         self.add_class("cls-b", listed=False, member="CommonClassBMember")
         # 상장 class를 subject로 둘 수 없다 (역방향 추정 금지).
         with self.assertRaises(qv_conversion.QVConversionError):
-            qv_conversion.register_relation(
-                self.connection, relation_id="bad", subject_class_id="cls-a",
-                reference_class_id="cls-b", issuer_id=ISSUER,
-                conversion_ratio_text="1", ratio_semantics="ONE_FOR_ONE",
-                effective_from="2015-01-01", effective_to=None,
-                usable_from_session="2015-01-02", source="manifest",
-                source_version=self.identity_version, provenance="fixture",
-            )
+            self.register_relation("bad", "cls-a", "cls-b")
 
     def test_current_ratio_is_not_backfilled_into_an_earlier_formation(self):
         self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
         self.add_class("cls-b", listed=False, member="CommonClassBMember")
-        qv_conversion.register_relation(
-            self.connection, relation_id="rel", subject_class_id="cls-b",
-            reference_class_id="cls-a", issuer_id=ISSUER,
-            conversion_ratio_text="1", ratio_semantics="ONE_FOR_ONE",
-            effective_from="2015-01-01", effective_to=None,
-            usable_from_session="2022-03-01", source="manifest",
-            source_version=self.identity_version, provenance="fixture",
+        # 증거가 2022년에야 usable해진다 -> 그 이전 formation으로 backfill되지 않는다.
+        self.register_relation(
+            "rel", "cls-b", "cls-a",
+            acceptance="2022-02-28T21:00:00.000000Z",
         )
         self.assertIsNone(
             qv_conversion.active_relation(
@@ -1258,7 +1700,10 @@ class MarketEquityTest(Step4Fixture, unittest.TestCase):
             qv_conversion.ClauseSemantics("cls-b", "cls-a", "1"),
         )
         return qv_conversion.assess_continuity(
-            [pre, post], [], valuation_date=self.D, formation_session=self.FORMATION
+            [pre, post], [], valuation_date=self.D, formation_session=self.FORMATION,
+            amendment_search=qv_conversion.AmendmentSearch(
+                qv_conversion.AMENDMENT_COMPLETE, ("amd-scan-1",), "events-v1",
+            ),
         )
 
     def test_two_listed_classes_keep_their_own_prices(self):
@@ -1285,13 +1730,8 @@ class MarketEquityTest(Step4Fixture, unittest.TestCase):
         self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
         self.add_class("cls-b", listed=False, member="CommonClassBMember")
         seed_price(self.connection, "AAA", self.D, 100.0)
-        qv_conversion.register_relation(
-            self.connection, relation_id="rel-b", subject_class_id="cls-b",
-            reference_class_id="cls-a", issuer_id=ISSUER,
-            conversion_ratio_text="1.5", ratio_semantics="EXPLICIT_INTEGER",
-            effective_from="2015-01-01", effective_to=None,
-            usable_from_session="2015-01-02", source="manifest",
-            source_version=self.identity_version, provenance="fixture",
+        self.register_relation(
+            "rel-b", "cls-b", "cls-a", ratio="1.5", semantics="EXPLICIT_INTEGER"
         )
         valuation = self.valuation("cls-b", continuity=self.confirmed_continuity())
         self.assertEqual(valuation.valuation_method, "CONVERSION_VALUE_PROXY")
@@ -1306,17 +1746,72 @@ class MarketEquityTest(Step4Fixture, unittest.TestCase):
         self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
         self.add_class("cls-b", listed=False, member="CommonClassBMember")
         seed_price(self.connection, "AAA", self.D, 100.0)
-        qv_conversion.register_relation(
-            self.connection, relation_id="rel-b", subject_class_id="cls-b",
-            reference_class_id="cls-a", issuer_id=ISSUER,
-            conversion_ratio_text="1", ratio_semantics="ONE_FOR_ONE",
-            effective_from="2015-01-01", effective_to=None,
-            usable_from_session="2015-01-02", source="manifest",
-            source_version=self.identity_version, provenance="fixture",
-        )
+        self.register_relation("rel-b", "cls-b", "cls-a")
         valuation = self.valuation("cls-b", continuity=None)
         self.assertEqual(valuation.valuation_method, "MISSING")
         self.assertIn("C3 continuity", valuation.missing_reason)
+
+    def test_relation_without_required_sec_evidence_cannot_be_registered(self):
+        self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        with self.assertRaises(qv_conversion.QVConversionError):
+            self.register_relation("rel-b", "cls-b", "cls-a", evidence=[])
+        with self.assertRaises(qv_conversion.QVConversionError):
+            self.register_relation("rel-b", "cls-b", "cls-a", evidence=[{
+                "source_kind": "KQ_FILING", "cik": CIK,
+                "accession": "0001234567-99-999999", "document_name": "d.htm",
+                "evidence_role": "CONVERSION_RIGHT_DISCLOSURE",
+                "dependency": "REQUIRED",
+            }])
+
+    def test_relation_usability_is_derived_from_its_evidence(self):
+        self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        usable = self.register_relation(
+            "rel-b", "cls-b", "cls-a", acceptance="2022-02-28T21:00:00.000000Z"
+        )
+        self.assertGreater(usable, "2022-02-28")
+        self.assertIsNone(
+            qv_conversion.active_relation(
+                self.connection, subject_class_id="cls-b", valuation_date=self.D,
+                formation_session=self.FORMATION, source_version=self.identity_version,
+            )
+        )
+        self.assertIsNotNone(
+            qv_conversion.active_relation(
+                self.connection, subject_class_id="cls-b", valuation_date=self.D,
+                formation_session="2022-06-30", source_version=self.identity_version,
+            )
+        )
+
+    def test_reference_class_not_usable_by_formation_is_missing(self):
+        self.add_class(
+            "cls-a", symbol="AAA", listed=True, member="CommonClassAMember",
+            usable="2021-08-02",
+        )
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        seed_price(self.connection, "AAA", self.D, 100.0)
+        self.register_relation("rel-b", "cls-b", "cls-a")
+        result = self.valuation("cls-b", continuity=self.confirmed_continuity())
+        self.assertEqual(result.valuation_method, "MISSING")
+        self.assertIn("reference class identity", result.missing_reason)
+
+    def test_reference_usable_by_formation_is_eligible_subject_to_c3(self):
+        self.add_class(
+            "cls-a", symbol="AAA", listed=True, member="CommonClassAMember",
+            usable="2021-01-04",
+        )
+        self.add_class("cls-b", listed=False, member="CommonClassBMember")
+        seed_price(self.connection, "AAA", self.D, 100.0)
+        self.register_relation("rel-b", "cls-b", "cls-a")
+        self.assertEqual(
+            self.valuation("cls-b", continuity=self.confirmed_continuity()).valuation_method,
+            "CONVERSION_VALUE_PROXY",
+        )
+        # C3가 없으면 같은 관계라도 MISSING이다.
+        self.assertEqual(
+            self.valuation("cls-b", continuity=None).valuation_method, "MISSING"
+        )
 
     def test_one_unresolved_active_class_makes_the_whole_issuer_missing(self):
         self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")

@@ -350,6 +350,57 @@ def _migrate_step4_identity(
     return True
 
 
+# Step-4 표는 새로 도입된 것이라 아직 production 행이 없다. DDL이 바뀌면 **비어 있을
+# 때만** 같은 fail-close 정책으로 다시 만든다. 무관한 표를 위한 범용 틀은 만들지 않는다.
+_STEP4_REBUILDABLE_TABLES = (
+    "qv_issuers",
+    "qv_class_valuation_resolutions",
+    "qv_class_share_resolutions",
+    "qv_class_market_equity",
+    "qv_issuer_market_equity",
+    "qv_share_observations",
+    "qv_share_basis_searches",
+    "qv_share_basis_candidates",
+    "qv_share_basis_class_effects",
+    "qv_class_conversion_relations",
+    "qv_identity_evidence",
+    "qv_sec_evidence_documents",
+)
+
+
+def _rebuild_changed_empty_step4_tables(
+    connection: sqlite3.Connection, schema_sql: str
+) -> list[str]:
+    """DDL이 바뀐 Step-4 표를 비어 있을 때만 원자적으로 다시 만든다."""
+    pending: list[tuple[str, str]] = []
+    for name in _STEP4_REBUILDABLE_TABLES:
+        existing = _table_sql(connection, name)
+        if existing is None:
+            continue
+        target = _schema_table_ddl(schema_sql, name)
+        if _normalized_table_sql(existing) == _normalized_table_sql(target):
+            continue
+        if _row_count(connection, name):
+            raise BacktestStorageError(
+                f"{name}에 행이 있어 스키마를 다시 만들지 않습니다"
+            )
+        pending.append((name, target))
+    if not pending:
+        return []
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        for name, target in pending:
+            connection.execute(f"DROP TABLE {name}")
+            connection.execute(
+                target.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
+            )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    return [name for name, _ in pending]
+
+
 def connect(
     data_dir: Path | str = DEFAULT_DATA_DIR, schema_path: Path = SCHEMA_PATH
 ) -> sqlite3.Connection:
@@ -363,6 +414,7 @@ def connect(
     schema_sql = Path(schema_path).read_text(encoding="utf-8")
     _upgrade_ca801b0_qv_sec_filings(connection, schema_sql)
     _migrate_step4_identity(connection, schema_sql)
+    _rebuild_changed_empty_step4_tables(connection, schema_sql)
     connection.executescript(schema_sql)
     add_missing_columns(connection)
     return connection

@@ -60,12 +60,14 @@ class QVIdentityFixture:
         cik: str,
         *,
         resolution_method: str = "SEC_TICKER",
+        usable_from_session: str = USABLE,
     ):
         return register_issuer(
             self.connection,
             issuer_id=issuer_id,
             cik=cik,
             resolution_method=resolution_method,
+            usable_from_session=usable_from_session,
             source=SOURCE,
             source_version=VERSION,
             provenance=f"fixture://issuer/{issuer_id}",
@@ -169,8 +171,12 @@ class QVIdentityFixture:
         semantics: str = "ONE_FOR_ONE",
         effective_from: str = "2000-01-01",
         effective_to: str | None = None,
-        usable_from_session: str = USABLE,
+        acceptance: str = "1999-12-30T21:00:00.000000Z",
     ):
+        """전환 관계는 canonical SEC 증거에서 usable을 파생한다."""
+        cik = get_issuer(self.connection, issuer_id, VERSION).cik
+        accession = f"{cik}-99-{abs(hash(relation_id)) % 1000000:06d}"
+        self._seed_filing(cik, accession, acceptance)
         return qv_conversion.register_relation(
             self.connection,
             relation_id=relation_id,
@@ -181,11 +187,49 @@ class QVIdentityFixture:
             ratio_semantics=semantics,
             effective_from=effective_from,
             effective_to=effective_to,
-            usable_from_session=usable_from_session,
+            evidence=[{
+                "source_kind": "KQ_FILING", "cik": cik, "accession": accession,
+                "document_name": "d.htm",
+                "evidence_role": "CONVERSION_RIGHT_DISCLOSURE",
+                "dependency": "REQUIRED",
+            }],
+            filings_source_version=VERSION,
             source=SOURCE,
             source_version=VERSION,
             provenance=f"fixture://relation/{relation_id}",
         )
+
+    def _seed_filing(self, cik: str, accession: str, acceptance: str) -> None:
+        """증거 해석에 필요한 최소 filing/달력 seed."""
+        self.connection.execute(
+            "INSERT OR REPLACE INTO data_sources"
+            " (source, source_version, kind, point_in_time, survivorship_biased, note)"
+            " VALUES ('cal', 'cal-v1', 'bars', 1, 0, 'fixture')"
+        )
+        self.connection.executemany(
+            "INSERT OR REPLACE INTO bars_daily"
+            " (symbol, trade_date, raw_open, raw_high, raw_low, raw_close, raw_volume,"
+            "  adj_open, adj_high, adj_low, adj_close, source, source_version)"
+            " VALUES ('SPY', ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 'cal', 'cal-v1')",
+            [(f"{year:04d}-01-04",) for year in range(1994, 2031)],
+        )
+        from backtest.qv_submissions import (
+            _acceptance_eastern_date,
+            _historical_usable_session,
+        )
+        eastern = _acceptance_eastern_date(acceptance)
+        usable = _historical_usable_session(self.connection, eastern, "cal", "cal-v1")
+        self.connection.execute(
+            "INSERT OR REPLACE INTO qv_sec_filings"
+            " (cik, accession, form, filed_date, acceptance_datetime,"
+            "  acceptance_eastern_date, historical_usable_session, sic_status,"
+            "  submissions_file, calendar_source, calendar_source_version,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, '10-K', ?, ?, ?, ?, 'MISSING', 'f.json', 'cal', 'cal-v1',"
+            "         ?, ?, 'fixture')",
+            (cik, accession, eastern, acceptance, eastern, usable, SOURCE, VERSION),
+        )
+        self.connection.commit()
 
 
 class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
@@ -733,6 +777,7 @@ class QVSnapshotRegressionTest(unittest.TestCase):
             issuer_id="issuer-spy",
             cik="884394",
             resolution_method="SEC_TICKER",
+            usable_from_session="1993-02-01",
             source=SOURCE,
             source_version=version,
             provenance="fixture://issuer/spy",

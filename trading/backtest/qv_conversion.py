@@ -24,6 +24,8 @@ CONTINUITY_NOT_REQUIRED = "NOT_REQUIRED"
 AMENDMENT_COMPLETE = "COMPLETE"
 AMENDMENT_UNRESOLVED = "UNRESOLVED"
 AMENDMENT_NOT_REQUIRED = "NOT_REQUIRED"
+AMENDMENT_NOT_SEARCHED = "NOT_SEARCHED"
+AMENDMENT_INCOMPLETE = "INCOMPLETE"
 
 # governing snapshot만 checkpoint가 된다. periodic prose·EX-4.x·proposal은 아니다.
 GOVERNING_SNAPSHOT_ROLES = frozenset(
@@ -76,6 +78,29 @@ class GoverningSnapshot:
 
 
 @dataclass(frozen=True)
+class AmendmentSearch:
+    """checkpoint 사이 amendment 탐색이 실제로 수행·완료됐다는 명시 증거.
+
+    **후보가 0건이라는 것은 closure가 아니다.** 이 receipt가 `COMPLETE`일 때만
+    continuity를 확인할 수 있다. 빈 Python 목록에서 COMPLETE를 추론하지 않는다.
+    """
+
+    coverage: str
+    searched_accessions: tuple[str, ...] = ()
+    source_version: str | None = None
+    reason: str | None = None
+
+    @property
+    def is_complete(self) -> bool:
+        return self.coverage == AMENDMENT_COMPLETE
+
+
+NOT_SEARCHED_AMENDMENTS = AmendmentSearch(
+    AMENDMENT_NOT_SEARCHED, (), None, "amendment 탐색이 수행되지 않았다"
+)
+
+
+@dataclass(frozen=True)
 class AmendmentCandidate:
     """checkpoint 사이에서 발견된 charter amendment 후보."""
 
@@ -94,6 +119,7 @@ class Continuity:
     post: GoverningSnapshot | None
     amendment_status: str
     reason: str | None
+    searched_accessions: tuple[str, ...] = ()
 
 
 def _decimal(text: str) -> Decimal:
@@ -117,17 +143,37 @@ def register_relation(
     ratio_semantics: str,
     effective_from: str,
     effective_to: str | None,
-    usable_from_session: str,
+    evidence: list[dict],
+    filings_source_version: str,
     source: str,
     source_version: str,
     provenance: str,
-) -> None:
-    """고정 직접 전환 관계를 등록한다. 역산·현재비율 소급은 여기서 막는다."""
+) -> str:
+    """고정 직접 전환 관계를 등록한다. 역산·현재비율 소급은 여기서 막는다.
+
+    **`usable_from_session`은 인자가 아니다.** canonical SEC 증거(S0/S1/S2)의 REQUIRED
+    항목에서 파생한다. 임의 날짜를 넣어 PIT 경계를 옮길 수 없다.
+    """
+    from .qv_manifest import (  # noqa: PLC0415 — 순환 import 회피
+        QVManifestError,
+        _normalize_evidence,
+        _insert_evidence,
+        resolve_usable_from_session,
+    )
+
     if ratio_semantics not in RATIO_SEMANTICS:
         raise QVConversionError(f"모르는 ratio_semantics입니다: {ratio_semantics!r}")
     if subject_class_id == reference_class_id:
         raise QVConversionError("subject와 reference가 같습니다")
     _decimal(conversion_ratio_text)
+
+    try:
+        items = _normalize_evidence({"evidence": evidence}, "conversion_relations")
+        usable_from_session, resolved = resolve_usable_from_session(
+            connection, items, filings_source_version
+        )
+    except QVManifestError as error:
+        raise QVConversionError(f"전환 관계 증거를 쓸 수 없습니다: {error}") from error
 
     subject = connection.execute(
         "SELECT is_ordinary_common, is_listed, issuer_id FROM qv_share_classes"
@@ -164,6 +210,17 @@ def register_relation(
                 source, source_version, provenance,
             ),
         )
+        connection.execute(
+            "DELETE FROM qv_identity_evidence"
+            " WHERE relation_kind = 'CONVERSION_RELATION' AND relation_key = ?"
+            "   AND source_version = ?",
+            (f"{relation_id}|{effective_from}", source_version),
+        )
+        _insert_evidence(
+            connection, "CONVERSION_RELATION",
+            f"{relation_id}|{effective_from}", resolved, source_version, provenance,
+        )
+    return usable_from_session
 
 
 def active_relation(
@@ -196,8 +253,14 @@ def assess_continuity(
     *,
     valuation_date: str,
     formation_session: str,
+    amendment_search: AmendmentSearch = NOT_SEARCHED_AMENDMENTS,
 ) -> Continuity:
-    """C3 bracket. pre/post checkpoint가 **둘 다** 필요하고 조항 의미가 같아야 한다."""
+    """C3 bracket. pre/post checkpoint가 **둘 다** 필요하고 조항 의미가 같아야 하며,
+    checkpoint 사이 amendment 탐색이 **명시적으로 COMPLETE**여야 한다.
+
+    후보가 0건이라는 사실만으로 closure를 주지 않는다.
+    """
+    searched = tuple(amendment_search.searched_accessions)
     checkpoints = [item for item in snapshots if item.is_checkpoint]
     pre_pool = [item for item in checkpoints if item.legal_as_of <= valuation_date]
     post_pool = [
@@ -208,34 +271,42 @@ def assess_continuity(
     ]
     if not pre_pool:
         return Continuity(
-            CONTINUITY_UNRESOLVED, None, None, AMENDMENT_NOT_REQUIRED,
-            "as-of <= D 인 governing snapshot(pre checkpoint)이 없다",
+            CONTINUITY_UNRESOLVED, None, None, amendment_search.coverage,
+            "as-of <= D 인 governing snapshot(pre checkpoint)이 없다", searched,
         )
     if not post_pool:
         return Continuity(
-            CONTINUITY_UNRESOLVED, None, None, AMENDMENT_NOT_REQUIRED,
-            "as-of >= D 이면서 formation 전에 usable한 post checkpoint가 없다",
+            CONTINUITY_UNRESOLVED, None, None, amendment_search.coverage,
+            "as-of >= D 이면서 formation 전에 usable한 post checkpoint가 없다", searched,
         )
     pre = max(pre_pool, key=lambda item: (item.legal_as_of, item.accession))
     post = min(post_pool, key=lambda item: (item.legal_as_of, item.accession))
 
     if pre.clause is None or post.clause is None:
         return Continuity(
-            CONTINUITY_UNRESOLVED, pre, post, AMENDMENT_NOT_REQUIRED,
-            "checkpoint에서 전환 조항을 읽지 못했다",
+            CONTINUITY_UNRESOLVED, pre, post, amendment_search.coverage,
+            "checkpoint에서 전환 조항을 읽지 못했다", searched,
         )
     if pre.clause_status != "READ" or post.clause_status != "READ":
         return Continuity(
-            CONTINUITY_UNRESOLVED, pre, post, AMENDMENT_NOT_REQUIRED,
-            "checkpoint 조항 의미가 모호하다",
+            CONTINUITY_UNRESOLVED, pre, post, amendment_search.coverage,
+            "checkpoint 조항 의미가 모호하다", searched,
         )
     if pre.clause.key() != post.clause.key():
         return Continuity(
-            CONTINUITY_UNRESOLVED, pre, post, AMENDMENT_NOT_REQUIRED,
-            f"전환 조항이 바뀌었다: {pre.clause.key()} -> {post.clause.key()}",
+            CONTINUITY_UNRESOLVED, pre, post, amendment_search.coverage,
+            f"전환 조항이 바뀌었다: {pre.clause.key()} -> {post.clause.key()}", searched,
         )
 
-    # checkpoint 사이 amendment 후보를 전수로 본다. 발견이 없다는 것 자체는 closure가 아니다.
+    # **탐색이 실제로 완료됐다는 명시 증거**가 없으면 여기서 닫히지 않는다.
+    if not amendment_search.is_complete:
+        return Continuity(
+            CONTINUITY_UNRESOLVED, pre, post, amendment_search.coverage,
+            "checkpoint 사이 amendment 탐색이 COMPLETE로 증명되지 않았다"
+            + (f": {amendment_search.reason}" if amendment_search.reason else ""),
+            searched,
+        )
+
     between = [
         item
         for item in amendments
@@ -247,6 +318,7 @@ def assess_continuity(
             CONTINUITY_UNRESOLVED, pre, post, AMENDMENT_UNRESOLVED,
             "미해결 amendment 후보가 있다: "
             + ", ".join(f"{item.accession}({item.reason})" for item in unresolved),
+            searched,
         )
     changed = [item for item in between if item.touches_conversion]
     if changed:
@@ -254,5 +326,8 @@ def assess_continuity(
             CONTINUITY_UNRESOLVED, pre, post, AMENDMENT_UNRESOLVED,
             "구간 안 amendment가 전환 조항을 건드린다: "
             + ", ".join(item.accession for item in changed),
+            searched,
         )
-    return Continuity(CONTINUITY_CONFIRMED, pre, post, AMENDMENT_COMPLETE, None)
+    return Continuity(
+        CONTINUITY_CONFIRMED, pre, post, AMENDMENT_COMPLETE, None, searched
+    )

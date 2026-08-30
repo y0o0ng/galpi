@@ -66,6 +66,7 @@ EVIDENCE_SOURCE_KINDS = frozenset({"KQ_FILING", "SEC_EVIDENCE_DOCUMENT"})
 EVIDENCE_DEPENDENCIES = frozenset({"REQUIRED", "CORROBORATING"})
 
 RELATION_KINDS = {
+    "issuers.jsonl": "ISSUER",
     "share_classes.jsonl": "SHARE_CLASS",
     "xbrl_aliases.jsonl": "XBRL_ALIAS",
     "prose_aliases.jsonl": "PROSE_ALIAS",
@@ -258,6 +259,7 @@ def _normalize_row(filename: str, row: dict) -> dict:
             "cik": normalize_cik(_require(row, "cik", filename)),
             "resolution_method": str(_require(row, "resolution_method", filename)).strip(),
             "provenance": str(_require(row, "provenance", filename)).strip(),
+            "evidence": _normalize_evidence(row, filename),
         }
 
     common = {
@@ -477,7 +479,12 @@ def materialize(
     version = manifest.identity_source_version
 
     prepared: dict[str, list[tuple[dict, str, list[dict]]]] = {}
-    for filename in ("share_classes.jsonl", "xbrl_aliases.jsonl", "prose_aliases.jsonl"):
+    for filename in (
+        "issuers.jsonl",
+        "share_classes.jsonl",
+        "xbrl_aliases.jsonl",
+        "prose_aliases.jsonl",
+    ):
         items = []
         for row in manifest.rows[filename]:
             usable, resolved = resolve_usable_from_session(
@@ -507,22 +514,26 @@ def materialize(
         ):
             connection.execute(f"DELETE FROM {table} WHERE source_version = ?", (version,))
 
-        connection.executemany(
-            "INSERT INTO qv_issuers"
-            " (issuer_id, cik, resolution_method, source, source_version, provenance)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            [
+        for row, usable, resolved in prepared["issuers.jsonl"]:
+            connection.execute(
+                "INSERT INTO qv_issuers"
+                " (issuer_id, cik, resolution_method, usable_from_session,"
+                "  source, source_version, provenance)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     row["issuer_id"],
                     row["cik"],
                     row["resolution_method"],
+                    usable,
                     IDENTITY_SOURCE,
                     version,
                     row["provenance"],
-                )
-                for row in manifest.rows["issuers.jsonl"]
-            ],
-        )
+                ),
+            )
+            _insert_evidence(
+                connection, "ISSUER", row["issuer_id"], resolved, version,
+                row["provenance"],
+            )
 
         for row, usable, resolved in prepared["share_classes.jsonl"]:
             connection.execute(

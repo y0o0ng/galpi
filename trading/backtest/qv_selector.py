@@ -54,25 +54,30 @@ def s1_window(valuation_date: str) -> tuple[str, str]:
     return f"{year:04d}-01-01", valuation_date
 
 
-def _candidate_rows(
+def _scope_rows(
     connection: sqlite3.Connection,
     *,
-    class_id: str,
+    cik: str,
     formation_session: str,
     valuation_date: str,
     shares_source_version: str,
     identity_source_version: str,
 ) -> list[sqlite3.Row]:
+    """적용 가능한 source scope 전부. **class_id로 먼저 거르지 않는다.**
+
+    class 해석에 실패한 A 관측(`class_id IS NULL`)이 여기서 사라지면 tier 판정이
+    A의 구조적 존재를 못 보고 B로 내려간다. 그것이 정확히 금지된 fallback이다.
+    """
     lo, hi = s1_window(valuation_date)
     return connection.execute(
         "SELECT * FROM qv_share_observations"
-        " WHERE class_id = ? AND source_version = ? AND identity_source_version = ?"
+        " WHERE cik = ? AND source_version = ? AND identity_source_version = ?"
         "   AND historical_usable_session <= ?"
         "   AND fact_instant >= ? AND fact_instant <= ?"
         " ORDER BY fact_instant DESC, acceptance_datetime DESC, accession DESC,"
         "          fact_ordinal ASC",
         (
-            class_id, shares_source_version, identity_source_version,
+            cik, shares_source_version, identity_source_version,
             formation_session, lo, hi,
         ),
     ).fetchall()
@@ -155,40 +160,55 @@ def resolve_class_shares(
 ) -> ShareResolution:
     """한 class·formation의 December 주식수를 P2 규칙으로 고른다."""
     filings_source_version = filings_source_version or shares_source_version
-    rows = _candidate_rows(
+    scope = _scope_rows(
         connection,
-        class_id=class_id,
+        cik=cik,
         formation_session=formation_session,
         valuation_date=valuation_date,
         shares_source_version=shares_source_version,
         identity_source_version=identity_source_version,
     )
-    if not rows:
-        return ShareResolution(
-            class_id, issuer_id, PATH_MISSING, None, None, None, None,
-            NO_CANDIDATE, "NOT_SEARCHED", "S1 창 안에 PIT-usable 후보가 없다",
-        )
+    mine = [row for row in scope if row["class_id"] == class_id]
 
-    tier_a = [row for row in rows if row["concept_tier"] == "A"]
-    if tier_a:
-        # fresh A가 이 class에 구조적으로 존재한다. A tier가 관측을 소유한다.
-        active_tier, pool, path = "A", tier_a, PATH_A
+    # tier 판정은 class 해석 실패보다 **먼저** 온다.
+    #   - 이 class로 풀린 A
+    #   - 아직 어느 class인지 모르는 A (이 class일 수도 있다)
+    # 둘 중 하나라도 있으면 A tier가 관측을 소유한다. 다른 class로 **명시적으로** 풀린
+    # A는 이 class의 구조적 존재가 아니다 — 그것까지 세면 무관한 class 때문에 전부 막힌다.
+    a_for_class = [row for row in mine if row["concept_tier"] == "A"]
+    a_unattributable = [
+        row for row in scope if row["concept_tier"] == "A" and row["class_id"] is None
+    ]
+
+    if a_for_class or a_unattributable:
+        usable = [
+            row for row in a_for_class if row["mapping_status"] == "RESOLVED"
+        ]
+        if not usable:
+            # 모호하거나 이 class로 귀속되지 않는 A는 B로 내려가는 근거가 되지 않는다.
+            detail = (
+                "이 class의 A가 전부 모호/사용불가하다"
+                if a_for_class
+                else f"class를 확정하지 못한 fresh A가 {len(a_unattributable)}건 있다"
+            )
+            return ShareResolution(
+                class_id, issuer_id, PATH_MISSING, None, None, None, None,
+                REGIME_UNRESOLVED, "NOT_SEARCHED",
+                f"{detail} — 하위 tier로 내려가지 않는다",
+            )
+        path = PATH_A
     else:
-        active_tier, pool, path = "B", [r for r in rows if r["concept_tier"] == "B"], PATH_B
-    if not pool:
-        return ShareResolution(
-            class_id, issuer_id, PATH_MISSING, None, None, None, None,
-            NO_CANDIDATE, "NOT_SEARCHED", f"{active_tier} tier 후보가 없다",
-        )
-
-    usable = [row for row in pool if row["mapping_status"] == "RESOLVED"]
-    if not usable:
-        # 모호하거나 쓸 수 없는 A는 B로 내려가는 근거가 되지 않는다.
-        return ShareResolution(
-            class_id, issuer_id, PATH_MISSING, None, None, None, None,
-            REGIME_UNRESOLVED, "NOT_SEARCHED",
-            f"{active_tier} tier 후보가 전부 모호/사용불가라 하위 tier로 내려가지 않는다",
-        )
+        usable = [
+            row
+            for row in mine
+            if row["concept_tier"] == "B" and row["mapping_status"] == "RESOLVED"
+        ]
+        if not usable:
+            return ShareResolution(
+                class_id, issuer_id, PATH_MISSING, None, None, None, None,
+                NO_CANDIDATE, "NOT_SEARCHED", "S1 창 안에 쓸 수 있는 후보가 없다",
+            )
+        path = PATH_B
 
     last_coverage = "NOT_SEARCHED"
     last_reason = None

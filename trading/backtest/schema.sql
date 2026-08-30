@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS qv_issuers (
   cik TEXT NOT NULL
     CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
   resolution_method TEXT NOT NULL CHECK (length(trim(resolution_method)) > 0),
+  usable_from_session TEXT NOT NULL
+    CHECK (usable_from_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   source TEXT NOT NULL,
   source_version TEXT NOT NULL,
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
@@ -427,7 +429,7 @@ CREATE TABLE IF NOT EXISTS qv_accounting_filings (
 -- 파생하며 손으로 덮어쓰지 않는다. CORROBORATING은 사용 가능 시점을 늦추지 않는다.
 CREATE TABLE IF NOT EXISTS qv_identity_evidence (
   relation_kind TEXT NOT NULL CHECK (relation_kind IN (
-    'SHARE_CLASS', 'XBRL_ALIAS', 'PROSE_ALIAS', 'CONVERSION_RELATION')),
+    'ISSUER', 'SHARE_CLASS', 'XBRL_ALIAS', 'PROSE_ALIAS', 'CONVERSION_RELATION')),
   relation_key TEXT NOT NULL CHECK (length(trim(relation_key)) > 0),
   evidence_ordinal INTEGER NOT NULL CHECK (evidence_ordinal >= 0),
   source_kind TEXT NOT NULL CHECK (source_kind IN ('KQ_FILING', 'SEC_EVIDENCE_DOCUMENT')),
@@ -579,11 +581,15 @@ CREATE TABLE IF NOT EXISTS qv_share_basis_searches (
   coverage TEXT NOT NULL CHECK (coverage IN ('NOT_SEARCHED', 'COMPLETE', 'INCOMPLETE')),
   incomplete_reason TEXT,
   searched_accessions TEXT NOT NULL,
+  processed_accessions TEXT,
+  failed_accessions TEXT,
   source TEXT NOT NULL,
   source_version TEXT NOT NULL,
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
   PRIMARY KEY (cik, anchor_accession, valuation_date, formation_session, source_version),
   CHECK (coverage <> 'COMPLETE' OR closure_accession IS NOT NULL),
+  -- metadata만으로 COMPLETE가 될 수 없다. 실제 문서 처리 증명이 있어야 한다.
+  CHECK (coverage <> 'COMPLETE' OR processed_accessions IS NOT NULL),
   CHECK (coverage <> 'INCOMPLETE' OR incomplete_reason IS NOT NULL)
 ) WITHOUT ROWID;
 
@@ -734,6 +740,7 @@ CREATE TABLE IF NOT EXISTS qv_class_valuation_resolutions (
     'NOT_REQUIRED', 'CONFIRMED', 'UNRESOLVED')),
   amendment_search_status TEXT NOT NULL CHECK (amendment_search_status IN (
     'NOT_REQUIRED', 'COMPLETE', 'UNRESOLVED')),
+  amendment_searched_accessions TEXT,
   evidence_cutoff_session TEXT,
   missing_reason TEXT,
   source TEXT NOT NULL,
@@ -754,6 +761,7 @@ CREATE TABLE IF NOT EXISTS qv_class_valuation_resolutions (
       AND c3_pre_accession IS NOT NULL AND c3_post_accession IS NOT NULL
       AND continuity_status = 'CONFIRMED'
       AND amendment_search_status = 'COMPLETE'
+      AND amendment_searched_accessions IS NOT NULL
       AND missing_reason IS NULL)
     OR
     (valuation_method = 'MISSING' AND missing_reason IS NOT NULL

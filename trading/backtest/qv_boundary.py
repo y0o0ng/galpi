@@ -58,41 +58,52 @@ def resolve_market_boundary(
     calendar_source: str,
     calendar_source_version: str,
 ) -> MarketBoundary:
-    """상장 class의 시장 경계를 정한다.
+    """확인된 SEC 사건 **하나**에 대응하는 상장 시장 경계를 정한다.
 
-    1. 그 class 자신의 상장 심볼 vendor split date -> 같은 날짜 이상 첫 정규 세션
-    2. explicit SEC TRADING_SPLIT_ADJUSTED는 corroborate하고, vendor가 없으면 fallback
-    3. 둘 다 없으면 UNRESOLVED
-    4. 둘이 충돌하면 UNRESOLVED
+    vendor row가 그 사건의 것임을 증명해야 한다. "formation 이전 마지막 split"을
+    묵시적 연결 규칙으로 쓰지 않는다.
+
+    연결이 성립하는 경우는 둘뿐이다.
+
+    1. PIT scope 안 vendor row가 **정확히 하나**다 — 후보가 하나뿐이라 모호하지 않다.
+    2. explicit SEC `TRADING_SPLIT_ADJUSTED`가 vendor row 하나와 **정확히 일치**한다.
+
+    그 밖에는 `UNRESOLVED`다. ±N일도 가격 tolerance도 비율 추정도 쓰지 않는다.
     """
     rows = connection.execute(
         "SELECT split_date FROM qv_vendor_split_events"
         " WHERE symbol = ? AND source_version = ? AND split_date <= ?"
-        " ORDER BY split_date DESC",
+        " ORDER BY split_date, raw_split",
         (symbol, vendor_source_version, formation_session),
     ).fetchall()
-    vendor_date = rows[0]["split_date"] if rows else None
+    candidates = sorted({row["split_date"] for row in rows})
 
-    if vendor_date is None and sec_trading_date is None:
-        return MarketBoundary(
-            UNRESOLVED, None, None, None, "NONE",
-            "vendor split도 explicit SEC TRADING_SPLIT_ADJUSTED도 없다",
-        )
-
-    if vendor_date is not None and sec_trading_date is not None:
-        if vendor_date != sec_trading_date:
+    if not candidates:
+        if sec_trading_date is None:
             return MarketBoundary(
-                UNRESOLVED, None, vendor_date, sec_trading_date, "CONFLICT",
-                f"vendor({vendor_date})와 SEC trading({sec_trading_date}) 경계가 다르다",
+                UNRESOLVED, None, None, None, "NONE",
+                "vendor split도 explicit SEC TRADING_SPLIT_ADJUSTED도 없다",
             )
-        basis = "VENDOR_CORROBORATED"
-        calendar_date = vendor_date
-    elif vendor_date is not None:
-        basis = "VENDOR"
-        calendar_date = vendor_date
+        basis, vendor_date, calendar_date = "SEC_TRADING_FALLBACK", None, sec_trading_date
+    elif sec_trading_date is not None:
+        matched = [date for date in candidates if date == sec_trading_date]
+        if not matched:
+            return MarketBoundary(
+                UNRESOLVED, None, candidates[-1], sec_trading_date, "CONFLICT",
+                f"explicit SEC trading({sec_trading_date})과 일치하는 vendor row가 없다"
+                f" (후보 {candidates})",
+            )
+        basis, vendor_date, calendar_date = (
+            "VENDOR_CORROBORATED", matched[0], matched[0]
+        )
+    elif len(candidates) == 1:
+        basis, vendor_date, calendar_date = "VENDOR", candidates[0], candidates[0]
     else:
-        basis = "SEC_TRADING_FALLBACK"
-        calendar_date = sec_trading_date
+        return MarketBoundary(
+            UNRESOLVED, None, None, None, "AMBIGUOUS_VENDOR",
+            "이 사건에 대응하는 vendor split row를 유일하게 정할 수 없다"
+            f" (후보 {candidates}) — explicit SEC TRADING_SPLIT_ADJUSTED가 없다",
+        )
 
     session = first_session_on_or_after(
         connection, calendar_date, calendar_source, calendar_source_version

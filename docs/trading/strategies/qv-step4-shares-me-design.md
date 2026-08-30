@@ -77,6 +77,11 @@ usable_from_session = max(REQUIRED 증거 전부의 PIT usable session)
 **손으로 넣은 `usable_from_session`은 거부한다** — 파생값을 덮어쓰지 못한다.
 REQUIRED 증거를 원장에서 못 풀면 그 매핑은 조용히 materialize되지 않는다.
 
+**issuer 매핑도 예외가 아니다.** `issuers.jsonl` 행 역시 같은 구조화 증거를 들고
+`usable_from_session`을 REQUIRED 증거에서 파생한다. `qv_issuers`는 그 값을 컬럼으로
+갖고, PIT 문맥의 `get_issuer` / `get_issuer_by_cik`는 그 시점에 아직 못 쓰는 매핑을
+보여주지 않는다. **현재 `securities`/ticker 이력을 issuer 증거로 쓰지 않는다.**
+
 ### 1.3 economic validity vs knowledge availability
 
 ```text
@@ -269,6 +274,13 @@ NOT_SEARCHED | COMPLETE | INCOMPLETE
 - **amendment는 증거이지만 절대 closing filing G가 될 수 없다**
 - 완전 탐색에 필요한 문서가 없거나 실패하면 `INCOMPLETE`
 
+> **metadata closure만으로 `COMPLETE`가 되지 않는다.** 구간 안 모든 필수 accession이
+> **실제로 읽히고 discovery/extraction을 통과했다는 증명**(`processed_accessions`)이
+> 있어야 하고, 필요한 문서를 하나라도 못 읽으면(`failed_accessions`) `INCOMPLETE`다.
+> 저장 경계(`store_search`)가 이 불변식을 강제하므로 처리 증명 없는 `COMPLETE`는
+> 영속화되지 않는다. production 경로는 `run_share_basis_search`이고 문서 획득은
+> 호출자의 loader가 맡는다 — 범용 SEC 크롤러를 만들지 않는다.
+
 **`COMPLETE + 사건 없음`은 "basis 변경이 발견되지 않았다"로 유효하고,
 `INCOMPLETE + 후보 없음`과 같지 않다.**
 
@@ -324,6 +336,23 @@ basis를 바꾸지 않는다는 명시 SEC 증거**다. 침묵 · 후보 없음 
 vendor split 데이터 · 가격 패턴 · 주식수 도약 · 형제 class 거동에서 **추론되지 않는다.**
 **manual issuer/year override는 없다.**
 
+> **형제가 긍정으로 지목됐다는 사실은 negative 증거가 아니다.**
+> `20-for-one split on each share of Class A stock`는 그 자체로
+> `Class B의 share-unit basis가 바뀌지 않았다`를 증명하지 않는다. 공시가 다른 class를
+> 지목했을 뿐 대상 class에 대해 아무 말도 하지 않으면 **`UNRESOLVED`다.**
+>
+> 명시 부정 표현은 **문법 방향으로 두 family**를 둔다. 실제 공시가 두 모양을 다 쓴다.
+>
+> ```text
+> OBJECT형  "The Class B stock split had no effect on ... Class A common shares"
+>           -> 영향받지 않는 class가 표현 뒤에 온다
+> SUBJECT형 "Holders of class B and C common stock did not receive a stock dividend"
+>           -> 영향받지 않는 class가 표현 앞에 온다
+> ```
+>
+> 목록에 없는 표현은 negative 증거가 아니고 점수를 매기지 않는다. 같은 이름이 긍정·부정
+> 양쪽에 걸리면 그 class는 결정되지 않는다.
+
 ---
 
 ## 6. share-side 날짜 + 상장 market boundary
@@ -343,6 +372,11 @@ EFFECTIVE | DISTRIBUTION(PAYMENT)
 
 - 1차: 그 class 자신의 상장 심볼 vendor split date → 같은 달력일 이상 첫 정규 세션
 - vendor split date 자체가 formation까지 **available**해야 한다
+- **그 vendor row가 지금 평가 중인 확인된 SEC 사건의 것이어야 한다.**
+  `formation 이전 마지막 split`을 묵시적 연결 규칙으로 쓰지 않는다. 연결이 성립하는
+  경우는 둘뿐이다 — PIT scope 안 후보가 **정확히 하나**이거나, explicit SEC
+  `TRADING_SPLIT_ADJUSTED`가 후보 하나와 **정확히 일치**할 때다. 그 밖에는
+  `UNRESOLVED`이고 새 매칭 휴리스틱을 만들지 않는다
 - explicit SEC `TRADING_SPLIT_ADJUSTED`는 corroborate한다
 - vendor 증거가 없으면 explicit SEC `TRADING_SPLIT_ADJUSTED`가 fallback이다
 - 둘 다 없으면 `UNRESOLVED`
@@ -386,6 +420,13 @@ B = dei:EntityCommonStockSharesOutstanding
 **모호하거나 쓸 수 없는 A는 B fallback을 허용하지 않는다.**
 **fresh A가 구조적으로 없을 때만** B를 본다. 이 구분은 mandatory다.
 
+> **구조적 존재 판정은 class 해석 실패보다 먼저 온다.** 후보를 `class_id`로 먼저 거르면
+> D0/alias 해석에 실패해 `class_id`가 NULL인 fresh A가 시야에서 사라지고 선택기가 B로
+> 내려간다 — 그것이 정확히 금지된 fallback이다. 따라서 scope는 issuer(CIK) 단위로 읽고,
+> **이 class로 풀린 A**와 **아직 어느 class인지 모르는 A** 둘 중 하나라도 있으면 A tier가
+> 소유한다. **다른 class로 명시적으로 풀린 A는 이 class의 구조적 존재가 아니다** —
+> 그것까지 세면 무관한 class 때문에 전부 막힌다.
+
 **same-regime 판정** — 후보 filing의 basis에서 D까지
 
 ```text
@@ -418,6 +459,11 @@ COMPLETE + 미해결/변경 없음     -> same regime
 보존: subject class · listed reference class · **정확한 양수 수치 비율(lossless
 Decimal 표현)** · legal `effective_from`/`effective_to` · SEC 증거 ·
 증거 usability/provenance · source/source_version.
+
+**`usable_from_session`은 호출자가 넣는 값이 아니다.** canonical SEC 증거(S0/S1/S2)의
+REQUIRED 항목에서 파생하고, 증거는 `qv_identity_evidence`에
+`relation_kind = CONVERSION_RELATION`으로 남는다. 전환 관계를 네 파일 identity
+manifest에 넣지 않고 범용 증거 창고도 만들지 않는다.
 
 **자격**
 
@@ -457,6 +503,11 @@ checkpoint 사이의 amendment 후보는 **전수 탐색**한다(CLOSED된 SEC a
 **미해결 amendment 후보가 하나라도 있으면 continuity unresolved다.**
 **amendment가 발견되지 않았다는 것 자체는 closure가 아니다.**
 
+> 그래서 continuity는 **명시적 탐색 receipt**를 요구한다. `AmendmentSearch.coverage`가
+> `COMPLETE`일 때만 확인될 수 있고, `NOT_SEARCHED`/`INCOMPLETE`/부재는 전부
+> `UNRESOLVED`다. **빈 Python 목록에서 COMPLETE를 추론하지 않는다.** 탐색한 accession은
+> `qv_class_valuation_resolutions.amendment_searched_accessions`에 남는다.
+
 **나중 filing이 더 이른 formation을 backfill하지 못한다.**
 historical formation은 **항상** C3 bracket을 요구한다.
 **"오늘 보기에 유효해 보인다"는 이유로 `effective_to = NULL`을 historical 증명으로
@@ -476,6 +527,10 @@ OBSERVED_MARKET_PRICE | CONVERSION_VALUE_PROXY | MISSING
 - **상장 ordinary class** → `OBSERVED_MARKET_PRICE`, 자기 December D raw close
 - **자격 있는 비상장 class** → `CONVERSION_VALUE_PROXY`,
   `subject shares × 확인된 고정 비율 × reference listed class의 D raw close`
+
+**reference listed class도 PIT를 통과해야 한다** — actual ordinary common · D에 활성 ·
+같은 issuer · **identity가 formation 시점에 usable**. 하나라도 아니면 그 formation의
+valuation은 `MISSING`이다. subject만 PIT로 보고 reference를 그냥 받으면 lookahead가 열린다.
 
 보존: 선택된 관계(proxy일 때) · C3 pre/post checkpoint · amendment 탐색/continuity 상태 ·
 증거 cutoff · 가격/reference provenance · missing 사유 · source versions.
