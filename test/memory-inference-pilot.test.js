@@ -460,6 +460,46 @@ test('result envelope rejects collapsed direct-task and selective-policy outcome
   );
 });
 
+test('LOCAL_FIRST local success requires direct success but escalation success does not', () => {
+  assert.throws(
+    () => validatePilotResult(pilotResult(POLICY_TYPES.LOCAL_FIRST, EXECUTOR_TYPES.LOCAL, {
+      directResult: taskResult(EXECUTOR_TYPES.LOCAL, {
+        taskOutcome: TASK_OUTCOMES.FAILURE,
+      }),
+      policyOutcome: POLICY_OUTCOMES.SUCCESS,
+    })),
+    /direct taskOutcome=SUCCESS/,
+  );
+
+  assert.equal(
+    validatePilotResult(pilotResult(POLICY_TYPES.LOCAL_FIRST, EXECUTOR_TYPES.LOCAL, {
+      directResult: taskResult(EXECUTOR_TYPES.LOCAL, {
+        taskOutcome: TASK_OUTCOMES.SUCCESS,
+      }),
+      policyOutcome: POLICY_OUTCOMES.SUCCESS,
+    })).policyOutcome,
+    POLICY_OUTCOMES.SUCCESS,
+  );
+
+  const escalated = validatePilotResult(pilotResult(
+    POLICY_TYPES.LOCAL_FIRST,
+    EXECUTOR_TYPES.LOCAL,
+    {
+      directResult: taskResult(EXECUTOR_TYPES.LOCAL, {
+        taskOutcome: TASK_OUTCOMES.FAILURE,
+      }),
+      escalation: {
+        decision: ESCALATION_DECISIONS.ESCALATED,
+        reasonCode: ESCALATION_REASONS.AMBIGUITY,
+        result: taskResult(EXECUTOR_TYPES.CLOUD),
+      },
+      policyOutcome: POLICY_OUTCOMES.SUCCESS,
+    },
+  ));
+  assert.equal(escalated.directResult.taskOutcome, TASK_OUTCOMES.FAILURE);
+  assert.equal(escalated.policyOutcome, POLICY_OUTCOMES.SUCCESS);
+});
+
 test('deterministic-control registry supports registered and NONE_JUSTIFIED definitions', () => {
   const registry = createControlRegistry([
     {
