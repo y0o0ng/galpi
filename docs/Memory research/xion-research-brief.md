@@ -10,7 +10,7 @@ The system already runs continuously on a Raspberry Pi and is accessed privately
 
 I am now designing and evaluating a new long-term memory architecture for XION. Alongside that work, I want to study a practical systems question:
 
-> **How much of a persistent personal AI workload can small local models handle efficiently before work should be escalated to stronger cloud models?**
+> **Can small local models serve as an always-on processing layer for recurring memory workloads, with harder or higher-risk cases selectively escalated to cloud models?**
 
 The goal is not to build a local chatbot benchmark. The goal is to evaluate local AI as a **continuous memory-compute layer** inside an AI system that is already used in daily life.
 

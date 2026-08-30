@@ -93,7 +93,7 @@ These layers are a planned architecture, not a claim about deployed Galpi. The c
 
 **Current production:** persistent chat and bounded retrieval, Codex-assisted knowledge organization, tasks and reminders, half-duplex voice, attachments and library documents, paper retrieval, bounded tools, and a native Raspberry Pi deployment.
 
-**Memory research:** R2 semantic design is complete, while R3 feasibility and instrumentation validation remains active. The later architecture is not yet claimed as implemented.
+**Current focus:** empirical validation of XION's next-generation memory architecture, alongside a study of whether small local models can serve as an always-on memory-processing layer with selective cloud escalation. The later architecture is not yet claimed as implemented.
 
 Galpi is under active development and is primarily built for personal use. Detailed state and next work live in [`docs/roadmap.md`](docs/roadmap.md).
 

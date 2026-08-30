@@ -78,8 +78,9 @@ identifier and relevant reasoning/settings must be snapshotted at
 experiment time. Cloud output is a comparison arm, **not ground truth**.
 Semantic gold labels come from human adjudication; deterministic or
 programmatic gold is used where the task permits it. A stronger
-secondary cloud model may be used on disagreement or high-risk subsets
-when useful, but is not required on every case.
+secondary cloud model may flag possible disagreements or assist review
+on high-risk subsets when useful, but is not required on every case and
+does not become ground truth.
 
 ## 3. Non-goals and Fixed Contracts
 
@@ -278,19 +279,37 @@ useful memory formation.
 
 ### 6.2 Runtime and coexistence
 
-Measure where meaningful:
+Runtime criteria depend on the workload's execution semantics.
 
--   end-to-end task latency, including preprocessing and validation;
--   time to first response/token when it materially affects the
-    workload;
--   generation throughput when generation is a meaningful component;
--   model load and residency cost;
--   peak and steady RAM/VRAM/shared-memory use;
--   swap or memory-pressure behavior;
--   concurrent impact on normal Galpi service latency and stability.
+For latency-sensitive synchronous work, measure end-to-end task latency,
+including preprocessing and validation, and p95 latency. Time to first
+response/token may also be primary when it materially affects the
+workload.
+
+For asynchronous or background work, measure:
+
+-   the workload deadline or maximum useful completion window;
+-   time to completion;
+-   queue wait time where applicable;
+-   queue throughput and drain rate;
+-   backlog growth under a sustained realistic arrival rate;
+-   coexistence impact on normal Galpi operation.
+
+Across both classes, measure generation throughput when generation is a
+meaningful component, model load and residency cost, peak and steady
+RAM/VRAM/shared-memory use, swap or memory-pressure behavior, and
+concurrent impact on normal Galpi service latency and stability.
 
 A model that is fast in isolation but materially degrades the persistent
 assistant is not an always-on success.
+
+A background task is not automatically worse because it takes longer in
+wall-clock time. It remains operationally acceptable when it comfortably
+meets its workload deadline, drains at least as fast as realistic work
+arrives, does not accumulate backlog, and does not materially harm normal
+Galpi operation. Numerical latency, deadline, queue, and coexistence
+thresholds remain **OPEN** during pilot calibration and must be frozen
+before held-out full evaluation.
 
 ### 6.3 System value
 
@@ -299,7 +318,8 @@ For each policy and workload, report:
 -   fraction completed locally;
 -   escalation rate, escalation recall where applicable, and escalation
     reasons;
--   workload-frequency-weighted local completion;
+-   workload-frequency-weighted local completion using observed
+    incidence under the contract in Section 8.2;
 -   counterfactual cloud calls avoided during shadow/pilot evaluation;
 -   estimated cloud cost avoided;
 -   quality change versus CLOUD-ONLY and adjudicated gold;
@@ -329,7 +349,8 @@ A candidate always-on node must provide:
 1.  **Usable memory headroom** sufficient for the smallest-sufficient
     quantized model, runtime/KV working memory, and normal Galpi
     services without sustained swap.
-2.  **Task latency** that meets workload-specific p95 targets
+2.  **Workload-specific runtime behavior** that meets synchronous p95
+    targets or background completion, queue-drain, and backlog criteria
     established from pilot observations.
 3.  **Acceptable residency behavior**, so repeated model reloads do not
     erase the operational benefit.
@@ -343,8 +364,8 @@ A candidate always-on node must provide:
     model/runtime path actually supports that accelerator efficiently.
 
 The full experiment should translate these into numerical requirements
-only after the smallest-sufficient model class and task latency envelope
-are known.
+only after the smallest-sufficient model class and workload-specific
+runtime envelope are known.
 
 ## 8. Pilot Design
 
@@ -382,10 +403,78 @@ ambiguous/adjudication-needed rather than forcing a single answer.
 Programmatic checks should validate schema, source grounding, allowed
 labels, and other deterministic constraints.
 
-### 8.2 Execution controls
+Primary human adjudication remains authoritative where deterministic or
+programmatic gold is unavailable. Boundary, high-risk, ambiguous, and a
+sample of ordinary cases should receive a blind second-pass review where
+practical; the second pass must not expose the first label. Record
+disagreements explicitly and resolve them by reviewing the underlying
+evidence. A stronger cloud model may flag possible disagreements or
+assist that review, but its suggestions never overwrite human labels
+automatically and never become ground truth. Report adjudication
+disagreement and revision rates where sample size permits. Cases that
+remain intrinsically ambiguous may retain `AMBIGUOUS` or
+`ADJUDICATION_NEEDED` rather than being forced into a binary label.
+
+### 8.2 Workload-frequency observation contract
+
+Before making system-value claims, the study must estimate the real XION
+occurrence rate of each eligible workload. Synthetic calibration balance
+and replay-set composition measure evaluation coverage; they **MUST NOT**
+be used as workload-frequency weights for local completion, cloud
+reduction, cost, or study-level value claims. Those weights come from
+observed XION workload incidence under a defined observation contract.
+
+For each workload, that contract must record:
+
+-   the workload classification and version, plus occurrence count by
+    workload type;
+-   the observation window with exact start and end boundaries and any
+    known gaps or coverage changes;
+-   eligible opportunities separately from model calls that were
+    actually executed;
+-   cases rejected by existing hard gates separately from cases eligible
+    for local inference;
+-   a per-day or otherwise justified normalized occurrence rate and the
+    distribution across days, rather than only one aggregate mean;
+-   a content-safe event or trace reference sufficient to map an
+    observation back to its workload classification without exposing
+    private raw content;
+-   observed production frequency separately from synthetic or replay
+    evaluation-set composition.
+
+The required observation-window duration is **OPEN** because the current
+evidence does not establish an appropriate duration for these three
+workloads. The duration, coverage rule, and boundaries must be frozen
+before system-value evaluation. If historical telemetry cannot reliably
+reconstruct a workload's occurrence rate, report the estimate as
+`UNAVAILABLE` or `INCOMPLETE` and collect prospective instrumentation;
+do not silently infer production frequency from partial traces or from
+the evaluation set.
+
+### 8.3 Execution controls
 
 All compared configurations receive the same task input and the same
 evidence available under the experiment's point-in-time rules.
+
+Before generative-model evaluation, each pilot workload must define the
+cheapest reasonable non-generative or specialized control when one
+exists. The control should be the simplest plausible alternative for the
+task, such as deterministic parsing/schema validation, a rule or
+heuristic classifier, existing Galpi deterministic logic, an
+embedding/similarity method, or a specialized classifier/reranker where
+appropriate. Do not invent an elaborate baseline merely to create
+competition. If no meaningful control exists, record `NONE JUSTIFIED`
+with the reason.
+
+The pilot comparison is therefore the cheapest sufficient method versus
+local generative inference versus the cloud or hybrid policy, not merely
+local LLM versus cloud LLM. A local generative model is useful only if it
+adds value relative to both the primary cloud baseline and the simplest
+sufficient alternative. These controls do not bypass the existing
+deterministic or authority gates, which remain authoritative and run
+before local inference. This requirement does not move retrieval/routing
+into the initial pilot; its existing deterministic/embedding controls
+remain part of Phase 1b.
 
 The harness must record enough metadata to reproduce a result:
 workload/version, case identifier, model/configuration identifier,
@@ -398,7 +487,7 @@ but parser/schema validation outside the model is authoritative. Invalid
 structured output counts as a local failure or escalation trigger;
 constrained decoding is not assumed to make semantic output correct.
 
-### 8.3 Scale probe
+### 8.4 Scale probe
 
 Run the smallest model class first. Advance a workload to the next size
 class only when the smaller class fails a quality, escalation, or
@@ -415,15 +504,18 @@ The pilot should avoid a combinatorial benchmark matrix. The goal is a
 failure boundary and a practical shared deployment candidate, not a
 leaderboard.
 
-### 8.4 Pilot outputs
+### 8.5 Pilot outputs
 
 For each workload, produce:
 
+-   the simplest plausible control, or `NONE JUSTIFIED` with its reason,
+    and its result alongside model policies;
 -   quality and error breakdown by model class;
 -   local completion versus escalation behavior;
--   latency and memory observations;
+-   workload-appropriate runtime and memory observations;
 -   notable failure cases;
--   whether deterministic code is a stronger baseline;
+-   observed workload-frequency coverage, with unavailable or incomplete
+    estimates identified explicitly;
 -   smallest model class worth carrying into the full experiment, if
     any.
 
@@ -435,7 +527,8 @@ Only workloads that survive the pilot proceed.
 
 Before the full experiment begins, the pilot-derived acceptance
 thresholds, prompts/schemas, escalation rules, eligible workload set,
-and candidate configurations used for final judgment must be frozen.
+workload-frequency observation contract, and candidate configurations
+used for final judgment must be frozen.
 
 The full experiment should compare CLOUD-ONLY, LOCAL-ONLY, and
 LOCAL-FIRST + SELECTIVE CLOUD ESCALATION on a larger private replay set
@@ -444,8 +537,9 @@ thresholds, workload eligibility, or escalation rules.
 
 The primary cloud baseline is the production XION cloud model
 snapshotted at experiment start. Human/programmatic labels remain gold.
-A second stronger cloud model may adjudicate selected disagreements or
-high-risk subsets but should not silently redefine ground truth.
+A second stronger cloud model may flag possible disagreements or assist
+evidence review on selected disagreements or high-risk subsets, but it
+cannot overwrite human labels or become ground truth.
 
 For a viable local size class, run a small cross-family comparison to
 test robustness. Hardware-specific optimized runtimes may then be
@@ -470,9 +564,10 @@ held-out full evaluation** and may not be relaxed or retuned in response
 to full-experiment results.
 
 Study-level acceptance of a local inference layer requires evidence of
-all three: **quality preservation, meaningful
-workload-frequency-weighted cloud reduction, and always-on operational
-feasibility**. No single raw local-completion percentage is sufficient.
+all three: **quality preservation, meaningful cloud reduction weighted
+by observed workload incidence under Section 8.2, and always-on
+operational feasibility**. No single raw local-completion percentage is
+sufficient.
 
 Correct escalation is an intended LOCAL-FIRST outcome. It is evaluated
 as policy success when the case should be escalated, while unnecessary
@@ -528,7 +623,9 @@ convert a contractually high-risk case into a local-only case.
 The following remain empirical and should not be fixed before the pilot:
 
 -   exact quality gates per workload;
--   acceptable p95 latency and concurrent Galpi degradation;
+-   acceptable synchronous p95 latency, background completion deadlines,
+    queue/backlog behavior, and concurrent Galpi degradation;
+-   workload-frequency observation-window duration and coverage rule;
 -   minimum useful local-completion fraction;
 -   acceptable escalation efficiency and minimum required escalation
     recall by workload;
