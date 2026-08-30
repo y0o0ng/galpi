@@ -5597,8 +5597,10 @@ event 후보가 걸리는 **249 observation**에서, `filing acceptance`·`Decem
 3. **BTU가 결정적이다.** SEC는 "completed a **1-for-15 reverse stock split** … **on September 30,
    2015**"로 명시하는데 **vendor `splits` 응답이 빈 배열이고, `bars_daily`의 BTU 시계열조차
    2017-04-03부터 시작한다**(파산·재상장으로 이전 이력이 없다).
-   **→ vendor market boundary가 구조적으로 존재하지 않을 수 있다.** R2 단독이면 무한정
-   unresolved이고, **SEC `TRADING`/`EFFECTIVE` fallback이 있어야 닫힌다.**
+   **→ vendor market boundary가 구조적으로 존재하지 않을 수 있다.**
+   **vendor market boundary가 없을 때 fallback으로 쓸 수 있는 것은 명시된 SEC `TRADING`뿐이다.**
+   **BTU는 `TRADING`이 없고 `EFFECTIVE`만 있으므로 valuation market boundary는 `UNRESOLVED`다.**
+   `EFFECTIVE`는 share-side 날짜이지 raw-price valuation boundary가 아니다(M2·M6).
 4. **SIRI는 별도 diagnostic이다.** 원문이 split이 아니라
    "conversion of Old Sirius shares into SplitCo common stock on a one-for-ten basis"이고
    SEC 날짜 role이 없다. vendor row는 있고 가격도 1/10로 끊긴다.
@@ -5681,11 +5683,22 @@ VALUATION_REGIME_BOUNDARY(listed class, confirmed event)
          PIT 불변식: split_date <= formation 인 row만 본다
       2) SEC 원문이 TRADING_SPLIT_ADJUSTED를 명시하면 corroboration으로 대조한다
          불일치 -> UNRESOLVED
-      3) vendor row가 없으면(BTU형) 명시된 SEC TRADING date로 닫는다
+      3) vendor row가 없으면 명시된 SEC TRADING date로 닫는다
       4) 둘 다 없으면 UNRESOLVED -> fail-close
 
   SEC EFFECTIVE / DISTRIBUTION 을 valuation boundary로 쓰지 않는다.
   그 둘은 share-side 날짜이고 이 표본에서 17건 중 16건이 market boundary와 1~4일 다르다.
+
+  transition safety guard  (D에서 가져온다)
+      share-side transition date = EFFECTIVE, 또는 그 action에 연결된 DISTRIBUTION
+      그것이 명시돼 있고 market boundary와 다를 때,
+      반개구간 [share-side transition, market boundary) 안에
+          share-filing basis anchor  또는  December valuation session
+      이 하나라도 놓이면 same/different regime을 강제로 정하지 않는다
+          -> UNRESOLVED -> fail-close
+
+      DECLARED / RECORD 는 transition endpoint로 쓰지 않는다.
+      임의의 +/-N일 window를 만들지 않는다.
 ```
 
 §19 기준별로 적는다.
@@ -5718,8 +5731,9 @@ share-side 날짜라 §5의 target이 아니고, 게다가 16 event 중 8건에�
 > **다만 D의 아이디어는 버리지 않는다.** M11이 보여주듯 **가장 가까운 endpoint-경계 간격이 5일**이고
 > share-side와 market-side가 1~4일 벌어져 있다. **둘 사이에 endpoint가 떨어지는 관측이 실제로
 > 생기면 C는 답을 하나로 정해버린다.** 그때는 D의 interval fail-close가 옳다.
-> **`[DISTRIBUTION/EFFECTIVE, market boundary]` 구간에 filing acceptance나 December session이
-> 들어오면 `UNRESOLVED`로 두는 안전장치를 C 위에 얹는 것을 권한다** — 이 격자에서 비용이 0이다.
+> **그래서 위 계약에 transition safety guard를 얹었다** — 반개구간
+> `[share-side transition, market boundary)`에 share-filing basis anchor나 December valuation
+> session이 들어오면 `UNRESOLVED`다. 이 격자에서 비용이 0이다.
 
 ### unlisted ordinary class: **B — explicit shared-action reference boundary** (그 외 fail-close)
 
@@ -5764,6 +5778,8 @@ unlisted class의 share-side boundary
 3. **vendor feed는 없을 수 있다.** BTU는 SEC가 `1-for-15 … on September 30, 2015`로 명시하는데
    vendor `splits`가 빈 배열이고 `bars_daily`의 시계열조차 2017년부터다.
    **fallback 없는 vendor 단독 계약은 그런 발행사에서 영구 unresolved다.**
+   **다만 fallback은 명시된 SEC `TRADING`뿐이라, `EFFECTIVE`만 있는 BTU는 그 fallback으로도
+   닫히지 않고 `UNRESOLVED`로 남는다.**
 4. **여유가 5일이다.** M11의 stress 표에서 가장 가까운 endpoint-경계 간격이 NKE 2013의 5일이고,
    SEC와 market의 차이는 1~4일이다. **이 격자에서 정책 간 wrong basis 차이가 0인 것은
    설계의 결과가 아니라 배치의 결과다.**
