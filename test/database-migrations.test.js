@@ -122,6 +122,32 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
   );
   assert.deepEqual(
     db.prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name = 'research_memory_inference_observations'
+    `).get(),
+    { name: 'research_memory_inference_observations' },
+  );
+  db.prepare(`
+    INSERT INTO research_memory_inference_observations (
+      observation_id, workload_type, occurred_at,
+      opportunity, hard_gated, local_eligible, executed,
+      source_event_sha256, ledger_schema_version, instrumentation_version,
+      guard_scope, reason_code
+    ) VALUES (?, 'ambiguity_escalation', 1, 1, 0, 1, 0, ?, 1,
+      'xion-local-memory-inference-p0-v1', 'none', 'none')
+  `).run('a'.repeat(64), 'b'.repeat(64));
+  assert.throws(() => db.prepare(`
+    INSERT INTO research_memory_inference_observations (
+      observation_id, workload_type, occurred_at,
+      opportunity, hard_gated, local_eligible, executed,
+      source_event_sha256, ledger_schema_version, instrumentation_version,
+      guard_scope, reason_code
+    ) VALUES (?, 'retrieval_routing', 1, 1, 0, 1, 0, ?, 1,
+      'xion-local-memory-inference-p0-v1', 'none', 'none')
+  `).run('c'.repeat(64), 'd'.repeat(64)), /CHECK/);
+  assert.deepEqual(
+    db.prepare(`
       SELECT content_sha256 AS contentSha256, indexed_sha256 AS indexedSha256,
              index_status AS indexStatus, ai_readable AS aiReadable,
              owner_agent AS ownerAgent

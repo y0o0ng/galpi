@@ -1,0 +1,95 @@
+{
+  "name": "xion-local-memory-inference-pilot-synthetic-v1",
+  "cases": [
+    {
+      "caseId": "synthetic-extraction-001",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 합성 프로젝트의 검토일을 2030-01-15로 정했다.",
+        "expectedSchema": "synthetic_fact_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2030-01-15"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "synthetic-triage-001",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "합성 대화의 지시 대상이 일시적인지 지속적인지 문맥만으로 정할 수 없다."
+      },
+      "adjudication": {
+        "state": "ADJUDICATION_NEEDED",
+        "primary": null,
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "ADJUDICATION_NEEDED",
+      "hardGateExpectation": {
+        "status": "UNKNOWN",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "synthetic-ambiguity-001",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "동명이인인 두 합성 인물 중 누구를 가리키는지 확인할 수 없다."
+      },
+      "adjudication": {
+        "state": "AMBIGUOUS",
+        "primary": {
+          "source": "HUMAN",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_identity_ambiguity"
+      }
+    }
+  ]
+}

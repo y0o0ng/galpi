@@ -655,3 +655,48 @@ The final architecture may therefore be cloud-centered, local-first,
 mixed by workload, or mostly deterministic. Any of those outcomes is
 acceptable if supported by measured quality, failure modes, operational
 cost, and the existing XION memory contracts.
+
+## Pilot P0 instrumentation implementation
+
+Pilot P0 uses the schema v24 SQLite table
+`research_memory_inference_observations` as a research observation
+ledger. It is telemetry only: it is not memory evidence, derived memory,
+or production decision authority. Rows contain bounded workload and
+gate metadata, timestamps, execution status, versions, and a hash of
+non-content event identifiers. They do not contain user or assistant
+text, memory contents, prompts, extracted facts, or model output.
+
+The prospective production observation point is the automatic derived-
+memory candidate boundary after the chat exchange has been saved.
+Write/no-write triage and ambiguity/escalation are opportunities for
+every ordinary candidate that passes the current production eligibility
+guards. Structured extraction is an opportunity only when the existing
+auto-save classifier already selected the memory-formation/save path;
+NO_WRITE decisions do not create structured-extraction ledger rows.
+Voice auto-save exclusion, schedule candidates, and temporary attachment
+context are recorded as hard-gated triage and ambiguity/escalation
+opportunities with
+`guard_scope=current_production_eligibility`; that label describes the
+current product path and does not promote those guards into permanent
+architecture contracts. Contract-level gate reasons use the separate
+`guard_scope=contract_level` namespace.
+
+Private natural replay files must use the ignored
+`fixtures/local-memory-inference-private*.json` pattern. Repository-
+tracked pilot fixtures are synthetic and are validated separately.
+
+Workload-frequency reporting is read-only and requires an explicit KST
+half-open calendar window:
+
+```bash
+npm run report:memory-inference-pilot -- \
+  --since YYYY-MM-DD --until YYYY-MM-DD
+```
+
+The default report is `INCOMPLETE` because the ledger alone cannot prove
+service/logging coverage or recover failed telemetry writes. It never
+estimates missing incidence, and synthetic/private replay composition is
+never included in observed-production frequency. `COMPLETE` may be
+declared only with an independently reviewed instrumentation-failure
+count. P0 invokes no local model and changes no production memory or
+retrieval decision.

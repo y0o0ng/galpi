@@ -162,6 +162,13 @@ const {
   parseStoredEmbedding,
 } = require('./lib/assistant-retrieval-shadow');
 const {
+  REASON_CODES: MEMORY_INFERENCE_REASON_CODES,
+  candidateBoundaryObservations,
+  createObservationRecorder,
+  hashSourceEvent: hashMemoryInferenceSourceEvent,
+  structuredExtractionObservation,
+} = require('./lib/memory-inference-pilot');
+const {
   compactError,
   createCodexRecoveryRequiredError,
   createCodexStorageError,
@@ -851,6 +858,72 @@ db.exec(`
     active_notes_json TEXT,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
+  CREATE TABLE IF NOT EXISTS research_memory_inference_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    observation_id TEXT NOT NULL UNIQUE CHECK (length(observation_id) = 64),
+    workload_type TEXT NOT NULL CHECK (workload_type IN (
+      'structured_extraction',
+      'write_candidate_triage',
+      'ambiguity_escalation'
+    )),
+    occurred_at INTEGER NOT NULL CHECK (occurred_at >= 0),
+    opportunity INTEGER NOT NULL CHECK (opportunity IN (0, 1)),
+    hard_gated INTEGER NOT NULL CHECK (hard_gated IN (0, 1)),
+    local_eligible INTEGER NOT NULL CHECK (local_eligible IN (0, 1)),
+    executed INTEGER NOT NULL DEFAULT 0 CHECK (executed IN (0, 1)),
+    source_event_sha256 TEXT NOT NULL CHECK (length(source_event_sha256) = 64),
+    ledger_schema_version INTEGER NOT NULL CHECK (ledger_schema_version = 1),
+    instrumentation_version TEXT NOT NULL
+      CHECK (instrumentation_version = 'xion-local-memory-inference-p0-v1'),
+    guard_scope TEXT NOT NULL CHECK (guard_scope IN (
+      'none',
+      'contract_level',
+      'current_production_eligibility'
+    )),
+    reason_code TEXT NOT NULL CHECK (reason_code IN (
+      'none',
+      'current_voice_auto_save_disabled',
+      'current_schedule_candidate',
+      'current_temporary_attachment_context',
+      'contract_explicit_correction',
+      'contract_identity_ambiguity',
+      'contract_core_or_high_impact',
+      'contract_authority_sensitive'
+    )),
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    CHECK (local_eligible = 0 OR (opportunity = 1 AND hard_gated = 0)),
+    CHECK (hard_gated = 0 OR (
+      opportunity = 1
+      AND local_eligible = 0
+      AND guard_scope != 'none'
+      AND reason_code != 'none'
+    )),
+    CHECK (hard_gated = 1 OR guard_scope = 'none'),
+    CHECK (
+      hard_gated = 0
+      OR (
+        guard_scope = 'current_production_eligibility'
+        AND reason_code IN (
+          'current_voice_auto_save_disabled',
+          'current_schedule_candidate',
+          'current_temporary_attachment_context'
+        )
+      )
+      OR (
+        guard_scope = 'contract_level'
+        AND reason_code IN (
+          'contract_explicit_correction',
+          'contract_identity_ambiguity',
+          'contract_core_or_high_impact',
+          'contract_authority_sensitive'
+        )
+      )
+    ),
+    CHECK (
+      hard_gated = 1
+      OR reason_code = 'none'
+    )
+  );
   CREATE TABLE IF NOT EXISTS auto_save_decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT,
@@ -911,6 +984,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_note_chunks_source_assistant ON note_chunks(source_assistant_message);
   CREATE INDEX IF NOT EXISTS idx_note_chunks_source_user ON note_chunks(source_user_message);
   CREATE INDEX IF NOT EXISTS idx_retrieval_shadow_created ON assistant_retrieval_shadow_runs(created_at);
+  CREATE INDEX IF NOT EXISTS idx_memory_inference_observations_time ON research_memory_inference_observations(occurred_at);
+  CREATE INDEX IF NOT EXISTS idx_memory_inference_observations_workload_time ON research_memory_inference_observations(workload_type, occurred_at);
   CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_created ON auto_save_decisions(created_at);
   CREATE INDEX IF NOT EXISTS idx_auto_save_decisions_decision ON auto_save_decisions(decision, reason);
   CREATE INDEX IF NOT EXISTS idx_note_edges_source ON note_edges(source_filename);
@@ -1323,6 +1398,26 @@ const stmtInsertRetrievalShadowRun = db.prepare(`
     @contextChars, @latencyMs, @error, @activeNotesJson
   )
 `);
+const stmtInsertMemoryInferenceObservation = db.prepare(`
+  INSERT INTO research_memory_inference_observations (
+    observation_id, workload_type, occurred_at,
+    opportunity, hard_gated, local_eligible, executed,
+    source_event_sha256, ledger_schema_version, instrumentation_version,
+    guard_scope, reason_code
+  ) VALUES (
+    @observationId, @workloadType, @occurredAt,
+    @opportunity, @hardGated, @localEligible, @executed,
+    @sourceEventSha256, @ledgerSchemaVersion, @instrumentationVersion,
+    @guardScope, @reasonCode
+  )
+  ON CONFLICT(observation_id) DO NOTHING
+`);
+const memoryInferencePilotRecorder = createObservationRecorder({
+  insertObservation: values => stmtInsertMemoryInferenceObservation.run(values),
+  onRecordError: error => console.warn(
+    `local memory inference 관찰 기록 실패: ${error?.code || error?.name || 'UNKNOWN'}`,
+  ),
+});
 const assistantRetrievalShadow = createAssistantRetrievalShadow({
   getChunksByNote: filename => topicChunkStore.listReadyByNote(filename),
   getGlobalChunkCandidates: () => topicChunkStore.listAllReady(),
@@ -2915,7 +3010,47 @@ function autoAppendTopicNote(args) {
   return topicMutations.run(() => autoAppendTopicNoteImpl(args));
 }
 
-async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessageId, assistantMessageId, model, isMemo = false, forceSave = false, webSources = [] }) {
+function observeMemoryInferenceCandidateBoundary({
+  sessionId,
+  userMessageId,
+  assistantMessageId,
+  currentGuardReason,
+}) {
+  try {
+    const occurredAt = Math.floor(Date.now() / 1000);
+    const sourceEventSha256 = hashMemoryInferenceSourceEvent({
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+    });
+    memoryInferencePilotRecorder.recordMany(candidateBoundaryObservations({
+      sourceEventSha256,
+      occurredAt,
+      currentGuardReason,
+    }));
+    return { sourceEventSha256, occurredAt };
+  } catch (error) {
+    console.warn(
+      `local memory inference 관찰 준비 실패: ${error?.code || error?.name || 'UNKNOWN'}`,
+    );
+    return null;
+  }
+}
+
+function observeStructuredExtractionCandidate(pilotObservation) {
+  if (!pilotObservation) return;
+  try {
+    memoryInferencePilotRecorder.record(structuredExtractionObservation({
+      ...pilotObservation,
+    }));
+  } catch (error) {
+    console.warn(
+      `local memory inference extraction 관찰 준비 실패: ${error?.code || error?.name || 'UNKNOWN'}`,
+    );
+  }
+}
+
+async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessageId, assistantMessageId, model, isMemo = false, forceSave = false, webSources = [], pilotObservation = null }) {
   if (forceSave && assistantMessageId) {
     const saved = getSavedNoteByMessageId(assistantMessageId);
     if (saved) return { ...saved, duplicate: true };
@@ -2924,6 +3059,7 @@ async function autoAppendTopicNoteImpl({ question, answer, sessionId, userMessag
   let classification = { save: true, reason: isMemo ? 'manual_memo' : 'manual_save' };
   if (!isMemo && !forceSave) {
     classification = classifyAutoSaveValue(question, answer);
+    if (classification.save) observeStructuredExtractionCandidate(pilotObservation);
     if (!classification.save) {
       logAutoSaveDecision({
         sessionId, userMessageId, assistantMessageId, model,
@@ -4265,6 +4401,19 @@ async function runSingleChatTurnBody({
     // 이미지는 도구를 거치지 않고 바로 입력에 실리므로 따로 확인한다.
     const hasTemporaryAttachmentContext = attachmentToolSession.hasTemporaryCandidates
       || attachmentImages.hasTemporaryImages({ sessionId, attachmentIds });
+    const currentMemoryInferenceGuardReason = scheduleCandidate
+      ? MEMORY_INFERENCE_REASON_CODES.CURRENT_SCHEDULE_CANDIDATE
+      : !allowAutoTopic
+        ? MEMORY_INFERENCE_REASON_CODES.CURRENT_VOICE_AUTO_SAVE_DISABLED
+        : hasTemporaryAttachmentContext
+          ? MEMORY_INFERENCE_REASON_CODES.CURRENT_TEMPORARY_ATTACHMENT_CONTEXT
+          : MEMORY_INFERENCE_REASON_CODES.NONE;
+    const pilotObservation = observeMemoryInferenceCandidateBoundary({
+      sessionId,
+      userMessageId,
+      assistantMessageId,
+      currentGuardReason: currentMemoryInferenceGuardReason,
+    });
     if (!scheduleCandidate && allowAutoTopic && !hasTemporaryAttachmentContext) {
       autoAppendTopicNote({
         question: message,
@@ -4274,6 +4423,7 @@ async function runSingleChatTurnBody({
         assistantMessageId,
         model: assistantModel,
         webSources: webEvidence?.results || [],
+        pilotObservation,
       }).catch(err => console.warn('자동 토픽 저장 실패:', err.message));
     }
 

@@ -13,6 +13,7 @@ ai-council-vault/
 galpi-vault/
 deploy-backups/
 fixtures/assistant-retrieval-private*.json
+fixtures/local-memory-inference-private*.json
 .playwright-mcp/
 public/lib/icons/Xion/Xion_pet/*.zip
 

@@ -17,6 +17,7 @@
     "eval:retrieval": "node scripts/evaluate-assistant-retrieval.js",
     "eval:mail-fixtures": "node scripts/evaluate-mail-fixtures.js",
     "report:retrieval-shadow": "node scripts/report-retrieval-shadow.js",
+    "report:memory-inference-pilot": "node scripts/report-memory-inference-pilot.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
