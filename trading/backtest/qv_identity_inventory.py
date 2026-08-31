@@ -1,17 +1,26 @@
-"""Step 5A-1 — PIT identity coverage inventory.
+"""Step 5A-1 — **static explicit identity mapping coverage demand** inventory.
 
 한 가지 질문만 결정론적으로 답한다.
 
-> 각 6월 formation에서, PIT S&P 500 구성 종목 중 **명시 QV identity manifest로 이미
-> 풀리는 것**은 무엇이고, 풀리지 않는 것과 모호한 것은 무엇인가?
+> 각 6월 formation에서, PIT S&P 500 구성 종목 중 **선택된 manifest에 명시적 economic
+> share-class/issuer 매핑이 존재하는 것**은 무엇이고, 어떤 것이 5A-2 identity 작업을
+> 필요로 하는가?
 
-**inventory/preflight일 뿐이다.** manifest를 넓히지 않고, SEC 문서를 받지 않으며,
-ME를 계산하지 않고, 어떤 Phase 0 gate도 판정하지 않는다.
+**이것은 PIT identity resolution이 아니다.** 매핑의 **존재/수요**를 재는 것이지 그
+매핑이 과거에 실제로 사용 가능했는지를 재는 것이 아니다.
 
-production identity 정본은 버전 관리되는 manifest와 그것을 materialize한 표뿐이다.
-`securities` · 현재 SEC ticker map · `edgar.resolve_cik` · 회사명 매칭 ·
-`CIK_OVERRIDES` · fuzzy matching · ticker 연속성 추정 · 현재 issuer identity의 과거
-소급은 **여기서 authoritative가 아니다.**
+`usable_from_session` · `resolved_usable_session` · `qv_identity_evidence` ·
+`qv_sec_filings`를 **여기서 보지 않는다.** 그것들은 5A-3이 증거를 materialize한 뒤에야
+존재하고, 그때 Step 4의 PIT 계약이 정본이 된다. 5A-1이 그것에 기대면 순환 의존이 된다 —
+materialize 전에 돌리면 "매핑이 없다"와 "manifest가 아직 DB에 안 들어갔다"를 구분하지
+못한다.
+
+따라서 이 단계는 **manifest 내용에서 직접** 읽는다. `qv_share_classes` /
+`qv_issuers` 행이 하나도 없어도 돌아야 한다.
+
+production 매핑 정본은 네 manifest 파일뿐이다. `securities` · 현재 SEC ticker map ·
+`edgar.resolve_cik` · `CIK_OVERRIDES` · 회사명/fuzzy 매칭 · ticker 연속성 추정 ·
+현재 identity의 과거 소급은 여기서 authoritative가 아니다.
 """
 
 from __future__ import annotations
@@ -19,19 +28,18 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 
-RESOLVED = "RESOLVED"
-MISSING = "MISSING"
-AMBIGUOUS = "AMBIGUOUS"
+# 상태 어휘를 production PIT identity resolution과 **의도적으로 다르게** 둔다.
+MAPPED = "MAPPED"
+UNMAPPED = "UNMAPPED"
+AMBIGUOUS_MAPPING = "AMBIGUOUS_MAPPING"
 
 # 사유는 열거값이다. 자유 문장으로 남기면 나중에 집계할 수 없다.
-NO_CLASS_SEGMENT_FOR_SYMBOL = "NO_CLASS_SEGMENT_FOR_SYMBOL"
+NO_CLASS_MAPPING_FOR_SYMBOL = "NO_CLASS_MAPPING_FOR_SYMBOL"
 CLASS_NOT_ACTIVE_AT_FORMATION = "CLASS_NOT_ACTIVE_AT_FORMATION"
 CLASS_NOT_LISTED_ORDINARY = "CLASS_NOT_LISTED_ORDINARY"
-CLASS_NOT_YET_USABLE = "CLASS_NOT_YET_USABLE"
-ISSUER_MISSING = "ISSUER_MISSING"
-ISSUER_NOT_YET_USABLE = "ISSUER_NOT_YET_USABLE"
-MULTIPLE_CLASS_RESOLUTIONS = "MULTIPLE_CLASS_RESOLUTIONS"
-CONTRADICTORY_IDENTITY_STATE = "CONTRADICTORY_IDENTITY_STATE"
+ISSUER_MAPPING_MISSING = "ISSUER_MAPPING_MISSING"
+MULTIPLE_CLASS_MAPPINGS = "MULTIPLE_CLASS_MAPPINGS"
+CONTRADICTORY_MANIFEST_STATE = "CONTRADICTORY_MANIFEST_STATE"
 
 DEFAULT_REFERENCE_SYMBOL = "SPY"
 
@@ -81,10 +89,10 @@ class FormationSummary:
     formation_year: int
     formation_session: str
     member_count: int
-    resolved_count: int
-    missing_count: int
+    mapped_count: int
+    unmapped_count: int
     ambiguous_count: int
-    resolved_issuer_count: int
+    mapped_issuer_count: int
     multi_security_issuer_count: int
 
     def as_json(self) -> dict:
@@ -92,10 +100,10 @@ class FormationSummary:
             "formation_year": self.formation_year,
             "formation_session": self.formation_session,
             "member_count": self.member_count,
-            "resolved_count": self.resolved_count,
-            "missing_count": self.missing_count,
+            "mapped_count": self.mapped_count,
+            "unmapped_count": self.unmapped_count,
             "ambiguous_count": self.ambiguous_count,
-            "resolved_issuer_count": self.resolved_issuer_count,
+            "mapped_issuer_count": self.mapped_issuer_count,
             "multi_security_issuer_count": self.multi_security_issuer_count,
         }
 
@@ -115,6 +123,12 @@ class Inventory:
     def as_json(self, *, git_commit: str | None = None) -> dict:
         """결정론적 semantic payload. 시각 정보를 넣지 않는다."""
         return {
+            "stage": "5A-1",
+            "measures": "STATIC_MAPPING_COVERAGE_DEMAND",
+            "note": (
+                "static manifest mapping coverage only — not PIT identity usability. "
+                "usable_from_session is materialized in 5A-3."
+            ),
             "starting_git_commit": git_commit,
             "index_name": self.index_name,
             "universe_source": self.universe_source,
@@ -132,14 +146,14 @@ class Inventory:
             "issuer_groups": [item.as_json() for item in self.issuer_groups],
         }
 
-    def unresolved_symbols(self) -> tuple[str, ...]:
-        """formation을 가로질러 한 번이라도 풀리지 않은 심볼."""
+    def mapping_demand_symbols(self) -> tuple[str, ...]:
+        """5A-2가 채워야 할 심볼 — 한 번이라도 `MAPPED`가 아니었던 것."""
         return tuple(
-            sorted({row.symbol for row in self.securities if row.status != RESOLVED})
+            sorted({row.symbol for row in self.securities if row.status != MAPPED})
         )
 
 
-# ── canonical 입력 ────────────────────────────────────────────────────────────
+# ── canonical 입력 (DB) ───────────────────────────────────────────────────────
 
 
 def june_formation_sessions(
@@ -198,37 +212,60 @@ def pit_members(
     return tuple(row["symbol"] for row in rows)
 
 
-# ── 해석 ──────────────────────────────────────────────────────────────────────
+# ── manifest 인덱스 ───────────────────────────────────────────────────────────
 
 
-def resolve_security(
-    connection: sqlite3.Connection,
-    symbol: str,
-    formation_session: str,
-    identity_source_version: str,
+@dataclass(frozen=True)
+class ManifestIndex:
+    """manifest 내용을 심볼 기준으로 한 번만 훑어 만든 조회 구조."""
+
+    identity_source_version: str
+    by_symbol: dict            # symbol -> list[share_class row]
+    class_owners: dict         # class_id -> set[issuer_id]
+    issuer_ids: frozenset
+
+
+def index_manifest(manifest) -> ManifestIndex:
+    """`qv_manifest.load_manifest()`가 돌려준 bundle을 조회용으로 편다."""
+    by_symbol: dict[str, list[dict]] = {}
+    class_owners: dict[str, set[str]] = {}
+    for row in manifest.rows["share_classes.jsonl"]:
+        class_owners.setdefault(row["class_id"], set()).add(row["issuer_id"])
+        symbol = row.get("symbol")
+        if symbol:
+            by_symbol.setdefault(symbol, []).append(row)
+    return ManifestIndex(
+        identity_source_version=manifest.identity_source_version,
+        by_symbol=by_symbol,
+        class_owners=class_owners,
+        issuer_ids=frozenset(
+            row["issuer_id"] for row in manifest.rows["issuers.jsonl"]
+        ),
+    )
+
+
+# ── static 매핑 판정 ──────────────────────────────────────────────────────────
+
+
+def map_security(
+    index: ManifestIndex, symbol: str, formation_session: str
 ) -> SecurityRow:
-    """한 구성 종목이 명시 identity로 풀리는지 본다.
+    """구성 종목 하나에 대한 **static** manifest 매핑을 본다.
 
-    모호한 집합에서 하나를 고르지 않는다. precedence·최신 행 선택·ticker 휴리스틱·
-    수동 override를 쓰지 않는다. 나중에 알게 된 class/issuer를 `usable_from_session`
-    이전에 보이게 하지 않는다.
+    `usable_from_session`을 보지 않는다. 이 단계는 매핑이 **존재하는가**를 재고,
+    그 매핑이 그때 실제로 쓸 수 있었는가는 5A-3이 증거를 materialize한 뒤에 정한다.
+
+    모호한 집합에서 하나를 고르지 않는다.
     """
-    segments = connection.execute(
-        "SELECT class_id, issuer_id, is_listed, is_ordinary_common,"
-        "       effective_from, effective_to, usable_from_session"
-        " FROM qv_share_classes"
-        " WHERE symbol = ? AND source_version = ?"
-        " ORDER BY class_id, effective_from",
-        (symbol, identity_source_version),
-    ).fetchall()
 
     def row(status, class_id, issuer_id, reason):
         return SecurityRow(
             formation_session, symbol, status, class_id, issuer_id, reason
         )
 
+    segments = index.by_symbol.get(symbol, ())
     if not segments:
-        return row(MISSING, None, None, NO_CLASS_SEGMENT_FOR_SYMBOL)
+        return row(UNMAPPED, None, None, NO_CLASS_MAPPING_FOR_SYMBOL)
 
     active = [
         item
@@ -237,57 +274,38 @@ def resolve_security(
         and (item["effective_to"] is None or formation_session < item["effective_to"])
     ]
     if not active:
-        return row(MISSING, None, None, CLASS_NOT_ACTIVE_AT_FORMATION)
+        return row(UNMAPPED, None, None, CLASS_NOT_ACTIVE_AT_FORMATION)
 
-    ordinary_listed = [
-        item
-        for item in active
-        if item["is_listed"] and item["is_ordinary_common"]
+    eligible = [
+        item for item in active if item["is_listed"] and item["is_ordinary_common"]
     ]
-    if not ordinary_listed:
-        return row(MISSING, None, None, CLASS_NOT_LISTED_ORDINARY)
+    if not eligible:
+        return row(UNMAPPED, None, None, CLASS_NOT_LISTED_ORDINARY)
 
-    usable = [
-        item
-        for item in ordinary_listed
-        if item["usable_from_session"] <= formation_session
-    ]
-    if not usable:
-        # 경제적으로는 활성인데 그 시점에 증거가 아직 usable하지 않다.
-        return row(MISSING, None, None, CLASS_NOT_YET_USABLE)
-
-    class_ids = {item["class_id"] for item in usable}
+    class_ids = {item["class_id"] for item in eligible}
     if len(class_ids) > 1:
-        return row(AMBIGUOUS, None, None, MULTIPLE_CLASS_RESOLUTIONS)
-    if len(usable) > 1:
-        # 같은 class_id의 활성 구간이 겹친다. 등록 경로가 막는 상태이므로 fail-close다.
-        return row(AMBIGUOUS, None, None, CONTRADICTORY_IDENTITY_STATE)
+        return row(AMBIGUOUS_MAPPING, None, None, MULTIPLE_CLASS_MAPPINGS)
+    if len(eligible) > 1:
+        # 같은 class_id의 활성 구간이 겹친다. 결정론적 매핑을 세울 수 없다.
+        return row(AMBIGUOUS_MAPPING, None, None, CONTRADICTORY_MANIFEST_STATE)
 
-    selected = usable[0]
+    selected = eligible[0]
     class_id = selected["class_id"]
-    owners = {item["issuer_id"] for item in segments if item["class_id"] == class_id}
+    owners = index.class_owners.get(class_id, set())
     if len(owners) != 1:
-        return row(AMBIGUOUS, class_id, None, CONTRADICTORY_IDENTITY_STATE)
+        return row(AMBIGUOUS_MAPPING, class_id, None, CONTRADICTORY_MANIFEST_STATE)
+
     issuer_id = selected["issuer_id"]
+    if issuer_id not in index.issuer_ids:
+        return row(UNMAPPED, class_id, None, ISSUER_MAPPING_MISSING)
 
-    issuers = connection.execute(
-        "SELECT issuer_id, usable_from_session FROM qv_issuers"
-        " WHERE issuer_id = ? AND source_version = ?",
-        (issuer_id, identity_source_version),
-    ).fetchall()
-    if not issuers:
-        return row(MISSING, class_id, None, ISSUER_MISSING)
-    if len(issuers) > 1:
-        return row(AMBIGUOUS, class_id, None, CONTRADICTORY_IDENTITY_STATE)
-    if issuers[0]["usable_from_session"] > formation_session:
-        return row(MISSING, class_id, None, ISSUER_NOT_YET_USABLE)
-
-    return row(RESOLVED, class_id, issuer_id, RESOLVED)
+    return row(MAPPED, class_id, issuer_id, MAPPED)
 
 
 def build_inventory(
     connection: sqlite3.Connection,
     *,
+    manifest,
     index_name: str,
     universe_source: str,
     universe_source_version: str,
@@ -298,7 +316,19 @@ def build_inventory(
     from_year: int | None = None,
     to_year: int | None = None,
 ) -> Inventory:
-    """formation × PIT 구성 종목 격자를 결정론적으로 훑는다."""
+    """formation × PIT 구성 종목 격자를 manifest 내용으로 훑는다.
+
+    요청된 `identity_source_version`은 실제로 읽은 bundle 해시와 **정확히** 같아야 한다.
+    다르면 fail-close다 — 조용히 다른/현재/최신 manifest를 재지 않는다.
+    """
+    if identity_source_version != manifest.identity_source_version:
+        raise QVInventoryError(
+            "요청한 identity_source_version이 읽은 manifest bundle과 다릅니다: "
+            f"requested={identity_source_version} "
+            f"manifest={manifest.identity_source_version}"
+        )
+    index = index_manifest(manifest)
+
     formations = june_formation_sessions(
         connection,
         calendar_source=calendar_source,
@@ -319,17 +349,14 @@ def build_inventory(
             universe_source=universe_source,
             universe_source_version=universe_source_version,
         )
-        rows = [
-            resolve_security(connection, symbol, session, identity_source_version)
-            for symbol in members
-        ]
+        rows = [map_security(index, symbol, session) for symbol in members]
         security_rows.extend(rows)
 
-        # 같은 issuer가 여러 구성 종목으로 나타나는 것은 identity 오류가 아니다.
+        # 같은 issuer가 여러 구성 종목으로 나타나는 것은 매핑 오류가 아니다.
         # security 행은 그대로 두고 issuer 단위 묶음을 따로 만든다. 순위는 매기지 않는다.
         grouped: dict[str, list[SecurityRow]] = {}
         for item in rows:
-            if item.status != RESOLVED or item.issuer_id is None:
+            if item.status != MAPPED or item.issuer_id is None:
                 continue
             grouped.setdefault(item.issuer_id, []).append(item)
         groups = [
@@ -348,10 +375,12 @@ def build_inventory(
                 formation_year=year,
                 formation_session=session,
                 member_count=len(members),
-                resolved_count=sum(1 for item in rows if item.status == RESOLVED),
-                missing_count=sum(1 for item in rows if item.status == MISSING),
-                ambiguous_count=sum(1 for item in rows if item.status == AMBIGUOUS),
-                resolved_issuer_count=len(groups),
+                mapped_count=sum(1 for item in rows if item.status == MAPPED),
+                unmapped_count=sum(1 for item in rows if item.status == UNMAPPED),
+                ambiguous_count=sum(
+                    1 for item in rows if item.status == AMBIGUOUS_MAPPING
+                ),
+                mapped_issuer_count=len(groups),
                 multi_security_issuer_count=sum(
                     1 for group in groups if len(group.member_symbols) > 1
                 ),
@@ -364,7 +393,7 @@ def build_inventory(
         universe_source_version=universe_source_version,
         calendar_source=calendar_source,
         calendar_source_version=calendar_source_version,
-        identity_source_version=identity_source_version,
+        identity_source_version=manifest.identity_source_version,
         formations=tuple(summaries),
         securities=tuple(
             sorted(security_rows, key=lambda item: (item.formation_session, item.symbol))

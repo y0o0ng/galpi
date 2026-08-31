@@ -1,18 +1,22 @@
-"""Step 5A-1 실행 진입점 — PIT identity coverage inventory.
+"""Step 5A-1 실행 진입점 — static explicit identity mapping coverage demand.
 
-읽기 전용이다. manifest를 넓히지 않고, SEC를 부르지 않으며, ME를 계산하지 않고,
+읽기 전용이다. manifest를 넓히지 않고, SEC를 부르지 않으며, DB를 바꾸지 않고,
 어떤 Phase 0 gate도 판정하지 않는다. 범용 research-run 프레임워크를 만들지 않는다.
+
+**materialize된 QV identity 표를 요구하지 않는다.** 매핑은 repository의 manifest
+파일에서 직접 읽는다 — `qv_share_classes` / `qv_issuers`가 비어 있어도 돌아야 한다.
 
     python3 -m selftest.qv_identity_inventory_run sources
     python3 -m selftest.qv_identity_inventory_run run \
         --index SP500 \
         --universe-source announcements --universe-version eodhd-15y-2026-08 \
         --calendar-source eodhd --calendar-version eodhd-15y-2026-08 \
-        --identity-version qv-identity-sha256:... \
+        [--manifest trading/qv/identity] \
+        [--identity-version qv-identity-sha256:...] \
         [--from-year 2010] [--to-year 2026] [--out /tmp/inventory.json]
 
-`sources`는 어떤 source/version이 있는지만 보여준다. **"최신"을 추측하지 않는다** —
-정하지 못하면 실행하지 않는 것이 맞다.
+`--identity-version`을 주면 읽은 bundle 해시와 **정확히** 같아야 한다. 다르면 멈춘다.
+`sources`는 어떤 source/version이 있는지만 보여준다 — **"최신"을 추측하지 않는다.**
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ if str(TRADING_ROOT) not in sys.path:
 
 from backtest import store  # noqa: E402
 from backtest.qv_identity_inventory import build_inventory  # noqa: E402
+from backtest.qv_manifest import DEFAULT_MANIFEST_DIR, load_manifest  # noqa: E402
 
 
 def _git_commit() -> str | None:
@@ -67,7 +72,13 @@ def stage_sources(connection) -> int:
             f"  {row['source']} / {row['source_version']}"
             f"  sessions={row['n']}  {row['lo']}..{row['hi']}"
         )
-    print("identity (qv_share_classes / qv_issuers):")
+    manifest = load_manifest(DEFAULT_MANIFEST_DIR)
+    print("manifest bundle (5A-1이 실제로 쓰는 것):")
+    print(f"  {DEFAULT_MANIFEST_DIR}")
+    print(f"  {manifest.identity_source_version}")
+    for name, rows in manifest.rows.items():
+        print(f"    {name}: {len(rows)} rows")
+    print("materialized QV identity (진단용 — 5A-1의 전제가 아니다):")
     for table in ("qv_share_classes", "qv_issuers"):
         rows = list(
             connection.execute(
@@ -76,43 +87,48 @@ def stage_sources(connection) -> int:
             )
         )
         if not rows:
-            print(f"  {table}: (비어 있음 — materialize된 manifest 없음)")
+            print(f"  {table}: (비어 있음 — 5A-3에서 채운다)")
         for row in rows:
             print(f"  {table}: {row['source_version']}  rows={row['n']}")
     return 0
 
 
 def stage_run(connection, arguments) -> int:
+    manifest = load_manifest(arguments.manifest or DEFAULT_MANIFEST_DIR)
+    requested = arguments.identity_version or manifest.identity_source_version
     inventory = build_inventory(
         connection,
+        manifest=manifest,
         index_name=arguments.index,
         universe_source=arguments.universe_source,
         universe_source_version=arguments.universe_version,
         calendar_source=arguments.calendar_source,
         calendar_source_version=arguments.calendar_version,
-        identity_source_version=arguments.identity_version,
+        identity_source_version=requested,
         from_year=arguments.from_year,
         to_year=arguments.to_year,
     )
     payload = inventory.as_json(git_commit=_git_commit())
-    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=False)
     if arguments.out:
-        Path(arguments.out).write_text(text + "\n", encoding="utf-8")
+        Path(arguments.out).write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         print(f"wrote {arguments.out}")
+
+    print(f"identity bundle: {inventory.identity_source_version}")
+    print("measures: STATIC mapping coverage demand — NOT PIT identity usability")
     for item in inventory.formations:
         print(
             f"{item.formation_year} {item.formation_session}"
             f"  members={item.member_count}"
-            f"  resolved={item.resolved_count}"
-            f"  missing={item.missing_count}"
+            f"  mapped={item.mapped_count}"
+            f"  unmapped={item.unmapped_count}"
             f"  ambiguous={item.ambiguous_count}"
-            f"  issuers={item.resolved_issuer_count}"
+            f"  issuers={item.mapped_issuer_count}"
             f"  multi_security_issuers={item.multi_security_issuer_count}"
         )
-    unresolved = inventory.unresolved_symbols()
-    print(f"unique unresolved symbols across formations: {len(unresolved)}")
-    if not arguments.out:
-        print("(--out 없이 실행하면 JSON을 파일로 남기지 않는다)")
+    demand = inventory.mapping_demand_symbols()
+    print(f"5A-2 mapping demand (unique symbols not MAPPED): {len(demand)}")
     return 0
 
 
@@ -126,7 +142,8 @@ def main() -> int:
     runner.add_argument("--universe-version", required=True)
     runner.add_argument("--calendar-source", required=True)
     runner.add_argument("--calendar-version", required=True)
-    runner.add_argument("--identity-version", required=True)
+    runner.add_argument("--manifest", default=None)
+    runner.add_argument("--identity-version", default=None)
     runner.add_argument("--from-year", type=int, default=None)
     runner.add_argument("--to-year", type=int, default=None)
     runner.add_argument("--out", default=None)

@@ -851,9 +851,12 @@ concept·value·unit·dimension·raw `decimals`·validation 상태 · preferred�
 > 정의이고, identity manifest · 주식수 관측 · 기업행동 탐색 · 전환 continuity ·
 > ME 산출의 CLOSED 계약은 그 문서에 있다.
 >
-> **Phase 0 실행 순서(5A-1 inventory → 5A-2 manifest 확장 → 5A-3 materialization →
+> **Phase 0 실행 순서(5A-1 static 매핑 수요 inventory → 5A-2 manifest 확장 →
+> 5A-3 evidence ingest·identity materialization·PIT usability·나머지 materialization →
 > 5B snapshot/gate)는 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`다.**
 > 그 문서는 실행 의존 관계만 명시하고 factor 계약과 gate를 바꾸지 않는다.
+> **5A-1은 PIT identity resolution이 아니라 static 매핑 coverage를 잰다** —
+> `usable_from_session`은 5A-3에서 생긴다.
 
 `B/M`의 denominator는 **formation 직전 12월 마지막 거래일의 issuer market equity**를 사용한다.
 
