@@ -1267,6 +1267,49 @@ python3 -m unittest discover -s tests -p "test_*.py"            -> 1472 tests OK
 
 ---
 
+## 10.11 P2 normalized-interval propagation fix receipt — 2026-08-31
+
+10.10이 정규화 구간을 도입했지만 **production 문서 처리 경로가 그것을 추출 층까지
+전파하지 않았다.** `run_share_basis_search()`가 `extract_candidates()`에 정규화되지 않은
+방향값(`interval_lo=anchor`, `interval_hi=D`)을 그대로 넘겼다.
+
+`anchor > D`인 일반적인 결산 이후 filing에서 구간이 뒤집힌다.
+
+```text
+D                 = 2020-12-31
+anchor acceptance = 2021-02-10
+split effective   = 2021-01-15      -- CLOSED 비교 구간 안이다
+
+넘겨진 값          interval_lo=2021-02-10, interval_hi=2020-12-31
+_dispose 판정      EXCLUDED_OUT_OF_WINDOW
+```
+
+**탐색 층은 필요한 10-K를 올바로 읽어오는데 추출 층이 그 사건을 조용히 버렸다.**
+
+수정은 `run_share_basis_search()`에서 기존 `normalized_interval()`로 `low`/`high`를
+구해 모든 `extract_candidates()` 호출에 넘기는 것 하나다. **두 번째 정규화 구현을
+만들지 않았다.** closure G · 필수 accession 범위 · proposal/재공시 규칙 · class 효과
+semantics · A/B tier · selector fallback · 비율 정규화 금지는 전부 그대로다.
+스키마 변경 없음.
+
+### 검증
+
+새 end-to-end regression을 수정 **전** 코드에 돌려 실패를 직접 확인했다.
+
+```text
+AssertionError: 'EXCLUDED_OUT_OF_WINDOW' != 'CURRENT_EVENT'
+```
+
+```text
+python3 -m unittest tests.test_qv_step4 tests.test_qv_identity  -> 138 tests OK
+python3 -m unittest discover -s tests -p "test_*.py"            -> 1474 tests OK
+```
+
+기존 `anchor < D` production-search 테스트는 그대로 남아 있고, 구간 **밖** 사건이
+여전히 `EXCLUDED_OUT_OF_WINDOW`인지도 함께 잠갔다. **Gate C는 판정하지 않는다.**
+
+---
+
 ## 11. 결과
 
 

@@ -734,7 +734,12 @@ def run_share_basis_search(
 
     HTML 본문을 DB에 넣지 않는다. 범용 SEC 크롤러를 만들지 않는다 — 문서 획득은
     호출자의 loader가 맡고 여기서는 처리 완료 여부만 증명한다.
+
+    추출도 **탐색과 같은 정규화 구간**을 쓴다. 방향값을 그대로 넘기면 `anchor > D`에서
+    구간이 뒤집혀, 탐색이 올바로 읽어온 10-K의 사건을 추출 층이 조용히
+    `EXCLUDED_OUT_OF_WINDOW`로 버린다.
     """
+    low, high = normalized_interval(anchor_acceptance_eastern_date, valuation_date)
     _closure, required = required_accessions(
         connection,
         cik=cik,
@@ -762,8 +767,8 @@ def run_share_basis_search(
                         payload,
                         document_name=document_name,
                         document_role=document_role,
-                        interval_lo=anchor_acceptance_eastern_date,
-                        interval_hi=valuation_date,
+                        interval_lo=low,
+                        interval_hi=high,
                     )
                 )
         except Exception as error:  # noqa: BLE001

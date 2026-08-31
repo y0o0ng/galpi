@@ -276,6 +276,10 @@ high = max(anchor acceptance_eastern_date, D)
 `anchor < D`다. 한쪽 방향만 가정하면 반대 방향에서 구간이 뒤집혀 비고, **그 사이 공시를
 하나도 읽지 않은 채 `COMPLETE`가 난다.** `±N일` 같은 여유는 없다.
 
+**이 구간은 탐색뿐 아니라 §5.3의 후보 처분(disposition)까지 그대로 간다.** 추출 층에
+방향값을 그대로 넘기면 탐색이 올바로 읽어온 문서의 사건이 `EXCLUDED_OUT_OF_WINDOW`로
+조용히 버려진다. 정규화는 한 곳(`normalized_interval`)에만 있고 두 층이 그것을 공유한다.
+
 - **closure filing G** = `acceptance_eastern_date >= high`인 **첫 원본** 10-K 또는 10-Q
 - G가 없으면 `INCOMPLETE`
 - G의 acceptance가 formation F보다 늦으면 `INCOMPLETE`

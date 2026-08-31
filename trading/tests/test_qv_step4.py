@@ -1291,6 +1291,87 @@ class EventSearchTest(Step4Fixture, unittest.TestCase):
         ).fetchone()
         self.assertEqual(row["coverage"], "INCOMPLETE")
 
+    def test_production_search_extracts_a_post_year_end_event(self):
+        """anchor > D — 정규화 구간을 추출 층까지 전파해야 한다.
+
+        D(2020-12-31)와 결산 이후 anchor(2021-02-10) 사이에서 발효한 split은
+        CLOSED 비교 구간 안에 있다. 방향값을 그대로 넘기면 구간이 뒤집혀 탐색이
+        올바로 읽어온 10-K의 사건을 추출 층이 EXCLUDED_OUT_OF_WINDOW로 버린다.
+        """
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-000001", form="10-K",
+            acceptance_datetime="2021-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+
+        seen = []
+
+        def loader(accession):
+            seen.append(accession)
+            return [(
+                "d.htm", "PRIMARY",
+                b"<p>On January 11, 2021 the Board of Directors approved a"
+                b" two-for-one stock split of the Company's common stock, which was"
+                b" effected in the form of a 100% stock dividend distributed on"
+                b" January 15, 2021.</p>",
+            )]
+
+        coverage, candidates = qv_events.run_share_basis_search(
+            self.connection, cik=CIK, anchor_accession="0001234567-21-000001",
+            anchor_acceptance_eastern_date="2021-02-10", valuation_date="2020-12-31",
+            formation_session="2021-06-30", filings_source_version=SHARES_VERSION,
+            load_documents=loader, source="qv", source_version=EVENTS_VERSION,
+            provenance="fixture",
+        )
+
+        self.assertEqual(coverage.coverage, "COMPLETE")
+        # 결산 이후 필수 filing이 실제로 처리됐다.
+        self.assertIn("0001234567-21-000001", seen)
+        self.assertIn("0001234567-21-000001", coverage.processed_accessions)
+        self.assertEqual(coverage.interval_lo, "2020-12-31")
+        self.assertEqual(coverage.interval_hi, "2021-02-10")
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate.disposition, "CURRENT_EVENT")
+        self.assertNotEqual(candidate.disposition, "EXCLUDED_OUT_OF_WINDOW")
+        anchored = [
+            (role, date)
+            for role, date in candidate.role_dates
+            if role in ("EFFECTIVE", "DISTRIBUTION")
+        ]
+        self.assertTrue(anchored)
+        for _role, date in anchored:
+            self.assertLess("2020-12-31", date)
+            self.assertLessEqual(date, "2021-02-10")
+
+    def test_production_search_still_excludes_an_event_outside_the_interval(self):
+        """정규화 구간 밖의 명시 사건은 여전히 제외된다."""
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-000001", form="10-K",
+            acceptance_datetime="2021-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+
+        def loader(accession):
+            return [(
+                "d.htm", "PRIMARY",
+                b"<p>On August 31, 2019, the Company effected a four-for-one stock"
+                b" split of its common stock, with an effective date of"
+                b" August 31, 2019.</p>",
+            )]
+
+        coverage, candidates = qv_events.run_share_basis_search(
+            self.connection, cik=CIK, anchor_accession="0001234567-21-000001",
+            anchor_acceptance_eastern_date="2021-02-10", valuation_date="2020-12-31",
+            formation_session="2021-06-30", filings_source_version=SHARES_VERSION,
+            load_documents=loader, source="qv", source_version=EVENTS_VERSION,
+            provenance="fixture",
+        )
+        self.assertEqual(coverage.coverage, "COMPLETE")
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].disposition, "EXCLUDED_OUT_OF_WINDOW")
+
     def test_production_search_path_completes_and_extracts(self):
         seed_filing(
             self.connection, cik=CIK, accession="0001234567-21-00000M", form="10-Q",
