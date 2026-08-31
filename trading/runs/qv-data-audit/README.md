@@ -1419,6 +1419,81 @@ MAPPED 심볼  CMCSA · GOOG · GOOGL · NKE · UA · UAA
 **Gate A~H와 Phase 0는 여전히 평가되지 않았다.** 수익률·B/M·Q/V·랭킹·선택·
 `coverage_start`를 계산하지 않았다.
 
+## 10.13 Step 5A-2a/b pilot receipt — 2026-08-31
+
+**정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`의
+5A-2 절이다.** 이 실행은 **production manifest를 바꾸지 않았다** —
+`trading/qv/identity/*.jsonl`은 읽지도 쓰지도 않았고 자동 승격도 없다.
+어떤 Phase 0 gate도 판정하지 않았다.
+
+**5A-2는 아직 끝나지 않았다.** 이 receipt는 5A-2a/b 구현의 pilot 실행 사실만 적는다.
+
+### 무엇을 확인하려던 실행인가
+
+수요 897개를 다 돌리는 것이 목적이 아니다. **상태 어휘(`AUTO_PROVABLE` /
+`REVIEW_REQUIRED` / `UNRESOLVED`)가 실제 filing에서 옳게 갈리는지**를 보려고 5A-1
+수요에서 서로 다른 모양 다섯 개를 골랐다.
+
+```text
+inventory     5A-1 산출물 (qv-identity-sha256:55ed78d0...372e6ec)
+대상          AAPL  post-2019 단일 class
+              FOXA  다중 class 발행사
+              CELG  2019 이전 표지 · 이후 피인수
+              LEH   CIK/재편 복잡 (CIK_OVERRIDES 고정)
+              ABMD  폐지 구성원
+SEC 호출      31
+```
+
+### 결과
+
+```text
+AUTO_PROVABLE=0  REVIEW_REQUIRED=4  UNRESOLVED=1
+```
+
+| symbol | status | proof accession | 제안 class | reason codes |
+|---|---|---|---|---|
+| AAPL | REVIEW_REQUIRED | 0000320193-26-000013 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON · SIBLING_CLASS_CENSUS_UNCLEAR |
+| FOXA | REVIEW_REQUIRED | 0001628280-26-033172 | 2 | CLASS_INTERVAL_NOT_EXPLICIT |
+| CELG | REVIEW_REQUIRED | 0000816284-19-000031 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE · SYMBOL_NOT_ON_COVER_PAGE |
+| LEH | REVIEW_REQUIRED | (없음) | 0 | DISCOVERY_ONLY_NO_SEC_PROOF · NO_COVER_PAGE_PROOF_DOCUMENT |
+| ABMD | UNRESOLVED | (없음) | 0 | NO_DISCOVERY_CANDIDATE · NO_COVER_PAGE_PROOF_DOCUMENT |
+
+### `AUTO_PROVABLE=0`은 실패가 아니다
+
+**표지는 class의 유효구간을 증명하지 않는다.** 5A-2b는 `effective_from` ·
+`effective_to`를 추론하지 않기로 계약했으므로, 표지만 읽은 제안에는 언제나
+`CLASS_INTERVAL_NOT_EXPLICIT`가 붙는다. 구간 증거는 5A-2c에서 사람이 붙인다.
+
+FOXA가 그 경계를 그대로 보여준다 — 표지가 증명한 것은 전부 깨끗했고
+(`CLASS_CENSUS_COMPLETE`, Class A/FOXA · Class B/FOX 둘 다 `ORDINARY_COMMON_LISTED`),
+**남은 유일한 이유가 구간이다.** 구간 증거가 들어오면 이 packet은 `AUTO_PROVABLE`이
+된다. 네트워크 없는 테스트가 stub 구간 증거로 그 전이를 잠근다.
+
+### 실행이 실제로 잡아낸 것 셋
+
+1. **발행사 확장 member namespace.** Apple 표지의 class member가
+   `http://www.apple.com/20260328` 확장이라 `qname_key`에 target CIK를 넘기지 않으면
+   그 자리에서 멈춘다. 실행 전에는 합성 fixture가 전부 `us-gaap` member라 안 보였다.
+   회귀 테스트를 넣었다.
+2. **AAPL은 단일 class인데도 census가 깨끗하지 않다.** 표지가
+   `EntityCommonStockSharesOutstanding`은 **차원 없는** context에, 12(b) 제목·심볼은
+   **class 축** context에 싣는다. 그래서 요구된 class(`CommonStockMember`, AAPL)에
+   주식수 fact가 없다. 이름으로 이었으면 조용히 통과했을 자리다 —
+   `DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON`로 막았다.
+   같은 표지의 notes 여섯 줄은 `REGISTERED_NOT_PROVED_COMMON`으로 남아 class 제안이
+   되지 않지만 packet의 질문으로는 남는다.
+3. **2019 표지 XBRL 의무화 이전 filing의 서명.** CELG의 2019-03-31 10-Q에는 제목·심볼
+   fact 칸 자체가 없다. "심볼이 없다"와 "심볼 칸이 없다"를 같은 이유로 적으면 검토자가
+   틀린 곳을 본다 — `PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE`를 따로 붙인다.
+
+### 이 receipt가 주장하지 않는 것
+
+- 5A-2가 완료됐다고 주장하지 않는다. 수요 897개 중 5개만 돌렸다.
+- 어떤 gate도 통과·실패했다고 주장하지 않는다.
+- `AUTO_PROVABLE`이 나왔더라도 그것은 manifest 변경이 아니다.
+- 5개 표본으로 897개의 상태 분포를 추정하지 않는다.
+
+
 ---
 
 ## 11. 결과

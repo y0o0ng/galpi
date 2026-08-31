@@ -127,6 +127,76 @@ mapping demand = MAPPED가 아닌 고유 심볼
 **5A-1의 결과를 보고 identity 규칙을 바꾸지 않는다.** coverage가 아쉽다고 fuzzy
 매칭이나 수동 예외를 만들지 않는다 — 그것이 정확히 Follow-up 9가 닫은 자리다.
 
+#### 승인 정책 — B
+
+```text
+발견(discovery)은 넓게, 증명(proof)은 좁게.
+```
+
+후보 CIK와 후보 filing을 찾는 층은 넓어도 된다 — 현재 ticker map · browse-EDGAR ·
+`CIK_OVERRIDES` · 이름 색인 · predecessor 힌트를 다 쓴다. 그러나 **production
+identity로 들어가는 것은 명시 SEC 증거뿐이다.** 세 층의 권한이 다르고, 이름이 그
+경계를 계속 말해야 한다.
+
+```text
+DISCOVERY_HINT   어디를 볼지 가리킨다.        production identity가 아니다.
+SEC_PROOF        원문이 실제로 말한 것.        제안의 근거가 된다.
+PRODUCTION_MANIFEST  사람이 승격시킨 것.       trading/qv/identity/*.jsonl
+```
+
+`AUTO_PROVABLE`은 **"승인된 규칙 아래 SEC 증거가 기계적으로 완결돼 보인다"**는 뜻일
+뿐이고 manifest가 이미 바뀌었다는 뜻이 **아니다.** 자동 승격은 없다.
+
+#### 5A-2a — 제안 후보 발견
+
+5A-1의 static 매핑 수요(심볼 → 요구 formation 세션)를 받아 심볼마다 후보 CIK를 모은다.
+후보가 0개면 `UNRESOLVED`, 둘 이상이면 `CIK_CONFLICT`로 **증명을 시도하지 않는다** —
+어느 등록인의 표지를 읽어야 하는지가 정해지지 않은 상태에서 읽으면 그 선택 자체가
+근거 없는 판정이 된다.
+
+#### 5A-2b — SEC proof packet
+
+확정된 CIK의 정기보고서 표지에서 **정확한 dei local name만** 읽는다
+(`Security12bTitle` · `Security12gTitle` · `TradingSymbol` ·
+`EntityCommonStockSharesOutstanding`). 요구 시점보다 **뒤에 수리된** 제출은 쓰지 않는다.
+
+```text
+보통주 여부는 member 이름이 아니라 EntityCommonStockSharesOutstanding의 존재로 정한다.
+```
+
+`CommonClassAMember` 같은 이름으로 추론하면 표지의 notes·warrant 줄이 보통주로
+승격된다. 반대로 제목·심볼만 있는 줄은 `REGISTERED_NOT_PROVED_COMMON`으로 남고
+class 제안이 되지 않되, **조용히 사라지지 않고** packet의 질문으로 남는다.
+
+등록인이 아닌 entity의 context(자회사 co-registrant 블록)는 제외하고, class 축 말고
+다른 축이 붙은 표지 fact는 **버리지 않고 anomaly로 적는다** — 조용히 버리면 census가
+빈 채로 완결돼 보인다.
+
+**표지는 class의 유효구간을 증명하지 않는다.** `effective_from`/`effective_to`는
+5A-2b에서 추론하지 않고, 명시 증거가 따로 들어올 때만 채워진다. 그래서 실제 SEC
+표지만으로는 대부분 `CLASS_INTERVAL_NOT_EXPLICIT`가 붙은 `REVIEW_REQUIRED`가 된다.
+**이것은 결함이 아니라 계약이다.**
+
+#### 5A-2c — 판정과 manifest 승격
+
+사람이 packet을 읽고 `trading/qv/identity/*.jsonl`에 반영하는 단계다. 구간 증거를
+붙이는 것도, 승계·재편 판정도, 제안 id(`prop-<cik>-<member>`)를 정식 `class_id`로
+바꾸는 것도 여기서 한다. **5A-2a/b는 이 파일들을 읽지도 쓰지도 않는다.**
+
+#### 상태 어휘 — 정확히 셋
+
+```text
+AUTO_PROVABLE     승인된 규칙 아래 SEC 증거가 기계적으로 완결됐다(승격은 아니다)
+REVIEW_REQUIRED   증거가 있으나 사람의 판정이 필요하다
+UNRESOLVED        증명을 시작할 후보조차 없다
+```
+
+구현은 `trading/backtest/qv_identity_proposals.py`이고 실행 진입점은
+`trading/selftest/qv_identity_proposal_run.py`다. 스키마를 바꾸지 않았고 SEC HTML
+본문을 DB에 넣지 않는다. **coverage를 늘리려고 문턱을 낮추지 않는다** — 이 단계의
+목적은 상태 어휘가 실제 filing에서 옳게 갈리는지를 확인하는 것이지 숫자를 키우는
+것이 아니다.
+
 ### 5A-3 — production ingest → identity materialization → PIT usability → 나머지
 
 SEC/evidence ingest가 먼저다. 그것이 있어야 manifest가 materialize되고,
