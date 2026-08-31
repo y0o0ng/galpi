@@ -967,3 +967,72 @@ separate. The command does not download or manage a model and does not
 read or write the production DB, Vault, memory path, retrieval, routing,
 or `server.js` flow. Private natural replay remains unopened until the
 P1-B1 results receive separate review and approval.
+
+### P1-B1 sub-1B calibration receipt
+
+This receipt records the completed P1-B1 `LOCAL_ONLY` synthetic
+calibration run. It is a model-size progression result, not final model
+acceptance, production authorization, or always-on hardware-feasibility
+evidence.
+
+Run identity:
+
+-   report version:
+    `xion-local-memory-inference-p1b1-report-v1`
+-   Galpi commit:
+    `5a789d7193b08e84b18b39efe1e146ad8af39355`
+-   model ID and artifact ID: `ggml-org/Qwen3-0.6B-GGUF:BF16`
+-   quantization and size class: `BF16`, `sub-1B`
+-   runtime and version: `llama.cpp`,
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`
+-   runner and prompt:
+    `xion-local-memory-inference-p1b1-runner-v1`,
+    `xion-local-memory-inference-p1b1-prompt-v1`
+-   fixture: `xion-local-memory-inference-p1b1-synthetic-v1`, 90 cases
+-   policy: `LOCAL_ONLY`
+-   runtime failures: 0
+
+Frozen workload screening results:
+
+1.  **Structured extraction:** 30 cases with zero runtime failures
+    produced two schema-valid exact matches and 28 invalid structured
+    outputs, all recorded as
+    `MODEL_OUTPUT_INVALID_JSON`. There were zero schema-valid wrong-value
+    failures and zero critical unsafe failures. Exact local completion
+    was 2/30 (6.67%), below the preregistered 27/30 (90%) boundary, so
+    the decision is `ADVANCE_SIZE`. This establishes failure of the
+    current strict structured-output completion screen at sub-1B. It
+    does not establish that underlying semantic extraction capability is
+    only 2/30, because the observed failure was dominated by invalid
+    structured output and both schema-valid answers were exact matches.
+2.  **Write/no-write triage:** all 30 outputs were schema-valid, with
+    zero runtime failures, 11 semantic successes, and 19 semantic
+    failures. The five hard-gated
+    capability probes all matched, with zero probe mismatches. Among
+    non-probe cases, gold `NO_WRITE` produced one `NO_WRITE` and nine
+    `ESCALATE`; gold `WRITE_CANDIDATE` produced two `NO_WRITE` and eight
+    `ESCALATE`; and all five gold `ESCALATE` cases produced `ESCALATE`.
+    `NO_WRITE` recall was 1/10 (10%), below the preregistered 8/10 (80%)
+    boundary. The two eligible false `NO_WRITE` results are two critical
+    unsafe failures, so the decision is `ADVANCE_SIZE`.
+3.  **Ambiguity/escalation:** all 30 outputs were schema-valid, with zero
+    runtime failures, 24 semantic successes, and six semantic failures.
+    The set contained 22
+    non-hard-gated cases and eight hard-gated capability probes; four
+    probe outputs mismatched. `CLEAR` recall was 12/12 (100%), which
+    passes the preregistered 11/12 finite boundary, but two eligible gold
+    `ESCALATE` cases were classified `CLEAR`. Those two critical unsafe
+    failures violate the preregistered critical-unsafe-zero condition,
+    so the decision is `ADVANCE_SIZE`. The four hard-gated probe
+    mismatches remain diagnostic and are excluded from LOCAL-FIRST
+    critical unsafe counts.
+
+No sub-1B workload passes its current preregistered screen. All three
+workloads therefore advance to the preregistered approximately 2B size
+class. The next run changes model size only as far as practical: it uses
+Qwen3-1.7B as the approximately 2B candidate with BF16, the same fixture,
+prompt/schema contracts, and llama.cpp runtime version. That run has not
+yet occurred, so no approximately 2B result is recorded here. The
+fixture, gold labels and provenance, parser and `response_format`
+behavior, screening thresholds, critical-unsafe-zero rules, hard-gate
+handling, and model-size progression remain unchanged.
