@@ -845,8 +845,110 @@ LOCAL-FIRST acceptance, production deployment, or always-on hardware
 feasibility. Qwen3-0.6B BF16 is the artifact that completed this smoke
 run; it is not a canonical or frozen model choice.
 
-P1-B calibration/private replay remains **UNOPENED** and requires
-separate approval. No prompt tuning, Markdown-fence stripping, JSON
-parser relaxation, schema change, or other three-case harness adaptation
-is part of this closeout; those would cross into calibration or
-experimental-policy work.
+P1-B1 synthetic capability calibration is now the active/open stage.
+Private natural replay remains **UNOPENED** until P1-B1 results are
+reviewed. No prompt tuning, Markdown-fence stripping, JSON parser
+relaxation, schema change, or other three-case harness adaptation is part
+of the P1-A closeout.
+
+## Pilot P1-B1 synthetic capability calibration
+
+P1-B1 is an offline, repository-tracked synthetic capability calibration
+stage. It expands beyond the closed three-case P1-A plumbing fixture to
+measure workload-specific capability and failure boundaries for one
+external local-model configuration at a time. It is not final model
+acceptance, private natural replay, held-out evaluation, production
+LOCAL-FIRST authorization, prompt optimization, quantization comparison,
+or always-on hardware-feasibility evidence.
+
+The tracked fixture is
+`fixtures/local-memory-inference-p1b1-synthetic.json`. Its envelope keeps
+calibration metadata keyed by `caseId` outside the existing exact-validated
+PilotCase objects. The 90 constructed synthetic cases are fixed as:
+
+-   structured extraction: 30 cases, split equally across exact-key date,
+    text-scalar, and quantity-plus-unit schemas (10 each);
+-   write/no-write triage: 10 `NO_WRITE`, 10 `WRITE_CANDIDATE`, five
+    non-hard-gated `ESCALATE`, and five hard-gated `ESCALATE` capability
+    probes;
+-   ambiguity/escalation: 12 `CLEAR`, 10 non-hard-gated `ESCALATE`, and
+    eight hard-gated `ESCALATE` capability probes. The `CLEAR` cases are
+    four easy, four distractor-but-resolvable, and four near-boundary but
+    uniquely resolvable cases. Contract-level probes cover identity
+    ambiguity, explicit correction, Core/high-impact, and
+    authority-sensitive boundaries.
+
+P1-B1 structured extraction uses **Option A**: every case asks for one
+fact that is explicitly present and unambiguous in bounded evidence.
+Missing-value, conflicting-answer, and intrinsically ambiguous extraction
+cases are excluded. A later, separately preregistered experiment may
+compare Option A plus the separate ambiguity detector against an Option C
+self-abstaining extraction contract such as
+`EXTRACTED / NOT_FOUND / ESCALATE`. Introducing Option C must not
+retroactively reinterpret or retune P1-B1 results.
+
+The model receives only the task specification, strict output schema, and
+synthetic input. Gold labels, strata, screening categories, and expected
+decisions are not included in the prompt. Thinking remains disabled for
+these bounded tasks. JSON parsing and exact-key schema validation remain
+external and authoritative; fenced JSON, prose around JSON, inferred
+fields, and extra keys fail closed. Invalid JSON or schema-invalid output
+is a direct local model failure.
+
+The preregistered P1-B1 model-size progression screens are:
+
+-   structured extraction: zero critical wrong-value semantic mismatches
+    and at least 90% exact local completion, which is at least 27/30;
+-   write/no-write triage: zero eligible false `NO_WRITE` results and at
+    least 80% `NO_WRITE` recall, which is at least 8/10;
+-   ambiguity/escalation: zero eligible false `CLEAR` results and at least
+    85% `CLEAR` recall. With 12 `CLEAR` cases the finite fixture boundary
+    is 11/12 (91.7%); 10/12 (83.3%) fails.
+
+These screens decide only whether a workload passes the current size or
+advances in the P1-B1 capacity probe. They are not production or final
+study acceptance thresholds and are not CLI tuning knobs. Hard-gated
+capability probes are reported separately: their mismatches do not enter
+critical unsafe counts or LOCAL-FIRST completion metrics because the
+existing authority gates prevent those cases from entering local-policy
+completion. Endpoint unavailability, timeout, malformed runtime envelope,
+and HTTP/runtime failure make the affected workload
+`INDETERMINATE_RUNTIME`; they must not be converted into semantic model
+insufficiency or `ADVANCE_SIZE`.
+
+Capacity probing begins with BF16 to avoid mixing model capacity and
+quantization. The progression is sub-1B, then approximately 2B only for
+workloads that fail screening, then approximately 4B only for workloads
+that still fail. There is no automatic step to 7–8B. If approximately 4B
+remains insufficient, human/design review must decide whether to stop the
+local workload or explicitly justify a larger test. P1-B1 freezes no model
+family and performs no quantization comparison.
+
+The registered non-generative controls are `NONE_JUSTIFIED` with
+`TASK_REQUIRES_SEMANTIC_JUDGMENT` for structured extraction and triage,
+and `EXISTING_LOGIC_IS_AUTHORITY_GATE` for ambiguity/escalation. Existing
+deterministic hard gates remain authoritative, but they are not relabeled
+as a competing semantic classifier or experimental gold.
+
+Run one separately managed external configuration with:
+
+```bash
+npm run research:memory-inference-calibration -- \
+  --endpoint http://127.0.0.1:8080/v1 \
+  --model MODEL_ID \
+  --artifact ARTIFACT_OR_REVISION_ID \
+  --quantization BF16 \
+  --model-size-class sub-1B \
+  --runtime-version RUNTIME_VERSION_OR_COMMIT
+```
+
+The JSON stdout report records the Galpi commit, fixture identity, model,
+artifact, quantization, size class, runtime, runner, prompt, task, and
+output-schema versions. Per-workload output keeps schema failures,
+runtime failures, semantic outcomes, confusion counts, capability probes,
+critical failures, metric numerators/denominators, thresholds, and the
+`PASS_CURRENT_SIZE`, `ADVANCE_SIZE`, or `INDETERMINATE_RUNTIME` decision
+separate. The command does not download or manage a model and does not
+read or write the production DB, Vault, memory path, retrieval, routing,
+or `server.js` flow. Private natural replay remains unopened until the
+P1-B1 results receive separate review and approval.

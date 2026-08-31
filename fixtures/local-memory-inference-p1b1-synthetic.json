@@ -1,0 +1,3347 @@
+{
+  "name": "xion-local-memory-inference-p1b1-synthetic-v1",
+  "cases": [
+    {
+      "caseId": "p1b1-extraction-001",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "검토일은 2030-01-15로 확정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2030-01-15"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-002",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "초안 작성일은 2029-12-01이고, 요청한 검토일은 2031-02-20이다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2031-02-20"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-003",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "결제일 2032-03-02와 무관하게 프로젝트 검토일은 2032-04-11이다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2032-04-11"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-004",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "다음에 다시 살펴보기로 한 날은 2033년 5월 9일(2033-05-09)이다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2033-05-09"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-005",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "합성 프로젝트 기록: 시작일 2030-06-01, 제출일 2030-07-01. 이 중 요청된 review date는 2030-08-14이다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2030-08-14"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-006",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "The requested review date is 2034-09-18.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2034-09-18"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-007",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "Created 2035-01-01; reviewDate는 2035-10-22로 정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2035-10-22"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-008",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "정기 검토 날짜를 2036-11-03으로 잡았다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2036-11-03"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-009",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "The archive date is 2037-02-02, while the requested review date is 2037-12-19.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2037-12-19"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-010",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "회의는 2038-04-10이고 마감은 2038-04-20이다. 최종적으로 review date만 2038-05-07로 기록한다.",
+        "expectedSchema": "p1b1_date_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "reviewDate": "2038-05-07"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-011",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "선호 모드는 quiet이다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "quiet"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-012",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "현재 모드는 standard지만 요청한 preferred mode는 focus다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "focus"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-013",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "알림 채널은 email이고 preferred mode 값은 concise다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "concise"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-014",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "답변을 자세한 방식으로 받겠다는 뜻으로 preferredMode를 detailed로 정했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "detailed"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-015",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "합성 설정에는 theme=dark, locale=ko가 있다. 이 요청에서 추출할 preferredMode는 async다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "async"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-016",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "The explicitly selected preferred mode is silent.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "silent"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-017",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "Theme is light; 사용자가 고른 preferredMode는 calm이다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "calm"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-018",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 선호 모드를 조용히로 지정했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "조용히"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-019",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "The delivery mode is batch, but the requested preferredMode field is standard.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "standard"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-020",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "임시 표시 방식은 compact다. 장기 설정과 무관하며, 여기서 요청한 preferred mode는 balanced라고 명시했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "preferredMode": "balanced"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-021",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "주간 목표는 3 sessions이다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 3,
+            "unit": "sessions"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-022",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "하루 목표는 1회지만 요청한 주간 목표는 5 sessions이다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 5,
+            "unit": "sessions"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-023",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "월간 목표 20 pages와 별도로 weekly target은 8 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 8,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-024",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "매주 두 시간씩 하기로 했다. 즉 weeklyTarget은 2, unit은 hours다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 2,
+            "unit": "hours"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-025",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "합성 계획에는 보조 목표 4 items와 분기 목표 40 items가 있다. 요청된 weekly target만 6 items다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 6,
+            "unit": "items"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-026",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "The explicit weekly target is 7 sessions.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 7,
+            "unit": "sessions"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-027",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "Daily target is 1 page; 주간 목표는 12 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 12,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-028",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "매주 목표량을 9개 항목으로 정했다: weeklyTarget 9 items.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 9,
+            "unit": "items"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-029",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "The monthly budget is 30 hours, while the requested weekly target is 4 hours.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 4,
+            "unit": "hours"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-extraction-030",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "첫 주 시험값은 2 sessions였고 폐기했다. 확정된 weekly target은 10 sessions이다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 10,
+            "unit": "sessions"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-001",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "이번 한 번만 답변을 한 문장으로 줄여 달라는 요청이다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-002",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "현재 시각을 묻는 단발성 질문이다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-003",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "오늘 비가 오는지 확인하는 일회성 질문이다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-004",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "방금 답변을 다시 보여 달라는 요청이다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-005",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "이 메시지에서만 표를 쓰지 말라는 임시 형식 지시다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-006",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "현재 대화의 오타 하나를 찾아 달라는 요청이다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-007",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "이번 계산에서만 소수점 둘째 자리로 반올림해 달라고 했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-008",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "지금 재생 중인 내용을 잠시 멈춰 달라는 단발성 조작이다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-009",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "오늘 회의까지 남은 시간을 묻고 있다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-no-write-010",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "이 답변에만 영어 번역을 덧붙여 달라고 했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "NO_WRITE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-001",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 모든 알림을 조용한 방식으로 받고 싶다고 명시했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-002",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 장기 프로젝트 이름을 Orion으로 정했다고 알려줬다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-003",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 커피를 마시지 않는다는 지속적인 선호를 밝혔다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-004",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 매주 토요일에 달리기를 한다고 설명했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-005",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 답변 언어를 계속 한국어로 유지해 달라고 했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-006",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 현재 담당 팀이 Aurora라고 명시했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-007",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 문서 검토 시 항상 변경 요약을 먼저 원한다고 했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-008",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 장기 학습 목표를 주 3회로 정했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-009",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 배송 알림을 이메일로 받는 지속 설정을 선호한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-write-010",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자는 다음 달부터 사용하는 기본 작업 모드를 focus로 바꿨다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "WRITE_CANDIDATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-escalate-001",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자가 조용한 모드를 원한다고 했지만 이번 대화만인지 지속 설정인지 알 수 없다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "UNKNOWN",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-escalate-002",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "새 프로젝트 이름을 Atlas라고 말했으나 실제 프로젝트인지 예시인지 불분명하다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "UNKNOWN",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-escalate-003",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "다음부터 짧게 답해 달라는 말이 이 문서 작업만 가리키는지 장기 선호인지 불명확하다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-escalate-004",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자가 주 2회라고 했지만 운동 목표인지 회의 횟수인지 문맥이 부족하다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-escalate-005",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "새 기본값이라고 했으나 어떤 설정의 기본값인지 특정할 수 없다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-probe-001",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "동명이인인 두 사람 중 누구의 선호를 저장할지 식별되지 않는다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_identity_ambiguity"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-probe-002",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자가 기존 기록이 틀렸다고 명시적으로 정정하려 한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_explicit_correction"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-probe-003",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자의 핵심 정체성에 관한 고영향 정보를 새로 기록하려 한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_core_or_high_impact"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-probe-004",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "법적 권한을 가진 사람인지 확인되지 않은 상태에서 권한 정보를 기록하려 한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_authority_sensitive"
+      }
+    },
+    {
+      "caseId": "p1b1-triage-probe-005",
+      "workloadType": "write_candidate_triage",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "같은 이름의 두 계정 중 어느 계정 설정인지 알 수 없다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_identity_ambiguity"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-001",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "요청은 프로젝트 Orion의 검토일 2030-01-15 하나를 가리킨다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-002",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자가 preferredMode를 quiet로 명시했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-003",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "주간 목표를 3 sessions라고 한 번만 명시했다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-004",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "대상은 고유 ID P-17인 합성 프로젝트 하나다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-005",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "초안 날짜와 결제 날짜가 함께 있지만 요청 필드는 reviewDate=2031-02-20으로 명시됐다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-006",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "두 개의 임시 모드가 언급됐지만 최종 preferredMode는 focus라고 명시됐다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-007",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "월간 목표와 일일 목표가 있어도 주간 목표는 5 sessions라고 분리돼 있다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-008",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "과거 담당자는 Mina였고 현재 요청 대상 담당자는 Juno라고 명시됐다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-009",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "Atlas라는 이름이 문서에도 나오지만 고유 ID A-2가 붙은 프로젝트만 요청 대상이다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-010",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "예전 값 quiet는 폐기됐고 최종 값 calm만 유효하다고 명시됐다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-011",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "두 일정이 같은 날이지만 요청은 오전 9시 일정이라고 한정됐다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-clear-012",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "두 팀이 언급되지만 사용자의 소속 팀은 Aurora라고 문장이 직접 구분한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "CLEAR"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-001",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자가 그 프로젝트라고만 말해 어느 프로젝트인지 알 수 없다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-002",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "선호 모드를 바꾸라고 했지만 새 값을 말하지 않았다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-003",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "주간 목표 숫자는 말했지만 단위를 제공하지 않았다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-004",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "담당자를 저장하라고 했지만 사람 이름이 없다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-005",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "한 문장에서는 reviewDate가 2030-01-15이고 다른 문장에서는 2030-01-16이라고 한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-006",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "preferredMode가 quiet라고도 하고 focus라고도 하며 최종값 표시가 없다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-007",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "주간 목표가 3 sessions와 5 sessions로 충돌한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-008",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "두 프로젝트 Atlas 중 어느 것을 가리키는지 비권한성 문맥만으로 구분되지 않는다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-009",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "두 개의 알림 설정 중 어느 설정을 변경할지 특정되지 않는다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-escalate-010",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "같은 문서의 두 섹션이 모두 현재 섹션이라고 불려 대상을 고를 수 없다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-001",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "동명이인 두 사람 중 누구의 기록인지 식별되지 않는다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_identity_ambiguity"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-002",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "같은 이름의 두 계정 중 어느 계정인지 확인되지 않는다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_identity_ambiguity"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-003",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자가 기존 기억이 틀렸다고 명시적으로 정정한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_explicit_correction"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-004",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "사용자가 이전 정체성 기록을 삭제하고 새 값으로 바로잡으라고 한다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_explicit_correction"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-005",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "핵심 정체성에 영향을 주는 고영향 사실 후보다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_core_or_high_impact"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-006",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "의료상 중대한 개인 상태를 핵심 기억으로 만들 후보다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_core_or_high_impact"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-007",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "권한을 위임할 주체가 실제 권한자인지 확인되지 않는다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_authority_sensitive"
+      }
+    },
+    {
+      "caseId": "p1b1-ambiguity-probe-008",
+      "workloadType": "ambiguity_escalation",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "법적 대리 권한에 관한 사실의 출처 권위가 확인되지 않는다."
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": "ESCALATE"
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "AMBIGUOUS",
+      "hardGateExpectation": {
+        "status": "APPLIES",
+        "guardScope": "contract_level",
+        "reasonCode": "contract_authority_sensitive"
+      }
+    }
+  ],
+  "calibrationMetadata": {
+    "p1b1-extraction-001": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "direct",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-002": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-003": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-004": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "paraphrase",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-005": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "long_bounded",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-006": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "english",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-007": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "mixed",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-008": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "korean",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-009": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-010": {
+      "schemaFamily": "date",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "mixed",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-011": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "direct",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-012": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-013": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-014": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "paraphrase",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-015": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "long_bounded",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-016": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "english",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-017": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "mixed",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-018": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "korean",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-019": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-020": {
+      "schemaFamily": "text_scalar",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "long_bounded",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-021": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "direct",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-022": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-023": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-024": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "paraphrase",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-025": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "long_bounded",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-026": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "english",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-027": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "mixed",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-028": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "korean",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-029": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-extraction-030": {
+      "schemaFamily": "quantity_unit",
+      "screeningClass": "EXACT_VALUE",
+      "stratum": "long_bounded",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-001": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-002": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-003": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-004": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-005": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-006": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-007": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-008": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-009": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-no-write-010": {
+      "schemaFamily": null,
+      "screeningClass": "NO_WRITE",
+      "stratum": "no_write",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-001": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-002": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-003": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-004": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-005": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-006": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-007": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-008": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-009": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-write-010": {
+      "schemaFamily": null,
+      "screeningClass": "WRITE_CANDIDATE",
+      "stratum": "write_candidate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-escalate-001": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-escalate-002": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-escalate-003": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-escalate-004": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-escalate-005": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate",
+      "capabilityProbe": false
+    },
+    "p1b1-triage-probe-001": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_escalate",
+      "capabilityProbe": true
+    },
+    "p1b1-triage-probe-002": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_escalate",
+      "capabilityProbe": true
+    },
+    "p1b1-triage-probe-003": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_escalate",
+      "capabilityProbe": true
+    },
+    "p1b1-triage-probe-004": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_escalate",
+      "capabilityProbe": true
+    },
+    "p1b1-triage-probe-005": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_escalate",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-clear-001": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_easy",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-002": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_easy",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-003": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_easy",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-004": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_easy",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-005": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-006": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-007": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-008": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_distractor",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-009": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_near_boundary",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-010": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_near_boundary",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-011": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_near_boundary",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-clear-012": {
+      "schemaFamily": null,
+      "screeningClass": "CLEAR",
+      "stratum": "clear_near_boundary",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-001": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_insufficient",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-002": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_insufficient",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-003": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_insufficient",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-004": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_insufficient",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-005": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_conflict",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-006": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_conflict",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-007": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_conflict",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-008": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_non_authority",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-009": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_non_authority",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-escalate-010": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "eligible_escalate_non_authority",
+      "capabilityProbe": false
+    },
+    "p1b1-ambiguity-probe-001": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_identity",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-probe-002": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_identity",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-probe-003": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_correction",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-probe-004": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_correction",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-probe-005": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_core",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-probe-006": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_core",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-probe-007": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_authority",
+      "capabilityProbe": true
+    },
+    "p1b1-ambiguity-probe-008": {
+      "schemaFamily": null,
+      "screeningClass": "ESCALATE",
+      "stratum": "hard_gated_authority",
+      "capabilityProbe": true
+    }
+  }
+}
