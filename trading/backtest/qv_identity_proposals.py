@@ -10,9 +10,16 @@
 `AUTO_PROVABLE`은 "승인된 규칙 아래 proof packet이 기계적으로 완결돼 보인다"는 뜻일
 뿐이고 **manifest가 이미 바뀌었다는 뜻이 아니다.**
 
-발견(discovery)은 넓어도 된다 — 현재 ticker map · `edgar.resolve_cik` ·
-`CIK_OVERRIDES` · 이름 색인 · predecessor 힌트. 그러나 그것들은 **후보 CIK/filing만**
-가리키고 production identity가 되지 못한다. 증명은 SEC 원문에서만 나온다.
+발견(discovery)은 넓어도 된다 — 현재 ticker map · `CIK_OVERRIDES` · browse-EDGAR ·
+구간 이름 색인(`edgar.resolve_by_name`) · 선행 등록인(`edgar.find_predecessor`).
+그러나 그것들은 **후보 CIK/filing만** 가리키고 production identity가 되지 못한다.
+증명은 SEC 원문에서만 나온다.
+
+**나중 문서가 더 오래된 상태를 증명할 수 있다.** Step 4의 CLOSED 계약대로, SEC 문서의
+수리 시각이 요구 formation보다 늦다는 이유로 그 문서를 static 증거에서 제외하지 않는다.
+그 증거를 과거 formation에서 실제로 쓸 수 있었는지는 5A-3이 REQUIRED 증거에서
+`usable_from_session`을 파생시켜 가른다 — **여기서 두 번째 look-ahead 규칙을 만들지
+않고, `usable_from_session`을 지어내지도 않는다.**
 """
 
 from __future__ import annotations
@@ -21,7 +28,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .edgar import CIK_OVERRIDES, resolve_by_browse
+from .edgar import CIK_OVERRIDES, find_predecessor, resolve_by_browse, resolve_by_name
 from .qv_manifest import APPROVED_CLASS_AXIS_LOCALS, prose_key, qname_key
 # 아카이브까지 훑는 submissions row 수집은 이미 한 곳에 있다. 여기서 복제하면
 # 두 경로가 조용히 갈라지므로 그대로 쓴다.
@@ -493,12 +500,73 @@ class SymbolProposal:
 
 # ── 5A-1 수요 읽기 ────────────────────────────────────────────────────────────
 
+# 5A-1 산출물이 반드시 들고 있어야 하는 semantic source 정체성. 하나라도 비면
+# fail-close다 — **버전을 추측하지 않고, 없는 값을 지금 DB에서 캐다 채우지도 않는다.**
+REQUIRED_PROVENANCE_FIELDS = (
+    "index_name",
+    "universe_source",
+    "universe_source_version",
+    "calendar_source",
+    "calendar_source_version",
+    "identity_source_version",
+)
 
-def load_mapping_demand(payload: dict) -> dict[str, tuple[str, ...]]:
-    """5A-1 inventory 산출물에서 **static 매핑 수요**만 뽑는다.
 
-    5A-1이 아닌 산출물, 다른 measure, stage 불일치는 fail-close다. 5A-2는 5A-1의
-    수요 정의를 다시 계산하지 않고 그대로 받는다.
+@dataclass(frozen=True)
+class DemandInput:
+    """5A-1이 만든 static 매핑 수요와 **그것을 만든 source 정체성 전부.**
+
+    `inventory_path`는 부가 provenance일 뿐이고 semantic source/version 필드를
+    대신하지 못한다.
+    """
+
+    index_name: str
+    universe_source: str
+    universe_source_version: str
+    calendar_source: str
+    calendar_source_version: str
+    identity_source_version: str
+    demand: dict[str, tuple[str, ...]]
+    inventory_path: str | None = None
+
+    def select(self, symbols) -> "DemandInput":
+        """일부 심볼만 고른다. **provenance는 그대로 따라간다.**"""
+        wanted = [str(item).strip().upper() for item in symbols]
+        missing = [item for item in wanted if item not in self.demand]
+        if missing:
+            raise QVProposalError(
+                "5A-1 수요에 없는 심볼입니다: " + ", ".join(sorted(missing))
+            )
+        return DemandInput(
+            index_name=self.index_name,
+            universe_source=self.universe_source,
+            universe_source_version=self.universe_source_version,
+            calendar_source=self.calendar_source,
+            calendar_source_version=self.calendar_source_version,
+            identity_source_version=self.identity_source_version,
+            demand={symbol: self.demand[symbol] for symbol in wanted},
+            inventory_path=self.inventory_path,
+        )
+
+    def provenance_json(self) -> dict:
+        return {
+            "stage_source": EXPECTED_STAGE,
+            "measures": EXPECTED_MEASURES,
+            "index_name": self.index_name,
+            "universe_source": self.universe_source,
+            "universe_source_version": self.universe_source_version,
+            "calendar_source": self.calendar_source,
+            "calendar_source_version": self.calendar_source_version,
+            "identity_source_version": self.identity_source_version,
+            "inventory_path": self.inventory_path,
+        }
+
+
+def load_mapping_demand(payload: dict, *, inventory_path: str | None = None) -> DemandInput:
+    """5A-1 inventory 산출물에서 **static 매핑 수요와 source 정체성**을 읽는다.
+
+    5A-1이 아닌 산출물, 다른 measure, 빠진 source/version은 전부 fail-close다.
+    5A-2는 5A-1의 수요 정의를 다시 계산하지 않고 그대로 받는다.
     """
     if not isinstance(payload, dict):
         raise QVProposalError("inventory payload가 객체가 아닙니다")
@@ -508,6 +576,17 @@ def load_mapping_demand(payload: dict) -> dict[str, tuple[str, ...]]:
     measures = payload.get("measures")
     if measures != EXPECTED_MEASURES:
         raise QVProposalError(f"measures 계약 불일치: {measures!r}")
+
+    provenance: dict[str, str] = {}
+    for field_name in REQUIRED_PROVENANCE_FIELDS:
+        value = str(payload.get(field_name) or "").strip()
+        if not value:
+            raise QVProposalError(
+                f"5A-1 provenance가 비었습니다: {field_name}"
+                " — 버전을 추측하지 않고 멈춥니다"
+            )
+        provenance[field_name] = value
+
     rows = payload.get("securities")
     if not isinstance(rows, list):
         raise QVProposalError("securities 목록이 없습니다")
@@ -525,16 +604,21 @@ def load_mapping_demand(payload: dict) -> dict[str, tuple[str, ...]]:
         if not session:
             raise QVProposalError(f"{symbol}: formation_session이 비었습니다")
         demand.setdefault(symbol, set()).add(session)
-    return {symbol: tuple(sorted(sessions)) for symbol, sessions in sorted(demand.items())}
+
+    return DemandInput(
+        demand={
+            symbol: tuple(sorted(sessions)) for symbol, sessions in sorted(demand.items())
+        },
+        inventory_path=inventory_path,
+        **provenance,
+    )
 
 
-def read_mapping_demand(path: str | Path) -> tuple[dict[str, tuple[str, ...]], str]:
-    """5A-1 JSON 파일에서 (수요, identity_source_version)을 읽는다."""
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    version = str(payload.get("identity_source_version") or "").strip()
-    if not version:
-        raise QVProposalError("identity_source_version이 없습니다")
-    return load_mapping_demand(payload), version
+def read_mapping_demand(path: str | Path) -> DemandInput:
+    """5A-1 JSON 파일을 읽는다. 빠진 provenance는 fail-close다."""
+    clean = str(path)
+    payload = json.loads(Path(clean).read_text(encoding="utf-8"))
+    return load_mapping_demand(payload, inventory_path=clean)
 
 
 # ── 제안 id(기계적·결정적). 5A-2c 승격 때 사람이 다시 이름 붙인다 ────────────
@@ -840,7 +924,7 @@ COVER_FORMS = ("10-K", "10-Q")
 FILING_SUMMARY_NAME = "FilingSummary.xml"
 DEFAULT_MAX_PROOF_ATTEMPTS = 3
 
-NO_FILINGS_IN_SCOPE = "요구 시점 이전에 정기보고서가 없습니다"
+NO_PERIODIC_FILINGS = "이 등록인에게 정기보고서(10-K/10-Q)가 없습니다"
 NO_COVER_FACTS = "표지에 dei class fact가 없습니다(inline XBRL 표지 이전일 수 있습니다)"
 
 
@@ -892,6 +976,102 @@ def discover_candidates(
     return tuple(sorted(unique, key=lambda item: (item.cik, item.origin, item.detail)))
 
 
+@dataclass(frozen=True)
+class DiscoveryHints:
+    """historical discovery의 **명시** 입력. 추측한 이름을 넣지 않는다.
+
+    `names`는 그 종목이 지수에 있던 동안의 회사 이름이고 `spans`는 멤버십 구간이다.
+    둘 다 명시 source/version을 달고 들어온다 — 지금 ticker 주인의 이름으로 과거를
+    추정하지 않는다.
+
+    **여기서 나온 후보는 끝까지 `DISCOVERY_HINT`다.** 어느 등록인의 filing을 볼지만
+    고르고, issuer/share-class 증명을 만들거나 `AUTO_PROVABLE`을 만들지 못한다.
+    """
+
+    source: str
+    source_version: str
+    provenance: str
+    names: dict[str, str]
+    spans: dict[str, tuple[str, str]]
+
+    def entry(self, symbol: str) -> tuple[str, tuple[str, str]] | None:
+        """그 심볼의 (이름, 구간). 둘 다 있어야 쓴다."""
+        name = str(self.names.get(symbol) or "").strip()
+        span = self.spans.get(symbol)
+        if not name or not span:
+            return None
+        start, end = str(span[0] or "").strip(), str(span[1] or "").strip()
+        if not start or not end:
+            return None
+        return name, (start, end)
+
+    def as_json(self) -> dict:
+        return {
+            "source": self.source,
+            "source_version": self.source_version,
+            "provenance": self.provenance,
+            "symbols_with_name_and_span": sorted(
+                symbol for symbol in self.names if self.entry(symbol) is not None
+            ),
+        }
+
+
+def historical_name_candidate(
+    client, symbol: str, hints: DiscoveryHints, index
+) -> DiscoveryCandidate | None:
+    """3층. **그 구간의 회사 이름**으로 등록인을 찾는다.
+
+    `edgar.resolve_by_name`을 그대로 쓴다 — 새 fuzzy resolver를 만들지 않는다. 그것이
+    하나로 좁히지 못하면 아무것도 돌려주지 않는다(조용히 첫 후보를 고르지 않는다).
+    """
+    found = hints.entry(symbol)
+    if found is None:
+        return None
+    name, span = found
+    cik, _survivors = resolve_by_name(client, name, index, span=span)
+    if not cik:
+        return None
+    return DiscoveryCandidate(
+        cik=cik,
+        origin=HISTORICAL_NAME_LOOKUP,
+        detail=f"{name} @ {span[0]}..{span[1]} ({hints.source}/{hints.source_version})",
+    )
+
+
+def predecessor_candidate(
+    client, symbol: str, hints: DiscoveryHints, index, successor_cik: str
+) -> DiscoveryCandidate | None:
+    """구간 앞부분을 냈던 **선행 등록인**. `edgar.find_predecessor`를 그대로 쓴다.
+
+    선행 등록인이 나오면 그 자체가 승계 판정이 필요하다는 신호다 — 기계가 둘 중
+    하나를 고르지 않는다.
+    """
+    found = hints.entry(symbol)
+    if found is None:
+        return None
+    name, span = found
+    dates, _payload = client.all_earnings_dates(successor_cik, span[0])
+    # 후속이 이미 구간 앞부분을 냈으면 선행 등록인을 찾을 이유가 없다. EDGAR 수집
+    # 경로(`edgar.collect`)가 쓰는 것과 같은 게이트다.
+    if dates and min(dates) <= span[0]:
+        return None
+    earlier = find_predecessor(
+        client,
+        name,
+        index,
+        span=span,
+        successor_cik=successor_cik,
+        successor_first=min(dates) if dates else None,
+    )
+    if not earlier:
+        return None
+    return DiscoveryCandidate(
+        cik=earlier,
+        origin=PREDECESSOR_HINT,
+        detail=f"{name} 선행 등록인 (successor {successor_cik})",
+    )
+
+
 def browse_candidate(client, symbol: str) -> DiscoveryCandidate | None:
     """browse-EDGAR 2층. 현재 등록인만 푼다(폐지 종목은 못 푼다)."""
     cik = resolve_by_browse(client, str(symbol).strip().upper())
@@ -904,22 +1084,23 @@ def cover_filing_rows(
     client,
     cik: str,
     *,
-    not_after_session: str | None = None,
     forms: tuple[str, ...] = COVER_FORMS,
 ) -> tuple:
     """표지 증명 후보 정기보고서. **수리 시각이 늦은 것부터** 결정적으로 정렬한다.
 
-    `not_after_session`을 주면 그날 이후에 수리된 제출은 제외한다 — 제안이 요구
-    시점보다 미래의 표지에서 만들어지지 않게 한다. 수리 시각이 같으면 accession으로
-    가른다(정렬 안정성).
+    **요구 formation 이후에 수리됐다는 이유로 제출을 버리지 않는다.** Step 4의 CLOSED
+    계약대로 나중 SEC 문서가 더 오래된 경제적·법적 상태를 명시로 증명할 수 있고,
+    5A-2는 그 static 증거를 모으는 단계다. 그 증거를 과거 formation에서 실제로 쓸 수
+    있었는지는 **5A-3이 REQUIRED 증거에서 `usable_from_session`을 파생시켜** 가른다.
+    여기에 두 번째 look-ahead 규칙을 만들지 않는다.
+
+    수리 시각이 같으면 accession으로 가른다(정렬 안정성).
     """
     rows = [
         row
         for row in _submission_rows_from_sec(client, normalize_cik(cik))
         if row.form in forms and row.acceptance_eastern_date
     ]
-    if not_after_session:
-        rows = [row for row in rows if row.acceptance_eastern_date <= not_after_session]
     return tuple(
         sorted(rows, key=lambda row: (row.acceptance_eastern_date, row.accession), reverse=True)
     )
@@ -950,7 +1131,6 @@ def fetch_cover_proof(
     client,
     cik: str,
     *,
-    not_after_session: str | None = None,
     forms: tuple[str, ...] = COVER_FORMS,
     max_attempts: int = DEFAULT_MAX_PROOF_ATTEMPTS,
 ) -> tuple[CoverPageProof | None, str | None, tuple[str, ...]]:
@@ -959,13 +1139,16 @@ def fetch_cover_proof(
     가장 최근 정기보고서부터 최대 `max_attempts`건을 본다. 표지 class fact가 하나도
     없으면 (inline XBRL 표지 이전이거나 그 filing이 담지 않은 것이라) 증명 없음으로
     끝낸다 — **추정으로 채우지 않는다.**
+
+    **문서의 자연스러운 SEC 증거 정체성을 그대로 보존한다.** 요구 formation보다 늦게
+    수리됐다는 이유로 문서를 거르지 않고, `usable_from_session`을 지어내지도 않는다.
     """
     target = normalize_cik(cik)
     if target is None:
         raise QVProposalError(f"CIK가 아닙니다: {cik!r}")
-    rows = cover_filing_rows(client, target, not_after_session=not_after_session, forms=forms)
+    rows = cover_filing_rows(client, target, forms=forms)
     if not rows:
-        return None, NO_FILINGS_IN_SCOPE, ()
+        return None, NO_PERIODIC_FILINGS, ()
     attempted: list[str] = []
     for row in rows[: max(1, int(max_attempts))]:
         attempted.append(row.accession)
@@ -985,12 +1168,20 @@ def fetch_cover_proof(
 
 @dataclass(frozen=True)
 class ProposalRun:
-    """5A-2a/b 한 번의 산출물. **manifest 변경이 아니다.**"""
+    """5A-2a/b 한 번의 산출물. **manifest 변경이 아니다.**
 
-    identity_source_version: str
-    demand_source: str
+    5A-1의 semantic source 정체성을 전부 그대로 들고 다닌다 — 파일 경로 하나로
+    대신하지 않는다.
+    """
+
+    demand_input: DemandInput
     proposals: tuple[SymbolProposal, ...]
     attempted_accessions: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    hints: DiscoveryHints | None = None
+
+    @property
+    def identity_source_version(self) -> str:
+        return self.demand_input.identity_source_version
 
     def counts(self) -> dict[str, int]:
         tally = {AUTO_PROVABLE: 0, REVIEW_REQUIRED: 0, UNRESOLVED: 0}
@@ -1005,15 +1196,28 @@ class ProposalRun:
                 tally[code] = tally.get(code, 0) + 1
         return dict(sorted(tally.items()))
 
+    def origin_counts(self) -> dict[str, int]:
+        tally: dict[str, int] = {}
+        for item in self.proposals:
+            for candidate in item.discovery_candidates:
+                tally[candidate.origin] = tally.get(candidate.origin, 0) + 1
+        return dict(sorted(tally.items()))
+
     def as_json(self) -> dict:
         return {
             "stage": "5A-2",
             "produces": "SEC_IDENTITY_PROPOSALS",
             "mutates_production_manifest": False,
+            "note": (
+                "static SEC identity evidence only — not PIT identity usability. "
+                "usable_from_session is derived in 5A-3 from REQUIRED evidence."
+            ),
+            "demand_provenance": self.demand_input.provenance_json(),
             "identity_source_version": self.identity_source_version,
-            "demand_source": self.demand_source,
+            "discovery_hints": self.hints.as_json() if self.hints else None,
             "counts": self.counts(),
             "reason_counts": self.reason_counts(),
+            "discovery_origin_counts": self.origin_counts(),
             "attempted_accessions": [
                 {"symbol": symbol, "accessions": list(accessions)}
                 for symbol, accessions in self.attempted_accessions
@@ -1024,44 +1228,71 @@ class ProposalRun:
 
 def run_proposals(
     client,
-    demand: dict[str, tuple[str, ...]],
+    demand_input: DemandInput,
     *,
     companies: dict,
-    identity_source_version: str,
-    demand_source: str,
     overrides: dict[str, str] | None = None,
     use_browse: bool = False,
+    hints: DiscoveryHints | None = None,
+    name_index=None,
     intervals: dict[str, dict[str, ClassInterval]] | None = None,
     max_attempts: int = DEFAULT_MAX_PROOF_ATTEMPTS,
 ) -> ProposalRun:
     """수요 심볼마다 발견 → SEC 증명 → 제안 packet을 만든다.
 
-    **manifest 파일을 읽지도 쓰지도 않는다.** `identity_source_version`은 어느 5A-1
-    수요를 상대로 만든 제안인지 기록하기 위한 표식일 뿐이다.
+    **manifest 파일을 읽지도 쓰지도 않는다.** 발견은 넓게 하되(현재 ticker map ·
+    `CIK_OVERRIDES` · browse-EDGAR · 구간 이름 색인 · 선행 등록인) 그 결과는 전부
+    `DISCOVERY_HINT`이고, production identity가 되는 것은 SEC 원문 증명뿐이다.
+
+    `hints`가 있으면 이름 색인은 처음 필요할 때 한 번만 만든다(40MB 다운로드다).
     """
     proposals: list[SymbolProposal] = []
     attempts: list[tuple[str, tuple[str, ...]]] = []
+    index = name_index
 
-    for symbol in sorted(demand):
-        sessions = tuple(sorted(demand[symbol]))
+    for symbol in sorted(demand_input.demand):
+        sessions = tuple(sorted(demand_input.demand[symbol]))
         extra: list[DiscoveryCandidate] = []
         if use_browse:
             found = browse_candidate(client, symbol)
             if found is not None:
                 extra.append(found)
-        candidates = discover_candidates(
-            symbol, companies=companies, overrides=overrides, extra=tuple(extra)
-        )
+        def assemble():
+            found = discover_candidates(
+                symbol, companies=companies, overrides=overrides, extra=tuple(extra)
+            )
+            return found, sorted({item.cik for item in found})
+
+        candidates, distinct = assemble()
+        wants_hint = hints is not None and hints.entry(symbol) is not None
+
+        # 3층은 앞 층이 빈손일 때만 돈다 — `edgar.collect`와 같은 순서다. 항상 돌리면
+        # 건강한 종목까지 동명 등록인과 부딪혀 전부 REVIEW_REQUIRED가 된다.
+        if wants_hint and not distinct:
+            if index is None:
+                index = client.cik_lookup()
+            found = historical_name_candidate(client, symbol, hints, index)
+            if found is not None:
+                extra.append(found)
+                candidates, distinct = assemble()
+
+        # 선행 등록인은 후속이 하나로 정해졌을 때만 의미가 있다.
+        successor_judgement = False
+        if wants_hint and len(distinct) == 1:
+            if index is None:
+                index = client.cik_lookup()
+            earlier = predecessor_candidate(client, symbol, hints, index, distinct[0])
+            if earlier is not None:
+                extra.append(earlier)
+                candidates, distinct = assemble()
+                successor_judgement = True
+
         proof = None
         absence = None
         tried: tuple[str, ...] = ()
-        distinct = sorted({item.cik for item in candidates})
         if len(distinct) == 1:
             proof, absence, tried = fetch_cover_proof(
-                client,
-                distinct[0],
-                not_after_session=max(sessions) if sessions else None,
-                max_attempts=max_attempts,
+                client, distinct[0], max_attempts=max_attempts
             )
         elif len(distinct) > 1:
             absence = "후보 CIK가 확정되지 않아 증명을 시도하지 않았습니다"
@@ -1074,12 +1305,13 @@ def run_proposals(
                 proof=proof,
                 proof_absence_reason=absence,
                 intervals=(intervals or {}).get(symbol),
+                successor_judgement_required=successor_judgement,
             )
         )
 
     return ProposalRun(
-        identity_source_version=identity_source_version,
-        demand_source=demand_source,
+        demand_input=demand_input,
         proposals=tuple(proposals),
         attempted_accessions=tuple(attempts),
+        hints=hints,
     )

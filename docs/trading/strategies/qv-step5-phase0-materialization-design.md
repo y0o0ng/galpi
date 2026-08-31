@@ -133,10 +133,18 @@ mapping demand = MAPPED가 아닌 고유 심볼
 발견(discovery)은 넓게, 증명(proof)은 좁게.
 ```
 
-후보 CIK와 후보 filing을 찾는 층은 넓어도 된다 — 현재 ticker map · browse-EDGAR ·
-`CIK_OVERRIDES` · 이름 색인 · predecessor 힌트를 다 쓴다. 그러나 **production
-identity로 들어가는 것은 명시 SEC 증거뿐이다.** 세 층의 권한이 다르고, 이름이 그
-경계를 계속 말해야 한다.
+후보 CIK와 후보 filing을 찾는 층은 넓어도 된다. **아래 다섯이 실제로 배선된 전부다.**
+
+```text
+CURRENT_TICKER_FILE     company_tickers.json
+EXISTING_CIK_OVERRIDE   edgar.CIK_OVERRIDES
+BROWSE_EDGAR            edgar.resolve_by_browse           (--browse)
+HISTORICAL_NAME_LOOKUP  edgar.resolve_by_name             (--historical)
+PREDECESSOR_HINT        edgar.find_predecessor            (--historical)
+```
+
+그러나 **production identity로 들어가는 것은 명시 SEC 증거뿐이다.** 세 층의 권한이
+다르고, 이름이 그 경계를 계속 말해야 한다.
 
 ```text
 DISCOVERY_HINT   어디를 볼지 가리킨다.        production identity가 아니다.
@@ -154,11 +162,32 @@ PRODUCTION_MANIFEST  사람이 승격시킨 것.       trading/qv/identity/*.jso
 어느 등록인의 표지를 읽어야 하는지가 정해지지 않은 상태에서 읽으면 그 선택 자체가
 근거 없는 판정이 된다.
 
+**층 순서는 `edgar.collect`와 같다.** 3층(구간 이름 색인)은 앞 층이 빈손일 때만 돌고,
+선행 등록인은 후속이 하나로 정해졌고 **그 후속의 제출이 멤버십 구간 앞부분을 덮지
+못할 때만** 찾는다. 항상 돌리면 건강한 종목까지 동명 등록인과 부딪혀 전부
+`REVIEW_REQUIRED`가 되고, 그러면 1층이 무의미해진다.
+
+historical 입력은 **이미 있는 명시 source**를 쓴다 — 이름은 EDGAR 수집 경로가 쓰는
+`trading/universe/<index>-changes.csv`의 `security` 칸이고, 멤버십 구간은 5A-1이 명시한
+`index_name`/`universe_source`/`universe_source_version`으로 `universe_membership`에서
+읽는다. **지금 ticker 주인의 이름으로 과거를 추정하지 않는다.** 새 회사 이름 source를
+만들지 않고 새 fuzzy resolver도 만들지 않는다.
+
+선행 등록인이 나오면 그것은 그대로 `SUCCESSOR_JUDGEMENT_REQUIRED`다 — 과거와 현재
+등록인 중 어느 쪽이 그 자리의 회사였는지는 기계가 고르지 않는다.
+
 #### 5A-2b — SEC proof packet
 
 확정된 CIK의 정기보고서 표지에서 **정확한 dei local name만** 읽는다
 (`Security12bTitle` · `Security12gTitle` · `TradingSymbol` ·
-`EntityCommonStockSharesOutstanding`). 요구 시점보다 **뒤에 수리된** 제출은 쓰지 않는다.
+`EntityCommonStockSharesOutstanding`).
+
+> **나중 문서가 더 오래된 상태를 증명할 수 있다.** Step 4의 CLOSED 계약이 그것이고,
+> 5A-2는 static identity 증거를 모으는 단계다. 그래서 **수리 시각이 요구 formation보다
+> 늦다는 이유로 문서를 거르지 않는다.** 그 증거를 과거 formation에서 실제로 쓸 수
+> 있었는지는 5A-3이 REQUIRED 증거에서 `usable_from_session`을 파생시켜 가른다.
+> 여기서 두 번째 look-ahead 규칙을 만들지 않고 `usable_from_session`을 지어내지도
+> 않는다. 문서의 자연스러운 SEC 증거 정체성을 그대로 보존한다.
 
 ```text
 보통주 여부는 member 이름이 아니라 EntityCommonStockSharesOutstanding의 존재로 정한다.
@@ -190,6 +219,22 @@ AUTO_PROVABLE     승인된 규칙 아래 SEC 증거가 기계적으로 완결�
 REVIEW_REQUIRED   증거가 있으나 사람의 판정이 필요하다
 UNRESOLVED        증명을 시작할 후보조차 없다
 ```
+
+#### 입력 provenance — fail-close
+
+5A-2는 5A-1 산출물의 **semantic source 정체성을 전부** 받아 그대로 들고 다닌다.
+
+```text
+stage == "5A-1"       measures == "STATIC_MAPPING_COVERAGE_DEMAND"
+index_name            universe_source / universe_source_version
+calendar_source       calendar_source_version
+identity_source_version
+```
+
+하나라도 비면 멈춘다. **버전을 추측하지 않고, 빠진 값을 지금 DB에서 캐다 채우지도
+않는다** — 그러면 어느 유니버스를 상대로 만든 제안인지 알 수 없게 된다. inventory 파일
+경로는 부가 provenance일 뿐 이 필드들을 대신하지 못하고, 산출물의 `demand_provenance`가
+그것을 그대로 재현한다.
 
 구현은 `trading/backtest/qv_identity_proposals.py`이고 실행 진입점은
 `trading/selftest/qv_identity_proposal_run.py`다. 스키마를 바꾸지 않았고 SEC HTML

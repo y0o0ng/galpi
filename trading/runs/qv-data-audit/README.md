@@ -1419,7 +1419,7 @@ MAPPED 심볼  CMCSA · GOOG · GOOGL · NKE · UA · UAA
 **Gate A~H와 Phase 0는 여전히 평가되지 않았다.** 수익률·B/M·Q/V·랭킹·선택·
 `coverage_start`를 계산하지 않았다.
 
-## 10.13 Step 5A-2a/b pilot receipt — 2026-08-31
+## 10.13 Step 5A-2a/b pilot receipt — 2026-08-31 (**pre-fix**) / 2026-09-01 정정판
 
 **정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`의
 5A-2 절이다.** 이 실행은 **production manifest를 바꾸지 않았다** —
@@ -1441,13 +1441,16 @@ inventory     5A-1 산출물 (qv-identity-sha256:55ed78d0...372e6ec)
               CELG  2019 이전 표지 · 이후 피인수
               LEH   CIK/재편 복잡 (CIK_OVERRIDES 고정)
               ABMD  폐지 구성원
-SEC 호출      31
 ```
 
-### 결과
+**대상 다섯은 초판과 정정판이 같다.** 아래 두 절이 초판(pre-fix) 실행이고 그 다음이
+정정판이다.
+
+### 초판 결과 — **pre-fix. 아래 정정판이 정본이다.**
 
 ```text
 AUTO_PROVABLE=0  REVIEW_REQUIRED=4  UNRESOLVED=1
+SEC 호출 31
 ```
 
 | symbol | status | proof accession | 제안 class | reason codes |
@@ -1486,12 +1489,75 @@ FOXA가 그 경계를 그대로 보여준다 — 표지가 증명한 것은 전�
    fact 칸 자체가 없다. "심볼이 없다"와 "심볼 칸이 없다"를 같은 이유로 적으면 검토자가
    틀린 곳을 본다 — `PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE`를 따로 붙인다.
 
+### 초판이 왜 pre-fix인가 — 리뷰 지적 셋
+
+1. **static 증거와 PIT 가용성을 섞었다.** 초판은 요구 formation 이후에 수리된 제출을
+   증명에서 제외했다. **Step 4의 CLOSED 계약은 나중 문서가 더 오래된 상태를 증명할 수
+   있다는 것이고,** 그 증거를 과거에 쓸 수 있었는지는 5A-3의 `usable_from_session`이
+   가른다. 5A-2에 두 번째 look-ahead 규칙을 둘 자리가 아니었다.
+2. **3층 발견이 어휘로만 있었다.** `HISTORICAL_NAME_LOOKUP` · `PREDECESSOR_HINT`가
+   상수로만 있고 실행 경로에 배선되지 않아, ABMD의 `NO_DISCOVERY_CANDIDATE`가 증거
+   공백이 아니라 **5A-2a의 한계**를 함께 반영하고 있었다.
+3. **5A-1 provenance를 잘라 썼다.** `identity_source_version`과 파일 경로만 들고
+   `index_name` · universe · calendar source/version을 버렸다.
+
+### 정정판 — 2026-09-01
+
+```text
+inventory     5A-1 산출물 (변경 없음)
+index_name             SP500
+universe               announcements / eodhd-15y-2026-08
+calendar               eodhd / eodhd-15y-2026-08
+identity bundle        qv-identity-sha256:55ed78d0...372e6ec
+discovery hints        이름: trading/universe/sp500-changes.csv (security 칸)
+                       구간: universe_membership (위 source/version)
+대상          AAPL · FOXA · CELG · LEH · ABMD (초판과 같다)
+SEC 호출      49   (초판 31 — 3층 이름 색인 40MB와 후보 제출 조회가 늘었다)
+```
+
+```text
+AUTO_PROVABLE=0  REVIEW_REQUIRED=5  UNRESOLVED=0
+발견 출처 분포  CURRENT_TICKER_FILE 2 · EXISTING_CIK_OVERRIDE 2 · HISTORICAL_NAME_LOOKUP 1
+```
+
+| symbol | status | 발견 출처 | proof accession | 제안 class | reason codes |
+|---|---|---|---|---|---|
+| AAPL | REVIEW_REQUIRED | CURRENT_TICKER_FILE | 0000320193-26-000020 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON · SIBLING_CLASS_CENSUS_UNCLEAR |
+| FOXA | REVIEW_REQUIRED | CURRENT_TICKER_FILE | 0001628280-26-053960 | 2 | CLASS_INTERVAL_NOT_EXPLICIT |
+| CELG | REVIEW_REQUIRED | EXISTING_CIK_OVERRIDE | 0000816284-19-000046 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON · SIBLING_CLASS_CENSUS_UNCLEAR |
+| ABMD | REVIEW_REQUIRED | HISTORICAL_NAME_LOOKUP | 0000950170-22-021880 | 1 | CLASS_INTERVAL_NOT_EXPLICIT |
+| LEH | REVIEW_REQUIRED | EXISTING_CIK_OVERRIDE | (없음) | 0 | DISCOVERY_ONLY_NO_SEC_PROOF · NO_COVER_PAGE_PROOF_DOCUMENT |
+
+#### 두 종목이 바뀐 이유
+
+- **CELG: `UNRESOLVED`가 아니라 증거가 더 늘었다.** 초판은 formation cutoff 때문에
+  2019-03-31 10-Q(`celg-20190331.xml`)만 볼 수 있었고 거기엔 표지 제목·심볼 fact 칸이
+  아예 없었다. cutoff를 없애자 **같은 등록인의 마지막 10-Q**(2019-09-30,
+  `a2019093010q_htm.xml`)가 잡혔고 그것이 `CELG` ↔ `Common Stock, par value $.01 per
+  share`를 명시로 증명한다. 같은 표지가 CVR(`CELGZ`)도 드러낸다.
+  **나중 문서가 더 오래된 관계를 증명한 실측 사례다.**
+- **ABMD: `UNRESOLVED` → `REVIEW_REQUIRED`.** 현재 ticker 파일에 없는 폐지 종목이라
+  초판은 후보 CIK가 0개였다. 3층 이름 색인이 `Abiomed`를 `0000815094`로 풀었고, 그
+  등록인의 마지막 10-Q(2022-09-30)가 `ABMD` ↔ Common Stock을 증명한다.
+  **초판의 `NO_DISCOVERY_CANDIDATE`는 증거 공백이 아니라 배선 공백이었다.**
+
+#### 정정판이 새로 보여준 것
+
+- **`DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON`이 AAPL만의 특수 사정이 아니다.**
+  CELG도 주식수를 차원 없는 context에, 제목·심볼을 class 축 context에 싣는다. 같은
+  모양이 다섯 표본에서 두 번 나왔다.
+- **`PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE`는 이번 실행에서 발화하지 않았다.** CELG의
+  더 늦은 표지에 fact가 있었기 때문이고, 그 사유 코드 자체는 network-free 회귀가
+  계속 잠근다. **초판 pilot이 그 코드의 유일한 근거가 아니다.**
+- LEH는 그대로다 — 2008년 제출에는 표지 XBRL 자체가 없다.
+
 ### 이 receipt가 주장하지 않는 것
 
 - 5A-2가 완료됐다고 주장하지 않는다. 수요 897개 중 5개만 돌렸다.
-- 어떤 gate도 통과·실패했다고 주장하지 않는다.
+- 어떤 gate도 통과·실패했다고 주장하지 않는다. **Gate A~H는 여전히 미판정이다.**
 - `AUTO_PROVABLE`이 나왔더라도 그것은 manifest 변경이 아니다.
 - 5개 표본으로 897개의 상태 분포를 추정하지 않는다.
+- Q/V · B/M · 랭크 · 선택 · 수익률을 계산하지 않았다.
 
 
 ---

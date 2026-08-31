@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -28,7 +29,7 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     NO_COVER_FACTS,
     NO_COVER_PAGE_PROOF_DOCUMENT,
     NO_DISCOVERY_CANDIDATE,
-    NO_FILINGS_IN_SCOPE,
+    NO_PERIODIC_FILINGS,
     ORDINARY_COMMON_LISTED,
     ORDINARY_COMMON_UNLISTED,
     PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE,
@@ -40,8 +41,12 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     SYMBOL_NOT_ON_COVER_PAGE,
     SYMBOL_REUSE_CONFLICT,
     UNRESOLVED,
+    HISTORICAL_NAME_LOOKUP,
+    PREDECESSOR_HINT,
     ClassInterval,
+    DemandInput,
     DiscoveryCandidate,
+    DiscoveryHints,
     EvidenceRef,
     QVProposalError,
     build_symbol_proposal,
@@ -153,30 +158,55 @@ class StubCompany:
 class StubClient:
     """SEC 호출을 흉내내는 stub. 네트워크를 쓰지 않는다."""
 
-    def __init__(self, *, rows_by_cik=None, files_by_accession=None, browse=None):
+    def __init__(
+        self,
+        *,
+        rows_by_cik=None,
+        files_by_accession=None,
+        browse=None,
+        name_index=None,
+        earnings_by_cik=None,
+        submissions_extra=None,
+    ):
         self.rows_by_cik = rows_by_cik or {}
         self.files_by_accession = files_by_accession or {}
         self.browse = browse or {}
+        self.name_index = name_index
+        self.earnings_by_cik = earnings_by_cik or {}
+        self.submissions_extra = submissions_extra or {}
         self.fetched: list[str] = []
+        self.cik_lookup_calls = 0
 
     # cover_filing_rows가 쓰는 경로
     def submissions(self, cik):
         rows = self.rows_by_cik.get(cik, [])
-        return {
-            "filings": {
-                "recent": {
-                    "accessionNumber": [row.accession for row in rows],
-                    "form": [row.form for row in rows],
-                    "filingDate": [row.acceptance_eastern_date for row in rows],
-                    "acceptanceDateTime": [
-                        f"{row.acceptance_eastern_date}T16:00:00.000Z" for row in rows
-                    ],
-                    "reportDate": [row.acceptance_eastern_date for row in rows],
-                    "primaryDocument": ["cover.htm" for _ in rows],
-                },
-                "files": [],
-            }
+        payload = dict(self.submissions_extra.get(cik) or {})
+        payload["filings"] = {
+            "recent": {
+                "accessionNumber": [row.accession for row in rows],
+                "form": [row.form for row in rows],
+                "filingDate": [row.acceptance_eastern_date for row in rows],
+                "acceptanceDateTime": [
+                    f"{row.acceptance_eastern_date}T16:00:00.000Z" for row in rows
+                ],
+                "reportDate": [row.acceptance_eastern_date for row in rows],
+                "primaryDocument": ["cover.htm" for _ in rows],
+            },
+            "files": [],
         }
+        return payload
+
+    def cik_lookup(self):
+        self.cik_lookup_calls += 1
+        if self.name_index is None:
+            raise AssertionError("이 stub에는 이름 색인이 없다")
+        return self.name_index
+
+    def all_earnings_dates(self, cik, window_start=None):
+        dates = sorted(self.earnings_by_cik.get(cik, []))
+        if window_start:
+            dates = [item for item in dates if item >= window_start]
+        return dates, self.submissions(cik)
 
     def accession_index(self, cik, accession):
         names = sorted(self.files_by_accession.get(accession, {}))
@@ -572,6 +602,11 @@ class DemandTest(unittest.TestCase):
         base = {
             "stage": "5A-1",
             "measures": "STATIC_MAPPING_COVERAGE_DEMAND",
+            "index_name": "SP500",
+            "universe_source": "announcements",
+            "universe_source_version": "eodhd-15y-2026-08",
+            "calendar_source": "eodhd",
+            "calendar_source_version": "eodhd-15y-2026-08",
             "identity_source_version": "qv-identity-sha256:abc",
             "securities": [
                 {"symbol": "AAA", "formation_session": "2024-06-28", "status": "UNMAPPED"},
@@ -585,15 +620,73 @@ class DemandTest(unittest.TestCase):
         return base
 
     def test_only_unmapped_and_ambiguous_rows_are_demand(self):
-        demand = load_mapping_demand(self.payload())
-        self.assertEqual(sorted(demand), ["AAA", "CCC"])
-        self.assertEqual(demand["AAA"], ("2023-06-30", "2024-06-28"))
+        loaded = load_mapping_demand(self.payload())
+        self.assertEqual(sorted(loaded.demand), ["AAA", "CCC"])
+        self.assertEqual(loaded.demand["AAA"], ("2023-06-30", "2024-06-28"))
 
     def test_non_5a1_payload_fails_closed(self):
         with self.assertRaises(QVProposalError):
             load_mapping_demand(self.payload(stage="5A-3"))
         with self.assertRaises(QVProposalError):
             load_mapping_demand(self.payload(measures="PIT_IDENTITY_USABILITY"))
+
+    def test_every_required_provenance_field_fails_closed(self):
+        """빠진 source/version을 추측하거나 DB에서 캐다 채우지 않는다."""
+        for field_name in (
+            "index_name",
+            "universe_source",
+            "universe_source_version",
+            "calendar_source",
+            "calendar_source_version",
+            "identity_source_version",
+        ):
+            for empty in (None, "", "   "):
+                with self.subTest(field=field_name, empty=repr(empty)):
+                    with self.assertRaises(QVProposalError):
+                        load_mapping_demand(self.payload(**{field_name: empty}))
+            with self.subTest(field=field_name, empty="absent"):
+                broken = self.payload()
+                del broken[field_name]
+                with self.assertRaises(QVProposalError):
+                    load_mapping_demand(broken)
+
+    def test_full_provenance_is_carried_not_reduced_to_a_path(self):
+        loaded = load_mapping_demand(self.payload(), inventory_path="runs/x/inventory.json")
+        self.assertEqual(
+            loaded.provenance_json(),
+            {
+                "stage_source": "5A-1",
+                "measures": "STATIC_MAPPING_COVERAGE_DEMAND",
+                "index_name": "SP500",
+                "universe_source": "announcements",
+                "universe_source_version": "eodhd-15y-2026-08",
+                "calendar_source": "eodhd",
+                "calendar_source_version": "eodhd-15y-2026-08",
+                "identity_source_version": "qv-identity-sha256:abc",
+                "inventory_path": "runs/x/inventory.json",
+            },
+        )
+
+    def test_selecting_symbols_preserves_provenance(self):
+        loaded = load_mapping_demand(self.payload(), inventory_path="runs/x/inventory.json")
+        picked = loaded.select(["AAA"])
+        self.assertEqual(sorted(picked.demand), ["AAA"])
+        self.assertEqual(picked.provenance_json(), loaded.provenance_json())
+        with self.assertRaises(QVProposalError):
+            loaded.select(["NOPE"])
+
+
+def demand_for(symbols: dict) -> DemandInput:
+    return DemandInput(
+        index_name="SP500",
+        universe_source="announcements",
+        universe_source_version="eodhd-15y-2026-08",
+        calendar_source="eodhd",
+        calendar_source_version="eodhd-15y-2026-08",
+        identity_source_version="qv-identity-sha256:abc",
+        demand=symbols,
+        inventory_path="runs/x/inventory.json",
+    )
 
 
 class DiscoveryTest(unittest.TestCase):
@@ -626,13 +719,13 @@ class DiscoveryTest(unittest.TestCase):
 
 
 class FetchTest(unittest.TestCase):
-    def client_with_cover(self, *, forms=("10-K",), facts=None):
+    def client_with_cover(self, facts=None):
         facts = dual_class_facts() if facts is None else facts
         return StubClient(
             rows_by_cik={
                 "0000000001": [
-                    StubRow("0000000001-24-000001", forms[0], "2024-02-20"),
-                    StubRow("0000000001-25-000001", forms[0], "2025-02-20"),
+                    StubRow("0000000001-24-000001", "10-K", "2024-02-20"),
+                    StubRow("0000000001-25-000001", "10-K", "2025-02-20"),
                 ]
             },
             files_by_accession={
@@ -645,22 +738,23 @@ class FetchTest(unittest.TestCase):
             },
         )
 
-    def test_proof_never_comes_from_after_the_demanded_session(self):
-        client = self.client_with_cover()
-        proof, absence, tried = fetch_cover_proof(
-            client, "0000000001", not_after_session="2024-06-28"
-        )
-        self.assertIsNone(absence)
-        self.assertEqual(proof.accession, "0000000001-24-000001")
-        self.assertEqual(tried, ("0000000001-24-000001",))
+    def test_later_filing_is_valid_static_evidence(self):
+        """CLOSED Step 4 계약: 나중 문서가 더 오래된 상태를 증명할 수 있다.
 
-    def test_no_filings_in_scope_is_named(self):
+        요구 formation보다 늦게 수리됐다는 이유로 문서를 버리지 않는다. 그 증거를
+        과거에 쓸 수 있었는지는 5A-3의 `usable_from_session`이 가른다.
+        """
         client = self.client_with_cover()
-        proof, absence, tried = fetch_cover_proof(
-            client, "0000000001", not_after_session="2009-06-26"
-        )
+        proof, absence, tried = fetch_cover_proof(client, "0000000001")
+        self.assertIsNone(absence)
+        self.assertEqual(proof.accession, "0000000001-25-000001")
+        self.assertEqual(tried, ("0000000001-25-000001",))
+
+    def test_no_periodic_filings_is_named(self):
+        client = StubClient(rows_by_cik={"0000000001": []})
+        proof, absence, tried = fetch_cover_proof(client, "0000000001")
         self.assertIsNone(proof)
-        self.assertEqual(absence, NO_FILINGS_IN_SCOPE)
+        self.assertEqual(absence, NO_PERIODIC_FILINGS)
         self.assertEqual(tried, ())
 
     def test_cover_without_dei_class_facts_is_absence_not_a_guess(self):
@@ -678,6 +772,284 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(tried, ("0000000001-10-000001",))
 
 
+class LaterEvidenceTest(unittest.TestCase):
+    """Finding 1 — static 증거와 PIT 가용성의 분리."""
+
+    def run_with_later_filing(self):
+        facts = dual_class_facts()
+        client = StubClient(
+            rows_by_cik={"0000000001": [StubRow("0000000001-25-000001", "10-K", "2025-02-20")]},
+            files_by_accession={
+                "0000000001-25-000001": {
+                    "cover.xml": cover_instance(facts, default_cik="0000000001")
+                }
+            },
+        )
+        return run_proposals(
+            client,
+            demand_for({"AAA": ("2009-06-30",)}),
+            companies={"AAA": StubCompany("0000000001", "Acme Inc.")},
+            overrides={},
+        )
+
+    def test_later_filing_reaches_the_proposal_through_the_run_path(self):
+        run = self.run_with_later_filing()
+        packet = run.proposals[0]
+        self.assertEqual(packet.proof.accession, "0000000001-25-000001")
+        self.assertNotIn(NO_COVER_PAGE_PROOF_DOCUMENT, packet.reason_codes)
+        self.assertEqual(len(packet.share_class_proposals), 2)
+
+    def test_no_usable_from_session_is_invented_anywhere(self):
+        payload = self.run_with_later_filing().as_json()
+        # 제안 본문 어디에도 PIT 가용성 값이 없다. 설명 note만 그것이 5A-3의 일이라고 적는다.
+        self.assertNotIn(
+            "usable_from_session", json.dumps(payload["proposals"], ensure_ascii=False)
+        )
+        self.assertIn("usable_from_session is derived in 5A-3", payload["note"])
+
+    def test_later_evidence_makes_no_claim_about_earlier_formations(self):
+        run = self.run_with_later_filing()
+        packet = run.proposals[0]
+        # 요구 formation은 기록되지만 그 시점에 쓸 수 있었다는 주장은 어디에도 없다.
+        self.assertEqual(packet.demanded_formation_sessions, ("2009-06-30",))
+        self.assertEqual(
+            [item.effective_from for item in packet.share_class_proposals], [None, None]
+        )
+        self.assertTrue(
+            all(not item.interval_proved for item in packet.share_class_proposals)
+        )
+        self.assertIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+
+
+class FakeNameIndex:
+    def __init__(self, mapping):
+        self.mapping = mapping
+
+    def candidates(self, name):
+        return sorted(self.mapping.get(name, ()))
+
+
+def historical_client(*, rows_by_cik, files_by_accession, submissions_extra, earnings, index):
+    return StubClient(
+        rows_by_cik=rows_by_cik,
+        files_by_accession=files_by_accession,
+        submissions_extra=submissions_extra,
+        earnings_by_cik=earnings,
+        name_index=index,
+    )
+
+
+def eight_k_rows(accession_prefix, dates):
+    return [StubRow(f"{accession_prefix}-{n:06d}", "8-K", date)
+            for n, date in enumerate(dates, start=1)]
+
+
+HISTORICAL_HINTS = DiscoveryHints(
+    source="announcements",
+    source_version="eodhd-15y-2026-08",
+    provenance="이름: sp500-changes.csv (security 칸) / 구간: universe_membership",
+    names={"OLDCO": "Oldco Industries", "REORG": "Reorg Industries"},
+    spans={"OLDCO": ("2008-01-02", "2012-06-30"), "REORG": ("2008-01-02", "2016-06-30")},
+)
+
+
+class HistoricalDiscoveryTest(unittest.TestCase):
+    """Finding 2 — 3층 발견이 실제 실행 경로에서 닿는다."""
+
+    def oldco_client(self, *, with_cover=True):
+        cover = cover_instance(dual_class_facts(), default_cik="0000000055")
+        rows = eight_k_rows("0000000055-10", ["2009-03-01", "2010-03-01"])
+        if with_cover:
+            rows = rows + [StubRow("0000000055-11-000001", "10-K", "2011-02-20")]
+        return historical_client(
+            rows_by_cik={"0000000055": rows},
+            files_by_accession={"0000000055-11-000001": {"cover.xml": cover}},
+            submissions_extra={
+                "0000000055": {"name": "OLDCO INDUSTRIES INC", "sic": "3714"}
+            },
+            earnings={"0000000055": ["2009-03-01", "2010-03-01"]},
+            index=FakeNameIndex({"Oldco Industries": ["0000000055"]}),
+        )
+
+    def test_historical_name_candidate_is_reachable_through_the_run_path(self):
+        client = self.oldco_client()
+        run = run_proposals(
+            client,
+            demand_for({"OLDCO": ("2010-06-30",)}),
+            companies={},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        packet = run.proposals[0]
+        origins = {item.origin for item in packet.discovery_candidates}
+        self.assertIn(HISTORICAL_NAME_LOOKUP, origins)
+        self.assertEqual(packet.selected_cik, "0000000055")
+        self.assertEqual(run.origin_counts().get(HISTORICAL_NAME_LOOKUP), 1)
+
+    def test_delisted_symbol_is_not_unresolved_just_because_the_ticker_file_lacks_it(self):
+        client = self.oldco_client()
+        run = run_proposals(
+            client,
+            demand_for({"OLDCO": ("2010-06-30",)}),
+            companies={},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        packet = run.proposals[0]
+        self.assertNotEqual(packet.proposal_status, UNRESOLVED)
+        self.assertNotIn(NO_DISCOVERY_CANDIDATE, packet.reason_codes)
+
+        without = run_proposals(
+            self.oldco_client(), demand_for({"OLDCO": ("2010-06-30",)}),
+            companies={}, overrides={},
+        )
+        self.assertEqual(without.proposals[0].proposal_status, UNRESOLVED)
+
+    def test_a_historical_hint_alone_cannot_create_auto_provable(self):
+        """증명이 있어도 구간 증거 없이는 승격되지 않고, 증명이 없으면 더더욱 아니다."""
+        client = self.oldco_client(with_cover=False)
+        run = run_proposals(
+            client,
+            demand_for({"OLDCO": ("2010-06-30",)}),
+            companies={},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        packet = run.proposals[0]
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(DISCOVERY_ONLY_NO_SEC_PROOF, packet.reason_codes)
+        self.assertEqual(packet.share_class_proposals, ())
+
+    def test_third_layer_does_not_run_when_earlier_layers_already_answered(self):
+        """`edgar.collect`와 같은 층 순서다. 항상 돌리면 건강한 종목까지 충돌한다."""
+        client = self.oldco_client()
+        run = run_proposals(
+            client,
+            demand_for({"OLDCO": ("2010-06-30",)}),
+            companies={"OLDCO": StubCompany("0000000055", "Oldco Inc.")},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        origins = {item.origin for item in run.proposals[0].discovery_candidates}
+        self.assertEqual(origins, {CURRENT_TICKER_FILE})
+
+    def reorg_client(self):
+        """후속은 2014부터만 제출하고 선행 등록인이 앞부분을 냈다."""
+        return historical_client(
+            rows_by_cik={
+                "0000000077": eight_k_rows("0000000077-14", ["2014-03-01", "2015-03-01"]),
+                "0000000066": eight_k_rows("0000000066-09", ["2009-03-01", "2010-03-01"]),
+            },
+            files_by_accession={},
+            submissions_extra={
+                "0000000077": {"name": "REORG HOLDINGS INC", "sic": "3714"},
+                "0000000066": {"name": "REORG INDUSTRIES INC", "sic": "3714"},
+            },
+            earnings={
+                "0000000077": ["2014-03-01", "2015-03-01"],
+                "0000000066": ["2009-03-01", "2010-03-01"],
+            },
+            index=FakeNameIndex({"Reorg Industries": ["0000000066"]}),
+        )
+
+    def test_predecessor_hint_is_reachable_through_the_run_path(self):
+        client = self.reorg_client()
+        run = run_proposals(
+            client,
+            demand_for({"REORG": ("2010-06-30",)}),
+            companies={"REORG": StubCompany("0000000077", "Reorg Holdings Inc.")},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        packet = run.proposals[0]
+        origins = {item.origin for item in packet.discovery_candidates}
+        self.assertIn(PREDECESSOR_HINT, origins)
+        self.assertEqual(run.origin_counts().get(PREDECESSOR_HINT), 1)
+
+    def test_historical_and_current_candidates_conflict_with_no_tie_break(self):
+        """선행(과거)과 후속(현재)이 함께 나오면 기계가 고르지 않는다."""
+        client = self.reorg_client()
+        run = run_proposals(
+            client,
+            demand_for({"REORG": ("2010-06-30",)}),
+            companies={"REORG": StubCompany("0000000077", "Reorg Holdings Inc.")},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        packet = run.proposals[0]
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(MULTIPLE_DISCOVERY_CANDIDATES, packet.reason_codes)
+        self.assertIn(CIK_CONFLICT, packet.reason_codes)
+        self.assertIsNone(packet.proof)
+        self.assertEqual(client.fetched, [])  # 확정 전에는 증명을 시도하지 않는다
+
+    def test_a_predecessor_hint_alone_cannot_create_auto_provable(self):
+        client = self.reorg_client()
+        run = run_proposals(
+            client,
+            demand_for({"REORG": ("2010-06-30",)}),
+            companies={"REORG": StubCompany("0000000077", "Reorg Holdings Inc.")},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        packet = run.proposals[0]
+        self.assertNotEqual(packet.proposal_status, AUTO_PROVABLE)
+        self.assertIn(SUCCESSOR_JUDGEMENT_REQUIRED, packet.reason_codes)
+        self.assertEqual(packet.share_class_proposals, ())
+
+    def test_predecessor_is_skipped_when_the_successor_already_covers_the_span(self):
+        client = historical_client(
+            rows_by_cik={
+                "0000000077": eight_k_rows("0000000077-07", ["2007-03-01", "2015-03-01"]),
+            },
+            files_by_accession={},
+            submissions_extra={"0000000077": {"name": "REORG HOLDINGS INC", "sic": "3714"}},
+            earnings={"0000000077": ["2007-03-01", "2015-03-01"]},
+            index=FakeNameIndex({"Reorg Industries": ["0000000066"]}),
+        )
+        run = run_proposals(
+            client,
+            demand_for({"REORG": ("2010-06-30",)}),
+            companies={"REORG": StubCompany("0000000077", "Reorg Holdings Inc.")},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        origins = {item.origin for item in run.proposals[0].discovery_candidates}
+        self.assertEqual(origins, {CURRENT_TICKER_FILE})
+
+    def test_name_index_is_built_at_most_once_per_run(self):
+        client = self.oldco_client()
+        run_proposals(
+            client,
+            demand_for({"OLDCO": ("2010-06-30",)}),
+            companies={},
+            overrides={},
+            hints=HISTORICAL_HINTS,
+        )
+        self.assertEqual(client.cik_lookup_calls, 1)
+
+    def test_hints_without_a_name_or_span_are_not_used(self):
+        partial = DiscoveryHints(
+            source="announcements",
+            source_version="eodhd-15y-2026-08",
+            provenance="부분",
+            names={"OLDCO": "Oldco Industries"},
+            spans={},
+        )
+        self.assertIsNone(partial.entry("OLDCO"))
+        client = self.oldco_client()
+        run = run_proposals(
+            client,
+            demand_for({"OLDCO": ("2010-06-30",)}),
+            companies={},
+            overrides={},
+            hints=partial,
+        )
+        self.assertEqual(run.proposals[0].proposal_status, UNRESOLVED)
+        self.assertEqual(client.cik_lookup_calls, 0)
+
+
 class RunTest(unittest.TestCase):
     def test_run_is_deterministic_and_declares_no_manifest_mutation(self):
         facts = dual_class_facts()
@@ -689,15 +1061,12 @@ class RunTest(unittest.TestCase):
                 }
             },
         )
-        demand = {"AAA": ("2024-06-28",), "ZZZ": ("2024-06-28",)}
         companies = {"AAA": StubCompany("0000000001", "Acme Inc.")}
         run = run_proposals(
             client,
-            demand,
+            demand_for({"AAA": ("2024-06-28",), "ZZZ": ("2024-06-28",)}),
             companies=companies,
             overrides={},
-            identity_source_version="qv-identity-sha256:abc",
-            demand_source="runs/x/inventory.json",
         )
         payload = run.as_json()
         self.assertIs(payload["mutates_production_manifest"], False)
@@ -708,15 +1077,36 @@ class RunTest(unittest.TestCase):
         self.assertEqual(run.counts()[AUTO_PROVABLE], 0)
         self.assertIn(CLASS_INTERVAL_NOT_EXPLICIT, run.reason_counts())
 
+    def test_run_output_reproduces_the_complete_5a1_provenance(self):
+        client = StubClient(rows_by_cik={}, files_by_accession={})
+        run = run_proposals(
+            client, demand_for({"ZZZ": ("2024-06-28",)}), companies={}, overrides={}
+        )
+        payload = run.as_json()
+        self.assertEqual(
+            payload["demand_provenance"],
+            {
+                "stage_source": "5A-1",
+                "measures": "STATIC_MAPPING_COVERAGE_DEMAND",
+                "index_name": "SP500",
+                "universe_source": "announcements",
+                "universe_source_version": "eodhd-15y-2026-08",
+                "calendar_source": "eodhd",
+                "calendar_source_version": "eodhd-15y-2026-08",
+                "identity_source_version": "qv-identity-sha256:abc",
+                "inventory_path": "runs/x/inventory.json",
+            },
+        )
+        self.assertEqual(payload["identity_source_version"], "qv-identity-sha256:abc")
+        self.assertIsNone(payload["discovery_hints"])
+
     def test_ambiguous_candidates_skip_the_sec_fetch_entirely(self):
         client = StubClient(rows_by_cik={}, files_by_accession={})
         run = run_proposals(
             client,
-            {"AAA": ("2024-06-28",)},
+            demand_for({"AAA": ("2024-06-28",)}),
             companies={"AAA": StubCompany("0000000001", "Acme Inc.")},
             overrides={"AAA": "0000000002"},
-            identity_source_version="qv-identity-sha256:abc",
-            demand_source="runs/x/inventory.json",
         )
         self.assertEqual(client.fetched, [])
         self.assertEqual(run.proposals[0].proposal_status, REVIEW_REQUIRED)
