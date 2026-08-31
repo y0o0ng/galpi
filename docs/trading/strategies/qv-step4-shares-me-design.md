@@ -264,13 +264,22 @@ qv_share_basis_class_effects   대상 class의 semantic 효과
 NOT_SEARCHED | COMPLETE | INCOMPLETE
 ```
 
-선택된 filing의 share-basis anchor에서 December D를 향하는 구간에 대해
+구간은 **선택된 filing의 share-basis anchor와 December D 두 끝점에서 정규화**한다.
 
-- **closure filing G** = `acceptance_eastern_date >= high boundary`인 **첫 원본**
-  10-K 또는 10-Q
+```text
+low  = min(anchor acceptance_eastern_date, D)
+high = max(anchor acceptance_eastern_date, D)
+탐색 구간 = (low, high]      -- low는 열려 있고 high는 닫혀 있다
+```
+
+**방향을 가정하지 않는다.** 후보가 결산 이후 filing이면 `anchor > D`이고 이전 filing이면
+`anchor < D`다. 한쪽 방향만 가정하면 반대 방향에서 구간이 뒤집혀 비고, **그 사이 공시를
+하나도 읽지 않은 채 `COMPLETE`가 난다.** `±N일` 같은 여유는 없다.
+
+- **closure filing G** = `acceptance_eastern_date >= high`인 **첫 원본** 10-K 또는 10-Q
 - G가 없으면 `INCOMPLETE`
 - G의 acceptance가 formation F보다 늦으면 `INCOMPLETE`
-- 탐색 범위는 `(lo, G.acceptance]`의 모든 `10-K / 10-K/A / 10-Q / 10-Q/A`
+- 탐색 범위는 `(low, G.acceptance]`의 모든 `10-K / 10-K/A / 10-Q / 10-Q/A`
 - **amendment는 증거이지만 절대 closing filing G가 될 수 없다**
 - 완전 탐색에 필요한 문서가 없거나 실패하면 `INCOMPLETE`
 
@@ -427,17 +436,18 @@ B = dei:EntityCommonStockSharesOutstanding
 > 소유한다. **다른 class로 명시적으로 풀린 A는 이 class의 구조적 존재가 아니다** —
 > 그것까지 세면 무관한 class 때문에 전부 막힌다.
 
-**same-regime 판정** — 후보 filing의 basis에서 D까지
+**same-regime 판정** — 후보 filing basis anchor의 regime과 D의 regime을 견준다
 
 ```text
-coverage != COMPLETE           -> 사용 불가 / fail-close
-적용 가능한 UNRESOLVED 효과     -> 사용 불가 / fail-close
-확인된 적용 가능 basis 변경     -> 다른 regime / 사용 불가
-COMPLETE + 미해결/변경 없음     -> same regime
+coverage != COMPLETE                  -> 사용 불가 / fail-close
+적용 가능한 UNRESOLVED 효과            -> 사용 불가 / fail-close
+(low, high] 안 확인된 적용 가능 변경   -> 다른 regime / 사용 불가
+COMPLETE + 미해결/변경 없음            -> same regime
 ```
 
-후보의 basis anchor는 그 filing의 acceptance 체제이므로, 판정 구간은 `(D, anchor]`다.
-**전환이 anchor보다 뒤에 일어났으면 그 filing은 여전히 D와 같은 단위다.**
+후보의 basis anchor는 그 filing의 acceptance 체제다. **판정 구간은 §5.1과 같은 정규화
+구간 `(min(anchor, D), max(anchor, D)]`이고 방향을 가정하지 않는다** — 두 층이 같은
+헬퍼를 쓰므로 어긋날 수 없다. **구간 밖의 사건은 후보와 D의 관계를 바꾸지 않는다.**
 
 **활성 tier 안 선택 순서**
 

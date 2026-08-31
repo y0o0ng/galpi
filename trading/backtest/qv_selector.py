@@ -18,7 +18,12 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 
-from .qv_events import COMPLETE, SHARE_BASIS_CHANGE_CONFIRMED, UNRESOLVED as EVENT_UNRESOLVED
+from .qv_events import (
+    COMPLETE,
+    SHARE_BASIS_CHANGE_CONFIRMED,
+    UNRESOLVED as EVENT_UNRESOLVED,
+    normalized_interval,
+)
 
 PATH_A = "A"
 PATH_B = "B_FALLBACK"
@@ -95,15 +100,18 @@ def _regime_for_accession(
     events_source_version: str,
     identity_source_version: str,
 ) -> tuple[str, str]:
-    """후보 filing의 basis에서 D까지 같은 regime인지 본다.
+    """후보 filing의 basis regime과 D의 basis regime이 같은지 본다.
 
-    후보의 share-basis anchor는 그 filing의 acceptance 체제다. 따라서 판정 구간은
-    `(D, anchor]`이고, 그 안에 확인된 basis 전환이 들어오면 그 filing의 숫자는
-    D와 다른 단위다. 사건이 anchor보다 뒤면 그 filing은 여전히 D와 같은 단위다.
+    후보의 share-basis anchor는 그 filing의 acceptance 체제다. 비교 구간은 두 끝점에서
+    정규화한 `(low, high]`이고 **방향을 가정하지 않는다** — 후보가 결산 이후 filing이면
+    `anchor > D`, 이전 filing이면 `anchor < D`다. 한쪽 방향만 보면 반대 방향의 확인된
+    전환이 조용히 same-regime으로 통과한다.
+
+    구간 **밖**의 사건은 후보와 D의 관계를 바꾸지 않는다.
 
         coverage != COMPLETE            -> 쓸 수 없다
         적용 가능한 UNRESOLVED 효과      -> 쓸 수 없다
-        구간 안 확인된 basis 변경        -> 다른 regime
+        (low, high] 안 확인된 basis 변경 -> 다른 regime
         COMPLETE + 미해결/변경 없음      -> same regime
     """
     search = connection.execute(
@@ -123,7 +131,9 @@ def _regime_for_accession(
     ).fetchone()
     if anchor_row is None or anchor_row["acceptance_eastern_date"] is None:
         return REGIME_UNRESOLVED, coverage
-    anchor = anchor_row["acceptance_eastern_date"]
+    low, high = normalized_interval(
+        anchor_row["acceptance_eastern_date"], valuation_date
+    )
 
     effects = connection.execute(
         "SELECT effect, share_side_transition_date FROM qv_share_basis_class_effects"
@@ -141,7 +151,7 @@ def _regime_for_accession(
         transition = row["share_side_transition_date"]
         if transition is None:
             return REGIME_UNRESOLVED, coverage
-        if valuation_date < transition <= anchor:
+        if low < transition <= high:
             return DIFFERENT_REGIME, coverage
     return SAME_REGIME, coverage
 

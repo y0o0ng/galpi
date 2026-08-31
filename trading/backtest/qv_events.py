@@ -381,6 +381,29 @@ def _dispose(
 # ── 탐색 coverage ─────────────────────────────────────────────────────────────
 
 
+def normalized_interval(
+    anchor_acceptance_eastern_date: str, valuation_date: str
+) -> tuple[str, str]:
+    """후보 basis anchor와 December D 사이의 정규화 구간 `(low, high]`.
+
+    P2가 비교하는 것은 **후보 filing basis anchor의 share-unit regime**과
+    **D의 share-unit regime**이다. 두 끝점의 시간 순서는 후보가 결산 이후 filing이냐
+    이전 filing이냐에 따라 뒤집히므로, 방향을 가정하지 않고 두 값에서 결정론적으로
+    낮은 쪽과 높은 쪽을 만든다. `±N일` 같은 여유는 없다.
+    """
+    if anchor_acceptance_eastern_date <= valuation_date:
+        return anchor_acceptance_eastern_date, valuation_date
+    return valuation_date, anchor_acceptance_eastern_date
+
+
+def _closure_filing(rows, high: str):
+    """정규화된 high boundary 이상 acceptance를 가진 **첫 원본** 10-K/10-Q."""
+    for row in rows:
+        if row["form"] in ORIGINAL_FORMS and row["acceptance_eastern_date"] >= high:
+            return row
+    return None
+
+
 @dataclass(frozen=True)
 class ProcessedDocument:
     """탐색이 실제로 읽고 discovery에 통과시킨 문서 하나."""
@@ -425,17 +448,20 @@ def compute_search_coverage(
     processed_accessions: tuple[str, ...] | list[str] | set[str] = (),
     failed_accessions: tuple[tuple[str, str], ...] | list[tuple[str, str]] = (),
 ) -> SearchCoverage:
-    """anchor filing에서 December D까지의 탐색이 닫히는지 판정한다.
+    """후보 basis anchor와 December D **사이**의 탐색이 닫히는지 판정한다.
 
-    closure filing G는 high boundary 이상 acceptance를 가진 **원본** 10-K/10-Q다.
+    구간은 두 끝점에서 정규화한 `(low, high]`다. 후보가 결산 이후 filing이면
+    `anchor > D`이고 이전 filing이면 `anchor < D`인데, 방향을 가정하면 한쪽에서
+    구간이 뒤집혀 비게 되고 그 사이 공시를 하나도 읽지 않은 채 COMPLETE가 난다.
+
+    closure filing G는 정규화된 high boundary 이상 acceptance를 가진 **원본** 10-K/10-Q다.
     amendment는 증거로 탐색에 들어가지만 **절대 닫지 못한다**.
 
     **metadata closure만으로는 COMPLETE가 되지 않는다.** 구간 안 모든 필수 accession이
     실제로 읽히고 discovery/extraction을 통과했다는 증명(`processed_accessions`)이
     있어야 하고, 필요한 문서를 하나라도 못 읽으면(`failed_accessions`) INCOMPLETE다.
     """
-    lo = anchor_acceptance_eastern_date
-    hi = valuation_date
+    lo, hi = normalized_interval(anchor_acceptance_eastern_date, valuation_date)
     processed = tuple(sorted(set(processed_accessions)))
     failed = tuple(sorted((str(a), str(r)) for a, r in failed_accessions))
 
@@ -446,14 +472,7 @@ def compute_search_coverage(
         (cik, filings_source_version),
     ).fetchall()
 
-    closure = None
-    for row in rows:
-        if row["form"] not in ORIGINAL_FORMS:
-            continue
-        if row["acceptance_eastern_date"] >= hi:
-            closure = row
-            break
-
+    closure = _closure_filing(rows, hi)
     if closure is None:
         return _incomplete(
             lo, hi, "high boundary 이상 acceptance를 가진 원본 10-K/10-Q가 없다",
@@ -669,27 +688,26 @@ def required_accessions(
     valuation_date: str,
     filings_source_version: str,
 ) -> tuple[str | None, tuple[str, ...]]:
-    """closure filing과 그때까지 반드시 읽어야 할 accession 목록."""
+    """closure filing과 그때까지 반드시 읽어야 할 accession 목록.
+
+    `compute_search_coverage`와 **같은 정규화 구간**을 쓴다. 둘이 어긋나면 처리 증명이
+    실제 필요 범위와 달라진다.
+    """
+    low, high = normalized_interval(anchor_acceptance_eastern_date, valuation_date)
     rows = connection.execute(
         "SELECT accession, form, acceptance_eastern_date FROM qv_sec_filings"
         " WHERE cik = ? AND source_version = ? AND acceptance_eastern_date IS NOT NULL"
         " ORDER BY acceptance_eastern_date, accession",
         (cik, filings_source_version),
     ).fetchall()
-    closure = None
-    for row in rows:
-        if row["form"] in ORIGINAL_FORMS and row["acceptance_eastern_date"] >= valuation_date:
-            closure = row
-            break
+    closure = _closure_filing(rows, high)
     if closure is None:
         return None, ()
     return closure["accession"], tuple(
         row["accession"]
         for row in rows
         if row["form"] in SEARCHABLE_FORMS
-        and anchor_acceptance_eastern_date
-        < row["acceptance_eastern_date"]
-        <= closure["acceptance_eastern_date"]
+        and low < row["acceptance_eastern_date"] <= closure["acceptance_eastern_date"]
     )
 
 

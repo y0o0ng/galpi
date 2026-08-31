@@ -1222,6 +1222,51 @@ python3 -m unittest discover -s tests -p "test_*.py"            -> 1465 tests OK
 
 ---
 
+## 10.10 P2 same-regime interval fix receipt — 2026-08-31
+
+**정본은 그대로 `docs/trading/strategies/qv-step4-shares-me-design.md`다.**
+P2를 다시 열지 않았고 새 휴리스틱·tolerance·tuning knob을 넣지 않았다.
+
+**버그는 시간 구간을 방향에 따라 다르게 다룬 것이다.** P2가 견주는 것은 후보 filing
+basis anchor의 regime과 December D의 regime인데, 구현이 한쪽 방향만 가정했다.
+
+| 층 | 증상 |
+|---|---|
+| 탐색 | `lo = anchor`, `hi = D`로 고정. 결산 이후 filing(`anchor > D`)에서 구간이 뒤집혀 필수 accession 범위가 **비고**, D와 anchor 사이 공시를 하나도 읽지 않은 채 `COMPLETE`가 났다 |
+| 선택기 | `D < transition <= anchor`만 봤다. 결산 **이전** filing(`anchor < D`)에서 `anchor < transition <= D`인 확인된 전환이 잡히지 않아 후보가 `SAME_REGIME`으로 통과했다 |
+
+**수정은 두 끝점에서 구간을 정규화하는 것 하나다.**
+
+```text
+low  = min(anchor acceptance_eastern_date, D)
+high = max(anchor acceptance_eastern_date, D)
+비교 구간 = (low, high]
+```
+
+`qv_events.normalized_interval()` 하나를 탐색(`compute_search_coverage` ·
+`required_accessions`)과 선택기(`_regime_for_accession`)가 **함께** 쓰므로 두 층이
+어긋날 수 없다. closure G·amendment 비폐쇄·처리 증명·A/B tier·fallback·비율 정규화
+금지는 전부 그대로다.
+
+### 검증
+
+새 regression을 수정 **전** 코드에 돌려 세 실패를 직접 확인했다.
+
+```text
+SAME_REGIME != DIFFERENT_REGIME        (anchor < D 전환을 못 잡음)
+COMPLETE != INCOMPLETE                 (뒤집힌 구간에서 빈 범위로 COMPLETE)
+() != ('0001234567-21-000001',)        (필수 accession 범위가 비어 있음)
+```
+
+```text
+python3 -m unittest tests.test_qv_step4 tests.test_qv_identity  -> 136 tests OK
+python3 -m unittest discover -s tests -p "test_*.py"            -> 1472 tests OK
+```
+
+기존 테스트는 하나도 약화하지 않았다. **Gate C는 여전히 판정하지 않는다.**
+
+---
+
 ## 11. 결과
 
 

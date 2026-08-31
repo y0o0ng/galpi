@@ -976,6 +976,86 @@ class TierAndSameRegimeTest(Step4Fixture, unittest.TestCase):
         # cls-a는 자기 A를 그대로 쓴다.
         self.assertEqual(self.resolve().selector_path, "A")
 
+    # ── 정규화 구간 `(min(anchor, D), max(anchor, D)]` ────────────────────────
+    #
+    # P2가 비교하는 것은 후보 basis anchor의 regime과 D의 regime이다. 후보가 결산
+    # 이후 filing이면 anchor > D, 이전 filing이면 anchor < D다. 한쪽 방향만 가정하면
+    # 반대 방향에서 조용히 틀린다.
+
+    def test_change_between_d_and_a_later_anchor_is_different_regime(self):
+        """anchor > D — D와 anchor 사이 전환은 후보를 다른 regime으로 만든다."""
+        self.setup_class_a()
+        self.ingest("0001234567-21-000001", [
+            {"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+             "instant": self.D, "value": "10000", "decimals": "INF",
+             "member": (USG, "CommonClassAMember")},
+        ], acceptance="2021-02-10T21:00:00.000000Z")
+        self.mark_search("0001234567-21-000001", "COMPLETE")
+        self.mark_effect(
+            "cls-a", "0001234567-21-000001", "SHARE_BASIS_CHANGE_CONFIRMED",
+            ratio="10-for-one", transition="2021-01-15", role="EFFECTIVE",
+        )
+        result = self.resolve()
+        self.assertEqual(result.regime_status, "DIFFERENT_REGIME")
+        self.assertEqual(result.selector_path, "MISSING")
+
+    def test_change_between_an_earlier_anchor_and_d_is_different_regime(self):
+        """anchor < D — 결산 이전 filing이 후보일 때도 전환을 잡아야 한다."""
+        self.setup_class_a()
+        self.ingest("0001234567-20-00000Q", [
+            {"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+             "instant": "2020-06-30", "value": "1000", "decimals": "INF",
+             "member": (USG, "CommonClassAMember")},
+        ], form="10-Q", acceptance="2020-08-10T21:00:00.000000Z")
+        self.mark_search("0001234567-20-00000Q", "COMPLETE")
+        self.mark_effect(
+            "cls-a", "0001234567-20-00000Q", "SHARE_BASIS_CHANGE_CONFIRMED",
+            ratio="10-for-one", transition="2020-10-01", role="EFFECTIVE",
+        )
+        result = self.resolve()
+        self.assertEqual(result.regime_status, "DIFFERENT_REGIME")
+        self.assertEqual(result.selector_path, "MISSING")
+
+    def test_event_outside_the_normalized_interval_keeps_same_regime(self):
+        self.setup_class_a()
+        self.ingest("0001234567-20-00000Q", [
+            {"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+             "instant": "2020-06-30", "value": "1000", "decimals": "INF",
+             "member": (USG, "CommonClassAMember")},
+        ], form="10-Q", acceptance="2020-08-10T21:00:00.000000Z")
+        self.mark_search("0001234567-20-00000Q", "COMPLETE")
+        # anchor(2020-08-10)보다 앞이고 D보다도 앞인 사건.
+        self.mark_effect(
+            "cls-a", "0001234567-20-00000Q", "SHARE_BASIS_CHANGE_CONFIRMED",
+            ratio="2-for-one", transition="2020-03-02", role="EFFECTIVE",
+        )
+        result = self.resolve()
+        self.assertEqual(result.regime_status, "SAME_REGIME")
+        self.assertEqual(result.share_value_text, "1000")
+
+    def test_both_orientations_with_no_event_are_same_regime(self):
+        self.setup_class_a()
+        self.ingest("0001234567-20-00000Q", [
+            {"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+             "instant": "2020-06-30", "value": "1000", "decimals": "INF",
+             "member": (USG, "CommonClassAMember")},
+        ], form="10-Q", acceptance="2020-08-10T21:00:00.000000Z")
+        self.mark_search("0001234567-20-00000Q", "COMPLETE")
+        early = self.resolve()
+        self.assertEqual(early.regime_status, "SAME_REGIME")
+        self.assertEqual(early.selected_accession, "0001234567-20-00000Q")
+
+        self.ingest("0001234567-21-000001", [
+            {"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+             "instant": self.D, "value": "1200", "decimals": "INF",
+             "member": (USG, "CommonClassAMember")},
+        ], acceptance="2021-02-10T21:00:00.000000Z")
+        self.mark_search("0001234567-21-000001", "COMPLETE")
+        later = self.resolve()
+        self.assertEqual(later.regime_status, "SAME_REGIME")
+        # 더 늦은 instant가 이긴다.
+        self.assertEqual(later.selected_accession, "0001234567-21-000001")
+
     def test_class_retired_before_d_is_excluded_from_the_universe(self):
         self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember")
         self.add_class("cls-old", listed=False, effective_from="2015-01-01",
@@ -1072,6 +1152,67 @@ class EventSearchTest(Step4Fixture, unittest.TestCase):
         self.assertEqual(complete.coverage, "COMPLETE")
         self.assertIsNone(complete.incomplete_reason)
 
+
+    def test_post_year_end_anchor_still_requires_processing_that_filing(self):
+        """anchor > D — 구간이 뒤집혀 비면 아무 문서도 안 읽고 COMPLETE가 난다.
+
+        정규화 뒤에는 D와 anchor 사이가 실제 구간이고, 후보 10-K 자신이 그 안에 있다.
+        """
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-000001", form="10-K",
+            acceptance_datetime="2021-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        empty = self.coverage(
+            anchor="2021-02-10", d="2020-12-31", formation="2021-06-30", processed=[]
+        )
+        self.assertEqual(empty.coverage, "INCOMPLETE")
+        self.assertEqual(empty.interval_lo, "2020-12-31")
+        self.assertEqual(empty.interval_hi, "2021-02-10")
+        self.assertIn("0001234567-21-000001", empty.searched_accessions)
+
+        done = self.coverage(anchor="2021-02-10", d="2020-12-31", formation="2021-06-30")
+        self.assertEqual(done.coverage, "COMPLETE")
+        self.assertEqual(done.closure_accession, "0001234567-21-000001")
+        self.assertIn("0001234567-21-000001", done.processed_accessions)
+
+    def test_pre_year_end_anchor_searches_through_the_closure(self):
+        """anchor < D — anchor 다음부터 closure까지가 필수 범위다."""
+        for accession, acceptance, form in (
+            ("0001234567-20-00000Q", "2020-08-10T21:00:00.000000Z", "10-Q"),
+            ("0001234567-20-00000R", "2020-11-05T21:00:00.000000Z", "10-Q"),
+            ("0001234567-21-000001", "2021-02-10T21:00:00.000000Z", "10-K"),
+        ):
+            seed_filing(
+                self.connection, cik=CIK, accession=accession, form=form,
+                acceptance_datetime=acceptance, source=SHARES_SOURCE,
+                source_version=SHARES_VERSION,
+            )
+        result = self.coverage(
+            anchor="2020-08-10", d="2020-12-31", formation="2021-06-30"
+        )
+        self.assertEqual(result.coverage, "COMPLETE")
+        self.assertEqual(result.interval_lo, "2020-08-10")
+        self.assertEqual(result.interval_hi, "2020-12-31")
+        self.assertEqual(result.closure_accession, "0001234567-21-000001")
+        # anchor 자신은 구간 밖(open on low)이고 그 뒤 둘은 필수다.
+        self.assertEqual(
+            set(result.searched_accessions),
+            {"0001234567-20-00000R", "0001234567-21-000001"},
+        )
+
+    def test_required_accessions_uses_the_same_normalized_interval(self):
+        seed_filing(
+            self.connection, cik=CIK, accession="0001234567-21-000001", form="10-K",
+            acceptance_datetime="2021-02-10T21:00:00.000000Z",
+            source=SHARES_SOURCE, source_version=SHARES_VERSION,
+        )
+        closure, required = qv_events.required_accessions(
+            self.connection, cik=CIK, anchor_acceptance_eastern_date="2021-02-10",
+            valuation_date="2020-12-31", filings_source_version=SHARES_VERSION,
+        )
+        self.assertEqual(closure, "0001234567-21-000001")
+        self.assertEqual(required, ("0001234567-21-000001",))
 
     def test_metadata_complete_but_unread_accession_is_incomplete(self):
         seed_filing(
