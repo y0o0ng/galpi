@@ -878,6 +878,21 @@ PilotCase objects. The 90 constructed synthetic cases are fixed as:
     ambiguity, explicit correction, Core/high-impact, and
     authority-sensitive boundaries.
 
+### P1-B1 pre-run primary adjudication receipt
+
+Before any P1-B1 model calibration output was observed, a blind primary
+human review under protocol `xion-p1b1-human-primary-v1` was frozen against
+fixture commit `4e8375fcc1e2d7c75db405ea7c2f127ac42d4d2d`.
+The review completed all 47 selected non-hard-gated semantic cases: 25
+write/no-write triage and 22 ambiguity/escalation cases. Human primary
+labels disagreed with the preregistered constructed labels on 0/47 cases.
+
+Those 47 reviewed cases now use `HUMAN` primary gold. The 30 structured
+extraction cases and 13 hard-gated capability probes retain
+`PROGRAMMATIC` gold. This was primary adjudication, not a blind second
+pass; `blindSecondPass` remains null and disagreement state remains
+`NOT_ASSESSED`. P1-B1 model calibration has not yet been run.
+
 P1-B1 structured extraction uses **Option A**: every case asks for one
 fact that is explicitly present and unambiguous in bounded evidence.
 Missing-value, conflicting-answer, and intrinsically ambiguous extraction

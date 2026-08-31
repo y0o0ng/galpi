@@ -183,6 +183,92 @@ test('P1-B1 tracked fixture is exact, synthetic, and has preregistered distribut
   ]) {
     assert.equal(ambiguityProbeReasons.filter(reason => reason === reasonCode).length, 2);
   }
+
+  const humanCases = fixture.cases.filter(item => item.adjudication.primary.source === 'HUMAN');
+  const programmaticCases = fixture.cases.filter(item => (
+    item.adjudication.primary.source === 'PROGRAMMATIC'
+  ));
+  assert.equal(humanCases.length, 47);
+  assert.equal(programmaticCases.length, 43);
+  assert.deepEqual({
+    triage: humanCases.filter(item => (
+      item.workloadType === WORKLOAD_TYPES.WRITE_CANDIDATE_TRIAGE
+      && item.hardGateExpectation.status !== HARD_GATE_EXPECTATIONS.APPLIES
+    )).length,
+    ambiguity: humanCases.filter(item => (
+      item.workloadType === WORKLOAD_TYPES.AMBIGUITY_ESCALATION
+      && item.hardGateExpectation.status !== HARD_GATE_EXPECTATIONS.APPLIES
+    )).length,
+  }, { triage: 25, ambiguity: 22 });
+  assert.equal(humanCases.some(item => (
+    item.workloadType === WORKLOAD_TYPES.STRUCTURED_EXTRACTION
+    || fixture.calibrationMetadata[item.caseId].capabilityProbe
+  )), false);
+  assert.deepEqual({
+    extraction: programmaticCases.filter(item => (
+      item.workloadType === WORKLOAD_TYPES.STRUCTURED_EXTRACTION
+    )).length,
+    probes: programmaticCases.filter(item => (
+      fixture.calibrationMetadata[item.caseId].capabilityProbe
+    )).length,
+  }, { extraction: 30, probes: 13 });
+  for (const pilotCase of humanCases) {
+    assert.equal(
+      pilotCase.adjudication.primary.label,
+      fixture.calibrationMetadata[pilotCase.caseId].screeningClass,
+    );
+  }
+  for (const pilotCase of fixture.cases) {
+    assert.equal(pilotCase.adjudication.state, 'PRIMARY_ADJUDICATED');
+    assert.equal(pilotCase.adjudication.blindSecondPass, null);
+    assert.equal(pilotCase.adjudication.disagreementState, 'NOT_ASSESSED');
+    assert.equal(pilotCase.adjudication.finalResolvedHumanLabel, null);
+    assert.equal(pilotCase.adjudication.cloudAssistedReview.performed, false);
+  }
+});
+
+test('P1-B1 validator requires primary provenance determined by workload and hard gate', () => {
+  const fixture = loadCalibrationFixture(FIXTURE_PATH);
+  const extraction = structuredClone(fixture.cases.find(item => (
+    item.workloadType === WORKLOAD_TYPES.STRUCTURED_EXTRACTION
+  )));
+  extraction.adjudication.primary.source = 'HUMAN';
+  assert.throws(
+    () => validateCalibrationFixture({
+      ...fixture,
+      cases: fixture.cases.map(item => item.caseId === extraction.caseId ? extraction : item),
+    }),
+    /PROGRAMMATIC/,
+  );
+
+  const nonHardGatedSemantic = structuredClone(fixture.cases.find(item => (
+    item.workloadType === WORKLOAD_TYPES.WRITE_CANDIDATE_TRIAGE
+    && item.hardGateExpectation.status !== HARD_GATE_EXPECTATIONS.APPLIES
+  )));
+  nonHardGatedSemantic.adjudication.primary.source = 'PROGRAMMATIC';
+  assert.throws(
+    () => validateCalibrationFixture({
+      ...fixture,
+      cases: fixture.cases.map(item => (
+        item.caseId === nonHardGatedSemantic.caseId ? nonHardGatedSemantic : item
+      )),
+    }),
+    /HUMAN/,
+  );
+
+  const hardGatedProbe = structuredClone(fixture.cases.find(item => (
+    fixture.calibrationMetadata[item.caseId].capabilityProbe
+  )));
+  hardGatedProbe.adjudication.primary.source = 'HUMAN';
+  assert.throws(
+    () => validateCalibrationFixture({
+      ...fixture,
+      cases: fixture.cases.map(item => (
+        item.caseId === hardGatedProbe.caseId ? hardGatedProbe : item
+      )),
+    }),
+    /PROGRAMMATIC/,
+  );
 });
 
 test('calibration metadata remains outside PilotCase and is never exposed to prompts', () => {

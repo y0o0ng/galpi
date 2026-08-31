@@ -1012,7 +1012,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1042,7 +1042,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1072,7 +1072,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1102,7 +1102,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1132,7 +1132,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1162,7 +1162,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1192,7 +1192,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1222,7 +1222,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1252,7 +1252,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1282,7 +1282,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "NO_WRITE"
         },
         "blindSecondPass": null,
@@ -1312,7 +1312,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1342,7 +1342,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1372,7 +1372,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1402,7 +1402,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1432,7 +1432,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1462,7 +1462,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1492,7 +1492,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1522,7 +1522,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1552,7 +1552,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1582,7 +1582,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "WRITE_CANDIDATE"
         },
         "blindSecondPass": null,
@@ -1612,7 +1612,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -1642,7 +1642,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -1672,7 +1672,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -1702,7 +1702,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -1732,7 +1732,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -1912,7 +1912,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -1942,7 +1942,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -1972,7 +1972,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2002,7 +2002,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2032,7 +2032,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2062,7 +2062,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2092,7 +2092,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2122,7 +2122,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2152,7 +2152,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2182,7 +2182,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2212,7 +2212,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2242,7 +2242,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "CLEAR"
         },
         "blindSecondPass": null,
@@ -2272,7 +2272,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2302,7 +2302,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2332,7 +2332,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2362,7 +2362,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2392,7 +2392,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2422,7 +2422,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2452,7 +2452,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2482,7 +2482,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2512,7 +2512,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
@@ -2542,7 +2542,7 @@
       "adjudication": {
         "state": "PRIMARY_ADJUDICATED",
         "primary": {
-          "source": "PROGRAMMATIC",
+          "source": "HUMAN",
           "label": "ESCALATE"
         },
         "blindSecondPass": null,
