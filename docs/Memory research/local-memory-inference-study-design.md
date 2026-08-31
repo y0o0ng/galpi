@@ -718,10 +718,10 @@ Start the runtime separately, record its exact version/artifact, then run:
 ```bash
 npm run research:memory-inference-smoke -- \
   --endpoint http://127.0.0.1:8080/v1 \
-  --model local-model-id \
-  --artifact ggml-org/Qwen3.5-0.8B-GGUF:Q8_0 \
-  --quantization Q8_0 \
-  --runtime-version llama.cpp-version-or-commit
+  --model MODEL_ID \
+  --artifact ARTIFACT_OR_REVISION_ID \
+  --quantization QUANTIZATION_ID \
+  --runtime-version RUNTIME_VERSION_OR_COMMIT
 ```
 
 The JSON stdout report records the Galpi commit and bounded model,
@@ -736,3 +736,117 @@ Intel Mac during bring-up is a development observation and is not final
 evidence that an always-on target device is operationally feasible. It
 does not freeze a model family, prompt, threshold, deadline, or hardware
 acceptance criterion.
+
+### First real-runtime bring-up receipt
+
+This receipt records a manually executed local development run, not a
+GitHub CI result.
+
+-   Galpi commit:
+    `8773445a4c2f40e15e977ee4ce93e9dbb0ff317e`
+-   llama.cpp runtime commit:
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`
+-   environment: Intel Mac development host, external llama.cpp HTTP
+    server, CPU-only execution with `--n-gpu-layers 0`
+-   model ID and artifact ID: `ggml-org/Qwen3-0.6B-GGUF:BF16`
+-   quantization: `BF16`
+-   policy: `LOCAL_ONLY`
+-   report version:
+    `xion-local-memory-inference-p1a-smoke-report-v1`
+
+The completed three-case run reported:
+
+```text
+cases: 3
+schemaValid: 2
+invalidStructuredOutput: 1
+runnerFailures: 0
+semanticScored: 1
+capabilityProbes: 1
+localFirstCompletionOpportunities: 1
+directTaskOutcomes: SUCCESS 1 / FAILURE 1 / UNKNOWN 1 / NOT_RUN 0
+```
+
+Per-case observations:
+
+1.  `synthetic-extraction-001` (`structured_extraction`) was a
+    `LOCAL_ELIGIBLE` case. Its output was `schemaStatus=INVALID`,
+    `taskOutcome=FAILURE`, with `MODEL_OUTPUT_INVALID_JSON`; semantic
+    scoring was `NOT_SCORED / INVALID_JSON`. End-to-end latency was
+    `728.482 ms`. The smoke runner did not preserve the raw invalid model
+    content, so this receipt does not attribute the failure to a Markdown
+    fence or any other unrecorded raw-output shape. A separate earlier
+    diagnostic request producing fenced JSON does not establish the cause
+    of this smoke-run failure.
+2.  `synthetic-triage-001` (`write_candidate_triage`) was
+    `ELIGIBILITY_UNKNOWN` and returned `{"decision":"ESCALATE"}` with
+    `schemaStatus=VALID` and `taskOutcome=UNKNOWN`. Semantic scoring was
+    `NOT_SCORED / ADJUDICATION_UNAVAILABLE`; end-to-end latency was
+    `1180.54 ms`. The case intentionally has no resolved gold label, so
+    this is neither a semantic success nor a semantic failure.
+3.  `synthetic-ambiguity-001` (`ambiguity_escalation`) was a hard-gated
+    `CAPABILITY_PROBE`, not a LOCAL-FIRST completion opportunity. It
+    returned `{"decision":"ESCALATE"}` with `schemaStatus=VALID`,
+    `taskOutcome=SUCCESS`, and `SCORED / MATCH`; end-to-end latency was
+    `1212.12 ms`.
+
+This run exercised the complete real-local path:
+
+```text
+PilotCase
+→ external llama.cpp HTTP inference
+→ model output
+→ external JSON/schema validation
+→ PilotResult validation
+```
+
+It includes both a valid-result path and a fail-closed invalid-output
+path. The measured latencies are Intel Mac CPU-only development
+observations, not final always-on hardware feasibility evidence.
+
+### Qwen3.5-0.8B compatibility observations
+
+The same development environment and llama.cpp runtime commit were used
+for an earlier Qwen3.5-0.8B bring-up attempt.
+
+-   The Q8_0 artifact produced repeated `@` token degeneration.
+-   The BF16 artifact answered trivial short prompts such as `OK` and a
+    simple short JSON request normally, but reproducibly degenerated into
+    repeated `@` tokens on the workload-shaped P1-A extraction prompt.
+-   The workload-shaped failure reproduced after a fresh llama-server
+    restart with `cached_tokens: 0`, so prompt-cache reuse was not a
+    sufficient explanation.
+-   Increasing maximum output from 128 to 512 produced more repeated `@`
+    tokens rather than recovery.
+-   Removing `response_format` did not eliminate the workload-shaped
+    failure.
+-   A JSON-schema-constrained diagnostic request caused llama.cpp HTTP
+    500 with
+    `Unexpected empty grammar stack after accepting piece: @ (31)`.
+
+These are model/runtime/environment compatibility observations for the
+tested Qwen3.5-0.8B artifacts on this Intel CPU-only llama.cpp setup.
+They do not establish that Qwen3.5-0.8B lacks semantic capability for the
+pilot workloads, and they are not a general rejection of Qwen3.5,
+Q8_0, or the host hardware. They are not hardware-feasibility evidence
+and provide no basis to alter the XION memory architecture.
+
+### P1-A closure
+
+**P1-A real-runtime bring-up is COMPLETE.** The milestone demonstrates
+that the external local-runtime experimental path can be exercised
+end-to-end and that invalid model output fails closed under the existing
+research contract.
+
+The tracked three-case synthetic fixture is plumbing/smoke coverage
+only. It is insufficient for model-family acceptance or rejection,
+prompt calibration, threshold selection, quantization conclusions,
+LOCAL-FIRST acceptance, production deployment, or always-on hardware
+feasibility. Qwen3-0.6B BF16 is the artifact that completed this smoke
+run; it is not a canonical or frozen model choice.
+
+P1-B calibration/private replay remains **UNOPENED** and requires
+separate approval. No prompt tuning, Markdown-fence stripping, JSON
+parser relaxation, schema change, or other three-case harness adaptation
+is part of this closeout; those would cross into calibration or
+experimental-policy work.
