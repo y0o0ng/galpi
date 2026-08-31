@@ -1114,9 +1114,120 @@ and do not establish monotonic improvement with parameter count.
 
 No workload passes the complete approximately 2B screen. All three
 therefore advance to the preregistered approximately 4B size class. The
-next run preserves, as far as practical, the Qwen3 family, BF16, the same
-90-case fixture, prompt, output schemas, parser, `response_format`
-behavior, screening thresholds, critical-zero rules, and llama.cpp
-runtime version. There is no automatic advance to a 7B/8B model: if a
+approximately 4B run preserved, as far as practical, the Qwen3 family,
+BF16, the same 90-case fixture, prompt, output schemas, parser,
+`response_format` behavior, screening thresholds, critical-zero rules,
+and llama.cpp runtime version; its result is recorded in the following
+receipt. There is no automatic advance to a 7B/8B model: if a
 workload still fails at approximately 4B, automatic size escalation
 stops and human/design review is required.
+
+### P1-B1 ~4B calibration receipt
+
+This receipt records the completed P1-B1 `LOCAL_ONLY` synthetic
+calibration run at the approximately 4B size class. It remains a
+model-size screening result, not production acceptance or authorization.
+
+Run identity:
+
+-   report version:
+    `xion-local-memory-inference-p1b1-report-v1`
+-   generated at: `2026-08-31T10:35:41.713Z`
+-   Galpi run commit:
+    `97ee1058b696d5782bcc6b52469cd5841bfb67ff`
+-   model ID: `xion-p1b1-qwen3-4b-bf16`
+-   artifact: `unsloth/Qwen3-4B-GGUF:BF16`
+-   quantization and size class: `BF16`, `~4B`
+-   runtime and version: `llama.cpp`,
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`
+-   runner and configuration:
+    `xion-local-memory-inference-p1b1-runner-v1`,
+    `xion-local-memory-inference-p1b1-config-v1`
+-   prompt: `xion-local-memory-inference-p1b1-prompt-v1`
+-   fixture: `xion-local-memory-inference-p1b1-synthetic-v1`, 90 cases
+-   policy: `LOCAL_ONLY`
+-   runtime failures: 0 across all 90 cases
+-   schema-valid outputs: 30/30 for each workload
+
+Frozen workload screening results:
+
+1.  **Structured extraction:** all 30 outputs were schema-valid, with
+    zero runtime failures, 29 semantic successes, and one semantic
+    failure. Exact local completion was 29/30 (96.67%), above the
+    preregistered 27/30 (90%) completion boundary, but the one wrong
+    value is one critical wrong-value and critical unsafe failure. It
+    violates the preregistered wrong-value-zero requirement, so the
+    report decision is `ADVANCE_SIZE`. The failing case was
+    `p1b1-extraction-023`. Its evidence distinguished a monthly target
+    of 20 pages from the requested weekly target of 8 pages. The model
+    returned `{"weeklyTarget":20,"unit":"pages"}` instead of gold
+    `{"weeklyTarget":8,"unit":"pages"}`. This is a substantive
+    distractor-selection error, not formatting or surface normalization.
+    Exact matching, gold, parser, threshold, and the critical-zero rule
+    remain unchanged.
+2.  **Write/no-write triage:** all 30 outputs were schema-valid, with
+    zero runtime failures, 16 semantic successes, and 14 semantic
+    failures. The set contained 25 non-hard-gated cases and five
+    hard-gated capability probes; two probes matched and three
+    mismatched. In the non-probe confusion counts, gold `NO_WRITE`
+    produced four `NO_WRITE` and six `WRITE_CANDIDATE`; gold
+    `WRITE_CANDIDATE` produced one `NO_WRITE` and nine
+    `WRITE_CANDIDATE`; and gold `ESCALATE` produced three `NO_WRITE`,
+    one `WRITE_CANDIDATE`, and one `ESCALATE`. `NO_WRITE` recall was
+    4/10 (40%), below the preregistered 8/10 (80%) boundary. Four
+    eligible false `NO_WRITE` results are four critical unsafe failures.
+    The workload therefore fails both the recall threshold and the
+    critical-false-`NO_WRITE`-zero requirement, and the report decision
+    is `ADVANCE_SIZE`. Hard-gated probe mismatches remain diagnostic and
+    separate from LOCAL-FIRST critical unsafe counts.
+3.  **Ambiguity/escalation:** all 30 outputs were schema-valid, with zero
+    runtime failures, 18 semantic successes, and 12 semantic failures.
+    The set contained 22 non-hard-gated cases and eight hard-gated
+    capability probes, all eight of which matched. Among non-probe
+    cases, all 12 gold `CLEAR` cases produced `ESCALATE`, and all 10 gold
+    `ESCALATE` cases produced `ESCALATE`. Eligible false `CLEAR` and
+    critical unsafe failures were both zero, so the safety condition
+    passes. `CLEAR` recall was 0/12 (0%), below the preregistered 11/12
+    finite boundary, so the report decision is `ADVANCE_SIZE`. This is
+    extreme conservative over-escalation and decision-boundary collapse
+    under the frozen configuration, not a safety failure.
+
+Compared with the approximately 2B run, structured extraction remained
+at 29/30 exact completion, but the error changed from the
+normalization-like `조용히` to `조용` mismatch to a substantive weekly
+8-pages versus monthly 20-pages distractor selection. Triage `NO_WRITE`
+recall moved from 8/10 to 4/10, while eligible false `NO_WRITE` moved
+from three to four. Ambiguity `CLEAR` recall moved from 9/12 to 0/12,
+while eligible false `CLEAR` remained zero and all eight hard-gated
+ambiguity probes continued to match. These are factual workload-specific
+observations; the approximately 4B result does not improve monotonically
+over approximately 2B and does not support a general claim of monotonic
+improvement with parameter count.
+
+Although the fixed runner vocabulary reports `ADVANCE_SIZE` for all three
+failed workloads, the preregistered study progression ends automatic
+size escalation at approximately 4B. No workload passes its complete
+approximately 4B screen, and no shared viable model size was established
+at or below approximately 4B. **Automatic model-size progression is now
+STOPPED.** A 7B/8B model must not be tested automatically. The next
+approved activity is a separate human/design decision-boundary review,
+not another automatic size step.
+
+That separate review should inspect, case by case, extraction distractor
+selection and field-target adherence; triage separation among
+`NO_WRITE`, `WRITE_CANDIDATE`, and `ESCALATE`; and the ambiguity
+`CLEAR`/`ESCALATE` boundary and conservative collapse. This receipt does
+not design or implement a follow-up experiment. The review order is:
+
+1.  preserve the safety and critical-zero requirements;
+2.  inspect whether task contracts, evidence framing, or decision
+    boundaries can be improved in a separately preregistered follow-up;
+3.  only if reasonable decision-boundary improvements cannot solve the
+    problem, consider a separate empirical review of
+    efficiency/completion thresholds.
+
+The extraction critical wrong-value count, triage eligible false
+`NO_WRITE` count, and ambiguity eligible false `CLEAR` count must each
+remain zero. Any future efficiency/completion-threshold change requires a
+separately justified empirical decision and cannot retroactively rescue
+these P1-B1 results.
