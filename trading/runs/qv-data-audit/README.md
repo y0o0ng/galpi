@@ -1310,6 +1310,84 @@ python3 -m unittest discover -s tests -p "test_*.py"            -> 1474 tests OK
 
 ---
 
+## 10.12 Step 5A-1 identity coverage inventory receipt — 2026-08-31
+
+**정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`다.**
+읽기 전용 preflight이고 **manifest를 바꾸지 않았으며 어떤 gate도 판정하지 않았다.**
+
+### 사용한 명시 source version
+
+```text
+index_name              SP500
+universe                announcements / eodhd-15y-2026-08
+calendar                eodhd / eodhd-15y-2026-08        (참조 심볼 SPY)
+identity_source_version qv-identity-sha256:55ed78d0b33bb5f85ccf14e81a5a7d8e6bcbe82d17812e46470b3b133372e6ec
+```
+
+**"최신"을 추측하지 않았다.** `SP500` 구성 데이터를 가진 non-smoke universe source는
+하나뿐이고 달력도 마찬가지라 모호하지 않았다.
+
+### 실행 방식
+
+production `data/backtest.db`에는 **아직 QV identity 표가 없다**(Step-4 스키마로 연 적이
+없다). production 파일을 건드리지 않기 위해 실제 `universe_membership`(1,257행)과
+`SPY` 달력(5,431행)만 스크래치 DB로 복사해 그곳에서 읽기 전용으로 돌렸다.
+**production DB는 열지 않았고 표도 만들지 않았다.**
+
+### 결과 — formation별
+
+| formation | session | members | resolved | missing | ambiguous |
+|---|---|---|---|---|---|
+| 2008 | 2008-06-30 | 494 | 0 | 494 | 0 |
+| 2009 | 2009-06-30 | 498 | 0 | 498 | 0 |
+| 2010 | 2010-06-30 | 498 | 0 | 498 | 0 |
+| 2011 | 2011-06-30 | 496 | 0 | 496 | 0 |
+| 2012 | 2012-06-29 | 497 | 0 | 497 | 0 |
+| 2013 | 2013-06-28 | 497 | 0 | 497 | 0 |
+| 2014 | 2014-06-30 | 498 | 0 | 498 | 0 |
+| 2015 | 2015-06-30 | 501 | 0 | 501 | 0 |
+| 2016 | 2016-06-30 | 504 | 0 | 504 | 0 |
+| 2017 | 2017-06-30 | 505 | 0 | 505 | 0 |
+| 2018 | 2018-06-29 | 506 | 0 | 506 | 0 |
+| 2019 | 2019-06-28 | 506 | 0 | 506 | 0 |
+| 2020 | 2020-06-30 | 505 | 0 | 505 | 0 |
+| 2021 | 2021-06-30 | 505 | 0 | 505 | 0 |
+| 2022 | 2022-06-30 | 503 | 0 | 503 | 0 |
+| 2023 | 2023-06-30 | 503 | 0 | 503 | 0 |
+| 2024 | 2024-06-28 | 503 | 0 | 503 | 0 |
+| 2025 | 2025-06-30 | 503 | 0 | 503 | 0 |
+| 2026 | 2026-06-30 | 503 | 0 | 503 | 0 |
+
+`2006`·`2007`은 달력에는 6월 세션이 있지만 universe source가 2008-01-02부터라
+구성원이 0이다. formation session이 6월 30일이 아닌 해(2012·2013·2018·2019·2024)는
+그 달의 **마지막 정규 세션**이 맞다.
+
+```text
+security 행 총계            9,525
+고유 미해결 심볼            898
+사유 분포                   NO_CLASS_SEGMENT_FOR_SYMBOL 9,525 (100%)
+ambiguous                   0
+```
+
+### 이 숫자를 어떻게 읽는가
+
+**`resolved = 0`은 manifest 내용이 틀렸다는 뜻이 아니라 이 DB에 materialize되지
+않았다는 뜻이다.** materialization은 `usable_from_session`을 `qv_sec_filings`의
+REQUIRED 증거에서 파생하는데, submissions ingestion은 이번 작업의 명시적 non-goal이다.
+
+그리고 **materialize되더라도 현재 manifest는 4개 발행사만 담는다.** 상장 심볼은
+`CMCSA · CMCSK · GOOG · GOOGL · NKE · UA · UAA` 일곱이고 그중 PIT 미해결 집합과
+겹치는 것은 여섯이다. 즉 **892개 심볼이 여전히 5A-2의 대상이다.**
+
+> **이것이 5A-1이 존재하는 이유다.** 병목이 "downstream 코드가 없다"가 아니라
+> "명시 identity가 892개 심볼만큼 비어 있다"라는 것이 이제 숫자로 남는다.
+> ambiguous 0은 지금 manifest가 작아서 나온 값이지 계약이 안전하다는 증거가 아니다.
+
+**Gate A~H와 Phase 0는 여전히 평가되지 않았다.** 수익률·B/M·Q/V·랭킹·선택·
+`coverage_start`를 계산하지 않았다.
+
+---
+
 ## 11. 결과
 
 
