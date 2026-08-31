@@ -20,6 +20,7 @@
     "report:memory-inference-pilot": "node scripts/report-memory-inference-pilot.js",
     "research:memory-inference-smoke": "node scripts/run-memory-inference-smoke.js",
     "research:memory-inference-calibration": "node scripts/run-memory-inference-calibration.js",
+    "research:memory-inference-extraction-boundary": "node scripts/run-memory-inference-extraction-boundary-diagnostic.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",

@@ -1,0 +1,327 @@
+{
+  "name": "xion-local-memory-inference-p1b2a-extraction-boundary-v1",
+  "cases": [
+    {
+      "caseId": "p1b2a-extraction-d0",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "월간 목표 20 pages와 별도로 weekly target은 8 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 8,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b2a-extraction-d1",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "weekly target은 8 pages다. 별도로 월간 목표는 20 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 8,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b2a-extraction-d2",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "월간 목표 20 pages와 별도로 요청한 weekly target은 8 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 8,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b2a-extraction-d3",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "월간 목표 20 pages와 별도로 주간 목표는 8 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 8,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b2a-extraction-d4",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "월간 목표 20 pages와 별도로 weeklyTarget은 8 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 8,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b2a-extraction-d5",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "월간 목표 20 items와 별도로 weekly target은 8 pages다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 8,
+            "unit": "pages"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b2a-extraction-c1",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "하루 목표는 1회지만 요청한 주간 목표는 5 sessions이다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 5,
+            "unit": "sessions"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    },
+    {
+      "caseId": "p1b2a-extraction-c2",
+      "workloadType": "structured_extraction",
+      "sourceType": "synthetic",
+      "taskContractVersion": "xion-local-memory-inference-case-v1",
+      "inputPayload": {
+        "evidence": "The monthly budget is 30 hours, while the requested weekly target is 4 hours.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      },
+      "adjudication": {
+        "state": "PRIMARY_ADJUDICATED",
+        "primary": {
+          "source": "PROGRAMMATIC",
+          "label": {
+            "weeklyTarget": 4,
+            "unit": "hours"
+          }
+        },
+        "blindSecondPass": null,
+        "disagreementState": "NOT_ASSESSED",
+        "finalResolvedHumanLabel": null,
+        "cloudAssistedReview": {
+          "performed": false,
+          "configurationId": null,
+          "suggestion": null
+        }
+      },
+      "ambiguityState": "CLEAR",
+      "hardGateExpectation": {
+        "status": "DOES_NOT_APPLY",
+        "guardScope": "none",
+        "reasonCode": "none"
+      }
+    }
+  ],
+  "diagnosticMetadata": {
+    "p1b2a-extraction-d0": {
+      "sourceCaseId": "p1b1-extraction-023",
+      "kind": "baseline",
+      "factor": "baseline_reproduction",
+      "pairedBaselineId": null
+    },
+    "p1b2a-extraction-d1": {
+      "sourceCaseId": "p1b1-extraction-023",
+      "kind": "variant",
+      "factor": "target_distractor_order",
+      "pairedBaselineId": "p1b2a-extraction-d0"
+    },
+    "p1b2a-extraction-d2": {
+      "sourceCaseId": "p1b1-extraction-023",
+      "kind": "variant",
+      "factor": "explicit_requested_cue",
+      "pairedBaselineId": "p1b2a-extraction-d0"
+    },
+    "p1b2a-extraction-d3": {
+      "sourceCaseId": "p1b1-extraction-023",
+      "kind": "variant",
+      "factor": "target_lexical_language",
+      "pairedBaselineId": "p1b2a-extraction-d0"
+    },
+    "p1b2a-extraction-d4": {
+      "sourceCaseId": "p1b1-extraction-023",
+      "kind": "variant",
+      "factor": "schema_key_lexical_alignment",
+      "pairedBaselineId": "p1b2a-extraction-d0"
+    },
+    "p1b2a-extraction-d5": {
+      "sourceCaseId": "p1b1-extraction-023",
+      "kind": "variant",
+      "factor": "same_unit_competition",
+      "pairedBaselineId": "p1b2a-extraction-d0"
+    },
+    "p1b2a-extraction-c1": {
+      "sourceCaseId": "p1b1-extraction-022",
+      "kind": "control",
+      "factor": "frozen_control",
+      "pairedBaselineId": null
+    },
+    "p1b2a-extraction-c2": {
+      "sourceCaseId": "p1b1-extraction-029",
+      "kind": "control",
+      "factor": "frozen_control",
+      "pairedBaselineId": null
+    }
+  }
+}

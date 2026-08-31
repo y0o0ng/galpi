@@ -1231,3 +1231,92 @@ The extraction critical wrong-value count, triage eligible false
 remain zero. Any future efficiency/completion-threshold change requires a
 separately justified empirical decision and cannot retroactively rescue
 these P1-B1 results.
+
+### P1-B2a structured-extraction decision-boundary diagnostic preregistration
+
+P1-B2a is a diagnostic characterization of the cross-size error observed
+on P1-B1 case `p1b1-extraction-023`. In the historical approximately 2B
+run, the model returned the requested weekly target of 8 pages; in the
+approximately 4B run, it selected the monthly 20-page distractor. This
+diagnostic tests whether that approximately 4B error reproduces and whether
+bounded single-factor changes reveal field-target selection sensitivity.
+It is not a new P1-B1 screen, threshold review, model-size progression, or
+production-acceptance step, and it cannot change or rescue any historical
+P1-B1 result.
+
+The fixed fixture is
+`xion-local-memory-inference-p1b2a-extraction-boundary-v1`. It contains
+exactly eight synthetic `structured_extraction` cases using the existing
+`p1b1_quantity_unit_v1` schema and PROGRAMMATIC gold:
+
+-   D0 (`p1b2a-extraction-d0`) exactly reproduces the P1-B1 023 evidence
+    and gold.
+-   D1 reverses target/distractor order; D2 adds an explicit requested
+    cue; D3 expresses the target lexically in Korean; D4 aligns the target
+    phrase with the `weeklyTarget` schema key; and D5 changes the monthly
+    distractor's unit while preserving the requested weekly target.
+-   C1 and C2 exactly reproduce P1-B1 cases `p1b1-extraction-022` and
+    `p1b1-extraction-029` as frozen controls.
+
+No cases may be added after observing outputs. Diagnostic metadata remains
+outside model-visible PilotCase input. Each call uses the fixed compatible
+P1-B1 calibration metadata (`quantity_unit`, `EXACT_VALUE`, `distractor`,
+not a capability probe).
+
+The diagnostic is preregistered for exactly two BF16 configurations:
+
+-   approximately 2B: Qwen3-1.7B,
+    `unsloth/Qwen3-1.7B-GGUF:BF16`;
+-   approximately 4B: Qwen3-4B,
+    `unsloth/Qwen3-4B-GGUF:BF16`.
+
+Both use external `llama.cpp`; the intended runtime version is
+`e42214804794fca6abb61b1a5f9adae2a845f0be`. Sub-1B, 7B/8B, other model
+families, and quantized variants are outside this diagnostic. The separate
+diagnostic runner/report identities are
+`xion-local-memory-inference-p1b2a-extraction-boundary-runner-v1` and
+`xion-local-memory-inference-p1b2a-extraction-boundary-report-v1`.
+Actual model requests continue through `runCalibrationCase()` so the frozen
+P1-B1 prompt and version, task/output-schema versions, request settings,
+`response_format`, JSON parsing, schema validation, and semantic exact-match
+behavior remain unchanged.
+
+Interpretation is frozen before any real P1-B2a run:
+
+1.  The historical approximately 4B baseline failure is reproduced only if
+    D0 again returns exactly `{"weeklyTarget":20,"unit":"pages"}`. Gold
+    `{"weeklyTarget":8,"unit":"pages"}` means
+    `BASELINE_NOT_REPRODUCED`; another wrong value is extraction
+    instability, not reproduction of the historical distractor error. D0
+    is not rerun to recover the historical error; a replication experiment
+    would require a separate decision.
+2.  C1 and C2 should remain exact matches. Failure of either control makes
+    factor-level interpretation for that model unstable or weak and must be
+    reported explicitly.
+3.  A result may be described as "supports sensitivity to <factor>" only
+    when the approximately 4B D0 reproduces the exact historical 20-page
+    error, both controls remain stable, and the corresponding D1-D5 variant
+    changes from that mismatch to the exact gold. This does not prove the
+    factor caused the error. If multiple variants repair D0, each supported
+    sensitivity is reported without ranking them.
+4.  Stability across D0-D5 at approximately 2B combined with variation at
+    approximately 4B supports size/checkpoint-specific calibration
+    sensitivity. Variation under the same manipulations in both models
+    supports broader prompt/representation sensitivity. Neither pattern
+    establishes a monotonic parameter-count effect.
+5.  A D0 or control runtime failure makes that model's diagnostic
+    uninterpretable. A runtime or schema failure isolated to one variant
+    makes only that factor unassessable; other valid observations may still
+    be described.
+6.  There is deliberately no N/8 acceptance threshold, no P1-B1 screening
+    decision, and no automatic diagnostic conclusion. Exact-match totals
+    are descriptive only. Semantic mismatches are observations; runtime
+    failures remain separately represented and make the CLI fail.
+
+There are no automatic reruns. The P1-B1 critical-zero requirements remain
+frozen: extraction wrong value, eligible triage false `NO_WRITE`, and
+eligible ambiguity false `CLEAR` must each remain zero. P1-B2a does not open
+those requirements, model-size progression, Option C, private replay, or
+production routing. Triage and ambiguity follow-up diagnostics are not
+designed by this task. No real P1-B2a model result existed when this
+preregistration was committed.

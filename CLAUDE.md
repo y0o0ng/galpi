@@ -87,7 +87,7 @@
 ### 장기기억 연구
 
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
-- **Local Memory Inference Study Pilot P0와 P1-A external runtime smoke는 `COMPLETE`이고, P1-B1 synthetic capability calibration이 현재 active/open 단계다.** production memory 판단·retrieval·model routing은 그대로이며 정본·receipt는 `docs/Memory research/local-memory-inference-study-design.md`; private natural replay는 P1-B1 결과 검토 전까지 `UNOPENED`이고 별도 승인이 필요하다.
+- **Local Memory Inference Study Pilot P0와 P1-A는 `COMPLETE`이고, P1-B1 synthetic model-size screening은 ~4B까지 완료해 preregistered rule에 따라 automatic size progression을 중단했다. P1-B2a extraction decision-boundary diagnostic이 active next step이다.** production memory 판단·retrieval·model routing은 그대로이며 정본·결과는 `docs/Memory research/local-memory-inference-study-design.md`; private natural replay는 `UNOPENED`이고 별도 승인이 필요하다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 
