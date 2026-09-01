@@ -6,7 +6,8 @@
     DISCOVERY_HINT  !=  SEC_PROOF  !=  PRODUCTION_MANIFEST
 
 `AUTO_PROVABLE`은 "승인된 규칙 아래 SEC 증거가 기계적으로 완결됐다"는 뜻이고
-manifest 승격은 5A-2c에서 사람이 따로 한다.
+manifest 승격은 5A-2c가 따로 한다 — 결정론적 재검증을 통과한 `AUTO_PROVABLE`은 사람의
+의미 승인 없이 승격될 수 있고, `REVIEW_REQUIRED`만 사람의 판정을 요구한다.
 
     python3 -m selftest.qv_identity_proposal_run demand --inventory <5A-1.json>
     python3 -m selftest.qv_identity_proposal_run run \

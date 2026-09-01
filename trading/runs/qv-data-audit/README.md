@@ -1882,6 +1882,99 @@ SEC 호출 57 → 157의 100건이 그 값이다.
 - Q/V · B/M · 랭크 · 선택 · 수익률을 계산하지 않았다.
 
 
+## 10.14 Step 5A-2b 완결성 fix + 5A-2c 승격기 코어 — 2026-09-01 (구현 receipt)
+
+**정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`의 5A-2b ·
+5A-2c 절이다.** 이 커밋은 **production identity manifest 행을 하나도 늘리지 않았다** —
+`trading/qv/identity/*.jsonl` 네 파일이 그대로다. 실행 receipt가 아니라 구현·테스트
+사실만 적는다. 어떤 Phase 0 gate도 판정하지 않았다.
+
+### 5A-2b가 무엇을 닫았나 — 관계마다 자기 유효구간
+
+`ShareClassProposal`만 `effective_from`/`effective_to`/`interval_proved`를 들고 있었고
+`XbrlAliasProposal`·`ProseAliasProposal`은 없었다. **production 승격에는 모자란다** —
+Step 4가 셋을 분리하기 때문이다.
+
+```text
+economic class 수명   !=   XBRL alias 수명   !=   prose alias 수명
+```
+
+세 제안이 각자 구간·증거를 들고 다니게 하고, 하나라도 비면 `AUTO_PROVABLE`이 되지
+않도록 사유 코드 셋을 더했다.
+
+```text
+XBRL_ALIAS_INTERVAL_NOT_EXPLICIT
+PROSE_ALIAS_INTERVAL_NOT_EXPLICIT
+CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT
+```
+
+**모든 보통주 sibling에 canonical bridge를 요구한다.** 요구된 상장 심볼만이 아니다.
+주식수 fact와 XBRL member만 있는 미상장 sibling은 canonical bridge가 없으므로
+`REVIEW_REQUIRED`로 남는다. `COVER_GROUP_LABEL`은 corroborating 전용이고 class 정체성도
+production class-ID seed도 되지 못한다.
+
+**옛 dual-class 테스트 기대가 너무 약했다.** `full_intervals(proof)`만으로
+`AUTO_PROVABLE`이 되던 자리를 고쳤다 — 이제 제목 없는 Class B에는 명시 governing
+instrument bridge가 있어야 한다.
+
+### `qv-class-id-v1` — 불투명 결정적 production class id (Option A)
+
+```text
+class_id = "us-cik-" + CIK + "-class-v1-" + SHA256(canonical_seed_json).hexdigest()
+seed     = {scheme, cik, effective_from, canonical_bridge_type, canonical_bridge_key}
+```
+
+전체 hex를 쓰고 자르지 않는다. **ticker·XBRL member·class 글자·제안 id·삽입 순서·정수
+시퀀스를 쓰지 않는다.** `prop-<CIK>-<member>`는 packet-local 임시 참조이고 production
+foreign key로 새어 나가지 않는다(회귀가 잠근다).
+
+기존 사람이 읽는 anchor id(`nke-b` · `googl-c` …)는 **개명하지 않는다.** 정확히 안전한
+재사용(같은 issuer · 같은 canonical comparison_key · 탄생 시점 유효 · economic 구간·속성
+일치 · 정확히 하나)만 시도하고, 둘 이상이면 fail-close다.
+
+### 5A-2c 승격기 코어
+
+구현 `trading/backtest/qv_identity_promotion.py`, 진입점
+`trading/selftest/qv_identity_promotion_run.py`(**기본 dry-run**).
+
+```text
+정확한 pinned base가 아니면        STALE_IDENTITY_BASE — 병합·rebase 없이 rerun
+proposal_status는 입력이지 권한이 아니다 — packet을 처음부터 재검증한다
+표지에서 온 관계는 packet에 박힌 원본 표지 fact와 대조한다
+SEC를 다시 부르지 않는다 · DB를 건드리지 않는다 · 다섯 번째 identity 파일이 없다
+append/reuse 전용 — 기존 semantic 행을 바꿔야 하면 fail-close
+선택한 AUTO_PROVABLE 하나가 실패하면 batch 전체 중단(--force·--skip-bad 없음)
+```
+
+후보 bundle은 임시 디렉터리에 네 파일로 세우고 **정본 `load_manifest()`·`validate()`**로
+검사한 뒤에야 쓰기로 간다. 쓰기 직전에 base version을 한 번 더 확인하고, 평범한 예외가
+나면 원래 바이트로 되돌린다. **그 이상의 파일시스템 crash-consistency를 주장하지
+않는다.**
+
+### 로컬 Python 실측 (2026-09-01)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_symbol_bridge` | 18 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_identity_proposals` | 92 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_step4` | 117 OK |
+| `test_qv_identity_promotion` | 40 OK (신규) |
+| **전체 trading suite** | **1,654 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — 워크플로는 `npm test`(`node --test`)만
+돌리고 `trading/`의 Python 테스트를 실행하지 않는다.
+
+### 이 receipt가 주장하지 않는 것
+
+- **production identity manifest를 넓히지 않았다.** 네 파일이 그대로다.
+- 897개 작업 항목을 production으로 돌리지 않았다.
+- 5A-3을 구현하지 않았고 DB materialize도 `usable_from_session` 파생도 하지 않았다.
+- **Gate A~H는 여전히 미판정이다.**
+- Q/V · B/M · 랭크 · 선택 · `coverage_start` · 수익률을 계산하지 않았다.
+
+
 ---
 
 ## 11. 결과

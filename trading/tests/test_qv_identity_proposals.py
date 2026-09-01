@@ -48,7 +48,15 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     PREDECESSOR_HINT,
     DIRECT,
     REUSED_VENDOR_SERIES,
-    ClassInterval,
+    CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT,
+    COVER_GROUP_LABEL,
+    GOVERNING_INSTRUMENT,
+    PROSE_ALIAS_INTERVAL_NOT_EXPLICIT,
+    SECURITY_TITLE_FACT,
+    XBRL_ALIAS_INTERVAL_NOT_EXPLICIT,
+    ClassEvidence,
+    ProseBridgeInput,
+    RelationInterval,
     DemandInput,
     DiscoveryCandidate,
     DiscoveryHints,
@@ -56,6 +64,7 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     QVProposalError,
     WorkItem,
     build_symbol_proposal,
+    canonical_bridges_for,
     class_role,
     cover_classes_for_symbol,
     discover_candidates,
@@ -310,11 +319,61 @@ class CoverExtractionTest(unittest.TestCase):
         self.assertTrue(proof.classes[0].member_key.startswith("ext:0000000001"))
 
 
-def full_intervals(proof):
+BIRTH = "2016-04-08"
+
+GOVERNING_EVIDENCE = (
+    EvidenceRef(
+        source_kind="SEC_EVIDENCE_DOCUMENT",
+        cik="0000000001",
+        accession="0000000000-16-000011",
+        document_name="charter.htm",
+        evidence_role="CHARTER_CLASS_DEFINITION",
+    ),
+)
+
+
+def span(evidence=INTERVAL_EVIDENCE, start=BIRTH, end=None):
+    return RelationInterval(start, end, evidence)
+
+
+def intervals_only(proof, **kwargs):
+    """**세 관계의 구간만** 채운다. canonical bridge를 보충하지 않는다.
+
+    제목 없는 보통주 sibling은 여전히 canonical bridge가 없다 — 그것이 계약이다.
+    """
     return {
-        item.member_key: ClassInterval("2016-04-08", None, INTERVAL_EVIDENCE)
+        item.member_key: ClassEvidence(
+            class_interval=span(**kwargs),
+            xbrl_interval=span(**kwargs),
+            cover_title_interval=span(**kwargs) if item.security_title else None,
+        )
         for item in proof.classes
     }
+
+
+def complete_evidence(proof):
+    """구간 셋 + 제목 없는 보통주 class의 명시 governing instrument bridge까지.
+
+    **표지 제목이 없는 class는 이것 없이는 절대 `AUTO_PROVABLE`이 되지 않는다.**
+    """
+    out = {}
+    for item in proof.classes:
+        extra = ()
+        if not item.security_title:
+            extra = (
+                ProseBridgeInput(
+                    raw_prose_name=f"{item.member_local or 'Common'} charter definition",
+                    bridge_type=GOVERNING_INSTRUMENT,
+                    interval=span(GOVERNING_EVIDENCE),
+                ),
+            )
+        out[item.member_key] = ClassEvidence(
+            class_interval=span(),
+            xbrl_interval=span(),
+            cover_title_interval=span() if item.security_title else None,
+            extra_prose_bridges=extra,
+        )
+    return out
 
 
 TICKER_CANDIDATE = (
@@ -344,7 +403,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(with_intervals.proposal_status, AUTO_PROVABLE)
         self.assertEqual(with_intervals.reason_codes, (MECHANICALLY_COMPLETE_SEC_PROOF,))
@@ -356,7 +415,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.issuer_proposal.issuer_id, "us-cik-0000000001")
         self.assertTrue(packet.issuer_proposal.evidence)
@@ -368,9 +427,20 @@ class AdjudicationTest(unittest.TestCase):
         ):
             for item in group:
                 self.assertTrue(item.evidence, item)
-        # 미상장 class는 prose alias를 만들지 않는다 — 표지에 제목이 없다.
-        self.assertEqual(len(packet.prose_alias_proposals), 1)
+        # 표지에서 나온 prose alias는 제목이 있는 class 하나뿐이고, 제목 없는
+        # sibling은 **명시 governing instrument bridge**로만 canonical이 된다.
+        by_type = {}
+        for item in packet.prose_alias_proposals:
+            by_type.setdefault(item.bridge_type, []).append(item)
+        self.assertEqual(sorted(by_type), [GOVERNING_INSTRUMENT, SECURITY_TITLE_FACT])
+        self.assertEqual(len(packet.prose_alias_proposals), 2)
         self.assertEqual(len(packet.xbrl_alias_proposals), 2)
+        # 관계마다 자기 구간이 따로 증명돼 있다.
+        for group in (packet.share_class_proposals, packet.xbrl_alias_proposals,
+                      packet.prose_alias_proposals):
+            for item in group:
+                self.assertTrue(item.interval_proved, item)
+                self.assertIsNotNone(item.effective_from, item)
         alias = packet.xbrl_alias_proposals[0]
         self.assertEqual(alias.axis_namespace, USG)
         self.assertEqual(alias.axis_local, "StatementClassOfStockAxis")
@@ -383,7 +453,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         payload = packet.as_json()
         self.assertEqual(payload["proposal_status"], AUTO_PROVABLE)
@@ -416,7 +486,7 @@ class AdjudicationTest(unittest.TestCase):
             candidates=TICKER_CANDIDATE
             + (DiscoveryCandidate(cik="0000000002", origin=EXISTING_CIK_OVERRIDE, detail="pin"),),
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(MULTIPLE_DISCOVERY_CANDIDATES, packet.reason_codes)
@@ -429,7 +499,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(REGISTRANT_CIK_MISMATCH, packet.reason_codes)
@@ -441,7 +511,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("BBB", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(SYMBOL_NOT_ON_COVER_PAGE, packet.reason_codes)
@@ -460,7 +530,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(SYMBOL_REUSE_CONFLICT, packet.reason_codes)
@@ -476,7 +546,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.class_census_status, CLASS_CENSUS_REVIEW_REQUIRED)
         self.assertIn(SIBLING_CLASS_CENSUS_UNCLEAR, packet.reason_codes)
@@ -498,7 +568,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.class_census_status, CLASS_CENSUS_REVIEW_REQUIRED)
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
@@ -517,7 +587,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertIn(DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON, packet.reason_codes)
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
@@ -528,7 +598,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
             successor_judgement_required=True,
         )
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
@@ -545,7 +615,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2019-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(SYMBOL_NOT_ON_COVER_PAGE, packet.reason_codes)
@@ -562,7 +632,7 @@ class AdjudicationTest(unittest.TestCase):
             work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.class_census_status, CLASS_CENSUS_COMPLETE)
         self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
@@ -583,7 +653,7 @@ class AdjudicationTest(unittest.TestCase):
         seen = {
             build_symbol_proposal(
                 work_item=work("AAA", ()), candidates=TICKER_CANDIDATE,
-                proof=proof, intervals=full_intervals(proof),
+                proof=proof, class_evidence=complete_evidence(proof),
             ).proposal_status,
             build_symbol_proposal(
                 work_item=work("AAA", ()), candidates=TICKER_CANDIDATE,
@@ -942,8 +1012,13 @@ class TargetAwareProofSearchTest(unittest.TestCase):
         self.assertEqual(
             [item.symbol for item in packet.share_class_proposals], ["OLD"]
         )
-        # 구간 증거만 남는다 — 그것이 5A-2c의 일이다.
-        self.assertEqual(packet.reason_codes, (CLASS_INTERVAL_NOT_EXPLICIT,))
+        # 남는 것은 명시 증거가 필요한 관계들뿐이다 — 표지는 어느 구간도 증명하지
+        # 않고, 제목 없는 sibling의 canonical bridge도 표지 밖에서 와야 한다.
+        self.assertEqual(
+            packet.reason_codes,
+            (CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, CLASS_INTERVAL_NOT_EXPLICIT,
+             PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, XBRL_ALIAS_INTERVAL_NOT_EXPLICIT),
+        )
 
     def test_the_match_is_found_beyond_the_old_three_attempt_limit(self):
         """옛 상한(3)을 되살리면 이 테스트가 깨진다.
@@ -1367,6 +1442,231 @@ class HistoricalDiscoveryTest(unittest.TestCase):
         self.assertEqual(client.cik_lookup_calls, 0)
 
 
+class RelationIntervalCompletenessTest(unittest.TestCase):
+    """`class 구간 != XBRL alias 구간 != prose alias 구간`.
+
+    production manifest에 쓰일 관계는 **저마다 자기 유효구간을 증명해야** 한다.
+    class가 X부터 존재한다는 것이 특정 QName이나 철자가 X부터 그 class를 가리켰다는
+    증명이 아니다.
+    """
+
+    def packet(self, evidence, *, facts=None, symbol="AAA"):
+        proof = proof_from(facts or dual_class_facts(), cik="0000000001")
+        return proof, build_symbol_proposal(
+            work_item=work(symbol, ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE,
+            proof=proof,
+            class_evidence=evidence(proof) if callable(evidence) else evidence,
+        )
+
+    def test_a_class_interval_alone_does_not_prove_the_xbrl_alias(self):
+        def only_class(proof):
+            return {
+                item.member_key: ClassEvidence(
+                    class_interval=span(),
+                    cover_title_interval=span() if item.security_title else None,
+                    extra_prose_bridges=complete_evidence(proof)[
+                        item.member_key
+                    ].extra_prose_bridges,
+                )
+                for item in proof.classes
+            }
+
+        _proof, packet = self.packet(only_class)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(XBRL_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertNotIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        for item in packet.xbrl_alias_proposals:
+            self.assertFalse(item.interval_proved)
+            self.assertIsNone(item.effective_from)
+
+    def test_a_class_interval_alone_does_not_prove_the_prose_alias(self):
+        def only_class_and_xbrl(proof):
+            return {
+                item.member_key: ClassEvidence(
+                    class_interval=span(),
+                    xbrl_interval=span(),
+                    extra_prose_bridges=complete_evidence(proof)[
+                        item.member_key
+                    ].extra_prose_bridges,
+                )
+                for item in proof.classes
+            }
+
+        _proof, packet = self.packet(only_class_and_xbrl)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertNotIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertNotIn(XBRL_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+
+    def test_an_alias_interval_is_never_copied_from_the_class_interval(self):
+        """class는 2016부터, alias는 2019부터. 그대로 따로 남는다."""
+        proof = proof_from(dual_class_facts(), cik="0000000001")
+        evidence = {}
+        for item in proof.classes:
+            evidence[item.member_key] = ClassEvidence(
+                class_interval=span(start="2016-04-08"),
+                xbrl_interval=span(start="2019-01-02"),
+                cover_title_interval=(
+                    span(start="2020-07-01") if item.security_title else None
+                ),
+                extra_prose_bridges=complete_evidence(proof)[
+                    item.member_key
+                ].extra_prose_bridges,
+            )
+        packet = build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof, class_evidence=evidence,
+        )
+        self.assertEqual(
+            {item.effective_from for item in packet.share_class_proposals},
+            {"2016-04-08"},
+        )
+        self.assertEqual(
+            {item.effective_from for item in packet.xbrl_alias_proposals},
+            {"2019-01-02"},
+        )
+        titles = [
+            item for item in packet.prose_alias_proposals
+            if item.bridge_type == SECURITY_TITLE_FACT
+        ]
+        self.assertEqual([item.effective_from for item in titles], ["2020-07-01"])
+
+    def test_the_cover_filing_date_is_never_used_as_an_alias_lifetime(self):
+        """표지 accession/수리 시각이 alias 수명으로 새어 들어가지 않는다."""
+        proof = proof_from(dual_class_facts(), cik="0000000001")
+        packet = build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof,
+        )
+        # 아무 구간도 주지 않았으면 아무 구간도 생기지 않는다.
+        for group in (packet.share_class_proposals, packet.xbrl_alias_proposals,
+                      packet.prose_alias_proposals):
+            for item in group:
+                self.assertFalse(item.interval_proved, item)
+                self.assertIsNone(item.effective_from, item)
+                self.assertIsNone(item.effective_to, item)
+        payload = json.dumps(packet.as_json(), ensure_ascii=False)
+        # 표지 accession의 연도(2024)가 구간 값으로 등장하지 않는다.
+        self.assertNotIn('"effective_from": "2024', payload)
+
+    def test_every_relation_interval_together_is_what_makes_auto_provable(self):
+        _proof, packet = self.packet(complete_evidence)
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+        self.assertEqual(packet.reason_codes, (MECHANICALLY_COMPLETE_SEC_PROOF,))
+
+
+class CanonicalClassBridgeTest(unittest.TestCase):
+    """모든 보통주 economic class에 canonical bridge가 하나는 있어야 한다.
+
+    요구된 상장 심볼만이 아니라 **발행사 package의 sibling 전부**다.
+    """
+
+    def build(self, evidence, facts=None):
+        proof = proof_from(facts or dual_class_facts(), cik="0000000001")
+        return build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof,
+            class_evidence=evidence(proof) if callable(evidence) else evidence,
+        )
+
+    def test_an_unlisted_shares_only_sibling_has_no_canonical_bridge(self):
+        """Class B는 주식수 fact와 XBRL member뿐이다 — 그것은 정체성이 아니다."""
+        packet = self.build(intervals_only)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, packet.reason_codes)
+        # 구간은 전부 있는데도 막힌다.
+        self.assertNotIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertNotIn(XBRL_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertNotIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        classb = [
+            item for item in packet.share_class_proposals
+            if item.class_id.endswith("CommonClassBMember")
+        ]
+        self.assertEqual(len(classb), 1)
+        self.assertEqual(
+            canonical_bridges_for(packet.prose_alias_proposals, classb[0].class_id), ()
+        )
+
+    def test_a_cover_group_label_alone_never_satisfies_canonical_identity(self):
+        def label_only(proof):
+            base = intervals_only(proof)
+            out = {}
+            for key, item in base.items():
+                out[key] = ClassEvidence(
+                    class_interval=item.class_interval,
+                    xbrl_interval=item.xbrl_interval,
+                    cover_title_interval=item.cover_title_interval,
+                    extra_prose_bridges=(
+                        ProseBridgeInput(
+                            raw_prose_name="Class B Common Stock",
+                            bridge_type=COVER_GROUP_LABEL,
+                            interval=span(),
+                        ),
+                    ),
+                )
+            return out
+
+        packet = self.build(label_only)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, packet.reason_codes)
+        # 라벨은 사라지지 않고 corroborating으로 packet에 남는다.
+        labels = [
+            item for item in packet.prose_alias_proposals
+            if item.bridge_type == COVER_GROUP_LABEL
+        ]
+        self.assertTrue(labels)
+        self.assertFalse(any(item.is_canonical for item in labels))
+
+    def test_a_security_title_fact_with_an_explicit_interval_satisfies_it(self):
+        packet = self.build(intervals_only, facts=single_class_facts("AAA"))
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+        bridges = canonical_bridges_for(
+            packet.prose_alias_proposals, packet.share_class_proposals[0].class_id
+        )
+        self.assertEqual([item.bridge_type for item in bridges], [SECURITY_TITLE_FACT])
+
+    def test_a_governing_instrument_with_an_explicit_interval_satisfies_it(self):
+        packet = self.build(complete_evidence)
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+        classb = [
+            item for item in packet.share_class_proposals
+            if item.class_id.endswith("CommonClassBMember")
+        ][0]
+        bridges = canonical_bridges_for(packet.prose_alias_proposals, classb.class_id)
+        self.assertEqual([item.bridge_type for item in bridges], [GOVERNING_INSTRUMENT])
+
+    def test_a_canonical_bridge_without_its_own_interval_does_not_count(self):
+        """제목은 있는데 그 철자의 구간이 없으면 정체성을 세우지 못한다."""
+        def title_without_interval(proof):
+            return {
+                item.member_key: ClassEvidence(
+                    class_interval=span(), xbrl_interval=span(),
+                )
+                for item in proof.classes
+            }
+
+        packet = self.build(title_without_interval, facts=single_class_facts("AAA"))
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, packet.reason_codes)
+        self.assertIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+
+    def test_an_unknown_bridge_type_fails_closed(self):
+        def bad(proof):
+            return {
+                item.member_key: ClassEvidence(
+                    class_interval=span(),
+                    extra_prose_bridges=(
+                        ProseBridgeInput("X", "TICKER_SIMILARITY", span()),
+                    ),
+                )
+                for item in proof.classes
+            }
+
+        with self.assertRaises(QVProposalError):
+            self.build(bad)
+
+
 class ReusedVendorSeriesTest(unittest.TestCase):
     """universe/bar 심볼 != SEC 경제적 심볼.
 
@@ -1580,7 +1880,7 @@ class ReusedVendorSeriesTest(unittest.TestCase):
                 ),
             ),
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE, packet.reason_codes)
@@ -1594,7 +1894,7 @@ class ReusedVendorSeriesTest(unittest.TestCase):
                 ),
             ),
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertEqual(direct.proposal_status, AUTO_PROVABLE)
 
@@ -1608,7 +1908,7 @@ class ReusedVendorSeriesTest(unittest.TestCase):
                 ),
             ),
             proof=proof,
-            intervals=full_intervals(proof),
+            class_evidence=complete_evidence(proof),
         )
         self.assertNotIn(REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE, packet.reason_codes)
         self.assertEqual(packet.proposal_status, AUTO_PROVABLE)

@@ -420,12 +420,68 @@ class 제안이 되지 않되, **조용히 사라지지 않고** packet의 질�
 표지만으로는 대부분 `CLASS_INTERVAL_NOT_EXPLICIT`가 붙은 `REVIEW_REQUIRED`가 된다.
 **이것은 결함이 아니라 계약이다.**
 
-#### 5A-2c — 승격 (**CLOSED 정책. 아직 구현하지 않았다.**)
+##### 관계마다 자기 유효구간이 필요하다
+
+**세 관계의 수명은 서로 다른 PIT 사실이다.**
+
+```text
+economic class 수명   !=   XBRL alias 수명   !=   prose alias 수명
+```
+
+class가 X부터 존재한다는 것은 특정 XBRL QName이나 prose 철자가 **X부터 그 class를
+가리켰다**는 증명이 아니다. 그래서 세 제안이 각자 `effective_from` · `effective_to` ·
+`interval_proved` · `evidence`를 따로 들고 다닌다.
+
+```text
+class 구간을 alias 구간으로 복사하지 않는다.
+최초/최종 관측 filing을 alias 수명으로 쓰지 않는다.
+수리 시각(acceptance date)을 경제적 유효성으로 바꾸지 않는다.
+```
+
+production manifest에 쓰일 관계가 자기 구간을 증명하지 못하면 나머지가 아무리
+완결돼도 `AUTO_PROVABLE`이 아니다.
+
+```text
+CLASS_INTERVAL_NOT_EXPLICIT          economic class 구간이 없다
+XBRL_ALIAS_INTERVAL_NOT_EXPLICIT     XBRL alias 구간이 없다
+PROSE_ALIAS_INTERVAL_NOT_EXPLICIT    prose alias 구간이 없다
+CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT  canonical class bridge가 없다
+```
+
+##### 모든 보통주 class에 canonical bridge가 필요하다
+
+Step 4 §1.6의 canonical bridge는 **둘뿐**이다.
+
+```text
+SECURITY_TITLE_FACT    Security12bTitle / Security12gTitle
+GOVERNING_INSTRUMENT   governing instrument의 명시 class 정의
+```
+
+`COVER_GROUP_LABEL`은 **corroborating 전용**이다. class 정체성을 세우지 못하고
+**production class-ID seed도 되지 못한다.** XBRL member 이름은 alias이지 정체성이
+아니다.
+
+이 요구는 **요구된 상장 심볼만이 아니라 발행사 package의 sibling 보통주 전부**에
+적용된다.
+
+```text
+Class A   Security12bTitle "Class A Common Stock" · symbol AAA · shares fact
+Class B   shares fact 뿐 · 12(b)/12(g) 제목 없음 · governing instrument 정의 없음
+```
+
+이 packet은 **두 class 구간을 다 넣어도 `AUTO_PROVABLE`이 되지 않는다.** Class B에
+canonical bridge가 없기 때문이고, 남는 상태는 `REVIEW_REQUIRED`다.
+`CommonClassBMember` · 표지 그룹 라벨 · sibling 순서 · 티커 · 주식수 · class 글자
+유사도로 "Class B"를 추론하지 않는다. 나중에 governing instrument 증거가 Class B를
+명시로 정의하면 그때 canonical bridge 요건을 만족한다.
+
+#### 5A-2c — 승격 (**CLOSED 정책 · 승격기 코어 구현됨 · production 확장은 아직 없다**)
 
 packet을 `trading/qv/identity/*.jsonl`에 반영하는 유일한 단계다. **5A-2a/b는 이
 파일들을 읽지도 쓰지도 않는다.**
 
-정책은 아래 일곱 줄로 얼린다. **구현은 별도 작업이고 이 문서가 그것을 선행한다.**
+정책은 아래 일곱 줄로 얼린다. 코어 구현은 `backtest/qv_identity_promotion.py`이고,
+**이 커밋에서 production manifest 행을 하나도 늘리지 않았다.**
 
 ##### 1. `AUTO_PROVABLE`은 사람의 의미 승인 없이 승격될 수 있다
 
@@ -469,6 +525,117 @@ packet은 입력이지 권한이 아니다.
 manifest를 읽지도 쓰지도 않는다. 이 경계는 자동 승격이 생겨도 바뀌지 않는다 —
 제안을 만드는 코드와 승격하는 코드가 같은 자리에 있으면 "증명했으니 바로 쓴다"가
 언젠가 관문을 우회한다.
+
+##### 구현 — `backtest/qv_identity_promotion.py`
+
+실행 진입점은 `selftest/qv_identity_promotion_run.py`이고 **기본은 dry-run**이다.
+
+```text
+plan    후보 bundle을 세워 검증하고 보고만 한다. production 파일을 바꾸지 않는다.
+apply   base를 다시 확인한 뒤에만 네 파일을 바꾼다.
+```
+
+`--force`도 `--skip-bad`도 없다. 한 apply에서 고른 `AUTO_PROVABLE` 중 **하나라도
+실패하면 전체를 중단한다** — 조용히 건너뛰지 않는다. `REVIEW_REQUIRED`·`UNRESOLVED`는
+보고만 하고 건드리지 않으며, 그것은 부분 승격이 아니라 **얼어붙은 상태 경계**다.
+
+`proposal_status`를 믿지 않는다. JSON의 `AUTO_PROVABLE`은 **입력이지 권한이 아니고**,
+승격기가 packet을 처음부터 다시 본다. 표지에서 나온 관계는 파생된 제안 행이 아니라
+**packet에 박힌 원본 표지 fact**와 대조한다. SEC를 다시 부르지 않는다 — 증거 수집은
+5A-2b가 끝냈고 여기는 자기 일관성과 manifest 호환성만 결정론적으로 본다.
+
+후보 bundle은 임시 디렉터리에 완전한 네 파일로 세우고 **정본 `load_manifest()` ·
+`validate()`로** 검사한다. private 정규화 헬퍼를 production 계약으로 쓰지 않는다.
+
+**append/reuse 전용이다.**
+
+```text
+할 수 있다   정확히 같은 issuer/class/alias 재사용 · 진짜 새 관계 추가
+할 수 없다   기존 issuer CIK 변경 · class_id 개명 · effective_from 변경 ·
+             effective_to 늘이기/줄이기 · 심볼 교체 · 기존 REQUIRED 증거 수정 ·
+             provenance를 위해 기존 행에 REQUIRED 증거 추가 · 행 삭제 · 과거 구간 재작성
+```
+
+마지막 것이 특히 중요하다 — 기존 행에 REQUIRED 증거를 더하면 그 행의 파생
+`usable_from_session`이 바뀔 수 있다. 기존 semantic 행을 바꿔야 하면 **fail-close**다.
+
+정확히 같은 semantic 관계는 재사용·중복제거하고, **같은 semantic key가 다른 내용이면
+fail-close**다. 같은 상장 심볼이 겹치는 구간에 두 class를 가리켜도 fail-close이고
+tie-break를 두지 않는다.
+
+기존 JSONL 줄을 정렬·서식 때문에 다시 쓰지 않는다. 새 줄만 결정론적 순서로 덧붙인다 —
+**물리 줄 순서는 정확성 의존이 아니다.** bundle 해시가 semantic 순서로 정규화한다.
+
+receipt는 `stage = 5A-2c` JSON 하나이고 **다섯 번째 identity 파일이 아니다.**
+run/audit 산출물로 남는다. DB는 건드리지 않는다 — materialize와
+`usable_from_session`은 5A-3의 일이다.
+
+#### production `class_id` — `qv-class-id-v1` (Option A)
+
+**production class_id는 불투명 결정적 안정 키다.** 다음을 쓰지 않는다.
+
+```text
+ticker · XBRL 축/member · 사람이 읽는 class 글자 · canonical bridge 계약 없는 표시 제목 ·
+제안 id · 삽입 순서 · 정수 시퀀스
+```
+
+`prop-<CIK>-<member>`는 **packet 안에서만 쓰는 임시 참조**이고 production foreign
+key로 새어 나가면 안 된다. XBRL member 이름에서 왔기 때문에 그것을 정체성으로 쓰면
+taxonomy가 바뀌는 순간 economic class가 바뀐 것처럼 보인다.
+
+진짜 새 economic class의 seed는 economic 사실뿐이다.
+
+```json
+{
+  "scheme": "qv-class-id-v1",
+  "cik": "<정규화된 10자리 CIK>",
+  "effective_from": "<명시 economic class effective_from>",
+  "canonical_bridge_type": "<GOVERNING_INSTRUMENT|SECURITY_TITLE_FACT>",
+  "canonical_bridge_key": "<N1 prose 비교 키>"
+}
+```
+
+QV identity 해싱과 **같은** 직렬화(`sort_keys=True` · `ensure_ascii=False` ·
+`separators=(",", ":")`)로 정규화한 뒤,
+
+```text
+class_id = "us-cik-" + CIK + "-class-v1-" + SHA256(canonical_seed_json).hexdigest()
+```
+
+**전체 SHA-256 hex를 쓰고 자르지 않는다.**
+
+##### seed bridge 선택
+
+**class의 정확한 `effective_from`을 자기 구간이 덮는 canonical bridge만** 새 class의
+seed가 될 수 있다. 몇 년 뒤에야 증거가 생긴 제목이 class의 탄생 정체성을 조용히
+정하지 못하게 한다. 여럿이면 결정론적으로 고른다.
+
+```text
+1. GOVERNING_INSTRUMENT
+2. SECURITY_TITLE_FACT
+3. 정확한 comparison_key 사전순
+```
+
+이 순서는 **불투명 키의 seed에만** 영향을 주고 economic semantics를 바꾸지 않는다.
+탄생 시점에 명시로 유효한 canonical bridge가 없으면 **새 자동 production class를
+만들지 않는다** — packet은 검토 대상으로 남는다.
+
+##### 기존 class는 안정적 foreign key다
+
+이미 manifest에 있는 id를 무턱대고 다시 만들지 않는다. 새 id를 만들기 전에 **정확히
+안전한 재사용만** 시도한다.
+
+```text
+같은 issuer · 정확히 같은 canonical prose comparison_key ·
+그 관계가 제안 class의 effective_from에 유효 · economic 구간·속성이 호환 ·
+정확히 하나만 일치
+```
+
+하나면 그 `class_id`를 그대로 쓴다. 0개면 production 불변식과 충돌하지 않을 때만 새로
+만든다. **둘 이상이면 fail-close이고 고르지 않는다.**
+
+`nke-b` · `googl-c` 같은 기존 사람이 읽는 anchor id는 **개명하지 않는다.** 여전히
+유효한 foreign key이고, 불투명 v1 id는 **새로 만드는 class에만** 적용된다.
 
 #### 상태 어휘 — 정확히 셋
 
