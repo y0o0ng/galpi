@@ -29,7 +29,9 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     NO_COVER_FACTS,
     NO_COVER_PAGE_PROOF_DOCUMENT,
     NO_DISCOVERY_CANDIDATE,
+    NO_EXPLICIT_COVER_SYMBOL_ANYWHERE,
     NO_PERIODIC_FILINGS,
+    NO_TARGET_SYMBOL_COVER_PROOF,
     ORDINARY_COMMON_LISTED,
     ORDINARY_COMMON_UNLISTED,
     PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE,
@@ -55,6 +57,7 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     WorkItem,
     build_symbol_proposal,
     class_role,
+    cover_classes_for_symbol,
     discover_candidates,
     extract_cover_proof,
     fetch_cover_proof,
@@ -822,14 +825,18 @@ class FetchTest(unittest.TestCase):
         과거에 쓸 수 있었는지는 5A-3의 `usable_from_session`이 가른다.
         """
         client = self.client_with_cover()
-        proof, absence, tried = fetch_cover_proof(client, "0000000001")
+        proof, absence, tried = fetch_cover_proof(
+            client, "0000000001", target_symbol="AAA"
+        )
         self.assertIsNone(absence)
         self.assertEqual(proof.accession, "0000000001-25-000001")
         self.assertEqual(tried, ("0000000001-25-000001",))
 
     def test_no_periodic_filings_is_named(self):
         client = StubClient(rows_by_cik={"0000000001": []})
-        proof, absence, tried = fetch_cover_proof(client, "0000000001")
+        proof, absence, tried = fetch_cover_proof(
+            client, "0000000001", target_symbol="AAA"
+        )
         self.assertIsNone(proof)
         self.assertEqual(absence, NO_PERIODIC_FILINGS)
         self.assertEqual(tried, ())
@@ -843,10 +850,243 @@ class FetchTest(unittest.TestCase):
             rows_by_cik={"0000000001": [StubRow("0000000001-10-000001", "10-K", "2010-02-20")]},
             files_by_accession={"0000000001-10-000001": {"cover.xml": empty}},
         )
-        proof, absence, tried = fetch_cover_proof(client, "0000000001")
+        proof, absence, tried = fetch_cover_proof(
+            client, "0000000001", target_symbol="AAA"
+        )
         self.assertIsNone(proof)
         self.assertEqual(absence, NO_COVER_FACTS)
         self.assertEqual(tried, ("0000000001-10-000001",))
+
+
+def single_class_facts(symbol: str, title: str | None = None) -> list[dict]:
+    """단일 class 표지. 제목·심볼·주식수를 같은 class 축 context에 싣는다."""
+    return [
+        {"concept": "Security12bTitle", "value": title or f"{symbol} Common Stock",
+         "member": "CommonStockMember", "context_id": "s"},
+        {"concept": "TradingSymbol", "value": symbol,
+         "member": "CommonStockMember", "context_id": "s"},
+        {"concept": "EntityCommonStockSharesOutstanding", "value": "1000",
+         "member": "CommonStockMember", "context_id": "s", "numeric": True},
+    ]
+
+
+class TargetAwareProofSearchTest(unittest.TestCase):
+    """5A-2b 표지 증명 탐색은 **요구 심볼을 알고** 들어간다.
+
+    target-blind 탐색은 같은 등록인의 티커 변경에서 체계적 위음성을 만든다 — 최신
+    표지(새 심볼)에서 멈춘 뒤 대조에서 떨어지고, 옛 심볼을 명시로 증명하는 더 오래된
+    표지는 읽히지도 않는다.
+    """
+
+    CIK = "0000000042"
+
+    def history(self, pairs, *, cik=None):
+        """`[(연도, 심볼 또는 None), ...]`을 filing 이력 stub으로 만든다.
+
+        `None`이면 표지 fact가 없는 filing이다(2019 표지 XBRL 의무화 이전 모양).
+        """
+        cik = cik or self.CIK
+        rows, files = [], {}
+        for year, symbol in pairs:
+            accession = f"{cik}-{str(year)[2:]}-000001"
+            rows.append(StubRow(accession, "10-K", f"{year}-02-20"))
+            if symbol is None:
+                payload = cover_instance(
+                    [{"concept": "EntityRegistrantName", "value": "Acme",
+                      "context_id": "p"}],
+                    default_cik=cik,
+                )
+            else:
+                payload = cover_instance(single_class_facts(symbol), default_cik=cik)
+            files[accession] = {"cover.xml": payload}
+        return StubClient(rows_by_cik={cik: rows}, files_by_accession=files)
+
+    # 2026/2025/2024 -> NEW, 2023 -> OLD. 같은 등록인 CIK 하나다.
+    TICKER_CHANGE = ((2026, "NEW"), (2025, "NEW"), (2024, "NEW"), (2023, "OLD"))
+
+    def test_a_same_cik_ticker_change_finds_the_older_matching_cover(self):
+        client = self.history(self.TICKER_CHANGE)
+        proof, absence, tried = fetch_cover_proof(
+            client, self.CIK, target_symbol="OLD"
+        )
+        self.assertIsNone(absence)
+        self.assertEqual(proof.accession, f"{self.CIK}-23-000001")
+        # 새 심볼 표지 셋이 탐색을 멈추지 못했고, 시도 기록에 그대로 남는다.
+        self.assertEqual(tried, tuple(
+            f"{self.CIK}-{n}-000001" for n in ("26", "25", "24", "23")
+        ))
+        self.assertEqual([item.trading_symbol for item in proof.classes], ["OLD"])
+
+    def test_the_new_symbol_still_selects_the_newest_matching_cover(self):
+        client = self.history(self.TICKER_CHANGE)
+        proof, absence, tried = fetch_cover_proof(
+            client, self.CIK, target_symbol="NEW"
+        )
+        self.assertIsNone(absence)
+        self.assertEqual(proof.accession, f"{self.CIK}-26-000001")
+        self.assertEqual(tried, (f"{self.CIK}-26-000001",))   # 즉시 멈춘다
+
+    def test_the_old_symbol_is_not_reported_missing_from_the_cover(self):
+        """회귀의 핵심 — 옛 심볼이 `SYMBOL_NOT_ON_COVER_PAGE`를 받지 않는다."""
+        client = self.history(self.TICKER_CHANGE)
+        run = run_proposals(
+            client,
+            demand_from_items(WorkItem("OLD", "OLD", DIRECT, ("2013-06-28",))),
+            companies={"OLD": StubCompany(self.CIK, "Acme Inc.")},
+            overrides={},
+        )
+        packet = run.proposals[0]
+        self.assertNotIn(SYMBOL_NOT_ON_COVER_PAGE, packet.reason_codes)
+        self.assertNotIn(NO_COVER_PAGE_PROOF_DOCUMENT, packet.reason_codes)
+        self.assertEqual(packet.proof.accession, f"{self.CIK}-23-000001")
+        self.assertEqual(
+            [item.symbol for item in packet.share_class_proposals], ["OLD"]
+        )
+        # 구간 증거만 남는다 — 그것이 5A-2c의 일이다.
+        self.assertEqual(packet.reason_codes, (CLASS_INTERVAL_NOT_EXPLICIT,))
+
+    def test_the_match_is_found_beyond_the_old_three_attempt_limit(self):
+        """옛 상한(3)을 되살리면 이 테스트가 깨진다.
+
+        과거 티커가 "현재로부터 네 번째·스무 번째 제출"이라는 이유로 증명 불가가
+        되면 안 된다.
+        """
+        beyond = tuple((2026 - n, "NEW") for n in range(8)) + ((2018, "OLD"),)
+        client = self.history(beyond)
+        proof, absence, tried = fetch_cover_proof(
+            client, self.CIK, target_symbol="OLD"
+        )
+        self.assertIsNone(absence)
+        self.assertEqual(proof.accession, f"{self.CIK}-18-000001")
+        self.assertEqual(len(tried), 9)          # 아홉 번째에서 찾았다
+        self.assertEqual(tried[-1], f"{self.CIK}-18-000001")
+
+    def test_a_run_reaches_a_match_far_down_the_history(self):
+        client = self.history(
+            tuple((2026 - n, "NEW") for n in range(8)) + ((2018, "OLD"),)
+        )
+        run = run_proposals(
+            client,
+            demand_from_items(WorkItem("OLD", "OLD", DIRECT, ("2013-06-28",))),
+            companies={"OLD": StubCompany(self.CIK, "Acme Inc.")},
+            overrides={},
+        )
+        packet = run.proposals[0]
+        self.assertEqual(packet.proof.accession, f"{self.CIK}-18-000001")
+        self.assertEqual(len(run.attempted_accessions[0][2]), 9)
+
+    def test_no_matching_cover_anywhere_returns_no_target_proof(self):
+        """어느 표지도 요구 심볼을 싣지 않으면 무관한 표지를 증명으로 삼지 않는다."""
+        client = self.history(((2026, "NEW"), (2025, "NEW"), (2024, "NEW")))
+        proof, absence, tried = fetch_cover_proof(
+            client, self.CIK, target_symbol="GONE"
+        )
+        self.assertIsNone(proof)
+        self.assertEqual(absence, NO_TARGET_SYMBOL_COVER_PROOF)
+        self.assertEqual(len(tried), 3)          # 무엇을 뒤졌는지 남는다
+
+    def test_no_matching_cover_keeps_the_candidate_and_stays_review_required(self):
+        client = self.history(((2026, "NEW"), (2025, "NEW"), (2024, "NEW")))
+        run = run_proposals(
+            client,
+            demand_from_items(WorkItem("GONE", "GONE", DIRECT, ("2010-06-30",))),
+            companies={"GONE": StubCompany(self.CIK, "Acme Inc.")},
+            overrides={},
+        )
+        packet = run.proposals[0]
+        self.assertIsNone(packet.proof)
+        self.assertNotEqual(packet.proposal_status, AUTO_PROVABLE)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)   # UNRESOLVED가 아니다
+        self.assertIn(NO_TARGET_SYMBOL_COVER_PROOF, packet.reason_codes)
+        self.assertIn(NO_COVER_PAGE_PROOF_DOCUMENT, packet.reason_codes)
+        self.assertIn(DISCOVERY_ONLY_NO_SEC_PROOF, packet.reason_codes)
+        # 후보 CIK는 그대로 보인다.
+        self.assertEqual(packet.selected_cik, self.CIK)
+        self.assertEqual(
+            [item.cik for item in packet.discovery_candidates], [self.CIK]
+        )
+        # 무관한 새 심볼의 class 제안을 만들지 않는다.
+        self.assertEqual(packet.share_class_proposals, ())
+        self.assertEqual(len(run.attempted_accessions[0][2]), 3)
+
+    def test_covers_without_any_title_or_symbol_keep_the_pre_inline_signature(self):
+        """표지 class fact는 있는데 제목·심볼 칸이 없는 모양은 따로 적는다."""
+        shares_only = cover_instance(
+            [{"concept": "EntityCommonStockSharesOutstanding", "value": "7",
+              "member": "CommonStockMember", "context_id": "x", "numeric": True}],
+            default_cik=self.CIK,
+        )
+        client = StubClient(
+            rows_by_cik={self.CIK: [StubRow(f"{self.CIK}-19-000001", "10-Q", "2019-04-30")]},
+            files_by_accession={f"{self.CIK}-19-000001": {"cover.xml": shares_only}},
+        )
+        proof, absence, tried = fetch_cover_proof(
+            client, self.CIK, target_symbol="OLD"
+        )
+        self.assertIsNone(proof)
+        self.assertEqual(absence, NO_EXPLICIT_COVER_SYMBOL_ANYWHERE)
+
+        run = run_proposals(
+            client,
+            demand_from_items(WorkItem("OLD", "OLD", DIRECT, ("2010-06-30",))),
+            companies={"OLD": StubCompany(self.CIK, "Acme Inc.")},
+            overrides={},
+        )
+        packet = run.proposals[0]
+        self.assertIn(PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE, packet.reason_codes)
+        self.assertIn(NO_TARGET_SYMBOL_COVER_PROOF, packet.reason_codes)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+
+    def test_filings_without_any_cover_facts_are_skipped_not_terminal(self):
+        """표지 fact가 없는 filing은 탐색을 끝내지 않는다."""
+        client = self.history(((2026, None), (2025, None), (2024, "OLD")))
+        proof, absence, tried = fetch_cover_proof(
+            client, self.CIK, target_symbol="OLD"
+        )
+        self.assertIsNone(absence)
+        self.assertEqual(proof.accession, f"{self.CIK}-24-000001")
+        self.assertEqual(len(tried), 3)
+
+    def test_no_cover_facts_anywhere_is_still_named_separately(self):
+        client = self.history(((2010, None), (2009, None)))
+        proof, absence, tried = fetch_cover_proof(
+            client, self.CIK, target_symbol="OLD"
+        )
+        self.assertIsNone(proof)
+        self.assertEqual(absence, NO_COVER_FACTS)
+
+    def test_the_search_and_the_adjudication_share_one_matcher(self):
+        """탐색이 고른 표지는 대조가 인정하는 표지와 같은 함수로 정해진다."""
+        proof = proof_from(single_class_facts("OLD"), cik=self.CIK)
+        self.assertEqual(
+            [item.trading_symbol for item in cover_classes_for_symbol(proof, "old")],
+            ["OLD"],
+        )
+        self.assertEqual(cover_classes_for_symbol(proof, "OL"), ())      # 부분 일치 없음
+        self.assertEqual(cover_classes_for_symbol(proof, "OLDX"), ())
+        self.assertEqual(cover_classes_for_symbol(proof, " OLD "), tuple(proof.classes))
+
+    def test_an_empty_target_symbol_fails_closed(self):
+        client = self.history(self.TICKER_CHANGE)
+        with self.assertRaises(QVProposalError):
+            fetch_cover_proof(client, self.CIK, target_symbol="  ")
+
+    def test_a_reused_series_work_item_searches_for_its_economic_symbol(self):
+        """다리를 거친 항목도 그대로다 — 탐색 대상은 `identity_symbol`이다."""
+        client = self.history(((2026, "NEW"), (2023, "FOXA")))
+        run = run_proposals(
+            client,
+            demand_from_items(
+                WorkItem("TFCFA", "FOXA", REUSED_VENDOR_SERIES, ("2010-06-30",))
+            ),
+            companies={"FOXA": StubCompany(self.CIK, "Acme Inc.")},
+            overrides={},
+        )
+        packet = run.proposals[0]
+        self.assertEqual(packet.proof.accession, f"{self.CIK}-23-000001")
+        self.assertEqual(
+            [item.symbol for item in packet.share_class_proposals], ["FOXA"]
+        )
 
 
 class LaterEvidenceTest(unittest.TestCase):

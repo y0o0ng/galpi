@@ -33,6 +33,11 @@ identity_symbol  FOXA         company_tickers · browse · 구간 이름 색인 
 `TFCFA`를 과거 거래소 티커인 것처럼 SEC에서 찾지 않는다. 반대로 identity 심볼 하나로
 모든 줄을 뭉개지도 않는다 — 같은 티커를 서로 다른 발행사가 겹치지 않는 기간에 쓸 수
 있고, 그 episode를 가르는 것이 데이터 계열 심볼이다.
+
+**표지 증명 탐색은 요구 심볼을 알고 들어간다.** 같은 등록인이 티커를 바꾼 경우
+target-blind로 훑으면 최신 표지(새 심볼)에서 멈춘 뒤 대조에서 떨어지고, 옛 심볼을
+명시로 증명하는 더 오래된 표지는 읽히지도 않는다. 그래서 정확한 심볼이 표지에 나올
+때까지 제출 이력을 결정론적으로 계속 본다 — **임의의 시도 상한이 없다.**
 """
 
 from __future__ import annotations
@@ -225,6 +230,25 @@ INDETERMINATE_CLASS = "INDETERMINATE_CLASS"
 NO_CLASS_AXIS = "__NO_CLASS_AXIS__"
 
 DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON = "DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON"
+
+
+def cover_classes_for_symbol(
+    proof: "CoverPageProof", symbol: str
+) -> tuple[CoverClass, ...]:
+    """표지에서 **정확히 그 거래 심볼을 든** class들.
+
+    `build_symbol_proposal`의 대조와 `fetch_cover_proof`의 탐색이 **같은 함수**를 쓴다.
+    둘이 갈리면 "증명으로 고른 표지"와 "증명으로 인정하는 표지"가 달라진다.
+
+    정규화는 manifest prose 계약의 `prose_key`(NFKC + 공백 정규화 + casefold) 하나뿐이다.
+    **fuzzy ticker 매칭이 없다** — 접미사·부분 일치·유사도를 쓰지 않는다.
+    """
+    key = prose_key(str(symbol or "").strip())
+    return tuple(
+        item
+        for item in proof.classes
+        if item.trading_symbol and prose_key(item.trading_symbol) == key
+    )
 
 
 def class_role(item: CoverClass) -> str:
@@ -976,7 +1000,15 @@ def build_symbol_proposal(
 
     if proof is None:
         reasons.append(NO_COVER_PAGE_PROOF_DOCUMENT)
-        if proof_absence_reason:
+        if proof_absence_reason == NO_TARGET_SYMBOL_COVER_PROOF:
+            reasons.append(NO_TARGET_SYMBOL_COVER_PROOF)
+            questions.append(NO_TARGET_SYMBOL_QUESTION)
+        elif proof_absence_reason == NO_EXPLICIT_COVER_SYMBOL_ANYWHERE:
+            # 요구 심볼의 표지가 없다는 사실은 같고, 그 **이유**가 다르다.
+            reasons.append(NO_TARGET_SYMBOL_COVER_PROOF)
+            reasons.append(PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE)
+            questions.append(NO_EXPLICIT_COVER_SYMBOL_QUESTION)
+        elif proof_absence_reason:
             questions.append(proof_absence_reason)
         if distinct:
             reasons.append(DISCOVERY_ONLY_NO_SEC_PROOF)
@@ -1005,12 +1037,7 @@ def build_symbol_proposal(
             reasons.append(SIBLING_CLASS_CENSUS_UNCLEAR)
             blocked = True
 
-        matched = [
-            item
-            for item in proof.classes
-            if item.trading_symbol
-            and prose_key(item.trading_symbol) == prose_key(clean_symbol)
-        ]
+        matched = cover_classes_for_symbol(proof, clean_symbol)
         if not matched:
             reasons.append(SYMBOL_NOT_ON_COVER_PAGE)
             if not any(item.trading_symbol or item.security_title for item in proof.classes):
@@ -1080,10 +1107,23 @@ def build_symbol_proposal(
 # 표지 dei fact를 담는 정기보고서. 사업보고서를 먼저 본다.
 COVER_FORMS = ("10-K", "10-Q")
 FILING_SUMMARY_NAME = "FilingSummary.xml"
-DEFAULT_MAX_PROOF_ATTEMPTS = 3
 
 NO_PERIODIC_FILINGS = "이 등록인에게 정기보고서(10-K/10-Q)가 없습니다"
 NO_COVER_FACTS = "표지에 dei class fact가 없습니다(inline XBRL 표지 이전일 수 있습니다)"
+
+# 요구 심볼의 표지를 끝내 못 찾은 두 모양. **열거값이라 집계할 수 있고**, 무관한 현재
+# 심볼 표지를 그 심볼의 증명으로 삼는 대신 여기서 멈춘다.
+NO_TARGET_SYMBOL_COVER_PROOF = "NO_TARGET_SYMBOL_COVER_PROOF"
+NO_EXPLICIT_COVER_SYMBOL_ANYWHERE = "NO_EXPLICIT_COVER_SYMBOL_ANYWHERE"
+
+NO_TARGET_SYMBOL_QUESTION = (
+    "정기보고서 표지들이 다른 증권을 명시로 증명하고 요구 심볼은 어느 표지에도 "
+    "없습니다 — 무관한 표지를 그 심볼의 증명으로 삼지 않습니다"
+)
+NO_EXPLICIT_COVER_SYMBOL_QUESTION = (
+    "표지 class fact는 있으나 어느 표지도 제목·심볼 fact를 싣지 않았습니다 — "
+    "2019 표지 XBRL 의무화 이전 filing일 수 있고, 다른 명시 증거가 필요합니다"
+)
 
 
 def discover_candidates(
@@ -1303,36 +1343,73 @@ def fetch_cover_proof(
     client,
     cik: str,
     *,
+    target_symbol: str,
     forms: tuple[str, ...] = COVER_FORMS,
-    max_attempts: int = DEFAULT_MAX_PROOF_ATTEMPTS,
 ) -> tuple[CoverPageProof | None, str | None, tuple[str, ...]]:
-    """표지 증명을 찾는다. `(proof, 부재사유, 시도한 accession)`을 돌려준다.
+    """**요구 심볼의** 표지 증명을 찾는다. `(proof, 부재사유, 시도한 accession)`이다.
 
-    가장 최근 정기보고서부터 최대 `max_attempts`건을 본다. 표지 class fact가 하나도
-    없으면 (inline XBRL 표지 이전이거나 그 filing이 담지 않은 것이라) 증명 없음으로
-    끝낸다 — **추정으로 채우지 않는다.**
+    **target-blind 탐색은 같은 등록인의 티커 변경에서 체계적 위음성을 만든다.** 옛
+    심볼을 요구하는데 최신 표지가 새 심볼을 싣고 있으면, "class fact가 있으니 이것"으로
+    멈춘 뒤 대조에서 `SYMBOL_NOT_ON_COVER_PAGE`가 난다. **옛 심볼을 명시로 증명하는 더
+    오래된 표지는 읽히지도 않는다.** fail-closed이긴 하지만 기계적으로 증명 가능한
+    과거 매핑을 수동 검토로 보내버린다.
 
-    **문서의 자연스러운 SEC 증거 정체성을 그대로 보존한다.** 요구 formation보다 늦게
-    수리됐다는 이유로 문서를 거르지 않고, `usable_from_session`을 지어내지도 않는다.
+    그래서 수리 시각이 늦은 것부터 결정론적으로 훑되 판정 기준이 하나 더 있다.
+
+    ```text
+    표지에 요구 심볼이 정확히 있다   -> 그 표지가 증명이다. 즉시 멈춘다.
+    다른 증권만 있다                 -> 더 오래된 filing을 계속 본다.
+    class fact가 없다                -> 계속 본다.
+    ```
+
+    **`proof.classes`가 비어 있지 않다는 이유만으로 멈추지 않는다.** 대조는
+    `cover_classes_for_symbol` 하나이고 `build_symbol_proposal`이 쓰는 것과 같은
+    함수다 — fuzzy ticker 매칭이 없다.
+
+    **탐색 지평에 임의의 상한을 두지 않는다.** 정확한 증명을 찾거나 적격 제출 이력이
+    바닥날 때까지 본다. 과거 티커가 "현재로부터 네 번째 제출"이라는 이유로 증명 불가가
+    되면 안 된다. 신뢰도 점수·연도 cutoff·사용자 조절 문턱을 만들지 않는다.
+
+    **formation cutoff를 되살리지 않는다.** 나중 SEC 문서가 더 오래된 경제적 상태를
+    증명할 수 있고, 그것을 그때 쓸 수 있었는지는 5A-3의 `usable_from_session`이 가른다.
     """
-    target = normalize_cik(cik)
-    if target is None:
+    registrant = normalize_cik(cik)
+    if registrant is None:
         raise QVProposalError(f"CIK가 아닙니다: {cik!r}")
-    rows = cover_filing_rows(client, target, forms=forms)
+    wanted = str(target_symbol or "").strip()
+    if not wanted:
+        raise QVProposalError("target_symbol이 비었습니다")
+
+    rows = cover_filing_rows(client, registrant, forms=forms)
     if not rows:
         return None, NO_PERIODIC_FILINGS, ()
+
     attempted: list[str] = []
-    for row in rows[: max(1, int(max_attempts))]:
+    saw_classes = False
+    saw_explicit_symbol_or_title = False
+    for row in rows:
         attempted.append(row.accession)
-        document, name = _instance_from_accession(client, target, row.accession)
+        document, name = _instance_from_accession(client, registrant, row.accession)
         if document is None:
             continue
         proof = extract_cover_proof(
-            document, cik=target, accession=row.accession, document_name=name
+            document, cik=registrant, accession=row.accession, document_name=name
         )
-        if proof.classes:
+        if not proof.classes:
+            continue
+        saw_classes = True
+        if any(item.trading_symbol or item.security_title for item in proof.classes):
+            saw_explicit_symbol_or_title = True
+        if cover_classes_for_symbol(proof, wanted):
             return proof, None, tuple(attempted)
-    return None, NO_COVER_FACTS, tuple(attempted)
+
+    if not saw_classes:
+        return None, NO_COVER_FACTS, tuple(attempted)
+    if not saw_explicit_symbol_or_title:
+        # 표지 class fact는 있는데 제목·심볼 칸이 아예 없다 — 2019 표지 XBRL 의무화
+        # 이전의 구조적 서명이다. "다른 회사 심볼이 있었다"와 구분해서 적는다.
+        return None, NO_EXPLICIT_COVER_SYMBOL_ANYWHERE, tuple(attempted)
+    return None, NO_TARGET_SYMBOL_COVER_PROOF, tuple(attempted)
 
 
 # ── 실행 산출물 ───────────────────────────────────────────────────────────────
@@ -1412,7 +1489,6 @@ def run_proposals(
     hints: DiscoveryHints | None = None,
     name_index=None,
     intervals: dict[tuple[str, str], dict[str, ClassInterval]] | None = None,
-    max_attempts: int = DEFAULT_MAX_PROOF_ATTEMPTS,
 ) -> ProposalRun:
     """수요 작업 항목마다 발견 → SEC 증명 → 제안 packet을 만든다.
 
@@ -1477,8 +1553,10 @@ def run_proposals(
         absence = None
         tried: tuple[str, ...] = ()
         if len(distinct) == 1:
+            # **요구 심볼을 들고 들어간다.** 어느 표지가 그 심볼의 증명인지는 대조
+            # 이후가 아니라 탐색 안에서 정해져야 한다.
             proof, absence, tried = fetch_cover_proof(
-                client, distinct[0], max_attempts=max_attempts
+                client, distinct[0], target_symbol=symbol
             )
         elif len(distinct) > 1:
             absence = "후보 CIK가 확정되지 않아 증명을 시도하지 않았습니다"

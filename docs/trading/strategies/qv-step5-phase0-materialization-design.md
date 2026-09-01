@@ -312,6 +312,69 @@ spans  member_symbol   -> 그 데이터 계열의 구간 universe_membership (5A
 (`Security12bTitle` · `Security12gTitle` · `TradingSymbol` ·
 `EntityCommonStockSharesOutstanding`).
 
+##### 표지 탐색은 요구 심볼을 알고 들어간다
+
+**target-blind 탐색은 같은 등록인의 티커 변경에서 체계적 위음성을 만든다.**
+
+```text
+같은 등록인 CIK
+  더 오래된 filing -> TradingSymbol OLD
+  더 최신 filing   -> TradingSymbol NEW
+work item identity_symbol = OLD
+```
+
+"표지에 class fact가 있으면 그것"으로 멈추면 최신 NEW 표지를 돌려주고, 대조는 그
+뒤에야 일어나 `SYMBOL_NOT_ON_COVER_PAGE`가 난다. **OLD를 명시로 증명하는 더 오래된
+표지는 읽히지도 않는다.** fail-closed이긴 하지만 기계적으로 증명 가능한 과거 매핑을
+수동 검토로 보내버리므로 5A-2b의 목적 자체를 무너뜨린다.
+
+그래서 탐색이 `target_symbol = work_item.identity_symbol`을 받는다. 수리 시각이 늦은
+것부터 결정론적으로 훑되 판정 기준이 이렇다.
+
+```text
+표지에 요구 심볼이 정확히 있다   -> 그 표지가 증명이다. 즉시 멈춘다.
+다른 증권만 실려 있다            -> 더 오래된 filing을 계속 본다.
+쓸 만한 표지 fact가 없다         -> 계속 본다.
+```
+
+**`proof.classes`가 비어 있지 않다는 이유만으로 멈추지 않는다.** 대조 함수는
+`cover_classes_for_symbol` 하나이고 제안 판정이 쓰는 것과 **같은 함수**다 — 둘이
+갈리면 "증명으로 고른 표지"와 "증명으로 인정하는 표지"가 달라진다. 정규화는 manifest
+prose 계약의 `prose_key` 하나뿐이고 **fuzzy ticker 매칭이 없다.**
+
+##### 탐색 지평 — 임의의 상한이 없다
+
+옛 `DEFAULT_MAX_PROOF_ATTEMPTS = 3`을 **없앴다.** 과거 티커가 "현재로부터 네 번째·
+스무 번째 제출"이라는 이유로 증명 불가가 되면 안 된다. 정확한 증명을 찾거나 적격 제출
+이력이 바닥날 때까지 보고, 찾는 즉시 멈춘다.
+
+**신뢰도 점수·연도 cutoff·사용자 조절 correctness 문턱을 만들지 않는다.** 성능
+최적화는 탐색 결과가 정확히 같을 때만 허용한다. **formation cutoff를 되살리지
+않는다** — 나중 SEC 문서가 더 오래된 경제적 상태를 증명할 수 있고, 그것을 그때 쓸 수
+있었는지는 5A-3의 `usable_from_session`이 가른다.
+
+대가는 SEC 호출이다. 표지 XBRL이 아예 없는 옛 등록인은 이제 제출 이력 전체를 훑는다
+(실측: LEH 3건 → 53건). **그 값으로 사는 것은 "최신 3건에 표지가 없다"가 아니라
+"이 등록인의 어느 정기보고서도 그 심볼을 증명하지 않는다"라는 결정론적 사실이다.**
+
+##### 못 찾았을 때 — 무관한 표지를 증명으로 삼지 않는다
+
+```text
+NO_PERIODIC_FILINGS                 정기보고서가 없다
+NO_COVER_FACTS                      어느 filing도 표지 class fact를 만들지 못했다
+NO_EXPLICIT_COVER_SYMBOL_ANYWHERE   class fact는 있으나 어느 표지도 제목·심볼을 싣지
+                                    않았다 (2019 표지 XBRL 의무화 이전 서명)
+NO_TARGET_SYMBOL_COVER_PROOF        다른 증권은 명시로 증명되는데 요구 심볼이 없다
+```
+
+뒤의 둘은 제안의 **사유 코드**로도 남는다(`NO_TARGET_SYMBOL_COVER_PROOF`, 그리고
+pre-inline 모양이면 `PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE`가 함께). 현재 심볼의 무관한
+표지를 그 심볼의 canonical proof로 돌려주지 않는다.
+
+**후보 CIK가 있으면 `UNRESOLVED`로 내리지 않는다** — 후보는 여전히 DISCOVERY_HINT로
+남고 제안은 `REVIEW_REQUIRED`다. 시도한 accession은 전부 provenance로 남아 검토자가
+무엇을 뒤졌는지 본다.
+
 > **나중 문서가 더 오래된 상태를 증명할 수 있다.** Step 4의 CLOSED 계약이 그것이고,
 > 5A-2는 static identity 증거를 모으는 단계다. 그래서 **수리 시각이 요구 formation보다
 > 늦다는 이유로 문서를 거르지 않는다.** 그 증거를 과거 formation에서 실제로 쓸 수

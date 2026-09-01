@@ -1671,7 +1671,12 @@ Q     Q     · Q_OLD            SNDK  SNDK · SNDK_OLD
 **Gate A~H와 Phase 0는 여전히 평가되지 않았다.** 수익률·B/M·Q/V·랭킹·선택·
 `coverage_start`를 계산하지 않았다.
 
-## 10.13b Step 5A-2a/b 정정 pilot — 2026-09-01 (**economic-identity 정본**)
+## 10.13b Step 5A-2a/b 정정 pilot — 2026-09-01 (**economic-identity 정본**, target-blind 탐색)
+
+> **이 실행의 표지 탐색은 target-blind였다** — 최신 정기보고서 3건까지만 보고 표지
+> class fact가 있으면 그것으로 멈췄다. 판정·CIK·증명 accession은 10.13c가 그대로
+> 재현했으므로 **이 표는 유효한 사실로 남는다.** 다만 `LEH`의 "표지 fact 없음"은 최신
+> 3건에 대한 것이고, 전 이력에 대한 진술이 아니다. 정본은 10.13c다.
 
 **production manifest를 바꾸지 않았다** — `trading/qv/identity/*.jsonl`은 읽지도 쓰지도
 않았고 자동 승격도 없다. 어떤 Phase 0 gate도 판정하지 않았다. **5A-2는 아직 끝나지
@@ -1761,6 +1766,113 @@ packet의 질문에도 그대로 남는다 — *"TFCFA는 FOXA의 옛 계열인�
 - `TFCFA → FOXA`의 옛 등록인이 `0001754301`이라고 주장하지 않는다. 그 packet의
   `selected_cik`은 **DISCOVERY_HINT일 뿐이고** 사유 코드가 그것을 명시로 막고 있다.
 - 6개 표본으로 897개의 상태 분포를 추정하지 않는다.
+- Q/V · B/M · 랭크 · 선택 · 수익률을 계산하지 않았다.
+
+
+## 10.13c Step 5A-2b target-aware 표지 탐색 — 2026-09-01 (**정본**)
+
+**정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`의 5A-2b
+절이다.** production manifest를 바꾸지 않았고(`trading/qv/identity/*.jsonl` 읽기·쓰기
+없음) 자동 승격도 없다. **5A-2는 아직 끝나지 않았고 Gate A~H는 여전히 미판정이다.**
+
+### 무엇이 문제였나 — target-blind 탐색
+
+`fetch_cover_proof()`가 요구 심볼을 모른 채 최신 정기보고서부터 훑고 **표지에 class
+fact가 있으면 그것을 돌려줬다.** 요구 심볼과의 대조는 그 **뒤에**
+`build_symbol_proposal()`에서 일어났다.
+
+```text
+같은 등록인 CIK
+  더 오래된 filing -> TradingSymbol OLD
+  더 최신 filing   -> TradingSymbol NEW
+요구 identity_symbol = OLD
+
+최신 NEW 표지를 읽는다 -> class fact가 있다 -> 그것을 돌려준다
+                       -> OLD가 없다 -> SYMBOL_NOT_ON_COVER_PAGE
+```
+
+**OLD를 명시로 증명하는 더 오래된 표지는 읽히지도 않는다.** fail-closed이긴 하지만
+기계적으로 증명 가능한 과거 매핑을 수동 검토로 보내버린다. 거기에 옛
+`DEFAULT_MAX_PROOF_ATTEMPTS = 3`이 겹쳐서, 일치하는 표지가 현재로부터 네 번째면 아예
+증명 불가였다.
+
+### 실측 — `FTR`이 정확히 그 모양이었다
+
+5A-1 수요에 실제로 있는 **같은 등록인 티커 변경** 사례 하나를 읽기 전용으로 확인했다.
+**만들어낸 사례가 아니다** — Frontier는 `universe/SOURCES.md`가 근거와 함께 적은
+`CZN → FTR` 개명 대상이고 수요에 `('FTR','FTR')` 작업 항목으로 들어 있다.
+
+```text
+member_symbol     FTR
+identity_symbol   FTR            (DIRECT — 재사용 벤더 계열이 아니다)
+candidate CIK     0000020520     HISTORICAL_NAME_LOOKUP
+                  "Frontier Communications @ 2008-01-02..2017-03-20"
+                  (announcements/eodhd-15y-2026-08)
+attempted         24 accessions  (최신순, 전부 provenance로 남는다)
+  첫 번째         0000020520-25-000006   fybr-20250930x10q_htm.xml -> FYBR
+  스물세 번째     0001562762-20-000173   c520-20200331x10q_htm.xml -> (제목·심볼 없음)
+  스물네 번째     0001140361-20-007583   form10k_htm.xml           -> **FTR**
+selected proof    0001140361-20-007583   (FY2019 10-K)
+표지가 증명한 것  FTR ↔ "Common Stock, par value $0.25 per share"
+                  N/A ↔ "Preferred Stock Purchase Rights"
+status            REVIEW_REQUIRED
+reason codes      CLASS_INTERVAL_NOT_EXPLICIT
+                  DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON
+                  SIBLING_CLASS_CENSUS_UNCLEAR
+SEC 호출          197
+```
+
+**같은 등록인 CIK가 FYBR와 FTR 둘 다로 제출한다.** 회생 이후 계열이 `FYBR`이고 그
+시절 구간의 티커가 `FTR`이다. 이 fix 이전이라면 첫 번째 accession(FYBR 표지)이 class
+fact를 갖고 있으므로 **그것이 FTR의 canonical proof로 돌아오고
+`SYMBOL_NOT_ON_COVER_PAGE`가 붙었을 것이다.** 24번째까지 가야 나오는 증명이라 옛
+3건 상한으로도 막혔다.
+
+남은 사유 셋은 이 fix와 무관한 **기존 계약 그대로**다 — Frontier 표지도 AAPL·CELG와
+같은 모양으로 주식수를 차원 없는 context에, 제목·심볼을 class 축 context에 싣는다.
+**고쳐 덮지 않았다.**
+
+### 여섯 항목 pilot 재실행 — 판정이 하나도 바뀌지 않았다
+
+10.13b와 같은 대상·같은 명시 입력이다.
+
+```text
+AUTO_PROVABLE=0  REVIEW_REQUIRED=6  UNRESOLVED=0        (10.13b와 같다)
+발견 출처 분포  CURRENT_TICKER_FILE 3 · EXISTING_CIK_OVERRIDE 2
+                · HISTORICAL_NAME_LOOKUP 1              (10.13b와 같다)
+SEC 호출        157   (10.13b 57 — 아래 LEH가 전부다)
+```
+
+| work item | status | proof accession | attempted | reason codes |
+|---|---|---|---|---|
+| AAPL → AAPL | REVIEW_REQUIRED | 0000320193-26-000020 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON · SIBLING_CLASS_CENSUS_UNCLEAR |
+| ABMD → ABMD | REVIEW_REQUIRED | 0000950170-22-021880 | 1 | CLASS_INTERVAL_NOT_EXPLICIT |
+| CELG → CELG | REVIEW_REQUIRED | 0000816284-19-000046 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON · SIBLING_CLASS_CENSUS_UNCLEAR |
+| FOXA → FOXA | REVIEW_REQUIRED | 0001628280-26-053960 | 1 | CLASS_INTERVAL_NOT_EXPLICIT |
+| LEH → LEH | REVIEW_REQUIRED | (없음) | **53** | DISCOVERY_ONLY_NO_SEC_PROOF · NO_COVER_PAGE_PROOF_DOCUMENT |
+| TFCFA → FOXA | REVIEW_REQUIRED | 0001628280-26-053960 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE |
+
+**증명을 찾은 다섯은 전부 첫 번째 accession에서 멈춘다.** 요구 심볼이 최신 표지에 이미
+있으므로 탐색이 즉시 끝나고, 결과는 10.13b와 **글자 그대로 같다.**
+
+**바뀐 것은 LEH의 provenance 하나다.** 3건 → 53건. 2008년 제출에는 표지 XBRL 자체가
+없어서 결론(`NO_COVER_FACTS`)은 같지만, 그 진술의 범위가 달라졌다.
+
+```text
+before   최신 3건에 표지 fact가 없다
+after    이 등록인의 정기보고서 53건 어디에도 표지 fact가 없다
+```
+
+SEC 호출 57 → 157의 100건이 그 값이다.
+
+### 이 receipt가 주장하지 않는 것
+
+- 5A-2가 완료됐다고 주장하지 않는다. 897개 작업 항목 중 pilot 6개와 smoke 1개만 돌렸다.
+- **어떤 gate도 통과·실패했다고 주장하지 않는다. Gate A~H는 여전히 미판정이다.**
+- `FTR`의 identity가 승격됐다고 주장하지 않는다 — `REVIEW_REQUIRED`이고 manifest는
+  바뀌지 않았다. 구간 증거와 census 판정은 5A-2c의 사람 몫이다.
+- 7개 표본으로 897개의 상태 분포를 추정하지 않는다.
+- 다른 896개 작업 항목에 같은 티커 변경 모양이 몇 개인지 세지 않았다.
 - Q/V · B/M · 랭크 · 선택 · 수익률을 계산하지 않았다.
 
 
