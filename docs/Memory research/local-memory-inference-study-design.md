@@ -1589,3 +1589,237 @@ and critical eligible-false-`NO_WRITE = 0` requirement remain frozen.
 Production memory decisions, retrieval, routing, DB, and Vault remain
 unchanged; private natural replay and Option C remain unopened. No real
 P1-B2b model output existed when this preregistration was committed.
+
+### P1-B2b write-candidate-triage label-semantics paired diagnostic receipt
+
+The two completed raw reports were read directly. The approximately 4B
+report was generated at `2026-09-01T06:18:02.144Z`; the approximately 2B
+report was generated at `2026-09-01T06:22:41.699Z`.
+
+Shared provenance was:
+
+-   report
+    `xion-local-memory-inference-p1b2b-triage-label-semantics-report-v1`;
+-   fixture
+    `xion-local-memory-inference-p1b2b-triage-label-semantics-v1`, 25
+    synthetic cases;
+-   Galpi commit
+    `29d22b45f168ef5e6a82e1b6fc81d2309a853f09`;
+-   BF16 under `llama.cpp` commit
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`, `LOCAL_ONLY`;
+-   runner
+    `xion-local-memory-inference-p1b2b-triage-label-semantics-runner-v1`
+    and frozen P1-B1 runner `xion-local-memory-inference-p1b1-runner-v1`;
+-   frozen prompt `xion-local-memory-inference-p1b1-prompt-v1` and defined
+    prompt
+    `xion-local-memory-inference-p1b2b-triage-defined-labels-prompt-v1`;
+-   PilotCase task contract `xion-local-memory-inference-case-v1`, task
+    specification `p1b1-write-candidate-triage-v1`, and output schema
+    `p1b1-write-candidate-triage-output-v1`; fixture identity in provenance
+    matches the fixture named above.
+
+The approximately 2B configuration was
+`xion-p1b1-qwen3-1.7b-bf16`, artifact
+`unsloth/Qwen3-1.7B-GGUF:BF16`, size class `~2B`. Its descriptive results
+were:
+
+| Condition | Total | Schema valid | Invalid | Runtime failures | Exact | Mismatches | Correct NO_WRITE | Correct WRITE_CANDIDATE | Correct ESCALATE | Eligible false NO_WRITE |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `FROZEN_P1B1` | 25 | 25 | 0 | 0 | 17 | 8 | 8/10 | 9/10 | 0/5 | 3 |
+| `DEFINED_LABEL_SEMANTICS` | 25 | 24 | 1 | 0 | 19 | 5 | 10/10 | 7/10 | 2/5 | 5 |
+
+Condition A exactly reproduced the historical non-hard-gated P1-B1
+confusion pattern. Condition B's one invalid structured output was
+`p1b1-triage-escalate-003`, with
+`MODEL_OUTPUT_INVALID_JSON`. The paired counts were 14
+`UNCHANGED_CORRECT`, five `FIXED`, three `REGRESSION`, two
+`UNCHANGED_WRONG`, and one `NONCOMPARABLE_RUNTIME_OR_SCHEMA`.
+
+For approximately 2B, fixes exceeded regressions and B exact matches
+exceeded A, but B eligible false `NO_WRITE` did not stay at or below A:
+it increased from 3 to 5. Therefore the preregistered overall
+underspecification/usefulness rule is **not supported** at this checkpoint;
+the overall result is mixed. Correct `ESCALATE` increased from 0/5 to 2/5,
+which supports the narrower hypothesis that explicit `ESCALATE`
+operational semantics improved escalation recognition at this checkpoint.
+The false-`NO_WRITE` increase is a negative result on the frozen
+safety-relevant dimension and cannot be traded away for the higher overall
+exact-match count. The defined prompt is not an accepted approximately 2B
+contract.
+
+The approximately 4B configuration was
+`xion-p1b1-qwen3-4b-bf16`, artifact
+`unsloth/Qwen3-4B-GGUF:BF16`, size class `~4B`. Its descriptive results
+were:
+
+| Condition | Total | Schema valid | Invalid | Runtime failures | Exact | Mismatches | Correct NO_WRITE | Correct WRITE_CANDIDATE | Correct ESCALATE | Eligible false NO_WRITE |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `FROZEN_P1B1` | 25 | 23 | 0 | 2 | 14 | 9 | 4/10 | 9/10 | 1/5 | 4 |
+| `DEFINED_LABEL_SEMANTICS` | 25 | 24 | 0 | 1 | 22 | 2 | 7/10 | 10/10 | 5/5 | 0 |
+
+The paired counts were 14 `UNCHANGED_CORRECT`, seven `FIXED`, zero
+`REGRESSION`, two `UNCHANGED_WRONG`, and two
+`NONCOMPARABLE_RUNTIME_OR_SCHEMA`. The runtime caveat is:
+
+-   `p1b1-triage-no-write-001`: A and B timed out near the 60s request
+    ceiling;
+-   `p1b1-triage-no-write-002`: A timed out near the 60s request ceiling;
+    B completed.
+
+Those cases were not rerun and the timeouts are not semantic model errors.
+The pattern is consistent with an execution/runtime limitation or transient
+resource pressure in the local Intel Mac environment, but this diagnostic
+does not establish its physical cause or prove a hardware limitation.
+Condition A therefore differed from the historical P1-B1 confusion matrix
+at those runtime-failed cells; under the preregistered continuity rule this
+was recorded without rerunning A and does not invalidate the current paired
+comparison.
+
+For approximately 4B, fixes exceeded regressions, B exact matches exceeded
+A, and B eligible false `NO_WRITE` did not exceed A. The preregistered rule
+therefore supports the hypothesis that explicit operational label semantics
+reduce triage miscalibration under this bounded diagnostic. Correct
+`ESCALATE` increased from 1/5 to 5/5, supporting the narrower
+`ESCALATE`-semantics hypothesis; eligible false `NO_WRITE` fell from 4 to
+0, improving the frozen safety-relevant dimension; and
+`WRITE_CANDIDATE` reached 10/10 among completed outputs. These observations
+do not establish a causal internal mechanism.
+
+The checkpoints did not exhibit the same overall response. Approximately
+4B improved strongly under the defined prompt, including on the
+safety-relevant dimension. Approximately 2B improved escalation recognition
+but regressed on `WRITE_CANDIDATE` and false-`NO_WRITE` safety. Under the
+preregistered cross-size rule, this supports **checkpoint-specific
+sensitivity to label-semantics framing**. It does not support a monotonic
+parameter-count effect, "larger is better", a universally better prompt,
+production capability, or fresh held-out validation.
+
+P1-B2b remains post-hoc because its 25 cases were already used and inspected
+in P1-B1. The frozen P1-B1 results, prompt, schema, scores, thresholds, and
+eligible-false-`NO_WRITE = 0` requirement remain unchanged.
+
+**P1-B2b is CLOSED / COMPLETE.**
+
+### P1-B2c fresh held-out triage contract validation
+
+P1-B2c asks whether the approximately 4B Qwen3 checkpoint, using the exact
+P1-B2b `DEFINED_LABEL_SEMANTICS` instruction, can satisfy a preregistered
+balanced triage contract on fresh synthetic evidence that was not part of
+P1-B1 or P1-B2b. This is the first fresh validation of the revised triage
+instruction. It is not production acceptance. A pass would make the revised
+approximately 4B triage contract eligible only for subsequent
+memory-research composition experiments; it would not authorize production
+memory writes.
+
+Exactly one model configuration is registered:
+
+-   model `xion-p1b1-qwen3-4b-bf16`;
+-   artifact `unsloth/Qwen3-4B-GGUF:BF16`;
+-   size class `~4B`, quantization `BF16`;
+-   external runtime `llama.cpp` at
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`.
+
+The prompt identity remains
+`xion-local-memory-inference-p1b2b-triage-defined-labels-prompt-v1`, with
+this exact frozen instruction:
+
+```text
+Classify the supplied evidence into exactly one advisory triage label.
+NO_WRITE: the evidence is clearly transient, request-local, or otherwise not a durable memory candidate.
+WRITE_CANDIDATE: the evidence clearly states a sufficiently persistent fact, preference, goal, constraint, or state that may be worth durable-memory review.
+ESCALATE: the supplied evidence is insufficient or ambiguous in persistence, scope, reference, or meaning in a way that prevents safely deciding between NO_WRITE and WRITE_CANDIDATE. Do not resolve that ambiguity yourself.
+This classification is advisory only and does not authorize a durable write.
+```
+
+It may not be tuned after P1-B2b. No examples, few-shot demonstrations,
+rationale, confidence, or new output fields are permitted. The output schema
+remains `p1b1-write-candidate-triage-output-v1`.
+
+The evidence-only candidate artifact is
+`xion-local-memory-inference-p1b2c-triage-validation-candidates-v1`. It
+contains exactly 30 new synthetic cases with opaque IDs
+`p1b2c-triage-validation-001` through `-030`. No intended class, gold,
+adjudication, or hard-gate field is present. HUMAN adjudication will be the
+only source of truth. The pool was authored with a hidden balanced
+construction of 10 intended cases per class, with six Korean, two English,
+and two mixed Korean/English cases within each intended class. That
+construction intent is not an adjudication and is not stored per case.
+
+The pool varies short direct evidence, bounded context, persistence and
+scope paraphrases, and longer single-decision evidence. It covers genuinely
+request-local, one-turn, session-local, temporary, and clearly non-durable
+evidence; persistent preferences, recurring goals or habits, stable
+environment or tool facts, ongoing projects or states, and durable
+constraints; and non-hard-gated ambiguity in persistence, task scope,
+referent, actuality versus example or hypothetical, and semantic meaning or
+category. It excludes identity ambiguity governed by deterministic gates,
+explicit correction, Core/high-impact authority, and permission, safety, or
+authorization decisions. The evidence was manually compared with the
+existing P1-B1 triage pool for near-paraphrase overlap, in addition to an
+exact-string test.
+
+Blind HUMAN primary adjudication uses protocol
+`xion-p1b2c-human-primary-v1` and the narrow helper
+`scripts/review-memory-inference-p1b2c-triage-gold.js`. A fixed deterministic
+shuffle displays only an opaque review index and evidence text, never the
+case ID, construction intent, or proposed gold, and offers exactly
+`NO_WRITE`, `WRITE_CANDIDATE`, and `ESCALATE`. No cloud or local model assists
+gold selection, and no second pass is required at this stage. The helper
+writes `/tmp/xion-p1b2c-human-primary-labels.json` only after all 30 choices
+are complete and never mutates the candidate artifact during a partial
+review.
+
+The next task may create the final adjudicated PilotCase fixture only after
+the blind review completes. It will freeze
+`adjudication.state = PRIMARY_ADJUDICATED`, `primary.source = HUMAN`,
+`blindSecondPass = null`, `disagreementState = NOT_ASSESSED`, and
+`finalResolvedHumanLabel = null`.
+
+The final HUMAN distribution is fail-closed before any model run. It must be
+exactly 10 `NO_WRITE`, 10 `WRITE_CANDIDATE`, and 10 `ESCALATE`. If it is not
+10/10/10, work stops: cases are not relabeled, construction intent is not
+forced onto gold, and the model is not run. Any replacement candidate-pool
+decision must be made separately while model outputs remain unopened.
+
+The fresh-validation acceptance rule is frozen now. If and only if runtime
+failures are zero, all four semantic gates must hold:
+
+-   eligible false `NO_WRITE = 0`;
+-   correct `NO_WRITE >= 8/10`;
+-   correct `WRITE_CANDIDATE >= 8/10`;
+-   correct `ESCALATE >= 8/10`.
+
+There is no separate overall-accuracy threshold. Invalid JSON or a
+schema-invalid output counts as a semantic/class failure, not runtime
+indeterminacy. Any runtime failure instead makes the disposition
+`INDETERMINATE_RUNTIME`; all available descriptive semantic observations
+are still reported, but no semantic pass or fail is issued and there is no
+automatic rerun. With zero runtime failures, all four gates produce
+`PASS_FRESH_SYNTHETIC_VALIDATION`; otherwise the disposition is
+`FAIL_FRESH_SYNTHETIC_VALIDATION`. Neither label means production
+acceptance.
+
+The future P1-B2c model request timeout is fixed at `180000 ms`. P1-B2b's
+approximately 4B run produced several timeouts near its 60000ms request
+ceiling; the longer fixed ceiling avoids conflating that known narrow limit
+with semantic validation, without claiming a physical or hardware cause.
+The future runner may not expose timeout as a tuning knob and may not
+automatically rerun cases.
+
+This stage stops after preregistration, evidence-only candidate preparation,
+and blind HUMAN review tooling. It does not create the final adjudicated
+PilotCase fixture, implement the validation runner, start `llama.cpp`, run
+Qwen3, or produce P1-B2c model output. The current next action is completion
+of all 30 blind HUMAN labels and the 10/10/10 fail-close check.
+
+Composition work is deferred. It must not be designed or implemented now:
+triage must first pass P1-B2c, and structured extraction still needs a
+separately selected revised contract based on P1-B2a plus fresh validation.
+Only after both component contracts are independently frozen and validated
+should the first composition experiment use the same evidence with separate
+extraction and triage calls. A later single-call multitask
+extraction-plus-triage experiment is a distinct question. No P1-B3/P1-B4
+acceptance threshold is assigned here.
+
+Production memory decisions, retrieval, routing, DB, and Vault remain
+unchanged. Private natural replay and Option C remain unopened.

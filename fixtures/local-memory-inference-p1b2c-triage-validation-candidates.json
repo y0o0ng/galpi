@@ -1,0 +1,215 @@
+{
+  "name": "xion-local-memory-inference-p1b2c-triage-validation-candidates-v1",
+  "cases": [
+    {
+      "caseId": "p1b2c-triage-validation-001",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "지금 비교 중인 두 숫자 가운데 큰 값에만 밑줄을 표시해 달라는 요청이다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-002",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "The user has switched their primary note-taking system to Obsidian for the foreseeable future."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-003",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "메모에는 '매일 백업한다'는 문장이 있다. 바로 앞줄은 예시 문구를 작성하는 단계이고, 이 문장이 사용자의 실제 습관인지 템플릿 예문인지 표시되어 있지 않다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-004",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 최소 올해 말까지 평일 아침마다 30분씩 스페인어를 공부할 계획이라고 밝혔다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-005",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "이번 debugging session이 끝날 때까지만 로그 timestamp를 local time으로 보여 달라고 했다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-006",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "The notes mention a project archive and an email archive, then say, 'keep the archive active after migration,' without tying the phrase to either one."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-007",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "파일 업로드가 끝날 때까지만 진행 상황 알림음을 꺼 달라는 임시 요청이다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-008",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 Python 환경을 만들 때 uv를 default tool로 쓰겠다고 정했다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-009",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 발표 화면을 어둡게 바꿔 달라며 '앞으로도 이렇게'라고 덧붙였다. 여기서 앞으로가 발표의 남은 슬라이드인지 이후 모든 화면인지 범위가 드러나지 않는다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-010",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "For this comparison only, sort the three quoted options alphabetically before answering."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-011",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자의 개발 노트북 운영체제는 Fedora 42라고 명시되어 있다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-012",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "`compact mode로 해줘`라는 요청이 현재 dashboard preview에만 적용되는지 계정의 지속 설정인지 분명하지 않다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-013",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "현재 브레인스토밍 세션에서는 후보 아이디어를 최대 다섯 개까지만 제시해 달라고 했다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-014",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "The user cannot schedule recurring study sessions on weekday evenings because of a standing caregiving commitment."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-015",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자가 '가벼운 작업'은 자동화한다고 했지만 무엇을 가벼운 작업으로 보는지 기준이 제시되지 않았다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-016",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 12월까지 이어지는 박물관 아카이브 디지털화 프로젝트를 진행 중이라고 밝혔다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-017",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "`오늘 stand-up`이 끝날 때까지만 status badge를 숨겨 달라는 요청이다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-018",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "The statement 'weekly reports use the compact template' appears in a planning draft, and it is unclear whether it describes an adopted practice or a proposed example."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-019",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "방금 붙여 넣은 문장에서 제품명 세 개만 세어 달라는 단발성 요청이다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-020",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 향후 meeting notes에서 action items를 영어로 유지하는 방식을 선호한다고 밝혔다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-021",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "대화에는 배포 저장소와 문서 저장소가 함께 언급된 뒤 '그 저장소는 계속 읽기 전용이다'라고만 적혀 있다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-022",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 매달 첫 영업일에 예산을 검토하는 습관이 있다고 말했다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-023",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "Until the current import finishes, suppress progress percentages and show only the spinner."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-024",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "테스트 결과를 보며 `archive these`라고 했지만, 방금 생성된 two files만 뜻하는지 앞으로 이 project의 모든 결과를 보관하라는 규칙인지 범위가 정해지지 않았다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-025",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 장기 문서 보관소의 검색 도구로 ripgrep을 사용한다고 명시했다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-026",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "첨부한 사진 한 장에서 표지판 색만 알려 달라는 단발성 요청이다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-027",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자가 '초록 상태는 계속 유지한다'고 했지만 초록이 완료 상태인지 단순 표시 색인지 의미가 분명하지 않다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-028",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "The user prefers calendar weeks to start on Monday in all future planning views."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-029",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "이번 문서 미리보기 동안에만 맞춤법 경고 표시를 숨겨 달라고 했다."
+      }
+    },
+    {
+      "caseId": "p1b2c-triage-validation-030",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자가 `I keep a paper backup`이라고 썼지만 자신의 실제 보관 방식인지 예시 문장을 번역해 달라는 것인지 알 수 없다."
+      }
+    }
+  ]
+}
