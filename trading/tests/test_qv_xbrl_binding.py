@@ -73,7 +73,7 @@ class BindingFixture:
         self.issuer()
         self.connection.commit()
 
-    def issuer(self, issuer_id=ISSUER, cik=CIK, usable="2010-01-04"):
+    def issuer(self, usable="2010-01-04", issuer_id=ISSUER, cik=CIK):
         self.connection.execute(
             "INSERT OR REPLACE INTO qv_issuers"
             " (issuer_id, cik, resolution_method, usable_from_session,"
@@ -127,7 +127,7 @@ class BindingFixture:
         self.filing(accession, usable=filing_usable, cik=cik)
         return derive_bindings(
             self.connection, document(facts, cik=cik, name=name),
-            cik=cik, accession=accession, issuer_id=ISSUER,
+            cik=cik, accession=accession,
             filing_source_version=FSV, identity_source_version=IDV,
             default_instant=instant,
         )
@@ -135,8 +135,8 @@ class BindingFixture:
     def store(self, bindings):
         return store_bindings(self.connection, bindings)
 
-    def lookup(self, accession, member_local="CommonClassAMember", *,
-               name="cover.xml", fact_instant=INSTANT, **kwargs):
+    def resolve(self, accession, member_local="CommonClassAMember", *,
+                name="cover.xml", fact_instant=INSTANT, **kwargs):
         return resolve_accession_member(
             self.connection, cik=CIK, accession=accession,
             instance_document_name=name,
@@ -145,6 +145,11 @@ class BindingFixture:
             filing_source_version=FSV, identity_source_version=IDV,
             fact_instant=fact_instant, **kwargs,
         )
+
+    def lookup(self, *args, **kwargs):
+        """`(class_id, 상태)` 짝. 매핑 가용성은 `resolve()`로 본다."""
+        found = self.resolve(*args, **kwargs)
+        return found.class_id, found.status
 
 
 class ExplicitTitleBridgeTest(BindingFixture, unittest.TestCase):
@@ -440,6 +445,140 @@ class FactInstantRevalidationTest(BindingFixture, unittest.TestCase):
         )
 
 
+class KnowledgeAvailabilityTest(BindingFixture, unittest.TestCase):
+    """**경제적 유효성과 지식 가용성은 둘 다 필요하다.**
+
+    나중 문서가 더 오래된 상태를 증명할 수 있지만, 그 증거가 usable해지기 전
+    formation은 그것을 쓸 수 없다.
+    """
+
+    def test_a_later_proved_prose_segment_is_invisible_to_an_earlier_formation(self):
+        """같은 class의 옛 구간이 2020에야 증명됐다면 2018 formation은 못 쓴다."""
+        self.klass("cls-a", "AAA", start="2010-01-01", usable="2011-01-03")
+        # 표지 instant(2024-01-31)를 덮는 구간 — binding은 여기서 선다.
+        self.prose("cls-a", "common stock",
+                   start="2015-01-01", end=None, usable="2017-01-03")
+        # 옛 fact instant를 덮는 구간인데 **2020에야 알 수 있게 됐다.**
+        self.prose("cls-a", "common stock",
+                   start="2010-01-01", end="2015-01-01", usable="2020-01-02")
+
+        # **binding 자체는 2017부터 쓸 수 있다.** 막는 것은 2013 구간 prose 하나다.
+        bound, _ = self.derive(
+            title_facts("CommonStockMember", "Common Stock", "AAA"),
+            filing_usable="2017-01-03",
+        )
+        self.assertEqual([item.class_id for item in bound], ["cls-a"])
+        self.assertEqual(bound[0].usable_from_session, "2017-01-03")
+        self.store(bound)
+
+        acc = "0000000042-24-000001"
+
+        def at(usable_by):
+            return self.lookup(
+                acc, "CommonStockMember", fact_instant="2013-06-28",
+                usable_by=usable_by,
+            )
+
+        # binding 자체는 2024-02-20부터 쓸 수 있지만, 2013 구간 prose는 2020부터다.
+        self.assertEqual(at("2018-06-29"), (None, UNRESOLVED))
+        self.assertEqual(at("2024-06-28"), ("cls-a", RESOLVED))
+
+    def test_a_later_proved_class_segment_is_invisible_to_an_earlier_formation(self):
+        self.klass("cls-a", "AAA", start="2015-01-01", usable="2016-01-04")
+        self.klass("cls-a", "AAA", start="2010-01-01", end="2015-01-01",
+                   usable="2020-01-02")
+        self.prose("cls-a", "common stock", start="2010-01-01", usable="2011-01-03")
+
+        bound, _ = self.derive(
+            title_facts("CommonStockMember", "Common Stock", "AAA"),
+            filing_usable="2017-01-03",
+        )
+        self.assertEqual(bound[0].usable_from_session, "2017-01-03")
+        self.store(bound)
+        acc = "0000000042-24-000001"
+
+        def at(usable_by):
+            return self.lookup(
+                acc, "CommonStockMember", fact_instant="2013-06-28",
+                usable_by=usable_by,
+            )
+
+        self.assertEqual(at("2018-06-29"), (None, UNRESOLVED))
+        self.assertEqual(at("2024-06-28"), ("cls-a", RESOLVED))
+
+    def test_the_mapping_usable_session_covers_every_required_relation(self):
+        self.issuer(usable="2012-01-03")
+        self.klass("cls-a", "AAA", start="2010-01-01", usable="2013-01-02")
+        self.prose("cls-a", "class a common stock",
+                   start="2010-01-01", usable="2014-01-02")
+        self.connection.commit()
+        bound, _ = self.derive(
+            title_facts("CommonClassAMember", "Class A Common Stock", "AAA")
+        )
+        self.store(bound)
+        found = self.resolve("0000000042-24-000001")
+        self.assertEqual(found.status, RESOLVED)
+        # filing 2024-02-20이 가장 늦다.
+        self.assertEqual(found.mapping_usable_from_session, "2024-02-20")
+
+    def test_a_later_usable_issuer_delays_the_binding(self):
+        """issuer 매핑도 PIT identity 관계다."""
+        self.issuer(usable="2022-06-30")
+        self.klass("cls-a", "AAA", usable="2011-01-03")
+        self.prose("cls-a", "class a common stock", usable="2011-01-03")
+        self.connection.commit()
+        bound, _ = self.derive(
+            title_facts("CommonClassAMember", "Class A Common Stock", "AAA"),
+            filing_usable="2012-02-20",
+        )
+        self.assertEqual(bound[0].identity_usable_from_session, "2022-06-30")
+        self.assertEqual(bound[0].usable_from_session, "2022-06-30")
+
+
+class IssuerDerivationTest(BindingFixture, unittest.TestCase):
+    """`issuer_id`는 **CIK에서 파생한다.** 두 정체성을 따로 받지 않는다."""
+
+    def test_a_filing_cik_cannot_be_paired_with_another_issuers_identity(self):
+        other = "us-cik-0000000099"
+        self.connection.execute(
+            "INSERT INTO qv_issuers (issuer_id, cik, resolution_method,"
+            " usable_from_session, source, source_version, provenance)"
+            " VALUES (?, '0000000099', 'SEC_REGISTRANT_CIK', '2010-01-04',"
+            "         'manifest', ?, 'fixture')",
+            (other, IDV),
+        )
+        self.klass("cls-b", "BBB", issuer_id=other)
+        self.prose("cls-b", "class b common stock", issuer_id=other)
+        self.connection.commit()
+
+        # CIK A의 filing인데 제목이 issuer B의 class를 가리킨다 — 묶이지 않는다.
+        bound, unresolved = self.derive(
+            title_facts("CommonClassBMember", "Class B Common Stock", "BBB")
+        )
+        self.assertEqual(bound, ())
+        self.assertIn("canonical prose bridge가 없습니다", unresolved[0][1])
+
+    def test_derivation_fails_closed_without_exactly_one_issuer_for_the_cik(self):
+        from backtest.qv_xbrl_binding import resolve_issuer
+
+        self.assertEqual(
+            resolve_issuer(self.connection, cik=CIK, identity_source_version=IDV),
+            (ISSUER, "2010-01-04"),
+        )
+        with self.assertRaises(QVBindingError):
+            resolve_issuer(
+                self.connection, cik="0000000077", identity_source_version=IDV
+            )
+
+    def test_the_derived_issuer_is_the_one_on_the_binding(self):
+        self.klass("cls-a", "AAA")
+        self.prose("cls-a", "class a common stock")
+        bound, _ = self.derive(
+            title_facts("CommonClassAMember", "Class A Common Stock", "AAA")
+        )
+        self.assertEqual([item.issuer_id for item in bound], [ISSUER])
+
+
 class FilingLedgerAuthorityTest(BindingFixture, unittest.TestCase):
     """PIT filing 가용성의 권한은 canonical K/Q 원장이다."""
 
@@ -451,7 +590,7 @@ class FilingLedgerAuthorityTest(BindingFixture, unittest.TestCase):
                 self.connection,
                 document(title_facts("CommonClassAMember",
                                      "Class A Common Stock", "AAA")),
-                cik=CIK, accession="0000000042-99-000001", issuer_id=ISSUER,
+                cik=CIK, accession="0000000042-99-000001",
                 filing_source_version=FSV, identity_source_version=IDV,
                 default_instant=INSTANT,
             )
@@ -464,7 +603,7 @@ class FilingLedgerAuthorityTest(BindingFixture, unittest.TestCase):
         bound, _ = derive_bindings(
             self.connection,
             document(title_facts("CommonClassAMember", "Class A Common Stock", "AAA")),
-            cik=CIK, accession="0000000042-24-000001", issuer_id=ISSUER,
+            cik=CIK, accession="0000000042-24-000001",
             filing_source_version=FSV, identity_source_version=IDV,
             default_instant=INSTANT,
         )

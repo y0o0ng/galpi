@@ -88,6 +88,30 @@ def _scope_rows(
     ).fetchall()
 
 
+def attributed_class(row, formation_session: str) -> str | None:
+    """그 formation에서 이 관측이 **실제로** 어느 class에 귀속되는가.
+
+    ```text
+    filing 가용성   historical_usable_session  — 그 filing을 언제 알 수 있었는가
+    매핑 가용성     mapping_usable_from_session — 그 귀속에 필요한 identity 관계가
+                                                 언제 알 수 있게 됐는가
+    ```
+
+    **둘은 다른 축이고 둘 다 필요하다.** 매핑이 아직 알 수 없으면 `class_id`가 저장돼
+    있어도 그 formation에서는 귀속되지 않는다 — 저장된 행은 formation 독립이고 문턱은
+    여기서 건다.
+
+    **그것이 B로 내려갈 근거가 되지는 않는다.** 귀속되지 않는 A는 "구조적으로 존재하나
+    아직 어느 class인지 쓸 수 없는 A"이고, tier 규칙은 그것을 그대로 A의 소유로 센다.
+    """
+    if row["class_id"] is None:
+        return None
+    usable = row["mapping_usable_from_session"]
+    if usable is None or str(usable) > formation_session:
+        return None
+    return row["class_id"]
+
+
 def _regime_for_accession(
     connection: sqlite3.Connection,
     *,
@@ -178,7 +202,10 @@ def resolve_class_shares(
         shares_source_version=shares_source_version,
         identity_source_version=identity_source_version,
     )
-    mine = [row for row in scope if row["class_id"] == class_id]
+    mine = [
+        row for row in scope
+        if attributed_class(row, formation_session) == class_id
+    ]
 
     # tier 판정은 class 해석 실패보다 **먼저** 온다.
     #   - 이 class로 풀린 A
@@ -186,8 +213,12 @@ def resolve_class_shares(
     # 둘 중 하나라도 있으면 A tier가 관측을 소유한다. 다른 class로 **명시적으로** 풀린
     # A는 이 class의 구조적 존재가 아니다 — 그것까지 세면 무관한 class 때문에 전부 막힌다.
     a_for_class = [row for row in mine if row["concept_tier"] == "A"]
+    # 저장된 `class_id`가 없는 A와, **그 formation에서 아직 매핑을 쓸 수 없는** A를
+    # 같은 자리에 둔다. 둘 다 "이 class일 수도 있는 fresh A"다.
     a_unattributable = [
-        row for row in scope if row["concept_tier"] == "A" and row["class_id"] is None
+        row for row in scope
+        if row["concept_tier"] == "A"
+        and attributed_class(row, formation_session) is None
     ]
 
     if a_for_class or a_unattributable:
@@ -199,7 +230,8 @@ def resolve_class_shares(
             detail = (
                 "이 class의 A가 전부 모호/사용불가하다"
                 if a_for_class
-                else f"class를 확정하지 못한 fresh A가 {len(a_unattributable)}건 있다"
+                else "class를 확정하지 못했거나 그 매핑을 아직 쓸 수 없는 fresh A가 "
+                     f"{len(a_unattributable)}건 있다"
             )
             return ShareResolution(
                 class_id, issuer_id, PATH_MISSING, None, None, None, None,

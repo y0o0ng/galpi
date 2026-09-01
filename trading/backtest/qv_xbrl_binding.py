@@ -260,20 +260,31 @@ def _canonical_class(
     comparison_key: str,
     identity_source_version: str,
     instant: str,
+    usable_by: str | None = None,
 ) -> tuple[str, str]:
     """`(class_id, prose usable_from_session)`.
 
     **canonical bridge만** 본다(`SECURITY_TITLE_FACT` · `GOVERNING_INSTRUMENT`).
     `COVER_GROUP_LABEL`은 corroborating이라 여기 걸리지 않는다. 그 시점에 정확히 하나로
     풀리지 않으면 fail-close다.
+
+    `usable_by`를 주면 **그 cutoff에 아직 알 수 없던 관계는 참여하지 못한다.** 나중
+    문서가 더 오래된 상태를 증명할 수 있지만 그 증거가 usable해지기 전 formation은
+    그것을 쓸 수 없다.
     """
-    rows = connection.execute(
+    statement = (
         "SELECT class_id, usable_from_session FROM qv_share_class_prose_aliases"
         " WHERE issuer_id = ? AND comparison_key = ? AND source_version = ?"
         "   AND bridge_type IN ('SECURITY_TITLE_FACT', 'GOVERNING_INSTRUMENT')"
-        "   AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)",
-        (issuer_id, comparison_key, identity_source_version, instant, instant),
-    ).fetchall()
+        "   AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)"
+    )
+    params: list[object] = [
+        issuer_id, comparison_key, identity_source_version, instant, instant,
+    ]
+    if usable_by is not None:
+        statement += " AND usable_from_session <= ?"
+        params.append(usable_by)
+    rows = connection.execute(statement, params).fetchall()
     if not rows:
         raise QVBindingError(
             f"canonical prose bridge가 없습니다: {issuer_id} {comparison_key!r} @ {instant}"
@@ -284,6 +295,34 @@ def _canonical_class(
             f"prose 키가 한 시점에 {len(class_ids)}개 class로 갑니다: {comparison_key!r}"
         )
     return next(iter(class_ids)), max(row["usable_from_session"] for row in rows)
+
+
+def resolve_issuer(
+    connection: sqlite3.Connection,
+    *,
+    cik: str,
+    identity_source_version: str,
+) -> tuple[str, str]:
+    """`(issuer_id, issuer usable_from_session)` — **CIK에서 파생한다.**
+
+    호출자가 `cik`과 `issuer_id`를 따로 주면 filing FK와 issuer FK가 각각 통과하면서
+    **CIK A의 filing이 issuer B의 economic identity에 묶일 수 있다.** 그래서 공개
+    파생 경계는 둘을 따로 받지 않고 CIK 하나만 받는다.
+
+    정확히 한 행이 아니면 fail-close다. ticker·심볼·class 이름·현재 SEC 메타데이터로
+    issuer를 추론하지 않는다.
+    """
+    rows = connection.execute(
+        "SELECT issuer_id, usable_from_session FROM qv_issuers"
+        " WHERE cik = ? AND source_version = ?",
+        (normalize_cik(cik), identity_source_version),
+    ).fetchall()
+    if len(rows) != 1:
+        raise QVBindingError(
+            f"CIK {normalize_cik(cik)}의 production issuer가 정확히 하나가 아닙니다: "
+            f"{len(rows)}건 ({identity_source_version})"
+        )
+    return rows[0]["issuer_id"], str(rows[0]["usable_from_session"])
 
 
 def filing_usable_session(
@@ -323,13 +362,22 @@ def _active_class(
     issuer_id: str,
     identity_source_version: str,
     instant: str,
+    usable_by: str | None = None,
 ) -> sqlite3.Row:
-    rows = connection.execute(
+    """그 시점에 활성인 economic class 한 행.
+
+    `usable_by`를 주면 그 cutoff에 아직 알 수 없던 구간은 보이지 않는다.
+    """
+    statement = (
         "SELECT * FROM qv_share_classes"
         " WHERE class_id = ? AND source_version = ?"
-        "   AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)",
-        (class_id, identity_source_version, instant, instant),
-    ).fetchall()
+        "   AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)"
+    )
+    params: list[object] = [class_id, identity_source_version, instant, instant]
+    if usable_by is not None:
+        statement += " AND usable_from_session <= ?"
+        params.append(usable_by)
+    rows = connection.execute(statement, params).fetchall()
     if len(rows) != 1:
         raise QVBindingError(
             f"economic class가 그 시점에 정확히 하나로 활성이 아닙니다: "
@@ -356,6 +404,7 @@ def bind_member(
     instance_document_name: str,
     instance_sha256: str,
     issuer_id: str,
+    issuer_usable_from_session: str,
     filing_source_version: str,
     identity_source_version: str,
     instant: str,
@@ -399,7 +448,12 @@ def bind_member(
                 f"{production!r}과 맞지 않습니다"
             )
 
-    identity_usable = max(str(row["usable_from_session"]), str(prose_usable))
+    # **issuer 매핑도 PIT identity 관계다.** 셋 중 가장 늦은 것이 identity 쪽 문턱이다.
+    identity_usable = max(
+        str(issuer_usable_from_session),
+        str(row["usable_from_session"]),
+        str(prose_usable),
+    )
     usable = max(str(filing_historical_usable_session), identity_usable)
     return ClassBinding(
         cik=normalize_cik(cik),
@@ -434,7 +488,6 @@ def derive_bindings(
     *,
     cik: str,
     accession: str,
-    issuer_id: str,
     filing_source_version: str,
     identity_source_version: str,
     default_instant: str,
@@ -443,9 +496,14 @@ def derive_bindings(
 
     묶지 못하는 것은 실패가 아니다 — 명시 filing-local 다리가 없으면 `UNRESOLVED`다.
 
-    **문서 이름·해시·filing usable session을 호출자에게서 받지 않는다.** 앞의 둘은
-    실제 `InstanceDocument`가, 마지막은 canonical K/Q filing 원장이 권한이다.
+    **문서 이름·해시·filing usable session·issuer_id를 호출자에게서 받지 않는다.**
+    앞의 둘은 실제 `InstanceDocument`가, filing session은 canonical K/Q 원장이,
+    issuer는 그 CIK의 production issuer 행이 권한이다 — 독립적으로 작성된 두 정체성을
+    받으면 CIK A의 filing이 issuer B에 묶일 수 있다.
     """
+    issuer_id, issuer_usable = resolve_issuer(
+        connection, cik=cik, identity_source_version=identity_source_version,
+    )
     instance_document_name = document.source_file
     instance_sha256 = document.sha256
     filing_historical_usable_session = filing_usable_session(
@@ -468,6 +526,7 @@ def derive_bindings(
                 axis_key=axis_key, member_key=member_key, cik=cik,
                 accession=accession, instance_document_name=instance_document_name,
                 instance_sha256=instance_sha256, issuer_id=issuer_id,
+                issuer_usable_from_session=issuer_usable,
                 filing_source_version=filing_source_version,
                 identity_source_version=identity_source_version,
                 instant=instant,
@@ -565,6 +624,19 @@ def store_bindings(
     return len(rows)
 
 
+@dataclass(frozen=True)
+class MemberResolution:
+    """accession member 해석 결과 하나.
+
+    `mapping_usable_from_session`은 **그 해석에 실제로 필요했던 관계 전부**가 알려진
+    가장 이른 시점이다. filing 가용성과는 다른 축이다.
+    """
+
+    class_id: str | None
+    status: str
+    mapping_usable_from_session: str | None = None
+
+
 def resolve_accession_member(
     connection: sqlite3.Connection,
     *,
@@ -577,8 +649,8 @@ def resolve_accession_member(
     identity_source_version: str,
     fact_instant: str,
     usable_by: str | None = None,
-) -> tuple[str | None, str]:
-    """`(class_id, 상태)`. **어느 축도 뺄 수 없다.**
+) -> MemberResolution:
+    """**어느 축도 뺄 수 없다.**
 
     ```text
     정확한 accession + 정확한 instance 문서 + 정확한 QName
@@ -590,13 +662,15 @@ def resolve_accession_member(
 
     행을 찾은 뒤에도 **그 fact instant에** 다시 확인한다. 저장된 canonical prose 키가
     그 시점에 같은 `class_id`로 풀리고, 그 class가 활성이며 같은 issuer의 보통주여야
-    한다. 하나라도 어긋나면 **다른 class로 바꾸지 않는다** — 더 오래되거나 더 새로운
-    prose 구간을 대신 쓰지도 않는다.
+    한다. 하나라도 어긋나면 **다른 class로 바꾸지 않는다.**
 
-    `usable_by`를 주면 그때 아직 쓸 수 없는 binding은 보이지 않는다.
+    **`usable_by`는 binding 행뿐 아니라 그 재확인에도 적용된다.** 나중에야 usable해진
+    prose/class 구간이 더 이른 formation에 노출되면 안 된다. cutoff에서 쓸 수 있는
+    관계가 없으면 `UNRESOLVED`, 둘 이상이면 `AMBIGUOUS`다.
     """
     statement = (
-        "SELECT issuer_id, class_id, canonical_prose_comparison_key"
+        "SELECT issuer_id, class_id, canonical_prose_comparison_key,"
+        "       usable_from_session"
         " FROM qv_xbrl_class_bindings"
         " WHERE cik = ? AND accession = ? AND instance_document_name = ?"
         "   AND axis_key = ? AND member_key = ?"
@@ -611,37 +685,57 @@ def resolve_accession_member(
         params.append(usable_by)
     rows = connection.execute(statement, params).fetchall()
     if not rows:
-        return None, UNRESOLVED
+        return MemberResolution(None, UNRESOLVED)
     if len({row["class_id"] for row in rows}) != 1:
-        return None, AMBIGUOUS
+        return MemberResolution(None, AMBIGUOUS)
     row = rows[0]
 
     # ── fact instant에서 economic/prose identity를 다시 확인한다 ─────────────
     try:
-        resolved, _usable = _canonical_class(
+        resolved, prose_usable = _canonical_class(
             connection,
             issuer_id=row["issuer_id"],
             comparison_key=row["canonical_prose_comparison_key"],
             identity_source_version=identity_source_version,
             instant=fact_instant,
+            usable_by=usable_by,
         )
     except QVBindingAmbiguity:
-        return None, AMBIGUOUS
+        return MemberResolution(None, AMBIGUOUS)
     except QVBindingError:
-        return None, UNRESOLVED
+        return MemberResolution(None, UNRESOLVED)
     if resolved != row["class_id"]:
         # 그 시점에는 같은 철자가 **다른 class**의 것이다. 바꿔치지 않는다.
-        return None, UNRESOLVED
+        return MemberResolution(None, UNRESOLVED)
     try:
-        _active_class(
+        active = _active_class(
             connection,
             class_id=row["class_id"],
             issuer_id=row["issuer_id"],
             identity_source_version=identity_source_version,
             instant=fact_instant,
+            usable_by=usable_by,
         )
     except QVBindingAmbiguity:
-        return None, AMBIGUOUS
+        return MemberResolution(None, AMBIGUOUS)
     except QVBindingError:
-        return None, UNRESOLVED
-    return row["class_id"], RESOLVED
+        return MemberResolution(None, UNRESOLVED)
+
+    issuer_usable = connection.execute(
+        "SELECT usable_from_session FROM qv_issuers"
+        " WHERE issuer_id = ? AND source_version = ?",
+        (row["issuer_id"], identity_source_version),
+    ).fetchone()
+    if issuer_usable is None:
+        return MemberResolution(None, UNRESOLVED)
+    if usable_by is not None and str(issuer_usable["usable_from_session"]) > usable_by:
+        return MemberResolution(None, UNRESOLVED)
+
+    # 이 해석에 실제로 필요했던 관계 전부의 최댓값이다.
+    mapping_usable = max(
+        str(row["usable_from_session"]),
+        str(issuer_usable["usable_from_session"]),
+        str(active["usable_from_session"]),
+        str(prose_usable),
+    )
+    return MemberResolution(row["class_id"], RESOLVED, mapping_usable)

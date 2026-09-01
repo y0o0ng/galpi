@@ -561,6 +561,13 @@ CREATE TABLE IF NOT EXISTS qv_share_observations (
   duplicate_status TEXT NOT NULL CHECK (duplicate_status IN (
     'UNIQUE', 'CONSOLIDATED', 'AMBIGUOUS')),
   duplicate_group TEXT,
+  -- **filing 가용성과 다른 축이다.** `historical_usable_session`은 그 filing을 언제
+  -- 알 수 있었는가이고, 이것은 그 class 귀속에 실제로 필요했던 identity 관계 전부가
+  -- 언제 알 수 있게 됐는가다. 저장된 관측은 formation 독립이고, formation cutoff는
+  -- 선택기가 이 두 칸으로 건다.
+  mapping_usable_from_session TEXT
+    CHECK (mapping_usable_from_session IS NULL OR mapping_usable_from_session
+           GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   source_file TEXT NOT NULL,
   instance_sha256 TEXT NOT NULL CHECK (length(instance_sha256) = 64),
   source TEXT NOT NULL,
@@ -568,7 +575,8 @@ CREATE TABLE IF NOT EXISTS qv_share_observations (
   identity_source_version TEXT NOT NULL,
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
   PRIMARY KEY (cik, accession, fact_ordinal, source_version, identity_source_version),
-  CHECK (mapping_status <> 'RESOLVED' OR (issuer_id IS NOT NULL AND class_id IS NOT NULL))
+  CHECK (mapping_status <> 'RESOLVED' OR (issuer_id IS NOT NULL AND class_id IS NOT NULL
+         AND mapping_usable_from_session IS NOT NULL))
 ) WITHOUT ROWID;
 
 -- accession 단위 XBRL class binding. **economic identity manifest 행이 아니다.**

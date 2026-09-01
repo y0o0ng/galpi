@@ -2299,6 +2299,92 @@ SEC 호출 8
 - **Gate A~H는 여전히 미판정이다.** Q/V·B/M·랭크·선택·수익률을 계산하지 않았다.
 
 
+## 10.18 accession binding PIT 완결 — 2026-09-02
+
+C2 구조는 그대로 승인 상태이고, production materialization 전에 남은 PIT·범위 구멍 둘을
+닫는다. **production identity 행을 늘리지 않았다.**
+
+### BLOCKER 1 — fact instant 재확인이 지식 가용성을 무시했다
+
+`resolve_accession_member(... usable_by=...)`가 binding 행은 걸렀지만 이어지는
+`_canonical_class()` · `_active_class()`는 `usable_by`를 무시했다. **나중에야 usable해진
+prose/class 구간이 더 이른 formation에 노출될 수 있었다.**
+
+두 순수 헬퍼에 `usable_by`를 선택 인자로 더하고(로직을 복제하지 않았다) 해석기가 두 재확인에
+모두 넘긴다. cutoff에서 쓸 수 있는 관계가 없으면 `UNRESOLVED`, 둘 이상이면 `AMBIGUOUS`이고
+다른 class로 바꿔치지 않는다.
+
+### BLOCKER 2 — `issuer_id`가 CIK와 독립으로 들어왔다
+
+`derive_bindings()`가 `cik`과 `issuer_id`를 따로 받아서 **CIK A의 filing이 issuer B의
+economic identity에 묶일 수 있었다** — 두 FK가 각각 통과하기 때문이다. 공개 파생 경계에서
+`issuer_id`를 없애고 `qv_issuers`에서 그 CIK로 **정확히 한 행**을 찾는다. 없거나 둘이면
+fail-close다.
+
+issuer 매핑도 PIT identity 관계이므로 binding의 identity 문턱이 셋의 최댓값이 됐다.
+
+```text
+identity_usable_from_session = max(issuer, economic class, canonical prose)
+```
+
+### 3 — 저장된 관측에 매핑 가용성을 명시한다
+
+`qv_share_observations`의 PK에 `formation_session`이 없어 formation마다 다른 매핑 결과를
+저장할 수 없다. 그래서 `extract_observations(... usable_by=<한 formation>)`의 결과를 모든
+formation에 쓰는 방식을 **버렸다** — 이제 그 인자가 없다.
+
+새 칸 `mapping_usable_from_session`을 더했다. class 축 관측이면 그 fact instant 해석에
+실제로 필요했던 관계 전부(binding · issuer · economic class · canonical prose)의
+최댓값이고, 차원 없는 관측이면 issuer·class 가용성의 최댓값이다. **filing 수리 시각을
+identity 가용성으로 쓰지 않는다** — filing은 `historical_usable_session`이 따로 다스린다.
+
+선택기는 formation F에서 두 문턱을 모두 요구한다.
+
+```text
+filing historical_usable_session <= F  AND  mapping_usable_from_session <= F
+```
+
+**tier 규칙은 그대로다.** 매핑을 아직 쓸 수 없는 A는 "귀속되지 않은 A"로 세어 B fallback을
+그대로 막는다. A-owns / B-fallback · same-regime 의미를 바꾸지 않았다.
+
+### 회귀 — fix 전에는 실패하는 것들
+
+네 축을 임시로 되돌려 **실제로 실패하는 것을 확인**한 뒤 복구했다.
+
+```text
+prose 구간이 2020에야 증명됐으면 2018 formation은 못 쓴다(binding 자체는 2017부터 usable)
+class 구간이 나중에 증명된 경우도 같다
+나중 usable한 issuer 매핑이 binding 가용성을 늦춘다
+CIK A가 issuer B에 묶이지 않는다 · CIK에 issuer가 정확히 하나가 아니면 fail-close
+매핑을 아직 못 쓰는 RESOLVED 관측은 그 formation에서 귀속되지 않는다
+그래도 B fallback을 막는다(9999를 쓰지 않는다) · formation이 문턱에 닿으면 귀속된다
+filing cutoff는 독립이고 여전히 필수다 · 저장 행은 formation 독립이다
+문서/accession/QName locality와 fact-instant class·prose 변경 회귀는 그대로 통과
+```
+
+### 로컬 Python 실측 (2026-09-02)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_xbrl_binding` | 34 OK |
+| `test_qv_step4` | 133 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_identity_proposals` | 102 OK |
+| `test_qv_identity_promotion` | 60 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| **전체 trading suite** | **1,734 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — 워크플로는 npm 테스트·빌드만 돌린다.
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity manifest를 넓히지 않았다. 897개를 승격·binding하지 않았다.
+- 5A-3을 여기서 필요한 관측/PIT 계약 이상으로 구현하지 않았다.
+- share-basis·사건 의미, 회계·Q/V·B/M·랭크를 바꾸지 않았다.
+- **Gate A~H는 여전히 미판정이다.** 수익률을 계산하지 않았다.
+
+
 ---
 
 ## 11. 결과

@@ -17,6 +17,12 @@ fact가 같은 경제적 날짜를 갖는다고 가정하지 않는다.
 
 한 accession 안에도 instance 문서가 여럿일 수 있으므로 조회에 **문서 이름까지** 넘긴다.
 다른 문서의 binding이 새지 않는다.
+
+**저장되는 관측은 formation 독립이다.** raw fact를 한 번 읽고 고정된 identity bundle
+아래 그 semantic class를 풀되, **그 매핑이 언제 알 수 있게 됐는지**를 함께 적는다
+(`mapping_usable_from_session`). formation 문턱은 선택기가 건다 — formation마다 다른
+매핑 결과를 저장하지 않는다. 한 관측 행의 PK에 `formation_session`이 없으므로 그렇게
+하면 어느 formation의 답인지 알 수 없게 된다.
 """
 
 from __future__ import annotations
@@ -78,6 +84,9 @@ class ShareObservation:
     issuer_id: str | None
     class_id: str | None
     mapping_status: str
+    # **filing 가용성과 다른 축이다.** 이 귀속에 필요했던 identity 관계 전부가 언제
+    # 알 수 있게 됐는가. formation cutoff는 선택기가 건다.
+    mapping_usable_from_session: str | None
     duplicate_status: str
     duplicate_group: str | None
 
@@ -191,15 +200,14 @@ def extract_observations(
     issuer_id: str,
     filing_source_version: str,
     identity_source_version: str,
-    usable_by: str | None = None,
 ) -> tuple[ShareObservation, ...]:
     """instance에서 주식수 fact만 뽑아 D0·중복·binding을 적용한다.
 
     class 축 fact는 **그 accession의 binding**으로만 푼다. dimensionless fact는 binding
     표를 보지 않고 그 시점 적용 가능한 ordinary class가 정확히 하나일 때만 푼다.
 
-    **economic 활성 판정은 fact마다 그 fact의 instant로 한다.** `usable_by`는
-    lookahead 차단용 formation cutoff다.
+    **economic 활성 판정은 fact마다 그 fact의 instant로 한다.** formation cutoff는
+    여기서 걸지 않는다 — 저장된 행이 formation 독립이어야 하기 때문이다.
     """
     contexts = instance.context_map()
     selected: list[tuple[int, Fact, Context, str]] = []
@@ -249,23 +257,25 @@ def extract_observations(
         # 판정해야 하므로, 중복이 모호해도 어느 class의 관측인지는 남긴다.
         resolution_status = UNUSABLE_SHAPE
 
+        mapping_usable: str | None = None
+
         if shape == DIMENSIONLESS:
             # 적용 가능한 ordinary class가 정확히 하나일 때만 issuer 총계를 그 class로
             # 본다. **binding 표를 보지 않는다** — 차원 없는 fact에는 member가 없다.
-            sole = _sole_ordinary_class(
-                connection, issuer_id, context.instant,
-                identity_source_version, usable_by,
+            sole, sole_usable = _sole_ordinary_class(
+                connection, issuer_id, context.instant, identity_source_version
             )
             if sole is None:
                 resolution_status = UNRESOLVED
             else:
                 class_id = sole
+                mapping_usable = sole_usable
                 resolution_status = RESOLVED
         elif shape == SINGLE_CLASS_AXIS:
             # **어느 축도 빼지 않는다** — accession · instance 문서 · QName ·
             # 고정 bundle · 개별 fact instant 전부를 넘긴다. 해석기가 그 instant에서
             # economic/prose identity까지 다시 확인한다.
-            bound, status = qv_xbrl_binding.resolve_accession_member(
+            found = qv_xbrl_binding.resolve_accession_member(
                 connection,
                 cik=cik,
                 accession=accession,
@@ -275,14 +285,14 @@ def extract_observations(
                 filing_source_version=filing_source_version,
                 identity_source_version=identity_source_version,
                 fact_instant=context.instant,
-                usable_by=usable_by,
             )
-            if status == qv_xbrl_binding.AMBIGUOUS:
+            if found.status == qv_xbrl_binding.AMBIGUOUS:
                 resolution_status = AMBIGUOUS
-            elif bound is None:
+            elif found.class_id is None:
                 resolution_status = UNRESOLVED
             else:
-                class_id = bound
+                class_id = found.class_id
+                mapping_usable = found.mapping_usable_from_session
                 resolution_status = RESOLVED
         else:
             resolution_status = UNUSABLE_SHAPE
@@ -310,6 +320,9 @@ def extract_observations(
                 issuer_id=issuer_id if class_id is not None else None,
                 class_id=class_id,
                 mapping_status=mapping_status,
+                mapping_usable_from_session=(
+                    mapping_usable if mapping_status == RESOLVED else None
+                ),
                 duplicate_status=duplicate_status,
                 duplicate_group=group_id,
             )
@@ -322,22 +335,30 @@ def _sole_ordinary_class(
     issuer_id: str,
     as_of: str,
     identity_source_version: str,
-    usable_by: str | None,
-) -> str | None:
-    """그 시점 적용 가능한 ordinary common class가 정확히 하나일 때만 class_id를 준다."""
-    statement = (
-        "SELECT class_id FROM qv_share_classes"
+) -> tuple[str | None, str | None]:
+    """`(class_id, mapping usable)` — 적용 가능한 ordinary class가 **정확히 하나**일 때.
+
+    D0는 member가 없으므로 binding 표를 보지 않는다. 그 하나를 세우는 데 필요한
+    identity 관계는 issuer 매핑과 그 class 구간이고, 둘 중 늦은 쪽이 매핑 가용성이다.
+    """
+    rows = connection.execute(
+        "SELECT class_id, usable_from_session FROM qv_share_classes"
         " WHERE issuer_id = ? AND source_version = ? AND is_ordinary_common = 1"
-        " AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)"
-    )
-    params: list[object] = [issuer_id, identity_source_version, as_of, as_of]
-    if usable_by is not None:
-        statement += " AND usable_from_session <= ?"
-        params.append(usable_by)
-    rows = connection.execute(statement, params).fetchall()
+        " AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)",
+        (issuer_id, identity_source_version, as_of, as_of),
+    ).fetchall()
     if len(rows) != 1:
-        return None
-    return rows[0]["class_id"]
+        return None, None
+    issuer = connection.execute(
+        "SELECT usable_from_session FROM qv_issuers"
+        " WHERE issuer_id = ? AND source_version = ?",
+        (issuer_id, identity_source_version),
+    ).fetchone()
+    if issuer is None:
+        return None, None
+    return rows[0]["class_id"], max(
+        str(rows[0]["usable_from_session"]), str(issuer["usable_from_session"])
+    )
 
 
 def store_observations(
@@ -368,6 +389,7 @@ def store_observations(
             item.raw_member_namespace, item.raw_member_local,
             item.axis_key, item.member_key, item.dimension_shape,
             item.issuer_id, item.class_id, item.mapping_status,
+            item.mapping_usable_from_session,
             item.duplicate_status, item.duplicate_group,
             source_file, instance_sha256, source, source_version,
             identity_source_version, provenance,
@@ -382,9 +404,10 @@ def store_observations(
             "  fact_instant, share_value_text, decimals, unit_id, context_id,"
             "  raw_axis_namespace, raw_axis_local, raw_member_namespace, raw_member_local,"
             "  axis_key, member_key, dimension_shape, issuer_id, class_id, mapping_status,"
-            "  duplicate_status, duplicate_group, source_file, instance_sha256,"
+            "  mapping_usable_from_session, duplicate_status, duplicate_group,"
+            "  source_file, instance_sha256,"
             "  source, source_version, identity_source_version, provenance)"
-            " VALUES (" + ", ".join("?" * 32) + ")",
+            " VALUES (" + ", ".join("?" * 33) + ")",
             rows,
         )
     return len(rows)

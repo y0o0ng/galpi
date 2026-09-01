@@ -208,6 +208,57 @@ usable_from_session = max(
 
 손으로 넣지 않는다. **filing 수리 시각을 economic class 유효성으로 쓰지 않는다.**
 
+#### 지식 가용성은 경제적 유효성과 **따로** 필요하다
+
+```text
+filing 가용성   historical_usable_session    그 filing을 언제 알 수 있었는가
+매핑 가용성     mapping_usable_from_session  그 귀속에 필요한 identity 관계 전부가
+                                             언제 알 수 있게 됐는가
+```
+
+**둘은 다른 축이고 둘 다 필요하다.** fact instant 재확인도 formation cutoff를 따른다 —
+나중에야 usable해진 prose/class 구간이 더 이른 formation에 노출되면 안 된다. cutoff에서
+쓸 수 있는 관계가 없으면 `UNRESOLVED`, 둘 이상이면 `AMBIGUOUS`이고 **다른 class로
+바꿔치지 않는다.**
+
+`issuer` 매핑도 PIT identity 관계이므로 binding의 identity 쪽 문턱은 셋의 최댓값이다.
+
+```text
+identity_usable_from_session = max(
+    issuer usable_from_session,
+    economic class usable_from_session,
+    canonical prose usable_from_session)
+```
+
+#### issuer는 CIK에서 파생한다
+
+공개 파생 경계는 `cik`과 `issuer_id`를 **따로 받지 않는다.** 둘을 독립적으로 받으면
+filing FK와 issuer FK가 각각 통과하면서 **CIK A의 filing이 issuer B의 economic
+identity에 묶일 수 있다.** `qv_issuers`에서 그 CIK로 정확히 한 행을 찾고, 없거나 둘이면
+fail-close다. ticker·심볼·class 이름·현재 SEC 메타데이터로 추론하지 않는다.
+
+#### 저장되는 share 관측은 formation 독립이다
+
+`qv_share_observations`의 PK에 `formation_session`이 없으므로 **formation마다 다른
+매핑 결과를 저장할 수 없다.** raw fact를 한 번 읽고 고정된 bundle 아래 그 semantic
+class를 풀되, `mapping_usable_from_session`으로 **그 매핑이 언제 알 수 있게 됐는지**를
+함께 적는다. class 축 관측이면 그 fact instant 해석에 실제로 필요했던 관계 전부
+(binding · issuer · economic class · canonical prose)의 최댓값이고, 차원 없는 관측이면
+그 하나를 세우는 데 필요한 issuer·class 가용성의 최댓값이다. **filing 수리 시각을
+identity 가용성으로 쓰지 않는다.**
+
+formation 문턱은 선택기가 건다.
+
+```text
+formation F에서 쓰려면
+    filing historical_usable_session <= F
+    AND mapping_usable_from_session <= F
+```
+
+**tier 규칙은 그대로 CLOSED다.** A 관측이 구조적으로 존재하는데 그 매핑을 F에서 아직 쓸
+수 없으면, 그것은 "귀속되지 않은 A"이지 **B로 내려갈 권한이 아니다.** A-owns / B-fallback
+의미와 same-regime 의미를 바꾸지 않는다.
+
 #### provenance는 호출자가 쓰지 않는다
 
 binding의 권한이 raw accession + 고정 bundle이므로 그 값들을 호출자가 지어낼 수 없다.

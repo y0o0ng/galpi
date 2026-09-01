@@ -152,7 +152,7 @@ class Step4Fixture:
 
     def ingest(self, accession, facts, *, form="10-K",
                acceptance="2021-02-10T21:00:00.000000Z", as_of="2020-12-31",
-               usable_by=None, bind_members=True):
+               bind_members=True):
         # `add_class(member=...)`로 예약된 member는 **이 accession의** binding이 된다.
         if bind_members:
             for class_id, member_local, usable_session in self._pending_members:
@@ -169,7 +169,6 @@ class Step4Fixture:
             self.connection, doc, cik=CIK, accession=accession, issuer_id=ISSUER,
             filing_source_version=SHARES_VERSION,
             identity_source_version=self.identity_version,
-            usable_by=usable_by,
         )
         qv_shares.store_observations(
             self.connection, obs, cik=CIK, accession=accession, form=form,
@@ -662,8 +661,14 @@ class ManifestEvidenceTest(Step4Fixture, unittest.TestCase):
                 usable_by=usable_by,
             )
 
-        self.assertEqual(lookup("2020-06-30"), (None, "UNRESOLVED"))
-        self.assertEqual(lookup("2021-06-30"), ("cls-a", "RESOLVED"))
+        self.assertEqual(
+            (lookup("2020-06-30").class_id, lookup("2020-06-30").status),
+            (None, "UNRESOLVED"),
+        )
+        self.assertEqual(
+            (lookup("2021-06-30").class_id, lookup("2021-06-30").status),
+            ("cls-a", "RESOLVED"),
+        )
 
     def test_issuer_row_without_required_evidence_is_rejected(self):
         rows = {
@@ -982,6 +987,123 @@ class AccessionScopedResolutionTest(Step4Fixture, unittest.TestCase):
         self.assertEqual(by_instant["2020-12-31"], "cls-b")
 
 
+class MappingAvailabilityTest(Step4Fixture, unittest.TestCase):
+    """**filing 가용성 != 매핑 가용성.** 저장된 관측은 formation 독립이다."""
+
+    def shares(self, member, value="1000", instant="2020-12-31"):
+        return [{"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+                 "value": value, "member": (USG, member),
+                 "instant": instant, "decimals": "-3"}]
+
+    def resolve(self, class_id, formation, *, accession="0001234567-21-000001"):
+        from backtest import qv_selector
+
+        # same-regime 탐색은 formation 단위로 기록된다. 이 테스트의 관심사가 아니므로
+        # 그 formation에 대해 COMPLETE로 채워 둔다.
+        self.mark_search(accession, "COMPLETE", formation=formation)
+        return qv_selector.resolve_class_shares(
+            self.connection, class_id=class_id, issuer_id=ISSUER, cik=CIK,
+            formation_session=formation, valuation_date="2020-12-31",
+            shares_source_version=SHARES_VERSION,
+            events_source_version=EVENTS_VERSION,
+            identity_source_version=self.identity_version,
+        )
+
+    def test_a_resolved_observation_stores_when_its_mapping_became_knowable(self):
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2019-06-28")
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock", usable="2021-06-30")
+        found, _ = self.ingest("0001234567-21-000001",
+                               self.shares("CommonClassAMember"), bind_members=False)
+        self.assertEqual([item.mapping_status for item in found], ["RESOLVED"])
+        self.assertEqual(
+            [item.mapping_usable_from_session for item in found], ["2021-06-30"]
+        )
+        row = self.connection.execute(
+            "SELECT mapping_usable_from_session, historical_usable_session"
+            " FROM qv_share_observations"
+        ).fetchone()
+        # 두 축이 따로 저장된다.
+        self.assertEqual(row["mapping_usable_from_session"], "2021-06-30")
+        self.assertNotEqual(
+            row["historical_usable_session"], row["mapping_usable_from_session"]
+        )
+
+    def test_a_mapping_not_yet_usable_is_not_attributed_at_that_formation(self):
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2019-06-28")
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock", usable="2022-06-30")
+        self.ingest("0001234567-21-000001", self.shares("CommonClassAMember"),
+                    bind_members=False)
+
+        early = self.resolve("cls-a", "2021-06-30")
+        self.assertEqual(early.selector_path, "MISSING")
+        later = self.resolve("cls-a", "2022-06-30")
+        self.assertEqual(later.selector_path, "A")
+        self.assertEqual(later.share_value_text, "1000")
+
+    def test_an_unusable_mapping_still_blocks_b_fallback(self):
+        """**A는 여전히 구조적으로 존재한다.** B로 내려갈 권한이 아니다."""
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2019-06-28")
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock", usable="2022-06-30")
+        facts = self.shares("CommonClassAMember") + [
+            {"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+             "value": "9999", "instant": "2020-12-31", "decimals": "-3"},
+        ]
+        self.ingest("0001234567-21-000001", facts, bind_members=False)
+
+        early = self.resolve("cls-a", "2021-06-30")
+        self.assertEqual(early.selector_path, "MISSING")
+        self.assertIn("fresh A", early.missing_reason)
+        # B로 내려가지 않았다 — 9999를 쓰지 않는다.
+        self.assertIsNone(early.share_value_text)
+
+        later = self.resolve("cls-a", "2022-06-30")
+        self.assertEqual(later.selector_path, "A")
+        self.assertEqual(later.share_value_text, "1000")
+
+    def test_the_filing_cutoff_stays_independent_and_mandatory(self):
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2019-06-28")
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock", usable="2019-06-28")
+        _found, filing_usable = self.ingest(
+            "0001234567-21-000001", self.shares("CommonClassAMember"),
+            bind_members=False,
+        )
+        # 매핑은 2019부터 쓸 수 있지만 filing 자체가 2021-02-11부터다.
+        self.assertGreater(filing_usable, "2019-06-28")
+        self.assertEqual(self.resolve("cls-a", "2020-06-30").selector_path, "MISSING")
+        self.assertEqual(self.resolve("cls-a", filing_usable).selector_path, "A")
+
+    def test_a_dimensionless_observation_carries_identity_availability(self):
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2019-06-28")
+        facts = [{"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+                  "value": "500", "instant": "2020-12-31", "decimals": "-3"}]
+        found, _ = self.ingest("0001234567-21-000001", facts, bind_members=False)
+        self.assertEqual([item.class_id for item in found], ["cls-a"])
+        # issuer 매핑과 class 구간 중 늦은 쪽이다(fixture issuer는 2015-01-02).
+        self.assertEqual(
+            [item.mapping_usable_from_session for item in found], ["2019-06-28"]
+        )
+
+    def test_the_stored_observation_is_formation_independent(self):
+        """formation마다 다른 매핑 결과를 저장하지 않는다."""
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2019-06-28")
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock", usable="2022-06-30")
+        self.ingest("0001234567-21-000001", self.shares("CommonClassAMember"),
+                    bind_members=False)
+        rows = self.connection.execute(
+            "SELECT class_id, mapping_status, mapping_usable_from_session"
+            " FROM qv_share_observations"
+        ).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["class_id"], "cls-a")
+        self.assertEqual(rows[0]["mapping_status"], "RESOLVED")
+        self.assertEqual(rows[0]["mapping_usable_from_session"], "2022-06-30")
+
+
 class DuplicateFactTest(Step4Fixture, unittest.TestCase):
     def facts(self, values):
         return [
@@ -1179,7 +1301,7 @@ class TierAndSameRegimeTest(Step4Fixture, unittest.TestCase):
         result = self.resolve()
         self.assertEqual(result.selector_path, "MISSING")
         self.assertNotEqual(result.selector_path, "B_FALLBACK")
-        self.assertIn("class를 확정하지 못한 fresh A", result.missing_reason)
+        self.assertIn("fresh A", result.missing_reason)
 
     def test_other_class_usable_a_does_not_block_this_class_b(self):
         """다른 class로 명시적으로 풀린 A는 이 class의 구조적 A가 아니다."""
