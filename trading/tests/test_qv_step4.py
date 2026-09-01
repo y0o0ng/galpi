@@ -54,6 +54,9 @@ class Step4Fixture:
         self.connection = store.connect_memory()
         seed_calendar(self.connection)
         self.identity_version = "identity-v1"
+        # `add_class(member=...)`가 예약해 두는 member. ingest 때 그 accession의
+        # binding으로 들어간다 — 전역 시간 구간 alias가 아니다.
+        self._pending_members: list[tuple[str, str, str]] = []
         self.connection.execute(
             "INSERT OR REPLACE INTO data_sources"
             " (source, source_version, kind, point_in_time, survivorship_biased, note)"
@@ -85,22 +88,31 @@ class Step4Fixture:
              effective_from, effective_to, usable, self.identity_version),
         )
         if member:
-            self.add_alias(class_id, member, effective_from=effective_from,
-                           effective_to=effective_to, usable=usable)
+            self._pending_members.append((class_id, member, usable))
         self.connection.commit()
 
-    def add_alias(self, class_id, member_local, *, effective_from="2015-01-01",
-                  effective_to=None, usable="2015-01-02", axis_local="StatementClassOfStockAxis"):
+    def bind(self, accession, class_id, member_local, *,
+             axis_local="StatementClassOfStockAxis", usable="2015-01-02",
+             instance_document_name=None, filing_usable="2015-01-02"):
+        """**accession 단위** binding. 옛 시간 구간 alias가 아니다.
+
+        accession A의 binding은 accession B에 대해 아무것도 말하지 않는다.
+        """
         self.connection.execute(
-            "INSERT INTO qv_share_class_xbrl_aliases"
-            " (class_id, issuer_id, axis_key, member_key, raw_axis_namespace,"
-            "  raw_axis_local, raw_member_namespace, raw_member_local,"
-            "  effective_from, effective_to, usable_from_session,"
-            "  source, source_version, provenance)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manifest', ?, 'fixture')",
-            (class_id, ISSUER, f"us-gaap:{axis_local}", f"us-gaap:{member_local}",
-             USG, axis_local, USG, member_local,
-             effective_from, effective_to, usable, self.identity_version),
+            "INSERT OR REPLACE INTO qv_xbrl_class_bindings"
+            " (cik, accession, instance_document_name, axis_key, member_key,"
+            "  filing_source_version, identity_source_version, issuer_id, class_id,"
+            "  raw_axis_namespace, raw_axis_local, raw_member_namespace,"
+            "  raw_member_local, canonical_prose_comparison_key, binding_method,"
+            "  instance_sha256, filing_historical_usable_session,"
+            "  identity_usable_from_session, usable_from_session, source, provenance)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+            "         'COVER_SECURITY_TITLE_FACT', ?, ?, ?, ?, 'fixture', 'fixture')",
+            (CIK, accession, instance_document_name or f"{accession}.xml",
+             f"us-gaap:{axis_local}", f"us-gaap:{member_local}",
+             SHARES_VERSION, self.identity_version, ISSUER, class_id,
+             USG, axis_local, USG, member_local, member_local.lower(),
+             "b" * 64, filing_usable, usable, max(str(filing_usable), str(usable))),
         )
         self.connection.commit()
 
@@ -119,7 +131,12 @@ class Step4Fixture:
 
     def ingest(self, accession, facts, *, form="10-K",
                acceptance="2021-02-10T21:00:00.000000Z", as_of="2020-12-31",
-               usable_by=None):
+               usable_by=None, bind_members=True):
+        # `add_class(member=...)`로 예약된 member는 **이 accession의** binding이 된다.
+        if bind_members:
+            for class_id, member_local, usable_session in self._pending_members:
+                self.bind(accession, class_id, member_local, usable=usable_session)
+        del as_of
         usable = seed_filing(
             self.connection, cik=CIK, accession=accession, form=form,
             acceptance_datetime=acceptance, source=SHARES_SOURCE,
@@ -128,8 +145,9 @@ class Step4Fixture:
         xml = instance_xml(facts, cik=CIK)
         doc = parse_instance(xml, f"{accession}.xml")
         obs = qv_shares.extract_observations(
-            self.connection, doc, cik=CIK, issuer_id=ISSUER,
-            identity_source_version=self.identity_version, as_of=as_of,
+            self.connection, doc, cik=CIK, accession=accession, issuer_id=ISSUER,
+            filing_source_version=SHARES_VERSION,
+            identity_source_version=self.identity_version,
             usable_by=usable_by,
         )
         qv_shares.store_observations(
@@ -449,44 +467,54 @@ class ManifestTest(unittest.TestCase):
             with self.assertRaises(qv_manifest.QVManifestError):
                 qv_manifest.load_manifest(self.write(Path(tmp), rows))
 
-    def test_derived_member_cannot_become_a_class(self):
+    def test_the_bundle_is_exactly_three_files(self):
+        """**XBRL QName은 economic identity가 아니다.** 네 번째 파일이 없다."""
+        self.assertEqual(
+            qv_manifest.MANIFEST_FILES,
+            ("issuers.jsonl", "share_classes.jsonl", "prose_aliases.jsonl"),
+        )
         rows = self.base_rows()
-        rows["xbrl_aliases.jsonl"][0]["member_local"] = "EquivalentClassAMember"
-        with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaises(qv_manifest.QVManifestError):
-                qv_manifest.load_manifest(self.write(Path(tmp), rows))
-
-    def test_unapproved_axis_is_rejected(self):
-        rows = self.base_rows()
-        rows["xbrl_aliases.jsonl"][0]["axis_local"] = "StatementEquityComponentsAxis"
-        with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaises(qv_manifest.QVManifestError):
-                qv_manifest.load_manifest(self.write(Path(tmp), rows))
-
-    def test_same_alias_to_two_classes_fails_closed(self):
-        rows = self.base_rows()
-        rows["share_classes.jsonl"].append({
-            **rows["share_classes.jsonl"][0], "class_id": "cls-b",
-            "symbol": None, "is_listed": False,
-        })
-        rows["xbrl_aliases.jsonl"].append({
-            **rows["xbrl_aliases.jsonl"][0], "class_id": "cls-b",
-        })
-        with tempfile.TemporaryDirectory() as tmp:
-            manifest = qv_manifest.load_manifest(self.write(Path(tmp), rows))
-            with self.assertRaises(qv_manifest.QVManifestError):
-                qv_manifest.validate(manifest)
-
-    def test_many_aliases_to_one_class_is_allowed(self):
-        rows = self.base_rows()
-        for member in ("ClassASpecialCommonStockMember", "ClassaSpecialCommonStockMember"):
-            rows["xbrl_aliases.jsonl"].append({
-                **rows["xbrl_aliases.jsonl"][0], "member_local": member,
-            })
         with tempfile.TemporaryDirectory() as tmp:
             manifest = qv_manifest.load_manifest(self.write(Path(tmp), rows))
             qv_manifest.validate(manifest)
-        self.assertEqual(len(manifest.rows["xbrl_aliases.jsonl"]), 3)
+            self.assertNotIn("xbrl_aliases.jsonl", manifest.rows)
+            # 파일이 있어도 bundle이 읽지 않는다.
+            (Path(tmp) / "xbrl_aliases.jsonl").write_text("{}\n", encoding="utf-8")
+            again = qv_manifest.load_manifest(Path(tmp))
+            self.assertEqual(
+                again.identity_source_version, manifest.identity_source_version
+            )
+
+    def test_the_bundle_hash_carries_an_explicit_schema_discriminator(self):
+        """옛 네 파일 bundle의 version과 절대 같아질 수 없다."""
+        self.assertEqual(qv_manifest.BUNDLE_SCHEMA, "qv-identity-bundle-v2")
+        rows = self.base_rows()
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = self.write(Path(tmp), rows)
+            baseline = qv_manifest.load_manifest(directory).identity_source_version
+            original = qv_manifest.BUNDLE_SCHEMA
+            try:
+                qv_manifest.BUNDLE_SCHEMA = "qv-identity-bundle-v1"
+                other = qv_manifest.load_manifest(directory).identity_source_version
+            finally:
+                qv_manifest.BUNDLE_SCHEMA = original
+        self.assertNotEqual(baseline, other)
+
+    def test_row_order_stays_hash_independent(self):
+        rows = self.base_rows()
+        rows["prose_aliases.jsonl"].append({
+            **rows["prose_aliases.jsonl"][0],
+            "raw_prose_name": "Class B Common Stock",
+            "class_id": "cls-a", "bridge_type": "GOVERNING_INSTRUMENT",
+        })
+        flipped = json.loads(json.dumps(rows))
+        flipped["prose_aliases.jsonl"].reverse()
+        with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
+            left = qv_manifest.load_manifest(self.write(Path(one), rows))
+            right = qv_manifest.load_manifest(self.write(Path(two), flipped))
+        self.assertEqual(
+            left.identity_source_version, right.identity_source_version
+        )
 
     def test_normalization_does_not_repair_a_missing_space(self):
         # Comcast 표지의 실제 오타형. 어떤 정규화 단계도 이 둘을 합치지 않는다.
@@ -595,20 +623,24 @@ class ManifestEvidenceTest(Step4Fixture, unittest.TestCase):
         self.assertEqual(row["document_sha256"], sha256(b"charter"))
 
     def test_later_evidence_cannot_backfill_an_earlier_formation(self):
-        self.add_class("cls-a", symbol="AAA", listed=True, member="CommonClassAMember",
-                       usable="2021-02-11")
-        # 2021-02-11부터 usable한 alias는 2020 formation에서 보이지 않는다.
-        from backtest import qv_identity
-        with self.assertRaises(qv_identity.UnresolvedIdentityError):
-            qv_identity.resolve_member(
-                self.connection, ISSUER, AXIS, "us-gaap:CommonClassAMember",
-                "2020-12-31", self.identity_version, usable_by="2020-06-30",
+        """binding도 filing·identity 양쪽이 알려진 뒤에야 보인다."""
+        from backtest import qv_xbrl_binding
+
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2021-02-11")
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember",
+                  usable="2021-02-11", filing_usable="2021-02-11")
+
+        def lookup(usable_by):
+            return qv_xbrl_binding.resolve_accession_member(
+                self.connection, cik=CIK, accession="0001234567-21-000001",
+                axis_key=AXIS, member_key="us-gaap:CommonClassAMember",
+                filing_source_version=SHARES_VERSION,
+                identity_source_version=self.identity_version,
+                usable_by=usable_by,
             )
-        resolved = qv_identity.resolve_member(
-            self.connection, ISSUER, AXIS, "us-gaap:CommonClassAMember",
-            "2020-12-31", self.identity_version, usable_by="2021-06-30",
-        )
-        self.assertEqual(resolved.class_id, "cls-a")
+
+        self.assertEqual(lookup("2020-06-30"), (None, "UNRESOLVED"))
+        self.assertEqual(lookup("2021-06-30"), ("cls-a", "RESOLVED"))
 
     def test_issuer_row_without_required_evidence_is_rejected(self):
         rows = {
@@ -751,6 +783,107 @@ class DimensionContractTest(Step4Fixture, unittest.TestCase):
              "member": (USG, "CommonClassASharesMember")},
         ])
         self.assertEqual(obs[0].mapping_status, "UNRESOLVED")
+
+
+class AccessionScopedResolutionTest(Step4Fixture, unittest.TestCase):
+    """class 축 관측은 **그 accession의 binding**으로만 풀린다.
+
+    QName은 economic identity가 아니다 — accession A에서 본 것이 accession B에 대해
+    아무것도 말하지 않는다.
+    """
+
+    def shares(self, member, value="1000", instant="2020-12-31"):
+        return [{"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+                 "value": value, "member": (USG, member),
+                 "instant": instant, "decimals": "-3"}]
+
+    def test_the_same_qname_maps_differently_in_two_accessions(self):
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        self.add_class("cls-x", symbol="XXX", listed=True)
+        self.bind("0001234567-20-000001", "cls-a", "CommonClassAMember")
+        self.bind("0001234567-24-000001", "cls-x", "CommonClassAMember")
+
+        first, _ = self.ingest("0001234567-20-000001",
+                               self.shares("CommonClassAMember"), bind_members=False)
+        second, _ = self.ingest("0001234567-24-000001",
+                                self.shares("CommonClassAMember"), bind_members=False)
+        self.assertEqual([item.class_id for item in first], ["cls-a"])
+        self.assertEqual([item.class_id for item in second], ["cls-x"])
+
+    def test_an_observation_never_resolves_from_another_accessions_binding(self):
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        self.bind("0001234567-20-000001", "cls-a", "CommonClassAMember")
+        other, _usable = self.ingest("0001234567-24-000001",
+                            self.shares("CommonClassAMember"), bind_members=False)
+        self.assertEqual([item.mapping_status for item in other], ["UNRESOLVED"])
+        self.assertEqual([item.class_id for item in other], [None])
+
+    def test_a_missing_binding_is_unresolved_not_guessed(self):
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        self.add_class("cls-b", symbol=None, listed=False)
+        found, _usable = self.ingest("0001234567-21-000001",
+                            self.shares("CommonClassAMember"), bind_members=False)
+        self.assertEqual([item.mapping_status for item in found], ["UNRESOLVED"])
+
+    def test_an_ambiguous_binding_fails_closed(self):
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        self.add_class("cls-b", symbol=None, listed=False)
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember")
+        self.bind("0001234567-21-000001", "cls-b", "CommonClassAMember",
+                  instance_document_name="second.xml")
+        found, _usable = self.ingest("0001234567-21-000001",
+                            self.shares("CommonClassAMember"), bind_members=False)
+        self.assertEqual([item.mapping_status for item in found], ["AMBIGUOUS"])
+        self.assertEqual([item.class_id for item in found], [None])
+
+    def test_the_individual_fact_instant_controls_economic_validity(self):
+        """한 filing 안의 fact들이 같은 경제적 날짜를 갖는다고 가정하지 않는다."""
+        self.add_class("cls-a", symbol="AAA", listed=True,
+                       effective_from="2015-01-01", effective_to="2019-01-02")
+        self.bind("0001234567-21-000001", "cls-a", "CommonClassAMember")
+        facts = (
+            self.shares("CommonClassAMember", value="1000", instant="2018-12-31")
+            + self.shares("CommonClassAMember", value="2000", instant="2020-12-31")
+        )
+        found, _usable = self.ingest("0001234567-21-000001", facts, bind_members=False)
+        by_instant = {item.fact_instant: item for item in found}
+        self.assertEqual(by_instant["2018-12-31"].class_id, "cls-a")
+        self.assertEqual(by_instant["2018-12-31"].mapping_status, "RESOLVED")
+        # 2020에는 그 class가 경제적으로 없었다 — 다른 class로 바꾸지 않는다.
+        self.assertIsNone(by_instant["2020-12-31"].class_id)
+        self.assertEqual(by_instant["2020-12-31"].mapping_status, "UNRESOLVED")
+
+    def test_dimensionless_still_resolves_with_exactly_one_active_class(self):
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        facts = [{"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+                  "value": "500", "instant": "2020-12-31", "decimals": "-3"}]
+        found, _usable = self.ingest("0001234567-21-000001", facts, bind_members=False)
+        self.assertEqual([item.dimension_shape for item in found], ["DIMENSIONLESS"])
+        self.assertEqual([item.class_id for item in found], ["cls-a"])
+
+    def test_dimensionless_stays_unresolved_with_two_active_classes(self):
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        self.add_class("cls-b", symbol=None, listed=False)
+        facts = [{"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+                  "value": "500", "instant": "2020-12-31", "decimals": "-3"}]
+        found, _usable = self.ingest("0001234567-21-000001", facts, bind_members=False)
+        self.assertEqual([item.mapping_status for item in found], ["UNRESOLVED"])
+
+    def test_dimensionless_uses_the_individual_fact_instant(self):
+        self.add_class("cls-a", symbol="AAA", listed=True,
+                       effective_from="2015-01-01", effective_to="2019-01-02")
+        self.add_class("cls-b", symbol=None, listed=False,
+                       effective_from="2019-01-02")
+        facts = [
+            {"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+             "value": "500", "instant": "2018-12-31", "decimals": "-3"},
+            {"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+             "value": "600", "instant": "2020-12-31", "decimals": "-3"},
+        ]
+        found, _usable = self.ingest("0001234567-21-000001", facts, bind_members=False)
+        by_instant = {item.fact_instant: item.class_id for item in found}
+        self.assertEqual(by_instant["2018-12-31"], "cls-a")
+        self.assertEqual(by_instant["2020-12-31"], "cls-b")
 
 
 class DuplicateFactTest(Step4Fixture, unittest.TestCase):

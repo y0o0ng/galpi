@@ -1,8 +1,11 @@
 """Quality + Value의 point-in-time issuer/share-class identity.
 
-이 모듈은 identity mapping만 다룬다. shares fact, 가격, formation snapshot, factor와
-수익률은 여기서 계산하지 않는다. 모든 mapping은 명시적으로 등록하며 이름 유사도나
-현재 ticker/CIK로 과거를 추정하지 않는다.
+이 모듈은 **economic** identity mapping만 다룬다. shares fact, 가격, formation
+snapshot, factor와 수익률은 여기서 계산하지 않는다. 모든 mapping은 명시적으로 등록하며
+이름 유사도나 현재 ticker/CIK로 과거를 추정하지 않는다.
+
+**filing-local 의미는 여기 들어오지 않는다.** 옛 시간 구간 XBRL alias 해석기
+(`resolve_member`)는 은퇴했다 — accession 단위 binding은 `qv_xbrl_binding`이 맡는다.
 """
 
 from __future__ import annotations
@@ -227,8 +230,12 @@ def register_share_class(
 ) -> ShareClass:
     """economic share class의 PIT 구간을 등록한다.
 
-    XBRL/prose alias는 여기 들어오지 않는다. alias는 별도 관계이고 economic class가
-    아니다(`qv_share_class_xbrl_aliases` · `qv_share_class_prose_aliases`).
+    prose alias는 여기 들어오지 않는다. alias는 별도 관계이고 economic class가
+    아니다(`qv_share_class_prose_aliases`).
+
+    **XBRL QName은 identity 관계가 아니다.** QName이 어느 class를 뜻하는지는 그 관계를
+    등록인이 명시로 세운 accession 안에서만 참이고, 그것은
+    `qv_xbrl_binding.resolve_accession_member`가 답한다.
     """
     class_id = _required(class_id, "class_id")
     issuer_id = _required(issuer_id, "issuer_id")
@@ -373,48 +380,6 @@ def resolve_symbol(
     return ResolvedSecurity(
         share_class=share_class,
         issuer=get_issuer(connection, share_class.issuer_id, source_version),
-    )
-
-
-def resolve_member(
-    connection: sqlite3.Connection,
-    issuer_id: str,
-    axis_key: str,
-    member_key: str,
-    as_of: str,
-    source_version: str,
-    *,
-    usable_by: str | None = None,
-) -> ShareClass:
-    """명시 등록된 exact XBRL alias만 class로 푼다.
-
-    alias는 별도 관계이고 economic class가 아니다. 이름 유사도·local-name 추론은 없다.
-    `usable_by`를 주면 그 시점에 아직 쓸 수 없는 alias는 보이지 않는다(lookahead 차단).
-    """
-    axis_key = _required(axis_key, "axis_key")
-    member_key = _required(member_key, "member_key")
-    as_of = _date(as_of, "as_of")
-    statement = (
-        "SELECT class_id FROM qv_share_class_xbrl_aliases"
-        " WHERE issuer_id = ? AND axis_key = ? AND member_key = ?"
-        " AND source_version = ?"
-        " AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)"
-    )
-    params: list[object] = [issuer_id, axis_key, member_key, source_version, as_of, as_of]
-    if usable_by is not None:
-        statement += " AND usable_from_session <= ?"
-        params.append(_date(usable_by, "usable_by"))
-    rows = connection.execute(statement, params).fetchall()
-    description = f"issuer={issuer_id}, alias={axis_key}/{member_key}, as_of={as_of}"
-    if not rows:
-        raise UnresolvedIdentityError(f"XBRL alias 등록이 없습니다: {description}")
-    class_ids = {row["class_id"] for row in rows}
-    if len(class_ids) != 1:
-        raise AmbiguousIdentityError(
-            f"XBRL alias가 한 시점에 {len(class_ids)}개 class로 갑니다: {description}"
-        )
-    return _active_class_by_id(
-        connection, next(iter(class_ids)), as_of, source_version
     )
 
 

@@ -106,7 +106,6 @@ def complete_evidence(proof, *, start=BIRTH, end=None):
             )
         out[item.member_key] = ClassEvidence(
             class_interval=span(start=start, end=end),
-            xbrl_interval=span(start=start, end=end),
             cover_title_interval=span(start=start, end=end) if item.security_title else None,
             extra_prose_bridges=extra,
         )
@@ -158,8 +157,7 @@ class ManifestFixture:
         self.addCleanup(self._tmp.cleanup)
         self.directory = Path(self._tmp.name)
         self.write({name: [] for name in (
-            "issuers.jsonl", "share_classes.jsonl",
-            "xbrl_aliases.jsonl", "prose_aliases.jsonl",
+            "issuers.jsonl", "share_classes.jsonl", "prose_aliases.jsonl",
         )})
 
     def write(self, payload: dict):
@@ -191,7 +189,7 @@ class ManifestFixture:
         return {
             name: (self.directory / name).read_bytes()
             for name in ("issuers.jsonl", "share_classes.jsonl",
-                         "xbrl_aliases.jsonl", "prose_aliases.jsonl")
+                         "prose_aliases.jsonl")
         }
 
 
@@ -290,7 +288,6 @@ class GeneratedIdIsOpaqueTest(ManifestFixture, unittest.TestCase):
             return {
                 item.member_key: ClassEvidence(
                     class_interval=span(start=BIRTH),
-                    xbrl_interval=span(start=BIRTH),
                     cover_title_interval=span(start="2020-01-02"),
                 )
                 for item in proof.classes
@@ -309,10 +306,74 @@ class GeneratedIdIsOpaqueTest(ManifestFixture, unittest.TestCase):
         text = "".join(
             (self.directory / name).read_text(encoding="utf-8")
             for name in ("issuers.jsonl", "share_classes.jsonl",
-                         "xbrl_aliases.jsonl", "prose_aliases.jsonl")
+                         "prose_aliases.jsonl")
         )
         self.assertNotIn("prop-", text)
         self.assertIn(f"us-cik-{CIK}-class-v1-", text)
+
+
+class BundleRedesignTest(ManifestFixture, unittest.TestCase):
+    """세 파일 economic identity bundle과 v2 판별자."""
+
+    def test_an_old_four_file_pinned_version_is_stale_against_the_new_bundle(self):
+        """옛 네 파일 bundle에 고정된 제안은 **설계상** stale이다."""
+        run = self.run_file(
+            [packet_for(single_class_facts("AAA"))],
+            identity_version=(
+                "qv-identity-sha256:"
+                "55ed78d0b33bb5f85ccf14e81a5a7d8e6bcbe82d17812e46470b3b133372e6ec"
+            ),
+        )
+        with self.assertRaises(QVPromotionError) as caught:
+            plan_promotion(run, manifest=self.manifest())
+        self.assertIn(STALE_IDENTITY_BASE, str(caught.exception))
+
+    def test_the_promoter_never_recreates_an_xbrl_alias_file(self):
+        plan = self.plan([packet_for(dual_class_facts())])
+        self.assertNotIn("xbrl_aliases.jsonl", plan.rows.added)
+        apply_promotion(plan, directory=self.directory)
+        self.assertFalse((self.directory / "xbrl_aliases.jsonl").exists())
+
+    def test_the_repository_bundle_is_three_files_with_unchanged_anchor_ids(self):
+        """기존 economic anchor id는 그대로다. 개명하지 않는다."""
+        from backtest.qv_manifest import DEFAULT_MANIFEST_DIR
+
+        manifest = load_manifest(DEFAULT_MANIFEST_DIR)
+        validate(manifest)
+        self.assertEqual(sorted(manifest.rows), [
+            "issuers.jsonl", "prose_aliases.jsonl", "share_classes.jsonl",
+        ])
+        self.assertFalse((DEFAULT_MANIFEST_DIR / "xbrl_aliases.jsonl").exists())
+        class_ids = {row["class_id"] for row in manifest.rows["share_classes.jsonl"]}
+        self.assertEqual(class_ids, {
+            "ua-a", "ua-c", "ua-conv", "cmcsa-a", "cmcsa-b", "cmcsa-aspecial",
+            "nke-a", "nke-b", "googl-a", "googl-b", "googl-c",
+        })
+        self.assertFalse(any("-class-v1-" in item for item in class_ids))
+
+    def test_the_class_id_seed_is_unchanged_for_equivalent_economic_inputs(self):
+        """`qv-class-id-v1`은 이 재설계로 바뀌지 않는다."""
+        self.assertEqual(
+            class_id_v1(
+                cik=CIK, effective_from=BIRTH,
+                canonical_bridge_type=SECURITY_TITLE_FACT,
+                canonical_bridge_key="class a common stock",
+            ),
+            "us-cik-0000000042-class-v1-"
+            "cad86f404b705165f5123b6c2a217fc7b610862675dba53e91de03540ef4d188",
+        )
+
+    def test_no_xbrl_qname_enters_the_production_class_id_seed(self):
+        base = self.plan([packet_for(single_class_facts("AAA"))])
+        renamed = [
+            dict(item, member="CompletelyDifferentMemberName")
+            for item in single_class_facts("AAA")
+        ]
+        other = self.plan([packet_for(renamed)])
+        self.assertEqual(
+            sorted(base.packets[0].class_id_map.values()),
+            sorted(other.packets[0].class_id_map.values()),
+        )
 
 
 class PromoterTest(ManifestFixture, unittest.TestCase):
@@ -344,24 +405,23 @@ class PromoterTest(ManifestFixture, unittest.TestCase):
         )
         self.assertEqual(len(manifest.rows["issuers.jsonl"]), 1)
         self.assertEqual(len(manifest.rows["share_classes.jsonl"]), 2)
-        self.assertEqual(len(manifest.rows["xbrl_aliases.jsonl"]), 2)
-        # 제목 하나 + governing instrument 하나.
+        # 제목 하나 + governing instrument 하나. **XBRL alias 파일이 없다.**
         self.assertEqual(len(manifest.rows["prose_aliases.jsonl"]), 2)
+        self.assertNotIn("xbrl_aliases.jsonl", manifest.rows)
 
-    def test_no_fifth_identity_file_is_created(self):
+    def test_the_bundle_is_exactly_three_files(self):
+        """**`xbrl_aliases.jsonl`을 다시 만들지 않는다.**"""
         plan = self.plan([packet_for(dual_class_facts())])
         apply_promotion(plan, directory=self.directory)
         self.assertEqual(
             sorted(item.name for item in self.directory.iterdir()),
-            ["issuers.jsonl", "prose_aliases.jsonl", "share_classes.jsonl",
-             "xbrl_aliases.jsonl"],
+            ["issuers.jsonl", "prose_aliases.jsonl", "share_classes.jsonl"],
         )
 
     def test_no_usable_from_session_reaches_the_manifest(self):
         plan = self.plan([packet_for(dual_class_facts())])
         apply_promotion(plan, directory=self.directory)
-        for name in ("issuers.jsonl", "share_classes.jsonl",
-                     "xbrl_aliases.jsonl", "prose_aliases.jsonl"):
+        for name in ("issuers.jsonl", "share_classes.jsonl", "prose_aliases.jsonl"):
             self.assertNotIn(
                 "usable_from_session",
                 (self.directory / name).read_text(encoding="utf-8"),
@@ -390,7 +450,7 @@ class PromoterTest(ManifestFixture, unittest.TestCase):
                     "dependency": "REQUIRED",
                 }],
             }],
-            "share_classes.jsonl": [], "xbrl_aliases.jsonl": [], "prose_aliases.jsonl": [],
+            "share_classes.jsonl": [], "prose_aliases.jsonl": [],
         })
         before = self.snapshot()
         with self.assertRaises(QVPromotionError) as caught:
@@ -597,7 +657,7 @@ class ForgedPacketTest(ManifestFixture, unittest.TestCase):
     def test_an_alias_interval_outside_the_class_lifetime_fails(self):
         packet = packet_for(single_class_facts("AAA"))
         raw = self.forge(packet)
-        raw["xbrl_alias_proposals"][0]["interval"]["effective_from"] = "2010-01-04"
+        raw["prose_alias_proposals"][0]["interval"]["effective_from"] = "2010-01-04"
         with self.assertRaises(QVPromotionError) as caught:
             revalidate_packet(raw)
         self.assertIn("class 수명 밖", str(caught.exception))
@@ -660,7 +720,6 @@ class BatchProspectiveStateTest(ManifestFixture, unittest.TestCase):
         # issuer 하나 · class 둘 · alias 각각 둘. **두 번 더하지 않는다.**
         self.assertEqual(len(plan.rows.added["issuers.jsonl"]), 1)
         self.assertEqual(len(plan.rows.added["share_classes.jsonl"]), 2)
-        self.assertEqual(len(plan.rows.added["xbrl_aliases.jsonl"]), 2)
         self.assertEqual(len(plan.rows.added["prose_aliases.jsonl"]), 2)
         # 두 번째 packet은 첫 번째가 계획한 것을 재사용한다.
         self.assertEqual(len(plan.packets[1].generated_class_ids), 0)
@@ -749,7 +808,6 @@ class ExistingRowsTest(ManifestFixture, unittest.TestCase):
         self.assertEqual(second.packets[0].generated_class_ids, ())
         self.assertEqual(second.rows.added["issuers.jsonl"], [])
         self.assertEqual(second.rows.added["share_classes.jsonl"], [])
-        self.assertEqual(second.rows.added["xbrl_aliases.jsonl"], [])
         self.assertEqual(second.rows.added["prose_aliases.jsonl"], [])
         # 아무것도 더할 것이 없으면 bundle 해시가 그대로다.
         self.assertEqual(
@@ -787,7 +845,7 @@ class ExistingRowsTest(ManifestFixture, unittest.TestCase):
                     "dependency": "REQUIRED",
                 }],
             }],
-            "share_classes.jsonl": [], "xbrl_aliases.jsonl": [], "prose_aliases.jsonl": [],
+            "share_classes.jsonl": [], "prose_aliases.jsonl": [],
         })
         with self.assertRaises(QVPromotionError):
             self.plan([packet_for(single_class_facts("AAA"))])
@@ -848,14 +906,6 @@ class ExistingRowsTest(ManifestFixture, unittest.TestCase):
                 row = dict(row)
                 if row.get("class_id") == class_id:
                     row["class_id"] = "acme-common"
-                if name == "xbrl_aliases.jsonl":
-                    row = dict(
-                        row,
-                        axis_namespace=row["raw_axis_namespace"],
-                        axis_local=row["raw_axis_local"],
-                        member_namespace=row["raw_member_namespace"],
-                        member_local=row["raw_member_local"],
-                    )
                 out.append(row)
             rename[name] = out
         self.write(rename)
@@ -884,18 +934,25 @@ class ConflictTest(ManifestFixture, unittest.TestCase):
         self.assertIn("겹치는 구간에 두 class", str(caught.exception))
         self.assertEqual(self.snapshot(), before)
 
-    def test_an_alias_pointing_at_two_classes_fails_before_write(self):
-        """같은 issuer·시점의 같은 XBRL member가 두 class로 가면 validate가 막는다."""
+    def test_a_prose_alias_pointing_at_two_classes_fails_before_write(self):
+        """같은 issuer·시점의 같은 canonical 철자가 두 class로 가면 validate가 막는다."""
         plan = self.plan([packet_for(single_class_facts("AAA"))])
         apply_promotion(plan, directory=self.directory)
         before = self.snapshot()
-        clash = packet_for(
-            single_class_facts("BBB", title="Class B Common Stock"),
-            symbol="BBB", accession="0000000042-24-000010",
-        )
+        manifest = self.manifest()
+        # 같은 철자를 다른 class에 붙인 행을 심는다 — 후보 bundle 검증이 막아야 한다.
+        prose = [dict(row) for row in manifest.rows["prose_aliases.jsonl"]]
+        classes = [dict(row) for row in manifest.rows["share_classes.jsonl"]]
+        self.write({
+            "issuers.jsonl": [dict(row) for row in manifest.rows["issuers.jsonl"]],
+            "share_classes.jsonl": classes + [
+                dict(classes[0], class_id="twin", symbol=None, is_listed=False)
+            ],
+            "prose_aliases.jsonl": prose + [dict(prose[0], class_id="twin")],
+        })
         with self.assertRaises(Exception):
-            self.plan([clash])
-        self.assertEqual(self.snapshot(), before)
+            self.plan([packet_for(single_class_facts("AAA"))])
+        del before
 
 
 class InputContractTest(ManifestFixture, unittest.TestCase):

@@ -7,6 +7,13 @@
 
 D0 dimension 계약과 accession 안 중복 fact 병합이 여기 산다. tier 선택(A가 B를
 가리는 규칙)과 same-regime 선택은 `qv_selector`가 맡는다.
+
+**class 축 관측은 accession 단위 binding으로 푼다.** 옛 시간 구간 XBRL alias 해석은
+은퇴했다 — QName이 어느 class를 뜻하는지는 그 관계를 등록인이 명시로 세운 **그
+accession 안에서만** 참이다. 다른 accession의 binding으로 새지 않는다.
+
+**economic class 활성 판정은 fact마다 그 fact의 instant로 한다.** 한 filing 안의 모든
+fact가 같은 경제적 날짜를 갖는다고 가정하지 않는다.
 """
 
 from __future__ import annotations
@@ -15,7 +22,7 @@ import sqlite3
 from dataclasses import dataclass
 from decimal import Decimal
 
-from . import qv_identity
+from . import qv_xbrl_binding
 from .qv_manifest import (
     APPROVED_CLASS_AXIS_LOCALS,
     DERIVED_MEMBER_LOCALS,
@@ -177,15 +184,19 @@ def extract_observations(
     instance: InstanceDocument,
     *,
     cik: str,
+    accession: str,
     issuer_id: str,
+    filing_source_version: str,
     identity_source_version: str,
-    as_of: str,
     usable_by: str | None = None,
 ) -> tuple[ShareObservation, ...]:
-    """instance에서 주식수 fact만 뽑아 D0·중복·alias를 적용한다.
+    """instance에서 주식수 fact만 뽑아 D0·중복·binding을 적용한다.
 
-    `as_of`는 identity 구간 판정 시점(보통 fact instant가 속한 December)이고
-    `usable_by`는 lookahead 차단용 formation cutoff다.
+    class 축 fact는 **그 accession의 binding**으로만 푼다. dimensionless fact는 binding
+    표를 보지 않고 그 시점 적용 가능한 ordinary class가 정확히 하나일 때만 푼다.
+
+    **economic 활성 판정은 fact마다 그 fact의 instant로 한다.** `usable_by`는
+    lookahead 차단용 formation cutoff다.
     """
     contexts = instance.context_map()
     selected: list[tuple[int, Fact, Context, str]] = []
@@ -221,10 +232,6 @@ def extract_observations(
                 group_id,
             )
 
-    sole_class = _sole_ordinary_class(
-        connection, issuer_id, as_of, identity_source_version, usable_by
-    )
-
     out: list[ShareObservation] = []
     for ordinal, fact, context, tier in selected:
         status, group_id = keep[ordinal]
@@ -240,29 +247,41 @@ def extract_observations(
         resolution_status = UNUSABLE_SHAPE
 
         if shape == DIMENSIONLESS:
-            # 적용 가능한 ordinary class가 정확히 하나일 때만 issuer 총계를 그 class로 본다.
-            if sole_class is None:
+            # 적용 가능한 ordinary class가 정확히 하나일 때만 issuer 총계를 그 class로
+            # 본다. **binding 표를 보지 않는다** — 차원 없는 fact에는 member가 없다.
+            sole = _sole_ordinary_class(
+                connection, issuer_id, context.instant,
+                identity_source_version, usable_by,
+            )
+            if sole is None:
                 resolution_status = UNRESOLVED
             else:
-                class_id = sole_class
+                class_id = sole
                 resolution_status = RESOLVED
         elif shape == SINGLE_CLASS_AXIS:
-            try:
-                resolved = qv_identity.resolve_member(
-                    connection,
-                    issuer_id,
-                    detail["axis_key"],
-                    detail["member_key"],
-                    as_of,
-                    identity_source_version,
-                    usable_by=usable_by,
-                )
-                class_id = resolved.class_id
-                resolution_status = RESOLVED
-            except qv_identity.AmbiguousIdentityError:
+            bound, status = qv_xbrl_binding.resolve_accession_member(
+                connection,
+                cik=cik,
+                accession=accession,
+                axis_key=detail["axis_key"],
+                member_key=detail["member_key"],
+                filing_source_version=filing_source_version,
+                identity_source_version=identity_source_version,
+                usable_by=usable_by,
+            )
+            if status == qv_xbrl_binding.AMBIGUOUS:
                 resolution_status = AMBIGUOUS
-            except qv_identity.UnresolvedIdentityError:
+            elif bound is None:
                 resolution_status = UNRESOLVED
+            elif not _class_active_at(
+                connection, bound, context.instant, identity_source_version
+            ):
+                # binding은 있는데 **그 fact instant에** 그 class가 경제적으로 활성이
+                # 아니다. 조용히 다른 class로 바꾸거나 잘라 맞추지 않는다.
+                resolution_status = UNRESOLVED
+            else:
+                class_id = bound
+                resolution_status = RESOLVED
         else:
             resolution_status = UNUSABLE_SHAPE
 
@@ -294,6 +313,25 @@ def extract_observations(
             )
         )
     return tuple(out)
+
+
+def _class_active_at(
+    connection: sqlite3.Connection,
+    class_id: str,
+    instant: str,
+    identity_source_version: str,
+) -> bool:
+    """그 fact instant에 그 economic class가 활성인가.
+
+    한 filing 안의 모든 fact가 같은 경제적 날짜를 갖는다고 가정하지 않는다.
+    """
+    row = connection.execute(
+        "SELECT 1 FROM qv_share_classes"
+        " WHERE class_id = ? AND source_version = ?"
+        "   AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)",
+        (class_id, identity_source_version, instant, instant),
+    ).fetchone()
+    return row is not None
 
 
 def _sole_ordinary_class(

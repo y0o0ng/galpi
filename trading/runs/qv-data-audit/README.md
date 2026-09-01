@@ -2075,6 +2075,118 @@ batch 안 semantic 불일치가 전체 실패 · 쓰기 실패 시 네 파일 �
 - **Gate A~H는 여전히 미판정이다.** Q/V·B/M·랭크·선택·수익률을 계산하지 않았다.
 
 
+## 10.16 XBRL alias 은퇴 → accession 단위 binding 재설계 — 2026-09-01
+
+**사용자가 CLOSED였던 Step 4 계약 하나를 명시로 다시 열어 닫았다.** 대규모 production
+identity 확장 **전에** 하는 것이 이 결정의 조건이었다.
+
+```text
+(issuer, QName, effective_from/effective_to) -> economic class      RETIRED
+
+economic class / prose identity   production identity — 오래 살고 버전 관리된다
+XBRL QName binding                파생 filing-local 관측 — accession 안에서만 참이다
+```
+
+정본은 `docs/trading/strategies/qv-step4-shares-me-design.md` §1.4와
+`qv-step5-phase0-materialization-design.md`다. **이 커밋도 production identity 행을
+늘리지 않았다** — economic anchor는 그대로이고 `xbrl_aliases.jsonl`만 삭제됐다.
+
+### 무엇이 바뀌었나
+
+```text
+identity bundle       네 파일 -> 세 파일 (issuers · share_classes · prose_aliases)
+bundle 해시           앞에 판별자 `qv-identity-bundle-v2`를 먹인다
+                      -> 옛 네 파일 version과 절대 같아질 수 없다(설계상 stale)
+xbrl_aliases.jsonl    삭제. 옛 행을 binding으로 변환하지 않는다 —
+                      그 행들이 주장한 것은 alias 수명이지 accession 안의 관계가 아니다
+새 표                 qv_xbrl_class_bindings (accession 단위 파생 관측)
+새 모듈               backtest/qv_xbrl_binding.py
+은퇴                  qv_identity.resolve_member(..., as_of=...)
+                      qv_share_class_xbrl_aliases (표는 물리적으로만 남는다)
+                      XbrlAliasProposal · xbrl_interval · XBRL_ALIAS_INTERVAL_NOT_EXPLICIT
+```
+
+**DB를 파괴적으로 고치지 않았다.** 옛 표와 `qv_identity_evidence`의 `XBRL_ALIAS`
+어휘는 legacy 값으로 남고 새 행을 쓰지 않는다. 실측: 로컬 `backtest.db`에서 옛 표가
+그대로 공존하고 `bars_daily` 4,122,726행도 그대로다.
+
+### 자동 binding은 좁다
+
+표지의 `Security12bTitle`/`Security12gTitle`이 그 member에 있고 그 N1 키가 고정된
+bundle에서 **정확히 하나의** class로 풀릴 때만 묶는다. `TradingSymbol`은 교차
+확인이고 ticker만으로는 묶지 않는다. **governing instrument는 class를 증명하지 QName
+관계를 증명하지 않는다** — 제목 없는 member는 charter가 같은 이름의 class를 정의해도
+자동으로 묶이지 않고 `UNRESOLVED`로 남는다.
+
+### 새 identity_source_version과 5A-1 재실행
+
+```text
+이전(네 파일)  qv-identity-sha256:55ed78d0b33bb5f85ccf14e81a5a7d8e6bcbe82d17812e46470b3b133372e6ec
+현재(세 파일)  qv-identity-sha256:612412421278fb9d7fba90fa351e95a0ede09596474d4ec8696a7c59f43906a1
+```
+
+**옛 pinned version은 전부 stale이다.** 손으로 맞추지 않았다. 같은 명시
+universe/calendar 입력으로 5A-1을 다시 돌렸다.
+
+```text
+security 행 총계                       9,525
+MAPPED 행                                61   (CMCSA · GOOG · GOOGL · NKE · UA · UAA)
+5A-2 work item                          897   (재사용 벤더 계열 63)
+고유 economic identity 심볼             889
+reused-tickers.csv를 거친 멤버십 행     340
+```
+
+**수치가 10.12b와 같다.** 기대되는 결과다 — `xbrl_aliases.jsonl`을 빼도 manifest가
+어느 심볼을 매핑하는지는 바뀌지 않는다. 바뀐 것은 `identity_source_version` 하나이고,
+그것이 옛 receipt를 stale로 만든다.
+
+### 실제 SEC binding smoke (읽기 전용, 기존 anchor 발행사)
+
+세 파일 bundle 행을 스크래치 메모리 DB에 넣고 실제 최신 표지를 읽었다. SEC 호출 17.
+
+| issuer | accession | 결과 |
+|---|---|---|
+| NKE `0000320187` | `0000320187-26-000088` / `nke-20260531_htm.xml` | 표지에 class 축 제목·심볼 fact가 없다 → binding 0 · unresolved 0 |
+| GOOGL `0001652044` | `0001652044-26-000071` / `goog-20260630_htm.xml` | binding 2 · unresolved 24 |
+
+```text
+us-gaap:CommonClassAMember              -> googl-a   'class a common stock, $0.001 par value'
+ext:0001652044:CapitalClassCMember      -> googl-c   'class c capital stock, $0.001 par value'
+usable_from_session 2026-07-22           (filing과 identity 다리의 max)
+```
+
+**`googl-b`는 묶이지 않았다.** manifest가 charter `GOVERNING_INSTRUMENT`로 Class B를
+economic class로 증명하지만, 그 표지에 Class B member의 제목 fact가 없다 —
+**governing instrument가 QName 관계를 만들지 않는다**는 계약이 실측에서 그대로
+나타났다. 남은 24건은 senior notes·depositary shares로 canonical prose bridge가 없다.
+
+`ext:0001652044:` 접두가 발행사 확장 member의 exact target CIK 키를 그대로 보존한다.
+
+### 로컬 Python 실측 (2026-09-01)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_identity` | 21 OK |
+| `test_qv_xbrl_binding` | 20 OK (신규) |
+| `test_qv_step4` | 124 OK |
+| `test_qv_identity_proposals` | 102 OK |
+| `test_qv_identity_promotion` | 60 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| **전체 trading suite** | **1,711 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — 워크플로는 npm 테스트·빌드만 돌리고
+`trading/`의 Python QV suite를 실행하지 않는다. 이 작업에서 CI를 바꾸지 않았다.
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity manifest를 넓히지 않았다. economic anchor 행이 그대로다.
+- 897개 작업 항목을 승격·binding하지 않았다.
+- 5A-3을 구현하지 않았다. materialize도 `usable_from_session` 파생도 하지 않았다.
+- accession 단위 사람 판정 기구를 만들지 않았다.
+- **Gate A~H는 여전히 미판정이다.** Q/V·B/M·랭크·선택·수익률을 계산하지 않았다.
+
+
 ---
 
 ## 11. 결과

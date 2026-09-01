@@ -54,7 +54,6 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     GOVERNING_INSTRUMENT,
     PROSE_ALIAS_INTERVAL_NOT_EXPLICIT,
     SECURITY_TITLE_FACT,
-    XBRL_ALIAS_INTERVAL_NOT_EXPLICIT,
     ClassEvidence,
     ProseBridgeInput,
     RelationInterval,
@@ -345,7 +344,6 @@ def intervals_only(proof, **kwargs):
     return {
         item.member_key: ClassEvidence(
             class_interval=span(**kwargs),
-            xbrl_interval=span(**kwargs),
             cover_title_interval=span(**kwargs) if item.security_title else None,
         )
         for item in proof.classes
@@ -370,7 +368,6 @@ def complete_evidence(proof):
             )
         out[item.member_key] = ClassEvidence(
             class_interval=span(),
-            xbrl_interval=span(),
             cover_title_interval=span() if item.security_title else None,
             extra_prose_bridges=extra,
         )
@@ -421,11 +418,7 @@ class AdjudicationTest(unittest.TestCase):
         self.assertEqual(packet.issuer_proposal.issuer_id, "us-cik-0000000001")
         self.assertTrue(packet.issuer_proposal.evidence)
         self.assertEqual(len(packet.share_class_proposals), 2)
-        for group in (
-            packet.share_class_proposals,
-            packet.xbrl_alias_proposals,
-            packet.prose_alias_proposals,
-        ):
+        for group in (packet.share_class_proposals, packet.prose_alias_proposals):
             for item in group:
                 self.assertTrue(item.evidence, item)
         # 표지에서 나온 prose alias는 제목이 있는 class 하나뿐이고, 제목 없는
@@ -435,16 +428,14 @@ class AdjudicationTest(unittest.TestCase):
             by_type.setdefault(item.bridge_type, []).append(item)
         self.assertEqual(sorted(by_type), [GOVERNING_INSTRUMENT, SECURITY_TITLE_FACT])
         self.assertEqual(len(packet.prose_alias_proposals), 2)
-        self.assertEqual(len(packet.xbrl_alias_proposals), 2)
         # 관계마다 자기 구간이 따로 증명돼 있다.
-        for group in (packet.share_class_proposals, packet.xbrl_alias_proposals,
-                      packet.prose_alias_proposals):
+        for group in (packet.share_class_proposals, packet.prose_alias_proposals):
             for item in group:
                 self.assertTrue(item.interval_proved, item)
                 self.assertIsNotNone(item.effective_from, item)
-        alias = packet.xbrl_alias_proposals[0]
-        self.assertEqual(alias.axis_namespace, USG)
-        self.assertEqual(alias.axis_local, "StatementClassOfStockAxis")
+        # exact axis/member는 **표지 증명 자료**로 남지 production 행이 되지 않는다.
+        axis = {item.axis_namespace for item in packet.proof.classes}
+        self.assertEqual(axis, {USG})
 
     def test_auto_provable_is_not_a_manifest_mutation(self):
         proof = proof_from(dual_class_facts(), cik="0000000001")
@@ -1018,7 +1009,7 @@ class TargetAwareProofSearchTest(unittest.TestCase):
         self.assertEqual(
             packet.reason_codes,
             (CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, CLASS_INTERVAL_NOT_EXPLICIT,
-             PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, XBRL_ALIAS_INTERVAL_NOT_EXPLICIT),
+             PROSE_ALIAS_INTERVAL_NOT_EXPLICIT),
         )
 
     def test_the_match_is_found_beyond_the_old_three_attempt_limit(self):
@@ -1460,12 +1451,11 @@ class RelationIntervalCompletenessTest(unittest.TestCase):
             class_evidence=evidence(proof) if callable(evidence) else evidence,
         )
 
-    def test_a_class_interval_alone_does_not_prove_the_xbrl_alias(self):
+    def test_a_class_interval_alone_does_not_prove_the_prose_alias(self):
         def only_class(proof):
             return {
                 item.member_key: ClassEvidence(
                     class_interval=span(),
-                    cover_title_interval=span() if item.security_title else None,
                     extra_prose_bridges=complete_evidence(proof)[
                         item.member_key
                     ].extra_prose_bridges,
@@ -1475,39 +1465,35 @@ class RelationIntervalCompletenessTest(unittest.TestCase):
 
         _proof, packet = self.packet(only_class)
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
-        self.assertIn(XBRL_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
-        self.assertNotIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
-        for item in packet.xbrl_alias_proposals:
-            self.assertFalse(item.interval_proved)
-            self.assertIsNone(item.effective_from)
-
-    def test_a_class_interval_alone_does_not_prove_the_prose_alias(self):
-        def only_class_and_xbrl(proof):
-            return {
-                item.member_key: ClassEvidence(
-                    class_interval=span(),
-                    xbrl_interval=span(),
-                    extra_prose_bridges=complete_evidence(proof)[
-                        item.member_key
-                    ].extra_prose_bridges,
-                )
-                for item in proof.classes
-            }
-
-        _proof, packet = self.packet(only_class_and_xbrl)
-        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
         self.assertNotIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
-        self.assertNotIn(XBRL_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+
+    def test_a_missing_xbrl_binding_never_blocks_an_economic_package(self):
+        """**QName은 production identity 관계가 아니다.**
+
+        표지에 class 축 member가 있어도 그것을 묶을 수 있는지는 economic class
+        package의 승격 자격과 무관하다.
+        """
+        proof = proof_from(dual_class_facts(), cik="0000000001")
+        packet = build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof,
+            class_evidence=complete_evidence(proof),
+        )
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+        payload = packet.as_json()
+        self.assertNotIn("xbrl_alias_proposals", payload)
+        # 표지의 exact axis/member는 **SEC 증명 자료로** 그대로 남는다.
+        members = [item["member_local"] for item in payload["proof"]["classes"]]
+        self.assertEqual(sorted(members), ["CommonClassAMember", "CommonClassBMember"])
 
     def test_an_alias_interval_is_never_copied_from_the_class_interval(self):
-        """class는 2016부터, alias는 2019부터. 그대로 따로 남는다."""
+        """class는 2016부터, prose alias는 2020부터. 그대로 따로 남는다."""
         proof = proof_from(dual_class_facts(), cik="0000000001")
         evidence = {}
         for item in proof.classes:
             evidence[item.member_key] = ClassEvidence(
                 class_interval=span(start="2016-04-08"),
-                xbrl_interval=span(start="2019-01-02"),
                 cover_title_interval=(
                     span(start="2020-07-01") if item.security_title else None
                 ),
@@ -1523,10 +1509,6 @@ class RelationIntervalCompletenessTest(unittest.TestCase):
             {item.effective_from for item in packet.share_class_proposals},
             {"2016-04-08"},
         )
-        self.assertEqual(
-            {item.effective_from for item in packet.xbrl_alias_proposals},
-            {"2019-01-02"},
-        )
         titles = [
             item for item in packet.prose_alias_proposals
             if item.bridge_type == SECURITY_TITLE_FACT
@@ -1541,8 +1523,7 @@ class RelationIntervalCompletenessTest(unittest.TestCase):
             candidates=TICKER_CANDIDATE, proof=proof,
         )
         # 아무 구간도 주지 않았으면 아무 구간도 생기지 않는다.
-        for group in (packet.share_class_proposals, packet.xbrl_alias_proposals,
-                      packet.prose_alias_proposals):
+        for group in (packet.share_class_proposals, packet.prose_alias_proposals):
             for item in group:
                 self.assertFalse(item.interval_proved, item)
                 self.assertIsNone(item.effective_from, item)
@@ -1623,8 +1604,7 @@ class AliasWithinClassLifetimeTest(unittest.TestCase):
         evidence = {
             item.member_key: ClassEvidence(
                 class_interval=class_span,
-                xbrl_interval=alias_span,
-                cover_title_interval=class_span,
+                cover_title_interval=alias_span,
             )
             for item in proof.classes
         }
@@ -1708,7 +1688,6 @@ class CanonicalClassBridgeTest(unittest.TestCase):
         self.assertIn(CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, packet.reason_codes)
         # 구간은 전부 있는데도 막힌다.
         self.assertNotIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
-        self.assertNotIn(XBRL_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
         self.assertNotIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
         classb = [
             item for item in packet.share_class_proposals
@@ -1726,7 +1705,6 @@ class CanonicalClassBridgeTest(unittest.TestCase):
             for key, item in base.items():
                 out[key] = ClassEvidence(
                     class_interval=item.class_interval,
-                    xbrl_interval=item.xbrl_interval,
                     cover_title_interval=item.cover_title_interval,
                     extra_prose_bridges=(
                         ProseBridgeInput(
@@ -1771,9 +1749,7 @@ class CanonicalClassBridgeTest(unittest.TestCase):
         """제목은 있는데 그 철자의 구간이 없으면 정체성을 세우지 못한다."""
         def title_without_interval(proof):
             return {
-                item.member_key: ClassEvidence(
-                    class_interval=span(), xbrl_interval=span(),
-                )
+                item.member_key: ClassEvidence(class_interval=span())
                 for item in proof.classes
             }
 
@@ -1863,7 +1839,6 @@ class ReusedVendorSeriesTest(unittest.TestCase):
                 "proof": payload["proof"],
                 "issuer_proposal": payload["issuer_proposal"],
                 "share_class_proposals": payload["share_class_proposals"],
-                "xbrl_alias_proposals": payload["xbrl_alias_proposals"],
                 "prose_alias_proposals": payload["prose_alias_proposals"],
             },
             ensure_ascii=False,

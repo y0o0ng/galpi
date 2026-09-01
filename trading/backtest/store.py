@@ -365,6 +365,7 @@ _STEP4_REBUILDABLE_TABLES = (
     "qv_class_conversion_relations",
     "qv_identity_evidence",
     "qv_sec_evidence_documents",
+    "qv_xbrl_class_bindings",
 )
 
 

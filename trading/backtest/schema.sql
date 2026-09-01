@@ -450,6 +450,11 @@ CREATE TABLE IF NOT EXISTS qv_identity_evidence (
 
 -- PIT XBRL QName alias. axis/member 둘 다 정규화 키로 저장하고 raw QName을
 -- provenance로 남긴다. local-name-only 추론은 하지 않는다.
+-- RETIRED. 옛 `(issuer, QName, effective_from/effective_to) -> class` 모델이다.
+-- **production lookup·materialize 어디에서도 읽지 않는다.** 기존 DB의 행과 CHECK
+-- 제약을 파괴적으로 다시 쓰지 않으려고 물리적으로만 남긴다. 새 행을 쓰지 않고,
+-- 옛 행을 accession binding으로 변환하지도 않는다 — 그 행들이 주장한 것은 alias
+-- **수명**이지 accession 안의 관계가 아니다.
 CREATE TABLE IF NOT EXISTS qv_share_class_xbrl_aliases (
   class_id TEXT NOT NULL,
   issuer_id TEXT NOT NULL,
@@ -564,6 +569,52 @@ CREATE TABLE IF NOT EXISTS qv_share_observations (
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
   PRIMARY KEY (cik, accession, fact_ordinal, source_version, identity_source_version),
   CHECK (mapping_status <> 'RESOLVED' OR (issuer_id IS NOT NULL AND class_id IS NOT NULL))
+) WITHOUT ROWID;
+
+-- accession 단위 XBRL class binding. **economic identity manifest 행이 아니다.**
+--
+-- 정본은 raw SEC K/Q accession + 고정된 economic identity bundle이고, 이 표는 그
+-- 둘에서 재생산 가능한 파생 관측이다. accession A에서 본 QName은 accession B에 대해
+-- 아무것도 말하지 않는다 — 최초/최종 관측 수명도, filing 사이 외삽도, 연속성 가정도
+-- 없다. 같은 exact QName이 두 accession에서 다르게 묶일 수 있다.
+CREATE TABLE IF NOT EXISTS qv_xbrl_class_bindings (
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  instance_document_name TEXT NOT NULL
+    CHECK (length(trim(instance_document_name)) > 0),
+  axis_key TEXT NOT NULL CHECK (length(trim(axis_key)) > 0),
+  member_key TEXT NOT NULL CHECK (length(trim(member_key)) > 0),
+  filing_source_version TEXT NOT NULL,
+  identity_source_version TEXT NOT NULL,
+  issuer_id TEXT NOT NULL,
+  class_id TEXT NOT NULL,
+  raw_axis_namespace TEXT,
+  raw_axis_local TEXT NOT NULL CHECK (length(trim(raw_axis_local)) > 0),
+  raw_member_namespace TEXT,
+  raw_member_local TEXT NOT NULL CHECK (length(trim(raw_member_local)) > 0),
+  -- 이 binding을 세운 filing-local canonical prose bridge의 N1 키.
+  canonical_prose_comparison_key TEXT NOT NULL
+    CHECK (length(trim(canonical_prose_comparison_key)) > 0),
+  binding_method TEXT NOT NULL CHECK (binding_method IN (
+    'COVER_SECURITY_TITLE_FACT')),
+  instance_sha256 TEXT NOT NULL CHECK (length(instance_sha256) = 64),
+  filing_historical_usable_session TEXT NOT NULL
+    CHECK (filing_historical_usable_session
+           GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  identity_usable_from_session TEXT NOT NULL
+    CHECK (identity_usable_from_session
+           GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  -- filing과 identity 다리가 **둘 다** 알려진 뒤에야 쓸 수 있다. 손으로 넣지 않는다.
+  usable_from_session TEXT NOT NULL
+    CHECK (usable_from_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (cik, accession, instance_document_name, axis_key, member_key,
+               filing_source_version, identity_source_version),
+  FOREIGN KEY (issuer_id, identity_source_version)
+    REFERENCES qv_issuers(issuer_id, source_version),
+  CHECK (usable_from_session >= filing_historical_usable_session),
+  CHECK (usable_from_session >= identity_usable_from_session)
 ) WITHOUT ROWID;
 
 -- 기업행동 탐색 coverage. class 효과 판정과 절대 합치지 않는다.
@@ -844,6 +895,9 @@ CREATE INDEX IF NOT EXISTS idx_qv_xbrl_alias_lookup
 CREATE INDEX IF NOT EXISTS idx_qv_prose_alias_lookup
   ON qv_share_class_prose_aliases(source_version, issuer_id, comparison_key,
                                   effective_from, effective_to);
+CREATE INDEX IF NOT EXISTS idx_qv_xbrl_class_bindings_lookup
+  ON qv_xbrl_class_bindings(identity_source_version, filing_source_version,
+                            cik, accession, axis_key, member_key);
 CREATE INDEX IF NOT EXISTS idx_qv_share_observations_lookup
   ON qv_share_observations(source_version, identity_source_version, class_id,
                            fact_instant, historical_usable_session);

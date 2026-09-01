@@ -27,7 +27,6 @@ from backtest.qv_identity import (  # noqa: E402
     get_issuer_by_cik,
     register_issuer,
     register_share_class,
-    resolve_member,
     resolve_prose_name,
     resolve_symbol,
     resolve_symbols_to_issuers,
@@ -100,40 +99,10 @@ class QVIdentityFixture:
             source_version=VERSION,
             provenance=f"fixture://class/{class_id}/{effective_from}",
         )
-        if member:
-            self.xbrl_alias(
-                class_id, issuer_id, member,
-                effective_from=effective_from, effective_to=effective_to,
-                usable_from_session=usable_from_session,
-            )
+        # `member`는 옛 시간 구간 XBRL alias를 만들던 자리다. 그 관계는 은퇴했고
+        # QName -> class는 accession 단위 binding이 답한다(`qv_xbrl_binding`).
+        del member
         return result
-
-    def xbrl_alias(
-        self,
-        class_id: str,
-        issuer_id: str,
-        member_local: str,
-        *,
-        effective_from: str = "2000-01-01",
-        effective_to: str | None = None,
-        usable_from_session: str = USABLE,
-    ):
-        """alias는 economic class가 아니라 별도 관계다."""
-        self.connection.execute(
-            "INSERT INTO qv_share_class_xbrl_aliases"
-            " (class_id, issuer_id, axis_key, member_key,"
-            "  raw_axis_namespace, raw_axis_local, raw_member_namespace, raw_member_local,"
-            "  effective_from, effective_to, usable_from_session,"
-            "  source, source_version, provenance)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                class_id, issuer_id, AXIS, f"us-gaap:{member_local}",
-                USG, "StatementClassOfStockAxis", USG, member_local,
-                effective_from, effective_to, usable_from_session,
-                SOURCE, VERSION, f"fixture://alias/{class_id}/{member_local}",
-            ),
-        )
-        self.connection.commit()
 
     def prose_alias(
         self,
@@ -339,22 +308,16 @@ class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
                 )
             )
 
-    def test_equivalent_class_a_member_is_not_an_actual_class(self):
+    def test_the_retired_xbrl_alias_table_is_never_written(self):
+        """옛 시간 구간 alias 관계는 은퇴했다. 표는 물리적으로만 남는다."""
         issuer = self.issuer("issuer-berkshire", "1067983")
         self.share_class(
             "berkshire-a", issuer.issuer_id, symbol="BRK.A",
             member="ClassACommonStockMember", listed=True,
         )
-        # 파생/등가 member는 alias로도 등록되지 않는다.
-        with self.assertRaises(UnresolvedIdentityError):
-            resolve_member(
-                self.connection, "issuer-berkshire", AXIS,
-                "us-gaap:EquivalentClassAMember", "2020-06-30", VERSION,
-            )
         self.assertEqual(
             self.connection.execute(
                 "SELECT COUNT(*) AS n FROM qv_share_class_xbrl_aliases"
-                " WHERE raw_member_local = 'EquivalentClassAMember'"
             ).fetchone()["n"],
             0,
         )
@@ -450,15 +413,13 @@ class QVIdentityContractTest(QVIdentityFixture, unittest.TestCase):
             listed=True,
         )
 
-        with self.assertRaises(UnresolvedIdentityError):
-            resolve_member(
-                self.connection,
-                "issuer-example",
-                AXIS,
-                "ClassACommonSharesMember",
-                "2020-06-30",
-                VERSION,
-            )
+        # QName은 economic identity가 아니므로 identity 층이 그것을 풀지 않는다.
+        self.assertEqual(
+            self.connection.execute(
+                "SELECT COUNT(*) AS n FROM qv_share_class_xbrl_aliases"
+            ).fetchone()["n"],
+            0,
+        )
 
     def test_conversion_ratio_effective_date_boundary(self):
         self.issuer("issuer-convertible", "7654321")
@@ -713,8 +674,10 @@ class QVSnapshotRegressionTest(unittest.TestCase):
                     {
                         "qv_issuers",
                         "qv_share_classes",
+                        # 은퇴했지만 물리적으로 남는다(파괴적 migration을 하지 않는다).
                         "qv_share_class_xbrl_aliases",
                         "qv_share_class_prose_aliases",
+                        "qv_xbrl_class_bindings",
                         "qv_identity_evidence",
                         "qv_sec_filings",
                         "qv_sec_evidence_documents",

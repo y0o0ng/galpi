@@ -3,15 +3,21 @@
 증거력의 정본은 원본 SEC 자료다. 이 모듈은 그 증거를 가리키는 **명시 manifest**를
 읽어 결정론적으로 해시하고, 검증하고, DB에 materialize한다.
 
-네 파일은 **하나의 bundle**이다. 편의를 위해 다섯 번째 identity 파일을 만들지 않는다.
+세 파일은 **하나의 bundle**이다. 편의를 위해 네 번째 identity 파일을 만들지 않는다.
 
     trading/qv/identity/issuers.jsonl
     trading/qv/identity/share_classes.jsonl
-    trading/qv/identity/xbrl_aliases.jsonl
     trading/qv/identity/prose_aliases.jsonl
+
+**XBRL QName은 economic identity가 아니다.** 옛
+`(issuer, QName, effective_from/effective_to) -> class` 관계는 은퇴했다. QName이 어느
+class를 뜻하는지는 **그 관계를 등록인이 명시로 세운 SEC accession 안에서만** 참이고,
+그것은 파생 관측 관계(`qv_xbrl_class_bindings`)이지 identity manifest 행이 아니다.
 
 `identity_source_version`은 Git commit이 아니라 **manifest 내용**에서 나온다.
 무관한 commit이 값을 바꾸면 안 되고, 의미 있는 내용이 바뀌면 반드시 바뀌어야 한다.
+bundle **스키마 자체**가 바뀐 것도 값에 들어가야 하므로 해시 입력 맨 앞에 bundle
+판별자를 넣는다 — 그래서 옛 네 파일 bundle의 version과는 절대 같아질 수 없다.
 """
 
 from __future__ import annotations
@@ -29,9 +35,12 @@ DEFAULT_MANIFEST_DIR = Path(__file__).resolve().parents[1] / "qv" / "identity"
 MANIFEST_FILES = (
     "issuers.jsonl",
     "share_classes.jsonl",
-    "xbrl_aliases.jsonl",
     "prose_aliases.jsonl",
 )
+
+# **bundle 스키마 판별자.** 해시 입력 맨 앞에 들어가므로 파일 구성이 바뀌면 내용이
+# 같아도 version이 달라진다. 옛 네 파일 receipt는 설계상 stale이 된다.
+BUNDLE_SCHEMA = "qv-identity-bundle-v2"
 
 IDENTITY_SOURCE = "qv-identity-manifest"
 IDENTITY_VERSION_PREFIX = "qv-identity-sha256:"
@@ -68,9 +77,12 @@ EVIDENCE_DEPENDENCIES = frozenset({"REQUIRED", "CORROBORATING"})
 RELATION_KINDS = {
     "issuers.jsonl": "ISSUER",
     "share_classes.jsonl": "SHARE_CLASS",
-    "xbrl_aliases.jsonl": "XBRL_ALIAS",
     "prose_aliases.jsonl": "PROSE_ALIAS",
 }
+
+# 옛 스키마의 어휘. **새 행을 쓰지 않는다** — 기존 DB의 CHECK 제약을 파괴적으로
+# 다시 쓰지 않으려고 legacy 값으로만 남긴다.
+RETIRED_RELATION_KINDS = frozenset({"XBRL_ALIAS"})
 
 
 class QVManifestError(Exception):
@@ -135,13 +147,6 @@ def _semantic_key(filename: str, row: dict) -> tuple:
         return (row.get("issuer_id"),)
     if filename == "share_classes.jsonl":
         return (row.get("class_id"), row.get("effective_from"))
-    if filename == "xbrl_aliases.jsonl":
-        return (
-            row.get("class_id"),
-            row.get("axis_key"),
-            row.get("member_key"),
-            row.get("effective_from"),
-        )
     if filename == "prose_aliases.jsonl":
         return (
             row.get("class_id"),
@@ -182,6 +187,9 @@ def load_manifest(directory: Path | str = DEFAULT_MANIFEST_DIR) -> Manifest:
     base = Path(directory)
     rows: dict[str, tuple[dict, ...]] = {}
     digest = hashlib.sha256()
+    # bundle 스키마를 먼저 먹인다. 파일 구성이 달라지면 내용이 같아도 값이 달라진다.
+    digest.update(BUNDLE_SCHEMA.encode("utf-8"))
+    digest.update(b"\x02")
     for filename in MANIFEST_FILES:
         raw_rows = _read_jsonl(base / filename)
         normalized = [_normalize_row(filename, row) for row in raw_rows]
@@ -287,32 +295,6 @@ def _normalize_row(filename: str, row: dict) -> dict:
                 row.get("is_ordinary_common") in (1, True, "1", "true")
             ),
             "is_listed": is_listed,
-        }
-
-    if filename == "xbrl_aliases.jsonl":
-        axis_ns = row.get("axis_namespace")
-        member_ns = row.get("member_namespace")
-        axis_local = str(_require(row, "axis_local", filename)).strip()
-        member_local = str(_require(row, "member_local", filename)).strip()
-        target_cik = row.get("extension_cik")
-        axis_key = qname_key(axis_ns, axis_local, target_cik)
-        member_key = qname_key(member_ns, member_local, target_cik)
-        if member_local in DERIVED_MEMBER_LOCALS:
-            raise QVManifestError(
-                f"{filename}: 파생/등가 member는 economic class가 아닙니다: {member_local}"
-            )
-        if not is_standard_family(axis_key) or axis_local not in APPROVED_CLASS_AXIS_LOCALS:
-            raise QVManifestError(
-                f"{filename}: 승인되지 않은 class 축입니다: {axis_key}"
-            )
-        return {
-            **common,
-            "axis_key": axis_key,
-            "member_key": member_key,
-            "raw_axis_namespace": str(axis_ns) if axis_ns else None,
-            "raw_axis_local": axis_local,
-            "raw_member_namespace": str(member_ns) if member_ns else None,
-            "raw_member_local": member_local,
         }
 
     if filename == "prose_aliases.jsonl":
@@ -455,7 +437,6 @@ def validate(manifest: Manifest) -> None:
                     raise QVManifestError(f"class 구간이 겹칩니다: {class_id}")
 
     for filename, key_field, label in (
-        ("xbrl_aliases.jsonl", "member_key", "XBRL"),
         ("prose_aliases.jsonl", "comparison_key", "prose"),
     ):
         for row in manifest.rows[filename]:
@@ -479,12 +460,7 @@ def materialize(
     version = manifest.identity_source_version
 
     prepared: dict[str, list[tuple[dict, str, list[dict]]]] = {}
-    for filename in (
-        "issuers.jsonl",
-        "share_classes.jsonl",
-        "xbrl_aliases.jsonl",
-        "prose_aliases.jsonl",
-    ):
+    for filename in MANIFEST_FILES:
         items = []
         for row in manifest.rows[filename]:
             usable, resolved = resolve_usable_from_session(
@@ -507,7 +483,6 @@ def materialize(
         )
         for table in (
             "qv_identity_evidence",
-            "qv_share_class_xbrl_aliases",
             "qv_share_class_prose_aliases",
             "qv_share_classes",
             "qv_issuers",
@@ -560,28 +535,6 @@ def materialize(
                 connection, "SHARE_CLASS",
                 f"{row['class_id']}|{row['effective_from']}", resolved, version,
                 row["provenance"],
-            )
-
-        for row, usable, resolved in prepared["xbrl_aliases.jsonl"]:
-            connection.execute(
-                "INSERT INTO qv_share_class_xbrl_aliases"
-                " (class_id, issuer_id, axis_key, member_key,"
-                "  raw_axis_namespace, raw_axis_local, raw_member_namespace, raw_member_local,"
-                "  effective_from, effective_to, usable_from_session,"
-                "  source, source_version, provenance)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    row["class_id"], row["issuer_id"], row["axis_key"], row["member_key"],
-                    row["raw_axis_namespace"], row["raw_axis_local"],
-                    row["raw_member_namespace"], row["raw_member_local"],
-                    row["effective_from"], row["effective_to"], usable,
-                    IDENTITY_SOURCE, version, row["provenance"],
-                ),
-            )
-            _insert_evidence(
-                connection, "XBRL_ALIAS",
-                f"{row['class_id']}|{row['axis_key']}|{row['member_key']}|{row['effective_from']}",
-                resolved, version, row["provenance"],
             )
 
         for row, usable, resolved in prepared["prose_aliases.jsonl"]:

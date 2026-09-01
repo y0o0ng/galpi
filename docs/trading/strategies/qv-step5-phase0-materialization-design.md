@@ -264,6 +264,12 @@ PRODUCTION_MANIFEST  승격된 것.               trading/qv/identity/*.jsonl
 **승격은 5A-2c에서만 일어난다.** 승격이 사람의 손을 거치는지 아닌지는 packet의
 **상태가 정한다** — 바로 아래 절이 그 경계다.
 
+> **economic identity 승격은 XBRL binding 완결성과 무관하다.** QName -> class는
+> production identity 관계가 아니라 accession 단위 파생 관측이다(Step 4 §1.4).
+> K/Q member를 아직 못 묶는 economic class package도 `AUTO_PROVABLE`이 될 수 있다.
+> 표지의 exact axis/member는 `CoverClass`에 **SEC 증명 자료**로 남지만 production
+> identity 행이 되지 않는다.
+
 `AUTO_PROVABLE`은 **"승인된 규칙 아래 SEC 증거가 기계적으로 완결됐다"**는 뜻이고
 manifest가 이미 바뀌었다는 뜻이 **아니다.** **5A-2a/b에는 승격 자체가 없다** —
 그 단계에서 `AUTO_PROVABLE`은 제안 상태일 뿐이다. 자동 승격의 경계는 5A-2c다.
@@ -422,14 +428,14 @@ class 제안이 되지 않되, **조용히 사라지지 않고** packet의 질�
 
 ##### 관계마다 자기 유효구간이 필요하다
 
-**세 관계의 수명은 서로 다른 PIT 사실이다.**
+**두 production 관계의 수명은 서로 다른 PIT 사실이다.**
 
 ```text
-economic class 수명   !=   XBRL alias 수명   !=   prose alias 수명
+economic class 수명   !=   prose alias 수명
 ```
 
-class가 X부터 존재한다는 것은 특정 XBRL QName이나 prose 철자가 **X부터 그 class를
-가리켰다**는 증명이 아니다. 그래서 세 제안이 각자 `effective_from` · `effective_to` ·
+class가 X부터 존재한다는 것은 특정 prose 철자가 **X부터 그 class를 가리켰다**는
+증명이 아니다. 그래서 두 제안이 각자 `effective_from` · `effective_to` ·
 `interval_proved` · `evidence`를 따로 들고 다닌다.
 
 ```text
@@ -455,7 +461,7 @@ class 구간을 alias 구간으로 복사하지 않는다.
 증명했는지**가 사라진다. 표지 fact는 "그 filing 시점에 이 관계가 있었다"를 증명하지
 경계를 증명하지 않는다. **그 fact가 REQUIRED라는 이유로 구간 증거를 대신하지 못한다.**
 
-세 production 관계(economic class · XBRL alias · prose alias) 모두 `AUTO_PROVABLE`이
+두 production 관계(economic class · prose alias) 모두 `AUTO_PROVABLE`이
 되려면 구간 객체가 있어야 하고, 그 객체는 비어 있지 않은 증거와 **REQUIRED SEC
 자연키 증거 하나 이상**을 들고 `[effective_from, effective_to)` 순서가 맞아야 한다.
 `RelationInterval`은 그 조건을 만드는 자리에서 fail-close한다.
@@ -475,11 +481,12 @@ production manifest에 쓰일 관계가 자기 구간을 증명하지 못하면 
 
 ```text
 CLASS_INTERVAL_NOT_EXPLICIT             economic class 구간이 없다
-XBRL_ALIAS_INTERVAL_NOT_EXPLICIT        XBRL alias 구간이 없다
 PROSE_ALIAS_INTERVAL_NOT_EXPLICIT       prose alias 구간이 없다
 CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT     canonical class bridge가 없다
 ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME   alias 구간이 class 수명 밖으로 나간다
 ```
+
+**XBRL alias 구간 사유는 없다.** 그것은 production 관계가 아니다.
 
 ##### 모든 보통주 class에 canonical bridge가 필요하다
 
@@ -525,7 +532,7 @@ packet을 `trading/qv/identity/*.jsonl`에 반영하는 유일한 단계다. **5
 
 ```text
 a. packet이 **정확히 그 pinned identity_source_version**에서 생성됐다
-b. 현재 네 파일 manifest bundle이 **여전히 그 정확한 base version**이다
+b. 현재 세 파일 manifest bundle이 **여전히 그 정확한 base version**이다
 c. 증거·제안 불변식이 결정론적으로 **재검증**된다
 d. REVIEW_REQUIRED / UNRESOLVED 사유나 conflict가 **하나도 없다**
 ```
@@ -561,11 +568,13 @@ manifest를 읽지도 쓰지도 않는다. 이 경계는 자동 승격이 생겨
 
 ##### 구현 — `backtest/qv_identity_promotion.py`
 
-실행 진입점은 `selftest/qv_identity_promotion_run.py`이고 **기본은 dry-run**이다.
+**세 파일 economic identity bundle만** 계획하고 쓴다. `xbrl_aliases.jsonl`을 다시
+만들지 않는다. 실행 진입점은 `selftest/qv_identity_promotion_run.py`이고 **기본은
+dry-run**이다.
 
 ```text
 plan    후보 bundle을 세워 검증하고 보고만 한다. production 파일을 바꾸지 않는다.
-apply   base를 다시 확인한 뒤에만 네 파일을 바꾼다.
+apply   base를 다시 확인한 뒤에만 세 파일을 바꾼다.
 ```
 
 `--force`도 `--skip-bad`도 없다. 한 apply에서 고른 `AUTO_PROVABLE` 중 **하나라도
@@ -598,7 +607,7 @@ census           `class_census_status` 문자열을 믿지 않고 원본 표지�
 SEC를 다시 부르지 않는다 — 증거 수집은 5A-2b가 끝냈고 여기는 자기 일관성과 manifest
 호환성만 결정론적으로 본다.
 
-후보 bundle은 임시 디렉터리에 완전한 네 파일로 세우고 **정본 `load_manifest()` ·
+후보 bundle은 임시 디렉터리에 완전한 세 파일로 세우고 **정본 `load_manifest()` ·
 `validate()`로** 검사한다. private 정규화 헬퍼를 production 계약으로 쓰지 않는다.
 
 **append/reuse 전용이다.**
@@ -637,14 +646,14 @@ production id 매핑을 그대로 보인다.
 기존 JSONL 줄을 정렬·서식 때문에 다시 쓰지 않는다. 새 줄만 결정론적 순서로 덧붙인다 —
 **물리 줄 순서는 정확성 의존이 아니다.** bundle 해시가 semantic 순서로 정규화한다.
 
-##### 쓰기 실패 시 네 파일 전부를 되돌린다
+##### 쓰기 실패 시 세 파일 전부를 되돌린다
 
-쓰기 직전에 base version을 한 번 더 확인한다. 평범한 Python 예외가 나면 **네 파일
+쓰기 직전에 base version을 한 번 더 확인한다. 평범한 Python 예외가 나면 **세 파일
 전부를** 원래 바이트로 되돌린다 — 쓰다가 터진 파일 자신이 이미 잘려 있을 수 있어
 "성공한 파일만 되돌리기"로는 모자란다. **그 이상의 파일시스템 crash-consistency를
 주장하지 않는다** — 프로세스가 죽거나 전원이 나가는 경우는 이 되돌리기가 다루지 않는다.
 
-receipt는 `stage = 5A-2c` JSON 하나이고 **다섯 번째 identity 파일이 아니다.**
+receipt는 `stage = 5A-2c` JSON 하나이고 **네 번째 identity 파일이 아니다.**
 run/audit 산출물로 남는다. DB는 건드리지 않는다 — materialize와
 `usable_from_session`은 5A-3의 일이다.
 

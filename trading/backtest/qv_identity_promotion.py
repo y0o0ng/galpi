@@ -18,7 +18,10 @@ UNRESOLVED        승격 경로가 없다
 - **`proposal_status`를 믿지 않는다.** JSON의 `AUTO_PROVABLE`은 입력이지 권한이 아니다.
 - **DB를 건드리지 않는다.** materialize와 `usable_from_session`은 5A-3의 일이다.
 - **fuzzy 추론·신뢰도 점수·휴리스틱 승격 경로를 만들지 않는다.**
-- **다섯 번째 identity 파일을 만들지 않는다.** receipt는 run/audit 산출물이다.
+- **네 번째 identity 파일을 만들지 않는다.** receipt는 run/audit 산출물이다.
+- **XBRL binding을 요구하지 않는다.** economic class package의 승격 자격은 K/Q
+  member를 묶을 수 있는지와 무관하다 — QName -> class는 production identity 관계가
+  아니라 accession 단위 파생 관측이다(`qv_xbrl_binding`).
 
 ## base version 규칙
 
@@ -67,16 +70,12 @@ from .qv_identity_proposals import (
     cover_proof_from_json,
 )
 from .qv_manifest import (
-    APPROVED_CLASS_AXIS_LOCALS,
-    DERIVED_MEMBER_LOCALS,
     EVIDENCE_DEPENDENCIES,
     EVIDENCE_SOURCE_KINDS,
     MANIFEST_FILES,
-    is_standard_family,
     load_manifest,
     normalize_cik,
     prose_key,
-    qname_key,
     validate,
 )
 
@@ -383,7 +382,6 @@ class PromotablePacket:
     proof_accession: str
     issuer_row: dict
     classes: tuple[dict, ...]          # proposal class_id -> 정규화된 class 행
-    xbrl_aliases: tuple[dict, ...]
     prose_aliases: tuple[dict, ...]
 
     @property
@@ -573,42 +571,6 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
             f"{label}: 표지가 증명한 보통주 class가 packet에 빠졌습니다"
         )
 
-    # ── XBRL alias ──────────────────────────────────────────────────────────
-    xbrl_rows: list[dict] = []
-    for row in packet.get("xbrl_alias_proposals") or []:
-        proposal_id = str(row.get("class_id") or "").strip()
-        if proposal_id not in proposal_ids:
-            raise QVPromotionError(f"{label}: alias가 모르는 class를 가리킵니다")
-        interval = _interval(row, f"{label} xbrl alias {proposal_id}")
-        axis_local = str(row.get("axis_local") or "").strip()
-        member_local = str(row.get("member_local") or "").strip()
-        axis_key = qname_key(row.get("axis_namespace"), axis_local, selected)
-        member_key = qname_key(row.get("member_namespace"), member_local, selected)
-        if member_local in DERIVED_MEMBER_LOCALS:
-            raise QVPromotionError(f"{label}: 파생/등가 member는 class가 아닙니다")
-        if not is_standard_family(axis_key) or axis_local not in APPROVED_CLASS_AXIS_LOCALS:
-            raise QVPromotionError(f"{label}: 승인되지 않은 class 축입니다: {axis_key}")
-        if member_key not in cover:
-            raise QVPromotionError(f"{label}: alias member가 표지에 없습니다: {member_key}")
-        xbrl_rows.append({
-            "proposal_class_id": proposal_id,
-            "issuer_id": issuer_id,
-            "axis_namespace": row.get("axis_namespace"),
-            "axis_local": axis_local,
-            "member_namespace": row.get("member_namespace"),
-            "member_local": member_local,
-            "axis_key": axis_key,
-            "member_key": member_key,
-            "effective_from": interval["effective_from"],
-            "effective_to": interval["effective_to"],
-            "interval": interval,
-            "provenance": str(row.get("provenance") or "").strip(),
-            "evidence": _merge_evidence(
-                _require_evidence(row.get("evidence"), f"{label} xbrl alias"),
-                interval["evidence"],
-            ),
-        })
-
     # ── prose alias ─────────────────────────────────────────────────────────
     prose_rows: list[dict] = []
     for row in packet.get("prose_alias_proposals") or []:
@@ -648,7 +610,7 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
 
     # ── alias는 그 class의 수명 밖에서 유효할 수 없다 ────────────────────────
     class_span = {row["proposal_class_id"]: row["interval"] for row in class_rows}
-    for alias in xbrl_rows + prose_rows:
+    for alias in prose_rows:
         outer = class_span.get(alias["proposal_class_id"])
         if outer is None:
             raise QVPromotionError(f"{label}: alias가 모르는 class를 가리킵니다")
@@ -680,7 +642,6 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
         proof_accession=accession,
         issuer_row=issuer_row,
         classes=tuple(class_rows),
-        xbrl_aliases=tuple(xbrl_rows),
         prose_aliases=tuple(prose_rows),
     )
 
@@ -883,8 +844,6 @@ CLASS_FIELDS = (
     "class_id", "issuer_id", "symbol", "is_ordinary_common", "is_listed",
     "effective_from", "effective_to",
 )
-XBRL_FIELDS = ("class_id", "issuer_id", "axis_key", "member_key",
-               "effective_from", "effective_to")
 PROSE_FIELDS = ("class_id", "issuer_id", "comparison_key", "bridge_type",
                 "effective_from", "effective_to")
 
@@ -1031,27 +990,6 @@ def plan_promotion(
         )
 
         # alias 관계 — semantic key가 같으면 내용이 정확히 같아야 재사용한다.
-        for alias in packet.xbrl_aliases:
-            row = {
-                "class_id": class_id_map[alias["proposal_class_id"]],
-                "issuer_id": alias["issuer_id"],
-                "axis_namespace": alias["axis_namespace"],
-                "axis_local": alias["axis_local"],
-                "member_namespace": alias["member_namespace"],
-                "member_local": alias["member_local"],
-                "effective_from": alias["effective_from"],
-                "effective_to": alias["effective_to"],
-                "provenance": alias["provenance"],
-                "evidence": alias["evidence"],
-            }
-            probe = {**row, "axis_key": alias["axis_key"], "member_key": alias["member_key"]}
-            _plan_alias(
-                prospective, plan_rows, "xbrl_aliases.jsonl", XBRL_FIELDS, probe, row,
-                key=(row["class_id"], alias["axis_key"], alias["member_key"],
-                     row["effective_from"]),
-                label=packet.label,
-            )
-
         for alias in packet.prose_aliases:
             row = {
                 "class_id": class_id_map[alias["proposal_class_id"]],
@@ -1100,12 +1038,8 @@ def _plan_alias(prospective, plan_rows, filename, fields, probe, row, *, key, la
             item for item in prospective.rows[filename]
             if (
                 item["class_id"] == key[0]
-                and item.get("axis_key" if filename == "xbrl_aliases.jsonl" else "comparison_key") == key[1]
-                and (
-                    item["member_key"] == key[2]
-                    if filename == "xbrl_aliases.jsonl"
-                    else item["bridge_type"] == key[2]
-                )
+                and item.get("comparison_key") == key[1]
+                and item["bridge_type"] == key[2]
                 and item["effective_from"] == key[3]
             )
         ),
@@ -1180,19 +1114,6 @@ def _row_json(filename: str, row: dict) -> str:
             "provenance": row["provenance"],
             "evidence": row["evidence"],
         }
-    elif filename == "xbrl_aliases.jsonl":
-        payload = {
-            "class_id": row["class_id"],
-            "issuer_id": row["issuer_id"],
-            "axis_namespace": row["axis_namespace"],
-            "axis_local": row["axis_local"],
-            "member_namespace": row["member_namespace"],
-            "member_local": row["member_local"],
-            "effective_from": row["effective_from"],
-            "effective_to": row["effective_to"],
-            "provenance": row["provenance"],
-            "evidence": row["evidence"],
-        }
     elif filename == "prose_aliases.jsonl":
         payload = {
             "class_id": row["class_id"],
@@ -1216,15 +1137,12 @@ def _sort_key(filename: str, row: dict) -> tuple:
         return (row["issuer_id"],)
     if filename == "share_classes.jsonl":
         return (row["class_id"], row["effective_from"])
-    if filename == "xbrl_aliases.jsonl":
-        return (row["class_id"], row["axis_local"], row["member_local"],
-                row["effective_from"])
     return (row["class_id"], row["raw_prose_name"], row["bridge_type"],
             row["effective_from"])
 
 
 def candidate_contents(manifest, rows: PlannedRows) -> dict[str, str]:
-    """네 파일의 완성된 새 내용. **기존 줄을 그대로 두고 새 줄만 덧붙인다.**
+    """세 파일의 완성된 새 내용. **기존 줄을 그대로 두고 새 줄만 덧붙인다.**
 
     정렬·서식을 이유로 기존 행을 다시 쓰지 않는다 — git 차이를 최소로 둔다.
     """
@@ -1243,7 +1161,7 @@ def candidate_contents(manifest, rows: PlannedRows) -> dict[str, str]:
 
 
 def _build_candidate(manifest, rows: PlannedRows):
-    """임시 디렉터리에 완전한 네 파일 bundle을 세우고 **정본 loader/validator로** 본다.
+    """임시 디렉터리에 완전한 세 파일 bundle을 세우고 **정본 loader/validator로** 본다.
 
     private 정규화 헬퍼를 production 계약으로 쓰지 않는다. `load_manifest`가 내용을
     전부 메모리로 읽으므로 임시 디렉터리는 그 자리에서 정리한다.
@@ -1274,10 +1192,10 @@ def _assert_no_usable_from_session(candidate) -> None:
 
 
 def apply_promotion(plan: PromotionPlan, *, directory: Path | str) -> dict:
-    """네 파일을 실제로 바꾼다. **직전에 base version을 한 번 더 확인한다.**
+    """세 파일을 실제로 바꾼다. **직전에 base version을 한 번 더 확인한다.**
 
     쓰기 전에 완성된 내용을 전부 메모리에 만들어 두고, 평범한 Python 예외가 나면
-    **네 파일 전부를** 원래 바이트로 되돌린다. 쓰다가 실패한 파일 자신이 이미 잘리거나
+    **세 파일 전부를** 원래 바이트로 되돌린다. 쓰다가 실패한 파일 자신이 이미 잘리거나
     일부만 쓰였을 수 있으므로 "성공한 파일만 되돌리기"로는 모자란다.
 
     **그 이상의 파일시스템 crash-consistency를 주장하지 않는다** — 프로세스가 죽거나
@@ -1309,7 +1227,7 @@ def apply_promotion(plan: PromotionPlan, *, directory: Path | str) -> dict:
                 f"{plan.candidate_identity_source_version}"
             )
     except Exception:
-        # **네 파일 전부를 되돌린다.** 쓰기가 터진 파일은 `written`에 들어가지 못했지만
+        # **세 파일 전부를 되돌린다.** 쓰기가 터진 파일은 `written`에 들어가지 못했지만
         # 그 파일이야말로 잘려 있을 수 있다.
         for filename in MANIFEST_FILES:
             (base / filename).write_bytes(original[filename])

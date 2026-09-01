@@ -28,12 +28,15 @@ explicit PIT identity
 ```text
 trading/qv/identity/issuers.jsonl
 trading/qv/identity/share_classes.jsonl
-trading/qv/identity/xbrl_aliases.jsonl
 trading/qv/identity/prose_aliases.jsonl
 ```
 
-**네 파일은 하나의 bundle이다.** 편의를 위해 다섯 번째 identity 파일을 만들지 않는다.
+**세 파일은 하나의 bundle이다.** 편의를 위해 네 번째 identity 파일을 만들지 않는다.
 raw SEC 파일·캐시·materialize된 DB는 git 밖에 남는다.
+
+> **REOPENED → CLOSED (사용자 결정).** 옛 `xbrl_aliases.jsonl`과
+> `(issuer, QName, effective_from/effective_to) -> class` 관계는 **은퇴했다.**
+> XBRL QName은 economic identity가 아니다 — §1.4를 본다.
 
 ### 1.1 identity_source_version
 
@@ -92,25 +95,108 @@ usable_from_session             그 증명이 당시 행위자에게 공개된 �
 **둘 다 만족해야 쓸 수 있다.** 나중 문서가 더 오래된 법적 상태를 증명할 수는 있어도,
 **그 증거가 usable해지기 전 formation으로 backfill되지 않는다.**
 
-### 1.4 economic class vs alias
+### 1.4 economic class vs alias vs **accession binding**
 
 ```text
-qv_share_classes                  안정된 economic class + ticker/상장/생애
-qv_share_class_xbrl_aliases       PIT XBRL QName alias 관계
-qv_share_class_prose_aliases      PIT SEC prose alias 관계
+qv_share_classes                  안정된 economic class + ticker/상장/생애   (production identity)
+qv_share_class_prose_aliases      PIT SEC prose alias 관계                   (production identity)
+qv_xbrl_class_bindings            accession 단위 XBRL binding                (파생 관측)
 ```
 
-**`qv_share_classes`에서 `xbrl_axis`/`xbrl_member`를 제거했다.**
-XBRL alias 표가 **유일한** semantic XBRL member 매핑 소스다.
+**`qv_share_classes`에서 `xbrl_axis`/`xbrl_member`를 제거했다.** prose alias 표가
+canonical bridge의 유일한 소스다.
 
-- 겹치는 여러 alias → 같은 class: 허용
+- 겹치는 여러 prose alias → 같은 class: 허용
 - 같은 issuer·시점의 같은 정규화 alias → 2개 이상 class: **AMBIGUOUS / fail-close**
 - **alias를 economic class로 만들지 않는다**
 - `EquivalentClassAMember` 같은 파생/등가 member는 실제 class가 아니다
 
+#### XBRL QName은 economic identity가 아니다 (REOPENED → CLOSED)
+
+옛 모델은 은퇴했다.
+
+```text
+(issuer, QName, effective_from/effective_to) -> economic class      RETIRED
+```
+
+```text
+economic class / prose identity   production identity — 오래 살고 버전 관리된다
+XBRL QName binding                파생 filing-local 관측 — accession 안에서만 참이다
+```
+
+**QName이 어느 class를 뜻하는지는 그 관계를 등록인이 명시로 세운 SEC accession
+안에서만 참이다.** accession A에서 본 QName은 accession B에 대해 아무것도 말하지
+않는다. 같은 exact QName이 두 accession에서 다르게 묶일 수 있고, 그것은 오류가 아니라
+정상이다.
+
+```text
+최초/최종 관측 수명 없음 · filing 사이 외삽 없음 · 연속성 가정 없음
+```
+
+binding의 권한은 **raw SEC K/Q accession + 고정된 economic identity bundle** 둘뿐이고
+그 둘에서 재생산 가능한 파생 데이터다. **손으로 유지하는 새 매핑 파일이 아니다.**
+
+`qv_share_class_xbrl_aliases`는 **은퇴했다.** production lookup·materialize 어디에서도
+읽지 않고, 새 행을 쓰지 않으며, 옛 행을 binding으로 변환하지도 않는다 — 그 행들이
+주장한 것은 alias **수명**이지 accession 안의 관계가 아니다. 기존 DB의 행과 CHECK
+제약을 파괴적으로 다시 쓰지 않으려고 표는 물리적으로만 남긴다.
+`qv_identity_evidence`의 `XBRL_ALIAS` 어휘도 같은 이유로 legacy 값으로만 남고 **새
+행을 쓰지 않는다.**
+
+#### 자동 binding 규칙 — 의도적으로 좁다
+
+한 K/Q accession의 class 축 member는 **그 filing의 구조화 fact가 관계를 명시로
+세울 때만** 자동으로 묶인다.
+
+```text
+1. QName 모양이 기존 exact QName/D0 규칙을 만족한다
+2. 등록인 CIK가 맞는다
+3. 그 member에 Security12bTitle 또는 Security12gTitle이 있다
+4. 그 제목을 기존 N1 prose_key로 정규화한다
+5. 고정된 bundle에서 그 키가 share-fact instant에 **정확히 하나의** class로 풀린다
+6. 그 class가 같은 issuer의 것이다
+7. 그 class가 그 instant에 활성이다
+8. TradingSymbol이 있으면 production class 심볼과 맞는다
+9. 제목·심볼·member·anomaly 충돌은 전부 fail-close
+10. 기존 표지/주식수 규칙 아래 보통주로 증명된다
+```
+
+`TradingSymbol`은 **교차 확인**이지 정체성이 아니다. ticker만으로 묶지 않는다.
+
+**governing instrument만으로는 QName을 묶지 못한다.** charter가 "economic Class B가
+존재한다"를 증명해도 "accession X의 `CommonClassBMember`가 그 Class B다"는 증명하지
+않는다. 제목 없는 member를 다음으로 만들어내지 않는다.
+
+```text
+XBRL member 철자 · class 글자 · COVER_GROUP_LABEL · sibling 순서 · 주식수 ·
+ticker 유사도 · governing instrument의 class 이름 유사도
+```
+
+명시 filing-local 다리가 없으면 **`UNRESOLVED`이고 그것으로 괜찮다.** accession 단위
+사람 판정 기구는 실제 coverage가 요구할 때 따로 설계한다.
+
+#### binding 가용성
+
+filing과 identity 다리가 **둘 다** 알려진 뒤에야 쓸 수 있다.
+
+```text
+usable_from_session = max(
+    filing historical_usable_session,
+    matched economic class usable_from_session,
+    matched canonical prose relation usable_from_session)
+```
+
+손으로 넣지 않는다. **filing 수리 시각을 economic class 유효성으로 쓰지 않는다.**
+
+구현은 `trading/backtest/qv_xbrl_binding.py`이고 해석기는
+`resolve_accession_member(...)`다. 옛 시간 구간 `qv_identity.resolve_member(...,
+as_of=...)`는 은퇴했다. 층은 그대로 나눈다 — **SEC/raw instance ingest → accession
+binding 파생 → share observation 추출/해석.** 범용 XBRL 창고를 만들지 않고 QV에
+필요한 K/Q accession/member만 다룬다.
+
 ### 1.5 XBRL QName 정규화
 
-parser의 진실은 `QName(namespace URI, exact local)` 그대로다. alias 매칭 키는
+parser의 진실은 `QName(namespace URI, exact local)` 그대로다. 매칭 키는
 
 ```text
 표준 taxonomy   <canonical family>:<exact local>     예) us-gaap:StatementClassOfStockAxis
@@ -228,7 +314,9 @@ Jan 1(t-1) <= share fact instant <= December valuation session D
    여러 class가 있으면 **issuer 총계를 배분하지 않는다.**
 2. **명시 dimension 정확히 하나** — 축이 승인된 표준 주식 class 축 하나여야 한다
    (`StatementClassOfStockAxis` · `ClassesOfShareCapitalAxis`).
-   exact PIT XBRL alias → 안정된 `class_id`.
+   그 accession의 exact XBRL binding → 안정된 `class_id`.
+   **binding이 없으면 `UNRESOLVED`다.** 다른 accession의 binding으로 새지 않고,
+   economic class 활성 판정은 **그 fact의 instant**로 한다.
 3. **그 밖의 모든 모양** — 사용 불가 / fail-close.
 
 **typed dimension은 쓸 수 없다. member를 전역 추론하지 않는다.**
@@ -620,6 +708,7 @@ probe 파일은 연구 기록이므로 다시 쓰지 않는다. **아래는 이 
 |---|---|
 | 로드맵 §4.4.1의 단순 December selector("usable filing 중 December 이하 가장 늦은 instant") | **§7 P2 same-regime selector.** freshness·D0·tier·regime 판정이 추가됐고 same-regime이 아니면 더 오래된 후보로 물러선다 |
 | `qv_share_classes`가 XBRL axis/member를 직접 들고 있던 모델 | **§1.4** alias 분리. `xbrl_axis`/`xbrl_member` 제거 |
+| PIT 시간 구간 XBRL alias 관계 | **§1.4 REOPENED → CLOSED.** accession 단위 filing-local binding으로 교체. `xbrl_aliases.jsonl` 삭제, bundle은 세 파일 |
 | `qv_class_valuation` 하나가 법적 관계와 사용 가능성을 겸하던 모델 | **§8·§10** 두 표 분리. `qv_class_valuation`은 RETIRED |
 | Follow-up 6·7이 남긴 "vendor split_date를 boundary로 쓴다" | **§6** 그대로 유지하되 `available by formation` · 충돌 시 `UNRESOLVED` · 불일치 구간 guard가 추가됐다 |
 | Follow-up 7 N15의 META `2013~2026 ELIGIBLE` | **Follow-up 8이 이미 명시적으로 supersede했다.** C3 bracket이 §9의 계약이다 |
