@@ -235,8 +235,11 @@ member FOXA  / identity FOXA   2019~2026 formations   새 발행사 · 새 계�
 
 #### 승인 정책 — B
 
+**B는 두 짝으로 이루어진다.** 하나는 증거를 모으는 방식이고 하나는 승격 경계다.
+
 ```text
 발견(discovery)은 넓게, 증명(proof)은 좁게.
+승격(promotion)은 상태가 정한다 — 보편적 사람 승인이 아니다.
 ```
 
 후보 CIK와 후보 filing을 찾는 층은 넓어도 된다. **아래 다섯이 실제로 배선된 전부다.**
@@ -255,11 +258,29 @@ PREDECESSOR_HINT        edgar.find_predecessor            (--historical)
 ```text
 DISCOVERY_HINT   어디를 볼지 가리킨다.        production identity가 아니다.
 SEC_PROOF        원문이 실제로 말한 것.        제안의 근거가 된다.
-PRODUCTION_MANIFEST  사람이 승격시킨 것.       trading/qv/identity/*.jsonl
+PRODUCTION_MANIFEST  승격된 것.               trading/qv/identity/*.jsonl
 ```
 
-`AUTO_PROVABLE`은 **"승인된 규칙 아래 SEC 증거가 기계적으로 완결돼 보인다"**는 뜻일
-뿐이고 manifest가 이미 바뀌었다는 뜻이 **아니다.** 자동 승격은 없다.
+**승격은 5A-2c에서만 일어난다.** 승격이 사람의 손을 거치는지 아닌지는 packet의
+**상태가 정한다** — 바로 아래 절이 그 경계다.
+
+`AUTO_PROVABLE`은 **"승인된 규칙 아래 SEC 증거가 기계적으로 완결됐다"**는 뜻이고
+manifest가 이미 바뀌었다는 뜻이 **아니다.** **5A-2a/b에는 승격 자체가 없다** —
+그 단계에서 `AUTO_PROVABLE`은 제안 상태일 뿐이다. 자동 승격의 경계는 5A-2c다.
+
+#### 승인 경계 — 상태가 정한다
+
+```text
+AUTO_PROVABLE     5A-2c가 사람의 의미 판단 없이 승격할 수 있다(아래 fail-close 관문 통과 시)
+REVIEW_REQUIRED   승격 전에 사람의 판정이 필요하다
+UNRESOLVED        승격하지 않는다
+```
+
+**보편적 사람 승인이 아니다.** 모든 packet을 사람이 읽어야 한다는 규칙은 이 문서의
+계약이 아니었고, 지금 명시로 못박는다 — 기계적으로 완결된 증거를 사람이 다시 읽는
+것은 판단을 더하지 않고 처리량만 없앤다. 사람의 판단이 실제로 필요한 자리는
+`REVIEW_REQUIRED`이고, 그 자리를 정하는 것은 사람의 재량이 아니라 **얼어붙은 SEC
+증명 규칙**이다.
 
 #### 5A-2a — 제안 후보 발견
 
@@ -399,18 +420,64 @@ class 제안이 되지 않되, **조용히 사라지지 않고** packet의 질�
 표지만으로는 대부분 `CLASS_INTERVAL_NOT_EXPLICIT`가 붙은 `REVIEW_REQUIRED`가 된다.
 **이것은 결함이 아니라 계약이다.**
 
-#### 5A-2c — 판정과 manifest 승격
+#### 5A-2c — 승격 (**CLOSED 정책. 아직 구현하지 않았다.**)
 
-사람이 packet을 읽고 `trading/qv/identity/*.jsonl`에 반영하는 단계다. 구간 증거를
-붙이는 것도, 승계·재편 판정도, 제안 id(`prop-<cik>-<member>`)를 정식 `class_id`로
-바꾸는 것도 여기서 한다. **5A-2a/b는 이 파일들을 읽지도 쓰지도 않는다.**
+packet을 `trading/qv/identity/*.jsonl`에 반영하는 유일한 단계다. **5A-2a/b는 이
+파일들을 읽지도 쓰지도 않는다.**
+
+정책은 아래 일곱 줄로 얼린다. **구현은 별도 작업이고 이 문서가 그것을 선행한다.**
+
+##### 1. `AUTO_PROVABLE`은 사람의 의미 승인 없이 승격될 수 있다
+
+기계적 완결의 기준은 얼어붙은 SEC 증명 규칙이지 사람의 재량이 아니다. 그 규칙 아래
+완결된 packet을 사람이 다시 읽는 것은 판단을 더하지 않는다.
+
+##### 2. 자동 승격 전 fail-close 관문 — 넷 다 통과해야 한다
+
+```text
+a. packet이 **정확히 그 pinned identity_source_version**에서 생성됐다
+b. 현재 네 파일 manifest bundle이 **여전히 그 정확한 base version**이다
+c. 증거·제안 불변식이 결정론적으로 **재검증**된다
+d. REVIEW_REQUIRED / UNRESOLVED 사유나 conflict가 **하나도 없다**
+```
+
+하나라도 어긋나면 승격하지 않는다. **추측으로 메우지 않고, 부분 승격도 하지 않는다.**
+재검증은 제안 생성 때 쓴 규칙을 다시 돌리는 것이지 결과를 신뢰하는 것이 아니다 —
+packet은 입력이지 권한이 아니다.
+
+##### 3. base가 바뀌었으면 새 상태에 merge하지 않는다
+
+제안 생성 이후 manifest base가 달라졌으면 **그 새 bundle에서 다시 돌린다.** 새 상태에
+대고 병합하면 어느 base에서 증명된 것인지가 사라지고, 그 순간 packet의 provenance가
+거짓이 된다. **rebase가 아니라 rerun이다.**
+
+##### 4. `REVIEW_REQUIRED`는 사람의 판정을 요구한다
+
+구간 증거를 붙이는 것도, 승계·재편 판정도, 재사용 계열의 등록인 판정도 여기다.
+제안 id(`prop-<cik>-<member>`)를 정식 `class_id`로 바꾸는 것도 사람이 한다.
+
+##### 5. `UNRESOLVED`는 승격되지 않는다
+
+증명을 시작할 후보조차 없는 상태다. 승격 경로가 아예 없다.
+
+##### 6. fuzzy 추론 · 신뢰도 점수 · 휴리스틱 승격 경로를 만들지 않는다
+
+"거의 맞다"로 넘어가는 문이 하나라도 생기면 나머지 관문이 전부 무의미해진다.
+
+##### 7. 5A-2a/b는 읽기 전용 제안/증명 단계로 남는다
+
+manifest를 읽지도 쓰지도 않는다. 이 경계는 자동 승격이 생겨도 바뀌지 않는다 —
+제안을 만드는 코드와 승격하는 코드가 같은 자리에 있으면 "증명했으니 바로 쓴다"가
+언젠가 관문을 우회한다.
 
 #### 상태 어휘 — 정확히 셋
 
 ```text
-AUTO_PROVABLE     승인된 규칙 아래 SEC 증거가 기계적으로 완결됐다(승격은 아니다)
-REVIEW_REQUIRED   증거가 있으나 사람의 판정이 필요하다
-UNRESOLVED        증명을 시작할 후보조차 없다
+AUTO_PROVABLE     승인된 규칙 아래 SEC 증거가 기계적으로 완결됐다
+                  (5A-2a/b에서는 제안 상태일 뿐이고 manifest 변경이 아니다.
+                   5A-2c의 fail-close 관문을 통과하면 사람 승인 없이 승격될 수 있다)
+REVIEW_REQUIRED   증거가 있으나 사람의 판정이 필요하다 — 승격 전에 사람이 본다
+UNRESOLVED        증명을 시작할 후보조차 없다 — 승격 경로가 없다
 ```
 
 **이 셋뿐이다.** 이번 fix가 사유 코드

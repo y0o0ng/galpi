@@ -1773,7 +1773,13 @@ packet의 질문에도 그대로 남는다 — *"TFCFA는 FOXA의 옛 계열인�
 
 **정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`의 5A-2b
 절이다.** production manifest를 바꾸지 않았고(`trading/qv/identity/*.jsonl` 읽기·쓰기
-없음) 자동 승격도 없다. **5A-2는 아직 끝나지 않았고 Gate A~H는 여전히 미판정이다.**
+없음) 승격도 없다. **5A-2는 아직 끝나지 않았고 Gate A~H는 여전히 미판정이다.**
+
+> **10.13 계열 receipt는 전부 5A-2a/b 실행이고, 그 단계는 승격을 하지 않는다.**
+> 이 절들의 "사람이 판정한다"는 말은 **`REVIEW_REQUIRED` packet에 대한 것**이지 모든
+> packet에 사람 승인이 필요하다는 뜻이 아니다. 승격 경계는 상태가 정하고(승인 정책 B)
+> 정본은 설계 문서의 5A-2c 절이다 — `AUTO_PROVABLE`은 fail-close 관문을 통과하면
+> 사람의 의미 승인 없이 승격될 수 있다. **아래 실측·판정은 그대로 유효하다.**
 
 ### 무엇이 문제였나 — target-blind 탐색
 
