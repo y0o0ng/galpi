@@ -24,6 +24,11 @@ inventory가 명시한 `universe_source`/`universe_source_version`/`index_name`�
 `universe_membership`에서 읽는다. **지금 ticker 주인의 이름으로 과거를 추정하지
 않는다.** 이름 색인은 40MB 한 번이고 선행 등록인 확인은 종목당 제출 이력을 훑는다 —
 비싸므로 기본이 아니다.
+
+**universe/bar 심볼은 SEC 경제적 심볼이 아니다.** 작업 항목은 `member_symbol`(저장된
+시장 데이터 계열)과 `identity_symbol`(실제 거래 심볼)을 둘 다 들고 다니고 SEC에는
+`identity_symbol`만 던진다. `--symbols`는 둘 중 어느 쪽으로도 고를 수 있고
+`MEMBER/IDENTITY` 쌍으로 정확히 하나를 집을 수도 있다.
 """
 
 from __future__ import annotations
@@ -73,14 +78,20 @@ def _select(demand_input: DemandInput, arguments) -> DemandInput:
         wanted = [item.strip().upper() for item in arguments.symbols.split(",") if item.strip()]
         return demand_input.select(wanted)
     if arguments.limit:
-        return demand_input.select(sorted(demand_input.demand)[: arguments.limit])
+        return demand_input.select(
+            f"{item.member_symbol}/{item.identity_symbol}"
+            for item in demand_input.work_items[: arguments.limit]
+        )
     raise SystemExit("--symbols 또는 --limit 중 하나가 필요합니다(전부 돌리기는 기본이 아닙니다)")
 
 
 def historical_names(index_name: str) -> dict[str, str]:
-    """티커 → **그 구간의** 회사 이름. 지수 변경 이력 CSV가 정본이다.
+    """**경제적** 티커 → 그 구간의 회사 이름. 지수 변경 이력 CSV가 정본이다.
 
     EDGAR 수집 경로가 이미 쓰는 자료와 같다(`selftest.real_run.security_names()`).
+    **키가 경제적 심볼인 이유**는 지수 공고가 `FOXA`라고 적지 벤더 계열 코드
+    `TFCFA`라고 적지 않기 때문이다. 벤더 코드로 찾으면 언제나 빈손이다.
+
     같은 티커에 이름이 여럿이면 가장 이른 것을 쓴다 — 폐지 종목의 CIK를 찾는 것이
     목적이라 그 티커가 지수를 떠날 때의 회사가 알고 싶은 쪽이다.
     """
@@ -100,7 +111,12 @@ def historical_names(index_name: str) -> dict[str, str]:
 
 
 def membership_spans(connection, demand_input: DemandInput) -> dict[str, tuple[str, str]]:
-    """티커 → 멤버십 전 구간. **5A-1이 명시한 source/version만** 읽는다."""
+    """**데이터 계열 심볼** → 그 계열의 멤버십 구간. 5A-1이 명시한 source/version만 읽는다.
+
+    **경제적 심볼로 묶지 않는다.** 재사용된 티커의 옛 episode는 이미 벤더 계열 심볼로
+    저장돼 있으므로 저장된 심볼로 묶으면 episode가 그대로 갈라진다. 경제적 심볼로 묶으면
+    서로 다른 발행사의 구간이 하나의 `MIN(valid_from)`/`MAX(valid_to)`로 합쳐진다.
+    """
     rows = connection.execute(
         "SELECT symbol, MIN(valid_from) AS first,"
         "       MAX(COALESCE(valid_to, valid_from)) AS last"
@@ -117,7 +133,10 @@ def membership_spans(connection, demand_input: DemandInput) -> dict[str, tuple[s
 
 
 def build_hints(demand_input: DemandInput, data_dir=None) -> DiscoveryHints:
-    """3층 발견 입력. 이름과 구간 둘 다 **명시 source**에서만 온다."""
+    """3층 발견 입력. 이름과 구간 둘 다 **명시 source**에서만 온다.
+
+    이름은 경제적 심볼로, 구간은 데이터 계열 심볼로 키를 잡는다.
+    """
     names = historical_names(demand_input.index_name)
     connection = store.connect(data_dir) if data_dir else store.connect()
     try:
@@ -134,8 +153,9 @@ def build_hints(demand_input: DemandInput, data_dir=None) -> DiscoveryHints:
         source=demand_input.universe_source,
         source_version=demand_input.universe_source_version,
         provenance=(
-            f"이름: trading/universe/{demand_input.index_name.lower()}-changes.csv"
-            " (security 칸) / 구간: universe_membership"
+            f"이름(identity_symbol 키): trading/universe/"
+            f"{demand_input.index_name.lower()}-changes.csv (security 칸)"
+            " / 구간(member_symbol 키): universe_membership"
         ),
         names=names,
         spans=spans,
@@ -151,10 +171,21 @@ def stage_demand(arguments) -> int:
     demand_input = read_mapping_demand(arguments.inventory)
     print("5A-1 provenance:")
     _print_provenance(demand_input)
-    demand = demand_input.demand
-    print(f"5A-1 mapping demand symbols: {len(demand)}")
-    for symbol in sorted(demand)[: arguments.limit or 20]:
-        print(f"  {symbol}  formations={len(demand[symbol])}  first={demand[symbol][0]}")
+    items = demand_input.work_items
+    reused = [item for item in items if item.symbol_bridge_kind != "DIRECT"]
+    print(f"5A-1 mapping demand work items: {len(items)}")
+    print(f"  reused vendor series: {len(reused)}")
+    print(
+        "  unique economic identity symbols: "
+        + str(len({item.identity_symbol for item in items}))
+    )
+    for item in items[: arguments.limit or 20]:
+        print(
+            f"  {item.member_symbol:10s} -> {item.identity_symbol:10s}"
+            f" {item.symbol_bridge_kind:22s}"
+            f" formations={len(item.formation_sessions)}"
+            f" first={item.formation_sessions[0]}"
+        )
     return 0
 
 
@@ -193,8 +224,13 @@ def stage_run(arguments) -> int:
     )
     for item in run.proposals:
         origins = ",".join(sorted({c.origin for c in item.discovery_candidates})) or "-"
+        bridged = (
+            f"{item.member_symbol}->{item.identity_symbol}"
+            if item.member_symbol != item.identity_symbol
+            else item.identity_symbol
+        )
         print(
-            f"  {item.symbol:6s} {item.proposal_status:16s}"
+            f"  {bridged:18s} {item.proposal_status:16s}"
             f" cik={item.selected_cik or '-'}"
             f" classes={len(item.share_class_proposals)}"
             f" origins={origins}"

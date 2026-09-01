@@ -1310,7 +1310,12 @@ python3 -m unittest discover -s tests -p "test_*.py"            -> 1474 tests OK
 
 ---
 
-## 10.12 Step 5A-1 inventory receipt — 2026-08-31 (초판, **무효**) / 2026-08-31 정정판
+## 10.12 Step 5A-1 inventory receipt — 2026-08-31 (초판, **무효**) / 2026-08-31 (**pre-fix**) / 2026-09-01 정정판
+
+> **아래 2026-08-31 정정판의 `897`은 economic-identity 수요의 정본이 아니다.**
+> 그때는 `universe_membership.symbol`을 그대로 economic 심볼로 썼고, 그 심볼 중 일부는
+> 벤더 계열 코드(`TFCFA`·`MON_OLD`·`SUN1`…)다. **사실 receipt로 보존하되
+> pre-fix/noncanonical로 표시한다.** 정본은 10.12b다. 손으로 고치지 않았다.
 
 **정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`다.**
 읽기 전용이고 manifest를 바꾸지 않았으며 어떤 gate도 판정하지 않았다.
@@ -1405,6 +1410,9 @@ MAPPED 심볼  CMCSA · GOOG · GOOGL · NKE · UA · UAA
 **`897`은 이번 inventory가 직접 산출한 값이다.** 초판이 유도했던 `892`와 다르고,
 그 차이가 정확히 손으로 빼는 방식이 왜 정본이 될 수 없는지를 보여준다.
 
+> **pre-fix.** 이 `897`은 **저장된 심볼**의 고유 수다. `TFCFA`를 `FOXA`와 다른 경제적
+> 심볼로 세고 있었고, 5A-2가 그 값을 SEC 티커로 던지게 되어 있었다. 10.12b가 정본이다.
+
 #### 이 숫자가 재는 것과 재지 않는 것
 
 - **재는 것**: 선택된 manifest bundle 안의 **static 매핑 coverage/수요**.
@@ -1419,7 +1427,12 @@ MAPPED 심볼  CMCSA · GOOG · GOOGL · NKE · UA · UAA
 **Gate A~H와 Phase 0는 여전히 평가되지 않았다.** 수익률·B/M·Q/V·랭킹·선택·
 `coverage_start`를 계산하지 않았다.
 
-## 10.13 Step 5A-2a/b pilot receipt — 2026-08-31 (**pre-fix**) / 2026-09-01 정정판
+## 10.13 Step 5A-2a/b pilot receipt — 2026-08-31 (**pre-fix**) / 2026-09-01 (**pre-fix**)
+
+> **아래 두 실행의 대상은 `universe_membership`에 저장된 심볼이다.** 그중 일부는 벤더
+> 계열 코드이고, 여기서 `FOXA`는 2019 이후 episode만 가리킨다. 실행 사실로 보존하되
+> **수요 `897`의 해석과 대상 정의는 pre-fix/noncanonical이다.** 정본은 10.13b다.
+> 이 절의 숫자를 손으로 고치지 않았다.
 
 **정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`의
 5A-2 절이다.** 이 실행은 **production manifest를 바꾸지 않았다** —
@@ -1553,10 +1566,201 @@ AUTO_PROVABLE=0  REVIEW_REQUIRED=5  UNRESOLVED=0
 
 ### 이 receipt가 주장하지 않는 것
 
-- 5A-2가 완료됐다고 주장하지 않는다. 수요 897개 중 5개만 돌렸다.
+- 5A-2가 완료됐다고 주장하지 않는다. 수요 897개 중 5개만 돌렸다
+  (**그 `897`은 pre-fix 해석이다 — 10.12b를 본다**).
 - 어떤 gate도 통과·실패했다고 주장하지 않는다. **Gate A~H는 여전히 미판정이다.**
 - `AUTO_PROVABLE`이 나왔더라도 그것은 manifest 변경이 아니다.
 - 5개 표본으로 897개의 상태 분포를 추정하지 않는다.
+- Q/V · B/M · 랭크 · 선택 · 수익률을 계산하지 않았다.
+- **`FOXA`가 옛 21세기폭스 episode까지 덮는다고 주장하지 않는다.** 이 실행의 `FOXA`는
+  저장된 심볼이고 2019 이후 episode만이다. 옛 episode는 `TFCFA`로 저장돼 있었고
+  10.13b가 그것을 별도 작업 항목으로 돌린다.
+
+
+## 10.12b Step 5A-1 정정 실행 — 2026-09-01 (**economic-identity 정본**)
+
+**정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md` §0과 5A-1
+절이다.** 읽기 전용이고 manifest를 바꾸지 않았으며 어떤 gate도 판정하지 않았다.
+
+### 왜 다시 돌렸나 — universe/bar 심볼 != SEC 경제적 심볼
+
+production 과거 유니버스는 재사용된 과거 티커 일부를 `universe_membership`에 넣기 전에
+**벤더 계열 코드**로 바꾼다(`reconstruction → apply_reused(...) → universe_membership`).
+
+```text
+ABI -> ABI_OLD1   FOXA -> TFCFA   FOX -> TFCF   MON -> MON_OLD   SNDK -> SNDK_OLD
+SUN -> SUN1       CC   -> CCTYQ   MICC -> MIICF
+```
+
+그 값들은 **시장 데이터 계열 locator**이고 SEC 경제적 거래 심볼이 아니다. 10.12의 5A-1은
+`universe_membership.symbol`을 그대로 읽어 manifest 조회 키로 썼고, 5A-2는 같은 값을
+발견·증명 심볼로 썼다. **시장 데이터 계열 정체성과 경제적 증권 정체성이라는 두 영역이
+거기서 섞였다.**
+
+**해답은 벤더 코드를 manifest에 넣는 것이 아니다.** manifest는 SEC/경제적 identity
+정본으로 남고 SEC 증거가 증명한 **실제 과거 거래 심볼**만 담는다.
+
+### 사용한 명시 source version — 10.12와 같다
+
+```text
+index_name              SP500
+universe                announcements / eodhd-15y-2026-08
+calendar                eodhd / eodhd-15y-2026-08        (참조 심볼 SPY)
+identity bundle         qv-identity-sha256:55ed78d0b33bb5f85ccf14e81a5a7d8e6bcbe82d17812e46470b3b133372e6ec
+reused-series bridge    trading/universe/reused-tickers.csv
+                        reused-tickers-sha256:a9e7e79cc5807813ed250ac694a81b5d8652ff5b092ee040578fa2af78f0e55e
+materialized qv_share_classes rows   0   (5A-1의 전제가 아니다)
+```
+
+**재사용 매핑 provenance는 SEC identity bundle의 일부가 아니다.** universe/market-data
+심볼 provenance이고 산출물의 `symbol_bridge` 블록이 그 문장을 직접 들고 다닌다.
+
+### 결과 — formation별 표는 10.12와 **같다**
+
+`member_count` · `mapped_count` · `unmapped_count` · `ambiguous_count` ·
+`mapped_issuer_count` · `multi_security_issuer_count`가 formation마다 전부 같다. 다리는
+**행을 만들거나 없애지 않고 조회 키만 바꾸므로** 그것이 기대되는 결과다.
+
+```text
+security 행 총계                       9,525   (10.12와 같다)
+MAPPED 행                                61    (10.12와 같다)
+AMBIGUOUS_MAPPING                         0    (10.12와 같다)
+MAPPED 심볼   CMCSA · GOOG · GOOGL · NKE · UA · UAA   (10.12와 같다)
+사유 분포     NO_CLASS_MAPPING_FOR_SYMBOL 9,442
+              CLASS_NOT_ACTIVE_AT_FORMATION  22
+              MAPPED                         61
+```
+
+### 바뀐 것 — 수요의 **의미**
+
+```text
+symbol_bridge_kind 분포   DIRECT 9,185 · REUSED_VENDOR_SERIES 340
+reused-tickers.csv를 거친 멤버십 행      340   (formation × 행)
+
+5A-2 work item (member_symbol, identity_symbol)   897
+  그중 재사용 벤더 계열                              63
+고유 economic identity 심볼                        889
+```
+
+**`897`이라는 숫자는 우연히 같고 재는 것이 다르다.** 10.12의 `897`은 "MAPPED가 아닌
+**저장된 심볼**의 고유 수"였고, 이번 `897`은 "MAPPED가 아닌 고유
+`(데이터 계열, 경제적 심볼)` 작업 항목 수"다. **경제적 심볼로 세면 `889`이고 그 값은
+10.12가 산출할 수 없던 것이다.** 두 숫자가 갈리는 자리가 정확히 재사용 episode 8개다.
+
+```text
+CEG   CEG   · CEG_OLD          DELL  DELL · DELL_OLD
+DOW   DOW   · DOW_OLD          FOX   FOX  · TFCF
+FOXA  FOXA  · TFCFA            GM    GM   · GM_OLD
+Q     Q     · Q_OLD            SNDK  SNDK · SNDK_OLD
+```
+
+**이 여덟은 하나로 뭉치면 안 된다.** 같은 티커를 서로 다른 발행사가 겹치지 않는 기간에
+썼고, 뭉치면 두 발행사가 하나의 `selected_cik`로 밀려 들어간다. 예를 들어 FOXA는
+`TFCFA/FOXA`가 2008~2018 formation 11개, `FOXA/FOXA`가 2019~2026 formation 8개다.
+
+### 이 숫자가 재는 것과 재지 않는 것 — 10.12와 같다
+
+- **재는 것**: 선택된 manifest bundle 안의 **static 매핑 coverage/수요**.
+- **재지 않는 것**: **historical PIT identity usability**. `usable_from_session`은
+  5A-3이 REQUIRED 증거를 materialize한 뒤에 생긴다.
+- `AMBIGUOUS_MAPPING = 0`은 지금 manifest가 작아서 나온 값이지 계약이 안전하다는
+  증거가 아니다.
+- **다리가 coverage를 늘리지 않았다.** `MAPPED`는 61 그대로다. 이 fix는 숫자를 키우는
+  것이 아니라 **어느 심볼에 대해 SEC 증거를 찾을 것인가**를 바로잡는다.
+
+**Gate A~H와 Phase 0는 여전히 평가되지 않았다.** 수익률·B/M·Q/V·랭킹·선택·
+`coverage_start`를 계산하지 않았다.
+
+## 10.13b Step 5A-2a/b 정정 pilot — 2026-09-01 (**economic-identity 정본**)
+
+**production manifest를 바꾸지 않았다** — `trading/qv/identity/*.jsonl`은 읽지도 쓰지도
+않았고 자동 승격도 없다. 어떤 Phase 0 gate도 판정하지 않았다. **5A-2는 아직 끝나지
+않았다.**
+
+10.13의 두 실행(초판·2026-09-01 정정판)은 사실 receipt로 그대로 남는다. 다만 그 실행들의
+대상은 **저장된 심볼**이었고, `FOXA`는 2019 이후 episode만 가리키고 있었다.
+
+### 대상 — 10.13의 다섯에 재사용 episode 하나를 더했다
+
+```text
+inventory     10.12b 산출물 (같은 명시 source/version, 위에 적었다)
+대상          AAPL/AAPL    post-2019 단일 class
+              TFCFA/FOXA   **재사용 벤더 계열** — 옛 21세기폭스 episode (2008~2018)
+              FOXA/FOXA    같은 경제적 심볼의 새 episode (2019~2026)
+              CELG/CELG    2019 이전 표지 · 이후 피인수
+              LEH/LEH      CIK/재편 복잡 (CIK_OVERRIDES 고정)
+              ABMD/ABMD    폐지 구성원
+discovery     --historical (이름: sp500-changes.csv `security` 칸 / 구간: universe_membership)
+              name_key = identity_symbol · span_key = member_symbol
+SEC 호출      57
+```
+
+```text
+AUTO_PROVABLE=0  REVIEW_REQUIRED=6  UNRESOLVED=0
+발견 출처 분포  CURRENT_TICKER_FILE 3 · EXISTING_CIK_OVERRIDE 2 · HISTORICAL_NAME_LOOKUP 1
+```
+
+| work item | status | 발견 출처 | proof accession | 제안 class | reason codes |
+|---|---|---|---|---|---|
+| AAPL → AAPL | REVIEW_REQUIRED | CURRENT_TICKER_FILE | 0000320193-26-000020 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON · SIBLING_CLASS_CENSUS_UNCLEAR |
+| ABMD → ABMD | REVIEW_REQUIRED | HISTORICAL_NAME_LOOKUP | 0000950170-22-021880 | 1 | CLASS_INTERVAL_NOT_EXPLICIT |
+| CELG → CELG | REVIEW_REQUIRED | EXISTING_CIK_OVERRIDE | 0000816284-19-000046 | 1 | CLASS_INTERVAL_NOT_EXPLICIT · DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON · SIBLING_CLASS_CENSUS_UNCLEAR |
+| FOXA → FOXA | REVIEW_REQUIRED | CURRENT_TICKER_FILE | 0001628280-26-053960 | 2 | CLASS_INTERVAL_NOT_EXPLICIT |
+| LEH → LEH | REVIEW_REQUIRED | EXISTING_CIK_OVERRIDE | (없음) | 0 | DISCOVERY_ONLY_NO_SEC_PROOF · NO_COVER_PAGE_PROOF_DOCUMENT |
+| **TFCFA → FOXA** | REVIEW_REQUIRED | CURRENT_TICKER_FILE | 0001628280-26-053960 | 2 | CLASS_INTERVAL_NOT_EXPLICIT · **REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE** |
+
+10.13 정정판과 비교해 **AAPL·CELG·LEH·ABMD의 판정·CIK·사유가 그대로다.** 다리는 그
+넷을 건드리지 않는다(전부 `DIRECT`).
+
+### 이 실행이 실제로 확인한 것
+
+1. **`TFCFA`가 SEC에 던져지지 않았다.** 발견·증명이 전부 `FOXA`로 갔고 표지 대조도
+   `FOXA`로 붙었다. 벤더 코드로 대조했다면 SEC 표지에 실릴 수 없는 문자열이라 언제나
+   `SYMBOL_NOT_ON_COVER_PAGE`였을 것이다. network-free 회귀가 그것을 잠근다
+   (`ReusedVendorSeriesTest`).
+2. **두 FOXA episode가 별도 packet으로 남았다.** 요구 formation이
+   `TFCFA/FOXA` 11개(2008-06-30~2018-06-29)와 `FOXA/FOXA` 8개(2019-06-28~2026-06-30)로
+   갈린다. 하나로 뭉갰다면 19개가 한 `selected_cik`에 붙었을 것이다.
+3. **옛 episode가 조용히 새 발행사로 완결되지 않았다.** 아래가 그 실측이다.
+
+### 실측이 드러낸 한계 — `TFCFA → FOXA`의 발견
+
+3층(구간 이름 색인)은 이 항목에서 **돌았고 빈손이었다.** 명시 source
+(`sp500-changes.csv`)가 `FOXA`에 대해 적은 이름이 `21st Century Fox`인데 EDGAR 이름
+색인은 그 문자열을 풀지 못한다.
+
+```text
+"21st Century Fox"          -> []            (등록인 이름이 아니다)
+"Twenty-First Century Fox"  -> 0001308161    (실제 옛 등록인)
+"Fox Corporation"           -> 0000881040 · 0001754301
+```
+
+**이름을 고쳐 넣지 않았다.** 새 회사 이름 source를 만들거나 fuzzy 정규화를 하는 것은
+Follow-up 9가 닫은 자리다. 그래서 이 항목의 유일한 후보가 현재 ticker 파일의
+`0001754301`(**새** Fox Corporation)이었다.
+
+그 상태가 `AUTO_PROVABLE`이 되면 **옛 economic identity에 새 발행사의 표지가 붙는다.**
+그래서 이번 fix가 사유 코드 하나를 더했다.
+
+```text
+REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE
+  재사용 벤더 계열인데 발견 후보가 현재 티커 계열 출처뿐이다.
+  구간 증거가 다 들어와도 기계적 완결이 되지 못한다 — 5A-2c의 사람이 판정한다.
+```
+
+packet의 질문에도 그대로 남는다 — *"TFCFA는 FOXA의 옛 계열인데 발견 후보가 현재 티커
+계열 출처뿐입니다 — 그 구간의 등록인인지 사람이 판정해야 합니다."*
+
+**상태 어휘는 여전히 셋뿐이다**(`AUTO_PROVABLE` · `REVIEW_REQUIRED` · `UNRESOLVED`).
+`DIRECT` 항목의 판정 규칙은 하나도 바뀌지 않았다.
+
+### 이 receipt가 주장하지 않는 것
+
+- 5A-2가 완료됐다고 주장하지 않는다. 897개 작업 항목 중 6개만 돌렸다.
+- **어떤 gate도 통과·실패했다고 주장하지 않는다. Gate A~H는 여전히 미판정이다.**
+- `TFCFA → FOXA`의 옛 등록인이 `0001754301`이라고 주장하지 않는다. 그 packet의
+  `selected_cik`은 **DISCOVERY_HINT일 뿐이고** 사유 코드가 그것을 명시로 막고 있다.
+- 6개 표본으로 897개의 상태 분포를 추정하지 않는다.
 - Q/V · B/M · 랭크 · 선택 · 수익률을 계산하지 않았다.
 
 

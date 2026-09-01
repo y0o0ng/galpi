@@ -31,6 +31,7 @@
 - 트레이딩 전략 구축 계약: 전략 family마다 로드맵이 하나다. **연구 예산·종료 조건·Phase별 사전등록이 거기 있다.** 실험 산출물 색인은 `trading/runs/README.md`다.
   - `momentum-v2` (CLOSED/FROZEN): `docs/trading/momentum-v2-roadmap.md`
   - `quality-value` (Phase 0 진행 중 — Step 4 PIT shares/ME까지 구현했고 다음은 Step 5다): `docs/trading/strategies/quality-value-roadmap.md`. **Step 4 구현 정본은 `docs/trading/strategies/qv-step4-shares-me-design.md`이고 P2 same-regime selector·C3 continuity·identity manifest가 거기서 얼어붙었다.**
+    - **`universe_membership.symbol`은 SEC 경제적 심볼이 아니다.** production 유니버스는 재사용된 과거 티커 일부를 벤더 계열 코드로 바꿔 저장한다(`TFCFA`=옛 `FOXA`, `SUN1`=옛 `SUN`…). SEC identity·manifest 조회는 `trading/universe/reused-tickers.csv`로 되돌린 `identity_symbol`로만 하고, 작업 단위는 `(member_symbol, identity_symbol)`이라 같은 티커의 서로 다른 발행사 episode가 한 CIK로 뭉치지 않는다. 접미사 규칙으로 유도하지 않는다 — 계약은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md` §0이다.
 - 메일 에이전트(독립 트랙 MAIL-1~4): `docs/xion-mail-agent-design-final.md`. 스키마·Phase·통과 기준이 전부 그 문서에 있다.
 - 세부 설계는 각 기능 문서를 단일 기준으로 삼고, 이 파일에 상세 이력을 복제하지 않는다.
 

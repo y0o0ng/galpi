@@ -20,6 +20,19 @@
 그 증거를 과거 formation에서 실제로 쓸 수 있었는지는 5A-3이 REQUIRED 증거에서
 `usable_from_session`을 파생시켜 가른다 — **여기서 두 번째 look-ahead 규칙을 만들지
 않고, `usable_from_session`을 지어내지도 않는다.**
+
+**universe/bar 심볼은 SEC 경제적 심볼이 아니다.** 작업 항목은 둘을 끝까지 들고 다니고,
+**모든 SEC 발견·증명은 `identity_symbol`로 한다.**
+
+```text
+member_symbol    TFCFA        universe_membership에 저장된 시장 데이터 계열
+identity_symbol  FOXA         company_tickers · browse · 구간 이름 색인 ·
+                              표지 TradingSymbol 대조가 쓰는 실제 거래 심볼
+```
+
+`TFCFA`를 과거 거래소 티커인 것처럼 SEC에서 찾지 않는다. 반대로 identity 심볼 하나로
+모든 줄을 뭉개지도 않는다 — 같은 티커를 서로 다른 발행사가 겹치지 않는 기간에 쓸 수
+있고, 그 episode를 가르는 것이 데이터 계열 심볼이다.
 """
 
 from __future__ import annotations
@@ -76,7 +89,12 @@ PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE = "PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE"
 CIK_CONFLICT = "CIK_CONFLICT"
 SYMBOL_REUSE_CONFLICT = "SYMBOL_REUSE_CONFLICT"
 SUCCESSOR_JUDGEMENT_REQUIRED = "SUCCESSOR_JUDGEMENT_REQUIRED"
+REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE = "REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE"
 MECHANICALLY_COMPLETE_SEC_PROOF = "MECHANICALLY_COMPLETE_SEC_PROOF"
+
+# 옛 episode의 등록인을 실제로 가리킬 수 있는 발견 출처. 나머지는 전부 **지금** 그
+# 티커를 들고 있는 쪽을 가리킨다.
+HISTORICAL_ORIGINS = frozenset({HISTORICAL_NAME_LOOKUP, PREDECESSOR_HINT})
 
 # cover page에서 읽는 dei concept. 이름 유사도가 아니라 정확한 local name이다.
 SECURITY_12B_TITLE = "Security12bTitle"
@@ -87,6 +105,11 @@ ENTITY_COMMON_SHARES = "EntityCommonStockSharesOutstanding"
 # 5A-1 inventory payload가 만족해야 하는 계약.
 EXPECTED_STAGE = "5A-1"
 EXPECTED_MEASURES = "STATIC_MAPPING_COVERAGE_DEMAND"
+
+# 재사용 벤더 계열 다리의 고정 어휘. 5A-1이 준 값만 받는다.
+DIRECT = "DIRECT"
+REUSED_VENDOR_SERIES = "REUSED_VENDOR_SERIES"
+BRIDGE_KINDS = frozenset({DIRECT, REUSED_VENDOR_SERIES})
 
 
 class QVProposalError(Exception):
@@ -462,9 +485,15 @@ class ProseAliasProposal:
 
 @dataclass(frozen=True)
 class SymbolProposal:
-    """심볼 하나에 대한 제안 packet. **manifest 상태가 아니다.**"""
+    """작업 항목 하나에 대한 제안 packet. **manifest 상태가 아니다.**
 
-    symbol: str
+    `member_symbol`과 `identity_symbol`을 둘 다 남긴다 — 어느 시장 데이터 계열의 수요를
+    어느 경제적 심볼로 증명했는지가 packet만 보고도 되짚어져야 한다.
+    """
+
+    member_symbol: str
+    identity_symbol: str
+    symbol_bridge_kind: str
     demanded_formation_sessions: tuple[str, ...]
     discovery_candidates: tuple[DiscoveryCandidate, ...]
     selected_cik: str | None
@@ -481,7 +510,9 @@ class SymbolProposal:
 
     def as_json(self) -> dict:
         return {
-            "symbol": self.symbol,
+            "member_symbol": self.member_symbol,
+            "identity_symbol": self.identity_symbol,
+            "symbol_bridge_kind": self.symbol_bridge_kind,
             "demanded_formation_sessions": list(self.demanded_formation_sessions),
             "discovery_candidates": [item.as_json() for item in self.discovery_candidates],
             "selected_cik": self.selected_cik,
@@ -509,7 +540,45 @@ REQUIRED_PROVENANCE_FIELDS = (
     "calendar_source",
     "calendar_source_version",
     "identity_source_version",
+    # universe/market-data 심볼 provenance. **SEC identity bundle의 일부가 아니다.**
+    # 빠지면 어느 재사용 매핑을 거쳐 만든 수요인지 알 수 없으므로 fail-close다.
+    "reused_series_source",
+    "reused_series_source_version",
 )
+
+
+@dataclass(frozen=True)
+class WorkItem:
+    """5A-2 작업 단위 하나 — **데이터 계열 + 경제적 심볼 + 요구 formation.**
+
+    identity 심볼 하나로 모든 줄을 뭉개면 같은 티커의 서로 다른 발행사·기간이 하나의
+    `selected_cik`로 밀려 들어간다. 반대로 데이터 계열 심볼로 SEC를 찾으면 벤더 코드를
+    과거 거래소 티커로 착각한다. **둘 다 들고 다니고 SEC에는 `identity_symbol`만 쓴다.**
+    """
+
+    member_symbol: str
+    identity_symbol: str
+    symbol_bridge_kind: str
+    formation_sessions: tuple[str, ...]
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.member_symbol, self.identity_symbol)
+
+    @property
+    def label(self) -> str:
+        """사람이 읽는 이름. 다리를 거친 항목만 두 심볼을 함께 보인다."""
+        if self.symbol_bridge_kind == DIRECT:
+            return self.identity_symbol
+        return f"{self.member_symbol}->{self.identity_symbol}"
+
+    def as_json(self) -> dict:
+        return {
+            "member_symbol": self.member_symbol,
+            "identity_symbol": self.identity_symbol,
+            "symbol_bridge_kind": self.symbol_bridge_kind,
+            "demanded_formation_sessions": list(self.formation_sessions),
+        }
 
 
 @dataclass(frozen=True)
@@ -526,13 +595,44 @@ class DemandInput:
     calendar_source: str
     calendar_source_version: str
     identity_source_version: str
-    demand: dict[str, tuple[str, ...]]
+    reused_series_source: str
+    reused_series_source_version: str
+    demand: dict[tuple[str, str], WorkItem]
     inventory_path: str | None = None
 
+    @property
+    def work_items(self) -> tuple[WorkItem, ...]:
+        return tuple(self.demand[key] for key in sorted(self.demand))
+
     def select(self, symbols) -> "DemandInput":
-        """일부 심볼만 고른다. **provenance는 그대로 따라간다.**"""
-        wanted = [str(item).strip().upper() for item in symbols]
-        missing = [item for item in wanted if item not in self.demand]
+        """일부 작업 항목만 고른다. **provenance는 그대로 따라간다.**
+
+        토큰 하나는 `MEMBER/IDENTITY` 쌍이거나 심볼 하나다. 심볼 하나는 데이터 계열
+        심볼과 경제적 심볼 **양쪽**에 맞춰본다 — `FOXA`라고 적으면 옛 `TFCFA` episode와
+        새 `FOXA` episode가 둘 다 걸린다. 어느 것에도 안 걸리면 멈춘다.
+        """
+        picked: dict[tuple[str, str], WorkItem] = {}
+        missing: list[str] = []
+        for raw in symbols:
+            token = str(raw).strip().upper()
+            if not token:
+                continue
+            if "/" in token:
+                member, _, identity = token.partition("/")
+                found = [
+                    item for item in self.demand.values()
+                    if item.member_symbol == member and item.identity_symbol == identity
+                ]
+            else:
+                found = [
+                    item for item in self.demand.values()
+                    if token in (item.member_symbol, item.identity_symbol)
+                ]
+            if not found:
+                missing.append(token)
+                continue
+            for item in found:
+                picked[item.key] = item
         if missing:
             raise QVProposalError(
                 "5A-1 수요에 없는 심볼입니다: " + ", ".join(sorted(missing))
@@ -544,7 +644,9 @@ class DemandInput:
             calendar_source=self.calendar_source,
             calendar_source_version=self.calendar_source_version,
             identity_source_version=self.identity_source_version,
-            demand={symbol: self.demand[symbol] for symbol in wanted},
+            reused_series_source=self.reused_series_source,
+            reused_series_source_version=self.reused_series_source_version,
+            demand=picked,
             inventory_path=self.inventory_path,
         )
 
@@ -558,6 +660,8 @@ class DemandInput:
             "calendar_source": self.calendar_source,
             "calendar_source_version": self.calendar_source_version,
             "identity_source_version": self.identity_source_version,
+            "reused_series_source": self.reused_series_source,
+            "reused_series_source_version": self.reused_series_source_version,
             "inventory_path": self.inventory_path,
         }
 
@@ -591,23 +695,53 @@ def load_mapping_demand(payload: dict, *, inventory_path: str | None = None) -> 
     if not isinstance(rows, list):
         raise QVProposalError("securities 목록이 없습니다")
 
-    demand: dict[str, set[str]] = {}
+    # 작업 단위는 `(데이터 계열, 경제적 심볼)`이다. 경제적 심볼 하나로 뭉개지 않는다.
+    collected: dict[tuple[str, str], tuple[str, set[str]]] = {}
     for row in rows:
         if not isinstance(row, dict):
             raise QVProposalError("securities 항목이 객체가 아닙니다")
         if row.get("status") == "MAPPED":
             continue
-        symbol = str(row.get("symbol") or "").strip()
-        if not symbol:
-            raise QVProposalError("symbol이 비었습니다")
+        member = str(row.get("member_symbol") or "").strip().upper()
+        identity = str(row.get("identity_symbol") or "").strip().upper()
+        if not member or not identity:
+            raise QVProposalError(
+                "securities 행에 member_symbol/identity_symbol이 없습니다 — "
+                "이 구분이 생기기 전의 5A-1 산출물입니다. "
+                "벤더 계열 심볼을 SEC 심볼로 취급하지 않기 위해 멈춥니다"
+            )
+        kind = str(row.get("symbol_bridge_kind") or "").strip().upper()
+        if kind not in BRIDGE_KINDS:
+            raise QVProposalError(
+                f"{member}: 알 수 없는 symbol_bridge_kind입니다 — {kind!r}"
+            )
+        if kind == DIRECT and member != identity:
+            raise QVProposalError(
+                f"{member}: DIRECT인데 identity_symbol이 다릅니다 — {identity}"
+            )
         session = str(row.get("formation_session") or "").strip()
         if not session:
-            raise QVProposalError(f"{symbol}: formation_session이 비었습니다")
-        demand.setdefault(symbol, set()).add(session)
+            raise QVProposalError(f"{member}: formation_session이 비었습니다")
+        key = (member, identity)
+        existing = collected.get(key)
+        if existing is None:
+            collected[key] = (kind, {session})
+            continue
+        if existing[0] != kind:
+            raise QVProposalError(
+                f"{member}/{identity}: symbol_bridge_kind가 행마다 다릅니다"
+            )
+        existing[1].add(session)
 
     return DemandInput(
         demand={
-            symbol: tuple(sorted(sessions)) for symbol, sessions in sorted(demand.items())
+            key: WorkItem(
+                member_symbol=key[0],
+                identity_symbol=key[1],
+                symbol_bridge_kind=kind,
+                formation_sessions=tuple(sorted(sessions)),
+            )
+            for key, (kind, sessions) in sorted(collected.items())
         },
         inventory_path=inventory_path,
         **provenance,
@@ -765,23 +899,29 @@ def _class_packets(
 
 def build_symbol_proposal(
     *,
-    symbol: str,
-    formation_sessions: tuple[str, ...] | list[str],
+    work_item: WorkItem,
     candidates: tuple[DiscoveryCandidate, ...] | list[DiscoveryCandidate],
     proof: CoverPageProof | None = None,
     proof_absence_reason: str | None = None,
     intervals: dict[str, ClassInterval] | None = None,
     successor_judgement_required: bool = False,
 ) -> SymbolProposal:
-    """심볼 하나의 제안 packet을 만든다. **manifest를 읽지도 쓰지도 않는다.**
+    """작업 항목 하나의 제안 packet을 만든다. **manifest를 읽지도 쓰지도 않는다.**
+
+    표지 `TradingSymbol` 대조는 **`identity_symbol`로만** 한다 — 벤더 계열 코드는 SEC
+    표지에 실릴 수 없으므로 그것으로 대조하면 항상 `SYMBOL_NOT_ON_COVER_PAGE`가 된다.
 
     상태는 `AUTO_PROVABLE` · `REVIEW_REQUIRED` · `UNRESOLVED` 셋뿐이고,
     `AUTO_PROVABLE`은 "승인된 규칙 아래 SEC 증거가 기계적으로 완결됐다"는 뜻이지
     manifest가 바뀌었다는 뜻이 아니다.
     """
-    clean_symbol = str(symbol or "").strip()
+    clean_symbol = str(work_item.identity_symbol or "").strip()
     if not clean_symbol:
-        raise QVProposalError("symbol이 비었습니다")
+        raise QVProposalError("identity_symbol이 비었습니다")
+    if work_item.symbol_bridge_kind not in BRIDGE_KINDS:
+        raise QVProposalError(
+            f"알 수 없는 symbol_bridge_kind입니다: {work_item.symbol_bridge_kind!r}"
+        )
     ordered_candidates = tuple(
         sorted(candidates, key=lambda item: (item.cik, item.origin, item.detail))
     )
@@ -810,6 +950,22 @@ def build_symbol_proposal(
     if successor_judgement_required:
         reasons.append(SUCCESSOR_JUDGEMENT_REQUIRED)
         questions.append("발행사 승계·재편 판정이 필요합니다(기계로 정하지 않습니다)")
+        blocked = True
+
+    # **재사용 벤더 계열인데 현재 티커 계열 출처만 나왔다면 기계적 완결이 아니다.**
+    # 그 행이 다시 쓰인 이유가 "그 구간의 그 티커는 지금 주인의 것이 아니다"인데,
+    # 지금 주인의 표지로 증명이 완결되면 옛 economic identity에 새 발행사가 붙는다.
+    # 여기서 고르지 않고 5A-2c의 사람에게 넘긴다.
+    if (
+        work_item.symbol_bridge_kind == REUSED_VENDOR_SERIES
+        and ordered_candidates
+        and not any(item.origin in HISTORICAL_ORIGINS for item in ordered_candidates)
+    ):
+        reasons.append(REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE)
+        questions.append(
+            f"{work_item.member_symbol}는 {clean_symbol}의 옛 계열인데 발견 후보가 현재"
+            " 티커 계열 출처뿐입니다 — 그 구간의 등록인인지 사람이 판정해야 합니다"
+        )
         blocked = True
 
     census = CLASS_CENSUS_REVIEW_REQUIRED
@@ -900,8 +1056,10 @@ def build_symbol_proposal(
         reasons.append(MECHANICALLY_COMPLETE_SEC_PROOF)
 
     return SymbolProposal(
-        symbol=clean_symbol,
-        demanded_formation_sessions=tuple(sorted(set(formation_sessions))),
+        member_symbol=work_item.member_symbol,
+        identity_symbol=clean_symbol,
+        symbol_bridge_kind=work_item.symbol_bridge_kind,
+        demanded_formation_sessions=tuple(sorted(set(work_item.formation_sessions))),
         discovery_candidates=ordered_candidates,
         selected_cik=selected,
         proposal_status=status,
@@ -980,9 +1138,16 @@ def discover_candidates(
 class DiscoveryHints:
     """historical discovery의 **명시** 입력. 추측한 이름을 넣지 않는다.
 
-    `names`는 그 종목이 지수에 있던 동안의 회사 이름이고 `spans`는 멤버십 구간이다.
-    둘 다 명시 source/version을 달고 들어온다 — 지금 ticker 주인의 이름으로 과거를
-    추정하지 않는다.
+    두 칸의 키가 다르고, 그것이 이 fix의 핵심이다.
+
+    ```text
+    names  identity_symbol -> 그 구간의 회사 이름   (지수 변경 공고 CSV)
+    spans  member_symbol   -> 그 데이터 계열의 구간 (universe_membership)
+    ```
+
+    이름은 **경제적 심볼**로 찾는다 — 지수 공고는 `FOXA`라고 적지 `TFCFA`라고 적지
+    않는다. 구간은 **데이터 계열 심볼**로 찾는다 — 그것이 재사용 episode를 이미 갈라
+    놓았고, 경제적 심볼로 뭉치면 서로 다른 발행사의 구간이 하나의 min/max로 합쳐진다.
 
     **여기서 나온 후보는 끝까지 `DISCOVERY_HINT`다.** 어느 등록인의 filing을 볼지만
     고르고, issuer/share-class 증명을 만들거나 `AUTO_PROVABLE`을 만들지 못한다.
@@ -994,10 +1159,10 @@ class DiscoveryHints:
     names: dict[str, str]
     spans: dict[str, tuple[str, str]]
 
-    def entry(self, symbol: str) -> tuple[str, tuple[str, str]] | None:
-        """그 심볼의 (이름, 구간). 둘 다 있어야 쓴다."""
-        name = str(self.names.get(symbol) or "").strip()
-        span = self.spans.get(symbol)
+    def entry(self, work_item: WorkItem) -> tuple[str, tuple[str, str]] | None:
+        """그 작업 항목의 (이름, 구간). 둘 다 있어야 쓴다."""
+        name = str(self.names.get(work_item.identity_symbol) or "").strip()
+        span = self.spans.get(work_item.member_symbol)
         if not name or not span:
             return None
         start, end = str(span[0] or "").strip(), str(span[1] or "").strip()
@@ -1010,21 +1175,28 @@ class DiscoveryHints:
             "source": self.source,
             "source_version": self.source_version,
             "provenance": self.provenance,
-            "symbols_with_name_and_span": sorted(
-                symbol for symbol in self.names if self.entry(symbol) is not None
+            "name_key": "identity_symbol",
+            "span_key": "member_symbol",
+            "identity_symbols_with_name": sorted(
+                symbol for symbol, name in self.names.items() if str(name or "").strip()
+            ),
+            "member_symbols_with_span": sorted(
+                symbol for symbol, span in self.spans.items()
+                if span and str(span[0] or "").strip() and str(span[1] or "").strip()
             ),
         }
 
 
 def historical_name_candidate(
-    client, symbol: str, hints: DiscoveryHints, index
+    client, work_item: WorkItem, hints: DiscoveryHints, index
 ) -> DiscoveryCandidate | None:
     """3층. **그 구간의 회사 이름**으로 등록인을 찾는다.
 
+    이름은 경제적 심볼로, 구간은 그 작업 항목의 데이터 계열로 잡는다(`DiscoveryHints`).
     `edgar.resolve_by_name`을 그대로 쓴다 — 새 fuzzy resolver를 만들지 않는다. 그것이
     하나로 좁히지 못하면 아무것도 돌려주지 않는다(조용히 첫 후보를 고르지 않는다).
     """
-    found = hints.entry(symbol)
+    found = hints.entry(work_item)
     if found is None:
         return None
     name, span = found
@@ -1039,14 +1211,14 @@ def historical_name_candidate(
 
 
 def predecessor_candidate(
-    client, symbol: str, hints: DiscoveryHints, index, successor_cik: str
+    client, work_item: WorkItem, hints: DiscoveryHints, index, successor_cik: str
 ) -> DiscoveryCandidate | None:
     """구간 앞부분을 냈던 **선행 등록인**. `edgar.find_predecessor`를 그대로 쓴다.
 
     선행 등록인이 나오면 그 자체가 승계 판정이 필요하다는 신호다 — 기계가 둘 중
     하나를 고르지 않는다.
     """
-    found = hints.entry(symbol)
+    found = hints.entry(work_item)
     if found is None:
         return None
     name, span = found
@@ -1176,7 +1348,7 @@ class ProposalRun:
 
     demand_input: DemandInput
     proposals: tuple[SymbolProposal, ...]
-    attempted_accessions: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    attempted_accessions: tuple[tuple[str, str, tuple[str, ...]], ...] = ()
     hints: DiscoveryHints | None = None
 
     @property
@@ -1219,8 +1391,12 @@ class ProposalRun:
             "reason_counts": self.reason_counts(),
             "discovery_origin_counts": self.origin_counts(),
             "attempted_accessions": [
-                {"symbol": symbol, "accessions": list(accessions)}
-                for symbol, accessions in self.attempted_accessions
+                {
+                    "member_symbol": member,
+                    "identity_symbol": identity,
+                    "accessions": list(accessions),
+                }
+                for member, identity, accessions in self.attempted_accessions
             ],
             "proposals": [item.as_json() for item in self.proposals],
         }
@@ -1235,10 +1411,12 @@ def run_proposals(
     use_browse: bool = False,
     hints: DiscoveryHints | None = None,
     name_index=None,
-    intervals: dict[str, dict[str, ClassInterval]] | None = None,
+    intervals: dict[tuple[str, str], dict[str, ClassInterval]] | None = None,
     max_attempts: int = DEFAULT_MAX_PROOF_ATTEMPTS,
 ) -> ProposalRun:
-    """수요 심볼마다 발견 → SEC 증명 → 제안 packet을 만든다.
+    """수요 작업 항목마다 발견 → SEC 증명 → 제안 packet을 만든다.
+
+    `intervals`의 키는 작업 항목 키 `(member_symbol, identity_symbol)`이다.
 
     **manifest 파일을 읽지도 쓰지도 않는다.** 발견은 넓게 하되(현재 ticker map ·
     `CIK_OVERRIDES` · browse-EDGAR · 구간 이름 색인 · 선행 등록인) 그 결과는 전부
@@ -1247,11 +1425,13 @@ def run_proposals(
     `hints`가 있으면 이름 색인은 처음 필요할 때 한 번만 만든다(40MB 다운로드다).
     """
     proposals: list[SymbolProposal] = []
-    attempts: list[tuple[str, tuple[str, ...]]] = []
+    attempts: list[tuple[str, str, tuple[str, ...]]] = []
     index = name_index
 
-    for symbol in sorted(demand_input.demand):
-        sessions = tuple(sorted(demand_input.demand[symbol]))
+    for work_item in demand_input.work_items:
+        # **모든 SEC 발견·증명이 경제적 심볼로 간다.** 데이터 계열 심볼은 어느 episode의
+        # 수요인지를 가르는 데만 쓰이고 SEC에 던져지지 않는다.
+        symbol = work_item.identity_symbol
         extra: list[DiscoveryCandidate] = []
         if use_browse:
             found = browse_candidate(client, symbol)
@@ -1264,14 +1444,20 @@ def run_proposals(
             return found, sorted({item.cik for item in found})
 
         candidates, distinct = assemble()
-        wants_hint = hints is not None and hints.entry(symbol) is not None
+        wants_hint = hints is not None and hints.entry(work_item) is not None
 
         # 3층은 앞 층이 빈손일 때만 돈다 — `edgar.collect`와 같은 순서다. 항상 돌리면
         # 건강한 종목까지 동명 등록인과 부딪혀 전부 REVIEW_REQUIRED가 된다.
-        if wants_hint and not distinct:
+        #
+        # **재사용 벤더 계열은 예외다.** 그 멤버십 행이 다시 쓰인 이유가 바로 "그 구간의
+        # 그 티커는 지금 주인의 것이 아니다"이므로, 현재 ticker 파일의 답은 구조적으로
+        # 다른 경제적 사용에 대한 것이다. 여기서 1층에 멈추면 옛 episode가 조용히 지금
+        # 주인의 CIK를 받는다. 둘이 갈리면 `CIK_CONFLICT`로 사람에게 넘긴다 — 기계가
+        # 승계·재편을 고르지 않는다.
+        if wants_hint and (not distinct or work_item.symbol_bridge_kind == REUSED_VENDOR_SERIES):
             if index is None:
                 index = client.cik_lookup()
-            found = historical_name_candidate(client, symbol, hints, index)
+            found = historical_name_candidate(client, work_item, hints, index)
             if found is not None:
                 extra.append(found)
                 candidates, distinct = assemble()
@@ -1281,7 +1467,7 @@ def run_proposals(
         if wants_hint and len(distinct) == 1:
             if index is None:
                 index = client.cik_lookup()
-            earlier = predecessor_candidate(client, symbol, hints, index, distinct[0])
+            earlier = predecessor_candidate(client, work_item, hints, index, distinct[0])
             if earlier is not None:
                 extra.append(earlier)
                 candidates, distinct = assemble()
@@ -1296,15 +1482,14 @@ def run_proposals(
             )
         elif len(distinct) > 1:
             absence = "후보 CIK가 확정되지 않아 증명을 시도하지 않았습니다"
-        attempts.append((symbol, tried))
+        attempts.append((work_item.member_symbol, symbol, tried))
         proposals.append(
             build_symbol_proposal(
-                symbol=symbol,
-                formation_sessions=sessions,
+                work_item=work_item,
                 candidates=candidates,
                 proof=proof,
                 proof_absence_reason=absence,
-                intervals=(intervals or {}).get(symbol),
+                intervals=(intervals or {}).get(work_item.key),
                 successor_judgement_required=successor_judgement,
             )
         )

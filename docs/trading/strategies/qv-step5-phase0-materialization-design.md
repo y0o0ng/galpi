@@ -13,6 +13,84 @@
 
 ---
 
+## 0. universe/bar 심볼 != SEC 경제적 심볼
+
+**이것을 섞으면 5A 전체가 틀린 대상을 잰다.** 아래 두 절이 그 위에 서 있다.
+
+production 과거 유니버스는 재사용된 과거 티커 일부를 `universe_membership`에 넣기 전에
+**벤더 계열 코드**로 바꾼다.
+
+```text
+reconstruction -> apply_reused(...) -> universe_membership
+```
+
+```text
+ABI  -> ABI_OLD1     FOXA -> TFCFA      MON  -> MON_OLD
+FOX  -> TFCF         SNDK -> SNDK_OLD   SUN  -> SUN1       CC -> CCTYQ
+```
+
+오른쪽 값은 **시장 데이터 계열 locator**다. SEC 경제적 거래 심볼이 아니고 SEC 표지에
+실릴 수도 없다. manifest는 SEC 경제적 identity 정본이므로 그 코드를 **담지 않는다** —
+담게 하는 것이 해답이 아니다.
+
+그래서 5A는 두 값을 끝까지 구분해서 들고 다닌다.
+
+```text
+member_symbol / data_symbol   universe_membership에 저장된 심볼 = 시장 데이터 계열
+identity_symbol               SEC identity / manifest 조회에 쓰는 실제 거래 심볼
+```
+
+```text
+평범한 구성원 행       member_symbol == identity_symbol
+명시로 다시 쓰인 행    member_symbol = vendor_symbol,  identity_symbol = 원 심볼
+                       예: member TFCFA / identity FOXA
+```
+
+`symbol_bridge_kind`는 고정 어휘 둘뿐이다 — `DIRECT` · `REUSED_VENDOR_SERIES`.
+**신뢰도 점수를 만들지 않는다.**
+
+### 다리의 정본
+
+`trading/universe/reused-tickers.csv` **하나뿐이다**(`backtest/qv_symbol_bridge.py`).
+원 심볼을 이렇게 유도하지 않는다.
+
+```text
+접미사 떼기 · `_OLD` 관례 · 현재 ticker 조회 · 이름 매칭 · fuzzy 매칭 ·
+임의의 벤더 코드 해석
+```
+
+`SUN1` · `CCTYQ` · `TFCFA` · `MIICF`가 접미사 휴리스틱이 정본이 될 수 없다는 것을 그대로
+보여준다. **정확한 매핑 줄이 권한이다.**
+
+파일의 grain은 `(원 심볼, valid_from) → 벤더 계열`이다. QV의 역방향 해석은 멤버십 구간
+정체성을 그대로 뒤집는다.
+
+```text
+(vendor_symbol, valid_from) -> identity_symbol
+```
+
+**fail-close 조건**은 넷이다 — 역관계가 모호할 때(같은 `(계열, 구간)`이 두 원 심볼을
+가리킴) · 한 심볼이 원 심볼이면서 동시에 벤더 계열일 때 · 자기 자신을 가리킬 때 ·
+**벤더 계열로는 아는데 그 구간에 대한 명시 줄이 없을 때.** 마지막 것을 자기 자신으로
+되돌리면 벤더 코드가 SEC 심볼로 조용히 새어 나간다. 매핑에 벤더 계열로 아예 없는 심볼의
+identity 심볼은 자기 자신이다.
+
+### provenance — identity 증거가 아니다
+
+실행 산출물은 그 실행에 쓴 매핑의 **내용 해시**를 남긴다.
+
+```text
+reused_series_source            trading/universe/reused-tickers.csv
+reused_series_source_version    reused-tickers-sha256:<64 hex>
+```
+
+**이것은 SEC identity bundle의 일부가 아니다.** universe/market-data 심볼 provenance일
+뿐이고, 산출물의 `symbol_bridge` 블록이 그 문장을 직접 들고 다닌다. 5A-2는 이 두 칸이
+비면 fail-close다 — 어느 재사용 매핑을 거쳐 만든 수요인지 모르면 제안의 대상이 무엇인지
+모른다.
+
+---
+
 ## 1. 실행 단계
 
 ```text
@@ -63,7 +141,23 @@ formation_session(t) = 그 해 6월의 마지막 정규 SPY 세션
 membership           = [valid_from, valid_to) 반개구간
                        index_name · universe source/version을 명시로 받는다
 identity             = qv_manifest.load_manifest()가 돌려준 bundle 하나
+symbol bridge        = reused-tickers.csv 하나 (§0)
 ```
+
+**`universe_membership` 스키마를 바꾸지 않는다.** 저장된 심볼을 그대로 읽되
+`valid_from`·`valid_to`를 함께 들고 와서 `(member_symbol, valid_from)`으로 경제적 심볼을
+푼다 — 구간 정체성이 다리의 grain이라 심볼만 `DISTINCT`로 뽑으면 그것을 물어볼 수 없다.
+**manifest 조회는 푼 뒤의 `identity_symbol`로만 한다.**
+
+security 행의 모양은 이렇다.
+
+```text
+formation_session · member_symbol · identity_symbol · symbol_bridge_kind
+                  · status · class_id · issuer_id · reason
+```
+
+issuer 묶음은 추적을 위해 `member_symbols`와 `identity_symbols`를 둘 다 남기되,
+**identity 판정 자체는 경제적 심볼로 이미 끝나 있다.**
 
 요청된 `identity_source_version`은 읽은 bundle 해시와 **정확히** 같아야 한다.
 다르면 fail-close다 — 조용히 다른/현재/최신 manifest를 재지 않는다.
@@ -105,16 +199,28 @@ CONTRADICTORY_MANIFEST_STATE    구간이 겹치거나 한 class가 두 issuer�
 security 행은 그대로 두고 issuer 단위 묶음을 따로 만든다. 그것이 나중에 Gate G를
 증명할 입력이고, 여기서 **순위를 매기거나 execution security를 고르지 않는다.**
 
-5A-2의 작업량은 inventory가 직접 준다.
+5A-2의 작업량은 inventory가 직접 준다. **작업 단위는 경제적 심볼 하나가 아니다.**
 
 ```text
-mapping demand = MAPPED가 아닌 고유 심볼
+mapping demand work item = MAPPED가 아닌 고유 (member_symbol, identity_symbol)
 ```
+
+같은 티커를 서로 다른 발행사가 겹치지 않는 기간에 쓸 수 있고, 그 episode를 가르는 것이
+데이터 계열 심볼이다. **경제적 심볼 하나로 뭉개면 옛 발행사와 새 발행사가 하나의
+`selected_cik`로 밀려 들어간다.**
+
+```text
+member TFCFA / identity FOXA   2008~2018 formations   옛 발행사 · 옛 계열
+member FOXA  / identity FOXA   2019~2026 formations   새 발행사 · 새 계열
+```
+
+고유 경제적 심볼 수도 함께 적는다 — 둘은 다른 숫자이고 둘 다 사실이다.
 
 **`MAPPED`가 PIT 안전을 뜻하지 않는다.** 5A-3이 REQUIRED 증거를 materialize하면
 그중 일부는 `usable_from_session` 때문에 그 formation에서 여전히 쓸 수 없을 수 있다.
 
-구현은 `trading/backtest/qv_identity_inventory.py` 하나이고 실행 진입점은
+구현은 `trading/backtest/qv_identity_inventory.py`와 다리 하나
+(`trading/backtest/qv_symbol_bridge.py`)이고 실행 진입점은
 `trading/selftest/qv_identity_inventory_run.py`다. 범용 research-run 프레임워크를
 만들지 않았고 스키마도 바꾸지 않았다.
 
@@ -157,21 +263,45 @@ PRODUCTION_MANIFEST  사람이 승격시킨 것.       trading/qv/identity/*.jso
 
 #### 5A-2a — 제안 후보 발견
 
-5A-1의 static 매핑 수요(심볼 → 요구 formation 세션)를 받아 심볼마다 후보 CIK를 모은다.
-후보가 0개면 `UNRESOLVED`, 둘 이상이면 `CIK_CONFLICT`로 **증명을 시도하지 않는다** —
-어느 등록인의 표지를 읽어야 하는지가 정해지지 않은 상태에서 읽으면 그 선택 자체가
-근거 없는 판정이 된다.
+5A-1의 static 매핑 수요(작업 항목 → 요구 formation 세션)를 받아 항목마다 후보 CIK를
+모은다. 후보가 0개면 `UNRESOLVED`, 둘 이상이면 `CIK_CONFLICT`로 **증명을 시도하지
+않는다** — 어느 등록인의 표지를 읽어야 하는지가 정해지지 않은 상태에서 읽으면 그 선택
+자체가 근거 없는 판정이 된다.
+
+> **모든 SEC 발견·증명은 `identity_symbol`로 한다.** `company_tickers.json` · browse ·
+> 구간 이름 색인 · 표지 `TradingSymbol` 대조 전부 그렇다. `TFCFA`를 과거 거래소
+> 티커인 것처럼 SEC에서 **절대 찾지 않는다** — 벤더 코드는 SEC 표지에 실릴 수 없으므로
+> 그것으로 대조하면 언제나 `SYMBOL_NOT_ON_COVER_PAGE`다. `member_symbol`은 어느
+> episode의 수요인지를 가르는 데만 쓰이고 SEC에 던져지지 않는다.
 
 **층 순서는 `edgar.collect`와 같다.** 3층(구간 이름 색인)은 앞 층이 빈손일 때만 돌고,
 선행 등록인은 후속이 하나로 정해졌고 **그 후속의 제출이 멤버십 구간 앞부분을 덮지
 못할 때만** 찾는다. 항상 돌리면 건강한 종목까지 동명 등록인과 부딪혀 전부
 `REVIEW_REQUIRED`가 되고, 그러면 1층이 무의미해진다.
 
-historical 입력은 **이미 있는 명시 source**를 쓴다 — 이름은 EDGAR 수집 경로가 쓰는
-`trading/universe/<index>-changes.csv`의 `security` 칸이고, 멤버십 구간은 5A-1이 명시한
-`index_name`/`universe_source`/`universe_source_version`으로 `universe_membership`에서
-읽는다. **지금 ticker 주인의 이름으로 과거를 추정하지 않는다.** 새 회사 이름 source를
-만들지 않고 새 fuzzy resolver도 만들지 않는다.
+**`REUSED_VENDOR_SERIES` 항목만 예외다.** 그 행이 벤더 계열로 다시 쓰인 이유가 바로
+"그 구간의 그 티커는 지금 주인의 것이 아니다"이므로, 현재 ticker 파일의 답은 구조적으로
+**다른 경제적 사용**에 대한 것이다. 1층에 멈추면 옛 episode가 조용히 지금 주인의 CIK를
+받는다. 그래서 3층을 함께 돌리고 둘이 갈리면 `CIK_CONFLICT`로 사람에게 넘긴다.
+
+그래도 발견이 현재 티커 계열 출처(`CURRENT_TICKER_FILE` · `BROWSE_EDGAR` ·
+`EXISTING_CIK_OVERRIDE`)뿐이면 `REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE`가 붙어
+**기계적 완결이 되지 못한다.** 구간 증거가 다 들어와도 마찬가지다 — 지금 주인의 표지로
+옛 economic identity를 완결시키면 그것이 정확히 이 fix가 막는 사고다. `DIRECT` 항목의
+판정은 그대로이고 회귀가 아니다.
+
+historical 입력은 **이미 있는 명시 source**를 쓰되 **두 칸의 키가 다르다.**
+
+```text
+names  identity_symbol -> 그 구간의 회사 이름   trading/universe/<index>-changes.csv
+spans  member_symbol   -> 그 데이터 계열의 구간 universe_membership (5A-1 명시 source)
+```
+
+이름을 경제적 심볼로 찾는 이유는 지수 공고가 `FOXA`라고 적지 `TFCFA`라고 적지 않기
+때문이고, 구간을 데이터 계열 심볼로 찾는 이유는 그것이 재사용 episode를 이미 갈라
+놓았기 때문이다. **경제적 심볼로 구간을 묶으면 서로 다른 발행사의 구간이 하나의
+`MIN(valid_from)`/`MAX(valid_to)`로 합쳐진다.** 지금 ticker 주인의 이름으로 과거를
+추정하지 않고, 새 회사 이름 source도 새 fuzzy resolver도 만들지 않는다.
 
 선행 등록인이 나오면 그것은 그대로 `SUCCESSOR_JUDGEMENT_REQUIRED`다 — 과거와 현재
 등록인 중 어느 쪽이 그 자리의 회사였는지는 기계가 고르지 않는다.
@@ -220,6 +350,9 @@ REVIEW_REQUIRED   증거가 있으나 사람의 판정이 필요하다
 UNRESOLVED        증명을 시작할 후보조차 없다
 ```
 
+**이 셋뿐이다.** 이번 fix가 사유 코드
+`REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE` 하나를 더했을 뿐 상태 어휘는 그대로다.
+
 #### 입력 provenance — fail-close
 
 5A-2는 5A-1 산출물의 **semantic source 정체성을 전부** 받아 그대로 들고 다닌다.
@@ -229,7 +362,12 @@ stage == "5A-1"       measures == "STATIC_MAPPING_COVERAGE_DEMAND"
 index_name            universe_source / universe_source_version
 calendar_source       calendar_source_version
 identity_source_version
+reused_series_source  reused_series_source_version        (§0 — identity 증거가 아니다)
 ```
+
+securities 행도 `member_symbol` · `identity_symbol` · `symbol_bridge_kind`를 다 들고
+있어야 한다. `symbol` 하나만 들고 있던 이 구분 이전의 5A-1 산출물은 **받지 않는다** —
+그것을 조용히 받으면 벤더 코드가 SEC 심볼로 새어 나간다.
 
 하나라도 비면 멈춘다. **버전을 추측하지 않고, 빠진 값을 지금 DB에서 캐다 채우지도
 않는다** — 그러면 어느 유니버스를 상대로 만든 제안인지 알 수 없게 된다. inventory 파일

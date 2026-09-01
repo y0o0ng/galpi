@@ -35,6 +35,7 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE,
     REGISTERED_NOT_PROVED_COMMON,
     REGISTRANT_CIK_MISMATCH,
+    REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE,
     REVIEW_REQUIRED,
     SIBLING_CLASS_CENSUS_UNCLEAR,
     SUCCESSOR_JUDGEMENT_REQUIRED,
@@ -43,12 +44,15 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     UNRESOLVED,
     HISTORICAL_NAME_LOOKUP,
     PREDECESSOR_HINT,
+    DIRECT,
+    REUSED_VENDOR_SERIES,
     ClassInterval,
     DemandInput,
     DiscoveryCandidate,
     DiscoveryHints,
     EvidenceRef,
     QVProposalError,
+    WorkItem,
     build_symbol_proposal,
     class_role,
     discover_candidates,
@@ -315,12 +319,18 @@ TICKER_CANDIDATE = (
 )
 
 
+def work(identity, sessions, *, member=None):
+    """작업 항목 하나. `member`를 주면 재사용 벤더 계열 항목이 된다."""
+    if member is None or member == identity:
+        return WorkItem(identity, identity, DIRECT, tuple(sessions))
+    return WorkItem(member, identity, REUSED_VENDOR_SERIES, tuple(sessions))
+
+
 class AdjudicationTest(unittest.TestCase):
     def test_auto_provable_needs_explicit_intervals(self):
         proof = proof_from(dual_class_facts(), cik="0000000001")
         without = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
         )
@@ -328,8 +338,7 @@ class AdjudicationTest(unittest.TestCase):
         self.assertIn(CLASS_INTERVAL_NOT_EXPLICIT, without.reason_codes)
 
         with_intervals = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -341,8 +350,7 @@ class AdjudicationTest(unittest.TestCase):
     def test_auto_provable_packet_carries_evidence_on_every_relation(self):
         proof = proof_from(dual_class_facts(), cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -369,8 +377,7 @@ class AdjudicationTest(unittest.TestCase):
         run = run_proposals.__module__
         self.assertTrue(run.endswith("qv_identity_proposals"))
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -381,7 +388,7 @@ class AdjudicationTest(unittest.TestCase):
 
     def test_no_candidate_is_unresolved(self):
         packet = build_symbol_proposal(
-            symbol="GONE", formation_sessions=("2009-06-26",), candidates=()
+            work_item=work("GONE", ("2009-06-26",)), candidates=()
         )
         self.assertEqual(packet.proposal_status, UNRESOLVED)
         self.assertIn(NO_DISCOVERY_CANDIDATE, packet.reason_codes)
@@ -389,8 +396,7 @@ class AdjudicationTest(unittest.TestCase):
 
     def test_discovery_without_sec_proof_is_review_required(self):
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2009-06-26",),
+            work_item=work("AAA", ("2009-06-26",)),
             candidates=TICKER_CANDIDATE,
             proof_absence_reason=NO_COVER_FACTS,
         )
@@ -403,8 +409,7 @@ class AdjudicationTest(unittest.TestCase):
     def test_multiple_ciks_block_even_with_proof(self):
         proof = proof_from(dual_class_facts(), cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE
             + (DiscoveryCandidate(cik="0000000002", origin=EXISTING_CIK_OVERRIDE, detail="pin"),),
             proof=proof,
@@ -418,8 +423,7 @@ class AdjudicationTest(unittest.TestCase):
     def test_proof_cik_outside_candidates_is_a_mismatch(self):
         proof = proof_from(dual_class_facts(), cik="0000000007")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -431,8 +435,7 @@ class AdjudicationTest(unittest.TestCase):
     def test_symbol_absent_from_cover_blocks(self):
         proof = proof_from(dual_class_facts(), cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="BBB",
-            formation_sessions=("2024-06-28",),
+            work_item=work("BBB", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -451,8 +454,7 @@ class AdjudicationTest(unittest.TestCase):
         ]
         proof = proof_from(facts, cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -468,8 +470,7 @@ class AdjudicationTest(unittest.TestCase):
         ]
         proof = proof_from(facts, cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -491,8 +492,7 @@ class AdjudicationTest(unittest.TestCase):
         ]
         proof = proof_from(facts, cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -511,8 +511,7 @@ class AdjudicationTest(unittest.TestCase):
         ]
         proof = proof_from(facts, cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -523,8 +522,7 @@ class AdjudicationTest(unittest.TestCase):
     def test_successor_judgement_is_never_machine_decided(self):
         proof = proof_from(dual_class_facts(), cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -541,8 +539,7 @@ class AdjudicationTest(unittest.TestCase):
         ]
         proof = proof_from(facts, cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2019-06-28",),
+            work_item=work("AAA", ("2019-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -559,8 +556,7 @@ class AdjudicationTest(unittest.TestCase):
         ]
         proof = proof_from(facts, cik="0000000001")
         packet = build_symbol_proposal(
-            symbol="AAA",
-            formation_sessions=("2024-06-28",),
+            work_item=work("AAA", ("2024-06-28",)),
             candidates=TICKER_CANDIDATE,
             proof=proof,
             intervals=full_intervals(proof),
@@ -575,8 +571,7 @@ class AdjudicationTest(unittest.TestCase):
     def test_unknown_discovery_origin_is_rejected(self):
         with self.assertRaises(QVProposalError):
             build_symbol_proposal(
-                symbol="AAA",
-                formation_sessions=("2024-06-28",),
+                work_item=work("AAA", ("2024-06-28",)),
                 candidates=(DiscoveryCandidate(cik="0000000001", origin="GUESS"),),
             )
 
@@ -584,20 +579,30 @@ class AdjudicationTest(unittest.TestCase):
         proof = proof_from(dual_class_facts(), cik="0000000001")
         seen = {
             build_symbol_proposal(
-                symbol="AAA", formation_sessions=(), candidates=TICKER_CANDIDATE,
+                work_item=work("AAA", ()), candidates=TICKER_CANDIDATE,
                 proof=proof, intervals=full_intervals(proof),
             ).proposal_status,
             build_symbol_proposal(
-                symbol="AAA", formation_sessions=(), candidates=TICKER_CANDIDATE,
+                work_item=work("AAA", ()), candidates=TICKER_CANDIDATE,
             ).proposal_status,
             build_symbol_proposal(
-                symbol="AAA", formation_sessions=(), candidates=(),
+                work_item=work("AAA", ()), candidates=(),
             ).proposal_status,
         }
         self.assertEqual(seen, {AUTO_PROVABLE, REVIEW_REQUIRED, UNRESOLVED})
 
 
 class DemandTest(unittest.TestCase):
+    def row(self, identity, session, *, member=None, status="UNMAPPED"):
+        member = member or identity
+        return {
+            "member_symbol": member,
+            "identity_symbol": identity,
+            "symbol_bridge_kind": DIRECT if member == identity else REUSED_VENDOR_SERIES,
+            "formation_session": session,
+            "status": status,
+        }
+
     def payload(self, **overrides):
         base = {
             "stage": "5A-1",
@@ -608,12 +613,14 @@ class DemandTest(unittest.TestCase):
             "calendar_source": "eodhd",
             "calendar_source_version": "eodhd-15y-2026-08",
             "identity_source_version": "qv-identity-sha256:abc",
+            "reused_series_source": "trading/universe/reused-tickers.csv",
+            "reused_series_source_version": "reused-tickers-sha256:abc",
             "securities": [
-                {"symbol": "AAA", "formation_session": "2024-06-28", "status": "UNMAPPED"},
-                {"symbol": "AAA", "formation_session": "2023-06-30", "status": "UNMAPPED"},
-                {"symbol": "BBB", "formation_session": "2024-06-28", "status": "MAPPED"},
-                {"symbol": "CCC", "formation_session": "2024-06-28",
-                 "status": "AMBIGUOUS_MAPPING"},
+                self.row("AAA", "2024-06-28"),
+                self.row("AAA", "2023-06-30"),
+                self.row("BBB", "2024-06-28", status="MAPPED"),
+                self.row("CCC", "2024-06-28", status="AMBIGUOUS_MAPPING"),
+                self.row("FOXA", "2010-06-30", member="TFCFA"),
             ],
         }
         base.update(overrides)
@@ -621,8 +628,43 @@ class DemandTest(unittest.TestCase):
 
     def test_only_unmapped_and_ambiguous_rows_are_demand(self):
         loaded = load_mapping_demand(self.payload())
-        self.assertEqual(sorted(loaded.demand), ["AAA", "CCC"])
-        self.assertEqual(loaded.demand["AAA"], ("2023-06-30", "2024-06-28"))
+        self.assertEqual(
+            [item.key for item in loaded.work_items],
+            [("AAA", "AAA"), ("CCC", "CCC"), ("TFCFA", "FOXA")],
+        )
+        self.assertEqual(
+            loaded.demand[("AAA", "AAA")].formation_sessions,
+            ("2023-06-30", "2024-06-28"),
+        )
+
+    def test_the_work_item_keeps_both_symbols(self):
+        loaded = load_mapping_demand(self.payload())
+        item = loaded.demand[("TFCFA", "FOXA")]
+        self.assertEqual(item.member_symbol, "TFCFA")
+        self.assertEqual(item.identity_symbol, "FOXA")
+        self.assertEqual(item.symbol_bridge_kind, REUSED_VENDOR_SERIES)
+
+    def test_a_pre_fix_payload_without_the_distinction_fails_closed(self):
+        """`symbol` 하나만 들고 있던 5A-1 산출물은 더 이상 받지 않는다."""
+        broken = self.payload(securities=[
+            {"symbol": "AAA", "formation_session": "2024-06-28", "status": "UNMAPPED"},
+        ])
+        with self.assertRaises(QVProposalError) as caught:
+            load_mapping_demand(broken)
+        self.assertIn("member_symbol", str(caught.exception))
+
+    def test_an_unknown_or_inconsistent_bridge_kind_fails_closed(self):
+        unknown = self.payload(securities=[
+            dict(self.row("AAA", "2024-06-28"), symbol_bridge_kind="GUESS"),
+        ])
+        with self.assertRaises(QVProposalError):
+            load_mapping_demand(unknown)
+        lying = self.payload(securities=[
+            dict(self.row("FOXA", "2010-06-30", member="TFCFA"),
+                 symbol_bridge_kind=DIRECT),
+        ])
+        with self.assertRaises(QVProposalError):
+            load_mapping_demand(lying)
 
     def test_non_5a1_payload_fails_closed(self):
         with self.assertRaises(QVProposalError):
@@ -639,6 +681,8 @@ class DemandTest(unittest.TestCase):
             "calendar_source",
             "calendar_source_version",
             "identity_source_version",
+            "reused_series_source",
+            "reused_series_source_version",
         ):
             for empty in (None, "", "   "):
                 with self.subTest(field=field_name, empty=repr(empty)):
@@ -663,6 +707,8 @@ class DemandTest(unittest.TestCase):
                 "calendar_source": "eodhd",
                 "calendar_source_version": "eodhd-15y-2026-08",
                 "identity_source_version": "qv-identity-sha256:abc",
+                "reused_series_source": "trading/universe/reused-tickers.csv",
+                "reused_series_source_version": "reused-tickers-sha256:abc",
                 "inventory_path": "runs/x/inventory.json",
             },
         )
@@ -670,13 +716,27 @@ class DemandTest(unittest.TestCase):
     def test_selecting_symbols_preserves_provenance(self):
         loaded = load_mapping_demand(self.payload(), inventory_path="runs/x/inventory.json")
         picked = loaded.select(["AAA"])
-        self.assertEqual(sorted(picked.demand), ["AAA"])
+        self.assertEqual([item.key for item in picked.work_items], [("AAA", "AAA")])
         self.assertEqual(picked.provenance_json(), loaded.provenance_json())
         with self.assertRaises(QVProposalError):
             loaded.select(["NOPE"])
 
+    def test_selection_reaches_a_work_item_by_either_symbol(self):
+        loaded = load_mapping_demand(self.payload())
+        for token in ("TFCFA", "FOXA", "TFCFA/FOXA"):
+            with self.subTest(token=token):
+                self.assertEqual(
+                    [item.key for item in loaded.select([token]).work_items],
+                    [("TFCFA", "FOXA")],
+                )
 
-def demand_for(symbols: dict) -> DemandInput:
+
+def demand_for(symbols: dict, *, members: dict | None = None) -> DemandInput:
+    """`{경제적 심볼: 세션들}`. `members`로 그 심볼의 데이터 계열을 따로 준다."""
+    items = [
+        work(identity, sessions, member=(members or {}).get(identity))
+        for identity, sessions in symbols.items()
+    ]
     return DemandInput(
         index_name="SP500",
         universe_source="announcements",
@@ -684,7 +744,24 @@ def demand_for(symbols: dict) -> DemandInput:
         calendar_source="eodhd",
         calendar_source_version="eodhd-15y-2026-08",
         identity_source_version="qv-identity-sha256:abc",
-        demand=symbols,
+        reused_series_source="trading/universe/reused-tickers.csv",
+        reused_series_source_version="reused-tickers-sha256:abc",
+        demand={item.key: item for item in items},
+        inventory_path="runs/x/inventory.json",
+    )
+
+
+def demand_from_items(*items: WorkItem) -> DemandInput:
+    return DemandInput(
+        index_name="SP500",
+        universe_source="announcements",
+        universe_source_version="eodhd-15y-2026-08",
+        calendar_source="eodhd",
+        calendar_source_version="eodhd-15y-2026-08",
+        identity_source_version="qv-identity-sha256:abc",
+        reused_series_source="trading/universe/reused-tickers.csv",
+        reused_series_source_version="reused-tickers-sha256:abc",
+        demand={item.key: item for item in items},
         inventory_path="runs/x/inventory.json",
     )
 
@@ -1037,7 +1114,7 @@ class HistoricalDiscoveryTest(unittest.TestCase):
             names={"OLDCO": "Oldco Industries"},
             spans={},
         )
-        self.assertIsNone(partial.entry("OLDCO"))
+        self.assertIsNone(partial.entry(work("OLDCO", ("2010-06-30",))))
         client = self.oldco_client()
         run = run_proposals(
             client,
@@ -1048,6 +1125,351 @@ class HistoricalDiscoveryTest(unittest.TestCase):
         )
         self.assertEqual(run.proposals[0].proposal_status, UNRESOLVED)
         self.assertEqual(client.cik_lookup_calls, 0)
+
+
+class ReusedVendorSeriesTest(unittest.TestCase):
+    """universe/bar 심볼 != SEC 경제적 심볼.
+
+    `member_symbol=TFCFA` · `identity_symbol=FOXA` 작업 항목의 SEC 발견·증명은 전부
+    `FOXA`로 간다. `TFCFA`를 과거 거래소 티커인 것처럼 SEC에서 찾지 않는다.
+    """
+
+    FOXA_ITEM = WorkItem("TFCFA", "FOXA", REUSED_VENDOR_SERIES, ("2010-06-30",))
+
+    def fox_facts(self):
+        return [
+            {"concept": "Security12bTitle", "value": "Class A Common Stock",
+             "member": "CommonClassAMember", "context_id": "a"},
+            {"concept": "TradingSymbol", "value": "FOXA",
+             "member": "CommonClassAMember", "context_id": "a"},
+            {"concept": "EntityCommonStockSharesOutstanding", "value": "1000",
+             "member": "CommonClassAMember", "context_id": "a", "numeric": True},
+        ]
+
+    def fox_client(self):
+        return StubClient(
+            rows_by_cik={
+                "0000000021": [StubRow("0000000021-19-000001", "10-K", "2019-02-20")]
+            },
+            files_by_accession={
+                "0000000021-19-000001": {
+                    "cover.xml": cover_instance(self.fox_facts(), default_cik="0000000021")
+                }
+            },
+            browse={"FOXA": "0000000021"},
+        )
+
+    def test_sec_discovery_queries_the_identity_symbol_never_the_vendor_series(self):
+        client = self.fox_client()
+        run = run_proposals(
+            client,
+            demand_from_items(self.FOXA_ITEM),
+            companies={"FOXA": StubCompany("0000000021", "Twenty-First Century Fox")},
+            overrides={},
+            use_browse=True,
+        )
+        packet = run.proposals[0]
+        self.assertEqual(packet.member_symbol, "TFCFA")
+        self.assertEqual(packet.identity_symbol, "FOXA")
+        self.assertEqual(packet.symbol_bridge_kind, REUSED_VENDOR_SERIES)
+        self.assertEqual(packet.selected_cik, "0000000021")
+        # 표지 대조가 경제적 심볼로 붙었다 — 벤더 코드였다면 SYMBOL_NOT_ON_COVER_PAGE다.
+        self.assertNotIn(SYMBOL_NOT_ON_COVER_PAGE, packet.reason_codes)
+        # 다만 발견이 현재 티커 계열뿐이라 기계적 완결은 아니다.
+        self.assertIn(
+            REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE, packet.reason_codes
+        )
+        self.assertEqual(
+            [item.symbol for item in packet.share_class_proposals], ["FOXA"]
+        )
+        # SEC를 향한 어떤 칸에도 벤더 코드가 들어가지 않는다. 사람이 읽는 질문에는
+        # 남아도 되고, 남아야 검토자가 어느 계열의 수요인지 안다.
+        payload = packet.as_json()
+        self.assertEqual(payload["member_symbol"], "TFCFA")
+        sec_facing = json.dumps(
+            {
+                "discovery_candidates": payload["discovery_candidates"],
+                "proof": payload["proof"],
+                "issuer_proposal": payload["issuer_proposal"],
+                "share_class_proposals": payload["share_class_proposals"],
+                "xbrl_alias_proposals": payload["xbrl_alias_proposals"],
+                "prose_alias_proposals": payload["prose_alias_proposals"],
+            },
+            ensure_ascii=False,
+        )
+        self.assertNotIn("TFCFA", sec_facing)
+
+    def test_the_vendor_series_is_never_a_discovery_key(self):
+        """`TFCFA`가 ticker map · override · browse 어디에도 던져지지 않는다."""
+        seen: list[str] = []
+
+        class WatchingClient(StubClient):
+            def text(self, url):
+                seen.append(url)
+                return super().text(url)
+
+        client = WatchingClient(
+            rows_by_cik={},
+            files_by_accession={},
+            browse={"FOXA": "0000000021"},
+        )
+        run_proposals(
+            client,
+            demand_from_items(self.FOXA_ITEM),
+            companies={"TFCFA": StubCompany("0000000099", "Wrong Series Inc.")},
+            overrides={"TFCFA": "0000000098"},
+            use_browse=True,
+        )
+        self.assertTrue(seen)
+        for url in seen:
+            self.assertNotIn("TFCFA", url)
+
+    def test_a_vendor_series_lookalike_in_the_ticker_map_is_not_reachable(self):
+        """벤더 코드가 우연히 현재 ticker 파일에 있어도 그것으로 풀리지 않는다."""
+        client = self.fox_client()
+        run = run_proposals(
+            client,
+            demand_from_items(self.FOXA_ITEM),
+            companies={"TFCFA": StubCompany("0000000099", "Unrelated Inc.")},
+            overrides={},
+        )
+        packet = run.proposals[0]
+        self.assertEqual(packet.proposal_status, UNRESOLVED)
+        self.assertIn(NO_DISCOVERY_CANDIDATE, packet.reason_codes)
+        self.assertEqual(packet.discovery_candidates, ())
+
+    def test_historical_name_lookup_keys_from_the_economic_symbol(self):
+        """이름은 지수 공고의 `FOXA`로 찾고 구간은 데이터 계열 `TFCFA`로 찾는다."""
+        cover = cover_instance(self.fox_facts(), default_cik="0000000021")
+        client = historical_client(
+            rows_by_cik={
+                "0000000021": eight_k_rows("0000000021-10", ["2009-03-01"])
+                + [StubRow("0000000021-19-000001", "10-K", "2019-02-20")]
+            },
+            files_by_accession={"0000000021-19-000001": {"cover.xml": cover}},
+            submissions_extra={
+                "0000000021": {"name": "21ST CENTURY FOX", "sic": "4841"}
+            },
+            earnings={"0000000021": ["2009-03-01"]},
+            index=FakeNameIndex({"21st Century Fox": ["0000000021"]}),
+        )
+        hints = DiscoveryHints(
+            source="announcements",
+            source_version="eodhd-15y-2026-08",
+            provenance="이름(identity_symbol 키) / 구간(member_symbol 키)",
+            names={"FOXA": "21st Century Fox"},
+            spans={"TFCFA": ("2008-01-02", "2019-03-20")},
+        )
+        # 두 칸의 키가 실제로 다르다.
+        self.assertIsNotNone(hints.entry(self.FOXA_ITEM))
+        self.assertEqual(hints.entry(self.FOXA_ITEM)[1], ("2008-01-02", "2019-03-20"))
+
+        run = run_proposals(
+            client, demand_from_items(self.FOXA_ITEM),
+            companies={}, overrides={}, hints=hints,
+        )
+        packet = run.proposals[0]
+        self.assertEqual(
+            [item.origin for item in packet.discovery_candidates],
+            [HISTORICAL_NAME_LOOKUP],
+        )
+        self.assertEqual(packet.selected_cik, "0000000021")
+
+    def test_a_name_keyed_by_the_vendor_series_is_not_reachable(self):
+        hints = DiscoveryHints(
+            source="announcements", source_version="v1", provenance="p",
+            names={"TFCFA": "Twenty-First Century Fox"},
+            spans={"TFCFA": ("2008-01-02", "2019-03-20")},
+        )
+        self.assertIsNone(hints.entry(self.FOXA_ITEM))
+
+    def test_a_span_keyed_by_the_economic_symbol_is_not_reachable(self):
+        hints = DiscoveryHints(
+            source="announcements", source_version="v1", provenance="p",
+            names={"FOXA": "21st Century Fox"},
+            spans={"FOXA": ("2019-03-20", "2026-06-30")},
+        )
+        self.assertIsNone(hints.entry(self.FOXA_ITEM))
+
+    def test_two_reuse_episodes_do_not_collapse_into_one_work_item(self):
+        """옛 FOXA(TFCFA 계열)와 새 FOXA는 서로 다른 발행사·서로 다른 packet이다."""
+        old_cover = cover_instance(self.fox_facts(), default_cik="0000000021")
+        new_cover = cover_instance(self.fox_facts(), default_cik="0000000031")
+        client = StubClient(
+            rows_by_cik={
+                "0000000021": [StubRow("0000000021-19-000001", "10-K", "2019-02-20")],
+                "0000000031": [StubRow("0000000031-24-000001", "10-K", "2024-08-20")],
+            },
+            files_by_accession={
+                "0000000021-19-000001": {"cover.xml": old_cover},
+                "0000000031-24-000001": {"cover.xml": new_cover},
+            },
+        )
+        new_item = WorkItem("FOXA", "FOXA", DIRECT, ("2024-06-28",))
+        run = run_proposals(
+            client,
+            demand_from_items(self.FOXA_ITEM, new_item),
+            companies={"FOXA": StubCompany("0000000031", "Fox Corporation")},
+            overrides={"TFCFA/FOXA": "unused"},
+        )
+        self.assertEqual(len(run.proposals), 2)
+        by_member = {item.member_symbol: item for item in run.proposals}
+        self.assertEqual(sorted(by_member), ["FOXA", "TFCFA"])
+        self.assertEqual(by_member["FOXA"].selected_cik, "0000000031")
+        # 옛 episode는 현재 ticker 주인의 CIK로 조용히 승격되지 않는다. 여기서는
+        # 후보가 그 하나뿐이라 발견은 같은 CIK를 주지만 **작업 항목은 별도로 남는다.**
+        self.assertEqual(
+            by_member["TFCFA"].demanded_formation_sessions, ("2010-06-30",)
+        )
+        self.assertEqual(
+            by_member["FOXA"].demanded_formation_sessions, ("2024-06-28",)
+        )
+
+    def test_a_current_ticker_only_reused_series_never_becomes_auto_provable(self):
+        """옛 계열에 지금 주인의 표지가 붙어 기계적으로 완결되면 안 된다.
+
+        구간 증거가 다 들어와도 발견이 현재 티커 계열뿐이면 `REVIEW_REQUIRED`다 —
+        그 표지는 **다른 발행사의** 것일 수 있고 그 판정은 5A-2c의 사람 몫이다.
+        """
+        proof = proof_from(self.fox_facts(), cik="0000000031")
+        packet = build_symbol_proposal(
+            work_item=self.FOXA_ITEM,
+            candidates=(
+                DiscoveryCandidate(
+                    cik="0000000031", origin=CURRENT_TICKER_FILE, detail="Fox Corporation"
+                ),
+            ),
+            proof=proof,
+            intervals=full_intervals(proof),
+        )
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE, packet.reason_codes)
+
+        # 같은 증거라도 DIRECT 항목이면 그대로 AUTO_PROVABLE이다 — 회귀가 아니다.
+        direct = build_symbol_proposal(
+            work_item=WorkItem("FOXA", "FOXA", DIRECT, ("2024-06-28",)),
+            candidates=(
+                DiscoveryCandidate(
+                    cik="0000000031", origin=CURRENT_TICKER_FILE, detail="Fox Corporation"
+                ),
+            ),
+            proof=proof,
+            intervals=full_intervals(proof),
+        )
+        self.assertEqual(direct.proposal_status, AUTO_PROVABLE)
+
+    def test_a_historical_origin_clears_the_current_ticker_only_block(self):
+        proof = proof_from(self.fox_facts(), cik="0000000021")
+        packet = build_symbol_proposal(
+            work_item=self.FOXA_ITEM,
+            candidates=(
+                DiscoveryCandidate(
+                    cik="0000000021", origin=HISTORICAL_NAME_LOOKUP, detail="21st Century Fox"
+                ),
+            ),
+            proof=proof,
+            intervals=full_intervals(proof),
+        )
+        self.assertNotIn(REUSED_SERIES_ONLY_CURRENT_TICKER_CANDIDATE, packet.reason_codes)
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+
+    def test_a_reused_series_still_asks_the_historical_layer(self):
+        """옛 episode가 지금 ticker 주인의 CIK를 조용히 받지 않는다.
+
+        그 행이 벤더 계열로 다시 쓰인 이유가 바로 "그 구간의 그 티커는 지금 주인의 것이
+        아니다"이므로, 1층이 답했다고 3층을 건너뛰면 옛 episode가 새 발행사로 붙는다.
+        둘이 갈리면 `CIK_CONFLICT`이고 증명은 시도하지 않는다.
+        """
+        client = historical_client(
+            rows_by_cik={
+                "0000000021": eight_k_rows("0000000021-10", ["2009-03-01"]),
+                "0000000031": [StubRow("0000000031-24-000001", "10-K", "2024-08-20")],
+            },
+            files_by_accession={},
+            submissions_extra={
+                "0000000021": {"name": "21ST CENTURY FOX", "sic": "4841"}
+            },
+            earnings={"0000000021": ["2009-03-01"]},
+            index=FakeNameIndex({"21st Century Fox": ["0000000021"]}),
+        )
+        hints = DiscoveryHints(
+            source="announcements", source_version="v1", provenance="p",
+            names={"FOXA": "21st Century Fox"},
+            spans={"TFCFA": ("2008-01-02", "2019-03-20")},
+        )
+        run = run_proposals(
+            client, demand_from_items(self.FOXA_ITEM),
+            companies={"FOXA": StubCompany("0000000031", "Fox Corporation")},
+            overrides={}, hints=hints,
+        )
+        packet = run.proposals[0]
+        self.assertEqual(
+            sorted(item.origin for item in packet.discovery_candidates),
+            [CURRENT_TICKER_FILE, HISTORICAL_NAME_LOOKUP],
+        )
+        self.assertIn(CIK_CONFLICT, packet.reason_codes)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertEqual(client.fetched, [])   # 확정 전에는 증명하지 않는다
+
+    def test_a_direct_work_item_keeps_the_layer_order(self):
+        """DIRECT 항목의 층 순서는 그대로다 — 3층을 항상 돌리지 않는다."""
+        client = historical_client(
+            rows_by_cik={"0000000031": [StubRow("0000000031-24-000001", "10-K", "2024-08-20")]},
+            files_by_accession={
+                "0000000031-24-000001": {
+                    "cover.xml": cover_instance(self.fox_facts(), default_cik="0000000031")
+                }
+            },
+            submissions_extra={},
+            earnings={"0000000031": ["2024-08-20"]},
+            index=FakeNameIndex({"Fox Corporation": ["0000000099"]}),
+        )
+        hints = DiscoveryHints(
+            source="announcements", source_version="v1", provenance="p",
+            names={"FOXA": "Fox Corporation"},
+            spans={"FOXA": ("2019-03-20", "2026-06-30")},
+        )
+        run = run_proposals(
+            client, demand_from_items(WorkItem("FOXA", "FOXA", DIRECT, ("2024-06-28",))),
+            companies={"FOXA": StubCompany("0000000031", "Fox Corporation")},
+            overrides={}, hints=hints,
+        )
+        packet = run.proposals[0]
+        self.assertEqual(
+            [item.origin for item in packet.discovery_candidates], [CURRENT_TICKER_FILE]
+        )
+        self.assertNotIn(CIK_CONFLICT, packet.reason_codes)
+
+    def test_the_run_payload_carries_the_reused_mapping_provenance(self):
+        client = StubClient(rows_by_cik={}, files_by_accession={})
+        payload = run_proposals(
+            client, demand_from_items(self.FOXA_ITEM), companies={}, overrides={}
+        ).as_json()
+        provenance = payload["demand_provenance"]
+        self.assertEqual(
+            provenance["reused_series_source"], "trading/universe/reused-tickers.csv"
+        )
+        self.assertEqual(
+            provenance["reused_series_source_version"], "reused-tickers-sha256:abc"
+        )
+        # identity bundle과 다른 값이다 — 같은 자리에 두지 않는다.
+        self.assertNotEqual(
+            provenance["reused_series_source_version"],
+            provenance["identity_source_version"],
+        )
+        self.assertEqual(
+            payload["attempted_accessions"][0]["member_symbol"], "TFCFA"
+        )
+        self.assertEqual(
+            payload["attempted_accessions"][0]["identity_symbol"], "FOXA"
+        )
+
+    def test_an_unknown_bridge_kind_fails_closed(self):
+        with self.assertRaises(QVProposalError):
+            build_symbol_proposal(
+                work_item=WorkItem("TFCFA", "FOXA", "GUESS", ("2010-06-30",)),
+                candidates=TICKER_CANDIDATE,
+            )
 
 
 class RunTest(unittest.TestCase):
@@ -1071,7 +1493,9 @@ class RunTest(unittest.TestCase):
         payload = run.as_json()
         self.assertIs(payload["mutates_production_manifest"], False)
         self.assertEqual(payload["stage"], "5A-2")
-        self.assertEqual([item["symbol"] for item in payload["proposals"]], ["AAA", "ZZZ"])
+        self.assertEqual(
+            [item["identity_symbol"] for item in payload["proposals"]], ["AAA", "ZZZ"]
+        )
         self.assertEqual(run.counts()[UNRESOLVED], 1)
         self.assertEqual(run.counts()[REVIEW_REQUIRED], 1)
         self.assertEqual(run.counts()[AUTO_PROVABLE], 0)
@@ -1094,6 +1518,8 @@ class RunTest(unittest.TestCase):
                 "calendar_source": "eodhd",
                 "calendar_source_version": "eodhd-15y-2026-08",
                 "identity_source_version": "qv-identity-sha256:abc",
+                "reused_series_source": "trading/universe/reused-tickers.csv",
+                "reused_series_source_version": "reused-tickers-sha256:abc",
                 "inventory_path": "runs/x/inventory.json",
             },
         )

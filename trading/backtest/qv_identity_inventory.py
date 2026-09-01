@@ -21,12 +21,33 @@ materialize 전에 돌리면 "매핑이 없다"와 "manifest가 아직 DB에 안
 production 매핑 정본은 네 manifest 파일뿐이다. `securities` · 현재 SEC ticker map ·
 `edgar.resolve_cik` · `CIK_OVERRIDES` · 회사명/fuzzy 매칭 · ticker 연속성 추정 ·
 현재 identity의 과거 소급은 여기서 authoritative가 아니다.
+
+**universe/bar 심볼은 SEC 경제적 심볼이 아니다.** production 과거 유니버스는 재사용된
+과거 티커 일부를 벤더 계열 코드로 바꿔 `universe_membership`에 넣는다. 그래서 이 단계는
+두 값을 끝까지 구분해서 들고 다닌다.
+
+```text
+member_symbol / data_symbol   universe_membership에 저장된 심볼(시장 데이터 계열)
+identity_symbol               SEC identity / manifest 조회에 쓰는 실제 거래 심볼
+```
+
+manifest 조회는 **`identity_symbol`로만** 한다. 다리는
+`trading/universe/reused-tickers.csv`(`qv_symbol_bridge`) 하나가 정본이고 접미사
+휴리스틱을 쓰지 않는다.
 """
 
 from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+
+from .qv_symbol_bridge import (
+    BRIDGE_PROVENANCE_KIND,
+    BRIDGE_PROVENANCE_NOTE,
+    DIRECT,
+    REUSED_VENDOR_SERIES,
+    SymbolBridge,
+)
 
 # 상태 어휘를 production PIT identity resolution과 **의도적으로 다르게** 둔다.
 MAPPED = "MAPPED"
@@ -49,9 +70,26 @@ class QVInventoryError(Exception):
 
 
 @dataclass(frozen=True)
+class MembershipRow:
+    """`universe_membership` 한 줄에서 identity 판정에 필요한 것만.
+
+    `member_symbol`은 저장된 시장 데이터 계열 심볼이고 `identity_symbol`은 명시 다리가
+    돌려준 실제 거래 심볼이다. 둘을 합치지 않는다.
+    """
+
+    member_symbol: str
+    identity_symbol: str
+    symbol_bridge_kind: str
+    valid_from: str
+    valid_to: str | None
+
+
+@dataclass(frozen=True)
 class SecurityRow:
     formation_session: str
-    symbol: str
+    member_symbol: str
+    identity_symbol: str
+    symbol_bridge_kind: str
     status: str
     class_id: str | None
     issuer_id: str | None
@@ -60,7 +98,9 @@ class SecurityRow:
     def as_json(self) -> dict:
         return {
             "formation_session": self.formation_session,
-            "symbol": self.symbol,
+            "member_symbol": self.member_symbol,
+            "identity_symbol": self.identity_symbol,
+            "symbol_bridge_kind": self.symbol_bridge_kind,
             "status": self.status,
             "class_id": self.class_id,
             "issuer_id": self.issuer_id,
@@ -70,9 +110,16 @@ class SecurityRow:
 
 @dataclass(frozen=True)
 class IssuerGroup:
+    """issuer 단위 묶음. **추적을 위해 데이터 계열 심볼도 함께 남긴다.**
+
+    identity 판정 자체는 `identity_symbols`로 이미 끝났고, `member_symbols`는 그 줄이
+    어느 시장 데이터 계열에서 왔는지를 되짚기 위한 것이다.
+    """
+
     formation_session: str
     issuer_id: str
     member_symbols: tuple[str, ...]
+    identity_symbols: tuple[str, ...]
     member_class_ids: tuple[str, ...]
 
     def as_json(self) -> dict:
@@ -80,6 +127,7 @@ class IssuerGroup:
             "formation_session": self.formation_session,
             "issuer_id": self.issuer_id,
             "member_symbols": list(self.member_symbols),
+            "identity_symbols": list(self.identity_symbols),
             "member_class_ids": list(self.member_class_ids),
         }
 
@@ -116,6 +164,10 @@ class Inventory:
     calendar_source: str
     calendar_source_version: str
     identity_source_version: str
+    # universe/market-data 심볼 provenance. **identity bundle의 일부가 아니다.**
+    reused_series_source: str
+    reused_series_source_version: str
+    translated_membership_rows: int
     formations: tuple[FormationSummary, ...]
     securities: tuple[SecurityRow, ...]
     issuer_groups: tuple[IssuerGroup, ...]
@@ -136,6 +188,17 @@ class Inventory:
             "calendar_source": self.calendar_source,
             "calendar_source_version": self.calendar_source_version,
             "identity_source_version": self.identity_source_version,
+            # 재사용 계열 다리는 universe/market-data 심볼 provenance다. identity 증거가
+            # 아니므로 identity bundle과 같은 자리에 두지 않는다.
+            "reused_series_source": self.reused_series_source,
+            "reused_series_source_version": self.reused_series_source_version,
+            "symbol_bridge": {
+                "kind": BRIDGE_PROVENANCE_KIND,
+                "note": BRIDGE_PROVENANCE_NOTE,
+                "reused_series_source": self.reused_series_source,
+                "reused_series_source_version": self.reused_series_source_version,
+                "translated_membership_rows": self.translated_membership_rows,
+            },
             "formation_sessions": [
                 {"formation_year": item.formation_year,
                  "formation_session": item.formation_session}
@@ -146,10 +209,26 @@ class Inventory:
             "issuer_groups": [item.as_json() for item in self.issuer_groups],
         }
 
-    def mapping_demand_symbols(self) -> tuple[str, ...]:
-        """5A-2가 채워야 할 심볼 — 한 번이라도 `MAPPED`가 아니었던 것."""
+    def mapping_demand_work_items(self) -> tuple[tuple[str, str], ...]:
+        """5A-2 작업 단위 — `(member_symbol, identity_symbol)`.
+
+        **identity 심볼 하나로 뭉개지 않는다.** 같은 티커를 서로 다른 발행사가 겹치지
+        않는 기간에 쓸 수 있고, 그 episode를 가르는 것이 데이터 계열 심볼이다.
+        """
         return tuple(
-            sorted({row.symbol for row in self.securities if row.status != MAPPED})
+            sorted(
+                {
+                    (row.member_symbol, row.identity_symbol)
+                    for row in self.securities
+                    if row.status != MAPPED
+                }
+            )
+        )
+
+    def mapping_demand_symbols(self) -> tuple[str, ...]:
+        """수요의 고유 **경제적** 심볼. 작업량은 `mapping_demand_work_items()`가 준다."""
+        return tuple(
+            sorted({row.identity_symbol for row in self.securities if row.status != MAPPED})
         )
 
 
@@ -191,25 +270,43 @@ def june_formation_sessions(
     return tuple(out)
 
 
-def pit_members(
+def pit_membership_rows(
     connection: sqlite3.Connection,
     formation_session: str,
     *,
     index_name: str,
     universe_source: str,
     universe_source_version: str,
-) -> tuple[str, ...]:
-    """`[valid_from, valid_to)` 구간으로 본 formation 시점 구성 종목."""
+    symbol_bridge: SymbolBridge,
+) -> tuple[MembershipRow, ...]:
+    """`[valid_from, valid_to)` 구간으로 본 formation 시점 구성 종목.
+
+    **스키마를 바꾸지 않는다.** 저장된 심볼을 그대로 읽되 `valid_from`을 함께 들고 와서
+    `(member_symbol, valid_from)`으로 경제적 심볼을 명시 다리에서 푼다. 구간 정체성이
+    다리의 grain이므로 심볼만 `DISTINCT`로 뽑으면 그것을 물어볼 수 없다.
+    """
     rows = connection.execute(
-        "SELECT DISTINCT symbol FROM universe_membership"
+        "SELECT DISTINCT symbol, valid_from, valid_to FROM universe_membership"
         " WHERE index_name = ? AND source = ? AND source_version = ?"
         "   AND valid_from <= ?"
         "   AND (valid_to IS NULL OR valid_to > ?)"
-        " ORDER BY symbol",
+        " ORDER BY symbol, valid_from",
         (index_name, universe_source, universe_source_version,
          formation_session, formation_session),
     ).fetchall()
-    return tuple(row["symbol"] for row in rows)
+    out: list[MembershipRow] = []
+    for row in rows:
+        identity, kind = symbol_bridge.resolve(row["symbol"], row["valid_from"])
+        out.append(
+            MembershipRow(
+                member_symbol=row["symbol"],
+                identity_symbol=identity,
+                symbol_bridge_kind=kind,
+                valid_from=row["valid_from"],
+                valid_to=row["valid_to"],
+            )
+        )
+    return tuple(out)
 
 
 # ── manifest 인덱스 ───────────────────────────────────────────────────────────
@@ -248,19 +345,30 @@ def index_manifest(manifest) -> ManifestIndex:
 
 
 def map_security(
-    index: ManifestIndex, symbol: str, formation_session: str
+    index: ManifestIndex,
+    member_symbol: str,
+    formation_session: str,
+    *,
+    identity_symbol: str | None = None,
+    symbol_bridge_kind: str = DIRECT,
 ) -> SecurityRow:
     """구성 종목 하나에 대한 **static** manifest 매핑을 본다.
+
+    조회 키는 **`identity_symbol`이다.** 벤더 계열 심볼(`TFCFA`·`MON_OLD`…)로 manifest를
+    찾지 않는다 — manifest는 SEC 경제적 identity 정본이고 벤더 코드를 담지 않는다.
+    `identity_symbol`을 주지 않으면 다리를 거치지 않은 직접 심볼로 본다.
 
     `usable_from_session`을 보지 않는다. 이 단계는 매핑이 **존재하는가**를 재고,
     그 매핑이 그때 실제로 쓸 수 있었는가는 5A-3이 증거를 materialize한 뒤에 정한다.
 
     모호한 집합에서 하나를 고르지 않는다.
     """
+    symbol = identity_symbol if identity_symbol is not None else member_symbol
 
     def row(status, class_id, issuer_id, reason):
         return SecurityRow(
-            formation_session, symbol, status, class_id, issuer_id, reason
+            formation_session, member_symbol, symbol, symbol_bridge_kind,
+            status, class_id, issuer_id, reason,
         )
 
     segments = index.by_symbol.get(symbol, ())
@@ -312,6 +420,7 @@ def build_inventory(
     calendar_source: str,
     calendar_source_version: str,
     identity_source_version: str,
+    symbol_bridge: SymbolBridge,
     reference_symbol: str = DEFAULT_REFERENCE_SYMBOL,
     from_year: int | None = None,
     to_year: int | None = None,
@@ -320,6 +429,9 @@ def build_inventory(
 
     요청된 `identity_source_version`은 실제로 읽은 bundle 해시와 **정확히** 같아야 한다.
     다르면 fail-close다 — 조용히 다른/현재/최신 manifest를 재지 않는다.
+
+    `symbol_bridge`는 `universe_membership`에 저장된 시장 데이터 계열 심볼을 SEC 경제적
+    심볼로 옮긴다. **manifest 조회는 옮긴 뒤의 심볼로만 한다.**
     """
     if identity_source_version != manifest.identity_source_version:
         raise QVInventoryError(
@@ -342,14 +454,28 @@ def build_inventory(
     issuer_groups: list[IssuerGroup] = []
     summaries: list[FormationSummary] = []
 
+    translated = 0
     for year, session in formations:
-        members = pit_members(
+        members = pit_membership_rows(
             connection, session,
             index_name=index_name,
             universe_source=universe_source,
             universe_source_version=universe_source_version,
+            symbol_bridge=symbol_bridge,
         )
-        rows = [map_security(index, symbol, session) for symbol in members]
+        translated += sum(
+            1 for item in members if item.symbol_bridge_kind == REUSED_VENDOR_SERIES
+        )
+        rows = [
+            map_security(
+                index,
+                item.member_symbol,
+                session,
+                identity_symbol=item.identity_symbol,
+                symbol_bridge_kind=item.symbol_bridge_kind,
+            )
+            for item in members
+        ]
         security_rows.extend(rows)
 
         # 같은 issuer가 여러 구성 종목으로 나타나는 것은 매핑 오류가 아니다.
@@ -363,7 +489,8 @@ def build_inventory(
             IssuerGroup(
                 session,
                 issuer_id,
-                tuple(sorted(entry.symbol for entry in entries)),
+                tuple(sorted(entry.member_symbol for entry in entries)),
+                tuple(sorted({entry.identity_symbol for entry in entries})),
                 tuple(sorted({entry.class_id for entry in entries if entry.class_id})),
             )
             for issuer_id, entries in sorted(grouped.items())
@@ -394,9 +521,17 @@ def build_inventory(
         calendar_source=calendar_source,
         calendar_source_version=calendar_source_version,
         identity_source_version=manifest.identity_source_version,
+        reused_series_source=symbol_bridge.source,
+        reused_series_source_version=symbol_bridge.source_version,
+        translated_membership_rows=translated,
         formations=tuple(summaries),
         securities=tuple(
-            sorted(security_rows, key=lambda item: (item.formation_session, item.symbol))
+            sorted(
+                security_rows,
+                key=lambda item: (
+                    item.formation_session, item.member_symbol, item.identity_symbol
+                ),
+            )
         ),
         issuer_groups=tuple(
             sorted(issuer_groups, key=lambda item: (item.formation_session, item.issuer_id))

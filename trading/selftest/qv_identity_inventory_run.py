@@ -13,10 +13,16 @@
         --calendar-source eodhd --calendar-version eodhd-15y-2026-08 \
         [--manifest trading/qv/identity] \
         [--identity-version qv-identity-sha256:...] \
+        [--reused-tickers trading/universe/reused-tickers.csv] \
         [--from-year 2010] [--to-year 2026] [--out /tmp/inventory.json]
 
 `--identity-version`을 주면 읽은 bundle 해시와 **정확히** 같아야 한다. 다르면 멈춘다.
 `sources`는 어떤 source/version이 있는지만 보여준다 — **"최신"을 추측하지 않는다.**
+
+**universe/bar 심볼은 SEC 경제적 심볼이 아니다.** production 유니버스는 재사용된 과거
+티커 일부를 벤더 계열 코드로 바꿔 저장하므로, manifest 조회 전에
+`trading/universe/reused-tickers.csv`로 경제적 심볼을 되돌린다. 그 파일이 없으면
+멈춘다 — 빈 매핑으로 넘어가면 벤더 코드가 SEC 심볼로 새어 나간다.
 """
 
 from __future__ import annotations
@@ -34,6 +40,11 @@ if str(TRADING_ROOT) not in sys.path:
 from backtest import store  # noqa: E402
 from backtest.qv_identity_inventory import build_inventory  # noqa: E402
 from backtest.qv_manifest import DEFAULT_MANIFEST_DIR, load_manifest  # noqa: E402
+from backtest.qv_symbol_bridge import (  # noqa: E402
+    DEFAULT_REUSED_PATH,
+    REUSED_VENDOR_SERIES,
+    load_symbol_bridge,
+)
 
 
 def _git_commit() -> str | None:
@@ -72,6 +83,10 @@ def stage_sources(connection) -> int:
             f"  {row['source']} / {row['source_version']}"
             f"  sessions={row['n']}  {row['lo']}..{row['hi']}"
         )
+    bridge = load_symbol_bridge(DEFAULT_REUSED_PATH)
+    print("reused-series symbol bridge (universe/market-data provenance — identity 증거가 아니다):")
+    print(f"  {bridge.source}")
+    print(f"  {bridge.source_version}  rows={len(bridge.reverse)}")
     manifest = load_manifest(DEFAULT_MANIFEST_DIR)
     print("manifest bundle (5A-1이 실제로 쓰는 것):")
     print(f"  {DEFAULT_MANIFEST_DIR}")
@@ -95,10 +110,12 @@ def stage_sources(connection) -> int:
 
 def stage_run(connection, arguments) -> int:
     manifest = load_manifest(arguments.manifest or DEFAULT_MANIFEST_DIR)
+    bridge = load_symbol_bridge(arguments.reused_tickers or DEFAULT_REUSED_PATH)
     requested = arguments.identity_version or manifest.identity_source_version
     inventory = build_inventory(
         connection,
         manifest=manifest,
+        symbol_bridge=bridge,
         index_name=arguments.index,
         universe_source=arguments.universe_source,
         universe_source_version=arguments.universe_version,
@@ -116,6 +133,10 @@ def stage_run(connection, arguments) -> int:
         print(f"wrote {arguments.out}")
 
     print(f"identity bundle: {inventory.identity_source_version}")
+    print(
+        f"reused-series bridge: {inventory.reused_series_source}"
+        f" / {inventory.reused_series_source_version}"
+    )
     print("measures: STATIC mapping coverage demand — NOT PIT identity usability")
     for item in inventory.formations:
         print(
@@ -127,8 +148,22 @@ def stage_run(connection, arguments) -> int:
             f"  issuers={item.mapped_issuer_count}"
             f"  multi_security_issuers={item.multi_security_issuer_count}"
         )
+    translated = sum(
+        1 for row in inventory.securities
+        if row.symbol_bridge_kind == REUSED_VENDOR_SERIES
+    )
+    work_items = inventory.mapping_demand_work_items()
     demand = inventory.mapping_demand_symbols()
-    print(f"5A-2 mapping demand (unique symbols not MAPPED): {len(demand)}")
+    print(
+        "membership rows translated through reused-tickers.csv: "
+        f"{translated} (distinct formations x rows)"
+    )
+    print(f"5A-2 work items (member_symbol, identity_symbol): {len(work_items)}")
+    print(f"5A-2 unique economic identity symbols: {len(demand)}")
+    print(
+        "  reused-series work items: "
+        + str(sum(1 for member, identity in work_items if member != identity))
+    )
     return 0
 
 
@@ -144,6 +179,7 @@ def main() -> int:
     runner.add_argument("--calendar-version", required=True)
     runner.add_argument("--manifest", default=None)
     runner.add_argument("--identity-version", default=None)
+    runner.add_argument("--reused-tickers", default=None)
     runner.add_argument("--from-year", type=int, default=None)
     runner.add_argument("--to-year", type=int, default=None)
     runner.add_argument("--out", default=None)
