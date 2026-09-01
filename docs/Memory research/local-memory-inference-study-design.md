@@ -1430,3 +1430,162 @@ exactly as recorded, and production memory decisions, retrieval, and model
 routing remain unchanged.
 
 **P1-B2a is CLOSED / COMPLETE.**
+
+### P1-B2b write-candidate-triage label-semantics paired diagnostic preregistration
+
+P1-B2b is a post-hoc paired diagnostic of the write-candidate-triage
+decision semantics used in the completed P1-B1 model-size screen. The
+frozen P1-B1 instruction names three output labels but does not define
+their operational meanings:
+
+```text
+Classify the input as WRITE_CANDIDATE, NO_WRITE, or ESCALATE. This is advisory triage only and does not authorize a durable write.
+```
+
+The historical non-hard-gated P1-B1 observations motivate this diagnostic
+and remain unchanged. At approximately 2B, gold `NO_WRITE` produced
+8 `NO_WRITE`, 2 `WRITE_CANDIDATE`, and 0 `ESCALATE`; gold
+`WRITE_CANDIDATE` produced 1, 9, and 0 respectively; and gold `ESCALATE`
+produced 2, 3, and 0. Eligible false `NO_WRITE` was 3 and correct eligible
+`ESCALATE` was 0/5. At approximately 4B, those rows were 4/6/0,
+1/9/0, and 3/1/1 respectively. Eligible false `NO_WRITE` was 4 and
+correct eligible `ESCALATE` was 1/5. P1-B2b cannot rerate or rescue either
+historical result.
+
+The fixed diagnostic fixture is
+`xion-local-memory-inference-p1b2b-triage-label-semantics-v1`. It is an
+exact deep-copy snapshot of the 25 non-hard-gated P1-B1
+`write_candidate_triage` PilotCase objects, in frozen fixture order:
+
+-   `p1b1-triage-no-write-001` through `-010`;
+-   `p1b1-triage-write-001` through `-010`;
+-   `p1b1-triage-escalate-001` through `-005`.
+
+The distribution is 10 `NO_WRITE`, 10 `WRITE_CANDIDATE`, and five
+eligible `ESCALATE`. All 25 retain their existing HUMAN primary
+adjudication. The five `p1b1-triage-probe-001` through `-005` hard-gated
+capability probes are excluded, as are all extraction and ambiguity cases.
+Evidence, gold, adjudication, ambiguity state, hard-gate expectation, task
+contract, and workload are unchanged. Cases may not be added or
+re-adjudicated after observing outputs.
+
+Each case is run under exactly two paired conditions:
+
+1.  **`FROZEN_P1B1`:** use the exact frozen P1-B1 prompt through
+    `runCalibrationCase()`, with prompt identity
+    `xion-local-memory-inference-p1b1-prompt-v1`.
+2.  **`DEFINED_LABEL_SEMANTICS`:** clone the frozen scaffold from
+    `buildCalibrationPrompt()` and replace only the `INSTRUCTION:` content
+    with the following exact text, identified as
+    `xion-local-memory-inference-p1b2b-triage-defined-labels-prompt-v1`:
+
+```text
+Classify the supplied evidence into exactly one advisory triage label.
+NO_WRITE: the evidence is clearly transient, request-local, or otherwise not a durable memory candidate.
+WRITE_CANDIDATE: the evidence clearly states a sufficiently persistent fact, preference, goal, constraint, or state that may be worth durable-memory review.
+ESCALATE: the supplied evidence is insufficient or ambiguous in persistence, scope, reference, or meaning in a way that prevents safely deciding between NO_WRITE and WRITE_CANDIDATE. Do not resolve that ambiguity yourself.
+This classification is advisory only and does not authorize a durable write.
+```
+
+The defined instruction is frozen as written. It adds no examples,
+few-shot demonstrations, rationales, chain-of-thought request, confidence,
+new output fields, or case-specific hints. Examples are deliberately
+excluded so operational label definitions are not confounded with
+few-shot pattern teaching.
+
+Both conditions preserve the same system message, workload line, task
+specification, output schema, input JSON, model, runtime request fields,
+parser, schema validator, and semantic exact-match behavior. Runtime
+requests remain `temperature: 0`, `max_tokens: 128`, `stream: false`,
+`chat_template_kwargs: { enable_thinking: false }`, and
+`response_format: { type: "json_object" }`. The existing
+`p1b1-write-candidate-triage-v1` task specification and
+`p1b1-write-candidate-triage-output-v1` schema remain authoritative. The
+frozen P1-B1 library receives no generic prompt override or tuning knob.
+
+Exactly two BF16 configurations are registered:
+
+-   approximately 2B: `xion-p1b1-qwen3-1.7b-bf16`, artifact
+    `unsloth/Qwen3-1.7B-GGUF:BF16`;
+-   approximately 4B: `xion-p1b1-qwen3-4b-bf16`, artifact
+    `unsloth/Qwen3-4B-GGUF:BF16`.
+
+Both use external `llama.cpp` at
+`e42214804794fca6abb61b1a5f9adae2a845f0be`. Sub-1B, 7B/8B, other model
+families, and quantized variants are excluded. The diagnostic runner and
+report identities are
+`xion-local-memory-inference-p1b2b-triage-label-semantics-runner-v1` and
+`xion-local-memory-inference-p1b2b-triage-label-semantics-report-v1`.
+
+For each case in fixture order, the runner executes `FROZEN_P1B1` once,
+then `DEFINED_LABEL_SEMANTICS` once, then moves to the next case. There are
+no automatic reruns, including for semantic mismatches. Each model makes
+25 × 2 = 50 calls; the complete planned experiment is 100 calls. A failed
+request is recorded and execution continues under the bounded diagnostic
+failure semantics.
+
+Each condition reports total cases, schema-valid outputs, invalid
+structured outputs, runtime failures, exact matches, and mismatches. Its
+confusion matrix uses gold rows `NO_WRITE`, `WRITE_CANDIDATE`, and
+`ESCALATE`, with actual columns for those labels plus `INVALID` and
+`RUNTIME_FAILURE`. It separately reports correct `NO_WRITE` out of 10,
+correct `WRITE_CANDIDATE` out of 10, correct `ESCALATE` out of 5, and
+eligible false `NO_WRITE` where gold is `WRITE_CANDIDATE` or `ESCALATE`.
+
+Each pair receives exactly one descriptive transition:
+
+-   `UNCHANGED_CORRECT`: A and B are both correct;
+-   `FIXED`: A is wrong and B is correct;
+-   `REGRESSION`: A is correct and B is wrong;
+-   `UNCHANGED_WRONG`: A and B are both wrong;
+-   `NONCOMPARABLE_RUNTIME_OR_SCHEMA`: either side cannot be compared
+    semantically because of runtime or schema failure.
+
+Interpretation is frozen before any real P1-B2b output exists:
+
+1.  **Historical baseline continuity.** Condition A is compared with the
+    historical P1-B1 confusion pattern. Any difference is reported without
+    rerunning A to recover the old matrix. Historical non-reproduction alone
+    does not invalidate the current within-run A/B pairing, which is the
+    primary diagnostic comparison.
+2.  **Case-level evidence.** `FIXED` supports only the narrow statement
+    that explicit label semantics moved that case in the correct direction
+    while evidence, HUMAN gold, model, runtime contract, schema, and request
+    scaffold were fixed. It does not prove an internal causal mechanism.
+    `REGRESSION` receives equal prominence.
+3.  **Overall definition usefulness.** For one model, the result supports
+    the underspecification/usefulness hypothesis only when fixes exceed
+    regressions, B exact matches exceed A exact matches, and B eligible
+    false `NO_WRITE` does not exceed A. This is a directional diagnostic
+    rule, not an acceptance threshold. If all three do not hold, the result
+    is mixed or not supportive.
+4.  **ESCALATE semantics.** More correct B `ESCALATE` decisions among the
+    five gold `ESCALATE` cases than in A supports the narrower hypothesis
+    that explicit operational semantics improved escalation recognition for
+    that model. Equal or worse does not support it.
+5.  **Safety.** A reduction in eligible false `NO_WRITE` is improvement on
+    the frozen safety-relevant error dimension. An increase is negative even
+    if overall exact match improves. The false-`NO_WRITE`-zero requirement
+    never changes.
+6.  **Cross-size interpretation.** Similar improvements and class patterns
+    at both sizes support a prompt-contract underspecification explanation
+    across these two checkpoints. Material change in only one model while
+    the other stays stable supports checkpoint-specific sensitivity to
+    label-semantics framing. Neither pattern establishes a monotonic
+    parameter-count effect.
+7.  **Post-hoc limitation.** These 25 cases were already used and inspected
+    in P1-B1. P1-B2b is not fresh held-out evidence. Even a strong positive
+    result cannot establish revised-prompt capability, replace P1-B1, or
+    authorize production use. A fresh, separately preregistered validation
+    fixture is required before a revised task contract can be accepted.
+
+There is deliberately no N/25 threshold, `screeningDecision`,
+`PASS_CURRENT_SIZE`, `ADVANCE_SIZE`, automatic prompt adoption, model-size
+progression, or automatic conclusion. P1-B2b is diagnostic
+characterization only: it is not P1-B1 rerating, a new screen, threshold
+review, production acceptance, held-out validation, 7B/8B justification,
+or quantization experiment. The P1-B1 prompt, schema, scores, thresholds,
+and critical eligible-false-`NO_WRITE = 0` requirement remain frozen.
+Production memory decisions, retrieval, routing, DB, and Vault remain
+unchanged; private natural replay and Option C remain unopened. No real
+P1-B2b model output existed when this preregistration was committed.

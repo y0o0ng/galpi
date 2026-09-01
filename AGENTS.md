@@ -87,7 +87,7 @@
 ### 장기기억 연구
 
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
-- **Local Memory Inference Study Pilot P0와 P1-A는 `COMPLETE`, P1-B1 model-size screening은 ~4B까지 `COMPLETE`이며 automatic size progression은 계속 중단 상태다. P1-B2a extraction decision-boundary diagnostic도 `COMPLETE`이고 bounded diagnostic에서 size/checkpoint-specific extraction field-target calibration sensitivity를 지지했다. 다음은 write-candidate triage decision-semantics / label-semantics diagnostic의 설계·리뷰이며 아직 preregistered 또는 구현되지 않았다.** production memory 판단·retrieval·model routing은 그대로이고 private natural replay는 `UNOPENED`·별도 gate이며, 정본·결과는 `docs/Memory research/local-memory-inference-study-design.md`다.
+- **Local Memory Inference Study Pilot P0와 P1-A, ~4B까지의 P1-B1 model-size screening, P1-B2a extraction diagnostic은 `COMPLETE`이고 automatic size progression은 계속 중단 상태다. P1-B2b triage label-semantics paired diagnostic은 preregistered·구현 완료된 active next step이며, frozen 25개 non-hard-gated HUMAN-adjudicated triage case를 frozen-vs-defined prompt 조건으로 짝지어 본다.** production memory 판단·retrieval·model routing은 그대로이고 private natural replay는 `UNOPENED`·별도 gate이며, 정본·결과는 `docs/Memory research/local-memory-inference-study-design.md`다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 
