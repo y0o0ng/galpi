@@ -40,6 +40,37 @@ ticker 유사도 · governing instrument의 class 이름 유사도
 명시 filing-local 다리가 없으면 **`UNRESOLVED`이고 그것으로 괜찮다.**
 
 `TradingSymbol`은 **교차 확인**이지 정체성이 아니다. ticker만으로 묶지 않는다.
+
+## 해석 grain — 어느 축도 뺄 수 없다
+
+```text
+정확한 SEC accession
++ 정확한 instance 문서
++ 정확한 QName
++ 고정된 identity bundle
++ 개별 fact instant
+```
+
+한 accession 안에도 instance 문서가 여럿일 수 있고, **문서마다 같은 QName이 다르게
+묶일 수 있다.** 문서 이름을 빼고 조회하면 다른 문서의 binding이 새거나 멀쩡한
+문서-지역 매핑이 `AMBIGUOUS`가 된다. 문서를 순서로 고르지 않고, 문서 이름 없는
+조회를 지원하지 않는다.
+
+**fact instant마다 다시 확인한다.** binding 행을 찾은 뒤에도 그 행이 저장한 canonical
+prose 키가 **그 instant에** 같은 class로 풀리고 그 class가 활성이며 같은 issuer의
+보통주여야 한다. 하나라도 어긋나면 다른 class로 바꾸지 않고 `UNRESOLVED`다.
+
+## provenance는 caller가 쓰지 않는다
+
+```text
+instance_document_name   = document.source_file
+instance_sha256          = document.sha256
+filing usable session    = qv_sec_filings의 그 accession 행
+```
+
+binding의 권한이 raw accession + 고정 bundle이므로 그 값들을 호출자가 지어낼 수
+없다. canonical K/Q filing 원장에 그 accession이 없으면 **fail-close**다 — binding은
+그 기록과 독립해서 존재할 수 없다.
 """
 
 from __future__ import annotations
@@ -77,6 +108,13 @@ class QVBindingError(Exception):
     """binding 계약을 벗어날 때 올린다. **전부 fail-close다.**"""
 
 
+class QVBindingAmbiguity(QVBindingError):
+    """한 시점에 둘 이상으로 풀려 하나를 고를 수 없을 때.
+
+    "없다"와 "둘이다"를 문자열로 구분하지 않으려고 형으로 가른다.
+    """
+
+
 @dataclass(frozen=True)
 class ClassBinding:
     """accession 하나 안에서 확인된 `QName -> economic class` 관계."""
@@ -94,6 +132,10 @@ class ClassBinding:
     raw_member_local: str
     canonical_prose_comparison_key: str
     binding_method: str
+    # **불변 source 정체성.** 전부 실제 입력에서 파생하고 호출자가 따로 넣지 않는다.
+    instance_sha256: str
+    filing_source_version: str
+    identity_source_version: str
     filing_historical_usable_session: str
     identity_usable_from_session: str
     usable_from_session: str
@@ -238,10 +280,40 @@ def _canonical_class(
         )
     class_ids = {row["class_id"] for row in rows}
     if len(class_ids) != 1:
-        raise QVBindingError(
+        raise QVBindingAmbiguity(
             f"prose 키가 한 시점에 {len(class_ids)}개 class로 갑니다: {comparison_key!r}"
         )
     return next(iter(class_ids)), max(row["usable_from_session"] for row in rows)
+
+
+def filing_usable_session(
+    connection: sqlite3.Connection,
+    *,
+    cik: str,
+    accession: str,
+    filing_source_version: str,
+) -> str:
+    """canonical K/Q filing 원장에서 그 accession의 `historical_usable_session`.
+
+    **호출자가 준 값을 받지 않는다.** binding은 그 filing 기록과 독립해서 존재할 수
+    없으므로 행이 없거나 둘이면 fail-close다.
+    """
+    rows = connection.execute(
+        "SELECT historical_usable_session FROM qv_sec_filings"
+        " WHERE cik = ? AND accession = ? AND source_version = ?",
+        (normalize_cik(cik), accession, filing_source_version),
+    ).fetchall()
+    if len(rows) != 1:
+        raise QVBindingError(
+            f"canonical K/Q filing 기록이 정확히 하나가 아닙니다: {cik}/{accession}"
+            f"/{filing_source_version} ({len(rows)}건)"
+        )
+    session = rows[0]["historical_usable_session"]
+    if not session:
+        raise QVBindingError(
+            f"filing의 historical_usable_session이 비었습니다: {accession}"
+        )
+    return str(session)
 
 
 def _active_class(
@@ -282,7 +354,9 @@ def bind_member(
     cik: str,
     accession: str,
     instance_document_name: str,
+    instance_sha256: str,
     issuer_id: str,
+    filing_source_version: str,
     identity_source_version: str,
     instant: str,
     filing_historical_usable_session: str,
@@ -341,6 +415,9 @@ def bind_member(
         raw_member_local=facts.member_local,
         canonical_prose_comparison_key=comparison_key,
         binding_method=COVER_SECURITY_TITLE_FACT,
+        instance_sha256=instance_sha256,
+        filing_source_version=filing_source_version,
+        identity_source_version=identity_source_version,
         filing_historical_usable_session=str(filing_historical_usable_session),
         identity_usable_from_session=identity_usable,
         usable_from_session=usable,
@@ -357,16 +434,24 @@ def derive_bindings(
     *,
     cik: str,
     accession: str,
-    instance_document_name: str,
     issuer_id: str,
+    filing_source_version: str,
     identity_source_version: str,
-    filing_historical_usable_session: str,
     default_instant: str,
 ) -> tuple[tuple[ClassBinding, ...], tuple[tuple[str, str], ...]]:
-    """한 accession의 자동 binding 전부와 **묶지 못한 이유**를 함께 돌려준다.
+    """한 accession/문서의 자동 binding 전부와 **묶지 못한 이유**를 함께 돌려준다.
 
     묶지 못하는 것은 실패가 아니다 — 명시 filing-local 다리가 없으면 `UNRESOLVED`다.
+
+    **문서 이름·해시·filing usable session을 호출자에게서 받지 않는다.** 앞의 둘은
+    실제 `InstanceDocument`가, 마지막은 canonical K/Q filing 원장이 권한이다.
     """
+    instance_document_name = document.source_file
+    instance_sha256 = document.sha256
+    filing_historical_usable_session = filing_usable_session(
+        connection, cik=cik, accession=accession,
+        filing_source_version=filing_source_version,
+    )
     facts, anomalies = member_facts(document, cik=cik)
     if anomalies:
         raise QVBindingError(
@@ -382,7 +467,8 @@ def derive_bindings(
                 connection, item,
                 axis_key=axis_key, member_key=member_key, cik=cik,
                 accession=accession, instance_document_name=instance_document_name,
-                issuer_id=issuer_id,
+                instance_sha256=instance_sha256, issuer_id=issuer_id,
+                filing_source_version=filing_source_version,
                 identity_source_version=identity_source_version,
                 instant=instant,
                 filing_historical_usable_session=filing_historical_usable_session,
@@ -405,40 +491,77 @@ def derive_bindings(
 # ── 저장과 조회 ───────────────────────────────────────────────────────────────
 
 
+# semantic 내용 — 정확히 같은 자연키에서 이 값들이 다르면 fail-close다.
+_BINDING_CONTENT = (
+    "issuer_id", "class_id", "canonical_prose_comparison_key", "binding_method",
+    "instance_sha256", "raw_axis_namespace", "raw_axis_local",
+    "raw_member_namespace", "raw_member_local",
+    "filing_historical_usable_session", "identity_usable_from_session",
+    "usable_from_session",
+)
+
+
 def store_bindings(
     connection: sqlite3.Connection,
-    bindings: tuple[ClassBinding, ...],
-    *,
-    filing_source_version: str,
-    identity_source_version: str,
-    instance_sha256: str,
+    bindings: tuple[ClassBinding, ...] | list[ClassBinding],
 ) -> int:
-    rows = [
-        (
+    """binding을 저장한다. **정확히 같은 자연키를 조용히 덮어쓰지 않는다.**
+
+    같은 자연키에 같은 내용이면 멱등 재사용이고, 내용이 다르면 fail-close다.
+    `instance_document_name`이 다르면 **다른 자연키**이므로 같은 QName이 다르게
+    묶여도 정상이다.
+
+    provenance 값은 전부 `ClassBinding`이 들고 온다 — 호출자가 따로 넣지 않는다.
+    """
+    rows: list[tuple] = []
+    for item in bindings:
+        key = (
             item.cik, item.accession, item.instance_document_name,
-            item.axis_key, item.member_key, filing_source_version,
-            identity_source_version, item.issuer_id, item.class_id,
+            item.axis_key, item.member_key,
+            item.filing_source_version, item.identity_source_version,
+        )
+        existing = connection.execute(
+            "SELECT * FROM qv_xbrl_class_bindings"
+            " WHERE cik = ? AND accession = ? AND instance_document_name = ?"
+            "   AND axis_key = ? AND member_key = ?"
+            "   AND filing_source_version = ? AND identity_source_version = ?",
+            key,
+        ).fetchone()
+        if existing is not None:
+            differing = [
+                name for name in _BINDING_CONTENT
+                if existing[name] != getattr(item, name)
+            ]
+            if differing:
+                raise QVBindingError(
+                    "같은 binding 자연키에 다른 내용이 이미 있습니다 — 덮어쓰지 "
+                    f"않습니다: {key} / 다른 칸 {differing}"
+                )
+            continue  # 정확히 같다 — 멱등 재사용
+        rows.append((
+            item.cik, item.accession, item.instance_document_name,
+            item.axis_key, item.member_key, item.filing_source_version,
+            item.identity_source_version, item.issuer_id, item.class_id,
             item.raw_axis_namespace, item.raw_axis_local,
             item.raw_member_namespace, item.raw_member_local,
             item.canonical_prose_comparison_key, item.binding_method,
-            instance_sha256, item.filing_historical_usable_session,
+            item.instance_sha256, item.filing_historical_usable_session,
             item.identity_usable_from_session, item.usable_from_session,
             BINDING_SOURCE, item.provenance,
-        )
-        for item in bindings
-    ]
-    with connection:
-        connection.executemany(
-            "INSERT OR REPLACE INTO qv_xbrl_class_bindings"
-            " (cik, accession, instance_document_name, axis_key, member_key,"
-            "  filing_source_version, identity_source_version, issuer_id, class_id,"
-            "  raw_axis_namespace, raw_axis_local, raw_member_namespace,"
-            "  raw_member_local, canonical_prose_comparison_key, binding_method,"
-            "  instance_sha256, filing_historical_usable_session,"
-            "  identity_usable_from_session, usable_from_session, source, provenance)"
-            " VALUES (" + ", ".join("?" * 21) + ")",
-            rows,
-        )
+        ))
+    if rows:
+        with connection:
+            connection.executemany(
+                "INSERT INTO qv_xbrl_class_bindings"
+                " (cik, accession, instance_document_name, axis_key, member_key,"
+                "  filing_source_version, identity_source_version, issuer_id, class_id,"
+                "  raw_axis_namespace, raw_axis_local, raw_member_namespace,"
+                "  raw_member_local, canonical_prose_comparison_key, binding_method,"
+                "  instance_sha256, filing_historical_usable_session,"
+                "  identity_usable_from_session, usable_from_session, source, provenance)"
+                " VALUES (" + ", ".join("?" * 21) + ")",
+                rows,
+            )
     return len(rows)
 
 
@@ -447,24 +570,40 @@ def resolve_accession_member(
     *,
     cik: str,
     accession: str,
+    instance_document_name: str,
     axis_key: str,
     member_key: str,
     filing_source_version: str,
     identity_source_version: str,
+    fact_instant: str,
     usable_by: str | None = None,
 ) -> tuple[str | None, str]:
-    """`(class_id, 상태)`. **그 accession의 binding만** 본다.
+    """`(class_id, 상태)`. **어느 축도 뺄 수 없다.**
 
-    다른 accession의 binding으로 새지 않는다. `usable_by`를 주면 그때 아직 쓸 수 없는
-    binding은 보이지 않는다 — filing과 identity 다리가 둘 다 알려진 뒤에야 쓸 수 있다.
+    ```text
+    정확한 accession + 정확한 instance 문서 + 정확한 QName
+    + 고정된 identity bundle + 개별 fact instant
+    ```
+
+    자연키 전체로 조회한다 — 문서 이름을 빼고 찾거나 순서로 문서를 고르는 폴백이
+    없다. 다른 accession·다른 문서의 binding으로 새지 않는다.
+
+    행을 찾은 뒤에도 **그 fact instant에** 다시 확인한다. 저장된 canonical prose 키가
+    그 시점에 같은 `class_id`로 풀리고, 그 class가 활성이며 같은 issuer의 보통주여야
+    한다. 하나라도 어긋나면 **다른 class로 바꾸지 않는다** — 더 오래되거나 더 새로운
+    prose 구간을 대신 쓰지도 않는다.
+
+    `usable_by`를 주면 그때 아직 쓸 수 없는 binding은 보이지 않는다.
     """
     statement = (
-        "SELECT class_id FROM qv_xbrl_class_bindings"
-        " WHERE cik = ? AND accession = ? AND axis_key = ? AND member_key = ?"
+        "SELECT issuer_id, class_id, canonical_prose_comparison_key"
+        " FROM qv_xbrl_class_bindings"
+        " WHERE cik = ? AND accession = ? AND instance_document_name = ?"
+        "   AND axis_key = ? AND member_key = ?"
         "   AND filing_source_version = ? AND identity_source_version = ?"
     )
     params: list[object] = [
-        normalize_cik(cik), accession, axis_key, member_key,
+        normalize_cik(cik), accession, instance_document_name, axis_key, member_key,
         filing_source_version, identity_source_version,
     ]
     if usable_by is not None:
@@ -473,7 +612,36 @@ def resolve_accession_member(
     rows = connection.execute(statement, params).fetchall()
     if not rows:
         return None, UNRESOLVED
-    class_ids = {row["class_id"] for row in rows}
-    if len(class_ids) != 1:
+    if len({row["class_id"] for row in rows}) != 1:
         return None, AMBIGUOUS
-    return next(iter(class_ids)), RESOLVED
+    row = rows[0]
+
+    # ── fact instant에서 economic/prose identity를 다시 확인한다 ─────────────
+    try:
+        resolved, _usable = _canonical_class(
+            connection,
+            issuer_id=row["issuer_id"],
+            comparison_key=row["canonical_prose_comparison_key"],
+            identity_source_version=identity_source_version,
+            instant=fact_instant,
+        )
+    except QVBindingAmbiguity:
+        return None, AMBIGUOUS
+    except QVBindingError:
+        return None, UNRESOLVED
+    if resolved != row["class_id"]:
+        # 그 시점에는 같은 철자가 **다른 class**의 것이다. 바꿔치지 않는다.
+        return None, UNRESOLVED
+    try:
+        _active_class(
+            connection,
+            class_id=row["class_id"],
+            issuer_id=row["issuer_id"],
+            identity_source_version=identity_source_version,
+            instant=fact_instant,
+        )
+    except QVBindingAmbiguity:
+        return None, AMBIGUOUS
+    except QVBindingError:
+        return None, UNRESOLVED
+    return row["class_id"], RESOLVED

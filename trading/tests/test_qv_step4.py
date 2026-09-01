@@ -93,11 +93,31 @@ class Step4Fixture:
 
     def bind(self, accession, class_id, member_local, *,
              axis_local="StatementClassOfStockAxis", usable="2015-01-02",
-             instance_document_name=None, filing_usable="2015-01-02"):
+             instance_document_name=None, filing_usable="2015-01-02",
+             comparison_key=None):
         """**accession 단위** binding. 옛 시간 구간 alias가 아니다.
 
         accession A의 binding은 accession B에 대해 아무것도 말하지 않는다.
+
+        해석기가 fact instant마다 canonical prose를 다시 확인하므로 그 다리도 함께
+        심는다. 구간은 넓게 둬서 **economic class 수명만이 문지기**가 되게 한다.
         """
+        key = comparison_key or member_local.lower()
+        exists = self.connection.execute(
+            "SELECT 1 FROM qv_share_class_prose_aliases"
+            " WHERE class_id = ? AND comparison_key = ? AND source_version = ?",
+            (class_id, key, self.identity_version),
+        ).fetchone()
+        if exists is None:
+            self.connection.execute(
+                "INSERT INTO qv_share_class_prose_aliases"
+                " (class_id, issuer_id, raw_prose_name, comparison_key, bridge_type,"
+                "  effective_from, effective_to, usable_from_session,"
+                "  source, source_version, provenance)"
+                " VALUES (?, ?, ?, ?, 'SECURITY_TITLE_FACT', '2000-01-01', NULL, ?,"
+                "         'manifest', ?, 'fixture')",
+                (class_id, ISSUER, key, key, usable, self.identity_version),
+            )
         self.connection.execute(
             "INSERT OR REPLACE INTO qv_xbrl_class_bindings"
             " (cik, accession, instance_document_name, axis_key, member_key,"
@@ -111,7 +131,8 @@ class Step4Fixture:
             (CIK, accession, instance_document_name or f"{accession}.xml",
              f"us-gaap:{axis_local}", f"us-gaap:{member_local}",
              SHARES_VERSION, self.identity_version, ISSUER, class_id,
-             USG, axis_local, USG, member_local, member_local.lower(),
+             USG, axis_local, USG, member_local,
+             comparison_key or member_local.lower(),
              "b" * 64, filing_usable, usable, max(str(filing_usable), str(usable))),
         )
         self.connection.commit()
@@ -633,9 +654,11 @@ class ManifestEvidenceTest(Step4Fixture, unittest.TestCase):
         def lookup(usable_by):
             return qv_xbrl_binding.resolve_accession_member(
                 self.connection, cik=CIK, accession="0001234567-21-000001",
+                instance_document_name="0001234567-21-000001.xml",
                 axis_key=AXIS, member_key="us-gaap:CommonClassAMember",
                 filing_source_version=SHARES_VERSION,
                 identity_source_version=self.identity_version,
+                fact_instant="2020-12-31",
                 usable_by=usable_by,
             )
 
@@ -800,8 +823,11 @@ class AccessionScopedResolutionTest(Step4Fixture, unittest.TestCase):
     def test_the_same_qname_maps_differently_in_two_accessions(self):
         self.add_class("cls-a", symbol="AAA", listed=True)
         self.add_class("cls-x", symbol="XXX", listed=True)
-        self.bind("0001234567-20-000001", "cls-a", "CommonClassAMember")
-        self.bind("0001234567-24-000001", "cls-x", "CommonClassAMember")
+        # 두 filing이 같은 QName을 **서로 다른 표지 제목**으로 세운 경우다.
+        self.bind("0001234567-20-000001", "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock")
+        self.bind("0001234567-24-000001", "cls-x", "CommonClassAMember",
+                  comparison_key="reorganized common stock")
 
         first, _ = self.ingest("0001234567-20-000001",
                                self.shares("CommonClassAMember"), bind_members=False)
@@ -835,6 +861,76 @@ class AccessionScopedResolutionTest(Step4Fixture, unittest.TestCase):
                             self.shares("CommonClassAMember"), bind_members=False)
         self.assertEqual([item.mapping_status for item in found], ["AMBIGUOUS"])
         self.assertEqual([item.class_id for item in found], [None])
+
+    def test_a_share_fact_never_sees_another_documents_binding(self):
+        """**instance 문서 이름은 조회 grain의 일부다.**
+
+        한 accession 안의 다른 문서에 걸린 binding이 새거나, 그것이 있다는 이유로
+        멀쩡한 문서-지역 매핑이 `AMBIGUOUS`가 되면 안 된다.
+        """
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        self.add_class("cls-x", symbol="XXX", listed=True)
+        accession = "0001234567-21-000001"
+        # 관측이 읽는 문서는 `{accession}.xml`이다(ingest가 그 이름으로 파싱한다).
+        self.bind(accession, "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock")
+        # 같은 accession의 **다른 문서**가 같은 QName을 다른 class로 세운다.
+        self.bind(accession, "cls-x", "CommonClassAMember",
+                  instance_document_name="second.xml",
+                  comparison_key="reorganized common stock")
+
+        found, _ = self.ingest(accession, self.shares("CommonClassAMember"),
+                               bind_members=False)
+        self.assertEqual([item.class_id for item in found], ["cls-a"])
+        self.assertEqual([item.mapping_status for item in found], ["RESOLVED"])
+
+    def test_a_binding_only_on_another_document_leaves_the_fact_unresolved(self):
+        self.add_class("cls-a", symbol="AAA", listed=True)
+        accession = "0001234567-21-000001"
+        self.bind(accession, "cls-a", "CommonClassAMember",
+                  instance_document_name="only-other.xml",
+                  comparison_key="class a common stock")
+        found, _ = self.ingest(accession, self.shares("CommonClassAMember"),
+                               bind_members=False)
+        self.assertEqual([item.mapping_status for item in found], ["UNRESOLVED"])
+        self.assertEqual([item.class_id for item in found], [None])
+
+    def test_a_prose_key_owned_by_another_class_at_the_fact_instant_unresolves(self):
+        """binding은 있는데 **그 instant에** 그 철자가 다른 class의 것이다."""
+        self.add_class("cls-a", symbol="AAA", listed=True,
+                       effective_from="2010-01-01", effective_to="2019-01-02")
+        self.add_class("cls-b", symbol="BBB", listed=True,
+                       effective_from="2019-01-02")
+        accession = "0001234567-21-000001"
+        self.bind(accession, "cls-a", "CommonClassAMember",
+                  comparison_key="common stock")
+        # 같은 철자가 2019부터는 cls-b의 것이다.
+        self.connection.execute(
+            "UPDATE qv_share_class_prose_aliases SET effective_to = '2019-01-02'"
+            " WHERE class_id = 'cls-a' AND comparison_key = 'common stock'"
+        )
+        self.connection.execute(
+            "INSERT INTO qv_share_class_prose_aliases"
+            " (class_id, issuer_id, raw_prose_name, comparison_key, bridge_type,"
+            "  effective_from, effective_to, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES ('cls-b', ?, 'Common Stock', 'common stock',"
+            "         'SECURITY_TITLE_FACT', '2019-01-02', NULL, '2015-01-02',"
+            "         'manifest', ?, 'fixture')",
+            (ISSUER, self.identity_version),
+        )
+        self.connection.commit()
+
+        facts = (
+            self.shares("CommonClassAMember", value="1000", instant="2018-12-31")
+            + self.shares("CommonClassAMember", value="2000", instant="2020-12-31")
+        )
+        found, _ = self.ingest(accession, facts, bind_members=False)
+        by_instant = {item.fact_instant: item for item in found}
+        self.assertEqual(by_instant["2018-12-31"].class_id, "cls-a")
+        # **cls-b로 바꿔치지 않는다.**
+        self.assertIsNone(by_instant["2020-12-31"].class_id)
+        self.assertEqual(by_instant["2020-12-31"].mapping_status, "UNRESOLVED")
 
     def test_the_individual_fact_instant_controls_economic_validity(self):
         """한 filing 안의 fact들이 같은 경제적 날짜를 갖는다고 가정하지 않는다."""

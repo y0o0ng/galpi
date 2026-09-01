@@ -14,6 +14,9 @@ accession 안에서만** 참이다. 다른 accession의 binding으로 새지 않
 
 **economic class 활성 판정은 fact마다 그 fact의 instant로 한다.** 한 filing 안의 모든
 fact가 같은 경제적 날짜를 갖는다고 가정하지 않는다.
+
+한 accession 안에도 instance 문서가 여럿일 수 있으므로 조회에 **문서 이름까지** 넘긴다.
+다른 문서의 binding이 새지 않는다.
 """
 
 from __future__ import annotations
@@ -259,25 +262,24 @@ def extract_observations(
                 class_id = sole
                 resolution_status = RESOLVED
         elif shape == SINGLE_CLASS_AXIS:
+            # **어느 축도 빼지 않는다** — accession · instance 문서 · QName ·
+            # 고정 bundle · 개별 fact instant 전부를 넘긴다. 해석기가 그 instant에서
+            # economic/prose identity까지 다시 확인한다.
             bound, status = qv_xbrl_binding.resolve_accession_member(
                 connection,
                 cik=cik,
                 accession=accession,
+                instance_document_name=instance.source_file,
                 axis_key=detail["axis_key"],
                 member_key=detail["member_key"],
                 filing_source_version=filing_source_version,
                 identity_source_version=identity_source_version,
+                fact_instant=context.instant,
                 usable_by=usable_by,
             )
             if status == qv_xbrl_binding.AMBIGUOUS:
                 resolution_status = AMBIGUOUS
             elif bound is None:
-                resolution_status = UNRESOLVED
-            elif not _class_active_at(
-                connection, bound, context.instant, identity_source_version
-            ):
-                # binding은 있는데 **그 fact instant에** 그 class가 경제적으로 활성이
-                # 아니다. 조용히 다른 class로 바꾸거나 잘라 맞추지 않는다.
                 resolution_status = UNRESOLVED
             else:
                 class_id = bound
@@ -313,25 +315,6 @@ def extract_observations(
             )
         )
     return tuple(out)
-
-
-def _class_active_at(
-    connection: sqlite3.Connection,
-    class_id: str,
-    instant: str,
-    identity_source_version: str,
-) -> bool:
-    """그 fact instant에 그 economic class가 활성인가.
-
-    한 filing 안의 모든 fact가 같은 경제적 날짜를 갖는다고 가정하지 않는다.
-    """
-    row = connection.execute(
-        "SELECT 1 FROM qv_share_classes"
-        " WHERE class_id = ? AND source_version = ?"
-        "   AND effective_from <= ? AND (effective_to IS NULL OR effective_to > ?)",
-        (class_id, identity_source_version, instant, instant),
-    ).fetchone()
-    return row is not None
 
 
 def _sole_ordinary_class(

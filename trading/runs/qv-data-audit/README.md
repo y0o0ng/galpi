@@ -2187,6 +2187,118 @@ economic class로 증명하지만, 그 표지에 Class B member의 제목 fact�
 - **Gate A~H는 여전히 미판정이다.** Q/V·B/M·랭크·선택·수익률을 계산하지 않았다.
 
 
+## 10.17 accession binding grain · fact-instant 재확인 · provenance 권한 fix — 2026-09-02
+
+10.16 재설계(C2)는 그대로 승인 상태이고, 그 위의 리뷰 지적 넷을 고친다. **production
+identity 행을 늘리지 않았다** — economic anchor 세 파일이 그대로다.
+
+### 1 (BLOCKER) — 조회 grain에 instance 문서가 빠져 있었다
+
+스키마 자연키에는 `instance_document_name`이 있는데 `resolve_accession_member()`가
+그것을 빼고 찾았고 `qv_shares`도 넘기지 않았다. **한 accession 안의 다른 instance
+문서 binding이 관측으로 새거나, 그것이 있다는 이유로 멀쩡한 문서-지역 매핑이
+`AMBIGUOUS`가 됐다.**
+
+문서 이름을 **필수 조회 입력**으로 만들고 자연키 전체로 찾는다. 문서 이름을 무시하는
+폴백도, 순서로 문서를 고르는 규칙도 없다. `qv_shares`는 이미 들고 있는
+`instance.source_file`을 그대로 넘긴다.
+
+### 2 (BLOCKER) — fact instant에서 economic/prose identity를 다시 확인한다
+
+binding 파생은 표지 context instant를 쓰고, `qv_shares`는 나중에 class 수명만 다시
+봤다. **CLOSED 규칙은 그 share-fact instant에서 철자가 정확히 하나로 풀리고 그 class가
+활성일 것을 요구한다.**
+
+`resolve_accession_member()`에 `fact_instant`를 필수로 넣고, 행을 찾은 뒤 저장된
+`issuer_id`·`class_id`·canonical prose 키로 그 시점에 다시 확인한다 — 같은 class로
+풀리는가 · 활성인가 · 같은 issuer인가 · 보통주인가. **다른 class로 바꿔치지 않고 더
+오래되거나 더 새로운 prose 구간을 대신 쓰지도 않는다.** 기존 `_canonical_class` ·
+`_active_class`를 그대로 쓰고 두 번째 정의를 만들지 않았다. "없다"와 "둘이다"는
+문자열이 아니라 `QVBindingAmbiguity` 형으로 가른다. `qv_shares`의 독립
+`_class_active_at`는 해석기가 계약을 통째로 갖게 되어 없앴다.
+
+### 3 (MAJOR) — filing session과 instance SHA는 파생 provenance다
+
+호출자가 `filing_historical_usable_session`과 `instance_sha256`을 넣을 수 있어서 실제
+K/Q filing·실제 문서와 어긋난 provenance로 binding이 저장될 수 있었다.
+
+```text
+instance_document_name = document.source_file
+instance_sha256        = document.sha256
+filing usable session  = qv_sec_filings의 (cik, accession, source_version) 행
+```
+
+filing 원장 조회는 **정확히 한 행**을 요구하고 없으면 fail-close다. 스키마에도 FK를
+걸었다 — `qv_sec_filings`의 PK가 그대로 그 셋이고 binding 표는 10.16에서 새로 생긴
+빈 표라 파괴적 migration이 필요 없었다. `ClassBinding`이 불변 source 정체성을 직접
+들고 다니므로 `store_bindings()`는 호출자 복사본을 받지 않는다.
+
+### 4 (MAJOR) — 정확한 자연키 충돌이 fail-close다
+
+`INSERT OR REPLACE`가 같은 자연키의 다른 semantic 내용을 조용히 덮어썼다. 이제
+같은 내용이면 멱등 재사용이고 다르면 `QVBindingError`다. `instance_document_name`이
+다르면 **다른 자연키**라 같은 QName이 다르게 묶여도 정상이다. 행을 직접 `UPDATE`한 뒤
+관찰하던 옛 테스트를 실제 저장 경로 테스트로 바꿨다.
+
+### 정리
+
+`load_manifest()`의 "네 파일"과 `data_sources.note`의 `(4 files...)`를 세 파일 ·
+bundle v2로 맞췄다.
+
+### 회귀 — fix 전에는 실패하는 것들
+
+문서 grain 셋(공유 binding 분리 · 다른 문서 binding 미노출 · qv_shares 누출)은
+**fix를 임시로 되돌려 실제로 실패하는 것을 확인**한 뒤 복구했다.
+
+```text
+한 accession 두 문서가 같은 QName을 따로 묶는다(어느 쪽도 AMBIGUOUS가 아니다) ·
+없는 문서 이름은 UNRESOLVED · share fact가 다른 문서 binding을 보지 않는다 ·
+철자가 다른 class의 것인 instant에서 UNRESOLVED · 그 instant에 class가 비활성이면
+UNRESOLVED · 그 instant에 철자가 둘로 가면 AMBIGUOUS · filing 기록이 없으면
+fail-close · 원장 session을 쓰고 호출자 값을 쓰지 않는다 · 같은 자연키 다른 내용은
+fail-close이고 원래 행이 그대로 · 같은 내용 재저장은 멱등
+```
+
+### 실제 SEC smoke (읽기 전용, GOOGL `0001652044-26-000071`)
+
+```text
+문서            goog-20260630_htm.xml     (document.source_file)
+instance sha    1376c154c799dd52…         (document.sha256)
+filing usable   2026-07-23                (qv_sec_filings 행에서)
+저장            2행 · 같은 것 재저장 0행(멱등)
+us-gaap:CommonClassAMember          -> googl-a   정확한 문서 조회 RESOLVED
+ext:0001652044:CapitalClassCMember  -> googl-c   정확한 문서 조회 RESOLVED
+같은 QName을 `other.xml`로 조회      -> (None, UNRESOLVED)   폴백 없음
+googl-b bound: False                 unresolved 24
+SEC 호출 8
+```
+
+`googl-b`는 여전히 묶이지 않는다 — governing instrument는 class를 증명하지 QName
+관계를 증명하지 않는다.
+
+### 로컬 Python 실측 (2026-09-02)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_xbrl_binding` | 27 OK |
+| `test_qv_step4` | 127 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_identity_proposals` | 102 OK |
+| `test_qv_identity_promotion` | 60 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| **전체 trading suite** | **1,721 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — 워크플로는 npm 테스트·빌드만 돌린다.
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity manifest를 넓히지 않았다.
+- 897개를 승격·binding하지 않았고 5A-3을 구현하지 않았다.
+- 사람 QName 판정 기구를 만들지 않았다.
+- **Gate A~H는 여전히 미판정이다.** Q/V·B/M·랭크·선택·수익률을 계산하지 않았다.
+
+
 ---
 
 ## 11. 결과

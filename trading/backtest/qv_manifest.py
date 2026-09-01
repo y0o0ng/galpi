@@ -183,7 +183,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 def load_manifest(directory: Path | str = DEFAULT_MANIFEST_DIR) -> Manifest:
-    """네 파일을 읽고 정규화·중복검사한 뒤 bundle 해시를 계산한다."""
+    """세 파일을 읽고 정규화·중복검사한 뒤 bundle 해시를 계산한다."""
     base = Path(directory)
     rows: dict[str, tuple[dict, ...]] = {}
     digest = hashlib.sha256()
@@ -478,7 +478,7 @@ def materialize(
             (
                 IDENTITY_SOURCE,
                 version,
-                "QV identity manifest bundle (4 files, canonical SHA-256)",
+                "QV identity manifest bundle v2 (3 files, canonical SHA-256)",
             ),
         )
         for table in (

@@ -175,6 +175,26 @@ ticker 유사도 · governing instrument의 class 이름 유사도
 명시 filing-local 다리가 없으면 **`UNRESOLVED`이고 그것으로 괜찮다.** accession 단위
 사람 판정 기구는 실제 coverage가 요구할 때 따로 설계한다.
 
+#### 해석 grain — 어느 축도 뺄 수 없다
+
+```text
+정확한 SEC accession
++ 정확한 instance 문서
++ 정확한 QName
++ 고정된 identity bundle
++ 개별 fact instant
+```
+
+**한 accession 안에도 instance 문서가 여럿일 수 있다.** 문서마다 같은 QName이 다르게
+묶일 수 있으므로 `instance_document_name`은 자연키이자 **필수 조회 입력**이다. 문서
+이름을 빼고 찾는 폴백이 없고 순서로 문서를 고르지 않는다 — 그렇게 하면 다른 문서의
+binding이 새거나 멀쩡한 문서-지역 매핑이 `AMBIGUOUS`가 된다.
+
+**binding 행을 찾은 뒤에도 그 fact instant에서 다시 확인한다.** 저장된 canonical prose
+키가 그 시점에 **같은 `class_id`로** 풀리고, 그 class가 활성이며 같은 issuer의
+보통주여야 한다. 하나라도 어긋나면 다른 class로 바꾸지 않고 더 오래되거나 더 새로운
+prose 구간을 대신 쓰지도 않는다 — `UNRESOLVED`이거나 기존 모호 규칙대로 fail-close다.
+
 #### binding 가용성
 
 filing과 identity 다리가 **둘 다** 알려진 뒤에야 쓸 수 있다.
@@ -187,6 +207,39 @@ usable_from_session = max(
 ```
 
 손으로 넣지 않는다. **filing 수리 시각을 economic class 유효성으로 쓰지 않는다.**
+
+#### provenance는 호출자가 쓰지 않는다
+
+binding의 권한이 raw accession + 고정 bundle이므로 그 값들을 호출자가 지어낼 수 없다.
+
+```text
+instance_document_name   = document.source_file
+instance_sha256          = document.sha256
+filing usable session    = qv_sec_filings의 그 (cik, accession, source_version) 행
+```
+
+filing 원장 조회는 **정확히 한 행**을 요구하고 없으면 fail-close다 — binding은 그
+canonical K/Q 기록과 독립해서 존재할 수 없다. 스키마에도 같은 불변식을 FK로 걸었다.
+
+```sql
+FOREIGN KEY (cik, accession, filing_source_version)
+  REFERENCES qv_sec_filings(cik, accession, source_version)
+```
+
+`qv_sec_filings`의 PK가 그대로 `(cik, accession, source_version)`이고
+`qv_xbrl_class_bindings`는 이번 재설계에서 새로 생긴 빈 표라 파괴적 migration이 필요
+없었다. 코드에서도 같은 불변식을 따로 확인한다(메모리 DB는 FK 강제를 켜지 않는다).
+
+#### 저장 충돌은 fail-close다
+
+```text
+같은 자연키 + 같은 내용        멱등 재사용
+같은 자연키 + 다른 내용        fail-close — 조용히 덮어쓰지 않는다
+다른 instance_document_name    **다른 자연키** — 같은 QName이 다르게 묶여도 정상이다
+```
+
+"다른 내용"은 `class_id` · `issuer_id` · canonical prose 키 · binding 방법 ·
+instance SHA · raw QName 칸 · 세 usable session이다.
 
 구현은 `trading/backtest/qv_xbrl_binding.py`이고 해석기는
 `resolve_accession_member(...)`다. 옛 시간 구간 `qv_identity.resolve_member(...,
@@ -314,9 +367,9 @@ Jan 1(t-1) <= share fact instant <= December valuation session D
    여러 class가 있으면 **issuer 총계를 배분하지 않는다.**
 2. **명시 dimension 정확히 하나** — 축이 승인된 표준 주식 class 축 하나여야 한다
    (`StatementClassOfStockAxis` · `ClassesOfShareCapitalAxis`).
-   그 accession의 exact XBRL binding → 안정된 `class_id`.
-   **binding이 없으면 `UNRESOLVED`다.** 다른 accession의 binding으로 새지 않고,
-   economic class 활성 판정은 **그 fact의 instant**로 한다.
+   그 accession·**그 instance 문서**의 exact XBRL binding → 안정된 `class_id`.
+   **binding이 없으면 `UNRESOLVED`다.** 다른 accession·다른 문서의 binding으로 새지
+   않고, economic/prose identity 재확인은 **그 fact의 instant**로 한다.
 3. **그 밖의 모든 모양** — 사용 불가 / fail-close.
 
 **typed dimension은 쓸 수 없다. member를 전역 추론하지 않는다.**

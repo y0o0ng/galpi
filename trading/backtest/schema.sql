@@ -613,6 +613,9 @@ CREATE TABLE IF NOT EXISTS qv_xbrl_class_bindings (
                filing_source_version, identity_source_version),
   FOREIGN KEY (issuer_id, identity_source_version)
     REFERENCES qv_issuers(issuer_id, source_version),
+  -- binding은 canonical K/Q filing 기록과 독립해서 존재할 수 없다.
+  FOREIGN KEY (cik, accession, filing_source_version)
+    REFERENCES qv_sec_filings(cik, accession, source_version),
   CHECK (usable_from_session >= filing_historical_usable_session),
   CHECK (usable_from_session >= identity_usable_from_session)
 ) WITHOUT ROWID;
