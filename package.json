@@ -29,6 +29,7 @@
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
     "smoke:openai-responses": "node scripts/smoke-openai-responses.js",
+    "smoke:github-mcp": "node scripts/smoke-github-mcp.js",
     "mcp:obsidian": "node scripts/galpi-mcp.mjs"
   },
   "dependencies": {
