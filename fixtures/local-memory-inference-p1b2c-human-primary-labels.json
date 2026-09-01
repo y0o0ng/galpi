@@ -1,0 +1,127 @@
+{
+  "protocolVersion": "xion-p1b2c-human-primary-v1",
+  "candidateFixture": "xion-local-memory-inference-p1b2c-triage-validation-candidates-v1",
+  "completedAt": "2026-09-01T09:20:26.476Z",
+  "labels": [
+    {
+      "caseId": "p1b2c-triage-validation-001",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-002",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-003",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-004",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-005",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-006",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-007",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-008",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-009",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-010",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-011",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-012",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-013",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-014",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-015",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-016",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-017",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-018",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-019",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-020",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-021",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-022",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-023",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-024",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-025",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-026",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-027",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-028",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-029",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2c-triage-validation-030",
+      "label": "ESCALATE"
+    }
+  ]
+}

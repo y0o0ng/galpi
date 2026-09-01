@@ -1799,18 +1799,19 @@ automatic rerun. With zero runtime failures, all four gates produce
 `FAIL_FRESH_SYNTHETIC_VALIDATION`. Neither label means production
 acceptance.
 
-The future P1-B2c model request timeout is fixed at `180000 ms`. P1-B2b's
+The P1-B2c model request timeout is fixed at `180000 ms`. P1-B2b's
 approximately 4B run produced several timeouts near its 60000ms request
 ceiling; the longer fixed ceiling avoids conflating that known narrow limit
 with semantic validation, without claiming a physical or hardware cause.
-The future runner may not expose timeout as a tuning knob and may not
+The runner may not expose timeout as a tuning knob and may not
 automatically rerun cases.
 
-This stage stops after preregistration, evidence-only candidate preparation,
-and blind HUMAN review tooling. It does not create the final adjudicated
-PilotCase fixture, implement the validation runner, start `llama.cpp`, run
-Qwen3, or produce P1-B2c model output. The current next action is completion
-of all 30 blind HUMAN labels and the 10/10/10 fail-close check.
+The preregistration commit stopped after preregistration, evidence-only
+candidate preparation, and blind HUMAN review tooling. It did not create
+the final adjudicated PilotCase fixture, implement the validation runner,
+start `llama.cpp`, run Qwen3, or produce P1-B2c model output. The later gold
+freeze receipt below advances only that staged status; it does not revise
+the preregistered contract.
 
 Composition work is deferred. It must not be designed or implemented now:
 triage must first pass P1-B2c, and structured extraction still needs a
@@ -1823,3 +1824,36 @@ acceptance threshold is assigned here.
 
 Production memory decisions, retrieval, routing, DB, and Vault remain
 unchanged. Private natural replay and Option C remain unopened.
+
+#### P1-B2c blind HUMAN primary gold freeze receipt
+
+Blind HUMAN primary adjudication under protocol
+`xion-p1b2c-human-primary-v1` completed at
+`2026-09-01T09:20:26.476Z`. All 30/30 mappings for candidate fixture
+`xion-local-memory-inference-p1b2c-triage-validation-candidates-v1` were
+read directly from the completed local review output and preserved exactly
+in `fixtures/local-memory-inference-p1b2c-human-primary-labels.json`. The
+final HUMAN distribution is 10 `NO_WRITE`, 10 `WRITE_CANDIDATE`, and 10
+`ESCALATE`; the preregistered distribution fail-close therefore passed.
+HUMAN primary gold is now frozen.
+
+No cloud or local model assisted adjudication, there was no blind second
+pass, and disagreement resolution was not assessed or performed. No
+P1-B2c model output existed when gold was frozen. The evidence strings and
+opaque IDs in the candidate artifact are unchanged. The final adjudicated
+fixture `xion-local-memory-inference-p1b2c-triage-validation-v1` is derived
+only from that unchanged candidate artifact and exact HUMAN mapping, with
+`PRIMARY_ADJUDICATED` HUMAN primary gold, `blindSecondPass = null`,
+`disagreementState = NOT_ASSESSED`, and no applicable hard gate.
+
+The validation runner
+`xion-local-memory-inference-p1b2c-triage-validation-runner-v1` reuses the
+unchanged P1-B2b defined-label one-case execution primitive. It fixes the
+approximately 4B Qwen3 BF16 configuration, `llama.cpp` runtime commit,
+defined-label prompt, 30 fixture-order calls, one call per case, no
+automatic reruns, and `180000 ms` timeout. Its implementation does not
+change the preregistered safety-zero or 8/10-per-class gates, disposition
+rules, frozen P1-B1/P1-B2a/P1-B2b contracts, or production boundaries.
+
+**P1-B2c model validation is READY TO RUN after implementation review. No
+P1-B2c model result exists yet.**
