@@ -1320,3 +1320,113 @@ those requirements, model-size progression, Option C, private replay, or
 production routing. Triage and ambiguity follow-up diagnostics are not
 designed by this task. No real P1-B2a model result existed when this
 preregistration was committed.
+
+### P1-B2a structured-extraction decision-boundary diagnostic receipt
+
+P1-B2a ran on 2026-09-01 under the preregistered frozen configuration.
+The approximately 2B report was generated at
+`2026-09-01T03:32:06.082Z`; the approximately 4B report was generated at
+`2026-09-01T03:34:23.094Z`.
+
+Shared provenance recorded directly by both reports:
+
+-   report version:
+    `xion-local-memory-inference-p1b2a-extraction-boundary-report-v1`
+-   fixture: `xion-local-memory-inference-p1b2a-extraction-boundary-v1`,
+    synthetic, eight cases
+-   Galpi commit:
+    `729f1fedb8e67b6bb00daf6fdd526834b5007836`
+-   policy and quantization: `LOCAL_ONLY`, `BF16`
+-   runtime and version: `llama.cpp`,
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`
+-   diagnostic runner:
+    `xion-local-memory-inference-p1b2a-extraction-boundary-runner-v1`
+-   P1-B1 runner and prompt:
+    `xion-local-memory-inference-p1b1-runner-v1`,
+    `xion-local-memory-inference-p1b1-prompt-v1`
+-   task contract, task specification, and output schema:
+    `xion-local-memory-inference-case-v1`,
+    `p1b1-structured-extraction-quantity-unit-v1`, and
+    `p1b1-structured-extraction-quantity-unit-output-v1`
+
+The approximately 2B configuration was
+`xion-p1b1-qwen3-1.7b-bf16`,
+`unsloth/Qwen3-1.7B-GGUF:BF16`, size class `~2B`. The approximately 4B
+configuration was `xion-p1b1-qwen3-4b-bf16`,
+`unsloth/Qwen3-4B-GGUF:BF16`, size class `~4B`. Both reports recorded the
+fixture identity above without substitution.
+
+Descriptive summaries:
+
+-   **Approximately 2B:** 8 total, 8 schema-valid, 0 invalid structured
+    outputs, 0 runtime failures, 8 exact matches, and 0 mismatches.
+-   **Approximately 4B:** 8 total, 8 schema-valid, 0 invalid structured
+    outputs, 0 runtime failures, 5 exact matches, and 3 mismatches.
+
+Per-case results (`expected` is PROGRAMMATIC gold):
+
+| Case | Diagnostic factor | Expected | ~2B actual | ~4B actual |
+| --- | --- | --- | --- | --- |
+| D0 `p1b2a-extraction-d0` | baseline reproduction | `{"weeklyTarget":8,"unit":"pages"}` | same, MATCH | `{"weeklyTarget":20,"unit":"pages"}`, MISMATCH |
+| D1 | target/distractor order | `{"weeklyTarget":8,"unit":"pages"}` | same, MATCH | same, MATCH |
+| D2 | explicit requested cue | `{"weeklyTarget":8,"unit":"pages"}` | same, MATCH | same, MATCH |
+| D3 | target lexical language / phrasing | `{"weeklyTarget":8,"unit":"pages"}` | same, MATCH | same, MATCH |
+| D4 | schema-key lexical alignment | `{"weeklyTarget":8,"unit":"pages"}` | same, MATCH | `{"weeklyTarget":20,"unit":"pages"}`, MISMATCH |
+| D5 | same-unit competition | `{"weeklyTarget":8,"unit":"pages"}` | same, MATCH | `{"weeklyTarget":20,"unit":"items"}`, MISMATCH |
+| C1 `p1b2a-extraction-c1` | frozen control | `{"weeklyTarget":5,"unit":"sessions"}` | same, MATCH | same, MATCH |
+| C2 `p1b2a-extraction-c2` | frozen control | `{"weeklyTarget":4,"unit":"hours"}` | same, MATCH | same, MATCH |
+
+D0 at approximately 4B reproduced the exact historical P1-B1
+`p1b1-extraction-023` error, including
+`{"weeklyTarget":20,"unit":"pages"}`. This is not
+`BASELINE_NOT_REPRODUCED`. C1 and C2 remained exact matches, so the
+approximately 4B factor-level diagnostic is interpretable under the
+preregistered control rule.
+
+Because D0 reproduced that exact historical error, both controls stayed
+stable, and each paired variant changed to exact gold, the approximately
+4B result **supports sensitivity to** target/distractor order, explicit
+requested cues, and target lexical language or phrasing. These three
+sensitivities are not ranked, and the diagnostic does not prove that any
+one factor caused the failure.
+
+D4 is a negative diagnostic observation: merely aligning the evidence
+token with the schema key `weeklyTarget` did not repair the approximately
+4B error. D5 is also negative evidence: removing same-unit competition
+did not repair it, and the model returned the complete monthly distractor
+fact `{"weeklyTarget":20,"unit":"items"}`. This weakens a simple
+"same unit caused the confusion" explanation and is consistent with
+incorrect field/target selection rather than merely attaching the wrong
+number to the requested unit. It is diagnostic evidence, not proof of an
+internal model mechanism.
+
+The approximately 2B configuration was stable across D0-D5 and both
+controls, while the approximately 4B configuration varied under the
+bounded manipulations and reproduced the historical D0 failure. Under the
+preregistered rule, this supports **size/checkpoint-specific calibration
+sensitivity**. It does not show that parameter count caused the
+difference, that larger models are generally worse, a monotonic size
+effect, an underlying architecture mechanism, or generalization beyond
+this bounded diagnostic.
+
+Bounded conclusion:
+
+> Under the frozen P1-B1 extraction contract, the Qwen3-4B BF16
+> `p1b1-extraction-023` wrong-value failure is reproducible and sensitive
+> to bounded changes in target/distractor order, explicit requested cues,
+> and target lexical phrasing. The same eight-case diagnostic was stable
+> for Qwen3-1.7B BF16. The evidence supports size/checkpoint-specific
+> field-target selection calibration sensitivity; it does not establish a
+> monotonic model-size effect or prove a causal internal mechanism.
+
+This diagnostic characterization does not retroactively rescue P1-B1 or
+change any P1-B1 score. It does not relax extraction critical wrong value
+`= 0`, introduce an N/8 acceptance threshold, reopen automatic model-size
+progression, justify 7B/8B, open quantization, modify the prompt, schema,
+parser, runtime, or model configuration, establish production acceptance
+or target-hardware feasibility, open private natural replay, or open
+Option C. The original P1-B1 approximately 4B screening failure remains
+exactly as recorded, and production memory decisions, retrieval, and model
+routing remain unchanged.
+
+**P1-B2a is CLOSED / COMPLETE.**
