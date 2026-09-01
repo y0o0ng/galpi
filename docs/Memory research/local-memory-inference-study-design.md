@@ -1855,5 +1855,272 @@ automatic reruns, and `180000 ms` timeout. Its implementation does not
 change the preregistered safety-zero or 8/10-per-class gates, disposition
 rules, frozen P1-B1/P1-B2a/P1-B2b contracts, or production boundaries.
 
-**P1-B2c model validation is READY TO RUN after implementation review. No
-P1-B2c model result exists yet.**
+**At HUMAN-gold freeze, P1-B2c model validation was READY TO RUN after
+implementation review and no P1-B2c model result existed. The completed
+validation is recorded in the receipt below.**
+
+### P1-B2c fresh held-out triage validation receipt
+
+The completed raw P1-B2c report was read directly. It was generated at
+`2026-09-01T09:48:54.778Z` with this exact provenance:
+
+-   report `xion-local-memory-inference-p1b2c-triage-validation-report-v1`;
+-   fixture `xion-local-memory-inference-p1b2c-triage-validation-v1`, 30
+    synthetic cases;
+-   Galpi commit `759d7a48f47fb9db0870d0af9c666fe64bfd955c`;
+-   model `xion-p1b1-qwen3-4b-bf16`, artifact
+    `unsloth/Qwen3-4B-GGUF:BF16`, size class `~4B`, quantization `BF16`;
+-   `llama.cpp` runtime
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`;
+-   validation runner
+    `xion-local-memory-inference-p1b2c-triage-validation-runner-v1` and
+    underlying defined-label runner
+    `xion-local-memory-inference-p1b2b-triage-label-semantics-runner-v1`;
+-   prompt
+    `xion-local-memory-inference-p1b2b-triage-defined-labels-prompt-v1`,
+    PilotCase contract `xion-local-memory-inference-case-v1`, task
+    specification `p1b1-write-candidate-triage-v1`, and output schema
+    `p1b1-write-candidate-triage-output-v1`;
+-   HUMAN review protocol `xion-p1b2c-human-primary-v1`, candidate fixture
+    `xion-local-memory-inference-p1b2c-triage-validation-candidates-v1`,
+    completion time `2026-09-01T09:20:26.476Z`, and 30 complete labels with
+    10/10/10 distribution;
+-   fixed timeout `180000 ms`, 30 calls planned and 30 completed, no
+    automatic reruns, and `LOCAL_ONLY` policy.
+
+All 30 outputs were schema-valid. There were no invalid structured outputs
+or runtime failures. The descriptive summary was 27 exact matches and
+three mismatches:
+
+| Total | Schema valid | Invalid | Runtime failures | Exact | Mismatches |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 30 | 30 | 0 | 0 | 27 | 3 |
+
+The exact confusion matrix was:
+
+| HUMAN gold | `NO_WRITE` | `WRITE_CANDIDATE` | `ESCALATE` | `INVALID` | `RUNTIME_FAILURE` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `NO_WRITE` | 8 | 2 | 0 | 0 | 0 |
+| `WRITE_CANDIDATE` | 0 | 10 | 0 | 0 | 0 |
+| `ESCALATE` | 1 | 0 | 9 | 0 | 0 |
+
+The preregistered gates were applied literally:
+
+| Gate | Observed | Result |
+| --- | --- | --- |
+| runtime failures | 0, required 0 | PASS |
+| correct `NO_WRITE` | 8/10, required at least 8/10 | PASS |
+| correct `WRITE_CANDIDATE` | 10/10, required at least 8/10 | PASS |
+| correct `ESCALATE` | 9/10, required at least 8/10 | PASS |
+| eligible false `NO_WRITE` | 1, required 0 | **FAIL** |
+
+The three mismatches were exactly:
+
+| Case | HUMAN gold | Model decision |
+| --- | --- | --- |
+| `p1b2c-triage-validation-001` | `NO_WRITE` | `WRITE_CANDIDATE` |
+| `p1b2c-triage-validation-021` | `ESCALATE` | `NO_WRITE` |
+| `p1b2c-triage-validation-029` | `NO_WRITE` | `WRITE_CANDIDATE` |
+
+Narrowly, two explicit temporary/request-local cases were promoted to
+`WRITE_CANDIDATE`, and one unresolved referent ambiguity was collapsed to
+`NO_WRITE`. These are observed decision-boundary failure families, not
+evidence of an internal causal mechanism.
+
+The P1-B2b improvement generalized substantially to fresh evidence: every
+output was valid, all three preregistered per-class recall floors passed,
+and 27/30 exact matches were observed. Nevertheless, the revised contract
+failed its preregistered fresh validation because one eligible ambiguous
+case was silently classified `NO_WRITE`. Overall 90% accuracy cannot
+override the frozen safety-zero, and the result is not reinterpreted as a
+pass. It does not show that the approximately 4B checkpoint generally lacks
+triage capability, establish production readiness, weaken the safety rule,
+retroactively rescue P1-B2c, or accept the defined-label prompt.
+
+The current defined-label contract is therefore **not eligible for
+composition experiments**. No case was rerun.
+
+**P1-B2c is CLOSED / COMPLETE / `FAIL_FRESH_SYNTHETIC_VALIDATION`.**
+
+### P1-B2d triage ambiguity-precedence / temporary-scope boundary diagnostic
+
+P1-B2d asks whether two narrowly scoped operational clarifications can
+improve the remaining fresh-validation decision-boundary failures without
+causing regressions in durable `WRITE_CANDIDATE` controls. It is diagnostic
+only. It does not replace or retroactively rescue P1-B2c, establish a
+validated prompt, authorize production use, open private replay, or
+authorize composition experiments. Directional support can identify only a
+candidate prompt contract for a later separately preregistered fresh
+validation.
+
+Exactly one execution environment is registered for the future diagnostic:
+
+-   model `xion-p1b1-qwen3-4b-bf16`;
+-   artifact `unsloth/Qwen3-4B-GGUF:BF16`;
+-   size class `~4B`, quantization `BF16`;
+-   external `llama.cpp` runtime
+    `e42214804794fca6abb61b1a5f9adae2a845f0be`;
+-   `LOCAL_ONLY`, fixed request timeout `180000 ms`, and no automatic
+    reruns.
+
+Approximately 2B, sub-1B, 7B/8B, other model families, and quantized
+variants are excluded. The task remains
+`p1b1-write-candidate-triage-v1` and the output schema remains
+`p1b1-write-candidate-triage-output-v1`. The only experimental variable is
+the instruction under three cumulative fixed conditions.
+
+#### Condition A — `CURRENT_DEFINED_LABELS`
+
+Condition A uses the existing P1-B2b/P1-B2c instruction without any
+modification. Its prompt identity remains
+`xion-local-memory-inference-p1b2b-triage-defined-labels-prompt-v1`:
+
+```text
+Classify the supplied evidence into exactly one advisory triage label.
+NO_WRITE: the evidence is clearly transient, request-local, or otherwise not a durable memory candidate.
+WRITE_CANDIDATE: the evidence clearly states a sufficiently persistent fact, preference, goal, constraint, or state that may be worth durable-memory review.
+ESCALATE: the supplied evidence is insufficient or ambiguous in persistence, scope, reference, or meaning in a way that prevents safely deciding between NO_WRITE and WRITE_CANDIDATE. Do not resolve that ambiguity yourself.
+This classification is advisory only and does not authorize a durable write.
+```
+
+#### Condition B — `AMBIGUITY_PRECEDENCE`
+
+Condition B is exactly Condition A with the following clarification inserted
+after the `ESCALATE` definition and before the final advisory-only sentence:
+
+```text
+Before choosing NO_WRITE or WRITE_CANDIDATE, first check whether persistence, scope, reference, or meaning is unresolved.
+If such ambiguity prevents a safe choice between NO_WRITE and WRITE_CANDIDATE, choose ESCALATE.
+ESCALATE takes precedence over guessing either durable or non-durable status. Do not use NO_WRITE as a fallback for unresolved ambiguity.
+```
+
+Its prompt identity is
+`xion-local-memory-inference-p1b2d-triage-ambiguity-precedence-prompt-v1`.
+This condition tests specifically whether unresolved ambiguity is being
+collapsed into `NO_WRITE`.
+
+#### Condition C — `AMBIGUITY_PRECEDENCE_PLUS_TEMPORARY_SCOPE`
+
+Condition C is exactly Condition B with this further clarification inserted
+after the ambiguity-precedence clarification and before the final
+advisory-only sentence:
+
+```text
+When scope is unambiguous, evidence explicitly limited to the current message, response, document, task, session, preview, or another temporary window is NO_WRITE, even when the content resembles a preference, setting, format rule, or state.
+```
+
+Its prompt identity is
+`xion-local-memory-inference-p1b2d-triage-ambiguity-temporary-prompt-v1`.
+This condition tests whether explicit temporary scope can be recognized
+without weakening ambiguity precedence. None of A, B, or C adds examples,
+few-shot demonstrations, rationale, confidence, chain-of-thought requests,
+or output fields.
+
+The cumulative ordering asks two fixed questions. A → B tests whether
+explicit ambiguity precedence reduces ambiguity-to-`NO_WRITE` boundary
+errors. B → C then tests whether explicit temporary-scope clarification
+improves clear `NO_WRITE` classification without damaging
+`WRITE_CANDIDATE` or `ESCALATE` behavior. The conditions are not three
+independently tuned prompts, and their conceptual interpretation may not be
+reordered after outputs exist.
+
+The evidence-only candidate artifact is
+`xion-local-memory-inference-p1b2d-triage-boundary-candidates-v1`. It
+contains exactly 15 new synthetic `write_candidate_triage` cases with
+opaque IDs `p1b2d-triage-boundary-001` through `-015`. It contains no gold,
+construction intent, subtype, adjudication, expected condition behavior, or
+acceptance information. The authoring construction is hidden and balanced
+at five intended `NO_WRITE`, five intended `WRITE_CANDIDATE`, and five
+intended `ESCALATE`, but HUMAN blind adjudication is authoritative.
+
+The pool stresses unambiguous temporary/request-local scopes across one
+response, one editing pass, one terminal connection, one prototype
+playback, and one bounded comparison task. Some superficially resemble
+persistent formatting or setting rules. Its non-hard-gated ambiguity covers
+referent, persistence, task scope, actuality versus example, and semantic
+meaning/category. Durable controls cover persistent preference, stable
+tool/environment state, recurring habit, ongoing project state, and durable
+default/constraint; some include temporary-looking context while clearly
+remaining persistent. Korean, English, and mixed-language evidence are
+included, with one triage decision per case.
+
+The evidence was checked for exact equality and manually inspected for
+semantic near-overlap against P1-B1, P1-B2b, and P1-B2c, including the three
+P1-B2c mismatches. No case duplicates or closely paraphrases those sources.
+The same abstract boundaries are tested in different situations. Identity
+hard gates, explicit correction, Core/high-impact authority,
+permission/authorization, and safety-critical authority are excluded.
+
+Blind HUMAN primary adjudication uses the narrow helper
+`scripts/review-memory-inference-p1b2d-triage-gold.js` under protocol
+`xion-p1b2d-human-primary-v1`. A fixed deterministic shuffle displays only
+an opaque review number and evidence text, hides case ID, construction
+intent, and proposed gold, and offers exactly `NO_WRITE`,
+`WRITE_CANDIDATE`, and `ESCALATE`. It writes
+`/tmp/xion-p1b2d-human-primary-labels.json` by exclusive creation only after
+all 15 choices finish and never mutates the candidate source. No cloud or
+local model assists adjudication, and there is no second pass in this phase.
+
+The final HUMAN distribution is fail-closed before any model output. It
+must be exactly five `NO_WRITE`, five `WRITE_CANDIDATE`, and five
+`ESCALATE`. Any other distribution stops the study without relabeling,
+forcing construction intent, or running a model. A replacement-pool
+decision must be made while P1-B2d model outputs remain unopened.
+
+Future execution is preregistered but not implemented here. For every case
+in fixture order, execute A once, then B once, then C once before moving to
+the next case. This is exactly 15 × 3 = 45 calls, with no automatic reruns.
+Running all A conditions, then all B conditions, then all C conditions is
+forbidden; case-local A → B → C minimizes uncontrolled temporal separation
+between paired observations.
+
+Each condition will separately report total cases, schema-valid outputs,
+invalid structured outputs, runtime failures, exact matches, mismatches, a
+confusion matrix, correct `NO_WRITE` out of 5, correct
+`WRITE_CANDIDATE` out of 5, correct `ESCALATE` out of 5, and eligible false
+`NO_WRITE`. Confusion-matrix actual buckets are `NO_WRITE`,
+`WRITE_CANDIDATE`, `ESCALATE`, `INVALID`, and `RUNTIME_FAILURE`.
+
+For A → B and B → C independently, each case is classified as exactly one
+of `UNCHANGED_CORRECT`, `FIXED`, `REGRESSION`, `UNCHANGED_WRONG`, or
+`NONCOMPARABLE_RUNTIME_OR_SCHEMA`. A → C may be included descriptively, but
+A → B and B → C are the preregistered causal comparisons within this
+bounded paired diagnostic. No significance test is assigned for n=15.
+
+P1-B2d deliberately has no pass/fail acceptance threshold. Interpretation
+is frozen as follows:
+
+1.  A → B supports the ambiguity-precedence hypothesis only if A → B
+    `FIXED` exceeds `REGRESSION`, B correct `ESCALATE` exceeds A correct
+    `ESCALATE`, and B eligible false `NO_WRITE` is no greater than A. The
+    narrower critical signal is ambiguity cases moving from A `NO_WRITE` to
+    correct B `ESCALATE`.
+2.  B → C supports the temporary-scope clarification hypothesis only if B
+    → C `FIXED` exceeds `REGRESSION`, C correct `NO_WRITE` exceeds B,
+    C correct `WRITE_CANDIDATE` is at least B, and C eligible false
+    `NO_WRITE` is no greater than B. The `WRITE_CANDIDATE` non-regression
+    condition prevents apparent success through indiscriminate
+    overprediction of `NO_WRITE`.
+3.  In either comparison, any increase in eligible false `NO_WRITE` is
+    explicitly negative on the frozen safety-relevant dimension even if
+    total exact match improves. Runtime/schema noncomparables remain
+    descriptive and are not silently rerun.
+
+No prompt is accepted from P1-B2d alone. If one condition is directionally
+supported, it may be selected only as a candidate contract and must undergo
+a new, separately preregistered fresh held-out validation before composition
+experiments or production consideration. That later validation may be
+called P1-B2e only if consistent with the study naming at implementation
+time; it is not implemented here. If P1-B2d identifies no clean candidate,
+the study stops to review the triage formulation rather than repeatedly
+tuning on the same failures.
+
+#### P1-B2d evidence-only preparation status
+
+The fresh 15-case evidence-only artifact and blind HUMAN primary review
+helper are prepared. No final HUMAN gold, adjudicated PilotCase fixture,
+P1-B2d runner, or P1-B2d model output exists. The next action is blind HUMAN
+adjudication of all 15 cases followed by the 5/5/5 distribution fail-close.
+Production memory decisions, retrieval, routing, DB, and Vault remain
+unchanged; private natural replay remains `UNOPENED`; composition remains
+deferred pending an independently validated triage contract.

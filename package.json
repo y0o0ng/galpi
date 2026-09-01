@@ -24,6 +24,7 @@
     "research:memory-inference-triage-label-semantics": "node scripts/run-memory-inference-triage-label-semantics-diagnostic.js",
     "research:memory-inference-p1b2c-triage-validation": "node scripts/run-memory-inference-p1b2c-triage-validation.js",
     "review:memory-inference-p1b2c-triage-gold": "node scripts/review-memory-inference-p1b2c-triage-gold.js",
+    "review:memory-inference-p1b2d-triage-gold": "node scripts/review-memory-inference-p1b2d-triage-gold.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",

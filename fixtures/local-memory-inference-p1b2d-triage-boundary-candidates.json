@@ -1,0 +1,110 @@
+{
+  "name": "xion-local-memory-inference-p1b2d-triage-boundary-candidates-v1",
+  "cases": [
+    {
+      "caseId": "p1b2d-triage-boundary-001",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "A mixed-language design note discusses notification sound와 chart palette together. A later line says, `keep that muted from now on`, but does not identify whether `that` means the audio behavior or the visual styling."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-002",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "이 답변을 작성하는 동안에만 heading을 sentence case로 통일하고, 다음 답변부터는 원래 형식을 쓰라고 했다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-003",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "The user wants every future repository review, including short ad-hoc reviews, to begin its summary with behavioral risk."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-004",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "계약서의 이번 교정 회차 한 번에만 날짜 표기를 YYYY-MM-DD로 맞추고 문서 기본 스타일은 바꾸지 말라고 했다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-005",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "워크숍 메모에 `알림은 오전에 모아서 본다`고 적혀 있으나, 오늘 워크숍 운영안인지 사용자의 지속 습관인지 표시가 없다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-006",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자의 장기 운영 서버는 로그 수집기로 Vector를 사용하며, 임시 점검 shell에서도 같은 환경을 조회한다고 명시돼 있다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-007",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "이번 data cleanup 중 `names stay abbreviated`라고 했는데, 현재 batch에만 적용하는지 앞으로의 import default인지 범위가 정해지지 않았다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-008",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 분기마다 마지막 금요일에 personal knowledge base의 orphan notes를 검토하는 습관을 유지한다고 했다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-009",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "현재 SSH 접속을 종료할 때까지만 명령 결과에서 warning 줄을 먼저 보여 달라고 요청했다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-010",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 이제 시작한 지역사 구술 기록 프로젝트를 향후 18개월간 계속하며, 모든 인터뷰를 bilingual transcript로 관리한다고 밝혔다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-011",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "A role-playing worksheet contains `I plan meals every Sunday` in the participant's voice, but it is not marked as the user's own routine or a sample answer."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-012",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "Use the compact card layout for this single prototype playback, then reset the view when the playback ends."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-013",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "Even during one-off exports, the user's standing default is to keep source filenames unchanged because downstream audit links depend on them."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-014",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "사용자는 `cold items remain separate`라고 했지만, cold가 저장 온도 범주인지 backlog의 비활성 상태 이름인지 설명이 없어 지속 규칙의 의미를 정할 수 없다."
+      }
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-015",
+      "workloadType": "write_candidate_triage",
+      "inputPayload": {
+        "evidence": "이번 공급업체 선정 작업에서만 비용 열을 기본 정렬 기준으로 쓰고, 이후 표 설정에는 남기지 말라고 했다."
+      }
+    }
+  ]
+}
