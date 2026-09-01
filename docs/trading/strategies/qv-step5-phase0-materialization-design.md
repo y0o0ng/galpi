@@ -438,14 +438,47 @@ class 구간을 alias 구간으로 복사하지 않는다.
 수리 시각(acceptance date)을 경제적 유효성으로 바꾸지 않는다.
 ```
 
+**구간은 별도로 직렬화된 증명 객체다.** `interval_proved = true` 하나가 아니다.
+
+```json
+{
+  "... 관계 칸 ...": "...",
+  "interval": {
+    "effective_from": "2016-04-08",
+    "effective_to": null,
+    "evidence": [ ... ]
+  }
+}
+```
+
+구간 증거를 관계 증거에 평평하게 섞지 않는다 — 섞으면 **어느 증거가 수명 경계를
+증명했는지**가 사라진다. 표지 fact는 "그 filing 시점에 이 관계가 있었다"를 증명하지
+경계를 증명하지 않는다. **그 fact가 REQUIRED라는 이유로 구간 증거를 대신하지 못한다.**
+
+세 production 관계(economic class · XBRL alias · prose alias) 모두 `AUTO_PROVABLE`이
+되려면 구간 객체가 있어야 하고, 그 객체는 비어 있지 않은 증거와 **REQUIRED SEC
+자연키 증거 하나 이상**을 들고 `[effective_from, effective_to)` 순서가 맞아야 한다.
+`RelationInterval`은 그 조건을 만드는 자리에서 fail-close한다.
+
+##### alias는 class 수명 밖에서 유효할 수 없다
+
+```text
+class.effective_from <= alias.effective_from
+class.effective_to가 유한하면 alias.effective_to가 그것을 넘지 않는다
+```
+
+밖으로 나가면 `ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME`으로 멈춘다. **조용히 잘라
+맞추지 않는다.**
+
 production manifest에 쓰일 관계가 자기 구간을 증명하지 못하면 나머지가 아무리
 완결돼도 `AUTO_PROVABLE`이 아니다.
 
 ```text
-CLASS_INTERVAL_NOT_EXPLICIT          economic class 구간이 없다
-XBRL_ALIAS_INTERVAL_NOT_EXPLICIT     XBRL alias 구간이 없다
-PROSE_ALIAS_INTERVAL_NOT_EXPLICIT    prose alias 구간이 없다
-CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT  canonical class bridge가 없다
+CLASS_INTERVAL_NOT_EXPLICIT             economic class 구간이 없다
+XBRL_ALIAS_INTERVAL_NOT_EXPLICIT        XBRL alias 구간이 없다
+PROSE_ALIAS_INTERVAL_NOT_EXPLICIT       prose alias 구간이 없다
+CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT     canonical class bridge가 없다
+ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME   alias 구간이 class 수명 밖으로 나간다
 ```
 
 ##### 모든 보통주 class에 canonical bridge가 필요하다
@@ -539,10 +572,31 @@ apply   base를 다시 확인한 뒤에만 네 파일을 바꾼다.
 실패하면 전체를 중단한다** — 조용히 건너뛰지 않는다. `REVIEW_REQUIRED`·`UNRESOLVED`는
 보고만 하고 건드리지 않으며, 그것은 부분 승격이 아니라 **얼어붙은 상태 경계**다.
 
-`proposal_status`를 믿지 않는다. JSON의 `AUTO_PROVABLE`은 **입력이지 권한이 아니고**,
-승격기가 packet을 처음부터 다시 본다. 표지에서 나온 관계는 파생된 제안 행이 아니라
-**packet에 박힌 원본 표지 fact**와 대조한다. SEC를 다시 부르지 않는다 — 증거 수집은
-5A-2b가 끝냈고 여기는 자기 일관성과 manifest 호환성만 결정론적으로 본다.
+**`AUTO_PROVABLE`은 상태·사유 문자열로 재구성되지 않는다.** JSON의
+`proposal_status`와 `reason_codes`는 입력이지 권한이 아니다. 승격기는 packet의
+**구조화된 fact**에서 5A-2b의 상태 결정 규칙을 전부 다시 계산한다.
+
+```text
+작업 항목 계약   member/identity 비어 있지 않음 · symbol_bridge_kind 유효 ·
+                 DIRECT면 member == identity
+요구 심볼        원본 표지를 되살려 5A-2b와 **같은** 대조 함수
+                 (`cover_classes_for_symbol`)로 정확히 하나 · 상장 보통주로 증명 ·
+                 명시 제목 bridge 존재
+발견 조건        출처 어휘 유효 · REUSED_VENDOR_SERIES인데 historical 출처가 하나도
+                 없으면 자동 승격 대상이 아니다
+승계 판정        `successor_judgement_required` **명시 칸**을 본다.
+                 자유 문장 질문에서 추론하지 않는다
+census           `class_census_status` 문자열을 믿지 않고 원본 표지에서 **같은 순수
+                 함수**(`census_status`)로 다시 센다. 결과가 COMPLETE여야 한다
+구간             직렬화된 `interval` 객체에서 직접 확인한다
+```
+
+두 곳이 표지를 따로 해석하면 정의가 조용히 갈라지므로 승격기는 제안기의 순수 함수를
+**공유해서 쓴다**(`cover_proof_from_json` · `cover_classes_for_symbol` ·
+`class_role` · `census_status`). 두 번째 조금 다른 정의를 만들지 않는다.
+
+SEC를 다시 부르지 않는다 — 증거 수집은 5A-2b가 끝냈고 여기는 자기 일관성과 manifest
+호환성만 결정론적으로 본다.
 
 후보 bundle은 임시 디렉터리에 완전한 네 파일로 세우고 **정본 `load_manifest()` ·
 `validate()`로** 검사한다. private 정규화 헬퍼를 production 계약으로 쓰지 않는다.
@@ -563,8 +617,32 @@ apply   base를 다시 확인한 뒤에만 네 파일을 바꾼다.
 fail-close**다. 같은 상장 심볼이 겹치는 구간에 두 class를 가리켜도 fail-close이고
 tie-break를 두지 않는다.
 
+##### 계획은 base + 이번 batch의 전망 상태 위에서 돈다
+
+한 batch의 packet들은 **하나의 누적된 전망 상태**에 대고 해석된다. packet 하나를
+계획할 때마다 그 행들이 상태에 합쳐지고 다음 packet은 그 위에서 풀린다.
+
+```text
+A와 B가 정확히 같은 production issuer/class/alias를 말한다
+  -> 앞 packet이 추가하고 뒤 packet은 **이미 계획된 관계를 재사용한다**
+같은 semantic key인데 내용이 다르다
+  -> 고른 batch 전체가 실패한다
+```
+
+다중 증권 발행사에서 실제로 필요하다 — 같은 발행사의 같은 sibling package를 두 상장
+심볼이 각자 들고 오면 base만 보는 계획이 같은 관계를 두 번 추가한다. **계획 중에
+production 파일을 쓰지 않는다.** receipt는 두 작업 항목 모두에 대해 제안 id → **같은**
+production id 매핑을 그대로 보인다.
+
 기존 JSONL 줄을 정렬·서식 때문에 다시 쓰지 않는다. 새 줄만 결정론적 순서로 덧붙인다 —
 **물리 줄 순서는 정확성 의존이 아니다.** bundle 해시가 semantic 순서로 정규화한다.
+
+##### 쓰기 실패 시 네 파일 전부를 되돌린다
+
+쓰기 직전에 base version을 한 번 더 확인한다. 평범한 Python 예외가 나면 **네 파일
+전부를** 원래 바이트로 되돌린다 — 쓰다가 터진 파일 자신이 이미 잘려 있을 수 있어
+"성공한 파일만 되돌리기"로는 모자란다. **그 이상의 파일시스템 crash-consistency를
+주장하지 않는다** — 프로세스가 죽거나 전원이 나가는 경우는 이 되돌리기가 다루지 않는다.
 
 receipt는 `stage = 5A-2c` JSON 하나이고 **다섯 번째 identity 파일이 아니다.**
 run/audit 산출물로 남는다. DB는 건드리지 않는다 — materialize와

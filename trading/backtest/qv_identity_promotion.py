@@ -44,6 +44,12 @@ from pathlib import Path
 
 from .qv_identity_proposals import (
     AUTO_PROVABLE,
+    BRIDGE_KINDS,
+    DIRECT,
+    DISCOVERY_ORIGINS,
+    HISTORICAL_ORIGINS,
+    ORDINARY_COMMON_LISTED,
+    REUSED_VENDOR_SERIES,
     CoverClass,
     CANONICAL_PROSE_BRIDGES,
     CLASS_CENSUS_COMPLETE,
@@ -54,7 +60,11 @@ from .qv_identity_proposals import (
     UNRESOLVED,
     GOVERNING_INSTRUMENT,
     SECURITY_TITLE_FACT,
+    census_status,
     class_id_for,
+    class_role,
+    cover_classes_for_symbol,
+    cover_proof_from_json,
 )
 from .qv_manifest import (
     APPROVED_CLASS_AXIS_LOCALS,
@@ -282,17 +292,51 @@ def _require_evidence(items, label: str) -> list[dict]:
     return out
 
 
-def _interval(row: dict, label: str) -> tuple[str, str | None]:
-    if not row.get("interval_proved"):
-        raise QVPromotionError(f"{label}: 자기 유효구간이 증명되지 않았습니다")
-    start = str(row.get("effective_from") or "").strip()
+def _merge_evidence(relation: list[dict], interval: list[dict]) -> list[dict]:
+    """관계 증거 + 구간 증거. **중복은 한 번만 남기고 순서는 결정론적이다.**"""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in list(relation) + list(interval):
+        key = _canonical_json(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def _interval(row: dict, label: str) -> dict:
+    """**직렬화된 구간 객체에서 직접 확인한다.**
+
+    `interval_proved` 같은 논리 flag를 믿지 않는다. 구간은 자기 증거를 들고 있어야
+    하고, 그 증거에 REQUIRED가 하나는 있어야 한다. **표지 fact가 REQUIRED라는 이유로
+    수명 경계 증거를 대신하지 못한다** — 관계 증거와 구간 증거는 다른 자리에 있다.
+    """
+    payload = row.get("interval")
+    if not isinstance(payload, dict):
+        raise QVPromotionError(
+            f"{label}: 구간 객체가 없습니다 — 관계마다 자기 유효구간 증거가 필요합니다"
+        )
+    start = str(payload.get("effective_from") or "").strip()
     if not start:
-        raise QVPromotionError(f"{label}: effective_from이 비었습니다")
-    end = row.get("effective_to")
+        raise QVPromotionError(f"{label}: 구간 effective_from이 비었습니다")
+    end = payload.get("effective_to")
     end = str(end).strip() if end not in (None, "") else None
     if end is not None and end <= start:
         raise QVPromotionError(f"{label}: 구간이 뒤집혔습니다 {start}..{end}")
-    return start, end
+    evidence = _require_evidence(payload.get("evidence"), f"{label} 구간")
+    return {"effective_from": start, "effective_to": end, "evidence": evidence}
+
+
+def _within(inner: dict, outer: dict) -> bool:
+    """alias 구간이 class 수명 안에 들어가는가. **조용히 잘라 맞추지 않는다.**"""
+    if inner["effective_from"] < outer["effective_from"]:
+        return False
+    if outer["effective_to"] is None:
+        return True
+    if inner["effective_to"] is None:
+        return False
+    return inner["effective_to"] <= outer["effective_to"]
 
 
 def _cover_index(proof: dict, cik: str) -> tuple[dict[str, dict], dict[str, str]]:
@@ -367,19 +411,50 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
         )
     if packet.get("conflicts"):
         raise QVPromotionError(f"{label}: conflict가 남아 있습니다")
-    if packet.get("class_census_status") != CLASS_CENSUS_COMPLETE:
-        raise QVPromotionError(f"{label}: sibling class census가 완결되지 않았습니다")
     if "usable_from_session" in _canonical_json(packet):
         raise QVPromotionError(f"{label}: usable_from_session은 5A-3의 파생값입니다")
 
+    # ── 작업 항목 계약 — 상태 문자열이 아니라 원본 칸에서 다시 본다 ──────────
+    member_symbol = str(packet.get("member_symbol") or "").strip()
+    identity_symbol = str(packet.get("identity_symbol") or "").strip()
+    bridge_kind = str(packet.get("symbol_bridge_kind") or "").strip()
+    if not member_symbol or not identity_symbol:
+        raise QVPromotionError(f"{label}: member/identity 심볼이 비었습니다")
+    if bridge_kind not in BRIDGE_KINDS:
+        raise QVPromotionError(f"{label}: 모르는 symbol_bridge_kind입니다: {bridge_kind!r}")
+    if bridge_kind == DIRECT and member_symbol != identity_symbol:
+        raise QVPromotionError(
+            f"{label}: DIRECT인데 member/identity 심볼이 다릅니다"
+        )
+
+    # 승계·재편 판정이 걸린 packet은 기계가 고를 자리가 아니다. **명시 칸을 본다.**
+    if packet.get("successor_judgement_required") is not False:
+        raise QVPromotionError(
+            f"{label}: 발행사 승계·재편 판정이 필요하거나 그 칸이 없습니다"
+        )
+
     selected = normalize_cik(packet.get("selected_cik"))
-    candidates = {
-        normalize_cik(item.get("cik"))
-        for item in packet.get("discovery_candidates") or []
-    }
+    raw_candidates = packet.get("discovery_candidates") or []
+    candidates = {normalize_cik(item.get("cik")) for item in raw_candidates}
     if candidates != {selected}:
         raise QVPromotionError(
             f"{label}: 발견 후보 CIK가 하나로 정해지지 않았습니다 {sorted(candidates)}"
+        )
+    origins = {str(item.get("origin") or "").strip() for item in raw_candidates}
+    unknown = origins - DISCOVERY_ORIGINS
+    if unknown:
+        raise QVPromotionError(f"{label}: 모르는 발견 출처입니다: {sorted(unknown)}")
+
+    # **재사용 벤더 계열인데 현재 티커 계열 출처뿐이면 자동 승격 대상이 아니다.**
+    # 5A-2b와 같은 frozen 규칙을 여기서 다시 돌린다.
+    if (
+        bridge_kind == REUSED_VENDOR_SERIES
+        and raw_candidates
+        and not (origins & HISTORICAL_ORIGINS)
+    ):
+        raise QVPromotionError(
+            f"{label}: 옛 계열인데 발견 후보가 현재 티커 계열 출처뿐입니다 — "
+            "그 구간의 등록인 판정이 필요합니다"
         )
 
     proof = packet.get("proof")
@@ -392,6 +467,35 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
     accession = str(proof.get("accession") or "").strip()
     if not accession:
         raise QVPromotionError(f"{label}: 증명 accession이 비었습니다")
+
+    # **원본 표지 구조를 되살려 5A-2b와 같은 순수 함수를 다시 돌린다.**
+    # `class_census_status` 문자열을 권한으로 삼지 않는다.
+    rebuilt = cover_proof_from_json(proof)
+    recomputed_census, _notes = census_status(rebuilt)
+    if recomputed_census != CLASS_CENSUS_COMPLETE:
+        raise QVPromotionError(
+            f"{label}: 표지에서 다시 센 sibling class census가 완결이 아닙니다 "
+            f"({recomputed_census})"
+        )
+    if packet.get("class_census_status") != CLASS_CENSUS_COMPLETE:
+        raise QVPromotionError(f"{label}: census 상태 칸이 완결이 아닙니다")
+
+    # 요구된 경제적 심볼이 표지에서 **정확히 하나**로 잡혀야 한다. 5A-2b가 쓰는
+    # 대조 함수를 그대로 쓴다 — 각 class가 자기 심볼과 맞는지만 보는 것으로는 모자란다.
+    demanded = cover_classes_for_symbol(rebuilt, identity_symbol)
+    if len(demanded) != 1:
+        raise QVPromotionError(
+            f"{label}: 표지에서 {identity_symbol}가 정확히 하나로 잡히지 않습니다 "
+            f"({len(demanded)}건)"
+        )
+    target = demanded[0]
+    if class_role(target) != ORDINARY_COMMON_LISTED:
+        raise QVPromotionError(
+            f"{label}: 요구 class가 표지에서 상장 보통주로 증명되지 않았습니다"
+        )
+    if not target.security_title:
+        raise QVPromotionError(f"{label}: 요구 class에 명시 제목 bridge가 없습니다")
+
     cover, member_of = _cover_index(proof, selected)
 
     issuer = packet.get("issuer_proposal")
@@ -424,7 +528,7 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
             raise QVPromotionError(f"{label}: class의 issuer_id가 다릅니다")
         if not row.get("is_ordinary_common"):
             raise QVPromotionError(f"{label}: 보통주가 아닌 class 제안입니다")
-        start, end = _interval(row, f"{label} class {proposal_id}")
+        interval = _interval(row, f"{label} class {proposal_id}")
 
         member_key = member_of.get(proposal_id)
         member = cover.get(member_key) if member_key else None
@@ -446,10 +550,15 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
             "symbol": symbol,
             "is_ordinary_common": True,
             "is_listed": bool(symbol),
-            "effective_from": start,
-            "effective_to": end,
+            "effective_from": interval["effective_from"],
+            "effective_to": interval["effective_to"],
+            "interval": interval,
             "provenance": str(row.get("provenance") or "").strip(),
-            "evidence": _require_evidence(row.get("evidence"), f"{label} class"),
+            # production 행의 증거는 관계 증거 + **구간 증거**를 함께 담는다.
+            "evidence": _merge_evidence(
+                _require_evidence(row.get("evidence"), f"{label} class"),
+                interval["evidence"],
+            ),
         })
     if not class_rows:
         raise QVPromotionError(f"{label}: 승격할 보통주 class가 없습니다")
@@ -470,7 +579,7 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
         proposal_id = str(row.get("class_id") or "").strip()
         if proposal_id not in proposal_ids:
             raise QVPromotionError(f"{label}: alias가 모르는 class를 가리킵니다")
-        start, end = _interval(row, f"{label} xbrl alias {proposal_id}")
+        interval = _interval(row, f"{label} xbrl alias {proposal_id}")
         axis_local = str(row.get("axis_local") or "").strip()
         member_local = str(row.get("member_local") or "").strip()
         axis_key = qname_key(row.get("axis_namespace"), axis_local, selected)
@@ -490,10 +599,14 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
             "member_local": member_local,
             "axis_key": axis_key,
             "member_key": member_key,
-            "effective_from": start,
-            "effective_to": end,
+            "effective_from": interval["effective_from"],
+            "effective_to": interval["effective_to"],
+            "interval": interval,
             "provenance": str(row.get("provenance") or "").strip(),
-            "evidence": _require_evidence(row.get("evidence"), f"{label} xbrl alias"),
+            "evidence": _merge_evidence(
+                _require_evidence(row.get("evidence"), f"{label} xbrl alias"),
+                interval["evidence"],
+            ),
         })
 
     # ── prose alias ─────────────────────────────────────────────────────────
@@ -505,7 +618,7 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
         bridge = str(row.get("bridge_type") or "").strip()
         if bridge not in PROSE_BRIDGE_TYPES:
             raise QVPromotionError(f"{label}: 모르는 bridge_type입니다: {bridge!r}")
-        start, end = _interval(row, f"{label} prose alias {proposal_id}")
+        interval = _interval(row, f"{label} prose alias {proposal_id}")
         raw_name = str(row.get("raw_prose_name") or "").strip()
         comparison = prose_key(raw_name)
         if str(row.get("prose_key") or "") != comparison:
@@ -523,11 +636,29 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
             "raw_prose_name": raw_name,
             "comparison_key": comparison,
             "bridge_type": bridge,
-            "effective_from": start,
-            "effective_to": end,
+            "effective_from": interval["effective_from"],
+            "effective_to": interval["effective_to"],
+            "interval": interval,
             "provenance": str(row.get("provenance") or "").strip(),
-            "evidence": _require_evidence(row.get("evidence"), f"{label} prose alias"),
+            "evidence": _merge_evidence(
+                _require_evidence(row.get("evidence"), f"{label} prose alias"),
+                interval["evidence"],
+            ),
         })
+
+    # ── alias는 그 class의 수명 밖에서 유효할 수 없다 ────────────────────────
+    class_span = {row["proposal_class_id"]: row["interval"] for row in class_rows}
+    for alias in xbrl_rows + prose_rows:
+        outer = class_span.get(alias["proposal_class_id"])
+        if outer is None:
+            raise QVPromotionError(f"{label}: alias가 모르는 class를 가리킵니다")
+        if not _within(alias["interval"], outer):
+            raise QVPromotionError(
+                f"{label}: alias 구간이 class 수명 밖으로 나갑니다 — "
+                f"{alias['proposal_class_id']} "
+                f"alias {alias['effective_from']}..{alias['effective_to']} vs "
+                f"class {outer['effective_from']}..{outer['effective_to']}"
+            )
 
     # ── canonical bridge — 모든 보통주 class에 하나씩 ────────────────────────
     for row in class_rows:
@@ -568,7 +699,7 @@ def _covers(row: dict, session: str) -> bool:
 
 
 def resolve_class_id(
-    manifest,
+    state,
     *,
     issuer_id: str,
     cik: str,
@@ -577,8 +708,11 @@ def resolve_class_id(
 ) -> tuple[str, bool, dict]:
     """`(class_id, 새로 만들었는가, 쓴 탄생 bridge)`.
 
-    **기존 class id를 함부로 다시 만들지 않는다.** 이미 manifest에 있는 id는 안정적인
-    foreign key다. 정확히 안전한 재사용만 시도하고, 둘 이상 걸리면 fail-close다.
+    **기존 class id를 함부로 다시 만들지 않는다.** 이미 있는 id는 안정적인 foreign
+    key다. 정확히 안전한 재사용만 시도하고, 둘 이상 걸리면 fail-close다.
+
+    `state`는 base manifest이거나 **base + 이번 batch가 이미 계획한 행**을 함께 든
+    전망 상태다. 둘 다 `.rows` 하나만 읽는다.
     """
     birth = select_birth_bridge(bridges, class_row["effective_from"])
     if birth is None:
@@ -589,7 +723,7 @@ def resolve_class_id(
     # 같은 issuer · **정확히 같은** canonical comparison_key · 그 관계가 제안 class의
     # 탄생 시점에 유효한 기존 prose alias만 후보다.
     matches: set[str] = set()
-    for row in manifest.rows["prose_aliases.jsonl"]:
+    for row in state.rows["prose_aliases.jsonl"]:
         if row["issuer_id"] != issuer_id:
             continue
         if row["bridge_type"] not in CANONICAL_PROSE_BRIDGES:
@@ -603,7 +737,7 @@ def resolve_class_id(
     compatible: set[str] = set()
     for class_id in matches:
         segments = [
-            row for row in manifest.rows["share_classes.jsonl"]
+            row for row in state.rows["share_classes.jsonl"]
             if row["class_id"] == class_id
         ]
         # **정확히 같은 economic 구간과 속성일 때만 재사용한다.** 다르면 기존 행을
@@ -637,7 +771,7 @@ def resolve_class_id(
         canonical_bridge_type=birth["bridge_type"],
         canonical_bridge_key=birth["comparison_key"],
     )
-    existing_ids = {row["class_id"] for row in manifest.rows["share_classes.jsonl"]}
+    existing_ids = {row["class_id"] for row in state.rows["share_classes.jsonl"]}
     if new_id in existing_ids:
         raise QVPromotionError(f"새 class id가 기존 id와 충돌합니다: {new_id}")
     return new_id, True, birth
@@ -645,6 +779,25 @@ def resolve_class_id(
 
 def _semantic_same(left: dict, right: dict, fields: tuple[str, ...]) -> bool:
     return all(left.get(name) == right.get(name) for name in fields)
+
+
+class Prospective:
+    """base manifest + **이번 batch가 이미 계획한 행**을 함께 보는 조회 상태.
+
+    같은 batch의 앞 packet이 만든 class/alias를 뒤 packet이 **본다.** 그러지 않으면
+    두 상장 심볼이 같은 발행사의 같은 sibling package를 들고 올 때 같은 관계가 두 번
+    추가된다. 다중 증권 발행사에서 정확히 그 일이 일어난다.
+
+    **production 파일을 쓰지 않는다.** 메모리 안의 전망 상태일 뿐이다.
+    """
+
+    def __init__(self, manifest):
+        self.rows = {
+            name: list(manifest.rows[name]) for name in MANIFEST_FILES
+        }
+
+    def add(self, filename: str, row: dict) -> None:
+        self.rows[filename].append(row)
 
 
 @dataclass
@@ -796,22 +949,22 @@ def plan_promotion(
     plan_rows = PlannedRows()
     packet_plans: list[PacketPlan] = []
 
-    # 후보 bundle 안에서만 유효한 대조표. 같은 실행 안의 두 packet도 서로를 본다.
-    pending_classes: list[dict] = []
-    pending_prose: list[dict] = []
+    # **base + 이번 batch가 이미 계획한 것**을 함께 보는 전망 상태. packet 하나를
+    # 계획할 때마다 여기에 합치고, 다음 packet은 그 위에서 해석된다.
+    prospective = Prospective(manifest)
 
     for raw in selected:
         packet = revalidate_packet(raw)
 
         # issuer — 정확히 같으면 재사용, 다르면 fail-close.
         existing_issuer = next(
-            (row for row in manifest.rows["issuers.jsonl"]
+            (row for row in prospective.rows["issuers.jsonl"]
              if row["issuer_id"] == packet.issuer_id),
             None,
         )
         if existing_issuer is None:
             clash = next(
-                (row for row in manifest.rows["issuers.jsonl"]
+                (row for row in prospective.rows["issuers.jsonl"]
                  if row["cik"] == packet.selected_cik),
                 None,
             )
@@ -820,11 +973,8 @@ def plan_promotion(
                     f"{packet.label}: CIK {packet.selected_cik}가 이미 다른 issuer"
                     f"({clash['issuer_id']})에 붙어 있습니다"
                 )
-            if not any(
-                row["issuer_id"] == packet.issuer_id
-                for row in plan_rows.added["issuers.jsonl"]
-            ):
-                plan_rows.added["issuers.jsonl"].append(packet.issuer_row)
+            plan_rows.added["issuers.jsonl"].append(packet.issuer_row)
+            prospective.add("issuers.jsonl", packet.issuer_row)
         else:
             if not _semantic_same(existing_issuer, packet.issuer_row, ISSUER_FIELDS):
                 raise QVPromotionError(
@@ -843,7 +993,7 @@ def plan_promotion(
                 if item["proposal_class_id"] == class_row["proposal_class_id"]
             ]
             class_id, is_new, _birth = resolve_class_id(
-                manifest,
+                prospective,
                 issuer_id=packet.issuer_id,
                 cik=packet.selected_cik,
                 class_row=class_row,
@@ -865,11 +1015,11 @@ def plan_promotion(
             }
             if is_new:
                 plan_rows.added["share_classes.jsonl"].append(production)
+                prospective.add("share_classes.jsonl", production)
             else:
                 plan_rows.reused["share_classes.jsonl"].append(
                     (class_id, class_row["effective_from"])
                 )
-            pending_classes.append(production)
 
         packet_plans.append(
             PacketPlan(
@@ -896,7 +1046,7 @@ def plan_promotion(
             }
             probe = {**row, "axis_key": alias["axis_key"], "member_key": alias["member_key"]}
             _plan_alias(
-                manifest, plan_rows, "xbrl_aliases.jsonl", XBRL_FIELDS, probe, row,
+                prospective, plan_rows, "xbrl_aliases.jsonl", XBRL_FIELDS, probe, row,
                 key=(row["class_id"], alias["axis_key"], alias["member_key"],
                      row["effective_from"]),
                 label=packet.label,
@@ -915,14 +1065,13 @@ def plan_promotion(
             }
             probe = {**row, "comparison_key": alias["comparison_key"]}
             _plan_alias(
-                manifest, plan_rows, "prose_aliases.jsonl", PROSE_FIELDS, probe, row,
+                prospective, plan_rows, "prose_aliases.jsonl", PROSE_FIELDS, probe, row,
                 key=(row["class_id"], alias["comparison_key"], row["bridge_type"],
                      row["effective_from"]),
                 label=packet.label,
             )
-            pending_prose.append(probe)
 
-    _assert_symbol_not_split(manifest, pending_classes)
+    _assert_symbol_not_split(prospective)
 
     candidate = _build_candidate(manifest, plan_rows)
 
@@ -940,11 +1089,15 @@ def plan_promotion(
     )
 
 
-def _plan_alias(manifest, plan_rows, filename, fields, probe, row, *, key, label):
-    """semantic key가 같은 기존 행이 있으면 내용 일치 확인 후 재사용, 없으면 덧붙인다."""
+def _plan_alias(prospective, plan_rows, filename, fields, probe, row, *, key, label):
+    """semantic key가 같은 행이 **전망 상태에** 있으면 내용 일치 확인 후 재사용한다.
+
+    같은 batch의 앞 packet이 이미 계획한 관계도 여기서 보인다 — 두 번 덧붙이지 않는다.
+    같은 semantic key인데 내용이 다르면 **batch 전체가 실패한다.**
+    """
     existing = next(
         (
-            item for item in manifest.rows[filename]
+            item for item in prospective.rows[filename]
             if (
                 item["class_id"] == key[0]
                 and item.get("axis_key" if filename == "xbrl_aliases.jsonl" else "comparison_key") == key[1]
@@ -959,10 +1112,8 @@ def _plan_alias(manifest, plan_rows, filename, fields, probe, row, *, key, label
         None,
     )
     if existing is None:
-        if not any(
-            _semantic_same(item, probe, fields) for item in plan_rows.added[filename]
-        ):
-            plan_rows.added[filename].append(row)
+        plan_rows.added[filename].append(row)
+        prospective.add(filename, probe)
         return
     if not _semantic_same(existing, probe, fields):
         raise QVPromotionError(
@@ -971,17 +1122,18 @@ def _plan_alias(manifest, plan_rows, filename, fields, probe, row, *, key, label
     plan_rows.reused[filename].append(key)
 
 
-def _assert_symbol_not_split(manifest, pending_classes) -> None:
+def _assert_symbol_not_split(prospective) -> None:
     """같은 상장 심볼이 겹치는 구간에 두 class를 가리키면 fail-close다.
 
     `validate()`가 보지 않는 관계라 승격기가 직접 본다. 동률 선택을 하지 않는다.
+    base 행과 이번 batch가 계획한 행을 **함께** 본다.
     """
     rows = [
         {
             "class_id": row["class_id"], "symbol": row["symbol"],
             "effective_from": row["effective_from"], "effective_to": row["effective_to"],
         }
-        for row in list(manifest.rows["share_classes.jsonl"]) + list(pending_classes)
+        for row in prospective.rows["share_classes.jsonl"]
         if row.get("symbol")
     ]
     buckets: dict[str, list[dict]] = {}
@@ -1124,9 +1276,12 @@ def _assert_no_usable_from_session(candidate) -> None:
 def apply_promotion(plan: PromotionPlan, *, directory: Path | str) -> dict:
     """네 파일을 실제로 바꾼다. **직전에 base version을 한 번 더 확인한다.**
 
-    쓰기 전에 완성된 내용을 전부 메모리에 만들어 두고, 평범한 예외가 나면 원래 바이트로
-    되돌려 작업 트리가 반쯤 쓰인 채 남지 않게 한다. **그 이상의 파일시스템
-    crash-consistency를 주장하지 않는다.**
+    쓰기 전에 완성된 내용을 전부 메모리에 만들어 두고, 평범한 Python 예외가 나면
+    **네 파일 전부를** 원래 바이트로 되돌린다. 쓰다가 실패한 파일 자신이 이미 잘리거나
+    일부만 쓰였을 수 있으므로 "성공한 파일만 되돌리기"로는 모자란다.
+
+    **그 이상의 파일시스템 crash-consistency를 주장하지 않는다** — 프로세스가 죽거나
+    전원이 나가는 경우는 이 되돌리기가 다루지 않는다.
     """
     base = Path(directory)
     fresh = load_manifest(base)
@@ -1142,11 +1297,9 @@ def apply_promotion(plan: PromotionPlan, *, directory: Path | str) -> dict:
     original = {
         name: (base / name).read_bytes() for name in MANIFEST_FILES
     }
-    written: list[str] = []
     try:
         for filename in MANIFEST_FILES:
             (base / filename).write_text(contents[filename], encoding="utf-8")
-            written.append(filename)
         after = load_manifest(base)
         validate(after)
         if after.identity_source_version != plan.candidate_identity_source_version:
@@ -1156,7 +1309,9 @@ def apply_promotion(plan: PromotionPlan, *, directory: Path | str) -> dict:
                 f"{plan.candidate_identity_source_version}"
             )
     except Exception:
-        for filename in written:
+        # **네 파일 전부를 되돌린다.** 쓰기가 터진 파일은 `written`에 들어가지 못했지만
+        # 그 파일이야말로 잘려 있을 수 있다.
+        for filename in MANIFEST_FILES:
             (base / filename).write_bytes(original[filename])
         raise
     return plan.as_receipt(applied=True)

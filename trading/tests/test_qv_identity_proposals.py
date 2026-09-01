@@ -48,6 +48,7 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     PREDECESSOR_HINT,
     DIRECT,
     REUSED_VENDOR_SERIES,
+    ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME,
     CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT,
     COVER_GROUP_LABEL,
     GOVERNING_INSTRUMENT,
@@ -1554,6 +1555,136 @@ class RelationIntervalCompletenessTest(unittest.TestCase):
         _proof, packet = self.packet(complete_evidence)
         self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
         self.assertEqual(packet.reason_codes, (MECHANICALLY_COMPLETE_SEC_PROOF,))
+
+
+class IntervalEvidenceIntegrityTest(unittest.TestCase):
+    """`interval_proved`는 **구간 증거가 실제로 있다**는 뜻이어야 한다.
+
+    표지 fact는 "그 filing 시점에 이 관계가 있었다"를 증명하지 **수명 경계**를
+    증명하지 않는다. 빈 증거로 구간을 만들 수 있으면 그 flag가 아무것도 뜻하지 않는다.
+    """
+
+    def test_an_interval_with_no_evidence_cannot_be_constructed(self):
+        with self.assertRaises(QVProposalError) as caught:
+            RelationInterval("2016-04-08", None, ())
+        self.assertIn("구간 증거", str(caught.exception))
+
+    def test_an_interval_needs_at_least_one_required_evidence(self):
+        corroborating = (
+            EvidenceRef(
+                source_kind="KQ_FILING", cik="0000000001",
+                accession="0000000000-16-000009", document_name="x.htm",
+                evidence_role="CORROBORATING_NOTE", dependency="CORROBORATING",
+            ),
+        )
+        with self.assertRaises(QVProposalError):
+            RelationInterval("2016-04-08", None, corroborating)
+
+    def test_a_reversed_interval_cannot_be_constructed(self):
+        with self.assertRaises(QVProposalError):
+            RelationInterval("2016-04-08", "2015-01-01", INTERVAL_EVIDENCE)
+
+    def test_the_interval_is_serialized_as_its_own_object(self):
+        proof = proof_from(single_class_facts("AAA"), cik="0000000001")
+        packet = build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof,
+            class_evidence=complete_evidence(proof),
+        )
+        row = packet.as_json()["share_class_proposals"][0]
+        self.assertIn("interval", row)
+        self.assertEqual(row["interval"]["effective_from"], BIRTH)
+        self.assertTrue(row["interval"]["evidence"])
+        self.assertTrue(
+            any(item["dependency"] == "REQUIRED" for item in row["interval"]["evidence"])
+        )
+
+    def test_interval_evidence_is_not_flattened_into_relation_evidence(self):
+        """관계 증거(표지 fact)와 구간 증거가 서로 다른 자리에 남는다."""
+        proof = proof_from(single_class_facts("AAA"), cik="0000000001")
+        packet = build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof,
+            class_evidence=complete_evidence(proof),
+        )
+        row = packet.as_json()["share_class_proposals"][0]
+        relation_roles = {item["evidence_role"] for item in row["evidence"]}
+        interval_roles = {item["evidence_role"] for item in row["interval"]["evidence"]}
+        self.assertEqual(relation_roles, {"COVER_SECURITY_12B_TITLE"})
+        self.assertEqual(interval_roles, {"CLASS_CREATION_CHARTER"})
+        self.assertFalse(relation_roles & interval_roles)
+
+
+class AliasWithinClassLifetimeTest(unittest.TestCase):
+    """class→alias 관계는 그 class 수명 **밖에서** 유효할 수 없다."""
+
+    def build(self, *, class_span, alias_span):
+        proof = proof_from(single_class_facts("AAA"), cik="0000000001")
+        evidence = {
+            item.member_key: ClassEvidence(
+                class_interval=class_span,
+                xbrl_interval=alias_span,
+                cover_title_interval=class_span,
+            )
+            for item in proof.classes
+        }
+        return build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof, class_evidence=evidence,
+        )
+
+    def test_an_alias_starting_before_class_birth_fails_closed(self):
+        packet = self.build(
+            class_span=span(start="2016-04-08"),
+            alias_span=span(start="2010-01-04"),
+        )
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME, packet.reason_codes)
+
+    def test_an_alias_outliving_a_finite_class_fails_closed(self):
+        packet = self.build(
+            class_span=span(start="2016-04-08", end="2019-01-02"),
+            alias_span=span(start="2016-04-08", end="2021-01-04"),
+        )
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME, packet.reason_codes)
+
+    def test_an_open_ended_alias_under_a_finite_class_fails_closed(self):
+        packet = self.build(
+            class_span=span(start="2016-04-08", end="2019-01-02"),
+            alias_span=span(start="2016-04-08", end=None),
+        )
+        self.assertIn(ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME, packet.reason_codes)
+
+    def test_an_alias_inside_the_class_lifetime_is_fine(self):
+        packet = self.build(
+            class_span=span(start="2016-04-08", end="2021-01-04"),
+            alias_span=span(start="2017-01-03", end="2020-01-02"),
+        )
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+
+
+class SuccessorFlagTest(unittest.TestCase):
+    def test_the_successor_requirement_is_an_explicit_machine_readable_field(self):
+        """자유 문장 질문에서 추론하지 않는다."""
+        proof = proof_from(single_class_facts("AAA"), cik="0000000001")
+        plain = build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof,
+            class_evidence=complete_evidence(proof),
+        )
+        self.assertIs(plain.successor_judgement_required, False)
+        self.assertIs(plain.as_json()["successor_judgement_required"], False)
+
+        flagged = build_symbol_proposal(
+            work_item=work("AAA", ("2024-06-28",)),
+            candidates=TICKER_CANDIDATE, proof=proof,
+            class_evidence=complete_evidence(proof),
+            successor_judgement_required=True,
+        )
+        self.assertIs(flagged.as_json()["successor_judgement_required"], True)
+        self.assertEqual(flagged.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(SUCCESSOR_JUDGEMENT_REQUIRED, flagged.reason_codes)
 
 
 class CanonicalClassBridgeTest(unittest.TestCase):

@@ -1975,6 +1975,106 @@ append/reuse 전용 — 기존 semantic 행을 바꿔야 하면 fail-close
 - Q/V · B/M · 랭크 · 선택 · `coverage_start` · 수익률을 계산하지 않았다.
 
 
+## 10.15 5A-2b 구간 증거 무결성 + 5A-2c 재검증·batch 원자성 fix — 2026-09-01
+
+**정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`다.**
+이 커밋도 **production identity manifest 행을 하나도 늘리지 않았다** — 네 파일이
+그대로다. 테스트는 전부 임시 fixture manifest만 쓴다. Gate A~H는 여전히 미판정이다.
+
+### BLOCKER 1 — `interval_proved`가 구간 증거의 존재를 증명하지 못했다
+
+`RelationInterval`이 빈 증거를 받았고, `_class_packets()`가 구간 증거를 관계 증거에
+평평하게 합쳤다. 그래서 이런 것이 통과했다.
+
+```text
+RelationInterval("2016-04-08", None, evidence=())
+  -> interval_proved = true
+  -> evidence = [표지 fact]        (구간을 증명한 것이 아무것도 없다)
+```
+
+표지 fact는 "그 filing 시점에 이 관계가 있었다"를 증명하지 **수명 경계**를 증명하지
+않는다. 승격기가 그 둘을 구분할 방법이 없었다.
+
+**구간을 별도로 직렬화되는 증명 객체로 만들었다.**
+
+```json
+"interval": {"effective_from": "...", "effective_to": null, "evidence": [...]}
+```
+
+`RelationInterval`이 빈 증거 · REQUIRED 없는 증거 · 뒤집힌 순서를 **만들어지는 자리에서**
+거부한다. 승격기는 `interval_proved` flag가 아니라 그 객체에서 직접 확인하고,
+**관계 증거가 REQUIRED라는 이유로 구간 증거를 대신하지 못한다.**
+
+구간 포함 불변식도 넣었다 — alias는 그 class 수명 밖에서 유효할 수 없고, 벗어나면
+`ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME`이다. **조용히 잘라 맞추지 않는다.**
+
+### BLOCKER 2 — 승격기가 상태 결정 규칙을 전부 다시 계산하지 않았다
+
+`proposal_status`와 `reason_codes`만 고친 packet이 통과할 수 있었다. 이제 승격기가
+구조화된 fact에서 다시 계산한다.
+
+```text
+작업 항목 계약 · 요구 심볼(같은 대조 함수) · 발견 출처 · 재사용 계열의 historical 출처
+요구 · 승계 판정(명시 칸) · 원본 표지에서 다시 센 census
+```
+
+**제안기의 순수 함수를 공유해서 쓴다** — `cover_proof_from_json` ·
+`cover_classes_for_symbol` · `class_role` · `census_status`. 두 번째 조금 다른 정의를
+만들지 않았다. `successor_judgement_required`는 `SymbolProposal`의 명시 칸으로 넣었고
+자유 문장 질문에서 추론하지 않는다.
+
+### MAJOR 3 — batch 안의 packet들이 서로를 못 봤다
+
+`resolve_class_id()`가 base manifest만 받아서, 같은 batch의 앞 packet이 계획한
+class/alias를 뒤 packet이 보지 못했다. 다중 증권 발행사에서 두 상장 심볼이 같은
+sibling package를 들고 오면 같은 관계가 두 번 추가된다.
+
+**base + 이번 batch가 계획한 행을 함께 보는 전망 상태 위에서 계획한다.** 같은 관계면
+재사용하고, 같은 semantic key인데 내용이 다르면 batch 전체가 실패한다. 계획 중에
+production 파일을 쓰지 않는다.
+
+### MAJOR 4 — 쓰다가 터진 파일 자신이 되돌려지지 않았다
+
+`write_text()`가 파일을 자른 뒤 예외를 던지면 그 파일명은 아직 `written`에 들어가지
+못해 되돌리기에서 빠졌다. **이제 평범한 Python 예외에서 네 파일 전부를 원래 바이트로
+되돌린다.** 그 이상의 파일시스템 crash-consistency는 여전히 주장하지 않는다.
+
+### 회귀 — fix 전에는 실패하는 것들
+
+10개를 넣었고, 그중 가장 미묘한 둘(전체 되돌리기 · batch 전망 상태)은 **fix를 임시로
+되돌려 실제로 실패하는 것을 확인한 뒤** 복구했다.
+
+```text
+빈 구간 증거로 AUTO_PROVABLE 불가 · 표지에 없는 요구 심볼 위조 실패 ·
+CURRENT_TICKER_FILE만 든 재사용 계열 위조 실패 · census 위조 실패 ·
+DIRECT 심볼 불일치 실패 · alias가 class 탄생 전/사망 후로 나가면 실패 ·
+같은 발행사 package를 든 두 작업 항목이 전망 상태에 대고 중복 제거 ·
+batch 안 semantic 불일치가 전체 실패 · 쓰기 실패 시 네 파일 원본 복구
+```
+
+### 로컬 Python 실측 (2026-09-01)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_identity_proposals` | 102 OK |
+| `test_qv_identity_promotion` | 55 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_step4` | 117 OK |
+| **전체 trading suite** | **1,679 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — 워크플로는 npm 테스트·빌드만 돌리고
+`trading/`의 Python QV suite를 실행하지 않는다.
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity manifest를 넓히지 않았다. 네 파일이 그대로다.
+- 897개 작업 항목을 승격하지 않았다.
+- 5A-3·materialize·`usable_from_session` 파생을 하지 않았다.
+- **Gate A~H는 여전히 미판정이다.** Q/V·B/M·랭크·선택·수익률을 계산하지 않았다.
+
+
 ---
 
 ## 11. 결과

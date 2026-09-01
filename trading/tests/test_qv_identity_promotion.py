@@ -55,6 +55,8 @@ from backtest.qv_xbrl import parse_instance  # noqa: E402
 sys.path.insert(0, str(TRADING_ROOT / "tests"))
 from test_qv_identity_proposals import (  # noqa: E402
     CURRENT_TICKER_FILE,
+    HISTORICAL_NAME_LOOKUP,
+    USG,
     cover_instance,
     dual_class_facts,
     single_class_facts,
@@ -399,8 +401,14 @@ class PromoterTest(ManifestFixture, unittest.TestCase):
     def test_a_tampered_packet_claiming_auto_provable_fails_revalidation(self):
         packet = packet_for(single_class_facts("AAA"))
         raw = packet.as_json()
-        raw["share_class_proposals"][0]["interval_proved"] = False
-        raw["share_class_proposals"][0]["effective_from"] = None
+        raw["share_class_proposals"][0]["interval"] = None
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+
+        # `interval_proved`만 true로 남겨도 구간 객체가 없으면 통하지 않는다.
+        raw = packet.as_json()
+        raw["share_class_proposals"][0].pop("interval")
+        raw["share_class_proposals"][0]["interval_proved"] = True
         with self.assertRaises(QVPromotionError):
             revalidate_packet(raw)
 
@@ -475,6 +483,252 @@ class PromoterTest(ManifestFixture, unittest.TestCase):
         self.assertTrue(all("-class-v1-" in value for value in mapping.values()))
         self.assertEqual(len(entry["class_ids_generated"]), 2)
         self.assertEqual(entry["class_ids_reused"], [])
+
+
+class ForgedPacketTest(ManifestFixture, unittest.TestCase):
+    """`proposal_status`/`reason_codes`만 바꿔서는 승격 자격을 만들 수 없다.
+
+    승격기는 원본 packet fact에서 5A-2b의 상태 결정 규칙을 **전부 다시 계산한다.**
+    """
+
+    def forge(self, packet, **overrides):
+        raw = packet.as_json()
+        raw["proposal_status"] = AUTO_PROVABLE
+        raw["reason_codes"] = ["MECHANICALLY_COMPLETE_SEC_PROOF"]
+        raw["conflicts"] = []
+        raw.update(overrides)
+        return raw
+
+    def test_a_demanded_symbol_absent_from_the_cover_fails(self):
+        """표지는 AAA를 증명하는데 요구 심볼이 BBB다."""
+        proof = proof_for(single_class_facts("AAA"))
+        packet = build_symbol_proposal(
+            work_item=WorkItem("BBB", "BBB", "DIRECT", ("2024-06-28",)),
+            candidates=(DiscoveryCandidate(cik=CIK, origin=CURRENT_TICKER_FILE,
+                                           detail="Acme"),),
+            proof=proof, class_evidence=complete_evidence(proof),
+        )
+        self.assertNotEqual(packet.proposal_status, AUTO_PROVABLE)
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(self.forge(packet))
+        self.assertIn("정확히 하나로 잡히지 않습니다", str(caught.exception))
+
+    def test_a_direct_item_with_mismatched_symbols_fails(self):
+        packet = packet_for(single_class_facts("AAA"))
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(self.forge(packet, member_symbol="OTHER"))
+        self.assertIn("DIRECT", str(caught.exception))
+
+    def test_an_unknown_symbol_bridge_kind_fails(self):
+        packet = packet_for(single_class_facts("AAA"))
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(self.forge(packet, symbol_bridge_kind="GUESS"))
+
+    def test_a_forged_reused_series_with_current_ticker_only_fails(self):
+        """`TFCFA -> FOXA` · CURRENT_TICKER_FILE 뿐 · AUTO_PROVABLE 위조."""
+        proof = proof_for(single_class_facts("FOXA"))
+        packet = build_symbol_proposal(
+            work_item=WorkItem("TFCFA", "FOXA", "REUSED_VENDOR_SERIES", ("2010-06-30",)),
+            candidates=(DiscoveryCandidate(cik=CIK, origin=CURRENT_TICKER_FILE,
+                                           detail="Fox"),),
+            proof=proof, class_evidence=complete_evidence(proof),
+        )
+        self.assertNotEqual(packet.proposal_status, AUTO_PROVABLE)
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(self.forge(packet))
+        self.assertIn("현재 티커 계열 출처뿐", str(caught.exception))
+
+    def test_a_reused_series_with_a_historical_origin_can_promote(self):
+        proof = proof_for(single_class_facts("FOXA"))
+        packet = build_symbol_proposal(
+            work_item=WorkItem("TFCFA", "FOXA", "REUSED_VENDOR_SERIES", ("2010-06-30",)),
+            candidates=(DiscoveryCandidate(cik=CIK, origin=HISTORICAL_NAME_LOOKUP,
+                                           detail="21st Century Fox"),),
+            proof=proof, class_evidence=complete_evidence(proof),
+        )
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+        self.assertEqual(revalidate_packet(packet.as_json()).identity_symbol, "FOXA")
+
+    def test_a_successor_judgement_packet_cannot_be_promoted(self):
+        proof = proof_for(single_class_facts("AAA"))
+        packet = build_symbol_proposal(
+            work_item=WorkItem("AAA", "AAA", "DIRECT", ("2024-06-28",)),
+            candidates=(DiscoveryCandidate(cik=CIK, origin=CURRENT_TICKER_FILE,
+                                           detail="Acme"),),
+            proof=proof, class_evidence=complete_evidence(proof),
+            successor_judgement_required=True,
+        )
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(self.forge(packet))
+        self.assertIn("승계", str(caught.exception))
+
+    def test_a_missing_successor_field_fails_closed(self):
+        packet = packet_for(single_class_facts("AAA"))
+        raw = packet.as_json()
+        raw.pop("successor_judgement_required")
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+
+    def test_a_forged_complete_census_over_a_rejected_cover_fails(self):
+        """`class_census_status` 문자열을 권한으로 삼지 않는다."""
+        proof = proof_for(single_class_facts("AAA"))
+        packet = packet_for(single_class_facts("AAA"))
+        raw = self.forge(packet)
+        # 표지에 anomaly를 심는다 — `census_status()`가 거부하는 모양이다.
+        raw["proof"]["anomalies"] = ["EXTRA_DIMENSION_ON_COVER_FACT"]
+        raw["class_census_status"] = "CLASS_CENSUS_COMPLETE"
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+        del proof
+
+        # 역할을 정할 수 없는 class 축 member를 섞어도 마찬가지다.
+        raw = self.forge(packet_for(single_class_facts("AAA")))
+        raw["proof"]["classes"].append({
+            "member_key": "us-gaap:CommonClassZMember",
+            "axis_namespace": USG, "axis_local": "StatementClassOfStockAxis",
+            "member_namespace": USG, "member_local": "CommonClassZMember",
+            "security_title": None, "title_concept": None,
+            "trading_symbol": None, "has_shares_fact": False,
+        })
+        raw["class_census_status"] = "CLASS_CENSUS_COMPLETE"
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+
+    def test_an_alias_interval_outside_the_class_lifetime_fails(self):
+        packet = packet_for(single_class_facts("AAA"))
+        raw = self.forge(packet)
+        raw["xbrl_alias_proposals"][0]["interval"]["effective_from"] = "2010-01-04"
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(raw)
+        self.assertIn("class 수명 밖", str(caught.exception))
+
+        raw = self.forge(packet_for(single_class_facts("AAA")))
+        raw["share_class_proposals"][0]["interval"]["effective_to"] = "2019-01-02"
+        raw["prose_alias_proposals"][0]["interval"]["effective_to"] = "2021-01-04"
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+
+    def test_an_interval_without_required_evidence_fails(self):
+        packet = packet_for(single_class_facts("AAA"))
+        raw = self.forge(packet)
+        for item in raw["share_class_proposals"][0]["interval"]["evidence"]:
+            item["dependency"] = "CORROBORATING"
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+
+    def test_a_cover_fact_cannot_substitute_for_interval_evidence(self):
+        """관계 증거가 REQUIRED라는 이유로 구간 증거를 대신하지 못한다."""
+        packet = packet_for(single_class_facts("AAA"))
+        raw = self.forge(packet)
+        relation_evidence = raw["share_class_proposals"][0]["evidence"]
+        self.assertTrue(
+            any(item["dependency"] == "REQUIRED" for item in relation_evidence)
+        )
+        raw["share_class_proposals"][0]["interval"]["evidence"] = []
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+
+
+class BatchProspectiveStateTest(ManifestFixture, unittest.TestCase):
+    """한 batch의 packet들은 **하나의 전망 상태** 위에서 계획된다."""
+
+    def sibling_facts(self, symbol):
+        """같은 발행사의 같은 A/B sibling package를 A 또는 B 상장 심볼로 요구한다."""
+        return [
+            {"concept": "Security12bTitle", "value": "Class A Common Stock",
+             "member": "CommonClassAMember", "context_id": "a"},
+            {"concept": "TradingSymbol", "value": "AAA",
+             "member": "CommonClassAMember", "context_id": "a"},
+            {"concept": "EntityCommonStockSharesOutstanding", "value": "1000",
+             "member": "CommonClassAMember", "context_id": "a", "numeric": True},
+            {"concept": "Security12bTitle", "value": "Class B Common Stock",
+             "member": "CommonClassBMember", "context_id": "b"},
+            {"concept": "TradingSymbol", "value": "AAB",
+             "member": "CommonClassBMember", "context_id": "b"},
+            {"concept": "EntityCommonStockSharesOutstanding", "value": "500",
+             "member": "CommonClassBMember", "context_id": "b", "numeric": True},
+        ]
+
+    def test_two_work_items_on_one_issuer_package_plan_it_exactly_once(self):
+        facts = self.sibling_facts("AAA")
+        first = packet_for(facts, symbol="AAA")
+        second = packet_for(facts, symbol="AAB")
+        self.assertEqual(first.proposal_status, AUTO_PROVABLE)
+        self.assertEqual(second.proposal_status, AUTO_PROVABLE)
+
+        plan = self.plan([first, second])
+        # issuer 하나 · class 둘 · alias 각각 둘. **두 번 더하지 않는다.**
+        self.assertEqual(len(plan.rows.added["issuers.jsonl"]), 1)
+        self.assertEqual(len(plan.rows.added["share_classes.jsonl"]), 2)
+        self.assertEqual(len(plan.rows.added["xbrl_aliases.jsonl"]), 2)
+        self.assertEqual(len(plan.rows.added["prose_aliases.jsonl"]), 2)
+        # 두 번째 packet은 첫 번째가 계획한 것을 재사용한다.
+        self.assertEqual(len(plan.packets[1].generated_class_ids), 0)
+        self.assertEqual(len(plan.packets[1].reused_class_ids), 2)
+        # receipt은 두 작업 항목 모두의 매핑을 같은 production id로 보인다.
+        left = plan.packets[0].class_id_map
+        right = plan.packets[1].class_id_map
+        self.assertEqual(sorted(left.values()), sorted(right.values()))
+
+        apply_promotion(plan, directory=self.directory)
+        manifest = load_manifest(self.directory)
+        validate(manifest)
+        self.assertEqual(len(manifest.rows["issuers.jsonl"]), 1)
+        self.assertEqual(len(manifest.rows["share_classes.jsonl"]), 2)
+        self.assertEqual(len(manifest.rows["prose_aliases.jsonl"]), 2)
+
+    def test_a_same_batch_semantic_disagreement_fails_the_whole_batch(self):
+        facts = self.sibling_facts("AAA")
+        first = packet_for(facts, symbol="AAA")
+        second = packet_for(
+            facts, symbol="AAB",
+            evidence=lambda proof: complete_evidence(proof, start="2019-01-02"),
+        )
+        before = self.snapshot()
+        with self.assertRaises(QVPromotionError):
+            self.plan([first, second])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_the_batch_sees_a_symbol_split_planned_earlier_in_the_same_batch(self):
+        first = packet_for(single_class_facts("AAA"))
+        clash = packet_for(
+            single_class_facts("AAA", title="Common Shares of Beneficial Interest"),
+            accession="0000000042-24-000031",
+        )
+        with self.assertRaises(QVPromotionError) as caught:
+            self.plan([first, clash])
+        self.assertIn("겹치는 구간에 두 class", str(caught.exception))
+
+
+class RollbackTest(ManifestFixture, unittest.TestCase):
+    def test_a_failure_while_writing_restores_all_four_files(self):
+        """쓰다가 터진 파일 자신도 되돌린다 — 성공한 파일만으로는 모자란다."""
+        plan = self.plan([packet_for(dual_class_facts())])
+        before = self.snapshot()
+
+        real_write = Path.write_text
+        calls = {"n": 0}
+
+        def flaky(self, data, *args, **kwargs):
+            if self.name in ("issuers.jsonl", "share_classes.jsonl",
+                             "xbrl_aliases.jsonl", "prose_aliases.jsonl"):
+                calls["n"] += 1
+                if calls["n"] == 3:
+                    # 세 번째 파일을 **잘라 놓고** 실패한다.
+                    real_write(self, "{ truncated", *args, **kwargs)
+                    raise OSError("디스크가 터졌다고 치자")
+            return real_write(self, data, *args, **kwargs)
+
+        Path.write_text = flaky
+        try:
+            with self.assertRaises(OSError):
+                apply_promotion(plan, directory=self.directory)
+        finally:
+            Path.write_text = real_write
+
+        self.assertEqual(self.snapshot(), before)
+        # 되돌린 bundle이 여전히 읽히고 검증된다.
+        validate(load_manifest(self.directory))
 
 
 class ExistingRowsTest(ManifestFixture, unittest.TestCase):

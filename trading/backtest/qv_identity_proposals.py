@@ -98,6 +98,9 @@ XBRL_ALIAS_INTERVAL_NOT_EXPLICIT = "XBRL_ALIAS_INTERVAL_NOT_EXPLICIT"
 PROSE_ALIAS_INTERVAL_NOT_EXPLICIT = "PROSE_ALIAS_INTERVAL_NOT_EXPLICIT"
 # 모든 보통주 economic class는 canonical class bridge를 하나는 가져야 한다.
 CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT = "CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT"
+# class→alias 관계는 그 class의 수명 **밖에서** 경제적으로 유효할 수 없다.
+# 조용히 잘라 맞추지 않는다.
+ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME = "ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME"
 PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE = "PRE_INLINE_XBRL_NO_EXPLICIT_BRIDGE"
 CIK_CONFLICT = "CIK_CONFLICT"
 SYMBOL_REUSE_CONFLICT = "SYMBOL_REUSE_CONFLICT"
@@ -250,6 +253,43 @@ INDETERMINATE_CLASS = "INDETERMINATE_CLASS"
 NO_CLASS_AXIS = "__NO_CLASS_AXIS__"
 
 DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON = "DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON"
+
+
+def cover_proof_from_json(payload: dict) -> CoverPageProof:
+    """직렬화된 표지 증명을 원본 구조로 되살린다.
+
+    **승격기가 파생된 제안 행이 아니라 이 원본 fact로 5A-2b 규칙을 다시 돌리기 위한
+    통로다.** 두 곳이 표지를 따로 해석하면 정의가 조용히 갈라진다.
+    """
+    if not isinstance(payload, dict):
+        raise QVProposalError("표지 증명이 객체가 아닙니다")
+    classes = []
+    for item in payload.get("classes") or []:
+        if not isinstance(item, dict):
+            raise QVProposalError("표지 class가 객체가 아닙니다")
+        member_key = str(item.get("member_key") or "").strip()
+        if not member_key:
+            raise QVProposalError("표지 class에 member_key가 없습니다")
+        classes.append(
+            CoverClass(
+                member_key=member_key,
+                axis_namespace=item.get("axis_namespace"),
+                axis_local=item.get("axis_local"),
+                member_namespace=item.get("member_namespace"),
+                member_local=item.get("member_local"),
+                security_title=item.get("security_title"),
+                title_concept=item.get("title_concept"),
+                trading_symbol=item.get("trading_symbol"),
+                has_shares_fact=bool(item.get("has_shares_fact")),
+            )
+        )
+    return CoverPageProof(
+        cik=normalize_cik(payload.get("cik")),
+        accession=str(payload.get("accession") or "").strip(),
+        document_name=str(payload.get("document_name") or "").strip(),
+        classes=tuple(classes),
+        anomalies=tuple(str(item) for item in (payload.get("anomalies") or [])),
+    )
 
 
 def cover_classes_for_symbol(
@@ -434,11 +474,44 @@ class RelationInterval:
     effective_to: str | None
     evidence: tuple[EvidenceRef, ...]
 
+    def __post_init__(self) -> None:
+        """**빈 증거로는 구간을 만들 수 없다.**
+
+        표지 fact는 "그 filing 시점에 이 관계가 있었다"를 증명하지 그 관계의 **수명
+        경계**를 증명하지 않는다. 구간 객체가 자기 증거를 못 들고 오면 `interval_proved`가
+        아무것도 뜻하지 않게 되므로 만들어지는 자리에서 막는다.
+        """
+        start = str(self.effective_from or "").strip()
+        if not start:
+            raise QVProposalError("구간의 effective_from이 비었습니다")
+        end = self.effective_to
+        if end is not None and str(end).strip() <= start:
+            raise QVProposalError(f"구간이 뒤집혔습니다: {start}..{end}")
+        if not self.evidence:
+            raise QVProposalError(
+                "구간 증거가 비었습니다 — 표지 fact는 수명 경계를 증명하지 않습니다"
+            )
+        if not any(item.dependency == "REQUIRED" for item in self.evidence):
+            raise QVProposalError("구간에 REQUIRED 증거가 최소 하나 필요합니다")
+
     def covers(self, session: str) -> bool:
         """그 시점에 이 관계가 유효한가. 반개구간 `[from, to)`다."""
         return self.effective_from <= session and (
             self.effective_to is None or session < self.effective_to
         )
+
+    def within(self, outer: "RelationInterval") -> bool:
+        """이 구간이 `outer` 안에 들어가는가.
+
+        class→alias 관계는 그 class의 수명 밖에서 경제적으로 유효할 수 없다.
+        """
+        if self.effective_from < outer.effective_from:
+            return False
+        if outer.effective_to is None:
+            return True
+        if self.effective_to is None:
+            return False
+        return self.effective_to <= outer.effective_to
 
     def as_json(self) -> dict:
         return {
@@ -500,11 +573,24 @@ class ShareClassProposal:
     is_ordinary_common: bool
     is_listed: bool
     role: str
-    effective_from: str | None
-    effective_to: str | None
-    interval_proved: bool
+    # **구간은 별도 객체로 직렬화된다.** 관계 증거에 평평하게 섞으면 어느 증거가
+    # 수명 경계를 증명했는지가 사라진다.
+    interval: RelationInterval | None
     provenance: str
     evidence: tuple[EvidenceRef, ...]
+
+    @property
+    def effective_from(self) -> str | None:
+        return self.interval.effective_from if self.interval else None
+
+    @property
+    def effective_to(self) -> str | None:
+        return self.interval.effective_to if self.interval else None
+
+    @property
+    def interval_proved(self) -> bool:
+        """**구간 객체가 자기 증거와 함께 있는가.** 논리 flag 하나가 아니다."""
+        return self.interval is not None
 
     def as_json(self) -> dict:
         return {
@@ -514,9 +600,8 @@ class ShareClassProposal:
             "is_ordinary_common": self.is_ordinary_common,
             "is_listed": self.is_listed,
             "role": self.role,
-            "effective_from": self.effective_from,
-            "effective_to": self.effective_to,
             "interval_proved": self.interval_proved,
+            "interval": self.interval.as_json() if self.interval else None,
             "provenance": self.provenance,
             "evidence": [item.as_json() for item in self.evidence],
         }
@@ -536,11 +621,22 @@ class XbrlAliasProposal:
     axis_local: str
     member_namespace: str
     member_local: str
-    effective_from: str | None
-    effective_to: str | None
-    interval_proved: bool
+    interval: RelationInterval | None
     provenance: str
     evidence: tuple[EvidenceRef, ...]
+
+    @property
+    def effective_from(self) -> str | None:
+        return self.interval.effective_from if self.interval else None
+
+    @property
+    def effective_to(self) -> str | None:
+        return self.interval.effective_to if self.interval else None
+
+    @property
+    def interval_proved(self) -> bool:
+        """**구간 객체가 자기 증거와 함께 있는가.** 논리 flag 하나가 아니다."""
+        return self.interval is not None
 
     def as_json(self) -> dict:
         return {
@@ -550,9 +646,8 @@ class XbrlAliasProposal:
             "axis_local": self.axis_local,
             "member_namespace": self.member_namespace,
             "member_local": self.member_local,
-            "effective_from": self.effective_from,
-            "effective_to": self.effective_to,
             "interval_proved": self.interval_proved,
+            "interval": self.interval.as_json() if self.interval else None,
             "provenance": self.provenance,
             "evidence": [item.as_json() for item in self.evidence],
         }
@@ -571,15 +666,26 @@ class ProseAliasProposal:
     raw_prose_name: str
     prose_key: str
     bridge_type: str
-    effective_from: str | None
-    effective_to: str | None
-    interval_proved: bool
+    interval: RelationInterval | None
     provenance: str
     evidence: tuple[EvidenceRef, ...]
 
     @property
     def is_canonical(self) -> bool:
         return self.bridge_type in CANONICAL_PROSE_BRIDGES
+
+    @property
+    def effective_from(self) -> str | None:
+        return self.interval.effective_from if self.interval else None
+
+    @property
+    def effective_to(self) -> str | None:
+        return self.interval.effective_to if self.interval else None
+
+    @property
+    def interval_proved(self) -> bool:
+        """**구간 객체가 자기 증거와 함께 있는가.** 논리 flag 하나가 아니다."""
+        return self.interval is not None
 
     def as_json(self) -> dict:
         return {
@@ -588,9 +694,8 @@ class ProseAliasProposal:
             "raw_prose_name": self.raw_prose_name,
             "prose_key": self.prose_key,
             "bridge_type": self.bridge_type,
-            "effective_from": self.effective_from,
-            "effective_to": self.effective_to,
             "interval_proved": self.interval_proved,
+            "interval": self.interval.as_json() if self.interval else None,
             "provenance": self.provenance,
             "evidence": [item.as_json() for item in self.evidence],
         }
@@ -613,6 +718,8 @@ class SymbolProposal:
     proposal_status: str
     reason_codes: tuple[str, ...]
     class_census_status: str
+    # **기계가 읽는 명시 칸이다.** 자유 문장 질문에서 추론하지 않는다.
+    successor_judgement_required: bool
     proof: CoverPageProof | None
     issuer_proposal: IssuerProposal | None
     share_class_proposals: tuple[ShareClassProposal, ...]
@@ -632,6 +739,7 @@ class SymbolProposal:
             "proposal_status": self.proposal_status,
             "reason_codes": list(self.reason_codes),
             "class_census_status": self.class_census_status,
+            "successor_judgement_required": self.successor_judgement_required,
             "proof": self.proof.as_json() if self.proof else None,
             "issuer_proposal": self.issuer_proposal.as_json() if self.issuer_proposal else None,
             "share_class_proposals": [item.as_json() for item in self.share_class_proposals],
@@ -892,7 +1000,7 @@ def class_id_for(cik: str, item: CoverClass) -> str:
 # ── 판정 ──────────────────────────────────────────────────────────────────────
 
 
-def _census_status(proof: CoverPageProof) -> tuple[str, tuple[str, ...]]:
+def census_status(proof: CoverPageProof) -> tuple[str, tuple[str, ...]]:
     """sibling class census가 기계적으로 완결됐는가."""
     notes: list[str] = []
     if proof.anomalies:
@@ -946,6 +1054,10 @@ def _class_packets(
     **세 관계의 구간을 따로 받는다.** 표지는 셋 중 어느 것의 유효구간도 증명하지
     않는다. `class_evidence`로 명시 증거가 들어온 관계만 값이 차고 나머지는 `None`으로
     남는다. **class 구간을 alias 구간으로 복사하지 않는다.**
+
+    **구간 증거를 관계 증거에 섞지 않는다.** 관계 증거(표지 fact)는 "그 filing 시점에
+    이 관계가 있었다"를 증명하고, 구간 증거는 **수명 경계**를 증명한다. 하나로 합치면
+    승격기가 어느 쪽이 경계를 증명했는지 물어볼 수 없다.
     """
     issuer_id = issuer_id_for(proof.cik)
     classes: list[ShareClassProposal] = []
@@ -967,8 +1079,6 @@ def _class_packets(
         if role == ORDINARY_COMMON_LISTED and item.title_concept == SECURITY_12G_TITLE:
             evidence_role = "COVER_SECURITY_12G_TITLE"
         evidence = _evidence_for(proof, evidence_role)
-        if class_interval is not None:
-            evidence = evidence + tuple(class_interval.evidence)
         classes.append(
             ShareClassProposal(
                 class_id=class_id,
@@ -977,9 +1087,7 @@ def _class_packets(
                 is_ordinary_common=True,
                 is_listed=item.is_listed,
                 role=role,
-                effective_from=class_interval.effective_from if class_interval else None,
-                effective_to=class_interval.effective_to if class_interval else None,
-                interval_proved=class_interval is not None,
+                interval=class_interval,
                 provenance=(
                     f"cover page {proof.document_name} — "
                     f"{item.security_title or '(제목 없음)'} / member {item.member_local or '(축 없음)'}"
@@ -991,8 +1099,6 @@ def _class_packets(
         if item.has_axis and item.axis_namespace and item.member_namespace:
             alias_interval = supplied.xbrl_interval
             alias_evidence = _evidence_for(proof, "COVER_CLASS_AXIS_FACT")
-            if alias_interval is not None:
-                alias_evidence = alias_evidence + tuple(alias_interval.evidence)
             xbrl.append(
                 XbrlAliasProposal(
                     class_id=class_id,
@@ -1001,11 +1107,7 @@ def _class_packets(
                     axis_local=item.axis_local or "",
                     member_namespace=item.member_namespace,
                     member_local=item.member_local or "",
-                    effective_from=(
-                        alias_interval.effective_from if alias_interval else None
-                    ),
-                    effective_to=alias_interval.effective_to if alias_interval else None,
-                    interval_proved=alias_interval is not None,
+                    interval=alias_interval,
                     provenance=f"cover page class 축 fact ({proof.document_name})",
                     evidence=alias_evidence,
                 )
@@ -1019,8 +1121,6 @@ def _class_packets(
                 if item.title_concept == SECURITY_12G_TITLE
                 else "SECURITY_12B_TITLE",
             )
-            if title_interval is not None:
-                title_evidence = title_evidence + tuple(title_interval.evidence)
             prose.append(
                 ProseAliasProposal(
                     class_id=class_id,
@@ -1028,11 +1128,7 @@ def _class_packets(
                     raw_prose_name=item.security_title,
                     prose_key=prose_key(item.security_title),
                     bridge_type=SECURITY_TITLE_FACT,
-                    effective_from=(
-                        title_interval.effective_from if title_interval else None
-                    ),
-                    effective_to=title_interval.effective_to if title_interval else None,
-                    interval_proved=title_interval is not None,
+                    interval=title_interval,
                     provenance=f"cover {item.title_concept or SECURITY_12B_TITLE}",
                     evidence=title_evidence,
                 )
@@ -1051,9 +1147,7 @@ def _class_packets(
                     raw_prose_name=bridge.raw_prose_name,
                     prose_key=prose_key(bridge.raw_prose_name),
                     bridge_type=bridge.bridge_type,
-                    effective_from=bridge.interval.effective_from,
-                    effective_to=bridge.interval.effective_to,
-                    interval_proved=True,
+                    interval=bridge.interval,
                     provenance=f"명시 {bridge.bridge_type} 증거",
                     evidence=tuple(bridge.interval.evidence),
                 )
@@ -1186,7 +1280,7 @@ def build_symbol_proposal(
             evidence=_evidence_for(proof, "SEC_REGISTRANT_CIK_ON_FILING"),
         )
 
-        census, notes = _census_status(proof)
+        census, notes = census_status(proof)
         questions.extend(notes)
         if census != CLASS_CENSUS_COMPLETE:
             reasons.append(SIBLING_CLASS_CENSUS_UNCLEAR)
@@ -1253,6 +1347,27 @@ def build_symbol_proposal(
             # **모든 보통주 class에 canonical bridge가 필요하다.** 요구된 상장 심볼만이
             # 아니라 발행사 package의 sibling 전부다. XBRL member 이름·표지 그룹 라벨·
             # sibling 순서·티커·주식수·class 글자 유사도로 추론하지 않는다.
+            # **alias는 그 class의 수명 밖에서 유효할 수 없다.** 잘라 맞추지 않고
+            # 사람에게 넘긴다.
+            class_span = {
+                item.class_id: item.interval
+                for item in class_proposals if item.interval is not None
+            }
+            outside = sorted({
+                item.class_id
+                for item in tuple(xbrl_proposals) + tuple(prose_proposals)
+                if item.interval is not None
+                and class_span.get(item.class_id) is not None
+                and not item.interval.within(class_span[item.class_id])
+            })
+            if outside:
+                reasons.append(ALIAS_INTERVAL_OUTSIDE_CLASS_LIFETIME)
+                questions.append(
+                    "alias 유효구간이 economic class 수명 밖으로 나갑니다: "
+                    + ", ".join(outside)
+                )
+                blocked = True
+
             missing_bridge = sorted({
                 item.class_id
                 for item in class_proposals
@@ -1285,6 +1400,7 @@ def build_symbol_proposal(
         proposal_status=status,
         reason_codes=tuple(sorted(set(reasons))),
         class_census_status=census,
+        successor_judgement_required=bool(successor_judgement_required),
         proof=proof,
         issuer_proposal=issuer_proposal,
         share_class_proposals=class_proposals,
