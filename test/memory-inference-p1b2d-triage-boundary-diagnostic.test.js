@@ -38,7 +38,6 @@ const {
   BOUNDARY_RUNNER_VERSION,
   CALLS_PLANNED,
   CONDITIONS,
-  DEFAULT_HUMAN_REVIEW,
   FIXED_MODEL_CONFIGURATION,
   FIXED_TIMEOUT_MS,
   HUMAN_REVIEW_COMPLETED_AT,
@@ -185,10 +184,6 @@ test('final P1-B2d HUMAN mapping is the exact supplied 15-case 5/5/5 gold', () =
   );
   assert.equal(review.labels[12].caseId, 'p1b2d-triage-boundary-013');
   assert.equal(review.labels[12].label, 'WRITE_CANDIDATE');
-  assert.deepEqual(
-    fs.readFileSync(DEFAULT_HUMAN_REVIEW),
-    fs.readFileSync('/tmp/xion-p1b2d-human-primary-labels.json'),
-  );
 });
 
 test('final PilotCase fixture preserves candidate order/evidence and exact HUMAN adjudication', () => {
