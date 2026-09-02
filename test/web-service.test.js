@@ -158,12 +158,19 @@ test('query-assisted Extract normalizes the query and fixes chunks_per_source at
 });
 
 test('Extract rejects missing content and sanitizes provider failures', async () => {
-  const empty = createHarness({ providerResponse: { results: [], failed_results: [{ error: 'SECRET HTML' }] } });
+  const empty = createHarness({
+    providerResponse: {
+      results: [],
+      failed_results: [{ error: 'SECRET HTML' }],
+      usage: { credits: 1 },
+    },
+  });
   await assert.rejects(empty.service.fetch('https://example.com'), error => {
     assert.equal(error.code, 'WEB_FETCH_NO_CONTENT');
     assert.doesNotMatch(error.message, /SECRET HTML/);
     return true;
   });
+  assert.deepEqual(empty.usage, [{ provider: 'tavily', credits: 1 }]);
 
   const failed = createHarness({
     providerResponse: () => response(403, { error: 'token tvly-test-secret <html>private</html>' }),
@@ -173,16 +180,26 @@ test('Extract rejects missing content and sanitizes provider failures', async ()
     assert.doesNotMatch(error.message, /tvly-test-secret|private|html/);
     return true;
   });
+  assert.deepEqual(failed.usage, []);
+
+  const networkFailure = createHarness({
+    providerResponse: () => { throw new Error('network failure'); },
+  });
+  await assert.rejects(networkFailure.service.fetch('https://example.com'), error => (
+    error.code === 'WEB_FETCH_PROVIDER_FAILED'
+  ));
+  assert.deepEqual(networkFailure.usage, []);
 });
 
 test('Extract validates the provider-returned URL before exposing evidence', async () => {
-  const { service } = createHarness({
+  const { service, usage } = createHarness({
     providerResponse: {
       results: [{ url: 'http://127.0.0.1/private', raw_content: 'must not escape' }],
       usage: { credits: 1 },
     },
   });
   await assert.rejects(service.fetch('https://example.com'), error => error.code === 'WEB_FETCH_URL_NOT_PUBLIC');
+  assert.deepEqual(usage, [{ provider: 'tavily', credits: 1 }]);
 });
 
 test('public URL validation accepts normal HTTP(S) and rejects local/non-public targets', () => {
