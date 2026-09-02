@@ -60,6 +60,7 @@ const AMBIGUITY_TEMPORARY_PROMPT_VERSION = (
 );
 const HUMAN_REVIEW_COMPLETED_AT = '2026-09-02T02:59:25.032Z';
 const FIXED_TIMEOUT_MS = 180_000;
+const PREFLIGHT_TIMEOUT_MS = 10_000;
 const CALLS_PLANNED = 45;
 const LABEL_DISTRIBUTION = Object.freeze({
   NO_WRITE: 5,
@@ -495,6 +496,85 @@ function validateConfiguration(options) {
   return options;
 }
 
+function deriveHealthUrl(endpoint) {
+  let url;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new TypeError('P1-B2d endpoint는 유효한 URL이어야 합니다.');
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol)
+    || url.username
+    || url.password
+    || url.search
+    || url.hash
+  ) {
+    throw new TypeError('P1-B2d endpoint는 credential/query/hash 없는 HTTP(S) URL이어야 합니다.');
+  }
+  const segments = url.pathname.split('/').filter(Boolean);
+  if (segments.at(-2) === 'chat' && segments.at(-1) === 'completions') {
+    segments.splice(-2);
+  }
+  if (segments.at(-1) === 'v1') segments.pop();
+  segments.push('health');
+  url.pathname = `/${segments.join('/')}`;
+  return url.toString();
+}
+
+function preflightFailure(reason, cause) {
+  return new Error(
+    `P1-B2d endpoint preflight failed: llama.cpp is unavailable or not ready. ${reason}`,
+    cause ? { cause } : undefined,
+  );
+}
+
+async function preflightLlamaCppEndpoint(endpoint, fetchImpl) {
+  if (typeof fetchImpl !== 'function') {
+    throw preflightFailure('fetch implementation is unavailable.');
+  }
+  const healthUrl = deriveHealthUrl(endpoint);
+  const controller = new AbortController();
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new DOMException('llama.cpp health request timed out', 'AbortError'));
+    }, PREFLIGHT_TIMEOUT_MS);
+  });
+  let response;
+  try {
+    response = await Promise.race([
+      fetchImpl(healthUrl, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      }),
+      timeout,
+    ]);
+  } catch (error) {
+    const reason = error?.name === 'AbortError'
+      ? `health request timed out after ${PREFLIGHT_TIMEOUT_MS}ms.`
+      : error?.message || 'health request failed.';
+    throw preflightFailure(reason, error);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!response || response.status !== 200) {
+    throw preflightFailure(`HTTP ${response?.status ?? 'unknown'}.`);
+  }
+  let health;
+  try {
+    health = await response.json();
+  } catch (error) {
+    throw preflightFailure('health response was not valid JSON.', error);
+  }
+  if (!isPlainObject(health) || health.status !== 'ok') {
+    throw preflightFailure('health status was not "ok".');
+  }
+  return { healthUrl, status: health.status };
+}
+
 async function runBoundaryDiagnostic(fixture, runnerOptions) {
   validateBoundaryFixture(fixture);
   const review = loadHumanReview();
@@ -503,21 +583,44 @@ async function runBoundaryDiagnostic(fixture, runnerOptions) {
     runtimeFamily: FIXED_MODEL_CONFIGURATION.runtimeFamily,
     timeoutMs: FIXED_TIMEOUT_MS,
   });
+  const delegateFetch = options.fetchImpl || globalThis.fetch;
+  await preflightLlamaCppEndpoint(options.endpoint, delegateFetch);
+  let callsAttempted = 0;
+  const experimentalFetch = async (url, init) => {
+    if (init?.method !== 'POST') {
+      throw new Error('P1-B2d experimental request는 POST여야 합니다.');
+    }
+    callsAttempted += 1;
+    if (callsAttempted > CALLS_PLANNED) {
+      throw new Error(`P1-B2d unexpected extra call invariant 위반: ${callsAttempted}`);
+    }
+    return delegateFetch(url, init);
+  };
+  const experimentalOptions = { ...options, fetchImpl: experimentalFetch };
   const triplets = [];
   for (const pilotCase of fixture.cases) {
     const metadata = calibrationMetadataForCase(pilotCase);
-    const conditionA = await runConditionCase(pilotCase, metadata, options, CONDITIONS.A);
-    const conditionB = await runConditionCase(pilotCase, metadata, options, CONDITIONS.B);
-    const conditionC = await runConditionCase(pilotCase, metadata, options, CONDITIONS.C);
+    const conditionA = await runConditionCase(
+      pilotCase, metadata, experimentalOptions, CONDITIONS.A,
+    );
+    const conditionB = await runConditionCase(
+      pilotCase, metadata, experimentalOptions, CONDITIONS.B,
+    );
+    const conditionC = await runConditionCase(
+      pilotCase, metadata, experimentalOptions, CONDITIONS.C,
+    );
     triplets.push({ pilotCase, conditionA, conditionB, conditionC });
   }
-  const callsCompleted = triplets.length * 3;
-  if (callsCompleted !== CALLS_PLANNED) {
-    throw new Error(`P1-B2d callsCompleted invariant 위반: ${callsCompleted}`);
+  if (callsAttempted !== CALLS_PLANNED) {
+    throw new Error(`P1-B2d callsAttempted invariant 위반: ${callsAttempted}`);
   }
   const conditionARuns = triplets.map(item => item.conditionA);
   const conditionBRuns = triplets.map(item => item.conditionB);
   const conditionCRuns = triplets.map(item => item.conditionC);
+  const callsCompleted = [conditionARuns, conditionBRuns, conditionCRuns]
+    .flat()
+    .filter(run => run.result.directResult.taskOutcome !== TASK_OUTCOMES.NOT_RUN)
+    .length;
   const observations = triplets.map(({ pilotCase, conditionA, conditionB, conditionC }) => ({
     caseId: pilotCase.caseId,
     humanGoldLabel: pilotCase.adjudication.primary.label,
@@ -568,6 +671,7 @@ async function runBoundaryDiagnostic(fixture, runnerOptions) {
     execution: {
       timeoutMs: FIXED_TIMEOUT_MS,
       callsPlanned: CALLS_PLANNED,
+      callsAttempted,
       callsCompleted,
       order: 'case-local A->B->C',
       automaticReruns: false,
@@ -591,9 +695,17 @@ async function runBoundaryDiagnostic(fixture, runnerOptions) {
 
 function exitCodeForReport(report) {
   if (
-    report.execution?.callsPlanned !== CALLS_PLANNED
-    || report.execution?.callsCompleted !== CALLS_PLANNED
+    report.reportVersion !== BOUNDARY_REPORT_VERSION
+    || report.execution?.callsPlanned !== CALLS_PLANNED
+    || report.execution?.callsAttempted !== CALLS_PLANNED
+    || !Number.isInteger(report.execution?.callsCompleted)
+    || report.execution.callsCompleted < 0
+    || report.execution.callsCompleted > report.execution.callsAttempted
     || report.observations?.length !== FIXED_CASE_IDS.length
+    || report.fixture?.name !== BOUNDARY_FIXTURE_NAME
+    || !isPlainObject(report.summaries)
+    || !isPlainObject(report.pairedSummaries)
+    || !isPlainObject(report.directionalInterpretation)
   ) {
     throw new Error('P1-B2d complete report invariant가 충족되지 않았습니다.');
   }
@@ -710,9 +822,11 @@ module.exports = {
   FIXED_TIMEOUT_MS,
   HUMAN_REVIEW_COMPLETED_AT,
   LABEL_DISTRIBUTION,
+  PREFLIGHT_TIMEOUT_MS,
   TEMPORARY_SCOPE_CLARIFICATION,
   buildConditionPrompt,
   calibrationMetadataForCase,
+  deriveHealthUrl,
   exitCodeForReport,
   helpText,
   instructionForCondition,
@@ -721,6 +835,7 @@ module.exports = {
   loadHumanReview,
   main,
   parseArguments,
+  preflightLlamaCppEndpoint,
   runBoundaryDiagnostic,
   runBoundaryWrappedCase,
   runConditionCase,

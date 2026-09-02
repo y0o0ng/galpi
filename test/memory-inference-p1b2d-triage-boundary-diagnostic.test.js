@@ -42,9 +42,11 @@ const {
   FIXED_TIMEOUT_MS,
   HUMAN_REVIEW_COMPLETED_AT,
   LABEL_DISTRIBUTION,
+  PREFLIGHT_TIMEOUT_MS,
   TEMPORARY_SCOPE_CLARIFICATION,
   buildConditionPrompt,
   calibrationMetadataForCase,
+  deriveHealthUrl,
   exitCodeForReport,
   helpText,
   interpretDirectionalHypotheses,
@@ -115,6 +117,39 @@ function responseForContent(content) {
 
 function responseForDecision(decision) {
   return responseForContent(JSON.stringify({ decision }));
+}
+
+function healthResponse({ status = 200, body = { status: 'ok' }, malformed = false } = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    async json() {
+      if (malformed) throw new SyntaxError('synthetic malformed health JSON');
+      return body;
+    },
+  };
+}
+
+function healthyExperimentFetch(fixture, responseForCall = (pilotCase) => (
+  responseForDecision(pilotCase.adjudication.primary.label)
+)) {
+  const evidenceToCase = new Map(fixture.cases.map(item => [item.inputPayload.evidence, item]));
+  const healthCalls = [];
+  const experimentalCalls = [];
+  const fetchImpl = async (url, init) => {
+    if (init.method === 'GET') {
+      healthCalls.push({ url, init });
+      return healthResponse();
+    }
+    const body = JSON.parse(init.body);
+    const inputLine = body.messages[1].content.split('\n').find(line => line.startsWith('INPUT: '));
+    const input = JSON.parse(inputLine.slice('INPUT: '.length));
+    const pilotCase = evidenceToCase.get(input.evidence);
+    const condition = conditionLetter(body);
+    experimentalCalls.push({ url, init, body, pilotCase, condition });
+    return responseForCall(pilotCase, condition, experimentalCalls.length);
+  };
+  return { fetchImpl, healthCalls, experimentalCalls };
 }
 
 function conditionLetter(body) {
@@ -337,33 +372,112 @@ test('A/B/C preserve request scaffold/settings and issue exactly one request eac
   assert.equal(results[2].result.configuration.runnerVersion, BOUNDARY_RUNNER_VERSION);
 });
 
-test('runner uses exact case-local A/B/C order and never reruns mismatch, invalid, or timeout', async () => {
+test('health URL derivation strips standard completion suffixes and preserves prefixes', () => {
+  assert.equal(PREFLIGHT_TIMEOUT_MS, 10000);
+  for (const endpoint of [
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:8080/v1',
+    'http://127.0.0.1:8080/v1/chat/completions',
+    'http://127.0.0.1:8080/chat/completions',
+  ]) {
+    assert.equal(deriveHealthUrl(endpoint), 'http://127.0.0.1:8080/health');
+  }
+  assert.equal(
+    deriveHealthUrl('http://127.0.0.1:8080/prefix/v1/chat/completions'),
+    'http://127.0.0.1:8080/prefix/health',
+  );
+  assert.equal(
+    deriveHealthUrl('http://127.0.0.1:8080/prefix'),
+    'http://127.0.0.1:8080/prefix/health',
+  );
+});
+
+test('unavailable llama.cpp preflight is fatal before any experimental POST', async () => {
   const fixture = loadBoundaryFixture();
-  const evidenceToCase = new Map(fixture.cases.map(item => [item.inputPayload.evidence, item]));
-  const calls = [];
+  let healthGets = 0;
+  let experimentalPosts = 0;
   const fetchImpl = async (url, init) => {
-    const body = JSON.parse(init.body);
-    const inputLine = body.messages[1].content.split('\n').find(line => line.startsWith('INPUT: '));
-    const input = JSON.parse(inputLine.slice('INPUT: '.length));
-    const pilotCase = evidenceToCase.get(input.evidence);
-    const condition = conditionLetter(body);
-    calls.push(`${pilotCase.caseId}-${condition}`);
-    if (calls.length === 1) return responseForDecision('NO_WRITE');
-    if (calls.length === 2) return responseForContent('not-json');
-    if (calls.length === 3) throw new DOMException('synthetic timeout', 'AbortError');
-    return responseForDecision(pilotCase.adjudication.primary.label);
+    if (init.method === 'GET') {
+      healthGets += 1;
+      assert.equal(url, 'http://127.0.0.1:1/health');
+      throw new TypeError('fetch failed: connection refused');
+    }
+    experimentalPosts += 1;
+    return responseForDecision('NO_WRITE');
   };
-  const report = await runBoundaryDiagnostic(fixture, fixedRunnerOptions(fetchImpl));
+  await assert.rejects(
+    runBoundaryDiagnostic(fixture, fixedRunnerOptions(fetchImpl)),
+    /P1-B2d endpoint preflight failed: llama\.cpp is unavailable or not ready/u,
+  );
+  assert.equal(healthGets, 1);
+  assert.equal(experimentalPosts, 0);
+});
+
+test('llama.cpp loading response is fatal before any experimental POST', async () => {
+  const fixture = loadBoundaryFixture();
+  let experimentalPosts = 0;
+  const fetchImpl = async (url, init) => {
+    if (init.method === 'GET') return healthResponse({ status: 503, body: { status: 'loading' } });
+    experimentalPosts += 1;
+    return responseForDecision('NO_WRITE');
+  };
+  await assert.rejects(
+    runBoundaryDiagnostic(fixture, fixedRunnerOptions(fetchImpl)),
+    /P1-B2d endpoint preflight failed.*HTTP 503/u,
+  );
+  assert.equal(experimentalPosts, 0);
+});
+
+test('malformed or non-ready health JSON is fatal before any experimental POST', async (t) => {
+  for (const [name, health] of [
+    ['malformed JSON', healthResponse({ malformed: true })],
+    ['non-ready status', healthResponse({ body: { status: 'loading' } })],
+  ]) {
+    await t.test(name, async () => {
+      const fixture = loadBoundaryFixture();
+      let experimentalPosts = 0;
+      const fetchImpl = async (url, init) => {
+        if (init.method === 'GET') return health;
+        experimentalPosts += 1;
+        return responseForDecision('NO_WRITE');
+      };
+      await assert.rejects(
+        runBoundaryDiagnostic(fixture, fixedRunnerOptions(fetchImpl)),
+        /P1-B2d endpoint preflight failed: llama\.cpp is unavailable or not ready/u,
+      );
+      assert.equal(experimentalPosts, 0);
+    });
+  }
+});
+
+test('runner uses one healthy preflight, exact case-local A/B/C order, and no reruns', async () => {
+  const fixture = loadBoundaryFixture();
+  const harness = healthyExperimentFetch(fixture, (pilotCase, condition, callNumber) => {
+    if (callNumber === 1) return responseForDecision('NO_WRITE');
+    if (callNumber === 2) return responseForContent('not-json');
+    if (callNumber === 3) throw new DOMException('synthetic timeout', 'AbortError');
+    return responseForDecision(pilotCase.adjudication.primary.label);
+  });
+  const report = await runBoundaryDiagnostic(fixture, fixedRunnerOptions(harness.fetchImpl));
   const expectedOrder = fixture.cases.flatMap(item => [
     `${item.caseId}-A`, `${item.caseId}-B`, `${item.caseId}-C`,
   ]);
-  assert.deepEqual(calls, expectedOrder);
-  assert.equal(calls.length, CALLS_PLANNED);
+  assert.equal(harness.healthCalls.length, 1);
+  assert.equal(harness.healthCalls[0].url, 'http://127.0.0.1:1/health');
+  assert.equal(harness.healthCalls[0].init.method, 'GET');
+  assert.equal(Object.hasOwn(harness.healthCalls[0].init, 'body'), false);
+  assert.deepEqual(
+    harness.experimentalCalls.map(call => `${call.pilotCase.caseId}-${call.condition}`),
+    expectedOrder,
+  );
+  assert.equal(harness.experimentalCalls.length, CALLS_PLANNED);
+  assert.ok(harness.experimentalCalls.every(call => call.init.method === 'POST'));
   assert.equal(report.reportVersion, BOUNDARY_REPORT_VERSION);
   assert.equal(report.execution.timeoutMs, FIXED_TIMEOUT_MS);
   assert.equal(report.execution.timeoutMs, 180000);
   assert.equal(report.execution.callsPlanned, 45);
-  assert.equal(report.execution.callsCompleted, 45);
+  assert.equal(report.execution.callsAttempted, 45);
+  assert.equal(report.execution.callsCompleted, 44);
   assert.equal(report.execution.order, 'case-local A->B->C');
   assert.equal(report.execution.automaticReruns, false);
   assert.equal(report.observations.length, 15);
@@ -380,6 +494,38 @@ test('runner uses exact case-local A/B/C order and never reruns mismatch, invali
   assert.equal(Object.hasOwn(report, 'finalDisposition'), false);
   assert.equal(Object.hasOwn(report, 'acceptanceThreshold'), false);
   assert.doesNotMatch(JSON.stringify(report), /PASS_B2D|FAIL_B2D/u);
+});
+
+test('healthy all-valid execution reports planned=attempted=completed=45', async () => {
+  const fixture = loadBoundaryFixture();
+  const harness = healthyExperimentFetch(fixture);
+  const report = await runBoundaryDiagnostic(fixture, fixedRunnerOptions(harness.fetchImpl));
+  assert.equal(harness.healthCalls.length, 1);
+  assert.equal(harness.experimentalCalls.length, 45);
+  assert.deepEqual(report.execution, {
+    timeoutMs: 180000,
+    callsPlanned: 45,
+    callsAttempted: 45,
+    callsCompleted: 45,
+    order: 'case-local A->B->C',
+    automaticReruns: false,
+  });
+  assert.equal(exitCodeForReport(report), 0);
+});
+
+test('completed invalid structured response counts as completed inference response', async () => {
+  const fixture = loadBoundaryFixture();
+  const harness = healthyExperimentFetch(fixture, (pilotCase, condition, callNumber) => (
+    callNumber === 1
+      ? responseForContent('not-json')
+      : responseForDecision(pilotCase.adjudication.primary.label)
+  ));
+  const report = await runBoundaryDiagnostic(fixture, fixedRunnerOptions(harness.fetchImpl));
+  assert.equal(harness.experimentalCalls.length, 45);
+  assert.equal(report.execution.callsAttempted, 45);
+  assert.equal(report.execution.callsCompleted, 45);
+  assert.equal(report.summaries[CONDITIONS.A].invalidStructuredOutputs, 1);
+  assert.equal(exitCodeForReport(report), 0);
 });
 
 test('configuration is fixed to Qwen3-4B BF16, fixed runtime, and fixed timeout', () => {

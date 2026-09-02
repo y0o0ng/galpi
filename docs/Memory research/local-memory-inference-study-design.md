@@ -2140,6 +2140,17 @@ fresh-validated triage contract. Production memory decisions, retrieval,
 routing, DB, and Vault remain unchanged, and private natural replay remains
 `UNOPENED`.
 
+#### P1-B2d endpoint-unavailable attempt and harness correction
+
+A first execution attempt at Galpi commit
+`1c5ed431623460a7afbae86cff9daa0d1dd4ed33` encountered an unavailable local
+endpoint before producing any model output. All 45 constructed observations
+were `NOT_RUN` / `LOCAL_ENDPOINT_UNAVAILABLE`, so that artifact is an
+infrastructure/harness failure rather than semantic P1-B2d evidence and does
+not consume the preregistered no-rerun model execution. The runner now
+requires one successful non-inference `llama.cpp` readiness preflight before
+any experimental call; a valid P1-B2d run remains pending.
+
 A later raw-context evaluation is deferred and separate from this
 evidence-only component diagnostic. Only after the strongest bounded triage
 prompt candidate is selected and passes separate fresh validation should a
