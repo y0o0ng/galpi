@@ -8,20 +8,14 @@ const MAX_RESULT_CHARS = 4000;
 
 async function main() {
   const path = String(process.argv[2] || 'README.md').trim();
-  const ref = String(process.argv[3] || '').trim();
   let github;
 
   try {
     github = await createGitHubMcpClient();
     const listed = await github.listTools();
     const toolNames = (listed.tools || []).map(tool => tool.name);
-    if (!toolNames.includes('get_file_contents')) {
-      throw Object.assign(new Error('get_file_contents 도구가 없습니다.'), {
-        code: 'GITHUB_MCP_TOOL_MISSING',
-      });
-    }
-
-    const result = await github.readFile(path, ref ? { ref } : undefined);
+    const snapshot = await github.openMainSnapshot();
+    const result = await snapshot.readFile(path);
     if (result?.isError === true) {
       throw Object.assign(new Error('GitHub MCP 파일 읽기 도구가 오류 결과를 반환했습니다.'), {
         code: 'GITHUB_MCP_TOOL_RESULT_ERROR',
@@ -31,7 +25,7 @@ async function main() {
     console.log(JSON.stringify({
       success: true,
       path,
-      ref: ref || null,
+      sha: snapshot.sha,
       tools: toolNames,
       result: serialized.slice(0, MAX_RESULT_CHARS),
       truncated: serialized.length > MAX_RESULT_CHARS,
