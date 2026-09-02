@@ -9,7 +9,11 @@ const TEST_TOKEN = 'github-test-token-secret';
 const VALID_REPOSITORY = 'y0o0ng/galpi';
 const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
-const EXPECTED_TOOLS = [{ name: 'get_commit' }, { name: 'get_file_contents' }];
+const EXPECTED_TOOLS = [
+  { name: 'get_commit' },
+  { name: 'get_file_contents' },
+  { name: 'pull_request_read' },
+];
 
 function commitResult(sha = SHA_A) {
   return {
@@ -106,6 +110,27 @@ function createSdkHarness({
   };
 }
 
+function createFetchHarness({ response, error } = {}) {
+  const state = { requests: [] };
+  async function fetchImpl(url, options) {
+    state.requests.push({ url: url.href, options: structuredClone(options) });
+    if (error) throw error;
+    if (response) return response;
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          full_name: 'github/github-mcp-server',
+          private: false,
+          default_branch: 'main',
+        };
+      },
+    };
+  }
+  return { fetchImpl, state };
+}
+
 test('missing token fails before loading the SDK or connecting', async () => {
   let sdkLoads = 0;
   await withGitHubEnv({
@@ -145,7 +170,7 @@ test('transport uses the official endpoint, Bearer token, and strict tool header
     assert.deepEqual(harness.state.transport.options.requestInit.headers, {
       Authorization: `Bearer ${TEST_TOKEN}`,
       'X-MCP-Readonly': 'true',
-      'X-MCP-Tools': 'get_commit,get_file_contents',
+      'X-MCP-Tools': 'get_commit,get_file_contents,pull_request_read',
     });
     await github.close();
   });
@@ -311,7 +336,7 @@ test('listTools is available and close is idempotent', async () => {
   assert.equal(harness.state.closed, 1);
 });
 
-test('the exact two-tool allowlist is accepted in either order', async () => {
+test('the exact three-tool allowlist is accepted independent of ordering', async () => {
   for (const tools of [EXPECTED_TOOLS, [...EXPECTED_TOOLS].reverse()]) {
     const harness = createSdkHarness({ tools });
     await withGitHubEnv({
@@ -521,6 +546,231 @@ test('an existing snapshot stays pinned when a new snapshot resolves a moved mai
     const fileCalls = harness.state.toolCalls.filter(call => call.name === 'get_file_contents');
     assert.deepEqual(fileCalls.map(call => call.arguments.sha), [SHA_A, SHA_B, SHA_A]);
     assert.equal(commitCalls, 2);
+    await github.close();
+  });
+});
+
+test('public repository input is structurally validated before metadata or MCP calls', async () => {
+  const sdk = createSdkHarness();
+  const rest = createFetchHarness();
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    const github = await createGitHubMcpClient({
+      loadSdk: sdk.loadSdk,
+      fetchImpl: rest.fetchImpl,
+    });
+    for (const invalid of ['github', 'github/repo/extra', 'https://github.com/github/repo', 'bad owner/repo']) {
+      await assert.rejects(
+        () => github.openPublicSnapshot(invalid),
+        error => error.code === 'GITHUB_MCP_REPOSITORY_INVALID',
+      );
+    }
+    assert.equal(rest.state.requests.length, 0);
+    assert.equal(sdk.state.toolCalls.length, 0);
+    await github.close();
+  });
+});
+
+test('public metadata uses fixed unauthenticated GitHub API and pins the default branch once', async () => {
+  const sdk = createSdkHarness({
+    callResult(request) {
+      if (request.name === 'get_commit') return commitResult(SHA_B);
+      return { content: [{ type: 'text', text: request.arguments.path }] };
+    },
+  });
+  const rest = createFetchHarness({
+    response: {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          full_name: 'github/github-mcp-server',
+          private: false,
+          default_branch: 'trunk',
+        };
+      },
+    },
+  });
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    const github = await createGitHubMcpClient({
+      loadSdk: sdk.loadSdk,
+      fetchImpl: rest.fetchImpl,
+    });
+    const first = await github.openPublicSnapshot('github/github-mcp-server');
+    const second = await github.openPublicSnapshot('GITHUB/GITHUB-MCP-SERVER');
+    await first.readFile('README.md');
+    await second.readFile('/');
+
+    assert.equal(first, second);
+    assert.equal(first.repository, 'github/github-mcp-server');
+    assert.equal(first.defaultBranch, 'trunk');
+    assert.equal(first.sha, SHA_B);
+    assert.deepEqual(rest.state.requests, [{
+      url: 'https://api.github.com/repos/github/github-mcp-server',
+      options: {
+        method: 'GET',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'galpi-github-public-verifier',
+        },
+      },
+    }]);
+    assert.equal('Authorization' in rest.state.requests[0].options.headers, false);
+    assert.deepEqual(sdk.state.toolCalls, [
+      {
+        name: 'get_commit',
+        arguments: {
+          owner: 'github', repo: 'github-mcp-server', sha: 'trunk', detail: 'none',
+        },
+      },
+      {
+        name: 'get_file_contents',
+        arguments: {
+          owner: 'github', repo: 'github-mcp-server', path: 'README.md', sha: SHA_B,
+        },
+      },
+      {
+        name: 'get_file_contents',
+        arguments: {
+          owner: 'github', repo: 'github-mcp-server', path: '/', sha: SHA_B,
+        },
+      },
+    ]);
+    assert.equal(sdk.state.toolCalls.some(call => 'ref' in call.arguments), false);
+    await github.close();
+  });
+});
+
+test('private, unavailable, rate-limited, malformed, and failed public metadata fail closed', async () => {
+  const cases = [
+    { response: { ok: false, status: 404, json: async () => ({}) } },
+    { response: { ok: false, status: 403, json: async () => ({}) } },
+    { response: { ok: false, status: 429, json: async () => ({}) } },
+    { error: new Error(`network ${TEST_TOKEN}`) },
+    { response: { ok: true, status: 200, json: async () => { throw new Error('bad json'); } } },
+    { response: { ok: true, status: 200, json: async () => ({ full_name: 'github/github-mcp-server', private: true, default_branch: 'main' }) } },
+    { response: { ok: true, status: 200, json: async () => ({ full_name: 'other/repo', private: false, default_branch: 'main' }) } },
+    { response: { ok: true, status: 200, json: async () => ({ full_name: 'github/github-mcp-server', private: false, default_branch: '' }) } },
+    { response: { ok: true, status: 200, json: async () => ({ full_name: 'github/github-mcp-server', private: false, default_branch: 'bad..branch' }) } },
+  ];
+
+  for (const fetchCase of cases) {
+    const sdk = createSdkHarness();
+    const rest = createFetchHarness(fetchCase);
+    await withGitHubEnv({
+      GITHUB_MCP_TOKEN: TEST_TOKEN,
+      GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+    }, async () => {
+      const github = await createGitHubMcpClient({
+        loadSdk: sdk.loadSdk,
+        fetchImpl: rest.fetchImpl,
+      });
+      await assert.rejects(
+        () => github.openPublicSnapshot('github/github-mcp-server'),
+        error => error.code === 'GITHUB_PUBLIC_REPOSITORY_UNVERIFIED'
+          && !String(error).includes(TEST_TOKEN),
+      );
+      assert.equal(sdk.state.toolCalls.length, 0);
+      await github.close();
+    });
+  }
+});
+
+test('external public PR is verified before the exact pull_request_read call', async () => {
+  const toolResult = { content: [{ type: 'text', text: 'pull request data' }] };
+  const sdk = createSdkHarness({ callResult: toolResult });
+  const rest = createFetchHarness();
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    const github = await createGitHubMcpClient({
+      loadSdk: sdk.loadSdk,
+      fetchImpl: rest.fetchImpl,
+    });
+    const response = await github.readPullRequest({
+      repository: 'github/github-mcp-server',
+      pullNumber: 42,
+      method: 'get_reviews',
+    });
+    assert.equal(rest.state.requests.length, 1);
+    assert.deepEqual(response, {
+      repository: 'github/github-mcp-server',
+      result: toolResult,
+    });
+    assert.deepEqual(sdk.state.toolCalls, [{
+      name: 'pull_request_read',
+      arguments: {
+        method: 'get_reviews', owner: 'github', repo: 'github-mcp-server', pullNumber: 42,
+      },
+    }]);
+    await github.close();
+  });
+});
+
+test('configured-repository PR skips public verification and preserves tool-level errors', async () => {
+  const toolResult = {
+    isError: true,
+    content: [{ type: 'text', text: 'untrusted remote PR error' }],
+  };
+  const sdk = createSdkHarness({ callResult: toolResult });
+  const rest = createFetchHarness({ error: new Error('must not fetch') });
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    const github = await createGitHubMcpClient({
+      loadSdk: sdk.loadSdk,
+      fetchImpl: rest.fetchImpl,
+    });
+    const response = await github.readPullRequest({ pullNumber: 7, method: 'get_diff' });
+    assert.equal(rest.state.requests.length, 0);
+    assert.deepEqual(response.result, toolResult);
+    assert.deepEqual(sdk.state.toolCalls, [{
+      name: 'pull_request_read',
+      arguments: {
+        method: 'get_diff', owner: 'y0o0ng', repo: 'galpi', pullNumber: 7,
+      },
+    }]);
+    await github.close();
+  });
+});
+
+test('private external PR fails before pull_request_read', async () => {
+  const sdk = createSdkHarness();
+  const rest = createFetchHarness({
+    response: {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          full_name: 'private/repo',
+          private: true,
+          default_branch: 'main',
+        };
+      },
+    },
+  });
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    const github = await createGitHubMcpClient({
+      loadSdk: sdk.loadSdk,
+      fetchImpl: rest.fetchImpl,
+    });
+    await assert.rejects(
+      () => github.readPullRequest({
+        repository: 'private/repo', pullNumber: 1, method: 'get',
+      }),
+      error => error.code === 'GITHUB_PUBLIC_REPOSITORY_UNVERIFIED',
+    );
+    assert.equal(sdk.state.toolCalls.length, 0);
     await github.close();
   });
 });

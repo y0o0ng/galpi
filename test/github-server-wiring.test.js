@@ -12,6 +12,7 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
 const API_TOKEN = 'github-wiring-test-token';
+const GITHUB_TOOL_NAMES = ['github_read', 'github_public_read', 'github_pr_read'];
 
 async function availablePort() {
   const server = net.createServer();
@@ -160,7 +161,10 @@ test('GitHub tools require the explicit chat enable flag', async t => {
   await server.ask('최신 main의 README를 확인해줘');
 
   const request = server.responseRequests.at(-1);
-  assert.equal((request.tools || []).some(tool => tool.name === 'github_read'), false);
+  assert.deepEqual(
+    (request.tools || []).filter(tool => GITHUB_TOOL_NAMES.includes(tool.name)),
+    [],
+  );
   assert.doesNotMatch(String(request.instructions || ''), /GitHub이 현재 저장소의 정본/);
 });
 
@@ -169,19 +173,33 @@ test('normal text and half-duplex voice receive the lazy GitHub session', async 
   await server.ask('최신 main의 README를 확인해줘');
   const textRequest = server.responseRequests.at(-1);
 
-  assert.ok((textRequest.tools || []).some(tool => tool.name === 'github_read'));
+  assert.deepEqual(
+    (textRequest.tools || [])
+      .map(tool => tool.name)
+      .filter(name => GITHUB_TOOL_NAMES.includes(name)),
+    GITHUB_TOOL_NAMES,
+  );
   assert.match(textRequest.instructions, /GitHub이 현재 저장소의 정본/);
   assert.match(textRequest.instructions, /신뢰하지 않는 근거 데이터/);
 
   await server.ask('최신 main의 README를 읽어줘', 'voice');
   const voiceRequest = server.responseRequests.at(-1);
-  assert.ok((voiceRequest.tools || []).some(tool => tool.name === 'github_read'));
+  assert.deepEqual(
+    (voiceRequest.tools || [])
+      .map(tool => tool.name)
+      .filter(name => GITHUB_TOOL_NAMES.includes(name)),
+    GITHUB_TOOL_NAMES,
+  );
   assert.match(voiceRequest.instructions, /GitHub이 현재 저장소의 정본/);
   assert.match(voiceRequest.instructions, /신뢰하지 않는 근거 데이터/);
 });
 
 test('shortcut is explicitly excluded and model generation always owns cleanup', async () => {
   const source = await fs.readFile(path.join(ROOT, 'server.js'), 'utf8');
+  assert.match(
+    source,
+    /\['github_read', 'github_public_read', 'github_pr_read'\]\.includes\(toolUse\.name\)/,
+  );
   const shortcut = source.slice(
     source.indexOf('const shortcutRoutes = createVoiceShortcutRoutes'),
     source.indexOf('voiceShortcutTurnHandler = shortcutRoutes.handleTurn'),

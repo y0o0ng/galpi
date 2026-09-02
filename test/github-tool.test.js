@@ -4,6 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  GITHUB_PR_READ_TOOL,
+  GITHUB_PUBLIC_READ_TOOL,
   GITHUB_READ_TOOL,
   MAX_CONTEXT_CHARS_PER_ANSWER,
   MAX_RESULT_CHARS_PER_CALL,
@@ -11,6 +13,7 @@ const {
 } = require('../lib/github/tool');
 
 const SNAPSHOT_SHA = 'a'.repeat(40);
+const PUBLIC_SNAPSHOT_SHA = 'b'.repeat(40);
 
 function fileResult(text) {
   return { content: [{ type: 'text', text }] };
@@ -18,14 +21,21 @@ function fileResult(text) {
 
 function createClientHarness({
   readResults = [fileResult('file contents')],
+  publicReadResults = [fileResult('public contents')],
+  prResults = [fileResult('pull request contents')],
   createError = null,
   snapshotError = null,
+  publicSnapshotError = null,
+  prError = null,
   closeError = null,
 } = {}) {
   const state = {
     clients: 0,
     snapshots: 0,
     reads: [],
+    publicSnapshots: [],
+    publicReads: [],
+    pullRequests: [],
     closes: 0,
   };
 
@@ -47,6 +57,33 @@ function createClientHarness({
           },
         };
       },
+      async openPublicSnapshot(repository) {
+        state.publicSnapshots.push(repository);
+        if (publicSnapshotError) throw publicSnapshotError;
+        return {
+          repository,
+          defaultBranch: 'main',
+          sha: PUBLIC_SNAPSHOT_SHA,
+          async readFile(path) {
+            state.publicReads.push({ repository, path });
+            const index = Math.min(state.publicReads.length - 1, publicReadResults.length - 1);
+            const result = publicReadResults[index];
+            if (result instanceof Error) throw result;
+            return structuredClone(result);
+          },
+        };
+      },
+      async readPullRequest(input) {
+        state.pullRequests.push(structuredClone(input));
+        if (prError) throw prError;
+        const index = Math.min(state.pullRequests.length - 1, prResults.length - 1);
+        const result = prResults[index];
+        if (result instanceof Error) throw result;
+        return {
+          repository: input.repository || 'y0o0ng/galpi',
+          result: structuredClone(result),
+        };
+      },
       async close() {
         state.closes += 1;
         if (closeError) throw closeError;
@@ -63,19 +100,46 @@ function payloadOf(result) {
   return JSON.parse(result.content.slice(newline + 1));
 }
 
-test('session creation is lazy and exposes only github_read with path input', async () => {
+test('session creation is lazy and exposes only the three bounded GitHub read tools', async () => {
   const harness = createClientHarness();
   const session = createGitHubReadSession({ createClient: harness.createClient });
 
   assert.equal(harness.state.clients, 0);
-  assert.deepEqual(session.getToolDefinitions(), [GITHUB_READ_TOOL]);
+  assert.deepEqual(session.getToolDefinitions(), [
+    GITHUB_READ_TOOL,
+    GITHUB_PUBLIC_READ_TOOL,
+    GITHUB_PR_READ_TOOL,
+  ]);
   assert.equal(GITHUB_READ_TOOL.name, 'github_read');
   assert.deepEqual(Object.keys(GITHUB_READ_TOOL.input_schema.properties), ['path']);
   assert.deepEqual(GITHUB_READ_TOOL.input_schema.required, ['path']);
   assert.equal(GITHUB_READ_TOOL.input_schema.additionalProperties, false);
+  assert.deepEqual(
+    Object.keys(GITHUB_PUBLIC_READ_TOOL.input_schema.properties),
+    ['repository', 'path'],
+  );
+  assert.deepEqual(GITHUB_PUBLIC_READ_TOOL.input_schema.required, ['repository', 'path']);
+  assert.deepEqual(
+    Object.keys(GITHUB_PR_READ_TOOL.input_schema.properties),
+    ['repository', 'pull_number', 'method'],
+  );
+  assert.deepEqual(GITHUB_PR_READ_TOOL.input_schema.required, ['pull_number', 'method']);
+  assert.deepEqual(GITHUB_PR_READ_TOOL.input_schema.properties.method.enum, [
+    'get',
+    'get_diff',
+    'get_status',
+    'get_files',
+    'get_commits',
+    'get_review_comments',
+    'get_reviews',
+    'get_comments',
+    'get_check_runs',
+  ]);
   assert.match(session.systemPrompt, /GitHub이 현재 저장소의 정본/);
   assert.match(session.systemPrompt, /Tavily|웹 검색/);
   assert.match(session.systemPrompt, /신뢰하지 않는 근거/);
+  assert.match(session.systemPrompt, /github_public_read/);
+  assert.match(session.systemPrompt, /github_pr_read/);
 
   await session.close();
   assert.equal(harness.state.clients, 0);
@@ -161,6 +225,122 @@ test('the repository root path is accepted', async () => {
   await session.close();
 });
 
+test('public reads expose pinned provenance and reuse one repository snapshot', async () => {
+  const harness = createClientHarness({
+    publicReadResults: [fileResult('public one'), fileResult('public two')],
+  });
+  const session = createGitHubReadSession({ createClient: harness.createClient });
+  const first = await session.execute('github_public_read', {
+    repository: 'github/github-mcp-server',
+    path: 'README.md',
+  });
+  const second = await session.execute('github_public_read', {
+    repository: 'GITHUB/GITHUB-MCP-SERVER',
+    path: '/',
+  });
+
+  assert.deepEqual(harness.state.publicSnapshots, ['github/github-mcp-server']);
+  assert.deepEqual(harness.state.publicReads, [
+    { repository: 'github/github-mcp-server', path: 'README.md' },
+    { repository: 'github/github-mcp-server', path: '/' },
+  ]);
+  assert.deepEqual(payloadOf(first), {
+    success: true,
+    repository: 'github/github-mcp-server',
+    defaultBranch: 'main',
+    snapshotSha: PUBLIC_SNAPSHOT_SHA,
+    path: 'README.md',
+    content: 'public one',
+    truncated: false,
+    trust: 'untrusted_repository_evidence',
+  });
+  assert.equal(payloadOf(second).snapshotSha, PUBLIC_SNAPSHOT_SHA);
+  assert.equal(payloadOf(second).path, '/');
+  await session.close();
+});
+
+test('pull request reads expose live provenance for configured and public repositories', async () => {
+  const harness = createClientHarness({
+    prResults: [fileResult('configured PR'), fileResult('public PR')],
+  });
+  const session = createGitHubReadSession({ createClient: harness.createClient });
+  const configured = await session.execute('github_pr_read', {
+    pull_number: 12,
+    method: 'get_diff',
+  });
+  const external = await session.execute('github_pr_read', {
+    repository: 'github/github-mcp-server',
+    pull_number: 34,
+    method: 'get_reviews',
+  });
+
+  assert.deepEqual(harness.state.pullRequests, [
+    { pullNumber: 12, method: 'get_diff' },
+    { repository: 'github/github-mcp-server', pullNumber: 34, method: 'get_reviews' },
+  ]);
+  assert.deepEqual(payloadOf(configured), {
+    success: true,
+    repository: 'y0o0ng/galpi',
+    pullNumber: 12,
+    method: 'get_diff',
+    content: 'configured PR',
+    truncated: false,
+    trust: 'untrusted_repository_evidence',
+  });
+  assert.equal(payloadOf(external).repository, 'github/github-mcp-server');
+  assert.equal(payloadOf(external).pullNumber, 34);
+  assert.equal(payloadOf(external).method, 'get_reviews');
+  await session.close();
+});
+
+test('model inputs cannot add revisions, private overrides, or arbitrary MCP controls', async () => {
+  const harness = createClientHarness();
+  const session = createGitHubReadSession({ createClient: harness.createClient });
+  const cases = [
+    ['github_public_read', {
+      repository: 'github/github-mcp-server', path: 'README.md', branch: 'dev',
+    }],
+    ['github_public_read', {
+      repository: 'github/github-mcp-server', path: 'README.md', sha: SNAPSHOT_SHA,
+    }],
+    ['github_public_read', {
+      repository: 'github/github-mcp-server', path: 'README.md', private: true,
+    }],
+    ['github_pr_read', {
+      repository: 'github/github-mcp-server', pull_number: 1, method: 'get', ref: 'main',
+    }],
+    ['github_pr_read', {
+      repository: 'github/github-mcp-server', pull_number: 1, method: 'merge',
+    }],
+    ['github_pr_read', {
+      repository: 'https://github.com/github/github-mcp-server', pull_number: 1, method: 'get',
+    }],
+  ];
+  for (const [name, input] of cases) {
+    const result = await session.execute(name, input);
+    assert.equal(result.isError, true);
+  }
+  assert.equal(harness.state.clients, 0);
+  await session.close();
+});
+
+test('the two-call limit is shared across all GitHub tool names', async () => {
+  const harness = createClientHarness();
+  const session = createGitHubReadSession({ createClient: harness.createClient });
+  await session.execute('github_public_read', {
+    repository: 'github/github-mcp-server', path: 'README.md',
+  });
+  await session.execute('github_pr_read', { pull_number: 1, method: 'get' });
+  const third = await session.execute('github_read', { path: 'package.json' });
+
+  assert.equal(third.isError, true);
+  assert.match(third.content, /최대 2회/);
+  assert.deepEqual(harness.state.reads, []);
+  assert.equal(harness.state.publicReads.length, 1);
+  assert.equal(harness.state.pullRequests.length, 1);
+  await session.close();
+});
+
 test('at most two GitHub reads are allowed per answer', async () => {
   const harness = createClientHarness();
   const session = createGitHubReadSession({ createClient: harness.createClient });
@@ -193,13 +373,16 @@ test('successful content is bounded and truncation is explicit', async () => {
   await session.close();
 });
 
-test('the total GitHub context budget is shared across both reads', async () => {
+test('the total GitHub context budget is shared across different GitHub tools', async () => {
   const harness = createClientHarness({
-    readResults: [fileResult('a'.repeat(30000)), fileResult('b'.repeat(30000))],
+    publicReadResults: [fileResult('a'.repeat(30000))],
+    prResults: [fileResult('b'.repeat(30000))],
   });
   const session = createGitHubReadSession({ createClient: harness.createClient });
-  const first = await session.execute('github_read', { path: 'one.txt' });
-  const second = await session.execute('github_read', { path: 'two.txt' });
+  const first = await session.execute('github_public_read', {
+    repository: 'github/github-mcp-server', path: 'one.txt',
+  });
+  const second = await session.execute('github_pr_read', { pull_number: 1, method: 'get_diff' });
 
   assert.ok(first.content.length <= MAX_RESULT_CHARS_PER_CALL);
   assert.ok(second.content.length <= MAX_RESULT_CHARS_PER_CALL);
@@ -224,6 +407,36 @@ test('file-level MCP errors and malformed results become sanitized tool errors',
     assert.equal(result.content.includes(remoteDetail), false);
     await session.close();
   }
+});
+
+test('public verification and PR remote failures become bounded sanitized tool errors', async () => {
+  const token = 'github-secret-public-token';
+  const publicHarness = createClientHarness({
+    publicSnapshotError: Object.assign(new Error(`Bearer ${token}`), {
+      code: 'GITHUB_PUBLIC_REPOSITORY_UNVERIFIED',
+    }),
+  });
+  const publicSession = createGitHubReadSession({ createClient: publicHarness.createClient });
+  const publicResult = await publicSession.execute('github_public_read', {
+    repository: 'github/github-mcp-server', path: 'README.md',
+  });
+  assert.equal(publicResult.isError, true);
+  assert.match(publicResult.content, /GITHUB_PUBLIC_REPOSITORY_UNVERIFIED/);
+  assert.equal(publicResult.content.includes(token), false);
+  await publicSession.close();
+
+  const remoteDetail = 'REMOTE_PR_SECRET_INSTRUCTION';
+  const prHarness = createClientHarness({
+    prResults: [{ isError: true, content: [{ type: 'text', text: remoteDetail }] }],
+  });
+  const prSession = createGitHubReadSession({ createClient: prHarness.createClient });
+  const prResult = await prSession.execute('github_pr_read', {
+    pull_number: 5, method: 'get_comments',
+  });
+  assert.equal(prResult.isError, true);
+  assert.match(prResult.content, /GITHUB_PR_RESULT_ERROR/);
+  assert.equal(prResult.content.includes(remoteDetail), false);
+  await prSession.close();
 });
 
 test('thrown client errors never expose token-like detail', async () => {

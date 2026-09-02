@@ -3668,7 +3668,7 @@ function createChatToolRuntime({
           onStage(writingStage);
         }
       }
-      if (toolUse.name === 'github_read') {
+      if (['github_read', 'github_public_read', 'github_pr_read'].includes(toolUse.name)) {
         if (!githubSession) {
           return { isError: true, content: '현재 요청에서는 GitHub 저장소를 읽을 수 없습니다.' };
         }
