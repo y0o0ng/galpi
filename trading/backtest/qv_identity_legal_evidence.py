@@ -96,6 +96,11 @@ UNRESOLVED = "UNRESOLVED"
 
 # ── 증거 역할 — 정확한 이름을 일관되게 쓴다. 동의어를 늘리지 않는다 ──────────
 GOVERNING_CLASS_DEFINITION = "GOVERNING_CLASS_DEFINITION"
+# **정의와 탄생은 다른 사실이다.** 완전 restated instrument가 그 class를 정의하고
+# 스스로 D에 발효한다는 것은 "그 class가 D에 만들어졌다"가 아니다 — class가 그
+# restatement보다 수십 년 앞설 수 있다. 탄생은 그 class를 실제로 세우는 **명시 실행
+# 행위**가 따로 있어야 한다.
+CLASS_BIRTH_ACTION = "CLASS_BIRTH_ACTION"
 CLASS_BIRTH_EFFECTIVE_DATE = "CLASS_BIRTH_EFFECTIVE_DATE"
 CURRENT_GOVERNING_SNAPSHOT = "CURRENT_GOVERNING_SNAPSHOT"
 CLASS_TERMINATION_EFFECTIVE_DATE = "CLASS_TERMINATION_EFFECTIVE_DATE"
@@ -114,10 +119,32 @@ CHARTER_AMENDMENT_ITEM = "5.03"
 PRIMARY = "PRIMARY"
 EXHIBIT = "EXHIBIT"
 
+# ── 증명 권한 — discovery와 authority는 다른 축이다 ──────────────────────────
+#
+# **filing 서술은 governing instrument가 아니다.** Item 5.03 8-K의 primary 문서는
+# "우리가 Certificate of Amendment를 제출했다"라고 말할 뿐 그 instrument 자체가
+# 아니다. 그 서술을 economic identity로 파싱하면 첨부물 이름만 보고 class 사실을
+# 만들어내는 셈이 된다. 후보 discovery는 그대로 두되 권한은 실제 Exhibit 3 문서에만
+# 준다.
+GOVERNING_EXHIBIT = "GOVERNING_EXHIBIT"
+FILING_NARRATIVE = "FILING_NARRATIVE"
+
 # **Exhibit 3 계열만이다.** `EX-3`으로 문자열 prefix 비교를 하면 SOX 인증서
 # `EX-31.1`·`EX-32.1`이 전부 governing 후보로 끌려 들어온다(실측: ABMD 385건 중 102건이
 # 그 이유로 분류 불가였다). 전시번호 3 뒤에 다른 숫자가 붙지 않는 것만 받는다.
 EXHIBIT_3_PATTERN = re.compile(r"^EX-0*3(?![0-9])", re.IGNORECASE)
+
+
+def document_proof_authority(document_type: object) -> str:
+    """그 문서가 **법적 증명 권한**을 갖는가. 정의는 여기 하나뿐이다.
+
+    실제 Exhibit 3 문서만 governing instrument로 읽힌다. Item 5.03으로 발견된 primary
+    8-K는 discovery/corroborating receipt로 남되 어떤 finding도 만들지 못한다.
+    """
+    clean = str(document_type or "").strip()
+    if clean and EXHIBIT_3_PATTERN.match(clean):
+        return GOVERNING_EXHIBIT
+    return FILING_NARRATIVE
 
 # ── 문서 분류 — 열거된 family만 인정한다 ─────────────────────────────────────
 #
@@ -155,6 +182,25 @@ CLASS_DEFINITION_PATTERNS = (
      r"authorized\s+to\s+issue\b[^.;]{0,240}?\bshares\s+of\s+(?:the\s+)?{name}\b"),
     ("DIVIDED_INTO", r"\bdivided\s+into\b[^.;]{0,240}?\b{name}\b"),
     ("DESIGNATED", r"\bdesignated(?:\s+as)?\s+(?:the\s+)?[\"“‘']?{name}\b"),
+)
+
+# ── 명시 class 탄생 행위 grammar ─────────────────────────────────────────────
+#
+# **정의가 아니라 생성이다.** `authorized to issue ... Class A Common Stock`은 그
+# instrument가 서술하는 **상태**이고, 그 class를 그 시점에 만들었다는 진술이 아니다.
+# 여기 있는 것은 그 class를 실제로 세우는 행위를 명시로 말하는 문장 모양뿐이다.
+# 원본 governing instrument도 그 언어가 있을 때만 탄생을 증명한다.
+CLASS_BIRTH_ACTION_PATTERNS = (
+    ("HEREBY_CREATED",
+     r"\bhereby\s+(?:created|established)\b[^.;]{0,200}?\b{name}\b"),
+    ("HEREBY_CREATED",
+     r"\b{name}\b[^.;]{0,160}?\b(?:is|are|shall\s+be)\s+hereby\s+"
+     r"(?:created|established)\b"),
+    ("NEW_CLASS_DESIGNATED",
+     r"\bnew\s+class\b[^.;]{0,200}?\bdesignated(?:\s+as)?\s+(?:the\s+)?"
+     r"[\"“‘']?{name}\b"),
+    ("RECLASSIFIED_INTO",
+     r"\breclassified\s+into\b[^.;]{0,200}?\b{name}\b"),
 )
 
 _DATE = r"[A-Z][a-z]+ \d{1,2}, \d{4}"
@@ -252,6 +298,11 @@ class LegalDocument:
     source_url: str
     document_sha256: str
     classification: str
+    # **discovery와 authority는 다른 축이다.** 서술 문서도 receipt에는 남지만
+    # 어떤 finding도 만들지 못한다.
+    proof_authority: str
+    # 첫 일치 하나만이 아니라 문서가 언급한 family 전부. 조용히 잃지 않는다.
+    classification_families: tuple[str, ...] = ()
 
     @property
     def key(self) -> tuple[str, str, str]:
@@ -269,6 +320,8 @@ class LegalDocument:
             "source_url": self.source_url,
             "document_sha256": self.document_sha256,
             "classification": self.classification,
+            "proof_authority": self.proof_authority,
+            "classification_families": list(self.classification_families),
         }
 
 
@@ -401,6 +454,21 @@ def classify_document(blocks: tuple[str, ...]) -> str:
     return UNCLASSIFIED
 
 
+def classification_families(blocks: tuple[str, ...]) -> tuple[str, ...]:
+    """문서 **전체**가 언급한 family 전부.
+
+    `classify_document()`는 첫 일치 하나만 돌려주므로, bylaws를 먼저 말하고 charter
+    amendment를 나중에 말하는 서술은 앞의 것만 남고 뒤가 조용히 사라진다. 권한이 없는
+    서술이라도 무엇을 봤는지는 receipt에 남아야 한다.
+    """
+    found: set[str] = set()
+    for block in blocks:
+        for name, pattern in AMENDMENT_FAMILIES + SNAPSHOT_FAMILIES + NON_GOVERNING_FAMILIES:
+            if re.search(pattern, block, re.IGNORECASE):
+                found.add(name)
+    return tuple(sorted(found))
+
+
 # ── 명시 사실 추출 ────────────────────────────────────────────────────────────
 
 
@@ -443,6 +511,18 @@ def class_definition_matches(
 ) -> tuple[tuple[int, str], ...]:
     """그 **정확한** 이름을 법적으로 세우는 block들. 단순 언급은 걸리지 않는다."""
     return _matches(blocks, CLASS_DEFINITION_PATTERNS, raw_name)
+
+
+def class_birth_action_matches(
+    blocks: tuple[str, ...], raw_name: str
+) -> tuple[tuple[int, str], ...]:
+    """그 **정확한** 이름의 class를 실제로 세우는 block들.
+
+    정의(`class_definition_matches`)와 다르다. 정의는 instrument가 서술하는 상태이고
+    여기는 그 class를 만드는 **행위**다. 완전 restated instrument의 발효일이 그 안의
+    모든 class의 탄생일이 되면 안 되기 때문에 둘을 가른다.
+    """
+    return _matches(blocks, CLASS_BIRTH_ACTION_PATTERNS, raw_name)
 
 
 def class_termination_matches(
@@ -669,6 +749,25 @@ def collect_legal_evidence(
                 "flat layout이라 문서 자연키로 가리킬 수 없다",
             ))
             continue
+        # **Item 5.03은 정관이 바뀌었다는 구조화된 신고다.** 그 accession에 주소를
+        # 지정할 수 있는 Exhibit 3이 하나도 없으면 그 governing 변경을 읽을 길이 없다.
+        # primary 서술로 대신하지 않고 탐색 실패로 적는다.
+        if (
+            row.form in EIGHT_K_FORMS
+            and CHARTER_AMENDMENT_ITEM in (
+                header_items or _items_tokens(getattr(row, "items", None))
+            )
+            and not any(
+                document_proof_authority(document_type) == GOVERNING_EXHIBIT
+                for _name, _role, document_type in candidates
+            )
+        ):
+            failures.append((
+                f"governing_exhibit_missing:{row.accession}",
+                "Item 5.03 8-K인데 주소 지정 가능한 Exhibit 3 문서가 없다 — primary "
+                "서술은 governing instrument가 아니다",
+            ))
+
         for name, role, document_type in candidates:
             try:
                 payload = client.accession_file_bytes(registrant, row.accession, name)
@@ -680,6 +779,7 @@ def collect_legal_evidence(
                 continue
             blocks = html_blocks(payload)
             classification = classify_document(blocks)
+            authority = document_proof_authority(document_type)
             document = LegalDocument(
                 cik=registrant,
                 accession=row.accession,
@@ -691,10 +791,15 @@ def collect_legal_evidence(
                 source_url=accession_dir_url(registrant, row.accession) + "/" + name,
                 document_sha256=sha256(payload),
                 classification=classification,
+                proof_authority=authority,
+                classification_families=classification_families(blocks),
             )
             documents.append(document)
             blocks_by_key[document.key] = blocks
-            if classification == UNCLASSIFIED:
+            # 분류 실패는 **증명 권한이 있는 문서**에만 탐색 실패다. 권한 없는 서술이
+            # 열거된 family에 안 맞는 것은 그 자체로 증거 공백이 아니다 — 진짜 공백은
+            # 위의 `governing_exhibit_missing`이 잡는다.
+            if classification == UNCLASSIFIED and authority == GOVERNING_EXHIBIT:
                 failures.append((
                     f"classify:{row.accession}/{name}",
                     "governing 후보를 열거된 family로 분류하지 못했다",
@@ -766,6 +871,8 @@ def project_class_proof(
                 if isinstance(item, dict) and str(item.get("class_name_key") or "") == target]
     definitions = [item for item in findings
                    if item.get("finding_kind") == GOVERNING_CLASS_DEFINITION]
+    birth_actions = [item for item in findings
+                     if item.get("finding_kind") == CLASS_BIRTH_ACTION]
     birth_dates = [item for item in findings
                    if item.get("finding_kind") == CLASS_BIRTH_EFFECTIVE_DATE
                    and item.get("effective_date")]
@@ -777,8 +884,8 @@ def project_class_proof(
         "status": UNRESOLVED, "birth_date": None, "termination_date": None,
         "open_ended": False, "snapshot_accession": None,
         "snapshot_document_name": None, "birth_definition": None,
-        "birth_date_finding": None, "snapshot_definition": None,
-        "termination_finding": None, "notes": (),
+        "birth_action": None, "birth_date_finding": None,
+        "snapshot_definition": None, "termination_finding": None, "notes": (),
     }
     if not search_ok:
         return {**blank, "status": INCOMPLETE,
@@ -788,8 +895,9 @@ def project_class_proof(
     distinct_births = sorted({str(item["effective_date"]) for item in birth_dates})
     if not distinct_births:
         return {**blank, "notes": (
-            "명시 governing class 정의와 명시 발효일이 한 instrument에서 함께 증명되지 "
-            "않았다 — 탄생이 증명되지 않는다",
+            "그 class를 세우는 **명시 실행 행위**와 거기 묶인 명시 발효일이 한 "
+            "instrument에서 함께 증명되지 않았다 — 정의만으로는 탄생이 아니고, 완전 "
+            "restated instrument의 발효일도 그 안의 class 탄생일이 아니다",
         )}
     if len(distinct_births) > 1:
         return {**blank, "notes": (
@@ -807,6 +915,15 @@ def project_class_proof(
     )
     if not birth_definition:
         return {**blank, "notes": ("탄생일 문서가 그 class를 명시로 정의하지 않는다",)}
+    birth_action = sorted(
+        (item for item in birth_actions if _finding_document(item) == birth_document),
+        key=lambda item: str(item.get("locator") or ""),
+    )
+    if not birth_action:
+        return {**blank, "notes": (
+            "탄생일 문서에 그 class를 세우는 명시 실행 행위가 없다 — instrument 발효일을 "
+            "class 탄생일로 쓰지 않는다",
+        )}
 
     # ── E. 명시 종료가 있으면 그것이 끝이다 ─────────────────────────────────
     distinct_terminations = sorted({str(item["effective_date"]) for item in terminations})
@@ -829,6 +946,7 @@ def project_class_proof(
             "open_ended": False, "snapshot_accession": None,
             "snapshot_document_name": None,
             "birth_definition": birth_definition[0],
+            "birth_action": birth_action[0],
             "birth_date_finding": birth_date_finding,
             "snapshot_definition": None,
             "termination_finding": termination_finding,
@@ -836,8 +954,16 @@ def project_class_proof(
         }
 
     # ── B. current-in-effect 완전 governing snapshot ────────────────────────
+    #
+    # **증명 권한이 있는 문서만 센다.** Item 5.03 primary 서술은 그 본문이 무엇을
+    # 말하든 governing instrument가 아니다. 저장된 `proof_authority` 칸이 아니라
+    # `document_type`에서 같은 공유 helper로 다시 계산한다.
+    governing = [
+        item for item in documents
+        if document_proof_authority(item.get("document_type")) == GOVERNING_EXHIBIT
+    ]
     snapshots = sorted(
-        (item for item in documents
+        (item for item in governing
          if str(item.get("classification") or "") in SNAPSHOT_CLASSIFICATIONS),
         key=_document_order,
     )
@@ -848,6 +974,25 @@ def project_class_proof(
         )}
     current = snapshots[-1]
     current_key = (str(current.get("accession") or ""), str(current.get("document_name") or ""))
+
+    # **amendment는 complete snapshot이 아니다.** 가장 늦은 완전 snapshot 뒤에
+    # governing amendment가 하나라도 있으면 그 snapshot은 현재 상태를 닫지 못한다.
+    # 그 amendment가 대상 class 정의를 되풀이한다는 이유로 snapshot을 "현재"로
+    # 올려주지 않는다 — 그러면 amendment를 complete snapshot으로 승격하는 셈이다.
+    # 나중에 그 상태를 흡수한 완전 restated snapshot이 나와야 열린다.
+    later_amendments = sorted(
+        f"{item.get('accession')}/{item.get('document_name')}"
+        for item in governing
+        if str(item.get("classification") or "") in AMENDMENT_CLASSIFICATIONS
+        and _document_order(item) > _document_order(current)
+    )
+    if later_amendments:
+        return {**blank, "birth_date": birth, "notes": (
+            "가장 늦은 완전 governing snapshot 뒤에 governing amendment가 있다 — "
+            "그 snapshot은 current-in-effect 상태를 닫지 못한다: "
+            + ", ".join(later_amendments),
+        )}
+
     snapshot_definition = sorted(
         (item for item in definitions if _finding_document(item) == current_key),
         key=lambda item: str(item.get("locator") or ""),
@@ -870,7 +1015,7 @@ def project_class_proof(
     defined_keys = {_finding_document(item) for item in definitions}
     unresolved_changes = sorted(
         f"{item.get('accession')}/{item.get('document_name')}"
-        for item in documents
+        for item in governing
         if str(item.get("classification") or "") in GOVERNING_CLASSIFICATIONS
         and birth_order is not None
         and _document_order(item) > birth_order
@@ -889,6 +1034,7 @@ def project_class_proof(
         "snapshot_accession": current_key[0],
         "snapshot_document_name": current_key[1],
         "birth_definition": birth_definition[0],
+        "birth_action": birth_action[0],
         "birth_date_finding": birth_date_finding,
         "snapshot_definition": snapshot_definition[0],
         "termination_finding": None,
@@ -922,6 +1068,10 @@ def _class_findings(
     """governing 문서에서 그 정확한 class 이름에 대한 명시 사실만 모은다."""
     findings: list[LegalFinding] = []
     for document in documents:
+        # **filing 서술은 governing instrument가 아니다.** 첨부된 instrument 이름을
+        # 말한다는 이유로 economic identity 사실을 만들지 않는다.
+        if document.proof_authority != GOVERNING_EXHIBIT:
+            continue
         if document.classification not in GOVERNING_CLASSIFICATIONS:
             continue
         blocks = blocks_by_key.get(document.key, ())
@@ -936,6 +1086,20 @@ def _class_findings(
                 raw_class_name=raw_name,
                 semantic_family=family,
             ))
+        # **탄생 행위는 정의와 별개로 명시돼야 한다.** 완전 restated instrument가 그
+        # class를 정의하고 스스로 D에 발효한다는 것만으로는 탄생이 아니다.
+        birth_actions = class_birth_action_matches(blocks, raw_name)
+        for ordinal, family in birth_actions:
+            findings.append(LegalFinding(
+                finding_kind=CLASS_BIRTH_ACTION,
+                accession=document.accession,
+                document_name=document.document_name,
+                locator=f"block:{ordinal}",
+                class_name_key=name_key,
+                raw_class_name=raw_name,
+                semantic_family=family,
+            ))
+
         hits = _effective_date_hits(blocks)
         distinct = sorted({iso for _ordinal, iso in hits})
         # **instrument의 발효일이 정확히 하나일 때만** 그 행위의 경제적 발효일이다.
@@ -943,7 +1107,8 @@ def _class_findings(
         if len(distinct) != 1:
             continue
         ordinal = min(item for item, iso in hits if iso == distinct[0])
-        if definitions:
+        # 명시 탄생 행위가 있는 문서에서만 그 발효일이 탄생일 후보가 된다.
+        if birth_actions:
             findings.append(LegalFinding(
                 finding_kind=CLASS_BIRTH_EFFECTIVE_DATE,
                 accession=document.accession,
@@ -1020,6 +1185,120 @@ def _ref(finding: dict, *, cik: str, role: str) -> EvidenceRef:
     )
 
 
+# ── 정규 직렬화와 비교 — **정의가 하나여야 한다** ────────────────────────────
+#
+# production 행은 나중에 packet의 구간 증거를 합쳐 넣고, 5A-3는 그 REQUIRED 자연키에서
+# `usable_from_session`을 파생시킨다. 그래서 날짜만 맞춰 보면 **같은 구간에 다른
+# 증거를 끼워 넣는 변조**가 통과한다. 승격 재검증은 provenance까지 본다.
+
+
+def canonical_evidence_refs(items) -> list[dict]:
+    """증거 참조 목록의 결정론적 정규형. **순서만 정규화하고 내용은 손대지 않는다.**
+
+    중복을 지우지 않는다 — 하나를 지우면 치환을 못 잡는다.
+    """
+    out = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            raise QVLegalEvidenceError("증거 항목이 객체가 아닙니다")
+        locator = item.get("locator")
+        out.append({
+            "source_kind": str(item.get("source_kind") or ""),
+            "cik": str(item.get("cik") or ""),
+            "accession": str(item.get("accession") or ""),
+            "document_name": str(item.get("document_name") or ""),
+            "evidence_role": str(item.get("evidence_role") or ""),
+            "dependency": str(item.get("dependency") or ""),
+            "locator": "" if locator in (None, "") else str(locator),
+        })
+    return sorted(out, key=lambda row: tuple(sorted(row.items())))
+
+
+def canonical_interval(payload: dict | None) -> dict | None:
+    """직렬화된 구간 하나의 정규형 — 경계 **와** 증거 provenance."""
+    if payload is None:
+        return None
+    if not isinstance(payload, dict):
+        raise QVLegalEvidenceError("구간이 객체가 아닙니다")
+    end = payload.get("effective_to")
+    return {
+        "effective_from": str(payload.get("effective_from") or ""),
+        "effective_to": None if end in (None, "") else str(end),
+        "evidence": canonical_evidence_refs(payload.get("evidence")),
+    }
+
+
+def canonical_class_evidence(evidence: ClassEvidence) -> dict:
+    """`ClassEvidence` 하나의 정규형. 승격 재검증이 이 모양으로 대조한다."""
+    return {
+        "class_interval": canonical_interval(
+            evidence.class_interval.as_json() if evidence.class_interval else None
+        ),
+        "cover_title_interval": canonical_interval(
+            evidence.cover_title_interval.as_json()
+            if evidence.cover_title_interval else None
+        ),
+        "extra_prose_bridges": sorted(
+            (
+                {
+                    "bridge_type": item.bridge_type,
+                    "prose_key": prose_key(item.raw_prose_name),
+                    "interval": canonical_interval(
+                        item.interval.as_json() if item.interval else None
+                    ),
+                }
+                for item in evidence.extra_prose_bridges
+            ),
+            key=lambda row: (row["bridge_type"], row["prose_key"]),
+        ),
+    }
+
+
+def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> None:
+    """구조화된 proof가 **그 표지 증명에 실제로 속하는지** 본다.
+
+    다른 등록인의 proof나 다른 표지의 proof를 끼워 넣으면 finding은 그대로인데
+    class가 엉뚱한 발행사에 붙는다. finding이 receipt에 없는 문서를 가리키는 것도
+    막는다 — 그러면 5A-3가 맞춰 볼 자연키가 없는 증거가 production으로 새어 나간다.
+
+    **네트워크를 부르지 않는다.** 문서 SHA를 실제 SEC 문서와 맞춰 보는 것은 5A-3다.
+    """
+    if not isinstance(payload, dict):
+        raise QVLegalEvidenceError("legal_evidence_proof가 객체가 아닙니다")
+    cik = normalize_cik(payload.get("cik"))
+    if cik is None or cik != normalize_cik(cover_proof.cik):
+        raise QVLegalEvidenceError(
+            f"legal proof CIK가 표지 증명과 다릅니다: {payload.get('cik')!r} != "
+            f"{cover_proof.cik}"
+        )
+    if str(payload.get("cover_accession") or "") != cover_proof.accession:
+        raise QVLegalEvidenceError(
+            "legal proof의 cover accession이 표지 증명과 다릅니다: "
+            f"{payload.get('cover_accession')!r} != {cover_proof.accession}"
+        )
+    if str(payload.get("cover_document_name") or "") != cover_proof.document_name:
+        raise QVLegalEvidenceError(
+            "legal proof의 cover 문서가 표지 증명과 다릅니다: "
+            f"{payload.get('cover_document_name')!r} != {cover_proof.document_name}"
+        )
+    known = {
+        (str(item.get("accession") or ""), str(item.get("document_name") or ""))
+        for item in (payload.get("documents") or []) if isinstance(item, dict)
+    }
+    for entry in payload.get("classes") or []:
+        if not isinstance(entry, dict):
+            raise QVLegalEvidenceError("legal proof class 항목이 객체가 아닙니다")
+        for finding in entry.get("findings") or []:
+            if not isinstance(finding, dict):
+                raise QVLegalEvidenceError("legal proof finding이 객체가 아닙니다")
+            key = _finding_document(finding)
+            if key not in known:
+                raise QVLegalEvidenceError(
+                    "finding이 receipt에 없는 문서를 가리킵니다: "
+                    f"{key[0]}/{key[1]}"
+                )
+
+
 def class_evidence_from_legal_proof(
     payload: dict, *, cover_proof: CoverPageProof
 ) -> dict[str, ClassEvidence]:
@@ -1035,11 +1314,8 @@ def class_evidence_from_legal_proof(
     anchor는 정확한 N1 동일성 하나다. 표지 제목과 legal proof의 대상 이름이 N1으로
     같지 않으면 그 class는 조용히 빠진다 — 사람 눈에 아무리 비슷해도 잇지 않는다.
     """
-    if not isinstance(payload, dict):
-        raise QVLegalEvidenceError("legal_evidence_proof가 객체가 아닙니다")
+    assert_proof_integrity(payload, cover_proof=cover_proof)
     cik = normalize_cik(payload.get("cik"))
-    if cik is None:
-        raise QVLegalEvidenceError(f"CIK가 아닙니다: {payload.get('cik')!r}")
     documents = [item for item in (payload.get("documents") or []) if isinstance(item, dict)]
     # **탐색 상태도 구조에서 다시 계산한다.** `search_status` 칸을 COMPLETE로 고쳐도
     # 실패가 하나라도 박혀 있으면 여기서 아무 구간도 나오지 않는다.
@@ -1068,6 +1344,7 @@ def class_evidence_from_legal_proof(
         birth_date_finding = projected["birth_date_finding"]
         interval_evidence = [
             _ref(definition, cik=cik, role=GOVERNING_CLASS_DEFINITION),
+            _ref(projected["birth_action"], cik=cik, role=CLASS_BIRTH_ACTION),
             _ref(birth_date_finding, cik=cik, role=CLASS_BIRTH_EFFECTIVE_DATE),
         ]
         title_interval = None

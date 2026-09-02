@@ -611,6 +611,34 @@ GOVERNING_SEARCH_FORMS = 8-K 계열 · 10-K 계열 · 10-Q 계열
 discovery는 힌트일 뿐 **권위가 아니다.** 파일명에 `charter`가 있다는 이유로 문서가
 권위를 갖지 않는다 — 본문이 아래 semantic 규칙을 만족해야 한다.
 
+##### filing 서술은 governing instrument가 아니다
+
+**discovery와 proof authority는 다른 축이다.**
+
+```text
+실제 Exhibit 3 문서        -> 본문 분류 뒤 법적 증명 권한을 갖는다
+Item 5.03 PRIMARY 8-K      -> filing 서술 / discovery / corroborating receipt 전용
+                              GOVERNING_CLASS_DEFINITION · CLASS_BIRTH_ACTION ·
+                              CLASS_BIRTH_EFFECTIVE_DATE · CURRENT_GOVERNING_SNAPSHOT ·
+                              CLASS_TERMINATION_EFFECTIVE_DATE · PROSE_ALIAS_LIFETIME을
+                              **하나도** 만들지 못한다
+```
+
+`우리는 Certificate of Amendment를 제출했다`라고 말하는 서술은 그 instrument가
+**아니다.** 첨부물 이름을 말한다는 이유로 economic identity 사실을 파싱하지 않는다.
+권한 판정은 선언된 문서 종류 하나로 정해지고(`document_proof_authority()`) 그 정의는
+코드에 한 곳뿐이다 — 수집기와 투영기가 같은 함수를 쓴다.
+
+**Item 5.03은 정관이 바뀌었다는 구조화된 신고다.** 그 accession에 주소 지정 가능한
+Exhibit 3이 하나도 없으면 그 governing 변경을 읽을 길이 없으므로
+`governing_exhibit_missing` 탐색 실패다. primary 서술로 대신하지 않는다. 이 증분에서
+embedded 문서 parser를 만들지 않는다.
+
+`classify_document()`는 첫 일치 하나만 돌려주므로 bylaws를 먼저 말하고 charter
+amendment를 나중에 말하는 서술은 뒤가 조용히 사라진다. 그래서 문서가 언급한 family
+**전부**를 `classification_families`로 함께 남긴다. 어느 쪽도 governing instrument
+증명이 되지 않지만 무엇을 봤는지는 receipt에 남아야 한다.
+
 ##### 탐색 closure — COMPLETE / INCOMPLETE
 
 `COMPLETE`는 선언된 지평이 요구하는 모든 accession/문서를 실제로 열거하고 모든
@@ -618,8 +646,13 @@ governing 후보를 받아 분류했다는 뜻이다. 다음 중 하나라도 �
 
 ```text
 submissions archive 실패 · accession header 색인 실패 · 후보 문서 fetch 실패 ·
-열거된 family로 분류할 수 없는 후보 · 파일 이름 없이 선언된 문서
+열거된 family로 분류할 수 없는 **증명 권한 있는** 후보 ·
+Item 5.03인데 주소 지정 가능한 Exhibit 3이 없다 · 파일 이름 없이 선언된 문서
 ```
+
+분류 실패는 **증명 권한이 있는 문서**에만 탐색 실패다. 권한 없는 서술이 열거된 family에
+안 맞는 것은 그 자체로 증거 공백이 아니다 — 진짜 공백은 `governing_exhibit_missing`이
+잡는다.
 
 마지막이 **2001년 이전 flat layout**이다. 그 시기 accession은 문서를 개별 파일로 두지
 않아 문서 자연키로 가리킬 수 없다. 후보가 0건인 것과 구분해 `legacy_layout` 실패로
@@ -635,6 +668,10 @@ submissions archive 실패 · accession header 색인 실패 · 후보 문서 fe
 class 정의   authorized to issue ... shares of <NAME>
              ... divided into ... <NAME> ...
              ... designated <NAME>
+탄생 행위    hereby created/established ... <NAME>
+             <NAME> is hereby created/established
+             new class ... designated <NAME>
+             reclassified into ... <NAME>
 발효일       effective as of D · shall become/became effective on D ·
              effective date of/is D · effective on D
 종료         <NAME> 주식이 reclassified / eliminated / cancelled /
@@ -642,6 +679,38 @@ class 정의   authorized to issue ... shares of <NAME>
 ```
 
 단순 언급은 정의가 아니다. 맞지 않으면 `UNRESOLVED`다.
+
+##### governing snapshot의 발효일은 그 안 class의 탄생일이 아니다
+
+**정의와 탄생은 다른 사실이다.**
+
+```text
+authorized to issue Class A Common Stock
+this Certificate becomes effective on 2020-01-01
+```
+
+이것이 증명하는 것은 둘이다.
+
+```text
+그 snapshot에 Class A가 정의돼 있다
+그 snapshot이 2020-01-01에 operative하다
+```
+
+증명하지 **않는** 것은 하나다.
+
+```text
+Class A가 2020-01-01에 만들어졌다
+```
+
+class는 나중 amended-and-restated certificate보다 수십 년 앞설 수 있다. 그래서
+`CLASS_BIRTH_EFFECTIVE_DATE`는 그 class를 실제로 세우는 **명시 실행 행위**
+(`CLASS_BIRTH_ACTION`)가 같은 instrument에 있고 operative date가 그 행위에 모호함 없이
+묶일 때만 나온다. 완전 restatement의 발효일 단독 · snapshot 발효일 · 수리 시각 ·
+filed date · 최초 관측을 탄생일로 쓰지 않고 가까운 날짜를 고르지도 않는다.
+
+원본 governing instrument도 그 언어가 명시로 있을 때만 탄생을 증명한다. **결과적으로,
+정의만 든 restatement가 둘이어도 그 발효일들은 탄생일 후보가 아니므로 서로 충돌하지
+않는다.**
 
 **경제적 발효일로 쓰지 않는 것**: SEC 수리 시각 · filed date · accession 날짜 · report
 date · 서명일 단독 · 최초 관측 filing · 최초 XBRL 등장 · 최초 ticker 등장.
@@ -666,12 +735,23 @@ block은 어떤 finding도 만들지 못한다.
 조건을 **전부** 만족할 때만 나온다. C3가 이미 쓰는 fail-close continuity 철학과 같다.
 
 ```text
-A  명시 CLASS_BIRTH가 정확히 하나 (탄생일이 충돌하면 UNRESOLVED)
-B  current-in-effect **완전** governing snapshot이 그 정확한 N1 class를 정의한다
+A  명시 CLASS_BIRTH_ACTION + 거기 묶인 operative date가 정확히 하나
+   (탄생일이 충돌하면 UNRESOLVED)
+B  current-in-effect **완전** governing snapshot이 그 정확한 N1 class를 정의하고,
+   그 snapshot 뒤에 governing amendment가 없다
 C  governing amendment 탐색이 COMPLETE
 D  탄생 이후 모든 governing 후보의 class 영향이 해소됐다
 E  명시 종료가 없다 (있으면 effective_to = 그 종료일이다)
 ```
+
+**B의 뒷부분이 핵심이다 — amendment는 complete snapshot이 아니다.** 가장 늦은 완전
+snapshot 뒤에 governing amendment가 하나라도 있으면 그 snapshot은 현재 상태를 닫지
+못하므로 open-ended continuity는 `UNRESOLVED`다. 그 amendment가 대상 class 정의를
+되풀이한다는 이유로 snapshot을 "현재"로 올려주지 않는다 — 그러면 Certificate/Articles
+of Amendment를 complete snapshot으로 승격하는 셈이다. 그 상태를 흡수한 **나중 완전
+restated snapshot**이 나와야 다시 열린다.
+
+유한 명시 종료는 그 독립된 규칙(E)으로 그대로 처리된다.
 
 D의 해소 기준이 좁다. **대상 class 이름이 없다는 것은 영향이 없다는 증명이 아니므로**,
 탄생 뒤의 governing 문서는 그 class를 **명시로 정의해야만** 해소된 것으로 센다. 그래서
@@ -721,9 +801,12 @@ SEC HTML 본문은 넣지 않는다. semantic finding마다 결정론적 locator
 증거 역할은 정확히 이 이름들이다. 동의어를 늘리지 않는다.
 
 ```text
-GOVERNING_CLASS_DEFINITION · CLASS_BIRTH_EFFECTIVE_DATE ·
+GOVERNING_CLASS_DEFINITION · CLASS_BIRTH_ACTION · CLASS_BIRTH_EFFECTIVE_DATE ·
 CURRENT_GOVERNING_SNAPSHOT · CLASS_TERMINATION_EFFECTIVE_DATE · PROSE_ALIAS_LIFETIME
 ```
+
+문서 receipt는 `classification`(첫 일치) 말고 `classification_families`(언급한 family
+전부)와 `proof_authority`(`GOVERNING_EXHIBIT` / `FILING_NARRATIVE`)를 함께 남긴다.
 
 `usable_from_session`은 여기서 더하지 않는다. 5A-3이 자연키를
 `qv_sec_evidence_documents`에 맞춰 풀고 knowledge availability를 파생시킨다.
@@ -739,12 +822,44 @@ class_evidence_from_legal_proof(legal_evidence_proof, cover_proof) -> ClassEvide
 
 이 함수는 저장된 **결론 칸을 믿지 않는다.** `proposal_status` · `reason_codes` ·
 `interval_proved` · `search_status` · `status` · `birth_date`가 아니라
-`documents` · `findings` · `failures`에서 다시 계산한다. 그래서 packet에서 다음을 고쳐도
-승격이 실패한다.
+`documents` · `findings` · `failures`에서 다시 계산한다.
+
+##### 재검증은 날짜가 아니라 **증거 provenance까지** 비교한다
+
+production 행은 나중에 packet의 구간 증거를 합쳐 넣고, 5A-3가 그 REQUIRED 자연키에서
+`usable_from_session`을 파생시킨다. **경계만 대조하면 같은 구간에 다른 증거를 끼워
+넣는 변조가 통과하고 그 파생이 조용히 바뀐다.**
+
+그래서 정규화된 `ClassEvidence` 전체를 비교한다.
+
+```text
+class_interval · cover_title_interval · extra_prose_bridges
+    effective_from · effective_to
+    각 EvidenceRef의 source_kind · cik · accession · document_name ·
+                     evidence_role · dependency · locator
+```
+
+**순서만 결정론적으로 정규화한다.** 증거를 더하거나 빼거나 바꿔치는 것은 전부 실패이고,
+중복을 지우지 않는다 — 하나를 지우면 치환을 못 잡는다. 정규 직렬화·비교 정의는 legal
+증거 모듈 한 곳(`canonical_class_evidence` · `canonical_interval` ·
+`canonical_evidence_refs`)에 있고 승격기가 그것을 그대로 쓴다.
+
+같은 경계에서 구조화된 proof 자체의 정합성도 fail-close다.
+
+```text
+legal proof의 cik != 표지 증명 CIK
+cover_accession != CoverPageProof.accession
+cover_document_name != CoverPageProof.document_name
+finding이 legal_evidence_proof.documents에 없는 문서를 가리킨다
+```
+
+그래서 packet에서 다음을 고쳐도 승격이 실패한다.
 
 ```text
 class effective_from / effective_to · 표지 제목 구간 · governing bridge 구간 ·
-탐색 COMPLETE 상태 · finding의 발효일 · GOVERNING_CLASS_DEFINITION finding 삭제
+구간 증거의 accession/문서/역할/locator · REQUIRED 증거 추가·삭제 ·
+탐색 COMPLETE 상태 · finding의 발효일 · GOVERNING_CLASS_DEFINITION finding 삭제 ·
+다른 등록인/다른 표지의 legal proof 끼워 넣기
 ```
 
 **승격기는 여전히 네트워크를 부르지 않는다.** 박혀 있는 SEC 문서 SHA와 자연키를 실제

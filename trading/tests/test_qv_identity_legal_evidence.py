@@ -25,6 +25,7 @@ sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest import qv_evidence  # noqa: E402
 from backtest.qv_identity_legal_evidence import (  # noqa: E402
+    CLASS_BIRTH_ACTION,
     CLASS_BIRTH_EFFECTIVE_DATE,
     CLASS_TERMINATION_EFFECTIVE_DATE,
     COMPLETE,
@@ -88,14 +89,30 @@ def effective(date: str) -> str:
     return f"This Certificate shall become effective on {date}."
 
 
-def restated(*, names=(CLASS_A,), date=BIRTH_PROSE, extra=()) -> bytes:
-    """완전한 current-in-effect governing instrument 하나."""
+def creates(name: str) -> str:
+    """그 class를 **실제로 세우는** 명시 실행 행위."""
+    return f"There is hereby created a new class of capital stock designated {name}."
+
+
+def restated(*, names=(CLASS_A,), date=BIRTH_PROSE, extra=(), created=()) -> bytes:
+    """완전한 current-in-effect governing instrument 하나.
+
+    **기본값은 탄생을 증명하지 않는다.** 이 instrument가 그 class를 정의하고 스스로 D에
+    발효한다는 것은 "그 class가 D에 만들어졌다"가 아니다 — class가 이 restatement보다
+    수십 년 앞설 수 있다. 탄생을 증명하려면 `created=`로 명시 실행 행위를 넣는다.
+    """
     body = ["AMENDED AND RESTATED CERTIFICATE OF INCORPORATION OF ACME INC."]
+    body.extend(creates(name) for name in created)
     body.extend(authorized(name) for name in names)
     if date:
         body.append(effective(date))
     body.extend(extra)
     return html(*body)
+
+
+def founding_charter(*, names=(CLASS_A,), date=BIRTH_PROSE, extra=()) -> bytes:
+    """그 class를 세우는 행위와 발효일을 **둘 다** 든 완전 instrument."""
+    return restated(names=names, date=date, extra=extra, created=names)
 
 
 def amendment(*, paragraphs=(), date=None) -> bytes:
@@ -338,7 +355,7 @@ class CandidateDiscoveryTest(BaseFixture):
             {
                 "form8k.htm": ("8-K", html("Item 9.01.")),
                 "ex10-1.htm": ("EX-10.1", html("Employment agreement.")),
-                "ex3-1.htm": ("EX-3.1", restated()),
+                "ex3-1.htm": ("EX-3.1", founding_charter()),
             },
         )
         client, _proof, collected = collect([filing])
@@ -350,15 +367,111 @@ class CandidateDiscoveryTest(BaseFixture):
             [item.document_role for item in collected.documents], ["EXHIBIT"]
         )
 
-    def test_an_item_503_primary_document_is_discovered(self):
+    def test_an_item_503_primary_document_is_discovered_but_has_no_authority(self):
+        """**Finding 3** — 서술은 발견되고 receipt에 남지만 증명 권한이 없다."""
         client, _proof, collected = collect(
-            [item_503_8k("0000000042-15-000001", "2015-10-05", restated())]
+            [item_503_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
         )
         self.assertEqual(client.document_calls, ["0000000042-15-000001/form8k.htm"])
         self.assertEqual(
             [item.document_role for item in collected.documents], ["PRIMARY"]
         )
+        self.assertEqual(
+            [item.proof_authority for item in collected.documents], ["FILING_NARRATIVE"]
+        )
+        # 그 서술 본문이 완전 instrument처럼 읽혀도 finding을 만들지 않는다.
+        self.assertEqual(collected.classes[0].findings, ())
+        # Item 5.03인데 주소 지정 가능한 Exhibit 3이 없으므로 탐색은 닫히지 않는다.
+        self.assertEqual(collected.search_status, INCOMPLETE)
+        self.assertEqual(
+            [item[0] for item in collected.failures],
+            ["governing_exhibit_missing:0000000042-15-000001"],
+        )
+
+    def test_a_primary_narrative_never_creates_class_proof(self):
+        """**Finding 3** — 서술이 첨부물 이름을 말한다고 governing instrument가 아니다.
+
+        Item 5.03 primary가 `Certificate of Amendment`를 말하고 그 본문에 정의·탄생·
+        종료 문장이 다 있어도, 실제 EX-3 문서가 없으면 어떤 finding도 나오지 않는다.
+        """
+        narrative = item_503_8k(
+            "0000000042-15-000001", "2015-10-05",
+            html(
+                "On October 2, 2015 we filed a Certificate of Amendment to our "
+                "certificate of incorporation.",
+                creates(CLASS_A),
+                authorized(CLASS_A),
+                effective(BIRTH_PROSE),
+            ),
+        )
+        _client, _proof, collected = collect([narrative])
+        self.assertEqual(collected.classes[0].findings, ())
+        self.assertIsNone(collected.classes[0].birth_date)
+        self.assertIsNone(collected.classes[0].snapshot_accession)
+        self.assertEqual(collected.search_status, INCOMPLETE)
+
+    def test_a_primary_mentioning_bylaws_first_loses_no_narrative(self):
+        """첫 일치 하나만 남기면 뒤의 서술이 조용히 사라진다.
+
+        어느 쪽도 governing instrument 증명이 되지 않지만, 무엇을 봤는지는 receipt에
+        전부 남아야 한다.
+        """
+        narrative = item_503_8k(
+            "0000000042-15-000001", "2015-10-05",
+            html(
+                "We adopted Amended and Restated Bylaws.",
+                "We also filed a Certificate of Amendment to the charter.",
+                creates(CLASS_A),
+                effective(BIRTH_PROSE),
+            ),
+        )
+        _client, _proof, collected = collect([narrative])
+        document = collected.documents[0]
+        self.assertEqual(document.classification, "BYLAWS")
+        self.assertEqual(
+            document.classification_families, ("BYLAWS", "CERTIFICATE_OF_AMENDMENT")
+        )
+        self.assertEqual(document.proof_authority, "FILING_NARRATIVE")
+        self.assertEqual(collected.classes[0].findings, ())
+
+    def test_an_actual_ex3_certificate_of_amendment_remains_eligible(self):
+        _client, _proof, collected = collect([
+            charter_8k("0000000042-15-000001", "2015-10-05",
+                       amendment(paragraphs=(creates(CLASS_A), authorized(CLASS_A)),
+                                 date=BIRTH_PROSE)),
+        ])
+        document = collected.documents[0]
+        self.assertEqual(document.proof_authority, "GOVERNING_EXHIBIT")
+        self.assertEqual(document.classification, "CERTIFICATE_OF_AMENDMENT")
+        self.assertEqual(collected.classes[0].birth_date, BIRTH_DATE)
+
+    def test_an_actual_ex3_restated_certificate_remains_a_snapshot(self):
+        _client, _proof, collected = collect(
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
+        )
+        document = collected.documents[0]
+        self.assertEqual(document.proof_authority, "GOVERNING_EXHIBIT")
+        self.assertEqual(document.classification, "AMENDED_AND_RESTATED_CERTIFICATE")
+        self.assertEqual(collected.classes[0].snapshot_accession,
+                         "0000000042-15-000001")
+        self.assertTrue(collected.classes[0].open_ended)
+
+    def test_an_item_503_with_an_exhibit_3_bylaws_document_still_closes(self):
+        """Exhibit 3 문서가 있으면 그것이 bylaws여도 주소 지정은 된다."""
+        filing = Filing(
+            "0000000042-16-000001", "8-K", "2016-05-05",
+            {
+                "form8k.htm": ("8-K", html("Item 5.03 Amendments to Bylaws.")),
+                "ex3-2.htm": ("EX-3.2", html("AMENDED AND RESTATED BYLAWS")),
+            },
+            items="5.03",
+        )
+        _client, _proof, collected = collect([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            filing,
+        ])
         self.assertEqual(collected.search_status, COMPLETE)
+        self.assertEqual(collected.failures, ())
 
     def test_an_8k_without_item_503_contributes_no_primary_candidate(self):
         client, _proof, collected = collect([
@@ -382,7 +495,7 @@ class CandidateDiscoveryTest(BaseFixture):
                 "form8k.htm": ("8-K", html("Item 9.01.")),
                 "ex31-1.htm": ("EX-31.1", html("Certification pursuant to Rule 13a-14.")),
                 "ex32-1.htm": ("EX-32.1", html("Certification pursuant to 18 U.S.C. 1350.")),
-                "ex3-1.htm": ("EX-3.1", restated()),
+                "ex3-1.htm": ("EX-3.1", founding_charter()),
             },
         )
         client, _proof, collected = collect([filing])
@@ -402,7 +515,7 @@ class CandidateDiscoveryTest(BaseFixture):
             "<DOCUMENT>\n<TYPE>EX-3.1\n<SEQUENCE>2\n<TEXT>\ncharter\n</DOCUMENT>\n"
         )
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             legacy,
         ])
         self.assertEqual(payload["search_status"], INCOMPLETE)
@@ -421,7 +534,7 @@ class CandidateDiscoveryTest(BaseFixture):
 
         filing = Filing(
             "0000000042-15-000001", "8-K", "2015-10-05",
-            {"form8k.htm": ("8-K", html("x")), "ex3-1.htm": ("EX-3.1", restated())},
+            {"form8k.htm": ("8-K", html("x")), "ex3-1.htm": ("EX-3.1", founding_charter())},
         )
         icons = {
             item["type"]
@@ -481,9 +594,103 @@ class CoverTitlePolicyTest(BaseFixture):
 
 
 class BirthTest(BaseFixture):
+    def test_a_restated_snapshot_effective_date_is_not_a_class_birth(self):
+        """**Finding 1의 핵심.** class가 2020년 restatement보다 앞설 수 있다.
+
+        ```text
+        authorized to issue Class A Common Stock
+        this Certificate becomes effective on 2020-01-01
+        ```
+
+        이것이 증명하는 것은 "그 snapshot에 Class A가 정의돼 있다"와 "그 snapshot이
+        2020-01-01에 발효한다"이지 **"Class A가 2020-01-01에 만들어졌다"가 아니다.**
+        """
+        payload, evidence = self.assertClassEvidence(
+            [charter_8k("0000000042-20-000001", "2020-01-05",
+                        restated(date="January 1, 2020"))]
+        )
+        self.assertEqual(payload["search_status"], COMPLETE)
+        entry = evidence_for(payload)
+        # 정의는 있다.
+        kinds = [item["finding_kind"] for item in entry["findings"]]
+        self.assertIn(GOVERNING_CLASS_DEFINITION, kinds)
+        # 탄생 행위와 탄생일은 없다.
+        self.assertNotIn(CLASS_BIRTH_ACTION, kinds)
+        self.assertNotIn(CLASS_BIRTH_EFFECTIVE_DATE, kinds)
+        self.assertIsNone(entry["birth_date"])
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertEqual(evidence, {})
+
+    def test_two_restated_snapshots_do_not_become_conflicting_birth_dates(self):
+        """정의만 있는 두 restatement의 발효일은 탄생일 후보가 아니다.
+
+        전에는 둘이 탄생일로 충돌해 UNRESOLVED가 됐고, 그 사유 문구가 사실과 달랐다.
+        """
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05",
+                       restated(date="October 2, 2015")),
+            charter_8k("0000000042-20-000001", "2020-01-05",
+                       restated(date="January 1, 2020")),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(
+            [item["finding_kind"] for item in entry["findings"]],
+            [GOVERNING_CLASS_DEFINITION, GOVERNING_CLASS_DEFINITION],
+        )
+        self.assertIsNone(entry["birth_date"])
+        self.assertNotIn("탄생일이 서로 다른", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_an_explicit_creation_action_with_a_date_proves_birth(self):
+        """명시 실행 생성 행위 + 거기 묶인 발효일이 있어야 탄생이다."""
+        payload, evidence = self.assertClassEvidence(
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
+        )
+        entry = evidence_for(payload)
+        kinds = [item["finding_kind"] for item in entry["findings"]]
+        self.assertIn(CLASS_BIRTH_ACTION, kinds)
+        self.assertIn(CLASS_BIRTH_EFFECTIVE_DATE, kinds)
+        self.assertEqual(entry["birth_date"], BIRTH_DATE)
+        self.assertEqual(
+            evidence["us-gaap:CommonClassAMember"].class_interval.effective_from,
+            BIRTH_DATE,
+        )
+
+    def test_an_explicit_reclassification_into_the_target_proves_birth(self):
+        """`reclassified into <NAME>`도 그 class를 세우는 실행 행위다."""
+        payload, _evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05",
+                       amendment(paragraphs=(
+                           f"Each share of Common Stock was reclassified into one "
+                           f"share of {CLASS_A}.",
+                           authorized(CLASS_A),
+                       ), date=BIRTH_PROSE)),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["birth_date"], BIRTH_DATE)
+        self.assertIn(
+            "RECLASSIFIED_INTO",
+            [item["semantic_family"] for item in entry["findings"]
+             if item["finding_kind"] == CLASS_BIRTH_ACTION],
+        )
+
+    def test_a_definition_with_a_single_instrument_date_still_proves_no_birth(self):
+        """발효일이 정확히 하나여도 탄생 행위가 없으면 탄생이 아니다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05",
+                       amendment(paragraphs=(authorized(CLASS_A),), date=BIRTH_PROSE)),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(
+            [item["finding_kind"] for item in entry["findings"]],
+            [GOVERNING_CLASS_DEFINITION],
+        )
+        self.assertIsNone(entry["birth_date"])
+        self.assertEqual(evidence, {})
+
     def test_an_exact_definition_with_an_explicit_date_proves_birth(self):
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())]
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
         )
         self.assertEqual(payload["search_status"], COMPLETE)
         entry = evidence_for(payload)
@@ -537,7 +744,7 @@ class BirthTest(BaseFixture):
         """`Class A Common Stock, $0.001 par value` != `Class A Common Stock`."""
         facts = cover_facts(title="Class A Common Stock, $0.001 par value")
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())], facts
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())], facts
         )
         self.assertEqual(evidence, {})
         entry = evidence_for(payload)
@@ -546,9 +753,9 @@ class BirthTest(BaseFixture):
 
     def test_conflicting_birth_dates_are_unresolved(self):
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-19-000001", "2019-05-05",
-                       restated(date="April 1, 2019")),
+                       founding_charter(date="April 1, 2019")),
         ])
         self.assertEqual(evidence, {})
         entry = evidence_for(payload)
@@ -568,7 +775,7 @@ class OpenEndedContinuityTest(BaseFixture):
         """탄생만 있고 complete snapshot이 없으면 `effective_to = null`이 없다."""
         payload, evidence = self.assertClassEvidence(
             [charter_8k("0000000042-15-000001", "2015-10-05",
-                        amendment(paragraphs=(authorized(CLASS_A),),
+                        amendment(paragraphs=(creates(CLASS_A), authorized(CLASS_A)),
                                   date=BIRTH_PROSE))]
         )
         entry = evidence_for(payload)
@@ -581,8 +788,8 @@ class OpenEndedContinuityTest(BaseFixture):
     def test_an_incomplete_amendment_search_never_produces_null(self):
         payload, evidence = self.assertClassEvidence(
             [
-                charter_8k("0000000042-15-000001", "2015-10-05", restated()),
-                charter_8k("0000000042-20-000001", "2020-03-05", restated()),
+                charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+                charter_8k("0000000042-20-000001", "2020-03-05", founding_charter()),
             ],
             index_failures=("0000000042-20-000001",),
         )
@@ -592,7 +799,7 @@ class OpenEndedContinuityTest(BaseFixture):
 
     def test_birth_plus_current_snapshot_plus_complete_search_produces_null(self):
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())]
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
         )
         entry = evidence_for(payload)
         self.assertEqual(entry["status"], COMPLETE)
@@ -607,13 +814,19 @@ class OpenEndedContinuityTest(BaseFixture):
         )
 
     def test_an_unresolved_intervening_governing_change_blocks_null(self):
-        """탄생 뒤 governing amendment의 class 영향이 해소되지 않으면 막힌다."""
+        """탄생 뒤 governing amendment의 class 영향이 해소되지 않으면 막힌다.
+
+        그 amendment는 나중 완전 snapshot **앞에** 있으므로 checkpoint 자체는 현재를
+        닫는다 — 막는 것은 그 amendment의 class 영향이 해소되지 않았다는 사실이다.
+        """
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-18-000001", "2018-06-05",
                        amendment(paragraphs=(
                            "Article IV is hereby amended in its entirety.",
                        ))),
+            charter_8k("0000000042-21-000001", "2021-03-05",
+                       restated(date="March 1, 2021")),
         ])
         self.assertEqual(payload["search_status"], COMPLETE)
         entry = evidence_for(payload)
@@ -622,10 +835,63 @@ class OpenEndedContinuityTest(BaseFixture):
         self.assertIn("해소되지 않았다", entry["notes"][0])
         self.assertEqual(evidence, {})
 
+    def test_an_amendment_after_the_latest_snapshot_blocks_null(self):
+        """**Finding 2** — amendment는 complete snapshot이 아니다.
+
+        2015 완전 snapshot 뒤에 2020 governing amendment가 있고 그 뒤에 완전 snapshot이
+        없으면, 2015 snapshot은 현재 상태를 닫지 못한다.
+        """
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000001", "2020-03-05",
+                       amendment(paragraphs=(authorized(CLASS_A),),
+                                 date="March 1, 2020")),
+        ])
+        self.assertEqual(payload["search_status"], COMPLETE)
+        entry = evidence_for(payload)
+        self.assertEqual(entry["birth_date"], BIRTH_DATE)
+        self.assertFalse(entry["open_ended"])
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("닫지 못한다", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_a_later_amendment_repeating_the_definition_does_not_make_it_current(self):
+        """정의를 되풀이한다고 amendment가 complete snapshot으로 승격되지 않는다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000001", "2020-03-05",
+                       amendment(paragraphs=(
+                           creates(CLASS_A), authorized(CLASS_A),
+                       ))),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("닫지 못한다", entry["notes"][0])
+        self.assertIsNone(entry["snapshot_accession"])
+        self.assertEqual(evidence, {})
+
+    def test_a_later_complete_snapshot_reopens_open_ended_continuity(self):
+        """그 상태를 흡수한 완전 restated snapshot이 나오면 다시 열린다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000001", "2020-03-05",
+                       amendment(paragraphs=(authorized(CLASS_A),),
+                                 date="March 1, 2020")),
+            charter_8k("0000000042-21-000001", "2021-03-05",
+                       restated(date="March 1, 2021")),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], COMPLETE)
+        self.assertTrue(entry["open_ended"])
+        self.assertEqual(entry["snapshot_accession"], "0000000042-21-000001")
+        interval = evidence["us-gaap:CommonClassAMember"].class_interval
+        self.assertEqual((interval.effective_from, interval.effective_to),
+                         (BIRTH_DATE, None))
+
     def test_mentioning_another_class_is_not_negative_proof_for_the_target(self):
         """**대상 class 이름의 부재는 영향 없음의 증명이 아니다.**"""
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-18-000001", "2018-06-05",
                        amendment(paragraphs=(
                            f"The number of authorized shares of {CLASS_B} is increased.",
@@ -639,7 +905,7 @@ class OpenEndedContinuityTest(BaseFixture):
     def test_a_failing_accession_index_makes_closure_incomplete(self):
         payload, evidence = self.assertClassEvidence(
             [
-                charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+                charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
                 Filing("0000000042-21-000001", "10-K", "2021-02-10", {}),
             ],
             index_failures=("0000000042-21-000001",),
@@ -658,7 +924,7 @@ class OpenEndedContinuityTest(BaseFixture):
             items="5.03", primary_document="form8k.htm",
         )
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated()), broken]
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()), broken]
         )
         self.assertEqual(payload["search_status"], INCOMPLETE)
         self.assertEqual(
@@ -669,7 +935,7 @@ class OpenEndedContinuityTest(BaseFixture):
 
     def test_an_unclassifiable_governing_candidate_makes_closure_incomplete(self):
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-21-000001", "2021-02-10",
                        html("Exhibit 3.1", "Nothing recognizable here.")),
         ])
@@ -688,7 +954,7 @@ class OpenEndedContinuityTest(BaseFixture):
             for index in range(24)
         ]
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())] + noise
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())] + noise
         )
         self.assertGreater(len(payload["searched_accessions"]), 20)
         self.assertEqual(payload["search_status"], COMPLETE)
@@ -712,7 +978,7 @@ TERMINATION = (
 class TerminationTest(BaseFixture):
     def test_an_implemented_termination_with_a_date_gives_a_finite_interval(self):
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-20-000001", "2020-03-05",
                        amendment(paragraphs=(TERMINATION,), date="March 1, 2020")),
         ])
@@ -733,7 +999,7 @@ class TerminationTest(BaseFixture):
 
     def test_a_proposal_or_future_intent_is_never_a_termination(self):
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-20-000001", "2020-03-05",
                        amendment(paragraphs=(
                            "The board has proposed that each share of "
@@ -750,7 +1016,7 @@ class TerminationTest(BaseFixture):
     def test_a_disappeared_ticker_is_never_a_termination(self):
         """ticker가 사라졌다는 사실은 문서에 없다 — 증거로 만들어내지 않는다."""
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())],
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())],
             cover_facts(symbol="GONE"),
         )
         entry = evidence_for(payload)
@@ -763,7 +1029,7 @@ class TerminationTest(BaseFixture):
     def test_absence_from_a_later_cover_is_never_a_termination(self):
         """나중 표지에 그 class가 없다는 사실은 governing 종료 증거가 아니다."""
         payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             Filing("0000000042-24-000002", "10-K", "2024-02-10", {}),
         ])
         entry = evidence_for(payload)
@@ -782,7 +1048,7 @@ class TerminationTest(BaseFixture):
 class ProseIntervalTest(BaseFixture):
     def test_the_exact_legal_chain_independently_proves_the_title_interval(self):
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())]
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
         )
         title = evidence["us-gaap:CommonClassAMember"].cover_title_interval
         self.assertIsNotNone(title)
@@ -806,7 +1072,7 @@ class ProseIntervalTest(BaseFixture):
     def test_the_class_interval_is_never_copied_into_the_prose_interval(self):
         """종료된 class는 class 구간만 갖고 title 구간은 갖지 않는다."""
         _payload, evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-20-000001", "2020-03-05",
                        amendment(paragraphs=(TERMINATION,), date="March 1, 2020")),
         ])
@@ -825,7 +1091,7 @@ class SiblingTest(BaseFixture):
         """charter가 `Class B Common Stock`을 정의해도 `CommonClassBMember`에 잇지 않는다."""
         payload, evidence = self.assertClassEvidence(
             [charter_8k("0000000042-15-000001", "2015-10-05",
-                        restated(names=(CLASS_A, CLASS_B)))],
+                        founding_charter(names=(CLASS_A, CLASS_B)))],
             dual_cover_facts(),
         )
         self.assertEqual(sorted(evidence), ["us-gaap:CommonClassAMember"])
@@ -837,7 +1103,7 @@ class SiblingTest(BaseFixture):
     def test_every_ordinary_sibling_still_needs_its_own_canonical_bridge(self):
         _client, proof, collected = collect(
             [charter_8k("0000000042-15-000001", "2015-10-05",
-                        restated(names=(CLASS_A, CLASS_B)))],
+                        founding_charter(names=(CLASS_A, CLASS_B)))],
             dual_cover_facts(),
         )
         payload = collected.as_json()
@@ -857,7 +1123,7 @@ class SiblingTest(BaseFixture):
 class SearchReceiptTest(BaseFixture):
     def test_complete_carries_a_deterministic_searched_receipt(self):
         payload, _evidence = self.assertClassEvidence([
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             Filing("0000000042-24-000002", "10-K", "2024-02-10", {}),
             Filing("0000000042-24-000003", "DEF 14A", "2024-04-10", {}),
         ])
@@ -882,7 +1148,7 @@ class SearchReceiptTest(BaseFixture):
 
     def test_incomplete_lists_the_failed_required_source(self):
         payload, _evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())],
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())],
             index_failures=("0000000042-15-000001",),
         )
         self.assertEqual(payload["search_status"], INCOMPLETE)
@@ -893,7 +1159,7 @@ class SearchReceiptTest(BaseFixture):
 
     def test_the_structured_proof_serializes_deterministically(self):
         filings = [
-            charter_8k("0000000042-15-000001", "2015-10-05", restated()),
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             Filing("0000000042-24-000002", "10-K", "2024-02-10", {}),
         ]
         first = collect(filings)[2].as_json()
@@ -910,7 +1176,7 @@ class SearchReceiptTest(BaseFixture):
 
     def test_a_submissions_failure_fails_closed(self):
         payload, evidence = self.assertClassEvidence(
-            [charter_8k("0000000042-15-000001", "2015-10-05", restated())],
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())],
             submissions_error=RuntimeError("HTTP 503"),
         )
         self.assertEqual(payload["search_status"], INCOMPLETE)
@@ -923,7 +1189,7 @@ class SearchReceiptTest(BaseFixture):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-CHARTER = charter_8k("0000000042-15-000001", "2015-10-05", restated())
+CHARTER = charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())
 
 
 def legal_packet(filings=(CHARTER,), facts=None):
@@ -934,11 +1200,8 @@ def legal_packet(filings=(CHARTER,), facts=None):
     return packet_from(evidence, proof, payload)
 
 
-class PromoterRevalidationTest(unittest.TestCase):
-    """승격기는 **`class_evidence_from_legal_proof`를 다시 돌린다.**
-
-    `proposal_status` · `reason_codes` · `interval_proved`를 권한으로 삼지 않는다.
-    """
+class TamperFixture:
+    """무변조 packet을 만들어 한 곳만 고친 뒤 승격 재검증에 넣는다."""
 
     def tampered(self, mutate):
         payload = legal_packet().as_json()
@@ -946,6 +1209,13 @@ class PromoterRevalidationTest(unittest.TestCase):
         with self.assertRaises(QVPromotionError) as caught:
             revalidate_packet(payload)
         return str(caught.exception)
+
+
+class PromoterRevalidationTest(TamperFixture, unittest.TestCase):
+    """승격기는 **`class_evidence_from_legal_proof`를 다시 돌린다.**
+
+    `proposal_status` · `reason_codes` · `interval_proved`를 권한으로 삼지 않는다.
+    """
 
     def test_the_untampered_legal_packet_revalidates(self):
         packet = legal_packet()
@@ -963,7 +1233,7 @@ class PromoterRevalidationTest(unittest.TestCase):
         def mutate(payload):
             for row in payload["share_class_proposals"]:
                 row["interval"]["effective_from"] = "2010-01-01"
-        self.assertIn("class 구간", self.tampered(mutate))
+        self.assertIn("ClassEvidence", self.tampered(mutate))
 
     def test_a_null_effective_to_unsupported_by_the_proof_fails(self):
         """구조화된 증명이 유한 종료를 말하는데 packet이 null이면 어긋난다.
@@ -984,7 +1254,7 @@ class PromoterRevalidationTest(unittest.TestCase):
                 "effective_date": "2020-03-01",
             })
         message = self.tampered(mutate)
-        self.assertIn("class 구간", message)
+        self.assertIn("ClassEvidence", message)
         self.assertIn("2020-03-01", message)
 
     def test_changing_the_cover_title_interval_fails(self):
@@ -992,7 +1262,7 @@ class PromoterRevalidationTest(unittest.TestCase):
         def mutate(payload):
             for row in payload["prose_alias_proposals"]:
                 row["interval"]["effective_from"] = "2018-01-01"
-        self.assertIn("prose alias 구간", self.tampered(mutate))
+        self.assertIn("ClassEvidence", self.tampered(mutate))
 
     def test_adding_a_fabricated_prose_bridge_fails(self):
         """법적 증명이 만들지 않은 production prose 행을 얹으면 어긋난다."""
@@ -1003,7 +1273,7 @@ class PromoterRevalidationTest(unittest.TestCase):
             row["prose_key"] = "class a common shares"
             row["provenance"] = "지어낸 bridge"
             payload["prose_alias_proposals"].append(row)
-        self.assertIn("prose alias 구간", self.tampered(mutate))
+        self.assertIn("ClassEvidence", self.tampered(mutate))
 
     def test_marking_the_search_complete_over_an_embedded_failure_fails(self):
         """`search_status`를 COMPLETE로 고쳐도 실패가 박혀 있으면 구간이 안 나온다."""
@@ -1015,7 +1285,7 @@ class PromoterRevalidationTest(unittest.TestCase):
             for entry in payload["legal_evidence_proof"]["classes"]:
                 entry["status"] = COMPLETE
         message = self.tampered(mutate)
-        self.assertIn("class 구간", message)
+        self.assertIn("ClassEvidence", message)
 
     def test_tampering_a_finding_effective_date_fails(self):
         def mutate(payload):
@@ -1023,7 +1293,7 @@ class PromoterRevalidationTest(unittest.TestCase):
                 for finding in entry["findings"]:
                     if finding["finding_kind"] == CLASS_BIRTH_EFFECTIVE_DATE:
                         finding["effective_date"] = "2001-01-01"
-        self.assertIn("class 구간", self.tampered(mutate))
+        self.assertIn("ClassEvidence", self.tampered(mutate))
 
     def test_removing_the_governing_definition_finding_fails(self):
         def mutate(payload):
@@ -1032,7 +1302,91 @@ class PromoterRevalidationTest(unittest.TestCase):
                     item for item in entry["findings"]
                     if item["finding_kind"] != GOVERNING_CLASS_DEFINITION
                 ]
-        self.assertIn("class 구간", self.tampered(mutate))
+        self.assertIn("ClassEvidence", self.tampered(mutate))
+
+
+class LegalEvidenceProvenanceTest(TamperFixture, unittest.TestCase):
+    """**Finding 4** — 날짜가 같아도 증거 provenance가 다르면 승격이 실패한다.
+
+    production 행은 나중에 packet의 구간 증거를 합쳐 넣고 5A-3가 그 REQUIRED 자연키에서
+    `usable_from_session`을 파생시킨다. 경계만 대조하면 그 파생이 조용히 바뀐다.
+    """
+
+    def test_replacing_a_class_interval_evidence_ref_fails(self):
+        def mutate(payload):
+            for row in payload["share_class_proposals"]:
+                row["interval"]["evidence"][0]["accession"] = "0000000042-99-000001"
+        message = self.tampered(mutate)
+        self.assertIn("ClassEvidence", message)
+        self.assertIn("0000000042-99-000001", message)
+
+    def test_replacing_a_prose_interval_evidence_ref_fails(self):
+        def mutate(payload):
+            for row in payload["prose_alias_proposals"]:
+                row["interval"]["evidence"][0]["document_name"] = "other.htm"
+        self.assertIn("ClassEvidence", self.tampered(mutate))
+
+    def test_changing_only_an_evidence_locator_fails(self):
+        """같은 문서라도 **어느 위치가 증명했는가**가 바뀌면 다른 증거다."""
+        def mutate(payload):
+            for row in payload["share_class_proposals"]:
+                row["interval"]["evidence"][0]["locator"] = "block:999"
+        self.assertIn("ClassEvidence", self.tampered(mutate))
+
+    def test_changing_only_an_evidence_role_fails(self):
+        def mutate(payload):
+            for row in payload["share_class_proposals"]:
+                row["interval"]["evidence"][0]["evidence_role"] = "SOMETHING_ELSE"
+        self.assertIn("ClassEvidence", self.tampered(mutate))
+
+    def test_dropping_a_required_legal_evidence_ref_fails(self):
+        def mutate(payload):
+            for row in payload["share_class_proposals"]:
+                row["interval"]["evidence"] = row["interval"]["evidence"][:1]
+        self.assertIn("ClassEvidence", self.tampered(mutate))
+
+    def test_adding_an_unrelated_required_evidence_ref_fails(self):
+        def mutate(payload):
+            for row in payload["share_class_proposals"]:
+                extra = dict(row["interval"]["evidence"][0])
+                extra["accession"] = "0000000042-77-000001"
+                extra["evidence_role"] = "GOVERNING_CLASS_DEFINITION"
+                row["interval"]["evidence"].append(extra)
+        self.assertIn("ClassEvidence", self.tampered(mutate))
+
+    def test_reordering_evidence_alone_still_promotes(self):
+        """순서만 정규화한다 — 순서 차이로 실패하지 않는다."""
+        payload = legal_packet().as_json()
+        for row in payload["share_class_proposals"]:
+            row["interval"]["evidence"].reverse()
+        promotable = revalidate_packet(payload)
+        self.assertEqual(len(promotable.classes), 1)
+
+
+class LegalProofIntegrityTest(TamperFixture, unittest.TestCase):
+    """구조화된 proof가 **그 표지 증명에 속하는지**도 본다."""
+
+    def test_a_legal_proof_cik_mismatch_fails(self):
+        def mutate(payload):
+            payload["legal_evidence_proof"]["cik"] = "0000000099"
+        self.assertIn("CIK", self.tampered(mutate))
+
+    def test_a_legal_proof_cover_accession_mismatch_fails(self):
+        def mutate(payload):
+            payload["legal_evidence_proof"]["cover_accession"] = "0000000042-11-000001"
+        self.assertIn("cover accession", self.tampered(mutate))
+
+    def test_a_legal_proof_cover_document_mismatch_fails(self):
+        def mutate(payload):
+            payload["legal_evidence_proof"]["cover_document_name"] = "other.xml"
+        self.assertIn("cover 문서", self.tampered(mutate))
+
+    def test_a_finding_referencing_an_unlisted_document_fails(self):
+        def mutate(payload):
+            for entry in payload["legal_evidence_proof"]["classes"]:
+                for finding in entry["findings"]:
+                    finding["document_name"] = "ghost.htm"
+        self.assertIn("receipt에 없는 문서", self.tampered(mutate))
 
 
 class LegalPromotionTest(ManifestFixture, unittest.TestCase):

@@ -69,7 +69,12 @@ from .qv_identity_proposals import (
     cover_classes_for_symbol,
     cover_proof_from_json,
 )
-from .qv_identity_legal_evidence import class_evidence_from_legal_proof
+from .qv_identity_legal_evidence import (
+    QVLegalEvidenceError,
+    canonical_class_evidence,
+    canonical_interval,
+    class_evidence_from_legal_proof,
+)
 from .qv_manifest import (
     EVIDENCE_DEPENDENCIES,
     EVIDENCE_SOURCE_KINDS,
@@ -408,8 +413,13 @@ def _assert_legal_projection(
     `proposal_status` · `reason_codes` · `interval_proved`를 권한으로 삼지 않는다.
     `class_evidence_from_legal_proof`는 5A-2 제안 생성이 쓴 것과 **같은 함수**이고,
     저장된 결론 칸이 아니라 `documents` · `findings` · `failures`에서 다시 계산한다.
-    그래서 누가 packet의 `effective_from`/`effective_to`/표지 제목 구간/탐색 상태를
-    고쳐도 여기서 어긋난다.
+
+    **날짜만 보지 않는다.** production 행은 나중에 packet의 구간 증거를 합쳐 넣고
+    5A-3가 그 REQUIRED 자연키에서 `usable_from_session`을 파생시킨다. 경계만 대조하면
+    같은 구간에 **다른 증거를 끼워 넣는 변조**가 통과한다. 그래서 정규화된
+    `ClassEvidence` 전체(구간 경계 + 각 `EvidenceRef`의 source_kind · cik · accession ·
+    document_name · evidence_role · dependency · locator)를 비교한다. 순서만 정규화하고
+    증거를 더하거나 빼거나 바꿔치는 것은 전부 실패다.
 
     **네트워크를 부르지 않는다.** 문서 SHA와 자연키를 실제 SEC 문서와 맞춰 보는 것은
     5A-3 ingest의 일이다.
@@ -420,46 +430,58 @@ def _assert_legal_projection(
     if not isinstance(legal, dict):
         raise QVPromotionError(f"{label}: legal_evidence_proof가 객체가 아닙니다")
 
-    expected = class_evidence_from_legal_proof(legal, cover_proof=cover_proof)
+    try:
+        expected_evidence = class_evidence_from_legal_proof(
+            legal, cover_proof=cover_proof
+        )
+    except QVLegalEvidenceError as error:
+        raise QVPromotionError(f"{label}: {error}") from error
 
-    def bounds(interval):
-        return (interval.effective_from, interval.effective_to)
-
-    derived_classes = {
-        member_of[row["proposal_class_id"]]: (row["effective_from"], row["effective_to"])
-        for row in class_rows
-    }
-    expected_classes = {
-        member: bounds(item.class_interval)
-        for member, item in expected.items()
+    expected = {
+        member: canonical_class_evidence(item)
+        for member, item in expected_evidence.items()
         if item.class_interval is not None
     }
-    if derived_classes != expected_classes:
-        raise QVPromotionError(
-            f"{label}: class 구간이 구조화된 법적 증명에서 다시 파생한 값과 다릅니다\n"
-            f"  packet {sorted(derived_classes.items())}\n"
-            f"  legal  {sorted(expected_classes.items())}"
-        )
 
-    derived_prose: dict[tuple[str, str], tuple[str, str | None]] = {}
+    # ── packet 쪽을 같은 정규형으로 세운다 ──────────────────────────────────
+    derived: dict[str, dict] = {}
+    for row in class_rows:
+        member = member_of[row["proposal_class_id"]]
+        if member in derived:
+            raise QVPromotionError(f"{label}: 같은 표지 member의 class 행이 둘입니다")
+        derived[member] = {
+            "class_interval": canonical_interval(row["interval"]),
+            "cover_title_interval": None,
+            "extra_prose_bridges": [],
+        }
     for row in prose_rows:
         member = member_of[row["proposal_class_id"]]
-        key = (member, row["bridge_type"])
-        if key in derived_prose:
-            raise QVPromotionError(
-                f"{label}: 같은 class·bridge의 prose 행이 둘입니다: {key}"
-            )
-        derived_prose[key] = (row["effective_from"], row["effective_to"])
-    expected_prose = {
-        (member, SECURITY_TITLE_FACT): bounds(item.cover_title_interval)
-        for member, item in expected.items()
-        if item.cover_title_interval is not None
-    }
-    if derived_prose != expected_prose:
+        slot = derived.get(member)
+        if slot is None:
+            raise QVPromotionError(f"{label}: prose alias가 모르는 class를 가리킵니다")
+        if row["bridge_type"] == SECURITY_TITLE_FACT:
+            if slot["cover_title_interval"] is not None:
+                raise QVPromotionError(
+                    f"{label}: 같은 class의 표지 제목 prose 행이 둘입니다"
+                )
+            slot["cover_title_interval"] = canonical_interval(row["interval"])
+            continue
+        slot["extra_prose_bridges"].append({
+            "bridge_type": row["bridge_type"],
+            "prose_key": row["comparison_key"],
+            "interval": canonical_interval(row["interval"]),
+        })
+    for slot in derived.values():
+        slot["extra_prose_bridges"].sort(
+            key=lambda item: (item["bridge_type"], item["prose_key"])
+        )
+
+    if derived != expected:
         raise QVPromotionError(
-            f"{label}: prose alias 구간이 구조화된 법적 증명에서 다시 파생한 값과 "
-            f"다릅니다\n  packet {sorted(derived_prose.items())}\n"
-            f"  legal  {sorted(expected_prose.items())}"
+            f"{label}: 파생된 ClassEvidence가 구조화된 법적 증명에서 다시 파생한 값과 "
+            "다릅니다(구간 경계와 증거 provenance를 모두 비교합니다)\n"
+            f"  packet {_canonical_json(derived)}\n"
+            f"  legal  {_canonical_json(expected)}"
         )
 
 

@@ -2766,6 +2766,218 @@ Bylaws"를 말하면 그렇게 분류되고, governing class 정의로는 쓰이
 
 ---
 
+## 10.21 5A-2 법적 증거 — 탄생 semantics · governing 권한 · snapshot closure · 증거 재검증 — 2026-09-02
+
+10.20의 아키텍처는 그대로 두고 semantic 구멍 넷을 닫았다. **production identity
+manifest는 여전히 바꾸지 않았고 par-value/N1 정책은 건드리지 않았다**(별도 사용자
+결정).
+
+### BLOCKER 1 — 완전 restated instrument의 발효일이 곧 class 탄생일이 아니었다
+
+`_class_findings()`가 "정의 하나 + instrument 발효일 하나"만 보고
+`CLASS_BIRTH_EFFECTIVE_DATE`를 만들었다. 그것은 두 사실을 섞는다.
+
+```text
+그 restated governing instrument가 D에 발효했다
+그 economic class가 D에 만들어졌다
+```
+
+class는 나중 amended-and-restated certificate보다 수십 년 앞설 수 있다. 예컨대
+
+```text
+authorized to issue Class A Common Stock
+this Certificate becomes effective on 2020-01-01
+```
+
+가 증명하는 것은 "그 snapshot에 Class A가 정의돼 있다"와 "그 snapshot이 2020-01-01에
+operative하다"뿐이고 **"Class A가 2020-01-01에 만들어졌다"가 아니다.**
+
+`GOVERNING_CLASS_DEFINITION`에서 `CLASS_BIRTH_ACTION`을 갈랐다. 열거된 탄생 행위
+문법은 넷이다.
+
+```text
+hereby created/established ... <NAME>
+<NAME> is hereby created/established
+new class ... designated <NAME>
+reclassified into ... <NAME>
+```
+
+`CLASS_BIRTH_EFFECTIVE_DATE`는 같은 instrument에 명시 탄생 행위가 있고 operative
+date가 거기 모호함 없이 묶일 때만 나온다. 완전 restatement의 발효일 단독 · snapshot
+발효일 · 수리 시각 · filed date · 최초 관측을 쓰지 않고 가까운 날짜를 고르지도 않는다.
+원본 governing instrument도 그 언어가 명시로 있을 때만 탄생을 증명한다.
+
+**부수 효과 하나**: 정의만 든 restatement가 둘이어도 그 발효일들은 이제 탄생일 후보가
+아니므로 서로 충돌하지 않는다. 전에는 그 둘이 "탄생일 충돌"로 UNRESOLVED가 됐고 그
+사유 문구가 사실과 달랐다.
+
+### BLOCKER 2 — B2의 "current" snapshot이 실제로 현재를 닫지 않았다
+
+`project_class_proof()`가 완전 snapshot 중 가장 늦은 것을 골랐는데, 그 뒤에 governing
+amendment가 있어도 그 amendment가 대상 class 정의를 되풀이하면 D 검사에서 "해소됨"으로
+세어 열린 채 통과했다. **그것은 Certificate/Articles of Amendment를 complete
+snapshot으로 승격하는 셈이다.**
+
+최소 보수 규칙을 넣었다.
+
+```text
+가장 늦은 완전 snapshot 뒤에 governing amendment가 하나라도 있으면
+open-ended continuity는 UNRESOLVED다.
+그 상태를 흡수한 나중 완전 restated snapshot이 나와야 다시 열린다.
+```
+
+정의를 되풀이한다는 이유로 amendment를 snapshot으로 올려주지 않는다. 유한 명시 종료는
+독립된 종료 규칙으로 그대로 처리된다.
+
+### BLOCKER 3 — Item 5.03 primary 8-K 서술이 governing instrument로 읽혔다
+
+Item 5.03 primary는 후보 discovery로는 옳았지만 `classify_document()`가 본문만 보고
+분류하므로 `우리는 Certificate of Amendment를 제출했다`라는 **서술**이
+`CERTIFICATE_OF_AMENDMENT`로 분류돼 정의·탄생·종료 finding을 만들 수 있었다. 그리고
+`classify_document()`는 첫 일치 하나만 돌려주므로 bylaws를 먼저 말하고 charter
+amendment를 나중에 말하는 서술은 뒤가 조용히 사라졌다.
+
+discovery는 그대로 두고 **권한**을 갈랐다.
+
+```text
+실제 Exhibit 3 문서    -> 본문 분류 뒤 법적 증명 권한
+Item 5.03 PRIMARY 8-K  -> filing 서술 / discovery / corroborating receipt 전용
+                          여섯 증거 역할을 하나도 만들지 못한다
+```
+
+권한 판정 정의는 `document_proof_authority()` 한 곳이고 수집기와 투영기가 같은 함수를
+쓴다. 투영기는 저장된 `proof_authority` 칸이 아니라 `document_type`에서 다시 계산한다.
+
+**진짜 증거 공백은 따로 잡는다.** Item 5.03은 정관이 바뀌었다는 구조화된 신고이므로,
+그 accession에 주소 지정 가능한 Exhibit 3이 하나도 없으면
+`governing_exhibit_missing` 탐색 실패다 — primary 서술로 대신하지 않는다. 대신 분류
+실패는 이제 **증명 권한이 있는 문서**에만 탐색 실패다. 그리고 문서가 언급한 family
+전부를 `classification_families`로 남겨 서술이 조용히 사라지지 않게 했다.
+
+이 증분에서 embedded 문서 parser를 만들지 않았다.
+
+### BLOCKER 4 — 승격 재검증이 구간 경계만 비교했다
+
+`_assert_legal_projection()`이 `effective_from`/`effective_to`만 대조했다. production
+행은 나중에 packet의 구간 증거를 합쳐 넣고 **5A-3가 그 REQUIRED 자연키에서
+`usable_from_session`을 파생시킨다.** 그래서 같은 경계를 유지한 채 증거 자연키를
+바꿔치면 그 파생이 조용히 달라진다.
+
+정규화된 `ClassEvidence` 전체를 비교하도록 바꿨다.
+
+```text
+class_interval · cover_title_interval · extra_prose_bridges
+    effective_from · effective_to
+    각 EvidenceRef의 source_kind · cik · accession · document_name ·
+                     evidence_role · dependency · locator
+```
+
+**순서만 결정론적으로 정규화한다.** 추가·삭제·치환은 전부 실패이고 중복을 지우지
+않는다 — 하나를 지우면 치환을 못 잡는다. 정규 직렬화·비교 정의는 legal 증거 모듈
+한 곳(`canonical_class_evidence` · `canonical_interval` · `canonical_evidence_refs`)에
+두고 승격기가 그대로 쓴다.
+
+같은 경계에서 구조화된 proof의 정합성도 fail-close다.
+
+```text
+legal proof의 cik != 표지 증명 CIK
+cover_accession != CoverPageProof.accession
+cover_document_name != CoverPageProof.document_name
+finding이 legal_evidence_proof.documents에 없는 문서를 가리킨다
+```
+
+`assert_proof_integrity()`가 `class_evidence_from_legal_proof()` 안에 있으므로 제안
+생성과 승격 재검증이 **둘 다** 이 검사를 받는다. 승격기는 여전히 네트워크를 부르지
+않는다 — 문서 SHA를 실제 SEC 문서와 맞춰 보는 것은 5A-3다.
+
+### 회귀 — network-free fixture로 잠갔다
+
+`tests/test_qv_identity_legal_evidence.py` **80건**(10.20의 56건에서 +24). 새로 잠근 축:
+
+```text
+탄생      restated snapshot의 발효일은 탄생일이 아니다 ·
+          정의만 든 두 restatement의 발효일은 충돌하는 탄생일이 되지 않는다 ·
+          명시 생성 행위 + 발효일이 있어야 탄생이다 ·
+          reclassified into도 생성 행위다 ·
+          발효일이 정확히 하나여도 생성 행위가 없으면 탄생이 아니다
+B2        가장 늦은 완전 snapshot 뒤 amendment가 있으면 null이 없다 ·
+          그 amendment가 정의를 되풀이해도 snapshot이 current가 되지 않는다 ·
+          나중 완전 restated snapshot이 나오면 다시 열린다 ·
+          snapshot 앞의 미해결 amendment는 D 규칙이 따로 막는다
+권한      Item 5.03 primary는 발견되지만 증명 권한이 없다 ·
+          서술이 정의·생성·발효일을 다 말해도 finding이 0이다 ·
+          bylaws를 먼저 말한 서술도 family 전부를 receipt에 남긴다 ·
+          실제 EX-3 certificate of amendment는 그대로 유효하다 ·
+          실제 EX-3 restated certificate는 그대로 snapshot이다 ·
+          Item 5.03에 Exhibit 3이 없으면 governing_exhibit_missing으로 닫히지 않는다 ·
+          Exhibit 3이 bylaws여도 주소 지정은 되므로 닫힌다
+증거      구간 증거의 accession/문서/역할/locator 치환이 전부 실패 ·
+          REQUIRED 증거 삭제·추가가 실패 · 순서만 다른 것은 그대로 승격 ·
+          legal proof CIK/cover accession/cover 문서 불일치가 실패 ·
+          receipt에 없는 문서를 가리키는 finding이 실패
+```
+
+### 로컬 Python 실측 (2026-09-02)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_identity_legal_evidence` | 80 OK |
+| `test_qv_identity_proposals` | 103 OK |
+| `test_qv_identity_promotion` | 60 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| `test_qv_xbrl_binding` | 35 OK |
+| `test_qv_step4` | 138 OK |
+| `test_qv_submissions` | 48 OK |
+| **전체 trading suite** | **1,821 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — `.github/workflows/docker.yml` 하나뿐이고
+Python 테스트를 돌리지 않는다. CI를 이것 때문에 고치지 않았다.
+
+### 실제 SEC read-only smoke (2026-09-02, 같은 5A-1 inventory)
+
+`--historical --legal-evidence`. **어느 packet도 승격하지 않았고 결과를 보고 문법을
+고치지 않았다.**
+
+| 항목 | CIK | legal 탐색 | 실패 종류 | 문서(권한 있음/서술) | 탄생 | 구간 | 최종 | SEC 호출 |
+|---|---|---|---|---|---|---|---|---|
+| AAPL | 0000320193 | INCOMPLETE | legacy 43 · exhibit_missing 1 | 37 (22/15) | 없음 | 0 | REVIEW_REQUIRED | 615 |
+| FOXA | 0001754301 | INCOMPLETE | classify 1 | 15 (9/6) | 없음 | 0 | REVIEW_REQUIRED | 258 |
+| CELG | 0000816284 | INCOMPLETE | legacy 42 | 22 (14/8) | 없음 | 0 | REVIEW_REQUIRED | 698 |
+| LEH | 0000806085 | 미실행(표지 증명 없음) | — | — | — | 0 | REVIEW_REQUIRED | 115 |
+| ABMD | 0000815094 | INCOMPLETE | legacy 30 | 13 (11/2) | 없음 | 0 | REVIEW_REQUIRED | 671 |
+
+10.20과 견줘 달라진 것 둘이다. **AAPL에 `governing_exhibit_missing` 1건이 새로
+생겼다** — Item 5.03 8-K인데 주소 지정 가능한 Exhibit 3이 없어 전에는 primary 서술이
+후보로 남았고 지금은 명시 탐색 실패다. 그리고 **문서 receipt가 권한별로 갈렸다** —
+서술 문서가 AAPL 15 · CELG 8 · FOXA 6 · ABMD 2건이고 그것들은 이제 어떤 finding도
+만들지 못한다.
+
+### 새로 관찰된 미지원 SEC 언어 (문법을 넓히지 않고 보고만 한다)
+
+**탄생 행위 문법이 실 pilot에서 한 건도 걸리지 않았다.** 다섯 종목 전부 finding이
+0인데, FOXA는 par-value anchor 때문에 정의 단계에서 이미 막히고 나머지는 탐색이 legacy
+layout으로 닫히지 않아 그 앞에서 멈춘다. 그래서 **이번 pilot은 탄생 문법의 실제
+recall을 재지 못했다** — 문법이 좁아서 못 잡은 것인지 앞 단계에서 막힌 것인지 구분할
+표본이 없다. 탐색이 닫히는 등록인 표본이 생긴 뒤에 다시 봐야 한다.
+
+이전에 올린 두 질문은 그대로다 — 표지 제목의 par-value 수식(`Class A Common Stock,
+par value $0.01 per share` vs charter의 `Class A Common Stock`)과 2001년 이전 flat
+layout의 문서 자연키. **둘 다 이번 fix에서 건드리지 않았다.**
+
+### 이 receipt가 주장하지 않는 것
+
+- B1/B2를 바꾸지 않았고 par-value 정규화·exact N1을 건드리지 않았다.
+- production identity JSONL을 바꾸지 않았고 897개를 확장·승격하지 않았다.
+- fuzzy/LLM/신뢰도 · 사람 검토 UI · 넓은 합병 종료 엔진 · embedded 문서 parser ·
+  5A-3 전체를 만들지 않았다.
+- C2 accession binding · share-basis/사건 의미 · 회계 · Q/V · B/M · 랭크 ·
+  Gate A~H · 수익률을 건드리지 않았다.
+
+
+---
+
 ## 11. 결과
 
 
