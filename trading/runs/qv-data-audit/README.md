@@ -3159,6 +3159,182 @@ FOXA에서 RESOLVED가 나온 5건은 **전부 bylaws**이고, 실제
 
 ---
 
+## 10.23 5A-2 recall 확장 — O2 주 filing 시점 · P2 액면가 연결 정규화 — 2026-09-02
+
+**사용자 승인 CLOSED 결정 둘만 구현했다.** 다른 자동 증거 규칙을 느슨하게 하지 않았다.
+production identity JSONL · `qv_manifest.prose_key` · `qv-class-id-v1` · C2 accession
+binding · 회계/Q/V/B-M/랭크/Gate/수익률을 건드리지 않았다. 897개를 확장·승격하지 않았고
+5A-3도 만들지 않았다.
+
+계약 정본은 `docs/trading/strategies/qv-step5-phase0-materialization-design.md`의 5A-2
+절(**O2** · **P2**)이다. 여기에는 구현·테스트·pilot 실측만 적는다.
+
+### O2 — 법적 시점의 출처가 셋이 됐다
+
+```text
+EXPLICIT_EFFECTIVE_DATE          기존 좁은 문법 그대로
+STATE_CERTIFIED_EFFECTIVE_DATE   같은 Exhibit 3 안의 주 증명이 명시한 발효일/발효시각
+STATE_FILED_UPON_FILING          제출 발효 명시 조항 + 같은 문서의 주 FILED 스탬프
+```
+
+`OperativeDate`가 `status · date · source_family · supporting_locators · observed`를
+든다. `STATE_FILED_UPON_FILING`은 조항 locator와 스탬프 locator를 **둘 다** 남기고,
+`assert_proof_integrity()`가 family별 locator 개수와 탄생일 finding의 locator 일치를
+fail-close로 잠근다. `acceptance_datetime`은 provenance로 그대로 남는다.
+
+**바뀌지 않은 것**: SEC 수리 시각·EDGAR 접수·filed date·report date·서명일 단독은
+여전히 법적 시점이 아니다. 지연 발효는 명시 발효일이 지배하고(스탬프는 제출 발효
+조항이 없으면 애초에 후보가 아니다), 제출 발효를 말하면서 다른 명시 발효일까지 들면
+`AMBIGUOUS`다. 주 기관 어휘는 `Secretary of State` · `Division of Corporations` ·
+`Department of State` 셋으로 열거돼 있다.
+
+### P2 — 액면가 수식은 연결 경계에서만 무시된다
+
+`class_designation_anchor()`가 **끝에 붙은 인식된 숫자 액면가 수식** 하나만 떼어내고
+값은 Decimal로 정확히 읽는다(float·허용 오차 없음). `associate_class_designation()`이
+연결 판정의 **유일한 정의**이고 생성기와 승격기가 같은 함수를 돌린다.
+
+```text
+exact N1을 먼저 본다                          -> EXACT_N1
+실패했을 때만 core designation을 본다
+  한쪽만 숫자 액면가 / 양쪽이 Decimal 동일    -> NUMERIC_PAR_VALUE_SUFFIX
+  양쪽 숫자 액면가가 다르다                   -> 연결하지 않는다
+```
+
+fail-close 셋: 같은 core가 서로 다른 숫자 액면가로 나타남 · 같은 표지의 다른 보통주
+제목이 같은 core로 줄어듦 · 서로 다른 governing designation 여럿에 닿음. 일치 자리에서
+앞이 더 긴 designation의 꼬리이거나(`Class A ` + `Common Stock`) 뒤가 값 수식처럼
+보이는데 동결 문법에 없으면 그 자리를 버린다.
+
+**연결 동치 != production alias 동치.** P2로 연결된 class는 governing 이름의
+`GOVERNING_INSTRUMENT` bridge만 얻고 표지 제목은 `cover_title_interval`을 받지 못한다
+(B1 그대로). 연결 전용 designation key는 class-ID seed에 들어가지 않는다.
+
+**Step 4의 CLOSED 계약 하나가 이 결정으로 다시 열려 닫혔다** —
+`test_an_approximate_title_never_links_a_governing_class`(액면가 제목은 절대 연결되지
+않는다)가 `test_a_numeric_par_value_title_associates_but_keeps_its_own_n1`으로 바뀌었다.
+N1과 production alias 격리는 그 테스트가 계속 잠근다.
+
+### 로컬 Python 실측 (2026-09-02)
+
+| 모듈 | 이전 | 이번 |
+|---|---|---|
+| `test_qv_identity_legal_evidence` | 92 | **143 OK** |
+| `test_qv_identity_proposals` | 103 | 103 OK |
+| `test_qv_identity_promotion` | 60 | 60 OK |
+| `test_qv_identity` | 21 | 21 OK |
+| `test_qv_identity_inventory` | 30 | 30 OK |
+| `test_qv_symbol_bridge` | 18 | 18 OK |
+| `test_qv_xbrl_binding` | 35 | 35 OK |
+| `test_qv_step4` | 138 | 138 OK |
+| `test_qv_submissions` | 48 | 48 OK |
+| **전체 trading suite** | 1,833 | **1,884 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — `.github/workflows/docker.yml` 하나뿐이고
+`npm ci` · `npm test`(Node)만 돌린다. Python 테스트를 돌리지 않으므로 CI 통과가 위
+숫자의 독립 재현이 아니다. CI를 이것 때문에 고치지 않았다.
+
+### 실제 SEC read-only smoke (2026-09-02, 같은 5A-1 inventory)
+
+`--historical --legal-evidence`, manifest `qv-identity-sha256:6124124…`. **어느 packet도
+승격하지 않았고 결과를 보고 문법을 고치지 않았다.** SEC 호출 2,350(이전 실행의 종목별
+합 2,357). 최종 판정은 여섯 작업 항목 모두 `REVIEW_REQUIRED`로 10.22와 같다.
+
+| 항목 | governing exhibit | operative R/M/A | source family | 탐색 실패 |
+|---|---|---|---|---|
+| AAPL | 22 → **22** | 0/22/0 → **0/22/0** | — | legacy 43 · exhibit_missing 1 (그대로) |
+| FOXA | 9 → **9** | 5/4/0 → **5/4/0** | EXPLICIT 5 | classify 1 (그대로) |
+| CELG | 14 → **14** | 0/14/0 → **0/14/0** | — | legacy 42 (그대로) |
+| LEH | — | — | — | 미실행(표지 증명 없음) |
+| ABMD | 10 → **11** | 1/9/0 → **1/10/0** | EXPLICIT 1 | legacy 30 (그대로) |
+
+**O2의 실 recall 개선은 0이다.** 이번 pilot의 governing exhibit 어디에서도
+`STATE_CERTIFIED_EFFECTIVE_DATE`·`STATE_FILED_UPON_FILING`이 한 건도 걸리지 않았다.
+ABMD의 governing exhibit이 10 → 11로 는 것은 문법이 아니라 지난 실행의 일시적 SEC
+오류(`HTTP 503`) 1건이 이번에는 정상 응답한 결과다.
+
+**P2는 실제로 막혀 있던 정의를 열었다.**
+
+| 항목 | 표지 제목 | designation | 연결 | 정의 finding (이전 → 이번) |
+|---|---|---|---|---|
+| AAPL | `Common Stock, $0.00001 par value per share` | `common stock` | NUMERIC_PAR_VALUE_SUFFIX | 0 → **3** |
+| CELG | `Common Stock, par value $.01 per share` | `common stock` | NUMERIC_PAR_VALUE_SUFFIX | 0 → **1** |
+| ABMD | `Common Stock, $0.01 par value` | `common stock` | 없음 | 0 → 0 |
+| FOXA | `Class A/B Common Stock, par value $0.01 per share` | `class a/b common stock` | 없음 | 0 → 0 |
+
+exact-N1 anchor는 다섯 종목 모두 이전에도 이번에도 **0**이다 — 표지 제목이 전부 액면가
+수식을 달고 있어 governing 이름과 N1으로 같을 수 없었다. 액면가 충돌·P2 모호성은 이번
+pilot에서 0건이다.
+
+이전 = 이번의 직접 대조는 같은 문서에 이전 target(표지 제목 원문)과 이번 target(core
+designation)을 각각 걸어 확인했다.
+
+```text
+AAPL 0001193125-14-084697/d684095dex31.htm block:13
+  "authorized to issue one class of shares designated “Common Stock,” par value
+   $0.00001 per share"
+  이전 target 정의 일치 0 · 이번 target 정의 일치 1
+
+CELG 0001193125-14-241821/d744699dex31.htm block:10
+  "1,150,000,000 shares of the par value of $.01 per share shall be designated
+   ‘Common Stock’"
+  이전 target 정의 일치 0 · 이번 target 정의 일치 1
+```
+
+**그래도 class 구간은 여전히 0/0이다.** 다섯 종목 전부 탐색이 닫히지 않아
+(`legacy_layout` · `classify` · `governing_exhibit_missing`) `search_status`가
+`INCOMPLETE`이고, 그 상태로는 어떤 구간도 나오지 않는다. **P2/O2가 만든 상태가
+아니다** — §20의 별도 진단이다.
+
+### FOXA — par-value anchor는 더 이상 막는 요인이 아니다 (그러나 여전히 막힌다)
+
+가장 깨끗한 사례였던 FOXA를 실제로 확인했다. P2 연결 자리 규칙은 **통과한다.**
+
+```text
+d721949dex31.htm block:18
+  "consisting of 2,000,000,000 shares of Class A Common Stock, par value $0.01 per
+   share (“Class A Common Stock”), 1,000,000,000 shares of Class B Common Stock,
+   par value $0.01 per share …"
+
+_designation_site -> ("Class A Common Stock", "$0.01")   표지 $0.01과 Decimal 동일
+                  -> ("Class B Common Stock", "$0.01")   표지 $0.01과 Decimal 동일
+```
+
+막는 것은 이제 **class 정의 문법**이다. 실제 charter는 `authorized to issue … shares
+of <NAME>`이 아니라 `shall have authority to issue … consisting of … shares of
+<NAME>`로 말하고, 동결된 세 정의 shape(`AUTHORIZED_TO_ISSUE` · `DIVIDED_INTO` ·
+`DESIGNATED`) 어느 것도 걸리지 않는다(일치 0/0/0, 탄생 행위도 0). **이번 증분의 승인
+범위가 아니므로 넓히지 않았고 후속 설계 질문으로 올린다.**
+
+### 이번 pilot이 드러낸 후속 설계 질문 (문법을 넓히지 않고 보고만 한다)
+
+1. **주 스탬프의 실제 표기가 동결된 날짜 토큰과 맞지 않는다.** 실 Delaware 스탬프는
+   `FILED 09:00 AM 01/03/2022`처럼 숫자 날짜이거나 전부 대문자다. 동결된 `_DATE`는
+   산문 날짜(`January 3, 2022`)만 받고 `_iso_date`는 대소문자를 가리므로 둘 다
+   `MISSING`이다(offline 확인). 숫자 날짜 토큰을 여는 것은 **새 날짜 문법 결정**이고
+   `_iso_date`는 `qv_events`와 공유하므로 이 증분에서 건드리지 않았다. **이것이 O2
+   개선 0의 가장 유력한 원인이다.**
+2. **닫는 따옴표가 액면가 수식을 가린다.** AAPL의 `designated “Common Stock,” par
+   value $0.00001 per share`에서 이름 바로 뒤가 `,”`라 인식 문법에도 값 수식 탐지에도
+   걸리지 않아 그 자리의 액면가가 `None`으로 관측된다. 지금은 한쪽만 액면가를 든 것이
+   되어 연결이 허용된다 — **양쪽 값이 실제로 달랐다면 충돌을 못 잡는 좁은 구멍이다.**
+   따옴표를 통과시키는 것은 결과를 본 뒤의 문법 변경이므로 하지 않았다.
+3. **class 정의 문법이 실 charter 표현을 덮지 못한다**(위 FOXA 절).
+4. 2001년 이전 flat layout의 문서 자연키는 그대로 열려 있다(§21). `legacy_layout ->
+   INCOMPLETE` fail-close를 유지했다.
+
+### 이 receipt가 주장하지 않는 것
+
+- O2/P2 밖의 어떤 자동 증거 규칙도 느슨하게 하지 않았다.
+- `qv_manifest.prose_key` · `qv-class-id-v1` · production identity JSONL을 바꾸지 않았다.
+- P2만으로 production alias를 만들지 않았고 class 수명을 표지 제목 수명으로 복사하지
+  않았다.
+- legacy flat layout · 누락 Exhibit 3 · 분류 실패 · 명시 탄생 행위 부재를 고치지 않았다.
+- 897개 확장·승격 · 5A-3 · C2 binding · 회계/Q/V/B-M/랭크/Gate/수익률을 건드리지 않았다.
+
+
+---
+
 ## 11. 결과
 
 

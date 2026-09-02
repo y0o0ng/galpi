@@ -18,12 +18,14 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 TRADING_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TRADING_ROOT))
 
 from backtest import qv_evidence  # noqa: E402
+from backtest.qv_events import html_blocks  # noqa: E402
 from backtest.qv_identity_legal_evidence import (  # noqa: E402
     CLASS_BIRTH_ACTION,
     CLASS_BIRTH_EFFECTIVE_DATE,
@@ -34,12 +36,17 @@ from backtest.qv_identity_legal_evidence import (  # noqa: E402
     INCOMPLETE,
     PROSE_ALIAS_LIFETIME,
     UNRESOLVED,
+    QVLegalEvidenceError,
+    associate_class_designation,
+    class_designation_anchor,
     class_evidence_from_legal_proof,
     classify_document,
     collect_legal_evidence,
+    governing_operative_date,
 )
 from backtest.qv_identity_promotion import (  # noqa: E402
     QVPromotionError,
+    class_id_v1,
     revalidate_packet,
 )
 from backtest.qv_identity_proposals import (  # noqa: E402
@@ -48,6 +55,7 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     CLASS_INTERVAL_NOT_EXPLICIT,
     CURRENT_TICKER_FILE,
     DIRECT,
+    GOVERNING_INSTRUMENT,
     PROSE_ALIAS_INTERVAL_NOT_EXPLICIT,
     REVIEW_REQUIRED,
     SECURITY_TITLE_FACT,
@@ -56,6 +64,7 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     build_symbol_proposal,
     extract_cover_proof,
 )
+from backtest.qv_manifest import prose_key  # noqa: E402
 from backtest.qv_xbrl import parse_instance  # noqa: E402
 
 sys.path.insert(0, str(TRADING_ROOT / "tests"))
@@ -740,16 +749,35 @@ class BirthTest(BaseFixture):
         self.assertEqual(evidence, {})
         self.assertEqual(evidence_for(payload)["findings"], [])
 
-    def test_an_approximate_title_never_links_a_governing_class(self):
-        """`Class A Common Stock, $0.001 par value` != `Class A Common Stock`."""
+    def test_a_numeric_par_value_title_associates_but_keeps_its_own_n1(self):
+        """**P2** — 액면가 수식은 연결 판단에서만 무시된다. N1은 그대로다."""
         facts = cover_facts(title="Class A Common Stock, $0.001 par value")
         payload, evidence = self.assertClassEvidence(
             [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())], facts
         )
-        self.assertEqual(evidence, {})
         entry = evidence_for(payload)
-        self.assertEqual(entry["findings"], [])
+        # production N1은 액면가를 그대로 들고 있다 — 여기서 바뀌지 않는다.
         self.assertEqual(entry["target_name_key"], "class a common stock, $0.001 par value")
+        self.assertEqual(entry["designation_key"], "class a common stock")
+        self.assertEqual(entry["association_method"], "NUMERIC_PAR_VALUE_SUFFIX")
+        self.assertEqual(entry["governing_raw_name"], CLASS_A)
+        item = evidence["us-gaap:CommonClassAMember"]
+        # 연결됐다고 표지 제목이 production alias가 되지는 않는다(§11 · B1).
+        self.assertIsNone(item.cover_title_interval)
+        self.assertEqual(
+            [(bridge.raw_prose_name, bridge.bridge_type)
+             for bridge in item.extra_prose_bridges],
+            [(CLASS_A, "GOVERNING_INSTRUMENT")],
+        )
+
+    def test_a_non_numeric_descriptor_never_links_a_governing_class(self):
+        """`no par value`는 벗기지 않는다 — 연결도 되지 않는다."""
+        facts = cover_facts(title="Class A Common Stock, no par value")
+        payload, evidence = self.assertClassEvidence(
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())], facts
+        )
+        self.assertEqual(evidence, {})
+        self.assertEqual(evidence_for(payload)["findings"], [])
 
     def test_conflicting_birth_dates_are_unresolved(self):
         payload, evidence = self.assertClassEvidence([
@@ -1017,7 +1045,11 @@ class OpenEndedContinuityTest(BaseFixture):
         document = payload["documents"][0]
         self.assertEqual(document["legal_operative_status"], "RESOLVED")
         self.assertEqual(document["legal_operative_date"], BIRTH_DATE)
-        self.assertTrue(document["legal_operative_locator"].startswith("block:"))
+        self.assertEqual(
+            document["legal_operative_source_family"], "EXPLICIT_EFFECTIVE_DATE"
+        )
+        self.assertEqual(len(document["legal_operative_locators"]), 1)
+        self.assertTrue(document["legal_operative_locators"][0].startswith("block:"))
         self.assertEqual(document["legal_operative_observed"], [BIRTH_DATE])
         # SEC 수리 시각은 provenance로 그대로 남되 순서 근거가 아니다.
         self.assertEqual(document["acceptance_datetime"], "2015-10-05T21:00:00.000000Z")
@@ -1552,10 +1584,13 @@ class LegalChronologyRevalidationTest(TamperFixture, unittest.TestCase):
         self.assertIn("operative date와 다릅니다", self.tampered(mutate))
 
     def test_removing_a_document_operative_date_fails(self):
+        """RESOLVED인데 날짜가 없는 구조는 **투영 전에** 멈춘다."""
         def mutate(payload):
             for document in payload["legal_evidence_proof"]["documents"]:
                 document["legal_operative_date"] = None
-        self.assertIn("operative date와 다릅니다", self.tampered(mutate))
+        self.assertIn(
+            "RESOLVED인데 operative date가 없습니다", self.tampered(mutate)
+        )
 
     def test_changing_only_sec_acceptance_still_promotes(self):
         """**수리 시각은 경제적 순서 근거가 아니다.** 바꿔도 재검증이 통과한다."""
@@ -1713,3 +1748,609 @@ class EvidenceLedgerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# O2 — 주(州) filing이 법적 시점을 세우는 좁은 두 경로
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+#: 주 기관이 명시된 FILED 스탬프. 이것만으로는 발효를 만들지 못한다.
+def state_stamp(prose: str, *, authority: str = "Secretary of State") -> str:
+    return (
+        f"State of Delaware {authority} Division of Corporations "
+        f"FILED 09:00 AM {prose}"
+    )
+
+
+#: instrument가 **제출을 발효 사건으로** 명시하는 조항.
+UPON_FILING = (
+    "This Certificate shall become effective upon filing with the Secretary of "
+    "State of the State of Delaware."
+)
+#: 서명/집행일. **단독으로는 절대 발효일이 아니다.**
+SIGNED = (
+    "IN WITNESS WHEREOF, the undersigned officer has executed this Certificate "
+    "on November 3, 2022."
+)
+
+
+def certification(prose: str) -> str:
+    """주 증명이 **스스로** 발효일을 말하는 자료."""
+    return (
+        "State of Delaware Secretary of State: I do hereby certify that the "
+        f"Effective Date: {prose}"
+    )
+
+
+def operative(*paragraphs: str):
+    return governing_operative_date(html_blocks(html(*paragraphs)))
+
+
+class OperativeDateGrammarTest(unittest.TestCase):
+    """**동결된 세 출처뿐이다.** SEC 수리 시각·서명일은 여전히 발효일이 아니다."""
+
+    def test_the_existing_explicit_grammar_resolves_identically(self):
+        item = operative("This Certificate shall become effective on October 2, 2015.")
+        self.assertEqual(
+            (item.status, item.date, item.source_family),
+            ("RESOLVED", BIRTH_DATE, "EXPLICIT_EFFECTIVE_DATE"),
+        )
+        self.assertEqual(len(item.supporting_locators), 1)
+
+    def test_a_state_certification_effective_date_resolves(self):
+        item = operative("SOME CERTIFICATE.", certification("January 3, 2022"))
+        self.assertEqual(
+            (item.status, item.date, item.source_family),
+            ("RESOLVED", "2022-01-03", "STATE_CERTIFIED_EFFECTIVE_DATE"),
+        )
+        self.assertEqual(item.supporting_locators, ("block:1",))
+
+    def test_an_upon_filing_clause_plus_a_state_stamp_resolves(self):
+        item = operative(UPON_FILING, state_stamp("January 3, 2022"))
+        self.assertEqual(
+            (item.status, item.date, item.source_family),
+            ("RESOLVED", "2022-01-03", "STATE_FILED_UPON_FILING"),
+        )
+        # **근거 둘을 모두 남긴다** — 왜 그 날짜가 나왔는지 되짚을 수 있어야 한다.
+        self.assertEqual(item.supporting_locators, ("block:0", "block:1"))
+
+    def test_an_upon_filing_clause_without_a_state_stamp_is_missing(self):
+        self.assertEqual(operative(UPON_FILING).status, "MISSING")
+
+    def test_a_state_stamp_alone_never_creates_an_operative_date(self):
+        """스탬프는 **제출이 발효 사건일 때만** 법적 시점이 된다."""
+        item = operative("SOME CERTIFICATE.", state_stamp("January 3, 2022"))
+        self.assertEqual((item.status, item.date), ("MISSING", None))
+        self.assertEqual(item.observed, ())
+
+    def test_a_generic_filed_word_is_not_a_state_stamp(self):
+        item = operative(UPON_FILING, "FILED 09:00 AM January 3, 2022")
+        self.assertEqual(item.status, "MISSING")
+
+    def test_sec_acceptance_metadata_never_satisfies_the_stamp_rule(self):
+        item = operative(
+            UPON_FILING,
+            "Filed with the Securities and Exchange Commission on January 3, 2022 "
+            "and accepted by EDGAR at 21:00 that day",
+        )
+        self.assertEqual(item.status, "MISSING")
+
+    def test_a_delayed_effective_date_governs_over_the_state_filed_date(self):
+        """state FILED 6/1 + 명시 발효 6/15 -> **6/15가 법적 발효일이다.**"""
+        item = operative(
+            "This Certificate shall become effective on June 15, 2022.",
+            state_stamp("June 1, 2022"),
+        )
+        self.assertEqual(
+            (item.status, item.date, item.source_family),
+            ("RESOLVED", "2022-06-15", "EXPLICIT_EFFECTIVE_DATE"),
+        )
+
+    def test_a_state_certified_delayed_date_governs_over_the_filed_date(self):
+        item = operative(
+            certification("June 15, 2022"), state_stamp("June 1, 2022")
+        )
+        self.assertEqual(
+            (item.status, item.date, item.source_family),
+            ("RESOLVED", "2022-06-15", "STATE_CERTIFIED_EFFECTIVE_DATE"),
+        )
+
+    def test_a_direct_date_conflicting_with_an_upon_filing_date_is_ambiguous(self):
+        """문서가 제출 발효를 말하면서 다른 명시 발효일을 들면 법이 모순이다."""
+        item = operative(
+            UPON_FILING,
+            "This Certificate shall become effective on June 15, 2022.",
+            state_stamp("June 1, 2022"),
+        )
+        self.assertEqual((item.status, item.date), ("AMBIGUOUS", None))
+        self.assertEqual(item.observed, ("2022-06-01", "2022-06-15"))
+
+    def test_a_signature_date_never_substitutes_for_a_missing_stamp(self):
+        self.assertEqual(operative(UPON_FILING, SIGNED).status, "MISSING")
+
+    def test_a_signature_date_alone_is_missing(self):
+        self.assertEqual(operative(SIGNED).status, "MISSING")
+
+    def test_two_distinct_state_filed_dates_are_ambiguous(self):
+        item = operative(
+            UPON_FILING, state_stamp("January 3, 2022"), state_stamp("March 4, 2022")
+        )
+        self.assertEqual((item.status, item.date), ("AMBIGUOUS", None))
+        self.assertEqual(item.observed, ("2022-01-03", "2022-03-04"))
+
+    def test_duplicate_stamps_of_one_date_resolve_deterministically(self):
+        item = operative(
+            UPON_FILING, state_stamp("January 3, 2022"), state_stamp("January 3, 2022")
+        )
+        self.assertEqual((item.status, item.date), ("RESOLVED", "2022-01-03"))
+        # 가장 이른 근거 자리를 결정론적으로 고른다.
+        self.assertEqual(item.supporting_locators, ("block:0", "block:1"))
+
+    def test_the_authority_vocabulary_is_enumerated(self):
+        """`Bureau of Widgets`는 주 법인 filing 기관 어휘가 아니다."""
+        item = operative(
+            UPON_FILING,
+            "State of Delaware Bureau of Widgets FILED 09:00 AM January 3, 2022",
+        )
+        self.assertEqual(item.status, "MISSING")
+        # 열거된 기관이면 같은 문장이 스탬프가 된다.
+        listed = operative(
+            UPON_FILING,
+            "State of Delaware Department of State FILED 09:00 AM January 3, 2022",
+        )
+        self.assertEqual((listed.status, listed.date), ("RESOLVED", "2022-01-03"))
+
+
+class StateDerivedChronologyTest(BaseFixture):
+    """**B2 연대기는 새 출처를 기존 직접 발효일과 똑같이 쓴다.**"""
+
+    def charter(self, acceptance="2022-02-05"):
+        return charter_8k(
+            "0000000042-22-000001", acceptance,
+            founding_charter(date=None, extra=(UPON_FILING,
+                                               state_stamp("January 3, 2022"))),
+        )
+
+    def test_a_state_derived_operative_date_drives_the_class_interval(self):
+        payload, evidence = self.assertClassEvidence([self.charter()])
+        document = payload["documents"][0]
+        self.assertEqual(
+            document["legal_operative_source_family"], "STATE_FILED_UPON_FILING"
+        )
+        self.assertEqual(len(document["legal_operative_locators"]), 2)
+        item = evidence["us-gaap:CommonClassAMember"].class_interval
+        self.assertEqual((item.effective_from, item.effective_to), ("2022-01-03", None))
+
+    def test_moving_sec_acceptance_never_moves_a_state_derived_interval(self):
+        """**수리 시각은 경제적 축이 아니다.** 州 파생 발효일이 고정이면 구간도 고정이다."""
+        def run(acceptance):
+            _payload, evidence = self.assertClassEvidence([self.charter(acceptance)])
+            item = evidence["us-gaap:CommonClassAMember"].class_interval
+            return (item.effective_from, item.effective_to)
+
+        self.assertEqual(run("2022-02-05"), ("2022-01-03", None))
+        self.assertEqual(run("2024-11-30"), ("2022-01-03", None))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# P2 — 액면가 수식은 **연결 판단 경계에서만** 무시된다
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+A_PAR_01 = "Class A Common Stock, par value $0.01 per share"
+A_PAR_01_ALT = "Class A Common Stock, $.01 par value"
+A_PAR_001 = "Class A Common Stock, $0.001 par value"
+
+
+class DesignationAnchorTest(unittest.TestCase):
+    """벗기는 것은 **끝에 붙은 인식된 숫자 액면가 수식** 하나뿐이다."""
+
+    def test_a_terminal_numeric_par_value_is_recognized(self):
+        for raw, par in (
+            (A_PAR_01, "0.01"),
+            ("Class A Common Stock, $0.01 par value per share", "0.01"),
+            (A_PAR_01_ALT, "0.01"),
+            (A_PAR_001, "0.001"),
+            ("Class A Common Stock, par value $0.01", "0.01"),
+        ):
+            with self.subTest(raw=raw):
+                anchor = class_designation_anchor(raw)
+                self.assertTrue(anchor.suffix_removed)
+                self.assertEqual(anchor.designation_key, "class a common stock")
+                self.assertEqual(anchor.par_value, par)
+                # **production N1은 그대로다.**
+                self.assertEqual(anchor.prose_key, prose_key(raw))
+
+    def test_equivalent_numeric_renderings_are_exactly_equal(self):
+        self.assertEqual(
+            Decimal(class_designation_anchor(A_PAR_01).par_value),
+            Decimal(class_designation_anchor(A_PAR_01_ALT).par_value),
+        )
+
+    def test_unsupported_descriptors_are_never_stripped(self):
+        for raw in (
+            "Common Stock, no par value",
+            "Common Stock, without par value",
+            "Class A Common Stock, stated value $0.01",
+            "Class A Common Stock, liquidation value $0.01",
+            # 종단이 아니다 — 이름이 계속된다.
+            "Class A Common Stock, par value $0.01 per share, Series 2",
+            # 관련 없는 뒤 산문·괄호 법적 수식.
+            "Class A Common Stock (the Class A Shares)",
+            "Class A Common Stock, non-voting",
+        ):
+            with self.subTest(raw=raw):
+                anchor = class_designation_anchor(raw)
+                self.assertFalse(anchor.suffix_removed)
+                self.assertIsNone(anchor.par_value)
+                self.assertEqual(anchor.designation_key, prose_key(raw))
+
+    def test_an_empty_name_fails_closed(self):
+        with self.assertRaises(QVLegalEvidenceError):
+            class_designation_anchor("   ")
+
+
+class DesignationAssociationTest(unittest.TestCase):
+    """**연결 판정의 정의는 하나다.** 생성기와 승격기가 이 함수를 쓴다."""
+
+    def outcome(self, cover, governing, **kwargs):
+        return associate_class_designation(cover, governing, **kwargs).outcome
+
+    def test_exact_n1_stays_exact_n1(self):
+        self.assertEqual(self.outcome(CLASS_A, CLASS_A), "EXACT_N1")
+        self.assertEqual(self.outcome(CLASS_A, "class a  common stock"), "EXACT_N1")
+
+    def test_a_one_sided_suffix_associates_in_both_directions(self):
+        self.assertEqual(self.outcome(A_PAR_01, CLASS_A), "NUMERIC_PAR_VALUE_SUFFIX")
+        self.assertEqual(self.outcome(CLASS_A, A_PAR_01), "NUMERIC_PAR_VALUE_SUFFIX")
+
+    def test_equal_numeric_par_values_associate(self):
+        self.assertEqual(
+            self.outcome(A_PAR_01, A_PAR_01_ALT), "NUMERIC_PAR_VALUE_SUFFIX"
+        )
+
+    def test_different_numeric_par_values_never_associate(self):
+        self.assertEqual(self.outcome(A_PAR_01, A_PAR_001), "PAR_VALUE_CONFLICT")
+        # 허용 오차를 쓰지 않는다.
+        self.assertEqual(
+            self.outcome(A_PAR_01, "Class A Common Stock, par value $0.0100001"),
+            "PAR_VALUE_CONFLICT",
+        )
+
+    def test_a_different_class_designation_never_associates(self):
+        self.assertEqual(self.outcome(A_PAR_01, CLASS_B), "NOT_ASSOCIATED")
+        self.assertEqual(self.outcome("Common Stock", A_PAR_01), "NOT_ASSOCIATED")
+
+    def test_an_unsupported_descriptor_never_associates(self):
+        self.assertEqual(
+            self.outcome("Class A Common Stock, no par value", CLASS_A),
+            "NOT_ASSOCIATED",
+        )
+        self.assertEqual(
+            self.outcome("Class A Common Stock, stated value $0.01", CLASS_A),
+            "NOT_ASSOCIATED",
+        )
+
+    def test_the_site_par_value_is_read_from_raw_text_not_a_derived_field(self):
+        self.assertEqual(
+            self.outcome(A_PAR_01, CLASS_A, governing_par_text="$.01"),
+            "NUMERIC_PAR_VALUE_SUFFIX",
+        )
+        self.assertEqual(
+            self.outcome(A_PAR_01, CLASS_A, governing_par_text="$0.001"),
+            "PAR_VALUE_CONFLICT",
+        )
+
+
+def par_charter(par_text=None, *, name=CLASS_A, definitions=None):
+    """`name`을 세우고 정의하는 완전 instrument.
+
+    `par_text`가 있으면 **정의 자리에** 액면가 수식을 붙인다. 기본 `authorized()`는
+    항상 `$0.001`을 붙이므로 액면가 조합을 고르려면 여기를 쓴다.
+    """
+    if definitions is None:
+        tail = f", par value {par_text} per share" if par_text else ""
+        definitions = (
+            "The Corporation is authorized to issue 100,000,000 shares of "
+            f"{name}{tail}.",
+        )
+    return html(
+        "AMENDED AND RESTATED CERTIFICATE OF INCORPORATION OF ACME INC.",
+        creates(name),
+        *definitions,
+        effective(BIRTH_PROSE),
+    )
+
+
+def par_filing(par_text=None, **kwargs):
+    return charter_8k("0000000042-15-000001", "2015-10-05",
+                      par_charter(par_text, **kwargs))
+
+
+class ParValueAssociationTest(BaseFixture):
+    """실제 governing 문서에서 P2가 어떻게 걸리고 어디서 fail-close하는가."""
+
+    def test_a_par_value_cover_title_reaches_a_bare_governing_class(self):
+        payload, evidence = self.assertClassEvidence(
+            [par_filing()], cover_facts(title=A_PAR_01)
+        )
+        entry = evidence_for(payload)
+        self.assertEqual(entry["association_method"], "NUMERIC_PAR_VALUE_SUFFIX")
+        self.assertEqual(entry["governing_raw_name"], CLASS_A)
+        self.assertEqual(entry["cover_par_value"], "0.01")
+        self.assertIsNone(entry["governing_par_value"])
+        self.assertEqual(
+            evidence["us-gaap:CommonClassAMember"].class_interval.effective_from,
+            BIRTH_DATE,
+        )
+
+    def test_a_bare_cover_title_reaches_a_par_value_governing_class(self):
+        """반대 방향 — governing 쪽만 액면가를 달고 있어도 연결된다."""
+        payload, evidence = self.assertClassEvidence([par_filing("$0.01")])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["association_method"], "EXACT_N1")
+        self.assertEqual(entry["governing_par_value"], "0.01")
+        self.assertIsNotNone(evidence["us-gaap:CommonClassAMember"].class_interval)
+
+    def test_equivalent_numeric_renderings_associate_at_the_site(self):
+        """`$.01`과 `$0.01`은 Decimal로 정확히 같다."""
+        payload, evidence = self.assertClassEvidence(
+            [par_filing("$0.01")], cover_facts(title=A_PAR_01_ALT)
+        )
+        entry = evidence_for(payload)
+        self.assertEqual(entry["association_method"], "NUMERIC_PAR_VALUE_SUFFIX")
+        self.assertEqual((entry["cover_par_value"], entry["governing_par_value"]),
+                         ("0.01", "0.01"))
+        self.assertIsNotNone(evidence["us-gaap:CommonClassAMember"].class_interval)
+
+    def test_a_conflicting_site_par_value_blocks_the_association(self):
+        """표지 $0.001은 붙고 표지 $0.01은 붙지 않는다. 허용 오차가 없다."""
+        _payload, matched = self.assertClassEvidence(
+            [par_filing("$0.001")], cover_facts(title=A_PAR_001)
+        )
+        self.assertEqual(sorted(matched), ["us-gaap:CommonClassAMember"])
+
+        payload, evidence = self.assertClassEvidence(
+            [par_filing("$0.001")], cover_facts(title=A_PAR_01)
+        )
+        self.assertEqual(evidence, {})
+        entry = evidence_for(payload)
+        self.assertIsNone(entry["association_method"])
+        self.assertIn("서로 다른 숫자 액면가", entry["notes"][0])
+
+    def test_two_governing_par_values_for_one_core_are_ambiguous(self):
+        """같은 core가 서로 다른 액면가로 나타나면 **두 경제적 class다.**"""
+        filing = charter_8k(
+            "0000000042-15-000001", "2015-10-05",
+            par_charter(definitions=(
+                "The Corporation is authorized to issue 100,000,000 shares of "
+                "Class A Common Stock, par value $0.01 per share.",
+                "The Corporation is authorized to issue 50,000,000 shares of "
+                "Class A Common Stock, par value $0.001 per share.",
+            )),
+        )
+        payload, evidence = self.assertClassEvidence(
+            [filing], cover_facts(title=A_PAR_01)
+        )
+        self.assertEqual(evidence, {})
+        entry = evidence_for(payload)
+        self.assertIsNone(entry["association_method"])
+        self.assertIn("서로 다른 숫자 액면가", entry["notes"][0])
+
+    def test_two_cover_siblings_with_one_core_disable_automatic_p2(self):
+        facts = cover_facts(title=A_PAR_01) + [
+            {"concept": "Security12bTitle", "value": A_PAR_001,
+             "member": "CommonClassBMember", "context_id": "b"},
+            {"concept": "EntityCommonStockSharesOutstanding", "value": "500",
+             "member": "CommonClassBMember", "context_id": "b", "numeric": True},
+        ]
+        payload, evidence = self.assertClassEvidence([par_filing()], facts)
+        self.assertEqual(evidence, {})
+        for entry in payload["classes"]:
+            self.assertIsNone(entry["association_method"])
+            self.assertIn("core designation", entry["notes"][0])
+
+    def test_an_exact_n1_sibling_keeps_its_anchor_when_p2_is_disabled(self):
+        """**exact N1이 가장 강하다.** 형제 충돌이 P2만 끈다."""
+        facts = cover_facts(title=CLASS_A) + [
+            {"concept": "Security12bTitle", "value": A_PAR_01,
+             "member": "CommonClassBMember", "context_id": "b"},
+            {"concept": "EntityCommonStockSharesOutstanding", "value": "500",
+             "member": "CommonClassBMember", "context_id": "b", "numeric": True},
+        ]
+        payload, evidence = self.assertClassEvidence([par_filing()], facts)
+        self.assertEqual(sorted(evidence), ["us-gaap:CommonClassAMember"])
+        methods = {
+            item["member_key"]: item["association_method"] for item in payload["classes"]
+        }
+        self.assertEqual(methods["us-gaap:CommonClassAMember"], "EXACT_N1")
+        self.assertIsNone(methods["us-gaap:CommonClassBMember"])
+
+    def test_a_different_class_letter_never_associates(self):
+        payload, evidence = self.assertClassEvidence(
+            [par_filing(name=CLASS_B)], cover_facts(title=A_PAR_01)
+        )
+        self.assertEqual(evidence, {})
+        self.assertEqual(evidence_for(payload)["findings"], [])
+
+    def test_a_longer_governing_designation_is_never_matched_by_its_tail(self):
+        """`Class A Common Stock` 안의 `Common Stock`을 그 class로 읽지 않는다."""
+        payload, evidence = self.assertClassEvidence(
+            [par_filing()], cover_facts(title="Common Stock")
+        )
+        self.assertEqual(evidence, {})
+        self.assertEqual(evidence_for(payload)["findings"], [])
+
+    def definition_locators(self, filing, title):
+        payload, _evidence = self.assertClassEvidence(
+            [filing], cover_facts(title=title)
+        )
+        return [
+            item["locator"] for item in evidence_for(payload)["findings"]
+            if item["finding_kind"] == GOVERNING_CLASS_DEFINITION
+        ]
+
+    def test_an_unclassifiable_value_descriptor_fails_closed_at_the_site(self):
+        """`stated value $0.01`이 붙은 자리는 같다고 보지 않고 **그 자리를 버린다.**
+
+        `creates()` 문장은 그대로 정의로 남으므로, 사라지는 것은 분류할 수 없는
+        수식이 붙은 `authorized` 자리 하나다.
+        """
+        unrecognized = charter_8k(
+            "0000000042-15-000001", "2015-10-05",
+            par_charter(definitions=(
+                "The Corporation is authorized to issue 100,000,000 shares of "
+                "Class A Common Stock, stated value $0.01 per share.",
+            )),
+        )
+        self.assertEqual(
+            self.definition_locators(par_filing("$0.01"), A_PAR_01),
+            ["block:1", "block:2"],
+        )
+        self.assertEqual(
+            self.definition_locators(unrecognized, A_PAR_01), ["block:1"]
+        )
+
+    def test_the_association_receipt_serializes_deterministically(self):
+        first, _evidence = self.assertClassEvidence(
+            [par_filing()], cover_facts(title=A_PAR_01)
+        )
+        second, _again = self.assertClassEvidence(
+            [par_filing()], cover_facts(title=A_PAR_01)
+        )
+        self.assertEqual(
+            json.dumps(evidence_for(first), sort_keys=True, ensure_ascii=False),
+            json.dumps(evidence_for(second), sort_keys=True, ensure_ascii=False),
+        )
+
+
+#: P2로만 연결되는 무변조 packet의 재료.
+P2_CHARTER = par_filing()
+P2_FACTS = cover_facts(title=A_PAR_01)
+
+
+class P2ProofIntegrityTest(unittest.TestCase):
+    """직렬화된 연결 칸은 **receipt이지 권한이 아니다.** 거짓말하면 멈춘다."""
+
+    def packet(self):
+        return legal_packet(filings=(P2_CHARTER,), facts=P2_FACTS).as_json()
+
+    def tampered(self, mutate):
+        payload = self.packet()
+        mutate(payload)
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(payload)
+        return str(caught.exception)
+
+    def test_the_untampered_p2_packet_reprojects_to_the_same_evidence(self):
+        packet = legal_packet(filings=(P2_CHARTER,), facts=P2_FACTS)
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+        promotable = revalidate_packet(packet.as_json())
+        self.assertEqual(promotable.classes[0]["effective_from"], BIRTH_DATE)
+        self.assertEqual(
+            [(item["bridge_type"], item["raw_prose_name"])
+             for item in promotable.prose_aliases],
+            [(GOVERNING_INSTRUMENT, CLASS_A)],
+        )
+
+    def test_claiming_p2_where_the_raw_strings_are_exact_fails(self):
+        def mutate(payload):
+            entry = payload["legal_evidence_proof"]["classes"][0]
+            entry["association_method"] = "NUMERIC_PAR_VALUE_SUFFIX"
+        exact = legal_packet().as_json()
+        exact["legal_evidence_proof"]["classes"][0]["association_method"] = (
+            "NUMERIC_PAR_VALUE_SUFFIX"
+        )
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(exact)
+        self.assertIn("다시 판정한 값과 다릅니다", str(caught.exception))
+        del mutate
+
+    def test_changing_a_parsed_par_value_fails(self):
+        def mutate(payload):
+            entry = payload["legal_evidence_proof"]["classes"][0]
+            entry["cover_par_value"] = "0.001"
+        self.assertIn("원문과 다릅니다", self.tampered(mutate))
+
+    def test_changing_a_site_par_value_text_fails(self):
+        """**액면가의 진실은 원문이다.** finding의 원문을 바꾸면 재판정이 달라진다."""
+        def mutate(payload):
+            for finding in payload["legal_evidence_proof"]["classes"][0]["findings"]:
+                finding["governing_par_text"] = "$0.001"
+        self.assertIn("다시 판정한 값과 다릅니다", self.tampered(mutate))
+
+    def test_replacing_the_governing_raw_name_fails(self):
+        def mutate(payload):
+            for finding in payload["legal_evidence_proof"]["classes"][0]["findings"]:
+                finding["governing_raw_name"] = CLASS_B
+        self.assertIn("다시 판정한 값과 다릅니다", self.tampered(mutate))
+
+    def test_changing_the_designation_key_receipt_fails(self):
+        def mutate(payload):
+            entry = payload["legal_evidence_proof"]["classes"][0]
+            entry["designation_key"] = "class b common stock"
+        self.assertIn("원문과 다릅니다", self.tampered(mutate))
+
+
+class ProductionIdentityIsolationTest(ManifestFixture, unittest.TestCase):
+    """**연결 동치 != production prose alias 동치.**"""
+
+    def test_prose_key_is_unchanged_by_this_helper(self):
+        for raw in (A_PAR_01, A_PAR_01_ALT, A_PAR_001, CLASS_A,
+                    "Common Stock, no par value"):
+            with self.subTest(raw=raw):
+                self.assertEqual(prose_key(raw), " ".join(raw.split()).casefold())
+        # 액면가 변형은 **전역 alias 동치가 아니다.**
+        self.assertNotEqual(prose_key(A_PAR_01), prose_key(CLASS_A))
+        self.assertNotEqual(prose_key(A_PAR_01), prose_key(A_PAR_01_ALT))
+
+    def test_a_p2_promotion_never_creates_an_alias_for_the_cover_string(self):
+        plan = self.plan([legal_packet(filings=(P2_CHARTER,), facts=P2_FACTS)])
+        aliases = plan.rows.added["prose_aliases.jsonl"]
+        self.assertEqual(
+            [(item["bridge_type"], item["raw_prose_name"]) for item in aliases],
+            [(GOVERNING_INSTRUMENT, CLASS_A)],
+        )
+        # 더 긴 표지 문자열은 production alias가 되지 않는다(B1 그대로).
+        self.assertNotIn(
+            prose_key(A_PAR_01),
+            {prose_key(item["raw_prose_name"]) for item in aliases},
+        )
+        self.assertEqual(prose_key(aliases[0]["raw_prose_name"]), prose_key(CLASS_A))
+
+    def test_the_class_lifetime_is_never_copied_onto_the_cover_title(self):
+        _client, proof, collected = collect([P2_CHARTER], P2_FACTS)
+        evidence = class_evidence_from_legal_proof(
+            collected.as_json(), cover_proof=proof
+        )
+        item = evidence["us-gaap:CommonClassAMember"]
+        self.assertIsNotNone(item.class_interval)
+        self.assertIsNone(item.cover_title_interval)
+
+    def test_the_association_key_never_seeds_the_production_class_id(self):
+        plan = self.plan([legal_packet(filings=(P2_CHARTER,), facts=P2_FACTS)])
+        row = plan.rows.added["share_classes.jsonl"][0]
+        self.assertEqual(
+            row["class_id"],
+            class_id_v1(
+                cik=CIK, effective_from=BIRTH_DATE,
+                canonical_bridge_type=GOVERNING_INSTRUMENT,
+                canonical_bridge_key=prose_key(CLASS_A),
+            ),
+        )
+        # 표지의 액면가 문자열로는 절대 seed되지 않는다.
+        self.assertNotEqual(
+            row["class_id"],
+            class_id_v1(
+                cik=CIK, effective_from=BIRTH_DATE,
+                canonical_bridge_type=GOVERNING_INSTRUMENT,
+                canonical_bridge_key=prose_key(A_PAR_01),
+            ),
+        )
+
+    def test_the_manifest_hash_does_not_move_because_the_helper_exists(self):
+        before = self.manifest().identity_source_version
+        class_designation_anchor(A_PAR_01)
+        associate_class_designation(A_PAR_01, CLASS_A)
+        self.assertEqual(self.manifest().identity_source_version, before)
