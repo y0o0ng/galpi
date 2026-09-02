@@ -2149,7 +2149,127 @@ were `NOT_RUN` / `LOCAL_ENDPOINT_UNAVAILABLE`, so that artifact is an
 infrastructure/harness failure rather than semantic P1-B2d evidence and does
 not consume the preregistered no-rerun model execution. The runner now
 requires one successful non-inference `llama.cpp` readiness preflight before
-any experimental call; a valid P1-B2d run remains pending.
+any experimental call; at that point, a valid P1-B2d run remained pending.
+
+#### P1-B2d completed diagnostic result and closure
+
+The valid diagnostic report
+`xion-local-memory-inference-p1b2d-triage-boundary-report-v1`, generated at
+`2026-09-02T05:05:25.959Z`, records Galpi commit
+`163eea0d649343caf56e5c01d416f52db7d05ef9`, model
+`xion-p1b1-qwen3-4b-bf16`, artifact
+`unsloth/Qwen3-4B-GGUF:BF16`, and `llama.cpp` runtime
+`e42214804794fca6abb61b1a5f9adae2a845f0be`. All 45 planned calls were
+attempted and completed in case-local A → B → C order, with no automatic
+reruns, runtime failures, or invalid structured outputs. This is the valid
+result and is distinct from the earlier endpoint-unavailable artifact.
+
+| Condition | Exact | Correct `NO_WRITE` | Correct `WRITE_CANDIDATE` | Correct `ESCALATE` | Eligible false `NO_WRITE` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A — `CURRENT_DEFINED_LABELS` | 12/15 | 3/5 | 5/5 | 4/5 | 1 |
+| B — `AMBIGUITY_PRECEDENCE` | 10/15 | 0/5 | 5/5 | 5/5 | 0 |
+| C — `AMBIGUITY_PRECEDENCE_PLUS_TEMPORARY_SCOPE` | 11/15 | 1/5 | 5/5 | 5/5 | 0 |
+
+| Comparison | Unchanged correct | Fixes | Regressions | Unchanged wrong | Noncomparable | Registered interpretation |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| A → B | 9 | 1 | 3 | 2 | 0 | ambiguity-precedence support: false |
+| B → C | 10 | 1 | 0 | 4 | 0 | temporary-scope support: true |
+| A → C, descriptive | 10 | 1 | 2 | 2 | 0 | descriptive only |
+
+The narrow critical A `NO_WRITE` → correct B `ESCALATE` transition occurred
+once, in case `p1b2d-triage-boundary-011`. No statistical significance is
+assigned to these descriptive counts, and the output pattern is not used to
+infer an internal causal mechanism.
+
+**P1-B2d = CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED.**
+
+Condition A retained the highest exact score, but its one eligible false
+`NO_WRITE` left the safety-relevant failure unresolved. Condition B removed
+eligible false `NO_WRITE` and reached 5/5 correct `ESCALATE`, but the
+ambiguity-precedence clarification strongly over-escalated clear temporary
+cases: correct `NO_WRITE` fell from 3/5 to 0/5, and A → B produced one fix
+versus three regressions. Condition C demonstrated a real registered
+directional effect relative to B because B → C satisfied every registered
+support criterion. It nevertheless was not a clean replacement for A: A →
+C produced one fix versus two regressions, and C reached 11/15 exact versus
+A's 12/15.
+
+Accordingly, none of A, B, or C is selected for fresh validation or a
+composition experiment. This follows the preregistered stop rule: when B2d
+identifies no clean candidate, review the triage formulation rather than
+continue tuning prompts against the same boundary failures. No further
+A+D/E/F prompt diagnostic is opened. P1-B2c remains CLOSED / COMPLETE /
+`FAIL_FRESH_SYNTHETIC_VALIDATION`, and B2d does not rescue it. No B2d prompt
+is production-validated; composition remains blocked; production memory
+behavior is unchanged; private natural replay remains `UNOPENED`; and the
+raw-context experiment remains deferred.
+
+#### Successor hypothesis — decomposed small-model memory pipeline
+
+The shared approximately 4B prompt-only triage formulation showed coupled
+decision-boundary behavior: stronger ambiguity handling improved the
+false-`NO_WRITE` safety dimension while producing excessive `ESCALATE`
+behavior on clear temporary cases. This is an observed operating-boundary
+pattern, not a claim about the model's internal mechanism. Rather than tune
+another single three-label prompt on the same cases, the next provisional
+research direction is to test whether separating narrow semantic
+responsibilities improves quality and system behavior:
+
+```text
+saved evidence / existing deterministic hard gates
+    ->
+untuned ~1.7B ambiguity/escalation stage
+    CLEAR / ESCALATE
+
+ESCALATE -> stronger / cloud path
+
+CLEAR
+    ->
+untuned ~1.7B write/no-write stage
+    NO_WRITE / WRITE_CANDIDATE
+
+NO_WRITE -> stop
+
+WRITE_CANDIDATE
+    ->
+untuned ~1.7B structured-extraction stage
+    -> structured candidate
+    -> existing validators / authority / provenance boundaries
+```
+
+The first successor experiment should test **specialization by
+decomposition**, not model training. Unless its later design establishes a
+better controlled comparison, all three narrow stages should use the same
+untuned approximately 1.7B base checkpoint. Each stage may have its own task
+prompt and output contract, but the first question is whether role
+decomposition itself improves quality and end-to-end behavior.
+
+Task-specific training is conditional and is not the next committed step.
+Only if the untuned decomposed pipeline shows a clearly meaningful
+improvement should a later experiment consider ambiguity-specialized,
+write/no-write-specialized, and extraction-specialized approximately 1.7B
+components. No training data, dataset size, adapter, full-fine-tuning choice,
+or LoRA/SFT mechanism is selected here. This ordering keeps
+specialization-by-decomposition distinct from specialization-by-training.
+
+The successor experiment is not preregistered or implemented. Before any of
+its model outputs exist, its own design must preregister a controlled
+comparison and success criteria covering at least eligible false
+`NO_WRITE`/fail-close safety, ambiguity/escalation behavior, `NO_WRITE` and
+`WRITE_CANDIDATE` quality, structured-extraction quality, end-to-end joint
+pipeline success, latency and total inference cost, memory residency and
+resource cost, cloud-escalation implications, and Galpi coexistence. Exact
+thresholds and fixture design remain open.
+
+This is an execution/policy hypothesis underneath the existing memory
+architecture, not a reopening of its authority contracts. Source-evidence
+authority, derived-state semantics, provenance requirements, explicit
+correction privilege, identity fail-close rules, Core/high-impact
+boundaries, governance/authorization, and production durable-write authority
+remain unchanged. Every specialized stage remains a non-authoritative
+processing component. The successor receives no final P1-B3, P1-B4, or
+P1-B2e identifier until its actual experiment design is written, so existing
+composition naming is not silently repurposed.
 
 A later raw-context evaluation is deferred and separate from this
 evidence-only component diagnostic. Only after the strongest bounded triage
