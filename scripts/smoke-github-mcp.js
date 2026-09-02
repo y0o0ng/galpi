@@ -22,6 +22,11 @@ async function main() {
     }
 
     const result = await github.readFile(path, ref ? { ref } : undefined);
+    if (result?.isError === true) {
+      throw Object.assign(new Error('GitHub MCP 파일 읽기 도구가 오류 결과를 반환했습니다.'), {
+        code: 'GITHUB_MCP_TOOL_RESULT_ERROR',
+      });
+    }
     const serialized = JSON.stringify(result);
     console.log(JSON.stringify({
       success: true,

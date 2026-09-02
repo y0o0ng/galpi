@@ -25,7 +25,14 @@ async function withGitHubEnv(values, run) {
   }
 }
 
-function createSdkHarness({ tools, connectError, listError, callError } = {}) {
+function createSdkHarness({
+  tools,
+  toolLists,
+  connectError,
+  listError,
+  callError,
+  callResult,
+} = {}) {
   const state = {
     clientInfo: null,
     transport: null,
@@ -54,12 +61,16 @@ function createSdkHarness({ tools, connectError, listError, callError } = {}) {
     async listTools() {
       state.listCalls += 1;
       if (listError) throw listError;
-      return { tools: tools || [{ name: 'get_file_contents' }] };
+      const listedTools = toolLists
+        ? toolLists[Math.min(state.listCalls - 1, toolLists.length - 1)]
+        : tools;
+      return { tools: listedTools || [{ name: 'get_file_contents' }] };
     }
 
     async callTool(request) {
       state.toolCalls.push(structuredClone(request));
       if (callError) throw callError;
+      if (callResult !== undefined) return structuredClone(callResult);
       return {
         content: [{ type: 'text', text: 'file contents' }],
         structuredContent: { path: request.arguments.path },
@@ -168,6 +179,23 @@ test('readFile can only call get_file_contents', async () => {
   });
 });
 
+test('readFile faithfully preserves an MCP tool-level error result', async () => {
+  const toolResult = {
+    isError: true,
+    content: [{ type: 'text', text: 'remote tool detail' }],
+    structuredContent: { status: 'failed' },
+  };
+  const harness = createSdkHarness({ callResult: toolResult });
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    const github = await createGitHubMcpClient({ loadSdk: harness.loadSdk });
+    assert.deepEqual(await github.readFile('README.md'), toolResult);
+    await github.close();
+  });
+});
+
 test('connection and tool-call errors are distinct and never expose the token', async () => {
   await withGitHubEnv({
     GITHUB_MCP_TOKEN: TEST_TOKEN,
@@ -212,6 +240,43 @@ test('a missing remote tool fails distinctly and cleans up', async () => {
       () => createGitHubMcpClient({ loadSdk: harness.loadSdk }),
       error => error.code === 'GITHUB_MCP_TOOL_MISSING',
     );
+  });
+  assert.equal(harness.state.closed, 1);
+});
+
+test('an unexpected additional remote tool fails closed and cleans up', async () => {
+  const harness = createSdkHarness({
+    tools: [{ name: 'get_file_contents' }, { name: 'search_code' }],
+  });
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    await assert.rejects(
+      () => createGitHubMcpClient({ loadSdk: harness.loadSdk }),
+      error => error.code === 'GITHUB_MCP_TOOLSET_UNEXPECTED',
+    );
+  });
+  assert.equal(harness.state.closed, 1);
+});
+
+test('listTools fails closed if the remote toolset drifts during the session', async () => {
+  const harness = createSdkHarness({
+    toolLists: [
+      [{ name: 'get_file_contents' }],
+      [{ name: 'get_file_contents' }, { name: 'get_me' }],
+    ],
+  });
+  await withGitHubEnv({
+    GITHUB_MCP_TOKEN: TEST_TOKEN,
+    GITHUB_MCP_REPOSITORY: VALID_REPOSITORY,
+  }, async () => {
+    const github = await createGitHubMcpClient({ loadSdk: harness.loadSdk });
+    await assert.rejects(
+      () => github.listTools(),
+      error => error.code === 'GITHUB_MCP_TOOLSET_UNEXPECTED',
+    );
+    await github.close();
   });
   assert.equal(harness.state.closed, 1);
 });
