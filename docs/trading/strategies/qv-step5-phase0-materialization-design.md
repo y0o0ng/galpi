@@ -515,6 +515,254 @@ canonical bridge가 없기 때문이고, 남는 상태는 `REVIEW_REQUIRED`다.
 유사도로 "Class B"를 추론하지 않는다. 나중에 governing instrument 증거가 Class B를
 명시로 정의하면 그때 canonical bridge 요건을 만족한다.
 
+##### B1 — 표지 제목은 filing 관측이지 temporal production alias가 아니다 (**CLOSED**)
+
+```text
+Security12bTitle = "Class A Common Stock"
+```
+
+이 표지가 증명하는 것은 **그 accession이 그 증권을 그렇게 불렀다**이다. 증명하지 않는
+것은 **"그 철자가 economic class 탄생부터 지금까지 유효한 alias였다"**이다.
+
+```text
+표지 제목이 있다   !=   production prose alias 행이 있어야 한다
+```
+
+그래서 표지 제목은 **자기 구간이 독립적으로 증명됐을 때만** production prose 제안이
+된다.
+
+```text
+제목 있음 + cover_title_interval 있음   -> SECURITY_TITLE_FACT production 제안
+제목 있음 + cover_title_interval 없음   -> CoverPageProof에만 남고 제안 행이 없다
+```
+
+구간 없는 제목은 **제안되지 않으므로 `PROSE_ALIAS_INTERVAL_NOT_EXPLICIT`도 붙지
+않는다.** 애초에 production 관계가 될 자격이 없던 것에 "구간이 없다"는 가짜 사유를
+만들지 않는다. 그 사유는 **실제로 제안된** production prose 관계에만 적용된다.
+
+제목은 사라지지 않는다. `CoverPageProof`에 남아 계속 다음을 증명한다.
+
+```text
+요구 심볼 · 그 accession의 등록 증권 정체성 · filing-local 제목 ·
+법적 증거 공급기가 쓰는 anchor
+```
+
+그 결과 canonical bridge가 없어져 package가 `REVIEW_REQUIRED`로 남을 수 있다.
+**그것은 결함이 아니라 계약이다.**
+
+#### 5A-2 법적 증거 공급기 (`qv_identity_legal_evidence`)
+
+```text
+SEC submission/accession 문서
+      -> 명시 legal/governing 사실
+      -> 구조화된 legal proof
+      -> ClassEvidence
+```
+
+**읽기 전용 5A-2 경로다.** production manifest를 바꾸지 않는다. 일반 legal NLP 엔진 ·
+범용 SEC 문서 창고 · LLM parser · embedding/fuzzy 검색을 만들지 않는다. 결정론적 구조
+파싱과 **열거된 semantic family**뿐이다.
+
+##### 자동 class 연결의 anchor는 정확한 N1 동일성 하나다
+
+```text
+표지에 Security12bTitle / Security12gTitle이 있고
+N1(표지 증권 제목) == N1(governing class 이름)
+```
+
+다음으로는 **절대** 잇지 않는다.
+
+```text
+XBRL member 철자 · CommonClassBMember · class 글자 유사도 · sibling 순서 ·
+ticker 유사도 · 액면가 유사도 · 주식수 · COVER_GROUP_LABEL · 근사 prose 유사도
+```
+
+**결과**: 제목 없는 sibling(`CommonClassBMember` + 주식수 fact)은 charter가 "Class B
+Common Stock"을 정의한다는 이유로 기계적으로 연결되지 않는다. 그대로
+`REVIEW_REQUIRED`다. **AUTO 비율을 올리려고 이 규칙을 약화하지 않는다.**
+
+##### 탐색 지평은 선언된 form 계열이다 — 건수·연도 상한이 아니다
+
+```text
+GOVERNING_SEARCH_FORMS = 8-K 계열 · 10-K 계열 · 10-Q 계열
+```
+
+그 지평 안의 **모든** accession header 색인을 읽고 후보 문서를 하나도 건너뛰지 않는다.
+`최근 3건` · `최근 5년` · `최신 charter만`을 correctness 규칙으로 쓰지 않는다.
+
+지평 밖 form에만 존재하는 governing instrument는 이 증분의 **선언된 한계**이고 proof의
+`accessions_outside_horizon`에 수량으로 남는다 — 조용히 흡수하지 않는다.
+
+##### 후보 discovery — 구조화된 metadata의 정본은 header 색인이다
+
+**`index.json`의 `type`은 문서 종류가 아니라 아이콘 이름이다**(`text.gif`). 문서별
+`<TYPE>`(`EX-3.1`)·`<FILENAME>`·`<SEQUENCE>`와 8-K `<ITEMS>`는 accession의 SGML header
+색인(`<accession>-index-headers.html`)에만 구조화돼 있다.
+
+```text
+선언된 종류가 Exhibit 3 계열   -> governing exhibit 후보
+8-K이고 ITEMS에 5.03이 있다    -> 그 8-K의 primary(SEQUENCE 1) 문서도 후보
+```
+
+**전시번호를 문자열 prefix로 비교하지 않는다.** `EX-3`으로 startswith 비교를 하면 SOX
+인증서 `EX-31.1`·`EX-32.1`이 전부 governing 후보가 되고 분류에 실패해 멀쩡한 등록인이
+통째로 INCOMPLETE가 된다(실측: ABMD 385 accession 중 102건).
+
+discovery는 힌트일 뿐 **권위가 아니다.** 파일명에 `charter`가 있다는 이유로 문서가
+권위를 갖지 않는다 — 본문이 아래 semantic 규칙을 만족해야 한다.
+
+##### 탐색 closure — COMPLETE / INCOMPLETE
+
+`COMPLETE`는 선언된 지평이 요구하는 모든 accession/문서를 실제로 열거하고 모든
+governing 후보를 받아 분류했다는 뜻이다. 다음 중 하나라도 있으면 `INCOMPLETE`다.
+
+```text
+submissions archive 실패 · accession header 색인 실패 · 후보 문서 fetch 실패 ·
+열거된 family로 분류할 수 없는 후보 · 파일 이름 없이 선언된 문서
+```
+
+마지막이 **2001년 이전 flat layout**이다. 그 시기 accession은 문서를 개별 파일로 두지
+않아 문서 자연키로 가리킬 수 없다. 후보가 0건인 것과 구분해 `legacy_layout` 실패로
+적는다 — 조용히 넘어가면 그 시기 governing instrument를 하나도 안 본 채 무기한 수명이
+만들어진다.
+
+##### 열거된 legal semantic family
+
+**명시 역할 텍스트에서만 나온다.** 토큰 창 점수 · 최근접 날짜 · "가장 그럴듯한 class"를
+쓰지 않는다. block 분해는 `qv_events.html_blocks`를 그대로 쓴다.
+
+```text
+class 정의   authorized to issue ... shares of <NAME>
+             ... divided into ... <NAME> ...
+             ... designated <NAME>
+발효일       effective as of D · shall become/became effective on D ·
+             effective date of/is D · effective on D
+종료         <NAME> 주식이 reclassified / eliminated / cancelled /
+             (전체 class) converted — **명시로 실행된** 것만
+```
+
+단순 언급은 정의가 아니다. 맞지 않으면 `UNRESOLVED`다.
+
+**경제적 발효일로 쓰지 않는 것**: SEC 수리 시각 · filed date · accession 날짜 · report
+date · 서명일 단독 · 최초 관측 filing · 최초 XBRL 등장 · 최초 ticker 등장.
+
+**instrument의 발효일은 문서 수준으로 정확히 하나여야 한다.** 둘 이상이면 어느 것이 그
+행위의 발효일인지 기계로 정할 수 없으므로 아무것도 증명하지 못한다.
+
+명시 미실행 표현(제안 · 승인 대기 · 장래 의사 · 주주총회 대기 · 기준일 · 공고)이 있는
+block은 어떤 finding도 만들지 못한다.
+
+**종료가 아닌 것**: ticker 소멸 · 주식수 0 · 피인수 · 나중 표지에서의 부재 · 현재 SEC
+메타데이터의 부재. 넓은 합병 종료 parser는 이 증분에 없고, 과거 피인수·상장폐지 사례는
+`REVIEW_REQUIRED`로 남아도 된다.
+
+##### B2 — 탄생 증거만으로는 `effective_to = null`이 되지 않는다 (**CLOSED**)
+
+```text
+명시 탄생일 + 발견된 종료 없음   =>   effective_to = null      **금지**
+```
+
+**종료를 못 찾았다는 것은 연속성의 증거가 아니다.** open-ended economic lifetime은 다섯
+조건을 **전부** 만족할 때만 나온다. C3가 이미 쓰는 fail-close continuity 철학과 같다.
+
+```text
+A  명시 CLASS_BIRTH가 정확히 하나 (탄생일이 충돌하면 UNRESOLVED)
+B  current-in-effect **완전** governing snapshot이 그 정확한 N1 class를 정의한다
+C  governing amendment 탐색이 COMPLETE
+D  탄생 이후 모든 governing 후보의 class 영향이 해소됐다
+E  명시 종료가 없다 (있으면 effective_to = 그 종료일이다)
+```
+
+D의 해소 기준이 좁다. **대상 class 이름이 없다는 것은 영향이 없다는 증명이 아니므로**,
+탄생 뒤의 governing 문서는 그 class를 **명시로 정의해야만** 해소된 것으로 센다. 그래서
+중간에 해석되지 않는 amendment가 하나라도 있으면 무기한 수명이 나오지 않는다.
+
+**의도적으로 보수적이다.** 멀쩡한 등록인이 charter 이력 때문에 `REVIEW_REQUIRED`로
+남아도 괜찮다. **coverage 결과로 이 규칙을 약화하지 않는다.**
+
+##### prose alias 구간은 class 수명과 **다른** 사실이다
+
+class 구간을 title 구간으로 복사하지 않는다. 표지 제목의 구간은 **독립된** 법적 사슬이
+만든다.
+
+```text
+탄생 정의에 그 정확한 N1 이름이 있고
+current 완전 governing snapshot에도 같은 정확한 N1 이름이 있고
+amendment 탐색이 COMPLETE
+    -> 그 이름의 open-ended 구간
+```
+
+legal class 이름이 표지 제목과 N1으로 다르면 **동등하다고 추론하지 않고** title 구간을
+만들지 않는다 — 사람 눈에 아무리 관련돼 보여도 그렇다.
+
+표지 제목과 governing 이름이 exact N1으로 같으므로 별도 `GOVERNING_INSTRUMENT` 행은
+**provenance만 다른 중복 production row**다. 이 증분은 그것을 만들지 않는다. 지켜야 하는
+불변식은 하나다 — **class `effective_from`을 덮는, 자기 유효성이 독립적으로 증명된
+canonical bridge가 최소 하나 있다.**
+
+##### 구조화된 legal proof는 packet에 그대로 남는다
+
+SEC 원문을 `RelationInterval`로 바꾼 뒤 **그것이 어떻게 나왔는지를 버리지 않는다.**
+제안 packet에 `legal_evidence_proof`가 기계가 읽는 구조로 실린다.
+
+```text
+LegalEvidenceProof
+    target cik · cover accession/document
+    search status · searched accession receipt · horizon forms
+    documents  (cik · accession · form · document_name · document_role ·
+                acceptance_datetime · source_url · document_sha256 · classification)
+    failures   (실패한 필수 source)
+    classes    (cover class별 legal proof)
+```
+
+SEC HTML 본문은 넣지 않는다. semantic finding마다 결정론적 locator(`block:<ordinal>`)가
+있고 `EvidenceRef.locator`가 그것을 가리킨다.
+
+증거 역할은 정확히 이 이름들이다. 동의어를 늘리지 않는다.
+
+```text
+GOVERNING_CLASS_DEFINITION · CLASS_BIRTH_EFFECTIVE_DATE ·
+CURRENT_GOVERNING_SNAPSHOT · CLASS_TERMINATION_EFFECTIVE_DATE · PROSE_ALIAS_LIFETIME
+```
+
+`usable_from_session`은 여기서 더하지 않는다. 5A-3이 자연키를
+`qv_sec_evidence_documents`에 맞춰 풀고 knowledge availability를 파생시킨다.
+
+##### 생성기와 승격기가 **같은 함수**를 쓴다
+
+```text
+class_evidence_from_legal_proof(legal_evidence_proof, cover_proof) -> ClassEvidence
+```
+
+5A-2 제안 생성과 5A-2c 승격 재검증이 이 순수 함수 하나를 쓴다. 두 곳이 각자 법 규칙을
+들고 있으면 조용히 갈라지고, 그러면 재검증이 아무것도 확인하지 못한다.
+
+이 함수는 저장된 **결론 칸을 믿지 않는다.** `proposal_status` · `reason_codes` ·
+`interval_proved` · `search_status` · `status` · `birth_date`가 아니라
+`documents` · `findings` · `failures`에서 다시 계산한다. 그래서 packet에서 다음을 고쳐도
+승격이 실패한다.
+
+```text
+class effective_from / effective_to · 표지 제목 구간 · governing bridge 구간 ·
+탐색 COMPLETE 상태 · finding의 발효일 · GOVERNING_CLASS_DEFINITION finding 삭제
+```
+
+**승격기는 여전히 네트워크를 부르지 않는다.** 박혀 있는 SEC 문서 SHA와 자연키를 실제
+문서와 맞춰 보는 것은 5A-3 ingest의 일이다.
+
+##### K/Q accession 안의 governing exhibit
+
+governing instrument는 10-K/10-Q accession의 **exhibit**으로 올 수 있다. 그때 중요한 것은
+그 문서의 정확한 정체성과 SHA이므로 `qv_sec_evidence_documents`에 들어간다.
+
+```text
+10-K / 10-K/A / 10-Q / 10-Q/A  PRIMARY   -> 거부 (qv_sec_filings가 filing 정본이다)
+10-K / 10-K/A / 10-Q / 10-Q/A  EXHIBIT   -> 허용 (SEC_EVIDENCE_DOCUMENT)
+```
+
+**`qv_sec_filings`를 넓히지 않는다.** submission row 열거만 form 필터를 선택적으로 받고,
+적재 경로는 기본값(K/Q 계열)을 그대로 쓴다.
+
 #### 5A-2c — 승격 (**CLOSED 정책 · 승격기 코어 구현됨 · production 확장은 아직 없다**)
 
 packet을 `trading/qv/identity/*.jsonl`에 반영하는 유일한 단계다. **5A-2a/b는 이

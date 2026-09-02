@@ -20,9 +20,13 @@ from .qv_submissions import (
 )
 from .qv_xbrl import normalize_cik, sha256
 
-DOCUMENT_ROLES = frozenset({"PRIMARY", "EXHIBIT"})
+PRIMARY_ROLE = "PRIMARY"
+DOCUMENT_ROLES = frozenset({PRIMARY_ROLE, "EXHIBIT"})
 
-# qv_sec_filings가 이미 정본인 form은 여기 중복 저장하지 않는다.
+# **K/Q PRIMARY 문서**만 qv_sec_filings가 정본이라 여기 중복 저장하지 않는다.
+# governing instrument는 10-K/10-Q accession 안의 **exhibit**으로 올 수 있고, 그때는
+# 그 문서의 정확한 정체성·SHA가 중요하므로 여기 들어온다. form 전체를 막으면 그
+# exhibit이 증거가 될 길이 사라진다.
 KQ_FORMS = frozenset({"10-K", "10-K/A", "10-Q", "10-Q/A"})
 
 
@@ -57,12 +61,13 @@ def register_evidence_document(
     form = str(form).strip()
     if not accession or not document_name or not form:
         raise QVEvidenceError("accession·document_name·form은 비울 수 없습니다")
-    if form in KQ_FORMS:
-        raise QVEvidenceError(
-            f"K/Q 계열은 qv_sec_filings가 정본이라 여기 중복 저장하지 않습니다: {form}"
-        )
     if document_role not in DOCUMENT_ROLES:
         raise QVEvidenceError(f"모르는 document_role입니다: {document_role!r}")
+    if form in KQ_FORMS and document_role == PRIMARY_ROLE:
+        raise QVEvidenceError(
+            "K/Q PRIMARY 문서는 qv_sec_filings가 정본이라 여기 중복 저장하지 "
+            f"않습니다: {form}"
+        )
 
     if document_sha256 is None:
         if document_bytes is None:

@@ -13,6 +13,7 @@ manifest 승격은 5A-2c가 따로 한다 — 결정론적 재검증을 통과�
     python3 -m selftest.qv_identity_proposal_run run \
         --inventory <5A-1.json> \
         --symbols AAA,BBB [--limit 5] [--browse] [--historical] \
+        [--legal-evidence] \
         [--contact "이름 <메일>"] [--out /tmp/proposals.json]
 
 `run`은 **실제 SEC를 부른다.** 대상은 `--symbols`로 명시하거나 `--limit`으로 5A-1
@@ -25,6 +26,12 @@ inventory가 명시한 `universe_source`/`universe_source_version`/`index_name`�
 `universe_membership`에서 읽는다. **지금 ticker 주인의 이름으로 과거를 추정하지
 않는다.** 이름 색인은 40MB 한 번이고 선행 등록인 확인은 종목당 제출 이력을 훑는다 —
 비싸므로 기본이 아니다.
+
+`--legal-evidence`는 5A-2 법적 증거 공급기를 켠다. 표지 증명이 선 뒤 선언된 지평
+(8-K · 10-K · 10-Q 계열)의 accession index를 전부 읽고 governing instrument 후보를
+분류·해석해 **명시 법적 사실만** `ClassEvidence`로 만든다. **SEC 호출이 크게 늘어난다**
+— 기본값은 더 싼 표지 전용 경로 그대로다. 후보 CIK가 확정되지 않았거나 쓸 만한 표지
+제목 anchor가 없으면 돌지 않는다.
 
 **universe/bar 심볼은 SEC 경제적 심볼이 아니다.** 작업 항목은 `member_symbol`(저장된
 시장 데이터 계열)과 `identity_symbol`(실제 거래 심볼)을 둘 다 들고 다니고 SEC에는
@@ -163,6 +170,30 @@ def build_hints(demand_input: DemandInput, data_dir=None) -> DiscoveryHints:
     )
 
 
+def _print_legal(item) -> None:
+    """법적 증거 receipt를 한 줄씩 보인다. **없으면 아무것도 찍지 않는다.**"""
+    legal = item.legal_evidence_proof
+    if not legal:
+        return
+    print(
+        f"      legal search={legal['search_status']}"
+        f" accessions={len(legal['searched_accessions'])}"
+        f" outside_horizon={legal['accessions_outside_horizon']}"
+        f" documents={len(legal['documents'])}"
+        f" failures={len(legal['failures'])}"
+    )
+    for entry in legal["classes"]:
+        print(
+            f"      {entry['member_key']:34s} {entry['status']:11s}"
+            f" birth={entry['birth_date'] or '-'}"
+            f" end={entry['termination_date'] or ('null' if entry['open_ended'] else '-')}"
+            f" snapshot={entry['snapshot_accession'] or '-'}"
+            f" findings={len(entry['findings'])}"
+        )
+        for note in entry["notes"]:
+            print(f"        - {note}")
+
+
 def _print_provenance(demand_input: DemandInput) -> None:
     for key, value in demand_input.provenance_json().items():
         print(f"  {key}: {value}")
@@ -202,6 +233,7 @@ def stage_run(arguments) -> int:
         companies=companies,
         use_browse=arguments.browse,
         hints=hints,
+        legal_evidence=arguments.legal_evidence,
     )
     payload = run.as_json()
     payload["git_commit"] = _git_commit()
@@ -237,6 +269,7 @@ def stage_run(arguments) -> int:
             f" origins={origins}"
             f" reasons={','.join(item.reason_codes) or '-'}"
         )
+        _print_legal(item)
     print(f"SEC calls: {client.calls}")
     return 0
 
@@ -253,6 +286,7 @@ def main() -> int:
     runner.add_argument("--limit", type=int, default=None)
     runner.add_argument("--browse", action="store_true")
     runner.add_argument("--historical", action="store_true")
+    runner.add_argument("--legal-evidence", action="store_true")
     runner.add_argument("--data-dir", default=None)
     runner.add_argument("--contact", default=None)
     runner.add_argument("--out", default=None)

@@ -23,7 +23,7 @@ MISSING = "MISSING"
 AMBIGUOUS = "AMBIGUOUS"
 
 _REQUIRED_COLUMNS = ("accessionNumber", "form", "filingDate")
-_OPTIONAL_COLUMNS = ("reportDate", "acceptanceDateTime", "primaryDocument")
+_OPTIONAL_COLUMNS = ("reportDate", "acceptanceDateTime", "primaryDocument", "items")
 _ACCESSION_PATTERN = re.compile(r"^\d{10}-\d{2}-\d{6}$")
 _ACCEPTANCE_PATTERN = re.compile(
     r"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$"
@@ -50,6 +50,9 @@ class SubmissionRow:
     acceptance_eastern_date: str | None
     primary_document: str | None
     submissions_file: str
+    # 8-K의 구조화된 항목 번호(`5.03,9.01`). K/Q 적재 경로는 쓰지 않고, governing
+    # instrument 탐색이 "이 8-K가 정관 변경을 알린다"를 **명시 metadata로** 볼 때 쓴다.
+    items: str | None = None
 
 
 @dataclass(frozen=True)
@@ -161,9 +164,15 @@ def _column(block: dict, name: str, *, required: bool, count: int | None) -> lis
 
 
 def parse_submission_rows(
-    block: object, *, submissions_file: str
+    block: object, *, submissions_file: str, forms=ALLOWED_FORMS
 ) -> tuple[SubmissionRow, ...]:
-    """compact columnar block을 검증한 뒤 허용 form의 row만 만든다."""
+    """compact columnar block을 검증한 뒤 요청한 form의 row만 만든다.
+
+    **기본값은 K/Q 계열 그대로다.** `qv_sec_filings` 적재 경로의 동작은 바뀌지 않는다.
+    `forms=None`이면 form을 거르지 않는다 — governing instrument 탐색이 8-K 같은 다른
+    form을 열거해야 하는데, 그렇다고 `qv_sec_filings`를 범용 SEC filing 창고로
+    넓히지는 않는다.
+    """
     if not isinstance(block, dict):
         raise QVSubmissionsError(
             f"submissions block이 객체가 아닙니다: {submissions_file}"
@@ -199,7 +208,7 @@ def parse_submission_rows(
             columns["acceptanceDateTime"][index]
         )
         primary_document = _optional(columns["primaryDocument"][index])
-        if form in ALLOWED_FORMS:
+        if forms is None or form in forms:
             rows.append(
                 SubmissionRow(
                     accession=accession,
@@ -210,6 +219,7 @@ def parse_submission_rows(
                     acceptance_eastern_date=_acceptance_eastern_date(acceptance),
                     primary_document=primary_document,
                     submissions_file=submissions_file,
+                    items=_optional(columns["items"][index]),
                 )
             )
     return tuple(rows)
@@ -300,8 +310,13 @@ def _historical_usable_session(
 
 
 def _submissions_rows(
-    client: EdgarClient, cik: str
+    client: EdgarClient, cik: str, *, forms=ALLOWED_FORMS
 ) -> tuple[SubmissionRow, ...]:
+    """recent + archive submission row. **form 필터만 선택적이다.**
+
+    `forms=None`이면 전부 열거한다. 적재 경로는 기본값을 쓰므로 `qv_sec_filings`는
+    여전히 K/Q 계열만 담는다.
+    """
     payload = client.submissions(cik)
     filings = payload.get("filings")
     if not isinstance(filings, dict):
@@ -310,7 +325,7 @@ def _submissions_rows(
     if not isinstance(recent, dict):
         raise QVSubmissionsError(f"submissions recent가 객체가 아닙니다: {cik}")
     rows = list(
-        parse_submission_rows(recent, submissions_file=f"CIK{cik}.json")
+        parse_submission_rows(recent, submissions_file=f"CIK{cik}.json", forms=forms)
     )
     files = filings.get("files", [])
     if not isinstance(files, list):
@@ -322,7 +337,7 @@ def _submissions_rows(
             )
         name = _required(metadata.get("name"), f"filings.files[{index}].name")
         archive = client.submissions_archive(name)
-        rows.extend(parse_submission_rows(archive, submissions_file=name))
+        rows.extend(parse_submission_rows(archive, submissions_file=name, forms=forms))
     return tuple(rows)
 
 

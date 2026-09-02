@@ -190,8 +190,9 @@ class EvidenceRef:
 class CoverClass:
     """cover page의 class 축 member 하나에서 읽은 사실.
 
-    axis/member QName을 문자열 키로만 남기지 않고 namespace까지 보존한다 —
-    XBRL alias 제안이 prefix가 아니라 namespace로 서야 하기 때문이다.
+    axis/member QName을 문자열 키로만 남기지 않고 namespace까지 보존한다 — 그것은
+    provenance이지 production identity 행이 아니다(C2 이후 QName -> class는 accession
+    단위 파생 관측이다).
     """
 
     member_key: str
@@ -461,16 +462,18 @@ def extract_cover_proof(
 class RelationInterval:
     """관계 하나의 유효구간. **이 모듈은 이것을 절대 추론하지 않는다.**
 
-    명시 증거와 함께 들어올 때만 존재한다. **세 관계의 구간은 서로 다른 사실이다.**
+    명시 증거와 함께 들어올 때만 존재한다. **두 관계의 구간은 서로 다른 사실이다.**
 
     ```text
-    economic class 수명  !=  XBRL alias 수명  !=  prose alias 수명
+    economic class 수명  !=  prose alias 수명
     ```
 
-    class가 X부터 존재한다는 것은 특정 XBRL QName이나 prose 철자가 X부터 그 class를
-    가리켰다는 증명이 **아니다.** class 구간을 alias 구간으로 복사하지 않는다.
-    최초/최종 관측 filing을 alias 수명으로 쓰지 않고, 수리 시각을 경제적 유효성으로
-    바꾸지도 않는다.
+    C2 이후 이 문맥의 production identity 관계는 그 둘뿐이다 — XBRL QName -> class는
+    production 관계가 아니라 accession 단위 파생 관측이다(`qv_xbrl_binding`).
+
+    class가 X부터 존재한다는 것은 특정 prose 철자가 X부터 그 class를 가리켰다는 증명이
+    **아니다.** class 구간을 alias 구간으로 복사하지 않는다. 최초/최종 관측 filing을
+    alias 수명으로 쓰지 않고, 수리 시각을 경제적 유효성으로 바꾸지도 않는다.
     """
 
     effective_from: str
@@ -541,7 +544,8 @@ class ProseBridgeInput:
 class ClassEvidence:
     """cover class 하나에 대한 **명시** 구간·bridge 증거.
 
-    세 칸이 전부 독립이다. 하나를 채웠다고 나머지가 채워지지 않는다.
+    세 칸이 전부 독립이다. 하나를 채웠다고 나머지가 채워지지 않는다 — 특히
+    `class_interval`을 `cover_title_interval`로 복사하지 않는다.
 
     **XBRL alias 구간은 여기 없다.** QName -> class는 production identity 관계가 아니고
     accession 단위 binding이 따로 답한다.
@@ -685,6 +689,11 @@ class SymbolProposal:
     prose_alias_proposals: tuple[ProseAliasProposal, ...]
     conflicts: tuple[str, ...] = ()
     unresolved_questions: tuple[str, ...] = ()
+    # **구조화된 법적 원증거.** SEC 원문을 `RelationInterval`로 바꾼 뒤 그것이 어떻게
+    # 나왔는지를 버리지 않는다. 승격기가 이 구조에서 같은 `ClassEvidence`를 다시
+    # 파생시켜 packet의 구간과 대조한다 — `proposal_status` · `reason_codes` ·
+    # `interval_proved`를 권한으로 삼지 않는다. 기계가 읽는 구조이고 산문이 아니다.
+    legal_evidence_proof: dict | None = None
 
     def as_json(self) -> dict:
         return {
@@ -704,6 +713,7 @@ class SymbolProposal:
             "prose_alias_proposals": [item.as_json() for item in self.prose_alias_proposals],
             "conflicts": list(self.conflicts),
             "unresolved_questions": list(self.unresolved_questions),
+            "legal_evidence_proof": self.legal_evidence_proof,
         }
 
 
@@ -1004,9 +1014,12 @@ def _class_packets(
 ) -> tuple[tuple[ShareClassProposal, ...], tuple[ProseAliasProposal, ...]]:
     """cover page가 실제로 증명한 것만 제안으로 만든다.
 
-    **세 관계의 구간을 따로 받는다.** 표지는 셋 중 어느 것의 유효구간도 증명하지
-    않는다. `class_evidence`로 명시 증거가 들어온 관계만 값이 차고 나머지는 `None`으로
-    남는다. **class 구간을 alias 구간으로 복사하지 않는다.**
+    **두 production 관계의 구간을 따로 받는다.** 표지는 둘 중 어느 것의 유효구간도
+    증명하지 않는다. `class_evidence`로 명시 증거가 들어온 관계만 값이 차고 나머지는
+    `None`으로 남는다. **class 구간을 alias 구간으로 복사하지 않는다.**
+
+    **표지 제목은 자기 구간이 있을 때만 production prose 행이 된다**(B1). 없으면
+    관측으로만 남고, 제안되지 않은 관계에 "구간 없음" 사유가 붙지 않는다.
 
     **구간 증거를 관계 증거에 섞지 않는다.** 관계 증거(표지 fact)는 "그 filing 시점에
     이 관계가 있었다"를 증명하고, 구간 증거는 **수명 경계**를 증명한다. 하나로 합치면
@@ -1052,7 +1065,14 @@ def _class_packets(
             )
         )
 
-        if item.security_title:
+        # **B1 — 표지 제목은 관측이지 자동으로 temporal production alias가 아니다.**
+        # 표지는 "그 accession이 이 증권을 이렇게 불렀다"를 증명하지 "그 철자가 class
+        # 수명 내내 유효한 alias였다"를 증명하지 않는다. 그래서 자기 구간이 **독립적으로**
+        # 증명됐을 때만 production prose 행이 된다. 구간이 없으면 제목은
+        # `CoverPageProof`에 그대로 남고(요구 심볼·등록 증권 정체성·filing-local 제목·
+        # legal 공급기의 anchor를 계속 증명한다) **제안 행은 만들지 않는다** — 애초에
+        # 제안될 자격이 없던 관계에 가짜 "구간 없음" 사유를 붙이지 않기 위해서다.
+        if item.security_title and supplied.cover_title_interval is not None:
             title_interval = supplied.cover_title_interval
             title_evidence = _evidence_for(
                 proof,
@@ -1088,7 +1108,14 @@ def _class_packets(
                     bridge_type=bridge.bridge_type,
                     interval=bridge.interval,
                     provenance=f"명시 {bridge.bridge_type} 증거",
-                    evidence=tuple(bridge.interval.evidence),
+                    # 구간이 없는 bridge는 **제안은 되지만 아무것도 증명하지 못한다.**
+                    # 조용히 버리면 packet에서 사라지고, 여기서 터지면 어느 관계가
+                    # 모자란지 검토자가 못 본다. 그 자리를 남겨 두고
+                    # `PROSE_ALIAS_INTERVAL_NOT_EXPLICIT`가 막게 한다.
+                    evidence=(
+                        tuple(bridge.interval.evidence)
+                        if bridge.interval is not None else ()
+                    ),
                 )
             )
 
@@ -1117,6 +1144,7 @@ def build_symbol_proposal(
     proof_absence_reason: str | None = None,
     class_evidence: dict[str, ClassEvidence] | None = None,
     successor_judgement_required: bool = False,
+    legal_evidence_proof: dict | None = None,
 ) -> SymbolProposal:
     """작업 항목 하나의 제안 packet을 만든다. **manifest를 읽지도 쓰지도 않는다.**
 
@@ -1335,6 +1363,7 @@ def build_symbol_proposal(
         prose_alias_proposals=prose_proposals,
         conflicts=tuple(conflicts),
         unresolved_questions=tuple(questions),
+        legal_evidence_proof=legal_evidence_proof,
     )
 
 
@@ -1725,10 +1754,17 @@ def run_proposals(
     hints: DiscoveryHints | None = None,
     name_index=None,
     class_evidence: dict[tuple[str, str], dict[str, ClassEvidence]] | None = None,
+    legal_evidence: bool = False,
 ) -> ProposalRun:
     """수요 작업 항목마다 발견 → SEC 증명 → 제안 packet을 만든다.
 
     `class_evidence`의 키는 작업 항목 키 `(member_symbol, identity_symbol)`이다.
+
+    `legal_evidence=True`면 표지 증명 뒤에 governing instrument 탐색을 **추가로**
+    돌린다(SEC 호출이 크게 늘어난다). 기본값은 더 싼 표지 전용 경로 그대로다.
+    후보 CIK가 하나로 정해지지 않았거나 쓸 만한 표지 제목 anchor가 없으면 돌리지
+    않는다 — 던질 대상이 없기 때문이다. 호출자가 직접 넘긴 `class_evidence`가 있으면
+    그쪽이 이긴다.
 
     **manifest 파일을 읽지도 쓰지도 않는다.** 발견은 넓게 하되(현재 ticker map ·
     `CIK_OVERRIDES` · browse-EDGAR · 구간 이름 색인 · 선행 등록인) 그 결과는 전부
@@ -1787,6 +1823,7 @@ def run_proposals(
 
         proof = None
         absence = None
+        legal_proof_json = None
         tried: tuple[str, ...] = ()
         if len(distinct) == 1:
             # **요구 심볼을 들고 들어간다.** 어느 표지가 그 심볼의 증명인지는 대조
@@ -1797,14 +1834,34 @@ def run_proposals(
         elif len(distinct) > 1:
             absence = "후보 CIK가 확정되지 않아 증명을 시도하지 않았습니다"
         attempts.append((work_item.member_symbol, symbol, tried))
+
+        supplied = dict((class_evidence or {}).get(work_item.key) or {})
+        if legal_evidence and proof is not None and any(
+            item.security_title for item in proof.classes
+        ):
+            # 순환 import 회피 — 법적 증거 공급기가 이 모듈의 자료형을 쓴다.
+            from . import qv_identity_legal_evidence as legal  # noqa: PLC0415
+
+            collected = legal.collect_legal_evidence(
+                client, cik=proof.cik, cover_proof=proof
+            )
+            legal_proof_json = collected.as_json()
+            # **생성기와 승격기가 같은 함수를 쓴다.** 여기서 다른 규칙을 만들지 않는다.
+            derived = legal.class_evidence_from_legal_proof(
+                legal_proof_json, cover_proof=proof
+            )
+            derived.update(supplied)
+            supplied = derived
+
         proposals.append(
             build_symbol_proposal(
                 work_item=work_item,
                 candidates=candidates,
                 proof=proof,
                 proof_absence_reason=absence,
-                class_evidence=(class_evidence or {}).get(work_item.key),
+                class_evidence=supplied or None,
                 successor_judgement_required=successor_judgement,
+                legal_evidence_proof=legal_proof_json,
             )
         )
 

@@ -69,6 +69,7 @@ from .qv_identity_proposals import (
     cover_classes_for_symbol,
     cover_proof_from_json,
 )
+from .qv_identity_legal_evidence import class_evidence_from_legal_proof
 from .qv_manifest import (
     EVIDENCE_DEPENDENCIES,
     EVIDENCE_SOURCE_KINDS,
@@ -391,6 +392,77 @@ class PromotablePacket:
         return f"{self.member_symbol}->{self.identity_symbol}"
 
 
+# ── 법적 증거 재검증 — **생성기와 같은 함수를 다시 돌린다** ──────────────────
+
+
+def _assert_legal_projection(
+    label: str,
+    packet: dict,
+    cover_proof,
+    member_of: dict[str, str],
+    class_rows: list[dict],
+    prose_rows: list[dict],
+) -> None:
+    """packet에 구조화된 법적 증명이 있으면 **거기서 구간을 다시 파생시켜 대조한다.**
+
+    `proposal_status` · `reason_codes` · `interval_proved`를 권한으로 삼지 않는다.
+    `class_evidence_from_legal_proof`는 5A-2 제안 생성이 쓴 것과 **같은 함수**이고,
+    저장된 결론 칸이 아니라 `documents` · `findings` · `failures`에서 다시 계산한다.
+    그래서 누가 packet의 `effective_from`/`effective_to`/표지 제목 구간/탐색 상태를
+    고쳐도 여기서 어긋난다.
+
+    **네트워크를 부르지 않는다.** 문서 SHA와 자연키를 실제 SEC 문서와 맞춰 보는 것은
+    5A-3 ingest의 일이다.
+    """
+    legal = packet.get("legal_evidence_proof")
+    if legal is None:
+        return
+    if not isinstance(legal, dict):
+        raise QVPromotionError(f"{label}: legal_evidence_proof가 객체가 아닙니다")
+
+    expected = class_evidence_from_legal_proof(legal, cover_proof=cover_proof)
+
+    def bounds(interval):
+        return (interval.effective_from, interval.effective_to)
+
+    derived_classes = {
+        member_of[row["proposal_class_id"]]: (row["effective_from"], row["effective_to"])
+        for row in class_rows
+    }
+    expected_classes = {
+        member: bounds(item.class_interval)
+        for member, item in expected.items()
+        if item.class_interval is not None
+    }
+    if derived_classes != expected_classes:
+        raise QVPromotionError(
+            f"{label}: class 구간이 구조화된 법적 증명에서 다시 파생한 값과 다릅니다\n"
+            f"  packet {sorted(derived_classes.items())}\n"
+            f"  legal  {sorted(expected_classes.items())}"
+        )
+
+    derived_prose: dict[tuple[str, str], tuple[str, str | None]] = {}
+    for row in prose_rows:
+        member = member_of[row["proposal_class_id"]]
+        key = (member, row["bridge_type"])
+        if key in derived_prose:
+            raise QVPromotionError(
+                f"{label}: 같은 class·bridge의 prose 행이 둘입니다: {key}"
+            )
+        derived_prose[key] = (row["effective_from"], row["effective_to"])
+    expected_prose = {
+        (member, SECURITY_TITLE_FACT): bounds(item.cover_title_interval)
+        for member, item in expected.items()
+        if item.cover_title_interval is not None
+    }
+    if derived_prose != expected_prose:
+        raise QVPromotionError(
+            f"{label}: prose alias 구간이 구조화된 법적 증명에서 다시 파생한 값과 "
+            f"다릅니다\n  packet {sorted(derived_prose.items())}\n"
+            f"  legal  {sorted(expected_prose.items())}"
+        )
+
+
 def revalidate_packet(packet: dict) -> PromotablePacket:
     """**`proposal_status`를 믿지 않고** packet을 처음부터 다시 본다.
 
@@ -621,6 +693,10 @@ def revalidate_packet(packet: dict) -> PromotablePacket:
                 f"alias {alias['effective_from']}..{alias['effective_to']} vs "
                 f"class {outer['effective_from']}..{outer['effective_to']}"
             )
+
+    _assert_legal_projection(
+        label, packet, rebuilt, member_of, class_rows, prose_rows
+    )
 
     # ── canonical bridge — 모든 보통주 class에 하나씩 ────────────────────────
     for row in class_rows:

@@ -2526,6 +2526,246 @@ Python 테스트를 돌리지 않는다. 위 숫자는 전부 로컬 실측이�
 
 ---
 
+## 10.20 5A-2 법적 증거 공급기 — B1/B2 CLOSED · 구조화된 proof · 승격 재검증 — 2026-09-02
+
+5A-2의 병목은 더 이상 identity 아키텍처가 아니었다. 제안 경로는 이미 작업 항목마다
+`ClassEvidence`를 받고 승격기도 구현·검토가 끝나 있었다. 빠진 것은 **SEC 원문의 명시
+법적 증거를 읽어 그 원문이 실제로 증명하는 것만 `ClassEvidence`로 만드는 좁은 공급기**
+하나였다. 이번에 그것을 넣었다. **production identity manifest는 바꾸지 않았다.**
+
+### 사용자 결정 두 개를 CLOSED로 구현했다
+
+**B1 — 표지 제목은 filing 관측이지 자동으로 temporal production alias가 아니다.**
+`Security12bTitle`은 "그 accession이 그 증권을 그렇게 불렀다"를 증명하지 "그 철자가
+class 수명 내내 유효했다"를 증명하지 않는다. 그래서 `_class_packets()`가 바뀌었다.
+
+```text
+제목 있음 + cover_title_interval 있음  ->  SECURITY_TITLE_FACT production 제안
+제목 있음 + cover_title_interval 없음  ->  CoverPageProof에만 남고 제안 행이 없다
+```
+
+구간 없는 제목은 제안되지 않으므로 `PROSE_ALIAS_INTERVAL_NOT_EXPLICIT`도 붙지 않는다 —
+애초에 production 관계가 될 자격이 없던 것에 가짜 사유를 만들지 않는다. 그 사유는
+**실제로 제안된** prose 관계에만 남아 있고(테스트로 잠갔다), package는 canonical bridge가
+없어 `REVIEW_REQUIRED`로 남는다.
+
+**B2 — 탄생 증거만으로는 `effective_to = null`이 되지 않는다.** 종료를 못 찾았다는
+것은 연속성의 증거가 아니다. 다섯 조건을 전부 만족해야 무기한 수명이 나온다.
+
+```text
+A  명시 CLASS_BIRTH 정확히 하나 (충돌하면 UNRESOLVED)
+B  current-in-effect 완전 governing snapshot이 그 정확한 N1 class를 정의한다
+C  governing amendment 탐색이 COMPLETE
+D  탄생 이후 모든 governing 후보의 class 영향이 해소됐다
+E  명시 종료가 없다 (있으면 effective_to = 그 종료일)
+```
+
+D의 해소 기준이 좁다 — **대상 class 이름의 부재는 영향 없음의 증명이 아니므로** 탄생 뒤
+governing 문서는 그 class를 명시로 정의해야만 해소된 것으로 센다.
+
+### 새 모듈 — `backtest/qv_identity_legal_evidence.py`
+
+```text
+SEC submission/accession 문서 -> 명시 legal 사실 -> 구조화된 proof -> ClassEvidence
+```
+
+자동 anchor는 **정확한 N1 동일성 하나**다(`N1(표지 제목) == N1(governing class 이름)`).
+XBRL member 철자 · class 글자 유사도 · sibling 순서 · ticker/액면가 유사도 · 주식수 ·
+`COVER_GROUP_LABEL` · 근사 prose 유사도로 잇지 않는다. 제목 없는 sibling은 charter가
+같은 이름을 정의해도 연결되지 않고 `REVIEW_REQUIRED`로 남는다.
+
+semantic family는 열거돼 있다 — 정의 3종(`authorized to issue` · `divided into` ·
+`designated`), 발효일 4종(`effective as of` · `becomes/became effective on` ·
+`effective date of/is` · `effective on`), 종료 4종(reclassified · eliminated/cancelled ·
+전체 class converted). block 분해는 `qv_events.html_blocks`를 그대로 쓴다. 토큰 창
+점수 · 최근접 날짜 · "가장 그럴듯한 class"가 없다.
+
+**instrument 발효일은 문서 수준으로 정확히 하나여야 한다.** 둘 이상이면 어느 것이 그
+행위의 발효일인지 기계로 정할 수 없어 아무것도 증명하지 못한다.
+
+### 실측이 드러낸 defect 셋 — 전부 고쳤다
+
+**1. `index.json`의 `type`은 문서 종류가 아니라 아이콘 이름이다.**
+
+```text
+{"name": "d395522dex31.htm", "type": "text.gif"}
+```
+
+처음 구현은 `type.startswith("EX-3")`으로 governing exhibit을 찾았는데, 실 SEC에서 그
+값은 `text.gif`·`compressed.gif`라 **EX-3 exhibit이 하나도 발견되지 않았다**(ABMD 385
+accession에서 governing 문서 2건). 문서별 `<TYPE>`·`<FILENAME>`·`<SEQUENCE>`와 8-K
+`<ITEMS>`는 accession의 SGML header 색인(`<accession>-index-headers.html`)에만 구조화돼
+있다. `EdgarClient.accession_header_index()`와 `parse_accession_header()`로 바꾼 뒤
+ABMD의 governing 문서가 13건이 됐다.
+
+**2. `EX-3` 문자열 prefix 비교가 SOX 인증서를 끌어왔다.** `"EX-31.1".startswith("EX-3")`이
+참이라 `EX-31.1`·`EX-32.1`이 전부 governing 후보가 됐고, 분류 불가로 ABMD 385건 중
+**102건이 실패**해 멀쩡한 등록인이 통째로 INCOMPLETE가 됐다. 전시번호 3 뒤에 다른 숫자가
+붙지 않는 것만 받도록 고쳤다(`EX-3` · `EX-3.1` · `EX-3.2.1` · `EX-3(i)` 통과,
+`EX-31.1` · `EX-32.1` · `EX-30` 탈락).
+
+**3. 2001년 이전 flat layout이 조용히 COMPLETE를 만들 뻔했다.** 그 시기 accession에는
+`-index-headers.html`이 없고(HTTP 404) complete submission의 `<DOCUMENT>` 블록에
+`<FILENAME>`이 없다. 폴백만 두면 "선언된 문서 0건 = 후보 없음"이 되어 그 시기 governing
+instrument를 하나도 안 본 채 무기한 수명이 만들어진다. **파일 이름 없이 선언된 문서 수를
+세어 `legacy_layout` 실패로 적는다** — 후보 0건과 명시적으로 구분한다.
+
+### 탐색 closure와 지평
+
+`COMPLETE`는 선언된 지평(`8-K` · `10-K` · `10-Q` 계열)이 요구하는 accession/문서를 전부
+열거하고 모든 governing 후보를 받아 분류했다는 뜻이다. submissions archive 실패 ·
+header 색인 실패 · 문서 fetch 실패 · 분류 불가 후보 · legacy layout 중 하나라도 있으면
+`INCOMPLETE`이고, 그 상태로는 어떤 구간도 나오지 않는다. 건수·연도 상한은 correctness
+규칙으로 쓰지 않는다. **지평 밖 form은 `accessions_outside_horizon`에 수량으로 남는다.**
+
+### 구조화된 proof와 승격 재검증 — 함수가 하나다
+
+제안 packet에 `legal_evidence_proof`가 기계가 읽는 구조로 실린다(문서 자연키·form·
+document_role·acceptance·source_url·SHA·분류, finding별 `block:<ordinal>` locator,
+실패 목록, cover class별 proof). SEC HTML 본문은 넣지 않는다.
+
+```text
+class_evidence_from_legal_proof(legal_evidence_proof, cover_proof) -> ClassEvidence
+```
+
+5A-2 제안 생성과 5A-2c 승격 재검증이 **이 순수 함수 하나**를 쓴다. 저장된 결론 칸
+(`proposal_status` · `reason_codes` · `interval_proved` · `search_status` · `status` ·
+`birth_date`)을 믿지 않고 `documents` · `findings` · `failures`에서 다시 계산한다.
+승격기는 여전히 네트워크를 부르지 않는다.
+
+### K/Q exhibit 증거 원장
+
+`register_evidence_document`가 form만 보고 K/Q를 통째로 거부하던 것을 좁혔다. governing
+instrument는 10-K/10-Q accession의 **exhibit**으로 올 수 있고 그때는 그 문서의 정확한
+정체성·SHA가 중요하다.
+
+```text
+K/Q PRIMARY  -> 거부 (qv_sec_filings가 filing 정본이다)
+K/Q EXHIBIT  -> 허용 (SEC_EVIDENCE_DOCUMENT)
+```
+
+`qv_sec_filings`는 넓히지 않았다. submission row 열거만 `forms` 필터를 선택적으로 받고
+적재 경로는 기본값(K/Q 계열)을 그대로 쓴다.
+
+### 회귀 — 36개 요구를 network-free fixture로 잠갔다
+
+`tests/test_qv_identity_legal_evidence.py`(56건). 축별로:
+
+```text
+B1        구간 없는 표지 제목은 관측으로만 남고 production 행이 되지 않는다 ·
+          가짜 PROSE_ALIAS_INTERVAL_NOT_EXPLICIT가 생기지 않는다 ·
+          canonical bridge가 없어 REVIEW_REQUIRED로 남는다
+탄생      정확한 N1 정의 + 명시 발효일이 있어야 탄생이다 · 발효일 없으면 탄생이 아니다 ·
+          수리 시각/최초 관측 filing이 탄생일이 되지 않는다 · XBRL member 철자로
+          class 이름을 만들지 않는다 · 근사 제목으로 잇지 않는다 · 탄생일 충돌은 UNRESOLVED
+B2        탄생만으로 null이 안 된다 · 탐색 INCOMPLETE면 null이 안 된다 ·
+          탄생+current snapshot+COMPLETE면 null이다 · 해소되지 않는 중간 governing
+          변경이 막는다 · 다른 class 언급은 negative 증거가 아니다 ·
+          index 실패/문서 fetch 실패/분류 불가/legacy layout이 INCOMPLETE를 만든다 ·
+          임의 N건 뒤에 멈추지 않는다(관련 증거를 20건 너머에 뒀다)
+유한      명시 실행 종료 + 발효일이 유한 구간을 만든다 · 제안/장래 의사는 종료가 아니다 ·
+          ticker 소멸과 나중 표지에서의 부재는 종료가 아니다
+prose     exact-N1 법적 사슬이 title 구간을 독립적으로 증명한다 · 다른 N1 governing
+          이름은 표지 제목 구간을 상속하지 않는다 · class 구간을 prose로 복사하지 않는다
+sibling   제목 없는 sibling은 XBRL member 철자로 연결되지 않는다 ·
+          모든 보통주 sibling에 여전히 canonical bridge가 필요하다
+discovery EX-3 exhibit만 받고 나머지는 fetch하지 않는다 · ITEMS 5.03 primary를 받는다 ·
+          5.03 없는 8-K는 primary 후보가 없다 · SOX 인증서는 후보가 아니다 ·
+          index.json 아이콘 type을 문서 종류로 쓰지 않는다
+receipt   COMPLETE의 결정론적 탐색 receipt · INCOMPLETE의 실패 source ·
+          결정론적 직렬화 · submissions 실패 fail-close
+승격      무변조 packet은 승격된다(임시 manifest) · effective_from 변조 실패 ·
+          증명이 종료를 말하는데 null이면 실패 · 표지 제목 구간 변조 실패 ·
+          지어낸 prose bridge 실패 · 실패가 박힌 채 COMPLETE로 고치면 실패 ·
+          finding 발효일 변조 실패 · 정의 finding 삭제 실패
+원장      K/Q PRIMARY 거부 유지 · K/Q EXHIBIT 허용
+실행      기본 경로는 legal 탐색을 돌리지 않는다 · opt-in이 ClassEvidence를 공급한다 ·
+          표지 제목 anchor가 없으면 돌지 않는다
+```
+
+### 로컬 Python 실측 (2026-09-02)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_identity_legal_evidence` | 56 OK (신규) |
+| `test_qv_identity_proposals` | 103 OK |
+| `test_qv_identity_promotion` | 60 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| `test_qv_xbrl_binding` | 35 OK |
+| `test_qv_step4` | 138 OK |
+| `test_qv_submissions` | 48 OK |
+| **전체 trading suite** | **1,797 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — `.github/workflows/docker.yml` 하나뿐이고
+Python 테스트를 돌리지 않는다. 위 숫자는 전부 로컬 실측이다. CI를 이것 때문에 고치지
+않았다.
+
+### 실제 SEC read-only smoke (2026-09-02)
+
+5A-1 inventory(SP500 · `announcements/eodhd-15y-2026-08` ·
+`qv-identity-sha256:6124124…`)에서 pilot 5종목을 `--historical --legal-evidence`로 돌렸다.
+**어느 packet도 승격하지 않았다.**
+
+| 항목 | CIK | 표지 accession | legal 탐색 | 탄생 | snapshot | 종료 | class/prose 구간 | 최종 | SEC 호출 |
+|---|---|---|---|---|---|---|---|---|---|
+| AAPL | 0000320193 | `0000320193-26-000020` | INCOMPLETE(legacy 43) | 없음 | 없음 | 없음 | 0 / 0 | REVIEW_REQUIRED | 615 |
+| FOXA | 0001754301 | `0001628280-26-053960` | INCOMPLETE(분류 1) | 없음 | 없음 | 없음 | 0 / 0 | REVIEW_REQUIRED | 258 |
+| CELG | 0000816284 | `0000816284-19-000046` | INCOMPLETE(legacy 42) | 없음 | 없음 | 없음 | 0 / 0 | REVIEW_REQUIRED | 698 |
+| LEH | 0000806085 | (없음) | 미실행 | — | — | — | 0 / 0 | REVIEW_REQUIRED | 115 |
+| ABMD | 0000815094 | `0000950170-22-021880` | INCOMPLETE(legacy 30) | 없음 | 없음 | 없음 | 0 / 0 | REVIEW_REQUIRED | 671 |
+
+사유 코드: AAPL·CELG는 `CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT` ·
+`CLASS_INTERVAL_NOT_EXPLICIT` · `DEMANDED_CLASS_NOT_PROVED_ORDINARY_COMMON` ·
+`SIBLING_CLASS_CENSUS_UNCLEAR`, FOXA·ABMD는 앞의 둘, LEH는
+`DISCOVERY_ONLY_NO_SEC_PROOF` · `NO_COVER_PAGE_PROOF_DOCUMENT`(표지 증명 자체가 없어
+legal 탐색을 돌리지 않았다).
+
+지평 밖 accession은 AAPL 1,877 · CELG 1,615 · ABMD 1,420 · FOXA 547건이고(대부분 Form 4
+계열) 수량으로 receipt에 남는다. 문서 분류 실측: BYLAWS가 압도적이고
+(AAPL 31 · CELG 19 · FOXA 11 · ABMD 11) 완전 snapshot은 AAPL 5 · FOXA 3 · CELG 1 ·
+ABMD 2건이었다.
+
+**결과를 보고 parser 규칙을 조정하지 않았다.** AUTO 비율을 올리려고 문법을 넓히지 않는다.
+
+### 실 SEC 언어가 드러낸 후속 설계 질문 (문법을 넓히지 않고 보고만 한다)
+
+**표지 제목이 액면가 수식을 달고 있으면 exact-N1 anchor가 성립하지 않는다.** FOXA가
+가장 깨끗한 사례다 — 탐색은 거의 닫혔고(분류 실패 1건) 완전 snapshot이 3건 있는데
+findings가 0이다.
+
+```text
+표지    "Class A Common Stock, par value $0.01 per share"
+charter "Class A Common Stock"
+```
+
+§5의 CLOSED 규칙대로 exact N1이 아니므로 잇지 않았다. 이것이 실제 coverage의 지배적
+차단 요인으로 보이지만, **par-value 수식을 벗기는 정규화는 새 semantic 가정**이므로
+사용자 결정 없이 넣지 않았다. 별도 결정 사항으로 올린다.
+
+**2001년 이전 flat layout은 문서 자연키가 없다.** 그 시기 filing이 있는 등록인은 지평이
+구조적으로 닫히지 않아 항상 INCOMPLETE다(AAPL 43 · CELG 42 · ABMD 30건). complete
+submission 안의 `<DOCUMENT>` 블록을 문서로 취급하려면 `<FILENAME>` 없는 문서의 자연키를
+새로 정의해야 하므로 이 증분에서 열지 않았다.
+
+**8-K primary가 Item 5.03 서술 때문에 BYLAWS로 분류된다.** 본문이 "Amended and Restated
+Bylaws"를 말하면 그렇게 분류되고, governing class 정의로는 쓰이지 않으므로 결과를
+낙관적으로 만들지 않는다. 다만 실 데이터에서 BYLAWS 분류가 압도적인 이유가 이것이다.
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity JSONL을 바꾸지 않았다. 897개를 확장·승격하지 않았다.
+- 사람 검토 UI · 수동 override · title-less sibling 추론 · fuzzy class 이름 매칭 ·
+  신뢰도 점수 · LLM을 만들지 않았다.
+- 넓은 합병/피인수 종료 엔진과 5A-3 전체를 구현하지 않았다.
+- C2 accession XBRL binding · share-basis/사건 의미 · 회계 · Q/V · B/M · 랭크를
+  건드리지 않았다.
+- **Gate A~H는 여전히 미판정이다.** 수익률을 계산하지 않았다.
+
+
+---
+
 ## 11. 결과
 
 

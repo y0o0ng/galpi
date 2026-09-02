@@ -1005,11 +1005,19 @@ class TargetAwareProofSearchTest(unittest.TestCase):
             [item.symbol for item in packet.share_class_proposals], ["OLD"]
         )
         # 남는 것은 명시 증거가 필요한 관계들뿐이다 — 표지는 어느 구간도 증명하지
-        # 않고, 제목 없는 sibling의 canonical bridge도 표지 밖에서 와야 한다.
+        # 않고, canonical bridge도 표지 밖에서 와야 한다.
+        #
+        # **B1**: 표지 제목은 자기 구간이 없으므로 애초에 production prose 행이 되지
+        # 않는다. 그래서 "구간이 없다"는 사유도 붙지 않는다.
         self.assertEqual(
             packet.reason_codes,
-            (CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, CLASS_INTERVAL_NOT_EXPLICIT,
-             PROSE_ALIAS_INTERVAL_NOT_EXPLICIT),
+            (CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, CLASS_INTERVAL_NOT_EXPLICIT),
+        )
+        self.assertEqual(packet.prose_alias_proposals, ())
+        # 제목 자체는 표지 증명에 그대로 남는다.
+        self.assertIn(
+            "OLD Common Stock",
+            [item.security_title for item in packet.proof.classes],
         )
 
     def test_the_match_is_found_beyond_the_old_three_attempt_limit(self):
@@ -1435,11 +1443,11 @@ class HistoricalDiscoveryTest(unittest.TestCase):
 
 
 class RelationIntervalCompletenessTest(unittest.TestCase):
-    """`class 구간 != XBRL alias 구간 != prose alias 구간`.
+    """`economic class 구간 != prose alias 구간`.
 
-    production manifest에 쓰일 관계는 **저마다 자기 유효구간을 증명해야** 한다.
-    class가 X부터 존재한다는 것이 특정 QName이나 철자가 X부터 그 class를 가리켰다는
-    증명이 아니다.
+    C2 이후 이 문맥의 production 관계는 그 둘뿐이다. production manifest에 쓰일 관계는
+    **저마다 자기 유효구간을 증명해야** 하고, class가 X부터 존재한다는 것이 특정
+    철자가 X부터 그 class를 가리켰다는 증명이 아니다.
     """
 
     def packet(self, evidence, *, facts=None, symbol="AAA"):
@@ -1452,6 +1460,12 @@ class RelationIntervalCompletenessTest(unittest.TestCase):
         )
 
     def test_a_class_interval_alone_does_not_prove_the_prose_alias(self):
+        """**B1** — class 수명은 그 철자의 수명이 아니다.
+
+        class 구간만 있고 표지 제목의 구간이 없으면 제목은 production prose 행이
+        되지 않는다. 그 결과 그 class에는 canonical bridge가 없고 package는
+        `REVIEW_REQUIRED`로 남는다 — class 구간을 alias 구간으로 복사하지 않는다.
+        """
         def only_class(proof):
             return {
                 item.member_key: ClassEvidence(
@@ -1465,8 +1479,40 @@ class RelationIntervalCompletenessTest(unittest.TestCase):
 
         _proof, packet = self.packet(only_class)
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
-        self.assertIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertIn(CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, packet.reason_codes)
         self.assertNotIn(CLASS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        # 제안되지 않은 관계에 가짜 "구간 없음" 사유를 붙이지 않는다.
+        self.assertNotIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertEqual(
+            [item.bridge_type for item in packet.prose_alias_proposals],
+            [GOVERNING_INSTRUMENT],
+        )
+
+    def test_a_proposed_prose_relation_without_an_interval_still_fails_closed(self):
+        """제안된 production prose 관계는 여전히 자기 구간을 증명해야 한다.
+
+        B1이 없애는 것은 **애초에 제안되지 않는** 관계의 가짜 사유이지, 실제로
+        제안된 관계의 구간 요구가 아니다.
+        """
+        def bridge_without_interval(proof):
+            return {
+                item.member_key: ClassEvidence(
+                    class_interval=span(),
+                    cover_title_interval=span() if item.security_title else None,
+                    extra_prose_bridges=(
+                        ProseBridgeInput(
+                            raw_prose_name="Class B Common Stock",
+                            bridge_type=GOVERNING_INSTRUMENT,
+                            interval=None,
+                        ),
+                    ),
+                )
+                for item in proof.classes
+            }
+
+        _proof, packet = self.packet(bridge_without_interval)
+        self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
+        self.assertIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
 
     def test_a_missing_xbrl_binding_never_blocks_an_economic_package(self):
         """**QName은 production identity 관계가 아니다.**
@@ -1745,8 +1791,12 @@ class CanonicalClassBridgeTest(unittest.TestCase):
         bridges = canonical_bridges_for(packet.prose_alias_proposals, classb.class_id)
         self.assertEqual([item.bridge_type for item in bridges], [GOVERNING_INSTRUMENT])
 
-    def test_a_canonical_bridge_without_its_own_interval_does_not_count(self):
-        """제목은 있는데 그 철자의 구간이 없으면 정체성을 세우지 못한다."""
+    def test_a_cover_title_without_its_own_interval_never_becomes_an_alias(self):
+        """**B1** — 제목은 있는데 그 철자의 구간이 없으면 관측으로만 남는다.
+
+        production prose 행이 만들어지지 않고, 그래서 그 class에는 canonical bridge가
+        없다. 제안되지 않은 관계에 `PROSE_ALIAS_INTERVAL_NOT_EXPLICIT`를 붙이지 않는다.
+        """
         def title_without_interval(proof):
             return {
                 item.member_key: ClassEvidence(class_interval=span())
@@ -1756,7 +1806,13 @@ class CanonicalClassBridgeTest(unittest.TestCase):
         packet = self.build(title_without_interval, facts=single_class_facts("AAA"))
         self.assertEqual(packet.proposal_status, REVIEW_REQUIRED)
         self.assertIn(CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT, packet.reason_codes)
-        self.assertIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertNotIn(PROSE_ALIAS_INTERVAL_NOT_EXPLICIT, packet.reason_codes)
+        self.assertEqual(packet.prose_alias_proposals, ())
+        # 표지 제목 관측 자체는 사라지지 않는다.
+        self.assertEqual(
+            [item.security_title for item in packet.proof.classes],
+            ["AAA Common Stock"],
+        )
 
     def test_an_unknown_bridge_type_fails_closed(self):
         def bad(proof):

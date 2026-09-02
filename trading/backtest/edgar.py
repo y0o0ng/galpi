@@ -402,6 +402,20 @@ class EdgarClient:
             raise EdgarError(f"accession index 응답이 객체가 아닙니다: {accession}")
         return payload
 
+    def accession_header_index(self, cik: str, accession: str) -> str:
+        """accession의 SGML header 색인 원문.
+
+        **`index.json`의 `type`은 문서 종류가 아니라 아이콘 이름이다**(`text.gif`).
+        문서별 `<TYPE>`(`EX-3.1`)·`<FILENAME>`·`<SEQUENCE>`와 8-K `<ITEMS>`는 여기에만
+        구조화돼 있고, complete submission 원문과 달리 본문을 싣지 않아 작다.
+        """
+        clean = str(accession).strip()
+        if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", clean):
+            raise EdgarError(f"accession 형식이 잘못됐습니다: {accession!r}")
+        return self.text(
+            accession_dir_url(cik, clean) + f"/{clean}-index-headers.html"
+        )
+
     def accession_file_bytes(self, cik: str, accession: str, name: str) -> bytes:
         """accession 안의 파일 하나를 raw bytes로 읽는다.
 
