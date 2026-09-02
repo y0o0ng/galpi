@@ -124,6 +124,7 @@ const {
   createAttachmentOriginalService,
 } = require('./lib/attachment-originals');
 const { createAttachmentDocumentTools } = require('./lib/attachment-document-tools');
+const { createGitHubReadSession } = require('./lib/github/tool');
 const {
   AttachmentLifecycleError,
   MAX_ATTACHMENTS_PER_MESSAGE,
@@ -201,6 +202,7 @@ const CLAUDE_DEEP_MODEL = process.env.CLAUDE_DEEP_MODEL || 'claude-opus-4-5';
 const GPT_MODEL    = process.env.GPT_MODEL    || 'gpt-4o';
 const GPT_DEEP_MODEL = process.env.GPT_DEEP_MODEL || 'gpt-5.5';
 const GPT_RESPONSES_ENABLED = process.env.GPT_RESPONSES_ENABLED === 'true';
+const GITHUB_MCP_CHAT_ENABLED = process.env.GITHUB_MCP_CHAT_ENABLED === 'true';
 const GPT_CHAT_BOOTSTRAP_MODEL = process.env.GPT_CHAT_BOOTSTRAP_MODEL || 'gpt-5.6-terra';
 const GPT_CHAT_REASONING_EFFORT = new Set(['none', 'low', 'medium', 'high', 'xhigh', 'max'])
   .has(process.env.GPT_CHAT_REASONING_EFFORT)
@@ -3558,6 +3560,7 @@ function createChatToolRuntime({
   newsSearchSession = null,
   mailPreferenceSession = null,
   newsInterestSession = null,
+  githubSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3575,6 +3578,7 @@ function createChatToolRuntime({
       ...(mailPreferenceSession?.getToolDefinitions() || []),
       ...(newsInterestSession?.getToolDefinitions() || []),
       ...(newsSearchSession?.getToolDefinitions() || []),
+      ...(githubSession?.getToolDefinitions() || []),
     ],
     executeTool: async toolUse => {
       if (toolUse.name === 'web_search') {
@@ -3664,6 +3668,12 @@ function createChatToolRuntime({
           onStage(writingStage);
         }
       }
+      if (toolUse.name === 'github_read') {
+        if (!githubSession) {
+          return { isError: true, content: '현재 요청에서는 GitHub 저장소를 읽을 수 없습니다.' };
+        }
+        return githubSession.execute(toolUse.name, toolUse.input);
+      }
       return { isError: true, content: '허용되지 않은 도구입니다.' };
     },
     result() {
@@ -3713,6 +3723,7 @@ function buildChatToolInstructions({
   newsSearchSession,
   mailPreferenceSession,
   newsInterestSession,
+  githubSession,
   includeLanguageRule = false,
   voiceTurn = false,
   additionalInstructions = '',
@@ -3728,6 +3739,7 @@ function buildChatToolInstructions({
     mailPreferenceSession?.systemPrompt || '',
     newsInterestSession?.systemPrompt || '',
     newsSearchSession?.systemPrompt || '',
+    githubSession?.systemPrompt || '',
     additionalInstructions,
   ].filter(Boolean).join('\n\n');
 }
@@ -3744,6 +3756,7 @@ async function generateClaudeReplyWithTools({
   newsSearchSession = null,
   mailPreferenceSession = null,
   newsInterestSession = null,
+  githubSession = null,
   onStage = () => {},
   writingStage = 'answer',
 }) {
@@ -3756,6 +3769,7 @@ async function generateClaudeReplyWithTools({
     newsSearchSession,
     mailPreferenceSession,
     newsInterestSession,
+    githubSession,
     onStage,
     writingStage,
   });
@@ -3773,6 +3787,7 @@ async function generateClaudeReplyWithTools({
       newsSearchSession,
       mailPreferenceSession,
       newsInterestSession,
+      githubSession,
     }),
     maxToolRounds: 2,
     getTools: runtime.getTools,
@@ -3800,6 +3815,7 @@ async function generateGptReplyWithTools({
   newsSearchSession = null,
   mailPreferenceSession = null,
   newsInterestSession = null,
+  githubSession = null,
   onStage = () => {},
   writingStage = 'answer',
   onSpokenText = null,
@@ -3815,6 +3831,7 @@ async function generateGptReplyWithTools({
     newsSearchSession,
     mailPreferenceSession,
     newsInterestSession,
+    githubSession,
     onStage,
     writingStage,
   });
@@ -3843,6 +3860,7 @@ async function generateGptReplyWithTools({
       newsSearchSession,
       mailPreferenceSession,
       newsInterestSession,
+      githubSession,
       includeLanguageRule: true,
       voiceTurn,
       additionalInstructions,
@@ -3875,6 +3893,7 @@ async function generateChatReply(model, context, {
   newsSearchSession = null,
   mailPreferenceSession = null,
   newsInterestSession = null,
+  githubSession = null,
   onStage = () => {},
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
@@ -3893,6 +3912,7 @@ async function generateChatReply(model, context, {
       newsSearchSession,
       mailPreferenceSession,
       newsInterestSession,
+      githubSession,
       onStage,
     });
   }
@@ -3911,6 +3931,7 @@ async function generateChatReply(model, context, {
       newsSearchSession,
       mailPreferenceSession,
       newsInterestSession,
+      githubSession,
       onStage,
       onSpokenText,
       voiceTurn,
@@ -4148,6 +4169,7 @@ async function runSingleChatTurnBody({
   progress,
   spokenStream = null,
   voiceTurn = Boolean(spokenStream),
+  allowGitHub = false,
   allowSchedulePrepare = true,
   persistScheduleImmediately = false,
   scheduleClientRequestId = null,
@@ -4324,7 +4346,38 @@ async function runSingleChatTurnBody({
         '이번 말이 그 질문과 무관하면 도구를 부르지 말고 평범한 대화로 답한다.',
       ].join('\n')
       : '';
+    const githubSession = GITHUB_MCP_CHAT_ENABLED && allowGitHub
+      ? createGitHubReadSession()
+      : null;
     progress.stage('answer');
+    let generatedReply;
+    try {
+      generatedReply = await generateChatReply(model, context, {
+        modelSnapshot,
+        sessionId,
+        enableWebTool: allowModelWebTool,
+        paperToolSession,
+        attachmentToolSession,
+        scheduleToolSession,
+        mailSearchSession,
+        newsSearchSession,
+        mailPreferenceSession,
+        newsInterestSession,
+        githubSession,
+        onStage: progress.stage,
+        onSpokenText: spokenStream,
+        voiceTurn,
+        additionalInstructions: [additionalInstructions, newsProactiveInstruction]
+          .filter(Boolean)
+          .join('\n\n') || undefined,
+      });
+    } finally {
+      try {
+        await githubSession?.close();
+      } catch {
+        console.warn('⚠️ GitHub 읽기 세션 정리 실패');
+      }
+    }
     const {
       reply,
       usedModel,
@@ -4335,24 +4388,7 @@ async function runSingleChatTurnBody({
       attachmentEvidenceRefs,
       attachmentDocumentUsage,
       scheduleCandidate,
-    } = await generateChatReply(model, context, {
-      modelSnapshot,
-      sessionId,
-      enableWebTool: allowModelWebTool,
-      paperToolSession,
-      attachmentToolSession,
-      scheduleToolSession,
-      mailSearchSession,
-      newsSearchSession,
-      mailPreferenceSession,
-      newsInterestSession,
-      onStage: progress.stage,
-      onSpokenText: spokenStream,
-      voiceTurn,
-      additionalInstructions: [additionalInstructions, newsProactiveInstruction]
-        .filter(Boolean)
-        .join('\n\n') || undefined,
-    });
+    } = generatedReply;
     spokenStream?.flush();
     const spokenRemaining = spokenStream?.remaining() || '';
     if (!webEvidence && hasWebEvidenceResults(toolWebEvidence)) webEvidence = toolWebEvidence;
@@ -4539,6 +4575,7 @@ app.post('/api/chat', async (req, res) => {
       progress,
       spokenStream,
       voiceTurn: Boolean(spokenStream),
+      allowGitHub: source === undefined || source === 'text',
       // 음성 출처 턴은 전사 오류가 지식 베이스에 굳지 않도록 topic 자동 저장에서 제외한다.
       // 대화 자체는 기존 경로로 저장하고 명시적 저장만 허용한다.
       allowAutoTopic: source !== 'voice',
@@ -5052,6 +5089,7 @@ const shortcutRoutes = createVoiceShortcutRoutes({
         webSearch: false,
         progress: { stage() {} },
         voiceTurn: true,
+        allowGitHub: false,
         allowSchedulePrepare: true,
         persistScheduleImmediately: true,
         scheduleClientRequestId: `shortcut-task:${turn.requestId}`,
