@@ -197,7 +197,6 @@ def extract_observations(
     *,
     cik: str,
     accession: str,
-    issuer_id: str,
     filing_source_version: str,
     identity_source_version: str,
 ) -> tuple[ShareObservation, ...]:
@@ -206,9 +205,19 @@ def extract_observations(
     class 축 fact는 **그 accession의 binding**으로만 푼다. dimensionless fact는 binding
     표를 보지 않고 그 시점 적용 가능한 ordinary class가 정확히 하나일 때만 푼다.
 
+    **issuer는 호출자가 주지 않고 CIK에서 파생한다.** `cik`과 `issuer_id`를 따로 받으면
+    CIK A의 문서를 처리하면서 issuer B를 넘길 수 있고, 그러면 차원 없는 fact가 issuer
+    B의 class로 풀리거나 class 축 관측이 `issuer_id=B` · `class_id=<A의 class>`로
+    저장된다. `qv_xbrl_binding.resolve_issuer`가 유일한 CIK→issuer 권한이다 — 여기에
+    두 번째 구현을 두지 않고, ticker·class 심볼·XBRL member·현재 SEC 메타데이터로
+    추론하지 않는다.
+
     **economic 활성 판정은 fact마다 그 fact의 instant로 한다.** formation cutoff는
     여기서 걸지 않는다 — 저장된 행이 formation 독립이어야 하기 때문이다.
     """
+    issuer_id, issuer_usable = qv_xbrl_binding.resolve_issuer(
+        connection, cik=cik, identity_source_version=identity_source_version,
+    )
     contexts = instance.context_map()
     selected: list[tuple[int, Fact, Context, str]] = []
     for ordinal, fact in enumerate(instance.facts):
@@ -263,7 +272,8 @@ def extract_observations(
             # 적용 가능한 ordinary class가 정확히 하나일 때만 issuer 총계를 그 class로
             # 본다. **binding 표를 보지 않는다** — 차원 없는 fact에는 member가 없다.
             sole, sole_usable = _sole_ordinary_class(
-                connection, issuer_id, context.instant, identity_source_version
+                connection, issuer_id, context.instant, identity_source_version,
+                issuer_usable_from_session=issuer_usable,
             )
             if sole is None:
                 resolution_status = UNRESOLVED
@@ -335,11 +345,14 @@ def _sole_ordinary_class(
     issuer_id: str,
     as_of: str,
     identity_source_version: str,
+    *,
+    issuer_usable_from_session: str,
 ) -> tuple[str | None, str | None]:
     """`(class_id, mapping usable)` — 적용 가능한 ordinary class가 **정확히 하나**일 때.
 
     D0는 member가 없으므로 binding 표를 보지 않는다. 그 하나를 세우는 데 필요한
     identity 관계는 issuer 매핑과 그 class 구간이고, 둘 중 늦은 쪽이 매핑 가용성이다.
+    issuer와 그 가용성은 CIK에서 이미 한 번 파생했으므로 여기서 다시 찾지 않는다.
     """
     rows = connection.execute(
         "SELECT class_id, usable_from_session FROM qv_share_classes"
@@ -349,15 +362,8 @@ def _sole_ordinary_class(
     ).fetchall()
     if len(rows) != 1:
         return None, None
-    issuer = connection.execute(
-        "SELECT usable_from_session FROM qv_issuers"
-        " WHERE issuer_id = ? AND source_version = ?",
-        (issuer_id, identity_source_version),
-    ).fetchone()
-    if issuer is None:
-        return None, None
     return rows[0]["class_id"], max(
-        str(rows[0]["usable_from_session"]), str(issuer["usable_from_session"])
+        str(rows[0]["usable_from_session"]), str(issuer_usable_from_session)
     )
 
 

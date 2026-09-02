@@ -185,6 +185,12 @@ ticker 유사도 · governing instrument의 class 이름 유사도
 + 개별 fact instant
 ```
 
+**filing-local binding grain은 `(axis_key, member_key)` 쌍이다.** 승인된 두 축에 같은
+철자의 member가 실리고 각자 명시 filing-local 다리를 가지면 그것은 **서로 다른 두
+관계**이고 둘 다 표현할 수 있어야 한다. member local name이나 member QName만으로 세면
+정상 filing이 충돌로 멈추거나 한쪽 관계가 조용히 사라진다. 정확히 **같은**
+`axis_key + member_key`가 두 class를 가리키는 것만 fail-close다.
+
 **한 accession 안에도 instance 문서가 여럿일 수 있다.** 문서마다 같은 QName이 다르게
 묶일 수 있으므로 `instance_document_name`은 자연키이자 **필수 조회 입력**이다. 문서
 이름을 빼고 찾는 폴백이 없고 순서로 문서를 고르지 않는다 — 그렇게 하면 다른 문서의
@@ -195,15 +201,24 @@ binding이 새거나 멀쩡한 문서-지역 매핑이 `AMBIGUOUS`가 된다.
 보통주여야 한다. 하나라도 어긋나면 다른 class로 바꾸지 않고 더 오래되거나 더 새로운
 prose 구간을 대신 쓰지도 않는다 — `UNRESOLVED`이거나 기존 모호 규칙대로 fail-close다.
 
-#### binding 가용성
+#### binding 가용성 — 칸이 둘이고 뜻이 다르다
 
-filing과 identity 다리가 **둘 다** 알려진 뒤에야 쓸 수 있다.
+binding 행은 가용성을 **두 칸으로 나눠** 적는다. 하나로 합치면 되돌릴 수 없다.
+
+```text
+binding.identity_usable_from_session
+    그 binding을 세우는 데 필요한 **identity 관계**가 알려진 시점
+binding.usable_from_session
+    filing 문턱까지 포함한 총합 — 그 binding 행 자체를 언제 쓸 수 있는가
+```
+
+binding 행을 쓰려면 filing과 identity 다리가 **둘 다** 알려져야 하므로 총합은 둘의
+최댓값이다.
 
 ```text
 usable_from_session = max(
     filing historical_usable_session,
-    matched economic class usable_from_session,
-    matched canonical prose relation usable_from_session)
+    identity_usable_from_session)
 ```
 
 손으로 넣지 않는다. **filing 수리 시각을 economic class 유효성으로 쓰지 않는다.**
@@ -211,10 +226,17 @@ usable_from_session = max(
 #### 지식 가용성은 경제적 유효성과 **따로** 필요하다
 
 ```text
-filing 가용성   historical_usable_session    그 filing을 언제 알 수 있었는가
-매핑 가용성     mapping_usable_from_session  그 귀속에 필요한 identity 관계 전부가
-                                             언제 알 수 있게 됐는가
+binding.usable_from_session           filing 문턱 + binding identity 문턱
+binding.identity_usable_from_session  그 binding을 세우는 데 필요한 identity 관계
+observation.historical_usable_session  filing 문턱 — 그 filing을 언제 알 수 있었는가
+observation.mapping_usable_from_session  identity/class 귀속 문턱 — 그 귀속에 필요한
+                                         identity 관계 전부가 언제 알 수 있게 됐는가
 ```
+
+**filing 문턱은 `observation.historical_usable_session` 한 곳에만 산다.** 매핑
+가용성을 계산할 때 binding의 **총합** `usable_from_session`을 쓰면 identity 전용이어야
+할 축이 filing 문턱을 조용히 상속한다 — 그러면 두 축을 나눈 의미가 사라진다. 매핑
+가용성은 binding의 `identity_usable_from_session`을 쓴다.
 
 **둘은 다른 축이고 둘 다 필요하다.** fact instant 재확인도 formation cutoff를 따른다 —
 나중에야 usable해진 prose/class 구간이 더 이른 formation에 노출되면 안 된다. cutoff에서
@@ -237,15 +259,21 @@ filing FK와 issuer FK가 각각 통과하면서 **CIK A의 filing이 issuer B�
 identity에 묶일 수 있다.** `qv_issuers`에서 그 CIK로 정확히 한 행을 찾고, 없거나 둘이면
 fail-close다. ticker·심볼·class 이름·현재 SEC 메타데이터로 추론하지 않는다.
 
+**share 관측 추출도 같은 경계다.** `extract_observations(...)`는 `issuer_id`를 받지
+않고 `cik`에서 파생하며, 그 하나가 차원 없는 D0 해석 · class 축 관측의 `issuer_id` ·
+매핑 가용성 · 저장되는 모든 행에 쓰인다. **CIK→issuer 구현은 하나다**
+(`qv_xbrl_binding.resolve_issuer`) — 두 번째 구현을 두지 않는다.
+
 #### 저장되는 share 관측은 formation 독립이다
 
 `qv_share_observations`의 PK에 `formation_session`이 없으므로 **formation마다 다른
 매핑 결과를 저장할 수 없다.** raw fact를 한 번 읽고 고정된 bundle 아래 그 semantic
 class를 풀되, `mapping_usable_from_session`으로 **그 매핑이 언제 알 수 있게 됐는지**를
-함께 적는다. class 축 관측이면 그 fact instant 해석에 실제로 필요했던 관계 전부
-(binding · issuer · economic class · canonical prose)의 최댓값이고, 차원 없는 관측이면
-그 하나를 세우는 데 필요한 issuer·class 가용성의 최댓값이다. **filing 수리 시각을
-identity 가용성으로 쓰지 않는다.**
+함께 적는다. class 축 관측이면 그 fact instant 해석에 실제로 필요했던 identity 관계 전부
+(binding의 `identity_usable_from_session` · issuer · economic class · canonical prose)의
+최댓값이고, 차원 없는 관측이면 그 하나를 세우는 데 필요한 issuer·class 가용성의
+최댓값이다. **filing 수리 시각을 identity 가용성으로 쓰지 않는다** — binding의 총합
+`usable_from_session`을 여기 쓰는 것이 정확히 그 실수다.
 
 formation 문턱은 선택기가 건다.
 

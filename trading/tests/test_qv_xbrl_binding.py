@@ -136,11 +136,12 @@ class BindingFixture:
         return store_bindings(self.connection, bindings)
 
     def resolve(self, accession, member_local="CommonClassAMember", *,
-                name="cover.xml", fact_instant=INSTANT, **kwargs):
+                name="cover.xml", fact_instant=INSTANT,
+                axis_local="StatementClassOfStockAxis", **kwargs):
         return resolve_accession_member(
             self.connection, cik=CIK, accession=accession,
             instance_document_name=name,
-            axis_key="us-gaap:StatementClassOfStockAxis",
+            axis_key=f"us-gaap:{axis_local}",
             member_key=f"us-gaap:{member_local}",
             filing_source_version=FSV, identity_source_version=IDV,
             fact_instant=fact_instant, **kwargs,
@@ -280,6 +281,54 @@ class FilingLocalityTest(BindingFixture, unittest.TestCase):
         self.assertNotEqual(self.lookup(acc, name="first.xml")[1], AMBIGUOUS)
         # 없는 문서 이름은 그냥 없는 것이다 — 순서로 고르는 폴백이 없다.
         self.assertEqual(self.lookup(acc, name="third.xml"), (None, UNRESOLVED))
+
+    def test_one_member_qname_under_two_axes_binds_independently(self):
+        """**binding grain은 `(축, member)` 쌍이다.** 축을 빼고 뭉개지 않는다.
+
+        승인된 두 축에 같은 철자의 member가 실리고 각자 명시 filing-local 다리를
+        가지면 둘은 서로 다른 두 관계다. member만으로 세면 정상 filing이 충돌로
+        멈추거나 한쪽 관계가 조용히 사라진다.
+        """
+        self.klass("cls-a", "AAA")
+        self.klass("cls-b", "BBB")
+        self.prose("cls-a", "class a common stock")
+        self.prose("cls-b", "class b common stock")
+
+        def titled(axis, title, symbol, context):
+            return [
+                {"concept": "Security12bTitle", "value": title,
+                 "member": "CommonStockMember", "axis": axis, "context_id": context},
+                {"concept": "TradingSymbol", "value": symbol,
+                 "member": "CommonStockMember", "axis": axis, "context_id": context},
+            ]
+
+        bound, unresolved = self.derive(
+            titled("StatementClassOfStockAxis", "Class A Common Stock", "AAA", "c1")
+            + titled("ClassesOfShareCapitalAxis", "Class B Common Stock", "BBB", "c2")
+        )
+        self.assertEqual(unresolved, ())
+        # 같은 member QName, 다른 축 — 독립된 두 binding이다.
+        self.assertEqual({item.member_key for item in bound},
+                         {"us-gaap:CommonStockMember"})
+        self.assertEqual(
+            {(item.axis_key, item.class_id) for item in bound},
+            {("us-gaap:StatementClassOfStockAxis", "cls-a"),
+             ("us-gaap:ClassesOfShareCapitalAxis", "cls-b")},
+        )
+        self.assertEqual(self.store(bound), 2)
+
+        acc = "0000000042-24-000001"
+        # 정확한 축으로 조회하면 각자의 class가 나온다. 축이 섞이지 않는다.
+        self.assertEqual(
+            self.lookup(acc, "CommonStockMember",
+                        axis_local="StatementClassOfStockAxis"),
+            ("cls-a", RESOLVED),
+        )
+        self.assertEqual(
+            self.lookup(acc, "CommonStockMember",
+                        axis_local="ClassesOfShareCapitalAxis"),
+            ("cls-b", RESOLVED),
+        )
 
     def test_one_accession_binding_two_titles_to_one_qname_fails_closed(self):
         self.klass("cls-a", "AAA")
@@ -506,7 +555,8 @@ class KnowledgeAvailabilityTest(BindingFixture, unittest.TestCase):
         self.assertEqual(at("2018-06-29"), (None, UNRESOLVED))
         self.assertEqual(at("2024-06-28"), ("cls-a", RESOLVED))
 
-    def test_the_mapping_usable_session_covers_every_required_relation(self):
+    def test_the_mapping_usable_session_covers_every_required_identity_relation(self):
+        """**매핑 가용성은 identity 관계만 센다.** filing 문턱을 상속하지 않는다."""
         self.issuer(usable="2012-01-03")
         self.klass("cls-a", "AAA", start="2010-01-01", usable="2013-01-02")
         self.prose("cls-a", "class a common stock",
@@ -515,11 +565,16 @@ class KnowledgeAvailabilityTest(BindingFixture, unittest.TestCase):
         bound, _ = self.derive(
             title_facts("CommonClassAMember", "Class A Common Stock", "AAA")
         )
+        # binding의 총합 문턱은 filing까지 포함하고, identity 전용 문턱은 prose다.
+        self.assertEqual(bound[0].filing_historical_usable_session, "2024-02-20")
+        self.assertEqual(bound[0].identity_usable_from_session, "2014-01-02")
+        self.assertEqual(bound[0].usable_from_session, "2024-02-20")
         self.store(bound)
         found = self.resolve("0000000042-24-000001")
         self.assertEqual(found.status, RESOLVED)
-        # filing 2024-02-20이 가장 늦다.
-        self.assertEqual(found.mapping_usable_from_session, "2024-02-20")
+        # issuer 2012 · class 2013 · prose 2014 중 가장 늦은 것이다.
+        # filing 2024-02-20은 **여기 들어오지 않는다.**
+        self.assertEqual(found.mapping_usable_from_session, "2014-01-02")
 
     def test_a_later_usable_issuer_delays_the_binding(self):
         """issuer 매핑도 PIT identity 관계다."""

@@ -25,6 +25,7 @@ from backtest import (  # noqa: E402
     qv_market_equity,
     qv_selector,
     qv_shares,
+    qv_xbrl_binding,
     store,
 )
 from backtest.qv_xbrl import parse_instance, sha256  # noqa: E402
@@ -166,7 +167,7 @@ class Step4Fixture:
         xml = instance_xml(facts, cik=CIK)
         doc = parse_instance(xml, f"{accession}.xml")
         obs = qv_shares.extract_observations(
-            self.connection, doc, cik=CIK, accession=accession, issuer_id=ISSUER,
+            self.connection, doc, cik=CIK, accession=accession,
             filing_source_version=SHARES_VERSION,
             identity_source_version=self.identity_version,
         )
@@ -1102,6 +1103,159 @@ class MappingAvailabilityTest(Step4Fixture, unittest.TestCase):
         self.assertEqual(rows[0]["class_id"], "cls-a")
         self.assertEqual(rows[0]["mapping_status"], "RESOLVED")
         self.assertEqual(rows[0]["mapping_usable_from_session"], "2022-06-30")
+
+
+    def test_mapping_availability_never_inherits_filing_availability(self):
+        """**두 축은 파생부터 선택기까지 분리된다.**
+
+        ```text
+        issuer 2012 · class 2013 · prose 2014      -> 매핑 가용성 2014
+        filing 2024                                 -> filing 가용성 2024
+        ```
+
+        binding 행의 `usable_from_session`은 이미 filing 문턱을 품고 있으므로 매핑
+        가용성에 쓰면 identity 전용이어야 할 축이 filing을 상속한다. 관측은 **두
+        문턱을 모두** 넘는 formation에서만 쓰인다.
+        """
+        self.connection.execute(
+            "UPDATE qv_issuers SET usable_from_session = '2012-01-03'"
+            " WHERE issuer_id = ?", (ISSUER,),
+        )
+        self.connection.commit()
+        self.add_class("cls-a", symbol="AAA", listed=True, usable="2013-01-02")
+        accession = "0001234567-24-000001"
+        self.bind(accession, "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock",
+                  usable="2014-01-02", filing_usable="2024-02-20")
+        found, filing_usable = self.ingest(
+            accession, self.shares("CommonClassAMember"),
+            acceptance="2024-02-20T21:00:00.000000Z", bind_members=False,
+        )
+        self.assertTrue(filing_usable.startswith("2024-"), filing_usable)
+        self.assertEqual(
+            [item.mapping_usable_from_session for item in found], ["2014-01-02"]
+        )
+
+        row = self.connection.execute(
+            "SELECT historical_usable_session, mapping_usable_from_session"
+            " FROM qv_share_observations"
+        ).fetchone()
+        # filing 문턱은 관측의 historical_usable_session 한 곳에만 산다.
+        self.assertEqual(row["historical_usable_session"], filing_usable)
+        # 매핑 문턱은 identity 관계만 센다 — filing 2024가 새어 들어오지 않는다.
+        self.assertEqual(row["mapping_usable_from_session"], "2014-01-02")
+
+        # 매핑은 2014부터 알 수 있지만 filing이 아직 없으므로 2020 formation은 못 쓴다.
+        self.assertEqual(
+            self.resolve("cls-a", "2020-06-30", accession=accession).selector_path,
+            "MISSING",
+        )
+        # 둘 다 통과한 뒤에야 쓸 수 있다.
+        both = self.resolve("cls-a", filing_usable, accession=accession)
+        self.assertEqual(both.selector_path, "A")
+        self.assertEqual(both.share_value_text, "1000")
+
+
+class ShareIssuerDerivationTest(Step4Fixture, unittest.TestCase):
+    """**issuer는 CIK에서 정확히 한 번 파생한다.** 두 번째 정체성을 못 받는다."""
+
+    OTHER_CIK = "0007654321"
+    OTHER_ISSUER = "us-cik-0007654321"
+
+    def setUp(self):
+        super().setUp()
+        # CIK B -> issuer B. 둘 다 보통주가 정확히 하나씩 있다.
+        self.connection.execute(
+            "INSERT INTO qv_issuers"
+            " (issuer_id, cik, resolution_method, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES (?, ?, 'SEC_REGISTRANT_CIK', '2015-01-02', 'manifest', ?,"
+            "         'fixture')",
+            (self.OTHER_ISSUER, self.OTHER_CIK, self.identity_version),
+        )
+        self.connection.execute(
+            "INSERT INTO qv_share_classes"
+            " (class_id, issuer_id, symbol, is_ordinary_common, is_listed,"
+            "  effective_from, effective_to, usable_from_session,"
+            "  source, source_version, provenance)"
+            " VALUES ('other-ordinary', ?, 'BBB', 1, 1, '2015-01-01', NULL,"
+            "         '2015-01-02', 'manifest', ?, 'fixture')",
+            (self.OTHER_ISSUER, self.identity_version),
+        )
+        self.connection.commit()
+        self.add_class("cls-a", symbol="AAA", listed=True)
+
+    def test_the_extraction_api_cannot_be_handed_a_second_issuer(self):
+        """CIK A 문서를 처리하면서 issuer B를 넣을 **자리 자체가 없다.**"""
+        import inspect
+
+        parameters = inspect.signature(qv_shares.extract_observations).parameters
+        self.assertNotIn("issuer_id", parameters)
+        self.assertNotIn(
+            inspect.Parameter.VAR_KEYWORD,
+            [item.kind for item in parameters.values()],
+        )
+        document = parse_instance(instance_xml([], cik=CIK), "empty.xml")
+        with self.assertRaises(TypeError):
+            qv_shares.extract_observations(
+                self.connection, document, cik=CIK,
+                accession="0001234567-21-000001",
+                issuer_id=self.OTHER_ISSUER,
+                filing_source_version=SHARES_VERSION,
+                identity_source_version=self.identity_version,
+            )
+
+    def test_a_dimensionless_cik_a_fact_only_uses_cik_a_identity(self):
+        facts = [{"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+                  "value": "500", "instant": "2020-12-31", "decimals": "-3"}]
+        found, _ = self.ingest("0001234567-21-000001", facts, bind_members=False)
+        self.assertEqual([item.mapping_status for item in found], ["RESOLVED"])
+        # issuer B의 유일 보통주는 CIK A 문서에 참여하지 못한다.
+        self.assertEqual([item.class_id for item in found], ["cls-a"])
+        self.assertEqual([item.issuer_id for item in found], [ISSUER])
+
+    def test_a_class_axis_observation_stores_the_cik_derived_issuer(self):
+        accession = "0001234567-21-000001"
+        self.bind(accession, "cls-a", "CommonClassAMember",
+                  comparison_key="class a common stock")
+        self.ingest(
+            accession,
+            [{"concept": ("us-gaap", "CommonStockSharesOutstanding"),
+              "value": "1000", "member": (USG, "CommonClassAMember"),
+              "instant": "2020-12-31", "decimals": "-3"}],
+            bind_members=False,
+        )
+        row = self.connection.execute(
+            "SELECT issuer_id, class_id, mapping_status FROM qv_share_observations"
+        ).fetchone()
+        self.assertEqual(row["mapping_status"], "RESOLVED")
+        self.assertEqual(row["issuer_id"], ISSUER)
+        # 저장된 issuer와 class는 **같은 발행사**의 것이다.
+        owner = self.connection.execute(
+            "SELECT issuer_id FROM qv_share_classes"
+            " WHERE class_id = ? AND source_version = ?",
+            (row["class_id"], self.identity_version),
+        ).fetchone()
+        self.assertEqual(owner["issuer_id"], row["issuer_id"])
+        self.assertEqual(row["issuer_id"], ISSUER)
+
+    def test_a_cik_without_an_issuer_fails_closed(self):
+        """추측하지 않는다 — 그 CIK의 issuer가 없으면 추출 자체가 멈춘다.
+
+        `UNIQUE(cik, source_version)`이 "둘" 쪽을 이미 막으므로 남는 경우는 "없다"다.
+        여기서 다른 issuer로 넘어가지 않는 것이 계약이다.
+        """
+        self.connection.execute(
+            "DELETE FROM qv_issuers WHERE issuer_id = ?", (ISSUER,),
+        )
+        self.connection.commit()
+        with self.assertRaises(qv_xbrl_binding.QVBindingError):
+            self.ingest(
+                "0001234567-21-000001",
+                [{"concept": ("dei", "EntityCommonStockSharesOutstanding"),
+                  "value": "500", "instant": "2020-12-31", "decimals": "-3"}],
+                bind_members=False,
+            )
 
 
 class DuplicateFactTest(Step4Fixture, unittest.TestCase):

@@ -2387,6 +2387,145 @@ filing cutoff는 독립이고 여전히 필수다 · 저장 행은 formation 독
 
 ---
 
+## 10.19 C2 마무리 — issuer 파생 · `(축, member)` grain · 두 가용성 축 분리 — 2026-09-02
+
+C2 아키텍처와 10.18의 PIT fix는 그대로 두고 남은 세 곳만 고쳤다.
+
+### BLOCKER 1 — share 관측 추출이 여전히 `cik`과 `issuer_id`를 따로 받았다
+
+`derive_bindings()`에서는 이미 없앤 문제가 `qv_shares.extract_observations()`에 남아
+있었다. 잘못된 호출이 다음을 짝지을 수 있었다.
+
+```text
+CIK A의 filing  +  issuer B
+```
+
+차원 없는 fact는 `_sole_ordinary_class()`가 **호출자가 준 issuer**로 풀어서 issuer B의
+class가 됐고, class 축 fact는 binding 해석기가 CIK A로 올바른 class를 찾은 뒤
+`ShareObservation.issuer_id`만 호출자의 issuer로 채워 다음이 저장될 수 있었다.
+
+```text
+cik=A · issuer_id=B · class_id=<issuer A의 class> · mapping_status=RESOLVED
+```
+
+공개 입력에서 `issuer_id`를 없애고 `cik` + `identity_source_version`에서 한 번만
+파생한다. **CIK→issuer 구현은 그대로 하나다** — `qv_xbrl_binding.resolve_issuer()`를
+그대로 쓰고 두 번째 구현을 만들지 않았다. `_sole_ordinary_class()`가 따로 하던
+`qv_issuers` 재조회도 없앴고 파생된 값을 받는다. 그 하나가 D0 해석 · class 축 관측의
+`issuer_id` · 매핑 가용성 · 저장되는 모든 행에 쓰인다. ticker · class 심볼 · XBRL
+member · 현재 SEC 메타데이터 · 호출자 상태로 추론하지 않는다.
+
+### BLOCKER 2 — 충돌 추적이 `axis_key`를 버렸다
+
+production 자연키는 `(cik, accession, instance_document_name, axis_key, member_key,
+filing_source_version, identity_source_version)`인데 `derive_bindings()`는
+`seen[member_key]`만 추적했다. 승인된 두 축에 같은 member QName이 실리면 **서로 다른 두
+관계가 한 자리로 무너져** 정상 filing이 충돌로 멈췄다.
+
+`seen`의 키를 `(axis_key, member_key)` 쌍으로 바꿨다. member local name도 member QName도
+축을 가로질러 뭉개지 않는다. 정확히 **같은** `axis_key + member_key`가 두 class를
+가리키는 것만 fail-close이고, 그것은 저장 자연키에서도 이미 fail-close다.
+
+### MAJOR 3 — 매핑 가용성이 filing 가용성을 품고 있었다
+
+`resolve_accession_member()`가 `MemberResolution.mapping_usable_from_session`을
+binding 행의 `usable_from_session`으로 계산했는데, 그 칸은 이미 다음이다.
+
+```text
+usable_from_session = max(filing_historical_usable_session,
+                          identity_usable_from_session)
+```
+
+그래서 identity 전용이어야 할 매핑 가용성이 filing 가용성을 **상속했다.** 선택기가
+filing 문턱을 따로 요구하므로 조기 사용 버그는 아니었지만, 두 축을 나눈 의미가
+사라지고 provenance가 사실과 달라진다.
+
+binding의 `identity_usable_from_session`을 쓰도록 바꿨다.
+
+```text
+mapping_usable_from_session = max(
+    binding.identity_usable_from_session,
+    fact-instant issuer usable_from_session,
+    fact-instant economic class usable_from_session,
+    fact-instant canonical prose usable_from_session)
+```
+
+filing 가용성은 이제 `qv_share_observations.historical_usable_session` **한 곳에만**
+산다. 선택기 계약은 그대로다.
+
+```text
+historical_usable_session <= F  AND  mapping_usable_from_session <= F
+```
+
+### 용어 — 네 칸의 뜻이 서로 다르다
+
+```text
+binding.usable_from_session              filing 문턱 + binding identity 문턱
+binding.identity_usable_from_session     그 binding을 세우는 데 필요한 identity 관계
+observation.historical_usable_session    filing 문턱
+observation.mapping_usable_from_session  identity/class 귀속 문턱
+```
+
+### 회귀 — fix 전에는 실패하는 것을 확인했다
+
+fix를 임시로 되돌려 **실제로 실패하는 것을 본 뒤** 복구했다.
+
+| 회귀 | 되돌렸을 때 |
+|---|---|
+| `test_one_member_qname_under_two_axes_binds_independently` | `QVBindingError: …/us-gaap:CommonStockMember가 이 accession 안에서 두 class로 갑니다: cls-b vs cls-a` |
+| `test_the_mapping_usable_session_covers_every_required_identity_relation` | `'2024-02-20' != '2014-01-02'` |
+| `test_mapping_availability_never_inherits_filing_availability` | `['2024-02-20'] != ['2014-01-02']` |
+
+축별 회귀 내용:
+
+```text
+같은 member QName이 두 승인 축에 실리면 독립된 두 binding이 되고, 정확한 축으로
+    조회하면 각자의 class가 나온다(StatementClassOfStock -> cls-a,
+    ClassesOfShareCapital -> cls-b). 같은 축+member의 두 class는 저장에서 fail-close다.
+extract_observations의 서명에 `issuer_id`가 없고 `**kwargs`도 없다 — CIK A 문서를
+    처리하면서 issuer B를 넣을 자리가 없다(TypeError).
+CIK A의 차원 없는 fact는 issuer A의 identity만 쓴다(issuer B에도 유일 보통주가 있다).
+CIK A의 class 축 fact가 저장하는 issuer_id·class_id는 같은 발행사의 것이다.
+그 CIK의 issuer가 없으면 다른 issuer로 넘어가지 않고 fail-close다
+    (`UNIQUE(cik, source_version)`이 "둘" 쪽을 이미 막는다).
+issuer 2012 · class 2013 · prose 2014 · filing 2024이면 저장된 관측은
+    historical_usable_session = 2024, mapping_usable_from_session = 2014이고,
+    2020 formation에서는 filing 문턱 때문에 여전히 못 쓴다. 두 문턱을 모두 넘은
+    formation에서만 A로 귀속된다.
+```
+
+기존 계약은 그대로 통과한다 — 세 파일 identity bundle v2 · 시간 구간 XBRL alias 없음 ·
+정확한 accession/문서/QName binding · fact-instant 재확인 · 지식 가용성 cutoff · CIK 파생
+issuer · `qv_sec_filings` filing provenance · `InstanceDocument`의 문서 이름/SHA · 정확한
+자연키 충돌 fail-close · 멱등 저장 · formation 독립 관측 · A-owns/B-fallback ·
+same-regime · `qv-class-id-v1`.
+
+### 로컬 Python 실측 (2026-09-02)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_xbrl_binding` | 35 OK |
+| `test_qv_step4` | 138 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_identity_proposals` | 102 OK |
+| `test_qv_identity_promotion` | 60 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| **전체 trading suite** | **1,740 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — `.github/workflows/docker.yml` 하나뿐이고
+Python 테스트를 돌리지 않는다. 위 숫자는 전부 로컬 실측이다.
+
+### 이 receipt가 주장하지 않는 것
+
+- C2 아키텍처를 바꾸지 않았다. 시간 구간 XBRL alias를 되살리지 않았다.
+- 897개 작업 항목을 넓히거나 승격하지 않았다. 사람의 QName 판정 기구를 만들지 않았다.
+- 5A-3을 넓히지 않았다. share-basis·사건 의미를 바꾸지 않았다.
+- 회계 · Q/V · B/M · 랭크 · Gate A~H · 수익률을 건드리지 않았다.
+
+
+---
+
 ## 11. 결과
 
 

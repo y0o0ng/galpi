@@ -517,7 +517,10 @@ def derive_bindings(
         )
     bound: list[ClassBinding] = []
     unresolved: list[tuple[str, str]] = []
-    seen: dict[str, str] = {}
+    # **filing-local binding grain은 `(axis_key, member_key)` 쌍이다.** member만으로
+    # 세면 승인된 두 축에 같은 철자의 member가 실렸을 때 서로 다른 두 관계가 한
+    # 자리로 무너져 정상 filing이 충돌로 멈춘다.
+    seen: dict[tuple[str, str], str] = {}
     for (axis_key, member_key), item in facts.items():
         instant = item.instants[0] if item.instants else default_instant
         try:
@@ -535,14 +538,15 @@ def derive_bindings(
         except QVBindingError as error:
             unresolved.append((member_key, str(error)))
             continue
-        # **같은 accession 안에서** 한 QName이 두 class로 가면 fail-close다.
-        previous = seen.get(member_key)
+        # **같은 accession 안에서** 정확히 같은 `(축, QName)`이 두 class로 가면
+        # fail-close다. 축을 빼고 보지 않고, member local name으로 뭉개지도 않는다.
+        previous = seen.get((axis_key, member_key))
         if previous is not None and previous != binding.class_id:
             raise QVBindingError(
-                f"{accession}: {member_key}가 이 accession 안에서 두 class로 갑니다: "
-                f"{previous} vs {binding.class_id}"
+                f"{accession}: {axis_key}/{member_key}가 이 accession 안에서 두 "
+                f"class로 갑니다: {previous} vs {binding.class_id}"
             )
-        seen[member_key] = binding.class_id
+        seen[(axis_key, member_key)] = binding.class_id
         bound.append(binding)
     return tuple(bound), tuple(unresolved)
 
@@ -628,8 +632,10 @@ def store_bindings(
 class MemberResolution:
     """accession member 해석 결과 하나.
 
-    `mapping_usable_from_session`은 **그 해석에 실제로 필요했던 관계 전부**가 알려진
-    가장 이른 시점이다. filing 가용성과는 다른 축이다.
+    `mapping_usable_from_session`은 **그 귀속에 실제로 필요했던 identity 관계 전부**가
+    알려진 가장 이른 시점이다(issuer 매핑 · economic class 구간 · canonical prose
+    다리 · binding의 identity 문턱). **filing 가용성은 여기 들어가지 않는다** — 그것은
+    관측의 `historical_usable_session`이고 선택기가 따로 건다.
     """
 
     class_id: str | None
@@ -670,7 +676,7 @@ def resolve_accession_member(
     """
     statement = (
         "SELECT issuer_id, class_id, canonical_prose_comparison_key,"
-        "       usable_from_session"
+        "       identity_usable_from_session"
         " FROM qv_xbrl_class_bindings"
         " WHERE cik = ? AND accession = ? AND instance_document_name = ?"
         "   AND axis_key = ? AND member_key = ?"
@@ -731,9 +737,12 @@ def resolve_accession_member(
     if usable_by is not None and str(issuer_usable["usable_from_session"]) > usable_by:
         return MemberResolution(None, UNRESOLVED)
 
-    # 이 해석에 실제로 필요했던 관계 전부의 최댓값이다.
+    # 이 해석에 실제로 필요했던 **identity 관계** 전부의 최댓값이다. binding 행의
+    # `usable_from_session`은 filing 문턱을 이미 품고 있으므로 여기 쓰지 않는다 —
+    # 그것을 쓰면 identity 전용이어야 할 매핑 가용성이 filing 가용성을 상속한다.
+    # filing 문턱은 관측의 `historical_usable_session` 한 곳에만 산다.
     mapping_usable = max(
-        str(row["usable_from_session"]),
+        str(row["identity_usable_from_session"]),
         str(issuer_usable["usable_from_session"]),
         str(active["usable_from_session"]),
         str(prose_usable),
