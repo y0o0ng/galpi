@@ -2067,7 +2067,7 @@ must be exactly five `NO_WRITE`, five `WRITE_CANDIDATE`, and five
 forcing construction intent, or running a model. A replacement-pool
 decision must be made while P1-B2d model outputs remain unopened.
 
-Future execution is preregistered but not implemented here. For every case
+Execution was preregistered at preparation time as follows. For every case
 in fixture order, execute A once, then B once, then C once before moving to
 the next case. This is exactly 15 × 3 = 45 calls, with no automatic reruns.
 Running all A conditions, then all B conditions, then all C conditions is
@@ -2115,12 +2115,36 @@ time; it is not implemented here. If P1-B2d identifies no clean candidate,
 the study stops to review the triage formulation rather than repeatedly
 tuning on the same failures.
 
-#### P1-B2d evidence-only preparation status
+#### P1-B2d HUMAN gold freeze and implementation readiness receipt
 
-The fresh 15-case evidence-only artifact and blind HUMAN primary review
-helper are prepared. No final HUMAN gold, adjudicated PilotCase fixture,
-P1-B2d runner, or P1-B2d model output exists. The next action is blind HUMAN
-adjudication of all 15 cases followed by the 5/5/5 distribution fail-close.
-Production memory decisions, retrieval, routing, DB, and Vault remain
-unchanged; private natural replay remains `UNOPENED`; composition remains
-deferred pending an independently validated triage contract.
+The final HUMAN gold mapping was frozen at five `NO_WRITE`, five
+`WRITE_CANDIDATE`, and five `ESCALATE` before any P1-B2d model output
+existed. The completed mapping under protocol
+`xion-p1b2d-human-primary-v1` was read directly from the user-supplied local
+artifact and preserved in
+`fixtures/local-memory-inference-p1b2d-human-primary-labels.json`; the
+candidate identity remains
+`xion-local-memory-inference-p1b2d-triage-boundary-candidates-v1`. The final
+adjudicated fixture
+`xion-local-memory-inference-p1b2d-triage-boundary-v1` preserves every
+candidate ID and evidence string and is now frozen.
+
+The A/B/C prompt contracts remain exactly as preregistered. The runner
+`xion-local-memory-inference-p1b2d-triage-boundary-runner-v1` fixes Qwen3-4B
+BF16, the registered `llama.cpp` runtime, `180000 ms`, 45 case-local
+A → B → C calls, and no automatic reruns. Its implementation is **READY TO
+RUN after review**. No P1-B2d model output exists yet, and P1-B2d remains a
+diagnostic without a pass/fail disposition. P1-B2c remains CLOSED / COMPLETE
+/ `FAIL_FRESH_SYNTHETIC_VALIDATION`; composition remains blocked pending a
+fresh-validated triage contract. Production memory decisions, retrieval,
+routing, DB, and Vault remain unchanged, and private natural replay remains
+`UNOPENED`.
+
+A later raw-context evaluation is deferred and separate from this
+evidence-only component diagnostic. Only after the strongest bounded triage
+prompt candidate is selected and passes separate fresh validation should a
+distinct experiment test locating evidence in less curated conversational
+context, conversational scope, speaker/reference resolution, transient
+versus durable context, and surrounding distractors. No fixture, threshold,
+implementation, private replay, or P1-B2d reinterpretation is opened for
+that future experiment here.

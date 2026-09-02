@@ -186,7 +186,7 @@ test('completed mapping remains fail-closed until all 15 HUMAN labels exist', ()
   assert.throws(() => buildCompletedMapping(fixture, labels), /label이 올바르지/);
 });
 
-test('P1-B2d review CLI is narrow and has no model-run command', () => {
+test('P1-B2d review CLI remains narrow and separate from the diagnostic runner', () => {
   assert.equal(DEFAULT_OUTPUT, '/tmp/xion-p1b2d-human-primary-labels.json');
   assert.match(helpText(), new RegExp(REVIEW_PROTOCOL_VERSION, 'u'));
   assert.match(helpText(), new RegExp(DEFAULT_OUTPUT, 'u'));
@@ -196,7 +196,7 @@ test('P1-B2d review CLI is narrow and has no model-run command', () => {
     'node scripts/review-memory-inference-p1b2d-triage-gold.js',
   );
   assert.equal(
-    Object.keys(packageJson.scripts).some(name => name.includes('p1b2d') && name.startsWith('research:')),
-    false,
+    packageJson.scripts['research:memory-inference-p1b2d-triage-boundary'],
+    'node scripts/run-memory-inference-p1b2d-triage-boundary-diagnostic.js',
   );
 });

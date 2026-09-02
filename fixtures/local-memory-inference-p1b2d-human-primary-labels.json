@@ -1,0 +1,67 @@
+{
+  "protocolVersion": "xion-p1b2d-human-primary-v1",
+  "candidateFixture": "xion-local-memory-inference-p1b2d-triage-boundary-candidates-v1",
+  "completedAt": "2026-09-02T02:59:25.032Z",
+  "labels": [
+    {
+      "caseId": "p1b2d-triage-boundary-001",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-002",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-003",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-004",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-005",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-006",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-007",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-008",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-009",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-010",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-011",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-012",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-013",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-014",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b2d-triage-boundary-015",
+      "label": "NO_WRITE"
+    }
+  ]
+}
