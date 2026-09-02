@@ -38,6 +38,7 @@ from backtest.qv_identity_legal_evidence import (  # noqa: E402
     UNRESOLVED,
     QVLegalEvidenceError,
     associate_class_designation,
+    class_definition_matches,
     class_designation_anchor,
     class_evidence_from_legal_proof,
     classify_document,
@@ -1887,6 +1888,54 @@ class OperativeDateGrammarTest(unittest.TestCase):
         # 가장 이른 근거 자리를 결정론적으로 고른다.
         self.assertEqual(item.supporting_locators, ("block:0", "block:1"))
 
+    def test_a_numeric_state_filed_stamp_resolves(self):
+        """**O2를 부른 실제 모양이다** — `FILED 09:00 AM 01/03/2022`."""
+        item = operative(UPON_FILING, state_stamp("01/03/2022"))
+        self.assertEqual(
+            (item.status, item.date, item.source_family),
+            ("RESOLVED", "2022-01-03", "STATE_FILED_UPON_FILING"),
+        )
+        self.assertEqual(item.supporting_locators, ("block:0", "block:1"))
+
+    def test_a_state_certified_numeric_date_resolves(self):
+        item = operative("SOME CERTIFICATE.", certification("01/03/2022"))
+        self.assertEqual(
+            (item.status, item.date, item.source_family),
+            ("RESOLVED", "2022-01-03", "STATE_CERTIFIED_EFFECTIVE_DATE"),
+        )
+
+    def test_uppercase_month_names_read_the_same_date(self):
+        """주 자료의 대문자 월 이름은 **같은 영어 월 이름의 변형이다.**"""
+        stamped = operative(UPON_FILING, state_stamp("JANUARY 3, 2022"))
+        self.assertEqual((stamped.status, stamped.date), ("RESOLVED", "2022-01-03"))
+        certified = operative("SOME CERTIFICATE.", certification("JANUARY 3, 2022"))
+        self.assertEqual(
+            (certified.status, certified.date, certified.source_family),
+            ("RESOLVED", "2022-01-03", "STATE_CERTIFIED_EFFECTIVE_DATE"),
+        )
+
+    def test_a_numeric_date_outside_state_material_is_never_read(self):
+        """**같은 숫자 문자열이라도** 주 기관 자료 밖이면 게이트에서 떨어진다."""
+        item = operative(UPON_FILING, "FILED 09:00 AM 01/03/2022")
+        self.assertEqual((item.status, item.observed), ("MISSING", ()))
+        # 일반 발효일 문법은 게이트가 없으므로 숫자 날짜를 아예 읽지 않는다.
+        generic = operative("This Certificate shall become effective on 01/03/2022.")
+        self.assertEqual((generic.status, generic.observed), ("MISSING", ()))
+
+    def test_sec_metadata_numeric_filed_dates_remain_unusable(self):
+        item = operative(
+            UPON_FILING,
+            "Filed with the Securities and Exchange Commission on 01/03/2022 and "
+            "accepted by EDGAR at 21:00 that day",
+        )
+        self.assertEqual((item.status, item.observed), ("MISSING", ()))
+
+    def test_an_unreadable_state_date_is_dropped_not_guessed(self):
+        for prose in ("13/03/2022", "02/31/2022", "Bureau 3, 2022"):
+            with self.subTest(prose=prose):
+                item = operative(UPON_FILING, state_stamp(prose))
+                self.assertEqual((item.status, item.observed), ("MISSING", ()))
+
     def test_the_authority_vocabulary_is_enumerated(self):
         """`Bureau of Widgets`는 주 법인 filing 기관 어휘가 아니다."""
         item = operative(
@@ -1926,6 +1975,25 @@ class StateDerivedChronologyTest(BaseFixture):
         """**수리 시각은 경제적 축이 아니다.** 州 파생 발효일이 고정이면 구간도 고정이다."""
         def run(acceptance):
             _payload, evidence = self.assertClassEvidence([self.charter(acceptance)])
+            item = evidence["us-gaap:CommonClassAMember"].class_interval
+            return (item.effective_from, item.effective_to)
+
+        self.assertEqual(run("2022-02-05"), ("2022-01-03", None))
+        self.assertEqual(run("2024-11-30"), ("2022-01-03", None))
+
+    def test_a_numeric_state_stamp_drives_the_interval_the_same_way(self):
+        """실제 주 스탬프 모양으로도 **수리 시각은 구간을 움직이지 못한다.**"""
+        def run(acceptance):
+            filing = charter_8k(
+                "0000000042-22-000001", acceptance,
+                founding_charter(date=None, extra=(UPON_FILING,
+                                                   state_stamp("01/03/2022"))),
+            )
+            payload, evidence = self.assertClassEvidence([filing])
+            self.assertEqual(
+                payload["documents"][0]["legal_operative_source_family"],
+                "STATE_FILED_UPON_FILING",
+            )
             item = evidence["us-gaap:CommonClassAMember"].class_interval
             return (item.effective_from, item.effective_to)
 
@@ -1989,6 +2057,67 @@ class DesignationAnchorTest(unittest.TestCase):
     def test_an_empty_name_fails_closed(self):
         with self.assertRaises(QVLegalEvidenceError):
             class_designation_anchor("   ")
+
+
+class QuotedDesignationSiteTest(unittest.TestCase):
+    """닫는 인용부호가 **진짜 숫자 액면가를 가리면 안 된다.**
+
+    실제 SEC 산문은 `designated “Common Stock,” par value $0.00001 per share`이고
+    이름 그룹은 인용부호 앞에서 끝난다. 그 하나를 지나가지 못하면 액면가가 `None`이
+    되어 다른 액면가를 든 표지 제목이 **충돌이 아니라 한쪽만 있는 정상 연결로 보인다.**
+    """
+
+    def site(self, prose: str):
+        """`(일치한 governing 이름, 액면가 원문)` · 자리가 버려졌으면 `None`."""
+        found = class_definition_matches(
+            ("The Corporation hereby " + prose,), "Common Stock"
+        )
+        return (found[0][2], found[0][3]) if found else None
+
+    def test_the_par_value_is_read_across_every_closing_quote_form(self):
+        for open_q, close_q in (("“", "”"), ('"', '"'), ("‘", "’"), ("'", "'")):
+            with self.subTest(quote=close_q):
+                self.assertEqual(
+                    self.site(
+                        f"designated {open_q}Common Stock,{close_q} "
+                        "par value $0.001 per share."
+                    ),
+                    ("Common Stock", "$0.001"),
+                )
+
+    def test_the_adjacent_comma_may_sit_on_either_side_of_the_quote(self):
+        for prose in (
+            "designated “Common Stock,” par value $0.001 per share.",
+            "designated “Common Stock”, par value $0.001 per share.",
+            "designated “Common Stock” par value $0.001 per share.",
+            "designated “Common Stock,” $0.001 par value.",
+        ):
+            with self.subTest(prose=prose):
+                self.assertEqual(self.site(prose), ("Common Stock", "$0.001"))
+
+    def test_unrelated_quoted_prose_is_still_never_stripped(self):
+        """인용부호 **하나**를 지나가는 것과 임의 산문을 벗기는 것은 다르다."""
+        for prose in (
+            "designated “Common Stock,” which shall vote as one class.",
+            "designated “Common Stock” (the “Common Shares”).",
+            "designated “Common Stock,” and “Preferred Stock,” par value $0.001.",
+        ):
+            with self.subTest(prose=prose):
+                self.assertEqual(self.site(prose), ("Common Stock", None))
+
+    def test_an_unsupported_descriptor_behind_a_quote_still_fails_closed(self):
+        """지나갈 수 있게 된 자리는 **fail-close 경로에도** 열려야 한다."""
+        for prose in (
+            "designated “Common Stock,” no par value per share.",
+            "designated “Common Stock,” stated value $0.01 per share.",
+        ):
+            with self.subTest(prose=prose):
+                self.assertIsNone(self.site(prose))
+
+    def test_the_production_prose_key_is_untouched(self):
+        """연결 경계의 정규화는 **N1을 건드리지 않는다.**"""
+        raw = "“Common Stock,” par value $0.001 per share"
+        self.assertEqual(class_designation_anchor(raw).prose_key, prose_key(raw))
 
 
 class DesignationAssociationTest(unittest.TestCase):
@@ -2068,8 +2197,59 @@ def par_filing(par_text=None, **kwargs):
                       par_charter(par_text, **kwargs))
 
 
+#: 실제 SEC governing 산문 — designation이 인용부호 안에 있고 액면가가 그 뒤에 온다.
+COMMON = "Common Stock"
+COMMON_PAR_01 = "Common Stock, $0.01 par value"
+
+
+def quoted_charter(par_prose, *, quotes=("“", "”")):
+    open_q, close_q = quotes
+    return charter_8k(
+        "0000000042-15-000001", "2015-10-05",
+        par_charter(name=COMMON, definitions=(
+            f"The Corporation hereby designated {open_q}{COMMON},{close_q} {par_prose}",
+        )),
+    )
+
+
 class ParValueAssociationTest(BaseFixture):
     """실제 governing 문서에서 P2가 어떻게 걸리고 어디서 fail-close하는가."""
+
+    def definition_par_texts(self, payload):
+        return [
+            item["governing_par_text"] for item in evidence_for(payload)["findings"]
+            if item["finding_kind"] == GOVERNING_CLASS_DEFINITION
+        ]
+
+    def test_a_closing_quote_never_hides_a_par_value_conflict(self):
+        """표지 $0.01 · governing $0.001. **인용부호가 그 충돌을 삼키면 안 된다.**"""
+        for quotes in (("“", "”"), ('"', '"')):
+            with self.subTest(quotes=quotes):
+                payload, evidence = self.assertClassEvidence(
+                    [quoted_charter("par value $0.001 per share.", quotes=quotes)],
+                    cover_facts(title=COMMON_PAR_01),
+                )
+                # 인용부호 뒤의 액면가를 **실제로 읽었다.**
+                self.assertEqual(self.definition_par_texts(payload), [None, "$0.001"])
+                self.assertEqual(evidence, {})
+                entry = evidence_for(payload)
+                self.assertIsNone(entry["association_method"])
+                self.assertIn("서로 다른 숫자 액면가", entry["notes"][0])
+
+    def test_a_closing_quote_keeps_a_decimal_equal_association(self):
+        """`$.01`과 `$0.01`은 인용부호 뒤에서도 Decimal로 정확히 같다."""
+        payload, evidence = self.assertClassEvidence(
+            [quoted_charter("par value $.01 per share.")],
+            cover_facts(title=COMMON_PAR_01),
+        )
+        self.assertEqual(self.definition_par_texts(payload), [None, "$.01"])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["association_method"], "NUMERIC_PAR_VALUE_SUFFIX")
+        self.assertEqual(entry["cover_par_value"], "0.01")
+        self.assertEqual(
+            evidence["us-gaap:CommonClassAMember"].class_interval.effective_from,
+            BIRTH_DATE,
+        )
 
     def test_a_par_value_cover_title_reaches_a_bare_governing_class(self):
         payload, evidence = self.assertClassEvidence(

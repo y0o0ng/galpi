@@ -679,6 +679,28 @@ exact N1로 연결된 경우는 지금까지와 같다 — 표지 제목이 곧 
 
 임의 부분문자열 매칭·fuzzy·토큰 유사도가 없다.
 
+**"바로 뒤"는 닫는 인용부호 하나를 지나간다.** 실 SEC 산문은 designation을 인용부호로
+감싸므로 이름 그룹이 그 앞에서 끝난다.
+
+```text
+designated “Common Stock,” par value $0.00001 per share
+                         ^^ 이름과 액면가 수식 사이에 닫는 인용부호가 낀다
+```
+
+이것은 편의가 아니라 **안전 문제다.** 지나가지 못하면 그 자리의 액면가가 `None`으로
+관측되고, 다른 액면가를 든 표지 제목이 `PAR_VALUE_CONFLICT`가 아니라 **한쪽만 액면가를
+든 정상 연결**로 보인다 — P2의 fail-close가 조용히 열린다.
+
+```text
+지나가는 것   `"` · `”` · `'` · `’` **하나**와 그에 인접한 쉼표·공백
+지나간 뒤     동결된 숫자 액면가 문법을 **그대로** 적용한다
+```
+
+**일반 구두점 정규화가 아니다.** 괄호·임의 뒤 산문·둘 이상의 인용부호를 건너뛰지 않고,
+전역 N1과 표지 제목의 종단 수식 인식은 바뀌지 않는다. 인식·fail-close 두 경로에 같은
+구분자가 열려 있어서 인용부호 뒤의 `no par value` 같은 미분류 수식은 여전히 그 자리를
+버린다.
+
 ###### 생성기와 승격기가 같은 판정을 쓴다
 
 연결 판정의 정의는 `associate_class_designation()` **하나**다. 5A-2 제안 생성과 5A-2c
@@ -867,6 +889,29 @@ STATE_FILED_UPON_FILING   instrument가 "주 filing 기관에 제출하면 발�
 ```text
 Secretary of State · Division of Corporations · Department of State
 ```
+
+**주 자료 안의 날짜 표기는 O2 전용 parser가 읽는다.** 실 Delaware 스탬프는 산문 날짜가
+아니라 숫자 날짜이거나 전부 대문자다. 공유 `qv_events._iso_date`는 `January 3, 2022`
+하나만 읽어서 O2를 열고도 주 출처 recall이 0이었다.
+
+```text
+Secretary of State ... FILED 09:00 AM 01/03/2022
+EFFECTIVE DATE: JANUARY 3, 2022
+```
+
+```text
+받는 모양   MM/DD/YYYY · Month D, YYYY · 같은 영어 월 이름의 대소문자 변형
+읽는 자리   이미 주 기관 게이트를 통과한 주 filing/증명 자료 **안에서만**
+```
+
+`MM/DD/YYYY`를 미국 월/일/년으로 읽는 것은 **그 게이트 안에서만** 참이다. 달력으로
+성립하지 않는 날짜(`13/03/2022` · `02/31/2022`)와 인식하지 못하는 월 이름은 추측하지
+않고 그 자리를 버린다. **공유 parser의 의미는 넓히지 않았고** 월 이름 변환 자체는 여전히
+그 하나가 한다 — O2 parser는 대소문자만 정규화해 넘긴다.
+
+**밖에서는 아무것도 늘어나지 않았다.** 게이트 없는 일반 발효일 문법
+(`EFFECTIVE_DATE_PATTERNS`)은 이 모양을 쓰지 않으므로 숫자 날짜를 읽지 않고, SEC
+수리·EDGAR 접수·report date·서명일은 그대로 법적 시점이 아니다.
 
 **우선순위와 모호성.**
 

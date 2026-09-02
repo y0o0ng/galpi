@@ -88,6 +88,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date as _calendar_date
 from decimal import Decimal, InvalidOperation
 
 from .edgar import accession_dir_url
@@ -286,14 +287,60 @@ STATE_FILING_MARKERS = (
     r"\bdo\s+hereby\s+certify\b",
 )
 
+# ── O2-local 날짜 문법 — **주 자료 안에서만** ───────────────────────────────
+#
+# 실제 주 스탬프는 이렇게 생겼다.
+#
+# ```text
+# Secretary of State ... FILED 09:00 AM 01/03/2022
+# EFFECTIVE DATE: JANUARY 3, 2022
+# ```
+#
+# 공유 `qv_events._iso_date`는 `January 3, 2022` 하나만 읽는다. 그래서 O2를 열고도
+# 주 출처 recall이 0이었다. **공유 parser의 의미는 넓히지 않는다** — 아래는 이미
+# `_state_filing_material` 게이트를 통과한 주 filing/증명 자료 안에서만 쓰이는 O2
+# 전용 문법이고, 월 이름 변환 자체는 여전히 공유 parser 하나가 한다.
+#
+# ```text
+# 01/03/2022        미국 월/일/년으로 읽는다 — **주 자료 안에서만**
+# January 3, 2022   기존 모양 그대로
+# JANUARY 3, 2022   같은 영어 월 이름의 대소문자 변형
+# ```
+#
+# SEC 수리 시각·EDGAR 접수·report date·서명일은 여전히 읽지 않는다. 같은 숫자 날짜가
+# 주 기관 자료 **밖**에 있으면 게이트에서 먼저 떨어지고, 일반 발효일 문법
+# (`EFFECTIVE_DATE_PATTERNS`)은 게이트가 없으므로 이 문법을 쓰지 않는다.
+_STATE_NUMERIC_DATE = r"\d{1,2}/\d{1,2}/\d{4}"
+_STATE_MONTH_DATE = r"[A-Za-z]{3,9} \d{1,2}, \d{4}"
+_STATE_DATE = r"(?:" + _STATE_MONTH_DATE + r"|" + _STATE_NUMERIC_DATE + r")"
+
+
+def _state_iso_date(text: str) -> str | None:
+    """주 자료 안의 날짜 문자열 하나 → ISO. 읽지 못하면 `None`으로 버린다."""
+    raw = " ".join(str(text or "").split())
+    numeric = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", raw)
+    if numeric is not None:
+        month, day, year = (int(item) for item in numeric.groups())
+        try:
+            return _calendar_date(year, month, day).isoformat()
+        except ValueError:
+            return None
+    named = re.match(r"([A-Za-z]{3,9})(?= \d{1,2}, \d{4}$)", raw)
+    if named is None:
+        return None
+    # 월 이름의 **대소문자만** 정규화하고 변환은 공유 parser에 그대로 넘긴다. 인식
+    # 못 하는 월 이름은 거기서 `None`이 된다.
+    return _iso_date(named.group(1).capitalize() + raw[named.end():])
+
+
 # O2-A — 주 증명이 **스스로** 발효일/발효시각을 말하는 모양.
 _EFFECTIVE_LABEL = r"effective\s+(?:date|time)(?:\s*/\s*(?:date|time))?"
 STATE_CERTIFIED_DATE_PATTERNS = (
     ("STATE_CERTIFIED_EFFECTIVE",
-     r"\b" + _EFFECTIVE_LABEL + r"\s*[:\-]?\s*(?P<d>" + _DATE + r")"),
+     r"\b" + _EFFECTIVE_LABEL + r"\s*[:\-]?\s*(?P<d>" + _STATE_DATE + r")"),
     ("STATE_CERTIFIED_EFFECTIVE",
      r"\b" + _EFFECTIVE_LABEL + r"\s+(?:of|is|shall\s+be)\b[^.;]{0,60}?"
-     r"(?P<d>" + _DATE + r")"),
+     r"(?P<d>" + _STATE_DATE + r")"),
 )
 
 # O2-B(1) — instrument가 **제출을 발효 사건으로** 명시한다. 기관 없는
@@ -306,7 +353,7 @@ UPON_FILING_PATTERNS = (
 
 # O2-B(2) — 같은 문서의 주 FILED 스탬프가 **제출일**을 명시한다.
 STATE_FILED_STAMP_PATTERNS = (
-    ("STATE_FILED_STAMP", r"\bfiled\b[^.;]{0,80}?(?P<d>" + _DATE + r")"),
+    ("STATE_FILED_STAMP", r"\bfiled\b[^.;]{0,80}?(?P<d>" + _STATE_DATE + r")"),
 )
 
 # ── operative date의 출처 family — **동결된 어휘 셋뿐이다** ──────────────────
@@ -386,12 +433,33 @@ _PAR_SUFFIX_BODY = (
 # 이름의 일부일 수 있으므로 건드리지 않는다.
 _TERMINAL_PAR_SUFFIX = re.compile(r"\s*,?\s*" + _PAR_SUFFIX_BODY + r"\s*$", re.IGNORECASE)
 # governing 정의 안에서 이름 **바로 뒤**에 붙은 수식.
-_LEADING_PAR_SUFFIX = re.compile(r"^\s*,?\s*" + _PAR_SUFFIX_BODY, re.IGNORECASE)
+#
+# 실제 SEC 산문은 designation을 인용부호로 감싼다.
+#
+# ```text
+# designated “Common Stock,” par value $0.00001 per share
+#                          ^^ 이름과 수식 사이에 닫는 인용부호가 낀다
+# ```
+#
+# 이름 그룹은 그 인용부호 앞에서 끝난다. 하나를 지나가지 못하면 액면가가 `None`이
+# 되고, 그러면 **다른 액면가를 든 표지 제목이 충돌이 아니라 한쪽만 있는 정상 연결로
+# 보인다** — P2의 `PAR_VALUE_CONFLICT` fail-close가 조용히 열린다. 그래서 designation
+# 자리에서만 열거된 닫는 인용부호 **하나**와 그에 인접한 쉼표·공백을 지나간다.
+# 일반 구두점 제거가 아니고 괄호도 임의 산문도 건너뛰지 않으며, 전역 N1과 표지의
+# 종단 수식(`_TERMINAL_PAR_SUFFIX`)은 그대로다. 지나간 뒤에 적용하는 숫자 액면가
+# 문법은 동결된 그대로다.
+_SITE_CLOSING_QUOTES = "\"”'’"
+_SITE_DELIMITER = r"\s*,?\s*[" + _SITE_CLOSING_QUOTES + r"]?\s*,?\s*"
+_LEADING_PAR_SUFFIX = re.compile(
+    r"^" + _SITE_DELIMITER + _PAR_SUFFIX_BODY, re.IGNORECASE
+)
 # 값 수식처럼 보이지만 **동결된 문법에 없는** 것들. 인식하지 못한 채 같다고 보지 않고
-# 그 자리에서 fail-close한다.
+# 그 자리에서 fail-close한다. 인용부호 뒤에서도 마찬가지다 — 지나갈 수 있게 된 자리는
+# 인식 경로와 fail-close 경로 **둘 다**에 열려야 한다.
 _VALUE_SHAPED = re.compile(
-    r"^\s*,?\s*(?:\$|no\s+par\b|without\s+par\b|par\s+value\b|stated\s+value\b"
-    r"|liquidation\s+value\b|redemption\s+value\b|conversion\s+value\b)",
+    r"^" + _SITE_DELIMITER + r"(?:\$|no\s+par\b|without\s+par\b|par\s+value\b"
+    r"|stated\s+value\b|liquidation\s+value\b|redemption\s+value\b"
+    r"|conversion\s+value\b)",
     re.IGNORECASE,
 )
 # 일치 지점 **앞**이 더 긴 designation의 꼬리인가. `Class A Common Stock` 안의
@@ -854,7 +922,10 @@ def _state_filing_material(block: str) -> bool:
     return any(re.search(item, block, re.IGNORECASE) for item in STATE_FILING_MARKERS)
 
 
-def _date_hits(blocks, patterns, *, gate=None) -> list[tuple[int, str]]:
+def _date_hits(
+    blocks, patterns, *, gate=None, parser=_iso_date
+) -> list[tuple[int, str]]:
+    """`parser`는 **게이트와 짝이다.** 주 자료 문법은 주 게이트가 있는 자리에만 온다."""
     hits: list[tuple[int, str]] = []
     for ordinal, block in enumerate(blocks):
         if _not_implemented(block):
@@ -863,7 +934,7 @@ def _date_hits(blocks, patterns, *, gate=None) -> list[tuple[int, str]]:
             continue
         for _role, pattern in patterns:
             for match in re.finditer(pattern, block, re.IGNORECASE):
-                iso = _iso_date(match.group("d"))
+                iso = parser(match.group("d"))
                 if iso and (ordinal, iso) not in hits:
                     hits.append((ordinal, iso))
     return hits
@@ -910,10 +981,12 @@ def governing_operative_date(blocks: tuple[str, ...]) -> OperativeDate:
     """
     explicit = _date_hits(blocks, EFFECTIVE_DATE_PATTERNS)
     certified = _date_hits(
-        blocks, STATE_CERTIFIED_DATE_PATTERNS, gate=_state_filing_material
+        blocks, STATE_CERTIFIED_DATE_PATTERNS,
+        gate=_state_filing_material, parser=_state_iso_date,
     )
     stamped = _date_hits(
-        blocks, STATE_FILED_STAMP_PATTERNS, gate=_state_filing_material
+        blocks, STATE_FILED_STAMP_PATTERNS,
+        gate=_state_filing_material, parser=_state_iso_date,
     )
     clauses = _clause_ordinals(blocks, UPON_FILING_PATTERNS)
 

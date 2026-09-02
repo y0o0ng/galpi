@@ -3333,6 +3333,130 @@ of <NAME>`이 아니라 `shall have authority to issue … consisting of … sha
 - 897개 확장·승격 · 5A-3 · C2 binding · 회계/Q/V/B-M/랭크/Gate/수익률을 건드리지 않았다.
 
 
+## 10.24 5A-2 후속 — 인용부호 뒤 액면가 · 주 자료 날짜 표기 — 2026-09-03
+
+10.23이 올린 후속 설계 질문 **둘만** 고쳤다(리뷰가 지정한 BLOCKER 1 · MAJOR 2). 나머지
+셋(`shall have authority to issue … consisting of` 정의 문법 · legacy flat layout 자연키 ·
+governing exhibit 누락)은 그대로 열어뒀고 탄생·snapshot·종료 문법도 건드리지 않았다.
+production identity JSONL · `qv_manifest.prose_key` · `qv-class-id-v1` · SEC 수리 의미론은
+그대로다. 계약 정본은 설계 문서의 5A-2 절(**O2** · **P2**)이다.
+
+### 1. 닫는 인용부호가 진짜 액면가 충돌을 가릴 수 있었다 (BLOCKER)
+
+```text
+designated “Common Stock,” par value $0.00001 per share
+                         ^^ 이름 그룹이 여기서 끝나고 그 뒤를 못 읽었다
+```
+
+`_LEADING_PAR_SUFFIX`도 `_VALUE_SHAPED`도 인용부호를 지나가지 못해 그 자리의 액면가가
+`None`으로 관측됐다. **그러면 다른 액면가를 든 표지 제목이 `PAR_VALUE_CONFLICT`가 아니라
+"한쪽만 액면가를 든 정상 연결"로 보인다** — P2 fail-close가 조용히 열린다.
+
+designation 자리에서만 열거된 닫는 인용부호 **하나**(`"` · `”` · `'` · `’`)와 그에 인접한
+쉼표·공백을 지나가고, 지나간 뒤에는 동결된 숫자 액면가 문법을 그대로 적용한다. 인식
+경로와 fail-close 경로 **둘 다**에 같은 구분자를 열어서 인용부호 뒤의 `no par value` ·
+`stated value $0.01`은 여전히 그 자리를 버린다. 일반 구두점 제거가 아니고 괄호·임의 뒤
+산문을 벗기지 않으며 전역 N1과 표지 종단 수식은 그대로다.
+
+### 2. O2가 실제 주 스탬프 날짜 표기를 못 읽었다 (MAJOR)
+
+```text
+실제        Secretary of State ... FILED 09:00 AM 01/03/2022
+동결 _DATE  January 3, 2022
+```
+
+**공유 `qv_events._iso_date`의 의미는 넓히지 않았다.** 이미 `_state_filing_material`
+게이트를 통과한 주 자료 **안에서만** `MM/DD/YYYY` · `Month D, YYYY` · 같은 영어 월 이름의
+대소문자 변형을 읽는 O2 전용 parser를 뒀다. `MM/DD/YYYY`를 미국 월/일/년으로 읽는 것은 그
+게이트 안에서만 참이고, 달력으로 성립하지 않는 날짜와 모르는 월 이름은 추측하지 않고
+버린다. 게이트 없는 일반 발효일 문법은 이 모양을 쓰지 않으므로 숫자 날짜를 읽지 않는다.
+O2 출처 동작(스탬프 단독 -> 발효 없음 · 제출 발효 조항 + 스탬프 -> 주 제출일 · 주 증명
+명시 발효일 · 지연 발효 우선순위·모호성)은 하나도 바꾸지 않았다.
+
+### 로컬 Python 실측 (2026-09-03)
+
+| 모듈 | 10.23 | 이번 |
+|---|---|---|
+| `test_qv_identity_legal_evidence` | 143 | **157 OK** |
+| `test_qv_identity_proposals` | 103 | 103 OK |
+| `test_qv_identity_promotion` | 60 | 60 OK |
+| `test_qv_identity` | 21 | 21 OK |
+| `test_qv_identity_inventory` | 30 | 30 OK |
+| `test_qv_symbol_bridge` | 18 | 18 OK |
+| `test_qv_xbrl_binding` | 35 | 35 OK |
+| `test_qv_step4` | 138 | 138 OK |
+| `test_qv_submissions` | 48 | 48 OK |
+| **전체 trading suite** | 1,884 | **1,898 OK** |
+
+새 테스트 14개는 **고치기 전 코드에서 전부 실패한다**(17 subtest 실패, 확인함). GitHub CI는
+여전히 Node만 돌리므로 이 숫자를 재현하지 않는다.
+
+### 실제 SEC read-only smoke (2026-09-03, 같은 inventory·같은 5종목)
+
+`--historical --legal-evidence`, SEC 호출 2,350(10.23과 같다). **어느 packet도 승격하지
+않았고 결과를 보고 문법을 다시 넓히지 않았다.** 여섯 작업 항목 모두 `REVIEW_REQUIRED`로
+10.23과 같다.
+
+| 항목 | governing exhibit | operative R/M/A | source family | 연결 |
+|---|---|---|---|---|
+| AAPL | 22 → **22** | 0/22/0 → **0/22/0** | — | NUMERIC 1 (그대로) |
+| FOXA | 9 → **9** | 5/4/0 → **5/4/0** | EXPLICIT 5 | 없음 (그대로) |
+| CELG | 14 → **14** | 0/14/0 → **0/14/0** | — | NUMERIC 1 (그대로) |
+| ABMD | 11 → **11** | 1/10/0 → **1/10/0** | EXPLICIT 1 | 없음 (그대로) |
+| LEH | — | — | — | 미실행(표지 증명 없음) |
+
+**P2 — 관측 가능한 변화는 하나다.**
+
+```text
+AAPL us-gaap:CommonStockMember
+  표지 "Common Stock, $0.00001 par value per share"  cover_par 0.00001
+  governing "Common Stock"        gov_par  None  ->  **0.00001**
+  method NUMERIC_PAR_VALUE_SUFFIX (그대로)
+```
+
+이제 그 자리의 액면가를 **실제로 읽는다.** 값이 표지와 Decimal로 같아서 판정은 그대로지만,
+달랐다면 이번에는 `PAR_VALUE_CONFLICT`가 된다 — 10.23에서 열려 있던 구멍이 그것이다.
+액면가 충돌·P2 모호성은 이번에도 **0건**이고, CELG는 액면가가 이름 **앞**에 오는 문장
+(`shares of the par value of $.01 per share shall be designated ‘Common Stock’`)이라
+읽을 것이 없어 `gov_par=None` 그대로다. class 구간은 다섯 종목 전부 여전히 0/0이다
+(`search_status=INCOMPLETE`, P2/O2가 만든 상태가 아니다).
+
+FOXA의 `accessions_outside_horizon` 547 → 548은 문법이 아니라 그 사이 SEC에 새 제출이
+하나 들어온 결과다.
+
+### O2 — 실 recall은 **여전히 0이고, 원인은 날짜 표기가 아니었다**
+
+숫자·대문자 주 스탬프는 이번 pilot에서 **한 건도 O2 hit를 만들지 않았다.** 10.23의 가설
+1번("날짜 표기가 O2 개선 0의 가장 유력한 원인이다")은 **이 pilot에서는 틀렸다.** 대표
+governing exhibit 5건을 직접 다시 읽어 확인했다.
+
+```text
+문서                      주 자료 block  기관 언급  제출발효 조항  숫자 날짜
+AAPL d684095dex31.htm          0            0           0            없음
+AAPL d49399dex31.htm           0            0           0            없음
+FOXA d721949dex31.htm          1            1           0            없음
+CELG tm1923405d1_ex3-1.htm     0            0           0            없음
+ABMD d353287dex31.htm          0            0           0            없음
+```
+
+**스탬프 자체가 문서에 없다.** EDGAR Exhibit 3은 다시 타이핑된 conformed 사본이라 주
+기관의 FILED 스탬프(원본의 스캔 머리글)가 대개 본문에 없다. 유일하게 기관을 말하는 FOXA
+block은 연혁 서술(`The original Certificate of Incorporation was filed with the
+Secretary of State ... on May 3, 2018`)이고 그 문서에 제출 발효 조항이 없으므로 **스탬프
+단독은 발효를 만들지 않는다**는 동결 규칙대로 후보가 되지 않는다 — 설계대로 동작한 것이다.
+
+날짜 표기 gap은 실재했고 이번에 닫혔다(테스트가 잠근다). 다만 **이 pilot의 O2 recall 0을
+설명하는 것은 표기가 아니라 conformed exhibit에 주 스탬프가 없다는 사실이다.** 결과를 보고
+문법을 다시 넓히지 않았다 — conformed 사본에서 주 filing 시점을 어디서 얻을 것인가는 별도
+설계 질문으로 남긴다.
+
+### 이 receipt가 주장하지 않는 것
+
+- production prose identity(N1 · `prose_key` · class-ID seed · JSONL)를 넓히지 않았다.
+- SEC 수리·EDGAR 접수 의미론을 넓히지 않았다. 수리 시각은 여전히 구간을 움직이지 못한다.
+- 10.23이 남긴 나머지 후속 질문 셋을 고치지 않았다.
+- 어떤 packet도 승격하지 않았다.
+
 ---
 
 ## 11. 결과
