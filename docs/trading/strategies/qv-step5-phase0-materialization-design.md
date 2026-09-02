@@ -680,6 +680,43 @@ class 정의   authorized to issue ... shares of <NAME>
 
 단순 언급은 정의가 아니다. 맞지 않으면 `UNRESOLVED`다.
 
+##### 법적 연대기는 operative date로만 세운다 — SEC 수리 시각이 아니다
+
+**이미 CLOSED인 구분이 여기에도 그대로 적용된다.**
+
+```text
+governing instrument의 operative date  ->  경제적/법적 연대기
+SEC acceptance                          ->  5A-3의 증거 지식 가용성
+```
+
+SEC 수리 시각은 그 증거를 **언제 알 수 있었는가**를 정하지, 그 governing 행위가
+**언제 법적으로 발효했는가**를 정하지 않는다. **EDGAR가 늦게 받았다는 이유로 문서가
+경제적으로 더 나중이 되지 않는다.**
+
+그래서 이 공급기의 모든 경제적/법적 순서는 문서 본문에서 읽은 명시 operative date
+하나에서 나온다. 다음은 **순서 근거로 쓰지 않는다.**
+
+```text
+acceptance_datetime · acceptance date · filed date · accession 순서 · report date
+```
+
+그것들은 provenance로 receipt에 그대로 남고 5A-3의 지식 가용성 입력이다.
+
+operative date는 문서 수준 사실 하나다(`governing_operative_date()`). 기존 좁은
+`EFFECTIVE_DATE_PATTERNS`를 그대로 쓴다.
+
+```text
+명시 발효일 하나        -> RESOLVED   그 문서의 법적 as-of가 정해진다
+하나도 없다             -> MISSING    그 문서의 법적 연대기는 미해결이다
+서로 다른 둘 이상       -> AMBIGUOUS  법적 연대기가 모호하다
+```
+
+가장 가까운/이른/늦은 날짜를 고르지 않고 **SEC 수리 시각으로 되돌아가지 않는다.**
+`CLASS_BIRTH_EFFECTIVE_DATE`와 `CLASS_TERMINATION_EFFECTIVE_DATE`도 같은 값에서
+나오므로 **경제적 날짜의 원천은 문서마다 하나다.** 문서의 operative date가 있다고
+class 탄생이 증명되는 것은 아니다 — 탄생은 여전히 `CLASS_BIRTH_ACTION`이 함께 있어야
+한다.
+
 ##### governing snapshot의 발효일은 그 안 class의 탄생일이 아니다
 
 **정의와 탄생은 다른 사실이다.**
@@ -751,6 +788,34 @@ snapshot 뒤에 governing amendment가 하나라도 있으면 그 snapshot은 �
 of Amendment를 complete snapshot으로 승격하는 셈이다. 그 상태를 흡수한 **나중 완전
 restated snapshot**이 나와야 다시 열린다.
 
+**"뒤"는 법적 operative date로 센다.** 예컨대
+
+```text
+restated snapshot   법적 2020-05-15 / SEC 수리 2020-07-01
+amendment           법적 2020-06-01 / SEC 수리 2020-06-03
+```
+
+수리 순서로는 amendment가 앞이지만 **법적으로는 뒤다.** 그러므로
+`effective_to = null`은 막힌다. 반대로 법적으로 앞인 amendment는 SEC가 나중에
+받았더라도 나중 완전 snapshot이 흡수할 수 있다.
+
+##### 연대기가 없거나 모호하면 fail-close다
+
+open-ended continuity에 필요한 governing 문서 중 하나라도 유일한 명시 operative date가
+없으면 자동 open-ended는 `UNRESOLVED`다. **SEC timestamp로 순서를 추론하지 않는다.**
+
+두 governing 문서의 operative date가 같고 그 선후가 B2 결과를 바꾸면 그 연대기는
+미해결이다.
+
+```text
+같은 날짜의 완전 snapshot이 둘  -> 어느 것이 current인지 정할 수 없다
+amendment가 snapshot과 같은 날  -> 앞인지 뒤인지 정할 수 없다
+탄생일과 같은 날의 미해소 문서  -> 탄생 앞뒤를 정할 수 없다
+```
+
+**accession tie-break를 만들지 않는다** — 그것은 semantic 순서가 아니다. 결정론적
+자연키 정렬은 직렬화·표시에만 쓴다.
+
 유한 명시 종료는 그 독립된 규칙(E)으로 그대로 처리된다.
 
 D의 해소 기준이 좁다. **대상 class 이름이 없다는 것은 영향이 없다는 증명이 아니므로**,
@@ -807,6 +872,15 @@ CURRENT_GOVERNING_SNAPSHOT · CLASS_TERMINATION_EFFECTIVE_DATE · PROSE_ALIAS_LI
 
 문서 receipt는 `classification`(첫 일치) 말고 `classification_families`(언급한 family
 전부)와 `proof_authority`(`GOVERNING_EXHIBIT` / `FILING_NARRATIVE`)를 함께 남긴다.
+법적 연대기 사실도 문서 자연키와 locator를 달고 여기 산다.
+
+```text
+legal_operative_status · legal_operative_date · legal_operative_locator ·
+legal_operative_observed
+```
+
+`acceptance_datetime`은 같은 receipt에 provenance로 남되 **순서 근거가 아니다.**
+제안 생성과 승격 재검증이 이 하나의 구조화된 연대기를 쓴다 — 두 번째 구현이 없다.
 
 `usable_from_session`은 여기서 더하지 않는다. 5A-3이 자연키를
 `qv_sec_evidence_documents`에 맞춰 풀고 knowledge availability를 파생시킨다.
@@ -851,7 +925,12 @@ legal proof의 cik != 표지 증명 CIK
 cover_accession != CoverPageProof.accession
 cover_document_name != CoverPageProof.document_name
 finding이 legal_evidence_proof.documents에 없는 문서를 가리킨다
+finding의 경제적 날짜 != 그 문서의 법적 operative date
 ```
+
+마지막이 **경제적 날짜의 단일 원천**을 잠근다. 생성기가 탄생일·종료일과 문서
+operative date를 같은 `OperativeDate` 하나에서 만들므로, packet에서 둘이 갈라져 있으면
+어느 쪽이 참인지 알 수 없다 — 고르지 않고 멈춘다.
 
 그래서 packet에서 다음을 고쳐도 승격이 실패한다.
 

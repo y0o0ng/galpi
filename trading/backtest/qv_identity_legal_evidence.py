@@ -119,6 +119,18 @@ CHARTER_AMENDMENT_ITEM = "5.03"
 PRIMARY = "PRIMARY"
 EXHIBIT = "EXHIBIT"
 
+# ── 법적 연대기 상태 — SEC 수리 시각과 **완전히 다른 축이다** ────────────────
+#
+# ```text
+# governing instrument의 operative date  ->  경제적/법적 연대기
+# SEC acceptance                          ->  5A-3의 증거 지식 가용성
+# ```
+#
+# EDGAR가 늦게 받았다는 이유로 문서가 경제적으로 더 나중이 되지 않는다.
+LEGAL_DATE_RESOLVED = "RESOLVED"
+LEGAL_DATE_MISSING = "MISSING"
+LEGAL_DATE_AMBIGUOUS = "AMBIGUOUS"
+
 # ── 증명 권한 — discovery와 authority는 다른 축이다 ──────────────────────────
 #
 # **filing 서술은 governing instrument가 아니다.** Item 5.03 8-K의 primary 문서는
@@ -301,6 +313,8 @@ class LegalDocument:
     # **discovery와 authority는 다른 축이다.** 서술 문서도 receipt에는 남지만
     # 어떤 finding도 만들지 못한다.
     proof_authority: str
+    # **경제적/법적 연대기의 유일한 근거.** SEC 수리 시각은 순서를 정하지 않는다.
+    legal_operative: OperativeDate
     # 첫 일치 하나만이 아니라 문서가 언급한 family 전부. 조용히 잃지 않는다.
     classification_families: tuple[str, ...] = ()
 
@@ -321,6 +335,12 @@ class LegalDocument:
             "document_sha256": self.document_sha256,
             "classification": self.classification,
             "proof_authority": self.proof_authority,
+            # 법적 연대기는 여기서만 온다. `acceptance_datetime`은 provenance이고
+            # 5A-3의 지식 가용성 입력이지 순서 근거가 아니다.
+            "legal_operative_status": self.legal_operative.status,
+            "legal_operative_date": self.legal_operative.date,
+            "legal_operative_locator": self.legal_operative.locator,
+            "legal_operative_observed": list(self.legal_operative.observed),
             "classification_families": list(self.classification_families),
         }
 
@@ -472,23 +492,56 @@ def classification_families(blocks: tuple[str, ...]) -> tuple[str, ...]:
 # ── 명시 사실 추출 ────────────────────────────────────────────────────────────
 
 
-def instrument_effective_dates(blocks: tuple[str, ...]) -> tuple[str, ...]:
-    """그 instrument에 명시로 붙은 발효일 전부(중복 제거·정렬).
+@dataclass(frozen=True)
+class OperativeDate:
+    """governing instrument의 **명시 법적 발효일** 하나와 그 위치.
 
-    **문서 수준으로 센다.** 하나면 그 instrument의 operative date이고, 둘 이상이면
-    어느 것이 그 행위의 발효일인지 기계로 정할 수 없으므로 아무것도 증명하지 못한다.
-    가장 가까운 날짜를 고르거나 최초/최종을 쓰지 않는다.
+    이 모듈의 모든 경제적/법적 연대기가 여기서 나온다. SEC 수리 시각·filed date·
+    accession 순서·report date는 **순서 결정에 쓰이지 않는다** — 그것들은 provenance이고
+    5A-3의 지식 가용성 입력이다.
     """
-    found: set[str] = set()
-    for block in blocks:
+
+    status: str
+    date: str | None
+    locator: str | None
+    observed: tuple[str, ...]
+
+    def as_json(self) -> dict:
+        return {
+            "status": self.status,
+            "date": self.date,
+            "locator": self.locator,
+            "observed": list(self.observed),
+        }
+
+
+def governing_operative_date(blocks: tuple[str, ...]) -> OperativeDate:
+    """그 instrument에 명시로 붙은 발효일. **문서 수준으로 정확히 하나여야 한다.**
+
+    ```text
+    명시 발효일 하나   -> 그 문서의 법적 as-of가 정해진다
+    하나도 없다        -> 그 문서의 법적 연대기는 미해결이다
+    서로 다른 둘 이상  -> 법적 연대기가 모호하다
+    ```
+
+    가장 가까운/이른/늦은 날짜를 고르지 않고 **SEC 수리 시각으로 되돌아가지 않는다.**
+    """
+    hits: list[tuple[int, str]] = []
+    for ordinal, block in enumerate(blocks):
         if _not_implemented(block):
             continue
         for _role, pattern in EFFECTIVE_DATE_PATTERNS:
             for match in re.finditer(pattern, block, re.IGNORECASE):
                 iso = _iso_date(match.group("d"))
-                if iso:
-                    found.add(iso)
-    return tuple(sorted(found))
+                if iso and (ordinal, iso) not in hits:
+                    hits.append((ordinal, iso))
+    observed = tuple(sorted({iso for _ordinal, iso in hits}))
+    if not observed:
+        return OperativeDate(LEGAL_DATE_MISSING, None, None, ())
+    if len(observed) > 1:
+        return OperativeDate(LEGAL_DATE_AMBIGUOUS, None, None, observed)
+    ordinal = min(item for item, iso in hits if iso == observed[0])
+    return OperativeDate(LEGAL_DATE_RESOLVED, observed[0], f"block:{ordinal}", observed)
 
 
 def _matches(
@@ -725,6 +778,8 @@ def collect_legal_evidence(
             horizon.append(row)
         else:
             outside += 1
+    # **탐색 순회 순서일 뿐 법적 연대기가 아니다.** receipt를 결정론적으로 만들기 위한
+    # 자연키 정렬이고, 경제적 결론은 전부 문서의 operative date로 정해진다.
     horizon.sort(key=lambda row: (row.acceptance_eastern_date or row.filed_date, row.accession))
 
     for row in horizon:
@@ -780,6 +835,7 @@ def collect_legal_evidence(
             blocks = html_blocks(payload)
             classification = classify_document(blocks)
             authority = document_proof_authority(document_type)
+            operative = governing_operative_date(blocks)
             document = LegalDocument(
                 cik=registrant,
                 accession=row.accession,
@@ -792,6 +848,7 @@ def collect_legal_evidence(
                 document_sha256=sha256(payload),
                 classification=classification,
                 proof_authority=authority,
+                legal_operative=operative,
                 classification_families=classification_families(blocks),
             )
             documents.append(document)
@@ -837,12 +894,19 @@ def collect_legal_evidence(
 # 갈라지고, 그러면 승격 재검증이 아무것도 확인하지 못한다.
 
 
-def _document_order(document: dict) -> tuple:
-    return (
-        str(document.get("acceptance_datetime") or ""),
-        str(document.get("accession") or ""),
-        str(document.get("document_name") or ""),
-    )
+def _legal_date(document: dict) -> str | None:
+    """그 문서의 **법적 operative date**. 없으면 순서를 세울 수 없다.
+
+    **SEC 수리 시각으로 되돌아가지 않는다.** EDGAR가 늦게 받았다는 이유로 문서가
+    경제적으로 더 나중이 되지 않는다.
+    """
+    value = document.get("legal_operative_date")
+    return str(value) if value not in (None, "") else None
+
+
+def _document_label(document: dict) -> str:
+    """receipt·오류 메시지용 자연키 표시. **semantic 순서 근거가 아니다.**"""
+    return f"{document.get('accession')}/{document.get('document_name')}"
 
 
 def _finding_document(finding: dict) -> tuple[str, str]:
@@ -962,34 +1026,70 @@ def project_class_proof(
         item for item in documents
         if document_proof_authority(item.get("document_type")) == GOVERNING_EXHIBIT
     ]
-    snapshots = sorted(
-        (item for item in governing
-         if str(item.get("classification") or "") in SNAPSHOT_CLASSIFICATIONS),
-        key=_document_order,
+
+    # **법적 순서는 governing instrument의 operative date로만 세운다.** 하나라도
+    # 유일한 명시 발효일이 없으면 그 문서가 현재 snapshot인지, 그 뒤 amendment인지
+    # 판정할 수 없다. SEC 수리 시각으로 순서를 추론하지 않고 fail-close다.
+    undated = sorted(
+        _document_label(item) for item in governing if _legal_date(item) is None
     )
+    if undated:
+        return {**blank, "birth_date": birth, "notes": (
+            "governing 문서에 유일한 명시 법적 발효일이 없어 법적 순서를 세울 수 "
+            "없다(SEC 수리 시각으로 추론하지 않는다): " + ", ".join(undated),
+        )}
+
+    snapshots = [
+        item for item in governing
+        if str(item.get("classification") or "") in SNAPSHOT_CLASSIFICATIONS
+    ]
     if not snapshots:
         return {**blank, "birth_date": birth, "notes": (
             "current-in-effect 완전 governing snapshot이 없다 — 탄생만으로는 "
             "effective_to = null이 되지 않는다",
         )}
-    current = snapshots[-1]
+    current_date = max(_legal_date(item) for item in snapshots)
+    newest = [item for item in snapshots if _legal_date(item) == current_date]
+    if len(newest) > 1:
+        # 같은 법적 발효일의 완전 snapshot이 둘이면 어느 것이 현재인지 정할 수 없다.
+        # accession으로 tie-break하지 않는다 — 그것은 semantic 순서가 아니다.
+        return {**blank, "birth_date": birth, "notes": (
+            f"같은 법적 발효일({current_date})의 완전 governing snapshot이 둘 이상이라 "
+            "어느 것이 current인지 정할 수 없다: "
+            + ", ".join(sorted(_document_label(item) for item in newest)),
+        )}
+    current = newest[0]
     current_key = (str(current.get("accession") or ""), str(current.get("document_name") or ""))
 
-    # **amendment는 complete snapshot이 아니다.** 가장 늦은 완전 snapshot 뒤에
-    # governing amendment가 하나라도 있으면 그 snapshot은 현재 상태를 닫지 못한다.
+    amendments = [
+        item for item in governing
+        if str(item.get("classification") or "") in AMENDMENT_CLASSIFICATIONS
+    ]
+    # 같은 날짜의 amendment는 snapshot의 앞인지 뒤인지 명시 법적 텍스트로 정해지지
+    # 않는다. 그 순서가 B2 결과를 바꾸므로 fail-close다.
+    tied_amendments = sorted(
+        _document_label(item) for item in amendments
+        if _legal_date(item) == current_date
+    )
+    if tied_amendments:
+        return {**blank, "birth_date": birth, "notes": (
+            f"governing amendment가 완전 snapshot과 같은 법적 발효일({current_date})이라 "
+            "선후를 세울 수 없다: " + ", ".join(tied_amendments),
+        )}
+
+    # **amendment는 complete snapshot이 아니다.** 가장 늦은 완전 snapshot보다 법적으로
+    # 뒤인 governing amendment가 하나라도 있으면 그 snapshot은 현재 상태를 닫지 못한다.
     # 그 amendment가 대상 class 정의를 되풀이한다는 이유로 snapshot을 "현재"로
     # 올려주지 않는다 — 그러면 amendment를 complete snapshot으로 승격하는 셈이다.
     # 나중에 그 상태를 흡수한 완전 restated snapshot이 나와야 열린다.
     later_amendments = sorted(
-        f"{item.get('accession')}/{item.get('document_name')}"
-        for item in governing
-        if str(item.get("classification") or "") in AMENDMENT_CLASSIFICATIONS
-        and _document_order(item) > _document_order(current)
+        _document_label(item) for item in amendments
+        if _legal_date(item) > current_date
     )
     if later_amendments:
         return {**blank, "birth_date": birth, "notes": (
-            "가장 늦은 완전 governing snapshot 뒤에 governing amendment가 있다 — "
-            "그 snapshot은 current-in-effect 상태를 닫지 못한다: "
+            "가장 늦은 완전 governing snapshot보다 법적으로 뒤인 governing amendment가 "
+            "있다 — 그 snapshot은 current-in-effect 상태를 닫지 못한다: "
             + ", ".join(later_amendments),
         )}
 
@@ -1006,21 +1106,32 @@ def project_class_proof(
     #
     # **대상 class 이름이 없다는 것은 영향이 없다는 증명이 아니다.** 그래서 탄생 뒤의
     # governing 문서는 그 class를 명시로 정의해야만 해소된 것으로 센다.
-    order_of = {
-        (str(item.get("accession") or ""), str(item.get("document_name") or "")):
-        _document_order(item)
-        for item in documents
-    }
-    birth_order = order_of.get(birth_document)
+    #
+    # 순서는 여기서도 **법적 operative date**다. 탄생일이 곧 탄생 문서의 법적
+    # 발효일이므로 그것을 경계로 쓴다.
     defined_keys = {_finding_document(item) for item in definitions}
+
+    def _undefined(item) -> bool:
+        return (
+            str(item.get("classification") or "") in GOVERNING_CLASSIFICATIONS
+            and (str(item.get("accession") or ""), str(item.get("document_name") or ""))
+            not in defined_keys
+        )
+
+    # 탄생일과 같은 날의 governing 문서는 탄생 앞뒤를 세울 수 없다. 그 class를 명시로
+    # 정의하는 문서(탄생 문서 자신 포함)는 어느 쪽이든 해소되므로 영향이 없다.
+    tied_at_birth = sorted(
+        _document_label(item) for item in governing
+        if _legal_date(item) == birth and _undefined(item)
+    )
+    if tied_at_birth:
+        return {**blank, "birth_date": birth, "notes": (
+            f"탄생일({birth})과 같은 법적 발효일의 governing 문서가 있어 선후를 세울 수 "
+            "없다: " + ", ".join(tied_at_birth),
+        )}
     unresolved_changes = sorted(
-        f"{item.get('accession')}/{item.get('document_name')}"
-        for item in governing
-        if str(item.get("classification") or "") in GOVERNING_CLASSIFICATIONS
-        and birth_order is not None
-        and _document_order(item) > birth_order
-        and (str(item.get("accession") or ""), str(item.get("document_name") or ""))
-        not in defined_keys
+        _document_label(item) for item in governing
+        if _legal_date(item) > birth and _undefined(item)
     )
     if unresolved_changes:
         return {**blank, "birth_date": birth, "notes": (
@@ -1042,20 +1153,6 @@ def project_class_proof(
             "탄생 · current 완전 snapshot · COMPLETE 탐색 · 미해결 영향 없음",
         ),
     }
-
-
-def _effective_date_hits(blocks: tuple[str, ...]) -> tuple[tuple[int, str], ...]:
-    """`(block ordinal, ISO date)` — instrument에 명시로 붙은 발효일 위치."""
-    out: list[tuple[int, str]] = []
-    for ordinal, block in enumerate(blocks):
-        if _not_implemented(block):
-            continue
-        for _role, pattern in EFFECTIVE_DATE_PATTERNS:
-            for match in re.finditer(pattern, block, re.IGNORECASE):
-                iso = _iso_date(match.group("d"))
-                if iso and (ordinal, iso) not in out:
-                    out.append((ordinal, iso))
-    return tuple(out)
 
 
 def _class_findings(
@@ -1100,24 +1197,22 @@ def _class_findings(
                 semantic_family=family,
             ))
 
-        hits = _effective_date_hits(blocks)
-        distinct = sorted({iso for _ordinal, iso in hits})
-        # **instrument의 발효일이 정확히 하나일 때만** 그 행위의 경제적 발효일이다.
-        # 가장 가까운 날짜를 고르거나 최초/최종을 쓰지 않는다.
-        if len(distinct) != 1:
+        # **문서의 법적 operative date 하나가 유일한 원천이다.** 여기서 다시 계산하면
+        # 문서 receipt의 연대기와 조용히 갈라진다.
+        operative = document.legal_operative
+        if operative.status != LEGAL_DATE_RESOLVED:
             continue
-        ordinal = min(item for item, iso in hits if iso == distinct[0])
         # 명시 탄생 행위가 있는 문서에서만 그 발효일이 탄생일 후보가 된다.
         if birth_actions:
             findings.append(LegalFinding(
                 finding_kind=CLASS_BIRTH_EFFECTIVE_DATE,
                 accession=document.accession,
                 document_name=document.document_name,
-                locator=f"block:{ordinal}",
+                locator=str(operative.locator),
                 class_name_key=name_key,
                 raw_class_name=raw_name,
                 semantic_family="INSTRUMENT_EFFECTIVE_DATE",
-                effective_date=distinct[0],
+                effective_date=operative.date,
             ))
         for block_ordinal, family in class_termination_matches(blocks, raw_name):
             findings.append(LegalFinding(
@@ -1128,7 +1223,7 @@ def _class_findings(
                 class_name_key=name_key,
                 raw_class_name=raw_name,
                 semantic_family=family,
-                effective_date=distinct[0],
+                effective_date=operative.date,
             ))
     return tuple(findings)
 
@@ -1281,10 +1376,13 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
             "legal proof의 cover 문서가 표지 증명과 다릅니다: "
             f"{payload.get('cover_document_name')!r} != {cover_proof.document_name}"
         )
-    known = {
-        (str(item.get("accession") or ""), str(item.get("document_name") or ""))
-        for item in (payload.get("documents") or []) if isinstance(item, dict)
-    }
+    operative_by_document: dict[tuple[str, str], str | None] = {}
+    for item in payload.get("documents") or []:
+        if not isinstance(item, dict):
+            raise QVLegalEvidenceError("legal proof document 항목이 객체가 아닙니다")
+        operative_by_document[
+            (str(item.get("accession") or ""), str(item.get("document_name") or ""))
+        ] = _legal_date(item)
     for entry in payload.get("classes") or []:
         if not isinstance(entry, dict):
             raise QVLegalEvidenceError("legal proof class 항목이 객체가 아닙니다")
@@ -1292,10 +1390,25 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
             if not isinstance(finding, dict):
                 raise QVLegalEvidenceError("legal proof finding이 객체가 아닙니다")
             key = _finding_document(finding)
-            if key not in known:
+            if key not in operative_by_document:
                 raise QVLegalEvidenceError(
                     "finding이 receipt에 없는 문서를 가리킵니다: "
                     f"{key[0]}/{key[1]}"
+                )
+            # **경제적 날짜의 원천은 문서의 법적 operative date 하나다.** 생성기가 둘을
+            # 같은 `OperativeDate`에서 만드는데 packet에서 갈라져 있으면 어느 쪽이
+            # 참인지 알 수 없다 — 고르지 않고 멈춘다.
+            if finding.get("finding_kind") not in (
+                CLASS_BIRTH_EFFECTIVE_DATE, CLASS_TERMINATION_EFFECTIVE_DATE
+            ):
+                continue
+            stated = finding.get("effective_date")
+            stated = str(stated) if stated not in (None, "") else None
+            if stated != operative_by_document[key]:
+                raise QVLegalEvidenceError(
+                    f"finding의 경제적 날짜가 그 문서의 법적 operative date와 다릅니다: "
+                    f"{key[0]}/{key[1]} finding={stated} "
+                    f"document={operative_by_document[key]}"
                 )
 
 

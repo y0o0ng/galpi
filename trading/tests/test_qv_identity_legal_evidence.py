@@ -824,7 +824,7 @@ class OpenEndedContinuityTest(BaseFixture):
             charter_8k("0000000042-18-000001", "2018-06-05",
                        amendment(paragraphs=(
                            "Article IV is hereby amended in its entirety.",
-                       ))),
+                       ), date="June 1, 2018")),
             charter_8k("0000000042-21-000001", "2021-03-05",
                        restated(date="March 1, 2021")),
         ])
@@ -860,15 +860,167 @@ class OpenEndedContinuityTest(BaseFixture):
         payload, evidence = self.assertClassEvidence([
             charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
             charter_8k("0000000042-20-000001", "2020-03-05",
-                       amendment(paragraphs=(
-                           creates(CLASS_A), authorized(CLASS_A),
-                       ))),
+                       amendment(paragraphs=(authorized(CLASS_A),),
+                                 date="March 1, 2020")),
         ])
         entry = evidence_for(payload)
         self.assertEqual(entry["status"], UNRESOLVED)
         self.assertIn("닫지 못한다", entry["notes"][0])
         self.assertIsNone(entry["snapshot_accession"])
         self.assertEqual(evidence, {})
+
+    def test_legal_order_beats_sec_acceptance_order(self):
+        """**핵심 회귀** — EDGAR가 늦게 받았다고 경제적으로 더 나중이 되지 않는다.
+
+        ```text
+        snapshot   법적 2020-05-15 / SEC 수리 2020-07-01
+        amendment  법적 2020-06-01 / SEC 수리 2020-06-03
+        ```
+
+        수리 순서로는 amendment가 앞이라 snapshot이 현재처럼 보이지만, **법적으로는
+        amendment가 뒤다.** 그러므로 `effective_to = null`은 막혀야 한다.
+        """
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000002", "2020-07-01",
+                       restated(date="May 15, 2020")),
+            charter_8k("0000000042-20-000001", "2020-06-03",
+                       amendment(paragraphs=(authorized(CLASS_A),),
+                                 date="June 1, 2020")),
+        ])
+        self.assertEqual(payload["search_status"], COMPLETE)
+        entry = evidence_for(payload)
+        self.assertEqual(entry["birth_date"], BIRTH_DATE)
+        self.assertFalse(entry["open_ended"])
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("법적으로 뒤인", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_an_amendment_accepted_later_but_legally_earlier_is_absorbed(self):
+        """반대 방향도 같다 — 법적으로 앞인 amendment는 나중 완전 snapshot이 흡수한다.
+
+        ```text
+        amendment  법적 2020-05-01 / SEC 수리 2020-08-01
+        snapshot   법적 2020-06-01 / SEC 수리 2020-06-05
+        ```
+        """
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000009", "2020-08-01",
+                       amendment(paragraphs=(authorized(CLASS_A),),
+                                 date="May 1, 2020")),
+            charter_8k("0000000042-20-000003", "2020-06-05",
+                       restated(date="June 1, 2020")),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], COMPLETE)
+        self.assertTrue(entry["open_ended"])
+        self.assertEqual(entry["snapshot_accession"], "0000000042-20-000003")
+        interval = evidence["us-gaap:CommonClassAMember"].class_interval
+        self.assertEqual((interval.effective_from, interval.effective_to),
+                         (BIRTH_DATE, None))
+
+    def test_a_snapshot_without_an_explicit_operative_date_is_unresolved(self):
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000001", "2020-03-05", restated(date=None)),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("법적 순서를 세울 수 없다", entry["notes"][0])
+        self.assertIn("0000000042-20-000001", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_an_amendment_without_an_explicit_operative_date_is_unresolved(self):
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000001", "2020-03-05",
+                       amendment(paragraphs=(authorized(CLASS_A),))),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("법적 순서를 세울 수 없다", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_two_distinct_operative_dates_make_the_chronology_ambiguous(self):
+        """하나를 고르지 않는다 — 가장 이른/늦은/가까운 날짜를 쓰지 않는다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000001", "2020-03-05",
+                       amendment(paragraphs=(
+                           authorized(CLASS_A),
+                           "This amendment is effective as of March 1, 2020.",
+                       ), date="April 1, 2020")),
+        ])
+        document = next(
+            item for item in payload["documents"]
+            if item["accession"] == "0000000042-20-000001"
+        )
+        self.assertEqual(document["legal_operative_status"], "AMBIGUOUS")
+        self.assertIsNone(document["legal_operative_date"])
+        self.assertEqual(document["legal_operative_observed"],
+                         ["2020-03-01", "2020-04-01"])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("법적 순서를 세울 수 없다", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_two_snapshots_on_the_same_operative_date_fail_closed(self):
+        """어느 것이 current인지 정할 수 없다. accession으로 tie-break하지 않는다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000001", "2020-03-05",
+                       restated(date="March 1, 2020")),
+            charter_8k("0000000042-20-000002", "2020-03-06",
+                       restated(date="March 1, 2020")),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("어느 것이 current인지", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_an_amendment_tied_with_the_snapshot_date_fails_closed(self):
+        """같은 날의 amendment가 snapshot 앞인지 뒤인지 법적 텍스트가 정하지 않는다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-20-000002", "2020-03-06",
+                       restated(date="March 1, 2020")),
+            charter_8k("0000000042-20-000001", "2020-03-05",
+                       amendment(paragraphs=(authorized(CLASS_A),),
+                                 date="March 1, 2020")),
+        ])
+        entry = evidence_for(payload)
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertIn("선후를 세울 수 없다", entry["notes"][0])
+        self.assertEqual(evidence, {})
+
+    def test_changing_only_sec_acceptance_never_moves_the_class_interval(self):
+        """**완결 조건.** 법적 발효일이 그대로면 수리 시각을 바꿔도 구간이 같다."""
+        def run(first_acceptance, second_acceptance):
+            _payload, evidence = self.assertClassEvidence([
+                charter_8k("0000000042-15-000001", first_acceptance,
+                           founding_charter()),
+                charter_8k("0000000042-20-000003", second_acceptance,
+                           restated(date="June 1, 2020")),
+            ])
+            item = evidence["us-gaap:CommonClassAMember"].class_interval
+            return (item.effective_from, item.effective_to)
+
+        self.assertEqual(run("2015-10-05", "2020-06-05"), (BIRTH_DATE, None))
+        # 수리 순서를 완전히 뒤집어도 경제적 구간은 그대로다.
+        self.assertEqual(run("2024-01-02", "2016-01-04"), (BIRTH_DATE, None))
+
+    def test_the_receipt_carries_the_operative_date_fact(self):
+        payload, _evidence = self.assertClassEvidence(
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
+        )
+        document = payload["documents"][0]
+        self.assertEqual(document["legal_operative_status"], "RESOLVED")
+        self.assertEqual(document["legal_operative_date"], BIRTH_DATE)
+        self.assertTrue(document["legal_operative_locator"].startswith("block:"))
+        self.assertEqual(document["legal_operative_observed"], [BIRTH_DATE])
+        # SEC 수리 시각은 provenance로 그대로 남되 순서 근거가 아니다.
+        self.assertEqual(document["acceptance_datetime"], "2015-10-05T21:00:00.000000Z")
 
     def test_a_later_complete_snapshot_reopens_open_ended_continuity(self):
         """그 상태를 흡수한 완전 restated snapshot이 나오면 다시 열린다."""
@@ -1254,7 +1406,7 @@ class PromoterRevalidationTest(TamperFixture, unittest.TestCase):
                 "effective_date": "2020-03-01",
             })
         message = self.tampered(mutate)
-        self.assertIn("ClassEvidence", message)
+        self.assertIn("operative date와 다릅니다", message)
         self.assertIn("2020-03-01", message)
 
     def test_changing_the_cover_title_interval_fails(self):
@@ -1288,12 +1440,13 @@ class PromoterRevalidationTest(TamperFixture, unittest.TestCase):
         self.assertIn("ClassEvidence", message)
 
     def test_tampering_a_finding_effective_date_fails(self):
+        """경제적 날짜의 원천은 문서의 법적 operative date 하나다."""
         def mutate(payload):
             for entry in payload["legal_evidence_proof"]["classes"]:
                 for finding in entry["findings"]:
                     if finding["finding_kind"] == CLASS_BIRTH_EFFECTIVE_DATE:
                         finding["effective_date"] = "2001-01-01"
-        self.assertIn("ClassEvidence", self.tampered(mutate))
+        self.assertIn("operative date와 다릅니다", self.tampered(mutate))
 
     def test_removing_the_governing_definition_finding_fails(self):
         def mutate(payload):
@@ -1387,6 +1540,33 @@ class LegalProofIntegrityTest(TamperFixture, unittest.TestCase):
                 for finding in entry["findings"]:
                     finding["document_name"] = "ghost.htm"
         self.assertIn("receipt에 없는 문서", self.tampered(mutate))
+
+
+class LegalChronologyRevalidationTest(TamperFixture, unittest.TestCase):
+    """승격 재검증도 **같은 법적 연대기**를 쓴다. 두 번째 구현이 없다."""
+
+    def test_tampering_a_document_operative_date_fails(self):
+        def mutate(payload):
+            for document in payload["legal_evidence_proof"]["documents"]:
+                document["legal_operative_date"] = "2001-01-01"
+        self.assertIn("operative date와 다릅니다", self.tampered(mutate))
+
+    def test_removing_a_document_operative_date_fails(self):
+        def mutate(payload):
+            for document in payload["legal_evidence_proof"]["documents"]:
+                document["legal_operative_date"] = None
+        self.assertIn("operative date와 다릅니다", self.tampered(mutate))
+
+    def test_changing_only_sec_acceptance_still_promotes(self):
+        """**수리 시각은 경제적 순서 근거가 아니다.** 바꿔도 재검증이 통과한다."""
+        payload = legal_packet().as_json()
+        for document in payload["legal_evidence_proof"]["documents"]:
+            document["acceptance_datetime"] = "2099-12-31T21:00:00.000000Z"
+        promotable = revalidate_packet(payload)
+        self.assertEqual(
+            [item["effective_from"] for item in promotable.classes], [BIRTH_DATE]
+        )
+        self.assertEqual([item["effective_to"] for item in promotable.classes], [None])
 
 
 class LegalPromotionTest(ManifestFixture, unittest.TestCase):

@@ -2978,6 +2978,187 @@ layout의 문서 자연키. **둘 다 이번 fix에서 건드리지 않았다.**
 
 ---
 
+## 10.22 5A-2 법적 연대기 — governing operative date로 순서를 세운다 — 2026-09-02
+
+10.21의 네 fix는 그대로 두고 마지막 연대기 구멍 하나를 닫았다. **production identity
+manifest는 여전히 바꾸지 않았고 par-value/exact-N1 정책도 건드리지 않았다.**
+
+### BLOCKER — 법적 연대기가 SEC 수리 순서를 쓰고 있었다
+
+`_document_order()`가 `acceptance_datetime` → `accession` → `document_name`으로 정렬했고
+`project_class_proof()`가 그 순서로 세 가지를 정했다.
+
+```text
+가장 늦은 완전 governing snapshot이 무엇인가
+amendment가 그 snapshot보다 뒤인가
+탄생 이후의 governing 변경이 무엇인가
+```
+
+이것은 이미 CLOSED인 구분을 어긴다.
+
+```text
+경제적/법적 유효성   !=   SEC 지식 가용성
+```
+
+SEC 수리 시각은 그 증거를 **언제 알 수 있었는가**를 정하지, governing 행위가 **언제
+법적으로 발효했는가**를 정하지 않는다. **EDGAR가 늦게 받았다는 이유로 문서가 경제적으로
+더 나중이 되지 않는다.**
+
+### 구조화된 operative-date 사실 하나
+
+기존 좁은 `EFFECTIVE_DATE_PATTERNS`를 그대로 쓰고 문서 수준 사실 하나로 모았다
+(`governing_operative_date()`).
+
+```text
+명시 발효일 하나        -> RESOLVED   그 문서의 법적 as-of가 정해진다
+하나도 없다             -> MISSING    그 문서의 법적 연대기는 미해결이다
+서로 다른 둘 이상       -> AMBIGUOUS  법적 연대기가 모호하다
+```
+
+가장 가까운/이른/늦은 날짜를 고르지 않고 SEC 수리 시각으로 되돌아가지 않는다. 그 값이
+문서 receipt에 자연키·locator와 함께 남는다.
+
+```text
+legal_operative_status · legal_operative_date · legal_operative_locator ·
+legal_operative_observed
+```
+
+`CLASS_BIRTH_EFFECTIVE_DATE`와 `CLASS_TERMINATION_EFFECTIVE_DATE`도 **같은 값**에서
+나온다 — 경제적 날짜의 원천이 문서마다 하나다. 문서에 operative date가 있다고 탄생이
+증명되는 것은 아니다(탄생은 여전히 `CLASS_BIRTH_ACTION`이 함께 있어야 한다). 중복
+계산이던 옛 `instrument_effective_dates()`/`_effective_date_hits()`는 없앴다.
+
+### B2 연대기와 fail-close
+
+현재 완전 snapshot 선택과 "그 뒤 amendment" 판정, 탄생 이후 변경 판정이 전부 법적
+operative date로 바뀌었다.
+
+```text
+restated snapshot   법적 2020-05-15 / SEC 수리 2020-07-01
+amendment           법적 2020-06-01 / SEC 수리 2020-06-03
+```
+
+수리 순서로는 amendment가 앞이지만 법적으로는 뒤이므로 `effective_to = null`은 막힌다.
+반대로 법적으로 앞인 amendment는 SEC가 나중에 받았더라도 나중 완전 snapshot이 흡수할 수
+있다.
+
+연대기를 세울 수 없으면 자동 open-ended는 `UNRESOLVED`다.
+
+```text
+open-ended에 필요한 governing 문서 중 하나라도 유일한 명시 operative date가 없다
+같은 날짜의 완전 snapshot이 둘 -> 어느 것이 current인지 정할 수 없다
+amendment가 snapshot과 같은 날 -> 앞인지 뒤인지 정할 수 없다
+탄생일과 같은 날의 미해소 문서 -> 탄생 앞뒤를 정할 수 없다
+```
+
+**accession tie-break를 만들지 않았다** — 그것은 semantic 순서가 아니다. 결정론적
+자연키 정렬은 탐색 순회·직렬화·표시에만 남는다.
+
+### 승격 재검증
+
+`project_class_proof()`가 packet의 `legal_operative_date`를 읽으므로 제안 생성과 승격
+재검증이 **같은 구조화된 연대기 하나**를 쓴다. 두 번째 구현이 없고 승격기는 여전히
+offline이다.
+
+`assert_proof_integrity()`에 단일 원천 잠금을 하나 더했다 — finding의 경제적 날짜가 그
+문서의 법적 operative date와 다르면 fail-close다. 생성기가 둘을 같은 `OperativeDate`
+하나에서 만들므로 packet에서 갈라져 있으면 어느 쪽이 참인지 알 수 없고, 고르지 않고
+멈춘다.
+
+### 회귀 — 되돌리면 실제로 깨진다
+
+`_legal_date()`를 `acceptance_datetime`으로 임시로 되돌려 **일곱 개가 실패하는 것을
+확인**한 뒤 복구했다.
+
+```text
+법적 순서가 SEC 수리 순서를 이긴다(snapshot 05-15/수리 07-01 vs amendment 06-01/수리 06-03)
+수리는 늦지만 법적으로 앞인 amendment는 나중 완전 snapshot이 흡수한다
+완전 snapshot에 명시 operative date가 없으면 미해결이다
+관련 governing amendment에 명시 operative date가 없으면 미해결이다
+한 문서에 서로 다른 발효일이 둘이면 하나를 고르지 않는다(AMBIGUOUS)
+같은 법적 발효일의 완전 snapshot이 둘이면 fail-close다
+amendment가 snapshot과 같은 법적 발효일이면 fail-close다
+```
+
+그리고 **수리 시각만 바꾸고 법적 발효일을 그대로 두면 경제적 구간이 바뀌지 않는다**
+(공급기와 승격 재검증 양쪽에서). 문서 operative date나 finding 발효일을 고치면 실패한다.
+
+`test_qv_identity_legal_evidence`는 80 -> **92건**이다.
+
+### 로컬 Python 실측 (2026-09-02)
+
+| 모듈 | 결과 |
+|---|---|
+| `test_qv_identity_legal_evidence` | 92 OK |
+| `test_qv_identity_proposals` | 103 OK |
+| `test_qv_identity_promotion` | 60 OK |
+| `test_qv_identity` | 21 OK |
+| `test_qv_identity_inventory` | 30 OK |
+| `test_qv_symbol_bridge` | 18 OK |
+| `test_qv_xbrl_binding` | 35 OK |
+| `test_qv_step4` | 138 OK |
+| `test_qv_submissions` | 48 OK |
+| **전체 trading suite** | **1,833 OK** |
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — docker 워크플로 하나뿐이고 Python 테스트를
+돌리지 않는다.
+
+### 실제 SEC read-only smoke (2026-09-02, 같은 5A-1 inventory)
+
+`--historical --legal-evidence`. **어느 packet도 승격하지 않았고 결과를 보고 문법을
+고치지 않았다.** 최종 판정은 다섯 종목 모두 `REVIEW_REQUIRED`로 10.21과 같다.
+
+| 항목 | governing exhibit | operative date RESOLVED / MISSING / AMBIGUOUS | 탐색 | SEC 호출 |
+|---|---|---|---|---|
+| AAPL | 22 | 0 / 22 / 0 | INCOMPLETE(legacy 43 · exhibit_missing 1) | 615 |
+| FOXA | 9 | 5 / 4 / 0 | INCOMPLETE(classify 1) | 258 |
+| CELG | 14 | 0 / 14 / 0 | INCOMPLETE(legacy 42) | 698 |
+| LEH | — | — | 미실행(표지 증명 없음) | 115 |
+| ABMD | 10 | 1 / 9 / 0 | INCOMPLETE(legacy 30 · document 1) | 671 |
+
+ABMD의 `document` 실패 1건은 **일시적 SEC 오류**다(`HTTP 503`,
+`0001564590-20-003682/abmd-ex321_663.htm`). 코드 변화가 아니라 그 시각 EDGAR 응답이다.
+
+### 새로 측정된 것 — operative-date 문법의 실제 recall이 매우 낮다 (설계 질문)
+
+이번 smoke가 처음으로 **실제 governing exhibit에 대한 operative-date recall**을 쟀다.
+
+```text
+AAPL  governing exhibit 22건 중 22건이 MISSING
+CELG  14건 중 14건이 MISSING
+ABMD  10건 중 9건이 MISSING
+FOXA   9건 중 4건이 MISSING
+```
+
+FOXA에서 RESOLVED가 나온 5건은 **전부 bylaws**이고, 실제
+`AMENDED_AND_RESTATED_CERTIFICATE` 3건은 모두 MISSING이다. 즉 실 charter는 열거된 네
+표현(`effective as of D` · `shall become/became effective on D` ·
+`effective date of/is D` · `effective on D`)으로 자기 발효일을 말하지 않는다 — 흔한
+실제 표현은 `effective upon filing with the Secretary of State`이거나 서명/집행 블록의
+날짜다.
+
+**그래서 지금 규칙 아래 B2 open-ended continuity는 실 발행사 대부분에서 도달 불가능하다.**
+이 fix가 그렇게 만든 것이 아니라, 전에는 SEC 수리 순서가 그 공백을 조용히 메우고 있었고
+이제 그것이 정직하게 드러난 것이다.
+
+**문법을 넓히지 않았다.** `effective upon filing`류를 받으려면 "filing 시점"을 무엇으로
+볼지(그리고 그것이 SEC 수리 시각과 어떻게 다른지)를 새로 정해야 하고, 서명 블록 날짜는
+§9.2가 명시로 금지한 "execution/signature date by itself"에 닿는다. 둘 다 사용자
+결정이 필요한 semantic 확장이므로 후속 설계 질문으로 올린다.
+
+이전 두 질문은 그대로다 — 표지 제목의 par-value 수식과 2001년 이전 flat layout의 문서
+자연키. **둘 다 이번에도 건드리지 않았다.**
+
+### 이 receipt가 주장하지 않는 것
+
+- B1/B2 · exact N1 · par-value 정책을 바꾸지 않았다.
+- production identity JSONL을 바꾸지 않았고 897개를 확장·승격하지 않았다.
+- C2 · 사람 검토 · 넓은 합병 종료 · 5A-3 전체를 만들지 않았다.
+- 회계 · Q/V · B/M · 랭크 · Gate A~H · 수익률을 건드리지 않았다.
+
+
+---
+
 ## 11. 결과
 
 
