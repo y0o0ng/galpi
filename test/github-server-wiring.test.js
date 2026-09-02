@@ -164,7 +164,7 @@ test('GitHub tools require the explicit chat enable flag', async t => {
   assert.doesNotMatch(String(request.instructions || ''), /GitHub이 현재 저장소의 정본/);
 });
 
-test('normal text receives the lazy GitHub session while voice does not', async t => {
+test('normal text and half-duplex voice receive the lazy GitHub session', async t => {
   const server = await startServer(t, { githubEnabled: true });
   await server.ask('최신 main의 README를 확인해줘');
   const textRequest = server.responseRequests.at(-1);
@@ -175,8 +175,9 @@ test('normal text receives the lazy GitHub session while voice does not', async 
 
   await server.ask('최신 main의 README를 읽어줘', 'voice');
   const voiceRequest = server.responseRequests.at(-1);
-  assert.equal((voiceRequest.tools || []).some(tool => tool.name === 'github_read'), false);
-  assert.doesNotMatch(String(voiceRequest.instructions || ''), /GitHub이 현재 저장소의 정본/);
+  assert.ok((voiceRequest.tools || []).some(tool => tool.name === 'github_read'));
+  assert.match(voiceRequest.instructions, /GitHub이 현재 저장소의 정본/);
+  assert.match(voiceRequest.instructions, /신뢰하지 않는 근거 데이터/);
 });
 
 test('shortcut is explicitly excluded and model generation always owns cleanup', async () => {

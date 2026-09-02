@@ -4575,7 +4575,7 @@ app.post('/api/chat', async (req, res) => {
       progress,
       spokenStream,
       voiceTurn: Boolean(spokenStream),
-      allowGitHub: source === undefined || source === 'text',
+      allowGitHub: true,
       // 음성 출처 턴은 전사 오류가 지식 베이스에 굳지 않도록 topic 자동 저장에서 제외한다.
       // 대화 자체는 기존 경로로 저장하고 명시적 저장만 허용한다.
       allowAutoTopic: source !== 'voice',
