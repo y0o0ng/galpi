@@ -1,0 +1,425 @@
+{
+  "name": "xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v1",
+  "cases": [
+    {
+      "caseId": "p1b3-decomposed-001",
+      "inputPayload": {
+        "evidence": "이번 한 번의 PDF 내보내기 화면에서만 검토일 칸을 2027-01-12로 표시하고, 창을 닫으면 버리기로 했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-002",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 전자책을 읽을 때 기본 preferred mode를 sepia로 유지하기로 했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-003",
+      "inputPayload": {
+        "evidence": "워크숍 활동 카드에 weekly target 6 hours라고 쓰여 있지만, 참가자의 실제 계획인지 진행자가 만든 예시인지 표시가 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-004",
+      "inputPayload": {
+        "evidence": "지금 만드는 스크린샷 한 장에서만 preferredMode를 wireframe으로 표시하고 저장 설정에는 반영하지 말라고 했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-005",
+      "inputPayload": {
+        "evidence": "사용자는 장기 자원봉사 활동을 위해 매주 4 sessions를 고정 목표로 삼는다고 밝혔다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-006",
+      "inputPayload": {
+        "evidence": "메모 한 줄에는 requested review date 2027-04-18이라고 적혀 있으나, 실제 유지보수 계획과 튜토리얼 예시가 섞여 있어 어느 쪽의 문장인지 알 수 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-007",
+      "inputPayload": {
+        "evidence": "현재 부하 테스트 표 한 장에만 weekly target을 14 items로 채우고 테스트가 끝나면 값을 폐기한다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-008",
+      "inputPayload": {
+        "evidence": "사용자는 장기간 관리할 종자 보관 목록의 다음 정기 review date를 2027-10-08로 확정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-009",
+      "inputPayload": {
+        "evidence": "붙여 넣은 등장인물 설정표에는 preferredMode가 lantern이라고 쓰여 있지만, 사용자의 설정을 말하는지 소설 속 인물의 설정인지 구분되지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-010",
+      "inputPayload": {
+        "evidence": "이번 리허설용 안내문에서만 reviewDate를 2028-02-03으로 넣고 실제 일정에는 추가하지 않는다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-011",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 음악 연습 기록을 볼 때 preferredMode를 notation으로 쓰는 방식을 계속 선호한다고 말했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-012",
+      "inputPayload": {
+        "evidence": "초안에는 weekly target 11 pages라고 명시돼 있지만, 이번 주 임시 과제인지 앞으로 반복할 독서 목표인지 범위가 적혀 있지 않다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-013",
+      "inputPayload": {
+        "evidence": "이 한 번의 API 응답 예시에서만 preferredMode 값을 sandbox로 채우고 예시가 끝나면 유지하지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-014",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 매주 도예 연습을 3 sessions씩 이어가는 목표를 세웠다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-015",
+      "inputPayload": {
+        "evidence": "체크리스트에 review date 2028-07-21이라고 적혀 있으나, 개인 계획과 샘플 체크리스트가 같은 문서에 있어 이 날짜의 실제 적용 여부가 불분명하다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-016",
+      "inputPayload": {
+        "evidence": "지금 진행하는 상자 라벨 시뮬레이션 한 번에만 weeklyTarget 32 items를 사용하고 결과와 함께 폐기한다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-017",
+      "inputPayload": {
+        "evidence": "사용자는 장기 관찰 중인 옥상 정원의 다음 토양 review date를 2028-11-16으로 정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-018",
+      "inputPayload": {
+        "evidence": "회의 기록에 preferredMode=gallery가 있으나, 회의실 디스플레이의 일회 설정인지 사용자의 계속되는 보기 선호인지 밝혀져 있지 않다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-019",
+      "inputPayload": {
+        "evidence": "현재 이메일 템플릿 렌더링 시험에서만 reviewDate 2029-03-05를 넣고 발송 규칙에는 저장하지 않는다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-020",
+      "inputPayload": {
+        "evidence": "사용자는 장기적으로 조리법을 정리할 때 preferredMode를 metric으로 유지한다고 명시했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-021",
+      "inputPayload": {
+        "evidence": "설문 답안에 weekly target 9 sessions가 적혀 있지만, 응답자의 실제 계획인지 설문 작성 예시인지 표식이 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-022",
+      "inputPayload": {
+        "evidence": "이번 지도 색상 교정 작업 동안만 preferredMode를 contour로 표시하고 작업 종료 후 원래 보기로 돌아간다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-023",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 매주 보존 사진 18 items를 분류하는 지속 목표를 정했다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-024",
+      "inputPayload": {
+        "evidence": "문서에는 requested reviewDate 2029-08-27이 한 번만 나오지만, 파일이 실행 계획인지 교육용 샘플인지 판별할 정보가 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-025",
+      "inputPayload": {
+        "evidence": "현재 키보드 입력 지연 데모에서만 weekly target 5 sessions를 출력하고 데모 종료 뒤에는 쓰지 않는다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-026",
+      "inputPayload": {
+        "evidence": "사용자는 장기간 운영할 공동 공구 목록의 정기 review date를 2030-02-12로 확정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-027",
+      "inputPayload": {
+        "evidence": "대화에서 preferredMode를 mosaic로 두자는 말이 나왔지만, 지금 검토 중인 포스터 한 장의 표현인지 이후 모든 포스터 작업의 기본인지 드러나지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-028",
+      "inputPayload": {
+        "evidence": "이 단일 OCR 검증 결과에만 reviewDate 2030-06-24를 기록하고 원본 문서의 일정으로 취급하지 않는다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-029",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 천체 관측 노트를 정리할 때 preferredMode를 chronological로 고정한다고 밝혔다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-030",
+      "inputPayload": {
+        "evidence": "프로젝트 초안에 weekly target 7 hours라고 적혀 있으나, 한 주짜리 집중 기간에만 해당하는지 계속되는 작업 계획인지 알 수 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-031",
+      "inputPayload": {
+        "evidence": "현재 프린터 미리보기에서만 preferredMode를 grayscale로 선택하고 기기 기본값은 바꾸지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-032",
+      "inputPayload": {
+        "evidence": "사용자는 장기적으로 매주 12 pages의 악보를 디지털화하는 목표를 유지한다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-033",
+      "inputPayload": {
+        "evidence": "보드에는 reviewDate 2030-12-09가 명시돼 있지만, 실제 장비 점검표인지 양식 작성 연습인지 설명이 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-034",
+      "inputPayload": {
+        "evidence": "이번 한 번의 재고 정렬 예시에서만 weeklyTarget을 40 items로 넣고 이후 기록에는 남기지 않는다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-035",
+      "inputPayload": {
+        "evidence": "사용자는 계속 관리할 수질 측정 일지의 다음 review date를 2031-04-17로 정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-036",
+      "inputPayload": {
+        "evidence": "노트에 preferredMode=studio가 있으나, 현재 녹음 세션의 임시 화면 배치인지 앞으로의 기본 작업 방식인지 범위가 없다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-037",
+      "inputPayload": {
+        "evidence": "지금 만드는 달력 인쇄 샘플에만 reviewDate 2031-09-02를 넣고 개인 일정 데이터에는 저장하지 않는다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-038",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 자수 도안을 보관할 때 preferredMode를 color-indexed로 유지하기로 했다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-039",
+      "inputPayload": {
+        "evidence": "강의 자료의 예문에 weekly target 15 items가 나오지만, 사용자가 채택한 수집 목표인지 단순 연습 문장인지 알 수 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-040",
+      "inputPayload": {
+        "evidence": "이번 한 번의 자막 배치 확인에서만 preferredMode를 high-contrast로 쓰고 접근성 설정에는 남기지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-041",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 매주 2 hours씩 새소리 기록을 정리하는 장기 습관을 시작했다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-042",
+      "inputPayload": {
+        "evidence": "작업 노트는 requested review date를 2032-01-28로 적지만, 가상 시나리오 설명과 실제 계획이 섞여 이 날짜가 어느 쪽인지 불명확하다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-043",
+      "inputPayload": {
+        "evidence": "현재 바코드 스캐너 시연 한 번에만 weekly target 24 items를 넣고 시연이 끝나면 폐기한다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-044",
+      "inputPayload": {
+        "evidence": "사용자는 여러 해 관리할 가족 레시피 색인의 다음 review date를 2032-05-19로 확정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-045",
+      "inputPayload": {
+        "evidence": "사용자가 preferredMode를 ledger로 한다고 말했지만, 지금 열린 예산 시트에만 적용하는지 이후 모든 예산 검토의 선호인지 정하지 않았다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-046",
+      "inputPayload": {
+        "evidence": "이번 한 차례의 알림 레이아웃 캡처에만 reviewDate 2032-10-07을 표시하고 일정 항목은 만들지 않는다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-047",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 등산 경로 기록을 읽을 때 preferredMode를 topographic으로 유지한다고 밝혔다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-048",
+      "inputPayload": {
+        "evidence": "메모에는 weekly target 6 sessions가 명시돼 있으나, 이번 행사 준비 기간의 목표인지 반복되는 장기 목표인지 기간이 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-049",
+      "inputPayload": {
+        "evidence": "현재 음성 파형 이미지 한 장에서만 preferredMode를 mono로 표시하고 오디오 설정에는 반영하지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-050",
+      "inputPayload": {
+        "evidence": "사용자는 장기간 매주 10 items의 우표를 목록화하는 목표를 세웠다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-051",
+      "inputPayload": {
+        "evidence": "양식에 review date 2033-03-14가 채워져 있지만, 사용자의 실제 보관 계획인지 예시 데이터인지 출처가 표시되지 않았다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-052",
+      "inputPayload": {
+        "evidence": "이번 단일 스프레드시트 수식 검산에서만 weeklyTarget 16 items를 사용하고 검산 후 버린다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-053",
+      "inputPayload": {
+        "evidence": "사용자는 계속 추적할 실내 식물 기록의 다음 review date를 2033-07-26으로 정했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-054",
+      "inputPayload": {
+        "evidence": "문서에 preferredMode=field라고 적혀 있으나, 현장 조사 하루의 임시 보기인지 이후 조사 전반의 지속 설정인지 알 수 없다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-055",
+      "inputPayload": {
+        "evidence": "현재 QR 코드 안내판 mockup에만 reviewDate 2033-11-30을 넣고 실제 검토 일정으로 저장하지 않는다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-056",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 필름 스캔 기록을 확인할 때 preferredMode를 contact-sheet로 유지한다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-057",
+      "inputPayload": {
+        "evidence": "계획 카드에 weekly target 13 pages가 적혀 있지만, 한 번의 챌린지 목표인지 지속 독서 계획인지 설명이 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-058",
+      "inputPayload": {
+        "evidence": "이번 한 번의 네트워크 토폴로지 캡처에서만 preferredMode를 diagnostic으로 보여주고 사용자 설정에는 남기지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-059",
+      "inputPayload": {
+        "evidence": "사용자는 앞으로 매주 8 hours를 목공 프로젝트에 쓰는 지속 목표를 밝혔다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-060",
+      "inputPayload": {
+        "evidence": "기록에는 requested reviewDate 2034-04-22가 있지만, 사용자가 실행할 계획인지 문서 작성자가 넣은 샘플인지 판별할 수 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    }
+  ]
+}

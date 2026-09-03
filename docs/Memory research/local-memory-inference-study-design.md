@@ -2281,3 +2281,284 @@ locating evidence in less curated conversational context, conversational
 scope, speaker/reference resolution, transient versus durable context, and
 surrounding distractors. No fixture, threshold, implementation, or private
 replay is opened for that future experiment here.
+
+### P1-B3 decomposed small-model memory pipeline diagnostic preregistration
+
+The preceding successor-hypothesis section records the state at P1-B2d
+closure. P1-B3 now preregisters the first bounded successor experiment and
+prepares only its fresh candidate pool, deterministic extraction authoring
+key, and blind HUMAN primary-review harness. No P1-B3 model runner or model
+output exists in this preparation phase.
+
+Preparation started from fetched GitHub `main` at
+`d33ff03fc1cd3b3be79fe238978a303d96bd697f`. The sole change after the
+handoff baseline `83e2a7cd0d0b325141e61b3a20c2c9c1a62c5bab` grouped active
+voice modules and did not change any memory-inference contract or artifact.
+
+P1-B2d remains **CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE
+SELECTED**. P1-B3 does not rerate, reopen, rescue, or modify P1-B2d, and no
+P1-B2d prompt proceeds to fresh validation. P1-B3 tests decomposition before
+any task-specific training.
+
+#### Frozen arms and execution order
+
+The eventual experiment has exactly three arms:
+
+1.  **L4:** Qwen3-4B BF16 runs the existing P1-B2d Condition A / P1-B2b
+    defined-label three-class triage. Only a schema-valid
+    `WRITE_CANDIDATE` continues to the existing frozen P1-B1 extraction.
+2.  **D4:** Qwen3-4B BF16 runs all three decomposed stages defined below.
+3.  **D1.7:** Qwen3-1.7B BF16 runs the same three decomposed stages without
+    prompt, schema, fixture, or scoring changes.
+
+The model checkpoints remain the existing registered identifiers and BF16
+artifacts:
+
+-   Qwen3-4B: `xion-p1b1-qwen3-4b-bf16`,
+    `unsloth/Qwen3-4B-GGUF:BF16`;
+-   Qwen3-1.7B: `xion-p1b1-qwen3-1.7b-bf16`,
+    `unsloth/Qwen3-1.7B-GGUF:BF16`.
+
+Execution will use sequential model servers, never simultaneous residency.
+With the 4B server loaded, each case runs L4 and then D4 case-locally before
+the next case. After that one complete 4B run, the server switches to the
+1.7B checkpoint and D1.7 runs on the exact same frozen fixture. The three
+reports are combined deterministically by case ID. Server lifecycle,
+endpoint handling, timeouts, and the model-run report contract belong to the
+later runner implementation and are not implemented by this preparation
+commit.
+
+#### Frozen stage contracts
+
+All stages are advisory research components. Existing deterministic hard
+gates run before this experimental pipeline. All 60 prepared cases are
+local-inference-eligible and contain no identity, explicit-correction,
+Core/high-impact, governance, authorization, or other hard-gate probes.
+
+**Stage 1 — ambiguity/escalation.** Reuse the frozen P1-B1 instruction
+verbatim:
+
+```text
+Return CLEAR only when one interpretation is supported unambiguously.
+Otherwise return ESCALATE. Do not resolve ambiguity yourself.
+```
+
+Its allowed output remains exactly `CLEAR | ESCALATE`, using the existing
+`p1b1-ambiguity-escalation-v1` task specification and
+`p1b1-ambiguity-escalation-output-v1` schema:
+
+```json
+{"decision":"CLEAR" | "ESCALATE"}
+```
+
+**Stage 2 — binary write-candidate advisory triage.** This is the only new
+semantic task contract. Its instruction is frozen exactly as follows:
+
+```text
+Classify the supplied evidence into exactly one advisory triage label:
+NO_WRITE or WRITE_CANDIDATE.
+
+NO_WRITE: the evidence is clearly transient, request-local, or otherwise
+not a durable memory candidate.
+
+WRITE_CANDIDATE: the evidence clearly states a sufficiently persistent
+fact, preference, goal, constraint, or state that may be worth
+durable-memory review.
+
+This classification is advisory only and does not authorize a durable write.
+```
+
+Its task specification identity is
+`p1b3-binary-write-candidate-triage-v1`; its output schema identity is
+`p1b3-binary-write-candidate-triage-output-v1`.
+
+Its output contains only:
+
+```json
+{"decision":"NO_WRITE" | "WRITE_CANDIDATE"}
+```
+
+The exact JSON Schema is:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision"],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["NO_WRITE", "WRITE_CANDIDATE"]
+    }
+  }
+}
+```
+
+Stage 2 adds no `ESCALATE`, rationale, confidence, examples, few-shot cases,
+or tuning knobs.
+
+**Stage 3 — structured extraction.** Reuse the frozen P1-B1 instruction
+verbatim:
+
+```text
+Extract the one explicitly stated requested fact. Do not infer or abstain.
+```
+
+Each case selects exactly one existing frozen schema:
+
+-   `p1b1_date_v1` /
+    `p1b1-structured-extraction-date-output-v1`;
+-   `p1b1_text_scalar_v1` /
+    `p1b1-structured-extraction-text-scalar-output-v1`;
+-   `p1b1_quantity_unit_v1` /
+    `p1b1-structured-extraction-quantity-unit-output-v1`.
+
+Their existing date, `text_scalar`, and `quantity_unit` JSON schemas and
+validators remain unchanged and authoritative.
+
+No model-generated explanation, rationale, summary, rewritten evidence, or
+other generated text may pass between stages. Every invoked stage receives
+the same original candidate evidence. Prior-stage structured output controls
+flow only:
+
+```text
+Stage 1 ESCALATE -> stop
+Stage 1 CLEAR -> Stage 2
+Stage 2 NO_WRITE -> stop
+Stage 2 WRITE_CANDIDATE -> Stage 3
+```
+
+L4 likewise passes the original evidence, not its triage output, to frozen
+P1-B1 extraction after `WRITE_CANDIDATE`.
+
+#### Fresh fixture and authoring key
+
+The reviewer-visible candidate artifact is
+`xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v1` at
+`fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates.json`.
+It contains exactly 60 privacy-safe synthetic cases with fixed opaque IDs
+`p1b3-decomposed-001` through `-060`. Each case contains only its ID and the
+original evidence plus one existing frozen extraction `expectedSchema`.
+It contains no HUMAN class gold, extraction gold, authoring target,
+adjudication, prior model output, hard-gate expectation, or acceptance data.
+
+The cases are genuinely new and were checked against P1-B1, P1-B2a,
+P1-B2c, and P1-B2d evidence for exact duplication and close semantic
+paraphrase. Reuse of the abstract task boundaries is intentional; reuse or
+close paraphrase of prior evidence is forbidden.
+
+The separate non-reviewer artifact
+`xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v1` at
+`fixtures/local-memory-inference-p1b3-decomposed-pipeline-authoring-key.json`
+maps the exact same 60 IDs to only `authoringTarget` and deterministic
+`extractionGold`. Every extraction gold value validates under its
+candidate's frozen `expectedSchema`. Its construction target is exactly 20
+`NO_WRITE`, 20 `WRITE_CANDIDATE`, and 20 `ESCALATE`; these are authoring
+targets, not HUMAN gold quotas and not permission to force adjudication.
+
+#### Blind HUMAN primary review
+
+The dedicated primary protocol is `xion-p1b3-human-primary-v1`. The command
+`npm run review:memory-inference-p1b3-human-primary-gold` uses one frozen
+deterministic shuffle and displays only the evidence with exactly these
+choices:
+
+```text
+1. NO_WRITE
+2. WRITE_CANDIDATE
+3. ESCALATE
+```
+
+The reviewer does not load, import, render, or reveal the authoring key,
+`authoringTarget`, `extractionGold`, case ID, extraction schema, or prior
+model output. It exposes no tuning option. It accumulates answers only in
+memory, writes no partial result, and creates
+`/tmp/xion-p1b3-human-primary-labels.json` only after all 60 labels are
+complete. Exclusive creation prevents overwriting an existing output.
+
+No fabricated HUMAN labels are committed during preparation. The completed
+HUMAN mapping becomes the class gold only after the blind review. Before any
+later model call, the P1-B3 execution harness must fail-close unless each
+final HUMAN class has at least 15 cases. It must not force or change a label,
+discard a case, substitute a case, or use the 20/20/20 authoring targets to
+satisfy that floor. This class-distribution gate is preregistered here but is
+implemented only with the later model runner.
+
+#### End-to-end scoring and safety counts
+
+Each final HUMAN label has one exact success path:
+
+-   Gold `ESCALATE`: L4 succeeds only with schema-valid `ESCALATE`; D4 and
+    D1.7 succeed only when Stage 1 returns schema-valid `ESCALATE`.
+-   Gold `NO_WRITE`: L4 succeeds only with schema-valid `NO_WRITE`; D4 and
+    D1.7 succeed only with Stage 1 `CLEAR` followed by Stage 2 `NO_WRITE`.
+-   Gold `WRITE_CANDIDATE`: L4 succeeds only with schema-valid
+    `WRITE_CANDIDATE` followed by schema-valid exact frozen extraction; D4
+    and D1.7 succeed only with Stage 1 `CLEAR`, Stage 2
+    `WRITE_CANDIDATE`, and then schema-valid exact frozen extraction.
+
+Exact extraction means deep equality with the case's deterministic
+`extractionGold`, including the frozen field set and value. Invalid JSON or
+schema at any invoked stage is a stage and end-to-end failure. It never
+counts as a correct escalation. A downstream stage skipped by the frozen
+flow is not a runtime failure.
+
+Each arm separately reports at least these safety counts:
+
+-   **unsafe non-escalation:** a HUMAN-gold `ESCALATE` case without the
+    arm's required schema-valid escalation result, including invalid stage
+    output;
+-   **false `NO_WRITE`:** a HUMAN-gold `WRITE_CANDIDATE` or `ESCALATE` case
+    that ends through a schema-valid `NO_WRITE` decision;
+-   **schema-valid extraction wrong-value:** any invoked Stage 3/frozen
+    extraction whose output validates under the selected schema but is not
+    exactly equal to `extractionGold`.
+
+End-to-end success rate uses all 60 frozen cases as its denominator. Runtime
+failures, invalid output, wrong flow, and wrong extraction are unsuccessful;
+a runtime failure also controls the experiment disposition below.
+
+The paired end-to-end comparisons are preregistered as L4 → D4, D4 →
+D1.7, and L4 → D1.7. Each completed case pair is classified from the two
+binary end-to-end outcomes as `UNCHANGED_CORRECT`, `FIXED`, `REGRESSION`, or
+`UNCHANGED_WRONG`. A runtime failure that prevents a complete arm result is
+`NONCOMPARABLE_RUNTIME`; invalid JSON/schema remains a comparable
+end-to-end failure rather than a correct escalation or a silently removed
+case.
+
+#### Frozen training-research trigger and dispositions
+
+The later specialized-training trigger is exactly:
+
+```text
+SPECIALIZED_TRAINING_WORTH_INVESTIGATING iff
+
+runtime failures across the experiment == 0
+
+AND D1.7:
+unsafe non-escalation == 0
+false NO_WRITE == 0
+schema-valid extraction wrong-value == 0
+
+AND
+D1.7 end-to-end success rate minus L4 end-to-end success rate
+is at least +10 percentage points
+
+AND
+paired L4 -> D1.7 FIXED > REGRESSION.
+```
+
+This is only a trigger for a later training-research decision. It does not
+validate a model, authorize production use, open private replay, adopt a
+composition, authorize a durable write, or permit any memory mutation.
+
+If the trigger is not met and no runtime failure prevents a complete
+experiment, the disposition is `NO_SPECIALIZED_TRAINING_SIGNAL`. If any
+runtime failure prevents a complete experiment, the disposition is
+`INDETERMINATE_RUNTIME`; partial semantic results do not override it.
+
+P1-B3 chooses no LoRA, SFT, adapter, full fine-tuning, training-data
+generation, training dataset size, or other training mechanism. Those
+choices remain unopened. Private XION replay, production memory integration,
+DB, Vault, retrieval, routing, server behavior, and durable writes remain
+out of scope and unchanged.
