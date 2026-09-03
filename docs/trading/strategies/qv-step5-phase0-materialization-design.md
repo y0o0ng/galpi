@@ -798,6 +798,8 @@ Item 5.03인데 주소 지정 가능한 Exhibit 3이 없다 · 파일 이름 없
 
 ```text
 class 정의   authorized to issue ... shares of <NAME>
+             Corporation shall have [the] authority to issue ...
+                 consisting of ... shares of <NAME>
              ... divided into ... <NAME> ...
              ... designated <NAME>
 탄생 행위    hereby created/established ... <NAME>
@@ -811,6 +813,35 @@ class 정의   authorized to issue ... shares of <NAME>
 ```
 
 단순 언급은 정의가 아니다. 맞지 않으면 `UNRESOLVED`다.
+
+`AUTHORIZED_TO_ISSUE`의 문언은 **둘이고 semantic family는 하나다.** 실 charter는
+`authorized to issue`가 아니라 자본구조 문장으로 같은 법적 사실을 말한다.
+
+```text
+Corporation is authorized to issue ... shares of <NAME>
+
+Corporation shall have [the] authority to issue ...
+    consisting of ... shares of <NAME>
+```
+
+**둘 다 정의일 뿐 탄생이 아니다.** 자본구조 문장을 든 restated instrument에 발효일이
+있어도 그 class가 그날 만들어졌다는 뜻이 아니다 — 탄생은 여전히 동결된 탄생 행위 문법이
+같은 instrument에 따로 있을 때만 나온다.
+
+두 번째 문언은 셋으로 좁혀져 있다.
+
+```text
+주어가 법인 자신이다     Board · directors · officers · holders는 아니고,
+                         `Board of Directors of the Corporation`의 Corporation은
+                         주어가 아니라 of의 목적어다
+자본구조 문장이다        consisting of ... shares of <NAME>가 있어야 한다
+문장 경계를 넘지 않는다  넘는 것은 숫자 사이의 소수점뿐이다 — 한 문장 안의 Class B가
+                         `$0.01` 뒤에 오기 때문이고, 진짜 문장 끝은 그대로 막는다
+```
+
+형제 이름을 추론하지 않고 열거 위치·주식수를 identity로 쓰지 않는다. 각 class는
+여전히 **요청된 정확한 designation**으로만 걸리고 기존 일치 자리 규칙과 액면가 규칙을
+그대로 지난다.
 
 ##### 법적 연대기는 operative date로만 세운다 — SEC 수리 시각이 아니다
 

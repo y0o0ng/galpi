@@ -210,9 +210,38 @@ GOVERNING_CLASSIFICATIONS = SNAPSHOT_CLASSIFICATIONS | AMENDMENT_CLASSIFICATIONS
 #
 # **단순 언급으로는 부족하다.** 그 이름이 법적으로 세워지는 문장 모양이어야 한다.
 # 목록을 열린 채로 늘리지 않는다 — 맞지 않으면 UNRESOLVED다.
+#
+# 실 charter는 `authorized to issue`가 아니라 **자본구조 문장**으로 같은 사실을 말한다.
+#
+# ```text
+# The total number of shares of capital stock which the Corporation shall have
+# authority to issue is 3,070,000,000 shares, consisting of 2,000,000,000 shares of
+# Class A Common Stock, par value $0.01 per share (“Class A Common Stock”),
+# 1,000,000,000 shares of Class B Common Stock, ...
+# ```
+#
+# 법적으로 `Corporation is authorized to issue`와 **같은 종류의 사실**이므로 같은
+# `AUTHORIZED_TO_ISSUE` family의 또 다른 문언이다 — 네 번째 family를 만들지 않는다.
+# **정의이지 탄생이 아니다**(§9.3 그대로).
+#
+# 주어는 **법인 자신**이어야 한다. `The Board shall have authority to issue`는 이사회
+# 권한이지 class 정의가 아니고, `The Board of Directors of the Corporation`의
+# `Corporation`은 주어가 아니라 `of`의 목적어다.
+_CORPORATION_SUBJECT = (
+    r"(?:(?<!of )\bthe\s+Corporation\b|(?<!of the )(?<!of )\bCorporation\b)"
+)
+# `[^.;]`는 `$0.01`의 마침표에서 멈춘다 — 그러면 **같은 문장 안의 Class B**에 영원히
+# 닿지 못한다. 숫자 사이의 마침표는 문장 경계가 아니므로 그것 하나만 지나간다.
+# 진짜 문장 끝(`. `)은 그대로 막는다.
+_CAPITAL_STRUCTURE_SPAN = r"(?:[^.;]|\.(?=\d))"
 CLASS_DEFINITION_PATTERNS = (
     ("AUTHORIZED_TO_ISSUE",
      r"authorized\s+to\s+issue\b[^.;]{0,240}?\bshares\s+of\s+(?:the\s+)?{name}\b"),
+    ("AUTHORIZED_TO_ISSUE",
+     _CORPORATION_SUBJECT
+     + r"\s+shall\s+have\s+(?:the\s+)?authority\s+to\s+issue\b"
+     + _CAPITAL_STRUCTURE_SPAN + r"{0,120}?\bconsisting\s+of\b"
+     + _CAPITAL_STRUCTURE_SPAN + r"{0,240}?\bshares\s+of\s+(?:the\s+)?{name}\b"),
     ("DIVIDED_INTO", r"\bdivided\s+into\b[^.;]{0,240}?\b{name}\b"),
     ("DESIGNATED", r"\bdesignated(?:\s+as)?\s+(?:the\s+)?[\"“‘']?{name}\b"),
 )

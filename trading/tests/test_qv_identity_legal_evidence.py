@@ -793,6 +793,162 @@ class BirthTest(BaseFixture):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 정의 grammar — `Corporation shall have authority to issue … consisting of …`
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+#: 실 FOXA governing charter(`0001193125-19-079678/d721949dex31.htm` block:18)의
+#: 자본구조 문장을 그대로 옮긴 것이다. 두 class가 **한 문장 안에** 있고 Class B에
+#: 닿으려면 `$0.01`의 소수점을 지나야 한다.
+CORPORATION_AUTHORITY_CLAUSE = (
+    "(a) The total number of shares of capital stock which the Corporation shall "
+    "have authority to issue is 3,070,000,000 shares, consisting of 2,000,000,000 "
+    "shares of Class A Common Stock, par value $0.01 per share (“Class A Common "
+    "Stock”), 1,000,000,000 shares of Class B Common Stock, par value $0.01 per "
+    "share (“Class B Common Stock”), 35,000,000 shares of Series Common Stock, par "
+    "value $0.01 per share (“Series Common Stock”) and 35,000,000 shares of "
+    "Preferred Stock, par value $0.01 per share (“Preferred Stock”)."
+)
+
+
+def definitions_in(prose: str, name: str):
+    return class_definition_matches(html_blocks(html(prose)), name)
+
+
+class CorporationAuthorityDefinitionTest(unittest.TestCase):
+    """`Corporation shall have authority to issue … consisting of …`는 **정의다.**
+
+    법적으로 `Corporation is authorized to issue …`와 같은 종류의 사실이라 같은
+    `AUTHORIZED_TO_ISSUE` family의 또 다른 문언일 뿐이다. 네 번째 family가 아니다.
+    """
+
+    def test_the_real_dual_class_capital_structure_defines_both_classes(self):
+        for name in (CLASS_A, CLASS_B):
+            with self.subTest(name=name):
+                found = definitions_in(CORPORATION_AUTHORITY_CLAUSE, name)
+                self.assertEqual(len(found), 1)
+                _ordinal, family, governing, par_text = found[0]
+                self.assertEqual(family, "AUTHORIZED_TO_ISSUE")
+                # **일치한 governing 산문 그대로**이고 형제 이름이 아니다.
+                self.assertEqual(governing, name)
+                # 자리의 액면가는 기존 P2 규칙이 그대로 읽는다.
+                self.assertEqual(par_text, "$0.01")
+
+    def test_class_a_and_class_b_never_collapse_into_one(self):
+        """형제 이름을 추론하지도, 위치로 세지도 않는다."""
+        a = definitions_in(CORPORATION_AUTHORITY_CLAUSE, CLASS_A)
+        b = definitions_in(CORPORATION_AUTHORITY_CLAUSE, CLASS_B)
+        self.assertEqual((a[0][2], b[0][2]), (CLASS_A, CLASS_B))
+        # 요청하지 않은 형제는 나오지 않는다.
+        self.assertEqual(
+            definitions_in(CORPORATION_AUTHORITY_CLAUSE, "Class C Common Stock"), ()
+        )
+
+    def test_the_capital_structure_shape_is_required(self):
+        """`consisting of … shares of <NAME>` 없이는 이 문언이 정의가 아니다."""
+        self.assertEqual(
+            definitions_in(
+                "The Corporation shall have authority to issue 3,070,000,000 "
+                "shares of Class A Common Stock.",
+                CLASS_A,
+            ),
+            (),
+        )
+
+    def test_only_the_corporation_itself_can_be_the_subject(self):
+        """이사회·이사·임원·주주 권한은 class 정의가 아니다."""
+        tail = (
+            " shall have authority to issue 3,070,000,000 shares, consisting of "
+            "2,000,000,000 shares of Class A Common Stock, par value $0.01 per share."
+        )
+        for subject in (
+            "The Board",
+            "The Board of Directors",
+            # **`of the Corporation`은 주어가 아니라 목적어다.**
+            "The Board of Directors of the Corporation",
+            "The directors",
+            "The holders",
+        ):
+            with self.subTest(subject=subject):
+                self.assertEqual(definitions_in(subject + tail, CLASS_A), ())
+
+    def test_a_different_legal_verb_is_not_this_grammar(self):
+        """`may issue`는 다른 법적 문언이다 — 동의어로 받지 않는다."""
+        self.assertEqual(
+            definitions_in(
+                "The Corporation may issue 3,070,000,000 shares, consisting of "
+                "2,000,000,000 shares of Class A Common Stock, par value $0.01 per "
+                "share.",
+                CLASS_A,
+            ),
+            (),
+        )
+
+    def test_the_clause_never_crosses_a_sentence_boundary(self):
+        """이름을 찾겠다고 문장 경계를 넘지 않는다. 넘는 것은 **숫자 소수점뿐이다.**"""
+        self.assertEqual(
+            definitions_in(
+                "The Corporation shall have authority to issue 100 shares, "
+                "consisting of 100 shares of Preferred Stock. The plan reserves "
+                "5,000,000 shares of Class A Common Stock.",
+                CLASS_A,
+            ),
+            (),
+        )
+
+    def test_the_existing_authorized_to_issue_literal_is_unchanged(self):
+        found = definitions_in(authorized(CLASS_A), CLASS_A)
+        self.assertEqual(len(found), 1)
+        self.assertEqual((found[0][1], found[0][2], found[0][3]),
+                         ("AUTHORIZED_TO_ISSUE", CLASS_A, "$0.001"))
+
+
+class CorporationAuthorityBirthSeparationTest(BaseFixture):
+    """**정의는 탄생이 아니다.** 새 문언도 그 경계를 하나도 옮기지 않는다."""
+
+    def charter(self, *extra):
+        return charter_8k(
+            "0000000042-19-000001", "2019-03-20",
+            html("AMENDED AND RESTATED CERTIFICATE OF INCORPORATION OF ACME INC.",
+                 CORPORATION_AUTHORITY_CLAUSE, effective(BIRTH_PROSE), *extra),
+        )
+
+    def test_the_new_definition_shape_with_an_operative_date_proves_no_birth(self):
+        payload, evidence = self.assertClassEvidence([self.charter()])
+        entry = evidence_for(payload)
+        kinds = [item["finding_kind"] for item in entry["findings"]]
+        self.assertEqual(kinds, [GOVERNING_CLASS_DEFINITION])
+        self.assertNotIn(CLASS_BIRTH_ACTION, kinds)
+        self.assertNotIn(CLASS_BIRTH_EFFECTIVE_DATE, kinds)
+        self.assertIsNone(entry["birth_date"])
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertEqual(evidence, {})
+
+    def test_an_independent_birth_action_still_proves_birth(self):
+        """같은 instrument가 **따로** 동결된 탄생 문언을 들면 그때는 탄생이다."""
+        payload, evidence = self.assertClassEvidence([self.charter(creates(CLASS_A))])
+        entry = evidence_for(payload)
+        kinds = [item["finding_kind"] for item in entry["findings"]]
+        self.assertIn(CLASS_BIRTH_ACTION, kinds)
+        self.assertEqual(entry["birth_date"], BIRTH_DATE)
+        self.assertEqual(
+            evidence["us-gaap:CommonClassAMember"].class_interval.effective_from,
+            BIRTH_DATE,
+        )
+
+    def test_the_matched_site_still_routes_through_the_par_value_rules(self):
+        """새 문언이 P2 안전 장치를 우회하지 않는다 — 액면가가 다르면 연결이 꺼진다."""
+        payload, evidence = self.assertClassEvidence(
+            [self.charter()],
+            cover_facts(title="Class A Common Stock, $0.001 par value"),
+        )
+        self.assertEqual(evidence, {})
+        entry = evidence_for(payload)
+        self.assertIsNone(entry["association_method"])
+        self.assertIn("서로 다른 숫자 액면가", entry["notes"][0])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # B2 — open-ended 연속성
 # ══════════════════════════════════════════════════════════════════════════════
 

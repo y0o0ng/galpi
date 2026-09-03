@@ -3457,6 +3457,109 @@ Secretary of State ... on May 3, 2018`)이고 그 문서에 제출 발효 조항
 - 10.23이 남긴 나머지 후속 질문 셋을 고치지 않았다.
 - 어떤 packet도 승격하지 않았다.
 
+## 10.25 5A-2 — `Corporation shall have authority to issue` 정의 문언 — 2026-09-03
+
+10.23이 남긴 후속 설계 질문 3번(**FOXA class 정의 문법**) 하나만 닫는다. 시작 `main`은
+`d33ff03fc1cd3b3be79fe238978a303d96bd697f`다. 나머지 후속 질문(legacy flat layout ·
+governing exhibit 누락 · O2 주 출처 recall)은 열린 채로 두고, legacy는 직전 read-only
+probe 결론대로 `legacy_layout -> INCOMPLETE` fail-close를 유지한다.
+
+### 문법 추가 — semantic family는 늘지 않는다
+
+실 charter는 `authorized to issue`가 아니라 자본구조 문장으로 같은 법적 사실을 말한다.
+
+```text
+The total number of shares of capital stock which the Corporation shall have
+authority to issue is 3,070,000,000 shares, consisting of 2,000,000,000 shares of
+Class A Common Stock, par value $0.01 per share (“Class A Common Stock”),
+1,000,000,000 shares of Class B Common Stock, ...
+```
+
+`AUTHORIZED_TO_ISSUE` family에 **두 번째 문언 하나**를 더했다. 네 번째 family를 만들지
+않았고 `finding_kind`는 `GOVERNING_CLASS_DEFINITION` 그대로다. 좁히는 것은 셋이다.
+
+```text
+주어가 법인 자신이다     `(?<!of )the Corporation` | `(?<!of the )(?<!of )Corporation`
+                         Board · directors · officers · holders는 받지 않고,
+                         `Board of Directors of the Corporation`도 받지 않는다
+자본구조 문장이다        consisting of ... shares of <NAME>
+문장 경계를 넘지 않는다  `(?:[^.;]|\.(?=\d))` — 숫자 사이의 소수점만 지나간다
+```
+
+세 번째가 필요한 이유는 **한 문장 안의 Class B가 `$0.01` 뒤에 오기 때문이다.** 기존
+`[^.;]` 창은 그 소수점에서 멈춰 Class B에 영원히 닿지 못한다. 진짜 문장 끝(`. `)은
+그대로 막는다. 기존 세 문언(`authorized to issue` · `divided into` · `designated`)과
+`_matches` · `_fill` · `_designation_site` · P2 · N1 · class-ID는 한 줄도 바꾸지 않았다.
+
+**정의는 여전히 탄생이 아니다.** 이 문언 + 발효일만으로는 탄생이 나오지 않고, 같은
+instrument에 동결된 탄생 행위 문법이 **따로** 있을 때만 탄생이다. 계약 정본은 설계
+문서의 열거된 legal semantic family 절이다.
+
+### 로컬 Python 실측 (2026-09-03)
+
+| 모듈 | 이전 | 이번 |
+|---|---|---|
+| `test_qv_identity_legal_evidence` | 157 | **167 OK** |
+| **전체 trading suite** | 1,898 | **1,908 OK** |
+
+새 테스트 10개 중 **양성 5개는 구현 전에 실패하는 것을 먼저 확인했다**(dual-class 정의
+A·B · 두 class 비충돌 · 정의≠탄생 · P2 액면가 라우팅). 음성 테스트(이사회·이사·주주
+주어 · `of the Corporation` 목적어 · `may issue` · `consisting of` 없음 · 문장 경계)는
+구현 전후 모두 통과한다. **GitHub CI는 Node만 돌리므로 이 숫자를 재현하지 않는다.**
+
+### 실제 SEC read-only smoke (FOXA 단독, 2026-09-03)
+
+`--symbols FOXA --historical --legal-evidence`, SEC 호출 258. **승격하지 않았고
+manifest·production JSONL을 건드리지 않았다.**
+
+| | 이전 | 이번 |
+|---|---|---|
+| Class A 연결 | 없음 | **NUMERIC_PAR_VALUE_SUFFIX** |
+| Class B 연결 | 없음 | **NUMERIC_PAR_VALUE_SUFFIX** |
+| Class A findings | 0 | **2** |
+| Class B findings | 0 | **2** |
+| governing exhibit | 9 | 9 |
+| operative R/M/A | 5/4/0 | 5/4/0 |
+| class 구간 | 0/2 | 0/2 |
+| 판정 | REVIEW_REQUIRED | REVIEW_REQUIRED |
+
+새로 나온 finding 4건은 전부 정의이고 탄생이 아니다.
+
+```text
+CommonClassAMember
+  GOVERNING_CLASS_DEFINITION AUTHORIZED_TO_ISSUE
+    0001193125-19-079678/d721949dex31.htm block:18  'Class A Common Stock'  $0.01
+    0001628280-23-002786/foxa-20221231x10qex31.htm block:19  'Class A Common Stock'  $0.01
+CommonClassBMember
+  GOVERNING_CLASS_DEFINITION AUTHORIZED_TO_ISSUE
+    0001193125-19-079678/d721949dex31.htm block:18  'Class B Common Stock'  $0.01
+    0001628280-23-002786/foxa-20221231x10qex31.htm block:19  'Class B Common Stock'  $0.01
+```
+
+`d721949dex31.htm` block:18은 10.23이 지목한 바로 그 자리다. 두 class가 서로 다른
+governing 이름으로 남고 각 자리의 액면가 `$0.01`이 표지 `$0.01`과 Decimal로 같아
+기존 P2 규칙 그대로 연결됐다. `CLASS_BIRTH_ACTION`·`CLASS_BIRTH_EFFECTIVE_DATE`는
+**0건**이다.
+
+### 남아 있는 차단 요인 (이번에 고치지 않았다)
+
+```text
+classify:0001193125-19-296568/d837035dex31.htm   governing 후보 분류 실패 1건
+  -> search_status = INCOMPLETE  -> class 구간 0/2  -> REVIEW_REQUIRED
+명시 탄생 행위 없음 · 두 restated certificate의 operative date MISSING
+```
+
+**정의 recall 구멍만 닫혔고 무관한 semantic은 하나도 바뀌지 않았다.** 결과를 보고
+문법을 다시 넓히지 않았다.
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity JSONL · `qv_manifest.prose_key` · `qv-class-id-v1` ·
+  provenance 자연키 · SEC 수리 의미론을 바꾸지 않았다.
+- 탄생·종료·snapshot 분류·O2·P2·B1/B2·Exhibit 3 권한·Item 5.03을 바꾸지 않았다.
+- legacy flat layout을 열지 않았다(`legacy_layout -> INCOMPLETE` 그대로).
+- 어떤 packet도 승격하지 않았고 5A-3를 만들지 않았다.
+
 ---
 
 ## 11. 결과
