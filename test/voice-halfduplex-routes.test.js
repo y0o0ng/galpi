@@ -4,8 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 
-const { registerVoiceHalfDuplexRoutes } = require('../lib/voice-halfduplex-routes');
-const { createVoiceTranscriptionService } = require('../lib/voice-transcription');
+const { registerVoiceHalfDuplexRoutes } = require('../lib/voice/halfduplex-routes');
+const { createVoiceTranscriptionService } = require('../lib/voice/transcription');
 
 function pcmWav(seconds = 1) {
   const samples = Math.round(seconds * 16000);

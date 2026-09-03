@@ -96,9 +96,9 @@ function loadClient({
     ArrayBuffer,
   };
   vm.runInNewContext(
-    fs.readFileSync(path.join(ROOT, 'public/voice-halfduplex.js'), 'utf8'),
+    fs.readFileSync(path.join(ROOT, 'public/voice/halfduplex.js'), 'utf8'),
     context,
-    { filename: 'voice-halfduplex.js' },
+    { filename: 'voice/halfduplex.js' },
   );
 
   const client = fakeWindow.VoiceHalfDuplex;

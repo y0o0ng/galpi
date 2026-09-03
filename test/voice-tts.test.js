@@ -30,7 +30,7 @@ const {
   DEFAULT_SPEED,
   createVoiceTtsService,
   selectSpokenText,
-} = require('../lib/voice-tts');
+} = require('../lib/voice/tts');
 
 test('a short answer is spoken whole and an empty one produces nothing', () => {
   assert.equal(selectSpokenText('오후 3시야.'), '오후 3시야.');
@@ -167,7 +167,7 @@ test('the delivery instruction no longer fights the speed setting', () => {
 });
 
 test('the spoken text is split at sentence ends and tiny pieces are merged', () => {
-  const { splitSpokenSegments } = require('../lib/voice-tts');
+  const { splitSpokenSegments } = require('../lib/voice/tts');
 
   assert.deepEqual(
     splitSpokenSegments('내일 오전 9시에 일정 하나 있어. 할머니집 가기야. 알림도 걸어둘까?'),
@@ -194,7 +194,7 @@ test('the spoken text is split at sentence ends and tiny pieces are merged', () 
 });
 
 test('splitting reuses the one cap so long answers still point at the screen', () => {
-  const { splitSpokenSegments, DEFAULT_MAX_CHARS, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const { splitSpokenSegments, DEFAULT_MAX_CHARS, SPOKEN_CLOSING: closing } = require('../lib/voice/tts');
   const segments = splitSpokenSegments('가나다라마바사아자차. '.repeat(120));
 
   assert.ok(segments.length >= 1);
@@ -204,14 +204,14 @@ test('splitting reuses the one cap so long answers still point at the screen', (
 });
 
 test('the number of TTS calls is bounded no matter how many sentences arrive', () => {
-  const { splitSpokenSegments, MAX_SEGMENTS } = require('../lib/voice-tts');
+  const { splitSpokenSegments, MAX_SEGMENTS } = require('../lib/voice/tts');
   const many = Array.from({ length: 40 }, (_, i) => `${i}번 문장은 조금 길게 적어둔다.`).join(' ');
 
   assert.ok(splitSpokenSegments(many, { maxChars: 5000 }).length <= MAX_SEGMENTS);
 });
 
 test('the incremental segmenter matches the batch one as text arrives', () => {
-  const { createSpokenSegmenter } = require('../lib/voice-tts');
+  const { createSpokenSegmenter } = require('../lib/voice/tts');
   const feed = (chunks, options) => {
     const segmenter = createSpokenSegmenter(options);
     const out = [];
@@ -229,7 +229,7 @@ test('the incremental segmenter matches the batch one as text arrives', () => {
 });
 
 test('a decimal or ellipsis split across chunks is not mistaken for a sentence end', () => {
-  const { createSpokenSegmenter } = require('../lib/voice-tts');
+  const { createSpokenSegmenter } = require('../lib/voice/tts');
   const segmenter = createSpokenSegmenter();
 
   // "3." 까지만 왔을 때는 소수점인지 알 수 없으므로 내보내지 않는다.
@@ -240,7 +240,7 @@ test('a decimal or ellipsis split across chunks is not mistaken for a sentence e
 });
 
 test('the streamed cap stops reading and points at the screen', () => {
-  const { createSpokenSegmenter, MAX_SPOKEN_SEGMENTS } = require('../lib/voice-tts');
+  const { createSpokenSegmenter, MAX_SPOKEN_SEGMENTS } = require('../lib/voice/tts');
   const feed = text => {
     const segmenter = createSpokenSegmenter();
     const out = [];
@@ -267,7 +267,7 @@ test('the streamed cap stops reading and points at the screen', () => {
 });
 
 test('quiet and loud segments end up at the same loudness', () => {
-  const { normalizeWavLoudness, TARGET_RMS } = require('../lib/voice-tts');
+  const { normalizeWavLoudness, TARGET_RMS } = require('../lib/voice/tts');
   const rmsOf = wav => {
     const samples = (wav.length - 44) / 2;
     let sum = 0;
@@ -289,7 +289,7 @@ test('quiet and loud segments end up at the same loudness', () => {
 });
 
 test('normalizing never clips and leaves non-PCM bytes alone', () => {
-  const { normalizeWavLoudness } = require('../lib/voice-tts');
+  const { normalizeWavLoudness } = require('../lib/voice/tts');
   const peakOf = wav => {
     const samples = (wav.length - 44) / 2;
     let peak = 0;
@@ -313,7 +313,7 @@ test('normalizing never clips and leaves non-PCM bytes alone', () => {
 });
 
 test('the streamed wav header is rewritten with its real length', () => {
-  const { normalizeWavLoudness } = require('../lib/voice-tts');
+  const { normalizeWavLoudness } = require('../lib/voice/tts');
   const wav = silentWav(400, 6000);
   // provider는 길이를 모른 채 만들어 0xFFFFFFFF를 적어 보낸다.
   wav.writeUInt32LE(0xFFFFFFFF, 4);
@@ -326,7 +326,7 @@ test('the streamed wav header is rewritten with its real length', () => {
 });
 
 test('the header is fixed even when the loudness already matches', () => {
-  const { normalizeWavLoudness, TARGET_RMS } = require('../lib/voice-tts');
+  const { normalizeWavLoudness, TARGET_RMS } = require('../lib/voice/tts');
   // 목표 음량과 같아 표본은 건드릴 필요가 없는 조각.
   const wav = silentWav(400, Math.round(TARGET_RMS * 32768));
   wav.writeUInt32LE(0xFFFFFFFF, 40);
@@ -335,7 +335,7 @@ test('the header is fixed even when the loudness already matches', () => {
 });
 
 test('the plan hands back what it did not read so it can be continued', () => {
-  const { planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const { planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice/tts');
   const sentence = '이건 근거 문장인데 실제 답변과 비슷하게 충분히 길게 적는다. ';
   const long = `${sentence.repeat(11)}마지막 문장은 여기서 끝난다.`;
 
@@ -356,7 +356,7 @@ test('the plan hands back what it did not read so it can be continued', () => {
 });
 
 test('the streamed answer hands back what it did not read, like the batch plan does', () => {
-  const { createSpokenProgressStream, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const { createSpokenProgressStream, SPOKEN_CLOSING: closing } = require('../lib/voice/tts');
   const sentence = '이건 근거 문장인데 실제 답변과 비슷하게 충분히 길게 적는다. ';
   const long = `${sentence.repeat(11)}마지막 문장은 여기서 끝난다.`;
 
@@ -374,7 +374,7 @@ test('the streamed answer hands back what it did not read, like the batch plan d
 });
 
 test('an answer that ends on its own leaves nothing to continue', () => {
-  const { createSpokenProgressStream, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const { createSpokenProgressStream, SPOKEN_CLOSING: closing } = require('../lib/voice/tts');
   const spoken = [];
   const stream = createSpokenProgressStream(segment => spoken.push(segment));
   for (const char of '이건 짧은 답변이야 이 정도로.') stream.delta(char);
@@ -385,7 +385,7 @@ test('an answer that ends on its own leaves nothing to continue', () => {
 });
 
 test('text dropped before a tool call leaves no stale continuation', () => {
-  const { createSpokenProgressStream } = require('../lib/voice-tts');
+  const { createSpokenProgressStream } = require('../lib/voice/tts');
   const spoken = [];
   const stream = createSpokenProgressStream(segment => spoken.push(segment));
   for (const char of '먼저 이렇게 말하다가 도구를 부른다 이렇게.') stream.delta(char);
@@ -398,7 +398,7 @@ test('text dropped before a tool call leaves no stale continuation', () => {
 });
 
 test('the continued read finishes the rest instead of asking again', () => {
-  const { planContinuedSegments, planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const { planContinuedSegments, planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice/tts');
   const rest = '남은 문장을 충분히 길게 적어서 실제 답변과 비슷하게 만든다. '.repeat(40).trim();
 
   // 기존 모드는 세 문장만 읽고 되묻는다.
@@ -419,7 +419,7 @@ test('the continued read finishes the rest instead of asking again', () => {
 });
 
 test('a short spoken answer is read whole instead of being cut at three sentences', () => {
-  const { planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice-tts');
+  const { planSpokenSegments, SPOKEN_CLOSING: closing } = require('../lib/voice/tts');
   // 음성 답변이 몇 문장으로 짧아진 뒤의 실제 길이대로. 예전 3문장 상한은 이런 답변도
   // 잘라 매번 되묻게 만들었다. 이제는 글자 수만으로 가둔다.
   const short = '응, 그 방식이 가장 현실적이야. 로봇팔 쪽에 허용된 툴만 열어두면 돼. '
@@ -445,7 +445,7 @@ test('a short spoken answer is read whole instead of being cut at three sentence
 // 사용자가 원문으로 들어갈 길이 사라진다. 그래서 화면 텍스트는 그대로 두고
 // **소리로 가는 텍스트에서만** 벗긴다.
 
-const { planSpokenSegments, createSpokenSegmenter } = require('../lib/voice-tts');
+const { planSpokenSegments, createSpokenSegmenter } = require('../lib/voice/tts');
 
 test('말할 때는 링크가 표시 글자만 남는다', () => {
   const answer = '안전 문제로 개발을 멈췄대. [Axios 기사](https://www.axios.com/2026/08/19/openai-astra) 참고해.';

@@ -8,7 +8,7 @@
 >
 > 이 문서는 V4-B 음성의 **새 단일 기준**이다. [Realtime 설계](voice-realtime-design.md)는 R0~R2c-1의 구현·인수 기록으로 보존하되, 이후 신규 작업의 기준으로 삼지 않는다.
 
-현 production STT와 턴 폐기 판정은 `lib/voice-transcription.js`, 네 half-duplex HTTP endpoint는 `lib/voice-halfduplex-routes.js`가 소유한다. `/api/chat`과 spoken progress 연결은 공유 채팅 runtime인 `server.js`에 남는다.
+현 production STT와 턴 폐기 판정은 `lib/voice/transcription.js`, 네 half-duplex HTTP endpoint는 `lib/voice/halfduplex-routes.js`가 소유한다. `/api/chat`과 spoken progress 연결은 공유 채팅 runtime인 `server.js`에 남는다.
 
 ---
 
@@ -143,7 +143,7 @@ RECOVER        짧은 안내 음성 → LISTENING
 
 ## 3. 턴 폐기 규칙
 
-**새 규칙을 만들지 않는다.** `lib/voice-transcription.js`의 `isPersistableUserTurn`을 그대로 쓴다. 실기기 표본으로 만들고 회귀 테스트가 붙어 있다.
+**새 규칙을 만들지 않는다.** `lib/voice/transcription.js`의 `isPersistableUserTurn`을 그대로 쓴다. 실기기 표본으로 만들고 회귀 테스트가 붙어 있다.
 
 ```
 폐기 ⟺ 문장부호·공백 제거 후 빈 문자열
@@ -269,7 +269,7 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 
 |자산|상태|
 |---|---|
-|`public/voice-turn-recorder.js` 16kHz mono PCM WAV 캡처|**재사용**. VAD 경계가 명확해져 오히려 단순해진다|
+|`public/voice/turn-recorder.js` 16kHz mono PCM WAV 캡처|**재사용**. VAD 경계가 명확해져 오히려 단순해진다|
 |`POST /turns/:id/transcribe` 라우트·`voice-transcription` 서비스|**재사용**. 부산물이 아니라 주 입력이 된다|
 |`isPersistableUserTurn`|**재사용**|
 |`dbSaveChatExchange`·A2 회수·일정 도구·모델 라우팅|**재사용**|

@@ -8,7 +8,7 @@ const {
   createVoiceTranscriptionService,
   inspectPcmWav,
   isPersistableUserTurn,
-} = require('../lib/voice-transcription');
+} = require('../lib/voice/transcription');
 
 function pcmWav({
   seconds = 1,

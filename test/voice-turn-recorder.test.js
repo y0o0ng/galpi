@@ -56,9 +56,9 @@ function loadRecorder({ maxBytes = 8 * 1024 * 1024 } = {}) {
     Math,
   };
   vm.runInNewContext(
-    fs.readFileSync(path.join(ROOT, 'public/voice-turn-recorder.js'), 'utf8'),
+    fs.readFileSync(path.join(ROOT, 'public/voice/turn-recorder.js'), 'utf8'),
     context,
-    { filename: 'voice-turn-recorder.js' },
+    { filename: 'voice/turn-recorder.js' },
   );
   const results = [];
   const recorder = fakeWindow.VoiceTurnRecorder.create({

@@ -494,7 +494,7 @@ test('hidden fields in the task form actually disappear', () => {
 
 test('recurrence and override candidates stay unpersisted until the card is pressed', () => {
   const taskSource = read('public/task-panel.js');
-  const voiceSource = read('public/voice-halfduplex.js');
+  const voiceSource = read('public/voice/halfduplex.js');
 
   // 카드 종류는 셋이고 각각 자기 API로만 간다.
   assert.match(taskSource, /if \(candidate\?\.kind === 'series'\) return makeSeriesCandidateCard\(candidate\);/);

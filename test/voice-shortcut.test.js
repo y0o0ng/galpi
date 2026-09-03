@@ -12,7 +12,7 @@ const {
   createVoiceShortcutService,
   normalizeTurnInput,
   parseShortcutResponse,
-} = require('../lib/voice-shortcut');
+} = require('../lib/voice/shortcut');
 
 function createDatabase() {
   const db = new Database(':memory:');

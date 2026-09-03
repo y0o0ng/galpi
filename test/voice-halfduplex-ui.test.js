@@ -58,9 +58,9 @@ function loadUi({ halfDuplexEnabled = true } = {}) {
   };
   const context = { window: fakeWindow, console, Object, String, Boolean };
   vm.runInNewContext(
-    read('public/voice-halfduplex-ui.js'),
+    read('public/voice/halfduplex-ui.js'),
     context,
-    { filename: 'voice-halfduplex-ui.js' },
+    { filename: 'voice/halfduplex-ui.js' },
   );
 
   const asks = [];
@@ -151,9 +151,9 @@ test('the stop control ends the loop from inside the panel', () => {
 test('the page loads the loop before its UI and both before app.js', () => {
   const html = read('public/index.html');
 
-  assert.ok(html.indexOf('voice-turn-recorder.js') < html.indexOf('voice-halfduplex.js'));
-  assert.ok(html.indexOf('voice-halfduplex.js') < html.indexOf('voice-halfduplex-ui.js'));
-  assert.ok(html.indexOf('voice-halfduplex-ui.js') < html.indexOf('app.js'));
+  assert.ok(html.indexOf('voice/turn-recorder.js') < html.indexOf('voice/halfduplex.js'));
+  assert.ok(html.indexOf('voice/halfduplex.js') < html.indexOf('voice/halfduplex-ui.js'));
+  assert.ok(html.indexOf('voice/halfduplex-ui.js') < html.indexOf('app.js'));
   assert.match(html, /id="voice-hd-panel"[^>]*hidden/);
   assert.match(html, /id="voice-hd-button"[^>]*hidden/);
   assert.match(read('public/app.js'), /VoiceHalfDuplexUi\?\.init\(\{[\s\S]*?config: config\.halfDuplexVoice/);

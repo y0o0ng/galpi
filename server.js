@@ -97,17 +97,17 @@ const {
 const { createWebPushTransport } = require('./lib/web-push-transport');
 const {
   createVoiceTranscriptionService,
-} = require('./lib/voice-transcription');
-const { registerVoiceHalfDuplexRoutes } = require('./lib/voice-halfduplex-routes');
-const { createVoiceTtsService } = require('./lib/voice-tts');
+} = require('./lib/voice/transcription');
+const { registerVoiceHalfDuplexRoutes } = require('./lib/voice/halfduplex-routes');
+const { createVoiceTtsService } = require('./lib/voice/tts');
 const {
   SHORTCUT_CONVERSATION_CONTROL_SYSTEM_PROMPT,
   SHORTCUT_RESPONSE_FORMAT,
   VoiceShortcutError,
   createVoiceShortcutService,
   parseShortcutResponse,
-} = require('./lib/voice-shortcut');
-const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
+} = require('./lib/voice/shortcut');
+const { createVoiceShortcutRoutes } = require('./lib/voice/shortcut-routes');
 const { AttachmentUploadError, createAttachmentUploadService } = require('./lib/attachment-upload');
 const { createAttachmentDocumentService } = require('./lib/attachment-documents');
 const { createAttachmentImageService } = require('./lib/attachment-images');
