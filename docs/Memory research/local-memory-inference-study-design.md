@@ -2271,11 +2271,13 @@ processing component. The successor receives no final P1-B3, P1-B4, or
 P1-B2e identifier until its actual experiment design is written, so existing
 composition naming is not silently repurposed.
 
-A later raw-context evaluation is deferred and separate from this
-evidence-only component diagnostic. Only after the strongest bounded triage
-prompt candidate is selected and passes separate fresh validation should a
-distinct experiment test locating evidence in less curated conversational
-context, conversational scope, speaker/reference resolution, transient
-versus durable context, and surrounding distractors. No fixture, threshold,
-implementation, private replay, or P1-B2d reinterpretation is opened for
-that future experiment here.
+A later raw-context evaluation remains deferred and separate from this
+evidence-only component diagnostic. It may open only after a successor
+bounded local-memory processing contract and pipeline has been separately
+designed and validated. This paragraph does not decide whether that
+successor is the decomposed approximately 1.7B pipeline above or another
+later validated contract. A distinct raw-context experiment would test
+locating evidence in less curated conversational context, conversational
+scope, speaker/reference resolution, transient versus durable context, and
+surrounding distractors. No fixture, threshold, implementation, or private
+replay is opened for that future experiment here.
