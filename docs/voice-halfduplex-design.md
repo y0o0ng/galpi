@@ -8,6 +8,8 @@
 >
 > 이 문서는 V4-B 음성의 **새 단일 기준**이다. [Realtime 설계](voice-realtime-design.md)는 R0~R2c-1의 구현·인수 기록으로 보존하되, 이후 신규 작업의 기준으로 삼지 않는다.
 
+현 production STT와 턴 폐기 판정은 `lib/voice-transcription.js`, 네 half-duplex HTTP endpoint는 `lib/voice-halfduplex-routes.js`가 소유한다. `/api/chat`과 spoken progress 연결은 공유 채팅 runtime인 `server.js`에 남는다.
+
 ---
 
 ## 0. 왜 바꾸는가
@@ -141,7 +143,7 @@ RECOVER        짧은 안내 음성 → LISTENING
 
 ## 3. 턴 폐기 규칙
 
-**신규 구현하지 않는다.** `lib/realtime-turn-store.js`의 `isPersistableUserTurn`을 그대로 쓴다. 실기기 표본으로 만들고 회귀 테스트가 붙어 있다.
+**새 규칙을 만들지 않는다.** `lib/voice-transcription.js`의 `isPersistableUserTurn`을 그대로 쓴다. 실기기 표본으로 만들고 회귀 테스트가 붙어 있다.
 
 ```
 폐기 ⟺ 문장부호·공백 제거 후 빈 문자열
@@ -268,7 +270,7 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 |자산|상태|
 |---|---|
 |`public/voice-turn-recorder.js` 16kHz mono PCM WAV 캡처|**재사용**. VAD 경계가 명확해져 오히려 단순해진다|
-|`POST /turns/:id/transcribe` 라우트·`realtime-transcription` 서비스|**재사용**. 부산물이 아니라 주 입력이 된다|
+|`POST /turns/:id/transcribe` 라우트·`voice-transcription` 서비스|**재사용**. 부산물이 아니라 주 입력이 된다|
 |`isPersistableUserTurn`|**재사용**|
 |`dbSaveChatExchange`·A2 회수·일정 도구·모델 라우팅|**재사용**|
 |`sendSingleMessage` 렌더링·저장 경로|**재사용** (H2). 음성이 `overrideText`·`source`로 올라탄다|
@@ -373,7 +375,7 @@ TTS는 첫 문장이 확정되는 즉시 시작한다. 스트리밍은 선택이
 
 **저장이 없는 것이 성공의 증거다.** 확인 명령 턴은 모델도 저장도 거치지 않으므로, 등록이 말로 성공하면 `messages`에 아무것도 남지 않고 `assistant_tasks`만 는다. 이 비대칭을 모르면 성공을 수동 클릭으로 잘못 읽는다.
 
-**H5 Realtime 운영 종료 — 2026-08-03 Pi 배포·실기기 인수 완료.** DB·Vault 백업 `20260803-2019` 뒤 `OPENAI_REALTIME_ENABLED`, `OPENAI_REALTIME_READ_TOOLS_ENABLED`, `OPENAI_REALTIME_CORRECTION_ENABLED`, `OPENAI_REALTIME_FINALIZE_ENABLED`를 모두 `false`로 바꾸고 `VOICE_HALFDUPLEX_ENABLED=true`는 유지했다. 새 PID `182239`, 공개 config의 Realtime·보정·finalize 비활성, 반이중 활성, 반이중 session HTTP 200·`no-store`, 새 시작 이후 warning 0건을 확인했고 사용자가 폰 실기기에서 정상이라고 인수했다. Realtime 코드는 롤백과 기록을 위해 남기며 제거는 별도 컨펌으로 한다. 가장 작은 롤백은 네 Realtime flag를 다시 `true`로 돌리고 서비스를 재시작하는 것이다.
+**H5 Realtime 운영 종료 — 2026-08-03 Pi 배포·실기기 인수 완료.** DB·Vault 백업 `20260803-2019` 뒤 `OPENAI_REALTIME_ENABLED`, `OPENAI_REALTIME_READ_TOOLS_ENABLED`, `OPENAI_REALTIME_CORRECTION_ENABLED`, `OPENAI_REALTIME_FINALIZE_ENABLED`를 모두 `false`로 바꾸고 `VOICE_HALFDUPLEX_ENABLED=true`는 유지했다. 새 PID `182239`, 공개 config의 Realtime·보정·finalize 비활성, 반이중 활성, 반이중 session HTTP 200·`no-store`, 새 시작 이후 warning 0건을 확인했고 사용자가 폰 실기기에서 정상이라고 인수했다. 이후 퇴역한 standalone Realtime 소스는 `legacy/voice-realtime/`로 옮겼고 활성 runtime은 이를 import하지 않는다.
 
 **H6 잠금화면 단축어 음성 입구 — 2026-08-04 현재 범위 인수 완료.** PWA를 열지 않고 iOS가 질문을 받아 적고 갈피가 답변을 만든 뒤 iOS가 읽어주는 두 번째 반이중 입구를 만들었다. 새 음성 뇌를 만들지 않고, 현재 반이중의 `정확한 텍스트 → 회수·GPT → 대화 저장 → 음성용 답변` 가운데 구간을 공용화한다. iPhone은 잠금 화면이 표시되는 동안 동작하지만 디스플레이가 소등돼 잠자기 상태가 되면 `시온아` 음성 단축어 호출 단계에서 시작되지 않는다. 이 제약은 서버 변경으로 해결할 수 없어 현재 범위에서 수용한다.
 
@@ -602,12 +604,11 @@ iPhone 현재 인수:
 
 구현 전에 정한다.
 
-1. **Realtime 코드 제거** — 운영 flag는 껐고 기록·롤백용 코드는 남겼다. 제거는 필요성이 생길 때만 별도 컨펌으로 한다
-2. **H3 문턱** — 현재 작은 표본에서 정확 전사의 최저 logprob은 -0.024~-0.425, 오류 전사는 -0.652와 -1.356이지만 확정 문턱으로 쓰기엔 부족하다
-3. **침묵·earcon** — 침묵 1200→1000ms와 생각 중 earcon을 각각 별도 실기기 변경으로 열지
-4. **빈 전사 25%** — Realtime 시절 원인은 미규명이다. 클래식에서는 답변 생성 전 빈 전사를 알고 LISTENING으로 복귀하므로 답변까지 유실되지는 않는다
-5. **H6 연결 UX** — iPhone 수동 설정으로 현재 사용 범위를 충족했고 디스플레이 소등 호출을 지원하지 못하므로 추가 UI를 만들지 않는다. iPad·노트북 등록은 각각 강의 노트와 V6에서 다시 판단한다
-6. **H6 잠금 동작 — 종료.** 잠금 화면 표시 중에는 동작하고 디스플레이 소등 상태에서는 최소 음성 단축어부터 호출되지 않는다. 서버로 해결하지 않고 현재 제약으로 수용한다
+1. **H3 문턱** — 현재 작은 표본에서 정확 전사의 최저 logprob은 -0.024~-0.425, 오류 전사는 -0.652와 -1.356이지만 확정 문턱으로 쓰기엔 부족하다
+2. **침묵·earcon** — 침묵 1200→1000ms와 생각 중 earcon을 각각 별도 실기기 변경으로 열지
+3. **빈 전사 25%** — Realtime 시절 원인은 미규명이다. 클래식에서는 답변 생성 전 빈 전사를 알고 LISTENING으로 복귀하므로 답변까지 유실되지는 않는다
+4. **H6 연결 UX** — iPhone 수동 설정으로 현재 사용 범위를 충족했고 디스플레이 소등 호출을 지원하지 못하므로 추가 UI를 만들지 않는다. iPad·노트북 등록은 각각 강의 노트와 V6에서 다시 판단한다
+5. **H6 잠금 동작 — 종료.** 잠금 화면 표시 중에는 동작하고 디스플레이 소등 상태에서는 최소 음성 단축어부터 호출되지 않는다. 서버로 해결하지 않고 현재 제약으로 수용한다
 
 ---
 

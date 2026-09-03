@@ -66,7 +66,7 @@ test('every composer action keeps a 44px touch target', () => {
   assert.match(mobile, /#chat-model-button \{[^}]*height: 44px/s);
   assert.match(
     mobile,
-    /#send-btn,\s*#voice-hd-button,\s*#voice-realtime-button \{[^}]*width: 44px;[^}]*height: 44px/s,
+    /#send-btn,\s*#voice-hd-button \{[^}]*width: 44px;[^}]*height: 44px/s,
   );
 });
 

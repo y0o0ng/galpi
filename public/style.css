@@ -277,43 +277,6 @@ html, body {
   opacity: 0.4;
 }
 
-.council-btn {
-  padding: 5px 14px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--label);
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), transform 0.1s var(--ease-spring);
-  font-family: var(--font);
-  letter-spacing: -0.1px;
-}
-
-.council-btn.disabled {
-  border-style: dashed;
-  color: #C7C7CC;
-  cursor: not-allowed;
-}
-
-.council-btn:hover:not(.disabled):not(.active) {
-  border-color: var(--brand-border);
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-}
-
-.council-btn:active:not(.disabled) {
-  transform: scale(0.95);
-}
-
-.council-btn.active {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: var(--brand-on);
-  box-shadow: 0 2px 8px var(--brand-shadow);
-}
-
 /* ── 채팅 영역 ─────────────────────────────────────────── */
 
 /* 넓은 화면에서는 좌우 여백을 키워 읽기 폭에 가둔다. 배경과 경계선은 화면 전체를
@@ -2940,8 +2903,7 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .notification-panel-skeleton span,
   .schedule-agent-skeleton span,
-  .task-panel-skeleton span,
-  .voice-realtime-presence span {
+  .task-panel-skeleton span {
     animation: none;
   }
 }
@@ -3048,217 +3010,6 @@ html, body {
 }
 
 /* ── 입력 영역 ─────────────────────────────────────────── */
-
-#voice-realtime-panel {
-  margin: 0 12px 10px;
-  padding: 12px;
-  border: 1px solid var(--brand-border);
-  border-radius: 16px;
-  background: var(--panel-bg);
-  box-shadow: var(--shadow-sm);
-  flex-shrink: 0;
-}
-
-#voice-realtime-panel[hidden] {
-  display: none;
-}
-
-.voice-realtime-head {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-}
-
-.voice-realtime-presence {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand-ink);
-}
-
-.voice-realtime-presence span {
-  width: 2px;
-  height: 8px;
-  border-radius: 2px;
-  background: currentColor;
-  transform-origin: center;
-}
-
-#voice-realtime-panel[data-phase="listening"] .voice-realtime-presence span,
-#voice-realtime-panel[data-phase="thinking"] .voice-realtime-presence span,
-#voice-realtime-panel[data-phase="speaking"] .voice-realtime-presence span {
-  animation: voice-presence 0.8s ease-in-out infinite alternate;
-}
-
-#voice-realtime-panel[data-phase="speaking"] .voice-realtime-presence span:nth-child(2),
-#voice-realtime-panel[data-phase="listening"] .voice-realtime-presence span:nth-child(2) {
-  animation-delay: 0.14s;
-}
-
-#voice-realtime-panel[data-phase="speaking"] .voice-realtime-presence span:nth-child(3),
-#voice-realtime-panel[data-phase="listening"] .voice-realtime-presence span:nth-child(3) {
-  animation-delay: 0.28s;
-}
-
-@keyframes voice-presence {
-  from { transform: scaleY(0.55); opacity: 0.55; }
-  to { transform: scaleY(1.35); opacity: 1; }
-}
-
-.voice-realtime-heading {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.voice-realtime-heading strong {
-  font-size: 13px;
-  letter-spacing: -0.1px;
-}
-
-.voice-realtime-heading span,
-#voice-realtime-timer,
-.voice-realtime-disclosure {
-  color: var(--label);
-  font-size: 10.5px;
-}
-
-#voice-realtime-timer {
-  min-width: 32px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-#voice-realtime-transcript {
-  display: grid;
-  gap: 7px;
-  max-height: 168px;
-  margin-top: 10px;
-  padding: 9px 10px;
-  overflow-y: auto;
-  border-radius: 11px;
-  background: var(--ai-bubble);
-  scrollbar-width: thin;
-}
-
-#voice-realtime-transcript:empty {
-  display: none;
-}
-
-.voice-transcript-row {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 7px;
-  align-items: start;
-}
-
-.voice-transcript-speaker {
-  padding-top: 1px;
-  color: var(--label);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.voice-transcript-row.assistant .voice-transcript-speaker {
-  color: var(--brand-ink);
-}
-
-.voice-transcript-text {
-  min-width: 0;
-  margin: 0;
-  color: var(--ai-text);
-  font-size: 12.5px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.voice-transcript-row.partial .voice-transcript-text {
-  opacity: 0.68;
-}
-
-.voice-transcript-row.correction_pending .voice-transcript-text,
-.voice-transcript-row.provisional .voice-transcript-text {
-  opacity: 0.78;
-}
-
-.voice-transcript-row.corrected .voice-transcript-text {
-  opacity: 1;
-}
-
-.voice-transcript-row.correction_failed .voice-transcript-text {
-  color: #B45309;
-}
-
-.voice-transcript-row.interrupted .voice-transcript-text {
-  color: var(--label);
-  opacity: 0.58;
-}
-
-.voice-transcript-row.incomplete .voice-transcript-text,
-.voice-transcript-row.failed .voice-transcript-text {
-  color: #B45309;
-  opacity: 0.9;
-}
-
-#voice-realtime-error {
-  display: none;
-  margin: 9px 2px 0;
-  color: #B45309;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-#voice-realtime-panel[data-phase="error"] #voice-realtime-error:not(:empty) {
-  display: block;
-}
-
-.voice-realtime-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.voice-realtime-disclosure {
-  margin-right: auto;
-}
-
-#voice-realtime-mute,
-#voice-realtime-stop {
-  min-height: 32px;
-  padding: 0 11px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--ai-text);
-  font: 650 11px/1 var(--font);
-  cursor: pointer;
-}
-
-#voice-realtime-mute:hover:not(:disabled),
-#voice-realtime-mute[aria-pressed="true"] {
-  border-color: var(--brand-border);
-  background: var(--brand-soft);
-  color: var(--brand-ink);
-}
-
-#voice-realtime-stop {
-  border-color: rgba(180, 83, 9, 0.28);
-  color: #B45309;
-}
-
-#voice-realtime-mute:disabled,
-#voice-realtime-stop:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
 
 #input-area {
   background: var(--header-bg);
@@ -3857,8 +3608,7 @@ html, body {
 }
 
 #send-btn,
-#voice-hd-button,
-#voice-realtime-button {
+#voice-hd-button {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -3881,31 +3631,18 @@ html, body {
 }
 
 #send-btn[hidden],
-#voice-hd-button[hidden],
-#voice-realtime-button[hidden] {
+#voice-hd-button[hidden] {
   display: none;
 }
 
-#voice-realtime-button:hover:not(:disabled),
-#voice-realtime-button[aria-pressed="true"] {
-  filter: brightness(1.08);
-  transform: scale(1.04);
-}
-
-#voice-realtime-button:active:not(:disabled) {
-  transform: scale(0.91);
-}
-
 #send-btn:focus-visible,
-#voice-hd-button:focus-visible,
-#voice-realtime-button:focus-visible {
+#voice-hd-button:focus-visible {
   outline: 2px solid var(--brand-ink);
   outline-offset: 2px;
 }
 
 #send-btn:disabled,
-#voice-hd-button:disabled,
-#voice-realtime-button:disabled {
+#voice-hd-button:disabled {
   cursor: default;
   opacity: 0.45;
   box-shadow: none;
@@ -4009,8 +3746,7 @@ html, body {
   }
 
   #send-btn,
-  #voice-hd-button,
-  #voice-realtime-button {
+  #voice-hd-button {
     width: 44px;
     height: 44px;
   }
@@ -4024,23 +3760,6 @@ html, body {
     width: min(88%, 420px);
   }
 
-  #voice-realtime-panel {
-    margin: 0 10px 8px;
-    padding: 11px;
-    border-radius: 14px;
-  }
-
-  #voice-realtime-transcript {
-    max-height: 142px;
-  }
-
-  .voice-realtime-actions {
-    flex-wrap: wrap;
-  }
-
-  .voice-realtime-disclosure {
-    flex: 1 0 100%;
-  }
 }
 
 /* ── 토스트 알림 ────────────────────────────────────────── */
@@ -4075,46 +3794,6 @@ html, body {
   100% { opacity: 0; transform: translateX(-50%) translateY(-4px) scale(0.97); }
 }
 
-/* ── 의회 답변 방식 토글 ───────────────────────────────────── */
-
-.council-mode-toggle {
-  display: flex;
-  border: 1.5px solid var(--border);
-  border-radius: 20px;
-  overflow: hidden;
-  background: rgba(0,0,0,0.02);
-  transition: opacity 0.15s;
-}
-
-.council-mode-toggle.disabled {
-  opacity: 0.35;
-  pointer-events: none;
-}
-
-.mode-opt {
-  padding: 4px 10px;
-  font-size: 12px;
-  border: none;
-  background: transparent;
-  color: var(--label);
-  cursor: pointer;
-  font-family: var(--font);
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
-  white-space: nowrap;
-  letter-spacing: -0.1px;
-}
-
-.mode-opt.active {
-  background: var(--council);
-  color: #fff;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
-}
-
-.mode-opt:not(.active):hover {
-  color: var(--council);
-  background: rgba(124, 111, 205, 0.08);
-}
-
 /* ── 의회 모드 ─────────────────────────────────────────────── */
 
 .council-group {
@@ -4131,25 +3810,6 @@ html, body {
   padding: 0 4px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-}
-
-.council-loading {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  width: fit-content;
-  max-width: 100%;
-  min-height: 32px;
-  padding: 7px 4px;
-  gap: 7px;
-  box-sizing: border-box;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.synthesis-loading {
-  margin-top: 4px;
 }
 
 .loading-text {

@@ -343,7 +343,7 @@
       );
     }
 
-    // 반이중은 Realtime 핸드셰이크를 하지 않으므로 전사용 세션을 직접 받는다.
+    // 반이중 전사용 세션은 이 HTTP 경로에서 직접 받는다.
     async function ensureCorrectionSession() {
       if (state.correctionSessionId) return state.correctionSessionId;
       const response = await state.apiFetch('/api/voice/session', { method: 'POST' });

@@ -139,6 +139,8 @@ iPhone·iPad는 iOS/iPadOS 16.4 이상에서 canonical HTTPS를 Safari로 열어
 
 ### R1 Realtime 읽기 도구
 
+> 아래 Realtime R1~R2 절은 과거 배포·복구 기록이다. active runtime과 `.env.example`에서는 퇴역했으며 현재 음성 운영은 `docs/voice-halfduplex-design.md`를 따른다.
+
 R0 음성이 이미 정상이고 A2 실제 주입이 인수된 Pi에서만 R1 flag를 연다. 세 값 중 하나라도 false면 읽기 도구는 session config에 들어가지 않는다.
 
 ```env

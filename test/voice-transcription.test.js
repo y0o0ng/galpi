@@ -5,9 +5,10 @@ const assert = require('node:assert/strict');
 
 const {
   createOpenAITranscriptionProvider,
-  createRealtimeTranscriptionService,
+  createVoiceTranscriptionService,
   inspectPcmWav,
-} = require('../lib/realtime-transcription');
+  isPersistableUserTurn,
+} = require('../lib/voice-transcription');
 
 function pcmWav({
   seconds = 1,
@@ -105,10 +106,10 @@ test('OpenAI transcription provider aborts a slow request at the bounded timeout
   );
 });
 
-test('Realtime correction is session-bound, serialized, idempotent, and bounded to three pending turns', async () => {
+test('voice transcription is session-bound, serialized, idempotent, and bounded to three pending turns', async () => {
   const releases = [];
   const calls = [];
-  const service = createRealtimeTranscriptionService({
+  const service = createVoiceTranscriptionService({
     enabled: true,
     transcribeAudio: ({ inputItemId }) => new Promise(resolve => {
       calls.push(inputItemId);
@@ -209,9 +210,9 @@ test('Realtime correction is session-bound, serialized, idempotent, and bounded 
   await third;
 });
 
-test('Realtime correction rejects expired sessions, unsafe IDs, formats, durations, and size mismatches', async () => {
+test('voice transcription rejects expired sessions, unsafe IDs, formats, durations, and size mismatches', async () => {
   let clock = 100;
-  const service = createRealtimeTranscriptionService({
+  const service = createVoiceTranscriptionService({
     enabled: true,
     transcribeAudio: async () => ({ correctedTranscript: 'ok' }),
     sessionTtlMs: 1000,
@@ -266,8 +267,8 @@ test('Realtime correction rejects expired sessions, unsafe IDs, formats, duratio
   );
 });
 
-test('disabled Realtime correction exposes no model session and fails closed', async () => {
-  const service = createRealtimeTranscriptionService({
+test('disabled voice transcription exposes no model session and fails closed', async () => {
+  const service = createVoiceTranscriptionService({
     enabled: false,
     apiKey: 'unused-key',
   });
@@ -313,7 +314,7 @@ test('an empty correction reports bounded audio diagnostics without any content'
 });
 
 test('the service tags an empty correction with the audio hash so turns can be compared', async () => {
-  const service = createRealtimeTranscriptionService({
+  const service = createVoiceTranscriptionService({
     enabled: true,
     transcribeAudio: async () => ({ correctedTranscript: '' }),
   });
@@ -420,4 +421,16 @@ test('the hint can be cleared without breaking transcription', async () => {
 
   assert.equal(requests[0].get('prompt'), null);
   assert.equal(result.correctedTranscript, '안녕');
+});
+
+test('user-turn persistability preserves the deployed filler boundary', () => {
+  for (const value of ['', '   ', '.', '...', '  ??  ', null, undefined]) {
+    assert.equal(isPersistableUserTurn(value), false);
+  }
+  for (const value of ['하...', '그', '음', '흥.', '음.', '음음', '하하', 'uh', 'Um']) {
+    assert.equal(isPersistableUserTurn(value), false);
+  }
+  for (const value of ['응', '네', '잠깐', '아니 그거 말고', '음 좋아']) {
+    assert.equal(isPersistableUserTurn(value), true);
+  }
 });

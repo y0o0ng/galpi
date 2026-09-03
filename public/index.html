@@ -62,27 +62,6 @@
 
         <div id="command-palette" style="display:none"></div>
 
-        <section id="voice-realtime-panel" aria-label="XION 실시간 음성 대화" hidden>
-          <div class="voice-realtime-head">
-            <div class="voice-realtime-presence" aria-hidden="true">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="voice-realtime-heading">
-              <strong id="voice-realtime-status">대화 준비</strong>
-              <span id="voice-realtime-model"></span>
-            </div>
-            <time id="voice-realtime-timer" aria-label="남은 음성 대화 시간"></time>
-          </div>
-          <div id="voice-realtime-transcript" aria-live="polite" aria-relevant="additions text"></div>
-          <p id="voice-realtime-error" role="alert"></p>
-          <div class="voice-realtime-actions">
-            <span id="voice-realtime-disclosure" class="voice-realtime-disclosure">AI 생성 음성 · 저장 안 함</span>
-            <button id="voice-realtime-mute" type="button" aria-pressed="false">음소거</button>
-            <button id="voice-realtime-stop" type="button">종료</button>
-          </div>
-          <audio id="voice-realtime-audio" autoplay playsinline hidden></audio>
-        </section>
-
         <section id="voice-hd-panel" aria-label="XION 음성 대화" hidden>
           <div class="voice-hd-head">
             <span id="voice-hd-dot" class="voice-hd-dot" aria-hidden="true"></span>
@@ -135,13 +114,6 @@
                   <span class="composer-action-disc" aria-hidden="true">
                     <span class="xion-mark-icon"></span>
                   </span>
-                </button>
-                <button id="voice-realtime-button" type="button" title="XION 실시간 음성 대화" aria-label="XION 실시간 음성 대화 시작" aria-pressed="false" hidden>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <rect width="8" height="13" x="8" y="2" rx="4"></rect>
-                    <path d="M18 10a6 6 0 0 1-12 0"></path>
-                    <path d="M12 19v3"></path>
-                  </svg>
                 </button>
                 <button id="send-btn" title="전송 (Enter)" aria-label="전송" hidden>
                   <span class="composer-action-disc" aria-hidden="true">
@@ -226,7 +198,6 @@
   <script src="agent-panel.js"></script>
   <script src="model-picker.js"></script>
   <script src="voice-turn-recorder.js"></script>
-  <script src="voice-realtime.js"></script>
   <script src="voice-halfduplex.js"></script>
   <script src="voice-halfduplex-ui.js"></script>
   <script src="paper-panel.js"></script>

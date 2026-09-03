@@ -6,6 +6,8 @@
 >
 > Status: **후속 작업의 기준 아님.** R0~R2c-1의 구현·인수 기록으로 보존한다. 2026-08-01 실기기 관찰에서 Realtime 모델의 한국어 이해·도구 호출 실패가 반복 확인돼 반이중 클래식 파이프라인으로 전환했다. 새 단일 기준은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)다.
 >
+> 퇴역한 standalone runtime 소스는 `legacy/voice-realtime/`에 보존한다. 여기 기록된 전사 기능의 현 production owner는 `lib/voice-transcription.js`다.
+>
 > 완료 기록: R0 GO, R1 노트 탐색·말투 연속성 Pi 기능 인수, R2a 이벤트 reconciliation·R2b bounded 턴 보정 Pi 기술 인수, `near_field` 실기기 잡음 표본 조건부 인수, R2c-1 corrected-only finalization Pi 배포·부분 인수. R2c-2 이후 미구현이며 전환에 따라 착수하지 않는다.
 >
 > Scope: 짧은 음성 입력, 자연스러운 실시간 대화, 갈피 읽기 도구, 보정 전사 정본, 승인형 쓰기, 음성 모델 운영

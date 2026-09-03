@@ -54,7 +54,7 @@
 ## 음성의 현재 계약
 
 - Realtime은 2026-08-01 제품 경로에서 접었다. `docs/voice-realtime-design.md`는 R0~R2c-1 기록일 뿐이고 새 작업 기준은 반이중 문서다.
-- 2026-08-03 H5에서 Pi의 Realtime·read tool·correction·finalize 운영 flag를 모두 껐고 반이중만 유지해 실기기 인수했다. Realtime 코드는 기록·롤백용으로 남긴다.
+- Realtime active runtime은 퇴역했고 rollback 소스만 `legacy/voice-realtime/`에 둔다. production은 반이중뿐이며 정본은 `docs/voice-halfduplex-design.md`다.
 - H6a 서버와 iPhone 단일·고정 3회 반복·로컬 종료는 인수했다. 잠금 화면 표시 중에는 동작하지만 디스플레이 소등 상태에서는 최소 음성 단축어부터 호출되지 않아 플랫폼 제약으로 수용하고 H6 확대를 닫았다. 현재 iPhone route·credential은 유지하되 iPad는 강의 노트, 노트북은 V6 화면 시온 단계까지 등록하지 않는다.
 - H6d는 단축어의 명시적인 새 일정 생성만 기존 validator 뒤 `shortcut-task:<requestId>`로 즉시·멱등 저장하도록 Pi·실기기 인수했다. PWA 카드 확인, 기존 일정 mutation·다른 쓰기 차단, scoped bearer exact route를 유지하며 생성·알림·취소 projection까지 정상이다.
 - 운영 흐름은 브라우저 VAD → `gpt-transcribe` → 기존 단일 GPT 채팅 → `gpt-4o-mini-tts`다. 음성 턴도 `sendSingleMessage`를 통해 `shared-main`에 저장하지만 `source:'voice'`는 topic 자동 저장에서 제외한다. 원본 오디오는 DB·Vault·backup·temp file에 저장하지 않는다.
