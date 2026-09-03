@@ -3460,9 +3460,22 @@ Secretary of State ... on May 3, 2018`)이고 그 문서에 제출 발효 조항
 ## 10.25 5A-2 — `Corporation shall have authority to issue` 정의 문언 — 2026-09-03
 
 10.23이 남긴 후속 설계 질문 3번(**FOXA class 정의 문법**) 하나만 닫는다. 시작 `main`은
-`d33ff03fc1cd3b3be79fe238978a303d96bd697f`다. 나머지 후속 질문(legacy flat layout ·
-governing exhibit 누락 · O2 주 출처 recall)은 열린 채로 두고, legacy는 직전 read-only
-probe 결론대로 `legacy_layout -> INCOMPLETE` fail-close를 유지한다.
+`d33ff03fc1cd3b3be79fe238978a303d96bd697f`다.
+
+**legacy flat layout은 열린 질문이 아니라 CLOSED다.**
+
+```text
+2001년 이전 파일명 없는 flat layout 문서
+  -> 지금의 provenance 계약은 synthetic identity 없이 그것을 가리킬 수 없다
+  -> read-only probe에서 finding recall 이득이 0이었다(EX-3 14건이 전부
+     bylaws 9 · amendment 5이고 operative date·정의·탄생·종료 전부 0)
+  -> legacy_layout -> INCOMPLETE fail-close를 유지한다
+  -> 나중 Phase 0 coverage 증거가 구체적으로 요구하지 않는 한 다시 열지 않는다
+```
+
+아직 **열려 있는** 후속 질문은 둘이다 — governing exhibit 누락(`classify` ·
+`governing_exhibit_missing`)과 O2 주 출처 recall(conformed exhibit에 주 스탬프가 없다,
+10.24절)이다.
 
 ### 문법 추가 — semantic family는 늘지 않는다
 
@@ -3479,12 +3492,26 @@ Class A Common Stock, par value $0.01 per share (“Class A Common Stock”),
 않았고 `finding_kind`는 `GOVERNING_CLASS_DEFINITION` 그대로다. 좁히는 것은 셋이다.
 
 ```text
-주어가 법인 자신이다     `(?<!of )the Corporation` | `(?<!of the )(?<!of )Corporation`
-                         Board · directors · officers · holders는 받지 않고,
-                         `Board of Directors of the Corporation`도 받지 않는다
+주어가 법인 자신이다     `(?:^|[.;:,)]\s+|\bwhich\s+)(?:the )?Corporation`
 자본구조 문장이다        consisting of ... shares of <NAME>
 문장 경계를 넘지 않는다  `(?:[^.;]|\.(?=\d))` — 숫자 사이의 소수점만 지나간다
 ```
+
+**주어 경계는 부정이 아니라 열거로 세운다**(리뷰 지적으로 고쳤다). 처음에는 `of the
+Corporation`을 부정 lookbehind로 막았는데 그 방식은 닫히지 않는다 — `The Board
+appointed by the Corporation` · `A committee designated by the Corporation` ·
+`An officer authorized by the Corporation`이 전부 통과했다. 막아야 할 전치사·분사
+목록에는 끝이 없다. 그래서 반대로 **절이 시작하는 자리 셋만 받는다.**
+
+```text
+block 시작        Corporation shall have authority to issue ...
+절 경계 구두점    (a) The Corporation shall have authority to issue ...
+관계대명사 which  ... capital stock which the Corporation shall have authority ...
+```
+
+그 밖이면 `Corporation` 앞에 다른 낱말이 있다는 뜻이고, 그때 `shall have authority`의
+주어는 법인이 아니다. 관계대명사는 실제로 관측된 `which` 하나만 열거했다 — `that`
+변형은 관측되면 그때 별도로 연다. 영어 문법 parser도 fuzzy도 아니다.
 
 세 번째가 필요한 이유는 **한 문장 안의 Class B가 `$0.01` 뒤에 오기 때문이다.** 기존
 `[^.;]` 창은 그 소수점에서 멈춰 Class B에 영원히 닿지 못한다. 진짜 문장 끝(`. `)은
@@ -3497,15 +3524,22 @@ instrument에 동결된 탄생 행위 문법이 **따로** 있을 때만 탄생�
 
 ### 로컬 Python 실측 (2026-09-03)
 
-| 모듈 | 이전 | 이번 |
-|---|---|---|
-| `test_qv_identity_legal_evidence` | 157 | **167 OK** |
-| **전체 trading suite** | 1,898 | **1,908 OK** |
+| 모듈 | 이전 | 문법 추가 | 주어 경계 수정 |
+|---|---|---|---|
+| `test_qv_identity_legal_evidence` | 157 | 167 OK | **169 OK** |
+| **전체 trading suite** | 1,898 | 1,908 OK | **1,910 OK** |
 
 새 테스트 10개 중 **양성 5개는 구현 전에 실패하는 것을 먼저 확인했다**(dual-class 정의
 A·B · 두 class 비충돌 · 정의≠탄생 · P2 액면가 라우팅). 음성 테스트(이사회·이사·주주
-주어 · `of the Corporation` 목적어 · `may issue` · `consisting of` 없음 · 문장 경계)는
-구현 전후 모두 통과한다. **GitHub CI는 Node만 돌리므로 이 숫자를 재현하지 않는다.**
+주어 · `may issue` · `consisting of` 없음 · 문장 경계)는 구현 전후 모두 통과한다.
+
+주어 경계 수정에서 테스트 2개를 더 넣었고, **음성 3건이 고치기 전에 실패하는 것을 먼저
+확인했다**(`appointed by` · `designated by` · `authorized by` + the Corporation).
+양성 통제(`The Corporation` · 관계절 `which the Corporation` · `(a) The Corporation` ·
+`shall have the authority`)는 수정 전후 모두 통과하고, 실 FOXA charter의 Class A/B
+recall도 그대로다(`d721949dex31.htm` block:18, 각각 `$0.01`, 탄생 0건).
+
+**GitHub CI는 Node만 돌리므로 이 숫자를 재현하지 않는다.**
 
 ### 실제 SEC read-only smoke (FOXA 단독, 2026-09-03)
 

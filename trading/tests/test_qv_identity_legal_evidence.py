@@ -872,6 +872,49 @@ class CorporationAuthorityDefinitionTest(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assertEqual(definitions_in(subject + tail, CLASS_A), ())
 
+    def test_a_corporation_inside_a_modifier_is_never_the_subject(self):
+        """**앞 명사를 하나씩 막는 방식으로는 닫히지 않는다.**
+
+        `of the Corporation`을 막아도 `appointed by the Corporation`이 남고, 막아야 할
+        전치사·분사 목록은 끝이 없다. 여기서 `shall have authority`의 주어는 Board ·
+        committee · officer이지 법인이 아니다.
+        """
+        tail = (
+            " shall have authority to issue 3,070,000,000 shares, consisting of "
+            "2,000,000,000 shares of Class A Common Stock, par value $0.01 per share."
+        )
+        for subject in (
+            "The Board appointed by the Corporation",
+            "A committee designated by the Corporation",
+            "An officer authorized by the Corporation",
+            "The Board of Directors of the Corporation",
+            "Each holder of record of the Corporation",
+        ):
+            with self.subTest(subject=subject):
+                self.assertEqual(definitions_in(subject + tail, CLASS_A), ())
+
+    def test_the_accepted_subject_shapes_stay_accepted(self):
+        """받는 왼쪽 문맥은 셋뿐이다 — block 시작 · 절 경계 구두점 · `which`."""
+        tail = (
+            " shall have authority to issue 3,070,000,000 shares, consisting of "
+            "2,000,000,000 shares of Class A Common Stock, par value $0.01 per share."
+        )
+        for prose in (
+            "The Corporation" + tail,
+            "Corporation" + tail,
+            "The Corporation shall have the authority to issue 3,070,000,000 shares, "
+            "consisting of 2,000,000,000 shares of Class A Common Stock, par value "
+            "$0.01 per share.",
+            "(a) The Corporation" + tail,
+            # 실 FOXA의 관계절 모양.
+            "The total number of shares of capital stock which the Corporation" + tail,
+        ):
+            with self.subTest(prose=prose[:48]):
+                found = definitions_in(prose, CLASS_A)
+                self.assertEqual(len(found), 1)
+                self.assertEqual((found[0][1], found[0][2]),
+                                 ("AUTHORIZED_TO_ISSUE", CLASS_A))
+
     def test_a_different_legal_verb_is_not_this_grammar(self):
         """`may issue`는 다른 법적 문언이다 — 동의어로 받지 않는다."""
         self.assertEqual(

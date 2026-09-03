@@ -225,11 +225,25 @@ GOVERNING_CLASSIFICATIONS = SNAPSHOT_CLASSIFICATIONS | AMENDMENT_CLASSIFICATIONS
 # **정의이지 탄생이 아니다**(§9.3 그대로).
 #
 # 주어는 **법인 자신**이어야 한다. `The Board shall have authority to issue`는 이사회
-# 권한이지 class 정의가 아니고, `The Board of Directors of the Corporation`의
-# `Corporation`은 주어가 아니라 `of`의 목적어다.
-_CORPORATION_SUBJECT = (
-    r"(?:(?<!of )\bthe\s+Corporation\b|(?<!of the )(?<!of )\bCorporation\b)"
-)
+# 권한이지 class 정의가 아니다.
+#
+# **앞 명사를 하나씩 부정으로 막는 방식은 닫히지 않는다.** `of the Corporation`을 막아도
+# `appointed by the Corporation` · `designated by the Corporation`이 남고, 막아야 할
+# 전치사·분사 목록은 끝이 없다. 그래서 반대로 **절이 시작하는 자리만 열거해서 받는다.**
+#
+# ```text
+# block 시작        Corporation shall have authority to issue ...
+# 절 경계 구두점    (a) The Corporation shall have authority to issue ...
+# 관계대명사 which  ... capital stock which the Corporation shall have authority ...
+# ```
+#
+# 그 셋 밖에서는 `Corporation` 앞에 다른 낱말이 있다는 뜻이고, 그때 `shall have
+# authority`의 주어는 법인이 아니다 — `The Board appointed by the Corporation` ·
+# `A committee designated by the Corporation` · `The Board of Directors of the
+# Corporation`이 전부 여기서 걸린다. 관계대명사는 실제로 관측된 `which` 하나만
+# 열거한다(`that` 변형은 관측되면 그때 별도로 연다). 영어 문법 parser도 fuzzy도 아니다.
+_SUBJECT_CLAUSE_START = r"(?:^|[.;:,)]\s+|\bwhich\s+)"
+_CORPORATION_SUBJECT = _SUBJECT_CLAUSE_START + r"(?:the\s+)?Corporation\b"
 # `[^.;]`는 `$0.01`의 마침표에서 멈춘다 — 그러면 **같은 문장 안의 Class B**에 영원히
 # 닿지 못한다. 숫자 사이의 마침표는 문장 경계가 아니므로 그것 하나만 지나간다.
 # 진짜 문장 끝(`. `)은 그대로 막는다.
