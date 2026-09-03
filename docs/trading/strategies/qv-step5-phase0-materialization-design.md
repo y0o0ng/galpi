@@ -581,6 +581,138 @@ ticker 유사도 · 액면가 유사도 · 주식수 · COVER_GROUP_LABEL · 근
 Common Stock"을 정의한다는 이유로 기계적으로 연결되지 않는다. 그대로
 `REVIEW_REQUIRED`다. **AUTO 비율을 올리려고 이 규칙을 약화하지 않는다.**
 
+##### P2 — 액면가 정규화는 **연결 경계에만** 있다 (**CLOSED**)
+
+실 pilot에서 지배적 차단 요인은 표지 제목의 액면가 수식이었다(FOXA가 가장 깨끗한
+사례다 — 탐색이 거의 닫혔고 완전 snapshot이 3건인데 findings가 0이었다).
+
+```text
+표지    "Class A Common Stock, par value $0.01 per share"
+charter "Class A Common Stock"
+```
+
+사용자 결정으로 **연결 판단에서만** 액면가 수식을 무시한다.
+
+```text
+전역 N1(qv_manifest.prose_key)          바뀌지 않는다
+qv-class-id-v1                          바뀌지 않는다
+production identity JSONL               다시 쓰지 않는다
+액면가 변형                             전역 alias 동치가 **아니다**
+```
+
+**인식하는 것은 끝에 붙은 숫자 액면가 수식 하나뿐이다.**
+
+```text
+..., par value $0.01 per share      ..., par value $0.01
+..., $0.01 par value per share      ..., $.01 par value
+```
+
+숫자는 Decimal로 정확히 읽는다. float도 허용 오차도 일반 통화 정규화도 없다. 다음은
+**벗기지 않는다** — 맞지 않으면 P2 정규화가 아예 없고 exact N1만 남는다.
+
+```text
+no par value · without par value · stated/liquidation/redemption/conversion value ·
+Series/Class 지정 · 의결권 표현 · 우선주/보통주 표현 · 괄호 법적 수식 ·
+그 밖의 뒤 산문 · 종단이 아닌 par value 산문
+```
+
+**연결 규칙.**
+
+```text
+1. exact N1을 먼저 본다            cover N1 == governing N1  ->  EXACT_N1
+2. 실패했을 때만 core를 본다       core designation이 정확히 같아야 한다
+   한쪽만 숫자 액면가              -> 연결 허용
+   양쪽 숫자 액면가가 Decimal 동일 -> 연결 허용
+   양쪽 숫자 액면가가 다르다       -> 연결하지 않는다
+```
+
+**모호성은 fail-close다.** 한 표지 class가 서로 다른 governing designation 여럿에
+닿거나, 같은 core가 서로 다른 숫자 액면가로 나타나거나, 같은 표지의 다른 보통주
+제목이 같은 core로 줄어들면 자동 연결이 꺼진다. 문서 날짜·등장 순서·ticker·class
+글자·주식수·액면가 근접도로 하나를 고르지 않는다. **exact N1이 있으면 그것이 이긴다** —
+stripped core가 다른 무언가에도 맞는다는 이유로 P2 후보를 덧붙이지 않는다.
+
+**governing 이름은 실제로 일치한 산문 그대로 보존한다.** 정규화된 core로 바꿔치지
+않고, 그 자리의 액면가 원문도 함께 남긴다. 구조화된 proof가 드는 것은 다음이다.
+
+```text
+raw cover title · cover prose_key · cover 액면가
+raw governing name · governing prose_key · 그 자리의 액면가 원문
+association method(EXACT_N1 | NUMERIC_PAR_VALUE_SUFFIX) · designation key
+```
+
+**연결 전용 designation key는 production class-ID seed에 들어가지 않는다.**
+
+###### 연결 동치 != production prose alias 동치
+
+이 구분이 이 결정의 핵심이다.
+
+```text
+표지    "Class A Common Stock, par value $0.01 per share"
+charter "Class A Common Stock"
+```
+
+P2가 세우는 것은 **둘이 같은 경제적 class를 가리킨다**이지 **두 철자의 temporal alias
+수명이 같다**가 아니다. 그래서 P2로 연결된 class는 이렇게 나온다.
+
+```text
+governing 이름   구간이 증명되면 GOVERNING_INSTRUMENT canonical bridge가 된다
+표지 제목        cover_title_interval을 자동으로 받지 못한다(B1 그대로)
+                 자기 수명이 독립으로 증명되기 전에는 SECURITY_TITLE_FACT 행이 없다
+class 수명       표지 제목 alias 수명으로 복사되지 않는다
+```
+
+exact N1로 연결된 경우는 지금까지와 같다 — 표지 제목이 곧 governing 이름이므로
+`cover_title_interval`을 갖고 중복 `GOVERNING_INSTRUMENT` 행을 만들지 않는다.
+
+###### governing 문서 안에서의 매칭
+
+일반 class 이름 추출기를 만들지 않았다. 탐색 target은 여전히 **표지 증권 제목에서
+결정론적으로 파생한 하나**이고, P2가 걸릴 때 그것이 core designation이 된다. 일치
+자리에서는 다음을 본다.
+
+```text
+바로 앞이 더 긴 designation의 꼬리다(`Class A ` + `Common Stock`)  -> 그 class가 아니다
+바로 뒤가 인식된 숫자 액면가 수식이다                              -> 원문을 함께 남긴다
+바로 뒤가 값 수식처럼 보이는데 동결 문법에 없다                    -> 같다고 보지 않고 버린다
+```
+
+임의 부분문자열 매칭·fuzzy·토큰 유사도가 없다.
+
+**"바로 뒤"는 닫는 인용부호 하나를 지나간다.** 실 SEC 산문은 designation을 인용부호로
+감싸므로 이름 그룹이 그 앞에서 끝난다.
+
+```text
+designated “Common Stock,” par value $0.00001 per share
+                         ^^ 이름과 액면가 수식 사이에 닫는 인용부호가 낀다
+```
+
+이것은 편의가 아니라 **안전 문제다.** 지나가지 못하면 그 자리의 액면가가 `None`으로
+관측되고, 다른 액면가를 든 표지 제목이 `PAR_VALUE_CONFLICT`가 아니라 **한쪽만 액면가를
+든 정상 연결**로 보인다 — P2의 fail-close가 조용히 열린다.
+
+```text
+지나가는 것   `"` · `”` · `'` · `’` **하나**와 그에 인접한 쉼표·공백
+지나간 뒤     동결된 숫자 액면가 문법을 **그대로** 적용한다
+```
+
+**일반 구두점 정규화가 아니다.** 괄호·임의 뒤 산문·둘 이상의 인용부호를 건너뛰지 않고,
+전역 N1과 표지 제목의 종단 수식 인식은 바뀌지 않는다. 인식·fail-close 두 경로에 같은
+구분자가 열려 있어서 인용부호 뒤의 `no par value` 같은 미분류 수식은 여전히 그 자리를
+버린다.
+
+###### 생성기와 승격기가 같은 판정을 쓴다
+
+연결 판정의 정의는 `associate_class_designation()` **하나**다. 5A-2 제안 생성과 5A-2c
+승격 offline 재검증이 같은 함수를 돌리고, 승격기는 직렬화된 `association_method` ·
+`designation_key` · 액면가 파생값을 권한으로 삼지 않는다 — **표지 제목 원문과 finding이
+남긴 governing 이름·액면가 원문에서 다시 판정한다.** 직렬화된 칸은 receipt이고,
+그것이 재판정과 어긋나면 `assert_proof_integrity()`가 fail-close한다.
+
+P2는 **탄생·snapshot·종료 규칙을 하나도 바꾸지 않는다.** 정의 != 탄생, open-ended는
+탄생 + current 완전 snapshot + COMPLETE 탐색 + 미해결 영향 없음, 종료는 명시 실행 +
+명시 발효일 그대로다.
+
 ##### 탐색 지평은 선언된 form 계열이다 — 건수·연도 상한이 아니다
 
 ```text
@@ -716,6 +848,104 @@ operative date는 문서 수준 사실 하나다(`governing_operative_date()`). 
 나오므로 **경제적 날짜의 원천은 문서마다 하나다.** 문서의 operative date가 있다고
 class 탄생이 증명되는 것은 아니다 — 탄생은 여전히 `CLASS_BIRTH_ACTION`이 함께 있어야
 한다.
+
+##### O2 — 주(州) filing은 **instrument가 그렇게 만들 때만** 법적 시점을 세운다 (**CLOSED**)
+
+실 pilot에서 governing exhibit의 operative-date recall이 매우 낮았다(AAPL 22/22 ·
+CELG 14/14 · ABMD 9/10 MISSING). 실제 charter는 열거된 네 표현으로 자기 발효일을
+말하지 않고 **주 filing/증명 의미론**으로 말한다. 사용자 결정으로 그 두 경로만 열었다.
+
+**늘어난 것은 문법이지 원칙이 아니다.** 다음은 그대로다.
+
+```text
+economic/legal validity  !=  SEC knowledge availability
+SEC acceptance · EDGAR 접수 · filed date · report date  ->  발효일이 아니다
+signature / execution / attestation / notary / 서명일 단독  ->  발효일이 아니다
+```
+
+**직접 출처 둘 — 법적 발효를 스스로 진술한다.**
+
+```text
+EXPLICIT_EFFECTIVE_DATE          기존 좁은 EFFECTIVE_DATE_PATTERNS 그대로
+STATE_CERTIFIED_EFFECTIVE_DATE   같은 authoritative Exhibit 3 안의 주 증명이
+                                 effective date / effective date-time을 명시한다
+```
+
+**제출 발효 출처 하나 — 직접 진술이 없을 때만 쓰인다.**
+
+```text
+STATE_FILED_UPON_FILING   instrument가 "주 filing 기관에 제출하면 발효한다"를
+                          명시하고 + **같은 문서**의 주 FILED 스탬프가 제출일 D를
+                          명시하면  ->  법적 operative date = D
+```
+
+이것은 **법적 문서 안의 관계**이지 SEC 수리 폴백이 아니다. 주 스탬프가 시점을 세울 수
+있는 이유는 그 instrument 자신이 제출을 발효 사건으로 만들었기 때문이다.
+
+**주 기관 어휘는 작고 열거돼 있다.** `FILED`라는 낱말만으로는 부족하고, block이 그
+기관을 명시로 말하면서 filing/증명 표지(`filed` · `do hereby certify`)를 함께 들어야
+주 filing 자료로 인정된다.
+
+```text
+Secretary of State · Division of Corporations · Department of State
+```
+
+**주 자료 안의 날짜 표기는 O2 전용 parser가 읽는다.** 실 Delaware 스탬프는 산문 날짜가
+아니라 숫자 날짜이거나 전부 대문자다. 공유 `qv_events._iso_date`는 `January 3, 2022`
+하나만 읽어서 O2를 열고도 주 출처 recall이 0이었다.
+
+```text
+Secretary of State ... FILED 09:00 AM 01/03/2022
+EFFECTIVE DATE: JANUARY 3, 2022
+```
+
+```text
+받는 모양   MM/DD/YYYY · Month D, YYYY · 같은 영어 월 이름의 대소문자 변형
+읽는 자리   이미 주 기관 게이트를 통과한 주 filing/증명 자료 **안에서만**
+```
+
+`MM/DD/YYYY`를 미국 월/일/년으로 읽는 것은 **그 게이트 안에서만** 참이다. 달력으로
+성립하지 않는 날짜(`13/03/2022` · `02/31/2022`)와 인식하지 못하는 월 이름은 추측하지
+않고 그 자리를 버린다. **공유 parser의 의미는 넓히지 않았고** 월 이름 변환 자체는 여전히
+그 하나가 한다 — O2 parser는 대소문자만 정규화해 넘긴다.
+
+**밖에서는 아무것도 늘어나지 않았다.** 게이트 없는 일반 발효일 문법
+(`EFFECTIVE_DATE_PATTERNS`)은 이 모양을 쓰지 않으므로 숫자 날짜를 읽지 않고, SEC
+수리·EDGAR 접수·report date·서명일은 그대로 법적 시점이 아니다.
+
+**우선순위와 모호성.**
+
+```text
+직접 발효일 하나                    -> RESOLVED (그 직접 family)
+직접 발효일 둘 이상                 -> AMBIGUOUS
+직접 하나 + 제출 파생 날짜가 다르다 -> AMBIGUOUS
+직접 없음 + 제출 파생 하나          -> RESOLVED (STATE_FILED_UPON_FILING)
+직접 없음 + 제출 파생 둘 이상       -> AMBIGUOUS
+제출 발효 조항만 있고 스탬프 없음   -> MISSING
+스탬프만 있고 제출 발효 조항 없음   -> MISSING
+```
+
+"가장 이른 날짜가 이긴다"를 만들지 않았다. **지연 발효**(state FILED 6/1 · 명시 발효
+6/15)는 명시 발효일이 지배한다 — 그 문서에 제출 발효 조항이 없으므로 스탬프는 애초에
+후보가 아니다. 문서가 제출 발효를 말하면서 다른 명시 발효일까지 들면 법이 모순이므로
+`AMBIGUOUS`다.
+
+**구조화된 proof가 출처를 드러낸다.**
+
+```text
+status · date · source_family · supporting_locators · observed
+```
+
+`source_family`는 위 셋뿐이고 신뢰도 점수가 아니다. `STATE_FILED_UPON_FILING`은 제출
+발효 조항 locator와 주 스탬프 locator를 **둘 다** 남긴다 — 그래서 왜 D가 나왔는지
+receipt만 보고 되짚을 수 있다. `acceptance_datetime`은 별도 provenance로 남는다.
+
+`assert_proof_integrity()`가 이 모양을 fail-close로 잠근다 — `RESOLVED`는 날짜·동결
+family·그 family가 요구하는 locator 개수를 모두 갖춰야 하고, 탄생일 finding의 locator는
+그 문서 operative date의 근거와 같아야 한다. 같은 날짜를 남긴 채 출처만 바꿔치면 걸린다.
+
+**두 번째 법적 날짜 해석기를 만들지 않았다.** `CLASS_BIRTH_EFFECTIVE_DATE` ·
+`CLASS_TERMINATION_EFFECTIVE_DATE` · B2 연대기가 전부 이 하나의 구조에서 나온다.
 
 ##### governing snapshot의 발효일은 그 안 class의 탄생일이 아니다
 

@@ -36,18 +36,35 @@ prose alias 제안이 된다(§11 · `_class_packets`).
 미해결 class 영향 없음**이 전부 성립할 때만 나온다. C3가 이미 쓰는 fail-close
 continuity 철학과 같다.
 
-## 자동 class 연결은 의도적으로 좁다
-
-governing 문서의 class를 표지 class에 자동으로 잇는 anchor는 **하나뿐**이다.
+## 법적 시점의 출처는 셋뿐이다 (O2)
 
 ```text
-표지에 Security12bTitle / Security12gTitle이 있고
-N1(표지 증권 제목) == N1(governing class 이름)
+EXPLICIT_EFFECTIVE_DATE          instrument가 명시한 발효일
+STATE_CERTIFIED_EFFECTIVE_DATE   같은 Exhibit 3 안의 주 증명이 명시한 발효일/발효시각
+STATE_FILED_UPON_FILING          제출로 발효한다는 명시 조항 + 같은 문서의 주 FILED 스탬프
 ```
 
-정확한 N1 동일성만이다. XBRL member 철자 · `CommonClassBMember` · class 글자 유사도 ·
-sibling 순서 · ticker 유사도 · 액면가 유사도 · 주식수 · `COVER_GROUP_LABEL` ·
-근사 prose 유사도 · fuzzy 매칭으로 잇지 않는다.
+주 스탬프가 시점을 세울 수 있는 이유는 **그 instrument 자신이 제출을 발효 사건으로
+만들었기 때문**이다. SEC 수리 시각·EDGAR 접수·서명일 단독은 여전히 법적 시점이 아니다.
+
+## 자동 class 연결은 의도적으로 좁다
+
+governing 문서의 class를 표지 class에 자동으로 잇는 길은 **둘뿐이고 순서가 있다**.
+
+```text
+1. EXACT_N1                  N1(표지 증권 제목) == N1(governing class 이름)
+2. NUMERIC_PAR_VALUE_SUFFIX  1이 실패했을 때만, **끝에 붙은 인식된 숫자 액면가
+                             수식**을 뺀 core designation이 정확히 같고 액면가가
+                             충돌하지 않을 때(P2 · §7~14)
+```
+
+**exact N1이 가장 강하다.** XBRL member 철자 · `CommonClassBMember` · class 글자
+유사도 · sibling 순서 · ticker 유사도 · 액면가 **근접도** · 주식수 ·
+`COVER_GROUP_LABEL` · 근사 prose 유사도 · fuzzy 매칭으로 잇지 않는다.
+
+**P2는 연결 판단 경계에만 있다.** `qv_manifest.prose_key`의 N1은 그대로이고,
+액면가 변형이 전역 alias 동치가 되지 않는다. P2로 연결된 class는 governing 이름의
+`GOVERNING_INSTRUMENT` bridge만 얻고 표지 제목은 자기 수명을 받지 못한다(§11 · B1).
 
 **결과**: 제목 없는 sibling(`CommonClassBMember` + 주식수 fact)은 charter에 "Class B
 Common Stock"이 있다는 이유로 기계적으로 연결되지 않는다. 그대로 `REVIEW_REQUIRED`다.
@@ -71,6 +88,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date as _calendar_date
+from decimal import Decimal, InvalidOperation
 
 from .edgar import accession_dir_url
 from .qv_events import NOT_IMPLEMENTED_PATTERNS, html_blocks
@@ -78,9 +97,11 @@ from .qv_events import NOT_IMPLEMENTED_PATTERNS, html_blocks
 # parser를 만들면 두 경로가 조용히 갈라진다.
 from .qv_events import _iso_date
 from .qv_identity_proposals import (
+    GOVERNING_INSTRUMENT,
     ClassEvidence,
     CoverPageProof,
     EvidenceRef,
+    ProseBridgeInput,
     RelationInterval,
 )
 from .qv_manifest import prose_key
@@ -233,6 +254,123 @@ EFFECTIVE_DATE_PATTERNS = (
     ("EFFECTIVE", r"\beffective\s+on\s+(?P<d>" + _DATE + r")"),
 )
 
+# ── O2 — 주(州) filing이 법적 시점을 세우는 **좁은 두 경로** ─────────────────
+#
+# ```text
+# 경제적/법적 유효성  !=  SEC 지식 가용성
+# ```
+#
+# 이 확장은 그 CLOSED 구분을 **건드리지 않는다.** SEC 수리 시각·EDGAR 접수 시각은
+# 여전히 법적 발효일이 될 수 없고, 서명·집행일 단독도 될 수 없다. 늘어나는 것은
+# **governing instrument 자신이 명시로 만든 관계** 둘뿐이다.
+#
+# ```text
+# O2-A  같은 authoritative Exhibit 3 안의 주 증명이 발효일/발효시각을 명시한다
+# O2-B  instrument가 "제출로 발효한다"를 명시하고 + 같은 문서의 주 FILED 스탬프가
+#       제출일 D를 명시한다  ->  법적 operative date = D
+# ```
+#
+# **주 기관 어휘는 작고 열거돼 있다.** `FILED`라는 단어 하나로는 부족하다 — SEC
+# filed date · SEC acceptance · EDGAR metadata · report filed date를 주 filing
+# 스탬프로 착각하지 않기 위해 그 block이 주 기관을 명시로 말해야 한다.
+STATE_FILING_AUTHORITIES = (
+    r"secretary\s+of\s+state",
+    r"division\s+of\s+corporations",
+    r"department\s+of\s+state",
+)
+_STATE_AUTHORITY = r"(?:" + r"|".join(STATE_FILING_AUTHORITIES) + r")"
+
+# 그 block이 **주 filing/증명 자료 자체**임을 말하는 표현. 기관 이름만으로는
+# 부족하다 — 그러면 본문의 임의 문장이 스탬프가 된다.
+STATE_FILING_MARKERS = (
+    r"\bfiled\b",
+    r"\bdo\s+hereby\s+certify\b",
+)
+
+# ── O2-local 날짜 문법 — **주 자료 안에서만** ───────────────────────────────
+#
+# 실제 주 스탬프는 이렇게 생겼다.
+#
+# ```text
+# Secretary of State ... FILED 09:00 AM 01/03/2022
+# EFFECTIVE DATE: JANUARY 3, 2022
+# ```
+#
+# 공유 `qv_events._iso_date`는 `January 3, 2022` 하나만 읽는다. 그래서 O2를 열고도
+# 주 출처 recall이 0이었다. **공유 parser의 의미는 넓히지 않는다** — 아래는 이미
+# `_state_filing_material` 게이트를 통과한 주 filing/증명 자료 안에서만 쓰이는 O2
+# 전용 문법이고, 월 이름 변환 자체는 여전히 공유 parser 하나가 한다.
+#
+# ```text
+# 01/03/2022        미국 월/일/년으로 읽는다 — **주 자료 안에서만**
+# January 3, 2022   기존 모양 그대로
+# JANUARY 3, 2022   같은 영어 월 이름의 대소문자 변형
+# ```
+#
+# SEC 수리 시각·EDGAR 접수·report date·서명일은 여전히 읽지 않는다. 같은 숫자 날짜가
+# 주 기관 자료 **밖**에 있으면 게이트에서 먼저 떨어지고, 일반 발효일 문법
+# (`EFFECTIVE_DATE_PATTERNS`)은 게이트가 없으므로 이 문법을 쓰지 않는다.
+_STATE_NUMERIC_DATE = r"\d{1,2}/\d{1,2}/\d{4}"
+_STATE_MONTH_DATE = r"[A-Za-z]{3,9} \d{1,2}, \d{4}"
+_STATE_DATE = r"(?:" + _STATE_MONTH_DATE + r"|" + _STATE_NUMERIC_DATE + r")"
+
+
+def _state_iso_date(text: str) -> str | None:
+    """주 자료 안의 날짜 문자열 하나 → ISO. 읽지 못하면 `None`으로 버린다."""
+    raw = " ".join(str(text or "").split())
+    numeric = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", raw)
+    if numeric is not None:
+        month, day, year = (int(item) for item in numeric.groups())
+        try:
+            return _calendar_date(year, month, day).isoformat()
+        except ValueError:
+            return None
+    named = re.match(r"([A-Za-z]{3,9})(?= \d{1,2}, \d{4}$)", raw)
+    if named is None:
+        return None
+    # 월 이름의 **대소문자만** 정규화하고 변환은 공유 parser에 그대로 넘긴다. 인식
+    # 못 하는 월 이름은 거기서 `None`이 된다.
+    return _iso_date(named.group(1).capitalize() + raw[named.end():])
+
+
+# O2-A — 주 증명이 **스스로** 발효일/발효시각을 말하는 모양.
+_EFFECTIVE_LABEL = r"effective\s+(?:date|time)(?:\s*/\s*(?:date|time))?"
+STATE_CERTIFIED_DATE_PATTERNS = (
+    ("STATE_CERTIFIED_EFFECTIVE",
+     r"\b" + _EFFECTIVE_LABEL + r"\s*[:\-]?\s*(?P<d>" + _STATE_DATE + r")"),
+    ("STATE_CERTIFIED_EFFECTIVE",
+     r"\b" + _EFFECTIVE_LABEL + r"\s+(?:of|is|shall\s+be)\b[^.;]{0,60}?"
+     r"(?P<d>" + _STATE_DATE + r")"),
+)
+
+# O2-B(1) — instrument가 **제출을 발효 사건으로** 명시한다. 기관 없는
+# `effective upon filing`은 무엇에 제출하는지가 없으므로 받지 않는다.
+UPON_FILING_PATTERNS = (
+    ("EFFECTIVE_UPON_FILING",
+     r"\beffective\s+(?:upon|at\s+the\s+time\s+of)\s+"
+     r"(?:its\s+|the\s+|such\s+)?filing\s+with\s+(?:the\s+)?" + _STATE_AUTHORITY),
+)
+
+# O2-B(2) — 같은 문서의 주 FILED 스탬프가 **제출일**을 명시한다.
+STATE_FILED_STAMP_PATTERNS = (
+    ("STATE_FILED_STAMP", r"\bfiled\b[^.;]{0,80}?(?P<d>" + _STATE_DATE + r")"),
+)
+
+# ── operative date의 출처 family — **동결된 어휘 셋뿐이다** ──────────────────
+EXPLICIT_EFFECTIVE_DATE = "EXPLICIT_EFFECTIVE_DATE"
+STATE_CERTIFIED_EFFECTIVE_DATE = "STATE_CERTIFIED_EFFECTIVE_DATE"
+STATE_FILED_UPON_FILING = "STATE_FILED_UPON_FILING"
+OPERATIVE_SOURCE_FAMILIES = frozenset({
+    EXPLICIT_EFFECTIVE_DATE, STATE_CERTIFIED_EFFECTIVE_DATE, STATE_FILED_UPON_FILING,
+})
+# **family마다 요구되는 locator 모양이 다르다.** `STATE_FILED_UPON_FILING`은 제출
+# 발효 조항과 주 스탬프 **둘 다**를 들고 있어야 그 날짜가 왜 나왔는지 보인다.
+OPERATIVE_LOCATOR_COUNT = {
+    EXPLICIT_EFFECTIVE_DATE: 1,
+    STATE_CERTIFIED_EFFECTIVE_DATE: 1,
+    STATE_FILED_UPON_FILING: 2,
+}
+
 # ── 명시 class 종료 grammar — §9.5 ───────────────────────────────────────────
 #
 # 제안 · 승인 · 장래 의사 · 주주총회 대기 · 기준일 · 공고는 종료가 아니다. ticker
@@ -267,6 +405,230 @@ class QVLegalEvidenceError(Exception):
     """법적 증거 계약을 벗어날 때 올린다. **전부 fail-close다.**"""
 
 
+# ── P2 — 액면가 수식은 **연결 판단에서만** 무시된다 ──────────────────────────
+#
+# ```text
+# production prose identity  ==  N1 그대로다(qv_manifest.prose_key)
+# 표지 <-> governing 연결     ==  여기서만 액면가 수식을 벗긴다
+# ```
+#
+# **둘은 같은 것이 아니다.** 여기서 `Class A Common Stock, $0.01 par value`와
+# `Class A Common Stock`을 **같은 경제적 class로 연결**할 수 있어도, 그 둘이 같은
+# temporal production alias가 되지는 않는다(§11 · `class_evidence_from_legal_proof`).
+#
+# 벗기는 것은 **끝에 붙은 인식된 숫자 액면가 수식** 하나뿐이다. 일반 통화 정규화도,
+# `par` 뒤 임의 텍스트 제거도 아니다.
+_PAR_AMOUNT = r"\$\s*(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)"
+# 관측된 좁은 두 모양뿐이다.
+#
+# ```text
+# ..., par value $0.01 per share      ..., par value $0.01
+# ..., $0.01 par value per share      ..., $.01 par value
+# ```
+_PAR_SUFFIX_BODY = (
+    r"(?:par\s+value\s+(" + _PAR_AMOUNT + r")(?:\s+per\s+share)?"
+    r"|(" + _PAR_AMOUNT + r")\s+par\s+value(?:\s+per\s+share)?)"
+)
+# 표지 제목에서 벗기는 것은 **종단** 수식뿐이다. 중간에 나오는 `par value` 산문은
+# 이름의 일부일 수 있으므로 건드리지 않는다.
+_TERMINAL_PAR_SUFFIX = re.compile(r"\s*,?\s*" + _PAR_SUFFIX_BODY + r"\s*$", re.IGNORECASE)
+# governing 정의 안에서 이름 **바로 뒤**에 붙은 수식.
+#
+# 실제 SEC 산문은 designation을 인용부호로 감싼다.
+#
+# ```text
+# designated “Common Stock,” par value $0.00001 per share
+#                          ^^ 이름과 수식 사이에 닫는 인용부호가 낀다
+# ```
+#
+# 이름 그룹은 그 인용부호 앞에서 끝난다. 하나를 지나가지 못하면 액면가가 `None`이
+# 되고, 그러면 **다른 액면가를 든 표지 제목이 충돌이 아니라 한쪽만 있는 정상 연결로
+# 보인다** — P2의 `PAR_VALUE_CONFLICT` fail-close가 조용히 열린다. 그래서 designation
+# 자리에서만 열거된 닫는 인용부호 **하나**와 그에 인접한 쉼표·공백을 지나간다.
+# 일반 구두점 제거가 아니고 괄호도 임의 산문도 건너뛰지 않으며, 전역 N1과 표지의
+# 종단 수식(`_TERMINAL_PAR_SUFFIX`)은 그대로다. 지나간 뒤에 적용하는 숫자 액면가
+# 문법은 동결된 그대로다.
+_SITE_CLOSING_QUOTES = "\"”'’"
+_SITE_DELIMITER = r"\s*,?\s*[" + _SITE_CLOSING_QUOTES + r"]?\s*,?\s*"
+_LEADING_PAR_SUFFIX = re.compile(
+    r"^" + _SITE_DELIMITER + _PAR_SUFFIX_BODY, re.IGNORECASE
+)
+# 값 수식처럼 보이지만 **동결된 문법에 없는** 것들. 인식하지 못한 채 같다고 보지 않고
+# 그 자리에서 fail-close한다. 인용부호 뒤에서도 마찬가지다 — 지나갈 수 있게 된 자리는
+# 인식 경로와 fail-close 경로 **둘 다**에 열려야 한다.
+_VALUE_SHAPED = re.compile(
+    r"^" + _SITE_DELIMITER + r"(?:\$|no\s+par\b|without\s+par\b|par\s+value\b"
+    r"|stated\s+value\b|liquidation\s+value\b|redemption\s+value\b"
+    r"|conversion\s+value\b)",
+    re.IGNORECASE,
+)
+# 일치 지점 **앞**이 더 긴 designation의 꼬리인가. `Class A Common Stock` 안의
+# `Common Stock`을 그 class로 읽지 않는다.
+_DESIGNATION_PREFIX = re.compile(
+    r"\b(?:class|series)\s+[A-Za-z0-9][A-Za-z0-9-]{0,3}\s+$", re.IGNORECASE
+)
+
+# 연결 방법 — **둘뿐이고 신뢰도 점수가 아니다.**
+EXACT_N1 = "EXACT_N1"
+NUMERIC_PAR_VALUE_SUFFIX = "NUMERIC_PAR_VALUE_SUFFIX"
+ASSOCIATION_METHODS = frozenset({EXACT_N1, NUMERIC_PAR_VALUE_SUFFIX})
+# 연결되지 않은 이유. 액면가 충돌은 **없음과 다르다** — 같은 core가 서로 다른 액면가로
+# 나타나면 그 문서가 두 경제적 class를 가른 것이므로 자동 연결을 끈다.
+PAR_VALUE_CONFLICT = "PAR_VALUE_CONFLICT"
+NOT_ASSOCIATED = "NOT_ASSOCIATED"
+
+
+def _par_decimal(raw: object) -> str:
+    """액면가의 **정규 Decimal 문자열.** float도 허용 오차도 쓰지 않는다."""
+    clean = str(raw or "").replace("$", "").strip()
+    try:
+        value = Decimal(clean)
+    except InvalidOperation as error:
+        raise QVLegalEvidenceError(f"액면가를 Decimal로 읽지 못했습니다: {raw!r}") from error
+    value = value.normalize()
+    if value == value.to_integral_value():
+        value = value.to_integral_value()
+    return format(value, "f")
+
+
+@dataclass(frozen=True)
+class ClassDesignation:
+    """class 이름 하나를 **연결 판단용으로** 분해한 결과.
+
+    `prose_key`는 production identity가 쓰는 N1 그대로이고, `designation_key`는
+    **이 모듈 안에서만** 쓰이는 연결용 키다. 후자는 production class-ID seed에도
+    manifest에도 들어가지 않는다.
+    """
+
+    raw: str
+    prose_key: str
+    designation: str
+    designation_key: str
+    par_value: str | None
+    par_value_suffix: str | None
+    suffix_removed: bool
+
+    def as_json(self) -> dict:
+        return {
+            "raw": self.raw,
+            "prose_key": self.prose_key,
+            "designation": self.designation,
+            "designation_key": self.designation_key,
+            "par_value": self.par_value,
+            "par_value_suffix": self.par_value_suffix,
+            "suffix_removed": self.suffix_removed,
+        }
+
+
+def class_designation_anchor(raw_name: str) -> ClassDesignation:
+    """이름 하나에서 **인식된 종단 숫자 액면가 수식만** 떼어낸다.
+
+    ```text
+    Class A Common Stock, par value $0.01 per share  ->  Class A Common Stock  0.01
+    Class A Common Stock, $.01 par value             ->  Class A Common Stock  0.01
+    Common Stock, no par value                       ->  그대로(벗기지 않는다)
+    Class A Common Stock, stated value $0.01         ->  그대로
+    Class A Common Stock, par value $0.01, Series 2  ->  그대로(종단이 아니다)
+    ```
+
+    `qv_manifest.prose_key()`를 부르되 **바꾸지 않는다.** 여기서 만든 `designation_key`는
+    연결 판단 전용이다.
+    """
+    text = " ".join(str(raw_name or "").split())
+    if not text:
+        raise QVLegalEvidenceError("class 이름이 비었습니다")
+    match = _TERMINAL_PAR_SUFFIX.search(text)
+    if match is not None and match.start() > 0:
+        core = text[: match.start()].rstrip(" ,")
+        if core:
+            return ClassDesignation(
+                raw=text,
+                prose_key=prose_key(text),
+                designation=core,
+                designation_key=prose_key(core),
+                par_value=_par_decimal(match.group(1) or match.group(2)),
+                par_value_suffix=text[match.start():].strip(),
+                suffix_removed=True,
+            )
+    return ClassDesignation(
+        raw=text, prose_key=prose_key(text), designation=text,
+        designation_key=prose_key(text), par_value=None,
+        par_value_suffix=None, suffix_removed=False,
+    )
+
+
+@dataclass(frozen=True)
+class DesignationAssociation:
+    """표지 제목 <-> governing class 이름 **연결 판정 하나.**"""
+
+    outcome: str
+    cover: ClassDesignation
+    governing: ClassDesignation
+    governing_par_value: str | None
+
+    @property
+    def associated(self) -> bool:
+        return self.outcome in ASSOCIATION_METHODS
+
+
+def associate_class_designation(
+    cover_raw: str, governing_raw: str, *, governing_par_text: object = None
+) -> DesignationAssociation:
+    """**연결 판정의 유일한 정의다.** 5A-2 생성기와 5A-2c 승격기가 이 함수를 쓴다.
+
+    ```text
+    N1이 정확히 같다                    -> EXACT_N1        (가장 강한 anchor다)
+    core designation이 정확히 같고
+      한쪽만 숫자 액면가                -> NUMERIC_PAR_VALUE_SUFFIX
+      양쪽 숫자 액면가가 Decimal로 같다 -> NUMERIC_PAR_VALUE_SUFFIX
+      양쪽 숫자 액면가가 다르다         -> PAR_VALUE_CONFLICT
+    그 밖                                -> NOT_ASSOCIATED
+    ```
+
+    fuzzy·토큰 유사도·허용 오차·신뢰도 점수를 쓰지 않는다. `governing_par_text`는 그
+    이름 **바로 뒤**에서 읽은 액면가 원문이고, 직렬화된 파생값이 아니라 여기서 다시
+    Decimal로 읽는다.
+    """
+    cover = class_designation_anchor(cover_raw)
+    governing = class_designation_anchor(governing_raw)
+    governing_par = governing.par_value
+    if governing_par_text not in (None, ""):
+        parsed = _par_decimal(governing_par_text)
+        if governing_par is not None and Decimal(parsed) != Decimal(governing_par):
+            return DesignationAssociation(
+                PAR_VALUE_CONFLICT, cover, governing, governing_par
+            )
+        governing_par = parsed
+    if cover.prose_key == governing.prose_key:
+        return DesignationAssociation(EXACT_N1, cover, governing, governing_par)
+    if cover.designation_key != governing.designation_key:
+        return DesignationAssociation(NOT_ASSOCIATED, cover, governing, governing_par)
+    if cover.par_value is not None and governing_par is not None:
+        if Decimal(cover.par_value) != Decimal(governing_par):
+            return DesignationAssociation(
+                PAR_VALUE_CONFLICT, cover, governing, governing_par
+            )
+    return DesignationAssociation(
+        NUMERIC_PAR_VALUE_SUFFIX, cover, governing, governing_par
+    )
+
+
+def cover_designation_collisions(cover_proof: CoverPageProof) -> frozenset[str]:
+    """같은 표지에서 **서로 다른** 제목 둘이 같은 core로 줄어드는 designation key들.
+
+    그런 core는 자동 P2 연결을 끈다 — 두 형제 class를 하나로 합치지 않는다. 정확한
+    N1 anchor는 그대로 남는다(§13, exact N1이 가장 강하다).
+    """
+    seen: dict[str, set[str]] = {}
+    for item in cover_proof.classes:
+        title = str(item.security_title or "").strip()
+        if not title:
+            continue
+        anchor = class_designation_anchor(title)
+        seen.setdefault(anchor.designation_key, set()).add(anchor.prose_key)
+    return frozenset(key for key, titles in seen.items() if len(titles) > 1)
+
+
 def _name_regex(raw_name: str) -> str:
     """정확한 class 이름의 정규식 조각. **fuzzy가 아니라 exact token 연쇄다.**"""
     parts = str(raw_name or "").split()
@@ -276,7 +638,8 @@ def _name_regex(raw_name: str) -> str:
 
 
 def _fill(pattern: str, raw_name: str) -> str:
-    return pattern.replace("{name}", _name_regex(raw_name))
+    """`{name}`을 **실제로 일치한 산문을 되돌려주는** 이름 그룹으로 바꾼다."""
+    return pattern.replace("{name}", r"(?P<name>" + _name_regex(raw_name) + r")")
 
 
 def _not_implemented(block: str) -> tuple[str, ...]:
@@ -339,7 +702,8 @@ class LegalDocument:
             # 5A-3의 지식 가용성 입력이지 순서 근거가 아니다.
             "legal_operative_status": self.legal_operative.status,
             "legal_operative_date": self.legal_operative.date,
-            "legal_operative_locator": self.legal_operative.locator,
+            "legal_operative_source_family": self.legal_operative.source_family,
+            "legal_operative_locators": list(self.legal_operative.supporting_locators),
             "legal_operative_observed": list(self.legal_operative.observed),
             "classification_families": list(self.classification_families),
         }
@@ -361,6 +725,10 @@ class LegalFinding:
     raw_class_name: str
     semantic_family: str
     effective_date: str | None = None
+    # **실제로 일치한 governing 산문과 그 자리의 액면가 원문.** 연결 판정은 파생
+    # 칸이 아니라 이 원문 둘에서 다시 계산된다(§18).
+    governing_raw_name: str | None = None
+    governing_par_text: str | None = None
 
     def as_json(self) -> dict:
         return {
@@ -372,6 +740,8 @@ class LegalFinding:
             "raw_class_name": self.raw_class_name,
             "semantic_family": self.semantic_family,
             "effective_date": self.effective_date,
+            "governing_raw_name": self.governing_raw_name,
+            "governing_par_text": self.governing_par_text,
         }
 
 
@@ -399,12 +769,27 @@ class ClassLegalProof:
     snapshot_document_name: str | None
     findings: tuple[LegalFinding, ...]
     notes: tuple[str, ...]
+    # **P2 연결 receipt — 출력이지 권한이 아니다.** 승격기는 이 칸들을 믿지 않고
+    # 원본 산문에서 같은 함수로 다시 판정한다. 그래도 receipt가 거짓말하면
+    # `assert_proof_integrity`가 fail-close한다.
+    designation_key: str = ""
+    cover_par_value: str | None = None
+    association_method: str | None = None
+    governing_raw_name: str | None = None
+    governing_prose_key: str | None = None
+    governing_par_value: str | None = None
 
     def as_json(self) -> dict:
         return {
             "member_key": self.member_key,
             "raw_target_name": self.raw_target_name,
             "target_name_key": self.target_name_key,
+            "designation_key": self.designation_key,
+            "cover_par_value": self.cover_par_value,
+            "association_method": self.association_method,
+            "governing_raw_name": self.governing_raw_name,
+            "governing_prose_key": self.governing_prose_key,
+            "governing_par_value": self.governing_par_value,
             "status": self.status,
             "birth_date": self.birth_date,
             "termination_date": self.termination_date,
@@ -494,95 +879,228 @@ def classification_families(blocks: tuple[str, ...]) -> tuple[str, ...]:
 
 @dataclass(frozen=True)
 class OperativeDate:
-    """governing instrument의 **명시 법적 발효일** 하나와 그 위치.
+    """governing instrument의 **명시 법적 발효일** 하나와 그 출처.
 
     이 모듈의 모든 경제적/법적 연대기가 여기서 나온다. SEC 수리 시각·filed date·
     accession 순서·report date는 **순서 결정에 쓰이지 않는다** — 그것들은 provenance이고
     5A-3의 지식 가용성 입력이다.
+
+    `source_family`는 신뢰도 점수가 아니라 **동결된 셋 중 하나**이고,
+    `supporting_locators`는 그 날짜가 왜 나왔는지를 되짚을 수 있는 결정론적 span들이다.
+    `STATE_FILED_UPON_FILING`은 제출 발효 조항과 주 스탬프 **둘 다**를 남긴다.
     """
 
     status: str
     date: str | None
-    locator: str | None
+    source_family: str | None
+    supporting_locators: tuple[str, ...]
     observed: tuple[str, ...]
+
+    @property
+    def locator(self) -> str | None:
+        """finding이 쓰는 단일 문자열 투영. 근거 span을 하나도 버리지 않는다."""
+        return ";".join(self.supporting_locators) or None
 
     def as_json(self) -> dict:
         return {
             "status": self.status,
             "date": self.date,
-            "locator": self.locator,
+            "source_family": self.source_family,
+            "supporting_locators": list(self.supporting_locators),
             "observed": list(self.observed),
         }
+
+
+def _state_filing_material(block: str) -> bool:
+    """그 block이 **주 filing/증명 자료 자체**인가.
+
+    기관 이름만으로도, `FILED`라는 낱말만으로도 부족하다. 둘이 함께 있어야 SEC
+    수리 metadata·보고서 filed date와 구분된다.
+    """
+    if re.search(_STATE_AUTHORITY, block, re.IGNORECASE) is None:
+        return False
+    return any(re.search(item, block, re.IGNORECASE) for item in STATE_FILING_MARKERS)
+
+
+def _date_hits(
+    blocks, patterns, *, gate=None, parser=_iso_date
+) -> list[tuple[int, str]]:
+    """`parser`는 **게이트와 짝이다.** 주 자료 문법은 주 게이트가 있는 자리에만 온다."""
+    hits: list[tuple[int, str]] = []
+    for ordinal, block in enumerate(blocks):
+        if _not_implemented(block):
+            continue
+        if gate is not None and not gate(block):
+            continue
+        for _role, pattern in patterns:
+            for match in re.finditer(pattern, block, re.IGNORECASE):
+                iso = parser(match.group("d"))
+                if iso and (ordinal, iso) not in hits:
+                    hits.append((ordinal, iso))
+    return hits
+
+
+def _clause_ordinals(blocks, patterns) -> list[int]:
+    out: list[int] = []
+    for ordinal, block in enumerate(blocks):
+        if _not_implemented(block):
+            continue
+        if any(re.search(pattern, block, re.IGNORECASE) for _role, pattern in patterns):
+            out.append(ordinal)
+    return out
 
 
 def governing_operative_date(blocks: tuple[str, ...]) -> OperativeDate:
     """그 instrument에 명시로 붙은 발효일. **문서 수준으로 정확히 하나여야 한다.**
 
+    법적 발효를 **직접** 말하는 출처는 둘이다.
+
     ```text
-    명시 발효일 하나   -> 그 문서의 법적 as-of가 정해진다
-    하나도 없다        -> 그 문서의 법적 연대기는 미해결이다
-    서로 다른 둘 이상  -> 법적 연대기가 모호하다
+    명시 발효일 문법                  EXPLICIT_EFFECTIVE_DATE
+    주 증명이 명시한 발효일/발효시각  STATE_CERTIFIED_EFFECTIVE_DATE
+    ```
+
+    제출 발효 출처는 **직접 진술이 없을 때만** 쓰인다.
+
+    ```text
+    제출로 발효한다는 명시 조항 + 같은 문서의 주 FILED 스탬프
+                                      STATE_FILED_UPON_FILING
+    ```
+
+    ```text
+    직접 발효일 하나            -> 그 문서의 법적 as-of가 정해진다
+    직접 발효일 둘 이상         -> 모호하다
+    직접 하나 + 제출 파생 불일치 -> 모호하다
+    직접 없음 + 제출 파생 하나  -> 그 날짜가 법적 as-of다
+    조항만 있고 스탬프 없음     -> 미해결
+    스탬프만 있고 조항 없음     -> 미해결(스탬프 단독은 발효를 만들지 않는다)
     ```
 
     가장 가까운/이른/늦은 날짜를 고르지 않고 **SEC 수리 시각으로 되돌아가지 않는다.**
+    서명·집행일도 발효일이 아니다.
     """
-    hits: list[tuple[int, str]] = []
-    for ordinal, block in enumerate(blocks):
-        if _not_implemented(block):
-            continue
-        for _role, pattern in EFFECTIVE_DATE_PATTERNS:
-            for match in re.finditer(pattern, block, re.IGNORECASE):
-                iso = _iso_date(match.group("d"))
-                if iso and (ordinal, iso) not in hits:
-                    hits.append((ordinal, iso))
-    observed = tuple(sorted({iso for _ordinal, iso in hits}))
-    if not observed:
-        return OperativeDate(LEGAL_DATE_MISSING, None, None, ())
-    if len(observed) > 1:
-        return OperativeDate(LEGAL_DATE_AMBIGUOUS, None, None, observed)
-    ordinal = min(item for item, iso in hits if iso == observed[0])
-    return OperativeDate(LEGAL_DATE_RESOLVED, observed[0], f"block:{ordinal}", observed)
+    explicit = _date_hits(blocks, EFFECTIVE_DATE_PATTERNS)
+    certified = _date_hits(
+        blocks, STATE_CERTIFIED_DATE_PATTERNS,
+        gate=_state_filing_material, parser=_state_iso_date,
+    )
+    stamped = _date_hits(
+        blocks, STATE_FILED_STAMP_PATTERNS,
+        gate=_state_filing_material, parser=_state_iso_date,
+    )
+    clauses = _clause_ordinals(blocks, UPON_FILING_PATTERNS)
+
+    direct = {iso for _ordinal, iso in explicit} | {iso for _ordinal, iso in certified}
+    # **스탬프 단독은 법적 발효일 후보가 아니다.** instrument가 제출을 발효 사건으로
+    # 명시했을 때만 그 날짜가 후보가 된다.
+    derived = {iso for _ordinal, iso in stamped} if clauses else set()
+    observed = tuple(sorted(direct | derived))
+
+    def _blank(status: str) -> OperativeDate:
+        return OperativeDate(status, None, None, (), observed)
+
+    if len(direct) > 1:
+        return _blank(LEGAL_DATE_AMBIGUOUS)
+    if len(direct) == 1:
+        date = next(iter(direct))
+        # 지연 발효(state FILED 6/1 · 명시 발효 6/15)는 **명시 발효일이 지배한다.**
+        # 그 문서가 제출 발효까지 함께 말하면서 날짜가 갈리면 법이 모순이므로 모호하다.
+        if derived and derived != {date}:
+            return _blank(LEGAL_DATE_AMBIGUOUS)
+        ordinals = [ordinal for ordinal, iso in explicit if iso == date]
+        if ordinals:
+            family = EXPLICIT_EFFECTIVE_DATE
+        else:
+            family = STATE_CERTIFIED_EFFECTIVE_DATE
+            ordinals = [ordinal for ordinal, iso in certified if iso == date]
+        return OperativeDate(
+            LEGAL_DATE_RESOLVED, date, family, (f"block:{min(ordinals)}",), observed
+        )
+    if not derived:
+        return _blank(LEGAL_DATE_MISSING)
+    if len(derived) > 1:
+        return _blank(LEGAL_DATE_AMBIGUOUS)
+    date = next(iter(derived))
+    stamp = min(ordinal for ordinal, iso in stamped if iso == date)
+    return OperativeDate(
+        LEGAL_DATE_RESOLVED, date, STATE_FILED_UPON_FILING,
+        (f"block:{min(clauses)}", f"block:{stamp}"), observed,
+    )
+
+
+def _designation_site(block: str, match) -> tuple[str, str | None] | None:
+    """일치 지점이 **그 designation 자체인가.** 아니면 `None`으로 fail-close한다.
+
+    ```text
+    앞이 더 긴 designation의 꼬리다        -> 그 class가 아니다
+    바로 뒤가 인식된 숫자 액면가 수식이다  -> 그 액면가 원문을 함께 돌려준다
+    바로 뒤가 값 수식처럼 보이는데 문법에
+      없다                                 -> 같다고 보지 않고 버린다
+    그 밖                                  -> 이름만 돌려준다
+    ```
+    """
+    start, end = match.span("name")
+    if _DESIGNATION_PREFIX.search(block[:start]):
+        return None
+    tail = block[end:]
+    suffix = _LEADING_PAR_SUFFIX.match(tail)
+    if suffix is not None:
+        return (match.group("name"), suffix.group(1) or suffix.group(2))
+    if _VALUE_SHAPED.match(tail):
+        return None
+    return (match.group("name"), None)
 
 
 def _matches(
-    blocks: tuple[str, ...], patterns, raw_name: str
-) -> tuple[tuple[int, str], ...]:
-    """`(block ordinal, semantic family)` — 명시 미실행 표현이 있는 block은 뺀다."""
-    out: list[tuple[int, str]] = []
+    blocks: tuple[str, ...], patterns, search_name: str
+) -> tuple[tuple[int, str, str, str | None], ...]:
+    """`(block ordinal, semantic family, 일치한 governing 이름, 액면가 원문)`.
+
+    명시 미실행 표현이 있는 block과 designation으로 읽을 수 없는 자리는 뺀다.
+    """
+    out: list[tuple[int, str, str, str | None]] = []
     for ordinal, block in enumerate(blocks):
         if _not_implemented(block):
             continue
+        site = None
         for family, pattern in patterns:
-            if re.search(_fill(pattern, raw_name), block, re.IGNORECASE):
-                out.append((ordinal, family))
+            for match in re.finditer(_fill(pattern, search_name), block, re.IGNORECASE):
+                found = _designation_site(block, match)
+                if found is None:
+                    continue
+                site = (ordinal, family, found[0], found[1])
                 break
+            if site is not None:
+                break
+        if site is not None:
+            out.append(site)
     return tuple(out)
 
 
 def class_definition_matches(
-    blocks: tuple[str, ...], raw_name: str
-) -> tuple[tuple[int, str], ...]:
+    blocks: tuple[str, ...], search_name: str
+) -> tuple[tuple[int, str, str, str | None], ...]:
     """그 **정확한** 이름을 법적으로 세우는 block들. 단순 언급은 걸리지 않는다."""
-    return _matches(blocks, CLASS_DEFINITION_PATTERNS, raw_name)
+    return _matches(blocks, CLASS_DEFINITION_PATTERNS, search_name)
 
 
 def class_birth_action_matches(
-    blocks: tuple[str, ...], raw_name: str
-) -> tuple[tuple[int, str], ...]:
+    blocks: tuple[str, ...], search_name: str
+) -> tuple[tuple[int, str, str, str | None], ...]:
     """그 **정확한** 이름의 class를 실제로 세우는 block들.
 
     정의(`class_definition_matches`)와 다르다. 정의는 instrument가 서술하는 상태이고
     여기는 그 class를 만드는 **행위**다. 완전 restated instrument의 발효일이 그 안의
     모든 class의 탄생일이 되면 안 되기 때문에 둘을 가른다.
     """
-    return _matches(blocks, CLASS_BIRTH_ACTION_PATTERNS, raw_name)
+    return _matches(blocks, CLASS_BIRTH_ACTION_PATTERNS, search_name)
 
 
 def class_termination_matches(
-    blocks: tuple[str, ...], raw_name: str
-) -> tuple[tuple[int, str], ...]:
+    blocks: tuple[str, ...], search_name: str
+) -> tuple[tuple[int, str, str, str | None], ...]:
     """그 **정확한** 이름의 class를 실제로 끝내는 block들."""
-    return _matches(blocks, CLASS_TERMINATION_PATTERNS, raw_name)
+    return _matches(blocks, CLASS_TERMINATION_PATTERNS, search_name)
 
 
 # ── SEC 탐색 ─────────────────────────────────────────────────────────────────
@@ -710,17 +1228,23 @@ def _accession_header(client, cik: str, accession: str) -> str:
             raise error from None
 
 
-def _target_names(cover_proof: CoverPageProof) -> tuple[tuple[str, str, str], ...]:
-    """`(member_key, raw title, N1 key)` — **명시 표지 제목이 있는 class만.**
+def _target_names(
+    cover_proof: CoverPageProof,
+) -> tuple[tuple[str, str, ClassDesignation], ...]:
+    """`(member_key, raw title, 연결용 분해)` — **명시 표지 제목이 있는 class만.**
 
     제목 없는 sibling에는 anchor가 없다. XBRL member 철자로 만들어내지 않는다.
+
+    **탐색 target은 core designation 하나다.** 표지 제목이 인식된 종단 액면가 수식을
+    달고 있으면 그 수식을 뺀 이름으로 governing 정의를 찾고, 실제로 일치한 산문과 그
+    자리의 액면가를 그대로 남긴다. 일반 class 이름 추출기를 만들지 않는다.
     """
     out = []
     for item in cover_proof.classes:
         title = str(item.security_title or "").strip()
         if not title:
             continue
-        out.append((item.member_key, title, prose_key(title)))
+        out.append((item.member_key, title, class_designation_anchor(title)))
     return tuple(out)
 
 
@@ -762,13 +1286,16 @@ def collect_legal_evidence(
             failures=((f"submissions:{registrant}", f"{type(error).__name__}: {error}"),),
             classes=tuple(
                 ClassLegalProof(
-                    member_key=member, raw_target_name=raw, target_name_key=key,
+                    member_key=member, raw_target_name=raw,
+                    target_name_key=anchor.prose_key,
+                    designation_key=anchor.designation_key,
+                    cover_par_value=anchor.par_value,
                     status=INCOMPLETE, birth_date=None, termination_date=None,
                     open_ended=False, snapshot_accession=None,
                     snapshot_document_name=None, findings=(),
                     notes=("submissions 이력을 읽지 못했다",),
                 )
-                for member, raw, key in targets
+                for member, raw, anchor in targets
             ),
         )
 
@@ -863,16 +1390,19 @@ def collect_legal_evidence(
                 ))
 
     search_status = INCOMPLETE if failures else COMPLETE
+    # **형제 표지 제목이 같은 core로 줄어들면 자동 P2 연결을 끈다.** 둘을 합치지 않는다.
+    blocked = cover_designation_collisions(cover_proof)
     classes = tuple(
         _assess_class(
             member_key=member,
             raw_name=raw,
-            name_key=key,
+            anchor=anchor,
             documents=tuple(documents),
             blocks_by_key=blocks_by_key,
             search_status=search_status,
+            blocked_designations=blocked,
         )
-        for member, raw, key in targets
+        for member, raw, anchor in targets
     )
     return LegalEvidenceProof(
         cik=registrant,
@@ -892,6 +1422,58 @@ def collect_legal_evidence(
 #
 # **생성기와 승격기가 같은 함수를 쓴다.** 둘이 각자 법 규칙을 들고 있으면 조용히
 # 갈라지고, 그러면 승격 재검증이 아무것도 확인하지 못한다.
+
+
+def _operative_locator(document: dict) -> str:
+    """그 문서 operative date의 **단일 문자열 투영.** finding이 이 값을 들어야 한다."""
+    locators = document.get("legal_operative_locators")
+    if not isinstance(locators, list):
+        return ""
+    return ";".join(str(item) for item in locators)
+
+
+def _assert_operative_structure(document: dict) -> None:
+    """operative date 구조가 **동결된 모양인가.** 아니면 그 자리에서 멈춘다.
+
+    ```text
+    RESOLVED   날짜가 있고 · source family가 동결 어휘이고 · 그 family가 요구하는
+               locator 개수를 정확히 든다
+    MISSING    선택된 날짜가 없다
+    AMBIGUOUS  선택된 날짜가 없다
+    ```
+
+    `STATE_FILED_UPON_FILING`을 `EXPLICIT_EFFECTIVE_DATE`로 바꿔치면 locator 개수가
+    맞지 않아 여기서 걸린다 — 같은 날짜를 남긴 채 출처만 바꾸는 변조를 막는다.
+    """
+    label = _document_label(document)
+    status = str(document.get("legal_operative_status") or "")
+    date = document.get("legal_operative_date")
+    family = document.get("legal_operative_source_family")
+    locators = document.get("legal_operative_locators")
+    if status not in (LEGAL_DATE_RESOLVED, LEGAL_DATE_MISSING, LEGAL_DATE_AMBIGUOUS):
+        raise QVLegalEvidenceError(
+            f"{label}: 모르는 legal operative 상태입니다: {status!r}"
+        )
+    if not isinstance(locators, list):
+        raise QVLegalEvidenceError(f"{label}: legal operative locator가 목록이 아닙니다")
+    if status != LEGAL_DATE_RESOLVED:
+        if date not in (None, ""):
+            raise QVLegalEvidenceError(
+                f"{label}: {status}인데 선택된 operative date가 있습니다: {date!r}"
+            )
+        return
+    if date in (None, ""):
+        raise QVLegalEvidenceError(f"{label}: RESOLVED인데 operative date가 없습니다")
+    if family not in OPERATIVE_SOURCE_FAMILIES:
+        raise QVLegalEvidenceError(
+            f"{label}: 모르는 operative source family입니다: {family!r}"
+        )
+    required = OPERATIVE_LOCATOR_COUNT[family]
+    if len(locators) != required:
+        raise QVLegalEvidenceError(
+            f"{label}: {family}는 근거 locator가 {required}개여야 합니다 — "
+            f"{len(locators)}개입니다"
+        )
 
 
 def _legal_date(document: dict) -> str | None:
@@ -916,8 +1498,92 @@ def _finding_document(finding: dict) -> tuple[str, str]:
     )
 
 
+def resolve_class_association(
+    class_entry: dict, *, blocked_designations=frozenset()
+) -> tuple[DesignationAssociation | None, list[dict], tuple[str, ...]]:
+    """`(연결 판정, 그 연결에 속하는 finding들, notes)`. **원본 산문에서 다시 판정한다.**
+
+    직렬화된 `association_method` · `designation_key` · `par_value`를 권한으로 삼지
+    않는다 — 표지 제목 원문과 finding이 남긴 governing 이름·액면가 원문에서
+    `associate_class_designation`을 다시 돌린다(§18).
+
+    ```text
+    exact N1 후보가 있으면 그것이 이긴다      (§13, 가장 강한 anchor)
+    액면가가 충돌하는 자리가 하나라도 있다     -> 자동 연결 없음
+    형제 표지 제목과 core가 겹친다            -> 자동 P2 연결 없음
+    서로 다른 governing designation 둘 이상   -> 모호하다
+    ```
+    """
+    target = str(class_entry.get("target_name_key") or "")
+    raw_cover = str(class_entry.get("raw_target_name") or "")
+    findings = [item for item in (class_entry.get("findings") or [])
+                if isinstance(item, dict) and str(item.get("class_name_key") or "") == target]
+    if not raw_cover or not findings:
+        return None, [], ()
+
+    scored: list[tuple[dict, DesignationAssociation]] = []
+    for item in findings:
+        governing = item.get("governing_raw_name")
+        if governing in (None, ""):
+            # 옛 packet에는 governing 산문이 없다. 연결을 추측하지 않는다.
+            return None, [], ("finding에 일치한 governing class 이름이 없다",)
+        scored.append((item, associate_class_designation(
+            raw_cover, str(governing),
+            governing_par_text=item.get("governing_par_text"),
+        )))
+
+    if any(item.outcome == PAR_VALUE_CONFLICT for _finding, item in scored):
+        return None, [], (
+            "같은 core designation이 서로 다른 숫자 액면가로 나타난다 — 두 경제적 "
+            "class를 자동으로 합치지 않는다",
+        )
+
+    associated = [(finding, item) for finding, item in scored if item.associated]
+    if not associated:
+        return None, [], ()
+    # **exact N1이 가장 강하다.** 그것이 있으면 P2 후보를 덧붙이지 않는다.
+    if any(item.outcome == EXACT_N1 for _finding, item in associated):
+        associated = [
+            (finding, item) for finding, item in associated if item.outcome == EXACT_N1
+        ]
+    else:
+        blocked = frozenset(blocked_designations or ())
+        if associated[0][1].cover.designation_key in blocked:
+            return None, [], (
+                "같은 표지의 다른 보통주 제목이 같은 core designation으로 줄어든다 — "
+                "자동 P2 연결을 켜지 않는다",
+            )
+    keys = sorted({item.governing.prose_key for _finding, item in associated})
+    if len(keys) > 1:
+        return None, [], (
+            "표지 제목이 서로 다른 governing class designation 여럿에 연결된다: "
+            + ", ".join(keys),
+        )
+    # **같은 이름이 서로 다른 액면가로 나타나면 두 경제적 class다.** 표지가 액면가를
+    # 주장하지 않아 자리마다 충돌이 나지 않더라도 어느 쪽인지 고르지 않는다.
+    pars = sorted({
+        item.governing_par_value for _finding, item in associated
+        if item.governing_par_value is not None
+    })
+    if len(pars) > 1:
+        return None, [], (
+            "같은 core designation이 서로 다른 숫자 액면가로 나타난다: "
+            + ", ".join(pars),
+        )
+    chosen = associated[0][1]
+    return (
+        DesignationAssociation(
+            chosen.outcome, chosen.cover, chosen.governing,
+            pars[0] if pars else None,
+        ),
+        [finding for finding, _item in associated],
+        (),
+    )
+
+
 def project_class_proof(
-    class_entry: dict, documents: list[dict], *, search_ok: bool
+    class_entry: dict, documents: list[dict], *, search_ok: bool,
+    blocked_designations=frozenset(),
 ) -> dict:
     """구조화된 finding에서 **구간 결론을 다시 계산한다.**
 
@@ -930,9 +1596,9 @@ def project_class_proof(
         탄생 + current-in-effect 완전 snapshot + 탐색 COMPLETE + 미해결 영향 없음
     ```
     """
-    target = str(class_entry.get("target_name_key") or "")
-    findings = [item for item in (class_entry.get("findings") or [])
-                if isinstance(item, dict) and str(item.get("class_name_key") or "") == target]
+    association, findings, association_notes = resolve_class_association(
+        class_entry, blocked_designations=blocked_designations
+    )
     definitions = [item for item in findings
                    if item.get("finding_kind") == GOVERNING_CLASS_DEFINITION]
     birth_actions = [item for item in findings
@@ -950,10 +1616,24 @@ def project_class_proof(
         "snapshot_document_name": None, "birth_definition": None,
         "birth_action": None, "birth_date_finding": None,
         "snapshot_definition": None, "termination_finding": None, "notes": (),
+        "association_method": None, "governing_raw_name": None,
+        "governing_prose_key": None, "governing_par_value": None,
     }
+    if association is not None:
+        blank = {
+            **blank,
+            "association_method": association.outcome,
+            "governing_raw_name": association.governing.raw,
+            "governing_prose_key": association.governing.prose_key,
+            "governing_par_value": association.governing_par_value,
+        }
     if not search_ok:
         return {**blank, "status": INCOMPLETE,
                 "notes": ("필요한 SEC 탐색이 닫히지 않았다",)}
+    # **연결 자체가 실패한 것과 아무것도 못 찾은 것은 다르다.** 후자는 아래 탄생
+    # 규칙이 그대로 "명시 탄생 행위가 없다"로 말한다.
+    if association is None and association_notes:
+        return {**blank, "notes": association_notes}
 
     # ── A. 탄생 — 정확히 하나 ────────────────────────────────────────────────
     distinct_births = sorted({str(item["effective_date"]) for item in birth_dates})
@@ -1006,6 +1686,7 @@ def project_class_proof(
             key=lambda item: (_finding_document(item), str(item.get("locator") or "")),
         )[0]
         return {
+            **blank,
             "status": COMPLETE, "birth_date": birth, "termination_date": end,
             "open_ended": False, "snapshot_accession": None,
             "snapshot_document_name": None,
@@ -1140,6 +1821,7 @@ def project_class_proof(
         )}
 
     return {
+        **blank,
         "status": COMPLETE, "birth_date": birth, "termination_date": None,
         "open_ended": True,
         "snapshot_accession": current_key[0],
@@ -1158,11 +1840,18 @@ def project_class_proof(
 def _class_findings(
     *,
     raw_name: str,
-    name_key: str,
+    anchor: ClassDesignation,
     documents: tuple[LegalDocument, ...],
     blocks_by_key: dict,
 ) -> tuple[LegalFinding, ...]:
-    """governing 문서에서 그 정확한 class 이름에 대한 명시 사실만 모은다."""
+    """governing 문서에서 그 class에 대한 명시 사실만 모은다.
+
+    탐색 target은 `anchor.designation`(표지 제목의 core designation) 하나이고, 실제로
+    일치한 governing 산문과 그 자리의 액면가 원문을 finding마다 남긴다. 연결 판정은
+    여기서 하지 않는다 — `resolve_class_association`이 그 원문에서 다시 한다.
+    """
+    name_key = anchor.prose_key
+    search_name = anchor.designation
     findings: list[LegalFinding] = []
     for document in documents:
         # **filing 서술은 governing instrument가 아니다.** 첨부된 instrument 이름을
@@ -1172,8 +1861,8 @@ def _class_findings(
         if document.classification not in GOVERNING_CLASSIFICATIONS:
             continue
         blocks = blocks_by_key.get(document.key, ())
-        definitions = class_definition_matches(blocks, raw_name)
-        for ordinal, family in definitions:
+        definitions = class_definition_matches(blocks, search_name)
+        for ordinal, family, governing, par_text in definitions:
             findings.append(LegalFinding(
                 finding_kind=GOVERNING_CLASS_DEFINITION,
                 accession=document.accession,
@@ -1182,11 +1871,13 @@ def _class_findings(
                 class_name_key=name_key,
                 raw_class_name=raw_name,
                 semantic_family=family,
+                governing_raw_name=governing,
+                governing_par_text=par_text,
             ))
         # **탄생 행위는 정의와 별개로 명시돼야 한다.** 완전 restated instrument가 그
         # class를 정의하고 스스로 D에 발효한다는 것만으로는 탄생이 아니다.
-        birth_actions = class_birth_action_matches(blocks, raw_name)
-        for ordinal, family in birth_actions:
+        birth_actions = class_birth_action_matches(blocks, search_name)
+        for ordinal, family, governing, par_text in birth_actions:
             findings.append(LegalFinding(
                 finding_kind=CLASS_BIRTH_ACTION,
                 accession=document.accession,
@@ -1195,6 +1886,8 @@ def _class_findings(
                 class_name_key=name_key,
                 raw_class_name=raw_name,
                 semantic_family=family,
+                governing_raw_name=governing,
+                governing_par_text=par_text,
             ))
 
         # **문서의 법적 operative date 하나가 유일한 원천이다.** 여기서 다시 계산하면
@@ -1204,6 +1897,10 @@ def _class_findings(
             continue
         # 명시 탄생 행위가 있는 문서에서만 그 발효일이 탄생일 후보가 된다.
         if birth_actions:
+            # 탄생일 finding은 이름 자리가 아니라 문서의 operative date에서 나온다.
+            # 연결 판정이 그 finding에도 걸리도록 **그 문서의 탄생 행위 자리**의
+            # governing 산문을 그대로 붙인다. 새 이름을 만들지 않는다.
+            first = min(birth_actions, key=lambda item: item[0])
             findings.append(LegalFinding(
                 finding_kind=CLASS_BIRTH_EFFECTIVE_DATE,
                 accession=document.accession,
@@ -1213,8 +1910,12 @@ def _class_findings(
                 raw_class_name=raw_name,
                 semantic_family="INSTRUMENT_EFFECTIVE_DATE",
                 effective_date=operative.date,
+                governing_raw_name=first[2],
+                governing_par_text=first[3],
             ))
-        for block_ordinal, family in class_termination_matches(blocks, raw_name):
+        for block_ordinal, family, governing, par_text in class_termination_matches(
+            blocks, search_name
+        ):
             findings.append(LegalFinding(
                 finding_kind=CLASS_TERMINATION_EFFECTIVE_DATE,
                 accession=document.accession,
@@ -1224,6 +1925,8 @@ def _class_findings(
                 raw_class_name=raw_name,
                 semantic_family=family,
                 effective_date=operative.date,
+                governing_raw_name=governing,
+                governing_par_text=par_text,
             ))
     return tuple(findings)
 
@@ -1232,28 +1935,37 @@ def _assess_class(
     *,
     member_key: str,
     raw_name: str,
-    name_key: str,
+    anchor: ClassDesignation,
     documents: tuple[LegalDocument, ...],
     blocks_by_key: dict,
     search_status: str,
+    blocked_designations=frozenset(),
 ) -> ClassLegalProof:
     """한 표지 class의 법적 증명. **결론은 `project_class_proof`가 낸다.**"""
     findings = _class_findings(
-        raw_name=raw_name, name_key=name_key,
+        raw_name=raw_name, anchor=anchor,
         documents=documents, blocks_by_key=blocks_by_key,
     )
     entry = {
-        "target_name_key": name_key,
+        "raw_target_name": raw_name,
+        "target_name_key": anchor.prose_key,
         "findings": [item.as_json() for item in findings],
     }
     projected = project_class_proof(
         entry, [item.as_json() for item in documents],
         search_ok=search_status == COMPLETE,
+        blocked_designations=blocked_designations,
     )
     return ClassLegalProof(
         member_key=member_key,
         raw_target_name=raw_name,
-        target_name_key=name_key,
+        target_name_key=anchor.prose_key,
+        designation_key=anchor.designation_key,
+        cover_par_value=anchor.par_value,
+        association_method=projected["association_method"],
+        governing_raw_name=projected["governing_raw_name"],
+        governing_prose_key=projected["governing_prose_key"],
+        governing_par_value=projected["governing_par_value"],
         status=projected["status"],
         birth_date=projected["birth_date"],
         termination_date=projected["termination_date"],
@@ -1349,6 +2061,69 @@ def canonical_class_evidence(evidence: ClassEvidence) -> dict:
     }
 
 
+def _assert_association_receipt(entry: dict, *, blocked_designations=frozenset()) -> None:
+    """직렬화된 P2 연결 receipt가 **원본 산문과 어긋나지 않는가.**
+
+    receipt는 출력이지 권한이 아니다. 그래도 거짓말하면 검토자가 그 packet에서 읽는
+    이유가 실제 판정과 달라지므로, 원본 산문에서 같은 함수로 다시 계산해 대조한다.
+
+    ```text
+    association_method · designation_key · 액면가 파생값을 손대면 여기서 걸린다
+    ```
+    """
+    raw = str(entry.get("raw_target_name") or "")
+    if not raw:
+        return
+    anchor = class_designation_anchor(raw)
+    stated = {
+        "target_name_key": entry.get("target_name_key"),
+        "designation_key": entry.get("designation_key"),
+        "cover_par_value": entry.get("cover_par_value"),
+    }
+    expected = {
+        "target_name_key": anchor.prose_key,
+        "designation_key": anchor.designation_key,
+        "cover_par_value": anchor.par_value,
+    }
+    if "designation_key" not in entry:
+        # 연결 receipt가 아예 없는 옛 packet은 N1 계약만 본다.
+        expected.pop("designation_key")
+        stated.pop("designation_key")
+        expected.pop("cover_par_value")
+        stated.pop("cover_par_value")
+    if stated != expected:
+        raise QVLegalEvidenceError(
+            f"표지 제목 분해 receipt가 원문과 다릅니다: {stated} != {expected}"
+        )
+    if "association_method" not in entry:
+        return
+    association, _findings, _notes = resolve_class_association(
+        entry, blocked_designations=blocked_designations
+    )
+    method = association.outcome if association is not None else None
+    if method is not None and method not in ASSOCIATION_METHODS:
+        raise QVLegalEvidenceError(f"모르는 연결 방법입니다: {method!r}")
+    recomputed = {
+        "association_method": method,
+        "governing_raw_name": association.governing.raw if association else None,
+        "governing_prose_key": association.governing.prose_key if association else None,
+    }
+    carried = {key: entry.get(key) for key in recomputed}
+    if carried != recomputed:
+        raise QVLegalEvidenceError(
+            f"P2 연결 receipt가 원본 산문에서 다시 판정한 값과 다릅니다: "
+            f"{carried} != {recomputed}"
+        )
+    # **`governing_par_value`의 진실은 finding의 액면가 원문이다.** 여기서는 모양만
+    # 본다 — 그 값이 바뀌어도 production 행을 바꾸지 못하고, 원문이 바뀌면 위의
+    # 재판정이 이미 걸린다.
+    stated_par = entry.get("governing_par_value")
+    if stated_par not in (None, "") and _par_decimal(stated_par) != str(stated_par):
+        raise QVLegalEvidenceError(
+            f"governing 액면가가 정규 Decimal 문자열이 아닙니다: {stated_par!r}"
+        )
+
+
 def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> None:
     """구조화된 proof가 **그 표지 증명에 실제로 속하는지** 본다.
 
@@ -1376,16 +2151,22 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
             "legal proof의 cover 문서가 표지 증명과 다릅니다: "
             f"{payload.get('cover_document_name')!r} != {cover_proof.document_name}"
         )
+    # 형제 표지 제목 충돌은 그 표지 증명의 사실이다 — receipt를 다시 판정할 때도
+    # 생성기와 같은 입력을 쓴다.
+    blocked = cover_designation_collisions(cover_proof)
     operative_by_document: dict[tuple[str, str], str | None] = {}
+    locator_by_document: dict[tuple[str, str], str] = {}
     for item in payload.get("documents") or []:
         if not isinstance(item, dict):
             raise QVLegalEvidenceError("legal proof document 항목이 객체가 아닙니다")
-        operative_by_document[
-            (str(item.get("accession") or ""), str(item.get("document_name") or ""))
-        ] = _legal_date(item)
+        _assert_operative_structure(item)
+        key = (str(item.get("accession") or ""), str(item.get("document_name") or ""))
+        operative_by_document[key] = _legal_date(item)
+        locator_by_document[key] = _operative_locator(item)
     for entry in payload.get("classes") or []:
         if not isinstance(entry, dict):
             raise QVLegalEvidenceError("legal proof class 항목이 객체가 아닙니다")
+        _assert_association_receipt(entry, blocked_designations=blocked)
         for finding in entry.get("findings") or []:
             if not isinstance(finding, dict):
                 raise QVLegalEvidenceError("legal proof finding이 객체가 아닙니다")
@@ -1410,6 +2191,16 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
                     f"{key[0]}/{key[1]} finding={stated} "
                     f"document={operative_by_document[key]}"
                 )
+            # 탄생일 finding은 문서 operative date의 근거 span을 그대로 든다. 문서
+            # 쪽 locator만 바꾸는 변조가 조용히 지나가지 않는다.
+            if finding.get("finding_kind") == CLASS_BIRTH_EFFECTIVE_DATE:
+                stated_locator = str(finding.get("locator") or "")
+                if stated_locator != locator_by_document[key]:
+                    raise QVLegalEvidenceError(
+                        "탄생일 finding의 locator가 그 문서 operative date의 근거와 "
+                        f"다릅니다: {key[0]}/{key[1]} finding={stated_locator!r} "
+                        f"document={locator_by_document[key]!r}"
+                    )
 
 
 def class_evidence_from_legal_proof(
@@ -1435,6 +2226,7 @@ def class_evidence_from_legal_proof(
     search_ok = not (payload.get("failures") or [])
 
     by_member = {item.member_key: item for item in cover_proof.classes}
+    blocked = cover_designation_collisions(cover_proof)
     out: dict[str, ClassEvidence] = {}
     for entry in payload.get("classes") or []:
         if not isinstance(entry, dict):
@@ -1448,7 +2240,9 @@ def class_evidence_from_legal_proof(
             # anchor가 정확한 N1 동일성이 아니다. 유사도로 잇지 않는다.
             continue
 
-        projected = project_class_proof(entry, documents, search_ok=search_ok)
+        projected = project_class_proof(
+            entry, documents, search_ok=search_ok, blocked_designations=blocked
+        )
         if projected["status"] != COMPLETE:
             continue
 
@@ -1461,21 +2255,34 @@ def class_evidence_from_legal_proof(
             _ref(birth_date_finding, cik=cik, role=CLASS_BIRTH_EFFECTIVE_DATE),
         ]
         title_interval = None
+        bridges: tuple[ProseBridgeInput, ...] = ()
         if projected["open_ended"]:
             snapshot = projected["snapshot_definition"]
             interval_evidence.append(
                 _ref(snapshot, cik=cik, role=CURRENT_GOVERNING_SNAPSHOT)
             )
             # **prose alias 수명은 class 수명과 다른 사실이다.** class 구간을 복사하지
-            # 않는다 — 같은 정확한 N1 이름이 탄생 정의와 current 완전 snapshot 양쪽에
-            # 있고 탐색이 닫혔다는 **독립된** 법적 사슬이 이 구간을 만든다.
-            title_interval = RelationInterval(
+            # 않는다 — 같은 이름이 탄생 정의와 current 완전 snapshot 양쪽에 있고 탐색이
+            # 닫혔다는 **독립된** 법적 사슬이 이 구간을 만든다.
+            lifetime = RelationInterval(
                 birth, None,
                 (
                     _ref(definition, cik=cik, role=PROSE_ALIAS_LIFETIME),
                     _ref(snapshot, cik=cik, role=PROSE_ALIAS_LIFETIME),
                 ),
             )
+            # **P2 연결은 production alias 동치가 아니다(§11).** 액면가 수식을 벗겨야
+            # 연결됐다면 그 사슬이 증명한 것은 **governing 이름**의 수명이지 표지
+            # 제목의 수명이 아니다. 표지 제목에는 자기 구간이 없으므로 B1대로 아무
+            # 행도 만들지 않고, governing 이름만 canonical bridge가 된다.
+            if projected["association_method"] == EXACT_N1:
+                title_interval = lifetime
+            else:
+                bridges = (ProseBridgeInput(
+                    raw_prose_name=str(projected["governing_raw_name"]),
+                    bridge_type=GOVERNING_INSTRUMENT,
+                    interval=lifetime,
+                ),)
             end = None
         else:
             interval_evidence.append(
@@ -1487,9 +2294,9 @@ def class_evidence_from_legal_proof(
         out[member_key] = ClassEvidence(
             class_interval=RelationInterval(birth, end, tuple(interval_evidence)),
             cover_title_interval=title_interval,
-            # 표지 제목과 governing 이름이 exact N1으로 같으므로 별도
+            # 표지 제목과 governing 이름이 exact N1으로 같을 때 별도
             # `GOVERNING_INSTRUMENT` 행은 **중복 production row**일 뿐이다.
             # provenance만 다른 행을 늘리지 않는다.
-            extra_prose_bridges=(),
+            extra_prose_bridges=bridges,
         )
     return out
