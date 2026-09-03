@@ -2,7 +2,7 @@
 
 > 작성: 2026-07-15 · 갱신: 2026-07-31
 >
-> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 검색·한국어 경계 보정, V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI, schema v8 일정 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보까지 Pi에 인수했다. 운영 trace 77개 재생으로 보수 정책을 검증한 A2 실제 청크 주입을 2026-07-28 단일 GPT 전환과 함께 Pi에 활성화했다. 새 GPT generation의 독립 온라인 관찰을 시작했다. 2026-07-30 V4-B R0 raw WebRTC를 Pi에 활성화하고 사용자 iPhone의 5분 한·영 대화·끼어들기·mute·종료까지 통과해 R0 GO로 승격했다. R1 읽기 도구와 노트 탐색을 Pi에 인수했고 Cedar·bounded 말투 문맥 보정도 적용해 사용자가 이전보다 훨씬 낫다고 승인했다. R2a 휘발성 receipt·이벤트 reconciliation에 이어 2026-07-31 R2b bounded PCM WAV·`gpt-transcribe` 무쓰기 보정을 Pi에 기술 인수했다. 로컬 집중 23/23·전체 234/234, Pi 집중 23/23·전체 230/230, 재시작 PID `133153`, correction config·정적 hash·DB/Vault 불변을 확인했다. 실기기 보정 품질 확인과 R2c corrected-only 영구 저장은 아직 미완료다
+> 상태: A0·A1 shadow, S0b-2 Pi 실제 복구, S0c 공용 topic 쓰기 경로와 A1b 전역 청크 검색·한국어 경계 보정, V4.5-C schema v5/v6/v7·PWA·Web Push·지식 시트/일정 에이전트 UI, schema v8 일정 컨텍스트·월별 종결 노트 projection과 C1.5 자연어 무저장 후보까지 Pi에 인수했다. 운영 trace 77개 재생으로 보수 정책을 검증한 A2 실제 청크 주입을 2026-07-28 단일 GPT 전환과 함께 Pi에 활성화했다. Realtime 음성은 이후 퇴역했고 현재 음성 계약은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)를 따른다.
 >
 > 위치: V4-A 논문 검색 완료 후, V4-B 음성과 V5-A 딜 스카우트·V5-B 주식 분석 전에 진행
 
@@ -16,7 +16,7 @@
 
 이 세 기능 전에 **S0 저장 무결성**을 둔다. 토픽 노트 형식은 유지하되, Markdown `QA-LOG`와 SQLite 검색 인덱스가 어긋나도 감지·복구할 수 있게 만든 뒤 A2 실제 답변 회수로 전환한다. 저장 형식을 원자 노트나 외부 메모리 저장소로 교체하는 작업은 아니다.
 
-V4-B 음성은 이 기반 뒤에 연결한다. 자연 대화는 OpenAI Realtime WebRTC를 `R0 무쓰기 → R1 읽기 전용 → R2 corrected-only 기록·승인형 쓰기`로 승격한다. R2의 Realtime 자막은 임시본이고, 같은 사용자 턴을 `gpt-transcribe`로 보정한 텍스트만 대화 정본과 쓰기 후보에 사용한다. 사용자가 별도로 시작하는 정밀 음성 전사는 Inbox/미리보기에서 목적을 확인한 뒤 `대화 | 메모 | 할 일` 중 하나로 보낸다. 상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다.
+V4-B 음성은 이 기반을 기존 `/api/chat`과 `runSingleChatTurn`을 통해 재사용한다. 브라우저는 `VAD → gpt-transcribe → 단일 GPT → gpt-4o-mini-tts` 반이중 경로이고, iPhone Shortcut은 별도 입·귀를 쓰되 같은 채팅·`shared-main` 경계를 유지한다. 상세 단일 기준은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)다.
 
 이 단계에서 하지 않는 것:
 
@@ -159,7 +159,7 @@ Anthropic의 context engineering 원칙인 "smallest possible set of high-signal
   -> 후보 안의 Q&A 청크 회수
   -> 최신성·유효성·출처 적용
   -> 요청 전체 컨텍스트 상한으로 조립
-  -> Claude 또는 의회 답변
+  -> 단일 GPT 답변
   -> 실행 trace 기록
   -> 저장 정책(auto/manual/never/inbox)
   -> 메모리·할 일 후보가 있으면 승인 큐
@@ -274,7 +274,7 @@ supersedes_chunk_id
 
 |정책|용도|영구 topic 반영|
 |---|---|---|
-|`auto`|일반 채팅·의회|현재 가치 판정 후 가능|
+|`auto`|일반 텍스트 채팅|현재 가치 판정 후 가능|
 |`manual`|명시적 저장|사용자 확인 후|
 |`never`|스모크·평가·관리 요청|안 함|
 |`inbox`|명시적 정밀 음성 전사·R2 Realtime 보정 완료 턴·불확실한 캡처|사용자 분류 전에는 안 함|
@@ -389,13 +389,12 @@ trace에는 API 키, 전체 프롬프트, 전체 외부 원문을 중복 저장�
 
 답변 대기 중에는 별도 오버레이를 만들지 않고 기존 점 세 개 위치에 서버가 실제로 수행 중인 큰 단계만 표시한다. 이는 사용자 대기 경험을 위한 일시적 전송 이벤트이며 `assistant_runs` trace나 모델의 내부 추론 공개가 아니다.
 
-- `/api/chat`과 `/api/council/debate`는 클라이언트가 `progress: true`를 보낸 경우에만 NDJSON으로 단계와 최종 결과를 전송한다.
-- 공개 단계 ID는 `context`, `evidence`, `web_search`, `paper_search`, `paper_read`, `answer`, `council_draft`, `council_critique`처럼 안정된 작업 경계만 사용한다.
+- `/api/chat`은 클라이언트가 `progress: true`를 보낸 경우에만 NDJSON으로 단계와 최종 결과를 전송한다.
+- 공개 단계 ID는 `context`, `evidence`, `web_search`, `paper_search`, `paper_read`, `answer`처럼 안정된 작업 경계만 사용한다.
 - 검색·전문 도구 단계는 도구가 실제 실행될 때만 내보내고, 완료 후 답변 또는 초안 작성 단계로 돌아간다.
 - 단계 이벤트에는 질문, 검색어, 근거 본문, 도구 결과, 모델 내부 추론을 넣지 않으며 영구 저장하지 않는다.
 - 진행 표시를 위해 모델이나 외부 API를 추가 호출하지 않는다.
 - progress를 요청하지 않은 호출과 스트림 시작 전 검증 오류는 기존 JSON 응답을 유지한다. 프론트도 일반 JSON 응답을 fallback으로 처리한다.
-- 심층 재검증과 최종 종합은 브라우저가 이미 분리된 요청 시작을 알고 있으므로 별도 스트리밍 없이 같은 상태 문구 컴포넌트를 사용한다.
 
 ### 5.5 사용자 피드백
 
@@ -409,7 +408,7 @@ trace에는 API 키, 전체 프롬프트, 전체 외부 원문을 중복 저장�
 
 ### 5.6 답변 근거 표시
 
-단일 채팅과 의회 결과에 간단한 상태를 표시한다.
+단일 채팅 결과에 간단한 상태를 표시한다.
 
 ```text
 기억 3 · 웹 2 · 논문 전문 1
@@ -417,7 +416,7 @@ trace에는 API 키, 전체 프롬프트, 전체 외부 원문을 중복 저장�
 
 누르면 제목, 날짜, 섹션·페이지, URL을 확인한다. 원문 전체나 내부 점수는 기본 화면에 노출하지 않는다.
 
-현재 API가 반환하는 `paperFullText.used`, `calls`, `evidenceRefs`는 이 표시와 저장 provenance에 사용한다. 브라우저가 전문 본문을 보관하거나 심층 의회 요청에 재전송하지 않는 기존 원칙은 유지한다.
+현재 API가 반환하는 `paperFullText.used`, `calls`, `evidenceRefs`는 이 표시와 저장 provenance에 사용한다. 브라우저는 전문 본문을 보관하거나 재전송하지 않는다.
 
 ### 5.7 자동화 회귀 테스트
 
@@ -444,15 +443,15 @@ C1은 아래 범위만 구현한다.
 - 지식 시트 첫 `알림` 탭: `전체 | Codex | 시스템 | 최근 저장`. 일정 알림은 여기서 제외한다.
 - 에이전트 탭 최상단의 일정 에이전트 블록: 3주 21일 스와이프, 지연·오늘·예정·Inbox, 오늘·지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 같은 탭의 일정 작업 화면
 
-자연어 후보, 반복, 오늘 브리핑, 완료 결과 기록, 외부 캘린더는 C1 본체에서 제외한다. C1.5는 단일 Claude가 직접 사용자 요청에서 `schedule_prepare`로 무저장 후보 하나만 만들고, 확인 뒤 기존 task API가 저장하는 자연어 진입으로 별도 구현했다. 반복은 `task -> occurrence -> reminder`의 3층이 필요한 별도 schema migration으로 진행한다. Web Push는 C1 범위지만 task core와 분리된 schema·feature flag·인수 단위로 구현한다.
+자연어 후보, 반복, 오늘 브리핑, 완료 결과 기록, 외부 캘린더는 C1 본체에서 제외한다. C1.5는 단일 GPT가 직접 사용자 요청에서 `schedule_prepare`로 무저장 후보 하나만 만들고, 확인 뒤 기존 task API가 저장하는 자연어 진입으로 별도 구현했다. 반복은 `task -> occurrence -> reminder`의 3층이 필요한 별도 schema migration으로 진행한다. Web Push는 C1 범위지만 task core와 분리된 schema·feature flag·인수 단위로 구현한다.
 
 명시적 `/task`, 새 전용 테이블·모듈, 무LLM을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다. C1e는 사용자 컨펌 뒤 활성 일정 bounded 컨텍스트와 종결 일정 월별 노트를 추가했으며 A1b 점수·trace와 topic 자동 저장 판단은 바꾸지 않는다. C1.5도 A1b 점수·trace 형식은 유지하고 후보가 생긴 운영 요청만 topic 자동 저장에서 제외한다. 숨은 웹 탭을 계속 refresh하는 방식은 지원 계약이 아니며, Pi scheduler가 시각을 판정하고 Service Worker가 push event 때만 깨어난 뒤 앱 복귀 시 정본을 재동기화한다.
 
 ## 7. V4-B 음성과의 경계
 
-상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다. 이 문서에서는 V4.5 기억·task 경계만 고정한다.
+현재 상세 단일 기준은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)다. Realtime 실행은 퇴역했고 아래 R0~R2 설명은 [레거시 Realtime 설계](../legacy/voice-realtime/docs/voice-realtime-design.md)에 보존된 당시 경계와 인수 기록이다. 이 문서에서는 V4.5 기억·task 경계만 고정한다.
 
-1. **Realtime 대화**
+1. **Realtime 대화 — 퇴역 전 역사 기록**
    - R0·R1은 DB·Vault·task에 쓰지 않는다.
    - R0는 서버 소유 unified SDP proxy, raw WebRTC client, tool 0개, 5분 hard cap과 공용 media cleanup을 Pi 운영에 활성화했다. Mac·Pi HTTPS의 실제 `201`·remote audio·완료 자막과 DB·Vault·task 불변, 사용자 iPhone의 5분 한·영 대화·끼어들기·mute·수동/자동 종료·마이크 해제를 통과해 GO로 승격했다.
    - R1의 기억·노트·일정 도구는 기존 A2 retrieval, topic `ready` QA 청크와 task 합성기를 읽기 전용으로 재사용한다. Pi 첫 배포는 `galpi_context_lookup`·`schedule_read`였고, 실기기에서 확인한 창작 노트 탐색 공백은 `galpi_note_search → galpi_note_read`로 보강했다. 노트 탐색은 활성 `ai_readable` 제목을 먼저 고르고 topic 본문 대신 기존 QA를 최대 6개·8,000자 안에서 읽으므로 A2 전역 문턱을 낮추지 않는다. 서버는 5분 tool session, call ID 멱등성, 턴당 2회·합계 8,000자·5초 timeout을 집행한다. 첫 Pi 배포는 Realtime 13/13·전체 220/220, 보강은 로컬 14/14·전체 순차 225/225와 Pi 14/14·전체 순차 221/221을 통과했다. 백업 `20260730-2137` 뒤 새 PID `128332`, DB·Vault·task·trace 불변과 운영 `시` 노트 ready QA 13개를 확인했고 사용자가 같은 음성 문장의 정상 동작을 승인했다. 코드 기본값은 false다.
@@ -685,12 +684,12 @@ Pi DB·vault 백업 `20260718-1345`와 코드 백업 `retrieval-report-pre-20260
 - [x] schema v7 subscription·delivery outbox, 사용자 opt-in PWA·Web Push와 일정 에이전트 fallback 로컬 구현
 - [x] 1440×900·390×844 viewport, 주간 스와이프·deep link·일반/일정 알림 경계·모바일 44px target 확인
 - [x] schema v8 `owner_agent`·generation outbox, 활성 일정 bounded 대화 컨텍스트, 완료·취소 월별 노트 projection을 Pi 인수
-- [x] 단일 Claude `schedule_prepare`, 기존 task validator의 무쓰기 후보, 채팅 확인 뒤 기존 API 저장을 Pi 인수
+- [x] 단일 GPT `schedule_prepare`, 기존 task validator의 무쓰기 후보, 채팅 확인 뒤 기존 API 저장을 Pi 인수
 - [x] Tailscale Serve private HTTPS와 iPhone·iPad·Mac 홈 화면 구독, provider acceptance 3/3 확인
 - [ ] 잠금화면 표시 10회 GO 기준 확인
 - C1.5 자연어 후보는 Pi 배포 완료, 실제 후보 카드→등록은 다음 실사용 일정으로 확인하며 반복·브리핑은 후속 별도 단계
 
-### D. 음성
+### D. 음성 — 퇴역 전 역사 기록
 
 - R0 Realtime WebRTC 무쓰기 spike
 - R1 A2 기억·활성 일정·서버 KST 현재 시각 read-only 도구
@@ -763,6 +762,8 @@ function tool은 `response.function_call_arguments.done`에서 실행하지 않�
 - [ ] 반복·결과 기록은 별도 컨펌
 
 ### D. 음성 연결
+
+> 아래 체크리스트는 Realtime R0~R2의 역사 기록이다. 현행 인수 기준은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)를 따른다.
 
 - [x] iPhone PWA·Mac에서 5분 한국어·영어 Realtime, 끼어들기, mute·수동/자동 종료와 마이크 해제
 - [x] R0 전후 DB·Vault·task 불변, 표준 API 키 브라우저 비노출

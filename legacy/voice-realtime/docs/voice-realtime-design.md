@@ -4,7 +4,7 @@
 >
 > Date: 2026-07-31
 >
-> Status: **후속 작업의 기준 아님.** R0~R2c-1의 구현·인수 기록으로 보존한다. 2026-08-01 실기기 관찰에서 Realtime 모델의 한국어 이해·도구 호출 실패가 반복 확인돼 반이중 클래식 파이프라인으로 전환했다. 새 단일 기준은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)다.
+> Status: **후속 작업의 기준 아님.** R0~R2c-1의 구현·인수 기록으로 보존한다. 2026-08-01 실기기 관찰에서 Realtime 모델의 한국어 이해·도구 호출 실패가 반복 확인돼 반이중 클래식 파이프라인으로 전환했다. 새 단일 기준은 [음성 반이중 파이프라인 설계](../../../docs/voice-halfduplex-design.md)다.
 >
 > 퇴역한 standalone runtime 소스는 `legacy/voice-realtime/`에 보존한다. 여기 기록된 전사 기능의 현 production owner는 `lib/voice/transcription.js`다.
 >
@@ -190,7 +190,7 @@ R2b recorder의 물리 output 경로도 예방적으로 분리했다. 기존 Web
 9. 일정·메모처럼 상태를 바꾸는 요청은 R2에서도 후보만 만들고, 기존 확인 카드와 API를 통해 사용자가 승인한 뒤에만 저장한다.
 10. 초기 제품 계약은 **화면이 열린 동안의 명시적 음성 세션**이다. 상시 마이크, 호출어, 잠금화면·백그라운드 지속 대화는 포함하지 않는다.
 11. 기능 flag, 세션 시간 상한, 도구 호출 상한, last-known-good 모델을 코드에서 집행한다. 모델 지시만으로 비용과 권한을 통제하지 않는다.
-12. 이 문서를 V4-B의 상세 단일 기준으로 삼는다. 저장·task 경계는 [V4.5 비서 기본기 설계](assistant-foundation-design.md)와 [시온 약속 루프 설계](task-reminder-design.md), 텍스트 모델 경계는 [단일 GPT 채팅·모델 라우팅 설계](chat-model-routing-design.md)를 따른다.
+12. 당시에는 이 문서를 V4-B의 상세 단일 기준으로 삼았다. 현재 기준은 [음성 반이중 파이프라인 설계](../../../docs/voice-halfduplex-design.md)다. 저장·task 경계는 [V4.5 비서 기본기 설계](../../../docs/assistant-foundation-design.md)와 [시온 약속 루프 설계](../../../docs/task-reminder-design.md), 텍스트 모델 경계는 [단일 GPT 채팅·모델 라우팅 설계](../../../docs/chat-model-routing-design.md)를 따른다.
 13. Realtime이 이미 생성한 답변은 사후 보정 transcript로 소급 수정되지 않는다. 날짜·시각·금액·고유명사·외부 행동처럼 오인식 비용이 큰 요청은 보정본을 보여주고 사용자가 확인한 뒤에만 쓰기 작업을 실행한다.
 
 ---
@@ -900,7 +900,7 @@ R0가 위 기준을 통과하지 못하면 R1을 만들지 않는다. 정확한 
 - R0 전에 Agents SDK·TypeScript·번들러를 도입하는 작업
 - Realtime이 텍스트 GPT-5.6 경로와 완전히 같은 모델이라고 보이게 하는 UI
 
-강의 녹음은 [갈피 강의 노트 설계](Lecture-note-system_Design_v4.2.md)의 Apple 음성 메모 기반 안정성 경계를 유지한다. V4-B 짧은 대화 세션을 강의 녹음기로 확장하지 않는다.
+강의 녹음은 [갈피 강의 노트 설계](../../../docs/Lecture-note-system_Design_v4.2.md)의 Apple 음성 메모 기반 안정성 경계를 유지한다. V4-B 짧은 대화 세션을 강의 녹음기로 확장하지 않는다.
 
 ---
 

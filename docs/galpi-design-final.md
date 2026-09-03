@@ -2,6 +2,8 @@
 
  # 갈피 × 옵시디언 — 설계 문서 (v1.5)
 
+  > 현재 런타임 정정 (2026-09-03): 메인 채팅은 단일 GPT이고 신규 Council 실행과 Realtime 음성 실행은 퇴역했다. 기존 Council 기록은 읽기 호환성만 유지하며, 브라우저 음성의 현재 정본은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)다. 아래의 Council·Realtime 구현 설명은 당시 설계와 인수 기록이다.
+
   ## 0. v1.5 아키텍처 전환 요약
 
   v1.5의 중심은 “대화 하나를 노트 하나로 저장”하는 구조에서
@@ -21,7 +23,7 @@
   - 검색은 작은 스냅샷 노트 5개를 고르는 방식에서 topic 우선 회수로 이동한다.
   - 임베딩은 frontmatter를 포함한 전체 파일이 아니라 의미 본문 중심으로 만든다.
 
-  현재 운영 기준 (2026-06-06 반영):
+  당시 운영 기준 (2026-06-06 반영):
 
   - 프론트엔드 기본 채팅은 단일 Claude 모드다.
   - GPT 단일 채팅 토글은 제거한다.
@@ -621,7 +623,7 @@
 
 ### 현재 진행 상태 (구현)
 
-> 갱신: 2026-07-30. 단계 구분은 `roadmap.md`(V1~V7) 기준.
+> 갱신: 2026-09-03. 단계 구분은 `roadmap.md`(V1~V7) 기준. 아래 V4-B R0~R2 항목은 퇴역 전 인수 기록이며 현재 구현은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)를 따른다.
 
 - **현재 단계:** V3.5와 V4-A 논문 검색·전문 능동 독서, V4.5 S0b-2·S0c·S0d·S0e, A1b 전역 청크 검색과 보수 A2, V4.5-M 단일 GPT·모델 UI·의회 신규 실행 퇴역·Codex 모델 설정까지 Pi 운영 적용을 마쳤다. Codex 일반 모델은 `gpt-5.6-terra`, 깊은 재처리는 `gpt-5.5`, Pi Codex CLI는 `0.144.5`다. 메인 채팅 `자동`도 실제 `gpt-5.6-terra`를 사용한다.
 - **다음 단계 설계:** 새 `chat:gpt-single-v1:a2` 온라인 표본에서 과회수·최신성·abstention을 독립 관찰한다. 유지보수·평가 세션이 자동 topic 저장되지 않는 명시적 경계는 별도 후속으로 설계한다. 상세 회수 근거는 [assistant-foundation-design.md](assistant-foundation-design.md), 모델 경계는 [chat-model-routing-design.md](chat-model-routing-design.md)를 따른다.
@@ -709,7 +711,7 @@
 
 -----
 
-## 3. 의회 모드 동작
+## 3. 의회 모드 동작 — 퇴역 전 역사 기록
 
 질문 1건당 Claude가 답하고 GPT가 그 답을 검증하는 비평가로 참여한다. 최종 답변은 항상 Claude가 만든다. 의회 속도는 세 단계다.
 
@@ -1342,7 +1344,7 @@ DB에만 두고 노트화하지 않는 것: 짧은 확인, 잡담, 임시 질문
 - 기본 **수동**. 답 옆 **[노트로 저장]** 버튼이 주 경로.
 - “저장해줘 / 이건 기억해 / 옵시디언에 넣어줘” 같은 말은 보조 경로 (모델이 의도로 해석).
 
-### 의회 모드 저장
+### 의회 모드 저장 — 역사 기록
 
 - 기본 **자동 노트화** (비용·가치가 크므로). 답변 후 **[저장 취소] / [숨김] / [노트 열기]** 제공.
 - 노트에는 질문·1차/2차·최종 종합·종합자·시각·태그/링크 구역을 담는다 (섹션 6 구조).
@@ -1497,9 +1499,9 @@ Codex는 vault를 직접 읽고 쓸 수 있다. 단, 수정 허용 범위는 아
 
 -----
 
-## 18. V4-B 음성 — 정밀 전사와 Realtime 대화
+## 18. V4-B 음성 — 퇴역 전 Realtime 역사 기록
 
-> R0 GO, R1 노트 탐색·말투 연속성 Pi 기능 인수, R2a 휘발성 receipt·이벤트 reconciliation과 R2b bounded 턴 보정 Pi 기술 인수 완료. R2b 실기기 품질 확인과 R2c 이후는 미완료다. 상세 단일 기준은 [V4-B 시온 음성·Realtime 설계](voice-realtime-design.md)다. V4.5의 기억·일정·승인 경계는 [assistant-foundation-design.md](assistant-foundation-design.md) 7절을 함께 따른다.
+> 이 절은 R0~R2c-1의 역사 기록이다. Realtime 실행은 퇴역했고 상세 기록은 [레거시 Realtime 설계](../legacy/voice-realtime/docs/voice-realtime-design.md)에 보존한다. 현재 브라우저 음성의 단일 기준은 [음성 반이중 파이프라인 설계](voice-halfduplex-design.md)다.
 
 ### 결정
 
@@ -1599,15 +1601,15 @@ Realtime input transcription은 Realtime 모델의 음성 이해와 별도로 �
 1. topic 회수는 노트 후보 → Q&A 청크의 2단계로 바꾼다.
 2. 요청 전체 retrieval context를 8,000자로 제한한다.
 3. 청크에 source type, provenance, `active | invalidated | superseded` 상태를 둔다.
-4. 테스트는 `never`, 명시적 정밀 전사와 R2 Realtime의 보정 완료 턴은 `inbox` 저장 정책을 사용한다. R0·R1과 R2 partial/provisional transcript는 대화·지식 정본으로 저장하지 않는다.
+4. 테스트는 `never`, 브라우저 반이중 음성은 `source:'voice'`로 topic 자동 저장에서 제외한다. 원본 오디오는 DB·Vault·backup·temp file에 저장하지 않는다.
 5. 사용자 메모리는 자동 확정하지 않고 시온 승인 제안으로 갱신한다.
 6. 실제 실패 기반 20개 평가와 요청별 evidence·token·latency trace를 먼저 만든다.
 7. task·reminder는 [V4.5-C 시온 약속 루프 상세 설계](task-reminder-design.md)를 단일 기준으로 삼아 SQLite 상태와 결정론적 scheduler로 실행한다. C1은 명시적 `/task`, 단발성 reminder, 참조 가능한 `closed`와 일반 회수에서 제외하는 `deleted`, 무LLM·별도 정본을 다루며 A1b shadow 관찰과 격리해 병행할 수 있다.
 8. reminder는 약속 occurrence와 사용자 확인 상태의 정본, push subscription은 브라우저 endpoint 정본, delivery는 reminder×subscription 전송 receipt다. private HTTPS 홈 화면 PWA와 Web Push를 C1 첫 배포에 포함하되 일정 에이전트의 in-app reminder·foreground refresh를 fallback으로 유지한다.
 9. 에이전트 탭 최상단에는 task DB를 읽는 일정 에이전트를 둔다. 이전·현재·다음 3주 21일을 native swipe와 키보드 좌우 이동으로 탐색하고 별도 이전·오늘·다음 버튼은 두지 않는다. 지연/오늘/예정/Inbox, 오늘/지연 최대 3개, 다음 알림, unresolved reminder, push 상태와 일정 작업 화면을 같은 탭에 제공한다. task 변경 행동은 `TaskPanel` 단일 renderer만 사용한다.
-10. 활성 task는 별도 분류 LLM 없이 최대 20개·6,000자의 DB 스냅샷으로 단일 Claude와 의회 공통 컨텍스트에 넣는다. 완료·취소는 KST 월별 `schedule_history` 노트로 자동 투영해 일반 노트 검색이 과거 일정을 찾게 하며, 다시 열기·삭제·복원 때 재생성한다. DB가 정본이고 노트는 파생본이다.
-11. C1.5 자연어 생성은 단일 Claude의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보 하나를 만든다. 확인 카드의 `등록`만 기존 task API를 같은 request ID로 호출하며, 후보는 새로고침·취소 때 폐기하고 topic 자동 저장·노트 저장 버튼에서 제외한다.
-12. 음성의 귀·입은 Realtime, 대화 저장의 기록관은 턴 종료 뒤 `gpt-transcribe`, 별도 캡처 입력구는 확인형 정밀 전사로 나눈다. Realtime은 R0 무쓰기→R1 읽기 전용→R2 corrected-only 턴·승인형 쓰기로 승격하고, 명시적 정밀 전사는 확인 후 대화·메모·할 일 중 하나로 보낸다.
+10. 활성 task는 별도 분류 LLM 없이 최대 20개·6,000자의 DB 스냅샷으로 단일 GPT 컨텍스트에 넣는다. 완료·취소는 KST 월별 `schedule_history` 노트로 자동 투영해 일반 노트 검색이 과거 일정을 찾게 하며, 다시 열기·삭제·복원 때 재생성한다. DB가 정본이고 노트는 파생본이다.
+11. C1.5 자연어 생성은 단일 GPT의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보 하나를 만든다. 확인 카드의 `등록`만 기존 task API를 같은 request ID로 호출하며, 후보는 새로고침·취소 때 폐기하고 topic 자동 저장·노트 저장 버튼에서 제외한다.
+12. 브라우저 음성은 `브라우저 VAD → gpt-transcribe → 기존 /api/chat → gpt-4o-mini-tts` 반이중 경로를 쓰고, iPhone Shortcut은 별도 입·귀를 사용하되 같은 `runSingleChatTurn`과 `shared-main`을 재사용한다.
 
 ### 구조 원칙
 

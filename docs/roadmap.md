@@ -1,5 +1,7 @@
 # 갈피 — 구현 로드맵 (v1 → 비서)
 
+> 현재 런타임 (2026-09-03): 메인 채팅은 단일 GPT이고 신규 의회 실행과 Realtime 음성 실행은 퇴역했다. 기존 의회 기록은 읽기 호환성만 유지하며 브라우저 음성은 [반이중 설계](voice-halfduplex-design.md)를 따른다. 아래 V1~V4-B의 의회·Realtime 항목은 완료 당시의 역사 기록이다.
+
 > 원칙 세 가지 (설계 문서에서 그대로 가져옴)
 > 1. **각 단계는 그 자체로 쓸 수 있는 완성품이다.** 다음 단계를 위한 반쪽짜리가 아니다.
 > 2. **단계마다 "핵심"과 "보너스"를 가른다.** 보너스는 핵심이 돌아간 뒤에만 손댄다.
@@ -201,7 +203,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 >
 > R1 말투 연속성 Pi 적용 (2026-07-30): 실사용에서 번역투 문장과 텍스트 세션과 다른 말투가 확인돼 기본 voice를 `cedar`로 바꾸고, 한국어 지시를 친구 같은 자연스러운 반말·짧은 음성 문장으로 정렬했다. 세션 시작에는 메모리 전체 대신 말투·호칭·답변 선호 최대 600자와 `shared-main` 최근 완료 대화 3쌍 최대 2,400자만 넣고, 전체를 3,200자로 제한한다. 무관 메모리·오래된 대화·미완료 턴은 제외하며 사실 기억과 일정은 기존 질문별 read tool을 유지한다. OpenAI는 voice 성별을 공식 분류하지 않으므로 Cedar를 남성 음성으로 계약하지 않는다. 로컬 단위 8/8·HTTP 통합 1/1, 전체 병렬 224/226 뒤 Codex 기동 timeout 격리 2/2와 최종 순차 전체 226/226을 통과했다. Pi 백업 `galpi-20260730-2228.db`, `vault-20260730-2228.tar.gz`와 코드 복구본 `code-v4b-r1-tone-pre-20260730-2228.tar.gz` 뒤 Pi 집중 15/15·전체 순차 222/222를 통과했다. 사용자가 재시작했고 22:42:57 KST의 새 PID `130040`은 active/running, 인증 config는 mini·Cedar·300초·read tools 활성, 시작 오류 0건이다. 실기기 말투·발음 체감은 이 재시작 뒤 확인한다. mini를 먼저 유지하고 이 보정 뒤에도 문장·발음이 부족할 때만 full `gpt-realtime-2.1`을 검토한다.
 >
-> R2 정본 전사 결정 (2026-07-30, 설계 승인·미구현): Realtime input transcription은 별도 ASR이 만든 임시 자막이며 OpenAI도 모델 해석과 달라질 수 있는 “rough guide”로 설명한다. 따라서 귀·입·VAD·끼어들기는 Realtime이 계속 맡고, 같은 mic stream의 bounded 턴 오디오를 종료 뒤 `gpt-transcribe`로 보정한다. 일반 대화는 보정본만 `shared-main`에 exactly-once 저장하고, 일정·메모는 보정본을 기존 확인 카드에 넣는다. partial/provisional은 정본이 아니며 보정 실패 때 자동 fallback 저장하지 않는다. 원본 오디오는 메모리 우선으로 처리하고 DB·Vault·backup에 넣지 않으며, 임시 파일이 불가피하면 모든 종료 경로의 삭제와 crash TTL sweeper를 요구한다. 상세 상태·receipt·실패·비용·인수 기준은 [voice-realtime-design.md](voice-realtime-design.md) 4·6~9절을 따른다.
+> R2 정본 전사 결정 (2026-07-30, 설계 승인·미구현): Realtime input transcription은 별도 ASR이 만든 임시 자막이며 OpenAI도 모델 해석과 달라질 수 있는 “rough guide”로 설명한다. 따라서 귀·입·VAD·끼어들기는 Realtime이 계속 맡고, 같은 mic stream의 bounded 턴 오디오를 종료 뒤 `gpt-transcribe`로 보정한다. 일반 대화는 보정본만 `shared-main`에 exactly-once 저장하고, 일정·메모는 보정본을 기존 확인 카드에 넣는다. partial/provisional은 정본이 아니며 보정 실패 때 자동 fallback 저장하지 않는다. 원본 오디오는 메모리 우선으로 처리하고 DB·Vault·backup에 넣지 않으며, 임시 파일이 불가피하면 모든 종료 경로의 삭제와 crash TTL sweeper를 요구한다. 상세 상태·receipt·실패·비용·인수 기준은 [보관된 Realtime 설계](../legacy/voice-realtime/docs/voice-realtime-design.md) 4·6~9절을 따른다.
 >
 > R1 체감 승인·R2a Pi 인수 (2026-07-30): 사용자는 Cedar·bounded 말투 문맥 적용 뒤 실제 음성 대화를 “훨씬 낫다”고 승인했다. 이는 고유명사·숫자·날짜별 전사율을 계수한 평가는 아니므로 mini/Cedar를 그대로 유지한다. 이어 R2a에서 브라우저 메모리 안의 turn receipt와 input item→turn, response→turn, assistant item→response 대사를 추가했다. `event_id` 중복, 완료 뒤 late delta, 서로 다른 턴의 out-of-order completion, tool-only response, completion 뒤 cancellation을 합성 fixture로 고정했고 user 자막은 `provisional`, 취소된 assistant는 `interrupted`로 수렴한다. session 종료 때 모든 receipt를 지으며 당시에는 audio upload·보정 STT·schema·DB/Vault/message/task/trace write가 없었다. 로컬 집중 15/15·전체 226/226, Pi 집중 15/15·전체 순차 222/222를 통과했다. 백업은 DB·Vault `20260730-2354`, 코드 `code-v4b-r2a-pre-20260730-2353.tar.gz`이며 정적 응답 hash 일치, PID `130040` 유지, messages/notes/task/event/reminder/trace와 Vault hash 불변, SQLite integrity `ok`·foreign key 0을 확인했다.
 >
@@ -373,7 +375,7 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 6. 1440×900·390×844에서 중앙 주 초기 표시·주간 스와이프·키보드 좌우 이동·작성/수정·deep link·알림 분리·확인 처리·light/dark·overflow·모바일 44px target을 확인했다. 화면의 `이전 | 오늘 | 다음` 중복 버튼은 제거했다.
 7. C1c는 fire/outbox 원자성, lease·TTL·bounded retry, endpoint allowlist, VAPID 비밀 비노출, canonical HTTPS에서만 가능한 사용자 opt-in을 구현했다. 다음은 Tailscale Serve와 iPhone 실기기 전달 검증이다.
 8. C1e는 활성 task DB를 최대 20개·6,000자의 공통 채팅 컨텍스트로 합성하고, 완료·취소를 월별 `schedule_history` 노트로 투영한다. 다시 열기·삭제·복원은 같은 월을 재생성하고 DB만 정본으로 유지한다. 일정별 노트·저장 버튼·추가 LLM·과거 일정 질문 분류기는 두지 않는다.
-9. C1.5는 단일 Claude의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보를 만들고, 사용자가 채팅 카드의 `등록`을 누를 때만 `TaskPanel`이 기존 task API를 호출한다. 후보는 휘발 상태이며 후보 답변은 topic 자동 저장과 노트 저장 버튼에서 제외한다.
+9. C1.5는 단일 GPT의 `schedule_prepare`가 현재 직접 사용자 요청에서만 기존 task validator로 무저장 canonical 후보를 만들고, 사용자가 채팅 카드의 `등록`을 누를 때만 `TaskPanel`이 기존 task API를 호출한다. 후보는 휘발 상태이며 후보 답변은 topic 자동 저장과 노트 저장 버튼에서 제외한다.
 10. 반복은 C2 구현 시점의 다음 가용 schema에서 별도 컨펌하고, 브리핑·자유 서술 결과 기록은 C3에서 별도 컨펌
 
 명시적 `/task`, 새 전용 테이블·모듈, 무LLM을 지키는 C1은 A1b shadow 관찰과 격리해 병행할 수 있다. C1e는 A1b 후보 점수·trace와 topic 자동 저장은 그대로 두고, 활성 일정 전용 bounded 블록과 종결 일정의 일반 노트 projection만 추가한다. C1.5도 A1b 점수·trace 형식을 바꾸지 않으며 후보가 실제로 생긴 운영 요청만 topic 자동 저장에서 제외한다. 숨은 탭의 timer를 계속 돌리는 것은 지원하지 않으며 Pi scheduler가 시각을 판정하고 Web Push가 Service Worker를 이벤트성으로 깨운다.
@@ -472,18 +474,16 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 
 새 V단계가 아니라 기존 회수/답변 파이프라인 위에 얹는 보강. 외부 웹 근거를 답변에 주입한다.
 
-> **상태:** MVP + planner + 보안(월 한도 집행·sourceType 정확매칭) + 단일 Claude `tool_use` 검색 + 의회 공통 evidence 주입까지 구현, Pi에 `enabled:true`, `maxResults:3`, `maxSnippetChars:400` 배포 완료.
+> **현재 상태:** MVP + planner + 보안(월 한도 집행·sourceType 정확매칭)을 단일 GPT Responses 도구 루프에서 운영한다. 퇴역 전 Claude·의회 evidence 경로의 완료 기록은 git에 남아 있다.
 
 ### 핵심
-1. 단일 Claude는 `web_search` tool_use로 백엔드 search agent(Tavily)를 직접 요청한다.
+1. 단일 GPT는 `web_search` 도구로 백엔드 search agent(Tavily)를 직접 요청한다.
 2. MVP: 명시적 `/web` / Tavily 1개 / 프롬프트 인젝션 격리 / 저장 시 provenance.
-3. 의회 모드는 백엔드 search agent가 한 번 검색한 evidence를 Claude/GPT 양쪽에 주입한다.
 
 > 상세 설계는 `galpi-design-final.md`의 "외부 검색 (웹 근거 주입)" 절.
 
 ### 통과 기준
-- [x] 단일 Claude tool_use 또는 `/web 검색어` → 답변에 출처가 달린다
-- [x] 의회 검색 → 같은 근거가 Claude·GPT 양쪽에 주입된다
+- [x] 단일 GPT tool loop 또는 `/web 검색어` → 답변에 출처가 달린다
 - [x] 웹 결과가 `/save`·Codex·정책·파일 수정을 트리거하지 못한다 (격리 확인)
 - [x] 웹 근거로 저장된 노트에 출처가 남는다 (frontmatter + 인라인)
 

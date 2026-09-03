@@ -6,7 +6,7 @@
 >
 > Scope: 핸즈프리 반이중 음성 대화, 전사 검증·되묻기, 음성 답변 분리, iOS 잠금화면 단축어 입구, 기존 채팅 파이프라인 재사용
 >
-> 이 문서는 V4-B 음성의 **새 단일 기준**이다. [Realtime 설계](voice-realtime-design.md)는 R0~R2c-1의 구현·인수 기록으로 보존하되, 이후 신규 작업의 기준으로 삼지 않는다.
+> 이 문서는 V4-B 음성의 **현재 단일 기준**이다. [Realtime 설계](../legacy/voice-realtime/docs/voice-realtime-design.md)는 R0~R2c-1의 구현·인수 기록으로 보존하되, 이후 신규 작업의 기준으로 삼지 않는다.
 
 현 production STT와 턴 폐기 판정은 `lib/voice/transcription.js`, 네 half-duplex HTTP endpoint는 `lib/voice/halfduplex-routes.js`가 소유한다. `/api/chat`과 spoken progress 연결은 공유 채팅 runtime인 `server.js`에 남는다.
 

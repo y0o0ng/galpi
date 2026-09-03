@@ -476,7 +476,7 @@ CLI 정상 · 목록 갱신 7분 전
 - Claude billing 링크
 - 활성 Anthropic runtime 설정과 SDK
 
-한 release 동안 기존 `/api/council/*`는 모델을 호출하지 않고 `410 COUNCIL_RETIRED`와 `/api/chat` 안내를 반환한다. stale 브라우저가 의회를 조용히 실행했다고 오해하지 않게 하기 위한 tombstone이다. 다음 release에서 호출 관측이 0이면 route를 제거한다.
+기존 `/api/council/*`는 모델을 호출하지 않고 `410 COUNCIL_RETIRED`와 `/api/chat` 안내를 반환한다. stale 브라우저가 의회를 조용히 실행했다고 오해하지 않게 하기 위한 호환 tombstone이며, 별도 API 정리 전까지 유지한다.
 
 ### 보존
 
