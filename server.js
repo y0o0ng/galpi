@@ -114,7 +114,13 @@ const {
   isPersistableUserTurn,
 } = require('./lib/realtime-turn-store');
 const { createVoiceTtsService } = require('./lib/voice-tts');
-const { VoiceShortcutError, createVoiceShortcutService } = require('./lib/voice-shortcut');
+const {
+  SHORTCUT_CONVERSATION_CONTROL_SYSTEM_PROMPT,
+  SHORTCUT_RESPONSE_FORMAT,
+  VoiceShortcutError,
+  createVoiceShortcutService,
+  parseShortcutResponse,
+} = require('./lib/voice-shortcut');
 const { createVoiceShortcutRoutes } = require('./lib/voice-shortcut-routes');
 const { AttachmentUploadError, createAttachmentUploadService } = require('./lib/attachment-upload');
 const { createAttachmentDocumentService } = require('./lib/attachment-documents');
@@ -3804,7 +3810,13 @@ async function generateGptReplyWithTools({
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
   additionalInstructions = '',
+  shortcutConversationControl = false,
 }) {
+  if (shortcutConversationControl && onSpokenText) {
+    const error = new Error('단축어 구조화 응답은 음성 스트리밍과 함께 쓸 수 없습니다.');
+    error.code = 'SHORTCUT_STREAMING_UNSUPPORTED';
+    throw error;
+  }
   const runtime = createChatToolRuntime({
     webToolSession,
     paperToolSession,
@@ -3824,7 +3836,15 @@ async function generateGptReplyWithTools({
     .digest('hex')
     .slice(0, 64);
   const result = await runOpenAIResponsesToolLoop({
-    createResponse: request => openai.responses.create(request),
+    createResponse: request => openai.responses.create(shortcutConversationControl
+      ? {
+        ...request,
+        text: {
+          ...(request.text || {}),
+          format: SHORTCUT_RESPONSE_FORMAT,
+        },
+      }
+      : request),
     // 음성 턴에서만 스트리밍한다. 텍스트 채팅은 기존 비스트리밍 호출을 그대로 쓴다.
     ...(onSpokenText ? {
       createResponseStream: request => openai.responses.create(request),
@@ -3856,8 +3876,13 @@ async function generateGptReplyWithTools({
     executeTool: runtime.executeTool,
   });
 
+  const shortcutResponse = shortcutConversationControl
+    ? parseShortcutResponse(result.outputText)
+    : null;
+
   return {
-    reply: result.outputText,
+    reply: shortcutResponse ? shortcutResponse.answer : result.outputText,
+    ...(shortcutResponse ? { canContinue: shortcutResponse.canContinue } : {}),
     usedModel: String(result.response.model || model),
     usage: result.response.usage || null,
     providerRequestId: result.response._request_id || result.response.id || null,
@@ -3881,6 +3906,7 @@ async function generateChatReply(model, context, {
   onSpokenText = null,
   voiceTurn = Boolean(onSpokenText),
   additionalInstructions = '',
+  shortcutConversationControl = false,
 } = {}) {
   if (model === 'claude') {
     return generateClaudeReplyWithTools({
@@ -3919,6 +3945,7 @@ async function generateChatReply(model, context, {
       onSpokenText,
       voiceTurn,
       additionalInstructions,
+      shortcutConversationControl,
     });
   }
   throw new Error('지원하지 않는 단일 채팅 모델입니다.');
@@ -4097,6 +4124,7 @@ async function runSingleChatTurnBody({
   scheduleClientRequestId = null,
   allowAutoTopic = true,
   additionalInstructions = '',
+  shortcutConversationControl = false,
   onExchangeInserted = null,
   attachmentIds = [],
   turnAttachments = [],
@@ -4297,6 +4325,7 @@ async function runSingleChatTurnBody({
         onStage: progress.stage,
         onSpokenText: spokenStream,
         voiceTurn,
+        shortcutConversationControl,
         additionalInstructions: [additionalInstructions, newsProactiveInstruction]
           .filter(Boolean)
           .join('\n\n') || undefined,
@@ -4318,6 +4347,7 @@ async function runSingleChatTurnBody({
       attachmentEvidenceRefs,
       attachmentDocumentUsage,
       scheduleCandidate,
+      canContinue,
     } = generatedReply;
     spokenStream?.flush();
     const spokenRemaining = spokenStream?.remaining() || '';
@@ -4331,7 +4361,9 @@ async function runSingleChatTurnBody({
       queryEmbedding,
       assistantModel,
       modelSnapshot,
-      onInserted: onExchangeInserted,
+      onInserted: shortcutConversationControl && typeof onExchangeInserted === 'function'
+        ? inserted => onExchangeInserted({ ...inserted, canContinue })
+        : onExchangeInserted,
       attachmentIds,
     });
     onAttachmentExchangeInserted();
@@ -4405,6 +4437,7 @@ async function runSingleChatTurnBody({
       messageId: assistantMessageId,
       attachments,
       scheduleCandidate,
+      ...(shortcutConversationControl ? { canContinue } : {}),
       // 음성이 "계속"이라고 했을 때 이어 읽을 나머지. 서버는 보관하지 않는다.
       ...(spokenRemaining ? { spokenRemaining } : {}),
       webSources: webEvidence?.results || [],
@@ -5026,14 +5059,19 @@ const shortcutRoutes = createVoiceShortcutRoutes({
         persistScheduleImmediately: true,
         scheduleClientRequestId: `shortcut-task:${turn.requestId}`,
         allowAutoTopic: false,
-        additionalInstructions: SHORTCUT_SCOPED_WRITE_SYSTEM_PROMPT,
-        onExchangeInserted({ userMessageId, assistantMessageId }) {
+        shortcutConversationControl: true,
+        additionalInstructions: [
+          SHORTCUT_SCOPED_WRITE_SYSTEM_PROMPT,
+          SHORTCUT_CONVERSATION_CONTROL_SYSTEM_PROMPT,
+        ].join('\n\n'),
+        onExchangeInserted({ userMessageId, assistantMessageId, canContinue }) {
           voiceShortcut.completeRequest({
             credentialId: credential.id,
             requestId: turn.requestId,
             requestSha256: turn.requestSha256,
             userMessageId,
             assistantMessageId,
+            canContinue,
           });
         },
       });

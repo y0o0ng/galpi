@@ -7,9 +7,11 @@ const Database = require('better-sqlite3');
 
 const { runDatabaseMigrations } = require('../lib/database-migrations');
 const {
+  SHORTCUT_RESPONSE_FORMAT,
   VoiceShortcutError,
   createVoiceShortcutService,
   normalizeTurnInput,
+  parseShortcutResponse,
 } = require('../lib/voice-shortcut');
 
 function createDatabase() {
@@ -172,6 +174,48 @@ test('shortcut turn input is normalized and rejects client-owned policy fields',
   );
 });
 
+test('shortcut structured response schema and parser expose only natural answer and boolean control', () => {
+  assert.deepEqual(SHORTCUT_RESPONSE_FORMAT, {
+    type: 'json_schema',
+    name: 'voice_shortcut_turn',
+    strict: true,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        answer: { type: 'string' },
+        canContinue: { type: 'boolean' },
+      },
+      required: ['answer', 'canContinue'],
+    },
+  });
+  assert.deepEqual(
+    parseShortcutResponse('{"answer":"  계속 말해줘.  ","canContinue":true}'),
+    { answer: '계속 말해줘.', canContinue: true },
+  );
+  assert.deepEqual(
+    parseShortcutResponse('{"answer":"응, 나중에 보자.","canContinue":false}'),
+    { answer: '응, 나중에 보자.', canContinue: false },
+  );
+
+  for (const invalid of [
+    'not-json',
+    '[]',
+    '{"canContinue":true}',
+    '{"answer":"","canContinue":true}',
+    '{"answer":"답"}',
+    '{"answer":"답","canContinue":"true"}',
+    '{"answer":"답","canContinue":true,"extra":"secret-provider-output"}',
+  ]) {
+    assert.throws(
+      () => parseShortcutResponse(invalid),
+      error => error.code === 'SHORTCUT_RESPONSE_INVALID'
+        && error.message === '단축어 응답 형식이 올바르지 않습니다.'
+        && !error.message.includes('secret-provider-output'),
+    );
+  }
+});
+
 test('shortcut receipts replay completed turns and bound pending retries', () => {
   const db = createDatabase();
   let currentTime = 2000;
@@ -219,11 +263,39 @@ test('shortcut receipts replay completed turns and bound pending retries', () =>
     requestSha256: turn.requestSha256,
     userMessageId,
     assistantMessageId,
+    canContinue: true,
   });
   const replay = service.claimRequest(credential.id, turn);
   assert.equal(replay.kind, 'replay');
   assert.equal(replay.answer, '내일 일정은 없어.');
   assert.equal(replay.assistantMessageId, assistantMessageId);
+  assert.equal(replay.canContinue, true);
+  assert.equal(typeof replay.canContinue, 'boolean');
+
+  const closingTurn = service.normalizeTurnInput({
+    text: '오늘은 여기까지만 할게',
+    requestId: '00000000-0000-4000-8000-000000000004',
+  });
+  service.claimRequest(credential.id, closingTurn);
+  service.completeRequest({
+    credentialId: credential.id,
+    requestId: closingTurn.requestId,
+    requestSha256: closingTurn.requestSha256,
+    userMessageId,
+    assistantMessageId,
+    canContinue: false,
+  });
+  assert.equal(service.claimRequest(credential.id, closingTurn).canContinue, false);
+  assert.throws(
+    () => service.completeRequest({
+      credentialId: credential.id,
+      requestId: closingTurn.requestId,
+      requestSha256: closingTurn.requestSha256,
+      userMessageId,
+      assistantMessageId,
+    }),
+    /canContinue는 boolean/,
+  );
 
   const exhaustedTurn = service.normalizeTurnInput({
     text: '다른 질문',

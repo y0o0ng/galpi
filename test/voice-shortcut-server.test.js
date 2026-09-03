@@ -125,10 +125,31 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
     if (req.url === '/v1/responses') {
       responseRequests.push(body);
       await new Promise(resolve => setTimeout(resolve, 40));
+      const shortcutStructured = body.text?.format?.name === 'voice_shortcut_turn';
       const hasToolOutput = body.input.some(item => item?.type === 'function_call_output');
       const isScheduleRequest = hasToolOutput
         ? body.input.some(item => item?.call_id === 'call_shortcut_schedule')
         : JSON.stringify(body.input.at(-1)).includes('내일 오전 9시에 일정을 등록해줘');
+      if (shortcutStructured && JSON.stringify(body.input).includes('malformed shortcut response')) {
+        return sendJson(res, 200, {
+          id: `resp_shortcut_malformed_${responseRequests.length}`,
+          object: 'response',
+          status: 'completed',
+          model: body.model,
+          output_text: '{"answer":"secret-provider-output"}',
+          output: [{
+            type: 'message',
+            id: `msg_shortcut_malformed_${responseRequests.length}`,
+            role: 'assistant',
+            status: 'completed',
+            content: [{
+              type: 'output_text',
+              text: '{"answer":"secret-provider-output"}',
+              annotations: [],
+            }],
+          }],
+        });
+      }
       if (isScheduleRequest && !hasToolOutput) {
         return sendJson(res, 200, {
           id: `resp_shortcut_schedule_${responseRequests.length}`,
@@ -149,12 +170,14 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
         });
       }
       if (isScheduleRequest && hasToolOutput) {
+        const answer = '병원 예약 일정을 내일 오전 9시로 등록했어.';
+        const outputText = JSON.stringify({ answer, canContinue: true });
         return sendJson(res, 200, {
           id: `resp_shortcut_schedule_done_${responseRequests.length}`,
           object: 'response',
           status: 'completed',
           model: body.model,
-          output_text: '병원 예약 일정을 내일 오전 9시로 등록했어.',
+          output_text: outputText,
           output: [{
             type: 'message',
             id: `msg_shortcut_schedule_${responseRequests.length}`,
@@ -162,7 +185,7 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
             status: 'completed',
             content: [{
               type: 'output_text',
-              text: '병원 예약 일정을 내일 오전 9시로 등록했어.',
+              text: outputText,
               annotations: [],
             }],
           }],
@@ -170,18 +193,21 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
         });
       }
       const answer = '그 변경은 갈피 화면에서 확인해줘.';
+      const outputText = shortcutStructured
+        ? JSON.stringify({ answer, canContinue: false })
+        : answer;
       return sendJson(res, 200, {
         id: `resp_shortcut_${responseRequests.length}`,
         object: 'response',
         status: 'completed',
         model: body.model,
-        output_text: answer,
+        output_text: outputText,
         output: [{
           type: 'message',
           id: `msg_shortcut_${responseRequests.length}`,
           role: 'assistant',
           status: 'completed',
-          content: [{ type: 'output_text', text: answer, annotations: [] }],
+          content: [{ type: 'output_text', text: outputText, annotations: [] }],
         }],
         usage: { input_tokens: 10, output_tokens: 8, total_tokens: 18 },
       });
@@ -294,13 +320,34 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
     'answer', 'canContinue', 'conversationId', 'messageId',
   ]);
   assert.equal(first.body.answer, '병원 예약 일정을 내일 오전 9시로 등록했어.');
-  assert.equal(first.body.canContinue, false);
+  assert.equal(first.body.canContinue, true);
+  assert.equal(typeof first.body.canContinue, 'boolean');
   assert.equal(first.response.headers.get('cache-control'), 'no-store');
   assert.equal(responseRequests.length, 2);
   assert.match(responseRequests[0].instructions, /이 답변은 소리로 읽힌다/);
   assert.match(responseRequests[0].instructions, /잠금화면 음성 단축어/);
   assert.match(responseRequests[0].instructions, /명시적으로 새 일정.*생성 요청일 때만/);
+  assert.match(responseRequests[0].instructions, /애매하면 반드시 true/);
+  assert.match(responseRequests[0].instructions, /완료됐다는 사실만으로 false로 두지 않는다/);
   assert.match(JSON.stringify(responseRequests[0].tools || []), /schedule_prepare/);
+  for (const request of responseRequests.slice(0, 2)) {
+    assert.deepEqual(request.text, {
+      format: {
+        type: 'json_schema',
+        name: 'voice_shortcut_turn',
+        strict: true,
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            answer: { type: 'string' },
+            canContinue: { type: 'boolean' },
+          },
+          required: ['answer', 'canContinue'],
+        },
+      },
+    });
+  }
   assert.match(
     responseRequests[1].input.find(item => item?.type === 'function_call_output').output,
     /"persisted":true/,
@@ -329,6 +376,8 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
   ]);
   assert.deepEqual(concurrent.map(result => result.response.status), [200, 200]);
   assert.deepEqual(concurrent[0].body, concurrent[1].body);
+  assert.equal(concurrent[0].body.canContinue, false);
+  assert.equal(typeof concurrent[0].body.canContinue, 'boolean');
   assert.equal(responseRequests.length, 3);
 
   const scopedCannotChat = await requestJson(url, '/api/chat', {
@@ -368,15 +417,25 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
   );
   assert.deepEqual(
     db.prepare(`
+      SELECT content FROM messages WHERE role = 'assistant' ORDER BY id
+    `).all(),
+    [
+      { content: '병원 예약 일정을 내일 오전 9시로 등록했어.' },
+      { content: '그 변경은 갈피 화면에서 확인해줘.' },
+    ],
+  );
+  assert.deepEqual(
+    db.prepare(`
       SELECT status, attempt_count AS attemptCount,
              user_message_id IS NOT NULL AS hasUser,
-             assistant_message_id IS NOT NULL AS hasAssistant
+             assistant_message_id IS NOT NULL AS hasAssistant,
+             can_continue AS canContinue
       FROM voice_shortcut_receipts
       ORDER BY id
     `).all(),
     [
-      { status: 'completed', attemptCount: 1, hasUser: 1, hasAssistant: 1 },
-      { status: 'completed', attemptCount: 1, hasUser: 1, hasAssistant: 1 },
+      { status: 'completed', attemptCount: 1, hasUser: 1, hasAssistant: 1, canContinue: 1 },
+      { status: 'completed', attemptCount: 1, hasUser: 1, hasAssistant: 1, canContinue: 0 },
     ],
   );
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM auto_save_decisions').get().count, 0);
@@ -419,6 +478,41 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
   assert.equal(rateStatuses[10], 429);
   assert.equal(responseRequests.length, 3);
 
+  const normalText = await adminRequest(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: '평범한 텍스트 채팅',
+      model: 'gpt',
+      sessionId: 'plain-text-session',
+    }),
+  });
+  assert.equal(normalText.response.status, 200, JSON.stringify(normalText.body));
+  assert.equal(normalText.body.reply, '그 변경은 갈피 화면에서 확인해줘.');
+  assert.equal(Object.hasOwn(normalText.body, 'canContinue'), false);
+  assert.equal(responseRequests[3].text, undefined);
+
+  const halfDuplexVoice = await adminRequest(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: '브라우저 반이중 음성',
+      model: 'gpt',
+      sessionId: 'half-duplex-session',
+      source: 'voice',
+    }),
+  });
+  assert.equal(halfDuplexVoice.response.status, 200, JSON.stringify(halfDuplexVoice.body));
+  assert.equal(halfDuplexVoice.body.reply, '그 변경은 갈피 화면에서 확인해줘.');
+  assert.equal(Object.hasOwn(halfDuplexVoice.body, 'canContinue'), false);
+  assert.equal(responseRequests[4].text, undefined);
+
+  const malformed = await shortcutRequest(url, token, {
+    text: 'malformed shortcut response',
+    requestId: '00000000-0000-4000-8000-000000000017',
+  });
+  assert.equal(malformed.response.status, 500);
+  assert.equal(malformed.body.code, 'SHORTCUT_TURN_FAILED');
+  assert.equal(JSON.stringify(malformed.body).includes('secret-provider-output'), false);
+
   const revoked = await adminRequest(url, `/api/voice/shortcut/credentials/${issued.body.id}`, {
     method: 'DELETE',
   });
@@ -429,5 +523,5 @@ test('shortcut route uses scoped device auth and saves each shared turn exactly 
     requestId: '00000000-0000-4000-8000-000000000016',
   });
   assert.equal(afterRevoke.response.status, 401);
-  assert.equal(responseRequests.length, 3);
+  assert.equal(responseRequests.length, 6);
 });

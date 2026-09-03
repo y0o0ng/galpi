@@ -65,6 +65,22 @@ function createLegacyDatabase() {
   return db;
 }
 
+function migrateThrough(db, lastVersion) {
+  db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))");
+  const insertVersion = db.prepare('INSERT INTO schema_version (version, name) VALUES (?, ?)');
+  for (const migration of migrations.filter(item => item.version <= lastVersion)) {
+    if (migration.ownsTransaction) {
+      migration.up(db);
+      insertVersion.run(migration.version, migration.name);
+    } else {
+      db.transaction(() => {
+        migration.up(db);
+        insertVersion.run(migration.version, migration.name);
+      })();
+    }
+  }
+}
+
 test('database migrations upgrade a legacy DB sequentially and remain idempotent', () => {
   const db = createLegacyDatabase();
   db.prepare(`
@@ -233,6 +249,60 @@ test('database migrations upgrade a legacy DB sequentially and remain idempotent
   assert.equal(
     db.prepare('SELECT COUNT(*) AS count FROM schema_version').get().count,
     LATEST_SCHEMA_VERSION,
+  );
+  db.close();
+});
+
+test('schema v25 preserves historical shortcut replay behavior and constrains can_continue', () => {
+  const db = createLegacyDatabase();
+  migrateThrough(db, 24);
+  const subscriptionId = Number(db.prepare(`
+    INSERT INTO assistant_push_subscriptions (endpoint, p256dh, auth, status)
+    VALUES ('https://web.push.apple.com/historical-shortcut', 'key', 'auth', 'active')
+  `).run().lastInsertRowid);
+  const credentialId = Number(db.prepare(`
+    INSERT INTO assistant_shortcut_credentials (
+      subscription_id, token_sha256, token_prefix, status, created_at
+    ) VALUES (?, ?, 'prefix12', 'active', 100)
+  `).run(subscriptionId, 'a'.repeat(64)).lastInsertRowid);
+  db.prepare(`
+    INSERT INTO voice_shortcut_receipts (
+      credential_id, request_id, request_sha256, status,
+      conversation_id, attempt_count, created_at, updated_at
+    ) VALUES (?, '00000000-0000-4000-8000-000000000025', ?, 'pending', 'historical-conversation', 1, 100, 100)
+  `).run(credentialId, 'b'.repeat(64));
+  const tablesBefore = db.prepare(`
+    SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name
+  `).all();
+
+  const result = runDatabaseMigrations(db);
+  assert.deepEqual(result.applied, [{
+    version: 25,
+    name: 'voice_shortcut_conversation_control',
+  }]);
+  assert.equal(result.currentVersion, 25);
+  assert.deepEqual(
+    db.prepare(`SELECT can_continue AS canContinue FROM voice_shortcut_receipts`).get(),
+    { canContinue: 0 },
+  );
+  db.prepare('UPDATE voice_shortcut_receipts SET can_continue = 1').run();
+  assert.equal(
+    db.prepare('SELECT can_continue AS canContinue FROM voice_shortcut_receipts').get().canContinue,
+    1,
+  );
+  assert.throws(
+    () => db.prepare('UPDATE voice_shortcut_receipts SET can_continue = 2').run(),
+    /CHECK/,
+  );
+  assert.deepEqual(
+    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`).all(),
+    tablesBefore,
+  );
+  assert.deepEqual(
+    db.prepare('PRAGMA table_info(voice_shortcut_receipts)').all()
+      .filter(column => column.name === 'can_continue')
+      .map(column => ({ name: column.name, notnull: column.notnull, default: column.dflt_value })),
+    [{ name: 'can_continue', notnull: 1, default: '0' }],
   );
   db.close();
 });
