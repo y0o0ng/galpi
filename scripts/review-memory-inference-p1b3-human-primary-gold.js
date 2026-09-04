@@ -8,10 +8,10 @@ const readline = require('node:readline/promises');
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_CANDIDATE_FIXTURE = path.join(
   ROOT,
-  'fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates.json',
+  'fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates-v2.json',
 );
 const DEFAULT_OUTPUT = '/tmp/xion-p1b3-human-primary-labels.json';
-const CANDIDATE_FIXTURE_NAME = 'xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v1';
+const CANDIDATE_FIXTURE_NAME = 'xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2';
 const REVIEW_PROTOCOL_VERSION = 'xion-p1b3-human-primary-v1';
 const LABELS = Object.freeze(['NO_WRITE', 'WRITE_CANDIDATE', 'ESCALATE']);
 const EXTRACTION_SCHEMA_IDS = Object.freeze([
@@ -20,15 +20,15 @@ const EXTRACTION_SCHEMA_IDS = Object.freeze([
   'p1b1_quantity_unit_v1',
 ]);
 const FIXED_REVIEW_ORDER = Object.freeze([
-  59, 25, 5, 46, 43, 35, 28, 32, 9, 15,
-  13, 55, 41, 37, 1, 23, 8, 16, 3, 10,
-  19, 4, 24, 45, 42, 18, 36, 31, 29, 0,
-  56, 38, 17, 51, 22, 30, 53, 20, 33, 54,
-  27, 12, 57, 49, 48, 26, 7, 34, 11, 14,
-  39, 2, 44, 40, 47, 50, 52, 6, 21, 58,
+  1, 21, 20, 17, 0, 4, 2, 30, 32, 29,
+  54, 7, 53, 5, 46, 22, 19, 47, 14, 28,
+  37, 25, 31, 57, 52, 59, 43, 18, 55, 24,
+  27, 42, 51, 49, 56, 33, 12, 36, 11, 8,
+  26, 40, 3, 13, 44, 23, 45, 48, 16, 9,
+  34, 6, 50, 39, 35, 58, 41, 38, 10, 15,
 ]);
 const FIXED_CASE_IDS = Object.freeze(Array.from({ length: 60 }, (_, index) => (
-  `p1b3-decomposed-${String(index + 1).padStart(3, '0')}`
+  `p1b3-decomposed-v2-${String(index + 1).padStart(3, '0')}`
 )));
 
 function isPlainObject(value) {

@@ -30,6 +30,14 @@ const {
 const ROOT = path.resolve(__dirname, '..');
 const AUTHORING_KEY = path.join(
   ROOT,
+  'fixtures/local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v2.json',
+);
+const SUPERSEDED_CANDIDATE_FIXTURE = path.join(
+  ROOT,
+  'fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates.json',
+);
+const SUPERSEDED_AUTHORING_KEY = path.join(
+  ROOT,
   'fixtures/local-memory-inference-p1b3-decomposed-pipeline-authoring-key.json',
 );
 const REVIEWER_SOURCE = path.join(
@@ -42,6 +50,7 @@ const EXISTING_FIXTURES = [
   'fixtures/local-memory-inference-p1b2b-triage-label-semantics.json',
   'fixtures/local-memory-inference-p1b2c-triage-validation-candidates.json',
   'fixtures/local-memory-inference-p1b2d-triage-boundary-candidates.json',
+  'fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates.json',
 ].map(relativePath => path.join(ROOT, relativePath));
 
 function candidateBytes() {
@@ -56,7 +65,7 @@ function normalizedEvidence(value) {
   return String(value).normalize('NFKC').trim().replace(/\s+/gu, ' ').toLowerCase();
 }
 
-test('P1-B3 candidate fixture has 60 fixed gold-free fresh local-eligible cases', () => {
+test('P1-B3 v2 candidate fixture has 60 fixed gold-free exact-distinct local-eligible cases', () => {
   const raw = JSON.parse(fs.readFileSync(DEFAULT_CANDIDATE_FIXTURE, 'utf8'));
   const fixture = loadCandidateFixture();
   assert.equal(validateCandidateFixture(fixture), fixture);
@@ -94,7 +103,7 @@ test('P1-B3 candidate fixture has 60 fixed gold-free fresh local-eligible cases'
   const candidateEvidence = new Set();
   for (const candidate of fixture.cases) {
     assert.deepEqual(Object.keys(candidate), ['caseId', 'inputPayload']);
-    assert.match(candidate.caseId, /^p1b3-decomposed-\d{3}$/u);
+    assert.match(candidate.caseId, /^p1b3-decomposed-v2-\d{3}$/u);
     assert.doesNotMatch(candidate.caseId, /no.?write|write.?candidate|escalate|date|text|quantity/iu);
     assert.deepEqual(Object.keys(candidate.inputPayload), ['evidence', 'expectedSchema']);
     assert.ok(EXTRACTION_SCHEMA_IDS.includes(candidate.inputPayload.expectedSchema));
@@ -115,7 +124,7 @@ test('separate authoring key matches all candidates, validates extraction gold, 
   assert.deepEqual(Object.keys(key), ['name', 'candidateFixture', 'cases']);
   assert.equal(
     key.name,
-    'xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v1',
+    'xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v2',
   );
   assert.equal(key.candidateFixture, CANDIDATE_FIXTURE_NAME);
   assert.deepEqual(Object.keys(key.cases), [...FIXED_CASE_IDS]);
@@ -133,6 +142,25 @@ test('separate authoring key matches all candidates, validates extraction gold, 
   assert.deepEqual(counts, { NO_WRITE: 20, WRITE_CANDIDATE: 20, ESCALATE: 20 });
 });
 
+test('superseded v1 artifacts remain preserved under identities distinct from v2', () => {
+  const candidate = JSON.parse(fs.readFileSync(SUPERSEDED_CANDIDATE_FIXTURE, 'utf8'));
+  const key = JSON.parse(fs.readFileSync(SUPERSEDED_AUTHORING_KEY, 'utf8'));
+  assert.equal(
+    candidate.name,
+    'xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v1',
+  );
+  assert.equal(
+    key.name,
+    'xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v1',
+  );
+  assert.notEqual(candidate.name, CANDIDATE_FIXTURE_NAME);
+  assert.notEqual(key.candidateFixture, CANDIDATE_FIXTURE_NAME);
+  assert.throws(
+    () => loadCandidateFixture(SUPERSEDED_CANDIDATE_FIXTURE),
+    /fixture identity가 올바르지/,
+  );
+});
+
 test('P1-B3 blind review order is one fixed deterministic permutation', () => {
   const fixture = loadCandidateFixture();
   assert.equal(FIXED_REVIEW_ORDER.length, 60);
@@ -144,6 +172,11 @@ test('P1-B3 blind review order is one fixed deterministic permutation', () => {
   const second = shuffledCandidates(fixture).map(item => item.caseId);
   assert.deepEqual(first, second);
   assert.notDeepEqual(first, fixture.cases.map(item => item.caseId));
+  assert.deepEqual(first.slice(0, 3), [
+    'p1b3-decomposed-v2-002',
+    'p1b3-decomposed-v2-022',
+    'p1b3-decomposed-v2-021',
+  ]);
 });
 
 test('reviewer loads no authoring key and displays only evidence with the three fixed choices', () => {
@@ -180,7 +213,7 @@ test('partial blind review writes nothing and mutates neither fixture nor author
     conductBlindReview(fixture, {
       outputPath,
       ask: async prompt => {
-        assert.doesNotMatch(prompt, /p1b3-decomposed-|expectedSchema/iu);
+        assert.doesNotMatch(prompt, /p1b3-decomposed-v2-|expectedSchema/iu);
         answers += 1;
         if (answers === 7) throw new Error('synthetic interruption');
         return '1';
@@ -208,7 +241,7 @@ test('complete blind review writes every case exactly once with fixed provenance
     },
   });
   assert.equal(prompts.length, 60);
-  assert.ok(prompts.every(prompt => !prompt.includes('p1b3-decomposed-')));
+  assert.ok(prompts.every(prompt => !prompt.includes('p1b3-decomposed-v2-')));
   assert.deepEqual(JSON.parse(fs.readFileSync(outputPath, 'utf8')), mapping);
   assert.equal(mapping.protocolVersion, REVIEW_PROTOCOL_VERSION);
   assert.equal(mapping.protocolVersion, 'xion-p1b3-human-primary-v1');

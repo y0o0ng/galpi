@@ -2294,6 +2294,12 @@ Preparation started from fetched GitHub `main` at
 `d33ff03fc1cd3b3be79fe238978a303d96bd697f`. The sole change after the
 handoff baseline `83e2a7cd0d0b325141e61b3a20c2c9c1a62c5bab` grouped active
 voice modules and did not change any memory-inference contract or artifact.
+The pre-HUMAN correction review started from fetched GitHub `main` at
+`01c321b58e12e0ebdde56b10bafb2bca9b7b288f`. The two commits after the
+known P1-B3 preparation commit
+`0a12ff323e6492824fbf5c79d7540d0c0638f757` changed voice documentation
+and QV legal-evidence handling only; neither changed a memory-inference
+contract or artifact.
 
 P1-B2d remains **CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE
 SELECTED**. P1-B3 does not rerate, reopen, rescue, or modify P1-B2d, and no
@@ -2324,9 +2330,23 @@ With the 4B server loaded, each case runs L4 and then D4 case-locally before
 the next case. After that one complete 4B run, the server switches to the
 1.7B checkpoint and D1.7 runs on the exact same frozen fixture. The three
 reports are combined deterministically by case ID. Server lifecycle,
-endpoint handling, timeouts, and the model-run report contract belong to the
-later runner implementation and are not implemented by this preparation
-commit.
+endpoint handling, and the model-run report implementation belong to the
+later runner and are not implemented by this preparation commit. The
+following runtime contract is nevertheless frozen before any model output:
+
+-   each sequential `llama.cpp` model server must pass a non-inference
+    readiness preflight before any experimental inference using that server;
+-   a readiness-preflight failure permits no semantic model attempt;
+-   every model call has a fixed `180000 ms` timeout and exactly one attempt,
+    with no automatic rerun;
+-   reports must distinguish and state honestly the planned, attempted, and
+    completed model-call counts, runtime failures, and invalid JSON/schema
+    attempts; and
+-   any runtime failure that prevents a complete experiment comparison yields
+    `INDETERMINATE_RUNTIME`.
+
+The later runner must implement these values as written and must not reopen
+them.
 
 #### Frozen stage contracts
 
@@ -2433,24 +2453,46 @@ P1-B1 extraction after `WRITE_CANDIDATE`.
 
 #### Fresh fixture and authoring key
 
-The reviewer-visible candidate artifact is
+**Pre-HUMAN preparation correction receipt — 2026-09-04.** The initially
+prepared artifacts
 `xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v1` at
-`fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates.json`.
+`fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates.json`
+and
+`xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v1` at
+`fixtures/local-memory-inference-p1b3-decomposed-pipeline-authoring-key.json`
+are **SUPERSEDED_BEFORE_HUMAN_REVIEW**. Their repeated construction templates
+were not adequate for the registered fresh diagnostic. They remain preserved
+only as superseded preparation provenance and must not be loaded for HUMAN
+review or later model execution. No HUMAN label, model call, or model output
+used v1, so this correction consumes no HUMAN or model evaluation.
+
+The replacement reviewer-visible candidate artifact is
+`xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2` at
+`fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates-v2.json`.
 It contains exactly 60 privacy-safe synthetic cases with fixed opaque IDs
-`p1b3-decomposed-001` through `-060`. Each case contains only its ID and the
-original evidence plus one existing frozen extraction `expectedSchema`.
+`p1b3-decomposed-v2-001` through `-060`. Each case contains only its ID and
+the original evidence plus one existing frozen extraction `expectedSchema`.
 It contains no HUMAN class gold, extraction gold, authoring target,
 adjudication, prior model output, hard-gate expectation, or acceptance data.
 
-The cases are genuinely new and were checked against P1-B1, P1-B2a,
-P1-B2c, and P1-B2d evidence for exact duplication and close semantic
-paraphrase. Reuse of the abstract task boundaries is intentional; reuse or
-close paraphrase of prior evidence is forbidden.
+Normalized exact-duplicate protection against P1-B1, P1-B2a, P1-B2b,
+P1-B2c, P1-B2d, and superseded P1-B3 v1 evidence is programmatic. Semantic
+freshness and non-close-paraphrase are design-time manual-review
+requirements, not an automated similarity guarantee. Before HUMAN
+adjudication, the corrected v2 pool was manually reviewed against the prior
+P1-B1, P1-B2a, P1-B2c, and P1-B2d evidence. It uses materially varied
+constructions across explicit temporary/request-local scope, durable
+facts/preferences/goals, unresolved persistence or scope, unresolved
+referent or applicability, actual user state versus example/hypothetical/
+quoted material, bounded facts amid distracting context, and persistent
+defaults inside otherwise temporary context. Reuse of those abstract task
+boundaries is intentional; reuse or close paraphrase of prior evidence
+remains forbidden.
 
-The separate non-reviewer artifact
-`xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v1` at
-`fixtures/local-memory-inference-p1b3-decomposed-pipeline-authoring-key.json`
-maps the exact same 60 IDs to only `authoringTarget` and deterministic
+The replacement separate non-reviewer artifact is
+`xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v2` at
+`fixtures/local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v2.json`.
+It maps the exact same 60 v2 IDs to only `authoringTarget` and deterministic
 `extractionGold`. Every extraction gold value validates under its
 candidate's frozen `expectedSchema`. Its construction target is exactly 20
 `NO_WRITE`, 20 `WRITE_CANDIDATE`, and 20 `ESCALATE`; these are authoring
@@ -2459,9 +2501,9 @@ targets, not HUMAN gold quotas and not permission to force adjudication.
 #### Blind HUMAN primary review
 
 The dedicated primary protocol is `xion-p1b3-human-primary-v1`. The command
-`npm run review:memory-inference-p1b3-human-primary-gold` uses one frozen
-deterministic shuffle and displays only the evidence with exactly these
-choices:
+`npm run review:memory-inference-p1b3-human-primary-gold` loads only the
+replacement v2 candidate artifact, uses one frozen deterministic shuffle,
+and displays only the evidence with exactly these choices:
 
 ```text
 1. NO_WRITE
@@ -2510,9 +2552,15 @@ Each arm separately reports at least these safety counts:
     output;
 -   **false `NO_WRITE`:** a HUMAN-gold `WRITE_CANDIDATE` or `ESCALATE` case
     that ends through a schema-valid `NO_WRITE` decision;
--   **schema-valid extraction wrong-value:** any invoked Stage 3/frozen
-    extraction whose output validates under the selected schema but is not
-    exactly equal to `extractionGold`.
+-   **schema-valid extraction wrong-value:** a HUMAN-gold `WRITE_CANDIDATE`
+    case that reaches the arm's required Stage 3/frozen extraction, produces
+    output valid under the selected schema, but is not exactly equal to
+    `extractionGold`.
+
+Extraction reached through wrong control flow on a HUMAN-gold `NO_WRITE` or
+`ESCALATE` case is not counted under this specific extraction-wrong metric.
+Those cases remain end-to-end failures and are captured by the applicable
+classification or escalation counts.
 
 End-to-end success rate uses all 60 frozen cases as its denominator. Runtime
 failures, invalid output, wrong flow, and wrong extraction are unsuccessful;

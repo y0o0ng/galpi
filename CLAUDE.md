@@ -91,7 +91,7 @@
 ### 장기기억 연구
 
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
-- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`이고, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`로 닫혀 어떤 B2d prompt도 fresh validation으로 가지 않는다.** composition은 계속 막혀 있다. 다음 provisional 연구 방향은 별도 설계할 untuned ~1.7B ambiguity → write/no-write → extraction decomposition이며, task-specific training은 이 untuned decomposition이 명확히 유의미하게 개선될 때만 검토한다. successor는 아직 preregister/implement하지 않았고 production memory는 그대로이며 private natural replay는 `UNOPENED`다. 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
+- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`다.** P1-B3 decomposed small-model pipeline diagnostic은 preregister됐고 준비 범위는 교정된 fresh candidate pool과 blind HUMAN primary reviewer뿐이며 model runner/output은 없다. 교정 replacement fixture 검토 뒤 HUMAN review가 다음 단계이고 task-specific training은 frozen P1-B3 trigger 충족에만 조건부다. production memory는 그대로이고 private replay는 `UNOPENED`이며 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

@@ -1,0 +1,425 @@
+{
+  "name": "xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2",
+  "cases": [
+    {
+      "caseId": "p1b3-decomposed-v2-001",
+      "inputPayload": {
+        "evidence": "이 답변에서 날짜 형식을 확인하려고 ‘다시 볼 날: 2027-02-09’를 한 번 넣어 보자. 결과만 확인하고 이 대화가 끝나면 잊어도 된다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-002",
+      "inputPayload": {
+        "evidence": "악보를 읽을 때는 페이지 단위보다 두 마디씩 넘기는 `phrase` 보기가 편하다. 내 연습 기록도 이 방식을 기본으로 정리해 줘.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-003",
+      "inputPayload": {
+        "evidence": "지난 통화 요약 끝에 ‘한 주에 6 pages’가 적혀 있다. 이 수치가 내 독서 계획인지 편집자가 제안한 권장량인지는 기록되지 않았다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-004",
+      "inputPayload": {
+        "evidence": "장비 대여대장을 분기마다 확인하기로 했고, 다음 확인일은 2027-03-26이다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-005",
+      "inputPayload": {
+        "evidence": "지금 색각 비교를 보는 동안만 화면을 `protanopia-preview` 모드로 바꿔 줘. 선택값을 기억할 필요는 없다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-006",
+      "inputPayload": {
+        "evidence": "달력 메모에는 도서 기증함과 자료 폐기함이 함께 나오고, 이어서 ‘다음 점검은 2027-05-14’라고만 적혀 있다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-007",
+      "inputPayload": {
+        "evidence": "이번 견적의 페이지 배분을 계산하려고 한 주 몫을 17 pages로 가정하자. 실제 계획으로 정한 수치는 아니다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-008",
+      "inputPayload": {
+        "evidence": "편집 화면과 인쇄 샘플을 함께 보던 중 ‘preferred mode는 `linen`’이라고 적었지만, 어느 작업에 적용할 기본인지 남아 있지 않다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-009",
+      "inputPayload": {
+        "evidence": "도예 일지를 보니 나는 매주 두 번 공방에 간다. 새 연습 목표도 그대로 주 2 sessions로 잡는다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-010",
+      "inputPayload": {
+        "evidence": "인터뷰 원고 속 인용문에 ‘다시 확인할 날은 2027-07-01’이 나온다. 화자의 일정인지 내가 붙인 편집 메모인지 표식이 빠져 있다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-011",
+      "inputPayload": {
+        "evidence": "오늘 사진 한 장만 흑백으로 보정하더라도, 내 사진 정리 화면의 기본 preferred mode는 `filmstrip` 그대로 두자.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-012",
+      "inputPayload": {
+        "evidence": "보드게임 규칙을 설명하는 예시에서는 참가자가 매주 4 sessions를 채운다고 가정한다. 내 활동 목표와는 무관하다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-013",
+      "inputPayload": {
+        "evidence": "QA 체크를 위해 가짜 다음 검토일 `2027-08-19`를 폼에 넣었다가 제출하지 않고 지울 거야.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-014",
+      "inputPayload": {
+        "evidence": "어학 교환을 무리 없이 이어가려고 주 3 hours를 내 고정 목표로 잡았어.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-015",
+      "inputPayload": {
+        "evidence": "‘`speaker-notes`로 읽는 편이 낫다’는 문장이 리허설 직후 감상에 남아 있다. 그날의 평가인지 발표 자료를 볼 때의 계속되는 선호인지 알 수 없다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-016",
+      "inputPayload": {
+        "evidence": "계속 관리하는 자전거 정비 기록은 2027-10-23에 다시 검토한다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-017",
+      "inputPayload": {
+        "evidence": "주간 계획표의 수영 칸과 프랑스어 칸 아래에 합계 ‘5 sessions’가 적혀 있는데, 어느 활동의 목표인지 표시가 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-018",
+      "inputPayload": {
+        "evidence": "두 색상표를 고르는 지금 화면에서만 preferred mode를 `solarized`로 써 보자. 선택이 끝나면 원래 보기로 돌아간다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-019",
+      "inputPayload": {
+        "evidence": "이번 주는 출장이라 못 하겠지만 평소 수채화 스캔 목표는 한 주 12 items로 유지한다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-020",
+      "inputPayload": {
+        "evidence": "공유된 작업지에 ‘review: 2027-12-06’이 적혀 있지만, 그 줄이 내 보관함 규칙인지 팀 공용 체크리스트인지 구분 표시가 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-021",
+      "inputPayload": {
+        "evidence": "사용법 문서의 샘플 출력에는 ‘next review 2028-01-17’이 보인다. 설명용 값이지 내 일정은 아니다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-022",
+      "inputPayload": {
+        "evidence": "긴 글을 읽을 때 문단 사이 여백이 넓은 `open` 보기가 내 기본값이다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-023",
+      "inputPayload": {
+        "evidence": "코칭 대본에서 진행자가 ‘그럼 주 7 hours로 해볼까요?’라고 묻지만, 내가 동의했는지 보여 주는 다음 문장이 누락됐다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-024",
+      "inputPayload": {
+        "evidence": "내 평소 설정은 건드리지 말고, 첨부한 지도 범례를 설명할 때만 preferred mode를 `terrain-demo`로 적어 줘.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-025",
+      "inputPayload": {
+        "evidence": "계절마다 손보는 발효 기록의 다음 검토일을 2028-04-28로 달력에 확정해 두었다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-026",
+      "inputPayload": {
+        "evidence": "메모에는 전자잉크 단말과 프린트 미리보기가 함께 언급된 다음 ‘`paperlike`를 기본 preferred mode로’라고만 적혀 있다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-027",
+      "inputPayload": {
+        "evidence": "합창단 시즌이 끝날 때까지 파트 연습을 매주 4 sessions씩 하기로 정했다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-028",
+      "inputPayload": {
+        "evidence": "문장 파서 테스트에 필요한 날짜 리터럴은 2028-06-15다. 테스트 입력일 뿐 검토 약속은 아니다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-029",
+      "inputPayload": {
+        "evidence": "냉장고에 붙은 쪽지에는 ‘주 9 items’라고만 쓰여 있다. 이번 이사 정리 물량인지 반복해서 지킬 분류 목표인지 알 수 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-030",
+      "inputPayload": {
+        "evidence": "여행 사진은 위치순보다 촬영 시간순인 `chronicle` 보기가 훨씬 편해서, 내 앨범 기본으로 쓰고 있다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-031",
+      "inputPayload": {
+        "evidence": "23 items면 축이 어떻게 보이는지만 계산해 줘. 그 수치는 이번 그래프 예시의 weekly target이고 끝나면 버린다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-032",
+      "inputPayload": {
+        "evidence": "소설 초고의 주인공 일지에는 2028-09-30을 검토일로 잡았다고 쓰여 있다. 이 문장이 작가 자신의 계획도 겸하는지는 알 수 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-033",
+      "inputPayload": {
+        "evidence": "오늘은 재고표를 급히 훑기만 하지만, 정기 재검토 일정은 2028-11-11로 이미 고정되어 있다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-034",
+      "inputPayload": {
+        "evidence": "이 채팅에서 발음을 비교하는 동안 TTS preferred mode를 `whisper-test`로 써 보자. 다음 대화에는 이어지지 않는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-035",
+      "inputPayload": {
+        "evidence": "노트에 `margin-notes`가 preferred mode로 적혀 있다. 바로 위에는 빌린 태블릿 설정, 아래에는 내 독서 환경 정리가 이어져 어느 범위에 적용되는 값인지 알 수 없다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-036",
+      "inputPayload": {
+        "evidence": "집에 쌓인 필름을 천천히 정리하려고 주 6 pages 분량의 콘택트시트를 처리하는 계획을 세웠다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-037",
+      "inputPayload": {
+        "evidence": "2029-02-08에 다시 본다는 날짜는 분명하지만, 한 번 빌린 장비의 반환 전 점검인지 계속 관리할 장비대장의 정기 검토인지 문맥이 끊겼다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-038",
+      "inputPayload": {
+        "evidence": "올해 계획표를 만들자는 얘기가 아니라, 방금 붙인 SQL 예시가 주 10 hours를 반환하는지만 확인해 줘.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-039",
+      "inputPayload": {
+        "evidence": "레시피 단위는 계량컵보다 gram 중심의 `metric-only` 보기를 내 기본으로 삼는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-040",
+      "inputPayload": {
+        "evidence": "포스터 시안의 타이포 균형을 보려고 작은 글씨로 2029-04-21을 검토일 자리에 넣었다. 인쇄 전에 지운다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-041",
+      "inputPayload": {
+        "evidence": "가족 달력과 동네 모임 계획을 한 장에 옮긴 메모에 ‘매주 3 sessions’가 적혀 있다. 어느 계획의 목표인지는 표시가 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-042",
+      "inputPayload": {
+        "evidence": "반려식물 성장 기록을 계속 남기며, 다음 전체 검토는 2029-07-07에 하기로 했다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-043",
+      "inputPayload": {
+        "evidence": "접근성 가이드의 예시 JSON에는 `preferredMode: large-pointer`가 들어 있다. 내 환경 설정을 말하는 값은 아니다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-044",
+      "inputPayload": {
+        "evidence": "상자를 정리하다가 내가 ‘보기는 `catalog`가 낫네’라고 했지만, 지금 찾는 상자에만 해당하는 감상인지 보관 목록 전체의 선호인지 이어서 말하지 않았다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-045",
+      "inputPayload": {
+        "evidence": "지역 조류 관찰 기록은 장기적으로 한 주 8 hours를 들여 정리할 생각이다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-046",
+      "inputPayload": {
+        "evidence": "지금 예약 API 오류를 재현하려면 reviewDate를 2029-10-16으로 보내 봐. 재현 요청 외에는 쓰지 않는다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-047",
+      "inputPayload": {
+        "evidence": "이번 원고에는 예외로 각주를 숨겨도, 내가 논문을 읽는 기본 preferred mode는 `annotated`다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-048",
+      "inputPayload": {
+        "evidence": "서랍 목록에는 보증서와 사용 설명서가 이어지고 마지막에 ‘2030-01-29 재검토’라고 적혀 있다. 날짜가 어느 묶음에 붙는지 알 수 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-049",
+      "inputPayload": {
+        "evidence": "예산 계산 예제로만 매주 15 items를 처리한다고 놓자. 실제 작업량을 정한 건 아니다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-050",
+      "inputPayload": {
+        "evidence": "해마다 갱신하는 비상용품 목록의 다음 검토 날짜는 2030-03-18로 정해 두었다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-051",
+      "inputPayload": {
+        "evidence": "프롬프트 예시 안에 `preferredMode = sparse`가 있고 바로 아래에는 실제 설정 메모가 이어진다. 구분선이 빠져 이 값이 어느 부분에 속하는지 모르겠다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-052",
+      "inputPayload": {
+        "evidence": "이 한 번의 OCR 결과를 눈으로 대조할 때만 글자 보기를 `glyph-grid`로 바꾼다. 작업을 마치면 닫는다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-053",
+      "inputPayload": {
+        "evidence": "캘린더에는 이번 달 네 주 모두 4 hours가 반복 입력되어 있다. 한 달짜리 시험 운영인지 그 뒤에도 이어갈 주간 목표인지는 설명이 없다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-054",
+      "inputPayload": {
+        "evidence": "오래된 엽서 색인을 끝내기 위해 매주 20 items씩 등록하는 루틴을 시작했다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-055",
+      "inputPayload": {
+        "evidence": "달력 UI 교육 슬라이드에는 검토일 예시로 2030-06-24가 쓰였다. 내 일정에 추가할 날짜는 아니다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-056",
+      "inputPayload": {
+        "evidence": "기록에 2030-08-12를 다시 확인할 날로 적었는데, 이번 여행 준비 체크에만 필요한 날짜인지 이후에도 관리할 여권 사본 기록의 검토일인지 설명이 없다.",
+        "expectedSchema": "p1b1_date_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-057",
+      "inputPayload": {
+        "evidence": "박물관 도록을 읽을 때는 작품 사진이 먼저 나오는 `image-first` 배열을 늘 선택한다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-058",
+      "inputPayload": {
+        "evidence": "면접 과제의 샘플 답안은 한 주 목표를 11 pages라고 두고 계산한다. 내 독서량으로 저장하지 않는다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-059",
+      "inputPayload": {
+        "evidence": "‘preferred mode는 `dialogue`’라는 설정 줄이 낭독 프로필 설명과 팟캐스트 대본 예시 사이에 끼어 있다. 머리글이 빠져 어느 블록의 값인지 알 수 없다.",
+        "expectedSchema": "p1b1_text_scalar_v1"
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-060",
+      "inputPayload": {
+        "evidence": "한 번짜리 창고 시뮬레이션에서 작업자당 weekly target을 30 items로 놓고 병목만 계산한다. 운영 목표로 채택하지 않는다.",
+        "expectedSchema": "p1b1_quantity_unit_v1"
+      }
+    }
+  ]
+}
