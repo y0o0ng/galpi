@@ -3596,6 +3596,116 @@ classify:0001193125-19-296568/d837035dex31.htm   governing 후보 분류 실패 
 
 ---
 
+## 10.26 5A-2 — Certificate of Elimination 문서 분류 — 2026-09-04
+
+시작 `main` = `ba034a4d23c3c7d5204f3044cbc4ebe7ef6de87d`(설계 시점 `01c321b`의 한 커밋
+뒤이고 그 커밋은 메모리 연구 파일만 건드린다). **어느 packet도 승격하지 않았고
+manifest·production JSONL을 읽지도 쓰지도 않았다.**
+
+### 정확히 무엇을 더했나
+
+FOXA의 남은 탐색 실패 하나가 목표다.
+
+```text
+classify:0001193125-19-296568/d837035dex31.htm
+```
+
+실제 SEC Exhibit 3.1은 `FOX CORPORATION / CERTIFICATE OF ELIMINATION / OF THE /
+SERIES A JUNIOR PARTICIPATING PREFERRED STOCK`이다. **진짜 governing instrument인데
+열거된 family에 그 이름이 없어서** 분류에 실패하고 있었다.
+
+`AMENDMENT_FAMILIES`에 열거 항목 하나만 붙였다.
+
+```python
+("CERTIFICATE_OF_ELIMINATION", r"certificate\s+of\s+elimination"),
+```
+
+```text
+CERTIFICATE_OF_ELIMINATION
+    ∈ AMENDMENT_CLASSIFICATIONS  ∈ GOVERNING_CLASSIFICATIONS
+    ∉ SNAPSHOT_CLASSIFICATIONS
+```
+
+넓은 `ELIMINATION` family도, 두 번째 분류기도, elimination finding 문법도, 우선주
+lifecycle parsing도, 발행사·티커 예외도 만들지 않았다. 기존 분류·탐색 closure 논리를
+그대로 재사용한다.
+
+**분류는 문서가 무엇인지만 말한다.** 관측된 FOXA 문서는 우선주 시리즈를 없애고 Class
+A/B 보통주를 명시로 논하지 않는다 — 그것은 A/B에 영향이 없다는 증명이 아니다. B2
+fail-close(`대상 class 이름의 부재는 영향 없음의 증명이 아니다`)는 그대로이고, 인식은
+**탐색 열거**를 닫을 뿐 A/B 구간을 만들지 않는다. operative date 규칙(O2)·Item 5.03
+증명 권한·B1/B2·P2·탄생/종료 문법은 한 줄도 바꾸지 않았다.
+
+### 로컬 Python 실측 (2026-09-04)
+
+| 모듈 | 이전 | 이번 |
+|---|---|---|
+| `test_qv_identity_legal_evidence` | 169 | **175 OK** |
+| **전체 trading suite** | 1,910 | **1,916 OK** |
+
+새 테스트 6개를 구현 **전에** 넣었고 그중 5개가 먼저 실패하는 것을 확인했다(분류 ·
+탐색 closure · snapshot 승격 거부 · 보통주 A/B finding 0건 · operative MISSING 유지).
+여섯 번째(`SNAPSHOT_CLASSIFICATIONS`에 없다)는 회귀 방지용 음성 통제라 전후 모두
+통과한다. 기존 분류 테스트(Certificate/Articles of Amendment · restated snapshot ·
+bylaws)는 한 줄도 바꾸지 않았다.
+
+**GitHub CI는 Node만 돌리므로 이 숫자를 재현하지 않는다.**
+
+### 실제 SEC read-only smoke (FOXA 단독, 2026-09-04)
+
+`--symbols FOXA --historical --legal-evidence`, SEC 호출 258(10.25와 같다).
+**승격하지 않았고 manifest·production JSONL을 건드리지 않았다.**
+
+| | 이전(10.25) | 이번 |
+|---|---|---|
+| governing 문서 | 9 | 9 |
+| 분류 실패 | **1** | **0** |
+| `search_status` | **INCOMPLETE** | **COMPLETE** |
+| Class A 정의 findings | 2 | 2 |
+| Class B 정의 findings | 2 | 2 |
+| 탄생 findings | 0 | 0 |
+| operative R/M/A | 5/4/0 | 5/4/0 |
+| class 구간 | 0/2 | 0/2 |
+| 최종 판정 | REVIEW_REQUIRED | REVIEW_REQUIRED |
+
+분류 결과는 `AMENDED_AND_RESTATED_CERTIFICATE` 3 · `BYLAWS` 5 ·
+`CERTIFICATE_OF_ELIMINATION` 1이고 `UNCLASSIFIED`는 0건이다.
+
+```text
+0001193125-19-296568/d837035dex31.htm
+  CERTIFICATE_OF_ELIMINATION   legal_operative = MISSING
+```
+
+**operative 5/4/0은 그대로다.** elimination 문서는 전에도 지금도 `MISSING`이다 —
+분류만 바뀌었고 O2는 그대로다. 서명일·SEC 수리 시각·8-K 서술("델라웨어에 제출했고
+제출 즉시 발효한다")로 되돌아가지 않았다. 그것을 근거로 쓰는 것은 별도의 O2/증명 권한
+결정이고 여기서 하지 않았다.
+
+**FOXA가 legacy가 아닌 첫 search-complete pilot 발행사다**(`accessions=104` ·
+`outside_horizon=548` · `documents=15` · `failures=0`). 이제 탄생 recall과 O2가
+불완전 탐색에 가려지지 않은 채로 측정된다.
+
+### 남아 있는 차단 요인 (이번에 고치지 않았다)
+
+```text
+명시 탄생 행위 = 0건          -> Class A/B 둘 다 UNRESOLVED (정의 2건씩만 있다)
+restated certificate 3건의 operative date = MISSING
+```
+
+`CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT` · `CLASS_INTERVAL_NOT_EXPLICIT`가 그대로 남아
+판정은 `REVIEW_REQUIRED`다. **결과를 보고 탄생·O2 문법을 넓히지 않았다.**
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity JSONL · `qv_manifest.prose_key` · `qv-class-id-v1` ·
+  provenance 자연키 · SEC 수리 의미론을 바꾸지 않았다.
+- 탄생·종료·class 정의 문법 · snapshot 분류 · O2 · P2 · B1/B2 · Exhibit 3 권한 ·
+  Item 5.03을 바꾸지 않았다.
+- legacy flat layout을 열지 않았다.
+- 어떤 packet도 승격하지 않았고 5A-3를 만들지 않았다.
+
+---
+
 ## 11. 결과
 
 

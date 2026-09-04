@@ -195,6 +195,12 @@ SNAPSHOT_FAMILIES = (
 AMENDMENT_FAMILIES = (
     ("CERTIFICATE_OF_AMENDMENT", r"certificate\s+of\s+amendment"),
     ("ARTICLES_OF_AMENDMENT", r"articles\s+of\s+amendment"),
+    # 이미 지정된 우선주 시리즈를 없애는 실제 governing instrument다(실측: FOXA
+    # `0001193125-19-296568/d837035dex31.htm` Exhibit 3.1). **amendment-class이지
+    # complete snapshot이 아니다** — current-in-effect 상태를 스스로 닫지 못한다.
+    # 분류는 문서가 무엇인지만 말한다. 다른 class를 명시로 논한다는 이유로 대상
+    # 보통주 class에 영향이 없다고 읽지 않는다(B2 fail-close 그대로).
+    ("CERTIFICATE_OF_ELIMINATION", r"certificate\s+of\s+elimination"),
 )
 # governing instrument가 **아니라고** 분류되는 것들. 인식됐으므로 미분류가 아니다.
 NON_GOVERNING_FAMILIES = (

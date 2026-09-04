@@ -771,6 +771,36 @@ amendment를 나중에 말하는 서술은 뒤가 조용히 사라진다. 그래
 **전부**를 `classification_families`로 함께 남긴다. 어느 쪽도 governing instrument
 증명이 되지 않지만 무엇을 봤는지는 receipt에 남아야 한다.
 
+##### 열거된 문서 분류 family
+
+**분류는 문서가 무엇인지만 말한다.** 열거된 셋뿐이고 fuzzy 분류기를 만들지 않는다.
+
+```text
+snapshot(완전 current-in-effect)  AMENDED_AND_RESTATED_CERTIFICATE
+                                  AMENDED_AND_RESTATED_ARTICLES
+                                  RESTATED_CERTIFICATE
+                                  RESTATED_ARTICLES
+amendment-class(governing이지만    CERTIFICATE_OF_AMENDMENT
+  스스로 현재를 닫지 못한다)        ARTICLES_OF_AMENDMENT
+                                  CERTIFICATE_OF_ELIMINATION
+non-governing(인식됐으므로 미분류가 아니다)   BYLAWS
+```
+
+`Certificate of Elimination`은 이미 지정된 우선주 시리즈를 없애는 **실제 governing
+instrument**다(실측: FOXA `0001193125-19-296568/d837035dex31.htm` Exhibit 3.1). 문언
+`certificate of elimination` 하나로만 인식하고 넓은 `ELIMINATION` family를 만들지
+않는다. 세 가지가 그 자리에서 함께 고정된다.
+
+- **snapshot이 아니다.** amendment-class이므로 `CURRENT_GOVERNING_SNAPSHOT`이 될 수
+  없고, 가장 늦은 완전 snapshot보다 법적으로 뒤이면 그 snapshot이 현재를 닫지 못하게
+  막는다(위 B의 뒷부분 그대로).
+- **분류만으로 대상 class 영향이 증명되지 않는다.** 그 문서가 다른 class를 명시로
+  논한다는 사실은 대상 보통주 class에 영향이 없다는 증명이 아니다 — B2 fail-close
+  그대로다. 인식은 **탐색 열거**를 닫을 뿐 A/B 구간을 만들지 않는다.
+- **새 semantic finding family를 만들지 않는다.** elimination 문법도 우선주 lifecycle
+  parsing도 없고, 그 문서의 operative date는 동결된 O2 규칙 그대로다(만족하지 못하면
+  `MISSING`으로 남고 서명일·수리 시각·제출 서술로 되돌아가지 않는다).
+
 ##### 탐색 closure — COMPLETE / INCOMPLETE
 
 `COMPLETE`는 선언된 지평이 요구하는 모든 accession/문서를 실제로 열거하고 모든

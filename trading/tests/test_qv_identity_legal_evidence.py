@@ -27,14 +27,17 @@ sys.path.insert(0, str(TRADING_ROOT))
 from backtest import qv_evidence  # noqa: E402
 from backtest.qv_events import html_blocks  # noqa: E402
 from backtest.qv_identity_legal_evidence import (  # noqa: E402
+    AMENDMENT_CLASSIFICATIONS,
     CLASS_BIRTH_ACTION,
     CLASS_BIRTH_EFFECTIVE_DATE,
     CLASS_TERMINATION_EFFECTIVE_DATE,
     COMPLETE,
     CURRENT_GOVERNING_SNAPSHOT,
     GOVERNING_CLASS_DEFINITION,
+    GOVERNING_CLASSIFICATIONS,
     INCOMPLETE,
     PROSE_ALIAS_LIFETIME,
+    SNAPSHOT_CLASSIFICATIONS,
     UNRESOLVED,
     QVLegalEvidenceError,
     associate_class_designation,
@@ -132,6 +135,38 @@ def amendment(*, paragraphs=(), date=None) -> bytes:
     if date:
         body.append(effective(date))
     return html(*body)
+
+
+#: 실 FOXA Exhibit 3.1 `d837035dex31.htm`의 제목 모양.
+ELIMINATED_SERIES = "Series A Junior Participating Preferred Stock"
+
+
+def elimination(*, series=ELIMINATED_SERIES, paragraphs=(), date=None) -> bytes:
+    """우선주 시리즈를 없애는 Certificate of Elimination — **amendment-class다.**
+
+    governing instrument이지만 complete snapshot이 아니고, 다른 class를 논한다는
+    이유로 보통주 A/B에 대한 어떤 사실도 만들지 않는다.
+    """
+    body = [
+        "ACME INC.",
+        "CERTIFICATE OF ELIMINATION",
+        "OF THE",
+        series.upper(),
+    ]
+    body.extend(paragraphs)
+    if date:
+        body.append(effective(date))
+    return html(*body)
+
+
+def ab_cover_facts():
+    """A·B 둘 다 표지 제목이 있는 dual-class 표지."""
+    return cover_facts(title=CLASS_A) + [
+        {"concept": "Security12bTitle", "value": CLASS_B,
+         "member": "CommonClassBMember", "context_id": "b"},
+        {"concept": "EntityCommonStockSharesOutstanding", "value": "500",
+         "member": "CommonClassBMember", "context_id": "b", "numeric": True},
+    ]
 
 
 # ── 표지 fixture ─────────────────────────────────────────────────────────────
@@ -351,6 +386,93 @@ class ClassificationTest(unittest.TestCase):
                               name="charter.htm")]
         _payload, evidence = BaseFixture().assertClassEvidence(filings)
         self.assertEqual(evidence, {})
+
+    def test_a_certificate_of_elimination_is_an_amendment_class_document(self):
+        """실 FOXA Exhibit 3.1 제목. governing이지만 complete snapshot이 아니다."""
+        self.assertEqual(
+            classify_document((
+                "FOX CORPORATION",
+                "CERTIFICATE OF ELIMINATION",
+                "OF THE",
+                "SERIES A JUNIOR PARTICIPATING PREFERRED STOCK",
+            )),
+            "CERTIFICATE_OF_ELIMINATION",
+        )
+        self.assertIn("CERTIFICATE_OF_ELIMINATION", AMENDMENT_CLASSIFICATIONS)
+        self.assertIn("CERTIFICATE_OF_ELIMINATION", GOVERNING_CLASSIFICATIONS)
+
+    def test_a_certificate_of_elimination_is_never_a_snapshot(self):
+        self.assertNotIn("CERTIFICATE_OF_ELIMINATION", SNAPSHOT_CLASSIFICATIONS)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Certificate of Elimination — 문서 분류일 뿐 대상 class 사실이 아니다
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class CertificateOfEliminationTest(BaseFixture):
+    """인식은 **탐색 열거**를 닫을 뿐 A/B 구간을 만들어내지 않는다.
+
+    B2 fail-close 그대로다 — 대상 class 이름이 없다는 것은 영향이 없다는 증명이 아니다.
+    """
+
+    def elimination_document(self, payload, accession):
+        return next(
+            item for item in payload["documents"]
+            if item["accession"] == accession and item["document_role"] == "EXHIBIT"
+        )
+
+    def test_it_closes_search_instead_of_failing_classification(self):
+        payload, _evidence = self.assertClassEvidence(
+            [charter_8k("0000000042-19-000001", "2019-11-05", elimination())]
+        )
+        self.assertEqual(payload["failures"], [])
+        self.assertEqual(payload["search_status"], COMPLETE)
+        self.assertEqual(
+            self.elimination_document(payload, "0000000042-19-000001")["classification"],
+            "CERTIFICATE_OF_ELIMINATION",
+        )
+
+    def test_it_never_becomes_the_current_governing_snapshot(self):
+        """완전 snapshot보다 법적으로 뒤여도 snapshot으로 승격되지 않는다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-19-000001", "2019-11-05",
+                       elimination(date="November 1, 2019")),
+        ])
+        self.assertEqual(payload["search_status"], COMPLETE)
+        entry = evidence_for(payload)
+        self.assertIsNone(entry["snapshot_accession"])
+        self.assertEqual(evidence, {})
+        self.assertIn("완전 governing snapshot보다 법적으로 뒤인", entry["notes"][0])
+
+    def test_a_preferred_elimination_creates_no_common_class_findings(self):
+        """우선주를 없애는 문서가 보통주 A/B의 정의·탄생·종료를 만들지 않는다."""
+        payload, evidence = self.assertClassEvidence(
+            [charter_8k("0000000042-19-000001", "2019-11-05",
+                        elimination(date="November 1, 2019"))],
+            ab_cover_facts(),
+        )
+        self.assertEqual(payload["search_status"], COMPLETE)
+        for member in ("us-gaap:CommonClassAMember", "us-gaap:CommonClassBMember"):
+            with self.subTest(member=member):
+                entry = evidence_for(payload, member)
+                self.assertEqual(entry["findings"], [])
+                self.assertIsNone(entry["birth_date"])
+                self.assertIsNone(entry["termination_date"])
+                self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertEqual(evidence, {})
+
+    def test_an_unresolved_operative_date_stays_missing(self):
+        """서명일·제출 서술로 되돌아가지 않는다. 동결된 O2 그대로다."""
+        payload, _evidence = self.assertClassEvidence(
+            [charter_8k("0000000042-19-000001", "2019-11-05",
+                        elimination(paragraphs=(UPON_FILING, SIGNED)))]
+        )
+        document = self.elimination_document(payload, "0000000042-19-000001")
+        self.assertEqual(document["classification"], "CERTIFICATE_OF_ELIMINATION")
+        self.assertEqual(document["legal_operative_status"], "MISSING")
+        self.assertIsNone(document["legal_operative_date"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
