@@ -18,8 +18,8 @@
 
   function displayModelName(modelId) {
     return String(modelId || '')
-      .replace(/^gpt-/i, 'GPT-')
-      .replace(/-(sol|terra|luna)$/i, (_, tier) => ` ${tier[0].toUpperCase()}${tier.slice(1)}`);
+      .replace(/-([a-z][a-z0-9]*)/gi, (_, segment) => ` ${segment[0].toUpperCase()}${segment.slice(1)}`)
+      .replace(/^gpt(?=[- ])/i, 'GPT');
   }
 
   function close({ restoreFocus = false } = {}) {

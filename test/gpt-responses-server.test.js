@@ -10,6 +10,8 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const Database = require('better-sqlite3');
+const { createModelCatalogStore } = require('../lib/model-catalog-store');
+const { buildOpenAIModelCatalogPayload } = require('../lib/openai-model-catalog');
 
 const ROOT = path.resolve(__dirname, '..');
 const API_TOKEN = 'gpt-responses-test-token';
@@ -533,5 +535,40 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   const expiredHistory = await api(url, '/api/sessions/shared-main');
   const expiredMessage = expiredHistory.body.messages.find(message => message.content === '첨부 연결 턴');
   assert.equal(expiredMessage.attachments[0].expired, true);
+
+  // Exercise the same exact unknown selection through real HTTP chat and title calls.
+  const payload = await buildOpenAIModelCatalogPayload({
+    models: [{ id: 'gpt-6-astra' }, { id: 'gpt-5.6-terra' }],
+    probeModel: async () => {}, probeImageInput: async () => {},
+  });
+  createModelCatalogStore(db).saveSuccess('openai_api', payload, { payloadVersion: 2 });
+  const exact = await api(url, '/api/settings/chat-model', {
+    method: 'PUT', headers: { 'If-Match': '"1"' },
+    body: JSON.stringify({ selection: 'gpt-6-astra' }),
+  });
+  assert.equal(exact.response.status, 200);
+  const exactChat = await api(url, '/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message: '수동 모델 검증', model: 'gpt', sessionId: 'shared-main' }),
+  });
+  assert.equal(exactChat.response.status, 200);
+  assert.equal(exactChat.body.modelId, 'gpt-6-astra');
+  assert.equal(responseRequests.at(-1).model, 'gpt-6-astra');
+  // The earlier retrieval fixture deliberately has no writable QA-LOG; create a new topic here.
+  db.prepare('UPDATE notes SET embedding = NULL').run();
+  const beforeTitle = responseRequests.length;
+  const saved = await api(url, '/api/save-note', {
+    method: 'POST',
+    body: JSON.stringify({ question: '독립적인 제목 검증', answer: '수동 모델로 제목을 만든다.',
+      model: 'gpt', sessionId: 'metadata-test' }),
+  });
+  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+  const titleCalls = responseRequests.slice(beforeTitle);
+  assert.ok(titleCalls.length > 0);
+  for (const request of titleCalls) {
+    assert.equal(request.model, 'gpt-6-astra');
+    assert.deepEqual(request.reasoning, { effort: 'medium', context: 'current_turn' });
+    assert.equal(request.max_output_tokens, 8192);
+  }
   db.close();
 });

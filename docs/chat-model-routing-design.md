@@ -162,22 +162,22 @@ fresh + 다음 갱신 실패
 discovered
   → probing
   → compatible
-  → active
+  → exact manual option
+  → known auto-policy role에 해당할 때만 active 후보
 
-probe 실패
-  → rejected
+durable probe 실패 → rejected
+transient probe 실패 → untested (다음 refresh에서 재검증)
 ```
 
-`자동` 후보는 다음을 모두 만족해야 한다.
+Discovery와 auto-routing policy는 별도 판정이다. Models API가 반환한 ID가 `gpt-`로 시작하면 후보로 삼되, 끝의 날짜 snapshot suffix(`-YYYY-MM-DD`)와 하이픈으로 구분된 `preview` lifecycle segment는 제외한다. Fine-tuned ID 등 non-`gpt-*` surface로 넓히지 않는다. stable specialized alias를 이름 denylist로 제외하거나 새 family를 allowlist에 추가하지 않는다. Galpi Responses runtime과의 호환성은 capability probe가 판단한다.
 
-1. 현재 API 계정의 Models 목록에 존재
-2. 안정판 GPT 대화 모델 family로 분류 가능
-3. preview·날짜 snapshot·embedding·audio·transcription·realtime·image generation 모델이 아님
-4. 목표 계층과 일치
-5. 현재 `probe_version`의 Responses 계약 검증 통과
-6. 기존 active 후보보다 공식 family 순서상 최신
+모든 discovery candidate를 검증한다. 같은 `OPENAI_PROBE_VERSION`과 `probeReasoningEffort`에서 이미 durable `compatible` / `rejected`인 결과는 재사용하고, 신규·`untested` 모델은 probe한다. 일시적 실패는 그 자리에서 한 번 재시도하며 계속 실패하면 `untested`로 남긴다. Models 조회 등 refresh 자체가 실패하면 last-known-good payload를 보존한다.
 
-초기 family parser는 `gpt-<major>.<minor>-sol|terra|luna`처럼 역할이 이름에 명시된 안정판만 자동 분류한다. 같은 naming 규칙의 5.7·5.8은 코드 배포 없이 후보가 될 수 있지만, OpenAI가 명명 체계를 바꾸거나 역할이 불명확한 새 family를 내면 자동 노출하지 않는다. 이 경우 공식 문서를 확인해 data-only routing policy를 갱신한 뒤 probe한다. 자동 최신보다 오분류 방지가 우선이다.
+Manual availability의 정본은 text `probeStatus === 'compatible'`이다. `/api/models/chat`은 `auto:balanced`를 첫 option으로 유지하고, 그 뒤에 모든 compatible stable GPT candidate를 exact option으로 노출한다. 목록은 provider `created` 내림차순(없으면 0), 동률은 model ID 순으로 정렬한다. 라벨은 family 이름을 일반 형식으로 표시하며(`gpt-6-astra` → `GPT-6 Astra`), unknown 모델 설명은 `검증된 GPT 모델`이다. 이름·생성 시각으로 품질·가격·속도를 추론하지 않는다.
+
+Known auto-policy classifier만 `gpt-<major>.<minor>-sol|terra|luna`를 해석한다. Sol → `quality`, Terra → `balanced`, Luna → `fast`이며 각 role에서 major/minor 기준 최신 compatible 모델을 `active`로 선택한다. `activeImage`는 text와 image가 모두 compatible인 known model 중 같은 순서로 선택한다. provider `created`는 자동 정책에 사용하지 않는다. `gpt-6-astra` 같은 unknown stable family는 probe를 통과하면 코드 변경 없이 **manual-only**로 사용하며 role은 `null`이다. 따라서 새 unknown family discovery가 `auto:balanced`를 암묵적으로 바꾸지 않는다. 자동의 text turn은 `active.balanced`, image turn은 `activeImage.balanced`를 계속 사용한다.
+
+Exact 선택은 현재 catalog에 없거나 text compatibility가 없으면 `MODEL_UNAVAILABLE`, image turn에 image compatibility가 없으면 `MODEL_IMAGE_UNSUPPORTED`로 실패한다. 다른 모델로 조용히 전환하지 않으며, 선택은 다음 response부터 적용하고 요청 시작 시 실제 model snapshot을 고정한다.
 
 호환성 probe는 실제 사용자 질문·대화·첨부를 사용하지 않는다.
 
@@ -187,9 +187,12 @@ probe 실패
 - 정확한 `call_id` 연결
 - 함수 결과 뒤 최종 텍스트 응답
 - `store: false`
-- 짧은 timeout·출력·비용 상한
+- 실제 채팅의 `GPT_CHAT_REASONING_EFFORT`(기본 `medium`)와 `reasoning.context: current_turn`
+- 출력 상한: `none`이면 기존 128토큰, 추론을 사용하면 메인 채팅과 같은 8,192토큰(추론 토큰 포함)
 
-문자열상 버전이 커 보인다는 이유만으로 승격하지 않는다. 새 후보가 실패하면 현재 active와 last-known-good를 유지한다.
+이미지 probe는 text-compatible 모델에만 수행하고 별도 image 상태로 저장한다. 이미지 거부가 일반 text chat을 막지 않는다. 제목·요약 생성도 선택 모델 snapshot의 effort를 사용하며, 추론을 쓰면 기존 짧은 출력 예산에 최소 8,192토큰 상한을 적용한다. 이 상한은 답변 길이 목표가 아니며 기존 제목·요약 프롬프트와 결과 검증은 유지한다.
+
+**2026-09-05 설계 보완:** [공식 GPT-6 Astra 문서](https://developers.openai.com/api/docs/guides/latest-model#gpt-6-astra-whats-new)는 `none` effort 미지원을 명시한다. 따라서 discovery 분리와 함께 기존 probe·제목·요약의 `none` 고정을 제거한다. family별 예외나 effort UI는 추가하지 않는다. OpenAI catalog payload는 `schemaVersion` / `OPENAI_CATALOG_PAYLOAD_VERSION` **1 → 2**, 실제 probe 요청 계약이 바뀌므로 `OPENAI_PROBE_VERSION`은 **2 → 3**으로 올린다. DB migration 없이 cached v1 payload는 refresh 전까지 읽을 수 있고, v2 probe 결과는 새 계약으로 한 번 재검증한다. 이후 같은 probe version·effort의 durable 결과는 재사용하며 effort 변경 시 다시 검증한다.
 
 ---
 

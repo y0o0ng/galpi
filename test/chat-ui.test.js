@@ -4,10 +4,22 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const css = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8');
 const app = fs.readFileSync(path.join(ROOT, 'public/app.js'), 'utf8');
+
+test('model picker formats unknown and known GPT families without tier-specific names', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'public/model-picker.js'), 'utf8');
+  const helper = source.slice(source.indexOf('function displayModelName('), source.indexOf('function close('));
+  const display = vm.runInNewContext(`(${helper.trim()})`);
+  for (const [id, label] of [
+    ['gpt-6-astra', 'GPT-6 Astra'], ['gpt-5.6-sol', 'GPT-5.6 Sol'],
+    ['gpt-5.6-terra', 'GPT-5.6 Terra'], ['gpt-5.6-luna', 'GPT-5.6 Luna'],
+    ['gpt-9-future-family', 'GPT-9 Future Family'],
+  ]) assert.equal(display(id), label);
+});
 
 // 미디어 쿼리는 중첩 중괄호를 담으므로 괄호를 세서 잘라낸다.
 function blockAt(text, start) {

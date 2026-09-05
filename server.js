@@ -2528,8 +2528,9 @@ async function generateSmallGptText(prompt, maxOutputTokens) {
     model: snapshot.modelId,
     input: [{ role: 'user', content: prompt }],
     store: false,
-    max_output_tokens: maxOutputTokens,
-    reasoning: { effort: 'none', context: 'current_turn' },
+    // Reasoning consumes output tokens too, even when the requested title is short.
+    max_output_tokens: snapshot.reasoningEffort === 'none' ? maxOutputTokens : Math.max(maxOutputTokens, 8192),
+    reasoning: { effort: snapshot.reasoningEffort, context: 'current_turn' },
   });
   if (response?.status && response.status !== 'completed') {
     throw new Error(`메타데이터 응답이 완료되지 않았습니다: ${response.status}`);
@@ -3773,6 +3774,7 @@ async function refreshOpenAICatalog() {
   return refreshOpenAIModelCatalog({
     store: modelCatalogs,
     client: openai,
+    reasoningEffort: GPT_CHAT_REASONING_EFFORT,
   });
 }
 

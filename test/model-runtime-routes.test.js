@@ -8,6 +8,7 @@ const { runDatabaseMigrations } = require('../lib/database-migrations');
 const { createModelCatalogStore } = require('../lib/model-catalog-store');
 const { registerModelRuntimeRoutes } = require('../lib/model-runtime-routes');
 const { createModelSettingsStore } = require('../lib/model-settings');
+const { buildOpenAIModelCatalogPayload, resolveChatModelSelection } = require('../lib/openai-model-catalog');
 
 function createDatabase() {
   const db = new Database(':memory:');
@@ -147,7 +148,7 @@ function setup() {
     refreshOpenAI: async () => catalogs.get('openai_api'),
     refreshCodex: async () => catalogs.get('codex_subscription'),
   });
-  return { app, db, settings };
+  return { app, db, settings, catalogs };
 }
 
 test('chat model setting validates the catalog and applies from the next response', () => {
@@ -202,4 +203,45 @@ test('Codex settings update atomically and reject a stale browser', () => {
   assert.equal(settings.get('codex.general_model').value, 'gpt-5.6-sol');
   assert.equal(settings.get('codex.deep_model').value, 'gpt-5.6-sol');
   db.close();
+});
+
+test('chat API offers compatible unknown exact models and fails closed after removal', async () => {
+  const { app, db, settings, catalogs } = setup();
+  try {
+    const payload = await buildOpenAIModelCatalogPayload({
+      models: [{ id: 'gpt-6-astra', created: 100 }, { id: 'gpt-5.6-terra', created: 1 },
+        { id: 'gpt-future-rejected' }, { id: 'gpt-future-untested' }],
+      probeModel: async id => {
+        if (id === 'gpt-future-rejected') throw Object.assign(new Error('unsupported'), { status: 400 });
+        if (id === 'gpt-future-untested') throw Object.assign(new Error('temporary'), { status: 503 });
+      },
+      probeImageInput: async () => {},
+    });
+    catalogs.saveSuccess('openai_api', payload, { payloadVersion: 2 });
+    const get = app.routes.get('GET /api/models/chat');
+    const put = app.routes.get('PUT /api/settings/chat-model');
+    const catalog = invoke(get);
+    assert.equal(catalog.body.resolvedModelId, 'gpt-5.6-terra');
+    assert.deepEqual(catalog.body.options.map(option => option.value),
+      ['auto:balanced', 'gpt-6-astra', 'gpt-5.6-terra']);
+    assert.equal(catalog.body.options[1].label, 'GPT-6 Astra');
+    const selected = invoke(put, {
+      headers: { 'if-match': '"1"' }, body: { selection: 'gpt-6-astra' },
+    });
+    assert.equal(selected.status, 200);
+    assert.equal(selected.body.resolvedModelId, 'gpt-6-astra');
+    assert.equal(selected.body.appliesFrom, 'next_response');
+    catalogs.saveSuccess('openai_api', {
+      ...payload, models: payload.models.filter(model => model.id !== 'gpt-6-astra'),
+    }, { payloadVersion: 2 });
+    assert.equal(invoke(get).body.resolvedModelId, null);
+    assert.equal(settings.get('chat.model_selection').value, 'gpt-6-astra');
+    assert.equal(invoke(put, {
+      headers: { 'if-match': '"2"' }, body: { selection: 'gpt-6-astra' },
+    }).body.code, 'MODEL_UNAVAILABLE');
+    assert.throws(() => resolveChatModelSelection({
+      selection: settings.get('chat.model_selection').value,
+      catalogRow: catalogs.get('openai_api'),
+    }), { code: 'MODEL_UNAVAILABLE' });
+  } finally { db.close(); }
 });
