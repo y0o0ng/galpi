@@ -1,0 +1,29 @@
+{
+  "name": "xion-local-memory-inference-p1b3-human-resolution-v1",
+  "candidateFixture": "xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2",
+  "primaryArtifact": "fixtures/local-memory-inference-p1b3-human-primary-labels.json",
+  "primaryProtocolVersion": "xion-p1b3-human-primary-v1",
+  "primaryCompletedAt": "2026-09-04T09:12:16.673Z",
+  "resolutions": [
+    {
+      "caseId": "p1b3-decomposed-v2-033",
+      "primaryLabel": "NO_WRITE",
+      "secondPassLabel": "WRITE_CANDIDATE",
+      "finalResolvedHumanLabel": "WRITE_CANDIDATE",
+      "reason": "The current activity (오늘은 재고표를 급히 훑기) is temporary, but the memory-relevant fact is explicitly a fixed recurring review schedule: 정기 재검토 일정은 2028-11-11로 이미 고정되어 있다. Under the persistence rubric, this durable fact is an advisory WRITE_CANDIDATE. The resolution is justified by the evidence and rubric, not by agreement with a construction target.",
+      "provenance": {
+        "selectionTrigger": "After the blind primary review was complete, comparison with construction authoring targets identified exactly one mismatch, case 033, which triggered this post-primary evidence re-review.",
+        "preregisteredIndependentSecondPass": false,
+        "authoringTargetDisclosedBeforeSecondPassSelection": false,
+        "reviewerPresentedWith": "The original evidence and the same fixed choices: NO_WRITE / WRITE_CANDIDATE / ESCALATE.",
+        "p1b3ModelOutputExisted": false,
+        "authoringTargetDisclosedOnlyAfterSecondPassSelection": true,
+        "authoringTargetIsClassGoldAuthority": false
+      },
+      "reviewerRecollection": {
+        "status": "UNVERIFIED_RECOLLECTION",
+        "statement": "The reviewer later recalled that they may have intended to press option 2 during primary review and may have made an input slip. This is not independently verified and does not establish that a typo occurred."
+      }
+    }
+  ]
+}

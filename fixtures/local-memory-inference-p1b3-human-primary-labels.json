@@ -1,0 +1,247 @@
+{
+  "protocolVersion": "xion-p1b3-human-primary-v1",
+  "candidateFixture": "xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2",
+  "completedAt": "2026-09-04T09:12:16.673Z",
+  "labels": [
+    {
+      "caseId": "p1b3-decomposed-v2-001",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-002",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-003",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-004",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-005",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-006",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-007",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-008",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-009",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-010",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-011",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-012",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-013",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-014",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-015",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-016",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-017",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-018",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-019",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-020",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-021",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-022",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-023",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-024",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-025",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-026",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-027",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-028",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-029",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-030",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-031",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-032",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-033",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-034",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-035",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-036",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-037",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-038",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-039",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-040",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-041",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-042",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-043",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-044",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-045",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-046",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-047",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-048",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-049",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-050",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-051",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-052",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-053",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-054",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-055",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-056",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-057",
+      "label": "WRITE_CANDIDATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-058",
+      "label": "NO_WRITE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-059",
+      "label": "ESCALATE"
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-060",
+      "label": "NO_WRITE"
+    }
+  ]
+}

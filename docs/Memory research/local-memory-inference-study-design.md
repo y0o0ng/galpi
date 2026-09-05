@@ -2610,3 +2610,76 @@ generation, training dataset size, or other training mechanism. Those
 choices remain unopened. Private XION replay, production memory integration,
 DB, Vault, retrieval, routing, server behavior, and durable writes remain
 out of scope and unchanged.
+
+#### P1-B3 HUMAN completion, post-primary resolution, and class-gold freeze receipt
+
+This HUMAN-gold/provenance freeze started from fetched GitHub `main` at
+`329c7be18a5d0171dbaeffd40efe99136e62659f`, unchanged from the last reviewed
+main. No intervening memory-inference contract or artifact changed.
+
+**Primary blind HUMAN review.** Protocol `xion-p1b3-human-primary-v1`
+completed at `2026-09-04T09:12:16.673Z` against candidate fixture
+`xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2`.
+The actual completed `/tmp/xion-p1b3-human-primary-labels.json` was read,
+validated, and copied byte-for-byte to
+`fixtures/local-memory-inference-p1b3-human-primary-labels.json`, with SHA-256
+`9e852bcea91b4ab362e28de641467ac7b724d401b2bb41b985fd756ccaaaf77f`.
+Its 60 IDs and original distribution remain immutable: 21 `NO_WRITE`,
+19 `WRITE_CANDIDATE`, and 20 `ESCALATE`. In particular,
+`p1b3-decomposed-v2-033` remains primary `NO_WRITE` in that artifact.
+
+**One post-primary evidence re-review.** After primary completion, comparison
+with the construction authoring targets identified exactly one mismatch,
+case `p1b3-decomposed-v2-033`. That mismatch triggered selection for re-review;
+this was not a preregistered independent second pass. Before the second-pass
+choice, the reviewer received the original evidence and the same fixed
+`NO_WRITE / WRITE_CANDIDATE / ESCALATE` choices without disclosure of the
+authoring target. The reviewer selected `WRITE_CANDIDATE`; only afterward
+was the authoring target disclosed. No P1-B3 model output existed.
+
+The evidence is:
+
+> 오늘은 재고표를 급히 훑기만 하지만, 정기 재검토 일정은 2028-11-11로 이미 고정되어 있다.
+
+The current activity is temporary, but the memory-relevant fact explicitly
+states a fixed recurring review schedule. Under the persistence rubric,
+that durable fact is an advisory `WRITE_CANDIDATE`. The final resolution
+therefore records primary `NO_WRITE`, post-primary evidence re-review
+`WRITE_CANDIDATE`, and final resolved HUMAN `WRITE_CANDIDATE`. It is justified
+by the evidence and rubric, not by matching the construction target.
+The reviewer later recalled possibly intending to press option 2 during
+primary review and possibly making an input slip. This is **unverified
+reviewer recollection**, not an independently established typo.
+
+The separate receipt is `fixtures/local-memory-inference-p1b3-human-resolution.json`,
+identity `xion-local-memory-inference-p1b3-human-resolution-v1`. It records
+only this one resolution and its provenance; it does not rewrite primary
+history or contain model results or extraction gold.
+
+**Frozen effective HUMAN class gold.** The derived immutable artifact
+`fixtures/local-memory-inference-p1b3-human-resolved-labels.json`, identity
+`xion-local-memory-inference-p1b3-human-resolved-labels-v1`, references the
+v2 candidate fixture, primary protocol/artifact/completion, and resolution
+artifact/version. For each original case ID, its label is the receipt's
+`finalResolvedHumanLabel` if explicitly resolved, otherwise the original
+primary HUMAN label. Only case 033 differs from primary. The final effective
+distribution is 20 `NO_WRITE`, 20 `WRITE_CANDIDATE`, and 20 `ESCALATE`.
+**P1-B3 HUMAN class-distribution gate = PASS** under the preregistered
+`>=15/class` rule. The primary 21/19/20 distribution already met that floor;
+this resolution was not needed to satisfy a quota.
+
+The later P1-B3 runner must use this final resolved HUMAN artifact as its
+class-gold source. `authoringTarget` is **not class-gold authority** and must
+never supply effective class labels. The unchanged authoring key remains
+authoritative only for construction provenance and deterministic
+`extractionGold` used to score Stage 3.
+
+This gate permits runner preparation only: the next step is runner
+implementation, not model execution. No P1-B3 model runner, output, or model
+report exists at this freeze; this is not a model result or experiment
+disposition. Stage prompts, candidate pool, extraction gold, and thresholds
+remain frozen. P1-B2c remains **CLOSED / COMPLETE /
+FAIL_FRESH_SYNTHETIC_VALIDATION**; P1-B2d remains **CLOSED / COMPLETE —
+NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED**. Task-specific training remains
+conditional on the frozen P1-B3 trigger, production memory is unchanged,
+and private replay remains **UNOPENED**.
