@@ -87,7 +87,7 @@ proof의 `accessions_outside_horizon`에 수량으로 남는다 — 조용히 �
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as _dataclass_replace
 from datetime import date as _calendar_date
 from decimal import Decimal, InvalidOperation
 
@@ -126,6 +126,12 @@ CLASS_BIRTH_EFFECTIVE_DATE = "CLASS_BIRTH_EFFECTIVE_DATE"
 CURRENT_GOVERNING_SNAPSHOT = "CURRENT_GOVERNING_SNAPSHOT"
 CLASS_TERMINATION_EFFECTIVE_DATE = "CLASS_TERMINATION_EFFECTIVE_DATE"
 PROSE_ALIAS_LIFETIME = "PROSE_ALIAS_LIFETIME"
+
+# **날짜만 받쳐주는 역할이다.** class 정의·탄생·종료 권한을 하나도 주지 않는다.
+# `ITEM_503_CORROBORATED_UPON_FILING`으로 세운 연대기에 의존하는 구간이 그 primary를
+# REQUIRED로 들고 다니게 해서, 5A-3가 "그 날짜는 이 문서가 나오기 전엔 알 수 없었다"를
+# 그대로 파생시킨다.
+LEGAL_OPERATIVE_DATE_CORROBORATION = "LEGAL_OPERATIVE_DATE_CORROBORATION"
 
 SEC_EVIDENCE_DOCUMENT = "SEC_EVIDENCE_DOCUMENT"
 
@@ -272,6 +278,22 @@ CLASS_DEFINITION_PATTERNS = (
 # instrument가 서술하는 **상태**이고, 그 class를 그 시점에 만들었다는 진술이 아니다.
 # 여기 있는 것은 그 class를 실제로 세우는 행위를 명시로 말하는 문장 모양뿐이다.
 # 원본 governing instrument도 그 언어가 있을 때만 탄생을 증명한다.
+#
+# **주식 재분류는 여기 없다**(사용자 결정으로 옛 `RECLASSIFIED_INTO` 규칙을 대체했다).
+#
+# ```text
+# reclassified into <NAME>                      주식 사건이지 class 생성이 아니다
+# reclassified as and become <NAME>             같다 — 넓힌 문법을 만들지 않는다
+# shares of <NAME> into which ... reclassified  같다
+# ```
+#
+# 그 문장이 증명하는 것은 **그 주식들이 대상 class의 주식이 됐다**는 사실이고, 대상
+# class가 그 시점에 만들어졌다는 진술이 아니다 — class가 재분류보다 수십 년 앞설 수
+# 있다. 관측을 보존하려고 중립 finding family를 새로 만들지도 않는다. 재분류
+# provenance가 따로 필요해지면 그때 별도로 설계한다.
+#
+# **종료 쪽 재분류는 다른 사실이고 그대로다**(`CLASS_TERMINATION_PATTERNS`) — 거기서는
+# 대상 class가 명시로 재분류되어 **사라지는** 모양이다.
 CLASS_BIRTH_ACTION_PATTERNS = (
     ("HEREBY_CREATED",
      r"\bhereby\s+(?:created|established)\b[^.;]{0,200}?\b{name}\b"),
@@ -281,8 +303,6 @@ CLASS_BIRTH_ACTION_PATTERNS = (
     ("NEW_CLASS_DESIGNATED",
      r"\bnew\s+class\b[^.;]{0,200}?\bdesignated(?:\s+as)?\s+(?:the\s+)?"
      r"[\"“‘']?{name}\b"),
-    ("RECLASSIFIED_INTO",
-     r"\breclassified\s+into\b[^.;]{0,200}?\b{name}\b"),
 )
 
 _DATE = r"[A-Z][a-z]+ \d{1,2}, \d{4}"
@@ -405,19 +425,91 @@ STATE_FILED_STAMP_PATTERNS = (
     ("STATE_FILED_STAMP", r"\bfiled\b[^.;]{0,80}?(?P<d>" + _STATE_DATE + r")"),
 )
 
+# ── O2-C — **교차 문서 보강 전용 어휘.** 위 동결 tuple을 넓히지 않는다 ───────
+#
+# ```text
+# 같은 문서 경로  STATE_FILED_UPON_FILING          <- UPON_FILING_PATTERNS 그대로
+# 교차 문서 경로  ITEM_503_CORROBORATED_UPON_FILING <- 아래 전용 tuple
+# ```
+#
+# **왜 나누는가.** 같은 문서 경로는 조항이 기관을 명시하고 같은 문서의 주 스탬프가
+# 날짜를 준다 — 보상 장치가 문서 안에 있다. 교차 경로는 그 보상이 **primary가 명시한
+# 기관과 날짜**다. 조항 어휘를 공유 tuple에 넣으면 동결된 같은 문서 family가 조용히
+# 함께 느슨해진다.
+#
+# 실측 문언(FOXA `0001193125-19-079678/d721949dex31.htm` block:127):
+#
+# ```text
+# This Restated Certificate of Incorporation shall become effective
+# upon filing pursuant to the DGCL.
+# ```
+#
+# 델라웨어 일반회사법은 제출처를 **법으로** 하나로 정한다. 그래서 이 조항은 "제출이
+# 발효 사건이다"를 명시하고 기관은 법령 참조로 들어온다. **법령 이름은 열거된 둘
+# 뿐이다** — `pursuant to applicable law` · `pursuant to Delaware law` ·
+# `pursuant to law` · 기관도 법령도 없는 맨 `effective upon filing`은 받지 않는다.
+#
+# **이 조항 단독으로는 날짜를 만들지 못한다.** governing 절반일 뿐이다.
+DELAWARE_STATUTE_NAMES = (
+    r"DGCL",
+    r"General\s+Corporation\s+Law\s+of\s+the\s+State\s+of\s+Delaware",
+)
+_DELAWARE_STATUTE = r"(?:" + r"|".join(DELAWARE_STATUTE_NAMES) + r")"
+DELAWARE = "DELAWARE"
+CROSS_DOCUMENT_UPON_FILING_PATTERNS = (
+    ("EFFECTIVE_UPON_FILING_UNDER_STATUTE",
+     r"\beffective\s+(?:upon|at\s+the\s+time\s+of)\s+"
+     r"(?:its\s+|the\s+|such\s+)?filing\s+pursuant\s+to\s+(?:the\s+)?"
+     + _DELAWARE_STATUTE + r"\b"),
+)
+
+# **관할이 일치해야 한다.** DGCL 조항은 델라웨어 제출처와만 짝지어진다. 발행사
+# domicile metadata로 주를 유추하지 않는다 — primary가 명시로 말해야 한다.
+DELAWARE_FILING_OFFICES = (
+    r"Secretary\s+of\s+State\s+of\s+the\s+State\s+of\s+Delaware",
+    r"Delaware\s+Secretary\s+of\s+State",
+)
+_DELAWARE_OFFICE = r"(?:" + r"|".join(DELAWARE_FILING_OFFICES) + r")"
+
+# Item 5.03 primary가 **제출 사실과 발효일을 함께** 말하는 모양. 제출일 단독도,
+# 발효일 단독도 아니다 — 둘이 한 문장 안에서 같은 instrument에 붙어야 한다.
+ITEM_503_FILED_EFFECTIVE_PATTERNS = (
+    ("ITEM_503_FILED_AND_EFFECTIVE",
+     r"\bfiled\s+with\b[^.;]{0,80}?" + _DELAWARE_OFFICE
+     + r"\b[^.;]{0,120}?\bbecame\s+effective\s+(?:on|as\s+of)\s+"
+     + r"(?P<d>" + _DATE + r")"),
+)
+
 # ── operative date의 출처 family — **동결된 어휘 셋뿐이다** ──────────────────
 EXPLICIT_EFFECTIVE_DATE = "EXPLICIT_EFFECTIVE_DATE"
 STATE_CERTIFIED_EFFECTIVE_DATE = "STATE_CERTIFIED_EFFECTIVE_DATE"
 STATE_FILED_UPON_FILING = "STATE_FILED_UPON_FILING"
+# O2-C — **같은 accession의 Item 5.03 primary가 날짜만 보강한다.** 아래 §O2-C 참조.
+ITEM_503_CORROBORATED_UPON_FILING = "ITEM_503_CORROBORATED_UPON_FILING"
 OPERATIVE_SOURCE_FAMILIES = frozenset({
     EXPLICIT_EFFECTIVE_DATE, STATE_CERTIFIED_EFFECTIVE_DATE, STATE_FILED_UPON_FILING,
+    ITEM_503_CORROBORATED_UPON_FILING,
 })
 # **family마다 요구되는 locator 모양이 다르다.** `STATE_FILED_UPON_FILING`은 제출
 # 발효 조항과 주 스탬프 **둘 다**를 들고 있어야 그 날짜가 왜 나왔는지 보인다.
+#
+# `ITEM_503_CORROBORATED_UPON_FILING`의 locator는 **governing 문서 안의 것 하나**(제출
+# 발효 조항)뿐이다. 날짜를 준 primary는 다른 문서이므로 locator 문자열이 아니라 아래
+# `OperativeDependency`로 자연키째 남는다 — 다른 문서의 `block:N`을 이 문서의 것처럼
+# 적지 않는다.
 OPERATIVE_LOCATOR_COUNT = {
     EXPLICIT_EFFECTIVE_DATE: 1,
     STATE_CERTIFIED_EFFECTIVE_DATE: 1,
     STATE_FILED_UPON_FILING: 2,
+    ITEM_503_CORROBORATED_UPON_FILING: 1,
+}
+# **교차 문서 의존은 family가 정한다.** 같은 문서 안에서 끝나는 셋은 0이어야 하고,
+# 교차 보강은 정확히 하나여야 한다. 이 표가 "family만 바꿔치는" 변조를 막는다.
+OPERATIVE_DEPENDENCY_COUNT = {
+    EXPLICIT_EFFECTIVE_DATE: 0,
+    STATE_CERTIFIED_EFFECTIVE_DATE: 0,
+    STATE_FILED_UPON_FILING: 0,
+    ITEM_503_CORROBORATED_UPON_FILING: 1,
 }
 
 # ── 명시 class 종료 grammar — §9.5 ───────────────────────────────────────────
@@ -754,6 +846,11 @@ class LegalDocument:
             "legal_operative_source_family": self.legal_operative.source_family,
             "legal_operative_locators": list(self.legal_operative.supporting_locators),
             "legal_operative_observed": list(self.legal_operative.observed),
+            # **교차 문서 의존을 문자열 locator에 숨기지 않는다.** 5A-3가 두 문서의
+            # 자연키를 다 맞춰 볼 수 있어야 한다.
+            "legal_operative_dependencies": [
+                item.as_json() for item in self.legal_operative.dependencies
+            ],
             "classification_families": list(self.classification_families),
         }
 
@@ -927,6 +1024,37 @@ def classification_families(blocks: tuple[str, ...]) -> tuple[str, ...]:
 
 
 @dataclass(frozen=True)
+class OperativeDependency:
+    """operative date가 **다른 SEC 문서에 의존한다**는 명시 사실 하나.
+
+    ```text
+    governing Exhibit  ->  제출이 발효 사건이라는 법적 규칙
+    같은 accession의
+    Item 5.03 primary  ->  그 제출이 실제로 일어난 날짜
+    ```
+
+    **문자열 locator 안에 숨기지 않는다.** 다른 문서의 `block:N`을 이 문서의 근거인
+    것처럼 적으면 5A-3가 맞춰 볼 자연키를 잃는다. 그래서 의존 문서의 자연키
+    (`cik`·`accession`·`document_name`)와 그 안의 locator를 통째로 든다.
+    """
+
+    cik: str
+    accession: str
+    document_name: str
+    locator: str
+    proof_authority: str
+
+    def as_json(self) -> dict:
+        return {
+            "cik": self.cik,
+            "accession": self.accession,
+            "document_name": self.document_name,
+            "locator": self.locator,
+            "proof_authority": self.proof_authority,
+        }
+
+
+@dataclass(frozen=True)
 class OperativeDate:
     """governing instrument의 **명시 법적 발효일** 하나와 그 출처.
 
@@ -944,10 +1072,15 @@ class OperativeDate:
     source_family: str | None
     supporting_locators: tuple[str, ...]
     observed: tuple[str, ...]
+    #: **다른 SEC 문서에 대한 명시 의존.** 같은 문서 안에서 끝나는 family는 비어 있다.
+    dependencies: tuple["OperativeDependency", ...] = ()
 
     @property
     def locator(self) -> str | None:
-        """finding이 쓰는 단일 문자열 투영. 근거 span을 하나도 버리지 않는다."""
+        """finding이 쓰는 단일 문자열 투영. 근거 span을 하나도 버리지 않는다.
+
+        **이 문서 안의 span만이다.** 교차 문서 의존은 `dependencies`가 자연키째 든다.
+        """
         return ";".join(self.supporting_locators) or None
 
     def as_json(self) -> dict:
@@ -957,6 +1090,7 @@ class OperativeDate:
             "source_family": self.source_family,
             "supporting_locators": list(self.supporting_locators),
             "observed": list(self.observed),
+            "dependencies": [item.as_json() for item in self.dependencies],
         }
 
 
@@ -1075,6 +1209,214 @@ def governing_operative_date(blocks: tuple[str, ...]) -> OperativeDate:
         LEGAL_DATE_RESOLVED, date, STATE_FILED_UPON_FILING,
         (f"block:{min(clauses)}", f"block:{stamp}"), observed,
     )
+
+
+# ── O2-C — Item 5.03 정확 문서 연결 ─────────────────────────────────────────
+#
+# **primary는 날짜만 준다.** 어느 Exhibit의 날짜인지는 primary가 **명시로** 말해야
+# 하고, 그 진술은 `html_blocks()` block **하나** 안에서 끝나야 한다(§5 경계 결정).
+#
+# 받는 모양은 둘뿐이다.
+#
+# ```text
+# 직접   "... is attached hereto as Exhibit 3.3"      block 안 Exhibit 번호가 정확히 하나
+# 대응   "... Certificate and By-laws are attached
+#         hereto as Exhibits 3.1 and 3.2, respectively"
+# ```
+#
+# **명시 `respectively`는 순서 추론이 아니다.** 그 낱말이 대응 자체를 문장 안에서
+# 선언한다. 금지된 것은 **명시 대응 표지 없이** 순서·표 행·문서 sequence·파일명·
+# 유사도로 짝짓는 것이다. `respectively`가 없으면 같은 문장이어도 받지 않는다.
+#
+# 2↔2만 받는다 — 관측된 원문 모양이 그것이고, 일반 N항 자연어 대응 parser를 만들지
+# 않는다.
+_EXHIBIT_NUMBER = r"\d+\.\d+"
+_EXHIBIT_REFERENCE = re.compile(
+    r"\bExhibits?\s+(" + _EXHIBIT_NUMBER
+    + r"(?:\s*(?:,|and)\s*" + _EXHIBIT_NUMBER + r")*)",
+    re.IGNORECASE,
+)
+_RESPECTIVELY = re.compile(r"\A\s*,?\s*respectively\b", re.IGNORECASE)
+_SENTENCE_BREAK = re.compile(r"[.;]\s")
+
+
+def _exhibit_number(document_type: object) -> str | None:
+    """선언된 문서 종류에서 **전시 번호**. `EX-3.1` -> `3.1`. 아니면 `None`."""
+    match = re.fullmatch(r"EX-0*(\d+)\.(\d+)", str(document_type or "").strip(),
+                         re.IGNORECASE)
+    if match is None:
+        return None
+    return f"{int(match.group(1))}.{int(match.group(2))}"
+
+
+def _sentence_head(text: str, index: int) -> str:
+    """그 지점을 품은 문장에서 **지점 앞부분**만. instrument 나열은 여기 있다."""
+    left = 0
+    for match in _SENTENCE_BREAK.finditer(text, 0, index):
+        left = match.end()
+    return text[left:index]
+
+
+def _instrument_families(text: str) -> tuple[str, ...]:
+    """그 구간이 명시로 나열한 instrument family를 **등장 순서대로**.
+
+    **분류기가 이미 아는 열거 family로만 읽는다**(§4). 임의 제목 문구를 정규화하지
+    않고, 소유격·관사 포장은 family 정체성이 아니므로 자연히 무시된다.
+
+    `Amended and Restated Certificate of Incorporation`은 더 짧은
+    `Restated Certificate of Incorporation`을 품는다 — 겹치면 **바깥쪽 하나만** 센다.
+    """
+    spans = []
+    for name, pattern in AMENDMENT_FAMILIES + SNAPSHOT_FAMILIES + NON_GOVERNING_FAMILIES:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            spans.append((match.start(), -(match.end() - match.start()), match.end(), name))
+    spans.sort()
+    out: list[str] = []
+    covered = -1
+    for start, _neg_length, end, name in spans:
+        if start < covered:
+            continue
+        out.append(name)
+        covered = end
+    return tuple(out)
+
+
+def item_503_document_association(block: str, target_family: str) -> str | None:
+    """그 block이 **어느 전시 번호**를 대상 instrument에 명시로 붙였는가.
+
+    돌려주는 것은 전시 번호 문자열(`"3.1"`)이고, 그것을 문서로 바꾸는 것은 accession의
+    SEC 선언 metadata다. 확정할 수 없으면 `None`으로 fail-close한다.
+    """
+    references = list(_EXHIBIT_REFERENCE.finditer(block))
+    if not references:
+        return None
+    numbers: list[str] = []
+    for match in references:
+        numbers.extend(re.findall(_EXHIBIT_NUMBER, match.group(1)))
+    # 직접 연결 — block 전체가 전시 번호를 정확히 하나만 말한다.
+    if len(numbers) == 1:
+        return numbers[0]
+    # 대응 연결 — 명시 `respectively`가 닫는 2↔2만이다.
+    for match in references:
+        listed = re.findall(_EXHIBIT_NUMBER, match.group(1))
+        if len(listed) != 2:
+            continue
+        if _RESPECTIVELY.match(block[match.end():]) is None:
+            continue
+        families = _instrument_families(_sentence_head(block, match.start()))
+        if len(families) != 2 or families[0] == families[1]:
+            # 나열이 2개가 아니거나 둘이 같은 family면 어느 쪽인지 정할 수 없다.
+            return None
+        if target_family not in families:
+            return None
+        return listed[families.index(target_family)]
+    return None
+
+
+def item_503_corroborated_dates(
+    *, documents: tuple, blocks_by_key: dict, items,
+) -> dict:
+    """accession 하나를 **문서들이 정해진 뒤에** 다시 맞춰 본다. O2-C의 전부다.
+
+    `governing_operative_date()`는 여전히 **한 문서만 읽는 parser**다. 그 계약이
+    "이 instrument를 읽어라"인데 조용히 바깥 block에 의존하게 만들지 않는다 — 교차
+    보강은 accession의 후보 문서가 다 정해진 뒤 여기서 결정론적으로 한 번 돈다.
+
+    돌려주는 것은 `문서 key -> 새 OperativeDate`이고, 바뀌지 않는 문서는 들어 있지
+    않다. 모든 조건이 하나라도 어긋나면 그 문서는 **원래 상태 그대로**다.
+    """
+    if not documents:
+        return {}
+    if documents[0].form not in EIGHT_K_FORMS:
+        return {}
+    if CHARTER_AMENDMENT_ITEM not in tuple(items or ()):
+        return {}
+    # **primary가 정확히 하나여야 한다.** 둘이면 어느 서술이 그 accession의 신고인지
+    # 정할 수 없다.
+    primaries = [
+        item for item in documents
+        if item.document_role == PRIMARY and item.proof_authority == FILING_NARRATIVE
+    ]
+    if len(primaries) != 1:
+        return {}
+    primary = primaries[0]
+    primary_blocks = tuple(blocks_by_key.get(primary.key, ()))
+    if not primary_blocks:
+        return {}
+
+    # 전시 번호 -> 문서. **SEC 선언 metadata 하나가 정본이다.** 같은 번호를 든 문서가
+    # 둘이면 그 번호는 통째로 버린다 — 고르지 않는다.
+    by_number: dict[str, object] = {}
+    duplicated: set[str] = set()
+    for item in documents:
+        if item.proof_authority != GOVERNING_EXHIBIT:
+            continue
+        number = _exhibit_number(item.document_type)
+        if number is None:
+            continue
+        if number in by_number:
+            duplicated.add(number)
+        by_number[number] = item
+    for number in duplicated:
+        by_number.pop(number, None)
+
+    out: dict = {}
+    for target in documents:
+        if target.proof_authority != GOVERNING_EXHIBIT:
+            continue
+        # **governing Exhibit이 법적 규칙을 대야 한다.** primary는 날짜만 준다.
+        clauses = _clause_ordinals(
+            tuple(blocks_by_key.get(target.key, ())),
+            CROSS_DOCUMENT_UPON_FILING_PATTERNS,
+        )
+        if not clauses:
+            continue
+        dates: dict[str, int] = {}
+        for ordinal, iso in _date_hits(primary_blocks, ITEM_503_FILED_EFFECTIVE_PATTERNS):
+            number = item_503_document_association(
+                primary_blocks[ordinal], target.classification
+            )
+            if number is None:
+                continue
+            matched = by_number.get(number)
+            if matched is None or matched.key != target.key:
+                continue
+            dates.setdefault(iso, ordinal)
+        if not dates:
+            continue
+        existing = target.legal_operative
+        observed = tuple(sorted(set(existing.observed) | set(dates)))
+        # 이미 모호한 문서를 primary가 구해내지 못한다.
+        if existing.status == LEGAL_DATE_AMBIGUOUS:
+            continue
+        # 같은 Exhibit에 서로 다른 qualifying 날짜가 둘이면 고르지 않는다.
+        if len(dates) > 1:
+            out[target.key] = OperativeDate(
+                LEGAL_DATE_AMBIGUOUS, None, None, (), observed
+            )
+            continue
+        date = next(iter(dates))
+        if existing.status == LEGAL_DATE_RESOLVED:
+            # **문서 안의 직접 진술이 더 강하다.** 일치하면 그대로 두고 family를
+            # 바꾸지 않는다. 갈리면 법이 모순이므로 모호하다.
+            if existing.date == date:
+                continue
+            out[target.key] = OperativeDate(
+                LEGAL_DATE_AMBIGUOUS, None, None, (), observed
+            )
+            continue
+        out[target.key] = OperativeDate(
+            LEGAL_DATE_RESOLVED, date, ITEM_503_CORROBORATED_UPON_FILING,
+            (f"block:{min(clauses)}",), observed,
+            (OperativeDependency(
+                cik=primary.cik,
+                accession=primary.accession,
+                document_name=primary.document_name,
+                locator=f"block:{dates[date]}",
+                proof_authority=FILING_NARRATIVE,
+            ),),
+        )
+    return out
 
 
 def _designation_site(block: str, match) -> tuple[str, str | None] | None:
@@ -1399,6 +1741,7 @@ def collect_legal_evidence(
                 "서술은 governing instrument가 아니다",
             ))
 
+        accession_documents: list[LegalDocument] = []
         for name, role, document_type in candidates:
             try:
                 payload = client.accession_file_bytes(registrant, row.accession, name)
@@ -1427,7 +1770,7 @@ def collect_legal_evidence(
                 legal_operative=operative,
                 classification_families=classification_families(blocks),
             )
-            documents.append(document)
+            accession_documents.append(document)
             blocks_by_key[document.key] = blocks
             # 분류 실패는 **증명 권한이 있는 문서**에만 탐색 실패다. 권한 없는 서술이
             # 열거된 family에 안 맞는 것은 그 자체로 증거 공백이 아니다 — 진짜 공백은
@@ -1437,6 +1780,20 @@ def collect_legal_evidence(
                     f"classify:{row.accession}/{name}",
                     "governing 후보를 열거된 family로 분류하지 못했다",
                 ))
+
+        # **O2-C는 accession 단위 두 번째 걸음이다.** 문서별 parser가 끝난 뒤 같은
+        # accession의 Item 5.03 primary가 날짜만 보강한다.
+        corroborated = item_503_corroborated_dates(
+            documents=tuple(accession_documents),
+            blocks_by_key=blocks_by_key,
+            items=header_items or _items_tokens(getattr(row, "items", None)),
+        )
+        for document in accession_documents:
+            revised = corroborated.get(document.key)
+            documents.append(
+                document if revised is None
+                else _dataclass_replace(document, legal_operative=revised)
+            )
 
     search_status = INCOMPLETE if failures else COMPLETE
     # **형제 표지 제목이 같은 core로 줄어들면 자동 P2 연결을 끈다.** 둘을 합치지 않는다.
@@ -1523,6 +1880,81 @@ def _assert_operative_structure(document: dict) -> None:
             f"{label}: {family}는 근거 locator가 {required}개여야 합니다 — "
             f"{len(locators)}개입니다"
         )
+    # **교차 문서 의존 개수도 family가 정한다.** 같은 문서 family로 바꿔치면서
+    # 의존만 남기거나, 교차 family인데 의존을 지우는 변조가 여기서 걸린다.
+    dependencies = document.get("legal_operative_dependencies")
+    if dependencies is None:
+        dependencies = []
+    if not isinstance(dependencies, list):
+        raise QVLegalEvidenceError(
+            f"{label}: legal operative 교차 의존이 목록이 아닙니다"
+        )
+    expected = OPERATIVE_DEPENDENCY_COUNT[family]
+    if len(dependencies) != expected:
+        raise QVLegalEvidenceError(
+            f"{label}: {family}는 교차 문서 의존이 {expected}개여야 합니다 — "
+            f"{len(dependencies)}개입니다"
+        )
+    for item in dependencies:
+        if not isinstance(item, dict):
+            raise QVLegalEvidenceError(f"{label}: 교차 의존 항목이 객체가 아닙니다")
+        for field in ("cik", "accession", "document_name", "locator", "proof_authority"):
+            if not str(item.get(field) or "").strip():
+                raise QVLegalEvidenceError(
+                    f"{label}: 교차 의존에 {field}이(가) 없습니다"
+                )
+
+
+def _assert_operative_dependencies(
+    document: dict, *, documents: list, cik: str
+) -> None:
+    """교차 문서 의존이 **같은 accession의 진짜 Item 5.03 primary**를 가리키는가.
+
+    ```text
+    다른 accession을 가리킨다        -> 나중 recital이 앞 문서를 소급 결정하는 셈이다
+    packet에 없는 문서를 가리킨다    -> 5A-3가 맞춰 볼 자연키가 없다
+    primary가 아닌 Exhibit을 가리킨다 -> 다른 Exhibit의 날짜를 베끼는 셈이다
+    ```
+
+    전부 fail-close다. 저장된 결론 칸을 믿지 않는다.
+    """
+    label = _document_label(document)
+    accession = str(document.get("accession") or "")
+    for item in document.get("legal_operative_dependencies") or []:
+        if normalize_cik(item.get("cik")) != cik:
+            raise QVLegalEvidenceError(
+                f"{label}: 교차 의존 CIK가 proof와 다릅니다: {item.get('cik')!r}"
+            )
+        if str(item.get("accession") or "") != accession:
+            raise QVLegalEvidenceError(
+                f"{label}: 교차 의존이 다른 accession을 가리킵니다: "
+                f"{item.get('accession')!r} != {accession}"
+            )
+        name = str(item.get("document_name") or "")
+        referenced = next(
+            (
+                other for other in documents
+                if str(other.get("accession") or "") == accession
+                and str(other.get("document_name") or "") == name
+            ),
+            None,
+        )
+        if referenced is None:
+            raise QVLegalEvidenceError(
+                f"{label}: 교차 의존이 receipt에 없는 문서를 가리킵니다: "
+                f"{accession}/{name}"
+            )
+        if str(referenced.get("document_role") or "") != PRIMARY:
+            raise QVLegalEvidenceError(
+                f"{label}: 교차 의존이 primary가 아닌 문서를 가리킵니다: "
+                f"{accession}/{name}"
+            )
+        authority = document_proof_authority(referenced.get("document_type"))
+        if authority != FILING_NARRATIVE or str(item.get("proof_authority")) != FILING_NARRATIVE:
+            raise QVLegalEvidenceError(
+                f"{label}: 교차 의존은 FILING_NARRATIVE primary여야 합니다: "
+                f"{accession}/{name} authority={authority}"
+            )
 
 
 def _legal_date(document: dict) -> str | None:
@@ -2041,6 +2473,43 @@ def _ref(finding: dict, *, cik: str, role: str) -> EvidenceRef:
     )
 
 
+def _operative_corroboration_refs(refs, documents, *, cik: str) -> list[EvidenceRef]:
+    """구간이 실제로 기댄 문서들 중 **교차 보강으로 날짜를 얻은 것**의 primary 참조.
+
+    구간 증거가 가리키는 문서만 본다 — accession 안의 무관한 문서까지 끌어오지 않는다.
+    같은 primary가 여러 번 나와도 자연키 하나로 모은다.
+    """
+    used = {(item.accession, item.document_name) for item in refs}
+    out: list[EvidenceRef] = []
+    seen: set[tuple[str, str, str]] = set()
+    for document in documents:
+        key = (str(document.get("accession") or ""),
+               str(document.get("document_name") or ""))
+        if key not in used:
+            continue
+        if document.get("legal_operative_source_family") != ITEM_503_CORROBORATED_UPON_FILING:
+            continue
+        for dependency in document.get("legal_operative_dependencies") or []:
+            natural = (
+                str(dependency.get("accession") or ""),
+                str(dependency.get("document_name") or ""),
+                str(dependency.get("locator") or ""),
+            )
+            if natural in seen:
+                continue
+            seen.add(natural)
+            out.append(EvidenceRef(
+                source_kind=SEC_EVIDENCE_DOCUMENT,
+                cik=cik,
+                accession=natural[0],
+                document_name=natural[1],
+                evidence_role=LEGAL_OPERATIVE_DATE_CORROBORATION,
+                dependency="REQUIRED",
+                locator=natural[2],
+            ))
+    return out
+
+
 # ── 정규 직렬화와 비교 — **정의가 하나여야 한다** ────────────────────────────
 #
 # production 행은 나중에 packet의 구간 증거를 합쳐 넣고, 5A-3는 그 REQUIRED 자연키에서
@@ -2205,13 +2674,20 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
     blocked = cover_designation_collisions(cover_proof)
     operative_by_document: dict[tuple[str, str], str | None] = {}
     locator_by_document: dict[tuple[str, str], str] = {}
-    for item in payload.get("documents") or []:
-        if not isinstance(item, dict):
-            raise QVLegalEvidenceError("legal proof document 항목이 객체가 아닙니다")
+    documents = [
+        item for item in (payload.get("documents") or []) if isinstance(item, dict)
+    ]
+    if len(documents) != len(payload.get("documents") or []):
+        raise QVLegalEvidenceError("legal proof document 항목이 객체가 아닙니다")
+    for item in documents:
         _assert_operative_structure(item)
         key = (str(item.get("accession") or ""), str(item.get("document_name") or ""))
         operative_by_document[key] = _legal_date(item)
         locator_by_document[key] = _operative_locator(item)
+    # **교차 문서 의존은 receipt 안에서 실제로 가리켜져야 한다.** 자연키만 그럴듯하게
+    # 적고 그 문서가 packet에 없으면 5A-3가 맞춰 볼 것이 없다.
+    for item in documents:
+        _assert_operative_dependencies(item, documents=documents, cik=cik)
     for entry in payload.get("classes") or []:
         if not isinstance(entry, dict):
             raise QVLegalEvidenceError("legal proof class 항목이 객체가 아닙니다")
@@ -2339,6 +2815,13 @@ def class_evidence_from_legal_proof(
                      role=CLASS_TERMINATION_EFFECTIVE_DATE)
             )
             end = str(projected["termination_date"])
+
+        # **교차 보강으로 세운 연대기는 그 primary도 REQUIRED로 들고 간다.**
+        # 5A-3는 REQUIRED 자연키에서 `usable_from_session`을 파생시키므로, 이것이
+        # 빠지면 "primary가 나오기 전에도 그 날짜를 알 수 있었다"고 주장하는 셈이다.
+        interval_evidence.extend(
+            _operative_corroboration_refs(interval_evidence, documents, cik=cik)
+        )
 
         out[member_key] = ClassEvidence(
             class_interval=RelationInterval(birth, end, tuple(interval_evidence)),

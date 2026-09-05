@@ -3706,6 +3706,139 @@ restated certificate 3건의 operative date = MISSING
 
 ---
 
+## 10.27 5A-2 — 탄생 계약 축소 · Item 5.03 날짜 보강(O2-C) — 2026-09-05
+
+시작 `main` = `3ff6f5dcf8c2cc76ca2c0c2ef18576a02c6b8316`. **어느 packet도 승격하지
+않았고 `trading/qv/identity/*.jsonl`을 읽지도 쓰지도 않았다.**
+
+### 사전 영향 점검 — `RECLASSIFIED_INTO` (읽기 전용)
+
+옛 탄생 규칙을 지우기 전에 이미 승격된 production 행이 그것에 기대는지 전수로 봤다.
+
+```text
+tracked 파일의 RECLASSIFIED_INTO   source + test 두 곳뿐이다(문서·receipt에는 없다)
+tracked proof/proposal packet      없다
+승격된 class 구간                  11개
+그중 CLASS_BIRTH_ACTION 역할        0개
+```
+
+`cmcsa-aspecial`만 `RECLASSIFICATION_8K`를 들지만 **`CORROBORATING`이고 종료 쪽
+사실**(`2010-01-01 -> 2015-12-12`)이다. 종료 재분류 문법은 이번에 건드리지 않았다.
+**의존 0건 — 조용한 semantic 무효화 없이 진행했다.**
+
+### 결정 1 — 재분류도 열거도 탄생이 아니다
+
+`CLASS_BIRTH_ACTION_PATTERNS`에서 `RECLASSIFIED_INTO`를 지웠다. `reclassified as and
+become`을 **새 탄생 문법으로 넣지 않았고**, 관측 보존용 중립 finding family도 만들지
+않았다. 수권자본 열거는 CLOSED 규칙 그대로 정의뿐이다. 명시 생성 문법
+(`hereby created` · `hereby established` · `new class ... designated`)은 그대로다.
+
+### 결정 2 — O2-C `ITEM_503_CORROBORATED_UPON_FILING`
+
+```text
+governing Exhibit  ->  제출이 발효 사건이라는 법적 규칙
+Item 5.03 primary  ->  그 제출이 일어난 날짜
+```
+
+**동결된 `UPON_FILING_PATTERNS`를 넓히지 않았다.** 교차 경로 전용 tuple
+(`CROSS_DOCUMENT_UPON_FILING_PATTERNS`)을 따로 두어 `effective upon filing pursuant to
+the DGCL`만 받는다 — 같은 문서 `STATE_FILED_UPON_FILING`은 조항이 기관을 명시해야 한다는
+계약 그대로다. 보상 장치가 다르기 때문이다(같은 문서의 주 스탬프 vs. primary가 명시한
+기관·날짜). `applicable law` · `Delaware law` · 맨 `upon filing`은 받지 않고, DGCL 조항은
+델라웨어 제출처와만 짝지어진다.
+
+**명시 `respectively`는 순서 추론이 아니다**(사용자 결정). 금지 규칙은 *명시 대응 표지
+없는* 순서 추론을 가리킨다. 받는 모양은 block 하나 안의 **직접 참조** 또는
+**`respectively`가 닫는 2↔2**뿐이고, 두 instrument 이름은 분류기가 이미 아는 열거
+family로만 읽는다. 나열이 둘이 아니거나 · 둘이 같은 family이거나 · 대상이 그 둘에 없거나 ·
+`respectively`가 없으면 fail-close다.
+
+**교차 의존을 문자열 locator에 숨기지 않았다.** `OperativeDependency`가
+`cik`·`accession`·`document_name`·`locator`·`proof_authority`를 통째로 들고,
+최종 구간 증거는 그 primary를 `LEGAL_OPERATIVE_DATE_CORROBORATION` **REQUIRED**로 함께
+든다 — 5A-3가 두 문서에서 PIT 가용성을 파생시킨다. `governing_operative_date()`는 여전히
+한 문서만 읽는 parser이고, 보강은 accession 단위 두 번째 걸음이다.
+
+### 로컬 Python 실측 (2026-09-05)
+
+| 모듈 | 이전 | 이번 |
+|---|---|---|
+| `test_qv_identity_legal_evidence` | 175 | **201 OK** |
+| **전체 trading suite** | 1,916 | **1,942 OK** |
+
+새 테스트 26개다. 탄생 쪽은 뒤집은 테스트가 구현 전에 실패하는 것을 먼저 확인했고
+(`reclassified into -> 탄생`이 이제 반대다), 음성 통제 둘(FOXA `reclassified as and
+become` · 수권자본 열거 + 해소된 날짜)은 전후 모두 통과한다 — 넓힌 문법이 없다는 뜻이다.
+O2-C 쪽은 양성 · `respectively` 제거 · 대응 개수 불일치 · 같은 family 중복 · 비델라웨어
+관청 · 열린 법령 문구 · Item 5.03 없음 · 조항 없음 · 다른 Exhibit 지목 · 나중 accession ·
+동반 by-laws · 일치/불일치 직접 날짜 · 복수 날짜, 그리고 provenance 변조 7건이다.
+
+**GitHub CI는 Node만 돌리므로 이 숫자를 재현하지 않는다.**
+
+### 실제 SEC read-only smoke (FOXA 단독, 2026-09-05)
+
+`--symbols FOXA --historical --legal-evidence`, SEC 호출 258(10.26과 같다).
+**승격하지 않았고 manifest·production JSONL을 건드리지 않았다.**
+
+| | 이전(10.26) | 이번 |
+|---|---|---|
+| `search_status` | COMPLETE | COMPLETE |
+| 분류 실패 | 0 | 0 |
+| governing exhibit | 9 | 9 |
+| operative R/M/A | 5/4/0 | **6/3/0** |
+| Class A/B 정의 findings | 2 / 2 | 2 / 2 |
+| 탄생 findings | 0 | 0 |
+| class 구간 | 0/2 | 0/2 |
+| 최종 판정 | REVIEW_REQUIRED | REVIEW_REQUIRED |
+
+바뀐 문서는 하나다.
+
+```text
+0001193125-19-079678/d721949dex31.htm
+  MISSING  ->  RESOLVED 2019-03-18  ITEM_503_CORROBORATED_UPON_FILING
+  Exhibit  block:127   "shall become effective upon filing pursuant to the DGCL"
+  primary  0001193125-19-079678/d721949d8k.htm  block:204  FILING_NARRATIVE
+```
+
+`block:204`가 델라웨어 제출·발효일과 `Exhibits 3.1 and 3.2, respectively`를 **한
+block에** 담고, SEC header가 `EX-3.1 -> d721949dex31.htm`으로 유일하게 대응시킨다.
+
+**나머지는 계약대로 MISSING이다.**
+
+```text
+d721949dex33.htm            Certificate of Designation — 제출 발효 조항이 없다
+d837035dex31.htm            Certificate of Elimination — governing 쪽 조항이 없다
+                            (primary의 `effective upon filing`은 법적 규칙을 대지 못한다)
+foxa-20221231x10qex31.htm   DGCL 조항은 있으나 10-Q accession이라 Item 5.03 primary가 없다
+```
+
+**Class A·B는 여전히 `UNRESOLVED`이고 구간은 0/2, 판정은 `REVIEW_REQUIRED`다.** 날짜가
+풀렸어도 탄생 계약이 더 엄격해졌기 때문이고 **그것이 의도한 결과다.** 결과를 보고 탄생
+문법을 넓히지 않았다.
+
+### 다음 관측 blocker — Certificate of Designation 오분류 (이번에 고치지 않았다)
+
+`d721949dex33.htm`은 Certificate of Designation인데 본문이 모(母) charter를 인용한다는
+이유만으로 `AMENDED_AND_RESTATED_CERTIFICATE`로 분류된다. **Certificate of Designation이
+모 charter를 언급했다는 이유로 complete governing snapshot이 되면 안 된다.**
+
+이번 변경은 그 오분류를 **이용하지도 악화시키지도 않는다** — 연결은 family로 전시 번호를
+고른 뒤 SEC metadata로 문서를 확정하고 그것이 대상 문서와 같은지 다시 본다. `3.1`은
+`d721949dex31.htm`이므로 `d721949dex33.htm`에 붙지 않고, 그 문서는 조항이 없어 애초에
+O2-C에 닿지 못한다. FOXA에 complete snapshot이 하나 더 있다고 읽지 않는다. **다음 작업은
+좁은 문서 제목/분류 수정이다.**
+
+### 이 receipt가 주장하지 않는 것
+
+- production identity JSONL · `qv_manifest.prose_key` · `qv-class-id-v1` ·
+  provenance 자연키 · SEC 수리 의미론을 바꾸지 않았다.
+- 탐색 지평 · `GOVERNING_SEARCH_FORMS` · Form 10/10-12B 수집 · class 정의 문법 ·
+  종료 문법 · P2 · B1 · N1 · Exhibit 3 권한 · Item 5.03의 일반 의미 권한을 바꾸지 않았다.
+- 같은 문서 O2 family(`STATE_FILED_UPON_FILING`)를 넓히지 않았다.
+- 어떤 packet도 승격하지 않았고 5A-3를 만들지 않았다.
+
+---
+
 ## 11. 결과
 
 

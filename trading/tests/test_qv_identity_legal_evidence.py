@@ -36,6 +36,8 @@ from backtest.qv_identity_legal_evidence import (  # noqa: E402
     GOVERNING_CLASS_DEFINITION,
     GOVERNING_CLASSIFICATIONS,
     INCOMPLETE,
+    ITEM_503_CORROBORATED_UPON_FILING,
+    LEGAL_OPERATIVE_DATE_CORROBORATION,
     PROSE_ALIAS_LIFETIME,
     SNAPSHOT_CLASSIFICATIONS,
     UNRESOLVED,
@@ -45,6 +47,7 @@ from backtest.qv_identity_legal_evidence import (  # noqa: E402
     class_designation_anchor,
     class_evidence_from_legal_proof,
     classify_document,
+    item_503_document_association,
     collect_legal_evidence,
     governing_operative_date,
 )
@@ -157,6 +160,68 @@ def elimination(*, series=ELIMINATED_SERIES, paragraphs=(), date=None) -> bytes:
     if date:
         body.append(effective(date))
     return html(*body)
+
+
+#: O2-C — governing Exhibit이 대는 **법적 규칙**. 기관 이름 대신 법령을 참조한다.
+DGCL_UPON_FILING = (
+    "This Restated Certificate of Incorporation shall become effective upon "
+    "filing pursuant to the DGCL."
+)
+#: Item 5.03 primary가 대는 **사실**: 델라웨어 제출 + 발효일.
+DELAWARE_FILED_EFFECTIVE = (
+    "The Amended and Restated Certificate of Incorporation was filed with the "
+    "Secretary of State of the State of Delaware and became effective on "
+    "March 18, 2019."
+)
+#: 명시 `respectively`가 대응을 문장 안에서 닫는다. 실측 FOXA block:204 모양이다.
+RESPECTIVELY = (
+    "The descriptions of the foregoing are qualified in their entirety by "
+    "reference to the Company\u2019s Amended and Restated Certificate of "
+    "Incorporation and Amended and Restated By-laws, which are attached hereto "
+    "as Exhibits 3.1 and 3.2, respectively, and incorporated herein by reference."
+)
+CORROBORATED_DATE = "2019-03-18"
+
+
+def narrative(filed=DELAWARE_FILED_EFFECTIVE, association=RESPECTIVELY):
+    """Item 5.03 서술 **한 block**. 실측 FOXA block:204가 둘을 한 문단에 담는다.
+
+    §5의 경계가 block 하나이므로 fixture도 한 문단이어야 한다 — 여러 block에 걸친
+    Item 5.03 절 parser를 만들지 않는다.
+    """
+    return " ".join(item for item in (filed, association) if item)
+
+
+def dgcl_certificate(*, created=(CLASS_A,), date=None, extra=()):
+    """DGCL 제출 발효 조항을 든 완전 restated instrument. **자체 날짜는 없다.**"""
+    return restated(created=created, date=date, extra=tuple(extra) + (DGCL_UPON_FILING,))
+
+
+def item_503_filing(accession="0000000042-19-000001", acceptance="2019-03-19", *,
+                    primary_paragraphs=(narrative(),),
+                    certificate=None, bylaws=True, items="5.03,9.01"):
+    """Item 5.03을 선언한 8-K. primary 서술 + EX-3.1(+EX-3.2)을 함께 낸다."""
+    documents = {"form8k.htm": ("8-K", html("Item 5.03.", *primary_paragraphs))}
+    documents["ex3-1.htm"] = (
+        "EX-3.1", dgcl_certificate() if certificate is None else certificate
+    )
+    if bylaws:
+        # **동반 by-laws는 자기 날짜를 스스로 갖는다**(실측 FOXA ex3-2도 그렇다).
+        # 그 날짜는 by-laws의 것이고 certificate로 건너가지 않는다.
+        documents["ex3-2.htm"] = ("EX-3.2", html(
+            "AMENDED AND RESTATED BY-LAWS OF ACME INC.",
+            "The foregoing By-laws were adopted by the Board, effective as of "
+            "March 18, 2019.",
+        ))
+    return Filing(accession, "8-K", acceptance, documents,
+                  items=items, primary_document="form8k.htm")
+
+
+def operative_of(payload, document_name="ex3-1.htm"):
+    return next(
+        item for item in payload["documents"]
+        if item["document_name"] == document_name
+    )
 
 
 def ab_cover_facts():
@@ -788,9 +853,14 @@ class BirthTest(BaseFixture):
             BIRTH_DATE,
         )
 
-    def test_an_explicit_reclassification_into_the_target_proves_birth(self):
-        """`reclassified into <NAME>`도 그 class를 세우는 실행 행위다."""
-        payload, _evidence = self.assertClassEvidence([
+    def test_a_reclassification_into_the_target_is_not_a_birth(self):
+        """**주식 재분류는 class 생성이 아니다**(사용자 결정으로 옛 규칙을 대체했다).
+
+        `reclassified into <NAME>`이 증명하는 것은 그 주식들이 대상 class의 주식이
+        됐다는 **주식 사건**이다. 그 class가 그 시점에 만들어졌다는 진술이 아니다 —
+        class가 그 재분류보다 앞설 수 있다.
+        """
+        payload, evidence = self.assertClassEvidence([
             charter_8k("0000000042-15-000001", "2015-10-05",
                        amendment(paragraphs=(
                            f"Each share of Common Stock was reclassified into one "
@@ -799,12 +869,64 @@ class BirthTest(BaseFixture):
                        ), date=BIRTH_PROSE)),
         ])
         entry = evidence_for(payload)
-        self.assertEqual(entry["birth_date"], BIRTH_DATE)
-        self.assertIn(
-            "RECLASSIFIED_INTO",
-            [item["semantic_family"] for item in entry["findings"]
-             if item["finding_kind"] == CLASS_BIRTH_ACTION],
+        kinds = [item["finding_kind"] for item in entry["findings"]]
+        self.assertIn(GOVERNING_CLASS_DEFINITION, kinds)
+        self.assertNotIn(CLASS_BIRTH_ACTION, kinds)
+        self.assertNotIn(CLASS_BIRTH_EFFECTIVE_DATE, kinds)
+        self.assertIsNone(entry["birth_date"])
+        self.assertEqual(evidence, {})
+
+    def test_the_foxa_shaped_reclassification_is_not_a_birth(self):
+        """실측 FOXA 문언. **넓은 재분류 문법을 birth에 만들지 않는다.**
+
+        `0001193125-19-079678/d721949dex31.htm` block:20의 실제 모양이다.
+        """
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-19-000001", "2019-03-19",
+                       amendment(paragraphs=(
+                           "Each share of the Corporation\u2019s common stock, par "
+                           "value $0.001 per share (the \u201cOld Common Stock\u201d), "
+                           "issued and outstanding immediately prior to the Effective "
+                           "Time, will be automatically reclassified as and become "
+                           f"1/100th of a share of {CLASS_B}.",
+                           authorized(CLASS_B),
+                       ), date="March 18, 2019")),
+        ], cover_facts(title=CLASS_B, symbol="BBB"))
+        entry = evidence_for(payload, "us-gaap:CommonClassAMember")
+        kinds = [item["finding_kind"] for item in entry["findings"]]
+        self.assertNotIn(CLASS_BIRTH_ACTION, kinds)
+        self.assertNotIn(CLASS_BIRTH_EFFECTIVE_DATE, kinds)
+        self.assertIsNone(entry["birth_date"])
+        self.assertEqual(evidence, {})
+
+    def test_authorized_capital_enumeration_with_a_date_is_not_a_birth(self):
+        """**수권자본 열거는 정의뿐이다**(CLOSED 규칙 재확인).
+
+        실 FOXA charter와 같은 자본구조 문언 + 완전히 해소된 발효일이 있어도 탄생이
+        아니다 — 그 class가 그 restatement보다 앞설 수 있고, 앞선 instrument가 SEC에
+        없으면 어느 쪽인지 판정할 수 없다. fail-close다.
+        """
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-19-000001", "2019-03-19", restated(extra=(
+                "The total number of shares of capital stock which the Corporation "
+                "shall have authority to issue is 3,000,000,000 shares, consisting "
+                f"of 2,000,000,000 shares of {CLASS_A}, par value $0.001 per share.",
+            ), date="March 18, 2019")),
+        ])
+        document = next(
+            item for item in payload["documents"]
+            if item["document_role"] == "EXHIBIT"
         )
+        # 발효일은 완전히 해소됐다 — 막는 것은 날짜가 아니라 탄생 행위의 부재다.
+        self.assertEqual(document["legal_operative_status"], "RESOLVED")
+        self.assertEqual(document["legal_operative_date"], "2019-03-18")
+        entry = evidence_for(payload)
+        kinds = [item["finding_kind"] for item in entry["findings"]]
+        self.assertIn(GOVERNING_CLASS_DEFINITION, kinds)
+        self.assertNotIn(CLASS_BIRTH_ACTION, kinds)
+        self.assertIsNone(entry["birth_date"])
+        self.assertEqual(entry["status"], UNRESOLVED)
+        self.assertEqual(evidence, {})
 
     def test_a_definition_with_a_single_instrument_date_still_proves_no_birth(self):
         """발효일이 정확히 하나여도 탄생 행위가 없으면 탄생이 아니다."""
@@ -1467,6 +1589,300 @@ class OpenEndedContinuityTest(BaseFixture):
         self.assertEqual(
             evidence["us-gaap:CommonClassAMember"].class_interval.effective_from,
             BIRTH_DATE,
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# O2-C — 같은 accession의 Item 5.03이 **날짜만** 보강한다
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class Item503CorroborationTest(BaseFixture):
+    """**primary는 여전히 어떤 class 사실도 만들지 못한다.** 새 권한은 날짜 하나뿐이다."""
+
+    def test_an_explicit_respectively_resolves_the_exact_exhibit(self):
+        payload, _evidence = self.assertClassEvidence([item_503_filing()])
+        document = operative_of(payload)
+        self.assertEqual(
+            (document["legal_operative_status"],
+             document["legal_operative_date"],
+             document["legal_operative_source_family"]),
+            ("RESOLVED", CORROBORATED_DATE, ITEM_503_CORROBORATED_UPON_FILING),
+        )
+        # governing 쪽 근거는 **그 Exhibit 안의 제출 발효 조항**이다.
+        self.assertEqual(len(document["legal_operative_locators"]), 1)
+        # primary 쪽은 자연키째 남는다 — 남의 block:N을 이 문서 것으로 적지 않는다.
+        dependencies = document["legal_operative_dependencies"]
+        self.assertEqual(len(dependencies), 1)
+        self.assertEqual(
+            (dependencies[0]["cik"], dependencies[0]["accession"],
+             dependencies[0]["document_name"], dependencies[0]["proof_authority"]),
+            (CIK, "0000000042-19-000001", "form8k.htm", "FILING_NARRATIVE"),
+        )
+        self.assertTrue(dependencies[0]["locator"].startswith("block:"))
+
+    def test_the_same_sentence_without_respectively_never_guesses(self):
+        """**대응 표지가 없으면 순서로 짝짓지 않는다.** §6 금지 규칙 그대로다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(
+                narrative(association=RESPECTIVELY.replace(", respectively,", ",")),
+            ),
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_a_mismatched_cardinality_fails_association(self):
+        """2↔2만 받는다. 일반 N항 대응 parser를 만들지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(narrative(association=RESPECTIVELY.replace(
+                "Exhibits 3.1 and 3.2, respectively",
+                "Exhibits 3.1, 3.2 and 3.3, respectively",
+            )),),
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_two_instruments_of_the_same_family_fail_association(self):
+        """둘이 같은 family면 어느 쪽인지 정할 수 없다 — 임의로 배정하지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(narrative(association=(
+                "The descriptions are qualified by reference to the Amended and "
+                "Restated Certificate of Incorporation and the Amended and "
+                "Restated Certificate of Incorporation of the Bank, which are "
+                "attached hereto as Exhibits 3.1 and 3.2, respectively."
+            )),),
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_a_direct_single_exhibit_reference_resolves(self):
+        """block이 전시 번호를 정확히 하나만 말하면 그것이 결정론적 연결이다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(narrative(
+                association="The Certificate is attached hereto as Exhibit 3.1."
+            ),),
+            bylaws=False,
+        )])
+        document = operative_of(payload)
+        self.assertEqual(document["legal_operative_date"], CORROBORATED_DATE)
+        self.assertEqual(
+            document["legal_operative_source_family"],
+            ITEM_503_CORROBORATED_UPON_FILING,
+        )
+
+    def test_a_non_delaware_filing_office_never_pairs_with_the_dgcl_clause(self):
+        """**관할이 맞아야 한다.** 발행사 domicile로 주를 유추하지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(narrative(filed=DELAWARE_FILED_EFFECTIVE.replace(
+                "the State of Delaware", "the State of New York"
+            )),),
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_an_open_ended_statute_phrase_is_never_an_operative_event(self):
+        """열거된 법령 이름만이다. `applicable law`·맨 `upon filing`은 받지 않는다."""
+        for clause in (
+            "This Certificate shall become effective upon filing.",
+            "This Certificate shall become effective upon filing pursuant to "
+            "applicable law.",
+            "This Certificate shall become effective upon filing pursuant to "
+            "Delaware law.",
+            "This Certificate shall become effective upon filing pursuant to law.",
+        ):
+            with self.subTest(clause=clause):
+                payload, _evidence = self.assertClassEvidence([item_503_filing(
+                    certificate=restated(created=(CLASS_A,), date=None,
+                                         extra=(clause,)),
+                )])
+                self.assertEqual(
+                    operative_of(payload)["legal_operative_status"], "MISSING"
+                )
+
+    def test_the_dgcl_clause_alone_never_supplies_a_date(self):
+        """Item 5.03 신고가 없으면 primary는 후보조차 아니다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(items="9.01")])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_an_exhibit_without_the_upon_filing_clause_stays_missing(self):
+        """primary가 날짜를 대도 governing 쪽 법적 규칙이 없으면 만들지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            certificate=restated(created=(CLASS_A,), date=None),
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_a_date_pinned_to_another_exhibit_never_resolves_this_one(self):
+        """primary가 By-laws를 가리키면 certificate는 그대로 MISSING이다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(
+                "The Amended and Restated By-laws were filed with the Secretary "
+                "of State of the State of Delaware and became effective on "
+                "March 18, 2019. The By-laws are attached hereto as Exhibit 3.2.",
+            ),
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_a_later_accession_never_backfills_an_earlier_document(self):
+        """나중 recital이 앞 instrument의 법적 시점을 소급 결정하지 않는다."""
+        payload, _evidence = self.assertClassEvidence([
+            item_503_filing("0000000042-19-000001", "2019-03-19",
+                            primary_paragraphs=("Item 9.01.",)),
+            item_503_filing("0000000042-23-000001", "2023-02-08"),
+        ])
+        self.assertEqual(
+            operative_of(payload)["legal_operative_status"], "MISSING"
+        )
+
+    def test_companion_bylaws_never_lend_their_date_to_the_certificate(self):
+        """그 날짜는 by-laws의 것이다. 다른 Exhibit으로 베끼지 않는다."""
+        filing = item_503_filing(primary_paragraphs=("Item 9.01.",))
+        filing.documents["ex3-2.htm"] = ("EX-3.2", html(
+            "AMENDED AND RESTATED BY-LAWS OF ACME INC.",
+            "The foregoing By-laws were adopted by the Board, effective as of "
+            "March 18, 2019.",
+        ))
+        payload, _evidence = self.assertClassEvidence([filing])
+        self.assertEqual(operative_of(payload, "ex3-2.htm")["legal_operative_date"],
+                         CORROBORATED_DATE)
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_an_agreeing_in_document_date_keeps_the_stronger_family(self):
+        """문서 안의 직접 진술이 더 강하다. 보강이 있다고 family를 바꾸지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            certificate=dgcl_certificate(date="March 18, 2019"),
+        )])
+        document = operative_of(payload)
+        self.assertEqual(document["legal_operative_date"], CORROBORATED_DATE)
+        self.assertEqual(
+            document["legal_operative_source_family"], "EXPLICIT_EFFECTIVE_DATE"
+        )
+        self.assertEqual(document["legal_operative_dependencies"], [])
+
+    def test_a_conflicting_in_document_date_is_ambiguous(self):
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            certificate=dgcl_certificate(date="March 20, 2019"),
+        )])
+        document = operative_of(payload)
+        self.assertEqual(document["legal_operative_status"], "AMBIGUOUS")
+        self.assertIsNone(document["legal_operative_date"])
+
+    def test_two_conflicting_primary_dates_are_ambiguous(self):
+        """가장 이른/늦은/가까운 것을 고르지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(
+                "The Certificate was filed with the Secretary of State of the "
+                "State of Delaware and became effective on March 18, 2019. It is "
+                "attached hereto as Exhibit 3.1.",
+                "The Certificate was filed with the Secretary of State of the "
+                "State of Delaware and became effective on March 20, 2019. It is "
+                "attached hereto as Exhibit 3.1.",
+            ),
+            bylaws=False,
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "AMBIGUOUS")
+
+    def test_the_association_helper_needs_the_explicit_marker(self):
+        """연결 판정 자체의 계약. `respectively`가 유일한 이유임을 고정한다."""
+        with_marker = (
+            "The Amended and Restated Certificate of Incorporation and Amended "
+            "and Restated By-laws are attached hereto as Exhibits 3.1 and 3.2, "
+            "respectively."
+        )
+        self.assertEqual(
+            item_503_document_association(
+                with_marker, "AMENDED_AND_RESTATED_CERTIFICATE"),
+            "3.1",
+        )
+        self.assertEqual(
+            item_503_document_association(with_marker, "BYLAWS"), "3.2"
+        )
+        # 대상이 나열된 둘 중 어느 것도 아니면 배정하지 않는다.
+        self.assertIsNone(item_503_document_association(
+            with_marker, "CERTIFICATE_OF_AMENDMENT"))
+        # **`respectively`가 유일한 이유다.** 빼면 그 자리에서 fail-close다.
+        self.assertIsNone(item_503_document_association(
+            with_marker.replace(", respectively", ""), "BYLAWS"
+        ))
+
+
+class Item503ProvenanceTest(BaseFixture):
+    """**두 문서 의존이 구간까지 살아 있어야 한다.** 5A-3가 거기서 PIT를 파생시킨다."""
+
+    def packet(self):
+        return self.assertClassEvidence([item_503_filing()])
+
+    def test_the_interval_carries_the_primary_as_required_evidence(self):
+        payload, evidence = self.packet()
+        interval = evidence["us-gaap:CommonClassAMember"].class_interval
+        self.assertEqual(interval.effective_from, CORROBORATED_DATE)
+        corroboration = [
+            item for item in interval.evidence
+            if item.evidence_role == LEGAL_OPERATIVE_DATE_CORROBORATION
+        ]
+        self.assertEqual(len(corroboration), 1)
+        self.assertEqual(
+            (corroboration[0].document_name, corroboration[0].dependency),
+            ("form8k.htm", "REQUIRED"),
+        )
+        # governing Exhibit도 그대로 남는다 — 하나가 다른 하나를 대신하지 않는다.
+        self.assertIn(
+            "ex3-1.htm",
+            [item.document_name for item in interval.evidence
+             if item.evidence_role == GOVERNING_CLASS_DEFINITION],
+        )
+
+    def assertTamperFails(self, mutate):
+        payload, _evidence = self.packet()
+        mutate(payload)
+        with self.assertRaises(QVLegalEvidenceError):
+            class_evidence_from_legal_proof(payload, cover_proof=cover_proof(cover_facts()))
+
+    def test_dropping_the_primary_dependency_fails_closed(self):
+        def mutate(payload):
+            operative_of(payload)["legal_operative_dependencies"] = []
+        self.assertTamperFails(mutate)
+
+    def test_pointing_the_dependency_at_another_accession_fails_closed(self):
+        def mutate(payload):
+            operative_of(payload)["legal_operative_dependencies"][0]["accession"] = (
+                "0000000042-99-000001"
+            )
+        self.assertTamperFails(mutate)
+
+    def test_pointing_the_dependency_at_an_absent_document_fails_closed(self):
+        def mutate(payload):
+            operative_of(payload)["legal_operative_dependencies"][0]["document_name"] = (
+                "nowhere.htm"
+            )
+        self.assertTamperFails(mutate)
+
+    def test_pointing_the_dependency_at_an_exhibit_fails_closed(self):
+        """다른 Exhibit의 날짜를 베끼는 치환. primary가 아니면 받지 않는다."""
+        def mutate(payload):
+            operative_of(payload)["legal_operative_dependencies"][0]["document_name"] = (
+                "ex3-2.htm"
+            )
+        self.assertTamperFails(mutate)
+
+    def test_swapping_the_source_family_fails_closed(self):
+        """같은 날짜를 남긴 채 출처만 바꾸면 의존 개수가 맞지 않는다."""
+        def mutate(payload):
+            operative_of(payload)["legal_operative_source_family"] = (
+                "EXPLICIT_EFFECTIVE_DATE"
+            )
+        self.assertTamperFails(mutate)
+
+    def test_emptying_the_dependency_locator_fails_closed(self):
+        def mutate(payload):
+            operative_of(payload)["legal_operative_dependencies"][0]["locator"] = ""
+        self.assertTamperFails(mutate)
+
+    def test_changing_the_dependency_locator_changes_the_projection(self):
+        """locator 변조는 재투영에서 **다른 증거**가 되어 승격 비교에서 걸린다."""
+        payload, evidence = self.packet()
+        before = evidence["us-gaap:CommonClassAMember"].class_interval.evidence
+        operative_of(payload)["legal_operative_dependencies"][0]["locator"] = "block:999"
+        after = class_evidence_from_legal_proof(
+            payload, cover_proof=cover_proof(cover_facts())
+        )["us-gaap:CommonClassAMember"].class_interval.evidence
+        self.assertNotEqual(
+            [item.locator for item in before], [item.locator for item in after]
         )
 
 

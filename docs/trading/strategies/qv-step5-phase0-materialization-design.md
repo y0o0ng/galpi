@@ -1008,6 +1008,106 @@ family·그 family가 요구하는 locator 개수를 모두 갖춰야 하고, �
 **두 번째 법적 날짜 해석기를 만들지 않았다.** `CLASS_BIRTH_EFFECTIVE_DATE` ·
 `CLASS_TERMINATION_EFFECTIVE_DATE` · B2 연대기가 전부 이 하나의 구조에서 나온다.
 
+##### O2-C — 같은 accession의 Item 5.03이 **날짜만** 보강한다 (**CLOSED**)
+
+**`FILING_NARRATIVE`는 여전히 어떤 class 의미 사실도 만들지 못한다.** 새로 얻는 권한은
+좁게 경계된 operative-date 보강 하나뿐이고, `GOVERNING_CLASS_DEFINITION` ·
+`CLASS_BIRTH_ACTION` · `CLASS_BIRTH_EFFECTIVE_DATE` · `CURRENT_GOVERNING_SNAPSHOT` ·
+`CLASS_TERMINATION_EFFECTIVE_DATE` · `PROSE_ALIAS_LIFETIME`은 하나도 만들지 못한다.
+
+```text
+governing Exhibit  ->  제출이 발효 사건이라는 **법적 규칙**
+Item 5.03 primary  ->  그 제출이 실제로 일어난 **날짜**
+```
+
+네 번째 `source_family` `ITEM_503_CORROBORATED_UPON_FILING`은 **아래가 전부 참일 때만**
+나온다.
+
+```text
+같은 CIK · 같은 accession
+실제 8-K / 8-K-A primary이고 Item 5.03이 선언돼 있다
+대상 문서가 authoritative Exhibit 3이다
+대상 Exhibit이 교차 문서 제출 발효 조항을 든다
+primary가 델라웨어 주무관청 제출을 명시한다
+primary가 "became effective on D"를 명시한다
+primary가 그 정확한 Exhibit을 결정론적으로 지목한다
+그 전시 번호가 SEC 선언 metadata로 문서 하나에 유일하게 대응한다
+```
+
+**DGCL 조항 어휘는 교차 경로 전용이다.** 같은 문서 경로
+(`STATE_FILED_UPON_FILING` · `UPON_FILING_PATTERNS`)는 조항이 기관을 명시해야 한다는
+계약 그대로 동결이다 — 거기서는 보상 장치가 같은 문서의 주 스탬프이기 때문이다. 교차
+경로의 보상은 **primary가 명시한 기관과 날짜**이므로 조항이 기관 대신 법령을 참조할 수
+있다.
+
+```text
+effective upon filing pursuant to the DGCL                          받는다(교차 전용)
+effective upon filing pursuant to the General Corporation Law
+  of the State of Delaware                                          받는다(교차 전용)
+effective upon filing                                               받지 않는다
+... pursuant to applicable law / Delaware law / law                 받지 않는다
+```
+
+**`pursuant to the DGCL` 단독으로는 날짜가 나오지 않는다.** 그것은 governing 절반일
+뿐이다. 그리고 **관할이 일치해야 한다** — DGCL 조항은 델라웨어 제출처와만 짝지어지고,
+발행사 domicile metadata로 주를 유추하지 않는다.
+
+##### 명시 `respectively`는 순서 추론이 **아니다**
+
+금지된 것은 **명시 대응 표지 없이** 순서로 짝짓는 것이다 — 문서 sequence · Item 9.01 표
+행 순서 · 가장 가까운 Exhibit · 파일명 · 제목 유사도 · 분류 family만으로 accession 전체를
+가르는 것. `respectively`는 그 대응을 **문장이 스스로 선언하는 낱말**이므로 추론이
+아니라 원문 근거다.
+
+```text
+... the Amended and Restated Certificate of Incorporation and Amended and
+    Restated By-laws, which are attached hereto as Exhibits 3.1 and 3.2,
+    respectively
+```
+
+받는 모양은 둘뿐이고 경계는 `html_blocks()` **block 하나**다.
+
+```text
+직접   block이 전시 번호를 정확히 하나만 말한다
+대응   명시 `respectively`가 닫는 2↔2
+```
+
+대응 경로는 **열거된 instrument family로만** 두 이름을 읽는다(분류기가 이미 아는
+`AMENDED_AND_RESTATED_CERTIFICATE` · `BYLAWS` · `CERTIFICATE_OF_AMENDMENT` …). 임의 제목
+문구를 정규화하지 않고, 소유격·관사 포장은 family 정체성이 아니다. 나열이 둘이 아니거나 ·
+둘이 같은 family이거나 · 대상 family가 그 둘에 없거나 · `respectively`가 없으면 그 자리에서
+fail-close다. **일반 N항 자연어 대응 parser를 만들지 않는다.**
+
+##### 우선순위 — 문서 안의 직접 진술이 더 강하다
+
+```text
+Exhibit이 이미 RESOLVED이고 primary가 같은 날짜   -> 원래 family 그대로 둔다
+Exhibit이 이미 RESOLVED이고 primary가 다른 날짜   -> AMBIGUOUS
+Exhibit이 이미 AMBIGUOUS                          -> primary가 구해내지 못한다
+Exhibit이 MISSING이고 qualifying 날짜 하나         -> RESOLVED (O2-C)
+같은 Exhibit에 qualifying 날짜가 둘 이상          -> AMBIGUOUS
+```
+
+##### 교차 문서 의존은 자연키째 남는다
+
+O2-C의 결론은 **두 SEC 문서**에 의존하므로 `supporting_locators` 문자열 하나로 표현할 수
+없다. 다른 문서의 `block:N`을 이 문서의 근거인 것처럼 적지 않는다.
+
+```text
+supporting_locators   governing Exhibit 안의 제출 발효 조항 locator 하나
+dependencies          cik · accession · document_name · locator · proof_authority
+```
+
+그리고 그 연대기에 기댄 **최종 구간 증거**가 primary를 `REQUIRED`
+(`LEGAL_OPERATIVE_DATE_CORROBORATION`)로 함께 든다. 5A-3가 REQUIRED 자연키에서
+`usable_from_session`을 파생시키므로, 이것이 빠지면 "primary가 나오기 전에도 그 날짜를
+알 수 있었다"고 주장하는 셈이다. 그 역할은 날짜만 받치고 class 정의·탄생·종료 권한을
+하나도 주지 않는다.
+
+`assert_proof_integrity()`가 여기도 fail-close다 — family가 요구하는 교차 의존 개수 ·
+같은 accession · receipt 안에 실재하는 문서 · 그 문서가 primary `FILING_NARRATIVE`인지를
+전부 본다.
+
 ##### governing snapshot의 발효일은 그 안 class의 탄생일이 아니다
 
 **정의와 탄생은 다른 사실이다.**
@@ -1039,6 +1139,33 @@ filed date · 최초 관측을 탄생일로 쓰지 않고 가까운 날짜를 �
 원본 governing instrument도 그 언어가 명시로 있을 때만 탄생을 증명한다. **결과적으로,
 정의만 든 restatement가 둘이어도 그 발효일들은 탄생일 후보가 아니므로 서로 충돌하지
 않는다.**
+
+##### 재분류도 수권자본 열거도 탄생이 **아니다** (**CLOSED — 옛 규칙을 대체했다**)
+
+사용자 결정으로 **옛 `RECLASSIFIED_INTO` 탄생 규칙은 폐기됐다.** 주식 재분류가 증명하는
+것은 그 주식들이 대상 class의 주식이 됐다는 **주식 사건**이고, 대상 class가 그 시점에
+만들어졌다는 진술이 아니다 — class가 재분류보다 수십 년 앞설 수 있다.
+
+```text
+reclassified into <NAME>                         탄생이 아니다
+reclassified as and become <NAME>                탄생이 아니다(넓힌 문법을 만들지 않는다)
+shares of <NAME> into which ... reclassified     탄생이 아니다
+authorized capital includes <NAME>               정의일 뿐이다
+Corporation shall have authority to issue <NAME> 정의일 뿐이다
+```
+
+**관측을 보존하려고 중립 finding family를 새로 만들지 않았다.** 재분류 provenance가 따로
+필요해지면 그때 별도로 설계한다. 남는 탄생 문법은 그 class를 실제로 세우는 명시 실행
+행위(`hereby created` · `hereby established` · `new class ... designated <NAME>`)뿐이고
+넓히지 않는다.
+
+**종료 쪽 재분류는 다른 사실이고 그대로다**(§9.5) — 거기서는 대상 class가 명시로
+재분류되어 **사라지는** 모양이다.
+
+실측(FOXA): 2019 restated certificate가 Class A를 수권자본에 열거하고 Old Common Stock을
+Class B로 재분류하지만, **둘 다 탄생이 아니므로 Class A·B는 `UNRESOLVED`로 남는다.**
+2018년의 앞선 authoritative certificate가 SEC에 없어서 Class A가 2019에 새로 생겼는지
+앞 자본구조에서 이어졌는지 판정할 수 없다 — fail-close다.
 
 **경제적 발효일로 쓰지 않는 것**: SEC 수리 시각 · filed date · accession 날짜 · report
 date · 서명일 단독 · 최초 관측 filing · 최초 XBRL 등장 · 최초 ticker 등장.
