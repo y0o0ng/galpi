@@ -997,7 +997,7 @@ EFFECTIVE DATE: JANUARY 3, 2022
 status · date · source_family · supporting_locators · observed
 ```
 
-`source_family`는 위 셋뿐이고 신뢰도 점수가 아니다. `STATE_FILED_UPON_FILING`은 제출
+`source_family`는 동결된 넷뿐이고(위 셋 + 아래 O2-C) 신뢰도 점수가 아니다. `STATE_FILED_UPON_FILING`은 제출
 발효 조항 locator와 주 스탬프 locator를 **둘 다** 남긴다 — 그래서 왜 D가 나왔는지
 receipt만 보고 되짚을 수 있다. `acceptance_datetime`은 별도 provenance로 남는다.
 
@@ -1068,9 +1068,26 @@ effective upon filing                                               받지 않�
 받는 모양은 둘뿐이고 경계는 `html_blocks()` **block 하나**다.
 
 ```text
-직접   block이 전시 번호를 정확히 하나만 말한다
+직접   전시 번호가 정확히 하나이고, **그 참조가 든 문장이** 대상 instrument를
+       명시로 말한다
 대응   명시 `respectively`가 닫는 2↔2
 ```
+
+**번호가 하나라는 것만으로는 연결이 아니다.** 원문이 그 Exhibit을 대상 instrument에
+붙였다고 말해야 한다 — 지나가는 언급이나 다른 instrument에 붙은 번호를 읽지 않는다.
+
+```text
+The Amended and Restated Certificate of Incorporation
+  is attached hereto as Exhibit 3.1.          받는다
+For additional information, see Exhibit 3.1.  받지 않는다(instrument가 없다)
+The By-laws are attached hereto as Exhibit 3.1.
+                                              받지 않는다(다른 family다)
+The Certificate is attached hereto as Exhibit 3.1.
+                                              받지 않는다(정의어 참조는 설계 범위 밖)
+```
+
+정의어·대명사 공참조 해소를 만들지 않는다. 실제 원문이 `the Certificate -> 앞서 정의된
+정확한 instrument`를 요구하면 그때 별도로 설계한다.
 
 대응 경로는 **열거된 instrument family로만** 두 이름을 읽는다(분류기가 이미 아는
 `AMENDED_AND_RESTATED_CERTIFICATE` · `BYLAWS` · `CERTIFICATE_OF_AMENDMENT` …). 임의 제목

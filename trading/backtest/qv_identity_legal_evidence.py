@@ -1062,7 +1062,7 @@ class OperativeDate:
     accession 순서·report date는 **순서 결정에 쓰이지 않는다** — 그것들은 provenance이고
     5A-3의 지식 가용성 입력이다.
 
-    `source_family`는 신뢰도 점수가 아니라 **동결된 셋 중 하나**이고,
+    `source_family`는 신뢰도 점수가 아니라 **동결된 넷 중 하나**이고,
     `supporting_locators`는 그 날짜가 왜 나왔는지를 되짚을 수 있는 결정론적 span들이다.
     `STATE_FILED_UPON_FILING`은 제출 발효 조항과 주 스탬프 **둘 다**를 남긴다.
     """
@@ -1161,6 +1161,11 @@ def governing_operative_date(blocks: tuple[str, ...]) -> OperativeDate:
 
     가장 가까운/이른/늦은 날짜를 고르지 않고 **SEC 수리 시각으로 되돌아가지 않는다.**
     서명·집행일도 발효일이 아니다.
+
+    **여기서 나오는 것은 동결된 네 family 중 이 셋뿐이다.** 네 번째
+    `ITEM_503_CORROBORATED_UPON_FILING`은 다른 SEC 문서에 의존하므로 이 단일 문서
+    parser가 만들지 않는다 — accession 단위 두 번째 걸음
+    (`item_503_corroborated_dates()`)이 그것을 정한다.
     """
     explicit = _date_hits(blocks, EFFECTIVE_DATE_PATTERNS)
     certified = _date_hits(
@@ -1249,12 +1254,16 @@ def _exhibit_number(document_type: object) -> str | None:
     return f"{int(match.group(1))}.{int(match.group(2))}"
 
 
-def _sentence_head(text: str, index: int) -> str:
-    """그 지점을 품은 문장에서 **지점 앞부분**만. instrument 나열은 여기 있다."""
+def _sentence_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    """그 구간을 품은 문장 하나의 경계. instrument 이름을 여기서만 읽는다."""
     left = 0
-    for match in _SENTENCE_BREAK.finditer(text, 0, index):
+    for match in _SENTENCE_BREAK.finditer(text, 0, start):
         left = match.end()
-    return text[left:index]
+    right = len(text)
+    match = _SENTENCE_BREAK.search(text, end)
+    if match is not None:
+        right = match.start()
+    return left, right
 
 
 def _instrument_families(text: str) -> tuple[str, ...]:
@@ -1293,9 +1302,30 @@ def item_503_document_association(block: str, target_family: str) -> str | None:
     numbers: list[str] = []
     for match in references:
         numbers.extend(re.findall(_EXHIBIT_NUMBER, match.group(1)))
-    # 직접 연결 — block 전체가 전시 번호를 정확히 하나만 말한다.
+    # 직접 연결 — 전시 번호가 하나라는 것만으로는 **부족하다.** 그 참조가 든 문장이
+    # 대상 instrument를 명시로 말해야 한다. `see Exhibit 3.1` 같은 지나가는 언급이나
+    # 다른 instrument에 붙은 번호를 대상의 연결로 읽지 않는다.
+    #
+    # ```text
+    # The Amended and Restated Certificate of Incorporation
+    #   is attached hereto as Exhibit 3.1.        받는다(대상 family가 명시로 있다)
+    # For additional information, see Exhibit 3.1. 받지 않는다(instrument가 없다)
+    # The By-laws are attached hereto as Exhibit 3.1.
+    #                                              받지 않는다(다른 family다)
+    # The Certificate is attached hereto as Exhibit 3.1.
+    #                                              받지 않는다(정의어 참조는 이번
+    #                                              증분의 설계 범위가 아니다)
+    # ```
+    #
+    # 이름을 읽는 어휘는 `respectively` 경로와 **같은 열거 family**다. 정의어·대명사
+    # 공참조 해소를 만들지 않는다 — 실제 원문이 요구하면 그때 별도로 설계한다.
     if len(numbers) == 1:
-        return numbers[0]
+        reference = references[0]
+        left, right = _sentence_bounds(block, reference.start(), reference.end())
+        families = _instrument_families(block[left:right])
+        if len(families) == 1 and families[0] == target_family:
+            return numbers[0]
+        return None
     # 대응 연결 — 명시 `respectively`가 닫는 2↔2만이다.
     for match in references:
         listed = re.findall(_EXHIBIT_NUMBER, match.group(1))
@@ -1303,7 +1333,8 @@ def item_503_document_association(block: str, target_family: str) -> str | None:
             continue
         if _RESPECTIVELY.match(block[match.end():]) is None:
             continue
-        families = _instrument_families(_sentence_head(block, match.start()))
+        left, _right = _sentence_bounds(block, match.start(), match.start())
+        families = _instrument_families(block[left:match.start()])
         if len(families) != 2 or families[0] == families[1]:
             # 나열이 2개가 아니거나 둘이 같은 family면 어느 쪽인지 정할 수 없다.
             return None

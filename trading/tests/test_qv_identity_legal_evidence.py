@@ -183,6 +183,20 @@ RESPECTIVELY = (
 CORROBORATED_DATE = "2019-03-18"
 
 
+def direct(instrument="Amended and Restated Certificate of Incorporation",
+           date="March 18, 2019", number="3.1"):
+    """직접 연결 서술 한 문장 — 제출·발효일·전시 참조가 **한 문장 안에** 있다.
+
+    전시 번호가 하나라는 것만으로는 부족하고 그 문장이 대상 instrument를 명시로
+    말해야 한다. 정의어 참조(`The Certificate`)는 이번 증분의 설계 범위가 아니다.
+    """
+    return (
+        f"The {instrument} was filed with the Secretary of State of the State of "
+        f"Delaware and became effective on {date}, and is attached hereto as "
+        f"Exhibit {number}."
+    )
+
+
 def narrative(filed=DELAWARE_FILED_EFFECTIVE, association=RESPECTIVELY):
     """Item 5.03 서술 **한 block**. 실측 FOXA block:204가 둘을 한 문단에 담는다.
 
@@ -1652,13 +1666,10 @@ class Item503CorroborationTest(BaseFixture):
         )])
         self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
 
-    def test_a_direct_single_exhibit_reference_resolves(self):
-        """block이 전시 번호를 정확히 하나만 말하면 그것이 결정론적 연결이다."""
+    def test_a_direct_reference_naming_the_target_instrument_resolves(self):
+        """전시 참조가 든 문장이 **대상 instrument를 명시로** 말할 때만이다."""
         payload, _evidence = self.assertClassEvidence([item_503_filing(
-            primary_paragraphs=(narrative(
-                association="The Certificate is attached hereto as Exhibit 3.1."
-            ),),
-            bylaws=False,
+            primary_paragraphs=(direct(),), bylaws=False,
         )])
         document = operative_of(payload)
         self.assertEqual(document["legal_operative_date"], CORROBORATED_DATE)
@@ -1666,6 +1677,32 @@ class Item503CorroborationTest(BaseFixture):
             document["legal_operative_source_family"],
             ITEM_503_CORROBORATED_UPON_FILING,
         )
+
+    def test_a_sole_exhibit_number_without_a_named_instrument_fails(self):
+        """**번호가 하나라는 것만으로는 연결이 아니다.** 지나가는 언급을 읽지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(
+                DELAWARE_FILED_EFFECTIVE
+                + " For additional information, see Exhibit 3.1.",
+            ),
+            bylaws=False,
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_a_sole_exhibit_number_on_another_instrument_fails(self):
+        """다른 family에 붙은 번호를 대상의 연결로 읽지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(direct(instrument="Amended and Restated By-laws"),),
+            bylaws=False,
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
+
+    def test_a_generic_defined_term_reference_fails_closed(self):
+        """`The Certificate`는 열거 family가 아니다 — 공참조 해소를 만들지 않는다."""
+        payload, _evidence = self.assertClassEvidence([item_503_filing(
+            primary_paragraphs=(direct(instrument="Certificate"),), bylaws=False,
+        )])
+        self.assertEqual(operative_of(payload)["legal_operative_status"], "MISSING")
 
     def test_a_non_delaware_filing_office_never_pairs_with_the_dgcl_clause(self):
         """**관할이 맞아야 한다.** 발행사 domicile로 주를 유추하지 않는다."""
@@ -1765,14 +1802,7 @@ class Item503CorroborationTest(BaseFixture):
     def test_two_conflicting_primary_dates_are_ambiguous(self):
         """가장 이른/늦은/가까운 것을 고르지 않는다."""
         payload, _evidence = self.assertClassEvidence([item_503_filing(
-            primary_paragraphs=(
-                "The Certificate was filed with the Secretary of State of the "
-                "State of Delaware and became effective on March 18, 2019. It is "
-                "attached hereto as Exhibit 3.1.",
-                "The Certificate was filed with the Secretary of State of the "
-                "State of Delaware and became effective on March 20, 2019. It is "
-                "attached hereto as Exhibit 3.1.",
-            ),
+            primary_paragraphs=(direct(), direct(date="March 20, 2019")),
             bylaws=False,
         )])
         self.assertEqual(operative_of(payload)["legal_operative_status"], "AMBIGUOUS")
@@ -1799,6 +1829,24 @@ class Item503CorroborationTest(BaseFixture):
         self.assertIsNone(item_503_document_association(
             with_marker.replace(", respectively", ""), "BYLAWS"
         ))
+        # 직접 경로도 같은 열거 어휘를 요구한다.
+        self.assertEqual(
+            item_503_document_association(
+                "The Amended and Restated Certificate of Incorporation is "
+                "attached hereto as Exhibit 3.1.",
+                "AMENDED_AND_RESTATED_CERTIFICATE",
+            ),
+            "3.1",
+        )
+        for block in (
+            "For additional information, see Exhibit 3.1.",
+            "The By-laws are attached hereto as Exhibit 3.1.",
+            "The Certificate is attached hereto as Exhibit 3.1.",
+        ):
+            with self.subTest(block=block):
+                self.assertIsNone(item_503_document_association(
+                    block, "AMENDED_AND_RESTATED_CERTIFICATE"
+                ))
 
 
 class Item503ProvenanceTest(BaseFixture):

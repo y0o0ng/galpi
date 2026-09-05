@@ -3709,7 +3709,9 @@ restated certificate 3건의 operative date = MISSING
 ## 10.27 5A-2 — 탄생 계약 축소 · Item 5.03 날짜 보강(O2-C) — 2026-09-05
 
 시작 `main` = `3ff6f5dcf8c2cc76ca2c0c2ef18576a02c6b8316`. **어느 packet도 승격하지
-않았고 `trading/qv/identity/*.jsonl`을 읽지도 쓰지도 않았다.**
+않았고 production identity를 바꾸지 않았다.** 아래 사전 영향 점검이
+`trading/qv/identity/*.jsonl`을 **읽기 전용으로 조회했고**(승격된 class 구간의 증거
+역할을 세는 목적) 쓰기·승격·이행은 하나도 하지 않았다.
 
 ### 사전 영향 점검 — `RECLASSIFIED_INTO` (읽기 전용)
 
@@ -3836,6 +3838,81 @@ O2-C에 닿지 못한다. FOXA에 complete snapshot이 하나 더 있다고 읽�
   종료 문법 · P2 · B1 · N1 · Exhibit 3 권한 · Item 5.03의 일반 의미 권한을 바꾸지 않았다.
 - 같은 문서 O2 family(`STATE_FILED_UPON_FILING`)를 넓히지 않았다.
 - 어떤 packet도 승격하지 않았고 5A-3를 만들지 않았다.
+
+---
+
+## 10.28 5A-2 후속 — 직접 연결에 명시 instrument를 요구한다 — 2026-09-05
+
+시작 `main` = `7f544cedbb6f691a4951a11008af1b86295e8d56`(리뷰 대상 `81837f4` 이후 커밋
+셋은 전부 다른 트랙이고 QV 파일을 건드리지 않았다). **승격·manifest 변경 없다.**
+
+### 고친 것 하나
+
+`item_503_document_association()`의 **직접** 경로가 block 안에 전시 번호가 하나뿐이면
+그것을 연결로 받았다. 원문이 그 Exhibit을 대상 instrument에 붙였다고 말하지 않아도
+통과하므로 동결된 exact-document 계약 위반이다.
+
+이제 직접 경로는 **그 참조가 든 문장**이 `respectively` 경로와 **같은 열거 family**로
+대상을 명시할 때만 성립한다.
+
+```text
+recognized family 정확히 하나  AND  recognized family == target_family
+AND  전시 번호 정확히 하나
+```
+
+```text
+The Amended and Restated Certificate of Incorporation
+  is attached hereto as Exhibit 3.1.          받는다
+For additional information, see Exhibit 3.1.  받지 않는다(instrument가 없다)
+The By-laws are attached hereto as Exhibit 3.1.
+                                              받지 않는다(다른 family다)
+The Certificate is attached hereto as Exhibit 3.1.
+                                              받지 않는다(정의어 참조)
+```
+
+**정의어·대명사 공참조 해소를 만들지 않았다** — 옛 양성 fixture를 살리려고 문법을
+넓히지 않고 fixture 쪽을 명시 이름으로 고쳤다. `respectively` 경로 · DGCL 조항 문법 ·
+provenance 구조 · O2 우선순위 · 탄생 의미론은 한 줄도 바뀌지 않았다. 문장 경계 helper만
+양쪽 경계를 갖도록 넓혔고 `respectively`가 읽는 텍스트는 그대로다.
+
+### 로컬 Python 실측 (2026-09-05)
+
+| 모듈 | 이전 | 이번 |
+|---|---|---|
+| `test_qv_identity_legal_evidence` | 201 | **204 OK** |
+| **전체 trading suite** | 1,942 | **1,945 OK** |
+
+새 음성 테스트 3건(instrument 없음 · 다른 family · 정의어 참조)과 helper 계약 통제를
+더했고, 옛 직접 양성 테스트 둘은 명시 이름 fixture로 고쳤다 — 그 둘이 수정 뒤 새 규칙으로
+먼저 실패하는 것을 확인하고 고쳤다.
+
+### 실제 SEC read-only smoke (FOXA 단독, 2026-09-05)
+
+helper가 바뀌었으므로 다시 돌렸다. `--symbols FOXA --historical --legal-evidence`,
+SEC 호출 258. **결과는 10.27과 동일하다.**
+
+```text
+search_status = COMPLETE      분류 실패 0      operative R/M/A = 6/3/0
+0001193125-19-079678/d721949dex31.htm
+    RESOLVED 2019-03-18  ITEM_503_CORROBORATED_UPON_FILING
+    Exhibit block:127  ·  primary d721949d8k.htm block:204
+Class A/B 탄생 0 · 구간 0/2 · REVIEW_REQUIRED
+```
+
+FOXA는 `respectively` 경로로 연결되므로 영향이 없다. `block:206`(Certificate of
+Designation)은 이제 직접 경로에서도 떨어지지만 — `Certificate of Designation`은 열거
+family가 아니다 — 그 Exhibit은 제출 발효 조항이 없어 애초에 O2-C에 닿지 못했다.
+**MISSING 그대로다.**
+
+### 문서 정정
+
+- `qv_identity_legal_evidence.py`: `OperativeDate`의 "동결된 셋"을 넷으로 고쳤고,
+  `governing_operative_date()`가 네 family 중 셋만 만든다는 것을 명시했다
+  (`ClassLegalProof.status`의 "셋"은 상태 어휘라 그대로다).
+- 설계 문서: 직접 경로 서술을 새 규칙으로 고치고 `source_family`가 넷임을 반영했다.
+- 10.27 receipt 서두: production identity JSONL을 "읽지도 않았다"는 서술이 사전 점검
+  사실과 어긋나므로 **읽기 전용 조회는 했고 변경·승격은 없다**로 정정했다. 점검
+  **결과**(의존 0건)는 관측 그대로이므로 바꾸지 않았다.
 
 ---
 
