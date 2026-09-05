@@ -207,6 +207,20 @@ AMENDMENT_FAMILIES = (
     # 분류는 문서가 무엇인지만 말한다. 다른 class를 명시로 논한다는 이유로 대상
     # 보통주 class에 영향이 없다고 읽지 않는다(B2 fail-close 그대로).
     ("CERTIFICATE_OF_ELIMINATION", r"certificate\s+of\s+elimination"),
+    # 이사회가 위임받은 권한으로 특정 우선주 시리즈의 조건을 세우거나 바꾸는 실제
+    # governing instrument다(실측: FOXA `0001193125-19-079678/d721949dex33.htm`
+    # Exhibit 3.3). **발행사의 charter 전체를 restate하지 않으므로 complete
+    # current-in-effect snapshot이 아니다.**
+    #
+    # 이 family가 없어서 그 문서가 뒤쪽 모(母) charter 인용(`... authority conferred
+    # upon the Board ... by the Amended and Restated Certificate of
+    # Incorporation ...`)만 보고 `AMENDED_AND_RESTATED_CERTIFICATE`로 분류됐다.
+    # **모 charter를 인용한다는 것이 그 문서가 모 charter라는 뜻은 아니다** — 제목이
+    # 인용보다 앞서므로 block 순서 그대로 바로잡힌다.
+    #
+    # `certificate of designation` 문구뿐이다. 일반 `designation`·`designated` 산문은
+    # 문서 분류가 아니고, class 사실 문법(`... designated <NAME>`)은 다른 층이다.
+    ("CERTIFICATE_OF_DESIGNATION", r"certificate\s+of\s+designation\b"),
 )
 # governing instrument가 **아니라고** 분류되는 것들. 인식됐으므로 미분류가 아니다.
 NON_GOVERNING_FAMILIES = (

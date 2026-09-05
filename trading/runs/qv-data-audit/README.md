@@ -3916,6 +3916,110 @@ family가 아니다 — 그 Exhibit은 제출 발효 조항이 없어 애초에 
 
 ---
 
+## 10.29 5A-2 — Certificate of Designation 문서 분류 — 2026-09-05
+
+시작 `main` = `b007f083d2541bb132a6910fa2582499e2a29399`. **어느 packet도 승격하지
+않았고 production identity를 바꾸지 않았다**(이번에는 읽지도 않았다).
+
+### 관측된 오분류
+
+```text
+0001193125-19-079678/d721949dex33.htm
+  실제:  CERTIFICATE OF DESIGNATION, PREFERENCES, AND
+         RIGHTS OF SERIES A JUNIOR PARTICIPATING PREFERRED STOCK
+  분류:  AMENDED_AND_RESTATED_CERTIFICATE
+```
+
+`CERTIFICATE_OF_DESIGNATION`이 닫힌 어휘에 없어서, 뒤쪽 모(母) charter 인용
+(`... authority conferred upon the Board ... by the Amended and Restated Certificate
+of Incorporation ...`) 하나가 시리즈 전용 instrument를 **완전 governing snapshot으로**
+만들었다. 10.28 receipt가 다음 blocker로 적어둔 그것이다.
+
+### 정확히 무엇을 더했나
+
+`AMENDMENT_FAMILIES`에 열거 항목 하나뿐이다.
+
+```python
+("CERTIFICATE_OF_DESIGNATION", r"certificate\s+of\s+designation\b"),
+```
+
+```text
+CERTIFICATE_OF_DESIGNATION
+    ∈ AMENDMENT_CLASSIFICATIONS  ∈ GOVERNING_CLASSIFICATIONS
+    ∉ SNAPSHOT_CLASSIFICATIONS
+```
+
+제목 blocks가 인용보다 앞서므로 **기존 block 순서 동작 그대로** 바로잡힌다.
+`classify_document()`를 재설계하지 않았고, 제목 NLP·heading 추출·fuzzy 분류·파일명
+분류·발행사 예외를 만들지 않았다. 일반 `designation`·`designated` 산문은 분류되지 않고,
+class 사실 문법(`... designated <NAME>`)은 **다른 층 그대로**다.
+
+### 로컬 Python 실측 (2026-09-05)
+
+| 모듈 | 이전 | 이번 |
+|---|---|---|
+| `test_qv_identity_legal_evidence` | 204 | **211 OK** |
+| **전체 trading suite** | 1,945 | **1,952 OK** |
+
+새 테스트 7건이고 그중 **5건이 구현 전에 실패하는 것을 먼저 확인했다** — FOXA 모양 분류 ·
+모 charter 인용의 진단 보존 · B2에서 snapshot으로 뽑히지 않음 · 대상 class를 언급해도
+마찬가지 · operative가 여전히 MISSING. 음성 통제 2건(앞선 진짜 restated 제목이 이김 ·
+일반 designation 산문)은 전후 모두 통과한다 — 넓힌 문법이 없다는 뜻이다.
+
+**GitHub CI는 Node만 돌리므로 이 숫자를 재현하지 않는다.**
+
+### 실제 SEC read-only smoke (FOXA 단독, 2026-09-05)
+
+`--symbols FOXA --historical --legal-evidence`, SEC 호출 258. **승격하지 않았고
+manifest·production JSONL을 건드리지 않았다.**
+
+문서 **하나만** 바뀌었다.
+
+```text
+0001193125-19-079678/d721949dex33.htm
+  AMENDED_AND_RESTATED_CERTIFICATE  ->  CERTIFICATE_OF_DESIGNATION
+  proof_authority = GOVERNING_EXHIBIT (그대로)
+  legal_operative_status = MISSING   (그대로)
+  classification_families에 AMENDED_AND_RESTATED_CERTIFICATE가 그대로 남는다
+```
+
+| | 이전(10.28) | 이번 |
+|---|---|---|
+| snapshot-class 문서 | 3 | **2** |
+| amendment-class 문서 | 1 | **2** |
+| `search_status` | COMPLETE | COMPLETE |
+| 분류 실패 | 0 | 0 |
+| operative R/M/A | 6/3/0 | 6/3/0 |
+| Class A/B 정의 findings | 2 / 2 | 2 / 2 |
+| 탄생 findings | 0 | 0 |
+| class 구간 | 0/2 | 0/2 |
+| 최종 판정 | REVIEW_REQUIRED | REVIEW_REQUIRED |
+
+**O2는 그대로다.** 새 family가 O2-C의 열거 instrument 어휘에 자연히 참여하므로 그
+accession의 `block:206`(`The Certificate of Designation is attached hereto as Exhibit
+3.3`)이 이제 직접 연결에 성공하지만, **그 Exhibit에 제출 발효 조항이 없어서** O2-C가
+애초에 닿지 못한다 — `MISSING` 그대로다. `ITEM_503_CORROBORATED_UPON_FILING` ·
+`CROSS_DOCUMENT_UPON_FILING_PATTERNS` · `item_503_document_association()` ·
+`item_503_corroborated_dates()`는 한 줄도 바꾸지 않았다.
+
+우선주 lifecycle은 열지 않았다 — identity package · 탄생 구간 · 시리즈 파싱 ·
+우선주/보통주 관계 논리 전부 없다. 이 작업은 **문서 분류 하나**다.
+
+### 함께 고친 낡은 서술 하나
+
+설계 문서의 열거 semantic family 표가 `탄생 행위`에 `reclassified into ... <NAME>`을
+아직 적고 있었다 — 10.27에서 코드는 이미 그것을 뺐다. 표를 사실에 맞췄고 문법은 건드리지
+않았다.
+
+### 이 receipt가 주장하지 않는 것
+
+- O2/O2-C · Item 5.03 권한 · 탄생/정의/종료 문법 · P2 · N1 · `qv-class-id-v1` ·
+  legacy · SEC 자연키 · 탐색 지평 · 승격기 · production identity · 5A-3를 바꾸지 않았다.
+- 일반 분류기 refactor를 하지 않았다.
+- 어떤 packet도 승격하지 않았다.
+
+---
+
 ## 11. 결과
 
 

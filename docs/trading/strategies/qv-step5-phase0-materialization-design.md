@@ -773,7 +773,7 @@ amendment를 나중에 말하는 서술은 뒤가 조용히 사라진다. 그래
 
 ##### 열거된 문서 분류 family
 
-**분류는 문서가 무엇인지만 말한다.** 열거된 셋뿐이고 fuzzy 분류기를 만들지 않는다.
+**분류는 문서가 무엇인지만 말한다.** 열거된 것뿐이고 fuzzy 분류기를 만들지 않는다.
 
 ```text
 snapshot(완전 current-in-effect)  AMENDED_AND_RESTATED_CERTIFICATE
@@ -783,8 +783,27 @@ snapshot(완전 current-in-effect)  AMENDED_AND_RESTATED_CERTIFICATE
 amendment-class(governing이지만    CERTIFICATE_OF_AMENDMENT
   스스로 현재를 닫지 못한다)        ARTICLES_OF_AMENDMENT
                                   CERTIFICATE_OF_ELIMINATION
+                                  CERTIFICATE_OF_DESIGNATION
 non-governing(인식됐으므로 미분류가 아니다)   BYLAWS
 ```
+
+`Certificate of Designation`은 이사회가 위임받은 권한으로 특정 우선주 시리즈의 조건을
+세우거나 바꾸는 **실제 governing instrument**다(실측: FOXA
+`0001193125-19-079678/d721949dex33.htm` Exhibit 3.3). 발행사의 charter 전체를 restate하지
+않으므로 **complete current-in-effect snapshot이 아니고** 스스로
+`CURRENT_GOVERNING_SNAPSHOT`이 되거나 B2의 현재 상태를 닫지 못한다.
+
+**모 charter를 인용한다는 것이 그 문서가 모 charter라는 뜻은 아니다.** 이 family가
+없었을 때 그 문서는 뒤쪽 인용문 하나(`... authority conferred upon the Board ... by the
+Amended and Restated Certificate of Incorporation ...`) 때문에
+`AMENDED_AND_RESTATED_CERTIFICATE`로 분류됐고, 시리즈 전용 instrument가 완전 snapshot
+행세를 했다. 제목이 인용보다 앞서므로 **block 순서 그대로** 바로잡힌다 — 문서 전체에서
+amendment family를 snapshot보다 우선시키지 않는다(앞선 진짜 snapshot 제목은 그대로
+이긴다). 인용된 모 charter는 `classification_families` 진단에 그대로 남는다.
+
+문언은 `certificate of designation` 하나뿐이다. 일반 `designation` · `designated` 산문은
+문서 분류가 아니고, class 사실 문법(`... designated <NAME>`)은 **다른 층**이다 —
+분류는 그 자체로 어떤 class semantic finding도 만들지 않는다.
 
 `Certificate of Elimination`은 이미 지정된 우선주 시리즈를 없애는 **실제 governing
 instrument**다(실측: FOXA `0001193125-19-296568/d837035dex31.htm` Exhibit 3.1). 문언
@@ -835,7 +854,7 @@ class 정의   authorized to issue ... shares of <NAME>
 탄생 행위    hereby created/established ... <NAME>
              <NAME> is hereby created/established
              new class ... designated <NAME>
-             reclassified into ... <NAME>
+             (**재분류는 탄생이 아니다** — 아래 CLOSED 결정을 보라)
 발효일       effective as of D · shall become/became effective on D ·
              effective date of/is D · effective on D
 종료         <NAME> 주식이 reclassified / eliminated / cancelled /

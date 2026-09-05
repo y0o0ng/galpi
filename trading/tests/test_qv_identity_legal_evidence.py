@@ -46,6 +46,7 @@ from backtest.qv_identity_legal_evidence import (  # noqa: E402
     class_definition_matches,
     class_designation_anchor,
     class_evidence_from_legal_proof,
+    classification_families,
     classify_document,
     item_503_document_association,
     collect_legal_evidence,
@@ -236,6 +237,28 @@ def operative_of(payload, document_name="ex3-1.htm"):
         item for item in payload["documents"]
         if item["document_name"] == document_name
     )
+
+
+#: 실측 FOXA EX-3.3(`0001193125-19-079678/d721949dex33.htm`)의 제목과 모(母) 인용.
+DESIGNATION_TITLE = (
+    "CERTIFICATE OF DESIGNATION, PREFERENCES, AND",
+    "RIGHTS OF SERIES A JUNIOR PARTICIPATING PREFERRED STOCK",
+)
+PARENT_CHARTER_RECITAL = (
+    "That pursuant to the authority conferred upon the Board of Directors of the "
+    "Corporation (the \u201cBoard\u201d) by the Amended and Restated Certificate "
+    "of Incorporation of the Corporation, the said Board adopted the following "
+    "resolution creating a series of Preferred Stock."
+)
+
+
+def designation(*, extra=(), date=None) -> bytes:
+    """Certificate of Designation 하나. **제목이 먼저이고 모 charter 인용이 뒤다.**"""
+    body = ["ACME INC.", *DESIGNATION_TITLE, PARENT_CHARTER_RECITAL]
+    body.extend(extra)
+    if date:
+        body.append(effective(date))
+    return html(*body)
 
 
 def ab_cover_facts():
@@ -482,6 +505,42 @@ class ClassificationTest(unittest.TestCase):
 
     def test_a_certificate_of_elimination_is_never_a_snapshot(self):
         self.assertNotIn("CERTIFICATE_OF_ELIMINATION", SNAPSHOT_CLASSIFICATIONS)
+
+    def test_a_certificate_of_designation_is_not_the_parent_charter(self):
+        """실측 FOXA EX-3.3. **모 charter 인용이 그 문서를 모 charter로 만들지 않는다.**"""
+        blocks = tuple(html_blocks(designation()))
+        self.assertEqual(classify_document(blocks), "CERTIFICATE_OF_DESIGNATION")
+        self.assertIn("CERTIFICATE_OF_DESIGNATION", AMENDMENT_CLASSIFICATIONS)
+        self.assertIn("CERTIFICATE_OF_DESIGNATION", GOVERNING_CLASSIFICATIONS)
+        self.assertNotIn("CERTIFICATE_OF_DESIGNATION", SNAPSHOT_CLASSIFICATIONS)
+
+    def test_the_parent_charter_recital_stays_visible_diagnostically(self):
+        """`classification`은 문서가 무엇인지, `classification_families`는 무엇을 봤는지."""
+        families = classification_families(tuple(html_blocks(designation())))
+        self.assertIn("CERTIFICATE_OF_DESIGNATION", families)
+        self.assertIn("AMENDED_AND_RESTATED_CERTIFICATE", families)
+
+    def test_a_true_restated_certificate_keeps_its_snapshot_title(self):
+        """앞선 진짜 snapshot 제목을 뒤의 amendment family가 덮지 않는다."""
+        self.assertEqual(
+            classify_document(tuple(html_blocks(restated(extra=(
+                "The Board may adopt a Certificate of Designation for any series "
+                "of Preferred Stock.",
+            ))))),
+            "AMENDED_AND_RESTATED_CERTIFICATE",
+        )
+
+    def test_generic_designation_prose_is_never_a_certificate_of_designation(self):
+        """문서 family 문구가 아니면 분류하지 않는다 — class 사실 문법과 다른 층이다."""
+        for prose in (
+            "the Board designated the shares of Series B Preferred Stock",
+            "the designation of the securities registered hereunder",
+            "each share was designated Class A Common Stock",
+        ):
+            with self.subTest(prose=prose):
+                self.assertEqual(
+                    classify_document(tuple(html_blocks(html(prose)))), "UNCLASSIFIED"
+                )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1604,6 +1663,65 @@ class OpenEndedContinuityTest(BaseFixture):
             evidence["us-gaap:CommonClassAMember"].class_interval.effective_from,
             BIRTH_DATE,
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Certificate of Designation — governing이지만 complete snapshot이 아니다
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class CertificateOfDesignationTest(BaseFixture):
+    def test_it_is_never_the_current_governing_snapshot(self):
+        """authoritative Exhibit 3이고 발효일이 해소돼도 snapshot이 되지 않는다.
+
+        탄생 뒤 법적으로 더 뒤인 governing amendment가 있으면 **가장 늦은 완전
+        snapshot이 현재를 닫지 못한다** — B2 fail-close 그대로다.
+        """
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-19-000001", "2019-03-19",
+                       designation(date="March 19, 2019")),
+        ])
+        document = next(
+            item for item in payload["documents"]
+            if item["accession"] == "0000000042-19-000001"
+            and item["document_role"] == "EXHIBIT"
+        )
+        self.assertEqual(document["classification"], "CERTIFICATE_OF_DESIGNATION")
+        self.assertEqual(document["proof_authority"], "GOVERNING_EXHIBIT")
+        self.assertEqual(document["legal_operative_date"], "2019-03-19")
+        entry = evidence_for(payload)
+        # snapshot으로 뽑히지 않았고 구간도 열리지 않았다.
+        self.assertIsNone(entry["snapshot_accession"])
+        self.assertEqual(evidence, {})
+        self.assertIn("완전 governing snapshot보다 법적으로 뒤인", entry["notes"][0])
+
+    def test_mentioning_the_target_class_still_creates_no_snapshot(self):
+        """대상 class 이름을 담아도 complete snapshot 자격이 생기지 않는다."""
+        payload, evidence = self.assertClassEvidence([
+            charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
+            charter_8k("0000000042-19-000001", "2019-03-19",
+                       designation(extra=(authorized(CLASS_A),),
+                                   date="March 19, 2019")),
+        ])
+        entry = evidence_for(payload)
+        self.assertIsNone(entry["snapshot_accession"])
+        self.assertEqual(evidence, {})
+
+    def test_its_operative_date_still_needs_its_own_evidence(self):
+        """분류가 바뀌어도 O2는 그대로다 — 서명일·수리 시각으로 되돌아가지 않는다."""
+        payload, _evidence = self.assertClassEvidence([
+            charter_8k("0000000042-19-000001", "2019-03-19", designation(extra=(
+                "IN WITNESS WHEREOF, Acme Inc. has caused this Certificate of "
+                "Designation to be signed this 19 day of March, 2019.",
+            ))),
+        ])
+        document = next(
+            item for item in payload["documents"]
+            if item["document_role"] == "EXHIBIT"
+        )
+        self.assertEqual(document["classification"], "CERTIFICATE_OF_DESIGNATION")
+        self.assertEqual(document["legal_operative_status"], "MISSING")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
