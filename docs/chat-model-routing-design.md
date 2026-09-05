@@ -175,6 +175,10 @@ Discovery와 auto-routing policy는 별도 판정이다. Models API가 반환한
 
 Manual availability의 정본은 text `probeStatus === 'compatible'`이다. `/api/models/chat`은 `auto:balanced`를 첫 option으로 유지하고, 그 뒤에 모든 compatible stable GPT candidate를 exact option으로 노출한다. 목록은 provider `created` 내림차순(없으면 0), 동률은 model ID 순으로 정렬한다. 라벨은 family 이름을 일반 형식으로 표시하며(`gpt-6-astra` → `GPT-6 Astra`), unknown 모델 설명은 `검증된 GPT 모델`이다. 이름·생성 시각으로 품질·가격·속도를 추론하지 않는다.
 
+**2026-09-05 picker 표시 범위 보완:** 화면 메뉴는 `자동`과 compatible options에 실제로 있는 최신·직전 버전 묶음만 표시한다. ID의 `gpt-` 뒤 major/minor 숫자를 비교하며 `6 → 5.6`처럼 빠진 버전을 건너뛰고, 소수점 계산이나 `-0.1`을 쓰지 않는다. 같은 버전의 family·tier는 모두 유지하고 서버의 option 순서를 보존한다. 사용 중인 구버전 exact pin과 숫자 버전을 해석할 수 없는 새 naming은 표시에서 제외하지 않는다. 메뉴 높이를 제한하고 목록 안에서 스크롤한다. 이 필터는 프런트엔드 표시만 바꾸며 discovery·probe·API manual availability·auto policy·저장된 선택에는 영향을 주지 않는다.
+
+같은 날 Pi에 정적 파일을 배포하고 실제 JS/CSS 응답 SHA-256 일치를 확인했다(서버 재시작 없음). 현재 API options 18개 중 화면에는 `자동`, `GPT-6 Astra`, `GPT-5.6 Luna/Terra/Sol`의 5개가 남고 exact Terra 선택은 유지됐다. 로컬 전체 회귀 1,193/1,193, Pi 집중 회귀 67/67 통과. Chromium 390×844·844×390·1440×900·900×400에서 다수 항목의 높이 제한·스크롤·키보드 이동과 여러 줄 입력 상태를 검증했다. 교체 전 온라인 백업 식별자는 `20260905-2118-8b529359-bf50-45c1-a84d-88d5a529b017`(DB 무결성·foreign key·Vault tar 정상), 코드 복구본은 `/home/pi/backups/galpi/code-picker-pre-1788610731598.tar.gz`다.
+
 Known auto-policy classifier만 `gpt-<major>.<minor>-sol|terra|luna`를 해석한다. Sol → `quality`, Terra → `balanced`, Luna → `fast`이며 각 role에서 major/minor 기준 최신 compatible 모델을 `active`로 선택한다. `activeImage`는 text와 image가 모두 compatible인 known model 중 같은 순서로 선택한다. provider `created`는 자동 정책에 사용하지 않는다. `gpt-6-astra` 같은 unknown stable family는 probe를 통과하면 코드 변경 없이 **manual-only**로 사용하며 role은 `null`이다. 따라서 새 unknown family discovery가 `auto:balanced`를 암묵적으로 바꾸지 않는다. 자동의 text turn은 `active.balanced`, image turn은 `activeImage.balanced`를 계속 사용한다.
 
 Exact 선택은 현재 catalog에 없거나 text compatibility가 없으면 `MODEL_UNAVAILABLE`, image turn에 image compatibility가 없으면 `MODEL_IMAGE_UNSUPPORTED`로 실패한다. 다른 모델로 조용히 전환하지 않으며, 선택은 다음 response부터 적용하고 요청 시작 시 실제 model snapshot을 고정한다.

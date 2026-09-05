@@ -3347,6 +3347,9 @@ html, body {
   left: 0;
   bottom: calc(100% + 10px);
   width: min(330px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  max-height: min(420px, 50dvh);
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -3363,6 +3366,7 @@ html, body {
 
 .chat-model-menu-head {
   display: flex;
+  flex-shrink: 0;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
@@ -3382,6 +3386,9 @@ html, body {
 #chat-model-options {
   display: grid;
   gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .chat-model-option {
@@ -3431,6 +3438,7 @@ html, body {
 }
 
 #chat-model-status {
+  flex-shrink: 0;
   min-height: 15px;
   padding: 8px 6px 1px;
   line-height: 1.4;

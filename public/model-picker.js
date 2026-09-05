@@ -16,6 +16,23 @@
     returnFocus: null,
   };
 
+  function visibleOptions(catalog) {
+    const versions = new Map();
+    const rows = catalog.options.map(option => {
+      const match = /^gpt-(\d+)(?:\.(\d+))?/.exec(option.modelId || option.value);
+      const version = match ? [Number(match[1]), Number(match[2] || 0)] : null;
+      const key = version?.join('.');
+      if (version) versions.set(key, version);
+      return { option, key };
+    });
+    const recent = new Set([...versions]
+      .sort(([, a], [, b]) => b[0] - a[0] || b[1] - a[1])
+      .slice(0, 2).map(([key]) => key));
+    // 표시 범위만 줄인다. 현재 pin과 버전을 모르는 새 naming은 숨기지 않는다.
+    return rows.filter(({ option, key }) => !key || recent.has(key) || option.value === catalog.selection)
+      .map(({ option }) => option);
+  }
+
   function displayModelName(modelId) {
     return String(modelId || '')
       .replace(/-([a-z][a-z0-9]*)/gi, (_, segment) => ` ${segment[0].toUpperCase()}${segment.slice(1)}`)
@@ -67,7 +84,7 @@
     state.status.classList.toggle('warn', !catalog.resolvedModelId || ['stale', 'fallback'].includes(catalog.catalog?.status));
     state.options.replaceChildren();
 
-    catalog.options.forEach(option => {
+    visibleOptions(catalog).forEach(option => {
       const item = document.createElement('button');
       item.type = 'button';
       item.className = 'chat-model-option';
