@@ -91,7 +91,7 @@
 ### 장기기억 연구
 
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
-- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`다.** P1-B3는 preregister됐고 blind HUMAN primary review는 완료됐다. primary 분포는 `21 / 19 / 20`이며 post-primary evidence re-review 한 건이 033을 `NO_WRITE → WRITE_CANDIDATE`로 해결했다. 최종 effective HUMAN class gold는 `20 / 20 / 20`(`NO_WRITE / WRITE_CANDIDATE / ESCALATE`)이고 사전등록 `>=15/class` gate는 PASS다. 아직 P1-B3 model runner/output은 없으며 다음은 runner 구현이고 모델 실행은 아니다. task-specific training은 frozen P1-B3 trigger 충족에만 조건부다. production memory는 그대로이고 private replay는 `UNOPENED`이며 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
+- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`다.** P1-B3는 preregister됐고 HUMAN class gold는 `20 / 20 / 20`(`NO_WRITE / WRITE_CANDIDATE / ESCALATE`), `>=15/class` gate는 PASS다. 전용 runner와 deterministic combiner를 구현하고 fake fetch로 검증했으며 실제 모델 호출·output/report는 아직 없다. 코드 리뷰 뒤 다음은 순차 4B 실행 → 1.7B 실행 → deterministic combination이다. task-specific training은 frozen P1-B3 trigger 충족에만 조건부다. production memory는 그대로이고 private replay는 `UNOPENED`이며 HUMAN 검토 provenance와 구현 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

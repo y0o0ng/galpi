@@ -2683,3 +2683,69 @@ FAIL_FRESH_SYNTHETIC_VALIDATION**; P1-B2d remains **CLOSED / COMPLETE —
 NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED**. Task-specific training remains
 conditional on the frozen P1-B3 trigger, production memory is unchanged,
 and private replay remains **UNOPENED**.
+
+#### P1-B3 HUMAN-review assistance disclosure
+
+The reviewer UI itself was blind to authoring labels. During the 60-case
+primary HUMAN review, however, the reviewer requested external rubric
+assistance on two cases. The assisting reviewer had previously inspected the
+hidden P1-B3 authoring artifact during pre-HUMAN fixture review. The primary
+review therefore must not be characterized as fully unaided independent
+adjudication. No P1-B3 model output existed at that time. This disclosure
+does not change the existing primary, resolution, or final resolved HUMAN
+artifacts, including case 033; their bytes and effective 20/20/20 gold remain
+unchanged.
+
+#### P1-B3 runner implementation receipt — no experimental inference
+
+The dedicated runner `scripts/run-memory-inference-p1b3-decomposed-pipeline.js`
+and deterministic combiner
+`scripts/combine-memory-inference-p1b3-decomposed-pipeline.js` are implemented.
+Their identities are
+`xion-local-memory-inference-p1b3-decomposed-pipeline-runner-v1` and
+`xion-local-memory-inference-p1b3-decomposed-pipeline-combiner-v1`.
+Phase reports use
+`xion-local-memory-inference-p1b3-decomposed-pipeline-4b-report-v1` and
+`xion-local-memory-inference-p1b3-decomposed-pipeline-1p7b-report-v1`;
+combination uses
+`xion-local-memory-inference-p1b3-decomposed-pipeline-combined-report-v1`.
+
+Package commands are `research:memory-inference-p1b3-4b` and
+`research:memory-inference-p1b3-1p7b`, each requiring only `--endpoint` and
+optionally `--commit` (default: `git rev-parse HEAD`). Phase selects the
+frozen model configuration. `research:memory-inference-p1b3-combine` accepts
+only `--4b-report` and `--1p7b-report` paths. All commands emit JSON to stdout;
+none manages a model server. No tuning controls were added.
+
+The P1-B3-local HTTP path separates schema validation and control flow from
+HUMAN semantic scoring; it does not use `runCalibrationCase`. Existing
+P1-B1/B2 implementations are unchanged. L4 messages match the frozen B2b
+defined-label builder, ambiguity/extraction messages match P1-B1, and binary
+Stage 2 uses the preregistered instruction/schema with prompt identity
+`xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1`.
+Every invoked stage receives only the original candidate evidence (plus the
+existing expected schema for extraction).
+
+Each phase validates the three frozen input artifacts before its 10000ms
+non-inference readiness check. Calls use the fixed 180000ms timeout and one
+attempt, with case-local L4 → D4 order in the 4B phase and fixture-order D1.7
+in the later phase. Reports retain exact input-byte SHA-256 digests, stage
+versions, skip reasons, raw assistant content, runtime/schema distinctions,
+dynamic planned/attempted/completed counts, and observed latency summaries.
+The combiner checks matching provenance, exact cases/arms, stage control
+flow, and raw-output/schema consistency against the frozen inputs, then
+recomputes and verifies scores/counts before applying the three paired
+comparisons and frozen training-research trigger. With 60 cases per arm,
+the authoritative >=10 percentage-point improvement rule is checked as at
+least six net successful cases to avoid floating-point threshold ambiguity.
+
+Frozen arms, stage semantics, prompts, extraction gold, HUMAN labels,
+thresholds, and B2c/B2d dispositions did not change. Effective HUMAN gold is
+still 20 `NO_WRITE` / 20 `WRITE_CANDIDATE` / 20 `ESCALATE`, and the HUMAN
+distribution gate remains PASS. Tests use injected fake fetch only;
+synthetic test reports stay in memory. No real model call, model output,
+or experimental report was produced in this implementation commit, and
+`llama.cpp` was not started. After code review, the next step is the
+sequential 4B run, then the 1.7B run, then deterministic combination.
+Training remains conditional on the frozen trigger, private replay remains
+UNOPENED, and production memory/DB/Vault/retrieval/routing remain unchanged.
