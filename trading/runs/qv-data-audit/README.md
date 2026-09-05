@@ -4020,6 +4020,106 @@ accession의 `block:206`(`The Certificate of Designation is attached hereto as E
 
 ---
 
+## 10.30 5A-2 실행 — 작업 항목 단위 체크포인트/재개 — 2026-09-05
+
+**실행 인프라만 바꿨다.** identity·발견·법적 증거·승격 semantics를 한 줄도 바꾸지
+않았고, 어떤 packet도 승격하지 않았고, 문턱·문법·상태 어휘를 건드리지 않았다.
+
+### 왜 (실측된 차단 요인)
+
+전수 cheap-path census(`N=897` · `--browse --historical` · legal 없음)가 약 2시간 7분을
+돌다가 **작업 항목 397/897 `HOG/HOG`**에서 죽었다.
+
+```text
+EdgarError: HTTP 503: https://www.sec.gov/cgi-bin/browse-edgar?...CIK=HOG...
+```
+
+러너가 `run_proposals()`가 **끝난 뒤에야** 산출물을 직렬화하므로 **이미 끝난 396개
+작업 항목이 전부 사라졌다.** 그 session의 `client.calls`도 함께 사라져 정확한 SEC
+호출 수를 알 수 없다.
+
+전송 실패 하나가 전수 실행을 통째로 버리게 만드는 것이 관측된 blocker다. legal 경로는
+accession 단위 실패를 이미 `failures`로 삼키지만(`qv_identity_legal_evidence.py`),
+**발견 층 `browse_candidate()`에는 그 보호가 없다** — 그래서 cheap 경로가 시간당
+취약도는 오히려 더 높다.
+
+### 무엇을 더했나
+
+`selftest/qv_identity_proposal_run.py` 하나에만 더했다. `run_proposals()` ·
+법적 공급기 · 승격기는 그대로다.
+
+```text
+--checkpoint-dir <dir>   작업 항목 하나 단위로 durable하게 적는 실행 모드
+--resume                 첫 미완료 작업 항목부터 이어서 돌린다
+```
+
+- **체크포인트 단위는 `(member_symbol, identity_symbol)` 하나다.** 티커로 묶지 않아
+  재사용 벤더 계열 episode가 합쳐지지 않는다. 한 항목이 끝나면 다음 항목을 시작하기
+  전에 `os.replace`로 원자적으로 남으므로, 전송 실패로 잃는 것은 **그때 돌던 항목
+  하나뿐이다.**
+- **전송 실패는 의미 상태가 아니다.** 503은 `UNRESOLVED`·`REVIEW_REQUIRED`로 적히지
+  않는다 — 그 항목의 artifact 자체가 생기지 않고, `N+1`로 넘어가지 않고, 종료 코드가
+  1이다. 자동 재시도·backoff는 이 증분에 **없다**(`EdgarClient._read`는 그대로다).
+- **체크포인트 디렉터리는 정확히 한 실행 정체성에 속한다.** schema · git commit ·
+  inventory 바이트 SHA-256 · 수요 provenance 전부 · `identity_source_version` ·
+  선택된 작업 항목 키의 **순서** · `--browse`/`--historical`/`--legal-evidence` ·
+  `--historical`일 때 지수 변경 CSV의 SHA-256을 묶는다. `--resume`에서 전부 다시
+  계산해 대조하고 **하나라도 다르면 멈춘다.** `--force`도 `--ignore-version`도
+  best-effort merge도 rebase도 없다.
+- **완료 항목은 파일 존재만으로 건너뛰지 않는다.** JSON 유효성 · schema · 실행 정체성
+  digest · 수요 provenance · 그 순번의 작업 항목 키 · packet 키를 전부 검증하고, 하나라도
+  어긋나면 fail-close다. 순번 파일이 그 순번의 키만 받으므로 같은 작업 항목이 둘일
+  수는 없다.
+- **모든 항목이 검증을 통과했을 때만** `--out`을 쓴다. 조립은 빈 `ProposalRun.as_json()`
+  에서 정적·provenance 칸을 그대로 받고 항목별 칸만 다시 세므로 기존 5A-2 산출물 계약이
+  갈리지 않는다. 제안 순서는 선택된 수요 순서이고 `qv_identity_promotion.load_proposal_run()`
+  이 특별 취급 없이 그대로 읽는다.
+- **실행 회계.** session receipt를 시작할 때 `RUNNING`으로 적고 끝/실패에 덮어쓴다.
+  급사하면 `RUNNING`이 남아 그 session의 SEC 호출 수가 **`unknown`**으로 합계에
+  전파된다 — 추정치를 지어내지 않는다. 회계는 진단이고 제안 semantics에 닿지 않는다.
+- **40MB 이름 색인은 프로세스당 한 번이다.** 항목마다 `run_proposals()`를 부르므로
+  기존 `name_index=` 인자로 미리 만들어 넘긴다. ticker map도 한 번이다.
+
+### 로컬 Python 실측 (2026-09-05)
+
+```text
+python3 -m unittest trading.tests.test_qv_identity_proposal_run
+  31 tests · PASS
+
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,983 tests · PASS
+```
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — `.github/workflows/docker.yml` 하나뿐이고
+`npm ci` · `npm test`(Node)만 돌린다. Python 테스트를 돌리지 않으므로 CI 통과가 위
+숫자의 독립 재현이 아니다. CI를 이것 때문에 고치지 않았다.
+
+핵심 회귀는 **등가성**이다. 같은 결정적 network-free fixture에서
+
+```text
+기존 한 번에 돌리기            ==  체크포인트로 중단 없이 돌리기
+기존 한 번에 돌리기            ==  1..K 완료 → K+1 실패 → --resume → 나머지 완료
+```
+
+의 최종 산출물이 진단용 칸(`sec_calls` · `git_commit` · `checkpoint_dir` ·
+`run_identity_sha256`)을 뺀 **직렬화까지 같다.** dict 비교만 하면 `counts`·
+`reason_counts`의 정렬 계약이 조용히 사라져도 통과하므로 문자열로 견준다.
+
+가드마다 하나씩 무력화해 테스트가 실제로 잡는지 확인했다(정체성 digest · 항목 키 ·
+항목 schema · 항목 provenance · 정렬 계약 · 실패 후 계속 진행 · 기존 체크포인트 재사용).
+구조적으로 닿을 수 없던 중복 검사 하나는 지웠다 — 순번 키 검사가 이미 그것을 보장한다.
+
+### 이 receipt가 주장하지 않는 것
+
+- 전수 census를 **다시 돌리지 않았다.** 이 작업은 인프라뿐이고, 재개 실행은 별도다.
+- 자동 재시도·backoff를 넣지 않았다. 재개로 부족한지는 따로 정한다.
+- `--browse`를 layer-1 해결 여부에 조건부로 만들지 않았다 — 503이 난 그 호출이지만
+  발견 semantics라 이 작업의 경계 밖이다.
+- B1/B2 · O2/O2-C · P2 · N1 · 탐색 지평 · legacy fail-close · Item 5.03 권한 ·
+  `qv-class-id-v1` · 상태 어휘 · 사유 코드 · 승격 정책 · manifest · production DB ·
+  Phase 0 gate를 하나도 바꾸지 않았다.
+- 어떤 packet도 승격하지 않았고 factor·rank·수익률을 계산하지 않았다.
+
 ## 11. 결과
 
 
