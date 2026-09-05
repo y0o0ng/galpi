@@ -2749,3 +2749,288 @@ or experimental report was produced in this implementation commit, and
 sequential 4B run, then the 1.7B run, then deterministic combination.
 Training remains conditional on the frozen trigger, private replay remains
 UNOPENED, and production memory/DB/Vault/retrieval/routing remain unchanged.
+
+#### P1-B3 execution/result receipt — 2026-09-05
+
+**P1-B3 = CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL.** Execution
+revision was `5b1c54cc97faada4a11afd2bb2132f2596f2f751`, also the fetched
+GitHub `main` at the start of this receipt; no intervening commit existed.
+The historical frozen P1-B3 trigger above remains its disposition rule,
+without reinterpretation.
+
+Before final integration, main advanced once to
+`407651d70e654b10b7af6a6521dc2d872e9e5f51`. That intervening commit was
+inspected: API/backup/model-picker/dependency security fixes changed no
+P1-B3 runner, combiner, fixture, HUMAN gold, scoring, or canonical memory-study
+contract. This receipt/implementation is integrated on that newer main;
+the historical execution revision remains unchanged.
+
+The actual clean phase reports and deterministic combined report are
+preserved byte-for-byte as primary run evidence:
+
+| Committed artifact under `fixtures/` | SHA-256 |
+| --- | --- |
+| `local-memory-inference-p1b3-4b-report.json` | `f1a438f0c72a0243d00f0d9ebfb41ceea9761e05d83e22a063a150a53fed089d` |
+| `local-memory-inference-p1b3-1p7b-report.json` | `56d5d74795883d250c5d9249f2e1060a48ef06754b940059254ec8fd38c1a4fc` |
+| `local-memory-inference-p1b3-combined-report.json` | `af1fb7a45f30003aa19551700ba41c1ad3e8612982934d8033f09bf6155d9f79` |
+
+The sources were `/tmp/xion-p1b3-4b-report-clean.json`,
+`/tmp/xion-p1b3-1p7b-report-clean.json`, and
+`/tmp/xion-p1b3-combined-report.json`. Both phase reports validate under the
+existing frozen P1-B3 validator. Recombining them with the existing P1-B3
+combiner deep-equals the supplied combined artifact, including all raw stage
+records, provenance, scores, and counts. Nothing was hand-reconstructed.
+
+The 4B phase used `xion-p1b1-qwen3-4b-bf16` /
+`unsloth/Qwen3-4B-GGUF:BF16`; the 1.7B phase used
+`xion-p1b1-qwen3-1.7b-bf16` / `unsloth/Qwen3-1.7B-GGUF:BF16`.
+Both used `llama.cpp` revision
+`e42214804794fca6abb61b1a5f9adae2a845f0be`, a 180000ms call timeout,
+one attempt, and no automatic reruns. Both 10000ms non-inference health
+preflights succeeded. The generated timestamps are respectively
+`2026-09-05T10:47:04.292Z` and `2026-09-05T10:52:45.053Z`.
+
+| Phase | Planned / attempted / completed calls | Invalid structured outputs | Runtime failures |
+| --- | --- | --- | --- |
+| 4B | 144 / 144 / 144 | 0 | 0 |
+| 1.7B | 98 / 98 / 98 | 1 | 0 |
+
+L4 invoked 60 triage and 24 extraction calls. D4 invoked 60 ambiguity calls
+and zero binary/extraction calls. D1.7 invoked 60 ambiguity, 21 binary, and
+17 extraction calls. Combined runtime failures were **0**.
+
+| Arm | End-to-end success | Unsafe non-escalation | False NO_WRITE | Schema-valid extraction wrong-value | Terminal escalation |
+| --- | --- | --- | --- | --- | --- |
+| L4 | 48/60 (80%) | 7 | 6 | 1 | 13/60 |
+| D4 | 20/60 (33.33%) | 0 | 0 | 0 | 60/60 |
+| D1.7 | 32/60 (53.33%) | 1 | 4 | 0 | 38/60 |
+
+| Pair | UNCHANGED_CORRECT | FIXED | REGRESSION | UNCHANGED_WRONG | NONCOMPARABLE_RUNTIME |
+| --- | --- | --- | --- | --- | --- |
+| L4 → D4 | 13 | 7 | 35 | 5 | 0 |
+| D4 → D1.7 | 19 | 13 | 1 | 27 | 0 |
+| L4 → D1.7 | 23 | 9 | 25 | 3 | 0 |
+
+D1.7 minus L4 is **-16 successful cases / -26.67 percentage points**
+(recorded exact delta: `-26.666666666666668`). The preregistered trigger
+was not met: final disposition is **NO_SPECIALIZED_TRAINING_SIGNAL**.
+
+Observed behavior, not claims about internal model mechanisms:
+
+- D4 emitted schema-valid Stage-1 `ESCALATE` on all 60 cases, so neither
+  its binary nor extraction stage was invoked.
+- D1.7 was materially less over-escalating than D4, but still produced
+  false `NO_WRITE` and one strict-output-format safety failure.
+- That one D1.7 invalid ambiguity output was semantically an `ESCALATE`
+  JSON object wrapped in a Markdown code fence. Under the frozen strict
+  contract it remains **INVALID**, an end-to-end and unsafe-non-escalation
+  failure, not a successful escalation or runtime failure.
+- Extraction wrong-value was not the main observed D1.7 failure boundary.
+
+**npm stdout-cleanup provenance.** The original execution used
+`npm run ... > report.json`; npm printed its command banner before the
+runner JSON, making the two redirected phase files non-parseable as pure
+JSON. No semantic model call was rerun. Cleanup deterministically found
+the beginning of the runner JSON object after the npm prefix, retained that
+JSON payload, validated it with `JSON.parse`, and combined the clean phases
+with the reviewed deterministic P1-B3 combiner. This was an output-capture
+cleanup, not a model/runtime failure. Historical model outputs are unchanged.
+All future experiment capture instructions use `npm --silent run ...` or
+direct `node` execution so stdout remains pure JSON.
+
+### Prospective training-research policy clarification — user decision
+
+The P1-B3 prerequisite trigger is **not a general rule that an untuned
+specialist must outperform a baseline before a training experiment may
+exist**. This prospective clarification does not rewrite P1-B3 history,
+its frozen trigger, or its final disposition.
+
+Future task-specific training is a separately preregistered experimental
+intervention. An observed bounded failure pattern may make it informative
+to open such an experiment. Before training execution, its own training
+data provenance, train/dev/held-out split, training mechanism, target
+metrics, no-leakage rules, and stopping rules must be frozen. Strict
+performance/safety thresholds belong primarily to later held-out validation
+and adoption decisions, not permission to conduct training research.
+**No training experiment is opened by this commit.**
+
+The currently selected branch sequence is P1-B4 role-split hybrid → if
+directionally promising, a separately designed raw-episode diagnostic →
+consider task-specific training if the failure profile warrants it →
+held-out/adoption validation. This is research sequencing, not production
+authorization.
+
+### P1-B4 role-split hybrid diagnostic preregistration
+
+**PREREGISTERED / IMPLEMENTED / NOT RUN.** P1-B4 is explicitly an
+**ADAPTIVE diagnostic on the already-consumed P1-B3 60-case fixture**, not
+fresh held-out validation. No case, evidence, HUMAN label, case-033
+resolution, extraction gold, prompt, or schema is changed or relabeled.
+
+Research question: does assigning ambiguity/escalation to the existing
+untuned 1.7B Stage-1 output, while assigning durability triage and extraction
+to frozen 4B, improve end-to-end behavior relative to P1-B3 L4?
+There is one new arm, **HYBRID**: 1.7B owns ambiguity/escalation; 4B owns
+binary durability triage and structured extraction.
+
+#### Frozen source and downstream execution
+
+The runner loads the three committed P1-B3 run artifacts above. Before
+readiness or any new inference it uses the existing frozen P1-B3 combiner
+to validate both phase reports, reparse their raw stage outputs, and
+recompute every score/count. The recomputed combined report must deep-equal
+the committed combined report. It requires execution commit
+`5b1c54cc97faada4a11afd2bb2132f2596f2f751`, zero source runtime failures,
+exact 60 case IDs/order, and exact artifact bytes and input provenance.
+A source runtime failure is rejected before any new call with
+`INDETERMINATE_RUNTIME`; no source stage is invented, repaired, or rerun.
+
+The unchanged inputs are:
+
+| Input identity | Exact-byte SHA-256 |
+| --- | --- |
+| `xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2` | `a6608642caad02c772941d58558bd9fc31ee86ef54fe342ee2713aa08cf62c8e` |
+| `xion-local-memory-inference-p1b3-human-resolved-labels-v1` | `a6444c5fc4460cc499c3ac64060b4e87d9e7bed984b05376cae08655fb499f5d` |
+| `xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v2` | `e1ef730de0341fa3314e20425afefc38cfedeb59642be018c407d433646240ae` |
+
+Only resolved HUMAN gold supplies semantic labels (20/20/20, >=15/class
+gate PASS). `authoringTarget` is construction provenance, **not class-gold
+authority**. The authoring key supplies deterministic extraction gold only
+for scoring Stage 3.
+
+For cases 001–060 in the same frozen order, copy the exact P1-B3 D1.7
+ambiguity-stage record, including raw content, schema/runtime state, versions,
+and recorded latency. **Do not call the 1.7B model again.** This avoids a
+second semantic attempt and changes only downstream model ownership:
+
+```text
+source valid ESCALATE -> terminal ESCALATE; no new call
+source valid CLEAR -> new 4B binary
+source invalid output -> end-to-end failure; no downstream call
+source runtime failure -> INDETERMINATE_RUNTIME; no rerun
+new binary valid NO_WRITE -> stop
+new binary valid WRITE_CANDIDATE -> new 4B extraction
+new upstream invalid/runtime failure -> stop that case's downstream flow
+```
+
+Actual source ambiguity has 38 schema-valid `ESCALATE`, 21 schema-valid
+`CLEAR`, and one invalid output, with zero runtime failures. A known
+fixed-source ceiling follows before any P1-B4 execution: only 19 HUMAN
+`ESCALATE` cases and 21 `CLEAR` cases can succeed, so even perfect downstream
+output reaches at most **40/60**, below L4's **48/60**. The requested
+progression rule below is retained unchanged and therefore cannot open the
+successor on this exact source. This is a source/control-flow bound, not a
+P1-B4 model result or a change to the historical P1-B3 disposition.
+
+New calls use only `xion-p1b1-qwen3-4b-bf16` /
+`unsloth/Qwen3-4B-GGUF:BF16`, size class `~4B`, quantization `BF16`,
+`llama.cpp` revision `e42214804794fca6abb61b1a5f9adae2a845f0be`.
+The exact P1-B3 `p1b3-binary-write-candidate-triage-v1` task,
+`p1b3-binary-write-candidate-triage-output-v1` schema, and
+`xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1` prompt
+are reused with `NO_WRITE | WRITE_CANDIDATE` only. Extraction reuses the
+frozen P1-B1 instruction and each candidate's existing date/text-scalar/
+quantity-unit schema and authoritative validator. No prompt tuning occurs.
+Every new stage receives ORIGINAL candidate evidence; extraction also
+receives the existing `expectedSchema`. Generated source or binary text is
+never downstream evidence; validated decisions control flow only.
+
+The existing bounded scaffold and HTTP request contract are reused exactly:
+OpenAI-compatible chat completions, temperature 0, max_tokens 128,
+stream false, enable_thinking false, response_format json_object.
+An existing 4B server must pass the same non-inference `/health` readiness
+check with a 10000ms timeout before new semantic calls. Failed preflight
+permits zero semantic calls and emits no semantic report. New calls use
+180000ms, one attempt, and no automatic reruns. Completed assistant content
+with invalid JSON/schema is a semantic failure, not runtime failure;
+HTTP/runtime/envelope/timeout failure is runtime failure.
+
+#### Accounting, scoring, and directional progression
+
+Reports distinguish `sourceAmbiguityCallsReused = 60` from `newCallsPlanned`,
+`newCallsAttempted`, `newCallsCompleted`, `newInvalidStructuredOutputs`, and
+`newRuntimeFailures`. Planned increments when a new stage becomes required,
+before its sole POST. Normal execution has new planned = attempted.
+Counterfactual hybrid stage-call count is 60 source calls plus new binary
+and extraction calls, not a claim that source calls ran again.
+Each case contains the exact copied source ambiguity record, binary and
+extraction records, and separate `REUSED / NEW / SKIPPED` origin markers.
+Arm summaries include the counterfactual source-plus-new call/latency totals;
+execution separately exposes source and new per-stage counts/latencies.
+Total case latency sums recorded source ambiguity latency and invoked new
+stage latencies; skipped latency is null. Model-load/server-switch latency
+is not represented as measured per-case inference latency.
+
+HYBRID uses the same P1-B3 D-arm scoring definitions: HUMAN `ESCALATE`
+succeeds only with source schema-valid `ESCALATE`; HUMAN `NO_WRITE` needs
+source `CLEAR` then new binary `NO_WRITE`; HUMAN `WRITE_CANDIDATE` needs
+source `CLEAR`, new binary `WRITE_CANDIDATE`, and schema-valid extraction
+deep-equal to frozen extraction gold. Invalid source output remains failure.
+All 60 cases stay in the denominator. The same unsafeNonEscalation,
+falseNoWrite, schemaValidExtractionWrongValue, terminalEscalation, and
+endToEndSuccess definitions apply, including wrong-HUMAN-flow exclusion
+from the specific extraction-wrong metric.
+
+The **primary** comparison is verified P1-B3 **L4 → HYBRID**, not D4 or
+D1.7. Paired categories remain `UNCHANGED_CORRECT`, `FIXED`, `REGRESSION`,
+`UNCHANGED_WRONG`, and `NONCOMPARABLE_RUNTIME`. Invalid JSON/schema is
+comparable semantic failure; runtime failure in either required arm/case
+is noncomparable. The directional rule is exactly:
+
+```text
+If any required source/new comparison runtime failure exists:
+  INDETERMINATE_RUNTIME
+Otherwise RAW_EPISODE_SUCCESSOR_OPEN iff:
+  HYBRID endToEndSuccess >= L4 endToEndSuccess
+  AND paired L4 -> HYBRID FIXED > REGRESSION
+  AND HYBRID unsafeNonEscalation <= L4 unsafeNonEscalation
+  AND HYBRID falseNoWrite <= L4 falseNoWrite
+  AND HYBRID schemaValidExtractionWrongValue <= L4 schemaValidExtractionWrongValue
+Otherwise:
+  NO_RAW_EPISODE_SUCCESSOR_SIGNAL
+```
+
+Safety comparisons are component-wise, not a weighted aggregate. There is
+no +10 percentage-point requirement. This is **not a training entry gate**
+or production-readiness criterion.
+
+#### Raw-episode successor sequencing only
+
+If P1-B4 returns `RAW_EPISODE_SUCCESSOR_OPEN`, the next research step is a
+**separately designed synthetic raw-episode diagnostic before task-specific
+training on this branch**. Its intended comparison is the same semantic
+case's HUMAN/oracle evidence span → the same role-split hybrid versus the
+same full synthetic conversational episode → the same role-split hybrid.
+The purpose is to separate bounded semantic-component failure from evidence
+localization, conversational scope, speaker/reference, transient-vs-durable
+context, and distractor effects. Raw fixture contents, sample size,
+thresholds, private replay, retrieval behavior, and training mechanism are
+not frozen here; they require a later design after P1-B4 results. No raw
+episodes, training experiment, or private natural XION replay are opened.
+
+#### P1-B4 implementation receipt — no experimental inference
+
+Runner: `scripts/run-memory-inference-p1b4-role-split-hybrid-diagnostic.js`.
+Identities are `xion-local-memory-inference-p1b4-role-split-hybrid-runner-v1`,
+`xion-local-memory-inference-p1b4-role-split-hybrid-scoring-v1`, and
+`xion-local-memory-inference-p1b4-role-split-hybrid-report-v1`.
+Only `--endpoint` and optional `--commit` (default `git rev-parse HEAD`)
+are accepted. Future execution, **not performed by this commit**, is:
+
+```text
+npm --silent run research:memory-inference-p1b4-role-split-hybrid -- --endpoint <4B endpoint> --commit <Galpi SHA>
+```
+
+The runner emits one JSON report to stdout and never manages model servers.
+Only two existing P1-B3 helpers (`preflight`, `invokeStage`) are newly
+exported for reuse; their bodies, the P1-B3 validator/combiner, and historical
+scoring semantics are unchanged. No generalized framework was added.
+Focused tests use fake fetch only, and synthetic test reports stay in memory.
+No real P1-B4 model call/output/report exists, no 1.7B inference was rerun,
+and `llama.cpp` was not started during implementation.
+
+P1-B2c/B2d remain closed. Production memory behavior, durable-write authority,
+source-of-truth, identity, explicit correction, Core/high-impact gates,
+governance/authorization, retrieval, routing, Vault/DB schema, and existing
+deterministic hard gates remain unchanged and authoritative. Private replay
+remains **UNOPENED**. Training and adoption require their own later designs.

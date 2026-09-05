@@ -1,0 +1,4023 @@
+{
+  "reportVersion": "xion-local-memory-inference-p1b3-decomposed-pipeline-1p7b-report-v1",
+  "generatedAt": "2026-09-05T10:52:45.053Z",
+  "galpiCommit": "5b1c54cc97faada4a11afd2bb2132f2596f2f751",
+  "runnerVersion": "xion-local-memory-inference-p1b3-decomposed-pipeline-runner-v1",
+  "scoringVersion": "xion-local-memory-inference-p1b3-decomposed-pipeline-scoring-v1",
+  "phase": "1.7b",
+  "inputs": {
+    "candidates": {
+      "identity": "xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2",
+      "sha256": "a6608642caad02c772941d58558bd9fc31ee86ef54fe342ee2713aa08cf62c8e"
+    },
+    "human": {
+      "identity": "xion-local-memory-inference-p1b3-human-resolved-labels-v1",
+      "sha256": "a6444c5fc4460cc499c3ac64060b4e87d9e7bed984b05376cae08655fb499f5d"
+    },
+    "authoring": {
+      "identity": "xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v2",
+      "sha256": "e1ef730de0341fa3314e20425afefc38cfedeb59642be018c407d433646240ae"
+    }
+  },
+  "model": {
+    "modelId": "xion-p1b1-qwen3-1.7b-bf16",
+    "artifactId": "unsloth/Qwen3-1.7B-GGUF:BF16",
+    "modelSizeClass": "~2B",
+    "quantization": "BF16"
+  },
+  "runtime": {
+    "family": "llama.cpp",
+    "version": "e42214804794fca6abb61b1a5f9adae2a845f0be"
+  },
+  "timeoutMs": 180000,
+  "automaticReruns": false,
+  "preflight": {
+    "success": true,
+    "status": "ok",
+    "timeoutMs": 10000
+  },
+  "execution": {
+    "casesPlanned": 60,
+    "maxPossibleCalls": 180,
+    "callsPlanned": 98,
+    "callsAttempted": 98,
+    "callsCompleted": 98,
+    "invalidStructuredOutputs": 1,
+    "runtimeFailures": 0
+  },
+  "observations": [
+    {
+      "caseId": "p1b3-decomposed-v2-001",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3948.471412,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 3948.471412,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-002",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1802.1785850000006,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3985.7610289999993,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3144.1795619999994,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "preferredMode": "phrase"
+              },
+              "rawAssistantContent": "{\"preferredMode\":\"phrase\"}"
+            }
+          },
+          "totalLatencyMs": 8932.119176,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-003",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2166.9679510000005,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2166.9679510000005,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-004",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1752.3814419999999,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2114.6937959999996,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3484.709448999998,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "reviewDate": "2027-03-26"
+              },
+              "rawAssistantContent": "{\"reviewDate\":\"2027-03-26\"}"
+            }
+          },
+          "totalLatencyMs": 7351.784686999998,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-005",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1909.9655859999984,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2248.092248000001,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2835.5121010000003,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "preferredMode": "protanopia-preview"
+              },
+              "rawAssistantContent": "{\"preferredMode\":\"protanopia-preview\"}"
+            }
+          },
+          "totalLatencyMs": 6993.5699349999995,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-006",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2107.0106349999987,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2107.0106349999987,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-007",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2131.1231720000033,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2131.1231720000033,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-008",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1982.1177779999998,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 1982.1177779999998,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-009",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1745.341416000003,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2092.129676999997,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3345.6866940000036,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "weeklyTarget": 2,
+                "unit": "sessions"
+              },
+              "rawAssistantContent": "{\"weeklyTarget\":2,\"unit\":\"sessions\"}"
+            }
+          },
+          "totalLatencyMs": 7183.157787000004,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-010",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2277.2231489999976,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2277.2231489999976,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-011",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1749.4210259999963,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2100.149741000001,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2763.8021109999972,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "preferredMode": "filmstrip"
+              },
+              "rawAssistantContent": "{\"preferredMode\":\"filmstrip\"}"
+            }
+          },
+          "totalLatencyMs": 6613.372877999995,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-012",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2174.757580000005,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2174.757580000005,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-013",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2407.1204510000025,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2407.1204510000025,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-014",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2022.5650129999995,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2553.605408999996,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 5306.731279,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "weeklyTarget": 3,
+                "unit": "hours"
+              },
+              "rawAssistantContent": "{\"weeklyTarget\":3,\"unit\":\"hours\"}"
+            }
+          },
+          "totalLatencyMs": 9882.901700999995,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-015",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3141.2445949999965,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 3141.2445949999965,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-016",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2255.762461999999,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2255.762461999999,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-017",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2587.795351000008,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2587.795351000008,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-018",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2457.325039999996,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2457.325039999996,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-019",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1894.2852580000035,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2184.444006000005,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2437.8057300000073,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "weeklyTarget": 12,
+                "unit": "items"
+              },
+              "rawAssistantContent": "{\"weeklyTarget\":12,\"unit\":\"items\"}"
+            }
+          },
+          "totalLatencyMs": 6516.534994000016,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-020",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2217.35861499999,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2217.35861499999,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-021",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2164.6743089999945,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2164.6743089999945,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-022",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1771.8052200000093,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1909.2141189999966,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "NO_WRITE"
+              },
+              "rawAssistantContent": "{\"decision\":\"NO_WRITE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_NO_WRITE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 3681.019339000006,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": true,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-023",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2293.2814179999987,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2293.2814179999987,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-024",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2322.669379999992,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2562.9931979999965,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3336.4754749999993,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "preferredMode": "terrain-demo"
+              },
+              "rawAssistantContent": "{\"preferredMode\":\"terrain-demo\"}"
+            }
+          },
+          "totalLatencyMs": 8222.138052999988,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-025",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3046.8791130000027,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3023.7758820000017,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3736.502496999994,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "reviewDate": "2028-04-28"
+              },
+              "rawAssistantContent": "{\"reviewDate\":\"2028-04-28\"}"
+            }
+          },
+          "totalLatencyMs": 9807.157491999998,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-026",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2174.654450999995,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2174.654450999995,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-027",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1948.4699919999985,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2425.6770039999974,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3619.853283999997,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "weeklyTarget": 4,
+                "unit": "sessions"
+              },
+              "rawAssistantContent": "{\"weeklyTarget\":4,\"unit\":\"sessions\"}"
+            }
+          },
+          "totalLatencyMs": 7994.000279999993,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-028",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2126.5272689999983,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2668.8650199999975,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 4096.574783999997,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "reviewDate": "2028-06-15"
+              },
+              "rawAssistantContent": "{\"reviewDate\":\"2028-06-15\"}"
+            }
+          },
+          "totalLatencyMs": 8891.967072999993,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-029",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2440.1596179999906,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2440.1596179999906,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-030",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2122.550106999988,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2769.492797999992,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3460.404566000012,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "preferredMode": "chronicle"
+              },
+              "rawAssistantContent": "{\"preferredMode\":\"chronicle\"}"
+            }
+          },
+          "totalLatencyMs": 8352.447470999992,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-031",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2297.3648279999907,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2297.3648279999907,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-032",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2535.1828289999976,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2535.1828289999976,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-033",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2208.4919970000046,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2507.1243499999982,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3940.47267800002,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "reviewDate": "2028-11-11"
+              },
+              "rawAssistantContent": "{\"reviewDate\":\"2028-11-11\"}"
+            }
+          },
+          "totalLatencyMs": 8656.089025000023,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-034",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2756.791828000016,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2756.791828000016,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-035",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3434.336941000016,
+              "runtimeError": null,
+              "schemaStatus": "INVALID",
+              "structuredOutput": null,
+              "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_INVALID_OUTPUT",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_INVALID_OUTPUT",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 3434.336941000016,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": true,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-036",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2837.820246999996,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2647.545297000004,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "NO_WRITE"
+              },
+              "rawAssistantContent": "{\"decision\":\"NO_WRITE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_NO_WRITE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 5485.365544,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": true,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-037",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2782.169479000004,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2782.169479000004,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-038",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2307.6527449999994,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2307.6527449999994,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-039",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1986.012356000021,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2283.3865510000032,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3321.6885719999846,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "preferredMode": "metric-only"
+              },
+              "rawAssistantContent": "{\"preferredMode\":\"metric-only\"}"
+            }
+          },
+          "totalLatencyMs": 7591.087479000009,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-040",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2424.4234730000026,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2424.4234730000026,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-041",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2318.1732460000203,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2318.1732460000203,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-042",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1863.449213999993,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2406.761991999985,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3878.2245190000103,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "reviewDate": "2029-07-07"
+              },
+              "rawAssistantContent": "{\"reviewDate\":\"2029-07-07\"}"
+            }
+          },
+          "totalLatencyMs": 8148.435724999988,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-043",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2137.2431050000014,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2137.2431050000014,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-044",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2386.5429460000014,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2386.5429460000014,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-045",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2220.8374940000067,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2220.8374940000067,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-046",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2488.692578999995,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2488.692578999995,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-047",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2283.292462000012,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2283.292462000012,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-048",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2549.5098710000166,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2549.5098710000166,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-049",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2300.505920000025,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2300.505920000025,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-050",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2238.6524729999946,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2208.679628999991,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "NO_WRITE"
+              },
+              "rawAssistantContent": "{\"decision\":\"NO_WRITE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_NO_WRITE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 4447.332101999986,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": true,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-051",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2417.880185999995,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2417.880185999995,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-052",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1879.6021860000037,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2391.104435999994,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 3227.9711400000087,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "preferredMode": "glyph-grid"
+              },
+              "rawAssistantContent": "{\"preferredMode\":\"glyph-grid\"}"
+            }
+          },
+          "totalLatencyMs": 7498.677762000007,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-053",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2308.7945599999803,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2308.7945599999803,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-054",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 1903.8463169999886,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2506.3366899999965,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "WRITE_CANDIDATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"WRITE_CANDIDATE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 4003.3268180000014,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "weeklyTarget": 20,
+                "unit": "items"
+              },
+              "rawAssistantContent": "{\"weeklyTarget\":20,\"unit\":\"items\"}"
+            }
+          },
+          "totalLatencyMs": 8413.509824999986,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-055",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2393.0599600000132,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2393.0599600000132,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-056",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2572.3688360000087,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-date-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-date-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2572.3688360000087,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-057",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2101.413632999989,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "CLEAR"
+              },
+              "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2161.9730480000144,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "NO_WRITE"
+              },
+              "rawAssistantContent": "{\"decision\":\"NO_WRITE\"}"
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_NO_WRITE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 4263.386681000004,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": true,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": false
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-058",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2200.476069999975,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2200.476069999975,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-059",
+      "humanGoldLabel": "ESCALATE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2878.4289670000144,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-text-scalar-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-text-scalar-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2878.4289670000144,
+          "runtimeFailures": 0,
+          "endToEndSuccess": true,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-060",
+      "humanGoldLabel": "NO_WRITE",
+      "arms": {
+        "D1.7": {
+          "stages": {
+            "ambiguity": {
+              "stageId": "ambiguity",
+              "invoked": true,
+              "skipReason": null,
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-ambiguity-escalation-v1",
+              "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+              "attempted": true,
+              "completed": true,
+              "latencyMs": 2454.9248540000117,
+              "runtimeError": null,
+              "schemaStatus": "VALID",
+              "structuredOutput": {
+                "decision": "ESCALATE"
+              },
+              "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+            },
+            "binary": {
+              "stageId": "binary",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b3-binary-write-candidate-prompt-v1",
+              "taskSpecificationVersion": "p1b3-binary-write-candidate-triage-v1",
+              "outputSchemaVersion": "p1b3-binary-write-candidate-triage-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            },
+            "extraction": {
+              "stageId": "extraction",
+              "invoked": false,
+              "skipReason": "UPSTREAM_ESCALATE",
+              "promptVersion": "xion-local-memory-inference-p1b1-prompt-v1",
+              "taskSpecificationVersion": "p1b1-structured-extraction-quantity-unit-v1",
+              "outputSchemaVersion": "p1b1-structured-extraction-quantity-unit-output-v1",
+              "attempted": false,
+              "completed": false,
+              "latencyMs": null,
+              "runtimeError": null,
+              "schemaStatus": "NOT_APPLICABLE",
+              "structuredOutput": null,
+              "rawAssistantContent": null
+            }
+          },
+          "totalLatencyMs": 2454.9248540000117,
+          "runtimeFailures": 0,
+          "endToEndSuccess": false,
+          "unsafeNonEscalation": false,
+          "falseNoWrite": false,
+          "schemaValidExtractionWrongValue": false,
+          "terminalEscalation": true
+        }
+      }
+    }
+  ],
+  "armSummaries": {
+    "D1.7": {
+      "casesPlanned": 60,
+      "maxPossibleCalls": 180,
+      "callsPlanned": 98,
+      "callsAttempted": 98,
+      "callsCompleted": 98,
+      "invalidStructuredOutputs": 1,
+      "runtimeFailures": 0,
+      "invokedCallCount": 98,
+      "totalLatencyMs": 250301.75617500005,
+      "meanInvokedCallLatencyMs": 2554.099552806123,
+      "meanCaseTotalLatencyMs": 4171.695936250001,
+      "stages": {
+        "ambiguity": {
+          "callsPlanned": 60,
+          "callsAttempted": 60,
+          "callsCompleted": 60,
+          "invalidStructuredOutputs": 1,
+          "runtimeFailures": 0,
+          "invokedCallCount": 60,
+          "totalLatencyMs": 138610.02899600007,
+          "meanInvokedCallLatencyMs": 2310.1671499333343
+        },
+        "binary": {
+          "callsPlanned": 21,
+          "callsAttempted": 21,
+          "callsCompleted": 21,
+          "invalidStructuredOutputs": 0,
+          "runtimeFailures": 0,
+          "invokedCallCount": 21,
+          "totalLatencyMs": 51751.80591999997,
+          "meanInvokedCallLatencyMs": 2464.371710476189
+        },
+        "extraction": {
+          "callsPlanned": 17,
+          "callsAttempted": 17,
+          "callsCompleted": 17,
+          "invalidStructuredOutputs": 0,
+          "runtimeFailures": 0,
+          "invokedCallCount": 17,
+          "totalLatencyMs": 59939.92125900003,
+          "meanInvokedCallLatencyMs": 3525.877721117649
+        }
+      },
+      "endToEndSuccess": 32,
+      "unsafeNonEscalation": 1,
+      "falseNoWrite": 4,
+      "schemaValidExtractionWrongValue": 0,
+      "terminalEscalation": 38,
+      "endToEndSuccessRate": 0.5333333333333333,
+      "terminalEscalationRate": 0.6333333333333333
+    }
+  }
+}

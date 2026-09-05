@@ -448,7 +448,7 @@ module.exports = {
   INPUT_FILES, INPUT_IDENTITIES, BINARY_PROMPT_VERSION, BINARY_INSTRUCTION, BINARY_SPECIFICATION,
   check, exactKeys, loadInputs, validateInputs, stageContract, buildStagePrompt, endpointUrls,
   stageIds, stageRecord, skipAfter, parseStageContent, scoreArmCase, summarizeCalls, summarizeArm,
-  runPhase, parseArguments, main,
+  preflight, invokeStage, runPhase, parseArguments, main,
 };
 
 if (require.main === module) {

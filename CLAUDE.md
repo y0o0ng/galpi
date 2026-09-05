@@ -92,7 +92,8 @@
 
 - **구조 검토 보완 제안 3건은 OPEN / 미채택이다.** 갱신 실패 중 읽기 상태·동일 원천 중복 지지/자기 재진술·유효 시점과 인지 시점의 구분 및 원본 직접 회수 주의점은 `docs/Memory research/xion-memory-research-docs/memory-architecture-design.md` §54에 있다. 기존 R2 계약·R3 사전등록은 그대로다.
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
-- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`다.** P1-B3는 preregister됐고 HUMAN class gold는 `20 / 20 / 20`(`NO_WRITE / WRITE_CANDIDATE / ESCALATE`), `>=15/class` gate는 PASS다. 전용 runner와 deterministic combiner를 구현하고 fake fetch로 검증했으며 실제 모델 호출·output/report는 아직 없다. 코드 리뷰 뒤 다음은 순차 4B 실행 → 1.7B 실행 → deterministic combination이다. task-specific training은 frozen P1-B3 trigger 충족에만 조건부다. production memory는 그대로이고 private replay는 `UNOPENED`이며 HUMAN 검토 provenance와 구현 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
+- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** P1-B3 run artifacts를 커밋했고 결과 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
+- **P1-B4 role-split hybrid diagnostic은 preregister/구현됐지만 실행하지 않았다.** 정확한 P1-B3 D1.7 ambiguity 출력을 재사용하고 source `CLEAR` 뒤에서만 4B binary + extraction을 새로 호출한다. 긍정적 progression은 별도 설계할 raw-episode diagnostic을 열 뿐 training을 열지 않는다. 앞으로 일반적인 pre-training 성능 entry gate는 채택하지 않으며 training/adoption은 각각 별도 설계한다. production memory는 그대로이고 private replay는 `UNOPENED`이며 정본은 위 canonical study 문서다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 
