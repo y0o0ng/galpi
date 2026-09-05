@@ -3043,6 +3043,8 @@ remains **UNOPENED**. Training and adoption require their own later designs.
 
 ### P1-B4 pre-execution correction — B4A recalibration → B4B hybrid
 
+Historical implementation receipt; the completed execution is closed below.
+
 **PREREGISTERED / IMPLEMENTED / NOT RUN.** Pre-run review superseded the
 initial design at `8cd47eebd9facfaa885f9105e2614269d2bf6307` before any
 P1-B4 real model call, output, or report. Latest reviewed main was
@@ -3262,3 +3264,234 @@ training. Strict performance/safety gates belong to later held-out/adoption
 decisions. Raw episodes, training, and private natural replay remain
 **UNOPENED**. All production memory/architecture and deterministic hard
 gate boundaries remain unchanged.
+
+### P1-B4 execution receipt — CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL
+
+P1-B4 executed at Galpi revision
+`4e079617e96c7fae41ef92ad0d356c4d7b5a2e56`. Both exact local reports were
+retained unchanged as durable run evidence:
+
+| Artifact | Identity | Exact-byte SHA-256 |
+|---|---|---|
+| `fixtures/local-memory-inference-p1b4-ambiguity-report.json` | `xion-local-memory-inference-p1b4-ambiguity-recalibration-report-v1` | `e77a7a6f9aa76c50e24d645f3e218f212295f05124e0a4da956c1cd68dc4cf70` |
+| `fixtures/local-memory-inference-p1b4-hybrid-report.json` | `xion-local-memory-inference-p1b4-role-split-hybrid-report-v2` | `55e6b83906904afd7da42961e9c8eb22304addd2479ab072f6e3c02dd6245ccf` |
+
+The source files were `/tmp/xion-p1b4-ambiguity-report.json` and
+`/tmp/xion-p1b4-hybrid-report.json`; exact bytes were copied, not rewritten
+or reconstructed. Generated timestamps are respectively
+`2026-09-05T12:51:56.939Z` and `2026-09-05T12:58:54.827Z`.
+The frozen B4A validator reparses A. Because B4B had no standalone report
+validator, the new research-only B5 source validator reconstructs the
+**entire existing B4B v2 report** using the unchanged strict parser,
+stage contracts, scoring, and progression function. It requires deep
+equality, exact A-byte SHA provenance, and the verified immutable P1-B3
+source reports. This verifies historical scoring; it does not change it.
+
+A used `xion-p1b1-qwen3-1.7b-bf16` /
+`unsloth/Qwen3-1.7B-GGUF:BF16` (`~2B`, BF16); B used
+`xion-p1b1-qwen3-4b-bf16` / `unsloth/Qwen3-4B-GGUF:BF16` (`~4B`, BF16).
+Both used `llama.cpp` revision `e42214804794fca6abb61b1a5f9adae2a845f0be`,
+180000ms semantic timeout, no automatic reruns, and successful 10000ms
+health preflights. Frozen candidate/HUMAN/extraction provenance is unchanged.
+
+A planned/attempted/completed **60/60/60** calls: 28 schema-valid CLEAR,
+12 schema-valid ESCALATE, **20 INVALID**, zero runtime failures.
+B reused those exact 60 A records and planned/attempted/completed
+**44/44/44** new 4B calls (28 binary, 16 extraction), with zero new invalid
+outputs and zero runtime failures. No Stage-1 call was repeated by B.
+
+| Metric | Historical P1-B3 L4 | P1-B4 HYBRID |
+|---|---:|---:|
+| End-to-end success | 48/60 (80%) | 33/60 (55%) |
+| unsafeNonEscalation | 7 | 10 |
+| falseNoWrite | 6 | 1 |
+| schemaValidExtractionWrongValue | 1 | 1 |
+| terminalEscalation | 13 | 12 |
+
+L4 → HYBRID paired counts: `UNCHANGED_CORRECT 29`, `FIXED 4`,
+`REGRESSION 19`, `UNCHANGED_WRONG 8`, `NONCOMPARABLE_RUNTIME 0`.
+Required runtime failures were zero. The frozen progression rule failed
+on E2E not-worse, FIXED > REGRESSION, and unsafeNonEscalation not-worse.
+The authoritative final disposition is **NO_RAW_EPISODE_SUCCESSOR_SIGNAL**.
+P1-B4 is **CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL**;
+no successor was opened by that result.
+
+#### Observed format family — no retroactive forgiveness
+
+All 20 A INVALID raw outputs were exactly one outer Markdown code fence
+with lowercase language tag `json`, no prose or other observed invalid
+family, and an otherwise schema-conforming decision object inside:
+
+````text
+```json
+{"decision":"CLEAR"}
+```
+````
+
+or the same presentation with `ESCALATE`. Inspecting the payloads finds
+12 CLEAR and 8 ESCALATE strings. These are an **observed presentation
+family, not proof of internal semantic intent**. P1-B4 correctly applied
+ordinary `JSON.parse` to the complete raw assistant string and counted
+all 20 INVALID. They remain invalid P1-B4 outputs and end-to-end failures;
+neither this receipt nor the subsequent diagnostic reinterprets P1-B4.
+
+### P1-B5 deterministic structured-output normalization diagnostic
+
+**PREREGISTERED / IMPLEMENTED / NOT RUN.** This is an **ADAPTIVE** pipeline
+diagnostic on already-consumed P1-B4/P1-B3 evidence, not fresh held-out
+validation. Research question: does a narrowly bounded deterministic
+normalization layer for the observed JSON code-fence wrapper make the
+same role-split hybrid directionally competitive with historical L4 under
+the unchanged raw-episode successor rule?
+
+The user confirmed **Stage-1-only normalization** before implementation.
+Existing and NEW 4B binary/extraction outputs retain the frozen strict
+parser. No prompt is strengthened, no model is retried, and semantic
+content, HUMAN gold, extraction gold, role ownership, and L4 thresholds
+remain unchanged. P1-B1/B2/B3/B4 historical parsers are not modified.
+
+#### Exact normalization envelope
+
+Normalizer identity:
+`xion-local-memory-inference-structured-output-normalizer-v1`.
+It acts on the exact raw B4A assistant content, before the unchanged
+ambiguity JSON/schema validation, with only these paths:
+
+1. **ALREADY_RAW_JSON:** ordinary `JSON.parse(raw)` succeeds. Return the
+   original string unchanged; `normalizationApplied = false`,
+   `normalizationKind = NONE`. The frozen stage schema still must pass.
+2. **EXACT_JSON_CODE_FENCE_UNWRAP:** after allowing only outer whitespace,
+   the whole response is exactly opening triple backticks + lowercase
+   `json`, a line break, payload, a line break, and closing triple
+   backticks. LF and CRLF are recognized. Remove only fence markers;
+   retain the exact inner payload, including boundary line breaks and all
+   JSON whitespace/escaping/capitalization. No triple-backtick sequence
+   may occur inside the envelope. Record `normalizationApplied = true`
+   and `normalizationKind = EXACT_JSON_CODE_FENCE_UNWRAP`; then ordinary
+   JSON.parse and the frozen ambiguity schema decide validity.
+3. Otherwise record `normalizationKind = NOT_NORMALIZABLE`,
+   `normalizationApplied = false`, normalized content null, and INVALID.
+
+An unwrapped malformed JSON payload or schema-invalid value stays INVALID;
+successful envelope removal is not successful semantic validation.
+Bare fences, uppercase/mixed-case tags, extra fence tags/options, prose,
+multiple/nested fences, non-whitespace prefixes/suffixes, JSON5, comments,
+trailing commas, single quotes, key-quoting repair, JSON substring
+extraction, regex decision inference, and semantic repair are not accepted.
+This is not a generic JSON repair facility or a production parsing policy.
+
+#### Pinned sources, reuse, and new-call boundary
+
+Before any new call, B5 validates immutable P1-B3 phase reports through the
+existing combiner, B4A from raw outputs, and the whole strict B4B report
+against exact A and P1-B3. It requires ordered case IDs 001–060, the exact
+B4 experiment revision above, zero source runtime failures, exact frozen
+candidate/HUMAN/authoring identities and SHA-256 values, and both pinned
+B4 report-byte hashes. Supplied scores are never trusted. Original A
+records, including historical schemaStatus/raw content, remain separately
+preserved beside B5's normalized validity/output and normalization metadata.
+
+For originally valid A CLEAR cases, copy the exact B4B binary/extraction
+records, including any failure/skipped state: **never rerun them**.
+Normalized ESCALATE terminates with no new call. Still-invalid Stage 1
+fails with no downstream call. Only originally INVALID A output that
+becomes schema-valid CLEAR and had no B4B downstream result may invoke
+NEW 4B binary. New valid NO_WRITE stops; new valid WRITE_CANDIDATE invokes
+frozen extraction. Invalid/runtime upstream output stops downstream.
+
+The observed source has **60 reused 1.7B calls and 44 reused 4B calls**.
+Its 20 fenced outputs make **12 CLEAR cases newly reachable**; the other
+8 fenced ESCALATE payloads require no downstream inference. Thus future
+execution needs 12 new binary attempts, with 0–12 new extraction calls
+determined only by binary outputs. These are source/control-flow facts,
+not a P1-B5 model result. No 1.7B call is made by B5.
+
+New calls use only the frozen 4B model/artifact/runtime above, 180000ms,
+one attempt, no retries. The exact P1-B3 binary task/prompt/schema and
+P1-B1 extraction task/prompt/schema are reused. Every new stage gets
+ORIGINAL candidate evidence; extraction also gets frozen expectedSchema.
+Normalized or generated output controls flow only, never downstream evidence.
+
+If no new 4B call is required, endpoint and health preflight are unnecessary.
+Otherwise endpoint is required and the existing 10000ms non-inference
+health check precedes every new semantic POST. Failed preflight returns
+`INDETERMINATE_RUNTIME`, zero semantic attempts, and no invented case
+scores or arm summary. Readiness failure is reported separately from
+`newRuntimeFailures` (failed attempted semantic calls). Schema-invalid
+new assistant content is a completed semantic failure, not runtime failure.
+
+Accounting separates `REUSED_P1B4A`, `REUSED_P1B4B`, `NEW`, and `SKIPPED`.
+Reports include source ambiguity/downstream calls reused, new binary and
+extraction planned/attempted/completed counts, new invalid/runtime counts,
+and normalization counts (`alreadyRawJson`, `codeFenceUnwrapped`,
+`notNormalizable`, `schemaValidAfterNormalization`). Normal execution has
+new planned = attempted. Failed preflight retains the required binary
+plan with zero attempts. Per-case latency and counterfactual call totals
+sum reused source and new model stages, not server-switch wall-clock time.
+
+#### Frozen scoring, interpretation, and successor policy
+
+B5 uses unchanged HUMAN class gold and extraction gold. HUMAN ESCALATE
+requires normalized schema-valid Stage-1 ESCALATE; NO_WRITE requires CLEAR
+then valid binary NO_WRITE; WRITE_CANDIDATE requires CLEAR, valid binary
+WRITE_CANDIDATE, and schema-valid extraction deep-equal to extraction gold.
+All 60 cases stay in the denominator. The same unsafeNonEscalation,
+falseNoWrite, schemaValidExtractionWrongValue (HUMAN WRITE only),
+terminalEscalation, and endToEndSuccess definitions apply. There is no
+special forgiveness metric for normalized cases.
+
+The primary baseline remains verified P1-B3 L4, with the same five paired
+categories (INVALID remains comparable; runtime is noncomparable).
+The existing B4 progression function is reused **unchanged**:
+
+```text
+Any required runtime failure -> INDETERMINATE_RUNTIME
+Otherwise RAW_EPISODE_SUCCESSOR_OPEN iff:
+  HYBRID endToEndSuccess >= L4 endToEndSuccess
+  AND paired L4 -> HYBRID FIXED > REGRESSION
+  AND HYBRID unsafeNonEscalation <= L4 unsafeNonEscalation
+  AND HYBRID falseNoWrite <= L4 falseNoWrite
+  AND HYBRID schemaValidExtractionWrongValue <= L4 schemaValidExtractionWrongValue
+Otherwise -> NO_RAW_EPISODE_SUCCESSOR_SIGNAL
+```
+
+Safety is component-wise, without weights or a +10pp condition. Positive
+evidence supports only directional promise of this role-split pipeline
+on this consumed synthetic fixture after handling the observed wrapper.
+It does not establish fresh capability, production readiness, arbitrary
+malformed-output recovery, a general JSON-repair policy, or training success.
+
+Positive B5 opens only a **separately designed synthetic raw-episode
+diagnostic**. A negative result means the format confound was insufficient
+under this rule: close this untuned hybrid diagnostic branch and review
+the remaining bounded failure profile before deciding whether training
+would be informative. Do not automatically train. The prospective policy
+of no general untuned-performance entry gate remains; training still
+requires its own preregistered provenance, split, mechanism, metrics,
+leakage controls, and stopping rules. No raw episodes, training experiment,
+or private replay are opened. Production parsing/memory and architecture
+hard gates remain unchanged.
+
+#### B5 implementation receipt — no real inference
+
+The only new runner is
+`scripts/run-memory-inference-p1b5-structured-output-normalization.js`,
+containing the narrow research-only normalizer and source verifier.
+Identities:
+
+- runner: `xion-local-memory-inference-p1b5-structured-output-normalization-runner-v1`
+- scoring: `xion-local-memory-inference-p1b5-structured-output-normalization-scoring-v1`
+- report: `xion-local-memory-inference-p1b5-structured-output-normalization-report-v1`
+
+CLI accepts only optional `--endpoint` and `--commit` (default HEAD);
+the pinned current source requires endpoint because it has 12 newly
+reachable CLEAR cases. No semantic tuning options or server management
+are provided. Future execution, **not run in this task**, captures pure JSON:
+
+```text
+npm --silent run research:memory-inference-p1b5-structured-output-normalization -- --endpoint <4B endpoint> --commit <fixed Galpi SHA> > /tmp/xion-p1b5-normalization-report.json
+```
+
+Implementation checks use fake fetch only; fake B5 reports stay in memory.
+No real P1-B5 report was generated, no model server was started, and no
+1.7B or existing 4B call was rerun.

@@ -29,6 +29,7 @@
     "research:memory-inference-p1b3-combine": "node scripts/combine-memory-inference-p1b3-decomposed-pipeline.js",
     "research:memory-inference-p1b4-role-split-hybrid": "node scripts/run-memory-inference-p1b4-role-split-hybrid-diagnostic.js",
     "research:memory-inference-p1b4-ambiguity-recalibration": "node scripts/run-memory-inference-p1b4-ambiguity-recalibration.js",
+    "research:memory-inference-p1b5-structured-output-normalization": "node scripts/run-memory-inference-p1b5-structured-output-normalization.js",
     "review:memory-inference-p1b2c-triage-gold": "node scripts/review-memory-inference-p1b2c-triage-gold.js",
     "review:memory-inference-p1b2d-triage-gold": "node scripts/review-memory-inference-p1b2d-triage-gold.js",
     "review:memory-inference-p1b3-human-primary-gold": "node scripts/review-memory-inference-p1b3-human-primary-gold.js",

@@ -1,0 +1,1567 @@
+{
+  "reportVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-report-v1",
+  "runnerVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-runner-v1",
+  "scoringVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-scoring-v1",
+  "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+  "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+  "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+  "galpiCommit": "4e079617e96c7fae41ef92ad0d356c4d7b5a2e56",
+  "generatedAt": "2026-09-05T12:51:56.939Z",
+  "phase": "P1-B4A",
+  "diagnosticType": "ADAPTIVE_CONSUMED_FIXTURE",
+  "inputs": {
+    "candidates": {
+      "identity": "xion-local-memory-inference-p1b3-decomposed-pipeline-candidates-v2",
+      "sha256": "a6608642caad02c772941d58558bd9fc31ee86ef54fe342ee2713aa08cf62c8e"
+    },
+    "human": {
+      "identity": "xion-local-memory-inference-p1b3-human-resolved-labels-v1",
+      "sha256": "a6444c5fc4460cc499c3ac64060b4e87d9e7bed984b05376cae08655fb499f5d"
+    },
+    "authoring": {
+      "identity": "xion-local-memory-inference-p1b3-decomposed-pipeline-authoring-key-v2",
+      "sha256": "e1ef730de0341fa3314e20425afefc38cfedeb59642be018c407d433646240ae"
+    }
+  },
+  "historicalSource": {
+    "galpiCommit": "5b1c54cc97faada4a11afd2bb2132f2596f2f751",
+    "artifacts": {
+      "report4b": {
+        "file": "fixtures/local-memory-inference-p1b3-4b-report.json",
+        "identity": "xion-local-memory-inference-p1b3-decomposed-pipeline-4b-report-v1",
+        "sha256": "f1a438f0c72a0243d00f0d9ebfb41ceea9761e05d83e22a063a150a53fed089d"
+      },
+      "report1p7b": {
+        "file": "fixtures/local-memory-inference-p1b3-1p7b-report.json",
+        "identity": "xion-local-memory-inference-p1b3-decomposed-pipeline-1p7b-report-v1",
+        "sha256": "56d5d74795883d250c5d9249f2e1060a48ef06754b940059254ec8fd38c1a4fc"
+      },
+      "combined": {
+        "file": "fixtures/local-memory-inference-p1b3-combined-report.json",
+        "identity": "xion-local-memory-inference-p1b3-decomposed-pipeline-combined-report-v1",
+        "sha256": "af1fb7a45f30003aa19551700ba41c1ad3e8612982934d8033f09bf6155d9f79"
+      }
+    },
+    "combinedRecomputed": true
+  },
+  "model": {
+    "modelId": "xion-p1b1-qwen3-1.7b-bf16",
+    "artifactId": "unsloth/Qwen3-1.7B-GGUF:BF16",
+    "modelSizeClass": "~2B",
+    "quantization": "BF16"
+  },
+  "runtime": {
+    "family": "llama.cpp",
+    "version": "e42214804794fca6abb61b1a5f9adae2a845f0be"
+  },
+  "requestSettings": {
+    "temperature": 0,
+    "max_tokens": 128,
+    "stream": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "response_format": {
+      "type": "json_object"
+    }
+  },
+  "timeoutMs": 180000,
+  "automaticReruns": false,
+  "preflight": {
+    "success": true,
+    "status": "ok",
+    "timeoutMs": 10000
+  },
+  "execution": {
+    "casesPlanned": 60,
+    "callsPlanned": 60,
+    "callsAttempted": 60,
+    "callsCompleted": 60,
+    "invalidStructuredOutputs": 20,
+    "runtimeFailures": 0
+  },
+  "observations": [
+    {
+      "caseId": "p1b3-decomposed-v2-001",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 4671.3216489999995,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-002",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1852.8334519999999,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-003",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2265.570245000001,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-004",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1799.933282,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-005",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1903.1845680000006,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-006",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2141.8397129999994,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-007",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1911.3196229999994,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-008",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2454.3724360000015,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-009",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1860.656836000002,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-010",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2232.6656379999986,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-011",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2344.105251000001,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-012",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1946.103409000003,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-013",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2448.9563180000005,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-014",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1653.1106040000013,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-015",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2183.688703,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-016",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2314.75677,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-017",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2799.414263999999,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-018",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1937.0120839999945,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-019",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1772.8823579999953,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-020",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2355.069058000001,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-021",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2088.530467999997,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-022",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1763.6554340000002,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-023",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2484.7000040000057,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-024",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2167.8388360000026,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-025",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2212.6101710000003,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-026",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2382.7448869999935,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-027",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1767.0373639999962,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-028",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1901.129691000002,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-029",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2130.8061039999957,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-030",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1866.2196820000026,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-031",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2018.2625449999905,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-032",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2352.9521379999933,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-033",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2243.549331000002,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-034",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2221.3776750000106,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-035",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2542.112586999996,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-036",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2574.4306780000043,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-037",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2409.4758160000056,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-038",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2348.5863439999957,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": true
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-039",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2055.967159000007,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-040",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2693.950693999999,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-041",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2791.637062000009,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-042",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2964.539692999999,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-043",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2618.605410999997,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-044",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 3102.5972679999977,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-045",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1960.4001209999988,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-046",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2020.926634000003,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-047",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1867.571695999999,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-048",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2305.242686999991,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-049",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2614.883462999991,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": true
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-050",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2401.0616909999953,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-051",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2376.131548999998,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-052",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2263.890094000002,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-053",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2437.510859000002,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": true,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-054",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2130.2349400000094,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-055",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2574.5742949999985,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"CLEAR\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-056",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2478.734249000001,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-057",
+      "humanGoldLabel": "WRITE_CANDIDATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1915.0930769999977,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-058",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2589.170457,
+        "runtimeError": null,
+        "schemaStatus": "INVALID",
+        "structuredOutput": null,
+        "rawAssistantContent": "```json\n{\"decision\":\"ESCALATE\"}\n```"
+      },
+      "decision": "INVALID",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-059",
+      "humanGoldLabel": "ESCALATE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 2351.2516690000193,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "ESCALATE"
+        },
+        "rawAssistantContent": "{\"decision\":\"ESCALATE\"}"
+      },
+      "decision": "ESCALATE",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    },
+    {
+      "caseId": "p1b3-decomposed-v2-060",
+      "humanGoldLabel": "NO_WRITE",
+      "ambiguity": {
+        "stageId": "ambiguity",
+        "invoked": true,
+        "skipReason": null,
+        "promptVersion": "xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1",
+        "taskSpecificationVersion": "p1b4-ambiguity-recalibration-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "attempted": true,
+        "completed": true,
+        "latencyMs": 1940.9314379999996,
+        "runtimeError": null,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "unsafeNonEscalation": false,
+      "unnecessaryEscalation": false
+    }
+  ],
+  "summary": {
+    "callsPlanned": 60,
+    "callsAttempted": 60,
+    "callsCompleted": 60,
+    "invalidStructuredOutputs": 20,
+    "runtimeFailures": 0,
+    "invokedCallCount": 60,
+    "totalLatencyMs": 136779.722222,
+    "meanInvokedCallLatencyMs": 2279.6620370333335,
+    "CLEAR": 28,
+    "ESCALATE": 12,
+    "INVALID": 20,
+    "RUNTIME_FAILURE": 0,
+    "unsafeNonEscalation": 10,
+    "unnecessaryEscalation": 2,
+    "perHumanClass": {
+      "NO_WRITE": {
+        "CLEAR": 12,
+        "ESCALATE": 2,
+        "INVALID": 6,
+        "RUNTIME_FAILURE": 0
+      },
+      "WRITE_CANDIDATE": {
+        "CLEAR": 13,
+        "ESCALATE": 0,
+        "INVALID": 7,
+        "RUNTIME_FAILURE": 0
+      },
+      "ESCALATE": {
+        "CLEAR": 3,
+        "ESCALATE": 10,
+        "INVALID": 7,
+        "RUNTIME_FAILURE": 0
+      }
+    }
+  },
+  "historicalComparison": {
+    "baseline": "P1-B3 D1.7 ambiguity; descriptive only",
+    "summary": {
+      "callsPlanned": 60,
+      "callsAttempted": 60,
+      "callsCompleted": 60,
+      "invalidStructuredOutputs": 1,
+      "runtimeFailures": 0,
+      "invokedCallCount": 60,
+      "totalLatencyMs": 138610.02899600007,
+      "meanInvokedCallLatencyMs": 2310.1671499333343,
+      "CLEAR": 21,
+      "ESCALATE": 38,
+      "INVALID": 1,
+      "RUNTIME_FAILURE": 0,
+      "unsafeNonEscalation": 1,
+      "unnecessaryEscalation": 19,
+      "perHumanClass": {
+        "NO_WRITE": {
+          "CLEAR": 4,
+          "ESCALATE": 16,
+          "INVALID": 0,
+          "RUNTIME_FAILURE": 0
+        },
+        "WRITE_CANDIDATE": {
+          "CLEAR": 17,
+          "ESCALATE": 3,
+          "INVALID": 0,
+          "RUNTIME_FAILURE": 0
+        },
+        "ESCALATE": {
+          "CLEAR": 0,
+          "ESCALATE": 19,
+          "INVALID": 1,
+          "RUNTIME_FAILURE": 0
+        }
+      }
+    },
+    "currentMinusHistorical": {
+      "CLEAR": 7,
+      "ESCALATE": -26,
+      "unsafeNonEscalation": 9,
+      "unnecessaryEscalation": -17
+    }
+  },
+  "runtimeDisposition": "COMPLETE"
+}

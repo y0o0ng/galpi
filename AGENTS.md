@@ -93,8 +93,8 @@
 - **구조 검토 보완 제안 3건은 OPEN / 미채택이다.** 갱신 실패 중 읽기 상태·동일 원천 중복 지지/자기 재진술·유효 시점과 인지 시점의 구분 및 원본 직접 회수 주의점은 `docs/Memory research/xion-memory-research-docs/memory-architecture-design.md` §54에 있다. 기존 R2 계약·R3 사전등록은 그대로다.
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
 - **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** P1-B3 run artifacts를 커밋했고 결과 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
-- **초기 P1-B4 frozen-source 설계는 `SUPERSEDED_BEFORE_EXECUTION`이다.** 사전 검토에서 40/60 상한이 L4 48/60보다 낮음을 확인했고 P1-B4 real model output은 없다. 근거 정본은 위 canonical study 문서다.
-- **교정 P1-B4는 P1-B4A 단일 프롬프트 adaptive 1.7B ambiguity recalibration → P1-B4B 4B durability/extraction hybrid로 preregister/구현됐고 아직 실행하지 않았다.** B는 검증된 A 출력을 그대로 재사용한다. L4 progression rule은 그대로이며 긍정적 결과는 raw-episode 설계를 열 뿐 training을 열지 않는다. 일반 pre-training 성능 entry gate는 없고 training/adoption은 별도 설계한다. raw episode·training·private replay는 `UNOPENED`, production memory는 그대로이며 위 canonical study가 정본이다.
+- **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 위 canonical study 문서에 있다.
+- **P1-B5 deterministic normalization diagnostic은 preregister/구현됐고 NOT RUN이다.** P1-B4 ambiguity format-invalid 20개는 모두 정확한 lowercase `json` Markdown fence였다. 정규화는 Stage 1에만 적용하고 1.7B를 재실행하지 않으며 기존 P1-B4 4B 결과도 그대로 재사용한다. 새로 정규화된 `CLEAR`에서만 새 4B downstream 호출이 가능하다. L4 progression은 그대로이고 긍정적 결과는 synthetic raw-episode 설계만 연다. 일반 pre-training 성능 entry gate는 없지만 raw episode·training·private replay는 `UNOPENED`, production parsing/memory는 그대로이며 위 canonical study가 정본이다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 
