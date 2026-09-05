@@ -4120,6 +4120,66 @@ python3 -m unittest discover -s trading/tests -p 'test_*.py'
   Phase 0 gate를 하나도 바꾸지 않았다.
 - 어떤 packet도 승격하지 않았고 factor·rank·수익률을 계산하지 않았다.
 
+## 10.31 5A-2 실행 — 체크포인트는 정확한 commit을 요구한다 — 2026-09-06
+
+10.30의 후속 fail-close 하나와 receipt 시각 하나다. 체크포인트/재개 구조 · 항목 단위 ·
+등가성 · 전송 실패 처리 · 최종 조립은 그대로다.
+
+### 고친 것 — `git_commit: null`은 정체성이 아니다
+
+`_git_commit()`은 git이 없는 환경에서도 돌게 `None`을 돌려준다. 기존 비-체크포인트
+실행에는 맞는 관용이지만 재개 실행에는 맞지 않는다 — 체크포인트 계약이 **"이 실행은
+이 commit의 코드다"**를 명시로 묶는데 `null`을 정체성으로 적으면 서로 다른 코드에서
+조용히 이어붙일 수 있다. `null == null`이라 정체성 대조가 통과해버린다.
+
+체크포인트 전용 helper `_required_git_commit()`를 더해 `run_identity()`가 그것을 쓴다.
+확인할 수 없으면 `CheckpointError`다.
+
+```text
+run.json을 만들기 전에 멈춘다        items/ · sessions/ 도 생기지 않는다
+EdgarClient를 세우기 전에 멈춘다     SEC 예산을 쓰지 않는다
+```
+
+`run_identity()`가 `Checkpoint` 생성 · `create()`/`open_existing()` · `EdgarClient()`
+**앞**에서 불리므로 세 조건이 그 자리에서 만족된다. 빈 문자열도 revision이 아니다.
+
+**다른 호출자는 건드리지 않았다.** `stage_run`(기존 경로) · `qv_identity_inventory_run` ·
+`qv_identity_promotion_run`은 여전히 관용적인 `_git_commit()`을 쓴다 — git 없는
+환경에서 그 실행들이 계속 돌아야 한다.
+
+최종 산출물의 `git_commit`은 다시 묻지 않고 **이미 검증된 정체성 값**을 그대로 쓴다.
+다시 물으면 실행 도중 git이 사라졌을 때 다 끝난 산출물이 `null`을 달게 된다.
+
+### 고친 것 — session receipt의 `started_at`
+
+`start_session()`이 적은 **실제 시작 시각**을 종료·실패 receipt가 보존한다. 전에는
+`COMPLETE`/`FAILED`를 쓸 때 `_now()`를 다시 불러 시작 시각이 끝난 시각으로 덮였다.
+`ended_at`은 그대로 종료·실패 시각이다. SEC 호출·제안 semantics는 닿지 않았다.
+
+### 로컬 Python 실측 (2026-09-06)
+
+```text
+python3 -m unittest trading.tests.test_qv_identity_proposal_run
+  41 tests · PASS
+
+python3 -m unittest discover -s trading/tests -p 'test_*.py'
+  1,993 tests · PASS
+```
+
+**GitHub CI는 이 숫자를 재현하지 않는다** — Python 테스트를 돌리지 않는다.
+
+가드를 하나씩 무력화해 테스트가 실제로 잡는지 확인했다. `started_at`은 **시계가
+움직이는 fixture**가 있어야 잡힌다 — `_now()`가 초 단위라 같은 초 안에서는 덮어써도
+값이 같아 통과한다. 그래서 `COMPLETE`·`FAILED` 두 경로 모두에 ticking clock 회귀를
+뒀고, 둘 다 무력화하면 실패한다.
+
+### 이 receipt가 주장하지 않는다
+
+- 전수 census를 다시 돌리지 않았다.
+- 발견·법적 증거·승격 semantics · 문턱 · 문법 · 상태 어휘 · 사유 코드 · manifest ·
+  production DB · Phase 0 gate를 하나도 바꾸지 않았다.
+- 어떤 packet도 승격하지 않았고 factor·rank·수익률을 계산하지 않았다.
+
 ## 11. 결과
 
 

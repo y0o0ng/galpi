@@ -205,6 +205,24 @@ class CheckpointError(RuntimeError):
     """체크포인트 정체성·무결성 위반. **fail-close다 — 우회 플래그가 없다.**"""
 
 
+def _required_git_commit() -> str:
+    """체크포인트가 묶이는 **정확한 코드 revision 하나.**
+
+    `_git_commit()`은 git이 없는 환경에서도 돌게 `None`을 돌려준다. 그 관용은 기존
+    비-체크포인트 실행에는 맞지만 재개 실행에는 맞지 않는다 — 체크포인트 계약이
+    "이 실행은 이 commit의 코드다"를 명시로 묶는데 `null`을 정체성으로 적으면 다른
+    코드에서 조용히 이어붙일 수 있다. 여기서는 fail-close이고, `run.json`을 만들기
+    전에·SEC 예산을 쓰기 전에 멈춘다.
+    """
+    commit = _git_commit()
+    if not commit:
+        raise CheckpointError(
+            "git revision을 확인할 수 없어 체크포인트를 열지 않습니다 —"
+            " 체크포인트는 정확한 commit 하나에 묶입니다"
+        )
+    return commit
+
+
 def _sha256_bytes(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
@@ -249,7 +267,7 @@ def run_identity(selected: DemandInput, arguments, *, inventory_digest: str) -> 
     """
     identity = {
         "checkpoint_schema": CHECKPOINT_SCHEMA,
-        "git_commit": _git_commit(),
+        "git_commit": _required_git_commit(),
         "inventory_sha256": inventory_digest,
         "demand_provenance": selected.provenance_json(),
         "identity_source_version": selected.identity_source_version,
@@ -422,13 +440,14 @@ class Checkpoint:
         return payload
 
     # ── session receipt ──────────────────────────────────────────────────
-    def start_session(self, *, first_order: int | None) -> Path:
+    def start_session(self, *, first_order: int | None) -> tuple[Path, str]:
         """**시작할 때 RUNNING으로 적는다.** 급사하면 그 표식이 그대로 남아
 
         "이 session의 SEC 호출 수는 알 수 없다"가 사후에도 읽힌다.
         """
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         path = self.sessions_dir / f"{time.strftime('%Y%m%dT%H%M%S')}-{os.getpid()}.json"
+        started_at = _now()
         _atomic_write_json(
             path,
             {
@@ -436,12 +455,12 @@ class Checkpoint:
                 "run_identity_sha256": self.digest,
                 "pid": os.getpid(),
                 "status": SESSION_RUNNING,
-                "started_at": _now(),
+                "started_at": started_at,
                 "first_attempted_order": first_order,
                 "sec_calls": CALLS_UNKNOWN,
             },
         )
-        return path
+        return path, started_at
 
     def finish_session(self, path: Path, payload: dict) -> None:
         _atomic_write_json(path, payload)
@@ -599,7 +618,9 @@ def stage_run_checkpointed(arguments) -> int:
     if pending:
         hints = build_hints(selected, arguments.data_dir) if arguments.historical else None
         client = EdgarClient(arguments.contact) if arguments.contact else EdgarClient()
-        session_path = checkpoint.start_session(first_order=pending[0])
+        session_path, session_started_at = checkpoint.start_session(
+            first_order=pending[0]
+        )
         companies = client.ticker_map()
         # **40MB 이름 색인은 프로세스당 한 번이다.** 항목마다 `run_proposals`를 부르므로
         # 여기서 만들어 넘기지 않으면 항목마다 다시 내려받는다.
@@ -628,7 +649,7 @@ def stage_run_checkpointed(arguments) -> int:
                         "run_identity_sha256": checkpoint.digest,
                         "pid": os.getpid(),
                         "status": SESSION_FAILED,
-                        "started_at": _now(),
+                        "started_at": session_started_at,
                         "ended_at": _now(),
                         "first_attempted_order": pending[0],
                         "last_completed_order": last_completed,
@@ -663,7 +684,7 @@ def stage_run_checkpointed(arguments) -> int:
                 "run_identity_sha256": checkpoint.digest,
                 "pid": os.getpid(),
                 "status": SESSION_COMPLETE,
-                "started_at": _now(),
+                "started_at": session_started_at,
                 "ended_at": _now(),
                 "first_attempted_order": pending[0],
                 "last_completed_order": last_completed,
@@ -688,7 +709,9 @@ def stage_run_checkpointed(arguments) -> int:
         # `discovery_hints`는 그대로 남아야 하므로 여기서 만든다.
         hints = build_hints(selected, arguments.data_dir)
     payload = assemble_proposal_run(selected, hints, ordered)
-    payload["git_commit"] = _git_commit()
+    # 이미 검증된 정체성 값을 그대로 쓴다 — 여기서 다시 물어보면 실행 도중 git이
+    # 사라졌을 때 다 끝난 산출물이 `null`을 달게 된다.
+    payload["git_commit"] = checkpoint.identity["git_commit"]
     payload["sec_calls"] = checkpoint.observed_sec_calls()
     payload["checkpoint_dir"] = str(checkpoint.directory)
     payload["run_identity_sha256"] = checkpoint.digest

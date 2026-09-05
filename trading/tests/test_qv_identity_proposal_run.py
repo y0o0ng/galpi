@@ -396,6 +396,57 @@ class CheckpointRunnerTest(unittest.TestCase):
         with self.assertRaises(runner.CheckpointError):
             runner.stage_run_checkpointed(self.args(resume=True))
 
+    def test_creation_refuses_when_the_git_revision_is_unknown(self):
+        """체크포인트는 정확한 commit 하나에 묶인다 — `None`은 정체성이 아니다."""
+        with unittest.mock.patch.object(runner, "_git_commit", lambda: None):
+            with self.assertRaises(runner.CheckpointError) as caught:
+                runner.stage_run_checkpointed(self.args())
+        self.assertIn("git revision", str(caught.exception))
+
+    def test_nothing_is_created_or_spent_when_the_git_revision_is_unknown(self):
+        """`run.json`을 만들지 않고 SEC client도 세우지 않는다."""
+        with unittest.mock.patch.object(runner, "_git_commit", lambda: None):
+            with self.assertRaises(runner.CheckpointError):
+                runner.stage_run_checkpointed(self.args())
+        self.assertFalse((self.ckpt() / "run.json").exists())
+        self.assertFalse((self.ckpt() / "items").exists())
+        self.assertFalse((self.ckpt() / "sessions").exists())
+        self.assertEqual(self.clients, [])
+        self.assertFalse((self.root / "out.json").exists())
+
+    def test_resume_refuses_when_the_git_revision_is_unknown(self):
+        runner.stage_run_checkpointed(self.args())
+        before = sorted(p.name for p in (self.ckpt() / "items").glob("*.json"))
+        with unittest.mock.patch.object(runner, "_git_commit", lambda: None):
+            with self.assertRaises(runner.CheckpointError) as caught:
+                runner.stage_run_checkpointed(self.args(resume=True))
+        self.assertIn("git revision", str(caught.exception))
+        # 이미 끝난 항목을 건드리지 않는다.
+        self.assertEqual(
+            sorted(p.name for p in (self.ckpt() / "items").glob("*.json")), before
+        )
+
+    def test_an_empty_git_revision_is_treated_as_unknown(self):
+        """빈 문자열도 revision이 아니다."""
+        with unittest.mock.patch.object(runner, "_git_commit", lambda: ""):
+            with self.assertRaises(runner.CheckpointError):
+                runner.stage_run_checkpointed(self.args())
+
+    def test_the_checkpoint_identity_never_serializes_a_null_commit(self):
+        runner.stage_run_checkpointed(self.args())
+        metadata = json.loads((self.ckpt() / "run.json").read_text(encoding="utf-8"))
+        self.assertTrue(metadata["run_identity"]["git_commit"])
+        self.assertTrue(self.out_payload()["git_commit"])
+
+    def test_the_legacy_non_checkpoint_run_still_tolerates_an_unknown_revision(self):
+        """기존 경로의 관용은 그대로다 — git 없는 환경에서도 돈다."""
+        arguments = self.args(checkpoint_dir=None)
+        with unittest.mock.patch.object(runner, "_git_commit", lambda: None):
+            self.assertEqual(runner.stage_run(arguments), 0)
+        payload = self.out_payload()
+        self.assertIsNone(payload["git_commit"])
+        self.assertEqual(len(payload["proposals"]), 3)
+
     def test_git_commit_mismatch_fails_closed(self):
         runner.stage_run_checkpointed(self.args())
         with unittest.mock.patch.object(runner, "_git_commit", lambda: "deadbeef"):
@@ -452,6 +503,85 @@ class CheckpointRunnerTest(unittest.TestCase):
         payload = self.out_payload()
         self.assertIsInstance(payload["sec_calls"], int)
         self.assertGreater(payload["sec_calls"], 0)
+
+    def capture_session_start(self):
+        """`start_session()`이 실제로 적은 시작 시각을 잡아둔다."""
+        captured = {}
+        original = runner.Checkpoint.start_session
+
+        def wrapper(inner_self, *args, **kwargs):
+            path, started_at = original(inner_self, *args, **kwargs)
+            captured["started_at"] = started_at
+            return path, started_at
+
+        patch = unittest.mock.patch.object(runner.Checkpoint, "start_session", wrapper)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return captured
+
+    def receipts(self):
+        return [
+            json.loads(p.read_text(encoding="utf-8"))
+            for p in (self.ckpt() / "sessions").glob("*.json")
+        ]
+
+    def test_the_terminal_receipt_keeps_the_real_session_start_time(self):
+        """`started_at`은 session이 실제로 시작한 시각이지 끝난 시각이 아니다."""
+        captured = self.capture_session_start()
+        runner.stage_run_checkpointed(self.args())
+
+        found = self.receipts()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["status"], runner.SESSION_COMPLETE)
+        self.assertEqual(found[0]["started_at"], captured["started_at"])
+
+    def test_the_failure_receipt_keeps_the_real_session_start_time(self):
+        captured = self.capture_session_start()
+        self.fail_at(1)
+        self.assertEqual(runner.stage_run_checkpointed(self.args()), 1)
+        self.unfail()
+
+        found = self.receipts()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["status"], runner.SESSION_FAILED)
+        self.assertEqual(found[0]["started_at"], captured["started_at"])
+
+    def test_started_at_is_not_simply_rewritten_on_failure(self):
+        """실패 경로도 시작 시각을 보존한다 — 시계가 움직여도 그대로다."""
+        captured = self.capture_session_start()
+        calls = {"n": 0}
+
+        def ticking_now():
+            calls["n"] += 1
+            return f"2026-04-04T00:00:{calls['n']:02d}+00:00"
+
+        self.fail_at(1)
+        with unittest.mock.patch.object(runner, "_now", ticking_now):
+            self.assertEqual(runner.stage_run_checkpointed(self.args()), 1)
+        self.unfail()
+
+        found = self.receipts()[0]
+        self.assertEqual(found["status"], runner.SESSION_FAILED)
+        self.assertEqual(found["started_at"], captured["started_at"])
+        self.assertLess(found["started_at"], found["ended_at"])
+
+    def test_started_at_is_not_simply_rewritten_at_completion(self):
+        """시작과 끝 사이에 시계가 움직였을 때 두 칸이 갈려야 한다."""
+        captured = self.capture_session_start()
+        real_now = runner._now
+        calls = {"n": 0}
+
+        def ticking_now():
+            calls["n"] += 1
+            return f"2026-03-03T00:00:{calls['n']:02d}+00:00"
+
+        with unittest.mock.patch.object(runner, "_now", ticking_now):
+            runner.stage_run_checkpointed(self.args())
+
+        found = self.receipts()[0]
+        self.assertEqual(found["started_at"], captured["started_at"])
+        self.assertNotEqual(found["ended_at"], found["started_at"])
+        self.assertLess(found["started_at"], found["ended_at"])
 
     def test_an_abruptly_dead_session_makes_the_total_unknown(self):
         """급사한 session은 `RUNNING`으로 남고 총합은 추정치를 지어내지 않는다."""
