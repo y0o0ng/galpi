@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const b3 = require('../scripts/run-memory-inference-p1b3-decomposed-pipeline');
+const b4a = require('../scripts/run-memory-inference-p1b4-ambiguity-recalibration');
 const { combineReports, validatePhaseReport, pairedTransition, TRANSITIONS } =
   require('../scripts/combine-memory-inference-p1b3-decomposed-pipeline');
 const {
@@ -22,10 +23,27 @@ const readReports = () => Object.fromEntries(Object.entries(SOURCE_ARTIFACTS).ma
   [key, JSON.parse(fs.readFileSync(path.join(__dirname, '..', value.file)))]));
 const ENDPOINT = 'http://p1b4.invalid/v1';
 const COMMIT = 'a'.repeat(40);
+const AMBIGUITY_PATH = '/virtual/fake-p1b4a-report.json';
+let ambiguityReport;
+let ambiguityBytes;
+const originalReadFile = fs.readFileSync;
+mock.method(fs, 'readFileSync', function (file, ...args) {
+  return String(file) === AMBIGUITY_PATH ? ambiguityBytes : originalReadFile.call(this, file, ...args);
+});
+const setAmbiguity = report => {
+  ambiguityReport = report;
+  ambiguityBytes = Buffer.from(JSON.stringify(report));
+};
+async function fakeAmbiguity(reply = ({ index }) => ({
+  decision: inputs.human.labels[index].label === 'ESCALATE' ? 'ESCALATE' : 'CLEAR',
+})) {
+  return b4a.runRecalibration({ endpoint: ENDPOINT, commit: COMMIT, fetchImpl: harness(reply).fetchImpl });
+}
+test.beforeEach(async () => setAmbiguity(await fakeAmbiguity()));
 const response = (text, status = 200) => ({ ok: status === 200, status, text: async () => text });
 const counts = () => ({ callsPlanned: 0, callsAttempted: 0, callsCompleted: 0,
   invalidStructuredOutputs: 0, runtimeFailures: 0 });
-const options = fetchImpl => ({ endpoint: ENDPOINT, commit: COMMIT, fetchImpl });
+const options = fetchImpl => ({ endpoint: ENDPOINT, ambiguityReport: AMBIGUITY_PATH, commit: COMMIT, fetchImpl });
 
 function perfect({ index, candidate, stageId }) {
   return stageId === 'extraction' ? inputs.authoring.cases[candidate.caseId].extractionGold
@@ -139,7 +157,10 @@ test('source provenance rejects altered commits, inputs, order, raw output, and 
   readMock.mock.restore();
 });
 
-test('real source records are copied exactly, with case-order 4B-only downstream and unchanged prompts/evidence', async () => {
+test('B4A records, not historical D1.7, are copied exactly with 4B-only downstream and frozen prompts', async () => {
+  assert.equal(RUNNER_VERSION, 'xion-local-memory-inference-p1b4-role-split-hybrid-runner-v2');
+  assert.equal(REPORT_VERSION, 'xion-local-memory-inference-p1b4-role-split-hybrid-report-v2');
+  assert.equal(SCORING_VERSION, 'xion-local-memory-inference-p1b4-role-split-hybrid-scoring-v1');
   const before = structuredClone(source.combined);
   const fake = harness();
   const report = await runHybrid(options(fake.fetchImpl));
@@ -150,6 +171,11 @@ test('real source records are copied exactly, with case-order 4B-only downstream
   assert.deepEqual(Object.keys(report.armSummaries), ['HYBRID']);
   assert.deepEqual(report.source.artifacts, source.provenance);
   assert.equal(report.source.galpiCommit, SOURCE_COMMIT);
+  assert.equal(report.source.ambiguityArm, 'P1-B4A');
+  assert.equal(report.source.ambiguityReport.sha256, createHash('sha256').update(ambiguityBytes).digest('hex'));
+  assert.equal(report.source.ambiguityReport.galpiCommit, COMMIT);
+  assert.equal(report.source.ambiguityReport.revalidated, true);
+  assert.notDeepEqual(ambiguityReport.observations[0].ambiguity, source.combined.observations[0].arms['D1.7'].stages.ambiguity);
   assert.deepEqual(report.inputs, inputs.provenance);
   assert.deepEqual(report.model, b3.PHASES['4b'].model);
   assert.deepEqual(report.model, { modelId: 'xion-p1b1-qwen3-4b-bf16',
@@ -166,9 +192,9 @@ test('real source records are copied exactly, with case-order 4B-only downstream
     const h = row.arms.HYBRID;
     assert.equal(row.caseId, original.caseId);
     assert.equal(row.humanGoldLabel, inputs.human.labels[index].label);
-    assert.deepEqual(h.stages.ambiguity, original.arms['D1.7'].stages.ambiguity);
-    assert.notEqual(h.stages.ambiguity, original.arms['D1.7'].stages.ambiguity);
-    assert.equal(h.stageOrigins.ambiguity, 'REUSED');
+    assert.deepEqual(h.stages.ambiguity, ambiguityReport.observations[index].ambiguity);
+    assert.notEqual(h.stages.ambiguity, ambiguityReport.observations[index].ambiguity);
+    assert.equal(h.stageOrigins.ambiguity, 'REUSED_P1B4A');
     assert.deepEqual(row.baselineL4, original.arms.L4);
     for (const id of ['binary', 'extraction']) {
       assert.equal(h.stageOrigins[id], h.stages[id].invoked ? 'NEW' : 'SKIPPED');
@@ -201,31 +227,106 @@ test('real source records are copied exactly, with case-order 4B-only downstream
     assert.ok(!r.body.messages[1].content.includes('p1b1-ambiguity-escalation-v1'));
   }
   assert.deepEqual(report.pairedComparisons['L4->HYBRID'], paired);
-  assert.deepEqual(paired, { UNCHANGED_CORRECT: 29, FIXED: 11, REGRESSION: 19,
-    UNCHANGED_WRONG: 1, NONCOMPARABLE_RUNTIME: 0 });
+  assert.deepEqual(paired, { UNCHANGED_CORRECT: 48, FIXED: 12, REGRESSION: 0,
+    UNCHANGED_WRONG: 0, NONCOMPARABLE_RUNTIME: 0 });
   assert.equal(report.execution.sourceAmbiguityCallsReused, 60);
-  assert.equal(report.execution.newCallsPlanned, 38);
-  assert.equal(report.execution.newCallsAttempted, 38);
-  assert.equal(report.execution.newCallsCompleted, 38);
+  assert.equal(report.execution.newCallsPlanned, 60);
+  assert.equal(report.execution.newCallsAttempted, 60);
+  assert.equal(report.execution.newCallsCompleted, 60);
   assert.equal(report.execution.newInvalidStructuredOutputs, 0);
   assert.equal(report.execution.newRuntimeFailures, 0);
-  assert.equal(report.execution.counterfactualHybridStageCalls, 98);
-  assert.equal(report.execution.newStages.binary.callsAttempted, 21);
-  assert.equal(report.execution.newStages.extraction.callsAttempted, 17);
-  assert.equal(report.execution.sourceAmbiguity.invalidStructuredOutputs, 1);
-  assert.equal(report.armSummaries.HYBRID.endToEndSuccess, 40); // Fixed-source upper bound, not a model result.
-  assert.equal(report.armSummaries.HYBRID.unsafeNonEscalation, 1);
+  assert.equal(report.execution.counterfactualHybridStageCalls, 120);
+  assert.equal(report.execution.newStages.binary.callsAttempted, 40);
+  assert.equal(report.execution.newStages.extraction.callsAttempted, 20);
+  assert.equal(report.execution.sourceAmbiguity.invalidStructuredOutputs, 0);
+  assert.equal(report.armSummaries.HYBRID.endToEndSuccess, 60);
+  assert.equal(report.armSummaries.HYBRID.unsafeNonEscalation, 0);
   assert.equal(report.armSummaries.HYBRID.falseNoWrite, 0);
   assert.equal(report.armSummaries.HYBRID.schemaValidExtractionWrongValue, 0);
-  assert.equal(report.armSummaries.HYBRID.terminalEscalation, 38);
-  assert.equal(report.armSummaries.HYBRID.endToEndSuccessRate, 40 / 60);
-  assert.equal(report.armSummaries.HYBRID.terminalEscalationRate, 38 / 60);
+  assert.equal(report.armSummaries.HYBRID.terminalEscalation, 20);
+  assert.equal(report.armSummaries.HYBRID.endToEndSuccessRate, 1);
+  assert.equal(report.armSummaries.HYBRID.terminalEscalationRate, 20 / 60);
   const summary = report.armSummaries.HYBRID;
-  assert.equal(summary.invokedCallCount, 98);
-  assert.equal(summary.meanInvokedCallLatencyMs, summary.totalLatencyMs / 98);
+  assert.equal(summary.invokedCallCount, 120);
+  assert.equal(summary.meanInvokedCallLatencyMs, summary.totalLatencyMs / 120);
   assert.equal(summary.meanCaseTotalLatencyMs, summary.totalLatencyMs / 60);
-  assert.equal(report.finalDisposition, 'NO_RAW_EPISODE_SUCCESSOR_SIGNAL');
+  assert.equal(report.finalDisposition, 'RAW_EPISODE_SUCCESSOR_OPEN');
+  assert.match(report.execution.latencyBasis, /counterfactual, not wall-clock/);
   assert.deepEqual(source.combined, before);
+});
+
+test('historical pre-run analysis: superseded source ceiling was 40, below unchanged L4 48', () => {
+  const rows = source.combined.observations;
+  const decision = row => row.arms['D1.7'].stages.ambiguity.structuredOutput?.decision;
+  const clear = rows.filter(row => decision(row) === 'CLEAR').length;
+  const escalated = rows.filter(row => decision(row) === 'ESCALATE');
+  const correctEscalations = escalated.filter(row => row.humanGoldLabel === 'ESCALATE').length;
+  assert.deepEqual([escalated.length, clear, rows.length - escalated.length - clear, correctEscalations], [38, 21, 1, 19]);
+  assert.equal(correctEscalations + clear, 40);
+  assert.ok(correctEscalations + clear < source.combined.armSummaries.L4.endToEndSuccess);
+});
+
+test('B4A raw/schema/score/count/provenance tampering and missing source reject before any fetch', async () => {
+  const valid = structuredClone(ambiguityReport);
+  for (const mutate of [
+    r => { r.reportVersion = 'other'; }, r => { r.runnerVersion = 'other'; },
+    r => { r.promptVersion = 'old'; }, r => { r.taskSpecificationVersion = 'old'; },
+    r => { r.model.modelId = b3.PHASES['4b'].model.modelId; },
+    r => { r.runtime.version = 'other'; }, r => { r.timeoutMs = 1; },
+    r => { r.automaticReruns = true; }, r => { r.requestSettings.temperature = 1; },
+    ...['candidates', 'human', 'authoring'].flatMap(key => [
+      r => { r.inputs[key].sha256 = '0'.repeat(64); },
+      r => { r.inputs[key].identity = 'other'; },
+    ]),
+    r => { r.observations.reverse(); }, r => { r.observations.pop(); },
+    r => { r.observations[0].ambiguity.rawAssistantContent = '{"decision":"ESCALATE"}'; },
+    r => { r.observations[0].ambiguity.structuredOutput.decision = 'ESCALATE'; },
+    r => { r.observations[0].ambiguity = source.combined.observations[0].arms['D1.7'].stages.ambiguity; },
+    r => { r.observations[0].unnecessaryEscalation = true; },
+    r => { r.summary.CLEAR -= 1; }, r => { r.execution.callsCompleted -= 1; },
+    r => { r.galpiCommit = 'b'.repeat(40); },
+  ]) {
+    const changed = structuredClone(valid);
+    mutate(changed);
+    setAmbiguity(changed);
+    let calls = 0;
+    await assert.rejects(runHybrid(options(async () => { calls += 1; })));
+    assert.equal(calls, 0);
+  }
+  await assert.rejects(runHybrid({ endpoint: ENDPOINT, commit: COMMIT,
+    fetchImpl: async () => assert.fail('missing source must fail before network') }), /ambiguity-report is required/);
+});
+
+test('B4A runtime failure prevents 4B preflight and semantic calls, without repair', async () => {
+  setAmbiguity(await fakeAmbiguity(({ index }) => index === 0 ? new TypeError('fake offline') : { decision: 'CLEAR' }));
+  assert.equal(b4a.validateAmbiguityReport(ambiguityReport).runtimeDisposition, 'INDETERMINATE_RUNTIME');
+  let calls = 0;
+  await assert.rejects(runHybrid(options(async () => { calls += 1; })), { code: 'INDETERMINATE_RUNTIME' });
+  assert.equal(calls, 0);
+});
+
+test('B4A INVALID remains semantic failure with no downstream; runtime-free poor scores have no entry gate', async () => {
+  setAmbiguity(await fakeAmbiguity(({ index }) => index === 2 ? '```json\n{"decision":"ESCALATE"}\n```'
+    : { decision: inputs.human.labels[index].label === 'ESCALATE' ? 'ESCALATE' : 'CLEAR' }));
+  const fake = harness();
+  const report = await runHybrid(options(fake.fetchImpl));
+  const invalid = report.observations[2].arms.HYBRID;
+  assert.deepEqual(invalid.stages.ambiguity, ambiguityReport.observations[2].ambiguity);
+  assert.equal(invalid.stages.ambiguity.schemaStatus, 'INVALID');
+  assert.equal(invalid.stages.binary.invoked, false);
+  assert.equal(invalid.endToEndSuccess, false);
+  assert.equal(invalid.unsafeNonEscalation, true);
+  assert.equal(fake.requests.some(row => row.index === 2), false);
+  assert.equal(report.execution.sourceAmbiguity.invalidStructuredOutputs, 1);
+  assert.equal(report.execution.newInvalidStructuredOutputs, 0);
+  assert.equal(report.runtimeFailures, 0);
+  setAmbiguity(await fakeAmbiguity(() => ({ decision: 'ESCALATE' })));
+  const noCalls = harness();
+  const poor = await runHybrid(options(noCalls.fetchImpl));
+  assert.deepEqual(noCalls.requests.map(row => row.method), ['GET']);
+  assert.equal(poor.execution.newCallsAttempted, 0);
+  assert.equal(poor.armSummaries.HYBRID.endToEndSuccess, 20);
+  assert.equal(poor.finalDisposition, 'NO_RAW_EPISODE_SUCCESSOR_SIGNAL');
 });
 
 test('new invalid JSON/schema and runtime failures remain distinct, stop downstream, and never retry', async () => {
@@ -242,27 +343,27 @@ test('new invalid JSON/schema and runtime failures remain distinct, stop downstr
       assert.equal(h.stages[stageId].completed, !runtime);
       assert.equal(report.execution.newInvalidStructuredOutputs, invalid);
       assert.equal(report.execution.newRuntimeFailures, runtime);
-      assert.equal(report.execution.newCallsPlanned, stageId === 'binary' ? 37 : 38);
+      assert.equal(report.execution.newCallsPlanned, stageId === 'binary' ? 59 : 60);
       assert.equal(report.execution.newCallsPlanned, report.execution.newCallsAttempted);
       assert.equal(report.execution.newCallsCompleted, report.execution.newCallsAttempted - runtime);
       assert.equal(fake.requests.filter(r => r.index === 1 && r.stageId === stageId).length, 1);
       assert.equal(fake.requests.some(r => r.body && JSON.stringify(r.body).includes('replacement evidence')), false);
       if (stageId === 'binary') assert.equal(h.stages.extraction.invoked, false);
       assert.equal(report.observations[1].transition, runtime ? 'NONCOMPARABLE_RUNTIME' : 'UNCHANGED_WRONG');
-      assert.equal(report.finalDisposition, runtime ? 'INDETERMINATE_RUNTIME' : 'NO_RAW_EPISODE_SUCCESSOR_SIGNAL');
+      assert.equal(report.finalDisposition, runtime ? 'INDETERMINATE_RUNTIME' : 'RAW_EPISODE_SUCCESSOR_OPEN');
     }
   }
 });
 
 test('NO_WRITE stops extraction and wrong-value safety counts exclude wrong HUMAN control flow', async () => {
   const allNo = await runHybrid(options(harness(() => ({ decision: 'NO_WRITE' })).fetchImpl));
-  assert.equal(allNo.execution.newCallsAttempted, 21);
+  assert.equal(allNo.execution.newCallsAttempted, 40);
   assert.equal(allNo.execution.newStages.extraction.totalLatencyMs, null);
   assert.equal(allNo.execution.newStages.extraction.meanInvokedCallLatencyMs, null);
-  assert.equal(allNo.armSummaries.HYBRID.falseNoWrite, 17);
+  assert.equal(allNo.armSummaries.HYBRID.falseNoWrite, 20);
   for (const humanGold of ['WRITE_CANDIDATE', 'NO_WRITE', 'ESCALATE']) {
     const candidate = inputs.candidates.cases[1];
-    const clear = source.combined.observations[1].arms['D1.7'].stages.ambiguity;
+    const clear = ambiguityReport.observations[1].ambiguity;
     const fake = harness(r => r.stageId === 'binary' ? { decision: 'WRITE_CANDIDATE' } : { preferredMode: 'wrong' });
     const h = await runHybridCase(candidate, humanGold, { preferredMode: 'phrase' }, clear,
       { endpoint: ENDPOINT, fetchImpl: fake.fetchImpl }, counts());
@@ -322,15 +423,15 @@ test('fixed 180000ms new-stage timeout aborts one attempt and still processes la
   const running = runHybrid(options(fake.fetchImpl));
   await pending;
   t.mock.timers.tick(179999);
-  assert.equal(fake.requests.length, 2);
-  assert.equal(fake.requests[1].signal.aborted, false);
+  assert.equal(fake.requests.length, 3);
+  assert.equal(fake.requests[2].signal.aborted, false);
   t.mock.timers.tick(1);
   const report = await running;
-  assert.equal(fake.requests[1].signal.aborted, true);
+  assert.equal(fake.requests[2].signal.aborted, true);
   assert.equal(fake.requests.filter(r => r.index === 1).length, 1);
   assert.equal(report.observations[1].arms.HYBRID.stages.binary.runtimeError.code, 'LOCAL_ENDPOINT_TIMEOUT');
-  assert.equal(report.execution.newCallsAttempted, 37);
-  assert.equal(report.execution.newCallsCompleted, 36);
+  assert.equal(report.execution.newCallsAttempted, 59);
+  assert.equal(report.execution.newCallsCompleted, 58);
   assert.equal(report.finalDisposition, 'INDETERMINATE_RUNTIME');
 });
 
@@ -373,13 +474,15 @@ test('all paired categories and component-wise progression boundaries use no +10
   assert.equal(progression(baseline, better, pair, 1).finalDisposition, 'INDETERMINATE_RUNTIME');
 });
 
-test('CLI and package command accept endpoint/commit only, with no phase, source override, or tuning knobs', () => {
-  assert.deepEqual(parseArguments(['--endpoint', ENDPOINT, '--commit', COMMIT]), { endpoint: ENDPOINT, commit: COMMIT });
-  assert.deepEqual(parseArguments(['--endpoint', ENDPOINT]), { endpoint: ENDPOINT });
+test('CLI requires the B4A report and permits only endpoint/report/commit, not semantic tuning', () => {
+  const required = ['--endpoint', ENDPOINT, '--ambiguity-report', AMBIGUITY_PATH];
+  assert.deepEqual(parseArguments([...required, '--commit', COMMIT]),
+    { endpoint: ENDPOINT, ambiguityReport: AMBIGUITY_PATH, commit: COMMIT });
+  assert.deepEqual(parseArguments(required), { endpoint: ENDPOINT, ambiguityReport: AMBIGUITY_PATH });
   for (const argv of [[], ['--endpoint'], ['--endpoint', ENDPOINT, '--endpoint', ENDPOINT],
-    ['--endpoint', ENDPOINT, '--commit', 'short'],
+    ['--endpoint', ENDPOINT], [...required, '--commit', 'short'],
     ...['phase', 'source', 'model', 'artifact', 'quantization', 'model-size', 'timeout', 'prompt', 'schema', 'runtime-version']
-      .map(key => ['--endpoint', ENDPOINT, `--${key}`, 'other'])]) assert.throws(() => parseArguments(argv));
+      .map(key => [...required, `--${key}`, 'other'])]) assert.throws(() => parseArguments(argv));
   assert.equal(require('../package.json').scripts['research:memory-inference-p1b4-role-split-hybrid'],
     'node scripts/run-memory-inference-p1b4-role-split-hybrid-diagnostic.js');
 });

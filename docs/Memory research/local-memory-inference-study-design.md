@@ -2860,7 +2860,13 @@ consider task-specific training if the failure profile warrants it →
 held-out/adoption validation. This is research sequencing, not production
 authorization.
 
-### P1-B4 role-split hybrid diagnostic preregistration
+### Initial P1-B4 role-split hybrid preregistration — SUPERSEDED_BEFORE_EXECUTION
+
+Historical record from `8cd47eebd9facfaa885f9105e2614269d2bf6307`:
+the following v1 design was preregistered/implemented but **NOT RUN**.
+It is **SUPERSEDED_BEFORE_EXECUTION**, not a failed experiment. The
+pre-execution correction and executable B4A → B4B contract follow below;
+the original source contract and CLI here are retained as history only.
 
 **PREREGISTERED / IMPLEMENTED / NOT RUN.** P1-B4 is explicitly an
 **ADAPTIVE diagnostic on the already-consumed P1-B3 60-case fixture**, not
@@ -3015,7 +3021,7 @@ Identities are `xion-local-memory-inference-p1b4-role-split-hybrid-runner-v1`,
 `xion-local-memory-inference-p1b4-role-split-hybrid-scoring-v1`, and
 `xion-local-memory-inference-p1b4-role-split-hybrid-report-v1`.
 Only `--endpoint` and optional `--commit` (default `git rev-parse HEAD`)
-are accepted. Future execution, **not performed by this commit**, is:
+were accepted by initial v1. Its superseded CLI, **never executed**, was:
 
 ```text
 npm --silent run research:memory-inference-p1b4-role-split-hybrid -- --endpoint <4B endpoint> --commit <Galpi SHA>
@@ -3034,3 +3040,225 @@ source-of-truth, identity, explicit correction, Core/high-impact gates,
 governance/authorization, retrieval, routing, Vault/DB schema, and existing
 deterministic hard gates remain unchanged and authoritative. Private replay
 remains **UNOPENED**. Training and adoption require their own later designs.
+
+### P1-B4 pre-execution correction — B4A recalibration → B4B hybrid
+
+**PREREGISTERED / IMPLEMENTED / NOT RUN.** Pre-run review superseded the
+initial design at `8cd47eebd9facfaa885f9105e2614269d2bf6307` before any
+P1-B4 real model call, output, or report. Latest reviewed main was
+`04c240ce7c251a1c87666bd37c20f4ac8ab0a604`; its change from that parent was
+Pi deployment-verification documentation, unrelated to local-memory inference.
+Before integration, another fetch found only
+`bca8048bc53f2c58cf3c54c2774d20ff9d62b784` (UI model-picker display limits).
+Its full diff was reviewed: no local-memory contract, fixture, P1-B3
+artifact, P1-B4 runner, or canonical-study semantics changed.
+
+The deterministic contradiction is exact: historical D1.7 Stage 1 produced
+38 schema-valid ESCALATE, 21 schema-valid CLEAR, and one INVALID. Only 19
+source ESCALATE cases have HUMAN ESCALATE gold. Thus perfect downstream
+behavior could yield only **19 + 21 = 40/60**, while the unchanged L4
+progression threshold requires **at least 48/60**. Initial v1 could never
+return `RAW_EPISODE_SUCCESSOR_OPEN`. This is pre-run design analysis, not
+a failed P1-B4 experiment or a claim about model internals.
+
+The **L4 threshold is NOT weakened** and the **role split is NOT abandoned**:
+1.7B still owns ambiguity/escalation; 4B still owns binary durability triage
+and structured extraction. Only frozen reuse of old P1-B3 Stage-1 outputs
+is replaced by one targeted adaptive Stage-1 contract correction.
+P1-B3 remains **CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL**;
+its artifacts, HUMAN/extraction gold, prompts, scoring, disposition, and
+historical training trigger are immutable.
+
+Both corrected phases use the already-consumed P1-B3 60-case fixture in
+exact order, unchanged evidence and HUMAN gold (20/20/20). Neither is fresh
+held-out validation. No cases are added, removed, edited, or relabeled and
+no new HUMAN adjudication is performed. The resolved HUMAN artifact alone
+is class gold; `authoringTarget` remains construction provenance only.
+
+#### P1-B4A — one-prompt adaptive 1.7B ambiguity recalibration
+
+Research question: can one targeted ambiguity-contract correction prevent
+the 1.7B ambiguity stage from conflating clearly temporary/request-local
+evidence with semantic ambiguity, while preserving escalation on genuinely
+unresolved meaning/scope/referent/applicability cases? This is informed by
+P1-B3's observed bounded failure pattern, not independent validation.
+
+Exactly **one** new instruction is frozen, with no prompt candidates,
+rationale, confidence, examples, few-shot demonstrations, or tuning knobs:
+
+```text
+Return CLEAR when the supplied evidence has one sufficiently clear
+interpretation for downstream durability classification, even if that
+interpretation is temporary, request-local, or would later be NO_WRITE.
+
+Return ESCALATE only when the evidence itself leaves material ambiguity
+about meaning, referent, scope, applicability, or whether the statement is
+actual user state versus quoted, example, or hypothetical content.
+
+Do not decide durability yourself. Do not resolve ambiguity yourself.
+```
+
+Runner: `scripts/run-memory-inference-p1b4-ambiguity-recalibration.js`.
+Frozen identities:
+
+- runner: `xion-local-memory-inference-p1b4-ambiguity-recalibration-runner-v1`
+- scoring: `xion-local-memory-inference-p1b4-ambiguity-recalibration-scoring-v1`
+- prompt: `xion-local-memory-inference-p1b4-ambiguity-recalibration-prompt-v1`
+- report: `xion-local-memory-inference-p1b4-ambiguity-recalibration-report-v1`
+- task: `p1b4-ambiguity-recalibration-v1`
+
+The existing `p1b1-ambiguity-escalation-output-v1` schema is structural only
+and is reused with its authoritative validator: exactly one required
+`decision`, enum `CLEAR | ESCALATE`, no additional properties. The task and
+prompt identities change because the instruction changes. The P1-B1 bounded
+system scaffold is unchanged. Each model input is only
+`{"evidence": ORIGINAL_EVIDENCE}`; no HUMAN labels, authoring targets,
+extraction gold, old model output, or downstream information enter a prompt.
+
+The only model is `xion-p1b1-qwen3-1.7b-bf16` /
+`unsloth/Qwen3-1.7B-GGUF:BF16`, size class `~2B`, quantization `BF16`.
+Runtime is `llama.cpp` revision
+`e42214804794fca6abb61b1a5f9adae2a845f0be`. Requests use the frozen
+OpenAI-compatible completion contract: temperature 0, max_tokens 128,
+stream false, enable_thinking false, response_format json_object,
+180000ms timeout, one attempt, no automatic reruns. The same non-inference
+`/health` preflight has a 10000ms deadline; failure permits zero semantic
+POSTs and no semantic report. Scripts never manage servers.
+
+All exact 60 cases run once in order. Calls planned increment before each
+POST; planned = attempted = 60 after successful preflight and normal
+process completion. Usable assistant content counts as completed even when
+strict JSON/schema validation fails. HTTP/runtime/envelope/timeout failure
+is incomplete runtime failure. No failed call is retried.
+
+The report retains per-case raw content, parsed structure/schema/runtime
+state, versions, latency, and post-generation HUMAN scoring. It reports
+planned/attempted/completed/invalid/runtime counts, CLEAR/ESCALATE counts,
+and per-HUMAN-class CLEAR/ESCALATE/INVALID/RUNTIME_FAILURE counts.
+`unsafeNonEscalation` is HUMAN ESCALATE without schema-valid ESCALATE;
+`unnecessaryEscalation` is HUMAN NO_WRITE or WRITE_CANDIDATE with
+schema-valid ESCALATE. Observed call latency totals and means are reported.
+Verified historical P1-B3 D1.7 ambiguity counts and current-minus-historical
+differences are **descriptive only**, never an entry test.
+
+There is **no B4A performance entry gate**. Runtime-free completion freezes
+the exact outputs as B4B Stage 1 regardless of whether they look better or
+worse. INVALID remains a semantic failure in that source and is never
+repaired. Any B4A runtime failure makes the required P1-B4 comparison
+`INDETERMINATE_RUNTIME`; B4B must stop before its health preflight or any
+4B semantic call. There is no prompt search or second semantic attempt.
+
+#### P1-B4B — exact B4A source, unchanged 4B downstream and progression
+
+Runner remains `scripts/run-memory-inference-p1b4-role-split-hybrid-diagnostic.js`.
+Changed source/execution identities distinguish it from superseded v1:
+
+- runner: `xion-local-memory-inference-p1b4-role-split-hybrid-runner-v2`
+- report: `xion-local-memory-inference-p1b4-role-split-hybrid-report-v2`
+- scoring stays `xion-local-memory-inference-p1b4-role-split-hybrid-scoring-v1`
+
+CLI requires `--endpoint` and `--ambiguity-report`, with optional `--commit`
+defaulting to `git rev-parse HEAD`. A and B must record the **same full
+experiment SHA**. No semantic tuning options are accepted by either phase.
+
+Before B's preflight, both immutable P1-B3 phase artifacts are validated by
+their existing validator/combiner; the recomputed combined report must
+deep-equal the committed report. The pinned source execution revision,
+zero runtime failures, exact artifact bytes/SHA-256 and candidate/HUMAN/
+authoring provenance above remain mandatory. P1-B3 L4 is the verified
+baseline, while old D1.7 ambiguity is historical context, **not HYBRID source**.
+
+B requires the B4A report identity, exact 60 IDs/order, identical frozen
+input provenance, exact 1.7B model/runtime/request/prompt/schema contract,
+and zero B4A runtime failures. Every raw assistant output is reparsed and
+validated; every stage record, HUMAN score, summary, and call count must
+equal the recomputation. Supplied score flags are not trusted. B records
+the SHA-256 of the exact loaded A report bytes and carries each exact
+source ambiguity record with origin `REUSED_P1B4A`. These checks establish
+internal consistency/provenance, not cryptographic authentication of a
+wholly rewritten report.
+
+```text
+B4A valid ESCALATE -> HYBRID terminal ESCALATE; no new 4B call
+B4A valid CLEAR -> new 4B binary durability stage
+B4A INVALID -> HYBRID semantic failure; no downstream call or repair
+B4A runtime failure -> INDETERMINATE_RUNTIME; B4B does not start inference
+4B binary valid NO_WRITE -> stop
+4B binary valid WRITE_CANDIDATE -> frozen 4B extraction
+new upstream invalid/runtime failure -> stop that case's downstream flow
+```
+
+New calls use the exact existing 4B model/runtime and P1-B3 binary
+task/prompt/schema plus frozen P1-B1 extraction contract specified in the
+initial receipt above, without tuning. Original evidence is supplied
+unchanged to every stage; extraction also receives frozen expectedSchema.
+Generated A or binary text never becomes evidence; validated decisions
+control flow only. Readiness, timeout, no-rerun policy, strict invalid-vs-
+runtime distinction, and per-case scoring/safety definitions are unchanged.
+
+Reports distinguish 60 previously executed B4A ambiguity calls **reused**
+by B from NEW/SKIPPED 4B binary/extraction records and new planned/attempted/
+completed/invalid/runtime counts. Counterfactual HYBRID call count and
+latency sum recorded A calls/latencies plus invoked new B stages. They are
+**not wall-clock pipeline latency across server switching**; Stage 1 is
+not executed again during B.
+
+Primary comparison remains verified historical **P1-B3 L4 → HYBRID**,
+with all 60 cases and exactly the five paired transition categories above.
+The progression rule and its scoring identity are **unchanged**:
+
+```text
+Any required B4A/new-B4B runtime failure -> INDETERMINATE_RUNTIME
+Otherwise RAW_EPISODE_SUCCESSOR_OPEN iff:
+  HYBRID endToEndSuccess >= L4 endToEndSuccess
+  AND paired L4 -> HYBRID FIXED > REGRESSION
+  AND HYBRID unsafeNonEscalation <= L4 unsafeNonEscalation
+  AND HYBRID falseNoWrite <= L4 falseNoWrite
+  AND HYBRID schemaValidExtractionWrongValue <= L4 schemaValidExtractionWrongValue
+Otherwise -> NO_RAW_EPISODE_SUCCESSOR_SIGNAL
+```
+
+Each safety comparison is component-wise; no weighted score, no +10pp
+condition, no training entry gate, and no production-adoption claim.
+
+#### Corrected execution sequence — commands NOT run in this implementation
+
+After code review, manually start the exact 1.7B server, then capture pure
+JSON with the fixed experiment revision:
+
+```sh
+npm --silent run research:memory-inference-p1b4-ambiguity-recalibration -- \
+  --endpoint <1.7B endpoint> \
+  --commit <fixed experiment SHA> \
+  > /tmp/xion-p1b4-ambiguity-report.json
+```
+
+Stop the 1.7B server, then start the exact 4B server. Only if A completed
+without runtime failure, consume its unchanged report using the same SHA:
+
+```sh
+npm --silent run research:memory-inference-p1b4-role-split-hybrid -- \
+  --endpoint <4B endpoint> \
+  --ambiguity-report /tmp/xion-p1b4-ambiguity-report.json \
+  --commit <same fixed experiment SHA> \
+  > /tmp/xion-p1b4-hybrid-report.json
+```
+
+No real P1-B4A/B4B model call or output/report was produced in this correction.
+Tests use fake fetch only; fake reports stay in memory. Existing P1-B3
+source-validation code is reused by A and B, and only the existing
+`requestText` helper is additionally exported from P1-B3; its implementation,
+prompts, validators, combiner, and historical scoring are unchanged.
+
+Only `RAW_EPISODE_SUCCESSOR_OPEN` opens a **separately designed synthetic
+raw-episode diagnostic before training** on this branch. Its fixture,
+sample size, thresholds, retrieval behavior, and training mechanism are
+not designed or frozen here. The prospective training policy above remains:
+no general untuned-performance entry gate; training is a separately
+preregistered intervention when a bounded failure pattern makes it
+informative. Data provenance, train/dev/held-out split, mechanism, target
+metrics, leakage controls, and stopping rules must be frozen before
+training. Strict performance/safety gates belong to later held-out/adoption
+decisions. Raw episodes, training, and private natural replay remain
+**UNOPENED**. All production memory/architecture and deterministic hard
+gate boundaries remain unchanged.
