@@ -38,7 +38,7 @@
     "mcp:obsidian": "node scripts/galpi-mcp.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.117.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0",
     "busboy": "^1.6.0",
