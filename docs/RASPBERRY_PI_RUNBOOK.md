@@ -97,6 +97,13 @@ CODEX_BIN=/home/pi/galpi/bin/codex
 
 의존성 보안 갱신은 `package-lock.json`을 기준으로 한다. 현재 `overrides.qs = 6.16.0`은 Express 4·body-parser 1의 `~6.15.1` 제약 때문에 수정 버전을 선택하기 위한 한정 예외다([공식 권고](https://github.com/ljharb/qs/security/advisories/GHSA-4mjr-xmp4-gh2g)). 상위 패키지가 수정 버전을 허용하면 override를 제거하고 재검증한다. DOMPurify 갱신 시 `node_modules/dompurify/dist/purify.min.js`를 `public/lib/purify.min.js`에도 복사하며, `test/vendor-dependencies.test.js`가 두 파일의 바이트 일치를 검사한다.
 
+2026-09-05 감사 수정 배포 receipt: `407651d70e654b10b7af6a6521dc2d872e9e5f51`의 27개 파일과 잠금 파일 기준 의존성을 배포했다. 기존 GPT discovery 변경도 포함하며, 별도 연구·트레이딩 변경과 기존 Pi의 `lib/assistant-retrieval-shadow.js` 차이는 배포 범위에서 제외했다.
+
+- 운영 데이터를 복사하지 않은 Pi staging에서 `npm ci --omit=dev --no-audit`로 설치했다. `node --test --test-concurrency=1`은 1,055/1,055 통과(실패·취소·skip 0), `npm audit --omit=dev --json`은 취약점 0건이었다. 첫 staging 실행의 1건 실패는 복사에서 빠진 `legacy/` 보존 폴더 때문이며, 기존 Pi 폴더를 보완한 뒤 전체를 재실행했다. 같은 배포 commit의 로컬 `npm test`는 1,176/1,176 통과, Chromium DOMPurify smoke는 공격 fixture 14개 제거·정상 Markdown 보존을 확인했다.
+- 교체 전 온라인 백업은 `/home/pi/backups/galpi/galpi-20260905-2053.db`와 `vault-20260905-2053.tar.gz`다. 백업 DB `integrity_check=ok`, foreign key 위반 0건, Vault tar 읽기 검증을 통과했다. 코드·기존 `node_modules` 복구본은 같은 경로의 `code-audit-pre-407651d-20260905-2053.tar.gz`, 교체 전 의존성 디렉터리는 `/home/pi/galpi-node_modules-pre-407651d`에 보존했다. `.env`는 복사하거나 교체하지 않았다.
+- 사용자 재시작 뒤 PID `393455`, 시작 `2026-09-05 20:56:00 KST`, `active/running`을 확인했다. 배포 파일 27개와 실제 정적 응답 3개(DOMPurify·model picker·notification panel)의 SHA-256이 일치했다. 무인증 모델 API는 401, 메일 본문 invalid-ID 요청은 400과 `Cache-Control: no-store`였으며 실제 메일 본문 조회나 테스트 대화 저장은 하지 않았다.
+- 기동 시 실제 OpenAI catalog refresh는 generation `98`, payload/schema `2`, probe `3`, 후보 63개로 완료됐다. `gpt-6-astra`는 text/image 모두 `compatible`, role은 `null`이고 `/api/models/chat` 수동 option의 `GPT-6 Astra`로 노출됐다. 자동 text/image balanced와 기존 exact 선택은 모두 `gpt-5.6-terra`를 유지했다. 별도 provider smoke 스크립트나 실채팅 호출은 실행하지 않았으며 이 결과는 운영 자동 compatibility probe와 읽기 전용 API·캐시 확인이다. 재시작 이후 확인 시점의 로그에서 error/exception/실패는 0건이었다.
+
 ### C1 일정·private Web Push를 처음 켤 때
 
 C1 일괄 배포 전에는 아래 flag를 `false`로 유지한다. schema v5→v6→v7은 코드가 순차 적용하지만, 운영 DB에는 배포 전 동시 DB·vault 백업을 먼저 만든다.
