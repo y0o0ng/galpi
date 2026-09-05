@@ -202,6 +202,73 @@ test('Extract validates the provider-returned URL before exposing evidence', asy
   assert.deepEqual(usage, [{ provider: 'tavily', credits: 1 }]);
 });
 
+for (const method of ['search', 'fetch']) {
+  for (const phase of ['response', 'body']) {
+    test(`${method} aborts a stalled ${phase} within the same 10-second request deadline`, async t => {
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+      t.mock.method(AbortSignal, 'timeout', delay => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(new DOMException('deadline', 'TimeoutError')), delay);
+        return controller.signal;
+      });
+      const entered = Promise.withResolvers();
+      const responseDelay = phase === 'body' ? 3000 : 0;
+      let stall = true;
+      const { service, requests, usage } = createHarness({
+        providerResponse: (url, { signal }) => {
+          if (!stall) return response(200, {
+            results: [{ title: 'Recovered', url: 'https://example.com/a', content: 'ok', raw_content: 'ok' }],
+            usage: { credits: 1 },
+          });
+          const waitForAbort = () => {
+            entered.resolve();
+            assert.ok(signal instanceof AbortSignal, 'request must carry its deadline signal');
+            return new Promise((resolve, reject) => {
+              signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+            });
+          };
+          t.mock.timers.tick(responseDelay);
+          return phase === 'response' ? waitForAbort() : { ok: true, json: waitForAbort };
+        },
+      });
+      const input = method === 'search' ? 'query' : 'https://example.com/a';
+      const pending = service[method](input).then(value => ({ value }), error => ({ error }));
+      await entered.promise;
+      const signal = requests[0].options.signal;
+      assert.ok(signal instanceof AbortSignal);
+      t.mock.timers.tick(9999 - responseDelay);
+      assert.equal(signal.aborted, false);
+      t.mock.timers.tick(1);
+      assert.equal(signal.aborted, true);
+      const { error } = await pending;
+      assert.equal(error?.code, method === 'search' ? 'WEB_SEARCH_PROVIDER_FAILED' : 'WEB_FETCH_PROVIDER_FAILED');
+      assert.doesNotMatch(error.message, /deadline|tvly-test-secret/);
+      assert.deepEqual(usage, []);
+
+      stall = false;
+      const recovered = await service[method](input);
+      assert.equal(requests.length, 2, 'failed requests must not become cached empty results');
+      assert.ok(method === 'search' ? recovered.results.length === 1 : recovered.content === 'ok');
+      assert.deepEqual(usage, [{ provider: 'tavily', credits: 1 }]);
+    });
+  }
+
+  test(`${method} rejects unreadable JSON instead of accepting empty evidence`, async () => {
+    const { service, requests, usage } = createHarness({
+      providerResponse: () => new Response('<private>tvly-test-secret', { status: 200 }),
+    });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await assert.rejects(service[method](method === 'search' ? 'query' : 'https://example.com/a'), error => {
+        assert.equal(error.code, method === 'search' ? 'WEB_SEARCH_PROVIDER_FAILED' : 'WEB_FETCH_PROVIDER_FAILED');
+        assert.doesNotMatch(error.message, /private|tvly-test-secret/);
+        return true;
+      });
+    }
+    assert.equal(requests.length, 2);
+    assert.deepEqual(usage, []);
+  });
+}
+
 test('public URL validation accepts normal HTTP(S) and rejects local/non-public targets', () => {
   assert.equal(normalizePublicWebUrl('https://example.com/a'), 'https://example.com/a');
   assert.equal(normalizePublicWebUrl('http://example.com/a.pdf'), 'http://example.com/a.pdf');

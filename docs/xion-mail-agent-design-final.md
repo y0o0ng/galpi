@@ -2206,6 +2206,10 @@ Notification card
 바뀌지 않는데, 그것은 이 화면의 조심성이 아니라 6.2의 `EXAMINE` + `BODY.PEEK`와
 Gmail 읽기 전용 scope가 보장한다.
 
+본문 route의 성공·오류 응답에는 `Cache-Control: no-store`를 붙인다. 브라우저 요청도
+`cache: 'no-store'`로 기존 HTTP 캐시를 사용하지 않는다. 펼친 카드의 DOM에 있는 본문은
+카드가 살아 있는 동안만 재사용하고 영구 저장하지 않는다.
+
 새 Mail Inbox / Mail Detail SPA 화면을 만들지 않는다.
 
 ```text

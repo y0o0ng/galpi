@@ -364,6 +364,38 @@ test('chat catalog reports bootstrap fallback before the first successful refres
   });
   assert.equal(view.catalog.status, 'fallback');
   assert.equal(view.resolvedModelId, 'gpt-5.6-terra');
+  assert.equal(view.options[0].resolvedModelId, 'gpt-5.6-terra');
+});
+
+test('auto option describes its own routing target independently of the saved selection', () => {
+  for (const balanced of ['gpt-5.7-terra', null]) {
+    for (const bootstrapModel of ['gpt-5.6-terra', null]) {
+      const catalogRow = { generation: 1, payload: {
+        active: { balanced },
+        activeImage: { balanced: 'gpt-5.5-terra' },
+        models: [
+          { id: 'gpt-6-astra', probeStatus: 'compatible' },
+          ...(balanced ? [{ id: balanced, probeStatus: 'compatible' }] : []),
+        ],
+      } };
+      const expectedAuto = balanced || bootstrapModel;
+      for (const selection of [CHAT_SELECTION_AUTO, 'gpt-6-astra', 'gpt-removed']) {
+        const view = buildOpenAIChatCatalogView({ catalogRow, bootstrapModel, setting: { value: selection } });
+        assert.equal(view.options[0].value, CHAT_SELECTION_AUTO);
+        assert.equal(view.options[0].resolvedModelId, expectedAuto);
+        assert.equal(view.selection, selection);
+        assert.equal(view.resolvedModelId, selection === CHAT_SELECTION_AUTO
+          ? expectedAuto : selection === 'gpt-6-astra' ? 'gpt-6-astra' : null);
+        if (expectedAuto) {
+          assert.equal(view.options[0].resolvedModelId,
+            resolveChatModelSelection({ catalogRow, bootstrapModel, selection: CHAT_SELECTION_AUTO }).modelId);
+        } else {
+          assert.throws(() => resolveChatModelSelection({ catalogRow, bootstrapModel, selection: CHAT_SELECTION_AUTO }),
+            { code: 'MODEL_CATALOG_UNAVAILABLE' });
+        }
+      }
+    }
+  }
 });
 
 test('transient probe failures retry once and never harden into a rejection', async () => {

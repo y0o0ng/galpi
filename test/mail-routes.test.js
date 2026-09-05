@@ -2,6 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
+const { once } = require('node:events');
+const express = require('express');
 
 const { registerMailRoutes } = require('../lib/mail/routes');
 
@@ -19,12 +22,14 @@ function createFakeApp() {
       if (!handler) throw new Error(`등록되지 않은 route: ${key}`);
       let status = 200;
       let body = null;
+      const headers = {};
       const res = {
+        set(name, value) { headers[name] = value; return res; },
         status(code) { status = code; return res; },
         json(payload) { body = payload; return res; },
       };
       await handler(req, res);
-      return { status, body };
+      return { status, body, headers };
     },
     has(key) { return routes.has(key); },
   };
@@ -360,6 +365,7 @@ test('the body route reads through the reader and never caches what it hands bac
   assert.equal(response.body.success, true);
   assert.match(response.body.body, /8월 21일/);
   assert.deepEqual(response.body.attachments, [{ filename: 'notice.pdf', size: 9 }]);
+  assert.equal(response.headers['Cache-Control'], 'no-store');
 });
 
 test('a body read that fails keeps its own status and code', async () => {
@@ -381,6 +387,7 @@ test('a body read that fails keeps its own status and code', async () => {
   const response = await app.call('GET /api/mail/messages/:id/body', { params: { id: '7' } });
   assert.equal(response.status, 409);
   assert.equal(response.body.code, 'MAIL_ACCOUNT_AUTH_REQUIRED');
+  assert.equal(response.headers['Cache-Control'], 'no-store');
 });
 
 test('an unexpected provider failure is bounded, without leaking the mail into the answer', async () => {
@@ -397,6 +404,7 @@ test('an unexpected provider failure is bounded, without leaking the mail into t
   assert.equal(response.body.code, 'MAIL_BODY_FAILED');
   // upstream 문구를 그대로 흘리지 않는다. 주소가 섞여 있을 수 있다(설계 19).
   assert.equal(response.body.error, '본문을 읽지 못했습니다.');
+  assert.equal(response.headers['Cache-Control'], 'no-store');
 });
 
 test('the body route refuses a bad id and stays closed while the flag is off', async () => {
@@ -411,6 +419,7 @@ test('the body route refuses a bad id and stays closed while the flag is off', a
   const bad = await app.call('GET /api/mail/messages/:id/body', { params: { id: '0' } });
   assert.equal(bad.status, 400);
   assert.equal(bad.body.code, 'MAIL_INVALID_MESSAGE');
+  assert.equal(bad.headers['Cache-Control'], 'no-store');
   assert.deepEqual(reads, []);
 
   const closed = createFakeApp();
@@ -418,4 +427,49 @@ test('the body route refuses a bad id and stays closed while the flag is off', a
   const off = await closed.call('GET /api/mail/messages/:id/body', { params: { id: '7' } });
   assert.equal(off.status, 503);
   assert.equal(off.body.code, 'MAIL_AGENT_DISABLED');
+  assert.equal(off.headers['Cache-Control'], 'no-store');
+
+  const unavailable = createFakeApp();
+  registerMailRoutes({ app: unavailable, store: createFakeStore(), config: { enabled: true } });
+  const missingReader = await unavailable.call('GET /api/mail/messages/:id/body', { params: { id: '7' } });
+  assert.equal(missingReader.status, 503);
+  assert.equal(missingReader.body.code, 'MAIL_BODY_UNAVAILABLE');
+  assert.equal(missingReader.headers['Cache-Control'], 'no-store');
+});
+
+test('mail body HTTP responses forbid caching, including conditional requests and missing mail', async t => {
+  const app = express();
+  let reads = 0;
+  let missing = false;
+  registerMailRoutes({
+    app, store: createFakeStore(), config: { enabled: true },
+    bodyReader: { async read() {
+      reads += 1;
+      if (missing) throw Object.assign(new Error('메일을 찾을 수 없습니다.'), {
+        code: 'MAIL_MESSAGE_NOT_FOUND', statusCode: 404,
+      });
+      return { body: 'fixture mail body' };
+    } },
+  });
+  const server = app.listen(0, '127.0.0.1');
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  await once(server, 'listening');
+  const url = `http://127.0.0.1:${server.address().port}/api/mail/messages/7/body`;
+  const request = headers => new Promise((resolve, reject) => {
+    http.get(url, { headers }, response => {
+      response.resume();
+      response.on('end', () => resolve(response));
+    }).on('error', reject);
+  });
+  const first = await request({});
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.headers['cache-control'], 'no-store');
+  const conditional = await request({ 'If-None-Match': '*' });
+  assert.equal(conditional.statusCode, 304);
+  assert.equal(conditional.headers['cache-control'], 'no-store');
+  assert.equal(reads, 2);
+  missing = true;
+  const gone = await request({});
+  assert.equal(gone.statusCode, 404);
+  assert.equal(gone.headers['cache-control'], 'no-store');
 });

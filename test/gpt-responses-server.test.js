@@ -554,6 +554,43 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   assert.equal(exactChat.response.status, 200);
   assert.equal(exactChat.body.modelId, 'gpt-6-astra');
   assert.equal(responseRequests.at(-1).model, 'gpt-6-astra');
+
+  await t.test('invalid save inputs return 400 without writes or terminating the server', async () => {
+    const beforeRequests = responseRequests.length;
+    const beforeMessages = db.prepare('SELECT COUNT(*) AS count FROM messages').get().count;
+    const beforeChunks = db.prepare('SELECT COUNT(*) AS count FROM note_chunks').get().count;
+    const beforeDecisions = db.prepare('SELECT COUNT(*) AS count FROM auto_save_decisions').get().count;
+    const beforeFiles = await fs.readdir(vaultPath);
+    for (const [route, valid, fields] of [
+      ['/api/vault/save-document', { content: '저장할 메모' }, ['content', 'originalText', 'sessionId']],
+      ['/api/save-note', { question: '저장할 질문', answer: '저장할 답변' },
+        ['question', 'answer', 'model', 'sessionId', 'messageId']],
+    ]) {
+      for (const field of fields) {
+        // A JSON object can shadow toString and throw during String(value).
+        for (const value of [{ toString: null }, {}, [], true]) {
+          const invalid = await api(url, route, {
+            method: 'POST', body: JSON.stringify({ ...valid, [field]: value }),
+          });
+          assert.equal(invalid.response.status, 400, `${route}: ${field}=${JSON.stringify(value)}`);
+        }
+      }
+    }
+    for (const messageId of ['', 'invalid', -1, 0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      const invalid = await api(url, '/api/save-note', {
+        method: 'POST', body: JSON.stringify({ question: '질문', answer: '답변', messageId }),
+      });
+      assert.equal(invalid.response.status, 400, `messageId=${JSON.stringify(messageId)}`);
+    }
+    assert.equal(responseRequests.length, beforeRequests);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, beforeMessages);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM note_chunks').get().count, beforeChunks);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM auto_save_decisions').get().count, beforeDecisions);
+    assert.deepEqual(await fs.readdir(vaultPath), beforeFiles);
+    assert.equal(child.exitCode, null);
+    assert.equal((await api(url, '/api/sessions/shared-main')).response.status, 200);
+  });
+
   // The earlier retrieval fixture deliberately has no writable QA-LOG; create a new topic here.
   db.prepare('UPDATE notes SET embedding = NULL').run();
   const beforeTitle = responseRequests.length;
@@ -570,5 +607,84 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
     assert.deepEqual(request.reasoning, { effort: 'medium', context: 'current_turn' });
     assert.equal(request.max_output_tokens, 8192);
   }
+
+  const memo = await api(url, '/api/vault/save-document', {
+    method: 'POST', body: JSON.stringify({ content: '  정상 메모 저장  ',
+      originalText: '저장: 정상 메모 저장', sessionId: 'save-validation-test' }),
+  });
+  assert.equal(memo.response.status, 200, JSON.stringify(memo.body));
+  assert.equal(memo.body.success, true);
+  assert.match(await fs.readFile(path.join(vaultPath, memo.body.filename), 'utf8'), /정상 메모 저장/);
+  const memoHistory = await api(url, '/api/sessions/save-validation-test');
+  assert.equal(memoHistory.body.messages[0].content, '저장: 정상 메모 저장');
+  assert.equal(memoHistory.body.messages[1].content, `노트 저장됨: ${memo.body.title}`);
+
+  // Both numeric API IDs and IDs restored from DOM datasets remain idempotent.
+  const messageId = exactChat.body.messageId;
+  assert.ok(Number.isSafeInteger(messageId));
+  const saveBody = { question: '수동 모델 검증', answer: exactChat.body.reply, model: 'gpt',
+    sessionId: 'shared-main', messageId };
+  const firstSave = await api(url, '/api/save-note', { method: 'POST', body: JSON.stringify(saveBody) });
+  assert.equal(firstSave.response.status, 200, JSON.stringify(firstSave.body));
+  const chunksAfterSave = db.prepare('SELECT COUNT(*) AS count FROM note_chunks').get().count;
+  for (const id of [messageId, String(messageId)]) {
+    const duplicate = await api(url, '/api/save-note', {
+      method: 'POST', body: JSON.stringify({ ...saveBody, messageId: id }),
+    });
+    assert.equal(duplicate.response.status, 200, JSON.stringify(duplicate.body));
+    assert.equal(duplicate.body.duplicate, true);
+    assert.equal(duplicate.body.filename, firstSave.body.filename);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM note_chunks').get().count, chunksAfterSave);
+
+  await t.test('tokenless loopback API rejects foreign Host and Origin without weakening token authentication', async () => {
+    const request = (pathname, headers = {}, method = 'GET') => new Promise((resolve, reject) => {
+      const req = http.request(`${url}${pathname}`, {
+        method, headers: { 'Content-Type': 'application/json', ...headers },
+      }, res => {
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks).toString()) }));
+      });
+      req.on('error', reject);
+      req.end(method === 'POST' ? JSON.stringify({ content: '로컬 인증 경계 테스트' }) : undefined);
+    });
+    const foreign = { Host: 'galpi.example.test', Origin: 'https://galpi.example.test' };
+    assert.equal((await request('/api/vault/notes', foreign)).status, 401);
+    assert.equal((await request('/api/vault/notes', { ...foreign, 'X-API-Token': API_TOKEN })).status, 200);
+    assert.equal((await request('/api/vault/notes', { ...foreign, Authorization: `Bearer ${API_TOKEN}` })).status, 200);
+    assert.deepEqual((await request('/api/config', foreign)).body, { requiresApiToken: true });
+
+    await stopServer(child);
+    serverEnv.API_TOKEN = '';
+    child = startTestServer();
+    await waitForServer(child, url, logs);
+    const beforeFiles = await fs.readdir(vaultPath);
+    const beforeRequests = responseRequests.length;
+    for (const headers of [
+      { Host: 'foreign.example' },
+      { Host: 'foreign.example', Origin: url, 'X-Forwarded-Host': `127.0.0.1:${port}` },
+      { Origin: 'https://foreign.example' },
+      { Origin: 'null' },
+      { Origin: `https://127.0.0.1:${port}` },
+      { Origin: `http://127.0.0.1:${port + 1}` },
+      { 'Sec-Fetch-Site': 'cross-site' },
+      { 'Sec-Fetch-Site': 'same-site' },
+    ]) {
+      assert.equal((await request('/api/vault/notes', headers)).status, 401, JSON.stringify(headers));
+      assert.equal((await request('/api/vault/save-document', headers, 'POST')).status, 401, JSON.stringify(headers));
+    }
+    assert.equal((await request('/api/config', foreign)).status, 401);
+    assert.deepEqual(await fs.readdir(vaultPath), beforeFiles);
+    assert.equal(responseRequests.length, beforeRequests);
+    assert.equal((await request('/api/vault/notes')).status, 200, 'local CLI has no Origin');
+    for (const Host of [`localhost:${port}`, `[::1]:${port}`]) {
+      assert.equal((await request('/api/vault/notes', { Host, Origin: `http://${Host}`, 'Sec-Fetch-Site': 'same-origin' })).status, 200);
+    }
+    assert.equal((await request('/api/config', { Origin: url })).body.requiresApiToken, false);
+    const localSave = await request('/api/vault/save-document', { Origin: url, 'Sec-Fetch-Site': 'same-origin' }, 'POST');
+    assert.equal(localSave.status, 200);
+    assert.match(await fs.readFile(path.join(vaultPath, localSave.body.filename), 'utf8'), /로컬 인증 경계 테스트/);
+  });
   db.close();
 });

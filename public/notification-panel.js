@@ -269,7 +269,7 @@
     body.dataset.loading = 'true';
     body.replaceChildren(makeBodyMessage('본문을 읽는 중이야…'));
     try {
-      const response = await state.apiFetch(`/api/mail/messages/${item.mailMessageId}/body`);
+      const response = await state.apiFetch(`/api/mail/messages/${item.mailMessageId}/body`, { cache: 'no-store' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || '본문을 읽지 못했습니다.');
       body.replaceChildren(...renderBody(data));

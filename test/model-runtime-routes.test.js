@@ -161,6 +161,7 @@ test('chat model setting validates the catalog and applies from the next respons
   assert.equal(result.status, 200);
   assert.equal(result.body.selection, 'gpt-5.6-sol');
   assert.equal(result.body.resolvedModelId, 'gpt-5.6-sol');
+  assert.equal(result.body.options[0].resolvedModelId, 'gpt-5.6-terra');
   assert.equal(result.body.selectionVersion, 2);
   assert.equal(result.body.appliesFrom, 'next_response');
   assert.equal(settings.get('chat.model_selection').value, 'gpt-5.6-sol');
@@ -230,11 +231,15 @@ test('chat API offers compatible unknown exact models and fails closed after rem
     });
     assert.equal(selected.status, 200);
     assert.equal(selected.body.resolvedModelId, 'gpt-6-astra');
+    assert.equal(selected.body.options[0].resolvedModelId, 'gpt-5.6-terra');
+    assert.equal(invoke(get).body.options[0].resolvedModelId, 'gpt-5.6-terra');
     assert.equal(selected.body.appliesFrom, 'next_response');
     catalogs.saveSuccess('openai_api', {
       ...payload, models: payload.models.filter(model => model.id !== 'gpt-6-astra'),
     }, { payloadVersion: 2 });
-    assert.equal(invoke(get).body.resolvedModelId, null);
+    const removed = invoke(get).body;
+    assert.equal(removed.resolvedModelId, null);
+    assert.equal(removed.options[0].resolvedModelId, 'gpt-5.6-terra');
     assert.equal(settings.get('chat.model_selection').value, 'gpt-6-astra');
     assert.equal(invoke(put, {
       headers: { 'if-match': '"2"' }, body: { selection: 'gpt-6-astra' },

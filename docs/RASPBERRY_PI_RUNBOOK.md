@@ -91,7 +91,11 @@ CODEX_BIN=/home/pi/galpi/bin/codex
 
 로컬에서만 쓸 때는 `HOST=127.0.0.1`이어도 된다. 폰/맥에서 접속하려면 `HOST=0.0.0.0`이 필요하다.
 
-`HOST=0.0.0.0`으로 LAN에 열 때는 `API_TOKEN`을 **반드시** 설정한다. 비워두면 같은 네트워크의 누구나 API를 호출해 키 크레딧을 쓰고 볼트를 읽을 수 있다(서버 시작 시 경고가 뜬다). 설정하면 첫 접속 시 브라우저가 토큰을 한 번 묻고 저장한다.
+`HOST=0.0.0.0`으로 LAN에 열 때는 `API_TOKEN`을 **반드시** 설정한다. 토큰 없이 loopback 밖에 바인드하면 서버가 기동을 거부한다. 설정하면 첫 접속 시 브라우저가 토큰을 한 번 묻고 저장한다.
+
+무토큰 개발 API는 loopback 연결과 local Host(`localhost`, `127.0.0.1`, `[::1]`, 선택적 포트)를 모두 요구한다. `Origin`이 있으면 scheme·host·port가 같은 출처여야 하며, `Sec-Fetch-Site`가 있으면 `same-origin` 또는 `none`만 허용한다. 따라서 다른 사이트·포트의 브라우저 요청과 `Origin: null`은 거부하고, Origin 없는 로컬 CLI는 유지한다. 이 검사는 `/api/config`에도 적용한다. 외부 접속을 중계하는 프록시는 토큰을 반드시 설정해야 하며 forwarded 헤더로 무토큰 경계를 우회할 수 없다. 토큰 설정 시 기존 인증과 공개 config의 `requiresApiToken` 안내, 음성 단축어의 별도 scoped bearer 경계는 유지한다.
+
+의존성 보안 갱신은 `package-lock.json`을 기준으로 한다. 현재 `overrides.qs = 6.16.0`은 Express 4·body-parser 1의 `~6.15.1` 제약 때문에 수정 버전을 선택하기 위한 한정 예외다([공식 권고](https://github.com/ljharb/qs/security/advisories/GHSA-4mjr-xmp4-gh2g)). 상위 패키지가 수정 버전을 허용하면 override를 제거하고 재검증한다. DOMPurify 갱신 시 `node_modules/dompurify/dist/purify.min.js`를 `public/lib/purify.min.js`에도 복사하며, `test/vendor-dependencies.test.js`가 두 파일의 바이트 일치를 검사한다.
 
 ### C1 일정·private Web Push를 처음 켤 때
 
@@ -644,6 +648,8 @@ Codex가 대상 파일 snapshot을 잡고 있는 동안 append·split·merge·ar
 - **보관:** 7일 지난 백업은 자동 삭제.
 - **위치:** 기본 `~/backups/galpi/`. `.env`의 `BACKUP_DIR`로 변경 가능.
 - **수동:** 채팅에 `/backup`, 또는 `node scripts/backup.js`.
+- **파일명(2026-09-05 코드부터):** `galpi-<YYYYMMDD-HHmm-UUID>.db`와 `vault-<같은 식별자>.tar.gz`. 빠른 재시도·동시 실행도 기존 백업을 덮어쓰지 않는다.
+- **완료 판정:** `.partial`에 DB·압축 파일을 모두 만든 뒤 최종 이름으로 공개한다. 목록과 최근 백업 시각은 같은 식별자의 DB·볼트 쌍만 센다. 예전 분 단위 `galpi-*`·`council-*` 쌍도 계속 지원한다. 실패한 임시 파일은 바로 정리하고, 프로세스 중단으로 남은 임시 파일은 7일 보관 정리 대상이다.
 
 서버가 꺼져 있어도 백업하고 싶으면 cron으로도 돌릴 수 있다 (같은 스크립트). 예: 매일 04:00.
 
@@ -660,7 +666,7 @@ crontab -e
 
 ### 복원
 
-백업에서 되돌릴 때 (`<stamp>`는 복원할 백업 시각):
+백업에서 되돌릴 때 (`<stamp>`는 복원할 파일명에서 가져온 전체 식별자이며, 새 백업은 UUID까지 포함한다):
 
 ```sh
 sudo systemctl stop galpi          # 서버 멈춤 (systemd 미사용이면 그냥 종료)

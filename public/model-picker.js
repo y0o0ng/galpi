@@ -44,7 +44,9 @@
   }
 
   function statusText(catalog) {
-    if (!catalog?.resolvedModelId) return '사용 가능한 GPT 모델을 확인하지 못했어.';
+    if (!catalog?.resolvedModelId) return catalog?.options?.length
+      ? '선택한 모델을 사용할 수 없어. 다른 모델을 선택해줘.'
+      : '사용 가능한 GPT 모델을 확인하지 못했어.';
     if (catalog.catalog?.status === 'stale') return '마지막 정상 목록을 사용 중이야.';
     if (catalog.catalog?.status === 'fallback') return '기본 검증 모델을 사용 중이야.';
     return '선택은 다음 답변부터 적용돼.';
@@ -58,11 +60,11 @@
       return;
     }
     const selected = catalog.options.find(option => option.value === catalog.selection);
-    state.label.textContent = selected?.label || '모델';
-    state.button.title = `${selected?.label || catalog.selection} · ${displayModelName(catalog.resolvedModelId)}`;
-    state.button.disabled = state.saving || !catalog.resolvedModelId;
+    state.label.textContent = selected?.label || displayModelName(catalog.selection) || '모델';
+    state.button.title = `${state.label.textContent} · ${displayModelName(catalog.resolvedModelId) || '사용 불가'}`;
+    state.button.disabled = state.saving || catalog.options.length === 0;
     state.status.textContent = statusText(catalog);
-    state.status.classList.toggle('warn', ['stale', 'fallback'].includes(catalog.catalog?.status));
+    state.status.classList.toggle('warn', !catalog.resolvedModelId || ['stale', 'fallback'].includes(catalog.catalog?.status));
     state.options.replaceChildren();
 
     catalog.options.forEach(option => {
@@ -113,14 +115,15 @@
       if (!response.ok) throw new Error(data.error || '모델을 변경하지 못했어.');
       state.catalog = data;
       state.showToast(changedDuringAnswer ? '다음 답변부터 새 모델을 쓸게' : '모델을 변경했어');
-      close({ restoreFocus: true });
     } catch (error) {
       state.showToast(error.message);
       await refresh();
+      return;
     } finally {
       state.saving = false;
       render();
     }
+    close({ restoreFocus: true });
   }
 
   async function refresh() {
@@ -186,7 +189,7 @@
       }
     });
     document.addEventListener('click', event => {
-      if (!event.target.closest('#chat-model-control')) close();
+      if (!event.composedPath().some(node => node.id === 'chat-model-control')) close();
     });
     void refresh();
   }

@@ -17,7 +17,8 @@ const {
   parsePublishedAt,
 } = require('../lib/news/normalize');
 const { MAX_ANALYSIS_ATTEMPTS, createNewsStore } = require('../lib/news/store');
-const { collectNews, FAILURE_BACKOFF_SECONDS } = require('../lib/news/collect');
+const { collectNews, createNewsCollector, FAILURE_BACKOFF_SECONDS } = require('../lib/news/collect');
+const { createWebService } = require('../lib/web/service');
 
 const NOW = Math.floor(Date.parse('2026-08-20T03:00:00Z') / 1000);
 
@@ -240,6 +241,72 @@ test('검색이 실패해도 다른 관심은 계속 돌고, 실패한 쪽만 �
   assert.equal(row.code, 'NEWS_SOURCE_DOWN');
   assert.equal(row.nextPollAt, NOW + FAILURE_BACKOFF_SECONDS);
   db.close();
+});
+
+test('Tavily 본문 timeout 뒤 다른 관심을 수집하고 다음 tick에서 재시도할 수 있다', async t => {
+  const db = createDatabase();
+  let now = NOW;
+  const store = createStore(db, { now: () => now });
+  const deadlines = [];
+  t.mock.method(AbortSignal, 'timeout', () => {
+    const controller = new AbortController();
+    deadlines.push(controller);
+    return controller.signal;
+  });
+  const entered = Promise.withResolvers();
+  let calls = 0;
+  const web = createWebService({
+    enabled: true,
+    apiKey: 'test-only',
+    now: () => now * 1000,
+    fetchImpl: async (url, { signal }) => {
+      calls += 1;
+      if (calls === 1) return {
+        ok: true,
+        json() {
+          entered.resolve();
+          assert.ok(signal instanceof AbortSignal);
+          return new Promise((resolve, reject) => {
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          });
+        },
+      };
+      return new Response(JSON.stringify({ results: [searchResult(`https://example.com/${calls}`)] }));
+    },
+  });
+  const collector = createNewsCollector({
+    loadInterests: async () => [...INTERESTS, { interestId: 'news-b202', topic: 'Zigbee' }],
+    search: web.search,
+    store,
+    now: () => now,
+    onError: error => assert.fail(error),
+  });
+  const first = collector.tick();
+  t.after(async () => {
+    deadlines.forEach(controller => controller.abort());
+    try { await first; } finally { db.close(); }
+  });
+  await entered.promise;
+  assert.equal(collector.tick(), first, '실행 중에는 수집을 겹치지 않는다');
+  assert.equal(deadlines.length, 1);
+  deadlines[0].abort(new DOMException('deadline', 'TimeoutError'));
+  await first;
+  assert.equal(calls, 2, '중단된 관심 다음의 관심은 계속 수집한다');
+  const failed = db.prepare('SELECT last_error_code, next_poll_at FROM news_interest_polls WHERE interest_id = ?').get('news-a13f');
+  assert.equal(failed.last_error_code, 'WEB_SEARCH_PROVIDER_FAILED');
+  assert.equal(failed.next_poll_at, NOW + FAILURE_BACKOFF_SECONDS);
+  assert.equal(store.creditsUsed(), 1);
+
+  now += FAILURE_BACKOFF_SECONDS - 1;
+  const next = collector.tick();
+  assert.notEqual(next, first, '완료된 running Promise를 해제한다');
+  await next;
+  assert.equal(calls, 2, '실패 backoff 전에는 재시도하지 않는다');
+  now += 1;
+  await collector.tick();
+  assert.equal(calls, 3);
+  assert.equal(store.articlesForInterest('news-a13f').length, 1);
+  assert.equal(store.creditsUsed(), 2);
 });
 
 test('뉴스 크레딧 한도가 채팅 검색을 굶기지 않게 문을 닫는다', async () => {

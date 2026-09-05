@@ -445,6 +445,7 @@ test('a mail card opens its body from the provider and never from a stored one',
 
   // 본문은 저장돼 있지 않다(설계 23). 카드가 여는 것은 그때 읽어오는 경로 하나다.
   assert.match(panel, /\/api\/mail\/messages\/\$\{item\.mailMessageId\}\/body/);
+  assert.match(panel, /apiFetch\(`\/api\/mail\/messages\/\$\{item\.mailMessageId\}\/body`, \{ cache: 'no-store' \}\)/);
   // HTML을 그리지 않는다. 그리면 원격 이미지·추적 픽셀이 들어올 구멍이 생긴다.
   assert.match(panel, /text\.textContent = data\.body/);
   const renderBody = panel.slice(panel.indexOf('function renderBody'));

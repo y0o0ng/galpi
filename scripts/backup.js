@@ -7,6 +7,7 @@
 const path = require('path');
 const fsp = require('fs/promises');
 const { execFile } = require('child_process');
+const { randomUUID } = require('crypto');
 const Database = require('better-sqlite3');
 const { resolveRuntimePaths } = require('../lib/runtime-paths');
 
@@ -44,7 +45,8 @@ async function pruneOldBackups(backupDir, retentionDays = RETENTION_DAYS) {
 
   let pruned = 0;
   for (const filename of files) {
-    if (!BACKUP_FILE_RE.test(filename)) continue;
+    // 중단된 프로세스가 남긴 임시 산출물도 같은 보관 기간 뒤 정리한다.
+    if (!BACKUP_FILE_RE.test(filename.replace(/\.partial$/, ''))) continue;
     const filepath = path.join(backupDir, filename);
     try {
       const { mtimeMs } = await fsp.stat(filepath);
@@ -69,11 +71,19 @@ async function listBackups(backupDir = defaultBackupDir()) {
   for (const filename of files) {
     if (!BACKUP_FILE_RE.test(filename)) continue;
     try {
-      const { size, mtimeMs } = await fsp.stat(path.join(backupDir, filename));
+      const stat = await fsp.stat(path.join(backupDir, filename));
+      const { size, mtimeMs } = stat;
+      if (!stat.isFile() || size === 0) continue;
       entries.push({ filename, size, mtimeMs });
     } catch { /* skip */ }
   }
-  return entries.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  // 둘 중 하나만 공개된 뒤 프로세스가 종료돼도 최근 정상 백업으로 세지 않는다.
+  const names = new Set(entries.map(entry => entry.filename));
+  return entries.filter(({ filename }) => {
+    const stamp = filename.replace(/^(galpi|council|vault)-/, '').replace(/\.(db|tar\.gz)$/, '');
+    return names.has(`vault-${stamp}.tar.gz`)
+      && (names.has(`galpi-${stamp}.db`) || names.has(`council-${stamp}.db`));
+  }).sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
 
 // db를 넘기면(인프로세스) 서버 연결로 온라인 백업, 안 넘기면(CLI) readonly 연결을 새로 연다.
@@ -92,20 +102,31 @@ async function runBackup({
   const dbPath = dbPathOverride || runtimePaths.dbPath;
 
   await fsp.mkdir(dir, { recursive: true });
-  const stamp = timestamp();
+  const stamp = `${timestamp()}-${randomUUID()}`;
 
-  // SQLite 온라인 백업 — 서버가 쓰는 중에도 안전 (단순 복사로 인한 손상 방지)
   const dbDest = path.join(dir, `galpi-${stamp}.db`);
+  const vaultDest = path.join(dir, `vault-${stamp}.tar.gz`);
+  const dbTemp = `${dbDest}.partial`;
+  const vaultTemp = `${vaultDest}.partial`;
   let ownDb = null;
-  const conn = db || (ownDb = new Database(dbPath, { readonly: true, fileMustExist: true }));
   try {
-    await conn.backup(dbDest);
+    // SQLite 온라인 백업 — 서버가 쓰는 중에도 안전 (단순 복사로 인한 손상 방지)
+    const conn = db || (ownDb = new Database(dbPath, { readonly: true, fileMustExist: true }));
+    await conn.backup(dbTemp);
+    await tarVault(vault, vaultTemp);
+
+    // 두 산출물이 완성된 뒤 공개한다. link는 rename과 달리 기존 목적지를 덮어쓰지 않는다.
+    await fsp.link(dbTemp, dbDest);
+    try {
+      await fsp.link(vaultTemp, vaultDest);
+    } catch (err) {
+      await fsp.unlink(dbDest);
+      throw err;
+    }
   } finally {
     if (ownDb) ownDb.close();
+    await Promise.all([fsp.rm(dbTemp, { force: true }), fsp.rm(vaultTemp, { force: true })]);
   }
-
-  const vaultDest = path.join(dir, `vault-${stamp}.tar.gz`);
-  await tarVault(vault, vaultDest);
 
   const pruned = await pruneOldBackups(dir, retentionDays);
   return { backupDir: dir, dbDest, vaultDest, stamp, pruned };

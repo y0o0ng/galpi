@@ -437,9 +437,11 @@ Codex 옵션 목록은 자동 갱신하지만, 선택한 정확한 model ID는 �
 - 입력창의 보내기 동선 가까이에 현재 모델 pill을 둔다.
 - 데스크톱은 작은 popover, 모바일은 bottom sheet로 연다.
 - pill에는 `자동 · GPT-5.6 Terra`처럼 selection과 현재 resolved model을 함께 표시한다.
+- 목록의 `자동` 옵션은 현재 수동 선택과 독립적으로 자동 text 대상(`active.balanced`, 없으면 기존 bootstrap 모델)을 표시한다. 최상위 `resolvedModelId`는 현재 선택의 대상이며, 고정 모델이 사용 불가이면 `null`을 유지한다.
 - 각 옵션은 이름, 짧은 용도, 실제 model ID만 보여준다.
 - 가격은 자주 바뀌므로 UI에 하드코딩하지 않는다.
 - 모델 저장 중에는 중복 선택을 막고, 실패하면 기존 선택을 유지한다.
+- 고정 모델이 사용 불가여도 다른 옵션이 있으면 메뉴를 열 수 있다. 선택한 모델 이름과 사용 불가 안내를 유지하고, 사용자가 직접 고른 뒤에만 설정을 바꾼다.
 - 답변 생성 중 바꾸면 `다음 답변부터 적용`을 표시한다.
 - 키보드 이동, Escape 닫기, focus 복귀, ARIA label, 44px touch target, reduced motion을 지원한다.
 - 1440×900, 390×844, light/dark에서 확인한다.

@@ -13,7 +13,7 @@ const Database = require('better-sqlite3');
 const webPush = require('web-push');
 const { runBackup, listBackups } = require('./scripts/backup');
 const { ensureDataDirectory, resolveRuntimePaths } = require('./lib/runtime-paths');
-const { assertBindIsAuthenticated } = require('./lib/bind-guard');
+const { assertBindIsAuthenticated, hasLocalApiOrigin } = require('./lib/bind-guard');
 const { searchSemanticScholar } = require('./lib/paper-search');
 const { MOCK_S2_RESPONSE } = require('./lib/paper-search-mock');
 const { createPaperNoteSaver } = require('./lib/paper-notes');
@@ -571,16 +571,16 @@ function socketRateLimitKey(req) {
 }
 
 function requireApiToken(req, res, next) {
-  if (req.originalUrl === '/api/config') return next();
   if (!API_TOKEN) {
     // 토큰 없는 운용은 loopback 개발에서만 허용한다. `assertBindIsAuthenticated`가
     // 기동 때 이미 막지만, 리버스 프록시가 외부 요청을 loopback으로 넘기는 배치에서는
     // 그 검사를 통과하고도 외부에 열린다. 요청 단에서 한 번 더 본다.
-    if (!isLoopbackRequest(req)) {
+    if (!isLoopbackRequest(req) || !hasLocalApiOrigin(req)) {
       return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
     }
     return next();
   }
+  if (req.originalUrl === '/api/config') return next();
   if (!safeTokenEqual(getRequestToken(req), API_TOKEN)) return res.status(401).json({ error: 'API 토큰이 필요합니다.' });
   return next();
 }
@@ -4327,9 +4327,17 @@ app.post('/api/chat', async (req, res) => {
 // ─── 노트 저장 ────────────────────────────────────────────────────────────────
 
 app.post('/api/vault/save-document', async (req, res) => {
-  const content = String(req.body?.content || '').trim();
-  const originalText = String(req.body?.originalText || content).trim();
-  const sessionId = String(req.body?.sessionId || 'unknown').trim();
+  const body = req.body || {};
+  if (typeof body.content !== 'string') {
+    return res.status(400).json({ error: '저장할 내용은 문자열이어야 합니다.' });
+  }
+  if ((body.originalText != null && typeof body.originalText !== 'string')
+    || (body.sessionId != null && typeof body.sessionId !== 'string')) {
+    return res.status(400).json({ error: 'originalText와 sessionId는 문자열이어야 합니다.' });
+  }
+  const content = body.content.trim();
+  const originalText = (body.originalText || content).trim();
+  const sessionId = (body.sessionId || 'unknown').trim();
   if (!content) return res.status(400).json({ error: '저장할 내용을 입력해주세요.' });
   if (content.length > 20000) return res.status(400).json({ error: '저장할 내용이 너무 깁니다 (최대 20,000자).' });
 
@@ -4367,14 +4375,19 @@ app.post('/api/vault/save-document', async (req, res) => {
 });
 
 app.post('/api/save-note', async (req, res) => {
-  const { question, answer, model, sessionId, messageId } = req.body;
-  if (!question || !answer) {
+  const { question, answer, model, sessionId, messageId } = req.body || {};
+  if (typeof question !== 'string' || typeof answer !== 'string' || !question.trim() || !answer.trim()) {
     return res.status(400).json({ error: '질문과 답변이 필요합니다.' });
   }
-
-  if (messageId) {
-    const existing = getSavedNoteByMessageId(messageId);
-    if (existing) return res.json({ success: true, title: existing.title, filename: existing.filename, duplicate: true });
+  if ((model != null && typeof model !== 'string')
+    || (sessionId != null && typeof sessionId !== 'string')) {
+    return res.status(400).json({ error: 'model과 sessionId는 문자열이어야 합니다.' });
+  }
+  if (messageId != null && (
+    !['number', 'string'].includes(typeof messageId)
+    || !Number.isSafeInteger(Number(messageId)) || Number(messageId) <= 0
+  )) {
+    return res.status(400).json({ error: '올바른 메시지 ID가 필요합니다.' });
   }
 
   try {

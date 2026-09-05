@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { assertBindIsAuthenticated, isLoopbackHost } = require('../lib/bind-guard');
+const { assertBindIsAuthenticated, isLoopbackHost, hasLocalApiOrigin } = require('../lib/bind-guard');
 
 const ROOT = path.resolve(__dirname, '..');
 const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
@@ -50,6 +50,33 @@ test('토큰이 없을 때 loopback 아닌 요청은 API에서도 막는다', ()
   const body = server.slice(at, at + 700);
   assert.match(body, /if \(!API_TOKEN\)/);
   assert.match(body, /isLoopbackRequest\(req\)/);
+  assert.match(body, /hasLocalApiOrigin\(req\)/);
+});
+
+test('무토큰 개발 API는 local Host와 같은 Origin만 허용한다', () => {
+  const check = (headers, protocol = 'http') => hasLocalApiOrigin({ protocol, get: name => headers[name] });
+  for (const Host of ['localhost:3000', '127.0.0.1:3000', '[::1]:3000', 'LOCALHOST:3000', 'localhost:80']) {
+    assert.equal(check({ Host }), true, Host);
+    assert.equal(check({ Host, Origin: new URL(`http://${Host}`).origin, 'Sec-Fetch-Site': 'same-origin' }), true);
+    assert.equal(check({ Host, 'Sec-Fetch-Site': 'none' }), true);
+  }
+  assert.equal(check({ Host: 'localhost:443', Origin: 'https://localhost' }, 'https'), true);
+  for (const Host of [undefined, '', 'evil.example', 'localhost.evil.example', 'evil.localhost',
+    '127.0.0.1.evil.example', '127.0.0.2', '0.0.0.0', '2130706433', '127.1',
+    'evil@localhost', 'localhost/path', 'localhost#evil', 'localhost:99999',
+    'localhost:', 'localhost:abc', 'localhost:3000,evil.example', '[::1', '::1']) {
+    assert.equal(check({ Host }), false, String(Host));
+  }
+  for (const Origin of ['', 'null', 'http://evil.example', 'http://localhost:3001',
+    'https://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3000.evil.example',
+    'http://localhost:3000/path', 'http://localhost:3000 http://evil.example']) {
+    assert.equal(check({ Host: 'localhost:3000', Origin }), false, Origin);
+  }
+  for (const site of ['cross-site', 'same-site', '', 'unknown']) {
+    assert.equal(check({ Host: 'localhost:3000', 'Sec-Fetch-Site': site }), false, site);
+  }
+  assert.equal(check({ Host: 'evil.example', 'X-Forwarded-Host': 'localhost:3000',
+    'X-Forwarded-For': '127.0.0.1', 'X-Forwarded-Proto': 'http' }), false);
 });
 
 test('보안 헤더가 정적 서빙보다 먼저 붙는다', () => {
