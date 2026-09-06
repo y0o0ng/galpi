@@ -94,7 +94,8 @@
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
 - **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** P1-B3 run artifacts를 커밋했고 결과 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
 - **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 위 canonical study 문서에 있다.
-- **P1-B5 deterministic normalization diagnostic은 preregister/구현됐고 NOT RUN이다.** P1-B4 ambiguity format-invalid 20개는 모두 정확한 lowercase `json` Markdown fence였다. 정규화는 Stage 1에만 적용하고 1.7B를 재실행하지 않으며 기존 P1-B4 4B 결과도 그대로 재사용한다. 새로 정규화된 `CLEAR`에서만 새 4B downstream 호출이 가능하다. L4 progression은 그대로이고 긍정적 결과는 synthetic raw-episode 설계만 연다. 일반 pre-training 성능 entry gate는 없지만 raw episode·training·private replay는 `UNOPENED`, production parsing/memory는 그대로이며 위 canonical study가 정본이다.
+- **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
+- **P1-B6 1.7B ambiguity specialist supervised adaptation은 데이터셋 계약만 부분 사전등록했다.** 다음은 candidate authoring/generation 계약이며 학습 방식·설정·평가 문턱은 OPEN이다. 학습 실행·raw episode·private replay는 `UNOPENED`, production은 그대로이고 상세 정본은 위 canonical study다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

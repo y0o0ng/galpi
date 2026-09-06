@@ -3337,7 +3337,9 @@ neither this receipt nor the subsequent diagnostic reinterprets P1-B4.
 
 ### P1-B5 deterministic structured-output normalization diagnostic
 
-**PREREGISTERED / IMPLEMENTED / NOT RUN.** This is an **ADAPTIVE** pipeline
+**CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL.** The frozen
+preregistration and implementation receipt below are preserved as history;
+the actual execution/result receipt follows them. This is an **ADAPTIVE** pipeline
 diagnostic on already-consumed P1-B4/P1-B3 evidence, not fresh held-out
 validation. Research question: does a narrowly bounded deterministic
 normalization layer for the observed JSON code-fence wrapper make the
@@ -3495,3 +3497,273 @@ npm --silent run research:memory-inference-p1b5-structured-output-normalization 
 Implementation checks use fake fetch only; fake B5 reports stay in memory.
 No real P1-B5 report was generated, no model server was started, and no
 1.7B or existing 4B call was rerun.
+
+#### B5 actual execution/result receipt — CLOSED / COMPLETE
+
+The completed local report was independently validated before this receipt
+was written. Documentation parent: `3543d5d39ce43d8931ed44679c0c2d11ea58b700`,
+confirmed equal to fetched `origin/main`; no intervening main commit existed.
+
+- Actual report: `/tmp/xion-p1b5-normalization-report.json`.
+- Report identity: `xion-local-memory-inference-p1b5-structured-output-normalization-report-v1`.
+- Execution revision: `d2bbdf5b079cf01e223191086d0bd8091fdc5ea7`.
+- `generatedAt`: `2026-09-05T14:10:13.641Z`.
+- Exact report-byte SHA-256:
+  `2247f6f9f0963ce9858e97128aab8ad4a3fd95a79c275044d0ad1bcfd59d455f`.
+
+Local validation used an inline `node <<'NODE'` assertion program, with
+`globalThis.fetch` replaced by a throwing function. It called the existing
+B5 `loadSources()` verifier (including the frozen B3 combiner and strict
+B4A/B4B validation), checked pinned input/source identities and hashes,
+and reconstructed all 60 B5 records from source raw ambiguity content and
+recorded new raw outputs. Existing `normalizedAmbiguity`, `stageRecord`,
+`skipAfter`, `parseStageContent`, `scoreArmCase`, `summarizeCalls`,
+`summarizeArm`, `pairedTransition`, and B4 `progression` contracts were used.
+Exact reused records, stage origins, ordered IDs, model/runtime metadata,
+counts, scores, paired transitions, and final disposition were checked;
+the whole reconstructed report was `assert.deepEqual` to the actual report.
+**PASS, local offline validation only**, not a new experiment or GitHub CI.
+Recorded timestamps/latencies are source observations, not independently
+remeasured timings. This documentation-only change neither edits nor copies
+the report into fixtures; its exact local source and digest are recorded here.
+
+Normalization observed **40 already-raw JSON**, **20 exact lowercase `json`
+code-fence unwraps**, **0 not-normalizable**, and **60 schema-valid after
+normalization**. Source reuse was 60 B4A ambiguity calls plus 44 B4B
+downstream calls. New 4B binary planned/attempted/completed were **12/12/12**;
+new extraction were **7/7/7**. New invalid structured outputs and new
+runtime failures were both **0**. The report records successful health
+preflight, zero readiness/required runtime failures, and 123 counterfactual
+HYBRID model-stage calls (60 + 44 + 19), not 123 newly executed calls.
+No 1.7B or already-observed 4B result was rerun by B5.
+
+| Metric | P1-B5 counterfactual HYBRID | Frozen historical L4 |
+|---|---:|---:|
+| End-to-end success | 48/60 (80%) | 48/60 (80%) |
+| unsafeNonEscalation | 4 | 7 |
+| falseNoWrite | 3 | 6 |
+| schemaValidExtractionWrongValue | 1 | 1 |
+| terminalEscalation | 20 | 13 |
+
+Paired **L4 → HYBRID**: `UNCHANGED_CORRECT 41`, `FIXED 7`,
+`REGRESSION 7`, `UNCHANGED_WRONG 5`, `NONCOMPARABLE_RUNTIME 0`.
+The unchanged successor conditions evaluate as follows:
+
+| Frozen condition | Result |
+|---|---|
+| Zero required runtime failures | PASS |
+| HYBRID E2E >= L4 E2E | PASS: 48 == 48 |
+| FIXED > REGRESSION | **FAIL: 7 == 7**, not strictly greater |
+| unsafeNonEscalation <= L4 | PASS: 4 <= 7 |
+| falseNoWrite <= L4 | PASS: 3 <= 6 |
+| schemaValidExtractionWrongValue <= L4 | PASS: 1 <= 1 |
+
+Authoritative disposition:
+**P1-B5 = CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL**.
+The consumed synthetic hybrid branch missed the frozen raw-episode
+successor rule solely because FIXED did not strictly exceed REGRESSION.
+No threshold is weakened or reinterpreted after observing this result.
+
+Normalization moved the hybrid to a different observed operating point:
+equal E2E to L4, lower unsafe-non-escalation and false-NO_WRITE counts,
+unchanged wrong-extraction count, and more terminal escalation. This does
+not establish fresh capability or production readiness. **P1-B4 remains
+historically 33/60**; B5 neither rescores nor retroactively rescues B4.
+All historical B1–B5 contracts, gold, and scores remain unchanged.
+Raw-episode evaluation remains **UNOPENED by the B5 rule**. This negative
+successor disposition does not prohibit a separately preregistered training
+experiment: the prospective policy above already rejects a general
+untuned-performance entry gate. The following section opens only that
+bounded experiment's design, not training execution.
+
+### P1-B6 1.7B ambiguity specialist supervised adaptation
+
+**DESIGN OPEN / DATASET CONTRACT PARTIALLY PREREGISTERED.** The dataset
+decisions explicitly marked CLOSED below are frozen user decisions.
+This is **not a complete training preregistration**, not authorization to
+generate the dataset or execute training in this documentation task, and
+not production authorization. No new case, HUMAN adjudication, model output,
+or training artifact is created here.
+
+The research target is adaptation of **only the ~1.7B ambiguity/escalation
+stage**: determine whether already-selected evidence has one sufficiently
+clear interpretation for downstream durability classification or requires
+`ESCALATE`. It must **not decide durability itself**. The 4B durability
+triage and extraction stages are not opened for training.
+
+The motivating B5 failure analysis concerns observed behavior, not an
+internal model mechanism: the dominant clean root failure was the 1.7B
+ambiguity boundary. Mirrored errors included clear explicit non-user,
+test/example, or temporary evidence over-escalated, and genuinely unresolved
+referent/scope/applicability/temporal evidence falsely cleared. This bounded
+failure profile motivates experimental adaptation; it does not overturn
+the B5 successor disposition or demonstrate that training will succeed.
+
+#### CLOSED — historical consumed data and corpus sizes
+
+All **60 historical P1-B3/B4/B5 cases** are consumed evaluation data
+intentionally permitted as **TRAIN ONLY** for B6, permanently excluded
+from DEV and FINAL HELD-OUT. Include all 60; preserve their original
+bounded evidence bytes and provenance. Training inputs must not contain
+historical model decisions, failure labels, mismatch notes, or model-specific
+error annotations. Derive Stage-1 labels deterministically from the final
+resolved HUMAN class-gold artifact, not construction authoring targets:
+
+| Final resolved HUMAN class gold | B6 ambiguity label |
+|---|---|
+| NO_WRITE | CLEAR |
+| WRITE_CANDIDATE | CLEAR |
+| ESCALATE | ESCALATE |
+
+The authority remains
+`fixtures/local-memory-inference-p1b3-human-resolved-labels.json`
+(`xion-local-memory-inference-p1b3-human-resolved-labels-v1`).
+No new adjudication of those historical cases is performed here.
+
+New synthetic data will be authored and frozen later:
+
+| Split | New cases | Historical cases | Final size |
+|---|---:|---:|---:|
+| TRAIN | 240 | 60 | 300 |
+| DEV | 60 | 0 | 60 |
+| FINAL HELD-OUT | 80 | 0 | 80 |
+| Total | 380 | 60 | 440 |
+
+The **new 380**, collectively, must contain exactly **190 CLEAR and
+190 ESCALATE**. This does not impose an additional per-split label quota.
+
+#### CLOSED — conversational evidence bundles and fragment counts
+
+For the **new 380 only**, exact fragment-count case totals are:
+
+| Conversational evidence fragments | Cases |
+|---:|---:|
+| 1 | 70 |
+| 2 | 100 |
+| 3 | 120 |
+| 4 | 70 |
+| 5 | 20 |
+| Total | 380 |
+
+A fragment is a **short contiguous conversational source span** relevant
+to one memory candidate, not a sentence count or rewritten summary.
+The intended serving shape is conversational evidence, normally preserving
+assistant + user interaction where that context is required to interpret
+the user's statement.
+
+**One item = one candidate/state/question** for ambiguity classification.
+A case may contain 1–5 fragments, but all must concern that same candidate;
+independent memory candidates must not share one gold decision.
+P1-B6 assumes the relevant evidence bundle has already been selected.
+
+Determining which raw-conversation spans belong together is a later
+**Evidence Bundle Builder** problem, outside B6. A possible future component
+could read raw context, locate multiple relevant spans, and return source
+references/verbatim evidence with provenance rather than a newly interpreted
+summary. That component is **not opened, specified, or selected here**.
+B6 neither trains nor evaluates raw-episode evidence discovery, and this
+section opens no raw-episode experiment or bundler implementation.
+
+#### CLOSED — realistic discourse and authored order
+
+New data must substantially include realistic, non-canonical conversational
+evidence, not only clean benchmark-like statements. Coverage includes:
+
+- tentative → tentative and tentative → explicit final decision;
+- within-episode self-revision and unresolved competing states;
+- general state plus a temporary exception and late-added constraints;
+- context-first versus conclusion-first expression;
+- interleaved semantic components and returning to the same topic after
+  another relevant component;
+- multiple fragments whose relationship is needed to determine whether
+  the candidate is resolved.
+
+Within-episode self-revision is in scope. **Explicit correction of an
+already stored durable memory is out of scope** and remains governed by
+existing architecture hard gates.
+
+There is no required canonical order for semantic components. As authoring
+concepts only, one conversation may express behavior then timing, another
+timing then behavior, and another interleave behavior, scope, timing, and
+finality. This is **source-discourse diversity**, not post-hoc augmentation
+by random permutation. Do not randomly reorder a completed bundle for
+primary training/evaluation; model input preserves authored conversational
+order.
+
+#### CLOSED — approximation is not unresolved ambiguity
+
+**Vagueness / approximation != unresolved ambiguity.** Expressions such as
+`정도`, `쯤`, `약`, `한`, `대략`, `3~4회`, `한두 번`, and equivalent English
+or mixed-language approximations do not by themselves require ESCALATE.
+A deliberately approximate point/range can be CLEAR when it expresses one
+sufficiently coherent state for downstream classification. Materially
+different unresolved candidate states—e.g. weekly versus biweekly without
+a final resolution—require ESCALATE. How approximation is represented in
+a downstream extraction schema is outside B6 and is not decided by the
+ambiguity stage.
+
+#### CLOSED — language, candidate over-generation, and HUMAN review
+
+The **new 380** must have exactly **266 Korean (70%)**, **76 natural
+Korean/English mixed (20%)**, and **38 English (10%)** cases. Mixed-language
+coverage must resemble plausible conversation, not awkward token-level
+language mixing.
+
+Generate **approximately 500 candidates**, not exactly 380 presumed-perfect
+items. Approximate candidate-stage coverage should reflect fragment counts,
+CLEAR/ESCALATE balance, semantic boundary families, clean/dirty discourse,
+varied discourse ordering, and language distribution. Only the final
+accepted 380 must meet the exact frozen totals above. Semantic-family and
+clean/dirty proportions are generation guidance, **not exact final quotas**.
+After HUMAN review, retain the natural accepted distribution unless a
+semantic family or important discourse class becomes materially
+underrepresented.
+
+While assigning HUMAN gold, the reviewer must not see the generator's
+intended label or family. Review records have independent decisions:
+**KEEP / FIX / REJECT** and **CLEAR / ESCALATE**.
+Difficult but human-resolvable cases may be kept. Ill-defined gold,
+incoherent candidate targets, or implausible conversational evidence should
+be rejected, not relabeled ESCALATE to retain the item. FIX cases must be
+reviewed again on their **final edited evidence** before final gold freezes.
+
+#### CLOSED — leakage and final held-out protection
+
+TRAIN / DEV / FINAL HELD-OUT must be separated by **semantic/template
+family**, not merely random rows. Near-paraphrases and simple entity/domain
+substitutions of the same semantic skeleton must not cross splits.
+The consumed historical 60 remain TRAIN-only permanently.
+
+FINAL HELD-OUT is not used for model or hyperparameter selection. Once its
+final evidence and HUMAN gold freeze, model outputs must not be used to
+replace, edit, or rebalance held-out cases.
+
+#### OPEN — required later decisions, not selected here
+
+The following remain explicitly **OPEN**; none is silently chosen by the
+dataset contract:
+
+- Exact approximately-500-case generation/authoring prompt, semantic-family
+  candidate allocation, and TRAIN/DEV/FINAL HELD-OUT family inventory.
+- Synthetic-data generation model/provider and exact HUMAN review UI/tool.
+- Base training checkpoint provenance; it **must be verified before
+  training**, but no checkpoint is selected here.
+- SFT/LoRA implementation stack or mechanism selection, LoRA rank, target
+  modules, learning rate, batch size/gradient accumulation, epochs/max
+  steps, optimizer, and quantization/training precision.
+- Checkpoint-selection rule and stopping rule.
+- Final standalone ambiguity acceptance thresholds and full-hybrid
+  fresh-held-out acceptance/adoption rule.
+- Adapter merge/GGUF conversion, deployment, or production authorization.
+- Raw-episode evaluation and private natural XION replay.
+
+Next step: close the **candidate authoring/generation contract**, not start
+training. The prospective policy still permits training as an informative,
+separately preregistered intervention without a general untuned-performance
+entry gate. Before execution, provenance, split, mechanism, metrics,
+no-leakage controls, and stopping rules must all be frozen. Strict
+performance/safety gates belong to later held-out/adoption decisions.
+Training execution, raw episodes, and private replay remain **UNOPENED**;
+production memory/parsing, DB/Vault/retrieval/routing, authority, identity,
+explicit correction, Core/high-impact gates, and architecture contracts
+remain unchanged.
