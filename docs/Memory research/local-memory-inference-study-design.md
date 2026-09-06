@@ -3578,18 +3578,27 @@ bounded experiment's design, not training execution.
 
 ### P1-B6 1.7B ambiguity specialist supervised adaptation
 
-**DESIGN OPEN / DATASET CONTRACT PARTIALLY PREREGISTERED.** The dataset
-decisions explicitly marked CLOSED below are frozen user decisions.
-This is **not a complete training preregistration**, not authorization to
-generate the dataset or execute training in this documentation task, and
-not production authorization. No new case, HUMAN adjudication, model output,
-or training artifact is created here.
+**DATASET CONTRACT CLOSED / TRAINING PREREGISTRATION INCOMPLETE / NOT RUN.**
+This prospective consolidation was reviewed against Galpi `main` at
+`9e1203c46e69b30040678d317c34c92cb3cb0971`. The dataset decisions marked
+CLOSED below are frozen user decisions. Training, model selection, dataset
+generation, review-tool implementation, and production use remain
+unauthorized. No new case, HUMAN adjudication, model output, or training
+artifact is created here.
 
 The research target is adaptation of **only the ~1.7B ambiguity/escalation
-stage**: determine whether already-selected evidence has one sufficiently
-clear interpretation for downstream durability classification or requires
-`ESCALATE`. It must **not decide durability itself**. The 4B durability
-triage and extraction stages are not opened for training.
+stage**. Given an already-selected, candidate-centered conversational
+evidence bundle, it decides whether the evidence has a sufficiently resolved
+interpretation for downstream durability classification. Output is exactly
+`CLEAR` or `ESCALATE`. `CLEAR` does **not** mean durable or memory-worthy:
+clearly temporary, approximate, test-only, example-only, or non-user-state
+evidence can be CLEAR when its interpretation is sufficiently resolved.
+
+The specialist must not decide durability or WRITE/NO_WRITE, extract a final
+memory proposition/value, resolve ambiguity, perform identity/correction/
+Core-promotion/governance/authorization or another architecture hard gate,
+discover candidates from raw episodes, or define the future Evidence Bundle
+Builder. The 4B durability and extraction stages are not opened for training.
 
 The motivating B5 failure analysis concerns observed behavior, not an
 internal model mechanism: the dominant clean root failure was the 1.7B
@@ -3599,42 +3608,139 @@ referent/scope/applicability/temporal evidence falsely cleared. This bounded
 failure profile motivates experimental adaptation; it does not overturn
 the B5 successor disposition or demonstrate that training will succeed.
 
-#### CLOSED — historical consumed data and corpus sizes
+#### CLOSED — supervised corpus and historical diagnostic separation
 
-All **60 historical P1-B3/B4/B5 cases** are consumed evaluation data
-intentionally permitted as **TRAIN ONLY** for B6, permanently excluded
-from DEV and FINAL HELD-OUT. Include all 60; preserve their original
-bounded evidence bytes and provenance. Training inputs must not contain
-historical model decisions, failure labels, mismatch notes, or model-specific
-error annotations. Derive Stage-1 labels deterministically from the final
-resolved HUMAN class-gold artifact, not construction authoring targets:
+The previous decision to add the consumed historical P1-B3 60 cases to
+supervised TRAIN is **REOPENED AND SUPERSEDED**. P1-B6 supervised learning
+uses only the newly authored anchor-centered conversational corpus:
 
-| Final resolved HUMAN class gold | B6 ambiguity label |
-|---|---|
-| NO_WRITE | CLEAR |
-| WRITE_CANDIDATE | CLEAR |
-| ESCALATE | ESCALATE |
+| Split | Final supervised cases |
+|---|---:|
+| TRAIN | 240 |
+| DEV | 60 |
+| FINAL HELD-OUT | 80 |
+| Total | 380 |
 
-The authority remains
-`fixtures/local-memory-inference-p1b3-human-resolved-labels.json`
-(`xion-local-memory-inference-p1b3-human-resolved-labels-v1`).
-No new adjudication of those historical cases is performed here.
+The historical 60 are excluded from supervised TRAIN, DEV, FINAL HELD-OUT,
+and checkpoint/hyperparameter selection. Preserve them byte-for-byte as a
+historical diagnostic/regression corpus. Do not invent turn, speaker,
+fragment, anchor, or source-episode provenance to make those flat historical
+cases fit the new serving schema. They may later compare base versus adapted
+behavior on already observed/simple failure boundaries, but are consumed
+evidence and must never be represented as fresh held-out evaluation.
 
-New synthetic data will be authored and frozen later:
+The 10 previously proposed historical semantic-skeleton groupings remain
+**historical reference skeletons only**: failure/coverage organization,
+near-duplicate detection while authoring new skeletons, regression grouping,
+and prevention of trivial repackaging of old cases. They are not supervised
+TRAIN-reserved structures and are not part of the new 56-skeleton catalog.
+No missing identity or content for those reference groupings is synthesized
+by this documentation update.
 
-| Split | New cases | Historical cases | Final size |
-|---|---:|---:|---:|
-| TRAIN | 240 | 60 | 300 |
-| DEV | 60 | 0 | 60 |
-| FINAL HELD-OUT | 80 | 0 | 80 |
-| Total | 380 | 60 | 440 |
+The final supervised 380 must contain exactly **190 CLEAR and 190 ESCALATE**.
+No additional exact per-split or per-skeleton label quota is imposed.
 
-The **new 380**, collectively, must contain exactly **190 CLEAR and
-190 ESCALATE**. This does not impose an additional per-split label quota.
+#### CLOSED — supervised semantic-skeleton catalog
 
-#### CLOSED — conversational evidence bundles and fragment counts
+The final approved new catalog must contain exactly **56 semantic
+skeletons**; this freezes its inventory and split allocation, not a claim
+that the later authoring/review artifacts already exist:
 
-For the **new 380 only**, exact fragment-count case totals are:
+| Boundary class | TRAIN | DEV | FINAL HELD-OUT | Total |
+|---|---:|---:|---:|---:|
+| FINALITY / COMMITMENT | 3 | 2 | 2 | 7 |
+| REVISION / CONFLICT | 3 | 2 | 2 | 7 |
+| PERSISTENCE / EXCEPTION | 3 | 2 | 2 | 7 |
+| REFERENT | 3 | 2 | 2 | 7 |
+| SCOPE / APPLICABILITY | 3 | 2 | 2 | 7 |
+| ACTUALITY | 3 | 2 | 2 | 7 |
+| COMPLEMENTARY EVIDENCE | 3 | 2 | 2 | 7 |
+| APPROXIMATION / RANGE | 3 | 2 | 2 | 7 |
+| **Total** | **24** | **16** | **16** | **56** |
+
+Leakage hierarchy:
+
+```text
+boundaryClass
+    -> semanticSkeletonId
+        -> surfaceInstance
+```
+
+`semanticSkeletonId` is the semantic leakage unit. The same ability or
+boundary class may occur across splits, but the same semantic skeleton or a
+near-paraphrase may not. Domain, entity, value, number, language, lexical
+phrasing, or discourse order alone does not create a new skeleton when the
+decision-relevant semantic relation remains unchanged. If those details can
+be replaced by placeholders while preserving that relation, the items share
+one skeleton. `discoursePattern` is surface metadata unless order itself
+changes the semantic relation being judged. All variants in a contrast group
+stay in one split.
+
+Author approximately **70 abstract skeleton candidates** to retain exactly
+56 after HUMAN review; 70 is guidance, not an exact generation quota.
+Skeletons contain abstract semantic structure only. Recommended conceptual
+fields are `semanticSkeletonId`, `splitAssignment`, `boundaryClass`,
+`intendedLabel`, `candidateFocus`, `semanticRelations`, `decisionBasis`, and
+`contrastGroupId`. Here `candidateFocus` describes the semantic aspect under
+test; it is neither a source-derived memory proposition nor necessarily a
+serving-time field. Do not put concrete conversations, names, dates, numbers,
+domains, language assignments, fragment counts, durability labels,
+extraction schemas, or historical model output into semantic structure.
+
+**HUMAN skeleton review Pass 1.** Show only semantic content needed to judge
+the structure, such as candidate focus and semantic relations. Hide generator
+intended label, boundary class, split, decision basis, contrast group, and
+historical-similarity metadata. The reviewer independently chooses
+`KEEP / FIX / REJECT` and `CLEAR / ESCALATE`. Difficult but human-resolvable
+structures may remain. If the abstract structure lacks stable HUMAN
+ambiguity gold, reject it rather than treating ill-defined gold as useful
+difficulty. A FIX receives a new blind review after editing; its prior HUMAN
+label is not inherited. Generator intent is not authority.
+
+**HUMAN skeleton review Pass 2.** After Pass-1 labels freeze, conduct a
+catalog-level leakage/coverage audit covering historical-reference and
+cross-split near-paraphrases, domain/entity/value substitution equivalence,
+duplicate semantic relations under different wording, trivial lexical
+shortcuts, natural realizability, and per-split boundary-class coverage.
+A model may suggest duplicate pairs; HUMAN review is final authority. If two
+cross-split entries are effectively the same skeleton, retain the more useful
+natural structure and author a genuinely different replacement for the
+deficient split. An accepted surface realization must retain its approved
+skeleton HUMAN label; an opposite blind surface label requires FIX/re-review
+or rejection, not silent reassignment.
+
+#### CLOSED — serving-shape, anchors, fragments, and future-builder boundary
+
+A new surface item conceptually contains:
+
+```text
+source episode
++ anchorTurnRefs
++ 1..5 selected conversational fragments
++ one ambiguity gold
+```
+
+Do not require a derived natural-language candidate proposition as a
+serving field. Store source episodes with stable episode and turn identities;
+source turns remain evidence and are not rewritten into candidate
+propositions. One episode may yield 0..N candidate-centered items, and one
+source turn may legitimately participate in multiple separately adjudicated
+items. For example, a USER turn mentioning both a new exercise intention and
+a new study intention may ground an exercise-centered item and a study-
+centered item when later evidence develops each separately. This overlap is
+expected, not leakage within the split.
+
+`anchorTurnRefs` reference **complete source turns**, not substrings,
+character offsets, extracted clauses, or rewritten propositions. At least one
+anchor is a USER turn. Assistant anchor/context turns may supply a question,
+referent, or conversational context, but an assistant statement cannot
+independently become user-state authority. Anchors identify and ground the
+expression/state/question under ambiguity judgment without pre-resolving its
+referent, scope, persistence, or other interpretation. Consequently, a
+grounded target with unresolved referent remains a valid `ESCALATE` item;
+the anchor contract must not make REFERENT ambiguity impossible.
+
+For the final supervised 380, exact fragment-count case totals are:
 
 | Conversational evidence fragments | Cases |
 |---:|---:|
@@ -3645,16 +3751,20 @@ For the **new 380 only**, exact fragment-count case totals are:
 | 5 | 20 |
 | Total | 380 |
 
-A fragment is a **short contiguous conversational source span** relevant
-to one memory candidate, not a sentence count or rewritten summary.
-The intended serving shape is conversational evidence, normally preserving
-assistant + user interaction where that context is required to interpret
-the user's statement.
+A fragment is a **short contiguous conversational source span** relevant to
+the one anchor-defined ambiguity target, not a sentence count or rewritten
+summary. It may contain one or more consecutive turns. Items have 1–5
+fragments; fragments preserve source chronology and are never post-hoc
+shuffled. Every selected fragment must be materially relevant to interpreting
+the target.
 
 **One item = one candidate/state/question** for ambiguity classification.
-A case may contain 1–5 fragments, but all must concern that same candidate;
-independent memory candidates must not share one gold decision.
-P1-B6 assumes the relevant evidence bundle has already been selected.
+A source turn may contain incidental or overlapping information about other
+memory candidates without invalidating the item. The hard prohibition is
+that independent targets must not silently share one ambiguity gold. The
+same turn or episode may instead support multiple separately anchored and
+adjudicated items. P1-B6 assumes the relevant evidence bundle has already
+been selected.
 
 Determining which raw-conversation spans belong together is a later
 **Evidence Bundle Builder** problem, outside B6. A possible future component
@@ -3662,7 +3772,38 @@ could read raw context, locate multiple relevant spans, and return source
 references/verbatim evidence with provenance rather than a newly interpreted
 summary. That component is **not opened, specified, or selected here**.
 B6 neither trains nor evaluates raw-episode evidence discovery, and this
-section opens no raw-episode experiment or bundler implementation.
+section opens no raw-episode experiment or bundler implementation. Only these
+interface-relevant observations are retained: one episode can produce 0..N
+bundles; bundles can overlap in source turns; temporally distant spans can
+belong to one candidate bundle; and candidate-discovery failure is distinct
+from downstream `NO_WRITE`. Candidate discovery, thread tracking,
+coreference, and bundle construction remain future research questions; no
+algorithm, model, heuristic, service, or production architecture is selected.
+
+Recommended source-normalized storage shape, **conceptual only**:
+
+```text
+sourceEpisodes:
+  sourceEpisodeId
+  splitAssignment
+  ordered source turns
+
+items:
+  itemId
+  sourceEpisodeId
+  semanticSkeletonId
+  anchorTurnRefs
+  1..5 fragment definitions referencing source turns
+  authoring metadata
+  HUMAN review/gold metadata in its appropriate artifact/layer
+```
+
+Source text has one canonical representation rather than separate anchor-
+text copies. Every anchor reference must point to a turn contained in the
+item's selected evidence. Exact JSON filenames, review-receipt schemas,
+canonical serialization/hashing, and renderer implementation remain for the
+subsequent dataset/review-tool implementation design; these details are not
+architecture semantics.
 
 #### CLOSED — realistic discourse and authored order
 
@@ -3693,8 +3834,9 @@ order.
 #### CLOSED — approximation is not unresolved ambiguity
 
 **Vagueness / approximation != unresolved ambiguity.** Expressions such as
-`정도`, `쯤`, `약`, `한`, `대략`, `3~4회`, `한두 번`, and equivalent English
-or mixed-language approximations do not by themselves require ESCALATE.
+`정도`, `쯤`, `약`, `한`, `대략`, `주 4회 정도`, `3~4회`, `한두 번`,
+`about`, `around`, `roughly`, and equivalent mixed-language approximations
+do not by themselves require ESCALATE.
 A deliberately approximate point/range can be CLEAR when it expresses one
 sufficiently coherent state for downstream classification. Materially
 different unresolved candidate states—e.g. weekly versus biweekly without
@@ -3702,68 +3844,145 @@ a final resolution—require ESCALATE. How approximation is represented in
 a downstream extraction schema is outside B6 and is not decided by the
 ambiguity stage.
 
-#### CLOSED — language, candidate over-generation, and HUMAN review
+#### CLOSED — language and surface authoring pool
 
 The **new 380** must have exactly **266 Korean (70%)**, **76 natural
 Korean/English mixed (20%)**, and **38 English (10%)** cases. Mixed-language
 coverage must resemble plausible conversation, not awkward token-level
 language mixing.
 
-Generate **approximately 500 candidates**, not exactly 380 presumed-perfect
-items. Approximate candidate-stage coverage should reflect fragment counts,
-CLEAR/ESCALATE balance, semantic boundary families, clean/dirty discourse,
-varied discourse ordering, and language distribution. Only the final
-accepted 380 must meet the exact frozen totals above. Semantic-family and
-clean/dirty proportions are generation guidance, **not exact final quotas**.
-After HUMAN review, retain the natural accepted distribution unless a
-semantic family or important discourse class becomes materially
-underrepresented.
+Author approximately **500 surface candidates**—roughly 315 TRAIN, 80 DEV,
+and 105 FINAL HELD-OUT—to retain the exact final split sizes. These are
+generation directions, not exact pool quotas. Do not force exact per-
+skeleton candidate counts. Approximate generation-stage fragment targets
+may be 92 / 132 / 158 / 92 / 26 for 1 / 2 / 3 / 4 / 5 fragments; only the
+accepted 380 must satisfy the exact final constraints.
 
-While assigning HUMAN gold, the reviewer must not see the generator's
-intended label or family. Review records have independent decisions:
-**KEEP / FIX / REJECT** and **CLEAR / ESCALATE**.
-Difficult but human-resolvable cases may be kept. Ill-defined gold,
-incoherent candidate targets, or implausible conversational evidence should
-be rejected, not relabeled ESCALATE to retain the item. FIX cases must be
-reviewed again on their **final edited evidence** before final gold freezes.
+Semantic-family and clean/dirty proportions beyond the hard constraints are
+generation guidance, not exact surface quotas. Subject to those hard
+constraints, retain the natural accepted distribution unless a semantic
+family or important discourse class becomes materially underrepresented.
 
-#### CLOSED — leakage and final held-out protection
+Within a skeleton, surface instances must differ in meaningful evidence
+realization, not merely nouns, numbers, or paraphrases. Vary where natural:
+fragment count, assistant involvement, evidence distribution, explicit
+versus elliptical replies, context-first/conclusion-first order, progressive
+refinement, return to topic, self-revision, temporary side context, language,
+surface domain, and location of resolving evidence.
 
-TRAIN / DEV / FINAL HELD-OUT must be separated by **semantic/template
-family**, not merely random rows. Near-paraphrases and simple entity/domain
-substitutions of the same semantic skeleton must not cross splits.
-The consumed historical 60 remain TRAIN-only permanently.
+Keep these `discoursePattern` metadata candidates: `CANONICAL`,
+`CONTEXT_FIRST`, `CONCLUSION_FIRST`, `INTERLEAVED`,
+`PROGRESSIVE_REFINEMENT`, `SELF_REVISION`, `RETURN_TO_TOPIC`, and
+`ELLIPTICAL_REPLY`. They are authoring metadata, not model input or semantic
+leakage identity.
 
-FINAL HELD-OUT is not used for model or hyperparameter selection. Once its
-final evidence and HUMAN gold freeze, model outputs must not be used to
-replace, edit, or rebalance held-out cases.
+#### CLOSED — primary HUMAN surface review
+
+The primary reviewer sees only the actual item's anchor source turns and
+selected evidence fragments. Hide intended label, semantic skeleton ID,
+boundary class, split, surface domain, discourse-pattern label, and generator
+rationale. Judgment uses only the selected evidence that the P1-B6 model
+would receive; unseen source-episode turns cannot determine gold. If required
+information exists only in an unselected turn, FIX or reject the item.
+
+The reviewer independently chooses `KEEP / FIX / REJECT` and
+`CLEAR / ESCALATE`; HUMAN gold is authoritative. Difficult but human-
+resolvable cases may remain. Ill-defined gold, incoherent targets, or
+implausible conversation must be rejected rather than converted to
+ESCALATE. A surface label opposite to its approved skeleton HUMAN label
+cannot remain an accepted realization without FIX/re-review or rejection.
+A FIX is blindly re-reviewed on its final edited evidence/anchors; neither
+the previous HUMAN label nor generator intent is inherited.
+
+#### CLOSED — two independent split-leakage protections
+
+Both constraints are mandatory:
+
+```text
+semantic-skeleton split integrity
++ source-episode split integrity
+```
+
+Near-paraphrases or simple entity/domain substitutions of one semantic
+skeleton cannot cross splits. Independently, **all items derived from one
+`sourceEpisodeId` belong to the same TRAIN/DEV/FINAL HELD-OUT split**. One
+episode cannot contribute, for example, an exercise item to TRAIN and a study
+item to FINAL HELD-OUT, because that leaks held-out source text. Assign split
+at source-episode/family authoring time before surface generation rather than
+row-random item splitting. Historical reference skeletons also participate
+in near-duplicate detection even though the historical 60 are excluded from
+every supervised split and from selection.
+
+#### CLOSED — FINAL HELD-OUT repeated blind HUMAN pass
+
+After primary review and evidence freeze for the final 80 held-out items:
+
+1. Opaquely reorder the items.
+2. The same HUMAN reviewer performs a second blind pass.
+3. Hide the first HUMAN label and disposition, generator intended label,
+   and family/skeleton metadata.
+4. Record disagreements.
+5. Re-review the underlying evidence visible to the model to resolve them.
+6. Freeze final HUMAN gold.
+
+This is a **blind repeated HUMAN pass**, not an independent second reviewer.
+Only after held-out evidence and final HUMAN gold freeze may any model output
+be inspected. FINAL HELD-OUT is never used for checkpoint/hyperparameter
+selection. After model output is seen, do not edit, replace, or rebalance
+held-out evidence/items.
+
+#### CLOSED — deterministic final selection
+
+After the accepted pool freezes, choose the final 380 through deterministic,
+constrained, non-interactive selection—not aesthetic hand-picking. Hard
+constraints are:
+
+- TRAIN 240, DEV 60, FINAL HELD-OUT 80;
+- CLEAR 190 and ESCALATE 190 overall;
+- exact overall fragment-count and language totals;
+- all 56 approved new skeletons represented by at least one final surface
+  instance;
+- source-episode split integrity and semantic-skeleton split integrity.
+
+Use a reproducible ranking/tie-break based on canonical item identity/hash
+or another explicitly reproducible mechanism. Exact serialization, hash,
+and solver implementation are selected later. If no valid 380-case subset
+exists, **FAIL CLOSED**: report the deficient region, author more cases for
+it, blind-review them, refreeze the accepted pool, and rerun deterministic
+selection. Do not force favored items into the dataset.
 
 #### OPEN — required later decisions, not selected here
 
 The following remain explicitly **OPEN**; none is silently chosen by the
 dataset contract:
 
-- Exact approximately-500-case generation/authoring prompt, semantic-family
-  candidate allocation, and TRAIN/DEV/FINAL HELD-OUT family inventory.
-- Synthetic-data generation model/provider and exact HUMAN review UI/tool.
-- Base training checkpoint provenance; it **must be verified before
-  training**, but no checkpoint is selected here.
-- SFT/LoRA implementation stack or mechanism selection, LoRA rank, target
-  modules, learning rate, batch size/gradient accumulation, epochs/max
-  steps, optimizer, and quantization/training precision.
-- Checkpoint-selection rule and stopping rule.
-- Final standalone ambiguity acceptance thresholds and full-hybrid
-  fresh-held-out acceptance/adoption rule.
+- Exact synthetic generation prompt, model/provider, model version,
+  settings, and temperature.
+- Exact HUMAN review UI/tool implementation and exact model-visible text
+  serialization/renderer.
+- Base 1.7B training-checkpoint provenance and final checkpoint choice;
+  provenance must be verified before training.
+- SFT/LoRA framework or mechanism, LoRA rank, target modules, learning rate,
+  optimizer, batch size/gradient accumulation, epochs/max steps, and
+  quantization/training precision.
+- Checkpoint-selection rule and training stopping rule.
+- Standalone ambiguity acceptance thresholds and full-hybrid fresh-held-out
+  acceptance/adoption rule.
 - Adapter merge/GGUF conversion, deployment, or production authorization.
+- Future raw Evidence Bundle Builder implementation and future candidate-
+  discovery/coreference/thread-tracking algorithm.
 - Raw-episode evaluation and private natural XION replay.
 
-Next step: close the **candidate authoring/generation contract**, not start
-training. The prospective policy still permits training as an informative,
-separately preregistered intervention without a general untuned-performance
-entry gate. Before execution, provenance, split, mechanism, metrics,
-no-leakage controls, and stopping rules must all be frozen. Strict
-performance/safety gates belong to later held-out/adoption decisions.
-Training execution, raw episodes, and private replay remain **UNOPENED**;
-production memory/parsing, DB/Vault/retrieval/routing, authority, identity,
-explicit correction, Core/high-impact gates, and architecture contracts
-remain unchanged.
+The user intends to choose the training environment and execute training
+interactively with ChatGPT later; this documentation task does not delegate
+or preselect those decisions. Next step is the **dataset/review-tool
+implementation design**—including the exact generation contract,
+serialization, review receipts, and deterministic selector—followed by the
+remaining training preregistration, not training itself. The prospective
+policy still permits a separately preregistered intervention without a
+general untuned-performance entry gate. Before execution, provenance,
+mechanism, metrics, leakage controls, checkpoint selection, and stopping
+rules must be frozen. Training execution, raw episodes, and private replay
+remain **UNOPENED**. Production memory/parsing, DB/Vault/retrieval/routing,
+authority, identity, explicit correction, Core/high-impact gates, and
+architecture contracts remain unchanged.
