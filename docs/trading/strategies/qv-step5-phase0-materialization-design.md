@@ -846,8 +846,14 @@ production locator 계약으로 주소 지정되지 않는 embedded layout
 ```text
 유일한 source-backed SEQUENCE  ->  embedded 문서가 addressable하다
 누락·중복·비숫자·비양수 SEQUENCE
-경계 손상 · 모호한 TEXT 구간   ->  fail-close · legacy_layout · INCOMPLETE
+짝이 맞지 않는 DOCUMENT 경계
+경쟁하는 TEXT 경계 토큰        ->  fail-close · legacy_layout · INCOMPLETE
 ```
+
+경계는 **위치 순서대로 한 번 훑어 정확히 짝지어야** 한다. 열림/닫힘이 남거나 순서가
+어긋나면 실패다 — 그 자리에서 하나를 고르면 본문 한가운데의 줄 머리 `</TEXT>` 뒤가
+조용히 잘린 채 그 바이트가 자식 SHA가 된다. **줄 머리가 아닌 인라인 문자열은 여전히
+경계가 아니다.**
 
 문서 주소 계약은 Step 4 §1.2의 typed locator 하나다.
 

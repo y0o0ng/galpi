@@ -40,6 +40,11 @@ from tests.qv_step4_fixtures import (  # noqa: E402
     seed_price,
 )
 
+# typed document locator **직전**의 스키마 commit. migration fixture는 이 고정
+# revision에서 옛 DDL을 읽는다 — `HEAD`로 두면 구현이 커밋되는 순간 fixture가 새
+# 스키마가 되어 migration 회귀가 스스로를 검사하지 않게 된다.
+PRE_LOCATOR_SCHEMA_COMMIT = "9684eee05307973041732a6524ad23b5b5deb0a6"
+
 SHARES_SOURCE = "sec-xbrl"
 SHARES_VERSION = "shares-v1"
 EVENTS_VERSION = "events-v1"
@@ -388,8 +393,15 @@ class MigrationTest(unittest.TestCase):
         )
         connection.close()
 
-    def _pre_locator_db(self, *, rows=True, unknown=False, revision="HEAD"):
-        """typed locator 이전 스키마의 DB. **증거 행을 미리 넣어 둔다.**"""
+    def _pre_locator_db(self, *, rows=True, unknown=False,
+                        revision=PRE_LOCATOR_SCHEMA_COMMIT):
+        """typed locator 이전 스키마의 DB. **증거 행을 미리 넣어 둔다.**
+
+        **revision은 고정 commit이지 `HEAD`가 아니다.** `HEAD`로 두면 이 구현이
+        커밋되는 순간 fixture가 새 스키마를 들고 와서, migration을 검사한다고 적힌
+        테스트가 아무것도 검사하지 않게 된다(알 수 없는 스키마 변조가 no-op이 되고
+        임시표 blocker도 옮길 표가 없어 지나간다).
+        """
         import subprocess
         old = subprocess.run(
             ["git", "show", f"{revision}:trading/backtest/schema.sql"],
@@ -398,14 +410,21 @@ class MigrationTest(unittest.TestCase):
         ).stdout
         if not old:
             self.skipTest("이전 스키마를 git에서 읽을 수 없다")
+        # fixture가 정말 locator 이전 스키마인가. 여기서 확인하지 않으면 위 계약이
+        # 조용히 깨져도 테스트가 통과한다.
+        self.assertNotIn("document_sequence", old)
         if unknown:
-            old = old.replace(
+            mutated = old.replace(
                 "  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),\n"
                 "  form TEXT NOT NULL CHECK (length(trim(form)) > 0),",
                 "  document_name TEXT NOT NULL,\n  surprise TEXT,\n"
                 "  form TEXT NOT NULL CHECK (length(trim(form)) > 0),",
                 1,
             )
+            # 변조가 실제로 적용됐는가. 안 되면 "알 수 없는 스키마" 테스트가 그냥
+            # 알려진 스키마를 검사하게 된다.
+            self.assertNotEqual(mutated, old)
+            old = mutated
         tmp = tempfile.mkdtemp()
         connection = sqlite3.connect(Path(tmp) / store.BACKTEST_DB_NAME)
         connection.executescript(old)
@@ -443,6 +462,16 @@ class MigrationTest(unittest.TestCase):
     def test_existing_evidence_rows_survive_the_locator_migration(self):
         """행이 있어도 drop하지 않는다. **의미 손실 없이 sequence = NULL이 붙는다.**"""
         tmp = self._pre_locator_db()
+        # migration 전: 두 표 어디에도 locator 칸이 없다.
+        before = sqlite3.connect(Path(tmp) / store.BACKTEST_DB_NAME)
+        before.row_factory = sqlite3.Row
+        for table in ("qv_identity_evidence", "qv_sec_evidence_documents"):
+            columns = {
+                row["name"] for row in before.execute(f"PRAGMA table_info({table})")
+            }
+            self.assertNotIn("document_sequence", columns, table)
+        before.close()
+
         connection = store.connect(tmp)
         for table in ("qv_identity_evidence", "qv_sec_evidence_documents"):
             rows = connection.execute(f"SELECT * FROM {table}").fetchall()

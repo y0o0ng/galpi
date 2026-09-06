@@ -35,6 +35,7 @@ from backtest.qv_sec_embedded import (  # noqa: E402,F401 — 기존 fixture가 
     NON_NUMERIC_SEQUENCE,
     NON_POSITIVE_SEQUENCE,
     NO_DOCUMENTS,
+    UNMATCHED_DOCUMENT_CLOSE,
     AccessionDecomposition,
     EmbeddedChild,
     decompose,

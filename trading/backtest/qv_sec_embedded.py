@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 
 # ── 실패 코드 — 고치지 않고 그대로 적는다. 하나라도 있으면 fail-close다. ────
 MISSING_DOCUMENT_CLOSE = "MISSING_DOCUMENT_CLOSE"
+UNMATCHED_DOCUMENT_CLOSE = "UNMATCHED_DOCUMENT_CLOSE"
 NESTED_DOCUMENT = "NESTED_DOCUMENT"
 MISSING_TYPE = "MISSING_TYPE"
 EMPTY_TYPE = "EMPTY_TYPE"
@@ -114,27 +115,42 @@ def _field_in(block: bytes, name: str) -> tuple[str | None, bool]:
 
 
 def _outer_document_spans(raw: bytes) -> tuple[list[tuple[int, int]], list[str]]:
-    """겹치지 않는 바깥 `<DOCUMENT>` 구간. 중첩은 고치지 않고 실패로 적는다."""
-    opens = [m for m in _DOC_OPEN.finditer(raw)]
-    closes = [m for m in _DOC_CLOSE.finditer(raw)]
+    """겹치지 않는 바깥 `<DOCUMENT>` 구간. 손상된 경계는 고치지 않고 실패로 적는다.
+
+    경계 토큰을 **위치 순서대로 한 번** 훑는 상태 기계다. 열림/닫힘이 정확히 짝지어야
+    하고, 그렇지 않은 모양은 전부 실패다.
+
+    ```text
+    열려 있는데 또 열린다  -> NESTED_DOCUMENT
+    안 열렸는데 닫힌다     -> UNMATCHED_DOCUMENT_CLOSE   (남는 닫힘도 여기다)
+    열린 채로 끝난다       -> MISSING_DOCUMENT_CLOSE
+    ```
+
+    **짝이 남는 닫힘을 무시하지 않는다.** 무시하면 열림 하나에 닫힘 둘인 문서가
+    조용히 첫 닫힘까지만 잘려 그 잘린 바이트가 자식 SHA가 된다.
+    """
+    tokens = sorted(
+        [(match.start(), True) for match in _DOC_OPEN.finditer(raw)]
+        + [(match.start(), False) for match in _DOC_CLOSE.finditer(raw)]
+    )
     failures: list[str] = []
     spans: list[tuple[int, int]] = []
-    close_at = [m.start() for m in closes]
-    used = 0
-    for index, opener in enumerate(opens):
-        following = [c for c in close_at if c > opener.start()]
-        if not following:
+    opened: int | None = None
+    for position, is_open in tokens:
+        if is_open:
+            if opened is not None:
+                failures.append(NESTED_DOCUMENT)
+                break
+            opened = position
+        else:
+            if opened is None:
+                failures.append(UNMATCHED_DOCUMENT_CLOSE)
+                break
+            spans.append((opened, position))
+            opened = None
+    else:
+        if opened is not None:
             failures.append(MISSING_DOCUMENT_CLOSE)
-            break
-        end = following[0]
-        # 다음 `<DOCUMENT>`가 이 닫힘보다 먼저 오면 중첩이다.
-        if index + 1 < len(opens) and opens[index + 1].start() < end:
-            failures.append(NESTED_DOCUMENT)
-            break
-        spans.append((opener.start(), end))
-        used += 1
-    if used < len(opens) and MISSING_DOCUMENT_CLOSE not in failures and NESTED_DOCUMENT not in failures:
-        failures.append(MISSING_DOCUMENT_CLOSE)
     return spans, failures
 
 
@@ -179,30 +195,30 @@ def decompose(raw: bytes) -> AccessionDecomposition:
 
         text_start = text_end = None
         text_sha = None
+        # **payload 경계는 정확히 한 쌍이어야 한다.** 경쟁하는 경계 토큰이 둘 이상이면
+        # 어느 것이 진짜인지 고르지 않는다 — 고르면 본문 한가운데의 줄 머리 `</TEXT>`
+        # 뒤가 조용히 잘린 채로 그 자식의 SHA가 된다.
         if not text_opens:
             failures.append(MISSING_TEXT_OPEN)
+        elif not text_closes:
+            failures.append(MISSING_TEXT_CLOSE)
+        elif len(text_opens) > 1 or len(text_closes) > 1:
+            failures.append(AMBIGUOUS_TEXT)
+        elif text_closes[0].start() < text_opens[0].end():
+            # 닫힘이 열림보다 앞이면 이 문서에는 닫힌 payload가 없다.
+            failures.append(MISSING_TEXT_CLOSE)
         else:
-            if len(text_opens) > 1:
-                failures.append(AMBIGUOUS_TEXT)
-            if not text_closes:
-                failures.append(MISSING_TEXT_CLOSE)
+            # `<TEXT>` 줄의 개행 다음부터 `</TEXT>` 줄 시작 앞까지가 payload다.
+            payload_start = text_opens[0].end()
+            while payload_start < len(block) and block[payload_start:payload_start + 1] in (b"\r", b"\n"):
+                payload_start += 1
+            payload_end = text_closes[0].start()
+            text_start = start + payload_start
+            text_end = start + payload_end
+            if not (start <= text_start <= text_end <= end):
+                failures.append(CHILD_RANGE_OUTSIDE_PARENT)
             else:
-                open_end = text_opens[0].end()
-                closing = [c for c in text_closes if c.start() >= open_end]
-                if not closing:
-                    failures.append(MISSING_TEXT_CLOSE)
-                else:
-                    # `<TEXT>` 줄의 개행 다음부터 `</TEXT>` 줄 시작 앞까지가 payload다.
-                    payload_start = open_end
-                    while payload_start < len(block) and block[payload_start:payload_start + 1] in (b"\r", b"\n"):
-                        payload_start += 1
-                    payload_end = closing[0].start()
-                    text_start = start + payload_start
-                    text_end = start + payload_end
-                    if not (start <= text_start <= text_end <= end):
-                        failures.append(CHILD_RANGE_OUTSIDE_PARENT)
-                    else:
-                        text_sha = sha256_bytes(raw[text_start:text_end])
+                text_sha = sha256_bytes(raw[text_start:text_end])
 
         out.children.append(EmbeddedChild(
             ordinal=ordinal, document_type=document_type,

@@ -4344,6 +4344,89 @@ embedded documents 10 / 47   document_name = null · document_sequence = 2·3
 자식은 위 분류대로 governing class 정의를 만들지 않았다 — **결과를 보고 문법이나
 semantics를 조정하지 않았다.**
 
+### 리뷰 수정 — 2026-09-07
+
+리뷰가 잡은 둘을 고쳤다. **계약은 그대로다** — typed locator · 자연키 · source kind ·
+raw child SHA · 부모 URL · bundle v3 · legal semantics 하나도 건드리지 않았다.
+
+#### 1. migration fixture가 움직이는 `HEAD`를 옛 스키마로 쓰고 있었다
+
+`_pre_locator_db()`의 기본 revision이 `HEAD`였다. 구현이 커밋되기 **전**에는 그것이
+locator 이전 스키마였지만, `8a2003c`가 커밋된 뒤에는 `HEAD`가 v3 스키마다.
+
+**그래서 커밋된 HEAD에서 migration 회귀 두 개가 실제로 깨졌다.**
+
+```text
+python3 -m unittest trading.tests.test_qv_step4   (at 8a2003c)
+  FAIL  test_an_unknown_evidence_schema_fails_closed
+  FAIL  test_a_blocked_locator_migration_changes_nothing
+```
+
+`8a2003c` receipt의 `2,047 PASS`는 **커밋 전 worktree**에서 나온 값이다(그때 `HEAD`는
+아직 `9684eee`였다). 그 값을 post-commit 검증으로 적은 것은 잘못이었다.
+
+fixture를 고정 상수로 못박았다.
+
+```text
+PRE_LOCATOR_SCHEMA_COMMIT = "9684eee05307973041732a6524ad23b5b5deb0a6"
+```
+
+fixture가 정말 locator 이전 스키마인지(`document_sequence`가 없는지)와, "알 수 없는
+스키마" 변조가 **실제로 적용됐는지**를 fixture 안에서 확인한다 — 둘 다 조용히 깨지면
+테스트가 아무것도 검사하지 않게 되는 자리다. migration 전 두 표에 `document_sequence`
+칸이 없다는 것도 이제 명시로 확인한다. 4c79a74 pre-`ISSUER` 어휘 케이스는 별도
+historical 케이스로 그대로 둔다. **production migration semantics는 손대지 않았다.**
+
+#### 2. 짝이 남는 SGML 닫힘 경계가 조용히 지나갔다
+
+`<DOCUMENT>` 경계를 열림마다 "뒤의 첫 닫힘"으로 잡고 **남는 닫힘을 세지 않았다.**
+`</TEXT>`도 여러 개면 첫 것으로 잘랐다. 이전 parser로 실측한 결과다.
+
+```text
+</DOCUMENT>가 하나 더 있다        -> deterministic True   (무시됐다)
+</DOCUMENT>가 열림보다 먼저다     -> deterministic True   (무시됐다)
+줄 머리 </TEXT>가 둘이다          -> deterministic True
+                                     해시된 payload = b'first part\n'   ← 잘렸다
+```
+
+경계 검출을 **위치 순서대로 한 번 훑는 상태 기계**로 바꿨다.
+
+```text
+열려 있는데 또 열린다  -> NESTED_DOCUMENT
+안 열렸는데 닫힌다     -> UNMATCHED_DOCUMENT_CLOSE   (남는 닫힘도 여기다)
+열린 채로 끝난다       -> MISSING_DOCUMENT_CLOSE
+TEXT 경계 토큰이 둘 이상 -> AMBIGUOUS_TEXT · payload도 SHA도 만들지 않는다
+```
+
+`UNMATCHED_DOCUMENT_CLOSE`는 parser 내부 실패 코드일 뿐이고 **production 상태 어휘는
+그대로다** — 그 accession은 여전히 `legacy_layout:<accession>` · `INCOMPLETE`다.
+줄 머리가 아닌 인라인 `</TEXT>`·`</DOCUMENT>` 문자열은 여전히 경계가 아니다(기존
+fixture 유지). 복구도 "가장 그럴듯한 후보" 선택도 넣지 않았다.
+
+#### 실측 (이 수정이 커밋된 HEAD에서, 2026-09-07)
+
+```text
+python3 -m unittest trading.tests.test_qv_legacy_document_probe      26  PASS
+python3 -m unittest trading.tests.test_qv_identity_legal_evidence   225  PASS
+python3 -m unittest trading.tests.test_qv_identity_promotion         62  PASS
+python3 -m unittest trading.tests.test_qv_step4                     151  PASS
+python3 -m unittest discover -s trading/tests -p 'test_*.py'      2,050  PASS
+```
+
+가드를 하나씩 무력화해 실제로 잡는지 확인했다 — `UNMATCHED_DOCUMENT_CLOSE` 제거
+(2 실패) · 여러 `</TEXT>` 허용(1 실패) · fixture를 `HEAD`로 되돌림(3 실패).
+
+**엄격해진 경계가 known-good accession을 거부하지 않는다**(실제 SEC 재확인).
+
+```text
+0000320193 / 0000320193-99-000004  children 5 · deterministic · EX-3 sequence 2·3
+                                   parent SHA·자식 SHA 5개 모두 수정 전과 동일
+0000789019 / 0001032210-00-001019  children 2 · deterministic
+0000051143 / 0001005477-00-003871  children 5 · deterministic
+```
+
+**smoke 결과를 보고 parser 규칙을 조정하지 않았다.**
+
 ### 이 receipt가 주장하지 않는다
 
 - 672건 전수 legal 실행을 하지 않았다. 897건 제안 재실행도 하지 않았다.

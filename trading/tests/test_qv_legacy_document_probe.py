@@ -25,6 +25,7 @@ from backtest.qv_sec_embedded import (  # noqa: E402
     MISSING_TYPE,
     NESTED_DOCUMENT,
     NON_NUMERIC_SEQUENCE,
+    UNMATCHED_DOCUMENT_CLOSE,
     decompose,
     failure_reasons,
     sha256_bytes,
@@ -133,6 +134,38 @@ class LegacyProbeParserTest(unittest.TestCase):
         out = decompose(raw)
         self.assertFalse(out.structurally_deterministic)
         self.assertIn(NESTED_DOCUMENT, out.failures)
+
+    def test_an_extra_document_close_is_unmatched_not_ignored(self):
+        """짝이 남는 `</DOCUMENT>`를 무시하지 않는다.
+
+        무시하면 열림 하나에 닫힘 둘인 문서가 조용히 첫 닫힘까지만 잘린다.
+        """
+        raw = submission(document(b"EX-3", b"2", b"charter")) + b"</DOCUMENT>\n"
+        out = decompose(raw)
+        self.assertFalse(out.structurally_deterministic)
+        self.assertIn(UNMATCHED_DOCUMENT_CLOSE, out.failures)
+
+    def test_a_close_before_any_open_is_unmatched(self):
+        """열리지 않은 채 닫히는 경계도 실패다 — 뒤가 멀쩡해도 구조가 깨졌다."""
+        raw = (b"-----BEGIN PRIVACY-ENHANCED MESSAGE-----\n</DOCUMENT>\n"
+               + document(b"EX-3", b"2", b"charter") + b"\n")
+        out = decompose(raw)
+        self.assertFalse(out.structurally_deterministic)
+        self.assertIn(UNMATCHED_DOCUMENT_CLOSE, out.failures)
+
+    def test_a_second_text_close_makes_the_payload_ambiguous(self):
+        """줄 머리 `</TEXT>`가 둘이면 앞의 것으로 잘라 해시하지 않는다."""
+        body = b"first part\n</TEXT>\nremaining line that must not be silently discarded"
+        raw = submission(document(b"EX-3", b"2", body))
+        out = decompose(raw)
+        self.assertFalse(out.structurally_deterministic)
+        child = out.children[0]
+        self.assertIn(AMBIGUOUS_TEXT, child.failures)
+        # 잘린 payload를 해시하지 않는다 — 경계를 못 정했으면 내용도 없다.
+        self.assertIsNone(child.text_sha256)
+        self.assertIsNone(child.text_start)
+        self.assertNotIn(sha256_bytes(b"first part\n"),
+                         [item.text_sha256 for item in out.children])
 
     def test_missing_text_open_is_reported(self):
         raw = submission(document(b"EX-3", b"2", b"charter", text_open=False))
