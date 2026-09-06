@@ -676,6 +676,37 @@ class ForgedPacketTest(ManifestFixture, unittest.TestCase):
         with self.assertRaises(QVPromotionError):
             revalidate_packet(raw)
 
+    def test_the_typed_document_locator_is_revalidated(self):
+        """`KQ_FILING`은 이름만, `SEC_EVIDENCE_DOCUMENT`는 이름 XOR sequence다.
+
+        `"2"` 같은 문자열은 정수로 바꾸지 않고 거부한다 — silent coercion은 그 자리에
+        무엇이 있었는지를 지운다.
+        """
+        broken = (
+            {"document_name": None, "document_sequence": None},          # 둘 다 없다
+            {"document_sequence": 2},                                    # 둘 다 있다
+            {"document_name": None, "document_sequence": "2"},           # 문자열
+            {"document_name": None, "document_sequence": 0},             # 0
+            {"document_name": None, "document_sequence": -1},            # 음수
+            {"document_name": None, "document_sequence": True},          # bool
+        )
+        for change in broken:
+            with self.subTest(change=change):
+                raw = self.forge(packet_for(single_class_facts("AAA")))
+                for item in raw["share_class_proposals"][0]["interval"]["evidence"]:
+                    item.update(change)
+                with self.assertRaises(QVPromotionError):
+                    revalidate_packet(raw)
+
+    def test_a_kq_filing_evidence_cannot_carry_a_sequence(self):
+        """K/Q filing은 파일 이름이 정본이다. sequence를 붙이면 거부한다."""
+        raw = self.forge(packet_for(single_class_facts("AAA")))
+        for item in raw["share_class_proposals"][0]["evidence"]:
+            self.assertEqual(item["source_kind"], "KQ_FILING")
+            item["document_sequence"] = 1
+        with self.assertRaises(QVPromotionError):
+            revalidate_packet(raw)
+
     def test_a_cover_fact_cannot_substitute_for_interval_evidence(self):
         """관계 증거가 REQUIRED라는 이유로 구간 증거를 대신하지 못한다."""
         packet = packet_for(single_class_facts("AAA"))

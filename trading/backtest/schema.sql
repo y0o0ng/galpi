@@ -435,7 +435,11 @@ CREATE TABLE IF NOT EXISTS qv_identity_evidence (
   source_kind TEXT NOT NULL CHECK (source_kind IN ('KQ_FILING', 'SEC_EVIDENCE_DOCUMENT')),
   cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
   accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
-  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),
+  -- typed document locator. filename 있는 문서는 이름으로, 2001년 이전 flat layout의
+  -- filename 없는 embedded 문서는 등록인이 명시한 <SEQUENCE>로 가리킨다.
+  document_name TEXT CHECK (document_name IS NULL OR length(trim(document_name)) > 0),
+  document_sequence INTEGER
+    CHECK (document_sequence IS NULL OR document_sequence > 0),
   evidence_role TEXT NOT NULL CHECK (length(trim(evidence_role)) > 0),
   locator TEXT,
   dependency TEXT NOT NULL CHECK (dependency IN ('REQUIRED', 'CORROBORATING')),
@@ -445,7 +449,11 @@ CREATE TABLE IF NOT EXISTS qv_identity_evidence (
   source TEXT NOT NULL,
   source_version TEXT NOT NULL,
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
-  PRIMARY KEY (relation_kind, relation_key, evidence_ordinal, source_version)
+  PRIMARY KEY (relation_kind, relation_key, evidence_ordinal, source_version),
+  CHECK (CASE source_kind
+    WHEN 'KQ_FILING'
+      THEN document_name IS NOT NULL AND document_sequence IS NULL
+    ELSE (document_name IS NULL) <> (document_sequence IS NULL) END)
 ) WITHOUT ROWID;
 
 -- PIT XBRL QName alias. axis/member 둘 다 정규화 키로 저장하고 raw QName을
@@ -507,7 +515,10 @@ CREATE TABLE IF NOT EXISTS qv_share_class_prose_aliases (
 CREATE TABLE IF NOT EXISTS qv_sec_evidence_documents (
   cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
   accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
-  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),
+  -- typed document locator. 둘 중 정확히 하나다 — 합성 파일명도 ordinal도 만들지 않는다.
+  document_name TEXT CHECK (document_name IS NULL OR length(trim(document_name)) > 0),
+  document_sequence INTEGER
+    CHECK (document_sequence IS NULL OR document_sequence > 0),
   form TEXT NOT NULL CHECK (length(trim(form)) > 0),
   document_role TEXT NOT NULL CHECK (document_role IN ('PRIMARY', 'EXHIBIT')),
   acceptance_datetime TEXT NOT NULL
@@ -524,9 +535,9 @@ CREATE TABLE IF NOT EXISTS qv_sec_evidence_documents (
   source TEXT NOT NULL,
   source_version TEXT NOT NULL,
   provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
-  PRIMARY KEY (cik, accession, document_name, source_version),
+  CHECK ((document_name IS NULL) <> (document_sequence IS NULL)),
   CHECK (historical_usable_session > acceptance_eastern_date)
-) WITHOUT ROWID;
+);
 
 -- accession 단위 주식수 관측 원장. 범용 XBRL 창고가 아니다.
 CREATE TABLE IF NOT EXISTS qv_share_observations (
@@ -914,6 +925,14 @@ CREATE INDEX IF NOT EXISTS idx_qv_share_observations_lookup
                            fact_instant, historical_usable_session);
 CREATE INDEX IF NOT EXISTS idx_qv_evidence_documents_usable
   ON qv_sec_evidence_documents(source_version, cik, historical_usable_session);
+-- locator 종류마다 유일성이 따로 있다. WITHOUT ROWID PK를 대신하는 자리이고,
+-- 대리 evidence id를 만들지 않는다 — SQLite rowid는 locator도 evidence 정체성도 아니다.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_qv_evidence_documents_file
+  ON qv_sec_evidence_documents(cik, accession, document_name, source_version)
+  WHERE document_name IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_qv_evidence_documents_sequence
+  ON qv_sec_evidence_documents(cik, accession, document_sequence, source_version)
+  WHERE document_sequence IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_qv_conversion_relations_subject
   ON qv_class_conversion_relations(source_version, subject_class_id,
                                    effective_from, effective_to);

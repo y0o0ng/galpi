@@ -73,7 +73,8 @@ from backtest.qv_identity_proposals import (  # noqa: E402
     extract_cover_proof,
 )
 from backtest.qv_manifest import prose_key  # noqa: E402
-from backtest.qv_xbrl import parse_instance  # noqa: E402
+from backtest.qv_sec_embedded import decompose  # noqa: E402
+from backtest.qv_xbrl import parse_instance, sha256  # noqa: E402
 
 sys.path.insert(0, str(TRADING_ROOT / "tests"))
 from test_qv_identity_promotion import ManifestFixture  # noqa: E402
@@ -320,8 +321,8 @@ class Filing:
         self.items = items
         self.primary_document = primary_document
 
-    #: 2001년 이전 flat layout fixture가 채우는 complete submission 원문.
-    legacy_text: str | None = None
+    #: 2001년 이전 flat layout fixture가 채우는 complete submission **원본 바이트**.
+    legacy_bytes: bytes | None = None
 
     def header(self) -> str:
         """SEC `-index-headers.html`과 같은 모양의 SGML header 색인."""
@@ -346,6 +347,47 @@ class Filing:
         )
 
 
+def legacy_submission(documents, *, form="10-Q", items=None, sequences=None) -> bytes:
+    """header 색인이 없는 flat-layout complete submission **원본 바이트**.
+
+    문서에 `<FILENAME>`이 **없다** — 주소는 등록인이 적은 `<SEQUENCE>`뿐이다.
+    `sequences`로 그 값을 일부러 망가뜨려(누락·중복·비숫자) fail-close를 확인한다.
+    """
+    lines = ["<SEC-HEADER>", f"CONFORMED SUBMISSION TYPE:\t{form}"]
+    for number in (items or "").split(","):
+        if number.strip():
+            lines.append(f"<ITEMS>{number.strip()}")
+    lines.append("</SEC-HEADER>")
+    for ordinal, (document_type, payload) in enumerate(documents, start=1):
+        sequence = sequences[ordinal - 1] if sequences else str(ordinal)
+        lines.append("<DOCUMENT>")
+        lines.append(f"<TYPE>{document_type}")
+        if sequence is not None:
+            lines.append(f"<SEQUENCE>{sequence}")
+        lines.append("<TEXT>")
+        lines.append(payload.decode("utf-8"))
+        lines.append("</TEXT>")
+        lines.append("</DOCUMENT>")
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def legacy_filing(accession, acceptance, documents, *, form="10-Q", items=None,
+                  sequences=None):
+    """2001년 이전 accession 하나. header 색인은 404이고 문서 파일도 없다."""
+    filing = Filing(accession, form, acceptance, {}, items=items)
+    filing.legacy_bytes = legacy_submission(
+        documents, form=form, items=items, sequences=sequences
+    )
+    return filing
+
+
+def embedded_child_bytes(filing, sequence: int) -> bytes:
+    """그 자식의 **raw `<TEXT>` payload 바이트.** production parser로 다시 잘라 온다."""
+    out = decompose(filing.legacy_bytes)
+    child = next(item for item in out.children if item.sequence == sequence)
+    return filing.legacy_bytes[child.text_start:child.text_end]
+
+
 class LegalStubClient:
     """SEC를 흉내내는 stub. 네트워크를 쓰지 않는다."""
 
@@ -355,6 +397,7 @@ class LegalStubClient:
         self.submissions_error = submissions_error
         self.index_calls: list[str] = []
         self.document_calls: list[str] = []
+        self.complete_submission_calls: list[str] = []
 
     def submissions(self, cik):
         if self.submissions_error is not None:
@@ -382,14 +425,15 @@ class LegalStubClient:
         if accession in self.index_failures:
             raise RuntimeError(f"index 503: {accession}")
         filing = self.filings[accession]
-        if filing.legacy_text is not None:
+        if filing.legacy_bytes is not None:
             # 2001년 이전 accession에는 header 색인 파일이 없다(실측: HTTP 404).
             raise RuntimeError(f"HTTP 404: {accession}-index-headers.html")
         return filing.header()
 
-    def complete_submission_text(self, cik, accession):
-        """2001년 이전 flat layout 폴백. legacy fixture만 이 경로를 쓴다."""
-        legacy = getattr(self.filings[accession], "legacy_text", None)
+    def complete_submission_bytes(self, cik, accession):
+        """2001년 이전 flat layout 폴백. **원본 바이트 그대로 돌려준다.**"""
+        self.complete_submission_calls.append(accession)
+        legacy = getattr(self.filings[accession], "legacy_bytes", None)
         if legacy is None:
             raise RuntimeError(f"complete submission 없음: {accession}")
         return legacy
@@ -772,17 +816,67 @@ class CandidateDiscoveryTest(BaseFixture):
         self.assertEqual(client.document_calls, ["0000000042-15-000001/ex3-1.htm"])
         self.assertEqual(collected.search_status, COMPLETE)
 
-    def test_a_legacy_flat_layout_accession_fails_closed(self):
-        """2001년 이전 filing은 문서를 파일 이름으로 가리킬 수 없다.
+    def test_a_wellformed_legacy_accession_addresses_its_embedded_exhibit(self):
+        """2001년 이전 filing은 **파일 이름이 없을 뿐** 주소가 없는 것이 아니다.
 
-        **후보가 0건이라는 뜻이 아니다.** 조용히 COMPLETE가 되면 그 시기의 governing
-        instrument를 하나도 안 본 채 무기한 수명을 만들 수 있다.
+        등록인이 명시한 `<SEQUENCE>`가 유일하면 그 embedded 문서는
+        `(CIK, accession, sequence)`로 가리켜진다. "filename이 없다"는 이유 하나로
+        `legacy_layout` 실패가 되지 않는다.
         """
-        legacy = Filing("0000000042-96-000002", "10-Q", "1996-02-06", {})
-        legacy.legacy_text = (
-            "<SEC-HEADER>\nCONFORMED SUBMISSION TYPE:\t10-Q\n"
-            "<DOCUMENT>\n<TYPE>10-Q\n<SEQUENCE>1\n<TEXT>\nFORM 10-Q\n</DOCUMENT>\n"
-            "<DOCUMENT>\n<TYPE>EX-3.1\n<SEQUENCE>2\n<TEXT>\ncharter\n</DOCUMENT>\n"
+        legacy = legacy_filing(
+            "0000000042-96-000002", "1996-02-06",
+            [("10-Q", html("FORM 10-Q")), ("EX-3.1", founding_charter())],
+        )
+        client, _proof, collected = collect([legacy])
+        self.assertEqual(collected.search_status, COMPLETE)
+        self.assertEqual(collected.failures, ())
+        # 자식마다 SEC를 다시 부르지 않는다 — 부모 원본 하나면 된다.
+        self.assertEqual(client.complete_submission_calls, ["0000000042-96-000002"])
+        self.assertEqual(client.document_calls, [])
+
+        document = collected.documents[0]
+        self.assertIsNone(document.document_name)
+        self.assertEqual(document.document_sequence, 2)
+        self.assertEqual(document.document_type, "EX-3.1")
+        self.assertEqual(document.proof_authority, "GOVERNING_EXHIBIT")
+        self.assertEqual(
+            document.source_url,
+            "https://www.sec.gov/Archives/edgar/data/42/000000004296000002/"
+            "0000000042-96-000002.txt",
+        )
+        # 내용 검사는 **자식 raw TEXT payload**의 SHA다. 부모 SHA도 offset도 아니다.
+        self.assertEqual(
+            document.document_sha256,
+            sha256(embedded_child_bytes(legacy, 2)),
+        )
+        self.assertEqual(collected.classes[0].birth_date, BIRTH_DATE)
+
+    def test_two_embedded_children_of_the_same_type_stay_distinct(self):
+        """`EX-3` 둘은 sequence가 다르면 서로 다른 문서다. 하나로 합치지 않는다."""
+        legacy = legacy_filing(
+            "0000000042-96-000002", "1996-02-06",
+            [
+                ("10-Q", html("FORM 10-Q")),
+                ("EX-3", founding_charter()),
+                ("EX-3", amendment(paragraphs=(authorized(CLASS_B),))),
+            ],
+        )
+        _client, _proof, collected = collect([legacy])
+        self.assertEqual(
+            [(item.document_name, item.document_sequence) for item in collected.documents],
+            [(None, 2), (None, 3)],
+        )
+        self.assertNotEqual(
+            collected.documents[0].document_sha256,
+            collected.documents[1].document_sha256,
+        )
+
+    def test_a_malformed_embedded_layout_still_fails_closed(self):
+        """SEQUENCE가 겹치면 그 accession은 주소 지정 불가다. ordinal로 대체하지 않는다."""
+        legacy = legacy_filing(
+            "0000000042-96-000002", "1996-02-06",
+            [("10-Q", html("FORM 10-Q")), ("EX-3.1", founding_charter())],
+            sequences=["1", "1"],
         )
         payload, evidence = self.assertClassEvidence([
             charter_8k("0000000042-15-000001", "2015-10-05", founding_charter()),
@@ -793,7 +887,51 @@ class CandidateDiscoveryTest(BaseFixture):
             [item[0] for item in payload["failures"]],
             ["legacy_layout:0000000042-96-000002"],
         )
+        self.assertIn("DUPLICATE_SEQUENCE", payload["failures"][0][1])
         self.assertEqual(evidence, {})
+
+    def test_a_missing_embedded_sequence_fails_closed(self):
+        """SEQUENCE가 없으면 주소가 없다. 순서로 만들어내지 않는다."""
+        legacy = legacy_filing(
+            "0000000042-96-000002", "1996-02-06",
+            [("10-Q", html("FORM 10-Q")), ("EX-3.1", founding_charter())],
+            sequences=["1", None],
+        )
+        _client, _proof, collected = collect([legacy])
+        self.assertEqual(collected.search_status, INCOMPLETE)
+        self.assertEqual(
+            [item[0] for item in collected.failures],
+            ["legacy_layout:0000000042-96-000002"],
+        )
+        self.assertEqual(collected.documents, ())
+
+    def test_a_missing_complete_submission_is_still_an_index_failure(self):
+        """header 색인도 complete submission도 못 읽으면 **원래 실패**가 남는다."""
+        legacy = Filing("0000000042-96-000002", "10-Q", "1996-02-06", {})
+        legacy.legacy_bytes = None
+        client = LegalStubClient(
+            [legacy], index_failures=["0000000042-96-000002"]
+        )
+        collected = collect_legal_evidence(
+            client, cik=CIK, cover_proof=cover_proof(cover_facts())
+        )
+        self.assertEqual(
+            [item[0] for item in collected.failures],
+            ["index:0000000042-96-000002"],
+        )
+
+    def test_an_ordinary_filename_accession_keeps_a_null_sequence(self):
+        """파일로 주소 지정된 문서는 **sequence를 갖지 않는다.** 계약이 XOR이다."""
+        _client, _proof, collected = collect(
+            [charter_8k("0000000042-15-000001", "2015-10-05", founding_charter())]
+        )
+        document = collected.documents[0]
+        self.assertEqual(document.document_name, "ex3-1.htm")
+        self.assertIsNone(document.document_sequence)
+        self.assertEqual(
+            document.source_url,
+            "https://www.sec.gov/Archives/edgar/data/42/000000004215000001/ex3-1.htm",
+        )
 
     def test_the_json_index_icon_type_is_never_used_as_a_document_type(self):
         """`index.json`의 `type`은 `text.gif` 같은 아이콘 이름이다.
@@ -1753,6 +1891,44 @@ class Item503CorroborationTest(BaseFixture):
         )
         self.assertTrue(dependencies[0]["locator"].startswith("block:"))
 
+    def test_o2c_works_across_embedded_documents_in_one_legacy_accession(self):
+        """primary도 Exhibit도 filename이 없을 때 **기존 규칙 그대로** 연결된다.
+
+        새 association heuristic이 없다 — Item 5.03 대응 · TYPE 권한 · sequence==1
+        PRIMARY 규칙만으로 잇고, 의존은 typed locator를 그대로 보존한다.
+        """
+        legacy = legacy_filing(
+            "0000000042-19-000002", "2019-03-19",
+            [("8-K", html("Item 5.03.", narrative())), ("EX-3.1", dgcl_certificate())],
+            form="8-K", items="5.03,9.01",
+        )
+        payload, evidence = self.assertClassEvidence([legacy])
+        document = next(
+            item for item in payload["documents"] if item["document_sequence"] == 2
+        )
+        self.assertIsNone(document["document_name"])
+        self.assertEqual(
+            (document["legal_operative_date"],
+             document["legal_operative_source_family"]),
+            (CORROBORATED_DATE, ITEM_503_CORROBORATED_UPON_FILING),
+        )
+        dependency = document["legal_operative_dependencies"][0]
+        self.assertEqual(
+            (dependency["accession"], dependency["document_name"],
+             dependency["document_sequence"], dependency["proof_authority"]),
+            ("0000000042-19-000002", None, 1, "FILING_NARRATIVE"),
+        )
+        # 보강 primary는 REQUIRED 증거로 따라가고 그 주소도 sequence다.
+        corroboration = [
+            item
+            for item in evidence[next(iter(evidence))].class_interval.evidence
+            if item.evidence_role == LEGAL_OPERATIVE_DATE_CORROBORATION
+        ]
+        self.assertEqual(
+            [(item.document_name, item.document_sequence) for item in corroboration],
+            [(None, 1)],
+        )
+
     def test_the_same_sentence_without_respectively_never_guesses(self):
         """**대응 표지가 없으면 순서로 짝짓지 않는다.** §6 금지 규칙 그대로다."""
         payload, _evidence = self.assertClassEvidence([item_503_filing(
@@ -2288,6 +2464,18 @@ def legal_packet(filings=(CHARTER,), facts=None):
     return packet_from(evidence, proof, payload)
 
 
+#: 같은 charter를 **embedded 자식**으로 낸 legacy accession. 파일 이름이 없다.
+LEGACY_CHARTER = legacy_filing(
+    "0000000042-96-000002", "1996-02-06",
+    [("10-Q", html("FORM 10-Q")), ("EX-3.1", founding_charter())],
+)
+
+
+def legacy_packet():
+    """filename 없는 embedded 증거로만 만든 packet."""
+    return legal_packet(filings=(LEGACY_CHARTER,))
+
+
 class TamperFixture:
     """무변조 packet을 만들어 한 곳만 고친 뒤 승격 재검증에 넣는다."""
 
@@ -2476,6 +2664,84 @@ class LegalProofIntegrityTest(TamperFixture, unittest.TestCase):
                 for finding in entry["findings"]:
                     finding["document_name"] = "ghost.htm"
         self.assertIn("receipt에 없는 문서", self.tampered(mutate))
+
+
+class EmbeddedDocumentLocatorTest(TamperFixture, unittest.TestCase):
+    """filename 없는 embedded 증거의 typed locator 계약.
+
+    ```text
+    document_name = null · document_sequence = source SEQUENCE
+    ```
+
+    **ordinal도 합성 파일명도 아니다.** 변조하면 승격 재검증이 그 자리에서 멈춘다.
+    """
+
+    def evidence_refs(self, payload=None):
+        payload = payload or legacy_packet().as_json()
+        return payload["share_class_proposals"][0]["interval"]["evidence"]
+
+    def test_embedded_evidence_carries_a_sequence_and_no_name(self):
+        packet = legacy_packet()
+        self.assertEqual(packet.proposal_status, AUTO_PROVABLE)
+        for item in self.evidence_refs(packet.as_json()):
+            self.assertIsNone(item["document_name"])
+            self.assertEqual(item["document_sequence"], 2)
+        promotable = revalidate_packet(packet.as_json())
+        self.assertEqual(promotable.classes[0]["effective_from"], BIRTH_DATE)
+
+    def test_the_snapshot_receipt_keeps_the_sequence(self):
+        """파생 receipt라고 sequence를 버리거나 파일명을 만들어내지 않는다."""
+        entry = legacy_packet().as_json()["legal_evidence_proof"]["classes"][0]
+        self.assertEqual(entry["snapshot_accession"], "0000000042-96-000002")
+        self.assertIsNone(entry["snapshot_document_name"])
+        self.assertEqual(entry["snapshot_document_sequence"], 2)
+
+    def legacy_tampered(self, mutate):
+        payload = legacy_packet().as_json()
+        mutate(payload)
+        with self.assertRaises(QVPromotionError) as caught:
+            revalidate_packet(payload)
+        return str(caught.exception)
+
+    def test_changing_the_evidence_sequence_fails(self):
+        def mutate(payload):
+            for item in payload["share_class_proposals"][0]["interval"]["evidence"]:
+                item["document_sequence"] = 3
+        self.assertIn("ClassEvidence", self.legacy_tampered(mutate))
+
+    def test_swapping_a_sequence_for_a_filename_fails(self):
+        def mutate(payload):
+            for item in payload["share_class_proposals"][0]["interval"]["evidence"]:
+                item["document_name"] = "ex3-1.htm"
+                item["document_sequence"] = None
+        self.assertIn("ClassEvidence", self.legacy_tampered(mutate))
+
+    def test_swapping_a_filename_for_a_sequence_fails(self):
+        def mutate(payload):
+            for item in payload["share_class_proposals"][0]["interval"]["evidence"]:
+                item["document_name"] = None
+                item["document_sequence"] = 2
+        self.assertIn("ClassEvidence", self.tampered(mutate))
+
+    def test_removing_the_document_locator_fails(self):
+        def mutate(payload):
+            for item in payload["share_class_proposals"][0]["interval"]["evidence"]:
+                item["document_name"] = None
+                item["document_sequence"] = None
+        self.assertIn("정확히 하나", self.legacy_tampered(mutate))
+
+    def test_carrying_both_locators_fails(self):
+        def mutate(payload):
+            for item in payload["share_class_proposals"][0]["interval"]["evidence"]:
+                item["document_name"] = "ex3-1.htm"
+        self.assertIn("정확히 하나", self.legacy_tampered(mutate))
+
+    def test_a_finding_pointing_at_an_absent_embedded_document_fails(self):
+        def mutate(payload):
+            for entry in payload["legal_evidence_proof"]["classes"]:
+                for finding in entry["findings"]:
+                    finding["document_sequence"] = 9
+        self.assertIn("receipt에 없는 문서", self.legacy_tampered(mutate))
 
 
 class LegalChronologyRevalidationTest(TamperFixture, unittest.TestCase):

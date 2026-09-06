@@ -4180,6 +4180,178 @@ python3 -m unittest discover -s trading/tests -p 'test_*.py'
   production DB · Phase 0 gate를 하나도 바꾸지 않았다.
 - 어떤 packet도 승격하지 않았고 factor·rank·수익률을 계산하지 않았다.
 
+## 10.32 5A-2 — filename 없는 embedded SEC 문서의 주소 (`REOPENED -> CLOSED`) — 2026-09-06
+
+**transport/addressability 하나만 고쳤다.** legal semantics · 문턱 · 문법 · 권한 규칙 ·
+상태 어휘를 하나도 넓히지 않았다. 전수 legal 실행도 승격도 하지 않았다.
+
+### 왜 열었나
+
+2001년 이전 flat-layout accession은 문서를 개별 파일로 두지 않고 complete submission
+안에 `<FILENAME>` 없이 담는다. 전 구현은 그 사실 **하나로** 그 accession 전체를
+`legacy_layout` 실패로 적었고, 그 시기 filing이 있는 등록인은 지평이 구조적으로 닫히지
+않아 언제나 `INCOMPLETE`였다(10.20의 실측: AAPL 43 · CELG 42 · ABMD 30건).
+
+그것은 법적 판단이 아니라 **주소 문제**였다.
+
+### 구조 probe 실측 (audit)
+
+production parser를 만들기 전에 실제 SEC 표본으로 분해 가능성을 쟀다.
+
+```text
+45 distinct CIK / 45 accessions
+212 embedded children
+structurally deterministic            45 / 45
+parent bytes stable across refetch    45 / 45
+full decomposition identical          45 / 45
+candidate keys unique                 45 / 45
+missing FILENAME                     212 / 212
+missing SEQUENCE                       0
+malformed accession                    0
+candidate-key collision                0
+```
+
+**이 표본은 global proof가 아니다.** production은 malformed를 fail-close한다.
+
+### 닫은 계약
+
+```text
+identity       CIK + accession + source-backed <SEQUENCE>
+authority      TYPE + 기존 semantic 규칙 (sequence는 권위가 아니다)
+content check  자식 raw <TEXT> payload의 SHA-256
+transport      부모 complete submission URL
+```
+
+증거 문서의 주소는 typed locator이고 형태가 정확히 둘이다 —
+`document_name` **XOR** `document_sequence`. `KQ_FILING`은 이름만 든다.
+**ordinal · `seq:2` 같은 합성 이름 · TYPE+순번 · 연도 cutoff · best-effort 복구가
+없다.** 문자열 `"2"`도 정수로 바꾸지 않고 거부한다.
+
+malformed는 그대로 실패다 — 누락·중복·비숫자·비양수 `SEQUENCE` · `<DOCUMENT>`/`<TEXT>`
+경계 손상 · 중첩 · 모호한 `TEXT` 구간 · 같은 키에 다른 바이트. 그 accession은
+`legacy_layout:<accession>` 실패로 남고 `search_status = INCOMPLETE`다. 실패 이름공간은
+그대로이고 **뜻만 바뀌었다**.
+
+```text
+전:  filename이 없어서 무조건 실패
+후:  embedded layout이 production locator 계약으로 결정론적으로 addressable하지 않다
+```
+
+parser는 `trading/backtest/qv_sec_embedded.py` **하나**다(bytes -> children, I/O 없음).
+audit probe(`trading/selftest/qv_legacy_document_probe.py`)가 그것을 import하므로 probe가
+검증하는 문법과 공급기가 쓰는 문법이 같다. **probe는 production 증거 원천이 아니다.**
+
+해시 앞에 어떤 정규화도 하지 않는다(HTML unescape · 개행 · Unicode · trim 전부 없음).
+부모 SHA · `<DOCUMENT>` ordinal · byte offset은 audit provenance로만 남고 production
+증거 정체성에 들어가지 않는다.
+
+### 바뀌지 않은 것
+
+B1 · B2 · 정의≠탄생 · O2 · O2-C · P2 · exact N1 · `qv-class-id-v1` · C2 ·
+promotion fail-close · manifest 정본 · Gate A-H · `document_proof_authority(TYPE)` ·
+`EXHIBIT_3_PATTERN` · 8-K primary의 source-backed `SEQUENCE == 1` 규칙.
+**새 primary heuristic도 새 association heuristic도 만들지 않았다.**
+
+`complete_submission_text()`의 외부 의미도 그대로다(원본 바이트의 latin-1 decode).
+
+### manifest bundle v2 -> v3
+
+증거 계약이 바뀌었으므로 bundle 판별자를 올렸다.
+
+```text
+qv-identity-bundle-v2 -> qv-identity-bundle-v3
+
+old identity_source_version  qv-identity-sha256:612412421278fb9d7fba90fa351e95a0ede09596474d4ec8696a7c59f43906a1
+new identity_source_version  qv-identity-sha256:de239b12524d48fbe02d12fac6bdc1ca68a34ab7ea859d695c7f574eec8914be
+```
+
+**manifest 파일 내용은 한 글자도 바꾸지 않았다.** 그래도 version이 바뀌는 것이
+의도된 결과다 — 그래서 그 앞의 5A-1 inventory와 5A-2 checkpoint는 stale이고 재사용하지
+않았다. `qv-class-id-v1`은 바뀌지 않았다.
+
+### DB migration — 기존 행을 보존한다
+
+`qv_identity_evidence` · `qv_sec_evidence_documents`를 generic "비어 있을 때만 재구축"
+목록에서 빼고 **좁은 명시 migration**을 뒀다.
+
+```text
+알려진 정확한 옛 스키마  -> 원자적 migration · 모든 행 보존 · document_sequence = NULL
+이미 새 스키마          -> no-op
+알 수 없는 스키마       -> BacktestStorageError · 아무것도 바꾸지 않는다
+```
+
+옛 `document_name`은 새 계약에서도 그대로 file locator이므로 **의미 추론이 없다.**
+`qv_identity_evidence`는 `ISSUER` 어휘가 붙기 전 4c79a74 모양도 알려진 옛 스키마로
+인식한다. 두 표의 계약 상승은 한 transaction이고, 한 표라도 옮길 수 없으면 아무 표도
+옮기지 않는다. 범용 migration 틀은 만들지 않았다.
+
+`qv_sec_evidence_documents`는 locator 종류마다 유일성이 따로 필요해 WITHOUT ROWID PK
+대신 **부분 유일 인덱스 둘**을 쓴다. 대리 evidence id를 production 계약으로 만들지
+않았다 — SQLite rowid는 locator도 evidence 정체성도 아니다.
+
+### 실제 SEC smoke (2026-09-06, read-only)
+
+고정 accession을 production parser로 다시 확인했다.
+
+```text
+CIK 0000320193  0000320193-99-000004
+  children 5 · structurally deterministic
+  EX-3 sequences 2 · 3 · 둘 다 filename 없음
+  parent bytes 190,424 · 재요청에서 parent SHA와 자식 SHA 5개 모두 동일
+```
+
+서로 다른 CIK의 legacy accession 둘을 더 봤다.
+
+```text
+0000789019  0001032210-00-001019  children 2  filename 없음 2  deterministic
+0000051143  0001005477-00-003871  children 5  filename 없음 5  deterministic
+```
+
+embedded EX-3 자식을 기존 파이프라인에 그대로 넣어 본 관측(**규칙을 바꾸지 않았다**):
+AAPL sequence 2는 `CERTIFICATE_OF_AMENDMENT` · sequence 3은 `BYLAWS`로 분류됐고 권한은
+`GOVERNING_EXHIBIT`, operative date는 둘 다 `MISSING`이다. 1990년대 평문 filing은
+`html_blocks`가 **block 하나**로 내므로 그 시기 문서의 block locator는 굵다 — 사실로
+적어 두고 이번에 고치지 않는다.
+
+### 5A-2 통합 smoke — AAPL 하나 (2026-09-06, read-only)
+
+bundle v3로 5A-1 inventory를 다시 만들고(`work items 897` · 이전과 같은 수요) 그중
+**작업 항목 하나**만 `--legal-evidence`로 돌렸다. **승격하지 않았다.**
+
+```text
+AAPL/AAPL  cik=0000320193  SEC calls 615
+  legal search=INCOMPLETE  accessions=368  outside_horizon=1878  documents=47
+  failures 1     (전: legacy_layout 43건)
+  최종 상태      REVIEW_REQUIRED
+```
+
+**`legacy_layout` 실패가 43 -> 0이 됐다.** 그 시기 accession이 실제로 열거되고
+embedded EX-3 자식 10건(9 accession)이 후보 문서가 됐다.
+
+```text
+embedded documents 10 / 47   document_name = null · document_sequence = 2·3
+  TYPE            EX-3 6 · EX-3.3 3 · EX-3.2 1
+  classification  BYLAWS 8 · CERTIFICATE_OF_AMENDMENT 2
+  source_url      부모 complete submission (…/0000320193-94-000013.txt)
+```
+
+남은 실패 하나는 **legacy layout과 무관하다** —
+`governing_exhibit_missing:0001181431-05-013840`(2005년 Item 5.03 8-K에 주소 지정
+가능한 Exhibit 3이 없다)이고 기존 CLOSED 규칙 그대로다. 그래서 탐색은 여전히
+`INCOMPLETE`이고 구간이 나오지 않는다.
+
+보통주 class의 finding 3건은 전부 **filename 있는 현대 문서**에서 나왔다. embedded
+자식은 위 분류대로 governing class 정의를 만들지 않았다 — **결과를 보고 문법이나
+semantics를 조정하지 않았다.**
+
+### 이 receipt가 주장하지 않는다
+
+- 672건 전수 legal 실행을 하지 않았다. 897건 제안 재실행도 하지 않았다.
+- 어떤 packet도 승격하지 않았고 manifest 행을 채우지 않았다.
+- 과거 README의 "legacy recovery probe가 governing-relevant 14개를 복구했다"는 주장은
+  **근거가 없어 여기 옮기지 않는다.**
+- returns · ranking · portfolio · Gate A-H를 계산하지 않았다.
+
 ## 11. 결과
 
 

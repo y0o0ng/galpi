@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from .qv_manifest import document_locator
 from .qv_submissions import (
     QVSubmissionsError,
     _acceptance_eastern_date,
@@ -39,7 +40,8 @@ def register_evidence_document(
     *,
     cik: str,
     accession: str,
-    document_name: str,
+    document_name: str | None = None,
+    document_sequence: int | None = None,
     form: str,
     document_role: str,
     acceptance_datetime: str,
@@ -52,15 +54,25 @@ def register_evidence_document(
     source_version: str,
     provenance: str,
 ) -> dict:
-    """SEC 증거 문서 하나를 등록한다. K/Q form은 거부한다."""
+    """SEC 증거 문서 하나를 등록한다. K/Q form은 거부한다.
+
+    문서 주소는 **둘 중 정확히 하나**다 — 파일 이름이거나, 2001년 이전 flat layout의
+    filename 없는 embedded 문서라면 등록인이 명시한 `<SEQUENCE>`다. embedded 문서의
+    `source_url`은 부모 complete submission이고 `document_bytes`는 그 자식의 raw
+    `<TEXT>` payload다.
+    """
     clean_cik = normalize_cik(cik)
     if clean_cik is None:
         raise QVEvidenceError(f"CIK가 아닙니다: {cik!r}")
     accession = str(accession).strip()
-    document_name = str(document_name).strip()
+    document_name, document_sequence, locator_error = document_locator(
+        document_name, document_sequence
+    )
+    if locator_error is not None:
+        raise QVEvidenceError(locator_error)
     form = str(form).strip()
-    if not accession or not document_name or not form:
-        raise QVEvidenceError("accession·document_name·form은 비울 수 없습니다")
+    if not accession or not form:
+        raise QVEvidenceError("accession·form은 비울 수 없습니다")
     if document_role not in DOCUMENT_ROLES:
         raise QVEvidenceError(f"모르는 document_role입니다: {document_role!r}")
     if form in KQ_FORMS and document_role == PRIMARY_ROLE:
@@ -94,7 +106,7 @@ def register_evidence_document(
         )
 
     row = (
-        clean_cik, accession, document_name, form, document_role,
+        clean_cik, accession, document_name, document_sequence, form, document_role,
         normalized_acceptance, eastern, usable, str(source_url).strip(),
         document_sha256, calendar_source, calendar_source_version,
         source, source_version, provenance,
@@ -102,17 +114,18 @@ def register_evidence_document(
     with connection:
         connection.execute(
             "INSERT OR REPLACE INTO qv_sec_evidence_documents"
-            " (cik, accession, document_name, form, document_role,"
+            " (cik, accession, document_name, document_sequence, form, document_role,"
             "  acceptance_datetime, acceptance_eastern_date, historical_usable_session,"
             "  source_url, document_sha256, calendar_source, calendar_source_version,"
             "  source, source_version, provenance)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             row,
         )
     return {
         "cik": clean_cik,
         "accession": accession,
         "document_name": document_name,
+        "document_sequence": document_sequence,
         "acceptance_datetime": normalized_acceptance,
         "acceptance_eastern_date": eastern,
         "historical_usable_session": usable,

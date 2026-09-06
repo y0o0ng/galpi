@@ -78,6 +78,7 @@ from .qv_identity_legal_evidence import (
 from .qv_manifest import (
     EVIDENCE_DEPENDENCIES,
     EVIDENCE_SOURCE_KINDS,
+    document_locator,
     MANIFEST_FILES,
     load_manifest,
     normalize_cik,
@@ -265,7 +266,17 @@ def load_proposal_run(path: str | Path) -> ProposalRunInput:
 
 
 def _require_evidence(items, label: str) -> list[dict]:
-    """Step 4의 SEC 자연키 모양 그대로인지 본다. DB row id를 받지 않는다."""
+    """Step 4의 SEC 자연키 모양 그대로인지 본다. DB row id를 받지 않는다.
+
+    문서 주소는 typed locator다 — **여기서 직접 확인한다.**
+
+    ```text
+    KQ_FILING              document_name 필수 · document_sequence는 null
+    SEC_EVIDENCE_DOCUMENT  document_name XOR document_sequence
+    ```
+
+    `"2"` 같은 문자열 sequence는 정수로 바꾸지 않고 거부한다.
+    """
     if not isinstance(items, list) or not items:
         raise QVPromotionError(f"{label}: 증거가 최소 하나 필요합니다")
     out = []
@@ -278,15 +289,21 @@ def _require_evidence(items, label: str) -> list[dict]:
         dependency = str(item.get("dependency") or "").strip()
         if dependency not in EVIDENCE_DEPENDENCIES:
             raise QVPromotionError(f"{label}: 모르는 dependency입니다: {dependency!r}")
+        name, sequence, locator_error = document_locator(
+            item.get("document_name"), item.get("document_sequence"), source_kind=kind
+        )
+        if locator_error is not None:
+            raise QVPromotionError(f"{label}: {locator_error}")
         entry = {
             "source_kind": kind,
             "cik": normalize_cik(item.get("cik")),
             "accession": str(item.get("accession") or "").strip(),
-            "document_name": str(item.get("document_name") or "").strip(),
+            "document_name": name,
+            "document_sequence": sequence,
             "evidence_role": str(item.get("evidence_role") or "").strip(),
             "dependency": dependency,
         }
-        if not (entry["accession"] and entry["document_name"] and entry["evidence_role"]):
+        if not (entry["accession"] and entry["evidence_role"]):
             raise QVPromotionError(f"{label}: 증거 필수 항목이 비었습니다")
         locator = item.get("locator")
         if locator not in (None, ""):
@@ -418,7 +435,7 @@ def _assert_legal_projection(
     5A-3가 그 REQUIRED 자연키에서 `usable_from_session`을 파생시킨다. 경계만 대조하면
     같은 구간에 **다른 증거를 끼워 넣는 변조**가 통과한다. 그래서 정규화된
     `ClassEvidence` 전체(구간 경계 + 각 `EvidenceRef`의 source_kind · cik · accession ·
-    document_name · evidence_role · dependency · locator)를 비교한다. 순서만 정규화하고
+    document_name · document_sequence · evidence_role · dependency · locator)를 비교한다. 순서만 정규화하고
     증거를 더하거나 빼거나 바꿔치는 것은 전부 실패다.
 
     **네트워크를 부르지 않는다.** 문서 SHA와 자연키를 실제 SEC 문서와 맞춰 보는 것은

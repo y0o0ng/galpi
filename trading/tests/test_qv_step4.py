@@ -388,6 +388,163 @@ class MigrationTest(unittest.TestCase):
         )
         connection.close()
 
+    def _pre_locator_db(self, *, rows=True, unknown=False, revision="HEAD"):
+        """typed locator 이전 스키마의 DB. **증거 행을 미리 넣어 둔다.**"""
+        import subprocess
+        old = subprocess.run(
+            ["git", "show", f"{revision}:trading/backtest/schema.sql"],
+            capture_output=True, text=True,
+            cwd=str(Path(__file__).resolve().parents[2]),
+        ).stdout
+        if not old:
+            self.skipTest("이전 스키마를 git에서 읽을 수 없다")
+        if unknown:
+            old = old.replace(
+                "  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),\n"
+                "  form TEXT NOT NULL CHECK (length(trim(form)) > 0),",
+                "  document_name TEXT NOT NULL,\n  surprise TEXT,\n"
+                "  form TEXT NOT NULL CHECK (length(trim(form)) > 0),",
+                1,
+            )
+        tmp = tempfile.mkdtemp()
+        connection = sqlite3.connect(Path(tmp) / store.BACKTEST_DB_NAME)
+        connection.executescript(old)
+        connection.executemany(
+            "INSERT INTO bars_daily (symbol, trade_date, raw_open, raw_high, raw_low,"
+            " raw_close, raw_volume, adj_open, adj_high, adj_low, adj_close, source,"
+            " source_version) VALUES ('SPY', ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 's', 'v')",
+            [(f"2020-01-{i:02d}",) for i in range(1, 29)],
+        )
+        if rows:
+            connection.execute(
+                "INSERT INTO qv_identity_evidence (relation_kind, relation_key,"
+                " evidence_ordinal, source_kind, cik, accession, document_name,"
+                " evidence_role, dependency, source, source_version, provenance)"
+                " VALUES ('ISSUER', 'us-cik-0001234567', 0, 'KQ_FILING', ?,"
+                " '0001234567-21-000001', 'p.htm', 'COVER', 'REQUIRED', 'manifest',"
+                " 'v', 'fixture')",
+                (CIK,),
+            )
+            connection.execute(
+                "INSERT INTO qv_sec_evidence_documents (cik, accession, document_name,"
+                " form, document_role, acceptance_datetime, acceptance_eastern_date,"
+                " historical_usable_session, source_url, document_sha256,"
+                " calendar_source, calendar_source_version, source, source_version,"
+                " provenance) VALUES (?, '0001234567-21-000010', 'ex3-1.htm', '8-K',"
+                " 'EXHIBIT', '2021-02-10T21:00:00.000000Z', '2021-02-10',"
+                " '2021-02-11', 'https://sec.gov/ex', ?, 'cal', 'cal-v', 'sec', 'v',"
+                " 'fixture')",
+                (CIK, "0" * 64),
+            )
+        connection.commit()
+        connection.close()
+        return tmp
+
+    def test_existing_evidence_rows_survive_the_locator_migration(self):
+        """행이 있어도 drop하지 않는다. **의미 손실 없이 sequence = NULL이 붙는다.**"""
+        tmp = self._pre_locator_db()
+        connection = store.connect(tmp)
+        for table in ("qv_identity_evidence", "qv_sec_evidence_documents"):
+            rows = connection.execute(f"SELECT * FROM {table}").fetchall()
+            self.assertEqual(len(rows), 1, table)
+            self.assertIsNotNone(rows[0]["document_name"])
+            self.assertIsNone(rows[0]["document_sequence"])
+        self.assertEqual(
+            connection.execute("SELECT count(*) AS n FROM bars_daily").fetchone()["n"], 28
+        )
+        # 새 유일성 인덱스가 실제로 강제된다.
+        indexes = {
+            row["name"]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+                " AND tbl_name = 'qv_sec_evidence_documents'"
+            )
+        }
+        self.assertIn("idx_qv_evidence_documents_file", indexes)
+        self.assertIn("idx_qv_evidence_documents_sequence", indexes)
+        connection.close()
+
+        # 두 번째 연결은 no-op다.
+        again = store.connect(tmp)
+        self.assertEqual(
+            again.execute(
+                "SELECT count(*) AS n FROM qv_identity_evidence"
+            ).fetchone()["n"],
+            1,
+        )
+        self.assertIsNone(
+            again.execute(
+                "SELECT 1 FROM sqlite_master WHERE name LIKE '%_pre_locator'"
+            ).fetchone()
+        )
+        again.close()
+
+    def test_the_pre_issuer_vocabulary_schema_also_migrates(self):
+        """`ISSUER` 어휘가 붙기 전 4c79a74 모양도 **알려진 옛 스키마**다."""
+        tmp = self._pre_locator_db(rows=False, revision="4c79a74")
+        connection = store.connect(tmp)
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(qv_identity_evidence)")
+        }
+        self.assertIn("document_sequence", columns)
+        connection.close()
+
+    def test_an_unknown_evidence_schema_fails_closed(self):
+        tmp = self._pre_locator_db(unknown=True)
+        with self.assertRaises(BacktestStorageError):
+            store.connect(tmp)
+        connection = sqlite3.connect(Path(tmp) / store.BACKTEST_DB_NAME)
+        connection.row_factory = sqlite3.Row
+        # 아무것도 바꾸지 않았다 — 행도 스키마도 그대로다.
+        self.assertEqual(
+            connection.execute(
+                "SELECT count(*) AS n FROM qv_sec_evidence_documents"
+            ).fetchone()["n"],
+            1,
+        )
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(qv_sec_evidence_documents)")
+        }
+        self.assertNotIn("document_sequence", columns)
+        self.assertIsNone(
+            connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE name LIKE '%_pre_locator'"
+            ).fetchone()
+        )
+        connection.close()
+
+    def test_a_blocked_locator_migration_changes_nothing(self):
+        """한 표라도 옮길 수 없으면 **아무 표도 옮기지 않는다.**
+
+        두 표의 계약 상승은 한 transaction이고, 그 앞에서 멈추면 절반 옮겨진 상태가
+        남지 않는다.
+        """
+        tmp = self._pre_locator_db()
+        path = Path(tmp) / store.BACKTEST_DB_NAME
+        connection = sqlite3.connect(path)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        schema_sql = store.SCHEMA_PATH.read_text(encoding="utf-8")
+        # 두 번째 표의 임시 이름을 미리 점유해 migration 도중에 실패시킨다.
+        connection.execute("CREATE TABLE qv_sec_evidence_documents_pre_locator (x TEXT)")
+        connection.commit()
+        with self.assertRaises(BacktestStorageError):
+            store._migrate_evidence_locators(connection, schema_sql)
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(qv_identity_evidence)")
+        }
+        self.assertNotIn("document_sequence", columns)
+        self.assertEqual(
+            connection.execute(
+                "SELECT count(*) AS n FROM qv_identity_evidence"
+            ).fetchone()["n"],
+            1,
+        )
+        connection.close()
+
     def test_unknown_schema_fails_closed(self):
         tmp = self.legacy_db(unknown=True)
         with self.assertRaises(BacktestStorageError):
@@ -507,8 +664,12 @@ class ManifestTest(unittest.TestCase):
             )
 
     def test_the_bundle_hash_carries_an_explicit_schema_discriminator(self):
-        """옛 네 파일 bundle의 version과 절대 같아질 수 없다."""
-        self.assertEqual(qv_manifest.BUNDLE_SCHEMA, "qv-identity-bundle-v2")
+        """옛 bundle의 version과 절대 같아질 수 없다.
+
+        v3는 증거가 typed document locator를 든다 — 파일 내용이 그대로여도
+        `identity_source_version`이 달라지는 것이 **의도된 결과**다.
+        """
+        self.assertEqual(qv_manifest.BUNDLE_SCHEMA, "qv-identity-bundle-v3")
         rows = self.base_rows()
         with tempfile.TemporaryDirectory() as tmp:
             directory = self.write(Path(tmp), rows)
@@ -558,6 +719,206 @@ class ManifestTest(unittest.TestCase):
             qv_manifest.qname_key("http://example.com/x", "FounderMember", "1234567"),
             "ext:0001234567:FounderMember",
         )
+
+
+class EmbeddedEvidenceLocatorTest(Step4Fixture, unittest.TestCase):
+    """typed document locator — 파일 이름 XOR source-backed `<SEQUENCE>`.
+
+    2001년 이전 flat-layout accession의 embedded 문서는 파일 이름이 없다. 주소는
+    등록인이 명시한 `<SEQUENCE>`뿐이고 **합성 파일명도 ordinal도 만들지 않는다.**
+    """
+
+    ACCESSION = "0001234567-96-000002"
+
+    def register(self, **overrides):
+        arguments = dict(
+            cik=CIK, accession=self.ACCESSION, form="10-Q", document_role="EXHIBIT",
+            acceptance_datetime="2021-02-10T21:00:00.000000Z",
+            source_url=f"https://sec.gov/Archives/{self.ACCESSION}.txt",
+            document_bytes=b"charter", calendar_source=CALENDAR_SOURCE,
+            calendar_source_version=CALENDAR_VERSION, source="sec",
+            source_version=SHARES_VERSION, provenance="fixture",
+        )
+        arguments.update(overrides)
+        return qv_evidence.register_evidence_document(self.connection, **arguments)
+
+    def embedded_evidence(self, sequence=2):
+        return {
+            "source_kind": "SEC_EVIDENCE_DOCUMENT", "cik": CIK,
+            "accession": self.ACCESSION, "document_name": None,
+            "document_sequence": sequence,
+            "evidence_role": "GOVERNING_CLASS_DEFINITION", "dependency": "REQUIRED",
+        }
+
+    def test_an_embedded_document_is_registered_by_sequence(self):
+        row = self.register(document_sequence=2)
+        self.assertIsNone(row["document_name"])
+        self.assertEqual(row["document_sequence"], 2)
+        self.assertEqual(row["document_sha256"], sha256(b"charter"))
+
+    def test_a_document_needs_exactly_one_locator(self):
+        with self.assertRaises(qv_evidence.QVEvidenceError):
+            self.register()  # 둘 다 없다
+        with self.assertRaises(qv_evidence.QVEvidenceError):
+            self.register(document_name="ex3-1.htm", document_sequence=2)
+        for bad in ("2", 0, -1, True):
+            with self.subTest(sequence=bad):
+                with self.assertRaises(qv_evidence.QVEvidenceError):
+                    self.register(document_sequence=bad)
+
+    def test_each_locator_kind_is_unique_on_its_own(self):
+        """파일 이름 유일성과 sequence 유일성이 따로 강제된다."""
+        self.register(document_sequence=2)
+        self.register(document_sequence=3)
+        self.register(document_name="ex3-1.htm")
+        self.assertEqual(
+            self.connection.execute(
+                "SELECT count(*) AS n FROM qv_sec_evidence_documents"
+            ).fetchone()["n"],
+            3,
+        )
+        # 같은 자연키를 다시 등록하면 덮어쓴다 — 행이 늘지 않는다.
+        self.register(document_sequence=2, document_bytes=b"charter v2")
+        self.assertEqual(
+            self.connection.execute(
+                "SELECT count(*) AS n FROM qv_sec_evidence_documents"
+            ).fetchone()["n"],
+            3,
+        )
+
+    def test_the_schema_rejects_a_row_without_exactly_one_locator(self):
+        columns = (
+            "cik, accession, document_name, document_sequence, form, document_role,"
+            " acceptance_datetime, acceptance_eastern_date, historical_usable_session,"
+            " source_url, document_sha256, calendar_source, calendar_source_version,"
+            " source, source_version, provenance"
+        )
+        for name, sequence in ((None, None), ("ex3-1.htm", 2), (None, 0)):
+            with self.subTest(name=name, sequence=sequence):
+                with self.assertRaises(sqlite3.IntegrityError):
+                    self.connection.execute(
+                        f"INSERT INTO qv_sec_evidence_documents ({columns})"
+                        " VALUES (?, ?, ?, ?, '8-K', 'EXHIBIT',"
+                        " '2021-02-10T21:00:00.000000Z', '2021-02-10', '2021-02-11',"
+                        " 'u', ?, ?, ?, 'sec', ?, 'p')",
+                        (CIK, self.ACCESSION, name, sequence, "0" * 64,
+                         CALENDAR_SOURCE, CALENDAR_VERSION, SHARES_VERSION),
+                    )
+                self.connection.rollback()
+
+    def test_required_embedded_evidence_resolves_its_usable_session(self):
+        row = self.register(document_sequence=2)
+        usable, resolved = qv_manifest.resolve_usable_from_session(
+            self.connection, [self.embedded_evidence()], SHARES_VERSION
+        )
+        self.assertEqual(usable, row["historical_usable_session"])
+        self.assertEqual(resolved[0]["document_sequence"], 2)
+
+    def test_a_wrong_sequence_is_not_silently_resolved(self):
+        self.register(document_sequence=2)
+        with self.assertRaises(qv_manifest.QVManifestError) as caught:
+            qv_manifest.resolve_usable_from_session(
+                self.connection, [self.embedded_evidence(3)], SHARES_VERSION
+            )
+        self.assertIn("sequence=3", str(caught.exception))
+
+    def test_the_manifest_normalizer_holds_the_xor_contract(self):
+        base = {
+            "issuer_id": ISSUER, "cik": CIK, "resolution_method": "SEC_REGISTRANT_CIK",
+            "provenance": "fixture",
+        }
+        good = qv_manifest._normalize_row(
+            "issuers.jsonl", {**base, "evidence": [self.embedded_evidence()]}
+        )
+        self.assertEqual(good["evidence"][0]["document_sequence"], 2)
+        self.assertIsNone(good["evidence"][0]["document_name"])
+        # filename 증거는 sequence null로 정규화된다 — 손으로 고칠 필요가 없다.
+        filename_evidence = {
+            "source_kind": "KQ_FILING", "cik": CIK, "accession": self.ACCESSION,
+            "document_name": "p.htm", "evidence_role": "COVER", "dependency": "REQUIRED",
+        }
+        legacy = qv_manifest._normalize_row(
+            "issuers.jsonl", {**base, "evidence": [filename_evidence]}
+        )
+        self.assertIsNone(legacy["evidence"][0]["document_sequence"])
+        for broken in (
+            {"document_name": None, "document_sequence": None},
+            {"document_name": "x.htm", "document_sequence": 2},
+            {"document_name": None, "document_sequence": "2"},
+            {"source_kind": "KQ_FILING", "document_name": "x.htm",
+             "document_sequence": 1},
+        ):
+            with self.subTest(broken=broken):
+                with self.assertRaises(qv_manifest.QVManifestError):
+                    qv_manifest._normalize_row("issuers.jsonl", {
+                        **base,
+                        "evidence": [{**self.embedded_evidence(), **broken}],
+                    })
+
+    def test_materialize_stores_both_locator_columns(self):
+        self.register(document_sequence=2)
+        evidence = [self.embedded_evidence()]
+        rows = {
+            "issuers.jsonl": [{
+                "issuer_id": ISSUER, "cik": CIK,
+                "resolution_method": "SEC_REGISTRANT_CIK", "provenance": "fixture",
+                "evidence": evidence,
+            }],
+            "share_classes.jsonl": [{
+                "class_id": "cls-a", "issuer_id": ISSUER, "symbol": "AAA",
+                "is_ordinary_common": True, "is_listed": True,
+                "effective_from": "2015-01-01", "effective_to": None,
+                "provenance": "fixture", "evidence": evidence,
+            }],
+            "prose_aliases.jsonl": [{
+                "class_id": "cls-a", "issuer_id": ISSUER,
+                "raw_prose_name": "Class A Common Stock",
+                "bridge_type": "GOVERNING_INSTRUMENT",
+                "effective_from": "2015-01-01", "effective_to": None,
+                "provenance": "fixture", "evidence": evidence,
+            }],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in qv_manifest.MANIFEST_FILES:
+                (Path(tmp) / name).write_text(
+                    "".join(json.dumps(item) + "\n" for item in rows[name]),
+                    encoding="utf-8",
+                )
+            manifest = qv_manifest.load_manifest(Path(tmp))
+            version = qv_manifest.materialize(
+                self.connection, manifest, filings_source_version=SHARES_VERSION
+            )
+        stored = self.connection.execute(
+            "SELECT document_name, document_sequence FROM qv_identity_evidence"
+            " WHERE source_version = ?", (version,)
+        ).fetchall()
+        self.assertEqual(len(stored), 3)
+        for item in stored:
+            self.assertIsNone(item["document_name"])
+            self.assertEqual(item["document_sequence"], 2)
+
+    def test_the_identity_evidence_schema_holds_the_source_kind_contract(self):
+        columns = (
+            "relation_kind, relation_key, evidence_ordinal, source_kind, cik,"
+            " accession, document_name, document_sequence, evidence_role, dependency,"
+            " source, source_version, provenance"
+        )
+        broken = (
+            ("KQ_FILING", None, 1),      # K/Q에 sequence
+            ("KQ_FILING", None, None),   # K/Q에 이름 없음
+            ("SEC_EVIDENCE_DOCUMENT", "x.htm", 2),
+            ("SEC_EVIDENCE_DOCUMENT", None, None),
+        )
+        for kind, name, sequence in broken:
+            with self.subTest(kind=kind, name=name, sequence=sequence):
+                with self.assertRaises(sqlite3.IntegrityError):
+                    self.connection.execute(
+                        f"INSERT INTO qv_identity_evidence ({columns})"
+                        " VALUES ('ISSUER', 'k', 0, ?, ?, ?, ?, ?, 'ROLE',"
+                        " 'REQUIRED', 'manifest', ?, 'p')",
+                        (kind, CIK, self.ACCESSION, name, sequence, SHARES_VERSION),
+                    )
+                self.connection.rollback()
 
 
 class ManifestEvidenceTest(Step4Fixture, unittest.TestCase):

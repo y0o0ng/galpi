@@ -91,7 +91,7 @@ from dataclasses import dataclass, replace as _dataclass_replace
 from datetime import date as _calendar_date
 from decimal import Decimal, InvalidOperation
 
-from .edgar import accession_dir_url
+from .edgar import accession_dir_url, complete_submission_url
 from .qv_events import NOT_IMPLEMENTED_PATTERNS, html_blocks
 # 날짜 문자열 → ISO 변환과 block 분해는 이미 한 곳에 있다. 두 번째로 미묘하게 다른
 # parser를 만들면 두 경로가 조용히 갈라진다.
@@ -104,7 +104,16 @@ from .qv_identity_proposals import (
     ProseBridgeInput,
     RelationInterval,
 )
-from .qv_manifest import prose_key
+from .qv_manifest import (
+    FILE_LOCATOR,
+    SEQUENCE_LOCATOR,
+    document_locator,
+    locator_label,
+    prose_key,
+)
+# filename 없는 embedded `<DOCUMENT>` 분해는 production parser **하나**다. probe가
+# 자기 문법을 복제하면 두 경로가 조용히 갈라진다.
+from .qv_sec_embedded import decompose, failure_reasons
 # recent + archive submission row 수집은 이미 한 곳에 있다(`qv_identity_proposals`가
 # 같은 이유로 같은 함수를 쓴다). form 필터만 넓혀서 그대로 재사용한다.
 from .qv_submissions import _submissions_rows as _submission_rows_from_sec
@@ -556,6 +565,15 @@ LEGAL_NOT_IMPLEMENTED_PATTERNS = NOT_IMPLEMENTED_PATTERNS + (
 )
 
 
+class QVLegacyLayoutError(Exception):
+    """embedded layout을 production locator 계약으로 가리킬 수 없다.
+
+    **"filename이 없다"가 아니다.** source-backed `<SEQUENCE>`가 유일하면 filename
+    없는 자식도 주소 지정된다. 여기 걸리는 것은 구조가 결정론적이지 않을 때다 —
+    누락·중복·비숫자 SEQUENCE · 경계 손상 · 모호한 TEXT 구간.
+    """
+
+
 class QVLegalEvidenceError(Exception):
     """법적 증거 계약을 벗어날 때 올린다. **전부 fail-close다.**"""
 
@@ -821,7 +839,9 @@ class LegalDocument:
     cik: str
     accession: str
     form: str
-    document_name: str
+    # typed locator — filename이거나, flat layout embedded 문서면 source-backed
+    # `<SEQUENCE>`다. 둘 중 정확히 하나이고 ordinal은 어느 쪽도 아니다.
+    document_name: str | None
     document_role: str
     document_type: str | None
     acceptance_datetime: str | None
@@ -835,10 +855,18 @@ class LegalDocument:
     legal_operative: OperativeDate
     # 첫 일치 하나만이 아니라 문서가 언급한 family 전부. 조용히 잃지 않는다.
     classification_families: tuple[str, ...] = ()
+    document_sequence: int | None = None
 
     @property
-    def key(self) -> tuple[str, str, str]:
-        return (self.cik, self.accession, self.document_name)
+    def key(self) -> tuple:
+        return (self.cik,) + _document_key(self.as_locator())
+
+    def as_locator(self) -> dict:
+        return {
+            "accession": self.accession,
+            "document_name": self.document_name,
+            "document_sequence": self.document_sequence,
+        }
 
     def as_json(self) -> dict:
         return {
@@ -846,6 +874,7 @@ class LegalDocument:
             "accession": self.accession,
             "form": self.form,
             "document_name": self.document_name,
+            "document_sequence": self.document_sequence,
             "document_role": self.document_role,
             "document_type": self.document_type,
             "acceptance_datetime": self.acceptance_datetime,
@@ -879,7 +908,7 @@ class LegalFinding:
 
     finding_kind: str
     accession: str
-    document_name: str
+    document_name: str | None
     locator: str
     class_name_key: str
     raw_class_name: str
@@ -889,12 +918,14 @@ class LegalFinding:
     # 칸이 아니라 이 원문 둘에서 다시 계산된다(§18).
     governing_raw_name: str | None = None
     governing_par_text: str | None = None
+    document_sequence: int | None = None
 
     def as_json(self) -> dict:
         return {
             "finding_kind": self.finding_kind,
             "accession": self.accession,
             "document_name": self.document_name,
+            "document_sequence": self.document_sequence,
             "locator": self.locator,
             "class_name_key": self.class_name_key,
             "raw_class_name": self.raw_class_name,
@@ -938,6 +969,7 @@ class ClassLegalProof:
     governing_raw_name: str | None = None
     governing_prose_key: str | None = None
     governing_par_value: str | None = None
+    snapshot_document_sequence: int | None = None
 
     def as_json(self) -> dict:
         return {
@@ -956,6 +988,7 @@ class ClassLegalProof:
             "open_ended": self.open_ended,
             "snapshot_accession": self.snapshot_accession,
             "snapshot_document_name": self.snapshot_document_name,
+            "snapshot_document_sequence": self.snapshot_document_sequence,
             "findings": [item.as_json() for item in self.findings],
             "notes": list(self.notes),
         }
@@ -1054,15 +1087,17 @@ class OperativeDependency:
 
     cik: str
     accession: str
-    document_name: str
+    document_name: str | None
     locator: str
     proof_authority: str
+    document_sequence: int | None = None
 
     def as_json(self) -> dict:
         return {
             "cik": self.cik,
             "accession": self.accession,
             "document_name": self.document_name,
+            "document_sequence": self.document_sequence,
             "locator": self.locator,
             "proof_authority": self.proof_authority,
         }
@@ -1457,6 +1492,7 @@ def item_503_corroborated_dates(
                 cik=primary.cik,
                 accession=primary.accession,
                 document_name=primary.document_name,
+                document_sequence=primary.document_sequence,
                 locator=f"block:{dates[date]}",
                 proof_authority=FILING_NARRATIVE,
             ),),
@@ -1557,6 +1593,43 @@ class AccessionDocument:
     description: str | None
 
 
+@dataclass(frozen=True)
+class DocumentCandidate:
+    """후보 문서 하나의 **typed locator와 header 힌트.**
+
+    `document_sequence`는 filename이 없을 때의 주소다. **권한이 아니다** — 권한은
+    §9의 `document_proof_authority(TYPE)` 그대로이고 sequence·ordinal은 어느 쪽도
+    법적 권위를 주지 않는다.
+    """
+
+    document_name: str | None
+    document_sequence: int | None
+    document_role: str
+    document_type: str | None
+
+    @property
+    def key(self) -> tuple:
+        return _document_key({
+            "document_name": self.document_name,
+            "document_sequence": self.document_sequence,
+        })
+
+
+def _candidate(document, role: str) -> DocumentCandidate:
+    """header 선언(`AccessionDocument`)과 embedded 자식(`EmbeddedChild`)을 한 모양으로.
+
+    **filename이 있으면 그것이 주소다.** 없을 때만 source-backed `<SEQUENCE>`가
+    주소가 되고, 합성 파일명이나 ordinal로 대체하지 않는다.
+    """
+    filename = document.filename or None
+    return DocumentCandidate(
+        document_name=filename,
+        document_sequence=None if filename else document.sequence,
+        document_role=role,
+        document_type=document.document_type or None,
+    )
+
+
 _DOCUMENT_BLOCK = re.compile(
     r"<DOCUMENT>\s*<TYPE>(?P<type>[^\n<]*)"
     r"(?:\s*<SEQUENCE>(?P<sequence>[^\n<]*))?"
@@ -1596,12 +1669,16 @@ def parse_accession_header(text: str) -> tuple[tuple[str, ...], tuple[AccessionD
 
 
 def unaddressable_document_count(text: str, documents) -> int:
-    """**파일 이름 없이 선언된 문서 수.**
+    """**header 색인이 파일 이름 없이 선언한 문서 수.**
 
-    2001년 이전 flat layout은 문서를 accession 디렉터리의 개별 파일로 두지 않고
-    complete submission 안에 `<FILENAME>` 없이 담는다. 그런 문서는 이 공급기가
-    문서 자연키로 가리킬 수 없으므로 **조용히 건너뛰지 않고 탐색 실패로 적는다** —
-    0을 돌려주면 governing 후보가 없다는 뜻이 되어 거짓 COMPLETE가 난다.
+    header 색인 경로의 안전 장치다. 색인은 문서마다 `<FILENAME>`을 주는 자료이므로,
+    이름 없는 선언이 있으면 그 색인만으로는 그 문서를 가리킬 수 없다. **조용히
+    건너뛰지 않고 탐색 실패로 적는다** — 0을 돌려주면 governing 후보가 없다는 뜻이
+    되어 거짓 COMPLETE가 난다.
+
+    **flat layout의 embedded 문서는 여기로 오지 않는다.** 그 시기 accession에는 header
+    색인 파일 자체가 없고, complete submission 원본 바이트를 분해해 source-backed
+    `<SEQUENCE>`로 주소 지정한다(`_embedded_layout`).
     """
     import html as _html
 
@@ -1610,12 +1687,12 @@ def unaddressable_document_count(text: str, documents) -> int:
 
 
 def governing_candidates(
-    documents: tuple[AccessionDocument, ...],
+    documents,
     *,
     form: str,
     items,
-) -> tuple[tuple[str, str, str | None], ...]:
-    """`(document_name, document_role, 선언된 문서 종류)` 후보들.
+) -> tuple[DocumentCandidate, ...]:
+    """typed locator를 든 후보 문서들.
 
     discovery는 header metadata를 **힌트로** 쓴다 — 권위가 아니다. 실제 권위는 본문이
     §9의 semantic 규칙을 만족하는지다.
@@ -1625,43 +1702,80 @@ def governing_candidates(
     8-K이고 ITEMS에 5.03이 있다   -> 그 8-K의 primary(SEQUENCE 1) 문서도 후보
     ```
 
-    파일명에 `charter`가 있다는 이유로 후보가 되지 않는다.
+    파일명에 `charter`가 있다는 이유로 후보가 되지 않는다. **`<TYPE>`과 `<SEQUENCE>`는
+    둘 다 source-backed이고**, filename 없는 embedded 자식도 같은 규칙으로 후보가 된다.
     """
-    found: dict[str, tuple[str, str, str | None]] = {}
+    found: dict[tuple, DocumentCandidate] = {}
     for document in documents:
-        if EXHIBIT_3_PATTERN.match(document.document_type.strip()):
-            found[document.filename] = (
-                document.filename,
-                PRIMARY if document.sequence == 1 else EXHIBIT,
-                document.document_type,
+        if EXHIBIT_3_PATTERN.match(str(document.document_type or "").strip()):
+            candidate = _candidate(
+                document, PRIMARY if document.sequence == 1 else EXHIBIT
             )
+            found[candidate.key] = candidate
     if form in EIGHT_K_FORMS and CHARTER_AMENDMENT_ITEM in tuple(items or ()):
         primary = next(
             (item for item in documents if item.sequence == 1), None
         )
-        if primary is not None and primary.filename not in found:
-            found[primary.filename] = (
-                primary.filename, PRIMARY, primary.document_type or None
-            )
-    return tuple(sorted(found.values()))
+        if primary is not None:
+            candidate = _candidate(primary, PRIMARY)
+            found.setdefault(candidate.key, candidate)
+    return tuple(sorted(found.values(), key=lambda item: item.key))
 
 
-def _accession_header(client, cik: str, accession: str) -> str:
-    """accession의 SGML header. **2001년 이전 flat layout에는 header 파일이 없다.**
+def _embedded_layout(raw: bytes) -> tuple[tuple[str, ...], tuple, dict]:
+    """complete submission **원본 바이트**를 그대로 분해한다.
 
-    그때는 complete submission 원문이 같은 `<DOCUMENT><TYPE><FILENAME>` 구조를 들고
-    있으므로 그것으로 돈다. 그 시기 filing은 작고(실측 34KB), 최신 filing은 header
-    파일이 있어 이 경로로 오지 않는다. 둘 다 실패하면 fail-close다 — 건너뛰지 않는다.
+    자식 하나라도 production locator 계약 아래 결정론적으로 주소 지정되지 않으면 그
+    accession 전체가 fail-close다 — 휴리스틱 복구도 ordinal 대체도 없다.
+
+    payload는 여기서 잘라 들고 간다. **자식마다 SEC를 다시 부르지 않는다** — 이미
+    받은 부모 바이트 안에 그 자식의 raw `<TEXT>`가 있다.
+    """
+    out = decompose(raw)
+    if not out.structurally_deterministic:
+        raise QVLegacyLayoutError(
+            "embedded 문서를 production locator 계약(CIK·accession·SEQUENCE)으로 "
+            "결정론적으로 가리킬 수 없다: " + ", ".join(failure_reasons(out))
+        )
+    # `<ITEMS>`는 같은 header 문법이라 기존 parser를 그대로 쓴다. 문서 목록은 쓰지
+    # 않는다 — 분해가 filename 있는 자식까지 이미 들고 있다.
+    items, _declared = parse_accession_header(raw.decode("latin-1"))
+    payloads = {
+        _document_key({"document_sequence": child.sequence}): raw[
+            child.text_start : child.text_end
+        ]
+        for child in out.children
+        if not child.filename
+    }
+    return items, out.children, payloads
+
+
+def _accession_layout(client, cik: str, accession: str):
+    """`(<ITEMS>, 선언된 문서들, embedded payload)`.
+
+    **2001년 이전 flat layout에는 header 색인 파일이 없다**(실측 HTTP 404). 그때는
+    complete submission 원본 바이트를 분해해 filename 없는 자식을 등록인이 명시한
+    `<SEQUENCE>`로 주소 지정한다. **연도로 가르지 않는다** — header가 있으면 기존
+    filename 경로 그대로다. 둘 다 실패하면 fail-close다 — 건너뛰지 않는다.
     """
     try:
-        return client.accession_header_index(cik, accession)
+        header = client.accession_header_index(cik, accession)
     except Exception as error:  # noqa: BLE001 — 옛 layout이면 complete submission으로
         try:
-            return client.complete_submission_text(cik, accession)
+            raw = client.complete_submission_bytes(cik, accession)
         except Exception:  # noqa: BLE001
             # 둘 다 실패하면 **원래 실패**를 그대로 올린다. 폴백이 원인을 가리면
             # receipt가 "왜 못 읽었는지"를 잃는다.
             raise error from None
+        return _embedded_layout(raw)
+    items, declared = parse_accession_header(header)
+    unaddressable = unaddressable_document_count(header, declared)
+    if unaddressable:
+        raise QVLegacyLayoutError(
+            f"header 색인이 선언한 문서 {unaddressable}건을 주소 지정할 수 없다 — "
+            "파일 이름도 source-backed SEQUENCE도 색인에서 읽히지 않는다"
+        )
+    return items, declared, {}
 
 
 def _target_names(
@@ -1703,7 +1817,7 @@ def collect_legal_evidence(
 
     failures: list[tuple[str, str]] = []
     documents: list[LegalDocument] = []
-    blocks_by_key: dict[tuple[str, str, str], tuple[str, ...]] = {}
+    blocks_by_key: dict[tuple, tuple[str, ...]] = {}
     searched: list[str] = []
     outside = 0
 
@@ -1748,24 +1862,20 @@ def collect_legal_evidence(
     for row in horizon:
         searched.append(row.accession)
         try:
-            header = _accession_header(client, registrant, row.accession)
-            header_items, declared = parse_accession_header(header)
+            header_items, declared, embedded = _accession_layout(
+                client, registrant, row.accession
+            )
             # header의 `<ITEMS>`가 정본이고, 없으면 submissions row의 값으로 돈다.
             candidates = governing_candidates(
                 declared,
                 form=row.form,
                 items=header_items or _items_tokens(getattr(row, "items", None)),
             )
+        except QVLegacyLayoutError as error:
+            failures.append((f"legacy_layout:{row.accession}", str(error)))
+            continue
         except Exception as error:  # noqa: BLE001
             failures.append((f"index:{row.accession}", f"{type(error).__name__}: {error}"))
-            continue
-        unaddressable = unaddressable_document_count(header, declared)
-        if unaddressable:
-            failures.append((
-                f"legacy_layout:{row.accession}",
-                f"파일 이름 없이 선언된 문서가 {unaddressable}건이다 — 2001년 이전 "
-                "flat layout이라 문서 자연키로 가리킬 수 없다",
-            ))
             continue
         # **Item 5.03은 정관이 바뀌었다는 구조화된 신고다.** 그 accession에 주소를
         # 지정할 수 있는 Exhibit 3이 하나도 없으면 그 governing 변경을 읽을 길이 없다.
@@ -1776,8 +1886,8 @@ def collect_legal_evidence(
                 header_items or _items_tokens(getattr(row, "items", None))
             )
             and not any(
-                document_proof_authority(document_type) == GOVERNING_EXHIBIT
-                for _name, _role, document_type in candidates
+                document_proof_authority(item.document_type) == GOVERNING_EXHIBIT
+                for item in candidates
             )
         ):
             failures.append((
@@ -1787,28 +1897,43 @@ def collect_legal_evidence(
             ))
 
         accession_documents: list[LegalDocument] = []
-        for name, role, document_type in candidates:
-            try:
-                payload = client.accession_file_bytes(registrant, row.accession, name)
-            except Exception as error:  # noqa: BLE001
-                failures.append((
-                    f"document:{row.accession}/{name}",
-                    f"{type(error).__name__}: {error}",
-                ))
-                continue
+        for candidate in candidates:
+            label = locator_label(candidate.document_name, candidate.document_sequence)
+            if candidate.document_name is not None:
+                try:
+                    payload = client.accession_file_bytes(
+                        registrant, row.accession, candidate.document_name
+                    )
+                except Exception as error:  # noqa: BLE001
+                    failures.append((
+                        f"document:{row.accession}/{label}",
+                        f"{type(error).__name__}: {error}",
+                    ))
+                    continue
+                source_url = (
+                    accession_dir_url(registrant, row.accession)
+                    + "/"
+                    + candidate.document_name
+                )
+            else:
+                # 부모 complete submission에서 이미 잘라낸 raw `<TEXT>`다. transport는
+                # 부모 URL이고 내용 검사는 이 자식 payload의 SHA다.
+                payload = embedded[candidate.key]
+                source_url = complete_submission_url(registrant, row.accession)
             blocks = html_blocks(payload)
             classification = classify_document(blocks)
-            authority = document_proof_authority(document_type)
+            authority = document_proof_authority(candidate.document_type)
             operative = governing_operative_date(blocks)
             document = LegalDocument(
                 cik=registrant,
                 accession=row.accession,
                 form=row.form,
-                document_name=name,
-                document_role=role,
-                document_type=document_type,
+                document_name=candidate.document_name,
+                document_sequence=candidate.document_sequence,
+                document_role=candidate.document_role,
+                document_type=candidate.document_type,
                 acceptance_datetime=row.acceptance_datetime,
-                source_url=accession_dir_url(registrant, row.accession) + "/" + name,
+                source_url=source_url,
                 document_sha256=sha256(payload),
                 classification=classification,
                 proof_authority=authority,
@@ -1822,7 +1947,7 @@ def collect_legal_evidence(
             # 위의 `governing_exhibit_missing`이 잡는다.
             if classification == UNCLASSIFIED and authority == GOVERNING_EXHIBIT:
                 failures.append((
-                    f"classify:{row.accession}/{name}",
+                    f"classify:{row.accession}/{label}",
                     "governing 후보를 열거된 family로 분류하지 못했다",
                 ))
 
@@ -1943,11 +2068,13 @@ def _assert_operative_structure(document: dict) -> None:
     for item in dependencies:
         if not isinstance(item, dict):
             raise QVLegalEvidenceError(f"{label}: 교차 의존 항목이 객체가 아닙니다")
-        for field in ("cik", "accession", "document_name", "locator", "proof_authority"):
+        for field in ("cik", "accession", "locator", "proof_authority"):
             if not str(item.get(field) or "").strip():
                 raise QVLegalEvidenceError(
                     f"{label}: 교차 의존에 {field}이(가) 없습니다"
                 )
+        # 문서 주소는 typed locator다 — 여기서 XOR을 어기면 그 자리에서 멈춘다.
+        _document_key(item)
 
 
 def _assert_operative_dependencies(
@@ -1975,30 +2102,24 @@ def _assert_operative_dependencies(
                 f"{label}: 교차 의존이 다른 accession을 가리킵니다: "
                 f"{item.get('accession')!r} != {accession}"
             )
-        name = str(item.get("document_name") or "")
+        wanted = _document_key(item)
         referenced = next(
-            (
-                other for other in documents
-                if str(other.get("accession") or "") == accession
-                and str(other.get("document_name") or "") == name
-            ),
-            None,
+            (other for other in documents if _document_key(other) == wanted), None
         )
+        target = _document_label(item)
         if referenced is None:
             raise QVLegalEvidenceError(
-                f"{label}: 교차 의존이 receipt에 없는 문서를 가리킵니다: "
-                f"{accession}/{name}"
+                f"{label}: 교차 의존이 receipt에 없는 문서를 가리킵니다: {target}"
             )
         if str(referenced.get("document_role") or "") != PRIMARY:
             raise QVLegalEvidenceError(
-                f"{label}: 교차 의존이 primary가 아닌 문서를 가리킵니다: "
-                f"{accession}/{name}"
+                f"{label}: 교차 의존이 primary가 아닌 문서를 가리킵니다: {target}"
             )
         authority = document_proof_authority(referenced.get("document_type"))
         if authority != FILING_NARRATIVE or str(item.get("proof_authority")) != FILING_NARRATIVE:
             raise QVLegalEvidenceError(
                 f"{label}: 교차 의존은 FILING_NARRATIVE primary여야 합니다: "
-                f"{accession}/{name} authority={authority}"
+                f"{target} authority={authority}"
             )
 
 
@@ -2013,15 +2134,36 @@ def _legal_date(document: dict) -> str | None:
 
 
 def _document_label(document: dict) -> str:
-    """receipt·오류 메시지용 자연키 표시. **semantic 순서 근거가 아니다.**"""
-    return f"{document.get('accession')}/{document.get('document_name')}"
+    """receipt·오류 메시지용 자연키 표시. **semantic 순서 근거가 아니다.**
 
-
-def _finding_document(finding: dict) -> tuple[str, str]:
+    filename 없는 문서는 `sequence=2`로 보인다 — 그것은 표시이지 문서 이름이 아니다.
+    """
     return (
-        str(finding.get("accession") or ""),
-        str(finding.get("document_name") or ""),
+        f"{document.get('accession')}/"
+        + locator_label(document.get("document_name"), document.get("document_sequence"))
     )
+
+
+def _document_key(payload: dict) -> tuple:
+    """직렬화된 문서/finding 하나의 **typed 자연키.**
+
+    ```text
+    (accession, FILENAME, document_name)     파일로 주소 지정된 문서
+    (accession, SEQUENCE, document_sequence) flat layout embedded 문서
+    ```
+
+    **문자열 하나로 합치지 않는다.** `document_name = "seq:2"` 같은 합성 이름을 만들면
+    파일 `seq:2`와 sequence 2가 같은 키가 된다. XOR을 어기면 그 자리에서 멈춘다.
+    """
+    name, sequence, error = document_locator(
+        payload.get("document_name"), payload.get("document_sequence")
+    )
+    if error is not None:
+        raise QVLegalEvidenceError(f"{payload.get('accession')}: {error}")
+    accession = str(payload.get("accession") or "")
+    if name is not None:
+        return (accession, FILE_LOCATOR, name)
+    return (accession, SEQUENCE_LOCATOR, sequence)
 
 
 def resolve_class_association(
@@ -2139,7 +2281,8 @@ def project_class_proof(
     blank = {
         "status": UNRESOLVED, "birth_date": None, "termination_date": None,
         "open_ended": False, "snapshot_accession": None,
-        "snapshot_document_name": None, "birth_definition": None,
+        "snapshot_document_name": None, "snapshot_document_sequence": None,
+        "birth_definition": None,
         "birth_action": None, "birth_date_finding": None,
         "snapshot_definition": None, "termination_finding": None, "notes": (),
         "association_method": None, "governing_raw_name": None,
@@ -2176,17 +2319,17 @@ def project_class_proof(
     birth = distinct_births[0]
     birth_date_finding = sorted(
         (item for item in birth_dates if str(item["effective_date"]) == birth),
-        key=lambda item: (_finding_document(item), str(item.get("locator") or "")),
+        key=lambda item: (_document_key(item), str(item.get("locator") or "")),
     )[0]
-    birth_document = _finding_document(birth_date_finding)
+    birth_document = _document_key(birth_date_finding)
     birth_definition = sorted(
-        (item for item in definitions if _finding_document(item) == birth_document),
+        (item for item in definitions if _document_key(item) == birth_document),
         key=lambda item: str(item.get("locator") or ""),
     )
     if not birth_definition:
         return {**blank, "notes": ("탄생일 문서가 그 class를 명시로 정의하지 않는다",)}
     birth_action = sorted(
-        (item for item in birth_actions if _finding_document(item) == birth_document),
+        (item for item in birth_actions if _document_key(item) == birth_document),
         key=lambda item: str(item.get("locator") or ""),
     )
     if not birth_action:
@@ -2209,13 +2352,13 @@ def project_class_proof(
             )}
         termination_finding = sorted(
             (item for item in terminations if str(item["effective_date"]) == end),
-            key=lambda item: (_finding_document(item), str(item.get("locator") or "")),
+            key=lambda item: (_document_key(item), str(item.get("locator") or "")),
         )[0]
         return {
             **blank,
             "status": COMPLETE, "birth_date": birth, "termination_date": end,
             "open_ended": False, "snapshot_accession": None,
-            "snapshot_document_name": None,
+            "snapshot_document_name": None, "snapshot_document_sequence": None,
             "birth_definition": birth_definition[0],
             "birth_action": birth_action[0],
             "birth_date_finding": birth_date_finding,
@@ -2266,7 +2409,7 @@ def project_class_proof(
             + ", ".join(sorted(_document_label(item) for item in newest)),
         )}
     current = newest[0]
-    current_key = (str(current.get("accession") or ""), str(current.get("document_name") or ""))
+    current_key = _document_key(current)
 
     amendments = [
         item for item in governing
@@ -2301,7 +2444,7 @@ def project_class_proof(
         )}
 
     snapshot_definition = sorted(
-        (item for item in definitions if _finding_document(item) == current_key),
+        (item for item in definitions if _document_key(item) == current_key),
         key=lambda item: str(item.get("locator") or ""),
     )
     if not snapshot_definition:
@@ -2316,13 +2459,12 @@ def project_class_proof(
     #
     # 순서는 여기서도 **법적 operative date**다. 탄생일이 곧 탄생 문서의 법적
     # 발효일이므로 그것을 경계로 쓴다.
-    defined_keys = {_finding_document(item) for item in definitions}
+    defined_keys = {_document_key(item) for item in definitions}
 
     def _undefined(item) -> bool:
         return (
             str(item.get("classification") or "") in GOVERNING_CLASSIFICATIONS
-            and (str(item.get("accession") or ""), str(item.get("document_name") or ""))
-            not in defined_keys
+            and _document_key(item) not in defined_keys
         )
 
     # 탄생일과 같은 날의 governing 문서는 탄생 앞뒤를 세울 수 없다. 그 class를 명시로
@@ -2351,7 +2493,8 @@ def project_class_proof(
         "status": COMPLETE, "birth_date": birth, "termination_date": None,
         "open_ended": True,
         "snapshot_accession": current_key[0],
-        "snapshot_document_name": current_key[1],
+        "snapshot_document_name": current.get("document_name"),
+        "snapshot_document_sequence": current.get("document_sequence"),
         "birth_definition": birth_definition[0],
         "birth_action": birth_action[0],
         "birth_date_finding": birth_date_finding,
@@ -2393,6 +2536,7 @@ def _class_findings(
                 finding_kind=GOVERNING_CLASS_DEFINITION,
                 accession=document.accession,
                 document_name=document.document_name,
+                document_sequence=document.document_sequence,
                 locator=f"block:{ordinal}",
                 class_name_key=name_key,
                 raw_class_name=raw_name,
@@ -2408,6 +2552,7 @@ def _class_findings(
                 finding_kind=CLASS_BIRTH_ACTION,
                 accession=document.accession,
                 document_name=document.document_name,
+                document_sequence=document.document_sequence,
                 locator=f"block:{ordinal}",
                 class_name_key=name_key,
                 raw_class_name=raw_name,
@@ -2431,6 +2576,7 @@ def _class_findings(
                 finding_kind=CLASS_BIRTH_EFFECTIVE_DATE,
                 accession=document.accession,
                 document_name=document.document_name,
+                document_sequence=document.document_sequence,
                 locator=str(operative.locator),
                 class_name_key=name_key,
                 raw_class_name=raw_name,
@@ -2446,6 +2592,7 @@ def _class_findings(
                 finding_kind=CLASS_TERMINATION_EFFECTIVE_DATE,
                 accession=document.accession,
                 document_name=document.document_name,
+                document_sequence=document.document_sequence,
                 locator=f"block:{block_ordinal}",
                 class_name_key=name_key,
                 raw_class_name=raw_name,
@@ -2498,6 +2645,7 @@ def _assess_class(
         open_ended=bool(projected["open_ended"]),
         snapshot_accession=projected["snapshot_accession"],
         snapshot_document_name=projected["snapshot_document_name"],
+        snapshot_document_sequence=projected["snapshot_document_sequence"],
         findings=findings,
         notes=tuple(projected["notes"]),
     )
@@ -2507,11 +2655,18 @@ def _assess_class(
 
 
 def _ref(finding: dict, *, cik: str, role: str) -> EvidenceRef:
+    """finding 하나 -> 증거 참조. **문서 주소를 typed 그대로 옮긴다.**"""
+    name, sequence, error = document_locator(
+        finding.get("document_name"), finding.get("document_sequence")
+    )
+    if error is not None:
+        raise QVLegalEvidenceError(error)
     return EvidenceRef(
         source_kind=SEC_EVIDENCE_DOCUMENT,
         cik=cik,
         accession=str(finding.get("accession") or ""),
-        document_name=str(finding.get("document_name") or ""),
+        document_name=name,
+        document_sequence=sequence,
         evidence_role=role,
         dependency="REQUIRED",
         locator=str(finding.get("locator") or ""),
@@ -2524,33 +2679,36 @@ def _operative_corroboration_refs(refs, documents, *, cik: str) -> list[Evidence
     구간 증거가 가리키는 문서만 본다 — accession 안의 무관한 문서까지 끌어오지 않는다.
     같은 primary가 여러 번 나와도 자연키 하나로 모은다.
     """
-    used = {(item.accession, item.document_name) for item in refs}
+    used = {
+        _document_key({
+            "accession": item.accession,
+            "document_name": item.document_name,
+            "document_sequence": item.document_sequence,
+        })
+        for item in refs
+    }
     out: list[EvidenceRef] = []
-    seen: set[tuple[str, str, str]] = set()
+    seen: set[tuple] = set()
     for document in documents:
-        key = (str(document.get("accession") or ""),
-               str(document.get("document_name") or ""))
-        if key not in used:
+        if _document_key(document) not in used:
             continue
         if document.get("legal_operative_source_family") != ITEM_503_CORROBORATED_UPON_FILING:
             continue
         for dependency in document.get("legal_operative_dependencies") or []:
-            natural = (
-                str(dependency.get("accession") or ""),
-                str(dependency.get("document_name") or ""),
-                str(dependency.get("locator") or ""),
-            )
+            locator = str(dependency.get("locator") or "")
+            natural = _document_key(dependency) + (locator,)
             if natural in seen:
                 continue
             seen.add(natural)
             out.append(EvidenceRef(
                 source_kind=SEC_EVIDENCE_DOCUMENT,
                 cik=cik,
-                accession=natural[0],
-                document_name=natural[1],
+                accession=str(dependency.get("accession") or ""),
+                document_name=dependency.get("document_name"),
+                document_sequence=dependency.get("document_sequence"),
                 evidence_role=LEGAL_OPERATIVE_DATE_CORROBORATION,
                 dependency="REQUIRED",
-                locator=natural[2],
+                locator=locator,
             ))
     return out
 
@@ -2572,16 +2730,29 @@ def canonical_evidence_refs(items) -> list[dict]:
         if not isinstance(item, dict):
             raise QVLegalEvidenceError("증거 항목이 객체가 아닙니다")
         locator = item.get("locator")
+        source_kind = str(item.get("source_kind") or "")
+        # **문서 주소가 정규형의 일부다.** 빼면 sequence 2를 3으로 바꾸거나 filename과
+        # sequence를 맞바꾸는 변조가 같은 정규형으로 지나간다.
+        name, sequence, error = document_locator(
+            item.get("document_name"), item.get("document_sequence"),
+            source_kind=source_kind,
+        )
+        if error is not None:
+            raise QVLegalEvidenceError(error)
         out.append({
-            "source_kind": str(item.get("source_kind") or ""),
+            "source_kind": source_kind,
             "cik": str(item.get("cik") or ""),
             "accession": str(item.get("accession") or ""),
-            "document_name": str(item.get("document_name") or ""),
+            "document_name": name,
+            "document_sequence": sequence,
             "evidence_role": str(item.get("evidence_role") or ""),
             "dependency": str(item.get("dependency") or ""),
             "locator": "" if locator in (None, "") else str(locator),
         })
-    return sorted(out, key=lambda row: tuple(sorted(row.items())))
+    # `None` · int · str가 섞이므로 값끼리 직접 비교하지 않는다. 표현으로 정렬한다.
+    return sorted(
+        out, key=lambda row: tuple(f"{key}={row[key]!r}" for key in sorted(row))
+    )
 
 
 def canonical_interval(payload: dict | None) -> dict | None:
@@ -2717,8 +2888,8 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
     # 형제 표지 제목 충돌은 그 표지 증명의 사실이다 — receipt를 다시 판정할 때도
     # 생성기와 같은 입력을 쓴다.
     blocked = cover_designation_collisions(cover_proof)
-    operative_by_document: dict[tuple[str, str], str | None] = {}
-    locator_by_document: dict[tuple[str, str], str] = {}
+    operative_by_document: dict[tuple, str | None] = {}
+    locator_by_document: dict[tuple, str] = {}
     documents = [
         item for item in (payload.get("documents") or []) if isinstance(item, dict)
     ]
@@ -2726,7 +2897,7 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
         raise QVLegalEvidenceError("legal proof document 항목이 객체가 아닙니다")
     for item in documents:
         _assert_operative_structure(item)
-        key = (str(item.get("accession") or ""), str(item.get("document_name") or ""))
+        key = _document_key(item)
         operative_by_document[key] = _legal_date(item)
         locator_by_document[key] = _operative_locator(item)
     # **교차 문서 의존은 receipt 안에서 실제로 가리켜져야 한다.** 자연키만 그럴듯하게
@@ -2740,11 +2911,11 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
         for finding in entry.get("findings") or []:
             if not isinstance(finding, dict):
                 raise QVLegalEvidenceError("legal proof finding이 객체가 아닙니다")
-            key = _finding_document(finding)
+            key = _document_key(finding)
             if key not in operative_by_document:
                 raise QVLegalEvidenceError(
                     "finding이 receipt에 없는 문서를 가리킵니다: "
-                    f"{key[0]}/{key[1]}"
+                    + _document_label(finding)
                 )
             # **경제적 날짜의 원천은 문서의 법적 operative date 하나다.** 생성기가 둘을
             # 같은 `OperativeDate`에서 만드는데 packet에서 갈라져 있으면 어느 쪽이
@@ -2757,8 +2928,8 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
             stated = str(stated) if stated not in (None, "") else None
             if stated != operative_by_document[key]:
                 raise QVLegalEvidenceError(
-                    f"finding의 경제적 날짜가 그 문서의 법적 operative date와 다릅니다: "
-                    f"{key[0]}/{key[1]} finding={stated} "
+                    "finding의 경제적 날짜가 그 문서의 법적 operative date와 다릅니다: "
+                    f"{_document_label(finding)} finding={stated} "
                     f"document={operative_by_document[key]}"
                 )
             # 탄생일 finding은 문서 operative date의 근거 span을 그대로 든다. 문서
@@ -2768,7 +2939,8 @@ def assert_proof_integrity(payload: dict, *, cover_proof: CoverPageProof) -> Non
                 if stated_locator != locator_by_document[key]:
                     raise QVLegalEvidenceError(
                         "탄생일 finding의 locator가 그 문서 operative date의 근거와 "
-                        f"다릅니다: {key[0]}/{key[1]} finding={stated_locator!r} "
+                        f"다릅니다: {_document_label(finding)} "
+                        f"finding={stated_locator!r} "
                         f"document={locator_by_document[key]!r}"
                     )
 

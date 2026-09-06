@@ -711,5 +711,37 @@ class CsvTest(unittest.TestCase):
         )
 
 
+class CompleteSubmissionTest(unittest.TestCase):
+    """complete submission 전송 계약. **바이트가 정본이다.**"""
+
+    #: latin-1로만 읽히는 바이트(0xE9)와 CRLF. 정규화하면 이 값이 달라진다.
+    RAW = b"<DOCUMENT>\r\n<TYPE>EX-3.1\r\ncaf\xe9\r\n</DOCUMENT>\r\n"
+
+    def client(self):
+        from backtest.edgar import EdgarClient
+
+        client = EdgarClient(contact="test <t@example.com>", interval=0)
+        seen = []
+        client._read = lambda url: (seen.append(url), self.RAW)[1]
+        return client, seen
+
+    def test_raw_bytes_come_back_untouched_from_the_canonical_url(self):
+        from backtest.edgar import complete_submission_url
+
+        client, seen = self.client()
+        payload = client.complete_submission_bytes("0000320193", "0000320193-99-000004")
+        self.assertEqual(payload, self.RAW)
+        self.assertEqual(
+            seen, [complete_submission_url("0000320193", "0000320193-99-000004")]
+        )
+
+    def test_the_text_method_keeps_its_latin1_semantics(self):
+        client, _seen = self.client()
+        self.assertEqual(
+            client.complete_submission_text("0000320193", "0000320193-99-000004"),
+            self.RAW.decode("latin-1"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

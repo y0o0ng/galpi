@@ -828,17 +828,65 @@ governing 후보를 받아 분류했다는 뜻이다. 다음 중 하나라도 �
 ```text
 submissions archive 실패 · accession header 색인 실패 · 후보 문서 fetch 실패 ·
 열거된 family로 분류할 수 없는 **증명 권한 있는** 후보 ·
-Item 5.03인데 주소 지정 가능한 Exhibit 3이 없다 · 파일 이름 없이 선언된 문서
+Item 5.03인데 주소 지정 가능한 Exhibit 3이 없다 ·
+production locator 계약으로 주소 지정되지 않는 embedded layout
 ```
 
 분류 실패는 **증명 권한이 있는 문서**에만 탐색 실패다. 권한 없는 서술이 열거된 family에
 안 맞는 것은 그 자체로 증거 공백이 아니다 — 진짜 공백은 `governing_exhibit_missing`이
 잡는다.
 
-마지막이 **2001년 이전 flat layout**이다. 그 시기 accession은 문서를 개별 파일로 두지
-않아 문서 자연키로 가리킬 수 없다. 후보가 0건인 것과 구분해 `legacy_layout` 실패로
-적는다 — 조용히 넘어가면 그 시기 governing instrument를 하나도 안 본 채 무기한 수명이
-만들어진다.
+##### 2001년 이전 flat layout — **REOPENED → CLOSED**
+
+> **사용자 결정으로 다시 열어 닫았다.** 전에는 그 시기 accession이 `<FILENAME>`을
+> 갖지 않는다는 이유 **하나로** 무조건 `legacy_layout` 실패였다. 그것은 legal
+> semantics가 아니라 **transport/addressability 문제**였다. 이제 filename 없는
+> embedded 문서도 등록인이 명시한 `<SEQUENCE>`로 주소 지정된다.
+
+```text
+유일한 source-backed SEQUENCE  ->  embedded 문서가 addressable하다
+누락·중복·비숫자·비양수 SEQUENCE
+경계 손상 · 모호한 TEXT 구간   ->  fail-close · legacy_layout · INCOMPLETE
+```
+
+문서 주소 계약은 Step 4 §1.2의 typed locator 하나다.
+
+```text
+file-addressed   document_name = 파일 이름   · document_sequence = null
+filename-less    document_name = null        · document_sequence = <SEQUENCE>
+```
+
+탐색 경로는 **연도로 가르지 않는다.** accession header 색인이 있으면 기존 filename
+경로 그대로이고, 없을 때만 complete submission **원본 바이트**를 받아 공유 parser
+(`backtest/qv_sec_embedded.py`)로 분해한다. 자식마다 SEC를 다시 부르지 않는다 —
+그 자식의 raw `<TEXT>` payload가 이미 부모 바이트 안에 있다.
+
+```text
+identity       CIK + accession + SEQUENCE
+authority      TYPE + 기존 semantic 규칙 (sequence는 권위가 아니다)
+content check  자식 raw TEXT payload의 SHA-256
+transport      부모 complete submission URL
+```
+
+**해시 앞에 어떤 정규화도 하지 않는다** — HTML unescape · 개행 · Unicode · trim 전부
+안 한다. 부모 SHA · `<DOCUMENT>` ordinal · byte offset은 audit provenance이고
+production 증거 정체성에 들어가지 않는다.
+
+`legacy_layout:<accession>` 실패의 뜻이 그래서 바뀐다.
+
+```text
+전:  filename이 없어서 무조건 실패
+후:  embedded layout이 production locator 계약으로 결정론적으로 addressable하지 않다
+```
+
+**legal semantics는 하나도 바뀌지 않았다.** B1 · B2 · 정의≠탄생 · O2 · O2-C · P2 ·
+exact N1 · `qv-class-id-v1` · C2 · 승격 fail-close · manifest 정본 · Gate A-H가 전부
+그대로다. `document_proof_authority(TYPE)`과 `EXHIBIT_3_PATTERN`도 그대로이고, 8-K
+primary 판정은 기존의 source-backed `SEQUENCE == 1` 규칙 그대로다 — **새 primary
+heuristic도 새 association heuristic도 만들지 않았다.**
+
+후보가 0건인 것과 실패는 여전히 구분해 적는다 — 조용히 넘어가면 그 시기 governing
+instrument를 하나도 안 본 채 무기한 수명이 만들어진다.
 
 ##### 열거된 legal semantic family
 

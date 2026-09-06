@@ -391,9 +391,18 @@ class EdgarClient:
             raise EdgarError(f"submissions archive 응답이 객체가 아닙니다: {name}")
         return payload
 
+    def complete_submission_bytes(self, cik: str, accession: str) -> bytes:
+        """complete submission **원본 바이트.**
+
+        embedded `<DOCUMENT>` 자식의 payload SHA는 이 바이트에서 잘라 계산한다.
+        해시 앞에 decode/정규화를 태우면 원본과 어긋난다.
+        """
+        return self._read(complete_submission_url(cik, accession))
+
     def complete_submission_text(self, cik: str, accession: str) -> str:
         """filing-time SEC header가 든 complete submission 원문."""
-        return self.text(complete_submission_url(cik, accession))
+        # `text()`와 같은 latin-1 디코딩이다. 외부 의미를 바꾸지 않는다.
+        return self.complete_submission_bytes(cik, accession).decode("latin-1")
 
     def accession_index(self, cik: str, accession: str) -> dict:
         """accession archive 디렉터리의 index metadata."""

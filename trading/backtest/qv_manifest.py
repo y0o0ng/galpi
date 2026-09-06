@@ -38,9 +38,10 @@ MANIFEST_FILES = (
     "prose_aliases.jsonl",
 )
 
-# **bundle 스키마 판별자.** 해시 입력 맨 앞에 들어가므로 파일 구성이 바뀌면 내용이
-# 같아도 version이 달라진다. 옛 네 파일 receipt는 설계상 stale이 된다.
-BUNDLE_SCHEMA = "qv-identity-bundle-v2"
+# **bundle 스키마 판별자.** 해시 입력 맨 앞에 들어가므로 파일 구성이나 증거 계약이
+# 바뀌면 내용이 같아도 version이 달라진다. 옛 receipt는 설계상 stale이 된다.
+# v3 = 증거가 typed document locator(`document_name` XOR `document_sequence`)를 든다.
+BUNDLE_SCHEMA = "qv-identity-bundle-v3"
 
 IDENTITY_SOURCE = "qv-identity-manifest"
 IDENTITY_VERSION_PREFIX = "qv-identity-sha256:"
@@ -133,6 +134,80 @@ def normalize_cik(value: object) -> str:
     if not clean.isdigit() or len(clean) > 10:
         raise QVManifestError(f"CIK가 아닙니다: {value!r}")
     return clean.zfill(10)
+
+
+# ── typed SEC document locator ────────────────────────────────────────────────
+#
+# SEC 증거 문서의 주소는 **정확히 두 형태 중 하나**다.
+#
+# ```text
+# file-addressed      (CIK, accession, document_name)      document_sequence = null
+# filename-less       (CIK, accession, document_sequence)  document_name = null
+# ```
+#
+# 두 번째는 2001년 이전 flat layout의 embedded `<DOCUMENT>`이고 `document_sequence`는
+# 등록인이 SGML header에 명시로 적은 `<SEQUENCE>`다. **ordinal · 합성 파일명 ·
+# `seq:2` 같은 문자열은 locator가 아니다.**
+
+FILE_LOCATOR = "FILENAME"
+SEQUENCE_LOCATOR = "SEQUENCE"
+
+
+def document_locator(
+    document_name: object, document_sequence: object, *, source_kind: str | None = None
+) -> tuple[str | None, int | None, str | None]:
+    """`(document_name, document_sequence, 오류 사유)`. **XOR 계약이 여기 하나다.**
+
+    오류를 예외로 올리지 않고 문자열로 돌려준다 — 호출자마다 계약 오류 타입이 다르고
+    (`QVManifestError` · `QVPromotionError` · `QVEvidenceError`), 여기서 하나를 고르면
+    나머지가 자기 계약 오류를 잃는다.
+
+    ```text
+    KQ_FILING              document_name 필수 · sequence는 null
+    SEC_EVIDENCE_DOCUMENT  둘 중 정확히 하나
+    ```
+
+    **문자열 `"2"`를 정수로 바꾸지 않는다.** silent coercion은 "그 자리에 무엇이
+    있었는지"를 지운다. `bool`도 정수 sequence가 아니다.
+    """
+    name = None if document_name in (None, "") else str(document_name).strip()
+    if document_name not in (None, "") and not name:
+        return None, None, "document_name이 비었습니다"
+    sequence = document_sequence
+    if sequence is not None:
+        if isinstance(sequence, bool) or not isinstance(sequence, int):
+            return None, None, f"document_sequence가 정수가 아닙니다: {sequence!r}"
+        if sequence <= 0:
+            return None, None, f"document_sequence가 양수가 아닙니다: {sequence!r}"
+    if source_kind == "KQ_FILING":
+        if name is None:
+            return None, None, "KQ_FILING 증거에는 document_name이 필요합니다"
+        if sequence is not None:
+            return None, None, "KQ_FILING 증거는 document_sequence를 가질 수 없습니다"
+        return name, None, None
+    if (name is None) == (sequence is None):
+        return None, None, (
+            "SEC 문서 locator는 document_name과 document_sequence 중 정확히 하나여야 "
+            f"합니다: name={document_name!r} sequence={document_sequence!r}"
+        )
+    return name, sequence, None
+
+
+def locator_key(document_name: object, document_sequence: object) -> tuple[str, object]:
+    """내부 비교용 typed key. **production `document_name`으로 직렬화하지 않는다.**"""
+    name, sequence, error = document_locator(document_name, document_sequence)
+    if error is not None:
+        raise QVManifestError(error)
+    if name is not None:
+        return (FILE_LOCATOR, name)
+    return (SEQUENCE_LOCATOR, sequence)
+
+
+def locator_label(document_name: object, document_sequence: object) -> str:
+    """오류 메시지 표시. `sequence=2`는 표시이지 문서 이름이 아니다."""
+    if document_name not in (None, ""):
+        return str(document_name)
+    return f"sequence={document_sequence}"
 
 
 # ── 정규 직렬화 / 해시 ────────────────────────────────────────────────────────
@@ -238,15 +313,21 @@ def _normalize_evidence(row: dict, filename: str) -> list[dict]:
         dependency = str(item.get("dependency", "")).strip()
         if dependency not in EVIDENCE_DEPENDENCIES:
             raise QVManifestError(f"{filename}: 모르는 dependency입니다: {dependency!r}")
+        name, sequence, error = document_locator(
+            item.get("document_name"), item.get("document_sequence"), source_kind=kind
+        )
+        if error is not None:
+            raise QVManifestError(f"{filename}: {error}")
         entry = {
             "source_kind": kind,
             "cik": normalize_cik(item.get("cik")),
             "accession": str(item.get("accession", "")).strip(),
-            "document_name": str(item.get("document_name", "")).strip(),
+            "document_name": name,
+            "document_sequence": sequence,
             "evidence_role": str(item.get("evidence_role", "")).strip(),
             "dependency": dependency,
         }
-        if not entry["accession"] or not entry["document_name"] or not entry["evidence_role"]:
+        if not entry["accession"] or not entry["evidence_role"]:
             raise QVManifestError(f"{filename}: evidence 필수 항목이 비었습니다")
         locator = item.get("locator")
         entry["locator"] = str(locator).strip() if locator not in (None, "") else None
@@ -326,7 +407,7 @@ def _evidence_usable_session(
             " WHERE cik = ? AND accession = ? AND source_version = ?",
             (item["cik"], item["accession"], filings_source_version),
         ).fetchone()
-    else:
+    elif item.get("document_name") is not None:
         row = connection.execute(
             "SELECT historical_usable_session FROM qv_sec_evidence_documents"
             " WHERE cik = ? AND accession = ? AND document_name = ?"
@@ -335,6 +416,19 @@ def _evidence_usable_session(
                 item["cik"],
                 item["accession"],
                 item["document_name"],
+                filings_source_version,
+            ),
+        ).fetchone()
+    else:
+        # filename-less embedded 문서는 SEQUENCE로만 찾는다. 파일명을 만들어내지 않는다.
+        row = connection.execute(
+            "SELECT historical_usable_session FROM qv_sec_evidence_documents"
+            " WHERE cik = ? AND accession = ? AND document_sequence = ?"
+            " AND source_version = ?",
+            (
+                item["cik"],
+                item["accession"],
+                item.get("document_sequence"),
                 filings_source_version,
             ),
         ).fetchone()
@@ -362,7 +456,8 @@ def resolve_usable_from_session(
         if session is None:
             raise QVManifestError(
                 "REQUIRED 증거를 원장에서 찾지 못해 materialize할 수 없습니다: "
-                f"{item['source_kind']} {item['accession']} {item['document_name']}"
+                f"{item['source_kind']} {item['accession']} "
+                + locator_label(item.get("document_name"), item.get("document_sequence"))
             )
         required_sessions.append(session)
     if not required_sessions:
@@ -478,7 +573,7 @@ def materialize(
             (
                 IDENTITY_SOURCE,
                 version,
-                "QV identity manifest bundle v2 (3 files, canonical SHA-256)",
+                "QV identity manifest bundle v3 (3 files, typed document locator, canonical SHA-256)",
             ),
         )
         for table in (
@@ -574,15 +669,15 @@ def _insert_evidence(
     connection.executemany(
         "INSERT INTO qv_identity_evidence"
         " (relation_kind, relation_key, evidence_ordinal, source_kind, cik, accession,"
-        "  document_name, evidence_role, locator, dependency, resolved_usable_session,"
-        "  source, source_version, provenance)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "  document_name, document_sequence, evidence_role, locator, dependency,"
+        "  resolved_usable_session, source, source_version, provenance)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 relation_kind, relation_key, ordinal, item["source_kind"], item["cik"],
-                item["accession"], item["document_name"], item["evidence_role"],
-                item["locator"], item["dependency"], item["resolved_usable_session"],
-                IDENTITY_SOURCE, version, provenance,
+                item["accession"], item["document_name"], item["document_sequence"],
+                item["evidence_role"], item["locator"], item["dependency"],
+                item["resolved_usable_session"], IDENTITY_SOURCE, version, provenance,
             )
             for ordinal, item in enumerate(resolved)
         ],

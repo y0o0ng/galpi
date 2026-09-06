@@ -44,14 +44,21 @@ raw SEC 파일·캐시·materialize된 DB는 git 밖에 남는다.
 identity_source_version = "qv-identity-sha256:<SHA256>"
 ```
 
-네 파일 **전부**의 결정론적 정규화에서 나온다.
+세 파일 **전부**의 결정론적 정규화에서 나온다.
 
+- **bundle 스키마 판별자**(현재 `qv-identity-bundle-v3`)가 해시 입력 맨 앞이다
 - 고정 파일 순서(위 목록 그대로)
 - canonical JSON 직렬화(`sort_keys` · 구분자 고정 · 비ASCII 보존)
 - semantic key로 결정론적 행 정렬
 - 의미가 같은 행이 둘이면 거부
 - **무관한 Git commit은 값을 바꾸지 못한다**
 - **의미 있는 내용이 바뀌면 반드시 바뀐다**
+
+bundle 스키마가 앞에 들어가므로 **파일 내용이 그대로여도 계약이 바뀌면
+`identity_source_version`이 바뀐다.** §1.2의 typed document locator 도입이 그렇게
+`v2 -> v3`를 만들었고, 그것은 **의도된 결과**다 — 그 앞의 5A-1 inventory와 5A-2
+checkpoint는 stale이므로 새 구현 뒤에 재사용하지 않는다. `qv-class-id-v1`은 바뀌지
+않는다.
 
 Galpi Git commit은 **provenance/run receipt로 따로** 기록한다.
 **Git commit SHA를 `identity_source_version`으로 쓰지 않는다.**
@@ -66,11 +73,37 @@ survivorship_biased=0`으로 등록한다. **이것이 현재 `securities` 표�
 
 ```text
 source_kind   KQ_FILING | SEC_EVIDENCE_DOCUMENT
-cik · accession · document_name
+cik · accession · document_name | document_sequence
 evidence_role
 locator (있으면)
 dependency    REQUIRED | CORROBORATING
 ```
+
+**문서 주소는 typed locator이고 형태가 정확히 둘이다.**
+
+```text
+file-addressed   document_name = SEC 파일 이름 · document_sequence = null
+filename-less    document_name = null · document_sequence = source-backed <SEQUENCE>
+```
+
+두 번째는 2001년 이전 flat-layout accession의 embedded `<DOCUMENT>`다. 그 시기 문서는
+accession 디렉터리에 개별 파일로 없고, 주소는 **등록인이 SGML header에 명시로 적은
+`<SEQUENCE>`**뿐이다. 자연키는 `(CIK, accession, document_sequence)`이고 그 셋이 유일할
+때만 성립한다.
+
+**만들어내는 주소가 없다.** ordinal · `TYPE + 순번` · `seq:2` 같은 합성 파일명 · 연도
+cutoff · best-effort 복구를 쓰지 않는다. 구조가 결정론적이지 않으면(누락·중복·비숫자·
+비양수 `SEQUENCE`, 경계 손상, 모호한 `TEXT` 구간) 그 accession은 fail-close다.
+
+```text
+KQ_FILING              document_name 필수 · document_sequence는 null
+SEC_EVIDENCE_DOCUMENT  document_name XOR document_sequence
+```
+
+`"2"` 같은 문자열 sequence를 정수로 바꾸지 않고 거부한다 — silent coercion은 그 자리에
+무엇이 있었는지를 지운다. **새 source kind를 만들지 않는다** — embedded 문서도
+`SEC_EVIDENCE_DOCUMENT`이고 다른 것은 주소 방식뿐이다. `TYPE` 권한 규칙도 그대로다 —
+sequence는 법적 권위가 아니다.
 
 ```text
 usable_from_session = max(REQUIRED 증거 전부의 PIT usable session)
@@ -391,15 +424,22 @@ migration 프레임워크를 만들지 않는다.
 `qv_sec_filings`는 **K/Q 계열 filing 원장 그대로 두고 넓히지 않는다**
 (`10-K / 10-K/A / 10-Q / 10-Q/A`).
 
-`qv_sec_evidence_documents`를 따로 둔다. 자연 grain은
-`(cik, accession, document_name, source_version)`이고, **CLOSED된 QV 증거/탐색 사슬이
-실제로 도달하는** 문서만 담는다(8-K/8-K/A · proxy/information statement ·
-charter/articles/EX-3.x · 필요한 등록·법적 filing).
+`qv_sec_evidence_documents`를 따로 둔다. 자연 grain은 §1.2의 typed locator에 따라
+`(cik, accession, document_name, source_version)` **또는**
+`(cik, accession, document_sequence, source_version)`이고, 유일성은 locator 종류마다
+따로 강제한다. **CLOSED된 QV 증거/탐색 사슬이 실제로 도달하는** 문서만 담는다
+(8-K/8-K/A · proxy/information statement · charter/articles/EX-3.x · 필요한 등록·법적
+filing).
 
 **모든 SEC 문서를 창고에 쌓지 않는다. HTML/본문을 DB에 넣지 않는다.**
-보존하는 것은 form · accession · document name · acceptance datetime ·
-acceptance eastern date · historical usable session · primary/exhibit 역할 ·
-SEC source URL · raw 문서 SHA-256 · source/source_version/provenance다.
+보존하는 것은 form · accession · document name **또는** document sequence ·
+acceptance datetime · acceptance eastern date · historical usable session ·
+primary/exhibit 역할 · SEC source URL · raw 문서 SHA-256 ·
+source/source_version/provenance다.
+
+embedded 문서의 `source_url`은 **부모 complete submission URL**이고 SHA-256은 그
+자식의 **raw `<TEXT>` payload 바이트**다. 부모 SHA · `<DOCUMENT>` ordinal · byte
+offset은 audit provenance이지 production 증거 정체성이 아니다 — 여기 넣지 않는다.
 
 PIT usable-session 규칙은 `qv_sec_filings`와 **같다** — SEC/Eastern acceptance
 날짜 **다음**의 첫 정규 SPY 세션이다.

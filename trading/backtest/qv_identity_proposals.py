@@ -164,15 +164,21 @@ class DiscoveryCandidate:
 
 @dataclass(frozen=True)
 class EvidenceRef:
-    """Step 4의 구조화 증거 자연키 모양 그대로. 지역 DB row id를 쓰지 않는다."""
+    """Step 4의 구조화 증거 자연키 모양 그대로. 지역 DB row id를 쓰지 않는다.
+
+    문서 주소는 typed locator다 — `document_name`과 `document_sequence` 중 **정확히
+    하나**를 든다. 두 번째는 2001년 이전 flat layout의 filename 없는 embedded 문서이고
+    등록인이 명시한 `<SEQUENCE>`다.
+    """
 
     source_kind: str
     cik: str
     accession: str
-    document_name: str
+    document_name: str | None
     evidence_role: str
     dependency: str = "REQUIRED"
     locator: str | None = None
+    document_sequence: int | None = None
 
     def as_json(self) -> dict:
         return {
@@ -180,6 +186,7 @@ class EvidenceRef:
             "cik": self.cik,
             "accession": self.accession,
             "document_name": self.document_name,
+            "document_sequence": self.document_sequence,
             "evidence_role": self.evidence_role,
             "dependency": self.dependency,
             "locator": self.locator,

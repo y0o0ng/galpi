@@ -283,14 +283,16 @@ def _table_sql(connection: sqlite3.Connection, name: str) -> str | None:
     return row["sql"] if row is not None else None
 
 
-def _schema_table_ddl(schema_sql: str, name: str) -> str:
+def _schema_table_ddl(
+    schema_sql: str, name: str, end_marker: str = ") WITHOUT ROWID;"
+) -> str:
     start = schema_sql.find(f"CREATE TABLE IF NOT EXISTS {name} (")
     if start < 0:
         raise BacktestStorageError(f"schema.sql에 {name} DDL이 없습니다")
-    end = schema_sql.find(") WITHOUT ROWID;", start)
+    end = schema_sql.find(end_marker, start)
     if end < 0:
         raise BacktestStorageError(f"schema.sql의 {name} DDL이 끝나지 않았습니다")
-    return schema_sql[start : end + len(") WITHOUT ROWID;")]
+    return schema_sql[start : end + len(end_marker)]
 
 
 def _row_count(connection: sqlite3.Connection, name: str) -> int:
@@ -363,10 +365,153 @@ _STEP4_REBUILDABLE_TABLES = (
     "qv_share_basis_candidates",
     "qv_share_basis_class_effects",
     "qv_class_conversion_relations",
-    "qv_identity_evidence",
-    "qv_sec_evidence_documents",
     "qv_xbrl_class_bindings",
 )
+
+
+# ── typed document locator migration (증거 두 표) ─────────────────────────────
+#
+# 이 변경은 **행을 보존할 수 있는 알려진 migration**이다. 기존 evidence 행의
+# `document_name`은 새 계약에서도 그대로 file locator이고 `document_sequence`만
+# NULL로 붙는다. 그래서 두 표는 위의 "비어 있을 때만 재구축"에 맡기지 않는다.
+#
+# ```text
+# 알려진 정확한 옛 스키마  -> 원자적 migration · 모든 행 보존 · sequence = NULL
+# 이미 새 스키마          -> no-op
+# 알 수 없는 스키마       -> BacktestStorageError · 아무것도 바꾸지 않는다
+# ```
+#
+# **의미 추론이 없다.** 범용 migration 틀도 만들지 않는다.
+_EVIDENCE_LOCATOR_PRE_SUFFIX = "_pre_locator"
+_EVIDENCE_LOCATOR_TABLE_END = {
+    "qv_identity_evidence": ") WITHOUT ROWID;",
+    # 새 증거 문서 표는 locator 종류마다 부분 유일 인덱스를 쓰므로 rowid 표다.
+    "qv_sec_evidence_documents": "\n);",
+}
+_EVIDENCE_LOCATOR_INDEXES = {
+    "qv_identity_evidence": (),
+    "qv_sec_evidence_documents": ("idx_qv_evidence_documents_usable",),
+}
+# 옛 행이 그대로 옮겨지는 컬럼들. `document_sequence`는 여기 없으므로 NULL로 남는다.
+_EVIDENCE_LOCATOR_COLUMNS = {
+    "qv_identity_evidence": (
+        "relation_kind", "relation_key", "evidence_ordinal", "source_kind", "cik",
+        "accession", "document_name", "evidence_role", "locator", "dependency",
+        "resolved_usable_session", "source", "source_version", "provenance",
+    ),
+    "qv_sec_evidence_documents": (
+        "cik", "accession", "document_name", "form", "document_role",
+        "acceptance_datetime", "acceptance_eastern_date", "historical_usable_session",
+        "source_url", "document_sha256", "calendar_source", "calendar_source_version",
+        "source", "source_version", "provenance",
+    ),
+}
+
+# 알려진 옛 DDL. `qv_identity_evidence`는 `ISSUER` 어휘가 붙기 전 4c79a74 모양도 같은
+# 표라 둘 다 인식한다 — 그 차이는 relation_kind 어휘 한 줄이고 locator와 무관하다.
+_OLD_IDENTITY_EVIDENCE_DDL = """CREATE TABLE IF NOT EXISTS qv_identity_evidence (
+  relation_kind TEXT NOT NULL CHECK (relation_kind IN (
+    'ISSUER', 'SHARE_CLASS', 'XBRL_ALIAS', 'PROSE_ALIAS', 'CONVERSION_RELATION')),
+  relation_key TEXT NOT NULL CHECK (length(trim(relation_key)) > 0),
+  evidence_ordinal INTEGER NOT NULL CHECK (evidence_ordinal >= 0),
+  source_kind TEXT NOT NULL CHECK (source_kind IN ('KQ_FILING', 'SEC_EVIDENCE_DOCUMENT')),
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),
+  evidence_role TEXT NOT NULL CHECK (length(trim(evidence_role)) > 0),
+  locator TEXT,
+  dependency TEXT NOT NULL CHECK (dependency IN ('REQUIRED', 'CORROBORATING')),
+  resolved_usable_session TEXT
+    CHECK (resolved_usable_session IS NULL OR resolved_usable_session GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (relation_kind, relation_key, evidence_ordinal, source_version)
+) WITHOUT ROWID;"""
+_OLD_EVIDENCE_DOCUMENTS_DDL = """CREATE TABLE IF NOT EXISTS qv_sec_evidence_documents (
+  cik TEXT NOT NULL CHECK (length(cik) = 10 AND cik NOT GLOB '*[^0-9]*'),
+  accession TEXT NOT NULL CHECK (length(trim(accession)) > 0),
+  document_name TEXT NOT NULL CHECK (length(trim(document_name)) > 0),
+  form TEXT NOT NULL CHECK (length(trim(form)) > 0),
+  document_role TEXT NOT NULL CHECK (document_role IN ('PRIMARY', 'EXHIBIT')),
+  acceptance_datetime TEXT NOT NULL
+    CHECK (acceptance_datetime GLOB
+      '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]Z'),
+  acceptance_eastern_date TEXT NOT NULL
+    CHECK (acceptance_eastern_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  historical_usable_session TEXT NOT NULL
+    CHECK (historical_usable_session GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source_url TEXT NOT NULL CHECK (length(trim(source_url)) > 0),
+  document_sha256 TEXT NOT NULL CHECK (length(document_sha256) = 64),
+  calendar_source TEXT NOT NULL,
+  calendar_source_version TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_version TEXT NOT NULL,
+  provenance TEXT NOT NULL CHECK (length(trim(provenance)) > 0),
+  PRIMARY KEY (cik, accession, document_name, source_version),
+  CHECK (historical_usable_session > acceptance_eastern_date)
+) WITHOUT ROWID;"""
+_EVIDENCE_LOCATOR_OLD_DDLS = {
+    "qv_identity_evidence": (
+        _OLD_IDENTITY_EVIDENCE_DDL,
+        _OLD_IDENTITY_EVIDENCE_DDL.replace(
+            "'ISSUER', 'SHARE_CLASS'", "'SHARE_CLASS'", 1
+        ),
+    ),
+    "qv_sec_evidence_documents": (_OLD_EVIDENCE_DOCUMENTS_DDL,),
+}
+
+
+def _migrate_evidence_locators(
+    connection: sqlite3.Connection, schema_sql: str
+) -> list[str]:
+    """증거 두 표를 typed locator 스키마로 옮긴다. **기존 행을 전부 보존한다.**"""
+    pending: list[tuple[str, str]] = []
+    for name in ("qv_identity_evidence", "qv_sec_evidence_documents"):
+        existing = _table_sql(connection, name)
+        if existing is None:
+            continue  # 새 DB. executescript가 그대로 만든다.
+        target = _schema_table_ddl(schema_sql, name, _EVIDENCE_LOCATOR_TABLE_END[name])
+        if _normalized_table_sql(existing) == _normalized_table_sql(target):
+            continue
+        known = {
+            _normalized_table_sql(ddl) for ddl in _EVIDENCE_LOCATOR_OLD_DDLS[name]
+        }
+        if _normalized_table_sql(existing) not in known:
+            raise BacktestStorageError(
+                f"알 수 없는 {name} schema라 locator migration을 하지 않습니다"
+            )
+        if _table_sql(connection, name + _EVIDENCE_LOCATOR_PRE_SUFFIX) is not None:
+            raise BacktestStorageError(
+                f"{name}{_EVIDENCE_LOCATOR_PRE_SUFFIX} 임시 표가 이미 있어 "
+                "migration하지 않습니다"
+            )
+        pending.append((name, target))
+    if not pending:
+        return []
+
+    # 두 표의 계약 상승은 한 transaction에서 끝난다. 중간 상태를 남기지 않는다.
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        for name, target in pending:
+            columns = ", ".join(_EVIDENCE_LOCATOR_COLUMNS[name])
+            temporary = name + _EVIDENCE_LOCATOR_PRE_SUFFIX
+            for index in _EVIDENCE_LOCATOR_INDEXES[name]:
+                connection.execute(f"DROP INDEX IF EXISTS {index}")
+            connection.execute(f"ALTER TABLE {name} RENAME TO {temporary}")
+            connection.execute(
+                target.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
+            )
+            connection.execute(
+                f"INSERT INTO {name} ({columns}) SELECT {columns} FROM {temporary}"
+            )
+            connection.execute(f"DROP TABLE {temporary}")
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    return [name for name, _ in pending]
 
 
 def _rebuild_changed_empty_step4_tables(
@@ -415,6 +560,7 @@ def connect(
     schema_sql = Path(schema_path).read_text(encoding="utf-8")
     _upgrade_ca801b0_qv_sec_filings(connection, schema_sql)
     _migrate_step4_identity(connection, schema_sql)
+    _migrate_evidence_locators(connection, schema_sql)
     _rebuild_changed_empty_step4_tables(connection, schema_sql)
     connection.executescript(schema_sql)
     add_missing_columns(connection)
