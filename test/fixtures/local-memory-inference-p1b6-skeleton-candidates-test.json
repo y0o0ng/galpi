@@ -1,0 +1,81 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-candidates-v1",
+  "candidates": [
+    {
+      "semanticSkeletonId": "p1b6-sk-0000000000000001",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Present status of a contemplated action",
+      "semanticRelations": [
+        "A person states that an action is under consideration.",
+        "The current undecided status is expressed without competing interpretations."
+      ],
+      "decisionBasis": "The uncertainty is the clearly stated user state rather than uncertainty in interpretation.",
+      "contrastGroupId": "p1b6-cg-0000000000000001"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0000000000000002",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Status of a possible plan",
+      "semanticRelations": [
+        "One statement presents an action as a suggestion.",
+        "The available relations do not establish whether the suggestion became an adopted plan."
+      ],
+      "decisionBasis": "The currently applicable commitment status is not established.",
+      "contrastGroupId": "p1b6-cg-0000000000000001"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0000000000000003",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Precedence between incompatible current states",
+      "semanticRelations": [
+        "Two statements support incompatible current states.",
+        "Neither statement retracts the other or establishes precedence."
+      ],
+      "decisionBasis": "The available relations leave current-state precedence unresolved."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0000000000000004",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Referent of the target expression",
+      "semanticRelations": [
+        "The target uses a context-dependent reference.",
+        "More than one antecedent remains materially possible."
+      ],
+      "decisionBasis": "The target referent cannot be selected from the stated relations.",
+      "contrastGroupId": null
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0000000000000005",
+      "splitAssignment": "DEV",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Meaning of a deliberate approximate range",
+      "semanticRelations": [
+        "A single state is expressed as an approximate range.",
+        "No incompatible alternative state is introduced.",
+        "Approximation is part of the resolved meaning."
+      ],
+      "decisionBasis": "Approximation alone does not create interpretive ambiguity."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0000000000000006",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Actuality status of described content",
+      "semanticRelations": [
+        "The content is explicitly introduced as an example.",
+        "Its non-actual status is established without a competing reading."
+      ],
+      "decisionBasis": "Clearly example-only content has a resolved interpretation even though it is not user state."
+    }
+  ]
+}

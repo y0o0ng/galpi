@@ -3581,10 +3581,12 @@ bounded experiment's design, not training execution.
 **DATASET CONTRACT CLOSED / TRAINING PREREGISTRATION INCOMPLETE / NOT RUN.**
 This prospective consolidation was reviewed against Galpi `main` at
 `9e1203c46e69b30040678d317c34c92cb3cb0971`. The dataset decisions marked
-CLOSED below are frozen user decisions. Training, model selection, dataset
-generation, review-tool implementation, and production use remain
-unauthorized. No new case, HUMAN adjudication, model output, or training
-artifact is created here.
+CLOSED below are frozen user decisions. The first skeleton-candidate
+validation and blind Pass-1 review-tool slice was implemented from Galpi
+`main` `7dc562a01138e88488ecfdb8b536952f70e518b9`; later review stages remain
+unimplemented. Training, model selection, dataset generation, and production
+use remain unauthorized. No real candidate, HUMAN adjudication, model output,
+or training artifact was created by that implementation slice.
 
 The research target is adaptation of **only the ~1.7B ambiguity/escalation
 stage**. Given an already-selected, candidate-centered conversational
@@ -3737,6 +3739,36 @@ structures may remain. If the abstract structure lacks stable HUMAN
 ambiguity gold, reject it rather than treating ill-defined gold as useful
 difficulty. A FIX receives a new blind review after editing; its prior HUMAN
 label is not inherited. Generator intent is not authority.
+
+**IMPLEMENTED / FROZEN — skeleton candidate validation and Pass-1 receipt.**
+The candidate envelope identity is
+`xion-local-memory-inference-p1b6-skeleton-candidates-v1` and has exactly
+`name` plus `candidates`; no canonical real candidate artifact exists yet.
+Each candidate has exactly the conceptual fields above, with optional
+`contrastGroupId`. `semanticSkeletonId` uses opaque
+`p1b6-sk-<16 lowercase hex>` form and an optional contrast identity uses
+`p1b6-cg-<16 lowercase hex>` or null. Candidate focus and each of 2–5 ordered
+relations are non-empty and bounded to 300 characters; decision basis is
+non-empty and bounded to 600 characters. IDs are unique, contrast-group
+members remain in one split, and unknown surface/model/training fields are
+rejected. Validation checks structure and enums only; it does not treat the
+generator's `intendedLabel` as semantically correct.
+
+The blind protocol is `xion-p1b6-skeleton-human-pass1-v1`; its completed
+receipt identity is
+`xion-local-memory-inference-p1b6-skeleton-human-pass1-receipt-v1`. Review
+order is the ascending SHA-256 order of `protocolVersion + NUL + opaque ID`;
+if that order ever equals authoring order exactly, it rotates once. It is
+therefore deterministic and non-authoring-order. The UI exposes only candidate
+focus and ordered semantic relations, with no ID or position, and collects
+independent `KEEP / FIX / REJECT` and `CLEAR / ESCALATE` decisions for every
+row. A completed write-once receipt records protocol and fixture identities,
+SHA-256 of the exact raw fixture bytes, completion time, and one minimal
+result per candidate restored to canonical fixture order.
+Interrupted review writes no receipt and never mutates the fixture. Explicit
+input/output paths are operational arguments, not semantic knobs. This slice
+does not implement FIX editing/re-review, Pass 2, catalog freeze, or any
+surface-data workflow.
 
 **HUMAN skeleton review Pass 2.** After Pass-1 labels freeze, conduct a
 catalog-level leakage/coverage audit covering historical-reference and
@@ -4186,12 +4218,13 @@ dataset contract:
 
 - Exact synthetic generation prompt, model/provider, model version,
   settings, and temperature.
-- Exact HUMAN review UI/tool and source-audit UI/tool; any assisting source-
-  audit model/provider.
+- Exact later skeleton FIX/re-review and Pass-2 tools, surface/HELD HUMAN
+  review UI/tool, and source-audit UI/tool; any assisting source-audit
+  model/provider.
 - Exact surface-similarity model/method and threshold.
-- Exact source-locator encoding, JSON artifact filenames/schemas, model-
-  visible renderer/serialization, canonical hash, and deterministic
-  constraint-solver implementation.
+- Exact source-locator encoding, later source/surface/catalog artifact
+  filenames/schemas, model-visible renderer/serialization, canonical hash,
+  and deterministic constraint-solver implementation.
 - Base 1.7B training-checkpoint provenance and final checkpoint choice;
   provenance must be verified before training.
 - SFT/LoRA framework or mechanism, LoRA rank, target modules, learning rate,
@@ -4208,14 +4241,15 @@ dataset contract:
 
 The user intends to choose the training environment and execute training
 interactively with ChatGPT later; this documentation task does not delegate
-or preselect those decisions. Next step is the **dataset/review-tool
-implementation design**—including the exact generation contract,
-serialization, review receipts, and deterministic selector—followed by the
-remaining training preregistration, not training itself. The prospective
-policy still permits a separately preregistered intervention without a
-general untuned-performance entry gate. Before execution, provenance,
-mechanism, metrics, leakage controls, checkpoint selection, and stopping
-rules must be frozen. Training execution, raw episodes, and private replay
-remain **UNOPENED**. Production memory/parsing, DB/Vault/retrieval/routing,
-authority, identity, explicit correction, Core/high-impact gates, and
-architecture contracts remain unchanged.
+or preselect those decisions. Next step is to freeze the **actual abstract
+skeleton authoring/generation contract**, produce the candidate fixture, and
+run the implemented blind Pass-1 review before designing FIX/re-review,
+Pass 2, or catalog freeze. Remaining surface-tool and training
+preregistration follows; training itself does not. The prospective policy
+still permits a separately preregistered intervention without a general
+untuned-performance entry gate. Before execution, provenance, mechanism,
+metrics, leakage controls, checkpoint selection, and stopping rules must be
+frozen. Training execution, raw episodes, and private replay remain
+**UNOPENED**. Production memory/parsing, DB/Vault/retrieval/routing, authority,
+identity, explicit correction, Core/high-impact gates, and architecture
+contracts remain unchanged.
