@@ -3783,8 +3783,10 @@ authoring protocol for this candidate run is frozen at
 `fixtures/local-memory-inference-p1b6-skeleton-authoring-protocol.json`:
 OpenAI Codex `gpt-5.5`, reasoning `medium`, with temperature/decoding knobs
 recorded as platform-controlled rather than invented. Exactly 72 real abstract
-candidates were authored under the frozen distribution, with candidate fixture
-SHA-256 `bda030d6990458da4830d87e106f2b8da4805218313c7cbaa593cb7cf11748ae`.
+candidates were authored under the frozen distribution. The HUMAN-review-
+visible fields are Korean after meaning-preserving review-language
+normalization, with candidate fixture SHA-256
+`c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9`.
 Generator intended labels remain non-authoritative. No HUMAN Pass-1 review
 has occurred, and no skeleton has become approved merely by generation. Next
 step is blind HUMAN Pass-1 using the implemented reviewer.

@@ -20,7 +20,24 @@
   "candidateFixture": {
     "name": "xion-local-memory-inference-p1b6-skeleton-candidates-v1",
     "path": "fixtures/local-memory-inference-p1b6-skeleton-candidates.json",
-    "sha256": "bda030d6990458da4830d87e106f2b8da4805218313c7cbaa593cb7cf11748ae"
+    "reviewerVisibleLanguage": "ko",
+    "previousEnglishSha256": "bda030d6990458da4830d87e106f2b8da4805218313c7cbaa593cb7cf11748ae",
+    "sha256": "c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9"
+  },
+  "reviewLanguageNormalization": {
+    "provider": "OpenAI",
+    "surface": "Codex",
+    "model": "gpt-5.5",
+    "exposedSettings": {
+      "reasoning": "medium"
+    },
+    "platformControlledSettings": [
+      "temperature",
+      "sampling",
+      "decoding",
+      "seed"
+    ],
+    "statement": "candidateFocus and semanticRelations were translated into natural Korean as a meaning-preserving review-language transform. This was not HUMAN adjudication, Pass 2, semantic re-authoring, or a reviewer protocol change."
   },
   "targetCounts": {
     "totalCandidates": 72,
