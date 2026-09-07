@@ -20,7 +20,7 @@
   "candidateFixture": {
     "name": "xion-local-memory-inference-p1b6-skeleton-candidates-v1",
     "path": "fixtures/local-memory-inference-p1b6-skeleton-candidates.json",
-    "sha256": "783e4ea0e294d95a3c8a4082315e3f24a2e90053bcc8d8cedd78063f1ca35549"
+    "sha256": "bda030d6990458da4830d87e106f2b8da4805218313c7cbaa593cb7cf11748ae"
   },
   "targetCounts": {
     "totalCandidates": 72,

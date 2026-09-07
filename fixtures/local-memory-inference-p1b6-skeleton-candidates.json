@@ -188,30 +188,30 @@
       "decisionBasis": "The retraction establishes the current status of the old claim."
     },
     {
-      "semanticSkeletonId": "p1b6-sk-072547caa044f63f",
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
       "splitAssignment": "DEV",
       "boundaryClass": "REVISION / CONFLICT",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Whether a later restatement corrects or merely repeats a stale value",
+      "candidateFocus": "Whether a later correction applies to the same target instance",
       "semanticRelations": [
-        "An older value is assigned to the target.",
-        "An intervening relation changes that value.",
-        "A later relation restates the older value without marking it as quotation, error, correction, or current adoption."
+        "An earlier relation assigns a state to one target instance.",
+        "A later correction relation assigns an incompatible state to a similarly described instance.",
+        "No relation states whether the two instance descriptions identify the same instance or separate instances."
       ],
-      "decisionBasis": "The visible structure does not establish whether the later restatement revives the old value or is a stale repetition."
+      "decisionBasis": "The correction can only determine the current state if it attaches to the same target instance, and that identity relation is absent."
     },
     {
-      "semanticSkeletonId": "p1b6-sk-d24288cb3b97d89c",
+      "semanticSkeletonId": "p1b6-sk-2355452bdd41e4eb",
       "splitAssignment": "DEV",
       "boundaryClass": "REVISION / CONFLICT",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Which of two same-dimension states currently applies",
+      "candidateFocus": "Whether an appended qualifier revises only part of a prior state",
       "semanticRelations": [
-        "Two relations assign different values to the same target dimension.",
-        "Both relations are presented as current-facing.",
-        "The visible structure supplies no correction, recency, or scope relation that selects one."
+        "A prior relation assigns a compound state to the target.",
+        "A later relation adds a qualifier that is incompatible with one component of the compound state.",
+        "No relation states whether the qualifier revises only that component or changes the whole compound state."
       ],
-      "decisionBasis": "The same dimension has competing current-facing assignments with no precedence relation."
+      "decisionBasis": "The visible evidence leaves the scope of the revision over the compound state undetermined."
     },
     {
       "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
@@ -558,17 +558,17 @@
       "decisionBasis": "Applicability turns on category membership criteria that are not established."
     },
     {
-      "semanticSkeletonId": "p1b6-sk-8265b324ea602b3e",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
       "splitAssignment": "FINAL_HELD_OUT",
       "boundaryClass": "SCOPE / APPLICABILITY",
       "intendedLabel": "CLEAR",
-      "candidateFocus": "Scope of an instruction limited to a named subset",
+      "candidateFocus": "Applicability of a rule after explicit transfer to a new container",
       "semanticRelations": [
-        "An instruction is stated for a subset.",
-        "The target is identified as belonging to that subset.",
-        "No relation extends the instruction to the surrounding category."
+        "A rule is stated for items inside a container.",
+        "The target is later placed inside that container.",
+        "No relation exempts transferred targets from the rule."
       ],
-      "decisionBasis": "The subset membership and limited instruction scope are established."
+      "decisionBasis": "The containment relation makes the rule applicable to the target."
     },
     {
       "semanticSkeletonId": "p1b6-sk-302069b96f1406b3",
@@ -664,17 +664,17 @@
       "decisionBasis": "The roleplay frame establishes the actuality status."
     },
     {
-      "semanticSkeletonId": "p1b6-sk-f9e1b5eb6d96125a",
+      "semanticSkeletonId": "p1b6-sk-59c8f51891ab4996",
       "splitAssignment": "DEV",
       "boundaryClass": "ACTUALITY",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Whether a paraphrased report is endorsed or only relayed",
+      "candidateFocus": "Whether a simulated result is reported as actual observation",
       "semanticRelations": [
-        "The target state is introduced as a paraphrase of another source.",
-        "A later relation evaluates the usefulness of that paraphrase.",
-        "No relation states whether the user endorses the target state itself."
+        "The target state appears after a simulation frame is introduced.",
+        "A later relation describes the target state as a result.",
+        "No relation states whether the result belongs to the simulation frame or to an actual observation."
       ],
-      "decisionBasis": "The visible structure leaves relaying versus adopting the reported state undetermined."
+      "decisionBasis": "The actuality frame of the reported result is not established by visible relations."
     },
     {
       "semanticSkeletonId": "p1b6-sk-32f27410e2beb10c",
