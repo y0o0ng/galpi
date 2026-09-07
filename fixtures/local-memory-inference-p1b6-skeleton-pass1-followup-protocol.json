@@ -1,0 +1,64 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-pass1-followup-protocol-v1",
+  "protocolIdentity": "p1b6-skeleton-pass1-followup-review-slice-v1",
+  "startingMainSha": "12162a4d57894fe76cbb79590b4864f164ccbe1c",
+  "originalCandidateFixture": {
+    "path": "fixtures/local-memory-inference-p1b6-skeleton-candidates.json",
+    "sha256": "c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9",
+    "immutableInThisSlice": true
+  },
+  "originalPass1Receipt": {
+    "path": "fixtures/local-memory-inference-p1b6-skeleton-human-pass1-receipt.json",
+    "sha256": "428f802a283ad9cddec6370595ceb157c95573cadcc252529898f419fd6fec75",
+    "immutableInThisSlice": true
+  },
+  "followupCandidateFixture": {
+    "name": "xion-local-memory-inference-p1b6-skeleton-pass1-followup-candidates-v1",
+    "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-candidates.json",
+    "sha256": "60348d0c9f83dc19f26fa7632f602551017c1b6813f0d5500b1b3b7c1bcb9285",
+    "candidateCount": 4
+  },
+  "sourceDecisions": {
+    "fixSourceIds": [
+      "p1b6-sk-11a3e916ff9b8129",
+      "p1b6-sk-f2fb3e894c37caac",
+      "p1b6-sk-4e7a29da8a3037a4"
+    ],
+    "rejectSourceIds": [
+      "p1b6-sk-eb1cd528d84aa3f2",
+      "p1b6-sk-348ebfd24bb7d3f5"
+    ],
+    "keepClearCorrection": {
+      "sourceId": "p1b6-sk-43016ef6da889a87",
+      "correctedDisposition": "KEEP",
+      "correctedAmbiguityLabel": "CLEAR"
+    },
+    "replacementMapping": {
+      "p1b6-sk-eb1cd528d84aa3f2": "p1b6-sk-3622bd6548e4d782"
+    },
+    "noReplacementSourceIds": [
+      "p1b6-sk-348ebfd24bb7d3f5"
+    ]
+  },
+  "replacementGenerator": {
+    "provider": "OpenAI",
+    "surface": "Codex",
+    "model": "gpt-5.5",
+    "exposedSettings": {
+      "reasoning": "medium"
+    },
+    "platformControlledSettings": [
+      "temperature",
+      "sampling",
+      "decoding",
+      "seed"
+    ],
+    "settingsStatement": "Temperature, sampling, decoding, and seed controls were not exposed as numeric settings in this Codex session; they are platform-controlled and not invented."
+  },
+  "excludedWork": [
+    "Pass 2 is not performed in this slice.",
+    "Exact-56 catalog freeze is not performed in this slice.",
+    "Surface generation and surface data workflows are not performed in this slice.",
+    "The completed 72-case Pass-1 fixture and receipt are not mutated or reopened."
+  ]
+}

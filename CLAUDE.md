@@ -96,7 +96,7 @@
 - **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** P1-B3 run artifacts를 커밋했고 결과 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
 - **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 위 canonical study 문서에 있다.
 - **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
-- **P1-B6 candidate fixture는 authored이고 HUMAN Pass-1이 다음이다.** 정본은 `fixtures/local-memory-inference-p1b6-skeleton-candidates.json`과 위 canonical study다. 학습 실행·raw episode·private replay는 `UNOPENED`, production은 그대로다.
+- **P1-B6 72-case HUMAN Pass-1은 완료됐고 4-case follow-up blind review가 다음이다.** 정본은 `fixtures/local-memory-inference-p1b6-skeleton-human-pass1-receipt.json`, `fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-candidates.json`, 위 canonical study다. Pass 2·exact-56 freeze·surface generation·학습 실행·raw episode·private replay는 `UNOPENED`, production은 그대로다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

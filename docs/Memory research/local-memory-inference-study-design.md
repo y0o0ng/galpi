@@ -3778,7 +3778,7 @@ input/output paths are operational arguments, not semantic knobs. This slice
 does not implement FIX editing/re-review, Pass 2, catalog freeze, or any
 surface-data workflow.
 
-**AUTHORED / NOT HUMAN REVIEWED — real skeleton candidate fixture.** The
+**PASS-1 COMPLETE / FOLLOW-UP REVIEW SLICE IMPLEMENTED — real skeleton candidate fixture.** The
 authoring protocol for this candidate run is frozen at
 `fixtures/local-memory-inference-p1b6-skeleton-authoring-protocol.json`:
 OpenAI Codex `gpt-5.5`, reasoning `medium`, with temperature/decoding knobs
@@ -3787,9 +3787,29 @@ candidates were authored under the frozen distribution. The HUMAN-review-
 visible fields are Korean after meaning-preserving review-language
 normalization, with candidate fixture SHA-256
 `c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9`.
-Generator intended labels remain non-authoritative. No HUMAN Pass-1 review
-has occurred, and no skeleton has become approved merely by generation. Next
-step is blind HUMAN Pass-1 using the implemented reviewer.
+Generator intended labels remain non-authoritative. HUMAN Pass-1 completed
+with receipt
+`fixtures/local-memory-inference-p1b6-skeleton-human-pass1-receipt.json`
+(`428f802a283ad9cddec6370595ceb157c95573cadcc252529898f419fd6fec75`).
+The original 72-case fixture and Pass-1 receipt are frozen and are not edited
+by follow-up work.
+
+Resolved HUMAN follow-up decisions: `p1b6-sk-11a3e916ff9b8129`,
+`p1b6-sk-f2fb3e894c37caac`, and `p1b6-sk-4e7a29da8a3037a4` require FIX and
+blind re-review; their prior HUMAN ambiguity labels are not inherited.
+`p1b6-sk-eb1cd528d84aa3f2` and `p1b6-sk-348ebfd24bb7d3f5` are rejected, but
+only `p1b6-sk-eb1cd528d84aa3f2` requires one genuinely new
+FINAL_HELD_OUT / PERSISTENCE replacement. `p1b6-sk-348ebfd24bb7d3f5`
+receives no replacement. `p1b6-sk-43016ef6da889a87` is corrected to
+KEEP + CLEAR. The `p1b6-sk-4e7a29da8a3037a4` FIX uses Option A: a later
+range for the same target and measurement dimension explicitly refines the
+earlier approximate point; CLEAR rests on that refinement relation, not
+mere numerical overlap. The follow-up candidate/protocol artifacts are
+`fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-candidates.json`
+and
+`fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-protocol.json`.
+Follow-up review precedes Pass 2; Pass 2, exact-56 freeze, and surface
+generation remain unperformed.
 
 **HUMAN skeleton review Pass 2.** After Pass-1 labels freeze, conduct a
 catalog-level leakage/coverage audit covering historical-reference and
