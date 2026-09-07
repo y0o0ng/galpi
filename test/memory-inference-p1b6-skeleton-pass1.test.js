@@ -72,7 +72,12 @@ test('P1-B6 skeleton fixture accepts only the frozen exact abstract schema', () 
     () => skeletons.validateSkeletonCandidateFixture({ ...fixture, metadata: {} }),
     /name과 candidates만/,
   );
-  assert.throws(() => skeletons.validateSkeletonCandidateFixture({ ...fixture, candidates: [] }));
+  for (const candidates of [[], fixture.candidates.slice(0, 1)]) {
+    assert.throws(
+      () => skeletons.validateSkeletonCandidateFixture({ ...fixture, candidates }),
+      /최소 2개 candidate/,
+    );
+  }
 });
 
 test('P1-B6 skeleton validation rejects duplicate IDs, semantic IDs, invalid enums, and bad relation counts', () => {
@@ -118,9 +123,13 @@ test('contrast-group members must stay in one split', () => {
   );
 });
 
-test('blind prompt exposes only focus and ordered relations, never hidden authoring metadata', () => {
+test('blind prompt shows the fixed ambiguity rubric and only candidate focus/relations', () => {
   const candidate = loadFixture().candidates[0];
   const prompt = skeletons.renderBlindReviewPrompt(candidate);
+  assert.equal(prompt.startsWith(skeletons.FIXED_AMBIGUITY_RUBRIC), true);
+  assert.match(prompt, /Explicit user uncertainty, tentativeness, provisionality, temporariness, approximation, or negative status may be CLEAR/u);
+  assert.match(prompt, /ESCALATE only when materially different decision-relevant interpretations remain unresolved/u);
+  assert.match(prompt, /CLEAR does not mean durable or memory-worthy/u);
   assert.equal(prompt.includes(candidate.candidateFocus), true);
   let cursor = -1;
   for (const relation of candidate.semanticRelations) {
@@ -132,10 +141,20 @@ test('blind prompt exposes only focus and ordered relations, never hidden author
     candidate.semanticSkeletonId,
     candidate.splitAssignment,
     candidate.boundaryClass,
-    candidate.intendedLabel,
     candidate.decisionBasis,
     candidate.contrastGroupId,
   ]) assert.equal(prompt.includes(hidden), false, hidden);
+
+  const hiddenMetadataChanged = {
+    ...candidate,
+    semanticSkeletonId: 'p1b6-sk-ffffffffffffffff',
+    splitAssignment: 'DEV',
+    boundaryClass: 'REFERENT',
+    intendedLabel: candidate.intendedLabel === 'CLEAR' ? 'ESCALATE' : 'CLEAR',
+    decisionBasis: 'A different hidden decision basis.',
+    contrastGroupId: 'p1b6-cg-ffffffffffffffff',
+  };
+  assert.equal(skeletons.renderBlindReviewPrompt(hiddenMetadataChanged), prompt);
 
   const source = fs.readFileSync(REVIEWER_SOURCE, 'utf8');
   assert.doesNotMatch(source, /authoring.?key|historical.*(?:report|output)|catalog.*\.json|fixtures\//iu);
@@ -229,6 +248,10 @@ test('complete review writes one canonical-order result per candidate and output
     },
   );
   assert.equal(prompts.length, fixture.candidates.length * 2);
+  assert.equal(
+    prompts.filter(prompt => prompt.includes(skeletons.FIXED_AMBIGUITY_RUBRIC)).length,
+    fixture.candidates.length,
+  );
   assert.equal(receipt.name, skeletons.REVIEW_RECEIPT_NAME);
   assert.equal(receipt.protocolVersion, skeletons.REVIEW_PROTOCOL_VERSION);
   assert.equal(receipt.candidateFixture, skeletons.CANDIDATE_FIXTURE_NAME);

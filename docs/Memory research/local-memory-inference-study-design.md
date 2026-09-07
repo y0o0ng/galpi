@@ -3752,7 +3752,8 @@ relations are non-empty and bounded to 300 characters; decision basis is
 non-empty and bounded to 600 characters. IDs are unique, contrast-group
 members remain in one split, and unknown surface/model/training fields are
 rejected. Validation checks structure and enums only; it does not treat the
-generator's `intendedLabel` as semantically correct.
+generator's `intendedLabel` as semantically correct. A reviewable fixture
+contains at least two candidates, so a non-authoring-order review is possible.
 
 The blind protocol is `xion-p1b6-skeleton-human-pass1-v1`; its completed
 receipt identity is
@@ -3760,11 +3761,17 @@ receipt identity is
 order is the ascending SHA-256 order of `protocolVersion + NUL + opaque ID`;
 if that order ever equals authoring order exactly, it rotates once. It is
 therefore deterministic and non-authoring-order. The UI exposes only candidate
-focus and ordered semantic relations, with no ID or position, and collects
-independent `KEEP / FIX / REJECT` and `CLEAR / ESCALATE` decisions for every
-row. A completed write-once receipt records protocol and fixture identities,
-SHA-256 of the exact raw fixture bytes, completion time, and one minimal
-result per candidate restored to canonical fixture order.
+focus and ordered semantic relations, with no ID or position. Every candidate
+receives the same fixed rubric: explicit user uncertainty, tentativeness,
+provisionality, temporariness, approximation, or negative status may be CLEAR
+when that semantic status itself is unambiguous; ESCALATE applies only when
+materially different decision-relevant interpretations remain unresolved;
+and CLEAR does not mean durable or memory-worthy. The rubric is protocol text,
+not candidate metadata. The reviewer then gives independent
+`KEEP / FIX / REJECT` and `CLEAR / ESCALATE` decisions for every row. A
+completed write-once receipt records protocol and fixture identities, SHA-256
+of the exact raw fixture bytes, completion time, and one minimal result per
+candidate restored to canonical fixture order.
 Interrupted review writes no receipt and never mutates the fixture. Explicit
 input/output paths are operational arguments, not semantic knobs. This slice
 does not implement FIX editing/re-review, Pass 2, catalog freeze, or any
