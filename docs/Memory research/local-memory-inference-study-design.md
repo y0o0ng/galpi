@@ -3608,6 +3608,36 @@ referent/scope/applicability/temporal evidence falsely cleared. This bounded
 failure profile motivates experimental adaptation; it does not overturn
 the B5 successor disposition or demonstrate that training will succeed.
 
+#### CLOSED — interpretation uncertainty, not user uncertainty
+
+Every item asks one invariant question:
+
+> Does the model-visible target and selected evidence establish one
+> sufficiently resolved decision-relevant interpretation for downstream
+> durability classification, or does material interpretive ambiguity remain?
+
+P1-B6 classifies uncertainty in the interpretation available to the system,
+not uncertainty that the user clearly expresses as their state. A known
+unresolved user state is not an unresolved system interpretation. Therefore
+explicitly tentative, undecided, provisional, temporary, approximate,
+negative, or otherwise unresolved user state can be `CLEAR` when that status
+itself is unambiguously established. For example, `I haven't decided yet.`,
+`I'm still choosing between A and B.`, and `I'm thinking about doing A.` are
+not `ESCALATE` merely because the user has not made a final choice.
+
+Use `ESCALATE` when the target's materially relevant semantic status itself
+cannot be determined—for example, the evidence does not establish whether A
+is a suggestion or an adopted plan, or two fragments support incompatible
+current states and neither is retracted or given precedence. This distinction
+applies across all eight boundary classes. Approximation alone remains
+non-ambiguous when it expresses one coherent approximate state.
+
+`CLEAR` means only that interpretation is sufficiently resolved for the next
+stage. It does not mean durable, final, desirable, true forever, memory-worthy,
+or write-authorized. P1-B6 does not resolve an ambiguous referent or perform
+durability, extraction, raw candidate discovery, hard-gate, or mutation-
+authority decisions.
+
 #### CLOSED — supervised corpus and historical diagnostic separation
 
 The previous decision to add the consumed historical P1-B3 60 cases to
@@ -3638,13 +3668,21 @@ No missing identity or content for those reference groupings is synthesized
 by this documentation update.
 
 The final supervised 380 must contain exactly **190 CLEAR and 190 ESCALATE**.
-No additional exact per-split or per-skeleton label quota is imposed.
+DEV must contain **at least 15 CLEAR and 15 ESCALATE**; FINAL HELD-OUT must
+contain **at least 20 CLEAR and 20 ESCALATE**. These 25% coverage floors reserve
+examples for both error directions; they do not establish statistical
+sufficiency or acceptance/adoption thresholds. Exact 30/30 DEV and 40/40 FINAL
+balance is not required. No further exact per-split or per-skeleton label
+quota is imposed. The HELD count follows its frozen skeleton labels and
+five-cases-per-skeleton rule, so its floor requires at least four of the 16
+HELD skeletons for each label without requiring an exact 8/8 allocation.
 
 #### CLOSED — supervised semantic-skeleton catalog
 
 The final approved new catalog must contain exactly **56 semantic
 skeletons**; this freezes its inventory and split allocation, not a claim
-that the later authoring/review artifacts already exist:
+that the later authoring/review artifacts already exist. No individual
+skeleton becomes approved until it completes the review process below:
 
 | Boundary class | TRAIN | DEV | FINAL HELD-OUT | Total |
 |---|---:|---:|---:|---:|
@@ -3686,6 +3724,9 @@ test; it is neither a source-derived memory proposition nor necessarily a
 serving-time field. Do not put concrete conversations, names, dates, numbers,
 domains, language assignments, fragment counts, durability labels,
 extraction schemas, or historical model output into semantic structure.
+No draft example or generator label is authoritative. In particular, an
+unambiguous relation equivalent to “I have not decided between A and B yet”
+cannot remain an `ESCALATE` skeleton merely because the final choice is absent.
 
 **HUMAN skeleton review Pass 1.** Show only semantic content needed to judge
 the structure, such as candidate focus and semantic relations. Hide generator
@@ -3709,13 +3750,38 @@ deficient split. An accepted surface realization must retain its approved
 skeleton HUMAN label; an opposite blind surface label requires FIX/re-review
 or rejection, not silent reassignment.
 
+**Catalog feasibility before final approval/freeze.** After blind skeleton
+review and the leakage/coverage audit, check whether the proposed HUMAN labels
+and split assignments can support the final split sizes, overall 190/190
+balance, DEV/FINAL label floors, representation of every skeleton, and five
+cases per HELD skeleton. This checks feasible case allocations; it does not
+invent surface cases. Final catalog approval and freeze require this check to
+pass. Actual fragment/language coverage and pool eligibility are additionally
+checked against the reviewed surface pool before final selection.
+
+Distinguish an insufficient surface pool from an infeasible skeleton catalog.
+If the catalog can support the counts but accepted surfaces are missing,
+author additional surfaces and run the required audits/reviews. If the
+skeleton HUMAN-label/split composition itself cannot support the counts, do
+not freeze the catalog: return to skeleton authoring, blind review, and catalog
+audit with genuinely different replacement structures. Adding surfaces of the
+same fixed-label skeleton cannot repair that failure. Do not change HUMAN
+labels to fit counts or duplicate a skeleton into another split. Recheck
+feasibility after any proposed catalog revision.
+
 #### CLOSED — serving-shape, anchors, fragments, and future-builder boundary
+
+**Anchor correction before dataset authoring.** The complete-turn-only
+anchor decision is **REOPENED AND SUPERSEDED** by exact source-span
+addressing. A shared turn can contain separately judged targets with
+different gold; whole-turn references alone need not distinguish them.
+This prospective P1-B6 correction changes no historical B1–B5 contract/data.
 
 A new surface item conceptually contains:
 
 ```text
 source episode
-+ anchorTurnRefs
++ anchorSpanRefs
 + 1..5 selected conversational fragments
 + one ambiguity gold
 ```
@@ -3730,15 +3796,51 @@ a new study intention may ground an exercise-centered item and a study-
 centered item when later evidence develops each separately. This overlap is
 expected, not leakage within the split.
 
-`anchorTurnRefs` reference **complete source turns**, not substrings,
-character offsets, extracted clauses, or rewritten propositions. At least one
-anchor is a USER turn. Assistant anchor/context turns may supply a question,
-referent, or conversational context, but an assistant statement cannot
-independently become user-state authority. Anchors identify and ground the
-expression/state/question under ambiguity judgment without pre-resolving its
-referent, scope, persistence, or other interpretation. Consequently, a
-grounded target with unresolved referent remains a valid `ESCALATE` item;
-the anchor contract must not make REFERENT ambiguity impossible.
+`anchorSpanRefs` are **exact verbatim source-span locators** within identified
+source turns. A locator may cover a complete turn when that already identifies
+one decision target and the complete turn is genuinely the smallest
+appropriate target; anchors need not be artificially shorter. Sub-turn spans
+are allowed where needed. The complete containing turn remains unchanged in
+the selected evidence. For example,
+`운동은 확정했고, 공부는 아직 못 정했어.` can support separate items anchored
+at `운동은 확정했고` and `공부는 아직 못 정했어`; the same visible turn alone
+would not identify which target is being judged.
+
+An anchor locates **what source expression/state/question is under judgment**,
+not its answer. It is not a rewritten candidate proposition, normalized value,
+summary, durability label, or extraction result. Selecting a target can involve
+semantic judgment, but the selection is a fallible processing annotation, not
+new source evidence or user-state authority. No serving-time semantic
+`candidateFocus` field is introduced.
+
+Target localization must preserve source-local operators materially necessary
+to identify what the source says, including applicable negation, modality,
+uncertainty or finality marking, local quantification, and local scope. Do not
+reduce `운동을 시작할까 생각 중이야` to an anchor equivalent to `운동을 시작`
+and thereby erase its modality. This does not authorize the builder to resolve
+external referents, infer a normalized proposition, or perform extraction.
+
+Use one target expression where sufficient. Multiple anchor spans must jointly
+identify the same single decision target, not silently combine independent
+candidates or assert an unresolved coreference link; supporting mentions may
+remain ordinary context. At least one anchor lies in a USER source turn.
+Assistant anchor/context turns may supply questions or context, but cannot
+independently become user-state authority.
+
+**Target identifiability is not interpretation resolution.** A target such as
+`그건 기본값을 4로 해.` remains valid `ESCALATE` when `그` has no resolved
+referent in the selected evidence. Anchor selection must not choose its
+antecedent, settle scope/finality, or omit competing relevant evidence to make
+the target look CLEAR. Conversely, an unmarked choice between independent
+targets is an item-definition defect, not useful REFERENT ambiguity.
+
+The model and HUMAN reviewer must see the target location within the evidence.
+A span alone is not a guarantee of a well-defined task: if deciding which
+state/aspect is being judged still requires hidden skeleton metadata or an
+author's unstated question, FIX/re-review or reject the item. Item IDs or
+unexplained candidate ordinals cannot disambiguate it. Under the same task
+contract, identical model-visible evidence and target marking must not carry
+different gold because of an invisible target distinction.
 
 For the final supervised 380, exact fragment-count case totals are:
 
@@ -3766,11 +3868,14 @@ same turn or episode may instead support multiple separately anchored and
 adjudicated items. P1-B6 assumes the relevant evidence bundle has already
 been selected.
 
-Determining which raw-conversation spans belong together is a later
-**Evidence Bundle Builder** problem, outside B6. A possible future component
-could read raw context, locate multiple relevant spans, and return source
-references/verbatim evidence with provenance rather than a newly interpreted
-summary. That component is **not opened, specified, or selected here**.
+Determining which raw-conversation spans belong together and selecting target
+source anchors belong to the future **Evidence Bundle Builder** responsibility,
+not the ambiguity specialist. This does not introduce a separate Candidate
+Formation subsystem or require the builder to extract a final memory
+proposition/value. Candidate discovery and target localization are semantic
+work, not merely offset bookkeeping. Its implementation remains **OUT OF
+SCOPE / UNOPENED**; success on preselected HUMAN-reviewed bundles would not
+establish that an automatic builder can construct them reliably.
 B6 neither trains nor evaluates raw-episode evidence discovery, and this
 section opens no raw-episode experiment or bundler implementation. Only these
 interface-relevant observations are retained: one episode can produce 0..N
@@ -3780,30 +3885,92 @@ from downstream `NO_WRITE`. Candidate discovery, thread tracking,
 coreference, and bundle construction remain future research questions; no
 algorithm, model, heuristic, service, or production architecture is selected.
 
+**Prospective downstream target continuity.** Ambiguity, durability, and
+extraction must retain the same source-grounded target and original selected
+evidence; structured decisions control flow, not replacement evidence.
+Durability judges that target only after CLEAR, and extraction derives the
+requested content from evidence without rediscovering an unmarked candidate.
+Existing B1–B5 evidence-only prompts do not implement this anchor-aware input.
+The later hybrid interface/prompt versions must be explicitly specified and
+tested; this correction neither edits frozen prompts nor claims that B1's
+bounded one-fact extraction already supports general proposition extraction.
+
 Recommended source-normalized storage shape, **conceptual only**:
 
 ```text
 sourceEpisodes:
   sourceEpisodeId
   splitAssignment
-  ordered source turns
+  point-in-time / version identity
+  ordered immutable source turns
 
 items:
   itemId
   sourceEpisodeId
   semanticSkeletonId
-  anchorTurnRefs
-  1..5 fragment definitions referencing source turns
+  anchorSpanRefs
+  1..5 fragment references into source turns
   authoring metadata
   HUMAN review/gold metadata in its appropriate artifact/layer
 ```
 
-Source text has one canonical representation rather than separate anchor-
-text copies. Every anchor reference must point to a turn contained in the
-item's selected evidence. Exact JSON filenames, review-receipt schemas,
-canonical serialization/hashing, and renderer implementation remain for the
-subsequent dataset/review-tool implementation design; these details are not
+Source text has one canonical representation. Anchors reference an exact
+occurrence in an immutable source version, using episode/turn identity and
+version/content identity; copied text alone cannot distinguish repeated text.
+Every anchor span must be inside the item's selected evidence. This follows
+the architecture's EvidenceRef source/locator boundary (§51.2–51.4), without
+requiring a new registry implementation for the dataset.
+
+Anchor text displayed to reviewer/model is resolved from that source. Any
+optional stored quote is a checked cache, not a second source of truth.
+Source edits require a new version, revalidation of all affected references,
+and new blind HUMAN review of each affected item before reuse. Do not silently
+normalize/rewrite source text, fuzzy-rematch a stale anchor, or treat locator
+failure as semantic ESCALATE. The eventual addressing unit must be explicit
+and preserve exact source identity across Unicode/normalization boundaries;
+tokenizer-token indices are not frozen as source addresses.
+
+Exact byte/character addressing, JSON filenames, review-receipt schemas,
+canonical serialization/hashing, and renderer implementation remain **OPEN**
+for the subsequent dataset/review-tool implementation design. Freeze those
+details before producing annotations that depend on them; they are not new
 architecture semantics.
+
+#### CLOSED — point-in-time source/bundle completeness audit
+
+P1-B6 separates **semantic incompleteness** from **selection
+incompleteness**. Semantic incompleteness means that the complete source
+evidence available at the item's point-in-time snapshot genuinely leaves the
+target unresolved; this may correctly yield `ESCALATE`. Selection
+incompleteness means that material evidence exists in that snapshot but was
+omitted from the selected bundle; this is a construction failure and must not
+be converted into `ESCALATE` gold.
+
+Before blind HUMAN ambiguity review, a separate source auditor inspects the
+frozen point-in-time source-episode snapshot, target span(s), and selected
+fragments. The audit asks only whether unselected source evidence could
+reasonably change, resolve, contradict, or otherwise alter the target's
+decision-relevant interpretation or its `CLEAR`/`ESCALATE` judgment. This
+includes evidence affecting referent, current-state precedence, finality,
+scope, persistence, actuality, contradiction, revision, or retraction.
+Redundant restatement need not be included, and a valid bundle need not copy
+the full transcript.
+
+The source auditor does not assign ambiguity gold. Hide generator intent and
+skeleton HUMAN label where practical. Conceptual outcomes may include `PASS`,
+missing material evidence, target not identifiable, and invalid source
+mapping; the exact enum, schema, and tool remain OPEN. Only `PASS` items enter
+blind surface-gold review.
+
+Completeness is assessed only against evidence available in the frozen source
+snapshot when the item is defined. Later conversation is not hindsight
+evidence against an earlier bundle. Exact timestamp/version schema remains
+OPEN, but future evidence must not retroactively change completeness.
+
+A material edit to an anchor, selected evidence/fragments, or source mapping
+after source audit or HUMAN review invalidates the affected decisions. The
+item must restart at source/bundle audit, receive `PASS`, and then receive a
+new blind HUMAN review; prior gold is not inherited.
 
 #### CLOSED — realistic discourse and authored order
 
@@ -3838,11 +4005,14 @@ order.
 `about`, `around`, `roughly`, and equivalent mixed-language approximations
 do not by themselves require ESCALATE.
 A deliberately approximate point/range can be CLEAR when it expresses one
-sufficiently coherent state for downstream classification. Materially
-different unresolved candidate states—e.g. weekly versus biweekly without
-a final resolution—require ESCALATE. How approximation is represented in
-a downstream extraction schema is outside B6 and is not decided by the
-ambiguity stage.
+sufficiently coherent state for downstream classification. An explicit state
+such as `매주 할지 격주로 할지 아직 고민 중이야` is CLEAR when that indecision
+is unambiguously established. Use ESCALATE when evidence about the currently
+applicable state conflicts and the model-visible evidence does not establish
+the relation or precedence between those claims. Absence of a final user
+choice alone does not require ESCALATE. How approximation is represented in a
+downstream extraction schema is outside B6 and is not decided by the ambiguity
+stage.
 
 #### CLOSED — language and surface authoring pool
 
@@ -3852,7 +4022,7 @@ coverage must resemble plausible conversation, not awkward token-level
 language mixing.
 
 Author approximately **500 surface candidates**—roughly 315 TRAIN, 80 DEV,
-and 105 FINAL HELD-OUT—to retain the exact final split sizes. These are
+and 105 HELD-eligible—to retain the exact final split sizes. These are
 generation directions, not exact pool quotas. Do not force exact per-
 skeleton candidate counts. Approximate generation-stage fragment targets
 may be 92 / 132 / 158 / 92 / 26 for 1 / 2 / 3 / 4 / 5 fragments; only the
@@ -3878,12 +4048,17 @@ leakage identity.
 
 #### CLOSED — primary HUMAN surface review
 
-The primary reviewer sees only the actual item's anchor source turns and
-selected evidence fragments. Hide intended label, semantic skeleton ID,
-boundary class, split, surface domain, discourse-pattern label, and generator
-rationale. Judgment uses only the selected evidence that the P1-B6 model
-would receive; unseen source-episode turns cannot determine gold. If required
-information exists only in an unselected turn, FIX or reject the item.
+Only a source/bundle-audit `PASS` item is eligible. The gold reviewer sees only
+the B6 model-visible input: selected evidence fragments with exact target
+source spans visibly marked, including their unchanged containing turns. The
+target distinction must also be visible to the model; a reviewer-only
+highlight cannot define its task. The reviewer does not see the full hidden
+source episode. Hide intended label, semantic skeleton ID, boundary class,
+split, surface domain, discourse-pattern label, and generator rationale.
+Judgment uses only the selected evidence that the model would receive; omitted
+turns cannot determine gold. Material evidence hidden from the model is a
+construction failure for the source/bundle audit, not information available
+to the gold reviewer.
 
 The reviewer independently chooses `KEEP / FIX / REJECT` and
 `CLEAR / ESCALATE`; HUMAN gold is authoritative. Difficult but human-
@@ -3891,16 +4066,19 @@ resolvable cases may remain. Ill-defined gold, incoherent targets, or
 implausible conversation must be rejected rather than converted to
 ESCALATE. A surface label opposite to its approved skeleton HUMAN label
 cannot remain an accepted realization without FIX/re-review or rejection.
-A FIX is blindly re-reviewed on its final edited evidence/anchors; neither
-the previous HUMAN label nor generator intent is inherited.
+Repeated mismatch triggers review of that skeleton's natural realizability
+and semantic stability.
+A FIX follows the full restart rule above; neither the previous HUMAN label
+nor generator intent is inherited.
 
-#### CLOSED — two independent split-leakage protections
+#### CLOSED — three independent split-leakage protections
 
-Both constraints are mandatory:
+All three constraints are mandatory:
 
 ```text
 semantic-skeleton split integrity
 + source-episode split integrity
++ surface-realization split integrity
 ```
 
 Near-paraphrases or simple entity/domain substitutions of one semantic
@@ -3913,43 +4091,93 @@ row-random item splitting. Historical reference skeletons also participate
 in near-duplicate detection even though the historical 60 are excluded from
 every supervised split and from selection.
 
-#### CLOSED — FINAL HELD-OUT repeated blind HUMAN pass
+Distinct skeleton and episode IDs are necessary but not sufficient. Across
+splits, prohibit exact or near-verbatim conversational evidence, mechanical
+entity/domain/number/language substitutions, and lexical paraphrases of
+essentially the same authored dialogue realization. Automated text,
+embedding, or similarity checks may later flag suspect pairs, but HUMAN
+judgment is final authority. A confirmed cross-split surface duplicate or
+near-duplicate is a hard leakage failure and must be removed or re-authored
+before pool freeze. Exact similarity method, model, and threshold remain OPEN.
 
-After primary review and evidence freeze for the final 80 held-out items:
+#### CLOSED — HELD pool review before deterministic FINAL selection
 
-1. Opaquely reorder the items.
-2. The same HUMAN reviewer performs a second blind pass.
-3. Hide the first HUMAN label and disposition, generator intended label,
-   and family/skeleton metadata.
-4. Record disagreements.
-5. Re-review the underlying evidence visible to the model to resolve them.
-6. Freeze final HUMAN gold.
+Repeated review precedes selection of the FINAL 80:
 
-This is a **blind repeated HUMAN pass**, not an independent second reviewer.
-Only after held-out evidence and final HUMAN gold freeze may any model output
-be inspected. FINAL HELD-OUT is never used for checkpoint/hyperparameter
-selection. After model output is seen, do not edit, replace, or rebalance
-held-out evidence/items.
+```text
+authored HELD pool
+-> source/bundle audit PASS
+-> primary blind HUMAN review
+-> accepted HELD-eligible pool
+-> evidence and target freeze
+-> blind repeated HUMAN pass on every eligible accepted candidate
+-> disagreement resolution and candidate-pool HUMAN gold freeze
+-> leakage/constraint validation
+-> deterministic selection of FINAL 80
+```
+
+Opaque-reorder the eligible pool before Pass 2. The same HUMAN reviewer
+performs this **blind repeated HUMAN pass**; it is not an independent second
+reviewer. Hide the Pass-1 label and disposition, generator intended label,
+generator rationale, and skeleton/boundary metadata where practical. Record
+each disagreement and resolve it using only the same frozen model-visible
+evidence. Do not edit evidence during disagreement resolution. If editing is
+needed, the item exits the frozen pool and restarts the applicable source
+audit and blind-review path.
+
+No P1-B6 model output may be inspected on FINAL candidates before source
+audit, both HUMAN passes, disagreement resolution, pool gold freeze,
+deterministic selection, and dataset freeze. FINAL HELD-OUT is never used for
+checkpoint or hyperparameter selection. Once FINAL model output has been
+inspected, that evaluation version's evidence, targets, HUMAN gold, case
+membership, and distribution are immutable. Later-discovered defects receive
+a separate erratum explaining their impact on interpretation; preserve the
+original evaluation inputs and results. Calling a change an error correction
+does not permit editing or replacing the frozen evaluation set.
+
+#### CLOSED — FINAL HELD-OUT coverage and reporting
+
+FINAL HELD-OUT contains exactly **16 held-out semantic skeletons × 5 accepted
+surface cases each = 80 cases**. TRAIN and DEV require representation of all
+their approved skeletons but no equal per-skeleton case count. If a held
+skeleton cannot yield five valid cases, mark selection **INFEASIBLE**, author
+additional candidates for that skeleton, run the required audits and blind
+reviews, refreeze the eligible pool, and rerun deterministic selection. Do not
+lower review quality or force weak cases to meet the count.
+
+FINAL analysis reports at least overall micro results, `ESCALATE` safety/error
+behavior, unnecessary escalation/CLEAR-side error behavior, per-skeleton
+results, a macro result across the 16 held skeletons, and a boundary-class
+breakdown. Exact acceptance/adoption thresholds remain OPEN. Equal synthetic
+coverage is a capability-evaluation design, not a claim about production
+ambiguity frequency; real system-value weighting remains governed by the
+separate workload-frequency observation contract.
 
 #### CLOSED — deterministic final selection
 
-After the accepted pool freezes, choose the final 380 through deterministic,
-constrained, non-interactive selection—not aesthetic hand-picking. Hard
-constraints are:
+After skeleton review, source/bundle audit, blind surface review, cross-split
+leakage audit, repeated HELD review, disagreement resolution, and eligible-
+pool gold freeze, choose the final 380 through deterministic, constrained,
+non-interactive selection—not aesthetic hand-picking. Hard constraints are:
 
 - TRAIN 240, DEV 60, FINAL HELD-OUT 80;
 - CLEAR 190 and ESCALATE 190 overall;
+- DEV at least 15 cases of each label; FINAL at least 20 of each label;
 - exact overall fragment-count and language totals;
-- all 56 approved new skeletons represented by at least one final surface
-  instance;
-- source-episode split integrity and semantic-skeleton split integrity.
+- all 56 approved new skeletons represented in their assigned split;
+- exactly five cases for each of the 16 FINAL HELD-OUT skeletons;
+- semantic-skeleton, source-episode, and surface-realization split integrity.
 
 Use a reproducible ranking/tie-break based on canonical item identity/hash
 or another explicitly reproducible mechanism. Exact serialization, hash,
 and solver implementation are selected later. If no valid 380-case subset
-exists, **FAIL CLOSED**: report the deficient region, author more cases for
-it, blind-review them, refreeze the accepted pool, and rerun deterministic
-selection. Do not force favored items into the dataset.
+exists, **FAIL CLOSED** and identify whether the cause is surface-pool
+shortage or catalog infeasibility using the catalog-feasibility rule above.
+For a surface shortage, author targeted cases, run all required audits and
+reviews, refreeze the eligible pool, and rerun selection. A catalog-level
+failure must return to skeleton review; it must not loop through additional
+fixed-label surfaces. Do not force favored items into the dataset or weaken
+frozen constraints after seeing model results.
 
 #### OPEN — required later decisions, not selected here
 
@@ -3958,8 +4186,12 @@ dataset contract:
 
 - Exact synthetic generation prompt, model/provider, model version,
   settings, and temperature.
-- Exact HUMAN review UI/tool implementation and exact model-visible text
-  serialization/renderer.
+- Exact HUMAN review UI/tool and source-audit UI/tool; any assisting source-
+  audit model/provider.
+- Exact surface-similarity model/method and threshold.
+- Exact source-locator encoding, JSON artifact filenames/schemas, model-
+  visible renderer/serialization, canonical hash, and deterministic
+  constraint-solver implementation.
 - Base 1.7B training-checkpoint provenance and final checkpoint choice;
   provenance must be verified before training.
 - SFT/LoRA framework or mechanism, LoRA rank, target modules, learning rate,
@@ -3969,8 +4201,9 @@ dataset contract:
 - Standalone ambiguity acceptance thresholds and full-hybrid fresh-held-out
   acceptance/adoption rule.
 - Adapter merge/GGUF conversion, deployment, or production authorization.
-- Future raw Evidence Bundle Builder implementation and future candidate-
-  discovery/coreference/thread-tracking algorithm.
+- Future raw Evidence Bundle Builder implementation, including model family,
+  heuristic, embeddings, retrieval, threshold, service architecture, and
+  candidate-discovery/coreference/thread-tracking algorithm.
 - Raw-episode evaluation and private natural XION replay.
 
 The user intends to choose the training environment and execute training
