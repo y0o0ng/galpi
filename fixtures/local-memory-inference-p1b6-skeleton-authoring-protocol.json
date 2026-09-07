@@ -1,0 +1,77 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-authoring-protocol-v1",
+  "protocolIdentity": "p1b6-abstract-semantic-skeleton-authoring-run-v1",
+  "startingMainSha": "6334f38c6f5bb3977aad729071a6dfeaa84382e3",
+  "generator": {
+    "provider": "OpenAI",
+    "surface": "Codex",
+    "model": "gpt-5.5",
+    "exposedSettings": {
+      "reasoning": "medium"
+    },
+    "platformControlledSettings": [
+      "temperature",
+      "sampling",
+      "decoding",
+      "seed"
+    ],
+    "settingsStatement": "Temperature, decoding, sampling, and seed controls were not exposed as user-configurable numeric settings in this Codex session; they are recorded as platform-controlled and not invented."
+  },
+  "candidateFixture": {
+    "name": "xion-local-memory-inference-p1b6-skeleton-candidates-v1",
+    "path": "fixtures/local-memory-inference-p1b6-skeleton-candidates.json",
+    "sha256": "82b29eec4cb865162aa09aed64b48e1123a51e8559377658839a169eeeda7ba0"
+  },
+  "targetCounts": {
+    "totalCandidates": 72,
+    "boundaryClasses": {
+      "FINALITY / COMMITMENT": 9,
+      "REVISION / CONFLICT": 9,
+      "PERSISTENCE / EXCEPTION": 9,
+      "REFERENT": 9,
+      "SCOPE / APPLICABILITY": 9,
+      "ACTUALITY": 9,
+      "COMPLEMENTARY EVIDENCE": 9,
+      "APPROXIMATION / RANGE": 9
+    },
+    "splits": {
+      "TRAIN": 32,
+      "DEV": 20,
+      "FINAL_HELD_OUT": 20
+    },
+    "intendedLabels": {
+      "CLEAR": 36,
+      "ESCALATE": 36
+    },
+    "splitIntendedLabels": {
+      "TRAIN": {
+        "CLEAR": 16,
+        "ESCALATE": 16
+      },
+      "DEV": {
+        "CLEAR": 10,
+        "ESCALATE": 10
+      },
+      "FINAL_HELD_OUT": {
+        "CLEAR": 10,
+        "ESCALATE": 10
+      }
+    },
+    "contrastGroups": {
+      "total": 8,
+      "membersPerGroup": 2,
+      "split": "TRAIN",
+      "intendedLabelsPerGroup": {
+        "CLEAR": 1,
+        "ESCALATE": 1
+      }
+    }
+  },
+  "authoringPromptBlock": "BEGIN P1-B6 AUTHORING PROMPT\n\nTask:\nAuthor privacy-safe abstract semantic skeletons for the XION P1-B6 ambiguity\nspecialist.\n\nThe fixed classifier question is:\n\n\"Does the candidate focus and visible semantic evidence establish one\nsufficiently resolved decision-relevant interpretation for downstream\ndurability classification?\"\n\nP1-B6 classifies interpretation uncertainty, not uncertainty expressed by the\nuser as part of a clearly understood state.\n\nTherefore an explicitly tentative, undecided, provisional, temporary,\napproximate, negative, example-only, or otherwise non-final state can be\nCLEAR when that status itself is semantically established.\n\nESCALATE applies only when a materially relevant semantic status of the target\ncannot itself be determined from the visible semantic structure.\n\nCLEAR does not mean durable.\nCLEAR does not mean memory-worthy.\nCLEAR does not mean true forever.\nCLEAR does not mean WRITE.\nDo not perform durability or extraction.\n\nCreate abstract semantic structures only.\n\nEvery candidate must be judgeable using ONLY:\n- candidateFocus\n- semanticRelations\n\ndecisionBasis is hidden rationale.\nIt MUST NOT contain a semantic fact required for the label that is absent from\ncandidateFocus + semanticRelations.\n\nboundaryClass, splitAssignment, intendedLabel, contrastGroupId, and IDs are\nalso hidden from the HUMAN reviewer and therefore MUST NOT be necessary to\nunderstand the task.\n\ncandidateFocus:\n- use a neutral abstract description of the aspect being judged;\n- do not encode the intended answer;\n- do not include concrete people, products, schedules, domains, names,\n  numbers, dates, or surface dialogue.\n\nsemanticRelations:\n- use 2–5 ordered, atomic semantic relations;\n- describe what semantic relations are present in the hypothetical evidence;\n- remain domain-independent;\n- provide enough information for a HUMAN to make the ambiguity judgment;\n- do not hide necessary information in decisionBasis;\n- do not use CLEAR or ESCALATE in visible semantic text;\n- avoid meta-label shortcuts such as simply saying \"the interpretation is\n  ambiguous/unambiguous\", \"the case is resolved/unresolved\", or equivalent\n  wording;\n- instead describe the actual relation that causes the judgment.\n\ndecisionBasis:\n- explain the generator's reasoning;\n- may summarize facts already expressed in visible fields;\n- must not add hidden evidence;\n- is not HUMAN gold.\n\nImportant semantic distinctions:\n\nFINALITY / COMMITMENT:\nCover distinctions involving suggestion, consideration, adoption, finality,\nexplicitly undecided status, confirmation, and stance.\nDo not equate \"not finalized\" with ESCALATE.\nAn explicitly established undecided/tentative stance may be CLEAR.\n\nREVISION / CONFLICT:\nCover correction, retraction, supersession, precedence, coexistence,\ndimension-specific revision, and current-state relation.\nESCALATE only when the applicable current relation/precedence itself cannot be\ndetermined.\n\nPERSISTENCE / EXCEPTION:\nCover durable default, bounded temporary state, recurring behavior, one-off\nexception, future interval, and whether persistence/exception status is\nsemantically established.\nA clearly temporary state may be CLEAR.\n\nREFERENT:\nCover whether a target expression's referent is recoverable from the stated\nsemantic relations.\nDo not resolve a referent in hidden metadata.\nIf multiple materially plausible antecedents remain, the visible structure\nmust itself show why.\n\nSCOPE / APPLICABILITY:\nCover scope attachment, category membership, general-vs-specific rules,\nexceptions, precedence, and applicability.\nDo not use generic \"insufficient information\"; specify the semantic relation\nwhose applicability remains indeterminate.\n\nACTUALITY:\nCover user state versus quotation, example, roleplay, another person's state,\nhistorical report, observed system state, and current actual assertion.\nClearly example-only or non-user content may be CLEAR when actuality status is\nknown.\n\nCOMPLEMENTARY EVIDENCE:\nCover cases where several partial semantic relations jointly establish a\nsingle status, and cases where a materially necessary relation remains absent\nor conflicting.\nDo not create arbitrary missing-context puzzles.\n\nAPPROXIMATION / RANGE:\nApproximation by itself is not ambiguity.\nA coherent approximate point/range/cadence may be CLEAR.\nUse ESCALATE only when a materially different interpretation remains, such as\nan unresolved basis, unit, relation between alternatives, or other\ndecision-relevant semantic dimension.\n\nAcross all classes:\n\n- Prefer natural semantic situations that could realistically arise from\n  conversation.\n- Do not create philosophical edge cases with no plausible serving relevance.\n- Do not create identity/correction/Core/governance hard-gate cases that belong\n  outside P1-B6.\n- Do not perform durability classification.\n- Do not perform extraction.\n- Do not encode specific surface language.\n- Do not encode fragment count.\n- Do not encode future model behavior.\n- Do not mention historical model failures inside skeleton fields.\n- Do not mechanically paraphrase another candidate.\n- Do not treat domain/entity/number/language substitutions as new skeletons.\n- Do not create a candidate whose label depends on generator intention rather\n  than the visible semantic structure.\n- Difficult is allowed; ill-defined is not.\n\nEvery candidate should represent a genuinely distinct decision-relevant\nsemantic relation.\n\nEND P1-B6 AUTHORING PROMPT",
+  "generationTimestamp": "2026-09-07T04:53:39Z",
+  "notes": [
+    "Generator intended labels are authoring metadata only and are not HUMAN gold.",
+    "HUMAN Pass-1 review has not been run.",
+    "No skeleton is approved by generation."
+  ]
+}

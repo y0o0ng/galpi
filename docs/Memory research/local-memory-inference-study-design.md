@@ -3743,7 +3743,8 @@ label is not inherited. Generator intent is not authority.
 **IMPLEMENTED / FROZEN — skeleton candidate validation and Pass-1 receipt.**
 The candidate envelope identity is
 `xion-local-memory-inference-p1b6-skeleton-candidates-v1` and has exactly
-`name` plus `candidates`; no canonical real candidate artifact exists yet.
+`name` plus `candidates`. The canonical real candidate artifact is
+`fixtures/local-memory-inference-p1b6-skeleton-candidates.json`.
 Each candidate has exactly the conceptual fields above, with optional
 `contrastGroupId`. `semanticSkeletonId` uses opaque
 `p1b6-sk-<16 lowercase hex>` form and an optional contrast identity uses
@@ -3776,6 +3777,17 @@ Interrupted review writes no receipt and never mutates the fixture. Explicit
 input/output paths are operational arguments, not semantic knobs. This slice
 does not implement FIX editing/re-review, Pass 2, catalog freeze, or any
 surface-data workflow.
+
+**AUTHORED / NOT HUMAN REVIEWED — real skeleton candidate fixture.** The
+authoring protocol for this candidate run is frozen at
+`fixtures/local-memory-inference-p1b6-skeleton-authoring-protocol.json`:
+OpenAI Codex `gpt-5.5`, reasoning `medium`, with temperature/decoding knobs
+recorded as platform-controlled rather than invented. Exactly 72 real abstract
+candidates were authored under the frozen distribution, with candidate fixture
+SHA-256 `82b29eec4cb865162aa09aed64b48e1123a51e8559377658839a169eeeda7ba0`.
+Generator intended labels remain non-authoritative. No HUMAN Pass-1 review
+has occurred, and no skeleton has become approved merely by generation. Next
+step is blind HUMAN Pass-1 using the implemented reviewer.
 
 **HUMAN skeleton review Pass 2.** After Pass-1 labels freeze, conduct a
 catalog-level leakage/coverage audit covering historical-reference and

@@ -1,0 +1,957 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-candidates-v1",
+  "candidates": [
+    {
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Commitment status of a considered course of action",
+      "semanticRelations": [
+        "The target concerns a course of action that is still being weighed.",
+        "No relation presents the course of action as already adopted.",
+        "The present stance is the act of consideration itself."
+      ],
+      "decisionBasis": "The visible structure establishes a tentative stance as the current status, so interpretation can proceed without treating the lack of adoption as interpretive uncertainty.",
+      "contrastGroupId": "p1b6-cg-0357cb1a70fdbf94"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Commitment status of a proposed course of action",
+      "semanticRelations": [
+        "The target concerns a course of action first introduced as a proposal.",
+        "A later approving response may address either the proposal or only the preceding discussion.",
+        "No relation specifies whether the proposal itself became the adopted stance."
+      ],
+      "decisionBasis": "The visible structure leaves the decision-relevant adoption relation undetermined, so the current commitment status cannot be selected.",
+      "contrastGroupId": "p1b6-cg-0357cb1a70fdbf94"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-de16754758b5bb97",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of a provisional preference",
+      "semanticRelations": [
+        "A preference is presented with an explicit provisional qualifier.",
+        "The qualifier applies to the preference rather than to a separate alternative.",
+        "No later relation removes or upgrades the provisional status."
+      ],
+      "decisionBasis": "The provisional status is itself the established interpretation; finality is not required for CLEAR."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-7e613818545d04bc",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Adoption status after acknowledgment",
+      "semanticRelations": [
+        "A suggested stance is followed by an acknowledgment.",
+        "The acknowledgment can attach to receipt of the suggestion or to acceptance of it.",
+        "No relation distinguishes receipt from adoption."
+      ],
+      "decisionBasis": "The status that matters for downstream classification is whether the stance was adopted; the visible evidence leaves that relation open."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-db0908294e6deb6f",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Standing of an explicitly rejected option",
+      "semanticRelations": [
+        "The target option is placed in a set of possibilities.",
+        "A later relation excludes that option from the user's current stance.",
+        "No relation reintroduces the option as active."
+      ],
+      "decisionBasis": "The negative current status is established; CLEAR does not require a positive adopted preference."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-75fa233a7cee369e",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Current status of a deliberately postponed decision",
+      "semanticRelations": [
+        "The target decision is explicitly deferred.",
+        "The deferral is presented as the current stance toward the decision.",
+        "No relation claims a selection was made elsewhere."
+      ],
+      "decisionBasis": "A known postponement is a determinate interpretation for the ambiguity stage."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether a preference statement is exploratory or settled",
+      "semanticRelations": [
+        "One relation presents attraction to a stance.",
+        "Another relation requests comparison with alternatives.",
+        "The visible structure does not state whether attraction is only exploratory or the current chosen stance."
+      ],
+      "decisionBasis": "The decision-relevant status between exploration and chosen preference is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-6b74f6c163e7fa5d",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Commitment status after explicit confirmation",
+      "semanticRelations": [
+        "A possible action is introduced before a later confirmation.",
+        "The confirmation directly targets the same action.",
+        "No relation limits the confirmation to discussion-only acknowledgment."
+      ],
+      "decisionBasis": "The adoption relation is present in the visible structure."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether a conditional plan has become active",
+      "semanticRelations": [
+        "The target action is tied to a prerequisite condition.",
+        "A later relation says the topic should be kept in mind.",
+        "No relation says whether the prerequisite condition now holds."
+      ],
+      "decisionBasis": "The active commitment status depends on a condition whose status is not visible."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Current-state relation after an explicit replacement",
+      "semanticRelations": [
+        "An earlier state is stated for the target.",
+        "A later state is introduced as replacing the earlier one.",
+        "The replacement relation applies to the same target and same dimension."
+      ],
+      "decisionBasis": "Precedence is established by the replacement relation, so there is one current interpretation.",
+      "contrastGroupId": "p1b6-cg-25b9b6e0a8cc73b4"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-49e0f357eda8365c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Current-state relation between two incompatible statements",
+      "semanticRelations": [
+        "An earlier state is stated for the target.",
+        "A later incompatible state concerns the same target and same dimension.",
+        "No relation marks either statement as replacing, correcting, or limiting the other."
+      ],
+      "decisionBasis": "The visible structure gives incompatible states without an applicable precedence relation.",
+      "contrastGroupId": "p1b6-cg-25b9b6e0a8cc73b4"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-82149f27c2f521ae",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Coexistence of two dimension-specific updates",
+      "semanticRelations": [
+        "One relation updates a first dimension of the target.",
+        "A second relation updates a different dimension of the same target.",
+        "The dimensions do not compete for the same slot."
+      ],
+      "decisionBasis": "The two updates coexist because they apply to separate dimensions."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aad4e8523ca5f042",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Precedence between a correction and a reiterated older state",
+      "semanticRelations": [
+        "A correction relation changes the target state.",
+        "A later relation repeats the older state without saying it is a retraction or reminder.",
+        "The visible structure does not specify whether the repetition supersedes or merely restates stale wording."
+      ],
+      "decisionBasis": "The applicable current relation between correction and later repetition is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-e7da7f4bbf645574",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of an explicitly retracted prior claim",
+      "semanticRelations": [
+        "A prior claim is tied to the target.",
+        "A later relation retracts that prior claim.",
+        "No replacement claim is needed to know the prior claim no longer stands."
+      ],
+      "decisionBasis": "The retraction establishes the current status of the old claim."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-072547caa044f63f",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Relation between a broad update and an earlier specific exception",
+      "semanticRelations": [
+        "An earlier relation creates a specific exception for the target.",
+        "A later broad update addresses the surrounding category.",
+        "No relation says whether the broad update removes, preserves, or bypasses the exception."
+      ],
+      "decisionBasis": "The current status of the exception is decision-relevant and not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-d24288cb3b97d89c",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Which of two same-dimension states currently applies",
+      "semanticRelations": [
+        "Two relations assign different values to the same target dimension.",
+        "Both relations are presented as current-facing.",
+        "The visible structure supplies no correction, recency, or scope relation that selects one."
+      ],
+      "decisionBasis": "The same dimension has competing current-facing assignments with no precedence relation."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Current relation after narrowing a broad statement",
+      "semanticRelations": [
+        "A broad state is stated for a category.",
+        "A later relation narrows that state to a specific subcase.",
+        "The narrowing relation is presented as the applicable refinement."
+      ],
+      "decisionBasis": "The broad claim and later refinement have an established precedence relation."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-ab85f961c71f1bb5",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REVISION / CONFLICT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether two asserted differences are conflict or independent updates",
+      "semanticRelations": [
+        "Two relations describe changes involving the same target.",
+        "The first relation concerns a property that may overlap with the second relation's property.",
+        "The visible structure does not specify whether the properties are the same dimension or separate dimensions."
+      ],
+      "decisionBasis": "Without the dimension relation, coexistence versus conflict cannot be determined."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-ae65e2ec3789a8e5",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of a durable default with a bounded exception",
+      "semanticRelations": [
+        "A default pattern is stated for the target.",
+        "A separate relation creates an exception with a bounded interval.",
+        "The exception is tied to the interval rather than replacing the default."
+      ],
+      "decisionBasis": "The relation between default and bounded exception is explicit, so persistence status is established.",
+      "contrastGroupId": "p1b6-cg-b7a6390627e152a5"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-67d79991996ef494",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Status of a changed pattern after a one-time departure",
+      "semanticRelations": [
+        "A default pattern is stated for the target.",
+        "A later relation describes a departure from that pattern.",
+        "No relation says whether the departure is a bounded exception or the new ongoing pattern."
+      ],
+      "decisionBasis": "The visible structure does not establish exception versus replacement.",
+      "contrastGroupId": "p1b6-cg-b7a6390627e152a5"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9ef1bb2b5c5e2d7f",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Meaning of a temporary state",
+      "semanticRelations": [
+        "The target state is explicitly tied to a limited period.",
+        "The limited period is part of the asserted status.",
+        "No relation presents the state as continuing beyond that period."
+      ],
+      "decisionBasis": "Temporary status is established and does not by itself require escalation."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether a recurring behavior persists after a disruption",
+      "semanticRelations": [
+        "A recurring behavior is stated for the target.",
+        "A later relation says the behavior stopped during a circumstance.",
+        "No relation says whether the behavior resumed, stayed stopped, or became conditional after the circumstance."
+      ],
+      "decisionBasis": "The persistence status after the disruption is decision-relevant and not visible."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-63b9e434ba146408",
+      "splitAssignment": "DEV",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of a one-off exception",
+      "semanticRelations": [
+        "A usual pattern is established for the target.",
+        "A later relation marks a single occurrence as departing from the pattern.",
+        "The departure is not presented as changing the usual pattern."
+      ],
+      "decisionBasis": "The one-off exception relation is established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9dedffcaacc2426f",
+      "splitAssignment": "DEV",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of a future bounded interval",
+      "semanticRelations": [
+        "The target state is assigned only to a future interval.",
+        "The interval boundary is part of the stated relation.",
+        "No relation claims the state already applies outside that interval."
+      ],
+      "decisionBasis": "The future-limited applicability is the established status."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f2fb3e894c37caac",
+      "splitAssignment": "DEV",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether a pause is temporary or indefinite",
+      "semanticRelations": [
+        "A previously recurring pattern is followed by a pause relation.",
+        "The pause relation does not include a boundary, trigger, or replacement pattern.",
+        "No later relation supplies a status after the pause begins."
+      ],
+      "decisionBasis": "The persistence status cannot be determined from the visible relations."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-001178537fb93442",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of a recurring behavior with stated cadence",
+      "semanticRelations": [
+        "The target behavior is described as recurring.",
+        "A cadence relation attaches to that behavior.",
+        "No exception or stop relation competes with the cadence."
+      ],
+      "decisionBasis": "The recurring status and cadence relation are established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-eb1cd528d84aa3f2",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Applicability of an exception after a broad restatement",
+      "semanticRelations": [
+        "A default state is followed by an exception relation.",
+        "A later broad restatement repeats the default state.",
+        "The visible structure does not say whether the restatement includes or excludes the exception case."
+      ],
+      "decisionBasis": "The exception's continuing applicability is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Referent of a target expression after a single active antecedent",
+      "semanticRelations": [
+        "The target expression refers back to a prior mentioned item.",
+        "Only one prior item has the required semantic role.",
+        "No competing antecedent matches that role."
+      ],
+      "decisionBasis": "The visible antecedent structure selects one referent.",
+      "contrastGroupId": "p1b6-cg-444986fab1759f08"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-264280ddad65a8da",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Referent of a target expression with multiple active antecedents",
+      "semanticRelations": [
+        "The target expression refers back to a prior mentioned item.",
+        "Two prior items both have the required semantic role.",
+        "No relation chooses between the two items for the target expression."
+      ],
+      "decisionBasis": "The visible structure leaves multiple materially plausible referents.",
+      "contrastGroupId": "p1b6-cg-444986fab1759f08"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Target of an elliptical confirmation",
+      "semanticRelations": [
+        "A question introduces one candidate target.",
+        "The following elliptical confirmation occurs in direct response to that question.",
+        "No intervening relation introduces another candidate target."
+      ],
+      "decisionBasis": "Adjacency and question-answer relation identify the target."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9dc48f4b2f10775d",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Target of an elliptical confirmation after multiple prompts",
+      "semanticRelations": [
+        "Two candidate targets are introduced before an elliptical confirmation.",
+        "The confirmation is compatible with either target.",
+        "No relation indicates which prompt the confirmation answers."
+      ],
+      "decisionBasis": "The target of the confirmation is not recoverable from visible relations."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-61cb1285dd1df651",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Referent of a comparative expression",
+      "semanticRelations": [
+        "The target expression is comparative.",
+        "The comparison set contains a single previously mentioned alternative.",
+        "The compared property is shared by the target and that alternative."
+      ],
+      "decisionBasis": "The comparison relation identifies the referent."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-66ecb02cbfc40c3c",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Referent of a role-based expression",
+      "semanticRelations": [
+        "The target expression selects an entity by role.",
+        "More than one active entity has that role.",
+        "No relation marks one role-holder as the active target."
+      ],
+      "decisionBasis": "Multiple role-compatible referents remain."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9af7e76a84e97be0",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Referent after a topic shift",
+      "semanticRelations": [
+        "A target expression follows a topic shift.",
+        "An older antecedent and a newer antecedent both match the expression's semantic type.",
+        "No relation states whether the expression continues the old topic or attaches to the new one."
+      ],
+      "decisionBasis": "The topic-shift relation does not select one antecedent."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11a3e916ff9b8129",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Referent of a repeated shorthand label",
+      "semanticRelations": [
+        "A shorthand label is introduced for one target.",
+        "The same shorthand is later used without any competing label assignment.",
+        "No other active target is assigned that shorthand."
+      ],
+      "decisionBasis": "The label assignment relation supplies the referent."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-379bd3b3dd05d85e",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REFERENT",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Referent of a category shorthand",
+      "semanticRelations": [
+        "The target expression names a category rather than a unique item.",
+        "Several active items belong to that category.",
+        "No relation narrows the category to a single item or intended subset."
+      ],
+      "decisionBasis": "The category reference has materially multiple possible targets."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Applicability of a rule with an explicitly attached exception",
+      "semanticRelations": [
+        "A general rule applies to a category.",
+        "An exception relation is attached to a named subcategory.",
+        "The target belongs to the exception subcategory."
+      ],
+      "decisionBasis": "The applicability relation is established by category membership and exception attachment.",
+      "contrastGroupId": "p1b6-cg-1826d1fddc7d53fa"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Applicability of a rule with a possible exception",
+      "semanticRelations": [
+        "A general rule applies to a category.",
+        "An exception relation is attached to a subcategory.",
+        "The target may or may not belong to that exception subcategory, and no membership relation is provided."
+      ],
+      "decisionBasis": "The rule's applicability depends on a membership relation absent from the visible structure.",
+      "contrastGroupId": "p1b6-cg-1826d1fddc7d53fa"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-348ebfd24bb7d3f5",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Scope of a constraint attached to a single target",
+      "semanticRelations": [
+        "A constraint is stated immediately after one target is introduced.",
+        "The constraint repeats a property unique to that target.",
+        "No broader category is introduced for the constraint to attach to."
+      ],
+      "decisionBasis": "The scope attachment points to the single target."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Scope of a trailing qualifier",
+      "semanticRelations": [
+        "A qualifier follows two coordinated targets.",
+        "The qualifier is semantically compatible with either the second target alone or both targets together.",
+        "No relation marks the qualifier's attachment boundary."
+      ],
+      "decisionBasis": "The visible structure leaves the scope attachment materially indeterminate."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-d8ca287837bcc32d",
+      "splitAssignment": "DEV",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Applicability of a specific override",
+      "semanticRelations": [
+        "A broad rule is stated for a category.",
+        "A later specific rule targets the same item.",
+        "The specific rule is presented as taking precedence for that item."
+      ],
+      "decisionBasis": "Specific override precedence is visible."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "splitAssignment": "DEV",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Applicability of a general rule to a borderline member",
+      "semanticRelations": [
+        "A general rule applies to members of a category.",
+        "The target shares some but not all defining relations of that category.",
+        "No relation states whether partial membership is sufficient for the rule."
+      ],
+      "decisionBasis": "Applicability turns on category membership criteria that are not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-8265b324ea602b3e",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Scope of an instruction limited to a named subset",
+      "semanticRelations": [
+        "An instruction is stated for a subset.",
+        "The target is identified as belonging to that subset.",
+        "No relation extends the instruction to the surrounding category."
+      ],
+      "decisionBasis": "The subset membership and limited instruction scope are established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-302069b96f1406b3",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Applicability when an exception is explicitly excluded",
+      "semanticRelations": [
+        "A rule applies to a category.",
+        "An exception exists for a subcategory.",
+        "The target is stated not to belong to the exception subcategory."
+      ],
+      "decisionBasis": "The exclusion relation makes the rule applicable to the target."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Which target a shared modifier limits",
+      "semanticRelations": [
+        "A shared modifier appears after a list of targets.",
+        "The modifier can semantically restrict the entire list or only the final target.",
+        "No relation identifies the modifier's intended span."
+      ],
+      "decisionBasis": "The modifier's scope is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-b4a6776ed886de2d",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Actuality status of example-only content",
+      "semanticRelations": [
+        "The target content is introduced as an example scenario.",
+        "The example relation covers the state being judged.",
+        "No relation presents the state as the user's actual state."
+      ],
+      "decisionBasis": "The non-actual example status is established.",
+      "contrastGroupId": "p1b6-cg-5e2d462b5ef6fe95"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-609043b6b1fb92e4",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Actuality status of content adjacent to an example",
+      "semanticRelations": [
+        "An example scenario is introduced before the target state appears.",
+        "The target state can be read as continuing the example or as a separate current assertion.",
+        "No relation closes the example frame or attaches the target state to it."
+      ],
+      "decisionBasis": "The actual-user-state versus example-frame relation is not established.",
+      "contrastGroupId": "p1b6-cg-5e2d462b5ef6fe95"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Actuality status of quoted content",
+      "semanticRelations": [
+        "The target content is marked as someone else's quoted statement.",
+        "The quotation relation covers the state being judged.",
+        "No relation adopts the quoted state as the user's own state."
+      ],
+      "decisionBasis": "The quotation frame establishes non-user actuality."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether a reported state is adopted by the user",
+      "semanticRelations": [
+        "The target state is attributed to another speaker.",
+        "A later relation expresses alignment with some part of that report.",
+        "No relation specifies whether the alignment adopts the target state itself."
+      ],
+      "decisionBasis": "The user's actuality relation to the reported state is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-714725eea477a631",
+      "splitAssignment": "DEV",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of a roleplay assertion",
+      "semanticRelations": [
+        "A roleplay frame is active for the target content.",
+        "The target state belongs to the role assumed inside that frame.",
+        "No relation exits the roleplay frame before the target state."
+      ],
+      "decisionBasis": "The roleplay frame establishes the actuality status."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f9e1b5eb6d96125a",
+      "splitAssignment": "DEV",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Actuality of a state after a hypothetical setup",
+      "semanticRelations": [
+        "A hypothetical setup is introduced.",
+        "The target state follows after the setup.",
+        "No relation marks whether the target remains inside the hypothetical setup or returns to current assertion."
+      ],
+      "decisionBasis": "The frame boundary around the target state is not visible."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-32f27410e2beb10c",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Actuality status of a historical report",
+      "semanticRelations": [
+        "The target state is tied to a past interval.",
+        "The past interval relation is part of the asserted content.",
+        "No relation presents the state as current."
+      ],
+      "decisionBasis": "Historical status is established; it is not current actuality ambiguity."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether an observed system state reflects user state",
+      "semanticRelations": [
+        "The target state is inferred from an observed system behavior.",
+        "The same behavior can result from user preference or from an external constraint.",
+        "No relation states which cause applies."
+      ],
+      "decisionBasis": "The actuality of the user state depends on a cause relation not visible."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-909e894ec573b62c",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Status of a target after mixed quotation and assertion",
+      "semanticRelations": [
+        "A quoted state and a user-authored assertion appear in the same evidence bundle.",
+        "The target expression could point to either the quoted state or the user-authored assertion.",
+        "No relation links the target expression to one actuality frame."
+      ],
+      "decisionBasis": "The target's actuality frame is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-24e17e0cafddd4ae",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status established by two partial relations",
+      "semanticRelations": [
+        "One relation identifies the target state.",
+        "A second relation supplies the missing qualifier needed for the same state.",
+        "The two relations attach to the same target and do not compete."
+      ],
+      "decisionBasis": "The partial relations jointly establish one interpretation.",
+      "contrastGroupId": "p1b6-cg-28736b74c85fcc93"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-38c426bb2e0bff42",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Status requiring a missing qualifier relation",
+      "semanticRelations": [
+        "One relation identifies the target state.",
+        "A second relation mentions a qualifier but does not attach it to the target state.",
+        "The target state has materially different interpretations depending on that attachment."
+      ],
+      "decisionBasis": "A necessary relation is present only as an unattached qualifier, leaving the interpretation undecided.",
+      "contrastGroupId": "p1b6-cg-28736b74c85fcc93"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status from confirming relations across fragments",
+      "semanticRelations": [
+        "An initial relation states a candidate status for the target.",
+        "A later relation confirms the same target and status.",
+        "No relation introduces an alternative status for the target."
+      ],
+      "decisionBasis": "Separate fragments reinforce the same status without conflict."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Status when partial relations point to competing readings",
+      "semanticRelations": [
+        "One relation supports a first status for the target.",
+        "Another relation supplies a qualifier compatible with a different status.",
+        "No relation states whether the qualifier modifies the first status or creates a separate status."
+      ],
+      "decisionBasis": "The combination relation between partial evidence is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-56c94f11c6522ef7",
+      "splitAssignment": "DEV",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status from a target relation and an explicit boundary",
+      "semanticRelations": [
+        "A target state is stated in one relation.",
+        "A boundary relation limits the same state.",
+        "The boundary relation explicitly attaches to the target state."
+      ],
+      "decisionBasis": "The combined state plus boundary is visible."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "splitAssignment": "DEV",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Status needing relation between two partial cues",
+      "semanticRelations": [
+        "One cue supplies a target state.",
+        "Another cue supplies a condition that could govern that state.",
+        "No relation indicates whether the condition applies to the target state or to a neighboring state."
+      ],
+      "decisionBasis": "The condition attachment is materially necessary and absent."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-fa8ae6d4b81d50a8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status from complementary identity and stance relations",
+      "semanticRelations": [
+        "One relation identifies which target is being discussed.",
+        "A separate relation gives the stance toward that same target.",
+        "No other target competes for the stance relation."
+      ],
+      "decisionBasis": "The identity and stance relations jointly establish the interpretation."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-1e2014a2b5e70a20",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status from separated default and exception relations",
+      "semanticRelations": [
+        "A default relation applies to the target category.",
+        "A later exception relation names the target as excluded.",
+        "The exception relation and default relation share the same governing dimension."
+      ],
+      "decisionBasis": "Separated relations combine into one applicability status."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-1382663d3ae9f6b7",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Status when one necessary relation conflicts across fragments",
+      "semanticRelations": [
+        "Two relations identify the same target.",
+        "One relation attaches a qualifier to the target while another attaches an incompatible qualifier.",
+        "No relation supplies precedence, timing, or coexistence between the qualifiers."
+      ],
+      "decisionBasis": "The visible structure contains competing qualifier relations with no governing relation."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Meaning of a coherent approximate range",
+      "semanticRelations": [
+        "The target state is expressed as a bounded range.",
+        "The range is presented as the intended form of the state.",
+        "No relation introduces a competing exact value or different basis."
+      ],
+      "decisionBasis": "Approximation is part of one established interpretation.",
+      "contrastGroupId": "p1b6-cg-084af1a6a0723538"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Basis of a range with multiple possible meanings",
+      "semanticRelations": [
+        "The target state is expressed as a bounded range.",
+        "The range can refer to either frequency or amount for the same target.",
+        "No relation identifies which dimension the range measures."
+      ],
+      "decisionBasis": "The approximate form is acceptable, but its measurement basis is not established.",
+      "contrastGroupId": "p1b6-cg-084af1a6a0723538"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-7209bf45f4ee890c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of an approximate cadence",
+      "semanticRelations": [
+        "A recurring target is assigned an approximate cadence.",
+        "The approximation modifies the cadence rather than the target identity.",
+        "No relation supplies a conflicting cadence."
+      ],
+      "decisionBasis": "The approximate cadence is coherent and visibly attached."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Relation between two approximate alternatives",
+      "semanticRelations": [
+        "Two approximate alternatives are stated for the same target.",
+        "The alternatives could be a range, a choice set, or a revision sequence.",
+        "No relation specifies how the alternatives relate."
+      ],
+      "decisionBasis": "The decision-relevant relation between approximate alternatives is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-084af1a6a0723538",
+      "splitAssignment": "DEV",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Meaning of a deliberate loose threshold",
+      "semanticRelations": [
+        "The target state includes a threshold described loosely.",
+        "The loose threshold is the stated decision boundary.",
+        "No relation introduces a second threshold basis."
+      ],
+      "decisionBasis": "A loose but coherent threshold is not interpretive ambiguity."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-16697b52f83abeba",
+      "splitAssignment": "DEV",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Unit of an approximate target value",
+      "semanticRelations": [
+        "The target state includes an approximate value.",
+        "The value can plausibly use two different units in the visible structure.",
+        "No relation selects the unit."
+      ],
+      "decisionBasis": "The unit relation is materially necessary and absent."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-75fe9a38eb99ab90",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "Status of an open-ended approximate preference",
+      "semanticRelations": [
+        "The target preference is expressed with an approximate lower boundary.",
+        "The boundary is attached to the preference scale.",
+        "No relation presents an incompatible scale or endpoint."
+      ],
+      "decisionBasis": "The approximate lower boundary provides one coherent interpretation."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Whether an approximate value is target state or example",
+      "semanticRelations": [
+        "An approximate value appears near the target state.",
+        "The value can function as an example or as the actual target value.",
+        "No relation marks the value's role."
+      ],
+      "decisionBasis": "The approximate value's semantic role is not established."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-4e7a29da8a3037a4",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "intendedLabel": "ESCALATE",
+      "candidateFocus": "Relation between an approximate point and a later range",
+      "semanticRelations": [
+        "An approximate point is stated for the target.",
+        "A later range is stated for the same target.",
+        "No relation specifies whether the range refines, replaces, or merely illustrates the point."
+      ],
+      "decisionBasis": "The relation between the point and range is decision-relevant and not visible."
+    }
+  ]
+}
