@@ -25,7 +25,7 @@
         "이전에 반복되던 행동이 명시적으로 중지된다.",
         "그 중지는 현재 적용되는 상태로 제시된다.",
         "중지의 종료 시점이나 재개 조건은 지정되지 않는다.",
-        "그 뒤 중지를 재개, 대체, 철회하는 관계는 없다."
+        "그 뒤 원래 행동을 재개하거나, 중지 상태를 대체하거나 철회하는 관계는 없다."
       ],
       "decisionBasis": "The current suspension is visible; its unspecified duration is not interpretive ambiguity."
     },
@@ -44,18 +44,18 @@
       "decisionBasis": "The explicit refinement relation, not numerical overlap alone, resolves the point-range relation."
     },
     {
-      "semanticSkeletonId": "p1b6-sk-3622bd6548e4d782",
+      "semanticSkeletonId": "p1b6-sk-95b3c63acff8f020",
       "splitAssignment": "FINAL_HELD_OUT",
       "boundaryClass": "PERSISTENCE / EXCEPTION",
-      "intendedLabel": "ESCALATE",
-      "candidateFocus": "조건부 중지 예외가 현재 대상에 적용되는지 여부",
+      "intendedLabel": "CLEAR",
+      "candidateFocus": "반복 기본값 안에서 반복 조건마다 다시 적용되는 예외의 상태",
       "semanticRelations": [
-        "한 대상에 대해 반복되는 기본 행동이 제시된다.",
-        "특정 조건에 해당하는 경우에는 그 반복 행동을 중지한다는 예외가 나중에 제시된다.",
-        "이후 현재 대상은 그 예외 조건과 일부 관련된 상태로 다시 언급된다.",
-        "보이는 관계는 현재 대상이 예외 조건을 충족하는지 벗어나는지 지정하지 않는다."
+        "한 대상에 대해 반복되는 기본 패턴이 제시된다.",
+        "그 기본 패턴 안의 반복 조건마다 적용되는 예외 관계가 나중에 제시된다.",
+        "그 예외는 조건이 반복될 때마다 다시 적용되는 것으로 명시된다.",
+        "그 예외를 한 번의 발생이나 닫힌 구간으로 제한하는 관계는 없다."
       ],
-      "decisionBasis": "The visible relations leave the exception's applicability to the current target unresolved."
+      "decisionBasis": "The visible relations establish a recurring exception inside the recurring default, not a one-off or bounded exception."
     }
   ]
 }

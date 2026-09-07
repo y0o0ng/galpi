@@ -17,7 +17,7 @@ const FOLLOWUP_PROTOCOL_PATH = path.join(ROOT, 'fixtures/local-memory-inference-
 
 const ORIGINAL_FIXTURE_SHA = 'c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9';
 const ORIGINAL_RECEIPT_SHA = '428f802a283ad9cddec6370595ceb157c95573cadcc252529898f419fd6fec75';
-const FOLLOWUP_FIXTURE_SHA = '60348d0c9f83dc19f26fa7632f602551017c1b6813f0d5500b1b3b7c1bcb9285';
+const FOLLOWUP_FIXTURE_SHA = '9791a61d4d46d7b6257642eda3cf6a677821f60e0d22afad71af0a5567b646f2';
 const STARTING_MAIN_SHA = '12162a4d57894fe76cbb79590b4864f164ccbe1c';
 const FIX_IDS = [
   'p1b6-sk-11a3e916ff9b8129',
@@ -29,7 +29,8 @@ const REJECT_IDS = [
   'p1b6-sk-348ebfd24bb7d3f5',
 ];
 const KEEP_CLEAR_CORRECTION_ID = 'p1b6-sk-43016ef6da889a87';
-const REPLACEMENT_ID = 'p1b6-sk-3622bd6548e4d782';
+const DISCARDED_REPLACEMENT_ID = 'p1b6-sk-3622bd6548e4d782';
+const REPLACEMENT_ID = 'p1b6-sk-95b3c63acff8f020';
 
 function read(pathname) {
   return fs.readFileSync(pathname);
@@ -78,6 +79,7 @@ test('follow-up fixture contains only three retained FIX IDs and one new held-ou
   assert.equal(fixture.candidates[3].semanticSkeletonId, REPLACEMENT_ID);
   assert.match(REPLACEMENT_ID, skeletons.SKELETON_ID_PATTERN);
   assert.equal(original.candidates.some(candidate => candidate.semanticSkeletonId === REPLACEMENT_ID), false);
+  assert.equal(fixture.candidates.some(candidate => candidate.semanticSkeletonId === DISCARDED_REPLACEMENT_ID), false);
   assert.equal(fixture.candidates.some(candidate => candidate.semanticSkeletonId === REJECT_IDS[1]), false);
   assert.equal(fixture.candidates.some(candidate => candidate.semanticSkeletonId === REJECT_IDS[0]), false);
   assert.equal(fixture.candidates.filter(candidate => !original.candidates.some(old => old.semanticSkeletonId === candidate.semanticSkeletonId)).length, 1);
@@ -85,7 +87,7 @@ test('follow-up fixture contains only three retained FIX IDs and one new held-ou
   const replacement = fixture.candidates.find(candidate => candidate.semanticSkeletonId === REPLACEMENT_ID);
   assert.equal(replacement.splitAssignment, 'FINAL_HELD_OUT');
   assert.equal(replacement.boundaryClass, 'PERSISTENCE / EXCEPTION');
-  assert.equal(replacement.intendedLabel, 'ESCALATE');
+  assert.equal(replacement.intendedLabel, 'CLEAR');
 });
 
 test('follow-up protocol records source provenance and intentionally omitted work', () => {

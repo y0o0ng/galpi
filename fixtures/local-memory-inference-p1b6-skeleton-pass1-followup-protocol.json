@@ -15,7 +15,7 @@
   "followupCandidateFixture": {
     "name": "xion-local-memory-inference-p1b6-skeleton-pass1-followup-candidates-v1",
     "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-candidates.json",
-    "sha256": "60348d0c9f83dc19f26fa7632f602551017c1b6813f0d5500b1b3b7c1bcb9285",
+    "sha256": "9791a61d4d46d7b6257642eda3cf6a677821f60e0d22afad71af0a5567b646f2",
     "candidateCount": 4
   },
   "sourceDecisions": {
@@ -34,7 +34,7 @@
       "correctedAmbiguityLabel": "CLEAR"
     },
     "replacementMapping": {
-      "p1b6-sk-eb1cd528d84aa3f2": "p1b6-sk-3622bd6548e4d782"
+      "p1b6-sk-eb1cd528d84aa3f2": "p1b6-sk-95b3c63acff8f020"
     },
     "noReplacementSourceIds": [
       "p1b6-sk-348ebfd24bb7d3f5"
