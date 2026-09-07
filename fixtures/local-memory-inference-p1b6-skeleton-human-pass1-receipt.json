@@ -1,0 +1,369 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-human-pass1-receipt-v1",
+  "protocolVersion": "xion-p1b6-skeleton-human-pass1-v1",
+  "candidateFixture": "xion-local-memory-inference-p1b6-skeleton-candidates-v1",
+  "candidateFixtureSha256": "c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9",
+  "completedAt": "2026-09-07T09:35:06.861Z",
+  "results": [
+    {
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-de16754758b5bb97",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-7e613818545d04bc",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-db0908294e6deb6f",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-75fa233a7cee369e",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-6b74f6c163e7fa5d",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-49e0f357eda8365c",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-82149f27c2f521ae",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aad4e8523ca5f042",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-e7da7f4bbf645574",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2355452bdd41e4eb",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-ab85f961c71f1bb5",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-ae65e2ec3789a8e5",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-67d79991996ef494",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9ef1bb2b5c5e2d7f",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-63b9e434ba146408",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9dedffcaacc2426f",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f2fb3e894c37caac",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-001178537fb93442",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-eb1cd528d84aa3f2",
+      "disposition": "REJECT",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-264280ddad65a8da",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9dc48f4b2f10775d",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-61cb1285dd1df651",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-66ecb02cbfc40c3c",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9af7e76a84e97be0",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11a3e916ff9b8129",
+      "disposition": "FIX",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-379bd3b3dd05d85e",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-348ebfd24bb7d3f5",
+      "disposition": "REJECT",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-d8ca287837bcc32d",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-302069b96f1406b3",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-b4a6776ed886de2d",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-609043b6b1fb92e4",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-714725eea477a631",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-59c8f51891ab4996",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-32f27410e2beb10c",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-909e894ec573b62c",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-24e17e0cafddd4ae",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-38c426bb2e0bff42",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-56c94f11c6522ef7",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-fa8ae6d4b81d50a8",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-1e2014a2b5e70a20",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-1382663d3ae9f6b7",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-7209bf45f4ee890c",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-084af1a6a0723538",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-16697b52f83abeba",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-75fe9a38eb99ab90",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
+      "disposition": "KEEP",
+      "ambiguityLabel": "ESCALATE"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-4e7a29da8a3037a4",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    }
+  ]
+}
