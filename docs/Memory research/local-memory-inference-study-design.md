@@ -3784,7 +3784,7 @@ authoring protocol for this candidate run is frozen at
 OpenAI Codex `gpt-5.5`, reasoning `medium`, with temperature/decoding knobs
 recorded as platform-controlled rather than invented. Exactly 72 real abstract
 candidates were authored under the frozen distribution, with candidate fixture
-SHA-256 `82b29eec4cb865162aa09aed64b48e1123a51e8559377658839a169eeeda7ba0`.
+SHA-256 `783e4ea0e294d95a3c8a4082315e3f24a2e90053bcc8d8cedd78063f1ca35549`.
 Generator intended labels remain non-authoritative. No HUMAN Pass-1 review
 has occurred, and no skeleton has become approved merely by generation. Next
 step is blind HUMAN Pass-1 using the implemented reviewer.

@@ -192,13 +192,13 @@
       "splitAssignment": "DEV",
       "boundaryClass": "REVISION / CONFLICT",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Relation between a broad update and an earlier specific exception",
+      "candidateFocus": "Whether a later restatement corrects or merely repeats a stale value",
       "semanticRelations": [
-        "An earlier relation creates a specific exception for the target.",
-        "A later broad update addresses the surrounding category.",
-        "No relation says whether the broad update removes, preserves, or bypasses the exception."
+        "An older value is assigned to the target.",
+        "An intervening relation changes that value.",
+        "A later relation restates the older value without marking it as quotation, error, correction, or current adoption."
       ],
-      "decisionBasis": "The current status of the exception is decision-relevant and not established."
+      "decisionBasis": "The visible structure does not establish whether the later restatement revives the old value or is a stale repetition."
     },
     {
       "semanticSkeletonId": "p1b6-sk-d24288cb3b97d89c",
@@ -430,13 +430,13 @@
       "splitAssignment": "DEV",
       "boundaryClass": "REFERENT",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Referent of a role-based expression",
+      "candidateFocus": "Referent of an ordinal expression after an insertion",
       "semanticRelations": [
-        "The target expression selects an entity by role.",
-        "More than one active entity has that role.",
-        "No relation marks one role-holder as the active target."
+        "An ordered set is established before the target expression is used.",
+        "A new member is inserted into that set before the target expression.",
+        "No relation states whether the target expression uses the original order or the updated order."
       ],
-      "decisionBasis": "Multiple role-compatible referents remain."
+      "decisionBasis": "The referent depends on which ordering relation applies after insertion."
     },
     {
       "semanticSkeletonId": "p1b6-sk-9af7e76a84e97be0",
@@ -536,13 +536,13 @@
       "splitAssignment": "DEV",
       "boundaryClass": "SCOPE / APPLICABILITY",
       "intendedLabel": "CLEAR",
-      "candidateFocus": "Applicability of a specific override",
+      "candidateFocus": "Applicability of a rule limited by a role condition",
       "semanticRelations": [
-        "A broad rule is stated for a category.",
-        "A later specific rule targets the same item.",
-        "The specific rule is presented as taking precedence for that item."
+        "A rule is stated with a required role condition.",
+        "The target is explicitly assigned that role.",
+        "No relation removes the role before the rule is applied."
       ],
-      "decisionBasis": "Specific override precedence is visible."
+      "decisionBasis": "The required condition and target membership relation are both visible."
     },
     {
       "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
@@ -588,13 +588,13 @@
       "splitAssignment": "FINAL_HELD_OUT",
       "boundaryClass": "SCOPE / APPLICABILITY",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Which target a shared modifier limits",
+      "candidateFocus": "Applicability of a rule after a category boundary changes",
       "semanticRelations": [
-        "A shared modifier appears after a list of targets.",
-        "The modifier can semantically restrict the entire list or only the final target.",
-        "No relation identifies the modifier's intended span."
+        "A rule is stated for members of a category.",
+        "A later relation changes the category boundary.",
+        "The target sits at the changed boundary, and no relation states whether the old or new boundary governs the rule."
       ],
-      "decisionBasis": "The modifier's scope is not established."
+      "decisionBasis": "Rule applicability depends on which category boundary applies."
     },
     {
       "semanticSkeletonId": "p1b6-sk-b4a6776ed886de2d",
@@ -668,13 +668,13 @@
       "splitAssignment": "DEV",
       "boundaryClass": "ACTUALITY",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Actuality of a state after a hypothetical setup",
+      "candidateFocus": "Whether a paraphrased report is endorsed or only relayed",
       "semanticRelations": [
-        "A hypothetical setup is introduced.",
-        "The target state follows after the setup.",
-        "No relation marks whether the target remains inside the hypothetical setup or returns to current assertion."
+        "The target state is introduced as a paraphrase of another source.",
+        "A later relation evaluates the usefulness of that paraphrase.",
+        "No relation states whether the user endorses the target state itself."
       ],
-      "decisionBasis": "The frame boundary around the target state is not visible."
+      "decisionBasis": "The visible structure leaves relaying versus adopting the reported state undetermined."
     },
     {
       "semanticSkeletonId": "p1b6-sk-32f27410e2beb10c",
@@ -787,13 +787,13 @@
       "splitAssignment": "DEV",
       "boundaryClass": "COMPLEMENTARY EVIDENCE",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Status needing relation between two partial cues",
+      "candidateFocus": "Status when two partial relations depend on an unstated bridge",
       "semanticRelations": [
-        "One cue supplies a target state.",
-        "Another cue supplies a condition that could govern that state.",
-        "No relation indicates whether the condition applies to the target state or to a neighboring state."
+        "One relation establishes a target state in one context.",
+        "Another relation establishes a matching state in a different context.",
+        "No relation states whether the two contexts should be combined, compared, or kept separate for the target."
       ],
-      "decisionBasis": "The condition attachment is materially necessary and absent."
+      "decisionBasis": "The visible partial evidence lacks the bridge needed to form one decision-relevant interpretation."
     },
     {
       "semanticSkeletonId": "p1b6-sk-fa8ae6d4b81d50a8",
@@ -813,13 +813,13 @@
       "splitAssignment": "FINAL_HELD_OUT",
       "boundaryClass": "COMPLEMENTARY EVIDENCE",
       "intendedLabel": "CLEAR",
-      "candidateFocus": "Status from separated default and exception relations",
+      "candidateFocus": "Status from separated cause and state relations",
       "semanticRelations": [
-        "A default relation applies to the target category.",
-        "A later exception relation names the target as excluded.",
-        "The exception relation and default relation share the same governing dimension."
+        "One relation identifies a target state.",
+        "A separate relation identifies the cause of that same state.",
+        "The cause relation and state relation share the same target without competing alternatives."
       ],
-      "decisionBasis": "Separated relations combine into one applicability status."
+      "decisionBasis": "The two visible relations jointly establish one state-plus-cause interpretation."
     },
     {
       "semanticSkeletonId": "p1b6-sk-1382663d3ae9f6b7",
@@ -906,13 +906,13 @@
       "splitAssignment": "DEV",
       "boundaryClass": "APPROXIMATION / RANGE",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Unit of an approximate target value",
+      "candidateFocus": "Reference baseline for an approximate change",
       "semanticRelations": [
-        "The target state includes an approximate value.",
-        "The value can plausibly use two different units in the visible structure.",
-        "No relation selects the unit."
+        "The target state is expressed as an approximate change.",
+        "Two possible baselines are active in the visible structure.",
+        "No relation states which baseline the change is measured against."
       ],
-      "decisionBasis": "The unit relation is materially necessary and absent."
+      "decisionBasis": "The approximate change is not enough because its reference baseline is not established."
     },
     {
       "semanticSkeletonId": "p1b6-sk-75fe9a38eb99ab90",
@@ -932,13 +932,13 @@
       "splitAssignment": "FINAL_HELD_OUT",
       "boundaryClass": "APPROXIMATION / RANGE",
       "intendedLabel": "ESCALATE",
-      "candidateFocus": "Whether an approximate value is target state or example",
+      "candidateFocus": "Aggregation basis for an approximate range",
       "semanticRelations": [
-        "An approximate value appears near the target state.",
-        "The value can function as an example or as the actual target value.",
-        "No relation marks the value's role."
+        "The target state is expressed as an approximate range.",
+        "The range can describe either each occurrence or the total across occurrences.",
+        "No relation specifies the aggregation basis."
       ],
-      "decisionBasis": "The approximate value's semantic role is not established."
+      "decisionBasis": "The visible structure leaves a decision-relevant aggregation relation unresolved."
     },
     {
       "semanticSkeletonId": "p1b6-sk-4e7a29da8a3037a4",
