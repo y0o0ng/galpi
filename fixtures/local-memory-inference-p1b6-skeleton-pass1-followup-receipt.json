@@ -1,0 +1,29 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-pass1-followup-receipt-v1",
+  "protocolVersion": "xion-p1b6-skeleton-human-pass1-followup-v1",
+  "candidateFixture": "xion-local-memory-inference-p1b6-skeleton-pass1-followup-candidates-v1",
+  "candidateFixtureSha256": "9791a61d4d46d7b6257642eda3cf6a677821f60e0d22afad71af0a5567b646f2",
+  "completedAt": "2026-09-07T15:32:23.321Z",
+  "results": [
+    {
+      "semanticSkeletonId": "p1b6-sk-11a3e916ff9b8129",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f2fb3e894c37caac",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-4e7a29da8a3037a4",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-95b3c63acff8f020",
+      "disposition": "KEEP",
+      "ambiguityLabel": "CLEAR"
+    }
+  ]
+}
