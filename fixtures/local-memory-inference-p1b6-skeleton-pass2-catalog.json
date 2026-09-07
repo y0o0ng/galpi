@@ -1,0 +1,1010 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-pass2-catalog-v1",
+  "sourceProtocol": "xion-local-memory-inference-p1b6-skeleton-pass2-audit-preparation-v1",
+  "startingMainSha": "d54c9faa31d256ffc864b0cd1b135a9791f750f8",
+  "sourceArtifacts": {
+    "originalFixture": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-candidates.json",
+      "sha256": "c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9"
+    },
+    "originalReceipt": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-human-pass1-receipt.json",
+      "sha256": "428f802a283ad9cddec6370595ceb157c95573cadcc252529898f419fd6fec75"
+    },
+    "followupFixture": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-candidates.json",
+      "sha256": "9791a61d4d46d7b6257642eda3cf6a677821f60e0d22afad71af0a5567b646f2"
+    },
+    "followupProtocol": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-protocol.json",
+      "sha256": "1ffe5da2896784856e7317348ccb5b55515cc2cd3754d3b9c58f1f17842a6426"
+    },
+    "followupReceipt": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-receipt.json",
+      "sha256": "c21fef8f0524791bc89151e391c7c7576a1831602e44a18d876414a6f4fd6b99"
+    },
+    "authoringProtocol": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-authoring-protocol.json",
+      "sha256": "193760cd68291138beaba00c9a79d46835a1f1d3aac0e0886a38b92ebf634ef1"
+    },
+    "historicalCases": {
+      "path": "fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates-v2.json",
+      "sha256": "a6608642caad02c772941d58558bd9fc31ee86ef54fe342ee2713aa08cf62c8e"
+    }
+  },
+  "coverage": {
+    "total": 71,
+    "splitCounts": {
+      "TRAIN": 31,
+      "DEV": 20,
+      "FINAL_HELD_OUT": 20
+    },
+    "humanLabelCounts": {
+      "CLEAR": 38,
+      "ESCALATE": 33
+    },
+    "boundaryClassSplitCounts": {
+      "FINALITY / COMMITMENT": {
+        "TRAIN": 4,
+        "DEV": 3,
+        "FINAL_HELD_OUT": 2
+      },
+      "REVISION / CONFLICT": {
+        "TRAIN": 4,
+        "DEV": 3,
+        "FINAL_HELD_OUT": 2
+      },
+      "PERSISTENCE / EXCEPTION": {
+        "TRAIN": 4,
+        "DEV": 3,
+        "FINAL_HELD_OUT": 2
+      },
+      "REFERENT": {
+        "TRAIN": 4,
+        "DEV": 3,
+        "FINAL_HELD_OUT": 2
+      },
+      "SCOPE / APPLICABILITY": {
+        "TRAIN": 3,
+        "DEV": 2,
+        "FINAL_HELD_OUT": 3
+      },
+      "ACTUALITY": {
+        "TRAIN": 4,
+        "DEV": 2,
+        "FINAL_HELD_OUT": 3
+      },
+      "COMPLEMENTARY EVIDENCE": {
+        "TRAIN": 4,
+        "DEV": 2,
+        "FINAL_HELD_OUT": 3
+      },
+      "APPROXIMATION / RANGE": {
+        "TRAIN": 4,
+        "DEV": 2,
+        "FINAL_HELD_OUT": 3
+      }
+    },
+    "targetPerBoundaryClassSplit": {
+      "TRAIN": 3,
+      "DEV": 2,
+      "FINAL_HELD_OUT": 2
+    },
+    "targetDelta": {
+      "FINALITY / COMMITMENT": {
+        "TRAIN": 1,
+        "DEV": 1,
+        "FINAL_HELD_OUT": 0
+      },
+      "REVISION / CONFLICT": {
+        "TRAIN": 1,
+        "DEV": 1,
+        "FINAL_HELD_OUT": 0
+      },
+      "PERSISTENCE / EXCEPTION": {
+        "TRAIN": 1,
+        "DEV": 1,
+        "FINAL_HELD_OUT": 0
+      },
+      "REFERENT": {
+        "TRAIN": 1,
+        "DEV": 1,
+        "FINAL_HELD_OUT": 0
+      },
+      "SCOPE / APPLICABILITY": {
+        "TRAIN": 0,
+        "DEV": 0,
+        "FINAL_HELD_OUT": 1
+      },
+      "ACTUALITY": {
+        "TRAIN": 1,
+        "DEV": 0,
+        "FINAL_HELD_OUT": 1
+      },
+      "COMPLEMENTARY EVIDENCE": {
+        "TRAIN": 1,
+        "DEV": 0,
+        "FINAL_HELD_OUT": 1
+      },
+      "APPROXIMATION / RANGE": {
+        "TRAIN": 1,
+        "DEV": 0,
+        "FINAL_HELD_OUT": 1
+      }
+    }
+  },
+  "candidates": [
+    {
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "고려 중인 행동의 약속 상태",
+      "semanticRelations": [
+        "대상은 아직 저울질 중인 행동이다.",
+        "그 행동이 이미 채택되었다고 제시하는 관계는 없다.",
+        "현재 태도는 고려하고 있다는 상태 자체다."
+      ],
+      "contrastGroupId": "p1b6-cg-0357cb1a70fdbf94"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "제안된 행동의 약속 상태",
+      "semanticRelations": [
+        "대상은 처음에 제안으로 도입된 행동이다.",
+        "뒤의 긍정적 반응은 그 제안 자체를 향할 수도 있고 앞선 논의에 대한 반응일 수도 있다.",
+        "그 제안 자체가 채택된 태도가 되었는지를 지정하는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-0357cb1a70fdbf94"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-de16754758b5bb97",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "임시 선호의 상태",
+      "semanticRelations": [
+        "선호가 명시적인 임시 한정과 함께 제시된다.",
+        "그 한정은 별도 대안이 아니라 선호에 적용된다.",
+        "뒤의 어떤 관계도 그 임시 상태를 제거하거나 더 강한 상태로 바꾸지 않는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-7e613818545d04bc",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "응답 이후의 채택 상태",
+      "semanticRelations": [
+        "제안된 태도 뒤에 확인성 응답이 따른다.",
+        "그 응답은 제안 수신에 붙을 수도 있고 제안 수락에 붙을 수도 있다.",
+        "수신과 채택을 구별하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-db0908294e6deb6f",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "명시적으로 제외된 선택지의 현재 지위",
+      "semanticRelations": [
+        "대상 선택지가 가능성 집합 안에 놓인다.",
+        "뒤의 관계가 그 선택지를 사용자의 현재 태도에서 제외한다.",
+        "그 선택지를 다시 활성 상태로 들여오는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-75fa233a7cee369e",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "의도적으로 미룬 결정의 현재 상태",
+      "semanticRelations": [
+        "대상 결정이 명시적으로 뒤로 미뤄진다.",
+        "그 연기는 결정에 대한 현재 태도로 제시된다.",
+        "다른 곳에서 선택이 이루어졌다고 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "선호 진술이 탐색인지 정착된 태도인지 여부",
+      "semanticRelations": [
+        "한 관계가 어떤 태도에 끌림을 제시한다.",
+        "다른 관계는 대안들과의 비교를 요청한다.",
+        "보이는 구조는 그 끌림이 탐색일 뿐인지 현재 선택된 태도인지 말하지 않는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-6b74f6c163e7fa5d",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "명시적 확인 이후의 약속 상태",
+      "semanticRelations": [
+        "가능한 행동이 도입된 뒤 나중에 확인이 나온다.",
+        "그 확인은 같은 행동을 직접 대상으로 삼는다.",
+        "확인을 논의 차원의 응답으로만 제한하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "조건부 계획이 활성화되었는지 여부",
+      "semanticRelations": [
+        "대상 행동은 선행 조건에 묶여 있다.",
+        "뒤의 관계는 그 주제를 기억해 두어야 한다고 말한다.",
+        "그 선행 조건이 현재 충족되었는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "명시적 대체 이후의 현재 상태 관계",
+      "semanticRelations": [
+        "대상에 대해 이전 상태가 진술된다.",
+        "나중 상태가 이전 상태를 대체하는 것으로 도입된다.",
+        "대체 관계는 같은 대상과 같은 차원에 적용된다."
+      ],
+      "contrastGroupId": "p1b6-cg-25b9b6e0a8cc73b4"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-49e0f357eda8365c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "서로 맞지 않는 두 진술 사이의 현재 상태 관계",
+      "semanticRelations": [
+        "대상에 대해 이전 상태가 진술된다.",
+        "나중의 양립 불가능한 상태가 같은 대상과 같은 차원을 다룬다.",
+        "어느 진술도 다른 진술을 대체하거나 수정하거나 제한한다고 표시하는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-25b9b6e0a8cc73b4"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-82149f27c2f521ae",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "차원별 갱신 두 개의 공존",
+      "semanticRelations": [
+        "한 관계가 대상의 첫 번째 차원을 갱신한다.",
+        "두 번째 관계가 같은 대상의 다른 차원을 갱신한다.",
+        "두 차원은 같은 자리를 놓고 경쟁하지 않는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aad4e8523ca5f042",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "수정과 이전 상태 재진술 사이의 우선 관계",
+      "semanticRelations": [
+        "수정 관계가 대상 상태를 바꾼다.",
+        "뒤의 관계가 그것이 철회인지 상기인지 말하지 않은 채 이전 상태를 반복한다.",
+        "보이는 구조는 그 반복이 앞선 수정을 덮는지 낡은 표현을 다시 말한 것인지 지정하지 않는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-e7da7f4bbf645574",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "명시적으로 철회된 이전 주장 상태",
+      "semanticRelations": [
+        "이전 주장이 대상에 연결되어 있다.",
+        "뒤의 관계가 그 이전 주장을 철회한다.",
+        "이전 주장이 더는 서지 않는다는 점을 알기 위해 대체 주장이 필요하지는 않다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "나중 수정이 같은 대상 인스턴스에 적용되는지 여부",
+      "semanticRelations": [
+        "이전 관계가 한 대상 인스턴스에 상태를 부여한다.",
+        "나중 수정 관계가 비슷하게 설명된 인스턴스에 양립 불가능한 상태를 부여한다.",
+        "두 인스턴스 설명이 같은 인스턴스를 가리키는지 별도 인스턴스를 가리키는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2355452bdd41e4eb",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "덧붙은 한정이 이전 복합 상태의 일부만 수정하는지 여부",
+      "semanticRelations": [
+        "이전 관계가 대상에 복합 상태를 부여한다.",
+        "나중 관계가 그 복합 상태의 한 구성요소와 양립하지 않는 한정을 덧붙인다.",
+        "그 한정이 해당 구성요소만 수정하는지 전체 복합 상태를 바꾸는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "넓은 진술을 좁힌 이후의 현재 관계",
+      "semanticRelations": [
+        "범주에 대해 넓은 상태가 진술된다.",
+        "뒤의 관계가 그 상태를 특정 하위 경우로 좁힌다.",
+        "그 좁힘 관계가 적용되는 세부화로 제시된다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-ab85f961c71f1bb5",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "두 차이 진술이 충돌인지 독립 갱신인지 여부",
+      "semanticRelations": [
+        "두 관계가 같은 대상과 관련된 변화를 설명한다.",
+        "첫 번째 관계의 속성은 두 번째 관계의 속성과 겹칠 수 있다.",
+        "보이는 구조는 그 속성들이 같은 차원인지 별도 차원인지 지정하지 않는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-ae65e2ec3789a8e5",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "지속적 기본값과 한정된 예외의 상태",
+      "semanticRelations": [
+        "대상에 기본 패턴이 진술된다.",
+        "별도 관계가 한정된 구간을 가진 예외를 만든다.",
+        "그 예외는 기본값을 대체하는 것이 아니라 그 구간에 묶여 있다."
+      ],
+      "contrastGroupId": "p1b6-cg-b7a6390627e152a5"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-67d79991996ef494",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "한 번의 이탈 이후 바뀐 패턴의 상태",
+      "semanticRelations": [
+        "대상에 기본 패턴이 진술된다.",
+        "뒤의 관계가 그 패턴에서 벗어난 일을 설명한다.",
+        "그 이탈이 한정된 예외인지 새 지속 패턴인지를 말하는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-b7a6390627e152a5"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9ef1bb2b5c5e2d7f",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "일시적 상태의 의미",
+      "semanticRelations": [
+        "대상 상태가 명시적으로 제한된 기간에 묶여 있다.",
+        "그 제한된 기간은 진술된 상태의 일부다.",
+        "그 상태가 기간 밖에서도 계속된다고 제시하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "반복 행동이 중단 이후에도 지속되는지 여부",
+      "semanticRelations": [
+        "대상에 반복 행동이 진술된다.",
+        "뒤의 관계는 어떤 상황 동안 그 행동이 멈췄다고 말한다.",
+        "그 상황 이후 행동이 재개되었는지, 계속 멈췄는지, 조건부가 되었는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-63b9e434ba146408",
+      "splitAssignment": "DEV",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "일회성 예외의 상태",
+      "semanticRelations": [
+        "대상에 일반적 패턴이 세워져 있다.",
+        "뒤의 관계가 단일 발생을 그 패턴에서 벗어난 것으로 표시한다.",
+        "그 이탈은 일반적 패턴을 바꾸는 것으로 제시되지 않는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9dedffcaacc2426f",
+      "splitAssignment": "DEV",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "미래 한정 구간의 상태",
+      "semanticRelations": [
+        "대상 상태가 미래 구간에만 배정된다.",
+        "그 구간 경계는 진술된 관계의 일부다.",
+        "그 상태가 이미 그 구간 밖에 적용된다고 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f2fb3e894c37caac",
+      "splitAssignment": "DEV",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "끝이 지정되지 않은 현재 중지 상태",
+      "semanticRelations": [
+        "이전에 반복되던 행동이 명시적으로 중지된다.",
+        "그 중지는 현재 적용되는 상태로 제시된다.",
+        "중지의 종료 시점이나 재개 조건은 지정되지 않는다.",
+        "그 뒤 원래 행동을 재개하거나, 중지 상태를 대체하거나 철회하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-001178537fb93442",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "정해진 빈도를 가진 반복 행동의 상태",
+      "semanticRelations": [
+        "대상 행동이 반복되는 것으로 설명된다.",
+        "빈도 관계가 그 행동에 붙는다.",
+        "그 빈도와 경쟁하는 예외나 중단 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-95b3c63acff8f020",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "반복 기본값 안에서 반복 조건마다 다시 적용되는 예외의 상태",
+      "semanticRelations": [
+        "한 대상에 대해 반복되는 기본 패턴이 제시된다.",
+        "그 기본 패턴 안의 반복 조건마다 적용되는 예외 관계가 나중에 제시된다.",
+        "그 예외는 조건이 반복될 때마다 다시 적용되는 것으로 명시된다.",
+        "그 예외를 한 번의 발생이나 닫힌 구간으로 제한하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "단일 활성 선행사가 있는 대상 표현의 지시 대상",
+      "semanticRelations": [
+        "대상 표현은 앞서 언급된 항목을 되가리킨다.",
+        "요구되는 의미 역할을 가진 이전 항목은 하나뿐이다.",
+        "그 역할에 맞는 경쟁 선행사는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-444986fab1759f08"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-264280ddad65a8da",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "여러 활성 선행사가 있는 대상 표현의 지시 대상",
+      "semanticRelations": [
+        "대상 표현은 앞서 언급된 항목을 되가리킨다.",
+        "두 이전 항목이 모두 요구되는 의미 역할을 가진다.",
+        "대상 표현에 대해 두 항목 중 하나를 고르는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-444986fab1759f08"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "생략된 확인의 대상",
+      "semanticRelations": [
+        "질문이 하나의 후보 대상을 도입한다.",
+        "이어지는 생략된 확인은 그 질문에 대한 직접 응답으로 나온다.",
+        "중간에 다른 후보 대상을 도입하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9dc48f4b2f10775d",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "여러 질문 뒤에 나온 생략된 확인의 대상",
+      "semanticRelations": [
+        "생략된 확인 전에 두 후보 대상이 도입된다.",
+        "그 확인은 어느 대상과도 맞을 수 있다.",
+        "그 확인이 어느 질문에 답하는지를 나타내는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-61cb1285dd1df651",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "비교 표현의 지시 대상",
+      "semanticRelations": [
+        "대상 표현은 비교 표현이다.",
+        "비교 집합에는 앞서 언급된 대안이 하나만 있다.",
+        "비교되는 속성은 대상과 그 대안이 함께 가진다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-66ecb02cbfc40c3c",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "삽입 이후 순서 표현의 지시 대상",
+      "semanticRelations": [
+        "대상 표현이 쓰이기 전에 순서 있는 집합이 세워진다.",
+        "대상 표현 전에 새 구성원이 그 집합에 삽입된다.",
+        "대상 표현이 원래 순서를 쓰는지 갱신된 순서를 쓰는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-9af7e76a84e97be0",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "주제 전환 이후의 지시 대상",
+      "semanticRelations": [
+        "대상 표현이 주제 전환 뒤에 나온다.",
+        "더 오래된 선행사와 더 새로운 선행사가 모두 그 표현의 의미 유형과 맞는다.",
+        "그 표현이 이전 주제를 이어가는지 새 주제에 붙는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11a3e916ff9b8129",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "앞서 한 대상에 배정된 짧은 축약 표지가 나중에 다시 쓰일 때의 지시 대상",
+      "semanticRelations": [
+        "한 대상에 대해 특정 축약 표지가 명시적으로 배정된다.",
+        "그 뒤 같은 축약 표지가 나중에 다시 쓰인다.",
+        "두 사용 사이에 그 축약 표지가 다른 대상에 재배정되지 않는다.",
+        "두 사용 사이에 같은 축약 표지를 가진 경쟁 대상이 도입되지 않는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-379bd3b3dd05d85e",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REFERENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "범주 축약 표현의 지시 대상",
+      "semanticRelations": [
+        "대상 표현은 고유 항목이 아니라 범주를 가리킨다.",
+        "여러 활성 항목이 그 범주에 속한다.",
+        "그 범주를 단일 항목이나 의도된 부분집합으로 좁히는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "명시적으로 붙은 예외가 있는 규칙의 적용 여부",
+      "semanticRelations": [
+        "일반 규칙이 범주에 적용된다.",
+        "예외 관계가 이름 붙은 하위 범주에 붙어 있다.",
+        "대상은 그 예외 하위 범주에 속한다."
+      ],
+      "contrastGroupId": "p1b6-cg-1826d1fddc7d53fa"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "가능한 예외가 있는 규칙의 적용 여부",
+      "semanticRelations": [
+        "일반 규칙이 범주에 적용된다.",
+        "예외 관계가 하위 범주에 붙어 있다.",
+        "대상은 그 예외 하위 범주에 속할 수도 있고 속하지 않을 수도 있으며, 소속 관계가 제공되지 않는다."
+      ],
+      "contrastGroupId": "p1b6-cg-1826d1fddc7d53fa"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "뒤따르는 한정어의 범위",
+      "semanticRelations": [
+        "두 개의 병렬 대상 뒤에 한정어가 따른다.",
+        "그 한정어는 두 번째 대상에만 붙을 수도 있고 두 대상 전체에 붙을 수도 있다.",
+        "그 한정어가 붙는 경계를 표시하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-d8ca287837bcc32d",
+      "splitAssignment": "DEV",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "역할 조건으로 제한된 규칙의 적용 여부",
+      "semanticRelations": [
+        "규칙이 필요한 역할 조건과 함께 진술된다.",
+        "대상은 그 역할을 가진 것으로 명시된다.",
+        "규칙 적용 전에 그 역할을 제거하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "splitAssignment": "DEV",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "경계선상 구성원에 대한 일반 규칙의 적용 여부",
+      "semanticRelations": [
+        "일반 규칙이 범주의 구성원에게 적용된다.",
+        "대상은 그 범주의 정의 관계 일부를 공유하지만 전부를 공유하지는 않는다.",
+        "부분 소속이 그 규칙에 충분한지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "새 컨테이너로 명시적 이동된 뒤 규칙의 적용 여부",
+      "semanticRelations": [
+        "규칙이 컨테이너 안의 항목들에 대해 진술된다.",
+        "대상이 나중에 그 컨테이너 안으로 옮겨진다.",
+        "이동된 대상이 그 규칙에서 제외된다는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-302069b96f1406b3",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "예외가 명시적으로 배제된 경우의 적용 여부",
+      "semanticRelations": [
+        "규칙이 범주에 적용된다.",
+        "하위 범주에 대한 예외가 존재한다.",
+        "대상은 그 예외 하위 범주에 속하지 않는다고 진술된다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "범주 경계 변경 이후 규칙의 적용 여부",
+      "semanticRelations": [
+        "규칙이 범주 구성원에 대해 진술된다.",
+        "뒤의 관계가 그 범주 경계를 바꾼다.",
+        "대상은 바뀐 경계에 걸쳐 있으며, 이전 경계와 새 경계 중 어느 것이 규칙을 지배하는지 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-b4a6776ed886de2d",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "예시 전용 내용의 실제성 상태",
+      "semanticRelations": [
+        "대상 내용이 예시 상황으로 도입된다.",
+        "예시 관계는 판단 대상 상태를 포함한다.",
+        "그 상태를 사용자의 실제 상태로 제시하는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-5e2d462b5ef6fe95"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-609043b6b1fb92e4",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "예시 옆에 놓인 내용의 실제성 상태",
+      "semanticRelations": [
+        "대상 상태가 나타나기 전에 예시 상황이 도입된다.",
+        "대상 상태는 예시를 계속하는 것으로도, 별도의 현재 주장으로도 읽힐 수 있다.",
+        "예시 틀을 닫거나 대상 상태를 그 틀에 붙이는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-5e2d462b5ef6fe95"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "인용된 내용의 실제성 상태",
+      "semanticRelations": [
+        "대상 내용이 다른 사람의 인용 진술로 표시된다.",
+        "인용 관계는 판단 대상 상태를 포함한다.",
+        "그 인용된 상태를 사용자의 자기 상태로 채택하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "보고된 상태를 사용자가 채택했는지 여부",
+      "semanticRelations": [
+        "대상 상태가 다른 화자에게 귀속된다.",
+        "뒤의 관계가 그 보고의 일부와 일치하는 태도를 표현한다.",
+        "그 일치가 대상 상태 자체를 채택하는지 지정하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-714725eea477a631",
+      "splitAssignment": "DEV",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "역할극 주장 상태",
+      "semanticRelations": [
+        "역할극 틀이 대상 내용에 대해 활성화되어 있다.",
+        "대상 상태는 그 틀 안에서 맡은 역할에 속한다.",
+        "대상 상태 전에 역할극 틀을 벗어나는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-59c8f51891ab4996",
+      "splitAssignment": "DEV",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "시뮬레이션 결과가 실제 관찰로 보고되는지 여부",
+      "semanticRelations": [
+        "대상 상태가 시뮬레이션 틀이 도입된 뒤 나타난다.",
+        "뒤의 관계가 대상 상태를 결과로 설명한다.",
+        "그 결과가 시뮬레이션 틀에 속하는지 실제 관찰에 속하는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-32f27410e2beb10c",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "과거 보고의 실제성 상태",
+      "semanticRelations": [
+        "대상 상태가 과거 구간에 묶여 있다.",
+        "그 과거 구간 관계는 진술된 내용의 일부다.",
+        "그 상태를 현재 상태로 제시하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "관찰된 시스템 상태가 사용자 상태를 반영하는지 여부",
+      "semanticRelations": [
+        "대상 상태가 관찰된 시스템 동작에서 추론된다.",
+        "같은 동작은 사용자 선호나 외부 제약에서 비롯될 수 있다.",
+        "어느 원인이 적용되는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-909e894ec573b62c",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "인용과 주장이 섞인 뒤 대상의 상태",
+      "semanticRelations": [
+        "인용된 상태와 사용자가 작성한 주장이 같은 증거 묶음 안에 나타난다.",
+        "대상 표현은 인용된 상태나 사용자 작성 주장 중 어느 쪽도 가리킬 수 있다.",
+        "대상 표현을 하나의 실제성 틀에 연결하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-24e17e0cafddd4ae",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "두 부분 관계로 세워지는 상태",
+      "semanticRelations": [
+        "한 관계가 대상 상태를 식별한다.",
+        "두 번째 관계가 같은 상태에 필요한 빠진 한정을 제공한다.",
+        "두 관계는 같은 대상에 붙으며 서로 경쟁하지 않는다."
+      ],
+      "contrastGroupId": "p1b6-cg-28736b74c85fcc93"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-38c426bb2e0bff42",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "빠진 한정 관계가 필요한 상태",
+      "semanticRelations": [
+        "한 관계가 대상 상태를 식별한다.",
+        "두 번째 관계가 한정을 언급하지만 대상 상태에 붙이지 않는다.",
+        "대상 상태는 그 한정이 붙는지에 따라 실질적으로 다른 해석을 가진다."
+      ],
+      "contrastGroupId": "p1b6-cg-28736b74c85fcc93"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "여러 조각의 확인 관계로 세워지는 상태",
+      "semanticRelations": [
+        "초기 관계가 대상에 대한 후보 상태를 진술한다.",
+        "뒤의 관계가 같은 대상과 같은 상태를 확인한다.",
+        "대상에 대한 대안 상태를 도입하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "부분 관계들이 경쟁하는 읽기로 향하는 상태",
+      "semanticRelations": [
+        "한 관계가 대상에 대한 첫 번째 상태를 지지한다.",
+        "다른 관계가 다른 상태와도 맞는 한정을 제공한다.",
+        "그 한정이 첫 번째 상태를 수정하는지 별도 상태를 만드는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-56c94f11c6522ef7",
+      "splitAssignment": "DEV",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "대상 관계와 명시적 경계로 세워지는 상태",
+      "semanticRelations": [
+        "한 관계에서 대상 상태가 진술된다.",
+        "경계 관계가 같은 상태를 제한한다.",
+        "그 경계 관계는 대상 상태에 명시적으로 붙는다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "splitAssignment": "DEV",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "두 부분 관계가 말해지지 않은 연결에 의존하는 상태",
+      "semanticRelations": [
+        "한 관계가 한 맥락에서 대상 상태를 세운다.",
+        "다른 관계가 다른 맥락에서 대응되는 상태를 세운다.",
+        "두 맥락을 대상에 대해 결합해야 하는지, 비교해야 하는지, 분리해야 하는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-fa8ae6d4b81d50a8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "식별 관계와 태도 관계가 보완해서 세우는 상태",
+      "semanticRelations": [
+        "한 관계가 어떤 대상이 논의되는지 식별한다.",
+        "별도 관계가 같은 대상에 대한 태도를 제공한다.",
+        "그 태도 관계를 두고 경쟁하는 다른 대상은 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-1e2014a2b5e70a20",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "분리된 원인 관계와 상태 관계로 세워지는 상태",
+      "semanticRelations": [
+        "한 관계가 대상 상태를 식별한다.",
+        "별도 관계가 같은 상태의 원인을 식별한다.",
+        "원인 관계와 상태 관계는 경쟁하는 대안 없이 같은 대상을 공유한다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-1382663d3ae9f6b7",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "필요한 한 관계가 여러 조각에서 충돌하는 상태",
+      "semanticRelations": [
+        "두 관계가 같은 대상을 식별한다.",
+        "한 관계는 대상에 한 한정을 붙이고, 다른 관계는 양립하지 않는 한정을 붙인다.",
+        "그 한정들 사이의 우선 관계, 시점, 공존 관계를 제공하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "일관된 대략 범위의 의미",
+      "semanticRelations": [
+        "대상 상태가 한정된 범위로 표현된다.",
+        "그 범위는 상태의 의도된 형식으로 제시된다.",
+        "경쟁하는 정확한 값이나 다른 기준을 도입하는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-084af1a6a0723538"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "여러 의미가 가능한 범위의 기준",
+      "semanticRelations": [
+        "대상 상태가 한정된 범위로 표현된다.",
+        "그 범위는 같은 대상에 대해 빈도나 양 중 어느 쪽도 가리킬 수 있다.",
+        "그 범위가 어느 차원을 재는지 식별하는 관계는 없다."
+      ],
+      "contrastGroupId": "p1b6-cg-084af1a6a0723538"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-7209bf45f4ee890c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "대략적 빈도의 상태",
+      "semanticRelations": [
+        "반복 대상에 대략적 빈도가 부여된다.",
+        "그 대략성은 대상 식별이 아니라 빈도를 수정한다.",
+        "충돌하는 빈도를 제공하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "두 대략적 대안 사이의 관계",
+      "semanticRelations": [
+        "같은 대상에 대해 두 대략적 대안이 진술된다.",
+        "그 대안들은 범위일 수도, 선택지 집합일 수도, 수정 순서일 수도 있다.",
+        "그 대안들이 어떤 관계인지 지정하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-084af1a6a0723538",
+      "splitAssignment": "DEV",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "의도적으로 느슨한 기준선의 의미",
+      "semanticRelations": [
+        "대상 상태에는 느슨하게 설명된 기준선이 포함된다.",
+        "그 느슨한 기준선은 진술된 판단 경계다.",
+        "두 번째 기준 근거를 도입하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-16697b52f83abeba",
+      "splitAssignment": "DEV",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "대략적 변화의 참조 기준점",
+      "semanticRelations": [
+        "대상 상태가 대략적 변화로 표현된다.",
+        "보이는 구조 안에 가능한 기준점 두 개가 활성화되어 있다.",
+        "그 변화가 어느 기준점에 대해 측정되는지를 말하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-75fe9a38eb99ab90",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "열린 끝을 가진 대략적 선호의 상태",
+      "semanticRelations": [
+        "대상 선호가 대략적인 하한과 함께 표현된다.",
+        "그 경계는 선호 척도에 붙어 있다.",
+        "양립하지 않는 척도나 끝점을 제시하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "대략 범위의 집계 기준",
+      "semanticRelations": [
+        "대상 상태가 대략 범위로 표현된다.",
+        "그 범위는 각 발생마다의 값일 수도 있고 여러 발생을 합친 총량일 수도 있다.",
+        "집계 기준을 지정하는 관계는 없다."
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-4e7a29da8a3037a4",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "같은 대상의 앞선 대략적 지점과 나중 범위 사이의 세부화 관계",
+      "semanticRelations": [
+        "한 대상과 한 측정 차원에 대해 앞선 대략적 지점이 붙는다.",
+        "나중에 같은 대상과 같은 측정 차원에 대해 범위가 붙는다.",
+        "나중 범위는 앞선 대략적 지점을 포함한다.",
+        "나중 범위는 앞선 대략적 지점을 더 구체화한 표현으로 명시된다."
+      ]
+    }
+  ]
+}

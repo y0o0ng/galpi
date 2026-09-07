@@ -3778,7 +3778,7 @@ input/output paths are operational arguments, not semantic knobs. This slice
 does not implement FIX editing/re-review, Pass 2, catalog freeze, or any
 surface-data workflow.
 
-**PASS-1 COMPLETE / FOLLOW-UP REVIEW SLICE IMPLEMENTED — real skeleton candidate fixture.** The
+**PASS-1 + FOLLOW-UP COMPLETE / PASS-2 AUDIT PREPARED — real skeleton catalog.** The
 authoring protocol for this candidate run is frozen at
 `fixtures/local-memory-inference-p1b6-skeleton-authoring-protocol.json`:
 OpenAI Codex `gpt-5.5`, reasoning `medium`, with temperature/decoding knobs
@@ -3791,8 +3791,12 @@ Generator intended labels remain non-authoritative. HUMAN Pass-1 completed
 with receipt
 `fixtures/local-memory-inference-p1b6-skeleton-human-pass1-receipt.json`
 (`428f802a283ad9cddec6370595ceb157c95573cadcc252529898f419fd6fec75`).
-The original 72-case fixture and Pass-1 receipt are frozen and are not edited
-by follow-up work.
+The 4-case follow-up blind review completed with receipt
+`fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-receipt.json`
+(`c21fef8f0524791bc89151e391c7c7576a1831602e44a18d876414a6f4fd6b99`).
+The original 72-case fixture, original Pass-1 receipt, follow-up fixture,
+follow-up protocol, and follow-up receipt are frozen inputs for Pass-2 audit
+preparation.
 
 Resolved HUMAN follow-up decisions: `p1b6-sk-11a3e916ff9b8129`,
 `p1b6-sk-f2fb3e894c37caac`, and `p1b6-sk-4e7a29da8a3037a4` require FIX and
@@ -3808,8 +3812,18 @@ mere numerical overlap. The follow-up candidate/protocol artifacts are
 `fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-candidates.json`
 and
 `fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-protocol.json`.
-Follow-up review precedes Pass 2; Pass 2, exact-56 freeze, and surface
-generation remain unperformed.
+The effective Pass-2 audit catalog is
+`fixtures/local-memory-inference-p1b6-skeleton-pass2-catalog.json`
+(`d8ffa4622ea4a70fc197e0e776cf9308f96f08e472a333875ac81f77e3b66501`):
+71 accepted skeletons, split counts TRAIN 31 / DEV 20 / FINAL_HELD_OUT 20,
+and HUMAN labels CLEAR 38 / ESCALATE 33. The historical-reference mapping
+artifact is
+`fixtures/local-memory-inference-p1b6-historical-reference-groups.json`.
+`fixtures/local-memory-inference-p1b6-skeleton-pass2-model-suggestions.json`
+contains non-authoritative model-assisted suggestions only; HUMAN review is
+final authority and absence or presence of a suggestion mutates nothing.
+Pass 2 is now the next semantic stage. Exact-56 freeze, surface generation,
+and training remain unperformed.
 
 **HUMAN skeleton review Pass 2.** After Pass-1 labels freeze, conduct a
 catalog-level leakage/coverage audit covering historical-reference and

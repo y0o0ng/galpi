@@ -1,0 +1,91 @@
+{
+  "name": "xion-local-memory-inference-p1b6-historical-reference-groups-v1",
+  "sourceFixture": {
+    "path": "fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates-v2.json",
+    "sha256": "a6608642caad02c772941d58558bd9fc31ee86ef54fe342ee2713aa08cf62c8e"
+  },
+  "status": "historical reference skeletons only; not supervised P1-B6 skeletons and not part of the exact-56 catalog",
+  "provenanceStatement": "This artifact records only frozen group membership over existing P1-B3 case IDs; it invents no turn, anchor, source-episode, or conversational provenance.",
+  "groups": {
+    "HIST-ACT-01": [
+      "p1b3-decomposed-v2-007",
+      "p1b3-decomposed-v2-012",
+      "p1b3-decomposed-v2-013",
+      "p1b3-decomposed-v2-021",
+      "p1b3-decomposed-v2-028",
+      "p1b3-decomposed-v2-031",
+      "p1b3-decomposed-v2-038",
+      "p1b3-decomposed-v2-043",
+      "p1b3-decomposed-v2-049",
+      "p1b3-decomposed-v2-055",
+      "p1b3-decomposed-v2-058",
+      "p1b3-decomposed-v2-060"
+    ],
+    "HIST-PER-01": [
+      "p1b3-decomposed-v2-001",
+      "p1b3-decomposed-v2-005",
+      "p1b3-decomposed-v2-018",
+      "p1b3-decomposed-v2-024",
+      "p1b3-decomposed-v2-034",
+      "p1b3-decomposed-v2-040",
+      "p1b3-decomposed-v2-046",
+      "p1b3-decomposed-v2-052"
+    ],
+    "HIST-FIN-01": [
+      "p1b3-decomposed-v2-002",
+      "p1b3-decomposed-v2-004",
+      "p1b3-decomposed-v2-009",
+      "p1b3-decomposed-v2-011",
+      "p1b3-decomposed-v2-014",
+      "p1b3-decomposed-v2-016",
+      "p1b3-decomposed-v2-022",
+      "p1b3-decomposed-v2-025",
+      "p1b3-decomposed-v2-030",
+      "p1b3-decomposed-v2-036",
+      "p1b3-decomposed-v2-039",
+      "p1b3-decomposed-v2-042",
+      "p1b3-decomposed-v2-045",
+      "p1b3-decomposed-v2-050",
+      "p1b3-decomposed-v2-054",
+      "p1b3-decomposed-v2-057"
+    ],
+    "HIST-PER-02": [
+      "p1b3-decomposed-v2-019",
+      "p1b3-decomposed-v2-033",
+      "p1b3-decomposed-v2-047"
+    ],
+    "HIST-SCP-01": [
+      "p1b3-decomposed-v2-027"
+    ],
+    "HIST-ACT-02": [
+      "p1b3-decomposed-v2-003",
+      "p1b3-decomposed-v2-010",
+      "p1b3-decomposed-v2-032",
+      "p1b3-decomposed-v2-051"
+    ],
+    "HIST-REF-01": [
+      "p1b3-decomposed-v2-006",
+      "p1b3-decomposed-v2-017",
+      "p1b3-decomposed-v2-041",
+      "p1b3-decomposed-v2-048"
+    ],
+    "HIST-SCP-02": [
+      "p1b3-decomposed-v2-008",
+      "p1b3-decomposed-v2-020",
+      "p1b3-decomposed-v2-026",
+      "p1b3-decomposed-v2-035",
+      "p1b3-decomposed-v2-044",
+      "p1b3-decomposed-v2-059"
+    ],
+    "HIST-PER-03": [
+      "p1b3-decomposed-v2-015",
+      "p1b3-decomposed-v2-029",
+      "p1b3-decomposed-v2-037",
+      "p1b3-decomposed-v2-053",
+      "p1b3-decomposed-v2-056"
+    ],
+    "HIST-FIN-02": [
+      "p1b3-decomposed-v2-023"
+    ]
+  }
+}

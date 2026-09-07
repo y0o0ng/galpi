@@ -1,0 +1,74 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-pass2-model-suggestions-v1",
+  "sourceProtocol": "xion-local-memory-inference-p1b6-skeleton-pass2-audit-preparation-v1",
+  "advisoryOnly": true,
+  "authorityStatement": "These suggestions are advisory. HUMAN review is final authority; this model review can miss semantic duplicates. No catalog mutation, approval, rejection, replacement, final catalog choice, or exact-56 selection follows automatically from any finding or from absence of findings.",
+  "generator": {
+    "provider": "OpenAI",
+    "surface": "Codex",
+    "model": "gpt-5.5",
+    "exposedSettings": {
+      "reasoning": "medium"
+    },
+    "platformControlledSettings": [
+      "temperature",
+      "sampling",
+      "decoding",
+      "seed"
+    ],
+    "settingsStatement": "Temperature, sampling, decoding, and seed controls were not exposed as numeric settings in this Codex session; they are platform-controlled and not invented."
+  },
+  "auditInputs": {
+    "effectiveCatalog": "fixtures/local-memory-inference-p1b6-skeleton-pass2-catalog.json",
+    "historicalReferenceGroups": "fixtures/local-memory-inference-p1b6-historical-reference-groups.json",
+    "historicalCaseEvidence": "fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates-v2.json"
+  },
+  "findings": [
+    {
+      "findingId": "p1b6-pass2-sugg-6d9f7c3e0a2b4f18",
+      "findingType": "duplicate_decision_relevant_relation_under_different_wording",
+      "involvedSemanticSkeletonIds": [
+        "p1b6-sk-5229ea237196499d",
+        "p1b6-sk-7e613818545d04bc"
+      ],
+      "historicalReferenceSkeletonIds": [],
+      "representativeHistoricalCaseIds": [],
+      "reasoning": "Both structures turn on whether a positive or confirmatory response after a proposed target establishes adoption of that target, or merely acknowledges surrounding discussion. The wording differs, but the decision-relevant relation may collapse."
+    },
+    {
+      "findingId": "p1b6-pass2-sugg-8124c0ef7395aa2d",
+      "findingType": "historical_reference_repackaging",
+      "involvedSemanticSkeletonIds": [
+        "p1b6-sk-b4a6776ed886de2d",
+        "p1b6-sk-43016ef6da889a87"
+      ],
+      "historicalReferenceSkeletonIds": [
+        "HIST-ACT-01"
+      ],
+      "representativeHistoricalCaseIds": [
+        "p1b3-decomposed-v2-012",
+        "p1b3-decomposed-v2-021",
+        "p1b3-decomposed-v2-043"
+      ],
+      "reasoning": "The historical group contains explicit sample/example or quoted non-user content that should not become user state. These skeletons are broader actuality checks, but HUMAN Pass-2 should ensure they are not merely repackaged historical actuality cases."
+    },
+    {
+      "findingId": "p1b6-pass2-sugg-f0a3bb61d95477ce",
+      "findingType": "historical_reference_repackaging",
+      "involvedSemanticSkeletonIds": [
+        "p1b6-sk-ae65e2ec3789a8e5",
+        "p1b6-sk-63b9e434ba146408",
+        "p1b6-sk-95b3c63acff8f020"
+      ],
+      "historicalReferenceSkeletonIds": [
+        "HIST-PER-01"
+      ],
+      "representativeHistoricalCaseIds": [
+        "p1b3-decomposed-v2-005",
+        "p1b3-decomposed-v2-018",
+        "p1b3-decomposed-v2-024"
+      ],
+      "reasoning": "The historical group covers temporary or one-context preference/settings exceptions. The involved skeletons are abstract persistence/exception structures, but HUMAN Pass-2 should check that the recurring-default/limited-exception relation is not just the historical temporary-setting pattern with nouns removed."
+    }
+  ]
+}
