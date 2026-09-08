@@ -892,7 +892,7 @@ DELETE /api/push/subscriptions/:id
 - `WEB_PUSH_ENABLED=false`이거나 schema v7 배포 전이면 비대화형 `알림 준비 중`, Push API·Service Worker를 지원하지 않으면 `알림 미지원`을 표시하고 버튼을 숨긴다. 상태를 읽는 동안은 `확인 중`, 구독이 있으면 `알림 켜짐`, 권한이 `denied`면 재요청 없이 `알림 차단됨`, 그 밖의 지원 가능한 미구독 상태에서만 `알림 켜기` 버튼을 보인다.
 - 탭을 처음 열 때, 앱 시작·focus·hidden→visible 복귀, foreground 60초 tick, task mutation 성공 뒤 일정 에이전트를 갱신한다. 범용 알림의 일반 source는 별도 `NotificationPanel`이 갱신하며 기존 채팅 7초 polling에는 연결하지 않는다.
 - `public/agent-panel.js`가 일정 셸·주간 탐색·loading/empty/error를 맡고 기존 `apiFetch`와 `TaskPanel`을 주입받는다. `public/notification-panel.js`는 범용 알림 네 필터만 맡는다. 현재 tab shell 이름인 `paper-panel.js`는 유지하고 큰 공용 패널 리팩터링은 하지 않는다.
-- 이후 딜·주식 에이전트 블록은 일정 블록 아래에 추가한다. 일정 블록은 노트 기반 에이전트 보고와 달리 task 정본의 운영 요약이므로 별도 보고 노트를 만들지 않는다.
+- 이후 주식 에이전트 블록은 일정 블록 아래에 추가한다. 일정 블록은 노트 기반 에이전트 보고와 달리 task 정본의 운영 요약이므로 별도 보고 노트를 만들지 않는다.
 
 ## 10. 입력·보안·개인정보 경계
 
