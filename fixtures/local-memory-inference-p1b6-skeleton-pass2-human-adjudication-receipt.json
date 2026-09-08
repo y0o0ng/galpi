@@ -1,0 +1,80 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-pass2-human-adjudication-receipt-v1",
+  "protocolVersion": "xion-p1b6-skeleton-pass2-human-adjudication-v1",
+  "recordedAt": "2026-09-08T09:53:51.000Z",
+  "recordedAtMeaning": "Materialization timestamp for this repository artifact; not an invented original review-completion timestamp.",
+  "effectiveInputCatalog": {
+    "path": "fixtures/local-memory-inference-p1b6-skeleton-pass2-catalog.json",
+    "sha256": "d8ffa4622ea4a70fc197e0e776cf9308f96f08e472a333875ac81f77e3b66501",
+    "candidateCount": 71,
+    "role": "audit input, not the final exact-56 catalog"
+  },
+  "authority": {
+    "humanFinalAuthority": true,
+    "assistantAssistedSemanticDiscussion": true,
+    "modelPass2SuggestionsAdvisoryOnly": true,
+    "pass2DidNotRelabelWholeCatalog": true,
+    "retainedExistingCandidatesKeepPass1HumanLabels": true,
+    "replacementLabelsAreHumanPass2Labels": true,
+    "noFinalHeldOutSurfaceModelOutputOccurred": true,
+    "freezesSemanticSkeletonsOnly": true,
+    "reviewWasNotFullyInteractionIsolated": true,
+    "doesNotClaimFullMetadataBlindness": true,
+    "metadataExposureCaveat": "The final replacement slots for REVISION / CONFLICT FINAL_HELD_OUT and PERSISTENCE / EXCEPTION DEV were disclosed before the HUMAN judgments on the last two replacement candidates."
+  },
+  "semanticContract": {
+    "question": "Does the visible target + evidence uniquely determine the target's decision-relevant semantic status?",
+    "classifiesInterpretationUncertaintyOnly": true,
+    "doesNotClassifyDurability": true,
+    "missingPersistenceEvidenceIsNotAutomaticallySemanticAmbiguity": true,
+    "historical60DiagnosticReferenceOnly": true,
+    "noIdentityCorrectionCoreGovernanceHardGateWorkOpened": true,
+    "noSurfaceGenerationOrTraining": true,
+    "sourceCompletenessRule": {
+      "fullFrozenPitSourceGenuinelyUnresolved": "valid semantic incompleteness / possible ESCALATE",
+      "relevantEvidenceExistsButBundleOmitsIt": "selection incompleteness / Bundle Builder construction error, not legitimate B6 ESCALATE"
+    },
+    "questionTurnPitClarification": "A user question such as '내가 평일엔 7시에 일어나기로 했었나?' may yield ESCALATE when the target is whether the 7am rule actually holds and the frozen PIT source contains no answer; if the answer exists in PIT source but the bundle omits it, that is a Bundle Builder error."
+  },
+  "dropExistingSemanticSkeletonIds": [
+    "p1b6-sk-7e613818545d04bc",
+    "p1b6-sk-b4a6776ed886de2d",
+    "p1b6-sk-ae65e2ec3789a8e5",
+    "p1b6-sk-63b9e434ba146408",
+    "p1b6-sk-302069b96f1406b3",
+    "p1b6-sk-264280ddad65a8da",
+    "p1b6-sk-ab85f961c71f1bb5",
+    "p1b6-sk-909e894ec573b62c",
+    "p1b6-sk-4e7a29da8a3037a4",
+    "p1b6-sk-1382663d3ae9f6b7",
+    "p1b6-sk-24e17e0cafddd4ae",
+    "p1b6-sk-2355452bdd41e4eb",
+    "p1b6-sk-609043b6b1fb92e4",
+    "p1b6-sk-9ef1bb2b5c5e2d7f",
+    "p1b6-sk-9dedffcaacc2426f",
+    "p1b6-sk-67d79991996ef494",
+    "p1b6-sk-75fa233a7cee369e",
+    "p1b6-sk-aad4e8523ca5f042",
+    "p1b6-sk-9af7e76a84e97be0",
+    "p1b6-sk-7209bf45f4ee890c",
+    "p1b6-sk-de16754758b5bb97",
+    "p1b6-sk-56c94f11c6522ef7"
+  ],
+  "expectedFinalCoverage": {
+    "total": 56,
+    "splitCounts": {
+      "TRAIN": 24,
+      "DEV": 16,
+      "FINAL_HELD_OUT": 16
+    },
+    "perBoundaryClassSplitCounts": {
+      "TRAIN": 3,
+      "DEV": 2,
+      "FINAL_HELD_OUT": 2
+    },
+    "humanLabelCounts": {
+      "CLEAR": 32,
+      "ESCALATE": 24
+    }
+  }
+}

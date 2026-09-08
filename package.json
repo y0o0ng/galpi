@@ -36,6 +36,7 @@
     "review:memory-inference-p1b6-skeleton-pass1": "node scripts/review-memory-inference-p1b6-skeleton-pass1.js",
     "review:memory-inference-p1b6-skeleton-pass1-followup": "node scripts/review-memory-inference-p1b6-skeleton-pass1-followup.js",
     "build:memory-inference-p1b6-skeleton-pass2-audit": "node scripts/build-memory-inference-p1b6-skeleton-pass2-audit.js",
+    "build:memory-inference-p1b6-skeleton-exact56": "node scripts/build-memory-inference-p1b6-skeleton-exact56.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",

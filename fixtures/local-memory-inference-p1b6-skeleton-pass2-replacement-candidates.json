@@ -1,0 +1,184 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-pass2-replacement-candidates-v1",
+  "recordedAt": "2026-09-08T09:53:51.000Z",
+  "recordedAtMeaning": "Materialization timestamp for this repository artifact; not an invented original review-completion timestamp.",
+  "provenance": {
+    "authoredBy": "OpenAI ChatGPT assistant",
+    "reviewedBy": "HUMAN reviewer",
+    "humanFinalAuthority": true,
+    "assistantAssisted": true,
+    "notFullyInteractionIsolated": true,
+    "doesNotClaimFullMetadataBlindness": true,
+    "partialMetadataExposureCaveat": "The final replacement slots for REVISION / CONFLICT FINAL_HELD_OUT and PERSISTENCE / EXCEPTION DEV were disclosed before the HUMAN judgments on the last two replacement candidates."
+  },
+  "acceptedReplacements": [
+    {
+      "semanticSkeletonId": "p1b6-sk-2b6f4ac9e15d8307",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "선호 순위와 실행 결정이 서로 다른 상태로 명시된 경우",
+      "semanticRelations": [
+        "두 대안 가운데 하나가 다른 하나보다 더 선호된다고 명시된다.",
+        "별도 관계에서 두 대안 중 무엇을 실제로 선택하거나 실행할지는 아직 결정하지 않았다고 명시된다.",
+        "선호 순위와 실행 결정을 같은 상태로 합치는 관계는 없다.",
+        "이후 선호 순위를 뒤집거나 실행 결정을 확정하는 관계도 없다."
+      ],
+      "humanDisposition": "KEEP"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-c3d0e91a74b6f258",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "REVISION / CONFLICT",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "변경이 과거 기록에는 소급되지 않고 이후 상태에만 적용되는 경우",
+      "semanticRelations": [
+        "한 대상에 대해 이전 시점까지 적용되는 상태가 명시되어 있다.",
+        "뒤의 관계가 같은 대상과 같은 차원에 새로운 상태를 도입한다.",
+        "그 변경은 명시된 경계 시점부터 앞으로 적용되고, 그 이전 기록에는 소급되지 않는다고 제시된다.",
+        "경계 이후 새 상태를 철회하거나 이전 상태로 되돌리는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-8a41f0d92c7e6b35",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "종료 조건이 실제로 충족된 뒤 지속 상태의 현재 지위",
+      "semanticRelations": [
+        "대상 상태는 특정 종료 조건이 충족될 때까지 계속되는 것으로 명시된다.",
+        "뒤의 관계가 그 종료 조건이 실제로 충족되었다고 명시한다.",
+        "종료 이후에도 대상 상태가 계속된다고 다시 주장하는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f03b5a7c91e2486d",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "일시 중단된 상태가 명시적 재개 관계 뒤에 다시 적용되는지 여부",
+      "semanticRelations": [
+        "대상에는 이전부터 적용되던 반복 상태가 있다.",
+        "뒤의 관계가 그 상태를 한정된 중단 구간 동안 멈춘다고 명시한다.",
+        "더 뒤의 관계가 같은 대상과 같은 상태를 직접 가리키며 재개한다고 명시한다.",
+        "재개 이후 그 상태를 다시 중단하거나 대체하는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-47c9b12e0a6f83d5",
+      "splitAssignment": "DEV",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "기존 반복 상태에 새로운 상태가 추가된 뒤 원래 상태의 유지 여부",
+      "semanticRelations": [
+        "한 대상에 대해 반복되는 기존 상태가 명시되어 있다.",
+        "뒤의 관계가 같은 대상에 새로운 상태를 추가한다.",
+        "그 새로운 상태는 기존 상태를 대체하거나 중단하는 것이 아니라 함께 유지되는 추가 상태라고 명시된다.",
+        "이후 기존 상태를 철회하거나 중단하는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-b8e64a03d97f251c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "humanLabel": "ESCALATE",
+      "candidateFocus": "정보를 묻는 질문 안에 등장한 자기 상태의 지위",
+      "semanticRelations": [
+        "대상 상태는 사용자 자신에 대해 묻는 정보 확인 질문의 내용으로 등장한다.",
+        "그 질문은 대상 상태가 성립하는지를 묻고 있으며, 그 상태를 사실로 주장하지 않는다.",
+        "보이는 관계 안에는 그 질문에 대한 답이 없다.",
+        "질문 밖에서 대상 상태를 현재 자기 상태로 별도로 주장하는 관계도 없다."
+      ],
+      "humanDisposition": "KEEP",
+      "provenanceNote": "HUMAN initially judged KEEP / ESCALATE. An assistant challenged whether it should be CLEAR. HUMAN clarified that the target is the underlying self-state, not merely whether the utterance is syntactically a question, and retained KEEP / ESCALATE."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5d2a9c70e4b18f63",
+      "splitAssignment": "DEV",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "humanLabel": "CLEAR",
+      "candidateFocus": "두 후보 상태 중 하나가 별도 관계에서 명시적으로 배제된 경우",
+      "semanticRelations": [
+        "대상 상태는 처음에 서로 양립할 수 없는 두 후보 중 하나로 제시된다.",
+        "별도 관계가 같은 대상과 같은 시점에 대해 두 번째 후보가 적용되지 않는다고 명시한다.",
+        "두 번째 후보를 다시 활성화하거나 세 번째 후보를 도입하는 관계는 없다.",
+        "따라서 남아 있는 첫 번째 후보와 경쟁하는 상태는 없다."
+      ],
+      "humanDisposition": "KEEP"
+    }
+  ],
+  "discardedReplacementAttempts": [
+    {
+      "attemptId": "p1b6-pass2-repl-discarded-01",
+      "candidateFocus": "실현되지 않은 조건문 안에 놓인 자기 상태",
+      "semanticRelations": [
+        "대상 상태는 명시적인 가정 조건문의 결과절 안에 놓인다.",
+        "그 조건은 현재 충족된 사실이 아니라 실현되지 않은 가정으로 표시된다.",
+        "대상 상태를 조건문 밖의 현재 자기 상태로 다시 주장하는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP",
+      "humanLabel": "CLEAR",
+      "finalCatalogAuditDecision": "DROP",
+      "finalCatalogAuditReason": "historical ACTUALITY repackaging / too close to HIST-ACT-01"
+    },
+    {
+      "attemptId": "p1b6-pass2-repl-discarded-02",
+      "candidateFocus": "잘못 붙은 상태가 다른 대상에게 명시적으로 재귀속된 뒤의 원래 대상 상태",
+      "semanticRelations": [
+        "앞선 관계가 한 상태를 첫 번째 대상에 부여한다.",
+        "뒤의 수정 관계는 그 상태가 첫 번째 대상에 잘못 붙었다고 명시한다.",
+        "같은 수정 관계가 그 상태를 두 번째 대상에 다시 귀속한다.",
+        "그 뒤 첫 번째 대상에 그 상태를 다시 부여하는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP",
+      "humanLabel": "CLEAR",
+      "finalCatalogAuditDecision": "DROP",
+      "finalCatalogAuditReason": "identity/correction hard-gate proximity plus cross-split relation risk"
+    },
+    {
+      "attemptId": "p1b6-pass2-repl-discarded-03",
+      "candidateFocus": "아직 시작 조건이 충족되지 않은 예정 상태의 현재 지위",
+      "semanticRelations": [
+        "대상 상태는 특정 시작 조건이 충족된 뒤에만 적용되는 것으로 명시된다.",
+        "현재 보이는 관계에서는 그 시작 조건이 아직 충족되지 않았다고 명시된다.",
+        "대상 상태를 그 조건보다 먼저 현재 상태로 활성화하는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP",
+      "humanLabel": "CLEAR",
+      "finalCatalogAuditDecision": "DROP",
+      "finalCatalogAuditReason": "cross-split duplicate/contrast with existing conditional-activation skeleton p1b6-sk-155420007d75f36f"
+    },
+    {
+      "attemptId": "p1b6-pass2-repl-discarded-04",
+      "candidateFocus": "서로 다른 버전에 놓인 충돌 상태 중 현재 버전이 명시된 경우",
+      "semanticRelations": [
+        "같은 대상과 같은 차원에 서로 양립하지 않는 두 상태가 각각 다른 버전에 놓여 있다.",
+        "두 버전은 같은 변경 계보 안에서 앞선 버전과 뒤의 버전으로 명시된다.",
+        "별도 관계가 뒤의 버전을 현재 버전으로 직접 지정한다.",
+        "그 이후 다른 버전을 현재로 지정하는 관계는 없다."
+      ],
+      "humanDisposition": "KEEP",
+      "humanLabel": "CLEAR",
+      "finalCatalogAuditDecision": "DROP",
+      "finalCatalogAuditReason": "same decision-relevant explicit-precedence relation as retained TRAIN p1b6-sk-6e493bbfafdb22de"
+    },
+    {
+      "attemptId": "p1b6-pass2-repl-discarded-05",
+      "candidateFocus": "반복 규칙에 붙은 종료 횟수가 충족되었는지 여부",
+      "semanticRelations": [
+        "대상 상태는 반복 발생마다 적용되는 것으로 제시된다.",
+        "별도 관계가 그 상태가 정해진 횟수의 발생까지만 유지된다고 제한한다.",
+        "현재까지의 발생 수는 그 종료 횟수에 도달했을 수도 있고 아직 도달하지 않았을 수도 있다.",
+        "보이는 관계만으로는 종료 조건 충족 여부를 결정할 수 없다."
+      ],
+      "humanDisposition": "KEEP",
+      "humanLabel": "ESCALATE",
+      "finalCatalogAuditDecision": "DROP",
+      "finalCatalogAuditReason": "same termination-condition skeleton as accepted PERSISTENCE/TRAIN replacement C above, creating cross-split leakage"
+    }
+  ]
+}

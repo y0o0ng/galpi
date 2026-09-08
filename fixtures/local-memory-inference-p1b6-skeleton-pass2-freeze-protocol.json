@@ -1,0 +1,108 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-pass2-freeze-protocol-v1",
+  "protocolIdentity": "xion-p1b6-skeleton-pass2-exact56-freeze-v1",
+  "startingMainSha": "a87360c0bf2482418f13df8bdbcfb9acbe9a16dc",
+  "sourceArtifacts": {
+    "originalFixture": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-candidates.json",
+      "sha256": "c849037cc086d2806c61f21da100a94cc502b5e41b903fc511db705d305277c9"
+    },
+    "originalReceipt": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-human-pass1-receipt.json",
+      "sha256": "428f802a283ad9cddec6370595ceb157c95573cadcc252529898f419fd6fec75"
+    },
+    "followupFixture": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-candidates.json",
+      "sha256": "9791a61d4d46d7b6257642eda3cf6a677821f60e0d22afad71af0a5567b646f2"
+    },
+    "followupProtocol": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-protocol.json",
+      "sha256": "1ffe5da2896784856e7317348ccb5b55515cc2cd3754d3b9c58f1f17842a6426"
+    },
+    "followupReceipt": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass1-followup-receipt.json",
+      "sha256": "c21fef8f0524791bc89151e391c7c7576a1831602e44a18d876414a6f4fd6b99"
+    },
+    "authoringProtocol": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-authoring-protocol.json",
+      "sha256": "193760cd68291138beaba00c9a79d46835a1f1d3aac0e0886a38b92ebf634ef1"
+    },
+    "historicalCases": {
+      "path": "fixtures/local-memory-inference-p1b3-decomposed-pipeline-candidates-v2.json",
+      "sha256": "a6608642caad02c772941d58558bd9fc31ee86ef54fe342ee2713aa08cf62c8e"
+    },
+    "pass2Catalog": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass2-catalog.json",
+      "sha256": "d8ffa4622ea4a70fc197e0e776cf9308f96f08e472a333875ac81f77e3b66501"
+    },
+    "pass2Protocol": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass2-protocol.json",
+      "sha256": "b4e4aa442dd61250d8de5c34a90684fc5078e27791d7bb05986eb748208a7965"
+    },
+    "historicalReferenceGroups": {
+      "path": "fixtures/local-memory-inference-p1b6-historical-reference-groups.json",
+      "sha256": "da97f3e0fa496ed779754acc1a2f15909665c9cc54d30bab66ce6fb9ed7f48f4"
+    },
+    "modelSuggestions": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass2-model-suggestions.json",
+      "sha256": "254a7712e3ff01cb9e0530fde80825586e576f8ca41bc497b0b948e04ee792b1"
+    },
+    "humanAdjudicationReceipt": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass2-human-adjudication-receipt.json",
+      "sha256": "d2320fe0f44b1f9a28be30334284a00d409a12637acec2f7d474ce7689d081f7"
+    },
+    "replacementCandidates": {
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-pass2-replacement-candidates.json",
+      "sha256": "9b32da295cad802f9582618d7d990bbef98630a1a072ec47ff8557c76718a266"
+    }
+  },
+  "outputs": {
+    "exact56": "fixtures/local-memory-inference-p1b6-skeleton-exact56.json",
+    "protocol": "fixtures/local-memory-inference-p1b6-skeleton-pass2-freeze-protocol.json"
+  },
+  "outputSha256": {
+    "exact56": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602"
+  },
+  "dropExistingSemanticSkeletonIds": [
+    "p1b6-sk-7e613818545d04bc",
+    "p1b6-sk-b4a6776ed886de2d",
+    "p1b6-sk-ae65e2ec3789a8e5",
+    "p1b6-sk-63b9e434ba146408",
+    "p1b6-sk-302069b96f1406b3",
+    "p1b6-sk-264280ddad65a8da",
+    "p1b6-sk-ab85f961c71f1bb5",
+    "p1b6-sk-909e894ec573b62c",
+    "p1b6-sk-4e7a29da8a3037a4",
+    "p1b6-sk-1382663d3ae9f6b7",
+    "p1b6-sk-24e17e0cafddd4ae",
+    "p1b6-sk-2355452bdd41e4eb",
+    "p1b6-sk-609043b6b1fb92e4",
+    "p1b6-sk-9ef1bb2b5c5e2d7f",
+    "p1b6-sk-9dedffcaacc2426f",
+    "p1b6-sk-67d79991996ef494",
+    "p1b6-sk-75fa233a7cee369e",
+    "p1b6-sk-aad4e8523ca5f042",
+    "p1b6-sk-9af7e76a84e97be0",
+    "p1b6-sk-7209bf45f4ee890c",
+    "p1b6-sk-de16754758b5bb97",
+    "p1b6-sk-56c94f11c6522ef7"
+  ],
+  "acceptedReplacementSemanticSkeletonIds": [
+    "p1b6-sk-2b6f4ac9e15d8307",
+    "p1b6-sk-c3d0e91a74b6f258",
+    "p1b6-sk-8a41f0d92c7e6b35",
+    "p1b6-sk-f03b5a7c91e2486d",
+    "p1b6-sk-47c9b12e0a6f83d5",
+    "p1b6-sk-b8e64a03d97f251c",
+    "p1b6-sk-5d2a9c70e4b18f63"
+  ],
+  "authorityStatement": "HUMAN is final authority. Pass-2 did not relabel the whole 71-case catalog; retained existing candidates keep their existing HUMAN labels, and replacement candidates use their listed HUMAN labels. Model Pass-2 suggestions are advisory only.",
+  "provenanceCaveat": "The replacement review was assistant-assisted and not fully interaction-isolated; this artifact does not claim full metadata-blindness.",
+  "excludedWork": [
+    "No surface data generation.",
+    "No FINAL HELD-OUT surface model output.",
+    "No fine-tuning or training.",
+    "No source-anchor architecture or Bundle Builder implementation.",
+    "No historical60 promotion into supervised P1-B6 skeletons."
+  ]
+}

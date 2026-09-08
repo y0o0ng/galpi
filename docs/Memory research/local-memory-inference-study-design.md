@@ -3578,15 +3578,13 @@ bounded experiment's design, not training execution.
 
 ### P1-B6 1.7B ambiguity specialist supervised adaptation
 
-**DATASET CONTRACT CLOSED / TRAINING PREREGISTRATION INCOMPLETE / NOT RUN.**
+**SEMANTIC SKELETON EXACT-56 CLOSED/FROZEN / TRAINING PREREGISTRATION INCOMPLETE / NOT RUN.**
 This prospective consolidation was reviewed against Galpi `main` at
 `9e1203c46e69b30040678d317c34c92cb3cb0971`. The dataset decisions marked
-CLOSED below are frozen user decisions. The first skeleton-candidate
-validation and blind Pass-1 review-tool slice was implemented from Galpi
-`main` `7dc562a01138e88488ecfdb8b536952f70e518b9`; later review stages remain
-unimplemented. Training, model selection, dataset generation, and production
-use remain unauthorized. No real candidate, HUMAN adjudication, model output,
-or training artifact was created by that implementation slice.
+CLOSED below are frozen user decisions. The semantic-skeleton Pass-1,
+follow-up, Pass-2 audit, and exact-56 materialization are complete; surface
+source-episode generation, model-visible bundle audit, training, model
+selection, and production use remain unauthorized.
 
 The research target is adaptation of **only the ~1.7B ambiguity/escalation
 stage**. Given an already-selected, candidate-centered conversational
@@ -3822,8 +3820,18 @@ artifact is
 `fixtures/local-memory-inference-p1b6-skeleton-pass2-model-suggestions.json`
 contains non-authoritative model-assisted suggestions only; HUMAN review is
 final authority and absence or presence of a suggestion mutates nothing.
-Pass 2 is now the next semantic stage. Exact-56 freeze, surface generation,
-and training remain unperformed.
+Pass-2 HUMAN catalog audit is complete. The frozen exact-56 catalog is
+`fixtures/local-memory-inference-p1b6-skeleton-exact56.json`
+(`772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602`),
+with freeze protocol
+`fixtures/local-memory-inference-p1b6-skeleton-pass2-freeze-protocol.json`.
+It contains 24 TRAIN / 16 DEV / 16 FINAL_HELD_OUT skeletons; every boundary
+class has exact 3 / 2 / 2 split coverage; HUMAN skeleton labels are 32 CLEAR
+/ 24 ESCALATE. Historical P1-B3 60 remains diagnostic/reference-only and is
+excluded from supervised TRAIN/DEV/HELD. The replacement review provenance
+records assistant-assisted HUMAN discussion and the partial metadata exposure
+caveat; HUMAN remained final authority. Next work is surface/source-episode
+generation and source/bundle audit, not further skeleton redesign.
 
 **HUMAN skeleton review Pass 2.** After Pass-1 labels freeze, conduct a
 catalog-level leakage/coverage audit covering historical-reference and
@@ -3855,6 +3863,11 @@ audit with genuinely different replacement structures. Adding surfaces of the
 same fixed-label skeleton cannot repair that failure. Do not change HUMAN
 labels to fit counts or duplicate a skeleton into another split. Recheck
 feasibility after any proposed catalog revision.
+
+The exact-56 skeleton catalog passes this feasibility check at skeleton level.
+The later 190 CLEAR / 190 ESCALATE balance is a surface-item construction
+target for the 380-case supervised/evaluation corpus, not an estimate of
+production ambiguity prevalence and not a skeleton-label quota.
 
 #### CLOSED — serving-shape, anchors, fragments, and future-builder boundary
 
@@ -4032,6 +4045,13 @@ target unresolved; this may correctly yield `ESCALATE`. Selection
 incompleteness means that material evidence exists in that snapshot but was
 omitted from the selected bundle; this is a construction failure and must not
 be converted into `ESCALATE` gold.
+
+Question-turn clarification: a user question such as `내가 평일엔 7시에
+일어나기로 했었나?` may be a legitimate `ESCALATE` when the target is whether
+the 7am rule actually holds and the frozen point-in-time source contains no
+answer. If the answer exists in that PIT source but the selected bundle omits
+it, the failure belongs to Bundle Builder/source-completeness handling, not
+to B6 semantic ambiguity.
 
 Before blind HUMAN ambiguity review, a separate source auditor inspects the
 frozen point-in-time source-episode snapshot, target span(s), and selected
@@ -4273,9 +4293,8 @@ dataset contract:
 
 - Exact synthetic generation prompt, model/provider, model version,
   settings, and temperature.
-- Exact later skeleton FIX/re-review and Pass-2 tools, surface/HELD HUMAN
-  review UI/tool, and source-audit UI/tool; any assisting source-audit
-  model/provider.
+- Exact surface/HELD HUMAN review UI/tool and source-audit UI/tool; any
+  assisting source-audit model/provider.
 - Exact surface-similarity model/method and threshold.
 - Exact source-locator encoding, later source/surface/catalog artifact
   filenames/schemas, model-visible renderer/serialization, canonical hash,
@@ -4296,15 +4315,14 @@ dataset contract:
 
 The user intends to choose the training environment and execute training
 interactively with ChatGPT later; this documentation task does not delegate
-or preselect those decisions. Next step is to freeze the **actual abstract
-skeleton authoring/generation contract**, produce the candidate fixture, and
-run the implemented blind Pass-1 review before designing FIX/re-review,
-Pass 2, or catalog freeze. Remaining surface-tool and training
-preregistration follows; training itself does not. The prospective policy
-still permits a separately preregistered intervention without a general
-untuned-performance entry gate. Before execution, provenance, mechanism,
-metrics, leakage controls, checkpoint selection, and stopping rules must be
-frozen. Training execution, raw episodes, and private replay remain
-**UNOPENED**. Production memory/parsing, DB/Vault/retrieval/routing, authority,
-identity, explicit correction, Core/high-impact gates, and architecture
-contracts remain unchanged.
+or preselect those decisions. Next step is surface/source episode generation
+and source/bundle audit under the closed exact-56 skeleton catalog, followed
+by remaining surface-tool and training preregistration. Training itself does
+not start here. The prospective policy still permits a separately
+preregistered intervention without a general untuned-performance entry gate.
+Before execution, provenance, mechanism, metrics, leakage controls,
+checkpoint selection, and stopping rules must be frozen. Training execution,
+raw episodes, and private replay remain **UNOPENED**. Production
+memory/parsing, DB/Vault/retrieval/routing, authority, identity, explicit
+correction, Core/high-impact gates, and architecture contracts remain
+unchanged.
