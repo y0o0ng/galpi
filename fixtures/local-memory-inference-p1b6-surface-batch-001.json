@@ -26,12 +26,12 @@
         {
           "turnId": "t4",
           "role": "ASSISTANT",
-          "text": "독서 모임은 토요일에 가보는 게 어때?"
+          "text": "독서 모임은 토요일 오후에 가볼까? 아니면 그 시간에 새로 생긴 서점에 들를까?"
         },
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "달력 알림은 이미 봤어. 토요일 오후는 괜찮아."
+          "text": "잠깐, 문자 하나만 보내고 말할게. 토요일 오후면 좋아."
         }
       ]
     },
@@ -336,17 +336,17 @@
         {
           "turnId": "t5",
           "role": "ASSISTANT",
-          "text": "둘 다 오늘 신청할 수 있어."
+          "text": "스터디룸을 예약해 둘까, online course를 결제해 둘까?"
         },
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "영수증은 이메일로 보내줘."
+          "text": "잠깐만, 메모 좀 하고."
         },
         {
           "turnId": "t7",
           "role": "USER",
-          "text": "응."
+          "text": "응, 그건 오늘 해줘."
         }
       ]
     },
@@ -935,12 +935,12 @@
         {
           "turnId": "t4",
           "startByte": 0,
-          "endByte": 51
+          "endByte": 106
         },
         {
           "turnId": "t5",
-          "startByte": 32,
-          "endByte": 62
+          "startByte": 46,
+          "endByte": 73
         }
       ],
       "discoursePattern": "CONTEXT_FIRST",
@@ -1303,12 +1303,12 @@
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 36
+          "endByte": 68
         },
         {
           "turnId": "t7",
           "startByte": 0,
-          "endByte": 4
+          "endByte": 26
         }
       ],
       "discoursePattern": "SELF_REVISION",

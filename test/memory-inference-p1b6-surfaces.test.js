@@ -50,6 +50,17 @@ test('batch-001 has the exact smoke identity and quotas', () => {
   }
 });
 
+test('surface validator accepts a matching later versioned batch identity', () => {
+  const later = changed(value => {
+    value.name = 'xion-local-memory-inference-p1b6-surface-batch-002-v1';
+    value.batchId = 'p1b6-surface-batch-002';
+  });
+  assert.equal(surfaces.validateSurfaceBatch(later), later);
+  assert.throws(() => surfaces.validateSurfaceBatch(changed(value => {
+    value.name = 'xion-local-memory-inference-p1b6-surface-batch-002-v1';
+  })), /identity is invalid/u);
+});
+
 test('all item, episode, skeleton, and family references are split-pure and unique', () => {
   assert.equal(new Set(batch.sourceEpisodes.map(row => row.sourceEpisodeId)).size, 28);
   assert.equal(new Set(batch.items.map(row => row.itemId)).size, 32);
@@ -149,9 +160,9 @@ test('fragment computation extends maximal contiguous source ranges to spans', (
 test('renderer is deterministic, blind, chronological, and shared with HUMAN review', () => {
   const item = batch.items[1];
   const expected = [
-    'ASSISTANT: [TARGET]독서 모임[/TARGET]은 토요일에 가보는 게 어때?',
+    'ASSISTANT: [TARGET]독서 모임[/TARGET]은 토요일 오후에 가볼까? 아니면 그 시간에 새로 생긴 서점에 들를까?',
     '---',
-    'USER: 토요일 오후는 괜찮아.',
+    'USER: 토요일 오후면 좋아.',
   ].join('\n');
   const rendered = surfaces.renderVisibleItem(batch, item);
   assert.equal(rendered, expected);
@@ -160,11 +171,22 @@ test('renderer is deterministic, blind, chronological, and shared with HUMAN rev
   assert.equal((rendered.match(/\[TARGET\]/gu) || []).length, 1);
   assert.equal((rendered.match(/\[\/TARGET\]/gu) || []).length, 1);
   assert.equal(rendered.replace('[TARGET]', '').replace('[/TARGET]', ''),
-    'ASSISTANT: 독서 모임은 토요일에 가보는 게 어때?\n---\nUSER: 토요일 오후는 괜찮아.');
+    'ASSISTANT: 독서 모임은 토요일 오후에 가볼까? 아니면 그 시간에 새로 생긴 서점에 들를까?\n---\nUSER: 토요일 오후면 좋아.');
   assert.equal(rendered.includes('...'), false);
   for (const hidden of [item.itemId, item.semanticSkeletonId, item.discoursePattern,
     item.surfaceFamilyId, episodes.get(item.sourceEpisodeId).sourceFamilyId,
     episodes.get(item.sourceEpisodeId).splitAssignment]) assert.equal(rendered.includes(hidden), false);
+
+  assert.equal(surfaces.renderVisibleItem(batch, 'p1b6-item-b001-014'), [
+    'USER: 스터디룸 예약할까?',
+    '---',
+    'USER: online course도 결제할까?',
+    '---',
+    'ASSISTANT: 스터디룸을 예약해 둘까, online course를 결제해 둘까?',
+    '---',
+    'USER: [TARGET]응[/TARGET], 그건 오늘 해줘.',
+  ].join('\n'));
+  assert.equal(episodes.get('p1b6-se-b001-011').turns[5].text, '잠깐만, 메모 좀 하고.');
 });
 
 test('source-audit packet contains full source and selected bundle but no hidden metadata', () => {

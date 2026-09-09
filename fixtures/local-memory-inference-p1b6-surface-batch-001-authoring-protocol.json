@@ -9,7 +9,7 @@
   "outputBatch": {
     "name": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
     "path": "fixtures/local-memory-inference-p1b6-surface-batch-001.json",
-    "sha256": "ffa412c3bdd12d6a6b287109161d70bc9bd4f3a3bcb6f5836163375f5b6a244c"
+    "sha256": "4827ebcacc8a95d7fb3031f8f7eece3c95ac348fd7e2e2fbd493c170e6dbbbdb"
   },
   "generator": {
     "provider": "OpenAI",
