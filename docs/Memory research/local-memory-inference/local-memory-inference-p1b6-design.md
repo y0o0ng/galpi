@@ -122,9 +122,16 @@ counts.
 
 ## Source Episodes and Items
 
-A source episode may produce zero or more B6 items. Most episodes may produce
+A source episode may produce 0..N B6 items/bundles. Most episodes may produce
 one item; multi-item episodes are allowed when they test candidate and anchor
-separation. The minimal research representation is:
+separation. Items from one episode may overlap in source turns, so one source
+turn may participate in multiple separately anchored candidate items.
+Temporally separated source regions may belong to one candidate bundle. All
+items from one source episode still remain in the same split. This overlap
+supports multi-topic evidence and does not create a separate candidate or
+anchor subsystem.
+
+The minimal research representation is:
 
 ```text
 sourceEpisode:
@@ -263,23 +270,64 @@ The audit protects two different states:
   Bundle Builder omitted it; this is a bundle/dataset construction failure, not
   a legitimate B6 ambiguity case.
 
-The audit checks that every selected fragment and anchor is source-grounded,
-that omitted evidence cannot change the target judgment, and that a source
-episode's split and authored chronology are preserved. Missing persistence or
-durability evidence is not ambiguity when the current semantic state is
-otherwise uniquely established.
+Before blind HUMAN surface review, a separate source auditor inspects the
+full frozen point-in-time source-episode snapshot, the selected
+source-grounded anchor or anchors, and the selected fragments. The auditor
+determines only whether omitted source evidence could materially change,
+resolve, contradict, or otherwise alter the candidate interpretation or its
+`CLEAR`/`ESCALATE` judgment. The source auditor does not assign HUMAN
+ambiguity gold.
+
+Only audit `PASS` items proceed to blind HUMAN review. Audit uncertainty fails
+closed; it must not be silently treated as semantic `ESCALATE`. The audit also
+checks that every selected fragment and anchor is source-grounded and that a
+source episode's split and authored chronology are preserved. Missing
+persistence or durability evidence is not ambiguity when the current semantic
+state is otherwise uniquely established.
+
+Any material change to source mapping, selected evidence, or anchor after the
+audit requires the item to restart source audit and blind HUMAN review. Prior
+gold or audit disposition is not inherited.
 
 ## HUMAN Review and HELD Freeze
 
-Only source/bundle-audit PASS items are reviewable. HUMAN sees only the
-model-visible selected evidence with target source spans visibly marked,
-including unchanged containing turns; hidden full episodes and generator
-metadata are unavailable. HUMAN independently decides KEEP/FIX/REJECT and
-CLEAR/ESCALATE. HUMAN is final authority; model suggestions remain advisory.
+Only source/bundle-audit `PASS` items are reviewable. The HUMAN ambiguity
+reviewer sees only the model-visible selected evidence plus the
+model-visible, source-grounded anchor marking. The reviewer does not see the
+full unselected source episode or:
+
+- generator intended label;
+- semantic skeleton ID;
+- boundary class;
+- split;
+- surface domain;
+- `discoursePattern` metadata;
+- generator rationale.
+
+The reviewer independently chooses `KEEP / FIX / REJECT` and
+`CLEAR / ESCALATE`; HUMAN gold is authoritative and model suggestions remain
+advisory. Ill-defined gold, incoherent candidate focus, or implausible
+conversation is `REJECT`, not automatic `ESCALATE`. If the blind HUMAN label
+opposes the approved skeleton HUMAN label, it cannot be silently accepted or
+relabeled: it requires FIX plus new review or rejection. Repeated mismatch
+triggers review of that skeleton's realizability.
 
 Any evidence edit restarts the applicable source audit and blind review. No
 previous HUMAN label or generator intent is inherited after an evidence edit.
 No FINAL surface item is used for training or tuning.
+
+## HELD Repeated HUMAN Pass
+
+After primary review, opaque-reorder the eligible frozen HELD pool before the
+repeated HUMAN pass. The same HUMAN reviewer performs this repeated blind pass;
+it is not an independent second reviewer. Where practical, hide the Pass-1
+label and disposition, generator intended label and rationale, and
+skeleton/boundary metadata.
+
+Resolve disagreements using only the same frozen model-visible evidence. Do
+not edit evidence during disagreement resolution. If an edit is required, the
+item exits the frozen pool and restarts the source-audit plus blind-review
+path.
 
 ## Leakage Controls
 
