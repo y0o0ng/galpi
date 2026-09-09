@@ -133,7 +133,7 @@ test('all L4 messages equal B2b; Stage 1 and Stage 3 messages equal frozen P1-B1
 });
 
 test('Stage 2 has exactly the preregistered binary instruction, scaffold, schema, and evidence payload', () => {
-  const doc = fs.readFileSync(path.join(__dirname, '../docs/Memory research/local-memory-inference-study-design.md'), 'utf8');
+  const doc = fs.readFileSync(path.join(__dirname, '../docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md'), 'utf8');
   assert.ok(doc.includes(`\n${BINARY_INSTRUCTION}\n`));
   assert.equal(BINARY_SPECIFICATION.taskSpecificationVersion, 'p1b3-binary-write-candidate-triage-v1');
   assert.equal(BINARY_SPECIFICATION.outputSchemaVersion, 'p1b3-binary-write-candidate-triage-output-v1');

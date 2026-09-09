@@ -75,7 +75,7 @@ Do not decide durability yourself. Do not resolve ambiguity yourself.`;
     assert.ok(!prompt.messages[1].content.includes('Return CLEAR only when one interpretation is supported unambiguously.'));
     assert.ok(!prompt.messages[1].content.includes('TASK_SPECIFICATION: p1b1-ambiguity-escalation-v1'));
   }
-  const doc = fs.readFileSync(path.join(__dirname, '../docs/Memory research/local-memory-inference-study-design.md'), 'utf8');
+  const doc = fs.readFileSync(path.join(__dirname, '../docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md'), 'utf8');
   assert.ok(doc.includes(`\n${INSTRUCTION}\n`));
 });
 

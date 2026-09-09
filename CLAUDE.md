@@ -93,10 +93,10 @@
 
 - **구조 검토 보완 제안 3건은 OPEN / 미채택이다.** 갱신 실패 중 읽기 상태·동일 원천 중복 지지/자기 재진술·유효 시점과 인지 시점의 구분 및 원본 직접 회수 주의점은 `docs/Memory research/xion-memory-research-docs/memory-architecture-design.md` §54에 있다. 기존 R2 계약·R3 사전등록은 그대로다.
 - **R3-P0 current-traffic feasibility는 active-note input instrumentation gap 때문에 `INDETERMINATE_PIT`다.** P0-B는 시작하지 않았고 schema v23이 앞으로 exact input filenames를 기록한다. 정본은 `docs/memory-r3-p0-a-receipt.md`이며 다음은 충분한 exact-window traffic이 쌓인 뒤 재측정이다.
-- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** P1-B3 run artifacts를 커밋했고 결과 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
+- **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** 결과 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
 - **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 위 canonical study 문서에 있다.
-- **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference-study-design.md`다.
-- **P1-B6 semantic-skeleton exact-56은 CLOSED/FROZEN이다.** 정본은 `fixtures/local-memory-inference-p1b6-skeleton-exact56.json`, freeze protocol, 위 canonical study 문서이고 다음은 surface/source-episode generation과 source/bundle audit이다; 학습 실행·raw episode·private replay는 `UNOPENED`, production은 그대로다.
+- **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
+- **P1-B6 semantic-skeleton exact-56은 CLOSED/FROZEN이다.** 정본은 `fixtures/local-memory-inference-p1b6-skeleton-exact56.json`, `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`, freeze protocol이고 다음은 surface/source-episode generation과 source/bundle audit이다; 학습 실행·raw episode·private replay는 `UNOPENED`, production은 그대로다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 
