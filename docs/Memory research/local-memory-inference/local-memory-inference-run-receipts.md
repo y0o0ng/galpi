@@ -3558,10 +3558,10 @@ The repair changed only omitted side turns in source episodes
 `p1b6-se-b001-011` and `p1b6-se-b001-028`; item mappings, selected evidence,
 anchors, skeletons, and all other source episodes/items are unchanged. The
 fixed batch raw SHA-256 is
-`b2a065be9a156c52bd18cb2bf1e1c80f93229dcc431cf4a899119ec201d5283c`.
+`8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa`.
 The existing canonical builder produced the fresh full attempt-002 packet at
 `/tmp/p1b6-source-audit-batch-001-attempt-002.json`, raw SHA-256
-`1bc45524d8813a93bc46caeddd077d5ff272f94c8cafcfdd9b29b1244ef2f929`;
+`01dee02a3ba9601a86133bab80f928bb7a2e1fe262d26e6ad2668d15ee582f99`;
 all 32 opaque audit row IDs changed because the batch SHA changed. Attempt 002
 has not run. Training, raw-episode evaluation, private replay, and production
 remain unopened/unchanged. Local verification completed with focused P1-B6
