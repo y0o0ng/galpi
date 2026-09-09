@@ -32,8 +32,9 @@ class has exact 3/2/2 coverage; HUMAN skeleton labels are CLEAR 32 and
 ESCALATE 24. Historical P1-B3's 60 flat cases remain diagnostic/reference-only
 and are excluded from supervised TRAIN, DEV, and FINAL_HELD_OUT.
 
-The next canonical work is surface/source-episode generation and the
-source/bundle completeness audit. Surface construction targets 240 TRAIN, 60
+The immediate prerequisite is the preregistered P1-B6 anchor-marker paired
+pilot; full surface/source-episode generation and the source/bundle
+completeness audit follow its representation decision. Surface construction targets 240 TRAIN, 60
 DEV, and 80 FINAL_HELD_OUT items, with exactly 190 CLEAR and 190 ESCALATE
 labels overall. That balanced surface target is a construction/evaluation
 contract, not an estimate of production ambiguity prevalence. Training, raw

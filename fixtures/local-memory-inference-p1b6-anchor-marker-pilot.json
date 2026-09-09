@@ -1,0 +1,305 @@
+{
+  "name": "xion-local-memory-inference-p1b6-anchor-marker-pilot-v1",
+  "cases": [
+    {
+      "caseId": "001",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "요즘 러닝을 다시 시작할까 생각 중이야." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "어느 정도로 생각하고 있어?" },
+        { "turnId": "t3", "role": "USER", "text": "러닝은 일단 주 2~3회 정도 생각만 해보고 있어. 아직 하기로 정한 건 아니야." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "러닝" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "러닝" },
+        { "turnId": "t3", "quote": "러닝" }
+      ]
+    },
+    {
+      "caseId": "002",
+      "humanGoldDecision": "ESCALATE",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "러닝을 다시 해볼까 싶긴 해." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "그러면 러닝은 월수금으로 하는 걸로 정할까, 아니면 일단 아이디어로만 둘까?" },
+        { "turnId": "t3", "role": "USER", "text": "좋아." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "러닝" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "러닝" },
+        { "turnId": "t2", "quote": "러닝" }
+      ]
+    },
+    {
+      "caseId": "003",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "커피는 하루 두 잔까지만 마시기로 했어." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "오후에도 커피 한 잔 마시는 거야?" },
+        { "turnId": "t3", "role": "USER", "text": "아, 이제 하루 한 잔까지만 마실래." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "커피" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "커피" },
+        { "turnId": "t2", "quote": "커피" }
+      ]
+    },
+    {
+      "caseId": "004",
+      "humanGoldDecision": "ESCALATE",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "공부는 평일에 하루 두 시간으로 잡았어." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "저녁에 몰아서 할 생각이야?" },
+        { "turnId": "t3", "role": "USER", "text": "저녁이 제일 편하긴 해." },
+        { "turnId": "t4", "role": "ASSISTANT", "text": "그럼 다른 일정은 그대로 두면 되겠네." },
+        { "turnId": "t5", "role": "USER", "text": "공부는 평일에 하루 한 시간으로 잡았어." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "공부" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "공부" },
+        { "turnId": "t5", "quote": "공부" }
+      ]
+    },
+    {
+      "caseId": "005",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "회의 알림은 전부 10분 전에 줘." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "온라인 회의도 똑같이?" },
+        { "turnId": "t3", "role": "USER", "text": "회의 알림 중에서 온라인 회의는 예외로 5분 전에 줘." },
+        { "turnId": "t4", "role": "ASSISTANT", "text": "내일 온라인 회의 하나 있어." },
+        { "turnId": "t5", "role": "USER", "text": "응, 그 온라인 회의 알림은 예외 쪽으로 하면 돼." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "회의 알림" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "회의 알림" },
+        { "turnId": "t3", "quote": "회의 알림" },
+        { "turnId": "t5", "quote": "회의 알림" }
+      ]
+    },
+    {
+      "caseId": "006",
+      "humanGoldDecision": "ESCALATE",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "배송 알림은 도착하는 대로 바로 알려줘." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "해외 배송은 밤에는 묶어서 알려주는 걸로 할까?" },
+        { "turnId": "t3", "role": "USER", "text": "배송 알림은 그 규칙으로 가자." },
+        { "turnId": "t4", "role": "ASSISTANT", "text": "지금 주문한 건 해외 물류를 거칠 수도 있고 국내에서 바로 올 수도 있대." },
+        { "turnId": "t5", "role": "USER", "text": "그럼 이 배송 알림은 어떻게 되는 거야?" }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "배송 알림" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "배송 알림" },
+        { "turnId": "t3", "quote": "배송 알림" },
+        { "turnId": "t5", "quote": "배송 알림" }
+      ]
+    },
+    {
+      "caseId": "007",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "민수가 자기는 아침 운동을 매일 할 거라고 하더라." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "너도 아침 운동을 매일 해볼 생각이야?" },
+        { "turnId": "t3", "role": "USER", "text": "아니. 아침 운동을 매일 한다는 건 민수 얘기야. 나는 아직 그런 계획 없어." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "아침 운동" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "아침 운동" },
+        { "turnId": "t2", "quote": "아침 운동" },
+        { "turnId": "t3", "quote": "아침 운동" }
+      ]
+    },
+    {
+      "caseId": "008",
+      "humanGoldDecision": "ESCALATE",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "지수가 밤 11시에 폰 끄는 게 좋다고 하더라." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "꽤 괜찮은 방법 같네." },
+        { "turnId": "t3", "role": "USER", "text": "응, 밤 11시에 폰 끄는 건 괜찮은 것 같아." },
+        { "turnId": "t4", "role": "ASSISTANT", "text": "그럼 너도 그렇게 하는 걸로?" },
+        { "turnId": "t5", "role": "USER", "text": "밤 11시에 폰 끄는 건 확실히 괜찮아 보여." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "밤 11시에 폰 끄는" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "밤 11시에 폰 끄는" },
+        { "turnId": "t3", "quote": "밤 11시에 폰 끄는" },
+        { "turnId": "t5", "quote": "밤 11시에 폰 끄는" }
+      ]
+    },
+    {
+      "caseId": "009",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "저녁 산책은 30분 정도로 해볼래." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "주말에도?" },
+        { "turnId": "t3", "role": "USER", "text": "주말도 똑같이." },
+        { "turnId": "t4", "role": "ASSISTANT", "text": "그러면 저녁 산책은 매일 30분 정도로 이해하면 돼?" },
+        { "turnId": "t5", "role": "USER", "text": "응, 저녁 산책은 그걸로 맞아." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "저녁 산책" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "저녁 산책" },
+        { "turnId": "t4", "quote": "저녁 산책" },
+        { "turnId": "t5", "quote": "저녁 산책" }
+      ]
+    },
+    {
+      "caseId": "010",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "여행 예산은 50만 원 정도로 잡고, 숙소는 아직 좀 더 찾아볼래." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "숙소보다 여행 예산부터 먼저 확정할까?" },
+        { "turnId": "t3", "role": "USER", "text": "응, 여행 예산은 60만 원까지로 잡자." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "여행 예산" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "여행 예산" },
+        { "turnId": "t2", "quote": "여행 예산" },
+        { "turnId": "t3", "quote": "여행 예산" }
+      ]
+    },
+    {
+      "caseId": "011",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "아침 러닝은 당분간 주 3회만 할래." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "계속 그 정도로 유지할 생각이야?" },
+        { "turnId": "t3", "role": "USER", "text": "아니, 아침 러닝은 이번 달까지만 그렇게 해볼 거야." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "아침 러닝" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "아침 러닝" },
+        { "turnId": "t3", "quote": "아침 러닝" }
+      ]
+    },
+    {
+      "caseId": "012",
+      "humanGoldDecision": "ESCALATE",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "카페인 줄이기는 시험 기간에만 해볼까 생각 중이야." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "시험 끝나고도 계속할 수도 있겠네." },
+        { "turnId": "t3", "role": "USER", "text": "응, 카페인 줄이기는 계속 해도 괜찮을 것 같아." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "카페인 줄이기" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "카페인 줄이기" },
+        { "turnId": "t3", "quote": "카페인 줄이기" }
+      ]
+    },
+    {
+      "caseId": "013",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "파란 셔츠랑 회색 셔츠 중에서 고민 중이야." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "파란 셔츠가 조금 더 캐주얼하긴 해." },
+        { "turnId": "t3", "role": "USER", "text": "그러네. 파란 셔츠가 지금 신발이랑도 더 잘 맞겠다." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "파란 셔츠" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "파란 셔츠" },
+        { "turnId": "t2", "quote": "파란 셔츠" },
+        { "turnId": "t3", "quote": "파란 셔츠" }
+      ]
+    },
+    {
+      "caseId": "014",
+      "humanGoldDecision": "ESCALATE",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "검은 가방이랑 검은 백팩 둘 다 괜찮아 보여." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "검은 가방은 수납이 좀 작고, 검은 백팩은 조금 무거워." },
+        { "turnId": "t3", "role": "USER", "text": "근데 검은 가방은 저거보다 가벼워 보이긴 해." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "검은 가방" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "검은 가방" },
+        { "turnId": "t2", "quote": "검은 가방" },
+        { "turnId": "t3", "quote": "검은 가방" }
+      ]
+    },
+    {
+      "caseId": "015",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "야식 제한은 평일에만 하려고." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "금요일 밤도 평일로 보는 거야?" },
+        { "turnId": "t3", "role": "USER", "text": "응. 야식 제한은 월요일 밤부터 금요일 밤까지 적용할게." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "야식 제한" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "야식 제한" },
+        { "turnId": "t3", "quote": "야식 제한" }
+      ]
+    },
+    {
+      "caseId": "016",
+      "humanGoldDecision": "ESCALATE",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "알림 끄기는 공부할 때 적용할래." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "혼자 공부할 때만? 스터디할 때도?" },
+        { "turnId": "t3", "role": "USER", "text": "알림 끄기는 집중해야 할 때 하는 걸로 생각하고 있어." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "알림 끄기" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "알림 끄기" },
+        { "turnId": "t3", "quote": "알림 끄기" }
+      ]
+    },
+    {
+      "caseId": "017",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "친구가 요즘 새벽 기상을 하고 있대." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "너도 해볼 생각 있어?" },
+        { "turnId": "t3", "role": "USER", "text": "아니, 새벽 기상은 친구가 하는 거고 나는 할 생각 없어." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "새벽 기상" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "새벽 기상" },
+        { "turnId": "t3", "quote": "새벽 기상" }
+      ]
+    },
+    {
+      "caseId": "018",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "형이 식단 기록을 매일 하면 좋다고 하더라." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "너한테도 꽤 괜찮을 것 같은데." },
+        { "turnId": "t3", "role": "USER", "text": "맞아. 식단 기록은 확실히 도움이 될 것 같아." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "식단 기록" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "식단 기록" },
+        { "turnId": "t3", "quote": "식단 기록" }
+      ]
+    },
+    {
+      "caseId": "019",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "자전거 타기는 주 3번 정도로 생각하고 있어." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "꼭 세 번을 채우려는 건 아니지?" },
+        { "turnId": "t3", "role": "USER", "text": "응. 자전거 타기는 대충 주 2~3번이면 충분해." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "자전거 타기" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "자전거 타기" },
+        { "turnId": "t3", "quote": "자전거 타기" }
+      ]
+    },
+    {
+      "caseId": "020",
+      "humanGoldDecision": "CLEAR",
+      "turns": [
+        { "turnId": "t1", "role": "USER", "text": "저축은 월급 들어오면 먼저 떼어놓으려고." },
+        { "turnId": "t2", "role": "ASSISTANT", "text": "금액도 정했어?" },
+        { "turnId": "t3", "role": "USER", "text": "일단 30만 원 정도 생각하고 있어." },
+        { "turnId": "t4", "role": "ASSISTANT", "text": "매달 같은 방식으로?" },
+        { "turnId": "t5", "role": "USER", "text": "응, 저축은 매달 월급 들어오면 30만 원 정도 먼저 빼둘래." }
+      ],
+      "representativeMention": { "turnId": "t1", "quote": "저축" },
+      "explicitMentions": [
+        { "turnId": "t1", "quote": "저축" },
+        { "turnId": "t5", "quote": "저축" }
+      ]
+    }
+  ]
+}

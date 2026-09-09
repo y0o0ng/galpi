@@ -13,10 +13,11 @@ P1-B6 asks whether the visible target and evidence uniquely determine the
 target's decision-relevant semantic status. It classifies interpretation
 uncertainty, not durability, memory worthiness, or authorization to write.
 
-The next step is to author source episodes and surface items, then run the
-source/bundle audit and HUMAN review. Do not redesign the frozen skeleton
-catalog, generate training output, expose a model to FINAL surface items, or
-start training in this phase.
+The next step is the preregistered anchor-marker paired pilot below. Full
+source-episode/surface authoring and source/bundle audit follow only after its
+representation decision. Do not redesign the frozen skeleton catalog,
+generate training output, expose a model to FINAL surface items, or start
+training in this phase.
 
 ## Task Boundary
 
@@ -357,6 +358,65 @@ whether any benefit justifies greater grouping/coreference burden. Do not
 expand this into arbitrary pronoun/coreference annotation. The default
 hypothesis may be that one representative anchor is sufficient, but that is
 not CLOSED.
+
+## Preregistered Anchor-Marker Paired Pilot
+
+This pilot resolves only whether repeated explicit mentions of one
+candidate/topic should all receive model-visible anchor markers. It is a
+representation/interface calibration, not a B6 capability benchmark,
+training experiment, Bundle Builder evaluation, DEV/FINAL evaluation, or
+production authorization.
+
+The canonical fixture is
+`fixtures/local-memory-inference-p1b6-anchor-marker-pilot.json`, identity
+`xion-local-memory-inference-p1b6-anchor-marker-pilot-v1`. Its 20 approved
+conversations are calibration-only, have no `semanticSkeletonId`, remain
+outside the supervised 380, satisfy no skeleton coverage, consume no held-out
+candidate, and must never be reused as TRAIN/DEV/FINAL surface items. For each
+case the full source episode is the complete model-visible evidence bundle;
+there is no evidence omission or fragment selection.
+
+Variant A marks the first declared representative explicit occurrence.
+Variant B marks every predeclared explicit same-topic occurrence. Both use
+`[TARGET]...[/TARGET]` in plain role-prefixed conversation. Marker locations
+come only from the fixture: do not discover synonyms, pronouns, stems, semantic
+matches, or coreference. Removing the tags from A and B must produce
+byte-identical visible conversation text.
+
+The fixed probe is `xion-p1b1-qwen3-1.7b-bf16`
+(`unsloth/Qwen3-1.7B-GGUF:BF16`, ~2B, BF16) on llama.cpp runtime
+`e42214804794fca6abb61b1a5f9adae2a845f0be`. This freezes only the pilot probe;
+future P1-B6 training-base provenance and selection remain OPEN.
+
+Use one 10,000 ms health preflight, then exactly 40 semantic calls in order
+`001A, 001B, ... 020A, 020B`, with no semantic rerun. Requests use temperature
+0, `max_tokens` 128, non-streaming JSON-object response, thinking disabled,
+and a 180,000 ms semantic timeout. The fixed prompt explains that markers
+identify only the topic/candidate and provide no proposition, referent,
+attribute/value, durability, or semantic answer. Output is the existing strict
+structural `CLEAR`/`ESCALATE` decision object with no rationale.
+
+For each variant report exact schema-valid agreement with HUMAN gold, invalid
+structured output, runtime failure, total correct, and CLEAR/ESCALATE counts.
+For each pair report whether valid decisions changed and classify
+`STABLE_CORRECT`, `STABLE_WRONG`, `FIXED`, or `REGRESSION`. Invalid structured
+output is a semantic failure and is not repaired or rerun. Any required runtime
+failure makes the pilot `INDETERMINATE_RUNTIME`; no representation is chosen
+from incomplete execution. No statistical-significance claim is permitted
+from N=20.
+
+Single representative marking is the default. A complete run mechanically
+requires `SINGLE_REQUIRED` when any `REGRESSION` occurs or fewer than two
+`FIXED` cases occur, including an A/B tie or both-perfect result. A complete
+run with zero regressions and at least two fixes is only
+`REPEATED_REVIEW_ELIGIBLE`, not an adoption decision. Only then may a HUMAN
+inspect the decision-change cases using frozen model-visible evidence and ask
+whether improvements genuinely came from topic identification without leaked
+semantic grouping. Mixed/uncertain attribution, semantic leakage, or a need
+for pronoun/synonym/coreference annotation selects `SINGLE_REPRESENTATIVE`.
+Only clear topic-identification benefit from explicit mentions with no such
+failure permits `REPEATED_EXPLICIT_MENTIONS`. This qualitative HUMAN step is
+not model rationale or a tuning loop.
 
 Other later decisions include exact generation/review tooling, source-locator
 encoding, similarity method/threshold, model-visible serialization, training
