@@ -61,12 +61,64 @@ The new supervised corpus has exactly 380 surface items:
 - TRAIN 240;
 - DEV 60;
 - FINAL_HELD_OUT 80;
-- CLEAR 190 and ESCALATE 190 overall.
+- CLEAR 190 and ESCALATE 190 overall;
+- DEV has at least 15 CLEAR and 15 ESCALATE;
+- FINAL_HELD_OUT has at least 20 CLEAR and 20 ESCALATE.
 
 The balanced 190/190 target is an evaluation/training construction constraint,
 not a claim about production ambiguity prevalence. All items from one source
 episode stay in one split. FINAL_HELD_OUT is never used for checkpoint or
 hyperparameter selection.
+
+All 56 approved semantic skeletons are represented in their assigned split.
+TRAIN and DEV represent every approved skeleton assigned to those splits.
+FINAL_HELD_OUT contains exactly 16 held-out semantic skeletons, with exactly
+five accepted surface cases per held skeleton, for 80 cases total.
+
+The final fragment totals are exactly 70 / 100 / 120 / 70 / 20 for 1 / 2 / 3
+/ 4 / 5 fragments. The final language totals are exactly KO266, natural
+KO-EN mixed76, and EN38.
+
+## Closed Selection and Freeze Constraints
+
+The accepted surface pool is selected through a deterministic, constrained,
+reproducible procedure after review and leakage validation. It is not aesthetic
+hand-selection. The selection procedure must freeze its serialization,
+identity/hash tie-break, and constraint implementation before final selection.
+
+The required order is:
+
+```text
+authored HELD pool
+  -> source/bundle audit PASS
+  -> primary blind HUMAN review
+  -> accepted HELD-eligible pool
+  -> evidence and target freeze
+  -> repeated blind HUMAN review of every eligible accepted candidate
+  -> disagreement resolution and pool HUMAN-gold freeze
+  -> leakage and constraint validation
+  -> deterministic FINAL selection
+  -> dataset freeze
+```
+
+Repeated HELD review therefore occurs before deterministic FINAL selection, and
+the evidence/target freeze precedes that repeated blind HUMAN review. No FINAL model output may be inspected before source audit, both HUMAN passes,
+disagreement resolution, pool gold freeze, deterministic selection, and dataset
+freeze. FINAL is never used for training, checkpoint selection, or
+hyperparameter selection.
+
+After FINAL model output has been inspected, that evaluation version's
+membership, evidence, targets, and HUMAN gold are immutable. A later defect
+may be recorded only through an explicit erratum path that preserves the
+original evaluation inputs and results; it does not silently replace the
+frozen set.
+
+If no valid 380-item subset exists, FAIL CLOSED. The failure must distinguish
+a surface-pool shortage from catalog infeasibility. A surface shortage may
+receive newly authored candidates followed by the full audit/review/refreeze
+path. Catalog infeasibility must return to skeleton review. Do not weaken a
+frozen constraint, hand-pick favored items, or relabel HUMAN gold to satisfy
+counts.
 
 ## Source Episodes and Items
 
@@ -188,9 +240,9 @@ The frozen final coverage target is:
 
 ## Surface Realization / Language / Discourse
 
-The 380 items target 266 Korean (70%), 76 natural Korean/English mixed (20%),
-and 38 English (10%). Author roughly 500 candidates to retain the exact final
-split sizes. Vary evidence realization, discourse order, progressive
+The 380 items target exactly 266 Korean (70%), 76 natural Korean/English mixed
+(20%), and 38 English (10%). Author roughly 500 candidates to retain the exact
+final split sizes. Vary evidence realization, discourse order, progressive
 refinement, return to topic, self-revision, temporary side context, language,
 and evidence location. Do not treat simple entity, number, domain, or language
 substitution as a new semantic skeleton.
@@ -225,11 +277,9 @@ including unchanged containing turns; hidden full episodes and generator
 metadata are unavailable. HUMAN independently decides KEEP/FIX/REJECT and
 CLEAR/ESCALATE. HUMAN is final authority; model suggestions remain advisory.
 
-Any evidence edit restarts the applicable source audit and blind review. The
-FINAL pool requires source audit, primary blind review, repeated blind HUMAN
-review, disagreement resolution, leakage validation, deterministic selection,
-and dataset freeze before any model output is inspected. No FINAL surface item
-is used for training or tuning.
+Any evidence edit restarts the applicable source audit and blind review. No
+previous HUMAN label or generator intent is inherited after an evidence edit.
+No FINAL surface item is used for training or tuning.
 
 ## Leakage Controls
 
