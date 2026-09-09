@@ -32,13 +32,14 @@ class has exact 3/2/2 coverage; HUMAN skeleton labels are CLEAR 32 and
 ESCALATE 24. Historical P1-B3's 60 flat cases remain diagnostic/reference-only
 and are excluded from supervised TRAIN, DEV, and FINAL_HELD_OUT.
 
-The immediate prerequisite is the preregistered P1-B6 anchor-marker paired
-pilot; full surface/source-episode generation and the source/bundle
-completeness audit follow its representation decision. Surface construction targets 240 TRAIN, 60
-DEV, and 80 FINAL_HELD_OUT items, with exactly 190 CLEAR and 190 ESCALATE
-labels overall. That balanced surface target is a construction/evaluation
-contract, not an estimate of production ambiguity prevalence. Training, raw
-episode execution, and private replay remain unopened.
+The P1-B6 anchor-marker paired pilot is complete and the representation is
+CLOSED as `SINGLE_REPRESENTATIVE`. The next canonical work is full
+surface/source-episode authoring, followed by source/bundle completeness audit
+and primary blind HUMAN review. Surface construction targets 240 TRAIN, 60 DEV,
+and 80 FINAL_HELD_OUT items, with exactly 190 CLEAR and 190 ESCALATE labels
+overall. That balanced surface target is a construction/evaluation contract,
+not an estimate of production ambiguity prevalence. Training, raw episode
+execution, and private replay remain unopened.
 
 For the question-turn PIT boundary, evidence that exists in the frozen source
 but is omitted by the bundle is a Bundle Builder construction error. When the

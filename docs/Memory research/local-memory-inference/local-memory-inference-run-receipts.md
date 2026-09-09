@@ -3452,6 +3452,48 @@ failure must return to skeleton review; it must not loop through additional
 fixed-label surfaces. Do not force favored items into the dataset or weaken
 frozen constraints after seeing model results.
 
+#### P1-B6 anchor-marker paired pilot execution receipt — CLOSED / `SINGLE_REPRESENTATIVE`
+
+The completed calibration report is
+`fixtures/local-memory-inference-p1b6-anchor-marker-pilot-report.json`, preserved
+byte-for-byte from the first JSON `{` through EOF of the original local run
+capture (excluding only its preceding npm banner), with raw SHA-256
+`ce43e493cb037779a52e682498769ec87e2ae614846a769e3eebe4b561da49e1`.
+The run identities and provenance are:
+
+- report: `xion-local-memory-inference-p1b6-anchor-marker-pilot-report-v1`;
+- runner: `xion-local-memory-inference-p1b6-anchor-marker-pilot-runner-v1`;
+- prompt: `xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1`;
+- renderer: `xion-local-memory-inference-p1b6-anchor-marker-renderer-v1`;
+- scoring: `xion-local-memory-inference-p1b6-anchor-marker-pilot-scoring-v1`;
+- task specification: `p1b6-anchor-marker-pilot-v1`;
+- Galpi execution commit: `a146ec090f1381768c6049ea4e5c1dae5aa863c9`;
+- fixture: `xion-local-memory-inference-p1b6-anchor-marker-pilot-v1`, raw
+  SHA-256 `e530ea9d2b1b2ea5ce42557a9cbb9828f97d14f6ab431e7dbb71ebbc825196e0`;
+- probe: `xion-p1b1-qwen3-1.7b-bf16`, artifact
+  `unsloth/Qwen3-1.7B-GGUF:BF16`, ~2B, BF16;
+- runtime: llama.cpp `e42214804794fca6abb61b1a5f9adae2a845f0be`;
+- request: temperature 0, `max_tokens` 128, `stream: false`,
+  `enable_thinking: false`, `response_format: json_object`, 180,000 ms semantic
+  timeout after one 10,000 ms health preflight, with no semantic reruns.
+
+All 20 cases and 40 planned calls were attempted and completed. Invalid
+structured outputs and runtime failures were both zero. Variant A and variant
+B each scored 13/20 and each returned CLEAR20 / ESCALATE0. Pair outcomes were
+`STABLE_CORRECT13`, `STABLE_WRONG7`, `FIXED0`, and `REGRESSION0`; there were
+zero schema-valid decision changes. The preregistered mechanical disposition
+was `SINGLE_REQUIRED`.
+
+Repeated explicit anchor marking is therefore CLOSED and the active design
+adopts `SINGLE_REPRESENTATIVE`. This is the preregistered simplicity result:
+repeated marking produced no fixes and no changed decisions, so it did not
+meet the required two-fix burden. No changed-case HUMAN attribution review was
+needed. The result does not establish that A is more accurate than B, that B
+hurts performance, or that the probe measures trained B6 capability. The
+pre-training probe's all-CLEAR behavior is descriptive pilot evidence only;
+future training-base selection remains OPEN. Current authority for the anchor
+contract is `local-memory-inference-p1b6-design.md`, not this receipt.
+
 #### OPEN — required later decisions, not selected here
 
 The following remain explicitly **OPEN**; none is silently chosen by the

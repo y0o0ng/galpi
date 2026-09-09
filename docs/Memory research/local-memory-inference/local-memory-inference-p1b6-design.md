@@ -13,11 +13,11 @@ P1-B6 asks whether the visible target and evidence uniquely determine the
 target's decision-relevant semantic status. It classifies interpretation
 uncertainty, not durability, memory worthiness, or authorization to write.
 
-The next step is the preregistered anchor-marker paired pilot below. Full
-source-episode/surface authoring and source/bundle audit follow only after its
-representation decision. Do not redesign the frozen skeleton catalog,
-generate training output, expose a model to FINAL surface items, or start
-training in this phase.
+The anchor-marker paired pilot is complete and the representation is CLOSED
+as `SINGLE_REPRESENTATIVE`. The next step is full source-episode/surface
+authoring, followed by source/bundle audit and primary blind HUMAN review. Do
+not redesign the frozen skeleton catalog, generate training output, expose a
+model to FINAL surface items, or start training in this phase.
 
 ## Task Boundary
 
@@ -228,6 +228,14 @@ token or character count. Exact locator serialization is a fixture detail;
 `turnId` plus a UTF-8 byte range is only one possible future representation,
 not a frozen production interface.
 
+Anchor-marker representation is **CLOSED — `SINGLE_REPRESENTATIVE`**. Each B6
+item marks exactly one representative verbatim source-grounded occurrence of
+its candidate/topic. Other explicit mentions of that same topic are not
+additionally marked, and marker generation does not expand through pronouns,
+synonyms, semantic matching, or coreference. The one marker remains only a
+topic/focus marker; it does not become a proposition, slot, attribute, value,
+referent resolution, or semantic answer.
+
 ## Fragments
 
 A fragment is a maximal contiguous source range among evidence selected by the
@@ -345,21 +353,7 @@ paraphrase leakage across splits. Historical reference skeletons participate
 in duplicate detection even though their 60 cases remain outside supervised
 splits. HUMAN judgment is final on suspected near-duplicates.
 
-## Remaining OPEN Decisions
-
-Repeated explicit mentions of the same candidate/topic in one bundle are
-deliberately OPEN. Do not yet choose between one representative anchor and
-multiple/all explicit mentions.
-
-Before full surface authoring, run a small paired pilot on identical evidence
-bundles comparing representative single anchors with repeated explicit topic
-mentions. Measure target identification and CLEAR/ESCALATE changes, and
-whether any benefit justifies greater grouping/coreference burden. Do not
-expand this into arbitrary pronoun/coreference annotation. The default
-hypothesis may be that one representative anchor is sufficient, but that is
-not CLOSED.
-
-## Preregistered Anchor-Marker Paired Pilot
+## Completed Anchor-Marker Paired Pilot
 
 This pilot resolves only whether repeated explicit mentions of one
 candidate/topic should all receive model-visible anchor markers. It is a
@@ -405,18 +399,23 @@ failure makes the pilot `INDETERMINATE_RUNTIME`; no representation is chosen
 from incomplete execution. No statistical-significance claim is permitted
 from N=20.
 
-Single representative marking is the default. A complete run mechanically
-requires `SINGLE_REQUIRED` when any `REGRESSION` occurs or fewer than two
-`FIXED` cases occur, including an A/B tie or both-perfect result. A complete
-run with zero regressions and at least two fixes is only
-`REPEATED_REVIEW_ELIGIBLE`, not an adoption decision. Only then may a HUMAN
-inspect the decision-change cases using frozen model-visible evidence and ask
-whether improvements genuinely came from topic identification without leaked
-semantic grouping. Mixed/uncertain attribution, semantic leakage, or a need
-for pronoun/synonym/coreference annotation selects `SINGLE_REPRESENTATIVE`.
-Only clear topic-identification benefit from explicit mentions with no such
-failure permits `REPEATED_EXPLICIT_MENTIONS`. This qualitative HUMAN step is
-not model rationale or a tuning loop.
+The completed report is
+`fixtures/local-memory-inference-p1b6-anchor-marker-pilot-report.json`, raw
+SHA-256 `ce43e493cb037779a52e682498769ec87e2ae614846a769e3eebe4b561da49e1`.
+All 40 calls completed, with zero invalid structured outputs and zero runtime
+failures. A and B each scored 13/20; both returned CLEAR on all 20 cases. The
+pairs were 13 `STABLE_CORRECT`, 7 `STABLE_WRONG`, 0 `FIXED`, and 0
+`REGRESSION`, with zero schema-valid decision changes. The preregistered
+mechanical disposition was therefore `SINGLE_REQUIRED` because repeated
+marking did not meet the required minimum of two fixes.
+
+The representation consequence is **CLOSED — `SINGLE_REPRESENTATIVE`**. No
+changed-case HUMAN attribution review was required because no decision
+changed. This does not show that single marking was more accurate or repeated
+marking harmful. The untrained/pre-training probe's all-CLEAR behavior—every
+CLEAR-gold case correct and every ESCALATE-gold case wrong in both variants—is
+diagnostic only; this pilot was not a B6 capability benchmark and did not
+select or accept a training base.
 
 Other later decisions include exact generation/review tooling, source-locator
 encoding, similarity method/threshold, model-visible serialization, training

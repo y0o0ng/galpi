@@ -1,0 +1,1177 @@
+{
+  "reportVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-report-v1",
+  "runnerVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-runner-v1",
+  "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+  "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+  "scoringVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-scoring-v1",
+  "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+  "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+  "galpiCommit": "a146ec090f1381768c6049ea4e5c1dae5aa863c9",
+  "generatedAt": "2026-09-09T08:00:17.699Z",
+  "fixture": {
+    "file": "fixtures/local-memory-inference-p1b6-anchor-marker-pilot.json",
+    "identity": "xion-local-memory-inference-p1b6-anchor-marker-pilot-v1",
+    "sha256": "e530ea9d2b1b2ea5ce42557a9cbb9828f97d14f6ab431e7dbb71ebbc825196e0",
+    "caseCount": 20
+  },
+  "pilotBoundary": {
+    "calibrationOnly": true,
+    "fullSourceEqualsVisibleEvidence": true,
+    "outsideSupervised380": true,
+    "noSemanticSkeletonIds": true,
+    "futureSupervisedReuseForbidden": true,
+    "trainingBaseSelectionOpen": true
+  },
+  "model": {
+    "modelId": "xion-p1b1-qwen3-1.7b-bf16",
+    "artifactId": "unsloth/Qwen3-1.7B-GGUF:BF16",
+    "modelSizeClass": "~2B",
+    "quantization": "BF16"
+  },
+  "runtime": {
+    "family": "llama.cpp",
+    "version": "e42214804794fca6abb61b1a5f9adae2a845f0be"
+  },
+  "requestSettings": {
+    "temperature": 0,
+    "max_tokens": 128,
+    "stream": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "response_format": {
+      "type": "json_object"
+    }
+  },
+  "timeoutMs": 180000,
+  "automaticReruns": false,
+  "preflight": {
+    "success": true,
+    "status": "ok",
+    "timeoutMs": 10000
+  },
+  "execution": {
+    "casesPlanned": 20,
+    "callsPlanned": 40,
+    "callsAttempted": 40,
+    "callsCompleted": 40,
+    "invalidStructuredOutputs": 0,
+    "runtimeFailures": 0
+  },
+  "records": [
+    {
+      "caseId": "001",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "001",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 10442.168760999999,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "001",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "001",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2336.352008,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "002",
+      "variant": "A",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "002",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2393.573982,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "002",
+      "variant": "B",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "002",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2099.3169400000006,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "003",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "003",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2171.2234050000006,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "003",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "003",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1998.4757959999988,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "004",
+      "variant": "A",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "004",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2602.9575399999994,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "004",
+      "variant": "B",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "004",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1766.6152509999993,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "005",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "005",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2690.669633999998,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "005",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "005",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2225.2013130000014,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "006",
+      "variant": "A",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "006",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2494.835060999998,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "006",
+      "variant": "B",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "006",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2135.075232000003,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "007",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "007",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2186.885267999998,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "007",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "007",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2039.5429960000038,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "008",
+      "variant": "A",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "008",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2665.061711000002,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "008",
+      "variant": "B",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "008",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2249.3267750000014,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "009",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "009",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2324.222662999993,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "009",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "009",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2115.0461250000008,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "010",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "010",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2291.036868999996,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "010",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "010",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1992.8119050000023,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "011",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "011",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2012.071441,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "011",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "011",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1738.8091669999994,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "012",
+      "variant": "A",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "012",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2257.5592319999996,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "012",
+      "variant": "B",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "012",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1904.7826970000024,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "013",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "013",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2257.467859999997,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "013",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "013",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1835.0867179999987,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "014",
+      "variant": "A",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "014",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2386.458614000003,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "014",
+      "variant": "B",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "014",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2575.6140939999896,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "015",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "015",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 3251.6817779999983,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "015",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "015",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2474.4995590000035,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "016",
+      "variant": "A",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "016",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2973.8270099999936,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "016",
+      "variant": "B",
+      "humanGoldDecision": "ESCALATE",
+      "result": {
+        "caseId": "016",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2610.667557000008,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": false
+    },
+    {
+      "caseId": "017",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "017",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 3106.8189399999974,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "017",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "017",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2045.1420269999944,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "018",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "018",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2339.287347999998,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "018",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "018",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1907.6626879999967,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "019",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "019",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2572.6263340000005,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "019",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "019",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1815.8817070000077,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "020",
+      "variant": "A",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "020",
+        "variant": "A",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 2449.323105000003,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    },
+    {
+      "caseId": "020",
+      "variant": "B",
+      "humanGoldDecision": "CLEAR",
+      "result": {
+        "caseId": "020",
+        "variant": "B",
+        "attempted": true,
+        "completed": true,
+        "promptVersion": "xion-local-memory-inference-p1b6-anchor-marker-pilot-prompt-v1",
+        "rendererVersion": "xion-local-memory-inference-p1b6-anchor-marker-renderer-v1",
+        "taskSpecificationVersion": "p1b6-anchor-marker-pilot-v1",
+        "outputSchemaVersion": "p1b1-ambiguity-escalation-output-v1",
+        "latencyMs": 1797.54491099999,
+        "schemaStatus": "VALID",
+        "structuredOutput": {
+          "decision": "CLEAR"
+        },
+        "rawAssistantContent": "{\"decision\":\"CLEAR\"}"
+      },
+      "decision": "CLEAR",
+      "correct": true
+    }
+  ],
+  "pairs": [
+    {
+      "caseId": "001",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "002",
+      "humanGoldDecision": "ESCALATE",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_WRONG",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "003",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "004",
+      "humanGoldDecision": "ESCALATE",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_WRONG",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "005",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "006",
+      "humanGoldDecision": "ESCALATE",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_WRONG",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "007",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "008",
+      "humanGoldDecision": "ESCALATE",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_WRONG",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "009",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "010",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "011",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "012",
+      "humanGoldDecision": "ESCALATE",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_WRONG",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "013",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "014",
+      "humanGoldDecision": "ESCALATE",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_WRONG",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "015",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "016",
+      "humanGoldDecision": "ESCALATE",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_WRONG",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "017",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "018",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "019",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    },
+    {
+      "caseId": "020",
+      "humanGoldDecision": "CLEAR",
+      "aDecision": "CLEAR",
+      "bDecision": "CLEAR",
+      "classification": "STABLE_CORRECT",
+      "schemaValidDecisionChanged": false
+    }
+  ],
+  "summary": {
+    "cases": 20,
+    "humanGold": {
+      "CLEAR": 13,
+      "ESCALATE": 7
+    },
+    "variants": {
+      "A": {
+        "correct": 13,
+        "CLEAR": 20,
+        "ESCALATE": 0,
+        "INVALID": 0,
+        "RUNTIME_FAILURE": 0
+      },
+      "B": {
+        "correct": 13,
+        "CLEAR": 20,
+        "ESCALATE": 0,
+        "INVALID": 0,
+        "RUNTIME_FAILURE": 0
+      }
+    },
+    "pairs": {
+      "STABLE_CORRECT": 13,
+      "STABLE_WRONG": 7,
+      "FIXED": 0,
+      "REGRESSION": 0
+    },
+    "schemaValidDecisionChanges": 0,
+    "runtimeFailures": 0
+  },
+  "mechanicalDisposition": "SINGLE_REQUIRED"
+}
