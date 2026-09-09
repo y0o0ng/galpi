@@ -321,7 +321,7 @@
         {
           "turnId": "t2",
           "role": "ASSISTANT",
-          "text": "오늘 밤에 마감이야."
+          "text": "참, 아까 온 메시지는 광고였어."
         },
         {
           "turnId": "t3",
@@ -867,12 +867,12 @@
         {
           "turnId": "t2",
           "role": "ASSISTANT",
-          "text": "회의마다 2~3개야, 이번 주 회의 전체에 2~3개야?"
+          "text": "회의 자료는 공유 폴더에 올려뒀어."
         },
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "참석자는 회의마다 달라."
+          "text": "응, 파일 이름도 확인했어."
         },
         {
           "turnId": "t4",
@@ -882,7 +882,7 @@
         {
           "turnId": "t5",
           "role": "ASSISTANT",
-          "text": "그럼 집계 기준을 정해야겠네."
+          "text": "일정 확인했어."
         },
         {
           "turnId": "t6",

@@ -14,11 +14,13 @@ target's decision-relevant semantic status. It classifies interpretation
 uncertainty, not durability, memory worthiness, or authorization to write.
 
 The anchor-marker paired pilot is complete and the representation is CLOSED
-as `SINGLE_REPRESENTATIVE`. Surface smoke batch-001 now begins the full
-source-episode/surface phase. Its next event is a separate strong-model
-source/bundle audit, followed only for audit-PASS items by primary blind HUMAN
-review. Do not redesign the frozen skeleton catalog, generate training output,
-expose a model to FINAL surface items, or start training in this phase.
+as `SINGLE_REPRESENTATIVE`. Surface smoke batch-001 is authored. Its separate
+strong-model source-audit attempt 001 completed at 30 PASS / 2 FAIL / 0
+UNCERTAIN; both failures were source/bundle construction failures, not HUMAN
+ambiguity judgments. The two constructions are fixed and the batch is prepared
+for a fresh full attempt 002. HUMAN review has not started. Do not redesign the
+frozen skeleton catalog, generate training output, expose a model to FINAL
+surface items, or start training in this phase.
 
 ## Task Boundary
 

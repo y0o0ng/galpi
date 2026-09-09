@@ -1,0 +1,201 @@
+{
+  "name": "xion-local-memory-inference-p1b6-source-audit-batch-001-attempt-001-receipt-v1",
+  "attemptId": "p1b6-source-audit-batch-001-attempt-001",
+  "status": "COMPLETE_NEEDS_FIX",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-source-audit-packet-v1",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+    "batchId": "p1b6-surface-batch-001",
+    "rawSha256": "4827ebcacc8a95d7fb3031f8f7eece3c95ac348fd7e2e2fbd493c170e6dbbbdb"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-source-audit-batch-001-results.json",
+    "sha256": "ead8b62067db16d17b74fc3ecac60d370360175d51cc81a59bd89717fed12e09"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "USER_REPORTED_NOT_INDEPENDENTLY_RECOVERED_FROM_API_OR_RUNTIME_METADATA",
+    "provider": "OpenAI",
+    "surface": "ChatGPT",
+    "model": "GPT-5.6 Sol",
+    "reasoningSetting": "High",
+    "sessionRelationship": "fresh/separate from authoring and design session"
+  },
+  "summary": {
+    "total": 32,
+    "PASS": 30,
+    "FAIL": 2,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "onlyPassWouldHaveBeenEligibleForHumanSemanticReview": true,
+    "humanSemanticReviewOccurred": false,
+    "humanAmbiguityGoldAssigned": false,
+    "failuresAreSourceBundleConstructionFailuresNotHumanClearEscalateJudgments": true
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-audit-29af12426112275b",
+      "disposition": "PASS",
+      "reason": "누락된 독서 모임 관련 대화는 수영이 아직 고려 단계라는 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-cf33b6b28d491f74",
+      "disposition": "PASS",
+      "reason": "누락된 수영 대화와 문자 전송 언급은 독서 모임의 토요일 오후 선택 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-f377e5a899292128",
+      "disposition": "PASS",
+      "reason": "예약 마감과 인원 정보는 Italian을 이번 선택에서 제외한다는 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-27b0230e5cb7ed9b",
+      "disposition": "PASS",
+      "reason": "위치·지도·예산 정보가 누락됐지만 pottery class를 확정하라는 명시적 응답의 해석에는 영향이 없다."
+    },
+    {
+      "auditRowId": "p1b6-audit-4fcc0df79adc2198",
+      "disposition": "PASS",
+      "reason": "누락된 내용은 점심 장소에 관한 것이며 회의 시간이 4시로 변경되었다는 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-ebcce3bc9d42da4c",
+      "disposition": "PASS",
+      "reason": "점심 장소 판단에 관련된 source material이 bundle에 모두 보존되어 있어 물질적 누락이 없다."
+    },
+    {
+      "auditRowId": "p1b6-audit-769a8b78ce37ec7c",
+      "disposition": "PASS",
+      "reason": "식당 위치 정보는 회식 참석 의사를 취소했다는 해석에 영향을 주지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-5807e1f2582b1617",
+      "disposition": "PASS",
+      "reason": "저장 공간과 단순 확인 표현의 누락은 3월까지 금요일, 4월부터 화요일이라는 적용 범위를 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-10f5d2d8f751757c",
+      "disposition": "PASS",
+      "reason": "누락된 내용은 주말 러닝에 관한 별도 상태이며 아침 스트레칭의 출장 중 중단 및 출장 종료 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-a8d74915f3055d7d",
+      "disposition": "PASS",
+      "reason": "주말 러닝의 출장 중 일시 중단과 이후 재개에 필요한 정보가 bundle에 보존되어 있고 누락분은 이를 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-b41c198f1e47f8a0",
+      "disposition": "PASS",
+      "reason": "게임의 기존 습관과 오늘부터의 중단 및 재개 시점 미정이 모두 보존되어 물질적 누락이 없다."
+    },
+    {
+      "auditRowId": "p1b6-audit-200f328a249dfe22",
+      "disposition": "PASS",
+      "reason": "키보드 설치 여부는 주 3회 저녁 피아노 연습 계획의 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-f6c92bdd8c32c56a",
+      "disposition": "PASS",
+      "reason": "배송 기간과 무료 배송 정보는 '그걸'이 유일하게 재고가 남은 방수 노트북 가방을 가리킨다는 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-62292b67240d87be",
+      "disposition": "FAIL",
+      "reason": "누락된 '오늘 밤에 마감' 정보는 '그건 오늘 해줘'의 지시 대상이 스터디룸일 가능성을 실질적으로 높여 referent 해석을 바꿀 수 있다."
+    },
+    {
+      "auditRowId": "p1b6-audit-67c26e7651a71e42",
+      "disposition": "PASS",
+      "reason": "누락된 예산·배송·결제 정보는 번호 방식이 미정인 상태에서 '두 번째 걸'의 해석을 변경하거나 해소하지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-fb31bf2b4e6fffa4",
+      "disposition": "PASS",
+      "reason": "별칭 정의와 목요일 일정 지정에 관련된 source material이 모두 보존되어 있다."
+    },
+    {
+      "auditRowId": "p1b6-audit-5ced2eec3e51cd1a",
+      "disposition": "PASS",
+      "reason": "누락된 주문·배송 내용은 외부 미팅이 업무 알림의 예외라는 해석과 무관하다."
+    },
+    {
+      "auditRowId": "p1b6-audit-36caf0e8aac3f31f",
+      "disposition": "PASS",
+      "reason": "주문 건의 해외·국내 배송 여부가 미확인이라는 핵심 불확실성이 보존되어 있고 외부 미팅 관련 누락은 이를 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-1428c580db47436a",
+      "disposition": "PASS",
+      "reason": "충전기·케이스·반납 창구 정보는 BYOD가 company devices에 포함되는지 정책상 불명확하다는 해석을 해소하지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-dbbe41704e9772e7",
+      "disposition": "PASS",
+      "reason": "rota·노트북 접근·급여 마감 정보는 경계 변경 시점에 걸친 trial extension의 규칙 적용 불확실성을 해소하거나 변경하지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-27b114844d56ede4",
+      "disposition": "PASS",
+      "reason": "새벽 수영이 민지 자신의 행동이라는 귀속 정보가 모두 보존되어 물질적 누락이 없다."
+    },
+    {
+      "auditRowId": "p1b6-audit-119bed5aa3bfbcfd",
+      "disposition": "PASS",
+      "reason": "내일 첫 일정과 물병 정보는 평일 7시 기상 결정을 확인할 기록이 없다는 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-f04d5434f7082002",
+      "disposition": "PASS",
+      "reason": "역할극 시작과 지속 여부가 bundle에 명시되어 있어 누락된 역할극 응답은 대상 진술의 역할극 맥락을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-57d3eaf9d610106e",
+      "disposition": "PASS",
+      "reason": "누락된 배터리·업데이트·기종 언급은 알림 비활성화가 선호를 반영하는지 불명확하다는 핵심 해석을 해소하지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-577c11c8b1977176",
+      "disposition": "PASS",
+      "reason": "출근 카드와 점심 약속 정보는 다음 주 금요일을 remote day로 명시적으로 확정한 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-6dcd5fa30f2f4d3a",
+      "disposition": "PASS",
+      "reason": "약 복용 빈도와 공복 메모의 귀속 불확실성에 관련된 source material이 모두 보존되어 있다."
+    },
+    {
+      "auditRowId": "p1b6-audit-576d6ac86bc9ca2b",
+      "disposition": "PASS",
+      "reason": "비 예보 정보는 지하철을 이번에는 타지 않겠다는 명시적 제외와 출근 방법 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-7dc967abbb549dfe",
+      "disposition": "PASS",
+      "reason": "날씨와 배터리 정보는 대상 카메라가 책상 위 소형 미러리스이며 이를 가져가겠다는 의도를 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-a343be95f33e9c76",
+      "disposition": "PASS",
+      "reason": "공원 조명과 운동화 위치는 25~35분의 느슨한 조깅 시간 범위 해석을 바꾸지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-3a82dfda8dc098d2",
+      "disposition": "PASS",
+      "reason": "원두 잔량 정보는 2~3의 단위가 여전히 미확정이라는 해석에 영향을 주지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-87f8c0f6a7c2afeb",
+      "disposition": "PASS",
+      "reason": "항공권 가격 미확정 정보는 두 기준 금액 중 '거기서'가 무엇을 가리키는지의 해석을 변경하거나 해소하지 않는다."
+    },
+    {
+      "auditRowId": "p1b6-audit-b3d567e8195f3ab8",
+      "disposition": "FAIL",
+      "reason": "누락된 대화가 2~3개가 회의별인지 주간 전체인지 직접 문제 삼고 집계 기준이 미정임을 명시하므로 후보 해석을 실질적으로 바꾼다."
+    }
+  ]
+}

@@ -96,7 +96,7 @@
 - **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** 결과 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
 - **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`에 있다.
 - **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
-- **P1-B6 exact-56은 CLOSED/FROZEN이고 anchor 표현은 `CLOSED / SINGLE_REPRESENTATIVE`다.** surface batch-001 smoke authoring이 현재 단계이며 구조 검증 뒤 다음은 별도 strong-model source/bundle audit이다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`; 학습 실행·raw episode·private replay는 `UNOPENED`, production은 그대로다.
+- **P1-B6 exact-56은 CLOSED/FROZEN이고 anchor 표현은 `CLOSED / SINGLE_REPRESENTATIVE`다.** surface batch-001 authoring 뒤 source-audit attempt 001은 30 PASS / 2 FAIL / 0 UNCERTAIN으로 끝났고 두 source/bundle construction failure를 고쳐 full fresh attempt 002를 준비했다. HUMAN review는 시작하지 않았으며 학습 실행·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

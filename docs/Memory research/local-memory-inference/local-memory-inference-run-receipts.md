@@ -3534,3 +3534,35 @@ raw episodes, and private replay remain **UNOPENED**. Production
 memory/parsing, DB/Vault/retrieval/routing, authority, identity, explicit
 correction, Core/high-impact gates, and architecture contracts remain
 unchanged.
+
+#### P1-B6 source-audit batch-001 attempt 001 and repair receipt — COMPLETE / NEEDS_FIX
+
+Attempt 001 audited pre-fix surface batch-001 raw SHA-256
+`4827ebcacc8a95d7fb3031f8f7eece3c95ac348fd7e2e2fbd493c170e6dbbbdb`
+under protocol `p1b6-source-bundle-completeness-audit-v1`. The canonical
+write-once result receipt is
+`fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-001.json`;
+the exact attached result bytes have SHA-256
+`ead8b62067db16d17b74fc3ecac60d370360175d51cc81a59bd89717fed12e09`.
+Execution provenance is explicitly user-reported, not independently recovered
+from API/runtime metadata: OpenAI ChatGPT, GPT-5.6 Sol, reasoning High, in a
+fresh session separate from authoring and design.
+
+All 32 rows completed: 30 PASS / 2 FAIL / 0 UNCERTAIN. The FAIL rows were
+`p1b6-audit-62292b67240d87be` and `p1b6-audit-b3d567e8195f3ab8`; both are
+Bundle Builder/source-selection completeness failures, not HUMAN
+CLEAR/ESCALATE judgments or skeleton labels. Only PASS would have been
+eligible for later HUMAN semantic review, and no HUMAN semantic review ran.
+
+The repair changed only omitted side turns in source episodes
+`p1b6-se-b001-011` and `p1b6-se-b001-028`; item mappings, selected evidence,
+anchors, skeletons, and all other source episodes/items are unchanged. The
+fixed batch raw SHA-256 is
+`b2a065be9a156c52bd18cb2bf1e1c80f93229dcc431cf4a899119ec201d5283c`.
+The existing canonical builder produced the fresh full attempt-002 packet at
+`/tmp/p1b6-source-audit-batch-001-attempt-002.json`, raw SHA-256
+`1bc45524d8813a93bc46caeddd077d5ff272f94c8cafcfdd9b29b1244ef2f929`;
+all 32 opaque audit row IDs changed because the batch SHA changed. Attempt 002
+has not run. Training, raw-episode evaluation, private replay, and production
+remain unopened/unchanged. Local verification completed with focused P1-B6
+tests 13/13 and the full repository suite 1277/1277 passing.

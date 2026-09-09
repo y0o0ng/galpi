@@ -12,6 +12,7 @@ const audit = require('../scripts/build-memory-inference-p1b6-source-audit-packe
 const ROOT = path.resolve(__dirname, '..');
 const BATCH_PATH = 'fixtures/local-memory-inference-p1b6-surface-batch-001.json';
 const AUTHORING_PATH = 'fixtures/local-memory-inference-p1b6-surface-batch-001-authoring-protocol.json';
+const ATTEMPT_001_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-001.json';
 const rawBatch = fs.readFileSync(path.join(ROOT, BATCH_PATH));
 const batch = JSON.parse(rawBatch);
 const exact56 = JSON.parse(fs.readFileSync(path.join(ROOT, surfaces.EXACT56_PATH)));
@@ -189,6 +190,41 @@ test('renderer is deterministic, blind, chronological, and shared with HUMAN rev
   assert.equal(episodes.get('p1b6-se-b001-011').turns[5].text, '잠깐만, 메모 좀 하고.');
 });
 
+test('batch-001 source-audit fixes remove only the two material omitted facts', () => {
+  assert.deepEqual(episodes.get('p1b6-se-b001-011').turns.map(turn => turn.text), [
+    '스터디룸 예약할까?',
+    '참, 아까 온 메시지는 광고였어.',
+    'online course도 결제할까?',
+    '카드 한도는 충분해.',
+    '스터디룸을 예약해 둘까, online course를 결제해 둘까?',
+    '잠깐만, 메모 좀 하고.',
+    '응, 그건 오늘 해줘.',
+  ]);
+  assert.deepEqual(episodes.get('p1b6-se-b001-028').turns.map(turn => turn.text), [
+    '회의 간식은 2~3개 정도 준비해.',
+    '회의 자료는 공유 폴더에 올려뒀어.',
+    '응, 파일 이름도 확인했어.',
+    '회의는 이번 주에 세 번 있어.',
+    '일정 확인했어.',
+    '그 정도면 돼.',
+  ]);
+  assert.equal(surfaces.renderVisibleItem(batch, 'p1b6-item-b001-032'), [
+    'USER: [TARGET]회의 간식[/TARGET]은 2~3개 정도 준비해.',
+    '---',
+    'USER: 회의는 이번 주에 세 번 있어.',
+    '---',
+    'USER: 그 정도면 돼.',
+  ].join('\n'));
+  assert.equal(surfaces.computeFragments(
+    batch.items.find(item => item.itemId === 'p1b6-item-b001-014'),
+    episodes.get('p1b6-se-b001-011'),
+  ).length, 4);
+  assert.equal(surfaces.computeFragments(
+    batch.items.find(item => item.itemId === 'p1b6-item-b001-032'),
+    episodes.get('p1b6-se-b001-028'),
+  ).length, 3);
+});
+
 test('source-audit packet contains full source and selected bundle but no hidden metadata', () => {
   const packet = audit.buildAuditPacket(rawBatch);
   const protocol = audit.loadProtocol();
@@ -247,6 +283,23 @@ test('authoring provenance binds the frozen exact56 and raw batch bytes', () => 
   assert.equal(protocol.authority.sourceAuditCompleted, false);
   assert.equal(protocol.authority.humanReviewCompleted, false);
   assert.equal(protocol.authority.generatorMetadataIsNeverHumanGold, true);
+});
+
+test('source-audit attempt 001 remains bound to the pre-fix batch', () => {
+  const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_001_PATH)));
+  assert.equal(receipt.status, 'COMPLETE_NEEDS_FIX');
+  assert.equal(receipt.auditedSourceBatch.rawSha256,
+    '4827ebcacc8a95d7fb3031f8f7eece3c95ac348fd7e2e2fbd493c170e6dbbbdb');
+  assert.equal(receipt.rawResultArtifact.sha256,
+    'ead8b62067db16d17b74fc3ecac60d370360175d51cc81a59bd89717fed12e09');
+  assert.deepEqual(receipt.summary, { total: 32, PASS: 30, FAIL: 2, UNCERTAIN: 0 });
+  assert.equal(receipt.rows.length, 32);
+  assert.equal(new Set(receipt.rows.map(row => row.auditRowId)).size, 32);
+  assert.deepEqual(receipt.rows.filter(row => row.disposition === 'FAIL').map(row => row.auditRowId), [
+    'p1b6-audit-62292b67240d87be',
+    'p1b6-audit-b3d567e8195f3ab8',
+  ]);
+  assert.equal(receipt.authority.humanSemanticReviewOccurred, false);
 });
 
 test('exact56 and anchor-marker pilot artifacts remain byte-identical', () => {
