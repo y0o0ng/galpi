@@ -14,10 +14,11 @@ target's decision-relevant semantic status. It classifies interpretation
 uncertainty, not durability, memory worthiness, or authorization to write.
 
 The anchor-marker paired pilot is complete and the representation is CLOSED
-as `SINGLE_REPRESENTATIVE`. The next step is full source-episode/surface
-authoring, followed by source/bundle audit and primary blind HUMAN review. Do
-not redesign the frozen skeleton catalog, generate training output, expose a
-model to FINAL surface items, or start training in this phase.
+as `SINGLE_REPRESENTATIVE`. Surface smoke batch-001 now begins the full
+source-episode/surface phase. Its next event is a separate strong-model
+source/bundle audit, followed only for audit-PASS items by primary blind HUMAN
+review. Do not redesign the frozen skeleton catalog, generate training output,
+expose a model to FINAL surface items, or start training in this phase.
 
 ## Task Boundary
 
@@ -147,10 +148,17 @@ item:
   itemId
   sourceEpisodeId
   semanticSkeletonId
-  anchorSpanRefs
-  fragmentRefs
+  anchorSpanRef
+  evidenceSpanRefs
   authoring/review metadata as required
 ```
+
+For this P1-B6 research corpus, a source locator is frozen as `turnId` plus
+zero-based raw UTF-8 byte offsets `[startByte, endByte)`. Both offsets must be
+code-point boundaries and the selected bytes must decode losslessly to
+non-empty text. This is a research-fixture representation only, not a frozen
+production Evidence DB or source-address interface. Evidence selection may
+use a proper subrange of a turn.
 
 Do not introduce production-storage machinery solely for research fidelity:
 no syntheticEvidence table, per-turn hashes, dataset-local PIT cutoff, replica
@@ -244,6 +252,23 @@ Bundle Builder. Selected `t1, t2, t3, t5, t6` therefore yields `t1..t3` and
 count measures disjoint source regions that must be integrated, not turns, and
 contiguous evidence must not be artificially split.
 
+With span-level selection, overlapping same-turn spans are invalid and
+directly adjacent spans are one canonical span. Omitted bytes between two
+same-turn spans create a fragment boundary. Selection continues across
+consecutive turns as one fragment only when the previous span reaches exactly
+the end of its turn and the next span starts at byte zero with no intervening
+turn. Fragment count is computed from evidence spans and is never authored as
+an item field.
+
+The frozen surface renderer identity is
+`xion-local-memory-inference-p1b6-surface-renderer-v1`. It renders only selected
+span text in source chronology with `USER` / `ASSISTANT` prefixes and exactly
+one `[TARGET]...[/TARGET]` pair around the anchor. Distinct fragments use the
+exact separator `\n---\n`. It emits no generated omission marker, turn or
+item ID, skeleton/split/language/discourse/family metadata, rationale, or
+unselected source text. The later HUMAN-visible review text is exactly this
+same rendered text.
+
 The frozen final coverage target is:
 
 | Fragments | Items |
@@ -257,11 +282,20 @@ The frozen final coverage target is:
 ## Surface Realization / Language / Discourse
 
 The 380 items target exactly 266 Korean (70%), 76 natural Korean/English mixed
-(20%), and 38 English (10%). Author roughly 500 candidates to retain the exact
-final split sizes. Vary evidence realization, discourse order, progressive
-refinement, return to topic, self-revision, temporary side context, language,
-and evidence location. Do not treat simple entity, number, domain, or language
-substitution as a new semantic skeleton.
+(20%), and 38 English (10%). Pool growth is adaptive: first calibrate
+representation, audit, and review on the 32-item smoke batch; if healthy, grow
+an initial reviewed pool to roughly 400-ish items without freezing that number;
+measure actual shortages against every frozen 380-item constraint; then author
+only targeted top-ups for missing split/skeleton/label/language/fragment cells.
+Stop when the reviewed pool can support deterministic final selection. This
+reduces unnecessary HUMAN review but does not exempt any final item from
+primary blind HUMAN review or any eligible HELD item from its repeated-review
+path. The final 380 is the only exact corpus-size contract.
+
+Vary evidence realization, discourse order, progressive refinement, return to
+topic, self-revision, temporary side context, language, and evidence location.
+Do not treat simple entity, number, domain, or language substitution as a new
+semantic skeleton.
 
 Useful authoring metadata includes `CANONICAL`, `CONTEXT_FIRST`,
 `CONCLUSION_FIRST`, `INTERLEAVED`, `PROGRESSIVE_REFINEMENT`, `SELF_REVISION`,
@@ -279,13 +313,20 @@ The audit protects two different states:
   Bundle Builder omitted it; this is a bundle/dataset construction failure, not
   a legitimate B6 ambiguity case.
 
-Before blind HUMAN surface review, a separate source auditor inspects the
-full frozen point-in-time source-episode snapshot, the selected
-source-grounded anchor or anchors, and the selected fragments. The auditor
-determines only whether omitted source evidence could materially change,
-resolve, contradict, or otherwise alter the candidate interpretation or its
-`CLEAR`/`ESCALATE` judgment. The source auditor does not assign HUMAN
-ambiguity gold.
+Before blind HUMAN surface review, a separate strong-model source auditor in a
+fresh session inspects the full frozen point-in-time source-episode snapshot,
+the selected source-grounded single anchor, and the selected fragments. The
+auditor determines only whether omitted source evidence could materially
+change, resolve, contradict, or otherwise alter the candidate interpretation
+or its `CLEAR`/`ESCALATE` judgment. The source auditor does not assign HUMAN
+ambiguity gold and is not HUMAN authority.
+
+The canonical audit protocol is
+`fixtures/local-memory-inference-p1b6-source-audit-protocol.json`. A blind
+packet contains one opaque row per item with only the complete source episode
+and exact rendered selected bundle. Audit dispositions are `PASS`, `FAIL`, or
+`UNCERTAIN`; only `PASS` proceeds. `FAIL` and `UNCERTAIN` fail closed. Audit
+generation and execution remain separate passes.
 
 Only audit `PASS` items proceed to blind HUMAN review. Audit uncertainty fails
 closed; it must not be silently treated as semantic `ESCALATE`. The audit also
@@ -417,8 +458,8 @@ CLEAR-gold case correct and every ESCALATE-gold case wrong in both variants—is
 diagnostic only; this pilot was not a B6 capability benchmark and did not
 select or accept a training base.
 
-Other later decisions include exact generation/review tooling, source-locator
-encoding, similarity method/threshold, model-visible serialization, training
+Other later decisions include remaining generation/review tooling, production
+source addressing, similarity method/threshold, training
 mechanism and checkpoint rule, acceptance thresholds, and future Bundle
 Builder implementation. None is selected by this document.
 

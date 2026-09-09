@@ -1,0 +1,41 @@
+{
+  "name": "xion-local-memory-inference-p1b6-source-audit-protocol-v1",
+  "protocolIdentity": "p1b6-source-bundle-completeness-audit-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "auditor": {
+    "role": "separate strong-model source/bundle completeness auditor",
+    "humanGoldAuthority": false,
+    "freshSessionRequired": true
+  },
+  "question": "Given the complete frozen source episode, the exact selected model-visible bundle, and the source-grounded single TARGET anchor, could any omitted source material materially change, resolve, contradict, or otherwise alter the interpretation of the anchored candidate or its CLEAR/ESCALATE judgment?",
+  "dispositions": {
+    "PASS": "No omitted source evidence appears capable of materially changing the candidate interpretation.",
+    "FAIL": "Material omitted source evidence exists, or another semantic bundle-selection defect makes this selected bundle incomplete.",
+    "UNCERTAIN": "The auditor cannot confidently determine completeness."
+  },
+  "reviewGate": {
+    "eligibleForHumanSemanticReview": ["PASS"],
+    "failClosed": ["FAIL", "UNCERTAIN"]
+  },
+  "blindFields": [
+    "generator intended label",
+    "exact56 HUMAN label",
+    "semanticSkeletonId",
+    "boundary class",
+    "split",
+    "discoursePattern",
+    "language quota",
+    "generator rationale"
+  ],
+  "outputContract": {
+    "required": ["auditRowId", "disposition", "reason"],
+    "dispositionEnum": ["PASS", "FAIL", "UNCERTAIN"],
+    "reason": "Short construction-diagnostic reason only; it is not ambiguity gold."
+  },
+  "constraints": [
+    "The auditor does not assign CLEAR or ESCALATE.",
+    "Audit uncertainty fails closed.",
+    "Only PASS may proceed to later blind HUMAN semantic review.",
+    "This protocol does not authorize source edits, HUMAN review, training, or production use."
+  ]
+}

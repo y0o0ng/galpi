@@ -33,9 +33,10 @@ ESCALATE 24. Historical P1-B3's 60 flat cases remain diagnostic/reference-only
 and are excluded from supervised TRAIN, DEV, and FINAL_HELD_OUT.
 
 The P1-B6 anchor-marker paired pilot is complete and the representation is
-CLOSED as `SINGLE_REPRESENTATIVE`. The next canonical work is full
-surface/source-episode authoring, followed by source/bundle completeness audit
-and primary blind HUMAN review. Surface construction targets 240 TRAIN, 60 DEV,
+CLOSED as `SINGLE_REPRESENTATIVE`. Surface/source-episode authoring has begun
+with smoke batch-001; its next event is a separate strong-model source/bundle
+completeness audit, followed for PASS items by primary blind HUMAN review.
+Surface construction targets 240 TRAIN, 60 DEV,
 and 80 FINAL_HELD_OUT items, with exactly 190 CLEAR and 190 ESCALATE labels
 overall. That balanced surface target is a construction/evaluation contract,
 not an estimate of production ambiguity prevalence. Training, raw episode

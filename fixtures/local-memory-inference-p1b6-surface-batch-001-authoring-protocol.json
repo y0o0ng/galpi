@@ -1,0 +1,79 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-001-authoring-protocol-v1",
+  "protocolIdentity": "p1b6-surface-authoring-smoke-batch-001-v1",
+  "startingMainSha": "c7ed8a4b62c7a3d74d0458bb5dbe08a44305372d",
+  "exact56": {
+    "path": "fixtures/local-memory-inference-p1b6-skeleton-exact56.json",
+    "sha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602"
+  },
+  "outputBatch": {
+    "name": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+    "path": "fixtures/local-memory-inference-p1b6-surface-batch-001.json",
+    "sha256": "ffa412c3bdd12d6a6b287109161d70bc9bd4f3a3bcb6f5836163375f5b6a244c"
+  },
+  "generator": {
+    "provider": "OpenAI",
+    "surface": "Codex",
+    "model": "GPT-5",
+    "exposedSettings": {},
+    "platformControlledSettings": [
+      "reasoning",
+      "temperature",
+      "sampling",
+      "decoding",
+      "seed"
+    ],
+    "settingsStatement": "No reasoning level or numeric sampling, decoding, temperature, or seed controls were exposed in this Codex execution; they are recorded as platform-controlled and not invented."
+  },
+  "generationTimestamp": "2026-09-09T09:38:30Z",
+  "smokeQuotas": {
+    "items": 32,
+    "splits": {
+      "TRAIN": 16,
+      "DEV": 8,
+      "FINAL_HELD_OUT": 8
+    },
+    "itemsPerBoundaryClass": {
+      "TRAIN": 2,
+      "DEV": 1,
+      "FINAL_HELD_OUT": 1,
+      "total": 4
+    },
+    "languages": {
+      "KO": 22,
+      "MIXED": 6,
+      "EN": 4
+    },
+    "discoursePatterns": {
+      "CANONICAL": 4,
+      "CONTEXT_FIRST": 4,
+      "CONCLUSION_FIRST": 4,
+      "INTERLEAVED": 4,
+      "PROGRESSIVE_REFINEMENT": 4,
+      "SELF_REVISION": 4,
+      "RETURN_TO_TOPIC": 4,
+      "ELLIPTICAL_REPLY": 4
+    },
+    "fragmentCounts": {
+      "1": 6,
+      "2": 8,
+      "3": 10,
+      "4": 6,
+      "5": 2
+    },
+    "minimumProperSubTurnItems": 8,
+    "minimumMultiItemEpisodes": 4,
+    "minimumOverlappingMultiItemEpisodes": 2
+  },
+  "authority": {
+    "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
+    "generatorMetadataIsNeverHumanGold": true,
+    "sourceAuditCompleted": false,
+    "humanReviewCompleted": false
+  },
+  "scope": [
+    "This batch is an eligible supervised-pool candidate batch, not disposable pilot data.",
+    "No source audit or HUMAN semantic review has occurred yet.",
+    "No semantic model inference, training, bulk authoring, or FINAL evaluation-model inspection occurred in this authoring task."
+  ]
+}
