@@ -4435,6 +4435,156 @@ python3 -m unittest discover -s trading/tests -p 'test_*.py'      2,050  PASS
   **근거가 없어 여기 옮기지 않는다.**
 - returns · ranking · portfolio · Gate A-H를 계산하지 않았다.
 
+## 10.33 5A-2 전수 법적 증거 population — 897 work item — 2026-09-10
+
+**관측 실행이다.** 코드·semantic·문턱을 하나도 바꾸지 않았고 승격·manifest 반영·5A-3·
+Gate를 실행하지 않았다. 결과를 보고 규칙을 조정하지 않았다.
+
+### 실행 정체성
+
+```text
+execution commit          9e1203c46e69b30040678d317c34c92cb3cb0971
+checkpoint schema         qv-5a2-checkpoint-v1
+run identity sha256       sha256:52ff66d48ef3a1aecc620bd7aed2c5ec15112c57a5abd9d714667532c1165fda
+inventory sha256          sha256:dc13cae6c9f375c2f1dea72a01da9bc16682d7298fcc2b24900d03feb5a8ceba
+identity_source_version   qv-identity-sha256:de239b12524d48fbe02d12fac6bdc1ca68a34ab7ea859d695c7f574eec8914be
+final output sha256       b68813def1f815c174ff454b89a6b198ddbac3eb6fe631ae1232f486b364cfc5
+runtime artifact path     trading/data/qv-5a2-run/   (gitignored · 산출물은 커밋하지 않는다)
+```
+
+실행은 `9e1203c`에 고정된 별도 worktree에서 했다. 그 사이 `main`은 다른 트랙으로
+전진했지만 checkpoint 정체성은 worktree HEAD에 묶이므로 재개가 흔들리지 않았다.
+
+**§11 완료 무결성 — 전부 통과.**
+
+```text
+git_commit == 9e1203c                     ✓
+identity_source_version == inventory       ✓
+proposals == 897                           ✓
+AUTO + REVIEW + UNRESOLVED == 897          ✓
+checkpoint item 파일 == 897                ✓
+(member_symbol, identity_symbol) 중복 0    ✓   inventory 집합과 정확히 일치(누락 0 · 잉여 0)
+mutates_production_manifest == false       ✓
+```
+
+### population
+
+```text
+work items 897    DIRECT 834 · REUSED_VENDOR_SERIES 63
+selected CIK 808 · cover proof 730 · usable title anchor 672 · legal-evidence proof 672
+
+AUTO_PROVABLE 0 · REVIEW_REQUIRED 847 · UNRESOLVED 50
+legal search   COMPLETE 255 · INCOMPLETE 417
+searched accessions 278,892 · legal documents 19,732
+```
+
+실패 계열:
+
+```text
+classify                   1,104
+governing_exhibit_missing    606
+document                     142
+index                         60
+legacy_layout                 19
+```
+
+### embedded 문서 — 이번 계약이 실제로 연 것
+
+```text
+embedded (sequence 주소)   1,440 / 19,732
+filename (파일 주소)      18,292
+embedded governing exhibit 1,440      (전부 EX-3 계열이라 100%다)
+embedded을 가진 고유 accession 1,087
+```
+
+`document_sequence` 분포는 `2` 965 · `3` 274 · `4` 109 · `5` 42 · `6` 20 · `7` 14 ·
+`8` 5 · `9` 2다. **이 분포는 진단이지 정체성이 아니다** — sequence는 등록인이 적은
+주소이고 ordinal로 해석하지 않는다.
+
+### 핵심 legacy 판정
+
+```text
+legacy_layout 실패        19건 · 고유 accession 19 · 영향 work item 18
+```
+
+확인된 legacy를 가진 적격 work item **425 / 672** 중 `legacy_layout`으로 끝난 것은
+**18개**다. 나머지는 embedded 문서가 source-backed `<SEQUENCE>`로 주소 지정됐다.
+
+19건은 전부 **실제로 손상된 accession**이고 새 계약상 올바른 fail-close다. 파일 이름이
+없다는 이유로 실패한 것은 0건이다.
+
+```text
+NO_DOCUMENTS                    11   WEN · HRL · MAT · DHR · GL · AN · HD · D · SNA · LMT(2) · JNJ
+MISSING_TEXT_CLOSE               3   HAL(seq 2) · CCL(seq 10) · WSM(seq 2·3·4·5·12·13)
+DUPLICATE_SEQUENCE + 다른 바이트  2   SRCL · ROP  (둘 다 sequence 1이 중복이고 내용이 다르다)
+MISSING_DOCUMENT_CLOSE           1   AES
+NESTED_DOCUMENT                  1   BAC
+```
+
+`MISSING_TEXT_CLOSE`와 `DUPLICATE_KEY_DIFFERENT_BYTES`는 2026-09-07 리뷰 수정으로
+엄격해진 경계 검사가 실제 SEC 자료에서 잡은 것이다. 그 전 parser였다면 잘린 payload나
+모호한 자식을 자식 SHA로 삼았을 자리다. **parser를 고치지 않았다.**
+
+### cheap-path baseline과의 비교 — 조정하지 않는다
+
+```text
+                    baseline   이번 전수
+work items              897        897   같다
+DIRECT / REUSED     834 / 63   834 / 63   같다
+selected CIK            808        808   같다
+cover proof             730        730   같다
+usable title anchor     672        672   같다
+AUTO_PROVABLE             0          0   같다
+REVIEW_REQUIRED         847        847   같다
+UNRESOLVED               50         50   같다
+```
+
+**법적 증거 공급기가 어떤 work item의 상태도 바꾸지 않았다.** 그 이유는 사유 코드에
+그대로 보인다 — `CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT` 730건과
+`CLASS_INTERVAL_NOT_EXPLICIT` 730건이 지배적이고, 이는 legal 탐색이 닫히기 전에
+표지 anchor 층에서 이미 걸린다는 뜻이다. legal 탐색 자체도 `COMPLETE`가 255건뿐이라
+구간을 만들 수 있는 자리가 좁다. **이 결과를 근거로 semantics를 넓히지 않는다.**
+
+### 실행
+
+```text
+sessions 4    COMPLETE 1 · FAILED 1(TimeoutError) · RUNNING 표식으로 남은 급사 2
+```
+
+```text
+20260907T011913  RUNNING   first=0    calls=unknown    (재부팅 위해 사용자가 정지)
+20260907T165338  FAILED    first=201  calls=2,923      TimeoutError: read operation timed out
+20260907T172245  RUNNING   first=207  calls=unknown    (재부팅 위해 사용자가 정지)
+20260908T172709  COMPLETE  first=451  calls=233,023    last_completed_order=896
+```
+
+```text
+SEC calls   확인된 두 세션 합 235,946 — **전체 합이 아니다.**
+            급사한 두 세션은 runner 계약상 unknown이고 추정하지 않는다.
+벽시계      90.1시간 (2026-09-06T16:19Z → 2026-09-10T10:24Z)
+순수 실행   87.9시간 · 평균 5.9분/항목
+```
+
+전송 실패는 **한 번**이었고 지시대로 처리했다 — semantic 상태로 적지 않고, 코드를
+바꾸지 않고, 자동 retry/backoff를 넣지 않고, checkpoint 항목을 손대지 않고, 같은
+명령에 `--resume`만 붙여 수동 재개했다. 재개 세 번 모두 identity 대조를 통과했다.
+
+### 검증 구분
+
+```text
+로컬 실행 결과   위 전수 population · §11 무결성 검사 전부
+코드 검사        legacy_layout 19건의 실패 사유는 checkpoint에 적힌 값 그대로다
+GitHub CI        이 숫자를 재현하지 않는다 — 워크플로가 Docker 하나뿐이고
+                 Python 테스트를 돌리지 않는다
+```
+
+### 범위
+
+- production manifest를 바꾸지 않았다. 어떤 packet도 승격하지 않았다.
+- 5A-3 materialization · Gate A-H · returns · ranking · portfolio를 실행하지 않았다.
+- semantic·문턱·문법·코드를 하나도 바꾸지 않았다.
+- 산출물 JSON·checkpoint·inventory는 gitignored 경로에 있고 커밋하지 않았다.
+
 ## 11. 결과
 
 
