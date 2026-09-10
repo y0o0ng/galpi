@@ -4548,7 +4548,7 @@ UNRESOLVED               50         50   같다
 > 표지 anchor 층에서 이미 걸린다"고 적었다. **그 해석은 자료로 입증되지 않는다.**
 > 10.34의 offline 재파생 결과, 요구된 class에 대해서는 표지 anchor가 아니라
 > **법적 탄생 증거 층**이 지배적 차단 지점이다. 표지 층이 막는 것은 별도의
-> 462건(요구 class 196 + sibling 266)이다. 정확한 수치는 10.34에 있다.
+> 465건(요구 class 199 + sibling 266)이다. 정확한 수치는 10.34에 있다.
 
 ### 실행
 
@@ -4773,6 +4773,207 @@ B2 continuity 사슬 (snapshot·amendment·영향)   0
 - 코드·semantic·문턱을 바꾸지 않았고 새 규칙이나 해결책을 제안하지 않는다.
 - 승격·manifest 반영·5A-3·Gate·returns·ranking·portfolio를 실행하지 않았다.
 - 분석 스크립트는 스크래치에 두고 저장소에 커밋하지 않는다.
+
+## 10.35 5A-2 진단 probe — 보통주 탄생/발효일이 원문에 있는가 — 2026-09-10
+
+**진단 probe다.** parser·semantics·CLOSED 계약을 바꾸지 않았고, 전수 재실행·제출 이력
+재열거·승격·manifest 변경을 하지 않았다. **해결책이나 정규식을 제안하지 않는다.**
+
+10.34가 "요구 class 254/254가 탐색이 닫히고도 탄생 증거에서 멈춘다"를 셌다. 이 절은
+**그 원인이 parser recall인지 원문 부재인지**를 실제 SEC 원문으로 가른다.
+
+### 표본 — 30문서 · 29 발행사
+
+선정은 저장된 5A-2 산출물에서만 했다(회사 재발견·이력 재스캔 없음).
+
+```text
+선정 규칙 (재현 가능)
+  natural_key = f"{cik}|{accession}|{document_name or ''}|{document_sequence or ''}|{member_key}"
+  order_key   = sha256("qv-5a2-birth-probe-v1|" + natural_key).hexdigest()
+  pool 안에서 order_key 오름차순, 앞 pool과 문서 중복 배제,
+  1차 순회에서 CIK 중복 배제 후 정원 미달이면 2차에서 허용
+```
+
+```text
+Pool A  15   요구 보통주 · 탐색 COMPLETE · governing definition 있음 · NO_BIRTH_ACTION_OR_DATE
+             (후보 76 · 고유 CIK 71)
+Pool B  10   요구 보통주 definition 있음 · 해당 governing exhibit operative MISSING
+             (후보 148 · 고유 CIK 143)
+Pool C   5   CLASS_BIRTH_ACTION이 실제로 검출된 우선주 control · operative MISSING
+             (후보 19 · 고유 CIK 4 — DLR이 2건, control이라 CIK 재사용 허용)
+```
+
+embedded 문서는 승인된 typed locator `(CIK, accession, document_sequence)`로만 해석했다
+(MTD seq:2 · CTXS seq:2 · LM seq:3). 파일명을 만들어내지 않았다.
+
+### 받은 바이트 — bounded live fetch
+
+```text
+SEC 호출 30회 (선정된 문서 정확히 30건) · 추가 열거 없음 · 자동 재시도 없음
+받은 바이트의 SHA-256 30/30이 전수 실행이 기록한 document_sha256과 일치
+```
+
+SHA 일치는 **전수 실행이 해시한 그 바이트를 그대로 읽었다**는 뜻이다. 본문은 저장소에
+커밋하지 않는다(기존 계약: HTML/본문을 DB·저장소에 넣지 않는다).
+
+### 기계 확인 — production 함수를 그대로 재실행
+
+`governing_operative_date` · `class_birth_action_matches` · O2 네 경로를 30문서에
+그대로 돌렸다.
+
+```text
+                              A(15)  B(10)  C(5)
+CLASS_BIRTH_ACTION 검출          0      0     5
+EXPLICIT 발효일 검출             1      0     0
+STATE_CERTIFIED 검출             0      0     0
+STATE_FILED 스탬프 검출          4      5     1
+제출발효 조항(UPON_FILING) 검출   0      0     0
+```
+
+**30문서 전부에서 `UPON_FILING_PATTERNS`가 한 번도 맞지 않았다.**
+
+### HUMAN 원문 판정 — 보통주 25건 (Pool A+B)
+
+원문을 읽고 사람이 내린 판정이다(자동 분류 아님).
+
+```text
+BIRTH_ACTION_SOURCE_JUDGMENT
+  EXPLICIT_TARGET_CLASS_CREATION      0
+  DEFINITION_ONLY                    18
+  OTHER / AMBIGUOUS                   7
+  현재 parser의 놓친 건수(false negative)   0
+```
+
+`DEFINITION_ONLY` 18건은 전부 자본구조 지정 문언이다 — `designated "Common Stock"` ·
+`authorized to issue ... shares of Common Stock` · `divided into`. **그 class가 언제
+어떤 행위로 생겼는지를 말하지 않는다.**
+
+`OTHER / AMBIGUOUS` 7건의 내역:
+
+```text
+기존 문자 class를 대상 보통주로 재분류·재지정   6   CXO · UIS · VRSK · FCX · DISCA · MSCI
+문서 본문이 bye-laws (governing charter 아님)    1   EG
+```
+
+그 6건은 예컨대 `each share of Class A Common Stock ... shall be automatically
+reclassified as one ... share of Common Stock`(VRSK) 같은 모양이다. **재분류는 탄생이
+아니라는 것이 CLOSED 결정**이므로(설계 문서 5A-2 절) parser가 내보내지 않는 것이
+계약대로다 — recall 결함이 아니라 계약 범위다.
+
+```text
+OPERATIVE_DATE_SOURCE_JUDGMENT
+  EXPLICIT_DATE_PRESENT                3    LW · WEC · DISCA
+  EFFECTIVE_UPON_FILING_PRESENT        3    VRSK · FCX · MSCI
+  STATE_CERTIFIED_DATE_PRESENT         0
+  NO_SUPPORTED_OPERATIVE_DATE         19
+  AMBIGUOUS                            0
+  현재 O2 true positive                1    LW
+  현재 O2 놓친 건수                     5    WEC · DISCA · VRSK · FCX · MSCI
+```
+
+### 놓친 어휘 계열 — 재현성 측정
+
+```text
+반복 계열 1건
+  "effective upon the filing of <instrument 이름> with <주 기관>"
+  현행 UPON_FILING_PATTERNS는 filing 바로 뒤 with를 요구해 instrument 이름이
+  끼면 맞지 않는다.
+  출현 4회   VRSK · FCX · MSCI · (control) MAA
+
+단발 표현 2건
+  대문자 월 표기        "AS AMENDED EFFECTIVE MAY 21, 2012"        WEC   1회
+  발효일 앞 시각 삽입구 "effective as of 5:00 p.m. ... on <date>"  DISCA 1회
+```
+
+### 놓친 것을 인정했다면 실제로 날짜가 나왔는가
+
+```text
+WEC    나온다   2012-05-21
+DISCA  나온다   2022-04-08
+VRSK   안 나온다   제출발효 조항은 있으나 문서에 주 FILED 스탬프가 없다
+MSCI   안 나온다   동     상
+FCX    틀린 날짜가 나온다   아래를 보라
+```
+
+`STATE_FILED_STAMP_PATTERNS`가 맞은 9건을 원문에서 확인한 결과 **8건이 이 instrument의
+FILED 스탬프가 아니라 원 설립 제출일 recital**이었다.
+
+```text
+진짜 주 FILED 스탬프   1건   NWL "Delivered 12:36 pm 05/06/2008 FILED 12:36 pm 05/06/2008"
+원 설립일 recital      8건   CXO 2006 · LW 2016 · VEEV 2007 · FCX 1987 · NWL 1987 ·
+                             DISCA 2008 · TDC 2007 · EXE 1996/1998 · HPE 2024
+```
+
+그래서 FCX는 조항을 인정해도 1987년(원 설립일)이 2007년 restatement의 발효일로
+파생된다. 오늘은 조항 검출이 0이라 `derived`가 항상 비어 무해하지만, **이 관측은
+사실로 적어 둔다.** 그리고 NWL은 진짜 스탬프가 있는데 조항이 없어 MISSING이다 —
+CLOSED 계약("스탬프 단독은 발효를 만들지 않는다") 그대로다.
+
+결과적으로 O2 recall을 계열대로 넓혔다면 **보통주 25건 중 2건**(WEC · DISCA)이 올바른
+발효일을 얻었을 것이다. 나머지는 원문에 쓸 날짜가 없거나 틀린 날짜가 나온다.
+
+### 우선주 control (Pool C, 5건)
+
+```text
+EXPLICIT_TARGET_CLASS_CREATION      5 / 5
+현재 parser true positive           5 / 5      놓친 건수 0
+```
+
+```text
+DLR  "A series of Preferred Stock, designated the '5.200% Series L ...', is hereby established."
+APO  "a series of Preferred Stock be, and hereby is, created and designated 6.75% Series A ..."
+MAA  "A series of Preferred Stock, designated the '8.50% Series I ...', is hereby established."
+HPE  "the New Preferred Stock be, and hereby is, created and designated 7.625% Series C ..."
+```
+
+**탄생 문법은 진짜 창설 문언을 정확히 인식한다.** 같은 parser가 보통주에서 0건인 것은
+문법의 능력 문제가 아니다.
+
+control의 발효일은 5건 중 4건이 원문에 없고(원 제출일 recital뿐), MAA 1건은
+`effective at the time the Tennessee Secretary of State accepts this amendment for
+filing`으로 위 반복 계열의 또 다른 변형이지만 스탬프가 없어 날짜가 나오지 않는다.
+
+### 결론
+
+```text
+CONCLUSION: MIXED
+```
+
+두 층이 서로 다른 답을 준다. 합치면 정확도가 떨어지므로 나눠 적는다.
+
+```text
+탄생 층    SOURCE_DOES_NOT_STATE_TRUE_BIRTH
+           보통주 25건 중 명시 창설 문언 0건 · parser 놓침 0건 · control 5/5 정상.
+           이 증거 지평의 후기 governing instrument는 그 class를 **정의**하지만
+           원래의 법적 창설 사건·날짜를 말하지 않는다.
+
+발효일 층  PARSER_RECALL_GAP (작다)
+           보통주 25건 중 5건을 놓쳤고 반복 계열 1개(4회) + 단발 2개다.
+           다만 인정해도 올바른 날짜가 나오는 것은 2건뿐이다.
+```
+
+**발효일 recall을 넓혀도 이번 표본에서 탄생 증거는 하나도 생기지 않는다** — 두 요소가
+한 instrument에서 함께 성립해야 하는데 창설 문언 자체가 0건이기 때문이다.
+
+이 절은 계약을 다시 열지 않는다. 어떤 규칙 변경도 제안하지 않는다.
+
+### 자료 구분
+
+```text
+저장소·코드 사실   선정에 쓴 산출물은 9e1203c가 만들었고 trading/backtest·selftest는
+                   그 이후 변경 0. 기계 확인은 production 함수를 그대로 호출했다.
+저장된 population 측정   pool 후보 수 · 단계 분포 · operative 상태는 10.34와 같은 산출물이다.
+새로 수행한 HUMAN 판정   위 두 판정표 30행 — 사람이 원문을 읽고 내렸다.
+bounded live SEC fetch   30회. 선정된 문서만. 재시도·확장 없음. SHA 30/30 일치.
+GitHub CI                이 절과 무관하다 — CI는 Python 테스트를 돌리지 않는다.
+```
+
+### 범위
+
+- production parser·semantics·CLOSED 계약(탄생·O2·O2-C·B1·B2·P2·N1)을 바꾸지 않았다.
+- 897건 전수 재실행·제출 이력 재스캔을 하지 않았다.
+- 승격·manifest 변경·5A-3·Gate·returns·ranking·portfolio를 하지 않았다.
+- 받은 SEC 본문과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
 
 ## 11. 결과
 
