@@ -5556,6 +5556,191 @@ source URL        https://www.sec.gov/Archives/edgar/data/1297996/00012979961700
 - 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
 - 판정 — **EXPLICIT_TARGET_CLASS_CREATION** / **NO_SUPPORTED_OPERATIVE_DATE** — control. 명시 창설 문언 — parser true positive.
 
+## 10.36 Option A 실현가능성 census — proved-validity-segment가 실제로 무엇을 여는가 — 2026-09-11
+
+**측정 전용이다.** Option A를 구현하지 않았고 CLOSED 계약을 하나도 바꾸지 않았다.
+가설 구간은 scratch 구조에만 계산했고 v3 `RelationInterval`이나 manifest 행으로
+직렬화하지 않았다. `birth_date`라 부르지 않고 `hypothetical_valid_from/to` ·
+`witness_family`로만 다뤘다.
+
+```text
+base commit          e2bc593b613e7899ffbe15f016f96ef6be696d9b
+inventory sha256     dc13cae6c9f375c2f1dea72a01da9bc16682d7298fcc2b24900d03feb5a8ceba
+5A-2 output sha256   b68813def1f815c174ff454b89a6b198ddbac3eb6fe631ae1232f486b364cfc5
+run_identity_sha256  sha256:52ff66d48ef3a1aecc620bd7aed2c5ec15112c57a5abd9d714667532c1165fda
+입력 경로            trading/data/qv-5a2-run/ (gitignored)
+network calls        0
+```
+
+세 SHA 모두 10.33 receipt 기록과 대조해 일치를 확인한 뒤 분석했다. 분석기는 scratch에
+두고 커밋하지 않는다. 아래 수치는 전부 **결정론적 코드/데이터 처리**이고 원문 판정을
+섞지 않았다.
+
+### 가설 규칙 — 바꾼 것은 하나뿐
+
+원래 탄생 요구만 제거하고 나머지는 현행 계약 그대로 재사용했다. anchor는 §3의 A/B이고
+연속성은 현행 B2 fail-close를 그대로 호출한다 — 무일자 governing 문서는 순서를 막고,
+미해결 class 영향은 연속성을 막으며, 열린 구간은 현행 current-snapshot 조건을 그대로
+요구한다. 새 연속성 가정이 필요한 자리는 `NEEDS_NEW_CONTINUITY_RULE`로 두고 진행하지
+않았다. K/Q 표지 사실은 점 증거로만 세고 구간으로 확장하지 않았다.
+
+### 결과 — work item funnel
+
+```text
+TOTAL WORK ITEMS                              897
+CURRENT AUTO_PROVABLE                           0
+
+  표지 층에서 탈락 (COVER_LAYER_FAILURE)      369
+  exact cover association 성립                528
+      legal search INCOMPLETE                 332
+      governing definition 없음               120
+      날짜 있는 anchor 없음                    65
+      anchor 있음(탐색 COMPLETE)                11
+          -> 무일자 governing 문서가 연속성 차단  11
+
+HYPOTHETICAL OPTION A
+  target class validity anchor                  0
+  target formation coverage                     0
+  target all formations covered                 0
+  full sibling package formation coverage       0
+  canonical prose package complete              0
+  full S1-window sufficient coverage            0
+```
+
+### 결과 — demanded formation point funnel
+
+work item 수와 formation point 수를 합치지 않는다.
+
+```text
+TOTAL FORMATION POINTS                      9,464
+
+  표지 층에서 탈락                           3,594
+  exact cover association 성립               5,870
+      legal search INCOMPLETE                3,947
+      governing definition 없음              1,248
+      날짜 있는 anchor 없음                    597
+      anchor 있음 -> 연속성 차단                 78
+
+  가설 구간이 덮은 formation point               0
+```
+
+### 연도별 (2010–2026) — 최근 formation도 열리지 않는다
+
+```text
+year   covered  search_INC  no_def  no_anchor  undated
+2010         0         164      47         21        1
+2013         0         175      54         24        1
+2016         0         192      60         30        4
+2019         0         200      72         35        6
+2022         0         198      81         41        7
+2026         0         182      85         47        7
+```
+
+전 구간에서 `covered = 0`이다. **이 규칙은 최근 formation에만 유리하지도 않다.**
+
+### anchor family
+
+```text
+DATED_COMPLETE_GOVERNING_SNAPSHOT   15   (탐색 closure를 무시했을 때)
+                                    11   (탐색 COMPLETE까지 요구했을 때)
+DATED_EXPLICIT_TARGET_ACTION         0   보통주에서 탄생 행위 finding이 0건이다(10.35)
+KQ_COVER_POINT_ONLY                528   구간 증거 없이 점 증거만 있는 요구 class
+```
+
+### 하위 섹션이 비는 이유
+
+`§5 sibling` · `§6 canonical prose` · `§7 S1 window`는 전부 0이다. **측정 실패가 아니라
+상위 관문에서 0이 나와 표본이 없기 때문이다.** sibling 의미론이나 prose 계약을 완화하지
+않았고, 그 층이 안전하다는 뜻도 아니다 — **아직 시험되지 않았다**는 뜻이다.
+
+```text
+FULL_S1_WINDOW_COVERAGE            0  (덮은 formation이 0이라 계산할 표본이 없다)
+EXACT_EXISTING_SHARE_FACT_COVERAGE NOT_MEASURABLE_PRE_5A3
+```
+
+로컬 DB를 확인한 결과 `qv_share_observations` · `qv_class_share_resolutions` ·
+`qv_share_classes` · `qv_issuers` · `qv_sec_evidence_documents` · `qv_identity_evidence`가
+**전부 0행**이다. 5A-3가 아직 materialize하지 않았으므로 실제 fact instant를 알 수 없고,
+이 지표를 채우려고 데이터를 받거나 materialize하지 않았다.
+
+**December D 매핑 주의.** 코드에 formation → December valuation session을 만드는 canonical
+helper가 없다(`s1_window()`는 valuation_date를 인자로 받는다). 달력 날짜를 지어내지
+않으려고, S1 충분조건을 "formation 직전 해 1월 1일부터 formation까지를 덮는가"로 잡았다 —
+그 구간을 덮으면 그 사이 어떤 December D로 끝나는 S1 창도 덮인다. **필요조건이 아니라
+충분조건이고**, 이번에는 표본이 0이라 결과에 영향이 없다.
+
+### qv-class-id-v2 충돌 census — 설계가 아니라 정보량 측정
+
+v1 seed가 true birth를 쓰므로 birth-unknown class에 그대로 쓸 수 없다. 탄생 없이 남는
+식별 정보가 얼마나 되는지만 셌다. 모집단은 **association이 성립한 요구 보통주 class**다
+(가설 구간이 0이라 그 상위 집합으로 잰다).
+
+```text
+모집단                                          151
+후보키 (CIK, bridge type, comparison_key)       149
+  한 class만 가리키는 키                        149
+  두 class 이상으로 갈리는 키                     0
+서로 다른 cover member가 한 키로 뭉치는 경우        0
+같은 키에 액면가 충돌                              0
+같은 키에 종료/재분류 증거                          1
+금지 seed(ticker·XBRL member·제안 id·삽입 순서)가
+  있어야만 유일해지는 경우                          0
+```
+
+**이 관측 증거 안에서는 충돌이 없다.** 다만 모집단이 151건이고 재분류 사례가 1건 있으므로
+"disambiguation 설계가 불필요하다"로 읽지 않는다 — 같은 키가 서로 겹치지 않는 두 episode에
+나타나는 모양은 이 표본에서 관측되지 않았을 뿐이다. v2 seed를 고르지 않았다.
+
+### 해석 — 물어본 것에 답한다
+
+**현재 AUTO 0 중 true-birth 요구가 기여한 몫.** 요구 보통주 528건 중 true-birth를 제거해
+실제로 anchor를 얻는 것은 **11건(2.1%)**이고, 그 11건도 전부 연속성에서 막혀 최종
+**0건**이 된다. **true-birth 요구는 지배적 차단 지점이 아니다.**
+
+**제거 후 지배적 차단.** 순서대로 `legal search INCOMPLETE 332` → `governing definition
+없음 120` → `날짜 있는 anchor 없음 65`다.
+
+**O2 날짜 불완전성이 여전히 구조적으로 지배적인가 — 그렇다.** 셋 중 둘이 직접 O2다.
+`날짜 있는 anchor 없음 65`는 정의는 찾았는데 그 문서에 법적 발효일이 없는 경우이고,
+`무일자 governing 문서 11`은 anchor를 얻고도 다른 문서의 무일자가 순서를 막은 경우다.
+10.35의 실측(governing exhibit 13,177건 중 **93%가 발효일 MISSING**)이 같은 방향이다.
+
+**sibling identity가 지배적인가 — 이 census로는 알 수 없다.** demanded가 0건이라 sibling
+층에 도달하지 못했다. 10.34는 sibling 단독 차단이 0건이었다고 셌지만, 그것도 완결이
+0건이어서 나온 값이다.
+
+**canonical prose 시간 증명이 지배적인가 — 역시 아직 시험되지 않았다.**
+
+**formation-only 집계가 감추는 하위 차단이 있는가 — 이번에는 없다.** 상위에서 0이라
+S1 창 요구가 추가 손실을 만들 자리 자체가 없다. 다만 **5A-3 이후에는 다시 물어야 한다** —
+formation 한 점을 덮는 것과 S1 창 전체를 덮는 것은 다른 요구다.
+
+**Option A의 경험적 유용성.** 이 population·이 증거 지평에서 **Option A 단독으로는 아무
+work item도 열리지 않는다**(897 → 0). 설계 방향의 옳고 그름을 판정하는 것이 아니라,
+**O2 발효일 커버리지가 먼저 해결되지 않으면 Option A만으로는 측정 가능한 이득이 없다**는
+사실을 적는다. 성공 문턱을 임의로 만들지 않았고 "Option A 통과"라고 쓰지 않는다.
+
+**남은 semantic 결정.** (1) O2 발효일 커버리지 — 10.35의 반복 계열과 스탬프 귀속 문제가
+선행 과제다. (2) 무일자 governing 문서가 순서를 막는 현행 B2 규칙을 유지할 것인가.
+(3) sibling·prose 층은 상위가 열린 뒤에 다시 측정해야 한다. **이 census는 그중 어느 것도
+결정하지 않는다.**
+
+### 범위
+
+```text
+production parser 변경      NO
+O2 / O2-C 변경              NO
+B1 / B2 / P2 / N1 / C2 변경  NO
+bundle schema 변경          NO
+qv-class-id 변경            NO
+production manifest 변경    NO
+promotion 실행              NO
+5A-3 실행                   NO
+Gate A-H 실행               NO
+returns / ranking / portfolio NO
+SEC / network 호출          0
+```
+
 ## 11. 결과
 
 
