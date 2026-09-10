@@ -4539,11 +4539,16 @@ REVIEW_REQUIRED         847        847   같다
 UNRESOLVED               50         50   같다
 ```
 
-**법적 증거 공급기가 어떤 work item의 상태도 바꾸지 않았다.** 그 이유는 사유 코드에
-그대로 보인다 — `CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT` 730건과
-`CLASS_INTERVAL_NOT_EXPLICIT` 730건이 지배적이고, 이는 legal 탐색이 닫히기 전에
-표지 anchor 층에서 이미 걸린다는 뜻이다. legal 탐색 자체도 `COMPLETE`가 255건뿐이라
-구간을 만들 수 있는 자리가 좁다. **이 결과를 근거로 semantics를 넓히지 않는다.**
+**법적 증거 공급기가 어떤 work item의 상태도 바꾸지 않았다.** 사유 코드는
+`CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT` 730건과 `CLASS_INTERVAL_NOT_EXPLICIT` 730건이
+지배적이고, legal 탐색은 `COMPLETE`가 255건뿐이다. **이 결과를 근거로 semantics를
+넓히지 않는다.**
+
+> **정정(10.34).** 이 절의 초판은 위 사유 코드를 두고 "legal 탐색이 닫히기 전에
+> 표지 anchor 층에서 이미 걸린다"고 적었다. **그 해석은 자료로 입증되지 않는다.**
+> 10.34의 offline 재파생 결과, 요구된 class에 대해서는 표지 anchor가 아니라
+> **법적 탄생 증거 층**이 지배적 차단 지점이다. 표지 층이 막는 것은 별도의
+> 462건(요구 class 196 + sibling 266)이다. 정확한 수치는 10.34에 있다.
 
 ### 실행
 
@@ -4584,6 +4589,190 @@ GitHub CI        이 숫자를 재현하지 않는다 — 워크플로가 Docker
 - 5A-3 materialization · Gate A-H · returns · ranking · portfolio를 실행하지 않았다.
 - semantic·문턱·문법·코드를 하나도 바꾸지 않았다.
 - 산출물 JSON·checkpoint·inventory는 gitignored 경로에 있고 커밋하지 않았다.
+
+## 10.34 5A-2 전수 결과 offline 분석 — 어느 CLOSED 계약이 무엇을 막는가 — 2026-09-10
+
+**측정만 한다.** 저장된 산출물(`qv-5a2-legal-proposals.json` · checkpoint)만 읽어
+production `project_class_proof`를 그대로 다시 돌렸다. SEC/network 호출 없음, 코드·
+semantic 변경 없음, 승격·manifest 반영 없음. **해결책을 제안하지 않는다.**
+
+재파생에 쓴 코드가 산출물을 만든 코드와 같은지 먼저 확인했다 —
+`git diff 9e1203c..HEAD -- trading/backtest/ trading/selftest/`가 비어 있다.
+
+### 먼저 — 전 population에서 완결된 것이 하나도 없다
+
+```text
+ClassEvidence 생성            0 / 672 legal proof
+prose_alias_proposal          0 / 897 work item
+interval_proved = true 인 share_class_proposal   0
+```
+
+그래서 `CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT` 730 = `CLASS_INTERVAL_NOT_EXPLICIT` 730이
+같은 수인 것은 우연이 아니다. 둘 다 legal proof가 있는 672건 + 없는 58건이다.
+
+### project_class_proof 단계별 병목
+
+`project_class_proof`의 조기 반환은 각자 고유한 note로 끝난다. 그 note로 단계를
+되짚었다(계측을 위해 코드를 고치지 않았다).
+
+```text
+                                요구 class   sibling class
+SEARCH_NOT_CLOSED                     415          605
+NO_BIRTH_ACTION_OR_DATE               254          214
+그 밖의 모든 단계                        0            0
+```
+
+**도달한 단계가 둘뿐이다.** 탄생일 충돌 · 탄생 문서의 정의/행위 부재 · 종료 충돌 ·
+governing 문서 무일자 · current snapshot 부재/동률 · 나중 amendment · snapshot 정의
+부재 · 탄생일 동률 · 미해결 영향 — **B2 continuity 사슬의 어느 관문에도 아무것도
+도달하지 못했다.** 그 규칙들이 이번 population에서 막은 건수는 0이다.
+
+##### legal search가 COMPLETE인 255건의 histogram
+
+요청된 histogram이다. 탐색이 닫혔는데도 class projection이 COMPLETE가 되지 않은 이유:
+
+```text
+NO_BIRTH_ACTION_OR_DATE   254 / 254   (100%)
+그 밖                       0
+```
+
+sibling도 같다(214/214). **탐색이 닫힌 항목에서는 예외 없이 탄생 증거 하나에서
+멈춘다.**
+
+### 왜 탄생 증거가 없는가 — 두 층으로 갈린다
+
+```text
+전 population의 finding 종류 (association 필터 전)
+  GOVERNING_CLASS_DEFINITION      843
+  CLASS_BIRTH_ACTION               19
+  CLASS_TERMINATION_EFFECTIVE_DATE 13
+  CLASS_BIRTH_EFFECTIVE_DATE        0
+```
+
+**`CLASS_BIRTH_ACTION` 19건은 전부 우선주 시리즈다.** 보통주 class에서 탄생 행위
+문법이 일치한 건 672개 발행사에서 **0건**이다.
+
+```text
+APO  us-gaap:SeriesAPreferredStockMember            1
+DLR  ext:...SeriesJ/K/L PreferredStockMember       16
+HPE  us-gaap:SeriesCPreferredStockMember            2
+MAA  us-gaap:CumulativePreferredStockMember         1
+```
+
+그 19건조차 `CLASS_BIRTH_EFFECTIVE_DATE`를 만들지 못했다 — 해당 문서의 법적 발효일이
+**전부 `MISSING`**이기 때문이다(APO 1 · DLR 6 · HPE 2 · MAA 1). 즉 탄생 행위와 O2
+발효일이 **한 instrument에서 함께** 성립해야 한다는 CLOSED 계약이 그 자리에서 막는다.
+
+##### O2 — governing exhibit의 법적 발효일
+
+```text
+governing exhibit 문서            13,177
+  MISSING                         12,250   (93.0%)
+  RESOLVED                           855   ( 6.5%)
+  AMBIGUOUS                           72   ( 0.5%)
+
+탐색이 닫힌 항목만                 3,475
+  MISSING                          3,190   (91.8%)
+  RESOLVED                           279
+  AMBIGUOUS                            6
+
+RESOLVED의 source family
+  EXPLICIT_EFFECTIVE_DATE            837
+  STATE_FILED_UPON_FILING             14
+  ITEM_503_CORROBORATED_UPON_FILING    4
+```
+
+O2-C(교차 문서 보강)가 실제로 세운 날짜는 **4건**이고 주 FILED 스탬프 경로는 14건이다.
+
+### `CANONICAL_CLASS_BRIDGE_NOT_EXPLICIT` 730건 분해
+
+요청대로 "실제로 governing canonical definition을 못 찾음"과 "definition은 있었지만
+full ClassEvidence가 생성되지 않아 bridge가 노출되지 않음"으로 갈랐다.
+
+```text
+legal proof 있음 672 · legal proof 없음 58
+
+요구 class (전부 표지에서 보통주로 증명된 473건)
+  A2  governing definition을 못 찾음                        322   (68.1%)
+  B   definition은 있었는데 projection 미완결                151   (31.9%)
+        ├ NO_BIRTH_ACTION_OR_DATE                            76
+        └ SEARCH_NOT_CLOSED                                  75
+  C   ClassEvidence가 있는데 bridge만 없음                     0
+
+sibling class (283건)
+  A1  표지 제목이 없어 legal 탐색 target이 되지 못함           266   (94.0%)
+  A2  governing definition을 못 찾음                           9
+  B   definition은 있었는데 projection 미완결                   8
+```
+
+**요구 class에서는 C가 0이다** — "definition을 찾고 ClassEvidence까지 만들었는데
+bridge만 안 붙은" 경우는 없다. 3분의 1(151건)은 governing definition을 실제로 찾았고,
+그 뒤 탄생 증거 또는 탐색 closure에서 막혔다.
+
+**sibling에서는 A1이 지배적이다.** 표지에 제목이 없는 보통주 class는 `_target_names`가
+탐색 target으로 삼지 않으므로 legal 층에 도달하지도 못한다. 이것이 표지 anchor 층
+(B1 · exact N1)이 실제로 막는 자리다.
+
+### `CLASS_INTERVAL_NOT_EXPLICIT` 730건 분해
+
+요청대로 "demanded class 자체가 미완결"과 "sibling 때문에 package가 막힘"으로 갈랐다.
+
+```text
+legal proof 있음 672 · legal proof 없음 58
+
+demanded 미완결 (단독)                        453
+demanded가 보통주로 증명 안 됨 → 제안 자체 없음  196
+demanded 미완결 + sibling도 미완결               20
+demanded를 표지에서 특정 못함                     3
+demanded는 완결인데 sibling만 미완결               0
+```
+
+**"sibling 때문에 package가 막힌" 경우는 0건이다.** 완결된 class가 전 population에
+하나도 없으므로 sibling 단독 차단은 구조적으로 나올 수 없다. 196건은 sibling 문제가
+아니라 **요구된 class 자신이 표지에서 보통주로 증명되지 않아**(`has_shares_fact`
+없음) 제안 자체가 만들어지지 않은 경우다 — 이는 표지 층이다.
+
+### 10.33의 해석 정정
+
+10.33 초판은 "legal 탐색이 닫히기 전에 표지 anchor 층에서 이미 걸린다"고 적었다.
+**자료가 그것을 뒷받침하지 않는다.**
+
+```text
+요구된 class를 막는 층
+  법적 탄생 증거 층   473 / 473 보통주 요구 class   (A2 322 + B 151)
+  표지 층             196 (보통주 미증명) + 3 (특정 실패)
+
+sibling class를 막는 층
+  표지 층             266 / 283   (제목 없음 → 탐색 target 아님)
+  법적 층              17
+```
+
+요구된 class에 대해서는 **표지 anchor를 통과한 뒤 법적 층에서 막힌다.** 표지 층이
+막는 것은 요구 class 199건과 sibling 266건, 합쳐 465건이고 요구 class의 지배적
+차단 지점이 아니다. 10.33 해당 문단에 정정을 달았다.
+
+### 이번 population에서 각 CLOSED 계약이 실제로 막은 건수
+
+```text
+탐색 closure (INCOMPLETE)                     요구 415 · sibling 605
+탄생 행위 + O2 발효일 동시 성립               요구 254 · sibling 214   (탐색 닫힌 전부)
+B1 표지 제목 anchor (제목 없으면 target 아님)  sibling 266
+표지 보통주 증명 (has_shares_fact)             요구 196
+exact N1 / P2 연결 실패                        0
+B2 continuity 사슬 (snapshot·amendment·영향)   0
+종료 규칙                                      0
+```
+
+**exact N1 · P2 · B2 · 종료 규칙은 이번 population에서 아무것도 막지 않았다** — 그
+앞 단계에서 이미 멈추기 때문이다. 이 측정은 그 규칙들이 느슨하다는 뜻도 엄격하다는
+뜻도 아니고, **아직 시험되지 않았다**는 뜻이다.
+
+### 범위
+
+- 저장된 산출물만 읽었다. SEC/network 호출 0회.
+- 코드·semantic·문턱을 바꾸지 않았고 새 규칙이나 해결책을 제안하지 않는다.
+- 승격·manifest 반영·5A-3·Gate·returns·ranking·portfolio를 실행하지 않았다.
+- 분석 스크립트는 스크래치에 두고 저장소에 커밋하지 않는다.
 
 ## 11. 결과
 
