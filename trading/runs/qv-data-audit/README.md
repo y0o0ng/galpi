@@ -4832,9 +4832,23 @@ STATE_FILED 스탬프 검출          4      5     1
 
 **30문서 전부에서 `UPON_FILING_PATTERNS`가 한 번도 맞지 않았다.**
 
-### HUMAN 원문 판정 — 보통주 25건 (Pool A+B)
+### SOURCE_TEXT_REVIEW — 보통주 25건 (Pool A+B)
 
-원문을 읽고 사람이 내린 판정이다(자동 분류 아님).
+> **판정 주체 정정.** 이 절의 초판은 아래 30행을 `HUMAN 판정`이라 적고 "사람이
+> 원문을 읽고 내렸다"고 기술했다. **그 provenance는 사실이 아니다.**
+>
+> ```text
+> 판정 주체   MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT
+>             원문을 읽고 판정한 것은 이 작업을 실행한 모델이다.
+> 아닌 것     primary-human gold judgment가 아니다.
+>             사람의 adjudication은 없었고 그것을 뒷받침할 human receipt도 없다.
+> ```
+>
+> 저장소 소유자가 이 30건을 직접 판정한 적이 없으므로 `HUMAN` 표기를 유지하지
+> 않는다. 모델 판정을 사람 증거로 조용히 바꾸지 않는다. 아래 수치는 그 전제에서
+> 읽어야 하고, 사람 검토가 필요하면 §10.35-A의 행 단위 부록이 그 입력이다.
+
+자동 분류가 아니라 원문을 읽고 내린 판정이지만, 읽은 주체는 사람이 아니라 모델이다.
 
 ```text
 BIRTH_ACTION_SOURCE_JUDGMENT
@@ -4906,7 +4920,12 @@ FILED 스탬프가 아니라 원 설립 제출일 recital**이었다.
 
 그래서 FCX는 조항을 인정해도 1987년(원 설립일)이 2007년 restatement의 발효일로
 파생된다. 오늘은 조항 검출이 0이라 `derived`가 항상 비어 무해하지만, **이 관측은
-사실로 적어 둔다.** 그리고 NWL은 진짜 스탬프가 있는데 조항이 없어 MISSING이다 —
+사실로 적어 둔다.**
+
+> **관측으로만 남긴다.** 이 스탬프 귀속 문제(recital과 이 instrument의 FILED 스탬프를
+> 가르지 못한다)는 이 commit에서 O2를 고치지 않는다. 그리고 **스탬프 귀속이 따로
+> 설계되기 전에는 `UPON_FILING` 확장을 제안하지 않는다** — 조항만 넓히면 위 FCX처럼
+> 잘못된 날짜가 파생되는 경로가 열린다. 그리고 NWL은 진짜 스탬프가 있는데 조항이 없어 MISSING이다 —
 CLOSED 계약("스탬프 단독은 발효를 만들지 않는다") 그대로다.
 
 결과적으로 O2 recall을 계열대로 넓혔다면 **보통주 25건 중 2건**(WEC · DISCA)이 올바른
@@ -4942,15 +4961,21 @@ CONCLUSION: MIXED
 두 층이 서로 다른 답을 준다. 합치면 정확도가 떨어지므로 나눠 적는다.
 
 ```text
-탄생 층    SOURCE_DOES_NOT_STATE_TRUE_BIRTH
-           보통주 25건 중 명시 창설 문언 0건 · parser 놓침 0건 · control 5/5 정상.
-           이 증거 지평의 후기 governing instrument는 그 class를 **정의**하지만
-           원래의 법적 창설 사건·날짜를 말하지 않는다.
+탄생 층    SOURCE_DOES_NOT_STATE_TRUE_BIRTH  (이 표본이 뒷받침한다 · 전수 증명은 아니다)
+           결정론적 보통주 25문서에서 명시 창설 문언 0건 · parser 놓침 0건 ·
+           control 5/5 정상. 여기에 10.34의 전수 관측(완결된 ClassEvidence 0건)이
+           같은 방향을 가리킨다.
 
 발효일 층  PARSER_RECALL_GAP (작다)
            보통주 25건 중 5건을 놓쳤고 반복 계열 1개(4회) + 단발 2개다.
            다만 인정해도 올바른 날짜가 나오는 것은 2건뿐이다.
 ```
+
+**이 결론이 주장하지 않는 것.** "어떤 SEC 문서도 보통주 탄생을 말할 수 없다"를 증명하지
+않는다. 증명한 것은 **이 30문서 표본과 이 증거 지평 안에서** 후기 governing instrument가
+그 class를 정의하되 원래의 법적 창설 사건·날짜를 말하지 않는다는 것이고, 전수 population은
+그것과 모순되지 않는 관측(완결 0건)을 준다. 다른 지평(원 설립 charter · S-1 · 주 기록)에서
+그 문언이 나올 가능성은 이 probe가 판단하지 않았다.
 
 **발효일 recall을 넓혀도 이번 표본에서 탄생 증거는 하나도 생기지 않는다** — 두 요소가
 한 instrument에서 함께 성립해야 하는데 창설 문언 자체가 0건이기 때문이다.
@@ -4963,7 +4988,8 @@ CONCLUSION: MIXED
 저장소·코드 사실   선정에 쓴 산출물은 9e1203c가 만들었고 trading/backtest·selftest는
                    그 이후 변경 0. 기계 확인은 production 함수를 그대로 호출했다.
 저장된 population 측정   pool 후보 수 · 단계 분포 · operative 상태는 10.34와 같은 산출물이다.
-새로 수행한 HUMAN 판정   위 두 판정표 30행 — 사람이 원문을 읽고 내렸다.
+새로 수행한 원문 판정     위 두 판정표 30행 — MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT.
+                   실행 모델이 원문을 읽고 내렸다. 사람 판정이 아니고 human receipt도 없다.
 bounded live SEC fetch   30회. 선정된 문서만. 재시도·확장 없음. SHA 30/30 일치.
 GitHub CI                이 절과 무관하다 — CI는 Python 테스트를 돌리지 않는다.
 ```
@@ -4974,6 +5000,561 @@ GitHub CI                이 절과 무관하다 — CI는 Python 테스트를 �
 - 897건 전수 재실행·제출 이력 재스캔을 하지 않았다.
 - 승격·manifest 변경·5A-3·Gate·returns·ranking·portfolio를 하지 않았다.
 - 받은 SEC 본문과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
+
+## 10.35-A 진단 probe 행 단위 감사 부록 — 30/30
+
+10.35가 선정한 **바로 그 30문서**다. 표본을 바꾸지 않았고 새 발행사를 받지 않았다.
+
+```text
+행 수                30 / 30
+source SHA-256 대조   30 / 30 일치 (5A-2 전수 실행이 기록한 document_sha256과)
+판정 주체            MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT — 실행 모델이 원문을 읽었다.
+                     primary-human gold가 아니고 사람 adjudication은 없었다.
+인용 범위            감사에 필요한 최소 구간만. 전체 filing을 싣지 않는다.
+```
+
+`CLASS_BIRTH_ACTION parser` 줄은 production `class_birth_action_matches`를 그 문서에
+다시 돌린 결과이고, `operative`는 전수 실행이 기록한 값이다.
+
+#### [A] LNT / LNT — 0000107832-02-000073
+
+```text
+CIK               0000352541
+locator           sept10q2002exh3pt1.txt
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $0.01 Par Value
+form / type       10-Q / EX-3
+classification    AMENDED_AND_RESTATED_ARTICLES
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/352541/000010783202000073/sept10q2002exh3pt1.txt
+```
+- class 근거 — `block:0 … The authorized capital stock ---------- of the Corporation shall consist of 40,000,000 shares, of which (i) 24,000,000 shares shall designated "Common Stock" of the par value of $2.50 each; and (ii) 16,000,000 shares shall be designated "Preferred Stock" of the par value of $.01 each. …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 자본구조 지정만. 창설 행위·발효일 문언 없음.
+
+#### [A] CXO / CXO — 0000950129-07-003852
+
+```text
+CIK               0001358071
+locator           h48791exv3w1.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, par value $0.001 per share
+form / type       8-K / EX-3.1
+classification    RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1358071/000095012907003852/h48791exv3w1.htm
+```
+- class 근거 — `block:18 … time (the “Old Common Stock”) shall be and hereby is automatically reclassified, changed and converted into one-half of a share (the “Reverse Stock Split”) of Common Stock without any action by the holder thereof. Shares of Old Common Stock that are held by stockholders through …`
+- 발효일 근거 — `block:6 … The original certificate of incorporation was filed with the Secretary of State of the State of Delaware on February 22, 2006. …`
+- 판정 — **OTHER_AMBIGUOUS** / **NO_SUPPORTED_OPERATIVE_DATE** — 역분할. Old Common Stock을 같은 Common Stock으로 재분류 — 새 class 창설 아님.
+
+#### [A] UIS / UIS — 0000746838-09-000207
+
+```text
+CIK               0000746838
+locator           ex3splitamend.txt
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, par value $.01
+form / type       8-K / EX-3.1
+classification    CERTIFICATE_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/746838/000074683809000207/ex3splitamend.txt
+```
+- class 근거 — `block:0 … nt to the General Corporation Law of the State of Delaware, each ten (10) shares of the Corporation's Common Stock, par value $.01 per share, issued and outstanding immediately prior to the Effective Time shall automatically be combined into one (1) validly issued, fully paid and …`
+- 발효일 근거 — `block:0 … the dates from which dividends thereon shall be cumulative. Upon the filing and effectiveness (the "Effective Time") of this amendment to the Restated Certificate of Incorporation of the Corporation pursuant to the General Corporation Law of the State of Delaware, each ten (10) shares of the …`
+- 판정 — **OTHER_AMBIGUOUS** / **NO_SUPPORTED_OPERATIVE_DATE** — 역분할 결합. 제출 발효를 말하나 주 기관 지정이 없고 스탬프도 없다.
+
+#### [A] IT / IT — 0000950123-00-011900
+
+```text
+CIK               0000749251
+locator           y43399ex3-1_a.txt
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $.0005 par value per share
+form / type       10-K / EX-3.1.A
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/749251/000095012300011900/y43399ex3-1_a.txt
+```
+- class 근거 — `block:0 … 000) shares. Two hundred fifty million (250,000,000) shares shall be designated common stock (the "Common Stock"), of which one hundred sixty-six million (166,000,000) shares shall be designated Common Stock, Class A (the "Class A Common Stock") and eighty-four million (84,000,000) shares sh …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — authorized/designated 지정만.
+
+#### [A] VST / VST — 0001193125-20-132407
+
+```text
+CIK               0001692819
+locator           d899504dex31.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common stock, par value $0.01 per share
+form / type       8-K / EX-3.1
+classification    RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1692819/000119312520132407/d899504dex31.htm
+```
+- class 근거 — `block:19 … authority to issue is 1,900,000,000, of which 1,800,000,000 shall be designated as Common Stock, par value $.01 per share (the “Common Stock”), and 100,000,000 shall be designated as Preferred Stock, par value $.01 per share (the “Preferred Stock”). For the avoidance of doubt, notwithstanding a …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — designated as Common Stock 지정만.
+
+#### [A] VRSK / VRSK — 0001193125-15-206612
+
+```text
+CIK               0001442145
+locator           d933894dex31.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock $.001 par value
+form / type       8-K / EX-3.1
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1442145/000119312515206612/d933894dex31.htm
+```
+- class 근거 — `block:15 … issued and outstanding immediately prior thereto, shall be automatically reclassified as one validly issued, fully paid and non-assessable share of Common Stock without any further action on the part of the Corporation or by the holder thereof. Each certificate formerly representing a share …`
+- 발효일 근거 — `block:9 … 4. This Certificate shall become effective upon the filing of this Amended and Restated Certificate of Incorporation with the Secretary of State of the State of Delaware. …`
+- 판정 — **OTHER_AMBIGUOUS** / **EFFECTIVE_UPON_FILING_PRESENT** — Class A를 Common으로 재분류. 제출 발효 조항 있으나 주 FILED 스탬프 없어 날짜 없음.
+
+#### [A] LW / LW — 0001193125-16-766127
+
+```text
+CIK               0001679273
+locator           d273163dex31.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $1.00 par value
+form / type       8-K / EX-3.1
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         RESOLVED / EXPLICIT_EFFECTIVE_DATE
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1679273/000119312516766127/d273163dex31.htm
+```
+- class 근거 — `block:37 … Section 1. Authorized Capital Stock. The Corporation is authorized to issue two classes of capital stock, designated Common Stock and Preferred Stock. The total number of shares of capital stock that the Corporation is authorized to issue is six hundred sixty million (660,000,000) share …`
+- 발효일 근거 — `block:10 … 3. Effective as of November 8, 2016, the text of the Certificate of Incorporation of the Corporation is amended and restated in its entirety to read as set forth in Exhibit A attached hereto. …`
+- 판정 — **DEFINITION_ONLY** / **EXPLICIT_DATE_PRESENT** — 지정만. 명시 발효일이 있고 parser가 인식했다(유일한 true positive).
+
+#### [A] MTD / MTD — 0000895345-98-000141
+
+```text
+CIK               0001037646
+locator           seq:2
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $0.01 par value
+form / type       10-K / EX-3.1
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1037646/000089534598000141/0000895345-98-000141.txt
+```
+- class 근거 — `block:0 … ll be designated as Preferred Stock, and 125,000,000 shares shall be designated as Common Stock. A. Preferred Stock. The Board of Directors is authorized, subject to limitations prescribed by law, to provide for the issuance of shares of Preferred Stock in one or more series, to establish the n …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 지정만. 발효일 어휘 자체가 없다.
+
+#### [A] VEEV / VEEV — 0001193125-13-406605
+
+```text
+CIK               0001393052
+locator           d615271dex31.htm
+member_key        __NO_CLASS_AXIS__
+target class      Class A Common Stock,par value $0.00001 per share
+form / type       8-K / EX-3.1
+classification    RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1393052/000119312513406605/d615271dex31.htm
+```
+- class 근거 — `block:22 … ons. Shares of Class A Common Stock or Class B Common Stock may not be subdivided, combined or reclassified unless the shares of the other class are concurrently therewith proportionately subdivided, combined or reclassified in a manner that maintains the same proportionate equity …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — Class A Common 창설 문언 없음. 분할·전환 조항뿐.
+
+#### [A] EME / EME — 0000930413-06-001268
+
+```text
+CIK               0000105634
+locator           c41117_ex3-a4.txt
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock
+form / type       10-K / EX-3.(A-4)
+classification    CERTIFICATE_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/105634/000093041306001268/c41117_ex3-a4.txt
+```
+- class 근거 — `block:0 … Restated Certificate of Incorporation of the Corporation is hereby amended by deleting Article FOURTH thereof and by substituting in lieu of said Article the following new Article: "FOURTH. The total number of shares of all classes of stock which the Corporation shall have the authorit …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — Article FOURTH 치환 amendment. 창설·발효 문언 없음.
+
+#### [A] WEC / WEC — 0000107815-12-000108
+
+```text
+CIK               0000783325
+locator           wec06302012ex31.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $.01 Par Value
+form / type       10-Q / EX-3.1
+classification    RESTATED_ARTICLES
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/783325/000010781512000108/wec06302012ex31.htm
+```
+- class 근거 — `block:20 … ll have authority to issue is Three Hundred and Forty Million (340,000,000) shares, consisting of Three Hundred and Twenty-Five Million (325,000,000) shares of Common Stock of the par value of One Cent ($.01) per share (hereinafter called the "Common Stock") and Fifteen Million (15,000,000) shares o …`
+- 발효일 근거 — `block:6 … AS AMENDED EFFECTIVE MAY 21, 2012 …`
+- 판정 — **DEFINITION_ONLY** / **EXPLICIT_DATE_PRESENT** — 지정만. 발효일이 대문자 월 표기라 EXPLICIT 문법이 놓쳤다.
+
+#### [A] CTXS / CTXS — 0000927016-98-004061
+
+```text
+CIK               0000877890
+locator           seq:2
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, par value $.001 per share
+form / type       10-Q / EX-3
+classification    CERTIFICATE_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/877890/000092701698004061/0000927016-98-004061.txt
+```
+- class 근거 — `block:0 … of shares of all classes of capital ------ stock which the Corporation shall have authority to issue is 155,000,000 shares, consisting of 150,000,000 shares of Common Stock with a par value of $.001 per share (the "Common Stock") and 5,000,000 shares of Preferred Stock with a par value of $.01 per s …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 수권주식 증자 amendment. 창설·발효 문언 없음.
+
+#### [A] EG / EG — 0001095073-09-000008
+
+```text
+CIK               0001095073
+locator           grpbyelaws3-2.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Shares, $0.01 par value
+form / type       10-K / EX-3.(II)
+classification    CERTIFICATE_OF_DESIGNATION
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1095073/000109507309000008/grpbyelaws3-2.htm
+```
+- class 근거 — `block:758 … n of these Bye-laws, the share capital of the Company shall initially be divided into two classes of shares consisting of (i) two hundred million (200,000,000) Common Shares and (ii) fifty million (50,000,000) Preferred Shares. The Board may create classes of shares and may increase or decrease the …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **OTHER_AMBIGUOUS** / **NO_SUPPORTED_OPERATIVE_DATE** — 본문이 bye-laws다. governing charter가 아니어서 창설 문언을 기대할 자리가 아니다.
+
+#### [A] FCX / FCX — 0000950103-07-000681
+
+```text
+CIK               0000831259
+locator           dp05057e_ex0301.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, par value $0.10 per share
+form / type       8-K / EX-3.1
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/831259/000095010307000681/dp05057e_ex0301.htm
+```
+- class 근거 — `block:9 … Common Stock of the Corporation, par value $0.10 per share, redesignated herein as the common stock of the Corporation (the “Common Stock) at the Corporation’s special meeting of stockholders held on March 14, 2007. …`
+- 발효일 근거 — `block:85 … Upon the filing of this Amended and Restated Certificate of Incorporation with the Delaware Secretary of State (the “Effective Time”), each outstanding share of the Class B Common Stock (including treasury shares) shall automatical …`
+- 판정 — **OTHER_AMBIGUOUS** / **EFFECTIVE_UPON_FILING_PRESENT** — Class B를 common으로 재지정. 제출 발효 조항 있으나 문서의 스탬프 후보는 1987년 원 설립일 recital이다.
+
+#### [A] EFX / EFX — 0001104659-09-032557
+
+```text
+CIK               0000033185
+locator           a09-13450_1ex3d1.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common stock, $1.25 par value per share
+form / type       8-K / EX-3.1
+classification    AMENDED_AND_RESTATED_ARTICLES
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/33185/000110465909032557/a09-13450_1ex3d1.htm
+```
+- class 근거 — `block:6 … f stock of which Three Hundred Million (300,000,000) shares shall be designated “Common Stock,” $1.25 par value per share, and Ten Million (10,000,000) shares shall be designated “Preferred Stock,” $.01 par value per share. Shares that are reacquired by the Corporation shall be classified as …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — designated Common Stock 지정만.
+
+#### [B] NWL / NWL — 0000950137-08-007241
+
+```text
+CIK               0000814453
+locator           c26543exv3w2.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common stock, $1 par value per share
+form / type       10-Q / EX-3.2
+classification    RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/814453/000095013708007241/c26543exv3w2.htm
+```
+- class 근거 — `block:11 … FOURTH: The total number of shares which the Corporation shall have authority to issue is 810,000,000, consisting of 800,000,000 shares of Common Stock of the par value of $1.00 per share and 10,000,000 shares of Preferred Stock, consisting of 10,000 shares without par value, and 9,990,000 shares of …`
+- 발효일 근거 — `block:2 … tate Division of Corporations Delivered 12:36 pm 05/06/2008 FILED 12:36 pm 05/06/2008 SRV 080508722 — 2118347 FILE …`
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 진짜 주 FILED 스탬프가 있으나 제출 발효 조항이 없다 — 스탬프 단독은 발효를 만들지 않는다(CLOSED).
+
+#### [B] ITT / ITT — 0000950123-08-005650
+
+```text
+CIK               0000216228
+locator           y55652exv3w1.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, par value $1.00 per share
+form / type       8-K / EX-3.1
+classification    CERTIFICATE_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/216228/000095012308005650/y55652exv3w1.htm
+```
+- class 근거 — `block:15 … y to issue is 550,000,000 shares, consisting of 500,000,000 shares designated “Common Stock” and 50,000,000 shares designated “Preferred Stock”. The shares of Common Stock shall have a par value of $1 per share, and the shares of Preferred Stock shall not have any par or stated value, excep …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — designated Common Stock 지정만.
+
+#### [B] DISCA / DISCA — 0001193125-22-103051
+
+```text
+CIK               0001437107
+locator           d328161dex31.htm
+member_key        us-gaap:CommonClassAMember
+target class      Series A Common Stock, par value $0.01 per share
+form / type       8-K / EX-3.1
+classification    RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1437107/000119312522103051/d328161dex31.htm
+```
+- class 근거 — `block:24 … tock, par value $0.01 per share, all of which shall be of a single class designated as Series A Common Stock (the “Common Stock”), and (y) 1,200,000,000 shares of preferred stock, par value $0.01 per share (the “Preferred Stock”), issuable in one or more series as hereinafter provided. The number of a …`
+- 발효일 근거 — `block:10 … ate of Delaware (as amended from time to time, the “DGCL”), effective as of 5:00 p.m. Eastern Time on April 8, 2022, so as to read in its entirety in the form attached hereto as Exhibit A and incorporated herein by this reference. …`
+- 판정 — **OTHER_AMBIGUOUS** / **EXPLICIT_DATE_PRESENT** — 여러 series를 Common으로 재분류. 명시 발효일이 있으나 시각 삽입구 때문에 EXPLICIT 문법이 놓쳤다.
+
+#### [B] M / M — 0000950152-07-003009
+
+```text
+CIK               0000794367
+locator           l25203aexv3w1w2.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $.01 par value per share
+form / type       10-K / EX-3.1.2
+classification    CERTIFICATE_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/794367/000095015207003009/l25203aexv3w1w2.htm
+```
+- class 근거 — `block:7 … ompany is authorized to issue two classes of capital stock, designated Common Stock and Preferred Stock. The total number of shares of capital stock that the Company is authorized to issue is 1,125,000,000 shares, consisting of 1,000,000,000 shares of Common Stock, par value $0.01 per share, and …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — designated Common Stock 지정만.
+
+#### [B] PCAR / PCAR — 0001104659-08-029403
+
+```text
+CIK               0000075362
+locator           a08-11219_1ex3db.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common stock, $1 par value
+form / type       10-Q / EX-3.B
+classification    CERTIFICATE_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/75362/000110465908029403/a08-11219_1ex3db.htm
+```
+- class 근거 — `block:9 … FOURTH: The Corporation is authorized to issue 1,201,000,000 shares of stock of all classes, consisting of 1,200,000,000 shares of common stock having a par value of $1 per share and 1,000,000 shares of preferred stock having no par value. …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 창설·발효 문언 없음.
+
+#### [B] TDC / TDC — 0001193125-07-198885
+
+```text
+CIK               0000816761
+locator           dex31.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $0.01 par value
+form / type       8-K / EX-3.1
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/816761/000119312507198885/dex31.htm
+```
+- class 근거 — `block:14 … l number of shares of stock which the Corporation shall have authority to issue is 600,000,000 shares of capital stock, consisting of (a) 500,000,000 shares of common stock, $0.01 par value per share (the “Common Stock”) and (b) 100,000,000 shares of preferred stock, $0.01 par value per share (the “ …`
+- 발효일 근거 — `block:6 … he original Certificate of Incorporation of the Corporation was filed with the office of the Secretary of State of the State of Delaware on March 27, 2007. …`
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 원 설립일 recital뿐. 창설 문언 없음.
+
+#### [B] MSCI / MSCI — 0001193125-12-212354
+
+```text
+CIK               0001408198
+locator           d324997dex31.htm
+member_key        __NO_CLASS_AXIS__
+target class      Common stock, par value $0.01 per share
+form / type       10-Q / EX-3.1
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1408198/000119312512212354/d324997dex31.htm
+```
+- class 근거 — `block:18 … mmon Stock”) outstanding immediately prior thereto shall be redesignated as one share of Common Stock and (ii) all references to the Class A Common Stock or any right to purchase or acquire the Class A Common Stock (whether in the Certificate of Incorporation or otherwise) shall refer to the Co …`
+- 발효일 근거 — `block:66 … This Certificate shall become effective upon the filing of this Third Amended and Restated Certificate of Incorporation with the Secretary of State of the State of Delaware. …`
+- 판정 — **OTHER_AMBIGUOUS** / **EFFECTIVE_UPON_FILING_PRESENT** — Class A를 Common으로 재지정. 제출 발효 조항 있으나 스탬프 없어 날짜 없음.
+
+#### [B] LM / LM — 0000704051-96-000026
+
+```text
+CIK               0000704051
+locator           seq:3
+member_key        __NO_CLASS_AXIS__
+target class      Common stock, $0.10 par value
+form / type       10-Q / EX-3
+classification    ARTICLES_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/704051/000070405196000026/0000704051-96-000026.txt
+```
+- class 근거 — `block:0 … orporation is authorized to issue is $41,200,000, represented by 4,000,000 shares of Preferred Stock of the par value of $10 per share and 12,000,000 shares of Common Stock of the par value of $.10 per share." 2. The first sentence of Article SIXTH is amended to read as follows: "SIXTH: The number o …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 창설·발효 문언 없음.
+
+#### [B] EXE / EXE — 0000950134-01-505480
+
+```text
+CIK               0000895126
+locator           d89135ex3-1.txt
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $0.01 par value per share
+form / type       10-Q / EX-3.1
+classification    CERTIFICATE_OF_DESIGNATION
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/895126/000095013401505480/d89135ex3-1.txt
+```
+- class 근거 — `block:0 … 0) shares, consisting of Ten Million (10,000,000) shares of Preferred Stock, par value $0.01 per share, and Three Hundred Fifty Million (350,000,000) shares of Common Stock, par value $0.01 per share. The preferences, qualifications, limitations, restrictions and the special or relative rights in re …`
+- 발효일 근거 — `block:0 … he original Certificate of Incorporation of the Corporation was filed with the Secretary of State of Oklahoma on November 19, 1996 (as amended from time to time, the "Certificate of Incorporation"). C. This Restated Certificate of Incorporation was duly adopted in accordance with the provisions of Section 10 …`
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — 원 설립일 recital뿐.
+
+#### [B] UNH / UNH — 0000950137-02-001930
+
+```text
+CIK               0000731766
+locator           c68469ex3-a.txt
+member_key        __NO_CLASS_AXIS__
+target class      Common Stock, $.01 par value
+form / type       10-K / EX-3.(A)
+classification    ARTICLES_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   0건 검출  (definition 1건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/731766/000095013702001930/c68469ex3-a.txt
+```
+- class 근거 — `block:0 … number of shares of capital stock which this corporation is authorized to issue is 1,510,000,000 shares, including 1,500,000,000 shares of Common Stock, $.01 par value, and 10,000,000 shares of Preferred Stock, $.001 par value. Shares of each class of stock of the corporation may be issued for s …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **DEFINITION_ONLY** / **NO_SUPPORTED_OPERATIVE_DATE** — authorized to issue 지정만.
+
+#### [C] DLR / DLR — 0001558370-20-001906
+
+```text
+CIK               0001297996
+locator           ex-3d1.htm
+member_key        ext:0001297996:SeriesLPreferredStockMember
+target class      Series L Cumulative Redeemable Preferred Stock
+form / type       10-K / EX-3.1
+classification    ARTICLES_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   1건 검출  (definition 0건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1297996/000155837020001906/ex-3d1.htm
+```
+- class 근거 — `block:170 … emable Preferred Stock” (the “ Series A Preferred Stock ”), is hereby established. The number of shares of Series A Preferred Stock shall be 4,140,000. …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **EXPLICIT_TARGET_CLASS_CREATION** / **NO_SUPPORTED_OPERATIVE_DATE** — control. 명시 창설 문언 — parser true positive.
+
+#### [C] APO / APO — 0001193125-23-210853
+
+```text
+CIK               0001858681
+locator           d538322dex31.htm
+member_key        us-gaap:SeriesAPreferredStockMember
+target class      6.75% Series A Mandatory Convertible Preferred Stock
+form / type       8-K / EX-3.1
+classification    AMENDED_AND_RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   1건 검출  (definition 3건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1858681/000119312523210853/d538322dex31.htm
+```
+- class 근거 — `block:8 … the Pricing Committee, a series of Preferred Stock be, and hereby is, created and designated 6.75% Series A Mandatory Convertible Preferred Stock, and that the designation and number of shares of such series, and the voting powers, designations, preferences and rights, and qualifications, li …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **EXPLICIT_TARGET_CLASS_CREATION** / **NO_SUPPORTED_OPERATIVE_DATE** — control. hereby is, created and designated — parser true positive.
+
+#### [C] MAA / MAA — 0001193125-16-765947
+
+```text
+CIK               0000912595
+locator           d292445dex31.htm
+member_key        us-gaap:CumulativePreferredStockMember
+target class      8.50% Series I Cumulative Redeemable Preferred Stock
+form / type       8-K / EX-3.1
+classification    ARTICLES_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   1건 검출  (definition 2건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/912595/000119312516765947/d292445dex31.htm
+```
+- class 근거 — `block:10 … deemable Preferred Stock” (the “Series I Preferred Stock”), is hereby established. The maximum number of authorized shares of the Series I Preferred Stock shall be 868,000. …`
+- 발효일 근거 — `block:76 … THIRD: This amendment to the Charter shall be effective at the time the Tennessee Secretary of State accepts this amendment to the Charter for filing. …`
+- 판정 — **EXPLICIT_TARGET_CLASS_CREATION** / **EFFECTIVE_UPON_FILING_PRESENT** — control. 창설 문언 인식됨. 수리시 발효 조항은 반복 계열의 변형이나 스탬프 없어 날짜 없음.
+
+#### [C] HPE / HPE — 0001645590-24-000139
+
+```text
+CIK               0001645590
+locator           ex-38xcorrectedcertificate.htm
+member_key        us-gaap:SeriesCPreferredStockMember
+target class      7.625% Series C Mandatory Convertible Preferred Stock, par value $0.01 per share
+form / type       10-K / EX-3.8
+classification    RESTATED_CERTIFICATE
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   1건 검출  (definition 3건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1645590/000164559024000139/ex-38xcorrectedcertificate.htm
+```
+- class 근거 — `block:21 … d to the Pricing Committee, the New Preferred Stock be, and hereby is, created and designated 7.625% Series C Mandatory Convertible Preferred Stock, and that the designation and number of shares of such series, and the voting powers, designations, preferences and rights, and qualifications, l …`
+- 발효일 근거 — `block:8 … he Corporation (the “Series C Certificate of Designations”) was filed with the Secretary of State of the State of Delaware on September 12, 2024, and the Series C Certificate of Designations requires correction as permitted by subsection (f) of Section 103 of the General Corporation Law of the St …`
+- 판정 — **EXPLICIT_TARGET_CLASS_CREATION** / **NO_SUPPORTED_OPERATIVE_DATE** — control. 창설 문언 인식됨. 발효일 후보는 원 Certificate of Designations 제출일 recital이다.
+
+#### [C] DLR / DLR — 0001297996-17-000155
+
+```text
+CIK               0001297996
+locator           ex31-articlesofamendmentan.htm
+member_key        ext:0001297996:SeriesJPreferredStockMember
+target class      Series J Cumulative Redeemable Preferred Stock
+form / type       10-Q / EX-3.1
+classification    ARTICLES_OF_AMENDMENT
+operative         MISSING / None
+CLASS_BIRTH_ACTION parser   1건 검출  (definition 0건)
+source SHA-256    OK (5A-2 기록과 대조)
+source URL        https://www.sec.gov/Archives/edgar/data/1297996/000129799617000155/ex31-articlesofamendmentan.htm
+```
+- class 근거 — `block:170 … emable Preferred Stock” (the “ Series A Preferred Stock ”), is hereby established. The number of shares of Series A Preferred Stock shall be 4,140,000. …`
+- 발효일 근거 — 이 instrument의 발효를 말하는 문언이 없다
+- 판정 — **EXPLICIT_TARGET_CLASS_CREATION** / **NO_SUPPORTED_OPERATIVE_DATE** — control. 명시 창설 문언 — parser true positive.
 
 ## 11. 결과
 
