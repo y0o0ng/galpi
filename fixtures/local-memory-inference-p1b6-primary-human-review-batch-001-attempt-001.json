@@ -1,0 +1,71 @@
+{
+  "name": "xion-local-memory-inference-p1b6-primary-human-review-batch-001-attempt-001-receipt-v1",
+  "attemptId": "p1b6-primary-human-review-batch-001-attempt-001",
+  "status": "COMPLETE_NEEDS_FIX",
+  "primaryHumanReviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-review-packet-v1",
+    "rawSha256": "5a57a22f595697dccbf70bf42b91f609a78676f0a21af78363ce05e611e00cb5"
+  },
+  "reviewedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+    "rawSha256": "8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa"
+  },
+  "rendererIdentity": "xion-local-memory-inference-p1b6-surface-renderer-v1",
+  "sourceAuditPrerequisite": {
+    "attemptId": "p1b6-source-audit-batch-001-attempt-002",
+    "status": "COMPLETE_PASS",
+    "allRowsPassed": true
+  },
+  "summary": {
+    "total": 32,
+    "KEEP": 31,
+    "FIX": 1,
+    "REJECT": 0,
+    "CLEAR": 21,
+    "ESCALATE": 11
+  },
+  "authority": {
+    "reviewCompletedForAllPresentedRows": true,
+    "acceptedKeepCount": 31,
+    "unresolvedFixCount": 1,
+    "humanReviewGateClosed": false,
+    "surfaceHumanGoldFrozen": false,
+    "decisionsSource": "REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER",
+    "modelInferenceUsedForHumanDecisions": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {"reviewRowId":"p1b6-review-16241f53f5fca822","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-24d9d460daa35e06","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-32cf5944a665da2b","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-34af2288ae141254","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-38d11517c2abc24b","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-3fc1aaafc279f58b","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-408461af837e90e6","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-40a612d78e6855e1","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-40cb623122b5566d","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-4ecadd4f27d268d0","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-54c48ab05aa7778e","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-584f964b097c2e7a","disposition":"FIX","decision":"CLEAR","reason":"The third visible turn should be USER rather than ASSISTANT for natural dialogue-role attribution."},
+    {"reviewRowId":"p1b6-review-63b07a425878c668","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-6c7606701cd27c0c","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-744c49cb835a49e5","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-74997389327d0132","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-75c2b4944a1a03a8","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-79b420663ae1c0be","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-8ddaaa03dcdd1a89","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-9896329626e8c9d6","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-aa0798c5cc1e4517","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-acbfa4ca05f1c0ca","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-b4587fa1a332cfd5","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-ba2fe93abdb7ad89","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-bf282d65c09a5d32","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-cbc1389b8a3c3ee6","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-d2de26ab996dbd22","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-d4b98800e63aa749","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-d5b2ae2e9b7bbb67","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-e0fca3b280d370ef","disposition":"KEEP","decision":"ESCALATE"},
+    {"reviewRowId":"p1b6-review-fb4d6c0747e111b9","disposition":"KEEP","decision":"CLEAR"},
+    {"reviewRowId":"p1b6-review-fcd924682367cc29","disposition":"KEEP","decision":"CLEAR"}
+  ]
+}

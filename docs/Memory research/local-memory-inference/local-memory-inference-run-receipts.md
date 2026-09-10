@@ -3597,3 +3597,33 @@ All review-row IDs are unique, opaque, and deterministically ordered. The
 serialized packet contains only the permitted binding metadata and each row's
 opaque ID plus canonical renderer output. This preparation assigns no HUMAN
 decision and does not start review.
+
+#### P1-B6 primary blind HUMAN review batch-001 attempt 001 and role repair — COMPLETE / NEEDS_FIX
+
+The canonical HUMAN receipt is
+`fixtures/local-memory-inference-p1b6-primary-human-review-batch-001-attempt-001.json`.
+It binds the reviewed blind packet raw SHA-256
+`5a57a22f595697dccbf70bf42b91f609a78676f0a21af78363ce05e611e00cb5`,
+the prior reviewed source batch raw SHA-256
+`8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa`,
+the frozen renderer, and the all-PASS source-audit attempt 002 prerequisite.
+
+All 32 presented rows received authoritative primary HUMAN decisions: 31 KEEP
+/ 1 FIX / 0 REJECT and 21 CLEAR / 11 ESCALATE. The one FIX requested a
+dialogue-role attribution correction. It was applied by changing one role
+field only: one source episode changed and two canonical model-visible bundles
+changed because that episode is shared. Source text bytes, evidence and anchor
+references, skeleton assignments, and all unrelated turns remain unchanged.
+The HUMAN review gate is not closed, and no HUMAN gold was carried forward or
+frozen.
+
+Source-audit attempts 001 and 002 remain immutable historical receipts;
+attempt 002 remains authority only for its prior batch SHA. The repaired
+current batch raw SHA-256 is
+`ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9`,
+so its current source-audit state is required/not passed. The canonical
+builder prepared the full 32-row attempt-003 packet at
+`~/Downloads/p1b6-source-audit-batch-001-attempt-003.json`, raw SHA-256
+`92954acfda2632110d267c9578f05f426f2f60fae3f204dbed3c2e66db5c5187`.
+Attempt 003 has not run. Training, semantic model inference, raw-episode
+evaluation, private replay, and production remain unopened/unchanged.

@@ -9,7 +9,7 @@
   "outputBatch": {
     "name": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
     "path": "fixtures/local-memory-inference-p1b6-surface-batch-001.json",
-    "sha256": "8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa"
+    "sha256": "ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9"
   },
   "generator": {
     "provider": "OpenAI",
@@ -68,12 +68,12 @@
   "authority": {
     "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
     "generatorMetadataIsNeverHumanGold": true,
-    "sourceAuditCompleted": true,
+    "sourceAuditCompleted": false,
     "humanReviewCompleted": false
   },
   "scope": [
     "This batch is an eligible supervised-pool candidate batch, not disposable pilot data.",
-    "The fixed batch completed source audit with every row PASS; HUMAN semantic review has not occurred.",
+    "The role-repaired current batch requires a fresh source audit; HUMAN review is not closed.",
     "No semantic model inference, training, bulk authoring, or FINAL evaluation-model inspection occurred in this authoring task."
   ]
 }

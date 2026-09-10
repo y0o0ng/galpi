@@ -18,10 +18,12 @@ as `SINGLE_REPRESENTATIVE`. Surface smoke batch-001 is authored. Its separate
 strong-model source-audit attempt 001 completed at 30 PASS / 2 FAIL / 0
 UNCERTAIN; both failures were source/bundle construction failures, not HUMAN
 ambiguity judgments. After repair, attempt 002 completed at 32 PASS / 0 FAIL /
-0 UNCERTAIN, so the smoke batch source/bundle gate is PASS. The next step is
-primary blind HUMAN review, which has not started. Do not redesign the frozen
-skeleton catalog, generate training output, expose a model to FINAL surface
-items, or start training in this phase.
+0 UNCERTAIN for the prior batch. Primary blind HUMAN review attempt 001 then
+completed at 31 KEEP / 1 FIX / 0 REJECT and 21 CLEAR / 11 ESCALATE. The one
+dialogue-role correction is applied; because it changes the source batch, a
+fresh source audit is required and HUMAN review is not closed. Do not redesign
+the frozen skeleton catalog, generate training output, expose a model to FINAL
+surface items, or start training in this phase.
 
 ## Task Boundary
 

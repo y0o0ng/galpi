@@ -218,7 +218,7 @@
         },
         {
           "turnId": "t4",
-          "role": "ASSISTANT",
+          "role": "USER",
           "text": "확인해 보니 출장은 어제 끝났어."
         },
         {

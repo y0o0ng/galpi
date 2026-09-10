@@ -15,11 +15,30 @@ const BATCH_PATH = 'fixtures/local-memory-inference-p1b6-surface-batch-001.json'
 const AUTHORING_PATH = 'fixtures/local-memory-inference-p1b6-surface-batch-001-authoring-protocol.json';
 const ATTEMPT_001_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-001.json';
 const ATTEMPT_002_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-002.json';
+const HUMAN_ATTEMPT_001_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-review-batch-001-attempt-001.json';
+const REVIEWED_BATCH_SHA256 = '8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa';
+const CURRENT_BATCH_SHA256 = 'ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9';
+const REVIEW_PACKET_SHA256 = '5a57a22f595697dccbf70bf42b91f609a78676f0a21af78363ce05e611e00cb5';
+const ATTEMPT_003_PACKET_SHA256 = '92954acfda2632110d267c9578f05f426f2f60fae3f204dbed3c2e66db5c5187';
+const REPAIR_REVIEW_ROW_ID = 'p1b6-review-584f964b097c2e7a';
 const rawBatch = fs.readFileSync(path.join(ROOT, BATCH_PATH));
 const batch = JSON.parse(rawBatch);
 const exact56 = JSON.parse(fs.readFileSync(path.join(ROOT, surfaces.EXACT56_PATH)));
 const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
 const episodes = new Map(batch.sourceEpisodes.map(row => [row.sourceEpisodeId, row]));
+
+function reconstructReviewedBatch() {
+  const value = structuredClone(batch);
+  const item = value.items.find(row =>
+    humanReview.opaqueReviewRowId(REVIEWED_BATCH_SHA256, row.itemId) === REPAIR_REVIEW_ROW_ID);
+  assert.ok(item);
+  const episode = value.sourceEpisodes.find(row => row.sourceEpisodeId === item.sourceEpisodeId);
+  episode.turns.find(turn => turn.turnId === item.evidenceSpanRefs[2].turnId).role = 'ASSISTANT';
+  return value;
+}
+
+const reviewedBatch = reconstructReviewedBatch();
+const rawReviewedBatch = Buffer.from(`${JSON.stringify(reviewedBatch, null, 2)}\n`);
 
 function changed(mutator) {
   const value = structuredClone(batch);
@@ -282,7 +301,7 @@ test('authoring provenance binds the frozen exact56 and raw batch bytes', () => 
   assert.equal(protocol.startingMainSha, 'c7ed8a4b62c7a3d74d0458bb5dbe08a44305372d');
   assert.equal(protocol.exact56.sha256, surfaces.EXACT56_SHA256);
   assert.equal(protocol.outputBatch.sha256, sha256RawBytes(rawBatch));
-  assert.equal(protocol.authority.sourceAuditCompleted, true);
+  assert.equal(protocol.authority.sourceAuditCompleted, false);
   assert.equal(protocol.authority.humanReviewCompleted, false);
   assert.equal(protocol.authority.generatorMetadataIsNeverHumanGold, true);
 });
@@ -322,7 +341,89 @@ test('source-audit attempt 002 is an all-PASS receipt bound to the fixed batch',
   assert.equal(receipt.authority.humanSemanticReviewOccurred, false);
   assert.equal(receipt.authority.surfaceHumanGoldAssigned, false);
   assert.equal(receipt.authority.trainingOccurred, false);
-  assert.doesNotThrow(() => humanReview.validateAuditReceipt(receipt, rawBatch));
+  assert.doesNotThrow(() => humanReview.validateAuditReceipt(receipt, rawReviewedBatch));
+  assert.throws(() => humanReview.validateAuditReceipt(receipt, rawBatch), /binding is invalid/u);
+});
+
+test('primary HUMAN review attempt 001 records only the authoritative blind decisions', () => {
+  const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_ATTEMPT_001_PATH)));
+  const auditReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_002_PATH)));
+  const packet = humanReview.buildHumanReviewPacket(rawReviewedBatch, auditReceipt);
+  assert.equal(receipt.status, 'COMPLETE_NEEDS_FIX');
+  assert.equal(receipt.primaryHumanReviewPacket.identity, humanReview.PACKET_IDENTITY);
+  assert.equal(receipt.primaryHumanReviewPacket.rawSha256, REVIEW_PACKET_SHA256);
+  assert.equal(sha256RawBytes(humanReview.packetBytes(packet)), REVIEW_PACKET_SHA256);
+  assert.equal(receipt.reviewedSourceBatch.rawSha256, REVIEWED_BATCH_SHA256);
+  assert.equal(receipt.rendererIdentity, surfaces.RENDERER_IDENTITY);
+  assert.deepEqual(receipt.summary, {
+    total: 32, KEEP: 31, FIX: 1, REJECT: 0, CLEAR: 21, ESCALATE: 11,
+  });
+  assert.equal(receipt.rows.length, 32);
+  assert.equal(new Set(receipt.rows.map(row => row.reviewRowId)).size, 32);
+  assert.deepEqual(new Set(receipt.rows.map(row => row.reviewRowId)),
+    new Set(packet.rows.map(row => row.reviewRowId)));
+  assert.deepEqual(receipt.rows.reduce((counts, row) => {
+    counts[row.disposition] += 1;
+    counts[row.decision] += 1;
+    return counts;
+  }, { KEEP: 0, FIX: 0, REJECT: 0, CLEAR: 0, ESCALATE: 0 }),
+  { KEEP: 31, FIX: 1, REJECT: 0, CLEAR: 21, ESCALATE: 11 });
+  assert.deepEqual(receipt.rows.find(row => row.reviewRowId === 'p1b6-review-32cf5944a665da2b'),
+    { reviewRowId: 'p1b6-review-32cf5944a665da2b', disposition: 'KEEP', decision: 'CLEAR' });
+  const fixRows = receipt.rows.filter(row => row.disposition === 'FIX');
+  assert.equal(fixRows.length, 1);
+  assert.deepEqual(Object.keys(fixRows[0]), ['reviewRowId', 'disposition', 'decision', 'reason']);
+  assert.ok(receipt.rows.filter(row => row.disposition !== 'FIX')
+    .every(row => Object.keys(row).join(',') === 'reviewRowId,disposition,decision'));
+  assert.equal(receipt.authority.reviewCompletedForAllPresentedRows, true);
+  assert.equal(receipt.authority.humanReviewGateClosed, false);
+  assert.equal(receipt.authority.surfaceHumanGoldFrozen, false);
+  assert.equal(receipt.authority.modelInferenceUsedForHumanDecisions, false);
+  assert.equal(receipt.authority.trainingOccurred, false);
+  const serialized = JSON.stringify(receipt);
+  for (const field of [
+    'itemId', 'sourceEpisodeId', 'semanticSkeletonId', 'splitAssignment',
+    'boundaryClass', 'humanLabel', 'skeletonLabel', 'auditReason',
+    'discoursePattern', 'sourceFamilyId', 'surfaceFamilyId',
+  ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+  for (const row of auditReceipt.rows) assert.equal(serialized.includes(row.reason), false);
+});
+
+test('the HUMAN repair changes one role field, one episode, and two visible bundles only', () => {
+  assert.equal(sha256RawBytes(rawReviewedBatch), REVIEWED_BATCH_SHA256);
+  assert.equal(sha256RawBytes(rawBatch), CURRENT_BATCH_SHA256);
+  assert.notEqual(CURRENT_BATCH_SHA256, REVIEWED_BATCH_SHA256);
+  const item = batch.items.find(row =>
+    humanReview.opaqueReviewRowId(REVIEWED_BATCH_SHA256, row.itemId) === REPAIR_REVIEW_ROW_ID);
+  const currentEpisode = batch.sourceEpisodes.find(row => row.sourceEpisodeId === item.sourceEpisodeId);
+  assert.equal(currentEpisode.turns.find(turn => turn.turnId === item.evidenceSpanRefs[2].turnId).role, 'USER');
+  assert.deepEqual(batch.sourceEpisodes.map(row => row.turns.map(turn => turn.text)),
+    reviewedBatch.sourceEpisodes.map(row => row.turns.map(turn => turn.text)));
+  assert.equal(batch.sourceEpisodes.filter((episode, index) =>
+    JSON.stringify(episode) !== JSON.stringify(reviewedBatch.sourceEpisodes[index])).length, 1);
+  assert.equal(batch.items.filter((row, index) =>
+    surfaces.renderHumanReviewText(batch, row)
+      !== surfaces.renderHumanReviewText(reviewedBatch, reviewedBatch.items[index])).length, 2);
+  assert.deepEqual(batch.items, reviewedBatch.items);
+  const sameRole = structuredClone(batch);
+  sameRole.sourceEpisodes[0].turns[1].role = sameRole.sourceEpisodes[0].turns[0].role;
+  assert.doesNotThrow(() => surfaces.validateSurfaceBatch(sameRole));
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT, ATTEMPT_001_PATH))),
+    '95026b2f6b274e5d909faba96c6cb7345e1286b9f6824450b971936fd685677b');
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT, ATTEMPT_002_PATH))),
+    '30d87b5949dbbf68624cfa28bd04977dc5248ae561c8e3410ab18604d90cded4');
+});
+
+test('attempt 003 packet is a fresh complete packet for the repaired batch', () => {
+  const packet = audit.buildAuditPacket(rawBatch);
+  const bytes = Buffer.from(`${JSON.stringify(packet, null, 2)}\n`);
+  assert.equal(packet.sourceBatch.sha256, CURRENT_BATCH_SHA256);
+  assert.equal(packet.rendererIdentity, surfaces.RENDERER_IDENTITY);
+  assert.equal(packet.rows.length, 32);
+  assert.equal(new Set(packet.rows.map(row => row.auditRowId)).size, 32);
+  assert.deepEqual(packet.rows.map(row => row.auditRowId),
+    batch.items.map(item => audit.opaqueAuditRowId(CURRENT_BATCH_SHA256, item.itemId)));
+  assert.equal(sha256RawBytes(bytes), ATTEMPT_003_PACKET_SHA256);
 });
 
 test('primary HUMAN review builder fails closed on incomplete or stale audit state', () => {
@@ -332,34 +433,34 @@ test('primary HUMAN review builder fails closed on incomplete or stale audit sta
     mutator(value);
     return value;
   };
-  assert.throws(() => humanReview.buildHumanReviewPacket(rawBatch, changedReceipt(value => {
+  assert.throws(() => humanReview.buildHumanReviewPacket(rawReviewedBatch, changedReceipt(value => {
     value.rows.pop();
     value.summary.total -= 1;
     value.summary.PASS -= 1;
   })), /all-PASS|missing/u);
-  assert.throws(() => humanReview.buildHumanReviewPacket(rawBatch, changedReceipt(value => {
+  assert.throws(() => humanReview.buildHumanReviewPacket(rawReviewedBatch, changedReceipt(value => {
     value.rows[1] = structuredClone(value.rows[0]);
   })), /incomplete, stale, or not all PASS/u);
   for (const disposition of ['FAIL', 'UNCERTAIN']) {
-    assert.throws(() => humanReview.buildHumanReviewPacket(rawBatch, changedReceipt(value => {
+    assert.throws(() => humanReview.buildHumanReviewPacket(rawReviewedBatch, changedReceipt(value => {
       value.rows[0].disposition = disposition;
     })), /not all PASS/u);
   }
-  assert.throws(() => humanReview.buildHumanReviewPacket(rawBatch, changedReceipt(value => {
+  assert.throws(() => humanReview.buildHumanReviewPacket(rawReviewedBatch, changedReceipt(value => {
     value.auditedSourceBatch.rawSha256 = '0'.repeat(64);
   })), /binding is invalid/u);
-  assert.throws(() => humanReview.buildHumanReviewPacket(rawBatch, changedReceipt(value => {
+  assert.throws(() => humanReview.buildHumanReviewPacket(rawReviewedBatch, changedReceipt(value => {
     value.rows[0].auditRowId = 'p1b6-audit-0000000000000000';
   })), /incomplete, stale, or not all PASS/u);
 });
 
 test('primary HUMAN review packet is deterministic and contains only blind fields', () => {
   const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_002_PATH)));
-  const packet = humanReview.buildHumanReviewPacket(rawBatch, receipt);
-  const batchSha256 = sha256RawBytes(rawBatch);
-  const expected = new Map(batch.items.map(item => [
+  const packet = humanReview.buildHumanReviewPacket(rawReviewedBatch, receipt);
+  const batchSha256 = sha256RawBytes(rawReviewedBatch);
+  const expected = new Map(reviewedBatch.items.map(item => [
     humanReview.opaqueReviewRowId(batchSha256, item.itemId),
-    surfaces.renderHumanReviewText(batch, item),
+    surfaces.renderHumanReviewText(reviewedBatch, item),
   ]));
   assert.deepEqual(Object.keys(packet), [
     'name', 'sourceBatch', 'rendererIdentity', 'sourceAuditAttempt', 'rows',
@@ -375,7 +476,8 @@ test('primary HUMAN review packet is deterministic and contains only blind field
     assert.equal((row.selectedBundle.match(/\[TARGET\]/gu) || []).length, 1);
     assert.equal((row.selectedBundle.match(/\[\/TARGET\]/gu) || []).length, 1);
   }
-  assert.deepEqual(humanReview.buildHumanReviewPacket(rawBatch, receipt), packet);
+  assert.deepEqual(humanReview.buildHumanReviewPacket(rawReviewedBatch, receipt), packet);
+  assert.equal(sha256RawBytes(humanReview.packetBytes(packet)), REVIEW_PACKET_SHA256);
   const serialized = JSON.stringify(packet);
   for (const field of [
     'itemId', 'auditRowId', 'sourceEpisodeId', 'semanticSkeletonId', 'humanLabel',
