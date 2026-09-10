@@ -3566,3 +3566,34 @@ all 32 opaque audit row IDs changed because the batch SHA changed. Attempt 002
 has not run. Training, raw-episode evaluation, private replay, and production
 remain unopened/unchanged. Local verification completed with focused P1-B6
 tests 13/13 and the full repository suite 1277/1277 passing.
+
+#### P1-B6 source-audit batch-001 attempt 002 receipt — COMPLETE / PASS
+
+The canonical receipt is
+`fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-002.json`.
+It binds fixed surface batch raw SHA-256
+`8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa`,
+rebuilt source-audit packet raw SHA-256
+`01dee02a3ba9601a86133bab80f928bb7a2e1fe262d26e6ad2668d15ee582f99`,
+and exact raw result artifact SHA-256
+`a6f28b21b50c3e47da6dc79ad4b7523190f6468f30f697f4fe80958bc74f2bfe`.
+Auditor execution provenance is explicitly user-reported rather than
+independently recovered from API/runtime metadata: OpenAI ChatGPT, GPT-5.6
+Sol, reasoning High, in a fresh/separate session used only for the blind
+source/bundle audit.
+
+All 32 packet rows matched exactly and completed at 32 PASS / 0 FAIL / 0
+UNCERTAIN. The smoke batch source/bundle gate is therefore PASS. No primary
+HUMAN semantic review or surface HUMAN-gold assignment has occurred, and no
+training ran. The next step is primary blind HUMAN review using only the
+canonical renderer output; raw-episode evaluation, private replay, and
+production remain unopened/unchanged.
+
+The focused builder
+`scripts/build-memory-inference-p1b6-human-review-packet.js` prepared the
+32-row primary blind review packet in the user's Downloads directory with raw
+SHA-256 `5a57a22f595697dccbf70bf42b91f609a78676f0a21af78363ce05e611e00cb5`.
+All review-row IDs are unique, opaque, and deterministically ordered. The
+serialized packet contains only the permitted binding metadata and each row's
+opaque ID plus canonical renderer output. This preparation assigns no HUMAN
+decision and does not start review.
