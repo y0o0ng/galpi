@@ -6288,6 +6288,352 @@ SHA 94/94다.
 | X093 | CI | 0001739940-22-000007 | exh32amendedandrestatedbyl.htm | EX-3.2 | BYLAWS | MISSING | ee6fd76321167d8ef60b474fd25a0bf2c66315937cbf3ff6b6984642a27df3ca | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
 
 
+## 10.38 B2 대상 class 연대기 관련성 재설계 census — proof authority ≠ chronology relevance — 2026-09-11
+
+**설계 census 전용이다.** production 코드와 CLOSED 계약(O2 · O2-C · B2 · 탄생 · B1/P2/N1)을 하나도
+바꾸지 않았다. R1 · R2는 **반사실 측정**이고 새 규칙을 설계하지 않았다.
+
+```text
+base (origin/main)   a3861a0b5cd1b9029aec3fcd8828636f0f8fa965
+                     로컬에만 있던 cbcd431(P1-B6 memory research)은 trading/ · docs/trading/ 변경 0
+inventory sha256     dc13cae6c9f375c2f1dea72a01da9bc16682d7298fcc2b24900d03feb5a8ceba   ✓
+5A-2 output sha256   b68813def1f815c174ff454b89a6b198ddbac3eb6fe631ae1232f486b364cfc5   ✓
+run_identity_sha256  sha256:52ff66d48ef3a1aecc620bd7aed2c5ec15112c57a5abd9d714667532c1165fda   ✓
+network calls        3  (NWS Certificate of Elimination 1 · ASH 2022 Exhibit 3.1/3.2 2) · SHA 3/3
+                     나머지 본문은 10.37이 SHA를 대조해 받은 스크래치 사본이고 R2 후보 6건은 다시 해시했다
+```
+
+**판정 주체.** 원문 판정은 전부 `MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT`다 — 10.37의 231문서 판정을
+그대로 쓰고, 이번에 새로 R2 후보 6 · ASH 2 · 일반 amendment 3(LW · WEC ×2)을 읽었다. primary-human
+gold가 아니고 사람 adjudication도 human receipt도 없다.
+
+### 1. corrected-O2 진단 baseline
+
+```text
+10.37 A  CURRENT_O2_EXPLICIT_DATE_PRESENT      원문 날짜를 반사실로 채운다
+10.37 D  DATE_PRESENT_BUT_WRONG_ATTRIBUTION     그 날짜를 이 instrument의 것으로 쓰지 않는다
+10.37 F  AMBIGUOUS                              미해결
+10.37 E  SUPPORTED_DATE_NOT_STATED              무일자
+현행 RESOLVED인데 10.37이 귀속 오류로 판정      무일자로 내린다
+  NWS  0001193125-18-249117/d603651dex31.htm   합본 안 우선주 지정서의 발효일
+  Q    0001193125-25-261603/d65598dex32.htm    다른 계약서(SDA)의 발효일
+10.37이 읽지 않은 RESOLVED 문서                 저장값 그대로 (한계로 적는다)
+```
+
+**이것은 production O2 변경이 아니다.** 효과는 이렇다 — Q는 날짜 있는 anchor를 잃어 B2에 도달하지
+못하고, NWS · NWSA는 10.37 A 판정 문서([099] · [101])의 2013-06-28 anchor를 유지하되 2018 합본이 무일자
+RESTATED_CERTIFICATE 차단 문서가 된다.
+
+### 2. 차단 population 재구성
+
+```text
+10.37 CURRENT-O2-recall 반사실 재현   22 work items · 고유 무일자 133 (BYLAWS 84 · 그 외 49)   정확히 일치
+corrected-O2 baseline                21 work items · 고유 무일자 133 (BYLAWS 84 · 그 외 49)
+                                     (Q의 [133] 차단이 빠지고 NWS 2018 합본이 들어온다)
+```
+
+### 3. 시뮬레이션 규칙
+
+현행 `project_class_proof`의 탄생 단계 뒤 사슬을 그대로 따랐고 anchor 날짜가 탄생일 자리에 온다(10.36과
+같다) — undated 관문 → snapshot 존재 · 같은 날짜 snapshot 둘 → snapshot과 같은 날 amendment → snapshot
+뒤 amendment → current snapshot의 대상 class 정의 → anchor와 같은 날 · anchor 뒤 미해소 governing 문서.
+**바뀐 것은 연대기 집합의 구성원뿐이다.** `OUT_OF_SCOPE` · `PROVEN_IRRELEVANT` 문서는 모든 연대기 검사에서
+빠지고, 그 밖의 문서는 전부 `RELEVANT` 또는 `UNRESOLVED`로 남아 **현행과 똑같이 막는다.**
+
+```text
+R1  연대기 집합 = classification ∈ GOVERNING_CLASSIFICATIONS
+    BYLAWS(NON_GOVERNING_FAMILIES) -> OUT_OF_SCOPE
+R2  R1 + CERTIFICATE_OF_DESIGNATION · CERTIFICATE_OF_ELIMINATION에만 다섯 조건 검사
+    전부 성립 -> PROVEN_IRRELEVANT · 하나라도 아니면 UNRESOLVED(fail-close)
+    CERTIFICATE_OF_AMENDMENT · ARTICLES_OF_AMENDMENT에는 적용하지 않는다
+```
+
+21 item 안에 명시 종료 finding은 0이다(FDXF의 1건은 anchor 없는 item이다).
+
+### 4. 결과
+
+```text
+                                   CORRECTED-O2 BASELINE        R1                          R2
+work items reaching B2                    21                    21                          21
+연대기 집합에서 빠진 문서                    0            OUT_OF_SCOPE 101            + PROVEN_IRRELEVANT 4 = 105
+  그중 무일자                                0                    84                          87
+residual 무일자 차단 (고유)                  133                    49                          46
+work items through undated gate              0                     1  (ASH)                    1  (ASH)
+work items B2-complete                       0                     0                           0
+처음 실패한 B2 관문                   UNDATED 21     UNDATED 20 · SNAPSHOT_TIE 1      UNDATED 20 · SNAPSHOT_TIE 1
+```
+
+R1의 OUT_OF_SCOPE 101 = BYLAWS 무일자 84 + 날짜 있는 BYLAWS 17이다.
+
+```text
+Residual blockers by classification        R1    R2
+AMENDED_AND_RESTATED_CERTIFICATE           10    10
+AMENDED_AND_RESTATED_ARTICLES               5     5
+RESTATED_CERTIFICATE                       12    12
+RESTATED_ARTICLES                           0     0
+CERTIFICATE_OF_AMENDMENT                   16    16
+ARTICLES_OF_AMENDMENT                       2     2
+CERTIFICATE_OF_DESIGNATION                  3     1
+CERTIFICATE_OF_ELIMINATION                  1     0
+other                                       0     0
+합                                         49    46
+```
+
+```text
+item     baseline   R1 무일자 · 관문         R2 무일자 · 관문         R2 residual 모양
+AA          2       2 · UNDATED              1 · UNDATED              DESIGNATION(UNRESOLVED) 1
+ASH         5       0 · SNAPSHOT_TIE         0 · SNAPSHOT_TIE         -
+CI          7       2 · UNDATED              2 · UNDATED              snapshot 2
+CPAY        9       5 · UNDATED              5 · UNDATED              snapshot 2 · amendment 3
+DAL        15       1 · UNDATED              1 · UNDATED              amendment 1
+FLT         9       5 · UNDATED              5 · UNDATED              snapshot 2 · amendment 3
+FOX         3       3 · UNDATED              1 · UNDATED              snapshot 1
+FOXA        3       3 · UNDATED              1 · UNDATED              snapshot 1
+GOOGL       2       2 · UNDATED              2 · UNDATED              snapshot 2 (분류 오류, 아래 §7)
+HII        11       3 · UNDATED              3 · UNDATED              snapshot 1 · amendment 2
+HLT        10       3 · UNDATED              3 · UNDATED              snapshot 1 · amendment 2
+LW          3       1 · UNDATED              1 · UNDATED              amendment 1
+NWS         5       4 · UNDATED              4 · UNDATED              snapshot 3 · amendment 1
+NWSA        5       4 · UNDATED              4 · UNDATED              snapshot 3 · amendment 1
+TFCF        3       3 · UNDATED              1 · UNDATED              snapshot 1
+TFCFA       3       3 · UNDATED              1 · UNDATED              snapshot 1
+TSCO       19       7 · UNDATED              7 · UNDATED              snapshot 3 · amendment 4
+VEEV        9       5 · UNDATED              5 · UNDATED              snapshot 5
+VRSK        7       2 · UNDATED              2 · UNDATED              snapshot 2
+WEC        11       2 · UNDATED              2 · UNDATED              amendment 2 (분류 오류, 아래 §7)
+WST        15       7 · UNDATED              7 · UNDATED              snapshot 5 · amendment 2
+```
+
+#### 새로 undated 관문을 넘은 item — ASH (R1)
+
+```text
+그만 막게 된 문서 5건 — 전부 BYLAWS -> OUT_OF_SCOPE (10.37 판정 E)
+  0000950170-22-000508/ash-ex3_1.htm
+  0000950170-22-018687/ash-ex3_1.htm
+  0001193125-16-714093/d246354dex32.htm
+  0001674862-16-000008/a9302016exhibit32by-laws.htm
+  0001674862-17-000083/ex3_1.htm
+그 뒤 실패  SNAPSHOT_TIE — 0000950170-22-013666의 ash-ex3_1.htm · ash-ex3_2.htm가 둘 다
+            AMENDED_AND_RESTATED_CERTIFICATE · 저장 RESOLVED 2022-08-01
+```
+
+두 문서를 받아 읽었다(SHA 2/2). **어느 쪽도 완전 snapshot이 아니다.**
+
+```text
+ash-ex3_1.htm  "CERTIFICATE OF OWNERSHIP AND MERGER MERGING ASHLAND CHEMCO INC. WITH AND INTO
+               ASHLAND GLOBAL HOLDINGS INC." · block:19 "This Certificate of Ownership and Merger and the
+               Merger shall become effective on August 1, 2022."   (날짜 귀속은 맞다)
+ash-ex3_2.htm  "BY-LAWS OF ASHLAND INC." · block:18 각주 "... change of the name of the Corporation ...
+               effective as of August 1, 2022"                       (bylaws다)
+대상 "Common Stock" 정의 매치   둘 다 0
+```
+
+관문을 통과한 유일한 item이 **분류 오류 위에 서 있다.** tie를 가르더라도 current snapshot이 대상 class를
+정의하지 않아 다음 관문에서 막히고, 올바르게 분류하면 ex3_2는 BYLAWS이고 ex3_1은 열거된 family가 아니어서
+탐색 자체가 `classify` 실패로 INCOMPLETE가 된다. **어느 경로로도 B2-complete가 아니다.**
+
+R2에서 새로 관문을 넘은 item은 0이다.
+
+### 5. R2 원문 검토 — PROVEN_IRRELEVANT와 기각된 후보
+
+조건 2는 production `associate_class_designation(표지 제목, 시리즈 이름)`으로만 봤고 결과가 전부
+`NOT_ASSOCIATED`다. 조건 3은 production 정의/탄생/종료 문법을 대상 designation으로 다시 돌려 전부 0이고
+저장 finding도 0이다. ticker · XBRL member · sibling 순서 · 유사도 · 이름 부재 추론을 쓰지 않았다 —
+**근거는 시리즈를 명시로 지목한 operative resolution 문장이다.**
+
+```text
+AA · CIK 0001675149 · 0001193125-26-077167 · aa-ex3_4.htm · EX-3.4 · CERTIFICATE_OF_DESIGNATION
+  target      Common Stock, par value $0.01 per share
+  scoped      Series A Convertible Preferred Stock
+  span        b9 "RESOLVED FURTHER, that the Board hereby cancels the Certificate of Designation and retires
+              and eliminates all Series A Convertible Preferred Stock"
+  capital     일반 자본구조 문언 없음 (Common Stock + 운영 어휘 block 0)
+  state       PROVEN_IRRELEVANT · 무일자(10.37 D)
+  rationale   제목부터 결의까지 그 시리즈의 지정서 취소에 한정된다
+
+FOX · FOXA · TFCF · TFCFA · CIK 0001754301 · 0001193125-19-079678 · d721949dex33.htm · EX-3.3 · CERTIFICATE_OF_DESIGNATION
+  target      Class A Common Stock, par value $0.01 per share · Class B Common Stock, par value $0.01 per share
+  scoped      Series A Junior Participating Preferred Stock
+  span        b9 "the Board hereby designates 1,000,000 shares of Preferred Stock, par value $0.01 per share,
+              of the Corporation as "Series A Junior Participating Preferred Stock""
+  capital     없음 — Common Stock 언급은 그 시리즈 조건의 조정 조항뿐이다(b41 "In the event the Corporation
+              shall at any time ... subdivide the outstanding Common Stock ... then ... the Adjustment Number")
+  state       PROVEN_IRRELEVANT · 무일자(10.37 D)
+  rationale   조건부 조정 조항은 대상 class에 가해지는 operation이 아니다
+
+FOX · FOXA · TFCF · TFCFA · CIK 0001754301 · 0001193125-19-296568 · d837035dex31.htm · EX-3.1 · CERTIFICATE_OF_ELIMINATION
+  target      Class A / Class B Common Stock, par value $0.01 per share
+  scoped      Series A Junior Participating Preferred Stock
+  span        b12 "none of the authorized shares of Series A Junior Participating Preferred Stock are
+              outstanding, and none will be issued" · b13 "to eliminate the Series A Junior Participating
+              Preferred Stock"
+  capital     없음 (block 0)
+  state       PROVEN_IRRELEVANT · 무일자(10.37 D)
+
+NWS · NWSA · CIK 0001564708 · 0001140361-21-032030 · brhc10029075_ex3-1.htm · EX-3.1 · CERTIFICATE_OF_ELIMINATION
+  target      Class A / Class B Common Stock, par value $0.01 per share
+  scoped      Series A Junior Participating Preferred Stock
+  span        b12 FOX와 같은 결의 문언
+  capital     없음 (block 0)
+  state       PROVEN_IRRELEVANT · 저장 RESOLVED 2021-09-22 (이번에 귀속을 감사하지 않았다 — 빠지므로 결과에 무관)
+
+Q · CIK 0002058873 · 0001193125-25-261603 · d65598dex31.htm · EX-3.1 · CERTIFICATE_OF_DESIGNATION
+  target      Common Stock, par value $0.01 per share
+  scoped      Series A Preferred Stock
+  span        b9 "The shares of such series of Preferred Stock shall be designated as "Series A Preferred Stock""
+  capital     없음 (block 0)
+  state       PROVEN_IRRELEVANT — 그러나 Q는 corrected baseline에서 anchor가 없어 funnel 밖이다(수치 영향 0)
+
+기각 — AA · CIK 0001675149 · 0000950103-24-011378 · dp215750_ex0301.htm · EX-3.1 · CERTIFICATE_OF_DESIGNATION
+  scoped      Series A Convertible Preferred Stock (조건 1–3 성립)
+  조건 4 실패  b114 "CITIC shall be entitled ... to surrender Common Stock to the Corporation in exchange for
+              the delivery to CITIC of a number of shares of such Non-Voting Preferred Stock" ·
+              b66 "... will be converted into a number of fully-paid and non-assessable shares of Common Stock"
+  state       UNRESOLVED -> fail-close
+  rationale   발행된 대상 class 주식을 그 시리즈와 맞바꾸는 operation이 시리즈 범위를 넘는다
+```
+
+조건 4의 경계는 **판정이지 규칙이 아니다** — "대상 class에 조건부로 반응하는 조정 조항"은 operation으로
+세지 않았고 "발행된 대상 class 주식을 옮기는 교환 · 전환 기제"는 셌다.
+
+### 6. 보존된 B2 불변식
+
+```text
+탐색 INCOMPLETE는 fail-close              모집단이 탐색 COMPLETE item뿐이고 통과로 세지 않았다
+법적 발효일만 순서를 세운다                SEC acceptance를 어디에도 쓰지 않았다
+무일자 RELEVANT 문서는 막는다              snapshot · 일반 amendment 46건이 그대로 막는다
+UNRESOLVED 관련성은 막는다                 일반 amendment 전부 · AA 2024 지정서
+amendment를 snapshot으로 올리지 않는다     snapshot 뒤 amendment 규칙 그대로
+대상 이름 부재는 아무것도 증명하지 않는다  이름이 없다는 이유로 빠진 문서 0
+같은 날짜 순서 모호는 fail-close           ASH tie를 그대로 실패로 셌다
+명시 종료 · 탄생 · B1/P2/N1                변경 없음
+```
+
+`OpenEndedContinuityTest`의 기대(`test_an_incomplete_amendment_search_never_produces_null` ·
+`test_an_amendment_after_the_latest_snapshot_blocks_null` ·
+`test_a_later_amendment_repeating_the_definition_does_not_make_it_current` ·
+`test_legal_order_beats_sec_acceptance_order` · `test_two_snapshots_on_the_same_operative_date_fail_closed` ·
+`test_an_amendment_tied_with_the_snapshot_date_fails_closed` · 무일자 snapshot/amendment 두 테스트)는 개념
+불변식으로 유지된다. 테스트를 돌리거나 고치지 않았다.
+
+### 7. 관측된 분류 오류 — 민감도이지 시나리오가 아니다
+
+**R1은 권한의 근거를 TYPE에서 classifier 출력으로 옮긴다.** 그래서 분류가 틀리면 R1도 틀린다. 이번
+funnel의 연대기 집합에서 원문으로 읽은 문서 중 분류가 틀린 것은 8건이다.
+
+```text
+FLT    0001628280-22-017144/flt-bylaws2022bdmeeting.htm   bylaws                        -> AMENDED_AND_RESTATED_CERTIFICATE
+ASH    0000950170-22-013666/ash-ex3_2.htm                 bylaws                        -> AMENDED_AND_RESTATED_CERTIFICATE
+ASH    0000950170-22-013666/ash-ex3_1.htm                 Certificate of Ownership and Merger -> AMENDED_AND_RESTATED_CERTIFICATE
+GOOGL  0001193125-26-259830/d36818dex31.htm · dex32.htm  Certificate of Designations ×2 -> AMENDED_AND_RESTATED_CERTIFICATE
+VEEV   0001393052-23-000055/certificateofretiremento.htm Certificate of Retirement of Class B Common Stock -> AMENDED_AND_RESTATED_CERTIFICATE
+WEC    0000107815-00-000004 · 0000107815-00-000009 seq:2  bylaws ×2                     -> ARTICLES_OF_AMENDMENT
+```
+
+그 8건만 바로잡아 R1 · R2를 다시 돌리면(나머지는 저장 분류 그대로):
+
+```text
+CPAY · FLT   무일자 5 -> 4, 여전히 UNDATED
+WEC          무일자 2 -> 0, 관문 통과 -> LATER_AMENDMENT (2012 snapshot 뒤 2015 · 2024 Articles of Amendment)
+ASH · VEEV   열거 family 밖 문서 -> classify 실패 -> 탐색 INCOMPLETE
+B2-complete  0
+```
+
+GOOGL의 두 지정서는 올바르게 분류되면 R2 대상이 된다. 시리즈(`6.25% Series A/B Mandatory Convertible
+Preferred Stock`)는 대상 `Class A Common Stock`과 `NOT_ASSOCIATED`이지만 Class A Common Stock으로의 의무
+전환 조건을 가져 AA 2024 지정서와 같은 모양이다 — 같은 판정이면 UNRESOLVED다(조건 4를 끝까지 검토하지
+않았다).
+
+### 8. 질문 4를 위한 상한 진단 — 규칙이 아니다
+
+R2에 더해 **모든** CERTIFICATE_OF_AMENDMENT · ARTICLES_OF_AMENDMENT를 연대기 집합에서 뺀다. 이것은 금지된
+"이름 부재" 추론보다도 넓은 **unsafe 상한**이고 오직 크기를 재려고 돌렸다.
+
+```text
+                                  저장 분류                              관측 분류 오류 8건 교정
+UNDATED                                17                                    16
+SNAPSHOT_TIE                            2  (ASH · DAL)                        1  (DAL)
+탐색 INCOMPLETE (classify)              -                                     2  (ASH · VEEV)
+B2-complete                             2  (LW · WEC)                         2  (LW · WEC)
+```
+
+그 두 B2-complete를 원문으로 확인했다.
+
+```text
+LW   [119] 0001679273-24-000064/lw-202409278kxex31.htm
+     "1. Article VIII of the Amended and Restated Certificate of Incorporation is hereby amended to read in
+     its entirety as follows: "ARTICLE VIII LIMITATION OF LIABILITY ...""
+     -> 명시로 지목된 조항 하나를 책임 제한 문언으로 바꾼다. 대상 class 연대기와 무관해 보이는 실례다.
+WEC  X024 0000107815-24-000203/a2024q2wec10qexhibit31.htm
+     "2. Article III(A) of the Restated Articles of Incorporation ... is hereby amended to read in its
+     entirety ... 650,000,000 shares of Common Stock of the par value of One Cent ($.01) per share"
+     -> 대상 class의 수권 구조를 다시 쓴다. RELEVANT다. 상한이 WEC를 통과시킨 것은 틀렸다.
+     X025 0001104659-15-048374/a15-14883_1ex3d1.htm — Article I(법인 이름)만 바꾼다.
+DAL  같은 2007 A&R certificate가 2007 · 2009에 두 번 제출돼 같은 법적 날짜의 snapshot 둘 -> tie fail-close.
+```
+
+**일괄 제외는 실제로 틀린 통과(WEC)를 만든다.** 상한에서 정당해 보이는 item은 LW 하나다.
+
+### 답
+
+1. **NON_GOVERNING 분리가 커버리지를 바꾸나 — 아니다.** 차단 문서는 133 -> 49로 크게 줄지만 undated 관문
+   통과는 0 -> 1(ASH)이고 B2-complete는 0 -> 0이다. 그 한 건도 분류 오류 위에 서 있다.
+2. **좁은 다른-시리즈 범위 증명이 R1 너머를 바꾸나 — 아니다.** PROVEN_IRRELEVANT 4(funnel 안) · residual
+   49 -> 46 · 새 통과 0 · B2-complete 0이다. FOX 계열은 지정서 · 소거증서가 빠져도 무일자 2023 A&R
+   certificate가 남고, AA는 교환 조건 때문에 2024 지정서가 UNRESOLVED로 남는다.
+3. **R2 뒤 지배적 residual은 무일자 완전 snapshot이다.** AMENDED_AND_RESTATED_CERTIFICATE 10 ·
+   AMENDED_AND_RESTATED_ARTICLES 5 · RESTATED_CERTIFICATE 12 = 27 / 46(59%)이고 21 item 중 16이 그것을
+   하나 이상 가진다. 완전 snapshot은 정의상 RELEVANT라 **관련성 규칙으로는 빠지지 않는다** — 법적 발효일
+   (10.37의 원문 부재 · 귀속 문제)이 필요하다. 다음이 일반 amendment 18(39%)이다.
+4. **일반 amendment 무관성 지원이 필요한가 — 필요하지만 충분하지 않다.** residual이 일반 amendment뿐인
+   item은 3(DAL · LW · WEC)이고 WEC의 둘은 분류 오류 bylaws다. unsafe 상한에서도 B2-complete는 2이고 그중
+   WEC는 원문상 틀렸다. 16 item은 어떤 amendment 규칙과도 무관하게 무일자 snapshot에서 막힌다.
+5. **이름 부재 없이 일반 amendment의 범위를 증명하려면 필요한 증거** (규칙을 설계하지 않는다)
+   - instrument 자신의 operative clause가 바뀌는 **조항을 명시로 열거**하고(`Article VIII ... is hereby
+     amended to read in its entirety`), 그 밖에 operative clause가 없다는 것이 문서 구조로 닫혀야 한다.
+   - 그 조항 번호가 **날짜 있는 current 완전 snapshot의 조항 지도에서** 자본구조 조항이 아닌 조항을
+     가리킨다는 양성 증거 — 교체 문언에서 대상 이름을 못 찾았다는 것이 아니다. WEC 2024처럼 교체 조항이
+     수권 구조(`Authorized Number and Classes of Shares`)면 RELEVANT다.
+   - 부속 문서(`as set forth in Exhibit A`)나 결의 인용으로 범위를 넓히는 문언이 없거나, 있으면 그것까지
+     읽혀야 한다.
+   - 법인 이름만 바꾸는 조항(WEC 2015 Article I)도 같은 조항 지도 증거가 필요하다.
+   - 어느 하나라도 닫히지 않으면 UNRESOLVED다.
+
+### 9. O2 correctness note
+
+production O2에는 **알려진 subject-attribution 실패가 있다.**
+
+```text
+NWS   0001193125-18-249117/d603651dex31.htm   합본 안 우선주 지정서의 발효일을 restated certificate의 날짜로 RESOLVED
+Q     0001193125-25-261603/d65598dex32.htm    다른 계약서(Separation and Distribution Agreement)의 발효일로 RESOLVED
+FDXF  0001104659-26-068521/tm2615735d1_ex3-2.htm  선행 amendment의 "filed ... effective on" 날짜를 함께 받아 AMBIGUOUS
+```
+
+이 census는 그것을 진단용으로 내렸을 뿐 고치지 않았다.
+
+**B2 production 구현은 O2 subject-attribution 버그에 회귀 테스트로 잠긴 수정이 있기 전에는 진행하지
+않는다.** 관련성 재설계는 연대기 집합을 줄이므로 남은 문서 하나하나의 날짜가 결과를 직접 정한다 — 틀린
+날짜 하나가 틀린 open-ended 구간을 만든다.
+
+### 범위
+
+```text
+production code changed          NO
+O2 / O2-C changed                NO
+B2 changed                       NO
+birth changed                    NO
+B1 / P2 / N1 changed             NO
+Option A implemented             NO
+bundle changed                   NO
+manifest changed                 NO
+full 897 rerun                   NO   (bounded exact refetch 3회)
+promotion / 5A-3 / Gates         NO
+returns / ranking / portfolio    NO
+```
+
+받은 SEC 본문과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
+
+
 ## 11. 결과
 
 
