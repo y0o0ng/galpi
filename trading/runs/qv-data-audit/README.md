@@ -5741,6 +5741,553 @@ returns / ranking / portfolio NO
 SEC / network 호출          0
 ```
 
+## 10.37 O2 / governing-date 순서 진단 census — 발효일 공백은 parser인가 원문인가 — 2026-09-11
+
+**진단 전용이다.** production 코드 · O2/O2-C · B1/B2/P2/N1 · 탄생 계약을 바꾸지 않았고 Option A를
+구현하지 않았다. 897건 전수 재실행 · 제출 이력 재열거 · 승격 · manifest 변경을 하지 않았다. 아래
+반사실은 **측정이지 production-valid가 아니다.**
+
+```text
+base commit          b025295c279b6dad98258e2be6335a9ce566bb47
+inventory sha256     dc13cae6c9f375c2f1dea72a01da9bc16682d7298fcc2b24900d03feb5a8ceba
+5A-2 output sha256   b68813def1f815c174ff454b89a6b198ddbac3eb6fe631ae1232f486b364cfc5
+run_identity_sha256  sha256:52ff66d48ef3a1aecc620bd7aed2c5ec15112c57a5abd9d714667532c1165fda
+입력 경로            trading/data/qv-5a2-run/ (gitignored)
+```
+
+세 SHA를 10.33 기록과 대조해 일치를 확인했다. pool 재구성은 10.36 funnel과 정확히 같다
+(표지 층 369 · INCOMPLETE 332 · definition 없음 120 · 날짜 anchor 없음 65 · anchor 11 · closure
+무시 anchor 15). 10.36의 528은 `trading_symbol`을 **대소문자 무시로** 맞춘 값이다 — 제목 없는
+소문자 심볼 10건(`cvg` · `mmm` …)이 여기 들어간다.
+
+### network — bounded exact refetch
+
+로컬 본문 캐시가 없었다(`EdgarClient`는 캐시하지 않고 10.35 스크래치는 남아 있지 않다). 이미 알려진
+자연키의 정확한 URL만 받았다.
+
+```text
+Pool B/C 문서 137건                 136회   SHA 137/137   (embedded 자식이 부모 submission을 공유)
+O2-C primary 확인                     1회   SHA 1/1
+Pool C 현행 anchor 귀속 확인          9회   SHA 9/9       (anchor Exhibit 8 + O2-C primary 1)
+반사실 연속성 문서 94건              92회   SHA 94/94
+합계                                238회   불일치 0 · 오류 0 · 자동 재시도 0 · 제출 이력 열거 0
+```
+
+### POOL A — legal search INCOMPLETE 332 (저장 산출물만)
+
+```text
+332 = legal search INCOMPLETE 277 + legal search 미실행 55
+```
+
+**55건은 탐색 실패가 아니다.** 표지 대응은 됐지만 요구 class에 표지 제목이 없어(B1)
+`_target_names`가 legal target을 만들지 않았고 `legal_evidence_proof`가 null이다. 10.36이 이 55건을
+INCOMPLETE 칸에 넣었다.
+
+failure family — 한 item이 여러 family를 가질 수 있다(겹침 포함).
+
+```text
+family                     items  CIKs  accessions  documents  rows
+governing_exhibit_missing    158   157        320          -    321
+classify                     139   137        476        629    633
+document                      65    64         75         90     91   HTTP 404 76 · 503 15
+index                         26    26         42          -     42   HTTP 404 38 · 503 4
+legacy_layout                 13    13         14          -     14
+submissions                    0     0          0          -      0
+other (legal search 미실행)    55    55          -          -      -
+```
+
+family 하나뿐인 item은 governing_exhibit_missing 75 · classify 61 · 미실행 55 · document 25 ·
+index 7 · legacy_layout 3이고 나머지 106건은 둘 이상이다.
+
+```text
+transport/source retrieval (index·document)   84 items · 그것만인 item 32 (그중 전부 HTTP 503인 item 3)
+malformed legacy layout                       13 items (단독 3)
+governing exhibit 누락 (Item 5.03)            158 items (단독 75)
+classification 실패                           139 items (단독 61) — 저장된 classification_families가 전부 비어 있다.
+                                              무슨 문서인지는 NOT_MEASURABLE (본문을 받지 않았다)
+지평 밖 accession 때문에 INCOMPLETE           0 — search_status는 failures가 있을 때만 INCOMPLETE다.
+                                              277/277이 accessions_outside_horizon > 0이지만 원인이 아니다.
+                                              지평 밖에 governing instrument가 있는지는 NOT_MEASURABLE
+date / O2 관련                                0 — O2 · O2-C는 failure를 만들지 않는다
+O2 parser 변경으로 개선 불가                  332 / 332
+```
+
+### POOL B · POOL C 구조 (결정론적)
+
+```text
+POOL B  65 = 무일자 snapshot 정의 문서가 있는 item 54 (문서 96) + 정의가 amendment 계열에만 있는 item 11
+POOL C  11 work items · 6 CIK · 막는 무일자 governing Exhibit 3 41건 (전부 열거)
+          BYLAWS 18 · CERTIFICATE_OF_AMENDMENT 7 · AMENDED_AND_RESTATED_CERTIFICATE 6 ·
+          AMENDED_AND_RESTATED_ARTICLES 5 · RESTATED_CERTIFICATE 2 · CERTIFICATE_OF_DESIGNATION 2 ·
+          CERTIFICATE_OF_ELIMINATION 1
+```
+
+amendment-only 11건(DRI · EG · EME · FIX · FLIR · HONA · IRM · ODP · VICI · VLTO · VRT)은 10.36 anchor
+정의(날짜 있는 완전 snapshot)상 **O2가 무엇을 해도 anchor가 생기지 않는다.**
+
+**현행 B2 undated 관문은 분류가 아니라 TYPE으로 governing을 고른다**
+(`document_proof_authority(document_type) == GOVERNING_EXHIBIT`). 그래서 BYLAWS로 분류된 EX-3도 순서를
+막고, Pool C 41건은 전부 "현행 B2에서 대상 class 연대기에 영향을 준다"다. anchor 문서 여부와 차단
+문서 여부는 행 단위 부록의 `B2 role` 열에 있다.
+
+### 기계 census — production 함수를 그대로 다시 돌렸다
+
+```text
+                                        Pool B 96     Pool C 41
+classification · operative status parity   96/96         41/41      (MISSING 136 · AMBIGUOUS 1)
+EFFECTIVE_DATE_PATTERNS 일치 문서            1             1         FDXF(날짜 둘 -> AMBIGUOUS) · Q bylaws(대문자 월 -> _iso_date 실패)
+STATE_CERTIFIED_DATE_PATTERNS                0             0
+UPON_FILING_PATTERNS                         0             0
+STATE_FILED_STAMP (주 게이트 통과)       35문서 47건   11문서 14건
+O2-C 교차 조항 (DGCL)                        0             2         NWS 8-K primary에 ITEM_503 문형 0 · FOXA는 10-Q라 primary가 없다
+```
+
+O2-C 두 건은 현행 계약대로 MISSING이다. 반사실 연속성 문서 94건도 parity 94/94다.
+
+### 현행 anchor 귀속 확인 — Pool C 8문서
+
+반사실이 anchor 날짜 위에 서므로 그 날짜의 근거 block을 원문으로 확인했다(MODEL_ASSISTED).
+
+```text
+WST  2020 · 2024 A&R articles   "(Effective as of May 5, 2020)" · "(Effective as of April 24, 2024)"          맞다
+FLT  2023 ex31 · ex32           "(As Amended on, and Effective as of June 9, 2022)"                            맞다
+LW   2016 A&R certificate       "Effective as of November 8, 2016, the text ... is amended and restated"       맞다
+FOX  2019 A&R (O2-C)            primary "filed with the Secretary of State ... and became effective on March 18, 2019"  맞다
+NWS  2018 restated certificate  block:207 "The effective time of this Certificate of Designations shall be June 28, 2013"  틀리다
+Q    2025 A&R certificate       block:83 "Separation and Distribution Agreement, effective as of November 1, 2025"        틀리다
+```
+
+**EXPLICIT_EFFECTIVE_DATE 문법에도 귀속 게이트가 없다.** NWS는 합본 안의 우선주 지정서 발효일을, Q는
+다른 계약서의 발효일을 그 instrument의 날짜로 받았다. Pool C 11건 중 3건(NWS · NWSA · Q)의 현행
+anchor가 그렇다. FDXF(Pool B)의 AMBIGUOUS도 같은 원인이다 — 선행 amendment의 `filed ... effective on
+May 27, 2026`을 이 문서의 날짜로 함께 받았다. **이 census는 그 anchor를 수치에서 빼지 않는다** — 빼는
+것이 새 규칙이다.
+
+### SOURCE_TEXT_REVIEW
+
+```text
+판정 주체   MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT — 실행 모델이 원문을 읽고 판정했다.
+            primary-human gold가 아니고 사람 adjudication도 human receipt도 없다.
+판정 수     231문서 = Pool B 96 · Pool C 41 · 반사실 연속성 94
+보조 장치   결정론적 prescreen이 발효/제출 어휘와 날짜가 같은 block에 있거나 제출-발효 조항 모양인 block만
+            창으로 뽑았다. 창이 0인 문서는 무필터 effective…<date> · 조항 · 범례 정규식으로 다시 확인했다.
+판정 규칙   A/B/C  현행 O2 의미의 사실이 대상 instrument에 붙어 있는데 parser가 놓쳤다
+            F      대상 instrument의 후보 날짜/사건이 둘 이상이고 현행 규칙으로 가를 수 없다
+            D      발효·제출·설립·서명처럼 보이는 날짜가 있지만 다른 instrument·사건의 것이다
+            E      그런 날짜가 없다 (Rule 12b-2 기준일 · 배당/상환일은 세지 않는다)
+```
+
+```text
+OPERATIVE_DATE_SOURCE_JUDGMENT          Pool B 96   Pool C 41   연속성 94   합 231
+A  CURRENT_O2_EXPLICIT_DATE_PRESENT         13           6           6        25
+B  CURRENT_O2_UPON_FILING_PRESENT            0           0           0         0
+C  CURRENT_O2_STATE_CERTIFIED_DATE_PRESENT   0           0           0         0
+D  DATE_PRESENT_BUT_WRONG_ATTRIBUTION       66          14          14        94
+E  SUPPORTED_DATE_NOT_STATED                16          21          73       110
+F  AMBIGUOUS                                 1           0           1         2
+G  OTHER                                     0           0           0         0
+```
+
+**B가 0인 이유.** 제출-발효 조항은 원문에 4문서(FCX · CMG · FLT · VRSK) 있지만 대상 instrument 자신의
+주 FILED 스탬프가 있는 문서가 **하나도 없다.** C가 0인 이유는 주 증명 발효일 자료가 문서 안에 없어서다.
+
+범례 모양 하나는 A가 아니라 **새 의미 규칙**이다 — `As Amended Through <date>` · `Amended and Restated
+as of <date>` · `As amended, <date>`는 `effective`를 말하지 않는다. 47문서 · 9 발행사이고 대부분 bylaws다.
+
+### 주 FILED 스탬프 귀속 — `STATE_FILED_STAMP_PATTERNS` 일치 전수
+
+```text
+                                      Pool B   Pool C   연속성    합
+SUBJECT_INSTRUMENT_STAMP                  0        0        0      0
+HISTORICAL_INCORPORATION_RECITAL         27        8        4     39
+PRIOR_INSTRUMENT_RECITAL                 20        6        4     30
+OTHER_DOCUMENT_DATE                       0        0        0      0
+AMBIGUOUS                                 0        0        0      0
+합 (주 게이트 통과)                       47       14        8     69
+```
+
+10.35의 "9건 중 8건 recital"이 이 pool에서는 **69건 중 69건**이다. 그리고 조항은 있는데 스탬프가
+recital뿐인 문서가 실재한다.
+
+```text
+FCX  [042]  "Upon the filing of this A&R Certificate with the Delaware Secretary of State (the "Effective Time")"
+            스탬프 = 1987 설립 recital   -> 조항만 넓히면 2007 restatement가 1987-11-10으로 RESOLVED
+CMG  [055]  서명란 "... effective as of the date of filing with the Secretary of State of the State of Delaware"
+            스탬프 = 1998 설립 recital   -> 2016 A&R이 1998-01-30으로 RESOLVED
+FLT  [073]  "effective upon the filing of this Certificate of Amendment with the Secretary of State of Delaware"
+            스탬프 = 2010 · 2018 선행 instrument   -> AMBIGUOUS
+VRSK [084]  "become effective upon the filing of this A&R Certificate with the Secretary of State ..."
+            스탬프 없음   -> MISSING 유지
+```
+
+조항 확장만으로 올바른 날짜가 나오는 문서는 0이다. 스탬프 귀속을 설계하지 않았다.
+
+### 놓친 어휘 계열 (A 25문서)
+
+```text
+family                              docs  발행사  실패한 자리              판정
+TIME_BEFORE_DATE                      18     13   EFFECTIVE_DATE_PATTERNS  PARSER_RECALL_ONLY (귀속 노출 있음)
+BARE_EFFECTIVE  "effective <date>"     6      5   EFFECTIVE_DATE_PATTERNS  ATTRIBUTION_PROBLEM
+UPPERCASE_MONTH (주 게이트 밖)          3      2   공유 _iso_date            NEW_SEMANTIC_RULE_REQUIRED
+ORDINAL_DAY  "13th day of February"     1      1   공유 _iso_date            singleton — 제안하지 않는다
+TIME_AFTER_DATE                         1      1   EFFECTIVE_DATE_PATTERNS  singleton (BARE_EFFECTIVE와 겹침)
+제출-발효 조항 변형 (A 아님)              4      4   UPON_FILING_PATTERNS     ATTRIBUTION_PROBLEM — 스탬프 귀속 선행
+```
+
+- **TIME_BEFORE_DATE** — `effective as of 5:00 p.m. Eastern time, on June 4, 2025`(TSCO [047]) ·
+  `shall become effective at 8:11 a.m. (local time ...) on May 25, 2022`(VRSK [085]) · `The effective time
+  of this ... Certificate ... is 9:03 a.m. on April 30, 2007`(DAL [001]). 문법은 `as of`/`on` 바로 뒤의
+  날짜만 받고, `effective time ... is` 경로의 `[^.;]{0,60}`은 `a.m.`의 마침표에서 멈춘다. 주어가 그
+  instrument인 문장만 보면 지역 정규식으로 충분해 보이지만, **같은 모양이 합본 안의 선행 amendment에도
+  있다**(FAST [038]–[041] `amended, effective at the close of business on May 10, 2002` · DAL X009).
+- **BARE_EFFECTIVE** — `effective June 3, 2022, at 4:01p.m., EDT`(GOOGL [111]) · `(Effective February 25,
+  2019)`(NWS bylaws [103]) · `AS AMENDED EFFECTIVE MAY 21, 2012`(WEC [034]). 같은 모양이 선행 결의(FAST
+  `effective August 6, 1987`) · 이사회 footnote(WEC X015 `Effective June 2, 1999, the Board`) · 주식 전환
+  note(ANF `Effective May 19, 1998`)에도 있어 문법만 넓히면 다른 사건 날짜를 받는다.
+- **UPPERCASE_MONTH** — Q bylaws [135] `EFFECTIVE AS OF NOVEMBER 1, 2025`는 문법이 맞았고 날짜 변환만
+  실패했다. 대문자 월 정규화는 CLOSED 결정으로 **주 자료 게이트 안에만** 있다 — 그 범위를 넓히는 결정이다.
+
+### 반사실 — CURRENT-O2-RECALL-ONLY
+
+A 판정 문서의 원문 날짜만 그 문서의 `legal_operative_date`로 채웠다. D · E · F · 범례 · 조항-only는
+채우지 않았다. anchor 정의와 B2 undated 관문은 10.36 · production 그대로이고, 관문을 넘는 item이 있으면
+나머지 B2 사슬을 돌리게 했지만 **넘은 item이 0이다.**
+
+```text
+                                   CURRENT   COUNTERFACTUAL (CURRENT-O2-RECALL-ONLY)
+dated-anchor work items                11        22   (+11 Pool B: AA · ASH · CI · DAL · GOOGL · HII · HLT · TSCO · VEEV · VRSK · WEC)
+continuity-pass work items              0         0
+```
+
+```text
+Pool B 새 dated anchor                         11
+Pool C 무일자 차단이 사라진 work item            0   (41문서 중 날짜를 얻는 것은 6: NWS 4 · Q 2)
+다른 무일자 문서 때문에 여전히 실패             22   (Pool C 11 + 새 anchor 11)
+legal search INCOMPLETE로 여전히 실패          332
+definition/association 없음으로 여전히 실패     120   (+ amendment-only 정의 11 · 표지 층 369)
+hypothetical validity segment 도달               0
+```
+
+anchor를 가진 22 item에 남는 무일자 governing 문서는 고유 133건이다.
+
+```text
+BYLAWS   84   범례(effective 없음) 45 · 날짜 없음 37 · D 1 · F 1
+그 외    49   D 37 (그중 bylaws 본문이 ARTICLES_OF_AMENDMENT로 분류된 2) · E 12
+잔여 차단이 전부 BYLAWS인 item   1   ASH (bylaws 5)
+```
+
+### 결정표 — exact cover association 528 work items
+
+```text
+CAUSE                                           WORK ITEMS
+----------------------------------------------------------
+SEARCH_INCOMPLETE_NON_O2                         332   INCOMPLETE 277 + legal search 미실행 55
+SOURCE_DOES_NOT_STATE_SUPPORTED_DATE              51   Pool B 40 + Pool C 11
+CURRENT_O2_PARSER_RECALL_GAP                      11   Pool B (anchor 층)
+STATE_STAMP_ATTRIBUTION_HAZARD                     2   Pool B FCX · CMG
+AMBIGUOUS_DATE                                     1   Pool B FDXF (EXPLICIT 귀속)
+OTHER                                            131   governing definition 없음 120 + amendment-only 정의 11
+                                                 528   (표지 층 369는 이 표 밖이다)
+```
+
+item 배정은 Pool B에서 A snapshot 정의 문서 -> F -> 조항+recital 스탬프 -> amendment-only -> 나머지
+순서이고, Pool C는 반사실 뒤에도 남는 차단 문서의 판정(11/11 D·E)으로 정했다.
+
+```text
+CURRENT_O2_RECALL_FIX PAYOFF
+- new dated anchors: 11
+- continuity blockers removed: 0 work items (Pool C 문서 6/41 · 연속성 문서 6/94)
+- work items reaching hypothetical validity segment: 0
+```
+
+### 답
+
+1. **O2 parser recall이 material blocker인가 — anchor 층에서만이다.** Pool B 65 중 11이 현행 O2 의미의
+   날짜를 원문에 갖고 있는데 문법이 놓쳤다(주로 시각 삽입, 18문서 · 13 발행사). 그러나 반사실로 anchor가
+   11 -> 22가 되어도 continuity-pass는 **0 -> 0**이다.
+2. **원문 부재가 지배적이다.** 판정 231문서 중 A 25 · F 2 · D 94 · E 110이고, 반사실 뒤에도 22 item 전부가
+   자기 날짜를 말하지 않는 governing 문서(고유 133)에서 막힌다.
+3. **스탬프 귀속은 UPON_FILING 확장의 선행 조건이다.** 주 게이트 통과 스탬프 69건 중 대상 instrument의
+   스탬프는 0이고, 조항이 있는 4문서 중 조항만 넓혀 올바른 날짜가 나오는 것은 0이다(설립일 RESOLVED 2 ·
+   AMBIGUOUS 1 · MISSING 1). **EXPLICIT 문법도 이미 귀속 문제가 있다**(현행 anchor 8 중 2 · FDXF).
+4. **parser-only fix는 Option A 커버리지를 바꾸지 않는다** — 0 -> 0.
+5. **다음에 다시 열어야 할 CLOSED 계약은 B2 undated fail-close의 범위다.** 현행 관문은 TYPE이 Exhibit
+   3이면 분류와 무관하게 전부 유일한 법적 발효일을 요구한다. 잔여 133건 중 84건이 BYLAWS이고, 나머지
+   49건도 자기 날짜를 말하지 않는다 — parser를 어떻게 넓혀도 이 population은 "모든 EX-3가 날짜를 가져야
+   순서를 세운다"를 충족하지 못한다. 그 논의에는 발효일 귀속(EXPLICIT · 스탬프)이 함께 따라온다.
+   **이 census는 어느 계약도 다시 열지 않는다.**
+
+### 범위
+
+```text
+production code changed          NO
+O2 / O2-C changed                NO
+B1 / B2 / P2 / N1 changed        NO
+birth contract changed           NO
+Option A implemented             NO
+bundle schema changed            NO
+qv-class-id changed              NO
+manifest changed                 NO
+full 897 SEC rerun               NO   (bounded exact refetch 238회 · 알려진 자연키만)
+promotion                        NO
+5A-3                             NO
+Gate A-H                         NO
+returns / rankings / portfolio   NO
+```
+
+받은 SEC 본문과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
+
+## 10.37-A 행 단위 감사 — Pool B/C 137문서
+
+`O2 matches`는 production 문법의 일치 수다 — `ex` EFFECTIVE_DATE · `ce` STATE_CERTIFIED(주 게이트) ·
+`up` UPON_FILING · `st` STATE_FILED_STAMP(주 게이트) · `x` O2-C 교차 조항. `stored`는 전수 실행 기록값이고
+재실행 값과 137/137 같다. SHA-256은 받은 바이트의 해시이고 5A-2 `document_sha256`과 전부 일치한다.
+source URL은 `(CIK, accession, locator)`에서 결정론적으로 나온다. `cf date`는 반사실에서 채운 날짜다.
+판정 주체는 전부 MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT다.
+
+| # | pool | work item(s) | CIK | accession | locator | TYPE | classification | stored | SHA-256 | O2 matches | B2 role | judgment | evidence | cf date |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 000 | B | BIO | 0000012208 | 0000012208-11-000016 | exhibit31.htm | EX-3 | RESTATED_CERTIFICATE | MISSING | 5fd81f2fd4d345dff89c02d186b145dbb3d31292af7059fc441026d7380757e8 | ex0 ce0 up0 st2 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: original cert filed 1975; restated cert filed 1989 |  |
+| 001 | B | DAL | 0000027904 | 0001019687-09-001566 | delta_8k-ex0301.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | b52d186f8826501907ad6a0baf3e131a15dccb634cb85d8ada0317237cf9a51f | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "The effective time of this A&R Certificate ... is 9:03 a.m. on April 30, 2007" | 2007-04-30 |
+| 002 | B | DAL | 0000027904 | 0001188112-07-001266 | ex3-1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 906ebaf26df47fb62a37c73bc9764d9462646f44d10d45f8b6dc2631fdf73f4b | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | same sentence (2007 original exhibit) | 2007-04-30 |
+| 003 | B | EFX | 0000033185 | 0001104659-09-032557 | a09-13450_1ex3d1.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 5a29054280bfc28abe8231be18b4022741f78da4f92bb612e494540f55c874ab | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dated effectiveness/filing statement |  |
+| 004 | B | NBL | 0000072207 | 0000072207-16-000092 | ex33restatedcertificationo.htm | EX-3.3 | RESTATED_CERTIFICATE | MISSING | cc970ee8fb7a97aeabcd8ce7e2b1c9ff37ed7ed6aa74401d4ae6e85c297cc840 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: original cert filed 1969; amendment filed 2002 |  |
+| 005 | C | WST | 0000105770 | 0000105770-04-000199 | exh3b.htm | EX-3.(I) | BYLAWS | MISSING | b50330e122e68f3a10e823a7473b1e3f7f41ee571b4a5f5614e18a49d71d4374 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended Through March 6, 2004" |  |
+| 006 | C | WST | 0000105770 | 0000105770-07-000368 | exh31.htm | EX-3 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 54a423797a097393d6a3b507b0c2e54085516ef6028024224195d96b22e40ad8 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | only Rule 12b-2 "as in effect on" reference dates |  |
+| 007 | C | WST | 0000105770 | 0000105770-07-000368 | exh32.htm | EX-3 | BYLAWS | MISSING | 15d35891e4c1581aafb35702aeacc28fa732641b6dae1c2fe0c76bd55ab9b636 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended Through December 11, 2007" |  |
+| 008 | C | WST | 0000105770 | 0000105770-08-000056 | exh3-2.htm | EX-3 | BYLAWS | MISSING | f8a9ad60e4fa6777ba6d5bed87b9ac0bc890685fd262ac804d452f0c338ef21d | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended Through October 14, 2008" |  |
+| 009 | C | WST | 0000105770 | 0000105770-11-000025 | exh31.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 4b1e544c193e67909f26c6a62b584f1800521fe6541387789827222402163cf4 | ex0 ce0 up0 st1 x0 | undated continuity blocker | **D** PRIOR+FILING_NOTATION | recital A&R articles filed 2007; footer "Filed with the Commonwealth of Pennsylvania on May 5, 2011" (no clause, outside authority vocab) |  |
+| 010 | C | WST | 0000105770 | 0000105770-13-000045 | exh31certificateofamendmen.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 1b797b6602707b5fdcdf1983bf82fafbef5ced4dd311ed3d7be1d049dd892f7a | ex0 ce0 up0 st1 x0 | undated continuity blocker | **D** PRIOR+FILING_NOTATION | recital A&R articles filed 2007; footer "Filed with the Commonwealth of Pennsylvania on August 23, 2013" |  |
+| 011 | C | WST | 0000105770 | 0000105770-14-000065 | ex31amendedandrestatedarti.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 0426882eec6548a92856e74fbb3818aa99f4407def0f3370da0b66585c312fe6 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | only Rule 12b-2 reference dates |  |
+| 012 | C | WST | 0000105770 | 0000105770-15-000015 | ex31amendedarticles.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | e32210d672eac05f38ac1c82a838f305224327a0a141539fdcd04745b3e8274f | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | only Rule 12b-2 reference dates |  |
+| 013 | C | WST | 0000105770 | 0000105770-15-000015 | ex32bylaws.htm | EX-3.2 | BYLAWS | MISSING | e3742d3d174127b1b192e2579abb5e30427af6a5a7d94efbaa0af09296a1f577 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended through May 5, 2015" |  |
+| 014 | C | WST | 0000105770 | 0000105770-21-000014 | wpsbylawamendmentsfinalfeb.htm | EX-3.2 | BYLAWS | MISSING | 117ca7bcc900a30f546e221ac50119f4887677e0385437d7df59ac019d9345e5 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended through February 23, 2021" |  |
+| 015 | C | WST | 0000105770 | 0000105770-23-000068 | amendedrestatedbylawsoct20.htm | EX-3.2 | BYLAWS | MISSING | 045926567804cde1e463ccf8c5e54690c9dfb46c43793de72a158f6fffb7f9ea | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended through October 23, 2023" |  |
+| 016 | C | WST | 0000105770 | 0000105770-98-000033 | seq:2 | EX-3 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 4b3316bc3ad698e254a12686cc235318fa7d6680cc16bfc7aa225e94e6e81017 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | legacy 1-block text; rights-plan/Rule 12b-2 dates only |  |
+| 017 | C | WST | 0000105770 | 0000105770-98-000033 | seq:3 | EX-3 | BYLAWS | MISSING | 93cfaa97a7a00f368824e47469f9bbbf4812ab3bc54cc20318c0c82b8300c2a5 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended Through October 27, 1998" |  |
+| 018 | C | WST | 0000105770 | 0000105770-99-000016 | seq:2 | EX-3 | AMENDED_AND_RESTATED_ARTICLES | MISSING | b68caa6fb39a1b7c1d05284ffcfe0bf114afd9c289bcfb727fe2989243c7315c | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | legacy 1-block text; rights-plan/Rule 12b-2 dates only |  |
+| 019 | C | WST | 0000105770 | 0000950115-95-000063 | seq:2 | EX-3.B | BYLAWS | MISSING | 5e70ce73b378e5ee89787054e87df0be512a59b24d04e154c0900daf3c175ed5 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended and Restated December 13, 1994" |  |
+| 020 | B | TXT | 0000217346 | 0000217346-10-000048 | threeone.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | ceba85addae5fa517bebff2acefe3e823d59fdb74053e3825ff65ebe4a54a8ea | ex0 ce0 up0 st2 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: original cert filed 1967; restated cert filed 1998 |  |
+| 021 | B | KLAC | 0000319201 | 0000319201-19-000031 | exhibit31restatedcertifica.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | b2399613270470bc9294bed6f1929e5da7952bc06a0f5fda3c6b645b8e8a2261 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | "date of filing its original Certificate ... was July 9, 1975" |  |
+| 022 | B | KLAC | 0000319201 | 0001193125-26-269375 | d144278dex32.htm | EX-3.2 | RESTATED_CERTIFICATE | MISSING | 5cd8f6137f144c07f9e2afb8fead1f84bc0bc38249dd2a545c0450cd65984a1b | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | same recital |  |
+| 023 | B | LNT | 0000352541 | 0000107832-02-000073 | sept10q2002exh3pt1.txt | EX-3 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 15d6ca2c9f303554830aafeb437c82966f583ec90440638bb36041fa1ee5f536 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 024 | B | LNT | 0000352541 | 0000107832-04-000096 | form10k123103exh3pt5.htm | EX-3 | RESTATED_ARTICLES | MISSING | c5ba4455e9b279dbd7ffde347390544cadbe61234fb7ec53f62191c78e92ce5a | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | preferred redemption/dividend dates only |  |
+| 025 | B | LNT | 0000352541 | 0000352541-21-000103 | lnt121720218-kex31.htm | EX-3.1 | RESTATED_ARTICLES | MISSING | a76fbbb7aa8b79d9bdbe19a20977ac87c9a6ef3324d12066710162a14dd9c026 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 026 | B | LNT | 0000352541 | 0001193125-13-216734 | d535964dex32.htm | EX-3.2 | RESTATED_ARTICLES | MISSING | 65981f8ef79e6eb8738f5325d7399c6d3723d13042cc24c08bc694259d7a4570 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | preferred redemption/dividend dates only |  |
+| 027 | B | LNT | 0000352541 | 0001193125-13-216734 | d535964dex34.htm | EX-3.4 | AMENDED_AND_RESTATED_ARTICLES | MISSING | cf791fdb350999d82fe6edc815f79aa50147cd9aef73cca8206f7fb74e9c5870 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 028 | B | COO | 0000711404 | 0001193125-06-006352 | dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 8511a892a9d0033dbf59cdce30e464c6ce3164099c9183e0235d7ac33e67c0d8 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** PRIOR | recital: certificate of designation filed 1997 |  |
+| 029 | B | EXPD | 0000746515 | 0000746515-18-000004 | a201710-kex31.htm | EX-3.1 | RESTATED_ARTICLES | MISSING | 58c313b68b7f39fd8d3f785f5385147b1a59c064713b92d559cde9d746a53c49 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** COMPONENT+SIGNATURE | compiled articles of amendment: adoption dates, "DATED:" and 1987 execution |  |
+| 030 | B | UIS | 0000746838 | 0001104659-25-048477 | tm2514710d1_ex3-1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 4c83b84135441d3b3a2ea9636c4ce96ab88d8c0a8b61ba89aff0e418f7398379 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | only Rule 12b-2 reference date |  |
+| 031 | B | UIS | 0000746838 | 0001104659-25-116956 | tm2532123d1_ex3-1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 0f29b923bcb5cbf9a54f245f7333f51d7cab4a7ffccec1ba8e169531961e181a | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: original cert 1984; A&R cert filed May 9, 2025 (this is a correction) |  |
+| 032 | B | IT | 0000749251 | 0000950123-00-011900 | y43399ex3-1_a.txt | EX-3.1.A | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 5ac02811264386e8a3f0f41d828c7133d62972f312831943ba4f23156dca8e93 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+SIGNATURE | "originally incorporated on June 1, 1990"; "executed this certificate on July 16, 1999" |  |
+| 033 | B | IT | 0000749251 | 0000950123-05-008192 | y10586exv3w1.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 3cdca96c57b9127e0c128fe967fbb29a01c024215f52494116798fd2d975bbd7 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+SIGNATURE | "originally incorporated on June 1, 1990"; executed July 5, 2005 |  |
+| 034 | B | WEC | 0000783325 | 0000107815-12-000108 | wec06302012ex31.htm | EX-3.1 | RESTATED_ARTICLES | MISSING | 71440e7eefd4d518d3faaa6d9db20f89a0b2ed124260cf2fee28e9c6b2ae4a95 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **A** BARE_EFFECTIVE+UPPERCASE+LEGEND | title legend "AS AMENDED EFFECTIVE MAY 21, 2012" | 2012-05-21 |
+| 035 | B | WEC | 0000783325 | 0000107815-95-000020 | seq:2 | EX-3.1 | RESTATED_ARTICLES | MISSING | 84af5bab65f78be3a289b7da03ae565105d6d1aceae8cc04e9454c52b6e986e8 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **A** BARE_EFFECTIVE+UPPERCASE+LEGEND | title legend "AS AMENDED AND RESTATED EFFECTIVE JUNE 12, 1995" | 1995-06-12 |
+| 036 | B | OI | 0000812074 | 0001047469-13-000991 | a2212782zex-3_1.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 1688c8817c89927db97e3e7cd7ab68853ba2aae9bc768cbdb222e36dca109fd9 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | "date of filing of its original Certificate ... was November 27, 1985" |  |
+| 037 | B | OI | 0000812074 | 0001104659-09-030006 | a09-9069_1ex3d1.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 56283b857d16333d9d87ea458364a8ca644250650a4fcafd1ff2cd69a882207c | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | same recital |  |
+| 038 | B | FAST | 0000815556 | 0000815556-19-000032 | ex_314232019amendedarticle.htm | EX-3.1 | RESTATED_ARTICLES | MISSING | 44c148dcaf27d71f4cc5853428524ec5e464eb572bb319a011b520ebc557bacf | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** COMPONENT | compiled component certificates "amended, effective at the close of business on May 10, 2002 / Nov 10, 2005 / May 20, 2011 / May 22, 2019" |  |
+| 039 | B | FAST | 0000815556 | 0001193125-05-206786 | dex31.htm | EX-3.1 | RESTATED_ARTICLES | MISSING | 8106ba9cf3e40794947aad402a3f378183dbe588c42379a24f36f313a1f5f9ee | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** COMPONENT | same compilation (2002, 2005) |  |
+| 040 | B | FAST | 0000815556 | 0001193125-11-104739 | dex31.htm | EX-3.1 | RESTATED_ARTICLES | MISSING | 2c91284e268763e7d03acaf91fccaec6810948841a21be2eb4f2bd0a29dff26a | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** COMPONENT | same compilation (2002, 2005, 2011) |  |
+| 041 | B | FAST | 0000815556 | 0001193125-12-172121 | d310097dex31.htm | EX-3.1 | RESTATED_ARTICLES | MISSING | 0c5ef90e3aeda8307039e5ab08d575c8c103da1b45be03f4fbafeffcd1a8be89 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** COMPONENT | same compilation (2002, 2005, 2011) |  |
+| 042 | B | FCX | 0000831259 | 0000950103-07-000681 | dp05057e_ex0301.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | bbf032104ff5ba9bdaa1d4b1d0fefe2d5e79b3834b4ae832d0e916b083fc233a | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC+CLAUSE_NO_SUBJECT_STAMP | "Upon the filing of this A&R Certificate with the Delaware Secretary of State (the Effective Time)"; only stamp = 1987 incorporation recital |  |
+| 043 | B | IEX | 0000832101 | 0000832101-18-000019 | iex-12312017xex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | bec6bc10fc2558a4432dc81aef9a69adb887659bff7e237b1099de2dfd8a3cb7 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | "date of filing of its original Certificate ... was September 24, 1987" |  |
+| 044 | B | CTXS | 0000877890 | 0001193125-13-239426 | d544715dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 66fa616a81f1d171949b7e115e9aaebe95bcfe243a5c469ffb828d7f971a6089 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1989 |  |
+| 045 | B | TSCO | 0000916365 | 0000916365-12-000017 | exhibit3_5.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 79eefa85cc22ca66f5ffa883a2b0d8dd3b69baa6e4099687746b59937aee64cf | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1982 |  |
+| 046 | B | TSCO | 0000916365 | 0000916365-20-000184 | restatedcertificateofi.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 4a8390b5a5c816d79d09d554a584a3f5b5c2c0e278b6d5f572bbb8d3e8e36c95 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1982 |  |
+| 047 | B | TSCO | 0000916365 | 0000916365-25-000150 | tscorestatedcertificateofi.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 03ecbff52921749b74383e918edc58ccda1f44888d1b190acc41eca98e535360 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "Effective as of 5:00 p.m. Eastern time, on June 4, 2025, the text ... shall read" | 2025-06-04 |
+| 048 | B | DVA | 0000927066 | 0001193125-07-172119 | dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 0cb87ddc935355d6e2f1ac5235200cf51424bd26da99b441d1cb00575840ed57 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** MEETING+SIGNATURE+CLASSIFICATION_HAZARD | body is a Certificate of Amendment (meeting May 29, 2007; signed May 30, 2007); classified from SEC description header |  |
+| 049 | B | HSIC | 0001000228 | 0000950123-05-009366 | y11335exv3w1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 9b20d1f3bd615f217803e30051982f20339fe502e7f6ed939a066ce42cd6af22 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1992 |  |
+| 050 | B | HSIC | 0001000228 | 0000950123-07-002886 | y30969exv3w1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 3aac84263c8efc1ba4fcab1dfe418d606d9a8b096c08e0468ec72c37686233ca | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1992 |  |
+| 051 | B | HSIC | 0001000228 | 0001193125-18-181713 | d586703dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | b2fb56b4da20be75c422f73d48a1867a83e987bb2719c44cfbbc47c78e1c7e8f | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1992 |  |
+| 052 | B | ANF | 0001018840 | 0000950123-11-082951 | c20376exv3w2.htm | EX-3.2 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | f5dd975a649d5a231b88c04d73da93643db8130eee416fe62b61970ab6ab5c40 | ex0 ce0 up0 st3 x0 | undated snapshot def (anchor candidate) | **D** PRIOR+COMPONENT | conformed notes: cert of designation filed 1998; amendments filed June 16, 2011; share conversions "Effective May 19, 1998" |  |
+| 053 | B | MTD | 0001037646 | 0000895345-98-000141 | seq:2 | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 564772e6d66b9bc123acea071f2b957638b03a93da04806150b971eed73b7793 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | legacy 1-block text; no dates |  |
+| 054 | B | CHRW | 0001043277 | 0001193125-12-233730 | d353095dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 4d855e272657624d8f9d4f9143da6bca37d2614142a32abbc66385a910600afd | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1997 |  |
+| 055 | B | CMG | 0001058090 | 0001058090-16-000088 | cmg-20160930xex3_1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 13a1b285bc977c68e68e8c934224c9fc960992f040a9c81ca36695f15c6e20b8 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC+CLAUSE_NO_SUBJECT_STAMP | signature block "effective as of the date of filing with the Secretary of State"; only stamp = 1998 incorporation recital |  |
+| 056 | B | NFLX | 0001065280 | 0001065280-15-000031 | restatedcertificateofincor.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 6747825cf3c7d0e995b8d3c9cbe104fab5f72f524569991d5660be4ff11f2843 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 057 | B | NFLX | 0001065280 | 0001065280-22-000216 | ex-31amendedandrestatedcer.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 4ae01c3f6d071e0a51ccd41b564e92b55ab6bcc881ed3cca03538e17c868ebbe | ex0 ce0 up0 st4 x0 | undated snapshot def (anchor candidate) | **D** PRIOR | recitals: A&R filed 2002; amendments filed 2003/2004/2015 |  |
+| 058 | B | NFLX | 0001065280 | 0001193125-04-128377 | dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 89c091808c199b69f0e18fa3848862e21a8f3ba9cab6a8f49dcbd8cdb45fdeb3 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+SIGNATURE | "originally incorporated on August 29, 1997"; executed May 29, 2002 |  |
+| 059 | B | ON | 0001097864 | 0001193125-06-155889 | dex31a.htm | EX-3.1(A) | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 8530bdbb56c31094ba4550c252be28a45ee55a15de55eea92d17a498560de4cd | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | compilation: original 1992; A&R 2000; designations filed 2001 |  |
+| 060 | B | ON | 0001097864 | 0001193125-08-104433 | dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | f62995e2e5b0ad5439ed373d7bf6d6e95e17c426630fca881b4bb113c91ed205 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | same compilation |  |
+| 061 | B | AYI | 0001144215 | 0001144215-24-000015 | ayi-20240124xex32xrestated.htm | EX-3.2 | RESTATED_CERTIFICATE | MISSING | 451356f9adef0b99ebf44fa84c137e9b23bea776e39233b6e83999bb065d3089 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert 2007 |  |
+| 062 | B | AYI | 0001144215 | 0001193125-07-208062 | dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 0ae5e6a4875b8535cf9de20f2855e13d53e90d523988c91a09462eb3f5ff6429 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert 2007 |  |
+| 063 | B | AAP | 0001158449 | 0001158449-04-000083 | exhibit_3-1.htm | EX-3 | RESTATED_CERTIFICATE | MISSING | 0faacb2b5966cdeed9e9d0756faf133d4768f8ddfa605701ad231f4c1c05d471 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** PRIOR | "as amended and restated in the Certificate of Amendment filed August 8, 2001" |  |
+| 064 | B | AAP | 0001158449 | 0001158449-13-000226 | aap_exhibit31x7132013.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | d96291cdef83f2262a466813d0ace6973400d226105e33f272068a9bdd403fb5 | ex0 ce0 up0 st2 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: Aug 1 2001 original; Aug 8 2001 amendment; 2001/2004 filings |  |
+| 065 | C | CPAY,FLT | 0001175454 | 0001175454-19-000020 | ex3120190614certificateofa.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | d7fc116ea24e911b9bb29e5ba6d5ebd89878ab3b904d5b347fb4ed45c7050633 | ex0 ce0 up0 st2 x0 | undated continuity blocker | **D** INC+PRIOR | recitals: cert filed 1998; amendments filed 2010/2018 |  |
+| 066 | C | CPAY,FLT | 0001175454 | 0001175454-20-000040 | a20201018bylawsoctober.htm | EX-3.1 | BYLAWS | MISSING | bb1428e77fd60868d8606e31beac7dfdb38eb9765a06787b2a4b17dfea48adab | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | bylaws; resignation-effectiveness language only |  |
+| 067 | C | CPAY,FLT | 0001175454 | 0001193125-11-078175 | dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 0e71e5c132608907bbd13e67fa2035196469b81abbe52132c856fdae247656e0 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **D** INC | "(Originally Incorporated on February 3, 1998)" |  |
+| 068 | C | CPAY,FLT | 0001175454 | 0001193125-11-078175 | dex32.htm | EX-3.2 | BYLAWS | MISSING | dfcededfbe893773289f8b2b1f90224d3bbd6448ca4de1dedd5a7782173c5fbd | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | bylaws; resignation-effectiveness language only |  |
+| 069 | C | CPAY,FLT | 0001175454 | 0001299933-16-003120 | exhibit1.htm | EX-3.01 | BYLAWS | MISSING | 5f8d8916545a1a62fee28f56a5d76d68f6a6e3c6a301b392de4244ae23a96bfd | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | bylaws; no dates |  |
+| 070 | C | CPAY,FLT | 0001175454 | 0001299933-18-000095 | exhibit1.htm | EX-3.1 | BYLAWS | MISSING | f15401fef9fe6a2b067a402614ca72c557b1219075218f533c937d49da3a6822 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | bylaws; no dates |  |
+| 071 | C | CPAY,FLT | 0001175454 | 0001299933-18-000489 | exhibit1.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 1fea7ca90b99a1413bb8434d9405972697496714ac8c59ef29eac57f0444d359 | ex0 ce0 up0 st2 x0 | undated continuity blocker | **D** INC+PRIOR | recitals: cert filed 1998; amendment filed 2010 |  |
+| 072 | C | CPAY,FLT | 0001175454 | 0001628280-22-017144 | flt-bylaws2022bdmeeting.htm | EX-3.2 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | a63df45dd5c0229f5f9da305bf01f9b26aefb8d6d2201303c9d3ea54889af0c1 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** CLASSIFICATION_HAZARD | bylaws text classified AMENDED_AND_RESTATED_CERTIFICATE; no dates |  |
+| 073 | C | CPAY,FLT | 0001175454 | 0001628280-22-017144 | flt-charteramendmentxjune9.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 09af4f06d27ab36f17080007179261c990dba5bd94ae2e8b3bb3c39c167e0bd9 | ex0 ce0 up0 st2 x0 | undated continuity blocker | **D** PRIOR+CLAUSE_NO_SUBJECT_STAMP | "effective upon the filing of this Certificate of Amendment with the Secretary of State of Delaware"; stamps = 2010/2018 prior-instrument recitals |  |
+| 074 | B | DPZ | 0001286681 | 0001193125-25-096735 | d574686dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | b211e8a0dd8625b245541b1f725230ce121f90cbcbeb4e3d56a4b775d83a97cb | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | "originally filed July 30, 2002, amended and restated on May 11, 2004 ..." |  |
+| 075 | B | TSLA | 0001318605 | 0001564590-17-003118 | tsla-ex31_1396.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 357e2c6007abcca524c8d0c5002663e1bfce2d89022828d93e6f808956df7df2 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital 2003; "Effective Date" = IPO closing (board classes) |  |
+| 076 | B | UAA | 0001336917 | 0001193125-12-335302 | d359179dex301.htm | EX-3.01 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 030a1cfb6a526362838e9d24282b3c5fa01adad91f49f2c47510d7f542e80a0a | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** COMPONENT | annotation "[Amended June 11, 2012]" |  |
+| 077 | B | CXO | 0001358071 | 0000950129-07-003852 | h48791exv3w1.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | ec1c412fd58d02c6ef6104943f52aa34f4ce48f2bf892c58ad83a796d7fad659 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2006 |  |
+| 078 | B | VEEV | 0001393052 | 0001193125-13-406605 | d615271dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 30468bd598f8c69cde4a27f8d86fd1d3e2f36c69fe0a1eff7e8f9bb971aa0b47 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2007 |  |
+| 079 | B | VEEV | 0001393052 | 0001393052-24-000031 | a240612arcertificateofin.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 4835644463b69f0e7c502928ac7ce3bc5823cb5abe5f0a53c5c44fc0265eb70b | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2007 |  |
+| 080 | B | VEEV | 0001393052 | 0001628280-21-001246 | veevex31feb2021.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | b6bb7ad78f7270fe992134da0fc9a09f127a13cf3c19615c7cb2332511918d49 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "shall be effective as of 12:02 p.m. Eastern Time on February 1, 2021" | 2021-02-01 |
+| 081 | B | VEEV | 0001393052 | 0001628280-21-013044 | veevex31jun2021.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 95572ef913cebef01603b5f39cffd627bb31d492edbd7226fc7df3e040005ed4 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2007 |  |
+| 082 | B | AWK | 0001410636 | 0001193125-08-227647 | dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 3dbad47ecaac5da4c76cc6d419393e8099a75d89c52bd8f6be363603691be4b1 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 1936 |  |
+| 083 | B | KDP | 0001418135 | 0001104659-18-044357 | a18-16509_3ex3d1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 32d9a21cbb4f46d0244934c9ca07ce4b0e23fee5fed9cd70b0de5c4be39fe0e5 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** SIGNATURE+CLASSIFICATION_HAZARD | "CERTIFICATE OF THIRD AMENDMENT" classified as A&R; executed July 9, 2018 |  |
+| 084 | B | VRSK | 0001442145 | 0001193125-15-206612 | d933894dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | ae286dc36dc2acee78b0707255dd383d94e996c68c59eb5845ac785e00a173ae | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+CLAUSE_NO_STAMP | "become effective upon the filing of this A&R Certificate with the Secretary of State"; no stamp at all |  |
+| 085 | B | VRSK | 0001442145 | 0001193125-22-163943 | d308585dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 1415b3ce0794d43cac146f395d9db8fed8cc68bf4d8aa27241ba618c55c4dbb0 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "shall become effective at 8:11 a.m. (local time ...) on May 25, 2022" | 2022-05-25 |
+| 086 | B | VRSK | 0001442145 | 0001193125-25-127567 | d908167dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | fcfce68b2952c0e7719efbdee02a1bbfb9ddd449e6b4f02b9021769a0a5b1c07 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2008 |  |
+| 087 | B | GM | 0001467858 | 0001193125-09-169233 | dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 7c69ceae6b31a0ee068904325bd70818e961293b5f824b2f920d22333080b322 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | "date of filing of its original Certificate ... was June 17, 2009" |  |
+| 088 | B | GM | 0001467858 | 0001193125-09-235641 | dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 5862279a7ceeb272345859ced853ed149549393c4d9923e0e169e5f66f3dbbcd | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR+BARE_UPON_FILING | appended Certificate of Amendment "shall be effective upon filing" (no authority, contract-excluded) |  |
+| 089 | B | GM | 0001467858 | 0001193125-10-279214 | dex32.htm | EX-3.2 | RESTATED_CERTIFICATE | MISSING | c0b2a4dd885d44552cdb573f5da2de424b7607df2c9e2b0a2aaae08f76f4da33 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | "date of filing ... was August 11, 2009" |  |
+| 090 | B | HII | 0001501585 | 0000950123-11-032558 | v59141exv3w1.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | c8fe868bd722008e6b4a68c6c60031765a2b5fb02aea78cdcd1cc8c08a8ec5f4 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "shall become effective at 11:59 p.m. (local time ...) on March 30, 2011" | 2011-03-30 |
+| 091 | B | XYL | 0001524472 | 0000950123-11-089760 | y93081exv3w1.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 8914c2ff92a2ed462a0d0656c0888de75a4af6275951abaae443d81484621637 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 092 | B | XYL | 0001524472 | 0001524472-13-000016 | xyl09302013ex31.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 94764aaa2f537fd2234b569e6ac587a11fa9bd17509cda7c937bb60360fe51a2 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 093 | B | XYL | 0001524472 | 0001524472-14-000013 | xyl06302014ex31.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 43f17e3fcebdaa9b4744603cb6cc5910f801a2791b6f46027c4263311147a605 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 094 | B | XYL | 0001524472 | 0001524472-17-000027 | a8-k31xcharter.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | 86317e062eb47bb5d2d3c79297cde702554fc548e4330d373c05faadbf146fcf | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 095 | B | CRWD | 0001535527 | 0001104659-19-035685 | a19-11597_1ex3d1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 9a22a5529e9730c8ca7e189adb20ff76a03bbe5b362fcedd05d5f07698300fd4 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2011 |  |
+| 096 | B | CRWD | 0001535527 | 0001104659-26-076376 | tm2618192d1_ex3-1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | ccebc29e4449080cc0bf7cf58a51d6330f6e91c636d8d1136540388f2618db7d | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2011 |  |
+| 097 | B | FANG | 0001539838 | 0001539838-12-000004 | exhibit31amendcertofincorp.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 369b0c5de21d828c31a7d9dd261e9f8da24a97ff7afaff6ee151fc4194b6485a | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 098 | B | FANG | 0001539838 | 0001539838-23-000086 | diamondbackex31-6x14x23.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 3f38fb5896b27cc14eeac90570eb8a63deef7a37db8a04ba15bc2e7ad2d7e864 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | "date of filing ... was the 30th day of December, 2011" |  |
+| 099 | C | NWS,NWSA | 0001564708 | 0001193125-13-281463 | d560987dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | b6f09bc8ec1f02c46ff634c38428f457100e52e7a7d3278ca3782a95f557b976 | ex0 ce0 up0 st1 x1 | undated continuity blocker | **A** TIME_BEFORE_DATE | "Upon this A&R Certificate ... becoming effective at 3:40 pm on June 28, 2013, the date of filing with the Secretary of State" | 2013-06-28 |
+| 100 | C | NWS,NWSA | 0001564708 | 0001193125-13-281463 | d560987dex32.htm | EX-3.2 | BYLAWS | MISSING | 35939885d65e35a627c156b2389a68992d2f8dea261f5828d84220d066382b73 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** | bylaws; no dates |  |
+| 101 | C | NWS,NWSA | 0001564708 | 0001193125-13-282830 | d564422dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 1629df8849843a3626a6eb95187d0732ad5954bef5f4ae96aec273712376c80d | ex0 ce0 up0 st1 x0 | undated continuity blocker | **A** TIME_BEFORE_DATE | same sentence (second 2013 copy) | 2013-06-28 |
+| 102 | C | NWS,NWSA | 0001564708 | 0001193125-13-373501 | d581644dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 3fe68918b4eae8cb9e80592bd67292a1a5b15b1f998aaa1a33d2e3de5f6eb714 | ex0 ce0 up0 st1 x0 | undated continuity blocker | **D** INC+PRIOR | recitals: LLC formation 2012; June 28, 2013 name change and A&R filings |  |
+| 103 | C | NWS,NWSA | 0001564708 | 0001564708-19-000002 | ex3-1.htm | EX-3.1 | BYLAWS | MISSING | eb3f80d9f512daae76d2415842201fae1fc706d78ac8a3b8a67134a65802b789 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **A** BARE_EFFECTIVE+LEGEND+BYLAWS | bylaws legend "(Effective February 25, 2019)" | 2019-02-25 |
+| 104 | C | NWS,NWSA | 0001564708 | 0001564708-23-000258 | exhibit31-amendedandrestat.htm | EX-3.1 | BYLAWS | MISSING | a6a7452c46d0c84cf91aaf996d74e7d6bb0c903d8c0f629fd57fc1e727bcc66c | ex0 ce0 up0 st0 x0 | undated continuity blocker | **A** BARE_EFFECTIVE+LEGEND+BYLAWS | bylaws legend "(Effective June 23, 2023)" | 2023-06-23 |
+| 105 | C | NWS,NWSA | 0001564708 | 0001564708-25-000586 | ex31combinedcertificateofa.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | d518a6d6dc0c0369949d21629aedecdfcf5317c959f64cb86cfad0f177e02e82 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **D** SIGNATURE | executed "this 19th day of November 2025"; no effective statement |  |
+| 106 | C | NWS,NWSA | 0001564708 | 0001564708-25-000586 | ex32combinedrestatedcertif.htm | EX-3.2 | RESTATED_CERTIFICATE | MISSING | 7c8501dc113ce26e47f6b9b7ab7ca70df6806078101130145323cb170ce3739b | ex0 ce0 up0 st1 x0 | undated continuity blocker | **D** INC+PRIOR | recitals: LLC formation 2012; 2013 filings; restates only |  |
+| 107 | B | HLT | 0001585689 | 0001193125-13-476077 | d645078dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | cc26447d0167402ec9c4d5f0d275d3741e5a19261c99c5172578ba5dd6b2b3ec | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "shall become effective at 8:00 a.m. (Eastern Time) on December 17, 2013" | 2013-12-17 |
+| 108 | B | HLT | 0001585689 | 0001585689-25-000109 | restatedhltcharterexhibit33.htm | EX-3.3 | RESTATED_CERTIFICATE | MISSING | a5127b8c7d526446357a11897a29f925faec21c4741a7b16b649b7d609129d00 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC+BARE_UPON_FILING | "shall be effective upon filing" (no authority, contract-excluded); recital 2010 |  |
+| 109 | B | CZR | 0001590895 | 0001104659-14-067189 | a14-21021_2ex3d1.htm | EX-3.1 | AMENDED_AND_RESTATED_ARTICLES | MISSING | dc479587c12a4e74a68a3463ff6a156e73b0667313a85981673edad1e1a15506 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 110 | B | CZR | 0001590895 | 0001193125-23-169019 | d522744dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 9e10c658d145c2901d9109b7ff2c08161accf7aa837453a783956d9f5c52162a | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert 2020 |  |
+| 111 | B | GOOGL | 0001652044 | 0001193125-22-167375 | d294315dex301.htm | EX-3.01 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | e2cbb1d17678da6d23c021c3f5dede303181926353170c0f36f5a9fafdd59e08 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **A** BARE_EFFECTIVE+TIME_AFTER_DATE | "amended and restated in its entirety, effective June 3, 2022, at 4:01p.m., EDT" | 2022-06-03 |
+| 112 | B | FTV | 0001659166 | 0001659166-21-000199 | a20210702-ex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 8b47f1efa92844178248c188803bc29949e2055dfbfb7d83055aef57da4a3841 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2015 |  |
+| 113 | B | FTV | 0001659166 | 0001659166-22-000155 | a202271-ex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | bd8573686812a35049157d73ba60ca5e52073854ecb45166e1703710a57c9d11 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2015 |  |
+| 114 | B | FTV | 0001659166 | 0001659166-24-000148 | exhibit31-restatedcertific.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | bfeba628b470d00c2b41b49427bee2590949f4dcd744afc4c2108b26ab81a9f6 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2015 |  |
+| 115 | B | ASH | 0001674862 | 0001193125-16-714093 | d246354dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 84fb79e3acdec2cee4096b125004680a278adf39e7eb183a2bce7bafd1004416 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "shall be effective as of 8:30 a.m. Eastern Daylight Time on September 20, 2016" | 2016-09-20 |
+| 116 | B | AA | 0001675149 | 0001193125-16-758975 | d474959dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 6d1726a8524f3f700fae2f269d66cd3c4a9b48ee33a461af3c3f03c46d02179f | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE | "is to become effective as of 11:59 p.m., Eastern time, on October 31, 2016" | 2016-10-31 |
+| 117 | C | LW | 0001679273 | 0001104659-23-036640 | tm239888d1_ex3-1.htm | EX-3.1 | BYLAWS | MISSING | 31a05234442ce30dd8273a07a87dbc36cc155bd29d7afd17e9292adccc20b51c | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended March 23, 2023" |  |
+| 118 | C | LW | 0001679273 | 0001193125-16-766127 | d273163dex32.htm | EX-3.2 | BYLAWS | MISSING | 352aec829c7c49b701dc4f1ed9dea6c4d280808c8508b426c8eeca2dfed3a637 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **E** LEGEND_NO_EFFECTIVE | bylaws "As Amended November 8, 2016" |  |
+| 119 | C | LW | 0001679273 | 0001679273-24-000064 | lw-202409278kxex31.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 0e538020a74df06466fb097ee70c98dcf2be95c6168eb4ae3361a703125b864a | ex0 ce0 up0 st0 x0 | undated continuity blocker | **D** PRIOR+SIGNATURE | "A&R Certificate ... dated November 8, 2016"; executed September 26, 2024 |  |
+| 120 | B | MRNA | 0001682852 | 0001193125-18-349938 | d677222dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | c5c588feb9977c6eee8efb90fb8981e126c1792c40c36091aafaf1258cd8d83a | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: original 2016; A&R filed May 7, 2018 |  |
+| 121 | B | MRNA | 0001682852 | 0001682852-24-000031 | exhibit3158248-k.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | edbaa2cf3764cf6547b29dc71b2da1762c01fbd017601490b568ce86e2ffc769 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert 2016 |  |
+| 122 | B | VST | 0001692819 | 0001193125-20-132407 | d899504dex31.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 658875be56fd812f57ca757aa961a9eaa6ce794b4171ac69bff029f56c94668a | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** OTHER | "Operative Date" defined by stockholder agreement dated October 3, 2016 |  |
+| 123 | B | VST | 0001692819 | 0001193125-25-112869 | d786785dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | a6ef5d6435775c91e48a52dbe9e21a52c440e01178e5df6eeb8638145c627332 | ex0 ce0 up0 st1 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recital: original cert filed 2016; restated April 29, 2020 |  |
+| 124 | B | CI | 0001739940 | 0000950159-23-000019 | ex3-2.htm | EX-3.2 | RESTATED_CERTIFICATE | MISSING | 1eb739c0231bacf2197411defe57471c584355b5e4ff9c5d555aabf8b450595e | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **A** TIME_BEFORE_DATE+ORDINAL_DAY | "shall become effective at 8:01 a.m. Eastern Time on the 13th day of February, 2023" | 2023-02-13 |
+| 125 | B | CI | 0001739940 | 0001739940-23-000016 | exhibit31-thecignagroupxre.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | db1e87e1b2137c9452689b25f237d4071d615bfa0c6d761bff07879bb9a2850e | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2018 |  |
+| 126 | B | CI | 0001739940 | 0001739940-23-000020 | exh_31xrestatedxcharter.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | 02498ad982c6201087d255871909c3106938273eb05a8f247ddda1cdd97a9a9c | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **D** INC | recital: original cert filed 2018 |  |
+| 127 | B | BEAM_OLD | 0001745999 | 0001193125-20-031290 | d842502dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | cf270e6f9ea470aeb33fe75ddbd09a42614080ff27c49c787dd5dd104e32fe48 | ex0 ce0 up0 st3 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: cert 2017; A&R filed 2018 x2; amendment filed 2019 |  |
+| 128 | C | FOX,FOXA,TFCF,TFCFA | 0001754301 | 0001193125-19-079678 | d721949dex33.htm | EX-3.3 | CERTIFICATE_OF_DESIGNATION | MISSING | 8cd6eef02eeb26545856103657ec90c5a544f106fa9f599e9afe344e2194c0e3 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **D** ADOPTION+SIGNATURE | board adopted March 19, 2019; signed 19 March 2019 |  |
+| 129 | C | FOX,FOXA,TFCF,TFCFA | 0001754301 | 0001193125-19-296568 | d837035dex31.htm | EX-3.1 | CERTIFICATE_OF_ELIMINATION | MISSING | 8bb59d99447682200685242dd0d1cd36200a4db3b9db8a8675a990384b7c231b | ex0 ce0 up0 st0 x0 | undated continuity blocker | **D** ADOPTION+SIGNATURE | board resolution March 19, 2019; signed November 20, 2019 |  |
+| 130 | C | FOX,FOXA,TFCF,TFCFA | 0001754301 | 0001628280-23-002786 | foxa-20221231x10qex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 477a9b5ce30b7c047dfbb218ea15e5929779ac986dd4d4fe4cae686f3386ceb5 | ex0 ce0 up0 st1 x1 | undated continuity blocker | **D** INC+PRIOR+DGCL_CLAUSE_10Q | "effective upon filing pursuant to the DGCL" in a 10-Q exhibit (no Item 5.03 primary) |  |
+| 131 | B | DNB_OLD | 0001799208 | 0001104659-25-082892 | tm2524330d1_ex3-1.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 859dd4566fad7b5268deafb34ca92144f681235fc21d3462dfbe2ec854acff95 | ex0 ce0 up0 st0 x0 | undated snapshot def (anchor candidate) | **E** | no dates |  |
+| 132 | B | MRVL | 0001835632 | 0001193125-23-071340 | d483967dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | aac9dae80ca493c5868b18a7548791c833bca7aa39228698f1ec628991730784 | ex0 ce0 up0 st2 x0 | undated snapshot def (anchor candidate) | **D** INC+PRIOR | recitals: original 2020; A&R filed 2021 |  |
+| 133 | C | Q | 0002058873 | 0001193125-25-240313 | d21160dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | e56a7cc32a67e63c6f8d341fa3174a9eb93c7710eb96b13ca9d8c2fa3a16bdd4 | ex0 ce0 up0 st1 x0 | undated continuity blocker | **D** INC+OTHER_INSTRUMENT | recital 2024; embedded power of attorney "effective as of this 1st day of November, 2025" |  |
+| 134 | C | Q | 0002058873 | 0001193125-25-261603 | d65598dex31.htm | EX-3.1 | CERTIFICATE_OF_DESIGNATION | MISSING | 681d653d4af35df60444cadd6abbbec41703aba005b7e419a85ed0826b6230f5 | ex0 ce0 up0 st0 x0 | undated continuity blocker | **A** TIME_BEFORE_DATE | series "authorized, designated and created, effective as of 11:59 p.m., New York City Time, on October 31, 2025" | 2025-10-31 |
+| 135 | C | Q | 0002058873 | 0001193125-25-261603 | d65598dex33.htm | EX-3.3 | BYLAWS | MISSING | 68545557fe52cf1a077a091a8bd3c10415738bc9562dac9b73f65047ec69efc3 | ex1 ce0 up0 st0 x0 | undated continuity blocker | **A** UPPERCASE_MONTH+LEGEND+BYLAWS | "EFFECTIVE AS OF NOVEMBER 1, 2025" (grammar matched; _iso_date rejects uppercase month) | 2025-11-01 |
+| 136 | B | FDXF | 0002082247 | 0001104659-26-068521 | tm2615735d1_ex3-2.htm | EX-3.2 | AMENDED_AND_RESTATED_CERTIFICATE | AMBIGUOUS | 18ea7267fe363b8fc24747cacbf5502a8418bb63ef30492ab319f2167f52ede2 | ex3 ce0 up0 st2 x0 | undated snapshot def (anchor candidate) | **F** EXPLICIT_ATTRIBUTION_HAZARD | subject "effective as of June 1, 2026 at 1:01 a.m." + prior amendment "filed ... effective on May 27, 2026" both taken by EXPLICIT grammar -> AMBIGUOUS |  |
+
+## 10.37-B 행 단위 감사 — 반사실 연속성 94문서
+
+새 anchor를 얻는 Pool B 11 item의 나머지 무일자 governing 문서다. 열은 10.37-A와 같고 parity 94/94 ·
+SHA 94/94다.
+
+| # | work item | accession | locator | TYPE | classification | stored | SHA-256 | O2 matches | judgment | evidence | cf date |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| X000 | DAL | 0000950144-03-003858 | g81186exv3w2.txt | EX-3.2 | BYLAWS | MISSING | 7cb87b08e034207d33d391f3c1a97c35abf7ed2d51009c54e3786e77115e5e53 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X001 | DAL | 0000950144-04-002423 | g87427exv3w2.txt | EX-3.2 | BYLAWS | MISSING | 98e298c326e2b00315092b5f4d0739220a083b46cecde61c858340c9c7ebfe5a | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "BY-LAWS AS AMENDED THROUGH NOVEMBER 23, 2003" |  |
+| X002 | DAL | 0000950144-98-001674 | seq:2 | EX-3.2 | BYLAWS | MISSING | 5ac13500add38af57004cf87eab8b74a78e40e34918e9c6bf2fca9ca34115302 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "BY-LAWS AS AMENDED THROUGH JANUARY 22, 1998" |  |
+| X003 | DAL | 0001019687-08-002378 | delta_8k-ex301.htm | EX-3.1 | BYLAWS | MISSING | 5d0cd2df8e547c38fa564f692c6ac78b73401e5e2316d6cbab19903ee5bb0e59 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "(As amended through May 19, 2008)" |  |
+| X004 | DAL | 0001019687-14-002579 | delta_8k-ex0301.htm | EX-3.01 | CERTIFICATE_OF_AMENDMENT | MISSING | e2ff13a737c49e9169adff3c793aaf067b3b614367ac7dd3e870fcd4b7ff5032 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X005 | DAL | 0001019687-14-002579 | delta_8k-ex0302.htm | EX-3.2 | BYLAWS | MISSING | 6e6baaba5f29565e96cd4babd05f7d47678db84d16f49e9f912eaf76e71c7483 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "(As amended through June 27, 2014)" |  |
+| X006 | DAL | 0001047469-98-035570 | seq:2 | EX-3.2 | BYLAWS | MISSING | 1dc41c705927bb4bbc14d26735d0f4ca25fcd6440b6349139b1e1afab249a2ff | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended Through July 23, 1998" |  |
+| X007 | DAL | 0001047469-98-041279 | seq:2 | EX-3.1 | BYLAWS | MISSING | 11979195dccbf606ecae4194a410a3eff6b8ada8369bfcff3727f6159d7208c3 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended Through November 16, 1998" |  |
+| X008 | DAL | 0001167966-05-000134 | ex-3.htm | EX-3 | BYLAWS | MISSING | ec66f046d24071285d5c039168f284dc832ed97736bdd9bcc088009bc89610f6 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended Through January 27, 2005" |  |
+| X009 | DAL | 0001188112-05-001106 | ex3-1.htm | EX-3.1 | BYLAWS | MISSING | 6d1061bedc6f355ca5040d92f505ec3c143e349586908b01e688d5821956bf1e | ex0 up0 st0 x0 | **D** COMPONENT | compiled 1998 amendment "5:00 p.m. ... November 2, 1998 (the Effective Time)"; 1996 designations |  |
+| X010 | DAL | 0001188112-05-001106 | ex3-2.htm | EX-3.2 | BYLAWS | MISSING | 13c04de09597a6475b6e122eb05a841106a28dc6fdeeaab9a8413522e03226d5 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended Through May 19, 2005" |  |
+| X011 | DAL | 0001188112-06-001696 | ex3-1.htm | EX-3.1 | BYLAWS | MISSING | b547358bd767d8cca5a96c0d8ea1c0fec5f1e5c17624ab0e9ab7ba6361e4161f | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended Through May 25, 2006" |  |
+| X012 | DAL | 0001683168-16-000419 | delta_8k-ex0301.htm | EX-3.1 | BYLAWS | MISSING | dd138e2ef85167c930599ee705c24f240e1fa800f3d7fb646dd87abf1e3fe061 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended and Restated through October 28, 2016" |  |
+| X013 | DAL | 0001683168-19-000302 | delta_8k-ex0301.htm | EX-3.1 | BYLAWS | MISSING | 8974c4dd035faa258bee7683476dcbb7ea653ef4a21ac3df728a13da10ebf0be | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended and Restated through February 7, 2019" |  |
+| X014 | DAL | 0001683168-22-008312 | delta_ex0301.htm | EX-3.1 | BYLAWS | MISSING | 502e6cc3326d34053feb7bbc8d15020994090d8086fe34f57bf6b4dceb1c2194 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As Amended and Restated through December 7, 2022" |  |
+| X015 | WEC | 0000107815-00-000004 | seq:2 | EX-3.2 | ARTICLES_OF_AMENDMENT | MISSING | 338a59daf80dc8281e9437255801fbfc0d55ad811b9e6ef752a3cc1f963984b2 | ex0 up0 st0 x0 | **D** COMPONENT+LEGEND_NO_EFFECTIVE | bylaws "As Amended to January 25, 2000"; footnote "Effective June 2, 1999, the Board ..." |  |
+| X016 | WEC | 0000107815-00-000009 | seq:2 | EX-3.1 | ARTICLES_OF_AMENDMENT | MISSING | 3f5b2ca268a9dc573041a15dd92fa6e2de9bf34c788b32ae4dc2dd17f4c742d3 | ex0 up0 st0 x0 | **D** COMPONENT+LEGEND_NO_EFFECTIVE | bylaws "As Amended to May 1, 2000"; footnote "Effective June 26, 2000, the Board ..." |  |
+| X017 | WEC | 0000107815-05-000049 | exhibit3.htm | EX-3 | BYLAWS | MISSING | 3f1d568411649b7e46c43a899cb37ba9a716a25fbdd53d34a94bc66320f3dea3 | ex0 up0 st0 x0 | **E** | "amended, effective at the time of the 2005 Annual Meeting" (event, no date) |  |
+| X018 | WEC | 0000107815-12-000108 | wec06302012ex32.htm | EX-3.2 | BYLAWS | MISSING | f46be596f2c8a70ad179d86e964fd3d61cc090181af80a7aadcd20602ef62a60 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X019 | WEC | 0000107815-16-000198 | bylawamendments2016.htm | EX-3.1 | BYLAWS | MISSING | 0a48df70f1993a8163c7ffd18a985e4c86309df056b3264bb80e405d6c0b49d0 | ex0 up0 st0 x0 | **F** CONDITIONAL_EVENT | "(Effective upon the Retirement of Gale E. Klappa as CEO, Expected to be May 1, 2016)" |  |
+| X020 | WEC | 0000107815-16-000306 | wec03312016ex31.htm | EX-3.1 | BYLAWS | MISSING | 488740dccbaa6188a74f48744a8c6cb42cafee519ae65e6350eb73c9662c1107 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X021 | WEC | 0000107815-16-000444 | wecenergygroupexhibit31102.htm | EX-3.1 | BYLAWS | MISSING | 6e2c810448203b4fa8e8ef8b16ba3db268e533af5030ab7cd3d7cffcac9a6b7b | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X022 | WEC | 0000107815-20-000165 | wecenergygroup-amended.htm | EX-3.1 | BYLAWS | MISSING | a3aa7edeb2d538a5102187cb7cc27f47b0308a0d3677f49c3ad6d93e68e75728 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X023 | WEC | 0000107815-23-000089 | wecenergygroupamendedbylaws.htm | EX-3.1 | BYLAWS | MISSING | c37f02e9ab3882f63b2d0a0f7f959c6b105bc633da17c19d9cc04363f1c985d8 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X024 | WEC | 0000107815-24-000203 | a2024q2wec10qexhibit31.htm | EX-3.1 | ARTICLES_OF_AMENDMENT | MISSING | 4454264b7c82b3c06856d04660b43ffe435c8f6739cdc97c37ef739816048b34 | ex0 up0 st0 x0 | **A** TIME_BEFORE_DATE | "This amendment shall be effective as of 5:00 p.m. Central Time on May 9, 2024" | 2024-05-09 |
+| X025 | WEC | 0001104659-15-048374 | a15-14883_1ex3d1.htm | EX-3.1 | ARTICLES_OF_AMENDMENT | MISSING | 87cfcc2522e4de8f9d5bc9804ee8ad3558e86878b1122b1179ce0dc5e139c50f | ex0 up0 st0 x0 | **A** TIME_BEFORE_DATE | "This amendment shall be effective as of 9:01 a.m. Central Time on June 29, 2015" | 2015-06-29 |
+| X026 | WEC | 0001104659-15-048374 | a15-14883_1ex3d2.htm | EX-3.2 | BYLAWS | MISSING | 6605b9b91f7fed440cec634524f0ced9c7b32828ddb63727f8014488c8624e80 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X027 | WEC | 0001193125-05-042628 | dex32b.htm | EX-3.2(B) | BYLAWS | MISSING | b0602416ee9298513dde7955bb0b5ccadca858afe9677d808c3f724d234b8fa9 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X028 | TSCO | 0000916365-12-000081 | exhibit31thirdamendedandre.htm | EX-3.1 | BYLAWS | MISSING | 0879dc010710a1e3e60bc82d9cc76aff370bd0ce7ca89c8029b5c44feb22c7d7 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X029 | TSCO | 0000916365-14-000123 | tscofourthamendedandrestat.htm | EX-3.1 | BYLAWS | MISSING | 3ece9c138d05caa0b2dc1d9d328486f7274e2e7a676ee77ea6e6169dc081b5a3 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X030 | TSCO | 0000916365-17-000026 | a31ififthamendedandrestate.htm | EX-3.1 | BYLAWS | MISSING | eaf76bcfcbd60a364ca512513c04c0455ec2c6c6416de44ad37843c80eebb1a9 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X031 | TSCO | 0000916365-17-000026 | a31iififthamendedandrestat.htm | EX-3.1 | BYLAWS | MISSING | 646d57377075dc1755b38f2a5812150413ab6e2a57c060968f46aa72d2207703 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X032 | TSCO | 0000916365-20-000065 | ex31bylawamendment.htm | EX-3.1 | BYLAWS | MISSING | e423f91b747f3da66bd412fa3bab56d656b51836579c7a41932202baeb9d8638 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X033 | TSCO | 0000916365-20-000107 | ex31-fifthamendedandre.htm | EX-3.1 | BYLAWS | MISSING | 97d31be1123493b2e3981ecde95f6f1defd7e3636de8f1fec53d2413ea9c50c3 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X034 | TSCO | 0000916365-22-000112 | ex31sixthamendedandrestate.htm | EX-3.1 | BYLAWS | MISSING | 2b03680f99d65aff1a83de9abcad28a471c019f62aee8ed246d7f685609ed3a9 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X035 | TSCO | 0000916365-22-000112 | ex32sixthamendedandrestate.htm | EX-3.2 | BYLAWS | MISSING | 15766254d0de405767a9088e5fe0472a5be73c29d2f4f9bf54c4c5b0276864c0 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X036 | TSCO | 0000916365-24-000110 | ex31seventhamendedandresta.htm | EX-3.1 | BYLAWS | MISSING | ec2f91d7c55eb7477a4c81ab507eff299c7bdb24a422b823c3e7881fc558a829 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X037 | TSCO | 0000916365-24-000110 | ex32seventhamendedandres.htm | EX-3.2 | BYLAWS | MISSING | b9e10da686453c1ca07b42e3cb019875f82545a11fbfe17d7216768ca3bdb8ac | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | redline legend "(as amended on November 73, 20242)" |  |
+| X038 | TSCO | 0000916365-24-000117 | exhibit31stocksplit12202024.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | e30068d0cf0193cf62940d4d2a3a9c8ab6f3029ccc9e6c13ab69ad948fbb1aae | ex0 up0 st0 x0 | **A** TIME_BEFORE_DATE | "This Certificate of Amendment shall be effective at 5:00 p.m., Eastern Time, on December 19, 2024" | 2024-12-19 |
+| X039 | TSCO | 0000950144-09-001147 | g17618exv3xiiy.htm | EX-3.II | BYLAWS | MISSING | 3c4531a1e321c4326f5dcfcf4516f531e0f93936eb91866897926a1ccfafb96a | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X040 | TSCO | 0000950144-97-008644 | seq:2 | EX-3.1 | RESTATED_CERTIFICATE | MISSING | a09fcecddaac3f2688c9f51a3403e71330a5619b4a492f5841092e947557edb4 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X041 | TSCO | 0000950144-97-008644 | seq:3 | EX-3.2 | CERTIFICATE_OF_AMENDMENT | MISSING | add818f4e639afd47ce0dadac7751f85e11f567ff535082aeb2dfe2109b6c9b4 | ex0 up0 st1 x0 | **D** INC | recital: cert originally filed 1982 |  |
+| X042 | TSCO | 0000950144-97-008644 | seq:4 | EX-3.3 | CERTIFICATE_OF_AMENDMENT | MISSING | 3c34f0cfbe31b154724f8e72d4175fa2f91f2d427a18053c15861d8f1a8acf34 | ex0 up0 st1 x0 | **D** INC | recital: cert originally filed 1982 |  |
+| X043 | TSCO | 0001188112-04-001145 | ex3_5.txt | EX-3 | BYLAWS | MISSING | a9cd5e03a8180eac40eb990e8faf90bed4714b751c341fb7bbcad9b9857ba954 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X044 | TSCO | 0001188112-05-000902 | tex3_1-6138.txt | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 72ad257ed534a6fa24d3cafe36e757e08014b7a9f3982724a31e5d574a504d8b | ex0 up0 st1 x0 | **D** INC | recital: cert originally filed 1982 |  |
+| X045 | TSCO | 0001188112-05-000902 | tex3_2-6138.txt | EX-3.2 | CERTIFICATE_OF_AMENDMENT | MISSING | 658b6b52876efa509bb97015f56e80ce2563e3ec6495776e138e3915a03c7a51 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X046 | VEEV | 0001393052-21-000008 | veevex31mar2021.htm | EX-3.1 | BYLAWS | MISSING | 80083dbeea08d9cedac45a4fb0c3fb04fd83f83e38154c41bc034449ac4f57ad | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "(as amended and restated on March 17, 2021)" |  |
+| X047 | VEEV | 0001393052-23-000039 | veevex31jun2023.htm | EX-3.1 | BYLAWS | MISSING | 3c9b0c9731185de9ea6658e2b7026245920248a5ca16d078d85c767ac7e1670b | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "(as amended and restated on June 21, 2023)" |  |
+| X048 | VEEV | 0001393052-23-000055 | amendedrestatedcertifica.htm | EX-3.2 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 69933b36632dac55e06bd1d2d6fedb0ad66a36787d4b21125eaac74ee699ad3f | ex0 up0 st1 x0 | **D** INC | recital: original cert filed 2007 |  |
+| X049 | VEEV | 0001393052-23-000055 | certificateofretiremento.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | 8d8885620a220d886fdb468d1243733e075c6e15fef4f625640ce9f4d6a0e9ae | ex0 up0 st1 x0 | **D** PRIOR+SIGNATURE | recital A&R filed June 25, 2021; "executed, acknowledged, and filed ... as of October 16, 2023" |  |
+| X050 | VEEV | 0001628280-21-001246 | veevex32feb2021.htm | EX-3.2 | BYLAWS | MISSING | 56612d75f4e13a1fbe4ba3a2a1ed57bc7f0f1f6ee26d114a30ac191c1938ca5f | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "(as amended and restated on February 1, 2021)" |  |
+| X051 | VEEV | 0001628280-21-013044 | veevex32june2021.htm | EX-3.2 | BYLAWS | MISSING | 1005183c336ea97328fe9e3a84e6df23aa6d6d7ca6a3e842d4ad46e4763d82e3 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "(as amended and restated on June 25, 2021)" |  |
+| X052 | VRSK | 0001193125-15-206612 | d933894dex32.htm | EX-3.2 | BYLAWS | MISSING | 7534432ba19c2732107c4339ab9edbcd3dea947558bcdc5d4c87a8f80d45b51e | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and Restated as of May 26, 2015" |  |
+| X053 | VRSK | 0001193125-16-503652 | d158680dex31.htm | EX-3.1 | BYLAWS | MISSING | 761c12a409b52e7a54c0370fd9d2815ee8221a36b8853c18c1c9c2dd0eea9578 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and Restated as of March 11, 2016" |  |
+| X054 | VRSK | 0001193125-19-042424 | d707519dex31.htm | EX-3.1 | BYLAWS | MISSING | 9ab4de0a388dd2bbaccc940c55945ecfd40c80e78d87aa87c050fbf4f0b6e985 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and Restated as of February 13, 2019" |  |
+| X055 | VRSK | 0001193125-22-163943 | d308585dex32.htm | EX-3.2 | BYLAWS | MISSING | 14fae38026f413cee9044d2441930648ec3ec10bd9446a19c497dfbc5d47dd11 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and Restated as of May 25, 2022" |  |
+| X056 | VRSK | 0001193125-25-127567 | d908167dex32.htm | EX-3.2 | BYLAWS | MISSING | 9aa34f51a490bf6a86275465c0ebb1d86e9ac96f53044fdf019956aee468758b | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and Restated as of May 20, 2025" |  |
+| X057 | HII | 0000950123-11-032558 | v59141exv3w2.htm | EX-3.2 | BYLAWS | MISSING | cc33171e742b0927fac0f1bad33a2abb86afea678463d561f7133c514ae7befb | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, March 30, 2011" |  |
+| X058 | HII | 0001193125-13-201661 | d532438dex3ii.htm | EX-3.(II) | BYLAWS | MISSING | 87ddd448e27d434c3643afe5e435589a0699f153e3e45cde1c0ef0f58292f21a | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, May 1, 2013" |  |
+| X059 | HII | 0001193125-15-073547 | d882901dex32.htm | EX-3.2 | BYLAWS | MISSING | c2fec4cb6731110f23b2c738c5c43fe454b3524bd67b876b3d36be4653c9a800 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, February 24, 2015" |  |
+| X060 | HII | 0001193125-16-445822 | d131600dex31.htm | EX-3.1 | BYLAWS | MISSING | a9c9d8560e066a69c1789ba58fbdf839aa6af7161aa11f3df2f6856ee30cd780 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, January 28, 2016" |  |
+| X061 | HII | 0001193125-21-100439 | d168808dex31.htm | EX-3.1 | BYLAWS | MISSING | 11b636e9e2b16e6d4c6b756920f0a6f8364a8c6c6654b94a212c0a7c4b870f57 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, March 2, 2021" |  |
+| X062 | HII | 0001193125-22-280169 | d418198dex31.htm | EX-3.1 | BYLAWS | MISSING | e48875d0e7f6a359d1503cb7966effa5b3af7166b76325d253a7e7d0ea6f8305 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, March 2, 2021" |  |
+| X063 | HII | 0001501585-12-000028 | hii-ex32q3.htm | EX-3.2 | BYLAWS | MISSING | 5e7fdeee4f8d05fa7ef0577c74d029e5dc38cd90a5e2aed032d60b820088a870 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, March 30, 2011" |  |
+| X064 | HII | 0001501585-14-000034 | hii-ex32q22014.htm | EX-3.2 | CERTIFICATE_OF_AMENDMENT | MISSING | 786cd558670492237867e0bbdaabbc045afcd9cf85890d2d7fcdb93cf84e9e45 | ex0 up0 st1 x0 | **D** PRIOR | recital: restated cert filed March 30, 2011 |  |
+| X065 | HII | 0001501585-15-000027 | hii-ex33q22015.htm | EX-3.3 | CERTIFICATE_OF_AMENDMENT | MISSING | 030ecfe0285decebea4869b7cee5be3c60f793e110ca32ae70c353dddb599488 | ex0 up0 st2 x0 | **D** PRIOR | recitals: restated cert filed 2011; amendment filed 2014 |  |
+| X066 | HII | 0001501585-25-000040 | ex31huntingtoningallsresta.htm | EX-3.1 | RESTATED_CERTIFICATE | MISSING | f7465dba345e684d494e97be12f4bdbad5e59aba960bc9f1148847d7c3f6b248 | ex0 up0 st0 x0 | **D** INC | recital: original cert filed 2010 |  |
+| X067 | HII | 0001501585-25-000040 | ex32hii-restatedbylaws0430.htm | EX-3.2 | BYLAWS | MISSING | f539a820447fc9f9525428c335802687b547b2fd2975ca72b1da7c159780844e | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "As amended, April 30, 2025" |  |
+| X068 | HLT | 0001193125-13-476077 | d645078dex32.htm | EX-3.2 | BYLAWS | MISSING | db6337451b4d8dc3b734d71fe34eade84d8d002c1434eafff3bed40802e8e8e7 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X069 | HLT | 0001193125-17-001901 | d302894dex31.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | ed5c92fb31156bf0ddaaa8a0b20ca3940a3ed23e57a731e0a0a2b567e0eb3574 | ex0 up0 st0 x0 | **A** TIME_BEFORE_DATE | "The foregoing amendment shall become effective at 5:01 p.m. (Eastern Time) on January 3, 2017" | 2017-01-03 |
+| X070 | HLT | 0001193125-17-087414 | d363167dex32.htm | EX-3.2 | BYLAWS | MISSING | 877d58f7061470b0e2fb9cfd4c197062910fcab12a3516002f331943451c8405 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X071 | HLT | 0001193125-17-347054 | d497124dex31.htm | EX-3.1 | BYLAWS | MISSING | 3ae2c02fc9606bb39a93584ea3d6f92f6d703b982ad3c4860e73a8c222c3cd97 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X072 | HLT | 0001193125-19-212020 | d778524dex31.htm | EX-3.1 | BYLAWS | MISSING | a74cc7338b3735e33fa72bb4c5d67cc5b24dde9a98d95036e24a8e38db8595cb | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X073 | HLT | 0001193125-19-212020 | d778524dex32.htm | EX-3.2 | BYLAWS | MISSING | 42743cebb441347b872e420a5184f27a032e79294dbc689552612a52ca773ed1 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X074 | HLT | 0001585689-25-000109 | certificateofamendment-bxe.htm | EX-3.2 | CERTIFICATE_OF_AMENDMENT | MISSING | 980bba1bbd5279f1ea163af92ba5900b2df0cce1780a0a723f433ea392ea2ea6 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X075 | HLT | 0001585689-25-000109 | certificateofamendment-sup.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 0952c270a24b3e0736d9538599a2bb3bae2d32f9ba4d5a9054c33677c82ffa18 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X076 | HLT | 0001585689-25-000109 | hlt-bylawredlinexex35.htm | EX-3.5 | BYLAWS | MISSING | 1586d755192dae3976e803deb1a53316469c7c8e99cd16af67280f4e092738f4 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X077 | HLT | 0001585689-25-000109 | hlt-bylawsexhibit34.htm | EX-3.4 | BYLAWS | MISSING | 70a14191fb88b2ad537641bbb9c425fbd54920cc93cb720e78709f9d7c8e68a8 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X078 | GOOGL | 0001193125-26-259830 | d36818dex31.htm | EX-3.1 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | def7e91b12dc53cee637ca08fe717c8b964dc781739681e172b5569b0869f2ec | ex0 up0 st0 x0 | **D** ADOPTION | certificate of designations; "on June 3, 2026, the Audit Committee adopted the resolution" |  |
+| X079 | GOOGL | 0001193125-26-259830 | d36818dex32.htm | EX-3.2 | AMENDED_AND_RESTATED_CERTIFICATE | MISSING | b4e855dec8bf104967cc27b592be4026df493e5d6749cd80ab8c16d5950d71d7 | ex0 up0 st0 x0 | **D** ADOPTION | same (Series B) |  |
+| X080 | ASH | 0000950170-22-000508 | ash-ex3_1.htm | EX-3.1 | BYLAWS | MISSING | c427d9770a598409cf80a20a772fe44c1ae495924a337bbf3d0572b718f9556e | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and restated as of January 24, 2022" |  |
+| X081 | ASH | 0000950170-22-018687 | ash-ex3_1.htm | EX-3.1 | BYLAWS | MISSING | f0559cbba84c912d7afe17973b568238c6b5281847fcb4c0e950b8e33cd06ad0 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and restated as of September 20, 2022" |  |
+| X082 | ASH | 0001193125-16-714093 | d246354dex32.htm | EX-3.2 | BYLAWS | MISSING | 0ecf0a75d11a43c5d4e114d12789dfd6c6b5eef7575f21c6f9f7aeb1f1c2987e | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and restated as of September 19, 2016" |  |
+| X083 | ASH | 0001674862-16-000008 | a9302016exhibit32by-laws.htm | EX-3.2 | BYLAWS | MISSING | e41a97c63128e36b0fdbd04f4c834eadb5ca5e7fc0c2b2480b250905171f8f70 | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "Amended and restated as of September 19, 2016" |  |
+| X084 | ASH | 0001674862-17-000083 | ex3_1.htm | EX-3.1 | BYLAWS | MISSING | 98f5ca63a368c03dbb9b3786e6b7c0189621c32cab5bff775f455a5c98702b3f | ex0 up0 st0 x0 | **E** LEGEND_NO_EFFECTIVE | "AMENDED AND RESTATED AS OF NOVEMBER 15, 2017" |  |
+| X085 | AA | 0000950103-24-011378 | dp215750_ex0301.htm | EX-3.1 | CERTIFICATE_OF_DESIGNATION | MISSING | 6d54fdf4e38012eb823f0c892f829c0216e7cd0cb310525ce24cf8fffaf67a33 | ex0 up0 st0 x0 | **E** | conversion-rate "effective as of the date the Board ... determines" (no instrument date) |  |
+| X086 | AA | 0001193125-26-077167 | aa-ex3_4.htm | EX-3.4 | CERTIFICATE_OF_DESIGNATION | MISSING | 6fd667382de45f07543997677c579a4b5e9f10b959795c469ee5fddeea582649 | ex0 up0 st0 x0 | **D** PRIOR | recital: certificate of designation filed July 31, 2024 |  |
+| X087 | CI | 0000950159-20-000057 | ex3-1.htm | EX-3.1 | BYLAWS | MISSING | d10ba40b0506b2fc736a4ead3a469f0360069f8434843f4078a35087bd202f24 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X088 | CI | 0000950159-21-000343 | ex3-1.htm | EX-3.1 | BYLAWS | MISSING | af9da629aa99d79ff06f4785aed9da6b6417a94a44fd6299a56466e19e783266 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X089 | CI | 0000950159-22-000220 | ex3-2.htm | EX-3.2 | BYLAWS | MISSING | d1a250bea6c6fb57e3d2241d6dba5f619644b596944a17f804940d64d63fbc40 | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X090 | CI | 0000950159-23-000019 | ex3-1.htm | EX-3.1 | CERTIFICATE_OF_AMENDMENT | MISSING | 81237abbf0e5c2142148a843a52ce2e25ca17568616ee6b8a278ab53cb26d5d5 | ex0 up0 st0 x0 | **A** TIME_BEFORE_DATE | "This Certificate of Amendment shall become effective at 8:00 a.m. Eastern Time on February 13, 2023" | 2023-02-13 |
+| X091 | CI | 0000950159-23-000019 | ex3-3.htm | EX-3.3 | BYLAWS | MISSING | 756129f68fb18222d97d0eee3c1a9b884c7fd8f497312ed7af21b9aa3281450e | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+| X092 | CI | 0001739940-21-000024 | exhibit31-2021_q3.htm | EX-3.1 | BYLAWS | MISSING | 6434b309d9bf2e8484a1619dbb608745368fbe5a844403ea3c892b689968aecc | ex0 up0 st0 x0 | **A** BARE_EFFECTIVE+BYLAWS | "Approved by the Board of Directors effective November 2, 2021." | 2021-11-02 |
+| X093 | CI | 0001739940-22-000007 | exh32amendedandrestatedbyl.htm | EX-3.2 | BYLAWS | MISSING | ee6fd76321167d8ef60b474fd25a0bf2c66315937cbf3ff6b6984642a27df3ca | ex0 up0 st0 x0 | **E** | no dated effectiveness/filing statement |  |
+
+
 ## 11. 결과
 
 
