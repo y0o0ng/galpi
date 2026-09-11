@@ -6634,6 +6634,289 @@ returns / ranking / portfolio    NO
 받은 SEC 본문과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
 
 
+## 10.39 Regulation S-K Item 601 current-state observation probe — 10-K가 "현재 유효한 정관"을 증언하는가 — 2026-09-11
+
+**작은 source/structure viability probe다.** production 코드와 CLOSED 계약(O2 · O2-C · B2 · 탄생 ·
+B1/P2/N1 · class-id · bundle · manifest · `RelationInterval`)을 바꾸지 않았고 Option A를 구현하지 않았다.
+새 사실 `REGULATORY_CURRENT_STATE_OBSERVATION`은 **법적 발효일도 탄생도 아니다** — 이 probe가 재는 것은
+`CURRENT_AT_OBSERVATION(target class, charter state, SEC filing observation time)`이 historical 10-K에서
+결정론적으로 뽑히는지와 얼마나 자주 formation 앞에 있는지뿐이다.
+
+```text
+base (origin/main)   0b52f97b9f0fe4946a8609d3e65581d305775546   (QV 코드·문서 이동 없음)
+inventory sha256     dc13cae6c9f375c2f1dea72a01da9bc16682d7298fcc2b24900d03feb5a8ceba   ✓
+5A-2 output sha256   b68813def1f815c174ff454b89a6b198ddbac3eb6fe631ae1232f486b364cfc5   ✓
+run_identity_sha256  sha256:52ff66d48ef3a1aecc620bd7aed2c5ec15112c57a5abd9d714667532c1165fda   ✓
+authority set        Form 10-K · 10-K/A 뿐 (10-Q · S-1 · S-3 · proxy · 주 등록부는 넣지 않았다)
+```
+
+열린 correctness 문제(O2 subject attribution · 10.38의 classifier false positive)는 고치지 않았고 그 출력을
+권위로 쓰지 않았다 — 이 probe는 charter의 O2 날짜를 한 번도 읽지 않는다.
+
+### 근거 구분
+
+```text
+OFFICIAL_SEC_RULE_BASIS    Regulation S-K Item 601(b)(3)(i) "as currently in effect" · 8-K에 amendment 문언만
+                           보고한 뒤 다음 해당 정기보고서/등록서류에 complete copy · Corp Fin C&DI 246.01 ·
+                           Form 8-K Item 5.03의 보고 조건(proxy/information statement로 이미 공시한 제안 제외)
+                           — 과제 지시문이 제시한 근거다. 이 probe에서 규칙 원문을 다시 받아 대조하지 않았다.
+DETERMINISTIC              표본 선정 · submissions 행 · exhibit index 행 추출 · 행 유형 · 참조 해석 · SHA ·
+                           production classify_document / resolve_class_association · 세션 수 · 틈 진단 · bracketing
+MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT
+                           TRMB · AME 불일치 원인 · WST 사례 해석 · 추출기 누락 식별. 사람 판정이 아니다.
+DIAGNOSTIC_INFERENCE       아래 "답" 5 · 6
+```
+
+### 표본 — 36 formation point
+
+```text
+eligible item     exact cover association(10.36의 528) 중 saved proof에 대상 class와 연결된
+                  GOVERNING_CLASS_DEFINITION이 하나 이상 있는 item — 151
+                  (production ClassEvidence는 전 population에서 0이라 "ClassEvidence 없음"은 자동 성립)
+formation point   그 item의 demanded_formation_sessions · 연도로 층을 나눈다
+                  2010–2014 373 · 2015–2020 556 · 2021–2026 604
+order key         sha256("qv-5a2-item601-probe-v1|" + member_symbol + "|" + identity_symbol + "|" + formation_session)
+선정              층마다 order key 오름차순 앞 12개 (CIK 중복 배제 없음)
+결과              36 case · 33 CIK (MCD · CTSH · TXT가 두 번씩)
+```
+
+### 관측 filing 선택 규칙
+
+```text
+PRE   acceptance Eastern date < formation인 10-K · 10-K/A 중 가장 늦은 것 하나.
+      그것이 10-K/A이고 exhibit index에 charter 행이 없으면 가장 늦은 원본 10-K 하나로만 물러난다(WM 1건).
+POST  acceptance Eastern date ≥ formation인 첫 10-K · 10-K/A (같은 물러남 규칙).
+      더 거슬러 올라가거나 다른 form을 보지 않는다.
+```
+
+### network
+
+```text
+requests 179 · distinct URL 172 · 표본 CIK 33 밖 요청 0 · population crawl 없음
+  submissions recent 33 · archive 46
+  10-K primary document · charter document 85
+  accession header index 11   (전부 HTTP 404 · 고유 URL 4)
+  complete submission 4
+deviation  실패 응답을 캐시에 남기지 않아 같은 404 header index URL 4개가 추출기 재실행과 pre/post에서
+           7번 더 요청됐다. 자동 retry 루프는 아니었지만 "요청은 한 번" 원칙에서 벗어났다. 결과는 같다.
+```
+
+### 추출기 개발 이력 — 낙관 편향을 적는다
+
+추출기는 이 36건을 보면서 세 번 고쳤다.
+
+```text
+v1  표 행 파서
+v2  여러 셀로 쪼개진 번호 조립 ("(3)" "(a)" · "3" ".1" · "3-1" · "EXHIBIT 3" "(a)")
+v3  괄호 번호 "(3.1)" · 문자 부속 번호 "3.A" · 표 footnote 뒤에 가려진 문단 목록 ·
+    "06/30/95 Form 10-Q" 기간 표기 · header index 404일 때 production _accession_layout과 같은
+    complete submission 분해
+```
+
+**같은 표본을 보며 고쳤으므로 아래 추출 성공률은 처음 보는 10-K에 대해 낙관적이다.** 자격 규칙(단일
+charter 행 · 모호하면 fail-close · 한 hop)은 반복 중 완화하지 않았다.
+
+### ITEM 601 EXTRACTION — PRE 36
+
+```text
+qualifying current-state observations     12   early 2 · mid 4 · late 6
+no qualifying 10-K                          1   BEAM_OLD — 선택 CIK(2018 설립 Beam Therapeutics)에 2012 이전 10-K가 없다
+exhibit-index parse failure                 0   관측 filing 35개 전부에서 Exhibit 3 행을 뽑았다(v3 기준)
+incorporated-by-reference (qualifying)     12
+directly filed (qualifying)                 0
+ambiguous/composite charter                17
+  charter + amendment 행                   10
+  charter + amendment + designation         2
+  charter + amendment + elimination         1
+  charter 행 여럿 (다중 등록인 AEP · EXC)    2
+  charter + certificate of merger (CPAY)    1
+  charter + other-series 행만 (NWS)          1   그 행을 제쳤다면 자격을 얻는다
+unresolved reference                        4   MCD ×2 참조에 exhibit 번호가 없다 · TDC "8-K dated" 날짜가 제출일인지
+                                                사건일인지 정해지지 않아 일치 0 · SWN 가리킨 8-K에 TYPE EX-3.1 0
+target definition absent                    0
+classification/source mismatch              2   TRMB · AME
+```
+
+qualifying 12의 참조 방식은 **hyperlink 9**(2019–2025 filing)와 **같은 CIK의 form + 제출일/기간 metadata 한
+hop + exhibit TYPE 3**(XYL · WEC · SWKS, 2011–2015 filing)이다. 두 번째 hop이 필요한 사례는 없었고, 회사 이름
+· fuzzy 문서 매칭은 쓰지 않았다.
+
+해석된 charter 본문은 **고유 16문서이고 전부 5A-2 receipt에 이미 있었으며 SHA가 전부 일치한다.** XYL · SWKS는
+complete submission `<TEXT>` payload의 SHA가 파일 SHA와 달라 exact file URL로 다시 받아 대조했다(2회) — 표현
+차이이지 provenance 차이가 아니다. 5A-2 밖에서 새로 따라간 문서는 0이다.
+
+**불일치 2건 (MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT).**
+
+```text
+TRMB  hyperlink ex3-1.htm = 델라웨어 주가 인증한 원 "CERTIFICATE OF INCORPORATION OF TRIMBLE INC." — 완전한 charter다.
+      production classifier에 plain certificate-of-incorporation family가 없어 본문의 by-laws 언급으로 BYLAWS가 됐다
+      (false positive). production 정의 문법도 "authorized to issue two classes of shares to be designated
+      respectively Preferred Stock ... and Common Stock"을 받지 못해 정의 0이다.
+AME   행 설명은 "Conformed Copy of Amended and Restated Certificate of Incorporation ... as amended to and
+      including May 9, 2019"인데 hyperlink가 가리키는 문서는 "CERTIFICATE OF AMENDMENT TO THE AMENDED AND
+      RESTATED CERTIFICATE OF INCORPORATION"(Article SEVENTH만 교체)이다. classifier가 맞다 — 10-K의 exhibit
+      index 설명과 그 링크 대상이 서로 다르다.
+```
+
+### FORMATION DIAGNOSTIC — qualifying 12
+
+```text
+observation before formation              12 / 12 (선택 규칙상)
+first_regular_session_after_observation   production _historical_usable_session
+                                          (SPY eodhd/eodhd-15y-2026-08 · acceptance Eastern date 다음 첫 세션)
+session gap                               [first session, formation) 안의 SPY 세션 수
+gaps                                      84 85 86 88 89 90 92 94 94 96 97 102
+median                                    91
+p90                                       97 (nearest-rank)
+```
+
+```text
+틈 진단 (관측 accept < t, t의 Eastern date < formation · 이미 알려진 SEC 증거만)
+no known charter/governing candidate in gap        11
+Item 5.03 filing in gap                             1   CMG (bylaws 8-K)
+target-class finding in gap                         0
+other-series-only positive scope                    0
+bylaws-only                                         1   CMG
+unresolved governing document                       0
+later current-state observation before formation    0   (WM의 10-K/A 1건은 exhibit index가 없다)
+classification ambiguity/error                      0
+틈 증거가 legal search INCOMPLETE item에서 온 것     7 / 12
+```
+
+**"no Item 5.03"은 연속성 증거가 아니다 — 이 표본에 실례가 있다.**
+
+```text
+WST  PRE  0000105770-20-000015 (10-K, 2020-02-21) -> 2015 A&R Articles(ex31amendedarticles.htm)가 current
+     POST 0000105770-21-000008 (10-K, 2021-02-23) -> 2020 A&R Articles(ex31articlesofincorpor.htm)가 current
+     새 articles 본문: "(Effective as of May 5, 2020)"   (10.37 anchor 귀속 감사)
+     formation 2020-06-30
+     틈 안: Item 5.03 8-K 0 · legal search COMPLETE · 새 articles의 첫 SEC 수리는 10-Q 2020-07-24(formation 뒤)
+```
+
+2월 10-K가 current라고 말한 charter는 **formation 전인 5월 5일에 이미 바뀌었다.** 그런데 틈 진단은
+"no known governing candidate"라고 셌다 — Item 5.03도 없고, 새 문서의 SEC 수리는 formation 뒤이기 때문이다.
+대상 class 이름과 액면가(Common Stock · $0.25)는 그대로였지만 **charter 상태는 달랐다.**
+
+### BRACKETING — qualifying 12
+
+```text
+post-formation qualifying observation available   12
+exact same referenced charter SHA                 11
+different referenced charter SHA                   1   WST
+same target designation / par                     12
+changed target designation / par                   0
+unresolved                                         0
+```
+
+같은 SHA 11건은 **두 관측 사이에 일시적 변경이 없었다는 증명이 아니다.** WST처럼 틈 안의 변경은 SEC
+증거로 보이지 않을 수 있고, 바뀌었다 되돌아간 상태는 bracketing이 원리상 볼 수 없다.
+
+POST 쪽 전체 분포는 QUALIFYING 12 · composite 17 · unresolved 4 · mismatch 2 · 10-K 없음 1(WAT, formation
+2026-06-30 뒤 10-K 미제출)이다.
+
+### DOWNSTREAM
+
+```text
+PRIOR_DECEMBER_CHECK = NOT_MEASURABLE
+```
+
+formation → December valuation session D를 만드는 canonical helper가 없다. `qv_selector.s1_window()`는 D를
+인자로 받고 `june_formation_sessions()`는 6월만 만든다. 새 달력 규칙을 만들지 않았고 share fact를
+materialize하지 않았다.
+
+### 답
+
+1. **historical 10-K에서 Item 601 current-state 관측을 결정론적으로 뽑을 수 있나 — 조건부로 그렇다.** 관측
+   filing 35개 전부에서 Exhibit 3 행을 뽑았고, 단일 charter 행 구조 18건 중 14건이 정확한 SEC 자연키로
+   풀렸다. 다만 exhibit index 모양이 filing마다 달라(분할 셀 · `(3)(a)` · `3-1` · 다중 등록인) 추출기를 이
+   표본으로 세 번 고쳐야 했다. 2019년 이후 hyperlink 행은 안정적이고, 그 이전 텍스트 참조가 약하다.
+2. **incorporation-by-reference를 휴리스틱 없이 풀 수 있나 — 대부분 그렇지만 전부는 아니다.** hyperlink 9건은
+   자연키가 URL에 그대로 있다. 텍스트 참조는 같은 CIK의 form + 제출일/기간 + exhibit TYPE으로 3건이 풀렸고
+   4건은 fail-close했다(exhibit 번호 없음 2 · "dated"의 제출일/사건일 모호 1 · TYPE 없음 1). **hyperlink도
+   설명과 다른 문서를 가리킬 수 있다(AME)** — 설명 ↔ 대상 일치 확인이 따로 필요하다.
+3. **formation 앞에 자격 있는 관측이 얼마나 자주 있나 — 36 중 12(early 2/12 · mid 4/12 · late 6/12).**
+   가장 큰 손실은 빈도가 아니라 **composite 구조(17/36)**다 — 기본 charter와 amendment들을 따로 나열하는
+   exhibit index는 흔하고, "단일 charter 행" 규칙이 그것을 전부 떨어뜨린다.
+4. **formation보다 얼마나 앞서나 — 중앙값 91 세션 · p90 97 세션.** 12월 결산 10-K(2월)에서 6월 formation까지의
+   거리다.
+5. **CURRENT_AT_OBSERVATION → proved-valid-segment 연속성 계약을 설계할 만큼 잦은가 — 문턱으로 답하지 않고
+   증거를 적는다.** 자격 관측은 formation 앞에 3분의 1에서 있고 formation 시점에 약 91 세션 묵어 있다.
+   12건 중 1건(WST)은 그 틈 안에서 charter가 법적으로 바뀌었는데 Item 5.03도 formation 전 SEC 수리 문서도
+   없었다. composite 구조가 빈도보다 큰 장벽이고, 그것을 쓰려면 "기본 charter + 나열된 amendment = 현재
+   상태" 해석 계약이 따로 필요하다. bracketing은 11/12가 같은 SHA이지만 틈 안의 변경을 배제하지 못한다.
+6. **점 관측을 세션 구간으로 만들려면 무엇이 더 필요한가.** SEC acceptance를 법적 시점으로 바꾸지 않는다는
+   전제에서:
+   - **틈 안 charter 변경의 완전한 원장.** Item 5.03은 원장이 아니다(WST). proxy/information statement의 승인
+     공시와 주 등록부 제출 기록이 후보이지만 이 probe의 authority set 밖이다.
+   - **틈을 줄이는 중간 관측.** 10-Q exhibit index가 Item 601(b)(3) current-state 표현을 싣는지는 이 probe가
+     확인하지 않았다.
+   - **관측 앞쪽 경계.** 관측은 acceptance 다음 첫 세션부터만 알 수 있다. 그 전 세션의 유효성은 charter 자신의
+     법적 발효일(O2)이 필요하고, O2는 subject-attribution 수리가 먼저다.
+   - **composite 상태 해석 계약**과 **exhibit 설명 ↔ 대상 문서 일치 확인**.
+   - **classifier 적용 범위** — plain certificate of incorporation · conformed copy(TRMB · AME).
+
+### 범위
+
+```text
+production code changed          NO
+O2 / O2-C · B2 · birth changed   NO
+B1 / P2 / N1 · class-id          NO
+Option A · bundle v4             NO
+RelationInterval semantics       NO   (관측을 어떤 구간에도 쓰지 않았다)
+manifest · promotion             NO
+5A-3 · Gates                     NO
+returns / rankings / portfolio   NO
+full 897 crawl                   NO   (표본 CIK 33만 · 179 요청)
+```
+
+받은 SEC 본문과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
+
+## 10.39-A 행 단위 감사 — 36 formation point
+
+`gap`은 `[first session after, formation)`의 SPY 세션 수다. `= 5A-2`는 charter 본문 SHA가 5A-2 기록의
+`document_sha256`과 같은지다. `bracket`은 PRE가 QUALIFYING일 때만 채운다. 판정은 전부 DETERMINISTIC이고,
+TRMB · AME의 원인 해석과 WST 해석만 위 절의 MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT다.
+
+| # | stratum | item | formation | CIK | 5A-2 stage | PRE 10-K observation (accession · form · acceptance) | first session after | gap | exhibit row | reference | charter natural key | charter SHA-256 | = 5A-2 | classification | target assoc | PRE outcome | gap diagnostics | POST outcome · charter | bracket |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 01 | early | NFLX/NFLX | 2014-06-30 | 0001065280 | NO_DATED_ANCHOR | 0001065280-14-000006 · 10-K · 2014-02-01T00:14:52.000000Z | 2014-02-03 | 102 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT_ELIMINATION | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001065280-15-000006 |  |
+| 02 | early | XYL/XYL | 2012-06-29 | 0001524472 | NO_DATED_ANCHOR | 0001193125-12-084766 · 10-K · 2012-02-28T19:43:15.000000Z | 2012-02-29 | 85 | (3.1) | TEXT_METADATA+COMPLETE_SUBMISSION · INCORPORATED | 0000950123-11-089760/y93081exv3w1.htm | 8914c2ff92a2ed462a0d0656c0888de75a4af6275951abaae443d81484621637 | True | AMENDED_AND_RESTATED_ARTICLES | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search COMPLETE | QUALIFYING · 0001524472-13-000003 · 0000950123-11-089760/y93081exv3w1.htm | SAME_SHA |
+| 03 | early | MCD/MCD | 2010-06-30 | 0000063908 | SEARCH_INCOMPLETE | 0001193125-10-042025 · 10-K · 2010-02-26T15:45:54.000000Z | 2010-03-01 | 85 | (3) (a) | TEXT · form=8-K exhibit=None date=1998-04-17 |  |  |  |  |  | **UNRESOLVED_REFERENCE** | no_known_governing_candidate=1 · search INCOMPLETE | UNRESOLVED_REFERENCE · 0001193125-11-046701 |  |
+| 04 | early | CTSH/CTSH | 2011-06-30 | 0001058290 | SEARCH_INCOMPLETE | 0001193125-11-043696 · 10-K · 2011-02-23T22:01:58.000000Z | 2011-02-24 | 88 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | target_class_finding=1, bylaws=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001193125-12-081638 |  |
+| 05 | early | ANF/ANF | 2010-06-30 | 0001018840 | NO_DATED_ANCHOR | 0000950123-10-029409 · 10-K · 2010-03-29T20:03:20.000000Z | 2010-03-30 | 64 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT_DESIGNATION | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT_DESIGNATION · 0000950123-11-030172 |  |
+| 06 | early | AEP/AEP | 2014-06-30 | 0000004904 | SEARCH_INCOMPLETE | 0000004904-14-000019 · 10-K · 2014-02-25T19:26:50.000000Z | 2014-02-26 | 86 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** MULTIPLE_CHARTER_ROWS | no_known_governing_candidate=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE MULTIPLE_CHARTER_ROWS · 0000004904-15-000008 |  |
+| 07 | early | WEC/WEC | 2011-06-30 | 0000783325 | NO_DATED_ANCHOR | 0000107815-11-000028 · 10-K · 2011-02-25T16:08:30.000000Z | 2011-02-28 | 86 | 3.1* | TEXT_METADATA+COMPLETE_SUBMISSION · INCORPORATED | 0000107815-95-000020/seq:2 | 84af5bab65f78be3a289b7da03ae565105d6d1aceae8cc04e9454c52b6e986e8 | True | RESTATED_ARTICLES | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search COMPLETE | QUALIFYING · 0000107815-12-000039 · 0000107815-95-000020/seq:2 | SAME_SHA |
+| 08 | early | BEAM_OLD/BEAM | 2012-06-29 | 0001745999 | NO_DATED_ANCHOR | — | — | — |  |  |  |  |  |  |  | **NO_QUALIFYING_10K** no 10-K/10-K-A on that side of formation under this CIK |  | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001564590-20-014308 |  |
+| 09 | early | MCD/MCD | 2014-06-30 | 0000063908 | SEARCH_INCOMPLETE | 0000063908-14-000019 · 10-K · 2014-02-24T18:26:44.000000Z | 2014-02-25 | 87 | (3)(a) | TEXT · form=10-Q exhibit=None date=2012-06-30 |  |  |  |  |  | **UNRESOLVED_REFERENCE** | no_known_governing_candidate=1 · search INCOMPLETE | UNRESOLVED_REFERENCE · 0000063908-15-000016 |  |
+| 10 | early | CTSH/CTSH | 2010-06-30 | 0001058290 | SEARCH_INCOMPLETE | 0001193125-10-040500 · 10-K · 2010-02-25T20:07:06.000000Z | 2010-02-26 | 86 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001193125-11-043696 |  |
+| 11 | early | TXT/TXT | 2013-06-28 | 0000217346 | NO_DATED_ANCHOR | 0001104659-13-011048 · 10-K · 2013-02-15T11:06:55.000000Z | 2013-02-19 | 91 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001104659-14-009908 |  |
+| 12 | early | SWN/SWN | 2012-06-29 | 0000007332 | SEARCH_INCOMPLETE | 0000007332-12-000003 · 10-K · 2012-02-27T18:06:56.000000Z | 2012-02-28 | 86 | 3.1 | TEXT_METADATA+COMPLETE_SUBMISSION · INCORPORATED · exhibit ('3', '1') TYPE matches=0 |  |  |  |  |  | **UNRESOLVED_REFERENCE** | item_503_in_gap=1 · search INCOMPLETE | UNRESOLVED_REFERENCE · 0000007332-13-000007 |  |
+| 13 | mid | EXC/EXC | 2016-06-30 | 0001109357 | SEARCH_INCOMPLETE | 0001193125-16-457652 · 10-K · 2016-02-10T21:36:37.000000Z | 2016-02-11 | 97 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** MULTIPLE_CHARTER_ROWS | item_503_in_gap=1, bylaws=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE MULTIPLE_CHARTER_ROWS · 0001193125-17-039639 |  |
+| 14 | mid | HAL/HAL | 2020-06-30 | 0000045012 | SEARCH_INCOMPLETE | 0000045012-20-000031 · 10-K · 2020-02-11T21:57:53.000000Z | 2020-02-12 | 96 | 3.1 | HYPERLINK · INCORPORATED | 0000045012-06-000247/restatedcertofincorp.htm | 72a88a07420e52ac0a4fc31199bf9321894f31e631fa18467951af64a4aa5dac | True | RESTATED_CERTIFICATE | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search INCOMPLETE | QUALIFYING · 0000045012-21-000009 · 0000045012-06-000247/restatedcertofincorp.htm | SAME_SHA |
+| 15 | mid | SWKS/SWKS | 2015-06-30 | 0000004127 | SEARCH_INCOMPLETE | 0000004127-15-000004 · 10-K/A · 2015-02-02T21:01:09.000000Z | 2015-02-03 | 102 | 3.1 | TEXT_METADATA+COMPLETE_SUBMISSION · INCORPORATED | 0001193125-11-216494/dex3a.htm | 50347176d7df827acc922c4b3ab9b95a9b72051b40cf5a4f865e7211f37a6db3 | True | RESTATED_CERTIFICATE | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search INCOMPLETE | QUALIFYING · 0000004127-15-000037 · 0001193125-11-216494/dex3a.htm | SAME_SHA |
+| 16 | mid | ISRG/ISRG | 2016-06-30 | 0001035267 | SEARCH_INCOMPLETE | 0001035267-16-000130 · 10-K · 2016-02-02T22:22:41.000000Z | 2016-02-03 | 103 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001035267-17-000021 |  |
+| 17 | mid | WST/WST | 2020-06-30 | 0000105770 | ANCHOR | 0000105770-20-000015 · 10-K · 2020-02-21T23:56:52.000000Z | 2020-02-24 | 89 | 3.1 | HYPERLINK · INCORPORATED | 0000105770-15-000015/ex31amendedarticles.htm | e32210d672eac05f38ac1c82a838f305224327a0a141539fdcd04745b3e8274f | True | AMENDED_AND_RESTATED_ARTICLES | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search COMPLETE | QUALIFYING · 0000105770-21-000008 · 0000105770-20-000045/ex31articlesofincorpor.htm | DIFFERENT_SHA |
+| 18 | mid | WU/WU | 2019-06-28 | 0001365135 | SEARCH_INCOMPLETE | 0001558370-19-000848 · 10-K · 2019-02-21T21:08:24.000000Z | 2019-02-22 | 88 | 3.1 | HYPERLINK · INCORPORATED | 0001365135-18-000024/exhibit31-2018amendedcoi.htm | c96c074a5ac9c4cf2754b05df29d467f67c5da19a91f27529423638c92a1cf67 | True | AMENDED_AND_RESTATED_CERTIFICATE | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search INCOMPLETE | QUALIFYING · 0001558370-20-001090 · 0001365135-18-000024/exhibit31-2018amendedcoi.htm | SAME_SHA |
+| 19 | mid | HSIC/HSIC | 2016-06-30 | 0001000228 | NO_DATED_ANCHOR | 0001000228-16-000042 · 10-K · 2016-02-10T20:04:27.000000Z | 2016-02-11 | 97 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001000228-17-000011 |  |
+| 20 | mid | TDC/TDC | 2015-06-30 | 0000816761 | SEARCH_INCOMPLETE | 0000816761-15-000008 · 10-K · 2015-02-27T15:27:25.000000Z | 2015-03-02 | 84 | 3.1 | TEXT_METADATA · 8-K PERIOD 2007-09-25 matches=0 |  |  |  |  |  | **UNRESOLVED_REFERENCE** | no_known_governing_candidate=1 · search INCOMPLETE | UNRESOLVED_REFERENCE · 0000816761-16-000045 |  |
+| 21 | mid | TXT/TXT | 2015-06-30 | 0000217346 | NO_DATED_ANCHOR | 0001104659-15-013784 · 10-K · 2015-02-25T18:56:08.000000Z | 2015-02-26 | 86 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001104659-16-099562 |  |
+| 22 | mid | AYI/AYI | 2017-06-30 | 0001144215 | NO_DATED_ANCHOR | 0001144215-16-000287 · 10-K · 2016-10-27T21:16:54.000000Z | 2016-10-28 | 168 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | unresolved_governing_document=1, bylaws=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001144215-17-000106 |  |
+| 23 | mid | KLAC/KLAC | 2016-06-30 | 0000319201 | NO_DATED_ANCHOR | 0000319201-15-000053 · 10-K · 2015-08-07T20:31:43.000000Z | 2015-08-10 | 225 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0000319201-16-000090 |  |
+| 24 | mid | CNC/CNC | 2020-06-30 | 0001071739 | SEARCH_INCOMPLETE | 0001071739-20-000060 · 10-K · 2020-02-18T22:17:30.000000Z | 2020-02-19 | 92 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT · 0001071739-21-000039 |  |
+| 25 | late | CPAY/CPAY | 2025-06-30 | 0001175454 | ANCHOR | 0001628280-25-008746 · 10-K · 2025-02-27T22:13:10.000000Z | 2025-02-28 | 83 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_MERGER | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_MERGER · 0001175454-26-000018 |  |
+| 26 | late | TRMB/TRMB | 2022-06-30 | 0000864749 | SEARCH_INCOMPLETE | 0000864749-22-000044 · 10-K · 2022-02-23T01:13:12.000000Z | 2022-02-23 | 88 | 3.1 | HYPERLINK · INCORPORATED | 0001341004-16-001666/ex3-1.htm | fcbd28aa9c1b4a0e6bc8bb96a298843a32d416ec77f2e3920a227f1d499ce822 | True | BYLAWS |  | **CLASSIFICATION_SOURCE_MISMATCH** | no_known_governing_candidate=1 · search INCOMPLETE | CLASSIFICATION_SOURCE_MISMATCH · 0000864749-23-000012 · 0001341004-16-001666/ex3-1.htm |  |
+| 27 | late | NWS/NWS | 2025-06-30 | 0001564708 | ANCHOR | 0001564708-24-000408 · 10-K · 2024-08-13T11:05:30.000000Z | 2024-08-14 | 218 | 3.1 | HYPERLINK · INCORPORATED | 0001193125-18-249117/d603651dex31.htm | 3c600fb75c3f88ba80152309a8695eb3fc203975fd08f7c2d5a7970e45093968 | True | RESTATED_CERTIFICATE | NUMERIC_PAR_VALUE_SUFFIX | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_OTHER_SERIES_ROWS | no_known_governing_candidate=1 · search COMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_OTHER_SERIES_ROWS · 0001564708-25-000419 · 0001193125-18-249117/d603651dex31.htm |  |
+| 28 | late | EXE/EXE | 2025-06-30 | 0000895126 | SEARCH_INCOMPLETE | 0000895126-25-000021 · 10-K · 2025-02-26T21:06:32.000000Z | 2025-02-27 | 84 | 3.1 | HYPERLINK · INCORPORATED | 0001104659-24-104976/tm2425151d1_ex3-1.htm | dae7d493e7434cb01d6d123994321e0e6a7e16d7a15b61b6b6151bd6c1b51ad6 | True | AMENDED_AND_RESTATED_CERTIFICATE | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search INCOMPLETE | QUALIFYING · 0000895126-26-000011 · 0001104659-24-104976/tm2425151d1_ex3-1.htm | SAME_SHA |
+| 29 | late | FE/FE | 2023-06-30 | 0001031296 | SEARCH_INCOMPLETE | 0001031296-23-000014 · 10-K · 2023-02-13T22:01:49.000000Z | 2023-02-14 | 94 | 3-1 | HYPERLINK · INCORPORATED | 0001031296-19-000034/q22019-ex3x1.htm | 1a367a7c8a01b191da019ea81532fef8e1530d652cd98827361b6e4fbd888a22 | True | AMENDED_AND_RESTATED_ARTICLES | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search INCOMPLETE | QUALIFYING · 0001031296-24-000008 · 0001031296-19-000034/q22019-ex3x1.htm | SAME_SHA |
+| 30 | late | CMG/CMG | 2021-06-30 | 0001058090 | NO_DATED_ANCHOR | 0001058090-21-000010 · 10-K · 2021-02-10T02:59:51.000000Z | 2021-02-10 | 97 | 3.1 | HYPERLINK · INCORPORATED | 0001058090-16-000088/cmg-20160930xex3_1.htm | 13a1b285bc977c68e68e8c934224c9fc960992f040a9c81ca36695f15c6e20b8 | True | AMENDED_AND_RESTATED_CERTIFICATE | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | item_503_in_gap=1, bylaws=1 · search COMPLETE | QUALIFYING · 0001058090-22-000011 · 0001058090-16-000088/cmg-20160930xex3_1.htm | SAME_SHA |
+| 31 | late | WM/WM | 2022-06-30 | 0000823768 | SEARCH_INCOMPLETE | 0001558370-22-001179 · 10-K · 2022-02-15T19:22:45.000000Z | 2022-02-16 | 92 | 3.1 | HYPERLINK · INCORPORATED | 0000950123-10-070947/h74168exv3w1.htm | abad27aa22e344f442885755ed8466a34c6f2953e17be8282c65e7bcd6d72fcf | True | RESTATED_CERTIFICATE | EXACT_N1 | **QUALIFYING** | later_10k_in_gap=1, no_known_governing_candidate=1 · search INCOMPLETE | QUALIFYING · 0001558370-23-000964 · 0000950123-10-070947/h74168exv3w1.htm | SAME_SHA |
+| 32 | late | AME/AME | 2021-06-30 | 0001037868 | SEARCH_INCOMPLETE | 0001037868-21-000007 · 10-K · 2021-02-18T17:23:36.000000Z | 2021-02-19 | 91 | 3.1 | HYPERLINK · INCORPORATED | 0001193125-19-144863/d740805dex31.htm | 8b279335fe25c180764db1803834d28b95f5014c8c4d7514b51e78bf78efc6a0 | True | CERTIFICATE_OF_AMENDMENT |  | **CLASSIFICATION_SOURCE_MISMATCH** | no_known_governing_candidate=1 · search INCOMPLETE | CLASSIFICATION_SOURCE_MISMATCH · 0001037868-22-000009 · 0001193125-19-144863/d740805dex31.htm |  |
+| 33 | late | CMI/CMI | 2024-06-28 | 0000026172 | SEARCH_INCOMPLETE | 0000026172-24-000012 · 10-K · 2024-02-12T20:24:59.000000Z | 2024-02-13 | 94 | 3(a) | HYPERLINK · INCORPORATED | 0000897069-18-000338/cg1103ex32.htm | 6afef606c03f88e8a29291f1d38d722a63311b78430294d80a1e4a81af52fc3c | True | RESTATED_ARTICLES | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search INCOMPLETE | QUALIFYING · 0000026172-25-000007 · 0000897069-18-000338/cg1103ex32.htm | SAME_SHA |
+| 34 | late | WAT/WAT | 2026-06-30 | 0001000697 | SEARCH_INCOMPLETE | 0001193125-26-062604 · 10-K · 2026-02-23T14:10:03.000000Z | 2026-02-24 | 87 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT | no_known_governing_candidate=1 · search INCOMPLETE | NO_QUALIFYING_10K no 10-K/10-K-A on that side of formation under this CIK |  |
+| 35 | late | TSCO/TSCO | 2022-06-30 | 0000916365 | NO_DATED_ANCHOR | 0000916365-22-000049 · 10-K · 2022-02-17T21:10:33.000000Z | 2022-02-18 | 90 | 3.1 | HYPERLINK · INCORPORATED | 0000916365-20-000184/restatedcertificateofi.htm | 4a8390b5a5c816d79d09d554a584a3f5b5c2c0e278b6d5f572bbb8d3e8e36c95 | True | RESTATED_CERTIFICATE | NUMERIC_PAR_VALUE_SUFFIX | **QUALIFYING** | no_known_governing_candidate=1 · search COMPLETE | QUALIFYING · 0000916365-23-000045 · 0000916365-20-000184/restatedcertificateofi.htm | SAME_SHA |
+| 36 | late | SYY/SYY | 2023-06-30 | 0000096021 | SEARCH_INCOMPLETE | 0000096021-22-000151 · 10-K · 2022-08-25T21:39:42.000000Z | 2022-08-26 | 211 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT_DESIGNATION | item_503_in_gap=1, bylaws=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT_DESIGNATION · 0000096021-23-000117 |  |
+
+
 ## 11. 결과
 
 
