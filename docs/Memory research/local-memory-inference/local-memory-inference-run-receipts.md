@@ -3627,3 +3627,38 @@ builder prepared the full 32-row attempt-003 packet at
 `92954acfda2632110d267c9578f05f426f2f60fae3f204dbed3c2e66db5c5187`.
 Attempt 003 has not run. Training, semantic model inference, raw-episode
 evaluation, private replay, and production remain unopened/unchanged.
+
+#### P1-B6 source-audit batch-001 attempt 003 and repair receipt — COMPLETE / NEEDS_FIX
+
+The canonical immutable receipt is
+`fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-003.json`.
+It binds source batch raw SHA-256
+`ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9`,
+audit packet raw SHA-256
+`92954acfda2632110d267c9578f05f426f2f60fae3f204dbed3c2e66db5c5187`,
+and exact raw result artifact SHA-256
+`c4007634f8e379092dc9f4e3593b4e47712028ae8c79669db7452044f5d56e74`
+under protocol `p1b6-source-bundle-completeness-audit-v1`. All 32 rows
+completed at 31 PASS / 1 FAIL / 0 UNCERTAIN. The failure was a
+source/bundle-completeness construction issue, not a HUMAN semantic judgment.
+
+The issue was repaired with one minimum evidence-span addition to one item.
+No source episode changed, one item definition changed, and one canonical
+selected bundle changed relative to the attempt-003 batch. Source text bytes,
+roles, target anchors, skeleton assignments, and unrelated metadata are
+unchanged. Three canonical HUMAN/model-visible bundles differ from the original
+primary HUMAN-reviewed batch. No prior HUMAN decision was carried forward or
+frozen.
+
+The repaired current batch raw SHA-256 is
+`2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36`.
+Attempt 003 remains authority only for its audited pre-repair SHA. The existing
+canonical builder prepared the fresh full 32-row attempt-004 packet at
+`~/Downloads/p1b6-source-audit-batch-001-attempt-004.json`, raw SHA-256
+`a5a1212ecd0a27695bf6122afde5d0aaf4804ac19e3e316530990c152e27e4f2`.
+All 32 opaque audit-row IDs are unique and regenerated for the repaired SHA;
+the packet contains no dispositions and attempt 004 has NOT RUN. HUMAN review
+remains open, no HUMAN gold is frozen, and training, semantic model inference,
+raw-episode evaluation, private replay, and production remain UNOPENED or
+unchanged. Local verification completed with focused P1-B6 tests 22/22 and the
+full repository suite 1286/1286 passing.

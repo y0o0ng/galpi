@@ -20,10 +20,14 @@ UNCERTAIN; both failures were source/bundle construction failures, not HUMAN
 ambiguity judgments. After repair, attempt 002 completed at 32 PASS / 0 FAIL /
 0 UNCERTAIN for the prior batch. Primary blind HUMAN review attempt 001 then
 completed at 31 KEEP / 1 FIX / 0 REJECT and 21 CLEAR / 11 ESCALATE. The one
-dialogue-role correction is applied; because it changes the source batch, a
-fresh source audit is required and HUMAN review is not closed. Do not redesign
-the frozen skeleton catalog, generate training output, expose a model to FINAL
-surface items, or start training in this phase.
+dialogue-role correction was applied, and source-audit attempt 003 completed at
+31 PASS / 1 FAIL / 0 UNCERTAIN. Its source/bundle completeness construction
+issue was repaired by the minimum evidence-selection change. The current batch
+changed again, so full source-audit attempt 004 is prepared but NOT RUN and
+HUMAN review remains open with no HUMAN gold frozen. Training, raw-episode
+evaluation, private replay, and production remain UNOPENED/unchanged. Do not
+redesign the frozen skeleton catalog, generate training output, expose a model
+to FINAL surface items, or start training in this phase.
 
 ## Task Boundary
 

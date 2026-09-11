@@ -1,0 +1,202 @@
+{
+  "name": "xion-local-memory-inference-p1b6-source-audit-batch-001-attempt-003-receipt-v1",
+  "attemptId": "p1b6-source-audit-batch-001-attempt-003",
+  "status": "COMPLETE_NEEDS_FIX",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-source-audit-packet-v1",
+  "auditPacketSha256": "92954acfda2632110d267c9578f05f426f2f60fae3f204dbed3c2e66db5c5187",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+    "batchId": "p1b6-surface-batch-001",
+    "rawSha256": "ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-source-audit-batch-001-attempt-003-results.json",
+    "sha256": "c4007634f8e379092dc9f4e3593b4e47712028ae8c79669db7452044f5d56e74"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "USER_REPORTED_NOT_INDEPENDENTLY_RECOVERED_FROM_API_OR_RUNTIME_METADATA",
+    "provider": "OpenAI",
+    "surface": "ChatGPT",
+    "model": "GPT-5.6 Sol",
+    "reasoningSetting": "High",
+    "sessionRelationship": "fresh/separate session used only for the blind source/bundle audit"
+  },
+  "summary": {
+    "total": 32,
+    "PASS": 31,
+    "FAIL": 1,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassed": false,
+    "humanSemanticReviewOccurred": false,
+    "surfaceHumanGoldAssigned": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-audit-e6d0149aa7b248c7",
+      "disposition": "PASS",
+      "reason": "Omitted turns are confined to the separate book-club thread and do not alter the swimming consideration or explicit non-commitment."
+    },
+    {
+      "auditRowId": "p1b6-audit-aac4ca72b04f12ef",
+      "disposition": "PASS",
+      "reason": "Omitted swimming context and the message-sending aside do not alter the book-club option or the Saturday-afternoon response."
+    },
+    {
+      "auditRowId": "p1b6-audit-f95d656465228b65",
+      "disposition": "PASS",
+      "reason": "Omitted reservation-deadline and party-size details do not alter the Italian option or its explicit exclusion."
+    },
+    {
+      "auditRowId": "p1b6-audit-81983c2c7caed5f0",
+      "disposition": "PASS",
+      "reason": "Omitted location, map, and budget details do not alter the pottery-class consideration-to-confirmation sequence."
+    },
+    {
+      "auditRowId": "p1b6-audit-08cf8688a0f7fb3e",
+      "disposition": "PASS",
+      "reason": "Omitted material concerns the separate lunch-location thread; all meeting-time revision evidence is retained."
+    },
+    {
+      "auditRowId": "p1b6-audit-334a565382b47f3d",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the full source episode, so no source material is omitted."
+    },
+    {
+      "auditRowId": "p1b6-audit-6df675e681e60b59",
+      "disposition": "PASS",
+      "reason": "The only omitted turn gives restaurant location and does not alter the attendance statement or its cancellation."
+    },
+    {
+      "auditRowId": "p1b6-audit-a121dc8aa6f59333",
+      "disposition": "PASS",
+      "reason": "Omitted storage and acknowledgment wording do not alter the backup schedule change or its April-only scope."
+    },
+    {
+      "auditRowId": "p1b6-audit-2c18fdc2c8470317",
+      "disposition": "PASS",
+      "reason": "Omitted material concerns the separate weekend-running thread or a grouping prompt; the stretch pause and trip end are retained."
+    },
+    {
+      "auditRowId": "p1b6-audit-e445aeef6e155eb3",
+      "disposition": "PASS",
+      "reason": "Omitted material is stretching context or a grouping prompt; the weekend-running pause, trip end, and resumption are retained."
+    },
+    {
+      "auditRowId": "p1b6-audit-a74f85e94bef04c5",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the full source episode, so no source material is omitted."
+    },
+    {
+      "auditRowId": "p1b6-audit-a5420d87c2cb2724",
+      "disposition": "PASS",
+      "reason": "The omitted keyboard-setup detail does not alter the stated piano-practice plan."
+    },
+    {
+      "auditRowId": "p1b6-audit-57907a90d4fb9242",
+      "disposition": "PASS",
+      "reason": "Omitted shipping timing and cost details do not alter the referent established by the sole in-stock waterproof bag."
+    },
+    {
+      "auditRowId": "p1b6-audit-1e13436d685d4773",
+      "disposition": "PASS",
+      "reason": "Omitted ad, availability, and note-taking asides do not resolve or materially alter the ambiguous referent after the binary choice."
+    },
+    {
+      "auditRowId": "p1b6-audit-303310f2fb58a357",
+      "disposition": "PASS",
+      "reason": "Omitted budget, shipping, and payment details do not resolve which list item “second” denotes; the numbering ambiguity is retained."
+    },
+    {
+      "auditRowId": "p1b6-audit-986783e47c5a9826",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the full source episode, so no source material is omitted."
+    },
+    {
+      "auditRowId": "p1b6-audit-fc6954999c1bc6e2",
+      "disposition": "PASS",
+      "reason": "Omitted order-shipping and event-instance details do not alter the external-meeting notification exception."
+    },
+    {
+      "auditRowId": "p1b6-audit-5d88ab138a4c2196",
+      "disposition": "PASS",
+      "reason": "Omitted external-meeting material is separate; the order’s unresolved overseas-versus-domestic shipping classification is retained."
+    },
+    {
+      "auditRowId": "p1b6-audit-61a39b0abd61b3c5",
+      "disposition": "PASS",
+      "reason": "Omitted charger, case, and return-window logistics do not resolve whether the BYOD falls within the company-device category."
+    },
+    {
+      "auditRowId": "p1b6-audit-ae1b6f847daec82b",
+      "disposition": "PASS",
+      "reason": "Omitted rota, access, and payroll logistics do not resolve the stated policy-boundary applicability question."
+    },
+    {
+      "auditRowId": "p1b6-audit-cf812ad58bb86aa6",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the full source episode, so no source material is omitted."
+    },
+    {
+      "auditRowId": "p1b6-audit-9e4fe67122a241e7",
+      "disposition": "PASS",
+      "reason": "Omitted schedule and water-bottle context does not establish or contradict the questioned prior 7 a.m. weekday wake plan."
+    },
+    {
+      "auditRowId": "p1b6-audit-1e4a4ad6249abaf7",
+      "disposition": "PASS",
+      "reason": "Omitted assistant role-play turns do not alter the explicit role-play framing or the statement that the user remains in character."
+    },
+    {
+      "auditRowId": "p1b6-audit-75a7895afaaa0595",
+      "disposition": "PASS",
+      "reason": "Omitted battery, update, and device-model details do not resolve whether the notification-off state reflects the user’s preference."
+    },
+    {
+      "auditRowId": "p1b6-audit-2d9e325617214a38",
+      "disposition": "PASS",
+      "reason": "Omitted access-card and lunch-arrangement details do not alter the explicit confirmation of the remote day."
+    },
+    {
+      "auditRowId": "p1b6-audit-8b2b7a345251404a",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the full source episode, so no source material is omitted."
+    },
+    {
+      "auditRowId": "p1b6-audit-4c3543b0bc313ffd",
+      "disposition": "PASS",
+      "reason": "The omitted weather detail does not alter the stated commute options or the explicit exclusion of the subway for this occasion."
+    },
+    {
+      "auditRowId": "p1b6-audit-0e7148883e34454d",
+      "disposition": "PASS",
+      "reason": "Omitted weather and battery details do not alter the camera identification or the explicit intent to take that mirrorless camera."
+    },
+    {
+      "auditRowId": "p1b6-audit-25ffbb544c47af49",
+      "disposition": "PASS",
+      "reason": "Omitted park-lighting and shoe-location details do not alter the stated loose 25–35 minute jogging-duration range."
+    },
+    {
+      "auditRowId": "p1b6-audit-08fd145a1f7a15b5",
+      "disposition": "PASS",
+      "reason": "The only omitted clause concerns remaining coffee beans and does not clarify the unresolved meaning of “2–3.”"
+    },
+    {
+      "auditRowId": "p1b6-audit-3b1d5dc131290c2e",
+      "disposition": "PASS",
+      "reason": "The omitted airfare-status turn does not select either of the two budget baselines or otherwise resolve the referent of the increase."
+    },
+    {
+      "auditRowId": "p1b6-audit-a81ca85cea721103",
+      "disposition": "FAIL",
+      "reason": "The omitted immediately preceding schedule-confirmation turn changes the local discourse context for “그 정도면 돼,” so its relation to the snack quantity is not completely represented."
+    }
+  ]
+}
