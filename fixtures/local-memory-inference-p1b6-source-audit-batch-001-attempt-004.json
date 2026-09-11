@@ -1,0 +1,202 @@
+{
+  "name": "xion-local-memory-inference-p1b6-source-audit-batch-001-attempt-004-receipt-v1",
+  "attemptId": "p1b6-source-audit-batch-001-attempt-004",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-source-audit-packet-v1",
+  "auditPacketSha256": "a5a1212ecd0a27695bf6122afde5d0aaf4804ac19e3e316530990c152e27e4f2",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+    "batchId": "p1b6-surface-batch-001",
+    "rawSha256": "2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-source-audit-batch-001-attempt-004-results.json",
+    "sha256": "21ecee72861a7c58d2b09d2777901475c6f60d1bae90c836ef5356d5203ea103"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "USER_REPORTED_NOT_INDEPENDENTLY_RECOVERED_FROM_API_OR_RUNTIME_METADATA",
+    "provider": "OpenAI",
+    "surface": "ChatGPT",
+    "model": "GPT-5.6 Sol",
+    "reasoningSetting": "High",
+    "sessionRelationship": "fresh/separate session used only for the blind source/bundle audit"
+  },
+  "summary": {
+    "total": 32,
+    "PASS": 32,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassed": true,
+    "humanSemanticReviewOccurred": false,
+    "surfaceHumanGoldAssigned": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-audit-6ed4ddd957812d31",
+      "disposition": "PASS",
+      "reason": "Omitted turns concern the separate book-club thread and do not materially alter the swimming candidate."
+    },
+    {
+      "auditRowId": "p1b6-audit-f473b359b3b929a2",
+      "disposition": "PASS",
+      "reason": "Omitted turns concern swimming; the bundle retains the book-club proposal and the user's Saturday-afternoon acceptance."
+    },
+    {
+      "auditRowId": "p1b6-audit-ed4ff405759a8df3",
+      "disposition": "PASS",
+      "reason": "Deadline and party-size details do not materially alter the explicit exclusion of Italian."
+    },
+    {
+      "auditRowId": "p1b6-audit-8d9d24177d7e54d8",
+      "disposition": "PASS",
+      "reason": "Location, map, and budget details are non-material once the pottery class is explicitly confirmed."
+    },
+    {
+      "auditRowId": "p1b6-audit-f42238d68a50d73d",
+      "disposition": "PASS",
+      "reason": "Omitted lunch-location material is a separate thread; all meeting-time revisions are retained."
+    },
+    {
+      "auditRowId": "p1b6-audit-e5aa07f49d39a718",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the full episode, including the unresolved lunch-location conflict."
+    },
+    {
+      "auditRowId": "p1b6-audit-a44f1016641152dc",
+      "disposition": "PASS",
+      "reason": "Restaurant location is unrelated to the attendance statement and its cancellation."
+    },
+    {
+      "auditRowId": "p1b6-audit-ac537377ec06b971",
+      "disposition": "PASS",
+      "reason": "Storage availability and a generic acknowledgement do not alter the dated backup-rule change."
+    },
+    {
+      "auditRowId": "p1b6-audit-f291bf4df7700d99",
+      "disposition": "PASS",
+      "reason": "Omitted weekend-running material is separate; the bundle retains the stretch pause and trip-end boundary."
+    },
+    {
+      "auditRowId": "p1b6-audit-83b6d2d5275f685d",
+      "disposition": "PASS",
+      "reason": "Omitted stretching material does not alter the weekend-running pause, trip end, and explicit restart."
+    },
+    {
+      "auditRowId": "p1b6-audit-ec0205655dd06e3d",
+      "disposition": "PASS",
+      "reason": "The full episode is retained for the game-stopping candidate."
+    },
+    {
+      "auditRowId": "p1b6-audit-a235e484b73bb783",
+      "disposition": "PASS",
+      "reason": "Keyboard setup is incidental and does not alter the explicit piano-practice schedule."
+    },
+    {
+      "auditRowId": "p1b6-audit-bd087a6faf73355e",
+      "disposition": "PASS",
+      "reason": "Shipping details do not alter the referent established by the sole remaining waterproof-bag candidate."
+    },
+    {
+      "auditRowId": "p1b6-audit-e1a8e12a18966f74",
+      "disposition": "PASS",
+      "reason": "Omitted ad, availability, and note-taking turns do not resolve the final ambiguous reference between the two actions."
+    },
+    {
+      "auditRowId": "p1b6-audit-0d3466cf8e4df123",
+      "disposition": "PASS",
+      "reason": "Budget, delivery batching, and payment-card details do not resolve which item is 'second' under the unsettled numbering scheme."
+    },
+    {
+      "auditRowId": "p1b6-audit-04e5c4e2a3afe7c9",
+      "disposition": "PASS",
+      "reason": "The full episode is retained for the alias candidate."
+    },
+    {
+      "auditRowId": "p1b6-audit-b5aff774280dfbbd",
+      "disposition": "PASS",
+      "reason": "The omitted order-shipping discussion is separate from the external-meeting notification exception."
+    },
+    {
+      "auditRowId": "p1b6-audit-87be5558f2d76283",
+      "disposition": "PASS",
+      "reason": "Omitted external-meeting material is separate; the bundle retains the shipping rule and unresolved order classification."
+    },
+    {
+      "auditRowId": "p1b6-audit-697e23ea8ec63684",
+      "disposition": "PASS",
+      "reason": "Charger, case, and return-window details do not resolve the stated BYOD policy-boundary uncertainty."
+    },
+    {
+      "auditRowId": "p1b6-audit-173dd9ff7d624272",
+      "disposition": "PASS",
+      "reason": "Rota location, draft status, laptop access, and payroll timing do not resolve the crossing-period policy ambiguity."
+    },
+    {
+      "auditRowId": "p1b6-audit-410973a06bf1bfbd",
+      "disposition": "PASS",
+      "reason": "The full episode is retained and clearly attributes the swimming statement to Minji."
+    },
+    {
+      "auditRowId": "p1b6-audit-728d936ecb8b2acc",
+      "disposition": "PASS",
+      "reason": "The 9 a.m. schedule and water-bottle aside do not supply a record resolving the questioned 7 a.m. routine."
+    },
+    {
+      "auditRowId": "p1b6-audit-d2934938275c0c6a",
+      "disposition": "PASS",
+      "reason": "The omitted supply-list aside is unrelated; the bundle retains the role-play framing and continuation."
+    },
+    {
+      "auditRowId": "p1b6-audit-01025a27c194b60c",
+      "disposition": "PASS",
+      "reason": "Battery, update, and device-model details do not establish whether the disabled notifications reflect a user preference."
+    },
+    {
+      "auditRowId": "p1b6-audit-063644e900c712ee",
+      "disposition": "PASS",
+      "reason": "Access-card and lunch-format details are incidental once the remote day is explicitly confirmed."
+    },
+    {
+      "auditRowId": "p1b6-audit-f23fe5da28d296e9",
+      "disposition": "PASS",
+      "reason": "The full episode is retained, including the unresolved attachment of the fasting note."
+    },
+    {
+      "auditRowId": "p1b6-audit-19ed055256751561",
+      "disposition": "PASS",
+      "reason": "The weather forecast does not materially alter the explicit rejection of the subway option."
+    },
+    {
+      "auditRowId": "p1b6-audit-b1b9e635e3365907",
+      "disposition": "PASS",
+      "reason": "Weather and battery-readiness details do not alter the identified mirrorless camera and explicit intent to take it."
+    },
+    {
+      "auditRowId": "p1b6-audit-1106824a68d788fb",
+      "disposition": "PASS",
+      "reason": "Park-light and shoe-location details are unrelated to the deliberately loose 25-to-35-minute jogging range."
+    },
+    {
+      "auditRowId": "p1b6-audit-071c5936bd42e495",
+      "disposition": "PASS",
+      "reason": "Bean availability is incidental and does not resolve the unspecified unit behind '2–3'."
+    },
+    {
+      "auditRowId": "p1b6-audit-49a8a068b2d6f0f3",
+      "disposition": "PASS",
+      "reason": "Unknown airfare pricing does not resolve which of the two open budget baselines 'there' refers to."
+    },
+    {
+      "auditRowId": "p1b6-audit-7c1f98c84f9b3c4e",
+      "disposition": "PASS",
+      "reason": "Shared-folder and filename turns are unrelated; the bundle retains the snack quantity, meeting count, and final acceptance."
+    }
+  ]
+}

@@ -23,11 +23,14 @@ completed at 31 KEEP / 1 FIX / 0 REJECT and 21 CLEAR / 11 ESCALATE. The one
 dialogue-role correction was applied, and source-audit attempt 003 completed at
 31 PASS / 1 FAIL / 0 UNCERTAIN. Its source/bundle completeness construction
 issue was repaired by the minimum evidence-selection change. The current batch
-changed again, so full source-audit attempt 004 is prepared but NOT RUN and
-HUMAN review remains open with no HUMAN gold frozen. Training, raw-episode
-evaluation, private replay, and production remain UNOPENED/unchanged. Do not
-redesign the frozen skeleton catalog, generate training output, expose a model
-to FINAL surface items, or start training in this phase.
+changed again, and full source-audit attempt 004 completed at 32 PASS / 0 FAIL /
+0 UNCERTAIN. The current source/bundle gate is PASS. Exactly three current
+HUMAN-visible bundles differ from the original primary packet, and their blind
+three-row re-review packet is prepared. HUMAN review remains open with no HUMAN
+gold frozen. Training, raw-episode evaluation, private replay, and production
+remain UNOPENED/unchanged. Do not redesign the frozen skeleton catalog,
+generate training output, expose a model to FINAL surface items, or start
+training in this phase.
 
 ## Task Boundary
 

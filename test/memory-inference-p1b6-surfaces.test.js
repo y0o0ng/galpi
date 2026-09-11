@@ -9,6 +9,7 @@ const { sha256RawBytes } = require('../lib/memory-inference-p1b6-skeletons');
 const surfaces = require('../lib/memory-inference-p1b6-surfaces');
 const audit = require('../scripts/build-memory-inference-p1b6-source-audit-packet');
 const humanReview = require('../scripts/build-memory-inference-p1b6-human-review-packet');
+const humanRereview = require('../scripts/build-memory-inference-p1b6-human-rereview-packet');
 
 const ROOT = path.resolve(__dirname, '..');
 const BATCH_PATH = 'fixtures/local-memory-inference-p1b6-surface-batch-001.json';
@@ -16,6 +17,7 @@ const AUTHORING_PATH = 'fixtures/local-memory-inference-p1b6-surface-batch-001-a
 const ATTEMPT_001_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-001.json';
 const ATTEMPT_002_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-002.json';
 const ATTEMPT_003_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-003.json';
+const ATTEMPT_004_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-004.json';
 const HUMAN_ATTEMPT_001_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-review-batch-001-attempt-001.json';
 const REVIEWED_BATCH_SHA256 = '8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa';
 const ATTEMPT_003_BATCH_SHA256 = 'ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9';
@@ -24,6 +26,8 @@ const REVIEW_PACKET_SHA256 = '5a57a22f595697dccbf70bf42b91f609a78676f0a21af78363
 const ATTEMPT_003_PACKET_SHA256 = '92954acfda2632110d267c9578f05f426f2f60fae3f204dbed3c2e66db5c5187';
 const ATTEMPT_003_RESULT_SHA256 = 'c4007634f8e379092dc9f4e3593b4e47712028ae8c79669db7452044f5d56e74';
 const ATTEMPT_004_PACKET_SHA256 = 'a5a1212ecd0a27695bf6122afde5d0aaf4804ac19e3e316530990c152e27e4f2';
+const ATTEMPT_004_RESULT_SHA256 = '21ecee72861a7c58d2b09d2777901475c6f60d1bae90c836ef5356d5203ea103';
+const REREVIEW_PACKET_SHA256 = '1924fea91c0667aa4ec0e7c47629836df988476bb0dfcaaa9dc3ed775e3a4fbc';
 const REPAIR_REVIEW_ROW_ID = 'p1b6-review-584f964b097c2e7a';
 const rawBatch = fs.readFileSync(path.join(ROOT, BATCH_PATH));
 const batch = JSON.parse(rawBatch);
@@ -57,6 +61,9 @@ function reconstructReviewedBatch() {
 
 const reviewedBatch = reconstructReviewedBatch();
 const rawReviewedBatch = Buffer.from(`${JSON.stringify(reviewedBatch, null, 2)}\n`);
+const attempt002Receipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_002_PATH)));
+const originalPacket = humanReview.buildHumanReviewPacket(rawReviewedBatch, attempt002Receipt);
+const rawOriginalPacket = humanReview.packetBytes(originalPacket);
 
 function changed(mutator) {
   const value = structuredClone(batch);
@@ -319,7 +326,7 @@ test('authoring provenance binds the frozen exact56 and raw batch bytes', () => 
   assert.equal(protocol.startingMainSha, 'c7ed8a4b62c7a3d74d0458bb5dbe08a44305372d');
   assert.equal(protocol.exact56.sha256, surfaces.EXACT56_SHA256);
   assert.equal(protocol.outputBatch.sha256, sha256RawBytes(rawBatch));
-  assert.equal(protocol.authority.sourceAuditCompleted, false);
+  assert.equal(protocol.authority.sourceAuditCompleted, true);
   assert.equal(protocol.authority.humanReviewCompleted, false);
   assert.equal(protocol.authority.generatorMetadataIsNeverHumanGold, true);
 });
@@ -384,6 +391,35 @@ test('source-audit attempt 003 receipt binds the raw result and pre-repair batch
   assert.equal(receipt.authority.humanSemanticReviewOccurred, false);
   assert.equal(receipt.authority.surfaceHumanGoldAssigned, false);
   assert.equal(receipt.authority.trainingOccurred, false);
+});
+
+test('source-audit attempt 004 is an all-PASS receipt bound to the unchanged current batch', () => {
+  const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_004_PATH)));
+  const packet = audit.buildAuditPacket(rawBatch);
+  assert.equal(sha256RawBytes(rawBatch), CURRENT_BATCH_SHA256);
+  assert.equal(receipt.status, 'COMPLETE_PASS');
+  assert.equal(receipt.auditPacketSha256, ATTEMPT_004_PACKET_SHA256);
+  assert.equal(receipt.auditedSourceBatch.rawSha256, CURRENT_BATCH_SHA256);
+  assert.equal(receipt.rawResultArtifact.sha256, ATTEMPT_004_RESULT_SHA256);
+  assert.deepEqual(receipt.summary, { total: 32, PASS: 32, FAIL: 0, UNCERTAIN: 0 });
+  assert.equal(receipt.rows.length, 32);
+  assert.equal(new Set(receipt.rows.map(row => row.auditRowId)).size, 32);
+  assert.deepEqual(new Set(receipt.rows.map(row => row.auditRowId)),
+    new Set(packet.rows.map(row => row.auditRowId)));
+  assert.ok(receipt.rows.every(row => row.disposition === 'PASS'
+    && typeof row.reason === 'string' && row.reason.trim()));
+  assert.equal(receipt.authority.sourceBundleGatePassed, true);
+  assert.equal(receipt.authority.humanSemanticReviewOccurred, false);
+  assert.equal(receipt.authority.surfaceHumanGoldAssigned, false);
+  assert.equal(receipt.authority.trainingOccurred, false);
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT, ATTEMPT_001_PATH))),
+    '95026b2f6b274e5d909faba96c6cb7345e1286b9f6824450b971936fd685677b');
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT, ATTEMPT_002_PATH))),
+    '30d87b5949dbbf68624cfa28bd04977dc5248ae561c8e3410ab18604d90cded4');
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT, ATTEMPT_003_PATH))),
+    '8e91b91866f6f958dd5877ceeddd8717a5946b308fa7c591e097fd6ed52ca9e2');
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT, HUMAN_ATTEMPT_001_PATH))),
+    '816a24aec8ca429fad3582dfd972bffb6437c9d41d7ddebd393674fb48d4d8e2');
 });
 
 test('primary HUMAN review attempt 001 records only the authoritative blind decisions', () => {
@@ -569,6 +605,145 @@ test('primary HUMAN review packet is deterministic and contains only blind field
   ]) assert.equal(serialized.includes(`"${field}"`), false, field);
   assert.doesNotMatch(serialized, /p1b6-(?:audit|item|sk|se|sf|surface-family)-/u);
   for (const row of receipt.rows) assert.equal(serialized.includes(row.reason), false);
+});
+
+test('focused HUMAN re-review packet discovers exactly three changed visible bundles', () => {
+  const auditReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_004_PATH)));
+  const originalReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_ATTEMPT_001_PATH)));
+  const packet = humanRereview.buildRereviewPacket(
+    rawBatch, auditReceipt, rawOriginalPacket, originalReceipt,
+  );
+  const originalRows = new Map(originalPacket.rows.map(row => [row.reviewRowId, row.selectedBundle]));
+  const changedItems = batch.items.filter(item => originalRows.get(humanReview.opaqueReviewRowId(
+    REVIEWED_BATCH_SHA256, item.itemId,
+  )) !== surfaces.renderHumanReviewText(batch, item));
+  const expected = new Map(changedItems.map(item => [
+    humanRereview.opaqueRereviewRowId(CURRENT_BATCH_SHA256, item.itemId),
+    surfaces.renderHumanReviewText(batch, item),
+  ]));
+
+  assert.equal(sha256RawBytes(rawOriginalPacket), REVIEW_PACKET_SHA256);
+  assert.equal(changedItems.length, 3);
+  assert.deepEqual(Object.keys(packet), [
+    'name', 'sourceBatch', 'rendererIdentity', 'sourceAuditAttempt',
+    'originalPrimaryHumanAttempt', 'originalPrimaryHumanPacketSha256', 'rows',
+  ]);
+  assert.deepEqual(Object.keys(packet.sourceBatch), ['identity', 'sha256']);
+  assert.equal(packet.name, humanRereview.PACKET_IDENTITY);
+  assert.equal(packet.sourceBatch.sha256, CURRENT_BATCH_SHA256);
+  assert.equal(packet.sourceAuditAttempt, humanRereview.AUDIT_ATTEMPT_ID);
+  assert.equal(packet.originalPrimaryHumanAttempt, humanRereview.ORIGINAL_ATTEMPT_ID);
+  assert.equal(packet.originalPrimaryHumanPacketSha256, REVIEW_PACKET_SHA256);
+  assert.equal(packet.rows.length, 3);
+  assert.equal(new Set(packet.rows.map(row => row.reviewRowId)).size, 3);
+  assert.deepEqual(packet.rows.map(row => row.reviewRowId),
+    packet.rows.map(row => row.reviewRowId).toSorted());
+  for (const row of packet.rows) {
+    assert.deepEqual(Object.keys(row), ['reviewRowId', 'selectedBundle']);
+    assert.match(row.reviewRowId, /^p1b6-rereview-[0-9a-f]{16}$/u);
+    assert.equal(row.selectedBundle, expected.get(row.reviewRowId));
+  }
+  assert.deepEqual(humanRereview.buildRereviewPacket(
+    rawBatch, auditReceipt, rawOriginalPacket, originalReceipt,
+  ), packet);
+  assert.equal(sha256RawBytes(humanRereview.packetBytes(packet)), REREVIEW_PACKET_SHA256);
+  const serialized = JSON.stringify(packet);
+  for (const field of [
+    'itemId', 'auditRowId', 'sourceEpisodeId', 'semanticSkeletonId', 'humanLabel',
+    'boundaryClass', 'splitAssignment', 'language', 'discoursePattern',
+    'sourceFamilyId', 'surfaceFamilyId', 'disposition', 'decision', 'reason',
+    'sourceEpisode', 'turns',
+  ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+  assert.doesNotMatch(serialized, /p1b6-(?:audit|review|item|sk|se|sf|surface-family)-/u);
+  for (const row of originalPacket.rows) assert.equal(serialized.includes(row.reviewRowId), false);
+  const script = fs.readFileSync(
+    path.join(ROOT, 'scripts/build-memory-inference-p1b6-human-rereview-packet.js'), 'utf8',
+  );
+  assert.doesNotMatch(script, /p1b6-item-/u);
+  assert.doesNotMatch(script, /\bfetch\s*\(|https?:\/\//u);
+});
+
+test('focused HUMAN re-review CLI accepts only the five bound artifact paths', () => {
+  const args = [
+    '--input', 'batch.json', '--audit-receipt', 'audit.json',
+    '--original-packet', 'packet.json', '--original-receipt', 'receipt.json',
+    '--output', 'output.json',
+  ];
+  assert.deepEqual(humanRereview.parseArgs(args), {
+    inputPath: 'batch.json',
+    auditReceiptPath: 'audit.json',
+    originalPacketPath: 'packet.json',
+    originalReceiptPath: 'receipt.json',
+    outputPath: 'output.json',
+  });
+  assert.throws(() => humanRereview.parseArgs(args.slice(0, -2)));
+  assert.throws(() => humanRereview.parseArgs([...args, '--model', 'x']));
+
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'p1b6-human-rereview-'));
+  const originalPacketPath = path.join(directory, 'original.json');
+  const outputPath = path.join(directory, 'output.json');
+  fs.writeFileSync(originalPacketPath, rawOriginalPacket);
+  const packet = humanRereview.writeRereviewPacket(
+    path.join(ROOT, BATCH_PATH), path.join(ROOT, ATTEMPT_004_PATH), originalPacketPath,
+    path.join(ROOT, HUMAN_ATTEMPT_001_PATH), outputPath,
+  );
+  assert.deepEqual(JSON.parse(fs.readFileSync(outputPath)), packet);
+  assert.throws(() => humanRereview.writeRereviewPacket(
+    path.join(ROOT, BATCH_PATH), path.join(ROOT, ATTEMPT_004_PATH), originalPacketPath,
+    path.join(ROOT, HUMAN_ATTEMPT_001_PATH), outputPath,
+  ), /not be overwritten/u);
+  fs.rmSync(directory, { recursive: true, force: true });
+});
+
+test('focused HUMAN re-review fails closed on stale or non-PASS audit state', () => {
+  const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_004_PATH)));
+  const originalReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_ATTEMPT_001_PATH)));
+  const changedReceipt = mutator => {
+    const value = structuredClone(receipt);
+    mutator(value);
+    return value;
+  };
+  assert.throws(() => humanRereview.buildRereviewPacket(rawBatch, changedReceipt(value => {
+    value.status = 'COMPLETE_NEEDS_FIX';
+  }), rawOriginalPacket, originalReceipt), /binding is invalid/u);
+  assert.throws(() => humanRereview.buildRereviewPacket(rawBatch, changedReceipt(value => {
+    value.rows[0].disposition = 'FAIL';
+  }), rawOriginalPacket, originalReceipt), /non-PASS/u);
+  assert.throws(() => humanRereview.buildRereviewPacket(rawBatch, changedReceipt(value => {
+    value.rows[1] = structuredClone(value.rows[0]);
+  }), rawOriginalPacket, originalReceipt), /duplicate/u);
+  assert.throws(() => humanRereview.buildRereviewPacket(rawBatch, changedReceipt(value => {
+    value.auditedSourceBatch.rawSha256 = '0'.repeat(64);
+  }), rawOriginalPacket, originalReceipt), /binding is invalid/u);
+});
+
+test('focused HUMAN re-review fails closed on stale original HUMAN artifacts', () => {
+  const auditReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_004_PATH)));
+  const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_ATTEMPT_001_PATH)));
+  assert.throws(() => humanRereview.buildRereviewPacket(
+    rawBatch, auditReceipt, Buffer.concat([rawOriginalPacket, Buffer.from(' ')]), receipt,
+  ), /packet hash is invalid/u);
+  for (const mutate of [
+    value => value.rows.pop(),
+    value => { value.rows[1] = structuredClone(value.rows[0]); },
+  ]) {
+    const packet = structuredClone(originalPacket);
+    mutate(packet);
+    assert.throws(() => humanRereview.buildRereviewPacket(
+      rawBatch, auditReceipt, humanReview.packetBytes(packet), receipt,
+    ), /packet hash is invalid/u);
+  }
+  for (const mutate of [
+    value => value.rows.pop(),
+    value => { value.rows[1] = structuredClone(value.rows[0]); },
+    value => { value.primaryHumanReviewPacket.rawSha256 = '0'.repeat(64); },
+  ]) {
+    const changed = structuredClone(receipt);
+    mutate(changed);
+    assert.throws(() => humanRereview.buildRereviewPacket(
+      rawBatch, auditReceipt, rawOriginalPacket, changed,
+    ), /binding is invalid|receipt rows/u);
+  }
 });
 
 test('exact56 and anchor-marker pilot artifacts remain byte-identical', () => {

@@ -3662,3 +3662,39 @@ remains open, no HUMAN gold is frozen, and training, semantic model inference,
 raw-episode evaluation, private replay, and production remain UNOPENED or
 unchanged. Local verification completed with focused P1-B6 tests 22/22 and the
 full repository suite 1286/1286 passing.
+
+#### P1-B6 source-audit batch-001 attempt 004 and focused HUMAN re-review preparation — COMPLETE / PASS
+
+The canonical immutable source-audit receipt is
+`fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-004.json`.
+It binds current source batch raw SHA-256
+`2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36`,
+audit packet raw SHA-256
+`a5a1212ecd0a27695bf6122afde5d0aaf4804ac19e3e316530990c152e27e4f2`,
+and exact raw result artifact SHA-256
+`21ecee72861a7c58d2b09d2777901475c6f60d1bae90c836ef5356d5203ea103`
+under protocol `p1b6-source-bundle-completeness-audit-v1`. Auditor provenance
+is user-reported OpenAI ChatGPT, GPT-5.6 Sol, reasoning High, and was not
+independently recovered from API or runtime metadata. All 32 unique rows match
+the deterministic current packet and completed at 32 PASS / 0 FAIL / 0
+UNCERTAIN, so the current source/bundle gate is PASS.
+
+The focused builder
+`scripts/build-memory-inference-p1b6-human-rereview-packet.js` validated the
+attempt-004 receipt, original primary HUMAN packet and receipt, and current
+batch bindings before comparing all 32 original/current canonical visible
+bundles through deterministic primary review-row mapping. Exactly three differ.
+It prepared only those rows at
+`~/Downloads/p1b6-primary-human-rereview-batch-001-attempt-002.json`, raw
+SHA-256
+`1924fea91c0667aa4ec0e7c47629836df988476bb0dfcaaa9dc3ed775e3a4fbc`.
+Each row contains only a fresh deterministic opaque re-review ID and the current
+canonical selected bundle; no prior decision or hidden source/item/audit
+metadata is present.
+
+The source batch itself is unchanged. HUMAN review remains open, HUMAN gold is
+not frozen, and training, semantic model inference, raw-episode evaluation,
+private replay, and production remain UNOPENED or unchanged. The next step is
+primary HUMAN blind re-review of the three-row packet. Local verification
+completed with focused P1-B6 tests 27/27 and the full repository suite
+1291/1291 passing.

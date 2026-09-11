@@ -68,12 +68,12 @@
   "authority": {
     "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
     "generatorMetadataIsNeverHumanGold": true,
-    "sourceAuditCompleted": false,
+    "sourceAuditCompleted": true,
     "humanReviewCompleted": false
   },
   "scope": [
     "This batch is an eligible supervised-pool candidate batch, not disposable pilot data.",
-    "The minimally evidence-repaired current batch requires fresh source-audit attempt 004; HUMAN review is not closed.",
+    "The minimally evidence-repaired current batch passed source-audit attempt 004; focused HUMAN re-review remains open.",
     "No semantic model inference, training, bulk authoring, or FINAL evaluation-model inspection occurred in this authoring task."
   ]
 }
