@@ -3698,3 +3698,32 @@ private replay, and production remain UNOPENED or unchanged. The next step is
 primary HUMAN blind re-review of the three-row packet. Local verification
 completed with focused P1-B6 tests 27/27 and the full repository suite
 1291/1291 passing.
+
+#### P1-B6 focused primary HUMAN re-review attempt 002 and skeleton reconciliation — COMPLETE / NEEDS_FIX
+
+The canonical focused HUMAN re-review receipt is
+`fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-001-attempt-002.json`.
+It binds the three-row blind packet raw SHA-256
+`1924fea91c0667aa4ec0e7c47629836df988476bb0dfcaaa9dc3ed775e3a4fbc`,
+current source batch raw SHA-256
+`2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36`,
+the frozen renderer, source-audit attempt 004 COMPLETE_PASS prerequisite, and
+original primary HUMAN attempt 001. All three presented rows completed at 3
+KEEP / 0 FIX / 0 REJECT and 2 CLEAR / 1 ESCALATE.
+
+The effective current primary HUMAN set is recorded at
+`fixtures/local-memory-inference-p1b6-primary-human-effective-current-batch-001.json`.
+It was derived by comparing every current canonical visible bundle with the
+original primary packet, retaining the original decision only for unchanged
+bundles and replacing every changed bundle with its focused re-review decision.
+The resulting aggregate is 32 KEEP / 0 FIX / 0 REJECT and 20 CLEAR / 12
+ESCALATE.
+
+Reconciliation against the frozen exact56 HUMAN labels found 30 matches and 2
+opposite-label mismatches. Per the frozen contract, those mismatches cannot be
+silently accepted or relabeled. `humanReviewCompleted` therefore remains false,
+HUMAN gold remains unfrozen, and the next step is a focused repair/rejection
+design step. Source episodes, evidence spans, anchors, skeleton assignments,
+and all historical audit/HUMAN receipts are unchanged. No training, semantic
+model inference, HELD repeated review, raw-episode evaluation, private replay,
+or production change occurred.

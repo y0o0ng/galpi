@@ -1,0 +1,64 @@
+{
+  "name": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-001-v1",
+  "status": "RECONCILIATION_NEEDS_FIX",
+  "currentSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+    "rawSha256": "2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36"
+  },
+  "rendererIdentity": "xion-local-memory-inference-p1b6-surface-renderer-v1",
+  "originalPrimaryHumanAttempt": "p1b6-primary-human-review-batch-001-attempt-001",
+  "focusedPrimaryHumanRereviewAttempt": "p1b6-primary-human-rereview-batch-001-attempt-002",
+  "summary": {
+    "total": 32,
+    "KEEP": 32,
+    "FIX": 0,
+    "REJECT": 0,
+    "CLEAR": 20,
+    "ESCALATE": 12
+  },
+  "reconciliation": {
+    "exact56Sha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602",
+    "matchCount": 30,
+    "mismatchCount": 2
+  },
+  "authority": {
+    "sourceBundleGatePassed": true,
+    "humanReviewCompleted": false,
+    "surfaceHumanGoldFrozen": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {"itemId":"p1b6-item-b001-001","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-002","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-003","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-004","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-005","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-006","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-007","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-008","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-009","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-010","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-011","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-012","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-013","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-014","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-015","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-016","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-017","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-018","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-019","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-020","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-021","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-022","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-023","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-024","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-025","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-026","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-027","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-028","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-029","disposition":"KEEP","decision":"CLEAR"},
+    {"itemId":"p1b6-item-b001-030","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-031","disposition":"KEEP","decision":"ESCALATE"},
+    {"itemId":"p1b6-item-b001-032","disposition":"KEEP","decision":"ESCALATE"}
+  ]
+}

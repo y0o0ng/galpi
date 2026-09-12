@@ -1,0 +1,58 @@
+{
+  "name": "xion-local-memory-inference-p1b6-primary-human-rereview-batch-001-attempt-002-receipt-v1",
+  "attemptId": "p1b6-primary-human-rereview-batch-001-attempt-002",
+  "status": "COMPLETE_PASS",
+  "primaryHumanRereviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-rereview-packet-v1",
+    "rawSha256": "1924fea91c0667aa4ec0e7c47629836df988476bb0dfcaaa9dc3ed775e3a4fbc"
+  },
+  "reviewedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+    "rawSha256": "2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36"
+  },
+  "rendererIdentity": "xion-local-memory-inference-p1b6-surface-renderer-v1",
+  "sourceAuditPrerequisite": {
+    "attemptId": "p1b6-source-audit-batch-001-attempt-004",
+    "status": "COMPLETE_PASS",
+    "allRowsPassed": true
+  },
+  "originalPrimaryHumanReview": {
+    "attemptId": "p1b6-primary-human-review-batch-001-attempt-001",
+    "receiptIdentity": "xion-local-memory-inference-p1b6-primary-human-review-batch-001-attempt-001-receipt-v1"
+  },
+  "summary": {
+    "total": 3,
+    "KEEP": 3,
+    "FIX": 0,
+    "REJECT": 0,
+    "CLEAR": 2,
+    "ESCALATE": 1
+  },
+  "authority": {
+    "reviewCompletedForAllPresentedRows": true,
+    "acceptedKeepCount": 3,
+    "unresolvedFixCount": 0,
+    "primaryHumanReviewGateClosed": false,
+    "surfaceHumanGoldFrozen": false,
+    "decisionsSource": "REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER",
+    "modelInferenceUsedForHumanDecisions": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-rereview-2a59d0efa5fa4a5c",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "reviewRowId": "p1b6-rereview-3103bdf5fda47336",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-rereview-5b1aab95130e93ee",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    }
+  ]
+}

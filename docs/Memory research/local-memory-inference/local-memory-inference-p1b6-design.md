@@ -24,13 +24,16 @@ dialogue-role correction was applied, and source-audit attempt 003 completed at
 31 PASS / 1 FAIL / 0 UNCERTAIN. Its source/bundle completeness construction
 issue was repaired by the minimum evidence-selection change. The current batch
 changed again, and full source-audit attempt 004 completed at 32 PASS / 0 FAIL /
-0 UNCERTAIN. The current source/bundle gate is PASS. Exactly three current
-HUMAN-visible bundles differ from the original primary packet, and their blind
-three-row re-review packet is prepared. HUMAN review remains open with no HUMAN
-gold frozen. Training, raw-episode evaluation, private replay, and production
-remain UNOPENED/unchanged. Do not redesign the frozen skeleton catalog,
-generate training output, expose a model to FINAL surface items, or start
-training in this phase.
+0 UNCERTAIN. The current source/bundle gate is PASS. Focused primary HUMAN
+re-review attempt 002 completed for the three changed visible bundles at 3 KEEP
+/ 0 FIX / 0 REJECT and 2 CLEAR / 1 ESCALATE. The effective current primary
+HUMAN set is 32 KEEP / 0 FIX / 0 REJECT and 20 CLEAR / 12 ESCALATE. Frozen
+exact56 reconciliation found 30 matches and 2 opposite-label mismatches, so the
+primary HUMAN review gate remains open and requires a focused repair/rejection
+design step. No HUMAN gold is frozen. Training, raw-episode evaluation, private
+replay, and production remain UNOPENED/unchanged. Do not redesign the frozen
+skeleton catalog, generate training output, expose a model to FINAL surface
+items, or start training in this phase.
 
 ## Task Boundary
 

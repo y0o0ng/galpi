@@ -96,7 +96,7 @@
 - **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** 결과 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
 - **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`에 있다.
 - **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
-- **P1-B6 exact-56과 anchor 표현은 CLOSED/FROZEN이다.** current batch는 source-audit attempt 004에서 32 PASS로 gate를 통과했고, original primary packet과 다른 visible bundle 3개의 blind re-review packet을 준비했다. HUMAN review는 열려 있고 gold는 동결되지 않았으며 training·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
+- **P1-B6 exact-56과 anchor 표현은 CLOSED/FROZEN이다.** current batch의 source audit와 focused primary HUMAN re-review는 끝났지만 frozen skeleton reconciliation에서 2 mismatch가 나와 HUMAN review gate는 OPEN이다. gold는 동결되지 않았고 다음은 focused repair/rejection design이며 training·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

@@ -19,6 +19,8 @@ const ATTEMPT_002_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batc
 const ATTEMPT_003_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-003.json';
 const ATTEMPT_004_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batch-001-attempt-004.json';
 const HUMAN_ATTEMPT_001_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-review-batch-001-attempt-001.json';
+const HUMAN_REREVIEW_ATTEMPT_002_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-001-attempt-002.json';
+const EFFECTIVE_HUMAN_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-effective-current-batch-001.json';
 const REVIEWED_BATCH_SHA256 = '8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa';
 const ATTEMPT_003_BATCH_SHA256 = 'ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9';
 const CURRENT_BATCH_SHA256 = '2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36';
@@ -64,6 +66,14 @@ const rawReviewedBatch = Buffer.from(`${JSON.stringify(reviewedBatch, null, 2)}\
 const attempt002Receipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_002_PATH)));
 const originalPacket = humanReview.buildHumanReviewPacket(rawReviewedBatch, attempt002Receipt);
 const rawOriginalPacket = humanReview.packetBytes(originalPacket);
+const attempt004Receipt = JSON.parse(fs.readFileSync(path.join(ROOT, ATTEMPT_004_PATH)));
+const originalHumanReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_ATTEMPT_001_PATH)));
+const rereviewPacket = humanRereview.buildRereviewPacket(
+  rawBatch, attempt004Receipt, rawOriginalPacket, originalHumanReceipt,
+);
+const rawRereviewPacket = humanRereview.packetBytes(rereviewPacket);
+const rereviewReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_REREVIEW_ATTEMPT_002_PATH)));
+const effectiveHuman = JSON.parse(fs.readFileSync(path.join(ROOT, EFFECTIVE_HUMAN_PATH)));
 
 function changed(mutator) {
   const value = structuredClone(batch);
@@ -661,6 +671,120 @@ test('focused HUMAN re-review packet discovers exactly three changed visible bun
   );
   assert.doesNotMatch(script, /p1b6-item-/u);
   assert.doesNotMatch(script, /\bfetch\s*\(|https?:\/\//u);
+});
+
+test('focused HUMAN re-review attempt 002 binds the exact packet and authoritative decisions', () => {
+  assert.equal(sha256RawBytes(rawRereviewPacket), REREVIEW_PACKET_SHA256);
+  assert.equal(rereviewPacket.rows.length, 3);
+  assert.equal(new Set(rereviewPacket.rows.map(row => row.reviewRowId)).size, 3);
+  assert.deepEqual(rereviewReceipt.rows, [
+    { reviewRowId: 'p1b6-rereview-2a59d0efa5fa4a5c', disposition: 'KEEP', decision: 'CLEAR' },
+    { reviewRowId: 'p1b6-rereview-3103bdf5fda47336', disposition: 'KEEP', decision: 'ESCALATE' },
+    { reviewRowId: 'p1b6-rereview-5b1aab95130e93ee', disposition: 'KEEP', decision: 'CLEAR' },
+  ]);
+  assert.deepEqual(rereviewReceipt.summary, {
+    total: 3, KEEP: 3, FIX: 0, REJECT: 0, CLEAR: 2, ESCALATE: 1,
+  });
+  assert.doesNotThrow(() => humanRereview.validateRereviewReceipt(
+    rawBatch, attempt004Receipt, rawOriginalPacket, originalHumanReceipt,
+    rawRereviewPacket, rereviewReceipt,
+  ));
+  const serialized = JSON.stringify(rereviewReceipt);
+  for (const field of [
+    'itemId', 'sourceEpisodeId', 'semanticSkeletonId', 'splitAssignment',
+    'boundaryClass', 'humanLabel', 'auditRowId', 'reason', 'discoursePattern',
+    'sourceFamilyId', 'surfaceFamilyId',
+  ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+});
+
+test('effective current HUMAN decisions mechanically replace all changed historical rows', () => {
+  const built = humanRereview.buildEffectiveHumanDecisionSet(
+    rawBatch, attempt004Receipt, rawOriginalPacket, originalHumanReceipt,
+    rawRereviewPacket, rereviewReceipt,
+    fs.readFileSync(path.join(ROOT, surfaces.EXACT56_PATH)),
+  );
+  assert.deepEqual(built, effectiveHuman);
+  assert.deepEqual(built.summary, {
+    total: 32, KEEP: 32, FIX: 0, REJECT: 0, CLEAR: 20, ESCALATE: 12,
+  });
+  assert.equal(built.rows.length, 32);
+  assert.equal(new Set(built.rows.map(row => row.itemId)).size, 32);
+
+  const originalBundles = new Map(originalPacket.rows.map(row => [row.reviewRowId, row.selectedBundle]));
+  const changedItems = batch.items.filter(item => originalBundles.get(humanReview.opaqueReviewRowId(
+    REVIEWED_BATCH_SHA256, item.itemId,
+  )) !== surfaces.renderHumanReviewText(batch, item));
+  assert.equal(changedItems.length, 3);
+  const rereviewRows = new Map(rereviewReceipt.rows.map(row => [row.reviewRowId, row]));
+  const effectiveRows = new Map(built.rows.map(row => [row.itemId, row]));
+  for (const item of changedItems) {
+    const expected = rereviewRows.get(humanRereview.opaqueRereviewRowId(CURRENT_BATCH_SHA256, item.itemId));
+    assert.deepEqual(effectiveRows.get(item.itemId), {
+      itemId: item.itemId, disposition: expected.disposition, decision: expected.decision,
+    });
+  }
+
+  const conflictingHistory = structuredClone(originalHumanReceipt);
+  const changedOriginalIds = new Set(changedItems.map(item => humanReview.opaqueReviewRowId(
+    REVIEWED_BATCH_SHA256, item.itemId,
+  )));
+  for (const row of conflictingHistory.rows) {
+    if (changedOriginalIds.has(row.reviewRowId)) {
+      row.disposition = 'REJECT';
+      row.decision = row.decision === 'CLEAR' ? 'ESCALATE' : 'CLEAR';
+    }
+  }
+  const rebuilt = humanRereview.buildEffectiveHumanDecisionSet(
+    rawBatch, attempt004Receipt, rawOriginalPacket, conflictingHistory,
+    rawRereviewPacket, rereviewReceipt,
+    fs.readFileSync(path.join(ROOT, surfaces.EXACT56_PATH)),
+  );
+  for (const item of changedItems) assert.deepEqual(
+    rebuilt.rows.find(row => row.itemId === item.itemId),
+    effectiveRows.get(item.itemId),
+  );
+});
+
+test('frozen skeleton reconciliation is deterministic and closes only with zero mismatches', () => {
+  assert.deepEqual(effectiveHuman.reconciliation, {
+    exact56Sha256: surfaces.EXACT56_SHA256, matchCount: 30, mismatchCount: 2,
+  });
+  assert.equal(effectiveHuman.status, 'RECONCILIATION_NEEDS_FIX');
+  assert.equal(effectiveHuman.authority.humanReviewCompleted, false);
+  assert.equal(effectiveHuman.authority.surfaceHumanGoldFrozen, false);
+
+  const labels = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row.humanLabel]));
+  const aligned = batch.items.map(item => ({
+    itemId: item.itemId, disposition: 'KEEP', decision: labels.get(item.semanticSkeletonId),
+  }));
+  assert.deepEqual(humanRereview.reconcileEffectiveHumanDecisions(batch, aligned, exact56), {
+    matchCount: 32, mismatchCount: 0, humanReviewCompleted: true,
+  });
+  const syntheticMismatch = structuredClone(aligned);
+  syntheticMismatch[0].decision = syntheticMismatch[0].decision === 'CLEAR' ? 'ESCALATE' : 'CLEAR';
+  assert.deepEqual(humanRereview.reconcileEffectiveHumanDecisions(
+    batch, syntheticMismatch, exact56,
+  ), { matchCount: 31, mismatchCount: 1, humanReviewCompleted: false });
+  assert.deepEqual(effectiveHuman.rows, humanRereview.buildEffectiveHumanDecisionSet(
+    rawBatch, attempt004Receipt, rawOriginalPacket, originalHumanReceipt,
+    rawRereviewPacket, rereviewReceipt,
+    fs.readFileSync(path.join(ROOT, surfaces.EXACT56_PATH)),
+  ).rows);
+});
+
+test('P1-B6 source, audit history, primary review, and exact56 bytes remain frozen', () => {
+  const hashes = {
+    [BATCH_PATH]: CURRENT_BATCH_SHA256,
+    [ATTEMPT_001_PATH]: '95026b2f6b274e5d909faba96c6cb7345e1286b9f6824450b971936fd685677b',
+    [ATTEMPT_002_PATH]: '30d87b5949dbbf68624cfa28bd04977dc5248ae561c8e3410ab18604d90cded4',
+    [ATTEMPT_003_PATH]: '8e91b91866f6f958dd5877ceeddd8717a5946b308fa7c591e097fd6ed52ca9e2',
+    [ATTEMPT_004_PATH]: 'a49e9a08fd2eb4da78c4a394734aa3cead2cb69505b91e87344ffafba609b162',
+    [HUMAN_ATTEMPT_001_PATH]: '816a24aec8ca429fad3582dfd972bffb6437c9d41d7ddebd393674fb48d4d8e2',
+    [surfaces.EXACT56_PATH]: surfaces.EXACT56_SHA256,
+  };
+  for (const [file, expected] of Object.entries(hashes)) {
+    assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT, file))), expected, file);
+  }
 });
 
 test('focused HUMAN re-review CLI accepts only the five bound artifact paths', () => {
