@@ -7543,8 +7543,9 @@ production code · schema · O2/O2-C · B2 · RelationInterval · manifest/bundl
 
 **결과를 먼저 적는다. census는 실행됐지만 관할 분포를 만들지 못했다.** 지정된 1차 source인
 `companyconcept` API가 `dei:EntityIncorporationStateCountryCode`를 **789개 CIK 전부에서 HTTP 404**로
-돌려줬다. 이것은 전송 실패가 아니라 그 API가 그 fact를 담지 않는다는 뜻이고, 아래 양성 대조가
-그것을 증명한다.
+돌려줬다. 전송 실패는 0이고, 아래 양성 대조가 그것이 transport·UA·URL 문제가 아님을 보인다.
+**(§10.43 정정)** 여기서 말할 수 있는 것은 "이 API 계열이 **테스트한 population에서** 이 concept을
+노출하지 않는다"까지다 — 단위 없는 문자열 fact가 범주적으로 제외된다는 일반 법칙은 주장하지 않는다.
 
 ```text
 base (기대 handoff)  ba73c4f7d8bab8f37b3ea0740df99f02f172e297
@@ -7671,9 +7672,10 @@ EntityIncorporationStateCountryCode  →  present: False
 둘 다 단위를 가진 수치 fact다(`shares` · `USD`). 2절 C의 문서 표현("each units on measure")과
 2절 A의 type(`edgarStateCountryItemType`, 단위 없는 문자열)이 정확히 맞물린다.
 
-**판정: `CONCEPT_NOT_AVAILABLE`은 등록인이 공시를 안 한 것이 아니라, 단위 기준으로 묶는 이
-API 계열이 단위 없는 표지 문자열 fact를 담지 않는다는 구조적 사실이다.** companyconcept과
-companyfacts 둘 다 같다.
+**판정: `CONCEPT_NOT_AVAILABLE`은 등록인이 공시를 안 한 것이 아니다.** companyconcept과
+companyfacts 둘 다 이 concept을 주지 않았고, 단위(unit of measure)로 배열을 나누는 공식 문서
+표현과 그 관측이 일치한다. **(§10.43 정정)** 다만 공식 문서가 "단위 없는 문자열 fact는 전부
+제외된다"고 명시하지는 않으므로, 그 일반 법칙을 증명했다고 쓰지 않는다.
 
 ### 5. 그 fact는 실제로 어디에 있는가 (POSITIVE_CONTROL)
 
@@ -7688,7 +7690,9 @@ concept 이름  dei_EntityIncorporationStateCountryCode        (R1.htm 안에 �
 R1.htm sha256 500b2f33c8f0191eb46529284dac778e9cfbcf683bc46ee4aa03582b19c4ed62
 ```
 
-fact는 **filing 단위 inline XBRL 표지에 존재한다.** 없는 것은 entity 단위로 모아 주는 API 경로다.
+fact는 **이 filing의 inline XBRL 표지에 존재한다.** 없는 것은 entity 단위로 모아 주는 API 경로다.
+**(§10.43 정정)** 이 한 건이 전 구간 가용성을 뜻하지는 않는다 — 표지 tagging 의무는 33-10618(2019)이
+만들었고 설립 관할은 그 전까지 tagging 대상이 아니었다. 구간별 coverage는 §10.43이 잰다.
 
 ### 6. 만들지 못한 값 (NOT_MEASURABLE)
 
@@ -7787,8 +7791,9 @@ sha256  148210ff5db7703e6ba2604e7a68b11b81568109efd7a16af435318a07ced39b
 incorporation"으로 SEC가 직접 정의한 표지 fact다. 바꿔야 할 것은 **주소**이지 fact가 아니다.
 
 ```text
-버린다   companyconcept / companyfacts / frames      단위 기준 API — 이 fact를 구조적으로 담지 않는다
-간다     filing 단위 inline XBRL instance의 dei fact  accession 단위로 정확히 주소가 있다
+버린다   companyconcept / companyfacts / frames      이 population에서 이 concept을 주지 않았다
+간다     filing 단위 SEC submission header             STATE-OF-INCORPORATION — §10.43이 1차로 채택
+보조     filing 표지 dei 설립관할 fact                 표지 tagging 의무 구간에만 있다 (§10.43)
 ```
 
 repo에 이미 있는 것으로 닿는다 — 새 parser를 만들 이유가 없다.
@@ -7801,10 +7806,11 @@ backtest/qv_xbrl.py  parse_instance(data, source_file)   raw XBRL instance → F
                      (기존 표지 parsing이 "exact DEI concept"만 받는다는 계약과 같은 결이다)
 ```
 
-다음 probe가 먼저 답해야 할 것은 비용이다. 관측 1건에 accession 1건의 instance를 받아야 하므로
-**요청 수가 CIK 수가 아니라 filing 수로 커진다.** 그래서 다음은 전수가 아니라 경계를 재는 probe여야
-한다 — CIK당 QV horizon 안에서 몇 건의 10-K/10-Q/8-K instance면 pre-formation 관측 1건이 서는지,
-2009년 inline XBRL 의무화 이전 formation point는 애초에 이 경로로 닿지 않는지.
+다음 probe가 먼저 답해야 할 것은 비용이다. 관측 1건에 accession 1건을 받아야 하므로 **요청 수가
+CIK 수가 아니라 filing 수로 커진다.** 그래서 다음은 전수가 아니라 경계를 재는 probe여야 한다.
+**(§10.43 정정)** 여기 있던 "2009년 inline XBRL 의무화" 표현은 틀렸다 — 2009년은 전통적 XBRL
+interactive-data의 단계적 시작이고, Inline XBRL은 33-10514(2018)이 채택해 2019~2021에 단계 적용됐으며,
+표지 데이터 tagging은 33-10618(2019)이 만들었다. 그 경계 측정이 §10.43이다.
 
 **쓰지 않기로 한 것을 적어 둔다.** `submissions` API payload에는 `stateOfIncorporation` 필드가 있다.
 이번 작업의 금지 목록("current SEC company profile state")에 정확히 해당하므로 보지도 쓰지도
@@ -7819,6 +7825,326 @@ birth changed             NO      Option A implemented    NO      bundle / manif
 promotion / 5A-3 / Gates  NO      returns / ranking       NO      paid purchase                $0
 5A-2 재실행               NO      주 등록부 조회          NO      상용 vendor 조회             NO
 JURISDICTION_INTERVAL / EFFECTIVE_FROM / EFFECTIVE_TO 생성       NO
+```
+
+## 10.43 SEC filing-header 관할 source 경계 probe — 표지 XBRL 이전에도 관할이 있는가 — 2026-09-12
+
+**source feasibility probe다.** production 코드 · schema · SEC 증거 원장 · O2/O2-C · B2 ·
+`RelationInterval` · 탄생 · bundle · manifest를 하나도 바꾸지 않았다. 주 등록부 · 상용 vendor를
+호출하지 않았고 지출은 $0다. **전수 census는 실행하지 않았다.**
+
+```text
+base (origin/main)   08ddbc435663c1a31640a27d8e2ef6e05454645f   (trading/ · docs/trading/ 변경 없음)
+접근일               2026-09-12
+```
+
+### 0. §10.42 정정 — source 역사 (OFFICIAL_SEC_SOURCE_VERBATIM)
+
+§10.42의 **실측 수치는 전부 그대로 유효하다**(789 CIK 전부 404 · 양성 대조 · 관측 0). 고친 것은
+source 해석 둘이다.
+
+**정정 1 — "2009년 inline XBRL 의무화"는 틀렸다.** 공식 연혁은 셋으로 나뉜다.
+
+```text
+2009        전통적 XBRL interactive-data 보고가 단계적으로 시작됐다(표지 tagging이 아니다)
+2018-06-28  Inline XBRL 채택 (Release No. 33-10514)
+            단계적 준수일 — 원문 표:
+              Large accelerated filers (U.S. GAAP)  Fiscal periods ending on or after June 15, 2019
+              Accelerated filers (U.S. GAAP)        Fiscal periods ending on or after June 15, 2020
+              All other filers                      Fiscal periods ending on or after June 15, 2021
+2019        FAST Act modernization (Release No. 33-10618)
+            "Registrants will be required to tag all cover page data in Inline XBRL"
+            대상 — "Forms 10-K, 10-Q, 8-K, 20-F and 40-F"
+```
+
+**설립 관할은 그 전까지 tagging 대상이 아니었다.** 33-10618 원문이 직접 말한다.
+
+> "the Form 10-K cover page contains approximately 25 data points. Less than half of those data
+> points are currently required to be tagged in XBRL. The non-tagged data points include, among
+> others, the exchange on which securities are registered and **the state (or jurisdiction) of
+> incorporation**."
+
+그러므로 filing 단위 `dei:EntityIncorporationStateCountryCode`를 **2008~2026 전 구간의 1차 source로
+쓸 수 없다** — 먼저 coverage를 재야 한다. §10.42의 "2009년 inline XBRL 의무화 이전" 표현을 내렸다.
+
+**정정 2 — API 인과 주장을 좁혔다.** 측정된 것과 해석을 분리한다.
+
+```text
+측정   companyconcept이 789 CIK 전부에서 이 concept을 404로 돌려줬다
+       AAPL companyfacts도 이 concept을 담지 않았다 (facts.dei는 단위 있는 둘뿐)
+       같은 CIK·UA의 단위 있는 fact는 200으로 성공했다
+해석   이 API 계열은 **테스트한 population에서** 이 concept을 노출하지 않는다.
+       단위(unit of measure)로 배열을 나누는 문서 표현과 그 관측이 일치한다.
+비주장 공식 문서가 "단위 없는 문자열 fact는 전부 범주적으로 제외된다"고 명시하지는 않는다.
+       그 일반 법칙을 증명했다고 쓰지 않는다.
+```
+
+### 1. 새 1차 후보 — SEC submission header (OFFICIAL_SEC_SOURCE_VERBATIM)
+
+공식 **EDGAR PDS Technical Specification**이 dissemination header 구조를 직접 정의한다.
+`https://www.sec.gov/info/edgar/specifications/pds_dissemination_spec.pdf`
+
+```text
+FILER                      <FILER>                        1+
+  COMPANY DATA             <COMPANY-DATA>
+    COMPANY CONFORMED NAME <CONFORMED-NAME>
+    CIK                    <CIK>
+    SIC                    <ASSIGNED-SIC>
+    ORGANIZATION NAME      <ORGANIZATION-NAME>
+    RELATIONSHIP           <RELATIONSHIP>                  ?
+    IRS NUMBER             <IRS-NUMBER>                    ?
+    STATE OF INCORPORATION <STATE-OF-INCORPORATION>        ?     ← 이 probe의 대상
+    FISCAL YEAR END        <FISCAL-YEAR-END>               ?
+  END COMPANY DATA         </COMPANY-DATA>
+```
+
+같은 문서의 "Table 7 - Symbology"가 기호를 정의한다.
+
+> Blank = "Required" · **? = "Optional"** · + = "Tag and element are required and repeatable" ·
+> * = "Tag and element are optional and repeatable"
+
+**`STATE-OF-INCORPORATION`은 공식적으로 Optional이다.** 아래 7절의 결측 5건은 이상이 아니라
+이 계약이 예고한 성질이다.
+
+관측의 의미는 좁게 고정한다.
+
+```text
+SEC_FILING_HEADER_JURISDICTION_OBSERVATION
+  = 이 SEC submission의 filer/company-data header가 target CIK의 설립 주/국가를 X로 적었다
+
+아님: 주 등록부 법적 증거 · 법적 발효일 · 그 전후 관할의 연속성 증명 · RelationInterval · 주 제출 증거
+```
+
+### 2. parsing — 기존 구조를 그대로 빌렸다
+
+`qv_submissions.parse_filing_sic`의 block 논리를 **그대로 복제**해 SIC 대신 STATE를 읽었다
+(production 파일은 수정하지 않았다). `FILER` 최상위 절 → `COMPANY DATA:` block → 그 block의
+`CENTRAL INDEX KEY`가 target CIK일 때만 그 block의 값을 취한다.
+
+```text
+0값   JURISDICTION_HEADER_MISSING
+1값   JURISDICTION_HEADER_EXACT
+2값+  JURISDICTION_HEADER_AMBIGUOUS      (승자를 고르지 않는다)
+```
+
+`BUSINESS ADDRESS STATE` · `MAIL ADDRESS STATE` · 본사 · `submissions.stateOfIncorporation`은
+쓰지 않았다.
+
+### 3. 표본 (DETERMINISTIC)
+
+`sha256("qv-jurisdiction-header-probe-v1|" + member_symbol + "|" + identity_symbol + "|" +
+selected_cik + "|" + formation_session)` 오름차순으로 층마다 앞 12개를 뽑고, §10.41 12건을
+대조군으로 더한 뒤 `(CIK, formation_session)` 중복을 제거했다.
+
+```text
+early  2008-2012   pool 2206 -> 12
+middle 2013-2018   pool 2819 -> 12
+late   2019-2026   pool 3934 -> 12
+§10.41 대조군                 12      (중복 제거 후 12건 전부 남았다)
+합계 표본                     48      고유 CIK 45
+```
+
+### 4. 관측 filing 선택
+
+등록인 form 계열(`10-K` · `10-K/A` · `10-Q` · `10-Q/A` · `8-K` · `8-K/A`)만 후보로 두고,
+production `_historical_usable_session`(SPY `eodhd`/`eodhd-15y-2026-08`)이 준
+`historical_usable_session <= formation_session`을 만족하는 **가장 늦은 하나**만 골랐다.
+acceptance가 없으면 후보에서 뺐고 `filed` date로 대체하지 않았다. 이후 filing으로 backfill하지 않았다.
+
+```text
+SELECTED                              47
+NO_PRE_FORMATION_REGISTRANT_FILING     1   DIS / 0001744489 / 2010-06-30
+                                           (2019년에 생긴 CIK라 2010 이전 filing이 없다 — 정상)
+선택된 form                           8-K 44 · 10-Q 3
+```
+
+### 5. 결과 — A(complete submission) vs B(index-header)
+
+```text
+                         A: complete submission <SEC-HEADER>     B: {accession}-index-headers.html
+JURISDICTION_HEADER_EXACT          42                                    31
+JURISDICTION_HEADER_MISSING         5                                     3
+JURISDICTION_HEADER_AMBIGUOUS       0                                     0
+INDEX_HEADER_NOT_AVAILABLE          —                                    13
+
+parity   HEADER_PARITY_MATCH        31 / 31 비교 가능한 전부
+         HEADER_PARITY_MISMATCH      0
+         NOT_COMPARABLE              3   (A·B 둘 다 결측 — 같은 3건)
+         INDEX_HEADER_NOT_AVAILABLE 13
+```
+
+**B 안에서 두 표현이 다시 일치했다.** index-header 파일은 SGML tag 형식(`<STATE-OF-INCORPORATION>`)과
+들여쓰기 text 형식(`STATE OF INCORPORATION:`)을 **둘 다** 싣는데, 31/31 같은 값이었다.
+
+complete submission(A)은 **들여쓰기 text 형식만** 싣는다(`<COMPANY-DATA>` tag 형식 0/47). 그래서
+A를 tag parser로 다시 읽으면 값이 안 나오는 것이 정상이고, A의 text parsing이 옳다는 교차 확인이다.
+
+시기별 coverage — **표지 XBRL 이전 구간에도 header가 있다.**
+
+```text
+             선택   A EXACT   A MISSING   B 사용가능
+early  2008-2012   11     10          1        0
+middle 2013-2018   12     10          2        9
+late   2019-2026   24     22          2       22
+```
+
+관측된 관할 코드(공식 SEC 표로만 이름을 붙였다).
+
+```text
+DE 22 · OH 4 · WA 2 · IN 2 · MO · MI · CA · NC · TX · FL · MA · OK · WI · PA 각 1
+V8 = SWITZERLAND 1 · L2 = IRELAND 1          (FOREIGN_COUNTRY_CODE — 미국 밖 설립이 실제로 있다)
+```
+
+### 6. §10.41 교차 검증
+
+```text
+AGREES_WITH_CHARTER_PROOF        8
+DISAGREES_WITH_CHARTER_PROOF     0
+HEADER_NOT_AVAILABLE             1   CMG
+```
+
+| case | formation | header | §10.41 charter 판정 | 결과 |
+|---|---|---|---|---|
+| CMI  | 2026-06-30 | IN | INDIANA | AGREES_WITH_CHARTER_PROOF |
+| EXE  | 2026-06-30 | OK | OKLAHOMA | AGREES_WITH_CHARTER_PROOF |
+| HAL  | 2026-06-30 | DE | DELAWARE | AGREES_WITH_CHARTER_PROOF |
+| TSCO | 2026-06-30 | DE | DELAWARE | AGREES_WITH_CHARTER_PROOF |
+| WEC  | 2026-06-30 | WI | WISCONSIN | AGREES_WITH_CHARTER_PROOF |
+| WM   | 2026-06-30 | DE | DELAWARE | AGREES_WITH_CHARTER_PROOF |
+| WST  | 2026-06-30 | PA | PENNSYLVANIA | AGREES_WITH_CHARTER_PROOF |
+| WU   | 2021-06-30 | DE | DELAWARE | AGREES_WITH_CHARTER_PROOF |
+| CMG  | 2026-06-30 · 2016-06-30 | (없음) | DELAWARE | **HEADER_NOT_AVAILABLE** (두 시점 모두) |
+| SWKS | 2026-06-30 | DE | INSUFFICIENT_EVIDENCE | INDEPENDENT_OBSERVATION |
+| XYL  | 2026-06-30 | IN | INSUFFICIENT_EVIDENCE | INDEPENDENT_OBSERVATION |
+| FE   | 2026-06-30 · 2008-06-30 | OH | INSUFFICIENT_EVIDENCE | INDEPENDENT_OBSERVATION |
+
+**§10.41이 charter 원문으로 못 읽은 3건을 이 source는 읽었다.** SWKS=DELAWARE · XYL=INDIANA ·
+FE=OHIO다. §10.41의 실패 상태를 물려받지 않았고, 불일치는 하나도 없었다.
+
+### 7. 측정된 실패 (숨기지 않는다)
+
+```text
+A JURISDICTION_HEADER_MISSING   5 / 47   (약 11%)
+  WYNN 0001174922 2010-06-30 · ESV 0000314808 2013-06-28 · MOS 0001285785 2019-06-28
+  CMG  0001058090 2016-06-30 · CMG 0001058090 2026-06-30
+```
+
+원문을 직접 확인했다 — 그 `COMPANY DATA:` block은 CIK · SIC · IRS NUMBER · FISCAL YEAR END까지
+있고 **`STATE OF INCORPORATION:` 줄 자체가 없다.** 1절의 공식 `?`(Optional) 계약과 정확히 맞는다.
+parser 결함이 아니다.
+
+**CMG가 중요하다.** §10.41이 charter 원문으로 DELAWARE를 증명한 회사인데, 서로 다른 두 formation
+시점(2016 · 2026)에서 고른 filing이 **둘 다** header에 관할을 안 적었다. 즉 이 source는 회사 단위로
+조용히 비는 구간이 있다 — 단독 1차 source로 쓰면 그 회사는 영영 미해소다.
+
+```text
+index-header 사용 불가          13 / 47   전부 HTTP 404
+  404 accession 연도 prefix     08 09 10 11 12 13 14
+  200 accession 연도 prefix     14 15 16 17 19 21 22 23 25 26
+```
+
+경계가 2014년 안에 있다. **초기 구간은 index-header만으로 못 간다.**
+
+```text
+multi-filer submission          2 / 47    (FILER/FILED BY block이 2개 이상)
+JURISDICTION_HEADER_AMBIGUOUS   0 / 47    target CIK block 선택이 이 표본에서 흔들리지 않았다
+```
+
+### 8. XBRL 2차 진단 (추가 요청 0회)
+
+§10.42가 이미 받아 둔 AAPL 표지에서 `dei:EntityIncorporationStateCountryCode = CA`였고, 이번
+probe의 AAPL header(`0001181431-12-038301`)도 `CA`였다. 두 SEC source가 같은 값을 말한다.
+
+```text
+HEADER_XBRL_AGREE      1   AAPL (기존 캐시 · 새 요청 없음)
+HEADER_XBRL_DISAGREE   0
+XBRL_FACT_NOT_PRESENT  미측정 — 이번 표본에서 XBRL instance를 새로 받지 않았다
+```
+
+XBRL 가용성을 source 성립 조건으로 삼지 않았다.
+
+### 9. source 성립 판정 — 7문항
+
+```text
+1 초기/중기/후기에 header가 있는가          있다. early 10/11 · middle 10/12 · late 22/24 EXACT
+2 target CIK block 선택이 결정론적인가      그렇다. AMBIGUOUS 0 · multi-filer 2건에서도 정확
+3 §10.41 charter 증명과 일치하는가          비교 가능한 8건 전부 일치 · 불일치 0 · CMG만 결측
+4 multi-filer가 모호성을 만드는가           이 표본에서는 안 만들었다 (2건 관측 · 모호성 0)
+5 index-header가 전수에 쓸 만큼 동등한가    값은 동등(31/31 일치)하나 2014 이전이 404 — 단독 불가
+6 2019-2021 표지 XBRL 경계를 피하는가       피한다. 2008년 filing에서도 header가 나왔다
+7 1차 source로 쓰지 말아야 할 측정된 이유    **있다 — 공식 Optional이고 5/47(≈11%)이 비어 있다.**
+                                            charter로 DE가 증명된 CMG가 두 시점 모두 비었다.
+```
+
+### 10. 전수 census 계획 — 실행하지 않았다
+
+```text
+고유 selected CIK                     789
+selected CIK 있는 formation point     8959
+표본에서 accession 재사용              0 / 47     → 재사용으로 줄어들 여지가 거의 없다
+naive 상한 (formation point당 1건)    header 8959 + submissions 789 + archive 약 1140
+                                       ≈ 10,900 요청
+
+바이트 (이번 표본 실측)
+  A  complete submission   </SEC-HEADER>까지만 스트리밍해서 끊었다 (대부분 65,536B에서 중단)
+                           전체 파일은 그보다 훨씬 크다 — 전체를 받는 계획을 세우지 않는다
+  B  index-header 전체     중앙값 5,266B · 최소 2,218B · 최대 17,699B
+```
+
+권고하는 최소 검색 계획.
+
+```text
+1  accession 연도 >= 2015  index-header를 먼저 쓴다 (전체가 5KB 수준 · 값 동등 확인됨)
+2  accession 연도 <= 2014  complete submission을 </SEC-HEADER>에서 끊어 읽는다
+3  같은 CIK의 인접 formation point가 같은 accession을 고르면 캐시로 접는다
+4  JURISDICTION_HEADER_MISSING은 fail-close로 남기고 추정하지 않는다
+```
+
+### 11. 다음 조사 권고
+
+**filing-header를 1차 point-observation source로 채택하되 단독으로 쓰지 않는다.** 7번 항목이
+그 이유를 실측으로 준다.
+
+```text
+1차   SEC submission header STATE-OF-INCORPORATION   2008년까지 닿고 · charter 증명과 불일치 0
+보조  filing 표지 dei:EntityIncorporationStateCountryCode
+      33-10618이 표지 tagging을 의무화한 구간(대략 2019-2021 준수일 이후)에만 존재한다
+```
+
+두 source의 공백이 **반대 방향**이라는 것이 요점이다 — header는 초기 구간을 덮고, 표지 XBRL은
+후기 구간을 덮는다. 다음 probe가 확인할 **아직 검증되지 않은 가설** 하나를 적어 둔다: header가 빈
+CMG 2026-06-30은 표지 tagging 의무 구간에 있으므로 표지 XBRL이 그 구멍을 메울 수 있다.
+**이번 작업에서 그것을 측정하지 않았다** — 가설이지 결과가 아니다.
+
+주 등록부 · 상용 vendor 판단은 §10.42 그대로 `UNANSWERED_FROM_THIS_SOURCE`다. 전수 관할 분포가
+아직 없으므로 Delaware 전용 구매 결정을 정당화하지 않는다.
+
+### 12. 네트워크 · 산출물
+
+```text
+submissions recent      45      submissions archive     65
+complete submission     47      index-header            47   (200 34 · 404 13)
+probe 소계             204      (200 191 · 404 13)
+공식 source 문서        20      (200 8 · 404 12 — spec URL 추정 실패분)
+합계                   224      전송 실패 0 · 주 등록부 0 · 상용 vendor 0 · 지출 $0
+```
+
+행 단위 산출물은 gitignore된 runtime 영역에 두고 커밋하지 않는다.
+
+```text
+trading/data/qv-1043-probe/rows_1043.jsonl
+sha256  435eb193bb2bc8627d037dc4f8cd92f9f826e559d6ff781d5c7663bcd65a8494
+행       48   (표본 48건 전부 · §10.41 검증 상태 포함)
+```
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      SEC evidence ledger changed  NO
+O2 / O2-C changed         NO      B2 changed              NO      RelationInterval changed     NO
+birth changed             NO      Option A implemented    NO      bundle / manifest changed    NO
+promotion / 5A-3 / Gates  NO      returns / ranking       NO      paid purchase                $0
+주 등록부 조회            NO      상용 vendor 조회        NO      전수 관할 census             NO
 ```
 
 ## 11. 결과
