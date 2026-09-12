@@ -7224,6 +7224,267 @@ state filing evidence still needed   YES  (승인과 발효 사이의 법적 발
 production code · O2/O2-C · B2 · RelationInterval · Option A · manifest/promotion/5A-3/Gates   변경 없음
 ```
 
+## 10.41 주 등록부 legal-date source feasibility probe — 주 기록이 발효 시점을 줄 수 있는가 — 2026-09-12
+
+**source feasibility probe다.** 주 증거를 구현하지 않았고 production 코드 · schema · SEC 증거 원장
+(`qv_sec_evidence_documents`) · O2/O2-C · B2 · `RelationInterval` · 탄생 · bundle · manifest를 하나도 바꾸지
+않았다. **지출 $0** — 유료 산출물은 가격만 적었고 아무것도 주문하지 않았다.
+
+```text
+base (origin/main)   de0b8004a6eadb7098f7478176983652c6923a55   (trading/ · docs/trading/ 변경 없음)
+접근일               2026-09-12
+EDGAR 요청           0   (관할 판정은 §10.39/10.40이 이미 받아 둔 캐시 본문으로만 했다)
+```
+
+### 근거 구분
+
+```text
+OFFICIAL_SOURCE_VERBATIM   아래 인용은 공식 주 소스에서 직접 받아 인용했다(상용 요약을 쓰지 않았다)
+DETERMINISTIC              관할 census · 표본 선정 키 · 수수료 표 추출
+ACCESS_BLOCKED             이 환경에서 공식 소스에 닿지 못한 것(유료와 구분한다)
+PAID_ACCESS_REQUIRED       공식 경로가 있으나 유료인 것 — 가격만 기록하고 구매하지 않았다
+```
+
+### 1. 관할 census — SEC 원문으로만 (DETERMINISTIC)
+
+§10.39 자격 12건의 설립 관할을 **그 사건의 charter 원문**(이미 받아 둔 SEC governing instrument)에서 읽었다.
+ticker · 본사 · 회사 웹사이트 · 현재 프로필을 쓰지 않았다.
+
+```text
+DELAWARE      6   CMG · HAL · SWKS · TSCO · WM · WU
+PENNSYLVANIA  1   WST
+INDIANA       2   CMI · XYL
+OHIO          1   FE
+WISCONSIN     1   WEC
+OKLAHOMA      1   EXE
+```
+
+근거 문언(각 charter 원문):
+
+```text
+WST   "The Corporation is incorporated under the Pennsylvania Business Corporation Law"
+EXE   "incorporated on November 19, 1996 ... upon the filing with the Secretary of State of Oklahoma" ·
+      "the Oklahoma General Corporation Act"
+WEC   "a corporation incorporated under Chapter 180 of the Wisconsin Statutes, the Wisconsin Business Corporation Law"
+CMI   "existing pursuant to the Indiana Business Corporation Law"
+XYL   "The address of the registered office of the Corporation in the State of Indiana ..."
+FE    "The place in the State of Ohio where the Corporation's principal office is located is the City of Akron"
+CMG · HAL · SWKS · TSCO · WM · WU   "General Corporation Law of the State of Delaware" 계열 문언
+```
+
+Delaware로 증명된 pool이 6이라 부족분이 없다. 선정 키는
+`sha256("qv-state-source-probe-v1|" + CIK + "|" + formation_session)`이다.
+
+```text
+CMG  00f04366e4ce730d      HAL  0dd08e667358b080      SWKS 1c60ee2892fadb8a
+WM   66f7fb98c8a88f12      TSCO 823c855dfad84ed5      WU   a4c2b4011c52efe7
+-> 오름차순 앞 4개: CMG · HAL · SWKS · WM
+```
+
+### 2. 공식 법령 (OFFICIAL_SOURCE_VERBATIM)
+
+**DELAWARE — 8 Del. C. § 103** (`https://delcode.delaware.gov/title8/c001/sc01/index.html`, 2026-09-12)
+
+> (c)(3) "Upon delivery of the instrument, the Secretary of State shall record the date and time of its
+> delivery. Upon such delivery and tender of the required taxes and fees, the Secretary of State shall certify
+> that the instrument has been filed in the Secretary of State's office by endorsing upon the signed instrument
+> the word 'Filed', and the date and time of its filing. This endorsement is the 'filing date' of the
+> instrument, and is conclusive of the date and time of its filing in the absence of actual fraud. The
+> Secretary of State shall file and index the endorsed instrument."
+
+> (c)(8) "The Secretary of State shall cause to be entered such information from each instrument as the
+> Secretary of State deems appropriate into the Delaware Corporation Information System … and such information
+> and a copy of each such instrument shall be permanently maintained as a public record on a suitable medium.
+> The Secretary of State is authorized to grant direct access to such system to registered agents subject to
+> the execution of an operating agreement …"
+
+> (d) "Any instrument filed in accordance with subsection (c) of this section shall be effective upon its
+> filing date. Any instrument may provide that it is not to become effective until a specified time subsequent
+> to the time it is filed, but such time shall not be later than a time on the ninetieth day after the date of
+> its filing."
+
+**PENNSYLVANIA — 15 Pa.C.S. §§ 106 · 132 · 1915 · 1916 — `ACCESS_BLOCKED`.** 공식 경로 네 가지를 시도했고
+전부 실패했다.
+
+```text
+https://www.legis.state.pa.us/cfdocs/legis/LI/consCheck.cfm?... (§106·132·1915·1916)   timeout
+https://www.legis.state.pa.us/WU01/LI/LI/CT/HTM/15/00.001.006.000..HTM                 timeout
+https://www.palegis.us/statutes/consolidated/view-statute?...  (§106·132·1915·1916)    timeout
+https://www.palegis.us/statutes/consolidated  (root)                                    timeout
+WebFetch(palegis.us view-statute §1915 · §1916)                                         ECONNREFUSED
+```
+
+**상용 요약·비공식 미러로 대체하지 않았다.** 따라서 §1915의 지연 발효 지정과 §1916의 발효 시점 규칙은
+**이 probe에서 검증되지 않았다.** 아래 PA 판단은 전부 그 한계 위에 있다.
+
+### 3. 공식 접근 모델 (OFFICIAL_SOURCE_VERBATIM · PAID_ACCESS_REQUIRED)
+
+**DELAWARE.** 무료 entity search가 존재하지만 공식 페이지가 자동화를 명시로 금지한다
+(`https://icis.corp.delaware.gov/Ecorp/EntitySearch/NameSearch.aspx`, 2026-09-12).
+
+> "The Division of Corporations strictly prohibits mining data. Excessive and repeated searches that may have
+> a negative impact on our systems and customer experience are also prohibited. Use of automated tools in any
+> form may result in the suspension of your access to utilize this service."
+
+**그래서 이 probe는 DE entity search를 한 번도 조회하지 않았다.** 자동 도구로 그 화면에 접근하지 않는 것이
+규정 준수다 — 이것이 §6의 답이지 실패가 아니다.
+
+Online Status (`https://corp.delaware.gov/onlinestatus/`, 2026-09-12):
+
+> "There are two options of online status available, status ($10) or status with tax & history information
+> ($20). … If you are requesting the $20 status option, it will NOT return actual images of the documents on
+> record. The application will return a page listing the status, the last 5 filings, franchise tax assessment,
+> total authorized shares (if applicable), and tax due."
+
+수수료표(`https://corpfiles.delaware.gov/Fee_Schedule/AugustFee2026.pdf`, Revised August 1, 2026):
+
+```text
+Record Searches                        $50.00 (per entity)   · same day $40.00 · 24h $30.00
+Good Standing Short form               $50.00 (per certificate)
+Good Standing Long form (domestic)    $175.00 (per certificate)
+Long Form Listing                     $175.00 (per certificate)
+Certified Copy                         $50.00 (each)
+```
+
+**PENNSYLVANIA.** 공식 안내(`https://www.pa.gov/agencies/dos/programs/business/information-services`)는
+"Certified or Plain Photocopies · Good Standing or Subsistence Certificates · Preclearance of Documents"를
+서비스로 든다. 수수료(`.../business/fees-and-payments`):
+
+> "Record searches listing the entity number, name, address, and file date (these may also indicate a no
+> record) — $15" · "Plain copies — $15 plus $3 per page" · "Certified copies — $55 plus $3 per page" ·
+> "Printouts of the computer screen are available in the reception room — $3 per page" · "All microfilm
+> records are available for public inspection and copying in the bureau reception room — $3 per page"
+
+공식 Business Name Search(`https://file.dos.pa.gov/search/business`)는 이 환경에서 **HTTP 403**이다(직접
+요청 · WebFetch 모두). **헤더를 위장해 우회하지 않았다** → `ACCESS_BLOCKED`.
+
+**$0 확인.** PA 문서 · Index Report · DE $20 status · DE certificate · document copy · authorized vendor 구독을
+하나도 구매하지 않았다.
+
+### 4. WST 양성 대조 — 결론
+
+```text
+entity resolved          NO      공식 PA 검색이 403 (조회 자체를 못 했다)
+event found              NO
+state filing date        —
+state effective date     —
+delayed-effective 모호    DELAYED_EFFECT_UNKNOWN
+document available       유료 경로만 (plain $15+$3/p · certified $55+$3/p)
+free/paid                ACCESS_BLOCKED + PAID_ACCESS_REQUIRED
+exact SEC linkage        UNRESOLVED   (주 쪽 식별자를 못 봤으므로 연결 시도 자체가 성립하지 않는다)
+formation status         변화 없음 — APPROVED_CHANGE_EFFECT_UNKNOWN 그대로
+```
+
+**SEC의 2020-07 정관 사본에 있는 "(Effective as of May 5, 2020)"를 주 사실로 쓰지 않았다.** 그것은 양성 대조의
+기대값일 뿐이고, 주 기록으로 확인되지 않았다.
+
+### 5. DELAWARE 4건 — 접근 가능성
+
+표본 CMG · HAL · SWKS · WM. 네 건 모두 entity resolution · filing history · 법적 시점 · 문서 이미지가
+`NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION`이다. 사람이 브라우저로 한 건씩 보는 것은 가능하지만, 이 probe가
+평가하는 것은 **population 작업에 쓸 수 있는 programmatic 경로**다.
+
+```text
+LEGAL_SOURCE_EXISTS            YES   8 Del. C. §103(c)(3)·(c)(8)·(d)
+PROGRAMMATIC_FREE_ACCESS_EXISTS NO    공식 약관이 자동 도구를 금지한다
+필요한 유료 경로               $10/$20 online status(이미지 없음·최근 5건) · Record Search $50/entity ·
+                               Certified Copy $50/each · Long Form $175/entity
+공식 bulk 경로                 §103(c)(8)의 registered agent direct access 뿐 — 즉 authorized agent/vendor
+```
+
+### 6. PIT 판정
+
+```text
+Delaware       RECORD_IS_PUBLIC              YES  §103(c)(8)
+               FILING_TIME_IS_LEGAL_EVENT    YES  §103(c)(3) + §103(d)
+               역사적 공개 시점(latency)      규정 없음
+            -> PIT_PUBLIC_RECORD_BUT_PUBLICATION_LATENCY_UNKNOWN
+
+Pennsylvania   §§106·132 미검증(ACCESS_BLOCKED) · 공개 열람 자체는 수수료표 문언이 시사하나 법문 확인 실패
+            -> PIT_NOT_ESTABLISHED   (이 probe 한정 판정이다)
+```
+
+`usable_from_session`은 정의하지 않았다. **A(공적 기록)와 B(제출 시점이 법적 사건)에서 C(그때 조회 가능했다)를
+끌어내지 않는다.**
+
+### 7. 운영 규모 — 구매하지 않은 추정
+
+```text
+Delaware  무료 대량 조회      불가 (약관)
+          per-entity 온라인   $10 status · $20 status+tax&history (문서 이미지 없음 · 최근 5건)
+          per-document       Certified Copy $50 · Record Search $50/entity
+          전 이력 인증본      Long Form $175/entity
+          bulk/vendor        registered agent direct access (§103(c)(8))
+          N개 entity 비용 형태  최소 $20·N (이미지 없음) · 문서가 필요하면 + $50 × 문서수 ·
+                              전 이력 인증본이면 $175·N
+Pennsylvania  온라인 검색     이 환경에서 403 · per-document $15+$3/p(plain) · $55+$3/p(certified) ·
+                              공식 bulk/API 문서를 찾지 못했다
+```
+
+**QV population 실제 비용은 추정하지 않았다** — Delaware 발행인 수를 세는 관할 census가 먼저다.
+
+### 8. 답
+
+1. **PA 공식 기록이 WST의 `APPROVED_CHANGE_EFFECT_UNKNOWN`을 닫을 수 있나 — 이 probe에서는 못 닫았다.**
+   공식 검색이 403이라 조회 자체가 성립하지 않았다. 법적으로 가능한지는 §1915/§1916를 못 읽어 **판단 보류**다.
+2. **PA가 filing date와 지연 effective date를 구분해 노출하나 — 확인된 범위에서는 file date뿐이다.** 공식
+   수수료표의 record search 산출물이 "entity number, name, address, and file date"이고 effective date가 없다.
+   지연 발효 여부는 문서 사본(유료)을 봐야 알 가능성이 크다 → `DELAYED_EFFECT_UNKNOWN`.
+3. **DE가 법적으로 필요한 진실을 주나 — 그렇다.** §103(c)(3)이 filing date/time을 종국적으로 정하고,
+   §103(d)가 지연 발효(≤90일)를 규정하며, §103(c)(8)이 공적 기록 보존을 규정한다.
+4. **DE 무료/공개 인터페이스가 운영적으로 주나 — 아니다.** 자동화 금지 약관이 명시이고, $20 status조차
+   문서 이미지를 주지 않으며 최근 5건만 돌려준다.
+5. **상용/authorized source가 population 규모에 필요한가 — 그렇게 보인다.** 공식 대량 경로는 §103(c)(8)의
+   registered agent direct access뿐이다.
+6. **적합성 — (b) legal-date source only.** 조항 문언(semantic instrument)의 정본은 여전히 SEC 사본이고,
+   주 기록이 줄 수 있는 것은 filing/effective 시점이다.
+7. **남은 PIT 가정 — "지금 조회된다 = 그때도 조회할 수 있었다"가 증명되지 않는다.** 주 법령은 공적 기록임을
+   말하지만 역사적 공개 시점을 말하지 않는다. 그 가정을 세우기 전에는 주 기록으로 `usable_from_session`을
+   만들 수 없다.
+
+### 9. 후보 evidence 필드 — 구현하지 않는다
+
+실제 소스에서 **존재가 확인된 것**과 **확인 못 한 것**을 나눠 적는다. 아래는 승인된 schema가 아니고
+`qv_sec_evidence_documents` · `schema.sql` · manifest · bundle · `EvidenceRef`에 넣지 않았다.
+
+```text
+                     Delaware                          Pennsylvania
+source_kind          (개념) STATE_REGISTRY_FILING       (개념) 동일
+jurisdiction         확인                              확인
+state_entity_id      무료 화면에 존재(자동화 금지)      확인 못 함 (403)
+state_filing_id      확인 못 함                        확인 못 함
+instrument_type      확인 못 함                        확인 못 함
+filed_at             법적으로 확정(§103(c)(3))          "file date"가 유료 산출물에 존재
+effective_at         instrument가 명시할 때만(§103(d))  확인 못 함
+document_locator     유료($50 certified copy)           유료($15/$55 + $3/page)
+document_sha256      해당 없음(이미지 미취득)           해당 없음
+retrieved_at         —                                 —
+```
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      SEC evidence ledger changed  NO
+O2 / O2-C changed         NO      B2 changed              NO      RelationInterval changed     NO
+birth changed             NO      Option A implemented    NO      bundle / manifest changed    NO
+promotion / 5A-3 / Gates  NO      returns / ranking       NO      paid purchase                $0
+```
+
+받은 공식 페이지 사본과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
+
+## 10.41-A 행 단위 — 5건
+
+| # | case | 관할 (SEC 원문 근거) | 주 조회 시도 | 결과 | 필요한 공식 유료 경로 |
+|---|---|---|---|---|---|
+| 01 | WST / 0000105770 / 2020-06-30 | PENNSYLVANIA — "incorporated under the Pennsylvania Business Corporation Law" | `file.dos.pa.gov/search/business` (직접 · WebFetch) | **ACCESS_BLOCKED** HTTP 403 · entity 미해결 · event 미발견 · 발효일 미확인 | plain copy $15+$3/p · certified $55+$3/p · record search $15 |
+| 02 | CMG / 0001058090 / 2021-06-30 | DELAWARE — "General Corporation Law of the State of Delaware" | 없음 (ICIS 약관이 자동 도구 금지) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | status $10 / $20(이미지 없음) · record search $50 · certified copy $50 · long form $175 |
+| 03 | HAL / 0000045012 / 2020-06-30 | DELAWARE — 동일 문언 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
+| 04 | SWKS / 0000004127 / 2015-06-30 | DELAWARE — 동일 문언 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
+| 05 | WM / 0000823768 / 2022-06-30 | DELAWARE — 동일 문언 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
+
+선정에서 빠진 Delaware 2건(TSCO `823c855d…` · WU `a4c2b401…`)은 키 순서상 5·6번이다. Delaware pool 6건은
+전부 SEC charter 원문으로 관할이 증명됐다.
+
 ## 11. 결과
 
 
