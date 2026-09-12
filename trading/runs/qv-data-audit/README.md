@@ -7027,7 +7027,12 @@ ITEM_503 (bylaws-only)            1   CMG — "approved an amendment to Chipotle
 ITEM_507 8-K (정기주총)           12   12건 전부 gap 안에 있다
 ITEM_507_CHARTER_VOTE_APPROVED     1   WST
 ITEM_507_CHARTER_VOTE_REJECTED     0
-10-Q 검사                          13   자격 재-anchor 3 (XYL · WST · EXE) · Exhibit 3 charter 행 없음 10
+10-Q 검사                          13   상호배타 범주로 정리한다
+  QUALIFYING_CURRENT_STATE_OBSERVATION          3   XYL · WST · EXE
+  NO_CHARTER_ROW / NO_CURRENT_STATE_OBSERVATION 10
+  AMBIGUOUS_COMPOSITE                           0
+  UNRESOLVED_REFERENCE                          0
+  EXHIBIT_INDEX_PARSE_FAILURE                   0
 PROPOSAL_REFERENCE                 1   WST (아래 — 결정론적 참조 해석은 실패했다)
 UNRESOLVED_EVENT                   0
 ```
@@ -7036,11 +7041,23 @@ UNRESOLVED_EVENT                   0
 sha256 `71af8ac159185a2c474a281dd99c3c7f11ea0a39c3586ebf8ab56f11b0c1193a`, 규칙을 결과를 본 뒤에 고치지
 않았다). Exhibit 3 charter 행이 없는 10-Q는 파서 실패가 아니라 `NO_CURRENT_STATE_OBSERVATION`이다.
 
+**범주 정정(2026-09-12 receipt audit).** 동결된 v3 코드는 Exhibit 3 행이 0건이면 그 filing을
+`EXHIBIT_INDEX_PARSE_FAILURE`로 적는다 — 그 이름은 "행이 없다"와 "파서가 놓쳤다"를 구분하지 못한다.
+캐시된 본문으로 결정론적 재확인을 했다: 번호 셀(`3.1` · `(3.1)` 등) 뒤 3블록 안에 정관/부속정관 설명이
+붙는 자리와 `Exhibit 3` 표제를 함께 셌다. 자격 3건은 그 자리가 2 · 2 · 3개 있었고(XYL `(3.1)` ·
+WST `3.1` · EXE `3.1`), 나머지 10건은 **0개**다(FE는 charter가 아닌 행 1개뿐). 그러므로 그 10건은 실제로
+Exhibit 3 charter 행이 없는 filing이고 **참 파서 실패는 0건**이다. 아래 표의 10-Q 칸도 그 범주로 적고
+동결 코드가 내보낸 원 label은 괄호에 남긴다. network 호출 없이 캐시만 썼다.
+
 재-anchor가 실제로 틈을 줄인 것은 둘이다.
 
 ```text
-XYL  85 세션 -> 39 세션   (10-Q 0001193125-12-206735 usable 2012-05-04, 같은 charter SHA)
-EXE  84 세션 -> 41 세션   (10-Q 0000895126-25-000053 usable 2025-04-30, 같은 charter SHA)
+XYL  85 세션 -> 39 세션   10-Q 0001193125-12-206735 usable 2012-05-04
+                         PRE와 **같은 charter 자연키** 0000950123-11-089760/y93081exv3w1.htm를 가리킨다.
+                         SHA 둘은 같은 문서의 두 표현이다 — 파일 바이트 8914c2ff…(5A-2 기록과 일치) ·
+                         complete submission `<TEXT>` payload adda378c…. 다른 정관 상태가 아니다.
+EXE  84 세션 -> 41 세션   10-Q 0000895126-25-000053 usable 2025-04-30
+                         PRE와 같은 자연키 0001104659-24-104976/tm2425151d1_ex3-1.htm이고 SHA도 같다(dae7d493…)
 WST  재-anchor 10-Q(usable 2020-04-27)는 표결(5월 5일)보다 앞이라 변경 뒤 재-anchor가 아니다
 ```
 
@@ -7169,19 +7186,43 @@ qv_sec_filings 적재 범위 확대   NO      network                  EDGAR 27(
 
 | # | case | CIK | formation | PRE obs (usable) | PRE charter SHA | gap filings / sessions | 5.03 | 5.07 charter vote | proxy ref | 10-Q re-anchor | scope | ledger state at formation | C0 | C1 | POST bracket |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 01 | CMG | 0001058090 | 2021-06-30 | 0001058090-21-000010 (2021-02-10) | 13a1b285bc977c68… | 44 / 97 | bylaws-only (forum provision, Art. XII of Bylaws) | annual-meeting votes, no charter amendment | — | 0001058090-21-000022 2021-04-29 EXHIBIT_INDEX_PARSE_FAILURE | PROVEN_NON_CLASS_SCOPE | **ONLY_PROVEN_NON_CLASS_CHANGES** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 02 | CMI | 0000026172 | 2024-06-28 | 0000026172-24-000012 (2024-02-13) | 6afef606c03f88e8… | 157 / 94 | none in gap | annual-meeting votes, no charter amendment | — | 0000026172-24-000023 2024-05-03 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 01 | CMG | 0001058090 | 2021-06-30 | 0001058090-21-000010 (2021-02-10) | 13a1b285bc977c68… | 44 / 97 | bylaws-only (forum provision, Art. XII of Bylaws) | annual-meeting votes, no charter amendment | — | 0001058090-21-000022 2021-04-29 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | PROVEN_NON_CLASS_SCOPE | **ONLY_PROVEN_NON_CLASS_CHANGES** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 02 | CMI | 0000026172 | 2024-06-28 | 0000026172-24-000012 (2024-02-13) | 6afef606c03f88e8… | 157 / 94 | none in gap | annual-meeting votes, no charter amendment | — | 0000026172-24-000023 2024-05-03 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
 | 03 | EXE | 0000895126 | 2025-06-30 | 0000895126-25-000021 (2025-02-27) | dae7d493e7434cb0… | 29 / 84 | none in gap | annual-meeting votes, no charter amendment | — | 0000895126-25-000053 2025-04-30 QUALIFYING dae7d493e7434cb0 | — | **NO_CHARTER_SIGNAL_OBSERVED+REANCHORED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 04 | FE | 0001031296 | 2023-06-30 | 0001031296-23-000014 (2023-02-14) | 1a367a7c8a01b191… | 42 / 94 | none in gap | annual-meeting votes, no charter amendment | — | 0001031296-23-000032 2023-04-28 NO_CHARTER_ROW | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 05 | HAL | 0000045012 | 2020-06-30 | 0000045012-20-000031 (2020-02-12) | 72a88a07420e52ac… | 25 / 96 | none in gap | annual-meeting votes, no charter amendment | — | 0000045012-20-000059 2020-04-27 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 06 | SWKS | 0000004127 | 2015-06-30 | 0000004127-15-000004 (2015-02-03) | 50347176d7df827a… | 38 / 102 | none in gap | annual-meeting votes, no charter amendment | — | 0000004127-15-000012 2015-05-07 EXHIBIT_INDEX_PARSE_FAILURE; 0000004127-15-000006 2015-02-05 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 07 | TSCO | 0000916365 | 2022-06-30 | 0000916365-22-000049 (2022-02-18) | 4a8390b5a5c816d7… | 22 / 90 | none in gap | annual-meeting votes, no charter amendment | — | 0000916365-22-000057 2022-05-06 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 08 | WEC | 0000783325 | 2011-06-30 | 0000107815-11-000028 (2011-02-28) | 84af5bab65f78be3… | 33 / 86 | none in gap | annual-meeting votes, no charter amendment | — | 0000107815-11-000052 2011-05-06 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 09 | WM | 0000823768 | 2022-06-30 | 0001558370-22-001179 (2022-02-16) | abad27aa22e344f4… | 49 / 92 | none in gap | annual-meeting votes, no charter amendment | — | 0001558370-22-005976 2022-04-27 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 04 | FE | 0001031296 | 2023-06-30 | 0001031296-23-000014 (2023-02-14) | 1a367a7c8a01b191… | 42 / 94 | none in gap | annual-meeting votes, no charter amendment | — | 0001031296-23-000032 2023-04-28 NO_CHARTER_ROW / NO_CURRENT_STATE_OBSERVATION | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 05 | HAL | 0000045012 | 2020-06-30 | 0000045012-20-000031 (2020-02-12) | 72a88a07420e52ac… | 25 / 96 | none in gap | annual-meeting votes, no charter amendment | — | 0000045012-20-000059 2020-04-27 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 06 | SWKS | 0000004127 | 2015-06-30 | 0000004127-15-000004 (2015-02-03) | 50347176d7df827a… | 38 / 102 | none in gap | annual-meeting votes, no charter amendment | — | 0000004127-15-000012 2015-05-07 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인); 0000004127-15-000006 2015-02-05 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 07 | TSCO | 0000916365 | 2022-06-30 | 0000916365-22-000049 (2022-02-18) | 4a8390b5a5c816d7… | 22 / 90 | none in gap | annual-meeting votes, no charter amendment | — | 0000916365-22-000057 2022-05-06 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 08 | WEC | 0000783325 | 2011-06-30 | 0000107815-11-000028 (2011-02-28) | 84af5bab65f78be3… | 33 / 86 | none in gap | annual-meeting votes, no charter amendment | — | 0000107815-11-000052 2011-05-06 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 09 | WM | 0000823768 | 2022-06-30 | 0001558370-22-001179 (2022-02-16) | abad27aa22e344f4… | 49 / 92 | none in gap | annual-meeting votes, no charter amendment | — | 0001558370-22-005976 2022-04-27 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
 | 10 | WST | 0000105770 | 2020-06-30 | 0000105770-20-000015 (2020-02-24) | e32210d672eac05f… | 38 / 89 | none in gap | APPROVED — Art. 5 authorized common 100M→200M | DEF 14A 0001047469-20-001767 (unique DEF 14A in gap; 5.07 cites “proxy statement dated March 13, 2020” — not matchable to a filing date)  | 0000105770-20-000021 2020-04-27 QUALIFYING e32210d672eac05f | GENERAL_CAPITAL_STRUCTURE | **APPROVED_CHANGE_EFFECT_UNKNOWN** | BLOCKS | C1_BLOCKED | DIFFERENT_SHA |
-| 11 | WU | 0001365135 | 2019-06-28 | 0001558370-19-000848 (2019-02-22) | c96c074a5ac9c4cf… | 35 / 88 | none in gap | annual-meeting votes, no charter amendment | — | 0001558370-19-004270 2019-05-08 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
-| 12 | XYL | 0001524472 | 2012-06-29 | 0001193125-12-084766 (2012-02-29) | 8914c2ff92a2ed46… | 53 / 85 | none in gap | annual-meeting votes, no charter amendment | — | 0001193125-12-206735 2012-05-04 QUALIFYING adda378ce4bde703 | — | **NO_CHARTER_SIGNAL_OBSERVED+REANCHORED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 11 | WU | 0001365135 | 2019-06-28 | 0001558370-19-000848 (2019-02-22) | c96c074a5ac9c4cf… | 35 / 88 | none in gap | annual-meeting votes, no charter amendment | — | 0001558370-19-004270 2019-05-08 NO_CURRENT_STATE_OBSERVATION (frozen label EXHIBIT_INDEX_PARSE_FAILURE · Exhibit 3 행 0건 확인) | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 12 | XYL | 0001524472 | 2012-06-29 | 0001193125-12-084766 (2012-02-29) | 8914c2ff92a2ed46… | 53 / 85 | none in gap | annual-meeting votes, no charter amendment | — | 0001193125-12-206735 2012-05-04 QUALIFYING · 같은 자연키 0000950123-11-089760/y93081exv3w1.htm · 파일 SHA 8914c2ff92a2ed46 (payload SHA adda378ce4bde703) | — | **NO_CHARTER_SIGNAL_OBSERVED+REANCHORED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
 
+
+### receipt audit — 2026-09-12
+
+이 절의 감사 불일치만 고쳤다. 연구 범위를 다시 돌리지 않았고 network 호출은 0회다(캐시된 진단 기록만 썼다).
+
+```text
+고친 것 1  10-Q 13건을 상호배타 5범주로 정리했다. 동결 label EXHIBIT_INDEX_PARSE_FAILURE를 그대로
+           "charter 행 없음"으로 세지 않고, 결정론적 재확인으로 참 파서 실패가 0건임을 밝혔다.
+고친 것 2  XYL의 "같은 charter SHA" 서술을 지웠다. 10-Q 재-anchor는 PRE와 같은 자연키를 가리키고
+           두 SHA는 파일 바이트와 complete submission payload라는 같은 문서의 두 표현이다.
+바뀌지 않은 집계  자격 재-anchor 3 · 틈 축소 XYL 85->39 · EXE 84->41 · 원장 상태 8/2/1/1
+                  C0 11/12 · C1 positively closed 0 / 완결성 가정 11 / 차단 1 · bracketing SAME 11 · DIFFERENT 1
+```
+
+실질 결론은 그대로다.
+
+```text
+WST detected by formation            YES   (Item 5.07 · usable 2020-05-08 <= formation 2020-06-30)
+WST channel                          Item 5.07
+WST status                           APPROVED_CHANGE_EFFECT_UNKNOWN
+SEC disclosure partition closed      NO
+state filing evidence still needed   YES  (승인과 발효 사이의 법적 발효일)
+production code · O2/O2-C · B2 · RelationInterval · Option A · manifest/promotion/5A-3/Gates   변경 없음
+```
 
 ## 11. 결과
 
