@@ -7535,6 +7535,292 @@ PIT                        역사적 공개 latency · usable_from_session 미�
 production code · schema · O2/O2-C · B2 · RelationInterval · manifest/bundle   변경 없음
 ```
 
+## 10.42 전수 설립관할 exposure census — 지정 source가 그 fact를 갖고 있지 않다 — 2026-09-12
+
+**source-procurement census다.** production 코드 · schema · SEC 증거 원장 · O2/O2-C · B2 ·
+`RelationInterval` · 탄생 · bundle · manifest를 하나도 바꾸지 않았다. 주 등록부 · 상용 vendor를
+호출하지 않았고 지출은 $0다.
+
+**결과를 먼저 적는다. census는 실행됐지만 관할 분포를 만들지 못했다.** 지정된 1차 source인
+`companyconcept` API가 `dei:EntityIncorporationStateCountryCode`를 **789개 CIK 전부에서 HTTP 404**로
+돌려줬다. 이것은 전송 실패가 아니라 그 API가 그 fact를 담지 않는다는 뜻이고, 아래 양성 대조가
+그것을 증명한다.
+
+```text
+base (기대 handoff)  ba73c4f7d8bab8f37b3ea0740df99f02f172e297
+base (실제 origin/main) 97e6a3e3606d8be38e80c1c13a52a21b2e04d129  "Close P1-B6 smoke acceptance …"
+                     → Local Memory 트랙이고 trading/ · docs/trading/ 파일을 하나도 건드리지 않는다
+불변식 확인          git diff 49dd7b0..origin/main -- trading/ docs/trading/   = 비어 있음 ✓
+접근일               2026-09-12
+```
+
+### 근거 구분
+
+```text
+OFFICIAL_SEC_SOURCE_VERBATIM   아래 인용은 공식 SEC taxonomy · 공식 SEC 문서에서 직접 받아 인용했다
+DETERMINISTIC                  population 고정 · 요청 · 상태 집계
+POSITIVE_CONTROL               "없음"이 전송/인증/URL 문제가 아님을 증명하려고 일부러 성공시킨 요청
+NOT_MEASURABLE                 source가 없어서 이번 probe가 만들 수 없는 값 (추정으로 채우지 않는다)
+```
+
+### 1. 고정한 population (DETERMINISTIC)
+
+prompt의 숫자를 믿지 않고 runtime artifact에서 다시 셌다.
+
+```text
+run identity sha256       sha256:52ff66d48ef3a1aecc620bd7aed2c5ec15112c57a5abd9d714667532c1165fda
+inventory sha256          dc13cae6c9f375c2f1dea72a01da9bc16682d7298fcc2b24900d03feb5a8ceba
+final output sha256       b68813def1f815c174ff454b89a6b198ddbac3eb6fe631ae1232f486b364cfc5
+identity_source_version   qv-identity-sha256:de239b12524d48fbe02d12fac6bdc1ca68a34ab7ea859d695c7f574eec8914be
+execution commit          9e1203c46e69b30040678d317c34c92cb3cb0971
+artifact                  trading/data/qv-5a2-run/   (gitignored · 5A-2 discovery를 다시 돌리지 않았다)
+
+WORK_ITEMS_TOTAL              897
+WORK_ITEMS_WITH_SELECTED_CIK  808
+WORK_ITEMS_WITHOUT_SELECTED_CIK  89
+UNIQUE_SELECTED_CIKS          789      ← 808 work item이 789 CIK로 모인다
+FORMATION_POINTS_TOTAL       9464      (selected CIK 있는 것 8959 · 없는 것 505)
+```
+
+`UNIQUE_SELECTED_CIKS`는 prompt가 적은 808이 아니라 **789**다. 808은 selected CIK를 가진 *work
+item* 수이고, 서로 다른 work item이 같은 CIK를 고르는 경우가 있어 고유 CIK는 그보다 적다.
+요청 상한은 고유 CIK 수이므로 789를 썼다.
+
+### 2. 공식 SEC source 계약 (OFFICIAL_SEC_SOURCE_VERBATIM)
+
+**A. concept 정의 — 공식 dei taxonomy.** `https://xbrl.sec.gov/dei/2025/dei-2025.xsd`
+
+```text
+name="EntityIncorporationStateCountryCode" id="dei_EntityIncorporationStateCountryCode"
+type="dei:edgarStateCountryItemType" substitutionGroup="xbrli:item" nillable="true"
+xbrli:periodType="duration"
+```
+
+`dei-2025_doc.xsd`의 documentation label 원문:
+
+> "Two-character EDGAR code representing the state or country of incorporation."
+
+**핵심은 `type`이다.** 이 fact는 `edgarStateCountryItemType`, 즉 **단위 없는 문자열**이지 수치가
+아니다. 아래 4절이 보여주듯 그것이 API에 없는 이유다.
+
+**B. code 표 — 공식 SEC "EDGAR State and Country Codes".** 309개 code를 그 페이지의 절 구분
+그대로 읽었다(이름을 기억으로 지어내지 않았다).
+
+```text
+States 절              52   ← 50개 주 + DC(DISTRICT OF COLUMBIA) + X1(UNITED STATES)
+Canadian Provinces 절  11   A0 ALBERTA … B0 YUKON
+Other Countries 절    246   D0 BERMUDA · L8 JAMAICA … XX UNKNOWN
+Delaware               DE = DELAWARE  (US_STATE_OR_TERRITORY)
+```
+
+`X1 = UNITED STATES`가 공식 표에서 **States 절 안에** 있다는 점을 적어 둔다. 미국이지만 주가
+아니므로, 관할 분포를 실제로 만들 때 DE/비DE 주 분류에서 따로 다뤄야 한다.
+
+**C. API 범위 — 공식 EDGAR API 문서.** `https://www.sec.gov/edgar/sec-api-documentation`
+
+> "The company-concept API returns all the XBRL disclosures from a single company (CIK) and
+> concept (a taxonomy and tag) into a single JSON file, **with a separate array of facts for each
+> units on measure** that the company has chosen to disclose"
+
+문서가 말하는 대로 이 API의 배열은 **측정 단위(unit of measure)별**로 나뉜다. `dei`가 대상
+taxonomy에 포함된다는 것도 문서가 맞다("a non-custom taxonomy (e.g. us-gaap, ifrs-full, dei, or
+srt)") — 다만 그것은 **단위를 가진 fact에 한해서** 참이다.
+
+받아 둔 공식 사본의 SHA-256:
+
+```text
+sec_api_doc.html          906437faf95663ab0e1f9e1cb9d1d746b58898c1ec181f26b45b4cccd0b554cc
+edgar_state_country.html  4e4dbca417d68d2f599b80ab55e68120cad2966754610589fdd6eeafc3a5a35a
+dei-2025.xsd              d6f84278744794000dea74d93eb49bf19483271d037a6b65c53697bc0caa18fe
+dei-2025_doc.xsd          c6146584ba201133ce8533a6ac59cba56fb0a45b30b2050a503106c9dfe6efcc
+```
+
+### 3. census 결과 (DETERMINISTIC)
+
+고유 CIK 789개 각각에 대해 지정된 좁은 URL을 **정확히 한 번** 요청했다.
+
+```text
+/api/xbrl/companyconcept/CIK##########/dei/EntityIncorporationStateCountryCode.json
+
+FETCH_COMPLETE            0
+CONCEPT_NOT_AVAILABLE   789      ← 전부 HTTP 404
+TRANSPORT_FAILURE         0
+companyconcept 요청     789      재시도 0 · 캐시 적중 0
+```
+
+전송 실패가 0이므로 이 789는 **의미 있는 관측**이다 — "네트워크가 나빠서 못 받았다"가 아니다.
+
+### 4. 404가 전송 실패가 아님을 증명한다 (POSITIVE_CONTROL)
+
+같은 UA · 같은 host · 같은 URL 모양으로 대조군을 돌렸다. CIK는 AAPL(`0000320193`)이다.
+
+| # | 요청 | 결과 | 뜻 |
+|---|---|---|---|
+| 01 | `companyconcept/CIK0000320193/dei/EntityIncorporationStateCountryCode.json` | **404** | 대형 filer에서도 없다 |
+| 02 | `companyconcept/CIK0000320193/dei/EntityCommonStockSharesOutstanding.json` | **200** · unit `shares` · fact 70 | `dei` taxonomy 자체는 이 API에 **있다** |
+| 03 | `companyconcept/CIK0000320193/us-gaap/AccountsPayableCurrent.json` | **200** · unit `USD` | URL 모양 · UA · 권한 모두 정상 |
+| 04 | `companyfacts/CIK0000320193.json` | **200** · 3.8MB | 전체 fact 묶음 |
+
+04의 `facts.dei`가 담은 concept은 **정확히 둘**이고 설립관할은 없다.
+
+```text
+facts.dei = { EntityCommonStockSharesOutstanding , EntityPublicFloat }
+EntityIncorporationStateCountryCode  →  present: False
+```
+
+둘 다 단위를 가진 수치 fact다(`shares` · `USD`). 2절 C의 문서 표현("each units on measure")과
+2절 A의 type(`edgarStateCountryItemType`, 단위 없는 문자열)이 정확히 맞물린다.
+
+**판정: `CONCEPT_NOT_AVAILABLE`은 등록인이 공시를 안 한 것이 아니라, 단위 기준으로 묶는 이
+API 계열이 단위 없는 표지 문자열 fact를 담지 않는다는 구조적 사실이다.** companyconcept과
+companyfacts 둘 다 같다.
+
+### 5. 그 fact는 실제로 어디에 있는가 (POSITIVE_CONTROL)
+
+"SEC에 없다"가 아니라 "이 API에 없다"임을 확인하려고, 실제 filing 하나에서 같은 concept을 찾았다.
+
+```text
+filing        AAPL 10-K · accession 0000320193-25-000079 · filed 2025-10-31
+경로          FilingSummary.xml → "Cover Page" → R1.htm
+표지 행       "Entity Incorporation, State or Country Code"  =  "CA"
+concept 이름  dei_EntityIncorporationStateCountryCode        (R1.htm 안에 그대로 있다)
+정의 문구     "Two-character EDGAR code representing the state or country of incorporation."
+R1.htm sha256 500b2f33c8f0191eb46529284dac778e9cfbcf683bc46ee4aa03582b19c4ed62
+```
+
+fact는 **filing 단위 inline XBRL 표지에 존재한다.** 없는 것은 entity 단위로 모아 주는 API 경로다.
+
+### 6. 만들지 못한 값 (NOT_MEASURABLE)
+
+관측이 0이므로 아래는 **하나도 계산하지 않았다.** 다른 source로 대체해 채우지 않았다.
+
+```text
+JURISDICTION_OBSERVATION            0       DEI fact 총계                    0
+EXACT_ACCESSION_JOIN                0       ACCESSION_NOT_IN_SUBMISSIONS     0
+ACCEPTANCE_DATETIME_MISSING         0       HISTORICAL_USABLE_SESSION_MISSING 0
+CONFLICTING_JURISDICTION_FACT       0       NO_USABLE_DEI_FACT               0
+관측 있는 CIK                       0       관측 없는 CIK                  789
+OBSERVED_JURISDICTION_CHANGE        0       다관할 CIK                       0
+(cik, jurisdiction) pair            0       DE 노출 CIK                      0
+formation point 해소                0       observation age median / p90    NOT_MEASURABLE
+```
+
+`submissions` 요청은 **0회**다. join할 fact가 하나도 없어서 5절 join 단계에 들어가지 않았다 —
+부를 이유가 없는 요청을 만들지 않았다.
+
+formation point 9464개 전부의 미해소 사유를 적는다.
+
+```text
+NO_PRE_FORMATION_OBSERVATION / CONCEPT_NOT_AVAILABLE   8959
+WORK_ITEM_NO_SELECTED_CIK                               505
+```
+
+work item은 897개 전부 `unresolved`이고, 4-grain 노출표(고유 CIK · work item · formation point ·
+(cik,jurisdiction) pair)는 전부 빈 표다. **비율을 만들지 않았다** — 분모가 0인 비율은 숫자가 아니다.
+
+### 7. §10.41 12건 교차 확인 (NOT_MEASURABLE)
+
+DEI fact는 §10.41의 charter 원문과 **독립된 source**이므로, §10.41이
+`JURISDICTION_INSUFFICIENT_EVIDENCE`로 둔 3건(SWKS · XYL · FE)이 여기서는 관할을 얻을 수 있었다.
+그러나 12건 전부 관측이 0이라 **확인도 반증도 못 했다.** §10.41 상태를 물려받지도, 조용히
+맞추지도 않았다.
+
+| case | selected CIK | QV horizon | DEI 관측 | §10.41 charter 판정 | 교차 결과 |
+|---|---|---|---|---|---|
+| WST  | 0000105770 | 2020-06-30 ~ 2026-06-30 | 0 | PROVED · PENNSYLVANIA | 확인 불가 |
+| WEC  | 0000783325 | 2009-06-30 ~ 2026-06-30 | 0 | PROVED · WISCONSIN | 확인 불가 |
+| CMI  | 0000026172 | 2008-06-30 ~ 2026-06-30 | 0 | PROVED · INDIANA | 확인 불가 |
+| EXE  | 0000895126 | 2025-06-30 ~ 2026-06-30 | 0 | PROVED · OKLAHOMA | 확인 불가 |
+| CMG  | 0001058090 | 2011-06-30 ~ 2026-06-30 | 0 | PROVED · DELAWARE | 확인 불가 |
+| HAL  | 0000045012 | 2008-06-30 ~ 2026-06-30 | 0 | PROVED · DELAWARE | 확인 불가 |
+| TSCO | 0000916365 | 2014-06-30 ~ 2026-06-30 | 0 | PROVED · DELAWARE | 확인 불가 |
+| WM   | 0000823768 | 2008-06-30 ~ 2026-06-30 | 0 | PROVED · DELAWARE | 확인 불가 |
+| WU   | 0001365135 | 2008-06-30 ~ 2021-06-30 | 0 | PROVED · DELAWARE | 확인 불가 |
+| SWKS | 0000004127 | 2015-06-30 ~ 2026-06-30 | 0 | INSUFFICIENT_EVIDENCE | 독립 확인 실패 |
+| XYL  | 0001524472 | 2012-06-29 ~ 2026-06-30 | 0 | INSUFFICIENT_EVIDENCE | 독립 확인 실패 |
+| FE   | 0001031296 | 2008-06-30 ~ 2026-06-30 | 0 | INSUFFICIENT_EVIDENCE | 독립 확인 실패 |
+
+### 8. Delaware 결정 지표 — 이 probe로는 답하지 못한다
+
+prompt 13절의 두 질문에 **문턱을 먼저 정하지 않고** 분포를 보고 답하려 했으나, 분포가 0건이다.
+
+```text
+DE 노출 고유 CIK            NOT_MEASURABLE   (해소된 CIK 0개 중 비율은 정의되지 않는다)
+DE 노출 work item           NOT_MEASURABLE
+DE formation point          NOT_MEASURABLE
+DE 관련 transition          NOT_MEASURABLE
+
+1. Delaware 전용 통합 경로가 정당한가?          UNANSWERED_FROM_THIS_SOURCE
+2. 50개 주 / aggregator 전략을 먼저 평가해야 하나?  UNANSWERED_FROM_THIS_SOURCE
+```
+
+지금 측정된 유일한 관할 증거는 §10.41의 12건 charter 원문 census뿐이다(9건 PROVED 중 DE 5 · PA 1 ·
+IN 1 · WI 1 · OK 1). **12건은 897 work item의 분포를 대표하지 않으므로** 그것으로 Delaware 전용
+구매 결정을 정당화하지 않는다.
+
+### 9. 네트워크 · 비용
+
+```text
+companyconcept (census)   789   전부 404 · 재시도 0 · 캐시 적중 0
+submissions (recent)        0   join할 fact가 없어 진입하지 않았다
+submissions (archive)       0
+양성 대조                   8   AAPL concept 2 · us-gaap 1 · companyfacts 1 · submissions 1
+                                FilingSummary 1 · R1.htm 2 (첫 요청은 값 cell을 저장하지 않아 1회 재요청)
+공식 source 문서           13   9건 200 · 4건 404 (dei-####_doc.xml · _lab.xml 경로 오추측)
+합계                      810   전송 실패 0 · 주 등록부 0 · 상용 vendor 0 · 지출 $0
+```
+
+요청 간격은 repo의 기존 SEC fair-access 값(`REQUEST_INTERVAL_SECONDS = 0.15`)과 contact identity를
+그대로 썼다. 실패 응답도 기록했다(§10.39에서 실패를 캐시하지 않아 같은 URL을 7번 더 부른 적이 있다).
+
+행 단위 진단 artifact는 gitignore된 runtime 영역에 두고 커밋하지 않는다.
+
+```text
+trading/data/qv-1042-probe/rows_1042.jsonl
+sha256  148210ff5db7703e6ba2604e7a68b11b81568109efd7a16af435318a07ced39b
+행       9464  (FORMATION_POINT 9464 · 관측 0 · 충돌 0 · transition 0)
+```
+
+### 10. 다음 source 조사 권고
+
+**이 fact를 쓰는 것 자체는 여전히 옳다.** 5절이 값이 실재함을 보였고, 의미가 "state or country of
+incorporation"으로 SEC가 직접 정의한 표지 fact다. 바꿔야 할 것은 **주소**이지 fact가 아니다.
+
+```text
+버린다   companyconcept / companyfacts / frames      단위 기준 API — 이 fact를 구조적으로 담지 않는다
+간다     filing 단위 inline XBRL instance의 dei fact  accession 단위로 정확히 주소가 있다
+```
+
+repo에 이미 있는 것으로 닿는다 — 새 parser를 만들 이유가 없다.
+
+```text
+backtest/qv_xbrl.py  parse_instance(data, source_file)   raw XBRL instance → Fact
+                     Fact.raw_value: str 가 value: Decimal|None 과 **별도로** 보존된다
+                     → 단위 없는 문자열 fact가 파서에서 버려지지 않는다
+                     is_dei(namespace) · QName(namespace, local) 로 정확 concept 매칭
+                     (기존 표지 parsing이 "exact DEI concept"만 받는다는 계약과 같은 결이다)
+```
+
+다음 probe가 먼저 답해야 할 것은 비용이다. 관측 1건에 accession 1건의 instance를 받아야 하므로
+**요청 수가 CIK 수가 아니라 filing 수로 커진다.** 그래서 다음은 전수가 아니라 경계를 재는 probe여야
+한다 — CIK당 QV horizon 안에서 몇 건의 10-K/10-Q/8-K instance면 pre-formation 관측 1건이 서는지,
+2009년 inline XBRL 의무화 이전 formation point는 애초에 이 경로로 닿지 않는지.
+
+**쓰지 않기로 한 것을 적어 둔다.** `submissions` API payload에는 `stateOfIncorporation` 필드가 있다.
+이번 작업의 금지 목록("current SEC company profile state")에 정확히 해당하므로 보지도 쓰지도
+않았다 — 그것은 PIT 관측이 아니라 현재 프로필 값이고, 과거 formation 시점의 관할을 증언하지 못한다.
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      SEC evidence ledger changed  NO
+O2 / O2-C changed         NO      B2 changed              NO      RelationInterval changed     NO
+birth changed             NO      Option A implemented    NO      bundle / manifest changed    NO
+promotion / 5A-3 / Gates  NO      returns / ranking       NO      paid purchase                $0
+5A-2 재실행               NO      주 등록부 조회          NO      상용 vendor 조회             NO
+JURISDICTION_INTERVAL / EFFECTIVE_FROM / EFFECTIVE_TO 생성       NO
+```
+
 ## 11. 결과
 
 
