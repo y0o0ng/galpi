@@ -27,6 +27,9 @@ const REREVIEW_ATTEMPT_ID = 'p1b6-primary-human-rereview-batch-001-attempt-002';
 const REREVIEW_RECEIPT_IDENTITY = 'xion-local-memory-inference-p1b6-primary-human-rereview-batch-001-attempt-002-receipt-v1';
 const REREVIEW_PACKET_SHA256 = '1924fea91c0667aa4ec0e7c47629836df988476bb0dfcaaa9dc3ed775e3a4fbc';
 const EFFECTIVE_DECISIONS_IDENTITY = 'xion-local-memory-inference-p1b6-primary-human-effective-current-batch-001-v1';
+const EFFECTIVE_DECISIONS_SHA256 = '44832509f04ffb81a0772e9fda9adcbbea43305315a5d05948819b2c845b162a';
+const SMOKE_ACCEPTANCE_IDENTITY = 'xion-local-memory-inference-p1b6-smoke-batch-001-acceptance-v1';
+const SKELETON_MISMATCH_REASON = 'SKELETON_REALIZATION_MISMATCH';
 const EXPECTED_EFFECTIVE_SUMMARY = Object.freeze({
   total: 32, KEEP: 32, FIX: 0, REJECT: 0, CLEAR: 20, ESCALATE: 12,
 });
@@ -325,6 +328,84 @@ function reconcileEffectiveHumanDecisions(batch, effectiveRows, exact56) {
   return { matchCount, mismatchCount, humanReviewCompleted: mismatchCount === 0 };
 }
 
+function classifySmokeAcceptance(batch, effectiveRows, exact56) {
+  const reconciliation = reconcileEffectiveHumanDecisions(batch, effectiveRows, exact56);
+  if (reconciliation.matchCount !== 30 || reconciliation.mismatchCount !== 2) {
+    fail('smoke acceptance requires exactly 30 matches and two mismatches');
+  }
+  const rows = new Map(effectiveRows.map(row => [row.itemId, row]));
+  const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
+  const accepted = [];
+  const rejected = [];
+  for (const item of batch.items) {
+    const row = rows.get(item.itemId);
+    if (row.decision === skeletons.get(item.semanticSkeletonId).humanLabel) {
+      accepted.push({ itemId: item.itemId, decision: row.decision });
+    } else {
+      rejected.push({ itemId: item.itemId, reasonCode: SKELETON_MISMATCH_REASON });
+    }
+  }
+  accepted.sort((left, right) => left.itemId < right.itemId ? -1 : 1);
+  rejected.sort((left, right) => left.itemId < right.itemId ? -1 : 1);
+  return { reconciliation, accepted, rejected };
+}
+
+function buildSmokeBatchAcceptance(rawBatchBytes, auditReceipt, rawEffectiveBytes, rawExact56Bytes) {
+  const { batch } = validateAuditReceipt(rawBatchBytes, auditReceipt);
+  if (sha256RawBytes(rawEffectiveBytes) !== EFFECTIVE_DECISIONS_SHA256
+    || sha256RawBytes(rawExact56Bytes) !== EXACT56_SHA256) {
+    fail('smoke acceptance input bytes are invalid');
+  }
+  const effective = JSON.parse(Buffer.from(rawEffectiveBytes).toString('utf8'));
+  const exact56 = JSON.parse(Buffer.from(rawExact56Bytes).toString('utf8'));
+  if (!exactKeys(effective, [
+    'name', 'status', 'currentSourceBatch', 'rendererIdentity', 'originalPrimaryHumanAttempt',
+    'focusedPrimaryHumanRereviewAttempt', 'summary', 'reconciliation', 'authority', 'rows',
+  ]) || effective.name !== EFFECTIVE_DECISIONS_IDENTITY
+    || effective.status !== 'RECONCILIATION_NEEDS_FIX'
+    || !exactKeys(effective.currentSourceBatch, ['identity', 'rawSha256'])
+    || effective.currentSourceBatch.identity !== batch.name
+    || effective.currentSourceBatch.rawSha256 !== CURRENT_BATCH_SHA256
+    || effective.rendererIdentity !== RENDERER_IDENTITY
+    || effective.originalPrimaryHumanAttempt !== ORIGINAL_ATTEMPT_ID
+    || effective.focusedPrimaryHumanRereviewAttempt !== REREVIEW_ATTEMPT_ID
+    || JSON.stringify(effective.summary) !== JSON.stringify(EXPECTED_EFFECTIVE_SUMMARY)
+    || !exactKeys(effective.reconciliation, ['exact56Sha256', 'matchCount', 'mismatchCount'])
+    || effective.reconciliation.exact56Sha256 !== EXACT56_SHA256
+    || effective.reconciliation.matchCount !== 30 || effective.reconciliation.mismatchCount !== 2
+    || !exactKeys(effective.authority, [
+      'sourceBundleGatePassed', 'humanReviewCompleted', 'surfaceHumanGoldFrozen',
+      'trainingOccurred',
+    ]) || effective.authority.sourceBundleGatePassed !== true
+    || effective.authority.humanReviewCompleted !== false
+    || effective.authority.surfaceHumanGoldFrozen !== false
+    || effective.authority.trainingOccurred !== false
+    || !Array.isArray(effective.rows)) {
+    fail('effective current HUMAN artifact binding is invalid');
+  }
+  const { accepted, rejected } = classifySmokeAcceptance(batch, effective.rows, exact56);
+  return {
+    name: SMOKE_ACCEPTANCE_IDENTITY,
+    status: 'COMPLETE_WITH_REJECTIONS',
+    sourceBatch: { identity: batch.name, rawSha256: CURRENT_BATCH_SHA256 },
+    exact56: { identity: exact56.name, rawSha256: EXACT56_SHA256 },
+    effectiveHumanDecisionArtifact: {
+      identity: effective.name,
+      rawSha256: EFFECTIVE_DECISIONS_SHA256,
+    },
+    summary: { reviewed: 32, accepted: accepted.length, rejected: rejected.length, unresolved: 0 },
+    authority: {
+      sourceBundleGatePassed: true,
+      primaryHumanReviewResolved: true,
+      finalCorpusHumanGoldFrozen: false,
+      heldRepeatedReviewCompleted: false,
+      trainingOccurred: false,
+    },
+    accepted,
+    rejected,
+  };
+}
+
 function buildEffectiveHumanDecisionSet(rawBatchBytes, auditReceipt, rawOriginalPacketBytes,
   originalReceipt, rawRereviewPacketBytes, rereviewReceipt, rawExact56Bytes) {
   const { batch, rows: rereviewRows } = validateRereviewReceipt(
@@ -403,13 +484,18 @@ module.exports = {
   AUDIT_ATTEMPT_ID,
   AUDIT_RESULT_SHA256,
   CURRENT_BATCH_SHA256,
+  EFFECTIVE_DECISIONS_SHA256,
   EXPECTED_CHANGED_COUNT,
   ORIGINAL_ATTEMPT_ID,
   ORIGINAL_BATCH_SHA256,
   ORIGINAL_PACKET_SHA256,
   PACKET_IDENTITY,
+  SMOKE_ACCEPTANCE_IDENTITY,
+  SKELETON_MISMATCH_REASON,
+  buildSmokeBatchAcceptance,
   buildEffectiveHumanDecisionSet,
   buildRereviewPacket,
+  classifySmokeAcceptance,
   main,
   opaqueRereviewRowId,
   packetBytes,

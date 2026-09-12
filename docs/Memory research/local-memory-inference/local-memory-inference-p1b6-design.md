@@ -28,12 +28,18 @@ changed again, and full source-audit attempt 004 completed at 32 PASS / 0 FAIL /
 re-review attempt 002 completed for the three changed visible bundles at 3 KEEP
 / 0 FIX / 0 REJECT and 2 CLEAR / 1 ESCALATE. The effective current primary
 HUMAN set is 32 KEEP / 0 FIX / 0 REJECT and 20 CLEAR / 12 ESCALATE. Frozen
-exact56 reconciliation found 30 matches and 2 opposite-label mismatches, so the
-primary HUMAN review gate remains open and requires a focused repair/rejection
-design step. No HUMAN gold is frozen. Training, raw-episode evaluation, private
-replay, and production remain UNOPENED/unchanged. Do not redesign the frozen
-skeleton catalog, generate training output, expose a model to FINAL surface
-items, or start training in this phase.
+exact56 reconciliation found 30 matches and 2 opposite-label realization
+mismatches. The repository owner chose dataset-acceptance rejection rather than
+another surface repair cycle, without changing any historical HUMAN judgment or
+frozen skeleton label. Smoke batch-001 acceptance is therefore closed at 30
+accepted / 2 rejected / 0 unresolved, and its primary HUMAN review and
+reconciliation workflow is complete. The 30 accepted candidates are eligible
+existing members for adaptive growth of the roughly 400-ish reviewed pool; the
+two rejected candidates do not count toward accepted-pool coverage. Final corpus
+HUMAN gold is not frozen. HELD repeated review, training, raw-episode evaluation,
+private replay, and production remain UNOPENED/unchanged. Do not redesign the
+frozen skeleton catalog, generate training output, expose a model to FINAL
+surface items, or start training in this phase.
 
 ## Task Boundary
 

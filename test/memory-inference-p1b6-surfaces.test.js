@@ -21,6 +21,7 @@ const ATTEMPT_004_PATH = 'fixtures/local-memory-inference-p1b6-source-audit-batc
 const HUMAN_ATTEMPT_001_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-review-batch-001-attempt-001.json';
 const HUMAN_REREVIEW_ATTEMPT_002_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-001-attempt-002.json';
 const EFFECTIVE_HUMAN_PATH = 'fixtures/local-memory-inference-p1b6-primary-human-effective-current-batch-001.json';
+const SMOKE_ACCEPTANCE_PATH = 'fixtures/local-memory-inference-p1b6-smoke-batch-001-acceptance.json';
 const REVIEWED_BATCH_SHA256 = '8663f2e2a376ae96f7ab5263168ea36d8a35a5861014473acf51c48b10dd19aa';
 const ATTEMPT_003_BATCH_SHA256 = 'ebb3af5a8c2507142c20f81e44351e99b5e2a746274537d78f491f782aa366e9';
 const CURRENT_BATCH_SHA256 = '2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36';
@@ -73,7 +74,9 @@ const rereviewPacket = humanRereview.buildRereviewPacket(
 );
 const rawRereviewPacket = humanRereview.packetBytes(rereviewPacket);
 const rereviewReceipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_REREVIEW_ATTEMPT_002_PATH)));
-const effectiveHuman = JSON.parse(fs.readFileSync(path.join(ROOT, EFFECTIVE_HUMAN_PATH)));
+const rawEffectiveHuman = fs.readFileSync(path.join(ROOT, EFFECTIVE_HUMAN_PATH));
+const effectiveHuman = JSON.parse(rawEffectiveHuman);
+const smokeAcceptance = JSON.parse(fs.readFileSync(path.join(ROOT, SMOKE_ACCEPTANCE_PATH)));
 
 function changed(mutator) {
   const value = structuredClone(batch);
@@ -337,8 +340,10 @@ test('authoring provenance binds the frozen exact56 and raw batch bytes', () => 
   assert.equal(protocol.exact56.sha256, surfaces.EXACT56_SHA256);
   assert.equal(protocol.outputBatch.sha256, sha256RawBytes(rawBatch));
   assert.equal(protocol.authority.sourceAuditCompleted, true);
-  assert.equal(protocol.authority.humanReviewCompleted, false);
+  assert.equal(protocol.authority.humanReviewCompleted, true);
   assert.equal(protocol.authority.generatorMetadataIsNeverHumanGold, true);
+  assert.match(protocol.scope.join(' '), /30 candidates are accepted/u);
+  assert.match(protocol.scope.join(' '), /final corpus HUMAN gold is not frozen/u);
 });
 
 test('source-audit attempt 001 remains bound to the pre-fix batch', () => {
@@ -772,6 +777,49 @@ test('frozen skeleton reconciliation is deterministic and closes only with zero 
   ).rows);
 });
 
+test('smoke acceptance mechanically excludes only the two reconciliation mismatches', () => {
+  const rawExact56 = fs.readFileSync(path.join(ROOT, surfaces.EXACT56_PATH));
+  assert.deepEqual(humanRereview.buildSmokeBatchAcceptance(
+    rawBatch, attempt004Receipt, rawEffectiveHuman, rawExact56,
+  ), smokeAcceptance);
+  assert.deepEqual(smokeAcceptance.summary, {
+    reviewed: 32, accepted: 30, rejected: 2, unresolved: 0,
+  });
+  assert.deepEqual(smokeAcceptance.authority, {
+    sourceBundleGatePassed: true,
+    primaryHumanReviewResolved: true,
+    finalCorpusHumanGoldFrozen: false,
+    heldRepeatedReviewCompleted: false,
+    trainingOccurred: false,
+  });
+
+  const effectiveRows = new Map(effectiveHuman.rows.map(row => [row.itemId, row]));
+  const expectedAccepted = batch.items.filter(item =>
+    effectiveRows.get(item.itemId).decision === skeletons.get(item.semanticSkeletonId).humanLabel)
+    .map(item => item.itemId).toSorted();
+  const expectedRejected = batch.items.filter(item =>
+    effectiveRows.get(item.itemId).decision !== skeletons.get(item.semanticSkeletonId).humanLabel)
+    .map(item => item.itemId).toSorted();
+  assert.deepEqual(smokeAcceptance.accepted.map(row => row.itemId), expectedAccepted);
+  assert.deepEqual(smokeAcceptance.rejected.map(row => row.itemId), expectedRejected);
+  for (const row of smokeAcceptance.accepted) {
+    const item = batch.items.find(candidate => candidate.itemId === row.itemId);
+    assert.equal(row.decision, effectiveRows.get(row.itemId).decision);
+    assert.equal(row.decision, skeletons.get(item.semanticSkeletonId).humanLabel);
+  }
+  for (const row of smokeAcceptance.rejected) {
+    assert.deepEqual(Object.keys(row), ['itemId', 'reasonCode']);
+    assert.equal(row.reasonCode, humanRereview.SKELETON_MISMATCH_REASON);
+    assert.equal(effectiveRows.get(row.itemId).disposition, 'KEEP');
+  }
+
+  const changedRows = structuredClone(effectiveHuman.rows);
+  const acceptedRow = changedRows.find(row => row.itemId === smokeAcceptance.accepted[0].itemId);
+  acceptedRow.decision = acceptedRow.decision === 'CLEAR' ? 'ESCALATE' : 'CLEAR';
+  assert.throws(() => humanRereview.classifySmokeAcceptance(batch, changedRows, exact56),
+    /exactly 30 matches and two mismatches/u);
+});
+
 test('P1-B6 source, audit history, primary review, and exact56 bytes remain frozen', () => {
   const hashes = {
     [BATCH_PATH]: CURRENT_BATCH_SHA256,
@@ -780,6 +828,8 @@ test('P1-B6 source, audit history, primary review, and exact56 bytes remain froz
     [ATTEMPT_003_PATH]: '8e91b91866f6f958dd5877ceeddd8717a5946b308fa7c591e097fd6ed52ca9e2',
     [ATTEMPT_004_PATH]: 'a49e9a08fd2eb4da78c4a394734aa3cead2cb69505b91e87344ffafba609b162',
     [HUMAN_ATTEMPT_001_PATH]: '816a24aec8ca429fad3582dfd972bffb6437c9d41d7ddebd393674fb48d4d8e2',
+    [HUMAN_REREVIEW_ATTEMPT_002_PATH]: '2c41dcd1c36231039958839a35e53cab187c5bbd1caf992d5c6f96aca30fd21e',
+    [EFFECTIVE_HUMAN_PATH]: humanRereview.EFFECTIVE_DECISIONS_SHA256,
     [surfaces.EXACT56_PATH]: surfaces.EXACT56_SHA256,
   };
   for (const [file, expected] of Object.entries(hashes)) {

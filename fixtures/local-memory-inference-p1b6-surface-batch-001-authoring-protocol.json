@@ -69,11 +69,11 @@
     "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
     "generatorMetadataIsNeverHumanGold": true,
     "sourceAuditCompleted": true,
-    "humanReviewCompleted": false
+    "humanReviewCompleted": true
   },
   "scope": [
     "This batch is an eligible supervised-pool candidate batch, not disposable pilot data.",
-    "Focused HUMAN re-review attempt 002 completed, but frozen-skeleton reconciliation found two mismatches; HUMAN review remains open.",
-    "No semantic model inference, training, bulk authoring, or FINAL evaluation-model inspection occurred in this authoring task."
+    "Smoke batch primary HUMAN review and frozen-skeleton reconciliation are complete: 30 candidates are accepted and two skeleton-realization mismatches are rejected from dataset acceptance.",
+    "No source, evidence, anchor, HUMAN decision, or skeleton label changed; final corpus HUMAN gold is not frozen, and no HELD repeated review, semantic model inference, training, bulk authoring, or FINAL evaluation-model inspection occurred."
   ]
 }

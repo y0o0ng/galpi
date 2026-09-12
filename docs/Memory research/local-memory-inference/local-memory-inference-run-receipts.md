@@ -3727,3 +3727,31 @@ design step. Source episodes, evidence spans, anchors, skeleton assignments,
 and all historical audit/HUMAN receipts are unchanged. No training, semantic
 model inference, HELD repeated review, raw-episode evaluation, private replay,
 or production change occurred.
+
+#### P1-B6 smoke batch-001 dataset acceptance resolution — COMPLETE / WITH_REJECTIONS
+
+The repository owner explicitly selected dataset-acceptance rejection for the
+two unresolved skeleton-realization mismatches rather than another surface
+repair cycle. This resolution does not rewrite the blind HUMAN judgments: the
+effective set remains 32 KEEP / 0 FIX / 0 REJECT and 20 CLEAR / 12 ESCALATE,
+and frozen exact56 reconciliation remains 30 matches / 2 mismatches.
+
+The canonical resolution is
+`fixtures/local-memory-inference-p1b6-smoke-batch-001-acceptance.json`. It was
+derived mechanically from the current source batch, source-audit attempt 004,
+the effective current HUMAN artifact, and frozen exact56. Smoke batch-001 closes
+at 32 reviewed / 30 accepted / 2 rejected / 0 unresolved. Every accepted row
+has a HUMAN/frozen-skeleton label match; the two mismatches are excluded from
+accepted-pool coverage under dataset-level reason
+`SKELETON_REALIZATION_MISMATCH` and remain in the authored source batch.
+
+The smoke primary HUMAN review/reconciliation workflow is resolved, so current
+authoring authority records `sourceAuditCompleted: true` and
+`humanReviewCompleted: true`. This does not freeze final corpus HUMAN gold or
+complete HELD repeated review. Source, evidence, anchors, roles, HUMAN decisions,
+skeleton labels and assignments, and historical audit/HUMAN artifacts are
+unchanged. No training, semantic model inference, raw-episode evaluation,
+private replay, or production change occurred. The next step is adaptive growth
+of the roughly 400-ish reviewed pool, treating the 30 accepted smoke candidates
+as existing eligible members and measuring later top-ups against the frozen
+final-corpus constraints.
