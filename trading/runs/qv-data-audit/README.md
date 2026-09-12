@@ -7250,36 +7250,59 @@ PAID_ACCESS_REQUIRED       공식 경로가 있으나 유료인 것 — 가격�
 §10.39 자격 12건의 설립 관할을 **그 사건의 charter 원문**(이미 받아 둔 SEC governing instrument)에서 읽었다.
 ticker · 본사 · 회사 웹사이트 · 현재 프로필을 쓰지 않았다.
 
+**직접 증명 시험(2026-09-12 audit).** instrument 자신이 (i) 그 법인이 특정 주 법에 따라
+`organized / existing / incorporated`라고 말하거나, (ii) 그 주 국무장관에게 원 정관을 제출해 설립됐다고
+말하거나, (iii) 그 주 회사법 조문에 따라 restate/amend됐다고 말할 때만 `JURISDICTION_PROVED`다.
+**등록사무소 · 주사무소 · 본사 · ticker · 현재 프로필은 근거가 아니다.** 목적 조항
+("corporations **may be** organized under …")은 그 법인 자신의 준거법 진술이 아니므로 단독으로는
+증명이 되지 않는다.
+
 ```text
-DELAWARE      6   CMG · HAL · SWKS · TSCO · WM · WU
-PENNSYLVANIA  1   WST
-INDIANA       2   CMI · XYL
-OHIO          1   FE
-WISCONSIN     1   WEC
-OKLAHOMA      1   EXE
+JURISDICTION_PROVED                 9
+  DELAWARE      5   CMG · HAL · TSCO · WM · WU
+  PENNSYLVANIA  1   WST
+  INDIANA       1   CMI
+  WISCONSIN     1   WEC
+  OKLAHOMA      1   EXE
+JURISDICTION_INSUFFICIENT_EVIDENCE  3   SWKS · XYL · FE   (목적 조항뿐)
 ```
 
 근거 문언(각 charter 원문):
 
 ```text
-WST   "The Corporation is incorporated under the Pennsylvania Business Corporation Law"
-EXE   "incorporated on November 19, 1996 ... upon the filing with the Secretary of State of Oklahoma" ·
-      "the Oklahoma General Corporation Act"
-WEC   "a corporation incorporated under Chapter 180 of the Wisconsin Statutes, the Wisconsin Business Corporation Law"
-CMI   "existing pursuant to the Indiana Business Corporation Law"
-XYL   "The address of the registered office of the Corporation in the State of Indiana ..."
-FE    "The place in the State of Ohio where the Corporation's principal office is located is the City of Akron"
-CMG · HAL · SWKS · TSCO · WM · WU   "General Corporation Law of the State of Delaware" 계열 문언
+PROVED
+  WST   "The Corporation is incorporated under the Pennsylvania Business Corporation Law"
+  WEC   "a corporation incorporated under Chapter 180 of the Wisconsin Statutes, the Wisconsin Business Corporation Law"
+  CMI   "Cummins Inc. (the "Corporation"), existing pursuant to the Indiana Business Corporation Law"
+  EXE   원 정관을 "filed with the Secretary of State of Oklahoma" · "the Oklahoma General Corporation Act"에 따라 채택
+  CMG   "a corporation organized and existing under the General Corporation Law of the State of Delaware"
+  HAL   원 정관이 "filed with the Secretary of State of the State of Delaware" · "Pursuant to Section 245 of the
+        General Corporation Law of the State of Delaware"
+  TSCO  "Tractor Supply Company, a Delaware corporation" · DGCL 242·245조에 따라 채택
+  WM    "in accordance with Section 242 and 245 of the General Corporation Law of the State of Delaware"
+  WU    "The Western Union Company, a Delaware corporation" · 원 정관이 델라웨어 국무장관에게 제출
+
+INSUFFICIENT_EVIDENCE — 목적 조항뿐이라 그 법인의 준거법 진술이 아니다
+  SWKS  "for which corporations may be organized under the General Corporation Law of the State of Delaware"
+  XYL   "for which corporations may be organized under the Indiana Business Corporation Law ("IBCL")"
+  FE    "for which corporations may be formed under Sections 1701.01 to 1701.98, inclusive, of the Ohio Revised Code"
 ```
 
-Delaware로 증명된 pool이 6이라 부족분이 없다. 선정 키는
-`sha256("qv-state-source-probe-v1|" + CIK + "|" + formation_session)`이다.
+**앞선 판은 XYL을 "registered office ... in the State of Indiana", FE를 "principal office ... in the State
+of Ohio"로 뒷받침했다. 그 둘은 설립 관할의 직접 증거가 아니어서 이번 audit에서 내렸다.**
+
+직접 증명을 통과한 Delaware pool은 **5건**이고 4건 이상이라 부족분이 없다. 선정 키는
+`sha256("qv-state-source-probe-v1|" + CIK + "|" + formation_session)`이고 키 자체는 바뀌지 않았다.
 
 ```text
-CMG  00f04366e4ce730d      HAL  0dd08e667358b080      SWKS 1c60ee2892fadb8a
-WM   66f7fb98c8a88f12      TSCO 823c855dfad84ed5      WU   a4c2b4011c52efe7
--> 오름차순 앞 4개: CMG · HAL · SWKS · WM
+proved pool   CMG 00f04366e4ce730d · HAL 0dd08e667358b080 · WM 66f7fb98c8a88f12 ·
+              TSCO 823c855dfad84ed5 · WU a4c2b4011c52efe7
+제외          SWKS 1c60ee2892fadb8a — JURISDICTION_INSUFFICIENT_EVIDENCE
+-> 오름차순 앞 4개: CMG · HAL · WM · TSCO
 ```
+
+**표본이 바뀌었다** — 앞선 판의 SWKS가 빠지고 TSCO가 들어왔다. Delaware 4건은 전부 약관 때문에 조회하지
+않았으므로(아래 §5) 이 교체는 실질 결론을 바꾸지 않는다.
 
 ### 2. 공식 법령 (OFFICIAL_SOURCE_VERBATIM)
 
@@ -7369,7 +7392,9 @@ event found              NO
 state filing date        —
 state effective date     —
 delayed-effective 모호    DELAYED_EFFECT_UNKNOWN
-document available       유료 경로만 (plain $15+$3/p · certified $55+$3/p)
+유료 document copy 경로   CONFIRMED (plain $15+$3/p · certified $55+$3/p — 공식 수수료표)
+무료 filing history      ACCESS_BLOCKED / NOT_MEASURABLE (403이라 무료 범위를 관측하지 못했다)
+무료 document image      ACCESS_BLOCKED / NOT_MEASURABLE (무료 경로가 없다는 공식 근거는 못 봤다)
 free/paid                ACCESS_BLOCKED + PAID_ACCESS_REQUIRED
 exact SEC linkage        UNRESOLVED   (주 쪽 식별자를 못 봤으므로 연결 시도 자체가 성립하지 않는다)
 formation status         변화 없음 — APPROVED_CHANGE_EFFECT_UNKNOWN 그대로
@@ -7380,7 +7405,7 @@ formation status         변화 없음 — APPROVED_CHANGE_EFFECT_UNKNOWN 그대
 
 ### 5. DELAWARE 4건 — 접근 가능성
 
-표본 CMG · HAL · SWKS · WM. 네 건 모두 entity resolution · filing history · 법적 시점 · 문서 이미지가
+표본 CMG · HAL · WM · TSCO. 네 건 모두 entity resolution · filing history · 법적 시점 · 문서 이미지가
 `NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION`이다. 사람이 브라우저로 한 건씩 보는 것은 가능하지만, 이 probe가
 평가하는 것은 **population 작업에 쓸 수 있는 programmatic 경로**다.
 
@@ -7476,14 +7501,39 @@ promotion / 5A-3 / Gates  NO      returns / ranking       NO      paid purchase 
 
 | # | case | 관할 (SEC 원문 근거) | 주 조회 시도 | 결과 | 필요한 공식 유료 경로 |
 |---|---|---|---|---|---|
-| 01 | WST / 0000105770 / 2020-06-30 | PENNSYLVANIA — "incorporated under the Pennsylvania Business Corporation Law" | `file.dos.pa.gov/search/business` (직접 · WebFetch) | **ACCESS_BLOCKED** HTTP 403 · entity 미해결 · event 미발견 · 발효일 미확인 | plain copy $15+$3/p · certified $55+$3/p · record search $15 |
-| 02 | CMG / 0001058090 / 2021-06-30 | DELAWARE — "General Corporation Law of the State of Delaware" | 없음 (ICIS 약관이 자동 도구 금지) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | status $10 / $20(이미지 없음) · record search $50 · certified copy $50 · long form $175 |
-| 03 | HAL / 0000045012 / 2020-06-30 | DELAWARE — 동일 문언 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
-| 04 | SWKS / 0000004127 / 2015-06-30 | DELAWARE — 동일 문언 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
-| 05 | WM / 0000823768 / 2022-06-30 | DELAWARE — 동일 문언 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
+| 01 | WST / 0000105770 / 2020-06-30 | PENNSYLVANIA — "incorporated under the Pennsylvania Business Corporation Law" | `file.dos.pa.gov/search/business` (직접 · WebFetch) | **ACCESS_BLOCKED** HTTP 403 · entity 미해결 · event 미발견 · 발효일 미확인 · 무료 이력/이미지 범위 NOT_MEASURABLE | 유료 경로 CONFIRMED: plain $15+$3/p · certified $55+$3/p · record search $15 |
+| 02 | CMG / 0001058090 / 2021-06-30 | DELAWARE — "organized and existing under the General Corporation Law of the State of Delaware" | 없음 (ICIS 약관이 자동 도구 금지) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | status $10 / $20(이미지 없음) · record search $50 · certified copy $50 · long form $175 |
+| 03 | HAL / 0000045012 / 2020-06-30 | DELAWARE — 원 정관이 델라웨어 국무장관에게 제출 · DGCL 245조 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
+| 04 | WM / 0000823768 / 2022-06-30 | DELAWARE — DGCL 242·245조에 따라 채택 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
+| 05 | TSCO / 0000916365 / 2022-06-30 | DELAWARE — "a Delaware corporation" · DGCL 242·245조 | 없음 (동일 사유) | **NOT_ATTEMPTED_TERMS_PROHIBIT_AUTOMATION** | 동일 |
 
-선정에서 빠진 Delaware 2건(TSCO `823c855d…` · WU `a4c2b401…`)은 키 순서상 5·6번이다. Delaware pool 6건은
-전부 SEC charter 원문으로 관할이 증명됐다.
+선정에서 빠진 것은 WU(`a4c2b401…`, proved pool 5번)와 SWKS(`1c60ee28…`,
+`JURISDICTION_INSUFFICIENT_EVIDENCE`)다.
+
+### receipt audit — 2026-09-12 (두 번째)
+
+```text
+고친 것 1  관할 census에 직접 증명 시험을 적용했다. 등록사무소(XYL) · 주사무소(FE)로 뒷받침하던 행과
+           목적 조항뿐인 SWKS를 JURISDICTION_INSUFFICIENT_EVIDENCE로 내렸다 (proved 9 · insufficient 3).
+고친 것 2  그 결과 Delaware proved pool이 6에서 5로 줄어 표본의 앞 4개가 바뀌었다(SWKS -> TSCO).
+           선정 키와 정렬 규칙은 그대로다.
+고친 것 3  PA "document available = 유료 경로만"을 내렸다. 403으로 무료 범위를 보지 못했으므로
+           유료 경로만 CONFIRMED이고 무료 이력 · 무료 이미지는 ACCESS_BLOCKED / NOT_MEASURABLE이다.
+network    0회 (캐시된 SEC 본문만 다시 읽었고 주 소스를 다시 부르지 않았다) · 지출 $0
+```
+
+실질 결론은 그대로다.
+
+```text
+WST 주 사건 독립 확인      NO — 공식 검색 403
+WST 상태                   APPROVED_CHANGE_EFFECT_UNKNOWN 그대로
+Delaware 법적 source       존재 (8 Del. C. 103조 (c)(3)·(c)(8)·(d))
+Delaware 무료 자동 경로    금지 (ICIS 약관)
+population 규모            authorized/commercial 경로가 필요해 보인다
+주 등록부의 현재 위치      legal-date source 후보일 뿐
+PIT                        역사적 공개 latency · usable_from_session 미해결
+production code · schema · O2/O2-C · B2 · RelationInterval · manifest/bundle   변경 없음
+```
 
 ## 11. 결과
 
