@@ -6917,6 +6917,272 @@ TRMB · AME의 원인 해석과 WST 해석만 위 절의 MODEL_ASSISTED_SOURCE_T
 | 36 | late | SYY/SYY | 2023-06-30 | 0000096021 | SEARCH_INCOMPLETE | 0000096021-22-000151 · 10-K · 2022-08-25T21:39:42.000000Z | 2022-08-26 | 211 |  |  |  |  |  |  |  | **AMBIGUOUS_COMPOSITE** CHARTER_PLUS_AMENDMENT_DESIGNATION | item_503_in_gap=1, bylaws=1 · search INCOMPLETE | AMBIGUOUS_COMPOSITE CHARTER_PLUS_AMENDMENT_DESIGNATION · 0000096021-23-000117 |  |
 
 
+## 10.40 SEC-only current-state gap ledger probe — 관측과 formation 사이를 SEC 공시가 메우는가 — 2026-09-12
+
+**진단 전용이다.** production 코드와 CLOSED 계약(O2 · O2-C · B2 · 탄생 · B1/P2/N1 · class-id · bundle ·
+manifest · `RelationInterval`)을 하나도 바꾸지 않았고 연속성 계약을 설계하지 않았다. 여기서 만든 것은
+**공시 사건 원장(disclosure ledger)**이지 경제 구간이 아니다. `qv_sec_filings` production 적재는 K/Q 전용
+그대로다.
+
+```text
+base (origin/main)   ccde5122c42e57f12f186a61b7ff253bfe77093e   (trading/ · docs/trading/ 변경 없음)
+population           §10.39-A의 PRE 자격 관측 12건 그대로 — 재표집하지 않았다
+                     XYL · WEC · HAL · SWKS · WST · WU · EXE · FE · CMG · WM · CMI · TSCO
+gap 시간 계약        gap 시작 = PRE 관측 acceptance · gap 끝 = formation_session
+                     filing은 production _historical_usable_session(SPY eodhd/eodhd-15y-2026-08)이 준
+                     historical_usable_session <= formation_session 일 때만 formation에서 쓸 수 있다
+network              EDGAR 27회 (전부 이 12 CIK · 성공 26 · header index 404 1건) + 규칙 원문 9회(비-EDGAR)
+                     그 404는 10-Q 참조 해석 중 000095012311089760의 header index이고,
+                     production _accession_layout과 같은 complete submission 경로로 처리됐다(§10.39와 같은 모양)
+                     §10.39 캐시 재사용 · population crawl 없음 · 자동 retry 없음
+```
+
+### 근거 구분
+
+```text
+OFFICIAL_SEC_RULE_BASIS            아래 §1 — 원문을 직접 받아 인용했다(요약기 해석을 쓰지 않았다)
+DETERMINISTIC                      submissions 열거 · PIT usable session · Item 5.03/5.07 구간 추출 ·
+                                   10-Q Item 601 추출(§10.39 v3 코드 동결) · SHA · 세션 수 · bracketing 대조
+MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT 5.03/5.07 원문의 정관/부속정관 구분과 대상 class 범위 판정 · WST 해석
+DIAGNOSTIC_COUNTERFACTUAL          §9의 C0 · C1. 채택한 규칙이 아니다
+```
+
+### 1. 공식 규칙 재확인 (OFFICIAL_SEC_RULE_BASIS)
+
+**ecfr.gov는 이 환경에서 차단 페이지로 redirect돼서** GPO 공식 연간판(CFR-2024)을 썼다. "current eCFR"이
+아니라 **2024 annual edition**이라는 것을 그대로 적는다.
+
+```text
+17 CFR 229.601(b)(3)(i)   https://www.govinfo.gov/content/pkg/CFR-2024-title17-vol3/xml/CFR-2024-title17-vol3-sec229-601.xml
+```
+
+> "The articles of incorporation of the registrant or instruments corresponding thereto as currently in
+> effect and any amendments thereto. Whenever the registrant files an amendment to its articles of
+> incorporation, it must file a complete copy of the articles as amended. However, if such amendment is
+> being reported on Form 8-K (§ 249.308 of this chapter), the registrant is required to file only the text
+> of the amendment as a Form 8-K exhibit. In such case, a complete copy of the articles of incorporation as
+> amended must be filed as an exhibit to the next Securities Act registration statement or periodic report
+> filed by the registrant to which this exhibit requirement applies."
+
+전시표(§229.601(a)(2))의 `(3)(i) Articles of incorporation` 행을 **원본 GPO 셀 위치로 정렬**했다.
+
+```text
+S-1 X · S-3 – · SF-1 X · SF-3 X · S-4 X · S-8 – · S-11 X · F-1 X · F-3 – · F-4 X
+10 X · 8-K X · 10-D X · 10-Q X · 10-K X
+주의: 그 행의 <ENT> 셀은 15개이고 열은 16개다(끝의 ABS-EE 빈 셀이 생략됐다). 앞 15열 정렬은 확정이고
+      10-Q · 10-K가 표시된다는 사실은 그 정렬 안에서 나온다.
+```
+
+**Form 8-K Item 5.03**(현행 양식 `https://www.sec.gov/files/form8-k.pdf`, 로컬 텍스트 추출):
+
+> "If a registrant with a class of equity securities registered under Section 12 of the Exchange Act amends
+> its articles of incorporation or bylaws and a proposal for the amendment was not disclosed in a proxy
+> statement or information statement filed by the registrant, disclose the following information: (i) the
+> effective date of the amendment; and (ii) a description of the provision adopted or changed by amendment
+> and, if applicable, the previous provision."
+> Instructions to Item 5.03: "1. Refer to Item 601(b)(3) of Regulation S-K (17 CFR 229.601(b)(3)) regarding
+> the filing of exhibits to this Item 5.03."
+
+**Form 8-K Item 5.07**(같은 출처):
+
+> "If any matter was submitted to a vote of security holders, through the solicitation of proxies or
+> otherwise, provide the following information: (a) The date of the meeting and whether it was an annual or
+> special meeting. … (b) If the meeting involved the election of directors, the name of each director
+> elected at the meeting, as well as a brief description of each other matter voted upon at the meeting; and
+> state the number of votes cast for, against or withheld …"
+> Instruction 1: "The four business day period for reporting the event under this Item 5.07 … shall begin to
+> run on the day on which the meeting ended. … The registrant shall file an amended report on Form 8-K under
+> this Item 5.07 to disclose the final voting results within four business days after the final voting
+> results are known."
+> Instruction 2: "If any matter has been submitted to a vote of security holders otherwise than at a meeting
+> of such security holders, corresponding information with respect to such submission shall be provided."
+
+**Corp Fin C&DI, Regulation S-K, Section 246 (Item 601 — Exhibits), Question 246.01**
+(`https://www.sec.gov/rules-regulations/staff-guidance/compliance-disclosure-interpretations/regulation-s-k`,
+페이지 표기 Last Update 2026-03-06, 해당 항목 표기 [July 3, 2008]):
+
+> "246.01 Item 601(b)(3) requires that the entire amended text of the articles or by-laws be filed, along
+> with the text of the new amendments. This could be accomplished by filing the entire amended text,
+> redlined to show the new amendments. [July 3, 2008]"
+
+**Item 5.03은 완전한 amendment 원장이 아니다** — 조문 자체가 "제안이 proxy/information statement로 공시되지
+않았을 때"로 조건을 건다. 그리고 **Item 5.07은 표결 결과를 요구하지 발효일을 요구하지 않는다.**
+
+### 2. 탐색 — submissions 전량 metadata
+
+```text
+_submissions_rows(client, cik, forms=None)  recent + archive   12/12 성공 → GAP_SEARCH_INCOMPLETE 0
+PIT로 formation에서 쓸 수 있는 gap filing 합계   565건
+  (CMI 157 · WM 49 · CMG 44 · FE 42 · SWKS 38 · WST 38 · WU 35 · WEC 33 · XYL 53 · EXE 29 · HAL 25 · TSCO 22)
+```
+
+`qv_sec_filings`(K/Q 전용)에 기대지 않았고 production 적재 범위를 넓히지 않았다.
+
+### 3. 원장 사건
+
+```text
+ITEM_503_EFFECTIVE_AMENDMENT      0
+ITEM_503 (bylaws-only)            1   CMG — "approved an amendment to Chipotle's Amended and Restated Bylaws
+                                      … to add a new forum selection provision as Article XII"
+ITEM_507 8-K (정기주총)           12   12건 전부 gap 안에 있다
+ITEM_507_CHARTER_VOTE_APPROVED     1   WST
+ITEM_507_CHARTER_VOTE_REJECTED     0
+10-Q 검사                          13   자격 재-anchor 3 (XYL · WST · EXE) · Exhibit 3 charter 행 없음 10
+PROPOSAL_REFERENCE                 1   WST (아래 — 결정론적 참조 해석은 실패했다)
+UNRESOLVED_EVENT                   0
+```
+
+**10-Q 재-anchor는 §10.39 v3 추출 코드를 그대로 얼려 돌렸다**(`i601eval_v3.py`
+sha256 `71af8ac159185a2c474a281dd99c3c7f11ea0a39c3586ebf8ab56f11b0c1193a`, 규칙을 결과를 본 뒤에 고치지
+않았다). Exhibit 3 charter 행이 없는 10-Q는 파서 실패가 아니라 `NO_CURRENT_STATE_OBSERVATION`이다.
+
+재-anchor가 실제로 틈을 줄인 것은 둘이다.
+
+```text
+XYL  85 세션 -> 39 세션   (10-Q 0001193125-12-206735 usable 2012-05-04, 같은 charter SHA)
+EXE  84 세션 -> 41 세션   (10-Q 0000895126-25-000053 usable 2025-04-30, 같은 charter SHA)
+WST  재-anchor 10-Q(usable 2020-04-27)는 표결(5월 5일)보다 앞이라 변경 뒤 재-anchor가 아니다
+```
+
+### 4. WST 양성 대조 — SEC-only 채널이 잡는다
+
+```text
+채널        Item 5.07  (8-K 0000105770-20-000025 · acceptance 2020-05-07 · usable 2020-05-08 <= formation 2020-06-30)
+원문        "Proposal 3: Our shareholders approved the amendment to Article 5 of our Amended and Restated
+             Articles of Incorporation to increase the number of authorized shares of common stock from
+             100 million to 200 million by the following vote:"
+성립하는 것  주주 승인(approval) · 대상 class 관련성(수권 보통주 수 = GENERAL_CAPITAL_STRUCTURE)
+성립하지 않는 것  법적 발효일. Item 5.07은 발효일을 요구하지 않고 이 8-K도 말하지 않는다.
+             독립 진단(§10.39)으로는 새 정관이 "(Effective as of May 5, 2020)"이고, 그 문서의 첫 SEC 수리는
+             formation 뒤인 2020-07-24 10-Q다.
+ledger 상태  APPROVED_CHANGE_EFFECT_UNKNOWN
+```
+
+**proxy 참조는 결정론적으로 풀리지 않았다.** 5.07은 "our proxy statement dated March 13, 2020"이라고만
+하고, gap 안 유일한 DEF 14A(`0001047469-20-001767`, filed 2020-03-25, report_date 2020-05-05)의 본문에서
+"March 13" 문자열은 **0회**다. 그래서 이 proxy는 **gap 안 유일성으로 고른 것이지 원문 참조로 해석한 것이
+아니다**(`UNRESOLVED_PROXY_REFERENCE` + `PROXY_UNIQUE_DEF14A_IN_GAP`). 그 전제에서 본문만 기록한다.
+
+> "If the Company's shareholders approve the proposed amendment to the Amended and Restated Articles of
+> Incorporation, the number of authorized shares of common stock will be increased to 200 million … The
+> amendment will be immediately effective upon approval and filing with the Pennsylvania Department of State
+> Corporation Bureau."
+
+proxy는 **제안 출처**다. 발효를 증명하지 않는다 — 그 문장도 "승인 + 주 제출"을 발효 조건으로 말한다.
+
+**C0 오통과 여부.** 이번 원장(5.03 + 5.07 + 10-Q)에서는 WST에 신호가 있으므로 C0가 WST를 통과시키지
+**않는다.** 그러나 **§10.39가 쓰던 좁은 채널 집합(5.03 + formation 앞 governing 문서 수리)에서는 신호가
+0이었고, 그 규칙이었다면 WST를 오통과시켰다.** 채널을 5.07까지 넓힌 것이 차이를 만들었다.
+
+### 5. 대상 class 범위 판정 (MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT)
+
+```text
+TARGET_CLASS_RELEVANT / GENERAL_CAPITAL_STRUCTURE   1   WST (수권 보통주 100M -> 200M, Article 5)
+PROVEN_NON_CLASS_SCOPE                              1   CMG — 개정 대상이 Bylaws Article XII(재판관할)이고
+                                                        operative 문언이 그 조항에 갇혀 있다. 정관이 아니다.
+UNRESOLVED_SCOPE                                    0
+```
+
+대상 class 이름이 없다는 것을 무관성의 근거로 쓰지 않았다. CMG는 "부속정관 조항"이라는 **양성 범위 증거**가
+있어서 non-class로 적었다.
+
+### 6. formation 시점 원장 상태
+
+```text
+NO_CHARTER_SIGNAL_OBSERVED                8   WEC · HAL · SWKS · WU · FE · WM · CMI · TSCO
+NO_CHARTER_SIGNAL_OBSERVED + REANCHORED   2   XYL · EXE (변경 신호 없이 10-Q가 재-anchor)
+ONLY_PROVEN_NON_CLASS_CHANGES             1   CMG
+APPROVED_CHANGE_EFFECT_UNKNOWN            1   WST
+KNOWN_CHANGE_RELEVANT / UNRESOLVED        0
+```
+
+`NO_CHARTER_SIGNAL_OBSERVED`는 **연속성 증명이 아니다.** 측정된 원장 결과일 뿐이다.
+
+### 7. 반사실 계약 (DIAGNOSTIC_COUNTERFACTUAL · 채택하지 않는다)
+
+```text
+C0  무신호 규칙          12 중 11 통과 · WST는 막힌다(5.07 신호) — 단 §10.39 채널이었다면 WST 오통과
+C1  공시원장 fail-close  positively closed by evidence           0
+                        requires SEC-ledger completeness assumption  11
+                        blocked / unresolved                      1   WST
+```
+
+C1이 "증거로 닫힌" 사례가 0인 이유는 구조적이다 — 11건은 **변경 신호가 없다**는 사실에 기대므로, 그것이
+연속성 증거인지는 이 probe가 정하지 않는 semantic 결정이다(§8).
+
+### 8. bracketing 대조 (§10.39 POST는 진단 진실로만 쓴다)
+
+```text
+SAME_SHA 11 · DIFFERENT_SHA 1
+DIFFERENT_SHA 중 formation 전 원장이 잡아낸 것        1 / 1   WST
+SAME_SHA 중 amendment 신호가 있던 것                  0
+SAME_SHA 중 non-class 신호만 있던 것                  1       CMG
+SAME_SHA 중 미해결 신호가 있던 것                      0
+SAME_SHA 중 신호가 전혀 없던 것                       10
+```
+
+같은 SHA가 일시적 변경의 부재를 증명하지 않는다는 §10.39 경고는 그대로다.
+
+### 9. 완결성 질문 — 공시 채널이 닫힌 분할을 이루는가
+
+**A. 규칙이 명시로 요구하는 것.** Section 12 등록 국내 발행인이 정관을 개정하면, (i) **제안이
+proxy/information statement로 공시되지 않았을 때** Item 5.03이 발효일과 변경 조항 설명을 요구하고,
+(ii) 증권보유자 표결·동의가 있었으면 Item 5.07이 그 결과를 요구하며(Instruction 2가 회의 밖 동의도 포함),
+(iii) Item 601(b)(3)(i)이 **다음** 해당 정기보고서/등록서류에 개정 반영 완전본을 요구한다.
+
+**B. 12건 실측.** 정관 변경이 실제로 있었던 1건(WST)은 (ii) 채널에 formation 전에 보였다. (i)은 0건,
+(iii)은 그 변경을 formation **뒤**에야 보여줬다. 나머지 11건은 어떤 정관 변경 신호도 없었다.
+
+**C. 남는 구멍.** 세 채널을 합쳐도 **닫힌 분할이 아니다.**
+
+```text
+1  5.03은 proxy/information statement로 이미 공시된 제안을 제외한다 — WST가 정확히 그 경우다.
+2  5.07은 승인을 말하지 발효를 말하지 않는다. 승인과 발효 사이의 지연·미이행·조건은 SEC 공시에 없다.
+3  601(b)(3)(i)의 완전본은 "다음 정기보고서"이므로 formation보다 늦을 수 있다(WST: 2020-07-24).
+4  이사회 단독 개정 중 5.03이 적용되는 경우에도 보고 기한(4영업일)과 수리 시각이 formation을 넘을 수 있다.
+5  지연 제출·미이행(noncompliance)은 어떤 규칙 인용으로도 배제되지 않는다.
+```
+
+**D. 그래서 여전히 주 기록이 필요한 자리.** 승인과 발효 사이(**정확한 법적 발효일**), 그리고 승인 없이
+이사회 권한으로 이뤄지는 변경의 발효 시점이다. 이 둘은 SEC 공시가 아니라 주 등록부 제출 기록이 정본이다.
+
+**이 절은 위 법적·공시 추론을 production 진실로 바꾸지 않는다.** `NO_CHARTER_SIGNAL_OBSERVED`를 연속성으로
+승격하는 결정은 하지 않았다.
+
+### 범위
+
+```text
+production code changed        NO      O2 / O2-C changed        NO
+B2 changed                     NO      birth changed            NO
+B1 / P2 / N1 changed           NO      RelationInterval changed NO
+class-id / bundle / manifest   NO      promotion                NO
+5A-3 / Gates                   NO      returns / ranking        NO
+qv_sec_filings 적재 범위 확대   NO      network                  EDGAR 27(12 CIK 한정) + 규칙 9
+```
+
+받은 SEC 본문과 분석 스크립트는 스크래치에 두고 커밋하지 않는다.
+
+## 10.40-A 행 단위 감사 — 12건
+
+`gap filings / sessions`는 PIT로 쓸 수 있는 gap filing 수와 §10.39가 잰 관측→formation 세션 수다.
+`C0`는 무신호 규칙이 그 사례를 통과시키는지, `C1`은 공시원장 fail-close의 결론이다. 둘 다 진단이다.
+
+| # | case | CIK | formation | PRE obs (usable) | PRE charter SHA | gap filings / sessions | 5.03 | 5.07 charter vote | proxy ref | 10-Q re-anchor | scope | ledger state at formation | C0 | C1 | POST bracket |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 01 | CMG | 0001058090 | 2021-06-30 | 0001058090-21-000010 (2021-02-10) | 13a1b285bc977c68… | 44 / 97 | bylaws-only (forum provision, Art. XII of Bylaws) | annual-meeting votes, no charter amendment | — | 0001058090-21-000022 2021-04-29 EXHIBIT_INDEX_PARSE_FAILURE | PROVEN_NON_CLASS_SCOPE | **ONLY_PROVEN_NON_CLASS_CHANGES** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 02 | CMI | 0000026172 | 2024-06-28 | 0000026172-24-000012 (2024-02-13) | 6afef606c03f88e8… | 157 / 94 | none in gap | annual-meeting votes, no charter amendment | — | 0000026172-24-000023 2024-05-03 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 03 | EXE | 0000895126 | 2025-06-30 | 0000895126-25-000021 (2025-02-27) | dae7d493e7434cb0… | 29 / 84 | none in gap | annual-meeting votes, no charter amendment | — | 0000895126-25-000053 2025-04-30 QUALIFYING dae7d493e7434cb0 | — | **NO_CHARTER_SIGNAL_OBSERVED+REANCHORED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 04 | FE | 0001031296 | 2023-06-30 | 0001031296-23-000014 (2023-02-14) | 1a367a7c8a01b191… | 42 / 94 | none in gap | annual-meeting votes, no charter amendment | — | 0001031296-23-000032 2023-04-28 NO_CHARTER_ROW | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 05 | HAL | 0000045012 | 2020-06-30 | 0000045012-20-000031 (2020-02-12) | 72a88a07420e52ac… | 25 / 96 | none in gap | annual-meeting votes, no charter amendment | — | 0000045012-20-000059 2020-04-27 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 06 | SWKS | 0000004127 | 2015-06-30 | 0000004127-15-000004 (2015-02-03) | 50347176d7df827a… | 38 / 102 | none in gap | annual-meeting votes, no charter amendment | — | 0000004127-15-000012 2015-05-07 EXHIBIT_INDEX_PARSE_FAILURE; 0000004127-15-000006 2015-02-05 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 07 | TSCO | 0000916365 | 2022-06-30 | 0000916365-22-000049 (2022-02-18) | 4a8390b5a5c816d7… | 22 / 90 | none in gap | annual-meeting votes, no charter amendment | — | 0000916365-22-000057 2022-05-06 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 08 | WEC | 0000783325 | 2011-06-30 | 0000107815-11-000028 (2011-02-28) | 84af5bab65f78be3… | 33 / 86 | none in gap | annual-meeting votes, no charter amendment | — | 0000107815-11-000052 2011-05-06 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 09 | WM | 0000823768 | 2022-06-30 | 0001558370-22-001179 (2022-02-16) | abad27aa22e344f4… | 49 / 92 | none in gap | annual-meeting votes, no charter amendment | — | 0001558370-22-005976 2022-04-27 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 10 | WST | 0000105770 | 2020-06-30 | 0000105770-20-000015 (2020-02-24) | e32210d672eac05f… | 38 / 89 | none in gap | APPROVED — Art. 5 authorized common 100M→200M | DEF 14A 0001047469-20-001767 (unique DEF 14A in gap; 5.07 cites “proxy statement dated March 13, 2020” — not matchable to a filing date)  | 0000105770-20-000021 2020-04-27 QUALIFYING e32210d672eac05f | GENERAL_CAPITAL_STRUCTURE | **APPROVED_CHANGE_EFFECT_UNKNOWN** | BLOCKS | C1_BLOCKED | DIFFERENT_SHA |
+| 11 | WU | 0001365135 | 2019-06-28 | 0001558370-19-000848 (2019-02-22) | c96c074a5ac9c4cf… | 35 / 88 | none in gap | annual-meeting votes, no charter amendment | — | 0001558370-19-004270 2019-05-08 EXHIBIT_INDEX_PARSE_FAILURE | — | **NO_CHARTER_SIGNAL_OBSERVED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+| 12 | XYL | 0001524472 | 2012-06-29 | 0001193125-12-084766 (2012-02-29) | 8914c2ff92a2ed46… | 53 / 85 | none in gap | annual-meeting votes, no charter amendment | — | 0001193125-12-206735 2012-05-04 QUALIFYING adda378ce4bde703 | — | **NO_CHARTER_SIGNAL_OBSERVED+REANCHORED** | clears | C1_REQUIRES_COMPLETENESS_DECISION | SAME_SHA |
+
+
 ## 11. 결과
 
 
