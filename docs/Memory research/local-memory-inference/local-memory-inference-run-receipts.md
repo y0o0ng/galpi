@@ -3755,3 +3755,39 @@ private replay, or production change occurred. The next step is adaptive growth
 of the roughly 400-ish reviewed pool, treating the 30 accepted smoke candidates
 as existing eligible members and measuring later top-ups against the frozen
 final-corpus constraints.
+
+#### P1-B6 adaptive-growth surface batch-002 authoring and audit preparation — AUTHORED / AUDIT_NOT_RUN
+
+Starting from main `08ddbc435663c1a31640a27d8e2ef6e05454645f`, the accepted
+smoke seed was mechanically rederived at 30 items with 26 of the frozen 56
+skeletons having zero accepted realization. The canonical batch-002 authoring
+protocol is
+`fixtures/local-memory-inference-p1b6-surface-batch-002-authoring-protocol.json`.
+It binds the frozen exact56 and smoke-acceptance bytes, records the complete
+accepted-seed coverage, and keeps the 64-item count as an execution tranche
+rather than a new corpus-size contract.
+
+The canonical adaptive-growth fixture is
+`fixtures/local-memory-inference-p1b6-surface-batch-002.json`, raw SHA-256
+`db212aae0c1e5c5943cfe68b15cfa106f7a1cc8bd454a8d30320ab0c6a290456`.
+It contains 64 new items in 64 new source episodes. Every zero-accepted smoke
+skeleton receives at least one candidate. Deterministic deficit allocation is
+satisfied at TRAIN41 / DEV10 / FINAL_HELD_OUT13, skeleton-authoring CLEAR31 /
+ESCALATE33, KO45 / MIXED13 / EN6, and fragment counts 12 / 17 / 20 / 12 / 3
+for one through five fragments. The eight frozen discourse patterns each have
+eight candidates. These authoring labels remain generator metadata, not HUMAN
+gold.
+
+The unchanged generic builder prepared
+`~/Downloads/p1b6-source-audit-batch-002-attempt-001.json`, raw SHA-256
+`cbf4a0ada611999bb26bb61f521e4559848044ec5729faf507e28af4f4c4a021`.
+It binds the exact batch-002 bytes and frozen source-audit protocol and contains
+64 unique opaque rows with complete source turns plus canonical selected
+bundles. It contains no results or dispositions; attempt 001 has not run.
+
+Batch-001 remains closed at 30 accepted / 2 dataset-rejected. Batch-002 is
+AUTHORED with `sourceAuditCompleted: false` and `humanReviewCompleted: false`,
+so the combined accepted pool remains 30. No HUMAN review, final corpus gold
+freeze, HELD repeated review, training, semantic model inference, raw-episode
+evaluation, private replay, or production change occurred. The next step is
+batch-002 source-audit attempt 001 in a fresh strong-model session.

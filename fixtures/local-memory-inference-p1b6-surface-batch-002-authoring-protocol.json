@@ -1,0 +1,174 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-002-authoring-protocol-v1",
+  "protocolIdentity": "p1b6-surface-authoring-adaptive-growth-batch-002-v1",
+  "startingMainSha": "08ddbc435663c1a31640a27d8e2ef6e05454645f",
+  "exact56": {
+    "path": "fixtures/local-memory-inference-p1b6-skeleton-exact56.json",
+    "sha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602"
+  },
+  "acceptedSmokeSeed": {
+    "path": "fixtures/local-memory-inference-p1b6-smoke-batch-001-acceptance.json",
+    "rawSha256": "449318d5d3895fca87257a40b7d47b6d8d8eb3df8e9817fff5998a34d658bb5c",
+    "acceptedTotal": 30
+  },
+  "trancheSize": 64,
+  "acceptedSeedCoverage": {
+    "total": 30,
+    "splits": {
+      "TRAIN": 15,
+      "DEV": 7,
+      "FINAL_HELD_OUT": 8
+    },
+    "skeletonAuthoringLabels": {
+      "CLEAR": 18,
+      "ESCALATE": 12
+    },
+    "semanticSkeletons": {
+      "p1b6-sk-000035b8df850b3e": 1,
+      "p1b6-sk-5229ea237196499d": 1,
+      "p1b6-sk-db0908294e6deb6f": 1,
+      "p1b6-sk-e7fe317a78077d37": 0,
+      "p1b6-sk-6b74f6c163e7fa5d": 1,
+      "p1b6-sk-155420007d75f36f": 0,
+      "p1b6-sk-6e493bbfafdb22de": 1,
+      "p1b6-sk-49e0f357eda8365c": 1,
+      "p1b6-sk-82149f27c2f521ae": 0,
+      "p1b6-sk-e7da7f4bbf645574": 1,
+      "p1b6-sk-5fc872afb058b370": 0,
+      "p1b6-sk-11e63b75bdf266dd": 0,
+      "p1b6-sk-8dd28ec6b22a18ad": 0,
+      "p1b6-sk-f2fb3e894c37caac": 1,
+      "p1b6-sk-001178537fb93442": 1,
+      "p1b6-sk-95b3c63acff8f020": 0,
+      "p1b6-sk-187292f8cbc0126c": 1,
+      "p1b6-sk-4bbd555977190591": 0,
+      "p1b6-sk-9dc48f4b2f10775d": 1,
+      "p1b6-sk-61cb1285dd1df651": 0,
+      "p1b6-sk-66ecb02cbfc40c3c": 1,
+      "p1b6-sk-11a3e916ff9b8129": 1,
+      "p1b6-sk-379bd3b3dd05d85e": 0,
+      "p1b6-sk-0767dc2f59b57601": 1,
+      "p1b6-sk-2da4e54e6609e34b": 1,
+      "p1b6-sk-5f335bdc1d9d630c": 0,
+      "p1b6-sk-d8ca287837bcc32d": 0,
+      "p1b6-sk-5269c91fcfb6c2cd": 0,
+      "p1b6-sk-2fa39ece4157b2b8": 0,
+      "p1b6-sk-a19bb9e94e9a416b": 1,
+      "p1b6-sk-43016ef6da889a87": 1,
+      "p1b6-sk-cc054a4227cdafef": 0,
+      "p1b6-sk-714725eea477a631": 1,
+      "p1b6-sk-59c8f51891ab4996": 0,
+      "p1b6-sk-32f27410e2beb10c": 0,
+      "p1b6-sk-869c71279b6b8a33": 1,
+      "p1b6-sk-38c426bb2e0bff42": 1,
+      "p1b6-sk-0ed5b52f4c5735e9": 1,
+      "p1b6-sk-be0efa305956d111": 0,
+      "p1b6-sk-aebbf047d6864a35": 0,
+      "p1b6-sk-fa8ae6d4b81d50a8": 1,
+      "p1b6-sk-1e2014a2b5e70a20": 0,
+      "p1b6-sk-f4d809ae085dbac9": 1,
+      "p1b6-sk-f58debd8f04f5c60": 1,
+      "p1b6-sk-28736b74c85fcc93": 0,
+      "p1b6-sk-084af1a6a0723538": 0,
+      "p1b6-sk-16697b52f83abeba": 1,
+      "p1b6-sk-75fe9a38eb99ab90": 0,
+      "p1b6-sk-135ab77919a554dc": 1,
+      "p1b6-sk-2b6f4ac9e15d8307": 0,
+      "p1b6-sk-c3d0e91a74b6f258": 1,
+      "p1b6-sk-8a41f0d92c7e6b35": 0,
+      "p1b6-sk-f03b5a7c91e2486d": 1,
+      "p1b6-sk-47c9b12e0a6f83d5": 0,
+      "p1b6-sk-b8e64a03d97f251c": 1,
+      "p1b6-sk-5d2a9c70e4b18f63": 1
+    },
+    "languages": {
+      "KO": 21,
+      "MIXED": 5,
+      "EN": 4
+    },
+    "fragments": {
+      "1": 6,
+      "2": 9,
+      "3": 8,
+      "4": 5,
+      "5": 2
+    },
+    "boundaryClasses": {
+      "FINALITY / COMMITMENT": 4,
+      "REVISION / CONFLICT": 4,
+      "PERSISTENCE / EXCEPTION": 3,
+      "REFERENT": 4,
+      "SCOPE / APPLICABILITY": 3,
+      "ACTUALITY": 4,
+      "COMPLEMENTARY EVIDENCE": 4,
+      "APPROXIMATION / RANGE": 4
+    }
+  },
+  "zeroAcceptedSkeletonCount": 26,
+  "allocationMethod": "Positive final-corpus deficits allocated by deterministic largest remainder with the prescribed canonical tie-breaks; zero-accepted skeleton coverage is mandatory, then compatible skeletons are chosen by accepted-seed count, planned count, and lexical semanticSkeletonId.",
+  "trancheTargets": {
+    "splits": {
+      "TRAIN": 41,
+      "DEV": 10,
+      "FINAL_HELD_OUT": 13
+    },
+    "skeletonAuthoringLabels": {
+      "CLEAR": 31,
+      "ESCALATE": 33
+    },
+    "languages": {
+      "KO": 45,
+      "MIXED": 13,
+      "EN": 6
+    },
+    "fragments": {
+      "1": 12,
+      "2": 17,
+      "3": 20,
+      "4": 12,
+      "5": 3
+    },
+    "discoursePatterns": {
+      "CANONICAL": 8,
+      "CONTEXT_FIRST": 8,
+      "CONCLUSION_FIRST": 8,
+      "INTERLEAVED": 8,
+      "PROGRESSIVE_REFINEMENT": 8,
+      "SELF_REVISION": 8,
+      "RETURN_TO_TOPIC": 8,
+      "ELLIPTICAL_REPLY": 8
+    }
+  },
+  "generator": {
+    "provider": "OpenAI",
+    "surface": "Codex",
+    "model": "GPT-5",
+    "exposedSettings": {},
+    "platformControlledSettings": [
+      "reasoning",
+      "temperature",
+      "sampling",
+      "decoding",
+      "seed"
+    ],
+    "settingsStatement": "No reasoning level or numeric sampling, decoding, temperature, or seed controls were exposed in this Codex execution; they are recorded as platform-controlled and not invented."
+  },
+  "outputBatch": {
+    "name": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "path": "fixtures/local-memory-inference-p1b6-surface-batch-002.json",
+    "sha256": "db212aae0c1e5c5943cfe68b15cfa106f7a1cc8bd454a8d30320ab0c6a290456"
+  },
+  "authority": {
+    "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
+    "generatorMetadataIsNeverHumanGold": true,
+    "sourceAuditCompleted": false,
+    "humanReviewCompleted": false,
+    "finalCorpusHumanGoldFrozen": false,
+    "trainingOccurred": false
+  },
+  "scope": [
+    "This is a 64-candidate adaptive-growth execution tranche, not a new corpus-size contract.",
+    "All 26 frozen skeletons with zero accepted smoke coverage receive at least one authored candidate; batch-002 candidates remain unaudited and unaccepted.",
+    "The combined accepted pool remains the 30 accepted smoke candidates; no HUMAN review, final gold freeze, training, raw-episode evaluation, private replay, or production change occurred."
+  ]
+}
