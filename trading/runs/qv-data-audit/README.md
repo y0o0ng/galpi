@@ -7933,8 +7933,22 @@ SEC_FILING_HEADER_JURISDICTION_OBSERVATION
 ### 3. 표본 (DETERMINISTIC)
 
 `sha256("qv-jurisdiction-header-probe-v1|" + member_symbol + "|" + identity_symbol + "|" +
-selected_cik + "|" + formation_session)` 오름차순으로 층마다 앞 12개를 뽑고, §10.41 12건을
-대조군으로 더한 뒤 `(CIK, formation_session)` 중복을 제거했다.
+selected_cik + "|" + formation_session)` 오름차순으로 층마다 앞 12개를 뽑아 결정론적 36점을 만들고,
+§10.41 12건을 대조군으로 union한 뒤 `(CIK, formation_session)` 중복을 제거했다.
+
+**대조군 12건은 §10.39/§10.41의 원래 formation 시점에서 재생한 것이 아니다.** 재현 가능하게 규칙을
+적어 둔다.
+
+```text
+대조군 선정 규칙   §10.41이 이름을 지정한 발행사마다, 고정된 5A-2 population 안에서 그 case의
+                   **가장 늦은 demanded formation session** 하나를 골랐다
+                   (§10.39/§10.41이 쓴 원래 formation session을 다시 쓰지 않았다)
+합치는 순서        결정론적 층화 36점  ∪  대조군 12점
+중복 제거 키       (CIK, formation_session)
+```
+
+그래서 **CMG와 FE는 두 자리에 나타날 수 있다** — 대조군 formation 한 번, 층화 표본이 독립적으로
+뽑은 다른 formation point 한 번이다. 아래 6절 표에서 그 두 날짜가 같은 줄에 함께 찍힌다.
 
 ```text
 early  2008-2012   pool 2206 -> 12
@@ -7995,7 +8009,11 @@ DE 22 · OH 4 · WA 2 · IN 2 · MO · MI · CA · NC · TX · FL · MA · OK ·
 V8 = SWITZERLAND 1 · L2 = IRELAND 1          (FOREIGN_COUNTRY_CODE — 미국 밖 설립이 실제로 있다)
 ```
 
-### 6. §10.41 교차 검증
+### 6. §10.41 교차 확인 — `CROSS_SOURCE_ISSUER_CONSISTENCY_CHECK`
+
+**이것은 §10.41을 같은 시점에서 재현한 것이 아니다.** 3절이 적은 대로 대조군 formation은 원래
+§10.41 formation과 다를 수 있다. 그러므로 이 비교가 말하는 것은 딱 하나다 — **발행사 단위로**
+§10.41의 charter-source 관할과 이 probe가 고른 formation의 filing-header 관할이 일치하는가.
 
 ```text
 AGREES_WITH_CHARTER_PROOF        8
@@ -8020,6 +8038,11 @@ HEADER_NOT_AVAILABLE             1   CMG
 
 **§10.41이 charter 원문으로 못 읽은 3건을 이 source는 읽었다.** SWKS=DELAWARE · XYL=INDIANA ·
 FE=OHIO다. §10.41의 실패 상태를 물려받지 않았고, 불일치는 하나도 없었다.
+
+**앞으로 불일치가 나와도 그것만으로 어느 한쪽이 틀렸다는 뜻은 아니다.** 대조군 formation이 원래
+§10.41 formation과 다를 수 있으므로, 불일치의 원인은 source 결함이나 parser 결함만이 아니라
+**두 시점 사이의 실제 재설립(reincorporation)**일 수도 있다. 불일치가 나오면 원인을 먼저 가르고,
+어느 source를 탈락시키는 판정은 그 뒤다.
 
 ### 7. 측정된 실패 (숨기지 않는다)
 
@@ -8111,10 +8134,19 @@ naive 상한 (formation point당 1건)    header 8959 + submissions 789 + archiv
       33-10618이 표지 tagging을 의무화한 구간(대략 2019-2021 준수일 이후)에만 존재한다
 ```
 
-두 source의 공백이 **반대 방향**이라는 것이 요점이다 — header는 초기 구간을 덮고, 표지 XBRL은
-후기 구간을 덮는다. 다음 probe가 확인할 **아직 검증되지 않은 가설** 하나를 적어 둔다: header가 빈
-CMG 2026-06-30은 표지 tagging 의무 구간에 있으므로 표지 XBRL이 그 구멍을 메울 수 있다.
-**이번 작업에서 그것을 측정하지 않았다** — 가설이지 결과가 아니다.
+두 source의 관계는 **측정된 것과 아직 아닌 것을 갈라서** 적는다.
+
+```text
+측정됨     header는 초기 QV 구간까지 실제로 닿는다 (2008년 filing에서 EXACT 관측)
+규정 사실  표지 XBRL의 관할 tagging은 33-10618이 만든 후기 준수 구간에만 의무다
+따라서     표지 XBRL은 후기 구간 header 공백의 **보완/backstop 후보로 그럴듯하다**
+미측정     그것이 CMG 2026-06-30이나 나머지 header 결측 행을 실제로 메우는지는
+           **아직 측정하지 않았다** (NOT_YET_MEASURED)
+```
+
+두 source의 공백이 서로 맞물려 메워진다고까지 주장하지 않는다 — 그것은 위 미측정 항목이
+확인돼야 할 수 있는 말이다. **다음 probe의 첫 양성 시험 대상은 CMG 2026-06-30**이다:
+header가 비어 있고, 동시에 표지 tagging 의무 구간에 있다.
 
 주 등록부 · 상용 vendor 판단은 §10.42 그대로 `UNANSWERED_FROM_THIS_SOURCE`다. 전수 관할 분포가
 아직 없으므로 Delaware 전용 구매 결정을 정당화하지 않는다.
