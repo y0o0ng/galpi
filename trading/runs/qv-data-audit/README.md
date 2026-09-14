@@ -8979,6 +8979,295 @@ B2 changed                NO      RelationInterval        NO      탄생 / class
 Option A implemented      NO      5A-3 / Gates            NO      returns / ranking            NO
 ```
 
+> **§10.47 source 화해 표시.** 위 §10.46의 관할 분포와 33건 transition은 **그 시점의 header-first
+> 관측 cascade**로 만든 값이다. §10.47이 같은 accession의 제출 표지(cover)를 제3의 source로 넣어
+> 그 cascade를 재검토했다. **§10.46의 측정값은 하나도 바꾸지 않았고**, 아래 §10.47과 함께 읽어야 한다.
+
+## 10.47 관할 source 화해 probe — header / XBRL / 제출 표지 3원 대조 — 2026-09-15
+
+**진단 probe다. production semantics를 하나도 바꾸지 않았다.** source hierarchy · schema ·
+`qv_xbrl` · `qv_submissions` · interval · legal-date · Option A · B2 · O2/O2-C · class identity ·
+bundle · manifest · 5A-3 · Gates · ranking · returns · portfolio 전부 그대로다. **코드에 source
+승자를 넣지 않았다.** 주 등록부 · 상용 vendor 호출 0 · 지출 $0.
+
+```text
+base (origin/main == HEAD)   ff06f07365c520d749d94738dfe307d02168095b
+                             ff06f07 이후 commit 없음 · trading/ · docs/trading/ 무변동 · 트리 clean
+접근일                       2026-09-15
+```
+
+### 1. 고정 입력 — §10.46 artifact 6종 전부 검증
+
+```text
+run.json            b48d0a59…6f331 ✓      source_units.jsonl  602e4047…8137c ✓  8,920행
+observations.jsonl  843078a7…06e3 ✓  8,920행   transitions.jsonl   3a4144d9…c5439 ✓     33행
+parity_1046.json    9b7a9549…c5159 ✓     60행   aggregates.json     9f126b60…1afa7 ✓
+```
+
+해시·행 수가 전부 일치했다. **§10.46 census를 다시 돌리지 않았다.**
+
+### 2. 결정론적 population
+
+```text
+A  33개 transition마다  직전 resolved 관측 · 새 code가 처음 나온 관측 · 그 다음 resolved 관측
+   SOURCE_UNIT 키로 중복 제거                                     81 unit
+B  §10.46의 60행 parity 표본 그대로 재사용 (새 표본 추출 없음)     60 unit
+A ∩ B                                                              3 unit
+A ∪ B = 실제 조회 population                                     138 unit · 138개 서로 다른 accession
+selected_units.jsonl sha256  a6e4a1786bcd1ef6795f3ebd50746250133ac1b616b8a4b41bc8f87b6d7e7ff1
+```
+
+필수 counterexample CIK `0000936395`(Ciena) / 2026-06-30이 population에 들어 있다.
+
+### 3. 세 source의 정의
+
+```text
+SGML_HEADER        target CIK의 FILER / COMPANY DATA block만 읽는다 (§10.43 계약 그대로)
+                   co-registrant block을 쓰지 않는다
+SAME_ACCESSION_XBRL  같은 accession의 instance에서 dei:EntityIncorporationStateCountryCode
+                   DEI namespace · context.cik == target · dimensionless · unit_id None
+                   companyfacts/companyconcept 사용 금지 — 쓰지 않았다
+FILED_PRIMARY_COVER  그 accession의 primary document(제출 metadata의 primaryDocument)에서
+                   "State or other jurisdiction of incorporation" 라벨 주변의 표시 관할
+```
+
+관할 이름 → EDGAR code 변환은 **공식 SEC state/country 표**로만 했다(퍼지 지리 추론 없음).
+
+### 4. 표지 판독의 두 층 — 층을 섞지 않는다
+
+```text
+DETERMINISTIC                       21 / 138   라벨 앞 window에 공식 관할명이 하나뿐
+MODEL_ASSISTED_SOURCE_TEXT_JUDGMENT 87 / 138   라벨에 가장 가까운 공식 관할명 (규칙 아래)
+COVER_UNMAPPED_NAME                  4 / 138   표시 관할은 보이나 code 공간으로 못 옮긴다
+COVER_NOT_FOUND                     26 / 138   primary document에 라벨 문구 자체가 없다
+사용 가능 표지                     108 / 138
+```
+
+**왜 2층이 필요했나.** 모든 SEC 표지 상단에 양식 letterhead
+`UNITED STATES SECURITIES AND EXCHANGE COMMISSION / Washington, D.C. 20549`가 있어서,
+결정론적 window 판독이 거의 매번 `UNITED STATES`(X1)·`WASHINGTON`(WA)을 실제 관할과 함께 잡았다
+(모호 91건 중 82건이 정확히 3개 매칭). 진짜 값은 **라벨 바로 앞**에 있다.
+
+```text
+규칙   라벨 직전의 마지막 공식 관할명. 단 그 이름이 라벨로부터 GUARD=160자 이내여야 한다.
+근거   측정된 거리 분포 — 87건이 48자 이내(중앙값 21), 그 뒤 공백, 3건이 253·265·287자
+       즉 문턱을 49~252 어디에 둬도 같은 3건만 갈린다. 경계 사례에 맞춰 고른 값이 아니다.
+blacklist 없음   실제로 WA에 설립된 등록인은 WA가 라벨에 가장 가까우므로 정상 판독된다
+```
+
+**이 규칙이 틀린 값을 만든 사례를 숨기지 않는다.** guard 없이 돌렸을 때 3건이 `WASHINGTON`으로
+잘못 판독됐다 — Rowan Companies plc · Aon plc · Nielsen Holdings PLC이고, 셋 다 표지가
+**"England and Wales"**라고 적는다. 그것은 EDGAR code 표에 없는 이름이라 letterhead의
+`Washington`이 최근접으로 떨어진 것이다. guard가 이 3건을 `COVER_UNMAPPED_NAME`으로 돌렸고
+(네 번째는 region에 공식 이름이 아예 없던 `0000087347`), **code로 강제 변환하지 않았다.**
+header·XBRL은 이 3건에서 `X0`(UNITED KINGDOM)로 일치한다.
+
+**이 정정은 결론에 불리한 방향으로 작용했다** — 정정 전 유일하게 남아 있던 Q1 반례
+(`0001492633`, header=XBRL=X0 인데 표지 WA)가 이 정정으로 사라졌다. 그래서 정정 뒤 숫자가
+정정 전보다 깨끗하다는 점을 명시한다.
+
+### 5. accession 단위 화해 행렬 (상호배타 · 합 138)
+
+| 분류 | 건수 |
+|---|---|
+| HEADER_COVER_AGREE_XBRL_UNAVAILABLE | 45 |
+| ALL_THREE_AGREE | 42 |
+| SINGLE_SOURCE_ONLY | 26 |
+| **XBRL_COVER_AGREE_HEADER_DISAGREE** | **15** |
+| HEADER_XBRL_AGREE_COVER_UNRESOLVED | 4 |
+| HEADER_COVER_DISAGREE_XBRL_UNAVAILABLE | 3 |
+| XBRL_COVER_AGREE_HEADER_UNAVAILABLE | 3 |
+
+```text
+source 가용성   header exact 133 / 138 · xbrl exact 66 / 138 · 표지 사용가능 108 / 138
+HEADER_COVER_AGREE_XBRL_DISAGREE   0        THREE_WAY_DISAGREE   0
+```
+
+### 6. 핵심 질문
+
+```text
+Q1  header·XBRL 둘 다 exact          61건 → 일치 46 · 불일치 15
+Q2  그 불일치 15건의 표지 판정        표지 사용가능 15 / 15
+      표지 == XBRL        15
+      표지 == header       0
+      표지 == 둘 다 아님    0
+Q1-보강  일치 46건 중 표지가 있는 42건 → 42 / 42 표지도 같은 값 · 불일치 0
+```
+
+| # | CIK | formation | header | XBRL | 표지 | 표지 provenance |
+|---|---|---|---|---|---|---|
+| 01 | 0000018230 (Caterpillar) | 2023-06-30 | TX | DE | **DE** | MODEL_ASSISTED |
+| 02 | 0000018230 (Caterpillar) | 2024-06-28 | TX | DE | **DE** | MODEL_ASSISTED |
+| 03 | 0000029905 (Dover) | 2026-06-30 | NY | DE | **DE** | MODEL_ASSISTED |
+| 04 | 0000354190 (A.J. Gallagher) | 2020-06-30 | IL | DE | **DE** | MODEL_ASSISTED |
+| 05 | 0000354190 (A.J. Gallagher) | 2021-06-30 | IL | DE | **DE** | MODEL_ASSISTED |
+| 06 | 0000718877 (Activision Blizzard) | 2022-06-30 | CA | DE | **DE** | MODEL_ASSISTED |
+| 07 | 0000719955 (Williams-Sonoma) | 2025-06-30 | CA | DE | **DE** | MODEL_ASSISTED |
+| 08 | 0000936395 (Ciena) | 2026-06-30 | MD | DE | **DE** | MODEL_ASSISTED |
+| 09 | 0001103982 (Mondelēz) | 2021-06-30 | IL | VA | **VA** | MODEL_ASSISTED |
+| 10 | 0001103982 (Mondelēz) | 2022-06-30 | IL | VA | **VA** | MODEL_ASSISTED |
+| 11 | 0001164727 (Newmont) | 2021-06-30 | CO | DE | **DE** | DETERMINISTIC |
+| 12 | 0001164727 (Newmont) | 2022-06-30 | CO | DE | **DE** | DETERMINISTIC |
+| 13 | 0001687229 (Invitation Homes) | 2023-06-30 | TX | MD | **MD** | MODEL_ASSISTED |
+| 14 | 0001967680 (Veralto) | 2025-06-30 | X1 | DE | **DE** | DETERMINISTIC |
+| 15 | 0001967680 (Veralto) | 2026-06-30 | X1 | DE | **DE** | DETERMINISTIC |
+
+**불일치 15건에서 header가 가리킨 값은 대부분 그 등록인의 본사 주(州)다** — Caterpillar TX(Irving),
+Dover NY, Gallagher IL(Rolling Meadows), Activision CA(Santa Monica), Williams-Sonoma CA(SF),
+Ciena MD(Hanover), Mondelēz IL(Chicago), Newmont CO(Denver), Invitation Homes TX(Dallas).
+표지는 전부 설립 관할을 따로 적고 있었다.
+
+**XBRL이 없을 때도 header가 틀리는 경우가 있다.** header+표지만 있는 48건 중 45건 일치 · **3건 불일치**다.
+
+### 7. Ciena — 필수 counterexample (원본에서 재현)
+
+```text
+2008-06-30  0000950133-08-002190  header DE · XBRL 없음 · 표지 DE (DETERMINISTIC)
+            표지 원문: "Ciena Corporation (Exact name of registrant as specified in its charter)
+                        Delaware 23-2725311 (State or other jurisdiction of incorporation)"
+2026-06-30  0001193125-26-267607  header MD · XBRL DE · 표지 DE (MODEL_ASSISTED)
+            표지 원문: "Ciena Corporation (Exact name of registrant as specified in its charter)
+                        Commission File Number: 001-36250 Delaware 23-2725311 ("
+            primary document d118604d8k.htm
+            sha256 b3c65c7afd411af9762835fc68bd2459b99b223b2ca3b15b89fb521191b52a16
+```
+
+**Ciena는 2008년에도 2026년에도 표지에 Delaware라고 적었다.** 바뀐 것은 EDGAR SGML header뿐이고
+그 값(MD)은 Ciena 본사 소재지(Hanover, Maryland)와 같다. 따라서 §10.46이 이 CIK에 기록한
+`DE→MD` 전이는 **표지 증거로 뒷받침되지 않는다.**
+
+### 8. 33건 transition 재화해 (합 33)
+
+```text
+TRANSITION_HEADER_ONLY_OR_CONTRADICTED   16      TRANSITION_COVER_CORROBORATED   7
+TRANSITION_NOT_RECONCILABLE               6      TRANSITION_STILL_AMBIGUOUS      4
+```
+
+| 판정 | CIK | §10.46 census | 표지 |
+|---|---|---|---|
+| CONTRADICTED | 0000018230 | DE→TX | DE→DE |
+| CONTRADICTED | 0000018230 | TX→DE | DE→DE |
+| CONTRADICTED | 0000029905 | DE→NY | DE→DE |
+| CORROBORATED | 0000077360 | V8→L2 | V8→L2 |
+| CONTRADICTED | 0000354190 | DE→IL | DE→DE |
+| CONTRADICTED | 0000354190 | IL→DE | DE→DE |
+| CORROBORATED | 0000354908 | OR→DE | OR→DE |
+| CONTRADICTED | 0000718877 | DE→CA | DE→DE |
+| CONTRADICTED | 0000718877 | CA→DE | DE→DE |
+| CONTRADICTED | 0000719955 | CA→DE | DE→DE |
+| CORROBORATED | 0000731766 | MN→DE | MN→DE |
+| CONTRADICTED | 0000815097 | DE→R1 | R1→R1 |
+| CORROBORATED | 0000815097 | R1→D0 | R1→D0 |
+| CORROBORATED | 0000858877 | CA→DE | CA→DE |
+| CONTRADICTED | 0000936395 | DE→MD | DE→DE |
+| CONTRADICTED | 0001103982 | VA→IL | VA→VA |
+| CONTRADICTED | 0001164727 | DE→CO | DE→DE |
+| CONTRADICTED | 0001164727 | CO→DE | DE→DE |
+| CORROBORATED | 0001318605 | DE→TX | DE→TX |
+| CONTRADICTED | 0001478242 | NC→DE | DE→DE |
+| CORROBORATED | 0001679788 | DE→TX | DE→TX |
+| CONTRADICTED | 0001687229 | TX→MD | MD→MD |
+| CONTRADICTED | 0001967680 | DE→X1 | DE→DE |
+
+**16건은 표지가 "바뀌지 않았다"고 말한다** — header만 움직였다. 여기서 "survives"는 여전히
+*선택된 SEC filing들이 서로 다른 관할을 적었다*는 뜻일 뿐, 법적 재설립이 그 시점에 일어났다는
+뜻이 아니다.
+
+```text
+Q4 (진단 전용)  §10.46의 다관할 CIK 25개 중, 표지 증거만으로 다관할이 유지되는 CIK  8개
+                (표지 증거가 있는 CIK 68개 기준 · census를 대체하지 않는다)
+```
+
+### 9. cascade 반사실 — 이 probe population 한정
+
+```text
+CURRENT    HEADER_EXACT -> XBRL_EXACT
+CANDIDATE  XBRL_EXACT   -> HEADER_EXACT
+
+동일 결과       123 / 138
+결과가 갈림       15 / 138   →  표지가 CANDIDATE를 지지  15
+                                표지가 CURRENT를 지지    0
+                                표지가 둘 다 아님        0
+```
+
+**8,920 SOURCE_UNIT 전체로 외삽하지 않는다.** 이 population은 transition 주변을 일부러 모은
+것이라 대표 표본이 아니다.
+
+### 10. 인용한 SEC 원문 (그 이상으로 해석하지 않는다)
+
+```text
+EDGAR PDS Technical Specification (공식)
+  "Electronic Data Gathering, Analysis, and Retrieval (EDGAR) System"
+  "…parses it to extract key information from the header and document. This information is then
+   loaded into the EDGAR database…"
+  "…the submission is then reassembled with informative header tags and the original public
+   documents before being disseminated…"
+  3.3.1 "Submission Header Tags" · Table 7 Symbology에서 STATE OF INCORPORATION은 "?" = Optional
+
+SEC DEI taxonomy (공식 dei-2025_doc.xsd)
+  EntityIncorporationStateCountryCode =
+  "Two-character EDGAR code representing the state or country of incorporation."
+```
+
+**둘 중 어느 것도 법적 권위 주장으로 키우지 않는다.** 검색한 공식 문서에서 header를 설립지의
+법적 확정 진술로 규정하는 표현은 찾지 못했고(`header elements`·`index field` 표현은 0회),
+DEI 정의도 "EDGAR code"라고만 말한다.
+
+### 11. 판정
+
+```text
+A.  XBRL_FIRST_SUPPORTED_FOR_FURTHER_DESIGN
+```
+
+근거는 측정치뿐이다 — header/XBRL이 충돌한 **15건 전부에서 표지가 XBRL 편**이었고 header 편은
+0건, 둘 다 아닌 경우도 0건이다. 일치하던 42건도 표지가 **42/42** 같은 값이었다. 표지가 header를
+지지한 충돌 사례는 이 population에서 **하나도 발견되지 않았다.**
+
+**그럼에도 이것은 연구 판정이지 production 변경이 아니다.** 한계를 같이 적는다.
+
+```text
+1  XBRL exact는 66 / 138뿐이다 — XBRL-first는 XBRL이 있는 filing에서만 의미가 있고,
+   없는 구간(§10.46 기준 초기 구간 전체)에서는 여전히 header가 유일한 source다.
+2  표지가 30 / 138에서 사용 불가였다(라벨 없음 26 · code 공간 밖 4).
+3  population이 transition 주변으로 편향돼 있다. 전수 비율로 읽으면 안 된다.
+4  표지 판독 87건이 MODEL_ASSISTED이고, 그 규칙은 guard 없이는 3건을 틀리게 읽었다.
+5  source hierarchy를 코드에 넣지 않았다. §10.46 수치도 그대로 두었다.
+```
+
+### 12. 명시적 비목표
+
+```text
+법적 재설립일 · 주 제출 사건 · 법적 발효 시점 · 연속성 구간 · 탄생 · Option A 유효성
+— 이 probe는 그 어느 것도 세우지 않는다. filing이 무엇을 **적었는지**만 판정한다.
+```
+
+### 13. 산출물 · 비용
+
+```text
+trading/data/qv-1047-jurisdiction-source-reconciliation/   (gitignore · 커밋하지 않는다)
+  selected_units.jsonl             a6e4a1786bcd1ef6795f3ebd50746250133ac1b616b8a4b41bc8f87b6d7e7ff1   138행
+  accession_evidence.jsonl         e3783f1b66f029206a331c146cdcb8651d4573cb461588fb33f0361ad5215c16   138행
+  transition_reconciliation.jsonl  921b3ff82d6de2f4f283029b879be08a845bce9fb4f6d7f63510c60cee38e633    33행
+  aggregates.json                  2cbbd73d85501bff92f51b1c06b089f078dabfb1ccda0ecf073ce1f55a0068bb
+
+요청  subs_recent 81 · subs_archive 103 · index_header 93 · complete_submission_header 45
+      index_json 138 · FilingSummary 73 · candidate_xml 348 · primary_document 138
+      성공 1,019 · HTTP 503 2 · 합계 1,021 · 145.5 MB · 약 9.5분
+      FETCH_INCOMPLETE 0 — 503 2건이 source 부재로 둔갑하지 않았다
+      SEC 문서 원본은 커밋하지 않는다
+```
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      qv_xbrl changed              NO
+qv_submissions changed    NO      source hierarchy        NO      O2 / O2-C changed            NO
+B2 changed                NO      RelationInterval        NO      탄생 / class-id changed      NO
+Option A implemented      NO      5A-3 / Gates            NO      returns / ranking            NO
+주 등록부 조회            NO      상용 vendor 조회        NO      유료 구매                    $0
+§10.46 수치 변경          NO      DB 변경                 NO      companyfacts/concept 사용    NO
+```
+
 ## 11. 결과
 
 
