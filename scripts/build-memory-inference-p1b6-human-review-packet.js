@@ -13,8 +13,6 @@ const {
 const sourceAudit = require('./build-memory-inference-p1b6-source-audit-packet');
 
 const PACKET_IDENTITY = 'xion-local-memory-inference-p1b6-primary-human-review-packet-v1';
-const RECEIPT_IDENTITY = 'xion-local-memory-inference-p1b6-source-audit-batch-001-attempt-002-receipt-v1';
-const ATTEMPT_ID = 'p1b6-source-audit-batch-001-attempt-002';
 
 function fail(message) {
   throw new TypeError(`P1-B6 primary HUMAN review packet ${message}`);
@@ -62,12 +60,16 @@ function validateAuditReceipt(receipt, rawBatchBytes) {
   const protocol = sourceAudit.loadProtocol();
   const auditPacket = sourceAudit.buildAuditPacket(rawBatchBytes);
   const auditPacketSha256 = sha256RawBytes(packetBytes(auditPacket));
+  const attempt = /^p1b6-source-audit-batch-(\d{3})-attempt-(\d{3})$/u.exec(receipt?.attemptId);
+  const batchNumber = /^p1b6-surface-batch-(\d{3})$/u.exec(batch.batchId)?.[1];
+  const receiptIdentity = attempt
+    && `xion-local-memory-inference-p1b6-source-audit-batch-${attempt[1]}-attempt-${attempt[2]}-receipt-v1`;
 
   if (!exactKeys(receipt, [
     'name', 'attemptId', 'status', 'auditPacketIdentity', 'auditPacketSha256',
     'sourceAuditProtocol', 'auditedSourceBatch', 'rawResultArtifact',
     'auditorExecutionProvenance', 'summary', 'authority', 'rows',
-  ]) || receipt.name !== RECEIPT_IDENTITY || receipt.attemptId !== ATTEMPT_ID
+  ]) || !attempt || attempt[1] !== batchNumber || receipt.name !== receiptIdentity
     || receipt.status !== 'COMPLETE_PASS'
     || receipt.auditPacketIdentity !== sourceAudit.PACKET_IDENTITY
     || receipt.auditPacketSha256 !== auditPacketSha256
@@ -98,11 +100,11 @@ function validateAuditReceipt(receipt, rawBatchBytes) {
     seenIds.add(row.auditRowId);
   }
   if (seenIds.size !== expectedIds.size) fail('receipt is missing an audit row');
-  return { batch, batchSha256 };
+  return { batch, batchSha256, attemptId: receipt.attemptId };
 }
 
 function buildHumanReviewPacket(rawBatchBytes, receipt) {
-  const { batch, batchSha256 } = validateAuditReceipt(receipt, rawBatchBytes);
+  const { batch, batchSha256, attemptId } = validateAuditReceipt(receipt, rawBatchBytes);
   const rows = batch.items.map(item => ({
     reviewRowId: opaqueReviewRowId(batchSha256, item.itemId),
     selectedBundle: renderHumanReviewText(batch, item),
@@ -111,7 +113,7 @@ function buildHumanReviewPacket(rawBatchBytes, receipt) {
     name: PACKET_IDENTITY,
     sourceBatch: { identity: batch.name, sha256: batchSha256 },
     rendererIdentity: RENDERER_IDENTITY,
-    sourceAuditAttempt: ATTEMPT_ID,
+    sourceAuditAttempt: attemptId,
     rows,
   };
 }
@@ -132,9 +134,7 @@ function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
-  ATTEMPT_ID,
   PACKET_IDENTITY,
-  RECEIPT_IDENTITY,
   buildHumanReviewPacket,
   main,
   opaqueReviewRowId,

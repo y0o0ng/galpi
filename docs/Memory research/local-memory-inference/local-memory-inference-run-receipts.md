@@ -3797,3 +3797,34 @@ so the combined accepted pool remains 30. No HUMAN review, final corpus gold
 freeze, HELD repeated review, training, semantic model inference, raw-episode
 evaluation, private replay, or production change occurred. The next step is
 batch-002 source-audit attempt 001 in a fresh strong-model session.
+
+#### P1-B6 adaptive-growth batch-002 source-audit attempt 001 and primary HUMAN review preparation — COMPLETE / PASS
+
+The canonical immutable receipt is
+`fixtures/local-memory-inference-p1b6-source-audit-batch-002-attempt-001.json`.
+It binds batch-002 raw SHA-256
+`552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334`,
+the canonical audit packet raw SHA-256
+`fb3f40c471299aeed79a5cab4da588e8c10602775ed91552e5ace887d4257072`,
+and result artifact raw SHA-256
+`896c06622228ade18bfe2a5a486f5266332fed8957ff70e93debe999eb77af6f`.
+All 64 unique rows match the rebuilt current packet and completed at 64 PASS /
+0 FAIL / 0 UNCERTAIN, so the batch-002 source/bundle gate is PASS. Auditor
+provenance is user-reported OpenAI ChatGPT, GPT-5.6 Sol, reasoning High, from a
+fresh separate audit session and was not independently recovered from API or
+runtime metadata.
+
+The minimally generalized canonical primary-review builder prepared
+`~/Downloads/p1b6-primary-human-review-batch-002-attempt-001.json`, raw SHA-256
+`e949dceb77e68dde278ef448eb17380645064573e187eb1cba7b24c673069fa5`.
+It contains 64 unique opaque rows, each with only the fresh review-row ID and
+current canonical selected bundle. No hidden source, item, skeleton, audit, or
+decision metadata is present. Historical batch-001 packet output remains
+byte-identical.
+
+Batch-002 now records `sourceAuditCompleted: true` and
+`humanReviewCompleted: false`. The accepted pool remains the 30 accepted smoke
+candidates. No HUMAN review, HUMAN gold assignment, final corpus gold freeze,
+HELD repeated review, training, semantic model inference, raw-episode
+evaluation, private replay, or production change occurred. The next step is
+batch-002 primary blind HUMAN review on the prepared 64-row packet.

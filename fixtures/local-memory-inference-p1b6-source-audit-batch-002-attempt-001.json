@@ -1,0 +1,362 @@
+{
+  "name": "xion-local-memory-inference-p1b6-source-audit-batch-002-attempt-001-receipt-v1",
+  "attemptId": "p1b6-source-audit-batch-002-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-source-audit-packet-v1",
+  "auditPacketSha256": "fb3f40c471299aeed79a5cab4da588e8c10602775ed91552e5ace887d4257072",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "batchId": "p1b6-surface-batch-002",
+    "rawSha256": "552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-source-audit-batch-002-attempt-001-results.json",
+    "sha256": "896c06622228ade18bfe2a5a486f5266332fed8957ff70e93debe999eb77af6f"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "USER_REPORTED_NOT_INDEPENDENTLY_RECOVERED_FROM_API_OR_RUNTIME_METADATA",
+    "provider": "OpenAI",
+    "surface": "ChatGPT",
+    "model": "GPT-5.6 Sol",
+    "reasoningSetting": "High",
+    "sessionRelationship": "fresh/separate session used only for the blind source/bundle audit"
+  },
+  "summary": {
+    "total": 64,
+    "PASS": 64,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassed": true,
+    "humanSemanticReviewOccurred": false,
+    "surfaceHumanGoldAssigned": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-audit-dfa8b95b15b17470",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-383ae0ab860192cc",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-5b6e01e598f6671b",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-944d1cc0c50c4e9d",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ff8de4a3dc43759b",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-89dabe95fc107232",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-601b60c67a69123c",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-22d93c3f272100ac",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-44e4a9a0b098b45c",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-9cc9a483307b059a",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-70bf22c7d50d942a",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-323a79aee39ada63",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-cc477a844e3ebb77",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-2398538c785e0063",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-0af6432e0028adfa",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ff822391a529c481",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-bb81d64e81155690",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-97fae878cbcbd53c",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-4355fb4250ad19c4",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-6ce15ca75f431e94",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-81c494c0fbdd9c34",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-096f1d5b9448a53e",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-c91764b75fce3e4e",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-1f1c1ced380ffe96",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-2d32a5197ec3d683",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-211ae3f427263dcd",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-54021cdfa6b5e89d",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-c521e2f6b1ae39ed",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-e7124e1d00c7b1f7",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-58f177b10f1806fb",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-dce44b8bf63990ce",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-19dd6c9053e803cc",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-f5feec733620f5d9",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ffaac076a83da2ff",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-d6e1def872bc8722",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-87b2e46fcefacc6a",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-39366df5a824bfff",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-48736431819d317c",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-a26fe3ff01401dd4",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-1ac67d1757732a45",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-74658f274b201112",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-b7153759b00159b1",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-481a351ab9feaead",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-e34eb242393a9e09",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-d2ea3fb576083d03",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-c9a260bb1f3e68b8",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-38cc7392a10decfc",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-d957f93799aa607f",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ff4956573d9d5f7e",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-b588082c3d7ca520",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-4303ded438a78a75",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-495c638a1a611f9d",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-a109290fe5f732f7",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-1eb77037e4972332",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-72947dcfb53d0f15",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-c7b893c1d80bb4be",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-9eb29e387f25f564",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-8daf4036125c3437",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-bc6175be00a1ab59",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-5247c78baafc8f00",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-8716a15051e2b834",
+      "disposition": "PASS",
+      "reason": "The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-4ebe2f71b1ff7801",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ffc10e49eae5bf4d",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-f23ccd0a42863224",
+      "disposition": "PASS",
+      "reason": "All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    }
+  ]
+}
