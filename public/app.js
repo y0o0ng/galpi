@@ -244,6 +244,7 @@ async function init() {
   });
 
   await loadHistory();
+  document.getElementById('chat').addEventListener('scroll', onHistoryScroll, { passive: true });
   openInitialPanelFromUrl();
   startTaskRefresh();
   setInterval(pollForUpdates, 7000);
@@ -351,6 +352,11 @@ let lastRenderedMsgId = 0;
 let lastRenderedSaveSignature = '';
 let lastRenderedAttachmentSignature = '';
 let renderedSavedMessageIds = new Set();
+const CHAT_HISTORY_PAGE_SIZE = 50;
+const HISTORY_TOP_THRESHOLD_PX = 120;
+let loadedHistoryMessages = [];
+let historyHasMore = false;
+let historyLoadingOlder = false;
 
 function getNoteSaveSignature(messages) {
   return messages
@@ -363,10 +369,12 @@ function rememberMessageSaved(messageId) {
   const id = Number(messageId);
   if (!Number.isSafeInteger(id) || id <= 0) return;
   renderedSavedMessageIds.add(String(id));
-  lastRenderedSaveSignature = [...renderedSavedMessageIds]
-    .map(Number)
-    .sort((a, b) => a - b)
-    .join(',');
+  loadedHistoryMessages = loadedHistoryMessages.map(message =>
+    Number(message.id) === id ? { ...message, noteSaved: true } : message
+  );
+  lastRenderedSaveSignature = getNoteSaveSignature(
+    loadedHistoryMessages.slice(-CHAT_HISTORY_PAGE_SIZE),
+  );
 }
 
 function syncRenderedSaveButtons(messages) {
@@ -380,7 +388,47 @@ function syncRenderedSaveButtons(messages) {
       markSaveButtonSaved(button);
     }
   });
-  lastRenderedSaveSignature = getNoteSaveSignature(messages);
+}
+
+function setLatestHistorySignatures(messages) {
+  const latest = messages.slice(-CHAT_HISTORY_PAGE_SIZE);
+  lastRenderedMsgId = latest.length ? (latest[latest.length - 1].id || 0) : 0;
+  lastRenderedSaveSignature = getNoteSaveSignature(latest);
+  lastRenderedAttachmentSignature = window.AttachmentUi?.getMessageSignature(latest) || '';
+}
+
+function mergeLatestHistoryMessages(current, latest) {
+  const latestById = new Map(latest.map(message => [String(message.id), message]));
+  const merged = current.map(message => latestById.get(String(message.id)) || message);
+  const seen = new Set(current.map(message => String(message.id)));
+  for (const message of latest) {
+    const id = String(message.id);
+    if (seen.has(id)) continue;
+    merged.push(latestById.get(id));
+    seen.add(id);
+  }
+  return merged;
+}
+
+function prependHistoryMessages(current, older) {
+  const seen = new Set(current.map(message => String(message.id)));
+  const prepend = [];
+  for (const message of older) {
+    const id = String(message.id);
+    if (seen.has(id)) continue;
+    prepend.push(message);
+    seen.add(id);
+  }
+  return [...prepend, ...current];
+}
+
+function historyPageUrl(before = null) {
+  const query = new URLSearchParams({ limit: String(CHAT_HISTORY_PAGE_SIZE) });
+  if (before) {
+    query.set('before_created_at', String(before.createdAt));
+    query.set('before_id', String(before.id));
+  }
+  return `/api/sessions/${sessionId}?${query}`;
 }
 
 // 메시지 배열로 대화창을 처음부터 다시 그린다. (폴링 갱신과 공유)
@@ -400,20 +448,50 @@ function renderMessages(messages) {
   } finally {
     isRestoringHistory = false;
   }
-  lastRenderedMsgId = messages.length ? (messages[messages.length - 1].id || 0) : 0;
-  lastRenderedAttachmentSignature = window.AttachmentUi?.getMessageSignature(messages) || '';
   syncRenderedSaveButtons(messages);
+  setLatestHistorySignatures(messages);
 }
 
 async function loadHistory() {
   try {
-    const res = await apiFetch(`/api/sessions/${sessionId}`);
+    const res = await apiFetch(historyPageUrl());
     if (!res.ok) { restoreLocalUiHistory(); return; }
-    const { messages } = await res.json();
+    const { messages, has_more: hasMore } = await res.json();
     if (!messages || messages.length === 0) { restoreLocalUiHistory(); return; }
-    renderMessages(messages);
+    loadedHistoryMessages = messages;
+    historyHasMore = hasMore === true;
+    renderMessages(loadedHistoryMessages);
   } catch (_) {
     restoreLocalUiHistory();
+  }
+}
+
+async function loadOlderHistory() {
+  if (historyLoadingOlder || !historyHasMore || isLoading || loadedHistoryMessages.length === 0) return;
+  historyLoadingOlder = true;
+  const chat = document.getElementById('chat');
+  const oldScrollHeight = chat.scrollHeight;
+  const oldScrollTop = chat.scrollTop;
+  try {
+    const res = await apiFetch(historyPageUrl(loadedHistoryMessages[0]));
+    if (!res.ok) throw new Error('history request failed');
+    const { messages, has_more: hasMore } = await res.json();
+    historyHasMore = hasMore === true;
+    if (!Array.isArray(messages) || messages.length === 0) return;
+    loadedHistoryMessages = prependHistoryMessages(loadedHistoryMessages, messages);
+    renderMessages(loadedHistoryMessages);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    chat.scrollTop = oldScrollTop + (chat.scrollHeight - oldScrollHeight);
+  } catch (_) {
+    showToast('이전 대화를 불러오지 못했어. 다시 스크롤하면 재시도할게.');
+  } finally {
+    historyLoadingOlder = false;
+  }
+}
+
+function onHistoryScroll() {
+  if (document.getElementById('chat').scrollTop <= HISTORY_TOP_THRESHOLD_PX) {
+    void loadOlderHistory();
   }
 }
 
@@ -421,7 +499,7 @@ async function loadHistory() {
 async function pollForUpdates() {
   if (document.hidden || isLoading) return;
   try {
-    const res = await apiFetch(`/api/sessions/${sessionId}`);
+    const res = await apiFetch(historyPageUrl());
     if (!res.ok) return;
     const { messages } = await res.json();
     if (!messages || messages.length === 0) return;
@@ -434,14 +512,18 @@ async function pollForUpdates() {
       && attachmentSignature === lastRenderedAttachmentSignature
     ) return;
     if (latestId === lastRenderedMsgId && attachmentSignature !== lastRenderedAttachmentSignature) {
-      renderMessages(messages);
+      loadedHistoryMessages = mergeLatestHistoryMessages(loadedHistoryMessages, messages);
+      renderMessages(loadedHistoryMessages);
       return;
     }
     if (latestId === lastRenderedMsgId) {
-      syncRenderedSaveButtons(messages);
+      loadedHistoryMessages = mergeLatestHistoryMessages(loadedHistoryMessages, messages);
+      syncRenderedSaveButtons(loadedHistoryMessages);
+      setLatestHistorySignatures(loadedHistoryMessages);
       return;
     }
-    renderMessages(messages);
+    loadedHistoryMessages = mergeLatestHistoryMessages(loadedHistoryMessages, messages);
+    renderMessages(loadedHistoryMessages);
   } catch (_) { /* 조용히 무시 */ }
 }
 
@@ -922,16 +1004,35 @@ async function sendSingleMessage(options = {}) {
       appendError(data.error);
       return { ok: false, reason: 'error' };
     }
+    let linkedAttachments = [];
     if (draftAttachments.length > 0) {
-      const linkedAttachments = Array.isArray(data.attachments) && data.attachments.length > 0
+      linkedAttachments = Array.isArray(data.attachments) && data.attachments.length > 0
         ? data.attachments
         : draftAttachments;
       window.AttachmentUi?.renderMessageAttachments(userGroup, linkedAttachments);
       window.AttachmentUi?.clearAfterSend(draftAttachments.map(attachment => attachment.attachmentId));
     }
     appendAssistantBubble({ ...data, question: text });
+    loadedHistoryMessages = mergeLatestHistoryMessages(loadedHistoryMessages, [
+      {
+        id: data.userMessageId,
+        role: 'user',
+        content: text,
+        model: null,
+        noteSaved: false,
+        attachments: linkedAttachments,
+      },
+      {
+        id: data.messageId,
+        role: 'assistant',
+        content: data.reply,
+        model: data.modelId || data.model,
+        noteSaved: false,
+        attachments: [],
+      },
+    ]);
+    setLatestHistorySignatures(loadedHistoryMessages);
     if (Array.isArray(data.webSources) && data.webSources.length > 0) refreshWebUsagePill();
-    lastRenderedMsgId = data.messageId || lastRenderedMsgId; // 방금 보낸 건 폴링이 다시 안 그리게
     document.dispatchEvent(new Event('pet:happy'));
     return { ok: true, reply: data.reply || '', spokenRemaining: data.spokenRemaining || '' };
   } catch (_) {

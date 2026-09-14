@@ -289,6 +289,122 @@ test('GPT Responses chat snapshots the model and commits each exchange atomicall
   const config = await api(url, '/api/config');
   assert.equal(config.body.retrievalA2Enabled, true);
 
+  await t.test('session history paginates by created_at and id without widening attachments', async () => {
+    const sessionId = 'pagination-test';
+    db.prepare('INSERT INTO sessions (id) VALUES (?)').run(sessionId);
+    const insert = db.prepare(`
+      INSERT INTO messages (session_id, role, content, created_at)
+      VALUES (?, ?, ?, ?)
+    `);
+    const messageIds = [];
+    for (let index = 0; index < 123; index += 1) {
+      messageIds.push(Number(insert.run(
+        sessionId,
+        index % 2 === 0 ? 'user' : 'assistant',
+        `pagination-${index + 1}`,
+        1_800_000_000,
+      ).lastInsertRowid));
+    }
+
+    const linkAttachment = (messageId, suffix) => {
+      const blobId = Number(db.prepare(`
+        INSERT INTO attachment_blobs (
+          sha256, stored_name, stored_path, mime_type, size_bytes
+        ) VALUES (?, ?, ?, 'text/plain', 1)
+      `).run(
+        suffix.repeat(64),
+        `pagination-${suffix}.txt`,
+        `/tmp/pagination-${suffix}.txt`,
+      ).lastInsertRowid);
+      const attachmentId = `att_${suffix.repeat(32)}`;
+      db.prepare(`
+        INSERT INTO attachments (
+          id, blob_id, original_name, kind, session_id, lifecycle_status
+        ) VALUES (?, ?, ?, 'text', ?, 'attached_temporary')
+      `).run(attachmentId, blobId, `pagination-${suffix}.txt`, sessionId);
+      db.prepare(`
+        INSERT INTO message_attachments (
+          message_id, attachment_id, position, origin_user_turn_index, replay_window_turns
+        ) VALUES (?, ?, 0, 1, 10)
+      `).run(messageId, attachmentId);
+      return attachmentId;
+    };
+    const newestAttachmentId = linkAttachment(messageIds[73], 'a');
+    const olderAttachmentId = linkAttachment(messageIds[22], 'b');
+
+    const first = await api(url, `/api/sessions/${sessionId}?limit=50`);
+    assert.equal(first.response.status, 200, JSON.stringify(first.body));
+    assert.equal(first.body.messages.length, 50);
+    assert.equal(first.body.has_more, true);
+    assert.deepEqual(first.body.messages.map(message => message.id), messageIds.slice(73));
+    assert.ok(first.body.messages.every((message, index, messages) =>
+      index === 0
+      || message.createdAt > messages[index - 1].createdAt
+      || (
+        message.createdAt === messages[index - 1].createdAt
+        && message.id > messages[index - 1].id
+      )
+    ));
+    assert.deepEqual(
+      first.body.messages.flatMap(message => message.attachments.map(item => item.attachmentId)),
+      [newestAttachmentId],
+    );
+
+    const cursor = first.body.messages[0];
+    const second = await api(
+      url,
+      `/api/sessions/${sessionId}?limit=50&before_created_at=${cursor.createdAt}&before_id=${cursor.id}`,
+    );
+    assert.equal(second.response.status, 200, JSON.stringify(second.body));
+    assert.equal(second.body.messages.length, 50);
+    assert.equal(second.body.has_more, true);
+    assert.deepEqual(second.body.messages.map(message => message.id), messageIds.slice(23, 73));
+
+    const finalCursor = second.body.messages[0];
+    const final = await api(
+      url,
+      `/api/sessions/${sessionId}?limit=50&before_created_at=${finalCursor.createdAt}&before_id=${finalCursor.id}`,
+    );
+    assert.equal(final.response.status, 200, JSON.stringify(final.body));
+    assert.equal(final.body.messages.length, 23);
+    assert.equal(final.body.has_more, false);
+    assert.deepEqual(final.body.messages.map(message => message.id), messageIds.slice(0, 23));
+    assert.deepEqual(
+      final.body.messages.flatMap(message => message.attachments.map(item => item.attachmentId)),
+      [olderAttachmentId],
+    );
+
+    const pagedIds = [...final.body.messages, ...second.body.messages, ...first.body.messages]
+      .map(message => message.id);
+    assert.deepEqual(pagedIds, messageIds);
+    assert.equal(new Set(pagedIds).size, messageIds.length);
+
+    for (const pathname of [
+      `/api/sessions/${sessionId}?limit=50&before_created_at=${cursor.createdAt}`,
+      `/api/sessions/${sessionId}?limit=50&before_id=${cursor.id}`,
+      `/api/sessions/${sessionId}?limit=50&before_created_at=invalid&before_id=${cursor.id}`,
+      `/api/sessions/${sessionId}?limit=50&before_created_at=${cursor.createdAt}&before_id=1.5`,
+    ]) {
+      assert.equal((await api(url, pathname)).response.status, 400, pathname);
+    }
+
+    const legacy = await api(url, `/api/sessions/${sessionId}`);
+    assert.equal(legacy.response.status, 200);
+    assert.equal(legacy.body.messages.length, 123);
+    assert.equal(Object.hasOwn(legacy.body, 'has_more'), false);
+
+    db.transaction(() => {
+      db.prepare(`
+        DELETE FROM message_attachments
+        WHERE message_id IN (SELECT id FROM messages WHERE session_id = ?)
+      `).run(sessionId);
+      db.prepare('DELETE FROM attachments WHERE session_id = ?').run(sessionId);
+      db.prepare("DELETE FROM attachment_blobs WHERE stored_name LIKE 'pagination-%'").run();
+      db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+      db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+    })();
+  });
+
   const first = await api(url, '/api/chat', {
     method: 'POST',
     body: JSON.stringify({

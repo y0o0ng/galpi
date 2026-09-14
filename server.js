@@ -4203,6 +4203,7 @@ async function runSingleChatTurnBody({
       runtimeGeneration: modelSnapshot?.runtimeGeneration || null,
       reasoningEffort: modelSnapshot?.reasoningEffort || null,
       usage: model === 'gpt' ? usage : undefined,
+      userMessageId,
       messageId: assistantMessageId,
       attachments,
       scheduleCandidate,
@@ -8055,8 +8056,42 @@ function buildTurnAttachmentContext(attachments = [], turnImages = null) {
 
 app.get('/api/sessions/:id', (req, res) => {
   const { id } = req.params;
-  const attachmentsByMessage = attachmentLifecycle.listForSession(id);
-  const messages = noteSaveState.listSessionMessages(id).map(message => ({
+  const hasLimit = req.query.limit !== undefined;
+  const hasBeforeCreatedAt = req.query.before_created_at !== undefined;
+  const hasBeforeId = req.query.before_id !== undefined;
+  const paginated = hasLimit || hasBeforeCreatedAt || hasBeforeId;
+
+  if (paginated && req.query.limit !== '50') {
+    return res.status(400).json({ error: 'limit은 50이어야 합니다.' });
+  }
+  if (hasBeforeCreatedAt !== hasBeforeId) {
+    return res.status(400).json({ error: '히스토리 커서는 두 필드가 모두 필요합니다.' });
+  }
+
+  let beforeCreatedAt = null;
+  let beforeId = null;
+  if (hasBeforeCreatedAt) {
+    const createdAtText = String(req.query.before_created_at);
+    const idText = String(req.query.before_id);
+    beforeCreatedAt = Number(createdAtText);
+    beforeId = Number(idText);
+    if (
+      !/^(0|[1-9]\d*)$/.test(createdAtText)
+      || !/^[1-9]\d*$/.test(idText)
+      || !Number.isSafeInteger(beforeCreatedAt)
+      || !Number.isSafeInteger(beforeId)
+    ) {
+      return res.status(400).json({ error: '올바른 히스토리 커서가 필요합니다.' });
+    }
+  }
+
+  const page = paginated
+    ? noteSaveState.listSessionMessagePage(id, { limit: 50, beforeCreatedAt, beforeId })
+    : { messages: noteSaveState.listSessionMessages(id), hasMore: false };
+  const attachmentsByMessage = paginated
+    ? attachmentLifecycle.listForMessageIds(page.messages.map(message => message.id))
+    : attachmentLifecycle.listForSession(id);
+  const messages = page.messages.map(message => ({
     ...message,
     noteSaved: !!message.noteSaved,
     attachments: attachmentsByMessage.get(message.id) || [],
@@ -8065,7 +8100,7 @@ app.get('/api/sessions/:id', (req, res) => {
   // 인메모리 컨텍스트 복원 (서버 재시작 후 AI가 이전 대화 참고 가능)
   hydrateSessionFromDb(id);
 
-  res.json({ messages });
+  res.json(paginated ? { messages, has_more: page.hasMore } : { messages });
 });
 
 app.get('/api/messages/:id/save-status', (req, res) => {
