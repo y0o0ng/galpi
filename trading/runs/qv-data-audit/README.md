@@ -8472,8 +8472,9 @@ filing 선택 실패                1                          1
 | 2025 | 48 | 42 | 6 | 6/48 |
 | 2026 | 48 | 42 | 6 | 6/48 |
 
-**결측은 줄지 않고 늘었다** — 2022 2/48에서 2025·2026 6/48이다. header 단독으로는 후기로 갈수록
-공백이 커진다.
+**관측된 것만 적는다(§10.46 정정).** 이 결정론적 240-unit bounded 표본에서 header 결측 건수는
+2022-2026 순서로 **2/48 · 3/48 · 3/48 · 6/48 · 6/48**이었다. **이것은 population 수준의 시간 추세를
+세우지 않는다** — 연도당 48개짜리 표본의 관측치이고, 추세로 읽으려면 별도 측정이 필요하다.
 
 ### 7. header 공백 20건 전부 same-accession XBRL 시험 — 20/20 해소
 
@@ -8603,13 +8604,16 @@ submissions 비중              요청의 50% · 바이트의 80% (111 MB / 138 
 전수 추정은 **submissions가 formation point가 아니라 CIK 단위**라는 점을 반영해야 한다.
 
 ```text
-전수(8,959 formation point / 789 CIK) 추정
+LATE-SAMPLE-EXTRAPOLATED SCENARIO ESTIMATE   (측정된 전수 요청 수가 아니다)
+후기 표본의 header 결측률 8.3%와 후기 XBRL 요청 강도 6.5를 전수에 투영한 시나리오다.
+
+전수(8,959 formation row / 789 CIK) 시나리오
   submissions   약  2,079      (789 CIK × (1 + 1.64))
   header            8,959
-  XBRL backstop 약  4,887      (결측률 8.3% × 6.5 요청)
-  합계          약 15,925 요청
+  XBRL backstop 약  4,887      (후기 결측률 8.3% × 6.5 요청 — 초기 구간에 성립한다는 근거 없음)
+  합계          약 15,925 요청   ← 시나리오 추정치
 
-후기 전체(2,458 unit / 561 CIK) 추정   약 5,277 요청
+후기 전체(2,458 unit / 561 CIK) 시나리오   약 5,277 요청
 ```
 
 단순히 unit당 4.39를 8,959에 곱하면 39,345가 나오는데 **약 2.5배 과대추정**이다. 추정치일 뿐이고
@@ -8622,7 +8626,7 @@ A header가 지배적 resolver인가        YES   해소 239건 중 219 (91.6%)
 B XBRL이 실제 공백의 유의미한 부분을 푸는가  YES   20 / 20
 C 24 대조군에 설명 안 되는 불일치가 있나     NO    24/24 일치
 D 모호·parser·source 실패가 감당되는가      YES   모호 0 · 404 0 · 전송실패 0 · source 실패 1(정당)
-E 요청 비용이 전수를 돌릴 만큼 유계인가     YES   약 15,925 요청 추정
+E 요청 비용이 전수를 돌릴 만큼 유계인가     YES   late-sample-extrapolated 시나리오 약 15,925
 F 잔여 미해소를 fail-close로 들 수 있는가   YES   이번 표본 잔여 0 · source 실패 1건은 명시 보존
 ```
 
@@ -8631,10 +8635,15 @@ F 잔여 미해소를 fail-close로 들 수 있는가   YES   이번 표본 잔�
 ```
 
 **다만 이 판정이 무엇에 대한 것인지 좁힌다.** 준비됐다는 것은 **source 경로와 비용**이고,
-**전수의 해소율이 아니다.** 전수에는 2008-2021 formation point가 들어오는데, §10.44가 그 구간
-accession에는 XBRL instance가 **아예 없음**을 측정했다. 그러므로 이번의 20/20 구제율은 초기 구간으로
-넘어가지 않고, 초기 구간 header 공백은 상당수 `UNRESOLVED`로 남을 것으로 본다. 전수는 그것을
-추정으로 메우지 말고 fail-close로 세어야 한다.
+**전수의 해소율이 아니다.** `FULL_CENSUS_READY`는 오직 이 뜻이다 — **source 경로가 충분히 특정됐고
+실제로 돌려봤으므로 전수를 측정할 수 있다.** 전수의 해소율 · 초기 구간 XBRL 가용성 · 전수 실제 요청
+수에 대한 주장이 아니다.
+
+**§10.44가 측정한 것을 정확히 좁힌다(§10.46 정정).** §10.44는 "2008-2021 accession에 XBRL instance가
+일반적으로 없다"를 측정한 적이 없다. 측정된 것은 **그 네 건의 선택된 accession**뿐이다 —
+WYNN 2010 · ESV 2013 · CMG 2016 · MOS 2019의 선택 accession에 instance가 없었다. 따라서
+후기 20/20 구제율을 **뒤로 외삽하지 않고**, 초기 구간 잔여 coverage는 전수를 돌리기 전까지
+`UNKNOWN`이다. 실제 초기 공백이 나오면 추정으로 메우지 말고 fail-close로 센다.
 
 다음 작업 권고는 **정확히 그 전수 census**다(8,959 formation point · header → same-accession XBRL →
 UNRESOLVED). 이번 작업에서는 실행하지 않는다.
@@ -8672,6 +8681,302 @@ companyconcept/facts 조회 NO      유료 구매               $0      jurisdic
 B2 changed                NO      RelationInterval        NO      탄생 / class-id changed      NO
 Option A implemented      NO      5A-3 / Gates changed    NO      returns / ranking            NO
 전수 8,959 census         NO
+```
+
+## 10.46 전수 설립관할 exposure census — 8,920 SOURCE_UNIT — 2026-09-14
+
+**전수 census다. Phase 0 DATA ONLY.** production 코드 · schema · `qv_xbrl` · `qv_submissions` ·
+SEC 증거 원장 · O2/O2-C · B2 · `RelationInterval` · 탄생 · class-id · bundle · manifest를 하나도
+바꾸지 않았다. 주 등록부 · 상용 vendor · `companyconcept`/`companyfacts`를 호출하지 않았고 $0다.
+
+```text
+handoff 기대       6959f43fd024a1177f29972bc376e2b1838b0f6c
+census 실행 시점   ae997f1f7e03f2536a29545e211c8764745225d1   (origin/main · QV path 무변동)
+이 receipt의 부모  2c92544bc4d0c2b2e8435e5e7b76f1ab5607ea87   (Local Memory P1-B6 · trading/ 무변동)
+접근일             2026-09-14
+```
+
+세 commit 사이 `git diff -- trading/ docs/trading/`는 전부 비어 있다 — 고정 입력과 계약이 실행
+내내 바뀌지 않았다.
+
+### 1. 고정한 5A-2 population (artifact에서 다시 셌다)
+
+```text
+inventory sha256   dc13cae6…a8ceba ✓      output sha256   b68813de…64cfc5 ✓
+run identity       sha256:52ff66d4…1165fda      identity_source_version   qv-identity-sha256:de239b12…8914be
+execution commit   9e1203c46e69b30040678d317c34c92cb3cb0971
+
+work items 897 · with CIK 808 · unique CIKs 789 · demanded formation rows 9,464 · with CIK 8,959
+```
+
+### 2. 두 grain을 분리한다
+
+```text
+formation rows with selected CIK   8,959      ← 의미상 요청된 population
+SOURCE_UNIT = (cik, formation_session)  8,920 ← 검색 단위 (39 row가 접혔다)
+unique selected CIKs                 789
+```
+
+아래 모든 표는 **SOURCE_UNIT grain**과 **formation-row 가중 grain**을 함께 적는다.
+SOURCE_UNIT 수를 "formation point"라고 부르지 않는다.
+
+### 3. filing 선택 · header 관측
+
+```text
+SELECTED_PRE_FORMATION_FILING     8,742      NO_PRE_FORMATION_REGISTRANT_FILING   178
+SOURCE_METADATA_INCOMPLETE            0
+
+HEADER_EXACT    8,254      HEADER_MISSING   488      HEADER_AMBIGUOUS   0      HEADER_FETCH_INCOMPLETE 0
+transport       INDEX_HEADER 5,745 · COMPLETE_SUBMISSION_HEADER 2,997 · 예기치 못한 fallback 0
+```
+
+§10.43이 잰 transport 경계(2015)를 그대로 썼고 **fallback이 한 번도 발생하지 않았다** — 경계가
+전수에서도 정확했다.
+
+### 4. header 공백 488건에 same-accession XBRL
+
+```text
+XBRL_EXACT 244 · XBRL_INSTANCE_NOT_AVAILABLE 207 · XBRL_MISSING 37
+XBRL_INSTANCE_AMBIGUOUS 0 · XBRL_FACT_AMBIGUOUS 0 · XBRL_FETCH_INCOMPLETE 0
+```
+
+### 5. 결합 cascade
+
+```text
+                                      SOURCE_UNIT      formation-row 가중
+RESOLVED_BY_HEADER                        8,254              8,288
+RESOLVED_BY_SAME_ACCESSION_XBRL             244                244
+UNRESOLVED                                  244                244
+SOURCE_INCOMPLETE (filing 없음)             178                183
+합계                                      8,920              8,959
+
+해소 합계                                 8,498              8,532   (95.3% / 95.2%)
+```
+
+### 6. 시기별 — **이번에 처음 측정된 것**
+
+§10.45는 후기 20/20만 봤고 초기는 `UNKNOWN`으로 뒀다. 전수가 그 답을 준다.
+
+| 구간 | units | header 공백 | 공백률 | XBRL_EXACT | NO_INSTANCE | FACT_MISSING | 구제 |
+|---|---|---|---|---|---|---|---|
+| 2008-2014 | 3,118 | 121 | 3.9% | 0 | 106 | 15 | **0 / 121** |
+| 2015-2021 | 3,344 | 186 | 5.6% | 64 | 100 | 22 | 64 / 186 |
+| 2022-2026 | 2,458 | 181 | 7.4% | 180 | 1 | 0 | 180 / 181 |
+
+**초기 구간에서 XBRL backstop은 한 건도 구제하지 못했다(0/121).** §10.44가 네 건에서 본 양상이
+전수에서 확인됐다 — 다만 이제는 네 건이 아니라 3,118 unit을 근거로 말한다. 그리고 구제율은
+2020년을 경계로 급변한다(2019년까지 0, 2020년 29/30, 2021년 이후 사실상 전부).
+
+**header 공백률 자체는 후기로 갈수록 높다**(3.9% → 5.6% → 7.4%). header 단독 의존은 시간이 갈수록
+불리해지고, 바로 그 구간에서 XBRL이 메운다. 두 source의 유효 구간이 실제로 상보적임이
+전수에서 확인됐다 — §10.45에서 "아직 측정 안 됨"으로 남겼던 항목이다.
+
+### 7. 연도별 coverage (SOURCE_UNIT grain)
+
+| year | units | 선택 | filing없음 | HDR_EXACT | HDR_MISS | XBRL_EX | NO_INST | FACT_MISS | 해소 | 미해소 | 가중 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2008 | 417 | 391 | 26 | 377 | 14 | 0 | 14 | 0 | 377 | 14 | 418 |
+| 2009 | 438 | 417 | 21 | 403 | 14 | 0 | 14 | 0 | 403 | 14 | 439 |
+| 2010 | 448 | 430 | 18 | 415 | 15 | 0 | 15 | 0 | 415 | 15 | 448 |
+| 2011 | 446 | 431 | 15 | 415 | 16 | 0 | 13 | 3 | 415 | 16 | 447 |
+| 2012 | 453 | 436 | 17 | 417 | 19 | 0 | 15 | 4 | 417 | 19 | 454 |
+| 2013 | 455 | 439 | 16 | 418 | 21 | 0 | 18 | 3 | 418 | 21 | 456 |
+| 2014 | 461 | 447 | 14 | 425 | 22 | 0 | 17 | 5 | 425 | 22 | 463 |
+| 2015 | 465 | 453 | 12 | 430 | 23 | 0 | 19 | 4 | 430 | 23 | 468 |
+| 2016 | 470 | 458 | 12 | 434 | 24 | 0 | 19 | 5 | 434 | 24 | 474 |
+| 2017 | 473 | 462 | 11 | 437 | 25 | 0 | 20 | 5 | 437 | 25 | 476 |
+| 2018 | 479 | 472 | 7 | 448 | 24 | 0 | 18 | 6 | 448 | 24 | 482 |
+| 2019 | 480 | 476 | 4 | 451 | 25 | 0 | 23 | 2 | 451 | 25 | 483 |
+| 2020 | 487 | 485 | 2 | 455 | 30 | 29 | 1 | 0 | 484 | 1 | 490 |
+| 2021 | 490 | 489 | 1 | 454 | 35 | 35 | 0 | 0 | 489 | 0 | 493 |
+| 2022 | 493 | 491 | 2 | 455 | 36 | 36 | 0 | 0 | 491 | 0 | 495 |
+| 2023 | 491 | 491 | 0 | 455 | 36 | 36 | 0 | 0 | 491 | 0 | 493 |
+| 2024 | 491 | 491 | 0 | 454 | 37 | 37 | 0 | 0 | 491 | 0 | 493 |
+| 2025 | 491 | 491 | 0 | 454 | 37 | 36 | 1 | 0 | 490 | 1 | 493 |
+| 2026 | 492 | 492 | 0 | 457 | 35 | 35 | 0 | 0 | 492 | 0 | 494 |
+
+### 8. 60건 bounded parity audit — 불일치 1건 발생
+
+`sha256("qv-jurisdiction-full-parity-v1|" + cik + "|" + accession + "|" + formation_session)`
+오름차순으로 구간마다 20건씩 뽑았다. 초기 구간에서 XBRL이 없는 filing을 쿼터 채우려고 반복
+조회하지 않았다 — 뽑힌 20건을 그대로 시험하고 결과를 그대로 적는다.
+
+| 구간 | AGREE | DISAGREE | NO_XBRL_INSTANCE | XBRL_FACT_MISSING |
+|---|---|---|---|---|
+| 2008-2014 | 0 | 0 | 19 | 1 |
+| 2015-2021 | 3 | 0 | 13 | 4 |
+| 2022-2026 | 18 | **1** | 1 | 0 |
+
+```text
+비교 가능했던 것 22건 중 AGREE 21 · DISAGREE 1
+```
+
+**`SOURCE_RECONCILIATION_REQUIRED` 1건.** 승자를 고르지 않았고 양쪽 값과 출처를 모두 보존한다.
+
+```text
+CIK 0000936395 · formation 2026-06-30 · accession 0001193125-26-267607
+  header  MD      (target CIK COMPANY DATA block)
+  XBRL    DE      instance d118604d8k_htm.xml
+                  sha256 42ad964650cab1a7e81d4c99b31c8520e66869598c584607c781dadd6f8cfbf4
+                  distinct_codes ["DE"] · dimensionless · unit_id None
+```
+
+**우연이 아니다.** 같은 CIK가 §9의 관측된 관할 변경 목록에 있고, 그 변경이 **정확히 이 accession**에
+떨어진다(`DE → MD`, 2008-06-09 → 2026-06-12). 즉 같은 제출물 안에서 SGML header는 MD를, 표지 XBRL은
+DE를 말한다. 어느 쪽이 옳은지 이 probe는 판정하지 않는다 — 별도 source 화해 작업이 필요하다.
+
+### 9. 관측된 관할 변경
+
+```text
+CIK with exactly one observed code   736
+CIK with >1 observed code             25
+transitions                           33
+```
+
+pair 분포: `DE->TX` 3 · `V8->L2` 3 · `CA->DE` 3 · `CO->DE` 2 · `DE->X0` 2 · `D0->V8` 2 ·
+나머지(`TX->DE` `DE->NY` `X0->L2` `DE->IL` `IL->DE` `OR->DE` `DE->CA` `MN->DE` `DE->R1` `R1->D0`
+`DE->MD` `DE->IN` `VA->IL` `DE->CO` `NC->DE` `P7->X0` `TX->MD` `DE->X1`) 각 1.
+
+의미는 **오직** "두 SEC 관측이 서로 다른 관할을 적었다"이다. 법적 재설립일 · 주 제출 사건 ·
+연속성 경계를 세우지 않는다. 이 25개 CIK가 뒤에 legal-date / 주 등록부 작업의 후보다.
+
+### 10. 관할 분포 — 이제 전수 측정치다
+
+```text
+resolved  SOURCE_UNIT 8,498 · 가중 8,532 · unique CIK 761 · distinct (cik,jurisdiction) pair 790
+```
+
+| code | CIK 노출 | SOURCE_UNIT | 가중 row |
+|---|---|---|---|
+| DE | 500 | 5,302 | 5,328 |
+| MD | 31 | 360 | 360 |
+| NY | 21 | 264 | 264 |
+| OH | 18 | 245 | 245 |
+| VA | 11 | 162 | 162 |
+| PA | 18 | 151 | 151 |
+| NJ | 9 | 145 | 145 |
+| L2 (IRELAND) | 17 | 144 | 146 |
+| WA | 8 | 142 | 142 |
+| MN | 9 | 126 | 126 |
+| CA | 11 | 121 | 121 |
+| MA | 10 | 115 | 115 |
+| IN | 10 | 107 | 107 |
+| MO | 7 | 88 | 88 |
+| GA | 6 | 87 | 87 |
+
+```text
+DE  unique CIK 노출   500 / 761 = 65.7%
+DE  SOURCE_UNIT     5,302 / 8,498 = 62.4%
+DE  가중 row        5,328 / 8,532 = 62.4%
+
+공식 class (SOURCE_UNIT)   US_STATE_OR_TERRITORY 8,150 · FOREIGN_COUNTRY_CODE 348
+DE 아닌 미국 주 unit       2,848
+해외 10개 code             L2 IRELAND 144(17 CIK) · D0 BERMUDA 58(10) · V8 SWITZERLAND 54(6) ·
+                           P7 NETHERLANDS 28(3) · Y9 JERSEY 22(2) · P8 NETH.ANTILLES 19(1) ·
+                           X0 UNITED KINGDOM 13(3) · N0 LIBERIA 7(1) · R1 PANAMA 2(1) · U0 SINGAPORE 1(1)
+```
+
+CIK 노출은 겹칠 수 있으므로(한 CIK가 여러 관할에 셈될 수 있다) **비율을 100%로 맞추지 않았다.**
+
+### 11. 미해소 census
+
+```text
+HEADER_MISSING_NO_XBRL_INSTANCE      207        NO_PRE_FORMATION_REGISTRANT_FILING   178
+HEADER_MISSING_XBRL_FACT_MISSING      37        HEADER_AMBIGUOUS                       0
+XBRL_AMBIGUOUS                         0        SOURCE_FETCH_INCOMPLETE                0
+합계  422 SOURCE_UNIT · 가중 427 · 관련 CIK 81
+```
+
+**source 부재와 전송 실패를 섞지 않았다** — 전송 실패와 404는 0건이다. 422건은 전부 "그 자리에
+자료가 없다"이지 "못 받았다"가 아니다.
+
+미해소가 한 해에 몰리지 않고 2008-2019에 고르게 깔려 있다(연 14~25건), 2020 이후는 0~2건이다.
+
+**그 CIK 전체에서 해소 관측이 하나도 없는 CIK 28개**가 실질적 공백이다.
+
+```text
+0000310522 0000816761 0000817473 0000832988 0000888746 0001026214 0001121026 0001132979
+0001141982 0001275283 0001288784 0001530721 0001545158 0001567892 0001627223 0001652044
+0001668717 0001674862 0001675149 0001678531 0001691493 0001701809 0001745999 0001746466
+0001790982 0001799208 0001800227 0002099681
+```
+
+나머지 53개 CIK는 일부 formation에서만 비었고 다른 시점에는 관할이 잡힌다. **이번 census는 그
+공백을 추정으로 메우지 않았다(fail-close).**
+
+### 12. 실제 요청 · 런타임
+
+```text
+subs_recent                789      subs_archive             1,143
+complete_submission_header 2,985    index_header             5,741
+index_json      486+60=546         FilingSummary   281+27=308      candidate_xml  1,319+129=1,448
+cache hit                   18      404                          0      transport failure   0
+합계 요청              12,960      전송량 약 991 MB
+census wall             6,224초 (약 104분)      finalize 약 3분      재개 세션 0
+```
+
+§10.45의 **late-sample-extrapolated 시나리오 추정 약 15,925**와 비교하면 실제 **12,960**으로 약 19%
+적었다. 그 추정은 후기 결측률 8.3%를 전 구간에 투영한 것이었는데, 실제 전수 결측률이 5.5%
+(488/8,742)라 XBRL 경로 호출이 예상보다 적게 발생했다.
+
+### 13. 조달 판정
+
+```text
+DE SOURCE_UNIT 비중        62.4%        DE 가중 row 비중      62.4%
+DE 노출 unique CIK         500 / 761 = 65.7%
+DE 아닌 미국 주 unit       2,848        해외 unit             348 (10개 code)
+distinct CIK/관할 pair     790          다관할 CIK             25
+```
+
+```text
+권고   DELAWARE_DEDICATED_PATH_FIRST
+```
+
+단일 관할 하나가 unit의 62.4% · CIK 노출의 65.7%를 덮는다. 이 집중도면 50개 주 aggregator를 먼저
+평가하는 것보다 **Delaware 전용 경로를 먼저 뚫는 것이 비용 대비 크다.** 다만 세 가지를 함께 적는다.
+
+```text
+1  DE만으로 3분의 1이 남는다 — 44개 code · 해외 10개 code가 그 안에 있다. "first"이지 "only"가 아니다.
+2  관할 변경 CIK 25개는 재설립 시 주 entity 식별자가 바뀔 수 있어 CIK 하나에 주 레코드가 둘일 수 있다.
+3  **SEC 관할 관측은 조달 노출을 재는 문제를 풀 뿐 주 법적 발효일 문제를 풀지 않는다.**
+   §10.41이 이미 쟀듯 Delaware 법적 기록(8 Del. C. 103조)은 존재하나 무료 자동 접근이 약관으로
+   금지돼 있다. 즉 이 census는 "어디를 사야 하는가"에 답했고 "그것이 발효일을 주는가"에는
+   답하지 않았다.
+```
+
+### 14. 의미 경계 — 고정한다
+
+이 census가 세우는 것은 **관할 OBSERVATION과 노출**뿐이다.
+
+```text
+아님   법적 설립 발효일 · SEC 관측 사이의 법적 연속성 · 재설립 발효 경계 · 주 제출 사건 ·
+       Option A 경제적 유효 구간 · class 탄생 · B2 연대기 종결
+```
+
+O2 · O2-C · B2 · `RelationInterval` · class-id · 탄생 · Option A를 수정하거나 다시 열지 않았다.
+주 등록부는 여전히 **별개의 legal-date source 문제**다.
+
+### 15. 산출물 (gitignore · 커밋하지 않는다)
+
+```text
+trading/data/qv-1046-full-jurisdiction-census/
+  run.json            b48d0a598b773bfe9c1e2f855863c992ecab4fd98a9058dc5b14fbaf26b6f331
+  source_units.jsonl  602e40477021b1febce36d3808e01358859ab8873692734b1e58b97ca2b8137c   8,920행
+  observations.jsonl  843078a74e6f20f7a337b9a1c28f029cd51c177dce4ae153b48bcbe73f7006e3   8,920행
+  transitions.jsonl   3a4144d9017f17fb4e96ae5b34a483b1e3eed696241abe107eb86f938c0c5439      33행
+  parity_1046.json    9b7a9549b5188b7cad3df63edbacd6c7df7b4fb5084222032d0f268caebc5159      60건
+  aggregates.json     9f126b600bcb93a33b7fc69593b8e5452fdf46119bc886bd3ff80400b721afa7
+```
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      qv_xbrl changed              NO
+qv_submissions changed    NO      주 등록부 조회          NO      상용 vendor 조회             NO
+companyconcept/facts 조회 NO      유료 구매               $0      jurisdiction interval 생성   NO
+법적 발효일 추론          NO      재설립 법적 경계 추론   NO      O2 / O2-C changed            NO
+B2 changed                NO      RelationInterval        NO      탄생 / class-id changed      NO
+Option A implemented      NO      5A-3 / Gates            NO      returns / ranking            NO
 ```
 
 ## 11. 결과
