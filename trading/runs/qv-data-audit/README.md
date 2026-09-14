@@ -8368,6 +8368,312 @@ RelationInterval changed  NO      bundle / manifest       NO      Option A imple
 5A-3 / Gates / returns    NO      전수 8,959 census       NO      filing 재선택                NO
 ```
 
+## 10.45 후기 구간 관할 source bounded census — 240 source unit — 2026-09-14
+
+**source feasibility 측정이다.** production 코드 · schema · `qv_xbrl` · `qv_submissions` · SEC 증거 원장 ·
+O2/O2-C · B2 · `RelationInterval` · 탄생 · class-id · bundle · manifest를 하나도 바꾸지 않았다.
+주 등록부 · 상용 vendor · `companyconcept`/`companyfacts`를 호출하지 않았고 지출은 $0다.
+**전수 8,959 census는 실행하지 않았다.**
+
+```text
+base (검증·실행 시점)  b71dc74cb724777eba8a8ae3f525884c81c68000
+                       이 commit에서 base를 검증하고 probe를 돌렸다 (그 시점 HEAD 일치 · 트리 clean)
+commit parent          aa557986dfc214c24d248a69b2b67e9fe60a1668
+                       실행 중 다른 트랙(Local Memory P1-B6)이 main을 전진시켜 이 receipt의 부모가 됐다
+                       git diff b71dc74..aa55798 -- trading/ docs/trading/  = 비어 있음
+                       → 고정 입력과 아래 측정값은 영향을 받지 않는다
+접근일                 2026-09-14
+```
+
+### 1. 고정한 5A-2 population (prompt를 믿지 않고 artifact에서 다시 셌다)
+
+```text
+inventory sha256          dc13cae6c9f375c2f1dea72a01da9bc16682d7298fcc2b24900d03feb5a8ceba   ✓
+final output sha256       b68813def1f815c174ff454b89a6b198ddbac3eb6fe631ae1232f486b364cfc5   ✓
+run identity sha256       sha256:52ff66d48ef3a1aecc620bd7aed2c5ec15112c57a5abd9d714667532c1165fda
+identity_source_version   qv-identity-sha256:de239b12524d48fbe02d12fac6bdc1ca68a34ab7ea859d695c7f574eec8914be
+execution commit          9e1203c46e69b30040678d317c34c92cb3cb0971
+
+work items                     897      work items with selected CIK   808
+unique selected CIKs           789      demanded formation points    9,464
+formation points with CIK    8,959
+```
+
+### 2. 후기 구간(2022-2026) source-unit population
+
+`SOURCE_UNIT = (selected_cik, formation_session)`으로 접었다. **다른 formation session은 접지 않았다.**
+
+```text
+late formation rows          2,468
+late unique SOURCE_UNITs     2,458
+unique late CIKs               561
+접힌 중복 formation row         10
+
+연도별 (rows / source units)   2022 495/493 · 2023 493/491 · 2024 493/491 · 2025 493/491 · 2026 494/492
+```
+
+### 3. 결정론적 표본 240 — SEC 결과를 보기 전에 얼렸다
+
+`sha256("qv-jurisdiction-late-bounded-v1|" + selected_cik + "|" + formation_session)` 오름차순으로
+연도마다 앞 48개. **어느 연도도 48개에 못 미치지 않았다**(부족분 대체 없음).
+
+```text
+표본 SOURCE_UNIT              240   (48 × 5)
+weighted formation rows       241   (multiplicity>1은 0001754301 / 2025-06-30 한 건뿐)
+표본 안 고유 CIK              200
+sample_1045.json sha256       0ba90367c9e3072fcf0541ba22c4663724eef458b9eacc82728f61849080457d
+```
+
+### 4. pre-formation filing 선택 — source 결과가 선택에 영향을 주지 않았다
+
+등록인 form(`10-K` · `10-K/A` · `10-Q` · `10-Q/A` · `8-K` · `8-K/A`)만 후보로 두고 production
+`_historical_usable_session`(SPY `eodhd`/`eodhd-15y-2026-08`)이 준
+`historical_usable_session <= formation_session`의 **가장 늦은 하나**만 골랐다. acceptance 없으면
+후보에서 뺐고 `filed`로 대체하지 않았다.
+
+```text
+SELECTED_PRE_FORMATION_FILING        239
+NO_PRE_FORMATION_REGISTRANT_FILING     1   0001288784 / 2022-06-30
+SOURCE_METADATA_INCOMPLETE             0
+
+form 분포        8-K 201 · 10-Q 33 · 8-K/A 2 · 10-K 2 · 10-K/A 1
+observation_age  중앙값 19 세션 · p90 37 · 최대 56       (진단용)
+선택 accession   239건 전부 서로 다르다 (재사용 0)
+```
+
+### 5. header 관측 — transport는 index-header 하나로 끝났다
+
+값 semantics는 §10.43 그대로다(target CIK의 `COMPANY DATA` block만 읽고 business/mail address
+state · 본사 · `submissions.stateOfIncorporation` · 현재 프로필은 쓰지 않았다).
+
+```text
+INDEX_HEADER                239 / 239      complete submission fallback 사용 0회
+```
+
+§10.43은 accession 연도 2014 이하에서 index-header가 404였는데, **2022-2026 구간에서는 239건 전부
+200이다.** 후기 구간 전수에서는 싼 transport만으로 충분하다.
+
+### 6. header coverage — 두 grain
+
+```text
+                       SOURCE_UNIT 그레인      formation-row 가중 그레인
+HEADER_EXACT                  219                        220
+HEADER_MISSING                 20                         20
+HEADER_AMBIGUOUS                0                          0
+filing 선택 실패                1                          1
+합계                          240                        241
+```
+
+| formation year | n | HEADER_EXACT | HEADER_MISSING | 결측률 |
+|---|---|---|---|---|
+| 2022 | 48 | 45 | 2 | 2/48 |
+| 2023 | 48 | 45 | 3 | 3/48 |
+| 2024 | 48 | 45 | 3 | 3/48 |
+| 2025 | 48 | 42 | 6 | 6/48 |
+| 2026 | 48 | 42 | 6 | 6/48 |
+
+**결측은 줄지 않고 늘었다** — 2022 2/48에서 2025·2026 6/48이다. header 단독으로는 후기로 갈수록
+공백이 커진다.
+
+### 7. header 공백 20건 전부 same-accession XBRL 시험 — 20/20 해소
+
+§10.44와 동일 경로(index JSON → FilingSummary → `candidate_xml_names()` → `looks_like_instance()` →
+`parse_instance()`)를 썼고 **다른 accession은 하나도 보지 않았다.**
+
+```text
+XBRL_EXACT                        20        XBRL_MISSING                    0
+XBRL_INSTANCE_NOT_AVAILABLE        0        XBRL_INSTANCE_AMBIGUOUS         0
+XBRL_FACT_AMBIGUOUS                0        XBRL_FETCH_INCOMPLETE           0
+
+HEADER_MISSING_XBRL_RESOLVED      20 / 20
+관할 코드                         DE 10 · NV 3 · GA 2 · L2 2 · PA 1 · D0 1 · MO 1
+연도별 공백                       2022 2 · 2023 3 · 2024 3 · 2025 6 · 2026 6
+```
+
+| # | CIK | formation | accession | XBRL 코드 |
+|---|---|---|---|---|
+| 01 | 0001262039 | 2022-06-30 | `0001262039-22-000023` | DE |
+| 02 | 0001058090 | 2022-06-30 | `0001193125-22-155668` | DE |
+| 03 | 0000922224 | 2023-06-30 | `0000922224-23-000033` | PA |
+| 04 | 0001633917 | 2023-06-30 | `0001193125-23-172688` | DE |
+| 05 | 0001136893 | 2023-06-30 | `0001136893-23-000091` | GA |
+| 06 | 0001174922 | 2024-06-28 | `0001174922-24-000082` | NV |
+| 07 | 0001137789 | 2024-06-28 | `0001137789-24-000034` | L2 |
+| 08 | 0001100682 | 2024-06-28 | `0001100682-24-000020` | DE |
+| 09 | 0000877212 | 2025-06-30 | `0000877212-25-000120` | DE |
+| 10 | 0001174922 | 2025-06-30 | `0001174922-25-000095` | NV |
+| 11 | 0001091667 | 2025-06-30 | `0001140361-25-019688` | DE |
+| 12 | 0000075677 | 2025-06-30 | `0001193125-25-117763` | DE |
+| 13 | 0001403568 | 2025-06-30 | `0001558370-25-008584` | DE |
+| 14 | 0001136893 | 2025-06-30 | `0001136893-25-000083` | GA |
+| 15 | 0000947484 | 2026-06-30 | `0000947484-26-000114` | D0 |
+| 16 | 0001711269 | 2026-06-30 | `0001193125-26-210269` | MO |
+| 17 | 0001385157 | 2026-06-30 | `0001104659-26-048160` | L2 |
+| 18 | 0001174922 | 2026-06-30 | `0001174922-26-000037` | NV |
+| 19 | 0001467858 | 2026-06-30 | `0001467858-26-000044` | DE |
+| 20 | 0000860730 | 2026-06-30 | `0001193125-26-275086` | DE |
+
+`0001174922`(WYNN)는 2024 · 2025 · 2026 **세 번 모두** header가 비었고 세 번 모두 XBRL이 NV를 줬다 —
+상습적으로 비우는 등록인이 있고, 후기 구간에서는 그때마다 메워진다.
+
+### 8. exact-header 대조군 24건 — 불일치 0
+
+240 표본을 얼린 **뒤에**, 그리고 대조군 XBRL 값을 보기 **전에**
+`sha256("qv-jurisdiction-late-parity-v1|" + selected_cik + "|" + accession + "|" +
+formation_session)` 오름차순 앞 24개를 `HEADER_EXACT` 219건에서 골랐다.
+
+```text
+HEADER_XBRL_AGREE            24 / 24
+HEADER_XBRL_DISAGREE          0
+CONTROL_XBRL_MISSING          0        CONTROL_NO_XBRL_INSTANCE     0
+CONTROL_XBRL_AMBIGUOUS        0        CONTROL_FETCH_INCOMPLETE     0
+```
+
+불일치가 없었으므로 승자를 고를 일도, source 화해(reconciliation) 절차를 열 일도 없었다.
+
+### 9. 결합 진단 cascade (보수적)
+
+`HEADER_AMBIGUOUS`는 XBRL로 덮지 않는다는 규칙을 그대로 뒀다(이번엔 해당 0건).
+
+```text
+                                      SOURCE_UNIT      weighted rows
+RESOLVED_BY_HEADER                        219               220
+RESOLVED_BY_SAME_ACCESSION_XBRL            20                20
+UNRESOLVED                                  0                 0
+AMBIGUOUS                                   0                 0
+SOURCE_INCOMPLETE                           1                 1
+```
+
+### 10. 관할 분포 — `BOUNDED_SAMPLE_ONLY`
+
+**이것은 QV 전수 분포가 아니다.** 후기 구간 240 표본의 관측일 뿐이고, **vendor 구매 결정에 쓰지 않는다.**
+이름은 공식 SEC code 표로만 붙였다.
+
+```text
+resolved 239 unit / weighted 240
+
+DE 159 (66.5% · 가중 160 / 66.7%)          VA 9 · OH 9 · MD 7 · GA 6 · NC 5 · MA 5 · NV 5
+NY 4 · PA 4 · MI 3 · TX 3 · MO 2 · WA 2 · OK 2 · NJ 1 · IN 1 · TN 1 · FL 1 · IL 1
+
+미국 밖 9 unit    L2 IRELAND 5 · D0 BERMUDA 2 · P8 NETHERLANDS ANTILLES 1 · Y9 JERSEY 1
+```
+
+```text
+DE share (resolved SOURCE_UNIT)        159 / 239 = 66.5%
+DE share (resolved weighted rows)      160 / 240 = 66.7%
+```
+
+### 11. 비율 — 분모를 같이 적는다
+
+```text
+header 결측률                      20 / 240 = 8.3%     (연도별 2/48 · 3/48 · 3/48 · 6/48 · 6/48)
+same-accession XBRL 구제           20 / 20             ← 분모 20이다
+header+XBRL 뒤 잔여 미해소          0 / 240 = 0.0%
+모호                                0 / 240
+source 실패                         1 / 240            (formation 이전 등록인 filing 자체가 없다)
+```
+
+**구제율의 분모가 20이라는 것을 분명히 적는다.** §10.44의 후기 공백 n=1에서 20으로 늘었고 20/20이
+나왔지만, 20은 여전히 작은 표본이라 "후기 구간 공백은 항상 메워진다"로 읽지 않는다.
+
+### 12. §10.44 anchor — 억지로 넣지 않았다
+
+```text
+CMG 2026-06-30      240 표본에 자연히 들어오지 않았다 → 추가하지 않았다. §10.44가 외부 anchor로 남는다
+CMG 2022-06-30      표본에 있다 → HEADER_MISSING → XBRL DE
+                    (다른 accession 0001193125-22-155668에서 §10.44와 같은 양상이 독립 재현됐다)
+§10.44 대조군       WM 2026만 240 표본에 자연히 있고, 24 parity 대조군에는 뽑히지 않았다
+                    AMT 2023 · XYL 2026은 표본에 없다 — 넣지 않았다
+```
+
+### 13. 요청 · 비용
+
+```text
+subs_recent            200      subs_archive           327      (CIK당 archive shard 1.64)
+index_header           239      complete_submission      0
+index_json              44      FilingSummary           44      candidate_xml          200
+cache hit                0      404                      0      transport failure        0
+합계                 1,054      전송량 138.4 MB
+
+요청 / SOURCE_UNIT            4.39
+XBRL 경로 요청 / 대상 unit     6.5      (공백 20 + 대조군 24 = 44 unit 기준)
+submissions 비중              요청의 50% · 바이트의 80% (111 MB / 138 MB)
+```
+
+전수 추정은 **submissions가 formation point가 아니라 CIK 단위**라는 점을 반영해야 한다.
+
+```text
+전수(8,959 formation point / 789 CIK) 추정
+  submissions   약  2,079      (789 CIK × (1 + 1.64))
+  header            8,959
+  XBRL backstop 약  4,887      (결측률 8.3% × 6.5 요청)
+  합계          약 15,925 요청
+
+후기 전체(2,458 unit / 561 CIK) 추정   약 5,277 요청
+```
+
+단순히 unit당 4.39를 8,959에 곱하면 39,345가 나오는데 **약 2.5배 과대추정**이다. 추정치일 뿐이고
+이번 작업에서 실행하지 않았다.
+
+### 14. 전수 준비 판정
+
+```text
+A header가 지배적 resolver인가        YES   해소 239건 중 219 (91.6%)
+B XBRL이 실제 공백의 유의미한 부분을 푸는가  YES   20 / 20
+C 24 대조군에 설명 안 되는 불일치가 있나     NO    24/24 일치
+D 모호·parser·source 실패가 감당되는가      YES   모호 0 · 404 0 · 전송실패 0 · source 실패 1(정당)
+E 요청 비용이 전수를 돌릴 만큼 유계인가     YES   약 15,925 요청 추정
+F 잔여 미해소를 fail-close로 들 수 있는가   YES   이번 표본 잔여 0 · source 실패 1건은 명시 보존
+```
+
+```text
+판정   FULL_CENSUS_READY
+```
+
+**다만 이 판정이 무엇에 대한 것인지 좁힌다.** 준비됐다는 것은 **source 경로와 비용**이고,
+**전수의 해소율이 아니다.** 전수에는 2008-2021 formation point가 들어오는데, §10.44가 그 구간
+accession에는 XBRL instance가 **아예 없음**을 측정했다. 그러므로 이번의 20/20 구제율은 초기 구간으로
+넘어가지 않고, 초기 구간 header 공백은 상당수 `UNRESOLVED`로 남을 것으로 본다. 전수는 그것을
+추정으로 메우지 말고 fail-close로 세어야 한다.
+
+다음 작업 권고는 **정확히 그 전수 census**다(8,959 formation point · header → same-accession XBRL →
+UNRESOLVED). 이번 작업에서는 실행하지 않는다.
+
+### 15. 의미 경계 — 전수를 돌려도 달라지지 않는다
+
+전수 결과가 뜻하는 것은 오직 이것뿐이다.
+
+```text
+formation 이전의 가장 늦은 usable SEC filing이 관할을 X로 적었다
+```
+
+```text
+아님   법적 설립 발효일 · formation 구간 내내 관할이 끊기지 않았다는 증명 ·
+       재설립(reincorporation) 경계 · 주 제출 사건 · 법적 현재 상태 · Option A 연속성
+```
+
+O2 · O2-C · B2 · `RelationInterval` · 탄생 · class-id · Option A를 다시 열지 않는다. 주 등록부는
+여전히 **별개의 legal-date source 질문**이다.
+
+### 16. 산출물 · 범위
+
+행 단위 산출물은 gitignore된 runtime 영역에 두고 커밋하지 않는다.
+
+```text
+trading/data/qv-1045-probe/sample_1045.json   sha256 0ba90367c9e3072fcf0541ba22c4663724eef458b9eacc82728f61849080457d
+trading/data/qv-1045-probe/rows_1045.jsonl    sha256 c75a846e99854c2b88d4d762cdbf49264e939a2d863c1b5822c1db8cb3bc2d7f   240행
+```
+
+```text
+production code changed   NO      schema changed          NO      qv_xbrl changed              NO
+qv_submissions changed    NO      주 등록부 조회          NO      상용 vendor 조회             NO
+companyconcept/facts 조회 NO      유료 구매               $0      jurisdiction interval 생성   NO
+법적 발효일 추론          NO      재설립 경계 추론        NO      O2 / O2-C changed            NO
+B2 changed                NO      RelationInterval        NO      탄생 / class-id changed      NO
+Option A implemented      NO      5A-3 / Gates changed    NO      returns / ranking            NO
+전수 8,959 census         NO
+```
+
 ## 11. 결과
 
 
