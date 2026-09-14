@@ -8179,6 +8179,195 @@ promotion / 5A-3 / Gates  NO      returns / ranking       NO      paid purchase 
 주 등록부 조회            NO      상용 vendor 조회        NO      전수 관할 census             NO
 ```
 
+## 10.44 same-accession XBRL 관할 backstop probe — header가 빈 그 accession이 스스로 메우는가 — 2026-09-14
+
+**source feasibility probe다.** production 코드 · schema · `qv_xbrl` · `qv_submissions` · SEC 증거 원장 ·
+O2/O2-C · B2 · `RelationInterval` · 탄생 · bundle · manifest를 하나도 바꾸지 않았다. 주 등록부 ·
+상용 vendor · `companyconcept`/`companyfacts`를 호출하지 않았고 지출은 $0다. 전수 census도,
+filing 재선택도 하지 않았다.
+
+**질문은 하나였다.** §10.43에서 선택된 pre-formation filing의 header에 `STATE-OF-INCORPORATION`이
+없을 때, **바로 그 accession**의 XBRL instance가 `dei:EntityIncorporationStateCountryCode`를
+독립적으로 주는가. 다른 accession으로 메우는 것은 금지했다.
+
+```text
+base (origin/main)   bf3ed4acef3da2c6226ceed5cd309a73dfa57335
+                     cba0ef9 이후 커밋은 Local Memory 하나뿐이고
+                     git diff cba0ef9..origin/main -- trading/ docs/trading/  = 비어 있음 ✓
+접근일               2026-09-14
+```
+
+### 1. 고정한 §10.43 입력 (DETERMINISTIC)
+
+```text
+artifact   trading/data/qv-1043-probe/rows_1043.jsonl
+sha256     435eb193bb2bc8627d037dc4f8cd92f9f826e559d6ff781d5c7663bcd65a8494   ✓ 대조 일치
+```
+
+prompt에 적힌 5건을 믿지 않고 artifact에서 `A_status == JURISDICTION_HEADER_MISSING`을 다시 뽑았다 —
+정확히 5건이고 prompt와 일치했다. **filing 선택 알고리즘을 다시 돌리지 않았고** §10.43이 고른
+accession · form · acceptance · `historical_usable_session`을 그대로 썼다.
+
+### 2. 대조군 3건 — 결정론적 선정
+
+`A_status == JURISDICTION_HEADER_EXACT`이고 formation이 후기(2019 이상)인 22건 pool에서
+`sha256("qv-jurisdiction-xbrl-control-v1|" + selected_cik + "|" + accession + "|" +
+formation_session)` 오름차순 앞 3개를 뽑았다. 5건의 결측 행은 제외했다. **대조군도 같은 accession을
+본다.**
+
+### 3. instance 탐색 경로 — 기존 production 함수만 썼다
+
+```text
+A  accession index.json                         (공식 SEC index)
+B  FilingSummary.xml 있으면  parse_filing_summary()
+C  candidate_xml_names(index_payload, summary)   후보 XML/XSD 이름
+D  각 후보 bytes를 looks_like_instance()로 판정   ← 파일명 접미사로 추정하지 않는다
+E  parse_instance() -> is_dei(namespace) & local_name == EntityIncorporationStateCountryCode
+   context.cik == selected_cik · context.dimensionless · fact.unit_id is None · 값 non-empty
+```
+
+**파일명으로 추정했다면 틀렸을 것이다.** 실제로 잡힌 instance 이름은 `cmg-20260611_htm.xml` ·
+`amt-20230627_htm.xml` · `tm2614440d2_8k_htm.xml` · `d142135d8k_htm.xml`이다 — 뒤 둘은 filing agent
+작명이라 규칙으로 못 고른다. root가 `{http://www.xbrl.org/2003/instance}xbrl`인지로만 골랐다.
+
+### 4. 5건 결과 — header 결측 행
+
+| issuer | CIK | formation | accession · form | usable session | 구간(서술) | instance | fact | code | 결과 |
+|---|---|---|---|---|---|---|---|---|---|
+| WYNN | 0001174922 | 2010-06-30 | `0001341004-10-000902` · 8-K | 2010-05-19 | PRE_COVER_TAGGING_MANDATE | NOT_AVAILABLE (후보 XML 0) | — | — | HEADER_MISSING_NO_XBRL_INSTANCE |
+| ESV | 0000314808 | 2013-06-28 | `0001140361-13-025461` · 8-K | 2013-06-18 | PRE_COVER_TAGGING_MANDATE | NOT_AVAILABLE (후보 XML 0) | — | — | HEADER_MISSING_NO_XBRL_INSTANCE |
+| CMG | 0001058090 | 2016-06-30 | `0001058090-16-000072` · 8-K | 2016-05-12 | PRE_COVER_TAGGING_MANDATE | NOT_AVAILABLE (후보 XML 0) | — | — | HEADER_MISSING_NO_XBRL_INSTANCE |
+| MOS | 0001285785 | 2019-06-28 | `0001243786-19-000100` · 8-K | 2019-06-19 | TRANSITION_PERIOD | NOT_AVAILABLE (후보 XML 0) | — | — | HEADER_MISSING_NO_XBRL_INSTANCE |
+| CMG | 0001058090 | 2026-06-30 | `0001058090-26-000056` · 8-K | 2026-06-17 | LATE_MANDATED_PERIOD | **EXACT** `cmg-20260611_htm.xml` | **EXACT** | **DE** | **HEADER_MISSING_XBRL_RESOLVED** |
+
+```text
+HEADER_MISSING_XBRL_RESOLVED        1
+HEADER_MISSING_NO_XBRL_INSTANCE     4
+HEADER_MISSING_XBRL_MISSING         0
+HEADER_MISSING_XBRL_AMBIGUOUS       0
+SOURCE_FETCH_INCOMPLETE             0
+```
+
+**4건의 실패는 추출 실패가 아니다.** 그 accession의 index에 XBRL 후보 XML이 **0개**다(index 파일 수는
+각각 5 · 7 · 6 · 6이고 `FilingSummary.xml`도 없다). 즉 파서가 못 읽은 게 아니라 **그 제출물에 XBRL
+instance 자체가 없다.** 구간 이름은 서술일 뿐이고, 이 filing들이 법적으로 그 fact를 실어야 했다고
+주장하지 않는다(특히 MOS 2019는 전환기다).
+
+### 5. CMG 2026 양성 시험 — 통과
+
+```text
+CMG_2026_XBRL_INSTANCE_AVAILABLE     YES   cmg-20260611_htm.xml
+                                     sha256 af5402af1c7708df09cedaea3847e8d4e48bfa701b29577759195b60543cd52d
+CMG_2026_JURISDICTION_FACT_AVAILABLE YES
+CMG_2026_CODE                        DE
+
+concept   {http://xbrl.sec.gov/dei/2025}EntityIncorporationStateCountryCode
+context   c-1 · dimensionless · entity CIK 0001058090 · period 2026-06-11 ~ 2026-06-11
+raw_value "DE"  ·  unit_id None  ·  distinct 값 1개
+관측 시점  historical_usable_session = 2026-06-17  (§10.43이 만든 것을 그대로 쓴다 · 새 timestamp 없음)
+```
+
+**가설이 첫 양성 후보에서 성립했다** — header가 빈 그 accession이 스스로 관할을 줬고, 값은
+§10.41이 charter 원문에서 읽은 DELAWARE와 같다. 다만 §10.41은 **다른 시점·다른 source**이므로
+same-time ground truth가 아니라 진단적 기대치로만 쓴다.
+
+### 6. 대조군 3건 — header ↔ XBRL 일치
+
+| control | formation | accession | instance | header | XBRL | 결과 |
+|---|---|---|---|---|---|---|
+| AMT | 2023-06-30 | `0001053507-23-000132` | `amt-20230627_htm.xml` | DE | DE | HEADER_XBRL_AGREE |
+| WM | 2026-06-30 | `0001104659-26-060755` | `tm2614440d2_8k_htm.xml` | DE | DE | HEADER_XBRL_AGREE |
+| XYL | 2026-06-30 | `0001193125-26-248342` | `d142135d8k_htm.xml` | IN | IN | HEADER_XBRL_AGREE |
+
+```text
+HEADER_XBRL_AGREE                3
+HEADER_XBRL_DISAGREE             0
+XBRL_NOT_AVAILABLE_FOR_CONTROL   0
+XBRL_AMBIGUOUS_FOR_CONTROL       0
+```
+
+추출 경로가 결측 행에서만 돌아간 게 아님을 보인다. 불일치가 없었으므로 승자를 고를 일도 없었다.
+
+### 7. 의미 — `SEC_XBRL_JURISDICTION_OBSERVATION`
+
+```text
+뜻     이 정확한 SEC accession이 EntityIncorporationStateCountryCode = X 라고 적었다
+아님   주 등록부 법적 증거 · 법적 발효일 · jurisdiction effective_from / effective_to ·
+       끊김 없는 연속성 · 그 filing의 usable session 이전에 대한 증명
+```
+
+**연속성을 만들지 않았다.** 구간(interval)도 발효일도 생성하지 않았고, 관측 시점은 그 accession의
+기존 `historical_usable_session` 그대로다.
+
+### 8. 판정 — 측정된 행만으로
+
+```text
+1 same-accession XBRL이 CMG 2026을 푸는가        YES · DE
+2 결측 5건 중 몇 건이 풀렸나                     1 / 5
+3 pre-mandate 구간에서 풀린 것                   0 / 3   (instance 자체가 없다)
+  transition(MOS 2019)                           0 / 1
+  late(CMG 2026)                                 1 / 1
+4 exact-header 대조군 3건이 XBRL과 일치하는가    3 / 3 일치 · 불일치 0
+5 HEADER -> SAME-ACCESSION XBRL -> UNRESOLVED
+  조합을 전수 규모로 시험할 근거가 되는가        부분적으로 된다 (아래)
+```
+
+```text
+권고   BACKSTOP_PARTIALLY_VIABLE_NEEDS_MORE_SAMPLE
+```
+
+근거를 그대로 적는다. **작동은 regime이 예측한 바로 그 자리에서 했다** — 후기 구간 결측 1건을
+정확히 메웠고 대조군 3건이 깨끗하게 일치했다. 그러나 **초기 구간 결측은 구조적으로 못 메운다**:
+그 8-K들에는 XBRL instance가 아예 없다. 그리고 후기 구간 결측 표본이 **n=1**이다. 그래서
+"전수에 쓸 수 있다"고 말하기에는 표본이 모자라고, "지지되지 않는다"고 말하기에는 첫 양성 시험이
+성공했다.
+
+### 9. 전수 계약은 아직 얼리지 않는다
+
+전망되는 진단 순서만 스케치한다. **production/census fallback 계약으로 고정하지 않는다.**
+
+```text
+1  선택된 accession의 header STATE-OF-INCORPORATION
+2  같은 accession의 exact DEI XBRL fact
+3  UNRESOLVED (fail-close · 추정하지 않는다)
+```
+
+여기에 **이전 filing · 다음 filing · 현재 프로필 · 주 등록부 · charter parsing을 넣지 않았다.**
+그것들은 별개 결정이다.
+
+다음 단계 권고는 전수(8,959)가 아니라 **경계를 넓히는 bounded census**다 — 후기 구간에서
+header 결측률과 same-accession XBRL 해소율을 더 큰 표본으로 재서, 후기 결측이 n=1이 아닌 곳에서도
+같은 비율로 메워지는지 확인한 뒤에 전수를 연다.
+
+### 10. 네트워크 · 산출물
+
+```text
+index JSON               8      (200 8)
+FilingSummary            4      (200 4 — 나머지 4건은 그 파일이 index에 없다)
+candidate XML           17      (200 17)
+cache hit                0      404 0 · transport failure 0
+합계                    29      주 등록부 0 · 상용 vendor 0 · companyconcept/companyfacts 0 · $0
+```
+
+행 단위 산출물은 gitignore된 runtime 영역에 두고 커밋하지 않는다.
+
+```text
+trading/data/qv-1044-probe/rows_1044.jsonl
+sha256  3acbe0e30d06922f52a1fcca5b3f3d8c6d67b50e37a6c81b480b61b0e50a4fbb
+행       8   (target 5 + control 3 · fact/context/instance SHA 포함)
+```
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      qv_xbrl changed              NO
+qv_submissions changed    NO      주 등록부 조회          NO      상용 vendor 조회             NO
+companyconcept/facts 조회 NO      유료 구매               $0      jurisdiction interval 생성   NO
+법적 발효일 추론          NO      O2 / O2-C changed       NO      B2 changed                   NO
+RelationInterval changed  NO      bundle / manifest       NO      Option A implemented         NO
+5A-3 / Gates / returns    NO      전수 8,959 census       NO      filing 재선택                NO
+```
+
 ## 11. 결과
 
 
