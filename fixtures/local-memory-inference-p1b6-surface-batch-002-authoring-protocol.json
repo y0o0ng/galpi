@@ -156,7 +156,7 @@
   "outputBatch": {
     "name": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
     "path": "fixtures/local-memory-inference-p1b6-surface-batch-002.json",
-    "sha256": "db212aae0c1e5c5943cfe68b15cfa106f7a1cc8bd454a8d30320ab0c6a290456"
+    "sha256": "552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334"
   },
   "authority": {
     "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
@@ -169,6 +169,7 @@
   "scope": [
     "This is a 64-candidate adaptive-growth execution tranche, not a new corpus-size contract.",
     "All 26 frozen skeletons with zero accepted smoke coverage receive at least one authored candidate; batch-002 candidates remain unaudited and unaccepted.",
+    "Before audit, repeated non-selected and non-anchor side-context turns were rewritten for source naturalness without changing any item definition or canonical visible bundle.",
     "The combined accepted pool remains the 30 accepted smoke candidates; no HUMAN review, final gold freeze, training, raw-episode evaluation, private replay, or production change occurred."
   ]
 }

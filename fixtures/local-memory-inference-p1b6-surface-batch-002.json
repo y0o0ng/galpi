@@ -39,7 +39,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "그 전에 laptop 충전기만 꽂고 올게."
+          "text": "잠깐, building manager한테 온 문자는 확인하고 다시 얘기할게."
         },
         {
           "turnId": "t4",
@@ -62,7 +62,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "I need to take a quick unrelated call."
+          "text": "The kettle just clicked off; let me pour the water before it cools."
         },
         {
           "turnId": "t3",
@@ -72,7 +72,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "One moment while I close the window."
+          "text": "I'm back—the tea can steep while we finish this."
         },
         {
           "turnId": "t5",
@@ -100,7 +100,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "주방 타이머가 울리네, 오븐부터 끄고 올게."
         },
         {
           "turnId": "t3",
@@ -115,7 +115,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "꺼내 놓으니 너무 뜨거워서 식힘망으로 옮기고 왔어."
         },
         {
           "turnId": "t6",
@@ -125,7 +125,7 @@
         {
           "turnId": "t7",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "오븐 장갑을 제자리에 두고 이제 다시 집중할게."
         },
         {
           "turnId": "t8",
@@ -153,7 +153,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "택배 기사님이 공동현관에 도착했다네, 문만 열어줄게."
         },
         {
           "turnId": "t3",
@@ -163,7 +163,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "상자를 현관 안쪽으로 들여놓고 돌아왔어."
         },
         {
           "turnId": "t5",
@@ -178,7 +178,7 @@
         {
           "turnId": "t7",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "송장에 내 이름이 맞는지만 확인했어."
         },
         {
           "turnId": "t8",
@@ -188,7 +188,7 @@
         {
           "turnId": "t9",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "박스 정리는 나중에 하고 이 이야기부터 마저 하자."
         },
         {
           "turnId": "t10",
@@ -216,7 +216,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "고양이가 책상 밑에서 케이블을 건드리네, 잠깐 치워둘게."
         },
         {
           "turnId": "t4",
@@ -226,7 +226,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "장난감 쪽으로 관심을 돌려놨으니 이제 괜찮아."
         },
         {
           "turnId": "t6",
@@ -249,7 +249,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 coffee 좀 가져오고 이어가자."
+          "text": "잠시만, laptop battery 경고가 떠서 전원부터 연결할게."
         },
         {
           "turnId": "t3",
@@ -295,7 +295,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "세탁기 종료 알림이 왔네, 젖은 빨래만 꺼내둘게."
         },
         {
           "turnId": "t3",
@@ -305,7 +305,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "수건은 건조대에 널고 나머지는 바구니에 담아뒀어."
         },
         {
           "turnId": "t5",
@@ -315,7 +315,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "바닥에 떨어진 양말까지 주웠으니 이어서 말할게."
         },
         {
           "turnId": "t7",
@@ -338,7 +338,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "화분 받침에 물이 고였네, 넘치기 전에 비우고 올게."
         },
         {
           "turnId": "t3",
@@ -348,7 +348,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "창가 쪽 흙도 닦았어, 이제 손에 묻을 일은 없겠다."
         },
         {
           "turnId": "t5",
@@ -371,7 +371,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 coffee 좀 가져오고 이어가자."
+          "text": "One sec, delivery app 알림이 떠서 현관 비밀번호만 보낼게."
         },
         {
           "turnId": "t3",
@@ -399,7 +399,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "밥솥이 취사 완료됐다고 하네, 보온으로 넘어갔는지 볼게."
         },
         {
           "turnId": "t3",
@@ -414,7 +414,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "주걱만 꺼내놓고 왔어, 식사는 이야기 끝나고 할게."
         },
         {
           "turnId": "t6",
@@ -455,7 +455,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "주차 관리실에서 전화가 왔어, 차 번호만 확인해줄게."
         },
         {
           "turnId": "t3",
@@ -465,7 +465,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "방문 차량 등록은 끝났대, 더 처리할 건 없다고 하네."
         },
         {
           "turnId": "t5",
@@ -475,7 +475,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "휴대폰을 무음으로 돌렸으니 이제 끊기지 않을 거야."
         },
         {
           "turnId": "t7",
@@ -498,7 +498,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "책상 위 커피가 쏟아질 듯 놓여 있어서 안쪽으로 옮길게."
         },
         {
           "turnId": "t3",
@@ -531,7 +531,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "복도에서 청소 안내 방송이 나오네, 문을 잠깐 닫고 올게."
         },
         {
           "turnId": "t4",
@@ -541,7 +541,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "문틈에 끼운 전단도 치웠어, 이제 조용하다."
         },
         {
           "turnId": "t6",
@@ -569,7 +569,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, delivery가 와서 문만 열어 줄게."
+          "text": "잠깐만, calendar reminder가 떴는데 dismiss하고 계속할게."
         },
         {
           "turnId": "t3",
@@ -615,7 +615,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "냉동실 문이 덜 닫혔다는 경고음이 들려, 확인하고 올게."
         },
         {
           "turnId": "t3",
@@ -625,7 +625,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "서랍에 걸린 봉지를 빼니까 문이 제대로 닫혔어."
         },
         {
           "turnId": "t5",
@@ -653,7 +653,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "옆집에서 맡긴 우편물을 찾으러 왔네, 잠깐 건네주고 올게."
         },
         {
           "turnId": "t3",
@@ -663,7 +663,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "봉투만 전달했는데도 고맙다며 귤을 두고 갔어."
         },
         {
           "turnId": "t5",
@@ -673,7 +673,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "귤은 식탁에 올려뒀고, 하던 얘기로 돌아오자."
         },
         {
           "turnId": "t7",
@@ -701,7 +701,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, delivery가 와서 문만 열어 줄게."
+          "text": "Hold on, 이어폰이 다른 기기에 붙어서 Bluetooth만 다시 잡을게."
         },
         {
           "turnId": "t3",
@@ -724,7 +724,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "창문 틈으로 빗물이 들어오네, 수건을 받쳐두고 올게."
         },
         {
           "turnId": "t3",
@@ -734,7 +734,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "빗방울 닿던 책도 마른 쪽으로 옮겨놨어."
         },
         {
           "turnId": "t5",
@@ -770,7 +770,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "One moment while I close the window."
+          "text": "A calendar alert popped up, but it can wait until this conversation is done."
         },
         {
           "turnId": "t3",
@@ -813,7 +813,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "현관 앞 재활용 봉투가 넘어졌네, 내용물부터 주워 담을게."
         },
         {
           "turnId": "t3",
@@ -823,7 +823,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "병이 굴러간 데까지 찾아서 다시 분리해뒀어."
         },
         {
           "turnId": "t5",
@@ -833,7 +833,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "봉투 입구를 묶으니 이번에는 쓰러지지 않겠다."
         },
         {
           "turnId": "t7",
@@ -843,7 +843,7 @@
         {
           "turnId": "t8",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "손을 씻고 왔으니 이제 차분히 마무리하자."
         },
         {
           "turnId": "t9",
@@ -866,7 +866,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "무선 마우스 불이 깜빡이네, 서랍에서 건전지를 꺼낼게."
         },
         {
           "turnId": "t3",
@@ -876,7 +876,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "새 건전지로 바꾸니 포인터가 다시 움직인다."
         },
         {
           "turnId": "t5",
@@ -899,7 +899,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 coffee 좀 가져오고 이어가자."
+          "text": "잠깐, phone storage 알림이 떠서 녹화 파일 하나만 옮길게."
         },
         {
           "turnId": "t3",
@@ -922,7 +922,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "베란다에 둔 방석이 바람에 넘어졌어, 안으로 들여놓을게."
         },
         {
           "turnId": "t3",
@@ -932,7 +932,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "유리문 고리도 걸어뒀으니 다시 넘어질 일은 없겠어."
         },
         {
           "turnId": "t5",
@@ -955,7 +955,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "손목시계 진동이 계속 와서 방해 금지로 바꿔둘게."
         },
         {
           "turnId": "t3",
@@ -991,7 +991,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 coffee 좀 가져오고 이어가자."
+          "text": "잠깐, coffee pickup notification이 와서 수령만 누를게."
         },
         {
           "turnId": "t3",
@@ -1001,7 +1001,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "아, phone call 하나만 받고 올게."
+          "text": "컵 뚜껑이 loose해서 냅킨으로 한 번 눌러뒀어."
         },
         {
           "turnId": "t5",
@@ -1011,7 +1011,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "잠깐, delivery가 와서 문만 열어 줄게."
+          "text": "이제 drink는 옆에 두고 finish what we were saying."
         },
         {
           "turnId": "t7",
@@ -1034,7 +1034,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "책갈피가 바닥에 떨어졌네, 어느 책에서 빠졌는지 볼게."
         },
         {
           "turnId": "t3",
@@ -1044,7 +1044,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "읽던 페이지 사이에 다시 끼워놓고 왔어."
         },
         {
           "turnId": "t5",
@@ -1067,7 +1067,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "가습기 물통이 비었다는 표시가 떠서 전원만 꺼둘게."
         },
         {
           "turnId": "t3",
@@ -1103,7 +1103,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "현관 센서등이 계속 켜져 있네, 문이 닫혔는지 확인할게."
         },
         {
           "turnId": "t3",
@@ -1113,7 +1113,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "신발 끈이 문틈에 걸려 있었어, 빼고 제대로 닫았어."
         },
         {
           "turnId": "t5",
@@ -1136,7 +1136,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "창가에 둔 종이가 선풍기 바람에 날려서 눌러놓고 올게."
         },
         {
           "turnId": "t3",
@@ -1146,7 +1146,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "두꺼운 머그컵을 올려두니 더는 흩어지지 않네."
         },
         {
           "turnId": "t5",
@@ -1156,7 +1156,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "바닥에 떨어진 한 장도 찾았으니 계속 이야기하자."
         },
         {
           "turnId": "t7",
@@ -1179,7 +1179,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, delivery가 와서 문만 열어 줄게."
+          "text": "One moment, 배달 기사님 call만 받고 공동문을 열어줄게."
         },
         {
           "turnId": "t3",
@@ -1202,7 +1202,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "휴대폰 케이스 안에서 교통카드가 빠졌네, 다시 끼울게."
         },
         {
           "turnId": "t3",
@@ -1212,7 +1212,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "모서리까지 눌러 넣었으니 이번엔 안 빠지겠다."
         },
         {
           "turnId": "t5",
@@ -1248,7 +1248,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "싱크대 수도가 덜 잠겼나 봐, 물방울 소리부터 멈출게."
         },
         {
           "turnId": "t3",
@@ -1258,7 +1258,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "손잡이를 조금 더 돌리니 이제 조용해졌어."
         },
         {
           "turnId": "t5",
@@ -1268,7 +1268,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "행주도 널어두고 왔으니 이쪽 이야기를 마저 하자."
         },
         {
           "turnId": "t7",
@@ -1291,7 +1291,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, delivery가 와서 문만 열어 줄게."
+          "text": "잠시만, browser update가 끝나서 restart later만 눌러둘게."
         },
         {
           "turnId": "t3",
@@ -1314,7 +1314,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "우편함에 두고 온 열쇠가 생각났어, 바로 가져올게."
         },
         {
           "turnId": "t3",
@@ -1324,7 +1324,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "열쇠고리에 다시 달았으니 이번에는 잊지 않겠다."
         },
         {
           "turnId": "t5",
@@ -1352,7 +1352,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "바닥 청소기가 충전대를 못 찾고 있네, 방향만 돌려줄게."
         },
         {
           "turnId": "t3",
@@ -1380,7 +1380,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "주전자 뚜껑이 제대로 안 닫혔네, 식기 전에 맞춰둘게."
         },
         {
           "turnId": "t3",
@@ -1390,7 +1390,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "김이 새던 부분을 눌렀더니 이제 괜찮아졌어."
         },
         {
           "turnId": "t5",
@@ -1431,7 +1431,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "복사기가 종이를 다 썼다는 표시가 떠서 한 묶음 넣을게."
         },
         {
           "turnId": "t3",
@@ -1441,7 +1441,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "용지함을 끝까지 밀어 넣으니 시험 출력이 나왔어."
         },
         {
           "turnId": "t5",
@@ -1451,7 +1451,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "출력물은 옆에 두고 대화를 계속하자."
         },
         {
           "turnId": "t7",
@@ -1479,7 +1479,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 coffee 좀 가져오고 이어가자."
+          "text": "잠깐, team chat에 urgent처럼 보이는 mention이 떠서 확인할게."
         },
         {
           "turnId": "t3",
@@ -1489,7 +1489,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "아, phone call 하나만 받고 올게."
+          "text": "It was just a lunch poll, so 답장은 나중에 해도 되겠어."
         },
         {
           "turnId": "t5",
@@ -1499,7 +1499,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "잠깐, delivery가 와서 문만 열어 줄게."
+          "text": "알림 badge만 지웠고 다른 channel은 열지 않았어."
         },
         {
           "turnId": "t7",
@@ -1509,7 +1509,7 @@
         {
           "turnId": "t8",
           "role": "USER",
-          "text": "그 전에 laptop 충전기만 꽂고 올게."
+          "text": "이제 notification은 muted라 편하게 continue할 수 있어."
         },
         {
           "turnId": "t9",
@@ -1537,7 +1537,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "전자레인지 안에 머그컵을 두고 온 게 생각났어, 꺼내올게."
         },
         {
           "turnId": "t4",
@@ -1547,7 +1547,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "컵은 찬장에 넣었고 문도 닫아뒀어."
         },
         {
           "turnId": "t6",
@@ -1575,7 +1575,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "책상 조명이 깜빡여서 플러그를 한 번 단단히 꽂을게."
         },
         {
           "turnId": "t3",
@@ -1611,7 +1611,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 coffee 좀 가져오고 이어가자."
+          "text": "잠깐, headphones firmware notice가 떴는데 창부터 닫을게."
         },
         {
           "turnId": "t3",
@@ -1621,7 +1621,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "아, phone call 하나만 받고 올게."
+          "text": "Update는 tonight로 미뤘고 소리는 그대로 잘 들려."
         },
         {
           "turnId": "t5",
@@ -1644,7 +1644,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "현관 매트가 문에 접혀 끼었네, 평평하게 펴고 올게."
         },
         {
           "turnId": "t3",
@@ -1654,7 +1654,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "모서리를 안쪽으로 밀어두니 문이 잘 닫힌다."
         },
         {
           "turnId": "t5",
@@ -1664,7 +1664,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "묻은 흙도 털어냈으니 이제 신경 쓰지 않아도 돼."
         },
         {
           "turnId": "t7",
@@ -1687,7 +1687,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "옆방 알람이 계속 울리네, 주인에게 메시지만 보내둘게."
         },
         {
           "turnId": "t3",
@@ -1715,7 +1715,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "창틀에 작은 벌레가 들어왔어, 종이컵으로 내보낼게."
         },
         {
           "turnId": "t3",
@@ -1725,7 +1725,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "밖으로 잘 날아갔고 방충망도 다시 닫았어."
         },
         {
           "turnId": "t5",
@@ -1748,7 +1748,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "I need to take a quick unrelated call."
+          "text": "My desk lamp flickered, so I'm reseating the plug before we continue."
         },
         {
           "turnId": "t3",
@@ -1804,7 +1804,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐, delivery가 와서 문만 열어 줄게."
+          "text": "Hold on, smart speaker가 갑자기 음악을 틀어서 stop할게."
         },
         {
           "turnId": "t3",
@@ -1814,7 +1814,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "그 전에 laptop 충전기만 꽂고 올게."
+          "text": "Voice command를 잘못 들은 것 같아, volume도 zero로 내렸어."
         },
         {
           "turnId": "t5",
@@ -1829,7 +1829,7 @@
         {
           "turnId": "t7",
           "role": "USER",
-          "text": "잠시 coffee 좀 가져오고 이어가자."
+          "text": "Speaker mic은 muted고 이제 우리 얘기만 이어가면 돼."
         },
         {
           "turnId": "t8",
@@ -1852,7 +1852,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "냉장고 위 달력이 떨어졌네, 자석을 하나 더 붙일게."
         },
         {
           "turnId": "t3",
@@ -1862,7 +1862,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "두 군데를 고정하니 종이가 더는 말리지 않아."
         },
         {
           "turnId": "t5",
@@ -1885,7 +1885,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "충전 케이블이 의자 바퀴에 걸렸어, 옆으로 빼둘게."
         },
         {
           "turnId": "t3",
@@ -1908,7 +1908,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "한숨 돌리고 계속 말할게."
+          "text": "커튼 사이로 햇빛이 너무 들어오네, 각도만 조금 바꿀게."
         },
         {
           "turnId": "t3",
@@ -1918,7 +1918,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠깐, 현관 벨이 울렸어."
+          "text": "화면 반사가 사라졌어, 이제 글씨가 잘 보인다."
         },
         {
           "turnId": "t5",
@@ -1954,7 +1954,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "그 전에 창문만 닫고 올게."
+          "text": "택배 포장지가 바람에 날리네, 종이류 상자에 넣고 올게."
         },
         {
           "turnId": "t3",
@@ -1964,7 +1964,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "테이프 조각까지 떼어내서 따로 버려뒀어."
         },
         {
           "turnId": "t5",
@@ -1974,7 +1974,7 @@
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "현관 주변도 정리됐으니 다시 이 대화에 집중하자."
         },
         {
           "turnId": "t7",
@@ -1997,7 +1997,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "잠시 물 한 잔 가져올게."
+          "text": "블루투스 키보드가 절전 모드에 들어갔네, 깨우고 올게."
         },
         {
           "turnId": "t3",
@@ -2020,7 +2020,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "아, 충전기부터 꽂고 이어가자."
+          "text": "식탁 위 꽃병 물이 흐려졌네, 새 물로 갈아주고 올게."
         },
         {
           "turnId": "t3",
@@ -2035,7 +2035,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "잠깐 전화가 와서 이것만 받을게."
+          "text": "줄기 끝도 조금 정리했더니 꽃이 다시 곧게 섰어."
         },
         {
           "turnId": "t6",

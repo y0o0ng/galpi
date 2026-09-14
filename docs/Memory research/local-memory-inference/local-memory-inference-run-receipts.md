@@ -3769,7 +3769,7 @@ rather than a new corpus-size contract.
 
 The canonical adaptive-growth fixture is
 `fixtures/local-memory-inference-p1b6-surface-batch-002.json`, raw SHA-256
-`db212aae0c1e5c5943cfe68b15cfa106f7a1cc8bd454a8d30320ab0c6a290456`.
+`552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334`.
 It contains 64 new items in 64 new source episodes. Every zero-accepted smoke
 skeleton receives at least one candidate. Deterministic deficit allocation is
 satisfied at TRAIN41 / DEV10 / FINAL_HELD_OUT13, skeleton-authoring CLEAR31 /
@@ -3780,10 +3780,16 @@ gold.
 
 The unchanged generic builder prepared
 `~/Downloads/p1b6-source-audit-batch-002-attempt-001.json`, raw SHA-256
-`cbf4a0ada611999bb26bb61f521e4559848044ec5729faf507e28af4f4c4a021`.
+`fb3f40c471299aeed79a5cab4da588e8c10602775ed91552e5ace887d4257072`.
 It binds the exact batch-002 bytes and frozen source-audit protocol and contains
 64 unique opaque rows with complete source turns plus canonical selected
 bundles. It contains no results or dispositions; attempt 001 has not run.
+
+Before audit, 103 repeated sentence-length side-context turns were rewritten
+for source naturalness. Every changed turn was outside selected evidence and
+anchors. The item-array digest and the ordered 64 canonical selected-bundle
+digest remained byte-identical; only full-source bytes and their dependent
+batch/packet bindings changed.
 
 Batch-001 remains closed at 30 accepted / 2 dataset-rejected. Batch-002 is
 AUTHORED with `sourceAuditCompleted: false` and `humanReviewCompleted: false`,

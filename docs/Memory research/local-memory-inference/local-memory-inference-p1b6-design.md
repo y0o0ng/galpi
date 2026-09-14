@@ -39,7 +39,9 @@ two rejected candidates do not count toward accepted-pool coverage. Adaptive-
 growth batch-002 is now authored with 64 new candidates, including at least one
 attempt for every frozen skeleton with zero accepted-smoke coverage. Its 64-row
 source-audit attempt-001 packet is prepared but has not run, so the accepted pool
-remains 30 and batch-002 HUMAN review has not occurred. Final corpus HUMAN gold
+remains 30 and batch-002 HUMAN review has not occurred. Before audit, repeated
+non-selected side-context turns were rewritten for source naturalness without
+changing any item definition or canonical visible bundle. Final corpus HUMAN gold
 is not frozen. HELD repeated review, training, raw-episode evaluation, private
 replay, and production remain UNOPENED/unchanged. The next step is batch-002
 source-audit attempt 001 in a fresh strong-model session. Do not redesign the

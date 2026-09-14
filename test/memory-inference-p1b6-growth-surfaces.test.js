@@ -24,6 +24,10 @@ const protocol = readJson(PROTOCOL_002);
 const acceptance = readJson(ACCEPTANCE);
 const exact56 = readJson(EXACT56);
 const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
+const PRE_NATURALNESS_ITEMS_SHA256 = '82667f84fe81bb70941a9ff80ca26e83ace0c063cb8576ccce2fb5ffe7a92794';
+const PRE_NATURALNESS_BUNDLES_SHA256 = 'c80817d06a6d7f5fb4198533310748f4f3a7d673c1c45007770b60e1a18b10cb';
+const PRE_NATURALNESS_TURN_STRUCTURE_SHA256 = '8934a22407461a016f7bafa3b6b2a0c597e2dc4f47829f72db14451c207bbd54';
+const PRE_NATURALNESS_BATCH_SHA256 = 'db212aae0c1e5c5943cfe68b15cfa106f7a1cc8bd454a8d30320ab0c6a290456';
 
 const ORDERS = {
   splits: ['TRAIN', 'DEV', 'FINAL_HELD_OUT'],
@@ -107,6 +111,10 @@ function normalizedConversation(turns) {
     .replace(/\p{N}+/gu, '#').replace(/[^\p{L}#]+/gu, '')}`).join('|');
 }
 
+function jsonSha256(value) {
+  return sha256RawBytes(Buffer.from(JSON.stringify(value)));
+}
+
 test('batch-002 validates as the 64-item current adaptive-growth tranche', () => {
   assert.equal(batch002.name, 'xion-local-memory-inference-p1b6-surface-batch-002-v1');
   assert.equal(batch002.batchId, 'p1b6-surface-batch-002');
@@ -119,6 +127,13 @@ test('batch-002 validates as the 64-item current adaptive-growth tranche', () =>
   assert.equal(protocol.authority.humanReviewCompleted, false);
   assert.equal(protocol.authority.finalCorpusHumanGoldFrozen, false);
   assert.equal(protocol.authority.trainingOccurred, false);
+  assert.equal(jsonSha256(batch002.items), PRE_NATURALNESS_ITEMS_SHA256);
+  assert.equal(jsonSha256(batch002.items.map(item =>
+    surfaces.renderHumanReviewText(batch002, item))), PRE_NATURALNESS_BUNDLES_SHA256);
+  assert.equal(jsonSha256(batch002.sourceEpisodes.map(episode => ({
+    sourceEpisodeId: episode.sourceEpisodeId,
+    turns: episode.turns.map(turn => ({ turnId: turn.turnId, role: turn.role })),
+  }))), PRE_NATURALNESS_TURN_STRUCTURE_SHA256);
 });
 
 test('accepted seed coverage and all tranche marginals are mechanically derived and satisfied', () => {
@@ -202,6 +217,20 @@ test('batch-002 identities, conversations, and families do not leak across batch
   }
 });
 
+test('batch-002 does not reuse exact sentence-length source scaffolding across episodes', () => {
+  const seen = new Map();
+  for (const episode of batch002.sourceEpisodes) {
+    for (const turn of episode.turns) {
+      const normalized = turn.text.normalize('NFKC').trim();
+      // Twelve Unicode code points catches sentence-like stock turns while allowing short acknowledgements.
+      if (Array.from(normalized).length < 12) continue;
+      assert.equal(seen.has(normalized), false,
+        `non-trivial exact turn reused across ${seen.get(normalized)} and ${episode.sourceEpisodeId}`);
+      seen.set(normalized, episode.sourceEpisodeId);
+    }
+  }
+});
+
 test('batch-002 evidence, anchors, fragments, and renderer stay canonical', () => {
   assert.equal(sha256RawBytes(fs.readFileSync(path.join(ROOT,
     'lib/memory-inference-p1b6-surfaces.js'))),
@@ -224,14 +253,18 @@ test('batch-002 source-audit attempt-001 packet is fresh, complete, and unrun', 
   const packet = audit.buildAuditPacket(rawBatch002);
   const packetBytes = Buffer.from(`${JSON.stringify(packet, null, 2)}\n`);
   const episodes = new Map(batch002.sourceEpisodes.map(row => [row.sourceEpisodeId, row]));
-  assert.equal(batchSha256, 'db212aae0c1e5c5943cfe68b15cfa106f7a1cc8bd454a8d30320ab0c6a290456');
+  assert.equal(batchSha256, '552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334');
   assert.equal(sha256RawBytes(packetBytes),
-    'cbf4a0ada611999bb26bb61f521e4559848044ec5729faf507e28af4f4c4a021');
+    'fb3f40c471299aeed79a5cab4da588e8c10602775ed91552e5ace887d4257072');
   assert.deepEqual(packet.sourceBatch, {
     identity: batch002.name, batchId: batch002.batchId, sha256: batchSha256,
   });
   assert.equal(packet.rows.length, 64);
   assert.equal(new Set(packet.rows.map(row => row.auditRowId)).size, 64);
+  assert.ok(packet.rows.every((row, index) => row.auditRowId
+    !== audit.opaqueAuditRowId(PRE_NATURALNESS_BATCH_SHA256, batch002.items[index].itemId)));
+  assert.equal(jsonSha256(packet.rows.map(row => row.selectedBundle)),
+    PRE_NATURALNESS_BUNDLES_SHA256);
   for (const [index, row] of packet.rows.entries()) {
     const item = batch002.items[index];
     assert.deepEqual(Object.keys(row), ['auditRowId', 'sourceEpisode', 'selectedBundle']);
