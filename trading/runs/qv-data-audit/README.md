@@ -9062,9 +9062,10 @@ blacklist 없음   실제로 WA에 설립된 등록인은 WA가 라벨에 가장
 (네 번째는 region에 공식 이름이 아예 없던 `0000087347`), **code로 강제 변환하지 않았다.**
 header·XBRL은 이 3건에서 `X0`(UNITED KINGDOM)로 일치한다.
 
-**이 정정은 결론에 불리한 방향으로 작용했다** — 정정 전 유일하게 남아 있던 Q1 반례
-(`0001492633`, header=XBRL=X0 인데 표지 WA)가 이 정정으로 사라졌다. 그래서 정정 뒤 숫자가
-정정 전보다 깨끗하다는 점을 명시한다.
+**이 정정은 결론에 유리한 방향으로 작용했다** — 정정 전 유일하게 남아 있던 Q1 반례
+(`0001492633`, header=XBRL=X0 인데 표지 WA)가 이 정정으로 **사라졌기** 때문이다. 즉 규칙을 실패
+양상을 **본 뒤에** 다듬었고, 그 결과 숫자가 정정 전보다 깨끗해졌다. 정정 전 실패는 바로 위에
+그대로 보존한다 — 그러므로 이 정정을 **독립적인 확인으로 읽으면 안 된다.**
 
 ### 5. accession 단위 화해 행렬 (상호배타 · 합 138)
 
@@ -9266,6 +9267,342 @@ B2 changed                NO      RelationInterval        NO      탄생 / class
 Option A implemented      NO      5A-3 / Gates            NO      returns / ranking            NO
 주 등록부 조회            NO      상용 vendor 조회        NO      유료 구매                    $0
 §10.46 수치 변경          NO      DB 변경                 NO      companyfacts/concept 사용    NO
+```
+
+## 10.48 XBRL-first 관할 관측 전수 census — 8,920 SOURCE_UNIT — 2026-09-15
+
+**승인된 source 계약(정책 B)으로 다시 잰 전수 census다. Phase 0 DATA ONLY.** production 코드 ·
+schema · `qv_xbrl` · `qv_submissions` · O2/O2-C · B2 · `RelationInterval` · 탄생 · class-id ·
+bundle · manifest를 하나도 바꾸지 않았다. 주 등록부 · 상용 vendor · `companyconcept`/`companyfacts`를
+호출하지 않았고 $0다. **표지(cover)는 이 census의 source cascade에 들어가지 않았다.**
+
+```text
+계약 정본   docs/trading/strategies/qv-jurisdiction-observation-design.md
+            CLOSED / FROZEN for Phase 0 jurisdiction-observation source selection
+계약 id     POLICY_B_XBRL_FIRST_HEADER_PROVISIONAL_FAIL_CLOSE
+
+handoff 기대   bc48ac66799e2defd6b4295a27d827171ee8732e
+실행 base      3e7a4ecbc21e24679340bc4e6925f5e22d4ac9d0
+접근일         2026-09-15
+```
+
+census 실행 중 `3e7a4ec`(`Repair P1-B6 batch-002 anchors and prepare audit`) 하나가 main에
+올라왔다. `git diff bc48ac6 3e7a4ec -- trading/ docs/trading/`는 **비어 있다** — QV 입력과 계약이
+실행 내내 바뀌지 않았다.
+
+### 1. 고정 입력 — §10.46 5종 · §10.47 4종 전부 검증
+
+```text
+§10.46  run.json b48d0a59…6f331 ✓ · source_units 602e4047…8137c ✓ 8,920행
+        observations 843078a7…06e3 ✓ 8,920행 · transitions 3a4144d9…c5439 ✓ 33행
+        aggregates 9f126b60…1afa7 ✓
+§10.47  selected_units a6e4a178…7ff1 ✓ 138행 · accession_evidence e3783f1b…d215c ✓ 138행
+        transition_reconciliation 921b3ff8…0cee38e633 ✓ 33행 · aggregates 2cbbd73d…a0068bb ✓
+```
+
+**identity discovery · formation 구성 · submissions 선택 · header census를 다시 돌리지 않았다.**
+선택된 accession과 `historical_usable_session`은 §10.46에서 고정된 그대로다.
+
+### 2. 조회 grain
+
+```text
+SOURCE_UNIT                      8,920
+선택된 filing                     8,742
+서로 다른 selected accession      8,726
+중복 accession 재사용                16   ← 같은 accession을 고른 formation row는 한 번만 조회했다
+NO_PRE_FORMATION_REGISTRANT_FILING  178   ← 조회할 accession이 없다
+```
+
+### 3. XBRL source 결과 (8,726 accession)
+
+```text
+XBRL_EXACT                3,416
+XBRL_ABSENT_NO_INSTANCE   4,698
+XBRL_ABSENT_FACT_MISSING    612
+XBRL_AMBIGUOUS                0
+XBRL_FETCH_INCOMPLETE         0
+```
+
+**부재 · 모호 · 전송 실패를 섞지 않았다.** 404 0건 · 전송 실패 0건이라 5,310건의 부재는 전부
+"그 자리에 자료가 없다"이지 "못 받았다"가 아니다.
+
+### 4. 화해 결과 (§15의 A~G · 상호배타 · 합 8,920)
+
+```text
+A  XBRL_EXACT + HEADER_EXACT  같은 code           3,110
+B  XBRL_EXACT + HEADER_EXACT  다른 code              62   ← SOURCE_DISAGREEMENT
+C  XBRL_EXACT + header 없음                          244
+D  XBRL 부재 + HEADER_EXACT  -> provisional       5,082
+E  XBRL 부재 + header 없음   -> 미해소               244
+F  XBRL_AMBIGUOUS                                      0
+G  SOURCE_INCOMPLETE (전송)                            0
+H  filing 없음                                        178
+```
+
+header·XBRL이 **둘 다 exact인 3,172건 중 62건이 불일치**했다(1.96%). 그 62건에서 최종값은 전부
+XBRL이고, header 값은 `header_code`에 그대로 남아 있다. **어느 행에서도 header가 exact XBRL을
+이기지 않았다.**
+
+### 5. 최종 authority 구성
+
+| 최종 상태 | SOURCE_UNIT | 가중 row |
+|---|---|---|
+| JURISDICTION_XBRL_EXACT | 3,416 | 3,432 |
+| JURISDICTION_HEADER_ONLY_PROVISIONAL | 5,082 | 5,100 |
+| JURISDICTION_UNRESOLVED | 244 | 244 |
+| JURISDICTION_SOURCE_INCOMPLETE | 178 | 183 |
+| 합계 | 8,920 | 8,959 |
+
+```text
+해소 합계   8,498 unit · 8,532 가중   (95.3% / 95.2%)
+미해소 244  = NO_INSTANCE+header없음 207 · FACT_MISSING+header없음 37
+```
+
+**해소 총량은 §10.46과 정확히 같다(8,498 / 8,532).** 바뀐 것은 *얼마나 많이* 해소되는지가 아니라
+**무엇이 그 값을 말하는가**와 **62건의 값 자체**다.
+
+> **해소분의 59.8%(5,082 / 8,498)가 `HEADER_ONLY_PROVISIONAL`이다.** 아래 모든 분포를 이 사실과
+> 함께 읽는다. provisional을 하나의 신뢰도 주장 안에 숨기지 않는다.
+
+### 6. 시기별 — XBRL-first가 실제로 작동하는 구간
+
+| 구간 | units | XBRL_EXACT | PROVISIONAL | 미해소 | filing없음 | 불일치 |
+|---|---|---|---|---|---|---|
+| 2008-2014 | 3,118 | **0** | 2,870 | 121 | 127 | **0** |
+| 2015-2021 | 3,344 | 968 | 2,205 | 122 | 49 | 19 |
+| 2022-2026 | 2,458 | 2,448 | 7 | 1 | 2 | 43 |
+
+**2008~2019 전 구간에서 XBRL_EXACT는 0이다.** 즉 그 구간에서 XBRL-first 계약은 아무것도 바꾸지
+않고, header가 여전히 유일한 source이며 그 값은 전부 provisional로 표시된다. 전환은 2020년에
+일어난다(2019년 0 → 2020년 482 / 487).
+
+| year | units | XBRL | PROV | 미해소 | filing없음 | 불일치 |
+|---|---|---|---|---|---|---|
+| 2008 | 417 | 0 | 377 | 14 | 26 | 0 |
+| 2009 | 438 | 0 | 403 | 14 | 21 | 0 |
+| 2010 | 448 | 0 | 415 | 15 | 18 | 0 |
+| 2011 | 446 | 0 | 415 | 16 | 15 | 0 |
+| 2012 | 453 | 0 | 417 | 19 | 17 | 0 |
+| 2013 | 455 | 0 | 418 | 21 | 16 | 0 |
+| 2014 | 461 | 0 | 425 | 22 | 14 | 0 |
+| 2015 | 465 | 0 | 430 | 23 | 12 | 0 |
+| 2016 | 470 | 0 | 434 | 24 | 12 | 0 |
+| 2017 | 473 | 0 | 437 | 25 | 11 | 0 |
+| 2018 | 479 | 0 | 448 | 24 | 7 | 0 |
+| 2019 | 480 | 0 | 451 | 25 | 4 | 0 |
+| 2020 | 487 | 482 | 2 | 1 | 2 | 9 |
+| 2021 | 490 | 486 | 3 | 0 | 1 | 10 |
+| 2022 | 493 | 489 | 2 | 0 | 2 | 9 |
+| 2023 | 491 | 489 | 2 | 0 | 0 | 10 |
+| 2024 | 491 | 490 | 1 | 0 | 0 | 8 |
+| 2025 | 491 | 490 | 0 | 1 | 0 | 8 |
+| 2026 | 492 | 490 | 2 | 0 | 0 | 8 |
+
+### 7. §10.47 회귀 검사 — 통과
+
+동결된 138개 accession에서 새 census의 XBRL 추출이 §10.47 결과를 **그대로 재현**했다.
+
+```text
+재현한 accession            138 / 138
+알려진 header/XBRL 불일치     15 / 15  → 새 계약에서 전부 XBRL code로 해소
+Ciena 필수 검사   CIK 0000936395 · 0001193125-26-267607
+                  XBRL_EXACT = DE · header = MD · 최종 DE · authority XBRL_EXACT
+                  source_disagreement = true                              ✓
+```
+
+### 8. 화해된 관할 분포
+
+```text
+resolved  SOURCE_UNIT 8,498 · 가중 8,532 · unique CIK 761 · distinct (cik,code) pair 785
+distinct code 45 (XBRL_EXACT 안에서만 보면 41)
+```
+
+| code | SOURCE_UNIT | 가중 | CIK 노출 | XBRL_EXACT : PROVISIONAL |
+|---|---|---|---|---|
+| DE | 5,338 | 5,364 | 505 | 2,207 : 3,131 |
+| MD | 359 | 359 | 30 | 141 : 218 |
+| NY | 256 | 256 | 20 | 86 : 170 |
+| OH | 245 | 245 | 18 | 82 : 163 |
+| VA | 168 | 168 | 11 | 74 : 94 |
+| PA | 151 | 151 | 18 | 53 : 98 |
+| L2 (IRELAND) | 145 | 147 | 17 | 91 : 54 |
+| NJ | 145 | 145 | 9 | 48 : 97 |
+| WA | 142 | 142 | 8 | 49 : 93 |
+| MN | 126 | 126 | 9 | 40 : 86 |
+| MA | 115 | 115 | 10 | 47 : 68 |
+| CA | 109 | 109 | 8 | 25 : 84 |
+| IN | 108 | 108 | 10 | 45 : 63 |
+| MO | 88 | 88 | 7 | 31 : 57 |
+| GA | 87 | 87 | 6 | 35 : 52 |
+
+```text
+공식 class (SOURCE_UNIT)  US_STATE_OR_TERRITORY 8,142 · FOREIGN_COUNTRY_CODE 356 (11개 code)
+DE 아닌 미국 주 unit      2,804
+해외   L2 145(17 CIK) · D0 58(10) · V8 54(6) · P7 26(3) · Y9 22(2) · P8 19(1) ·
+       X0 14(3) · N0 7(1) · R1 6(1) · X1 4(1) · U0 1(1)
+```
+
+§10.46 대비: DE 5,302→5,338 · DE CIK 500→505 · pair 790→785 · CA 121→109 · NY 264→256 ·
+VA 162→168. **CIK 노출은 겹칠 수 있으므로 비율을 100%로 맞추지 않았다.**
+
+### 9. Delaware 노출 — provisional 분리
+
+```text
+DE SOURCE_UNIT      5,338 / 8,498 = 62.81%
+DE 가중 row         5,364 / 8,532 = 62.87%
+DE 노출 unique CIK    505 /   761 = 66.36%
+
+DE 관측 중 XBRL_EXACT          2,207
+DE 관측 중 HEADER_ONLY_PROVISIONAL 3,131   ← DE 관측의 58.7%가 provisional이다
+```
+
+**provisional을 전부 버렸을 때(robustness check)**
+
+```text
+XBRL_EXACT만            3,416 unit · unique CIK 587
+그중 DE                 2,207 unit = 64.61%   ·  DE 노출 CIK 388 / 587 = 66.10%
+provisional로만 해소된 CIK  174
+```
+
+**Delaware 집중도는 provisional을 전부 제외해도 무너지지 않는다** — unit 기준 62.81% → 64.61%,
+CIK 기준 66.36% → 66.10%. 두 모집단이 시기적으로 완전히 다른데도(XBRL_EXACT는 사실상 2020년
+이후) 비율이 2%p 안에서 움직인다.
+
+### 10. source 불일치 62건
+
+```text
+unit 62 · unique CIK 22 · 2008-2014  0 · 2015-2021 19 · 2022-2026 43
+```
+
+```text
+header->XBRL   CA->DE 12 · NY->DE 8 · DC->DE 7 · IL->VA 6 · UT->X1 4 · IL->DE 4 · DE->R1 4 ·
+               CO->DE 3 · TX->DE 2 · MD->DE 2 · NC->DE 2 · P7->X0 2 · X1->DE 2 ·
+               X0->L2 1 · DE->IN 1 · DE->TX 1 · TX->MD 1
+```
+
+§10.47이 본 양상이 전수에서도 같다 — header가 가리킨 값이 대체로 **본사 소재지**이고 XBRL이
+설립 관할을 따로 적는다. **이 census는 그 해석을 표지로 다시 검증하지 않았다**(표지는 계약 밖이다).
+근거는 §10.47의 15/15이고 여기서는 계약을 적용만 했다.
+
+### 11. 관측된 code 변화 — 재분류
+
+§10.46의 33건은 **그 시점 header-first 해석의 산물**이고, 아래가 §10.48 계약의 transition set이다.
+**§10.46 receipt는 그대로 둔다.**
+
+```text
+§10.46   transitions 33 · 다관할 CIK 25
+§10.48   transitions 25 · 다관할 CIK 20
+
+XBRL_OBSERVED_CHANGE        4   (XBRL_EXACT -> XBRL_EXACT 만)
+PROVISIONAL_OBSERVED_CHANGE 21
+authority pair   PROV->XBRL 13 · PROV->PROV 8 · XBRL->XBRL 4
+```
+
+| CIK | 변화 | authority |
+|---|---|---|
+| 0000815097 | R1→D0 | XBRL→XBRL |
+| 0001045609 | DE→MD | XBRL→XBRL |
+| 0001318605 | DE→TX | XBRL→XBRL |
+| 0001679788 | DE→TX | XBRL→XBRL |
+
+**빠진 CIK 10개가 §10.47이 표지로 "바뀌지 않았다"고 판정한 바로 그 집합이다.**
+
+```text
+0000018230 0000029905 0000354190 0000718877 0000719955
+0000936395 0001103982 0001164727 0001687229 0001967680
+```
+
+즉 header-first가 만들던 유령 전이가 계약을 바꾸자 독립적으로 사라졌다. **다만 이것을 독립 확인으로
+읽지 않는다** — §10.47의 표지 증거와 이 계약은 같은 관측(XBRL)에 뿌리를 둔다.
+
+**새로 생긴 CIK 5개**는 header-first가 가리고 있던 변화다.
+
+```text
+0000006951(DC→DE) 0000109380(UT→X1) 0001002047(CA→DE) 0001045609(MD→DE→MD) 0001601712(NY→DE)
+```
+
+```text
+pair 분포  V8->L2 3 · DE->X0 2 · D0->V8 2 · CA->DE 2 · DE->TX 2 · 나머지
+           (DC->DE · CO->DE · UT->X1 · X0->L2 · OR->DE · MN->DE · DE->R1 · R1->D0 ·
+            MD->DE · DE->MD · DE->IN · NC->DE · P7->X0 · NY->DE) 각 1
+```
+
+**이 25건의 의미는 오직 "두 SEC 관측이 서로 다른 관할을 적었다"이다.** 법적 재설립 · 주 제출 사건 ·
+연속성 경계를 하나도 세우지 않는다. provisional이 낀 21건은 `PROVISIONAL_OBSERVED_CHANGE`이고
+**"corroborated transition"이 아니다.**
+
+### 12. 미해소 census
+
+```text
+HEADER_MISSING_NO_XBRL_INSTANCE   207      NO_PRE_FORMATION_REGISTRANT_FILING   178
+HEADER_MISSING_XBRL_FACT_MISSING   37      XBRL_AMBIGUOUS                         0
+SOURCE_FETCH_INCOMPLETE              0
+합계 422 SOURCE_UNIT · 가중 427
+```
+
+**그 CIK 전체에서 해소 관측이 하나도 없는 CIK 28개** — §10.46과 같은 집합이다.
+**이번 census도 그 공백을 추정으로 메우지 않았다(fail-close).**
+
+### 13. 조달 판정
+
+```text
+권고   DELAWARE_DEDICATED_PATH_FIRST   (§10.46 권고가 살아남았다)
+```
+
+§10.46의 권고를 그대로 물려받지 않고 화해된 분포로 다시 계산했고, 결론이 같았다. 세 가지를 함께 적는다.
+
+```text
+1  robustness  provisional을 전부 제외해도 DE는 unit 64.61% · CIK 66.10%다. 권고는 provisional
+               coverage에 의존하지 않는다 — 이번에 명시적으로 확인한 항목이다.
+2  "first"이지 "only"다 아니다  DE 밖에 미국 주 2,804 unit · 해외 11개 code 356 unit이 남는다.
+3  **분포 robustness ≠ legal-date completeness.** 이 census는 "어디를 사야 하는가"에만 답했다.
+   §10.41이 이미 쟀듯 Delaware 법적 기록(8 Del. C. 103조)은 존재하나 무료 자동 접근이 약관으로
+   금지돼 있다. 아무리 강한 Delaware 집중도도 **발효일 문제를 풀지 않는다.**
+```
+
+### 14. 실제 요청 · 런타임
+
+```text
+index_json 8,107 · FilingSummary 3,674 · candidate_xml 18,114     네트워크 요청 합계 29,895
+cache hit 2,609 (§10.46/§10.47 다운로드 재사용) · retry 5 · 404 0 · 전송 실패 0
+전송량 약 4.6 GB (4,598,969,428 B)     wall 16,449초 (약 4시간 34분) · 2 pass · 재개 0
+```
+
+`FETCH_INCOMPLETE 0` — 재시도 5건이 **source 부재로 둔갑하지 않았다.** SEC fair-access 간격
+(0.15초)을 지켰고 SEC 원본 문서는 커밋하지 않는다.
+
+### 15. 산출물 (gitignore · 커밋하지 않는다)
+
+```text
+trading/data/qv-1048-xbrl-first-jurisdiction-census/
+  accession_xbrl.jsonl           29f3e1ff4f18934457a38f080cfc9cddf63df797cf2b8787cae264e076a65187  8,726행
+  observations_reconciled.jsonl  c463f993211eb11f37bc5a62b08ceaa293280a4e1c08ce4ab38b59ecd30ea353  8,920행
+  transitions_reconciled.jsonl   15587c6a643cb7791005b70aa022b6c263ed2de95c7fa8015b3b796545a40be3     25행
+  aggregates.json                196c941873fd62180f06d3d612ef45cec95f69e90a54a5caf872a4aada6a613d
+  run.json                       024668a536bc876b64582d729a866d0a4d65eb7568d5d7a6b5b28e839e9e1f6a
+```
+
+### 16. 의미 경계 — 고정한다
+
+이 census가 세우는 것은 **관할 OBSERVATION과 노출**뿐이다.
+
+```text
+아님   법적 설립 발효 시점 · 주 제출 시점 · 재설립 발효 경계 · filing 앞뒤의 관할 연속성 ·
+       class 탄생 · RelationInterval · B2 연대기 · Option A 유효성
+```
+
+관측의 가용 시점은 §10.46의 `historical_usable_session` 그대로이고 **새 timestamp를 만들지 않았다.**
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      qv_xbrl changed              NO
+qv_submissions changed    NO      표지 parser production  NO      O2 / O2-C changed            NO
+B2 changed                NO      RelationInterval        NO      탄생 / class-id changed      NO
+Option A implemented      NO      5A-3 / Gates            NO      returns / ranking            NO
+주 등록부 조회            NO      상용 vendor 조회        NO      유료 구매                    $0
+§10.46 수치 변경          NO      §10.47 수치 변경        NO      DB 변경                      NO
+companyfacts/concept 사용 NO      법적 발효일 추론        NO      jurisdiction interval 생성   NO
 ```
 
 ## 11. 결과
