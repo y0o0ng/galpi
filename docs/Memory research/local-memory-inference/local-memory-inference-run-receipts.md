@@ -3885,3 +3885,33 @@ acceptance, final-gold freeze, HELD review, training, raw-episode evaluation,
 private replay, or production change occurred. The accepted pool remains 30.
 The next step is fresh strong-model batch-002 source-audit attempt 002; focused
 blind HUMAN re-review follows only after an all-PASS audit.
+
+#### P1-B6 adaptive-growth batch-002 incremental source re-audit attempt 002 and focused HUMAN re-review preparation — COMPLETE / PASS
+
+The repaired current batch remains bound to raw SHA-256
+`ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c`
+and full attempt-002 audit packet raw SHA-256
+`822c889903016a95ccfdff41f705863cd7116e0798d25915f4c445a894964f4d`.
+The repository-owner-supplied focused fresh audit result is
+`p1b6-source-audit-results.json`, raw SHA-256
+`62ab6fb085a504b1e4d6c5e5660cecea546109bd151cb4cbfcc26deb79404dad`.
+
+The canonical current receipt is
+`fixtures/local-memory-inference-p1b6-source-audit-batch-002-attempt-002.json`,
+raw SHA-256
+`c88f41043279c739d03c557fa35b73ae86f3890e0310b4993d9b67332ada889d`.
+It records effective 64 PASS / 0 FAIL / 0 UNCERTAIN authority truthfully as
+four fresh PASS rows plus 60 PASS rows carried forward from attempt 001 only
+after per-row exact `sourceEpisode` and `selectedBundle` equality. No changed
+row inherited prior authority, and historical attempt 001 remains immutable.
+
+The focused blind HUMAN re-review packet is prepared at
+`~/Downloads/p1b6-primary-human-rereview-batch-002-attempt-002.json`, raw
+SHA-256
+`f582776c81a51fb08f2e5cfe697b51be939aeb6533659e6038d80d391fffd2c9`.
+It contains four fresh opaque rows with only current canonical selected-bundle
+text. HUMAN re-review has not run, batch-002 dataset acceptance has not
+occurred, and the accepted pool remains 30. Final HUMAN gold, HELD review,
+training, raw-episode evaluation, private replay, and production remain
+unopened or unchanged. The next step is repository-owner focused blind HUMAN
+re-review of the four prepared rows.

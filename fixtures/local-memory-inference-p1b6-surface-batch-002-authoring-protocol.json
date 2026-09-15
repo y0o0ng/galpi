@@ -161,7 +161,7 @@
   "authority": {
     "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
     "generatorMetadataIsNeverHumanGold": true,
-    "sourceAuditCompleted": false,
+    "sourceAuditCompleted": true,
     "humanReviewCompleted": false,
     "finalCorpusHumanGoldFrozen": false,
     "trainingOccurred": false
@@ -170,8 +170,8 @@
     "This is a 64-candidate adaptive-growth execution tranche, not a new corpus-size contract.",
     "All 26 frozen skeletons with zero accepted smoke coverage receive at least one authored candidate; historical batch-002 source-audit attempt 001 passed all 64 rows and historical primary HUMAN review attempt 001 completed at 60 KEEP / 4 FIX / 0 REJECT and 55 CLEAR / 9 ESCALATE.",
     "Before audit, repeated non-selected and non-anchor side-context turns were rewritten for source naturalness without changing any item definition or canonical visible bundle.",
-    "The four FIX anchors received minimum anchorSpanRef-only repair without source or evidence changes; the repaired current batch has source-audit attempt 002 prepared but not run and requires focused blind HUMAN re-review after an all-PASS audit.",
-    "The repaired current batch records sourceAuditCompleted false and humanReviewCompleted false; batch-002 corpus acceptance has not occurred, and the combined accepted pool remains the 30 accepted smoke candidates.",
+    "The four FIX anchors received minimum anchorSpanRef-only repair without source or evidence changes; incremental source-audit attempt 002 is effective COMPLETE_PASS from 60 exact-unchanged carry-forward PASS rows plus four fresh PASS rows.",
+    "The repaired current batch records sourceAuditCompleted true and humanReviewCompleted false; the four-row focused blind HUMAN re-review packet is prepared but HUMAN re-review has not occurred, batch-002 corpus acceptance has not occurred, and the combined accepted pool remains the 30 accepted smoke candidates.",
     "Final corpus HUMAN gold is not frozen, and HELD repeated review, training, raw-episode evaluation, private replay, and production remain unopened or unchanged."
   ]
 }

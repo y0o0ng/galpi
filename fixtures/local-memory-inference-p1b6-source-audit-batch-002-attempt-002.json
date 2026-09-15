@@ -1,0 +1,362 @@
+{
+  "name": "xion-local-memory-inference-p1b6-source-audit-batch-002-attempt-002-receipt-v1",
+  "attemptId": "p1b6-source-audit-batch-002-attempt-002",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-source-audit-packet-v1",
+  "auditPacketSha256": "822c889903016a95ccfdff41f705863cd7116e0798d25915f4c445a894964f4d",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "batchId": "p1b6-surface-batch-002",
+    "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-source-audit-results.json",
+    "sha256": "62ab6fb085a504b1e4d6c5e5660cecea546109bd151cb4cbfcc26deb79404dad"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "USER_SUPPLIED_FOCUSED_FRESH_AUDIT_PLUS_MECHANICAL_CARRY_FORWARD",
+    "provider": "OpenAI",
+    "surface": "ChatGPT",
+    "model": "NOT_INDEPENDENTLY_RECOVERED_FROM_RESULT_ARTIFACT",
+    "reasoningSetting": "NOT_INDEPENDENTLY_RECOVERED_FROM_RESULT_ARTIFACT",
+    "sessionRelationship": "fresh/separate session reviewed only the four changed rows; 60 unchanged rows were mechanically carried forward from attempt 001 after exact sourceEpisode and selectedBundle equality"
+  },
+  "summary": {
+    "total": 64,
+    "PASS": 64,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassed": true,
+    "humanSemanticReviewOccurred": false,
+    "surfaceHumanGoldAssigned": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-audit-342ec0112d6a49e5",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-bea922c3673dbcce",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-06a7cd5e1a16beaa",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-935a86be8fa6f40c",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-e41dca06bc67b678",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-4c78d1a1190215bb",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-85188db2a7a45904",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-cee8078c3a60c188",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-6bd17b11c50d2a3f",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-6ba7424ec855cbc6",
+      "disposition": "PASS",
+      "reason": "The bundle preserves the photo-backup condition, the assistant's proposed automatic-backup action, and the user's confirmation; omitted turns concern unrelated plant cleanup."
+    },
+    {
+      "auditRowId": "p1b6-audit-5f870e7d48e1171c",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-78f6bd095745e087",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-fab63808c66ebfa2",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-df6e0ea243bc52c6",
+      "disposition": "PASS",
+      "reason": "The bundle preserves the correction from autoplay to subtitle settings, the specific always-on subtitle proposal, clarification of the target setting, and the user's confirmation; omitted turns are unrelated interruptions."
+    },
+    {
+      "auditRowId": "p1b6-audit-8f3a8ad0a57b0011",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-280519ab85a46ee4",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-2b592998d469d50c",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-7425eb9b4037de9a",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the complete source episode and faithfully preserves the meeting-notes topic, automatic shared-folder proposal, and user approval."
+    },
+    {
+      "auditRowId": "p1b6-audit-2b7f53fe8504437a",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-17852be9d4d09eb7",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-01cd24557d37619a",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-d656599aed385290",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-d58a446022d4339b",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-5b6c5e898a778c5f",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-a59975a6d9315d3c",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-4a07e488c3e66ca0",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ae95760b4d5f3c34",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-55f62ffd7f3b39ad",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-a27155cb0c99bae4",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-42a3b7b955765b5c",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-2ed279a11dea2296",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-a79a27699ef6f162",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-c818f09ab5698871",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-80c581a72d8bcaeb",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-1e43a8fbafe09921",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-0dfdcf900a0e180d",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-897d2cad1216c2c4",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-203cdbd2fbccf3f0",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-222f4dd831bde41c",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-519bab4532b1e6cf",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-7ab0c5419849a3a7",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-f733aeef57ae3e25",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ddc47f239150e94c",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-d6ed07733c087c79",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-e1ec940e3c9941e2",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-2d0cf33f34438f91",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-f9ea12a5e253d048",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-26b64c8208804b56",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-b32345f890d18dbb",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-965879c6fddf478f",
+      "disposition": "PASS",
+      "reason": "The selected bundle reproduces the complete source statement, including both laptop contexts and their differing battery-duration conditions, while the TARGET is directly source-grounded."
+    },
+    {
+      "auditRowId": "p1b6-audit-dff258bee40b42c7",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-96d60ff8eb0c3e40",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-cafc8a382f89bd46",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-72ef2ab1d9013792",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-3de4bfd2f54acdc0",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-cd7f9bd5c9f11c39",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-73afd6ff85177568",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-8ccd772f0d21b065",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-85dbf33ab6cca6cb",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-aee72eaf83df040a",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-ddb2fc79c0cc188f",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: The selected bundle covers the complete source episode."
+    },
+    {
+      "auditRowId": "p1b6-audit-f63ee1a0027c5367",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-7abb47f12178fcd6",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    },
+    {
+      "auditRowId": "p1b6-audit-192e6733b654d853",
+      "disposition": "PASS",
+      "reason": "Carried forward from batch-002 source-audit attempt 001 after exact sourceEpisode and selectedBundle equality. Prior reason: All candidate-relevant source evidence is selected; omitted turns are unrelated side context."
+    }
+  ]
+}

@@ -45,15 +45,16 @@ the batch-002 source/bundle gate is PASS. Primary blind HUMAN review completed
 for all 64 presented rows at 60 KEEP / 4 FIX / 0 REJECT and 55 CLEAR / 9
 ESCALATE; that attempt remains immutable historical evidence. Its four FIX
 anchors received the prescribed minimum `anchorSpanRef`-only repair, with no
-source-text or evidence-selection change. Because the visible anchors changed,
-the repaired current batch restarts the source-audit and focused HUMAN review
-path. Full 64-row source-audit attempt 002 is prepared but not run, and current
-`sourceAuditCompleted` and `humanReviewCompleted` are both false. Batch-002
-corpus acceptance has not occurred, the accepted pool remains 30, and final
-corpus HUMAN gold is not frozen. HELD repeated review, training, raw-episode
-evaluation, private replay, and production remain UNOPENED/unchanged. The next
-step is fresh strong-model batch-002 source-audit attempt 002; focused blind
-HUMAN re-review follows only after an all-PASS audit. Do not redesign the frozen
+source-text or evidence-selection change. Incremental source re-audit attempt
+002 is COMPLETE_PASS: 60 rows inherited PASS only after exact `sourceEpisode`
+and `selectedBundle` equality with attempt 001, and the four changed rows
+received fresh PASS judgments. The repaired current source/bundle gate is PASS,
+and a four-row focused blind HUMAN re-review packet is prepared; that HUMAN
+re-review has not occurred. Batch-002 corpus acceptance has not occurred, the
+accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
+repeated review, training, raw-episode evaluation, private replay, and
+production remain UNOPENED/unchanged. The next step is focused blind HUMAN
+re-review of exactly the four changed surfaces. Do not redesign the frozen
 skeleton catalog, generate training output, expose a model to FINAL surface
 items, or start training in this phase.
 

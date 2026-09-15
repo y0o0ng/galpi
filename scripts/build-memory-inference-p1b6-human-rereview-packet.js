@@ -38,6 +38,16 @@ const AUTHORITATIVE_REREVIEW_DECISIONS = new Map([
   ['p1b6-rereview-3103bdf5fda47336', ['KEEP', 'ESCALATE']],
   ['p1b6-rereview-5b1aab95130e93ee', ['KEEP', 'CLEAR']],
 ]);
+const BATCH002_REREVIEW = Object.freeze({
+  currentBatchSha256: 'ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c',
+  auditAttemptId: 'p1b6-source-audit-batch-002-attempt-002',
+  originalAttemptId: 'p1b6-primary-human-review-batch-002-attempt-001',
+  originalReceiptIdentity:
+    'xion-local-memory-inference-p1b6-primary-human-review-batch-002-attempt-001-receipt-v1',
+  originalBatchSha256: '552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334',
+  originalPacketSha256: 'e949dceb77e68dde278ef448eb17380645064573e187eb1cba7b24c673069fa5',
+  changedCount: 4,
+});
 
 function fail(message) {
   throw new TypeError(`P1-B6 primary HUMAN re-review packet ${message}`);
@@ -226,6 +236,131 @@ function buildRereviewPacket(rawBatchBytes, auditReceipt, rawOriginalPacketBytes
     sourceAuditAttempt: AUDIT_ATTEMPT_ID,
     originalPrimaryHumanAttempt: ORIGINAL_ATTEMPT_ID,
     originalPrimaryHumanPacketSha256: ORIGINAL_PACKET_SHA256,
+    rows,
+  };
+}
+
+function buildBatch002RereviewPacket(rawBatchBytes, auditReceipt,
+  rawOriginalPacketBytes, originalReceipt) {
+  const { batch, batchSha256, attemptId } = primaryReview.validateAuditReceipt(
+    auditReceipt, rawBatchBytes,
+  );
+  if (batchSha256 !== BATCH002_REREVIEW.currentBatchSha256
+    || attemptId !== BATCH002_REREVIEW.auditAttemptId
+    || sha256RawBytes(rawOriginalPacketBytes) !== BATCH002_REREVIEW.originalPacketSha256) {
+    fail('batch-002 current or historical binding is invalid');
+  }
+
+  const originalPacket = JSON.parse(Buffer.from(rawOriginalPacketBytes).toString('utf8'));
+  if (!exactKeys(originalPacket, [
+    'name', 'sourceBatch', 'rendererIdentity', 'sourceAuditAttempt', 'rows',
+  ]) || originalPacket.name !== primaryReview.PACKET_IDENTITY
+    || !exactKeys(originalPacket.sourceBatch, ['identity', 'sha256'])
+    || originalPacket.sourceBatch.identity !== batch.name
+    || originalPacket.sourceBatch.sha256 !== BATCH002_REREVIEW.originalBatchSha256
+    || originalPacket.rendererIdentity !== RENDERER_IDENTITY
+    || originalPacket.sourceAuditAttempt !== 'p1b6-source-audit-batch-002-attempt-001'
+    || !Array.isArray(originalPacket.rows) || originalPacket.rows.length !== batch.items.length
+    || !exactKeys(originalReceipt, [
+      'name', 'attemptId', 'status', 'primaryHumanReviewPacket', 'reviewedSourceBatch',
+      'rendererIdentity', 'sourceAuditPrerequisite', 'summary', 'authority', 'rows',
+    ]) || originalReceipt.name !== BATCH002_REREVIEW.originalReceiptIdentity
+    || originalReceipt.attemptId !== BATCH002_REREVIEW.originalAttemptId
+    || originalReceipt.status !== 'COMPLETE_NEEDS_FIX'
+    || !exactKeys(originalReceipt.primaryHumanReviewPacket, ['identity', 'rawSha256'])
+    || originalReceipt.primaryHumanReviewPacket.identity !== primaryReview.PACKET_IDENTITY
+    || originalReceipt.primaryHumanReviewPacket.rawSha256
+      !== BATCH002_REREVIEW.originalPacketSha256
+    || !exactKeys(originalReceipt.reviewedSourceBatch, ['identity', 'rawSha256'])
+    || originalReceipt.reviewedSourceBatch.identity !== batch.name
+    || originalReceipt.reviewedSourceBatch.rawSha256
+      !== BATCH002_REREVIEW.originalBatchSha256
+    || originalReceipt.rendererIdentity !== RENDERER_IDENTITY
+    || !exactKeys(originalReceipt.sourceAuditPrerequisite,
+      ['attemptId', 'status', 'allRowsPassed'])
+    || originalReceipt.sourceAuditPrerequisite.attemptId
+      !== 'p1b6-source-audit-batch-002-attempt-001'
+    || originalReceipt.sourceAuditPrerequisite.status !== 'COMPLETE_PASS'
+    || originalReceipt.sourceAuditPrerequisite.allRowsPassed !== true
+    || JSON.stringify(originalReceipt.summary) !== JSON.stringify({
+      total: 64, KEEP: 60, FIX: 4, REJECT: 0, CLEAR: 55, ESCALATE: 9,
+    })
+    || !exactKeys(originalReceipt.authority, [
+      'reviewCompletedForAllPresentedRows', 'acceptedKeepCount', 'unresolvedFixCount',
+      'humanReviewGateClosed', 'surfaceHumanGoldFrozen', 'decisionsSource',
+      'modelInferenceUsedForHumanDecisions', 'trainingOccurred',
+    ]) || originalReceipt.authority.reviewCompletedForAllPresentedRows !== true
+    || originalReceipt.authority.acceptedKeepCount !== 60
+    || originalReceipt.authority.unresolvedFixCount !== BATCH002_REREVIEW.changedCount
+    || originalReceipt.authority.humanReviewGateClosed !== false
+    || originalReceipt.authority.surfaceHumanGoldFrozen !== false
+    || originalReceipt.authority.decisionsSource
+      !== 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER'
+    || originalReceipt.authority.modelInferenceUsedForHumanDecisions !== false
+    || originalReceipt.authority.trainingOccurred !== false
+    || !Array.isArray(originalReceipt.rows)
+    || originalReceipt.rows.length !== batch.items.length) {
+    fail('batch-002 original primary HUMAN binding is invalid');
+  }
+
+  const packetRows = new Map();
+  for (const row of originalPacket.rows) {
+    if (!exactKeys(row, ['reviewRowId', 'selectedBundle'])
+      || typeof row.reviewRowId !== 'string' || typeof row.selectedBundle !== 'string'
+      || !row.selectedBundle || packetRows.has(row.reviewRowId)) {
+      fail('batch-002 original packet rows are invalid or duplicate');
+    }
+    packetRows.set(row.reviewRowId, row);
+  }
+  const decisions = new Map();
+  for (const row of originalReceipt.rows) {
+    const keys = row.disposition === 'FIX'
+      ? ['reviewRowId', 'disposition', 'decision', 'reason']
+      : ['reviewRowId', 'disposition', 'decision'];
+    if (!exactKeys(row, keys) || !packetRows.has(row.reviewRowId)
+      || decisions.has(row.reviewRowId)
+      || !['KEEP', 'FIX', 'REJECT'].includes(row.disposition)
+      || !['CLEAR', 'ESCALATE'].includes(row.decision)
+      || (row.disposition === 'FIX' && (typeof row.reason !== 'string' || !row.reason.trim()))) {
+      fail('batch-002 original receipt rows are invalid or duplicate');
+    }
+    decisions.set(row.reviewRowId, row);
+  }
+  if (decisions.size !== packetRows.size) fail('batch-002 original review rows are incomplete');
+
+  const changed = [];
+  const fixes = [];
+  for (const item of batch.items) {
+    const originalId = primaryReview.opaqueReviewRowId(
+      BATCH002_REREVIEW.originalBatchSha256, item.itemId,
+    );
+    const originalRow = packetRows.get(originalId);
+    const decision = decisions.get(originalId);
+    if (!originalRow || !decision) fail('batch-002 item has no original review row');
+    const selectedBundle = renderHumanReviewText(batch, item);
+    if (selectedBundle !== originalRow.selectedBundle) changed.push({ item, selectedBundle });
+    if (decision.disposition === 'FIX') fixes.push(item.itemId);
+  }
+  if (changed.length !== BATCH002_REREVIEW.changedCount
+    || fixes.length !== BATCH002_REREVIEW.changedCount
+    || changed.some(({ item }) => !fixes.includes(item.itemId))) {
+    fail('batch-002 changed bundle set does not exactly match historical FIX rows');
+  }
+
+  const rows = changed.map(({ item, selectedBundle }) => ({
+    reviewRowId: opaqueRereviewRowId(batchSha256, item.itemId),
+    selectedBundle,
+  })).sort((left, right) => left.reviewRowId < right.reviewRowId ? -1 : 1);
+  if (new Set(rows.map(row => row.reviewRowId)).size !== BATCH002_REREVIEW.changedCount) {
+    fail('batch-002 fresh re-review row IDs are not unique');
+  }
+  return {
+    name: PACKET_IDENTITY,
+    sourceBatch: { identity: batch.name, sha256: batchSha256 },
+    rendererIdentity: RENDERER_IDENTITY,
+    sourceAuditAttempt: attemptId,
+    originalPrimaryHumanAttempt: BATCH002_REREVIEW.originalAttemptId,
+    originalPrimaryHumanPacketSha256: BATCH002_REREVIEW.originalPacketSha256,
     rows,
   };
 }
@@ -493,6 +628,7 @@ module.exports = {
   SMOKE_ACCEPTANCE_IDENTITY,
   SKELETON_MISMATCH_REASON,
   buildSmokeBatchAcceptance,
+  buildBatch002RereviewPacket,
   buildEffectiveHumanDecisionSet,
   buildRereviewPacket,
   classifySmokeAcceptance,
