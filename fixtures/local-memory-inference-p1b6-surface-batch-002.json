@@ -2347,9 +2347,9 @@
       "sourceEpisodeId": "p1b6-se-b002-010",
       "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
       "anchorSpanRef": {
-        "turnId": "t5",
+        "turnId": "t1",
         "startByte": 0,
-        "endByte": 6
+        "endByte": 13
       },
       "evidenceSpanRefs": [
         {
@@ -2463,9 +2463,9 @@
       "sourceEpisodeId": "p1b6-se-b002-014",
       "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
       "anchorSpanRef": {
-        "turnId": "t7",
-        "startByte": 0,
-        "endByte": 14
+        "turnId": "t1",
+        "startByte": 45,
+        "endByte": 58
       },
       "evidenceSpanRefs": [
         {
@@ -2589,9 +2589,9 @@
       "sourceEpisodeId": "p1b6-se-b002-018",
       "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
       "anchorSpanRef": {
-        "turnId": "t3",
+        "turnId": "t1",
         "startByte": 0,
-        "endByte": 6
+        "endByte": 9
       },
       "evidenceSpanRefs": [
         {
@@ -3518,8 +3518,8 @@
       "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
       "anchorSpanRef": {
         "turnId": "t1",
-        "startByte": 36,
-        "endByte": 59
+        "startByte": 0,
+        "endByte": 32
       },
       "evidenceSpanRefs": [
         {

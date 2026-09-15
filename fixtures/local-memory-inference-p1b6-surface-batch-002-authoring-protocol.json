@@ -156,21 +156,22 @@
   "outputBatch": {
     "name": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
     "path": "fixtures/local-memory-inference-p1b6-surface-batch-002.json",
-    "sha256": "552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334"
+    "sha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
   },
   "authority": {
     "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
     "generatorMetadataIsNeverHumanGold": true,
-    "sourceAuditCompleted": true,
-    "humanReviewCompleted": true,
+    "sourceAuditCompleted": false,
+    "humanReviewCompleted": false,
     "finalCorpusHumanGoldFrozen": false,
     "trainingOccurred": false
   },
   "scope": [
     "This is a 64-candidate adaptive-growth execution tranche, not a new corpus-size contract.",
-    "All 26 frozen skeletons with zero accepted smoke coverage receive at least one authored candidate; all 64 batch-002 candidates passed source audit and received primary HUMAN review.",
+    "All 26 frozen skeletons with zero accepted smoke coverage receive at least one authored candidate; historical batch-002 source-audit attempt 001 passed all 64 rows and historical primary HUMAN review attempt 001 completed at 60 KEEP / 4 FIX / 0 REJECT and 55 CLEAR / 9 ESCALATE.",
     "Before audit, repeated non-selected and non-anchor side-context turns were rewritten for source naturalness without changing any item definition or canonical visible bundle.",
-    "Primary HUMAN review completed for all 64 presented rows at 60 KEEP / 4 FIX / 0 REJECT and 55 CLEAR / 9 ESCALATE; four FIX rows remain unresolved, so the HUMAN gate is not closed and batch-002 corpus acceptance has not occurred.",
-    "The combined accepted pool remains the 30 accepted smoke candidates; final corpus HUMAN gold is not frozen, and HELD repeated review, training, raw-episode evaluation, private replay, and production remain unopened or unchanged."
+    "The four FIX anchors received minimum anchorSpanRef-only repair without source or evidence changes; the repaired current batch has source-audit attempt 002 prepared but not run and requires focused blind HUMAN re-review after an all-PASS audit.",
+    "The repaired current batch records sourceAuditCompleted false and humanReviewCompleted false; batch-002 corpus acceptance has not occurred, and the combined accepted pool remains the 30 accepted smoke candidates.",
+    "Final corpus HUMAN gold is not frozen, and HELD repeated review, training, raw-episode evaluation, private replay, and production remain unopened or unchanged."
   ]
 }

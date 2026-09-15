@@ -3856,3 +3856,32 @@ semantic model inference, raw-episode evaluation, private replay, and
 production remain unopened or unchanged. The next step is a separate minimum
 repair, re-audit, and focused blind HUMAN re-review cycle for the four FIX
 rows.
+
+#### P1-B6 adaptive-growth batch-002 minimum anchor repair and source-audit attempt 002 preparation — REPAIRED / AUDIT_NOT_RUN
+
+Historical primary HUMAN attempt 001 remains immutable at 60 KEEP / 4 FIX / 0
+REJECT and 55 CLEAR / 9 ESCALATE, bound to pre-repair batch raw SHA-256
+`552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334`.
+The four prescribed construction fixes changed only `anchorSpanRef` for
+`p1b6-item-b002-010`, `p1b6-item-b002-014`, `p1b6-item-b002-018`, and
+`p1b6-item-b002-050`. No source episode, role, turn, evidence span, skeleton,
+split, language, discourse pattern, family identity, or other item field
+changed. Restoring only the four historical anchors mechanically reproduces
+the exact pre-repair batch bytes.
+
+The repaired current batch raw SHA-256 is
+`ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c`.
+The unchanged canonical builder prepared the full 64-row packet at
+`~/Downloads/p1b6-source-audit-batch-002-attempt-002.json`, raw SHA-256
+`822c889903016a95ccfdff41f705863cd7116e0798d25915f4c445a894964f4d`.
+It binds the repaired batch SHA, contains 64 unique fresh opaque audit IDs, and
+has no results or dispositions. Exactly the four repaired canonical visible
+bundles differ from the historical primary HUMAN packet; the other 60 are
+byte-identical.
+
+Current `sourceAuditCompleted` and `humanReviewCompleted` are false. No audit
+adjudication, HUMAN re-review, skeleton reconciliation, batch-002 dataset
+acceptance, final-gold freeze, HELD review, training, raw-episode evaluation,
+private replay, or production change occurred. The accepted pool remains 30.
+The next step is fresh strong-model batch-002 source-audit attempt 002; focused
+blind HUMAN re-review follows only after an all-PASS audit.
