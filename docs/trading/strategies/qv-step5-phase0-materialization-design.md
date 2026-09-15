@@ -1732,6 +1732,41 @@ accounting과 issuer ME의 join · Q/V raw value · 백분위 랭크 · 50:50 QV
 상위 20% 선택 · execution security 선택 · `coverage_start` · Gate A~H 판정 ·
 look-ahead audit/sentinel · 수익률.
 
+### Research fast path — production identity 완성 없이 coverage만 잰다 (**RESEARCH ONLY**)
+
+**사용자 결정이다.** production-grade 법적 share-class identity 완성을 "QV 연구가 가능한가"를
+보기 위한 전제 조건에서 뺐다. 위 5A-1 → 5A-3 → 5B 순서와 production 계약(identity bundle ·
+`qv-class-id-v1` · B1/B2 · O2/O2-C · P2 · C3 · binding · issuer ME · `qv-accounting-v3` ·
+factor · gate 문턱)은 **그대로 CLOSED이고 production의 정본이다.**
+
+```text
+research identity   RESEARCH_SELECTED_CIK — formation-local
+                    "이 formation/member episode에서 동결된 Phase 0 identity 증거가 SEC 등록인
+                     CIK X를 골랐다"는 뜻뿐이다. economic issuer · legal share class · CIK 간
+                     연속성 · class 수명이 아니다. production identity 표에 쓰지 않는다.
+research grain      (formation_session, selected_cik) — 같은 CIK의 여러 PIT security는 하나다
+SIC · accounting    동결된 historical_sic · qv-accounting-v3 · accounting_for_formation 그대로
+research ME         RESEARCH_SINGLE_CLASS_ME — 단순 단일 class일 때만
+                    membership security 정확히 하나 · 차원 없는 A/B shares (tier 규칙 그대로) ·
+                    class 축 주식수 fact 없음 · 같은 filing 표지가 보통주 상장 심볼 하나와 양립 ·
+                    S1 창 · PIT 가용 · 주식수 basis와 D 사이 vendor split 없음 · D raw close
+```
+
+**복잡하면 풀지 않는다.** 여러 membership security · class 축 주식수 · 표지의 여러 보통주
+심볼 · split 경계는 전부 `MISSING`이고, class를 고르거나 비율로 정규화하지 않는다.
+**research ME는 법적 class 수명 · 다른 class의 부재 · 전환권 · 비상장 class 가치를 세우지
+않는다.**
+
+**누락은 증거 확장을 촉발하지 않는다.** 이 경로의 결손은 governing instrument · 주 등록부 ·
+법적 발효일 · 관할 · manifest 확장 · 새 SEC probe 어느 것도 열지 않는다. 산출물은 coverage /
+attrition 결과이지 다음 연구 대기열이 아니다.
+
+**목적은 하나다** — production 법적 identity를 먼저 완성하지 않고도 Phase 0 coverage에 닿을
+수 있는지 판정하는 것. 판정은 coverage preflight일 뿐이고 Gate D~H · 수동 audit · sentinel은
+여전히 별도다. 구현은 `backtest/qv_research_fastpath.py` ·
+`selftest/qv_phase0_research_fastpath.py`, 결과는 `trading/runs/qv-data-audit/README.md`의
+research fast-path receipt다.
+
 ---
 
 ## 2. 이 단계가 하지 않는 것

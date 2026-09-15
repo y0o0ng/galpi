@@ -9605,6 +9605,266 @@ Option A implemented      NO      5A-3 / Gates            NO      returns / rank
 companyfacts/concept 사용 NO      법적 발효일 추론        NO      jurisdiction interval 생성   NO
 ```
 
+## 10.49 research fast-path coverage preflight — 8,965 research issuer-formation — 2026-09-16
+
+**사용자 결정으로 만든 RESEARCH-ONLY 경로다.** production-grade 법적 share-class identity 완성을
+"QV 연구가 가능한가"의 전제 조건에서 뺐다. production 계약은 하나도 바꾸지 않았다 —
+identity bundle · `qv-class-id-v1` · B1/B2 · O2/O2-C · P2 · C3 · `RelationInterval` · binding ·
+issuer ME · `qv-accounting-v3` · factor · gate 문턱 전부 CLOSED 그대로다. manifest에 연구용
+identity를 쓰지 않았고 사용자 DB는 **읽기 전용**으로만 붙였다. **수익률을 계산하지 않았다.**
+
+```text
+handoff 기대 / 실행 base     255ad03db1961c2517cb64160557d25b84bafcbe
+이 receipt의 base            9ccdb7add7ef47c918ecf72308fafb81318ffe23
+                             실행 중 다른 트랙(Local Memory P1-B6 · agent workflow)이 main을 전진시켰다
+                             git diff 255ad03..9ccdb7a -- trading/ docs/trading/ = 비어 있음
+계약 정본                    docs/trading/strategies/qv-step5-phase0-materialization-design.md
+                             (5B 아래 research fast path 절)
+구현                         backtest/qv_research_fastpath.py · selftest/qv_phase0_research_fastpath.py
+접근일                       2026-09-15 ~ 2026-09-16
+```
+
+### 1. 고정 입력 — 5A-1 / 5A-2 artifact 해시 검증
+
+```text
+qv-5a1-v3-inventory.json      dc13cae6…a8ceba ✓      qv-5a2-legal-proposals.json  b68813de…64cfc5 ✓
+identity_source_version       qv-identity-sha256:de239b12…8914be
+```
+
+**CIK를 새로 찾지 않았다.** `RESEARCH_SELECTED_CIK`은 5A-2 proposal의 `selected_cik`(8,959행)과
+production manifest issuer CIK(61행)에서만 온다.
+
+### 2. population — 9,464가 아니라 9,525에서 시작한다
+
+prompt가 기대한 경계는 9,464 / 8,959 / 505였는데, 그것은 **5A-2가 요구한 UNMAPPED 행만**이다.
+5A-1 inventory에는 이미 manifest에 매핑된 61행(NKE · CMCSA · GOOG · GOOGL · UA · UAA)이 더 있다.
+
+```text
+formation security 행          9,525      selected CIK 있음   9,020      IDENTITY_MISSING   505
+research issuer-formation      8,965      unique CIK            789      다중 security 55
+```
+
+**그 61행을 빼면 이미 아는 multi-class 발행사가 조용히 빠져 coverage가 올라간다.** 그래서 넣고
+provenance로 갈라 보고한다 — 아래 §9에 그 45개 nonfinancial 행의 결과가 따로 있다.
+
+### 3. 방법 — 무엇이 동결 코드이고 무엇이 연구용인가
+
+```text
+동결 그대로   parse_filing_sic · historical_sic · qv-accounting-v3(fetch_bundle · resolve_accounting ·
+              accounting_for_formation) · qv_xbrl candidate/instance 판정 · qv_shares의 tier·D0 모양·
+              accession 내 중복 병합 · _historical_usable_session
+연구용 신규   RESEARCH_SELECTED_CIK grain · 차원 없는 단일 class ME 후보 선택 · 표지 정합성 ·
+              split guard · coverage/attrition 집계
+```
+
+`RESEARCH_SINGLE_CLASS_ME` 자격은 전부 만족해야 한다 — membership security 정확히 하나 ·
+S1 창(t-1년 1월 1일 ~ D) · `historical_usable_session <= formation` · **class 축 주식수 fact 없음** ·
+차원 없는 A/B(동결 tier 규칙: 구조적으로 존재하는 A가 소유하고 모호한 A는 B로 내려가지 않는다) ·
+같은 filing 표지가 보통주 상장 심볼 하나와 양립 · 주식수 basis와 D 사이 vendor split 없음 ·
+D의 raw close 존재.
+
+**복잡하면 풀지 않았다.** class를 고르거나 비율로 정규화하거나 총계를 한 class로 보지 않았다.
+
+> **전송 계층만 바꾼 것 셋(의미는 그대로).** ① `Accept-Encoding: gzip` — 1.37MB linkbase가
+> 102KB로 오고 푼 바이트는 원문과 동일함을 확인했다. ② SIC header는 `-index-headers.html`의
+> `<PRE>`를 unescape해서 읽는다 — 동결 `parse_filing_sic`은 그 페이지 원문에서 HTML 주석 안
+> `</SEC-HEADER>`에 먼저 걸려 `MISSING`을 돌려준다. 같은 accession의 complete submission header와
+> **6/6 일치**를 확인했다. ③ 후보 XML은 앞 8KB로 **root 요소만** 보고 instance가 아니면 건너뛴다
+> (파일명 판정이 아니다).
+
+### 4. attrition — 이번 작업의 주 산출물
+
+```text
+formation security 행                9,525
+  -> selected CIK                    9,020   (94.7%)      IDENTITY_MISSING            505
+  -> research issuer-formation       8,965
+  -> historical SIC EXACT            8,781   (98.0%)      classification missing      184
+  -> nonfinancial denominator        7,144                financial                 1,637
+```
+
+nonfinancial 7,144 기준 **독립 가용성**과 **누적 chain**을 함께 적는다(ME는 accounting과 독립이라
+두 축을 한 줄로 합치지 않는다).
+
+| 항목 | 독립 가용 | 비율 | 누적 chain | 누적 비율 |
+|---|---|---|---|---|
+| Gross Profit | 3,579 | 50.1% | 3,579 | 50.1% |
+| Total Assets | 5,408 | 75.7% | 3,476 | 48.7% |
+| GPA (Q) | 3,476 | 48.7% | 3,476 | 48.7% |
+| Book Equity (>0) | 4,290 | 60.1% | 2,771 | 38.8% |
+| issuer ME | 5,124 | 71.7% | 2,252 | 31.5% |
+| **joint QV** | **2,252** | **31.5%** | | |
+
+`classification_missing` 184를 denominator에 포함하면 joint 30.7% · ME 69.9%다.
+
+### 5. 연도별 (nonfinancial)
+
+| year | n | GP | Assets | GPA | BE | ME | joint | joint cov | ME cov |
+|---|---|---|---|---|---|---|---|---|---|
+| 2008 | 316 | 0 | 0 | 0 | 0 | 0 | 0 | 0.000 | 0.000 |
+| 2009 | 343 | 0 | 0 | 0 | 0 | 7 | 0 | 0.000 | 0.020 |
+| 2010 | 357 | 0 | 0 | 0 | 0 | 236 | 0 | 0.000 | 0.661 |
+| 2011 | 355 | 161 | 286 | 161 | 192 | 290 | 96 | 0.270 | 0.817 |
+| 2012 | 361 | 203 | 328 | 203 | 210 | 299 | 111 | 0.307 | 0.828 |
+| 2013 | 366 | 201 | 335 | 201 | 235 | 291 | 117 | 0.320 | 0.795 |
+| 2014 | 373 | 218 | 349 | 218 | 264 | 287 | 127 | 0.340 | 0.769 |
+| 2015 | 374 | 208 | 336 | 208 | 262 | 296 | 129 | 0.345 | 0.791 |
+| 2016 | 375 | 213 | 343 | 212 | 274 | 301 | 137 | 0.365 | 0.803 |
+| 2017 | 374 | 214 | 347 | 212 | 289 | 303 | 150 | 0.401 | 0.810 |
+| 2018 | 379 | 224 | 356 | 220 | 286 | 313 | 148 | 0.391 | 0.826 |
+| 2019 | 383 | 259 | 358 | 256 | 293 | 302 | 168 | 0.439 | 0.789 |
+| 2020 | 393 | 265 | 364 | 259 | 292 | 313 | 167 | 0.425 | 0.796 |
+| 2021 | 400 | 257 | 360 | 250 | 300 | 320 | 169 | 0.422 | 0.800 |
+| 2022 | 399 | 185 | 289 | 136 | 234 | 323 | 92 | 0.231 | 0.810 |
+| 2023 | 400 | 251 | 356 | 236 | 300 | 320 | 168 | 0.420 | 0.800 |
+| 2024 | 401 | 246 | 340 | 239 | 291 | 313 | 167 | 0.416 | 0.781 |
+| 2025 | 398 | 237 | 331 | 233 | 284 | 308 | 154 | 0.387 | 0.774 |
+| 2026 | 397 | 237 | 330 | 232 | 284 | 302 | 152 | 0.383 | 0.761 |
+
+**2008~2010은 XBRL 이전이라 accounting이 구조적으로 0이다.** 2011 이후에도 joint는 27~44%이고
+85%에 닿은 해가 하나도 없다.
+
+### 6. 무엇이 막고 있는가 — ME가 아니라 accounting이다
+
+```text
+GROSS_PROFIT_MISSING       2,459      PERIOD_FAIL_CLOSE          1,003 (984건이 DPE_MISSING · 대부분 2008-2010)
+BOOK_EQUITY_UNRESOLVED       569      ASSETS_MISSING/AMBIGUOUS     103
+BOOK_EQUITY_NONPOSITIVE      136      ACCOUNTING_NO_ANNUAL_FILING   103
+AVAILABLE (Q와 BE 둘 다)   2,771
+```
+
+GP 실패의 실제 모양은 셋이다.
+
+```text
+COGS_MISSING                 1,322   표준 COGS 개념을 태그하지 않은 발행사 (custom tag 유사도 연결은 계약상 금지)
+NO_INCOME_STATEMENT_ROLE       733   손익계산서 role 미해결 629 · 모호 104
+COGS_AMBIGUOUS                 331
+```
+
+**2022 formation의 하락(GPA 136)은 우연이 아니다.** FY2021 filing에서 대차대조표
+`UNRESOLVED_STATEMENT_ROLE`이 89건으로 튄다(2021년 14 · 2023년 20), 그것이 `NO_BALANCE_SHEET_ROLE`
+104건으로 이어졌다. **원인을 파지 않았고 고치지 않았다** — 이 run은 계약을 적용만 한다.
+
+### 7. ME — 연구 경로는 실제로 붙었다
+
+```text
+RESEARCH_SINGLE_CLASS_ME            5,124      STRICT_PRODUCTION_ME                     0
+ME_MISSING_SHARE_FACT               1,224      ME_MISSING_COMPLEX_CLASS_STRUCTURE     754
+ME_MISSING_SPLIT_BOUNDARY              36      ME_SOURCE_INCOMPLETE                     6
+```
+
+```text
+NO_CANDIDATE_IN_S1_WINDOW      775   (대부분 XBRL 이전 구간)
+TIER_A_PRESENT_NOT_USABLE      445   동결 tier 규칙 — 모호/사용불가 A는 B로 내려가지 않는다
+CLASS_AXIS_SHARE_FACT          626   MULTIPLE_MEMBERSHIP_SECURITIES     50
+COVER_SYMBOL_NOT_IDENTITY_SYMBOL 45  COVER_MULTIPLE_COMMON_SYMBOLS      33
+split BETWEEN_INSTANT_AND_D     23   split BETWEEN_D_AND_ACCEPTANCE     13
+```
+
+**`STRICT_PRODUCTION_ME`는 0인데 그것은 측정 결과가 아니라 구조다** — 사용자 DB의
+`qv_issuer_market_equity`를 포함한 production `qv_*` 표가 전부 비어 있다(5A-3 미실행). 이 run은
+production ME를 materialize하지 않았다.
+
+> **동결 tier 규칙의 귀결을 숨기지 않는다.** 예: Owens-Illinois(0000812074) 2011 formation은
+> S1 창 안에 차원 없는 A가 2010-03-31 하나뿐이고 이후는 B뿐이라, 더 새로운 B(2010-12-31
+> 163,715,483)가 아니라 **A(2010-03-31 180,584,042)**가 선택된다. 계약이 그렇게 정한 것이고
+> 이 run은 그것을 바꾸지 않았다.
+
+> **split guard는 계약보다 한 칸 넓다.** 명세는 "주식수 fact instant와 D 사이"인데, D 뒤에
+> 제출된 filing의 비교기 주식수는 그 사이 split으로 **소급 재작성**될 수 있어 filing acceptance
+> 까지 구간에 넣었다. 두 경우를 따로 셌다(23 / 13).
+
+### 8. 판정 — coverage preflight
+
+```text
+coverage_start   없음 — joint QV >= 85%인 formation year가 3년 연속 나타난 구간이 하나도 없다
+                 (최대 연도값 0.439 · 2019)
+
+결과   DATA_NOT_READY_FAST_PATH
+```
+
+Gate A/B/C는 `coverage_start`가 없어 **평가되지 않았다**(A/B/C = null). 참고로 전 구간 aggregate는
+joint 31.5% · ME 71.7%로 85% · 95% 문턱에 모두 못 미친다.
+
+**문턱을 결과를 보고 고치지 않았다.** 이것은 coverage preflight이고 Gate D~H · 30건 수동 audit ·
+sentinel은 여전히 별도다. **Phase 0 PASS를 주장하지 않는다.**
+
+### 9. 분해 — 평균이 가리지 않게
+
+```text
+identity path    DIRECT              7,036  joint 0.319 · ME 0.720
+                 REUSED_VENDOR_SERIES  108  joint 0.074 · ME 0.556
+security 수      SINGLE              7,094  joint 0.317 · ME 0.722
+                 MULTI                  50  joint 0.000 · ME 0.000
+CIK provenance   5A2_PROPOSAL        7,099  joint 0.317
+                 PRODUCTION_MANIFEST    45  joint 0.000      ← §2의 61행 중 nonfinancial 분
+SIC 상태         EXACT 8,781 · NO_USABLE_KQ_FILING 183 · MISSING 1
+```
+
+**재사용 벤더 계열과 manifest multi-class 발행사가 전체 평균보다 크게 나쁘다.** 둘 다 구조적으로
+복잡한 집합이고, 이 경로는 그것을 풀지 않는 것이 목적이다.
+
+### 10. 비용 · 런타임
+
+```text
+SEC 요청 243,567 · 캐시 적중 8,247(+404 212 · root 2,094) · 404 4,493 · retry 1,668 · 전송 실패 0
+전송량 104.3 GB (gzip wire) / 199.5 GB (푼 바이트)      wall 42,300초 (약 11.8시간) · pass 3
+EODHD splits 802 심볼 · 801 성공 · 1 실패(CAM_OLD `Symbol not found`) · split 이벤트 2,272
+```
+
+**중간에 EODHD 자격증명이 만료돼 802건이 전부 HTTP 401이었다.** 그 상태의 산출물은 split guard를
+못 돌려 ME가 전부 `SOURCE_INCOMPLETE`가 되므로 **판정을 내지 않고 사용자에게 알렸고**, 사용자가
+복구한 뒤 다시 받아 이 receipt의 수치를 만들었다. 첫 pass에서 35개 CIK가 `IncompleteRead`로
+멈췄고(부분 결과는 저장되지 않는다) 재시도 계층을 고쳐 2차 pass에서 전부 성공했다.
+
+### 11. 산출물 (gitignore · 커밋하지 않는다)
+
+```text
+trading/data/qv-phase0-research-fastpath/
+  membership_identity.jsonl    c99d32b4d4a0f2390eb23e5689298e9eb54ce15723e1b4b079072cec62f9cd05   9,525행
+  issuer_formations.jsonl      f35b75aaa8887daf9a0a42f809a9b9bfc91c068937050c8af8457aae4670e8e0   8,965행
+  accounting_coverage.jsonl    82805e3496b56dcd57b1a9bfd3b462f613c8c7005e9cf004e678c09e47210db0   8,965행
+  me_coverage.jsonl            402f0289bcb21d55a1a1b4f8278934a86a268e058e9a0657a86c6a464eb49612   8,965행
+  attrition.json               408d2a8d55eb1135665badf7051d2e0f95a4c697f7aa81ecc83853d11a3e1989
+  coverage_by_year.json        6f91c4ab2fb1a969d3c5d9c0d8466eb203ca2d40ea3bfa68c1087bcbfda4eb28
+  coverage_by_missing_reason.json 97a5949c5c56bd75658ee3d17d7c4592653645d8b44bc86e870ca89811237614
+```
+
+### 12. 테스트
+
+```text
+tests/test_qv_research_fastpath.py   16 tests   local PASS
+기존 QV/edgar/eodhd suite            494 tests  local PASS
+```
+
+network-free다. production identity 표 미기록 · 다중 security → 복잡 · class 축 → 복잡 ·
+차원 없는 A 후보 · 모호한 A의 B 미하강 · A 부재일 때만 B · D 이후 fact 거부 · PIT 미가용 filing
+거부 · split 경계 미정규화 · D raw close 없음 · 같은 CIK 두 행이 한 issuer 행 · identity 누락 행
+유지 · ME 경로가 D의 raw close 하나만 읽고 수익률을 읽지 않음을 각각 잠근다.
+**GitHub CI 결과가 아니라 로컬 실행 결과다.**
+
+### 13. 이 run이 열지 않은 것 — STOP RULE
+
+```text
+새 legal/governing instrument 탐색   NO      주 등록부 · 관할 연구        NO
+manifest 확장 · 수동 identity 입력   NO      개별 결손 issuer 조사        NO
+문턱 조정 · factor 재설계            NO      vendor 구매                  NO
+production identity 승격 · class-id  NO      schema 변경                  NO
+companyfacts/companyconcept          NO      수익률 · ranking · portfolio NO
+```
+
+**coverage가 gate 아래라는 사실이 다음 identity/legal 연구 cycle을 자동으로 열지 않는다.**
+산출물은 attrition 표이고, 다음 결정은 사용자 몫이다.
+
+### 범위
+
+```text
+production code changed   NO      schema changed          NO      qv_xbrl changed              NO
+qv_submissions changed    NO      qv_shares/selector/ME   NO      qv_accounting changed        NO
+production manifest 변경  NO      class-id 생성           NO      O2 / O2-C · B2 changed       NO
+RelationInterval          NO      Option A implemented    NO      5A-3 / Gates 통과 선언       NO
+사용자 DB 변경            NO      returns / ranking       NO      §10.46~10.48 수치 변경       NO
+```
+
 ## 11. 결과
 
 
