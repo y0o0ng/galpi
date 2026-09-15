@@ -20,6 +20,8 @@ const PROTOCOL_002 = 'local-memory-inference-p1b6-surface-batch-002-authoring-pr
 const ACCEPTANCE = 'local-memory-inference-p1b6-smoke-batch-001-acceptance.json';
 const EXACT56 = 'local-memory-inference-p1b6-skeleton-exact56.json';
 const AUDIT_ATTEMPT_002 = 'local-memory-inference-p1b6-source-audit-batch-002-attempt-001.json';
+const HUMAN_ATTEMPT_002 = 'local-memory-inference-p1b6-primary-human-review-batch-002-attempt-001.json';
+const HUMAN_PACKET_002_SHA256 = 'e949dceb77e68dde278ef448eb17380645064573e187eb1cba7b24c673069fa5';
 const AUDIT_RESULT_002 = path.join(os.homedir(), 'Downloads',
   'p1b6-source-audit-batch-002-attempt-001-results.json');
 const AUDIT_RESULT_002_SHA256 = '896c06622228ade18bfe2a5a486f5266332fed8957ff70e93debe999eb77af6f';
@@ -30,6 +32,7 @@ const protocol = readJson(PROTOCOL_002);
 const acceptance = readJson(ACCEPTANCE);
 const exact56 = readJson(EXACT56);
 const auditReceipt002 = readJson(AUDIT_ATTEMPT_002);
+const humanReceipt002 = readJson(HUMAN_ATTEMPT_002);
 const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
 const PRE_NATURALNESS_ITEMS_SHA256 = '82667f84fe81bb70941a9ff80ca26e83ace0c063cb8576ccce2fb5ffe7a92794';
 const PRE_NATURALNESS_BUNDLES_SHA256 = 'c80817d06a6d7f5fb4198533310748f4f3a7d673c1c45007770b60e1a18b10cb';
@@ -131,7 +134,7 @@ test('batch-002 validates as the 64-item current adaptive-growth tranche', () =>
   assert.equal(protocol.outputBatch.sha256, sha256RawBytes(rawBatch002));
   assert.equal(protocol.trancheSize, 64);
   assert.equal(protocol.authority.sourceAuditCompleted, true);
-  assert.equal(protocol.authority.humanReviewCompleted, false);
+  assert.equal(protocol.authority.humanReviewCompleted, true);
   assert.equal(protocol.authority.finalCorpusHumanGoldFrozen, false);
   assert.equal(protocol.authority.trainingOccurred, false);
   assert.equal(jsonSha256(batch002.items), PRE_NATURALNESS_ITEMS_SHA256);
@@ -285,7 +288,7 @@ test('batch-002 source-audit attempt-001 packet remains canonical and result-fre
     assert.equal(serialized.includes(`"${forbidden}"`), false);
   }
   assert.equal(protocol.authority.sourceAuditCompleted, true);
-  assert.equal(protocol.authority.humanReviewCompleted, false);
+  assert.equal(protocol.authority.humanReviewCompleted, true);
   assert.equal(protocol.authority.trainingOccurred, false);
 });
 
@@ -351,7 +354,7 @@ test('generalized primary HUMAN builder fails closed on stale or non-PASS batch-
   })), /binding is invalid/u);
 });
 
-test('batch-002 primary HUMAN review packet is blind, deterministic, and undecided', () => {
+test('batch-002 primary HUMAN review packet is blind and deterministic', () => {
   const packet = humanReview.buildHumanReviewPacket(rawBatch002, auditReceipt002);
   const expected = new Map(batch002.items.map(item => [
     humanReview.opaqueReviewRowId(sha256RawBytes(rawBatch002), item.itemId),
@@ -375,7 +378,7 @@ test('batch-002 primary HUMAN review packet is blind, deterministic, and undecid
   }
   assert.deepEqual(humanReview.buildHumanReviewPacket(rawBatch002, auditReceipt002), packet);
   assert.equal(sha256RawBytes(humanReview.packetBytes(packet)),
-    'e949dceb77e68dde278ef448eb17380645064573e187eb1cba7b24c673069fa5');
+    HUMAN_PACKET_002_SHA256);
   const serialized = JSON.stringify(packet);
   for (const field of [
     'itemId', 'auditRowId', 'sourceEpisodeId', 'semanticSkeletonId', 'humanLabel',
@@ -384,9 +387,102 @@ test('batch-002 primary HUMAN review packet is blind, deterministic, and undecid
     'sourceEpisode', 'turns',
   ]) assert.equal(serialized.includes(`"${field}"`), false, field);
   assert.equal(acceptance.accepted.length, 30);
-  assert.equal(protocol.authority.humanReviewCompleted, false);
+  assert.equal(protocol.authority.humanReviewCompleted, true);
   assert.equal(protocol.authority.finalCorpusHumanGoldFrozen, false);
   assert.equal(protocol.authority.trainingOccurred, false);
+});
+
+test('batch-002 primary HUMAN receipt records the exact completed blind review', () => {
+  const packet = humanReview.buildHumanReviewPacket(rawBatch002, auditReceipt002);
+  const packetIds = packet.rows.map(row => row.reviewRowId);
+  const receiptIds = humanReceipt002.rows.map(row => row.reviewRowId);
+  assert.equal(sha256RawBytes(read(HUMAN_ATTEMPT_002)),
+    '6c2d8fabaf6c9caa4d86b5d4252d4e96801648c414b65ab0454e61c66ed0de4c');
+  assert.equal(sha256RawBytes(humanReview.packetBytes(packet)), HUMAN_PACKET_002_SHA256);
+  assert.equal(humanReceipt002.name,
+    'xion-local-memory-inference-p1b6-primary-human-review-batch-002-attempt-001-receipt-v1');
+  assert.equal(humanReceipt002.attemptId, 'p1b6-primary-human-review-batch-002-attempt-001');
+  assert.equal(humanReceipt002.status, 'COMPLETE_NEEDS_FIX');
+  assert.deepEqual(humanReceipt002.primaryHumanReviewPacket, {
+    identity: humanReview.PACKET_IDENTITY,
+    rawSha256: HUMAN_PACKET_002_SHA256,
+  });
+  assert.deepEqual(humanReceipt002.reviewedSourceBatch, {
+    identity: batch002.name,
+    rawSha256: '552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334',
+  });
+  assert.equal(humanReceipt002.rendererIdentity, surfaces.RENDERER_IDENTITY);
+  assert.deepEqual(humanReceipt002.sourceAuditPrerequisite, {
+    attemptId: auditReceipt002.attemptId,
+    status: 'COMPLETE_PASS',
+    allRowsPassed: true,
+  });
+  assert.equal(humanReceipt002.rows.length, 64);
+  assert.equal(new Set(receiptIds).size, 64);
+  assert.deepEqual(receiptIds, packetIds);
+  assert.deepEqual(receiptIds, receiptIds.toSorted());
+  assert.deepEqual(humanReceipt002.rows.reduce((summary, row) => {
+    summary[row.disposition] += 1;
+    summary[row.decision] += 1;
+    return summary;
+  }, { KEEP: 0, FIX: 0, REJECT: 0, CLEAR: 0, ESCALATE: 0 }), {
+    KEEP: 60, FIX: 4, REJECT: 0, CLEAR: 55, ESCALATE: 9,
+  });
+  assert.deepEqual(humanReceipt002.summary, {
+    total: 64, KEEP: 60, FIX: 4, REJECT: 0, CLEAR: 55, ESCALATE: 9,
+  });
+  assert.deepEqual(humanReceipt002.rows.filter(row => row.disposition === 'FIX')
+    .map(row => row.reviewRowId), [
+    'p1b6-review-00b24c2af0afb84a',
+    'p1b6-review-093bff64daa31e49',
+    'p1b6-review-11f3ff710421ae61',
+    'p1b6-review-49feb65692c796b9',
+  ]);
+  assert.deepEqual(humanReceipt002.rows.filter(row => row.decision === 'ESCALATE')
+    .map(row => row.reviewRowId), [
+    'p1b6-review-056fdea622f1b814',
+    'p1b6-review-0b85ca9a10860f2d',
+    'p1b6-review-168661d6b37f974d',
+    'p1b6-review-196ba36ad052d3f5',
+    'p1b6-review-566fe94c1416cf9d',
+    'p1b6-review-6180b0d378704f9b',
+    'p1b6-review-8cedcbf53724f0c9',
+    'p1b6-review-b2325591b6559cda',
+    'p1b6-review-c39aba4078c12eaa',
+  ]);
+  assert.deepEqual(Object.fromEntries(humanReceipt002.rows.filter(row => row.disposition === 'FIX')
+    .map(row => [row.reviewRowId, row.reason])), {
+    'p1b6-review-00b24c2af0afb84a':
+      'The TARGET span `배터리가 네 시간` is too narrow and behaves like an attribute/value selector rather than a candidate/topic focus marker; the semantic status is still CLEAR from the visible bundle.',
+    'p1b6-review-093bff64daa31e49':
+      'The TARGET span `응, 그렇게` is a generic acknowledgement and is too weak to serve as the candidate/topic focus marker; the semantic status is still CLEAR from the visible bundle.',
+    'p1b6-review-11f3ff710421ae61':
+      'The TARGET span `좋아` is a generic acknowledgement and is too weak to serve as the candidate/topic focus marker; the semantic status is still CLEAR from the visible bundle.',
+    'p1b6-review-49feb65692c796b9':
+      'The TARGET span `그래` is a generic acknowledgement and is too weak to serve as the candidate/topic focus marker; the semantic status is still CLEAR from the visible bundle.',
+  });
+  assert.ok(humanReceipt002.rows.filter(row => row.disposition === 'FIX')
+    .every(row => Object.keys(row).join(',') === 'reviewRowId,disposition,decision,reason'
+      && typeof row.reason === 'string' && row.reason.trim()));
+  assert.ok(humanReceipt002.rows.filter(row => row.disposition === 'KEEP')
+    .every(row => Object.keys(row).join(',') === 'reviewRowId,disposition,decision'));
+  assert.deepEqual(humanReceipt002.authority, {
+    reviewCompletedForAllPresentedRows: true,
+    acceptedKeepCount: 60,
+    unresolvedFixCount: 4,
+    humanReviewGateClosed: false,
+    surfaceHumanGoldFrozen: false,
+    decisionsSource: 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER',
+    modelInferenceUsedForHumanDecisions: false,
+    trainingOccurred: false,
+  });
+  const serialized = JSON.stringify(humanReceipt002);
+  for (const field of [
+    'itemId', 'sourceEpisodeId', 'semanticSkeletonId', 'splitAssignment',
+    'boundaryClass', 'humanLabel', 'skeletonLabel', 'generatorRationale',
+    'selectedBundle', 'discoursePattern', 'sourceFamilyId', 'surfaceFamilyId',
+  ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+  assert.equal(acceptance.accepted.length, 30);
 });
 
 test('batch-001, smoke acceptance, exact56, and all historical evidence remain byte-identical', () => {
@@ -396,6 +492,7 @@ test('batch-001, smoke acceptance, exact56, and all historical evidence remain b
       '3591d7db8b98ed7ee016533346908122832068e470dfdfd61a685e1670c13909',
     [ACCEPTANCE]: '449318d5d3895fca87257a40b7d47b6d8d8eb3df8e9817fff5998a34d658bb5c',
     [EXACT56]: '772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602',
+    [AUDIT_ATTEMPT_002]: '3cd73b58ed803d468ed0d668412dcbf46fb330f65f0adaa1859e5502279b619b',
     'local-memory-inference-p1b6-source-audit-batch-001-attempt-001.json':
       '95026b2f6b274e5d909faba96c6cb7345e1286b9f6824450b971936fd685677b',
     'local-memory-inference-p1b6-source-audit-batch-001-attempt-002.json':

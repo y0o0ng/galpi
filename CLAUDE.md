@@ -96,7 +96,7 @@
 - **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** 결과 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
 - **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`에 있다.
 - **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
-- **P1-B6 smoke calibration/reconciliation은 30 accepted / 2 dataset-rejected로 닫혔고, adaptive-growth batch-002 source audit은 64/64 PASS로 끝나 primary blind HUMAN review packet이 준비됐다.** accepted pool은 30 그대로이며 다음은 준비된 64-row packet의 batch-002 primary blind HUMAN review다. final gold는 동결되지 않았고 training·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
+- **P1-B6 batch-002 primary blind HUMAN review는 60 KEEP / 4 FIX / 0 REJECT와 55 CLEAR / 9 ESCALATE로 전 행 완료됐지만 HUMAN gate는 OPEN이다.** accepted pool은 30 그대로이며 다음은 네 FIX 행의 최소 repair → re-audit → focused blind HUMAN re-review다. final gold는 동결되지 않았고 training·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

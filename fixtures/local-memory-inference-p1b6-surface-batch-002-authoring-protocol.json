@@ -162,14 +162,15 @@
     "generatorSkeletonAssignmentAndLabelKnowledgeIsAuthoringMetadataOnly": true,
     "generatorMetadataIsNeverHumanGold": true,
     "sourceAuditCompleted": true,
-    "humanReviewCompleted": false,
+    "humanReviewCompleted": true,
     "finalCorpusHumanGoldFrozen": false,
     "trainingOccurred": false
   },
   "scope": [
     "This is a 64-candidate adaptive-growth execution tranche, not a new corpus-size contract.",
-    "All 26 frozen skeletons with zero accepted smoke coverage receive at least one authored candidate; all 64 batch-002 candidates passed source audit and remain HUMAN-unreviewed and unaccepted.",
+    "All 26 frozen skeletons with zero accepted smoke coverage receive at least one authored candidate; all 64 batch-002 candidates passed source audit and received primary HUMAN review.",
     "Before audit, repeated non-selected and non-anchor side-context turns were rewritten for source naturalness without changing any item definition or canonical visible bundle.",
-    "The combined accepted pool remains the 30 accepted smoke candidates; source audit is complete, and no HUMAN review, final gold freeze, training, raw-episode evaluation, private replay, or production change occurred."
+    "Primary HUMAN review completed for all 64 presented rows at 60 KEEP / 4 FIX / 0 REJECT and 55 CLEAR / 9 ESCALATE; four FIX rows remain unresolved, so the HUMAN gate is not closed and batch-002 corpus acceptance has not occurred.",
+    "The combined accepted pool remains the 30 accepted smoke candidates; final corpus HUMAN gold is not frozen, and HELD repeated review, training, raw-episode evaluation, private replay, and production remain unopened or unchanged."
   ]
 }

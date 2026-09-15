@@ -41,12 +41,15 @@ attempt for every frozen skeleton with zero accepted-smoke coverage. Before
 audit, repeated non-selected side-context turns were rewritten for source
 naturalness without changing any item definition or canonical visible bundle.
 Source-audit attempt 001 then completed at 64 PASS / 0 FAIL / 0 UNCERTAIN, so
-the batch-002 source/bundle gate is PASS. Its 64-row primary blind HUMAN review
-packet is prepared, but HUMAN review has not occurred and the accepted pool
-remains 30. Final corpus HUMAN gold is not frozen. HELD repeated review,
-training, raw-episode evaluation, private replay, and production remain
-UNOPENED/unchanged. The next step is batch-002 primary blind HUMAN review on the
-prepared packet. Do not redesign the frozen skeleton catalog, generate training
+the batch-002 source/bundle gate is PASS. Primary blind HUMAN review completed
+for all 64 presented rows at 60 KEEP / 4 FIX / 0 REJECT and 55 CLEAR / 9
+ESCALATE. Four FIX rows remain unresolved, so the HUMAN gate is not closed,
+batch-002 corpus acceptance has not occurred, and the accepted pool remains 30.
+Final corpus HUMAN gold is not frozen. HELD repeated review, training,
+raw-episode evaluation, private replay, and production remain
+UNOPENED/unchanged. The next step is a separate minimum repair, re-audit, and
+focused blind HUMAN re-review cycle for the four FIX rows. Do not perform that
+cycle implicitly, redesign the frozen skeleton catalog, generate training
 output, expose a model to FINAL surface items, or start training in this phase.
 
 ## Task Boundary

@@ -3828,3 +3828,31 @@ candidates. No HUMAN review, HUMAN gold assignment, final corpus gold freeze,
 HELD repeated review, training, semantic model inference, raw-episode
 evaluation, private replay, or production change occurred. The next step is
 batch-002 primary blind HUMAN review on the prepared 64-row packet.
+
+#### P1-B6 adaptive-growth batch-002 primary blind HUMAN review attempt 001 — COMPLETE / NEEDS_FIX
+
+The canonical immutable receipt is
+`fixtures/local-memory-inference-p1b6-primary-human-review-batch-002-attempt-001.json`,
+raw SHA-256
+`6c2d8fabaf6c9caa4d86b5d4252d4e96801648c414b65ab0454e61c66ed0de4c`.
+It binds source batch raw SHA-256
+`552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334`,
+the deterministic primary HUMAN review packet raw SHA-256
+`e949dceb77e68dde278ef448eb17380645064573e187eb1cba7b24c673069fa5`,
+the frozen renderer identity, and the canonical batch-002 source-audit
+attempt-001 COMPLETE_PASS prerequisite.
+
+The repository-owner primary HUMAN reviewer completed all 64 presented rows at
+60 KEEP / 4 FIX / 0 REJECT and 55 CLEAR / 9 ESCALATE. The four FIX rows remain
+historical HUMAN decisions with non-empty construction reasons; no source,
+evidence, anchor, or semantic decision was changed. `humanReviewCompleted` is
+therefore true for the completed first pass, while `humanReviewGateClosed` is
+false because the four FIX actions remain unresolved. No skeleton-label
+reconciliation or batch-002 dataset acceptance occurred, and the combined
+accepted pool remains the 30 accepted smoke candidates.
+
+Final corpus HUMAN gold remains unfrozen. HELD repeated review, training,
+semantic model inference, raw-episode evaluation, private replay, and
+production remain unopened or unchanged. The next step is a separate minimum
+repair, re-audit, and focused blind HUMAN re-review cycle for the four FIX
+rows.
