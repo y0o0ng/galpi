@@ -5,7 +5,7 @@
 > 사전등록, 사용자 검토 후 승인으로만 진행한다. 결과를 본 뒤 threshold·factor·보유기간을
 > 늘려서 전략을 구제하지 않는다.
 >
-> 상태: **Phase 0 승인·사전등록 완료 (2026-08-22) — 미실행.** 사전등록은 `trading/runs/qv-data-audit/README.md`다. Phase 1 이후는 아직 승인 전이다.  
+> 상태: **2026-09-16 자체 데이터 구축 종료 · `DATA_NOT_READY` 보류.** 종료 receipt는 `trading/runs/qv-data-audit/README.md` §11, 마지막 측정은 §10.49다. Phase 1·수익률 계산은 미실행이며 아래 연구 계약은 보존한다.
 > 작성일: 2026-08-18 · 최종 검토: 2026-08-22  
 > 작성 시점 `main` 확인 기준: `a58961bd38a4d7e250f6f519be9bd8f65ff82cef`
 

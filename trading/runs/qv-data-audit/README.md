@@ -3,6 +3,8 @@
 > **결과를 계산하기 전에 작성한 사전등록 문서다.** 결과를 본 뒤 이 문서의 판정 기준을
 > 고치지 않는다. **이 Phase는 수익률을 한 번도 계산하지 않는다.**
 
+> 현재 상태: **2026-09-16 사용자 결정으로 자체 데이터 구축 종료 · `DATA_NOT_READY` 보류.** 종료 receipt는 §11, 마지막 측정은 §10.49다.
+
 로드맵은 `docs/trading/strategies/quality-value-roadmap.md`이고 이 run은 그 **Phase 0**이다.
 
 **이 Phase는 alpha 예산을 태우지 않는다.** `alpha_intervention_budget = 0`은 그대로이고,
@@ -9865,11 +9867,12 @@ RelationInterval          NO      Option A implemented    NO      5A-3 / Gates �
 사용자 DB 변경            NO      returns / ranking       NO      §10.46~10.48 수치 변경       NO
 ```
 
-## 11. 결과
+## 11. 종료 receipt — 2026-09-16
 
+사용자 결정으로 **QV 자체 데이터 구축을 종료하고 `DATA_NOT_READY`로 보류한다.**
+마지막 측정은 §10.49의 `DATA_NOT_READY_FAST_PATH`다: joint coverage 31.5%, 최고 연도 43.9%,
+`coverage_start` 없음. Gate A~H 전체 평가·Phase 1·수익률 계산은 미실행이며 alpha 실패를 뜻하지 않는다.
 
-<!-- 전수 실행 후 채운다. 이 위의 어떤 문턱도 그때 고치지 않는다. -->
-
-```text
-판정        (미실행)
-```
+추가 파서 보수·identity 탐색·전수 재수집은 종료한다. 코드·데이터·기존 계약과 측정 결과는 보존한다.
+재개는 기존 데이터 기준을 충족할 수 있는 검증 가능한 PIT 공급원 확보 후 별도 사용자 결정으로만 한다.
+새 파서 아이디어는 재개 조건이 아니며, 다음 신호 연구는 이번 종료로 자동 착수하지 않는다.
