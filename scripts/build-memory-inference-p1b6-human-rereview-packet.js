@@ -61,6 +61,13 @@ const BATCH002_REREVIEW_DECISIONS = new Map([
 const BATCH002_REREVIEW_SUMMARY = Object.freeze({
   total: 4, KEEP: 4, FIX: 0, REJECT: 0, CLEAR: 4, ESCALATE: 0,
 });
+const BATCH002_EFFECTIVE_IDENTITY =
+  'xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v1';
+const BATCH002_MISMATCH_IDENTITY =
+  'xion-local-memory-inference-p1b6-primary-human-reconciliation-mismatches-batch-002-v1';
+const BATCH002_EFFECTIVE_SUMMARY = Object.freeze({
+  total: 64, KEEP: 64, FIX: 0, REJECT: 0, CLEAR: 55, ESCALATE: 9,
+});
 
 function fail(message) {
   throw new TypeError(`P1-B6 primary HUMAN re-review packet ${message}`);
@@ -677,6 +684,127 @@ function buildEffectiveHumanDecisionSet(rawBatchBytes, auditReceipt, rawOriginal
   };
 }
 
+function buildBatch002EffectiveHumanDecisionSet(rawBatchBytes, auditReceipt,
+  rawOriginalPacketBytes, originalReceipt, rawRereviewPacketBytes, rereviewReceipt,
+  rawExact56Bytes) {
+  const { rows: rereviewRows } = validateBatch002RereviewReceipt(
+    rawBatchBytes, auditReceipt, rawOriginalPacketBytes, originalReceipt,
+    rawRereviewPacketBytes, rereviewReceipt,
+  );
+  if (sha256RawBytes(rawExact56Bytes) !== EXACT56_SHA256) {
+    fail('batch-002 frozen exact56 bytes are invalid');
+  }
+  const batch = validateSurfaceBatch(JSON.parse(Buffer.from(rawBatchBytes).toString('utf8')));
+  const exact56 = JSON.parse(Buffer.from(rawExact56Bytes).toString('utf8'));
+  const originalPacket = JSON.parse(Buffer.from(rawOriginalPacketBytes).toString('utf8'));
+  const originalBundles = new Map(originalPacket.rows.map(row => [
+    row.reviewRowId, row.selectedBundle,
+  ]));
+  const originalDecisions = new Map(originalReceipt.rows.map(row => [row.reviewRowId, row]));
+
+  let inheritedCount = 0;
+  let repairedCount = 0;
+  const rows = batch.items.map(item => {
+    const originalId = primaryReview.opaqueReviewRowId(
+      BATCH002_REREVIEW.originalBatchSha256, item.itemId,
+    );
+    const changed = originalBundles.get(originalId) !== renderHumanReviewText(batch, item);
+    const decision = changed
+      ? rereviewRows.get(opaqueRereviewRowId(BATCH002_REREVIEW.currentBatchSha256, item.itemId))
+      : originalDecisions.get(originalId);
+    if (!decision || decision.disposition !== 'KEEP'
+      || !['CLEAR', 'ESCALATE'].includes(decision.decision)) {
+      fail('a batch-002 item has no applicable KEEP HUMAN decision');
+    }
+    if (changed) repairedCount += 1; else inheritedCount += 1;
+    return { itemId: item.itemId, disposition: decision.disposition, decision: decision.decision };
+  }).sort((left, right) => left.itemId < right.itemId ? -1 : 1);
+  if (new Set(rows.map(row => row.itemId)).size !== batch.items.length
+    || inheritedCount !== batch.items.length - BATCH002_REREVIEW.changedCount
+    || repairedCount !== BATCH002_REREVIEW.changedCount) {
+    fail('batch-002 effective rows are duplicated or misattributed');
+  }
+  const summary = summarizeDecisions(rows);
+  if (JSON.stringify(summary) !== JSON.stringify(BATCH002_EFFECTIVE_SUMMARY)) {
+    fail('batch-002 effective current HUMAN aggregate is invalid');
+  }
+
+  const reconciliation = reconcileEffectiveHumanDecisions(batch, rows, exact56);
+  if (reconciliation.matchCount + reconciliation.mismatchCount !== batch.items.length) {
+    fail('batch-002 reconciliation counts do not cover every current item');
+  }
+  return {
+    artifact: {
+      name: BATCH002_EFFECTIVE_IDENTITY,
+      status: reconciliation.humanReviewCompleted ? 'COMPLETE_PASS' : 'RECONCILIATION_NEEDS_FIX',
+      currentSourceBatch: {
+        identity: batch.name,
+        rawSha256: BATCH002_REREVIEW.currentBatchSha256,
+      },
+      rendererIdentity: RENDERER_IDENTITY,
+      originalPrimaryHumanAttempt: BATCH002_REREVIEW.originalAttemptId,
+      focusedPrimaryHumanRereviewAttempt: BATCH002_REREVIEW.rereviewAttemptId,
+      summary,
+      reconciliation: {
+        exact56Sha256: EXACT56_SHA256,
+        matchCount: reconciliation.matchCount,
+        mismatchCount: reconciliation.mismatchCount,
+      },
+      authority: {
+        sourceBundleGatePassed: true,
+        humanReviewCompleted: reconciliation.humanReviewCompleted,
+        surfaceHumanGoldFrozen: false,
+        trainingOccurred: false,
+      },
+      rows,
+    },
+    batch,
+    exact56,
+    reconciliation,
+    inheritedCount,
+    repairedCount,
+  };
+}
+
+function buildBatch002MismatchDiagnostic(effective) {
+  const { artifact, batch, exact56, reconciliation } = effective;
+  const decisions = new Map(artifact.rows.map(row => [row.itemId, row]));
+  const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
+  const mismatches = batch.items.filter(item =>
+    decisions.get(item.itemId).decision !== skeletons.get(item.semanticSkeletonId).humanLabel)
+    .map(item => ({
+      itemId: item.itemId,
+      semanticSkeletonId: item.semanticSkeletonId,
+      splitAssignment: skeletons.get(item.semanticSkeletonId).splitAssignment,
+      currentHumanDecision: decisions.get(item.itemId).decision,
+      frozenSkeletonHumanLabel: skeletons.get(item.semanticSkeletonId).humanLabel,
+    }))
+    .sort((left, right) => left.itemId < right.itemId ? -1 : 1);
+  if (mismatches.length !== reconciliation.mismatchCount) {
+    fail('batch-002 mismatch diagnostic does not match the reconciliation count');
+  }
+  return {
+    name: BATCH002_MISMATCH_IDENTITY,
+    status: 'DIAGNOSTIC_ONLY_REQUIRES_REPOSITORY_OWNER_RESOLUTION',
+    currentSourceBatch: artifact.currentSourceBatch,
+    effectiveHumanDecisionArtifact: { identity: artifact.name },
+    exact56: { identity: exact56.name, rawSha256: EXACT56_SHA256 },
+    summary: {
+      total: batch.items.length,
+      matchCount: reconciliation.matchCount,
+      mismatchCount: reconciliation.mismatchCount,
+    },
+    authority: {
+      humanDecisionsAltered: false,
+      frozenSkeletonLabelsAltered: false,
+      acceptanceOrRejectionPerformed: false,
+      surfacesRepaired: false,
+      neverExposedToBlindHumanReview: true,
+    },
+    mismatches,
+  };
+}
+
 function writeRereviewPacket(inputPath, auditReceiptPath, originalPacketPath,
   originalReceiptPath, outputPath) {
   if (fs.existsSync(outputPath)) throw new Error(`Existing output will not be overwritten: ${outputPath}`);
@@ -710,7 +838,12 @@ module.exports = {
   PACKET_IDENTITY,
   SMOKE_ACCEPTANCE_IDENTITY,
   SKELETON_MISMATCH_REASON,
+  BATCH002_EFFECTIVE_IDENTITY,
+  BATCH002_EFFECTIVE_SUMMARY,
+  BATCH002_MISMATCH_IDENTITY,
   buildSmokeBatchAcceptance,
+  buildBatch002EffectiveHumanDecisionSet,
+  buildBatch002MismatchDiagnostic,
   buildBatch002RereviewPacket,
   buildEffectiveHumanDecisionSet,
   buildRereviewPacket,

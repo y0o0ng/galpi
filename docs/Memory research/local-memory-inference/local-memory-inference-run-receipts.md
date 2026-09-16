@@ -3953,3 +3953,45 @@ corpus HUMAN gold remains unfrozen, and HELD repeated review, training,
 raw-episode evaluation, private replay, and production remain unopened or
 unchanged. The next step is a separate effective-current decision artifact
 followed by frozen exact56 reconciliation.
+
+#### P1-B6 adaptive-growth batch-002 effective-current HUMAN materialization and frozen Exact56 reconciliation — COMPLETE / RECONCILIATION_NEEDS_FIX
+
+The reconciled current batch remains bound to raw SHA-256
+`ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c`.
+The focused HUMAN re-review receipt is
+`fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-002.json`,
+raw SHA-256
+`141070c2e1485294a64c73d69de12dee867ce81ba1b66a3b9b189d61d84d67f3`.
+
+The effective-current artifact is
+`fixtures/local-memory-inference-p1b6-primary-human-effective-current-batch-002.json`,
+raw SHA-256
+`d0e5dcc2da7d1f87b4886d6e5b6726c1053c88fdc4cdf8fbd144a47c3cddf38f`.
+Its 64 rows were built mechanically: 60 decisions inherited from historical
+primary HUMAN rows whose selected bundle is exactly unchanged, and 4 decisions
+taken from the focused re-review. The effective summary is 64 KEEP / 0 FIX /
+0 REJECT and 55 CLEAR / 9 ESCALATE, proved before any Exact56 label was read.
+
+Frozen Exact56 raw SHA-256 is
+`772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602`.
+Reconciliation against the frozen skeleton HUMAN labels is **matchCount 40 /
+mismatchCount 24**, recomputed from the artifacts rather than hand-authored,
+so the status is `RECONCILIATION_NEEDS_FIX` and
+`authority.humanReviewCompleted` is false.
+
+All 24 mismatches run in one direction — current HUMAN `CLEAR` against frozen
+skeleton `ESCALATE`. No HUMAN decision and no frozen skeleton label was
+altered. The mismatched identities, their skeletons, and their split
+assignments are recorded only in the separate non-HUMAN-facing diagnostic
+`fixtures/local-memory-inference-p1b6-primary-human-reconciliation-mismatches-batch-002.json`,
+raw SHA-256
+`9a02ecfec486a6b5f5d1f586b2a2482dafc94a8b2f642e71e23f3653020129f5`.
+That artifact is diagnostic only and must never be exposed to a blind HUMAN
+review packet.
+
+**Repository-owner resolution is required** for the 24 mismatched
+realizations; a mismatch does not itself authorize acceptance, rejection, or
+surface repair. Batch-002 dataset acceptance was NOT RUN and the accepted pool
+remains exactly 30. Final corpus HUMAN gold remains unfrozen, and HELD repeated
+review, training, raw-episode evaluation, private replay, and production remain
+unopened or unchanged.

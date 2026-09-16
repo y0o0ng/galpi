@@ -36,6 +36,19 @@ const REREVIEW_PACKET_002_SHA256 =
   'f582776c81a51fb08f2e5cfe697b51be939aeb6533659e6038d80d391fffd2c9';
 const REREVIEW_ATTEMPT_002 =
   'local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-002.json';
+const REREVIEW_RECEIPT_002_SHA256 =
+  '141070c2e1485294a64c73d69de12dee867ce81ba1b66a3b9b189d61d84d67f3';
+const EFFECTIVE_002 =
+  'local-memory-inference-p1b6-primary-human-effective-current-batch-002.json';
+const EFFECTIVE_002_SHA256 =
+  'd0e5dcc2da7d1f87b4886d6e5b6726c1053c88fdc4cdf8fbd144a47c3cddf38f';
+const MISMATCHES_002 =
+  'local-memory-inference-p1b6-primary-human-reconciliation-mismatches-batch-002.json';
+const MISMATCHES_002_SHA256 =
+  '9a02ecfec486a6b5f5d1f586b2a2482dafc94a8b2f642e71e23f3653020129f5';
+const EXACT56_SHA256 = '772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602';
+const EFFECTIVE_001 =
+  'local-memory-inference-p1b6-primary-human-effective-current-batch-001.json';
 const REREVIEW_IDS_002 = [
   'p1b6-rereview-02acbfe8ee8d6bcc',
   'p1b6-rereview-27a2b7b3013ce07d',
@@ -52,6 +65,7 @@ const auditReceipt002 = readJson(AUDIT_ATTEMPT_002);
 const currentAuditReceipt002 = readJson(AUDIT_ATTEMPT_002_CURRENT);
 const humanReceipt002 = readJson(HUMAN_ATTEMPT_002);
 const rereviewReceipt002 = readJson(REREVIEW_ATTEMPT_002);
+const effectiveBatch001 = readJson(EFFECTIVE_001);
 const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
 const PRE_REPAIR_BATCH_SHA256 = '552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334';
 const REPAIRED_BATCH_SHA256 = 'ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c';
@@ -183,6 +197,19 @@ function restoreHistoricalAnchors(value) {
 
 const preRepairBatch002 = restoreHistoricalAnchors(batch002);
 const rawPreRepairBatch002 = batchBytes(preRepairBatch002);
+
+function buildBatch002Effective() {
+  const rawOriginalPacket = humanReview.packetBytes(
+    humanReview.buildHumanReviewPacket(rawPreRepairBatch002, auditReceipt002),
+  );
+  const rawRereviewPacket = humanRereview.packetBytes(humanRereview.buildBatch002RereviewPacket(
+    rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
+  ));
+  return humanRereview.buildBatch002EffectiveHumanDecisionSet(
+    rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
+    rawRereviewPacket, rereviewReceipt002, read(EXACT56),
+  );
+}
 
 test('batch-002 validates as the 64-item current adaptive-growth tranche', () => {
   assert.equal(batch002.name, 'xion-local-memory-inference-p1b6-surface-batch-002-v1');
@@ -826,16 +853,136 @@ test('batch-002 pre-reconciliation HUMAN overlay is 64 KEEP with 55 CLEAR and 9 
   assert.equal(overlay.filter(row => row.disposition === 'FIX').length, 0);
 });
 
-test('batch-002 reconciliation, acceptance, and gold freeze have not been opened', () => {
-  assert.equal(fs.existsSync(fixture(
-    'local-memory-inference-p1b6-primary-human-effective-current-batch-002.json')), false);
+test('batch-002 effective current HUMAN decisions are mechanically rebuilt from both sources', () => {
+  const { artifact, inheritedCount, repairedCount } = buildBatch002Effective();
+  assert.equal(sha256RawBytes(rawBatch002), REPAIRED_BATCH_SHA256);
+  assert.equal(sha256RawBytes(read(AUDIT_ATTEMPT_002_CURRENT)), CURRENT_AUDIT_RECEIPT_SHA256);
+  assert.equal(sha256RawBytes(read(REREVIEW_ATTEMPT_002)), REREVIEW_RECEIPT_002_SHA256);
+  assert.equal(sha256RawBytes(read(EXACT56)), EXACT56_SHA256);
+
+  assert.deepEqual(JSON.parse(read(EFFECTIVE_002)), artifact);
+  assert.equal(sha256RawBytes(read(EFFECTIVE_002)), EFFECTIVE_002_SHA256);
+  assert.deepEqual(Object.keys(artifact), Object.keys(effectiveBatch001));
+  assert.equal(artifact.name,
+    'xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v1');
+  assert.deepEqual(artifact.currentSourceBatch,
+    { identity: batch002.name, rawSha256: REPAIRED_BATCH_SHA256 });
+  assert.equal(artifact.rendererIdentity, surfaces.RENDERER_IDENTITY);
+  assert.equal(artifact.originalPrimaryHumanAttempt,
+    'p1b6-primary-human-review-batch-002-attempt-001');
+  assert.equal(artifact.focusedPrimaryHumanRereviewAttempt,
+    'p1b6-primary-human-rereview-batch-002-attempt-002');
+
+  assert.equal(artifact.rows.length, 64);
+  assert.equal(new Set(artifact.rows.map(row => row.itemId)).size, 64);
+  assert.deepEqual(artifact.rows.map(row => row.itemId),
+    batch002.items.map(item => item.itemId).toSorted());
+  assert.deepEqual(artifact.rows.map(row => row.itemId),
+    artifact.rows.map(row => row.itemId).toSorted());
+  for (const row of artifact.rows) {
+    assert.deepEqual(Object.keys(row), ['itemId', 'disposition', 'decision']);
+    assert.equal(row.disposition, 'KEEP');
+    assert.ok(['CLEAR', 'ESCALATE'].includes(row.decision));
+  }
+  assert.deepEqual(artifact.summary, {
+    total: 64, KEEP: 64, FIX: 0, REJECT: 0, CLEAR: 55, ESCALATE: 9,
+  });
+  assert.equal(inheritedCount, 60);
+  assert.equal(repairedCount, 4);
+
+  const historical = new Map(humanReceipt002.rows.map(row => [row.reviewRowId, row]));
+  const rereview = new Map(rereviewReceipt002.rows.map(row => [row.reviewRowId, row]));
+  const rows = new Map(artifact.rows.map(row => [row.itemId, row]));
+  const repairedItems = Object.keys(REPAIRED_ANCHORS);
+  for (const item of batch002.items) {
+    const originalId = humanReview.opaqueReviewRowId(PRE_REPAIR_BATCH_SHA256, item.itemId);
+    const source = repairedItems.includes(item.itemId)
+      ? rereview.get(humanRereview.opaqueRereviewRowId(REPAIRED_BATCH_SHA256, item.itemId))
+      : historical.get(originalId);
+    assert.equal(rows.get(item.itemId).decision, source.decision, item.itemId);
+  }
+});
+
+test('batch-002 frozen exact56 reconciliation is recomputed and drives the artifact status', () => {
+  const { artifact, reconciliation } = buildBatch002Effective();
+  const rows = new Map(artifact.rows.map(row => [row.itemId, row]));
+  let matchCount = 0;
+  for (const item of batch002.items) {
+    const skeleton = skeletons.get(item.semanticSkeletonId);
+    assert.ok(skeleton, item.itemId);
+    assert.ok(['CLEAR', 'ESCALATE'].includes(skeleton.humanLabel), item.itemId);
+    if (rows.get(item.itemId).decision === skeleton.humanLabel) matchCount += 1;
+  }
+  const mismatchCount = batch002.items.length - matchCount;
+  assert.equal(artifact.reconciliation.exact56Sha256, EXACT56_SHA256);
+  assert.equal(artifact.reconciliation.matchCount, matchCount);
+  assert.equal(artifact.reconciliation.mismatchCount, mismatchCount);
+  assert.equal(matchCount + mismatchCount, 64);
+  assert.equal(reconciliation.matchCount, matchCount);
+
+  assert.equal(artifact.status,
+    mismatchCount === 0 ? 'COMPLETE_PASS' : 'RECONCILIATION_NEEDS_FIX');
+  assert.deepEqual(artifact.authority, {
+    sourceBundleGatePassed: true,
+    humanReviewCompleted: mismatchCount === 0,
+    surfaceHumanGoldFrozen: false,
+    trainingOccurred: false,
+  });
+  assert.equal(protocol.authority.humanReviewCompleted, mismatchCount === 0);
+
+  assert.equal(matchCount, 40);
+  assert.equal(mismatchCount, 24);
+  assert.equal(artifact.status, 'RECONCILIATION_NEEDS_FIX');
+});
+
+test('batch-002 reconciliation leaves every HUMAN and frozen skeleton label untouched', () => {
+  const { artifact } = buildBatch002Effective();
+  assert.deepEqual(JSON.parse(read(EXACT56)), exact56);
+  assert.equal(sha256RawBytes(read(HUMAN_ATTEMPT_002)),
+    '6c2d8fabaf6c9caa4d86b5d4252d4e96801648c414b65ab0454e61c66ed0de4c');
+  assert.equal(sha256RawBytes(read(REREVIEW_ATTEMPT_002)), REREVIEW_RECEIPT_002_SHA256);
+
+  const diagnostic = JSON.parse(read(MISMATCHES_002));
+  assert.equal(sha256RawBytes(read(MISMATCHES_002)), MISMATCHES_002_SHA256);
+  assert.deepEqual(diagnostic,
+    humanRereview.buildBatch002MismatchDiagnostic(buildBatch002Effective()));
+  assert.equal(diagnostic.mismatches.length, artifact.reconciliation.mismatchCount);
+  assert.deepEqual(diagnostic.mismatches.map(row => row.itemId),
+    diagnostic.mismatches.map(row => row.itemId).toSorted());
+  assert.deepEqual(diagnostic.authority, {
+    humanDecisionsAltered: false,
+    frozenSkeletonLabelsAltered: false,
+    acceptanceOrRejectionPerformed: false,
+    surfacesRepaired: false,
+    neverExposedToBlindHumanReview: true,
+  });
+  const rows = new Map(artifact.rows.map(row => [row.itemId, row]));
+  for (const row of diagnostic.mismatches) {
+    assert.deepEqual(Object.keys(row), [
+      'itemId', 'semanticSkeletonId', 'splitAssignment',
+      'currentHumanDecision', 'frozenSkeletonHumanLabel',
+    ]);
+    assert.equal(row.currentHumanDecision, rows.get(row.itemId).decision);
+    assert.equal(row.frozenSkeletonHumanLabel,
+      skeletons.get(row.semanticSkeletonId).humanLabel);
+    assert.equal(row.splitAssignment, skeletons.get(row.semanticSkeletonId).splitAssignment);
+    assert.notEqual(row.currentHumanDecision, row.frozenSkeletonHumanLabel);
+  }
+  const serialized = JSON.stringify(artifact);
+  for (const field of [
+    'humanLabel', 'skeletonLabel', 'semanticSkeletonId', 'splitAssignment',
+    'boundaryClass', 'selectedBundle', 'reason', 'sourceEpisodeId',
+  ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+});
+
+test('batch-002 acceptance and gold freeze have not been opened', () => {
   assert.equal(fs.existsSync(fixture(
     'local-memory-inference-p1b6-smoke-batch-002-acceptance.json')), false);
   assert.equal(acceptance.accepted.length, 30);
   assert.equal(protocol.authority.sourceAuditCompleted, true);
-  assert.equal(protocol.authority.humanReviewCompleted, false);
   assert.equal(protocol.authority.finalCorpusHumanGoldFrozen, false);
   assert.equal(protocol.authority.trainingOccurred, false);
+  assert.equal(effectiveBatch001.authority.surfaceHumanGoldFrozen, false);
 });
 
 test('batch-001, smoke acceptance, exact56, and all historical evidence remain byte-identical', () => {

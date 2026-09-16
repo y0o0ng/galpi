@@ -1,0 +1,197 @@
+{
+  "name": "xion-local-memory-inference-p1b6-primary-human-reconciliation-mismatches-batch-002-v1",
+  "status": "DIAGNOSTIC_ONLY_REQUIRES_REPOSITORY_OWNER_RESOLUTION",
+  "currentSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
+  },
+  "effectiveHumanDecisionArtifact": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v1"
+  },
+  "exact56": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-exact56-v1",
+    "rawSha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602"
+  },
+  "summary": {
+    "total": 64,
+    "matchCount": 40,
+    "mismatchCount": 24
+  },
+  "authority": {
+    "humanDecisionsAltered": false,
+    "frozenSkeletonLabelsAltered": false,
+    "acceptanceOrRejectionPerformed": false,
+    "surfacesRepaired": false,
+    "neverExposedToBlindHumanReview": true
+  },
+  "mismatches": [
+    {
+      "itemId": "p1b6-item-b002-022",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-023",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-024",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-027",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-028",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-029",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-032",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-033",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-034",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-037",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-038",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-039",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-040",
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "splitAssignment": "TRAIN",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-047",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "splitAssignment": "DEV",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-049",
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "splitAssignment": "DEV",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-050",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "splitAssignment": "DEV",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "splitAssignment": "DEV",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-058",
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-060",
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-061",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-062",
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-064",
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "currentHumanDecision": "CLEAR",
+      "frozenSkeletonHumanLabel": "ESCALATE"
+    }
+  ]
+}

@@ -54,13 +54,20 @@ changed surfaces at 4 KEEP / 0 FIX / 0 REJECT and 4 CLEAR / 0 ESCALATE, so the
 focused repair review is resolved and no unresolved FIX remains. Overlaying the
 four focused decisions on the 60 inherited historical decisions gives a
 pre-reconciliation effective HUMAN aggregate of 64 KEEP / 0 FIX / 0 REJECT and
-55 CLEAR / 9 ESCALATE. That aggregate is HUMAN-review state only: no frozen
-exact56 reconciliation has been performed for batch-002. Batch-002 corpus
-acceptance has not occurred, the accepted pool remains 30, and final corpus
-HUMAN gold is not frozen. HELD repeated review, training, raw-episode
-evaluation, private replay, and production remain UNOPENED/unchanged. The next
-step is separate materialization of the effective-current decision artifact
-followed by frozen exact56 reconciliation. Do not redesign the frozen
+55 CLEAR / 9 ESCALATE. That aggregate was then materialized as the
+effective-current decision artifact and reconciled against the frozen exact56
+skeleton HUMAN labels, which produced 40 matches and 24 mismatches out of 64.
+The artifact status is therefore `RECONCILIATION_NEEDS_FIX` and
+`humanReviewCompleted` is false. Every mismatch runs in one direction: the
+authoritative current HUMAN decision is CLEAR where the frozen skeleton HUMAN
+label is ESCALATE. Neither side was relabeled; the mismatched identities live
+only in the separate non-HUMAN-facing diagnostic artifact and must never enter
+a blind HUMAN review packet. A mismatch does not itself authorize acceptance,
+rejection, or surface repair, so resolution of the 24 mismatched realizations
+is a repository-owner decision. Batch-002 corpus acceptance has not occurred,
+the accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
+repeated review, training, raw-episode evaluation, private replay, and
+production remain UNOPENED/unchanged. Do not redesign the frozen
 skeleton catalog, generate training output, expose a model to FINAL surface
 items, or start training in this phase.
 
