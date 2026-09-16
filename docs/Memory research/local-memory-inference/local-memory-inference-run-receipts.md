@@ -3995,3 +3995,34 @@ surface repair. Batch-002 dataset acceptance was NOT RUN and the accepted pool
 remains exactly 30. Final corpus HUMAN gold remains unfrozen, and HELD repeated
 review, training, raw-episode evaluation, private replay, and production remain
 unopened or unchanged.
+
+#### P1-B6 Conservative Pragmatic Interpretation and targeted batch-002 adjudication packet — COMPLETE / RECONCILIATION STILL UNRESOLVED
+
+The repository owner approved the `CONSERVATIVE_PRAGMATIC_INTERPRETATION` rule
+in response to the batch-002 reconciliation result: 24 of 64 mismatches, all in
+one direction (current HUMAN `CLEAR` against frozen skeleton `ESCALATE`). The
+rule text, its allowed and disallowed inference, the counter-reading test, the
+explicit scope of reopening, and the adjudication taxonomy are in the canonical
+design document, section "Conservative Pragmatic Interpretation".
+
+The clarification is prospective and applies to targeted re-adjudication only.
+No HUMAN decision, frozen Exact56 label, or surface was changed, and no
+mismatch was silently relabeled.
+
+A deterministic diagnostic packet holding exactly the 24 mismatched current
+items, grouped by their 10 unique `semanticSkeletonId` values, is at
+`fixtures/local-memory-inference-p1b6-pragmatic-adjudication-batch-002.json`,
+raw SHA-256
+`dd8697b890f41a3541c38b7101bd93ee697889bdaa9ceafea114d2d7feef4967`.
+It is built mechanically by `buildBatch002PragmaticAdjudicationPacket` from the
+current batch, Exact56, the mismatch diagnostic, and the canonical renderer,
+and it carries no current HUMAN decision, no frozen skeleton `humanLabel`, no
+generator intended label, no model-generated adjudication, and no
+acceptance/rejection recommendation. It is a diagnostic adjudication packet,
+not a HUMAN blind-review packet.
+
+No adjudication outcome was assigned. The reconciliation remains unresolved,
+`humanReviewCompleted` remains false, the accepted pool remains exactly 30, and
+final corpus HUMAN gold, HELD repeated review, training, raw-episode
+evaluation, private replay, and production remain unopened or unchanged. The
+next step is semantic adjudication, not acceptance.

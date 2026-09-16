@@ -68,6 +68,16 @@ const BATCH002_MISMATCH_IDENTITY =
 const BATCH002_EFFECTIVE_SUMMARY = Object.freeze({
   total: 64, KEEP: 64, FIX: 0, REJECT: 0, CLEAR: 55, ESCALATE: 9,
 });
+const BATCH002_ADJUDICATION_IDENTITY =
+  'xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-v1';
+const BATCH002_ADJUDICATION_EXPECTED = Object.freeze({ items: 24, skeletonGroups: 10 });
+const INTERPRETATION_RULE = 'CONSERVATIVE_PRAGMATIC_INTERPRETATION';
+const ADJUDICATION_TAXONOMY = Object.freeze([
+  'SKELETON_SEMANTICS_NEEDS_REVISION',
+  'SURFACE_COLLAPSES_AMBIGUITY',
+  'HUMAN_DECISION_NEEDS_REREVIEW',
+  'UNRESOLVED',
+]);
 
 function fail(message) {
   throw new TypeError(`P1-B6 primary HUMAN re-review packet ${message}`);
@@ -805,6 +815,89 @@ function buildBatch002MismatchDiagnostic(effective) {
   };
 }
 
+function buildBatch002PragmaticAdjudicationPacket(effective,
+  rawOriginalPacketBytes, rawRereviewPacketBytes) {
+  const { artifact, batch, exact56 } = effective;
+  const diagnostic = buildBatch002MismatchDiagnostic(effective);
+  const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
+  const items = new Map(batch.items.map(item => [item.itemId, item]));
+  const mismatchIds = new Set(diagnostic.mismatches.map(row => row.itemId));
+  if (mismatchIds.size !== BATCH002_ADJUDICATION_EXPECTED.items) {
+    fail('batch-002 adjudication packet expects exactly 24 mismatch items');
+  }
+  // The surface each mismatch item's HUMAN reviewer actually saw: the immutable original
+  // packet, or the focused re-review packet for a repaired anchor.
+  const seen = new Map();
+  for (const row of JSON.parse(Buffer.from(rawOriginalPacketBytes).toString('utf8')).rows) {
+    seen.set(row.reviewRowId, row.selectedBundle);
+  }
+  for (const row of JSON.parse(Buffer.from(rawRereviewPacketBytes).toString('utf8')).rows) {
+    seen.set(row.reviewRowId, row.selectedBundle);
+  }
+  const grouped = new Map();
+  for (const row of diagnostic.mismatches) {
+    const item = items.get(row.itemId);
+    if (!item) fail(`batch-002 mismatch item is absent from the current batch: ${row.itemId}`);
+    const skeleton = skeletons.get(row.semanticSkeletonId);
+    if (!skeleton) fail(`batch-002 mismatch skeleton is absent from exact56: ${row.semanticSkeletonId}`);
+    const selectedBundle = renderHumanReviewText(batch, item);
+    const canonical = seen.get(opaqueRereviewRowId(BATCH002_REREVIEW.currentBatchSha256, row.itemId))
+      ?? seen.get(primaryReview.opaqueReviewRowId(BATCH002_REREVIEW.originalBatchSha256, row.itemId));
+    if (selectedBundle !== canonical) {
+      fail(`batch-002 renderer output differs from the canonical HUMAN surface: ${row.itemId}`);
+    }
+    if (!grouped.has(row.semanticSkeletonId)) {
+      grouped.set(row.semanticSkeletonId, {
+        semanticSkeletonId: skeleton.semanticSkeletonId,
+        splitAssignment: skeleton.splitAssignment,
+        boundaryClass: skeleton.boundaryClass,
+        candidateFocus: skeleton.candidateFocus,
+        semanticRelations: skeleton.semanticRelations,
+        items: [],
+      });
+    }
+    grouped.get(row.semanticSkeletonId).items.push({ itemId: row.itemId, selectedBundle });
+  }
+  const skeletonGroups = [...grouped.values()]
+    .sort((left, right) => left.semanticSkeletonId < right.semanticSkeletonId ? -1 : 1);
+  for (const group of skeletonGroups) {
+    group.items.sort((left, right) => left.itemId < right.itemId ? -1 : 1);
+  }
+  const packetIds = skeletonGroups.flatMap(group => group.items.map(row => row.itemId));
+  if (skeletonGroups.length !== BATCH002_ADJUDICATION_EXPECTED.skeletonGroups) {
+    fail('batch-002 adjudication packet expects exactly 10 unique skeleton groups');
+  }
+  if (packetIds.length !== BATCH002_ADJUDICATION_EXPECTED.items
+    || new Set(packetIds).size !== packetIds.length
+    || packetIds.some(itemId => !mismatchIds.has(itemId))) {
+    fail('batch-002 adjudication packet contains a duplicated or non-mismatch item');
+  }
+  return {
+    name: BATCH002_ADJUDICATION_IDENTITY,
+    status: 'DIAGNOSTIC_ONLY_AWAITING_SEMANTIC_ADJUDICATION',
+    interpretationRule: INTERPRETATION_RULE,
+    currentSourceBatch: artifact.currentSourceBatch,
+    rendererIdentity: RENDERER_IDENTITY,
+    effectiveHumanDecisionArtifact: { identity: artifact.name },
+    mismatchDiagnostic: { identity: diagnostic.name },
+    exact56: { identity: exact56.name, rawSha256: EXACT56_SHA256 },
+    summary: {
+      mismatchItems: packetIds.length,
+      skeletonGroups: skeletonGroups.length,
+    },
+    adjudicationTaxonomy: ADJUDICATION_TAXONOMY,
+    authority: {
+      humanDecisionsAltered: false,
+      frozenSkeletonLabelsAltered: false,
+      acceptanceOrRejectionPerformed: false,
+      surfacesRepaired: false,
+      adjudicationPerformed: false,
+      neverExposedToBlindHumanReview: true,
+    },
+    skeletonGroups,
+  };
+}
+
 function writeRereviewPacket(inputPath, auditReceiptPath, originalPacketPath,
   originalReceiptPath, outputPath) {
   if (fs.existsSync(outputPath)) throw new Error(`Existing output will not be overwritten: ${outputPath}`);
@@ -841,6 +934,11 @@ module.exports = {
   BATCH002_EFFECTIVE_IDENTITY,
   BATCH002_EFFECTIVE_SUMMARY,
   BATCH002_MISMATCH_IDENTITY,
+  BATCH002_ADJUDICATION_IDENTITY,
+  BATCH002_ADJUDICATION_EXPECTED,
+  ADJUDICATION_TAXONOMY,
+  INTERPRETATION_RULE,
+  buildBatch002PragmaticAdjudicationPacket,
   buildSmokeBatchAcceptance,
   buildBatch002EffectiveHumanDecisionSet,
   buildBatch002MismatchDiagnostic,

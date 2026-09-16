@@ -64,12 +64,109 @@ label is ESCALATE. Neither side was relabeled; the mismatched identities live
 only in the separate non-HUMAN-facing diagnostic artifact and must never enter
 a blind HUMAN review packet. A mismatch does not itself authorize acceptance,
 rejection, or surface repair, so resolution of the 24 mismatched realizations
-is a repository-owner decision. Batch-002 corpus acceptance has not occurred,
+is a repository-owner decision. The repository owner has since approved the
+`CONSERVATIVE_PRAGMATIC_INTERPRETATION` rule below and a targeted 24-item
+adjudication packet is prepared, but the reconciliation itself remains
+unresolved: no mismatch was relabeled, and the next step is semantic
+adjudication, not acceptance. Batch-002 corpus acceptance has not occurred,
 the accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
 repeated review, training, raw-episode evaluation, private replay, and
 production remain UNOPENED/unchanged. Do not redesign the frozen
 skeleton catalog, generate training output, expose a model to FINAL surface
 items, or start training in this phase.
+
+## Conservative Pragmatic Interpretation
+
+This rule was opened because batch-002 reconciliation produced 24 mismatches
+out of 64 and every one of them runs in a single direction — current HUMAN
+`CLEAR` against a frozen skeleton `ESCALATE`. A disagreement that one-sided is
+a boundary definition problem, not 24 independent judgment errors, so the
+ambiguity-interpretation boundary is reopened to state the boundary explicitly.
+
+`CLEAR`: visible evidence, interpreted as ordinary cooperative conversation,
+supports one materially relevant semantic status as the natural dominant
+reading. A competing materially different status would require introducing an
+unstated event, fact, intention, exception, preference, or other additional
+premise not supplied by the visible evidence.
+
+`ESCALATE`: two or more materially different semantic statuses remain naturally
+licensed by the visible evidence itself, such that choosing one requires
+additional information.
+
+Allowed inference: ordinary lexical and grammatical meaning; discourse
+coherence and normal conversational implicature; tense, temporal ordering,
+bounded interval and condition relations; limited generic world/causal
+knowledge required for ordinary language understanding.
+
+Not allowed: hidden user intentions or preferences; personality inference;
+typicality alone ("people usually…"); inventing an event that was not
+evidenced; assuming a condition became true when that is not stated or
+pragmatically established; resolving a genuinely live referential or semantic
+alternative by guessing what was probably meant.
+
+The operational counter-reading test is one question: can a materially
+different competing reading be sustained using only the visible evidence, or
+does it require adding a new unstated premise? A visible-evidence-only
+competing reading is `ESCALATE`; a competing reading that requires a new
+unstated premise is `CLEAR`.
+
+Pragmatic inference may establish semantic status without establishing a
+separate real-world event. `매주 일요일마다 달렸다. 시험 기간에는 멈췄다. 시험은
+지난주에 끝났다.` may support `CLEAR` for the status of the recurring routine
+under this rule, without asserting that a post-exam run has already physically
+occurred.
+
+This clarification reopens only the ambiguity-interpretation boundary needed to
+resolve the batch-002 evidence. It does not reopen B6 ownership boundaries,
+durability, extraction, identity/correction/Core/governance, source-bundle
+rules, the renderer, the anchor contract, the split contract, corpus-size
+targets, or production behavior.
+
+The clarification is prospective and applies to targeted re-adjudication only.
+Existing HUMAN decisions and frozen skeleton labels remain historical immutable
+evidence until an explicit resolution is recorded. No mismatch is silently
+relabeled, and Exact56 labels are unchanged.
+
+## Targeted Pragmatic Adjudication Packet
+
+`fixtures/local-memory-inference-p1b6-pragmatic-adjudication-batch-002.json`
+holds exactly the 24 mismatched current items, grouped by their 10 unique
+`semanticSkeletonId` values. It is a diagnostic adjudication packet, **not** a
+HUMAN blind-review packet: it is derived mechanically by
+`buildBatch002PragmaticAdjudicationPacket` from the current batch, Exact56, the
+mismatch diagnostic, and the canonical renderer.
+
+Each skeleton group carries `semanticSkeletonId`, `splitAssignment`,
+`boundaryClass`, `candidateFocus`, `semanticRelations`, and its associated
+mismatch items; each item carries only `itemId` and the rendered
+`selectedBundle` exactly as the HUMAN reviewer saw it. The packet deliberately
+omits the current HUMAN decision, the frozen skeleton `humanLabel`, any
+generator intended label, any model-generated adjudication, and any
+acceptance/rejection recommendation, so that semantic comparison is possible
+without priming the adjudicator with the existing disagreement direction.
+
+The builder fails closed when the mismatch count is not exactly 24, the unique
+mismatch skeleton count is not exactly 10, a mismatch item is absent from the
+current batch, a skeleton is absent or duplicated, renderer output differs from
+the canonical HUMAN surface, or a non-mismatch item enters the packet. One
+mismatch item (`p1b6-item-b002-050`) is also one of the four repaired anchors,
+so the canonical surface for that item comes from the focused re-review packet
+rather than the original HUMAN packet.
+
+Adjudication outcomes are documented here but **not assigned**, in code or by
+heuristic; they require semantic adjudication:
+
+- `SKELETON_SEMANTICS_NEEDS_REVISION` — the surface faithfully realizes the
+  skeleton relations, and under Conservative Pragmatic Interpretation the
+  skeleton semantic status itself should be reconsidered.
+- `SURFACE_COLLAPSES_AMBIGUITY` — the frozen skeleton can remain `ESCALATE`;
+  the authored surface added pragmatic cues that eliminate the intended
+  ambiguity.
+- `HUMAN_DECISION_NEEDS_REREVIEW` — the current surface still contains a
+  genuinely live competing interpretation under the clarified rule, so the
+  existing HUMAN `CLEAR` decision requires a new blind re-review rather than
+  silent relabeling.
+- `UNRESOLVED` — evidence is insufficient to classify confidently; fail closed.
 
 ## Task Boundary
 

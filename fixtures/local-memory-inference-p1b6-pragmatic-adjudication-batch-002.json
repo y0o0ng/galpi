@@ -1,0 +1,266 @@
+{
+  "name": "xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-v1",
+  "status": "DIAGNOSTIC_ONLY_AWAITING_SEMANTIC_ADJUDICATION",
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "currentSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
+  },
+  "rendererIdentity": "xion-local-memory-inference-p1b6-surface-renderer-v1",
+  "effectiveHumanDecisionArtifact": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v1"
+  },
+  "mismatchDiagnostic": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-reconciliation-mismatches-batch-002-v1"
+  },
+  "exact56": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-exact56-v1",
+    "rawSha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602"
+  },
+  "summary": {
+    "mismatchItems": 24,
+    "skeletonGroups": 10
+  },
+  "adjudicationTaxonomy": [
+    "SKELETON_SEMANTICS_NEEDS_REVISION",
+    "SURFACE_COLLAPSES_AMBIGUITY",
+    "HUMAN_DECISION_NEEDS_REREVIEW",
+    "UNRESOLVED"
+  ],
+  "authority": {
+    "humanDecisionsAltered": false,
+    "frozenSkeletonLabelsAltered": false,
+    "acceptanceOrRejectionPerformed": false,
+    "surfacesRepaired": false,
+    "adjudicationPerformed": false,
+    "neverExposedToBlindHumanReview": true
+  },
+  "skeletonGroups": [
+    {
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "candidateFocus": "조건부 계획이 활성화되었는지 여부",
+      "semanticRelations": [
+        "대상 행동은 선행 조건에 묶여 있다.",
+        "뒤의 관계는 그 주제를 기억해 두어야 한다고 말한다.",
+        "그 선행 조건이 현재 충족되었는지를 말하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-058",
+          "selectedBundle": "USER: 주말 촬영 장소를 정하는 중이야.\n---\nUSER: 비가 오면 [TARGET]실내 촬영[/TARGET]으로 바꾸자는 조건부 계획을 적어 둬.\n---\nUSER: 그 계획은 기억해 줘."
+        },
+        {
+          "itemId": "p1b6-item-b002-060",
+          "selectedBundle": "USER: 업무 장비 예산안을 올려 둔 상태야.\n---\nUSER: 예산이 승인되면 큰 [TARGET]모니터를 사자[/TARGET]고 했어.\n---\nUSER: 그 조건부 계획은 계속 기억해 줘."
+        },
+        {
+          "itemId": "p1b6-item-b002-062",
+          "selectedBundle": "USER: 저녁 예약은 네 명 기준으로 보고 있어.\n---\nUSER: 동생이 합류하면 [TARGET]큰 테이블[/TARGET]을 예약하자.\n---\nUSER: 아, 확정 예약으로 적지는 말고 조건부 계획으로만 기억해 줘.\n---\nUSER: 큰 테이블은 창가 쪽으로 보고 있어."
+        },
+        {
+          "itemId": "p1b6-item-b002-064",
+          "selectedBundle": "USER: 예매가 열리면 [TARGET]야간 열차[/TARGET]로 잡자.\n---\nASSISTANT: 그 조건부 계획을 저장해 둘까?\nUSER: 응.\n---\nUSER: 야간 열차라면 창가 좌석이 좋아."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "candidateFocus": "새 컨테이너로 명시적 이동된 뒤 규칙의 적용 여부",
+      "semanticRelations": [
+        "규칙이 컨테이너 안의 항목들에 대해 진술된다.",
+        "대상이 나중에 그 컨테이너 안으로 옮겨진다.",
+        "이동된 대상이 그 규칙에서 제외된다는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-059",
+          "selectedBundle": "USER: 보관함 안 문서는 [TARGET]월말에 삭제[/TARGET]한다는 규칙이 있어.\n---\nUSER: 오늘 새 초안을 그 보관함으로 옮겼어."
+        },
+        {
+          "itemId": "p1b6-item-b002-061",
+          "selectedBundle": "USER: Shared folder 안의 기존 파일에는 [TARGET]read-only rule[/TARGET]이 있어. 방금 draft 하나를 그 폴더로 move했어."
+        },
+        {
+          "itemId": "p1b6-item-b002-063",
+          "selectedBundle": "USER: 빨간 바구니 안 옷은 오늘 [TARGET]세탁 대상[/TARGET]이라고 정했어.\n---\nUSER: 다시 세탁 얘기로 돌아가면 스카프를 방금 빨간 바구니로 옮겼어."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "splitAssignment": "DEV",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "candidateFocus": "경계선상 구성원에 대한 일반 규칙의 적용 여부",
+      "semanticRelations": [
+        "일반 규칙이 범주의 구성원에게 적용된다.",
+        "대상은 그 범주의 정의 관계 일부를 공유하지만 전부를 공유하지는 않는다.",
+        "부분 소속이 그 규칙에 충분한지를 말하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-047",
+          "selectedBundle": "USER: Coworking lounge의 [TARGET]resident rate[/TARGET] 규정을 보고 있어.\n---\nASSISTANT: 그 요금은 resident에게만 적용된다고 적혀 있네.\n---\nUSER: 나는 정식 입주 계약은 없고 guest pass만 있어.\n---\nUSER: 그래도 매주 사흘은 그 건물 guest room에 머물러.\n---\nUSER: 다시 rate 얘기로 돌아오면 장기 체류자에게 필요한 우편함도 쓰고 있어."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "candidateFocus": "뒤따르는 한정어의 범위",
+      "semanticRelations": [
+        "두 개의 병렬 대상 뒤에 한정어가 따른다.",
+        "그 한정어는 두 번째 대상에만 붙을 수도 있고 두 대상 전체에 붙을 수도 있다.",
+        "그 한정어가 붙는 경계를 표시하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-022",
+          "selectedBundle": "USER: 배포할 건 강의 자료와 연습문제야.\n---\nUSER: 아, 표현을 다시 할게. 강의 자료와 연습문제, [TARGET]초급자만[/TARGET].\n---\nASSISTANT: 그 문장 그대로 기록할게."
+        },
+        {
+          "itemId": "p1b6-item-b002-027",
+          "selectedBundle": "USER: Share the design notes and demo files [TARGET]for mobile only[/TARGET].\n---\nASSISTANT: 알겠어. 요청 문구대로 공유 목록에 적어 둘게."
+        },
+        {
+          "itemId": "p1b6-item-b002-032",
+          "selectedBundle": "USER: 창고에서 식물과 화분 받아 와.\n---\nUSER: [TARGET]베란다용만[/TARGET].\n---\nASSISTANT: 알겠어."
+        },
+        {
+          "itemId": "p1b6-item-b002-037",
+          "selectedBundle": "USER: Dashboard에서 alerts와 weekly reports를 보여 줘.\n---\nUSER: [TARGET]for admins only[/TARGET]라고 뒤에 붙여 뒀어."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REVISION / CONFLICT",
+      "candidateFocus": "나중 수정이 같은 대상 인스턴스에 적용되는지 여부",
+      "semanticRelations": [
+        "이전 관계가 한 대상 인스턴스에 상태를 부여한다.",
+        "나중 수정 관계가 비슷하게 설명된 인스턴스에 양립 불가능한 상태를 부여한다.",
+        "두 인스턴스 설명이 같은 인스턴스를 가리키는지 별도 인스턴스를 가리키는지를 말하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-049",
+          "selectedBundle": "USER: 어제 카페 앞에서 본 [TARGET]빨간 우산[/TARGET]은 손잡이가 깨져 있었어.\n---\nUSER: 오늘 역 앞에서 본 빨간 우산은 손잡이가 멀쩡하더라."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "candidateFocus": "반복 행동이 중단 이후에도 지속되는지 여부",
+      "semanticRelations": [
+        "대상에 반복 행동이 진술된다.",
+        "뒤의 관계는 어떤 상황 동안 그 행동이 멈췄다고 말한다.",
+        "그 상황 이후 행동이 재개되었는지, 계속 멈췄는지, 조건부가 되었는지를 말하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-023",
+          "selectedBundle": "USER: 다시 운동 얘기로 돌아가면, [TARGET]일요일마다 달리기[/TARGET]를 했는데 시험 기간에는 멈췄어. 시험은 지난주에 끝났어."
+        },
+        {
+          "itemId": "p1b6-item-b002-028",
+          "selectedBundle": "USER: 팀에 [TARGET]주간 뉴스레터[/TARGET]를 계속 보내 왔어.\n---\nUSER: 시스템 이전 작업 동안에는 발송을 멈췄지.\n---\nUSER: 그 이전 작업은 어제 끝났어."
+        },
+        {
+          "itemId": "p1b6-item-b002-033",
+          "selectedBundle": "USER: 매주 [TARGET]일요일 식사 준비[/TARGET]를 했는데 부엌 공사 중에는 중단했어.\n---\nUSER: 공사는 이제 끝났어."
+        },
+        {
+          "itemId": "p1b6-item-b002-038",
+          "selectedBundle": "USER: [TARGET]매일 단어 복습[/TARGET]을 해 왔어.\n---\nUSER: 정정할게, 여행 중에는 그 복습을 멈췄어.\n---\nUSER: 여행은 지난 주말에 끝났어."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "splitAssignment": "DEV",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "candidateFocus": "두 부분 관계가 말해지지 않은 연결에 의존하는 상태",
+      "semanticRelations": [
+        "한 관계가 한 맥락에서 대상 상태를 세운다.",
+        "다른 관계가 다른 맥락에서 대응되는 상태를 세운다.",
+        "두 맥락을 대상에 대해 결합해야 하는지, 비교해야 하는지, 분리해야 하는지를 말하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-050",
+          "selectedBundle": "USER: [TARGET]사무실에서 쓰는 노트북[/TARGET]은 배터리가 네 시간 갔어. 출장 중 시험한 노트북은 절전 모드에서 여섯 시간 갔고."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "candidateFocus": "부분 관계들이 경쟁하는 읽기로 향하는 상태",
+      "semanticRelations": [
+        "한 관계가 대상에 대한 첫 번째 상태를 지지한다.",
+        "다른 관계가 다른 상태와도 맞는 한정을 제공한다.",
+        "그 한정이 첫 번째 상태를 수정하는지 별도 상태를 만드는지를 말하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-024",
+          "selectedBundle": "USER: For the Finch workshops, use the [TARGET]quiet room[/TARGET].\n---\nASSISTANT: The coordinator also wrote that morning sessions may be flexible.\n---\nUSER: That part sounds useful.\n---\nASSISTANT: Okay, I will keep both notes as written."
+        },
+        {
+          "itemId": "p1b6-item-b002-029",
+          "selectedBundle": "USER: 기본 배송은 [TARGET]문 앞 배송[/TARGET]으로 적어 뒀어.\n---\nUSER: 비 오는 날은 로비도 괜찮다고 덧붙였어."
+        },
+        {
+          "itemId": "p1b6-item-b002-034",
+          "selectedBundle": "USER: The team handbook says [TARGET]formal dress[/TARGET] for client sessions. A later note says comfortable clothes are fine on remote days."
+        },
+        {
+          "itemId": "p1b6-item-b002-039",
+          "selectedBundle": "USER: 다시 사진 내보내기 얘기로 가자. 사진은 [TARGET]원본 크기[/TARGET]로 저장한다고 했고, 모바일 사본은 가볍게 해도 된다고 덧붙였어."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "candidateFocus": "보고된 상태를 사용자가 채택했는지 여부",
+      "semanticRelations": [
+        "대상 상태가 다른 화자에게 귀속된다.",
+        "뒤의 관계가 그 보고의 일부와 일치하는 태도를 표현한다.",
+        "그 일치가 대상 상태 자체를 채택하는지 지정하는 관계는 없다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-040",
+          "selectedBundle": "USER: 전시 담당자가 [TARGET]따뜻한 조명[/TARGET]을 쓰자고 했어.\n---\nUSER: 전시장 벽은 짙은 남색이야.\n---\nUSER: 따뜻한 조명이면 분위기는 좋겠다.\n---\nASSISTANT: 담당자 의견과 네 반응을 함께 메모해 둘게."
+        }
+      ]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "candidateFocus": "선호 진술이 탐색인지 정착된 태도인지 여부",
+      "semanticRelations": [
+        "한 관계가 어떤 태도에 끌림을 제시한다.",
+        "다른 관계는 대안들과의 비교를 요청한다.",
+        "보이는 구조는 그 끌림이 탐색일 뿐인지 현재 선택된 태도인지 말하지 않는다."
+      ],
+      "items": [
+        {
+          "itemId": "p1b6-item-b002-051",
+          "selectedBundle": "USER: 지금은 [TARGET]option B가 끌려[/TARGET].\n---\nUSER: 그래도 A와 C의 maintenance cost를 더 비교해 줘.\n---\nASSISTANT: 세 옵션 비교표를 이어서 만들어 볼게."
+        }
+      ]
+    }
+  ]
+}

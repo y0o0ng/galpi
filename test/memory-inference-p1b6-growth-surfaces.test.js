@@ -47,6 +47,10 @@ const MISMATCHES_002 =
 const MISMATCHES_002_SHA256 =
   '9a02ecfec486a6b5f5d1f586b2a2482dafc94a8b2f642e71e23f3653020129f5';
 const EXACT56_SHA256 = '772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602';
+const ADJUDICATION_002 =
+  'local-memory-inference-p1b6-pragmatic-adjudication-batch-002.json';
+const ADJUDICATION_002_SHA256 =
+  'dd8697b890f41a3541c38b7101bd93ee697889bdaa9ceafea114d2d7feef4967';
 const EFFECTIVE_001 =
   'local-memory-inference-p1b6-primary-human-effective-current-batch-001.json';
 const REREVIEW_IDS_002 = [
@@ -205,10 +209,14 @@ function buildBatch002Effective() {
   const rawRereviewPacket = humanRereview.packetBytes(humanRereview.buildBatch002RereviewPacket(
     rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
   ));
-  return humanRereview.buildBatch002EffectiveHumanDecisionSet(
-    rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
-    rawRereviewPacket, rereviewReceipt002, read(EXACT56),
-  );
+  return {
+    ...humanRereview.buildBatch002EffectiveHumanDecisionSet(
+      rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
+      rawRereviewPacket, rereviewReceipt002, read(EXACT56),
+    ),
+    rawOriginalPacket,
+    rawRereviewPacket,
+  };
 }
 
 test('batch-002 validates as the 64-item current adaptive-growth tranche', () => {
@@ -973,6 +981,88 @@ test('batch-002 reconciliation leaves every HUMAN and frozen skeleton label unto
     'humanLabel', 'skeletonLabel', 'semanticSkeletonId', 'splitAssignment',
     'boundaryClass', 'selectedBundle', 'reason', 'sourceEpisodeId',
   ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+});
+
+test('batch-002 pragmatic adjudication packet is exactly the 24 mismatches in 10 skeleton groups', () => {
+  const effective = buildBatch002Effective();
+  const packet = humanRereview.buildBatch002PragmaticAdjudicationPacket(
+    effective, effective.rawOriginalPacket, effective.rawRereviewPacket,
+  );
+  assert.equal(sha256RawBytes(read(ADJUDICATION_002)), ADJUDICATION_002_SHA256);
+  assert.deepEqual(JSON.parse(read(ADJUDICATION_002)), packet);
+
+  assert.equal(sha256RawBytes(rawBatch002), REPAIRED_BATCH_SHA256);
+  assert.equal(sha256RawBytes(read(EXACT56)), EXACT56_SHA256);
+  assert.equal(sha256RawBytes(read(EFFECTIVE_002)), EFFECTIVE_002_SHA256);
+  assert.equal(sha256RawBytes(read(MISMATCHES_002)), MISMATCHES_002_SHA256);
+
+  const canonical = new Map(JSON.parse(read(MISMATCHES_002)).mismatches
+    .map(row => [row.itemId, row.semanticSkeletonId]));
+  assert.equal(canonical.size, 24);
+  const items = packet.skeletonGroups.flatMap(group => group.items.map(row => row.itemId));
+  assert.equal(items.length, 24);
+  assert.equal(packet.skeletonGroups.length, 10);
+  assert.equal(new Set(packet.skeletonGroups.map(group => group.semanticSkeletonId)).size, 10);
+  assert.deepEqual(items.toSorted(), [...canonical.keys()].toSorted());
+  assert.deepEqual(packet.summary, { mismatchItems: 24, skeletonGroups: 10 });
+  assert.equal(packet.interpretationRule, 'CONSERVATIVE_PRAGMATIC_INTERPRETATION');
+  assert.deepEqual(packet.adjudicationTaxonomy, [
+    'SKELETON_SEMANTICS_NEEDS_REVISION', 'SURFACE_COLLAPSES_AMBIGUITY',
+    'HUMAN_DECISION_NEEDS_REREVIEW', 'UNRESOLVED',
+  ]);
+
+  const batchItems = new Map(batch002.items.map(item => [item.itemId, item]));
+  for (const group of packet.skeletonGroups) {
+    const skeleton = skeletons.get(group.semanticSkeletonId);
+    assert.deepEqual(Object.keys(group), ['semanticSkeletonId', 'splitAssignment',
+      'boundaryClass', 'candidateFocus', 'semanticRelations', 'items']);
+    assert.equal(group.splitAssignment, skeleton.splitAssignment);
+    assert.equal(group.boundaryClass, skeleton.boundaryClass);
+    assert.equal(group.candidateFocus, skeleton.candidateFocus);
+    assert.deepEqual(group.semanticRelations, skeleton.semanticRelations);
+    assert.deepEqual(group.items.map(row => row.itemId), group.items.map(row => row.itemId).toSorted());
+    for (const row of group.items) {
+      assert.deepEqual(Object.keys(row), ['itemId', 'selectedBundle']);
+      assert.equal(canonical.get(row.itemId), group.semanticSkeletonId, row.itemId);
+      assert.equal(row.selectedBundle,
+        surfaces.renderHumanReviewText(batch002, batchItems.get(row.itemId)), row.itemId);
+    }
+  }
+});
+
+test('batch-002 pragmatic adjudication packet leaks no label, decision, or adjudication result', () => {
+  const serialized = read(ADJUDICATION_002).toString('utf8');
+  for (const field of [
+    'currentHumanDecision', 'frozenSkeletonHumanLabel', 'humanLabel', 'skeletonLabel',
+    'intendedLabel', 'generatorIntendedLabel', 'decision', 'disposition',
+    'adjudication', 'adjudicationOutcome', 'result', 'recommendation',
+  ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+  const packet = JSON.parse(serialized);
+  assert.equal(packet.status, 'DIAGNOSTIC_ONLY_AWAITING_SEMANTIC_ADJUDICATION');
+  assert.deepEqual(packet.authority, {
+    humanDecisionsAltered: false,
+    frozenSkeletonLabelsAltered: false,
+    acceptanceOrRejectionPerformed: false,
+    surfacesRepaired: false,
+    adjudicationPerformed: false,
+    neverExposedToBlindHumanReview: true,
+  });
+  const effective = JSON.parse(read(EFFECTIVE_002));
+  assert.equal(effective.authority.humanReviewCompleted, false);
+  assert.equal(effective.status, 'RECONCILIATION_NEEDS_FIX');
+  assert.equal(acceptance.accepted.length, 30);
+  assert.equal(fs.existsSync(fixture(
+    'local-memory-inference-p1b6-smoke-batch-002-acceptance.json')), false);
+});
+
+test('batch-002 pragmatic adjudication packet fails closed on a non-mismatch or missing item', () => {
+  const effective = buildBatch002Effective();
+  const spliced = structuredClone(effective);
+  const clean = spliced.artifact.rows.find(row => row.itemId === 'p1b6-item-b002-001');
+  clean.decision = clean.decision === 'CLEAR' ? 'ESCALATE' : 'CLEAR';
+  assert.throws(() => humanRereview.buildBatch002PragmaticAdjudicationPacket(
+    spliced, effective.rawOriginalPacket, effective.rawRereviewPacket,
+  ), /mismatch/);
 });
 
 test('batch-002 acceptance and gold freeze have not been opened', () => {
