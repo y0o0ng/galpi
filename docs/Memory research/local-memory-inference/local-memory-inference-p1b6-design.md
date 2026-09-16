@@ -65,10 +65,19 @@ only in the separate non-HUMAN-facing diagnostic artifact and must never enter
 a blind HUMAN review packet. A mismatch does not itself authorize acceptance,
 rejection, or surface repair, so resolution of the 24 mismatched realizations
 is a repository-owner decision. The repository owner has since approved the
-`CONSERVATIVE_PRAGMATIC_INTERPRETATION` rule below and a targeted 24-item
-adjudication packet is prepared, but the reconciliation itself remains
-unresolved: no mismatch was relabeled, and the next step is semantic
-adjudication, not acceptance. Batch-002 corpus acceptance has not occurred,
+`CONSERVATIVE_PRAGMATIC_INTERPRETATION` rule below, including the refinement
+that a competing reading counts only when the visible evidence positively
+licenses it, and item-level semantic adjudication of all 24 mismatches is now
+COMPLETE at 10 `SKELETON_SEMANTICS_NEEDS_REVISION` / 11
+`SURFACE_COLLAPSES_AMBIGUITY` / 3 `HUMAN_DECISION_NEEDS_REREVIEW` / 0
+`UNRESOLVED`. That step is routing, not HUMAN relabeling: no HUMAN decision,
+frozen skeleton label, or surface changed. The reconciliation itself therefore
+remains unresolved, and three blockers stand — a fresh blind HUMAN re-review of
+the 3 routed rows, a targeted Exact56 semantic amendment decision for the 3
+affected frozen skeletons, and a repair-versus-rejection decision for the 11
+surface-collapse realizations. The owner's current reading of the three
+re-review rows was not blind and is not HUMAN gold. Batch-002 corpus acceptance
+has not occurred,
 the accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
 repeated review, training, raw-episode evaluation, private replay, and
 production remain UNOPENED/unchanged. Do not redesign the frozen
@@ -79,9 +88,12 @@ items, or start training in this phase.
 
 This rule was opened because batch-002 reconciliation produced 24 mismatches
 out of 64 and every one of them runs in a single direction — current HUMAN
-`CLEAR` against a frozen skeleton `ESCALATE`. A disagreement that one-sided is
-a boundary definition problem, not 24 independent judgment errors, so the
-ambiguity-interpretation boundary is reopened to state the boundary explicitly.
+`CLEAR` against a frozen skeleton `ESCALATE`. The strongly one-directional
+24/64 disagreement is strong evidence of a possible ambiguity-boundary
+definition problem and justified reopening that boundary for targeted
+clarification. Individual cases may still prove to be surface realization
+defects or HUMAN-review errors; the direction of the disagreement does not
+prove that all 24 mismatches are contract defects.
 
 `CLEAR`: visible evidence, interpreted as ordinary cooperative conversation,
 supports one materially relevant semantic status as the natural dominant
@@ -102,13 +114,21 @@ Not allowed: hidden user intentions or preferences; personality inference;
 typicality alone ("people usually…"); inventing an event that was not
 evidenced; assuming a condition became true when that is not stated or
 pragmatically established; resolving a genuinely live referential or semantic
-alternative by guessing what was probably meant.
+alternative by guessing what was probably meant; treating mere
+logical compatibility as a live competing reading.
 
 The operational counter-reading test is one question: can a materially
 different competing reading be sustained using only the visible evidence, or
 does it require adding a new unstated premise? A visible-evidence-only
 competing reading is `ESCALATE`; a competing reading that requires a new
 unstated premise is `CLEAR`.
+
+**Refinement — a competing reading counts only when the visible evidence
+positively licenses it.** Mere logical compatibility does not preserve
+ambiguity. If maintaining a counter-reading requires constructing an unstated
+category rule, event, identity continuity, possibility, or other premise, that
+counter-reading does not by itself force `ESCALATE`. Treating bare logical
+compatibility as a live competing reading is not allowed inference.
 
 Pragmatic inference may establish semantic status without establishing a
 separate real-world event. `매주 일요일마다 달렸다. 시험 기간에는 멈췄다. 시험은
@@ -167,6 +187,85 @@ heuristic; they require semantic adjudication:
   existing HUMAN `CLEAR` decision requires a new blind re-review rather than
   silent relabeling.
 - `UNRESOLVED` — evidence is insufficient to classify confidently; fail closed.
+
+## Item-Level Semantic Adjudication Receipt
+
+`fixtures/local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt.json`
+records the repository owner's item-level routing of all 24 mismatches under
+Conservative Pragmatic Interpretation:
+
+| outcome | count |
+| --- | --- |
+| `SKELETON_SEMANTICS_NEEDS_REVISION` | 10 |
+| `SURFACE_COLLAPSES_AMBIGUITY` | 11 |
+| `HUMAN_DECISION_NEEDS_REREVIEW` | 3 |
+| `UNRESOLVED` | 0 |
+
+Each row carries only `itemId` and `outcome`. **Semantic adjudication is
+routing, not HUMAN relabeling**: the receipt assigns no replacement
+`CLEAR`/`ESCALATE` gold, amends no frozen skeleton, and repairs no surface. It
+binds to the current batch, Exact56, the effective-current artifact, the
+canonical mismatch diagnostic, the pragmatic adjudication packet, and the
+interpretation rule identity.
+
+The 10 `SKELETON_SEMANTICS_NEEDS_REVISION` items span only three unique frozen
+skeletons. Their eventual amendment may require changing candidate focus,
+relations, or label with corpus-balance implications rather than merely
+flipping a label, so Exact56 stays byte-identical and the amendment is recorded
+as required, not performed. The 11 `SURFACE_COLLAPSES_AMBIGUITY` realizations
+are likewise untouched: repair-versus-dataset-rejection is a separate
+repository-owner resolution.
+
+The repository owner currently reads the three `HUMAN_DECISION_NEEDS_REREVIEW`
+rows as `ESCALATE`, but **those judgments were not blind** — the owner already
+knew the rows came from the reconciliation mismatch. They are therefore **not
+HUMAN gold**. They justify one thing only: routing those three rows to a fresh
+blind HUMAN review, attempt `p1b6-primary-human-rereview-batch-002-attempt-003`.
+
+`validateBatch002PragmaticAdjudicationReceipt` fails closed unless the receipt
+binds to every canonical artifact, holds exactly one sorted row per canonical
+mismatch item, matches the 10/11/3/0 summary, and claims no authority it does
+not have. Item-level outcomes live in the committed receipt, never in script
+source.
+
+## Canonical Mismatch Binding
+
+`buildBatch002PragmaticAdjudicationPacket` and the receipt validator consume
+the canonical mismatch diagnostic's **raw bytes**, not a diagnostic recomputed
+from a supplied effective object. `validateBatch002MismatchDiagnostic` fails
+closed unless the bytes hash to
+`9a02ecfec486a6b5f5d1f586b2a2482dafc94a8b2f642e71e23f3653020129f5`, carry the
+expected identity, bind to the current batch / effective artifact / Exact56,
+hold exactly 24 unique mismatch `itemId`s across exactly the canonical 10
+skeleton IDs, and agree mechanically with the diagnostic recomputed from the
+current effective rows and Exact56.
+
+The canonical diagnostic is source-of-truth for **which** reconciliation
+mismatches are adjudicated. A caller cannot mutate effective rows to substitute
+a different 24-item mismatch set while preserving the counts: flipping one
+clean row into a mismatch and one mismatch row back into a match keeps the
+count at 24 but breaks the mechanical agreement, so the build fails.
+
+## Fresh Blind HUMAN Re-Review — attempt 003
+
+`buildBatch002RereviewAttempt003Packet` builds the blind packet for exactly the
+`HUMAN_DECISION_NEEDS_REREVIEW` rows. **Selection is derived from the canonical
+semantic adjudication receipt**, not from a hard-coded item list, and the
+builder fails closed unless exactly three rows are selected and the receipt
+binds to the current batch, Exact56, and the mismatch diagnostic.
+
+HUMAN-facing rows expose only `reviewRowId` and `selectedBundle`, where
+`selectedBundle` is exactly the canonical renderer output. The packet carries
+no `itemId`, `semanticSkeletonId`, split, boundary class, previous HUMAN
+decision, frozen skeleton `humanLabel`, mismatch direction, adjudication
+outcome, model recommendation, or expected answer; no `p1b6-item-` or
+`p1b6-sk-` identifier appears anywhere in it.
+
+Following repository convention, HUMAN review packets are generated rather than
+committed — only their decision receipts are committed. The attempt-003 packet
+is deterministic at raw SHA-256
+`165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2`. **The blind
+review has not been performed**, so no attempt-003 decision receipt exists.
 
 ## Task Boundary
 

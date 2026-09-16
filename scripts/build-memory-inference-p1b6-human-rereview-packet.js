@@ -71,6 +71,43 @@ const BATCH002_EFFECTIVE_SUMMARY = Object.freeze({
 const BATCH002_ADJUDICATION_IDENTITY =
   'xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-v1';
 const BATCH002_ADJUDICATION_EXPECTED = Object.freeze({ items: 24, skeletonGroups: 10 });
+const BATCH002_EFFECTIVE_SHA256 =
+  'd0e5dcc2da7d1f87b4886d6e5b6726c1053c88fdc4cdf8fbd144a47c3cddf38f';
+const BATCH002_MISMATCH_SHA256 =
+  '9a02ecfec486a6b5f5d1f586b2a2482dafc94a8b2f642e71e23f3653020129f5';
+const BATCH002_ADJUDICATION_SHA256 =
+  'dd8697b890f41a3541c38b7101bd93ee697889bdaa9ceafea114d2d7feef4967';
+// The canonical 10 unique mismatch skeletons, lexically sorted. The diagnostic is
+// source-of-truth for WHICH 24 reconciliation mismatches are adjudicated, so a caller
+// cannot mutate effective rows and substitute a different 24-item set of the same size.
+const BATCH002_MISMATCH_SKELETONS = Object.freeze([
+  'p1b6-sk-155420007d75f36f',
+  'p1b6-sk-2fa39ece4157b2b8',
+  'p1b6-sk-5269c91fcfb6c2cd',
+  'p1b6-sk-5f335bdc1d9d630c',
+  'p1b6-sk-5fc872afb058b370',
+  'p1b6-sk-8dd28ec6b22a18ad',
+  'p1b6-sk-aebbf047d6864a35',
+  'p1b6-sk-be0efa305956d111',
+  'p1b6-sk-cc054a4227cdafef',
+  'p1b6-sk-e7fe317a78077d37',
+]);
+const BATCH002_ADJUDICATION_RECEIPT_IDENTITY =
+  'xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt-v1';
+const BATCH002_ADJUDICATION_SUMMARY = Object.freeze({
+  total: 24,
+  SKELETON_SEMANTICS_NEEDS_REVISION: 10,
+  SURFACE_COLLAPSES_AMBIGUITY: 11,
+  HUMAN_DECISION_NEEDS_REREVIEW: 3,
+  UNRESOLVED: 0,
+});
+const BATCH002_REREVIEW_003 = Object.freeze({
+  attemptId: 'p1b6-primary-human-rereview-batch-002-attempt-003',
+  selectionOutcome: 'HUMAN_DECISION_NEEDS_REREVIEW',
+  expectedRows: 3,
+  // HUMAN review packets are generated, never committed; only their receipts are.
+  packetSha256: '165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2',
+});
 const INTERPRETATION_RULE = 'CONSERVATIVE_PRAGMATIC_INTERPRETATION';
 const ADJUDICATION_TAXONOMY = Object.freeze([
   'SKELETON_SEMANTICS_NEEDS_REVISION',
@@ -815,10 +852,37 @@ function buildBatch002MismatchDiagnostic(effective) {
   };
 }
 
+// The canonical mismatch diagnostic decides WHICH reconciliation mismatches are
+// adjudicated. Binding to its raw bytes, and requiring it to agree mechanically with the
+// recomputed diagnostic, stops a caller from mutating effective rows into a different
+// 24-item mismatch set that still preserves the counts.
+function validateBatch002MismatchDiagnostic(effective, rawMismatchDiagnosticBytes) {
+  if (sha256RawBytes(rawMismatchDiagnosticBytes) !== BATCH002_MISMATCH_SHA256) {
+    fail('canonical batch-002 mismatch diagnostic bytes are invalid');
+  }
+  const diagnostic = JSON.parse(Buffer.from(rawMismatchDiagnosticBytes).toString('utf8'));
+  if (diagnostic.name !== BATCH002_MISMATCH_IDENTITY
+    || diagnostic.currentSourceBatch?.rawSha256 !== BATCH002_REREVIEW.currentBatchSha256
+    || diagnostic.effectiveHumanDecisionArtifact?.identity !== BATCH002_EFFECTIVE_IDENTITY
+    || diagnostic.exact56?.rawSha256 !== EXACT56_SHA256
+    || JSON.stringify(diagnostic) !== JSON.stringify(buildBatch002MismatchDiagnostic(effective))) {
+    fail('canonical batch-002 mismatch diagnostic does not bind to the current artifacts');
+  }
+  const itemIds = diagnostic.mismatches.map(row => row.itemId);
+  const skeletonIds = [...new Set(diagnostic.mismatches.map(row => row.semanticSkeletonId))]
+    .sort((left, right) => left < right ? -1 : 1);
+  if (itemIds.length !== BATCH002_ADJUDICATION_EXPECTED.items
+    || new Set(itemIds).size !== itemIds.length
+    || JSON.stringify(skeletonIds) !== JSON.stringify([...BATCH002_MISMATCH_SKELETONS])) {
+    fail('canonical batch-002 mismatch diagnostic is not the expected 24-item mismatch set');
+  }
+  return diagnostic;
+}
+
 function buildBatch002PragmaticAdjudicationPacket(effective,
-  rawOriginalPacketBytes, rawRereviewPacketBytes) {
+  rawOriginalPacketBytes, rawRereviewPacketBytes, rawMismatchDiagnosticBytes) {
   const { artifact, batch, exact56 } = effective;
-  const diagnostic = buildBatch002MismatchDiagnostic(effective);
+  const diagnostic = validateBatch002MismatchDiagnostic(effective, rawMismatchDiagnosticBytes);
   const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
   const items = new Map(batch.items.map(item => [item.itemId, item]));
   const mismatchIds = new Set(diagnostic.mismatches.map(row => row.itemId));
@@ -898,6 +962,137 @@ function buildBatch002PragmaticAdjudicationPacket(effective,
   };
 }
 
+// The committed receipt carries the repository owner's item-level semantic routing; this
+// script validates it and never authors an outcome. Routing is bound to the canonical
+// mismatch diagnostic, so it can only ever describe those exact 24 reconciliation
+// mismatches.
+function validateBatch002PragmaticAdjudicationReceipt(effective, rawOriginalPacketBytes,
+  rawRereviewPacketBytes, rawMismatchDiagnosticBytes, rawEffectiveBytes, rawReceiptBytes) {
+  const diagnostic = validateBatch002MismatchDiagnostic(effective, rawMismatchDiagnosticBytes);
+  if (sha256RawBytes(rawEffectiveBytes) !== BATCH002_EFFECTIVE_SHA256
+    || JSON.stringify(JSON.parse(Buffer.from(rawEffectiveBytes).toString('utf8')))
+      !== JSON.stringify(effective.artifact)) {
+    fail('batch-002 effective-current artifact bytes are invalid');
+  }
+  const packet = buildBatch002PragmaticAdjudicationPacket(effective, rawOriginalPacketBytes,
+    rawRereviewPacketBytes, rawMismatchDiagnosticBytes);
+  if (sha256RawBytes(packetBytes(packet)) !== BATCH002_ADJUDICATION_SHA256) {
+    fail('batch-002 pragmatic adjudication packet bytes changed');
+  }
+
+  const receipt = JSON.parse(Buffer.from(rawReceiptBytes).toString('utf8'));
+  if (!exactKeys(receipt, [
+    'name', 'status', 'interpretationRule', 'currentSourceBatch',
+    'effectiveHumanDecisionArtifact', 'mismatchDiagnostic', 'pragmaticAdjudicationPacket',
+    'exact56', 'summary', 'pendingResolutions', 'authority', 'rows',
+  ]) || receipt.name !== BATCH002_ADJUDICATION_RECEIPT_IDENTITY
+    || receipt.status !== 'COMPLETE_WITH_HUMAN_REREVIEW_REQUIRED'
+    || receipt.interpretationRule !== INTERPRETATION_RULE
+    || receipt.currentSourceBatch.rawSha256 !== BATCH002_REREVIEW.currentBatchSha256
+    || receipt.currentSourceBatch.identity !== effective.batch.name
+    || receipt.effectiveHumanDecisionArtifact.identity !== BATCH002_EFFECTIVE_IDENTITY
+    || receipt.effectiveHumanDecisionArtifact.rawSha256 !== BATCH002_EFFECTIVE_SHA256
+    || receipt.mismatchDiagnostic.identity !== diagnostic.name
+    || receipt.mismatchDiagnostic.rawSha256 !== BATCH002_MISMATCH_SHA256
+    || receipt.pragmaticAdjudicationPacket.identity !== packet.name
+    || receipt.pragmaticAdjudicationPacket.rawSha256 !== BATCH002_ADJUDICATION_SHA256
+    || receipt.exact56.identity !== effective.exact56.name
+    || receipt.exact56.rawSha256 !== EXACT56_SHA256) {
+    fail('batch-002 semantic adjudication receipt does not bind to the canonical artifacts');
+  }
+
+  // Exactly one row per canonical mismatch item, sorted, carrying only a routing outcome.
+  const mismatchIds = new Set(diagnostic.mismatches.map(row => row.itemId));
+  const itemIds = receipt.rows.map(row => row.itemId);
+  const summary = { total: receipt.rows.length };
+  for (const outcome of ADJUDICATION_TAXONOMY) {
+    summary[outcome] = receipt.rows.filter(row => row.outcome === outcome).length;
+  }
+  if (itemIds.length !== mismatchIds.size
+    || new Set(itemIds).size !== itemIds.length
+    || itemIds.some(itemId => !mismatchIds.has(itemId))
+    || JSON.stringify(itemIds) !== JSON.stringify([...itemIds].sort((left, right) =>
+      left < right ? -1 : 1))
+    || receipt.rows.some(row => !exactKeys(row, ['itemId', 'outcome'])
+      || !ADJUDICATION_TAXONOMY.includes(row.outcome))
+    || JSON.stringify(receipt.summary) !== JSON.stringify(BATCH002_ADJUDICATION_SUMMARY)
+    || JSON.stringify(summary) !== JSON.stringify(BATCH002_ADJUDICATION_SUMMARY)) {
+    fail('batch-002 semantic adjudication rows are not exactly the canonical mismatch set');
+  }
+
+  // Routing records what still has to be resolved; it assigns no HUMAN gold and amends nothing.
+  const skeletonOf = new Map(diagnostic.mismatches.map(row => [row.itemId, row.semanticSkeletonId]));
+  const revisionSkeletons = [...new Set(receipt.rows
+    .filter(row => row.outcome === 'SKELETON_SEMANTICS_NEEDS_REVISION')
+    .map(row => skeletonOf.get(row.itemId)))].sort((left, right) => left < right ? -1 : 1);
+  const { pendingResolutions: pending, authority } = receipt;
+  if (JSON.stringify(pending.exact56SemanticAmendment.semanticSkeletonIds)
+      !== JSON.stringify(revisionSkeletons)
+    || pending.surfaceRepairOrDatasetRejection.itemCount !== summary.SURFACE_COLLAPSES_AMBIGUITY
+    || pending.freshBlindHumanRereview.itemCount !== summary.HUMAN_DECISION_NEEDS_REREVIEW
+    || pending.freshBlindHumanRereview.attemptId !== BATCH002_REREVIEW_003.attemptId
+    || Object.values(pending).some(entry => entry.required !== true)
+    || authority.humanGoldAssigned !== false || authority.humanDecisionsAltered !== false
+    || authority.frozenSkeletonLabelsAltered !== false || authority.exact56Amended !== false
+    || authority.surfacesRepaired !== false
+    || authority.acceptanceOrRejectionPerformed !== false) {
+    fail('batch-002 semantic adjudication receipt claims authority it does not have');
+  }
+  return { receipt, diagnostic, packet, revisionSkeletons };
+}
+
+// Fresh blind HUMAN re-review packet for exactly the HUMAN_DECISION_NEEDS_REREVIEW rows.
+// Selection comes from the canonical semantic adjudication receipt, and the HUMAN-facing
+// rows carry nothing but an opaque row ID and the canonical rendered bundle.
+function buildBatch002RereviewAttempt003Packet(rawBatchBytes, auditReceipt,
+  rawAdjudicationReceiptBytes) {
+  const { batch, batchSha256, attemptId } = primaryReview.validateAuditReceipt(
+    auditReceipt, rawBatchBytes,
+  );
+  if (batchSha256 !== BATCH002_REREVIEW.currentBatchSha256
+    || attemptId !== BATCH002_REREVIEW.auditAttemptId) {
+    fail('batch-002 attempt-003 current batch or audit binding is invalid');
+  }
+  const receipt = JSON.parse(Buffer.from(rawAdjudicationReceiptBytes).toString('utf8'));
+  if (receipt.name !== BATCH002_ADJUDICATION_RECEIPT_IDENTITY
+    || receipt.interpretationRule !== INTERPRETATION_RULE
+    || receipt.currentSourceBatch?.rawSha256 !== BATCH002_REREVIEW.currentBatchSha256
+    || receipt.exact56?.rawSha256 !== EXACT56_SHA256
+    || receipt.mismatchDiagnostic?.rawSha256 !== BATCH002_MISMATCH_SHA256
+    || !Array.isArray(receipt.rows)
+    || receipt.rows.length !== BATCH002_ADJUDICATION_EXPECTED.items) {
+    fail('batch-002 semantic adjudication receipt binding is invalid');
+  }
+
+  const items = new Map(batch.items.map(item => [item.itemId, item]));
+  const selected = receipt.rows
+    .filter(row => row.outcome === BATCH002_REREVIEW_003.selectionOutcome)
+    .map(row => row.itemId);
+  if (selected.length !== BATCH002_REREVIEW_003.expectedRows
+    || new Set(selected).size !== selected.length) {
+    fail('batch-002 attempt-003 expects exactly three HUMAN re-review rows');
+  }
+  const rows = selected.map(itemId => {
+    const item = items.get(itemId);
+    if (!item) fail(`batch-002 attempt-003 row is absent from the current batch: ${itemId}`);
+    return {
+      reviewRowId: opaqueRereviewRowId(batchSha256, itemId),
+      selectedBundle: renderHumanReviewText(batch, item),
+    };
+  }).sort((left, right) => left.reviewRowId < right.reviewRowId ? -1 : 1);
+  if (new Set(rows.map(row => row.reviewRowId)).size !== rows.length) {
+    fail('batch-002 attempt-003 review row IDs are not unique');
+  }
+  return {
+    name: PACKET_IDENTITY,
+    attemptId: BATCH002_REREVIEW_003.attemptId,
+    sourceBatch: { identity: batch.name, sha256: batchSha256 },
+    rendererIdentity: RENDERER_IDENTITY,
+    sourceAuditAttempt: BATCH002_REREVIEW.auditAttemptId,
+    rows,
+  };
+}
+
 function writeRereviewPacket(inputPath, auditReceiptPath, originalPacketPath,
   originalReceiptPath, outputPath) {
   if (fs.existsSync(outputPath)) throw new Error(`Existing output will not be overwritten: ${outputPath}`);
@@ -938,7 +1133,12 @@ module.exports = {
   BATCH002_ADJUDICATION_EXPECTED,
   ADJUDICATION_TAXONOMY,
   INTERPRETATION_RULE,
+  BATCH002_ADJUDICATION_RECEIPT_IDENTITY,
+  BATCH002_ADJUDICATION_SUMMARY,
+  BATCH002_MISMATCH_SKELETONS,
+  BATCH002_REREVIEW_003,
   buildBatch002PragmaticAdjudicationPacket,
+  buildBatch002RereviewAttempt003Packet,
   buildSmokeBatchAcceptance,
   buildBatch002EffectiveHumanDecisionSet,
   buildBatch002MismatchDiagnostic,
@@ -952,6 +1152,8 @@ module.exports = {
   parseArgs,
   reconcileEffectiveHumanDecisions,
   validateAuditReceipt,
+  validateBatch002MismatchDiagnostic,
+  validateBatch002PragmaticAdjudicationReceipt,
   validateBatch002RereviewReceipt,
   validateOriginalPacket,
   validateRereviewReceipt,

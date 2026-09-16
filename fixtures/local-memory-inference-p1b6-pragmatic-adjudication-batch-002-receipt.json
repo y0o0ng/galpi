@@ -1,0 +1,158 @@
+{
+  "name": "xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt-v1",
+  "status": "COMPLETE_WITH_HUMAN_REREVIEW_REQUIRED",
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "currentSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
+  },
+  "effectiveHumanDecisionArtifact": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v1",
+    "rawSha256": "d0e5dcc2da7d1f87b4886d6e5b6726c1053c88fdc4cdf8fbd144a47c3cddf38f"
+  },
+  "mismatchDiagnostic": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-reconciliation-mismatches-batch-002-v1",
+    "rawSha256": "9a02ecfec486a6b5f5d1f586b2a2482dafc94a8b2f642e71e23f3653020129f5"
+  },
+  "pragmaticAdjudicationPacket": {
+    "identity": "xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-v1",
+    "rawSha256": "dd8697b890f41a3541c38b7101bd93ee697889bdaa9ceafea114d2d7feef4967"
+  },
+  "exact56": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-exact56-v1",
+    "rawSha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602"
+  },
+  "summary": {
+    "total": 24,
+    "SKELETON_SEMANTICS_NEEDS_REVISION": 10,
+    "SURFACE_COLLAPSES_AMBIGUITY": 11,
+    "HUMAN_DECISION_NEEDS_REREVIEW": 3,
+    "UNRESOLVED": 0
+  },
+  "pendingResolutions": {
+    "exact56SemanticAmendment": {
+      "required": true,
+      "semanticSkeletonIds": [
+        "p1b6-sk-155420007d75f36f",
+        "p1b6-sk-2fa39ece4157b2b8",
+        "p1b6-sk-8dd28ec6b22a18ad"
+      ]
+    },
+    "surfaceRepairOrDatasetRejection": {
+      "required": true,
+      "itemCount": 11
+    },
+    "freshBlindHumanRereview": {
+      "required": true,
+      "attemptId": "p1b6-primary-human-rereview-batch-002-attempt-003",
+      "itemCount": 3
+    }
+  },
+  "authority": {
+    "humanDecisionsAltered": false,
+    "frozenSkeletonLabelsAltered": false,
+    "humanGoldAssigned": false,
+    "acceptanceOrRejectionPerformed": false,
+    "surfacesRepaired": false,
+    "exact56Amended": false,
+    "neverExposedToBlindHumanReview": true
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b002-022",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-023",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-024",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-027",
+      "outcome": "HUMAN_DECISION_NEEDS_REREVIEW"
+    },
+    {
+      "itemId": "p1b6-item-b002-028",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-029",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-032",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-033",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-034",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-037",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-038",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-039",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-040",
+      "outcome": "HUMAN_DECISION_NEEDS_REREVIEW"
+    },
+    {
+      "itemId": "p1b6-item-b002-047",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-049",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-050",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "outcome": "SURFACE_COLLAPSES_AMBIGUITY"
+    },
+    {
+      "itemId": "p1b6-item-b002-058",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-060",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-061",
+      "outcome": "HUMAN_DECISION_NEEDS_REREVIEW"
+    },
+    {
+      "itemId": "p1b6-item-b002-062",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-064",
+      "outcome": "SKELETON_SEMANTICS_NEEDS_REVISION"
+    }
+  ]
+}

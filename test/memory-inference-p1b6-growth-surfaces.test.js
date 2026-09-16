@@ -51,6 +51,17 @@ const ADJUDICATION_002 =
   'local-memory-inference-p1b6-pragmatic-adjudication-batch-002.json';
 const ADJUDICATION_002_SHA256 =
   'dd8697b890f41a3541c38b7101bd93ee697889bdaa9ceafea114d2d7feef4967';
+const ADJUDICATION_RECEIPT_002 =
+  'local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt.json';
+const ADJUDICATION_RECEIPT_002_SHA256 =
+  'cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa';
+const REREVIEW_003_PACKET_SHA256 =
+  '165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2';
+const REREVIEW_003_ROW_IDS = [
+  'p1b6-rereview-2c251b9d9e952944',
+  'p1b6-rereview-a0c1900947d7341b',
+  'p1b6-rereview-f53ff2ec780365d2',
+];
 const EFFECTIVE_001 =
   'local-memory-inference-p1b6-primary-human-effective-current-batch-001.json';
 const REREVIEW_IDS_002 = [
@@ -986,7 +997,7 @@ test('batch-002 reconciliation leaves every HUMAN and frozen skeleton label unto
 test('batch-002 pragmatic adjudication packet is exactly the 24 mismatches in 10 skeleton groups', () => {
   const effective = buildBatch002Effective();
   const packet = humanRereview.buildBatch002PragmaticAdjudicationPacket(
-    effective, effective.rawOriginalPacket, effective.rawRereviewPacket,
+    effective, effective.rawOriginalPacket, effective.rawRereviewPacket, read(MISMATCHES_002),
   );
   assert.equal(sha256RawBytes(read(ADJUDICATION_002)), ADJUDICATION_002_SHA256);
   assert.deepEqual(JSON.parse(read(ADJUDICATION_002)), packet);
@@ -1061,8 +1072,183 @@ test('batch-002 pragmatic adjudication packet fails closed on a non-mismatch or 
   const clean = spliced.artifact.rows.find(row => row.itemId === 'p1b6-item-b002-001');
   clean.decision = clean.decision === 'CLEAR' ? 'ESCALATE' : 'CLEAR';
   assert.throws(() => humanRereview.buildBatch002PragmaticAdjudicationPacket(
-    spliced, effective.rawOriginalPacket, effective.rawRereviewPacket,
+    spliced, effective.rawOriginalPacket, effective.rawRereviewPacket, read(MISMATCHES_002),
   ), /mismatch/);
+});
+
+test('batch-002 adjudication binds to the canonical mismatch diagnostic raw bytes', () => {
+  const effective = buildBatch002Effective();
+  const args = [effective.rawOriginalPacket, effective.rawRereviewPacket];
+  assert.equal(sha256RawBytes(read(MISMATCHES_002)), MISMATCHES_002_SHA256);
+  assert.deepEqual(humanRereview.validateBatch002MismatchDiagnostic(effective, read(MISMATCHES_002)),
+    JSON.parse(read(MISMATCHES_002)));
+
+  // A diagnostic whose bytes are not the canonical ones is refused outright.
+  const retagged = humanRereview.packetBytes({
+    ...JSON.parse(read(MISMATCHES_002)), status: 'DIAGNOSTIC_ONLY',
+  });
+  assert.notEqual(sha256RawBytes(retagged), MISMATCHES_002_SHA256);
+  assert.throws(() => humanRereview.buildBatch002PragmaticAdjudicationPacket(
+    effective, ...args, retagged,
+  ), /mismatch diagnostic bytes are invalid/);
+
+  // Count-preserving substitution: flip one clean row into a mismatch and one mismatch row
+  // back into a match. The mismatch count stays 24 but the set differs, so it must fail.
+  const substituted = structuredClone(effective);
+  const rows = new Map(substituted.artifact.rows.map(row => [row.itemId, row]));
+  const flip = row => { row.decision = row.decision === 'CLEAR' ? 'ESCALATE' : 'CLEAR'; };
+  flip(rows.get('p1b6-item-b002-001'));
+  flip(rows.get('p1b6-item-b002-022'));
+  assert.equal(humanRereview.buildBatch002MismatchDiagnostic(substituted).mismatches.length, 24);
+  assert.notDeepEqual(
+    humanRereview.buildBatch002MismatchDiagnostic(substituted).mismatches.map(row => row.itemId),
+    JSON.parse(read(MISMATCHES_002)).mismatches.map(row => row.itemId));
+  assert.throws(() => humanRereview.buildBatch002PragmaticAdjudicationPacket(
+    substituted, ...args, read(MISMATCHES_002),
+  ), /does not bind to the current artifacts/);
+  assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
+    substituted, ...args, read(MISMATCHES_002), read(EFFECTIVE_002),
+    read(ADJUDICATION_RECEIPT_002),
+  ), /does not bind to the current artifacts/);
+});
+
+test('batch-002 semantic adjudication receipt routes exactly the canonical 24 mismatches', () => {
+  const effective = buildBatch002Effective();
+  const { receipt, revisionSkeletons } = humanRereview.validateBatch002PragmaticAdjudicationReceipt(
+    effective, effective.rawOriginalPacket, effective.rawRereviewPacket,
+    read(MISMATCHES_002), read(EFFECTIVE_002), read(ADJUDICATION_RECEIPT_002),
+  );
+  assert.equal(sha256RawBytes(read(ADJUDICATION_RECEIPT_002)), ADJUDICATION_RECEIPT_002_SHA256);
+  assert.deepEqual(JSON.parse(read(ADJUDICATION_RECEIPT_002)), receipt);
+  assert.equal(receipt.name, humanRereview.BATCH002_ADJUDICATION_RECEIPT_IDENTITY);
+  assert.equal(receipt.status, 'COMPLETE_WITH_HUMAN_REREVIEW_REQUIRED');
+  assert.equal(receipt.interpretationRule, 'CONSERVATIVE_PRAGMATIC_INTERPRETATION');
+
+  assert.deepEqual(receipt.summary, {
+    total: 24,
+    SKELETON_SEMANTICS_NEEDS_REVISION: 10,
+    SURFACE_COLLAPSES_AMBIGUITY: 11,
+    HUMAN_DECISION_NEEDS_REREVIEW: 3,
+    UNRESOLVED: 0,
+  });
+
+  // Every row is one of the canonical 24, each appears exactly once, nothing else enters.
+  const canonical = JSON.parse(read(MISMATCHES_002)).mismatches.map(row => row.itemId);
+  assert.equal(canonical.length, 24);
+  assert.equal(receipt.rows.length, 24);
+  assert.deepEqual(receipt.rows.map(row => row.itemId), canonical.toSorted());
+  assert.deepEqual(receipt.rows.map(row => row.itemId), receipt.rows.map(row => row.itemId).toSorted());
+  assert.equal(new Set(receipt.rows.map(row => row.itemId)).size, 24);
+  for (const row of receipt.rows) {
+    assert.deepEqual(Object.keys(row), ['itemId', 'outcome']);
+    assert.equal(canonical.includes(row.itemId), true, row.itemId);
+    assert.equal(humanRereview.ADJUDICATION_TAXONOMY.includes(row.outcome), true, row.outcome);
+  }
+  const byOutcome = outcome => receipt.rows.filter(row => row.outcome === outcome)
+    .map(row => row.itemId);
+  assert.deepEqual(byOutcome('HUMAN_DECISION_NEEDS_REREVIEW'),
+    ['p1b6-item-b002-027', 'p1b6-item-b002-040', 'p1b6-item-b002-061']);
+  assert.equal(byOutcome('UNRESOLVED').length, 0);
+
+  // The receipt binds to every canonical artifact and assigns no HUMAN gold.
+  assert.equal(receipt.currentSourceBatch.rawSha256, REPAIRED_BATCH_SHA256);
+  assert.equal(receipt.exact56.rawSha256, EXACT56_SHA256);
+  assert.equal(receipt.effectiveHumanDecisionArtifact.rawSha256, EFFECTIVE_002_SHA256);
+  assert.equal(receipt.mismatchDiagnostic.rawSha256, MISMATCHES_002_SHA256);
+  assert.equal(receipt.pragmaticAdjudicationPacket.rawSha256, ADJUDICATION_002_SHA256);
+  assert.equal(receipt.authority.humanGoldAssigned, false);
+  assert.equal(receipt.authority.humanDecisionsAltered, false);
+  assert.equal(receipt.authority.frozenSkeletonLabelsAltered, false);
+  assert.equal(receipt.authority.exact56Amended, false);
+  assert.equal(receipt.authority.surfacesRepaired, false);
+  assert.equal(receipt.authority.acceptanceOrRejectionPerformed, false);
+  for (const field of ['decision', 'disposition', 'humanLabel', 'currentHumanDecision',
+    'frozenSkeletonHumanLabel', 'selectedBundle']) {
+    assert.equal(read(ADJUDICATION_RECEIPT_002).toString('utf8').includes(`"${field}"`), false, field);
+  }
+
+  // The 10 revision rows span exactly three unique frozen skeletons; none is amended here.
+  const skeletonOf = new Map(JSON.parse(read(MISMATCHES_002)).mismatches
+    .map(row => [row.itemId, row.semanticSkeletonId]));
+  assert.deepEqual(receipt.pendingResolutions.exact56SemanticAmendment.semanticSkeletonIds,
+    [...new Set(byOutcome('SKELETON_SEMANTICS_NEEDS_REVISION').map(id => skeletonOf.get(id)))].toSorted());
+  assert.deepEqual(revisionSkeletons,
+    receipt.pendingResolutions.exact56SemanticAmendment.semanticSkeletonIds);
+  assert.equal(receipt.pendingResolutions.exact56SemanticAmendment.semanticSkeletonIds.length, 3);
+  assert.equal(receipt.pendingResolutions.surfaceRepairOrDatasetRejection.itemCount, 11);
+  assert.equal(receipt.pendingResolutions.freshBlindHumanRereview.itemCount, 3);
+});
+
+test('batch-002 semantic adjudication receipt fails closed on tampered routing', () => {
+  const effective = buildBatch002Effective();
+  const args = [effective.rawOriginalPacket, effective.rawRereviewPacket,
+    read(MISMATCHES_002), read(EFFECTIVE_002)];
+  const receipt = JSON.parse(read(ADJUDICATION_RECEIPT_002));
+
+  // A non-mismatch item may not enter the receipt.
+  const injected = structuredClone(receipt);
+  injected.rows[0] = { itemId: 'p1b6-item-b002-001', outcome: 'UNRESOLVED' };
+  assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
+    effective, ...args, humanRereview.packetBytes(injected)), /canonical mismatch set/);
+
+  // Counts may not drift from 10 / 11 / 3 / 0.
+  const recounted = structuredClone(receipt);
+  recounted.rows.find(row => row.outcome === 'HUMAN_DECISION_NEEDS_REREVIEW').outcome =
+    'SURFACE_COLLAPSES_AMBIGUITY';
+  assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
+    effective, ...args, humanRereview.packetBytes(recounted)), /canonical mismatch set/);
+
+  // The receipt may not claim authority it does not have.
+  const overreaching = structuredClone(receipt);
+  overreaching.authority.humanGoldAssigned = true;
+  assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
+    effective, ...args, humanRereview.packetBytes(overreaching)), /authority it does not have/);
+});
+
+test('batch-002 attempt-003 blind packet is exactly the three re-review rows and leaks nothing', () => {
+  const rawReceipt = read(ADJUDICATION_RECEIPT_002);
+  const packet = humanRereview.buildBatch002RereviewAttempt003Packet(
+    rawBatch002, currentAuditReceipt002, rawReceipt,
+  );
+  const rawPacket = humanRereview.packetBytes(packet);
+  assert.equal(sha256RawBytes(rawPacket), REREVIEW_003_PACKET_SHA256);
+  assert.equal(packet.name, 'xion-local-memory-inference-p1b6-primary-human-rereview-packet-v1');
+  assert.equal(packet.attemptId, 'p1b6-primary-human-rereview-batch-002-attempt-003');
+  assert.equal(packet.sourceBatch.sha256, REPAIRED_BATCH_SHA256);
+  assert.equal(packet.rendererIdentity, surfaces.RENDERER_IDENTITY);
+
+  // Exactly three rows, derived mechanically from the receipt outcomes, not hard-coded here.
+  const expected = JSON.parse(rawReceipt).rows
+    .filter(row => row.outcome === 'HUMAN_DECISION_NEEDS_REREVIEW').map(row => row.itemId);
+  assert.deepEqual(expected, ['p1b6-item-b002-027', 'p1b6-item-b002-040', 'p1b6-item-b002-061']);
+  assert.equal(packet.rows.length, 3);
+  assert.deepEqual(packet.rows.map(row => row.reviewRowId).toSorted(), REREVIEW_003_ROW_IDS);
+  assert.deepEqual(packet.rows.map(row => row.reviewRowId),
+    expected.map(itemId => humanRereview.opaqueRereviewRowId(REPAIRED_BATCH_SHA256, itemId)).toSorted());
+
+  // HUMAN-facing rows carry only an opaque ID and the canonical renderer output.
+  const batchItems = new Map(batch002.items.map(item => [item.itemId, item]));
+  const bundles = new Map(expected.map(itemId => [
+    humanRereview.opaqueRereviewRowId(REPAIRED_BATCH_SHA256, itemId),
+    surfaces.renderHumanReviewText(batch002, batchItems.get(itemId)),
+  ]));
+  for (const row of packet.rows) {
+    assert.deepEqual(Object.keys(row), ['reviewRowId', 'selectedBundle']);
+    assert.equal(row.selectedBundle, bundles.get(row.reviewRowId), row.reviewRowId);
+  }
+
+  // No adjudication, skeleton, or prior-label leakage reaches the blind reviewer.
+  const serialized = rawPacket.toString('utf8');
+  for (const field of ['itemId', 'semanticSkeletonId', 'splitAssignment', 'boundaryClass',
+    'decision', 'disposition', 'humanLabel', 'skeletonLabel', 'intendedLabel', 'outcome',
+    'currentHumanDecision', 'frozenSkeletonHumanLabel', 'adjudication', 'recommendation',
+    'expectedAnswer']) assert.equal(serialized.includes(`"${field}"`), false, field);
+  assert.equal(/p1b6-item-b002/.test(serialized), false);
+  assert.equal(/p1b6-sk-/.test(serialized), false);
+
+  // The blind review has not been performed: no attempt-003 decision receipt exists.
+  assert.equal(fs.existsSync(fixture(
+    'local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003.json')), false);
 });
 
 test('batch-002 acceptance and gold freeze have not been opened', () => {
@@ -1073,6 +1259,13 @@ test('batch-002 acceptance and gold freeze have not been opened', () => {
   assert.equal(protocol.authority.finalCorpusHumanGoldFrozen, false);
   assert.equal(protocol.authority.trainingOccurred, false);
   assert.equal(effectiveBatch001.authority.surfaceHumanGoldFrozen, false);
+  // Semantic adjudication is routing, not acceptance: nothing downstream opened.
+  assert.equal(JSON.parse(read(EFFECTIVE_002)).authority.humanReviewCompleted, false);
+  assert.equal(JSON.parse(read(ADJUDICATION_RECEIPT_002)).authority.humanGoldAssigned, false);
+  for (const file of [
+    'local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003.json',
+    'local-memory-inference-p1b6-smoke-batch-002-acceptance.json',
+  ]) assert.equal(fs.existsSync(fixture(file)), false, file);
 });
 
 test('batch-001, smoke acceptance, exact56, and all historical evidence remain byte-identical', () => {
@@ -1106,6 +1299,10 @@ test('batch-001, smoke acceptance, exact56, and all historical evidence remain b
       'e530ea9d2b1b2ea5ce42557a9cbb9828f97d14f6ab431e7dbb71ebbc825196e0',
     'local-memory-inference-p1b6-anchor-marker-pilot-report.json':
       'ce43e493cb037779a52e682498769ec87e2ae614846a769e3eebe4b561da49e1',
+    [EFFECTIVE_002]: EFFECTIVE_002_SHA256,
+    [MISMATCHES_002]: MISMATCHES_002_SHA256,
+    [ADJUDICATION_002]: ADJUDICATION_002_SHA256,
+    [ADJUDICATION_RECEIPT_002]: ADJUDICATION_RECEIPT_002_SHA256,
   };
   for (const [file, expected] of Object.entries(hashes)) assert.equal(sha256RawBytes(read(file)), expected, file);
 });
