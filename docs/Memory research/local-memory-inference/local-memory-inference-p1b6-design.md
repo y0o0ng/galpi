@@ -254,6 +254,17 @@ semantic adjudication receipt**, not from a hard-coded item list, and the
 builder fails closed unless exactly three rows are selected and the receipt
 binds to the current batch, Exact56, and the mismatch diagnostic.
 
+**The receipt itself is raw-byte bound before it may drive that selection.**
+Both consumers — `validateBatch002PragmaticAdjudicationReceipt` and
+`buildBatch002RereviewAttempt003Packet` — refuse any receipt whose bytes do not
+hash to
+`cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa`. The
+canonical item set and the 10/11/3/0 aggregate are not sufficient on their own:
+swapping one `HUMAN_DECISION_NEEDS_REREVIEW` row with one
+`SURFACE_COLLAPSES_AMBIGUITY` row preserves every item ID, every count, and all
+artifact metadata while silently changing which rows face the blind reviewer.
+Only the raw-byte binding closes that path.
+
 HUMAN-facing rows expose only `reviewRowId` and `selectedBundle`, where
 `selectedBundle` is exactly the canonical renderer output. The packet carries
 no `itemId`, `semanticSkeletonId`, split, boundary class, previous HUMAN

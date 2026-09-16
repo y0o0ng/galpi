@@ -94,6 +94,8 @@ const BATCH002_MISMATCH_SKELETONS = Object.freeze([
 ]);
 const BATCH002_ADJUDICATION_RECEIPT_IDENTITY =
   'xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt-v1';
+const BATCH002_ADJUDICATION_RECEIPT_SHA256 =
+  'cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa';
 const BATCH002_ADJUDICATION_SUMMARY = Object.freeze({
   total: 24,
   SKELETON_SEMANTICS_NEEDS_REVISION: 10,
@@ -962,6 +964,17 @@ function buildBatch002PragmaticAdjudicationPacket(effective,
   };
 }
 
+// Item-level routing decides which rows reach a blind HUMAN review, so the receipt is bound
+// by raw bytes, not only by its canonical item set and 10/11/3/0 aggregate. Without this a
+// count-preserving swap of two rows' outcomes would silently change the attempt-003
+// population while every structural check still passed.
+function parseCanonicalAdjudicationReceipt(rawReceiptBytes) {
+  if (sha256RawBytes(rawReceiptBytes) !== BATCH002_ADJUDICATION_RECEIPT_SHA256) {
+    fail('canonical batch-002 semantic adjudication receipt bytes are invalid');
+  }
+  return JSON.parse(Buffer.from(rawReceiptBytes).toString('utf8'));
+}
+
 // The committed receipt carries the repository owner's item-level semantic routing; this
 // script validates it and never authors an outcome. Routing is bound to the canonical
 // mismatch diagnostic, so it can only ever describe those exact 24 reconciliation
@@ -980,7 +993,7 @@ function validateBatch002PragmaticAdjudicationReceipt(effective, rawOriginalPack
     fail('batch-002 pragmatic adjudication packet bytes changed');
   }
 
-  const receipt = JSON.parse(Buffer.from(rawReceiptBytes).toString('utf8'));
+  const receipt = parseCanonicalAdjudicationReceipt(rawReceiptBytes);
   if (!exactKeys(receipt, [
     'name', 'status', 'interpretationRule', 'currentSourceBatch',
     'effectiveHumanDecisionArtifact', 'mismatchDiagnostic', 'pragmaticAdjudicationPacket',
@@ -1053,7 +1066,7 @@ function buildBatch002RereviewAttempt003Packet(rawBatchBytes, auditReceipt,
     || attemptId !== BATCH002_REREVIEW.auditAttemptId) {
     fail('batch-002 attempt-003 current batch or audit binding is invalid');
   }
-  const receipt = JSON.parse(Buffer.from(rawAdjudicationReceiptBytes).toString('utf8'));
+  const receipt = parseCanonicalAdjudicationReceipt(rawAdjudicationReceiptBytes);
   if (receipt.name !== BATCH002_ADJUDICATION_RECEIPT_IDENTITY
     || receipt.interpretationRule !== INTERPRETATION_RULE
     || receipt.currentSourceBatch?.rawSha256 !== BATCH002_REREVIEW.currentBatchSha256
@@ -1134,6 +1147,7 @@ module.exports = {
   ADJUDICATION_TAXONOMY,
   INTERPRETATION_RULE,
   BATCH002_ADJUDICATION_RECEIPT_IDENTITY,
+  BATCH002_ADJUDICATION_RECEIPT_SHA256,
   BATCH002_ADJUDICATION_SUMMARY,
   BATCH002_MISMATCH_SKELETONS,
   BATCH002_REREVIEW_003,

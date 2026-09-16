@@ -1188,21 +1188,66 @@ test('batch-002 semantic adjudication receipt fails closed on tampered routing',
   // A non-mismatch item may not enter the receipt.
   const injected = structuredClone(receipt);
   injected.rows[0] = { itemId: 'p1b6-item-b002-001', outcome: 'UNRESOLVED' };
-  assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
-    effective, ...args, humanRereview.packetBytes(injected)), /canonical mismatch set/);
 
   // Counts may not drift from 10 / 11 / 3 / 0.
   const recounted = structuredClone(receipt);
   recounted.rows.find(row => row.outcome === 'HUMAN_DECISION_NEEDS_REREVIEW').outcome =
     'SURFACE_COLLAPSES_AMBIGUITY';
-  assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
-    effective, ...args, humanRereview.packetBytes(recounted)), /canonical mismatch set/);
 
   // The receipt may not claim authority it does not have.
   const overreaching = structuredClone(receipt);
   overreaching.authority.humanGoldAssigned = true;
+
+  for (const tampered of [injected, recounted, overreaching]) {
+    assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
+      effective, ...args, humanRereview.packetBytes(tampered)),
+    /semantic adjudication receipt bytes are invalid/);
+  }
+});
+
+test('count-preserving routing reassignment cannot change the attempt-003 population', () => {
+  const effective = buildBatch002Effective();
+  const args = [effective.rawOriginalPacket, effective.rawRereviewPacket,
+    read(MISMATCHES_002), read(EFFECTIVE_002)];
+  const canonical = JSON.parse(read(ADJUDICATION_RECEIPT_002));
+
+  // Swap one HUMAN_DECISION_NEEDS_REREVIEW row with one SURFACE_COLLAPSES_AMBIGUITY row.
+  // Every aggregate check still passes: same 24 item IDs, same 10/11/3/0 counts, same
+  // batch / Exact56 / mismatch-diagnostic metadata. Only WHO faces the blind review moves.
+  const swapped = structuredClone(canonical);
+  const rowFor = itemId => swapped.rows.find(row => row.itemId === itemId);
+  const moveOut = rowFor('p1b6-item-b002-027');
+  const moveIn = rowFor('p1b6-item-b002-022');
+  assert.equal(moveOut.outcome, 'HUMAN_DECISION_NEEDS_REREVIEW');
+  assert.equal(moveIn.outcome, 'SURFACE_COLLAPSES_AMBIGUITY');
+  [moveOut.outcome, moveIn.outcome] = [moveIn.outcome, moveOut.outcome];
+
+  const rawSwapped = humanRereview.packetBytes(swapped);
+  assert.deepEqual(swapped.rows.map(row => row.itemId), canonical.rows.map(row => row.itemId));
+  assert.deepEqual(swapped.summary, canonical.summary);
+  assert.deepEqual(swapped.currentSourceBatch, canonical.currentSourceBatch);
+  assert.deepEqual(swapped.exact56, canonical.exact56);
+  assert.deepEqual(swapped.mismatchDiagnostic, canonical.mismatchDiagnostic);
+  for (const outcome of humanRereview.ADJUDICATION_TAXONOMY) {
+    assert.equal(swapped.rows.filter(row => row.outcome === outcome).length,
+      canonical.rows.filter(row => row.outcome === outcome).length, outcome);
+  }
+  assert.notEqual(sha256RawBytes(rawSwapped), ADJUDICATION_RECEIPT_002_SHA256);
+
+  // Both receipt consumers refuse the mutated bytes outright.
   assert.throws(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
-    effective, ...args, humanRereview.packetBytes(overreaching)), /authority it does not have/);
+    effective, ...args, rawSwapped), /semantic adjudication receipt bytes are invalid/);
+  assert.throws(() => humanRereview.buildBatch002RereviewAttempt003Packet(
+    rawBatch002, currentAuditReceipt002, rawSwapped),
+  /semantic adjudication receipt bytes are invalid/);
+
+  // The canonical receipt still validates and still yields exactly the same three rows.
+  assert.doesNotThrow(() => humanRereview.validateBatch002PragmaticAdjudicationReceipt(
+    effective, ...args, read(ADJUDICATION_RECEIPT_002)));
+  const packet = humanRereview.buildBatch002RereviewAttempt003Packet(
+    rawBatch002, currentAuditReceipt002, read(ADJUDICATION_RECEIPT_002));
+  assert.deepEqual(packet.rows.map(row => row.reviewRowId).toSorted(), REREVIEW_003_ROW_IDS);
+  assert.equal(sha256RawBytes(humanRereview.packetBytes(packet)), REREVIEW_003_PACKET_SHA256);
 });
 
 test('batch-002 attempt-003 blind packet is exactly the three re-review rows and leaks nothing', () => {
