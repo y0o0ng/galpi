@@ -48,13 +48,19 @@ anchors received the prescribed minimum `anchorSpanRef`-only repair, with no
 source-text or evidence-selection change. Incremental source re-audit attempt
 002 is COMPLETE_PASS: 60 rows inherited PASS only after exact `sourceEpisode`
 and `selectedBundle` equality with attempt 001, and the four changed rows
-received fresh PASS judgments. The repaired current source/bundle gate is PASS,
-and a four-row focused blind HUMAN re-review packet is prepared; that HUMAN
-re-review has not occurred. Batch-002 corpus acceptance has not occurred, the
-accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
-repeated review, training, raw-episode evaluation, private replay, and
-production remain UNOPENED/unchanged. The next step is focused blind HUMAN
-re-review of exactly the four changed surfaces. Do not redesign the frozen
+received fresh PASS judgments. The repaired current source/bundle gate is PASS.
+Focused blind HUMAN re-review attempt 002 then completed for exactly the four
+changed surfaces at 4 KEEP / 0 FIX / 0 REJECT and 4 CLEAR / 0 ESCALATE, so the
+focused repair review is resolved and no unresolved FIX remains. Overlaying the
+four focused decisions on the 60 inherited historical decisions gives a
+pre-reconciliation effective HUMAN aggregate of 64 KEEP / 0 FIX / 0 REJECT and
+55 CLEAR / 9 ESCALATE. That aggregate is HUMAN-review state only: no frozen
+exact56 reconciliation has been performed for batch-002. Batch-002 corpus
+acceptance has not occurred, the accepted pool remains 30, and final corpus
+HUMAN gold is not frozen. HELD repeated review, training, raw-episode
+evaluation, private replay, and production remain UNOPENED/unchanged. The next
+step is separate materialization of the effective-current decision artifact
+followed by frozen exact56 reconciliation. Do not redesign the frozen
 skeleton catalog, generate training output, expose a model to FINAL surface
 items, or start training in this phase.
 

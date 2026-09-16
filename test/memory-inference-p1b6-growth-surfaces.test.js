@@ -34,6 +34,14 @@ const FOCUSED_AUDIT_RESULT_002_SHA256 =
   '62ab6fb085a504b1e4d6c5e5660cecea546109bd151cb4cbfcc26deb79404dad';
 const REREVIEW_PACKET_002_SHA256 =
   'f582776c81a51fb08f2e5cfe697b51be939aeb6533659e6038d80d391fffd2c9';
+const REREVIEW_ATTEMPT_002 =
+  'local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-002.json';
+const REREVIEW_IDS_002 = [
+  'p1b6-rereview-02acbfe8ee8d6bcc',
+  'p1b6-rereview-27a2b7b3013ce07d',
+  'p1b6-rereview-4dc89a20b64524ef',
+  'p1b6-rereview-b8bc096f17086620',
+];
 const rawBatch002 = read(BATCH_002);
 const batch001 = readJson(BATCH_001);
 const batch002 = JSON.parse(rawBatch002);
@@ -43,6 +51,7 @@ const exact56 = readJson(EXACT56);
 const auditReceipt002 = readJson(AUDIT_ATTEMPT_002);
 const currentAuditReceipt002 = readJson(AUDIT_ATTEMPT_002_CURRENT);
 const humanReceipt002 = readJson(HUMAN_ATTEMPT_002);
+const rereviewReceipt002 = readJson(REREVIEW_ATTEMPT_002);
 const skeletons = new Map(exact56.candidates.map(row => [row.semanticSkeletonId, row]));
 const PRE_REPAIR_BATCH_SHA256 = '552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334';
 const REPAIRED_BATCH_SHA256 = 'ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c';
@@ -700,9 +709,142 @@ test('batch-002 primary HUMAN receipt records the exact completed blind review',
   assert.equal(acceptance.accepted.length, 30);
 });
 
+test('batch-002 focused HUMAN re-review receipt records the completed four-row repair review', () => {
+  const originalPacket = humanReview.buildHumanReviewPacket(rawPreRepairBatch002, auditReceipt002);
+  const rawOriginalPacket = humanReview.packetBytes(originalPacket);
+  const rawRereviewPacket = humanRereview.packetBytes(humanRereview.buildBatch002RereviewPacket(
+    rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
+  ));
+  assert.equal(sha256RawBytes(rawBatch002), REPAIRED_BATCH_SHA256);
+  assert.equal(sha256RawBytes(read(AUDIT_ATTEMPT_002_CURRENT)), CURRENT_AUDIT_RECEIPT_SHA256);
+  assert.equal(sha256RawBytes(rawRereviewPacket), REREVIEW_PACKET_002_SHA256);
+
+  const { packet, rows } = humanRereview.validateBatch002RereviewReceipt(
+    rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
+    rawRereviewPacket, rereviewReceipt002,
+  );
+  assert.deepEqual(packet.rows.map(row => row.reviewRowId), REREVIEW_IDS_002);
+  assert.deepEqual(packet.rows.map(row => row.reviewRowId),
+    packet.rows.map(row => row.reviewRowId).toSorted());
+  assert.equal(rows.size, 4);
+  assert.deepEqual(Object.keys(rereviewReceipt002), [
+    'name', 'attemptId', 'status', 'primaryHumanRereviewPacket', 'reviewedSourceBatch',
+    'rendererIdentity', 'sourceAuditPrerequisite', 'originalPrimaryHumanReview',
+    'summary', 'authority', 'rows',
+  ]);
+  assert.equal(rereviewReceipt002.name,
+    'xion-local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-002-receipt-v1');
+  assert.equal(rereviewReceipt002.attemptId, 'p1b6-primary-human-rereview-batch-002-attempt-002');
+  assert.equal(rereviewReceipt002.status, 'COMPLETE_PASS');
+  assert.deepEqual(rereviewReceipt002.primaryHumanRereviewPacket, {
+    identity: humanRereview.PACKET_IDENTITY,
+    rawSha256: REREVIEW_PACKET_002_SHA256,
+  });
+  assert.deepEqual(rereviewReceipt002.reviewedSourceBatch, {
+    identity: batch002.name,
+    rawSha256: REPAIRED_BATCH_SHA256,
+  });
+  assert.equal(rereviewReceipt002.rendererIdentity, surfaces.RENDERER_IDENTITY);
+  assert.deepEqual(rereviewReceipt002.sourceAuditPrerequisite, {
+    attemptId: 'p1b6-source-audit-batch-002-attempt-002',
+    status: 'COMPLETE_PASS',
+    allRowsPassed: true,
+  });
+  assert.deepEqual(rereviewReceipt002.originalPrimaryHumanReview, {
+    attemptId: 'p1b6-primary-human-review-batch-002-attempt-001',
+    receiptIdentity:
+      'xion-local-memory-inference-p1b6-primary-human-review-batch-002-attempt-001-receipt-v1',
+  });
+  assert.deepEqual(rereviewReceipt002.summary, {
+    total: 4, KEEP: 4, FIX: 0, REJECT: 0, CLEAR: 4, ESCALATE: 0,
+  });
+  assert.deepEqual(rereviewReceipt002.authority, {
+    reviewCompletedForAllPresentedRows: true,
+    acceptedKeepCount: 4,
+    unresolvedFixCount: 0,
+    primaryHumanReviewGateClosed: false,
+    surfaceHumanGoldFrozen: false,
+    decisionsSource: 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER',
+    modelInferenceUsedForHumanDecisions: false,
+    trainingOccurred: false,
+  });
+  assert.deepEqual(rereviewReceipt002.rows.map(row => row.reviewRowId), REREVIEW_IDS_002);
+  for (const row of rereviewReceipt002.rows) {
+    assert.deepEqual(Object.keys(row), ['reviewRowId', 'disposition', 'decision']);
+    assert.equal(row.disposition, 'KEEP');
+    assert.equal(row.decision, 'CLEAR');
+  }
+  const serialized = JSON.stringify(rereviewReceipt002);
+  for (const field of [
+    'itemId', 'sourceEpisodeId', 'semanticSkeletonId', 'splitAssignment', 'boundaryClass',
+    'humanLabel', 'skeletonLabel', 'intendedLabel', 'generatorRationale', 'selectedBundle',
+    'discoursePattern', 'sourceFamilyId', 'surfaceFamilyId', 'reason',
+  ]) assert.equal(serialized.includes(`"${field}"`), false, field);
+
+  const staleReceipt = structuredClone(rereviewReceipt002);
+  staleReceipt.rows[0].decision = 'ESCALATE';
+  assert.throws(() => humanRereview.validateBatch002RereviewReceipt(
+    rawBatch002, currentAuditReceipt002, rawOriginalPacket, humanReceipt002,
+    rawRereviewPacket, staleReceipt,
+  ), /rows are invalid, stale, or duplicate/u);
+});
+
+test('batch-002 pre-reconciliation HUMAN overlay is 64 KEEP with 55 CLEAR and 9 ESCALATE', () => {
+  const originalBundles = new Map(preRepairBatch002.items.map(item => [
+    humanReview.opaqueReviewRowId(PRE_REPAIR_BATCH_SHA256, item.itemId),
+    surfaces.renderHumanReviewText(preRepairBatch002, item),
+  ]));
+  const historical = new Map(humanReceipt002.rows.map(row => [row.reviewRowId, row]));
+  const rereview = new Map(rereviewReceipt002.rows.map(row => [row.reviewRowId, row]));
+  let inherited = 0;
+  let repaired = 0;
+  const overlay = batch002.items.map(item => {
+    const originalId = humanReview.opaqueReviewRowId(PRE_REPAIR_BATCH_SHA256, item.itemId);
+    const changed = originalBundles.get(originalId)
+      !== surfaces.renderHumanReviewText(batch002, item);
+    if (changed) {
+      repaired += 1;
+      const row = rereview.get(humanRereview.opaqueRereviewRowId(REPAIRED_BATCH_SHA256, item.itemId));
+      assert.ok(row, item.itemId);
+      return row;
+    }
+    inherited += 1;
+    const row = historical.get(originalId);
+    assert.ok(row, item.itemId);
+    assert.equal(row.disposition, 'KEEP');
+    return row;
+  });
+  assert.equal(inherited, 60);
+  assert.equal(repaired, 4);
+  assert.deepEqual(overlay.reduce((summary, row) => {
+    summary[row.disposition] += 1;
+    summary[row.decision] += 1;
+    return summary;
+  }, { total: overlay.length, KEEP: 0, FIX: 0, REJECT: 0, CLEAR: 0, ESCALATE: 0 }), {
+    total: 64, KEEP: 64, FIX: 0, REJECT: 0, CLEAR: 55, ESCALATE: 9,
+  });
+  assert.equal(overlay.filter(row => row.disposition === 'FIX').length, 0);
+});
+
+test('batch-002 reconciliation, acceptance, and gold freeze have not been opened', () => {
+  assert.equal(fs.existsSync(fixture(
+    'local-memory-inference-p1b6-primary-human-effective-current-batch-002.json')), false);
+  assert.equal(fs.existsSync(fixture(
+    'local-memory-inference-p1b6-smoke-batch-002-acceptance.json')), false);
+  assert.equal(acceptance.accepted.length, 30);
+  assert.equal(protocol.authority.sourceAuditCompleted, true);
+  assert.equal(protocol.authority.humanReviewCompleted, false);
+  assert.equal(protocol.authority.finalCorpusHumanGoldFrozen, false);
+  assert.equal(protocol.authority.trainingOccurred, false);
+});
+
 test('batch-001, smoke acceptance, exact56, and all historical evidence remain byte-identical', () => {
   const hashes = {
     [BATCH_001]: '2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36',
+    [BATCH_002]: REPAIRED_BATCH_SHA256,
+    [AUDIT_ATTEMPT_002_CURRENT]: CURRENT_AUDIT_RECEIPT_SHA256,
+    [REREVIEW_ATTEMPT_002]:
+      '141070c2e1485294a64c73d69de12dee867ce81ba1b66a3b9b189d61d84d67f3',
     'local-memory-inference-p1b6-surface-batch-001-authoring-protocol.json':
       '3591d7db8b98ed7ee016533346908122832068e470dfdfd61a685e1670c13909',
     [ACCEPTANCE]: '449318d5d3895fca87257a40b7d47b6d8d8eb3df8e9817fff5998a34d658bb5c',

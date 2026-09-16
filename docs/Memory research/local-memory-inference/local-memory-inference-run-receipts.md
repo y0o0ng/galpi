@@ -3915,3 +3915,41 @@ occurred, and the accepted pool remains 30. Final HUMAN gold, HELD review,
 training, raw-episode evaluation, private replay, and production remain
 unopened or unchanged. The next step is repository-owner focused blind HUMAN
 re-review of the four prepared rows.
+
+#### P1-B6 adaptive-growth batch-002 focused primary HUMAN re-review attempt 002 — COMPLETE / PASS
+
+The reviewed current batch remains bound to raw SHA-256
+`ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c`.
+The source-audit prerequisite is
+`p1b6-source-audit-batch-002-attempt-002`, canonical receipt
+`fixtures/local-memory-inference-p1b6-source-audit-batch-002-attempt-002.json`,
+raw SHA-256
+`c88f41043279c739d03c557fa35b73ae86f3890e0310b4993d9b67332ada889d`,
+status COMPLETE_PASS.
+
+The focused blind HUMAN re-review packet was mechanically rebuilt from
+canonical repository inputs through `buildBatch002RereviewPacket` and matched
+the repository-owner-supplied completed packet byte for byte at raw SHA-256
+`f582776c81a51fb08f2e5cfe697b51be939aeb6533659e6038d80d391fffd2c9`.
+
+The canonical re-review receipt is
+`fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-002.json`,
+raw SHA-256
+`141070c2e1485294a64c73d69de12dee867ce81ba1b66a3b9b189d61d84d67f3`.
+It records the repository owner's authoritative decisions for all four
+presented rows at 4 KEEP / 0 FIX / 0 REJECT and 4 CLEAR / 0 ESCALATE. No
+generator label, frozen skeleton label, or model-generated rationale entered
+any decision.
+
+Overlaying those four decisions on the 60 inherited historical primary HUMAN
+decisions gives a pre-reconciliation effective HUMAN aggregate of 64 KEEP / 0
+FIX / 0 REJECT and 55 CLEAR / 9 ESCALATE, with zero unresolved FIX rows. That
+aggregate is HUMAN-review state only.
+
+Frozen exact56 reconciliation was NOT RUN and no batch-002 effective-current
+decision artifact was created. Batch-002 dataset acceptance was NOT RUN and the
+accepted pool remains exactly 30. `humanReviewCompleted` stays false, final
+corpus HUMAN gold remains unfrozen, and HELD repeated review, training,
+raw-episode evaluation, private replay, and production remain unopened or
+unchanged. The next step is a separate effective-current decision artifact
+followed by frozen exact56 reconciliation.

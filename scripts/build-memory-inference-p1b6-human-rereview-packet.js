@@ -47,6 +47,19 @@ const BATCH002_REREVIEW = Object.freeze({
   originalBatchSha256: '552a11e4c976c514f27ee36afe0fa5546dcc921a465b24180c831771f9d02334',
   originalPacketSha256: 'e949dceb77e68dde278ef448eb17380645064573e187eb1cba7b24c673069fa5',
   changedCount: 4,
+  rereviewAttemptId: 'p1b6-primary-human-rereview-batch-002-attempt-002',
+  rereviewReceiptIdentity:
+    'xion-local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-002-receipt-v1',
+  rereviewPacketSha256: 'f582776c81a51fb08f2e5cfe697b51be939aeb6533659e6038d80d391fffd2c9',
+});
+const BATCH002_REREVIEW_DECISIONS = new Map([
+  ['p1b6-rereview-02acbfe8ee8d6bcc', ['KEEP', 'CLEAR']],
+  ['p1b6-rereview-27a2b7b3013ce07d', ['KEEP', 'CLEAR']],
+  ['p1b6-rereview-4dc89a20b64524ef', ['KEEP', 'CLEAR']],
+  ['p1b6-rereview-b8bc096f17086620', ['KEEP', 'CLEAR']],
+]);
+const BATCH002_REREVIEW_SUMMARY = Object.freeze({
+  total: 4, KEEP: 4, FIX: 0, REJECT: 0, CLEAR: 4, ESCALATE: 0,
 });
 
 function fail(message) {
@@ -365,6 +378,76 @@ function buildBatch002RereviewPacket(rawBatchBytes, auditReceipt,
   };
 }
 
+function validateBatch002RereviewReceipt(rawBatchBytes, auditReceipt, rawOriginalPacketBytes,
+  originalReceipt, rawRereviewPacketBytes, receipt) {
+  const packet = buildBatch002RereviewPacket(
+    rawBatchBytes, auditReceipt, rawOriginalPacketBytes, originalReceipt,
+  );
+  const rebuiltBytes = packetBytes(packet);
+  if (sha256RawBytes(rebuiltBytes) !== BATCH002_REREVIEW.rereviewPacketSha256
+    || !Buffer.from(rawRereviewPacketBytes).equals(rebuiltBytes)) {
+    fail('batch-002 completed re-review packet bytes are invalid');
+  }
+  if (!exactKeys(receipt, [
+    'name', 'attemptId', 'status', 'primaryHumanRereviewPacket', 'reviewedSourceBatch',
+    'rendererIdentity', 'sourceAuditPrerequisite', 'originalPrimaryHumanReview',
+    'summary', 'authority', 'rows',
+  ]) || receipt.name !== BATCH002_REREVIEW.rereviewReceiptIdentity
+    || receipt.attemptId !== BATCH002_REREVIEW.rereviewAttemptId
+    || receipt.status !== 'COMPLETE_PASS'
+    || !exactKeys(receipt.primaryHumanRereviewPacket, ['identity', 'rawSha256'])
+    || receipt.primaryHumanRereviewPacket.identity !== PACKET_IDENTITY
+    || receipt.primaryHumanRereviewPacket.rawSha256 !== BATCH002_REREVIEW.rereviewPacketSha256
+    || !exactKeys(receipt.reviewedSourceBatch, ['identity', 'rawSha256'])
+    || receipt.reviewedSourceBatch.identity !== packet.sourceBatch.identity
+    || receipt.reviewedSourceBatch.rawSha256 !== BATCH002_REREVIEW.currentBatchSha256
+    || receipt.rendererIdentity !== RENDERER_IDENTITY
+    || !exactKeys(receipt.sourceAuditPrerequisite, ['attemptId', 'status', 'allRowsPassed'])
+    || receipt.sourceAuditPrerequisite.attemptId !== BATCH002_REREVIEW.auditAttemptId
+    || receipt.sourceAuditPrerequisite.status !== 'COMPLETE_PASS'
+    || receipt.sourceAuditPrerequisite.allRowsPassed !== true
+    || !exactKeys(receipt.originalPrimaryHumanReview, ['attemptId', 'receiptIdentity'])
+    || receipt.originalPrimaryHumanReview.attemptId !== BATCH002_REREVIEW.originalAttemptId
+    || receipt.originalPrimaryHumanReview.receiptIdentity
+      !== BATCH002_REREVIEW.originalReceiptIdentity
+    || JSON.stringify(receipt.summary) !== JSON.stringify(BATCH002_REREVIEW_SUMMARY)
+    || !exactKeys(receipt.authority, [
+      'reviewCompletedForAllPresentedRows', 'acceptedKeepCount', 'unresolvedFixCount',
+      'primaryHumanReviewGateClosed', 'surfaceHumanGoldFrozen', 'decisionsSource',
+      'modelInferenceUsedForHumanDecisions', 'trainingOccurred',
+    ]) || receipt.authority.reviewCompletedForAllPresentedRows !== true
+    || receipt.authority.acceptedKeepCount !== BATCH002_REREVIEW.changedCount
+    || receipt.authority.unresolvedFixCount !== 0
+    || receipt.authority.primaryHumanReviewGateClosed !== false
+    || receipt.authority.surfaceHumanGoldFrozen !== false
+    || receipt.authority.decisionsSource !== 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER'
+    || receipt.authority.modelInferenceUsedForHumanDecisions !== false
+    || receipt.authority.trainingOccurred !== false
+    || !Array.isArray(receipt.rows)
+    || receipt.rows.length !== BATCH002_REREVIEW.changedCount) {
+    fail('batch-002 completed re-review receipt binding is invalid');
+  }
+
+  const expectedIds = new Set(packet.rows.map(row => row.reviewRowId));
+  const rows = new Map();
+  for (const row of receipt.rows) {
+    const expectedDecision = BATCH002_REREVIEW_DECISIONS.get(row.reviewRowId);
+    if (!exactKeys(row, ['reviewRowId', 'disposition', 'decision'])
+      || !expectedIds.has(row.reviewRowId) || rows.has(row.reviewRowId)
+      || !expectedDecision || row.disposition !== expectedDecision[0]
+      || row.decision !== expectedDecision[1]) {
+      fail('batch-002 completed re-review rows are invalid, stale, or duplicate');
+    }
+    rows.set(row.reviewRowId, row);
+  }
+  if (rows.size !== expectedIds.size
+    || JSON.stringify(summarizeDecisions([...rows.values()]))
+      !== JSON.stringify(BATCH002_REREVIEW_SUMMARY)) {
+    fail('batch-002 completed re-review rows do not match the authoritative aggregate');
+  }
+  return { packet, rows };
+}
+
 function summarizeDecisions(rows) {
   return rows.reduce((summary, row) => {
     summary[row.disposition] += 1;
@@ -638,6 +721,7 @@ module.exports = {
   parseArgs,
   reconcileEffectiveHumanDecisions,
   validateAuditReceipt,
+  validateBatch002RereviewReceipt,
   validateOriginalPacket,
   validateRereviewReceipt,
   writeRereviewPacket,
