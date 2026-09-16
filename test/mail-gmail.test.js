@@ -115,6 +115,43 @@ test('a 5xx during refresh stays retryable', async () => {
   });
 });
 
+// 2026-09-14에 Pi의 eth0가 잠깐 끊겼을 때 naver·works는 retryable로 복구했는데
+// gmail만 raw TypeError가 올라가 status='error'로 세워졌고, listDueAccounts가
+// active만 집으므로 40시간 동안 조용히 멈춰 있었다.
+test('a dropped link during refresh is retryable, not a permanent park', async () => {
+  const fetchImpl = async () => {
+    const error = new TypeError('fetch failed');
+    error.cause = Object.assign(new Error('connect ENETUNREACH'), { code: 'ENETUNREACH' });
+    throw error;
+  };
+  const source = createSource(fetchImpl);
+  await assert.rejects(() => source.getAccessToken(), error => {
+    assert.equal(error.code, 'MAIL_HTTP_FAILED');
+    assert.equal(error.retryable, true);
+    assert.equal(error.httpCode, 'ENETUNREACH');
+    assert.equal(error.name, 'Error');
+    return true;
+  });
+});
+
+test('a dropped link during an API call is retryable too', async () => {
+  const fetchImpl = createFakeFetch([tokenRoute()]);
+  const failing = async (url, init) => {
+    if (String(url).includes('oauth2.googleapis.com/token')) return fetchImpl(url, init);
+    throw new TypeError('fetch failed');
+  };
+  const provider = createGmailProvider({
+    fetch: failing,
+    tokenSource: createSource(failing),
+  });
+  await assert.rejects(() => provider.sync({ state: { baselineComplete: 1, gmailHistoryId: '42' } }),
+    error => {
+      assert.equal(error.code, 'MAIL_HTTP_FAILED');
+      assert.equal(error.retryable, true);
+      return true;
+    });
+});
+
 test('history is collected across every page before the cursor is reported', async () => {
   const fetchImpl = createFakeFetch([
     tokenRoute(),

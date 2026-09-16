@@ -2704,3 +2704,33 @@ https://help.naver.com/service/30029/bookmark/24347?lang=ko&osType=COMMONOS
 5. **Gmail auth client 선택.** 전체 Google API framework 도입 대신 최소 OAuth client로 충분한지 bundle/코드량으로 비교한다.
 6. **구현 시작 시점의 `LATEST_SCHEMA_VERSION`.** 2026-08-17 기준 18이며, 그 사이 다른 기능이 migration을 추가했을 수 있으므로 반드시 다시 확인하고 다음 version을 쓴다.
 7. ~~**Web Push payload 크기 한도.**~~ **불필요해졌다.** 미리보기 `표시` 모드를 없애면서 payload가 고정 6개 키가 되어 크기가 상수다(13.1).
+
+## 34. 운영 사고 — 네트워크 단절이 계정을 영구히 세운 경로 (2026-09-14, 해결됨)
+
+Pi의 `eth0` 링크가 23:24:46에 잠깐 끊겼고, 17초 뒤 메일 tick에서 계정 셋이 동시에 실패했다.
+네이버·works는 다음 tick에 스스로 복구했지만 **지메일만 40시간 동안 조용히 멈춰 있었다.**
+
+갈린 지점은 provider의 오류 정규화 경계다.
+
+- `naver.js`의 `normalizeImapError`가 전송 실패를 `retryable: true`로 바꿔 → `recordFailure`가
+  `status='active'`를 유지 → 다음 주기에 그냥 재시도.
+- `gmail.js`에는 같은 경계가 없어 `fetch`가 던지는 raw `TypeError: fetch failed`가 그대로 올라갔다.
+  `.code`도 `.retryable`도 없으니 `recordFailure`의 마지막 분기로 떨어져 `status='error'`.
+
+**`status='error'`는 사실상 영구 정지다.** `listDueAccounts`의 `WHERE status = 'active'`가 먼저
+거르므로 `next_sync_at`을 아무리 세워도 다시 선택되지 않는다. 게다가 알림이 있는 것은
+`auth_required`뿐이라(`onAuthRequired`) `error`는 아무 소리도 내지 않는다. 그래서 "조용히" 죽는다.
+
+**계약 — provider는 전송 계층 실패를 반드시 자기 경계에서 정규화한다.** 정규화하지 않은 오류가
+agent까지 올라가면 일시적 장애 한 번이 계정을 영구히 세운다. 세 번째 provider를 붙일 때 이
+경계부터 만든다. 지메일 쪽은 `fetchOrThrow`가 그 자리이고 `MAIL_HTTP_FAILED`(retryable)로 바꾼다.
+
+거절된 `fetch`를 코드 목록으로 가르지 않는 이유는 목록이 낡는 순간 같은 영구 정지가 다시 나기
+때문이다. 이 경계에서 거절되는 것은 전부 전송 계층 실패이고(HTTP 상태 실패는 응답이 돌아온 뒤
+따로 판정한다) URL은 모듈 상수라 잘못된 주소로 거절될 일이 없다.
+
+복구는 `store.setAccountStatus(id, 'active')`다. `reactivateAccount`를 타서 오류 코드를 지우고
+`next_sync_at`을 지금으로 당긴다 — "다시 켠다"는 것은 "지금 다시 해보라"는 뜻이다.
+
+**남은 구멍.** 정규화되지 않은 새 오류가 또 나오면 여전히 조용히 멈춘다. `status='error'`에도
+`auth_required`처럼 알림을 붙이는 것은 푸시 경로를 건드리는 별도 범위라 열지 않았다.

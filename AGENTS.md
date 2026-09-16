@@ -99,6 +99,7 @@
 - **MAIL-1~4와 카드의 본문 열기·일정 등록까지 2026-08-20 Pi 배포·실기기 인수로 닫혔다.** 계약과 실측은 `docs/xion-mail-agent-design-final.md`와 `docs/roadmap.md`의 독립 트랙 `MAIL-1~4`에 있고(`V5-C`는 외부 캘린더 에이전트가 쓰는 다른 이름이다), 코드로 잠긴 계약은 `lib/mail/*`와 `test/mail-*.test.js`가 정본이다. **운영 사실(스크래치 확인법·자격증명·분석 모델·막힌 길)은 로드맵의 `메일 운영 사실` 항목에 모아뒀다.**
 - **`MAIL_AGENT_ENABLED=true`로 서버를 띄우면 그 순간 실계정 메일이 동기화·분석되고 OpenAI 호출이 나간다.** 문법 확인은 `node --check`로 끝내고, 띄웠으면 PID를 잡아 반드시 종료한다. **Pi가 정본이고 로컬은 `false`다.**
 - **관측 대상 둘**: 실제 알림에서 판단 흔들림이 얼마나 드러나는지(흡수 장치인 batch 묶기와 발신자 억제는 이미 배포됐다), 그리고 본문 열기의 IMAP 연결이 동기화 tick과 부딪히는지.
+- **`status='error'`는 사실상 영구 정지다.** `listDueAccounts`가 `active`만 집으므로 `next_sync_at`을 세워도 다시 선택되지 않고, 알림은 `auth_required`에만 있어서 조용히 멈춘다. **그래서 provider는 전송 계층 실패를 반드시 자기 경계에서 retryable로 정규화한다** — 2026-09-14에 랜선이 잠깐 빠졌을 때 경계가 없던 지메일만 40시간 멈췄다. 복구는 `store.setAccountStatus(id, 'active')`이고 경위·계약은 `docs/xion-mail-agent-design-final.md` 34절이다.
 
 ### 뉴스 — v1 인수했다, 홈 노출과 재확인만 남았다
 
