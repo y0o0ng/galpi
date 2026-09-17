@@ -76,8 +76,16 @@ the 3 routed rows (attempt-003) is now **complete at 3 ESCALATE**, so the
 effective HUMAN state is 64 KEEP / 52 CLEAR / 12 ESCALATE and reconciliation
 moved to 43 match / 21 mismatch. The reconciliation itself therefore remains
 unresolved, and two blockers stand — a targeted Exact56 semantic amendment
-decision for the 3 affected frozen skeletons, and a repair-versus-rejection
-decision for the 11 surface-collapse realizations. Batch-002 corpus acceptance
+decision for the affected frozen skeletons, and a repair-versus-rejection
+decision for the surface-collapse realizations. The **targeted skeleton semantic
+amendment is now complete**: `p1b6-sk-8dd28ec6b22a18ad` and
+`p1b6-sk-155420007d75f36f` are amended to effective `CLEAR`,
+`p1b6-sk-2fa39ece4157b2b8` was deliberately **not** amended and stays
+`ESCALATE`, and items `059`/`063` are reclassified as surface-collapse
+realizations. Against the effective-current catalog batch-002 reconciles at
+**51 match / 13 mismatch**, and all 13 remaining mismatches are
+surface-realization cases. The one remaining semantic blocker is the
+repair-versus-rejection decision for those 13. Batch-002 corpus acceptance
 has not occurred,
 the accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
 repeated review, training, raw-episode evaluation, private replay, and
@@ -210,12 +218,13 @@ canonical mismatch diagnostic, the pragmatic adjudication packet, and the
 interpretation rule identity.
 
 The 10 `SKELETON_SEMANTICS_NEEDS_REVISION` items span only three unique frozen
-skeletons. Their eventual amendment may require changing candidate focus,
-relations, or label with corpus-balance implications rather than merely
-flipping a label, so Exact56 stays byte-identical and the amendment is recorded
-as required, not performed. The 11 `SURFACE_COLLAPSES_AMBIGUITY` realizations
-are likewise untouched: repair-versus-dataset-rejection is a separate
-repository-owner resolution.
+skeletons. That routing has since been resolved by the targeted semantic
+amendment below, which amended two of the three and reclassified the third
+skeleton's two items as surface-collapse realizations. This receipt is
+historical evidence of the decision state when it was written; its
+`10 / 11 / 3 / 0` routing is **not** rewritten. The
+`SURFACE_COLLAPSES_AMBIGUITY` realizations remain untouched:
+repair-versus-dataset-rejection is a separate repository-owner resolution.
 
 Historical note: before attempt-003 the repository owner's non-blind read of the
 three `HUMAN_DECISION_NEEDS_REREVIEW` rows was `ESCALATE`. Those provisional
@@ -308,10 +317,98 @@ CLEAR / 12 ESCALATE** and it reconciles at **43 match / 21 mismatch**.
 mismatches for the whole batch, not completion of one re-review attempt, and 21
 mismatches remain. The fresh-HUMAN-re-review portion of the semantic
 adjudication is resolved; the remaining semantic follow-up is the separate
-Exact56 amendment for the 3 affected skeletons and the repair-or-rejection
-decision for the 11 surface-collapse realizations. No acceptance, gold freeze,
+Exact56 amendment (since completed, see "Targeted Skeleton Semantic Amendment")
+and the repair-or-rejection decision for the surface-collapse realizations. No acceptance, gold freeze,
 HELD review, training, or downstream gate was opened, and the accepted pool
 remains 30.
+
+## Targeted Skeleton Semantic Amendment
+
+Five layers are distinct and must not be collapsed:
+
+1. **Historical Exact56 freeze** — `fixtures/local-memory-inference-p1b6-skeleton-exact56.json`,
+   raw SHA-256 `772f07bd…`, `CLOSED / FROZEN`, 32 CLEAR / 24 ESCALATE. Immutable,
+   and still the provenance base. It is not erroneous and is not overwritten.
+2. **Targeted semantic amendment** —
+   `fixtures/local-memory-inference-p1b6-skeleton-semantic-amendment-receipt.json`,
+   the committed authority for which amendments were approved and for their
+   replacement semantics.
+3. **Effective-current skeleton catalog** —
+   `fixtures/local-memory-inference-p1b6-skeleton-effective-current.json`,
+   built mechanically as historical Exact56 + exactly the two approved
+   amendments. This is the **prospective current semantic authority**; future
+   authoring reads it rather than the frozen historical labels.
+4. **Historical HUMAN evidence** — attempt-001/002/003 receipts and both
+   effective HUMAN artifacts, all unchanged. No HUMAN decision was relabeled.
+5. **Current reconciliation impact** — recomputed, never written back onto a
+   HUMAN artifact.
+
+`p1b6-sk-8dd28ec6b22a18ad` (TRAIN, PERSISTENCE / EXCEPTION) becomes `CLEAR`. Its
+`CLEAR` does **not** assert a new physical occurrence after the bounded
+interruption; it says the recurring status is sufficiently resolved once a
+recurring default, a bounded interruption, and the end of the interrupting
+condition are established and the visible evidence does not positively license
+continuation, cancellation, or replacement.
+
+`p1b6-sk-155420007d75f36f` (FINAL_HELD_OUT, FINALITY / COMMITMENT) becomes
+`CLEAR`. The classifier resolves the plan's visible semantic status; it is not
+required to establish that the condition fired. An explicitly maintained
+conditional plan can be `CLEAR` while remaining conditional and unexecuted.
+
+`p1b6-sk-2fa39ece4157b2b8` (FINAL_HELD_OUT, SCOPE / APPLICABILITY) is
+**explicitly preserved at `ESCALATE`**. A rule is stated over items inside a
+container, an item later moves in, and the evidence does not settle whether the
+rule extends to it. That ambiguity is intended. `p1b6-item-b002-061` is a
+faithful realization — its wording limits the rule to the folder's `기존 파일`
+— and the fresh blind HUMAN decision there is `ESCALATE`.
+
+Items `059` and `063` instead collapsed that intended ambiguity into a generic
+membership-triggered container rule, so they are **surface-realization defects,
+not skeleton defects**. The amendment receipt records the routing correction
+`SKELETON_SEMANTICS_NEEDS_REVISION` → `SURFACE_COLLAPSES_AMBIGUITY` for exactly
+those two items without mutating the historical routing receipt. Their source
+text is **not** repaired here; the selected minimum repair direction scopes the
+original rule to the current item set with `지금`, and executing it will require
+a fresh source audit and a fresh blind HUMAN review.
+
+The effective-current catalog holds 56 candidates with identical IDs, order,
+splits, boundary classes and contrast groups; exactly two rows differ
+semantically; the label distribution is **34 CLEAR / 22 ESCALATE**; split
+coverage stays TRAIN 24 / DEV 16 / FINAL_HELD_OUT 16 with unchanged per-boundary
+split counts.
+
+Reconciliation impact, recomputed from unchanged HUMAN decisions:
+
+| | historical Exact56 | effective-current |
+| --- | --- | --- |
+| batch-002 | 43 match / 21 mismatch | **51 match / 13 mismatch** |
+| batch-001 | 30 match / 2 mismatch | 31 match / 1 mismatch |
+
+The batch-002 HUMAN aggregate is unchanged at 64 KEEP / 52 CLEAR / 12 ESCALATE.
+All 13 remaining batch-002 mismatches are current surface-collapse
+realizations: `022`, `024`, `029`, `032`, `034`, `037`, `039`, `047`, `049`,
+`050`, `051`, `059`, `063`. Zero `SKELETON_SEMANTICS_NEEDS_REVISION`, zero
+`HUMAN_DECISION_NEEDS_REREVIEW`, and zero `UNRESOLVED` items remain.
+
+Batch-001's single remaining mismatch is `p1b6-item-b001-019`;
+`p1b6-item-b001-009` now agrees with the amended `8dd28…`. The closed smoke
+acceptance is **not** reopened — it stays at 30 accepted / 2 rejected /
+0 unresolved with `b001-009` historically rejected, so the accepted pool remains
+exactly 30.
+
+`humanReviewCompleted` remains **false**, and no dataset acceptance, HUMAN gold
+freeze, HELD repeated review, training, raw-episode evaluation, private replay,
+or production change was performed. Final corpus contracts (380 items, TRAIN 240
+/ DEV 60 / FINAL_HELD_OUT 80, gold target 190 CLEAR / 190 ESCALATE, coverage,
+language, fragment and HELD contracts) are unchanged. Historical authoring
+allocation metadata stays historical.
+
+`scripts/build-memory-inference-p1b6-skeleton-semantic-amendment.js` validates
+the receipt, applies exactly the two authorized changes, rebuilds the catalog
+and recomputes impact, failing closed on a third amendment, an amendment of the
+preserved skeleton, a wrong base or target label, split/boundary drift, a
+missing routing correction, or any authority the receipt may not claim. The
+historical Exact56 builder is untouched.
 
 ## Task Boundary
 

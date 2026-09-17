@@ -4166,3 +4166,72 @@ and the semantic adjudication receipt are byte-identical. Batch-002 acceptance
 was NOT RUN and no acceptance artifact exists, the accepted pool remains exactly
 30, and final corpus HUMAN gold, HELD repeated review, training, raw-episode
 evaluation, private replay, and production remain unopened or unchanged.
+
+#### P1-B6 targeted skeleton semantic amendment and effective-current catalog — COMPLETE / SURFACE WORK STILL OPEN
+
+The repository owner's targeted semantic decision is recorded without rewriting
+historical evidence. The historical Exact56 freeze is byte-identical at
+`772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602` and remains
+the provenance base; its builder was not modified and still reconstructs the
+frozen artifact at 32 CLEAR / 24 ESCALATE.
+
+The amendment receipt is
+`fixtures/local-memory-inference-p1b6-skeleton-semantic-amendment-receipt.json`,
+raw SHA-256
+`2778f64cf9f8f15bc85b7d015b706f5e87ad20e9dafc1249357477b235744977`. It binds by
+identity and raw SHA to historical Exact56, the historical pragmatic
+adjudication receipt
+(`cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa`), the
+post-attempt-003 effective HUMAN batch-002 artifact
+(`a96fc01393c79057d292cf10b565589e7448b86289eb52b8cd1c63657af2ed05`), the
+batch-001 effective HUMAN artifact
+(`44832509f04ffb81a0772e9fda9adcbbea43305315a5d05948819b2c845b162a`), and
+`CONSERVATIVE_PRAGMATIC_INTERPRETATION`. The semantic replacement content lives
+in the receipt as auditable data, not only in a builder.
+
+**Two skeletons amended to effective `CLEAR`**: `p1b6-sk-8dd28ec6b22a18ad`
+(TRAIN, PERSISTENCE / EXCEPTION) and `p1b6-sk-155420007d75f36f`
+(FINAL_HELD_OUT, FINALITY / COMMITMENT). Neither `CLEAR` asserts an unstated
+post-interruption event or a fired precondition; both resolve the visible
+semantic status only. **`p1b6-sk-2fa39ece4157b2b8` was explicitly not amended**
+and stays `ESCALATE` with its split, boundary class, focus and relations
+unchanged.
+
+Consequently `p1b6-item-b002-059` and `p1b6-item-b002-063` are recorded in the
+new receipt as `SKELETON_SEMANTICS_NEEDS_REVISION` → `SURFACE_COLLAPSES_AMBIGUITY`.
+The historical pragmatic adjudication receipt is **not** mutated and still reads
+`10 / 11 / 3 / 0`. No source text was edited; the selected minimum repair
+direction scopes each rule to the current item set with `지금`, and executing it
+will require a fresh source audit and a fresh blind HUMAN review.
+
+The effective-current catalog is
+`fixtures/local-memory-inference-p1b6-skeleton-effective-current.json`, raw
+SHA-256 `48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559`,
+built mechanically by
+`scripts/build-memory-inference-p1b6-skeleton-semantic-amendment.js`. It holds
+56 candidates with identical IDs, order, splits, boundary classes and contrast
+groups, differs from historical Exact56 at exactly the two approved rows, and
+carries **34 CLEAR / 22 ESCALATE** with split coverage TRAIN 24 / DEV 16 /
+FINAL_HELD_OUT 16 and unchanged per-boundary split counts. It is the prospective
+current semantic authority; historical Exact56 remains the historical freeze.
+
+Reconciliation, recomputed from unchanged HUMAN decisions: batch-002 moves from
+43 match / 21 mismatch historically to **51 match / 13 mismatch** against the
+effective catalog, with the HUMAN aggregate unchanged at 64 KEEP / 0 FIX /
+0 REJECT and 52 CLEAR / 12 ESCALATE. The 13 remaining mismatches are exactly the
+current surface-collapse set `022`, `024`, `029`, `032`, `034`, `037`, `039`,
+`047`, `049`, `050`, `051`, `059`, `063`; zero `SKELETON_SEMANTICS_NEEDS_REVISION`,
+zero `HUMAN_DECISION_NEEDS_REREVIEW` and zero `UNRESOLVED` remain. Item `061`
+stays a match at HUMAN `ESCALATE` against the preserved skeleton. Batch-001 moves
+from 30 match / 2 mismatch to 31 match / 1 mismatch, leaving only
+`p1b6-item-b001-019`.
+
+The closed smoke acceptance was not reopened: it remains 30 accepted / 2
+rejected / 0 unresolved with `p1b6-item-b001-009` still historically rejected, so
+the accepted pool remains exactly **30**. `humanReviewCompleted` remains false.
+Final corpus contracts are unchanged. No surface repair, dataset acceptance,
+HUMAN gold freeze, HELD repeated review, training, raw-episode evaluation,
+private replay, or production change occurred.
+
+Tests run locally: `node --test test/memory-inference-p1b6-skeleton-semantic-amendment.test.js`
+(8/8 pass) and the full `npm test` suite.

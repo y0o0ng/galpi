@@ -1,0 +1,105 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-semantic-amendment-receipt-v1",
+  "status": "COMPLETE_TARGETED_SEMANTIC_AMENDMENT",
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "historicalExact56": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-exact56-v1",
+    "rawSha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602",
+    "role": "IMMUTABLE_HISTORICAL_FREEZE_AND_PROVENANCE_BASE"
+  },
+  "historicalPragmaticAdjudicationReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt-v1",
+    "rawSha256": "cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa",
+    "role": "IMMUTABLE_HISTORICAL_ROUTING_EVIDENCE"
+  },
+  "effectiveHumanDecisionArtifacts": {
+    "batch002": {
+      "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2",
+      "rawSha256": "a96fc01393c79057d292cf10b565589e7448b86289eb52b8cd1c63657af2ed05"
+    },
+    "batch001": {
+      "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-001-v1",
+      "rawSha256": "44832509f04ffb81a0772e9fda9adcbbea43305315a5d05948819b2c845b162a"
+    }
+  },
+  "effectiveCurrentSkeletonCatalog": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+    "role": "PROSPECTIVE_CURRENT_SEMANTIC_AUTHORITY"
+  },
+  "summary": {
+    "amendedSkeletons": 2,
+    "preservedSkeletons": 1,
+    "routingCorrections": 2
+  },
+  "amendments": [
+    {
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "PERSISTENCE / EXCEPTION",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "한정된 중단 상황이 종료된 뒤 반복 행동의 현재 의미 상태",
+      "semanticRelations": [
+        "대상에 반복 행동이 기본 패턴으로 진술된다.",
+        "뒤의 관계는 특정 상황이 지속되는 동안 그 행동이 중단된다고 말한다.",
+        "그 중단을 한정하던 상황은 이후 종료된 것으로 제시된다.",
+        "원래 반복 패턴을 폐기하거나 중단을 연장하거나 다른 상태로 대체하는 관계는 없다."
+      ],
+      "interpretationContract": "CLEAR는 한정된 중단 이후에 새로운 물리적 사건이 일어났다고 주장하지 않는다. 반복 기본값이 성립하고, 한정된 중단이 성립하고, 그 중단을 한정하던 상황이 종료되었고, 보이는 근거가 중단의 연장·취소·대체를 적극적으로 licensing하지 않을 때 반복 행동의 의미 상태가 충분히 결정된다는 뜻이다. 진술되지 않은 중단 이후 사건을 새로 도입하지 않는다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "선행 조건에 묶인 계획의 현재 의미 상태",
+      "semanticRelations": [
+        "대상 행동은 명시적인 선행 조건에 묶인 계획으로 제시된다.",
+        "뒤의 관계는 그 계획을 조건부 상태 그대로 기억하거나 유지할 대상으로 확인한다.",
+        "선행 조건이 충족되었다거나 계획이 무조건적인 확정 행동으로 바뀌었다는 관계는 없다."
+      ],
+      "interpretationContract": "분류기가 판정하는 것은 계획의 보이는 의미 상태다. 선행 조건이 발동했음을 establish할 필요가 없다. 명시적으로 유지되는 조건부 계획은 조건부이고 미실행인 채로도 의미상 CLEAR일 수 있다."
+    }
+  ],
+  "preserved": [
+    {
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "humanLabel": "ESCALATE",
+      "amended": false,
+      "rationale": "컨테이너 안 항목들에 대한 규칙이 진술되고, 대상이 나중에 그 컨테이너로 옮겨지며, 보이는 근거가 앞선 규칙이 새로 옮겨진 항목까지 미치는지를 결정하지 않는다. 이 모호성은 의도된 것이라 보존한다."
+    }
+  ],
+  "routingCorrections": [
+    {
+      "itemId": "p1b6-item-b002-059",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "historicalOutcome": "SKELETON_SEMANTICS_NEEDS_REVISION",
+      "currentOutcome": "SURFACE_COLLAPSES_AMBIGUITY",
+      "plannedMinimumRepairConcept": "지금 보관함 안의 문서들은 월말에 삭제하기로 했어.",
+      "repairPerformed": false
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "historicalOutcome": "SKELETON_SEMANTICS_NEEDS_REVISION",
+      "currentOutcome": "SURFACE_COLLAPSES_AMBIGUITY",
+      "plannedMinimumRepairConcept": "지금 빨간 바구니 안의 옷은 오늘 세탁 대상이라고 정했어.",
+      "repairPerformed": false
+    }
+  ],
+  "routingCorrectionRationale": "스켈레톤은 현재 존재하는 항목 집합에 한정된 규칙을 다루는데, 이 두 표면은 컨테이너 소속 자체에 붙는 일반 규칙으로 자연스럽게 읽혀 의도된 모호성을 무너뜨린다. 따라서 스켈레톤 의미 결함이 아니라 현재 표면 실현 결함이다. 이 커밋에서 원문은 고치지 않는다. 실제 수리는 새 source audit과 새 blind HUMAN 재검토를 요구한다.",
+  "authority": {
+    "humanDecisionsAltered": false,
+    "historicalExact56BytesAltered": false,
+    "historicalPragmaticRoutingAltered": false,
+    "surfacesRepaired": false,
+    "datasetAcceptancePerformed": false,
+    "humanGoldFrozen": false,
+    "heldRepeatedReviewOpened": false,
+    "trainingOccurred": false,
+    "decisionsSource": "REPOSITORY_OWNER_SEMANTIC_ADJUDICATION"
+  }
+}

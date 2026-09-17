@@ -96,7 +96,10 @@
 - **`CONSERVATIVE_PRAGMATIC_INTERPRETATION`에 보완 규칙이 붙었다: 경쟁 해석은 보이는 근거가 적극적으로 licensing할 때만 인정한다.** 논리적으로 양립 가능하다는 것만으로는 모호성이 유지되지 않는다. 또 "한 방향 24/64는 경계 정의 문제다"라는 문장은 과했으므로 **"경계 정의 문제일 가능성의 강한 증거이고 재검토를 정당화한다. 개별 건은 여전히 surface 결함이나 HUMAN 오판일 수 있다"**로 고쳤다.
 - **attempt-003 blind HUMAN 재검토는 끝났다 — 3건 모두 `ESCALATE`다.** receipt는 `fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003.json`이고 blind 당시의 opaque ID로만 키를 잡는다. overlay를 태우면 효력 분포는 **64 KEEP / 52 CLEAR / 12 ESCALATE**, reconciliation은 **43 match / 21 mismatch**다. **`humanReviewCompleted`는 여전히 false다** — 그 플래그는 batch 전체의 mismatch 0을 뜻하지 한 attempt의 완료가 아니다.
 - **효력 artifact는 v2가 새로 생겼다**(`…-effective-current-batch-002-v2.json`). frozen mismatch 진단과 adjudication 사슬이 attempt-003 이전 artifact(`d0e5dc…`)에 결합돼 있어서 그것을 바꿀 수 없기 때문이고, v2는 자기가 무엇을 대체하는지 적는다. attempt-001·002 receipt와 패킷, adjudication receipt는 바이트 그대로다.
-- **남은 blocker 둘.** (1) 영향받은 frozen skeleton 3개의 표적 Exact56 amendment 결정, (2) surface-collapse 11건의 수리 vs 폐기 결정.
+- **표적 skeleton 의미 amendment는 끝났다.** `8dd28…`·`155420…`은 effective `CLEAR`로 고쳤고 `2fa39…`는 의도된 모호성이라 `ESCALATE`로 남겼다. **정본은 historical Exact56(불변, `772f07…`)이 아니라 `fixtures/local-memory-inference-p1b6-skeleton-effective-current.json`(34 CLEAR / 22 ESCALATE)이다** — 앞으로의 authoring은 이걸 읽는다. 결정 자체는 `…-skeleton-semantic-amendment-receipt.json`에 데이터로 있다.
+- **batch-002는 effective 기준 51 match / 13 mismatch이고 남은 13건은 전부 surface-collapse다**(`022 024 029 032 034 037 039 047 049 050 051 059 063`). HUMAN 집계는 64 KEEP / 52 CLEAR / 12 ESCALATE 그대로고 `humanReviewCompleted`는 false다.
+- **059·063은 skeleton 결함이 아니라 표면 결함으로 재분류됐다.** 최소 수리 방향은 이미 정했다 — `지금`으로 원래 규칙을 현재 항목 집합에 한정한다. **아직 고치지 않았고**, 고치면 새 source audit과 새 blind HUMAN 재검토가 필요하다.
+- **남은 blocker 하나.** surface-collapse 13건의 수리 vs 폐기 결정. accepted pool은 30 그대로이고 downstream gate는 전부 닫혀 있다.
 - **canonical mismatch 결합은 이제 fail-close다.** adjudication 빌더와 receipt validator가 진단 산출물의 raw bytes를 직접 검증하므로, effective 행을 조작해 개수만 24로 맞춘 다른 mismatch 집합으로 바꿔치기할 수 없다. 기존 adjudication 패킷 바이트(`dd8697…`)는 그대로다.
 - accepted pool은 30 그대로이고 acceptance 산출물은 없다. final gold·training·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
 
