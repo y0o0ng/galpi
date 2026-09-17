@@ -205,3 +205,56 @@ test('policy replay keeps generated embeddings and question output explicit', ()
   assert.doesNotMatch(output, /개인 질문/);
   assert.match(output, /--review/);
 });
+
+test('resolution outcomes are counted without storing new query plaintext', () => {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE assistant_retrieval_shadow_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT,
+      mode TEXT NOT NULL,
+      query_sha256 TEXT,
+      resolution_outcome TEXT,
+      retrieval_query_sha256 TEXT,
+      notes_json TEXT NOT NULL,
+      chunks_json TEXT NOT NULL,
+      context_chars INTEGER NOT NULL DEFAULT 0,
+      latency_ms INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      created_at INTEGER NOT NULL
+    );
+  `);
+  const insertRun = db.prepare(`
+    INSERT INTO assistant_retrieval_shadow_runs (
+      session_id, mode, query_sha256, resolution_outcome, retrieval_query_sha256,
+      notes_json, chunks_json, context_chars, latency_ms, error, created_at
+    ) VALUES (?, 'chat:a1b', ?, ?, ?, '[]', ?, 0, 5, ?, ?)
+  `);
+  const rawHash = sha256('그때 뭐 했었지?');
+  const chunks = JSON.stringify([{ chunkId: 'qa-1', noteFilename: 'a.md', score: 0.7 }]);
+  insertRun.run('s1', sha256('자립 질문'), 'pass', sha256('자립 질문'), chunks, null, 100);
+  insertRun.run('s1', rawHash, 'resolved', sha256('8월 20일 수원 모임'), chunks, null, 110);
+  insertRun.run('s1', sha256('응 그래서?'), 'no_retrieval', null, '[]', null, 120);
+  insertRun.run('s1', sha256('그거는?'), 'ambiguous', null, '[]', '해석 실패', 130);
+  insertRun.run('s1', sha256('과거 실행'), null, null, '[]', null, 140);
+
+  db.pragma('query_only = ON');
+  const report = buildRetrievalShadowReport({ db });
+  assert.deepEqual(report.byResolution, [
+    { outcome: 'ambiguous', runs: 1 },
+    { outcome: 'no_retrieval', runs: 1 },
+    { outcome: 'pass', runs: 1 },
+    { outcome: 'resolved', runs: 1 },
+    { outcome: 'unrecorded', runs: 1 },
+  ]);
+  assert.equal(report.runsWithoutCorpusRetrieval, 2);
+  assert.equal(report.rewrittenQueryRuns, 1);
+  // corpus 검색을 아예 하지 않은 턴은 중단으로 세지 않는다. 기록 없는 과거 실행은 그대로다.
+  assert.equal(report.abstentions, 1);
+
+  const output = formatRetrievalShadowReport(report);
+  assert.match(output, /질의 해석: ambiguous 1, no_retrieval 1, pass 1, resolved 1, unrecorded 1/);
+  assert.match(output, /corpus 미검색 2건 · 원문과 다른 질의 1건/);
+  assert.doesNotMatch(output, /그때|수원|그래서/);
+  db.close();
+});

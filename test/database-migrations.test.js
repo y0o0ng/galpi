@@ -276,11 +276,11 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
   `).all();
 
   const result = runDatabaseMigrations(db);
-  assert.deepEqual(result.applied, [{
-    version: 25,
-    name: 'voice_shortcut_conversation_control',
-  }]);
-  assert.equal(result.currentVersion, 25);
+  assert.deepEqual(result.applied, [
+    { version: 25, name: 'voice_shortcut_conversation_control' },
+    { version: 26, name: 'retrieval_query_resolution_trace' },
+  ]);
+  assert.equal(result.currentVersion, 26);
   assert.deepEqual(
     db.prepare(`SELECT can_continue AS canContinue FROM voice_shortcut_receipts`).get(),
     { canContinue: 0 },
@@ -323,6 +323,33 @@ test('schema v23 keeps historical active-note telemetry unknown instead of backf
       FROM assistant_retrieval_shadow_runs
     `).get().activeNotesJson,
     null,
+  );
+  db.close();
+});
+
+test('schema v26 leaves historical rows without a resolution outcome', () => {
+  const db = createLegacyDatabase();
+  migrateThrough(db, 25);
+  db.prepare(`
+    INSERT INTO assistant_retrieval_shadow_runs (
+      mode, query_sha256, notes_json, chunks_json
+    ) VALUES ('chat:gpt-single-v1:a2', ?, '[]', '[]')
+  `).run(sha256('과거 질문'));
+
+  runDatabaseMigrations(db);
+
+  // NULL은 해석 단계가 없었다는 뜻이다. `pass`로 소급 해석하지 않는다.
+  assert.deepEqual(
+    db.prepare(`
+      SELECT query_sha256 AS querySha256, resolution_outcome AS resolutionOutcome,
+             retrieval_query_sha256 AS retrievalQuerySha256
+      FROM assistant_retrieval_shadow_runs
+    `).get(),
+    {
+      querySha256: sha256('과거 질문'),
+      resolutionOutcome: null,
+      retrievalQuerySha256: null,
+    },
   );
   db.close();
 });

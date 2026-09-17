@@ -161,6 +161,10 @@ const {
   parseStoredEmbedding,
 } = require('./lib/assistant-retrieval-shadow');
 const {
+  AMBIGUOUS_RETRIEVAL_NOTICE,
+  createRetrievalQueryResolver,
+} = require('./lib/assistant-query-resolution');
+const {
   REASON_CODES: MEMORY_INFERENCE_REASON_CODES,
   candidateBoundaryObservations,
   createObservationRecorder,
@@ -700,6 +704,8 @@ db.exec(`
     latency_ms INTEGER NOT NULL DEFAULT 0,
     error TEXT,
     active_notes_json TEXT,
+    resolution_outcome TEXT,
+    retrieval_query_sha256 TEXT,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   );
   CREATE TABLE IF NOT EXISTS research_memory_inference_observations (
@@ -1258,10 +1264,12 @@ const stmtUpdateMessageEmbedding = db.prepare(
 const stmtInsertRetrievalShadowRun = db.prepare(`
   INSERT INTO assistant_retrieval_shadow_runs (
     session_id, mode, query_sha256, notes_json, chunks_json,
-    context_chars, latency_ms, error, active_notes_json
+    context_chars, latency_ms, error, active_notes_json,
+    resolution_outcome, retrieval_query_sha256
   ) VALUES (
     @sessionId, @mode, @querySha256, @notesJson, @chunksJson,
-    @contextChars, @latencyMs, @error, @activeNotesJson
+    @contextChars, @latencyMs, @error, @activeNotesJson,
+    @resolutionOutcome, @retrievalQuerySha256
   )
 `);
 const stmtInsertMemoryInferenceObservation = db.prepare(`
@@ -1290,6 +1298,49 @@ const assistantRetrievalShadow = createAssistantRetrievalShadow({
   insertRun: values => stmtInsertRetrievalShadowRun.run(values),
   onRecordError: error => console.warn('shadow retrieval trace 저장 실패:', error.message),
 });
+// 검색 질의 해석기(Stage B). 대화 지시어가 들어간 턴에만 불린다. 새 모델 env 값을
+// 만들지 않고 채팅과 같은 스냅샷을 쓴다 — 해석만 약한 모델로 밀리면 지시 대상이
+// 조용히 틀린 채로 검색에 들어간다.
+const retrievalQueryResolver = HAS_GPT
+  ? createRetrievalQueryResolver({
+    callModel: async ({ system, input, schema, schemaName }) => {
+      const snapshot = resolveChatModelSelection({
+        selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
+        catalogRow: modelCatalogs.get('openai_api'),
+        bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
+        reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+      });
+      const response = await openai.responses.create({
+        model: snapshot.modelId,
+        input: [
+          { role: 'system', content: system },
+          { role: 'user', content: input },
+        ],
+        store: false,
+        // 추론도 출력 토큰을 쓴다. 질의 한 줄이라도 상한을 낮게 잡으면 잘린다.
+        max_output_tokens: snapshot.reasoningEffort === 'none' ? 512 : 8192,
+        reasoning: { effort: snapshot.reasoningEffort, context: 'current_turn' },
+        text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } },
+      });
+      if (response?.status && response.status !== 'completed') {
+        const error = new Error(`질의 해석 응답이 완료되지 않았습니다: ${response.status}`);
+        error.code = 'RETRIEVAL_QUERY_RESOLUTION_INCOMPLETE';
+        throw error;
+      }
+      const text = extractSmallResponseText(response);
+      if (!text) {
+        const error = new Error('질의 해석 응답이 비어 있습니다.');
+        error.code = 'RETRIEVAL_QUERY_RESOLUTION_EMPTY';
+        throw error;
+      }
+      return JSON.parse(text);
+    },
+    // 발화 원문은 로그에 넣지 않는다. 오류 코드만 남긴다.
+    onError: error => console.warn(
+      `검색 질의 해석 실패: ${error?.code || error?.name || 'UNKNOWN'}`,
+    ),
+  })
+  : null;
 const stmtInsertAutoSaveDecision = db.prepare(`
   INSERT INTO auto_save_decisions (
     session_id, source_user_message, source_assistant_message, model,
@@ -3946,6 +3997,9 @@ async function runSingleChatTurnBody({
       modelSnapshot?.runtimeGeneration
         ? `chat:${modelSnapshot.runtimeGeneration}`
         : 'chat',
+      // 해석은 이번 턴 이전의 같은 세션 대화만 본다. 답변 경로가 이미 들고 있는
+      // 범위이고, 이것을 위해 더 긴 대화 저장소를 새로 만들지 않는다.
+      await resolveRetrievalQueryForTurn(message, history),
     );
     const baseContext = formatHistoryForModelContext(
       requestHistory.slice(-HISTORY_CONTEXT_MESSAGES),
@@ -7667,11 +7721,53 @@ function searchPastMessages(queryEmbedding, currentSessionId, limit = 2) {
     .map(({ embedding, sim, ...r }) => r);
 }
 
-async function getContextNotesForQuestion(question, activeNotes, sessionId = null, mode = 'chat') {
-  const active = await resolveActiveNotes(activeNotes);
+async function resolveRetrievalQueryForTurn(message, recentConversation) {
+  // GPT 키가 없으면 해석기도 없고 임베딩도 없다. 기존 단일 턴 동작을 그대로 둔다.
+  if (!retrievalQueryResolver) return { outcome: 'pass', retrievalQuery: message };
+  return retrievalQueryResolver.resolve({ userText: message, recentConversation });
+}
 
-  const queryEmbedding = await generateEmbedding(question);
-  const rankedSearched = await rankVaultNoteCandidates(question, queryEmbedding);
+// 사용자 발화 원문(`question`)과 검색에만 쓰는 질의(`retrievalQuery`)를 가른다.
+// 원문은 저장·히스토리·답변 입력에 그대로 남고, 해석된 질의는 임베딩·노트 랭킹·
+// 과거 대화 검색·A2 전역 회수에 한꺼번에 들어간다. 한쪽만 바뀌면 같은 턴 안에서
+// 두 질의가 서로 다른 것을 찾는다.
+async function getContextNotesForQuestion(
+  question,
+  activeNotes,
+  sessionId = null,
+  mode = 'chat',
+  resolution = null,
+) {
+  const outcome = resolution?.outcome || 'pass';
+  const retrievalQuery = outcome === 'pass' ? question : resolution.retrievalQuery;
+  const active = await resolveActiveNotes(activeNotes);
+  const traceMode = `${mode}:${ASSISTANT_RETRIEVAL_A2_ENABLED ? 'a2' : 'a1b'}`;
+
+  // 검색이 필요 없거나(`no_retrieval`) 지시 대상을 확정하지 못한(`ambiguous`) 턴은
+  // corpus를 건드리지 않는다. 원문을 약한 질의로 던지는 fallback을 만들지 않는다.
+  // 명시적으로 선택한 노트는 검색 결과가 아니라 사용자 선택이라 그대로 둔다.
+  if (outcome === 'no_retrieval' || outcome === 'ambiguous') {
+    assistantRetrievalShadow.record({
+      sessionId,
+      mode: traceMode,
+      query: question,
+      resolution,
+      activeNotes: active,
+      retrieval: null,
+      latencyMs: 0,
+      error: resolution?.error || null,
+    });
+    return {
+      notes: active,
+      pastMessages: [],
+      queryEmbedding: null,
+      shadowRetrieval: null,
+      retrievalContext: outcome === 'ambiguous' ? AMBIGUOUS_RETRIEVAL_NOTICE : '',
+    };
+  }
+
+  const queryEmbedding = await generateEmbedding(retrievalQuery);
+  const rankedSearched = await rankVaultNoteCandidates(retrievalQuery, queryEmbedding);
   const searched = rankedSearched.map(({
     score,
     keywordScore,
@@ -7694,7 +7790,7 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   let shadowError = null;
   try {
     shadowRetrieval = await assistantRetrievalShadow.retrieveGlobal({
-      query: question,
+      query: retrievalQuery,
       queryEmbedding,
       activeNotes: active,
       rankedCandidates: rankedSearched,
@@ -7704,8 +7800,9 @@ async function getContextNotesForQuestion(question, activeNotes, sessionId = nul
   }
   assistantRetrievalShadow.record({
     sessionId,
-    mode: `${mode}:${ASSISTANT_RETRIEVAL_A2_ENABLED ? 'a2' : 'a1b'}`,
+    mode: traceMode,
     query: question,
+    resolution: resolution || { outcome: 'pass', retrievalQuery: question },
     activeNotes: active,
     retrieval: shadowRetrieval,
     latencyMs: Date.now() - shadowStartedAt,
