@@ -71,12 +71,13 @@ licenses it, and item-level semantic adjudication of all 24 mismatches is now
 COMPLETE at 10 `SKELETON_SEMANTICS_NEEDS_REVISION` / 11
 `SURFACE_COLLAPSES_AMBIGUITY` / 3 `HUMAN_DECISION_NEEDS_REREVIEW` / 0
 `UNRESOLVED`. That step is routing, not HUMAN relabeling: no HUMAN decision,
-frozen skeleton label, or surface changed. The reconciliation itself therefore
-remains unresolved, and three blockers stand — a fresh blind HUMAN re-review of
-the 3 routed rows, a targeted Exact56 semantic amendment decision for the 3
-affected frozen skeletons, and a repair-versus-rejection decision for the 11
-surface-collapse realizations. The owner's current reading of the three
-re-review rows was not blind and is not HUMAN gold. Batch-002 corpus acceptance
+frozen skeleton label, or surface changed. The fresh blind HUMAN re-review of
+the 3 routed rows (attempt-003) is now **complete at 3 ESCALATE**, so the
+effective HUMAN state is 64 KEEP / 52 CLEAR / 12 ESCALATE and reconciliation
+moved to 43 match / 21 mismatch. The reconciliation itself therefore remains
+unresolved, and two blockers stand — a targeted Exact56 semantic amendment
+decision for the 3 affected frozen skeletons, and a repair-versus-rejection
+decision for the 11 surface-collapse realizations. Batch-002 corpus acceptance
 has not occurred,
 the accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
 repeated review, training, raw-episode evaluation, private replay, and
@@ -216,11 +217,13 @@ as required, not performed. The 11 `SURFACE_COLLAPSES_AMBIGUITY` realizations
 are likewise untouched: repair-versus-dataset-rejection is a separate
 repository-owner resolution.
 
-The repository owner currently reads the three `HUMAN_DECISION_NEEDS_REREVIEW`
-rows as `ESCALATE`, but **those judgments were not blind** — the owner already
-knew the rows came from the reconciliation mismatch. They are therefore **not
-HUMAN gold**. They justify one thing only: routing those three rows to a fresh
-blind HUMAN review, attempt `p1b6-primary-human-rereview-batch-002-attempt-003`.
+Historical note: before attempt-003 the repository owner's non-blind read of the
+three `HUMAN_DECISION_NEEDS_REREVIEW` rows was `ESCALATE`. Those provisional
+judgments were correctly **not** treated as HUMAN gold, because the owner
+already knew the rows came from the reconciliation mismatch; they justified one
+thing only — routing the rows to a fresh blind HUMAN review. Attempt-003 has
+since completed that review, and its receipt is the authoritative HUMAN decision
+source.
 
 `validateBatch002PragmaticAdjudicationReceipt` fails closed unless the receipt
 binds to every canonical artifact, holds exactly one sorted row per canonical
@@ -275,8 +278,40 @@ outcome, model recommendation, or expected answer; no `p1b6-item-` or
 Following repository convention, HUMAN review packets are generated rather than
 committed — only their decision receipts are committed. The attempt-003 packet
 is deterministic at raw SHA-256
-`165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2`. **The blind
-review has not been performed**, so no attempt-003 decision receipt exists.
+`165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2`.
+
+**The blind review is complete.** All three rows were decided `ESCALATE`, at
+`fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003.json`
+(3 KEEP / 0 FIX / 0 REJECT, 0 CLEAR / 3 ESCALATE). The receipt follows the
+attempt-002 schema and `validateBatch002Attempt003Receipt` fails closed on a
+wrong attempt ID, batch or blind-packet binding, a missing, extra, duplicate or
+unknown opaque row, a decision outside the HUMAN vocabulary, or any row the
+canonical blind packet did not present.
+
+Attempt-003 is an **additional HUMAN provenance layer**, not a rewrite:
+attempt-001 and attempt-002 receipts and their packets stay byte-identical, and
+the semantic adjudication receipt remains a routing artifact that does not
+encode these decisions.
+`buildBatch002EffectiveHumanDecisionSetWithAttempt003` layers it onto the
+existing overlay, mapping each opaque review ID back to its batch item
+mechanically and refusing to move any decision outside the reviewed population.
+
+Because the frozen mismatch diagnostic and the whole semantic adjudication
+chain bind to the pre-attempt-003 effective artifact
+(`d0e5dc…`, 40 match / 24 mismatch), that artifact stays byte-identical and the
+post-attempt-003 state is a successor artifact,
+`fixtures/local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2.json`,
+which names what it supersedes. Its effective distribution is **64 KEEP / 52
+CLEAR / 12 ESCALATE** and it reconciles at **43 match / 21 mismatch**.
+
+`humanReviewCompleted` stays **false**: it tracks zero remaining reconciliation
+mismatches for the whole batch, not completion of one re-review attempt, and 21
+mismatches remain. The fresh-HUMAN-re-review portion of the semantic
+adjudication is resolved; the remaining semantic follow-up is the separate
+Exact56 amendment for the 3 affected skeletons and the repair-or-rejection
+decision for the 11 surface-collapse realizations. No acceptance, gold freeze,
+HELD review, training, or downstream gate was opened, and the accepted pool
+remains 30.
 
 ## Task Boundary
 

@@ -4114,3 +4114,55 @@ production remain unopened or unchanged. The remaining blockers are (1) the
 fresh blind HUMAN re-review of 3 rows, (2) the targeted Exact56 semantic
 amendment decision for the 3 affected skeletons, and (3) the repair-versus-
 rejection decision for the 11 surface-collapse realizations.
+
+#### P1-B6 batch-002 fresh blind HUMAN re-review attempt 003 — COMPLETE / RECONCILIATION STILL UNRESOLVED
+
+The repository owner completed the fresh blind re-review of the three rows the
+semantic adjudication routed to `HUMAN_DECISION_NEEDS_REREVIEW`, without seeing
+item IDs, skeleton IDs, previous HUMAN decisions, frozen labels, adjudication
+outcomes, or expected answers. The reviewed packet is the canonical attempt-003
+blind packet, raw SHA-256
+`165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2`.
+
+**All three rows were decided `ESCALATE`** (3 KEEP / 0 FIX / 0 REJECT, 0 CLEAR /
+3 ESCALATE). The decision receipt is
+`fixtures/local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003.json`,
+raw SHA-256
+`182fcad42d34a631fe77057cd19046ce125a06d933d68c39d870f2d366241aa3`,
+keyed only by the opaque review IDs shown during the blind review. The
+opaque-ID-to-item mapping was recomputed from the attempt-003 builder rather
+than trusted from a copied list; it resolves to `p1b6-item-b002-027`,
+`p1b6-item-b002-040`, and `p1b6-item-b002-061`, each of which stood at HUMAN
+`CLEAR` before this attempt.
+
+Attempt-003 is an additional HUMAN provenance layer. Attempt-001 and
+attempt-002 receipts and their source packets remain byte-identical, and the
+semantic adjudication receipt was not mutated to encode these decisions — it
+remains a routing artifact.
+
+Because the frozen mismatch diagnostic and the semantic adjudication chain bind
+to the pre-attempt-003 effective artifact
+(`d0e5dcc2da7d1f87b4886d6e5b6726c1053c88fdc4cdf8fbd144a47c3cddf38f`, 40 match /
+24 mismatch), that artifact is unchanged and the post-attempt-003 state is its
+successor,
+`fixtures/local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2.json`,
+raw SHA-256
+`a96fc01393c79057d292cf10b565589e7448b86289eb52b8cd1c63657af2ed05`, which names
+what it supersedes. Exactly three rows changed decision; every other HUMAN
+decision is identical. The effective distribution is **64 KEEP / 52 CLEAR / 12
+ESCALATE** and frozen Exact56 reconciliation is **43 match / 21 mismatch**, both
+recomputed mechanically rather than asserted.
+
+`authority.humanReviewCompleted` remains **false**. That flag tracks zero
+remaining reconciliation mismatches across the whole batch, not the completion
+of a single re-review attempt, and 21 mismatches remain.
+
+The fresh-HUMAN-re-review portion of the semantic adjudication is resolved. The
+remaining semantic follow-up is the separate targeted Exact56 amendment for the
+three affected frozen skeletons and the repair-versus-rejection decision for the
+11 `SURFACE_COLLAPSES_AMBIGUITY` realizations; neither was started here. Exact56,
+batch-002 surfaces, the mismatch diagnostic, the pragmatic adjudication packet,
+and the semantic adjudication receipt are byte-identical. Batch-002 acceptance
+was NOT RUN and no acceptance artifact exists, the accepted pool remains exactly
+30, and final corpus HUMAN gold, HELD repeated review, training, raw-episode
+evaluation, private replay, and production remain unopened or unchanged.

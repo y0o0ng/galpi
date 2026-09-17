@@ -109,6 +109,22 @@ const BATCH002_REREVIEW_003 = Object.freeze({
   expectedRows: 3,
   // HUMAN review packets are generated, never committed; only their receipts are.
   packetSha256: '165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2',
+  receiptIdentity:
+    'xion-local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003-receipt-v1',
+});
+// Authoritative blind HUMAN decisions, keyed only by the opaque IDs shown during review.
+const BATCH002_ATTEMPT003_DECISIONS = new Map([
+  ['p1b6-rereview-2c251b9d9e952944', ['KEEP', 'ESCALATE']],
+  ['p1b6-rereview-a0c1900947d7341b', ['KEEP', 'ESCALATE']],
+  ['p1b6-rereview-f53ff2ec780365d2', ['KEEP', 'ESCALATE']],
+]);
+const BATCH002_ATTEMPT003_SUMMARY = Object.freeze({
+  total: 3, KEEP: 3, FIX: 0, REJECT: 0, CLEAR: 0, ESCALATE: 3,
+});
+const BATCH002_EFFECTIVE_003_IDENTITY =
+  'xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2';
+const BATCH002_EFFECTIVE_003_SUMMARY = Object.freeze({
+  total: 64, KEEP: 64, FIX: 0, REJECT: 0, CLEAR: 52, ESCALATE: 12,
 });
 const INTERPRETATION_RULE = 'CONSERVATIVE_PRAGMATIC_INTERPRETATION';
 const ADJUDICATION_TAXONOMY = Object.freeze([
@@ -1106,6 +1122,167 @@ function buildBatch002RereviewAttempt003Packet(rawBatchBytes, auditReceipt,
   };
 }
 
+// Attempt-003 is an additional HUMAN provenance layer over attempt-001/002; it rewrites no
+// history. The reviewed population is whatever the canonical attempt-003 blind packet held,
+// so the receipt is checked against the rebuilt packet rather than a copied item mapping.
+function validateBatch002Attempt003Receipt(rawBatchBytes, auditReceipt,
+  rawAdjudicationReceiptBytes, receipt) {
+  const packet = buildBatch002RereviewAttempt003Packet(
+    rawBatchBytes, auditReceipt, rawAdjudicationReceiptBytes,
+  );
+  if (sha256RawBytes(packetBytes(packet)) !== BATCH002_REREVIEW_003.packetSha256) {
+    fail('batch-002 attempt-003 blind packet bytes are invalid');
+  }
+  if (!exactKeys(receipt, [
+    'name', 'attemptId', 'status', 'primaryHumanRereviewPacket', 'reviewedSourceBatch',
+    'rendererIdentity', 'sourceAuditPrerequisite', 'originalPrimaryHumanReview',
+    'precedingFocusedRereview', 'reviewPopulationSelection', 'summary', 'authority', 'rows',
+  ]) || receipt.name !== BATCH002_REREVIEW_003.receiptIdentity
+    || receipt.attemptId !== BATCH002_REREVIEW_003.attemptId
+    || receipt.status !== 'COMPLETE_PASS'
+    || !exactKeys(receipt.primaryHumanRereviewPacket, ['identity', 'rawSha256'])
+    || receipt.primaryHumanRereviewPacket.identity !== PACKET_IDENTITY
+    || receipt.primaryHumanRereviewPacket.rawSha256 !== BATCH002_REREVIEW_003.packetSha256
+    || !exactKeys(receipt.reviewedSourceBatch, ['identity', 'rawSha256'])
+    || receipt.reviewedSourceBatch.identity !== packet.sourceBatch.identity
+    || receipt.reviewedSourceBatch.rawSha256 !== BATCH002_REREVIEW.currentBatchSha256
+    || receipt.rendererIdentity !== RENDERER_IDENTITY
+    || !exactKeys(receipt.sourceAuditPrerequisite, ['attemptId', 'status', 'allRowsPassed'])
+    || receipt.sourceAuditPrerequisite.attemptId !== BATCH002_REREVIEW.auditAttemptId
+    || receipt.sourceAuditPrerequisite.status !== 'COMPLETE_PASS'
+    || receipt.sourceAuditPrerequisite.allRowsPassed !== true
+    || !exactKeys(receipt.originalPrimaryHumanReview, ['attemptId', 'receiptIdentity'])
+    || receipt.originalPrimaryHumanReview.attemptId !== BATCH002_REREVIEW.originalAttemptId
+    || receipt.originalPrimaryHumanReview.receiptIdentity
+      !== BATCH002_REREVIEW.originalReceiptIdentity
+    || !exactKeys(receipt.precedingFocusedRereview, ['attemptId', 'receiptIdentity'])
+    || receipt.precedingFocusedRereview.attemptId !== BATCH002_REREVIEW.rereviewAttemptId
+    || receipt.precedingFocusedRereview.receiptIdentity
+      !== BATCH002_REREVIEW.rereviewReceiptIdentity
+    || !exactKeys(receipt.reviewPopulationSelection, [
+      'receiptIdentity', 'rawSha256', 'selectionOutcome',
+    ]) || receipt.reviewPopulationSelection.receiptIdentity
+      !== BATCH002_ADJUDICATION_RECEIPT_IDENTITY
+    || receipt.reviewPopulationSelection.rawSha256 !== BATCH002_ADJUDICATION_RECEIPT_SHA256
+    || receipt.reviewPopulationSelection.selectionOutcome
+      !== BATCH002_REREVIEW_003.selectionOutcome
+    || JSON.stringify(receipt.summary) !== JSON.stringify(BATCH002_ATTEMPT003_SUMMARY)
+    || !exactKeys(receipt.authority, [
+      'reviewCompletedForAllPresentedRows', 'acceptedKeepCount', 'unresolvedFixCount',
+      'blindReview', 'primaryHumanReviewGateClosed', 'surfaceHumanGoldFrozen',
+      'decisionsSource', 'modelInferenceUsedForHumanDecisions', 'trainingOccurred',
+    ]) || receipt.authority.reviewCompletedForAllPresentedRows !== true
+    || receipt.authority.acceptedKeepCount !== BATCH002_REREVIEW_003.expectedRows
+    || receipt.authority.unresolvedFixCount !== 0
+    || receipt.authority.blindReview !== true
+    || receipt.authority.primaryHumanReviewGateClosed !== false
+    || receipt.authority.surfaceHumanGoldFrozen !== false
+    || receipt.authority.decisionsSource !== 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER'
+    || receipt.authority.modelInferenceUsedForHumanDecisions !== false
+    || receipt.authority.trainingOccurred !== false
+    || !Array.isArray(receipt.rows)
+    || receipt.rows.length !== BATCH002_REREVIEW_003.expectedRows) {
+    fail('batch-002 attempt-003 receipt binding is invalid');
+  }
+
+  // Exactly the packet's opaque IDs, once each, carrying the authoritative HUMAN decisions.
+  const expectedIds = new Set(packet.rows.map(row => row.reviewRowId));
+  const rows = new Map();
+  for (const row of receipt.rows) {
+    const expectedDecision = BATCH002_ATTEMPT003_DECISIONS.get(row.reviewRowId);
+    if (!exactKeys(row, ['reviewRowId', 'disposition', 'decision'])
+      || !expectedIds.has(row.reviewRowId) || rows.has(row.reviewRowId)
+      || !expectedDecision || row.disposition !== expectedDecision[0]
+      || row.decision !== expectedDecision[1]) {
+      fail('batch-002 attempt-003 rows are invalid, stale, or duplicate');
+    }
+    rows.set(row.reviewRowId, row);
+  }
+  if (rows.size !== expectedIds.size
+    || JSON.stringify(summarizeDecisions([...rows.values()]))
+      !== JSON.stringify(BATCH002_ATTEMPT003_SUMMARY)) {
+    fail('batch-002 attempt-003 rows do not match the authoritative aggregate');
+  }
+  return { packet, rows };
+}
+
+// Layers attempt-003 onto the existing effective overlay. The prior artifact stays exactly as
+// built, because the frozen mismatch diagnostic and the semantic adjudication chain bind to it.
+function buildBatch002EffectiveHumanDecisionSetWithAttempt003(rawBatchBytes, auditReceipt,
+  rawOriginalPacketBytes, originalReceipt, rawRereviewPacketBytes, rereviewReceipt,
+  rawExact56Bytes, rawAdjudicationReceiptBytes, attempt003Receipt) {
+  const prior = buildBatch002EffectiveHumanDecisionSet(rawBatchBytes, auditReceipt,
+    rawOriginalPacketBytes, originalReceipt, rawRereviewPacketBytes, rereviewReceipt,
+    rawExact56Bytes);
+  const { rows: attempt003Rows } = validateBatch002Attempt003Receipt(
+    rawBatchBytes, auditReceipt, rawAdjudicationReceiptBytes, attempt003Receipt,
+  );
+
+  // Map each opaque review ID back to its batch item mechanically, never by a copied list.
+  const population = new Map();
+  for (const item of prior.batch.items) {
+    const reviewRowId = opaqueRereviewRowId(BATCH002_REREVIEW.currentBatchSha256, item.itemId);
+    if (attempt003Rows.has(reviewRowId)) population.set(item.itemId, attempt003Rows.get(reviewRowId));
+  }
+  if (population.size !== BATCH002_REREVIEW_003.expectedRows) {
+    fail('batch-002 attempt-003 rows do not map onto exactly the reviewed population');
+  }
+
+  let supersededCount = 0;
+  const rows = prior.artifact.rows.map(row => {
+    const decision = population.get(row.itemId);
+    if (!decision) return row;
+    supersededCount += 1;
+    return { itemId: row.itemId, disposition: decision.disposition, decision: decision.decision };
+  });
+  if (supersededCount !== BATCH002_REREVIEW_003.expectedRows
+    || rows.length !== prior.artifact.rows.length
+    || rows.some((row, index) => row.itemId !== prior.artifact.rows[index].itemId)
+    || rows.some((row, index) => !population.has(row.itemId)
+      && JSON.stringify(row) !== JSON.stringify(prior.artifact.rows[index]))) {
+    fail('batch-002 attempt-003 overlay changed a decision outside the reviewed population');
+  }
+  const summary = summarizeDecisions(rows);
+  if (JSON.stringify(summary) !== JSON.stringify(BATCH002_EFFECTIVE_003_SUMMARY)) {
+    fail('batch-002 post-attempt-003 effective aggregate is invalid');
+  }
+
+  const reconciliation = reconcileEffectiveHumanDecisions(prior.batch, rows, prior.exact56);
+  if (reconciliation.matchCount + reconciliation.mismatchCount !== prior.batch.items.length) {
+    fail('batch-002 reconciliation counts do not cover every current item');
+  }
+  return {
+    artifact: {
+      name: BATCH002_EFFECTIVE_003_IDENTITY,
+      status: reconciliation.humanReviewCompleted ? 'COMPLETE_PASS' : 'RECONCILIATION_NEEDS_FIX',
+      supersedes: { identity: BATCH002_EFFECTIVE_IDENTITY, rawSha256: BATCH002_EFFECTIVE_SHA256 },
+      currentSourceBatch: prior.artifact.currentSourceBatch,
+      rendererIdentity: RENDERER_IDENTITY,
+      originalPrimaryHumanAttempt: BATCH002_REREVIEW.originalAttemptId,
+      focusedPrimaryHumanRereviewAttempt: BATCH002_REREVIEW.rereviewAttemptId,
+      freshBlindPrimaryHumanRereviewAttempt: BATCH002_REREVIEW_003.attemptId,
+      summary,
+      reconciliation: {
+        exact56Sha256: EXACT56_SHA256,
+        matchCount: reconciliation.matchCount,
+        mismatchCount: reconciliation.mismatchCount,
+      },
+      authority: {
+        sourceBundleGatePassed: true,
+        humanReviewCompleted: reconciliation.humanReviewCompleted,
+        surfaceHumanGoldFrozen: false,
+        trainingOccurred: false,
+      },
+      rows,
+    },
+    batch: prior.batch,
+    exact56: prior.exact56,
+    prior,
+    reconciliation,
+    supersededCount,
+  };
+}
+
 function writeRereviewPacket(inputPath, auditReceiptPath, originalPacketPath,
   originalReceiptPath, outputPath) {
   if (fs.existsSync(outputPath)) throw new Error(`Existing output will not be overwritten: ${outputPath}`);
@@ -1154,7 +1331,11 @@ module.exports = {
   buildBatch002PragmaticAdjudicationPacket,
   buildBatch002RereviewAttempt003Packet,
   buildSmokeBatchAcceptance,
+  BATCH002_ATTEMPT003_SUMMARY,
+  BATCH002_EFFECTIVE_003_IDENTITY,
+  BATCH002_EFFECTIVE_003_SUMMARY,
   buildBatch002EffectiveHumanDecisionSet,
+  buildBatch002EffectiveHumanDecisionSetWithAttempt003,
   buildBatch002MismatchDiagnostic,
   buildBatch002RereviewPacket,
   buildEffectiveHumanDecisionSet,
@@ -1166,6 +1347,7 @@ module.exports = {
   parseArgs,
   reconcileEffectiveHumanDecisions,
   validateAuditReceipt,
+  validateBatch002Attempt003Receipt,
   validateBatch002MismatchDiagnostic,
   validateBatch002PragmaticAdjudicationReceipt,
   validateBatch002RereviewReceipt,

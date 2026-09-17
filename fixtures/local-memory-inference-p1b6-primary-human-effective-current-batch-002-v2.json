@@ -1,0 +1,357 @@
+{
+  "name": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2",
+  "status": "RECONCILIATION_NEEDS_FIX",
+  "supersedes": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v1",
+    "rawSha256": "d0e5dcc2da7d1f87b4886d6e5b6726c1053c88fdc4cdf8fbd144a47c3cddf38f"
+  },
+  "currentSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
+  },
+  "rendererIdentity": "xion-local-memory-inference-p1b6-surface-renderer-v1",
+  "originalPrimaryHumanAttempt": "p1b6-primary-human-review-batch-002-attempt-001",
+  "focusedPrimaryHumanRereviewAttempt": "p1b6-primary-human-rereview-batch-002-attempt-002",
+  "freshBlindPrimaryHumanRereviewAttempt": "p1b6-primary-human-rereview-batch-002-attempt-003",
+  "summary": {
+    "total": 64,
+    "KEEP": 64,
+    "FIX": 0,
+    "REJECT": 0,
+    "CLEAR": 52,
+    "ESCALATE": 12
+  },
+  "reconciliation": {
+    "exact56Sha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602",
+    "matchCount": 43,
+    "mismatchCount": 21
+  },
+  "authority": {
+    "sourceBundleGatePassed": true,
+    "humanReviewCompleted": false,
+    "surfaceHumanGoldFrozen": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b002-001",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-002",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-003",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-004",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-005",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-006",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-007",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-008",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-009",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-010",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-011",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-012",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-013",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-014",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-015",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-016",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-017",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-018",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-019",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-020",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-021",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-022",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-023",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-024",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-025",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-026",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-027",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-028",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-029",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-030",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-031",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-032",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-033",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-034",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-035",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-036",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-037",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-038",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-039",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-040",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-041",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-042",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-043",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-044",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-045",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-046",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-047",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-048",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-049",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-050",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-052",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-053",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-054",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-055",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-056",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-057",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-058",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-060",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-061",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-062",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    },
+    {
+      "itemId": "p1b6-item-b002-064",
+      "disposition": "KEEP",
+      "decision": "CLEAR"
+    }
+  ]
+}

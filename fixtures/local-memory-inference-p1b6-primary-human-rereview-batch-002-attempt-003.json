@@ -1,0 +1,68 @@
+{
+  "name": "xion-local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003-receipt-v1",
+  "attemptId": "p1b6-primary-human-rereview-batch-002-attempt-003",
+  "status": "COMPLETE_PASS",
+  "primaryHumanRereviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-rereview-packet-v1",
+    "rawSha256": "165d8d02ca6f5d36a22f4a8baa4d5ee7d19b059b6e2a944cbc5e1a19554973c2"
+  },
+  "reviewedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
+  },
+  "rendererIdentity": "xion-local-memory-inference-p1b6-surface-renderer-v1",
+  "sourceAuditPrerequisite": {
+    "attemptId": "p1b6-source-audit-batch-002-attempt-002",
+    "status": "COMPLETE_PASS",
+    "allRowsPassed": true
+  },
+  "originalPrimaryHumanReview": {
+    "attemptId": "p1b6-primary-human-review-batch-002-attempt-001",
+    "receiptIdentity": "xion-local-memory-inference-p1b6-primary-human-review-batch-002-attempt-001-receipt-v1"
+  },
+  "precedingFocusedRereview": {
+    "attemptId": "p1b6-primary-human-rereview-batch-002-attempt-002",
+    "receiptIdentity": "xion-local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-002-receipt-v1"
+  },
+  "reviewPopulationSelection": {
+    "receiptIdentity": "xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt-v1",
+    "rawSha256": "cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa",
+    "selectionOutcome": "HUMAN_DECISION_NEEDS_REREVIEW"
+  },
+  "summary": {
+    "total": 3,
+    "KEEP": 3,
+    "FIX": 0,
+    "REJECT": 0,
+    "CLEAR": 0,
+    "ESCALATE": 3
+  },
+  "authority": {
+    "reviewCompletedForAllPresentedRows": true,
+    "acceptedKeepCount": 3,
+    "unresolvedFixCount": 0,
+    "blindReview": true,
+    "primaryHumanReviewGateClosed": false,
+    "surfaceHumanGoldFrozen": false,
+    "decisionsSource": "REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER",
+    "modelInferenceUsedForHumanDecisions": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-rereview-2c251b9d9e952944",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-rereview-a0c1900947d7341b",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-rereview-f53ff2ec780365d2",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    }
+  ]
+}
