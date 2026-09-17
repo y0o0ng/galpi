@@ -43,13 +43,13 @@ const SURFACE_COLLAPSE_MISMATCHES = [
 
 const exact56 = readJson(EXACT56);
 const catalog = readJson(EFFECTIVE_CATALOG);
-const bindings = {
-  adjudicationReceiptSha256: ADJUDICATION_RECEIPT_SHA256,
-  batch002Sha256: HUMAN_002_V2_SHA256,
-  batch001Sha256: HUMAN_001_SHA256,
-};
-const rebuild = (rawReceipt = read(RECEIPT)) =>
-  amendment.buildEffectiveCurrentSkeletonCatalog(read(EXACT56), rawReceipt, bindings);
+const historicalSources = () => ({
+  adjudicationReceipt: read(ADJUDICATION_RECEIPT),
+  batch002Effective: read(HUMAN_002_V2),
+  batch001Effective: read(HUMAN_001),
+});
+const rebuild = (rawReceipt = read(RECEIPT), sources = historicalSources()) =>
+  amendment.buildEffectiveCurrentSkeletonCatalog(read(EXACT56), rawReceipt, sources);
 
 test('historical exact56 stays byte-identical and still reconstructs itself', () => {
   assert.equal(sha256RawBytes(read(EXACT56)), EXACT56_SHA256);
@@ -62,7 +62,8 @@ test('historical exact56 stays byte-identical and still reconstructs itself', ()
 
 test('amendment receipt binds canonical inputs and claims no extra authority', () => {
   assert.equal(sha256RawBytes(read(RECEIPT)), RECEIPT_SHA256);
-  const receipt = amendment.validateAmendmentReceipt(read(RECEIPT), read(EXACT56), bindings);
+  const receipt = amendment.validateAmendmentReceipt(
+    read(RECEIPT), read(EXACT56), historicalSources());
   assert.equal(receipt.name, amendment.RECEIPT_IDENTITY);
   assert.equal(receipt.interpretationRule, 'CONSERVATIVE_PRAGMATIC_INTERPRETATION');
   assert.equal(receipt.historicalExact56.rawSha256, EXACT56_SHA256);
@@ -117,6 +118,80 @@ test('amendment receipt validation fails closed on widened or drifting authority
   reject(r => { r.authority.humanGoldFrozen = true; }, 'claims gold freeze');
   reject(r => { r.authority.trainingOccurred = true; }, 'claims training');
   reject(r => { r.historicalExact56.rawSha256 = CATALOG_SHA256; }, 'wrong exact56 binding');
+  assert.doesNotThrow(() => rebuild());
+});
+
+test('historical evidence is pinned by identity and raw SHA, not by dynamic hashing', () => {
+  // Every pinned constant matches the artifact actually committed.
+  const pinned = amendment.HISTORICAL_SOURCES;
+  const onDisk = {
+    adjudicationReceipt: [ADJUDICATION_RECEIPT, ADJUDICATION_RECEIPT_SHA256],
+    batch002Effective: [HUMAN_002_V2, HUMAN_002_V2_SHA256],
+    batch001Effective: [HUMAN_001, HUMAN_001_SHA256],
+  };
+  for (const [key, [file, sha]] of Object.entries(onDisk)) {
+    assert.equal(pinned[key].rawSha256, sha, key);
+    assert.equal(sha256RawBytes(read(file)), pinned[key].rawSha256, key);
+    assert.equal(readJson(file).name, pinned[key].identity, key);
+  }
+
+  // A supplied source whose identity is wrong is refused even with a correct-looking receipt.
+  for (const key of Object.keys(pinned)) {
+    const sources = historicalSources();
+    const drifted = structuredClone(JSON.parse(sources[key].toString('utf8')));
+    drifted.name = 'xion-local-memory-inference-p1b6-not-the-canonical-artifact-v1';
+    sources[key] = amendment.artifactBytes(drifted);
+    assert.throws(() => rebuild(read(RECEIPT), sources),
+      /bytes are not the canonical historical evidence|identity is not canonical/, key);
+  }
+
+  // Raw-byte drift in any historical source is refused on its own.
+  for (const key of Object.keys(pinned)) {
+    const sources = historicalSources();
+    const drifted = JSON.parse(sources[key].toString('utf8'));
+    drifted.driftMarker = true;
+    sources[key] = amendment.artifactBytes(drifted);
+    assert.throws(() => rebuild(read(RECEIPT), sources),
+      /bytes are not the canonical historical evidence/, key);
+  }
+
+  // Coordinated drift: the source changes AND the receipt is rewritten to carry the drifted
+  // SHA. This satisfied the old dynamic-hash check; the pinned constants must still refuse it.
+  const receiptField = {
+    adjudicationReceipt: r => r.historicalPragmaticAdjudicationReceipt,
+    batch002Effective: r => r.effectiveHumanDecisionArtifacts.batch002,
+    batch001Effective: r => r.effectiveHumanDecisionArtifacts.batch001,
+  };
+  for (const [key, pick] of Object.entries(receiptField)) {
+    const sources = historicalSources();
+    const drifted = JSON.parse(sources[key].toString('utf8'));
+    drifted.driftMarker = true;
+    const driftedBytes = amendment.artifactBytes(drifted);
+    sources[key] = driftedBytes;
+    const receipt = structuredClone(readJson(RECEIPT));
+    pick(receipt).rawSha256 = sha256RawBytes(driftedBytes);
+    assert.notEqual(sha256RawBytes(driftedBytes), pinned[key].rawSha256);
+    assert.throws(() => rebuild(amendment.artifactBytes(receipt), sources),
+      /bytes are not the canonical historical evidence/, key);
+  }
+
+  // A receipt naming a wrong identity or a wrong canonical SHA is refused.
+  for (const [key, pick] of Object.entries(receiptField)) {
+    for (const mutate of [
+      row => { row.identity = 'xion-local-memory-inference-p1b6-wrong-identity-v1'; },
+      row => { row.rawSha256 = EXACT56_SHA256; },
+    ]) {
+      const receipt = structuredClone(readJson(RECEIPT));
+      mutate(pick(receipt));
+      assert.throws(() => rebuild(amendment.artifactBytes(receipt)),
+        /does not bind to the canonical historical inputs/, key);
+    }
+  }
+
+  // Missing sources fail closed rather than skipping verification.
+  assert.throws(() => rebuild(read(RECEIPT), {}), /were not supplied/);
+  assert.throws(() => amendment.buildEffectiveCurrentSkeletonCatalog(
+    read(EXACT56), read(RECEIPT), undefined), /were not supplied/);
   assert.doesNotThrow(() => rebuild());
 });
 

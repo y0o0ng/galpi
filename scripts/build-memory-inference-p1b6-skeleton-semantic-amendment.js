@@ -31,7 +31,29 @@ const EXPECTED_TOTAL = 56;
 const EXPECTED_LABELS = Object.freeze({ CLEAR: 34, ESCALATE: 22 });
 const EXPECTED_HISTORICAL_LABELS = Object.freeze({ CLEAR: 32, ESCALATE: 24 });
 const EXPECTED_SPLITS = Object.freeze({ TRAIN: 24, DEV: 16, FINAL_HELD_OUT: 16 });
-const AMENDABLE_FIELDS = Object.freeze(['humanLabel', 'candidateFocus', 'semanticRelations']);
+// Every historical input is pinned by identity AND raw SHA. The builder verifies the actual
+// bytes against these constants, so hashing whatever happens to be on disk can never define
+// what "canonical" means, and coordinated drift of a source plus its receipt SHA fails closed.
+const HISTORICAL_SOURCES = Object.freeze({
+  adjudicationReceipt: Object.freeze({
+    label: 'pragmatic adjudication receipt',
+    identity: 'xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt-v1',
+    rawSha256: 'cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa',
+    fixture: 'local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt.json',
+  }),
+  batch002Effective: Object.freeze({
+    label: 'batch-002 effective HUMAN artifact',
+    identity: 'xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2',
+    rawSha256: 'a96fc01393c79057d292cf10b565589e7448b86289eb52b8cd1c63657af2ed05',
+    fixture: 'local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2.json',
+  }),
+  batch001Effective: Object.freeze({
+    label: 'batch-001 effective HUMAN artifact',
+    identity: 'xion-local-memory-inference-p1b6-primary-human-effective-current-batch-001-v1',
+    rawSha256: '44832509f04ffb81a0772e9fda9adcbbea43305315a5d05948819b2c845b162a',
+    fixture: 'local-memory-inference-p1b6-primary-human-effective-current-batch-001.json',
+  }),
+});
 
 function fail(message) {
   throw new TypeError(`P1-B6 skeleton semantic amendment ${message}`);
@@ -66,9 +88,33 @@ function boundarySplitCounts(rows) {
 
 // The receipt is committed data. Everything it authorizes is checked against the frozen
 // expectations here, so an edited receipt cannot widen the amendment silently.
-function validateAmendmentReceipt(rawReceiptBytes, rawExact56Bytes, bindings) {
+function verifyHistoricalSource(key, rawBytes) {
+  const pinned = HISTORICAL_SOURCES[key];
+  if (!Buffer.isBuffer(rawBytes) && !ArrayBuffer.isView(rawBytes)) {
+    fail(`${pinned.label} bytes were not supplied`);
+  }
+  if (sha256RawBytes(rawBytes) !== pinned.rawSha256) {
+    fail(`${pinned.label} bytes are not the canonical historical evidence`);
+  }
+  const artifact = JSON.parse(Buffer.from(rawBytes).toString('utf8'));
+  if (artifact.name !== pinned.identity) {
+    fail(`${pinned.label} identity is not canonical`);
+  }
+  return artifact;
+}
+
+function validateAmendmentReceipt(rawReceiptBytes, rawExact56Bytes, historicalSources) {
   if (sha256RawBytes(rawExact56Bytes) !== EXACT56_SHA256) {
     fail('historical exact56 bytes are invalid');
+  }
+  if (JSON.parse(Buffer.from(rawExact56Bytes).toString('utf8')).name !== EXACT56_IDENTITY) {
+    fail('historical exact56 identity is not canonical');
+  }
+  if (!historicalSources || typeof historicalSources !== 'object') {
+    fail('historical source bytes were not supplied');
+  }
+  for (const key of Object.keys(HISTORICAL_SOURCES)) {
+    verifyHistoricalSource(key, historicalSources[key]);
   }
   const receipt = JSON.parse(Buffer.from(rawReceiptBytes).toString('utf8'));
   if (!exactKeys(receipt, [
@@ -81,10 +127,18 @@ function validateAmendmentReceipt(rawReceiptBytes, rawExact56Bytes, bindings) {
     || receipt.interpretationRule !== INTERPRETATION_RULE
     || receipt.historicalExact56.identity !== EXACT56_IDENTITY
     || receipt.historicalExact56.rawSha256 !== EXACT56_SHA256
+    || receipt.historicalPragmaticAdjudicationReceipt.identity
+      !== HISTORICAL_SOURCES.adjudicationReceipt.identity
     || receipt.historicalPragmaticAdjudicationReceipt.rawSha256
-      !== bindings.adjudicationReceiptSha256
-    || receipt.effectiveHumanDecisionArtifacts.batch002.rawSha256 !== bindings.batch002Sha256
-    || receipt.effectiveHumanDecisionArtifacts.batch001.rawSha256 !== bindings.batch001Sha256
+      !== HISTORICAL_SOURCES.adjudicationReceipt.rawSha256
+    || receipt.effectiveHumanDecisionArtifacts.batch002.identity
+      !== HISTORICAL_SOURCES.batch002Effective.identity
+    || receipt.effectiveHumanDecisionArtifacts.batch002.rawSha256
+      !== HISTORICAL_SOURCES.batch002Effective.rawSha256
+    || receipt.effectiveHumanDecisionArtifacts.batch001.identity
+      !== HISTORICAL_SOURCES.batch001Effective.identity
+    || receipt.effectiveHumanDecisionArtifacts.batch001.rawSha256
+      !== HISTORICAL_SOURCES.batch001Effective.rawSha256
     || receipt.effectiveCurrentSkeletonCatalog.identity !== EFFECTIVE_IDENTITY
     || JSON.stringify(receipt.summary)
       !== JSON.stringify({ amendedSkeletons: 2, preservedSkeletons: 1, routingCorrections: 2 })) {
@@ -150,8 +204,9 @@ function validateAmendmentReceipt(rawReceiptBytes, rawExact56Bytes, bindings) {
   return receipt;
 }
 
-function buildEffectiveCurrentSkeletonCatalog(rawExact56Bytes, rawReceiptBytes, bindings) {
-  const receipt = validateAmendmentReceipt(rawReceiptBytes, rawExact56Bytes, bindings);
+function buildEffectiveCurrentSkeletonCatalog(rawExact56Bytes, rawReceiptBytes,
+  historicalSources) {
+  const receipt = validateAmendmentReceipt(rawReceiptBytes, rawExact56Bytes, historicalSources);
   const exact56 = JSON.parse(Buffer.from(rawExact56Bytes).toString('utf8'));
   const amendments = new Map(receipt.amendments.map(row => [row.semanticSkeletonId, row]));
 
@@ -250,17 +305,16 @@ function loadFixture(name) {
   return fs.readFileSync(path.join(__dirname, '..', 'fixtures', name));
 }
 
+function loadHistoricalSources() {
+  return Object.fromEntries(Object.entries(HISTORICAL_SOURCES)
+    .map(([key, pinned]) => [key, loadFixture(pinned.fixture)]));
+}
+
 function main() {
   const rawExact56 = loadFixture('local-memory-inference-p1b6-skeleton-exact56.json');
   const rawReceipt = loadFixture('local-memory-inference-p1b6-skeleton-semantic-amendment-receipt.json');
-  const catalog = buildEffectiveCurrentSkeletonCatalog(rawExact56, rawReceipt, {
-    adjudicationReceiptSha256: sha256RawBytes(
-      loadFixture('local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt.json')),
-    batch002Sha256: sha256RawBytes(
-      loadFixture('local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2.json')),
-    batch001Sha256: sha256RawBytes(
-      loadFixture('local-memory-inference-p1b6-primary-human-effective-current-batch-001.json')),
-  });
+  const catalog = buildEffectiveCurrentSkeletonCatalog(rawExact56, rawReceipt,
+    loadHistoricalSources());
   const outputPath = path.join(__dirname, '..', 'fixtures',
     'local-memory-inference-p1b6-skeleton-effective-current.json');
   fs.writeFileSync(outputPath, artifactBytes(catalog));
@@ -272,12 +326,14 @@ module.exports = {
   AMENDED_SKELETON_IDS,
   EFFECTIVE_IDENTITY,
   EXPECTED_LABELS,
+  HISTORICAL_SOURCES,
   EXPECTED_SPLITS,
   PRESERVED_SKELETON_IDS,
   RECEIPT_IDENTITY,
   ROUTING_CORRECTION_ITEM_IDS,
   artifactBytes,
   buildEffectiveCurrentSkeletonCatalog,
+  loadHistoricalSources,
   main,
   reconcileAgainstCatalog,
   validateAmendmentReceipt,
