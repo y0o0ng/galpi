@@ -4001,8 +4001,12 @@ async function runSingleChatTurnBody({
       // 범위이고, 이것을 위해 더 긴 대화 저장소를 새로 만들지 않는다. 이번 턴
       // 첨부가 있으면 `이거`의 대상은 `<current_attachments>`가 이미 정하므로
       // 해석 단계를 열지 않는다.
+      // `turnImages.images`에는 replay 창으로 남아 있는 이전 턴 이미지가 섞여 있다.
+      // 개수로 세면 몇 턴 전 이미지 하나가 이후의 무관한 후속 질문까지 해석 단계에서
+      // 빼버린다. 이번 턴 것만 세는 표시는 이미 각 이미지가 들고 있다.
       await resolveRetrievalQueryForTurn(message, history, {
-        hasCurrentTurnAttachment: turnAttachments.length > 0 || turnImages.images.length > 0,
+        hasCurrentTurnAttachment: turnAttachments.length > 0
+          || turnImages.images.some(image => image.currentTurn),
       }),
     );
     const baseContext = formatHistoryForModelContext(

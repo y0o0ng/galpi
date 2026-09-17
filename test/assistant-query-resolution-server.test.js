@@ -11,6 +11,11 @@ const os = require('node:os');
 const path = require('node:path');
 const Database = require('better-sqlite3');
 const { sha256 } = require('../lib/content-hash');
+const { createModelCatalogStore } = require('../lib/model-catalog-store');
+const { buildOpenAIModelCatalogPayload } = require('../lib/openai-model-catalog');
+
+// PNG 서명만 맞으면 업로드 검증을 통과한다. 이미지 회수 경로는 디코딩하지 않는다.
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
 
 const ROOT = path.resolve(__dirname, '..');
 const API_TOKEN = 'query-resolution-test-token';
@@ -396,6 +401,63 @@ test('검색 질의 해석은 원문을 그대로 두고 회수 경로 전체에
     assert.equal(trace.resolutionOutcome, 'pass');
     assert.equal(trace.querySha256, sha256('이거 뭐야?'));
     assert.equal(trace.retrievalQuerySha256, trace.querySha256);
+  });
+
+  await t.test('replay로 남은 이전 턴 이미지는 해석 단계를 건너뛰게 하지 않는다', async () => {
+    // 이미지가 붙은 턴은 이미지 입력이 검증된 모델을 요구한다.
+    const seed = new Database(path.join(appRoot, 'galpi.db'));
+    createModelCatalogStore(seed).saveSuccess(
+      'openai_api',
+      await buildOpenAIModelCatalogPayload({
+        models: [{ id: 'gpt-5.6-terra' }],
+        probeModel: async () => {},
+        probeImageInput: async () => {},
+      }),
+      { payloadVersion: 2 },
+    );
+    seed.close();
+
+    const form = new FormData();
+    form.set('file', new Blob([PNG_BYTES], { type: 'image/png' }), 'replay.png');
+    const uploadResponse = await fetch(`${url}/api/attachments`, {
+      method: 'POST',
+      headers: { 'X-API-Token': API_TOKEN },
+      body: form,
+    });
+    const uploadBody = await uploadResponse.json();
+    assert.equal(uploadResponse.status, 201, JSON.stringify(uploadBody));
+
+    // 1) 이전 턴에 이미지를 붙인다. 그 턴은 해석 단계를 열지 않는다.
+    const resolverCallsBeforeImageTurn = resolverRequests.length;
+    nextAnswer = '사진 봤어.';
+    const imageTurn = await chat('이거 봐봐', { attachmentIds: [uploadBody.attachmentId] });
+    assert.equal(imageTurn.attachments[0].attachmentId, uploadBody.attachmentId);
+    assert.equal(resolverRequests.length, resolverCallsBeforeImageTurn);
+
+    // 2) 사이에 첨부 없는 무관한 턴을 하나 둔다.
+    nextAnswer = '응.';
+    await chat('알겠어 고마워');
+
+    // 3) 새 첨부가 없는 대화 의존 발화.
+    const resolverCalls = resolverRequests.length;
+    nextResolution = { outcome: 'resolved', query: RESOLVED_QUERY };
+    nextAnswer = '삼겹살 먹었어.';
+    await chat('그때 뭐 했었지?');
+
+    const request = JSON.stringify(chatRequests.at(-1).input);
+    // replay 창이 살아 있어 이전 턴 이미지가 아직 이 턴에 실린다.
+    assert.match(request, /"type":"input_image"/);
+    assert.match(request, /replay\.png/);
+    // 그런데도 해석 단계는 열리고, 해석된 질의가 회수에 그대로 쓰인다.
+    assert.equal(resolverRequests.length, resolverCalls + 1);
+    assert.equal(embeddingInputs.at(-1), RESOLVED_QUERY);
+    assert.match(request, /SCHEDULE_HISTORY_EVIDENCE/);
+    assert.match(request, /<user_question>\\n그때 뭐 했었지\?\\n<\/user_question>/);
+
+    const trace = traceRows().at(-1);
+    assert.equal(trace.resolutionOutcome, 'resolved');
+    assert.equal(trace.querySha256, sha256('그때 뭐 했었지?'));
+    assert.equal(trace.retrievalQuerySha256, sha256(RESOLVED_QUERY));
   });
 
   await t.test('주제를 바꾼 자립 질문은 이전 해석을 물려받지 않는다', async () => {
