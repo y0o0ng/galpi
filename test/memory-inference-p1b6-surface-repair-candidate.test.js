@@ -23,8 +23,8 @@ const ADJUDICATION_RECEIPT =
 const HUMAN_002_V2 = 'local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2.json';
 const REREVIEW_003 = 'local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003.json';
 
-const RECEIPT_SHA256 = '56c14bedf6f3c999925e516b65e97c7a831783891032e183fd5154033016a394';
-const CANDIDATE_SHA256 = '6f7ebf61952688b2b15331891f1770199fe86f063ee29b9beaa6fc81c2af6ee2';
+const RECEIPT_SHA256 = '792cb050b08375fd6dec9e8ce2b1a04787760123496b3dfed601aac984f4626d';
+const CANDIDATE_SHA256 = 'd59d0dec225d3f4fea74952da10e05b8f0be01942a3aa6e15ea58d659e22abb3';
 const REJECTED = 'p1b6-item-b002-050';
 
 const historicalSources = () => Object.fromEntries(
@@ -77,9 +77,11 @@ test('resolution receipt records exactly 12 REPAIR and 1 REJECT and claims nothi
   assert.equal(rejection.skeletonAmended, false);
   assert.equal(rejection.replacementAuthored, false);
 
-  // Fresh audit and fresh blind HUMAN review are still pending, and nothing was accepted.
+  // Exactly two current blockers: fresh source audit and fresh blind HUMAN review. A
+  // replacement surface for the rejected realization is explicitly NOT outstanding work.
   assert.equal(receipt.pending.freshSourceAudit, true);
   assert.equal(receipt.pending.freshBlindHumanReview, true);
+  assert.equal(receipt.pending.replacementSurfaceForRejectedItem, false);
   for (const [key, value] of Object.entries(receipt.authority)) {
     if (key !== 'decisionsSource') assert.equal(value, false, key);
   }
@@ -111,7 +113,10 @@ test('resolution receipt validation fails closed on a drifting decision set', ()
   reject(r => { repairRow(r).semanticSkeletonId = 'p1b6-sk-aebbf047d6864a35'; },
     'repaired row remapped to a different semantic skeleton');
   reject(r => { r.summary.REPAIR = 13; }, 'summary drift');
-  reject(r => { r.pending.freshBlindHumanReview = false; }, 'claims review is done');
+  reject(r => { r.pending.freshBlindHumanReview = false; }, 'claims blind review is done');
+  reject(r => { r.pending.freshSourceAudit = false; }, 'claims the source audit is done');
+  reject(r => { r.pending.replacementSurfaceForRejectedItem = true; },
+    'makes a replacement surface for the rejected item mandatory pending work');
   reject(r => { r.authority.repairedRowsAccepted = true; }, 'claims acceptance');
   reject(r => { r.authority.humanGoldFrozen = true; }, 'claims gold freeze');
   reject(r => { r.authority.heldOutReleasePerformed = true; }, 'claims HELD_OUT release');
@@ -189,6 +194,19 @@ test('the repair candidate holds exactly the 12 authorized repaired rows', () =>
     assert.equal(item.surfaceFamilyId, source.surfaceFamilyId, item.itemId);
     assert.equal(item.historicalDiscoursePattern, source.discoursePattern, item.itemId);
   }
+
+  // 047 states three TYPICAL membership signals. Recurring presence must not be strengthened
+  // into 상주: the subject only stays in the building three days a week, so a 상주 rule would
+  // leave the receipt's "two of the three signals" claim unrealized by the actual surface.
+  const turns047 = candidate.sourceEpisodes
+    .find(row => row.sourceEpisodeId === 'p1b6-se-b002-047').turns;
+  const rule047 = turns047.find(row => row.role === 'ASSISTANT').text;
+  assert.equal(rule047.includes('보통'), true, 'typical, not necessary-and-sufficient');
+  assert.equal(rule047.includes('상주'), false, 'recurring presence, not 상주');
+  for (const signal of ['장기 체류 등록', '주기적으로 건물에 머물', '개인 우편함']) {
+    assert.equal(rule047.includes(signal), true, signal);
+  }
+  assert.equal(turns047.some(row => row.text.includes('매주 사흘은 그 건물에 머물러')), true);
 
   // It is not an effective-current successor: no 51 unaffected rows, no 050 placeholder.
   assert.equal(candidate.pending.freshSourceAudit, true);

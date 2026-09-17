@@ -5,7 +5,7 @@
   "provenance": {
     "resolutionReceipt": {
       "identity": "xion-local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt-v1",
-      "rawSha256": "56c14bedf6f3c999925e516b65e97c7a831783891032e183fd5154033016a394"
+      "rawSha256": "792cb050b08375fd6dec9e8ce2b1a04787760123496b3dfed601aac984f4626d"
     },
     "historicalSourceBatch": {
       "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
@@ -237,7 +237,7 @@
         {
           "turnId": "t3",
           "role": "ASSISTANT",
-          "text": "그 요금은 resident에게만 적용되고, 안내에는 resident가 보통 장기 체류 등록과 건물 상주, 개인 우편함을 갖는다고 적혀 있네."
+          "text": "그 요금은 resident에게만 적용되고, 안내에는 resident는 보통 장기 체류 등록을 하고, 주기적으로 건물에 머물고, 개인 우편함을 쓴다고 적혀 있네."
         },
         {
           "turnId": "t4",
@@ -576,7 +576,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 164
+          "endByte": 191
         },
         {
           "turnId": "t5",

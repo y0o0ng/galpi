@@ -176,9 +176,14 @@ function validateResolutionReceipt(rawReceiptBytes, historicalSources) {
     || receipt.repairCandidateArtifact.identity !== CANDIDATE_IDENTITY
     || receipt.repairCandidateArtifact.status !== CANDIDATE_STATUS
     || JSON.stringify(receipt.summary) !== JSON.stringify(EXPECTED_SUMMARY)
+    // The pending fields do not share an expected value. The two fresh review gates are the
+    // only current blockers; a replacement surface for the rejected realization is explicitly
+    // NOT outstanding work, and a receipt claiming otherwise changes the agreed state contract.
     || !exactKeys(receipt.pending, [
       'freshSourceAudit', 'freshBlindHumanReview', 'replacementSurfaceForRejectedItem',
-    ]) || Object.values(receipt.pending).some(value => value !== true)) {
+    ]) || receipt.pending.freshSourceAudit !== true
+    || receipt.pending.freshBlindHumanReview !== true
+    || receipt.pending.replacementSurfaceForRejectedItem !== false) {
     fail('resolution receipt does not bind to the canonical Phase B contract');
   }
 

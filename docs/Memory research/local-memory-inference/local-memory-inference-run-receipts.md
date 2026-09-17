@@ -4248,8 +4248,8 @@ Generated artifacts:
 
 | artifact | raw SHA-256 |
 | --- | --- |
-| `fixtures/local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt.json` | `56c14bedf6f3c999925e516b65e97c7a831783891032e183fd5154033016a394` |
-| `fixtures/local-memory-inference-p1b6-surface-repair-candidate-batch-002.json` | `6f7ebf61952688b2b15331891f1770199fe86f063ee29b9beaa6fc81c2af6ee2` |
+| `fixtures/local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt.json` | `792cb050b08375fd6dec9e8ce2b1a04787760123496b3dfed601aac984f4626d` |
+| `fixtures/local-memory-inference-p1b6-surface-repair-candidate-batch-002.json` | `d59d0dec225d3f4fea74952da10e05b8f0be01942a3aa6e15ea58d659e22abb3` |
 
 All seven pinned historical inputs are byte-identical after the run: Exact56
 `772f07bd…`, the effective-current catalog `48490b6e…`, the Phase A amendment
@@ -4260,8 +4260,11 @@ adjudication receipt `cf05f507…`, the batch-002 effective HUMAN artifact
 No repaired row is accepted, no HUMAN decision was relabeled or carried onto
 repaired source text, no HUMAN gold was frozen, no HELD_OUT release occurred,
 and no training occurred. The accepted pool remains 30 and
-`humanReviewCompleted` stays false. **The next steps are a fresh source audit
-and a fresh blind HUMAN review of the 12 repaired surfaces; both are pending.**
+`humanReviewCompleted` stays false. **There are exactly two current blockers, a
+fresh source audit and a fresh blind HUMAN review of the 12 repaired surfaces.**
+A replacement surface for the rejected realization is **not** outstanding work:
+`pending.replacementSurfaceForRejectedItem` is `false`, and the coverage slot
+becomes a separate new-authoring task only if it is later needed.
 
 Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-candidate.test.js`
 (9/9 pass) and the full `npm test` suite (1377/1377 pass).

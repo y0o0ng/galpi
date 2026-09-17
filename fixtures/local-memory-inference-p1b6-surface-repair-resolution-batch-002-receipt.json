@@ -56,7 +56,7 @@
   "pending": {
     "freshSourceAudit": true,
     "freshBlindHumanReview": true,
-    "replacementSurfaceForRejectedItem": true
+    "replacementSurfaceForRejectedItem": false
   },
   "authority": {
     "historicalSourceBatchAltered": false,
@@ -355,7 +355,7 @@
         {
           "turnId": "t3",
           "role": "ASSISTANT",
-          "text": "그 요금은 resident에게만 적용되고, 안내에는 resident가 보통 장기 체류 등록과 건물 상주, 개인 우편함을 갖는다고 적혀 있네."
+          "text": "그 요금은 resident에게만 적용되고, 안내에는 resident는 보통 장기 체류 등록을 하고, 주기적으로 건물에 머물고, 개인 우편함을 쓴다고 적혀 있네."
         },
         {
           "turnId": "t4",
