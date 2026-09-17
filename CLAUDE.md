@@ -98,8 +98,8 @@
 - **효력 artifact는 v2가 새로 생겼다**(`…-effective-current-batch-002-v2.json`). frozen mismatch 진단과 adjudication 사슬이 attempt-003 이전 artifact(`d0e5dc…`)에 결합돼 있어서 그것을 바꿀 수 없기 때문이고, v2는 자기가 무엇을 대체하는지 적는다. attempt-001·002 receipt와 패킷, adjudication receipt는 바이트 그대로다.
 - **표적 skeleton 의미 amendment는 끝났다.** `8dd28…`·`155420…`은 effective `CLEAR`로 고쳤고 `2fa39…`는 의도된 모호성이라 `ESCALATE`로 남겼다. **정본은 historical Exact56(불변, `772f07…`)이 아니라 `fixtures/local-memory-inference-p1b6-skeleton-effective-current.json`(34 CLEAR / 22 ESCALATE)이다** — 앞으로의 authoring은 이걸 읽는다. 결정 자체는 `…-skeleton-semantic-amendment-receipt.json`에 데이터로 있다.
 - **batch-002는 effective 기준 51 match / 13 mismatch이고 남은 13건은 전부 surface-collapse다**(`022 024 029 032 034 037 039 047 049 050 051 059 063`). HUMAN 집계는 64 KEEP / 52 CLEAR / 12 ESCALATE 그대로고 `humanReviewCompleted`는 false다.
-- **059·063은 skeleton 결함이 아니라 표면 결함으로 재분류됐다.** 최소 수리 방향은 이미 정했다 — `지금`으로 원래 규칙을 현재 항목 집합에 한정한다. **아직 고치지 않았고**, 고치면 새 source audit과 새 blind HUMAN 재검토가 필요하다.
-- **남은 blocker 하나.** surface-collapse 13건의 수리 vs 폐기 결정. accepted pool은 30 그대로이고 downstream gate는 전부 닫혀 있다.
+- **Phase A는 닫혔고 Phase B 표면 수리 결정도 끝났다 — 13건이 12 REPAIR / 1 REJECT이고 수리본 12건을 materialize했다.** `050`은 현재 표면 실현만 폐기했고 skeleton은 그대로, 대체 표면도 안 만들었다. 결정 정본은 `fixtures/local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt.json`, 수리본은 `…-surface-repair-candidate-batch-002.json`이며 계약은 설계 문서의 `Phase B Surface Repair Materialization` 절이다.
+- **남은 blocker 둘.** 수리본의 새 source audit과 새 blind HUMAN 재검토다. **옛 HUMAN 라벨은 옛 표면의 증거일 뿐이라 수리된 원문으로 옮겨가지 않는다.** accepted pool은 30 그대로이고 downstream gate는 전부 닫혀 있다.
 - **canonical mismatch 결합은 이제 fail-close다.** adjudication 빌더와 receipt validator가 진단 산출물의 raw bytes를 직접 검증하므로, effective 행을 조작해 개수만 24로 맞춘 다른 mismatch 집합으로 바꿔치기할 수 없다. 기존 adjudication 패킷 바이트(`dd8697…`)는 그대로다.
 - accepted pool은 30 그대로이고 acceptance 산출물은 없다. final gold·training·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
 

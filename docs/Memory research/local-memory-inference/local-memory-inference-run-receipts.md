@@ -4235,3 +4235,33 @@ private replay, or production change occurred.
 
 Tests run locally: `node --test test/memory-inference-p1b6-skeleton-semantic-amendment.test.js`
 (8/8 pass) and the full `npm test` suite.
+
+#### P1-B6 Phase B surface repair materialization — COMPLETE / FRESH AUDIT AND BLIND HUMAN REVIEW PENDING
+
+The repair-versus-rejection decision for the 13 remaining current batch-002
+surface mismatches is recorded at **12 REPAIR / 1 REJECT**. Contracts, the
+item lists and the rejection reason are in
+[`local-memory-inference-p1b6-design.md`](local-memory-inference-p1b6-design.md)
+under "Phase B Surface Repair Materialization" and are not restated here.
+
+Generated artifacts:
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt.json` | `56c14bedf6f3c999925e516b65e97c7a831783891032e183fd5154033016a394` |
+| `fixtures/local-memory-inference-p1b6-surface-repair-candidate-batch-002.json` | `6f7ebf61952688b2b15331891f1770199fe86f063ee29b9beaa6fc81c2af6ee2` |
+
+All seven pinned historical inputs are byte-identical after the run: Exact56
+`772f07bd…`, the effective-current catalog `48490b6e…`, the Phase A amendment
+receipt `2778f64c…`, historical surface batch-002 `ed68a562…`, the pragmatic
+adjudication receipt `cf05f507…`, the batch-002 effective HUMAN artifact
+`a96fc013…`, and the attempt-003 blind re-review receipt `182fcad4…`.
+
+No repaired row is accepted, no HUMAN decision was relabeled or carried onto
+repaired source text, no HUMAN gold was frozen, no HELD_OUT release occurred,
+and no training occurred. The accepted pool remains 30 and
+`humanReviewCompleted` stays false. **The next steps are a fresh source audit
+and a fresh blind HUMAN review of the 12 repaired surfaces; both are pending.**
+
+Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-candidate.test.js`
+(9/9 pass) and the full `npm test` suite (1377/1377 pass).

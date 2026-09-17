@@ -1,0 +1,711 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-002-v1",
+  "status": "REPAIR_CANDIDATE_AWAITING_FRESH_SOURCE_AUDIT_AND_FRESH_BLIND_HUMAN_REVIEW",
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "provenance": {
+    "resolutionReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt-v1",
+      "rawSha256": "56c14bedf6f3c999925e516b65e97c7a831783891032e183fd5154033016a394"
+    },
+    "historicalSourceBatch": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+      "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c",
+      "role": "IMMUTABLE_HISTORICAL_SURFACE_SOURCE"
+    },
+    "effectiveCurrentSkeletonCatalog": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+      "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559",
+      "role": "PROSPECTIVE_SEMANTIC_AUTHORITY"
+    },
+    "rejectedItemIds": [
+      "p1b6-item-b002-050"
+    ],
+    "note": "Item IDs, semantic skeleton IDs, source episode IDs and family IDs are carried from the historical rows so provenance stays explicit. Byte offsets are recomputed from the repaired source text; no historical offset is reused."
+  },
+  "pending": {
+    "freshSourceAudit": true,
+    "freshBlindHumanReview": true
+  },
+  "authority": {
+    "humanDecisionsTransferredFromOldSurfaces": false,
+    "humanReviewPerformed": false,
+    "repairedRowsAccepted": false,
+    "datasetAcceptancePerformed": false,
+    "humanGoldFrozen": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false,
+    "effectiveCurrentSurfaceBatchSuperseded": false,
+    "decisionsSource": "REPOSITORY_OWNER_SEMANTIC_ADJUDICATION"
+  },
+  "coverage": {
+    "repairedItems": 12,
+    "rejectedItems": 1,
+    "splitCounts": {
+      "TRAIN": 7,
+      "DEV": 3,
+      "FINAL_HELD_OUT": 2
+    }
+  },
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-b002-022",
+      "sourceFamilyId": "p1b6-sf-b002-022",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "배포할 건 강의 자료와 연습문제야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "창문 틈으로 빗물이 들어오네, 수건을 받쳐두고 올게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "아, 표현을 다시 할게. 강의 자료와 연습문제의 초급자용 버전."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "빗방울 닿던 책도 마른 쪽으로 옮겨놨어."
+        },
+        {
+          "turnId": "t5",
+          "role": "ASSISTANT",
+          "text": "그 문장 그대로 기록할게."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-024",
+      "sourceFamilyId": "p1b6-sf-b002-024",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "For the Finch workshops, use the quiet room."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "A calendar alert popped up, but it can wait until this conversation is done."
+        },
+        {
+          "turnId": "t3",
+          "role": "ASSISTANT",
+          "text": "The coordinator also wrote in a separate note that morning sessions may be flexible about room choice."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "Give me a moment to answer the door."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "That part sounds useful."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "Let me plug in my laptop before we continue."
+        },
+        {
+          "turnId": "t7",
+          "role": "ASSISTANT",
+          "text": "Okay, I will keep both notes as written."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-029",
+      "sourceFamilyId": "p1b6-sf-b002-029",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "기본 배송은 문 앞 배송으로 적어 뒀어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "손목시계 진동이 계속 와서 방해 금지로 바꿔둘게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "별도 안내에는 비 오는 날 로비 수령도 가능하다고 적혀 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-032",
+      "sourceFamilyId": "p1b6-sf-b002-032",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "창고에서 의자와 테이블의 베란다용 모델 받아 와."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "책갈피가 바닥에 떨어졌네, 어느 책에서 빠졌는지 볼게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "읽던 페이지 사이에 다시 끼워놓고 왔어."
+        },
+        {
+          "turnId": "t4",
+          "role": "ASSISTANT",
+          "text": "알겠어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-034",
+      "sourceFamilyId": "p1b6-sf-b002-034",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "The team handbook says formal dress for client sessions. A later note says comfortable clothes are fine on remote days. Tomorrow is a remote day, and I have a client session."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-037",
+      "sourceFamilyId": "p1b6-sf-b002-037",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "On the dashboard, show alerts and weekly reports for admins only."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "One moment, 배달 기사님 call만 받고 공동문을 열어줄게."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-039",
+      "sourceFamilyId": "p1b6-sf-b002-039",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "다시 사진 내보내기 얘기로 가자. 사진은 원본 크기로 저장한다고 했고, 모바일에서는 용량을 줄여도 된다는 메모도 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-047",
+      "sourceFamilyId": "p1b6-sf-b002-047",
+      "splitAssignment": "DEV",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "Coworking lounge의 resident rate 규정을 보고 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "잠깐, team chat에 urgent처럼 보이는 mention이 떠서 확인할게."
+        },
+        {
+          "turnId": "t3",
+          "role": "ASSISTANT",
+          "text": "그 요금은 resident에게만 적용되고, 안내에는 resident가 보통 장기 체류 등록과 건물 상주, 개인 우편함을 갖는다고 적혀 있네."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "It was just a lunch poll, so 답장은 나중에 해도 되겠어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "나는 장기 체류 등록은 없어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "알림 badge만 지웠고 다른 channel은 열지 않았어."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "그래도 매주 사흘은 그 건물에 머물러."
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "이제 notification은 muted라 편하게 continue할 수 있어."
+        },
+        {
+          "turnId": "t9",
+          "role": "USER",
+          "text": "다시 rate 얘기로 돌아오면 개인 우편함도 쓰고 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-049",
+      "sourceFamilyId": "p1b6-sf-b002-049",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "어제 카페 앞에서 본 빨간 우산은 손잡이에 흰 스티커가 붙어 있었고 손잡이가 깨져 있었어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "책상 조명이 깜빡여서 플러그를 한 번 단단히 꽂을게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 역 앞에서도 흰 스티커가 붙은 빨간 우산을 봤는데 손잡이는 멀쩡하더라."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-051",
+      "sourceFamilyId": "p1b6-sf-b002-051",
+      "splitAssignment": "DEV",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "Option B 쪽이 더 마음에 들어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "잠깐, headphones firmware notice가 떴는데 창부터 닫을게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "그래도 A와 C의 maintenance cost를 더 비교해 줘."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "Update는 tonight로 미뤘고 소리는 그대로 잘 들려."
+        },
+        {
+          "turnId": "t5",
+          "role": "ASSISTANT",
+          "text": "알겠어. A와 C의 maintenance cost를 비교해 볼게."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-059",
+      "sourceFamilyId": "p1b6-sf-b002-059",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "지금 보관함 안의 문서들은 월말에 삭제하기로 했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "충전 케이블이 의자 바퀴에 걸렸어, 옆으로 빼둘게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 새 초안을 그 보관함으로 옮겼어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b002-063",
+      "sourceFamilyId": "p1b6-sf-b002-063",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "지금 빨간 바구니 안의 옷은 오늘 세탁 대상이라고 정했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "블루투스 키보드가 절전 모드에 들어갔네, 깨우고 올게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "다시 세탁 얘기로 돌아가면 스카프를 방금 빨간 바구니로 옮겼어."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-b002-022",
+      "sourceEpisodeId": "p1b6-se-b002-022",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "anchorSpanRef": {
+        "turnId": "t3",
+        "startByte": 63,
+        "endByte": 82
+      },
+      "anchorText": "초급자용 버전",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 47
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 83
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 34
+        }
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "surfaceFamilyId": "p1b6-surface-family-b002-022",
+      "historicalDiscoursePattern": "SELF_REVISION"
+    },
+    {
+      "itemId": "p1b6-item-b002-024",
+      "sourceEpisodeId": "p1b6-se-b002-024",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 33,
+        "endByte": 43
+      },
+      "anchorText": "quiet room",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 44
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 102
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 24
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 40
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b002-024",
+      "historicalDiscoursePattern": "ELLIPTICAL_REPLY"
+    },
+    {
+      "itemId": "p1b6-item-b002-029",
+      "sourceEpisodeId": "p1b6-se-b002-029",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 17,
+        "endByte": 31
+      },
+      "anchorText": "문 앞 배송",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 52
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 82
+        }
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "surfaceFamilyId": "p1b6-surface-family-b002-029",
+      "historicalDiscoursePattern": "PROGRESSIVE_REFINEMENT"
+    },
+    {
+      "itemId": "p1b6-item-b002-032",
+      "sourceEpisodeId": "p1b6-se-b002-032",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 36,
+        "endByte": 55
+      },
+      "anchorText": "베란다용 모델",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 67
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 10
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b002-032",
+      "historicalDiscoursePattern": "ELLIPTICAL_REPLY"
+    },
+    {
+      "itemId": "p1b6-item-b002-034",
+      "sourceEpisodeId": "p1b6-se-b002-034",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 23,
+        "endByte": 35
+      },
+      "anchorText": "formal dress",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 174
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b002-034",
+      "historicalDiscoursePattern": "CONTEXT_FIRST"
+    },
+    {
+      "itemId": "p1b6-item-b002-037",
+      "sourceEpisodeId": "p1b6-se-b002-037",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 49,
+        "endByte": 64
+      },
+      "anchorText": "for admins only",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 65
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b002-037",
+      "historicalDiscoursePattern": "PROGRESSIVE_REFINEMENT"
+    },
+    {
+      "itemId": "p1b6-item-b002-039",
+      "sourceEpisodeId": "p1b6-se-b002-039",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 55,
+        "endByte": 68
+      },
+      "anchorText": "원본 크기",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 162
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b002-039",
+      "historicalDiscoursePattern": "RETURN_TO_TOPIC"
+    },
+    {
+      "itemId": "p1b6-item-b002-047",
+      "sourceEpisodeId": "p1b6-se-b002-047",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 20,
+        "endByte": 33
+      },
+      "anchorText": "resident rate",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 58
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 164
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 38
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 51
+        },
+        {
+          "turnId": "t9",
+          "startByte": 0,
+          "endByte": 69
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b002-047",
+      "historicalDiscoursePattern": "RETURN_TO_TOPIC"
+    },
+    {
+      "itemId": "p1b6-item-b002-049",
+      "sourceEpisodeId": "p1b6-se-b002-049",
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 28,
+        "endByte": 41
+      },
+      "anchorText": "빨간 우산",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 122
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 104
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b002-049",
+      "historicalDiscoursePattern": "CANONICAL"
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "sourceEpisodeId": "p1b6-se-b002-051",
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 36
+      },
+      "anchorText": "Option B 쪽이 더 마음에 들어",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 37
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 58
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 58
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b002-051",
+      "historicalDiscoursePattern": "CONCLUSION_FIRST"
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "sourceEpisodeId": "p1b6-se-b002-059",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 37,
+        "endByte": 53
+      },
+      "anchorText": "월말에 삭제",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 70
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 51
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b002-059",
+      "historicalDiscoursePattern": "CONCLUSION_FIRST"
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "sourceEpisodeId": "p1b6-se-b002-063",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 45,
+        "endByte": 58
+      },
+      "anchorText": "세탁 대상",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 78
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 87
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b002-063",
+      "historicalDiscoursePattern": "RETURN_TO_TOPIC"
+    }
+  ]
+}

@@ -1,0 +1,549 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt-v1",
+  "status": "COMPLETE_PHASE_B_SURFACE_RESOLUTION_REPAIR_CANDIDATES_PENDING_REVIEW",
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "statement": [
+    "Semantic adjudication is COMPLETE for all 13 current batch-002 surface mismatches that remain against the effective-current skeleton catalog.",
+    "12 current surface realizations are authorized for candidate repair; 1 (p1b6-item-b002-050) is rejected at its current surface realization only.",
+    "No repaired source text has passed a fresh source audit or a fresh blind HUMAN review. The repaired rows are candidates, not evidence.",
+    "Historical HUMAN decisions were recorded against the OLD surface text and do not transfer to repaired source text. No HUMAN decision was relabeled, reused, or synthesized here.",
+    "No dataset acceptance occurred, no HUMAN gold was frozen, no HELD_OUT release occurred, and no training occurred. The accepted pool remains 30."
+  ],
+  "historicalExact56": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-exact56-v1",
+    "rawSha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602",
+    "role": "IMMUTABLE_HISTORICAL_FREEZE_AND_PROVENANCE_BASE"
+  },
+  "effectiveCurrentSkeletonCatalog": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+    "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559",
+    "role": "PROSPECTIVE_SEMANTIC_AUTHORITY"
+  },
+  "semanticAmendmentReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-amendment-receipt-v1",
+    "rawSha256": "2778f64cf9f8f15bc85b7d015b706f5e87ad20e9dafc1249357477b235744977",
+    "phaseAStatus": "CLOSED"
+  },
+  "historicalSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+    "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c",
+    "role": "IMMUTABLE_HISTORICAL_SURFACE_SOURCE"
+  },
+  "historicalPragmaticAdjudicationReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-pragmatic-adjudication-batch-002-receipt-v1",
+    "rawSha256": "cf05f5073fc30f19078aab1a0c081b59face607a041387bf5421ffa2af8bbdaa",
+    "role": "HISTORICAL_ROUTING_NOT_REWRITTEN"
+  },
+  "effectiveHumanDecisionArtifact": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2",
+    "rawSha256": "a96fc01393c79057d292cf10b565589e7448b86289eb52b8cd1c63657af2ed05",
+    "role": "HISTORICAL_HUMAN_EVIDENCE_FOR_THE_OLD_SURFACES_ONLY"
+  },
+  "freshBlindHumanRereviewAttempt": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-rereview-batch-002-attempt-003-receipt-v1",
+    "rawSha256": "182fcad42d34a631fe77057cd19046ce125a06d933d68c39d870f2d366241aa3",
+    "role": "HISTORICAL_HUMAN_EVIDENCE_FOR_THE_OLD_SURFACES_ONLY"
+  },
+  "repairCandidateArtifact": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-002-v1",
+    "status": "REPAIR_CANDIDATE_AWAITING_FRESH_SOURCE_AUDIT_AND_FRESH_BLIND_HUMAN_REVIEW"
+  },
+  "summary": {
+    "total": 13,
+    "REPAIR": 12,
+    "REJECT": 1
+  },
+  "pending": {
+    "freshSourceAudit": true,
+    "freshBlindHumanReview": true,
+    "replacementSurfaceForRejectedItem": true
+  },
+  "authority": {
+    "historicalSourceBatchAltered": false,
+    "historicalExact56BytesAltered": false,
+    "historicalHumanDecisionsAltered": false,
+    "historicalHumanDecisionsTransferredToRepairedText": false,
+    "historicalPragmaticRoutingAltered": false,
+    "phaseASemanticAmendmentReopened": false,
+    "rejectedItemSkeletonAmended": false,
+    "repairedRowsAccepted": false,
+    "datasetAcceptancePerformed": false,
+    "humanGoldFrozen": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false,
+    "decisionsSource": "REPOSITORY_OWNER_SEMANTIC_ADJUDICATION"
+  },
+  "decisions": [
+    {
+      "itemId": "p1b6-item-b002-022",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "repairRationale": "The old self-revision resolved the qualifier scope: a comma plus 초급자만 reads as a separate restriction rather than as a qualifier whose attachment is open. The repaired revision uses an adnominal 의 construction so the qualifier can attach to the second conjunct alone or to the whole coordination, and nothing in the visible evidence settles which.",
+      "intendedUnresolvedReadings": [
+        "강의 자료 + [연습문제의 초급자용 버전]",
+        "[강의 자료와 연습문제]의 초급자용 버전"
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "anchorTurnId": "t3",
+      "anchorText": "초급자용 버전",
+      "evidenceTurnIds": [
+        "t1",
+        "t3",
+        "t5"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "배포할 건 강의 자료와 연습문제야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "창문 틈으로 빗물이 들어오네, 수건을 받쳐두고 올게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "아, 표현을 다시 할게. 강의 자료와 연습문제의 초급자용 버전."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "빗방울 닿던 책도 마른 쪽으로 옮겨놨어."
+        },
+        {
+          "turnId": "t5",
+          "role": "ASSISTANT",
+          "text": "그 문장 그대로 기록할게."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-024",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "repairRationale": "The old assistant turn read as a flexibility remark about the same instruction, so the natural dominant reading was a qualification of the quiet-room rule. The repaired turn places the flexibility in a separate note and makes it about room choice, so whether it qualifies the quiet-room rule or stands as a separately coexisting state is not settled by the visible evidence. Whether this candidate actually restores the intended ambiguity is for the fresh blind HUMAN review to decide; this receipt does not assert that it does.",
+      "intendedUnresolvedReadings": [
+        "the separate note qualifies the quiet-room instruction for morning sessions",
+        "the separate note is a coexisting statement that leaves the quiet-room instruction intact"
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "anchorTurnId": "t1",
+      "anchorText": "quiet room",
+      "evidenceTurnIds": [
+        "t1",
+        "t3",
+        "t5",
+        "t7"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "For the Finch workshops, use the quiet room."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "A calendar alert popped up, but it can wait until this conversation is done."
+        },
+        {
+          "turnId": "t3",
+          "role": "ASSISTANT",
+          "text": "The coordinator also wrote in a separate note that morning sessions may be flexible about room choice."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "Give me a moment to answer the door."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "That part sounds useful."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "Let me plug in my laptop before we continue."
+        },
+        {
+          "turnId": "t7",
+          "role": "ASSISTANT",
+          "text": "Okay, I will keep both notes as written."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-029",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "repairRationale": "The old surface collapsed the distinction between a conditional alternative that is merely permitted/available and one that has actually become the conditional current state. 덧붙였어 presented the lobby option as an addition the speaker made to the same standing instruction, which reads as the rainy-day state. The repaired later statement reports a separate notice recording that lobby pickup is also possible, leaving open whether it qualifies the door-delivery default or coexists with it.",
+      "intendedUnresolvedReadings": [
+        "the separate notice qualifies the door-delivery default on rainy days",
+        "the separate notice records an available alternative that leaves the door-delivery default in force"
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "anchorTurnId": "t1",
+      "anchorText": "문 앞 배송",
+      "evidenceTurnIds": [
+        "t1",
+        "t3"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "기본 배송은 문 앞 배송으로 적어 뒀어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "손목시계 진동이 계속 와서 방해 금지로 바꿔둘게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "별도 안내에는 비 오는 날 로비 수령도 가능하다고 적혀 있어."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-032",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "repairRationale": "The old episode resolved the qualifier scope in the following turn: 베란다용만 as a standalone elliptical reply reads as a restriction applied after the fact rather than as a qualifier whose attachment is open. The repair folds the qualifier into one natural instruction with an adnominal 의 construction, and the obsolete elliptical turn is dropped because retaining it would resolve the repaired sentence. The unrelated interruption turns are preserved.",
+      "intendedUnresolvedReadings": [
+        "의자 + [테이블의 베란다용 모델]",
+        "[의자와 테이블]의 베란다용 모델"
+      ],
+      "discoursePattern": "CANONICAL",
+      "anchorTurnId": "t1",
+      "anchorText": "베란다용 모델",
+      "evidenceTurnIds": [
+        "t1",
+        "t4"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "창고에서 의자와 테이블의 베란다용 모델 받아 와."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "책갈피가 바닥에 떨어졌네, 어느 책에서 빠졌는지 볼게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "읽던 페이지 사이에 다시 끼워놓고 왔어."
+        },
+        {
+          "turnId": "t4",
+          "role": "ASSISTANT",
+          "text": "알겠어."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-034",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "repairRationale": "The old surface stated the two rules but never created an instance where they overlap, so the natural dominant reading was simply two rules for two disjoint situations. The repair preserves both rules verbatim and adds an overlapping instance, leaving unresolved whether the remote-day note qualifies the client-session rule or represents a separately coexisting state.",
+      "intendedUnresolvedReadings": [
+        "the remote-day note qualifies the client-session dress rule on a remote day",
+        "the remote-day note is a separately coexisting state and the client-session rule still governs"
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "anchorTurnId": "t1",
+      "anchorText": "formal dress",
+      "evidenceTurnIds": [
+        "t1"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "The team handbook says formal dress for client sessions. A later note says comfortable clothes are fine on remote days. Tomorrow is a remote day, and I have a client session."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-037",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-5f335bdc1d9d630c",
+      "repairRationale": "The old later turn said the restriction was appended afterwards, which biases the scope toward the second conjunct alone. The repair states one natural instruction in which the trailing restriction can scope over the second conjunct or over the whole coordination, and the obsolete meta-turn is dropped because retaining it would bias the scope. The unrelated interruption turn is preserved.",
+      "intendedUnresolvedReadings": [
+        "general alerts + admin-only weekly reports",
+        "both alerts and weekly reports restricted to admins"
+      ],
+      "discoursePattern": "CANONICAL",
+      "anchorTurnId": "t1",
+      "anchorText": "for admins only",
+      "evidenceTurnIds": [
+        "t1"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "On the dashboard, show alerts and weekly reports for admins only."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "One moment, 배달 기사님 call만 받고 공동문을 열어줄게."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-039",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "repairRationale": "모바일 사본 lexicalized a separate object, which pre-commits the second note to a separate coexisting state and removes the ambiguity. The repair says 모바일에서는 용량을 줄여도 된다, a context-conditioned permission about the same photos, so whether it qualifies the original-size rule or establishes a separate state is left open.",
+      "intendedUnresolvedReadings": [
+        "the mobile note qualifies the original-size saving rule",
+        "the mobile note establishes a separate state alongside the original-size rule"
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "anchorTurnId": "t1",
+      "anchorText": "원본 크기",
+      "evidenceTurnIds": [
+        "t1"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "다시 사진 내보내기 얘기로 가자. 사진은 원본 크기로 저장한다고 했고, 모바일에서는 용량을 줄여도 된다는 메모도 있어."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-047",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "repairRationale": "The old surface framed the subject as holding a guest pass with no formal lease, which strongly implies plain non-resident status and therefore resolves the rule's applicability. The repair states the rate applies to residents, describes residents as 보통 holding three membership signals, and gives the subject two of the three, without saying whether every signal is required. The interleaved structure and the unrelated interruption turns are preserved.",
+      "intendedUnresolvedReadings": [
+        "partial membership is enough, so the resident rate applies",
+        "every listed signal is required, so the resident rate does not apply"
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "anchorTurnId": "t1",
+      "anchorText": "resident rate",
+      "evidenceTurnIds": [
+        "t1",
+        "t3",
+        "t5",
+        "t7",
+        "t9"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "Coworking lounge의 resident rate 규정을 보고 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "잠깐, team chat에 urgent처럼 보이는 mention이 떠서 확인할게."
+        },
+        {
+          "turnId": "t3",
+          "role": "ASSISTANT",
+          "text": "그 요금은 resident에게만 적용되고, 안내에는 resident가 보통 장기 체류 등록과 건물 상주, 개인 우편함을 갖는다고 적혀 있네."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "It was just a lunch poll, so 답장은 나중에 해도 되겠어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "나는 장기 체류 등록은 없어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "알림 badge만 지웠고 다른 channel은 열지 않았어."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "그래도 매주 사흘은 그 건물에 머물러."
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "이제 notification은 muted라 편하게 continue할 수 있어."
+        },
+        {
+          "turnId": "t9",
+          "role": "USER",
+          "text": "다시 rate 얘기로 돌아오면 개인 우편함도 쓰고 있어."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-049",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "repairRationale": "The old pair shared only 빨간 우산 plus two different places and two incompatible handle states, so the natural dominant reading was two different umbrellas. The repair adds a shared non-unique identifying cue, a white sticker on the handle, which is evidence toward identity without being a unique identifier, so whether the two observations describe the same umbrella or two umbrellas is left open. The unrelated interruption turn is preserved.",
+      "intendedUnresolvedReadings": [
+        "the two observations describe the same umbrella and the later one revises the handle state",
+        "the two observations describe two similar umbrellas with independent handle states"
+      ],
+      "discoursePattern": "CANONICAL",
+      "anchorTurnId": "t1",
+      "anchorText": "빨간 우산",
+      "evidenceTurnIds": [
+        "t1",
+        "t3"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "어제 카페 앞에서 본 빨간 우산은 손잡이에 흰 스티커가 붙어 있었고 손잡이가 깨져 있었어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "책상 조명이 깜빡여서 플러그를 한 번 단단히 꽂을게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 역 앞에서도 흰 스티커가 붙은 빨간 우산을 봤는데 손잡이는 멀쩡하더라."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-050",
+      "decision": "REJECT",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "rejectionRationale": "Minimal repair attempts either collapse into ordinary context-conditioned measurements or introduce a referent/instance-identity ambiguity that is not the intended complementary-evidence boundary.",
+      "rejectedScope": "CURRENT_SURFACE_REALIZATION_ONLY",
+      "skeletonAmended": false,
+      "replacementAuthored": false
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "repairRationale": "지금은 marked the preference as provisional and the assistant's 세 옵션 비교표 turned the episode into an open three-option decision process, so the exploratory reading dominated. The repair states the preference without a provisionality marker and narrows the assistant response to the requested A/C comparison, leaving open whether B is the settled current preference with A/C due diligence or the leading exploratory preference pending comparison. The unrelated interruption turns are preserved.",
+      "intendedUnresolvedReadings": [
+        "B is already the settled current preference and the A/C comparison is due diligence",
+        "B is the leading exploratory preference pending the A/C comparison"
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "anchorTurnId": "t1",
+      "anchorText": "Option B 쪽이 더 마음에 들어",
+      "evidenceTurnIds": [
+        "t1",
+        "t3",
+        "t5"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "Option B 쪽이 더 마음에 들어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "잠깐, headphones firmware notice가 떴는데 창부터 닫을게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "그래도 A와 C의 maintenance cost를 더 비교해 줘."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "Update는 tonight로 미뤘고 소리는 그대로 잘 들려."
+        },
+        {
+          "turnId": "t5",
+          "role": "ASSISTANT",
+          "text": "알겠어. A와 C의 maintenance cost를 비교해 볼게."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "repairRationale": "보관함 안 문서는 stated the rule as a generic membership-triggered container rule, which resolves the scope toward including every later entrant. The repair scopes the original rule to the current item set with 지금, so whether a document moved in afterwards falls under the rule is left open. The later draft move into the container remains, and the unrelated interruption turn is preserved.",
+      "intendedUnresolvedReadings": [
+        "the rule follows container membership, so the new draft is included",
+        "the rule was fixed over the documents present when it was decided, so the new draft is outside it"
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "anchorTurnId": "t1",
+      "anchorText": "월말에 삭제",
+      "evidenceTurnIds": [
+        "t1",
+        "t3"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "지금 보관함 안의 문서들은 월말에 삭제하기로 했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "충전 케이블이 의자 바퀴에 걸렸어, 옆으로 빼둘게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 새 초안을 그 보관함으로 옮겼어."
+        }
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "decision": "REPAIR",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "repairRationale": "빨간 바구니 안 옷은 stated the rule as a generic membership-triggered container rule, which resolves the scope toward including every later entrant. The repair scopes the original rule to the current item set with 지금 and adds no wording that explicitly includes or excludes later entrants. The later scarf move into the red basket remains, and the unrelated interruption turn is preserved.",
+      "intendedUnresolvedReadings": [
+        "the rule follows container membership, so the scarf is in today's wash",
+        "the rule was fixed over the clothes present when it was decided, so the scarf is outside it"
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "anchorTurnId": "t1",
+      "anchorText": "세탁 대상",
+      "evidenceTurnIds": [
+        "t1",
+        "t3"
+      ],
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "지금 빨간 바구니 안의 옷은 오늘 세탁 대상이라고 정했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "블루투스 키보드가 절전 모드에 들어갔네, 깨우고 올게."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "다시 세탁 얘기로 돌아가면 스카프를 방금 빨간 바구니로 옮겼어."
+        }
+      ]
+    }
+  ]
+}

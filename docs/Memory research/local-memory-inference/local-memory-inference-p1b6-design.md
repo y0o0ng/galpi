@@ -84,9 +84,13 @@ amendment is now complete**: `p1b6-sk-8dd28ec6b22a18ad` and
 `ESCALATE`, and items `059`/`063` are reclassified as surface-collapse
 realizations. Against the effective-current catalog batch-002 reconciles at
 **51 match / 13 mismatch**, and all 13 remaining mismatches are
-surface-realization cases. The one remaining semantic blocker is the
-repair-versus-rejection decision for those 13. Batch-002 corpus acceptance
-has not occurred,
+surface-realization cases. **Phase A is CLOSED.** The **Phase B semantic
+adjudication of those 13 is now complete** at 12 REPAIR / 1 REJECT, and 12
+repaired candidate surfaces have been materialized; `p1b6-item-b002-050` is
+rejected at its current surface realization. **A fresh source audit and a
+fresh blind HUMAN review of the repaired text remain pending**, so no repaired
+row is accepted and no old HUMAN label transfers onto repaired source text.
+Batch-002 corpus acceptance has not occurred,
 the accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
 repeated review, training, raw-episode evaluation, private replay, and
 production remain UNOPENED/unchanged. Do not redesign the frozen
@@ -409,6 +413,61 @@ and recomputes impact, failing closed on a third amendment, an amendment of the
 preserved skeleton, a wrong base or target label, split/boundary drift, a
 missing routing correction, or any authority the receipt may not claim. The
 historical Exact56 builder is untouched.
+
+## Phase B Surface Repair Materialization
+
+Phase A closed the skeleton-semantics blocker and left one: repair versus
+rejection for the 13 current batch-002 surface realizations that still mismatch
+the effective-current catalog. That decision is now recorded in
+`fixtures/local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt.json`
+at **12 REPAIR / 1 REJECT**, and the repaired rows are materialized in
+`fixtures/local-memory-inference-p1b6-surface-repair-candidate-batch-002.json`.
+Per-item repaired text, rationale and intended unresolved readings live in the
+resolution receipt as auditable data; they are not restated here.
+
+**REPAIR**: `022`, `024`, `029`, `032`, `034`, `037`, `039`, `047`, `049`,
+`051`, `059`, `063`. **REJECT**: `050`, scoped
+`CURRENT_SURFACE_REALIZATION_ONLY` — minimal repair attempts either collapse
+into ordinary context-conditioned measurements or introduce a
+referent/instance-identity ambiguity that is not the intended
+complementary-evidence boundary. The skeleton `p1b6-sk-aebbf047d6864a35` is
+**not** amended and no replacement surface is authored; if that coverage slot is
+needed later, it is a separate new-authoring task followed by fresh review.
+
+The candidate artifact is **not** an effective-current successor. It holds
+exactly the 12 authorized repaired rows and nothing else: no 63-row or 64-row
+batch, none of the 51 unaffected rows, and no placeholder for the rejected item.
+Its status is
+`REPAIR_CANDIDATE_AWAITING_FRESH_SOURCE_AUDIT_AND_FRESH_BLIND_HUMAN_REVIEW`.
+Item IDs, semantic-skeleton IDs, source-episode IDs and family IDs are carried
+from the historical rows so provenance stays explicit, and every
+`anchorSpanRef` / `evidenceSpanRefs` offset is recomputed from the repaired
+source text — no historical offset is reused. Unrelated interruption turns are
+preserved except where the approved repair required restructuring the semantic
+turn (`032`, `037`), and where the discourse pattern changed with the structure
+the historical pattern is retained alongside it.
+
+**Old HUMAN labels do not transfer.** The batch-002 effective HUMAN artifact and
+the attempt-003 receipt are evidence for the OLD surface text only. No HUMAN
+decision was relabeled, reused, or synthesized here, no repaired row is
+accepted, no HUMAN gold is frozen, no HELD_OUT release occurred, and no training
+occurred. The accepted pool remains 30 and `humanReviewCompleted` stays false.
+**A fresh source audit and a fresh blind HUMAN review of the repaired text are
+the next steps and are still pending.**
+
+`scripts/build-memory-inference-p1b6-surface-repair-candidate.js` verifies every
+canonical historical input by identity AND pinned raw SHA before deriving
+anything, then derives the open mismatch set mechanically by reconciling
+batch-002 against the effective-current catalog with the unchanged HUMAN
+decisions. It fails closed on identity drift, raw-byte drift, coordinated
+source-plus-receipt drift, a missing or duplicate decision, a fourteenth
+decision, an omitted decision, a repaired row remapped to a different semantic
+skeleton, the rejected row or any unauthorized row appearing in the candidate,
+stale or invalid byte offsets, and any authority the receipt may not claim.
+Phase B validation is a narrow validator in that builder:
+`lib/memory-inference-p1b6-surfaces.js` stays pointed at the frozen historical
+Exact56 and the historical batch shape, so historical and prospective validation
+remain separate.
 
 ## Task Boundary
 
