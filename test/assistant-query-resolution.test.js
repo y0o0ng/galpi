@@ -156,13 +156,42 @@ test('주제가 바뀐 자립 질문은 이전 해석을 물려받지 않는다'
   assert.equal(calls.length, 1);
 });
 
-test('최근 대화가 없으면 해석 단계를 열지 않는다', async () => {
+test('대화가 없는 대화 의존 발화는 모델 없이 ambiguous로 닫는다', async () => {
   const { resolver, calls } = createResolver(() => {
-    throw new Error('대화가 없으면 해석 모델을 부르지 않아야 합니다.');
+    throw new Error('근거가 없으면 해석 모델을 부르지 않아야 합니다.');
   });
 
-  const result = await resolver.resolve({ userText: '그때 뭐 했었지?', recentConversation: [] });
-  assert.equal(result.outcome, 'pass');
+  for (const recentConversation of [[], [{ role: 'system', content: '무시된다' }]]) {
+    const result = await resolver.resolve({ userText: '그때 뭐 했었지?', recentConversation });
+    // 지시 대상이 없는 원문을 corpus에 던지지 않는다.
+    assert.equal(result.outcome, 'ambiguous');
+    assert.equal(result.retrievalQuery, null);
+  }
+  assert.equal(calls.length, 0);
+
+  // 대화가 없어도 자립 질문은 그대로 통과한다.
+  const selfContained = await resolver.resolve({
+    userText: 'EODHD 무료 플랜 하루 호출 한도가 얼마야?',
+    recentConversation: [],
+  });
+  assert.equal(selfContained.outcome, 'pass');
+  assert.equal(selfContained.retrievalQuery, 'EODHD 무료 플랜 하루 호출 한도가 얼마야?');
+  assert.equal(calls.length, 0);
+});
+
+test('이번 턴 첨부가 있으면 해석 단계를 열지 않는다', async () => {
+  const { resolver, calls } = createResolver(() => {
+    throw new Error('첨부 턴에는 해석 모델을 부르지 않아야 합니다.');
+  });
+
+  const result = await resolver.resolve({
+    userText: '이거 뭐야?',
+    recentConversation: SCHEDULE_CONVERSATION,
+    hasCurrentTurnAttachment: true,
+  });
+
+  // 첨부 경로가 이미 대상을 알고 있다. 대화로 다시 해석하지 않는다.
+  assert.deepEqual(result, { outcome: 'pass', retrievalQuery: '이거 뭐야?', error: null });
   assert.equal(calls.length, 0);
 });
 

@@ -3998,8 +3998,12 @@ async function runSingleChatTurnBody({
         ? `chat:${modelSnapshot.runtimeGeneration}`
         : 'chat',
       // 해석은 이번 턴 이전의 같은 세션 대화만 본다. 답변 경로가 이미 들고 있는
-      // 범위이고, 이것을 위해 더 긴 대화 저장소를 새로 만들지 않는다.
-      await resolveRetrievalQueryForTurn(message, history),
+      // 범위이고, 이것을 위해 더 긴 대화 저장소를 새로 만들지 않는다. 이번 턴
+      // 첨부가 있으면 `이거`의 대상은 `<current_attachments>`가 이미 정하므로
+      // 해석 단계를 열지 않는다.
+      await resolveRetrievalQueryForTurn(message, history, {
+        hasCurrentTurnAttachment: turnAttachments.length > 0 || turnImages.images.length > 0,
+      }),
     );
     const baseContext = formatHistoryForModelContext(
       requestHistory.slice(-HISTORY_CONTEXT_MESSAGES),
@@ -7721,10 +7725,10 @@ function searchPastMessages(queryEmbedding, currentSessionId, limit = 2) {
     .map(({ embedding, sim, ...r }) => r);
 }
 
-async function resolveRetrievalQueryForTurn(message, recentConversation) {
+async function resolveRetrievalQueryForTurn(message, recentConversation, options = {}) {
   // GPT 키가 없으면 해석기도 없고 임베딩도 없다. 기존 단일 턴 동작을 그대로 둔다.
   if (!retrievalQueryResolver) return { outcome: 'pass', retrievalQuery: message };
-  return retrievalQueryResolver.resolve({ userText: message, recentConversation });
+  return retrievalQueryResolver.resolve({ userText: message, recentConversation, ...options });
 }
 
 // 사용자 발화 원문(`question`)과 검색에만 쓰는 질의(`retrievalQuery`)를 가른다.

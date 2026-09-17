@@ -147,7 +147,7 @@ test('검색 질의 해석은 원문을 그대로 두고 회수 경로 전체에
       CODEX_RUNNER_MODE: 'heuristic',
       ASSISTANT_TASKS_ENABLED: 'false',
       WEB_PUSH_ENABLED: 'false',
-      ATTACHMENTS_ENABLED: 'false',
+      ATTACHMENTS_ENABLED: 'true',
       CONTEXT_N: '5',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -219,11 +219,11 @@ test('검색 질의 해석은 원문을 그대로 두고 회수 경로 전체에
   `).run('old-session', 'PAST_TURN_MARKER');
   db.close();
 
-  const chat = async message => {
+  const chat = async (message, extra = {}) => {
     const response = await fetch(`${url}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Token': API_TOKEN },
-      body: JSON.stringify({ message, model: 'gpt', sessionId: 'shared-main' }),
+      body: JSON.stringify({ message, model: 'gpt', sessionId: 'shared-main', ...extra }),
     });
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body));
@@ -338,6 +338,64 @@ test('검색 질의 해석은 원문을 그대로 두고 회수 경로 전체에
     assert.equal(trace.resolutionOutcome, 'ambiguous');
     assert.equal(trace.retrievalQuerySha256, null);
     assert.ok(trace.error);
+  });
+
+  await t.test('근거로 삼을 대화가 없으면 원문 검색 없이 닫는다', async () => {
+    const embeddingCalls = embeddingInputs.length;
+    const resolverCalls = resolverRequests.length;
+    nextAnswer = '무엇을 말하는지 알려줘.';
+    const response = await fetch(`${url}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Token': API_TOKEN },
+      // 대화가 하나도 없는 새 세션이다.
+      body: JSON.stringify({ message: '그때 뭐 했었지?', model: 'gpt', sessionId: 'fresh-session' }),
+    });
+    assert.equal(response.status, 200, JSON.stringify(await response.json()));
+
+    // 근거가 없으면 해석 모델도 부르지 않고 corpus도 돌리지 않는다.
+    assert.equal(resolverRequests.length, resolverCalls);
+    assert.equal(embeddingInputs.length, embeddingCalls);
+    const request = JSON.stringify(chatRequests.at(-1).input);
+    assert.match(request, /<retrieval_status>/);
+    assert.doesNotMatch(request, /SCHEDULE_HISTORY_EVIDENCE/);
+    assert.doesNotMatch(request, /CHUNK_ONLY_EVIDENCE/);
+    assert.match(request, /<user_question>\\n그때 뭐 했었지\?\\n<\/user_question>/);
+
+    const trace = traceRows().at(-1);
+    assert.equal(trace.resolutionOutcome, 'ambiguous');
+    assert.equal(trace.querySha256, sha256('그때 뭐 했었지?'));
+    assert.equal(trace.retrievalQuerySha256, null);
+    assert.equal(trace.chunksJson, '[]');
+  });
+
+  await t.test('이번 턴 첨부가 있으면 첨부 경로의 기존 계약을 그대로 둔다', async () => {
+    const form = new FormData();
+    form.set('file', new Blob(['ATTACHMENT_TURN_EVIDENCE'], { type: 'text/plain' }), '첨부.txt');
+    const uploadResponse = await fetch(`${url}/api/attachments`, {
+      method: 'POST',
+      headers: { 'X-API-Token': API_TOKEN },
+      body: form,
+    });
+    const uploadBody = await uploadResponse.json();
+    assert.equal(uploadResponse.status, 201, JSON.stringify(uploadBody));
+
+    const resolverCalls = resolverRequests.length;
+    nextAnswer = '첨부 내용을 봤어.';
+    const body = await chat('이거 뭐야?', { attachmentIds: [uploadBody.attachmentId] });
+    assert.equal(body.attachments[0].attachmentId, uploadBody.attachmentId);
+
+    // `이거`를 최근 대화로 다시 해석하지 않는다. 대상은 이번 턴 첨부다.
+    assert.equal(resolverRequests.length, resolverCalls);
+    assert.equal(embeddingInputs.at(-1), '이거 뭐야?');
+    const request = JSON.stringify(chatRequests.at(-1).input);
+    assert.match(request, /<current_attachments>/);
+    assert.match(request, /첨부\.txt/);
+    assert.doesNotMatch(request, /<retrieval_status>/);
+
+    const trace = traceRows().at(-1);
+    assert.equal(trace.resolutionOutcome, 'pass');
+    assert.equal(trace.querySha256, sha256('이거 뭐야?'));
+    assert.equal(trace.retrievalQuerySha256, trace.querySha256);
   });
 
   await t.test('주제를 바꾼 자립 질문은 이전 해석을 물려받지 않는다', async () => {
