@@ -4302,3 +4302,35 @@ acceptance, HUMAN gold freeze, HELD_OUT release, or training occurred.
 
 Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-source-audit-packet.test.js`
 (10/10 pass) and the full `npm test` suite.
+
+#### P1-B6 fresh source audit of the repaired candidates — COMPLETE_PASS 12/12 / HUMAN REVIEW PACKET BUILT, REVIEW PENDING
+
+The fresh source audit ran in a separate session and returned **12 PASS / 0 FAIL
+/ 0 UNCERTAIN** for the 12 repaired candidates. Contracts are in
+[`local-memory-inference-p1b6-design.md`](local-memory-inference-p1b6-design.md)
+under "Fresh Source Audit Result and Blind HUMAN Review Packet".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| external result `p1b6-repair-source-audit-results.json` (not committed) | `fd4d11a21ea9ee960b7f990df9d0207c4768d122e3c6afdb1dffab013f17f4aa` |
+| `fixtures/local-memory-inference-p1b6-surface-repair-source-audit-batch-002-attempt-001.json` | `d08bf4488d4fa4a89c8f03172c4569405093051e939fea395a85b5fafda254b9` |
+| generated blind HUMAN review packet (not committed) | `a6059bb7d94e27627528c63437420a4915557c91ffeb7c99095d63641496083b` |
+
+The receipt binds to the reviewed audit packet
+`9586be2fde0822d4c8025f4aa7cd3ad4833b37e18ee0a5111275233816224356`, the repair
+candidate `d59d0dec…`, and the unamended protocol `63a2c70c…`. Execution
+provenance is recorded conservatively: a user-supplied result from a
+fresh/separate ChatGPT source-audit session, with model and reasoning setting
+explicitly marked `NOT_RECOVERABLE_FROM_RESULT_ARTIFACT` rather than guessed. No
+historical batch-002 audit result was inherited.
+
+**No HUMAN decision was synthesized.** The blind HUMAN review packet holds
+exactly 12 rows of `reviewRowId` + `selectedBundle`, carries no source-audit
+reason, and is generated rather than committed. Phase B repair materialization
+stays CLOSED, the fresh blind HUMAN review is **pending**, the accepted pool
+remains 30, `humanReviewCompleted` stays false, HUMAN gold stays unfrozen,
+HELD_OUT release stays closed, and training stays unopened. P1-B6 is not
+complete.
+
+Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-human-review-packet.test.js`
+(8/8 pass) and the full `npm test` suite.

@@ -1,0 +1,107 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-repair-source-audit-batch-002-attempt-001-receipt-v1",
+  "attemptId": "p1b6-surface-repair-source-audit-batch-002-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-surface-repair-source-audit-packet-batch-002-v1",
+  "auditPacketSha256": "9586be2fde0822d4c8025f4aa7cd3ad4833b37e18ee0a5111275233816224356",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedRepairCandidate": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-002-v1",
+    "rawSha256": "d59d0dec225d3f4fea74952da10e05b8f0be01942a3aa6e15ea58d659e22abb3"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-repair-source-audit-results.json",
+    "sha256": "fd4d11a21ea9ee960b7f990df9d0207c4768d122e3c6afdb1dffab013f17f4aa"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "USER_SUPPLIED_RESULT_ARTIFACT_NOT_INDEPENDENTLY_RECOVERED_FROM_API_OR_RUNTIME_METADATA",
+    "surface": "ChatGPT",
+    "sessionRelationship": "fresh/separate session used only for the blind source/bundle audit of the repaired candidates",
+    "model": "NOT_RECOVERABLE_FROM_RESULT_ARTIFACT",
+    "reasoningSetting": "NOT_RECOVERABLE_FROM_RESULT_ARTIFACT"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "The repaired source text is new evidence. Every row received a fresh judgment and no historical batch-002 source-audit result carried forward."
+  },
+  "summary": {
+    "total": 12,
+    "PASS": 12,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassedForRepairedCandidates": true,
+    "humanSemanticReviewOccurred": false,
+    "humanGoldAssignedOrFrozen": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-repair-audit-1aadc1e0ed235dc0",
+      "disposition": "PASS",
+      "reason": "The omitted rain/book-handling turns are unrelated to the anchored beginner-version statement and do not alter its source context."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-008a522d9801af0c",
+      "disposition": "PASS",
+      "reason": "All room-choice context is included; omitted alert, door, and laptop turns are unrelated interruptions."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-2c6e08c4a1492152",
+      "disposition": "PASS",
+      "reason": "The rainy-day lobby alternative is included, and the omitted watch-setting turn is unrelated to delivery."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-f63590b559dc584b",
+      "disposition": "PASS",
+      "reason": "The omitted bookmark/page turns are unrelated to the balcony-model request and do not change the anchored candidate."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-f88ad086a7ce6f2d",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the complete source turn, so no source material is omitted."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-f49ffac3478f5842",
+      "disposition": "PASS",
+      "reason": "The only omitted turn concerns answering a delivery call and is unrelated to the admin-only dashboard restriction."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-b4d10b78a0d3610e",
+      "disposition": "PASS",
+      "reason": "The selected bundle contains the complete source turn, including the mobile-size exception."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-c170f247012abc30",
+      "disposition": "PASS",
+      "reason": "All resident-rate qualification details are included; omitted notification/chat turns are unrelated interruptions."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-95b02dc9534efde9",
+      "disposition": "PASS",
+      "reason": "Both potentially related umbrella observations are included; the omitted lamp turn is unrelated."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-f71b067889ad973a",
+      "disposition": "PASS",
+      "reason": "The preference and subsequent A/C comparison context are included; omitted firmware/update turns are unrelated."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-f81301aa74476bcd",
+      "disposition": "PASS",
+      "reason": "The later addition of a new draft to the storage box is included; the omitted cable turn is unrelated."
+    },
+    {
+      "auditRowId": "p1b6-repair-audit-44108f411fba642c",
+      "disposition": "PASS",
+      "reason": "The scarf's later move into the red basket is included; the omitted keyboard turn is unrelated."
+    }
+  ]
+}

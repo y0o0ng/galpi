@@ -514,11 +514,71 @@ Following repository convention the packet is **generated, not committed** —
 only decision receipts are committed. Report the generated packet's raw SHA-256
 so the later audit receipt binds to exactly the reviewed bytes.
 
-**Current state: Phase B repair materialization stays CLOSED, a deterministic
-fresh source-audit packet can now be generated for exactly the 12 repaired
-candidates, the fresh source audit itself is still PENDING until a separate
-auditor returns decisions, and the fresh blind HUMAN review stays blocked behind
-a source-audit `PASS`.**
+**The fresh source audit is now COMPLETE at 12/12 `PASS`**; see the next section.
+
+## Fresh Source Audit Result and Blind HUMAN Review Packet
+
+The fresh audit ran in a separate session and returned **12 PASS / 0 FAIL /
+0 UNCERTAIN**, committed at
+`fixtures/local-memory-inference-p1b6-surface-repair-source-audit-batch-002-attempt-001.json`
+(attempt `p1b6-surface-repair-source-audit-batch-002-attempt-001`). The receipt
+binds by identity and raw SHA to the blind audit packet
+(`9586be2f…`), the repair candidate (`d59d0dec…`), the unamended protocol
+(`63a2c70c…`), and the external raw result artifact by filename and SHA. Raw
+model output stays outside the repository by convention; the committed receipt
+retains its exact filename and SHA so the reviewed bytes remain identifiable.
+
+**Execution provenance is recorded conservatively.** The result artifact is a
+user-supplied file from a fresh/separate ChatGPT source-audit session. Exact
+model and reasoning-setting metadata are not independently recoverable from it,
+so the receipt records that explicitly rather than guessing. Every row received
+a fresh judgment and no historical batch-002 audit result was inherited.
+
+The receipt's authority records only that the source/bundle gate passed for
+these 12 repaired candidates. **HUMAN semantic review did not occur, no HUMAN
+gold was assigned or frozen, no dataset acceptance happened, no HELD_OUT release
+occurred, and nothing was trained.**
+
+`scripts/build-memory-inference-p1b6-surface-repair-human-review-packet.js` then
+builds the fresh blind primary HUMAN review packet for exactly those 12
+audit-PASS candidates. It rebuilds the canonical audit packet mechanically and
+refuses to proceed unless the receipt binds to it, covers exactly its 12 opaque
+audit IDs, is all `PASS` with non-empty reasons, inherits no historical result,
+and claims no authority it does not have. A single `FAIL` or `UNCERTAIN` closes
+the gate.
+
+Each HUMAN-facing row exposes **exactly two fields**: an opaque `reviewRowId`
+and the canonical `selectedBundle`. The reviewer sees the selected visible
+bundle, not the full source episode. No item, episode, family or skeleton ID,
+split, boundary class, discourse pattern, old or effective HUMAN label,
+source-audit reason, repair rationale, intended unresolved reading, mismatch
+direction, adjudication routing, REPAIR/REJECT metadata, expected answer, or the
+rejected `050` realization appears anywhere. **Source-audit reasons are
+construction diagnostics and are deliberately withheld so they cannot prime the
+semantic reviewer.** Rows are sorted deterministically by opaque review ID,
+matching the primary-HUMAN convention.
+
+Review IDs live in their own `p1b6-repair-review-` namespace derived from the
+packet identity, the canonical repair-candidate raw SHA and the internal item
+ID, so no historical `p1b6-review-` identity is reused for the changed source
+text and any candidate byte change moves the namespace. The item ID is a hash
+input only. Each row's `selectedBundle` is taken from the audited packet itself,
+so it is byte-for-byte what was source-audited.
+
+**This step makes no HUMAN decision.** The subsequent blind review uses the
+established schema — disposition `KEEP` / `FIX` / `REJECT` and semantic decision
+`CLEAR` / `ESCALATE`, with `FIX` optionally carrying a short construction reason.
+No expected semantic label is embedded in code and no authoritative decision map
+exists before the review happens. The packet is generated, not committed: the
+builder writes only to a caller-specified path, refuses overwrite, and reports
+the raw SHA-256 so the later HUMAN receipt binds to exactly the reviewed bytes.
+
+**Current state: Phase B repair materialization CLOSED; fresh source audit of
+the 12 repaired candidates COMPLETE_PASS at 12/12; fresh blind HUMAN review
+packet builder COMPLETE; the fresh blind HUMAN review itself PENDING. No
+repaired row is accepted, the accepted pool remains 30, HUMAN gold remains
+unfrozen, HELD_OUT release remains closed, and training remains unopened.
+P1-B6 is not complete.**
 
 ## Task Boundary
 
