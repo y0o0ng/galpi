@@ -100,6 +100,7 @@
 - **batch-002는 effective 기준 51 match / 13 mismatch이고 남은 13건은 전부 surface-collapse다**(`022 024 029 032 034 037 039 047 049 050 051 059 063`). HUMAN 집계는 64 KEEP / 52 CLEAR / 12 ESCALATE 그대로고 `humanReviewCompleted`는 false다.
 - **Phase A는 닫혔고 Phase B 표면 수리 결정도 끝났다 — 13건이 12 REPAIR / 1 REJECT이고 수리본 12건을 materialize했다.** `050`은 현재 표면 실현만 폐기했고 skeleton은 그대로, 대체 표면도 안 만들었다. 결정 정본은 `fixtures/local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt.json`, 수리본은 `…-surface-repair-candidate-batch-002.json`이며 계약은 설계 문서의 `Phase B Surface Repair Materialization` 절이다.
 - **남은 blocker 둘.** 수리본의 새 source audit과 새 blind HUMAN 재검토다. **옛 HUMAN 라벨은 옛 표면의 증거일 뿐이라 수리된 원문으로 옮겨가지 않는다.** accepted pool은 30 그대로이고 downstream gate는 전부 닫혀 있다.
+- **수리본 12건의 blind source-audit 패킷은 이제 결정론적으로 생성된다**(`scripts/build-memory-inference-p1b6-surface-repair-source-audit-packet.js`, 관례대로 커밋하지 않고 생성만 한다). **패킷을 만든 것은 감사를 한 것이 아니다** — 판정은 별도 fresh 세션이 내리고, 12건 전부 새 판정이 필요하다(옛 batch-002 `PASS`는 하나도 승계되지 않는다). blind HUMAN 재검토는 source-audit `PASS` 뒤에 있다.
 - **canonical mismatch 결합은 이제 fail-close다.** adjudication 빌더와 receipt validator가 진단 산출물의 raw bytes를 직접 검증하므로, effective 행을 조작해 개수만 24로 맞춘 다른 mismatch 집합으로 바꿔치기할 수 없다. 기존 adjudication 패킷 바이트(`dd8697…`)는 그대로다.
 - accepted pool은 30 그대로이고 acceptance 산출물은 없다. final gold·training·raw episode·private replay는 `UNOPENED`, production은 그대로다. 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 run receipt다.
 

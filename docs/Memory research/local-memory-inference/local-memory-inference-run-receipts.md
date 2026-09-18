@@ -4268,3 +4268,37 @@ becomes a separate new-authoring task only if it is later needed.
 
 Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-candidate.test.js`
 (9/9 pass) and the full `npm test` suite (1377/1377 pass).
+
+#### P1-B6 fresh source-audit packet builder for the repaired candidates — BUILDER COMPLETE / AUDIT NOT RUN
+
+`scripts/build-memory-inference-p1b6-surface-repair-source-audit-packet.js`
+deterministically constructs the blind source/bundle completeness audit packet
+for exactly the 12 repaired candidates. Contracts are in
+[`local-memory-inference-p1b6-design.md`](local-memory-inference-p1b6-design.md)
+under "Fresh Source Audit of the Repaired Candidates" and are not restated here.
+
+**No audit was run and no disposition was synthesized.** Constructing the packet
+is not the audit; a separate fresh strong-model session returns the decisions
+under the unamended protocol
+(`63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d`), where only
+`PASS` proceeds and `FAIL` / `UNCERTAIN` fail closed. All 12 rows require fresh
+judgments; no historical batch-002 `PASS` carries forward.
+
+Following convention the packet is generated rather than committed. From the
+canonical inputs — repair candidate
+`d59d0dec225d3f4fea74952da10e05b8f0be01942a3aa6e15ea58d659e22abb3`, Phase B
+resolution receipt
+`792cb050b08375fd6dec9e8ce2b1a04787760123496b3dfed601aac984f4626d`, and the
+effective-current catalog
+`48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559` — it is
+deterministic at raw SHA-256
+`9586be2fde0822d4c8025f4aa7cd3ad4833b37e18ee0a5111275233816224356`. A later
+audit receipt binds to exactly those bytes.
+
+Phase B repair materialization stays CLOSED. The fresh source audit is
+**pending**, the fresh blind HUMAN review stays blocked behind a source-audit
+`PASS`, the accepted pool remains 30, `humanReviewCompleted` stays false, and no
+acceptance, HUMAN gold freeze, HELD_OUT release, or training occurred.
+
+Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-source-audit-packet.test.js`
+(10/10 pass) and the full `npm test` suite.

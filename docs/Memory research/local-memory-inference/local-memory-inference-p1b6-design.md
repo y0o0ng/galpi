@@ -469,6 +469,57 @@ Phase B validation is a narrow validator in that builder:
 Exact56 and the historical batch shape, so historical and prospective validation
 remain separate.
 
+## Fresh Source Audit of the Repaired Candidates
+
+`scripts/build-memory-inference-p1b6-surface-repair-source-audit-packet.js`
+deterministically constructs the blind source/bundle completeness audit packet
+for exactly the 12 repaired candidates. **Constructing the packet is not the
+audit.** No disposition is assigned, no HUMAN label is created or transferred,
+no row is accepted, no gold is frozen, no HELD_OUT release occurred, and nothing
+was trained. The auditor runs later in a separate fresh strong-model session.
+
+The protocol at `fixtures/local-memory-inference-p1b6-source-audit-protocol.json`
+is **unamended and authoritative**: the same question, the same `PASS` / `FAIL` /
+`UNCERTAIN` dispositions, and the same gate where only `PASS` proceeds to blind
+HUMAN semantic review while `FAIL` and `UNCERTAIN` fail closed. The source
+auditor does not assign `CLEAR` or `ESCALATE`. The builder verifies that gate
+rather than rewriting it.
+
+**All 12 rows require fresh judgments.** The repaired source text is new
+evidence, so no historical batch-002 source-audit `PASS` carries forward. The
+opaque row IDs therefore live in their own `p1b6-repair-audit-` namespace,
+derived from the protocol identity, the canonical repair-candidate raw SHA and
+the internal item ID, so they are disjoint from the historical `p1b6-audit-`
+IDs and any candidate byte change moves the whole namespace. The item ID is a
+hash input only and never appears in a blind row.
+
+Each row exposes exactly three fields: the opaque `auditRowId`, the complete
+repaired source episode turns, and the exact selected model-visible bundle with
+its single source-grounded `[TARGET]…[/TARGET]` marker. No item ID, episode or
+family ID, `semanticSkeletonId`, boundary class, split, discourse pattern,
+language quota, HUMAN or skeleton label, repair rationale, intended unresolved
+reading, adjudication routing, or acceptance recommendation appears anywhere in
+the packet, and the rejected `050` realization is absent entirely.
+
+The builder pins the repair candidate, the Phase B resolution receipt, the
+effective-current catalog and the audit protocol by identity AND raw SHA, then
+re-runs `validateRepairCandidateBatch` before rendering, so identity drift,
+raw-byte drift, coordinated drift, a drifted row set and stale span offsets all
+fail closed. Rendering reuses the shared span primitives and reproduces the
+canonical renderer's visible-bundle semantics exactly; the historical
+`validateSurfaceBatch` contract in `lib/memory-inference-p1b6-surfaces.js` is
+untouched and still refuses the repair candidate's shape.
+
+Following repository convention the packet is **generated, not committed** —
+only decision receipts are committed. Report the generated packet's raw SHA-256
+so the later audit receipt binds to exactly the reviewed bytes.
+
+**Current state: Phase B repair materialization stays CLOSED, a deterministic
+fresh source-audit packet can now be generated for exactly the 12 repaired
+candidates, the fresh source audit itself is still PENDING until a separate
+auditor returns decisions, and the fresh blind HUMAN review stays blocked behind
+a source-audit `PASS`.**
+
 ## Task Boundary
 
 P1-B6 returns `CLEAR` when the target's materially relevant semantic status is
