@@ -4333,4 +4333,34 @@ HELD_OUT release stays closed, and training stays unopened. P1-B6 is not
 complete.
 
 Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-human-review-packet.test.js`
-(8/8 pass) and the full `npm test` suite.
+(8/8 pass at the time) and the full `npm test` suite.
+
+#### P1-B6 fresh blind HUMAN review of the repaired candidates — COMPLETE 12 KEEP / 12 ESCALATE, NOT ACCEPTED
+
+The repository owner's blind review returned **12 KEEP / 0 FIX / 0 REJECT and
+0 CLEAR / 12 ESCALATE**. Contracts and the independence limitation are in
+[`local-memory-inference-p1b6-design.md`](local-memory-inference-p1b6-design.md)
+under "Fresh Blind HUMAN Review Result — and What It Does Not Establish".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| reviewed blind HUMAN packet (not committed) | `a6059bb7d94e27627528c63437420a4915557c91ffeb7c99095d63641496083b` |
+| `fixtures/local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001.json` | `cab70e8a277189e0eee1847adcc89e114139363f20cebb95d39c7153fac30f04` |
+
+**Recomputed observation only**: the 12 decisions reconcile at 12 match / 0
+mismatch against the effective-current catalog. That is not acceptance, and the
+12 repaired rows were not combined with the 51 unaffected historical rows.
+
+**The result is uniform in the expected direction and the reviewer authored the
+repairs**, so the receipt records in `reviewIndependence` that this attempt does
+not establish reviewer-independent confirmation. The owner accepted that
+limitation and treats the gate as passed. No decision was synthesized or altered
+by tooling; `validateHumanReviewReceipt` privileges no CLEAR/ESCALATE
+distribution and the opposite answer validates equally.
+
+No dataset acceptance, effective-current successor batch, HUMAN gold freeze,
+HELD_OUT release, or training occurred. The accepted pool remains 30 and P1-B6
+is not complete.
+
+Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-human-review-packet.test.js`
+(10/10 pass) and the full `npm test` suite.

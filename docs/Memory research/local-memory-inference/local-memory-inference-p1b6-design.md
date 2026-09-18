@@ -573,12 +573,52 @@ exists before the review happens. The packet is generated, not committed: the
 builder writes only to a caller-specified path, refuses overwrite, and reports
 the raw SHA-256 so the later HUMAN receipt binds to exactly the reviewed bytes.
 
-**Current state: Phase B repair materialization CLOSED; fresh source audit of
-the 12 repaired candidates COMPLETE_PASS at 12/12; fresh blind HUMAN review
-packet builder COMPLETE; the fresh blind HUMAN review itself PENDING. No
-repaired row is accepted, the accepted pool remains 30, HUMAN gold remains
-unfrozen, HELD_OUT release remains closed, and training remains unopened.
-P1-B6 is not complete.**
+**The fresh blind HUMAN review is now COMPLETE**; see the next section.
+
+## Fresh Blind HUMAN Review Result — and What It Does Not Establish
+
+The repository owner's blind review of the 12 repaired candidates is committed at
+`fixtures/local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001.json`
+(attempt `p1b6-surface-repair-primary-human-review-batch-002-attempt-001`),
+binding by identity and raw SHA to the exact reviewed packet `a6059bb7…`, the
+repair candidate `d59d0dec…`, and the `COMPLETE_PASS` source-audit prerequisite.
+The result is **12 KEEP / 0 FIX / 0 REJECT and 0 CLEAR / 12 ESCALATE**.
+
+**Recomputed observation only**: against the effective-current catalog those 12
+decisions reconcile at **12 match / 0 mismatch**. This is reported, never written
+back onto a HUMAN artifact, and it is not acceptance. The 12 repaired rows and
+the 51 unaffected historical rows are still separate artifacts; combining them
+into an effective-current successor batch is a distinct step that has **not**
+been performed.
+
+**The independence limitation is recorded, not hidden.** The packet was blind at
+row level — opaque IDs, no labels, no rationale, no source-audit reasons — but
+the reviewer is the repository owner who authored all 12 repairs and therefore
+knew the entire presented population consisted of repairs intended to restore
+ambiguity. A uniform ESCALATE outcome is the expected direction, so **this
+attempt does not establish reviewer-independent confirmation that the repairs
+restored the intended ambiguity.** The receipt carries that statement in a
+`reviewIndependence` block and the validator refuses any receipt that erases it
+or claims independence it does not have. The repository owner has accepted this
+limitation and treats the blind HUMAN review gate as passed; the limitation
+stands on the record so a later reader does not over-read the result.
+
+`validateHumanReviewReceipt` checks shape, never answers. It binds the receipt to
+the rebuilt packet, requires exactly the 12 presented rows in packet order with
+no invented, duplicated, reordered, or historical row ID, restricts dispositions
+to `KEEP`/`FIX`/`REJECT` and decisions to `CLEAR`/`ESCALATE`, allows a short
+reason only on a `FIX` row, derives the status from the dispositions, and refuses
+any downstream authority. **No CLEAR/ESCALATE distribution is privileged**: the
+opposite answer validates just as well, and no review row identity appears
+anywhere in the builder source, so no answer can be attached to a specific
+reviewed surface.
+
+**Current state: Phase B repair materialization CLOSED; fresh source audit
+COMPLETE_PASS 12/12; fresh blind HUMAN review COMPLETE at 12 KEEP / 12 ESCALATE
+with its independence limitation on the record. No repaired row is accepted, no
+effective-current successor batch exists, the accepted pool remains 30, HUMAN
+gold remains unfrozen, HELD_OUT release remains closed, and training remains
+unopened. P1-B6 is not complete.**
 
 ## Task Boundary
 

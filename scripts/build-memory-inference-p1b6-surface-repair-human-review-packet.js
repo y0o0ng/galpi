@@ -36,6 +36,13 @@ const AUDIT_RECEIPT_IDENTITY =
   'xion-local-memory-inference-p1b6-surface-repair-source-audit-batch-002-attempt-001-receipt-v1';
 const AUDIT_RECEIPT_FIXTURE =
   'local-memory-inference-p1b6-surface-repair-source-audit-batch-002-attempt-001.json';
+const HUMAN_RECEIPT_IDENTITY =
+  'xion-local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001-receipt-v1';
+const HUMAN_ATTEMPT_ID = 'p1b6-surface-repair-primary-human-review-batch-002-attempt-001';
+const HUMAN_RECEIPT_FIXTURE =
+  'local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001.json';
+const DISPOSITIONS = Object.freeze(['KEEP', 'FIX', 'REJECT']);
+const DECISIONS = Object.freeze(['CLEAR', 'ESCALATE']);
 // The external result artifact stays outside the repository, as raw model output does by
 // convention. Its bytes are pinned here so the committed receipt cannot quietly re-point at a
 // different run, and so supplied result bytes can be checked when they are available.
@@ -191,6 +198,99 @@ function buildRepairHumanReviewPacket(receipt,
   };
 }
 
+// Validates the SHAPE of a completed blind review, never its answers. No CLEAR/ESCALATE
+// combination is privileged here: embedding an expected distribution would turn this validator
+// into the gold it is supposed to be checking.
+function validateHumanReviewReceipt(receipt,
+  canonicalInputs = auditPacketBuilder.loadCanonicalInputs()) {
+  const packet = buildRepairHumanReviewPacket(loadAuditReceipt(), canonicalInputs);
+  const packetSha256 = sha256RawBytes(packetBytes(packet));
+
+  if (!exactKeys(receipt, [
+    'name', 'attemptId', 'status', 'primaryHumanReviewPacket', 'reviewedRepairCandidate',
+    'rendererIdentity', 'sourceAuditPrerequisite', 'reviewIndependence', 'summary',
+    'authority', 'rows',
+  ]) || receipt.name !== HUMAN_RECEIPT_IDENTITY
+    || receipt.attemptId !== HUMAN_ATTEMPT_ID
+    || !exactKeys(receipt.primaryHumanReviewPacket, ['identity', 'rawSha256'])
+    || receipt.primaryHumanReviewPacket.identity !== PACKET_IDENTITY
+    || receipt.primaryHumanReviewPacket.rawSha256 !== packetSha256
+    || !exactKeys(receipt.reviewedRepairCandidate, ['identity', 'rawSha256'])
+    || receipt.reviewedRepairCandidate.rawSha256 !== packet.reviewedRepairCandidate.rawSha256
+    || receipt.reviewedRepairCandidate.identity !== packet.reviewedRepairCandidate.identity
+    || receipt.rendererIdentity !== RENDERER_IDENTITY
+    || !exactKeys(receipt.sourceAuditPrerequisite, ['attemptId', 'status', 'allRowsPassed'])
+    || receipt.sourceAuditPrerequisite.attemptId !== AUDIT_ATTEMPT_ID
+    || receipt.sourceAuditPrerequisite.status !== 'COMPLETE_PASS'
+    || receipt.sourceAuditPrerequisite.allRowsPassed !== true) {
+    fail('HUMAN review receipt binding is invalid');
+  }
+
+  // The reviewer authored the repairs and knew the whole presented population was repaired
+  // work, so the receipt must say so. A receipt claiming independence it does not have is
+  // refused: the limitation is what keeps a later reader from over-reading this attempt.
+  if (!exactKeys(receipt.reviewIndependence, [
+    'packetBlindToRowIdentity', 'packetCarriedNoLabelRationaleOrAuditReason',
+    'reviewerAuthoredTheRepairs', 'reviewerKnewEveryPresentedRowWasARepairedRealization',
+    'limitation',
+  ]) || receipt.reviewIndependence.packetBlindToRowIdentity !== true
+    || receipt.reviewIndependence.packetCarriedNoLabelRationaleOrAuditReason !== true
+    || receipt.reviewIndependence.reviewerAuthoredTheRepairs !== true
+    || receipt.reviewIndependence.reviewerKnewEveryPresentedRowWasARepairedRealization !== true
+    || typeof receipt.reviewIndependence.limitation !== 'string'
+    || !receipt.reviewIndependence.limitation.includes('does NOT establish')) {
+    fail('HUMAN review receipt does not record its independence limitation');
+  }
+
+  if (receipt.authority?.decisionsSource !== 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER'
+    || receipt.authority.reviewCompletedForAllPresentedRows !== true
+    || !exactKeys(receipt.authority, [
+      'reviewCompletedForAllPresentedRows', 'decisionsSource',
+      'modelInferenceUsedForHumanDecisions', 'unresolvedFixCount',
+      'reconciliationPerformedAsAuthority', 'datasetAcceptancePerformed', 'humanGoldFrozen',
+      'effectiveCurrentSuccessorBuilt', 'heldOutReleasePerformed', 'trainingOccurred',
+    ])
+    || receipt.authority.modelInferenceUsedForHumanDecisions !== false
+    || [receipt.authority.reconciliationPerformedAsAuthority,
+      receipt.authority.datasetAcceptancePerformed, receipt.authority.humanGoldFrozen,
+      receipt.authority.effectiveCurrentSuccessorBuilt,
+      receipt.authority.heldOutReleasePerformed, receipt.authority.trainingOccurred]
+      .some(value => value !== false)) {
+    fail('HUMAN review receipt claims authority it does not have');
+  }
+
+  const expected = packet.rows.map(row => row.reviewRowId);
+  if (!Array.isArray(receipt.rows) || receipt.rows.length !== expected.length
+    || JSON.stringify(receipt.rows.map(row => row.reviewRowId)) !== JSON.stringify(expected)) {
+    fail('HUMAN review rows are missing, extra, duplicated, reordered, or unknown');
+  }
+  for (const row of receipt.rows) {
+    const keys = Object.keys(row).toSorted();
+    const shaped = JSON.stringify(keys) === JSON.stringify(['decision', 'disposition', 'reviewRowId'])
+      || (JSON.stringify(keys) === JSON.stringify(['decision', 'disposition', 'reason', 'reviewRowId'])
+        && row.disposition === 'FIX' && typeof row.reason === 'string' && row.reason.trim() !== '');
+    if (!shaped || !DISPOSITIONS.includes(row.disposition)
+      || !DECISIONS.includes(row.decision)) {
+      fail(`HUMAN review row is invalid: ${row.reviewRowId}`);
+    }
+  }
+
+  const count = (field, value) => receipt.rows.filter(row => row[field] === value).length;
+  const fixCount = count('disposition', 'FIX');
+  if (!exactKeys(receipt.summary, ['total', 'KEEP', 'FIX', 'REJECT', 'CLEAR', 'ESCALATE'])
+    || receipt.summary.total !== receipt.rows.length
+    || DISPOSITIONS.some(value => receipt.summary[value] !== count('disposition', value))
+    || DECISIONS.some(value => receipt.summary[value] !== count('decision', value))
+    || receipt.authority.unresolvedFixCount !== fixCount) {
+    fail('HUMAN review summary does not agree with its rows');
+  }
+  const allKeep = fixCount === 0 && count('disposition', 'REJECT') === 0;
+  if (receipt.status !== (allKeep ? 'COMPLETE_ALL_KEEP' : 'COMPLETE_NEEDS_FIX')) {
+    fail('HUMAN review status does not follow from its dispositions');
+  }
+  return { receipt, packet, packetSha256 };
+}
+
 function loadAuditReceipt() {
   return JSON.parse(fs.readFileSync(
     path.join(__dirname, '..', 'fixtures', AUDIT_RECEIPT_FIXTURE), 'utf8'));
@@ -223,6 +323,12 @@ function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   AUDIT_ATTEMPT_ID,
+  DECISIONS,
+  DISPOSITIONS,
+  HUMAN_ATTEMPT_ID,
+  HUMAN_RECEIPT_FIXTURE,
+  HUMAN_RECEIPT_IDENTITY,
+  validateHumanReviewReceipt,
   AUDIT_RECEIPT_FIXTURE,
   AUDIT_RECEIPT_IDENTITY,
   PACKET_IDENTITY,

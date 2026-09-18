@@ -1,0 +1,108 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001-receipt-v1",
+  "attemptId": "p1b6-surface-repair-primary-human-review-batch-002-attempt-001",
+  "status": "COMPLETE_ALL_KEEP",
+  "primaryHumanReviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-primary-human-review-packet-batch-002-v1",
+    "rawSha256": "a6059bb7d94e27627528c63437420a4915557c91ffeb7c99095d63641496083b"
+  },
+  "reviewedRepairCandidate": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-002-v1",
+    "rawSha256": "d59d0dec225d3f4fea74952da10e05b8f0be01942a3aa6e15ea58d659e22abb3"
+  },
+  "rendererIdentity": "xion-local-memory-inference-p1b6-surface-renderer-v1",
+  "sourceAuditPrerequisite": {
+    "attemptId": "p1b6-surface-repair-source-audit-batch-002-attempt-001",
+    "status": "COMPLETE_PASS",
+    "allRowsPassed": true
+  },
+  "reviewIndependence": {
+    "packetBlindToRowIdentity": true,
+    "packetCarriedNoLabelRationaleOrAuditReason": true,
+    "reviewerAuthoredTheRepairs": true,
+    "reviewerKnewEveryPresentedRowWasARepairedRealization": true,
+    "limitation": "The packet was blind at row level, but the reviewer is the repository owner who authored all 12 repairs and therefore knew the entire presented population consisted of repairs intended to restore ambiguity. A uniform ESCALATE outcome is the expected direction, so this attempt does NOT establish reviewer-independent confirmation that the repairs restored the intended ambiguity."
+  },
+  "summary": {
+    "total": 12,
+    "KEEP": 12,
+    "FIX": 0,
+    "REJECT": 0,
+    "CLEAR": 0,
+    "ESCALATE": 12
+  },
+  "authority": {
+    "reviewCompletedForAllPresentedRows": true,
+    "decisionsSource": "REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER",
+    "modelInferenceUsedForHumanDecisions": false,
+    "unresolvedFixCount": 0,
+    "reconciliationPerformedAsAuthority": false,
+    "datasetAcceptancePerformed": false,
+    "humanGoldFrozen": false,
+    "effectiveCurrentSuccessorBuilt": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-repair-review-00dc276c69bfdc31",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-210291d973129aaf",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-25bfe67164203a6e",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-35b9a585ba63b3f7",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-5c59d82d99cabc33",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-5ff08bd359726bb9",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-7b41aa50fecbc57d",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-b23906152cbea238",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-bf50cf509608745e",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-cdb5dc4aa0c04de4",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-e38427f34e974ffc",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    },
+    {
+      "reviewRowId": "p1b6-repair-review-e773340148652b0d",
+      "disposition": "KEEP",
+      "decision": "ESCALATE"
+    }
+  ]
+}

@@ -318,13 +318,23 @@ test('the packet is written deterministically and never silently overwritten', (
 });
 
 test('no HUMAN decision is synthesized and historical contracts are untouched', () => {
-  // The builder embeds no semantic label vocabulary at all, so it cannot hold an expected
-  // answer or an authoritative decision map for the blind review.
+  // The builder knows the DECISION VOCABULARY, which it must in order to validate a completed
+  // review, but it holds no expected answer and no row-to-decision map. The distinguishing
+  // invariant is that no review row identity appears anywhere in the source, so no answer can
+  // be attached to a specific reviewed surface.
   const source = fs.readFileSync(path.join(ROOT,
     'scripts/build-memory-inference-p1b6-surface-repair-human-review-packet.js'), 'utf8');
   const code = source.split('\n').filter(line => !line.trim().startsWith('//')).join('\n');
-  for (const token of ['CLEAR', 'ESCALATE', 'decisionMap', 'expectedAnswer', 'expectedLabel']) {
+  assert.deepEqual(humanBuilder.DECISIONS, ['CLEAR', 'ESCALATE']);
+  assert.deepEqual(humanBuilder.DISPOSITIONS, ['KEEP', 'FIX', 'REJECT']);
+  for (const token of ['decisionMap', 'expectedAnswer', 'expectedLabel', 'expectedDecision']) {
     assert.equal(code.includes(token), false, token);
+  }
+  for (const row of readJson(humanBuilder.HUMAN_RECEIPT_FIXTURE).rows) {
+    assert.equal(code.includes(row.reviewRowId), false, row.reviewRowId);
+  }
+  for (const item of readJson(CANDIDATE).items) {
+    assert.equal(code.includes(item.itemId), false, item.itemId);
   }
   const packet = build();
   for (const row of packet.rows) {
@@ -343,4 +353,90 @@ test('no HUMAN decision is synthesized and historical contracts are untouched', 
   assert.equal(require('../package.json')
     .scripts['build:memory-inference-p1b6-surface-repair-human-review-packet'],
   'node scripts/build-memory-inference-p1b6-surface-repair-human-review-packet.js');
+});
+
+test('the completed blind HUMAN review receipt binds to the exact reviewed packet', () => {
+  const HUMAN_RECEIPT_SHA256 =
+    'cab70e8a277189e0eee1847adcc89e114139363f20cebb95d39c7153fac30f04';
+  assert.equal(sha256RawBytes(read(humanBuilder.HUMAN_RECEIPT_FIXTURE)), HUMAN_RECEIPT_SHA256);
+  const committed = readJson(humanBuilder.HUMAN_RECEIPT_FIXTURE);
+  const { packetSha256 } = humanBuilder.validateHumanReviewReceipt(committed);
+
+  assert.equal(committed.name, humanBuilder.HUMAN_RECEIPT_IDENTITY);
+  assert.equal(committed.attemptId, humanBuilder.HUMAN_ATTEMPT_ID);
+  assert.equal(committed.primaryHumanReviewPacket.rawSha256, packetSha256);
+  assert.equal(packetSha256, 'a6059bb7d94e27627528c63437420a4915557c91ffeb7c99095d63641496083b');
+  assert.equal(committed.sourceAuditPrerequisite.attemptId, humanBuilder.AUDIT_ATTEMPT_ID);
+
+  // Exactly the 12 presented rows, in packet order, with no invented row.
+  const packet = build();
+  assert.deepEqual(committed.rows.map(row => row.reviewRowId),
+    packet.rows.map(row => row.reviewRowId));
+  assert.equal(committed.summary.total, 12);
+  assert.equal(committed.summary.KEEP + committed.summary.FIX + committed.summary.REJECT, 12);
+  assert.equal(committed.summary.CLEAR + committed.summary.ESCALATE, 12);
+
+  // The independence limitation is recorded, not hidden.
+  assert.equal(committed.reviewIndependence.reviewerAuthoredTheRepairs, true);
+  assert.equal(committed.reviewIndependence
+    .reviewerKnewEveryPresentedRowWasARepairedRealization, true);
+  assert.equal(committed.reviewIndependence.limitation.includes('does NOT establish'), true);
+
+  // The gate stops here: nothing downstream was opened.
+  assert.equal(committed.authority.decisionsSource, 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER');
+  assert.equal(committed.authority.modelInferenceUsedForHumanDecisions, false);
+  for (const key of ['reconciliationPerformedAsAuthority', 'datasetAcceptancePerformed',
+    'humanGoldFrozen', 'effectiveCurrentSuccessorBuilt', 'heldOutReleasePerformed',
+    'trainingOccurred']) {
+    assert.equal(committed.authority[key], false, key);
+  }
+});
+
+test('the HUMAN review receipt validator checks shape, never the answers', () => {
+  const committed = readJson(humanBuilder.HUMAN_RECEIPT_FIXTURE);
+  const reject = (mutate, label) => {
+    const drifted = structuredClone(committed);
+    mutate(drifted);
+    assert.throws(() => humanBuilder.validateHumanReviewReceipt(drifted), /P1-B6/, label);
+  };
+
+  reject(r => { r.rows.pop(); r.summary.total = 11; }, 'missing row');
+  reject(r => { r.rows[1] = structuredClone(r.rows[0]); }, 'duplicate row');
+  reject(r => { r.rows[0].reviewRowId = 'p1b6-repair-review-0000000000000000'; }, 'unknown row');
+  reject(r => { r.rows.reverse(); }, 'reordered rows');
+  reject(r => { r.rows[0].reviewRowId = 'p1b6-review-00b24c2af0afb84a'; }, 'historical review id');
+  reject(r => { r.rows[0].disposition = 'MAYBE'; }, 'disposition outside the vocabulary');
+  reject(r => { r.rows[0].decision = 'UNCERTAIN'; }, 'decision outside the vocabulary');
+  reject(r => { r.rows[0].reason = 'unsolicited note'; }, 'reason on a KEEP row');
+  reject(r => { r.summary.ESCALATE -= 1; r.summary.CLEAR += 1; }, 'summary disagrees with rows');
+  reject(r => { r.primaryHumanReviewPacket.rawSha256 = `${'0'.repeat(64)}`; }, 'wrong packet SHA');
+  reject(r => { r.reviewedRepairCandidate.rawSha256 = `${'0'.repeat(64)}`; }, 'wrong candidate SHA');
+  reject(r => { r.sourceAuditPrerequisite.status = 'COMPLETE_NEEDS_FIX'; }, 'audit gate drift');
+  reject(r => { r.reviewIndependence.reviewerAuthoredTheRepairs = false; },
+    'claims independence it does not have');
+  reject(r => { r.reviewIndependence.limitation = 'All good.'; }, 'erases the limitation');
+  reject(r => { r.authority.humanGoldFrozen = true; }, 'claims gold freeze');
+  reject(r => { r.authority.datasetAcceptancePerformed = true; }, 'claims acceptance');
+  reject(r => { r.authority.effectiveCurrentSuccessorBuilt = true; }, 'claims a successor batch');
+  reject(r => { r.authority.trainingOccurred = true; }, 'claims training');
+  reject(r => { r.authority.modelInferenceUsedForHumanDecisions = true; }, 'claims model inference');
+  reject(r => { r.status = 'COMPLETE_NEEDS_FIX'; }, 'status disagrees with dispositions');
+
+  // A FIX row with a reason is structurally valid: the validator gates shape, not outcome.
+  const withFix = structuredClone(committed);
+  withFix.rows[0] = { ...withFix.rows[0], disposition: 'FIX', reason: 'anchor span too narrow' };
+  withFix.summary.KEEP -= 1;
+  withFix.summary.FIX += 1;
+  withFix.authority.unresolvedFixCount = 1;
+  withFix.status = 'COMPLETE_NEEDS_FIX';
+  assert.doesNotThrow(() => humanBuilder.validateHumanReviewReceipt(withFix));
+
+  // So is the opposite semantic answer. No CLEAR/ESCALATE distribution is privileged.
+  const flipped = structuredClone(committed);
+  for (const row of flipped.rows) row.decision = 'CLEAR';
+  flipped.summary.CLEAR = 12;
+  flipped.summary.ESCALATE = 0;
+  assert.doesNotThrow(() => humanBuilder.validateHumanReviewReceipt(flipped));
+
+  assert.doesNotThrow(() => humanBuilder.validateHumanReviewReceipt(committed));
 });
