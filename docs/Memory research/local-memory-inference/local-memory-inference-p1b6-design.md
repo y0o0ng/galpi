@@ -75,11 +75,12 @@ COMPLETE at 10 `SKELETON_SEMANTICS_NEEDS_REVISION` / 11
 frozen skeleton label, or surface changed. The fresh blind HUMAN re-review of
 the 3 routed rows (attempt-003) is now **complete at 3 ESCALATE**, so the
 effective HUMAN state is 64 KEEP / 52 CLEAR / 12 ESCALATE and reconciliation
-moved to 43 match / 21 mismatch. The reconciliation itself therefore remains
-unresolved, and two blockers stand — a targeted Exact56 semantic amendment
-decision for the affected frozen skeletons, and a repair-versus-rejection
-decision for the surface-collapse realizations. The **targeted skeleton semantic
-amendment is now complete**: `p1b6-sk-8dd28ec6b22a18ad` and
+moved to 43 match / 21 mismatch. The reconciliation therefore remained
+unresolved at that point, and two blockers stood — a targeted Exact56 semantic
+amendment decision for the affected frozen skeletons, and a
+repair-versus-rejection decision for the surface-collapse realizations. The
+**targeted skeleton semantic amendment is now complete**:
+`p1b6-sk-8dd28ec6b22a18ad` and
 `p1b6-sk-155420007d75f36f` are amended to effective `CLEAR`,
 `p1b6-sk-2fa39ece4157b2b8` was deliberately **not** amended and stays
 `ESCALATE`, and items `059`/`063` are reclassified as surface-collapse
