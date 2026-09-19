@@ -745,11 +745,60 @@ inventing them, and states that **no gate has run**. It is written once and is
 not rewritten later to pretend downstream gates completed; audit and review
 results get their own receipts.
 
-**Current state: the plan, the authoring protocol and the batch-003 validator
-are frozen; the 304 surfaces are NOT yet authored.** Authoring is the next step,
-and after it the next real gate is the **fresh source audit of all 304 rows**.
-No batch-003 HUMAN review, acceptance, HUMAN-gold freeze, repeated HELD review,
-FINAL selection, or training has occurred or is opened by this step.
+**Batch-003 authoring is now COMPLETE at 304 candidates.** The frozen plan and
+protocol above are unchanged; the surfaces were authored against them, not the
+other way round. `fixtures/local-memory-inference-p1b6-surface-batch-003.json`
+holds 304 items over 304 source episodes, one candidate per episode, with
+sequential `p1b6-item-b003-001`…`304` / `p1b6-se-b003-001`…`304` IDs and unique
+batch-003 source and surface families. Every marginal matches the derived plan
+exactly — split 195 / 47 / 62, authoring label 141 / 163, language 213 / 61 / 30,
+fragments 55 / 78 / 99 / 56 / 16, 38 per discourse pattern, and the per-skeleton
+`plannedSkeletonCounts`. The previously zero-covered `p1b6-sk-aebbf047d6864a35`
+receives its 5 new DEV/ESCALATE realizations, which are **new surfaces with new
+source text and new IDs, not a repair or replacement of historical item
+`p1b6-item-b002-050`**.
+
+Episode content is committed at
+`scripts/data/memory-inference-p1b6-batch-003-content.js`; every byte offset, ID
+and family ID is computed mechanically by
+`scripts/build-memory-inference-p1b6-batch-003-materialize.js`, which also
+assigns each slot's language / fragment / discourse spec deterministically from
+the frozen plan so the batch cannot drift from it.
+
+**Leakage checks are batch-003-specific and extend nothing historical.**
+`validateBatch003Leakage` reuses the same normalization the batch-002 growth
+tests already use and refuses any exact normalized conversation reused from the
+anchor-marker pilot, batch-001, historical batch-002 or the batch-002 successor,
+any non-trivial (≥12 character) exact turn reused from those sources or within
+batch-003, any reused item / episode / family identity, and any family crossing
+splits. `templateReuseDiagnostic` is a **report, not a gate**: it surfaces the
+most repeated short turns for HUMAN eyeballing, and obvious essential-dialogue
+paraphrase leakage still requires HUMAN or code review judgment rather than a
+fuzzy automatic rejection.
+
+The canonical generic `scripts/build-memory-inference-p1b6-source-audit-packet.js`
+builds a fresh batch-003 packet unchanged — 304 unique opaque audit rows, each
+carrying the complete source episode and a `selectedBundle` byte-identical to
+renderer output, with no item, episode or skeleton ID, no split, boundary class
+or discourse pattern, and no generator target or expected answer. Audit packets
+stay transient by convention and are not committed; the run receipt records the
+generated packet's path and raw SHA.
+
+Authoring provenance is recorded separately from planning provenance in
+`fixtures/local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json`,
+which binds the frozen protocol, the semantic authority and the completed batch
+by identity and raw SHA. **The frozen authoring protocol is not rewritten.** The
+per-item ESCALATE ambiguity self-check performed during authoring is recorded as
+authoring QA only — it is explicitly **not** HUMAN gold, not a source audit, and
+not independent validation.
+
+**Current state: batch-003 authoring COMPLETE at 304 candidates; the frozen plan
+and protocol unchanged; a fresh source-audit packet generates successfully. The
+fresh source audit is the next gate and has NOT been executed. No batch-003
+HUMAN review has happened and no batch-003 acceptance has happened. Final corpus
+HUMAN-gold freeze, repeated HELD review, FINAL_HELD_OUT release, deterministic
+FINAL selection, and training all remain UNOPENED, and the 380-item P1-B6 corpus
+is not complete.**
 
 ## Task Boundary
 

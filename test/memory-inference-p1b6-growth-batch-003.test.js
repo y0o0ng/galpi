@@ -5,7 +5,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { sha256RawBytes } = require('../lib/memory-inference-p1b6-skeletons');
+const { computeFragments, renderVisibleItem } = require('../lib/memory-inference-p1b6-surfaces');
+const sourceAudit = require('../scripts/build-memory-inference-p1b6-source-audit-packet');
 const plan = require('../scripts/build-memory-inference-p1b6-batch-003-authoring-plan');
+const materialize = require('../scripts/build-memory-inference-p1b6-batch-003-materialize');
 
 const ROOT = path.resolve(__dirname, '..');
 const fixture = file => path.join(ROOT, 'fixtures', file);
@@ -14,6 +17,11 @@ const readJson = file => JSON.parse(read(file));
 
 const ZERO_COVERED = 'p1b6-sk-aebbf047d6864a35';
 const PROTOCOL_SHA256 = '33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447';
+const BATCH_003_SHA256 = '99e118c6d1a44e8a5e64a185d875a1edae40082820b17363866b5719600a9e2f';
+const MATERIALIZATION_RECEIPT =
+  'local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json';
+const MATERIALIZATION_RECEIPT_SHA256 =
+  '311cabce93841b1e00213ce2ad8075af623cff0e51addf02e48b5c41f74e8ecc';
 
 // Historical artifacts this authoring step must leave byte-identical.
 const UNCHANGED = Object.freeze({
@@ -268,18 +276,190 @@ test('the authoring protocol records the plan and claims no completed gate', () 
   assert.equal(protocol.status, 'AUTHORING_PLAN_FROZEN_SURFACES_NOT_YET_AUTHORED');
 });
 
-test('the batch-003 validator is wired and fails closed before any surface exists', () => {
-  const built = bundle();
-  assert.equal(typeof plan.validateBatch003, 'function');
-  assert.throws(() => plan.validateBatch003({ name: 'wrong' }, built),
+test('the materialized batch-003 holds exactly 304 valid candidates', () => {
+  const batch = readJson(plan.BATCH_003_FILE);
+  assert.equal(sha256RawBytes(read(plan.BATCH_003_FILE)), BATCH_003_SHA256);
+  assert.equal(batch.name, plan.BATCH_003_IDENTITY);
+  assert.equal(batch.batchId, plan.BATCH_003_ID);
+  assert.equal(batch.items.length, 304);
+  assert.equal(batch.sourceEpisodes.length, 304);
+
+  // Structural validation against the frozen plan, unweakened.
+  assert.doesNotThrow(() => plan.validateBatch003(batch, bundle()));
+  assert.throws(() => plan.validateBatch003({ name: 'wrong' }, bundle()),
     /identity or batchId is not canonical/);
   assert.throws(() => plan.validateBatch003({
     name: plan.BATCH_003_IDENTITY, batchId: plan.BATCH_003_ID,
     sourceEpisodes: [], items: [],
-  }, built), /P1-B6/);
+  }, bundle()), /P1-B6/);
 
-  // The batch-003 surface fixture is authored in a later step; it is not claimed to exist yet.
-  assert.equal(fs.existsSync(fixture(plan.BATCH_003_FILE)), false);
+  // Sequential IDs, one item per episode, unique batch-scoped families.
+  batch.items.forEach((item, index) => {
+    const ordinal = String(index + 1).padStart(3, '0');
+    assert.equal(item.itemId, `p1b6-item-b003-${ordinal}`);
+    assert.equal(item.sourceEpisodeId, `p1b6-se-b003-${ordinal}`);
+    assert.equal(item.surfaceFamilyId, `p1b6-surface-family-b003-${ordinal}`);
+  });
+  assert.equal(new Set(batch.sourceEpisodes.map(row => row.sourceFamilyId)).size, 304);
+  assert.equal(new Set(batch.items.map(row => row.surfaceFamilyId)).size, 304);
+  assert.equal(new Set(batch.items.map(row => row.sourceEpisodeId)).size, 304);
+
+  // Regenerates deterministically from the authored content and the frozen plan.
+  const rebuilt = materialize.buildBatch003(materialize.loadAuthoredContent(), bundle());
+  assert.deepEqual(plan.artifactBytes(rebuilt), read(plan.BATCH_003_FILE));
+});
+
+test('batch-003 marginals and per-skeleton counts match the frozen plan exactly', () => {
+  const batch = readJson(plan.BATCH_003_FILE);
+  const built = bundle();
+  const skeletons = new Map(built.artifacts.effectiveCatalog.candidates
+    .map(row => [row.semanticSkeletonId, row]));
+  const episodes = new Map(batch.sourceEpisodes.map(row => [row.sourceEpisodeId, row]));
+  const count = values => values.reduce((totals, value) => {
+    totals[value] = (totals[value] || 0) + 1;
+    return totals;
+  }, {});
+
+  // The authoring target label is DERIVED from the effective-current catalog, not stored and
+  // not taken from historical Exact56.
+  assert.equal(batch.items.some(row => Object.hasOwn(row, 'humanLabel')), false);
+  assert.deepEqual(count(batch.items.map(row =>
+    skeletons.get(row.semanticSkeletonId).splitAssignment)), built.plan.split);
+  assert.deepEqual(count(batch.items.map(row =>
+    skeletons.get(row.semanticSkeletonId).humanLabel)), built.plan.label);
+  assert.deepEqual(count(batch.items.map(row =>
+    episodes.get(row.sourceEpisodeId).language)), built.plan.language);
+  assert.deepEqual(count(batch.items.map(row =>
+    computeFragments(row, episodes.get(row.sourceEpisodeId)).length)),
+  Object.fromEntries(Object.entries(built.plan.fragments)));
+  assert.deepEqual(count(batch.items.map(row => row.discoursePattern)),
+    built.plan.discoursePatterns);
+
+  // Per-skeleton counts, and every item's split agrees with its skeleton.
+  assert.deepEqual(count(batch.items.map(row => row.semanticSkeletonId)),
+    Object.fromEntries([...built.skeletonAssignments.entries()]));
+  for (const item of batch.items) {
+    assert.equal(episodes.get(item.sourceEpisodeId).splitAssignment,
+      skeletons.get(item.semanticSkeletonId).splitAssignment, item.itemId);
+  }
+
+  // The previously zero-covered skeleton receives its new DEV/ESCALATE realizations.
+  assert.equal(batch.items.filter(row => row.semanticSkeletonId === ZERO_COVERED).length,
+    built.skeletonAssignments.get(ZERO_COVERED));
+  assert.equal(built.skeletonAssignments.get(ZERO_COVERED) >= 1, true);
+});
+
+test('anchors and evidence spans are valid UTF-8 byte ranges over the authored text', () => {
+  const batch = readJson(plan.BATCH_003_FILE);
+  const episodes = new Map(batch.sourceEpisodes.map(row => [row.sourceEpisodeId, row]));
+  for (const item of batch.items) {
+    const turns = new Map(episodes.get(item.sourceEpisodeId).turns
+      .map(turn => [turn.turnId, turn]));
+    const check = span => {
+      const bytes = Buffer.from(turns.get(span.turnId).text, 'utf8');
+      assert.equal(span.startByte >= 0 && span.endByte > span.startByte
+        && span.endByte <= bytes.length, true, item.itemId);
+      // Round-tripping proves the boundaries land on code points.
+      const slice = bytes.subarray(span.startByte, span.endByte);
+      assert.equal(Buffer.compare(Buffer.from(slice.toString('utf8'), 'utf8'), slice), 0,
+        item.itemId);
+    };
+    check(item.anchorSpanRef);
+    item.evidenceSpanRefs.forEach(check);
+    const covered = item.evidenceSpanRefs.some(span => span.turnId === item.anchorSpanRef.turnId
+      && span.startByte <= item.anchorSpanRef.startByte
+      && span.endByte >= item.anchorSpanRef.endByte);
+    assert.equal(covered, true, item.itemId);
+
+    // Exactly one rendered TARGET pair per item.
+    const rendered = renderVisibleItem(batch, item);
+    assert.equal(rendered.split('[TARGET]').length - 1, 1, item.itemId);
+    assert.equal(rendered.split('[/TARGET]').length - 1, 1, item.itemId);
+  }
+});
+
+test('batch-003 reuses no prior, pilot or internal conversation or non-trivial turn', () => {
+  const batch = readJson(plan.BATCH_003_FILE);
+  assert.doesNotThrow(() => plan.validateBatch003Leakage(batch));
+
+  // The guard actually bites: a prior conversation, a prior turn, and an internal duplicate.
+  const prior = plan.loadPriorSources();
+  const reject = (mutate, pattern, label) => {
+    const drifted = structuredClone(batch);
+    mutate(drifted);
+    assert.throws(() => plan.validateBatch003Leakage(drifted, prior), pattern, label);
+  };
+  reject(b => { b.sourceEpisodes[0].turns = structuredClone(prior[0].turns); },
+    /reuses a prior or pilot conversation/, 'prior conversation');
+  reject(b => {
+    const reused = prior.flatMap(row => row.turns)
+      .find(turn => plan.isNonTrivialTurn(turn.text));
+    b.sourceEpisodes[0].turns[0] = { ...b.sourceEpisodes[0].turns[0], text: reused.text };
+  }, /non-trivial turn reused from/, 'prior turn');
+  reject(b => {
+    b.sourceEpisodes[1].turns[0] = { ...b.sourceEpisodes[1].turns[0],
+      text: b.sourceEpisodes[0].turns[0].text };
+  }, /non-trivial turn reused across/, 'internal duplicate turn');
+  reject(b => { b.sourceEpisodes[1].sourceFamilyId = b.sourceEpisodes[0].sourceFamilyId; },
+    /identity reused in batch-003|crosses splits/, 'family reuse');
+
+  // Template-reuse diagnostic is a report, never a gate.
+  const diagnostic = plan.templateReuseDiagnostic(batch);
+  assert.equal(diagnostic.distinctTurns > 1000, true);
+  assert.equal(Array.isArray(diagnostic.mostRepeated), true);
+});
+
+test('a fresh source-audit packet builds for all 304 rows with no answer leakage', () => {
+  const batch = readJson(plan.BATCH_003_FILE);
+  const packet = sourceAudit.buildAuditPacket(read(plan.BATCH_003_FILE));
+  assert.equal(packet.rows.length, 304);
+  assert.equal(new Set(packet.rows.map(row => row.auditRowId)).size, 304);
+
+  const batchSha = sha256RawBytes(read(plan.BATCH_003_FILE));
+  const byId = new Map(packet.rows.map(row => [row.auditRowId, row]));
+  const episodes = new Map(batch.sourceEpisodes.map(row => [row.sourceEpisodeId, row]));
+  for (const item of batch.items) {
+    const row = byId.get(sourceAudit.opaqueAuditRowId(batchSha, item.itemId));
+    assert.equal(Boolean(row), true, item.itemId);
+    assert.deepEqual(row.sourceEpisode.turns, episodes.get(item.sourceEpisodeId).turns);
+    assert.equal(row.selectedBundle, renderVisibleItem(batch, item), item.itemId);
+  }
+
+  // No generator target, skeleton label, HUMAN decision, or expected answer leaks.
+  const serialized = JSON.stringify(packet.rows);
+  for (const token of ['p1b6-item-', 'p1b6-sk-', 'p1b6-se-', 'p1b6-sf-', 'CLEAR', 'ESCALATE',
+    'humanLabel', 'splitAssignment', 'boundaryClass', 'discoursePattern', 'KEEP', 'PASS']) {
+    assert.equal(serialized.includes(token), false, token);
+  }
+});
+
+test('the materialization receipt records authoring provenance without claiming a gate', () => {
+  assert.equal(sha256RawBytes(read(MATERIALIZATION_RECEIPT)), MATERIALIZATION_RECEIPT_SHA256);
+  const receipt = readJson(MATERIALIZATION_RECEIPT);
+  assert.equal(receipt.materializedBatch.rawSha256, BATCH_003_SHA256);
+  assert.equal(receipt.materializedBatch.items, 304);
+
+  // The frozen planning protocol is bound but explicitly not rewritten.
+  assert.equal(receipt.frozenAuthoringProtocol.rawSha256, PROTOCOL_SHA256);
+  assert.equal(receipt.frozenAuthoringProtocol.amended, false);
+  assert.equal(receipt.authority.frozenAuthoringProtocolRewritten, false);
+
+  // Planning provenance and surface-authoring provenance are separate entries.
+  assert.equal(receipt.provenance.planningAndProtocolGeneration.note
+    .includes('authored no surface text'), true);
+  assert.equal(receipt.provenance.surfaceAuthoring.samplingControls,
+    'UNAVAILABLE_PLATFORM_CONTROLLED');
+  assert.equal(receipt.provenance.surfaceAuthoring.modelSamplingParameters,
+    'NOT_INDEPENDENTLY_RECOVERABLE');
+  assert.equal(receipt.provenance.surfaceAuthoring.ambiguitySelfCheck
+    .includes('NOT HUMAN gold'), true);
+
+  for (const [key, value] of Object.entries(receipt.gatesNotYetRun)) {
+    assert.equal(value, false, key);
+  }
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+  assert.equal(receipt.nextGate, 'FRESH_SOURCE_AUDIT_OF_ALL_304_ROWS');
+  assert.equal(receipt.status, 'COMPLETE_SURFACES_AUTHORED_SOURCE_AUDIT_NOT_RUN');
 });
 
 test('historical artifacts remain byte-identical and no gate result is invented', () => {

@@ -29,6 +29,15 @@ const BATCH_003_FILE = 'local-memory-inference-p1b6-surface-batch-003.json';
 const PROTOCOL_IDENTITY =
   'xion-local-memory-inference-p1b6-surface-batch-003-authoring-protocol-v1';
 const PROTOCOL_FILE = 'local-memory-inference-p1b6-surface-batch-003-authoring-protocol.json';
+// Same normalization the batch-002 growth tests already use, so the duplicate metric stays
+// comparable across batches rather than being a new invented similarity measure.
+const NON_TRIVIAL_TURN_CHARS = 12;
+const LEAKAGE_SOURCES = Object.freeze([
+  'local-memory-inference-p1b6-surface-batch-001.json',
+  'local-memory-inference-p1b6-surface-batch-002.json',
+  'local-memory-inference-p1b6-surface-effective-current-batch-002.json',
+]);
+const PILOT_FIXTURE = 'local-memory-inference-p1b6-anchor-marker-pilot.json';
 const INTERPRETATION_RULE = 'CONSERVATIVE_PRAGMATIC_INTERPRETATION';
 
 const SPLITS = Object.freeze(['TRAIN', 'DEV', 'FINAL_HELD_OUT']);
@@ -492,6 +501,124 @@ function validateBatch003(batch, bundle) {
   return batch;
 }
 
+function normalizedConversation(turns) {
+  return turns.map(turn => `${turn.role}:${turn.text.normalize('NFKC').toLowerCase()
+    .replace(/\p{N}+/gu, '#').replace(/[^\p{L}#]+/gu, '')}`).join('|');
+}
+
+function normalizedTurn(text) {
+  return text.normalize('NFKC').trim();
+}
+
+function isNonTrivialTurn(text) {
+  return Array.from(normalizedTurn(text)).length >= NON_TRIVIAL_TURN_CHARS;
+}
+
+// Prior/pilot material stays part of duplicate detection even where it was rejected or
+// superseded. This is an exact-match metric on purpose: obvious essential-dialogue paraphrase
+// leakage still needs HUMAN or code review judgment and is NOT silently rejected here.
+function loadPriorSources(root = ROOT) {
+  const episodes = [];
+  for (const file of LEAKAGE_SOURCES) {
+    const artifact = JSON.parse(fs.readFileSync(path.join(root, 'fixtures', file), 'utf8'));
+    for (const episode of artifact.sourceEpisodes) {
+      episodes.push({ origin: file, id: episode.sourceEpisodeId, turns: episode.turns });
+    }
+  }
+  const pilot = JSON.parse(fs.readFileSync(path.join(root, 'fixtures', PILOT_FIXTURE), 'utf8'));
+  pilot.cases.forEach((row, index) => {
+    episodes.push({ origin: PILOT_FIXTURE, id: `pilot-${index + 1}`, turns: row.turns });
+  });
+  return episodes;
+}
+
+function validateBatch003Leakage(batch, priorEpisodes = loadPriorSources()) {
+  const priorConversations = new Map();
+  const priorTurns = new Map();
+  for (const episode of priorEpisodes) {
+    priorConversations.set(normalizedConversation(episode.turns), `${episode.origin}:${episode.id}`);
+    for (const turn of episode.turns) {
+      if (isNonTrivialTurn(turn.text)) {
+        priorTurns.set(normalizedTurn(turn.text), `${episode.origin}:${episode.id}`);
+      }
+    }
+  }
+
+  const seenConversations = new Map();
+  const seenTurns = new Map();
+  const seenIdentities = new Map();
+  const familySplits = new Map();
+  const episodeSplits = new Map(batch.sourceEpisodes
+    .map(row => [row.sourceEpisodeId, row.splitAssignment]));
+
+  for (const episode of batch.sourceEpisodes) {
+    const conversation = normalizedConversation(episode.turns);
+    if (priorConversations.has(conversation)) {
+      fail(`episode reuses a prior or pilot conversation: ${episode.sourceEpisodeId} vs ${priorConversations.get(conversation)}`);
+    }
+    if (seenConversations.has(conversation)) {
+      fail(`episode duplicates another batch-003 conversation: ${episode.sourceEpisodeId} vs ${seenConversations.get(conversation)}`);
+    }
+    seenConversations.set(conversation, episode.sourceEpisodeId);
+
+    for (const turn of episode.turns) {
+      if (!isNonTrivialTurn(turn.text)) continue;
+      const normalized = normalizedTurn(turn.text);
+      if (priorTurns.has(normalized)) {
+        fail(`non-trivial turn reused from ${priorTurns.get(normalized)}: ${episode.sourceEpisodeId}`);
+      }
+      if (seenTurns.has(normalized)) {
+        fail(`non-trivial turn reused across ${seenTurns.get(normalized)} and ${episode.sourceEpisodeId}`);
+      }
+      seenTurns.set(normalized, episode.sourceEpisodeId);
+    }
+
+    for (const identity of [episode.sourceEpisodeId, episode.sourceFamilyId]) {
+      if (seenIdentities.has(identity)) fail(`identity reused in batch-003: ${identity}`);
+      seenIdentities.set(identity, episode.sourceEpisodeId);
+    }
+    const priorSplit = familySplits.get(episode.sourceFamilyId);
+    if (priorSplit && priorSplit !== episode.splitAssignment) {
+      fail(`sourceFamilyId crosses splits: ${episode.sourceFamilyId}`);
+    }
+    familySplits.set(episode.sourceFamilyId, episode.splitAssignment);
+  }
+
+  const surfaceFamilySplits = new Map();
+  for (const item of batch.items) {
+    for (const identity of [item.itemId, item.surfaceFamilyId]) {
+      if (seenIdentities.has(identity)) fail(`identity reused in batch-003: ${identity}`);
+      seenIdentities.set(identity, item.itemId);
+    }
+    const split = episodeSplits.get(item.sourceEpisodeId);
+    const priorSplit = surfaceFamilySplits.get(item.surfaceFamilyId);
+    if (priorSplit && priorSplit !== split) {
+      fail(`surfaceFamilyId crosses splits: ${item.surfaceFamilyId}`);
+    }
+    surfaceFamilySplits.set(item.surfaceFamilyId, split);
+  }
+  return batch;
+}
+
+// A HUMAN-facing diagnostic, not a gate. It reports the most reused turn texts below the
+// exact-match threshold so a reviewer can eyeball mechanical templating; it never rejects.
+function templateReuseDiagnostic(batch, limit = 15) {
+  const counts = new Map();
+  for (const episode of batch.sourceEpisodes) {
+    for (const turn of episode.turns) {
+      const normalized = normalizedTurn(turn.text);
+      counts.set(normalized, (counts.get(normalized) || 0) + 1);
+    }
+  }
+  const repeated = [...counts.entries()].filter(([, count]) => count > 1)
+    .sort((left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : 1));
+  return {
+    distinctTurns: counts.size,
+    repeatedTurnTexts: repeated.length,
+    mostRepeated: repeated.slice(0, limit).map(([text, count]) => ({ text, count })),
+  };
+}
+
 function buildPlan(canonicalInputs) {
   const artifacts = verifyCanonicalInputs(canonicalInputs);
   const seed = reconstructAcceptedSeed(artifacts);
@@ -673,7 +800,12 @@ module.exports = {
   loadCanonicalInputs,
   main,
   reconstructAcceptedSeed,
+  isNonTrivialTurn,
+  loadPriorSources,
+  normalizedConversation,
+  templateReuseDiagnostic,
   validateBatch003,
+  validateBatch003Leakage,
 };
 
 if (require.main === module) process.exit(main());

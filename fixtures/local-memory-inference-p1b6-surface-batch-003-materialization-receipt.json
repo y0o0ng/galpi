@@ -1,0 +1,62 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-003-materialization-receipt-v1",
+  "batchId": "p1b6-surface-batch-003",
+  "status": "COMPLETE_SURFACES_AUTHORED_SOURCE_AUDIT_NOT_RUN",
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "frozenAuthoringProtocol": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-003-authoring-protocol-v1",
+    "rawSha256": "33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447",
+    "amended": false,
+    "note": "The planning commit froze this protocol. It is not rewritten here and still records that no gate had run at planning time."
+  },
+  "semanticAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+    "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559",
+    "role": "AUTHORING_SEMANTIC_AUTHORITY"
+  },
+  "materializedBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+    "rawSha256": "99e118c6d1a44e8a5e64a185d875a1edae40082820b17363866b5719600a9e2f",
+    "items": 304,
+    "sourceEpisodes": 304
+  },
+  "provenance": {
+    "planningAndProtocolGeneration": {
+      "step": "Frozen batch-003 authoring plan and protocol",
+      "derivation": "DETERMINISTIC_FROM_CANONICAL_ARTIFACTS",
+      "agent": "Claude Opus 5 via Claude Code, driven by the repository owner",
+      "note": "That step derived allocations only. It authored no surface text."
+    },
+    "surfaceAuthoring": {
+      "step": "The 304 batch-003 source episodes and candidate items",
+      "agent": "Claude Opus 5 via Claude Code, driven by the repository owner",
+      "authoredAs": "Hand-authored episode content committed at scripts/data/memory-inference-p1b6-batch-003-content.js; byte offsets, IDs and family IDs are computed mechanically by scripts/build-memory-inference-p1b6-batch-003-materialize.js.",
+      "perSlotSpecSource": "DETERMINISTIC_FROM_THE_FROZEN_PLAN",
+      "samplingControls": "UNAVAILABLE_PLATFORM_CONTROLLED",
+      "modelSamplingParameters": "NOT_INDEPENDENTLY_RECOVERABLE",
+      "ambiguitySelfCheck": "Each ESCALATE realization was inspected during authoring for pragmatic collapse under the interpretation rule. This is authoring QA only: it is NOT HUMAN gold, NOT a source audit, and NOT independent validation."
+    }
+  },
+  "gatesNotYetRun": {
+    "sourceAuditCompleted": false,
+    "humanReviewCompleted": false,
+    "humanGoldFrozen": false,
+    "acceptancePerformed": false,
+    "heldRepeatedReviewPerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingPerformed": false
+  },
+  "authority": {
+    "exact56Altered": false,
+    "effectiveCurrentCatalogAltered": false,
+    "interpretationRuleAltered": false,
+    "frozenAuthoringProtocolRewritten": false,
+    "batch001Altered": false,
+    "batch002Altered": false,
+    "batch002AcceptanceAltered": false,
+    "sharedRendererAltered": false,
+    "authoringSemanticLabelsAreHumanGold": false,
+    "finalCorpusSizeContractChanged": false
+  },
+  "nextGate": "FRESH_SOURCE_AUDIT_OF_ALL_304_ROWS"
+}

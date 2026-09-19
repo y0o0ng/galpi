@@ -41,6 +41,7 @@
     "build:memory-inference-p1b6-source-audit-packet": "node scripts/build-memory-inference-p1b6-source-audit-packet.js",
     "build:memory-inference-p1b6-surface-repair-source-audit-packet": "node scripts/build-memory-inference-p1b6-surface-repair-source-audit-packet.js",
     "build:memory-inference-p1b6-surface-repair-human-review-packet": "node scripts/build-memory-inference-p1b6-surface-repair-human-review-packet.js",
+    "build:memory-inference-p1b6-batch-003-materialize": "node scripts/build-memory-inference-p1b6-batch-003-materialize.js",
     "build:memory-inference-p1b6-batch-002-finalization": "node scripts/build-memory-inference-p1b6-batch-002-finalization.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",

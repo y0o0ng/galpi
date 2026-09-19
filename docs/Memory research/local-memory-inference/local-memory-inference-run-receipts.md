@@ -4396,3 +4396,39 @@ P1-B6 corpus is not complete.
 
 Tests run locally: `node --test test/memory-inference-p1b6-batch-002-finalization.test.js`
 (8/8 pass) and the full `npm test` suite.
+
+#### P1-B6 batch-003 authoring — COMPLETE at 304 candidates / SOURCE AUDIT NOT RUN
+
+The frozen batch-003 plan and authoring protocol are unchanged; the 304 surfaces
+were authored against them. Contracts are in
+[`local-memory-inference-p1b6-design.md`](local-memory-inference-p1b6-design.md)
+under "Batch-003 Adaptive Corpus Growth".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003.json` | `99e118c6d1a44e8a5e64a185d875a1edae40082820b17363866b5719600a9e2f` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json` | `311cabce93841b1e00213ce2ad8075af623cff0e51addf02e48b5c41f74e8ecc` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-authoring-protocol.json` (unchanged) | `33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447` |
+
+Verified against the frozen plan: 304 items over 304 source episodes, split
+195 / 47 / 62, authoring label 141 / 163, language 213 / 61 / 30, fragments
+55 / 78 / 99 / 56 / 16, 38 per discourse pattern, per-skeleton counts equal to
+`plannedSkeletonCounts`, and 5 new DEV/ESCALATE realizations for the previously
+zero-covered `p1b6-sk-aebbf047d6864a35`. Cross-batch leakage checks pass: no
+normalized conversation and no non-trivial exact turn is reused from the
+anchor-marker pilot, batch-001, historical batch-002 or the batch-002 successor,
+and none is duplicated inside batch-003.
+
+The generated fresh source-audit packet is **transient by convention and not
+committed**. Built with the unchanged canonical generic builder from the
+committed batch, it is deterministic at raw SHA-256
+`1ed563ff9da497d24a2b198172c5808ba60578b480d5dc1133af99fb25943402` with 304
+unique opaque audit rows and no semantic-answer leakage.
+
+**No audit disposition, HUMAN decision, or acceptance was created.** The fresh
+source audit of all 304 rows is the next gate and has not been executed. Final
+corpus HUMAN-gold freeze, repeated HELD review, FINAL_HELD_OUT release, FINAL
+selection and training remain UNOPENED, and the 380-item corpus is not complete.
+
+Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
+(16/16 pass) and the full `npm test` suite.
