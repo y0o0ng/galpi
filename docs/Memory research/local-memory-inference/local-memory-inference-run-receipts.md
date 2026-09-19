@@ -4364,3 +4364,35 @@ is not complete.
 
 Tests run locally: `node --test test/memory-inference-p1b6-surface-repair-human-review-packet.test.js`
 (10/10 pass) and the full `npm test` suite.
+
+#### P1-B6 batch-002 finalization and acceptance — CLOSED at 63 accepted / 1 rejected / 0 unresolved
+
+The batch-002 repair/reconciliation cycle is finished. Contracts are in
+[`local-memory-inference-p1b6-design.md`](local-memory-inference-p1b6-design.md)
+under "Batch-002 Finalization and Acceptance".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-repair-human-review-provenance-correction.json` | `d7f635596f12c37241a7ccb231eeb244fec37b6b8d9ec459aa99d575b3747314` |
+| `fixtures/local-memory-inference-p1b6-surface-effective-current-batch-002.json` | `9701db8902ae99dc5c08cffb176bf9247443884910e3002b77548ac5436157d1` |
+| `fixtures/local-memory-inference-p1b6-primary-human-accepted-current-batch-002.json` | `32b2221e2cefdb9a1a7e47efa1f5accd3d2a915c3f418578dc8f1c314b5281c4` |
+| `fixtures/local-memory-inference-p1b6-batch-002-acceptance.json` | `c03b8dcf4ddcb2c5f8b193cde8247b9ad64b8ea676da51cab1d709795b273598` |
+
+Mechanically derived, not copied: 64 reviewed → 51 inherited + 12 repaired +
+1 rejected = 63 accepted; effective HUMAN 63 KEEP / 0 FIX / 0 REJECT and
+39 CLEAR / 24 ESCALATE; reconciliation against the effective-current catalog
+63 match / 0 mismatch; cumulative accepted pool 30 + 63 = **93**.
+
+The already-pushed HUMAN receipt (`cab70e8a…`) is **not** rewritten. Its
+`reviewerAuthoredTheRepairs: true` was an inaccurate record — the owner made the
+final judgments and knew every presented row was a repair, but did not personally
+author the 12 repaired surface texts — so a separate narrow correction artifact
+records that, preserves the non-independence limitation unchanged, and leaves all
+12 decisions standing.
+
+Final corpus HUMAN gold, repeated HELD review, FINAL_HELD_OUT release,
+deterministic FINAL selection, and training remain UNOPENED, and the 380-item
+P1-B6 corpus is not complete.
+
+Tests run locally: `node --test test/memory-inference-p1b6-batch-002-finalization.test.js`
+(8/8 pass) and the full `npm test` suite.

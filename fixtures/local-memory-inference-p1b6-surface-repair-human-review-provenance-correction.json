@@ -1,0 +1,39 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-repair-human-review-provenance-correction-v1",
+  "status": "NARROW_PROVENANCE_CORRECTION_DECISIONS_AND_HISTORICAL_BYTES_UNCHANGED",
+  "correctedArtifact": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001-receipt-v1",
+    "rawSha256": "cab70e8a277189e0eee1847adcc89e114139363f20cebb95d39c7153fac30f04",
+    "bytesAmended": false,
+    "note": "The historical receipt is NOT rewritten. It keeps its bytes and its 12 decisions; this artifact is the narrow correction that must be read alongside it."
+  },
+  "inaccurateClaim": {
+    "field": "reviewIndependence.reviewerAuthoredTheRepairs",
+    "recordedValue": true,
+    "alsoAssertedInProse": "the repository owner authored all 12 repairs",
+    "whyInaccurate": "The repository owner performed the final HUMAN judgments and knew that all 12 presented rows were repaired realizations intended to restore ambiguity, but did not personally author all 12 repaired surface texts. Recording literal surface-text authorship overstates the owner's role in producing the repaired source."
+  },
+  "correction": {
+    "reviewerPerformedFinalHumanJudgments": true,
+    "reviewerPersonallyAuthoredAllTwelveRepairedSurfaceTexts": false,
+    "interpretationRule": "`reviewerAuthoredTheRepairs: true` in the corrected artifact MUST NOT be interpreted as literal surface-text authorship. It stands only for the reviewer's non-independence from the repair work, which the preserved limitation below states directly."
+  },
+  "preservedLimitation": {
+    "reviewerKnewEveryPresentedRowWasARepair": true,
+    "reviewerKnewThePurposeWasToRestoreAmbiguity": true,
+    "reviewerIndependentConfirmationEstablished": false,
+    "statement": "The packet was blind at row level, but the reviewer knew every presented row was a repaired realization and knew the purpose was to restore ambiguity. A uniform ESCALATE outcome is the expected direction, so this attempt does NOT establish reviewer-independent confirmation that the repairs restored the intended ambiguity. Correcting the authorship claim narrows what is asserted about the reviewer's role; it does not weaken this limitation."
+  },
+  "authority": {
+    "historicalReceiptBytesAltered": false,
+    "humanDecisionsAltered": false,
+    "humanDecisionsReinterpreted": false,
+    "reviewerIndependenceClaimed": false,
+    "reviewGateReopened": false,
+    "datasetAcceptancePerformed": false,
+    "humanGoldFrozen": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false,
+    "correctionSource": "REPOSITORY_OWNER_PROVENANCE_CORRECTION"
+  }
+}

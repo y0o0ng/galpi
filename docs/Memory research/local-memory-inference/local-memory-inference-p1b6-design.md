@@ -593,15 +593,25 @@ been performed.
 
 **The independence limitation is recorded, not hidden.** The packet was blind at
 row level — opaque IDs, no labels, no rationale, no source-audit reasons — but
-the reviewer is the repository owner who authored all 12 repairs and therefore
-knew the entire presented population consisted of repairs intended to restore
-ambiguity. A uniform ESCALATE outcome is the expected direction, so **this
-attempt does not establish reviewer-independent confirmation that the repairs
-restored the intended ambiguity.** The receipt carries that statement in a
-`reviewIndependence` block and the validator refuses any receipt that erases it
+the reviewer knew the entire presented population consisted of repairs intended
+to restore ambiguity. A uniform ESCALATE outcome is the expected direction, so
+**this attempt does not establish reviewer-independent confirmation that the
+repairs restored the intended ambiguity.** The receipt carries that statement in
+a `reviewIndependence` block and the validator refuses any receipt that erases it
 or claims independence it does not have. The repository owner has accepted this
 limitation and treats the blind HUMAN review gate as passed; the limitation
 stands on the record so a later reader does not over-read the result.
+
+**Provenance correction.** The receipt's `reviewIndependence.reviewerAuthoredTheRepairs: true`
+is not an accurate record of the workflow: the repository owner performed the
+final HUMAN judgments and knew every presented row was a repair, but did **not**
+personally author all 12 repaired surface texts. The already-pushed receipt is
+not rewritten; the narrow correction is committed separately at
+`fixtures/local-memory-inference-p1b6-surface-repair-human-review-provenance-correction.json`,
+which names the receipt by identity and raw SHA, states that the flag must not be
+read as literal surface-text authorship, and preserves the limitation unchanged.
+All 12 decisions stand. **Correcting the authorship claim narrows what is
+asserted about the reviewer's role; it does not create independence.**
 
 `validateHumanReviewReceipt` checks shape, never answers. It binds the receipt to
 the rebuilt packet, requires exactly the 12 presented rows in packet order with
@@ -613,12 +623,48 @@ opposite answer validates just as well, and no review row identity appears
 anywhere in the builder source, so no answer can be attached to a specific
 reviewed surface.
 
-**Current state: Phase B repair materialization CLOSED; fresh source audit
-COMPLETE_PASS 12/12; fresh blind HUMAN review COMPLETE at 12 KEEP / 12 ESCALATE
-with its independence limitation on the record. No repaired row is accepted, no
-effective-current successor batch exists, the accepted pool remains 30, HUMAN
-gold remains unfrozen, HELD_OUT release remains closed, and training remains
-unopened. P1-B6 is not complete.**
+**The batch-002 repair/reconciliation cycle is now CLOSED**; see the next section.
+
+## Batch-002 Finalization and Acceptance
+
+`scripts/build-memory-inference-p1b6-batch-002-finalization.js` materializes the
+three artifacts that close the cycle, deterministically and from raw bytes:
+
+| artifact | identity | raw SHA-256 |
+| --- | --- | --- |
+| surface successor | `…-surface-effective-current-batch-002-v1` | `9701db8902ae99dc5c08cffb176bf9247443884910e3002b77548ac5436157d1` |
+| effective HUMAN successor | `…-primary-human-accepted-current-batch-002-v1` | `32b2221e2cefdb9a1a7e47efa1f5accd3d2a915c3f418578dc8f1c314b5281c4` |
+| batch-002 acceptance | `…-batch-002-acceptance-v1` | `c03b8dcf4ddcb2c5f8b193cde8247b9ad64b8ea676da51cab1d709795b273598` |
+
+The surface successor holds exactly **63 rows: 51 inherited + 12 repaired**, with
+no row for the rejected `050`. Inherited rows are carried byte-identically from
+the historical 64-row batch, repaired rows byte-identically from the repair
+candidate including their recomputed offsets, and **the historical batch is not
+modified**. The opaque fresh HUMAN review IDs are mapped back to item IDs
+mechanically through the packet builder; **no historical HUMAN decision travels
+onto repaired source text**, which the builder enforces structurally by requiring
+each row's `humanDecisionSource` to be the correct artifact.
+
+The effective HUMAN successor is **63 KEEP / 0 FIX / 0 REJECT and 39 CLEAR /
+24 ESCALATE**, derived rather than copied. Reconciliation is against the
+**effective-current skeleton catalog, not historical Exact56**, at **63 match /
+0 mismatch**; Exact56 stays immutable provenance. Acceptance is **64 reviewed /
+63 accepted / 1 rejected / 0 unresolved**, and the single rejected row keeps its
+existing Phase B current-surface-realization reason with no amended skeleton and
+no authored replacement.
+
+With smoke batch-001's closed 30, the cumulative accepted surface pool is **93**.
+That is corpus-growth state, not final corpus completion.
+
+**Current state: Phase A semantic amendment CLOSED; Phase B surface resolution
+CLOSED; repaired candidate materialization CLOSED; fresh source audit
+COMPLETE_PASS; fresh HUMAN review COMPLETE with its independence limitation and
+authorship correction on the record; repaired-row reconciliation COMPLETE;
+batch-002 acceptance CLOSED at 63 accepted / 1 rejected / 0 unresolved;
+cumulative accepted pool 93. Item `050` has no replacement. Final corpus HUMAN
+gold, repeated HELD review, FINAL_HELD_OUT release, deterministic FINAL
+selection, and training all remain UNOPENED. The 380-item P1-B6 corpus is NOT
+complete; construction continues later from the accepted pool of 93.**
 
 ## Task Boundary
 

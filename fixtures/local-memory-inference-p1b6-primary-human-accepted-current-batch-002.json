@@ -1,0 +1,430 @@
+{
+  "name": "xion-local-memory-inference-p1b6-primary-human-accepted-current-batch-002-v1",
+  "status": "ACCEPTED_CURRENT_HUMAN_STATE_BATCH_002",
+  "supersededScope": {
+    "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2",
+    "rawSha256": "a96fc01393c79057d292cf10b565589e7448b86289eb52b8cd1c63657af2ed05",
+    "note": "The historical 64-row HUMAN artifact stays byte-identical and remains the evidence for the OLD surfaces. Its decisions for the 12 repaired items and for the rejected 050 are deliberately NOT carried forward."
+  },
+  "decisionSources": {
+    "inherited": {
+      "identity": "xion-local-memory-inference-p1b6-primary-human-effective-current-batch-002-v2",
+      "rawSha256": "a96fc01393c79057d292cf10b565589e7448b86289eb52b8cd1c63657af2ed05"
+    },
+    "repaired": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001-receipt-v1",
+      "rawSha256": "cab70e8a277189e0eee1847adcc89e114139363f20cebb95d39c7153fac30f04"
+    },
+    "repairedProvenanceCorrection": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-human-review-provenance-correction-v1",
+      "rawSha256": "d7f635596f12c37241a7ccb231eeb244fec37b6b8d9ec459aa99d575b3747314"
+    }
+  },
+  "reconciliation": {
+    "against": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+    "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559",
+    "matchCount": 63,
+    "mismatchCount": 0
+  },
+  "reviewIndependence": {
+    "repairedRowsIndependentlyConfirmed": false,
+    "note": "The fresh blind HUMAN review of the repaired rows is not reviewer-independent; see the provenance correction and the HUMAN receipt."
+  },
+  "summary": {
+    "total": 63,
+    "KEEP": 63,
+    "FIX": 0,
+    "REJECT": 0,
+    "CLEAR": 39,
+    "ESCALATE": 24
+  },
+  "authority": {
+    "humanReviewCompletedForBatch002": true,
+    "oldHumanDecisionsTransferredToRepairedText": false,
+    "finalCorpusHumanGoldFrozen": false,
+    "heldRepeatedReviewCompleted": false,
+    "heldOutReleasePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b002-001",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-002",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-003",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-004",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-005",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-006",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-007",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-008",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-009",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-010",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-011",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-012",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-013",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-014",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-015",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-016",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-017",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-018",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-019",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-020",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-021",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-023",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-025",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-026",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-027",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-028",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-030",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-031",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-033",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-035",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-036",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-038",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-040",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-041",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-042",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-043",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-044",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-045",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-046",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-048",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-052",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-053",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-054",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-055",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-056",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-057",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-058",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-060",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-061",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-062",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-064",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-022",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-024",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-029",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-032",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-034",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-037",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-039",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-047",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-049",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    }
+  ]
+}

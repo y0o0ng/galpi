@@ -1,0 +1,399 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-002-acceptance-v1",
+  "status": "COMPLETE_WITH_REJECTIONS",
+  "bindings": {
+    "historicalBatch": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-002-v1",
+      "rawSha256": "ed68a562a67deee4d8e92d3e4841362d9589f876480d174a043d822cbf61e80c"
+    },
+    "repairResolutionReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-resolution-batch-002-receipt-v1",
+      "rawSha256": "792cb050b08375fd6dec9e8ce2b1a04787760123496b3dfed601aac984f4626d"
+    },
+    "repairCandidate": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-002-v1",
+      "rawSha256": "d59d0dec225d3f4fea74952da10e05b8f0be01942a3aa6e15ea58d659e22abb3"
+    },
+    "freshSourceAuditReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-source-audit-batch-002-attempt-001-receipt-v1",
+      "rawSha256": "d08bf4488d4fa4a89c8f03172c4569405093051e939fea395a85b5fafda254b9"
+    },
+    "freshHumanReviewReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-primary-human-review-batch-002-attempt-001-receipt-v1",
+      "rawSha256": "cab70e8a277189e0eee1847adcc89e114139363f20cebb95d39c7153fac30f04"
+    },
+    "humanReviewProvenanceCorrection": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-human-review-provenance-correction-v1",
+      "rawSha256": "d7f635596f12c37241a7ccb231eeb244fec37b6b8d9ec459aa99d575b3747314"
+    },
+    "effectiveCurrentSkeletonCatalog": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+      "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559"
+    },
+    "surfaceEffectiveCurrentSuccessor": {
+      "identity": "xion-local-memory-inference-p1b6-surface-effective-current-batch-002-v1",
+      "rawSha256": "9701db8902ae99dc5c08cffb176bf9247443884910e3002b77548ac5436157d1"
+    },
+    "humanAcceptedCurrentSuccessor": {
+      "identity": "xion-local-memory-inference-p1b6-primary-human-accepted-current-batch-002-v1",
+      "rawSha256": "32b2221e2cefdb9a1a7e47efa1f5accd3d2a915c3f418578dc8f1c314b5281c4"
+    }
+  },
+  "summary": {
+    "reviewed": 64,
+    "accepted": 63,
+    "rejected": 1,
+    "unresolved": 0
+  },
+  "corpusGrowth": {
+    "smokeBatch001Accepted": 30,
+    "batch002Accepted": 63,
+    "cumulativeAcceptedSurfacePool": 93,
+    "note": "Corpus-growth state, not final corpus completion. P1-B6 corpus construction continues from this pool."
+  },
+  "reconciliation": {
+    "against": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+    "matchCount": 63,
+    "mismatchCount": 0,
+    "historicalExact56Role": "IMMUTABLE_PROVENANCE_NOT_SEMANTIC_AUTHORITY"
+  },
+  "authority": {
+    "sourceBundleGatePassed": true,
+    "primaryHumanReviewResolved": true,
+    "repairedRowsIndependentlyConfirmed": false,
+    "finalCorpusHumanGoldFrozen": false,
+    "heldRepeatedReviewCompleted": false,
+    "heldOutReleasePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOccurred": false,
+    "finalModelOutputsInspected": false,
+    "p1b6CorpusComplete": false
+  },
+  "accepted": [
+    {
+      "itemId": "p1b6-item-b002-001",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-002",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-003",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-004",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-005",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-006",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-007",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-008",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-009",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-010",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-011",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-012",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-013",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-014",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-015",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-016",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-017",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-018",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-019",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-020",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-021",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-023",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-025",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-026",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-027",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-028",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-030",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-031",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-033",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-035",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-036",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-038",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-040",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-041",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-042",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-043",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-044",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-045",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-046",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-048",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-052",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-053",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-054",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-055",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-056",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-057",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-058",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-060",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-061",
+      "decision": "ESCALATE",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-062",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-064",
+      "decision": "CLEAR",
+      "realizationOrigin": "INHERITED_HISTORICAL_BATCH_002"
+    },
+    {
+      "itemId": "p1b6-item-b002-022",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-024",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-029",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-032",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-034",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-037",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-039",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-047",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-049",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "decision": "ESCALATE",
+      "realizationOrigin": "REPAIRED_PHASE_B_CANDIDATE"
+    }
+  ],
+  "rejected": [
+    {
+      "itemId": "p1b6-item-b002-050",
+      "reasonCode": "PHASE_B_CURRENT_SURFACE_REALIZATION_REJECTED",
+      "rejectedScope": "CURRENT_SURFACE_REALIZATION_ONLY",
+      "reason": "Minimal repair attempts either collapse into ordinary context-conditioned measurements or introduce a referent/instance-identity ambiguity that is not the intended complementary-evidence boundary.",
+      "skeletonAmended": false,
+      "replacementAuthored": false
+    }
+  ]
+}
