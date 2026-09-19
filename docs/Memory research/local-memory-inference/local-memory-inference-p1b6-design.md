@@ -57,8 +57,9 @@ pre-reconciliation effective HUMAN aggregate of 64 KEEP / 0 FIX / 0 REJECT and
 55 CLEAR / 9 ESCALATE. That aggregate was then materialized as the
 effective-current decision artifact and reconciled against the frozen exact56
 skeleton HUMAN labels, which produced 40 matches and 24 mismatches out of 64.
-The artifact status is therefore `RECONCILIATION_NEEDS_FIX` and
-`humanReviewCompleted` is false. Every mismatch runs in one direction: the
+That artifact's own status is therefore `RECONCILIATION_NEEDS_FIX`, and
+`humanReviewCompleted` was false at that point. Both describe the historical
+64-row artifact, not the accepted batch-002 successor materialized later. Every mismatch runs in one direction: the
 authoritative current HUMAN decision is CLEAR where the frozen skeleton HUMAN
 label is ESCALATE. Neither side was relabeled; the mismatched identities live
 only in the separate non-HUMAN-facing diagnostic artifact and must never enter
@@ -85,17 +86,33 @@ amendment is now complete**: `p1b6-sk-8dd28ec6b22a18ad` and
 realizations. Against the effective-current catalog batch-002 reconciles at
 **51 match / 13 mismatch**, and all 13 remaining mismatches are
 surface-realization cases. **Phase A is CLOSED.** The **Phase B semantic
-adjudication of those 13 is now complete** at 12 REPAIR / 1 REJECT, and 12
-repaired candidate surfaces have been materialized; `p1b6-item-b002-050` is
-rejected at its current surface realization. **A fresh source audit and a
-fresh blind HUMAN review of the repaired text remain pending**, so no repaired
-row is accepted and no old HUMAN label transfers onto repaired source text.
-Batch-002 corpus acceptance has not occurred,
-the accepted pool remains 30, and final corpus HUMAN gold is not frozen. HELD
-repeated review, training, raw-episode evaluation, private replay, and
-production remain UNOPENED/unchanged. Do not redesign the frozen
-skeleton catalog, generate training output, expose a model to FINAL surface
-items, or start training in this phase.
+adjudication of those 13 was completed** at 12 REPAIR / 1 REJECT, and 12
+repaired candidate surfaces were materialized; `p1b6-item-b002-050` is
+rejected at its current surface realization. At that point a fresh source audit
+and a fresh blind HUMAN review of the repaired text both remained pending, no
+repaired row was accepted, batch-002 corpus acceptance had not occurred, and the
+accepted pool stood at 30. **All of that has since been completed** — see
+"Fresh Source Audit Result and Blind HUMAN Review Packet", "Fresh Blind HUMAN
+Review Result" and "Batch-002 Finalization and Acceptance" below.
+
+**Authoritative current state.** Phase A semantic amendment CLOSED; Phase B
+repair resolution CLOSED; the fresh repair source audit COMPLETE_PASS at 12/12;
+the fresh repair HUMAN review COMPLETE at 12 KEEP / 12 ESCALATE. The
+effective-current successor holds **63 rows — 51 inherited + 12 repaired, with
+item `050` absent**; the effective HUMAN successor is **63 KEEP / 39 CLEAR /
+24 ESCALATE**; reconciliation against the effective-current skeleton catalog is
+**63 match / 0 mismatch**; batch-002 acceptance is **63 accepted / 1 rejected /
+0 unresolved**; and the cumulative accepted surface pool is **93**. Item `050`
+has no replacement and its skeleton is unchanged. The repaired HUMAN review is
+**not reviewer-independent**, and a separate provenance correction fixes the
+inaccurate literal-authorship claim without changing the historical HUMAN
+receipt or any decision. **Final corpus HUMAN-gold freeze, repeated HELD review,
+FINAL_HELD_OUT release, deterministic FINAL selection, and training all remain
+UNOPENED, and the full 380-item P1-B6 corpus is NOT complete.** The contracts
+are in "Batch-002 Finalization and Acceptance" below.
+
+Do not redesign the frozen skeleton catalog, generate training output, expose a
+model to FINAL surface items, or start training in this phase.
 
 ## Conservative Pragmatic Interpretation
 
@@ -317,14 +334,16 @@ post-attempt-003 state is a successor artifact,
 which names what it supersedes. Its effective distribution is **64 KEEP / 52
 CLEAR / 12 ESCALATE** and it reconciles at **43 match / 21 mismatch**.
 
-`humanReviewCompleted` stays **false**: it tracks zero remaining reconciliation
-mismatches for the whole batch, not completion of one re-review attempt, and 21
-mismatches remain. The fresh-HUMAN-re-review portion of the semantic
-adjudication is resolved; the remaining semantic follow-up is the separate
-Exact56 amendment (since completed, see "Targeted Skeleton Semantic Amendment")
-and the repair-or-rejection decision for the surface-collapse realizations. No acceptance, gold freeze,
-HELD review, training, or downstream gate was opened, and the accepted pool
-remains 30.
+`humanReviewCompleted` stayed **false** at this point: it tracks zero remaining
+reconciliation mismatches for the whole batch, not completion of one re-review
+attempt, and 21 mismatches remained. The fresh-HUMAN-re-review portion of the
+semantic adjudication was resolved; the remaining semantic follow-ups were the
+separate Exact56 amendment (since completed, see "Targeted Skeleton Semantic
+Amendment") and the repair-or-rejection decision for the surface-collapse
+realizations (since completed, see "Phase B Surface Repair Materialization"). No
+acceptance, gold freeze, HELD review, training, or downstream gate was opened at
+this point, and the accepted pool stood at 30. Batch-002 has since been accepted;
+see "Batch-002 Finalization and Acceptance".
 
 ## Targeted Skeleton Semantic Amendment
 
@@ -397,8 +416,8 @@ realizations: `022`, `024`, `029`, `032`, `034`, `037`, `039`, `047`, `049`,
 Batch-001's single remaining mismatch is `p1b6-item-b001-019`;
 `p1b6-item-b001-009` now agrees with the amended `8dd28…`. The closed smoke
 acceptance is **not** reopened — it stays at 30 accepted / 2 rejected /
-0 unresolved with `b001-009` historically rejected, so the accepted pool remains
-exactly 30.
+0 unresolved with `b001-009` historically rejected, so batch-001's contribution
+to the accepted pool stays exactly 30.
 
 `humanReviewCompleted` remains **false**, and no dataset acceptance, HUMAN gold
 freeze, HELD repeated review, training, raw-episode evaluation, private replay,
@@ -449,11 +468,17 @@ the historical pattern is retained alongside it.
 
 **Old HUMAN labels do not transfer.** The batch-002 effective HUMAN artifact and
 the attempt-003 receipt are evidence for the OLD surface text only. No HUMAN
-decision was relabeled, reused, or synthesized here, no repaired row is
-accepted, no HUMAN gold is frozen, no HELD_OUT release occurred, and no training
-occurred. The accepted pool remains 30 and `humanReviewCompleted` stays false.
-**A fresh source audit and a fresh blind HUMAN review of the repaired text are
-the next steps and are still pending.**
+decision was relabeled, reused, or synthesized here, no repaired row was
+accepted at this step, no HUMAN gold was frozen, no HELD_OUT release occurred,
+and no training occurred.
+
+**Historical snapshot of this step.** When the repair candidates were
+materialized, the accepted pool stood at 30, `humanReviewCompleted` was false,
+and a fresh source audit plus a fresh blind HUMAN review of the repaired text
+were the next steps and both still pending. **Both have since completed and
+batch-002 has since been accepted** — see "Fresh Source Audit Result and Blind
+HUMAN Review Packet", "Fresh Blind HUMAN Review Result" and "Batch-002
+Finalization and Acceptance".
 
 `scripts/build-memory-inference-p1b6-surface-repair-candidate.js` verifies every
 canonical historical input by identity AND pinned raw SHA before deriving
