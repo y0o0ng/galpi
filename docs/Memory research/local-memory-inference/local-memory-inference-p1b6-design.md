@@ -692,6 +692,65 @@ gold, repeated HELD review, FINAL_HELD_OUT release, deterministic FINAL
 selection, and training all remain UNOPENED. The 380-item P1-B6 corpus is NOT
 complete; construction continues later from the accepted pool of 93.**
 
+## Batch-003 Adaptive Corpus Growth
+
+Batch-002 remains **CLOSED** at 63 accepted / 1 rejected / 0 unresolved. The
+accepted surface pool is **93**, reconstructed mechanically from the batch-001
+smoke acceptance and the batch-002 acceptance rather than carried as a constant:
+TRAIN 56 / DEV 16 / FINAL_HELD_OUT 21, HUMAN 57 CLEAR / 36 ESCALATE, KO 65 /
+MIXED 18 / EN 10, fragments 18 / 26 / 27 / 17 / 5, and **55 of 56 skeletons
+covered**. Exactly one skeleton has no accepted surface:
+`p1b6-sk-aebbf047d6864a35` (DEV, ESCALATE, COMPLEMENTARY EVIDENCE).
+
+`scripts/build-memory-inference-p1b6-batch-003-authoring-plan.js` derives the
+tranche from that seed against the frozen 380 constraints and **fails closed if
+canonical main stops reproducing the baseline**, rather than silently
+redesigning the tranche. The no-loss shortage is **287**; batch-003 authors
+**304** candidates, leaving a **17-candidate buffer**. With the 96 attempts
+already authored across batch-001 and batch-002 this reaches the existing
+"roughly 400-ish reviewed pool, then measure shortages and top up" contract.
+**304 is an authoring-tranche size, not a corpus-size contract: the exact final
+corpus remains 380, and the 17 buffer candidates are review/rejection headroom,
+not automatic final members.**
+
+Derived tranche marginals — split **195 / 47 / 62**, authoring semantic label
+**141 CLEAR / 163 ESCALATE**, language **KO 213 / MIXED 61 / EN 30**, fragments
+**55 / 78 / 99 / 56 / 16**, and all eight discourse patterns **38 each**. The
+HELD contract takes precedence over an independent label split: each held
+skeleton's `max(0, 5 - currentAccepted)` shortage is mandatory first, totalling
+**59** (45 CLEAR / 14 ESCALATE), and the three remaining HELD candidates are
+buffer allocated **+2 CLEAR / +1 ESCALATE**, giving HELD **47 CLEAR / 15
+ESCALATE**. After reserving those, TRAIN is **76 CLEAR / 119 ESCALATE** and DEV
+is **18 CLEAR / 29 ESCALATE**.
+
+**The authoring semantic authority is the effective-current skeleton catalog**,
+not historical Exact56: `p1b6-sk-8dd28ec6b22a18ad` and
+`p1b6-sk-155420007d75f36f` are authoring-target `CLEAR`, and
+`p1b6-sk-2fa39ece4157b2b8` stays `ESCALATE`. These per-item labels are
+**generator targets, not HUMAN gold**, and must never enter a blind HUMAN
+packet. `lib/memory-inference-p1b6-surfaces.js` is unchanged and still points at
+Exact56 for historical callers; batch-003 supplies the effective-current catalog
+at its own boundary.
+
+The zero-covered skeleton receives entirely new DEV/ESCALATE realizations with
+new source text and new IDs. **This is not a repair or replacement of historical
+item `p1b6-item-b002-050`**, which stays rejected with no replacement.
+
+The committed authoring plan is
+`fixtures/local-memory-inference-p1b6-surface-batch-003-authoring-protocol.json`.
+It binds the seed inputs and the semantic authority by identity and raw SHA,
+records the full derivation including per-skeleton `needTo5` and planned counts,
+marks unavailable generator sampling controls as unavailable rather than
+inventing them, and states that **no gate has run**. It is written once and is
+not rewritten later to pretend downstream gates completed; audit and review
+results get their own receipts.
+
+**Current state: the plan, the authoring protocol and the batch-003 validator
+are frozen; the 304 surfaces are NOT yet authored.** Authoring is the next step,
+and after it the next real gate is the **fresh source audit of all 304 rows**.
+No batch-003 HUMAN review, acceptance, HUMAN-gold freeze, repeated HELD review,
+FINAL selection, or training has occurred or is opened by this step.
+
 ## Task Boundary
 
 P1-B6 returns `CLEAR` when the target's materially relevant semantic status is

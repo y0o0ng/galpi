@@ -98,6 +98,9 @@
 - **`050`은 대체본이 없다.** 현재 표면 실현만 폐기됐고 skeleton은 그대로다. 커버리지 슬롯이 필요해지면 별도 신규 authoring 작업이다.
 - **수리본 HUMAN 재검토는 리뷰어 독립적 확인이 아니다.** 리뷰어가 제시된 모집단 전체가 수리본이고 목적이 모호성 복원임을 알았다. receipt의 `reviewerAuthoredTheRepairs: true`가 부정확했던 부분은 `…-surface-repair-human-review-provenance-correction.json`에 좁게 정정했다 — **역사 receipt 바이트와 12건 판정은 그대로이고 정정은 독립성을 만들지 않는다.** 옛 HUMAN 라벨은 수리된 원문으로 옮겨가지 않는다.
 - **downstream gate는 하나도 열리지 않았다.** 최종 corpus HUMAN gold 동결·반복 HELD 검토·FINAL_HELD_OUT 공개·결정론적 FINAL 선정·학습 전부 `UNOPENED`이고 production은 그대로다. **380항목 P1-B6 corpus는 완료가 아니며 구축은 accepted pool 93에서 이어진다.**
+- **batch-003 adaptive growth의 계획·프로토콜·검증기는 고정됐고 304건 표면은 아직 안 썼다.** 수용 seed 93에서 부족분 287, 트랜치 304(버퍼 17), split 195/47/62 · label 141/163 · language 213/61/30 · fragment 55/78/99/56/16 · discourse 각 38. HELD는 필수 59(45+14)에 버퍼 +2/+1로 47/15다. 계획 정본은 `fixtures/local-memory-inference-p1b6-surface-batch-003-authoring-protocol.json`, 도출기는 `scripts/build-memory-inference-p1b6-batch-003-authoring-plan.js`다.
+- **새 authoring의 의미 권위는 effective-current 카탈로그이고 그 라벨은 generator target이지 HUMAN gold가 아니다** — blind HUMAN 패킷에 절대 들어가지 않는다. **304는 트랜치 크기이지 corpus 계약이 아니다**(최종 380 불변, 버퍼 17은 자동 최종 멤버가 아님). 무커버 skeleton `aebbf047…`은 새 DEV/ESCALATE 실현을 받는데 **`050`의 수리가 아니라 완전한 신규다.**
+- **다음은 304건 표면 authoring이고, 그다음 실제 게이트는 304행 전체의 fresh source audit이다.** batch-003의 HUMAN 재검토·수용·gold 동결·HELD 반복·FINAL 선정·학습은 하나도 열리지 않았다.
 - 상세 실행 이력·아티팩트 SHA는 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 `…/local-memory-inference-run-receipts.md`에 있다. 여기에 복제하지 않는다.
 
 ### 메일 — 닫혔다, 관측만 남았다

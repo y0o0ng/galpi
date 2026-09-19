@@ -1,0 +1,385 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-003-authoring-protocol-v1",
+  "batchId": "p1b6-surface-batch-003",
+  "status": "AUTHORING_PLAN_FROZEN_SURFACES_NOT_YET_AUTHORED",
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "semanticAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+    "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559",
+    "role": "AUTHORING_SEMANTIC_AUTHORITY",
+    "note": "All new authoring targets come from this catalog. Historical Exact56 stays immutable provenance and is NOT the authoring target where the two differ."
+  },
+  "acceptedSeedInputs": {
+    "batch001": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+      "rawSha256": "2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36"
+    },
+    "smokeAcceptance": {
+      "identity": "xion-local-memory-inference-p1b6-smoke-batch-001-acceptance-v1",
+      "rawSha256": "449318d5d3895fca87257a40b7d47b6d8d8eb3df8e9817fff5998a34d658bb5c"
+    },
+    "batch002Successor": {
+      "identity": "xion-local-memory-inference-p1b6-surface-effective-current-batch-002-v1",
+      "rawSha256": "9701db8902ae99dc5c08cffb176bf9247443884910e3002b77548ac5436157d1"
+    },
+    "batch002Human": {
+      "identity": "xion-local-memory-inference-p1b6-primary-human-accepted-current-batch-002-v1",
+      "rawSha256": "32b2221e2cefdb9a1a7e47efa1f5accd3d2a915c3f418578dc8f1c314b5281c4"
+    },
+    "batch002Acceptance": {
+      "identity": "xion-local-memory-inference-p1b6-batch-002-acceptance-v1",
+      "rawSha256": "c03b8dcf4ddcb2c5f8b193cde8247b9ad64b8ea676da51cab1d709795b273598"
+    }
+  },
+  "acceptedSeedCoverage": {
+    "total": 93,
+    "split": {
+      "TRAIN": 56,
+      "DEV": 16,
+      "FINAL_HELD_OUT": 21
+    },
+    "humanLabel": {
+      "CLEAR": 57,
+      "ESCALATE": 36
+    },
+    "language": {
+      "KO": 65,
+      "MIXED": 18,
+      "EN": 10
+    },
+    "fragments": {
+      "1": 18,
+      "2": 26,
+      "3": 27,
+      "4": 17,
+      "5": 5
+    },
+    "coveredSkeletons": 55,
+    "totalSkeletons": 56,
+    "zeroCoveredSkeletonIds": [
+      "p1b6-sk-aebbf047d6864a35"
+    ]
+  },
+  "finalCorpusTargets": {
+    "total": 380,
+    "split": {
+      "TRAIN": 240,
+      "DEV": 60,
+      "FINAL_HELD_OUT": 80
+    },
+    "label": {
+      "CLEAR": 190,
+      "ESCALATE": 190
+    },
+    "language": {
+      "KO": 266,
+      "MIXED": 76,
+      "EN": 38
+    },
+    "fragments": {
+      "1": 70,
+      "2": 100,
+      "3": 120,
+      "4": 70,
+      "5": 20
+    },
+    "heldSurfacesPerSkeleton": 5
+  },
+  "tranche": {
+    "noLossShortage": 287,
+    "size": 304,
+    "buffer": 17,
+    "deficits": {
+      "split": {
+        "TRAIN": 184,
+        "DEV": 44,
+        "FINAL_HELD_OUT": 59
+      },
+      "label": {
+        "CLEAR": 133,
+        "ESCALATE": 154
+      },
+      "language": {
+        "KO": 201,
+        "MIXED": 58,
+        "EN": 28
+      },
+      "fragments": {
+        "1": 52,
+        "2": 74,
+        "3": 93,
+        "4": 53,
+        "5": 15
+      }
+    },
+    "split": {
+      "TRAIN": 195,
+      "DEV": 47,
+      "FINAL_HELD_OUT": 62
+    },
+    "authoringSemanticLabel": {
+      "CLEAR": 141,
+      "ESCALATE": 163
+    },
+    "language": {
+      "KO": 213,
+      "MIXED": 61,
+      "EN": 30
+    },
+    "fragments": {
+      "1": 55,
+      "2": 78,
+      "3": 99,
+      "4": 56,
+      "5": 16
+    },
+    "discoursePatterns": {
+      "CANONICAL": 38,
+      "CONTEXT_FIRST": 38,
+      "CONCLUSION_FIRST": 38,
+      "INTERLEAVED": 38,
+      "PROGRESSIVE_REFINEMENT": 38,
+      "SELF_REVISION": 38,
+      "RETURN_TO_TOPIC": 38,
+      "ELLIPTICAL_REPLY": 38
+    },
+    "note": "304 is an authoring-tranche size, not a corpus-size contract. The exact final corpus remains 380 and the 17 buffer candidates are review/rejection headroom, not automatic final members."
+  },
+  "heldAllocation": {
+    "surfacesPerSkeleton": 5,
+    "mandatoryTotal": 59,
+    "mandatoryByLabel": {
+      "CLEAR": 45,
+      "ESCALATE": 14
+    },
+    "bufferTotal": 3,
+    "bufferByLabel": {
+      "CLEAR": 2,
+      "ESCALATE": 1
+    },
+    "trancheByLabel": {
+      "CLEAR": 47,
+      "ESCALATE": 15
+    },
+    "perSkeleton": [
+      {
+        "semanticSkeletonId": "p1b6-sk-6b74f6c163e7fa5d",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 4,
+        "needTo5": 1,
+        "batch003Planned": 1
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-001178537fb93442",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 5
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-95b3c63acff8f020",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-11a3e916ff9b8129",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 5
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-379bd3b3dd05d85e",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+        "humanLabel": "ESCALATE",
+        "currentAccepted": 3,
+        "needTo5": 2,
+        "batch003Planned": 2
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+        "humanLabel": "ESCALATE",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-32f27410e2beb10c",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+        "humanLabel": "ESCALATE",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-fa8ae6d4b81d50a8",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-1e2014a2b5e70a20",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-75fe9a38eb99ab90",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
+        "humanLabel": "ESCALATE",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 5
+      },
+      {
+        "semanticSkeletonId": "p1b6-sk-c3d0e91a74b6f258",
+        "humanLabel": "CLEAR",
+        "currentAccepted": 1,
+        "needTo5": 4,
+        "batch003Planned": 4
+      }
+    ],
+    "note": "needTo5 = max(0, 5 - currentAcceptedCountForSkeleton). The extra HELD candidates are buffer only; deterministic FINAL selection later still chooses exactly five accepted surfaces per held skeleton."
+  },
+  "trainDevCells": {
+    "TRAIN": {
+      "CLEAR": 76,
+      "ESCALATE": 119
+    },
+    "DEV": {
+      "CLEAR": 18,
+      "ESCALATE": 29
+    }
+  },
+  "allocationRules": {
+    "marginalBuffer": "Positive deficits against the frozen 380 constraints, with the 17-candidate buffer allocated by deterministic largest remainder in canonical key order.",
+    "heldPrecedence": "The per-skeleton HELD shortage is mandatory before any HELD buffer assignment; HELD buffer labels use largest remainder over the mandatory label deficits.",
+    "heldBufferSkeleton": "Larger mandatory needTo5 first, then lexical semanticSkeletonId.",
+    "trainDevLabel": "After reserving the HELD cells, each label is split across TRAIN and DEV by largest remainder proportional to their tranche sizes.",
+    "skeletonAssignment": "Any compatible skeleton with zero current accepted coverage receives one candidate first; every remaining assignment goes to the skeleton minimizing currentAcceptedCount + batch003PlannedCount, then batch003PlannedCount, then lexical semanticSkeletonId.",
+    "zeroCoverageRequirement": "p1b6-sk-aebbf047d6864a35 must receive at least one entirely new DEV/ESCALATE realization. This is a new candidate with new source text and new IDs, NOT a repair or replacement of historical item p1b6-item-b002-050."
+  },
+  "plannedSkeletonCounts": {
+    "p1b6-sk-000035b8df850b3e": 7,
+    "p1b6-sk-001178537fb93442": 5,
+    "p1b6-sk-0767dc2f59b57601": 7,
+    "p1b6-sk-084af1a6a0723538": 2,
+    "p1b6-sk-0ed5b52f4c5735e9": 7,
+    "p1b6-sk-11a3e916ff9b8129": 5,
+    "p1b6-sk-11e63b75bdf266dd": 4,
+    "p1b6-sk-135ab77919a554dc": 5,
+    "p1b6-sk-155420007d75f36f": 1,
+    "p1b6-sk-16697b52f83abeba": 4,
+    "p1b6-sk-187292f8cbc0126c": 7,
+    "p1b6-sk-1e2014a2b5e70a20": 4,
+    "p1b6-sk-28736b74c85fcc93": 8,
+    "p1b6-sk-2b6f4ac9e15d8307": 4,
+    "p1b6-sk-2da4e54e6609e34b": 12,
+    "p1b6-sk-2fa39ece4157b2b8": 2,
+    "p1b6-sk-32f27410e2beb10c": 4,
+    "p1b6-sk-379bd3b3dd05d85e": 4,
+    "p1b6-sk-38c426bb2e0bff42": 12,
+    "p1b6-sk-43016ef6da889a87": 7,
+    "p1b6-sk-47c9b12e0a6f83d5": 2,
+    "p1b6-sk-49e0f357eda8365c": 12,
+    "p1b6-sk-4bbd555977190591": 4,
+    "p1b6-sk-5229ea237196499d": 12,
+    "p1b6-sk-5269c91fcfb6c2cd": 4,
+    "p1b6-sk-59c8f51891ab4996": 4,
+    "p1b6-sk-5d2a9c70e4b18f63": 2,
+    "p1b6-sk-5f335bdc1d9d630c": 9,
+    "p1b6-sk-5fc872afb058b370": 4,
+    "p1b6-sk-61cb1285dd1df651": 2,
+    "p1b6-sk-66ecb02cbfc40c3c": 4,
+    "p1b6-sk-6b74f6c163e7fa5d": 4,
+    "p1b6-sk-6e493bbfafdb22de": 7,
+    "p1b6-sk-714725eea477a631": 2,
+    "p1b6-sk-75fe9a38eb99ab90": 4,
+    "p1b6-sk-82149f27c2f521ae": 4,
+    "p1b6-sk-869c71279b6b8a33": 4,
+    "p1b6-sk-8a41f0d92c7e6b35": 4,
+    "p1b6-sk-8dd28ec6b22a18ad": 4,
+    "p1b6-sk-95b3c63acff8f020": 4,
+    "p1b6-sk-9dc48f4b2f10775d": 12,
+    "p1b6-sk-a19bb9e94e9a416b": 4,
+    "p1b6-sk-aebbf047d6864a35": 5,
+    "p1b6-sk-b8e64a03d97f251c": 12,
+    "p1b6-sk-be0efa305956d111": 9,
+    "p1b6-sk-c3d0e91a74b6f258": 4,
+    "p1b6-sk-cc054a4227cdafef": 9,
+    "p1b6-sk-d8ca287837bcc32d": 2,
+    "p1b6-sk-db0908294e6deb6f": 2,
+    "p1b6-sk-e7da7f4bbf645574": 2,
+    "p1b6-sk-e7fe317a78077d37": 4,
+    "p1b6-sk-f03b5a7c91e2486d": 7,
+    "p1b6-sk-f2fb3e894c37caac": 2,
+    "p1b6-sk-f4d809ae085dbac9": 7,
+    "p1b6-sk-f58debd8f04f5c60": 12,
+    "p1b6-sk-fa8ae6d4b81d50a8": 4
+  },
+  "generatorProvenance": {
+    "authoringAgent": "Claude Opus 5 via Claude Code, driven by the repository owner",
+    "planDerivation": "DETERMINISTIC_FROM_CANONICAL_ARTIFACTS",
+    "samplingControls": "UNAVAILABLE_PLATFORM_CONTROLLED",
+    "modelSamplingParameters": "NOT_INDEPENDENTLY_RECOVERABLE",
+    "note": "Only genuinely available metadata is recorded. Sampling temperature, seeds and decoding parameters are platform-controlled and are not invented here."
+  },
+  "gatesNotYetRun": {
+    "surfacesAuthored": false,
+    "sourceAuditCompleted": false,
+    "humanReviewCompleted": false,
+    "humanGoldFrozen": false,
+    "acceptancePerformed": false,
+    "heldRepeatedReviewPerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingPerformed": false
+  },
+  "authority": {
+    "exact56Altered": false,
+    "effectiveCurrentCatalogAltered": false,
+    "interpretationRuleAltered": false,
+    "batch002Reopened": false,
+    "historicalItem050Repaired": false,
+    "oldHumanLabelsTransferred": false,
+    "finalCorpusSizeContractChanged": false,
+    "authoringSemanticLabelsAreHumanGold": false,
+    "note": "The per-item authoring semantic labels derived from the effective-current catalog are generator targets. They are NOT HUMAN gold and must never enter a blind HUMAN packet."
+  },
+  "nextGate": "FRESH_SOURCE_AUDIT_OF_ALL_304_ROWS"
+}
