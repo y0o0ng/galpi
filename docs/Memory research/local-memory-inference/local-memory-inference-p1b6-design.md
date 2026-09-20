@@ -360,8 +360,10 @@ Five layers are distinct and must not be collapsed:
 3. **Effective-current skeleton catalog** —
    `fixtures/local-memory-inference-p1b6-skeleton-effective-current.json`,
    built mechanically as historical Exact56 + exactly the two approved
-   amendments. This is the **prospective current semantic authority**; future
-   authoring reads it rather than the frozen historical labels.
+   amendments. **At that stage this became the prospective semantic authority**,
+   read by later authoring in place of the frozen historical labels. It has since
+   been superseded by semantic contract v2 and remains committed as historical
+   evidence of the prior authority; the decision recorded here is not rewritten.
 4. **Historical HUMAN evidence** — attempt-001/002/003 receipts and both
    effective HUMAN artifacts, all unchanged. No HUMAN decision was relabeled.
 5. **Current reconciliation impact** — recomputed, never written back onto a
@@ -864,13 +866,22 @@ ESCALATE surfaces repaired before any gate; the frozen plan and protocol
 unchanged; a fresh source-audit packet regenerated from the repaired batch. At
 that moment the fresh source audit had not yet been executed.
 
-**Current state: that source audit has since run and is complete at 301 PASS / 3
-FAIL / 0 UNCERTAIN** (see "Batch-003 Source Audit" below). The next gate is the
-**301-row blind strong-model semantic review**, which has NOT been executed. No
-batch-003 HUMAN review has happened and no batch-003 acceptance has happened.
-Reference-label freeze, the HELD second pass, `FINAL_HELD_OUT` release,
-deterministic FINAL selection, and training all remain UNOPENED, and the 380-item
-P1-B6 corpus is not complete.
+**Current state: the source audit ran and is complete at 301 PASS / 3 FAIL / 0
+UNCERTAIN, and the 301-row blind strong-model semantic review has since been
+executed and reconciled against semantic contract v2** — 301 `KEEP`, model
+decisions 214 CLEAR / 87 ESCALATE, **267 clean agreements and 34 rows routed to
+HUMAN adjudication**. See "Semantic Authority Lineage" and "Strong-model semantic
+review against v2" below.
+
+**Current next gates:**
+
+1. HUMAN adjudication of the 34 routed rows;
+2. the deterministic 32-row HUMAN calibration sample over the 267 clean
+   agreements.
+
+No batch-003 acceptance, reference-label freeze, HELD second-pass review,
+`FINAL_HELD_OUT` release, deterministic FINAL selection, training, or production
+change has occurred, and the 380-item P1-B6 corpus is not complete.
 
 ## Task Boundary
 
@@ -1036,10 +1047,20 @@ Blanket prospective `HUMAN gold` wording is replaced by explicit provenance:
 | `CATALOG_STRONG_MODEL_CONFIRMED` | audit `PASS` + blind strong-model `KEEP` + decision equal to the reference label; provisional, **not** HUMAN gold |
 | `HUMAN_ADJUDICATED` | the repository owner actually reviewed and adjudicated the row |
 
-The final corpus may legitimately mix all three. **The 190 CLEAR / 190 ESCALATE
-constraint is over the frozen reference labels**, not a claim that 380 surfaces
-each received direct HUMAN labeling. No item is described as HUMAN-reviewed
-unless the owner actually reviewed it.
+The final corpus may legitimately mix all three. No item is described as
+HUMAN-reviewed unless the owner actually reviewed it.
+
+**Historical wording, superseded.** This amendment originally added that "the
+190 CLEAR / 190 ESCALATE constraint is over the frozen reference labels, not a
+claim that 380 surfaces each received direct HUMAN labeling." That framing was
+correct for its own authority but is **no longer an active constraint**:
+[semantic contract v2](#semantic-authority-lineage) retires the exact
+`190 CLEAR / 190 ESCALATE` total and the per-label DEV and `FINAL_HELD_OUT`
+minimums prospectively, **with no replacement target ratio**. Label counts are a
+derived property of semantically valid selected surfaces. Corpus total 380,
+splits 240 / 60 / 80, language totals, fragment totals, source/bundle audit
+requirements and split isolation are unchanged. The large-batch authority
+amendment artifact itself is historical and is not edited.
 
 The effective-current catalog stays the semantic authority. A strong-model
 disagreement never relabels a skeleton or a surface by itself.

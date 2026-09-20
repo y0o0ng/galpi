@@ -609,18 +609,9 @@ test('the prospective design supersedes exhaustive HUMAN review without erasing 
     true);
   assert.equal(design.includes('remain valid and immutable'), true);
 
-  // The label constraint is over reference labels, not a HUMAN-labeling claim.
-  assert.equal(design.includes(
-    '**The 190 CLEAR / 190 ESCALATE\nconstraint is over the frozen reference labels**'), true);
   assert.equal(design.includes('301 PASS / 3 FAIL / 0 UNCERTAIN'), true);
   for (const failedId of FAILED) assert.equal(design.includes(failedId), true, failedId);
 
-  // No stale claim that the source audit is still the pending next gate.
-  assert.equal(/source audit[^.]*is the next gate and has NOT been\nexecuted/u.test(design), false);
-  assert.equal(design.includes(
-    '**Current state: that source audit has since run and is complete at 301 PASS / 3\nFAIL / 0 UNCERTAIN**'), true);
-  assert.equal(design.includes(
-    '**301-row blind strong-model semantic review**, which has NOT been executed.'), true);
   // The pre-audit story is kept, explicitly marked as a snapshot.
   assert.equal(design.includes('(historical snapshot)'), true);
 
@@ -634,6 +625,58 @@ test('the prospective design supersedes exhaustive HUMAN review without erasing 
   // Historical wording is untouched where it accurately describes batch-001/batch-002.
   assert.equal(design.includes(
     'For historical batch-001/batch-002 review, HUMAN gold was\nauthoritative'), true);
+});
+
+test('the canonical design states the current authority, contract and next gates', () => {
+  const design = read(
+    'docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md')
+    .toString('utf8');
+
+  // 1. Semantic contract v2 is the current prospective authority at 45 / 11.
+  assert.equal(design.includes('## Semantic Authority Lineage'), true);
+  assert.equal(design.includes('### Semantic contract v2'), true);
+  assert.equal(design.includes('**45 CLEAR / 11 ESCALATE**'), true);
+  assert.equal(design.includes('`…-skeleton-effective-current-v2.json`'), true);
+  assert.equal(design.includes('**Unknown is not ambiguity.**'), true);
+  // v1 is described as the prior authority, not the current one.
+  assert.equal(design.includes('**At that stage this became the prospective semantic authority**'),
+    true);
+  assert.equal(design.includes('superseded by semantic contract v2'), true);
+
+  // 2. Label balancing is retired prospectively with no replacement ratio.
+  assert.equal(design.includes('**Retired prospectively by semantic contract v2**'), true);
+  assert.equal(design.includes('**They are not replaced by a new target ratio.**'), true);
+  assert.equal(design.includes('**with no replacement target ratio**'), true);
+  assert.equal(design.includes('derived property of semantically valid selected'), true);
+  // The old rule survives only as explicitly historical wording.
+  assert.equal(design.includes('**Historical wording, superseded.**'), true);
+  assert.equal(/\*\*The 190 CLEAR \/ 190 ESCALATE\nconstraint is over the frozen reference labels\*\*/u
+    .test(design), false, 'the retired rule must not be reasserted as active');
+  // Structural contracts the retirement does not touch.
+  for (const kept of ['Corpus total 380', 'splits 240 / 60 / 80', 'language totals',
+    'fragment totals', 'split isolation']) {
+    assert.equal(design.includes(kept), true, kept);
+  }
+
+  // 3. Strong-model reconciliation is recorded as complete at 267 / 34.
+  assert.equal(design.includes('**267 clean agreements and 34 rows routed to'), true);
+  assert.equal(design.includes('HUMAN adjudication**'), true);
+  assert.equal(design.includes('214 CLEAR / 87 ESCALATE'), true);
+  assert.equal(design.includes('### Strong-model semantic review against v2'), true);
+
+  // 4. The current next gates are the 34-row adjudication and the 32-row calibration sample.
+  assert.equal(design.includes('**Current next gates:**'), true);
+  assert.equal(design.includes('HUMAN adjudication of the 34 routed rows'), true);
+  assert.equal(design.includes(
+    'the deterministic 32-row HUMAN calibration sample over the 267 clean'), true);
+
+  // 5. No unqualified current-state claim that the 301-row review has not run.
+  assert.equal(/which has NOT been executed/u.test(design), false);
+  assert.equal(/301-row blind strong-model semantic review[^.]*NOT been executed/u.test(design),
+    false);
+  // Downstream gates that genuinely have not opened are still named as such.
+  assert.equal(design.includes(
+    'No batch-003 acceptance, reference-label freeze, HELD second-pass review'), true);
 });
 
 test('batch-003 and the historical artifacts are byte-identical after this step', () => {
