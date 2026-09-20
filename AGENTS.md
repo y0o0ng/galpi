@@ -106,7 +106,11 @@
 - **3차로 `cc054a42` 2건(255·257)을 더 고쳤다.** 정렬 표현이 여전히 보고 전체를 술어로 받고 있었다(`반박할 게 없었어`·`토를 달지 않았어`·`고개를 끄덕였어`). 이제 사용자가 **다면 보고 중 한 면을 명시적으로 인정**하고(`선생님 친절한 건 인정했어`·`API가 깔끔하다는 데는 동의했어`) 전체 채택 여부는 남겨 둔다. 감사 전 수리 3회(53·15·2)는 전부 authoring 결함 수정이고 **HUMAN 재라벨도 감사 판정도 없다.**
 - **구성 형태 회귀 테스트는 의미 타당성을 증명하지 않는다.** 두 검토가 실제로 잡은 구조적 anti-pattern만 잠근다 — 어휘 매칭으로는 모호성을 증명할 수 없고, 1차 목록은 이미 `같은 말을 했어`·`맞는 말이라고 했어`를 놓쳤으며 다음 패러프레이즈도 놓친다. **의미 authoring QA는 사람의 검토 판단이고, source audit은 번들 완전성이라는 별개 질문이다.**
 - **누출 검사는 batch-003 전용이고 이제 materializer가 fail-close로 돌린다** — 구조 검증 뒤 `buildBatch003()`이 누출 검증을 통과해야 fixture가 써진다. pilot·batch-001·batch-002·batch-002 후속본과 batch-003 내부에 대해 정규화 대화 재사용, 12자 이상 정확 턴 재사용, 식별자 재사용, family의 split 교차를 거부한다. 템플릿 재사용 진단은 게이트가 아니라 사람이 볼 보고서다.
-- **다음 실제 게이트는 수리된 304행 전체의 fresh source audit이고 아직 실행하지 않았다.** 수리 전 packet 셋(`1ed563ff…`·`f5aa6766…`·`c1a6cfba…`)은 모두 stale이고 판정된 적이 없다. 최종 수리본으로 새 packet을 다시 만들었을 뿐이다(관례대로 커밋 안 함). batch-003의 HUMAN 재검토·수용·gold 동결·HELD 반복·FINAL 선정·학습은 하나도 열리지 않았다.
+- **source audit이 304행 전체에 대해 끝났다 — 301 PASS / 3 FAIL / 0 UNCERTAIN.** 영수증은 `fixtures/local-memory-inference-p1b6-source-audit-batch-003-attempt-001.json`(`COMPLETE_NEEDS_FIX`)이고 batch·packet·protocol·원본 결과에 SHA로 묶여 있다. opaque ID는 기계적으로 매핑했다. 원본 아티팩트에 auditor 모델·런타임 정보가 없어서 **아무것도 지어내지 않았다.**
+- **`002`·`006`·`109`는 fail-close다.** 각각 누락된 전세 계약 종료 맥락·동료의 보류 지시·직전 턴의 지시 대상이 해석을 바꾼다. **지금 고치지 않고 의미 검토 대상에서 빼둔다. batch-003은 건드리지 않았다.** 트랜치 버퍼 17이 검토 손실을 흡수하는 자리이고, 부족분·보충은 의미 검토 뒤에 잰다.
+- **대규모 배치의 전수 HUMAN 검토는 명시적으로 폐기됐다.** 저장소 주인의 결정이고 정본은 `fixtures/local-memory-inference-p1b6-large-batch-review-authority-amendment.json`이다. batch-003부터 **전향적으로만** 적용되고 batch-001·002의 HUMAN 이력은 그대로 유효·불변이다. 의미 권위는 effective-current 카탈로그의 reference label이고, **검토 안 된 일치 행은 HUMAN gold가 아니다**(`CATALOG_STRONG_MODEL_CONFIRMED`).
+- **다음 게이트는 301 PASS 행에 대한 fresh blind strong-model 의미 검토다.** 프로토콜은 `…-strong-model-semantic-review-protocol.json`, 빌더는 `scripts/build-memory-inference-p1b6-batch-003-strong-model-review-packet.js`(301행, opaque 정렬, 커밋 안 함)다. **HUMAN 작업은 그 뒤에 불일치·FIX·REJECT 행과 결정론적 32행 보정 표본으로만 한정된다.** FINAL_HELD_OUT은 반복 HUMAN 검토 대신 선정 후 독립 2차 strong-model 검토를 받는다.
+- **accepted pool은 여전히 93이다.** batch-003의 수용·reference label 동결·FINAL 선정·학습은 하나도 열리지 않았다. 수리 전 packet 셋(`1ed563ff…`·`f5aa6766…`·`c1a6cfba…`)은 모두 stale이고 판정된 적이 없다.
 - 상세 실행 이력·아티팩트 SHA는 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 `…/local-memory-inference-run-receipts.md`에 있다. 여기에 복제하지 않는다.
 
 ### 메일 — 닫혔다, 관측만 남았다

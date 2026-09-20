@@ -1,0 +1,1572 @@
+{
+  "name": "xion-local-memory-inference-p1b6-source-audit-batch-003-attempt-001-receipt-v1",
+  "attemptId": "p1b6-source-audit-batch-003-attempt-001",
+  "status": "COMPLETE_NEEDS_FIX",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-source-audit-packet-v1",
+  "auditPacketSha256": "9f18c656a1717c8d11b9e12ebb68d3e3a9d1e79dcb77d9371be859f45a9252a2",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+    "batchId": "p1b6-surface-batch-003",
+    "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-batch-003-source-audit-results.json",
+    "sha256": "956a94cf59f2cd62594d035fa5cf913dc758920341b6319c43a3a557526dc3c6"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "NOT_SUPPLIED_IN_RESULT_ARTIFACT",
+    "note": "The raw result artifact carries only the per-row dispositions and reasons. No provider, surface, model, reasoning setting or session metadata accompanied it, and none is invented here."
+  },
+  "summary": {
+    "total": 304,
+    "PASS": 301,
+    "FAIL": 3,
+    "UNCERTAIN": 0
+  },
+  "failedItems": {
+    "itemIds": [
+      "p1b6-item-b003-002",
+      "p1b6-item-b003-006",
+      "p1b6-item-b003-109"
+    ],
+    "disposition": "EXCLUDED_NOT_REPAIRED",
+    "note": "These three rows fail closed and are ineligible for semantic review. They are intentionally excluded from the batch-003 review population rather than repaired now; batch-003 itself is not mutated. The 17-candidate tranche buffer exists to absorb review loss, and any shortage or top-up is measured after semantic review, not here."
+  },
+  "authority": {
+    "wholeBatchAuditComplete": true,
+    "passRowsEligibleForSemanticReview": 301,
+    "failRowsIneligible": 3,
+    "humanSemanticReviewOccurred": false,
+    "strongModelSemanticReviewOccurred": false,
+    "surfaceAcceptanceOccurred": false,
+    "referenceLabelFreezeOccurred": false,
+    "trainingOrEvaluationOccurred": false,
+    "failuresAreSourceBundleConstructionFailuresNotSemanticJudgments": true
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-audit-da467dec231c50c1",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1f27d83d9ea5e8ff",
+      "disposition": "FAIL",
+      "reason": "Omitted lease-end context places the move timing around the August contract end, materially narrowing the otherwise generic undecided timing."
+    },
+    {
+      "auditRowId": "p1b6-audit-3cf28e971ff37911",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6a4eacb5358611af",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-0a15d8ccf1a28181",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-05394ce244bb9ebc",
+      "disposition": "FAIL",
+      "reason": "Omitted teammate instruction to hold off until quarter close adds a material deferral constraint on the tracker-switch decision."
+    },
+    {
+      "auditRowId": "p1b6-audit-ddd6cafab300c380",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1436240536a0fbd6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-53d7035c1f516d2a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b2e646e4d8cfb021",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-8b9fbfa2342935c5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5094d8ea544c73c2",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a8e23a2cdf57c4fd",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1df5145822d66cfb",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1d0fe00d4f228292",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-493b558ef67f368a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-38d47198092b2152",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-70196728e11a01fc",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-693d2415a5370a41",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-23dc569a0146a94a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-170531593a3dbf2b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5404ed2d7297f394",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4c637d9a5bff0528",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5a5c3d7fdcd70de3",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a9996411f8e20194",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-149efc3c67ec5456",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-af28edca5c008fa5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-29e2be8395affe5c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bb4662c734f3cd76",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-522549a3fdf1d871",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-324ce32f05516c45",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e2d794ed885d1971",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f4a7b02c7065f665",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-576127a4b50807ff",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-eceb0aa808f3e1e8",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-faa7ae7a1a91a53e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-40980c967aab68ff",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5f0c988358395251",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-de9288532571f906",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fe5abc6127791321",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-09ab4308751a578c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2696ef1a34c23160",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-26c485dcdd02220a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5473da2fb21cc9ba",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1545cc52f7b9f21c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2cd835ac01247437",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-082200a4377183f7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2f0d4d801c05e2c3",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-093d2464aeed9972",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-39393de16b1178dd",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e426c88c4a20641f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7842e0b11f59e177",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9fa0fee1f2927ebd",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9a26eb05bbce4fd1",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d06567c0a586e5c9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c8c56eb785604a50",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fc071d8be2f0e31d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a14dfa1d06c34afd",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a31ce17d918c826b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-48f81195ad925f50",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1333bd549078c4e0",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e92bef005eac50aa",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ae5bbfbb22139387",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e5d7976896b8b6a5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e4881433f16f1aa4",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f06e2f7c265b8bf7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6402d5270a3ec6d6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-dea70f3db4eecb8b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fb960c410a662e98",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d3c02ee12638317a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-006eafc85eb07736",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-20e54735632952fb",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d277c8e324e6025b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-86410c83647ca137",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b7919874fad5980b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f2d3ee5fb36ffb74",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c36dcdf2b6e8e1ec",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-66c0c235f497edc9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2d5ec64b1bdd541d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-8c3da9c607f83dbf",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4569ebfad1d04bce",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7abdc40813235f71",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-588d55dd1c8eed8c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9abbdeda91fa42a1",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1326931124c59f21",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1a66f7d289676251",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fa8ae19ea7fc709c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-371fad50750904d6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6c239afdcb171bee",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3e24b83a4d9ed66e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5c0adf09dadd8708",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5152824776ed1287",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5e6f0744e23cb902",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-de7b1393ca1d5c47",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-cfc286e1b001f1fe",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e4476bbb6d05a661",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e3673fa039ebd406",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-efed4105e41bddd3",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-81b06409b53c5ff2",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-434c9fe0e552b987",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bed422dac5befa49",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9b612f314be140de",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bee3d4f3b5f0c4e7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f9588f68dbc7ff52",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c6ca9585ab6d3f4f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b5a59147921d334a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a440c7d99412f744",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9940254c906a369a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-37ccdcdadbbff1b3",
+      "disposition": "FAIL",
+      "reason": "Omitted prior turn identifies 'that restaurant' as the cafeteria, resolving the referent needed to interpret the anchored report."
+    },
+    {
+      "auditRowId": "p1b6-audit-78d50830f05707f6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-00faa60f040ef928",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-506163e20cf0c744",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-936869eeb422e1d3",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fa11f631fbe31948",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6e32eb84676fbaf7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6ebea3f1634c4ac9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9db8d087e1bb5b0b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6fd3ddd4c98cddab",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7c2d15cdcb14248d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-559577c35aab13e2",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5cdf1de2cd3ab75e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-187fa9a777e1f6ff",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ed56d15c82b1ce94",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-12356b60aebcfae0",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b1edfbf0a2dceea5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-56b000657d063186",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c0bfcecb713d31ef",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2c0dc85160c89052",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fb8c6f5f12135317",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4ac5676a5b6fd0d9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f234dc1c5d6b7f03",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-338b92b8835fbfe7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c81a0accaf095712",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bb581ecfa001cda7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fa32078c1f4c6712",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d78d97c7e1f5b07f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2ecadb497fcd6853",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-80b0e428fcb436df",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-10286e2458e5ab43",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b095e4aa28ec9a9d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-589f4a303a43a454",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e8963d5441aa0ba7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4a6074c5a037bc61",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-cd3f57faba39ad60",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-09ead1b14efa3917",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f8f9f01b0886b718",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3e29646adda4ddff",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2a02d8d263af86f1",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4bcf7e71a696e502",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c6b28d314675a643",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d990ea2c287df758",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-08fec1094f7d4f25",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5a72aa4093e5229c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7ce7edf8e0785e8e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7371e4c97e46d621",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a95a7138b6276384",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-8c7cd3ed04d20235",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4e31a3914559ed0f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2a8365e31d8da5aa",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a55ccf7bbdd4e57b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b76fb654762afde9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bea44c1a11938917",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-aaa960ec7e3aea7f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f4343d07a2d57179",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-04ab7074971de72f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6b34917d0507651a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f1158eff6a080042",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2b03d6e7653d88e6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f8a918179b787a41",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-02ad89a40752a7b7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ed9a34e562bd7afc",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4cbdec1e8fa9ce99",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-596e7d69873ff5dd",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e8550bc21c99cb35",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-eab8610a339d8174",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4271acbb1e44c7b0",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9560d34644bbd4b9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c94197cb67b3df16",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bae70ad28b1f67da",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-21cd450cb45bc9ae",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4c3d66766e748910",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-266a0a90711d83a2",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2a7d711fd98230a6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6f0b8ce4ef9caa65",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-cf4156c7a236fd11",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ad1ab9613e530d87",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6857695400b3ff78",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bd657e53c6dbe8ec",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ef1b609326dd6e19",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ef88d46edadbb492",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ae29d5d57266b9d4",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-238ebfec86c4bb8d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ac7a364d717b4475",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6114817fdf135c13",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5e0714e1dcfac12b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7122111f0a586939",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e9b2e6dd5724b1cc",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5bdcab317ab5dbb6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7676937f2a6d2fc4",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c77f51c921d44d75",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2ab7d870b4895b72",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f9acf2800c3e7126",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-91c064cf9b176e9d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4fd7156af2d01f52",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-0a4b340a6a897ddb",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-93e692474e5cbf7f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a950f83e724fd821",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-babf83104a202690",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-40e25295cca7b14c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bc102fa4ad8d7aa7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-8dc758370f9216de",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-8808e38529064ae7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fe22395cd6a3ca35",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-dcc694163dce5b4b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-0c0964b0587dd945",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9855fb89453d1a8b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3bfc9cdca688154d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d9efaec936e0a1f4",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3b46329f7024b7ec",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ed9f4f82640c5587",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-80727dcd3fa8a2cb",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a2f3b5b47e78196a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2d01d66d7d7f951e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-0e8e41b1443f3a86",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7e8fa988eb2565c8",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-8a826a5d94f15a03",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d7b9150d7d846c5b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-552045d8d00eb4fe",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-cec467deb9987068",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d9d0948d6333fb0f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-53d7481b14ba8fa2",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a8ccc364652d1306",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-f1ee6a0f2c7bf7c4",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-ed885007ab90cad8",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a3076d0e6f469f05",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-da583e6cf17c9a72",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4de8f7af12690d6d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5ecd87e8be42b3e6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6508d8a2d37ad20c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7147dbef9b7ada5a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-950c56f67ceae7a3",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-1dfe5f28d13d7f34",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-fc64727bce034541",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-8b75156c59970960",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7c607a3d21ce35aa",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-21837618afd526e5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6419849c9f14f897",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6d6910b39b33bb25",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-31c4b1d88a2931b6",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-283e056aa6db2065",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3aa6dcd2736393d7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-892689c60b788c3f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-32aaa9606100d7d8",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-bea104cae6d958f4",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-815000b585e5de75",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-de01cb8edcaf42f0",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-68d568cf508ac467",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b33034bb8dce4a59",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9f38d7413103f2f5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-111c36ea3bd7f242",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7a286d3efcfcac1c",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-da6d5b3fd370c96d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-58e7ca5b6a321035",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d1ea0a83e05fd3b8",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-b6e4910b808ba423",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-aefafce58de08527",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-996bee052758cc5a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-196f5d96ebd217f9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4b5c118facebf9a2",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-99478757d6362bce",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-09d18657d6760a58",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d76a9f7f4eb7037f",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4a1bc55d841a8d41",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a88289ce2358ff8b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-9e3e97f1476ed7a7",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-d529edc7e1d120a0",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-85a1f36c8d127036",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5a24e9b1fc63e400",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7bb89638f51f7175",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e51617c9dce8bb03",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-83b2f60125773330",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a22027627b13a337",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-5eb95fe815cc1a19",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c047a2162c206f1a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-c40d2b0de3194e98",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-2877812c3dae97e9",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-7dfc9a49840d31a3",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-eb85423d796f1161",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-94bf23930b74044e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-763046cbe8321cdf",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-60047065535d5925",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3af60ab69a455069",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3e3b45e12d26ba6e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-259d56a301e5c9e5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6daf02c9916a872e",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-0a88ed732214fda0",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-e90f00cf5f2e8a49",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a13bdf6d46c7cc6d",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-a81f2aa63e030811",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-6980a33465987ec5",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-146958445b99ea24",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-3bcb55a881d00eb3",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-4ea881de8a28b25b",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    },
+    {
+      "auditRowId": "p1b6-audit-eff09b4d31dcb74a",
+      "disposition": "PASS",
+      "reason": "No omitted source material appears capable of materially changing the anchored candidate's interpretation or its CLEAR/ESCALATE judgment."
+    }
+  ]
+}

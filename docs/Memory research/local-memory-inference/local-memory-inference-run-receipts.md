@@ -4610,3 +4610,87 @@ UNOPENED, and the 380-item corpus is not complete.
 
 Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
 (20/20 pass) and the full `npm test` suite (1425/1425 pass).
+
+#### P1-B6 batch-003 source audit — COMPLETE_NEEDS_FIX at 301 PASS / 3 FAIL / 0 UNCERTAIN
+
+The fresh source audit ran over all 304 rows of the final repaired batch. The
+raw result artifact `p1b6-batch-003-source-audit-results.json`
+(`956a94cf59f2cd62594d035fa5cf913dc758920341b6319c43a3a557526dc3c6`) was verified
+mechanically against the canonical packet: batch
+`90b453c3…`, packet `9f18c656…`, protocol `63a2c70c…`, 304 unique audit IDs, all
+recognized, **301 PASS / 3 FAIL / 0 UNCERTAIN**. Opaque IDs were mapped back to
+items by recomputing them, not from a table.
+
+The three FAIL rows map exactly to `p1b6-item-b003-002`, `p1b6-item-b003-006`
+and `p1b6-item-b003-109`. The auditor's reasons are preserved verbatim in the
+receipt: omitted lease-end context narrowing an otherwise generic undecided
+timing; an omitted teammate instruction adding a material deferral constraint;
+an omitted prior turn resolving the referent the anchored report needs.
+
+**They fail closed, are excluded rather than repaired, and batch-003 was not
+mutated.** The 17-candidate tranche buffer absorbs review loss; shortage and
+top-up are measured after semantic review.
+
+The raw artifact carried only per-row dispositions and reasons, so the receipt
+records `evidenceBasis: NOT_SUPPLIED_IN_RESULT_ARTIFACT` — **no auditor provider,
+model or reasoning setting is claimed**, because none was supplied.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-source-audit-batch-003-attempt-001.json` | `3c840476bea6eccb522800248a3ace277b26a5334ec56b5f6b10bbf4d5821221` |
+| `fixtures/local-memory-inference-p1b6-large-batch-review-authority-amendment.json` | `821b0cb07580b4c2ac776014d88c78333263900759ca94d1746b4934964ffc0e` |
+| `fixtures/local-memory-inference-p1b6-strong-model-semantic-review-protocol.json` | `2f97028fe5bb9612a0750140754136785f99d07f93f7924c697a5b67990c16c4` |
+
+#### P1-B6 large-batch review-authority amendment — prospective
+
+The repository owner's intended large-batch workflow is **not** exhaustive manual
+HUMAN labeling of ~300 newly authored surfaces. The canonical design had
+generalized the small batch-001/batch-002 workflow into three blanket clauses —
+primary blind HUMAN review of every final item, HUMAN gold for every surface, and
+a repeated HUMAN pass over every eligible HELD candidate. **Those are superseded
+prospectively from batch-003 onward.** Batch-001/batch-002 HUMAN provenance stays
+valid and immutable; nothing historical was rewritten, renamed, or reopened.
+
+Prospective model: the effective-current catalog defines the reference label; the
+source audit validates evidence completeness; a fresh separate strong model
+reviews the realization blind; agreement between that blind decision and the
+reference label validates the realization **provisionally**
+(`CATALOG_STRONG_MODEL_CONFIRMED`, explicitly **not** HUMAN gold). HUMAN work is
+reserved for disagreement, `FIX`, `REJECT`, and a deterministic 32-row
+calibration sample. A strong-model disagreement never relabels the catalog, and a
+HUMAN `KEEP` opposing the reference label is a semantic mismatch requiring repair
+or rejection, not a silent catalog override.
+
+The final 190 CLEAR / 190 ESCALATE constraint is over the frozen **reference
+labels**. The corpus may legitimately mix `HISTORICAL_HUMAN_CONFIRMED`,
+`CATALOG_STRONG_MODEL_CONFIRMED` and `HUMAN_ADJUDICATED` rows, and no row is
+described as HUMAN-reviewed unless the owner actually reviewed it.
+
+`FINAL_HELD_OUT` gets a **second independent fresh strong-model blind review**
+over the provisionally selected 80 rows instead of a repeated HUMAN pass; only
+second-review conflicts reach HUMAN adjudication.
+
+#### P1-B6 batch-003 strong-model semantic-review packet — built, review NOT run
+
+`scripts/build-memory-inference-p1b6-batch-003-strong-model-review-packet.js`
+fails closed unless the batch bytes are the audited batch, the receipt binds to
+the canonical packet and protocol, and the outcome is exactly 304 / 301 / 3 / 0
+with the mechanically mapped 002 / 006 / 109 failures. It builds exactly **301**
+rows carrying only `reviewRowId` and `selectedBundle`, with opaque IDs in the new
+`p1b6-smreview-` namespace bound to protocol identity + batch SHA + item ID, in
+opaque order rather than source item order. `selectedBundle` is byte-identical to
+canonical renderer output. The historical generic HUMAN review builder is
+untouched and still refuses this receipt.
+
+Transient by convention and not committed, at raw SHA-256
+`91b0276d0301eb0d8193868d7bfbe011bfe9132fdf3501ec1151fb8689cd57ca`.
+
+The prospective reconciliation rule and the deterministic 32-row calibration
+selector are implemented and tested now so the next step is mechanical, but
+**neither is executed**: no strong-model result exists, no HUMAN packet was
+built, no decision was created, no label was frozen and nothing was accepted or
+trained. The accepted pool stays **93**.
+
+Tests run locally:
+`node --test test/memory-inference-p1b6-batch-003-strong-model-review.test.js`
+(10/10 pass) and the full `npm test` suite.

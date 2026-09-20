@@ -1,0 +1,94 @@
+{
+  "name": "xion-local-memory-inference-p1b6-large-batch-review-authority-amendment-v1",
+  "amendmentId": "p1b6-large-batch-review-authority-v1",
+  "status": "ACTIVE_PROSPECTIVE",
+  "decision": {
+    "source": "REPOSITORY_OWNER",
+    "kind": "EXPLICIT_DESIGN_CORRECTION",
+    "statement": "The intended large-batch workflow is not exhaustive manual HUMAN labeling of roughly 300 newly authored surfaces. The canonical design had generalized the small batch-001/batch-002 HUMAN-review workflow into blanket requirements; those requirements are superseded prospectively for large-batch growth."
+  },
+  "appliesFrom": "BATCH_003_LARGE_BATCH_REVIEW_ONWARD",
+  "retroactive": false,
+  "supersededProspectiveClauses": [
+    "every final item requires primary blind HUMAN review",
+    "HUMAN gold is authoritative for every surface",
+    "every eligible HELD candidate requires repeated HUMAN review"
+  ],
+  "historicalAuthority": {
+    "batch001And002ReviewArtifactsImmutable": true,
+    "historicalHumanProvenanceRemainsValid": true,
+    "retroactiveRelabelAuthorized": false,
+    "historicalWordingPreserved": true,
+    "note": "Batch-001 and batch-002 HUMAN review, re-review and acceptance receipts keep their original authority and wording. This amendment neither reopens nor renames any historical HUMAN decision."
+  },
+  "semanticAuthorityModel": {
+    "referenceLabelSourceOfTruth": "EFFECTIVE_CURRENT_SKELETON_CATALOG",
+    "exhaustivePerSurfaceHumanReviewRequired": false,
+    "appliesTo": [
+      "TRAIN",
+      "DEV",
+      "FINAL_HELD_OUT"
+    ],
+    "steps": [
+      "the effective-current semantic skeleton catalog defines the intended reference label",
+      "source/bundle audit validates evidence completeness",
+      "a fresh separate strong model performs blind semantic realization review",
+      "agreement between the blind strong-model decision and the reference label validates the realization provisionally",
+      "HUMAN review is reserved for strong-model/reference disagreement, FIX, REJECT, and a small deterministic calibration sample"
+    ],
+    "strongModelDisagreementRelabelsCatalog": false,
+    "strongModelDisagreementRelabelsSurface": false
+  },
+  "labelProvenanceCategories": {
+    "HISTORICAL_HUMAN_CONFIRMED": "Carried from batch-001/batch-002 HUMAN review and acceptance. Unchanged by this amendment.",
+    "CATALOG_STRONG_MODEL_CONFIRMED": "Source audit PASS, blind strong-model KEEP, and a strong-model decision equal to the effective-current reference label. Provisionally eligible. NOT HUMAN gold.",
+    "HUMAN_ADJUDICATED": "The repository owner actually reviewed the row and adjudicated it."
+  },
+  "humanProvenanceClaim": {
+    "unreviewedAgreementRowsAreHumanGold": false,
+    "calibrationExtrapolatedToUnreviewedRows": false,
+    "note": "No item may be described as HUMAN-reviewed unless the repository owner actually reviewed it. A clean calibration sample is QA evidence about the pipeline; it does not make unreviewed rows human-confirmed."
+  },
+  "humanAdjudicationSemantics": {
+    "KEEP_matching_reference": "May make the row eligible as HUMAN_ADJUDICATED.",
+    "FIX_or_REJECT": "Makes the current realization ineligible.",
+    "KEEP_opposing_reference": "Must not silently override the catalog. Treat the current realization as a semantic mismatch requiring surface repair or rejection; repeated same-skeleton mismatch may trigger an explicit skeleton-realizability review.",
+    "automaticCatalogAmendment": false
+  },
+  "finalHeldOutContract": {
+    "exhaustiveRepeatedHumanReviewRequired": false,
+    "secondIndependentStrongModelReviewRequired": true,
+    "humanAdjudicationScope": "HELD rows with a second-review disagreement, FIX or REJECT only"
+  },
+  "finalCorpusLabelConstraint": {
+    "constraint": "190 CLEAR / 190 ESCALATE",
+    "isOver": "FROZEN_REFERENCE_LABELS",
+    "claimsDirectHumanLabelingOfEvery380Surface": false,
+    "permittedProvenanceMixture": [
+      "HISTORICAL_HUMAN_CONFIRMED",
+      "CATALOG_STRONG_MODEL_CONFIRMED",
+      "HUMAN_ADJUDICATED"
+    ]
+  },
+  "boundTo": {
+    "canonicalDesign": {
+      "path": "docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md",
+      "rawSha256": "97551b7efdddbcb9aa71a68c87dcbee1041362b77f68c21025fc694fbfb7ef47",
+      "boundBefore": "THIS_AMENDMENT_S_OWN_DESIGN_EDIT"
+    },
+    "effectiveCurrentCatalog": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+      "path": "fixtures/local-memory-inference-p1b6-skeleton-effective-current.json",
+      "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559"
+    }
+  },
+  "authority": {
+    "skeletonSemanticsChanged": false,
+    "effectiveCurrentLabelsAmended": false,
+    "historicalArtifactsMutated": false,
+    "productionBehaviorChanged": false,
+    "humanReviewExecuted": false,
+    "strongModelReviewExecuted": false,
+    "acceptanceOrFreezeOccurred": false
+  }
+}

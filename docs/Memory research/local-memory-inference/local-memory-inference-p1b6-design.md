@@ -928,6 +928,118 @@ The final fragment totals are exactly 70 / 100 / 120 / 70 / 20 for 1 / 2 / 3
 / 4 / 5 fragments. The final language totals are exactly KO266, natural
 KO-EN mixed76, and EN38.
 
+## Large-Batch Review Authority (prospective amendment)
+
+The intended large-batch workflow is **not** exhaustive manual HUMAN labeling of
+roughly 300 newly authored surfaces. The canonical design had generalized the
+small batch-001/batch-002 HUMAN-review workflow into blanket requirements — that
+every final item receives primary blind HUMAN review, that HUMAN gold is
+authoritative for every surface, and that every eligible HELD candidate receives
+a repeated HUMAN pass. **Those three clauses are superseded prospectively for
+batch-003 and later large-batch growth** by an explicit repository-owner
+decision, recorded narrowly in
+`fixtures/local-memory-inference-p1b6-large-batch-review-authority-amendment.json`.
+
+Batch-001 and batch-002 HUMAN provenance remains **valid and immutable**. No
+historical receipt is rewritten, no historical HUMAN decision is renamed, and no
+retroactive relabel is authorized.
+
+For newly authored surfaces from batch-003 onward:
+
+1. the effective-current semantic skeleton catalog defines the intended
+   **reference label**;
+2. source/bundle audit validates evidence completeness;
+3. a fresh separate strong model performs blind semantic realization review;
+4. agreement between the blind strong-model decision and the reference label
+   validates the realization **provisionally**;
+5. HUMAN review is reserved for strong-model/reference disagreement,
+   strong-model `FIX`, strong-model `REJECT`, and a small deterministic
+   calibration sample of otherwise clean agreements;
+6. unreviewed clean agreements are **not** HUMAN gold.
+
+### Reference-label provenance
+
+Blanket prospective `HUMAN gold` wording is replaced by explicit provenance:
+
+| category | meaning |
+| --- | --- |
+| `HISTORICAL_HUMAN_CONFIRMED` | carried from batch-001/batch-002 HUMAN review and acceptance |
+| `CATALOG_STRONG_MODEL_CONFIRMED` | audit `PASS` + blind strong-model `KEEP` + decision equal to the reference label; provisional, **not** HUMAN gold |
+| `HUMAN_ADJUDICATED` | the repository owner actually reviewed and adjudicated the row |
+
+The final corpus may legitimately mix all three. **The 190 CLEAR / 190 ESCALATE
+constraint is over the frozen reference labels**, not a claim that 380 surfaces
+each received direct HUMAN labeling. No item is described as HUMAN-reviewed
+unless the owner actually reviewed it.
+
+The effective-current catalog stays the semantic authority. A strong-model
+disagreement never relabels a skeleton or a surface by itself.
+
+### HUMAN adjudication semantics
+
+When a routed row later reaches HUMAN adjudication:
+
+- HUMAN `KEEP` whose decision matches the reference label may make the row
+  eligible as `HUMAN_ADJUDICATED`;
+- HUMAN `FIX` or `REJECT` makes the current realization ineligible;
+- HUMAN `KEEP` whose decision **opposes** the reference label must not silently
+  override the catalog. Treat the realization as a semantic mismatch requiring
+  surface repair or rejection; repeated same-skeleton mismatch may trigger an
+  explicit skeleton-realizability review. The effective-current catalog is never
+  amended automatically.
+
+### Prospective reconciliation
+
+A row becomes `CATALOG_STRONG_MODEL_CONFIRMED` and provisionally eligible when
+source audit is `PASS`, strong-model disposition is `KEEP`, and the strong-model
+decision equals the effective-current reference label. A row routes to mandatory
+HUMAN adjudication on `FIX`, `REJECT`, a decision differing from the reference
+label, or a missing/invalid result. **The HUMAN-facing packet never exposes the
+routing reason, the model decision, or the reference label.**
+
+Alongside that, **32** clean-agreement rows are selected for blind HUMAN
+calibration by a deterministic rule: form cells by
+`boundaryClass × reference label`, use only cells present in the clean-agreement
+population, take one row from every non-empty cell first, rank rows inside a cell
+by `sha256("p1b6-large-batch-human-calibration-v1" + NUL + itemId)`, allocate the
+remaining slots up to 32 by largest remainder over each cell's remaining
+population with canonical `(boundaryClass, label)` ordering for ties, then take
+the next lowest hashes inside each cell. It **fails closed** if 32 clean
+agreements do not exist. At the current pre-review population 15 boundary × label
+cells are populated, but that count is **not a permanent invariant** — a
+strong-model disagreement can empty a cell.
+
+Calibration is QA of the pipeline. Its results are **not** extrapolated as HUMAN
+gold to unreviewed rows: a calibration-row defect is recorded as calibration
+evidence about that row, and a clean sample never proves that every unreviewed
+row is human-confirmed.
+
+## Batch-003 Source Audit — COMPLETE_NEEDS_FIX at 301 PASS / 3 FAIL / 0 UNCERTAIN
+
+The whole 304-row audit ran against the canonical packet and is complete. The
+receipt is
+`fixtures/local-memory-inference-p1b6-source-audit-batch-003-attempt-001.json`,
+bound to the batch, the audit packet, the audit protocol and the raw result
+artifact by identity and raw SHA. Opaque audit IDs were mapped back to items
+mechanically rather than from any hard-coded table. The raw artifact carried only
+per-row dispositions and reasons, so **no auditor model or runtime setting is
+recorded** — none was supplied and none is invented.
+
+Three rows fail closed and are ineligible for semantic review:
+`p1b6-item-b003-002` (omitted lease-end context narrows the otherwise generic
+undecided timing), `p1b6-item-b003-006` (an omitted teammate instruction adds a
+material deferral constraint) and `p1b6-item-b003-109` (an omitted prior turn
+resolves the referent the anchored report needs). The auditor's reasons are
+preserved verbatim in the receipt.
+
+**They are intentionally excluded, not repaired now, and batch-003 is not
+mutated.** The 17-candidate tranche buffer exists to absorb review loss; any
+shortage or top-up is measured after semantic review, not here.
+
+Exactly **301** rows are eligible for the next gate. No HUMAN review, no
+strong-model semantic review, no acceptance, no reference-label freeze and no
+training or evaluation has occurred.
+
 ## Closed Selection and Freeze Constraints
 
 The accepted surface pool is selected through a deterministic, constrained,
@@ -935,7 +1047,27 @@ reproducible procedure after review and leakage validation. It is not aesthetic
 hand-selection. The selection procedure must freeze its serialization,
 identity/hash tie-break, and constraint implementation before final selection.
 
-The required order is:
+**Prospective order, from batch-003 large-batch growth onward** (see the
+review-authority amendment below):
+
+```text
+authored surface
+  -> source/bundle audit PASS
+  -> blind strong-model semantic realization review
+  -> disagreement/FIX/REJECT HUMAN adjudication
+     + 32-row deterministic HUMAN calibration sample
+  -> reviewed eligible pool with explicit label provenance
+  -> deterministic constrained provisional selection
+  -> second independent strong-model review of selected HELD
+  -> HUMAN adjudication only for HELD conflicts
+  -> final constraint/leakage validation
+  -> reference-label + dataset freeze
+```
+
+Top-up is driven by actual shortages measured after these review losses, not
+planned in advance.
+
+The order used for the small batch-001 and batch-002 pools was:
 
 ```text
 authored HELD pool
@@ -950,11 +1082,14 @@ authored HELD pool
   -> dataset freeze
 ```
 
-Repeated HELD review therefore occurs before deterministic FINAL selection, and
-the evidence/target freeze precedes that repeated blind HUMAN review. No FINAL model output may be inspected before source audit, both HUMAN passes,
-disagreement resolution, pool gold freeze, deterministic selection, and dataset
-freeze. FINAL is never used for training, checkpoint selection, or
-hyperparameter selection.
+That historical order produced the batch-001/batch-002 receipts and their
+HUMAN provenance, which remain valid and immutable. It is **not** the order for
+large-batch growth.
+
+No FINAL model output may be inspected before source audit, semantic review,
+adjudication of every routed row, provisional selection, the second independent
+strong-model review of the selected HELD rows, and dataset freeze. FINAL is
+never used for training, checkpoint selection, or hyperparameter selection.
 
 After FINAL model output has been inspected, that evaluation version's
 membership, evidence, targets, and HUMAN gold are immutable. A later defect
@@ -1201,9 +1336,19 @@ full unselected source episode or:
 - `discoursePattern` metadata;
 - generator rationale.
 
+**Prospective scope (batch-003 onward):** this exhaustive per-surface HUMAN
+pass is superseded for large-batch growth. The blind reviewer of every PASS row
+is a fresh separate strong model under
+`fixtures/local-memory-inference-p1b6-strong-model-semantic-review-protocol.json`,
+and the section below applies to the rows that review routes to the repository
+owner. The blind-field list above still governs both reviewers.
+
 The reviewer independently chooses `KEEP / FIX / REJECT` and
-`CLEAR / ESCALATE`; HUMAN gold is authoritative and model suggestions remain
-advisory. Ill-defined gold, incoherent candidate focus, or implausible
+`CLEAR / ESCALATE`. For historical batch-001/batch-002 review, HUMAN gold was
+authoritative and model suggestions advisory. Prospectively the
+**effective-current skeleton catalog** is the reference-label authority: a
+strong-model decision never relabels it, and a HUMAN `KEEP` whose decision
+opposes the reference label does not silently override it either. Ill-defined gold, incoherent candidate focus, or implausible
 conversation is `REJECT`, not automatic `ESCALATE`. If the blind HUMAN label
 opposes the approved skeleton HUMAN label, it cannot be silently accepted or
 relabeled: it requires FIX plus new review or rejection. Repeated mismatch
@@ -1213,7 +1358,29 @@ Any evidence edit restarts the applicable source audit and blind review. No
 previous HUMAN label or generator intent is inherited after an evidence edit.
 No FINAL surface item is used for training or tuning.
 
-## HELD Repeated HUMAN Pass
+## HELD Second-Pass Validation
+
+**Prospective (batch-003 onward).** The repository owner does not perform two
+manual passes over every eligible HELD candidate. After the reviewed eligible
+pool can support deterministic corpus selection:
+
+1. perform provisional deterministic constrained selection;
+2. freeze the selected HELD evidence and targets;
+3. run a **second independent fresh strong-model blind semantic review** over
+   the provisionally selected 80 `FINAL_HELD_OUT` rows, hiding the first
+   strong-model result, the reference label, and all provenance/routing;
+4. a selected HELD row stays eligible only when **both** independent
+   strong-model reviews are `KEEP` and both decisions equal the reference label;
+5. any second-review disagreement, `FIX` or `REJECT` routes to HUMAN
+   adjudication;
+6. remove or reject defective rows and rerun deterministic selection if needed;
+7. only when no unresolved selected HELD row remains may the dataset freeze
+   occur.
+
+This is a second independent model review plus targeted adjudication. It is
+**not** repeated HUMAN review, and it must not be described as one.
+
+### Historical HELD repeated HUMAN pass (batch-001 / batch-002)
 
 After primary review, opaque-reorder the eligible frozen HELD pool before the
 repeated HUMAN pass. The same HUMAN reviewer performs this repeated blind pass;

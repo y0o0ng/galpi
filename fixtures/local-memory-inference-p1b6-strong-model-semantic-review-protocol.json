@@ -1,0 +1,91 @@
+{
+  "name": "xion-local-memory-inference-p1b6-strong-model-semantic-review-protocol-v1",
+  "protocolIdentity": "p1b6-strong-model-semantic-realization-review-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "isHumanProtocol": false,
+  "isSourceAuditProtocol": false,
+  "authorizedBy": "p1b6-large-batch-review-authority-v1",
+  "reviewer": {
+    "role": "fresh separate strong-model semantic realization reviewer",
+    "humanGoldAuthority": false,
+    "freshSessionRequired": true,
+    "knowsIntendedAnswer": false,
+    "mayAmendCatalog": false
+  },
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "question": "Reading only the visible selected bundle and its single marked TARGET, is the target's materially relevant semantic status determined by the visible evidence (CLEAR), or does the visible evidence positively license at least two materially different statuses (ESCALATE)? A competing reading that requires an unstated event, rule, preference, identity, exception or other new premise does not count, and bare logical compatibility is not ambiguity.",
+  "visibleToReviewer": [
+    "the exact model-visible selected bundle with its TARGET marking"
+  ],
+  "blindFields": [
+    "item ID",
+    "source episode ID",
+    "semanticSkeletonId",
+    "boundary class",
+    "split",
+    "language quota",
+    "discourse pattern",
+    "authoring label",
+    "effective-current reference label",
+    "source-audit reason or disposition",
+    "authoring rationale"
+  ],
+  "sourceEpisodeExposure": {
+    "fullUnselectedSourceEpisodeShown": false,
+    "rationale": "Source and bundle completeness was the previous gate and was decided there. This review is about the realization the model actually sees."
+  },
+  "outputContract": {
+    "required": ["reviewRowId", "disposition", "decision", "reason"],
+    "dispositionEnum": ["KEEP", "FIX", "REJECT"],
+    "decisionEnum": ["CLEAR", "ESCALATE", null],
+    "reason": "Short semantic or construction reason only. It is not ambiguity gold."
+  },
+  "dispositions": {
+    "KEEP": "The visible realization supports a stable semantic judgment. Requires decision CLEAR or ESCALATE.",
+    "FIX": "The visible realization appears repairable but is not clean enough to accept. Uses decision null.",
+    "REJECT": "The realization is ill-defined, incoherent, implausible, or lacks a meaningful stable semantic judgment. Uses decision null."
+  },
+  "constraints": [
+    "KEEP requires a non-null decision; FIX and REJECT require decision null.",
+    "The reviewer does not know the intended or reference answer.",
+    "The reviewer does not amend the effective-current skeleton catalog.",
+    "A REJECT is not an automatic ESCALATE.",
+    "Output is semantic QA evidence, not HUMAN gold.",
+    "This protocol authorizes no source edit, no acceptance, no label freeze, no training and no production use."
+  ],
+  "reconciliation": {
+    "cleanAgreement": {
+      "condition": "source audit PASS and disposition KEEP and decision equal to the effective-current reference label",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    "mandatoryHumanAdjudication": {
+      "routeWhen": [
+        "disposition FIX",
+        "disposition REJECT",
+        "decision differs from the reference label",
+        "result missing or invalid"
+      ],
+      "humanPacketMayExposeRoutingReason": false,
+      "humanPacketMayExposeModelDecision": false,
+      "humanPacketMayExposeReferenceLabel": false
+    },
+    "calibrationSample": {
+      "size": 32,
+      "population": "CLEAN_AGREEMENT_ROWS_ONLY",
+      "purpose": "QA of the pipeline, not exhaustive gold generation",
+      "extrapolatedToUnreviewedRows": false,
+      "hashDomain": "p1b6-large-batch-human-calibration-v1",
+      "rule": [
+        "form cells by boundaryClass x effective-current reference label",
+        "use only cells represented in the clean-agreement population",
+        "choose one row from every non-empty cell first",
+        "rank rows inside each cell by sha256 of the hash domain, a NUL separator, and the itemId",
+        "allocate the remaining slots up to 32 by largest remainder proportional to each cell's remaining agreement population, using canonical (boundaryClass, label) ordering for ties",
+        "select the next lowest hashes inside each cell"
+      ],
+      "failClosedWhenPopulationBelowSize": true,
+      "populatedCellCountIsNotAFixedInvariant": true
+    }
+  }
+}
