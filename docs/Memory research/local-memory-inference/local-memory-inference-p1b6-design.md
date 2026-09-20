@@ -908,6 +908,61 @@ extraction schemas, surface dialogue, source-episode provenance,
 `intendedLabel`, or `decisionBasis`. Existing contrast groups are inherited;
 new groups are not invented by later materialization.
 
+## Semantic Authority Lineage
+
+Three artifacts, three distinct roles. None replaces the file before it.
+
+| layer | artifact | labels | role |
+| --- | --- | --- | --- |
+| Historical freeze | `…-skeleton-exact56.json` (`772f07bd…`) | 32 / 24 | immutable historical provenance base |
+| Historical prior authority | `…-skeleton-effective-current.json` (`48490b6e…`) | 34 / 22 | the prior prospective authority; still committed, still byte-identical, still historical evidence |
+| **Current authority** | `…-skeleton-effective-current-v2.json` (`f1e78019…`) | **45 CLEAR / 11 ESCALATE** | prospective current semantic authority |
+
+v2 is derived from the **exact raw bytes of v1**, which already carry the Exact56
+lineage. Exact56 stays in provenance but is deliberately *not* a second
+independent rebuild path. The receipt is
+`…-skeleton-semantic-contract-v2-receipt.json` (`a12063c3…`) and the builder is
+`scripts/build-memory-inference-p1b6-skeleton-semantic-contract-v2.js`. All 56
+skeleton IDs, their order, split assignments, boundary classes and contrast
+groups are inherited unchanged; exactly 11 rows are amended and 45 are inherited.
+
+### Semantic contract v2
+
+- **CLEAR** when ordinary cooperative interpretation supports one natural
+  dominant materially relevant semantic status.
+- **ESCALATE** only when the visible evidence itself naturally and positively
+  licenses at least two materially different semantic readings and ordinary
+  pragmatic resolution cannot select one.
+- **Unknown is not ambiguity.** A question, an undecided state, an approximate
+  state, a conditional state, an attributed claim, an unknown cause, or an
+  unknown external fact is not ESCALATE merely because its real-world answer is
+  unknown.
+- **No added premise.** A competing reading that needs an unstated event, an
+  identity assumption, a grandfathering/effective-time rule, an old ordering, a
+  hidden preference, a category rule, an exception, or any other added premise is
+  not preserved.
+
+The 11 skeletons amended `ESCALATE → CLEAR` are `e7fe317a`, `66ecb02c`,
+`2da4e54e`, `5269c91f`, `2fa39ece`, `a19bb9e9`, `cc054a42`, `869c7127`,
+`aebbf047`, `16697b52` and `b8e64a03`. Each one's `candidateFocus` and
+`semanticRelations` are re-encoded to the new contract, not merely relabelled,
+and each carries an `interpretationContract` line. `2fa39ece` reverses the v1
+receipt's deliberate preservation of that skeleton; the reversal is recorded in
+the v2 receipt and the v1 receipt is not rewritten.
+
+**Current-rule temporal policy (`a19bb9e9`).** A changed category or rule governs
+the current interpretation unless visible evidence supplies an effective-time,
+grandfathering, or application-time governance rule. Merely mentioning that an
+application or action happened before the change does **not** invent such a rule.
+
+### The four mixed ESCALATE skeletons
+
+`5fc872af`, `be0efa30`, `f58debd8` and `28736b74` keep **ESCALATE at skeleton
+level**, but individual surface realizations may pragmatically collapse to CLEAR
+and must therefore be judged at surface QA time. The skeleton label does not
+decide a surface. This is not a defect in the skeletons; it is why surface QA
+exists.
+
 ## Supervised Corpus
 
 The new supervised corpus has exactly 380 surface items:
@@ -915,12 +970,21 @@ The new supervised corpus has exactly 380 surface items:
 - TRAIN 240;
 - DEV 60;
 - FINAL_HELD_OUT 80;
-- CLEAR 190 and ESCALATE 190 overall;
-- DEV has at least 15 CLEAR and 15 ESCALATE;
-- FINAL_HELD_OUT has at least 20 CLEAR and 20 ESCALATE.
+**Retired prospectively by semantic contract v2** (see below): the exact
+`CLEAR 190 / ESCALATE 190` total, the per-label DEV minimums, and the per-label
+`FINAL_HELD_OUT` minimums. **They are not replaced by a new target ratio.**
+CLEAR/ESCALATE counts are now a *derived property of semantically valid selected
+surfaces*, never an authoring or final-selection optimization target.
 
-The balanced 190/190 target is an evaluation/training construction constraint,
-not a claim about production ambiguity prevalence. All items from one source
+The historical wording, which applied under Exact56 and effective-current v1,
+was: CLEAR 190 and ESCALATE 190 overall; DEV at least 15 CLEAR and 15 ESCALATE;
+`FINAL_HELD_OUT` at least 20 CLEAR and 20 ESCALATE. That balanced target was an
+evaluation/training construction constraint, not a claim about production
+ambiguity prevalence.
+
+A low held-out positive count is a **downstream measurement-power limitation to
+report**. It is never fixed by relabeling, by moving historical skeletons between
+splits, or by inventing ambiguity. All items from one source
 episode stay in one split. FINAL_HELD_OUT is never used for checkpoint or
 hyperparameter selection.
 
@@ -1041,9 +1105,36 @@ preserved verbatim in the receipt.
 mutated.** The 17-candidate tranche buffer exists to absorb review loss; any
 shortage or top-up is measured after semantic review, not here.
 
-Exactly **301** rows are eligible for the next gate. No HUMAN review, no
-strong-model semantic review, no acceptance, no reference-label freeze and no
-training or evaluation has occurred.
+Exactly **301** rows are eligible for the next gate.
+
+### Batch-003 authoring allocation is historical metadata
+
+The frozen batch-003 authoring protocol allocated `CLEAR 141 / ESCALATE 163`.
+That number was derived under the **old corpus balance and the v1 catalog**. It
+is historical authoring metadata and **does not constrain current semantic
+truth**. The 304 authored surfaces are not regenerated, the frozen authoring
+protocol is not rewritten, and the growth-plan tests that reproduce it are
+verifying historical provenance rather than a current target.
+
+### Strong-model semantic review against v2
+
+The 301-row blind review was executed externally and its raw result artifact was
+supplied to the implementation environment, so it could be fed through the
+deterministic reconciliation path and bound by raw SHA-256. The receipt is
+`…-strong-model-semantic-review-batch-003-attempt-001.json`.
+
+Reconciliation reads **v2** as the current reference authority. The already-issued
+blind packet is unchanged and still binds the review-authority amendment that was
+in force when it was built: packet provenance and current reconciliation
+authority are separate concerns, and no review row ID, rendered bundle, or
+strong-model answer was altered because the catalog moved afterwards.
+
+**A summary alone is never enough.** Had the raw bytes been unavailable, the
+implementation would have stopped at reconciliation support: no result receipt,
+no SHA, no HUMAN packet, no calibration, no acceptance.
+
+No HUMAN adjudication, no calibration draw, no acceptance, no reference-label
+freeze and no training or evaluation has occurred.
 
 ## Closed Selection and Freeze Constraints
 

@@ -1,0 +1,284 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v2-receipt-v1",
+  "status": "COMPLETE_PROSPECTIVE_SEMANTIC_CONTRACT_SUCCESSION",
+  "contractVersion": "v2",
+  "interpretationRule": {
+    "identity": "P1B6_SEMANTIC_CONTRACT_V2",
+    "supersedesProspectively": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+    "clear": "CLEAR when ordinary cooperative interpretation supports one natural dominant materially relevant semantic status.",
+    "escalate": "ESCALATE only when the visible evidence itself naturally and positively licenses at least two materially different semantic readings and ordinary pragmatic resolution cannot select one.",
+    "unknownIsNotAmbiguity": "A question, an undecided state, an approximate state, a conditional state, an attributed claim, an unknown cause, or an unknown external fact is not ESCALATE merely because its real-world answer is unknown.",
+    "noAddedPremise": "Do not preserve a competing reading that requires an unstated event, identity assumption, grandfathering or effective-time rule, old ordering, hidden preference, category rule, exception, or other added premise."
+  },
+  "historicalExact56": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-exact56-v1",
+    "rawSha256": "772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602",
+    "role": "IMMUTABLE_HISTORICAL_FREEZE_AND_PROVENANCE_BASE",
+    "rebuiltFromHere": false,
+    "note": "Retained as lineage provenance only. v2 is derived from the v1 catalog bytes, which already preserve this lineage; it is not independently rebuilt from Exact56."
+  },
+  "derivationBase": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v1",
+    "rawSha256": "48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559",
+    "role": "IMMUTABLE_HISTORICAL_PRIOR_PROSPECTIVE_AUTHORITY_AND_DERIVATION_BASE",
+    "note": "v1 remains committed and byte-identical as historical evidence of the prior prospective authority. v2 does not overwrite or replace it."
+  },
+  "priorAmendmentReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-amendment-receipt-v1",
+    "rawSha256": "2778f64cf9f8f15bc85b7d015b706f5e87ad20e9dafc1249357477b235744977",
+    "role": "IMMUTABLE_HISTORICAL_AMENDMENT_EVIDENCE"
+  },
+  "successorCatalog": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v2",
+    "role": "PROSPECTIVE_CURRENT_SEMANTIC_AUTHORITY"
+  },
+  "supersededPriorDecisions": [
+    {
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "priorDecision": "PRESERVED_AS_ESCALATE_BY_THE_V1_AMENDMENT_RECEIPT",
+      "currentDecision": "AMENDED_TO_CLEAR_UNDER_SEMANTIC_CONTRACT_V2",
+      "note": "The v1 receipt deliberately preserved this skeleton's ambiguity. Contract v2 reverses that decision prospectively. The v1 receipt and catalog are not rewritten; this row records the reversal."
+    }
+  ],
+  "summary": {
+    "totalSkeletons": 56,
+    "amendedSkeletons": 11,
+    "inheritedSkeletons": 45,
+    "fromHumanLabelCounts": { "ESCALATE": 11 },
+    "toHumanLabelCounts": { "CLEAR": 11 },
+    "resultingLabelCounts": { "CLEAR": 45, "ESCALATE": 11 }
+  },
+  "amendments": [
+    {
+      "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+      "splitAssignment": "DEV",
+      "boundaryClass": "FINALITY / COMMITMENT",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "대안을 계속 비교하는 중에 명시된 선호의 현재 상태",
+      "semanticRelations": [
+        "대상에 대해 명시적 선호가 진술된다.",
+        "뒤의 관계는 사용자가 대안을 계속 비교하고 있음을 말한다.",
+        "그 선호 진술을 철회하거나 다른 선호로 대체하는 관계는 없다."
+      ],
+      "interpretationContract": "선호 상태와 최종 선택 완료는 별개 상태다. 비교를 계속한다는 사실은 이미 진술된 현재 선호를 취소하지 않는다. 최종 선택이 끝나지 않은 것은 미결이지 두 개의 경쟁 읽기가 아니다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-66ecb02cbfc40c3c",
+      "splitAssignment": "DEV",
+      "boundaryClass": "REFERENT",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "순서 집합이 갱신된 뒤 서수 표현의 지시 대상",
+      "semanticRelations": [
+        "순서가 있는 집합에 삽입이나 갱신이 보이게 일어난다.",
+        "뒤의 서수 표현이 그 집합의 항목을 가리킨다.",
+        "옛 순서를 다시 활성화하는 관계는 없다."
+      ],
+      "interpretationContract": "통상적 해석은 갱신된 현재 순서를 쓴다. 옛 순서가 지시 대상을 정하려면 원문이 그것을 명시적으로 다시 불러와야 하고, 단지 옛 순서가 앞서 언급되었다는 사실만으로 경쟁 읽기가 유지되지는 않는다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "예외 하위 범주 소속이 알려지지 않은 규칙의 적용",
+      "semanticRelations": [
+        "일반 규칙이 범주에 적용된다.",
+        "예외 관계가 하위 범주에 붙어 있다.",
+        "대상이 그 하위 범주에 속하는지 알려 주는 관계는 없다."
+      ],
+      "interpretationContract": "규칙과 예외의 의미는 둘 다 결정되어 있고, 빠진 것은 대상의 분류 사실이다. 소속 여부를 모르는 것은 사실·적용 가능성의 미상이지 두 개의 의미 해석이 아니다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "splitAssignment": "DEV",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "느슨하게 기술된 범주 정의를 일부만 만족하는 대상의 분류",
+      "semanticRelations": [
+        "일반 규칙이 느슨하게 기술된 범주에 적용된다.",
+        "대상이 그 정의의 일부만 만족한다.",
+        "그 정의가 대상을 포함하는지 확정하는 관계는 없다."
+      ],
+      "interpretationContract": "범주 소속이 미상으로 남을 수 있지만, 그 미상은 분류 사실의 미상이지 의미 모호성이 아니다. 규칙의 의미도 대상의 기술도 결정되어 있다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "나중에 컨테이너로 옮겨진 항목에 대한 일반 규칙의 적용",
+      "semanticRelations": [
+        "컨테이너 안 항목들에 대한 일반 규칙이 진술된다.",
+        "대상이 나중에 그 컨테이너로 옮겨진다.",
+        "규칙을 이전 또는 현재 항목 집합으로 한정하거나 나중 반입분을 배제하는 표현은 없다."
+      ],
+      "interpretationContract": "통상적 해석은 컨테이너 규칙이 나중에 들어온 항목에도 미친다고 본다. 시점 한정이나 나중 반입분 배제는 보이는 표현이 실제로 그렇게 말할 때만 인정하고, 없으면 지어내지 않는다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "범주나 규칙이 변경된 뒤 현재 규칙의 지배",
+      "semanticRelations": [
+        "규칙이 범주 구성원에 대해 진술된다.",
+        "뒤의 관계가 그 범주 경계나 규칙을 바꾼다.",
+        "시행 시점, 경과 규정, 적용 시점 같은 지배 규칙을 제공하는 관계는 없다."
+      ],
+      "interpretationContract": "기본값은 현재 규칙이다. 신청이나 행위가 변경 전에 있었다는 언급만으로 경과 규정을 지어내지 않는다. 옛 경계가 지배하려면 보이는 근거가 시행 시점·적용 시점 규칙을 실제로 제공해야 한다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "다면 보고 중 한 면에 명시적으로 동조했을 때 채택 범위",
+      "semanticRelations": [
+        "대상 상태가 다른 화자에게 귀속되고 여러 면을 담는다.",
+        "사용자가 그중 식별 가능한 한 면에 명시적으로 동조한다.",
+        "나머지 면까지 채택했음을 지지하는 관계는 없다."
+      ],
+      "interpretationContract": "동조한 면만 채택되고 확인되지 않은 면은 귀속 상태로 남는다. 보고 전체를 채택했다는 읽기는 적극적 근거가 있을 때만 인정한다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "boundaryClass": "ACTUALITY",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "원인이 알려지지 않은, 관찰된 시스템 동작이나 상태",
+      "semanticRelations": [
+        "관찰된 시스템 동작이나 상태가 진술된다.",
+        "그 상태의 원인이 사용자 선호인지 외부 제약인지 알려 주는 관계는 없다.",
+        "관찰된 상태 자체를 다르게 기술하는 관계는 없다."
+      ],
+      "interpretationContract": "관찰된 상태의 의미 지위는 결정되어 있다. 원인이 선호인지 외부 제약인지 모르는 것은 원인의 미상이지 상태의 모호성이 아니다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "splitAssignment": "DEV",
+      "boundaryClass": "COMPLEMENTARY EVIDENCE",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "서로 다른 맥락에서 진술된 대응 값들의 기본 관계",
+      "semanticRelations": [
+        "한 관계가 한 맥락에서 값이나 사실을 진술한다.",
+        "다른 관계가 다른 맥락에서 대응하는 값이나 사실을 진술한다.",
+        "두 값을 합산하거나 동일시하거나 비교하거나 결합하도록 요구하는 관계는 없다."
+      ],
+      "interpretationContract": "기본값은 별개 사실이다. 보이는 관계가 요구하지 않는 집계·동일성·비교·결합을 지어내지 않으며, 그런 연결이 가능하다는 것만으로 경쟁 읽기가 생기지는 않는다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-16697b52f83abeba",
+      "splitAssignment": "DEV",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "상대적 변화 표현이 쓰는 담화 기준점",
+      "semanticRelations": [
+        "대상 상태가 상대적 변화로 표현된다.",
+        "담화에 관련 기준점이 하나 이상 나타난다.",
+        "가장 최근의 관련 기준점이 아닌 다른 기준점을 적극적으로 지시하는 관계는 없다."
+      ],
+      "interpretationContract": "통상적 해석은 가장 최근의 관련 담화 기준점을 쓴다. 앞서 언급되어 이용 가능하다는 것만으로 옛 기준점이 살아 있는 경쟁 읽기가 되지는 않는다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-b8e64a03d97f251c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "fromHumanLabel": "ESCALATE",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "사용자 자신의 상태를 묻는 질문의 의미 지위",
+      "semanticRelations": [
+        "대상이 사용자 자신의 상태를 묻는 질문 안에 나타난다.",
+        "질문 안의 명제는 주장되지 않는다.",
+        "그 질문에 대한 답을 제공하는 관계는 없다."
+      ],
+      "interpretationContract": "질문의 의미 지위는 문의 또는 미상으로 결정되어 있다. 답이 아직 없다는 사실은 그 발화가 의미적으로 모호하다는 뜻이 아니다."
+    }
+  ],
+  "survivingEscalateSkeletonIds": [
+    "p1b6-sk-5229ea237196499d",
+    "p1b6-sk-49e0f357eda8365c",
+    "p1b6-sk-9dc48f4b2f10775d",
+    "p1b6-sk-5f335bdc1d9d630c",
+    "p1b6-sk-59c8f51891ab4996",
+    "p1b6-sk-38c426bb2e0bff42",
+    "p1b6-sk-135ab77919a554dc",
+    "p1b6-sk-5fc872afb058b370",
+    "p1b6-sk-be0efa305956d111",
+    "p1b6-sk-f58debd8f04f5c60",
+    "p1b6-sk-28736b74c85fcc93"
+  ],
+  "mixedRealizationEscalateSkeletons": [
+    {
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "skeletonLabel": "ESCALATE",
+      "note": "동일 인스턴스인지 별도 인스턴스인지가 열려 있을 때만 ESCALATE다. 개별 표면 실현이 두 기술을 같은 인스턴스로 자연스럽게 묶어 읽히면 그 표면은 CLEAR로 붕괴한다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "skeletonLabel": "ESCALATE",
+      "note": "두 규칙이 같은 차원에서 실제로 겹칠 때만 ESCALATE다. 규칙이 직교하거나 한쪽이 명시적 예외로 읽히면 그 표면은 CLEAR로 붕괴한다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "skeletonLabel": "ESCALATE",
+      "note": "빈도 읽기와 양 읽기가 둘 다 자연스러울 때만 ESCALATE다. 개별 표면의 단위나 술어가 한쪽 차원을 선택해 버리면 그 표면은 CLEAR로 붕괴한다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "skeletonLabel": "ESCALATE",
+      "note": "두 대략값의 관계가 범위·선택지·수정 중 어느 것인지 열려 있을 때만 ESCALATE다. 개별 표면이 수정 순서나 선택지 집합을 자연스럽게 지시하면 그 표면은 CLEAR로 붕괴한다."
+    }
+  ],
+  "mixedRealizationPolicy": "이 네 skeleton은 skeleton 수준에서 ESCALATE를 유지하되, 개별 표면 실현은 표면 QA 시점에 판정한다. skeleton 라벨이 개별 표면의 의미 판정을 대신하지 않는다.",
+  "corpusLabelContract": {
+    "retiredProspectively": [
+      "final corpus exactly 190 CLEAR / 190 ESCALATE",
+      "per-label DEV minimums",
+      "per-label FINAL_HELD_OUT minimums"
+    ],
+    "replacedWithNewRatio": false,
+    "currentRule": "CLEAR_ESCALATE_COUNTS_ARE_A_DERIVED_PROPERTY_OF_SEMANTICALLY_VALID_SELECTED_SURFACES",
+    "rationale": "라벨 균형을 목표로 잡으면 의미 계약이 아니라 카운트가 표면 판정을 정하게 된다. 라벨은 이제 authoring이나 최종 선정의 최적화 대상이 아니라 결과다.",
+    "unchangedStructuralContracts": [
+      "total corpus size 380",
+      "TRAIN / DEV / FINAL_HELD_OUT = 240 / 60 / 80",
+      "language totals",
+      "fragment totals",
+      "source and bundle audit requirements",
+      "split isolation",
+      "held skeleton structure"
+    ],
+    "heldOutPositiveCount": "낮은 held-out ESCALATE 수는 보고할 측정력 한계이지, 재라벨이나 split 이동이나 모호성 날조로 메울 대상이 아니다."
+  },
+  "batch003AuthoringProvenance": {
+    "frozenAuthoringAllocation": { "CLEAR": 141, "ESCALATE": 163 },
+    "status": "HISTORICAL_AUTHORING_METADATA_ONLY",
+    "note": "옛 코퍼스 균형과 v1 카탈로그 아래에서 나온 수치다. 현재 의미 진실을 구속하지 않으며, 304개 표면은 재생성하지 않는다. 고정된 authoring 프로토콜도 다시 쓰지 않는다."
+  },
+  "authority": {
+    "historicalExact56Superseded": false,
+    "historicalEffectiveCurrentV1Overwritten": false,
+    "historicalHumanDecisionsAltered": false,
+    "batch001Or002AcceptanceReopened": false,
+    "batch003SurfacesRegenerated": false,
+    "batch003AuthoringProtocolRewritten": false,
+    "strongModelOutputRelabeled": false,
+    "surfacesRepaired": false,
+    "datasetAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "humanAdjudicationPerformed": false,
+    "calibrationPerformed": false,
+    "trainingOccurred": false,
+    "productionBehaviorChanged": false
+  }
+}

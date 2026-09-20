@@ -1,0 +1,219 @@
+{
+  "name": "xion-local-memory-inference-p1b6-strong-model-semantic-review-batch-003-attempt-001-receipt-v1",
+  "attemptId": "p1b6-strong-model-semantic-review-batch-003-attempt-001",
+  "status": "COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V2",
+  "reviewProtocol": {
+    "identity": "p1b6-strong-model-semantic-realization-review-v1",
+    "sha256": "2f97028fe5bb9612a0750140754136785f99d07f93f7924c697a5b67990c16c4"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-003-strong-model-semantic-review-packet-v1",
+    "sha256": "91b0276d0301eb0d8193868d7bfbe011bfe9132fdf3501ec1151fb8689cd57ca",
+    "rows": 301
+  },
+  "reviewAuthorityAmendment": {
+    "identity": "p1b6-large-batch-review-authority-v1",
+    "sha256": "821b0cb07580b4c2ac776014d88c78333263900759ca94d1746b4934964ffc0e"
+  },
+  "reviewedSourceBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+    "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68"
+  },
+  "sourceAuditAttempt": "p1b6-source-audit-batch-003-attempt-001",
+  "rawResultArtifact": {
+    "filename": "p1b6-batch-003-strong-model-semantic-review-results.json",
+    "sha256": "148c272fa77174ce51d61d7cf5adce959061623715078284a5e6a7b0cfcdb2de",
+    "committed": false
+  },
+  "reviewerExecutionProvenance": {
+    "evidenceBasis": "NOT_SUPPLIED_IN_RESULT_ARTIFACT",
+    "note": "The raw result artifact carries only per-row reviewRowId, disposition, decision and reason. No provider, surface, model, reasoning setting or session metadata accompanied it, and none is invented here."
+  },
+  "currentReferenceAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v2",
+    "rawSha256": "f1e780195441246402ca389da188b1f7b8c4970f42fc1e6e3de2f436a3e9377c",
+    "role": "PROSPECTIVE_CURRENT_SEMANTIC_AUTHORITY",
+    "note": "Reconciliation reads v2. The issued blind packet still binds the review-authority amendment that was in force when it was built, and its bytes are unchanged."
+  },
+  "rawResultSummary": {
+    "total": 301,
+    "dispositions": {
+      "KEEP": 301
+    },
+    "decisions": {
+      "ESCALATE": 87,
+      "CLEAR": 214
+    }
+  },
+  "reconciliation": {
+    "agreements": 267,
+    "humanAdjudicationRouted": 34,
+    "routes": {
+      "DECISION_DISAGREEMENT": 34
+    },
+    "agreementByReferenceLabel": {
+      "CLEAR": 191,
+      "ESCALATE": 76
+    },
+    "provenanceForAgreements": "CATALOG_STRONG_MODEL_CONFIRMED",
+    "eligibilityForAgreements": "PROVISIONAL"
+  },
+  "disagreementsBySkeleton": {
+    "p1b6-sk-28736b74c85fcc93": {
+      "referenceLabel": "ESCALATE",
+      "modelDecision": "CLEAR",
+      "count": 2,
+      "itemIds": [
+        "p1b6-item-b003-060",
+        "p1b6-item-b003-061"
+      ]
+    },
+    "p1b6-sk-2da4e54e6609e34b": {
+      "referenceLabel": "CLEAR",
+      "modelDecision": "ESCALATE",
+      "count": 3,
+      "itemIds": [
+        "p1b6-item-b003-072",
+        "p1b6-item-b003-073",
+        "p1b6-item-b003-076"
+      ]
+    },
+    "p1b6-sk-49e0f357eda8365c": {
+      "referenceLabel": "ESCALATE",
+      "modelDecision": "CLEAR",
+      "count": 1,
+      "itemIds": [
+        "p1b6-item-b003-114"
+      ]
+    },
+    "p1b6-sk-5269c91fcfb6c2cd": {
+      "referenceLabel": "CLEAR",
+      "modelDecision": "ESCALATE",
+      "count": 4,
+      "itemIds": [
+        "p1b6-item-b003-142",
+        "p1b6-item-b003-143",
+        "p1b6-item-b003-144",
+        "p1b6-item-b003-145"
+      ]
+    },
+    "p1b6-sk-5f335bdc1d9d630c": {
+      "referenceLabel": "ESCALATE",
+      "modelDecision": "CLEAR",
+      "count": 1,
+      "itemIds": [
+        "p1b6-item-b003-155"
+      ]
+    },
+    "p1b6-sk-5fc872afb058b370": {
+      "referenceLabel": "ESCALATE",
+      "modelDecision": "CLEAR",
+      "count": 3,
+      "itemIds": [
+        "p1b6-item-b003-161",
+        "p1b6-item-b003-162",
+        "p1b6-item-b003-164"
+      ]
+    },
+    "p1b6-sk-9dc48f4b2f10775d": {
+      "referenceLabel": "ESCALATE",
+      "modelDecision": "CLEAR",
+      "count": 1,
+      "itemIds": [
+        "p1b6-item-b003-214"
+      ]
+    },
+    "p1b6-sk-be0efa305956d111": {
+      "referenceLabel": "ESCALATE",
+      "modelDecision": "CLEAR",
+      "count": 6,
+      "itemIds": [
+        "p1b6-item-b003-241",
+        "p1b6-item-b003-242",
+        "p1b6-item-b003-244",
+        "p1b6-item-b003-245",
+        "p1b6-item-b003-246",
+        "p1b6-item-b003-248"
+      ]
+    },
+    "p1b6-sk-cc054a4227cdafef": {
+      "referenceLabel": "CLEAR",
+      "modelDecision": "ESCALATE",
+      "count": 4,
+      "itemIds": [
+        "p1b6-item-b003-254",
+        "p1b6-item-b003-256",
+        "p1b6-item-b003-258",
+        "p1b6-item-b003-259"
+      ]
+    },
+    "p1b6-sk-f58debd8f04f5c60": {
+      "referenceLabel": "ESCALATE",
+      "modelDecision": "CLEAR",
+      "count": 9,
+      "itemIds": [
+        "p1b6-item-b003-290",
+        "p1b6-item-b003-292",
+        "p1b6-item-b003-293",
+        "p1b6-item-b003-294",
+        "p1b6-item-b003-295",
+        "p1b6-item-b003-296",
+        "p1b6-item-b003-297",
+        "p1b6-item-b003-299",
+        "p1b6-item-b003-300"
+      ]
+    }
+  },
+  "routedItemIds": [
+    "p1b6-item-b003-060",
+    "p1b6-item-b003-061",
+    "p1b6-item-b003-072",
+    "p1b6-item-b003-073",
+    "p1b6-item-b003-076",
+    "p1b6-item-b003-114",
+    "p1b6-item-b003-142",
+    "p1b6-item-b003-143",
+    "p1b6-item-b003-144",
+    "p1b6-item-b003-145",
+    "p1b6-item-b003-155",
+    "p1b6-item-b003-161",
+    "p1b6-item-b003-162",
+    "p1b6-item-b003-164",
+    "p1b6-item-b003-214",
+    "p1b6-item-b003-241",
+    "p1b6-item-b003-242",
+    "p1b6-item-b003-244",
+    "p1b6-item-b003-245",
+    "p1b6-item-b003-246",
+    "p1b6-item-b003-248",
+    "p1b6-item-b003-254",
+    "p1b6-item-b003-256",
+    "p1b6-item-b003-258",
+    "p1b6-item-b003-259",
+    "p1b6-item-b003-290",
+    "p1b6-item-b003-292",
+    "p1b6-item-b003-293",
+    "p1b6-item-b003-294",
+    "p1b6-item-b003-295",
+    "p1b6-item-b003-296",
+    "p1b6-item-b003-297",
+    "p1b6-item-b003-299",
+    "p1b6-item-b003-300"
+  ],
+  "authority": {
+    "humanAdjudicationPerformed": false,
+    "calibrationSampleDrawn": false,
+    "calibrationPerformed": false,
+    "strongModelOutputRelabeled": false,
+    "catalogAmendedByThisResult": false,
+    "surfacesRepaired": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  },
+  "nextGates": [
+    "HUMAN adjudication of the 34 routed rows",
+    "deterministic 32-row HUMAN calibration sample over the 267 clean agreements"
+  ]
+}

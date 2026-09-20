@@ -26,7 +26,12 @@ const BATCH = 'fixtures/local-memory-inference-p1b6-surface-batch-003.json';
 const RECEIPT = 'fixtures/local-memory-inference-p1b6-source-audit-batch-003-attempt-001.json';
 const AMENDMENT = 'fixtures/local-memory-inference-p1b6-large-batch-review-authority-amendment.json';
 const SM_PROTOCOL = 'fixtures/local-memory-inference-p1b6-strong-model-semantic-review-protocol.json';
-const CATALOG = 'fixtures/local-memory-inference-p1b6-skeleton-effective-current.json';
+// Reconciliation reads the CURRENT reference authority, which is semantic contract v2. The
+// superseded v1 catalog stays committed as historical evidence and must not be read here.
+const CATALOG = 'fixtures/local-memory-inference-p1b6-skeleton-effective-current-v2.json';
+const CATALOG_V1 = 'fixtures/local-memory-inference-p1b6-skeleton-effective-current.json';
+const CATALOG_V2_SHA256 = 'f1e780195441246402ca389da188b1f7b8c4970f42fc1e6e3de2f436a3e9377c';
+const CATALOG_V1_SHA256 = '48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559';
 
 const BATCH_SHA256 = '90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68';
 const AUDIT_PACKET_SHA256 = '9f18c656a1717c8d11b9e12ebb68d3e3a9d1e79dcb77d9371be859f45a9252a2';
@@ -43,8 +48,8 @@ const UNCHANGED = Object.freeze({
   'fixtures/local-memory-inference-p1b6-source-audit-protocol.json': AUDIT_PROTOCOL_SHA256,
   'fixtures/local-memory-inference-p1b6-skeleton-exact56.json':
     '772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602',
-  'fixtures/local-memory-inference-p1b6-skeleton-effective-current.json':
-    '48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559',
+  'fixtures/local-memory-inference-p1b6-skeleton-effective-current.json': CATALOG_V1_SHA256,
+  'fixtures/local-memory-inference-p1b6-skeleton-effective-current-v2.json': CATALOG_V2_SHA256,
   'lib/memory-inference-p1b6-surfaces.js':
     '4b6dabf2280529b138efe124f32252c2ff7a2b9a118d7eb2c2b3341c7c56f1b7',
   'scripts/build-memory-inference-p1b6-human-review-packet.js':
@@ -151,8 +156,18 @@ test('the review-authority amendment is prospective and grants no retroactive mu
   for (const [key, value] of Object.entries(amendment.authority)) {
     assert.equal(value, false, key);
   }
-  assert.equal(amendment.boundTo.effectiveCurrentCatalog.rawSha256,
-    sha256RawBytes(read(CATALOG)));
+  // The amendment is historical: it binds the v1 catalog that was current when it was written,
+  // and semantic contract v2 supersedes its label rule prospectively rather than editing it.
+  assert.equal(amendment.boundTo.effectiveCurrentCatalog.rawSha256, CATALOG_V1_SHA256);
+  assert.equal(amendment.boundTo.effectiveCurrentCatalog.identity,
+    'xion-local-memory-inference-p1b6-skeleton-effective-current-v1');
+  assert.equal(amendment.finalCorpusLabelConstraint.constraint, '190 CLEAR / 190 ESCALATE');
+  const contract = readJson(
+    'fixtures/local-memory-inference-p1b6-skeleton-semantic-contract-v2-receipt.json');
+  assert.equal(contract.corpusLabelContract.retiredProspectively
+    .includes('final corpus exactly 190 CLEAR / 190 ESCALATE'), true);
+  assert.equal(contract.corpusLabelContract.replacedWithNewRatio, false);
+  assert.equal(contract.authority.historicalEffectiveCurrentV1Overwritten, false);
 });
 
 test('the strong-model protocol leaks no expected answer and is not a HUMAN protocol', () => {
@@ -305,7 +320,7 @@ const cleanResults = (mutate = rows => rows) => mutate(canonical().references
     reason: 'stable judgment from the visible bundle',
   })));
 
-test('canonical references are derived from the batch and the pinned catalog', () => {
+test('canonical references are derived from the batch and the pinned v2 catalog', () => {
   const { references, catalogSha256, batchSha256 } = canonical();
   const batch = readJson(BATCH);
   const catalog = readJson(CATALOG);
@@ -317,6 +332,12 @@ test('canonical references are derived from the batch and the pinned catalog', (
   assert.equal(batchSha256, BATCH_SHA256);
   assert.equal(catalogSha256, strongModel.CATALOG_SHA256);
   assert.equal(catalogSha256, sha256RawBytes(read(CATALOG)));
+  assert.equal(catalogSha256, CATALOG_V2_SHA256);
+  assert.equal(readJson(CATALOG).name,
+    'xion-local-memory-inference-p1b6-skeleton-effective-current-v2');
+  // The superseded v1 catalog is still committed, but it is not what reconciliation reads.
+  assert.notEqual(catalogSha256, CATALOG_V1_SHA256);
+  assert.equal(sha256RawBytes(read(CATALOG_V1)), CATALOG_V1_SHA256);
 
   const items = new Map(batch.items.map(item => [item.itemId, item]));
   for (const reference of references) {
@@ -330,6 +351,16 @@ test('canonical references are derived from the batch and the pinned catalog', (
     assert.equal(reference.referenceLabel, skeleton.humanLabel, reference.itemId);
     assert.equal(Object.isFrozen(reference), true, reference.itemId);
   }
+
+  // Reference labels track the v2 contract, not the retired v1 one.
+  assert.deepEqual(catalog.candidates.reduce((totals, row) => {
+    totals[row.humanLabel] = (totals[row.humanLabel] || 0) + 1;
+    return totals;
+  }, {}), { CLEAR: 45, ESCALATE: 11 });
+  const v1Labels = new Map(readJson(CATALOG_V1).candidates
+    .map(row => [row.semanticSkeletonId, row.humanLabel]));
+  assert.equal(references.some(row => row.referenceLabel !== v1Labels.get(row.semanticSkeletonId)),
+    true, 'at least one reference label must differ from the superseded v1 catalog');
 
   // A catalog that is not the pinned bytes cannot supply reference labels.
   const drifted = structuredClone(catalog);
@@ -537,7 +568,10 @@ test('calibration only consumes reconciled clean agreements', () => {
   const { agreements } = strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), rows);
   const cellKey = row => `${row.boundaryClass}\u0000${row.referenceLabel}`;
   const populated = new Set(agreements.map(cellKey));
-  assert.equal(populated.size, 15);
+  // Populated cells are whatever the agreement population actually has; the count is not an
+  // invariant, so it is derived here rather than hard-coded.
+  assert.equal(populated.size, new Set(canonical().references.map(cellKey)).size);
+  assert.equal(populated.size <= 16, true);
   assert.deepEqual([...new Set(selected.map(cellKey))].sort(), [...populated].sort());
   for (const key of populated) {
     const cell = agreements.filter(row => cellKey(row) === key)
@@ -612,4 +646,62 @@ test('batch-003 and the historical artifacts are byte-identical after this step'
   assert.equal(typeof humanPacket.buildHumanReviewPacket, 'function');
   assert.throws(() => humanPacket.buildHumanReviewPacket(read(BATCH), readJson(RECEIPT)),
     /receipt binding is invalid|not an all-PASS result/);
+});
+
+test('the committed reconciliation receipt binds to real result bytes and claims no gate', () => {
+  const RECONCILIATION =
+    'fixtures/local-memory-inference-p1b6-strong-model-semantic-review-batch-003-attempt-001.json';
+  const receipt = readJson(RECONCILIATION);
+  const { references } = canonical();
+  const byItemId = new Map(references.map(row => [row.itemId, row]));
+
+  assert.equal(receipt.attemptId, 'p1b6-strong-model-semantic-review-batch-003-attempt-001');
+  assert.equal(receipt.status, 'COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V2');
+  assert.equal(receipt.reviewedSourceBatch.rawSha256, BATCH_SHA256);
+  assert.equal(receipt.sourceAuditAttempt, 'p1b6-source-audit-batch-003-attempt-001');
+
+  // The issued packet binding is the one that was actually issued.
+  assert.equal(receipt.reviewPacket.rows, 301);
+  assert.equal(receipt.reviewPacket.sha256,
+    '91b0276d0301eb0d8193868d7bfbe011bfe9132fdf3501ec1151fb8689cd57ca');
+  assert.equal(receipt.reviewProtocol.sha256, sha256RawBytes(read(SM_PROTOCOL)));
+  assert.equal(receipt.reviewAuthorityAmendment.sha256, sha256RawBytes(read(AMENDMENT)));
+
+  // Reconciliation authority is v2, separate from the packet's own provenance.
+  assert.equal(receipt.currentReferenceAuthority.rawSha256, CATALOG_V2_SHA256);
+  assert.equal(receipt.currentReferenceAuthority.identity,
+    'xion-local-memory-inference-p1b6-skeleton-effective-current-v2');
+
+  // Raw result bytes are bound by SHA and explicitly not committed; no reviewer metadata is
+  // invented, because the artifact carried none.
+  assert.equal(receipt.rawResultArtifact.filename,
+    'p1b6-batch-003-strong-model-semantic-review-results.json');
+  assert.equal(/^[0-9a-f]{64}$/u.test(receipt.rawResultArtifact.sha256), true);
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  assert.equal(receipt.reviewerExecutionProvenance.evidenceBasis,
+    'NOT_SUPPLIED_IN_RESULT_ARTIFACT');
+  for (const invented of ['provider', 'surface', 'model', 'reasoningSetting']) {
+    assert.equal(Object.hasOwn(receipt.reviewerExecutionProvenance, invented), false, invented);
+  }
+
+  // Counts are internally consistent and every routed item is a real canonical review row.
+  assert.equal(receipt.rawResultSummary.total, 301);
+  assert.equal(receipt.reconciliation.agreements
+    + receipt.reconciliation.humanAdjudicationRouted, 301);
+  assert.equal(receipt.routedItemIds.length, receipt.reconciliation.humanAdjudicationRouted);
+  assert.equal(new Set(receipt.routedItemIds).size, receipt.routedItemIds.length);
+  for (const itemId of receipt.routedItemIds) {
+    assert.equal(byItemId.has(itemId), true, itemId);
+    assert.equal(FAILED.includes(itemId), false, itemId);
+  }
+  assert.equal(Object.values(receipt.disagreementsBySkeleton)
+    .reduce((total, row) => total + row.count, 0),
+  receipt.reconciliation.humanAdjudicationRouted);
+  assert.equal(receipt.reconciliation.provenanceForAgreements, 'CATALOG_STRONG_MODEL_CONFIRMED');
+  assert.equal(receipt.reconciliation.eligibilityForAgreements, 'PROVISIONAL');
+
+  // Downstream gates stay shut.
+  for (const [key, value] of Object.entries(receipt.authority)) {
+    assert.equal(value, false, key);
+  }
 });

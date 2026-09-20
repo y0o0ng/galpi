@@ -47,9 +47,16 @@ const EXPECTED_FAILED_ITEM_IDS = Object.freeze([
   'p1b6-item-b003-002', 'p1b6-item-b003-006', 'p1b6-item-b003-109',
 ]);
 
-const CATALOG_PATH = 'fixtures/local-memory-inference-p1b6-skeleton-effective-current.json';
-const CATALOG_IDENTITY = 'xion-local-memory-inference-p1b6-skeleton-effective-current-v1';
-const CATALOG_SHA256 = '48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559';
+// Packet provenance and current reconciliation authority are deliberately separate.
+//
+// The issued blind packet binds the review-authority amendment that was in force when it was
+// built, and its bytes must stay reproducible even though the semantic reference catalog moved
+// afterwards. Reconciliation, by contrast, always reads the CURRENT reference catalog, which is
+// semantic contract v2 at 45 CLEAR / 11 ESCALATE. Changing the catalog changes which answers
+// count as agreement; it never changes a review row ID or a rendered bundle.
+const CATALOG_PATH = 'fixtures/local-memory-inference-p1b6-skeleton-effective-current-v2.json';
+const CATALOG_IDENTITY = 'xion-local-memory-inference-p1b6-skeleton-effective-current-v2';
+const CATALOG_SHA256 = 'f1e780195441246402ca389da188b1f7b8c4970f42fc1e6e3de2f436a3e9377c';
 
 const CALIBRATION_SIZE = 32;
 const CALIBRATION_HASH_DOMAIN = 'p1b6-large-batch-human-calibration-v1';

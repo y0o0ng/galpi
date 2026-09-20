@@ -4694,3 +4694,65 @@ trained. The accepted pool stays **93**.
 Tests run locally:
 `node --test test/memory-inference-p1b6-batch-003-strong-model-review.test.js`
 (10/10 pass) and the full `npm test` suite.
+
+#### P1-B6 semantic contract v2 and the batch-003 strong-model reconciliation
+
+**Semantic authority succeeded to v2 at 45 CLEAR / 11 ESCALATE.** v2 is derived
+from the exact raw bytes of the committed v1 catalog (`48490b6e…`), which already
+carry the Exact56 lineage; Exact56 (`772f07bd…`) stays as provenance and is
+deliberately not a second rebuild path. Exactly 11 skeletons move
+`ESCALATE → CLEAR` with re-encoded `candidateFocus`, `semanticRelations` and an
+`interpretationContract`; 45 are inherited byte-identical. IDs, order, splits,
+boundary classes and contrast groups do not drift. `2fa39ece` reverses the v1
+receipt's deliberate preservation, recorded in the v2 receipt without rewriting
+the v1 one.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-skeleton-effective-current-v2.json` | `f1e780195441246402ca389da188b1f7b8c4970f42fc1e6e3de2f436a3e9377c` |
+| `fixtures/local-memory-inference-p1b6-skeleton-semantic-contract-v2-receipt.json` | `a12063c38eee6245122e655126708c904319b4a7467cf82084acdea17a293344` |
+| `fixtures/local-memory-inference-p1b6-strong-model-semantic-review-batch-003-attempt-001.json` | `9b65327a4ce6d1923391253659c1acc3bb373bb54acdc7872e3ce74d52337074` |
+| `fixtures/local-memory-inference-p1b6-skeleton-effective-current.json` (v1, unchanged) | `48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559` |
+| `fixtures/local-memory-inference-p1b6-skeleton-exact56.json` (unchanged) | `772f07bd679a9c98ea65feaa164ec7a9c1f3e3fb33632052ef076f8301999602` |
+
+**The 301-row strong-model review was reconciled from exact raw bytes.** The raw
+artifact `p1b6-batch-003-strong-model-semantic-review-results.json`
+(`148c272fa77174ce51d61d7cf5adce959061623715078284a5e6a7b0cfcdb2de`, not
+committed) reports 301/301 `KEEP` with 214 CLEAR / 87 ESCALATE. Fed through the
+deterministic reconciliation path against v2:
+
+- **267 clean agreements** (`CATALOG_STRONG_MODEL_CONFIRMED`, `PROVISIONAL`) —
+  191 CLEAR / 76 ESCALATE by reference label;
+- **34 routed to HUMAN adjudication**, all `DECISION_DISAGREEMENT`.
+
+Computed from the rows, not taken from a summary. **20 of the 34 disagreements
+fall on the four mixed-realization ESCALATE skeletons** (`f58debd8` 9,
+`be0efa30` 6, `5fc872af` 3, `28736b74` 2) — the surface-collapse pattern the v2
+receipt predicts, showing up as measured disagreement rather than as a claim.
+
+The already-issued blind packet remains byte-identical at
+`91b0276d0301eb0d8193868d7bfbe011bfe9132fdf3501ec1151fb8689cd57ca`. Packet
+provenance still binds the review-authority amendment in force when it was built;
+current reconciliation authority is v2. No review row ID, rendered bundle, or
+strong-model answer changed because the catalog moved afterwards. The raw result
+artifact carried no reviewer model or runtime metadata, so the receipt records
+`NOT_SUPPLIED_IN_RESULT_ARTIFACT` and invents none.
+
+**Label balancing was retired prospectively and not replaced.** The exact
+`190 CLEAR / 190 ESCALATE` total and the per-label DEV and `FINAL_HELD_OUT`
+minimums no longer apply; CLEAR/ESCALATE counts are a derived property of
+semantically valid selected surfaces. 380 total, 240/60/80 splits, language and
+fragment totals, audit requirements and split isolation are unchanged. Batch-003's
+`CLEAR141 / ESCALATE163` allocation stays historical authoring metadata and the
+304 surfaces were not regenerated.
+
+**No gate past reconciliation was opened.** No HUMAN adjudication, no calibration
+draw, no acceptance, no reference-label freeze, no FINAL selection, no training.
+The next gates are HUMAN adjudication of the 34 routed rows and the deterministic
+32-row calibration sample over the 267 agreements.
+
+Tests run locally:
+`node --test test/memory-inference-p1b6-skeleton-semantic-contract-v2.test.js`
+(9/9 pass), the semantic-amendment, batch-003 strong-model review and growth
+batch-003 suites together (54/54 pass), and the full `npm test` suite
+(1450/1450 pass).
