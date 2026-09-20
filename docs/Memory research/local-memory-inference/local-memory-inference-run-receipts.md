@@ -4496,3 +4496,65 @@ not complete.
 
 Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
 (20/20 pass) and the full `npm test` suite (1425/1425 pass).
+
+#### P1-B6 batch-003 second pre-audit repair — 15 residual surfaces / SOURCE AUDIT STILL NOT RUN
+
+A second pre-audit construction review of the repaired surfaces found a **smaller
+residual collapse set** that the first pass did not resolve. Still an authoring
+defect caught before any gate: **no HUMAN relabel, no audit disposition.** The
+other 38 rows from the first repair were not reopened.
+
+| skeleton | items | residual defect | repair |
+| --- | --- | --- | --- |
+| `p1b6-sk-be0efa305956d111` | 241, 242, 244, 245, 246, 248 | the two rules were **orthogonal** — TV-off vs living-room light, spoken vs document language, snack frequency vs snack time, temperature vs humidity, delivery location vs receipt confirmation, duration vs intensity — so they simply coexist and attaching the second changes nothing about the target | the second rule now sets a different value on the **same dimension** as the first, over a category that **cross-cuts rather than nests**, so specificity does not decide modify-vs-coexist |
+| `p1b6-sk-cc054a4227cdafef` | 254, 255, 257, 259, 260, 261, 262 | the alignment clause was predicated of the report (`비슷한 인상을 받았어`, `비슷하게 느꼈어`, `비슷한 말을 하고 싶었어`, `같은 말을 했어`, `맞는 말이라고 했어`, `it matched what I found`) and so scoped over all of it | the general positive signal is now an **act or decision** whose scope is not lexically fixed, while the only aspect the speaker evidences is one of the two the report states |
+| `p1b6-sk-2da4e54e6609e34b` | 079 | `야간 접수 + 응급의학과` still read as having gone through the ER | one visible property supports classification inside the exception (119 ambulance) and another independently supports classification outside it (registered as an outpatient first visit), with no unstated administrative rule |
+| `p1b6-sk-59c8f51891ab4996` | 147 | the real alarm immediately preceded the result, so discourse recency selected it | the dry run and the real alarm are now **parallel members of one enumerated clause** (`once … and once …`), so neither wins on recency |
+
+Exactly 15 source rows changed from the previous commit, verified row by row
+against `HEAD`. Every repaired item keeps its `semanticSkeletonId`,
+`splitAssignment`, item/episode/family IDs, language, discourse pattern and
+fragment count; no other row's turns moved. All byte offsets were recomputed
+mechanically through the existing materializer.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003.json` (second repair) | `18a1d52122ab85ccadb4b2a031ad4b7a00307ea6a695b7e570b240c5fd06f7d1` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json` | `73868e0a948cd1a15a3cd503348398000d219750ba72bfbe79ed09e2db3bed8e` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-authoring-protocol.json` (unchanged) | `33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447` |
+
+Re-verified: 304 items / 304 source episodes, split 195 / 47 / 62, authoring
+label 141 / 163, language 213 / 61 / 30, fragments 55 / 78 / 99 / 56 / 16, 38 per
+discourse pattern, per-skeleton counts equal to `plannedSkeletonCounts`, anchors
+and evidence spans valid. Materializer fail-close is unchanged (structural
+validation → batch-003 leakage validation → fixture write) and both exact
+normalized-conversation and non-trivial exact-turn leakage still pass. The
+template-reuse report stays advisory at 1418 turns / 1357 distinct exact turn
+texts.
+
+**The semantic regression test was reframed.** It is now a *construction-shape*
+regression: it pins the known structural anti-patterns both reviews actually
+found so an edit cannot silently reintroduce them, and its comment states
+outright that **a green run does not establish semantic validity** — lexical
+matching cannot prove ambiguity, the first list already missed `같은 말을 했어`
+and `맞는 말이라고 했어`, and any list will miss the next paraphrase. Semantic
+authoring QA stays a review judgment; the source audit is a different question
+(bundle completeness). Every new assertion was checked against the previous
+commit and fails there, so none is vacuous.
+
+The previous transient packet
+`f5aa6766184fc5ca0de4bc8bf35496e79d0d18be446c99c7ef9cf6bdf684de45` is now
+**stale and was never adjudicated**, like the pre-repair packet before it. A
+fresh transient 304-row packet was generated from the final repaired batch with
+the unchanged canonical generic builder at raw SHA-256
+`c1a6cfba47796cc68b5e8d7bfc6c63d538f547b9758bef0e7cafdae9e5b80bbf`, with 304
+unique opaque audit rows and no semantic-answer leakage. Transient by convention
+and not committed.
+
+**No audit was executed and no disposition was created.** The fresh source audit
+of all 304 rows remains the next gate. Final corpus HUMAN-gold freeze, repeated
+HELD review, FINAL_HELD_OUT release, FINAL selection and training remain
+UNOPENED, and the 380-item corpus is not complete.
+
+Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
+(20/20 pass) and the full `npm test` suite (1425/1425 pass).

@@ -17,11 +17,11 @@ const readJson = file => JSON.parse(read(file));
 
 const ZERO_COVERED = 'p1b6-sk-aebbf047d6864a35';
 const PROTOCOL_SHA256 = '33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447';
-const BATCH_003_SHA256 = '164f5bd30106ed748697345b6134fbadc2eac6892c468c3c1b4ed8db0cefeca1';
+const BATCH_003_SHA256 = '18a1d52122ab85ccadb4b2a031ad4b7a00307ea6a695b7e570b240c5fd06f7d1';
 const MATERIALIZATION_RECEIPT =
   'local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json';
 const MATERIALIZATION_RECEIPT_SHA256 =
-  'b0791a9ec323ee34bef4079ba4b71c65a8f6488f1917c8d7439ffec06f017a13';
+  '73868e0a948cd1a15a3cd503348398000d219750ba72bfbe79ed09e2db3bed8e';
 
 // Historical artifacts this authoring step must leave byte-identical.
 const UNCHANGED = Object.freeze({
@@ -506,6 +506,10 @@ const REPAIRED = Object.freeze({
   'p1b6-sk-cc054a4227cdafef': [254, 255, 256, 257, 258, 259, 260, 261, 262],
 });
 
+// The second review pass re-authored this subset; it changed no slot and no other row.
+const REPAIRED_PASS_TWO = Object.freeze([79, 147, 241, 242, 244, 245, 246, 248,
+  254, 255, 257, 259, 260, 261, 262]);
+
 const itemId = ordinal => `p1b6-item-b003-${String(ordinal).padStart(3, '0')}`;
 const episodeText = (batch, ordinal) => batch.sourceEpisodes
   .find(row => row.sourceEpisodeId === `p1b6-se-b003-${String(ordinal).padStart(3, '0')}`)
@@ -546,12 +550,22 @@ test('the 53 repaired items keep their original skeletons and frozen slot contra
   }
 });
 
-test('the repaired ESCALATE surfaces no longer collapse the way the review found', () => {
+// Construction-shape regression only.
+//
+// These assertions pin the KNOWN STRUCTURAL ANTI-PATTERNS that two pre-audit construction
+// reviews actually found, so a future edit cannot silently reintroduce them. They do NOT
+// establish semantic validity: a green run here does not show that any surface is a valid
+// ESCALATE, does not show that two readings are positively licensed from visible evidence, and
+// does not substitute for review. Lexical matching cannot prove ambiguity — the first review's
+// list missed semantic equivalents such as `같은 말을 했어` and `맞는 말이라고 했어`, and any
+// list will miss the next paraphrase. Semantic authoring QA stays a review judgment, and the
+// fresh source audit is a different question again: whether each bundle is complete.
+test('repaired surfaces keep their construction shape and known anti-patterns stay out', () => {
   const batch = readJson(plan.BATCH_003_FILE);
   const text = ordinal => episodeText(batch, ordinal);
 
-  // FINALITY: a lone proposal followed by a cooperative assent resolved to acceptance. Each
-  // realization must now carry at least two rival proposals for the bare assent to target.
+  // FINALITY: at least two rival proposals must stay visible for the bare assent to target.
+  // Counting proposal-introducing clauses is an objective construction property.
   for (const ordinal of REPAIRED['p1b6-sk-5229ea237196499d']) {
     const body = text(ordinal);
     const proposals = countOf(body,
@@ -559,44 +573,56 @@ test('the repaired ESCALATE surfaces no longer collapse the way the review found
     assert.equal(proposals >= 2, true, `${itemId(ordinal)} proposals=${proposals}`);
   }
 
-  // ACTUALITY (report adoption): a direct whole-state adoption formula resolved the bundle.
+  // ACTUALITY (report adoption): the report states two aspects, and no clause predicated of the
+  // whole report may carry the alignment. The phrase list is the set both reviews caught, not a
+  // sufficient test for whole-report scope.
+  const WHOLE_REPORT_ADOPTION = Object.freeze([
+    '그 말에 동의', '같은 생각', '같은 인상을 받았어', '비슷한 인상을 받았어', '비슷하게 느꼈어',
+    '비슷한 말을 하고 싶었어', '같은 말을 했어', '맞는 말이라고 했어',
+    'felt the same way', 'matched what I found',
+  ]);
   for (const ordinal of REPAIRED['p1b6-sk-cc054a4227cdafef']) {
     const body = text(ordinal);
-    for (const collapsed of ['그 말에 동의', '같은 생각', 'felt the same way', '같은 인상을 받았어']) {
+    for (const collapsed of WHOLE_REPORT_ADOPTION) {
       assert.equal(body.includes(collapsed), false, `${itemId(ordinal)} ${collapsed}`);
     }
+    // The reported state must still offer two aspects to align with.
+    assert.equal(/고 .*다고 (?:했|했거든)|is .* and the .* are/u.test(body), true, itemId(ordinal));
   }
 
-  // ACTUALITY (simulation): the result was tied to the simulation frame alone. Both a simulation
-  // frame and an actual-observation frame must now be visible.
+  // ACTUALITY (simulation): both a simulation frame and an actual-observation frame stay visible.
   for (const ordinal of REPAIRED['p1b6-sk-59c8f51891ab4996']) {
     const body = text(ordinal);
     assert.equal(/모의|시뮬레이션|load test|dry run/u.test(body), true, itemId(ordinal));
-    assert.equal(/실제|actually|마침/u.test(body), true, itemId(ordinal));
+    assert.equal(/실제|actually|for real|마침/u.test(body), true, itemId(ordinal));
   }
+  // 147 keeps both frames inside one enumerated clause, so neither wins on recency.
+  assert.equal(/once on the evacuation dry run, and once when the alarm/u.test(text(147)), true);
 
-  // APPROXIMATION: the count and the amount shared a clause, scoping the value as the total.
-  // Both a per-occurrence basis and an aggregate basis must now be visible and unselected.
+  // APPROXIMATION: a per-occurrence basis and an aggregate basis are both visible and unselected.
   for (const ordinal of REPAIRED['p1b6-sk-135ab77919a554dc']) {
     const body = text(ordinal);
     assert.equal(/건별|건당|세션별|회차별|월 사용액/u.test(body), true, itemId(ordinal));
     assert.equal(/합계|총 장수|누계/u.test(body), true, itemId(ordinal));
   }
 
-  // COMPLEMENTARY (overlapping rules): an explicit exception resolved the relationship.
+  // COMPLEMENTARY (overlapping rules): no explicit exception or standing permission may resolve
+  // the relationship, and a second rule clause must be present alongside the first.
   for (const ordinal of REPAIRED['p1b6-sk-be0efa305956d111']) {
     const body = text(ordinal);
     for (const resolved of ['예외', '해도 된다', '둬도 된다', '봐도 된다', 'exempt', 'are fine']) {
       assert.equal(body.includes(resolved), false, `${itemId(ordinal)} ${resolved}`);
     }
+    assert.equal(/기로 한 것도 있|goes there instead|is also a note/u.test(body), true,
+      itemId(ordinal));
   }
 
-  // SCOPE (exception membership): the target said outright that it was in the exception.
+  // SCOPE (exception membership): the exception is stated, and 079 no longer says outright that
+  // the target went through the ER.
   assert.equal(text(79).includes('예외'), true);
-  assert.equal(/응급실 거쳐|응급실을 거쳐서/u.test(text(79)), false);
+  assert.equal(/응급실 거쳐|응급실을 거쳐서|응급의학과/u.test(text(79)), false);
 
-  // SCOPE (boundary change): the qualifying event must straddle the change so both the old and
-  // the new boundary stay applicable without a grandfathering premise.
+  // SCOPE (boundary change): the qualifying event straddles the change.
   assert.equal(text(220).includes('기준 바뀌기 전에'), true);
 });
 
@@ -630,27 +656,44 @@ test('materialization itself fails closed on cross-batch leakage', () => {
     /non-trivial turn reused across/, 'internal duplicate turn');
 });
 
-test('the repair records no gate result and leaves the frozen plan untouched', () => {
+test('the pre-audit repairs record no gate result and leave the frozen plan untouched', () => {
   assert.equal(sha256RawBytes(read(plan.PROTOCOL_FILE)), PROTOCOL_SHA256);
   const receipt = readJson(MATERIALIZATION_RECEIPT);
-  const repair = receipt.preAuditAuthoringRepair;
+  const passes = receipt.preAuditAuthoringRepairs;
 
-  assert.equal(repair.trigger, 'SEMANTIC_CONSTRUCTION_REVIEW');
-  assert.equal(repair.cause, 'PRE_AUDIT_AUTHORING_DEFECT_NOT_A_HUMAN_RELABEL');
-  assert.equal(repair.repairedItemCount, 53);
-  assert.deepEqual([...repair.repairedItemIds].sort(),
+  // Both pre-audit passes stay on the record: the initial materialization was structurally
+  // valid, 53 rows were repaired, then a residual 15 were. Neither superseded packet was ever
+  // adjudicated and neither pass is a HUMAN relabel.
+  assert.equal(receipt.preAuditAuthoringRepairHistory.initialMaterializationStructurallyValid,
+    true);
+  assert.equal(receipt.preAuditAuthoringRepairHistory.passes, 2);
+  assert.deepEqual(receipt.preAuditAuthoringRepairHistory.repairedRowsByPass, [53, 15]);
+  assert.equal(receipt.preAuditAuthoringRepairHistory.supersededPacketsAdjudicated, false);
+  assert.equal(receipt.preAuditAuthoringRepairHistory.humanRelabelOccurred, false);
+
+  assert.equal(passes.length, 2);
+  assert.deepEqual(passes.map(row => row.pass), [1, 2]);
+  assert.deepEqual(passes.map(row => row.repairedItemCount), [53, 15]);
+  assert.deepEqual([...passes[0].repairedItemIds].sort(),
     Object.values(REPAIRED).flat().map(itemId).sort());
-  assert.deepEqual(Object.keys(repair.repairedSkeletons).sort(), Object.keys(REPAIRED).sort());
-  assert.equal(repair.supersededPacketDisposition, 'STALE_NEVER_ADJUDICATED');
-  assert.equal(repair.offsetsRecomputedMechanically, true);
-  for (const key of ['frozenPlanAltered', 'marginalsAltered', 'plannedSkeletonCountsAltered',
-    'humanJudgmentRecorded', 'sourceAuditDispositionRecorded']) {
-    assert.equal(repair[key], false, key);
+  assert.deepEqual([...passes[1].repairedItemIds].sort(),
+    REPAIRED_PASS_TWO.map(itemId).sort());
+  assert.deepEqual(Object.keys(passes[0].repairedSkeletons).sort(), Object.keys(REPAIRED).sort());
+
+  for (const row of passes) {
+    assert.equal(row.trigger, 'SEMANTIC_CONSTRUCTION_REVIEW');
+    assert.equal(row.cause, 'PRE_AUDIT_AUTHORING_DEFECT_NOT_A_HUMAN_RELABEL');
+    assert.equal(row.supersededPacketDisposition, 'STALE_NEVER_ADJUDICATED');
+    assert.equal(row.offsetsRecomputedMechanically, true);
+    for (const key of ['frozenPlanAltered', 'marginalsAltered', 'plannedSkeletonCountsAltered',
+      'humanJudgmentRecorded', 'sourceAuditDispositionRecorded']) {
+      assert.equal(row[key], false, `pass ${row.pass} ${key}`);
+    }
   }
   assert.equal(receipt.leakageValidation.enforcedDuringMaterialization, true);
 
-  // No audit or review verdict vocabulary rides along with the repair record.
-  const serialized = JSON.stringify(receipt.preAuditAuthoringRepair);
+  // No audit or review verdict vocabulary rides along with either repair record.
+  const serialized = JSON.stringify(passes);
   for (const token of ['PASS', 'FAIL', 'UNCERTAIN', 'KEEP', 'REJECT', 'ACCEPT']) {
     assert.equal(serialized.includes(token), false, token);
   }

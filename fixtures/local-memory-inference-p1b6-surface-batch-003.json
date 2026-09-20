@@ -2550,7 +2550,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "나는 새벽에 야간 접수 창구로 들어갔고 진료는 응급의학과 선생님이 봤어. 그대로 하루 입원했다가 나왔고."
+          "text": "나는 새벽에 119로 실려 갔는데 접수는 외래 초진으로 잡혔어. 그대로 하루 입원했다가 나왔고."
         },
         {
           "turnId": "t6",
@@ -4654,7 +4654,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "We set up a dry run of the evacuation last week, and then the alarm actually went off on Thursday."
+          "text": "We timed the building twice this month: once on the evacuation dry run, and once when the alarm went off for real."
         },
         {
           "turnId": "t2",
@@ -7571,7 +7571,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "우리 집 규칙은 저녁 9시 이후엔 TV를 끄는 거야. 시험 기간에는 거실 불을 11시까지 켜 두기로 한 것도 있고. 오늘이 시험 기간 첫날이야."
+          "text": "우리 집 규칙은 저녁 9시 이후엔 TV를 끄는 거야. 시험 기간에는 거실 기기를 11시에 한꺼번에 끄기로 한 것도 있어. 오늘이 시험 기간 첫날이고."
         }
       ]
     },
@@ -7594,7 +7594,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "외부 guest가 있는 자리는 자료를 한국어로 준비한다는 안내가 따로 있어."
+          "text": "외부 guest가 오는 날은 진행 언어를 guest 쪽에 맞추기로 한 것도 있어."
         },
         {
           "turnId": "t4",
@@ -7604,7 +7604,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "이번 주 회의엔 협력사 guest가 와."
+          "text": "이번 주 회의 날에 한국어만 쓰는 협력사 guest가 와."
         }
       ]
     },
@@ -7660,7 +7660,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "아이 간식은 하루 한 번으로 정했어."
+          "text": "평일 아이 간식은 하루 한 번으로 정했어."
         },
         {
           "turnId": "t2",
@@ -7675,7 +7675,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "응. 할머니 댁에 가는 날은 간식 시간을 할머니가 정하시기로 한 것도 있어. 이번 주말이 그 날이고."
+          "text": "응. 할머니 댁에 가는 날은 두 번으로 잡기로 한 것도 있어. 이번 주 목요일에 가고."
         }
       ]
     },
@@ -7698,7 +7698,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "장비가 들어간 방은 습도 기준을 따로 맞추기로 한 것도 있어."
+          "text": "장비가 들어간 방은 22도로 맞추기로 한 것도 있어."
         },
         {
           "turnId": "t4",
@@ -7708,7 +7708,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "우리 방에 어제 장비 랙이 들어왔어."
+          "text": "우리 방은 사무실인데 어제 장비 랙이 들어왔어."
         }
       ]
     },
@@ -7721,7 +7721,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "택배는 경비실에 맡기기로 했어. 더 붙이자면 신선식품은 기사님이 수령 확인을 받기로 한 것도 있어. 내일 오는 게 신선식품이고."
+          "text": "택배는 경비실에 맡기기로 했어. 더 붙이자면 집을 비우는 날은 문 앞에 두기로 한 것도 있어. 내일은 종일 집을 비우는데 택배도 하나 와."
         }
       ]
     },
@@ -7787,7 +7787,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "컨디션이 나쁜 날은 강도를 절반으로 잡기로 한 것도 있어."
+          "text": "야근한 날은 저녁 일정을 15분으로 줄이기로 한 것도 있어."
         },
         {
           "turnId": "t4",
@@ -7797,7 +7797,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "이번 주는 계속 감기 기운이 있어."
+          "text": "이번 주는 계속 야근인데 운동은 저녁에 하고 있어."
         }
       ]
     },
@@ -7965,7 +7965,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "더 말하자면, 나도 지난주에 가 보고 비슷한 인상을 받았어. 커피는 확실히 괜찮더라."
+          "text": "더 말하자면, 나도 지난주에 가 보고 고개를 끄덕이게 됐어. 커피는 두 잔이나 마셨고."
         },
         {
           "turnId": "t4",
@@ -7998,7 +7998,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 상담 갔다가 비슷하게 느꼈어. 선생님은 진짜 그렇더라."
+          "text": "나도 상담 갔다 와서는 반박할 게 없었어. 선생님이 삼십 분을 그냥 내주시더라."
         }
       ]
     },
@@ -8054,7 +8054,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 며칠 써 보고 비슷한 말을 하고 싶었어."
+          "text": "나도 며칠 써 보고 딱히 토를 달지 않았어."
         },
         {
           "turnId": "t4",
@@ -8130,7 +8130,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "I walked through it on Tuesday and told her it matched what I found. I kept my coat on the whole time."
+          "text": "I walked through it on Tuesday and told her she had a point. I could hear the speaker from the back row without a microphone."
         },
         {
           "turnId": "t6",
@@ -8168,7 +8168,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "나도 형한테 같은 말을 했어. 장거리로 두 시간 탔는데 허리가 안 아프더라."
+          "text": "그 자리에서 아니라고는 안 했어. 장거리로 두 시간 탔는데 허리가 안 아프더라."
         }
       ]
     },
@@ -8191,7 +8191,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 다녀와서 맞는 말이라고 했어. 진료실에서만 이십 분 넘게 설명을 들었거든."
+          "text": "나도 다녀와서는 그 집으로 계속 다니기로 했어. 진료실에서만 이십 분 넘게 설명을 들었거든."
         },
         {
           "turnId": "t4",
@@ -8214,7 +8214,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "후배가 그 conference는 세션이 지루하고 networking은 좋다고 했어. 더 말하자면 나도 갔다 와서 비슷하게 느꼈어. hallway track에서 만난 사람들은 확실히 도움이 됐고."
+          "text": "후배가 그 conference는 세션이 지루하고 networking은 좋다고 했어. 더 말하자면 나도 갔다 와서 내년 등록을 바로 걸어 뒀어. hallway track에서 만난 사람들은 확실히 도움이 됐고."
         }
       ]
     },
@@ -11815,7 +11815,7 @@
       "anchorSpanRef": {
         "turnId": "t5",
         "startByte": 17,
-        "endByte": 99
+        "endByte": 80
       },
       "evidenceSpanRefs": [
         {
@@ -11831,7 +11831,7 @@
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 144
+          "endByte": 125
         },
         {
           "turnId": "t7",
@@ -13738,7 +13738,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 98
+          "endByte": 114
         },
         {
           "turnId": "t3",
@@ -16394,7 +16394,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 180
+          "endByte": 189
         }
       ],
       "discoursePattern": "CANONICAL",
@@ -16418,12 +16418,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 96
+          "endByte": 91
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 44
+          "endByte": 68
         }
       ],
       "discoursePattern": "CONCLUSION_FIRST",
@@ -16469,14 +16469,14 @@
       "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
       "anchorSpanRef": {
         "turnId": "t1",
-        "startByte": 17,
-        "endByte": 47
+        "startByte": 24,
+        "endByte": 54
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 48
+          "endByte": 55
         },
         {
           "turnId": "t3",
@@ -16486,7 +16486,7 @@
         {
           "turnId": "t4",
           "startByte": 0,
-          "endByte": 132
+          "endByte": 110
         }
       ],
       "discoursePattern": "ELLIPTICAL_REPLY",
@@ -16510,12 +16510,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 82
+          "endByte": 67
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 48
+          "endByte": 64
         }
       ],
       "discoursePattern": "INTERLEAVED",
@@ -16534,7 +16534,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 173
+          "endByte": 183
         }
       ],
       "discoursePattern": "PROGRESSIVE_REFINEMENT",
@@ -16592,12 +16592,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 78
+          "endByte": 77
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 45
+          "endByte": 68
         }
       ],
       "discoursePattern": "SELF_REVISION",
@@ -16761,7 +16761,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 113
+          "endByte": 114
         },
         {
           "turnId": "t5",
@@ -16790,7 +16790,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 81
+          "endByte": 106
         }
       ],
       "discoursePattern": "RETURN_TO_TOPIC",
@@ -16843,7 +16843,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 59
+          "endByte": 56
         },
         {
           "turnId": "t5",
@@ -16906,7 +16906,7 @@
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 102
+          "endByte": 125
         },
         {
           "turnId": "t7",
@@ -16940,7 +16940,7 @@
         {
           "turnId": "t4",
           "startByte": 0,
-          "endByte": 100
+          "endByte": 106
         }
       ],
       "discoursePattern": "ELLIPTICAL_REPLY",
@@ -16964,7 +16964,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 108
+          "endByte": 125
         },
         {
           "turnId": "t5",
@@ -16988,7 +16988,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 212
+          "endByte": 227
         }
       ],
       "discoursePattern": "PROGRESSIVE_REFINEMENT",

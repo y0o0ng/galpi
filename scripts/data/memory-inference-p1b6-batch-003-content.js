@@ -897,11 +897,11 @@ module.exports = [
       ['USER', '오늘 우체국에 들렀어.'],
       ['USER', '다만 응급실을 거친 건은 예외로 일수와 무관하게 보장된대.'],
       ['USER', '등기 하나 부치고 왔어.'],
-      ['USER', '나는 새벽에 야간 접수 창구로 들어갔고 진료는 응급의학과 선생님이 봤어. 그대로 하루 입원했다가 나왔고.'],
+      ['USER', '나는 새벽에 119로 실려 갔는데 접수는 외래 초진으로 잡혔어. 그대로 하루 입원했다가 나왔고.'],
       ['USER', '등기는 사흘 걸린대.'],
       ['ASSISTANT', '그렇게 적어 둘게요.'],
     ],
-    ev: [0, 2, 4, 6], anchor: [4, '야간 접수 창구로 들어갔고 진료는 응급의학과 선생님이 봤어'],
+    ev: [0, 2, 4, 6], anchor: [4, '119로 실려 갔는데 접수는 외래 초진으로 잡혔어'],
   },
   {
     sk: 'p1b6-sk-2da4e54e6609e34b', lang: 'KO', dp: 'SELF_REVISION',
@@ -1639,7 +1639,7 @@ module.exports = [
   {
     sk: 'p1b6-sk-59c8f51891ab4996', lang: 'EN', dp: 'CONTEXT_FIRST',
     turns: [
-      ['USER', 'We set up a dry run of the evacuation last week, and then the alarm actually went off on Thursday.'],
+      ['USER', 'We timed the building twice this month: once on the evacuation dry run, and once when the alarm went off for real.'],
       ['USER', 'The fire door hinge still squeaks.'],
       ['USER', 'The building cleared in four minutes.'],
     ],
@@ -2674,7 +2674,7 @@ module.exports = [
   {
     sk: 'p1b6-sk-be0efa305956d111', lang: 'KO', dp: 'CANONICAL',
     turns: [
-      ['USER', '우리 집 규칙은 저녁 9시 이후엔 TV를 끄는 거야. 시험 기간에는 거실 불을 11시까지 켜 두기로 한 것도 있고. 오늘이 시험 기간 첫날이야.'],
+      ['USER', '우리 집 규칙은 저녁 9시 이후엔 TV를 끄는 거야. 시험 기간에는 거실 기기를 11시에 한꺼번에 끄기로 한 것도 있어. 오늘이 시험 기간 첫날이고.'],
     ],
     ev: [0], anchor: [0, '저녁 9시 이후엔 TV를 끄는 거야'],
   },
@@ -2683,9 +2683,9 @@ module.exports = [
     turns: [
       ['USER', '결론만 말하면 회의는 전부 영어로 진행해.'],
       ['USER', '오늘 이어폰을 새로 꽂았어.'],
-      ['USER', '외부 guest가 있는 자리는 자료를 한국어로 준비한다는 안내가 따로 있어.'],
+      ['USER', '외부 guest가 오는 날은 진행 언어를 guest 쪽에 맞추기로 한 것도 있어.'],
       ['USER', '이어폰은 소리가 한쪽만 작아.'],
-      ['USER', '이번 주 회의엔 협력사 guest가 와.'],
+      ['USER', '이번 주 회의 날에 한국어만 쓰는 협력사 guest가 와.'],
     ],
     ev: [0, 2, 4], anchor: [0, '전부 영어로 진행해'],
   },
@@ -2705,10 +2705,10 @@ module.exports = [
   {
     sk: 'p1b6-sk-be0efa305956d111', lang: 'KO', dp: 'ELLIPTICAL_REPLY',
     turns: [
-      ['USER', '아이 간식은 하루 한 번으로 정했어.'],
+      ['USER', '평일 아이 간식은 하루 한 번으로 정했어.'],
       ['USER', '오늘 장을 봤어.'],
       ['ASSISTANT', '하루 한 번이요?'],
-      ['USER', '응. 할머니 댁에 가는 날은 간식 시간을 할머니가 정하시기로 한 것도 있어. 이번 주말이 그 날이고.'],
+      ['USER', '응. 할머니 댁에 가는 날은 두 번으로 잡기로 한 것도 있어. 이번 주 목요일에 가고.'],
     ],
     ev: [0, 2, 3], anchor: [0, '하루 한 번으로 정했어'],
   },
@@ -2717,16 +2717,16 @@ module.exports = [
     turns: [
       ['USER', '사무실 냉방은 26도로 맞추기로 했어.'],
       ['USER', '오늘 화분에 물을 줬어.'],
-      ['USER', '장비가 들어간 방은 습도 기준을 따로 맞추기로 한 것도 있어.'],
+      ['USER', '장비가 들어간 방은 22도로 맞추기로 한 것도 있어.'],
       ['USER', '화분 잎이 좀 누레졌어.'],
-      ['USER', '우리 방에 어제 장비 랙이 들어왔어.'],
+      ['USER', '우리 방은 사무실인데 어제 장비 랙이 들어왔어.'],
     ],
     ev: [0, 2, 4], anchor: [0, '26도로 맞추기로 했어'],
   },
   {
     sk: 'p1b6-sk-be0efa305956d111', lang: 'KO', dp: 'PROGRESSIVE_REFINEMENT',
     turns: [
-      ['USER', '택배는 경비실에 맡기기로 했어. 더 붙이자면 신선식품은 기사님이 수령 확인을 받기로 한 것도 있어. 내일 오는 게 신선식품이고.'],
+      ['USER', '택배는 경비실에 맡기기로 했어. 더 붙이자면 집을 비우는 날은 문 앞에 두기로 한 것도 있어. 내일은 종일 집을 비우는데 택배도 하나 와.'],
     ],
     ev: [0], anchor: [0, '경비실에 맡기기로 했어'],
   },
@@ -2748,9 +2748,9 @@ module.exports = [
     turns: [
       ['USER', '운동은 매일 하기로 했어. 아, 정확히는 매일 30분이야.'],
       ['USER', '오늘 운동화 끈을 갈았어.'],
-      ['USER', '컨디션이 나쁜 날은 강도를 절반으로 잡기로 한 것도 있어.'],
+      ['USER', '야근한 날은 저녁 일정을 15분으로 줄이기로 한 것도 있어.'],
       ['USER', '끈은 좀 짧은 걸로 샀어.'],
-      ['USER', '이번 주는 계속 감기 기운이 있어.'],
+      ['USER', '이번 주는 계속 야근인데 운동은 저녁에 하고 있어.'],
     ],
     ev: [0, 2, 4], anchor: [0, '매일 30분'],
   },
@@ -2814,7 +2814,7 @@ module.exports = [
     turns: [
       ['USER', '친구가 그 카페는 시끄럽고 커피는 맛있다고 했어.'],
       ['USER', '오늘 텀블러를 챙겼어.'],
-      ['USER', '더 말하자면, 나도 지난주에 가 보고 비슷한 인상을 받았어. 커피는 확실히 괜찮더라.'],
+      ['USER', '더 말하자면, 나도 지난주에 가 보고 고개를 끄덕이게 됐어. 커피는 두 잔이나 마셨고.'],
       ['USER', '텀블러는 보온이 잘 돼.'],
       ['ASSISTANT', '그대로 적어 둘게요.'],
     ],
@@ -2825,7 +2825,7 @@ module.exports = [
     turns: [
       ['USER', '아까 하던 학원 얘기로 돌아가면, 엄마가 거긴 숙제가 많고 선생님은 친절하다고 했어.'],
       ['USER', '오늘 필통을 샀어.'],
-      ['USER', '나도 상담 갔다가 비슷하게 느꼈어. 선생님은 진짜 그렇더라.'],
+      ['USER', '나도 상담 갔다 와서는 반박할 게 없었어. 선생님이 삼십 분을 그냥 내주시더라.'],
     ],
     ev: [0, 2], anchor: [0, '숙제가 많고 선생님은 친절하다고 했어'],
   },
@@ -2845,7 +2845,7 @@ module.exports = [
     turns: [
       ['USER', '팀원이 그 library는 문서가 부족하고 API는 깔끔하다고 했어.'],
       ['USER', '오늘 사무실 의자를 옮겼어.'],
-      ['USER', '나도 며칠 써 보고 비슷한 말을 하고 싶었어.'],
+      ['USER', '나도 며칠 써 보고 딱히 토를 달지 않았어.'],
       ['USER', '의자는 창가 쪽으로 뒀어.'],
       ['USER', 'signature 몇 개는 진짜 군더더기가 없더라.'],
       ['USER', '바퀴가 좀 뻑뻑해.'],
@@ -2869,7 +2869,7 @@ module.exports = [
       ['USER', 'I cleaned out my locker.'],
       ['USER', 'She said the room is cold and the acoustics are excellent.'],
       ['USER', 'There was an old umbrella in there.'],
-      ['USER', 'I walked through it on Tuesday and told her it matched what I found. I kept my coat on the whole time.'],
+      ['USER', 'I walked through it on Tuesday and told her she had a point. I could hear the speaker from the back row without a microphone.'],
       ['USER', 'I left the umbrella at reception.'],
       ['ASSISTANT', 'Noted.'],
     ],
@@ -2881,7 +2881,7 @@ module.exports = [
       ['USER', '형이 그 차는 연비가 나쁘고 승차감은 좋다고 했어.'],
       ['USER', '오늘 주차권을 끊었어.'],
       ['ASSISTANT', '타 보시니 어떠셨어요?'],
-      ['USER', '나도 형한테 같은 말을 했어. 장거리로 두 시간 탔는데 허리가 안 아프더라.'],
+      ['USER', '그 자리에서 아니라고는 안 했어. 장거리로 두 시간 탔는데 허리가 안 아프더라.'],
     ],
     ev: [0, 2, 3], anchor: [0, '연비가 나쁘고 승차감은 좋다고 했어'],
   },
@@ -2890,7 +2890,7 @@ module.exports = [
     turns: [
       ['USER', '이웃이 그 병원은 대기가 길고 의사는 꼼꼼하다고 했어.'],
       ['USER', '오늘 우산을 말렸어.'],
-      ['USER', '나도 다녀와서 맞는 말이라고 했어. 진료실에서만 이십 분 넘게 설명을 들었거든.'],
+      ['USER', '나도 다녀와서는 그 집으로 계속 다니기로 했어. 진료실에서만 이십 분 넘게 설명을 들었거든.'],
       ['USER', '우산은 현관에 세워 뒀어.'],
       ['ASSISTANT', '그 내용 그대로요.'],
     ],
@@ -2899,7 +2899,7 @@ module.exports = [
   {
     sk: 'p1b6-sk-cc054a4227cdafef', lang: 'MIXED', dp: 'PROGRESSIVE_REFINEMENT',
     turns: [
-      ['USER', '후배가 그 conference는 세션이 지루하고 networking은 좋다고 했어. 더 말하자면 나도 갔다 와서 비슷하게 느꼈어. hallway track에서 만난 사람들은 확실히 도움이 됐고.'],
+      ['USER', '후배가 그 conference는 세션이 지루하고 networking은 좋다고 했어. 더 말하자면 나도 갔다 와서 내년 등록을 바로 걸어 뒀어. hallway track에서 만난 사람들은 확실히 도움이 됐고.'],
     ],
     ev: [0], anchor: [0, '세션이 지루하고 networking은 좋다고 했어'],
   },

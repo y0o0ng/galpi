@@ -830,8 +830,30 @@ The pre-repair transient audit packet is **stale and was never adjudicated**. A
 fresh 304-row packet was regenerated from the repaired batch with the unchanged
 canonical generic builder.
 
-**Current state: batch-003 authoring COMPLETE at 304 candidates, with 53
-ESCALATE surfaces repaired before any gate; the frozen plan and protocol
+A **second** pre-audit construction review found a smaller residual set and
+repaired 15 more rows before any gate: six `p1b6-sk-be0efa305956d111`
+realizations whose two rules were **orthogonal** rather than overlapping (so
+attaching the second changed nothing about the target), seven
+`p1b6-sk-cc054a4227cdafef` realizations whose alignment clause was predicated of
+the report and so scoped over all of it, plus `079` (the target still read as
+having gone through the ER) and `147` (discourse recency selected the real alarm
+over the dry run). The repair puts the second rule on the **same dimension** over
+a **cross-cutting** category, replaces the whole-report alignment clause with an
+act or decision whose scope is not lexically fixed, gives `079` one visible
+property pulling into the exception and one pulling out, and makes `147`'s two
+timings parallel members of one enumerated clause. The other 38 rows from the
+first repair were not reopened, and all frozen slots are preserved.
+
+The construction-shape regression test pins the **known structural
+anti-patterns** both reviews found. It deliberately does **not** claim to
+establish semantic validity: lexical matching cannot prove that two readings are
+licensed, the first review's phrase list already missed semantic equivalents such
+as `같은 말을 했어` and `맞는 말이라고 했어`, and any list will miss the next
+paraphrase. **Semantic authoring QA remains a review judgment, and the source
+audit remains a separate completeness question.**
+
+**Current state: batch-003 authoring COMPLETE at 304 candidates, with 53 then a
+residual 15 ESCALATE surfaces repaired before any gate; the frozen plan and protocol
 unchanged; a fresh source-audit packet regenerated from the repaired batch. The
 fresh source audit of all 304 repaired rows is the next gate and has NOT been
 executed. No batch-003 HUMAN review has happened and no batch-003 acceptance has
