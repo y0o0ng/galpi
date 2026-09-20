@@ -4558,3 +4558,55 @@ UNOPENED, and the 380-item corpus is not complete.
 
 Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
 (20/20 pass) and the full `npm test` suite (1425/1425 pass).
+
+#### P1-B6 batch-003 third pre-audit repair — 2 residual rows / SOURCE AUDIT STILL NOT RUN
+
+A third pre-audit construction review found two residual rows in
+`p1b6-sk-cc054a4227cdafef` whose alignment still scoped over the whole report.
+Row 255 said `반박할 게 없었어` and row 257 paired `딱히 토를 달지 않았어` with
+`그 자리에서 고개를 끄덕였어` — clauses predicated of the report as a whole, which
+the later single-aspect evidence does not undo. Both were re-authored to the
+accepted partial-alignment shape: **the user explicitly aligns with one
+identifiable aspect** (`선생님 친절한 건 인정했어`, `API가 깔끔하다는 데는 동의했어`)
+and nothing establishes whether the whole reported target was adopted. **Still a
+pre-audit authoring repair — no HUMAN relabel, no audit disposition.**
+
+Exactly two source rows changed from the previous commit, verified row by row
+against `HEAD`: 2 episodes with changed turns, 2 items with changed spans, zero
+metadata/slot drift and zero fragment drift. Byte offsets were recomputed
+mechanically through the existing materializer.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003.json` (third repair) | `90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json` | `6f6efdff15cb488cb1f63d075f15bda10350a92c0c9176d0f9e19a9b289b2fa0` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-authoring-protocol.json` (unchanged) | `33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447` |
+
+Re-verified: 304 items / 304 source episodes, split 195 / 47 / 62, authoring
+label 141 / 163, language 213 / 61 / 30, fragments 55 / 78 / 99 / 56 / 16, 38 per
+discourse pattern, per-skeleton counts equal to `plannedSkeletonCounts`, anchors
+and evidence spans valid. Materializer fail-close is intact and both leakage
+checks still pass; the template-reuse report stays advisory at 1418 turns / 1357
+distinct exact turn texts. Historical artifacts are byte-identical.
+
+The added regression assertions remain **structural only** — they pin that the
+two whole-report clauses are gone and that an aspect-scoped alignment is present.
+As the test header says, that does not establish semantic validity; semantic
+authoring QA stays a review judgment. Both assertions were checked against the
+previous commit and fail there.
+
+All three transient packets are now superseded, **stale and never adjudicated**:
+`1ed563ff…`, `f5aa6766…` and `c1a6cfba…`. A fresh transient 304-row packet was
+generated from the final batch with the unchanged canonical generic builder at
+raw SHA-256
+`9f18c656a1717c8d11b9e12ebb68d3e3a9d1e79dcb77d9371be859f45a9252a2`, with 304
+unique opaque audit rows and no semantic-answer leakage. Transient by convention
+and not committed.
+
+**No audit was executed and no disposition was created.** The fresh source audit
+of all 304 rows remains the next gate. Final corpus HUMAN-gold freeze, repeated
+HELD review, FINAL_HELD_OUT release, FINAL selection and training remain
+UNOPENED, and the 380-item corpus is not complete.
+
+Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
+(20/20 pass) and the full `npm test` suite (1425/1425 pass).

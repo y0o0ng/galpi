@@ -17,11 +17,11 @@ const readJson = file => JSON.parse(read(file));
 
 const ZERO_COVERED = 'p1b6-sk-aebbf047d6864a35';
 const PROTOCOL_SHA256 = '33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447';
-const BATCH_003_SHA256 = '18a1d52122ab85ccadb4b2a031ad4b7a00307ea6a695b7e570b240c5fd06f7d1';
+const BATCH_003_SHA256 = '90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68';
 const MATERIALIZATION_RECEIPT =
   'local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json';
 const MATERIALIZATION_RECEIPT_SHA256 =
-  '73868e0a948cd1a15a3cd503348398000d219750ba72bfbe79ed09e2db3bed8e';
+  '6f6efdff15cb488cb1f63d075f15bda10350a92c0c9176d0f9e19a9b289b2fa0';
 
 // Historical artifacts this authoring step must leave byte-identical.
 const UNCHANGED = Object.freeze({
@@ -506,9 +506,10 @@ const REPAIRED = Object.freeze({
   'p1b6-sk-cc054a4227cdafef': [254, 255, 256, 257, 258, 259, 260, 261, 262],
 });
 
-// The second review pass re-authored this subset; it changed no slot and no other row.
+// The later review passes re-authored these subsets; neither changed a slot or any other row.
 const REPAIRED_PASS_TWO = Object.freeze([79, 147, 241, 242, 244, 245, 246, 248,
   254, 255, 257, 259, 260, 261, 262]);
+const REPAIRED_PASS_THREE = Object.freeze([255, 257]);
 
 const itemId = ordinal => `p1b6-item-b003-${String(ordinal).padStart(3, '0')}`;
 const episodeText = (batch, ordinal) => batch.sourceEpisodes
@@ -589,6 +590,15 @@ test('repaired surfaces keep their construction shape and known anti-patterns st
     // The reported state must still offer two aspects to align with.
     assert.equal(/고 .*다고 (?:했|했거든)|is .* and the .* are/u.test(body), true, itemId(ordinal));
   }
+  // Pass 3: these two carried a clause predicated of the report as a whole. Their replacements
+  // scope the alignment to one named aspect instead. Structural shape only — see the header.
+  for (const ordinal of REPAIRED_PASS_THREE) {
+    const body = text(ordinal);
+    for (const whole of ['반박할 게 없었어', '토를 달지 않았어', '고개를 끄덕였어']) {
+      assert.equal(body.includes(whole), false, `${itemId(ordinal)} ${whole}`);
+    }
+    assert.equal(/(?:친절한 건|깔끔하다는 데는|그 부분은)/u.test(body), true, itemId(ordinal));
+  }
 
   // ACTUALITY (simulation): both a simulation frame and an actual-observation frame stay visible.
   for (const ordinal of REPAIRED['p1b6-sk-59c8f51891ab4996']) {
@@ -666,18 +676,21 @@ test('the pre-audit repairs record no gate result and leave the frozen plan unto
   // adjudicated and neither pass is a HUMAN relabel.
   assert.equal(receipt.preAuditAuthoringRepairHistory.initialMaterializationStructurallyValid,
     true);
-  assert.equal(receipt.preAuditAuthoringRepairHistory.passes, 2);
-  assert.deepEqual(receipt.preAuditAuthoringRepairHistory.repairedRowsByPass, [53, 15]);
+  assert.equal(receipt.preAuditAuthoringRepairHistory.passes, 3);
+  assert.deepEqual(receipt.preAuditAuthoringRepairHistory.repairedRowsByPass, [53, 15, 2]);
+  assert.equal(receipt.preAuditAuthoringRepairHistory.supersededTransientAuditPackets.length, 3);
   assert.equal(receipt.preAuditAuthoringRepairHistory.supersededPacketsAdjudicated, false);
   assert.equal(receipt.preAuditAuthoringRepairHistory.humanRelabelOccurred, false);
 
-  assert.equal(passes.length, 2);
-  assert.deepEqual(passes.map(row => row.pass), [1, 2]);
-  assert.deepEqual(passes.map(row => row.repairedItemCount), [53, 15]);
+  assert.equal(passes.length, 3);
+  assert.deepEqual(passes.map(row => row.pass), [1, 2, 3]);
+  assert.deepEqual(passes.map(row => row.repairedItemCount), [53, 15, 2]);
   assert.deepEqual([...passes[0].repairedItemIds].sort(),
     Object.values(REPAIRED).flat().map(itemId).sort());
   assert.deepEqual([...passes[1].repairedItemIds].sort(),
     REPAIRED_PASS_TWO.map(itemId).sort());
+  assert.deepEqual([...passes[2].repairedItemIds].sort(),
+    REPAIRED_PASS_THREE.map(itemId).sort());
   assert.deepEqual(Object.keys(passes[0].repairedSkeletons).sort(), Object.keys(REPAIRED).sort());
 
   for (const row of passes) {

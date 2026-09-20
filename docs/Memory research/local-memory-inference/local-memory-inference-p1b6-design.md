@@ -852,8 +852,14 @@ as `같은 말을 했어` and `맞는 말이라고 했어`, and any list will mi
 paraphrase. **Semantic authoring QA remains a review judgment, and the source
 audit remains a separate completeness question.**
 
-**Current state: batch-003 authoring COMPLETE at 304 candidates, with 53 then a
-residual 15 ESCALATE surfaces repaired before any gate; the frozen plan and protocol
+A **third** pass repaired two residual `p1b6-sk-cc054a4227cdafef` rows (255, 257)
+whose alignment clause was still predicated of the report as a whole. They now
+follow the accepted partial-alignment shape: the user explicitly aligns with one
+identifiable aspect of the multi-aspect report, and nothing establishes whether
+the whole reported target was adopted.
+
+**Current state: batch-003 authoring COMPLETE at 304 candidates, with 53, then a
+residual 15, then a final 2 ESCALATE surfaces repaired before any gate; the frozen plan and protocol
 unchanged; a fresh source-audit packet regenerated from the repaired batch. The
 fresh source audit of all 304 repaired rows is the next gate and has NOT been
 executed. No batch-003 HUMAN review has happened and no batch-003 acceptance has

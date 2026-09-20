@@ -16,20 +16,26 @@
   },
   "materializedBatch": {
     "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
-    "rawSha256": "18a1d52122ab85ccadb4b2a031ad4b7a00307ea6a695b7e570b240c5fd06f7d1",
+    "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68",
     "items": 304,
     "sourceEpisodes": 304
   },
   "preAuditAuthoringRepairHistory": {
     "initialMaterializationStructurallyValid": true,
-    "passes": 2,
+    "passes": 3,
     "repairedRowsByPass": [
       53,
-      15
+      15,
+      2
     ],
     "supersededPacketsAdjudicated": false,
     "humanRelabelOccurred": false,
-    "note": "Initial materialization was structurally valid against the frozen plan. 53 rows were repaired before audit, then this review found a smaller residual semantic-collapse set and repaired 15 more, still before audit. Neither superseded transient packet was ever adjudicated and no HUMAN relabel occurred."
+    "note": "Initial materialization was structurally valid against the frozen plan. 53 rows were repaired before audit, then a residual 15, then a final 2 — every pass before any gate. No source-audit disposition has ever existed for this batch, none of the three superseded transient packets was ever adjudicated, and no HUMAN relabel occurred.",
+    "supersededTransientAuditPackets": [
+      "1ed563ff9da497d24a2b198172c5808ba60578b480d5dc1133af99fb25943402",
+      "f5aa6766184fc5ca0de4bc8bf35496e79d0d18be446c99c7ef9cf6bdf684de45",
+      "c1a6cfba47796cc68b5e8d7bfc6c63d538f547b9758bef0e7cafdae9e5b80bbf"
+    ]
   },
   "preAuditAuthoringRepairs": [
     {
@@ -128,7 +134,7 @@
       "pass": 2,
       "trigger": "SEMANTIC_CONSTRUCTION_REVIEW",
       "cause": "PRE_AUDIT_AUTHORING_DEFECT_NOT_A_HUMAN_RELABEL",
-      "note": "A second pre-audit construction review of the repaired surfaces found a smaller residual collapse set that pass 1 did not resolve: overlapping-rule realizations whose two rules were orthogonal, and reported-state realizations whose alignment clause still scoped over the whole report. 15 rows were re-authored. This is again an authoring defect caught before any gate — no HUMAN judgment, no audit disposition and no relabel.",
+      "note": "A second pre-audit construction review of the repaired surfaces found a smaller residual collapse set that pass 1 did not resolve: overlapping-rule realizations whose two rules were orthogonal, and reported-state realizations whose alignment clause still scoped over the whole report. 15 rows were re-authored. This is again an authoring defect caught before any gate — no HUMAN judgment, no audit disposition and no relabel. A third review pass afterwards found two residual rows in p1b6-sk-cc054a4227cdafef; see pass 3.",
       "supersededBatchSha256": "164f5bd30106ed748697345b6134fbadc2eac6892c468c3c1b4ed8db0cefeca1",
       "supersededTransientAuditPacketSha256": "f5aa6766184fc5ca0de4bc8bf35496e79d0d18be446c99c7ef9cf6bdf684de45",
       "supersededPacketDisposition": "STALE_NEVER_ADJUDICATED",
@@ -155,6 +161,40 @@
         "p1b6-sk-59c8f51891ab4996": "Item 147: the actual alarm immediately preceded the result, so discourse recency selected it. Re-authored as two parallel timings enumerated in one clause, so the dry run and the real alarm stay equally live referents.",
         "p1b6-sk-be0efa305956d111": "Items 241, 242, 244, 245, 246, 248: the two rules were orthogonal (device vs lighting, spoken vs document language, snack frequency vs snack time, temperature vs humidity, delivery location vs receipt confirmation, duration vs intensity), so they simply coexisted and attaching the second changed nothing. Re-authored so the second rule sets a different value on the same dimension as the first, over a category that cross-cuts rather than nests, leaving modify-vs-coexist open.",
         "p1b6-sk-cc054a4227cdafef": "Items 254, 255, 257, 259, 260, 261, 262: the alignment clause was predicated of the report and so scoped over all of it. Re-authored so the general positive signal is an act or a decision whose scope is not lexically fixed, while the only aspect the speaker evidences is one of the two the report states."
+      },
+      "preservedPerRepairedItem": [
+        "semanticSkeletonId",
+        "splitAssignment",
+        "itemId",
+        "sourceEpisodeId",
+        "sourceFamilyId",
+        "surfaceFamilyId",
+        "language",
+        "discoursePattern",
+        "fragmentCount"
+      ],
+      "offsetsRecomputedMechanically": true,
+      "frozenPlanAltered": false,
+      "marginalsAltered": false,
+      "plannedSkeletonCountsAltered": false,
+      "humanJudgmentRecorded": false,
+      "sourceAuditDispositionRecorded": false
+    },
+    {
+      "pass": 3,
+      "trigger": "SEMANTIC_CONSTRUCTION_REVIEW",
+      "cause": "PRE_AUDIT_AUTHORING_DEFECT_NOT_A_HUMAN_RELABEL",
+      "note": "A third pre-audit construction review found two residual rows whose alignment still scoped over the whole report: 255 said there was nothing to disagree with, and 257 paired a broad non-objection with a broad assent. Both were re-authored to the accepted partial-alignment shape, where the user explicitly aligns with one identifiable aspect of the multi-aspect report and nothing establishes whether the whole reported target was adopted. Still an authoring defect caught before any gate: no HUMAN judgment, no audit disposition and no relabel.",
+      "supersededBatchSha256": "18a1d52122ab85ccadb4b2a031ad4b7a00307ea6a695b7e570b240c5fd06f7d1",
+      "supersededTransientAuditPacketSha256": "c1a6cfba47796cc68b5e8d7bfc6c63d538f547b9758bef0e7cafdae9e5b80bbf",
+      "supersededPacketDisposition": "STALE_NEVER_ADJUDICATED",
+      "repairedItemCount": 2,
+      "repairedItemIds": [
+        "p1b6-item-b003-255",
+        "p1b6-item-b003-257"
+      ],
+      "repairedSkeletons": {
+        "p1b6-sk-cc054a4227cdafef": "Items 255 and 257: `반박할 게 없었어`, `딱히 토를 달지 않았어` and `그 자리에서 고개를 끄덕였어` all scope over the whole prior report, so they read as adopting both reported aspects and the later single-aspect evidence does not undo them. Re-authored so the user explicitly aligns with one identifiable aspect — the teacher being kind, the API being clean — with no clause predicated of the report as a whole."
       },
       "preservedPerRepairedItem": [
         "semanticSkeletonId",

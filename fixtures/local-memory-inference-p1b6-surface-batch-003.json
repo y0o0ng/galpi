@@ -7998,7 +7998,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 상담 갔다 와서는 반박할 게 없었어. 선생님이 삼십 분을 그냥 내주시더라."
+          "text": "나도 상담 갔다 와서 선생님 친절한 건 인정했어. 삼십 분을 그냥 내주시더라."
         }
       ]
     },
@@ -8054,7 +8054,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 며칠 써 보고 딱히 토를 달지 않았어."
+          "text": "나도 며칠 써 보고 API가 깔끔하다는 데는 동의했어."
         },
         {
           "turnId": "t4",
@@ -8074,7 +8074,7 @@
         {
           "turnId": "t7",
           "role": "USER",
-          "text": "그래서 그 자리에서 고개를 끄덕였어."
+          "text": "그래서 그 부분은 나도 좋게 봤다고 말해 뒀어."
         },
         {
           "turnId": "t8",
@@ -16790,7 +16790,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 106
+          "endByte": 103
         }
       ],
       "discoursePattern": "RETURN_TO_TOPIC",
@@ -16843,7 +16843,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 56
+          "endByte": 68
         },
         {
           "turnId": "t5",
@@ -16853,7 +16853,7 @@
         {
           "turnId": "t7",
           "startByte": 0,
-          "endByte": 50
+          "endByte": 62
         },
         {
           "turnId": "t9",
