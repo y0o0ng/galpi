@@ -47,6 +47,10 @@ const EXPECTED_FAILED_ITEM_IDS = Object.freeze([
   'p1b6-item-b003-002', 'p1b6-item-b003-006', 'p1b6-item-b003-109',
 ]);
 
+const CATALOG_PATH = 'fixtures/local-memory-inference-p1b6-skeleton-effective-current.json';
+const CATALOG_IDENTITY = 'xion-local-memory-inference-p1b6-skeleton-effective-current-v1';
+const CATALOG_SHA256 = '48490b6e4e1494856ef3268d944da16093c4735d207e07c1fd9e8bbf69df2559';
+
 const CALIBRATION_SIZE = 32;
 const CALIBRATION_HASH_DOMAIN = 'p1b6-large-batch-human-calibration-v1';
 const REFERENCE_LABELS = Object.freeze(['CLEAR', 'ESCALATE']);
@@ -97,6 +101,13 @@ function opaqueReviewRowId(batchSha256, itemId) {
     .update(`${PROTOCOL_IDENTITY}\0${batchSha256}\0${itemId}`).digest('hex').slice(0, 16)}`;
 }
 
+// Rebuilding the 304-row audit packet costs ~3s, and reconciliation revalidates on every call.
+// Validation is a pure function of the batch bytes, the receipt and two frozen on-disk
+// artifacts, so the verdict is memoized by content hash. Nothing is skipped: a different batch
+// or a different receipt is a different key and runs the full check. The batch is re-parsed per
+// call so no caller can mutate a shared object.
+const verdictCache = new Map();
+
 // Fails closed on every binding, not just the batch bytes: a receipt that drifted from the
 // canonical packet, protocol or outcome must not be able to produce a review population.
 function validateAuditReceipt(receipt, rawBatchBytes) {
@@ -104,6 +115,23 @@ function validateAuditReceipt(receipt, rawBatchBytes) {
   const batchSha256 = sha256RawBytes(rawBatchBytes);
   if (batchSha256 !== AUDITED_BATCH_SHA256) fail('batch bytes are not the audited batch');
 
+  const cacheKey = `${batchSha256}\0${crypto.createHash('sha256')
+    .update(JSON.stringify(receipt) ?? 'undefined').digest('hex')}`;
+  const cached = verdictCache.get(cacheKey);
+  if (cached) {
+    if (cached.error) throw cached.error;
+    return { batch, batchSha256, dispositions: cached.dispositions };
+  }
+  try {
+    return { batch, ...validateAuditReceiptUncached(receipt, batch, batchSha256, rawBatchBytes,
+      cacheKey) };
+  } catch (error) {
+    verdictCache.set(cacheKey, { error });
+    throw error;
+  }
+}
+
+function validateAuditReceiptUncached(receipt, batch, batchSha256, rawBatchBytes, cacheKey) {
   const protocol = sourceAudit.loadProtocol();
   const auditPacket = sourceAudit.buildAuditPacket(rawBatchBytes);
   const auditPacketSha256 = sha256RawBytes(packetBytes(auditPacket));
@@ -159,7 +187,8 @@ function validateAuditReceipt(receipt, rawBatchBytes) {
     !== JSON.stringify([...EXPECTED_FAILED_ITEM_IDS])) {
     fail('receipt failedItems do not match the mechanically mapped failures');
   }
-  return { batch, batchSha256, dispositions, auditPacketSha256 };
+  verdictCache.set(cacheKey, { dispositions });
+  return { batchSha256, dispositions, auditPacketSha256 };
 }
 
 function buildStrongModelReviewPacket(rawBatchBytes, receipt, root = ROOT) {
@@ -196,18 +225,103 @@ function buildStrongModelReviewPacket(rawBatchBytes, receipt, root = ROOT) {
 //
 // Not executed here: no strong-model result exists yet. These are the mechanical rules the next
 // step runs, implemented now so that step is mechanical rather than a fresh judgment call.
+//
+// The reference population is DERIVED, never supplied. A caller that could hand in an itemId,
+// boundaryClass or referenceLabel could silently decide what counts as agreement and how the
+// calibration sample is stratified, which would put the frozen source of truth in the caller's
+// hands. So the only public entry point takes raw artifacts and derives everything itself.
 
-function reconcile(results, references) {
-  const byRowId = new Map(results.map(row => [row.reviewRowId, row]));
+function loadEffectiveCurrentCatalog(catalogBytes, root = ROOT) {
+  const bytes = catalogBytes === undefined
+    ? fs.readFileSync(path.join(root, CATALOG_PATH)) : Buffer.from(catalogBytes);
+  const sha256 = sha256RawBytes(bytes);
+  if (sha256 !== CATALOG_SHA256) fail('effective-current catalog bytes are not the pinned catalog');
+  const catalog = JSON.parse(bytes.toString('utf8'));
+  if (catalog.name !== CATALOG_IDENTITY || !Array.isArray(catalog.candidates)) {
+    fail('effective-current catalog identity is invalid');
+  }
+  return { catalog, sha256 };
+}
+
+// Every field a reconciliation decision depends on comes from a frozen artifact here: the item
+// from the audited batch, the skeleton from that item, and the boundary class and reference
+// label from the pinned effective-current catalog.
+function buildCanonicalReviewReferences(rawBatchBytes, auditReceipt, catalogBytes, root = ROOT) {
+  const { batch, batchSha256, dispositions } = validateAuditReceipt(auditReceipt, rawBatchBytes);
+  const { catalog, sha256 } = loadEffectiveCurrentCatalog(catalogBytes, root);
+  const skeletons = new Map(catalog.candidates.map(row => [row.semanticSkeletonId, row]));
+
+  const references = batch.items
+    .filter(item => dispositions.get(item.itemId) === 'PASS')
+    .map(item => {
+      const skeleton = skeletons.get(item.semanticSkeletonId);
+      if (!skeleton) fail(`item has no effective-current skeleton: ${item.itemId}`);
+      if (!REFERENCE_LABELS.includes(skeleton.humanLabel)) {
+        fail(`effective-current reference label is invalid: ${item.semanticSkeletonId}`);
+      }
+      return Object.freeze({
+        reviewRowId: opaqueReviewRowId(batchSha256, item.itemId),
+        itemId: item.itemId,
+        semanticSkeletonId: item.semanticSkeletonId,
+        boundaryClass: skeleton.boundaryClass,
+        referenceLabel: skeleton.humanLabel,
+      });
+    });
+
+  if (references.length !== EXPECTED_PASS) {
+    fail(`canonical reference population is not exactly ${EXPECTED_PASS} rows`);
+  }
+  if (new Set(references.map(row => row.reviewRowId)).size !== EXPECTED_PASS
+    || new Set(references.map(row => row.itemId)).size !== EXPECTED_PASS) {
+    fail('canonical reference population is not unique');
+  }
+  return Object.freeze({
+    batchSha256, catalogSha256: sha256, references: Object.freeze(references),
+  });
+}
+
+// Artifact integrity versus row-level defects are different failures on purpose.
+//
+// A duplicate or unknown reviewRowId means the result artifact does not correspond to the packet
+// that was issued, so nothing in it can be trusted and the whole thing fails closed. A row that
+// is simply missing, or malformed while its identity is valid, is a defect in one expected
+// answer; the prospective contract routes that item to HUMAN rather than discarding the run.
+function validateStrongModelResults(results, references) {
+  if (!Array.isArray(results)) fail('strong-model results must be an array');
+  const known = new Set(references.map(row => row.reviewRowId));
+  const seen = new Set();
+  const byRowId = new Map();
+  for (const row of results) {
+    const rowId = row && typeof row === 'object' ? row.reviewRowId : undefined;
+    if (typeof rowId !== 'string' || !known.has(rowId)) {
+      fail(`strong-model result row is not a known batch-003 review row: ${String(rowId)}`);
+    }
+    if (seen.has(rowId)) fail(`strong-model result duplicates a review row: ${rowId}`);
+    seen.add(rowId);
+    byRowId.set(rowId, row);
+  }
+  return byRowId;
+}
+
+function isWellFormedResult(row) {
+  return exactKeys(row, ['reviewRowId', 'disposition', 'decision', 'reason'])
+    && typeof row.reason === 'string' && row.reason.trim() !== ''
+    && ['KEEP', 'FIX', 'REJECT'].includes(row.disposition)
+    && (row.disposition === 'KEEP'
+      ? REFERENCE_LABELS.includes(row.decision)
+      : row.decision === null);
+}
+
+// The only public reconciliation path. References are derived here, not accepted.
+function reconcileBatch003(rawBatchBytes, auditReceipt, results, catalogBytes, root = ROOT) {
+  const canonical = buildCanonicalReviewReferences(rawBatchBytes, auditReceipt, catalogBytes, root);
+  const byRowId = validateStrongModelResults(results, canonical.references);
+
   const agreements = [];
   const humanAdjudication = [];
-  for (const reference of references) {
+  for (const reference of canonical.references) {
     const row = byRowId.get(reference.reviewRowId);
-    const valid = row && ['KEEP', 'FIX', 'REJECT'].includes(row.disposition)
-      && (row.disposition === 'KEEP'
-        ? REFERENCE_LABELS.includes(row.decision)
-        : row.decision === null);
-    if (!valid) {
+    if (!row || !isWellFormedResult(row)) {
       humanAdjudication.push({ itemId: reference.itemId, route: 'MISSING_OR_INVALID_RESULT' });
       continue;
     }
@@ -227,7 +341,21 @@ function reconcile(results, references) {
       eligibility: 'PROVISIONAL',
     });
   }
-  return { agreements, humanAdjudication };
+  return {
+    batchSha256: canonical.batchSha256,
+    catalogSha256: canonical.catalogSha256,
+    agreements,
+    humanAdjudication,
+  };
+}
+
+// Production calibration entry point: the sample can only ever be drawn from rows this module
+// reconciled itself, so no caller-authored boundary class or reference label reaches it.
+function selectBatch003CalibrationSample(rawBatchBytes, auditReceipt, results, catalogBytes,
+  root = ROOT) {
+  const { agreements } = reconcileBatch003(rawBatchBytes, auditReceipt, results, catalogBytes,
+    root);
+  return selectCalibrationSample(agreements);
 }
 
 function calibrationHash(itemId) {
@@ -245,6 +373,14 @@ function selectCalibrationSample(agreements, size = CALIBRATION_SIZE) {
   }
   const cells = new Map();
   for (const row of agreements) {
+    // Shape guard, not a substitute for the production path: calibration is reachable in
+    // production only through selectBatch003CalibrationSample, which reconciles first.
+    if (!exactKeys(row, ['itemId', 'boundaryClass', 'referenceLabel', 'provenance', 'eligibility'])
+      || row.provenance !== 'CATALOG_STRONG_MODEL_CONFIRMED'
+      || row.eligibility !== 'PROVISIONAL'
+      || !REFERENCE_LABELS.includes(row.referenceLabel)) {
+      fail('calibration input is not a reconciled clean-agreement row');
+    }
     const key = `${row.boundaryClass} ${row.referenceLabel}`;
     if (!cells.has(key)) cells.set(key, []);
     cells.get(key).push(row);
@@ -355,16 +491,22 @@ module.exports = {
   PACKET_IDENTITY,
   PROTOCOL_IDENTITY,
   PROTOCOL_PATH,
+  CATALOG_IDENTITY,
+  CATALOG_SHA256,
+  buildCanonicalReviewReferences,
   buildStrongModelReviewPacket,
   calibrationHash,
   loadAmendment,
+  loadEffectiveCurrentCatalog,
   loadProtocol,
   main,
   opaqueReviewRowId,
   packetBytes,
   parseArgs,
-  reconcile,
+  reconcileBatch003,
+  selectBatch003CalibrationSample,
   selectCalibrationSample,
+  validateStrongModelResults,
   validateAuditReceipt,
   writeStrongModelReviewPacket,
 };

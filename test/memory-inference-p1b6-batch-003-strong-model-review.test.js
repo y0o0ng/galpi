@@ -212,6 +212,11 @@ test('the semantic-review packet holds exactly the 301 audit-PASS rows', () => {
   assert.equal(built.reviewProtocol.sha256, sha256RawBytes(read(SM_PROTOCOL)));
   assert.equal(built.reviewAuthorityAmendment.sha256, sha256RawBytes(read(AMENDMENT)));
 
+  // The packet-generation contract did not change in the reconciliation fix, so the bytes the
+  // reviewer receives must not move either.
+  assert.equal(sha256RawBytes(strongModel.packetBytes(built)),
+    '91b0276d0301eb0d8193868d7bfbe011bfe9132fdf3501ec1151fb8689cd57ca');
+
   // Every row comes from an audit PASS item, and the failed rows are absent.
   const byRowId = new Map(built.rows.map(row => [row.reviewRowId, row]));
   for (const item of eligible) {
@@ -283,88 +288,270 @@ test('the packet builder fails closed on every audit binding', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('prospective reconciliation routes disagreement and keeps clean agreements provisional', () => {
-  const references = [
-    { reviewRowId: 'r1', itemId: 'i1', boundaryClass: 'REFERENT', referenceLabel: 'CLEAR' },
-    { reviewRowId: 'r2', itemId: 'i2', boundaryClass: 'REFERENT', referenceLabel: 'ESCALATE' },
-    { reviewRowId: 'r3', itemId: 'i3', boundaryClass: 'ACTUALITY', referenceLabel: 'CLEAR' },
-    { reviewRowId: 'r4', itemId: 'i4', boundaryClass: 'ACTUALITY', referenceLabel: 'CLEAR' },
-    { reviewRowId: 'r5', itemId: 'i5', boundaryClass: 'ACTUALITY', referenceLabel: 'CLEAR' },
-  ];
-  const results = [
-    { reviewRowId: 'r1', disposition: 'KEEP', decision: 'CLEAR', reason: 'ok' },
-    { reviewRowId: 'r2', disposition: 'KEEP', decision: 'CLEAR', reason: 'disagrees' },
-    { reviewRowId: 'r3', disposition: 'FIX', decision: null, reason: 'repairable' },
-    { reviewRowId: 'r4', disposition: 'REJECT', decision: null, reason: 'incoherent' },
-    // r5 missing entirely.
-  ];
-  const { agreements, humanAdjudication } = strongModel.reconcile(results, references);
+// Deriving the canonical population revalidates the whole audit binding, which is slow. The
+// population is frozen and identical for every test, so derive it once and share it.
+let canonicalCache = null;
+const canonical = () => {
+  if (!canonicalCache) {
+    canonicalCache = strongModel.buildCanonicalReviewReferences(read(BATCH), readJson(RECEIPT));
+  }
+  return canonicalCache;
+};
+const cleanResults = (mutate = rows => rows) => mutate(canonical().references
+  .map(row => ({
+    reviewRowId: row.reviewRowId,
+    disposition: 'KEEP',
+    decision: row.referenceLabel,
+    reason: 'stable judgment from the visible bundle',
+  })));
 
-  assert.deepEqual(agreements.map(row => row.itemId), ['i1']);
-  assert.equal(agreements[0].provenance, 'CATALOG_STRONG_MODEL_CONFIRMED');
-  assert.equal(agreements[0].eligibility, 'PROVISIONAL');
-  assert.deepEqual(humanAdjudication, [
-    { itemId: 'i2', route: 'DECISION_DISAGREEMENT' },
-    { itemId: 'i3', route: 'FIX' },
-    { itemId: 'i4', route: 'REJECT' },
-    { itemId: 'i5', route: 'MISSING_OR_INVALID_RESULT' },
-  ]);
-
-  // KEEP without a decision, and FIX with one, are both invalid and route to HUMAN.
-  assert.deepEqual(strongModel.reconcile(
-    [{ reviewRowId: 'r1', disposition: 'KEEP', decision: null, reason: 'x' }],
-    [references[0]]).humanAdjudication,
-  [{ itemId: 'i1', route: 'MISSING_OR_INVALID_RESULT' }]);
-  assert.deepEqual(strongModel.reconcile(
-    [{ reviewRowId: 'r1', disposition: 'FIX', decision: 'CLEAR', reason: 'x' }],
-    [references[0]]).humanAdjudication,
-  [{ itemId: 'i1', route: 'MISSING_OR_INVALID_RESULT' }]);
-});
-
-test('the calibration selector implements the deterministic prospective rule', () => {
+test('canonical references are derived from the batch and the pinned catalog', () => {
+  const { references, catalogSha256, batchSha256 } = canonical();
   const batch = readJson(BATCH);
   const catalog = readJson(CATALOG);
   const skeletons = new Map(catalog.candidates.map(row => [row.semanticSkeletonId, row]));
-  // Stand-in population: the audit-PASS rows. The real population is clean agreements, which do
-  // not exist until the strong-model review runs.
-  const population = batch.items.filter(item => !FAILED.includes(item.itemId)).map(item => {
+
+  assert.equal(references.length, 301);
+  assert.equal(new Set(references.map(row => row.itemId)).size, 301);
+  assert.equal(new Set(references.map(row => row.reviewRowId)).size, 301);
+  assert.equal(batchSha256, BATCH_SHA256);
+  assert.equal(catalogSha256, strongModel.CATALOG_SHA256);
+  assert.equal(catalogSha256, sha256RawBytes(read(CATALOG)));
+
+  const items = new Map(batch.items.map(item => [item.itemId, item]));
+  for (const reference of references) {
+    const item = items.get(reference.itemId);
+    assert.equal(FAILED.includes(reference.itemId), false, reference.itemId);
+    assert.equal(reference.semanticSkeletonId, item.semanticSkeletonId, reference.itemId);
+    assert.equal(reference.reviewRowId,
+      strongModel.opaqueReviewRowId(BATCH_SHA256, reference.itemId));
     const skeleton = skeletons.get(item.semanticSkeletonId);
-    return {
-      itemId: item.itemId,
-      boundaryClass: skeleton.boundaryClass,
-      referenceLabel: skeleton.humanLabel,
-    };
-  });
-  assert.equal(population.length, 301);
+    assert.equal(reference.boundaryClass, skeleton.boundaryClass, reference.itemId);
+    assert.equal(reference.referenceLabel, skeleton.humanLabel, reference.itemId);
+    assert.equal(Object.isFrozen(reference), true, reference.itemId);
+  }
 
-  const selected = strongModel.selectCalibrationSample(population);
+  // A catalog that is not the pinned bytes cannot supply reference labels.
+  const drifted = structuredClone(catalog);
+  drifted.candidates[0].humanLabel =
+    drifted.candidates[0].humanLabel === 'CLEAR' ? 'ESCALATE' : 'CLEAR';
+  assert.throws(() => strongModel.buildCanonicalReviewReferences(read(BATCH), readJson(RECEIPT),
+    Buffer.from(`${JSON.stringify(drifted, null, 2)}\n`, 'utf8')),
+  /not the pinned catalog/);
+});
+
+test('callers have no authority over item, boundary class or reference label', () => {
+  // There is no public reconciliation path that accepts a reference population at all.
+  assert.equal(Object.hasOwn(strongModel, 'reconcile'), false);
+  assert.equal(typeof strongModel.reconcileBatch003, 'function');
+
+  const { references } = canonical();
+  const flipped = references[0].referenceLabel === 'CLEAR' ? 'ESCALATE' : 'CLEAR';
+
+  // A caller-authored reference asserting the opposite label changes nothing: the extra argument
+  // is not a reference population, and the label still comes from the pinned catalog.
+  const agreeing = cleanResults();
+  const withBogusReferences = strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT),
+    agreeing, undefined);
+  assert.equal(withBogusReferences.agreements.length, 301);
+  assert.equal(withBogusReferences.humanAdjudication.length, 0);
+
+  // Answering with the flipped label is a disagreement, not an agreement, however the caller
+  // describes it.
+  const lying = cleanResults(rows => rows.map((row, index) =>
+    (index === 0 ? { ...row, decision: flipped } : row)));
+  const result = strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), lying);
+  assert.equal(result.agreements.length, 300);
+  assert.deepEqual(result.humanAdjudication,
+    [{ itemId: references[0].itemId, route: 'DECISION_DISAGREEMENT' }]);
+  assert.equal(result.agreements.some(row => row.itemId === references[0].itemId), false);
+});
+
+test('a coordinated fake item and label cannot manufacture a clean agreement', () => {
+  const forgedItemId = 'p1b6-item-b003-999';
+  const forged = [{
+    reviewRowId: strongModel.opaqueReviewRowId(BATCH_SHA256, forgedItemId),
+    disposition: 'KEEP',
+    decision: 'CLEAR',
+    reason: 'forged',
+  }];
+  assert.throws(() => strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), forged),
+    /not a known batch-003 review row/);
+
+  // A source-audit FAIL item has no review row, so it cannot be smuggled back in either.
+  const excluded = [{
+    reviewRowId: strongModel.opaqueReviewRowId(BATCH_SHA256, FAILED[0]),
+    disposition: 'KEEP',
+    decision: 'CLEAR',
+    reason: 'excluded row',
+  }];
+  assert.throws(() => strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), excluded),
+    /not a known batch-003 review row/);
+
+  // Every agreement's boundary class and label trace to the catalog, never to the result rows.
+  const catalog = readJson(CATALOG);
+  const skeletons = new Map(catalog.candidates.map(row => [row.semanticSkeletonId, row]));
+  const byItemId = new Map(canonical().references.map(row => [row.itemId, row]));
+  for (const agreement of strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT),
+    cleanResults()).agreements) {
+    const skeleton = skeletons.get(byItemId.get(agreement.itemId).semanticSkeletonId);
+    assert.equal(agreement.boundaryClass, skeleton.boundaryClass, agreement.itemId);
+    assert.equal(agreement.referenceLabel, skeleton.humanLabel, agreement.itemId);
+  }
+});
+
+test('duplicate and unknown result rows are artifact-integrity failures that fail closed', () => {
+  const { references } = canonical();
+
+  // Duplicates must never be silently collapsed by a Map.
+  const duplicated = cleanResults(rows => [...rows, { ...rows[0] }]);
+  assert.throws(() => strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), duplicated),
+    /duplicates a review row/);
+  // Even a duplicate that disagrees with itself fails closed rather than picking a winner.
+  const contradicting = cleanResults(rows => [...rows,
+    { ...rows[0], decision: rows[0].decision === 'CLEAR' ? 'ESCALATE' : 'CLEAR' }]);
+  assert.throws(() => strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), contradicting),
+    /duplicates a review row/);
+
+  // Unknown and extra rows are never silently ignored.
+  const extra = cleanResults(rows => [...rows,
+    { reviewRowId: 'p1b6-smreview-0000000000000000', disposition: 'KEEP', decision: 'CLEAR', reason: 'x' }]);
+  assert.throws(() => strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), extra),
+    /not a known batch-003 review row/);
+  for (const bad of [null, 42, {}, { reviewRowId: 7 }]) {
+    assert.throws(() => strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT),
+      cleanResults(rows => [...rows, bad])), /not a known batch-003 review row/);
+  }
+  assert.throws(() => strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), {}),
+    /results must be an array/);
+
+  // The validator itself draws the same line.
+  assert.equal(strongModel.validateStrongModelResults(cleanResults(), references).size, 301);
+  assert.doesNotThrow(() => strongModel.validateStrongModelResults([], references),
+    'an empty artifact is every row missing, not an integrity failure');
+  assert.equal(strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), [])
+    .humanAdjudication.length, 301);
+});
+
+test('missing and malformed known rows route to HUMAN instead of failing the run', () => {
+  const { references } = canonical();
+  const target = references[5];
+
+  // Missing expected row.
+  const missing = cleanResults(rows => rows.filter(row => row.reviewRowId !== target.reviewRowId));
+  const missingResult = strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), missing);
+  assert.equal(missingResult.agreements.length, 300);
+  assert.deepEqual(missingResult.humanAdjudication,
+    [{ itemId: target.itemId, route: 'MISSING_OR_INVALID_RESULT' }]);
+
+  // Malformed but validly identified rows: each routes, none becomes an agreement.
+  const malformed = [
+    { disposition: 'KEEP', decision: null, reason: 'keep needs a decision' },
+    { disposition: 'FIX', decision: 'CLEAR', reason: 'fix must be null' },
+    { disposition: 'REJECT', decision: 'ESCALATE', reason: 'reject must be null' },
+    { disposition: 'MAYBE', decision: 'CLEAR', reason: 'unknown disposition' },
+    { disposition: 'KEEP', decision: 'PROBABLY', reason: 'unknown decision' },
+    { disposition: 'KEEP', decision: target.referenceLabel, reason: '   ' },
+    { disposition: 'KEEP', decision: target.referenceLabel, reason: 42 },
+    { disposition: 'KEEP', decision: target.referenceLabel },
+    { disposition: 'KEEP', decision: target.referenceLabel, reason: 'ok', extra: true },
+  ];
+  for (const shape of malformed) {
+    const rows = cleanResults(all => all.map(row => (row.reviewRowId === target.reviewRowId
+      ? { reviewRowId: target.reviewRowId, ...shape } : row)));
+    const result = strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), rows);
+    assert.equal(result.agreements.some(row => row.itemId === target.itemId), false,
+      JSON.stringify(shape));
+    assert.deepEqual(result.humanAdjudication,
+      [{ itemId: target.itemId, route: 'MISSING_OR_INVALID_RESULT' }], JSON.stringify(shape));
+  }
+});
+
+test('clean agreement, disagreement, FIX and REJECT route exactly as the contract says', () => {
+  const { references } = canonical();
+  const [keepRow, disagreeRow, fixRow, rejectRow] = references;
+  const flipped = label => (label === 'CLEAR' ? 'ESCALATE' : 'CLEAR');
+  const rows = cleanResults(all => all.map(row => {
+    if (row.reviewRowId === disagreeRow.reviewRowId) {
+      return { ...row, decision: flipped(disagreeRow.referenceLabel) };
+    }
+    if (row.reviewRowId === fixRow.reviewRowId) {
+      return { ...row, disposition: 'FIX', decision: null, reason: 'repairable' };
+    }
+    if (row.reviewRowId === rejectRow.reviewRowId) {
+      return { ...row, disposition: 'REJECT', decision: null, reason: 'incoherent' };
+    }
+    return row;
+  }));
+  const result = strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), rows);
+
+  assert.equal(result.agreements.length, 298);
+  assert.deepEqual(result.humanAdjudication.sort((left, right) =>
+    (left.itemId < right.itemId ? -1 : 1)), [
+    { itemId: disagreeRow.itemId, route: 'DECISION_DISAGREEMENT' },
+    { itemId: fixRow.itemId, route: 'FIX' },
+    { itemId: rejectRow.itemId, route: 'REJECT' },
+  ].sort((left, right) => (left.itemId < right.itemId ? -1 : 1)));
+
+  const kept = result.agreements.find(row => row.itemId === keepRow.itemId);
+  assert.equal(kept.provenance, 'CATALOG_STRONG_MODEL_CONFIRMED');
+  assert.equal(kept.eligibility, 'PROVISIONAL');
+  for (const agreement of result.agreements) {
+    assert.deepEqual(Object.keys(agreement).sort(),
+      ['boundaryClass', 'eligibility', 'itemId', 'provenance', 'referenceLabel']);
+    assert.equal(agreement.provenance, 'CATALOG_STRONG_MODEL_CONFIRMED');
+    assert.equal(agreement.eligibility, 'PROVISIONAL');
+  }
+  // Nothing here is HUMAN gold, and no HUMAN decision was created.
+  assert.equal(JSON.stringify(result).includes('HUMAN_ADJUDICATED'), false);
+});
+
+test('calibration only consumes reconciled clean agreements', () => {
+  const rows = cleanResults();
+  const selected = strongModel.selectBatch003CalibrationSample(read(BATCH), readJson(RECEIPT),
+    rows);
   assert.equal(selected.length, 32);
-  assert.equal(new Set(selected.map(row => row.itemId)).size, 32);
 
-  // Every populated cell contributes at least one row.
-  const cellKey = row => `${row.boundaryClass} ${row.referenceLabel}`;
-  const populated = new Set(population.map(cellKey));
+  // Boundary class and reference label on every selected row trace to the catalog.
+  const catalog = readJson(CATALOG);
+  const skeletons = new Map(catalog.candidates.map(row => [row.semanticSkeletonId, row]));
+  const byItemId = new Map(canonical().references.map(row => [row.itemId, row]));
+  for (const row of selected) {
+    const skeleton = skeletons.get(byItemId.get(row.itemId).semanticSkeletonId);
+    assert.equal(row.boundaryClass, skeleton.boundaryClass, row.itemId);
+    assert.equal(row.referenceLabel, skeleton.humanLabel, row.itemId);
+    assert.equal(row.provenance, 'CATALOG_STRONG_MODEL_CONFIRMED', row.itemId);
+  }
+
+  // Caller-authored rows cannot enter the selector as canonical data.
+  const forged = Array.from({ length: 40 }, (unused, index) => ({
+    itemId: `forged-${index}`, boundaryClass: 'REFERENT', referenceLabel: 'CLEAR',
+  }));
+  assert.throws(() => strongModel.selectCalibrationSample(forged),
+    /not a reconciled clean-agreement row/);
+  assert.throws(() => strongModel.selectCalibrationSample(forged.map(row =>
+    ({ ...row, provenance: 'HUMAN_ADJUDICATED', eligibility: 'PROVISIONAL' }))),
+  /not a reconciled clean-agreement row/);
+
+  // The 32-row allocation rule itself is unchanged.
+  const { agreements } = strongModel.reconcileBatch003(read(BATCH), readJson(RECEIPT), rows);
+  const cellKey = row => `${row.boundaryClass}\u0000${row.referenceLabel}`;
+  const populated = new Set(agreements.map(cellKey));
   assert.equal(populated.size, 15);
   assert.deepEqual([...new Set(selected.map(cellKey))].sort(), [...populated].sort());
-
-  // Within a cell, selection follows the stable hash order and nothing else.
   for (const key of populated) {
-    const cell = population.filter(row => cellKey(row) === key)
+    const cell = agreements.filter(row => cellKey(row) === key)
       .sort((left, right) => (strongModel.calibrationHash(left.itemId)
         < strongModel.calibrationHash(right.itemId) ? -1 : 1));
     const taken = selected.filter(row => cellKey(row) === key).map(row => row.itemId).sort();
     assert.deepEqual(taken, cell.slice(0, taken.length).map(row => row.itemId).sort(), key);
   }
-
-  // Deterministic and order-independent.
-  assert.deepEqual(strongModel.selectCalibrationSample([...population].reverse())
+  assert.deepEqual(strongModel.selectCalibrationSample([...agreements].reverse())
     .map(row => row.itemId), selected.map(row => row.itemId));
   assert.equal(strongModel.calibrationHash('p1b6-item-b003-001'),
     crypto.createHash('sha256')
       .update('p1b6-large-batch-human-calibration-v1\0p1b6-item-b003-001').digest('hex'));
-
-  // Fails closed rather than shrinking the sample.
-  assert.throws(() => strongModel.selectCalibrationSample(population.slice(0, 31)),
+  assert.throws(() => strongModel.selectCalibrationSample(agreements.slice(0, 31)),
     /smaller than the 32-row calibration sample/);
 });
 
@@ -393,6 +580,26 @@ test('the prospective design supersedes exhaustive HUMAN review without erasing 
     '**The 190 CLEAR / 190 ESCALATE\nconstraint is over the frozen reference labels**'), true);
   assert.equal(design.includes('301 PASS / 3 FAIL / 0 UNCERTAIN'), true);
   for (const failedId of FAILED) assert.equal(design.includes(failedId), true, failedId);
+
+  // No stale claim that the source audit is still the pending next gate.
+  assert.equal(/source audit[^.]*is the next gate and has NOT been\nexecuted/u.test(design), false);
+  assert.equal(design.includes(
+    '**Current state: that source audit has since run and is complete at 301 PASS / 3\nFAIL / 0 UNCERTAIN**'), true);
+  assert.equal(design.includes(
+    '**301-row blind strong-model semantic review**, which has NOT been executed.'), true);
+  // The pre-audit story is kept, explicitly marked as a snapshot.
+  assert.equal(design.includes('(historical snapshot)'), true);
+
+  // Prospective post-freeze wording protects reference labels and provenance, not blanket gold.
+  assert.equal(design.includes('membership, evidence, targets, and HUMAN gold are immutable'),
+    false);
+  assert.equal(design.includes(
+    'frozen **reference labels** and **label\nprovenance** are immutable'), true);
+  assert.equal(design.includes('relabel HUMAN gold to satisfy'), false);
+  assert.equal(design.includes('relabel a frozen reference label'), true);
+  // Historical wording is untouched where it accurately describes batch-001/batch-002.
+  assert.equal(design.includes(
+    'For historical batch-001/batch-002 review, HUMAN gold was\nauthoritative'), true);
 });
 
 test('batch-003 and the historical artifacts are byte-identical after this step', () => {

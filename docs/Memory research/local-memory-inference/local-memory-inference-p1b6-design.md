@@ -858,14 +858,19 @@ follow the accepted partial-alignment shape: the user explicitly aligns with one
 identifiable aspect of the multi-aspect report, and nothing establishes whether
 the whole reported target was adopted.
 
-**Current state: batch-003 authoring COMPLETE at 304 candidates, with 53, then a
-residual 15, then a final 2 ESCALATE surfaces repaired before any gate; the frozen plan and protocol
-unchanged; a fresh source-audit packet regenerated from the repaired batch. The
-fresh source audit of all 304 repaired rows is the next gate and has NOT been
-executed. No batch-003 HUMAN review has happened and no batch-003 acceptance has
-happened. Final corpus HUMAN-gold freeze, repeated HELD review, FINAL_HELD_OUT
-release, deterministic FINAL selection, and training all remain UNOPENED, and the
-380-item P1-B6 corpus is not complete.**
+**Authoring state as of the third repair (historical snapshot):** batch-003
+authoring COMPLETE at 304 candidates, with 53, then a residual 15, then a final 2
+ESCALATE surfaces repaired before any gate; the frozen plan and protocol
+unchanged; a fresh source-audit packet regenerated from the repaired batch. At
+that moment the fresh source audit had not yet been executed.
+
+**Current state: that source audit has since run and is complete at 301 PASS / 3
+FAIL / 0 UNCERTAIN** (see "Batch-003 Source Audit" below). The next gate is the
+**301-row blind strong-model semantic review**, which has NOT been executed. No
+batch-003 HUMAN review has happened and no batch-003 acceptance has happened.
+Reference-label freeze, the HELD second pass, `FINAL_HELD_OUT` release,
+deterministic FINAL selection, and training all remain UNOPENED, and the 380-item
+P1-B6 corpus is not complete.
 
 ## Task Boundary
 
@@ -1092,7 +1097,10 @@ strong-model review of the selected HELD rows, and dataset freeze. FINAL is
 never used for training, checkpoint selection, or hyperparameter selection.
 
 After FINAL model output has been inspected, that evaluation version's
-membership, evidence, targets, and HUMAN gold are immutable. A later defect
+membership, evidence, targets, frozen **reference labels** and **label
+provenance** are immutable. For the historical batch-001/batch-002 rows the
+frozen reference label is the HUMAN gold those receipts recorded; for
+batch-003 onward it is whatever the frozen provenance says it is. A later defect
 may be recorded only through an explicit erratum path that preserves the
 original evaluation inputs and results; it does not silently replace the
 frozen set.
@@ -1101,8 +1109,9 @@ If no valid 380-item subset exists, FAIL CLOSED. The failure must distinguish
 a surface-pool shortage from catalog infeasibility. A surface shortage may
 receive newly authored candidates followed by the full audit/review/refreeze
 path. Catalog infeasibility must return to skeleton review. Do not weaken a
-frozen constraint, hand-pick favored items, or relabel HUMAN gold to satisfy
-counts.
+frozen constraint, hand-pick favored items, or relabel a frozen reference label
+to satisfy counts. Historical HUMAN decisions and their provenance are never
+rewritten for this purpose either.
 
 ## Source Episodes and Items
 
