@@ -1227,7 +1227,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "이번 출장에서 taxi를 세 번 탔는데 대략 3만 원쯤 나왔어."
+          "text": "이번 출장에서 taxi를 세 번 탔어. 정산 sheet에는 건별 금액 칸이랑 합계 칸이 나란히 있고."
         },
         {
           "turnId": "t2",
@@ -1237,7 +1237,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "더 정확히 말하면 rough하게 3만 원 안팎이야."
+          "text": "더 정확히 말하면 내가 적어 낸 숫자는 rough하게 3만 원 안팎이야."
         }
       ]
     },
@@ -1250,7 +1250,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "아까 얘기하던 워크숍 인쇄물 말인데, 세 세션에 걸쳐 스무 장쯤 썼어."
+          "text": "아까 얘기하던 워크숍 인쇄물 말인데, 세 세션에 나눠서 돌렸어."
         },
         {
           "turnId": "t2",
@@ -1260,7 +1260,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "다시 인쇄물 얘기로 오면, 스무 장 정도가 내가 기억하는 수치야."
+          "text": "다시 인쇄물 얘기로 오면, 신청서에 세션별 장수 칸이랑 총 장수 칸이 따로 있는데 내가 기억하는 건 스무 장 정도야."
         },
         {
           "turnId": "t4",
@@ -1283,7 +1283,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "지난달에 배달을 네 번 시켰는데 한 2만 원쯤 나갔어."
+          "text": "지난달에 배달을 네 번 시켰어."
         },
         {
           "turnId": "t2",
@@ -1293,7 +1293,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "아, 표현을 다시 할게. 2만 원 언저리야."
+          "text": "아, 표현을 다시 할게. 가계부에 건당 금액이랑 월 합계를 같이 적어 두는데, 2만 원 언저리라는 숫자만 머리에 남았어."
         },
         {
           "turnId": "t4",
@@ -1303,7 +1303,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "카드 명세서를 정확히 본 건 아니고 감으로 말한 거야."
+          "text": "카드 명세서를 정확히 본 건 아니고 감으로 말하는 거야."
         },
         {
           "turnId": "t6",
@@ -1326,7 +1326,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "이번 주에 회의를 다섯 번 했는데 대략 한 시간 반 정도였어."
+          "text": "이번 주에 회의를 다섯 번 했어. 달력에는 회차별 소요 시간이랑 주간 누계가 같이 떠 있는데, 내 머리에 남은 건 대략 한 시간 반이야."
         },
         {
           "turnId": "t2",
@@ -1336,7 +1336,7 @@
         {
           "turnId": "t3",
           "role": "ASSISTANT",
-          "text": "한 시간 반 정도로 적어 둘게요."
+          "text": "한 시간 반으로 적어 둘게요."
         }
       ]
     },
@@ -1354,7 +1354,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "12월, 1월, 2월 고지서를 다 받아 놓고 하는 얘기야."
+          "text": "고지서를 12월, 1월, 2월 세 장 받아 뒀고 거기엔 월 사용액이랑 겨울 누계가 같이 찍혀 있어."
         }
       ]
     },
@@ -2550,7 +2550,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "나는 새벽에 응급실 거쳐서 하루 입원했다가 나왔어."
+          "text": "나는 새벽에 야간 접수 창구로 들어갔고 진료는 응급의학과 선생님이 봤어. 그대로 하루 입원했다가 나왔고."
         },
         {
           "turnId": "t6",
@@ -2967,7 +2967,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "이번 sprint 회고는 금요일 오후에 하기로 했어."
+          "text": "이번 sprint 회고는 금요일 오후로 잡았고, 같은 날 저녁에 release 점검도 있어."
         },
         {
           "turnId": "t2",
@@ -2977,7 +2977,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "remote 참여를 허용한다는 얘기도 나왔어."
+          "text": "격주로만 돌린다는 조건이 하나 붙었어."
         }
       ]
     },
@@ -2990,7 +2990,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "다음 주 워크숍은 오전 10시에 시작해."
+          "text": "다음 주 워크숍은 오전 10시에 시작하고, 오후에는 분과별 실습이 따로 있어."
         },
         {
           "turnId": "t2",
@@ -3000,7 +3000,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "더 붙이자면, 사전 등록자만 입장 가능하다는 말도 있었어."
+          "text": "더 붙이자면, 사전 등록자만 들어올 수 있다는 단서가 하나 있었어."
         },
         {
           "turnId": "t4",
@@ -3033,7 +3033,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "무인 반납기 얘기도 같이 나왔었고."
+          "text": "상호대차로 온 책은 2층 사무실에서 받고."
         },
         {
           "turnId": "t4",
@@ -3043,7 +3043,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "다시 반납 얘기로 오면, 내일 가려고 해."
+          "text": "다시 반납 얘기로 오면, 평일에만 받는다는 조건이 걸려 있어."
         },
         {
           "turnId": "t6",
@@ -3066,7 +3066,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "The team lunch is booked for Thursday."
+          "text": "The team lunch is booked for Thursday, and the client dinner is on the same week."
         },
         {
           "turnId": "t2",
@@ -3076,7 +3076,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "Let me add: someone mentioned a vegetarian menu."
+          "text": "Let me add: the budget only stretches to eight people."
         }
       ]
     },
@@ -3089,7 +3089,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "이번 정기 점검은 토요일에 진행돼. 야간 작업이 가능하다는 말도 있었어."
+          "text": "이번 정기 점검은 토요일에 진행되고, 소방 점검은 그 주에 한 번 더 있어. 야간에만 들어갈 수 있다는 조건이 하나 붙어 있고."
         }
       ]
     },
@@ -3112,7 +3112,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "rollback window를 따로 둔다는 얘기도 있었어."
+          "text": "config 이관도 같은 밤에 붙어 있어. rollback window 안에서만 건드린다는 단서가 하나 있고."
         },
         {
           "turnId": "t4",
@@ -3135,7 +3135,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "이번 분기 성과 면담은 팀장이 직접 진행해."
+          "text": "이번 분기 성과 면담은 팀장이 직접 진행하고, 커리어 면담은 인사팀이 따로 잡아."
         },
         {
           "turnId": "t2",
@@ -3145,7 +3145,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "자기평가서를 먼저 낸다는 얘기도 돌더라."
+          "text": "대면으로만 한다는 얘기가 돌더라."
         }
       ]
     },
@@ -3168,7 +3168,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "대기자 명단도 운영한다는 말이 있었어."
+          "text": "대기자 전환도 같이 돌린대. 선결제한 사람만 해당된다는 단서가 하나 붙어 있고."
         },
         {
           "turnId": "t4",
@@ -3206,7 +3206,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "절임 배추를 주문한다는 얘기도 나왔어."
+          "text": "절임 배추 수령은 형네가 맡기로 했고."
         },
         {
           "turnId": "t4",
@@ -3216,7 +3216,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "날짜는 다음 주 토요일이야."
+          "text": "오전에만 한다는 조건이 하나 붙어 있어."
         },
         {
           "turnId": "t6",
@@ -3226,7 +3226,7 @@
         {
           "turnId": "t7",
           "role": "ASSISTANT",
-          "text": "우리 집, 다음 주 토요일로 적어 둘게요."
+          "text": "우리 집으로 적어 둘게요."
         }
       ]
     },
@@ -3239,7 +3239,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "이번 촬영은 실내에서 해. 더 말하자면 조명 대여 얘기도 나왔어."
+          "text": "이번 촬영은 실내에서 하고 소품 컷은 따로 잡았어. 더 말하자면 조명 대여가 되는 날만 가능하다는 단서가 하나 있어."
         }
       ]
     },
@@ -3262,7 +3262,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "2주차 평가가 있다는 얘기도 같이 나왔어."
+          "text": "2주차에는 과제 review가 따로 잡혀 있어. 정규직에게만 적용된다는 단서가 하나 있고."
         },
         {
           "turnId": "t4",
@@ -3285,7 +3285,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "이번 모임 회비는 1인당 3만 원이야. 아, 정확히 말하면 현금만 받는대."
+          "text": "이번 모임 회비는 1인당 3만 원이야. 아, 정확히 말하면 뒤풀이 비용은 그날 따로 걷어."
         },
         {
           "turnId": "t2",
@@ -3295,7 +3295,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "식사 외 비용은 따로라는 말도 있었어."
+          "text": "현금만 받는다는 말이 하나 붙어 있었어."
         }
       ]
     },
@@ -4123,7 +4123,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "아까 회의에서 예산이 남았다는 얘기가 한참 오갔고, 그 끝에 회식을 목요일로 하자는 제안이 나왔어. 나는 좋다고 했고."
+          "text": "아까 회의에서 남은 예산을 회식에 쓰자는 제안이 먼저 나왔고, 바로 뒤에 그 돈으로 모니터를 바꾸자는 제안이 같이 올라왔어. 나는 좋다고 했고."
         }
       ]
     },
@@ -4146,7 +4146,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "그러다 누가 인스턴스를 줄이자고 제안했어. 나는 괜찮다고 했어."
+          "text": "한 명은 인스턴스를 줄이자고 했고 다른 한 명은 아예 다른 리전으로 옮기자고 했어. 나는 괜찮다고 했어."
         },
         {
           "turnId": "t4",
@@ -4169,7 +4169,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "장보기 동선이 비효율적이라는 얘기를 아내랑 한참 했어. 그러다 아내가 배송으로 바꾸자고 제안했어."
+          "text": "장보기 동선 얘기를 하다가 아내가 배송으로 바꾸자고 했고, 나는 주말에 몰아서 한 번만 가자고 했어."
         },
         {
           "turnId": "t2",
@@ -4179,7 +4179,7 @@
         {
           "turnId": "t3",
           "role": "ASSISTANT",
-          "text": "어떻게 하셨어요?"
+          "text": "그래서 어떻게 됐어요?"
         },
         {
           "turnId": "t4",
@@ -4207,7 +4207,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "그러다 동료가 CI에 coverage gate를 걸자고 제안했어."
+          "text": "동료가 CI에 coverage gate를 걸자고 했고, 옆자리는 gate 대신 주간 report만 돌리자고 했어."
         },
         {
           "turnId": "t4",
@@ -4227,7 +4227,7 @@
         {
           "turnId": "t7",
           "role": "ASSISTANT",
-          "text": "그렇게 적어 둘게요."
+          "text": "그 내용 그대로요."
         }
       ]
     },
@@ -4250,7 +4250,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "더 말하자면, 그 끝에 친구가 실내 전시로 바꾸자고 제안했고 나는 그러자고 했어."
+          "text": "더 말하자면, 친구는 실내 전시로 바꾸자고 했고 나는 날짜를 다음 주로 미루자고 했어. 그 두 얘기 끝에 그러자고 했어."
         },
         {
           "turnId": "t4",
@@ -4260,7 +4260,7 @@
         {
           "turnId": "t5",
           "role": "ASSISTANT",
-          "text": "그렇게 적어 둘게요."
+          "text": "네, 그렇게 둘게요."
         }
       ]
     },
@@ -4273,7 +4273,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "아까 하던 창고 정리 얘기로 돌아가면, 물건이 너무 많다는 말이 한참 오갔어."
+          "text": "아까 하던 창고 정리 얘기로 돌아가면, 형이 다음 달에 한 번에 치우자고 했어."
         },
         {
           "turnId": "t2",
@@ -4283,7 +4283,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "그러다 형이 다음 달에 한 번에 치우자고 제안했고, 나는 좋다고 했어."
+          "text": "나는 주말마다 조금씩 빼자고 했어. 그 두 얘기 끝에 좋다고 했어."
         }
       ]
     },
@@ -4296,7 +4296,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "동아리에서 회비를 올리자는 얘기가 길게 나왔어. 아, 정확히는 그 끝에 후배가 만 원 인상을 제안했고 나는 찬성한다고 했어."
+          "text": "동아리에서 회비 얘기가 길게 나왔어. 아, 정확히는 후배가 만 원 인상을 제안했고 회장은 인상 대신 행사를 줄이자고 했는데, 나는 찬성한다고 했어."
         }
       ]
     },
@@ -4319,7 +4319,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "Then someone proposed moving the reports to a weekly cadence. I said that sounded good."
+          "text": "Someone proposed moving the reports to a weekly cadence, and someone else proposed dropping two sections instead. I said that sounded good."
         },
         {
           "turnId": "t4",
@@ -4352,7 +4352,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "회의에서 build 시간이 길다는 얘기가 계속 나왔고, 그러다 누가 cache를 새로 깔자고 제안했거든."
+          "text": "회의에서 build 시간이 길다는 얘기가 계속 나왔고, 누가 cache를 새로 깔자고 했는데 그 자리에서 build step을 아예 줄이자는 제안도 같이 나왔거든."
         }
       ]
     },
@@ -4375,7 +4375,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "그러다 누나가 올해는 서울에서 모이자고 제안했어."
+          "text": "누나가 올해는 서울에서 모이자고 제안했어."
         },
         {
           "turnId": "t4",
@@ -4385,7 +4385,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "나는 그게 좋겠다고 했어."
+          "text": "매형은 올해는 아예 건너뛰자고 했어. 나는 그 두 안을 놓고 좋겠다고 답했어."
         },
         {
           "turnId": "t6",
@@ -4395,7 +4395,7 @@
         {
           "turnId": "t7",
           "role": "ASSISTANT",
-          "text": "그렇게 적어 둘게요."
+          "text": "그럼 그렇게 둘게요."
         }
       ]
     },
@@ -4418,7 +4418,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "그러다 한 분이 주 2회로 늘리자고 제안했어."
+          "text": "한 분이 주 2회로 늘리자고 했고, 다른 분은 분량을 줄이자고 했어."
         },
         {
           "turnId": "t4",
@@ -4451,7 +4451,7 @@
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "관리비가 계속 오른다는 얘기를 이웃들과 한참 했고, 그러다 누가 관리사무소에 같이 항의하자고 제안했어. 나도 좋다고 했어."
+          "text": "관리비가 계속 오른다는 얘기를 이웃들과 한참 했는데, 누가 관리사무소에 같이 항의하자고 했고 옆집은 명세서만 따로 받아 보자고 했어. 나도 좋다고 했어."
         },
         {
           "turnId": "t3",
@@ -4631,7 +4631,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "아까 우리가 창구 두 개짜리 모의 상황을 돌려 봤거든."
+          "text": "아까 창구 두 개짜리 모의 상황을 돌려 봤고, 오후에는 실제로 창구를 두 개만 열고 손님을 받았거든."
         },
         {
           "turnId": "t4",
@@ -4654,7 +4654,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "We set up a dry run of the evacuation last week."
+          "text": "We set up a dry run of the evacuation last week, and then the alarm actually went off on Thursday."
         },
         {
           "turnId": "t2",
@@ -4677,7 +4677,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "아까 load test 시나리오를 하나 돌려 봤는데, 응답이 800ms까지 올라갔어."
+          "text": "아까 load test 시나리오를 하나 돌려 봤는데, 그 사이에 실제 traffic peak도 한 번 왔어. 응답이 800ms까지 올라갔어."
         },
         {
           "turnId": "t2",
@@ -4700,7 +4700,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "아까 가계부 시뮬레이션을 한번 돌려 봤어."
+          "text": "아까 가계부 시뮬레이션을 한번 돌려 봤는데, 오늘 카드값도 마침 다 빠져나갔어."
         },
         {
           "turnId": "t2",
@@ -6928,7 +6928,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "지난달부터 정회원 기준을 가입 1년에서 6개월로 바꿨어. 나는 가입한 지 8개월 됐어."
+          "text": "지난달부터 정회원 기준을 가입 1년에서 6개월로 바꿨어. 나는 가입한 지 8개월이고 참가비 신청서는 기준 바뀌기 전에 내 뒀어."
         },
         {
           "turnId": "t4",
@@ -6938,12 +6938,12 @@
         {
           "turnId": "t5",
           "role": "ASSISTANT",
-          "text": "8개월이요?"
+          "text": "신청서는 그 전에요?"
         },
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "응, 8개월."
+          "text": "응, 바뀌기 전에."
         }
       ]
     },
@@ -7571,7 +7571,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "우리 집 규칙은 저녁 9시 이후엔 TV를 끄는 거야. 주말엔 좀 늦게까지 봐도 된다는 얘기도 있어."
+          "text": "우리 집 규칙은 저녁 9시 이후엔 TV를 끄는 거야. 시험 기간에는 거실 불을 11시까지 켜 두기로 한 것도 있고. 오늘이 시험 기간 첫날이야."
         }
       ]
     },
@@ -7594,7 +7594,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "한국어 발표 자료도 허용한다는 안내가 따로 있어."
+          "text": "외부 guest가 있는 자리는 자료를 한국어로 준비한다는 안내가 따로 있어."
         },
         {
           "turnId": "t4",
@@ -7603,8 +7603,8 @@
         },
         {
           "turnId": "t5",
-          "role": "ASSISTANT",
-          "text": "그대로 적어 둘게요."
+          "role": "USER",
+          "text": "이번 주 회의엔 협력사 guest가 와."
         }
       ]
     },
@@ -7627,7 +7627,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "초안은 개인 폴더에 둬도 된다는 메모가 따로 있어."
+          "text": "초안 단계 작업물은 개인 폴더에서 버전을 관리하기로 한 것도 있고."
         },
         {
           "turnId": "t4",
@@ -7675,7 +7675,7 @@
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "응. 할머니 댁에서는 더 줘도 된다고 적어 둔 것도 있고."
+          "text": "응. 할머니 댁에 가는 날은 간식 시간을 할머니가 정하시기로 한 것도 있어. 이번 주말이 그 날이고."
         }
       ]
     },
@@ -7698,7 +7698,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "서버실은 더 낮춰도 된다는 얘기가 따로 있어."
+          "text": "장비가 들어간 방은 습도 기준을 따로 맞추기로 한 것도 있어."
         },
         {
           "turnId": "t4",
@@ -7707,8 +7707,8 @@
         },
         {
           "turnId": "t5",
-          "role": "ASSISTANT",
-          "text": "네, 그렇게 둘게요."
+          "role": "USER",
+          "text": "우리 방에 어제 장비 랙이 들어왔어."
         }
       ]
     },
@@ -7721,7 +7721,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "택배는 경비실에 맡기기로 했어. 더 붙이자면 신선식품은 문 앞에 둬도 된다는 안내가 따로 있어."
+          "text": "택배는 경비실에 맡기기로 했어. 더 붙이자면 신선식품은 기사님이 수령 확인을 받기로 한 것도 있어. 내일 오는 게 신선식품이고."
         }
       ]
     },
@@ -7744,7 +7744,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "용량 큰 영상은 주 1회만 올려도 된다는 메모가 따로 있어."
+          "text": "용량 큰 영상은 주간 정리 때 외장 하드에 따로 보관하기로 한 것도 있고."
         },
         {
           "turnId": "t4",
@@ -7754,7 +7754,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "내가 지금 다루는 건 영상 파일이야."
+          "text": "내가 지금 다루는 건 그 큰 영상 파일이야."
         },
         {
           "turnId": "t6",
@@ -7787,7 +7787,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "몸이 안 좋은 날은 걸어도 된다는 말도 적어 뒀어."
+          "text": "컨디션이 나쁜 날은 강도를 절반으로 잡기로 한 것도 있어."
         },
         {
           "turnId": "t4",
@@ -7796,8 +7796,8 @@
         },
         {
           "turnId": "t5",
-          "role": "ASSISTANT",
-          "text": "알겠어요, 그렇게요."
+          "role": "USER",
+          "text": "이번 주는 계속 감기 기운이 있어."
         }
       ]
     },
@@ -7820,7 +7820,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "There is also a note saying socks are fine on the mats."
+          "text": "On class days the rack moves to the back room and everything goes there instead, and tomorrow is a class day."
         }
       ]
     },
@@ -7965,7 +7965,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "더 말하자면, 나도 그 말에 동의해."
+          "text": "더 말하자면, 나도 지난주에 가 보고 비슷한 인상을 받았어. 커피는 확실히 괜찮더라."
         },
         {
           "turnId": "t4",
@@ -7998,7 +7998,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 그렇게 생각해."
+          "text": "나도 상담 갔다가 비슷하게 느꼈어. 선생님은 진짜 그렇더라."
         }
       ]
     },
@@ -8021,7 +8021,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "아, 정확히 말하면 나도 같은 인상을 받았어."
+          "text": "아, 정확히 말하면 나도 써 보고 고개를 끄덕였어. 설정하느라 반나절을 썼거든."
         },
         {
           "turnId": "t4",
@@ -8054,7 +8054,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 같은 얘기를 하고 싶었어."
+          "text": "나도 며칠 써 보고 비슷한 말을 하고 싶었어."
         },
         {
           "turnId": "t4",
@@ -8064,7 +8064,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "쓰면서 느낀 게 비슷하더라."
+          "text": "signature 몇 개는 진짜 군더더기가 없더라."
         },
         {
           "turnId": "t6",
@@ -8074,7 +8074,7 @@
         {
           "turnId": "t7",
           "role": "USER",
-          "text": "그래서 그 평가에 고개를 끄덕였어."
+          "text": "그래서 그 자리에서 고개를 끄덕였어."
         },
         {
           "turnId": "t8",
@@ -8097,7 +8097,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "결론만 말하면 나도 그 말에 공감했어. 선배가 그 동네는 조용하고 교통은 불편하다고 했거든."
+          "text": "결론만 말하면 나도 그 자리에서 고개를 끄덕였어. 선배가 그 동네는 조용하고 교통은 불편하다고 했거든. 나는 밤에 가 봤는데 확실히 조용하더라."
         }
       ]
     },
@@ -8130,7 +8130,7 @@
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "I told her I felt the same way."
+          "text": "I walked through it on Tuesday and told her it matched what I found. I kept my coat on the whole time."
         },
         {
           "turnId": "t6",
@@ -8163,12 +8163,12 @@
         {
           "turnId": "t3",
           "role": "ASSISTANT",
-          "text": "어떻게 생각하세요?"
+          "text": "타 보시니 어떠셨어요?"
         },
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "나도 같은 생각이야."
+          "text": "나도 형한테 같은 말을 했어. 장거리로 두 시간 탔는데 허리가 안 아프더라."
         }
       ]
     },
@@ -8191,7 +8191,7 @@
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "나도 그 말이 맞다고 했어."
+          "text": "나도 다녀와서 맞는 말이라고 했어. 진료실에서만 이십 분 넘게 설명을 들었거든."
         },
         {
           "turnId": "t4",
@@ -8214,7 +8214,7 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "후배가 그 conference는 세션이 지루하고 networking은 좋다고 했어. 더 말하자면 나도 비슷하게 느꼈어."
+          "text": "후배가 그 conference는 세션이 지루하고 networking은 좋다고 했어. 더 말하자면 나도 갔다 와서 비슷하게 느꼈어. hallway track에서 만난 사람들은 확실히 도움이 됐고."
         }
       ]
     },
@@ -10634,20 +10634,20 @@
       "sourceEpisodeId": "p1b6-se-b003-038",
       "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
       "anchorSpanRef": {
-        "turnId": "t1",
-        "startByte": 46,
-        "endByte": 64
+        "turnId": "t3",
+        "startByte": 52,
+        "endByte": 79
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 75
+          "endByte": 118
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 58
+          "endByte": 86
         }
       ],
       "discoursePattern": "PROGRESSIVE_REFINEMENT",
@@ -10658,20 +10658,20 @@
       "sourceEpisodeId": "p1b6-se-b003-039",
       "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
       "anchorSpanRef": {
-        "turnId": "t1",
-        "startByte": 72,
-        "endByte": 85
+        "turnId": "t3",
+        "startByte": 134,
+        "endByte": 151
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 93
+          "endByte": 85
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 86
+          "endByte": 155
         },
         {
           "turnId": "t5",
@@ -10687,25 +10687,25 @@
       "sourceEpisodeId": "p1b6-se-b003-040",
       "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
       "anchorSpanRef": {
-        "turnId": "t1",
-        "startByte": 44,
-        "endByte": 59
+        "turnId": "t3",
+        "startByte": 102,
+        "endByte": 120
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 70
+          "endByte": 41
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 52
+          "endByte": 157
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 72
+          "endByte": 75
         },
         {
           "turnId": "t7",
@@ -10722,19 +10722,19 @@
       "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
       "anchorSpanRef": {
         "turnId": "t1",
-        "startByte": 45,
-        "endByte": 66
+        "startByte": 150,
+        "endByte": 171
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 80
+          "endByte": 178
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 42
+          "endByte": 38
         }
       ],
       "discoursePattern": "CANONICAL",
@@ -10758,7 +10758,7 @@
         {
           "turnId": "t2",
           "startByte": 0,
-          "endByte": 66
+          "endByte": 121
         }
       ],
       "discoursePattern": "CONCLUSION_FIRST",
@@ -11815,7 +11815,7 @@
       "anchorSpanRef": {
         "turnId": "t5",
         "startByte": 17,
-        "endByte": 50
+        "endByte": 99
       },
       "evidenceSpanRefs": [
         {
@@ -11831,7 +11831,7 @@
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 70
+          "endByte": 144
         },
         {
           "turnId": "t7",
@@ -12216,13 +12216,13 @@
       "anchorSpanRef": {
         "turnId": "t1",
         "startByte": 24,
-        "endByte": 60
+        "endByte": 53
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 61
+          "endByte": 101
         },
         {
           "turnId": "t3",
@@ -12240,18 +12240,18 @@
       "anchorSpanRef": {
         "turnId": "t1",
         "startByte": 24,
-        "endByte": 49
+        "endByte": 52
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 50
+          "endByte": 101
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 78
+          "endByte": 89
         },
         {
           "turnId": "t5",
@@ -12280,12 +12280,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 47
+          "endByte": 55
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 53
+          "endByte": 82
         },
         {
           "turnId": "t7",
@@ -12309,12 +12309,12 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 38
+          "endByte": 81
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 48
+          "endByte": 54
         }
       ],
       "discoursePattern": "SELF_REVISION",
@@ -12327,13 +12327,13 @@
       "anchorSpanRef": {
         "turnId": "t1",
         "startByte": 24,
-        "endByte": 46
+        "endByte": 49
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 98
+          "endByte": 167
         }
       ],
       "discoursePattern": "CANONICAL",
@@ -12357,7 +12357,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 56
+          "endByte": 115
         },
         {
           "turnId": "t5",
@@ -12375,18 +12375,18 @@
       "anchorSpanRef": {
         "turnId": "t1",
         "startByte": 31,
-        "endByte": 57
+        "endByte": 60
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 58
+          "endByte": 109
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 56
+          "endByte": 46
         }
       ],
       "discoursePattern": "CONTEXT_FIRST",
@@ -12410,7 +12410,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 53
+          "endByte": 108
         },
         {
           "turnId": "t5",
@@ -12444,17 +12444,17 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 53
+          "endByte": 51
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 37
+          "endByte": 54
         },
         {
           "turnId": "t7",
           "startByte": 0,
-          "endByte": 53
+          "endByte": 34
         }
       ],
       "discoursePattern": "INTERLEAVED",
@@ -12467,13 +12467,13 @@
       "anchorSpanRef": {
         "turnId": "t1",
         "startByte": 17,
-        "endByte": 33
+        "endByte": 36
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 86
+          "endByte": 157
         }
       ],
       "discoursePattern": "PROGRESSIVE_REFINEMENT",
@@ -12497,7 +12497,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 55
+          "endByte": 112
         },
         {
           "turnId": "t5",
@@ -12521,12 +12521,12 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 93
+          "endByte": 114
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 51
+          "endByte": 54
         }
       ],
       "discoursePattern": "SELF_REVISION",
@@ -13253,14 +13253,14 @@
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
         "turnId": "t1",
-        "startByte": 143,
-        "endByte": 159
+        "startByte": 37,
+        "endByte": 63
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 160
+          "endByte": 194
         }
       ],
       "discoursePattern": "CONCLUSION_FIRST",
@@ -13272,8 +13272,8 @@
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
         "turnId": "t3",
-        "startByte": 67,
-        "endByte": 86
+        "startByte": 11,
+        "endByte": 36
       },
       "evidenceSpanRefs": [
         {
@@ -13284,7 +13284,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 87
+          "endByte": 140
         },
         {
           "turnId": "t5",
@@ -13300,9 +13300,9 @@
       "sourceEpisodeId": "p1b6-se-b003-132",
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
-        "turnId": "t4",
-        "startByte": 0,
-        "endByte": 16
+        "turnId": "t1",
+        "startByte": 47,
+        "endByte": 69
       },
       "evidenceSpanRefs": [
         {
@@ -13313,7 +13313,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 23
+          "endByte": 30
         },
         {
           "turnId": "t4",
@@ -13329,9 +13329,9 @@
       "sourceEpisodeId": "p1b6-se-b003-133",
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
-        "turnId": "t5",
-        "startByte": 7,
-        "endByte": 26
+        "turnId": "t3",
+        "startByte": 16,
+        "endByte": 39
       },
       "evidenceSpanRefs": [
         {
@@ -13342,7 +13342,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 66
+          "endByte": 113
         },
         {
           "turnId": "t5",
@@ -13352,7 +13352,7 @@
         {
           "turnId": "t7",
           "startByte": 0,
-          "endByte": 27
+          "endByte": 24
         }
       ],
       "discoursePattern": "INTERLEAVED",
@@ -13364,8 +13364,8 @@
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
         "turnId": "t3",
-        "startByte": 89,
-        "endByte": 108
+        "startByte": 28,
+        "endByte": 54
       },
       "evidenceSpanRefs": [
         {
@@ -13376,12 +13376,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 109
+          "endByte": 159
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 27
+          "endByte": 25
         }
       ],
       "discoursePattern": "PROGRESSIVE_REFINEMENT",
@@ -13392,20 +13392,20 @@
       "sourceEpisodeId": "p1b6-se-b003-135",
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
-        "turnId": "t3",
-        "startByte": 76,
-        "endByte": 92
+        "turnId": "t1",
+        "startByte": 59,
+        "endByte": 93
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 103
+          "endByte": 104
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 93
+          "endByte": 87
         }
       ],
       "discoursePattern": "RETURN_TO_TOPIC",
@@ -13417,14 +13417,14 @@
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
         "turnId": "t1",
-        "startByte": 144,
-        "endByte": 166
+        "startByte": 79,
+        "endByte": 93
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 167
+          "endByte": 198
         }
       ],
       "discoursePattern": "SELF_REVISION",
@@ -13436,8 +13436,8 @@
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
         "turnId": "t3",
-        "startByte": 62,
-        "endByte": 86
+        "startByte": 17,
+        "endByte": 55
       },
       "evidenceSpanRefs": [
         {
@@ -13448,7 +13448,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 87
+          "endByte": 139
         },
         {
           "turnId": "t5",
@@ -13464,9 +13464,9 @@
       "sourceEpisodeId": "p1b6-se-b003-138",
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
-        "turnId": "t1",
-        "startByte": 27,
-        "endByte": 52
+        "turnId": "t3",
+        "startByte": 74,
+        "endByte": 96
       },
       "evidenceSpanRefs": [
         {
@@ -13477,7 +13477,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 126
+          "endByte": 191
         }
       ],
       "discoursePattern": "CONCLUSION_FIRST",
@@ -13488,9 +13488,9 @@
       "sourceEpisodeId": "p1b6-se-b003-139",
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
-        "turnId": "t5",
-        "startByte": 7,
-        "endByte": 33
+        "turnId": "t3",
+        "startByte": 20,
+        "endByte": 42
       },
       "evidenceSpanRefs": [
         {
@@ -13501,12 +13501,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 69
+          "endByte": 59
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 34
+          "endByte": 103
         },
         {
           "turnId": "t7",
@@ -13522,9 +13522,9 @@
       "sourceEpisodeId": "p1b6-se-b003-140",
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
-        "turnId": "t6",
-        "startByte": 7,
-        "endByte": 23
+        "turnId": "t3",
+        "startByte": 11,
+        "endByte": 32
       },
       "evidenceSpanRefs": [
         {
@@ -13535,7 +13535,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 59
+          "endByte": 88
         },
         {
           "turnId": "t5",
@@ -13557,14 +13557,14 @@
       "semanticSkeletonId": "p1b6-sk-5229ea237196499d",
       "anchorSpanRef": {
         "turnId": "t2",
-        "startByte": 151,
-        "endByte": 167
+        "startByte": 100,
+        "endByte": 119
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t2",
           "startByte": 0,
-          "endByte": 168
+          "endByte": 209
         }
       ],
       "discoursePattern": "INTERLEAVED",
@@ -13714,7 +13714,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 72
+          "endByte": 134
         },
         {
           "turnId": "t5",
@@ -13738,7 +13738,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 48
+          "endByte": 98
         },
         {
           "turnId": "t3",
@@ -13755,14 +13755,14 @@
       "semanticSkeletonId": "p1b6-sk-59c8f51891ab4996",
       "anchorSpanRef": {
         "turnId": "t1",
-        "startByte": 68,
-        "endByte": 92
+        "startByte": 121,
+        "endByte": 145
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 93
+          "endByte": 146
         },
         {
           "turnId": "t2",
@@ -13791,7 +13791,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 57
+          "endByte": 108
         },
         {
           "turnId": "t3",
@@ -15794,7 +15794,7 @@
       "anchorSpanRef": {
         "turnId": "t3",
         "startByte": 83,
-        "endByte": 104
+        "endByte": 168
       },
       "evidenceSpanRefs": [
         {
@@ -15805,17 +15805,17 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 112
+          "endByte": 169
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 14
+          "endByte": 27
         },
         {
           "turnId": "t6",
           "startByte": 0,
-          "endByte": 13
+          "endByte": 22
         }
       ],
       "discoursePattern": "ELLIPTICAL_REPLY",
@@ -16394,7 +16394,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 125
+          "endByte": 180
         }
       ],
       "discoursePattern": "CANONICAL",
@@ -16418,12 +16418,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 67
+          "endByte": 96
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 27
+          "endByte": 44
         }
       ],
       "discoursePattern": "CONCLUSION_FIRST",
@@ -16447,7 +16447,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 68
+          "endByte": 91
         },
         {
           "turnId": "t5",
@@ -16486,7 +16486,7 @@
         {
           "turnId": "t4",
           "startByte": 0,
-          "endByte": 74
+          "endByte": 132
         }
       ],
       "discoursePattern": "ELLIPTICAL_REPLY",
@@ -16510,12 +16510,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 61
+          "endByte": 82
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 25
+          "endByte": 48
         }
       ],
       "discoursePattern": "INTERLEAVED",
@@ -16534,7 +16534,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 129
+          "endByte": 173
         }
       ],
       "discoursePattern": "PROGRESSIVE_REFINEMENT",
@@ -16558,12 +16558,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 77
+          "endByte": 97
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 48
+          "endByte": 56
         },
         {
           "turnId": "t7",
@@ -16592,12 +16592,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 66
+          "endByte": 78
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 27
+          "endByte": 45
         }
       ],
       "discoursePattern": "SELF_REVISION",
@@ -16621,7 +16621,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 55
+          "endByte": 109
         }
       ],
       "discoursePattern": "CANONICAL",
@@ -16761,7 +16761,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 46
+          "endByte": 113
         },
         {
           "turnId": "t5",
@@ -16790,7 +16790,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 27
+          "endByte": 81
         }
       ],
       "discoursePattern": "RETURN_TO_TOPIC",
@@ -16814,7 +16814,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 59
+          "endByte": 106
         },
         {
           "turnId": "t5",
@@ -16843,17 +16843,17 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 41
+          "endByte": 59
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 37
+          "endByte": 54
         },
         {
           "turnId": "t7",
           "startByte": 0,
-          "endByte": 47
+          "endByte": 50
         },
         {
           "turnId": "t9",
@@ -16870,14 +16870,14 @@
       "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
       "anchorSpanRef": {
         "turnId": "t1",
-        "startByte": 76,
-        "endByte": 124
+        "startByte": 92,
+        "endByte": 140
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 125
+          "endByte": 196
         }
       ],
       "discoursePattern": "CONCLUSION_FIRST",
@@ -16906,7 +16906,7 @@
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 31
+          "endByte": 102
         },
         {
           "turnId": "t7",
@@ -16935,12 +16935,12 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 26
+          "endByte": 30
         },
         {
           "turnId": "t4",
           "startByte": 0,
-          "endByte": 27
+          "endByte": 100
         }
       ],
       "discoursePattern": "ELLIPTICAL_REPLY",
@@ -16964,7 +16964,7 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 35
+          "endByte": 108
         },
         {
           "turnId": "t5",
@@ -16988,7 +16988,7 @@
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 130
+          "endByte": 212
         }
       ],
       "discoursePattern": "PROGRESSIVE_REFINEMENT",

@@ -150,7 +150,11 @@ function buildBatch003(entries, bundle) {
     sourceEpisodes: rows.map(row => row.episode),
     items: rows.map(row => row.item),
   };
-  return plan.validateBatch003(batch, bundle);
+  // Structural compliance first, then leakage. Materialization itself fails closed: a batch that
+  // reuses a prior conversation, a non-trivial turn, an identity, or crosses a family across
+  // splits never reaches the fixture, whatever a separate test does.
+  plan.validateBatch003(batch, bundle);
+  return plan.validateBatch003Leakage(batch);
 }
 
 function loadAuthoredContent() {

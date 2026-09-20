@@ -17,11 +17,11 @@ const readJson = file => JSON.parse(read(file));
 
 const ZERO_COVERED = 'p1b6-sk-aebbf047d6864a35';
 const PROTOCOL_SHA256 = '33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447';
-const BATCH_003_SHA256 = '99e118c6d1a44e8a5e64a185d875a1edae40082820b17363866b5719600a9e2f';
+const BATCH_003_SHA256 = '164f5bd30106ed748697345b6134fbadc2eac6892c468c3c1b4ed8db0cefeca1';
 const MATERIALIZATION_RECEIPT =
   'local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json';
 const MATERIALIZATION_RECEIPT_SHA256 =
-  '311cabce93841b1e00213ce2ad8075af623cff0e51addf02e48b5c41f74e8ecc';
+  'b0791a9ec323ee34bef4079ba4b71c65a8f6488f1917c8d7439ffec06f017a13';
 
 // Historical artifacts this authoring step must leave byte-identical.
 const UNCHANGED = Object.freeze({
@@ -486,4 +486,172 @@ test('historical artifacts remain byte-identical and no gate result is invented'
   assert.equal(protocol.authority.authoringSemanticLabelsAreHumanGold, false);
   assert.equal(protocol.authority.note.includes('NOT HUMAN gold'), true);
   assert.equal(protocol.gatesNotYetRun.surfacesAuthored, false);
+});
+
+// --- Pre-audit authoring repair -------------------------------------------------------------
+//
+// A construction review before any source audit found systematic ESCALATE surface collapse: the
+// visible evidence resolved to one status instead of positively licensing two. The tests below
+// pin the repaired population and assert that the specific structural failure modes that caused
+// the repair are gone. They encode NO expected HUMAN answer and go into no blind artifact.
+
+const REPAIRED = Object.freeze({
+  'p1b6-sk-135ab77919a554dc': [38, 39, 40, 41, 42],
+  'p1b6-sk-2da4e54e6609e34b': [79],
+  'p1b6-sk-38c426bb2e0bff42': [93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104],
+  'p1b6-sk-5229ea237196499d': [130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141],
+  'p1b6-sk-59c8f51891ab4996': [146, 147, 148, 149],
+  'p1b6-sk-a19bb9e94e9a416b': [220],
+  'p1b6-sk-be0efa305956d111': [241, 242, 243, 244, 245, 246, 247, 248, 249],
+  'p1b6-sk-cc054a4227cdafef': [254, 255, 256, 257, 258, 259, 260, 261, 262],
+});
+
+const itemId = ordinal => `p1b6-item-b003-${String(ordinal).padStart(3, '0')}`;
+const episodeText = (batch, ordinal) => batch.sourceEpisodes
+  .find(row => row.sourceEpisodeId === `p1b6-se-b003-${String(ordinal).padStart(3, '0')}`)
+  .turns.map(turn => turn.text).join('\n');
+const countOf = (text, patterns) =>
+  patterns.reduce((total, pattern) => total + (text.match(pattern) || []).length, 0);
+
+test('the 53 repaired items keep their original skeletons and frozen slot contracts', () => {
+  const batch = readJson(plan.BATCH_003_FILE);
+  const built = bundle();
+  const slots = materialize.buildSlotSpecs(built);
+  const items = new Map(batch.items.map(row => [row.itemId, row]));
+  const episodes = new Map(batch.sourceEpisodes.map(row => [row.sourceEpisodeId, row]));
+  const skeletons = new Map(built.artifacts.effectiveCatalog.candidates
+    .map(row => [row.semanticSkeletonId, row]));
+
+  const ordinals = Object.values(REPAIRED).flat();
+  assert.equal(ordinals.length, 53);
+  assert.equal(new Set(ordinals).size, 53);
+
+  for (const [semanticSkeletonId, group] of Object.entries(REPAIRED)) {
+    for (const ordinal of group) {
+      const item = items.get(itemId(ordinal));
+      const episode = episodes.get(item.sourceEpisodeId);
+      const slot = slots[ordinal - 1];
+      assert.equal(item.semanticSkeletonId, semanticSkeletonId, item.itemId);
+      assert.equal(slot.semanticSkeletonId, semanticSkeletonId, item.itemId);
+      assert.equal(item.sourceEpisodeId, `p1b6-se-b003-${String(ordinal).padStart(3, '0')}`);
+      assert.equal(episode.sourceFamilyId, `p1b6-sf-b003-${String(ordinal).padStart(3, '0')}`);
+      assert.equal(item.surfaceFamilyId,
+        `p1b6-surface-family-b003-${String(ordinal).padStart(3, '0')}`);
+      assert.equal(episode.language, slot.language, item.itemId);
+      assert.equal(item.discoursePattern, slot.discoursePattern, item.itemId);
+      assert.equal(computeFragments(item, episode).length, slot.fragments, item.itemId);
+      assert.equal(episode.splitAssignment,
+        skeletons.get(semanticSkeletonId).splitAssignment, item.itemId);
+    }
+  }
+});
+
+test('the repaired ESCALATE surfaces no longer collapse the way the review found', () => {
+  const batch = readJson(plan.BATCH_003_FILE);
+  const text = ordinal => episodeText(batch, ordinal);
+
+  // FINALITY: a lone proposal followed by a cooperative assent resolved to acceptance. Each
+  // realization must now carry at least two rival proposals for the bare assent to target.
+  for (const ordinal of REPAIRED['p1b6-sk-5229ea237196499d']) {
+    const body = text(ordinal);
+    const proposals = countOf(body,
+      [/[가-힣]자고 (?:제안했|했|하고|한)|[가-힣]자는 제안|[을를] 제안했|proposed /gu]);
+    assert.equal(proposals >= 2, true, `${itemId(ordinal)} proposals=${proposals}`);
+  }
+
+  // ACTUALITY (report adoption): a direct whole-state adoption formula resolved the bundle.
+  for (const ordinal of REPAIRED['p1b6-sk-cc054a4227cdafef']) {
+    const body = text(ordinal);
+    for (const collapsed of ['그 말에 동의', '같은 생각', 'felt the same way', '같은 인상을 받았어']) {
+      assert.equal(body.includes(collapsed), false, `${itemId(ordinal)} ${collapsed}`);
+    }
+  }
+
+  // ACTUALITY (simulation): the result was tied to the simulation frame alone. Both a simulation
+  // frame and an actual-observation frame must now be visible.
+  for (const ordinal of REPAIRED['p1b6-sk-59c8f51891ab4996']) {
+    const body = text(ordinal);
+    assert.equal(/모의|시뮬레이션|load test|dry run/u.test(body), true, itemId(ordinal));
+    assert.equal(/실제|actually|마침/u.test(body), true, itemId(ordinal));
+  }
+
+  // APPROXIMATION: the count and the amount shared a clause, scoping the value as the total.
+  // Both a per-occurrence basis and an aggregate basis must now be visible and unselected.
+  for (const ordinal of REPAIRED['p1b6-sk-135ab77919a554dc']) {
+    const body = text(ordinal);
+    assert.equal(/건별|건당|세션별|회차별|월 사용액/u.test(body), true, itemId(ordinal));
+    assert.equal(/합계|총 장수|누계/u.test(body), true, itemId(ordinal));
+  }
+
+  // COMPLEMENTARY (overlapping rules): an explicit exception resolved the relationship.
+  for (const ordinal of REPAIRED['p1b6-sk-be0efa305956d111']) {
+    const body = text(ordinal);
+    for (const resolved of ['예외', '해도 된다', '둬도 된다', '봐도 된다', 'exempt', 'are fine']) {
+      assert.equal(body.includes(resolved), false, `${itemId(ordinal)} ${resolved}`);
+    }
+  }
+
+  // SCOPE (exception membership): the target said outright that it was in the exception.
+  assert.equal(text(79).includes('예외'), true);
+  assert.equal(/응급실 거쳐|응급실을 거쳐서/u.test(text(79)), false);
+
+  // SCOPE (boundary change): the qualifying event must straddle the change so both the old and
+  // the new boundary stay applicable without a grandfathering premise.
+  assert.equal(text(220).includes('기준 바뀌기 전에'), true);
+});
+
+test('materialization itself fails closed on cross-batch leakage', () => {
+  const built = bundle();
+  const authored = materialize.loadAuthoredContent();
+  assert.doesNotThrow(() => materialize.buildBatch003(authored, built));
+
+  // Rewrite a turn no span references, so structure stays exactly plan-compliant and only the
+  // leakage validator can reject. Without the fail-close the batch would be written as valid.
+  const unreferenced = entry => entry.turns.findIndex((turn, index) => {
+    const selected = entry.ev.some(sel => (Array.isArray(sel) ? sel[0] : sel) === index);
+    return !selected && index !== entry.anchor[0] && plan.isNonTrivialTurn(turn[1]);
+  });
+
+  const priorTurn = plan.loadPriorSources()
+    .flatMap(row => row.turns).find(turn => plan.isNonTrivialTurn(turn.text));
+  const leaky = structuredClone(authored);
+  const victim = unreferenced(leaky[0]);
+  assert.equal(victim >= 0, true);
+  leaky[0].turns[victim][1] = priorTurn.text;
+  assert.throws(() => materialize.buildBatch003(leaky, built),
+    /non-trivial turn reused from/, 'prior turn leakage');
+
+  const duplicated = structuredClone(authored);
+  const donor = unreferenced(duplicated[0]);
+  const target = unreferenced(duplicated[1]);
+  assert.equal(target >= 0, true);
+  duplicated[1].turns[target][1] = duplicated[0].turns[donor][1];
+  assert.throws(() => materialize.buildBatch003(duplicated, built),
+    /non-trivial turn reused across/, 'internal duplicate turn');
+});
+
+test('the repair records no gate result and leaves the frozen plan untouched', () => {
+  assert.equal(sha256RawBytes(read(plan.PROTOCOL_FILE)), PROTOCOL_SHA256);
+  const receipt = readJson(MATERIALIZATION_RECEIPT);
+  const repair = receipt.preAuditAuthoringRepair;
+
+  assert.equal(repair.trigger, 'SEMANTIC_CONSTRUCTION_REVIEW');
+  assert.equal(repair.cause, 'PRE_AUDIT_AUTHORING_DEFECT_NOT_A_HUMAN_RELABEL');
+  assert.equal(repair.repairedItemCount, 53);
+  assert.deepEqual([...repair.repairedItemIds].sort(),
+    Object.values(REPAIRED).flat().map(itemId).sort());
+  assert.deepEqual(Object.keys(repair.repairedSkeletons).sort(), Object.keys(REPAIRED).sort());
+  assert.equal(repair.supersededPacketDisposition, 'STALE_NEVER_ADJUDICATED');
+  assert.equal(repair.offsetsRecomputedMechanically, true);
+  for (const key of ['frozenPlanAltered', 'marginalsAltered', 'plannedSkeletonCountsAltered',
+    'humanJudgmentRecorded', 'sourceAuditDispositionRecorded']) {
+    assert.equal(repair[key], false, key);
+  }
+  assert.equal(receipt.leakageValidation.enforcedDuringMaterialization, true);
+
+  // No audit or review verdict vocabulary rides along with the repair record.
+  const serialized = JSON.stringify(receipt.preAuditAuthoringRepair);
+  for (const token of ['PASS', 'FAIL', 'UNCERTAIN', 'KEEP', 'REJECT', 'ACCEPT']) {
+    assert.equal(serialized.includes(token), false, token);
+  }
 });

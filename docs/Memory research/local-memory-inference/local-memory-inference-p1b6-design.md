@@ -792,13 +792,52 @@ per-item ESCALATE ambiguity self-check performed during authoring is recorded as
 authoring QA only — it is explicitly **not** HUMAN gold, not a source audit, and
 not independent validation.
 
-**Current state: batch-003 authoring COMPLETE at 304 candidates; the frozen plan
-and protocol unchanged; a fresh source-audit packet generates successfully. The
-fresh source audit is the next gate and has NOT been executed. No batch-003
-HUMAN review has happened and no batch-003 acceptance has happened. Final corpus
-HUMAN-gold freeze, repeated HELD review, FINAL_HELD_OUT release, deterministic
-FINAL selection, and training all remain UNOPENED, and the 380-item P1-B6 corpus
-is not complete.**
+### Pre-audit authoring repair
+
+The initial batch-003 materialization was **structurally correct** against the
+frozen plan, but a pre-audit semantic construction review of the ESCALATE
+surfaces found systematic **surface collapse** under
+`CONSERVATIVE_PRAGMATIC_INTERPRETATION`: the visible evidence resolved to one
+status instead of positively licensing two materially different ones. A valid
+ESCALATE surface licenses the competing reading from visible evidence alone; a
+reading that needs an unstated event, a grandfathering rule, a hidden preference
+or any other new premise does not count, and neither does a character saying the
+situation is unclear.
+
+**This is an authoring defect caught before any gate — not a HUMAN relabel and
+not an audit disposition.** 53 surfaces over 8 skeletons were re-authored:
+`p1b6-sk-135ab77919a554dc` (038–042), `p1b6-sk-2da4e54e6609e34b` (079),
+`p1b6-sk-38c426bb2e0bff42` (093–104), `p1b6-sk-5229ea237196499d` (130–141),
+`p1b6-sk-59c8f51891ab4996` (146–149), `p1b6-sk-a19bb9e94e9a416b` (220),
+`p1b6-sk-be0efa305956d111` (241–249) and `p1b6-sk-cc054a4227cdafef` (254–262).
+Per-defect collapse and repair are tabulated in the run receipt.
+
+The repair changed source dialogue, selected evidence and anchors only. Every
+repaired item keeps its `semanticSkeletonId`, `splitAssignment`, item ID,
+source-episode ID, `sourceFamilyId`, `surfaceFamilyId`, language, discourse
+pattern and fragment count, so all frozen marginals and `plannedSkeletonCounts`
+are unchanged and the batch is still exactly 304 items / 304 episodes. **All
+byte offsets were recomputed mechanically from the new text**; none was
+hand-edited. The frozen authoring protocol stays byte-identical.
+
+`buildBatch003()` now **fails closed on leakage**: after structural validation it
+runs the batch-003 leakage validator before the batch can be written, so a
+leakage-invalid authored batch never reaches the fixture whatever a separate test
+does. That behavior stays at the batch-003 boundary and is not pushed into the
+historical shared surface library.
+
+The pre-repair transient audit packet is **stale and was never adjudicated**. A
+fresh 304-row packet was regenerated from the repaired batch with the unchanged
+canonical generic builder.
+
+**Current state: batch-003 authoring COMPLETE at 304 candidates, with 53
+ESCALATE surfaces repaired before any gate; the frozen plan and protocol
+unchanged; a fresh source-audit packet regenerated from the repaired batch. The
+fresh source audit of all 304 repaired rows is the next gate and has NOT been
+executed. No batch-003 HUMAN review has happened and no batch-003 acceptance has
+happened. Final corpus HUMAN-gold freeze, repeated HELD review, FINAL_HELD_OUT
+release, deterministic FINAL selection, and training all remain UNOPENED, and the
+380-item P1-B6 corpus is not complete.**
 
 ## Task Boundary
 

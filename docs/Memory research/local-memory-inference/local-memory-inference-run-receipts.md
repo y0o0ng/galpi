@@ -4432,3 +4432,67 @@ selection and training remain UNOPENED, and the 380-item corpus is not complete.
 
 Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
 (16/16 pass) and the full `npm test` suite.
+
+#### P1-B6 batch-003 pre-audit authoring repair — 53 surfaces re-authored / SOURCE AUDIT STILL NOT RUN
+
+That first materialization was structurally correct against the frozen plan, but a
+**pre-audit semantic construction review** of the ESCALATE surfaces found systematic
+surface collapse under `CONSERVATIVE_PRAGMATIC_INTERPRETATION`: the visible evidence
+resolved to one status instead of positively licensing two. **This is an authoring
+defect found before any gate — it is not a HUMAN relabel and carries no audit
+disposition.** The affected source dialogue was re-authored and the batch rebuilt.
+
+53 items over 8 skeletons, all on their original skeletons and frozen slots:
+
+| skeleton | items | collapse found | repair |
+| --- | --- | --- | --- |
+| `p1b6-sk-135ab77919a554dc` | 038–042 | `세 번 탔는데 대략 3만 원` scoped the value as the aggregate | a per-occurrence column and an aggregate column are both visible; the value attaches to neither |
+| `p1b6-sk-2da4e54e6609e34b` | 079 | the target said outright it went through the ER, resolving exception membership | the route carries one property pulling into the exception and one pulling out |
+| `p1b6-sk-38c426bb2e0bff42` | 093–104 | the second relation was an unrelated coexisting fact | a host-free qualifier sits beside two candidate states and materially changes the target only if it attaches there |
+| `p1b6-sk-5229ea237196499d` | 130–141 | one proposal followed by `좋다고 했다` resolved as acceptance | two rival proposals stay live and the bare assent selects neither |
+| `p1b6-sk-59c8f51891ab4996` | 146–149 | the result was syntactically tied to the simulation | a simulation frame and an actual-observation frame are both active |
+| `p1b6-sk-a19bb9e94e9a416b` | 220 | the current six-month boundary applied; keeping the old one needed an unstated grandfathering premise | the qualifying event straddles the change, so both boundaries live on the visible timeline |
+| `p1b6-sk-be0efa305956d111` | 241–249 | an explicit exception or an orthogonal compatible fact resolved the relationship | genuinely overlapping rules where modify-vs-coexist is left open |
+| `p1b6-sk-cc054a4227cdafef` | 254–262 | `나도 그 말에 동의해` directly adopted the reported state | a general alignment clause plus one evidenced aspect leaves whole-state adoption unresolved |
+
+Preserved per repaired item: `semanticSkeletonId`, `splitAssignment`, item ID,
+source-episode ID, `sourceFamilyId`, `surfaceFamilyId`, language, discourse pattern
+and fragment count. **All byte offsets were recomputed mechanically**; none was
+hand-edited. The frozen authoring protocol is byte-identical.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003.json` (repaired) | `164f5bd30106ed748697345b6134fbadc2eac6892c468c3c1b4ed8db0cefeca1` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-materialization-receipt.json` | `b0791a9ec323ee34bef4079ba4b71c65a8f6488f1917c8d7439ffec06f017a13` |
+| `fixtures/local-memory-inference-p1b6-surface-batch-003-authoring-protocol.json` (unchanged) | `33c39777583009aaaa570718ae26741b6a2562e2006d4a4e428c60d47bdcc447` |
+
+Re-verified after repair: 304 items / 304 source episodes, split 195 / 47 / 62,
+authoring label 141 / 163, language 213 / 61 / 30, fragments 55 / 78 / 99 / 56 / 16,
+38 per discourse pattern, per-skeleton counts equal to `plannedSkeletonCounts`, the
+5 DEV/ESCALATE realizations for `p1b6-sk-aebbf047d6864a35` intact, and every anchor
+and evidence span valid. Cross-batch leakage passes unweakened; the template-reuse
+report stays advisory at 1418 turns / 1357 distinct exact turn texts.
+
+`buildBatch003()` now **fails closed on leakage**: it runs the batch-003 leakage
+validator after structural validation, so a leakage-invalid authored batch never
+reaches the fixture whatever a separate test does. A regression test mutates an
+unreferenced turn — leaving structure exactly plan-compliant — and proves the
+materialization path itself refuses it.
+
+The previous transient packet
+`1ed563ff9da497d24a2b198172c5808ba60578b480d5dc1133af99fb25943402` belongs to the
+pre-repair batch and is **stale and never adjudicated**. A new transient 304-row
+packet was generated from the repaired batch with the unchanged canonical generic
+builder at raw SHA-256
+`f5aa6766184fc5ca0de4bc8bf35496e79d0d18be446c99c7ef9cf6bdf684de45`, with 304 unique
+opaque audit rows and no semantic-answer leakage. It is transient by convention and
+not committed.
+
+**No audit disposition, HUMAN decision, or acceptance was created here either.** The
+fresh source audit of all 304 repaired rows remains the next gate and has not been
+executed. Final corpus HUMAN-gold freeze, repeated HELD review, FINAL_HELD_OUT
+release, FINAL selection and training remain UNOPENED, and the 380-item corpus is
+not complete.
+
+Tests run locally: `node --test test/memory-inference-p1b6-growth-batch-003.test.js`
+(20/20 pass) and the full `npm test` suite (1425/1425 pass).
