@@ -4,9 +4,9 @@
 //
 // No HUMAN result exists. These tests pin the derivation, the blindness of the packet and the
 // preregistered result semantics. The raw strong-model result bytes are not committed, so
-// derivation logic is exercised with results rebuilt from the committed reconciliation; the
-// derivation still has to reproduce that reconciliation exactly. The exact raw bytes are
-// checked separately when P1B6_B003_SM_RESULTS points at them.
+// the pure logic is exercised through `combined.unauthorized` with results rebuilt from the
+// committed reconciliation. Those populations are never admitted by the production gate; only
+// the exact raw bytes are, checked when P1B6_B003_SM_RESULTS points at them.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -17,6 +17,8 @@ const { renderHumanReviewText } = require('../lib/memory-inference-p1b6-surfaces
 const strongModel = require('../scripts/build-memory-inference-p1b6-batch-003-strong-model-review-packet');
 const humanPacket = require('../scripts/build-memory-inference-p1b6-human-review-packet');
 const combined = require('../scripts/build-memory-inference-p1b6-batch-003-human-adjudication-calibration-packet');
+
+const pure = combined.unauthorized;
 
 const ROOT = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(ROOT, file));
@@ -80,8 +82,7 @@ function rebuiltResults() {
 
 let cached;
 function populations() {
-  cached ??= combined.derivePopulationsFromVerifiedResults(read(BATCH), readJson(AUDIT),
-    rebuiltResults());
+  cached ??= pure.computePopulations(read(BATCH), readJson(AUDIT), rebuiltResults());
   return cached;
 }
 
@@ -168,7 +169,7 @@ test('results that do not reproduce the committed reconciliation fail closed', (
   const agreementRow = references.find(row => !routed.has(row.itemId));
   const target = flipped.find(row => row.reviewRowId === agreementRow.reviewRowId);
   target.decision = opposite(target.decision);
-  assert.throws(() => combined.derivePopulationsFromVerifiedResults(read(BATCH), readJson(AUDIT),
+  assert.throws(() => pure.computePopulations(read(BATCH), readJson(AUDIT),
     flipped), /not 267 agreements \/ 34 routes/);
 
   // Same counts, different routed rows: swap one routed and one agreeing row.
@@ -178,31 +179,24 @@ test('results that do not reproduce the committed reconciliation fail closed', (
     const row = swapped.find(entry => entry.reviewRowId === ref.reviewRowId);
     row.decision = opposite(row.decision);
   }
-  assert.throws(() => combined.derivePopulationsFromVerifiedResults(read(BATCH), readJson(AUDIT),
+  assert.throws(() => pure.computePopulations(read(BATCH), readJson(AUDIT),
     swapped), /do not match the committed reconciliation/);
 });
 
 test('the packet shows only an opaque row ID and the canonical selected bundle', () => {
   const pops = populations();
-  const packet = combined.buildPacketFromPopulations(pops);
+  const rows = pure.packetRows(pops);
   const batch = readJson(BATCH);
   const items = new Map(batch.items.map(item => [item.itemId, item]));
 
-  assert.deepEqual(Object.keys(packet),
-    ['name', 'sourceBatch', 'rendererIdentity', 'reviewProtocol', 'rows']);
-  assert.equal(packet.name, combined.PACKET_IDENTITY);
-  assert.equal(packet.rows.length, 66);
-  packet.rows.forEach((row, index) => {
+  assert.equal(rows.length, 66);
+  rows.forEach((row, index) => {
     assert.deepEqual(Object.keys(row), ['reviewRowId', 'selectedBundle']);
     assert.equal(row.selectedBundle, renderHumanReviewText(batch, items.get(pops.rows[index].itemId)));
   });
 
-  // The header names only the packet, batch, renderer and protocol; no row's role, answer or
-  // origin appears anywhere in the rows.
-  assert.deepEqual(packet.sourceBatch, { identity: batch.name, sha256: pops.batchSha256 });
-  assert.deepEqual(packet.reviewProtocol,
-    { identity: combined.PROTOCOL_IDENTITY, sha256: combined.loadProtocol().sha256 });
-  const text = JSON.stringify(packet.rows);
+  // No row's role, answer or origin appears anywhere in the rows.
+  const text = JSON.stringify(rows);
   const catalog = readJson(CATALOG);
   const leaks = [
     'MANDATORY_ADJUDICATION', 'CALIBRATION', 'DECISION_DISAGREEMENT', 'KEEP', 'provenance',
@@ -230,16 +224,52 @@ test('row IDs are deterministic, namespaced, and ordered by ID rather than sourc
   }
   const itemOrder = pops.rows.map(row => row.itemId);
   assert.notDeepEqual(itemOrder, [...itemOrder].sort());
-  assert.deepEqual(combined.buildPacketFromPopulations(populations()),
-    combined.buildPacketFromPopulations(combined.derivePopulationsFromVerifiedResults(read(BATCH),
-      readJson(AUDIT), rebuiltResults())));
+  assert.deepEqual(pure.packetRows(populations()),
+    pure.packetRows(pure.computePopulations(read(BATCH), readJson(AUDIT), rebuiltResults())));
 });
 
-test('hand-built populations are refused by the packet builder and reconciliation', () => {
-  const forged = { ...populations() };
-  assert.throws(() => combined.buildPacketFromPopulations(forged), /must come from derivePopulations/);
-  assert.throws(() => combined.reconcileHumanResults(forged, bytes({ results: [] })),
-    /must come from derivePopulations/);
+test('the public API authorizes a HUMAN population only from the exact raw bytes', () => {
+  // The export surface is closed: no trusted-results entry point or authorization flag exists.
+  assert.deepEqual(Object.keys(combined).sort(), [
+    'EXPECTED_ROWS', 'PACKET_IDENTITY', 'PROTOCOL_IDENTITY', 'PROTOCOL_PATH', 'ROLE',
+    'STRONG_MODEL_RESULT_SHA256', 'buildHumanPacket', 'buildPacketFromPopulations',
+    'derivePopulations', 'humanReviewRowId', 'loadProtocol', 'main', 'parseArgs',
+    'readStrongModelResults', 'reconcileHumanResults', 'unauthorized',
+  ]);
+  assert.deepEqual(Object.keys(pure).sort(),
+    ['classifyHumanResults', 'computePopulations', 'packetRows']);
+
+  const receipt = readJson(RECONCILIATION);
+  const substitutes = {
+    'committed receipt': read(RECONCILIATION),
+    'receipt summary': bytes(receipt.rawResultSummary),
+    'parsed synthetic rows': { results: rebuiltResults() },
+    'parsed synthetic array': rebuiltResults(),
+    'reserialized synthetic rows': Buffer.from(
+      `${JSON.stringify({ results: rebuiltResults() }, null, 2)}\n`, 'utf8'),
+  };
+  for (const [label, value] of Object.entries(substitutes)) {
+    assert.throws(() => combined.derivePopulations(read(BATCH), readJson(AUDIT), value),
+      /raw result artifact bytes|not the reconciled raw artifact/, label);
+    assert.throws(() => combined.buildHumanPacket(read(BATCH), readJson(AUDIT), value),
+      /raw result artifact bytes|not the reconciled raw artifact/, label);
+  }
+
+  // Pure derivation over synthetic rows, a copy of it, or a hand-built role/reference mapping is
+  // refused by both production consumers.
+  const synthetic = populations();
+  const handBuilt = {
+    ...synthetic,
+    rows: synthetic.rows.map(row => ({ ...row, role: combined.ROLE.CALIBRATION,
+      referenceLabel: 'CLEAR' })),
+  };
+  const valid = bytes({ results: allMatching(synthetic) });
+  for (const [label, candidate] of Object.entries({ synthetic, copy: { ...synthetic }, handBuilt })) {
+    assert.throws(() => combined.buildPacketFromPopulations(candidate),
+      /exact raw strong-model bytes/, label);
+    assert.throws(() => combined.reconcileHumanResults(candidate, valid),
+      /exact raw strong-model bytes/, label);
+  }
 });
 
 test('HUMAN results fail closed on duplicate, unknown, missing or malformed rows', () => {
@@ -247,7 +277,7 @@ test('HUMAN results fail closed on duplicate, unknown, missing or malformed rows
   const reject = (mutate, pattern, label) => {
     const results = allMatching(pops);
     const artifact = mutate(results) ?? { results };
-    assert.throws(() => combined.reconcileHumanResults(pops, bytes(artifact)), pattern, label);
+    assert.throws(() => pure.classifyHumanResults(pops, bytes(artifact)), pattern, label);
   };
   reject(results => { results.push({ ...results[0] }); }, /duplicate HUMAN review row/, 'dup');
   reject(results => { results[0].reviewRowId = 'p1b6-hacreview-0000000000000000'; },
@@ -263,8 +293,8 @@ test('HUMAN results fail closed on duplicate, unknown, missing or malformed rows
     /inconsistent with FIX/, 'fix decision');
   reject(results => { results[0].reason = '  '; }, /reason is empty/, 'reason');
   reject(results => { delete results[0].reason; }, /exactly reviewRowId/, 'shape');
-  assert.throws(() => combined.reconcileHumanResults(pops, '{"results":[]}'), /raw bytes/);
-  assert.throws(() => combined.reconcileHumanResults(pops, Buffer.from('{')), /not valid JSON/);
+  assert.throws(() => pure.classifyHumanResults(pops, '{"results":[]}'), /raw bytes/);
+  assert.throws(() => pure.classifyHumanResults(pops, Buffer.from('{')), /not valid JSON/);
 });
 
 test('HUMAN results cannot supply role, reference, identity or provenance', () => {
@@ -277,7 +307,7 @@ test('HUMAN results cannot supply role, reference, identity or provenance', () =
   for (const [key, value] of Object.entries(smuggled)) {
     const results = allMatching(pops);
     results[0][key] = value;
-    assert.throws(() => combined.reconcileHumanResults(pops, bytes({ results })),
+    assert.throws(() => pure.classifyHumanResults(pops, bytes({ results })),
       /exactly reviewRowId/, key);
   }
 });
@@ -298,7 +328,7 @@ test('routed and calibration outcomes follow their distinct preregistered contra
     if (choice === 'OPPOSE') return answer(row, 'KEEP', opposite(row.referenceLabel));
     return answer(row, choice, null);
   }).reverse();
-  const out = combined.reconcileHumanResults(pops, bytes({ results }));
+  const out = pure.classifyHumanResults(pops, bytes({ results }));
   const find = (list, row) => list.find(entry => entry.itemId === row.itemId);
 
   assert.equal(out.adjudication.length, 34);
@@ -340,15 +370,15 @@ test('routed and calibration outcomes follow their distinct preregistered contra
     CALIBRATION_REJECT: 1,
   });
   // Hidden role is restored from the derivation, so result order is irrelevant.
-  assert.deepEqual(combined.reconcileHumanResults(pops, bytes({ results: results.reverse() })).adjudication,
+  assert.deepEqual(pure.classifyHumanResults(pops, bytes({ results: results.reverse() })).adjudication,
     out.adjudication);
 });
 
 test('calibration results are not extrapolated to the 235 unreviewed agreements', () => {
   const pops = populations();
-  const clean = combined.reconcileHumanResults(pops, bytes({ results: allMatching(pops) }));
+  const clean = pure.classifyHumanResults(pops, bytes({ results: allMatching(pops) }));
   const allDefective = pops.rows.map(row => answer(row, 'REJECT', null));
-  const defective = combined.reconcileHumanResults(pops, bytes({ results: allDefective }));
+  const defective = pure.classifyHumanResults(pops, bytes({ results: allDefective }));
   assert.equal(clean.calibration.every(row => row.provenance === 'CATALOG_STRONG_MODEL_CONFIRMED'),
     true);
   assert.equal(defective.calibration.every(row => row.eligibility === 'INELIGIBLE'), true);
@@ -356,6 +386,23 @@ test('calibration results are not extrapolated to the 235 unreviewed agreements'
   assert.equal(clean.unreviewedAgreements.length, 235);
   assert.equal(clean.unreviewedAgreements.every(row => row.provenance
     === 'CATALOG_STRONG_MODEL_CONFIRMED' && row.eligibility === 'PROVISIONAL'), true);
+});
+
+test('the canonical design says the sample is drawn but no HUMAN review has run', () => {
+  const design = read(
+    'docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md')
+    .toString('utf8');
+  const start = design.indexOf('### Strong-model semantic review against v2');
+  const end = design.indexOf('## Closed Selection and Freeze Constraints');
+  assert.equal(start > 0 && end > start, true);
+  const current = design.slice(start, end);
+
+  // The packet is recorded as built, so the section cannot also deny that the sample was drawn.
+  assert.equal(current.includes(PACKET_SHA256), true);
+  assert.equal(/no calibration draw/iu.test(current), false);
+  assert.equal(current.includes('calibration sample selection: **DONE**'), true);
+  assert.equal(current.includes('HUMAN calibration review: **NOT RUN**'), true);
+  assert.equal(current.includes('HUMAN adjudication of the 34 routed rows: **NOT RUN**'), true);
 });
 
 test('historical artifacts, builders and semantic contract v2 are unchanged', () => {
@@ -385,4 +432,19 @@ test('the exact raw strong-model bytes reproduce the same 66-row packet',
     assert.deepEqual(real.rows, populations().rows);
     const packet = combined.buildHumanPacket(read(BATCH), readJson(AUDIT), raw);
     assert.equal(sha256RawBytes(strongModel.packetBytes(packet)), PACKET_SHA256);
+    assert.deepEqual(combined.buildPacketFromPopulations(real), packet);
+
+    // The header names only the packet, batch, renderer and protocol.
+    assert.deepEqual(Object.keys(packet),
+      ['name', 'sourceBatch', 'rendererIdentity', 'reviewProtocol', 'rows']);
+    assert.equal(packet.name, combined.PACKET_IDENTITY);
+    assert.deepEqual(packet.sourceBatch,
+      { identity: readJson(BATCH).name, sha256: real.batchSha256 });
+    assert.deepEqual(packet.reviewProtocol,
+      { identity: combined.PROTOCOL_IDENTITY, sha256: combined.loadProtocol().sha256 });
+    assert.deepEqual(packet.rows, pure.packetRows(real));
+
+    // The authorized population is the one production reconciliation accepts.
+    const out = combined.reconcileHumanResults(real, bytes({ results: allMatching(real) }));
+    assert.equal(out.adjudication.length + out.calibration.length, 66);
   });

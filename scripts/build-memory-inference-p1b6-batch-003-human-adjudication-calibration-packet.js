@@ -111,16 +111,15 @@ function humanReviewRowId(batchSha256, itemId) {
     .update(`${PROTOCOL_IDENTITY}\0${batchSha256}\0${itemId}`).digest('hex').slice(0, 16)}`;
 }
 
-// Populations are only ever produced here; reconciliation refuses any object not in this set,
-// so a caller cannot hand in its own role or reference mapping.
-const derivedPopulations = new WeakSet();
+// The authorization gate. Only derivePopulations writes to this set, and only after the exact
+// raw strong-model bytes passed the SHA check, so neither parsed rows nor a hand-built role or
+// reference mapping can become a population the packet builder or reconciliation will accept.
+const authorizedPopulations = new WeakSet();
 
-// Derivation after the raw-byte SHA check. The results still have to reproduce the committed
-// reconciliation exactly (267 / 34 and the same routed items), so the only thing this step
-// trusts its caller for is having verified the bytes. Production reaches it only through
-// derivePopulations.
-function derivePopulationsFromVerifiedResults(rawBatchBytes, auditReceipt, results,
-  catalogBytes, root = ROOT) {
+// Pure derivation from already-parsed results. It still has to reproduce the committed
+// reconciliation exactly (267 / 34 and the same routed items), but it authorizes nothing: its
+// output is never admitted by requireAuthorized.
+function computePopulations(rawBatchBytes, auditReceipt, results, catalogBytes, root = ROOT) {
   const receipt = loadReconciliationReceipt(root);
   const reconciled = strongModel.reconcileBatch003(rawBatchBytes, auditReceipt, results,
     catalogBytes, root);
@@ -163,7 +162,7 @@ function derivePopulationsFromVerifiedResults(rawBatchBytes, auditReceipt, resul
     fail(`HUMAN population is not exactly ${EXPECTED_ROWS} unique rows`);
   }
 
-  const populations = Object.freeze({
+  return Object.freeze({
     batchSha256: reconciled.batchSha256,
     catalogSha256: reconciled.catalogSha256,
     rawBatchBytes: Buffer.from(rawBatchBytes),
@@ -171,36 +170,42 @@ function derivePopulationsFromVerifiedResults(rawBatchBytes, auditReceipt, resul
     unreviewedAgreements: Object.freeze(reconciled.agreements
       .filter(row => !calibrationSet.has(row.itemId)).map(row => Object.freeze({ ...row }))),
   });
-  derivedPopulations.add(populations);
-  return populations;
 }
 
 function derivePopulations(rawBatchBytes, auditReceipt, rawStrongModelResultBytes, catalogBytes,
   root = ROOT) {
   const results = readStrongModelResults(rawStrongModelResultBytes, root);
-  return derivePopulationsFromVerifiedResults(rawBatchBytes, auditReceipt, results, catalogBytes,
-    root);
+  const populations = computePopulations(rawBatchBytes, auditReceipt, results, catalogBytes, root);
+  authorizedPopulations.add(populations);
+  return populations;
 }
 
-function requireDerived(populations) {
-  if (!derivedPopulations.has(populations)) fail('populations must come from derivePopulations');
+function requireAuthorized(populations) {
+  if (!authorizedPopulations.has(populations)) {
+    fail('populations must come from derivePopulations over the exact raw strong-model bytes');
+  }
 }
 
-// Only the opaque ID and the canonical rendering reach the reviewer.
-function buildPacketFromPopulations(populations, root = ROOT) {
-  requireDerived(populations);
-  const protocol = loadProtocol(root);
+// Only the opaque ID and the canonical rendering reach the reviewer. Pure; authorizes nothing.
+function packetRows(populations) {
   const batch = JSON.parse(populations.rawBatchBytes.toString('utf8'));
   const items = new Map(batch.items.map(item => [item.itemId, item]));
+  return populations.rows.map(row => ({
+    reviewRowId: row.reviewRowId,
+    selectedBundle: renderHumanReviewText(batch, items.get(row.itemId)),
+  }));
+}
+
+function buildPacketFromPopulations(populations, root = ROOT) {
+  requireAuthorized(populations);
+  const protocol = loadProtocol(root);
+  const batch = JSON.parse(populations.rawBatchBytes.toString('utf8'));
   return {
     name: PACKET_IDENTITY,
     sourceBatch: { identity: batch.name, sha256: populations.batchSha256 },
     rendererIdentity: RENDERER_IDENTITY,
     reviewProtocol: { identity: PROTOCOL_IDENTITY, sha256: protocol.sha256 },
-    rows: populations.rows.map(row => ({
-      reviewRowId: row.reviewRowId,
-      selectedBundle: renderHumanReviewText(batch, items.get(row.itemId)),
-    })),
+    rows: packetRows(populations),
   };
 }
 
@@ -266,7 +271,13 @@ function classify(role, human, referenceLabel) {
 }
 
 function reconcileHumanResults(populations, rawHumanResultBytes) {
-  requireDerived(populations);
+  requireAuthorized(populations);
+  return classifyHumanResults(populations, rawHumanResultBytes);
+}
+
+// Pure classification of HUMAN results against a population. Authorizes nothing; production
+// reaches it only through reconcileHumanResults.
+function classifyHumanResults(populations, rawHumanResultBytes) {
   const byRowId = validateHumanResults(populations, rawHumanResultBytes);
   const reconciled = populations.rows.map(row => {
     const human = byRowId.get(row.reviewRowId);
@@ -343,13 +354,14 @@ module.exports = {
   buildHumanPacket,
   buildPacketFromPopulations,
   derivePopulations,
-  derivePopulationsFromVerifiedResults,
   humanReviewRowId,
   loadProtocol,
   main,
   parseArgs,
   readStrongModelResults,
   reconcileHumanResults,
+  // Pure logic for unit tests. None of it can produce a population the gate above admits.
+  unauthorized: Object.freeze({ classifyHumanResults, computePopulations, packetRows }),
 };
 
 if (require.main === module) {

@@ -1158,8 +1158,15 @@ strong-model answer was altered because the catalog moved afterwards.
 implementation would have stopped at reconciliation support: no result receipt,
 no SHA, no HUMAN packet, no calibration, no acceptance.
 
-No HUMAN adjudication, no calibration draw, no acceptance, no reference-label
-freeze and no training or evaluation has occurred.
+**Current execution state:**
+
+- calibration sample selection: **DONE** — the deterministic 32-row sample was
+  drawn as part of building the combined 66-row packet below
+  (`4750a467b521975f60f6bf5fd776ff6cfd80ad5be1efa04a485e389532988ed0`);
+- HUMAN calibration review: **NOT RUN**;
+- HUMAN adjudication of the 34 routed rows: **NOT RUN**;
+- acceptance, reference-label freeze, FINAL selection, training and evaluation:
+  **NOT RUN**.
 
 ### Combined blind HUMAN adjudication and calibration packet
 
