@@ -873,15 +873,19 @@ decisions 214 CLEAR / 87 ESCALATE, **267 clean agreements and 34 rows routed to
 HUMAN adjudication**. See "Semantic Authority Lineage" and "Strong-model semantic
 review against v2" below.
 
-**Current next gates:**
+**Completed HUMAN gates** (reviewed together as one 66-row blind mixed packet;
+see "Combined blind HUMAN adjudication and calibration packet" and "HUMAN
+adjudication/calibration result — attempt 001" below):
 
 1. HUMAN adjudication of the 34 routed rows;
 2. the deterministic 32-row HUMAN calibration sample over the 267 clean
    agreements.
 
-Both are presented together as **one 66-row blind mixed HUMAN packet**, which has
-been built but **not reviewed**; see "Combined blind HUMAN adjudication and
-calibration packet" below.
+**Current next gates:**
+
+- an explicit resolution decision (repair, rejection, or skeleton-realizability
+  review) for the **26 realizations the HUMAN reconciliation made ineligible**;
+  nothing is decided automatically, and the next step is **not** acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD second-pass review,
 `FINAL_HELD_OUT` release, deterministic FINAL selection, training, or production
@@ -1163,10 +1167,11 @@ no SHA, no HUMAN packet, no calibration, no acceptance.
 - calibration sample selection: **DONE** — the deterministic 32-row sample was
   drawn as part of building the combined 66-row packet below
   (`4750a467b521975f60f6bf5fd776ff6cfd80ad5be1efa04a485e389532988ed0`);
-- HUMAN calibration review: **NOT RUN**;
-- HUMAN adjudication of the 34 routed rows: **NOT RUN**;
-- acceptance, reference-label freeze, FINAL selection, training and evaluation:
-  **NOT RUN**.
+- HUMAN calibration review: **DONE** (attempt 001, below);
+- HUMAN adjudication of the 34 routed rows: **DONE** (attempt 001, below);
+- resolution of the 26 ineligible realizations: **NOT RUN**;
+- repair, acceptance, reference-label freeze, FINAL selection, HELD second
+  review, training and evaluation: **NOT RUN**.
 
 ### Combined blind HUMAN adjudication and calibration packet
 
@@ -1225,9 +1230,57 @@ the catalog.
   are carried through unchanged whatever the sample shows, and a defect is not
   generalized to them automatically.
 
-The packet is transient and gitignored like the earlier ones. It has been built
-from the exact raw bytes; the HUMAN review itself has **not** been run, and no
-HUMAN result, acceptance, freeze or selection exists.
+The packet is transient and gitignored like the earlier ones. It was built from
+the exact raw bytes and has since been reviewed; see the next section.
+
+### HUMAN adjudication/calibration result — attempt 001
+
+The repository owner's blind result
+(`p1b6-batch-003-human-adjudication-calibration-results.json`,
+`2515be0eb8b48b313ee6ae3080cbd293332fd4cc6188a04cb76dab4aec8c98ad`, not committed)
+was reconciled by
+`scripts/reconcile-memory-inference-p1b6-batch-003-human-adjudication-calibration.js`
+into the receipt
+`fixtures/local-memory-inference-p1b6-batch-003-human-adjudication-calibration-attempt-001.json`
+(`COMPLETE_NEEDS_RESOLUTION`). Hidden roles came from the authorized population
+over the exact raw strong-model bytes; decisions and reasons are carried verbatim.
+
+**Blind raw summary** (before role restoration): 66 `KEEP`, 47 CLEAR / 19
+ESCALATE, no `FIX` or `REJECT`. This is not the reconciliation result.
+
+**Hidden reconciliation** (computed by code):
+
+| population | reference match | reference mismatch |
+| --- | --- | --- |
+| 34 mandatory routed | 13 → `HUMAN_ADJUDICATED` / `ELIGIBLE` | 21 → `HUMAN_KEEP_OPPOSING_REFERENCE` / `INELIGIBLE` |
+| 32 calibration | 27 → `CALIBRATION_MATCH`, still `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL` | 5 → `CALIBRATION_DECISION_MISMATCH` / `INELIGIBLE` |
+
+Every routed row had been routed because the strong model disagreed with the
+reference, so on the routed rows the HUMAN decision sided with the reference 13
+times and with the strong model 21 times (17 reference ESCALATE → HUMAN CLEAR,
+4 reference CLEAR → HUMAN ESCALATE). Calibration mismatches are 4 ESCALATE →
+CLEAR and 1 CLEAR → ESCALATE.
+
+**26 realizations now require explicit resolution** — routed:
+`060`, `061`, `072`, `142`, `145`, `162`, `214`, `242`, `244`, `246`, `248`,
+`259`, `290`, `292`–`297`, `299`, `300`; calibration: `040`, `103`, `231`, `249`,
+`298` (all `p1b6-item-b003-*`). 18 of the 26 fall on the four mixed-realization
+ESCALATE skeletons (`f58debd8` 10, `be0efa30` 5, `28736b74` 2, `5fc872af` 1). The
+per-skeleton grouping is in the receipt.
+
+34 of the 66 reasons, including 16 of the 26 requiring resolution, are the exact
+template `Reviewer marked <CLEAR|ESCALATE>; no additional reason provided.` The
+receipt counts them and keeps them verbatim; those rows carry no stated semantic
+rationale for later repair analysis.
+
+The 235 unsampled agreements are unchanged (`CATALOG_STRONG_MODEL_CONFIRMED` /
+`PROVISIONAL`); the 5 calibration mismatches are **not** extrapolated to them.
+No reference label, skeleton or v2 entry changed, and no surface was repaired,
+accepted, frozen or selected. The accepted pool stays **93**.
+
+Blindness was at packet level: row roles are a deterministic function of
+committed artifacts, and the receipt does not claim either way whether the
+reviewer consulted them.
 
 ## Closed Selection and Freeze Constraints
 

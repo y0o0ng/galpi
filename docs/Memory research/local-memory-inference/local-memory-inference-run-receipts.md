@@ -4793,3 +4793,33 @@ suites together (39/39 pass), every `test/memory-inference-p1b6-*.test.js` suite
 (214 pass / 0 fail / 1 skipped — the raw-bytes test, which skips without the
 uncommitted artifact) and the full `npm test` suite (1463 pass / 0 fail / 1
 skipped, the same test).
+
+#### P1-B6 batch-003 combined HUMAN adjudication/calibration — attempt 001, COMPLETE_NEEDS_RESOLUTION
+
+The repository owner's blind result for the 66-row packet (`4750a467…`) was
+reconciled from exact raw bytes. The HUMAN artifact
+`p1b6-batch-003-human-adjudication-calibration-results.json`
+(`2515be0eb8b48b313ee6ae3080cbd293332fd4cc6188a04cb76dab4aec8c98ad`) was hashed
+before parsing. Hidden roles came from the authorized population over the exact
+strong-model bytes (`148c272f…`); neither raw artifact is committed, following
+the existing convention for strong-model results and earlier HUMAN receipts, and
+the committed receipt carries every decision and reason verbatim.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-003-human-adjudication-calibration-attempt-001.json` | `0adbba1789bb91025f277701c51cbf82139092f147966053277573c3f0dbbe6a` |
+
+- Blind raw summary: 66 `KEEP`, 47 CLEAR / 19 ESCALATE.
+- Routed 34: **13 match** (`HUMAN_ADJUDICATED` / `ELIGIBLE`), **21 opposing**
+  (`INELIGIBLE`).
+- Calibration 32: **27 match** (stay `CATALOG_STRONG_MODEL_CONFIRMED` /
+  `PROVISIONAL`), **5 mismatch** (`INELIGIBLE`).
+- 26 realizations need explicit resolution; 18 of them are on the four mixed
+  ESCALATE skeletons. 34 of the 66 reasons, 16 of the 26, are the
+  no-reason template.
+- 235 unsampled agreements unchanged; nothing extrapolated; no catalog or
+  reference-label change; no repair, acceptance, freeze, selection, HELD review,
+  training or evaluation. The accepted pool stays **93**.
+
+The canonical design section "HUMAN adjudication/calibration result — attempt
+001" has the item list and the direction breakdown.

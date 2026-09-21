@@ -388,7 +388,7 @@ test('calibration results are not extrapolated to the 235 unreviewed agreements'
     === 'CATALOG_STRONG_MODEL_CONFIRMED' && row.eligibility === 'PROVISIONAL'), true);
 });
 
-test('the canonical design says the sample is drawn but no HUMAN review has run', () => {
+test('the canonical design says the sample is drawn and the HUMAN review is done', () => {
   const design = read(
     'docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md')
     .toString('utf8');
@@ -401,8 +401,11 @@ test('the canonical design says the sample is drawn but no HUMAN review has run'
   assert.equal(current.includes(PACKET_SHA256), true);
   assert.equal(/no calibration draw/iu.test(current), false);
   assert.equal(current.includes('calibration sample selection: **DONE**'), true);
-  assert.equal(current.includes('HUMAN calibration review: **NOT RUN**'), true);
-  assert.equal(current.includes('HUMAN adjudication of the 34 routed rows: **NOT RUN**'), true);
+  // The executed attempt replaced the NOT RUN claims; nothing downstream is claimed as done.
+  assert.equal(current.includes('HUMAN calibration review: **DONE**'), true);
+  assert.equal(current.includes('HUMAN adjudication of the 34 routed rows: **DONE**'), true);
+  assert.equal(/HUMAN (calibration review|adjudication[^:]*): \*\*NOT RUN\*\*/u.test(current), false);
+  assert.equal(current.includes('resolution of the 26 ineligible realizations: **NOT RUN**'), true);
 });
 
 test('historical artifacts, builders and semantic contract v2 are unchanged', () => {
