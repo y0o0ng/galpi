@@ -4756,3 +4756,40 @@ Tests run locally:
 (9/9 pass), the semantic-amendment, batch-003 strong-model review and growth
 batch-003 suites together (54/54 pass), and the full `npm test` suite
 (1450/1450 pass).
+
+#### P1-B6 batch-003 combined HUMAN adjudication/calibration packet — built, review NOT run
+
+The 34 mandatory HUMAN routes and the 32-row calibration sample are presented as
+**one 66-row blind mixed packet**. Both populations were reconstructed from the
+audited batch, the source-audit receipt, the pinned v2 catalog and the exact raw
+strong-model result bytes
+(`148c272fa77174ce51d61d7cf5adce959061623715078284a5e6a7b0cfcdb2de`, not
+committed), through the existing reconciliation (267 / 34, routed items equal to
+the committed receipt) and the existing calibration selector. The sets are
+disjoint and contain none of `002` / `006` / `109`.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-003-human-adjudication-calibration-protocol.json` | `171ee15d02a0dd674ed72f6910654ce0fe58242700415ded7e91ec858e55e001` |
+| `fixtures/local-memory-inference-private-p1b6-batch-003-human-adjudication-calibration-packet.json` (transient, gitignored) | `4750a467b521975f60f6bf5fd776ff6cfd80ad5be1efa04a485e389532988ed0` |
+
+Rows carry only a `p1b6-hacreview-` opaque ID and the canonical selected bundle,
+in ID order. Role, routing reason, model decision, reference label and every
+catalog field stay out of the packet; the hidden role is restored from the same
+derivation only after a HUMAN result validates. The result semantics are
+preregistered in the protocol and the builder: routed `KEEP` matching the
+reference → `HUMAN_ADJUDICATED`; routed opposing / `FIX` / `REJECT` → ineligible;
+calibration match → stays `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`;
+calibration mismatch / `FIX` / `REJECT` → that realization ineligible; the 235
+unsampled agreements are carried through unchanged.
+
+**No HUMAN review has been run.** No HUMAN result or result receipt exists, and
+no acceptance, reference-label freeze, FINAL selection, HELD second pass,
+training or evaluation occurred. The accepted pool stays **93**.
+
+Tests run locally: the new suite with `P1B6_B003_SM_RESULTS` pointing at the raw
+bytes (13/13 pass), the new, batch-003 strong-model review and semantic-contract-v2
+suites together (39/39 pass), every `test/memory-inference-p1b6-*.test.js` suite
+(214 pass / 0 fail / 1 skipped — the raw-bytes test, which skips without the
+uncommitted artifact) and the full `npm test` suite (1463 pass / 0 fail / 1
+skipped, the same test).

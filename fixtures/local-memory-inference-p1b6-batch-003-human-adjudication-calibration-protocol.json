@@ -1,0 +1,99 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-human-adjudication-calibration-protocol-v1",
+  "protocolIdentity": "p1b6-batch-003-human-adjudication-calibration-review-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "isHumanProtocol": true,
+  "isSourceAuditProtocol": false,
+  "authorizedBy": "p1b6-large-batch-review-authority-v1",
+  "semanticAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v2",
+    "rawSha256": "f1e780195441246402ca389da188b1f7b8c4970f42fc1e6e3de2f436a3e9377c"
+  },
+  "strongModelReconciliation": {
+    "attemptId": "p1b6-strong-model-semantic-review-batch-003-attempt-001",
+    "rawResultArtifact": "p1b6-batch-003-strong-model-semantic-review-results.json",
+    "rawResultSha256": "148c272fa77174ce51d61d7cf5adce959061623715078284a5e6a7b0cfcdb2de"
+  },
+  "reviewer": {
+    "role": "repository owner, blind HUMAN semantic realization reviewer",
+    "knowsIntendedAnswer": false,
+    "knowsRowRole": false,
+    "mayAmendCatalog": false
+  },
+  "interpretationRule": "CONSERVATIVE_PRAGMATIC_INTERPRETATION",
+  "question": "Reading only the visible selected bundle and its single marked TARGET, judge the realization under semantic contract v2. CLEAR when ordinary cooperative interpretation gives one naturally dominant materially relevant semantic status. ESCALATE only when the visible evidence itself naturally and positively licenses at least two materially different semantic readings and ordinary pragmatic resolution cannot choose one. Unknown is not ambiguity: an unanswered question, an undecided, approximate or conditional state, an attributed claim, an unknown cause or an unknown external fact is not ESCALATE merely because its truth is unknown. A competing reading that requires an unstated event, rule, preference, identity, exception, effective-time rule or other new premise does not count.",
+  "population": {
+    "rows": 66,
+    "composition": "all mandatory HUMAN-routed rows plus a deterministic calibration sample of clean agreements, mixed in one packet",
+    "mandatoryRouted": 34,
+    "calibration": 32,
+    "derivation": "reconstructed mechanically from the audited batch, the source-audit receipt, the pinned v2 catalog and the exact raw strong-model result bytes; never from a supplied list",
+    "calibrationSelector": "the existing canonical selector in scripts/build-memory-inference-p1b6-batch-003-strong-model-review-packet.js (hash domain p1b6-large-batch-human-calibration-v1)",
+    "sourceAuditFailRowsExcluded": true
+  },
+  "visibleToReviewer": [
+    "an opaque HUMAN review row ID",
+    "the exact model-visible selected bundle with its TARGET marking"
+  ],
+  "blindFields": [
+    "row role (mandatory adjudication or calibration)",
+    "routing reason",
+    "strong-model disposition",
+    "strong-model decision",
+    "effective-current reference label",
+    "item ID",
+    "source episode ID",
+    "semanticSkeletonId",
+    "boundary class",
+    "split",
+    "authoring label",
+    "calibration stratum",
+    "source-audit disposition or reason"
+  ],
+  "ordering": "ascending opaque review row ID, not source item order",
+  "outputContract": {
+    "container": "a JSON object whose only key is results, an array with exactly one row per packet row",
+    "required": ["reviewRowId", "disposition", "decision", "reason"],
+    "dispositionEnum": ["KEEP", "FIX", "REJECT"],
+    "decisionEnum": ["CLEAR", "ESCALATE", null],
+    "reason": "Non-empty short semantic or construction reason."
+  },
+  "dispositions": {
+    "KEEP": "The visible realization supports a stable semantic judgment. Requires decision CLEAR or ESCALATE.",
+    "FIX": "The visible realization appears repairable but is not clean enough to accept. Uses decision null.",
+    "REJECT": "The realization is ill-defined, incoherent, implausible, or lacks a meaningful stable semantic judgment. Uses decision null."
+  },
+  "resultIngestion": {
+    "failClosedOn": [
+      "result bytes that are not a JSON object with only results",
+      "unknown review row ID",
+      "duplicate review row ID",
+      "any of the 66 rows missing",
+      "a row with fields other than the four output fields",
+      "a disposition outside KEEP / FIX / REJECT",
+      "KEEP without CLEAR or ESCALATE, or FIX / REJECT with a non-null decision",
+      "an empty reason"
+    ],
+    "hiddenRoleRestoredFrom": "canonical artifacts after validation, never from result order or caller input"
+  },
+  "mandatoryRoutedSemantics": {
+    "KEEP_matching_reference": "HUMAN_ADJUDICATED; the current realization becomes eligible.",
+    "KEEP_opposing_reference": "Semantic mismatch; current realization ineligible pending surface repair or rejection. The reference label and the catalog are not changed.",
+    "FIX": "Current realization ineligible.",
+    "REJECT": "Current realization ineligible."
+  },
+  "calibrationSemantics": {
+    "KEEP_matching_reference": "CALIBRATION_MATCH recorded as QA evidence; provenance stays CATALOG_STRONG_MODEL_CONFIRMED and eligibility stays PROVISIONAL. Not HUMAN_ADJUDICATED and not HUMAN gold.",
+    "KEEP_opposing_reference": "CALIBRATION_DECISION_MISMATCH; current realization ineligible pending explicit resolution, repair or rejection. The catalog is not amended.",
+    "FIX": "CALIBRATION_FIX; current realization ineligible pending resolution.",
+    "REJECT": "CALIBRATION_REJECT; current realization ineligible pending resolution.",
+    "extrapolatedToUnreviewedRows": false,
+    "promotesProvenance": false
+  },
+  "constraints": [
+    "The reviewer does not know which rows are mandatory adjudication and which are calibration.",
+    "A HUMAN decision opposing the reference label never relabels a surface or amends the catalog automatically.",
+    "Calibration is pipeline QA; it neither creates HUMAN gold nor changes unsampled agreement rows.",
+    "This protocol authorizes no surface repair, no acceptance, no reference-label freeze, no FINAL selection, no HELD second pass, no training, no evaluation and no production use."
+  ]
+}

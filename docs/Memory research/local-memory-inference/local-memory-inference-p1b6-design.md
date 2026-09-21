@@ -879,6 +879,10 @@ review against v2" below.
 2. the deterministic 32-row HUMAN calibration sample over the 267 clean
    agreements.
 
+Both are presented together as **one 66-row blind mixed HUMAN packet**, which has
+been built but **not reviewed**; see "Combined blind HUMAN adjudication and
+calibration packet" below.
+
 No batch-003 acceptance, reference-label freeze, HELD second-pass review,
 `FINAL_HELD_OUT` release, deterministic FINAL selection, training, or production
 change has occurred, and the 380-item P1-B6 corpus is not complete.
@@ -1156,6 +1160,67 @@ no SHA, no HUMAN packet, no calibration, no acceptance.
 
 No HUMAN adjudication, no calibration draw, no acceptance, no reference-label
 freeze and no training or evaluation has occurred.
+
+### Combined blind HUMAN adjudication and calibration packet
+
+The two next gates are reviewed **together in one 66-row blind packet**, not as
+separate adjudication and calibration packets:
+
+- all **34 mandatory HUMAN-routed rows**, and
+- the deterministic **32-row calibration sample** drawn only from the 267 clean
+  agreements.
+
+The populations are **reconstructed mechanically**, never taken from a list: the
+builder validates the audited batch, the source-audit receipt and the pinned v2
+catalog, requires the **exact raw strong-model result bytes** (SHA-256 checked
+against the committed reconciliation receipt), runs the existing reconciliation,
+must reproduce exactly 267 agreements and the committed 34 routed items, and
+draws the calibration sample with the **existing canonical selector**. The two
+sets are proven disjoint and the three source-audit FAIL rows cannot enter. The
+protocol is
+`fixtures/local-memory-inference-p1b6-batch-003-human-adjudication-calibration-protocol.json`
+and the builder is
+`scripts/build-memory-inference-p1b6-batch-003-human-adjudication-calibration-packet.js`.
+
+Each visible row is an opaque `p1b6-hacreview-` ID (domain-separated hash of the
+HUMAN protocol identity, the batch raw SHA and the item ID) and the canonical
+selected bundle, in ID order rather than source order. **The HUMAN reviewer
+cannot see a row's role, routing reason, strong-model disposition or decision,
+reference label**, item, skeleton, boundary class, split, authoring label,
+calibration stratum or source-audit outcome. The review question is semantic
+contract v2 — CLEAR for one naturally dominant status, ESCALATE only when the
+visible evidence positively licenses two materially different readings, unknown
+is not ambiguity, and no added premise — with the usual `KEEP` / `FIX` /
+`REJECT` dispositions (`KEEP` needs a decision, `FIX`/`REJECT` use `null`).
+
+HUMAN results are preregistered to fail closed on an unknown, duplicate or
+missing row ID, any field beyond `reviewRowId` / `disposition` / `decision` /
+`reason`, an inconsistent decision or an empty reason. Each row's hidden role is
+restored from the same derivation after validation — never from the result file
+or its order — and a caller cannot supply role, reference label, item, skeleton
+or provenance.
+
+**Mandatory routed rows keep the semantics above:** `KEEP` matching the reference
+becomes eligible as `HUMAN_ADJUDICATED`; `FIX` or `REJECT` makes the current
+realization ineligible; `KEEP` opposing the reference is a semantic mismatch that
+requires repair or rejection and never overwrites the reference label or amends
+the catalog.
+
+**Calibration rows are pipeline QA, not provenance promotion:**
+
+- `KEEP` matching the reference is recorded as a calibration match; the row
+  stays `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. **A calibration match
+  does not become `HUMAN_ADJUDICATED`** and is not HUMAN gold;
+- `KEEP` opposing the reference, `FIX` or `REJECT` is recorded as a calibration
+  defect and **fails that realization closed** pending explicit resolution; the
+  catalog is not amended;
+- **calibration does not extrapolate HUMAN gold**: the 235 unsampled agreements
+  are carried through unchanged whatever the sample shows, and a defect is not
+  generalized to them automatically.
+
+The packet is transient and gitignored like the earlier ones. It has been built
+from the exact raw bytes; the HUMAN review itself has **not** been run, and no
+HUMAN result, acceptance, freeze or selection exists.
 
 ## Closed Selection and Freeze Constraints
 
