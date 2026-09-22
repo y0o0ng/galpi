@@ -12,7 +12,7 @@ function read(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
 }
 
-test('notification, task, and agent modules load before the panel shell and expose narrow APIs', () => {
+test('notification, task, and agent modules load before the product shell controller and expose narrow APIs', () => {
   const html = read('public/index.html');
   const appSource = read('public/app.js');
   const css = read('public/style.css');
@@ -27,9 +27,11 @@ test('notification, task, and agent modules load before the panel shell and expo
   const agentIndex = html.indexOf('<script src="agent-panel.js"></script>');
   const modelPickerIndex = html.indexOf('<script src="model-picker.js"></script>');
   const paperIndex = html.indexOf('<script src="paper-panel.js"></script>');
+  const homeIndex = html.indexOf('<script src="home.js"></script>');
   const appIndex = html.indexOf('<script src="app.js"></script>');
 
-  assert.match(html, /class="knowledge-tab active" data-panel-tab="agents"/);
+  const knowledgeTabs = html.slice(html.indexOf('id="knowledge-tabs"'), html.indexOf('id="knowledge-panel-close"'));
+  assert.deepEqual([...knowledgeTabs.matchAll(/data-panel-tab="([a-z]+)"/g)].map(match => match[1]), ['notes', 'papers']);
   assert.match(html, /id="notification-panel-content" class="notification-body" aria-live="polite"/);
   assert.match(html, /id="agent-panel-content" aria-live="polite"/);
   assert.match(html, /aria-label="기본 답변 비서 XION"/);
@@ -56,7 +58,7 @@ test('notification, task, and agent modules load before the panel shell and expo
   assert.match(modelPickerSource, /appliesFrom|다음 답변부터/);
   assert.ok(notificationIndex > 0 && notificationIndex < taskIndex);
   assert.ok(taskIndex < pushIndex && pushIndex < agentIndex);
-  assert.ok(agentIndex < modelPickerIndex && modelPickerIndex < paperIndex && paperIndex < appIndex);
+  assert.ok(agentIndex < modelPickerIndex && modelPickerIndex < paperIndex && paperIndex < homeIndex && homeIndex < appIndex);
 
   const notificationWindow = {};
   vm.runInNewContext(notificationSource, { window: notificationWindow }, { filename: 'notification-panel.js' });
@@ -217,21 +219,21 @@ test('runtime flag hides task entry points and foreground refresh stays separate
   assert.match(app, /meta\[name="theme-color"\][\s\S]*dark \? '#151A18' : '#F3F5F2'/);
   assert.match(app, /tasksEnabled = config\.tasksEnabled === true/);
   assert.match(app, /command\.feature !== 'tasks' \|\| tasksEnabled/);
-  assert.match(app, /window\.PaperPanel\.open\('agents'\)/);
-  assert.match(app, /window\.AgentPanel\.openTasks/);
+  assert.match(app, /window\.HomeDashboard\?\.openTasks/);
+  assert.match(app, /window\.HomeDashboard\?\.refresh\(\)/);
   assert.match(app, /setInterval\(refreshTaskViews, 60_000\)/);
   assert.match(app, /document\.visibilityState !== 'visible'/);
   assert.match(app, /document\.addEventListener\('visibilitychange'/);
   assert.match(app, /setInterval\(pollForUpdates, 7000\)/);
 });
 
-test('task controls stay in the agent tab and the floating notification center is removed', () => {
+test('task and notification controls route through Home and the floating notification center stays removed', () => {
   const app = read('public/app.js');
   const html = read('public/index.html');
   const css = read('public/style.css');
 
-  assert.match(app, /openTaskComposer[\s\S]*PaperPanel\.open\('agents'\)[\s\S]*AgentPanel\.openTasks/);
-  assert.match(app, /openNotificationsPanel[\s\S]*PaperPanel\.open\('notifications'\)/);
+  assert.match(app, /openTaskComposer[\s\S]*HomeDashboard\?\.openTasks/);
+  assert.match(app, /openNotificationsPanel[\s\S]*HomeDashboard\?\.openNotifications\('all'\)/);
   assert.doesNotMatch(`${app}\n${html}\n${css}`, /notification-center/);
   assert.doesNotMatch(app, /NotificationPanelPosition|enableNotificationPanelDrag/);
 });

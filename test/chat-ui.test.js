@@ -194,121 +194,76 @@ test('the codex agent card keeps three type steps, not four half-pixel ones', ()
   assert.match(css, /\.codex-agent-block \{[^}]*padding: 16px/s);
 });
 
-test('the home reuses the panel type scale and stays one column', () => {
-  // 지식 패널은 데스크톱에서 350px 고정 폭이라 2열이 물리적으로 안 들어간다.
-  // 그래서 홈은 데스크톱과 모바일이 같은 1열을 쓰고, 그리드 컬럼을 만들지 않는다.
-  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 350px;/);
-  assert.match(css, /\.home-agents \{[^}]*display: grid/s);
-  assert.doesNotMatch(css, /\.home-agents \{[^}]*grid-template-columns/s);
-
-  // 9 · 11 · 17만 쓴다. 홈 때문에 새 단계를 만들지 않는다.
-  assert.match(css, /\.home-section-title \{[^}]*font-size: 9px/s);
-  assert.match(css, /\.home-attention-title \{[^}]*font-size: 11px/s);
-  assert.match(css, /\.home-agent-title \{[^}]*font-size: 11px/s);
-
-  // 카드 모서리는 12px, 그 안의 일반 컨트롤은 10px 하나씩이다.
-  assert.match(css, /\.home-attention,\n\.home-today \{[^}]*border-radius: 12px/s);
-  assert.match(css, /\.home-agent \{[^}]*border-radius: 10px/s);
-  // 390px은 상세 블록의 값이다. 홈이 그 높이를 물려받으면 접는 의미가 없다.
-  assert.doesNotMatch(css, /\.home-agent \{[^}]*min-height/s);
-});
-
-test('XION sits first among the knowledge tabs and opens with the date', () => {
+test('the product shell exposes the four approved destinations on desktop and mobile', () => {
   const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
-  const order = [...html.matchAll(/data-panel-tab="([a-z]+)"/g)].map(match => match[1]);
-  assert.deepEqual(order, ['agents', 'notifications', 'notes', 'papers']);
-
-  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  const render = panel.slice(panel.indexOf('function renderSummary()'));
-  // 머리는 첫 줄이다. 인사와 날짜가 확인할 것 뒤로 가면 화면이 다시 목록처럼 읽힌다.
-  assert.ok(render.indexOf('makeHomeHead') < render.indexOf('makeAttentionSection'));
-  // 인사는 KST로 고른다. 브라우저 timezone을 쓰면 기기마다 다른 인사가 나온다.
-  assert.match(panel, /function greeting[\s\S]*?timeZone: 'Asia\/Seoul'/);
-  assert.match(css, /\.home-date \{[^}]*font-size: 17px/s);
+  const desktop = html.slice(html.indexOf('id="global-nav"'), html.indexOf('id="product-surface"'));
+  const mobile = html.slice(html.indexOf('id="bottom-nav"'), html.indexOf('id="shared-panel-store"'));
+  const routes = text => [...text.matchAll(/data-product-route="([a-z]+)"/g)].map(match => match[1]);
+  assert.deepEqual(routes(desktop), ['home', 'chat', 'notes', 'home', 'settings']);
+  assert.deepEqual(routes(mobile), ['home', 'chat', 'notes', 'settings']);
+  assert.match(css, /#product-shell \{[^}]*grid-template-columns: 232px minmax\(0, 1fr\)/s);
+  assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?#bottom-nav \{[^}]*display: grid/s);
 });
 
-test('the home head carries the weather without becoming a weather card', () => {
-  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  // 날씨는 날짜와 같은 성격의 오늘의 주변 맥락이라 머리줄에만 붙는다. 새 카드나
-  // 새 홈 섹션을 만들면 홈이 다시 목록이 된다(설계 1·20절).
-  assert.doesNotMatch(panel, /makeHomeSection\('날씨'/);
-  const render = panel.slice(panel.indexOf('function renderSummary()'));
-  assert.doesNotMatch(render.slice(0, render.indexOf('\n  }')), /weather/i);
-
-  // 인사와 온도가 한 줄을 나눠 쓴다. 좌우 2열로 나누면 350px 패널에서 문구가 감긴다.
-  assert.match(css, /\.home-head-top \{[^}]*justify-content: space-between/s);
-  // 새 글자 크기를 만들지 않는다. 홈은 9px·11px·17px만 쓴다.
-  assert.match(css, /\.home-weather-now \{[^}]*font-size: 11px/s);
-  assert.match(css, /\.home-weather-message \{[^}]*font-size: 11px/s);
-  // 문구는 최대 두 줄이다. 세 줄이 되면 `확인할 것`이 첫 화면 밖으로 밀린다.
-  assert.match(css, /\.home-weather-message \{[^}]*-webkit-line-clamp: 2/s);
+test('Home uses the approved 16-column geometry and responsive card flow', () => {
+  assert.match(css, /#home-grid \{[^}]*grid-template-columns: repeat\(16, minmax\(0, 1fr\)\)[^}]*gap: 20px/s);
+  assert.match(css, /\.home-card-weather \{ grid-column: 1 \/ span 4/);
+  assert.match(css, /\.home-card-tasks \{ grid-column: 5 \/ span 7/);
+  assert.match(css, /\.home-card-calendar \{ grid-column: 12 \/ span 5/);
+  assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 360px\)\)/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#home-grid,[\s\S]*?flex-direction: column/);
 });
 
-test('the weather never blocks the first home render, and never explains itself', () => {
-  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  // 위치 획득이 최대 5초다. allSettled 배열에 넣으면 홈 전체가 그만큼 늦어진다(설계 19절).
-  const settled = panel.slice(panel.indexOf('Promise.allSettled(['));
-  assert.doesNotMatch(settled.slice(0, settled.indexOf(']')), /refreshWeather|\/api\/weather/);
-  // 먼저 렌더하고 도착하면 머리 노드만 바꾼다.
-  assert.match(panel, /renderSummary\(\);\s*\/\/[^\n]*\n\s*void refreshWeather\(state\.requestId\)/);
-  assert.match(panel, /head\.replaceWith\(makeHomeHead\(\)\)/);
-
-  // 주석은 계약을 설명하는 자리다. 재는 것은 코드여야 한다.
-  const code = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-
-  // 홈 브리핑 하나 때문에 위치를 계속 따라다니지 않는다(설계 4절).
-  assert.equal(code.includes('watchPosition'), false);
-  assert.match(code, /navigator\.geolocation\.getCurrentPosition\(/);
-  // 마지막 좌표 한 건뿐이고 키는 기존 관례를 따른다(설계 5절).
-  assert.match(code, /LOCATION_KEY = 'councilLastLocation'/);
-
-  // 실패는 문구 없이 숨김이다. 홈은 diagnostics 화면이 아니다(설계 21절).
-  for (const forbidden of ['날씨 확인 중', '위치를 찾을 수 없', '기상청', '날씨를 불러오지 못']) {
-    assert.equal(code.includes(forbidden), false, forbidden);
-  }
-  // 홈이 60초마다 refresh하므로 캐시가 없으면 기상청을 시간당 60번 부른다(설계 22절).
-  assert.match(panel, /Date\.now\(\) - state\.weatherAt < WEATHER_CACHE_MS/);
+test('Home keeps one focus state and the platform-specific collapse contracts', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /focusedCard: null/);
+  assert.doesNotMatch(home, /focused(?:Tasks|Calendar|Mail|Notifications|Dday|Notes):/);
+  assert.match(home, /state\.focusedCard = id;\s*renderOverview\(\)/s);
+  assert.match(home, /!event\.target\.closest\('\.home-card\.focused'\)[\s\S]*?collapseFocus\(\)/);
+  assert.match(css, /#home-focus-collapse:not\(\[hidden\]\) \{[^}]*position: sticky/s);
 });
 
-test('the home briefing comes before the agent status, and never outranks itself', () => {
+test('Home renders no News surface and requests no News briefing', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  const render = panel.slice(panel.indexOf('function renderSummary()'));
-  const body = render.slice(0, render.indexOf('\n  }'));
-  // 홈이 답하는 질문은 "지금 뭘 봐야 하는가"다. 에이전트 운영 상태가 그 앞에 오면
-  // 순서가 뒤집힌다.
-  assert.ok(body.indexOf('makeAttentionSection') < body.indexOf('makeTodaySection'));
-  assert.ok(body.indexOf('makeTodaySection') < body.indexOf('makeScheduleRow'));
-
-  // 홈은 알림 탭과 같은 응답을 읽는다. 메일 전용 목록 API를 따로 부르지 않는다.
-  assert.match(panel, /item\.source === 'mail'/);
-  // 메일 Attention과 울린 일정 알림이 한 자리에 오고, 급한 일정 알림이 위다.
-  assert.match(
-    panel,
-    /items\.filter\(item => item\.type === 'task_reminder'\),\s*\.\.\.items\.filter\(item => item\.source === 'mail'\),/s,
-  );
-  // 상태 변경은 알림 탭의 몫이다. 홈에서 완료·미루기를 부르면 책임이 두 곳이 된다.
-  assert.doesNotMatch(panel, /\/api\/mail\/attention/);
-
-  // 정상 에이전트의 운영 세부값이 첫 화면을 채우지 않는다.
-  assert.match(panel, /tone === 'warn' \|\| tone === 'danger'/);
+  const summaryRefresh = panel.slice(panel.lastIndexOf('renderLoading();'), panel.indexOf('function show()'));
+  assert.doesNotMatch(home, /news|알아둘 것|\/api\/news\/briefing/i);
+  assert.doesNotMatch(summaryRefresh, /loadNewsBriefing|\/api\/news\/briefing/);
 });
 
-test('an agent row is one button, so mobile gets one target instead of several', () => {
-  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  // 줄 안에 버튼을 또 넣으면 중첩이 되고 타깃이 잘게 쪼개진다. 복구 버튼은 상세에 둔다.
-  assert.match(panel, /row = document\.createElement\('button'\)/);
-  assert.match(panel, /row\.addEventListener\('click', onOpen\)/);
-  assert.doesNotMatch(panel, /row\.appendChild\(button\(/);
+test('Chat knowledge tabs are exactly Notes and Papers with Notes selected', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  const tabs = html.slice(html.indexOf('id="knowledge-tabs"'), html.indexOf('id="knowledge-panel-close"'));
+  assert.deepEqual([...tabs.matchAll(/data-panel-tab="([a-z]+)"/g)].map(match => match[1]), ['notes', 'papers']);
+  const panel = fs.readFileSync(path.join(ROOT, 'public/paper-panel.js'), 'utf8');
+  assert.match(panel, /activeTab: 'notes'/);
+  assert.doesNotMatch(tabs, /agents|notifications/);
 });
 
-test('the summary screen reads status only, and details load their own agent', () => {
+test('Calendar compacts to one selected week and renders one event marker per day', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /const compactAnchor = state\.selectedDate \|\| today/);
+  assert.match(home, /outside-compact-week/);
+  assert.match(home, /const hasEvent = state\.tasks\.some\(task => taskDate\(task\) === item\.key\)/);
+  assert.match(home, /if \(hasEvent\) day\.append\(node\('i'/);
+  assert.match(css, /\.home-card-calendar:not\(\.focused\) \.calendar-day\.outside-compact-week \{[^}]*display: none/s);
+});
+
+test('Home actions reuse TaskPanel, Mail settings, and Codex settings', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
-  // 카드가 쓰는 runner는 organize/status에도 있다. 요약이 모델 카탈로그까지
-  // 부르면 에이전트가 늘 때마다 여는 비용이 그만큼 는다.
-  assert.match(panel, /loadScheduleSummary\(\) : Promise\.resolve\(false\),\s*loadCodexStatus\(\),\s*loadMailData\(\),\s*loadHomeAttention\(\),/s);
-  assert.doesNotMatch(panel, /loadCodexData\(\),\s*loadMailData/s);
-  // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
-  assert.match(panel, /Promise\.allSettled\(\[\s*state\.enabled \? loadScheduleSummary/s);
+  assert.match(home, /global\.TaskPanel\?\.render\(host, options\)/);
+  assert.match(panel, /state\.apiFetch\('\/api\/mail\/settings', \{\s*method: 'PUT'/s);
+  assert.match(panel, /state\.apiFetch\('\/api\/models\/codex'\)/);
+  assert.match(panel, /state\.apiFetch\('\/api\/settings\/codex-models', \{\s*method: 'PUT'/s);
+  assert.match(panel, /makeMailAgentCard\(\), makeScheduleAgentCard\(\), codex/);
+});
+
+test('legacy task and notification links route into working Home surfaces', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /params\.get\('panel'\) === 'agents'[\s\S]*?openTasks\(/);
+  assert.match(home, /params\.get\('panel'\) === 'notifications'[\s\S]*?openNotifications\(params\.get\('notification'\) === 'mail' \? 'mail' : 'all'\)/);
+  assert.match(home, /focusReminders: params\.get\('taskView'\) === 'reminders'/);
 });
 
 test('the mail card treats a disabled flag as off, not as an error', () => {

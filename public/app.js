@@ -194,6 +194,7 @@ async function init() {
     weatherEnabled = config.weatherEnabled === true;
     taskSeriesEnabled = config.taskSeriesEnabled === true;
     initPaperPanel();
+    window.HomeDashboard?.init({ apiFetch, showToast, weatherEnabled });
     // 옆의 XION 칩이 비서 이름을 말하므로 라벨은 모델만 남긴다.
     document.getElementById('model-indicator').textContent = config.gptChatBootstrapModel;
     renderWebUsagePill(config.webSearch);
@@ -221,6 +222,7 @@ async function init() {
     });
   } catch (_) {
     initPaperPanel();
+    window.HomeDashboard?.init({ apiFetch, showToast, weatherEnabled });
     appendError('서버에 연결할 수 없습니다. node server.js가 실행 중인지 확인해주세요.');
   }
 
@@ -2495,40 +2497,33 @@ window.openNotificationsPanel = openNotificationsPanel;
 
 function openNotificationsPanel() {
   if (!initPaperPanel()) return;
-  window.PaperPanel.open('notifications');
+  window.HomeDashboard?.openNotifications('all');
 }
 
 function openTaskComposer(initialTitle = '') {
   if (!initPaperPanel()) return;
-  window.PaperPanel.open('agents');
-  return window.AgentPanel.openTasks({ compose: true, initialTitle });
+  return window.HomeDashboard?.openTasks({ compose: true, initialTitle });
 }
 
 function openTaskList(view = 'today', options = {}) {
   if (!initPaperPanel()) return;
-  window.PaperPanel.open('agents');
-  return window.AgentPanel.openTasks({ view, ...options });
+  return window.HomeDashboard?.openTasks({ view, ...options });
 }
 
 function openInitialPanelFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('panel') === 'agents' || params.get('notification') === 'tasks') {
-    openTaskList('today', { focusReminders: params.get('taskView') === 'reminders' || params.get('notification') === 'tasks' });
-  } else if (params.get('panel') === 'notifications') {
-    openNotificationsPanel();
-  }
+  window.HomeDashboard?.handleInitialUrl();
 }
 
 function refreshTaskViews() {
   if (!tasksEnabled || document.visibilityState !== 'visible') return;
-  const panel = document.getElementById('agent-panel');
-  if (panel && !panel.hidden) window.AgentPanel?.refresh();
+  window.HomeDashboard?.refresh();
+  if (!document.getElementById('home-agents')?.hidden) window.AgentPanel?.refresh();
 }
 
 function handleTaskChanged() {
   if (!tasksEnabled) return;
-  const panel = document.getElementById('agent-panel');
-  if (panel && !panel.hidden) window.AgentPanel?.refresh();
+  window.HomeDashboard?.refresh();
+  if (!document.getElementById('home-agents')?.hidden) window.AgentPanel?.refresh();
 }
 
 function startTaskRefresh() {

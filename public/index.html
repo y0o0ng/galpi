@@ -16,7 +16,62 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
+  <div id="product-shell">
+    <aside id="global-nav" aria-label="전역 탐색">
+      <div class="shell-brand"><span class="xion-mark-icon" aria-hidden="true"></span><strong>Galpi</strong></div>
+      <span class="shell-nav-kicker">WORKSPACES</span>
+      <nav class="shell-nav-list">
+        <button class="shell-nav-item active" data-product-route="home" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10M9 20v-6h6v6"></path></svg>Home</button>
+        <button class="shell-nav-item" data-product-route="chat" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path></svg>Chat</button>
+        <button class="shell-nav-item" data-product-route="notes" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 10h8M8 14h8M8 18h5"></path></svg>Notes</button>
+      </nav>
+      <div class="shell-nav-tools">
+        <button data-product-route="home" data-home-card-target="notifications" type="button" aria-label="알림 보기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+        </button>
+        <button class="shell-theme-button" type="button" aria-label="테마 전환">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+      </div>
+      <button class="shell-nav-item shell-settings" data-product-route="settings" type="button">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>
+        Settings
+      </button>
+    </aside>
+
+    <div id="product-surface">
+      <header id="mobile-shell-header">
+        <div class="shell-brand"><span class="xion-mark-icon" aria-hidden="true"></span><strong>Galpi</strong></div>
+        <div>
+          <button data-product-route="home" data-home-card-target="notifications" type="button" aria-label="알림 보기">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+          </button>
+          <button class="shell-theme-button" type="button" aria-label="테마 전환">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </button>
+        </div>
+      </header>
+
+      <section id="home-page" class="product-page active" data-product-page="home" aria-label="Home">
+        <header class="home-page-head">
+          <div><h1>Home</h1><time id="home-now"></time></div>
+          <nav class="home-view-switch" aria-label="Home 보기">
+            <button class="active" data-home-view="overview" type="button"><span></span>Overview</button>
+            <button data-home-view="agents" type="button"><span></span>Agents</button>
+          </nav>
+        </header>
+        <section id="home-overview" class="home-view active" aria-label="Overview">
+          <button id="home-focus-collapse" type="button" aria-label="Home Overview로 돌아가기" hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          </button>
+          <div id="home-grid" aria-live="polite"></div>
+        </section>
+        <section id="home-agents" class="home-view" aria-label="Agents" hidden>
+          <div id="agent-panel-content" aria-live="polite"><div class="panel-empty-state">준비 중</div></div>
+        </section>
+      </section>
+
+      <div id="app" class="product-page" data-product-page="chat">
 
     <header id="header">
       <div id="header-top">
@@ -132,9 +187,7 @@
       <aside id="knowledge-panel" aria-label="지식 패널">
         <div id="knowledge-panel-head">
           <nav id="knowledge-tabs" aria-label="지식 유형" role="tablist">
-            <button class="knowledge-tab active" data-panel-tab="agents" type="button" role="tab" aria-selected="true" aria-controls="agent-panel">XION</button>
-            <button class="knowledge-tab" data-panel-tab="notifications" type="button" role="tab" aria-selected="false" aria-controls="notification-panel" title="알림센터">알림</button>
-            <button class="knowledge-tab" data-panel-tab="notes" type="button" role="tab" aria-selected="false" aria-controls="note-panel">노트</button>
+            <button class="knowledge-tab active" data-panel-tab="notes" type="button" role="tab" aria-selected="true" aria-controls="note-panel">노트</button>
             <button class="knowledge-tab" data-panel-tab="papers" type="button" role="tab" aria-selected="false" aria-controls="paper-panel">논문</button>
           </nav>
           <button id="knowledge-panel-close" type="button" title="지식 패널 닫기" aria-label="지식 패널 닫기">
@@ -142,25 +195,7 @@
           </button>
         </div>
 
-        <section id="notification-panel" class="knowledge-panel-view" role="tabpanel" hidden>
-          <div class="notification-panel-head">
-            <div>
-              <span class="notification-kicker">XION</span>
-              <strong class="notification-title">알림센터</strong>
-            </div>
-            <button id="notification-panel-refresh" class="notification-panel-refresh" type="button">새로고침</button>
-          </div>
-          <div class="notification-tabs" role="tablist" aria-label="알림 유형">
-            <button class="notification-tab active" data-notification-filter="all" type="button" role="tab" aria-selected="true">전체</button>
-            <button class="notification-tab" data-notification-filter="codex" type="button" role="tab" aria-selected="false">Codex</button>
-            <button class="notification-tab" data-notification-filter="system" type="button" role="tab" aria-selected="false">시스템</button>
-            <button class="notification-tab" data-notification-filter="mail" type="button" role="tab" aria-selected="false">메일</button>
-            <button class="notification-tab" data-notification-filter="saves" type="button" role="tab" aria-selected="false">최근 저장</button>
-          </div>
-          <div id="notification-panel-content" class="notification-body" aria-live="polite"></div>
-        </section>
-
-        <section id="note-panel" class="knowledge-panel-view" role="tabpanel" hidden>
+        <section id="note-panel" class="knowledge-panel-view" role="tabpanel">
           <form id="note-panel-search" role="search">
             <input id="note-panel-query" type="search" maxlength="200" placeholder="노트 제목 검색" autocomplete="off" aria-label="노트 제목 검색어">
             <button type="submit" title="노트 검색" aria-label="노트 검색">
@@ -168,12 +203,6 @@
             </button>
           </form>
           <div id="note-panel-content" aria-live="polite"></div>
-        </section>
-
-        <section id="agent-panel" class="knowledge-panel-view" role="tabpanel">
-          <div id="agent-panel-content" aria-live="polite">
-            <div class="panel-empty-state">준비 중</div>
-          </div>
         </section>
 
         <section id="paper-panel" class="knowledge-panel-view" role="tabpanel" hidden>
@@ -186,7 +215,40 @@
           <div id="paper-panel-content" aria-live="polite"></div>
         </section>
       </aside>
-    </main>
+      </main>
+    </div>
+
+      <section id="notes-page" class="product-page" data-product-page="notes" aria-label="Notes">
+        <header class="library-page-head"><h1>Notes</h1><nav role="tablist"><button class="active" data-panel-tab="notes" type="button" role="tab" aria-selected="true">노트</button><button data-panel-tab="papers" type="button" role="tab" aria-selected="false">논문</button></nav></header>
+        <div id="notes-page-views"></div>
+      </section>
+
+      <section id="settings-page" class="product-page" data-product-page="settings" aria-label="Settings">
+        <header class="settings-page-head"><h1>Settings</h1><p>갈피의 현재 설정 경로를 한곳에서 열어.</p></header>
+        <div class="settings-list">
+          <button class="settings-row shell-theme-button" type="button"><span><strong>화면 테마</strong><small>밝은 화면과 어두운 화면 전환</small></span><span>전환</span></button>
+          <button class="settings-row" data-product-route="chat" type="button"><span><strong>채팅 모델</strong><small>Chat 입력창에서 다음 답변 모델 선택</small></span><span>Chat 열기</span></button>
+          <button class="settings-row" data-product-route="home" data-home-view-target="agents" type="button"><span><strong>에이전트 설정</strong><small>Mail 알림과 Codex 모델 관리</small></span><span>Agents 열기</span></button>
+        </div>
+      </section>
+    </div>
+
+    <nav id="bottom-nav" aria-label="전역 탐색">
+      <button class="active" data-product-route="home" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10M9 20v-6h6v6"></path></svg>Home</button>
+      <button data-product-route="chat" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path></svg>Chat</button>
+      <button data-product-route="notes" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 10h8M8 14h8M8 18h5"></path></svg>Notes</button>
+      <button data-product-route="settings" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>Settings</button>
+    </nav>
+  </div>
+
+  <div id="shared-panel-store" hidden>
+    <section id="notification-panel" class="knowledge-panel-view" role="tabpanel">
+      <div class="notification-panel-head"><div><span class="notification-kicker">XION</span><strong class="notification-title">알림센터</strong></div><button id="notification-panel-refresh" class="notification-panel-refresh" type="button">새로고침</button></div>
+      <div class="notification-tabs" role="tablist" aria-label="알림 유형">
+        <button class="notification-tab active" data-notification-filter="all" type="button" role="tab" aria-selected="true">전체</button><button class="notification-tab" data-notification-filter="codex" type="button" role="tab" aria-selected="false">Codex</button><button class="notification-tab" data-notification-filter="system" type="button" role="tab" aria-selected="false">시스템</button><button class="notification-tab" data-notification-filter="mail" type="button" role="tab" aria-selected="false">메일</button><button class="notification-tab" data-notification-filter="saves" type="button" role="tab" aria-selected="false">최근 저장</button>
+      </div>
+      <div id="notification-panel-content" class="notification-body" aria-live="polite"></div>
+    </section>
   </div>
   <div id="knowledge-panel-backdrop" hidden></div>
   <script src="lib/marked.min.js"></script>
@@ -201,6 +263,7 @@
   <script src="voice/halfduplex.js"></script>
   <script src="voice/halfduplex-ui.js"></script>
   <script src="paper-panel.js"></script>
+  <script src="home.js"></script>
   <script src="attachment-ui.js"></script>
   <script src="app.js"></script>
 </body>

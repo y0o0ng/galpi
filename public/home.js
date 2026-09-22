@@ -1,0 +1,509 @@
+'use strict';
+
+(function setupHomeDashboard(global) {
+  const FOCUS_CLASS = { tasks: 'medium', calendar: 'large', mail: 'large', notifications: 'medium', dday: 'small', notes: 'large' };
+  const LOCATION_KEY = 'councilLastLocation';
+  const WEATHER_CACHE_MS = 15 * 60 * 1000;
+  const LOCATION_FALLBACK_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+  const state = {
+    initialized: false,
+    apiFetch: null,
+    showToast: null,
+    route: 'home',
+    homeView: 'overview',
+    focusedCard: null,
+    selectedDate: null,
+    summary: null,
+    tasks: [],
+    notifications: [],
+    recentSaves: [],
+    mail: null,
+    notes: [],
+    weather: null,
+    weatherAt: 0,
+    weatherEnabled: false,
+  };
+
+  function node(tag, className, text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text != null) element.textContent = text;
+    return element;
+  }
+
+  function action(label, handler, primary = false) {
+    const button = node('button', `home-card-action${primary ? ' primary' : ''}`, label);
+    button.type = 'button';
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      handler();
+    });
+    return button;
+  }
+
+  function formatDateTime(seconds) {
+    if (!Number.isFinite(Number(seconds))) return '예정 없음';
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date(Number(seconds) * 1000));
+  }
+
+  function updateClock() {
+    const target = document.getElementById('home-now');
+    if (!target) return;
+    target.textContent = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date());
+  }
+
+  function card(id, title, meta, content, { focusable = true } = {}) {
+    const article = node('article', `home-card home-card-${id}`);
+    article.dataset.cardId = id;
+    const head = node('header', 'home-card-head');
+    head.append(node('h2', '', title), node('span', '', meta || ''));
+    article.append(head, content);
+    if (focusable && FOCUS_CLASS[id]) {
+      article.classList.add('focusable');
+      article.tabIndex = 0;
+      article.setAttribute('role', 'button');
+      article.setAttribute('aria-label', `${title} 자세히 보기`);
+      const focus = () => setFocusedCard(id);
+      article.addEventListener('click', event => {
+        if (!event.target.closest('button, a, input, select, textarea')) {
+          event.stopPropagation();
+          focus();
+        }
+      });
+      article.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          focus();
+        }
+      });
+    }
+    return article;
+  }
+
+  function counts() {
+    return state.summary?.counts || {};
+  }
+
+  function renderWeather() {
+    const body = node('div', 'weather-card-content');
+    const line = node('div', 'weather-main');
+    line.append(node('span', 'weather-symbol', state.weather?.icon || '–'), node('strong', '', state.weather ? `${Math.round(state.weather.temperature)}°` : '—°'));
+    body.append(line, node('p', 'priority-p3', state.weather?.message || (state.weatherEnabled ? '현재 위치의 날씨를 확인하고 있어.' : '날씨 정보 없음')));
+    return card('weather', '날씨', state.weather?.sourceLabel || '', body, { focusable: false });
+  }
+
+  function taskRows(limit = 5) {
+    const list = node('div', 'home-task-list');
+    const rows = Array.isArray(state.summary?.preview) ? state.summary.preview.slice(0, limit) : [];
+    if (!rows.length) list.append(node('p', 'home-card-empty', '오늘 확인할 일정 없음'));
+    rows.forEach(item => {
+      const row = node('div', 'home-task-row');
+      row.append(node('span', `task-dot ${item.bucket === 'overdue' ? 'overdue' : ''}`), node('time', '', item.dueAt ? formatDateTime(item.dueAt).split(' ').slice(-1)[0] : ''), node('strong', '', item.title || '제목 없는 일정'));
+      list.append(row);
+    });
+    return list;
+  }
+
+  function renderTasks() {
+    const body = node('div', 'tasks-card-content');
+    const total = Number(counts().overdue || 0) + Number(counts().today || 0);
+    const summary = node('div', 'home-count-summary');
+    summary.append(node('strong', '', String(total)), node('span', '', '할 일'), node('p', '', `지연 ${counts().overdue || 0} · 예정 ${counts().upcoming || 0}`));
+    body.append(summary, taskRows(state.focusedCard === 'tasks' ? 8 : 5));
+    if (state.focusedCard === 'tasks') {
+      const actions = node('div', 'home-card-actions');
+      actions.append(action('일정 추가', () => openTaskPanel({ compose: true }), true), action('전체 일정', () => openTaskPanel({ view: 'today' })));
+      body.append(actions, node('div', 'home-focus-extra'));
+    }
+    return card('tasks', '할일', 'Today', body);
+  }
+
+  function kstDate(seconds) {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date(Number(seconds) * 1000));
+    const part = type => parts.find(item => item.type === type)?.value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  }
+
+  function taskDate(task) {
+    return task?.dueKind === 'none' || !task?.dueAt ? '' : kstDate(task.dueAt);
+  }
+
+  function monthDays() {
+    const [year, month] = (state.selectedDate || kstDate(Date.now() / 1000)).split('-').map(Number);
+    const first = new Date(Date.UTC(year, month - 1, 1));
+    const start = new Date(Date.UTC(year, month - 1, 1 - first.getUTCDay()));
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(start);
+      date.setUTCDate(start.getUTCDate() + index);
+      const key = [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-');
+      return { date, key, inMonth: date.getUTCMonth() === month - 1, year, month: month - 1 };
+    });
+  }
+
+  function renderCalendar() {
+    const body = node('div', 'calendar-card-content');
+    const days = monthDays();
+    const month = days.find(item => item.inMonth);
+    const monthHead = node('div', 'calendar-month-head');
+    monthHead.append(node('strong', '', `${month.month + 1}월`), node('span', '', `${month.year}년`));
+    const grid = node('div', 'calendar-month-grid');
+    ['일', '월', '화', '수', '목', '금', '토'].forEach(label => grid.append(node('span', 'calendar-weekday', label)));
+    const today = kstDate(Date.now() / 1000);
+    const compactAnchor = state.selectedDate || today;
+    const compactWeek = Math.max(0, Math.floor(days.findIndex(item => item.key === compactAnchor) / 7));
+    days.forEach(item => {
+      const day = node('button', 'calendar-day', String(item.date.getUTCDate()));
+      day.type = 'button';
+      day.classList.toggle('outside', !item.inMonth);
+      day.classList.toggle('today', item.key === today);
+      day.classList.toggle('selected', item.key === state.selectedDate);
+      day.classList.toggle('outside-compact-week', Math.floor(days.indexOf(item) / 7) !== compactWeek);
+      const hasEvent = state.tasks.some(task => taskDate(task) === item.key);
+      if (hasEvent) day.append(node('i', '', ''));
+      day.addEventListener('click', event => {
+        event.stopPropagation();
+        state.selectedDate = item.key;
+        if (state.focusedCard !== 'calendar') state.focusedCard = 'calendar';
+        renderOverview();
+      });
+      grid.append(day);
+    });
+    const selectedKey = state.selectedDate || today;
+    const selectedTasks = state.tasks.filter(task => taskDate(task) === selectedKey).slice(0, 4);
+    const agenda = node('div', 'calendar-agenda');
+    agenda.append(node('strong', '', `${selectedKey.slice(5).replace('-', '월 ')}일 · 일정 ${selectedTasks.length}개`));
+    selectedTasks.forEach(task => agenda.append(node('p', '', task.title)));
+    if (!selectedTasks.length) agenda.append(node('p', 'home-card-empty', '등록된 일정 없음'));
+    body.append(monthHead, grid, agenda);
+    if (state.focusedCard === 'calendar') {
+      const actions = node('div', 'home-card-actions');
+      actions.append(action('전체 일정', () => openTaskPanel({ view: 'today' })), action('일정 추가하기', () => openTaskPanel({ compose: true }), true));
+      body.append(actions, node('div', 'home-focus-extra'));
+    }
+    return card('calendar', '달력', '', body);
+  }
+
+  function mailNotifications() {
+    return state.notifications.filter(item => item.source === 'mail');
+  }
+
+  function renderMail() {
+    const body = node('div', 'mail-card-content');
+    const analysis = state.mail?.analysis || {};
+    const summary = node('div', 'home-count-summary');
+    summary.append(node('strong', '', String(mailNotifications().length)), node('span', '', '새 메일'));
+    const list = node('div', 'home-mail-list');
+    mailNotifications().slice(0, 4).forEach(item => {
+      const row = node('div', 'home-mail-row');
+      row.append(node('strong', '', item.sender || item.senderAddress || '메일'), node('span', '', item.subject || item.title || item.text || '확인할 메일'));
+      list.append(row);
+    });
+    if (!list.childElementCount) list.append(node('p', 'home-card-empty', `분석 대기 ${analysis.pending || 0} · 완료 ${analysis.done || 0}`));
+    body.append(summary, list);
+    if (state.focusedCard === 'mail') body.append(node('div', 'home-focus-extra'));
+    return card('mail', '메일', 'Today', body);
+  }
+
+  function renderNotifications() {
+    const body = node('div', 'notification-card-content');
+    const summary = node('div', 'home-count-summary');
+    summary.append(node('strong', '', String(state.notifications.length)), node('span', '', '새 알림'));
+    const list = node('ul', 'home-notification-list');
+    const groups = [
+      ['일정 알림', state.notifications.filter(item => item.type === 'task_reminder').length],
+      ['시스템 알림', state.notifications.filter(item => item.source === 'system' || item.source === 'codex').length],
+      ['새 메일', mailNotifications().length],
+      ['최근 저장', state.recentSaves.length],
+    ];
+    groups.forEach(([label, value]) => {
+      const item = node('li'); item.append(node('span', '', label), node('span', '', `${value}개`)); list.append(item);
+    });
+    body.append(summary, list);
+    if (state.focusedCard === 'notifications') body.append(node('div', 'home-focus-extra'));
+    return card('notifications', '알림', 'Today', body);
+  }
+
+  function ddayItems() {
+    const dayNumber = value => {
+      const [year, month, day] = value.split('-').map(Number);
+      return Date.UTC(year, month - 1, day) / 86400000;
+    };
+    const today = dayNumber(kstDate(Date.now() / 1000));
+    return state.tasks.filter(task => task.dueKind !== 'none' && task.dueAt).map(task => ({
+      task,
+      days: dayNumber(taskDate(task)) - today,
+    })).filter(item => item.days >= 0).sort((a, b) => a.days - b.days).slice(0, 3);
+  }
+
+  function renderDday() {
+    const body = node('div', 'dday-card-content');
+    const items = ddayItems();
+    items.forEach(item => {
+      const row = node('div', 'dday-row');
+      row.append(node('strong', '', item.days === 0 ? 'D-Day' : `D-${item.days}`), node('span', '', item.task.title));
+      body.append(row);
+    });
+    if (!items.length) body.append(node('p', 'home-card-empty', '다가오는 일정 없음'));
+    if (state.focusedCard === 'dday') {
+      const actions = node('div', 'home-card-actions');
+      actions.append(action('일정 추가', () => openTaskPanel({ compose: true }), true), action('전체 일정', () => openTaskPanel({ view: 'upcoming' })));
+      body.append(actions, node('div', 'home-focus-extra'));
+    }
+    return card('dday', '다가오는 날', '', body);
+  }
+
+  function renderLecture() {
+    const body = node('div', 'lecture-card-content');
+    body.append(node('strong', '', '준비 중'), node('p', '', '강의 노트 런타임이 연결되면 여기에 최근 처리 상태가 표시돼.'));
+    return card('lecture', '강의 노트', '', body, { focusable: false });
+  }
+
+  function renderNotes() {
+    const body = node('div', 'notes-card-content');
+    const list = node('div', 'home-notes-list');
+    state.notes.slice(0, 3).forEach(note => {
+      const item = node('button', 'home-note-row');
+      item.type = 'button';
+      item.append(node('strong', '', note.title || note.filename), node('span', '', note.noteType || '노트'));
+      item.addEventListener('click', event => {
+        event.stopPropagation();
+        setFocusedCard('notes');
+        global.NotePanel?.open(note);
+      });
+      list.append(item);
+    });
+    if (!list.childElementCount) list.append(node('p', 'home-card-empty', '저장된 노트 없음'));
+    body.append(list);
+    if (state.focusedCard === 'notes') {
+      const tabs = node('nav', 'home-library-tabs');
+      tabs.append(action('노트', () => mountLibrary('notes'), true), action('논문', () => mountLibrary('papers')));
+      body.append(tabs, node('div', 'home-focus-extra'));
+    }
+    return card('notes', '노트', '최근 저장 노트', body);
+  }
+
+  function parkSharedPanels() {
+    const notification = document.getElementById('notification-panel');
+    const store = document.getElementById('shared-panel-store');
+    if (notification && store && notification.parentElement !== store) store.appendChild(notification);
+    const knowledge = document.getElementById('knowledge-panel');
+    const note = document.getElementById('note-panel');
+    const paper = document.getElementById('paper-panel');
+    if (knowledge && note && note.parentElement !== knowledge) knowledge.appendChild(note);
+    if (knowledge && paper && paper.parentElement !== knowledge) knowledge.appendChild(paper);
+  }
+
+  function mountLibrary(tab = 'notes', host = document.querySelector('.home-card-notes .home-focus-extra')) {
+    if (!host) return;
+    const note = document.getElementById('note-panel');
+    const paper = document.getElementById('paper-panel');
+    host.append(note, paper);
+    global.PaperPanel?.setTab(tab);
+  }
+
+  function mountNotification(filter) {
+    const host = document.querySelector(`.home-card-${state.focusedCard} .home-focus-extra`);
+    const panel = document.getElementById('notification-panel');
+    if (!host || !panel) return;
+    host.appendChild(panel);
+    panel.hidden = false;
+    global.NotificationPanel?.show(filter);
+  }
+
+  function renderOverview() {
+    const grid = document.getElementById('home-grid');
+    if (!grid) return;
+    parkSharedPanels();
+    grid.className = state.focusedCard ? `has-focus focus-${FOCUS_CLASS[state.focusedCard]}` : '';
+    grid.replaceChildren(
+      renderWeather(), renderTasks(), renderCalendar(), renderMail(),
+      renderNotifications(), renderDday(), renderLecture(), renderNotes(),
+    );
+    [...grid.children].forEach(item => item.classList.toggle('focused', item.dataset.cardId === state.focusedCard));
+    const collapse = document.getElementById('home-focus-collapse');
+    collapse.hidden = !state.focusedCard;
+    if (state.focusedCard === 'mail') mountNotification('mail');
+    if (state.focusedCard === 'notifications') mountNotification('all');
+    if (state.focusedCard === 'notes') mountLibrary('notes');
+  }
+
+  function setFocusedCard(id) {
+    if (!FOCUS_CLASS[id] || state.focusedCard === id) return;
+    state.focusedCard = id;
+    renderOverview();
+    document.querySelector(`.home-card[data-card-id="${id}"]`)?.focus({ preventScroll: true });
+  }
+
+  function collapseFocus() {
+    if (!state.focusedCard) return;
+    state.focusedCard = null;
+    renderOverview();
+  }
+
+  function openTaskPanel(options) {
+    const host = document.querySelector(`.home-card-${state.focusedCard} .home-focus-extra`);
+    if (!host) return;
+    host.replaceChildren();
+    global.TaskPanel?.render(host, options);
+  }
+
+  function moveLibraryForRoute(route) {
+    const note = document.getElementById('note-panel');
+    const paper = document.getElementById('paper-panel');
+    if (!note || !paper) return;
+    if (route === 'notes') {
+      document.getElementById('notes-page-views').append(note, paper);
+      global.PaperPanel?.setTab('notes');
+    } else if (route === 'chat') {
+      document.getElementById('knowledge-panel').append(note, paper);
+      global.PaperPanel?.setTab('notes');
+    }
+  }
+
+  function setHomeView(view) {
+    state.homeView = view === 'agents' ? 'agents' : 'overview';
+    document.querySelectorAll('[data-home-view]').forEach(button => {
+      const active = button.dataset.homeView === state.homeView;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    const overview = document.getElementById('home-overview');
+    const agents = document.getElementById('home-agents');
+    overview.hidden = state.homeView !== 'overview';
+    agents.hidden = state.homeView !== 'agents';
+    overview.classList.toggle('active', state.homeView === 'overview');
+    agents.classList.toggle('active', state.homeView === 'agents');
+    if (state.homeView === 'agents') global.AgentPanel?.show();
+    else renderOverview();
+  }
+
+  function setRoute(route, homeView) {
+    if (!['home', 'chat', 'notes', 'settings'].includes(route)) route = 'home';
+    state.route = route;
+    document.body.dataset.productRoute = route;
+    document.querySelectorAll('[data-product-page]').forEach(page => page.classList.toggle('active', page.dataset.productPage === route));
+    document.querySelectorAll('[data-product-route]').forEach(button => button.classList.toggle('active', button.dataset.productRoute === route));
+    global.PaperPanel?.close();
+    moveLibraryForRoute(route);
+    if (route === 'home') setHomeView(homeView || state.homeView);
+    if (route === 'notes') global.NotePanel?.show();
+  }
+
+  function storedLocation() {
+    try {
+      const value = JSON.parse(localStorage.getItem(LOCATION_KEY));
+      return Number.isFinite(value?.lat) && Number.isFinite(value?.lon)
+        && Date.now() - Number(value.savedAt) < LOCATION_FALLBACK_MAX_AGE_MS ? value : null;
+    } catch { return null; }
+  }
+
+  async function currentLocation() {
+    if (!navigator.geolocation) return storedLocation();
+    try {
+      const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
+        resolve, reject, { enableHighAccuracy: false, timeout: 5000, maximumAge: WEATHER_CACHE_MS },
+      ));
+      const value = { lat: position.coords.latitude, lon: position.coords.longitude, savedAt: Date.now() };
+      localStorage.setItem(LOCATION_KEY, JSON.stringify(value));
+      return value;
+    } catch { return storedLocation(); }
+  }
+
+  async function loadWeather() {
+    if (!state.weatherEnabled) return;
+    if (state.weather && Date.now() - state.weatherAt < WEATHER_CACHE_MS) return;
+    const location = await currentLocation();
+    if (!location) return;
+    const response = await state.apiFetch(`/api/weather?lat=${encodeURIComponent(location.lat)}&lon=${encodeURIComponent(location.lon)}`);
+    if (!response.ok) return;
+    state.weather = await response.json();
+    state.weatherAt = Date.now();
+    if (state.route === 'home' && state.homeView === 'overview') renderOverview();
+  }
+
+  async function refresh() {
+    const requests = await Promise.allSettled([
+      state.apiFetch('/api/tasks/summary'),
+      state.apiFetch('/api/tasks?view=all&limit=100'),
+      state.apiFetch('/api/notifications'),
+      state.apiFetch('/api/mail/status'),
+      state.apiFetch('/api/vault/notes?excludeNoteType=paper&limit=6'),
+    ]);
+    const read = async (result, fallback) => {
+      if (result.status !== 'fulfilled' || !result.value.ok) return fallback;
+      return result.value.json().catch(() => fallback);
+    };
+    const [summary, tasks, notifications, mail, notes] = await Promise.all([
+      read(requests[0], null), read(requests[1], {}), read(requests[2], {}), read(requests[3], null), read(requests[4], {}),
+    ]);
+    state.summary = summary;
+    state.tasks = Array.isArray(tasks?.tasks) ? tasks.tasks : [
+      ...(tasks?.overdue || []), ...(tasks?.today || []), ...(tasks?.upcoming || []),
+    ];
+    state.notifications = Array.isArray(notifications?.notifications) ? notifications.notifications : [];
+    state.recentSaves = Array.isArray(notifications?.recentSaves) ? notifications.recentSaves : [];
+    state.mail = mail;
+    state.notes = Array.isArray(notes?.notes) ? notes.notes : [];
+    if (state.route === 'home' && state.homeView === 'overview') renderOverview();
+    void loadWeather().catch(() => {});
+  }
+
+  function openNotifications(filter = 'all') {
+    setRoute('home', 'overview');
+    state.focusedCard = filter === 'mail' ? 'mail' : 'notifications';
+    renderOverview();
+  }
+
+  function openTasks(options = {}) {
+    if (options.focusReminders) {
+      setRoute('home', 'agents');
+      global.AgentPanel?.openTasks(options);
+      return;
+    }
+    setRoute('home', 'overview');
+    state.focusedCard = options.compose ? 'calendar' : 'tasks';
+    renderOverview();
+    openTaskPanel(options.compose ? { compose: true, initialTitle: options.initialTitle || '' } : { view: options.view || 'today' });
+  }
+
+  function handleInitialUrl() {
+    const params = new URLSearchParams(global.location.search);
+    if (params.get('panel') === 'agents' || params.get('notification') === 'tasks') {
+      openTasks({ view: 'today', focusReminders: params.get('taskView') === 'reminders' || params.get('notification') === 'tasks' });
+    } else if (params.get('panel') === 'notifications') {
+      openNotifications(params.get('notification') === 'mail' ? 'mail' : 'all');
+    }
+  }
+
+  function init({ apiFetch, showToast, weatherEnabled = false }) {
+    if (state.initialized) return;
+    state.apiFetch = apiFetch;
+    state.showToast = showToast;
+    state.weatherEnabled = weatherEnabled;
+    document.querySelectorAll('[data-product-route]').forEach(button => button.addEventListener('click', () => {
+      if (button.dataset.homeCardTarget === 'notifications') openNotifications();
+      else setRoute(button.dataset.productRoute, button.dataset.homeViewTarget);
+    }));
+    document.querySelectorAll('[data-home-view]').forEach(button => button.addEventListener('click', () => setHomeView(button.dataset.homeView)));
+    document.querySelectorAll('.shell-theme-button').forEach(button => button.addEventListener('click', () => document.getElementById('theme-toggle')?.click()));
+    document.getElementById('home-focus-collapse').addEventListener('click', collapseFocus);
+    document.getElementById('home-page').addEventListener('click', event => {
+      if (state.focusedCard && !event.target.closest('.home-card.focused') && !event.target.closest('#home-focus-collapse')) collapseFocus();
+    });
+    state.initialized = true;
+    updateClock();
+    setInterval(updateClock, 60000);
+    setRoute('home', 'overview');
+    void refresh();
+  }
+
+  global.HomeDashboard = { init, refresh, setRoute, setHomeView, setFocusedCard, openNotifications, openTasks, handleInitialUrl };
+})(window);

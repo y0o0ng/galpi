@@ -1,187 +1,147 @@
-# XION 통합 홈 — 설계
+# Galpi 제품 셸과 XION Home — 설계
 
-> 기존 `에이전트` 탭의 첫 화면을 운영 상태 목록에서 사용자 브리핑으로 바꾼다.
+> 상태: 2026-09-23 승인 Figma 구현.
 >
-> 상태: 2026-08-19 v1 구현·Pi 배포·실기기 인수 완료. 통과 기준은 10절에 표시했다.
+> 시각·반응형 정본은 Figma `galpi-home-design`이고, 데이터·상태·행동 정본은 현재 저장소다.
+> 이 문서는 과거 350px 지식 패널 Home 설계를 대체한다.
 
----
+## 1. 제품 구조
 
-## 1. 정의
+최상위 목적지는 Home, Chat, Notes, Settings 네 개로 고정한다. 데스크톱은 232px 왼쪽 전역
+탐색을, Pad와 Phone은 아래 전역 탐색을 쓴다. Home 안에는 `Overview`와 `Agents`만 있다.
+범용 탐색·위젯·레이아웃 설정 구조는 만들지 않는다.
 
-XION 홈은 **기존 정본을 읽어 편집해 내놓는 read-only projection**이다. 새 상태 저장소도,
-새 dashboard route도, 범용 위젯 framework도 아니다.
+Chat은 기존 대화, composer, 모델 선택, 음성, 첨부, 활성 노트, polling 동작을 유지한다.
+Chat 오른쪽 지식 패널에는 `Notes`와 `Papers`만 남고 기본은 Notes다. 과거 XION과 알림 탭은
+보이는 Chat 탐색에서 사라지지만 그 도메인 기능은 Home에서 계속 쓴다.
 
-화면이 답하는 질문은 `에이전트들이 내부적으로 어떻게 돌고 있지?`가 아니라
-`지금 시온이 나한테 알려줘야 할 게 뭐지?`다.
+## 2. Overview 카드
 
-**정상 상태는 정보가 적은 상태다.** 채우기 위해 보여주는 정보를 만들지 않는다.
+현재 카드는 Weather, Tasks, Calendar, Mail, Notifications, D-Day, Lecture Notes, Notes다.
 
-## 2. v1 범위
+News는 표시하지 않고 빈 자리도 남기지 않는다. 뉴스 수집·판단 백엔드는 그대로 두되 Home은
+`/api/news/briefing`을 호출하지 않는다. Trading과 함께 다시 결정할 때까지 UI 범위 밖이다.
 
-머리 한 줄과 세 영역만 만든다.
+강의 녹음·전사 런타임과 강의 노트 전용 메타데이터는 아직 없으므로 Lecture Notes 카드는
+`준비 중`을 표시한다. 별도 저장소나 임시 스키마를 만들지 않는다.
 
-0. **머리** - KST 기준 인사와 오늘 날짜. 화면이 무엇을 보는 자리인지 알려주는 최소한이다
-1. **Needs Attention** — 후속 행동이 남은 것. 메일 Attention과 **울린 일정 알림**이 한 자리에 온다
-2. **오늘** — 오늘 일정·마감과 다음 알림
-3. **에이전트 상태** — 세 줄 축약과 개입 필요 강조
+## 3. 데스크톱 격자
 
-`최근`(알아둘 가치가 있었던 변화)은 v1에서 뺀다. 근거는 4절이다.
+Home 본문은 폭 1060px, 16열, gutter 20px의 CSS Grid다. 한 열은 47.5px이므로 승인된 `.5`
+치수를 그대로 만든다.
 
-행동은 **열기**뿐이다. 완료·미루기·복구·일정 추가 같은 상태 변경은 기존 책임 화면이 맡는다.
+| 카드 | 위치 | 크기 |
+|---|---|---:|
+| Weather | 1행 4열 | 250 × 210 |
+| Tasks | 1행 7열 | 452.5 × 210 |
+| Calendar | 1~2행 5열 | 317.5 × 440 |
+| Mail | 2행 7열 | 452.5 × 210 |
+| Notifications | 2행 4열 | 250 × 210 |
+| D-Day | 3행 2열 | 115 × 210 |
+| Lecture Notes | 3행 7열 | 452.5 × 210 |
+| Notes | 3행 7열 | 452.5 × 210 |
 
-## 3. 데이터 소스
+절대 좌표 대신 Grid를 사용한다. Pad portrait는 폭 740px의 360px 2열과 20px 간격을 쓴다.
+Phone은 좌우 16px, 카드 사이 16px인 세로 스크롤 흐름이다.
 
-새 API를 만들지 않는다. 아래 넷은 지금 `agent-panel.js`가 이미 병렬로 부르는 것들이다.
+## 4. 카드 focus
 
-| 영역 | 소스 | 쓰는 값 |
-|---|---|---|
-| Needs Attention | `GET /api/notifications` | `source === 'mail'` 항목 |
-| 오늘 | `GET /api/tasks/summary` | `counts` · `preview` · `nextReminder` |
-| Mail 상태 | `GET /api/mail/status` | `accounts[].status` · `analysis` · `stranded` |
-| Codex 상태 | `GET /api/organize/status` | `runner` · `queueable` · `stranded` · `recoveryRequired` |
-| 일정 상태 | `GET /api/tasks/summary` | `counts` |
+상태는 `focusedCard: CardId | null` 하나다. 동시에 하나만 focus할 수 있고 A에서 B로 이동할
+때는 값을 바로 교체한다. 모달이나 별도 페이지가 아니다. 카드가 원래 Home 자리에서 커지고
+주변 카드가 Grid 안에서 다시 흐른다.
 
-`/api/tasks/summary`의 `calendar`·`week`는 홈에서 쓰지 않는다. 홈 안에 달력을 다시 만들지 않는다.
+데스크톱 승인 크기:
 
-## 4. Needs Attention은 Notification이 아니다
+- Large 790 × 440: Calendar, Mail, Notes
+- Medium 452.5 × 440: Tasks, Notifications
+- Small 452.5 × 210: D-Day
+- focus 없음: Weather, Lecture Notes
 
-`알릴 가치가 있다`(`notification_mode`)와 `잊으면 안 될 후속 행동이 있다`(Attention)는 독립된 축이다.
-홈 최상단은 **후자만** 보여준다.
+데스크톱과 Pad에서는 focus 카드 밖을 누르면 Overview로 돌아간다. Phone에서는 모든 focus
+카드 위에 공통 왼쪽 위 collapse 버튼을 보인다. Notes/Papers 상세 안의 내부 `뒤로`는
+`detail → list`이고 Home collapse와 다른 단계다.
 
-- 대상: `mail_attention`의 `action_required` · `attachment_check` · `low_confidence`
-- **Attention 없는 `important/batch` 메일은 승격하지 않는다.** `listAttentionNotifications`가
-  `mail_attention` 조인이라 구조적으로 나올 수 없다.
-- **silent 메일은 홈에 나오지 않는다.** 같은 이유로 보장된다.
-- **`snoozed`는 v1에서 보여주지 않는다.** `나중에`는 사용자가 지금 안 보겠다고 말한 것이고,
-  홈 최상단에 다시 올리면 스누즈가 무의미해진다. 지금 API도 `state = 'open'`만 준다.
+Phone 참조 높이는 Large 600px, Medium 440px, Small 210px다. 개별 카드 내용은 카드 밖으로
+새지 않으며 필요한 긴 목록은 카드 안에서 스크롤한다.
 
-두 종류가 이 자리를 공유한다. 메일 Attention과 **울린 일정 알림**(`type = 'task_reminder'`)은
-사용자 입장에서 같은 뜻이라 한 목록이어야 한다. 순서는 **일정 알림이 위**다. 그것은 시각이
-이미 지난 것이고 메일 기한은 며칠 뒤일 수 있다.
+## 5. 크기별 정보 우선순위와 Calendar
 
-이 합류가 두 가지를 정한다.
+공간이 줄면 P3, P2 순으로 숨기고 P1을 유지한다. 카드 실제 폭을 기준으로 하는 container
+query를 우선한다. Weather는 맥락과 온도를 P1, 보조 날씨 표현을 P2, 짧은 조언을 P3로 둔다.
 
-- **접힌 나머지는 홈에서 편다.** 알림 탭은 일정 알림을 빼고 보여주므로(`type !== 'task_reminder'`)
-  그쪽으로 보내면 접힌 일정 알림을 볼 수 있는 곳이 없어진다.
-- **`오늘`은 이미 올라간 일정을 다시 보여주지 않는다.** 알림이 울린 일정은 `확인할 것`으로
-  승격된 것이라, 같은 일정이 두 자리에 뜨면 편집된 브리핑이 아니라 같은 목록의 반복이 된다.
+Calendar의 P1은 사라지지 않고 표현을 바꾼다. 충분한 폭에서는 월간 6주 격자를, compact에서는
+선택 날짜가 있으면 그 날짜의 주, 없으면 현재 주를 쓴다. 오늘, 선택 날짜, 이벤트 여부를
+유지하며 하루에 일정이 하나 이상 있으면 점은 하나만 그린다.
 
-`최근 Mail 알림`(Attention 없는 batch·immediate)을 보여주려면 새 read endpoint가 필요하다.
-그 순간 홈은 두 번째 알림 패널로 미끄러지기 시작하므로, 필요가 실제로 드러난 뒤에 연다.
+확장 Calendar의 일정 추가·전체 일정·등록·변경은 기존 `TaskPanel`과 task API를 사용한다.
+별도 일정 form이나 상태 기계를 만들지 않는다.
 
-## 5. 탭
+## 6. 데이터와 행동 정본
 
-다섯 번째 탭을 추가하지 않는다. 기존 `에이전트` 탭의 **라벨만** `XION`으로 바꾸고, 탭 줄의
-**맨 왼쪽**으로 옮기고, 패널을 열었을 때 **기본으로 선택되는 탭**으로 삼는다. 기본 탭은
-`index.html`의 `active`·`hidden`과 `paper-panel.js`의 `state.activeTab` 두 곳이 함께 정한다.
-한쪽만 바꾸면 표시와 화면이 어긋난다.
+Home은 projection이며 독립 저장소가 아니다.
 
-**`data-panel-tab="agents"` 키는 그대로 둔다.** `public/app.js`의 딥링크 파싱과 `public/sw.js`의
-일정 알림 fallback URL(`/?panel=agents&taskView=reminders`)이 그 값을 쓰고, 사용자 기기에 이미
-설치된 Service Worker와 지난 알림이 그 링크를 들고 있다. 키를 바꾸면 그것들이 깨진다.
-
-## 6. 에이전트 상태
-
-첫 화면에는 상태 한 줄씩만 둔다. `model id` · `prompt version` · lease · retry · cursor ·
-worker timestamp · queue 내부값 · 상세 설정은 첫 화면에 없다. 그것들은 상세의 몫이다.
-
-다만 **사람이 개입해야 멈춤이 풀리는 상태는 첫 화면에서 드러낸다.**
-
-| 신호 | 출처 |
+| 카드/화면 | 기존 정본 |
 |---|---|
-| 재인증 필요 | `accounts[].status === 'auth_required'` |
-| 분석 멈춤 | `analysis.failed > 0` |
-| 복구 필요 | `organize.recoveryRequired > 0` |
-| 정리 좌초 | `organize.stranded > 0` |
+| Tasks, Calendar, D-Day | `/api/tasks/summary`, task API, `TaskPanel` |
+| Mail | `/api/mail/status`, mail settings/preferences, Attention, body/requeue 동작 |
+| Notifications | `/api/notifications`, `NotificationPanel` |
+| Notes | vault note API, `NotePanel` |
+| Papers | vault paper API, `PaperPanel` |
+| Weather | `/api/weather`, 브라우저 현재 위치 |
+| Codex | `/api/models/codex`, app_settings 저장, organize API |
 
-카드를 누르면 **기존 상세**(`renderMailDetail` · `renderScheduleDetail` · `renderCodexDetail`)로
-간다. 상세를 새로 만들지 않고, 복구 버튼을 홈 카드에 옮기지 않는다.
+한 소스의 실패가 다른 카드까지 막지 않도록 독립 요청을 `Promise.allSettled`로 읽는다.
+서버 검증과 기존 mutation 의미가 항상 우선한다.
 
-## 7. 실패 격리
+위치는 `getCurrentPosition()`으로 한 번 얻고 마지막 좌표 한 건만 기기의
+`councilLastLocation`에 둔다. 서버·DB에는 위치 이력을 저장하지 않는다. 15분 날씨 캐시와
+6시간 좌표 fallback을 유지하며 위치 실패는 다른 Home 카드를 막지 않는다.
 
-한 소스가 죽어도 나머지 영역은 렌더한다. `agent-panel.js`가 이미 쓰는 `Promise.allSettled`
-패턴을 그대로 유지하고, 실패한 영역만 `확인 불가`로 둔다. 하나의 실패를 화면 전체 오류로
-승격하지 않는다.
+## 7. Mail과 Notes 확장
 
-`/api/mail/status`의 `503 MAIL_AGENT_DISABLED`는 오류가 아니다. 플래그가 꺼진 것뿐이라
-사람이 고칠 것이 없다.
+Mail 확장은 현재 알림의 mail filter를 재사용해 목록과 실제 처리 동작을 제공한다. Mail 계정,
+분석 상태, Push, 방해 금지, 알림 규칙, 재시도는 기존 mail API만 호출한다. UI용 두 번째 Mail
+store를 만들지 않는다.
 
-## 8. 모바일
+Notes 확장은 Note/Paper 패널 DOM과 controller를 그대로 옮겨 쓴다. Desktop은 넓은 카드 안의
+목록·상세 구성을 쓰고 Phone은 `list → detail`로 이동한다. 내부 back은 detail에서 list로만
+돌아간다. 저장된 paper를 여는 것만으로 활성 Chat context를 바꾸지 않는다.
 
-지식 패널은 데스크톱에서 350px 고정이라 2열이 물리적으로 들어가지 않는다. 모바일과 같은
-1열을 쓴다.
+## 8. Agents
 
-첫 viewport에 **Needs Attention과 오늘이 함께** 들어와야 한다. 메일 카드 실측 높이가 약
-118px이라 Attention을 3장 펼치면 오늘이 접힌다. 그래서 **첫 화면에는 Attention 2건까지만
-보이고 나머지는 `+N개` 한 줄로 접는다.**
+Agents는 과거 세 줄 요약이 아니라 세 운영 카드다.
 
-## 9. 빈 상태
+- Mail 에이전트: 계정 상태, 분석 수, 알림 상태, 규칙과 status를 보인다. Push, 방해 금지,
+  규칙 되돌리기는 기존 mail settings/preferences API를 호출한다.
+- 일정 에이전트: `/api/tasks/summary`의 기간, 지연·오늘·예정·Inbox, 현재 마감과 다음 알림을
+  보인다. 일정 추가와 전체 일정은 기존 `TaskPanel`을 연다.
+- 사서 Codex: 일반 정리와 깊은 재처리 모델은 `/api/models/codex`가 준 실제 select다. 변경
+  저장은 기존 app_settings 경로를, 목록 갱신과 대기열 정리는 기존 model/organize API를 쓴다.
 
-Attention도 오늘 일정도 없으면 빈 카드를 여러 장 만들지 않는다. `오늘은 따로 확인할 일이
-없어` 한 줄과 다음 일정, 그리고 에이전트가 모두 정상이라는 사실만 조용히 남긴다.
+세 카드는 각 소스 실패를 격리한다. Phone에서는 카드가 세로로 흐르고 action 영역은 줄바꿈해
+버튼과 글자가 겹치지 않는다.
 
-## 10. 통과 기준
+## 9. 이전 링크 호환
 
-- [x] 홈은 기존 정본만 읽고 별도 상태를 저장하지 않는다 (서버 변경 0줄)
-- [x] active Mail Attention이 있으면 Needs Attention에 보인다
-- [x] 울린 일정 알림이 메일보다 위에 오고, 그 일정은 `오늘`에서 중복되지 않는다
-- [x] Attention 없는 batch·immediate 메일은 Needs Attention으로 승격되지 않는다
-- [x] silent 메일은 홈에 나오지 않는다
-- [x] `snoozed` Attention은 홈에 나오지 않는다
-- [x] 오늘 영역이 `/api/tasks/summary`와 일치한다
-- [x] 한 소스가 실패해도 나머지 영역이 렌더된다
-- [x] 정상 에이전트의 운영 세부값이 첫 화면을 채우지 않는다
-- [x] 개입이 필요한 상태는 첫 화면에서 드러난다
-- [x] 기존 상세·복구 기능과 알림·노트·논문 탭이 회귀하지 않는다
-- [x] `/?panel=agents` 딥링크와 `sw.js`의 일정 fallback URL이 그대로 동작한다
-- [x] 모바일 첫 화면에서 운영 상태보다 Attention·오늘이 먼저 나온다
+이전 설치 Service Worker와 이미 발행된 알림 URL은 입력 계약으로 유지한다.
 
-## 11. 하지 않는 것
+- `/?panel=agents&taskView=reminders` → Home의 task/reminder 흐름
+- `/?panel=notifications` → Home의 Notifications focus
+- 이전 task notification 링크 → 기존 일정 알림 처리 흐름
 
-다섯 번째 홈 탭 · 홈 전용 DB나 API 래핑 · 범용 dashboard framework · activity event bus ·
-에이전트 공통 추상 schema · 메일함·알림 패널·달력·에이전트 상세 복제 · 실시간 websocket ·
-위젯 편집이나 레이아웃 저장 · 주변 UI 대규모 정리.
+과거 `data-panel-tab="agents"`를 보이는 탭으로 남기지 않는다. URL 호환 shim이 새 목적지로
+해석하며 기존 push URL 자체는 바꾸지 않는다.
 
----
+## 10. 비범위와 검증
 
-## 12. 날씨 — 머리줄 확장
+범용 dashboard/widget framework, 사용자 배치 설정, drag-and-drop, UI layout 저장, 새 DB/API,
+News UI, Trading, 강의 노트 백엔드, task/mail/note/paper/chat 재구축, Pi 배포는 이 작업 범위가
+아니다.
 
-**상세 계약은 `docs/xion-weather-design.md`가 단일 기준이다.** 여기에는 홈 설계가 이 결정
-때문에 바뀌는 것만 남긴다.
+검증 기준은 Desktop 약 1440px, Pad portrait 768/834px, Phone 약 390px이다. 모든 크기에서
+가로 page overflow, 카드 내부 누출, 버튼 겹침, 고정 artboard clipping이 없어야 한다. Chat의
+기존 model/composer/message/voice 동작과 Notes/Papers panel을 유지한다. 자동 검증은
+`npm test`와 변경 JS `node --check`다.
 
-**모양은 머리줄(2절의 0번) 확장이다.** 별도 카드도 아이콘도 아니고, 3행이다.
-
-```
-늦은 밤이야                                🌧️ 27°
-8월 21일 금요일
-3시간 뒤 비가 올 수도 있대 ☔
-```
-
-**2026-08-21 논의에서는 한 줄(`8월 21일 금요일 · 22° 🌧️ 오후부터 비`)로 정했지만 바꿨다.**
-8절이 말하듯 지식 패널이 데스크톱에서 350px 고정이라 날짜와 브리핑이 한 줄에 다 못 들어가
-어차피 감긴다. 그럴 바에는 온도만 인사 줄 오른쪽에 붙이고 문구에 전체 폭을 주는 편이 낫다.
-좌/우 2열도 같은 이유로 버렸다 — 오른쪽 열이 실질 190~210px가 되어 문구가 두 줄로 감긴다.
-
-**아이콘 하나로 두지 않는다.** 두 가지 이유다. 첫째, UI 계약의 "아이콘은 SVG로 그린다"는
-버튼·컨트롤 안에서 글리프를 광학 중심에 맞추는 문제라 본문 텍스트 흐름의 이모지에는
-해당하지 않지만, 하늘상태(4단계) × 강수형태(4단계)를 SVG로 그리면 **텍스트 한 줄보다
-일이 커진다.** 둘째, 날씨에서 행동을 바꾸는 것은 "지금 맑음"이 아니라 "이따 6시부터
-비"인데 **아이콘 하나는 그 시각을 나르지 못한다.** 가장 쓸모 있는 조각이 빠진다.
-
-**이것이 깨는 계약은 10절의 `서버 변경 0줄` 하나다.** 외부에서 가져오므로 새 read-only
-endpoint(`GET /api/weather`) 하나와 갱신 주기가 생긴다. 반면 1절의 "정상 상태는 정보가 적은
-상태다"는 깨지 않는다 — 그 문장이 금지하는 것은 *채우기 위해 정보를 지어내는 것*이고, 날씨는
-지어낸 것이 아니라 사람이 아침에 실제로 알고 싶은 것이다. **다만 날씨는 항상 있으므로 홈이
-영영 비지 않는 화면이 된다.** 9절의 빈 상태가 사라지는 것은 감수한 대가다.
-
-**위치는 상수가 아니라 브라우저의 현재 위치다.** 2026-08-21에는 "Pi가 집에 고정돼 있으므로
-`nx`·`ny`는 상수 하나이고 위경도 변환 코드가 필요 없다"고 적었지만 버렸다. Pi는 서버이고
-사용자는 PWA를 들고 다니므로, 고정 좌표는 집을 떠나 있을 때 **틀렸다는 표시도 없이 다른 지역
-날씨를 보여준다.** 대신 `getCurrentPosition()` → 서버 `toKmaGrid(lat, lon)` → 기상청 경로가
-생기고, 마지막 좌표 한 건만 기기 `localStorage`에 남는다. 서버·DB에는 위치 이력을 저장하지
-않는다.
-
-**순서 조건은 지키지 못했다.** 원래는 "홈에 `알아둘 것`이 붙은 것이 2026-08-21이라, 그 상태로
-며칠 써본 뒤에도 허전하면 그때 만든다"였는데 뉴스 인수 당일에 날씨를 얹었다. **그래서 어느
-쪽이 화면을 살렸는지는 앞으로도 가릴 수 없다.** 사용자 판단이고, 되돌릴 수 없는 관측이므로
-여기에 남긴다.
+과거 350px 한 열 Home과 Chat의 XION/Notifications 탭을 전제로 한 테스트는 이 계약의 회귀
+테스트로 교체한다.

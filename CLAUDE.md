@@ -27,7 +27,7 @@
 - XION 장기기억 연구 정본: `docs/Memory research/xion-memory-research-docs/memory-architecture-design.md`. Survey와 brainstorm은 supporting/non-canonical 자료이며 architecture 판단은 design 문서가 우선한다.
 - Pi 운영·복구: `docs/RASPBERRY_PI_RUNBOOK.md`
 - 현재 음성 기준: `docs/voice-halfduplex-design.md`
-- XION 통합 홈(지식 패널 첫 화면): `docs/xion-home-design.md`
+- Galpi 제품 셸·XION Home: `docs/xion-home-design.md`
 - 트레이딩(V5-B): `docs/trading/strategies/Swing Trading Agent Design v2 2.md`. 실측·완료 기록은 20.0절이다.
 - 트레이딩 전략 구축 계약: 전략 family마다 로드맵이 하나다. **연구 예산·종료 조건·Phase별 사전등록이 거기 있다.** 실험 산출물 색인은 `trading/runs/README.md`다.
   - `momentum-v2` (CLOSED/FROZEN): `docs/trading/momentum-v2-roadmap.md`
@@ -66,6 +66,7 @@
 
 ## UI 현재 계약
 
+- 전역 제품 구조는 Home·Chat·Notes·Settings다. Home은 Overview·Agents, Chat 지식 패널은 Notes·Papers만 쓰며 반응형·focus·이전 링크 호환 정본은 `docs/xion-home-design.md`다.
 - 방향은 미니멀리즘 기반 Apple Human Interface다. 기능보다 장식을 늘리지 않는다.
 - Markdown 말풍선은 `.bubble.md { white-space: normal; }`과 `marked`의 `breaks:true`를 함께 유지한다.
 - 공통 거터는 16px, 본문·입력 읽기 폭은 600px, 모바일 동작 타깃은 44px 이상, 경계선은 테마별 `--hairline`을 쓴다.

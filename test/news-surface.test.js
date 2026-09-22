@@ -187,41 +187,31 @@ test('조회 호출 수에 상한이 있고 상한에 닿으면 도구를 주지
   db.close();
 });
 
-test('홈은 새 소식이 없으면 영역을 만들지 않고, 관심 관리 UI를 두지 않는다', () => {
-  const panel = read('public/agent-panel.js');
+test('뉴스 도메인은 남지만 새 Home은 뉴스 표면을 요청하지 않는다', () => {
+  const home = read('public/home.js');
+  const server = read('server.js');
+  const routes = read('lib/news/routes.js');
 
-  // 기사가 없으면 null이라 컨테이너에 아무것도 안 붙는다.
-  assert.match(panel, /function makeNewsSection\(\)[\s\S]*?if \(!articles\.length\) return null;/);
-  // 홈에서 관심을 만들거나 지우지 않는다. 그 통로는 대화뿐이다(설계 14.1).
-  assert.doesNotMatch(panel, /news_interest_prepare/);
-  assert.doesNotMatch(panel, /관심사 확인|구독 유지/);
-  // 홈이 쓰는 뉴스 API는 읽기 하나다.
-  assert.match(panel, /\/api\/news\/briefing/);
-  assert.doesNotMatch(panel, /\/api\/news[^'`]*['`][\s\S]{0,120}method:\s*'(?:POST|PUT|PATCH|DELETE)'/);
+  assert.doesNotMatch(home, /news|알아둘 것|\/api\/news\/briefing/i);
+  assert.match(routes, /\/api\/news\/briefing/);
+  assert.match(server, /NEWS_SURFACE_ENABLED/);
 });
 
-test('뉴스는 확인할 것과 오늘보다 뒤에 붙는다', () => {
-  const panel = read('public/agent-panel.js');
-  const render = panel.slice(panel.indexOf('function renderSummary()'));
-  const body = render.slice(0, render.indexOf('\n  }'));
-
-  const attentionAt = body.indexOf('appendChild(attention)');
-  const todayAt = body.indexOf('appendChild(today)');
-  const newsAt = body.indexOf('appendChild(news)');
-  assert.ok(attentionAt > -1 && todayAt > -1 && newsAt > -1);
-  assert.ok(attentionAt < newsAt, '확인할 것이 뉴스보다 먼저 붙는다');
-  assert.ok(todayAt < newsAt, '오늘이 뉴스보다 먼저 붙는다');
+test('새 Home의 고정 카드 목록에는 뉴스 자리도 빈 슬롯도 없다', () => {
+  const home = read('public/home.js');
+  const render = home.slice(home.indexOf('function renderOverview()'), home.indexOf('function setFocusedCard('));
+  for (const name of ['renderWeather()', 'renderTasks()', 'renderCalendar()', 'renderMail()', 'renderNotifications()', 'renderDday()', 'renderLecture()', 'renderNotes()']) {
+    assert.match(render, new RegExp(name.replace(/[()]/g, '\\$&')));
+  }
+  assert.doesNotMatch(render, /renderNews|news/);
 });
 
-test('뉴스 카드가 기존 홈 카드와 같은 값을 쓴다', () => {
-  const css = read('public/style.css');
-  // 모서리는 패널 카드의 12px 하나다. 1px 차이의 새 값을 만들지 않는다.
-  assert.match(css, /\.home-news\s*{[^}]*border-radius: 12px/s);
-  assert.match(css, /\.home-news-title\s*{[^}]*font-size: 11px/s);
-  assert.match(css, /\.home-news-why\s*{[^}]*font-size: 11px/s);
-  // hover와 다크 배경은 기존 카드와 공유한다.
-  assert.match(css, /\.home-news:hover\s*{/s);
-  assert.match(css, /\[data-theme="dark"\][^{]*\.home-news\s*{/s);
+test('뉴스 관심 등록과 조회 도구는 UI 연기와 무관하게 유지된다', () => {
+  const app = read('public/app.js');
+  const server = read('server.js');
+  assert.match(app, /news_interest/);
+  assert.match(app, /news_search/);
+  assert.match(server, /createNewsSearchSession/);
 });
 
 // ── 문턱이 정해지기 전에는 홈만 조용하다 ──────────────────────────────────

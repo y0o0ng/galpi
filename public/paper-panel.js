@@ -9,7 +9,7 @@
     showToast: null,
     icons: null,
     contextNotes: null,
-    activeTab: 'agents',
+    activeTab: 'notes',
   };
 
   const backIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
@@ -62,9 +62,7 @@
       toggle: document.getElementById('knowledge-panel-toggle'),
       close: document.getElementById('knowledge-panel-close'),
       tabs: [...document.querySelectorAll('[data-panel-tab]')],
-      notifications: document.getElementById('notification-panel'),
       notes: document.getElementById('note-panel'),
-      agents: document.getElementById('agent-panel'),
       papers: document.getElementById('paper-panel'),
       form: document.getElementById('paper-panel-search'),
       query: document.getElementById('paper-panel-query'),
@@ -97,13 +95,10 @@
       button.classList.toggle('active', active);
       button.setAttribute('aria-selected', String(active));
     });
-    el.notifications.hidden = tab !== 'notifications';
     el.notes.hidden = tab !== 'notes';
-    el.agents.hidden = tab !== 'agents';
     el.papers.hidden = tab !== 'papers';
-    if (tab === 'notifications') global.NotificationPanel?.show();
     if (tab === 'notes') global.NotePanel?.show();
-    if (tab === 'agents') global.AgentPanel?.show();
+    if (tab === 'papers') loadSavedPapers();
   }
 
   function makeSectionHead(title, count, onBack) {
@@ -399,15 +394,13 @@
     if (state.initialized) return;
     const el = elements();
     const required = [
-      el.panel, el.backdrop, el.toggle, el.close, el.notifications, el.notes, el.agents,
+      el.panel, el.backdrop, el.toggle, el.close, el.notes,
       el.papers, el.form, el.query, el.content,
     ];
     if (
       typeof apiFetch !== 'function'
       || typeof showToast !== 'function'
       || typeof contextNotes?.makeToggle !== 'function'
-      || typeof global.NotificationPanel?.show !== 'function'
-      || typeof global.AgentPanel?.show !== 'function'
       || !icons?.save || !icons?.check || !icons?.loading
       || required.some(item => !item)
       || el.tabs.length === 0
@@ -437,10 +430,10 @@
 
     state.initialized = true;
     loadSavedPapers();
-    // 기본으로 여는 탭은 XION 홈이다. 여기서 다른 탭을 세우면 index.html의
+    // 기본으로 여는 탭은 노트다. 여기서 다른 탭을 세우면 index.html의
     // active 표시와 어긋난 채로 화면만 바뀐다.
     setTab(state.activeTab);
   }
 
-  global.PaperPanel = { init, open, close, search, loadSavedPapers };
+  global.PaperPanel = { init, open, close, setTab, search, loadSavedPapers };
 })(window);

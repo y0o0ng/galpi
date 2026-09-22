@@ -138,6 +138,16 @@
     return element;
   }
 
+  function renderCodexSurface() {
+    if (state.mode === 'summary') renderSummary();
+    else renderCodexDetail();
+  }
+
+  function renderMailSurface() {
+    if (state.mode === 'summary') renderSummary();
+    else renderMailDetail();
+  }
+
   function renderUnavailable() {
     state.container.replaceChildren();
     const empty = document.createElement('div');
@@ -198,7 +208,7 @@
     const deep = block.querySelector('select[name="deepModel"]')?.value;
     if (!general || !deep) return;
     state.codexSaving = true;
-    renderCodexDetail();
+    renderCodexSurface();
     try {
       const response = await state.apiFetch('/api/settings/codex-models', {
         method: 'PUT',
@@ -223,14 +233,14 @@
       await loadCodexData().catch(() => {});
     } finally {
       state.codexSaving = false;
-      renderCodexDetail();
+      renderCodexSurface();
     }
   }
 
   async function refreshCodexCatalog() {
     if (state.codexSaving) return;
     state.codexSaving = true;
-    renderCodexDetail();
+    renderCodexSurface();
     try {
       const response = await state.apiFetch('/api/models/refresh', {
         method: 'POST',
@@ -247,7 +257,7 @@
       state.showToast(error.message);
     } finally {
       state.codexSaving = false;
-      renderCodexDetail();
+      renderCodexSurface();
     }
   }
 
@@ -1013,29 +1023,51 @@
     return line;
   }
 
-  // 첫 화면은 브리핑이다. `확인할 것`과 `오늘`이 먼저 오고 에이전트 상태가 뒤에 온다.
-  // 상세 데이터는 줄을 눌렀을 때 그 화면이 쓴다. 에이전트가 늘어도 여는 비용이
-  // 줄 수만큼만 는다.
+  function makeMailAgentCard() {
+    const block = makeMailBlock();
+    block.classList.add('agents-operational-card', 'mail-agent-card');
+    const head = document.createElement('div');
+    head.className = 'schedule-agent-head';
+    const title = document.createElement('div');
+    const kicker = document.createElement('span');
+    kicker.className = 'schedule-agent-kicker';
+    kicker.textContent = 'MAIL AGENT';
+    const heading = document.createElement('h2');
+    heading.textContent = 'Mail 에이전트';
+    title.append(kicker, heading);
+    const status = document.createElement('span');
+    status.className = 'schedule-agent-status';
+    const accounts = Array.isArray(state.mail?.accounts) ? state.mail.accounts : [];
+    const unhealthy = accounts.some(account => account.status !== 'active');
+    status.textContent = state.mail?.disabled ? '꺼짐' : unhealthy ? '확인 필요' : '운영 중';
+    status.classList.toggle('danger', unhealthy || Boolean(state.mailError));
+    head.append(title, status);
+    block.prepend(head);
+    return block;
+  }
+
+  function makeScheduleAgentCard() {
+    if (!state.enabled || state.scheduleError || !state.summary) {
+      const block = document.createElement('section');
+      block.className = 'schedule-agent-block agents-operational-card';
+      block.append(makeHeader());
+      const message = document.createElement('p');
+      message.className = `codex-agent-message${state.scheduleError ? ' danger' : ' warn'}`;
+      message.textContent = state.scheduleError || '일정 기능이 꺼져 있어.';
+      block.append(message);
+      return block;
+    }
+    const block = makeScheduleBlock(state.summary);
+    block.classList.add('agents-operational-card');
+    return block;
+  }
+
+  // Agents는 Figma의 세 운영 카드다. 각 버튼과 설정은 기존 에이전트 동작을 그대로 쓴다.
   function renderSummary() {
     state.container.replaceChildren();
-    state.container.appendChild(makeHomeHead());
-    const attention = makeAttentionSection();
-    const today = makeTodaySection();
-    const news = makeNewsSection();
-    if (attention) state.container.appendChild(attention);
-    if (today) state.container.appendChild(today);
-    // 조용한 줄의 기준은 여전히 `확인할 것`과 `오늘`이다. 뉴스가 있다고 해서
-    // "확인할 일이 없다"가 거짓이 되지는 않는다. 뉴스에는 할 일이 없다.
-    if (!attention && !today) state.container.appendChild(makeQuietLine());
-    // 뉴스는 둘 뒤에 온다. 무조건 위로 올라오지 않는다(설계 14.4).
-    if (news) state.container.appendChild(news);
-
-    const agents = makeHomeSection('에이전트');
-    const rows = document.createElement('div');
-    rows.className = 'home-agents';
-    rows.append(makeScheduleRow(), makeMailRow(), makeCodexRow());
-    agents.appendChild(rows);
-    state.container.appendChild(agents);
+    const codex = makeCodexBlock();
+    codex.classList.add('agents-operational-card');
+    state.container.append(makeMailAgentCard(), makeScheduleAgentCard(), codex);
   }
 
   // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
@@ -1205,7 +1237,7 @@
     if (state.mail?.disabled) {
       const message = document.createElement('p');
       message.className = 'codex-agent-message warn';
-      message.textContent = 'MAIL_AGENT_ENABLED가 꺼져 있어 동기화와 분석이 돌지 않아.';
+      message.textContent = '메일 동기화와 분석이 꺼져 있어.';
       block.appendChild(message);
       return block;
     }
@@ -1223,7 +1255,7 @@
     if (accounts.length === 0) {
       const message = document.createElement('p');
       message.className = 'codex-agent-message warn';
-      message.textContent = '등록된 계정이 없어. scripts/register-mail-account.js로 등록해줘.';
+      message.textContent = '등록된 메일 계정이 없어.';
       block.appendChild(message);
     }
     accounts.forEach(account => {
@@ -1289,7 +1321,7 @@
   async function retryStalledNotes() {
     if (state.organizeRunning) return;
     state.organizeRunning = true;
-    renderCodexDetail();
+    renderCodexSurface();
     try {
       const response = await state.apiFetch('/api/organize/retry', {
         method: 'POST',
@@ -1312,7 +1344,7 @@
   async function organizeQueuedNotes() {
     if (state.organizeRunning) return;
     state.organizeRunning = true;
-    renderCodexDetail();
+    renderCodexSurface();
     try {
       const response = await state.apiFetch('/api/organize/queue', {
         method: 'POST',
@@ -1509,7 +1541,7 @@
   async function removeMailPreference(id) {
     if (state.mailPreferenceSaving) return;
     state.mailPreferenceSaving = true;
-    renderMailDetail();
+    renderMailSurface();
     try {
       const response = await state.apiFetch(`/api/mail/preferences/${id}`, { method: 'DELETE' });
       const data = await response.json().catch(() => ({}));
@@ -1520,14 +1552,14 @@
       state.showToast(error.message);
     } finally {
       state.mailPreferenceSaving = false;
-      renderMailDetail();
+      renderMailSurface();
     }
   }
 
   async function saveMailSettings(patch) {
     if (state.mailSettingsSaving) return;
     state.mailSettingsSaving = true;
-    renderMailDetail();
+    renderMailSurface();
     try {
       const response = await state.apiFetch('/api/mail/settings', {
         method: 'PUT',
@@ -1542,14 +1574,14 @@
       state.showToast(error.message);
     } finally {
       state.mailSettingsSaving = false;
-      renderMailDetail();
+      renderMailSurface();
     }
   }
 
   async function requeueMailAnalysis() {
     if (state.mailRequeueRunning) return;
     state.mailRequeueRunning = true;
-    renderMailDetail();
+    renderMailSurface();
     try {
       const response = await state.apiFetch('/api/mail/analysis/requeue', {
         method: 'POST',
@@ -1690,8 +1722,7 @@
   // 홈은 무엇을 봐야 하는지만 말한다. 완료·미루기는 알림 탭이 맡으므로 그쪽 메일
   // 필터를 열어준다(설계 2절).
   function openMailAttention() {
-    global.PaperPanel?.open('notifications');
-    global.NotificationPanel?.show('mail');
+    global.HomeDashboard?.openNotifications('mail');
   }
 
   async function refresh() {
@@ -1732,18 +1763,13 @@
     }
     renderLoading();
     // 한 소스가 죽어도 나머지 영역은 살아 있어야 한다.
-    const [scheduleResult, codexResult, mailResult, attentionResult] = await Promise.allSettled([
-      state.enabled ? loadScheduleSummary() : Promise.resolve(false),
-      loadCodexStatus(),
+    const [scheduleResult, codexResult, mailResult] = await Promise.allSettled([
+      state.enabled ? loadAgentData() : Promise.resolve(false),
+      loadCodexData(),
       loadMailData(),
-      loadHomeAttention(),
-      // 뉴스가 죽어도 나머지 영역은 그대로다. 실패하면 영역이 없을 뿐이라
-      // 따로 오류 상태를 만들지 않는다.
-      loadNewsBriefing().catch(() => { state.news = null; }),
+      loadMailSettings(),
+      loadMailPreferences(),
     ]);
-    state.attentionError = attentionResult.status === 'rejected'
-      ? attentionResult.reason.message
-      : '';
     state.scheduleError = scheduleResult.status === 'rejected'
       ? scheduleResult.reason.message
       : '';
@@ -1753,9 +1779,8 @@
     state.mailError = mailResult.status === 'rejected'
       ? mailResult.reason.message
       : '';
+    if (state.mode !== 'summary') return;
     renderSummary();
-    // 기다리지 않고 던진다. 도착하면 머리 노드만 교체한다(설계 19절).
-    void refreshWeather(state.requestId);
   }
 
   function show() {
