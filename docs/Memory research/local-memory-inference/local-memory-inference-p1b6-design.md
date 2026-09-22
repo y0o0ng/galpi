@@ -22,7 +22,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 gates are:
 
 - fresh source audit and fresh blind HUMAN review under v3 for the repaired
-  `162` / `214` candidates;
+  `162` / `214` candidates — the 2-row blind source-audit packet is
+  **constructed but the audit is NOT RUN** (see "Batch-003 repair source-audit
+  packet"); HUMAN review stays closed until both rows `PASS`;
 - fresh surface authoring, then the normal source-audit and blind-review gates,
   for the two replacement skeletons;
 - re-reconciliation under v3 of the remaining batch-003 surfaces on the three
@@ -914,8 +916,8 @@ v3](#semantic-contract-v3).
 
 **Current next gates:**
 
-- fresh source audit and fresh blind HUMAN review under v3 for the `162` / `214`
-  repair candidates;
+- fresh source audit (packet constructed, audit **NOT RUN**) and fresh blind
+  HUMAN review under v3 for the `162` / `214` repair candidates;
 - fresh surface authoring, then source audit and blind review, for the two
   replacement skeletons `53ab6351` and `0768ea20`;
 - re-reconciliation against v3 of the other batch-003 surfaces on the three
@@ -1423,6 +1425,31 @@ were `HUMAN_ADJUDICATED` CLEAR against v2) were reconciled against v2 CLEAR and
 have not been re-reconciled against v3. No acceptance, reference-label freeze,
 FINAL selection, HELD release, training or production change occurred; the
 accepted pool stays **93**.
+
+### Batch-003 repair source-audit packet
+
+`scripts/build-memory-inference-p1b6-batch-003-repair-source-audit-packet.js`
+(`npm run build:memory-inference-p1b6-batch-003-repair-source-audit-packet --
+--output <path>`) builds the blind source/bundle completeness packet for exactly
+the two repaired candidates. It pins the repair candidate (`8f625494…`), the
+resolution receipt (`61c29218…`), v3 (`89a48264…`) and the unamended source-audit
+protocol (`63a2c70c…`) by identity and raw SHA, requires the candidate's
+provenance to bind that receipt and v3, and rebuilds the candidate through the
+batch-003 repair contract and requires byte equality. Rendering reuses the
+historical repair renderer unchanged (source order, role prefixes, one
+source-grounded `[TARGET]`, `---` between fragments).
+
+Each row carries only an opaque `p1b6-b003-repair-audit-` ID (hash of packet
+identity, protocol, candidate SHA and the hidden item ID), the complete repaired
+source episode and the selected bundle — no item, episode, family or skeleton
+ID, split, boundary, discourse pattern, label, historical decision, rationale or
+intended reading. The packet is transient and gitignored; it is deterministic at
+raw SHA-256 `b32f57a45ad9728a5f1636e9b0298776a38b757ccfb02b1b47b95e4a622ba679`
+(2 rows).
+
+**The audit has NOT been run.** Both rows need fresh `PASS` / `FAIL` /
+`UNCERTAIN` judgments under the unchanged protocol; only `PASS` may proceed, and
+the fresh blind HUMAN review stays unopened until every audited row passes.
 
 ## Closed Selection and Freeze Constraints
 

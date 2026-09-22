@@ -4863,3 +4863,23 @@ Tests run locally: the two new suites (`…-skeleton-semantic-contract-v3`, 7/7;
 suite (237 tests: 235 pass / 0 fail / 2 skipped — the raw-bytes tests, which skip
 without the uncommitted artifacts) and the full `npm test` suite (1486 tests:
 1484 pass / 0 fail / 2 skipped, the same two). No CI result is claimed.
+
+#### P1-B6 batch-003 repair source-audit packet — CONSTRUCTED / AUDIT NOT RUN
+
+`scripts/build-memory-inference-p1b6-batch-003-repair-source-audit-packet.js`
+builds the blind packet for exactly repaired items `162` and `214`. Contracts are
+in the design section "Batch-003 repair source-audit packet".
+
+From the repair candidate `8f6254946eef8d8d0920485bde431ca137a83577a5060889f3676b8857b4aa9b`,
+resolution receipt `61c29218a360bf914c6453758c7fc243e629f1b5d400e38426d9d18720cb1ffe`,
+v3 `89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9` and the
+unamended protocol `63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d`,
+the packet is deterministic at raw SHA-256
+`b32f57a45ad9728a5f1636e9b0298776a38b757ccfb02b1b47b95e4a622ba679` (2 rows). It is
+generated, not committed.
+
+**No audit was run and no disposition exists.** Both rows need fresh judgments;
+HUMAN review stays unopened until all audited rows `PASS`. Replacement-skeleton
+surface authoring and the v3 re-reconciliation of the other surfaces on the three
+reversed skeletons are unchanged and still pending. No acceptance, freeze, HELD
+release or training; the accepted pool stays **93**.
