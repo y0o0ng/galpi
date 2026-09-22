@@ -94,6 +94,7 @@ function validateContractV3Receipt(receipt) {
     || rule.supersedesProspectively !== 'P1B6_SEMANTIC_CONTRACT_V2'
     || !['clear', 'escalate', 'uncertaintyDistinction', 'targetBoundary', 'pragmaticResolution']
       .every(key => nonEmptyString(rule[key]))
+    || !nonEmptyString(rule.retainedV2Clauses?.noAddedPremise)
     || JSON.stringify(rule.supersededV2Clauses) !== JSON.stringify(['unknownIsNotAmbiguity'])) {
     fail('receipt does not carry the complete v3 interpretation rule');
   }

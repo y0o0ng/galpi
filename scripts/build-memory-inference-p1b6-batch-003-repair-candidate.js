@@ -137,7 +137,8 @@ function validateResolutionReceipt(rawReceiptBytes, rawSources) {
     || pending.repairCandidateFreshBlindHumanReviewUnderV3 !== true
     || pending.replacementSkeletonSurfaceAuthoring !== true
     || pending.replacementSurfaceSourceAuditAndBlindHumanReview !== true
-    || pending.replacementSurfaceForRejectedBe0efa30Rows !== false) {
+    || pending.replacementSurfaceForRejectedBe0efa30Rows !== false
+    || pending.reconciliationOfOtherSurfacesOnReversedSkeletonsAgainstV3 !== true) {
     fail('receipt does not keep the fresh gates pending');
   }
 

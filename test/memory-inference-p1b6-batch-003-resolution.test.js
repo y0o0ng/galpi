@@ -198,6 +198,9 @@ test('no acceptance, HELD release or training authority is claimed', () => {
   }
   assert.throws(() => build(withReceipt(row => { row.pending.repairCandidateFreshSourceAudit = false; })),
     /fresh gates pending/);
+  assert.throws(() => build(withReceipt(row => {
+    row.pending.reconciliationOfOtherSurfacesOnReversedSkeletonsAgainstV3 = false;
+  })), /fresh gates pending/);
   assert.throws(() => build(withReceipt(row => { row.inputs.priorSemanticAuthority.rawSha256 = 'x'.repeat(64); })),
     /does not bind the canonical/);
 });

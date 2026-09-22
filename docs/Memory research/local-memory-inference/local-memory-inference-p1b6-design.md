@@ -2,12 +2,36 @@
 
 > Status: **ACTIVE DESIGN CONTRACT**
 >
-> The semantic-skeleton catalog is CLOSED/FROZEN. This document contains the
+> The historical Exact56 skeleton freeze and every earlier semantic authority
+> (v1, v2) are immutable. The current prospective semantic authority is
+> semantic contract v3; it is never edited in place and changes only through a
+> prospective successor. This document contains the
 > current contracts for the next surface/source-episode phase; historical
 > review and execution evidence is in
 > [`local-memory-inference-run-receipts.md`](local-memory-inference-run-receipts.md).
 
 ## Status / Current Next Step
+
+**Current state (semantic contract v3).** The current prospective semantic
+authority is [semantic contract v3](#semantic-contract-v3)
+(`…-skeleton-effective-current-v3.json`) at **42 CLEAR / 14 ESCALATE**. v3
+reversed the v2 CLEAR amendments of `2da4e54e`, `5269c91f` and `b8e64a03` to
+ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
+`28736b74`, replacing them in place with `53ab6351` and `0768ea20`. The batch-003
+26-row resolution is **CLOSED** (see "Batch-003 26-row resolution"). The next
+gates are:
+
+- fresh source audit and fresh blind HUMAN review under v3 for the repaired
+  `162` / `214` candidates;
+- fresh surface authoring, then the normal source-audit and blind-review gates,
+  for the two replacement skeletons;
+- re-reconciliation under v3 of the remaining batch-003 surfaces on the three
+  reversed skeletons.
+
+No batch-003 acceptance, reference-label freeze, HELD release or training has
+occurred; the accepted pool is 93. **Everything below in this section is the
+historical batch-002 narrative** and records what was true at those stages; the
+per-skeleton labels it mentions are not the current authority.
 
 P1-B6 asks whether the visible target and evidence uniquely determine the
 target's decision-relevant semantic status. It classifies interpretation
@@ -82,8 +106,9 @@ repair-versus-rejection decision for the surface-collapse realizations. The
 **targeted skeleton semantic amendment is now complete**:
 `p1b6-sk-8dd28ec6b22a18ad` and
 `p1b6-sk-155420007d75f36f` are amended to effective `CLEAR`,
-`p1b6-sk-2fa39ece4157b2b8` was deliberately **not** amended and stays
-`ESCALATE`, and items `059`/`063` are reclassified as surface-collapse
+`p1b6-sk-2fa39ece4157b2b8` was deliberately **not** amended and stayed
+`ESCALATE` at that stage (semantic contract v2 later amended it to CLEAR, and v3
+inherits that), and items `059`/`063` are reclassified as surface-collapse
 realizations. Against the effective-current catalog batch-002 reconciles at
 **51 match / 13 mismatch**, and all 13 remaining mismatches are
 surface-realization cases. **Phase A is CLOSED.** The **Phase B semantic
@@ -96,7 +121,7 @@ accepted pool stood at 30. **All of that has since been completed** — see
 "Fresh Source Audit Result and Blind HUMAN Review Packet", "Fresh Blind HUMAN
 Review Result" and "Batch-002 Finalization and Acceptance" below.
 
-**Authoritative current state.** Phase A semantic amendment CLOSED; Phase B
+**Batch-002 state at acceptance (historical).** Phase A semantic amendment CLOSED; Phase B
 repair resolution CLOSED; the fresh repair source audit COMPLETE_PASS at 12/12;
 the fresh repair HUMAN review COMPLETE at 12 KEEP / 12 ESCALATE. The
 effective-current successor holds **63 rows — 51 inherited + 12 repaired, with
@@ -112,8 +137,10 @@ FINAL_HELD_OUT release, deterministic FINAL selection, and training all remain
 UNOPENED, and the full 380-item P1-B6 corpus is NOT complete.** The contracts
 are in "Batch-002 Finalization and Acceptance" below.
 
-Do not redesign the frozen skeleton catalog, generate training output, expose a
-model to FINAL surface items, or start training in this phase.
+Do not edit Exact56 or any historical semantic authority in place — semantic
+changes go only through a prospective successor contract — and do not generate
+training output, expose a model to FINAL surface items, or start training in
+this phase.
 
 ## Conservative Pragmatic Interpretation
 

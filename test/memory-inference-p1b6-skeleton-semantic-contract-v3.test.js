@@ -207,9 +207,41 @@ test('the builder rejects a widened, narrowed or rebound change set', () => {
   assert.throws(() => build({
     receipt: withReceipt(row => { row.interpretationRule.supersededV2Clauses = []; }),
   }), /complete v3 interpretation rule/);
+  // The retained v2 noAddedPremise clause cannot silently disappear.
+  assert.throws(() => build({
+    receipt: withReceipt(row => { delete row.interpretationRule.retainedV2Clauses.noAddedPremise; }),
+  }), /complete v3 interpretation rule/);
+  assert.throws(() => build({
+    receipt: withReceipt(row => { row.interpretationRule.retainedV2Clauses.noAddedPremise = ' '; }),
+  }), /complete v3 interpretation rule/);
   for (const claim of [true, 'true', 1]) {
     assert.throws(() => build({
       receipt: withReceipt(row => { row.authority.datasetAcceptancePerformed = claim; }),
     }), /claims authority/);
   }
+});
+
+test('the canonical design top state names v3 and no stale current ESCALATE claim', () => {
+  const design = fs.readFileSync(path.join(ROOT,
+    'docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md'), 'utf8');
+  const start = design.indexOf('## Status / Current Next Step');
+  const end = design.indexOf('**Everything below in this section is the\nhistorical batch-002 narrative**');
+  assert.equal(start > 0 && end > start, true);
+  const current = design.slice(start, end);
+  for (const phrase of ['semantic contract v3', '**42 CLEAR / 14 ESCALATE**', '`2da4e54e`',
+    '`5269c91f`', '`b8e64a03`', '`f58debd8`', '`28736b74`', '`53ab6351`', '`0768ea20`',
+    '26-row resolution is **CLOSED**', '`162` / `214`', 'replacement skeletons',
+    're-reconciliation under v3', 'No batch-003 acceptance']) {
+    assert.equal(current.includes(phrase), true, phrase);
+  }
+  // 2fa39ece is CLEAR under v3; nothing in the document may say it currently stays ESCALATE.
+  assert.equal(readJson(v3.V3_FILE).candidates
+    .find(row => row.semanticSkeletonId === 'p1b6-sk-2fa39ece4157b2b8').humanLabel, 'CLEAR');
+  // Historical sections below may record what was true then; the top Status section may not.
+  const status = design.slice(start, design.indexOf('\n## ', start + 1));
+  assert.equal(/2fa39ece[^.]*\bstays\s+`ESCALATE`/u.test(status), false);
+  assert.equal(status.includes('v2 later amended it to CLEAR'), true);
+  assert.equal(design.includes('**Authoritative current state.**'), false);
+  assert.equal(design.includes('The semantic-skeleton catalog is CLOSED/FROZEN'), false);
+  assert.equal(design.includes('Do not redesign the frozen skeleton catalog'), false);
 });
