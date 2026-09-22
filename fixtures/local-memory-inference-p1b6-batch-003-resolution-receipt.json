@@ -1,0 +1,405 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-resolution-receipt-v1",
+  "status": "COMPLETE_RESOLUTION_REPAIR_CANDIDATES_AND_REPLACEMENT_SURFACES_PENDING_FRESH_GATES",
+  "decisionsSource": "REPOSITORY_OWNER_SEMANTIC_ADJUDICATION",
+  "statement": [
+    "Every one of the 26 realizations made ineligible by HUMAN reconciliation attempt-001 has exactly one recorded final disposition here.",
+    "Historical blind HUMAN decisions and reasons are quoted from the reconciliation receipt unchanged. Where the reference is upheld against the HUMAN decision, that is recorded as a reviewer correction; the HUMAN evidence is not rewritten.",
+    "Four rows resolve through semantic contract v3, which reverses three v2 CLEAR amendments. v2 is not rewritten.",
+    "Items 162 and 214 get repaired candidate text. The repaired text has passed no source audit and no blind HUMAN review, so it is a candidate, not evidence, and no HUMAN decision transfers onto it.",
+    "Five be0efa30 realizations are rejected at their current surface only; the skeleton is not amended. Twelve rows fall on two skeletons that v3 retires; no historical surface on those skeletons transfers to the replacements.",
+    "No batch acceptance, reference-label freeze, FINAL selection, FINAL_HELD_OUT release, training, or production change occurred. The accepted pool remains 93."
+  ],
+  "inputs": {
+    "priorSemanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v2",
+      "rawSha256": "f1e780195441246402ca389da188b1f7b8c4970f42fc1e6e3de2f436a3e9377c",
+      "role": "REFERENCE_AUTHORITY_OF_THE_RECONCILED_ATTEMPT"
+    },
+    "currentSemanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9",
+      "role": "PROSPECTIVE_CURRENT_SEMANTIC_AUTHORITY"
+    },
+    "semanticContractV3Receipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+      "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1"
+    },
+    "historicalSourceBatch": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+      "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68",
+      "role": "IMMUTABLE_HISTORICAL_SURFACE_SOURCE"
+    },
+    "sourceAuditAttempt": {
+      "identity": "xion-local-memory-inference-p1b6-source-audit-batch-003-attempt-001-receipt-v1",
+      "rawSha256": "3c840476bea6eccb522800248a3ace277b26a5334ec56b5f6b10bbf4d5821221"
+    },
+    "strongModelReviewAttempt": {
+      "identity": "xion-local-memory-inference-p1b6-strong-model-semantic-review-batch-003-attempt-001-receipt-v1",
+      "rawSha256": "9b65327a4ce6d1923391253659c1acc3bb373bb54acdc7872e3ce74d52337074"
+    },
+    "humanReconciliationAttempt": {
+      "identity": "xion-local-memory-inference-p1b6-batch-003-human-adjudication-calibration-attempt-001-receipt-v1",
+      "rawSha256": "0adbba1789bb91025f277701c51cbf82139092f147966053277573c3f0dbbe6a",
+      "rawHumanResultSha256": "2515be0eb8b48b313ee6ae3080cbd293332fd4cc6188a04cb76dab4aec8c98ad",
+      "role": "HISTORICAL_HUMAN_EVIDENCE_FOR_THE_OLD_SURFACES_ONLY"
+    }
+  },
+  "repairCandidateArtifact": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-003-v1",
+    "status": "REPAIR_CANDIDATE_AWAITING_FRESH_SOURCE_AUDIT_AND_FRESH_BLIND_HUMAN_REVIEW"
+  },
+  "summary": {
+    "total": 26,
+    "REFERENCE_UPHELD_REVIEWER_CORRECTION": 3,
+    "SEMANTIC_CONTRACT_CORRECTION": 4,
+    "SURFACE_REPAIR": 2,
+    "SURFACE_REJECT": 5,
+    "SKELETON_RETIRED": 12
+  },
+  "retiredSkeletonSurfaces": [
+    {
+      "retiredSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "replacementSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "historicalItemIds": [
+        "p1b6-item-b003-059", "p1b6-item-b003-060", "p1b6-item-b003-061", "p1b6-item-b003-062",
+        "p1b6-item-b003-063", "p1b6-item-b003-064", "p1b6-item-b003-065", "p1b6-item-b003-066"
+      ],
+      "transferredToReplacement": false,
+      "prospectiveStatus": "HISTORICAL_EVIDENCE_ONLY"
+    },
+    {
+      "retiredSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "replacementSkeletonId": "p1b6-sk-53ab63517113df16",
+      "historicalItemIds": [
+        "p1b6-item-b003-289", "p1b6-item-b003-290", "p1b6-item-b003-291", "p1b6-item-b003-292",
+        "p1b6-item-b003-293", "p1b6-item-b003-294", "p1b6-item-b003-295", "p1b6-item-b003-296",
+        "p1b6-item-b003-297", "p1b6-item-b003-298", "p1b6-item-b003-299", "p1b6-item-b003-300"
+      ],
+      "transferredToReplacement": false,
+      "prospectiveStatus": "HISTORICAL_EVIDENCE_ONLY"
+    }
+  ],
+  "pending": {
+    "repairCandidateFreshSourceAudit": true,
+    "repairCandidateFreshBlindHumanReviewUnderV3": true,
+    "replacementSkeletonSurfaceAuthoring": true,
+    "replacementSurfaceSourceAuditAndBlindHumanReview": true,
+    "replacementSurfaceForRejectedBe0efa30Rows": false,
+    "reconciliationOfOtherSurfacesOnReversedSkeletonsAgainstV3": true
+  },
+  "authority": {
+    "historicalSourceBatchAltered": false,
+    "historicalHumanDecisionsAltered": false,
+    "historicalHumanDecisionsTransferredToRepairedText": false,
+    "historicalSurfacesTransferredToReplacementSkeletons": false,
+    "semanticContractV2Overwritten": false,
+    "rejectedRowsSkeletonAmended": false,
+    "repairedRowsAccepted": false,
+    "datasetAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false,
+    "productionBehaviorChanged": false
+  },
+  "decisions": [
+    {
+      "itemId": "p1b6-item-b003-040",
+      "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
+      "historicalOutcome": "CALIBRATION_DECISION_MISMATCH",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "REFERENCE_UPHELD_REVIEWER_CORRECTION",
+      "resolvedLabel": "ESCALATE",
+      "rationale": "Reference upheld. The HUMAN CLEAR was reviewer error: the `2만 원` anchor does not specify a per-occurrence versus aggregate basis."
+    },
+    {
+      "itemId": "p1b6-item-b003-060",
+      "semanticSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-061",
+      "semanticSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-072",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "CLEAR",
+      "historicalHumanDecision": "ESCALATE",
+      "resolution": "SEMANTIC_CONTRACT_CORRECTION",
+      "resolvedLabel": "ESCALATE",
+      "rationale": "Resolved through semantic contract v3: the exception-subcategory membership needed to state the TARGET's rule-application status is not given, so the status cannot be stated. The v2 CLEAR amendment of this skeleton is reversed in v3."
+    },
+    {
+      "itemId": "p1b6-item-b003-103",
+      "semanticSkeletonId": "p1b6-sk-38c426bb2e0bff42",
+      "historicalOutcome": "CALIBRATION_DECISION_MISMATCH",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "REFERENCE_UPHELD_REVIEWER_CORRECTION",
+      "resolvedLabel": "ESCALATE",
+      "rationale": "Reference upheld. Qualifier scope remains unresolved between the onboarding, buddy and review readings."
+    },
+    {
+      "itemId": "p1b6-item-b003-142",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "CLEAR",
+      "historicalHumanDecision": "ESCALATE",
+      "resolution": "SEMANTIC_CONTRACT_CORRECTION",
+      "resolvedLabel": "ESCALATE",
+      "rationale": "Resolved through semantic contract v3: a loosely described (`보통`) category and partially matching features do not give the TARGET's actual membership, so its applicability cannot be stated. The v2 CLEAR amendment of this skeleton is reversed in v3."
+    },
+    {
+      "itemId": "p1b6-item-b003-145",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "CLEAR",
+      "historicalHumanDecision": "ESCALATE",
+      "resolution": "SEMANTIC_CONTRACT_CORRECTION",
+      "resolvedLabel": "ESCALATE",
+      "rationale": "Resolved through semantic contract v3: a loosely described (`보통`) category and partially matching features do not give the TARGET's actual membership, so its applicability cannot be stated. The v2 CLEAR amendment of this skeleton is reversed in v3."
+    },
+    {
+      "itemId": "p1b6-item-b003-162",
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SURFACE_REPAIR",
+      "resolvedLabel": null,
+      "rationale": "The historical opening turn `결론만 말하면 그 mug를 두 번 봤어.` collapses identity to the same instance. It is removed and no replacement filler is invented, so the repaired episode has one turn fewer.",
+      "repair": {
+        "intendedUnresolvedReadings": [
+          "the later mug is the same instance seen again, with an additional discovered property",
+          "the later mug is a separate but similar instance"
+        ],
+        "discoursePattern": "INTERLEAVED",
+        "anchorTurnId": "t2",
+        "anchorText": "파란 mug",
+        "evidenceTurnIds": ["t2", "t4", "t6"],
+        "turns": [
+          { "turnId": "t1", "role": "USER", "text": "오늘 탕비실 정수기를 청소했어." },
+          { "turnId": "t2", "role": "USER", "text": "지난달 회의실에 있던 파란 mug는 손잡이에 흠집이 있었어." },
+          { "turnId": "t3", "role": "USER", "text": "정수기 필터도 확인했어." },
+          { "turnId": "t4", "role": "USER", "text": "어제 휴게실에서도 흠집 있는 파란 mug를 봤어." },
+          { "turnId": "t5", "role": "USER", "text": "필터는 다음 달에 갈면 돼." },
+          { "turnId": "t6", "role": "USER", "text": "그런데 어제 것은 바닥에 이름이 적혀 있더라." },
+          { "turnId": "t7", "role": "USER", "text": "컵 받침도 새로 뒀어." },
+          { "turnId": "t8", "role": "ASSISTANT", "text": "그대로 남겨 둘게요." }
+        ]
+      }
+    },
+    {
+      "itemId": "p1b6-item-b003-214",
+      "semanticSkeletonId": "p1b6-sk-9dc48f4b2f10775d",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SURFACE_REPAIR",
+      "resolvedLabel": null,
+      "rationale": "The historical `더 정확히는, 주차권도 같이 연장할까요?` resolved the two questions into one combined action. It is replaced by the alternative question `아니면 주차권을 연장할까요?`; the later TARGET response is preserved.",
+      "repair": {
+        "intendedUnresolvedReadings": [
+          "the confirmation targets the subscription renewal",
+          "the confirmation targets the parking-pass renewal"
+        ],
+        "discoursePattern": "ELLIPTICAL_REPLY",
+        "anchorTurnId": "t5",
+        "anchorText": "연장해 줘",
+        "evidenceTurnIds": ["t1", "t3", "t5"],
+        "turns": [
+          { "turnId": "t1", "role": "ASSISTANT", "text": "다음 달 정기권을 연장할까요?" },
+          { "turnId": "t2", "role": "USER", "text": "오늘 지갑을 정리했어." },
+          { "turnId": "t3", "role": "ASSISTANT", "text": "아니면 주차권을 연장할까요?" },
+          { "turnId": "t4", "role": "USER", "text": "영수증을 한참 버렸어." },
+          { "turnId": "t5", "role": "USER", "text": "응, 연장해 줘." }
+        ]
+      }
+    },
+    {
+      "itemId": "p1b6-item-b003-231",
+      "semanticSkeletonId": "p1b6-sk-b8e64a03d97f251c",
+      "historicalOutcome": "CALIBRATION_DECISION_MISMATCH",
+      "historicalReferenceLabel": "CLEAR",
+      "historicalHumanDecision": "ESCALATE",
+      "resolution": "SEMANTIC_CONTRACT_CORRECTION",
+      "resolvedLabel": "ESCALATE",
+      "rationale": "Resolved through semantic contract v3: the TARGET is the queried real-world state of an unanswered self-state question, and nothing visible supplies that state. The v2 CLEAR amendment of this skeleton is reversed in v3."
+    },
+    {
+      "itemId": "p1b6-item-b003-242",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SURFACE_REJECT",
+      "resolvedLabel": null,
+      "rationale": "The surface instantiates a generic/default rule plus a more specific condition whose condition is explicitly satisfied, so ordinary interpretation resolves the result and the intended competing-relation ambiguity is absent. Changing the anchor alone does not repair it."
+    },
+    {
+      "itemId": "p1b6-item-b003-244",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SURFACE_REJECT",
+      "resolvedLabel": null,
+      "rationale": "The surface instantiates a generic/default rule plus a more specific condition whose condition is explicitly satisfied, so ordinary interpretation resolves the result and the intended competing-relation ambiguity is absent. Changing the anchor alone does not repair it."
+    },
+    {
+      "itemId": "p1b6-item-b003-246",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SURFACE_REJECT",
+      "resolvedLabel": null,
+      "rationale": "The surface instantiates a generic/default rule plus a more specific condition whose condition is explicitly satisfied, so ordinary interpretation resolves the result and the intended competing-relation ambiguity is absent. Changing the anchor alone does not repair it."
+    },
+    {
+      "itemId": "p1b6-item-b003-248",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SURFACE_REJECT",
+      "resolvedLabel": null,
+      "rationale": "The surface instantiates a generic/default rule plus a more specific condition whose condition is explicitly satisfied, so ordinary interpretation resolves the result and the intended competing-relation ambiguity is absent. Changing the anchor alone does not repair it."
+    },
+    {
+      "itemId": "p1b6-item-b003-249",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "historicalOutcome": "CALIBRATION_DECISION_MISMATCH",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SURFACE_REJECT",
+      "resolvedLabel": null,
+      "rationale": "The surface instantiates a generic/default rule plus a more specific condition whose condition is explicitly satisfied, so ordinary interpretation resolves the result and the intended competing-relation ambiguity is absent. Changing the anchor alone does not repair it."
+    },
+    {
+      "itemId": "p1b6-item-b003-259",
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "CLEAR",
+      "historicalHumanDecision": "ESCALATE",
+      "resolution": "REFERENCE_UPHELD_REVIEWER_CORRECTION",
+      "resolvedLabel": "CLEAR",
+      "rationale": "Reference upheld. The TARGET is the directly observed audibility statement; uncertainty about whether the user also adopted the `room is cold` facet is outside the TARGET."
+    },
+    {
+      "itemId": "p1b6-item-b003-290",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-292",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-293",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-294",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-295",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-296",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-297",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-298",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "CALIBRATION_DECISION_MISMATCH",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-299",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    },
+    {
+      "itemId": "p1b6-item-b003-300",
+      "semanticSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "historicalOutcome": "HUMAN_KEEP_OPPOSING_REFERENCE",
+      "historicalReferenceLabel": "ESCALATE",
+      "historicalHumanDecision": "CLEAR",
+      "resolution": "SKELETON_RETIRED",
+      "resolvedLabel": null,
+      "rationale": "The underlying skeleton is retired prospectively by semantic contract v3 as a skeleton-level realizability failure. The surface stays historical evidence only and does not transfer to the replacement skeleton."
+    }
+  ]
+}

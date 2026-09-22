@@ -405,7 +405,7 @@ test('the canonical design says the sample is drawn and the HUMAN review is done
   assert.equal(current.includes('HUMAN calibration review: **DONE**'), true);
   assert.equal(current.includes('HUMAN adjudication of the 34 routed rows: **DONE**'), true);
   assert.equal(/HUMAN (calibration review|adjudication[^:]*): \*\*NOT RUN\*\*/u.test(current), false);
-  assert.equal(current.includes('resolution of the 26 ineligible realizations: **NOT RUN**'), true);
+  assert.equal(current.includes('resolution of the 26 ineligible realizations: **DONE**'), true);
 });
 
 test('historical artifacts, builders and semantic contract v2 are unchanged', () => {

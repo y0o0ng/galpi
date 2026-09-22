@@ -1,0 +1,194 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+  "status": "COMPLETE_PROSPECTIVE_SEMANTIC_CONTRACT_SUCCESSION",
+  "contractVersion": "v3",
+  "decisionsSource": "REPOSITORY_OWNER_SEMANTIC_ADJUDICATION",
+  "interpretationRule": {
+    "identity": "P1B6_SEMANTIC_CONTRACT_V3",
+    "supersedesProspectively": "P1B6_SEMANTIC_CONTRACT_V2",
+    "clear": "CLEAR when the visible evidence provides the TARGET's materially relevant semantic status. The provided status does not need to be exact or final: an approximate, tentative, conditional, attributed, explicitly undecided, or otherwise uncertain status is CLEAR when that uncertain status itself is what the visible evidence gives.",
+    "escalate": "ESCALATE when the visible evidence does not provide the TARGET's materially relevant semantic status, either because multiple materially different readings remain unresolved or because a fact or relation necessary to state the TARGET status is absent from the visible evidence.",
+    "uncertaintyDistinction": "An uncertain status that is itself given is CLEAR. A TARGET status that cannot be stated without additional information, yielding only 'unknown / cannot tell', is ESCALATE.",
+    "targetBoundary": "Judge the TARGET itself, not a downstream inference derived from it. Do not ESCALATE merely because downstream eligibility, policy application, cause, durability, or another consequence remains unknown when the TARGET status itself is given. Conversely, do not invent missing facts or rules to turn an unknown TARGET status into CLEAR.",
+    "pragmaticResolution": "Ordinary pragmatic resolution remains allowed when it is actually supported by the visible discourse. The standard is not literal mathematical explicitness.",
+    "supersededV2Clauses": [
+      "unknownIsNotAmbiguity"
+    ],
+    "retainedV2Clauses": {
+      "noAddedPremise": "Do not preserve a competing reading that requires an unstated event, identity assumption, grandfathering or effective-time rule, old ordering, hidden preference, category rule, exception, or other added premise."
+    },
+    "supersessionNote": "The v2 unknownIsNotAmbiguity clause was too narrow: it treated a TARGET status that the visible evidence does not give as CLEAR merely because no second competing reading was positively licensed. v3 replaces it with the given-status rule above. The v2 receipt and catalog are not rewritten."
+  },
+  "derivationBase": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v2",
+    "rawSha256": "f1e780195441246402ca389da188b1f7b8c4970f42fc1e6e3de2f436a3e9377c",
+    "role": "IMMUTABLE_HISTORICAL_PRIOR_PROSPECTIVE_AUTHORITY_AND_DERIVATION_BASE",
+    "note": "v2 remains committed and byte-identical as historical evidence of the prior prospective authority. v3 is derived from its exact raw bytes and does not overwrite it."
+  },
+  "priorContractReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v2-receipt-v1",
+    "rawSha256": "a12063c38eee6245122e655126708c904319b4a7467cf82084acdea17a293344",
+    "role": "IMMUTABLE_HISTORICAL_AMENDMENT_EVIDENCE"
+  },
+  "successorCatalog": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "role": "PROSPECTIVE_CURRENT_SEMANTIC_AUTHORITY"
+  },
+  "summary": {
+    "totalSkeletons": 56,
+    "amendedSkeletons": 3,
+    "retiredAndReplacedSkeletons": 2,
+    "inheritedSkeletons": 51,
+    "priorLabelCounts": { "CLEAR": 45, "ESCALATE": 11 },
+    "resultingLabelCounts": { "CLEAR": 42, "ESCALATE": 14 }
+  },
+  "amendments": [
+    {
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "fromHumanLabel": "CLEAR",
+      "toHumanLabel": "ESCALATE",
+      "candidateFocus": "예외 하위 범주 소속이 주어지지 않아 대상의 규칙 적용 상태를 알 수 없는 경우",
+      "semanticRelations": [
+        "일반 규칙이 한 범주에 적용된다.",
+        "예외가 특정 하위 범주에 적용된다.",
+        "TARGET이 그 예외 하위 범주에 속하는지는 visible evidence에 주어지지 않는다.",
+        "TARGET의 규칙 적용 상태는 그 소속 여부에 따라 달라진다."
+      ],
+      "interpretationContract": "TARGET의 materially relevant status가 규칙의 적용 여부이고 그 판단에 필요한 예외 범주 소속 사실이 visible evidence에 주어지지 않았다면, 추가 classification fact 없이는 TARGET status를 말할 수 없으므로 ESCALATE한다. 규칙과 예외의 의미가 명확하다는 사실만으로 CLEAR가 되지 않는다.",
+      "reversesV2Amendment": true,
+      "resolvesBatch003ItemIds": ["p1b6-item-b003-072"]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "splitAssignment": "DEV",
+      "boundaryClass": "SCOPE / APPLICABILITY",
+      "fromHumanLabel": "CLEAR",
+      "toHumanLabel": "ESCALATE",
+      "candidateFocus": "느슨하게 기술된 범주의 일부 특징만 주어져 대상의 실제 범주 소속이 정해지지 않는 경우",
+      "semanticRelations": [
+        "일반 규칙이 특정 범주의 구성원에게 적용된다.",
+        "그 범주는 `보통` 또는 전형적 특징 등 느슨한 설명으로 제시된다.",
+        "TARGET은 그 특징의 일부만 만족하거나 전형적 기준 밖에 있다.",
+        "TARGET이 실제로 그 범주에 속하는지는 visible evidence에 주어지지 않는다.",
+        "규칙 적용 상태는 그 범주 소속에 달려 있다."
+      ],
+      "interpretationContract": "전형적 특징이나 느슨한 기준만으로 TARGET의 실제 category membership이 주어지지 않았다면, membership 또는 그에 따른 applicability를 말하기 위해 추가 정보가 필요하므로 ESCALATE한다. `보통`이라는 기술을 확정 membership rule로 임의 변환하지 않는다.",
+      "reversesV2Amendment": true,
+      "resolvesBatch003ItemIds": ["p1b6-item-b003-142", "p1b6-item-b003-145"]
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-b8e64a03d97f251c",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "ACTUALITY",
+      "fromHumanLabel": "CLEAR",
+      "toHumanLabel": "ESCALATE",
+      "candidateFocus": "답이 제공되지 않은 자기 상태 질문 속 TARGET의 실제 상태",
+      "semanticRelations": [
+        "TARGET은 사용자가 자신의 실제 상태를 묻는 질문 안에 나타난다.",
+        "질문은 해당 상태를 요청할 뿐 그 명제를 사실로 주장하지 않는다.",
+        "visible evidence에는 그 질문에 대한 답이 없다.",
+        "질문 밖에서 TARGET의 실제 상태를 별도로 제공하는 관계도 없다."
+      ],
+      "interpretationContract": "unanswered question이라는 speech act가 명확하다는 것과 그 질문이 묻는 TARGET status가 주어졌다는 것은 다르다. TARGET이 queried real-world state라면, 답 또는 그 상태를 제공하는 evidence가 없을 때 TARGET status는 visible evidence에 주어지지 않았으므로 ESCALATE한다.",
+      "reversesV2Amendment": true,
+      "resolvesBatch003ItemIds": ["p1b6-item-b003-231"]
+    }
+  ],
+  "retirements": [
+    {
+      "retiredSkeletonId": "p1b6-sk-f58debd8f04f5c60",
+      "replacementSkeletonId": "p1b6-sk-53ab63517113df16",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "ESCALATE",
+      "contrastGroupSlot": "INHERITED",
+      "candidateFocus": "여러 활성 정량 차원 가운데 대략적 잔여 비율이 적용되는 차원",
+      "semanticRelations": [
+        "같은 대상 상황에 서로 다른 두 정량적 차원이 동시에 활성화되어 있다.",
+        "TARGET은 그 상황에 대해 대략적인 잔여 비율을 표현한다.",
+        "그 비율은 첫 번째 차원의 잔여량에도 두 번째 차원의 잔여량에도 자연스럽게 적용될 수 있다.",
+        "visible evidence에는 TARGET이 어느 차원을 측정하는지 지정하는 관계가 없다."
+      ],
+      "interpretationContract": "대략적 비율 자체는 주어졌지만 그 비율이 어느 활성 차원의 잔여량인지가 주어지지 않아 TARGET의 materially relevant status를 말할 수 없으므로 ESCALATE한다. 단위나 술어가 한 차원을 지정하면 그 표면은 이 skeleton의 실현이 아니다.",
+      "realizabilityPrototype": "해야 할 작업이 20개고, 마감까지 4주가 주어졌어. [TARGET]반 정도 남았어[/TARGET].",
+      "intendedUnresolvedReadings": [
+        "작업량이 약 절반 남아 있음",
+        "마감까지 주어진 시간이 약 절반 남아 있음"
+      ],
+      "retirementReason": "SKELETON_LEVEL_REALIZABILITY_FAILURE",
+      "realizabilityReview": "The repository owner reviewed all batch-003 sibling realizations p1b6-item-b003-289..300. All were judged naturally CLEAR: natural units or wording identify frequency or quantity, and deleting the unit makes the sentence malformed or unnatural rather than producing valid semantic ambiguity.",
+      "historicalSiblingItemIds": [
+        "p1b6-item-b003-289", "p1b6-item-b003-290", "p1b6-item-b003-291", "p1b6-item-b003-292",
+        "p1b6-item-b003-293", "p1b6-item-b003-294", "p1b6-item-b003-295", "p1b6-item-b003-296",
+        "p1b6-item-b003-297", "p1b6-item-b003-298", "p1b6-item-b003-299", "p1b6-item-b003-300"
+      ],
+      "historicalSurfacesTransferred": false,
+      "humanDecisionsTransferred": false
+    },
+    {
+      "retiredSkeletonId": "p1b6-sk-28736b74c85fcc93",
+      "replacementSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "splitAssignment": "TRAIN",
+      "boundaryClass": "APPROXIMATION / RANGE",
+      "humanLabel": "ESCALATE",
+      "contrastGroupSlot": "NONE",
+      "candidateFocus": "여러 활성 측정 축 가운데 대략적 차이 표현이 적용되는 축",
+      "semanticRelations": [
+        "비교되는 두 대상에는 서로 독립적인 둘 이상의 동일 종류 측정 차원이 활성화되어 있다.",
+        "TARGET은 두 대상 사이의 대략적인 절대 차이를 하나의 단위로 표현한다.",
+        "그 차이는 첫 번째 측정 축에도 두 번째 측정 축에도 자연스럽게 적용될 수 있다.",
+        "visible evidence에는 TARGET이 어느 측정 축을 가리키는지 지정하는 관계가 없다."
+      ],
+      "interpretationContract": "대략적 차이 자체는 주어졌지만 그 차이가 어느 측정 축의 차이인지가 주어지지 않아 TARGET의 materially relevant status를 말할 수 없으므로 ESCALATE한다. 옛 skeleton의 범위·선택지·수정 순서 의미는 이어받지 않는다.",
+      "realizabilityPrototype": "첫 번째 판넬은 가로 60cm, 세로 35cm고 두 번째도 두 치수가 다 달라. [TARGET]두 번째가 한 5cm 정도 더 길어[/TARGET].",
+      "intendedUnresolvedReadings": [
+        "가로 차이가 약 5cm",
+        "세로 차이가 약 5cm"
+      ],
+      "retirementReason": "SKELETON_LEVEL_REALIZABILITY_FAILURE",
+      "realizabilityReview": "The repository owner reviewed all batch-003 sibling realizations p1b6-item-b003-059..066. All were judged naturally CLEAR under the corrected contract: parallel approximate alternatives describe an uncertain state that is itself given, and temporal ordering tends to resolve pragmatically toward revision.",
+      "historicalSiblingItemIds": [
+        "p1b6-item-b003-059", "p1b6-item-b003-060", "p1b6-item-b003-061", "p1b6-item-b003-062",
+        "p1b6-item-b003-063", "p1b6-item-b003-064", "p1b6-item-b003-065", "p1b6-item-b003-066"
+      ],
+      "historicalSurfacesTransferred": false,
+      "humanDecisionsTransferred": false
+    }
+  ],
+  "replacementIdPolicy": "Replacement semantic skeleton IDs are implementation-level opaque identifiers drawn at random. They encode no semantics and are not derived from the retired IDs.",
+  "mixedRealizationEscalateSkeletons": [
+    {
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "skeletonLabel": "ESCALATE",
+      "note": "동일 인스턴스인지 별도 인스턴스인지가 열려 있을 때만 ESCALATE다. 개별 표면 실현이 두 기술을 같은 인스턴스로 자연스럽게 묶어 읽히면 그 표면은 CLEAR로 붕괴한다."
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "skeletonLabel": "ESCALATE",
+      "note": "두 규칙이 같은 차원에서 실제로 겹칠 때만 ESCALATE다. 규칙이 직교하거나 한쪽이 명시적 예외로 읽히면 그 표면은 CLEAR로 붕괴한다."
+    }
+  ],
+  "mixedRealizationPolicy": "이 두 skeleton은 skeleton 수준에서 ESCALATE를 유지하되, 개별 표면 실현은 표면 QA 시점에 판정한다. v2의 나머지 두 mixed skeleton(f58debd8·28736b74)은 v3에서 은퇴했다.",
+  "unchangedByThisSuccession": [
+    "p1b6-sk-aebbf047d6864a35",
+    "p1b6-sk-869c71279b6b8a33"
+  ],
+  "unchangedNote": "aebbf047과 869c7127의 v2 CLEAR 의미는 그대로 권위다. 최종 코퍼스 수용 전 별도의 anchor 품질 후속 작업이 있다.",
+  "authority": {
+    "historicalExact56Superseded": false,
+    "historicalEffectiveCurrentV1Overwritten": false,
+    "historicalEffectiveCurrentV2Overwritten": false,
+    "historicalHumanDecisionsAltered": false,
+    "humanDecisionsTransferredToReplacementSkeletons": false,
+    "historicalSurfacesTransferredToReplacementSkeletons": false,
+    "batch003SurfacesRegenerated": false,
+    "strongModelOutputRelabeled": false,
+    "datasetAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false,
+    "productionBehaviorChanged": false
+  }
+}

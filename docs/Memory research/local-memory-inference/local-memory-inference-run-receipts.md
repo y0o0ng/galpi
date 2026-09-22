@@ -4823,3 +4823,43 @@ the committed receipt carries every decision and reason verbatim.
 
 The canonical design section "HUMAN adjudication/calibration result — attempt
 001" has the item list and the direction breakdown.
+
+#### P1-B6 semantic contract v3 and the batch-003 26-row resolution — COMPLETE, fresh gates pending
+
+Repository-owner semantic adjudication closed the 26-row gate left by HUMAN
+reconciliation attempt 001. Baseline `main` was
+`3383fde580caf4aba576c84c2340e906258c43e4`.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt.json` | `10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1` |
+| `fixtures/local-memory-inference-p1b6-skeleton-effective-current-v3.json` | `89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9` |
+| `fixtures/local-memory-inference-p1b6-batch-003-resolution-receipt.json` | `61c29218a360bf914c6453758c7fc243e629f1b5d400e38426d9d18720cb1ffe` |
+| `fixtures/local-memory-inference-p1b6-surface-repair-candidate-batch-003.json` | `8f6254946eef8d8d0920485bde431ca137a83577a5060889f3676b8857b4aa9b` |
+
+- **v3** (derived from the exact v2 bytes `f1e78019…`): given-status rule
+  replaces v2 `unknownIsNotAmbiguity`; `2da4e54e`, `5269c91f`, `b8e64a03`
+  reversed CLEAR → ESCALATE; `f58debd8` → `53ab6351` and `28736b74` →
+  `0768ea20` retired and replaced in place (TRAIN / APPROXIMATION·RANGE /
+  ESCALATE, `53ab6351` keeps contrast group `p1b6-cg-084af1a6…`); 51 inherited.
+  56 slots, 24 / 16 / 16, **42 CLEAR / 14 ESCALATE**.
+- **26-row resolution:** reviewer correction `040`, `103` (ESCALATE), `259`
+  (CLEAR); v3 contract correction `072`, `142`, `145`, `231` (ESCALATE); repair
+  `162`, `214`; surface reject `242`, `244`, `246`, `248`, `249`; skeleton retired
+  `060`, `061`, `290`, `292`–`300`. All 20 historical surfaces on the retired
+  skeletons (`059`–`066`, `289`–`300`) stay historical and do not transfer.
+- **Repair candidates** `162`, `214` only; offsets recomputed; no HUMAN decision
+  carried; pending fresh source audit and fresh blind HUMAN review under v3.
+- **Unchanged:** Exact56, v1, v2 and their receipts, batch-003 and its content
+  script, materialization receipt and protocol, source audit, strong-model
+  receipt, HUMAN reconciliation attempt 001.
+- **Still open:** replacement-skeleton surface authoring; re-reconciliation
+  against v3 of the other 24 batch-003 surfaces on the three reversed skeletons.
+  No acceptance, freeze, selection, HELD release, training or production change.
+  The accepted pool stays **93**.
+
+Tests run locally: the two new suites (`…-skeleton-semantic-contract-v3`, 7/7;
+`…-batch-003-resolution`, 6/6), every `test/memory-inference-p1b6-*.test.js`
+suite (237 tests: 235 pass / 0 fail / 2 skipped — the raw-bytes tests, which skip
+without the uncommitted artifacts) and the full `npm test` suite (1486 tests:
+1484 pass / 0 fail / 2 skipped, the same two). No CI result is claimed.

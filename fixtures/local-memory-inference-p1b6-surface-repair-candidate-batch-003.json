@@ -1,0 +1,190 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-003-v1",
+  "status": "REPAIR_CANDIDATE_AWAITING_FRESH_SOURCE_AUDIT_AND_FRESH_BLIND_HUMAN_REVIEW",
+  "interpretationRule": "P1B6_SEMANTIC_CONTRACT_V3",
+  "provenance": {
+    "resolutionReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-batch-003-resolution-receipt-v1",
+      "rawSha256": "61c29218a360bf914c6453758c7fc243e629f1b5d400e38426d9d18720cb1ffe"
+    },
+    "historicalSourceBatch": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+      "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68",
+      "role": "IMMUTABLE_HISTORICAL_SURFACE_SOURCE"
+    },
+    "semanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9",
+      "role": "PROSPECTIVE_SEMANTIC_AUTHORITY"
+    },
+    "note": "Item, skeleton, episode and family IDs are carried from the historical rows so provenance stays explicit. Byte offsets are recomputed from the repaired text. No HUMAN decision recorded against the old text applies here."
+  },
+  "pending": {
+    "freshSourceAudit": true,
+    "freshBlindHumanReviewUnderV3": true
+  },
+  "authority": {
+    "humanDecisionsTransferredFromOldSurfaces": false,
+    "humanReviewPerformed": false,
+    "sourceAuditPerformed": false,
+    "repairedRowsAccepted": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-b003-162",
+      "sourceFamilyId": "p1b6-sf-b003-162",
+      "splitAssignment": "DEV",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "오늘 탕비실 정수기를 청소했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "지난달 회의실에 있던 파란 mug는 손잡이에 흠집이 있었어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "정수기 필터도 확인했어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "어제 휴게실에서도 흠집 있는 파란 mug를 봤어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "필터는 다음 달에 갈면 돼."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "그런데 어제 것은 바닥에 이름이 적혀 있더라."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "컵 받침도 새로 뒀어."
+        },
+        {
+          "turnId": "t8",
+          "role": "ASSISTANT",
+          "text": "그대로 남겨 둘게요."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b003-214",
+      "sourceFamilyId": "p1b6-sf-b003-214",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "ASSISTANT",
+          "text": "다음 달 정기권을 연장할까요?"
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 지갑을 정리했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "ASSISTANT",
+          "text": "아니면 주차권을 연장할까요?"
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "영수증을 한참 버렸어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "응, 연장해 줘."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-b003-162",
+      "sourceEpisodeId": "p1b6-se-b003-162",
+      "semanticSkeletonId": "p1b6-sk-5fc872afb058b370",
+      "anchorSpanRef": {
+        "turnId": "t2",
+        "startByte": 30,
+        "endByte": 40
+      },
+      "anchorText": "파란 mug",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 77
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 61
+        },
+        {
+          "turnId": "t6",
+          "startByte": 0,
+          "endByte": 61
+        }
+      ],
+      "discoursePattern": "INTERLEAVED",
+      "surfaceFamilyId": "p1b6-surface-family-b003-162",
+      "historicalDiscoursePattern": "CONCLUSION_FIRST",
+      "intendedUnresolvedReadings": [
+        "the later mug is the same instance seen again, with an additional discovered property",
+        "the later mug is a separate but similar instance"
+      ]
+    },
+    {
+      "itemId": "p1b6-item-b003-214",
+      "sourceEpisodeId": "p1b6-se-b003-214",
+      "semanticSkeletonId": "p1b6-sk-9dc48f4b2f10775d",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 5,
+        "endByte": 18
+      },
+      "anchorText": "연장해 줘",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 40
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 39
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 19
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b003-214",
+      "historicalDiscoursePattern": "PROGRESSIVE_REFINEMENT",
+      "intendedUnresolvedReadings": [
+        "the confirmation targets the subscription renewal",
+        "the confirmation targets the parking-pass renewal"
+      ]
+    }
+  ]
+}

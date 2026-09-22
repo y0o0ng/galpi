@@ -881,11 +881,18 @@ adjudication/calibration result — attempt 001" below):
 2. the deterministic 32-row HUMAN calibration sample over the 267 clean
    agreements.
 
+The **26 realizations the HUMAN reconciliation made ineligible** are resolved
+(see "Batch-003 26-row resolution" below) under [semantic contract
+v3](#semantic-contract-v3).
+
 **Current next gates:**
 
-- an explicit resolution decision (repair, rejection, or skeleton-realizability
-  review) for the **26 realizations the HUMAN reconciliation made ineligible**;
-  nothing is decided automatically, and the next step is **not** acceptance.
+- fresh source audit and fresh blind HUMAN review under v3 for the `162` / `214`
+  repair candidates;
+- fresh surface authoring, then source audit and blind review, for the two
+  replacement skeletons `53ab6351` and `0768ea20`;
+- re-reconciliation against v3 of the other batch-003 surfaces on the three
+  reversed skeletons. The next step is **not** acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD second-pass review,
 `FINAL_HELD_OUT` release, deterministic FINAL selection, training, or production
@@ -929,13 +936,14 @@ new groups are not invented by later materialization.
 
 ## Semantic Authority Lineage
 
-Three artifacts, three distinct roles. None replaces the file before it.
+Four artifacts, four distinct roles. None replaces the file before it.
 
 | layer | artifact | labels | role |
 | --- | --- | --- | --- |
 | Historical freeze | `…-skeleton-exact56.json` (`772f07bd…`) | 32 / 24 | immutable historical provenance base |
-| Historical prior authority | `…-skeleton-effective-current.json` (`48490b6e…`) | 34 / 22 | the prior prospective authority; still committed, still byte-identical, still historical evidence |
-| **Current authority** | `…-skeleton-effective-current-v2.json` (`f1e78019…`) | **45 CLEAR / 11 ESCALATE** | prospective current semantic authority |
+| Historical prior authority (v1) | `…-skeleton-effective-current.json` (`48490b6e…`) | 34 / 22 | an earlier prospective authority; still committed, still byte-identical, still historical evidence |
+| Historical prior authority (v2) | `…-skeleton-effective-current-v2.json` (`f1e78019…`) | **45 CLEAR / 11 ESCALATE** | the prior prospective authority and v3's derivation base; still committed, still byte-identical |
+| **Current authority (v3)** | `…-skeleton-effective-current-v3.json` (`89a48264…`) | **42 CLEAR / 14 ESCALATE** | prospective current semantic authority — see [Semantic contract v3](#semantic-contract-v3) |
 
 v2 is derived from the **exact raw bytes of v1**, which already carry the Exact56
 lineage. Exact56 stays in provenance but is deliberately *not* a second
@@ -974,13 +982,68 @@ the current interpretation unless visible evidence supplies an effective-time,
 grandfathering, or application-time governance rule. Merely mentioning that an
 application or action happened before the change does **not** invent such a rule.
 
-### The four mixed ESCALATE skeletons
+### The four mixed ESCALATE skeletons (v2)
 
 `5fc872af`, `be0efa30`, `f58debd8` and `28736b74` keep **ESCALATE at skeleton
 level**, but individual surface realizations may pragmatically collapse to CLEAR
 and must therefore be judged at surface QA time. The skeleton label does not
 decide a surface. This is not a defect in the skeletons; it is why surface QA
-exists.
+exists. Under v3, `f58debd8` and `28736b74` are retired (below), so only
+`5fc872af` and `be0efa30` remain mixed.
+
+### Semantic contract v3
+
+Receipt `…-skeleton-semantic-contract-v3-receipt.json` (`10f8a10e…`), builder
+`scripts/build-memory-inference-p1b6-skeleton-semantic-contract-v3.js`, catalog
+`…-skeleton-effective-current-v3.json` (`89a48264…`). v3 is derived from the
+**exact raw bytes of v2**; v1 and Exact56 are carried as lineage, not rebuilt.
+Decisions are the repository owner's semantic adjudication.
+
+**The given-status rule** (replaces the v2 `unknownIsNotAmbiguity` clause, which
+was too narrow; `noAddedPremise` is retained):
+
+- **CLEAR** — visible evidence provides the TARGET's materially relevant
+  semantic status. It need not be exact or final: an approximate, tentative,
+  conditional, attributed, explicitly undecided or otherwise uncertain status is
+  CLEAR when that uncertain status itself is what the evidence gives.
+- **ESCALATE** — visible evidence does not provide that status, either because
+  materially different readings remain unresolved or because a fact or relation
+  needed to state the TARGET status is absent.
+- **An uncertain status that is itself given is CLEAR; a status that can only be
+  answered "unknown / cannot tell" without more information is ESCALATE.**
+- **Judge the TARGET, not a downstream inference.** Unknown eligibility, policy
+  application, cause or durability does not ESCALATE a TARGET whose own status
+  is given; conversely, missing facts or rules are never invented to make an
+  unknown TARGET status CLEAR. Ordinary pragmatic resolution supported by the
+  visible discourse stays allowed.
+
+**Three v2 amendments reversed, `CLEAR → ESCALATE`:** `2da4e54e` (exception
+subcategory membership not given; covers item `072`), `5269c91f` (loosely
+described `보통` category, actual membership not given; `142`, `145`) and
+`b8e64a03` (unanswered self-state question, queried state not given; `231`).
+Each carries re-encoded `candidateFocus`, `semanticRelations` and
+`interpretationContract`.
+
+**Two skeletons retired and replaced in place** (same TRAIN /
+`APPROXIMATION / RANGE` / ESCALATE slot, new random opaque IDs):
+
+| retired (stays in v2) | replacement | new semantics |
+| --- | --- | --- |
+| `f58debd8` | `53ab6351` (inherits contrast group `p1b6-cg-084af1a6…`) | an approximate remaining ratio over two active quantitative dimensions, e.g. `작업 20개 / 마감 4주 … 반 정도 남았어` |
+| `28736b74` | `0768ea20` (no contrast group, as before) | an approximate absolute difference over two active measurement axes, e.g. `가로·세로 … 한 5cm 정도 더 길어` |
+
+This is a **skeleton-level realizability failure**, not two bad rows: the owner
+reviewed every batch-003 sibling (`059`–`066`, `289`–`300`) and judged all of
+them naturally CLEAR. No historical surface and no HUMAN decision transfers to a
+replacement; the old range / choice-set / revision semantics of `28736b74` are
+not carried over. The replacements need fresh surface authoring before they can
+supply corpus rows.
+
+Everything else is inherited byte-for-byte (51 skeletons, including the v2 CLEAR
+semantics of `aebbf047` and `869c7127`, which have a separate anchor-quality
+follow-up before final acceptance). v3 keeps 56 slots, TRAIN / DEV / HELD
+24 / 16 / 16, **42 CLEAR / 14 ESCALATE**; the label-balancing retirement of v2
+stands and no ratio is targeted.
 
 ## Supervised Corpus
 
@@ -1169,8 +1232,10 @@ no SHA, no HUMAN packet, no calibration, no acceptance.
   (`4750a467b521975f60f6bf5fd776ff6cfd80ad5be1efa04a485e389532988ed0`);
 - HUMAN calibration review: **DONE** (attempt 001, below);
 - HUMAN adjudication of the 34 routed rows: **DONE** (attempt 001, below);
-- resolution of the 26 ineligible realizations: **NOT RUN**;
-- repair, acceptance, reference-label freeze, FINAL selection, HELD second
+- resolution of the 26 ineligible realizations: **DONE** (see "Batch-003
+  26-row resolution" below);
+- fresh gates for the 162 / 214 repair candidates and for replacement-skeleton
+  surfaces, acceptance, reference-label freeze, FINAL selection, HELD second
   review, training and evaluation: **NOT RUN**.
 
 ### Combined blind HUMAN adjudication and calibration packet
@@ -1281,6 +1346,56 @@ accepted, frozen or selected. The accepted pool stays **93**.
 Blindness was at packet level: row roles are a deterministic function of
 committed artifacts, and the receipt does not claim either way whether the
 reviewer consulted them.
+
+### Batch-003 26-row resolution
+
+Receipt `fixtures/local-memory-inference-p1b6-batch-003-resolution-receipt.json`
+(`61c29218…`), builder
+`scripts/build-memory-inference-p1b6-batch-003-repair-candidate.js`. The builder
+takes the population from the reconciliation receipt itself, requires one sorted
+row per item, checks every quoted historical HUMAN field against that receipt,
+and binds v2, v3, the v3 receipt, batch-003, source-audit attempt 001, the
+strong-model attempt and the HUMAN reconciliation (with its raw result SHA) by
+identity and raw SHA-256.
+
+| resolution | items | result |
+| --- | --- | --- |
+| reference upheld, reviewer correction | `040`, `103` → ESCALATE; `259` → CLEAR | the historical blind HUMAN decision is quoted, not rewritten |
+| semantic-contract correction (v3) | `072`, `142`, `145`, `231` → ESCALATE | resolved through v3, not by editing HUMAN evidence |
+| surface repair | `162`, `214` | new candidate text; not accepted |
+| surface rejection | `242`, `244`, `246`, `248`, `249` | current realization only; `be0efa30` itself is not amended and no replacement surface is owed |
+| skeleton retired | `060`, `061`, `290`, `292`–`300` | historical evidence only |
+
+The rejected `be0efa30` rows pair a generic/default rule with a more specific
+condition that is explicitly satisfied, so ordinary interpretation resolves the
+result; moving the anchor does not repair that. Every other historical surface
+on the retired skeletons (`059`, `062`–`066`, `289`, `291`) is likewise recorded
+as not transferring.
+
+**Repair candidates** —
+`fixtures/local-memory-inference-p1b6-surface-repair-candidate-batch-003.json`
+(`8f625494…`), separate from the frozen batch-003 fixture and content script:
+
+- `162` (`5fc872af`): the opening `결론만 말하면 그 mug를 두 번 봤어.`, which
+  collapsed identity to one instance, is removed without a replacement filler;
+  evidence is the three mug turns and the TARGET stays on the first `파란 mug`.
+  Readings: same instance seen again with a newly noticed property / a separate
+  similar instance.
+- `214` (`9dc48f4b`): `더 정확히는, 주차권도 같이 연장할까요?` becomes
+  `아니면 주차권을 연장할까요?`; the TARGET `응, 연장해 줘.` is kept. Readings:
+  the confirmation targets the subscription / the parking pass.
+
+Offsets are recomputed from the repaired text; no HUMAN decision carries over.
+
+**Pending:** fresh source audit and fresh blind HUMAN review under v3 for the two
+repair candidates; fresh surface authoring, source audit and blind review for
+the two replacement skeletons. **Also open, and not decided by this receipt:**
+the other batch-003 surfaces on the three reversed skeletons (`2da4e54e`,
+`5269c91f`, `b8e64a03` — 24 rows, including `073`, `076`, `143`, `144` which
+were `HUMAN_ADJUDICATED` CLEAR against v2) were reconciled against v2 CLEAR and
+have not been re-reconciled against v3. No acceptance, reference-label freeze,
+FINAL selection, HELD release, training or production change occurred; the
+accepted pool stays **93**.
 
 ## Closed Selection and Freeze Constraints
 
