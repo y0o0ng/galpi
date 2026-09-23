@@ -14,6 +14,11 @@
     focusedCard: null,
     notesView: 'notes',
     selectedDate: null,
+    calendarView: 'selected',
+    calendarFilter: 'today',
+    calendarPopup: false,
+    historyTasks: [],
+    calendarInitialTitle: '',
     summary: null,
     tasks: [],
     ddays: [],
@@ -212,13 +217,13 @@
         event.stopPropagation();
         state.selectedDate = item.key;
         if (state.focusedCard !== 'calendar') setFocusedCard('calendar');
-        else renderOverview();
+        else setCalendarView('selected');
       });
       grid.append(day);
     });
     const selectedKey = state.selectedDate || today;
     const allSelectedTasks = state.tasks.filter(task => taskDate(task) === selectedKey);
-    const selectedTasks = allSelectedTasks.slice(0, 4);
+    const selectedTasks = state.focusedCard === 'calendar' ? allSelectedTasks : allSelectedTasks.slice(0, 4);
     const agenda = node('div', 'calendar-agenda');
     const selectedLabel = new Intl.DateTimeFormat('ko-KR', { timeZone: 'UTC', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${selectedKey}T00:00:00Z`));
     agenda.append(node('strong', '', `${state.focusedCard === 'calendar' ? '' : `${selectedLabel} · `}일정 ${allSelectedTasks.length}개`));
@@ -228,19 +233,125 @@
       agenda.append(row);
     });
     if (!selectedTasks.length) agenda.append(node('p', 'home-card-empty', '등록된 일정 없음'));
-    body.append(monthHead, grid, agenda);
+    if (state.focusedCard === 'calendar') agenda.append(action('+ 일정 추가', () => {
+      state.calendarPopup = true;
+      renderOverview();
+    }));
+    body.append(monthHead, grid);
     if (state.focusedCard === 'calendar') {
+      const detail = node('div', 'calendar-detail');
       const actions = node('div', 'home-card-actions');
+      const selected = action(selectedLabel, () => setCalendarView('selected'));
+      selected.classList.add('calendar-selected-date');
+      selected.classList.toggle('active', state.calendarView === 'selected');
+      const all = action('전체 일정', () => setCalendarView('all'));
+      all.classList.toggle('active', state.calendarView === 'all');
+      const add = action('일정 추가하기', () => setCalendarView('add'));
+      add.classList.toggle('active', state.calendarView === 'add');
       actions.append(
-        node('span', 'calendar-selected-date', selectedLabel),
+        selected,
         node('span', 'calendar-action-divider'),
-        action('전체 일정', () => openTaskPanel({ view: 'today' })),
+        all,
         node('span', 'calendar-action-divider'),
-        action('일정 추가하기', () => openTaskPanel({ compose: true })),
+        add,
       );
-      body.append(actions, node('div', 'home-focus-extra'));
-    }
+      detail.append(actions);
+      if (state.calendarView === 'selected') {
+        detail.append(agenda);
+        if (state.calendarPopup) detail.append(node('div', 'home-focus-extra calendar-task-panel calendar-popup'));
+      } else {
+        if (state.calendarView === 'all') {
+          const filters = node('div', 'calendar-filters');
+          [['today', '오늘'], ['upcoming', '예정'], ['notifications', '알림'], ['repeated', '반복'], ['done', '종결']].forEach(([id, label]) => {
+            const button = action(label, () => setCalendarView('all', id));
+            button.classList.toggle('active', state.calendarFilter === id);
+            filters.append(button);
+          });
+          detail.append(filters);
+        }
+        if (state.calendarView === 'add' && !state.calendarPopup) {
+          const addEntry = node('div', 'calendar-add-entry');
+          const composer = node('form', 'calendar-add-composer');
+          const draft = node('input');
+          draft.type = 'text';
+          draft.placeholder = '내일 오후 3시에 프로젝트 일정 만들어줘';
+          draft.setAttribute('aria-label', '자연어로 일정 만들기');
+          composer.addEventListener('submit', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            const prompt = draft.value.trim();
+            if (!prompt) return draft.focus();
+            setRoute('chat');
+            const chatInput = document.getElementById('input');
+            if (!chatInput) return;
+            chatInput.value = prompt;
+            chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+            document.getElementById('send-btn')?.click();
+          });
+          const send = node('button', 'calendar-add-send', '↑');
+          send.type = 'submit';
+          send.setAttribute('aria-label', '일정 요청 보내기');
+          composer.append(draft, send);
+          addEntry.append(composer, node('p', '', '채팅에서 일정을 확인한 뒤 등록할 수 있어.'), action('수동으로 생성 ›', () => {
+            state.calendarPopup = true;
+            renderOverview();
+          }));
+          detail.append(addEntry);
+        } else detail.append(node('div', 'home-focus-extra calendar-task-panel'));
+      }
+      body.append(detail);
+    } else body.append(agenda);
     return card('calendar', '달력', '', body);
+  }
+
+  function setCalendarView(view, filter = state.calendarFilter) {
+    state.calendarView = view;
+    state.calendarFilter = filter;
+    state.calendarPopup = false;
+    renderOverview();
+  }
+
+  function closeCalendarEditor() {
+    state.calendarPopup = false;
+    renderOverview();
+  }
+
+  function saveCalendarEditor() {
+    state.calendarPopup = false;
+    state.calendarView = 'selected';
+    renderOverview();
+  }
+
+  function mountCalendar() {
+    const host = document.querySelector('.home-card-calendar.focused .calendar-task-panel');
+    if (!host) return;
+    if (state.calendarView === 'selected' || state.calendarView === 'add') {
+      global.TaskPanel?.render(host, {
+        compose: true, initialTitle: state.calendarInitialTitle,
+        onCancel: closeCalendarEditor, onSaved: saveCalendarEditor,
+      });
+      state.calendarInitialTitle = '';
+      return;
+    }
+    if (state.calendarFilter === 'notifications') {
+      const reminders = state.notifications.filter(item => item.type === 'task_reminder');
+      host.append(node('strong', 'calendar-list-count', `알림 ${reminders.length}개`));
+      reminders.forEach(item => host.append(global.TaskPanel.makeReminderCard(item)));
+      if (!reminders.length) host.append(node('p', 'home-card-empty', '확인할 일정 알림 없음'));
+      return;
+    }
+    if (state.calendarFilter === 'done') {
+      host.append(node('strong', 'calendar-list-count', `종결 ${state.historyTasks.length}개`));
+      state.historyTasks.forEach(task => {
+        const row = node('div', 'calendar-history-row');
+        row.append(node('time', '', task.dueAt ? formatDateTime(task.dueAt) : task.dueDate || ''), node('span', '', task.title));
+        host.append(row);
+      });
+      if (!state.historyTasks.length) host.append(node('p', 'home-card-empty', '종결된 일정 없음'));
+      return;
+    }
+    const view = { today: 'today', upcoming: 'upcoming', repeated: 'series' }[state.calendarFilter];
+    global.TaskPanel?.render(host, { view });
   }
 
   function mailNotifications() {
@@ -498,6 +609,7 @@
     collapse.hidden = !state.focusedCard;
     if (state.focusedCard === 'mail') mountNotification('mail');
     if (state.focusedCard === 'notes') mountLibrary();
+    if (state.focusedCard === 'calendar') mountCalendar();
   }
 
   function transitionOverview(nextCard) {
@@ -527,6 +639,10 @@
 
   function setFocusedCard(id) {
     if (!FOCUSABLE_CARDS.has(id) || state.focusedCard === id) return;
+    if (id === 'calendar') {
+      state.calendarView = 'selected';
+      state.calendarPopup = false;
+    }
     transitionOverview(id);
     document.querySelector(`.home-card[data-card-id="${id}"]`)?.focus({ preventScroll: true });
   }
@@ -601,7 +717,7 @@
     if (!response.ok) return;
     state.weather = await response.json();
     state.weatherAt = Date.now();
-    if (state.route === 'home' && state.homeView === 'overview') renderOverview();
+    if (state.route === 'home' && state.homeView === 'overview' && !(state.focusedCard === 'calendar' && state.calendarPopup)) renderOverview();
   }
 
   async function refresh() {
@@ -626,14 +742,15 @@
     state.tasks = Array.isArray(tasks?.tasks) ? tasks.tasks : [
       ...(tasks?.overdue || []), ...(tasks?.today || []), ...(tasks?.upcoming || []),
     ];
-    state.completedTasks = (completed?.tasks || []).filter(task => task.closedAt && kstDate(task.closedAt) === kstDate(Date.now() / 1000));
+    state.historyTasks = (completed?.tasks || []).filter(task => task.status === 'done');
+    state.completedTasks = state.historyTasks.filter(task => task.closedAt && kstDate(task.closedAt) === kstDate(Date.now() / 1000));
     state.completedToday = state.completedTasks.length;
     state.notifications = Array.isArray(notifications?.notifications) ? notifications.notifications : [];
     state.recentSaves = Array.isArray(notifications?.recentSaves) ? notifications.recentSaves : [];
     state.mail = mail;
     state.notes = Array.isArray(notes?.notes) ? notes.notes : [];
     state.ddays = Array.isArray(ddays?.ddays) ? ddays.ddays : [];
-    if (state.route === 'home' && state.homeView === 'overview') renderOverview();
+    if (state.route === 'home' && state.homeView === 'overview' && !(state.focusedCard === 'calendar' && state.calendarPopup)) renderOverview();
     void loadWeather().catch(() => {});
   }
 
@@ -651,7 +768,12 @@
     }
     setRoute('home', 'overview');
     setFocusedCard(options.compose ? 'calendar' : 'tasks');
-    openTaskPanel(options.compose ? { compose: true, initialTitle: options.initialTitle || '' } : { view: options.view || 'today' });
+    if (options.compose) {
+      state.calendarInitialTitle = options.initialTitle || '';
+      state.calendarView = 'add';
+      state.calendarPopup = true;
+      renderOverview();
+    } else openTaskPanel({ view: options.view || 'today' });
   }
 
   function handleInitialUrl() {

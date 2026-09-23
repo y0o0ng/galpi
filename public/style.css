@@ -4812,7 +4812,8 @@ textarea:focus-visible {
 .calendar-event-row { display: flex; gap: 14px; }
 .calendar-event-row time { flex: 0 0 42px; color: var(--label); }
 
-.home-card-calendar.focused { padding: 25px; }
+.home-card-calendar.focused,
+.home-card-calendar.focused:hover { padding: 25px; overflow: hidden; }
 .home-card-calendar.focused .home-card-head { min-height: 38px; margin-bottom: 40px; }
 .home-card-calendar.focused .home-card-head h2 { font-size: 24px; }
 .home-card-calendar.focused .calendar-month-head strong { font-size: 16px; }
@@ -4823,24 +4824,31 @@ textarea:focus-visible {
   grid-template-columns: minmax(0, 287.5px) minmax(0, 1fr);
   grid-template-rows: 24px minmax(0, 1fr);
   column-gap: 41.5px;
-  min-height: 285px;
+  height: 285px;
 }
 .home-card-calendar.focused .calendar-month-head { grid-area: 1 / 1; }
 .home-card-calendar.focused .calendar-month-grid { grid-area: 2 / 1; }
+.home-card-calendar.focused .calendar-detail {
+  display: flex;
+  grid-area: 1 / 2 / span 2;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
 @media (min-width: 1101px) {
   .home-card-calendar.focused .calendar-month-grid { grid-template-columns: repeat(7, 40px); }
 }
 .home-card-calendar.focused .home-card-actions {
   display: grid;
-  grid-area: 1 / 2;
   grid-template-columns: 110px 1px 110px 1px 110px;
   gap: 10px;
   width: max-content;
-  height: 25px;
-  margin: 8px 0 0 19px;
+  min-height: 33px;
+  margin: 0 0 0 19px;
   align-self: start;
 }
-.home-card-calendar.focused .calendar-agenda { grid-area: 2 / 2; align-content: start; margin: 0; padding-top: 31px; }
+.home-card-calendar.focused .calendar-agenda { flex: 1 1 auto; min-height: 0; align-content: start; overflow-y: auto; margin: 0; padding-top: 31px; }
 .home-card-calendar.focused .calendar-agenda strong { margin-bottom: 15px; font-size: 12px; }
 .home-card-calendar.focused .calendar-agenda p { font-size: 10px; }
 .home-card-calendar.focused .calendar-card-content { position: relative; }
@@ -4862,8 +4870,70 @@ textarea:focus-visible {
   color: var(--ai-text);
   font-size: 11px;
 }
+.home-card-calendar.focused .home-card-actions .home-card-action.active {
+  color: var(--brand-ink);
+  font-weight: 700;
+}
+.home-card-calendar.focused .home-card-actions .calendar-selected-date.active {
+  border-radius: 999px;
+  background: var(--brand-soft);
+}
 .calendar-action-divider { width: 1px; height: 25px; background: var(--hairline); }
-.calendar-selected-date { display: grid; height: 25px; padding: 0 12px; place-items: center; border-radius: 999px; background: var(--brand-soft); color: var(--brand-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.calendar-selected-date { display: grid; height: 25px; padding: 0 12px; place-items: center; color: var(--brand-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.home-card-calendar.focused .calendar-agenda > .home-card-action {
+  justify-self: start;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: 11px;
+}
+.calendar-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.calendar-filters .home-card-action {
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--label);
+  font-size: 10px;
+}
+.calendar-filters .home-card-action.active { border-bottom-color: var(--brand-ink); color: var(--brand-ink); }
+.calendar-task-panel { min-width: 0; min-height: 0; overflow: auto; margin-top: 12px; }
+.calendar-task-panel .task-view-tabs { display: none; }
+.calendar-task-panel .task-card { gap: 3px; padding: 7px 0; }
+.calendar-task-panel .task-card-top strong { font-size: 11px; }
+.calendar-task-panel .task-card-detail { font-size: 10px; }
+.calendar-list-count { display: block; margin: 0 0 10px; color: var(--brand-ink); font-size: 12px; }
+.calendar-history-row { display: flex; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--hairline); font-size: 11px; }
+.calendar-history-row time { flex: 0 0 auto; color: var(--label); }
+.calendar-add-entry { display: grid; gap: 8px; align-content: start; padding-top: 12px; }
+.calendar-add-composer { display: flex; height: 42px; align-items: center; gap: 8px; padding: 5px 9px; border: 1px solid var(--hairline); border-radius: 10px; }
+.calendar-add-composer input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ai-text); font: 11px/1.3 var(--font); }
+.calendar-add-send { flex: 0 0 28px; width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-on); font-size: 16px; cursor: pointer; }
+.calendar-add-entry p { padding: 12px; border: 1px solid var(--hairline); border-left: 4px solid var(--brand); border-radius: 10px; color: var(--label); font-size: 11px; }
+.calendar-add-entry > .home-card-action { min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--brand-ink); font-size: 11px; }
+.calendar-task-panel.calendar-popup {
+  position: absolute;
+  z-index: 2;
+  top: 112px;
+  right: 0;
+  width: min(409px, 100%);
+  max-height: 230px;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--ai-bubble);
+  box-shadow: var(--shadow-md);
+}
 
 .home-mail-row {
   display: grid;
@@ -5665,16 +5735,31 @@ textarea:focus-visible {
   #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-day.outside-compact-week { display: none; }
   #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-weekday { display: none; }
   #home-grid.has-focus .home-card-weather:not(.focused) .weather-main { margin: 2px 0; }
+  .home-card-calendar.focused { padding: 11px 23.418px 37.342px !important; }
   .home-card-calendar.focused .home-card-head { margin-bottom: 8px; }
   .home-card-calendar.focused .calendar-card-content { display: flex; flex-direction: column; min-height: 0; }
   #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-card-content { display: flex; flex-direction: column; }
   .home-card-calendar.focused .calendar-card-content::before { display: none; }
   .home-card-calendar.focused .calendar-month-head { order: 1; margin-bottom: 6px; }
   .home-card-calendar.focused .calendar-month-grid { order: 2; margin-bottom: 12px; }
+  .home-card-calendar.focused .calendar-detail { order: 3; flex: 1 1 auto; min-height: 0; overflow: hidden; }
   .home-card-calendar.focused .calendar-day { height: 44px; font-size: 14px; }
-  .home-card-calendar.focused .home-card-actions { order: 3; margin-top: 0; padding-top: 8px; border-top: 1px solid var(--hairline); }
-  .home-card-calendar.focused .calendar-agenda { order: 4; margin-top: 14px; padding-top: 0; border-top: 0; }
-  .home-card-calendar.focused .home-focus-extra { order: 5; }
+  .home-card-calendar.focused .home-card-actions {
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
+    gap: 0;
+    width: 100%;
+    min-height: 42px;
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--hairline);
+  }
+  .home-card-calendar.focused .home-card-actions .home-card-action { min-width: 0; font-size: 10px; }
+  .home-card-calendar.focused .calendar-agenda { margin-top: 14px; padding-top: 0; border-top: 0; }
+  .home-card-calendar.focused .calendar-filters { margin-top: 6px; }
+  .home-card-calendar.focused .calendar-task-panel { flex: 1 1 auto; }
+  .home-card-calendar.focused .calendar-popup { position: static; flex: 1 1 auto; width: 100%; max-height: none; margin-top: 4px; box-shadow: none; }
+  .home-card-calendar.focused .calendar-add-entry { overflow-y: auto; }
+  .home-card-calendar.focused .calendar-card-content { height: calc(100% - 34px); }
   #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-day { height: 38px; font-size: 14px; border-bottom: 0; border-radius: 50%; }
   #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-weekday { font-size: 10px; }
 

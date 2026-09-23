@@ -379,6 +379,22 @@ test('Calendar keeps the Figma month and compact weeks with one event marker per
   assert.match(css, /\.home-card-calendar\.focused \.calendar-agenda \{[^}]*padding-top: 31px/s);
 });
 
+test('focused Calendar follows the Figma selected, all-events, and add-event states', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  const tasks = fs.readFileSync(path.join(ROOT, 'public/task-panel.js'), 'utf8');
+  assert.match(home, /calendarView: 'selected'/);
+  assert.match(home, /calendarPopup: false/);
+  assert.match(home, /\['today', '오늘'\], \['upcoming', '예정'\], \['notifications', '알림'\], \['repeated', '반복'\], \['done', '종결'\]/);
+  assert.match(home, /else setCalendarView\('selected'\)/);
+  assert.match(home, /onCancel: closeCalendarEditor, onSaved: saveCalendarEditor/);
+  assert.match(home, /state\.focusedCard === 'calendar' && state\.calendarPopup\)\) renderOverview\(\)/);
+  assert.match(home, /global\.TaskPanel\?\.render\(host, \{ view \}\)/);
+  assert.match(home, /global\.TaskPanel\.makeReminderCard\(item\)/);
+  assert.match(tasks, /if \(onSaved\) onSaved\(\)/);
+  assert.match(css, /\.home-card-calendar\.focused \.calendar-detail \{[^}]*grid-area: 1 \/ 2 \/ span 2/s);
+  assert.match(css, /\.home-card-calendar\.focused \.calendar-detail \{ order: 3; flex: 1 1 auto;/);
+});
+
 test('focused Notes uses the Figma text selector in its card header', () => {
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   assert.match(home, /article\.querySelector\('\.home-card-head'\)\.replaceChildren\(tabs,/);

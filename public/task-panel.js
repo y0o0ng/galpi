@@ -321,7 +321,7 @@
     }
   }
 
-  function renderComposer(container, task = null, initialTitle = '', series = null) {
+  function renderComposer(container, task = null, initialTitle = '', series = null, onCancel = null, onSaved = null) {
     state.mode = 'compose';
     container.innerHTML = '';
     const form = document.createElement('form');
@@ -335,7 +335,7 @@
     head.className = 'task-form-head';
     const heading = document.createElement('strong');
     heading.textContent = series ? '반복 수정' : task ? '일정 수정' : '일정 추가';
-    const close = actionButton('목록으로', () => render(container));
+    const close = actionButton(onCancel ? '취소' : '목록으로', () => onCancel ? onCancel() : render(container));
     head.append(heading, close);
 
     const title = document.createElement('input');
@@ -594,8 +594,9 @@
             });
             state.showToast('반복 일정을 만들었어');
           }
+          if (onSaved) onSaved();
           state.onChanged?.();
-          render(container, { view: 'series' });
+          if (!onSaved) render(container, { view: 'series' });
           return;
         }
         const due = dueFromForm(form);
@@ -632,8 +633,9 @@
           });
           state.showToast('일정을 만들었어');
         }
+        if (onSaved) onSaved();
         state.onChanged?.();
-        render(container);
+        if (!onSaved) render(container);
       } catch (requestError) {
         error.textContent = requestError.message;
         submit.disabled = false;
@@ -912,7 +914,7 @@
       return;
     }
     if (options.compose) {
-      renderComposer(container, null, options.initialTitle || '');
+      renderComposer(container, null, options.initialTitle || '', null, options.onCancel, options.onSaved);
       return;
     }
     state.mode = 'list';
