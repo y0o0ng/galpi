@@ -5009,3 +5009,21 @@ reference is ESCALATE, so the result is not an independent confirmation. No HUMA
 acceptance, reference freeze, HELD release or training; the accepted pool stays **93**.
 
 Tests run locally: the new `…-batch-003-targeted-v3-human-review-packet` suite (5/5).
+
+#### P1-B6 batch-003 targeted v3 re-reconciliation — HUMAN review attempt 001 RECORDED (2026-09-23)
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw HUMAN result `p1b6-v3-human-review-results.json` (not committed, 8 rows) | `444f9c1025fdcb47b89bbf978332c799221c2197514a3f016876662201a3696b` |
+| blind HUMAN packet it answers (not committed) | `35c6601f202f2cf830ee6db4809e622c7c36aa0a7d8ad10d5cd0937cf9a6aa4b` |
+| `fixtures/local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001.json` | receipt |
+
+Owner decisions; a model only presented rows. Raw 1 KEEP CLEAR / 1 KEEP ESCALATE / 6 FIX;
+owner revised `075` KEEP CLEAR → FIX after the review (order effect recorded). Effective 7 FIX
+/ 1 KEEP ESCALATE: nothing eligible, `235` stays `CATALOG_STRONG_MODEL_CONFIRMED`. Not an
+independent confirmation. The self-stating-TARGET conflict on `2da4e54e` / `5269c91f` is an
+open observation, not adopted. No acceptance, reference freeze, HELD release or training; the
+accepted pool stays **93**.
+
+Tests run locally: `…-batch-003-targeted-v3-human-review-packet` with the raw bytes supplied
+(9/9).

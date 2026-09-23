@@ -76,3 +76,60 @@ test('the protocol carries v3 verbatim and records the reviewer limitation', () 
   assert.match(protocol.reviewer.independenceNote, /not an independent confirmation/);
   assert.equal(protocol.population.rows, 8);
 });
+
+const HUMAN_RECEIPT = 'fixtures/local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001.json';
+const syntheticResults = mutate => {
+  const packet = builder.buildHumanReviewPacket(RECEIPT, PROTOCOL);
+  const results = packet.rows.map(row => ({
+    reviewRowId: row.reviewRowId, disposition: 'KEEP', decision: 'ESCALATE', reason: 'r',
+  }));
+  results.find(row => row.reviewRowId === builder.OWNER_REVISIONS[0].reviewRowId).decision = 'CLEAR';
+  mutate(results);
+  return Buffer.from(JSON.stringify({ results }));
+};
+
+test('HUMAN routing follows the plan and the owner revision is applied beside the raw row', () => {
+  const receipt = builder.buildHumanResultReceipt(syntheticResults(() => {}), RECEIPT, PROTOCOL, '2026-09-23');
+  const byItem = new Map(receipt.rows.map(row => [row.itemId, row]));
+  const revised = byItem.get(item('075'));
+  assert.deepEqual([revised.rawDisposition, revised.rawDecision, revised.disposition, revised.decision],
+    ['KEEP', 'CLEAR', 'FIX', null]);
+  assert.equal(revised.eligibility, 'INELIGIBLE');
+  assert.equal(byItem.get(item('077')).provenance, 'HUMAN_ADJUDICATED');
+  assert.equal(byItem.get(item('076')).provenance, 'CATALOG_STRONG_MODEL_CONFIRMED');
+  const opposing = builder.buildHumanResultReceipt(syntheticResults(rows => {
+    rows.forEach(row => { if (row.decision === 'ESCALATE') row.decision = 'CLEAR'; });
+  }), RECEIPT, PROTOCOL, '2026-09-23');
+  assert.equal(opposing.rows.find(row => row.itemId === item('077')).eligibility, 'INELIGIBLE_PENDING_RESOLUTION');
+  assert.equal(opposing.rows.some(row => row.provenance === 'HUMAN_ADJUDICATED'), false);
+});
+
+test('HUMAN result drift fails closed', () => {
+  const build = bytes => builder.buildHumanResultReceipt(bytes, RECEIPT, PROTOCOL, '2026-09-23');
+  assert.throws(() => build(syntheticResults(rows => rows.pop())), /exactly the packet rows/);
+  assert.throws(() => build(syntheticResults(rows => { rows[0].decision = null; })), /malformed/);
+  assert.throws(() => build(syntheticResults(rows => {
+    rows.find(row => row.reviewRowId === builder.OWNER_REVISIONS[0].reviewRowId).disposition = 'FIX';
+    rows.find(row => row.reviewRowId === builder.OWNER_REVISIONS[0].reviewRowId).decision = null;
+  })), /revision does not match/);
+});
+
+test('the committed HUMAN receipt records 7 FIX / 1 KEEP ESCALATE and opens no gate', () => {
+  const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_RECEIPT)));
+  assert.equal(receipt.reviewPacket.sha256, '35c6601f202f2cf830ee6db4809e622c7c36aa0a7d8ad10d5cd0937cf9a6aa4b');
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  assert.deepEqual(receipt.summary.effective, { FIX: 7, KEEP: 1 });
+  assert.equal(receipt.summary.matchingV3Reference, 1);
+  assert.deepEqual(receipt.rows.map(row => row.itemId), EXPECTED);
+  assert.equal(receipt.rows.some(row => row.provenance === 'HUMAN_ADJUDICATED'), false);
+  assert.equal(receipt.reviewer.independentConfirmation, false);
+  assert.equal(receipt.observation.status, 'OPEN_NOT_ADOPTED');
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
+
+test('the HUMAN receipt equals the raw result bytes when they are supplied',
+  { skip: !fs.existsSync(path.join(require('node:os').homedir(), 'p1b6-v3-human-review-results.json')) }, () => {
+    const raw = fs.readFileSync(path.join(require('node:os').homedir(), 'p1b6-v3-human-review-results.json'));
+    const committed = JSON.parse(fs.readFileSync(path.join(ROOT, HUMAN_RECEIPT)));
+    assert.deepEqual(builder.buildHumanResultReceipt(raw, RECEIPT, PROTOCOL, committed.reviewDate), committed);
+  });

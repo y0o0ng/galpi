@@ -30,7 +30,9 @@ gates are:
 - re-reconciliation under v3 of the remaining batch-003 surfaces on the three
   reversed skeletons — the fresh strong-model review is **reconciled at 19 agree / 5
   HUMAN-routed** (see "Batch-003 targeted v3 re-reconciliation"); the 8-row blind HUMAN
-  packet (5 mandatory + 3 calibration) is built and the HUMAN review is not yet run.
+  packet (5 mandatory + 3 calibration) was HUMAN-reviewed on 2026-09-23: **7 FIX / 1 KEEP
+  ESCALATE, nothing eligible**, and the self-stating-TARGET observation on `2da4e54e` /
+  `5269c91f` is open (see "HUMAN review result — attempt 001" below).
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1540,7 +1542,7 @@ After validation the hidden roles were restored from canonical artifacts: both d
 surface and freezes no label; batch-003 acceptance, HELD release and training remain
 unopened and the accepted pool stays **93**.
 
-### Batch-003 targeted v3 re-reconciliation — strong-model review reconciled, HUMAN NOT RUN
+### Batch-003 targeted v3 re-reconciliation — strong-model reconciled, HUMAN reviewed
 
 The three v3 reversals (`2da4e54e`, `5269c91f`, `b8e64a03`, CLEAR → ESCALATE) change the
 semantic authority over batch-003 surfaces whose text did not change. The remaining **24**
@@ -1633,6 +1635,33 @@ The packet is gitignored and deterministic at raw SHA-256
 and has seen the reconciliation summary, so knows every row in this population has v3
 reference ESCALATE and that most were model CLEAR. Row blindness hides only which row is
 which; the result is not an independent confirmation and its receipt must say so.
+
+**HUMAN review result — attempt 001 (2026-09-23).** Decisions are the owner's; a model only
+presented rows one at a time (owner-reported: GPT-5.6 sol). Raw result
+`p1b6-v3-human-review-results.json` (raw SHA-256
+`444f9c1025fdcb47b89bbf978332c799221c2197514a3f016876662201a3696b`, not committed) is
+ingested by the same builder (`--results <raw> --date <YYYY-MM-DD> --receipt <path>`) into
+`fixtures/local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001.json`.
+
+- raw: 1 KEEP CLEAR (`075`), 1 KEEP ESCALATE (`235`), 6 FIX.
+- **owner revision:** `075` KEEP CLEAR → FIX after the review, recorded beside the unchanged
+  raw row. The owner found it odd but left it CLEAR, then marked FIX from the second row of
+  the same form on — an order effect the receipt records.
+- effective: **7 FIX / 1 KEEP ESCALATE**. Mandatory `075`, `077`, `080`, `082`, `143` →
+  ineligible; calibration `076`, `144` → ineligible pending resolution; calibration `235`
+  matches v3 and stays `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. No row becomes
+  `HUMAN_ADJUDICATED`.
+
+**Observation — OPEN / not adopted.** Every reviewed row on `2da4e54e` and `5269c91f` is FIX
+for the same reason: the TARGET span is the user's own stated fact (`작년에 24번 탔어`,
+`다른 이메일로 새로 가입`), which is self-evidencing and CLEAR when judged as itself, while
+both skeleton contracts define the TARGET status as rule applicability or category membership
+— which v3 `targetBoundary` ("Do not ESCALATE merely because downstream eligibility, policy
+application … remains unknown") treats as downstream. The five strong-model CLEARs were all
+on these two skeletons too; the question-form `b8e64a03` has no such conflict. The same
+construction sits on those skeletons' provisional agreements (`071`, `073`, `074`, `078`,
+`079`, `081`); calibration is not extrapolated, so they are not changed here. Retiring,
+amending or re-authoring the two skeletons is a separate semantic-contract decision.
 
 Nothing is accepted or frozen; replacement-skeleton authoring is separately pending and the
 accepted pool stays **93**.

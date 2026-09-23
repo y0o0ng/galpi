@@ -1,0 +1,203 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-003-targeted-v3-human-review-attempt-001",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-09-23",
+  "reviewProtocol": {
+    "identity": "p1b6-batch-003-targeted-v3-blind-human-review-v1",
+    "sha256": "b12ab70f5a1a79e7089e87c3cf35f46b8429f2a26a887237c9fed07711256542"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-packet-v1",
+    "sha256": "35c6601f202f2cf830ee6db4809e622c7c36aa0a7d8ad10d5cd0937cf9a6aa4b",
+    "rows": 8
+  },
+  "strongModelReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+    "rawSha256": "8db917801426d77f3d024bb843592208f008f490ca49f6a8499306d157f4d283"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-v3-human-review-results.json",
+    "sha256": "444f9c1025fdcb47b89bbf978332c799221c2197514a3f016876662201a3696b",
+    "committed": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "presentationAid": "a model presented packet rows one at a time and made no judgment (owner-reported: GPT-5.6 sol)",
+    "independentConfirmation": false,
+    "limitation": "The owner knew every row in this population has v3 reference ESCALATE and that most were model CLEAR; row blindness hid only which row was which.",
+    "orderEffect": "The owner left the first self-stating-TARGET row CLEAR, then marked FIX from the second such row on; that first row was revised afterwards (see ownerRevisions)."
+  },
+  "ownerRevisions": [
+    {
+      "reviewRowId": "p1b6-v3hreview-2a9457ef343c1153",
+      "from": {
+        "disposition": "KEEP",
+        "decision": "CLEAR"
+      },
+      "to": {
+        "disposition": "FIX",
+        "decision": null
+      },
+      "reason": "Same self-stating TARGET construction as the later FIX rows. The owner found it odd at first sight but left it CLEAR, and began marking FIX from the second row of that form; revised after the review to apply the same judgment."
+    }
+  ],
+  "summary": {
+    "raw": {
+      "KEEP_CLEAR": 1,
+      "KEEP_ESCALATE": 1,
+      "FIX": 6,
+      "REJECT": 0
+    },
+    "effective": {
+      "FIX": 7,
+      "KEEP": 1
+    },
+    "eligibility": {
+      "INELIGIBLE": 5,
+      "INELIGIBLE_PENDING_RESOLUTION": 2,
+      "PROVISIONAL": 1
+    },
+    "matchingV3Reference": 1
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-v3hreview-2a9457ef343c1153",
+      "itemId": "p1b6-item-b003-075",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "role": "mandatory",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "KEEP",
+      "rawDecision": "CLEAR",
+      "disposition": "FIX",
+      "decision": null,
+      "revisedAfterReview": true,
+      "reason": "조건부 표현이지만 TARGET의 8월 졸업 상태 자체가 visible evidence에 직접 주어져 있다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-v3hreview-56e8b02b8634742c",
+      "itemId": "p1b6-item-b003-076",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "FIX",
+      "rawDecision": null,
+      "disposition": "FIX",
+      "decision": null,
+      "revisedAfterReview": false,
+      "reason": "TARGET이 판단하려는 실제 semantic status가 아니라 가입 시점에 대한 간접 단서를 잡고 있어 target span이 부적절하다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE_PENDING_RESOLUTION"
+    },
+    {
+      "reviewRowId": "p1b6-v3hreview-f0d7af42e389beb7",
+      "itemId": "p1b6-item-b003-077",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "role": "mandatory",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "FIX",
+      "rawDecision": null,
+      "disposition": "FIX",
+      "decision": null,
+      "revisedAfterReview": false,
+      "reason": "TARGET이 쿠폰 사용 가능 여부 자체가 아니라 재가입 여부를 판단하기 위한 행동 단서를 잡고 있어 target span이 부적절하다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-v3hreview-cf675c81165f0678",
+      "itemId": "p1b6-item-b003-080",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "role": "mandatory",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "FIX",
+      "rawDecision": null,
+      "disposition": "FIX",
+      "decision": null,
+      "revisedAfterReview": false,
+      "reason": "TARGET이 할인 적용 여부 자체가 아니라 그 판단에 사용되는 상태와 증거 조각을 잡고 있어 target span이 부적절하다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-v3hreview-f361b963bbf857f6",
+      "itemId": "p1b6-item-b003-082",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "role": "mandatory",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "FIX",
+      "rawDecision": null,
+      "disposition": "FIX",
+      "decision": null,
+      "revisedAfterReview": false,
+      "reason": "TARGET은 상품의 출고 특성을 잡고 있지만 실제로 판정하려는 semantic status는 배송비 적용 여부로 읽혀 target span이 불일치한다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-v3hreview-e71dc684e767b1bb",
+      "itemId": "p1b6-item-b003-143",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "role": "mandatory",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "FIX",
+      "rawDecision": null,
+      "disposition": "FIX",
+      "decision": null,
+      "revisedAfterReview": false,
+      "reason": "TARGET이 lounge 이용 가능 여부 자체가 아니라 frequent flyer membership을 판단하기 위한 부분 조건만 잡고 있어 target span이 부적절하다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-v3hreview-57a1f029f0106ef2",
+      "itemId": "p1b6-item-b003-144",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "FIX",
+      "rawDecision": null,
+      "disposition": "FIX",
+      "decision": null,
+      "revisedAfterReview": false,
+      "reason": "TARGET이 장학금 eligibility 자체가 아니라 그 판단에 사용되는 특징 묶음을 잡고 있어 target span이 부적절하다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE_PENDING_RESOLUTION"
+    },
+    {
+      "reviewRowId": "p1b6-v3hreview-fa964d33b5983fd6",
+      "itemId": "p1b6-item-b003-235",
+      "semanticSkeletonId": "p1b6-sk-b8e64a03d97f251c",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "rawDisposition": "KEEP",
+      "rawDecision": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "revisedAfterReview": false,
+      "reason": "TARGET은 현재 VIP 등급 여부라는 실제 상태를 묻지만 visible evidence에는 그 상태를 알려 주는 답이 없어 추가 정보가 필요하다.",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "observation": {
+    "status": "OPEN_NOT_ADOPTED",
+    "skeletons": [
+      "p1b6-sk-2da4e54e6609e34b",
+      "p1b6-sk-5269c91fcfb6c2cd"
+    ],
+    "note": "Every reviewed row on these two skeletons was FIX: the TARGET span is the user's own stated fact, which is self-evidencing and CLEAR when judged as itself, while the skeleton contracts define the TARGET status as rule applicability or category membership, which v3 targetBoundary treats as downstream. The same construction is on the provisional agreement rows of these skeletons. Retiring, amending or re-authoring them is a separate semantic-contract decision; nothing here changes the catalog, the agreements or any surface."
+  },
+  "authority": {
+    "catalogAmendedByThisResult": false,
+    "agreementsRevisitedByThisResult": false,
+    "surfacesRepaired": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

@@ -109,14 +109,136 @@ function buildHumanReviewPacket(rawReceipt, rawProtocol) {
   };
 }
 
+// The owner's post-review revision, recorded next to the unchanged raw result, never in place.
+const OWNER_REVISIONS = Object.freeze([Object.freeze({
+  reviewRowId: 'p1b6-v3hreview-2a9457ef343c1153',
+  from: Object.freeze({ disposition: 'KEEP', decision: 'CLEAR' }),
+  to: Object.freeze({ disposition: 'FIX', decision: null }),
+  reason: 'Same self-stating TARGET construction as the later FIX rows. The owner found it odd at first sight but left it CLEAR, and began marking FIX from the second row of that form; revised after the review to apply the same judgment.',
+})]);
+const RAW_RESULT_FILENAME = 'p1b6-v3-human-review-results.json';
+
+// Routing preregistered in the internal re-reconciliation plan.
+function routeHumanResult(role, referenceLabel, row) {
+  const matches = row.disposition === 'KEEP' && row.decision === referenceLabel;
+  if (role === 'mandatory') {
+    return matches ? { provenance: 'HUMAN_ADJUDICATED', eligibility: 'ELIGIBLE' }
+      : { provenance: null, eligibility: row.disposition === 'KEEP' ? 'INELIGIBLE_PENDING_RESOLUTION' : 'INELIGIBLE' };
+  }
+  return matches ? { provenance: 'CATALOG_STRONG_MODEL_CONFIRMED', eligibility: 'PROVISIONAL' }
+    : { provenance: null, eligibility: 'INELIGIBLE_PENDING_RESOLUTION' };
+}
+
+function buildHumanResultReceipt(rawResultBytes, rawReceipt, rawProtocol, reviewDate) {
+  const packet = buildHumanReviewPacket(rawReceipt, rawProtocol);
+  const smReceipt = JSON.parse(rawReceipt.toString('utf8'));
+  const parsed = JSON.parse(Buffer.from(rawResultBytes).toString('utf8'));
+  if (!parsed || JSON.stringify(Object.keys(parsed)) !== '["results"]' || !Array.isArray(parsed.results)) {
+    fail('result artifact must be an object whose only key is results');
+  }
+  const ids = parsed.results.map(row => row.reviewRowId);
+  if (JSON.stringify(ids.toSorted()) !== JSON.stringify(packet.rows.map(row => row.reviewRowId))) {
+    fail('result rows are not exactly the packet rows');
+  }
+  for (const row of parsed.results) {
+    const ok = JSON.stringify(Object.keys(row).toSorted()) === '["decision","disposition","reason","reviewRowId"]'
+      && typeof row.reason === 'string' && row.reason.trim() !== ''
+      && (row.disposition === 'KEEP' ? ['CLEAR', 'ESCALATE'].includes(row.decision)
+        : ['FIX', 'REJECT'].includes(row.disposition) && row.decision === null);
+    if (!ok) fail(`result row is malformed: ${row.reviewRowId}`);
+  }
+  const batchSha256 = smPacket.CANONICAL_INPUTS.batch.rawSha256;
+  const roles = new Map([
+    ...smReceipt.mandatoryHumanRows.map(row => [row.itemId, 'mandatory']),
+    ...smReceipt.calibrationRows.map(row => [row.itemId, 'calibration']),
+  ]);
+  const references = new Map(reconcile.canonicalReferences(smPacket.loadCanonicalInputs())
+    .map(row => [row.itemId, row]));
+  const itemOf = new Map([...roles.keys()].map(itemId => [opaqueReviewRowId(batchSha256, itemId), itemId]));
+  const rows = parsed.results.map(raw => {
+    const revision = OWNER_REVISIONS.find(entry => entry.reviewRowId === raw.reviewRowId);
+    if (revision && (raw.disposition !== revision.from.disposition || raw.decision !== revision.from.decision)) {
+      fail(`revision does not match the raw result: ${raw.reviewRowId}`);
+    }
+    const effective = revision ? { ...raw, ...revision.to } : raw;
+    const itemId = itemOf.get(raw.reviewRowId);
+    const reference = references.get(itemId);
+    return {
+      reviewRowId: raw.reviewRowId,
+      itemId,
+      semanticSkeletonId: reference.semanticSkeletonId,
+      role: roles.get(itemId),
+      referenceLabel: reference.referenceLabel,
+      rawDisposition: raw.disposition,
+      rawDecision: raw.decision,
+      disposition: effective.disposition,
+      decision: effective.decision,
+      revisedAfterReview: Boolean(revision),
+      reason: raw.reason,
+      ...routeHumanResult(roles.get(itemId), reference.referenceLabel, effective),
+    };
+  }).toSorted((a, b) => (a.itemId < b.itemId ? -1 : 1));
+  const count = key => rows.reduce((acc, row) => {
+    acc[row[key]] = (acc[row[key]] ?? 0) + 1;
+    return acc;
+  }, {});
+  return {
+    name: 'xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1',
+    attemptId: 'p1b6-batch-003-targeted-v3-human-review-attempt-001',
+    status: 'COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3',
+    reviewDate,
+    reviewProtocol: { identity: packet.reviewProtocol.identity, sha256: PINNED.protocol.rawSha256 },
+    reviewPacket: { identity: PACKET_IDENTITY, sha256: sha256RawBytes(packetBytes(packet)), rows: packet.rows.length },
+    strongModelReceipt: { identity: PINNED.strongModelReceipt.identity, rawSha256: PINNED.strongModelReceipt.rawSha256 },
+    rawResultArtifact: { filename: RAW_RESULT_FILENAME, sha256: sha256RawBytes(rawResultBytes), committed: false },
+    reviewer: {
+      role: 'repository owner',
+      decisionsBy: 'repository owner',
+      presentationAid: 'a model presented packet rows one at a time and made no judgment (owner-reported: GPT-5.6 sol)',
+      independentConfirmation: false,
+      limitation: 'The owner knew every row in this population has v3 reference ESCALATE and that most were model CLEAR; row blindness hid only which row was which.',
+      orderEffect: 'The owner left the first self-stating-TARGET row CLEAR, then marked FIX from the second such row on; that first row was revised afterwards (see ownerRevisions).',
+    },
+    ownerRevisions: OWNER_REVISIONS,
+    summary: {
+      raw: { KEEP_CLEAR: 1, KEEP_ESCALATE: 1, FIX: 6, REJECT: 0 },
+      effective: count('disposition'),
+      eligibility: count('eligibility'),
+      matchingV3Reference: rows.filter(row => row.disposition === 'KEEP' && row.decision === row.referenceLabel).length,
+    },
+    rows,
+    observation: {
+      status: 'OPEN_NOT_ADOPTED',
+      skeletons: ['p1b6-sk-2da4e54e6609e34b', 'p1b6-sk-5269c91fcfb6c2cd'],
+      note: 'Every reviewed row on these two skeletons was FIX: the TARGET span is the user\'s own stated fact, which is self-evidencing and CLEAR when judged as itself, while the skeleton contracts define the TARGET status as rule applicability or category membership, which v3 targetBoundary treats as downstream. The same construction is on the provisional agreement rows of these skeletons. Retiring, amending or re-authoring them is a separate semantic-contract decision; nothing here changes the catalog, the agreements or any surface.',
+    },
+    authority: {
+      catalogAmendedByThisResult: false,
+      agreementsRevisitedByThisResult: false,
+      surfacesRepaired: false,
+      surfaceAcceptancePerformed: false,
+      referenceLabelFreezePerformed: false,
+      finalSelectionPerformed: false,
+      trainingOrEvaluationOccurred: false,
+    },
+  };
+}
+
 function loadPinned() {
   return [PINNED.strongModelReceipt, PINNED.protocol]
     .map(pinned => fs.readFileSync(path.join(ROOT, 'fixtures', pinned.fixture)));
 }
 
 function main(argv = process.argv.slice(2)) {
+  if (argv.length === 6 && argv[0] === '--results' && argv[2] === '--date' && argv[4] === '--receipt') {
+    if (fs.existsSync(argv[5])) throw new Error(`Existing output will not be overwritten: ${argv[5]}`);
+    const receipt = buildHumanResultReceipt(fs.readFileSync(argv[1]), ...loadPinned(), argv[3]);
+    fs.writeFileSync(argv[5], `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx' });
+    process.stdout.write(`Recorded HUMAN result: ${JSON.stringify(receipt.summary)}\n`);
+    return 0;
+  }
   if (argv.length !== 2 || argv[0] !== '--output' || !argv[1]) {
-    throw new Error('Usage: --output <targeted-v3-human-review-packet.json>');
+    throw new Error('Usage: --output <packet.json> | --results <raw.json> --date <YYYY-MM-DD> --receipt <receipt.json>');
   }
   if (fs.existsSync(argv[1])) throw new Error(`Existing output will not be overwritten: ${argv[1]}`);
   const packet = buildHumanReviewPacket(...loadPinned());
@@ -128,9 +250,11 @@ function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
+  OWNER_REVISIONS,
   PACKET_IDENTITY,
   PINNED,
   REVIEW_ID_NAMESPACE,
+  buildHumanResultReceipt,
   buildHumanReviewPacket,
   derivePopulation,
   loadPinned,
