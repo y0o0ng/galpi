@@ -68,7 +68,7 @@ async function startServer(t, enabled, pushEnabled = false, seriesEnabled = fals
   await fs.copyFile(path.join(ROOT, 'server.js'), path.join(appRoot, 'server.js'));
   const fakeCodex = path.join(appRoot, 'fake-codex');
   if (codexOutput) {
-    await fs.writeFile(fakeCodex, `#!/usr/bin/env node
+    await fs.writeFile(fakeCodex, `#!${process.execPath}
 const fs = require('node:fs');
 if (!process.argv.includes('exec')) { process.stdout.write('fake-codex'); process.exit(0); }
 if (!process.argv.includes('read-only') || !process.argv.includes('--ephemeral')) process.exit(3);
