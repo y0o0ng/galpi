@@ -102,11 +102,14 @@ test('the receipt binds the exact reviewed artifacts and current authority', () 
   assert.deepEqual(receipt.currentReferenceAuthority, {
     identity: strongModel.CATALOG_IDENTITY, rawSha256: UNCHANGED[CATALOG],
   });
-  // The private packet and raw results stay out of git.
-  const tracked = require('node:child_process')
-    .execFileSync('git', ['ls-files', 'fixtures'], { cwd: ROOT, encoding: 'utf8' });
-  assert.equal(tracked.includes('local-memory-inference-private-'), false);
-  assert.equal(tracked.includes('human-adjudication-calibration-results'), false);
+  // The private packet and raw results stay out of git. The container image has no .git
+  // (.dockerignore), so this is checked only in a git checkout.
+  if (fs.existsSync(path.join(ROOT, '.git'))) {
+    const tracked = require('node:child_process')
+      .execFileSync('git', ['ls-files', 'fixtures'], { cwd: ROOT, encoding: 'utf8' });
+    assert.equal(tracked.includes('local-memory-inference-private-'), false);
+    assert.equal(tracked.includes('human-adjudication-calibration-results'), false);
+  }
 });
 
 test('the HUMAN bytes are bound before parsing; mutations and reserializations fail', () => {
