@@ -74,8 +74,9 @@ test('the committed receipt is internally consistent and opens no gate', () => {
   const receipt = JSON.parse(read(RECEIPT));
   assert.equal(receipt.attemptId, reconcile.ATTEMPT_ID);
   assert.equal(receipt.status, 'COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3');
-  assert.equal(receipt.reviewPacket.sha256, sha256RawBytes(read(
-    'fixtures/local-memory-inference-private-p1b6-batch-003-targeted-v3-strong-model-review-packet.json')));
+  // The packet is gitignored, so compare against the deterministic rebuild, not the file.
+  assert.equal(receipt.reviewPacket.sha256,
+    sha256RawBytes(builder.packetBytes(builder.buildTargetedReviewPacket(inputs()))));
   assert.equal(receipt.rereconciliationPlan.rawSha256, sha256RawBytes(PLAN));
   assert.equal(receipt.referenceAuthority.rawSha256, builder.CANONICAL_INPUTS.v3Catalog.rawSha256);
   assert.equal(receipt.rawResultArtifact.committed, false);
