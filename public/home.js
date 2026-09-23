@@ -5,6 +5,7 @@
   const LOCATION_KEY = 'councilLastLocation';
   const WEATHER_CACHE_MS = 15 * 60 * 1000;
   const LOCATION_FALLBACK_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+  let scrollAnchorFrame = 0;
   const state = {
     initialized: false,
     apiFetch: null,
@@ -613,16 +614,42 @@
   }
 
   function transitionOverview(nextCard) {
+    cancelAnimationFrame(scrollAnchorFrame);
     const grid = document.getElementById('home-grid');
+    const page = document.getElementById('home-page');
+    const phone = matchMedia('(max-width: 640px)').matches;
     const previousFocus = state.focusedCard;
     const anchorId = nextCard || previousFocus;
     const before = new Map([...grid.querySelectorAll('.home-card')].map(card => [card.dataset.cardId, card.getBoundingClientRect()]));
+    const oldAnchor = before.get(anchorId);
+    let anchorY = null;
+    if (phone && oldAnchor) {
+      const viewport = page.getBoundingClientRect();
+      const bottom = Math.min(viewport.bottom, document.getElementById('bottom-nav').getBoundingClientRect().top);
+      const visibleTop = Math.max(oldAnchor.top, viewport.top);
+      const visibleBottom = Math.min(oldAnchor.bottom, bottom);
+      if (nextCard) anchorY = oldAnchor.top;
+      else if (visibleBottom > visibleTop) anchorY = (visibleTop + visibleBottom) / 2;
+      else anchorY = Math.max(viewport.top, Math.min((oldAnchor.top + oldAnchor.bottom) / 2, bottom));
+    }
     state.focusedCard = nextCard;
     renderOverview();
-    const phone = matchMedia('(max-width: 640px)').matches;
-    if (phone && anchorId && before.has(anchorId)) {
-      const current = grid.querySelector(`[data-card-id="${anchorId}"]`)?.getBoundingClientRect();
-      if (current) document.getElementById('home-page').scrollTop += current.top - before.get(anchorId).top;
+    grid.style.paddingBottom = '';
+    const alignCard = () => {
+      const card = grid.querySelector(`[data-card-id="${anchorId}"]`);
+      const current = card?.getBoundingClientRect();
+      if (!current) return;
+      const currentY = nextCard ? current.top : current.top + current.height / 2;
+      const wanted = Math.max(0, page.scrollTop + currentY - anchorY);
+      const extra = parseFloat(grid.style.paddingBottom) || 0;
+      const naturalMax = Math.max(0, page.scrollHeight - page.clientHeight - extra);
+      const missing = wanted - naturalMax;
+      grid.style.paddingBottom = !nextCard && missing > 0 ? `${Math.ceil(missing)}px` : '';
+      page.scrollTop = wanted;
+    };
+    if (anchorY != null) {
+      alignCard();
+      if (!nextCard) grid.querySelector(`[data-card-id="${anchorId}"]`)?.focus({ preventScroll: true });
     }
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     grid.querySelectorAll('.home-card').forEach(card => {
@@ -635,6 +662,14 @@
         { transform: 'none', width: `${current.width}px`, height: `${current.height}px` },
       ], { duration: 320, easing: 'cubic-bezier(.2,.7,.2,1)' });
     });
+    if (phone && !nextCard && anchorY != null) {
+      const until = performance.now() + 350;
+      const followCard = () => {
+        alignCard();
+        scrollAnchorFrame = performance.now() < until ? requestAnimationFrame(followCard) : 0;
+      };
+      scrollAnchorFrame = requestAnimationFrame(followCard);
+    }
   }
 
   function setFocusedCard(id) {
@@ -661,6 +696,10 @@
 
   function setHomeView(view) {
     state.homeView = view === 'agents' ? 'agents' : 'overview';
+    if (state.homeView !== 'overview') {
+      cancelAnimationFrame(scrollAnchorFrame);
+      document.getElementById('home-grid').style.paddingBottom = '';
+    }
     document.querySelectorAll('[data-home-view]').forEach(button => {
       const active = button.dataset.homeView === state.homeView;
       button.classList.toggle('active', active);
@@ -678,6 +717,10 @@
 
   function setRoute(route, homeView) {
     if (!['home', 'chat', 'notes', 'settings'].includes(route)) route = 'home';
+    if (route !== 'home') {
+      cancelAnimationFrame(scrollAnchorFrame);
+      document.getElementById('home-grid').style.paddingBottom = '';
+    }
     state.route = route;
     document.body.dataset.productRoute = route;
     document.querySelectorAll('[data-product-page]').forEach(page => page.classList.toggle('active', page.dataset.productPage === route));
@@ -797,7 +840,16 @@
     document.querySelectorAll('[data-home-view]').forEach(button => button.addEventListener('click', () => setHomeView(button.dataset.homeView)));
     document.querySelectorAll('.shell-theme-button').forEach(button => button.addEventListener('click', () => document.getElementById('theme-toggle')?.click()));
     document.getElementById('home-focus-collapse').addEventListener('click', collapseFocus);
-    document.getElementById('home-page').addEventListener('click', event => {
+    const homePage = document.getElementById('home-page');
+    homePage.addEventListener('scroll', () => {
+      const grid = document.getElementById('home-grid');
+      const extra = parseFloat(grid.style.paddingBottom) || 0;
+      if (extra && homePage.scrollTop <= homePage.scrollHeight - homePage.clientHeight - extra + 1) grid.style.paddingBottom = '';
+    }, { passive: true });
+    matchMedia('(max-width: 640px)').addEventListener('change', event => {
+      if (!event.matches) document.getElementById('home-grid').style.paddingBottom = '';
+    });
+    homePage.addEventListener('click', event => {
       if (state.focusedCard && !event.target.closest('.home-card.focused') && !event.target.closest('#home-focus-collapse')) collapseFocus();
     });
     state.initialized = true;

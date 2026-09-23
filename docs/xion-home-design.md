@@ -82,6 +82,8 @@ focus 뒤 페이지가 더 길어져도 자연스럽게 스크롤한다.
 데스크톱과 Pad에서는 focus 카드 밖을 누르면 Overview로 돌아간다. Phone에서는 모든 focus
 카드 위에 공통 왼쪽 위 collapse 버튼을 보인다. Notes/Papers 상세 안의 내부 `뒤로`는
 `detail → list`이고 Home collapse와 다른 단계다.
+Phone에서 collapse할 때는 방금 보던 카드가 화면의 같은 위치에 남도록 스크롤을 보정한다.
+페이지가 짧아져 스크롤 범위가 부족하면 필요한 만큼만 임시 아래 여백을 유지한다.
 
 Phone 참조 높이는 Large 600px, Medium 440px, Small 210px다. 개별 카드 내용은 카드 밖으로
 새지 않으며 필요한 긴 목록은 카드 안에서 스크롤한다.
