@@ -1084,7 +1084,7 @@
     const push = button(state.mailSettings?.notificationsEnabled ? 'Push 끄기' : 'Push 켜기', () => {
       saveMailSettings({ notificationsEnabled: !state.mailSettings.notificationsEnabled });
     });
-    const quiet = button(state.mailSettings?.quietHours.enabled ? '방해 금지 끄기' : '방해 금지', () => {
+    const quiet = button(state.mailSettings?.quietHours.enabled ? '방해 금지 끄기' : '방해 금지 켜기', () => {
       saveMailSettings({ quietHours: { ...state.mailSettings.quietHours, enabled: !state.mailSettings.quietHours.enabled } });
     });
     const revert = button('되돌리기', () => removeMailPreference(preference.id));
@@ -1120,9 +1120,13 @@
     due.appendChild(dueText);
     const next = agentSummarySection('다음 알림', 'agent-summary-next');
     const reminder = document.createElement('p');
-    reminder.textContent = state.summary.nextReminder
-      ? `${formatDateTime(state.summary.nextReminder.remindAt)} · ${state.summary.nextReminder.title || '제목 없는 일정'}`
-      : '예정 없음';
+    reminder.className = 'agent-next-reminder';
+    const reminderDate = document.createElement('span');
+    const reminderTitle = document.createElement('span');
+    reminderDate.textContent = state.summary.nextReminder
+      ? formatDateTime(state.summary.nextReminder.remindAt) : '예정 없음';
+    reminderTitle.textContent = state.summary.nextReminder?.title || '';
+    reminder.append(reminderDate, reminderTitle);
     const compactDue = document.createElement('small');
     compactDue.className = 'agent-next-due';
     compactDue.textContent = dueText.textContent;
@@ -1162,6 +1166,10 @@
     const waiting = Number(state.organize?.waitingJobs) || 0;
     const summary = document.createElement('p');
     summary.textContent = `대기 노트 ${count}개${waiting ? ` · 진행 대기 ${waiting}건` : ''}`;
+    const compactThreshold = document.createElement('span');
+    compactThreshold.className = 'agent-queue-compact';
+    compactThreshold.textContent = ` · 자동 시작 ${Number(state.organize?.autoQueueThreshold) || 0}개부터`;
+    summary.appendChild(compactThreshold);
     const threshold = document.createElement('small');
     threshold.textContent = `자동 시작은 ${Number(state.organize?.autoQueueThreshold) || 0}개부터`;
     const actions = document.createElement('div');

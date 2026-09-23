@@ -167,18 +167,23 @@
     const month = days.find(item => item.inMonth);
     const monthHead = node('div', 'calendar-month-head');
     monthHead.append(node('strong', '', `${month.month + 1}월`), node('span', '', `${month.year}년`));
-    const grid = node('div', 'calendar-month-grid');
+    const grid = node('div', `calendar-month-grid${days.length === 42 ? ' six-weeks' : ''}`);
     ['월', '화', '수', '목', '금', '토', '일'].forEach(label => grid.append(node('span', 'calendar-weekday', label)));
     const today = kstDate(Date.now() / 1000);
     const compactAnchor = state.selectedDate || today;
     const compactWeek = Math.max(0, Math.floor(days.findIndex(item => item.key === compactAnchor) / 7));
+    const compactPairStart = Math.min(compactWeek, days.length / 7 - 2);
     days.forEach(item => {
-      const day = node('button', 'calendar-day', String(item.date.getUTCDate()));
+      const day = node('button', 'calendar-day');
       day.type = 'button';
+      day.append(node('span', 'calendar-day-number', String(item.date.getUTCDate())));
       day.classList.toggle('outside', !item.inMonth);
+      day.classList.toggle('saturday', item.date.getUTCDay() === 6);
+      day.classList.toggle('sunday', item.date.getUTCDay() === 0);
       day.classList.toggle('today', item.key === today);
       day.classList.toggle('selected', item.key === state.selectedDate);
       day.classList.toggle('outside-compact-week', Math.floor(days.indexOf(item) / 7) !== compactWeek);
+      day.classList.toggle('outside-compact-pair', Math.floor(days.indexOf(item) / 7) < compactPairStart || Math.floor(days.indexOf(item) / 7) > compactPairStart + 1);
       const hasEvent = state.tasks.some(task => taskDate(task) === item.key);
       if (hasEvent) day.append(node('i', '', ''));
       day.addEventListener('click', event => {
@@ -190,9 +195,11 @@
       grid.append(day);
     });
     const selectedKey = state.selectedDate || today;
-    const selectedTasks = state.tasks.filter(task => taskDate(task) === selectedKey).slice(0, 4);
+    const allSelectedTasks = state.tasks.filter(task => taskDate(task) === selectedKey);
+    const selectedTasks = allSelectedTasks.slice(0, 4);
     const agenda = node('div', 'calendar-agenda');
-    agenda.append(node('strong', '', `일정 ${selectedTasks.length}개`));
+    const selectedLabel = new Intl.DateTimeFormat('ko-KR', { timeZone: 'UTC', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${selectedKey}T00:00:00Z`));
+    agenda.append(node('strong', '', `${state.focusedCard === 'calendar' ? '' : `${selectedLabel} · `}일정 ${allSelectedTasks.length}개`));
     selectedTasks.forEach(task => {
       const row = node('p', 'calendar-event-row');
       row.append(node('time', '', task.dueAt ? formatDateTime(task.dueAt).split(' ').slice(-1)[0] : ''), node('span', '', task.title));
@@ -202,7 +209,7 @@
     body.append(monthHead, grid, agenda);
     if (state.focusedCard === 'calendar') {
       const actions = node('div', 'home-card-actions');
-      actions.append(node('span', 'calendar-selected-date', new Intl.DateTimeFormat('ko-KR', { timeZone: 'UTC', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${selectedKey}T00:00:00Z`))), action('전체 일정', () => openTaskPanel({ view: 'today' })), action('일정 추가하기', () => openTaskPanel({ compose: true }), true));
+      actions.append(node('span', 'calendar-selected-date', selectedLabel), action('전체 일정', () => openTaskPanel({ view: 'today' })), action('일정 추가하기', () => openTaskPanel({ compose: true }), true));
       body.append(actions, node('div', 'home-focus-extra'));
     }
     return card('calendar', '달력', '', body);

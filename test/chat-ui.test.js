@@ -217,6 +217,26 @@ test('Home uses the approved 16-column geometry and responsive card flow', () =>
   assert.match(css, /#home-grid\.has-focus \.home-card\.focused:is\(\.home-card-calendar, \.home-card-mail, \.home-card-notes\) \{[^}]*grid-column-end: span 12/s);
 });
 
+test('every desktop focus layout fits the original three-row Home canvas without overlap', () => {
+  assert.match(css, /#home-grid\.has-focus \{ grid-template-rows: repeat\(3, 210px\); \}/);
+  const cards = ['weather', 'tasks', 'calendar', 'mail', 'notifications', 'dday', 'lecture', 'notes'];
+  for (const focus of ['calendar', 'tasks', 'mail', 'notifications', 'dday', 'notes']) {
+    const occupied = new Set();
+    for (const card of cards) {
+      const rule = css.match(new RegExp(`#home-grid\\.focus-${focus} \\.home-card-${card} \\{ grid-area: (\\d+) \\/ (\\d+)(?: \\/ span (\\d+) \\/ span (\\d+))?; \\}`));
+      assert.ok(rule, `${focus}: ${card} has a position`);
+      const row = Number(rule[1]), column = Number(rule[2]);
+      const rowSpan = Number(rule[3] || 1), columnSpan = Number(rule[4] || 1);
+      assert.ok(row + rowSpan <= 4 && column + columnSpan <= 17, `${focus}: ${card} stays inside 3 × 16`);
+      for (let r = row; r < row + rowSpan; r++) for (let c = column; c < column + columnSpan; c++) {
+        const cell = `${r}:${c}`;
+        assert.ok(!occupied.has(cell), `${focus}: ${card} does not overlap at ${cell}`);
+        occupied.add(cell);
+      }
+    }
+  }
+});
+
 test('Home keeps one focus state and the platform-specific collapse contracts', () => {
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   assert.match(home, /focusedCard: null/);
@@ -238,7 +258,7 @@ test('Home uses the Figma shell assets and the existing Notes and Mail controlle
   const note = fs.readFileSync(path.join(ROOT, 'public/note-panel.js'), 'utf8');
   const paper = fs.readFileSync(path.join(ROOT, 'public/paper-panel.js'), 'utf8');
   const notifications = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
-  for (const asset of ['galpi-logo.svg', 'bell.svg', 'moon.svg', 'more.svg', 'left.svg', 'nav-dot.svg', 'nav-active-dot.svg', 'task-open.svg']) {
+  for (const asset of ['galpi-logo.svg', 'bell.svg', 'moon.svg', 'more.svg', 'left.svg', 'nav-dot.svg', 'nav-active-dot.svg', 'task-open.svg', 'calendar-today.svg', 'calendar-selected.svg', 'calendar-event-dot.svg']) {
     assert.ok(fs.existsSync(path.join(ROOT, 'public/assets/figma', asset)));
   }
   assert.match(html, /assets\/figma\/galpi-logo\.svg/);
@@ -266,16 +286,21 @@ test('Chat knowledge tabs are exactly Notes and Papers with Notes selected', () 
   assert.doesNotMatch(tabs, /agents|notifications/);
 });
 
-test('Calendar compacts to one selected week and renders one event marker per day', () => {
+test('Calendar keeps the Figma month and compact weeks with one event marker per day', () => {
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   assert.match(home, /if \(task\?\.dueKind === 'date'\) return task\.dueDate \|\| ''/);
   assert.match(home, /const compactAnchor = state\.selectedDate \|\| today/);
   assert.match(home, /const mondayOffset = \(first\.getUTCDay\(\) \+ 6\) % 7/);
   assert.match(home, /length: weeks \* 7/);
+  assert.match(home, /days\.length === 42 \? ' six-weeks' : ''/);
   assert.match(home, /outside-compact-week/);
+  assert.match(home, /outside-compact-pair/);
   assert.match(home, /const hasEvent = state\.tasks\.some\(task => taskDate\(task\) === item\.key\)/);
   assert.match(home, /if \(hasEvent\) day\.append\(node\('i'/);
+  assert.match(css, /\.calendar-day\.today \.calendar-day-number \{ background: url\('assets\/figma\/calendar-today\.svg'\)/);
+  assert.match(css, /\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{[^}]*background: url\('assets\/figma\/calendar-selected\.svg'\)/);
   assert.match(css, /\.home-card-calendar:not\(\.focused\) \.calendar-day\.outside-compact-week \{[^}]*display: none/s);
+  assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?\.home-card-calendar:not\(\.focused\) \.calendar-day\.outside-compact-pair \{ display: none; \}/);
 });
 
 test('Home actions reuse TaskPanel, Mail settings, and Codex settings', () => {

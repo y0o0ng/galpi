@@ -4464,11 +4464,7 @@ textarea:focus-visible {
 .home-card-lecture { grid-column: 3 / span 7; grid-row: 3; }
 .home-card-notes { grid-column: 10 / span 7; grid-row: 3; }
 
-#home-grid.has-focus {
-  grid-template-rows: repeat(4, 210px);
-}
-
-#home-grid.focus-calendar { grid-template-rows: repeat(3, 210px); }
+#home-grid.has-focus { grid-template-rows: repeat(3, 210px); }
 
 #home-grid.has-focus .home-card {
   grid-column: auto / span 2;
@@ -4510,26 +4506,26 @@ textarea:focus-visible {
 #home-grid.focus-tasks .home-card-mail { grid-area: 2 / 1 / span 1 / span 4; }
 #home-grid.focus-tasks .home-card-notifications { grid-area: 3 / 1 / span 1 / span 4; }
 #home-grid.focus-tasks .home-card-dday { grid-area: 3 / 5 / span 1 / span 2; }
-#home-grid.focus-tasks .home-card-lecture { grid-area: 3 / 7 / span 1 / span 7; }
-#home-grid.focus-tasks .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+#home-grid.focus-tasks .home-card-lecture { grid-area: 3 / 7 / span 1 / span 5; }
+#home-grid.focus-tasks .home-card-notes { grid-area: 3 / 12 / span 1 / span 5; }
 
-#home-grid.focus-mail .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
-#home-grid.focus-mail .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
-#home-grid.focus-mail .home-card-calendar { grid-area: 1 / 12 / span 1 / span 5; }
-#home-grid.focus-mail .home-card-mail { grid-area: 2 / 1 / span 2 / span 12; }
-#home-grid.focus-mail .home-card-notifications { grid-area: 2 / 13 / span 1 / span 4; }
-#home-grid.focus-mail .home-card-dday { grid-area: 3 / 13 / span 1 / span 2; }
-#home-grid.focus-mail .home-card-lecture { grid-area: 4 / 1 / span 1 / span 7; }
-#home-grid.focus-mail .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+#home-grid.focus-mail .home-card-mail { grid-area: 1 / 1 / span 2 / span 12; }
+#home-grid.focus-mail .home-card-weather { grid-area: 1 / 13 / span 1 / span 2; }
+#home-grid.focus-mail .home-card-tasks { grid-area: 1 / 15 / span 1 / span 2; }
+#home-grid.focus-mail .home-card-calendar { grid-area: 2 / 13 / span 1 / span 2; }
+#home-grid.focus-mail .home-card-notifications { grid-area: 2 / 15 / span 1 / span 2; }
+#home-grid.focus-mail .home-card-dday { grid-area: 3 / 1 / span 1 / span 2; }
+#home-grid.focus-mail .home-card-lecture { grid-area: 3 / 3 / span 1 / span 7; }
+#home-grid.focus-mail .home-card-notes { grid-area: 3 / 10 / span 1 / span 7; }
 
 #home-grid.focus-notifications .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
-#home-grid.focus-notifications .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
-#home-grid.focus-notifications .home-card-calendar { grid-area: 1 / 12 / span 1 / span 5; }
-#home-grid.focus-notifications .home-card-mail { grid-area: 2 / 1 / span 1 / span 7; }
-#home-grid.focus-notifications .home-card-notifications { grid-area: 2 / 8 / span 2 / span 7; }
-#home-grid.focus-notifications .home-card-dday { grid-area: 2 / 15 / span 1 / span 2; }
-#home-grid.focus-notifications .home-card-lecture { grid-area: 3 / 1 / span 1 / span 7; }
-#home-grid.focus-notifications .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+#home-grid.focus-notifications .home-card-mail { grid-area: 2 / 1 / span 1 / span 4; }
+#home-grid.focus-notifications .home-card-notifications { grid-area: 1 / 5 / span 2 / span 7; }
+#home-grid.focus-notifications .home-card-calendar { grid-area: 1 / 12 / span 2 / span 5; }
+#home-grid.focus-notifications .home-card-dday { grid-area: 3 / 1 / span 1 / span 2; }
+#home-grid.focus-notifications .home-card-tasks { grid-area: 3 / 3 / span 1 / span 4; }
+#home-grid.focus-notifications .home-card-lecture { grid-area: 3 / 7 / span 1 / span 5; }
+#home-grid.focus-notifications .home-card-notes { grid-area: 3 / 12 / span 1 / span 5; }
 
 #home-grid.focus-dday .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
 #home-grid.focus-dday .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
@@ -4537,17 +4533,18 @@ textarea:focus-visible {
 #home-grid.focus-dday .home-card-mail { grid-area: 2 / 1 / span 1 / span 7; }
 #home-grid.focus-dday .home-card-notifications { grid-area: 2 / 8 / span 1 / span 4; }
 #home-grid.focus-dday .home-card-dday { grid-area: 3 / 1 / span 1 / span 7; }
-#home-grid.focus-dday .home-card-lecture { grid-area: 3 / 8 / span 1 / span 7; }
-#home-grid.focus-dday .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+#home-grid.focus-dday .home-card-lecture { grid-area: 3 / 8 / span 1 / span 4; }
+#home-grid.focus-dday .home-card-notes { grid-area: 3 / 12 / span 1 / span 5; }
 
-#home-grid.focus-notes .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
-#home-grid.focus-notes .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
-#home-grid.focus-notes .home-card-calendar { grid-area: 1 / 12 / span 2 / span 5; }
-#home-grid.focus-notes .home-card-mail { grid-area: 2 / 1 / span 1 / span 7; }
-#home-grid.focus-notes .home-card-notifications { grid-area: 2 / 8 / span 1 / span 4; }
+#home-grid.focus-notes .home-card-weather { grid-area: 1 / 1 / span 1 / span 2; }
+#home-grid.focus-notes .home-card-tasks { grid-area: 1 / 3 / span 1 / span 2; }
+#home-grid.focus-notes .home-card-mail { grid-area: 2 / 1 / span 1 / span 2; }
+#home-grid.focus-notes .home-card-notifications { grid-area: 2 / 3 / span 1 / span 2; }
 #home-grid.focus-notes .home-card-dday { grid-area: 3 / 1 / span 1 / span 2; }
-#home-grid.focus-notes .home-card-lecture { grid-area: 4 / 1 / span 1 / span 4; }
-#home-grid.focus-notes .home-card-notes { grid-area: 3 / 5 / span 2 / span 12; }
+#home-grid.focus-notes .home-card-lecture { grid-area: 3 / 3 / span 1 / span 7; }
+#home-grid.focus-notes .home-card-calendar { grid-area: 3 / 10 / span 1 / span 7; }
+#home-grid.focus-notes .home-card-notes { grid-area: 1 / 5 / span 2 / span 12; }
+#home-grid.focus-notes .home-card-calendar .calendar-day.outside-compact-pair { display: none; }
 
 .home-card-head {
   display: flex;
@@ -4674,84 +4671,102 @@ textarea:focus-visible {
 .home-task-row-actions .home-card-action { min-width: 80px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 10px; background: var(--brand-soft); font-size: 10px; }
 .home-task-row-actions .home-card-action:last-child { background: color-mix(in srgb, var(--danger) 9%, transparent); color: var(--danger); }
 
+.home-card-calendar { padding: 14px; }
+.home-card-calendar .home-card-head { margin-bottom: 4px; }
+.home-card-calendar .home-card-head h2 { font-size: 16px; }
+
 .calendar-month-head {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 8px;
+  height: 20px;
+  margin: 0 0 4px;
+  padding-left: 5px;
 }
 
-.calendar-month-head strong { font-size: 20px; }
-.calendar-month-head span { color: var(--label); font-size: 10px; }
+.calendar-month-head strong { font-size: 13px; }
+.calendar-month-head span { color: var(--label); font-size: 11px; }
 
 .calendar-month-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px 3px;
+  gap: 0;
+}
+@media (min-width: 1101px) {
+  #home-grid:not(.has-focus) .calendar-month-grid.six-weeks .calendar-day { height: 35px; }
 }
 
 .calendar-weekday {
+  display: grid;
+  height: 28px;
+  place-items: center;
+  border-bottom: 1px solid var(--hairline);
   color: var(--label);
-  font-size: 9px;
+  font-size: 10px;
   text-align: center;
 }
 
 .calendar-day {
   position: relative;
-  display: grid;
-  height: 30px;
-  place-items: center;
+  display: flex;
+  height: 42px;
+  align-items: flex-start;
+  justify-content: center;
   border: 0;
-  border-radius: 50%;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
   background: transparent;
   color: var(--ai-text);
-  font-size: 10px;
+  font-size: 13px;
   cursor: pointer;
 }
 
+.calendar-day.saturday { color: #505baf; }
+.calendar-day.sunday { color: #b55454; }
+.calendar-day-number { display: grid; width: 28px; height: 28px; margin-top: 4px; place-items: center; border-radius: 50%; }
 .calendar-day.outside { opacity: 0.28; }
-.calendar-day.today { color: var(--brand-ink); font-weight: 800; outline: 1px dashed var(--brand); outline-offset: -5px; }
-.calendar-day.selected { background: var(--brand); color: var(--brand-on); }
-.calendar-day.selected.today { outline: none; }
+.calendar-day.today .calendar-day-number { background: url('assets/figma/calendar-today.svg') center / contain no-repeat; color: #fff; font-weight: 700; }
+.calendar-day.selected:not(.today) .calendar-day-number { width: 29.5px; height: 29.5px; background: url('assets/figma/calendar-selected.svg') center / contain no-repeat; color: var(--brand-ink); font-weight: 700; }
 
 .calendar-day i {
   position: absolute;
-  bottom: 2px;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: currentColor;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  background: url('assets/figma/calendar-event-dot.svg') center / contain no-repeat;
 }
 
 .calendar-agenda {
   display: grid;
-  gap: 5px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--hairline);
+  gap: 7px;
+  margin-top: 12px;
 }
 
-.calendar-agenda strong,
+.calendar-agenda strong { margin-bottom: 14px; color: var(--brand-ink); font-size: 12px; }
 .calendar-agenda p { font-size: 10px; }
 .calendar-agenda p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-event-row { display: flex; gap: 14px; }
 .calendar-event-row time { flex: 0 0 42px; color: var(--label); }
 
-.home-card-calendar.focused { padding: 30px 24px 24px; }
-.home-card-calendar.focused .home-card-head { margin-bottom: 52px; }
-.home-card-calendar.focused .home-card-head h2 { font-size: 20px; }
-.home-card-calendar.focused .calendar-day { height: 36px; font-size: 12px; }
+.home-card-calendar.focused { padding: 25px; }
+.home-card-calendar.focused .home-card-head { min-height: 38px; margin-bottom: 40px; }
+.home-card-calendar.focused .home-card-head h2 { font-size: 24px; }
+.home-card-calendar.focused .calendar-month-head strong { font-size: 16px; }
+.home-card-calendar.focused .calendar-month-head span { font-size: 13px; }
+.home-card-calendar.focused .calendar-day { height: 42px; font-size: 13px; }
 .home-card-calendar.focused .calendar-card-content {
   display: grid;
   grid-template-columns: minmax(0, 288px) minmax(0, 1fr);
-  grid-template-rows: 34px minmax(0, 1fr);
+  grid-template-rows: 24px minmax(0, 1fr);
   column-gap: 40px;
   min-height: 280px;
 }
 .home-card-calendar.focused .calendar-month-head { grid-area: 1 / 1; }
 .home-card-calendar.focused .calendar-month-grid { grid-area: 2 / 1; }
 .home-card-calendar.focused .home-card-actions { grid-area: 1 / 2; margin: 0; align-self: start; }
-.home-card-calendar.focused .calendar-agenda { grid-area: 2 / 2; align-content: start; margin: 0; padding-top: 14px; }
+.home-card-calendar.focused .calendar-agenda { grid-area: 2 / 2; align-content: start; margin: 0; padding-top: 18px; }
+.home-card-calendar.focused .calendar-agenda strong { font-size: 14px; }
+.home-card-calendar.focused .calendar-agenda p { font-size: 14px; }
 .home-card-calendar.focused .calendar-card-content { position: relative; }
 .home-card-calendar.focused .calendar-card-content::before {
   position: absolute;
@@ -4762,7 +4777,7 @@ textarea:focus-visible {
   background: var(--hairline);
   content: '';
 }
-.home-card-calendar.focused .home-card-actions .home-card-action { padding: 0 10px; border: 0; }
+.home-card-calendar.focused .home-card-actions .home-card-action { padding: 0 10px; border: 0; font-size: 13px; }
 .calendar-selected-date { align-self: center; flex: 0 0 auto; padding: 6px 12px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 .home-mail-row {
@@ -4983,6 +4998,7 @@ textarea:focus-visible {
   border-radius: 12px;
   background: var(--ai-bubble);
   box-shadow: none;
+  overflow: hidden;
 }
 
 .agent-summary-head {
@@ -4997,7 +5013,7 @@ textarea:focus-visible {
   border: 0;
   background: transparent;
   color: var(--ai-text);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -5055,7 +5071,7 @@ textarea:focus-visible {
 .agent-summary-columns h3 {
   margin: 0 0 10px;
   color: var(--label);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
 }
 
@@ -5063,9 +5079,9 @@ textarea:focus-visible {
 .agent-account-row { display: grid; grid-template-columns: minmax(0, 245px) minmax(0, 145px); gap: 10px; align-items: baseline; }
 .agent-account-row span,
 .agent-account-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-account-row span { font-size: 11px; }
+.agent-account-row span { font-size: 14px; }
 .agent-account-row small,
-.agent-summary-columns small { color: var(--label); font-size: 10px; }
+.agent-summary-columns small { color: var(--label); font-size: 11px; }
 .agent-account-compact,
 .agent-summary-accounts > small { display: none; }
 
@@ -5077,19 +5093,22 @@ textarea:focus-visible {
 }
 .agent-summary-counts .agent-summary-metric-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .agent-summary-metric-list div { min-width: 0; }
-.agent-summary-metric-list dt { margin-bottom: 7px; color: var(--label); font-size: 10px; }
-.agent-summary-metric-list dd { margin: 0; color: var(--ai-text); font-size: 25px; font-weight: 700; line-height: 1; }
+.agent-summary-metric-list dt { margin-bottom: 7px; color: var(--label); font-size: 11px; }
+.agent-summary-metric-list dd { margin: 0; color: var(--ai-text); font-size: 32px; font-weight: 650; line-height: 1; }
 
 .agent-summary-columns p {
   margin: 0;
   overflow: hidden;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.agent-next-reminder span { display: block; }
+.agent-next-reminder span + span { margin-top: 5px; }
 .agent-summary-alerts small,
 .agent-summary-queue small { display: block; margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-queue-compact { display: none; }
 .agent-next-due { display: none; }
 
 .agent-summary-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
@@ -5098,7 +5117,7 @@ textarea:focus-visible {
   min-height: 30px;
   padding: 0 10px;
   border-radius: 10px;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -5109,8 +5128,8 @@ textarea:focus-visible {
   gap: 6px;
   margin-bottom: 5px;
 }
-.agent-summary-models .codex-model-field > span { font-size: 10px; font-weight: 500; }
-.agent-summary-models .codex-model-field select { min-height: 30px; padding-left: 8px; font-size: 11px; }
+.agent-summary-models .codex-model-field > span { font-size: 11px; font-weight: 500; }
+.agent-summary-models .codex-model-field select { min-height: 30px; padding-left: 8px; font-size: 14px; }
 .agent-summary-unavailable { display: flex; align-items: center; gap: 16px; padding: 8px 18px 18px; }
 .agent-summary-unavailable p { color: var(--label); font-size: 12px; }
 .agent-summary-unavailable .schedule-agent-action { min-height: 30px; }
@@ -5120,7 +5139,7 @@ textarea:focus-visible {
   #agent-panel-content > .mail-agent-card { min-height: 238px; }
   #agent-panel-content > .schedule-agent-card { min-height: 234px; }
   #agent-panel-content > .librarian-agent-card { min-height: 246px; }
-  .agent-summary-head { min-height: 83px; padding-top: 15px; margin: 0 18px; padding-inline: 0; border-bottom: 1px solid var(--hairline); }
+  .agent-summary-head { min-height: 72px; padding-top: 15px; margin: 0 18px; padding-inline: 0; border-bottom: 1px solid var(--hairline); }
   .agent-summary-head .schedule-agent-status { right: 0; }
   .agent-summary-columns { grid-template-columns: minmax(0, 392fr) minmax(0, 312fr); min-height: 0; margin-top: 13px; }
   .agent-summary-columns > section + section { padding-left: 21px; }
@@ -5220,9 +5239,6 @@ textarea:focus-visible {
 
 @container (max-width: 340px) {
   .priority-p3 { display: none; }
-  .home-card-calendar:not(.focused) .calendar-weekday,
-  .home-card-calendar:not(.focused) .calendar-day.outside-compact-week { display: none; }
-  .home-card-calendar:not(.focused) .calendar-month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 }
 
 @container (max-width: 150px) {
@@ -5236,8 +5252,11 @@ textarea:focus-visible {
   .weather-main strong { font-size: 30px; }
   .home-count-summary strong { font-size: 24px; }
   .home-count-summary p { display: none; }
+  .home-card-calendar:not(.focused) .calendar-weekday,
+  .home-card-calendar:not(.focused) .calendar-day.outside-compact-week { display: none; }
   .home-card-calendar:not(.focused) .calendar-month-grid { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .home-card-calendar:not(.focused) .calendar-day { width: 100%; height: 17px; justify-content: start; padding-left: 4px; border-radius: 10px; }
+  .home-card-calendar:not(.focused) .calendar-day { width: 100%; height: 17px; justify-content: start; padding-left: 4px; border: 0; }
+  .home-card-calendar:not(.focused) .calendar-day-number { width: 18px; height: 17px; margin: 0; }
 }
 
 @media (max-width: 1100px) {
@@ -5344,6 +5363,13 @@ textarea:focus-visible {
   .home-card-calendar.focused .calendar-card-content { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; }
   .home-card-calendar.focused .calendar-card-content::before { left: calc(50% - 14px); }
 
+  .home-card-calendar:not(.focused) .calendar-month-head { position: absolute; top: 14px; right: 14px; }
+  .home-card-calendar:not(.focused) .calendar-month-grid { margin-top: 12px; }
+  .home-card-calendar:not(.focused) .calendar-day.outside-compact-pair { display: none; }
+  .home-card-calendar:not(.focused) .calendar-day { height: 48px; }
+  .home-card-calendar:not(.focused) .calendar-agenda { margin-top: 11px; }
+  .home-card-calendar:not(.focused) .calendar-agenda strong { margin-bottom: 2px; }
+
   #home-grid.focus-calendar {
     grid-template-columns: 230px repeat(3, minmax(0, 1fr));
     grid-template-rows: 150px 150px 150px 174px 150px;
@@ -5365,7 +5391,8 @@ textarea:focus-visible {
   #home-grid.focus-calendar .home-card-calendar.focused .calendar-card-content::before { display: none; }
   #home-grid.focus-calendar .home-card-calendar.focused .calendar-month-grid { margin-bottom: 12px; }
   #home-grid.focus-calendar .home-card-calendar.focused .calendar-day { height: 64px; font-size: 20px; border-bottom: 1px solid var(--hairline); border-radius: 0; }
-  #home-grid.focus-calendar .home-card-calendar.focused .calendar-day:is(.selected, .today) { border-radius: 50%; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-day-number { width: 40px; height: 40px; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-day:is(.selected, .today) { border-radius: 0; }
   #home-grid.focus-calendar .home-card-calendar.focused .calendar-weekday { font-size: 13px; }
   #home-grid.focus-calendar .home-card-calendar.focused .home-card-actions { display: none; }
   #home-grid.focus-calendar .home-card-calendar.focused .calendar-agenda { margin-top: 12px; border-top: 1px solid var(--hairline); }
@@ -5510,10 +5537,6 @@ textarea:focus-visible {
     box-shadow: var(--shadow-sm);
   }
 
-  .home-card-calendar:not(.focused) .calendar-day.outside-compact-week {
-    display: none;
-  }
-
   .home-card-calendar:not(.focused) .calendar-agenda {
     margin-top: 12px;
   }
@@ -5547,7 +5570,7 @@ textarea:focus-visible {
   }
   #agent-panel-content > .mail-agent-card { min-height: 334px; }
   #agent-panel-content > .schedule-agent-card { min-height: 286px; }
-  #agent-panel-content > .librarian-agent-card { min-height: 376px; }
+  #agent-panel-content > .librarian-agent-card { min-height: 362px; }
   .agent-summary-head { min-height: 70px; margin-inline: 16px; padding-top: 14px; }
   .agent-summary-head p { max-width: calc(100% - 90px); margin-top: 7px; }
   .agent-summary-head p > span:first-child { display: none; }
@@ -5573,6 +5596,9 @@ textarea:focus-visible {
   .schedule-agent-card .agent-summary-counts h3 { display: none; }
   .schedule-agent-card .agent-summary-next { padding-top: 12px !important; }
   .schedule-agent-card .agent-summary-next .agent-summary-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 17px; }
+  .agent-next-reminder span { display: inline; }
+  .agent-next-reminder span + span { margin: 0; }
+  .agent-next-reminder span + span::before { content: ' · '; }
   .agent-summary-next .agent-next-due { display: none; }
   .librarian-agent-card .agent-summary-models { min-height: 114px; padding-top: 12px !important; border-bottom: 1px solid var(--hairline); }
   .librarian-agent-card .agent-summary-models h3 { margin-bottom: 5px; }
@@ -5580,10 +5606,13 @@ textarea:focus-visible {
   .agent-summary-models .codex-model-field select { min-height: 44px; }
   .librarian-agent-card .agent-summary-codex-metrics { min-height: 88px; padding-top: 12px !important; border-bottom: 1px solid var(--hairline); }
   .librarian-agent-card .agent-summary-codex-metrics h3 { display: none; }
-  .agent-summary-queue { padding-top: 12px !important; }
+  .agent-summary-queue { padding-top: 8px !important; }
   .agent-summary-queue h3 { display: none; }
-  .agent-summary-queue small { margin-top: 4px; }
-  .agent-summary-queue .agent-summary-actions { margin-top: 10px; }
+  .agent-summary-queue > small { display: none; }
+  .agent-summary-queue p { font-size: 11px; }
+  .agent-summary-queue p::before { content: '대기열 · '; }
+  .agent-queue-compact { display: inline; }
+  .agent-summary-queue .agent-summary-actions { margin-top: 8px; }
 
   .library-page-head,
   .settings-page-head { padding: 26px 0 18px; }
