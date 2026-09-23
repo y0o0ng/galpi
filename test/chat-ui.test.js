@@ -205,6 +205,17 @@ test('the product shell exposes the four approved destinations on desktop and mo
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?#bottom-nav \{[^}]*display: grid/s);
 });
 
+test('global Notes is a lecture-note placeholder while Chat keeps topic notes and papers', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  const notesPage = html.slice(html.indexOf('id="notes-page"'), html.indexOf('id="settings-page"'));
+  assert.match(notesPage, /강의 노트[\s\S]*준비 중/);
+  assert.doesNotMatch(notesPage, /data-panel-tab|notes-page-views|note-panel|paper-panel/);
+  assert.match(home, /if \(route !== 'home'\) parkSharedPanels\(\)/);
+  assert.doesNotMatch(home, /if \(route === 'notes'\) global\.NotePanel\?\.show\(\)/);
+  assert.match(html, /id="knowledge-panel"[\s\S]*id="note-panel"[\s\S]*id="paper-panel"/);
+});
+
 test('Home uses the approved 16-column geometry and responsive card flow', () => {
   assert.match(css, /#home-grid \{[^}]*grid-template-columns: repeat\(16, minmax\(0, 1fr\)\)[^}]*gap: 20px/s);
   assert.match(css, /\.home-card-weather \{ grid-column: 1 \/ span 4/);

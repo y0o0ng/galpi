@@ -543,19 +543,6 @@
     global.TaskPanel?.render(host, options);
   }
 
-  function moveLibraryForRoute(route) {
-    const note = document.getElementById('note-panel');
-    const paper = document.getElementById('paper-panel');
-    if (!note || !paper) return;
-    if (route === 'notes') {
-      document.getElementById('notes-page-views').append(note, paper);
-      global.PaperPanel?.setTab('notes');
-    } else if (route === 'chat') {
-      document.getElementById('knowledge-panel').append(note, paper);
-      global.PaperPanel?.setTab('notes');
-    }
-  }
-
   function setHomeView(view) {
     state.homeView = view === 'agents' ? 'agents' : 'overview';
     document.querySelectorAll('[data-home-view]').forEach(button => {
@@ -580,9 +567,9 @@
     document.querySelectorAll('[data-product-page]').forEach(page => page.classList.toggle('active', page.dataset.productPage === route));
     document.querySelectorAll('[data-product-route]').forEach(button => button.classList.toggle('active', button.dataset.productRoute === route));
     global.PaperPanel?.close();
-    moveLibraryForRoute(route);
+    if (route !== 'home') parkSharedPanels();
+    if (route === 'chat') global.PaperPanel?.setTab('notes');
     if (route === 'home') setHomeView(homeView || state.homeView);
-    if (route === 'notes') global.NotePanel?.show();
   }
 
   function storedLocation() {

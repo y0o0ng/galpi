@@ -14,6 +14,8 @@
 Chat은 기존 대화, composer, 모델 선택, 음성, 첨부, 활성 노트, polling 동작을 유지한다.
 Chat 오른쪽 지식 패널에는 `Notes`와 `Papers`만 남고 기본은 Notes다. 과거 XION과 알림 탭은
 보이는 Chat 탐색에서 사라지지만 그 도메인 기능은 Home에서 계속 쓴다.
+전역 탐색의 `Notes`는 별도의 강의 노트 자리다. 강의 노트 런타임이 아직 없으므로 지금은
+`준비 중`만 표시한다. 토픽 노트·논문은 Chat 지식 패널과 Home의 기존 노트 카드에서 계속 쓴다.
 
 ## 2. Overview 카드
 
@@ -143,7 +145,7 @@ Mail 확장은 현재 알림의 mail filter를 재사용해 목록과 실제 처
 분석 상태, Push, 방해 금지, 알림 규칙, 재시도는 기존 mail API만 호출한다. UI용 두 번째 Mail
 store를 만들지 않는다.
 
-Notes 확장은 Note/Paper 패널 DOM과 controller를 그대로 옮겨 쓴다. Desktop은 넓은 카드 안의
+Home의 Notes 카드 확장은 Note/Paper 패널 DOM과 controller를 그대로 옮겨 쓴다. Desktop은 넓은 카드 안의
 목록·상세 구성을 쓰고 Phone은 `list → detail`로 이동한다. 내부 back은 detail에서 list로만
 돌아간다. 저장된 paper를 여는 것만으로 활성 Chat context를 바꾸지 않는다.
 

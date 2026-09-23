@@ -4340,7 +4340,7 @@ textarea:focus-visible {
 .settings-list,
 #home-overview,
 #home-agents,
-#notes-page-views {
+.lecture-notes-placeholder {
   width: min(1060px, calc(100% - 64px));
   margin-inline: auto;
 }
@@ -5338,7 +5338,7 @@ textarea:focus-visible {
   .agent-summary-models .codex-model-field { grid-template-columns: 82px minmax(0, 1fr); gap: 8px; margin-bottom: 8px; }
 }
 
-/* Notes and Settings destinations reuse the existing panel controls. */
+/* Top-level Notes is reserved for lecture notes. */
 .library-page-head,
 .settings-page-head {
   padding: 44px 0 24px;
@@ -5350,43 +5350,9 @@ textarea:focus-visible {
   justify-content: space-between;
 }
 
-.library-page-head nav {
-  display: flex;
-  gap: 8px;
-}
-
-.library-page-head button {
-  min-height: 40px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 20px;
-  background: transparent;
-  color: var(--label);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.library-page-head button.active {
-  background: var(--brand-soft);
-  color: var(--brand-ink);
-}
-
-#notes-page-views {
-  min-height: 600px;
-  padding: 20px;
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  background: var(--ai-bubble);
-}
-
-#notes-page-views > .knowledge-panel-view:not([hidden]) {
-  display: block;
-  height: auto;
-}
-
-#notes-page-views > .knowledge-panel-view[hidden] {
-  display: none;
-}
+.lecture-notes-placeholder { display: grid; min-height: 40vh; align-content: center; gap: 8px; color: var(--label); text-align: center; }
+.lecture-notes-placeholder strong { font-size: 22px; }
+.lecture-notes-placeholder p { font-size: 14px; }
 
 .settings-list {
   display: grid;
@@ -5478,7 +5444,7 @@ textarea:focus-visible {
   .settings-list,
   #home-overview,
   #home-agents,
-  #notes-page-views {
+  .lecture-notes-placeholder {
     width: min(740px, calc(100% - 28px));
   }
 
@@ -5608,7 +5574,7 @@ textarea:focus-visible {
   .settings-list,
   #home-overview,
   #home-agents,
-  #notes-page-views {
+  .lecture-notes-placeholder {
     width: calc(100% - 32px);
   }
 
@@ -5822,8 +5788,6 @@ textarea:focus-visible {
   .library-page-head,
   .settings-page-head { padding: 26px 0 18px; }
   .library-page-head { align-items: flex-start; gap: 12px; }
-  .library-page-head button { min-height: 44px; padding-inline: 14px; }
-  #notes-page-views { min-height: 0; padding: 14px; }
   .settings-row { min-height: 76px; }
 
   #app.product-page.active {
