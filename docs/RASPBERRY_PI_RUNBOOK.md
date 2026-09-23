@@ -50,6 +50,15 @@ chmod 755 /home/pi/galpi/bin/codex
 
 wrapper는 인자를 바꾸지 않고 `"$@"`로 전달해야 한다. 서버가 이 경로에 `exec`, 모델, vault 작업 경로, sandbox 옵션을 인자로 붙이고 정리 프롬프트는 표준 입력으로 전달한다.
 
+**Codex CLI 자동 업데이트.** Codex 백엔드는 클라이언트 버전으로 모델 목록을 거른다. 2026-09-23에 Pi CLI `0.144.5`는 `gpt-6-*`를 받지 못했고 맥 `0.155.1`은 받았다. CLI가 낡으면 오류 없이 사서 카탈로그에서 새 모델만 빠지므로 pi 사용자 crontab이 매일 올린다.
+
+```sh
+crontab -l   # 10 9 * * * /home/pi/galpi/scripts/update-codex-cli.sh >/dev/null 2>&1
+journalctl -t galpi-codex-update --no-pager | tail
+```
+
+스크립트는 npm 최신과 다를 때만 설치하고, 버전·`login status`·아래 `RUNNER_OK` smoke로 검증한다. 실패하면 이전 버전으로 되돌리고 그 버전을 `~/.cache/galpi-codex-update-failed`에 적어 다음 릴리스까지 다시 시도하지 않는다. 결과(`updated`·`rolled_back`·`broken`)는 Web Push로 한 번 알린다. 조용한 시간(23:00~07:00)을 피해 09:10에 돈다. wrapper 경로는 nvm prefix 안이라 업데이트 뒤에도 그대로이고, 서버 재시작 없이 다음 Codex 카탈로그 갱신(24시간 주기)부터 새 모델이 보인다. Node 버전을 바꾸면 스크립트의 `NODE_BIN`도 함께 고친다.
+
 ## 2. 프로젝트 배치
 
 예시 경로:

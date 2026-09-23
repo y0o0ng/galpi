@@ -33,6 +33,18 @@ self.addEventListener('push', event => {
       fallbackUrl: '/',
       tag: () => `news-review:${safeInt(payload.candidateId) ?? 'unknown'}`,
     },
+    // Pi의 사서 Codex CLI 자동 업데이트 결과. 버전 문자열만 형식을 확인해서 쓴다.
+    codex_update: {
+      heading: '시온',
+      body: (() => {
+        const version = /^\d+\.\d+\.\d+$/.test(payload.codexVersion) ? payload.codexVersion : '새 버전';
+        if (payload.result === 'updated') return `사서 Codex를 ${version}로 올렸어.`;
+        if (payload.result === 'rolled_back') return `Codex 업데이트가 검증에 실패해서 ${version}로 되돌렸어.`;
+        return 'Codex 업데이트를 되돌리지 못했어. 사서 실행기를 확인해줘.';
+      })(),
+      fallbackUrl: '/',
+      tag: () => 'codex-update',
+    },
   };
   const kind = kinds[payload.type] || {
     heading: 'XION 일정 알림',

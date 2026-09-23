@@ -235,13 +235,21 @@ test('every desktop focus layout fits the original three-row Home canvas without
       }
     }
   }
+  for (const [card, row, column] of [
+    ['calendar', 1, 5], ['tasks', 1, 5], ['mail', 2, 1],
+    ['notifications', 2, 5], ['dday', 3, 1], ['notes', 2, 5],
+  ]) {
+    assert.match(css, new RegExp(`#home-grid\\.focus-${card} \\.home-card-${card} \\{ grid-area: ${row} \\/ ${column} \\/ span`));
+  }
 });
 
 test('Home keeps one focus state and the platform-specific collapse contracts', () => {
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   assert.match(home, /focusedCard: null/);
+  assert.match(home, /notesView: 'notes'/);
   assert.doesNotMatch(home, /focused(?:Tasks|Calendar|Mail|Notifications|Dday|Notes):/);
   assert.match(home, /state\.focusedCard = nextCard;[\s\S]*?renderOverview\(\)/);
+  assert.match(home, /if \(state\.focusedCard === 'notes'\) mountLibrary\(\)/);
   assert.match(home, /card\.animate\(\[/);
   assert.match(home, /prefers-reduced-motion: reduce/);
   assert.match(home, /before\.get\(nextCard\)[\s\S]*?focus-spacer-height/s);
@@ -267,6 +275,8 @@ test('Home uses the Figma shell assets and the existing Notes and Mail controlle
   assert.match(paper, /function splitDetail\(\)/);
   assert.match(notifications, /function makeMailCard\(item\)/);
   assert.match(notifications, /home-mail-workspace-list[\s\S]*?detail\.replaceChildren\(makeMailCard\(item\)\)/);
+  assert.match(notifications, /home-mail-workspace-actions[\s\S]*?mailAction\(item, 'done'\)[\s\S]*?mailAction\(item, 'snooze'\)/);
+  assert.match(css, /\.home-card-mail\.focused \.home-count-summary \{\s*display: block;/);
 });
 
 test('Home renders no News surface and requests no News briefing', () => {
@@ -288,6 +298,7 @@ test('Chat knowledge tabs are exactly Notes and Papers with Notes selected', () 
 
 test('Calendar keeps the Figma month and compact weeks with one event marker per day', () => {
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /selectedDate: null/);
   assert.match(home, /if \(task\?\.dueKind === 'date'\) return task\.dueDate \|\| ''/);
   assert.match(home, /const compactAnchor = state\.selectedDate \|\| today/);
   assert.match(home, /const mondayOffset = \(first\.getUTCDay\(\) \+ 6\) % 7/);
@@ -300,7 +311,11 @@ test('Calendar keeps the Figma month and compact weeks with one event marker per
   assert.match(css, /\.calendar-day\.today \.calendar-day-number \{ background: url\('assets\/figma\/calendar-today\.svg'\)/);
   assert.match(css, /\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{[^}]*background: url\('assets\/figma\/calendar-selected\.svg'\)/);
   assert.match(css, /\.home-card-calendar:not\(\.focused\) \.calendar-day\.outside-compact-week \{[^}]*display: none/s);
+  assert.match(css, /#home-grid:is\(\.focus-mail, \.focus-notes\) \.home-card-calendar \.calendar-day\.outside-compact-week \{ display: none; \}/);
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?\.home-card-calendar:not\(\.focused\) \.calendar-day\.outside-compact-pair \{ display: none; \}/);
+  const compact = css.slice(css.lastIndexOf('@media (min-width: 641px)'));
+  assert.match(compact, /@container \(max-width: 150px\)[\s\S]*?\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{ width: 18px; height: 18px; margin: 0; \}/);
+  assert.match(compact, /@media \(max-width: 640px\)[\s\S]*?\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{\s*width: 15px;\s*height: 15px;/);
 });
 
 test('Home actions reuse TaskPanel, Mail settings, and Codex settings', () => {
@@ -313,6 +328,13 @@ test('Home actions reuse TaskPanel, Mail settings, and Codex settings', () => {
   assert.match(panel, /makeMailAgentCard\(\), makeScheduleAgentCard\(\), makeCodexAgentCard\(\)/);
   assert.match(panel, /saveMailSettings\(\{ notificationsEnabled:/);
   assert.match(panel, /button\('대기열 정리', organizeQueuedNotes\)|button\(state\.organizeRunning \? '시작하는 중…' : '대기열 정리', organizeQueuedNotes\)/);
+});
+
+test('focused notifications inspect existing categories and provider counts', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /system\.filter\(item => item\.type === 'merge'\)/);
+  assert.match(home, /mail\.filter\(item => item\.provider === 'gmail'\)/);
+  assert.match(home, /home-notification-detail-row/);
 });
 
 test('Agents summary matches the three Figma operational cards without embedding the task calendar', () => {
@@ -510,6 +532,9 @@ test('the service worker shows fixed text and never reads mail content', () => {
   assert.match(sw, /kinds\[payload\.type\]/);
   assert.match(sw, /mail_attention:/);
   assert.match(sw, /news_review:/);
+  // Codex 업데이트 알림은 버전 형식을 확인한 뒤에만 문구에 넣는다.
+  assert.match(sw, /codex_update:/);
+  assert.match(sw, /\/\^\\d\+\\\.\\d\+\\\.\\d\+\$\/\.test\(payload\.codexVersion\)/);
   assert.match(sw, /XION 메일 알림/);
   assert.match(sw, /XION 일정 알림/);
   // 재확인 Push는 무엇을 물어보는지 밝히지 않는다(뉴스 설계 11.5).
