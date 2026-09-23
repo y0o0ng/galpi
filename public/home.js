@@ -18,6 +18,12 @@
     calendarView: 'selected',
     calendarFilter: 'today',
     calendarPopup: false,
+    calendarDraft: '',
+    calendarCandidate: null,
+    calendarEditing: false,
+    calendarMessage: '',
+    calendarPreparing: false,
+    calendarRequest: 0,
     historyTasks: [],
     calendarInitialTitle: '',
     summary: null,
@@ -275,25 +281,80 @@
           const composer = node('form', 'calendar-add-composer');
           const draft = node('input');
           draft.type = 'text';
-          draft.placeholder = '내일 오후 3시에 프로젝트 일정 만들어줘';
-          draft.setAttribute('aria-label', '자연어로 일정 만들기');
-          composer.addEventListener('submit', event => {
+          draft.placeholder = state.calendarEditing ? '무엇을 바꿀까? 예: 오후 4시로 바꿔줘' : '내일 오후 3시에 프로젝트 일정 만들어줘';
+          draft.setAttribute('aria-label', state.calendarEditing ? '일정 후보 수정하기' : '자연어로 일정 만들기');
+          draft.value = state.calendarDraft;
+          draft.addEventListener('input', () => { state.calendarDraft = draft.value; });
+          draft.disabled = state.calendarPreparing;
+          composer.addEventListener('submit', async event => {
             event.preventDefault();
             event.stopPropagation();
             const prompt = draft.value.trim();
             if (!prompt) return draft.focus();
-            setRoute('chat');
-            const chatInput = document.getElementById('input');
-            if (!chatInput) return;
-            chatInput.value = prompt;
-            chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-            document.getElementById('send-btn')?.click();
+            if (state.calendarPreparing) return;
+            const request = ++state.calendarRequest;
+            const baseCandidate = state.calendarEditing ? state.calendarCandidate : null;
+            state.calendarDraft = prompt;
+            if (!baseCandidate) state.calendarCandidate = null;
+            state.calendarMessage = baseCandidate ? '일정 후보를 수정하고 있어.' : '일정 후보를 만들고 있어.';
+            state.calendarPreparing = true;
+            renderOverview();
+            try {
+              const response = await state.apiFetch('/api/tasks/prepare-natural', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: prompt, ...(baseCandidate ? { baseCandidate } : {}) }),
+              });
+              const result = await response.json();
+              if (!response.ok) throw new Error(result.error || '일정 후보를 만들지 못했어.');
+              if (request !== state.calendarRequest) return;
+              if (result.scheduleCandidate) {
+                state.calendarCandidate = result.scheduleCandidate;
+                state.calendarEditing = false;
+                state.calendarDraft = '';
+                state.calendarMessage = '';
+              } else {
+                state.calendarMessage = result.clarification || '일정을 이해하지 못했어. 다시 적어줘.';
+              }
+            } catch (error) {
+              if (request !== state.calendarRequest) return;
+              state.calendarMessage = error.message || '일정 후보를 만들지 못했어.';
+            } finally {
+              if (request === state.calendarRequest) {
+                state.calendarPreparing = false;
+                renderOverview();
+              }
+            }
           });
           const send = node('button', 'calendar-add-send', '↑');
           send.type = 'submit';
+          send.disabled = state.calendarPreparing;
           send.setAttribute('aria-label', '일정 요청 보내기');
           composer.append(draft, send);
-          addEntry.append(composer, node('p', '', '채팅에서 일정을 확인한 뒤 등록할 수 있어.'), action('수동으로 생성 ›', () => {
+          const result = node('div', 'calendar-add-result');
+          const candidate = state.calendarCandidate && global.TaskPanel?.makeScheduleCandidateCard(state.calendarCandidate, {
+            onSettled: () => {
+              state.calendarCandidate = null;
+              state.calendarEditing = false;
+              state.calendarDraft = '';
+              state.calendarMessage = '';
+              renderOverview();
+            },
+            onEdit: () => {
+              state.calendarEditing = true;
+              state.calendarDraft = '';
+              state.calendarMessage = '수정할 내용을 위에 적어줘.';
+              renderOverview();
+              document.querySelector('.calendar-add-composer input')?.focus();
+            },
+          });
+          if (state.calendarMessage) result.append(node('p', '', state.calendarMessage));
+          if (candidate) {
+            if (state.calendarPreparing) candidate.querySelectorAll('button').forEach(button => { button.disabled = true; });
+            result.append(candidate);
+          } else if (!state.calendarMessage) result.append(node('p', '', '일정 후보를 확인한 뒤 등록할 수 있어.'));
+          result.setAttribute('aria-live', 'polite');
+          addEntry.append(composer, result, action('수동으로 생성 ›', () => {
             state.calendarPopup = true;
             renderOverview();
           }));
@@ -306,6 +367,13 @@
   }
 
   function setCalendarView(view, filter = state.calendarFilter) {
+    if (view !== 'add') {
+      state.calendarRequest += 1;
+      state.calendarCandidate = null;
+      state.calendarEditing = false;
+      state.calendarMessage = '';
+      state.calendarPreparing = false;
+    }
     state.calendarView = view;
     state.calendarFilter = filter;
     state.calendarPopup = false;
@@ -318,9 +386,7 @@
   }
 
   function saveCalendarEditor() {
-    state.calendarPopup = false;
-    state.calendarView = 'selected';
-    renderOverview();
+    setCalendarView('selected');
   }
 
   function mountCalendar() {
@@ -619,6 +685,13 @@
 
   function transitionOverview(nextCard) {
     cancelAnimationFrame(scrollAnchorFrame);
+    if (state.focusedCard === 'calendar' && nextCard !== 'calendar') {
+      state.calendarRequest += 1;
+      state.calendarCandidate = null;
+      state.calendarEditing = false;
+      state.calendarMessage = '';
+      state.calendarPreparing = false;
+    }
     const grid = document.getElementById('home-grid');
     const page = document.getElementById('home-page');
     const phone = matchMedia('(max-width: 640px)').matches;

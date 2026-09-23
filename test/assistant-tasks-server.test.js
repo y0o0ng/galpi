@@ -61,11 +61,30 @@ function kstDateTimeAfter(seconds) {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`;
 }
 
-async function startServer(t, enabled, pushEnabled = false, seriesEnabled = false) {
+async function startServer(t, enabled, pushEnabled = false, seriesEnabled = false, codexOutput = null, codexRevisionOutput = null) {
   const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'assistant-tasks-server-'));
   const vaultPath = path.join(appRoot, 'vault');
   await fs.mkdir(vaultPath);
   await fs.copyFile(path.join(ROOT, 'server.js'), path.join(appRoot, 'server.js'));
+  const fakeCodex = path.join(appRoot, 'fake-codex');
+  if (codexOutput) {
+    await fs.writeFile(fakeCodex, `#!/usr/bin/env node
+const fs = require('node:fs');
+if (!process.argv.includes('exec')) { process.stdout.write('fake-codex'); process.exit(0); }
+if (!process.argv.includes('read-only') || !process.argv.includes('--ephemeral')) process.exit(3);
+const outputPath = process.argv[process.argv.indexOf('--output-last-message') + 1];
+if (!outputPath || outputPath === 'exec') process.exit(4);
+let input = '';
+process.stdin.on('data', chunk => { input += chunk; });
+process.stdin.on('end', () => {
+  fs.writeFileSync(outputPath, JSON.stringify(input.includes('DATE_AMBIGUOUS_TEST')
+    ? { clarification: '언제 만들까?' }
+    : input.includes('<current_candidate>') ? ${JSON.stringify(codexRevisionOutput || codexOutput)}
+    : ${JSON.stringify(codexOutput)}));
+});
+`);
+    await fs.chmod(fakeCodex, 0o755);
+  }
   for (const name of ['lib', 'scripts', 'public', 'config', '.codex', 'node_modules']) {
     await fs.symlink(path.join(ROOT, name), path.join(appRoot, name), 'dir');
   }
@@ -83,7 +102,8 @@ async function startServer(t, enabled, pushEnabled = false, seriesEnabled = fals
       PORT: String(port),
       VAULT_PATH: vaultPath,
       BACKUP_DIR: path.join(appRoot, 'backups'),
-      CODEX_RUNNER_MODE: 'heuristic',
+      CODEX_RUNNER_MODE: codexOutput ? 'codex' : 'heuristic',
+      ...(codexOutput ? { CODEX_BIN: fakeCodex } : {}),
       ASSISTANT_TASKS_ENABLED: enabled ? 'true' : 'false',
       ASSISTANT_TASK_SERIES_ENABLED: seriesEnabled ? 'true' : 'false',
       WEB_PUSH_ENABLED: pushEnabled ? 'true' : 'false',
@@ -103,6 +123,76 @@ async function startServer(t, enabled, pushEnabled = false, seriesEnabled = fals
   await waitForServer(child, url, logs);
   return { appRoot, url };
 }
+
+test('calendar natural-language input prepares an unpersisted candidate without a Chat turn', async t => {
+  const dueAt = kstDateTimeAfter(2 * 60 * 60);
+  const { appRoot, url } = await startServer(t, true, false, false, {
+    candidate: { title: '프로젝트 일정', detail: '', due: { kind: 'datetime', at: dueAt } },
+  });
+  const post = text => api(url, '/api/tasks/prepare-natural', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+
+  assert.equal((await post('')).response.status, 400);
+  assert.equal((await api(url, '/api/tasks/prepare-natural', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: '내일 일정 만들어줘' }),
+  }, false)).response.status, 401);
+  const prepared = await post('내일 프로젝트 일정 만들어줘');
+  assert.equal(prepared.response.status, 200, JSON.stringify(prepared.body));
+  assert.equal(prepared.body.scheduleCandidate.kind, 'task');
+  assert.equal(prepared.body.scheduleCandidate.task.title, '프로젝트 일정');
+  assert.equal(prepared.body.scheduleCandidate.task.due.at, dueAt);
+  const before = await api(url, '/api/tasks?view=all');
+  assert.equal(before.body.tasks.length, 0);
+
+  const clarification = await post('DATE_AMBIGUOUS_TEST');
+  assert.equal(clarification.body.clarification, '언제 만들까?');
+  const registered = await api(url, '/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(prepared.body.scheduleCandidate.task),
+  });
+  assert.equal(registered.response.status, 201, JSON.stringify(registered.body));
+  const after = await api(url, '/api/tasks?view=all');
+  assert.equal(after.body.tasks.length, 1);
+  const db = new Database(path.join(appRoot, 'galpi.db'), { readonly: true });
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, 0);
+  db.close();
+});
+
+test('editing a calendar candidate replaces only the draft and saves only after registration', async t => {
+  const firstDue = kstDateTimeAfter(2 * 60 * 60);
+  const revisedDue = kstDateTimeAfter(3 * 60 * 60);
+  const { appRoot, url } = await startServer(t, true, false, false,
+    { candidate: { title: '프로젝트 일정', detail: '회의', due: { kind: 'datetime', at: firstDue } } },
+    { candidate: { title: '프로젝트 일정', detail: '회의', due: { kind: 'datetime', at: revisedDue } } });
+  const post = body => api(url, '/api/tasks/prepare-natural', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const first = await post({ text: '프로젝트 일정 만들어줘' });
+  assert.equal(first.response.status, 200, JSON.stringify(first.body));
+  const original = first.body.scheduleCandidate;
+  assert.equal((await post({ text: '수정해줘', baseCandidate: { kind: 'task' } })).response.status, 400);
+
+  const revised = await post({ text: '한 시간 뒤로 바꿔줘', baseCandidate: original });
+  assert.equal(revised.response.status, 200, JSON.stringify(revised.body));
+  assert.equal(revised.body.scheduleCandidate.task.due.at, revisedDue);
+  assert.equal(revised.body.scheduleCandidate.task.title, original.task.title);
+  assert.notEqual(revised.body.scheduleCandidate.task.clientRequestId, original.task.clientRequestId);
+  assert.equal((await api(url, '/api/tasks?view=all')).body.tasks.length, 0);
+
+  const registered = await api(url, '/api/tasks', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(revised.body.scheduleCandidate.task),
+  });
+  assert.equal(registered.response.status, 201, JSON.stringify(registered.body));
+  assert.equal((await api(url, '/api/tasks?view=all')).body.tasks[0].dueAt, Math.floor(new Date(revisedDue).getTime() / 1000));
+  const db = new Database(path.join(appRoot, 'galpi.db'), { readonly: true });
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM messages').get().count, 0);
+  db.close();
+});
 
 async function api(url, pathname, options = {}, authenticated = true) {
   const headers = { ...options.headers };

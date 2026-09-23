@@ -1014,7 +1014,7 @@
   }
 
   // 후보 카드의 뼈대는 셋이 같다. 다른 것은 무엇을 보여주고 무엇을 부르느냐뿐이다.
-  function candidateShell({ heading, title, detail, rows, confirmLabel, requestId, run }) {
+  function candidateShell({ heading, title, detail, rows, confirmLabel, requestId, run, onSettled, onEdit }) {
     const card = document.createElement('article');
     card.className = 'task-candidate-card';
     card.setAttribute('aria-label', heading);
@@ -1051,6 +1051,7 @@
 
     function runCancel() {
       releasePending();
+      onSettled?.();
       actions.remove();
       card.classList.add('is-cancelled');
       status.textContent = confirmLabel === '등록' ? '등록하지 않았어.' : '적용하지 않았어.';
@@ -1058,6 +1059,7 @@
 
     async function runConfirm() {
       cancel.disabled = true;
+      if (edit) edit.disabled = true;
       confirm.disabled = true;
       confirm.textContent = `${confirmLabel} 중`;
       status.classList.remove('error');
@@ -1065,6 +1067,7 @@
       try {
         await run();
         releasePending();
+        onSettled?.();
         actions.remove();
         card.classList.add('is-confirmed');
         status.textContent = confirmLabel === '등록' ? '일정을 등록했어.' : '변경을 적용했어.';
@@ -1072,6 +1075,7 @@
         state.onChanged?.();
       } catch (error) {
         cancel.disabled = false;
+        if (edit) edit.disabled = false;
         confirm.disabled = false;
         confirm.textContent = confirmLabel;
         status.classList.add('error');
@@ -1082,15 +1086,17 @@
     }
 
     const cancel = actionButton('취소', runCancel);
+    const edit = onEdit ? actionButton('수정', onEdit) : null;
     const confirm = actionButton(confirmLabel, runConfirm, true);
-    actions.append(cancel, confirm);
+    if (edit) actions.classList.add('has-edit');
+    actions.append(...[cancel, edit, confirm].filter(Boolean));
     card.append(headingNode, titleNode, detailNode, meta, status, actions);
 
     state.pendingCandidate = { id: requestId, title, confirm: runConfirm, cancel: runCancel };
     return card;
   }
 
-  function makeSeriesCandidateCard(candidate) {
+  function makeSeriesCandidateCard(candidate, { onSettled, onEdit } = {}) {
     const input = candidate?.series;
     const rule = input?.recurrence;
     if (
@@ -1121,6 +1127,8 @@
       ],
       confirmLabel: '등록',
       requestId: payload.clientRequestId,
+      onSettled,
+      onEdit,
       run: () => request('/api/task-series', { method: 'POST', body: JSON.stringify(payload) }),
     });
   }
@@ -1186,8 +1194,8 @@
     });
   }
 
-  function makeScheduleCandidateCard(candidate) {
-    if (candidate?.kind === 'series') return makeSeriesCandidateCard(candidate);
+  function makeScheduleCandidateCard(candidate, { onSettled, onEdit } = {}) {
+    if (candidate?.kind === 'series') return makeSeriesCandidateCard(candidate, { onSettled, onEdit });
     if (candidate?.kind === 'override') return makeOverrideCandidateCard(candidate);
     const input = candidate?.task;
     if (
@@ -1245,6 +1253,7 @@
 
     function runCancel() {
       releasePending();
+      onSettled?.();
       actions.remove();
       card.classList.add('is-cancelled');
       status.textContent = '등록하지 않았어.';
@@ -1252,6 +1261,7 @@
 
     async function runConfirm() {
       cancel.disabled = true;
+      if (edit) edit.disabled = true;
       confirm.disabled = true;
       confirm.textContent = '등록 중';
       status.classList.remove('error');
@@ -1259,6 +1269,7 @@
       try {
         await request('/api/tasks', { method: 'POST', body: JSON.stringify(payload) });
         releasePending();
+        onSettled?.();
         actions.remove();
         card.classList.add('is-confirmed');
         status.textContent = '일정을 등록했어.';
@@ -1266,6 +1277,7 @@
         state.onChanged?.();
       } catch (error) {
         cancel.disabled = false;
+        if (edit) edit.disabled = false;
         confirm.disabled = false;
         confirm.textContent = '등록';
         status.classList.add('error');
@@ -1276,8 +1288,10 @@
     }
 
     const cancel = actionButton('취소', runCancel);
+    const edit = onEdit ? actionButton('수정', onEdit) : null;
     const confirm = actionButton('등록', runConfirm, true);
-    actions.append(cancel, confirm);
+    if (edit) actions.classList.add('has-edit');
+    actions.append(...[cancel, edit, confirm].filter(Boolean));
     card.append(heading, title, detail, meta, status, actions);
 
     // 음성이 자기 요청을 새로 만들지 않고 버튼과 똑같은 경로를 부르게 한다.

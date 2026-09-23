@@ -443,6 +443,22 @@ test('a newer candidate replaces the one still waiting', () => {
   assert.equal(panel.getPendingScheduleConfirmation().id, 'req-2');
 });
 
+test('calendar candidates offer edit without registering, while Chat candidates keep two actions', () => {
+  const posts = [];
+  const panel = loadTaskPanel({ async apiFetch(path) { posts.push(path); return { ok: true, async json() { return {}; } }; } });
+  const chatCard = panel.makeScheduleCandidateCard(CANDIDATE);
+  assert.deepEqual(chatCard.children.at(-1).children.map(button => button.textContent), ['취소', '등록']);
+
+  let edits = 0;
+  const calendarCard = panel.makeScheduleCandidateCard(CANDIDATE, { onEdit: () => { edits += 1; } });
+  const actions = calendarCard.children.at(-1).children;
+  assert.deepEqual(actions.map(button => button.textContent), ['취소', '수정', '등록']);
+  actions[1].listeners.click[0]();
+  assert.equal(edits, 1);
+  assert.deepEqual(posts, []);
+  assert.equal(panel.getPendingScheduleConfirmation().id, 'req-1');
+});
+
 test('the recurrence tab and its controls stay behind the series flag', () => {
   const taskSource = read('public/task-panel.js');
   const appSource = read('public/app.js');
@@ -499,7 +515,7 @@ test('recurrence and override candidates stay unpersisted until the card is pres
   const voiceSource = read('public/voice/halfduplex.js');
 
   // 카드 종류는 셋이고 각각 자기 API로만 간다.
-  assert.match(taskSource, /if \(candidate\?\.kind === 'series'\) return makeSeriesCandidateCard\(candidate\);/);
+  assert.match(taskSource, /if \(candidate\?\.kind === 'series'\) return makeSeriesCandidateCard\(candidate, \{ onSettled, onEdit \}\);/);
   assert.match(taskSource, /if \(candidate\?\.kind === 'override'\) return makeOverrideCandidateCard\(candidate\);/);
   assert.match(taskSource, /heading: '반복 일정 등록 전 확인'/);
   assert.match(taskSource, /heading: '일정 변경 전 확인'/);

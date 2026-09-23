@@ -319,9 +319,19 @@ test('focused Tasks follows the Figma count, progress and list without extra for
   const tasks = home.slice(home.indexOf('function renderTasks()'), home.indexOf('function kstDate('));
   assert.match(tasks, /home-task-progress/);
   assert.match(tasks, /state\.completedToday \/ progressTotal/);
+  assert.match(css, /\.home-card-tasks \.home-task-progress \{ width: min\(115px, 100%\); \}/);
+  assert.match(css, /@container \(max-width: 150px\) \{\s*\.home-card-tasks:not\(\.focused\) \.tasks-card-content \{ display: block; \}/);
   assert.doesNotMatch(tasks, /일정 추가|전체 일정/);
   assert.match(home, /\/api\/tasks\?view=history&status=done&limit=100/);
   assert.match(css, /#home-grid\.has-focus \.home-card\.focused:is\(\.home-card-tasks, \.home-card-notifications\) \{ height: 440px; \}/);
+});
+
+test('calendar natural-language request stays in the focused card with a confirmation candidate', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  const add = home.slice(home.indexOf("if (state.calendarView === 'add' && !state.calendarPopup)"), home.indexOf('function setCalendarView('));
+  assert.match(add, /\/api\/tasks\/prepare-natural/);
+  assert.match(add, /makeScheduleCandidateCard\(state\.calendarCandidate/);
+  assert.doesNotMatch(add, /setRoute\('chat'\)|send-btn/);
 });
 
 test('Home uses the Figma shell assets and the existing Notes and Mail controllers in focused cards', () => {
@@ -403,6 +413,16 @@ test('focused Calendar follows the Figma selected, all-events, and add-event sta
   assert.match(tasks, /if \(onSaved\) onSaved\(\)/);
   assert.match(css, /\.home-card-calendar\.focused \.calendar-detail \{[^}]*grid-area: 1 \/ 2 \/ span 2/s);
   assert.match(css, /\.home-card-calendar\.focused \.calendar-detail \{ order: 3; flex: 1 1 auto;/);
+});
+
+test('Calendar view selector centers three controls and highlights the active view', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  for (const view of ['selected', 'all', 'add']) {
+    assert.match(home, new RegExp(`classList\\.toggle\\('active', state\\.calendarView === '${view}'\\)`));
+  }
+  assert.match(css, /\.home-card-calendar\.focused \.home-card-actions \{[^}]*grid-template-columns: 110px 1px 110px 1px 110px;[^}]*align-items: center/s);
+  assert.match(css, /\.home-card-calendar\.focused \.home-card-actions \.home-card-action \{[^}]*height: 25px;[^}]*place-items: center/s);
+  assert.match(css, /\.home-card-calendar\.focused \.home-card-actions \.home-card-action\.active \{[^}]*background: var\(--brand-soft\)/s);
 });
 
 test('focused Notes uses the Figma text selector in its card header', () => {

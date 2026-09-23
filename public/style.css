@@ -2633,6 +2633,7 @@ html, body {
   grid-template-columns: 1fr 1fr;
   gap: 7px;
 }
+.task-candidate-actions.has-edit { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .task-candidate-actions .task-action {
   min-height: 40px;
@@ -4605,6 +4606,7 @@ textarea:focus-visible {
 .home-count-summary {
   display: grid;
   grid-template-columns: auto 1fr;
+  min-width: 0;
   align-items: baseline;
   column-gap: 6px;
   margin-bottom: 12px;
@@ -4641,7 +4643,7 @@ textarea:focus-visible {
 
 .home-task-progress-fill { height: 100%; border-radius: inherit; background: var(--brand); }
 .home-card-tasks .home-count-summary strong { font-size: 40px; }
-.home-card-tasks .home-task-progress { width: 115px; }
+.home-card-tasks .home-task-progress { width: min(115px, 100%); }
 
 @media (min-width: 1101px) {
   .home-card-tasks:not(.focused) .tasks-card-content {
@@ -4845,8 +4847,9 @@ textarea:focus-visible {
   grid-template-columns: 110px 1px 110px 1px 110px;
   gap: 10px;
   width: max-content;
-  min-height: 33px;
+  min-height: 25px;
   margin: 0 0 0 19px;
+  align-items: center;
   align-self: start;
 }
 .home-card-calendar.focused .calendar-agenda { flex: 1 1 auto; min-height: 0; align-content: start; overflow-y: auto; margin: 0; padding-top: 31px; }
@@ -4863,7 +4866,10 @@ textarea:focus-visible {
   content: '';
 }
 .home-card-calendar.focused .home-card-actions .home-card-action {
+  display: grid;
+  height: 25px;
   min-height: 25px;
+  place-items: center;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -4872,12 +4878,10 @@ textarea:focus-visible {
   font-size: 11px;
 }
 .home-card-calendar.focused .home-card-actions .home-card-action.active {
+  border-radius: 10px;
+  background: var(--brand-soft);
   color: var(--brand-ink);
   font-weight: 700;
-}
-.home-card-calendar.focused .home-card-actions .calendar-selected-date.active {
-  border-radius: 999px;
-  background: var(--brand-soft);
 }
 .calendar-action-divider { width: 1px; height: 25px; background: var(--hairline); }
 .calendar-selected-date { display: grid; height: 25px; padding: 0 12px; place-items: center; color: var(--brand-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -4916,11 +4920,12 @@ textarea:focus-visible {
 .calendar-list-count { display: block; margin: 0 0 10px; color: var(--brand-ink); font-size: 12px; }
 .calendar-history-row { display: flex; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--hairline); font-size: 11px; }
 .calendar-history-row time { flex: 0 0 auto; color: var(--label); }
-.calendar-add-entry { display: grid; gap: 8px; align-content: start; padding-top: 12px; }
+.calendar-add-entry { display: grid; flex: 1 1 auto; min-height: 0; gap: 8px; align-content: start; overflow-y: auto; padding-top: 12px; }
 .calendar-add-composer { display: flex; height: 42px; align-items: center; gap: 8px; padding: 5px 9px; border: 1px solid var(--hairline); border-radius: 10px; }
 .calendar-add-composer input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ai-text); font: 11px/1.3 var(--font); }
 .calendar-add-send { flex: 0 0 28px; width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-on); font-size: 16px; cursor: pointer; }
-.calendar-add-entry p { padding: 12px; border: 1px solid var(--hairline); border-left: 4px solid var(--brand); border-radius: 10px; color: var(--label); font-size: 11px; }
+.calendar-add-result > p { padding: 12px; border: 1px solid var(--hairline); border-left: 4px solid var(--brand); border-radius: 10px; color: var(--label); font-size: 11px; }
+.calendar-add-result .task-candidate-card { margin: 0; }
 .calendar-add-entry > .home-card-action { min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--brand-ink); font-size: 11px; }
 .calendar-task-panel.calendar-popup {
   position: absolute;
@@ -5882,6 +5887,7 @@ textarea:focus-visible {
 }
 
 @container (max-width: 150px) {
+  .home-card-tasks:not(.focused) .tasks-card-content { display: block; }
   .weather-symbol,
   .home-task-list,
   .home-mail-list,

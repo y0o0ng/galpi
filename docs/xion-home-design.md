@@ -110,11 +110,16 @@ Calendar의 P1은 사라지지 않고 표현을 바꾼다. 데스크톱 기본 �
 확장 Calendar의 일정 추가·전체 일정·등록·변경은 기존 `TaskPanel`과 task API를 사용한다.
 별도 일정 form이나 상태 기계를 만들지 않는다.
 Calendar focus의 오른쪽 상단은 날짜 pill·세로 구분선·전체 일정·세로 구분선·일정 추가하기의
-25px 선택기이며, 일정 제목과 목록은 그 아래에 둔다. Figma의 `Calendar Focus Interaction ·
+25px 선택기이며, 세 항목은 같은 높이로 정렬되고 활성 항목에 같은 연녹색 배경을 쓴다.
+일정 제목과 목록은 그 아래에 둔다. Figma의 `Calendar Focus Interaction ·
 Explorations`에 따라 선택 날짜, 전체 일정(오늘·예정·알림·반복·종결), 일정 추가를 전환하고,
 선택 날짜의 `+ 일정 추가`와 일정 추가의 `수동으로 생성`은 각각 작성 상태를 연다. 취소하면
-해당 보기로 돌아간다. 자연어 일정 요청은 기존 Chat 일정 후보 경로로 보내고, 수동 등록과
-기존 일정 변경은 `TaskPanel`을 쓴다. Phone에서도 월간 격자 아래에 같은 선택기와 내용이
+해당 보기로 돌아간다. 자연어 일정 요청은 Chat 기록을 만들지 않고 Codex CLI가 달력 카드 안의
+미저장 확인 후보로 해석한다. 후보는 기존 일정 validator와 `TaskPanel` 확인 카드를 사용하며
+카드에는 `취소·수정·등록`을 둔다. `수정`은 위 입력창을 재사용해 현재 후보와 변경 요청을
+Codex CLI에 전달하고, 검증된 새 후보로 교체한다. 실패·모호함은 원래 후보를 유지한다.
+`등록`을 눌러야만 저장한다. 수동 등록과 기존 일정 변경도 `TaskPanel`을 쓴다.
+Phone에서도 월간 격자 아래에 같은 선택기와 내용이
 한 열로 이어지며 긴 목록·작성 폼만 카드 안에서 스크롤한다. Notes focus의 노트·논문 선택기는
 카드 헤더 안의 16px 텍스트와 세로 구분선이다. 각 상세 목록·동작은 기존 NotePanel/PaperPanel을 쓴다.
 
@@ -193,8 +198,8 @@ Pad는 각 카드가 2열로 재배치되고 Phone은 한 열로 압축된다. �
 
 ## 10. 비범위와 검증
 
-범용 dashboard/widget framework, 사용자 배치 설정, drag-and-drop, UI layout 저장, 새 DB/API,
-News UI, Trading, 강의 노트 백엔드, task/mail/note/paper/chat 재구축, Pi 배포는 이 작업 범위가
+범용 dashboard/widget framework, 사용자 배치 설정, drag-and-drop, UI layout 저장, 새 DB,
+News UI, Trading, 강의 노트 백엔드, task/mail/note/paper/chat 재구축은 이 작업 범위가
 아니다.
 
 검증 기준은 Desktop 약 1440px, Pad portrait 768/834px, Phone 약 390px이다. 모든 크기에서
