@@ -30,7 +30,7 @@ gates are:
 - re-reconciliation under v3 of the remaining batch-003 surfaces on the three
   reversed skeletons — the fresh strong-model review is **reconciled at 19 agree / 5
   HUMAN-routed** (see "Batch-003 targeted v3 re-reconciliation"); the 8-row blind HUMAN
-  packet (5 mandatory + 3 calibration) is not yet built or run.
+  packet (5 mandatory + 3 calibration) is built and the HUMAN review is not yet run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1615,8 +1615,27 @@ not committed).
 - **3 calibration rows**: `076` (`2da4e54e`, pool 7), `144` (`5269c91f`, pool 1), `235`
   (`b8e64a03`, pool 11).
 
-The 8-row blind HUMAN packet is **not built or run**. Nothing is accepted or frozen;
-replacement-skeleton authoring is separately pending and the accepted pool stays **93**.
+**Blind HUMAN packet — built, NOT RUN.**
+`scripts/build-memory-inference-p1b6-batch-003-targeted-v3-human-review-packet.js`
+(`npm run build:memory-inference-p1b6-batch-003-targeted-v3-human-review-packet -- --output
+<path>`) takes the mandatory and calibration rows from the committed strong-model receipt,
+re-checks that the receipt partitions the canonical 24 and that the calibration rows follow
+the preregistered hash rule, and renders the same bundles as the strong-model packet. Rows
+carry only a `p1b6-v3hreview-` ID and the bundle, sorted by ID, so mandatory and calibration
+rows are indistinguishable. Protocol:
+`fixtures/local-memory-inference-p1b6-batch-003-targeted-v3-human-review-protocol.json`
+(`p1b6-batch-003-targeted-v3-blind-human-review-v1`, raw SHA-256
+`b12ab70f5a1a79e7089e87c3cf35f46b8429f2a26a887237c9fed07711256542`), carrying v3 verbatim.
+The packet is gitignored and deterministic at raw SHA-256
+`35c6601f202f2cf830ee6db4809e622c7c36aa0a7d8ad10d5cd0937cf9a6aa4b` (8 rows).
+
+**Reviewer limitation.** The reviewer is the repository owner, who authored the v3 reversals
+and has seen the reconciliation summary, so knows every row in this population has v3
+reference ESCALATE and that most were model CLEAR. Row blindness hides only which row is
+which; the result is not an independent confirmation and its receipt must say so.
+
+Nothing is accepted or frozen; replacement-skeleton authoring is separately pending and the
+accepted pool stays **93**.
 
 ## Closed Selection and Freeze Constraints
 

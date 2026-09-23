@@ -4995,3 +4995,17 @@ training; the accepted pool stays **93**.
 Tests run locally: the new `…-batch-003-targeted-v3-strong-model-review` suite (5/5) and
 every `test/memory-inference-p1b6-*.test.js` suite (281 tests: 278 pass / 0 fail / 3 skipped —
 the raw-bytes tests). No CI result is claimed.
+
+#### P1-B6 batch-003 targeted v3 re-reconciliation — 8-row blind HUMAN packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001.json` (population source) | `8db917801426d77f3d024bb843592208f008f490ca49f6a8499306d157f4d283` |
+| `fixtures/local-memory-inference-p1b6-batch-003-targeted-v3-human-review-protocol.json` (`p1b6-batch-003-targeted-v3-blind-human-review-v1`) | `b12ab70f5a1a79e7089e87c3cf35f46b8429f2a26a887237c9fed07711256542` |
+| blind HUMAN packet (not committed, 8 rows) | `35c6601f202f2cf830ee6db4809e622c7c36aa0a7d8ad10d5cd0937cf9a6aa4b` |
+
+5 mandatory + 3 calibration rows, role hidden. The reviewer knows the whole population's v3
+reference is ESCALATE, so the result is not an independent confirmation. No HUMAN decision,
+acceptance, reference freeze, HELD release or training; the accepted pool stays **93**.
+
+Tests run locally: the new `…-batch-003-targeted-v3-human-review-packet` suite (5/5).
