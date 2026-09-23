@@ -10,9 +10,10 @@
     icons: null,
     contextNotes: null,
     activeTab: 'notes',
+    savedScrollTop: 0,
   };
 
-  const backIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
+  const backIcon = '<img src="assets/figma/left.svg" width="16" height="16" alt="" aria-hidden="true">';
 
   function normalizeExternalUrl(value) {
     try {
@@ -68,6 +69,12 @@
       query: document.getElementById('paper-panel-query'),
       content: document.getElementById('paper-panel-content'),
     };
+  }
+
+  function splitDetail() {
+    return document.getElementById('paper-panel')?.closest('.home-card-notes.focused')
+      && matchMedia('(min-width: 641px)').matches
+      ? document.getElementById('home-paper-detail') : null;
   }
 
   function open(tab = state.activeTab) {
@@ -196,7 +203,7 @@
     return card;
   }
 
-  async function loadSavedPapers() {
+  async function loadSavedPapers(restore = false) {
     state.mode = 'saved';
     const requestId = ++state.requestId;
     elements().query.value = '';
@@ -224,6 +231,8 @@
       list.className = 'paper-panel-list';
       notes.forEach(note => list.appendChild(makeSavedPaperCard(note)));
       content.appendChild(list);
+      if (restore === true) content.scrollTop = state.savedScrollTop;
+      if (splitDetail() && notes[0]) void openSavedPaper(notes[0]);
     } catch (error) {
       if (requestId !== state.requestId) return;
       renderError(error.message, loadSavedPapers);
@@ -233,17 +242,20 @@
   async function openSavedPaper(note) {
     state.mode = 'detail';
     const requestId = ++state.requestId;
-    renderLoading('논문');
+    const detail = splitDetail();
+    if (!detail) state.savedScrollTop = elements().content.scrollTop;
+    if (detail) detail.textContent = '논문을 읽는 중이야…';
+    else renderLoading('논문');
     try {
       const response = await state.apiFetch(`/api/vault/note/${encodeURIComponent(note.filename)}`);
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || '논문을 읽지 못했습니다.');
       if (requestId !== state.requestId || state.mode !== 'detail') return;
 
-      const { content } = elements();
+      const content = detail || elements().content;
       content.innerHTML = '';
       content.scrollTop = 0;
-      content.appendChild(makeSectionHead('논문', null, loadSavedPapers));
+      content.appendChild(makeSectionHead('논문', null, detail ? null : () => loadSavedPapers(true)));
 
       const metadata = data.note.metadata || {};
       const fullTextUrl = paperFullTextUrl(metadata);
@@ -261,7 +273,8 @@
       content.appendChild(article);
     } catch (error) {
       if (requestId !== state.requestId) return;
-      renderError(error.message, loadSavedPapers);
+      if (detail) detail.textContent = error.message;
+      else renderError(error.message, loadSavedPapers);
     }
   }
 

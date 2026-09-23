@@ -1,7 +1,7 @@
 'use strict';
 
 (function setupHomeDashboard(global) {
-  const FOCUS_CLASS = { tasks: 'medium', calendar: 'large', mail: 'large', notifications: 'medium', dday: 'small', notes: 'large' };
+  const FOCUSABLE_CARDS = new Set(['tasks', 'calendar', 'mail', 'notifications', 'dday', 'notes']);
   const LOCATION_KEY = 'councilLastLocation';
   const WEATHER_CACHE_MS = 15 * 60 * 1000;
   const LOCATION_FALLBACK_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -64,7 +64,7 @@
     const head = node('header', 'home-card-head');
     head.append(node('h2', '', title), node('span', '', meta || ''));
     article.append(head, content);
-    if (focusable && FOCUS_CLASS[id]) {
+    if (focusable && FOCUSABLE_CARDS.has(id)) {
       article.classList.add('focusable');
       article.tabIndex = 0;
       article.setAttribute('role', 'button');
@@ -105,6 +105,16 @@
     rows.forEach(item => {
       const row = node('div', 'home-task-row');
       row.append(node('span', `task-dot ${item.bucket === 'overdue' ? 'overdue' : ''}`), node('time', '', item.dueAt ? formatDateTime(item.dueAt).split(' ').slice(-1)[0] : ''), node('strong', '', item.title || '제목 없는 일정'));
+      const task = state.tasks.find(entry => entry.id === item.taskId);
+      if (state.focusedCard === 'tasks' && task) {
+        const controls = node('div', 'home-task-row-actions');
+        const complete = action('완료', () => global.TaskPanel?.completeFromHome(task, complete));
+        controls.append(complete, action('지연', () => {
+          const host = document.querySelector('.home-card-tasks .home-focus-extra');
+          if (host) global.TaskPanel?.editFromHome(task, host);
+        }));
+        row.append(controls);
+      }
       list.append(row);
     });
     return list;
@@ -133,14 +143,17 @@
   }
 
   function taskDate(task) {
-    return task?.dueKind === 'none' || !task?.dueAt ? '' : kstDate(task.dueAt);
+    if (task?.dueKind === 'date') return task.dueDate || '';
+    return task?.dueKind === 'datetime' && task.dueAt ? kstDate(task.dueAt) : '';
   }
 
   function monthDays() {
     const [year, month] = (state.selectedDate || kstDate(Date.now() / 1000)).split('-').map(Number);
     const first = new Date(Date.UTC(year, month - 1, 1));
-    const start = new Date(Date.UTC(year, month - 1, 1 - first.getUTCDay()));
-    return Array.from({ length: 42 }, (_, index) => {
+    const mondayOffset = (first.getUTCDay() + 6) % 7;
+    const start = new Date(Date.UTC(year, month - 1, 1 - mondayOffset));
+    const weeks = Math.ceil((mondayOffset + new Date(Date.UTC(year, month, 0)).getUTCDate()) / 7);
+    return Array.from({ length: weeks * 7 }, (_, index) => {
       const date = new Date(start);
       date.setUTCDate(start.getUTCDate() + index);
       const key = [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-');
@@ -155,7 +168,7 @@
     const monthHead = node('div', 'calendar-month-head');
     monthHead.append(node('strong', '', `${month.month + 1}월`), node('span', '', `${month.year}년`));
     const grid = node('div', 'calendar-month-grid');
-    ['일', '월', '화', '수', '목', '금', '토'].forEach(label => grid.append(node('span', 'calendar-weekday', label)));
+    ['월', '화', '수', '목', '금', '토', '일'].forEach(label => grid.append(node('span', 'calendar-weekday', label)));
     const today = kstDate(Date.now() / 1000);
     const compactAnchor = state.selectedDate || today;
     const compactWeek = Math.max(0, Math.floor(days.findIndex(item => item.key === compactAnchor) / 7));
@@ -171,21 +184,25 @@
       day.addEventListener('click', event => {
         event.stopPropagation();
         state.selectedDate = item.key;
-        if (state.focusedCard !== 'calendar') state.focusedCard = 'calendar';
-        renderOverview();
+        if (state.focusedCard !== 'calendar') setFocusedCard('calendar');
+        else renderOverview();
       });
       grid.append(day);
     });
     const selectedKey = state.selectedDate || today;
     const selectedTasks = state.tasks.filter(task => taskDate(task) === selectedKey).slice(0, 4);
     const agenda = node('div', 'calendar-agenda');
-    agenda.append(node('strong', '', `${selectedKey.slice(5).replace('-', '월 ')}일 · 일정 ${selectedTasks.length}개`));
-    selectedTasks.forEach(task => agenda.append(node('p', '', task.title)));
+    agenda.append(node('strong', '', `일정 ${selectedTasks.length}개`));
+    selectedTasks.forEach(task => {
+      const row = node('p', 'calendar-event-row');
+      row.append(node('time', '', task.dueAt ? formatDateTime(task.dueAt).split(' ').slice(-1)[0] : ''), node('span', '', task.title));
+      agenda.append(row);
+    });
     if (!selectedTasks.length) agenda.append(node('p', 'home-card-empty', '등록된 일정 없음'));
     body.append(monthHead, grid, agenda);
     if (state.focusedCard === 'calendar') {
       const actions = node('div', 'home-card-actions');
-      actions.append(action('전체 일정', () => openTaskPanel({ view: 'today' })), action('일정 추가하기', () => openTaskPanel({ compose: true }), true));
+      actions.append(node('span', 'calendar-selected-date', new Intl.DateTimeFormat('ko-KR', { timeZone: 'UTC', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${selectedKey}T00:00:00Z`))), action('전체 일정', () => openTaskPanel({ view: 'today' })), action('일정 추가하기', () => openTaskPanel({ compose: true }), true));
       body.append(actions, node('div', 'home-focus-extra'));
     }
     return card('calendar', '달력', '', body);
@@ -218,16 +235,30 @@
     summary.append(node('strong', '', String(state.notifications.length)), node('span', '', '새 알림'));
     const list = node('ul', 'home-notification-list');
     const groups = [
-      ['일정 알림', state.notifications.filter(item => item.type === 'task_reminder').length],
-      ['시스템 알림', state.notifications.filter(item => item.source === 'system' || item.source === 'codex').length],
-      ['새 메일', mailNotifications().length],
-      ['최근 저장', state.recentSaves.length],
+      ['일정 알림', state.notifications.filter(item => item.type === 'task_reminder').length, () => openTasks({ focusReminders: true })],
+      ['시스템 알림', state.notifications.filter(item => item.source === 'system' || item.source === 'codex').length, () => mountNotification('system')],
+      ['새 메일', mailNotifications().length, () => setFocusedCard('mail')],
+      ['최근 저장', state.recentSaves.length, () => mountNotification('saves')],
     ];
-    groups.forEach(([label, value]) => {
-      const item = node('li'); item.append(node('span', '', label), node('span', '', `${value}개`)); list.append(item);
+    groups.forEach(([label, value, handler]) => {
+      const item = node('li');
+      if (state.focusedCard === 'notifications') item.append(action(`${label} ${value}개`, handler));
+      else item.append(node('span', '', label), node('span', '', `${value}개`));
+      list.append(item);
     });
     body.append(summary, list);
-    if (state.focusedCard === 'notifications') body.append(node('div', 'home-focus-extra'));
+    if (state.focusedCard === 'notifications') {
+      const detail = node('div', 'home-notification-groups');
+      [['시스템 알림', state.notifications.filter(item => item.source === 'system' || item.source === 'codex').length],
+        ['새 메일', mailNotifications().length],
+        ['일정 알림', state.notifications.filter(item => item.type === 'task_reminder').length],
+        ['강의 노트', '준비 중']].forEach(([label, value]) => {
+        const group = node('div', 'home-notification-group');
+        group.append(node('strong', '', label), node('span', '', typeof value === 'number' ? `${value}개` : value));
+        detail.append(group);
+      });
+      body.append(detail, node('div', 'home-focus-extra'));
+    }
     return card('notifications', '알림', 'Today', body);
   }
 
@@ -237,7 +268,7 @@
       return Date.UTC(year, month - 1, day) / 86400000;
     };
     const today = dayNumber(kstDate(Date.now() / 1000));
-    return state.tasks.filter(task => task.dueKind !== 'none' && task.dueAt).map(task => ({
+    return state.tasks.filter(task => task.lifecycle === 'active' && taskDate(task)).map(task => ({
       task,
       days: dayNumber(taskDate(task)) - today,
     })).filter(item => item.days >= 0).sort((a, b) => a.days - b.days).slice(0, 3);
@@ -246,16 +277,31 @@
   function renderDday() {
     const body = node('div', 'dday-card-content');
     const items = ddayItems();
+    const list = state.focusedCard === 'dday' ? node('div', 'dday-focus-list') : body;
     items.forEach(item => {
       const row = node('div', 'dday-row');
       row.append(node('strong', '', item.days === 0 ? 'D-Day' : `D-${item.days}`), node('span', '', item.task.title));
-      body.append(row);
+      list.append(row);
     });
-    if (!items.length) body.append(node('p', 'home-card-empty', '다가오는 일정 없음'));
+    if (!items.length) list.append(node('p', 'home-card-empty', '다가오는 일정 없음'));
     if (state.focusedCard === 'dday') {
-      const actions = node('div', 'home-card-actions');
-      actions.append(action('일정 추가', () => openTaskPanel({ compose: true }), true), action('전체 일정', () => openTaskPanel({ view: 'upcoming' })));
-      body.append(actions, node('div', 'home-focus-extra'));
+      const management = node('div', 'dday-management');
+      const head = node('div', 'dday-management-head');
+      head.append(node('strong', '', 'D-Day 관리'), action('+ 추가', () => openTaskPanel({ compose: true })));
+      management.append(head);
+      items.forEach(item => {
+        const row = node('div', 'dday-management-row');
+        const label = node('div');
+        label.append(node('strong', '', item.task.title), node('span', '', taskDate(item.task)));
+        const edit = action('수정', () => {
+          const host = document.querySelector('.home-card-dday .home-focus-extra');
+          if (host) global.TaskPanel?.editFromHome(item.task, host);
+        });
+        const remove = action('삭제', () => global.TaskPanel?.deleteFromHome(item.task, remove));
+        row.append(label, edit, remove);
+        management.append(row);
+      });
+      body.append(list, management, node('div', 'home-focus-extra'));
     }
     return card('dday', '다가오는 날', '', body);
   }
@@ -275,13 +321,13 @@
       item.append(node('strong', '', note.title || note.filename), node('span', '', note.noteType || '노트'));
       item.addEventListener('click', event => {
         event.stopPropagation();
+        global.NotePanel?.queueOpen(note);
         setFocusedCard('notes');
-        global.NotePanel?.open(note);
       });
       list.append(item);
     });
     if (!list.childElementCount) list.append(node('p', 'home-card-empty', '저장된 노트 없음'));
-    body.append(list);
+    if (state.focusedCard !== 'notes') body.append(list);
     if (state.focusedCard === 'notes') {
       const tabs = node('nav', 'home-library-tabs');
       tabs.append(action('노트', () => mountLibrary('notes'), true), action('논문', () => mountLibrary('papers')));
@@ -305,7 +351,14 @@
     if (!host) return;
     const note = document.getElementById('note-panel');
     const paper = document.getElementById('paper-panel');
+    if (!document.getElementById('home-note-detail')) note.append(node('div', 'home-library-detail'));
+    if (!document.getElementById('home-paper-detail')) paper.append(node('div', 'home-library-detail'));
+    note.lastElementChild.id = 'home-note-detail';
+    paper.lastElementChild.id = 'home-paper-detail';
     host.append(note, paper);
+    const [noteTab, paperTab] = host.parentElement.querySelectorAll('.home-library-tabs button');
+    noteTab?.classList.toggle('primary', tab === 'notes');
+    paperTab?.classList.toggle('primary', tab === 'papers');
     global.PaperPanel?.setTab(tab);
   }
 
@@ -322,7 +375,7 @@
     const grid = document.getElementById('home-grid');
     if (!grid) return;
     parkSharedPanels();
-    grid.className = state.focusedCard ? `has-focus focus-${FOCUS_CLASS[state.focusedCard]}` : '';
+    grid.className = state.focusedCard ? `has-focus focus-${state.focusedCard}` : '';
     grid.replaceChildren(
       renderWeather(), renderTasks(), renderCalendar(), renderMail(),
       renderNotifications(), renderDday(), renderLecture(), renderNotes(),
@@ -331,21 +384,54 @@
     const collapse = document.getElementById('home-focus-collapse');
     collapse.hidden = !state.focusedCard;
     if (state.focusedCard === 'mail') mountNotification('mail');
-    if (state.focusedCard === 'notifications') mountNotification('all');
     if (state.focusedCard === 'notes') mountLibrary('notes');
   }
 
-  function setFocusedCard(id) {
-    if (!FOCUS_CLASS[id] || state.focusedCard === id) return;
-    state.focusedCard = id;
+  function transitionOverview(nextCard) {
+    const grid = document.getElementById('home-grid');
+    const previousFocus = state.focusedCard;
+    const anchorId = nextCard || previousFocus;
+    const oldGridTop = grid.getBoundingClientRect().top;
+    const before = new Map([...grid.children].map(card => [card.dataset.cardId, card.getBoundingClientRect()]));
+    state.focusedCard = nextCard;
+    grid.style.removeProperty('--focus-spacer-height');
     renderOverview();
+    const phone = matchMedia('(max-width: 640px)').matches;
+    if (nextCard && phone) {
+      const previous = before.get(nextCard);
+      const current = grid.querySelector(`[data-card-id="${nextCard}"]`)?.getBoundingClientRect();
+      const delta = previous && current ? previous.top - oldGridTop - (current.top - grid.getBoundingClientRect().top) : 0;
+      if (delta > 16) {
+        grid.style.setProperty('--focus-spacer-height', `${delta - 16}px`);
+        grid.classList.add('has-spacer');
+      }
+    }
+    if (phone && anchorId && before.has(anchorId)) {
+      const current = grid.querySelector(`[data-card-id="${anchorId}"]`)?.getBoundingClientRect();
+      if (current) document.getElementById('home-page').scrollTop += current.top - before.get(anchorId).top;
+    }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    [...grid.children].forEach(card => {
+      const previous = before.get(card.dataset.cardId);
+      if (!previous) return;
+      const current = card.getBoundingClientRect();
+      if (!current.width || !current.height) return;
+      card.animate([
+        { transform: `translate(${previous.left - current.left}px, ${previous.top - current.top}px)`, width: `${previous.width}px`, height: `${previous.height}px` },
+        { transform: 'none', width: `${current.width}px`, height: `${current.height}px` },
+      ], { duration: 320, easing: 'cubic-bezier(.2,.7,.2,1)' });
+    });
+  }
+
+  function setFocusedCard(id) {
+    if (!FOCUSABLE_CARDS.has(id) || state.focusedCard === id) return;
+    transitionOverview(id);
     document.querySelector(`.home-card[data-card-id="${id}"]`)?.focus({ preventScroll: true });
   }
 
   function collapseFocus() {
     if (!state.focusedCard) return;
-    state.focusedCard = null;
-    renderOverview();
+    transitionOverview(null);
   }
 
   function openTaskPanel(options) {
@@ -458,8 +544,8 @@
 
   function openNotifications(filter = 'all') {
     setRoute('home', 'overview');
-    state.focusedCard = filter === 'mail' ? 'mail' : 'notifications';
-    renderOverview();
+    setFocusedCard(filter === 'mail' ? 'mail' : 'notifications');
+    if (filter !== 'mail') mountNotification(filter);
   }
 
   function openTasks(options = {}) {
@@ -469,8 +555,7 @@
       return;
     }
     setRoute('home', 'overview');
-    state.focusedCard = options.compose ? 'calendar' : 'tasks';
-    renderOverview();
+    setFocusedCard(options.compose ? 'calendar' : 'tasks');
     openTaskPanel(options.compose ? { compose: true, initialTitle: options.initialTitle || '' } : { view: options.view || 'today' });
   }
 

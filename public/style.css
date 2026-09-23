@@ -4232,6 +4232,22 @@ textarea:focus-visible {
   flex: 0 0 auto;
 }
 
+.shell-brand img { width: 24px; height: 30px; object-fit: fill; }
+.shell-nav-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  background: url('assets/figma/nav-dot.svg') center / 100% 100% no-repeat;
+}
+.shell-nav-item.active .shell-nav-dot,
+#bottom-nav button.active .shell-nav-dot {
+  background-image: url('assets/figma/nav-active-dot.svg');
+}
+.shell-settings img,
+.shell-nav-tools img,
+#mobile-shell-header button img,
+#bottom-nav button img { width: 24px; height: 24px; object-fit: contain; }
+
 .shell-nav-item:hover,
 .shell-nav-item.active {
   background: var(--brand-soft);
@@ -4305,6 +4321,9 @@ textarea:focus-visible {
   overflow-x: hidden;
 }
 
+#home-page { scrollbar-width: none; }
+#home-page::-webkit-scrollbar { display: none; }
+
 #home-page.active,
 #notes-page.active,
 #settings-page.active {
@@ -4324,12 +4343,19 @@ textarea:focus-visible {
 }
 
 .home-page-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  min-height: 132px;
-  padding: 40px 0 26px;
+  min-height: 172px;
+  padding: 56px 0 16px;
 }
+
+.home-page-head > div { display: flex; align-items: baseline; gap: 10px; }
+.home-page-head h1 { font-size: 48px; }
+.home-page-head #home-now { margin: 0; font-size: 14px; }
+.home-page-head .home-view-switch { margin-top: 8px; }
+.home-page-head .home-view-switch button { min-height: 34px; padding: 0 14px; border-radius: 20px; font-weight: 500; }
+.home-page-head .home-view-switch button.active { background: var(--brand-soft); }
+.home-page-head .home-view-switch button span { display: inline-block; width: 7px; height: 7px; margin-right: 10px; background: url('assets/figma/nav-dot.svg') center / contain no-repeat; vertical-align: middle; }
+.home-page-head .home-view-switch button.active span { background-image: url('assets/figma/nav-active-dot.svg'); }
+.home-page-head .home-view-switch button.active::after { display: none; }
 
 .home-page-head h1,
 .library-page-head h1,
@@ -4339,6 +4365,7 @@ textarea:focus-visible {
   line-height: 1.1;
   letter-spacing: -0.04em;
 }
+.home-page-head h1 { font-size: 48px; }
 
 #home-now,
 .settings-page-head p {
@@ -4407,7 +4434,7 @@ textarea:focus-visible {
   border: 1px solid var(--hairline);
   border-radius: 12px;
   background: var(--ai-bubble);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   container-type: inline-size;
   transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
 }
@@ -4441,43 +4468,86 @@ textarea:focus-visible {
   grid-template-rows: repeat(4, 210px);
 }
 
+#home-grid.focus-calendar { grid-template-rows: repeat(3, 210px); }
+
 #home-grid.has-focus .home-card {
-  grid-column: auto / span 4;
-  grid-row: auto / span 1;
+  grid-column: auto / span 2;
+  grid-row: auto;
 }
 
-#home-grid.has-focus .home-card-tasks,
-#home-grid.has-focus .home-card-mail,
 #home-grid.has-focus .home-card-lecture,
 #home-grid.has-focus .home-card-notes {
   grid-column-end: span 7;
 }
 
-#home-grid.has-focus .home-card-calendar {
-  grid-column-end: span 5;
-  grid-row-end: span 2;
-}
-
-#home-grid.has-focus .home-card-dday {
-  grid-column-end: span 2;
-}
-
-#home-grid.has-focus.focus-large .home-card.focused {
+#home-grid.has-focus .home-card.focused:is(.home-card-calendar, .home-card-mail, .home-card-notes) {
   grid-column-end: span 12;
   grid-row-end: span 2;
-  height: 440px;
 }
 
-#home-grid.has-focus.focus-medium .home-card.focused {
+#home-grid.has-focus .home-card.focused:is(.home-card-tasks, .home-card-notifications) {
   grid-column-end: span 7;
   grid-row-end: span 2;
-  height: 440px;
 }
 
-#home-grid.has-focus.focus-small .home-card.focused {
+#home-grid.has-focus .home-card.focused.home-card-dday {
   grid-column-end: span 7;
-  height: 210px;
 }
+
+/* Calendar Focus Interaction: four 115px companions, 790px calendar, then the 7/7 row. */
+#home-grid.focus-calendar .home-card-weather { grid-area: 1 / 1 / span 1 / span 2; }
+#home-grid.focus-calendar .home-card-tasks { grid-area: 1 / 3 / span 1 / span 2; }
+#home-grid.focus-calendar .home-card-calendar { grid-area: 1 / 5 / span 2 / span 12; }
+#home-grid.focus-calendar .home-card-mail { grid-area: 2 / 1 / span 1 / span 2; }
+#home-grid.focus-calendar .home-card-notifications { grid-area: 2 / 3 / span 1 / span 2; }
+#home-grid.focus-calendar .home-card-dday { grid-area: 3 / 1 / span 1 / span 2; }
+#home-grid.focus-calendar .home-card-lecture { grid-area: 3 / 3 / span 1 / span 7; }
+#home-grid.focus-calendar .home-card-notes { grid-area: 3 / 10 / span 1 / span 7; }
+
+#home-grid.focus-tasks .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
+#home-grid.focus-tasks .home-card-tasks { grid-area: 1 / 5 / span 2 / span 7; }
+#home-grid.focus-tasks .home-card-calendar { grid-area: 1 / 12 / span 2 / span 5; }
+#home-grid.focus-tasks .home-card-mail { grid-area: 2 / 1 / span 1 / span 4; }
+#home-grid.focus-tasks .home-card-notifications { grid-area: 3 / 1 / span 1 / span 4; }
+#home-grid.focus-tasks .home-card-dday { grid-area: 3 / 5 / span 1 / span 2; }
+#home-grid.focus-tasks .home-card-lecture { grid-area: 3 / 7 / span 1 / span 7; }
+#home-grid.focus-tasks .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+
+#home-grid.focus-mail .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
+#home-grid.focus-mail .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
+#home-grid.focus-mail .home-card-calendar { grid-area: 1 / 12 / span 1 / span 5; }
+#home-grid.focus-mail .home-card-mail { grid-area: 2 / 1 / span 2 / span 12; }
+#home-grid.focus-mail .home-card-notifications { grid-area: 2 / 13 / span 1 / span 4; }
+#home-grid.focus-mail .home-card-dday { grid-area: 3 / 13 / span 1 / span 2; }
+#home-grid.focus-mail .home-card-lecture { grid-area: 4 / 1 / span 1 / span 7; }
+#home-grid.focus-mail .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+
+#home-grid.focus-notifications .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
+#home-grid.focus-notifications .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
+#home-grid.focus-notifications .home-card-calendar { grid-area: 1 / 12 / span 1 / span 5; }
+#home-grid.focus-notifications .home-card-mail { grid-area: 2 / 1 / span 1 / span 7; }
+#home-grid.focus-notifications .home-card-notifications { grid-area: 2 / 8 / span 2 / span 7; }
+#home-grid.focus-notifications .home-card-dday { grid-area: 2 / 15 / span 1 / span 2; }
+#home-grid.focus-notifications .home-card-lecture { grid-area: 3 / 1 / span 1 / span 7; }
+#home-grid.focus-notifications .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+
+#home-grid.focus-dday .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
+#home-grid.focus-dday .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
+#home-grid.focus-dday .home-card-calendar { grid-area: 1 / 12 / span 2 / span 5; }
+#home-grid.focus-dday .home-card-mail { grid-area: 2 / 1 / span 1 / span 7; }
+#home-grid.focus-dday .home-card-notifications { grid-area: 2 / 8 / span 1 / span 4; }
+#home-grid.focus-dday .home-card-dday { grid-area: 3 / 1 / span 1 / span 7; }
+#home-grid.focus-dday .home-card-lecture { grid-area: 3 / 8 / span 1 / span 7; }
+#home-grid.focus-dday .home-card-notes { grid-area: 4 / 10 / span 1 / span 7; }
+
+#home-grid.focus-notes .home-card-weather { grid-area: 1 / 1 / span 1 / span 4; }
+#home-grid.focus-notes .home-card-tasks { grid-area: 1 / 5 / span 1 / span 7; }
+#home-grid.focus-notes .home-card-calendar { grid-area: 1 / 12 / span 2 / span 5; }
+#home-grid.focus-notes .home-card-mail { grid-area: 2 / 1 / span 1 / span 7; }
+#home-grid.focus-notes .home-card-notifications { grid-area: 2 / 8 / span 1 / span 4; }
+#home-grid.focus-notes .home-card-dday { grid-area: 3 / 1 / span 1 / span 2; }
+#home-grid.focus-notes .home-card-lecture { grid-area: 4 / 1 / span 1 / span 4; }
+#home-grid.focus-notes .home-card-notes { grid-area: 3 / 5 / span 2 / span 12; }
 
 .home-card-head {
   display: flex;
@@ -4561,21 +4631,16 @@ textarea:focus-visible {
 
 .home-task-row {
   display: grid;
-  grid-template-columns: 7px 48px minmax(0, 1fr);
+  grid-template-columns: 16px 48px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
 .task-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--brand);
-}
-
-.task-dot.overdue {
-  background: var(--danger);
+  width: 16px;
+  height: 16px;
+  background: url('assets/figma/task-open.svg') center / contain no-repeat;
 }
 
 .home-task-row time,
@@ -4592,6 +4657,22 @@ textarea:focus-visible {
 .home-task-row time {
   color: var(--label);
 }
+
+.home-card-tasks.focused .home-count-summary {
+  width: fit-content;
+  margin: 0 auto 16px;
+  text-align: center;
+}
+.home-card-tasks.focused .home-task-list {
+  max-height: 245px;
+  padding-top: 16px;
+  overflow-y: auto;
+  border-top: 1px solid var(--hairline);
+}
+.home-card-tasks.focused .home-task-row { grid-template-columns: 16px 40px minmax(0, 1fr); row-gap: 3px; }
+.home-task-row-actions { grid-column: 3; display: flex; gap: 4px; }
+.home-task-row-actions .home-card-action { min-width: 80px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 10px; background: var(--brand-soft); font-size: 10px; }
+.home-task-row-actions .home-card-action:last-child { background: color-mix(in srgb, var(--danger) 9%, transparent); color: var(--danger); }
 
 .calendar-month-head {
   display: flex;
@@ -4629,8 +4710,9 @@ textarea:focus-visible {
 }
 
 .calendar-day.outside { opacity: 0.28; }
-.calendar-day.today { color: var(--brand-ink); font-weight: 800; }
+.calendar-day.today { color: var(--brand-ink); font-weight: 800; outline: 1px dashed var(--brand); outline-offset: -5px; }
 .calendar-day.selected { background: var(--brand); color: var(--brand-on); }
+.calendar-day.selected.today { outline: none; }
 
 .calendar-day i {
   position: absolute;
@@ -4652,6 +4734,36 @@ textarea:focus-visible {
 .calendar-agenda strong,
 .calendar-agenda p { font-size: 10px; }
 .calendar-agenda p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-event-row { display: flex; gap: 14px; }
+.calendar-event-row time { flex: 0 0 42px; color: var(--label); }
+
+.home-card-calendar.focused { padding: 30px 24px 24px; }
+.home-card-calendar.focused .home-card-head { margin-bottom: 52px; }
+.home-card-calendar.focused .home-card-head h2 { font-size: 20px; }
+.home-card-calendar.focused .calendar-day { height: 36px; font-size: 12px; }
+.home-card-calendar.focused .calendar-card-content {
+  display: grid;
+  grid-template-columns: minmax(0, 288px) minmax(0, 1fr);
+  grid-template-rows: 34px minmax(0, 1fr);
+  column-gap: 40px;
+  min-height: 280px;
+}
+.home-card-calendar.focused .calendar-month-head { grid-area: 1 / 1; }
+.home-card-calendar.focused .calendar-month-grid { grid-area: 2 / 1; }
+.home-card-calendar.focused .home-card-actions { grid-area: 1 / 2; margin: 0; align-self: start; }
+.home-card-calendar.focused .calendar-agenda { grid-area: 2 / 2; align-content: start; margin: 0; padding-top: 14px; }
+.home-card-calendar.focused .calendar-card-content { position: relative; }
+.home-card-calendar.focused .calendar-card-content::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 308px;
+  width: 1px;
+  background: var(--hairline);
+  content: '';
+}
+.home-card-calendar.focused .home-card-actions .home-card-action { padding: 0 10px; border: 0; }
+.calendar-selected-date { align-self: center; flex: 0 0 auto; padding: 6px 12px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 .home-mail-row {
   display: grid;
@@ -4676,6 +4788,23 @@ textarea:focus-visible {
 }
 
 .home-notification-list li span:last-child { color: var(--ai-text); font-weight: 700; }
+.home-card-notifications.focused .notification-card-content {
+  display: grid;
+  grid-template-columns: 55px minmax(0, 1fr);
+  gap: 14px;
+}
+.home-card-notifications.focused .home-count-summary { display: block; padding-right: 8px; border-right: 1px solid var(--hairline); }
+.home-card-notifications.focused .home-count-summary strong { display: block; margin-bottom: 9px; font-size: 38px; }
+.home-card-notifications.focused .home-count-summary > span { display: block; }
+.home-card-notifications.focused .home-notification-list { gap: 0; }
+.home-card-notifications.focused .home-notification-list li { display: block; }
+.home-card-notifications.focused .home-notification-list .home-card-action { width: 100%; min-height: 30px; padding: 0 8px; border: 0; text-align: left; font-weight: 500; }
+.home-card-notifications.focused .home-notification-groups,
+.home-card-notifications.focused .home-focus-extra { grid-column: 1 / -1; }
+.home-notification-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.home-notification-group { display: flex; justify-content: space-between; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--hairline); font-size: 11px; }
+.home-notification-group span { color: var(--label); }
+.home-card-notifications.focused .home-focus-extra { margin-top: 0; }
 
 .dday-card-content,
 .lecture-card-content {
@@ -4690,6 +4819,24 @@ textarea:focus-visible {
 
 .dday-row strong { color: var(--brand-ink); font-size: 17px; }
 .dday-row span { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.home-card-dday.focused .home-card-head { display: none; }
+.home-card-dday.focused .dday-card-content { grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+.home-card-dday.focused .dday-focus-list { display: grid; align-content: start; }
+.home-card-dday.focused .dday-row { padding: 6px 0; border-bottom: 1px solid var(--hairline); text-align: center; }
+.home-card-dday.focused .dday-management { min-width: 0; padding-left: 16px; border-left: 1px solid var(--hairline); }
+.dday-management-head,
+.dday-management-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.dday-management-head { margin-bottom: 5px; }
+.dday-management-head strong { font-size: 13px; white-space: nowrap; }
+.dday-management-head .home-card-action { min-height: 24px; background: var(--brand-soft); border: 0; }
+.dday-management-row { min-height: 42px; border-bottom: 1px solid var(--hairline); }
+.dday-management-row > div { min-width: 0; display: grid; gap: 2px; }
+.dday-management-row strong,
+.dday-management-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.dday-management-row span { color: var(--label); }
+.dday-management-row .home-card-action { flex: 0 0 auto; min-height: 24px; padding: 0 4px; border: 0; font-size: 10px; }
+.dday-management-row .home-card-action:last-child { color: var(--danger); }
+.home-card-dday.focused .home-focus-extra { grid-column: 1 / -1; margin: 0; }
 .lecture-card-content > strong { margin-top: 20px; color: var(--label); font-size: 20px; }
 
 .home-note-row {
@@ -4751,6 +4898,67 @@ textarea:focus-visible {
 .home-card.focused .home-focus-extra > .knowledge-panel-view[hidden] {
   display: none;
 }
+
+.home-library-detail { display: none; }
+.home-card-notes.focused .home-card-head { display: none; }
+.home-card-notes.focused .home-library-tabs { margin: 0 0 12px; }
+.home-card-notes.focused .home-focus-extra { margin: 0; }
+.home-card-notes.focused #note-panel:not([hidden]),
+.home-card-notes.focused #paper-panel:not([hidden]) {
+  display: grid;
+  grid-template-columns: minmax(0, 0.45fr) minmax(0, 0.55fr);
+  grid-template-rows: 55px minmax(0, 1fr);
+  height: 340px;
+  max-height: none;
+  overflow: hidden;
+}
+.home-card-notes.focused #note-panel-search,
+.home-card-notes.focused #paper-panel-search { grid-area: 1 / 1; }
+.home-card-notes.focused #note-panel-content,
+.home-card-notes.focused #paper-panel-content { grid-area: 2 / 1; }
+.home-card-notes.focused .home-library-detail {
+  display: block;
+  grid-area: 1 / 2 / span 2 / span 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 16px;
+  border-left: 1px solid var(--hairline);
+}
+
+.home-card-mail.focused .home-count-summary,
+.home-card-mail.focused .home-mail-list,
+.home-card-mail.focused .notification-panel-head,
+.home-card-mail.focused .notification-tabs { display: none; }
+.home-card-mail.focused .home-focus-extra { margin: 0; }
+.home-card-mail.focused #notification-panel { height: 348px; }
+.home-card-mail.focused #notification-panel-content {
+  display: grid;
+  grid-template-columns: minmax(0, 0.56fr) minmax(0, 0.44fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.home-mail-workspace-list,
+.home-mail-workspace-detail { min-width: 0; overflow-y: auto; }
+.home-mail-workspace-list { padding-right: 16px; }
+.home-mail-workspace-detail { padding: 0 0 0 16px; border-left: 1px solid var(--hairline); }
+.home-mail-workspace-row {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  padding: 11px;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--ai-text);
+  text-align: left;
+  cursor: pointer;
+}
+.home-mail-workspace-row.active { background: var(--brand-soft); }
+.home-mail-workspace-row strong,
+.home-mail-workspace-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.home-mail-workspace-row span { color: var(--label); }
+.home-mail-workspace-detail .notification-card { border: 0; padding: 0; box-shadow: none; }
 
 #home-focus-collapse {
   display: none;
@@ -4894,14 +5102,26 @@ textarea:focus-visible {
 .settings-row span:first-child { display: grid; gap: 5px; }
 .settings-row small { color: var(--label); }
 
-@container (max-width: 220px) {
+@container (max-width: 340px) {
   .priority-p3 { display: none; }
-  .weather-symbol { display: none; }
-  .weather-main { justify-content: flex-start; }
-  .home-card-calendar .calendar-weekday,
-  .home-card-calendar .calendar-day.outside-compact-week { display: none; }
-  .home-card-calendar .calendar-month-grid { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .home-card-calendar .calendar-day { width: 100%; height: 24px; justify-content: start; padding-left: 8px; border-radius: 10px; }
+  .home-card-calendar:not(.focused) .calendar-weekday,
+  .home-card-calendar:not(.focused) .calendar-day.outside-compact-week { display: none; }
+  .home-card-calendar:not(.focused) .calendar-month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+
+@container (max-width: 150px) {
+  .weather-symbol,
+  .home-task-list,
+  .home-mail-list,
+  .home-notification-list,
+  .home-notes-list,
+  .calendar-agenda { display: none; }
+  .weather-main { justify-content: flex-start; margin: 16px 0 0; }
+  .weather-main strong { font-size: 30px; }
+  .home-count-summary strong { font-size: 24px; }
+  .home-count-summary p { display: none; }
+  .home-card-calendar:not(.focused) .calendar-month-grid { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .home-card-calendar:not(.focused) .calendar-day { width: 100%; height: 17px; justify-content: start; padding-left: 4px; border-radius: 10px; }
 }
 
 @media (max-width: 1100px) {
@@ -4958,7 +5178,7 @@ textarea:focus-visible {
   }
 
   #bottom-nav button.active { color: var(--brand-ink); }
-  #bottom-nav svg { width: 20px; height: 20px; }
+  #bottom-nav .shell-nav-dot { width: 6px; height: 6px; flex-basis: 6px; }
 
   .home-page-head,
   .library-page-head,
@@ -4995,22 +5215,44 @@ textarea:focus-visible {
   .home-card-calendar { grid-column: 1 / -1; grid-row: auto / span 2; }
 
   #home-grid.has-focus { grid-template-rows: none; }
-  #home-grid.has-focus .home-card { grid-column: auto / span 1; grid-row: auto; }
-  #home-grid.has-focus .home-card-calendar { grid-column-end: span 2; grid-row-end: span 2; }
-  #home-grid.has-focus.focus-large .home-card.focused {
-    grid-column-end: span 2;
-    grid-row-end: span 2;
-    width: 740px;
+  #home-grid.has-focus .home-card { grid-area: auto; }
+  #home-grid.has-focus .home-card.focused:is(.home-card-calendar, .home-card-mail, .home-card-notes) {
+    grid-column: 1 / -1;
+    grid-row: auto / span 2;
   }
-  #home-grid.has-focus.focus-medium .home-card.focused {
-    grid-column-end: span 1;
-    grid-row-end: span 2;
-    width: 360px;
+  #home-grid.has-focus .home-card.focused:is(.home-card-tasks, .home-card-notifications) {
+    grid-column: auto / span 1;
+    grid-row: auto / span 2;
   }
-  #home-grid.has-focus.focus-small .home-card.focused {
-    grid-column-end: span 1;
-    width: 360px;
+  #home-grid.has-focus .home-card.focused.home-card-dday { grid-column: auto / span 1; }
+  .home-card-calendar.focused .calendar-card-content { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; }
+  .home-card-calendar.focused .calendar-card-content::before { left: calc(50% - 14px); }
+
+  #home-grid.focus-calendar {
+    grid-template-columns: 230px repeat(3, minmax(0, 1fr));
+    grid-template-rows: 150px 150px 150px 174px 150px;
+    gap: 20px;
   }
+  #home-grid.focus-calendar .home-card-weather { grid-area: 1 / 1; }
+  #home-grid.focus-calendar .home-card-tasks { grid-area: 2 / 1; }
+  #home-grid.focus-calendar .home-card-lecture { grid-area: 3 / 1; }
+  #home-grid.focus-calendar .home-card-notes { grid-area: 4 / 1; height: 150px; }
+  #home-grid.has-focus.focus-calendar .home-card-calendar.focused { grid-area: 1 / 2 / span 4 / span 3; height: 684px; }
+  #home-grid.focus-calendar .home-card-notifications { grid-area: 5 / 2; }
+  #home-grid.focus-calendar .home-card-mail { grid-area: 5 / 3; }
+  #home-grid.focus-calendar .home-card-dday { grid-area: 5 / 4; }
+  #home-grid.focus-calendar .home-card { padding: 16px; }
+  #home-grid.focus-calendar .home-card-lecture p { display: none; }
+  #home-grid.focus-calendar .home-card-calendar.focused { padding: 24px; }
+  #home-grid.focus-calendar .home-card-calendar.focused .home-card-head { margin-bottom: 18px; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-card-content { display: block; min-height: 0; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-card-content::before { display: none; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-month-grid { margin-bottom: 12px; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-day { height: 64px; font-size: 20px; border-bottom: 1px solid var(--hairline); border-radius: 0; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-day:is(.selected, .today) { border-radius: 50%; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-weekday { font-size: 13px; }
+  #home-grid.focus-calendar .home-card-calendar.focused .home-card-actions { display: none; }
+  #home-grid.focus-calendar .home-card-calendar.focused .calendar-agenda { margin-top: 12px; border-top: 1px solid var(--hairline); }
 
   #agent-panel-content .schedule-agent-block.agents-operational-card,
   #agent-panel-content .codex-agent-block.agents-operational-card {
@@ -5065,8 +5307,7 @@ textarea:focus-visible {
 
   #home-overview { padding-bottom: 20px; }
 
-  #home-grid,
-  #home-grid.has-focus {
+  #home-grid {
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -5088,18 +5329,62 @@ textarea:focus-visible {
   .home-card-dday { order: 7; height: 166px; }
   .home-card-notes { order: 8; height: 203px; }
 
-  #home-grid.has-focus.focus-large .home-card.focused {
-    width: 100%;
-    height: 600px;
+  #home-grid.has-focus {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    gap: 16px 10px;
   }
-  #home-grid.has-focus.focus-medium .home-card.focused {
-    width: 100%;
-    height: 440px;
+  #home-grid.has-focus.has-spacer::before {
+    grid-column: 1 / -1;
+    height: var(--focus-spacer-height);
+    content: '';
   }
-  #home-grid.has-focus.focus-small .home-card.focused {
-    width: 100%;
-    height: 210px;
+  #home-grid.has-focus .home-card {
+    grid-area: auto;
+    width: auto;
+    height: 100px;
+    padding: 12px;
   }
+  #home-grid.has-focus .home-card.focused {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    padding: 16px;
+  }
+  #home-grid.has-focus .home-card.focused:is(.home-card-calendar, .home-card-mail, .home-card-notes) { height: 600px; }
+  #home-grid.has-focus .home-card.focused:is(.home-card-tasks, .home-card-notifications) { height: 440px; }
+  #home-grid.has-focus .home-card.focused.home-card-dday { height: 210px; }
+  #home-grid.has-focus.focus-calendar .home-card-calendar.focused { grid-area: auto; grid-column: 1 / -1; height: 600px; }
+  #home-grid.has-focus .home-card-notes:not(.focused) { grid-column: 1 / -1; }
+  #home-grid.has-focus .home-card:not(.focused) .home-card-head { margin-bottom: 5px; }
+  #home-grid.has-focus .home-card:not(.focused) .home-card-head h2 { font-size: 12px; }
+  #home-grid.has-focus .home-card:not(.focused) .home-card-head span,
+  #home-grid.has-focus .home-card:not(.focused) .home-task-list,
+  #home-grid.has-focus .home-card:not(.focused) .home-mail-list,
+  #home-grid.has-focus .home-card:not(.focused) .home-notification-list,
+  #home-grid.has-focus .home-card:not(.focused) .home-notes-list,
+  #home-grid.has-focus .home-card:not(.focused) .calendar-agenda,
+  #home-grid.has-focus .home-card:not(.focused) .lecture-card-content p { display: none; }
+  #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-month-head { margin: 0; }
+  #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; }
+  #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-day { height: 15px; font-size: 8px; }
+  #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-day.outside-compact-week { display: none; }
+  #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-weekday { display: none; }
+  #home-grid.has-focus .home-card-weather:not(.focused) .weather-main { margin: 2px 0; }
+  .home-card-calendar.focused .home-card-head { margin-bottom: 8px; }
+  .home-card-calendar.focused .calendar-card-content { display: flex; flex-direction: column; min-height: 0; }
+  #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-card-content { display: flex; flex-direction: column; }
+  .home-card-calendar.focused .calendar-card-content::before { display: none; }
+  .home-card-calendar.focused .calendar-month-head { order: 1; margin-bottom: 6px; }
+  .home-card-calendar.focused .calendar-month-grid { order: 2; margin-bottom: 12px; }
+  .home-card-calendar.focused .calendar-day { height: 44px; font-size: 14px; }
+  .home-card-calendar.focused .home-card-actions { order: 3; margin-top: 0; padding-top: 8px; justify-content: space-between; border-top: 1px solid var(--hairline); }
+  .home-card-calendar.focused .calendar-agenda { order: 4; margin-top: 14px; padding-top: 0; border-top: 0; }
+  .home-card-calendar.focused .home-focus-extra { order: 5; }
+  #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-day { height: 38px; font-size: 14px; border-bottom: 0; border-radius: 50%; }
+  #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-weekday { font-size: 10px; }
+  #home-grid.has-focus.focus-calendar .home-card-calendar.focused .home-card-actions { display: flex; }
 
   #home-focus-collapse:not([hidden]) {
     position: sticky;
@@ -5128,6 +5413,18 @@ textarea:focus-visible {
   .home-card.focused .home-focus-extra > .knowledge-panel-view {
     max-height: 400px;
   }
+  .home-card-notes.focused #note-panel:not([hidden]),
+  .home-card-notes.focused #paper-panel:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+    max-height: none;
+  }
+  .home-card-notes.focused .home-library-detail { display: none; }
+  .home-card-mail.focused #notification-panel { height: 500px; }
+  .home-card-mail.focused #notification-panel-content { display: flex; flex-direction: column; overflow-y: auto; }
+  .home-mail-workspace-list { flex: 0 0 190px; overflow-y: auto; padding: 0; border-bottom: 1px solid var(--hairline); }
+  .home-mail-workspace-detail { flex: 1; overflow-y: auto; padding: 14px 0 0; border: 0; }
 
   .weather-main { margin-block: 10px; }
   .weather-main strong { font-size: 42px; }

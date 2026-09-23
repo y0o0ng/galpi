@@ -6,12 +6,14 @@
     loaded: false,
     requestId: 0,
     mode: 'list',
+    listScrollTop: 0,
+    pendingOpen: null,
     notes: [],
     apiFetch: null,
     contextNotes: null,
   };
 
-  const backIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
+  const backIcon = '<img src="assets/figma/left.svg" width="16" height="16" alt="" aria-hidden="true">';
 
   function elements() {
     return {
@@ -19,6 +21,12 @@
       query: document.getElementById('note-panel-query'),
       content: document.getElementById('note-panel-content'),
     };
+  }
+
+  function splitDetail() {
+    return document.getElementById('note-panel')?.closest('.home-card-notes.focused')
+      && matchMedia('(min-width: 641px)').matches
+      ? document.getElementById('home-note-detail') : null;
   }
 
   function formatUpdatedAt(value) {
@@ -116,7 +124,7 @@
     return card;
   }
 
-  function renderList() {
+  function renderList(restore = false) {
     state.mode = 'list';
     const query = elements().query.value.replace(/\s+/g, ' ').trim().toLocaleLowerCase('ko-KR');
     const notes = query
@@ -139,6 +147,7 @@
     list.className = 'paper-panel-list';
     notes.forEach(note => list.appendChild(makeNoteCard(note)));
     content.appendChild(list);
+    if (restore === true) content.scrollTop = state.listScrollTop;
   }
 
   async function loadNotes() {
@@ -152,26 +161,33 @@
       state.notes = Array.isArray(data.notes) ? data.notes : [];
       state.loaded = true;
       renderList();
+      const requested = state.pendingOpen;
+      state.pendingOpen = null;
+      if (requested) void openNote(requested);
+      else if (splitDetail() && state.notes[0]) void openNote(state.notes[0]);
     } catch (error) {
       if (requestId !== state.requestId) return;
       renderError(error.message, loadNotes);
     }
   }
 
-  async function openNote(note, onBack = renderList) {
+  async function openNote(note, onBack = () => renderList(true)) {
     state.mode = 'detail';
     const requestId = ++state.requestId;
-    renderLoading();
+    const detail = splitDetail();
+    if (!detail) state.listScrollTop = elements().content.scrollTop;
+    if (detail) detail.textContent = '노트를 읽는 중이야…';
+    else renderLoading();
     try {
       const response = await state.apiFetch(`/api/vault/note/${encodeURIComponent(note.filename)}`);
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || '노트를 읽지 못했습니다.');
       if (requestId !== state.requestId || state.mode !== 'detail') return;
 
-      const { content } = elements();
+      const content = detail || elements().content;
       content.innerHTML = '';
       content.scrollTop = 0;
-      content.appendChild(makeSectionHead(noteTypeLabel(note.noteType), null, onBack));
+      content.appendChild(makeSectionHead(noteTypeLabel(note.noteType), null, detail ? null : onBack));
       const actions = document.createElement('div');
       actions.className = 'paper-panel-actions';
       actions.appendChild(state.contextNotes.makeToggle({
@@ -185,13 +201,18 @@
       content.appendChild(article);
     } catch (error) {
       if (requestId !== state.requestId) return;
-      renderError(error.message, onBack);
+      if (detail) detail.textContent = error.message;
+      else renderError(error.message, onBack);
     }
   }
 
   function open(note) {
     if (!note?.filename) return;
     openNote({ ...note, noteType: note.noteType || 'topic' }, loadNotes);
+  }
+
+  function queueOpen(note) {
+    state.pendingOpen = note?.filename ? note : null;
   }
 
   function show() {
@@ -222,5 +243,5 @@
     state.initialized = true;
   }
 
-  global.NotePanel = { init, show, loadNotes, open };
+  global.NotePanel = { init, show, loadNotes, open, queueOpen };
 })(window);

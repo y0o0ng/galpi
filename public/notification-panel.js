@@ -511,6 +511,31 @@
       content.appendChild(emptyState('표시할 알림이 없습니다.'));
       return;
     }
+    if (state.filter === 'mail' && elements().panel.closest('.home-card-mail.focused')) {
+      const list = document.createElement('div');
+      list.className = 'home-mail-workspace-list';
+      const detail = document.createElement('div');
+      detail.className = 'home-mail-workspace-detail';
+      items.forEach(item => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'home-mail-workspace-row';
+        const sender = document.createElement('strong');
+        sender.textContent = item.sender || '보낸사람 없음';
+        const subject = document.createElement('span');
+        subject.textContent = item.title || '(제목 없음)';
+        row.append(sender, subject);
+        row.addEventListener('click', () => {
+          list.querySelector('.active')?.classList.remove('active');
+          row.classList.add('active');
+          detail.replaceChildren(makeMailCard(item));
+        });
+        list.appendChild(row);
+      });
+      content.append(list, detail);
+      list.firstElementChild.click();
+      return;
+    }
     items.forEach(item => content.appendChild(
       item.source === 'mail' ? makeMailCard(item) : makeNotificationCard(item),
     ));

@@ -650,7 +650,7 @@
     title.focus();
   }
 
-  async function mutateTask(task, action, button) {
+  async function mutateTask(task, action, button, refreshPanel = true) {
     const labels = { complete: '완료했어', cancel: '취소했어', reopen: '다시 열었어', delete: '삭제했어', restore: '복원했어' };
     button.disabled = true;
     try {
@@ -660,7 +660,7 @@
       });
       state.showToast(labels[action] || '일정을 변경했어');
       state.onChanged?.();
-      render(state.container);
+      if (refreshPanel && state.container?.isConnected) render(state.container);
     } catch (error) {
       state.showToast(error.message);
       button.disabled = false;
@@ -1309,5 +1309,8 @@
   global.TaskPanel = {
     init, render, refresh, makeReminderCard,
     makeScheduleCandidateCard, getPendingScheduleConfirmation,
+    completeFromHome: (task, button) => mutateTask(task, 'complete', button, false),
+    deleteFromHome: (task, button) => mutateTask(task, 'delete', button, false),
+    editFromHome: (task, container) => renderComposer(container, task),
   };
 })(window);

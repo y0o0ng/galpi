@@ -18,36 +18,36 @@
 <body>
   <div id="product-shell">
     <aside id="global-nav" aria-label="전역 탐색">
-      <div class="shell-brand"><span class="xion-mark-icon" aria-hidden="true"></span><strong>Galpi</strong></div>
+      <div class="shell-brand"><img src="assets/figma/galpi-logo.svg" alt="" aria-hidden="true"><strong>Galpi</strong></div>
       <span class="shell-nav-kicker">WORKSPACES</span>
       <nav class="shell-nav-list">
-        <button class="shell-nav-item active" data-product-route="home" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10M9 20v-6h6v6"></path></svg>Home</button>
-        <button class="shell-nav-item" data-product-route="chat" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path></svg>Chat</button>
-        <button class="shell-nav-item" data-product-route="notes" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 10h8M8 14h8M8 18h5"></path></svg>Notes</button>
+        <button class="shell-nav-item active" data-product-route="home" type="button"><span class="shell-nav-dot" aria-hidden="true"></span>Home</button>
+        <button class="shell-nav-item" data-product-route="chat" type="button"><span class="shell-nav-dot" aria-hidden="true"></span>Chat</button>
+        <button class="shell-nav-item" data-product-route="notes" type="button"><span class="shell-nav-dot" aria-hidden="true"></span>Notes</button>
       </nav>
       <div class="shell-nav-tools">
         <button data-product-route="home" data-home-card-target="notifications" type="button" aria-label="알림 보기">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+          <img src="assets/figma/bell.svg" alt="" aria-hidden="true">
         </button>
         <button class="shell-theme-button" type="button" aria-label="테마 전환">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <img src="assets/figma/moon.svg" alt="" aria-hidden="true">
         </button>
       </div>
       <button class="shell-nav-item shell-settings" data-product-route="settings" type="button">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>
+        <img src="assets/figma/more.svg" alt="" aria-hidden="true">
         Settings
       </button>
     </aside>
 
     <div id="product-surface">
       <header id="mobile-shell-header">
-        <div class="shell-brand"><span class="xion-mark-icon" aria-hidden="true"></span><strong>Galpi</strong></div>
+        <div class="shell-brand"><img src="assets/figma/galpi-logo.svg" alt="" aria-hidden="true"><strong>Galpi</strong></div>
         <div>
           <button data-product-route="home" data-home-card-target="notifications" type="button" aria-label="알림 보기">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+            <img src="assets/figma/bell.svg" alt="" aria-hidden="true">
           </button>
           <button class="shell-theme-button" type="button" aria-label="테마 전환">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <img src="assets/figma/moon.svg" alt="" aria-hidden="true">
           </button>
         </div>
       </header>
@@ -62,7 +62,7 @@
         </header>
         <section id="home-overview" class="home-view active" aria-label="Overview">
           <button id="home-focus-collapse" type="button" aria-label="Home Overview로 돌아가기" hidden>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+            <img src="assets/figma/left.svg" width="24" height="24" alt="" aria-hidden="true">
           </button>
           <div id="home-grid" aria-live="polite"></div>
         </section>
@@ -234,10 +234,10 @@
     </div>
 
     <nav id="bottom-nav" aria-label="전역 탐색">
-      <button class="active" data-product-route="home" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10M9 20v-6h6v6"></path></svg>Home</button>
-      <button data-product-route="chat" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path></svg>Chat</button>
-      <button data-product-route="notes" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 10h8M8 14h8M8 18h5"></path></svg>Notes</button>
-      <button data-product-route="settings" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>Settings</button>
+      <button class="active" data-product-route="home" type="button"><span class="shell-nav-dot" aria-hidden="true"></span>Home</button>
+      <button data-product-route="chat" type="button"><span class="shell-nav-dot" aria-hidden="true"></span>Chat</button>
+      <button data-product-route="notes" type="button"><span class="shell-nav-dot" aria-hidden="true"></span>Notes</button>
+      <button data-product-route="settings" type="button"><img src="assets/figma/more.svg" alt="" aria-hidden="true">Settings</button>
     </nav>
   </div>
 

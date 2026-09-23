@@ -211,16 +211,42 @@ test('Home uses the approved 16-column geometry and responsive card flow', () =>
   assert.match(css, /\.home-card-tasks \{ grid-column: 5 \/ span 7/);
   assert.match(css, /\.home-card-calendar \{ grid-column: 12 \/ span 5/);
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 360px\)\)/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#home-grid,[\s\S]*?flex-direction: column/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#home-grid \{[^}]*display: flex;[^}]*flex-direction: column/s);
+  assert.match(css, /#home-grid\.focus-calendar \.home-card-calendar \{ grid-area: 1 \/ 5 \/ span 2 \/ span 12; \}/);
+  assert.match(css, /#home-grid\.focus-calendar \.home-card-lecture \{ grid-area: 3 \/ 3 \/ span 1 \/ span 7; \}/);
+  assert.match(css, /#home-grid\.has-focus \.home-card\.focused:is\(\.home-card-calendar, \.home-card-mail, \.home-card-notes\) \{[^}]*grid-column-end: span 12/s);
 });
 
 test('Home keeps one focus state and the platform-specific collapse contracts', () => {
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   assert.match(home, /focusedCard: null/);
   assert.doesNotMatch(home, /focused(?:Tasks|Calendar|Mail|Notifications|Dday|Notes):/);
-  assert.match(home, /state\.focusedCard = id;\s*renderOverview\(\)/s);
+  assert.match(home, /state\.focusedCard = nextCard;[\s\S]*?renderOverview\(\)/);
+  assert.match(home, /card\.animate\(\[/);
+  assert.match(home, /prefers-reduced-motion: reduce/);
+  assert.match(home, /before\.get\(nextCard\)[\s\S]*?focus-spacer-height/s);
   assert.match(home, /!event\.target\.closest\('\.home-card\.focused'\)[\s\S]*?collapseFocus\(\)/);
   assert.match(css, /#home-focus-collapse:not\(\[hidden\]\) \{[^}]*position: sticky/s);
+  assert.match(css, /#home-grid\.focus-calendar \.home-card-calendar \{ grid-area: 1 \/ 5 \/ span 2 \/ span 12; \}/);
+  assert.match(css, /#home-grid\.has-focus\.focus-calendar \.home-card-calendar\.focused \{ grid-area: 1 \/ 2 \/ span 4 \/ span 3; height: 684px; \}/);
+  assert.match(css, /#home-grid\.has-focus\.has-spacer::before \{[^}]*height: var\(--focus-spacer-height\)/s);
+});
+
+test('Home uses the Figma shell assets and the existing Notes and Mail controllers in focused cards', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  const note = fs.readFileSync(path.join(ROOT, 'public/note-panel.js'), 'utf8');
+  const paper = fs.readFileSync(path.join(ROOT, 'public/paper-panel.js'), 'utf8');
+  const notifications = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
+  for (const asset of ['galpi-logo.svg', 'bell.svg', 'moon.svg', 'more.svg', 'left.svg', 'nav-dot.svg', 'nav-active-dot.svg', 'task-open.svg']) {
+    assert.ok(fs.existsSync(path.join(ROOT, 'public/assets/figma', asset)));
+  }
+  assert.match(html, /assets\/figma\/galpi-logo\.svg/);
+  assert.match(home, /host\.append\(note, paper\)/);
+  assert.match(note, /function splitDetail\(\)/);
+  assert.match(paper, /function splitDetail\(\)/);
+  assert.match(notifications, /function makeMailCard\(item\)/);
+  assert.match(notifications, /home-mail-workspace-list[\s\S]*?detail\.replaceChildren\(makeMailCard\(item\)\)/);
 });
 
 test('Home renders no News surface and requests no News briefing', () => {
@@ -242,7 +268,10 @@ test('Chat knowledge tabs are exactly Notes and Papers with Notes selected', () 
 
 test('Calendar compacts to one selected week and renders one event marker per day', () => {
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /if \(task\?\.dueKind === 'date'\) return task\.dueDate \|\| ''/);
   assert.match(home, /const compactAnchor = state\.selectedDate \|\| today/);
+  assert.match(home, /const mondayOffset = \(first\.getUTCDay\(\) \+ 6\) % 7/);
+  assert.match(home, /length: weeks \* 7/);
   assert.match(home, /outside-compact-week/);
   assert.match(home, /const hasEvent = state\.tasks\.some\(task => taskDate\(task\) === item\.key\)/);
   assert.match(home, /if \(hasEvent\) day\.append\(node\('i'/);

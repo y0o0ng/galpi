@@ -65,7 +65,7 @@ test('notification, task, and agent modules load before the product shell contro
   assert.deepEqual(Object.keys(notificationWindow.NotificationPanel).sort(), ['init', 'refresh', 'show']);
   const taskWindow = {};
   vm.runInNewContext(taskSource, { window: taskWindow }, { filename: 'task-panel.js' });
-  assert.deepEqual(Object.keys(taskWindow.TaskPanel).sort(), ['getPendingScheduleConfirmation', 'init', 'makeReminderCard', 'makeScheduleCandidateCard', 'refresh', 'render']);
+  assert.deepEqual(Object.keys(taskWindow.TaskPanel).sort(), ['completeFromHome', 'deleteFromHome', 'editFromHome', 'getPendingScheduleConfirmation', 'init', 'makeReminderCard', 'makeScheduleCandidateCard', 'refresh', 'render']);
   const pushWindow = {};
   vm.runInNewContext(pushSource, { window: pushWindow }, { filename: 'push-client.js' });
   assert.deepEqual(Object.keys(pushWindow.PushClient).sort(), ['enable', 'getState', 'init', 'refresh']);
