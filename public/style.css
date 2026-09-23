@@ -4292,6 +4292,9 @@ textarea:focus-visible {
   display: none;
 }
 
+#shell-knowledge-panel-toggle,
+#shell-web-usage-pill { display: none; }
+
 .product-page {
   display: none;
   min-width: 0;
@@ -4949,14 +4952,19 @@ textarea:focus-visible {
 .dday-management-head { margin-bottom: 5px; }
 .dday-management-head strong { font-size: 13px; white-space: nowrap; }
 .dday-management-head .home-card-action { min-height: 24px; background: var(--brand-soft); border: 0; }
-.dday-management-row { min-height: 42px; border-bottom: 1px solid var(--hairline); }
+.dday-management-row { min-height: 44px; border-bottom: 1px solid var(--hairline); }
 .dday-management-row > div { min-width: 0; display: grid; gap: 2px; }
 .dday-management-row strong,
 .dday-management-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .dday-management-row span { color: var(--label); }
-.dday-management-row .home-card-action { flex: 0 0 auto; min-height: 24px; padding: 0 4px; border: 0; font-size: 10px; }
+.dday-management-row .home-card-action { flex: 0 0 auto; min-height: 44px; padding: 0 4px; border: 0; font-size: 10px; }
 .dday-management-row .home-card-action:last-child { color: var(--danger); }
 .home-card-dday.focused .home-focus-extra { grid-column: 1 / -1; margin: 0; }
+.dday-editor { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+.dday-editor input { min-width: 0; min-height: 30px; padding: 4px 7px; border: 1px solid var(--border); border-radius: 10px; background: var(--ai-bubble); color: var(--ai-text); }
+.dday-editor input[name="title"] { flex: 1 1 110px; }
+.dday-editor input[name="targetDate"] { flex: 1 1 120px; }
+.dday-editor .home-card-action { min-height: 30px; }
 .lecture-card-content > strong { margin-top: 20px; color: var(--label); font-size: 20px; }
 
 .home-note-row {
@@ -5430,6 +5438,8 @@ textarea:focus-visible {
   }
 
   #mobile-shell-header > div:last-child { display: flex; gap: 2px; }
+  #app #header { display: none; }
+  body[data-product-route="chat"] #shell-web-usage-pill { display: inline-flex; align-self: center; }
 
   #bottom-nav {
     position: fixed;
@@ -5502,7 +5512,7 @@ textarea:focus-visible {
   #home-grid .home-card-calendar { height: 260px; }
   #home-grid .home-card-notifications { height: 206px; }
   #home-grid .home-card-mail { height: 209px; }
-  #home-grid .home-card-dday { height: 166px; }
+  #home-grid .home-card-dday { height: 190px; padding-bottom: 24px; }
 
   .home-card-tasks:not(.focused) .home-count-summary {
     grid-template-columns: 44px minmax(0, 1fr);
@@ -5569,6 +5579,10 @@ textarea:focus-visible {
     flex: 1;
     padding-bottom: 72px;
   }
+}
+
+@media (max-width: 900px) {
+  body[data-product-route="chat"] #shell-knowledge-panel-toggle { display: grid; }
 }
 
 @media (min-width: 641px) and (max-width: 1100px) {
@@ -5639,7 +5653,7 @@ textarea:focus-visible {
   #home-grid .home-card-notifications { order: 4 !important; height: 206px; }
   #home-grid .home-card-calendar { order: 5 !important; height: 260px; }
   #home-grid .home-card-mail { order: 6 !important; height: 209px; }
-  #home-grid .home-card-dday { order: 7 !important; height: 166px; }
+  #home-grid .home-card-dday { order: 7 !important; height: 190px; padding-bottom: 24px; }
   #home-grid .home-card-notes { order: 8 !important; height: 203px; }
   #home-grid.has-focus .home-card-calendar { order: 5 !important; }
   #home-grid.has-focus .home-card-mail { order: 6 !important; }

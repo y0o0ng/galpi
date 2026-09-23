@@ -16,6 +16,7 @@
     selectedDate: null,
     summary: null,
     tasks: [],
+    ddays: [],
     completedToday: 0,
     completedTasks: [],
     notifications: [],
@@ -80,7 +81,7 @@
         }
       });
       article.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (event.target === article && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
           focus();
         }
@@ -326,10 +327,58 @@
       return Date.UTC(year, month - 1, day) / 86400000;
     };
     const today = dayNumber(kstDate(Date.now() / 1000));
-    return state.tasks.filter(task => task.lifecycle === 'active' && taskDate(task)).map(task => ({
-      task,
-      days: dayNumber(taskDate(task)) - today,
+    return state.ddays.map(dday => ({
+      dday,
+      days: dayNumber(dday.targetDate) - today,
     })).filter(item => item.days >= 0).sort((a, b) => a.days - b.days).slice(0, 3);
+  }
+
+  function editDday(dday = null) {
+    const host = document.querySelector('.home-card-dday .home-focus-extra');
+    if (!host) return;
+    const form = node('form', 'dday-editor');
+    const title = node('input');
+    title.name = 'title';
+    title.placeholder = '이름';
+    title.maxLength = 120;
+    title.required = true;
+    title.value = dday?.title || '';
+    title.setAttribute('aria-label', 'D-Day 이름');
+    const date = node('input');
+    date.name = 'targetDate';
+    date.type = 'date';
+    date.required = true;
+    date.value = dday?.targetDate || '';
+    date.setAttribute('aria-label', 'D-Day 날짜');
+    const save = node('button', 'home-card-action primary', '저장');
+    save.type = 'submit';
+    const cancel = action('취소', () => host.replaceChildren());
+    form.append(title, date, save, cancel);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const response = await state.apiFetch(dday ? `/api/ddays/${dday.id}` : '/api/ddays', {
+        method: dday ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.value, targetDate: date.value }),
+      }).catch(() => null);
+      if (!response?.ok) {
+        state.showToast((await response?.json().catch(() => null))?.error || 'D-Day를 저장하지 못했어.');
+        return;
+      }
+      await refresh();
+    });
+    host.replaceChildren(form);
+    title.focus();
+  }
+
+  async function deleteDday(dday) {
+    if (!global.confirm(`‘${dday.title}’ D-Day를 삭제할까?`)) return;
+    const response = await state.apiFetch(`/api/ddays/${dday.id}`, { method: 'DELETE' }).catch(() => null);
+    if (!response?.ok) {
+      state.showToast('D-Day를 삭제하지 못했어.');
+      return;
+    }
+    await refresh();
   }
 
   function renderDday() {
@@ -338,24 +387,21 @@
     const list = state.focusedCard === 'dday' ? node('div', 'dday-focus-list') : body;
     items.forEach(item => {
       const row = node('div', 'dday-row');
-      row.append(node('strong', '', item.days === 0 ? 'D-Day' : `D-${item.days}`), node('span', '', item.task.title));
+      row.append(node('strong', '', item.days === 0 ? 'D-Day' : `D-${item.days}`), node('span', '', item.dday.title));
       list.append(row);
     });
-    if (!items.length) list.append(node('p', 'home-card-empty', '다가오는 일정 없음'));
+    if (!items.length) list.append(node('p', 'home-card-empty', '등록된 D-Day 없음'));
     if (state.focusedCard === 'dday') {
       const management = node('div', 'dday-management');
       const head = node('div', 'dday-management-head');
-      head.append(node('strong', '', 'D-Day 관리'), action('+ 추가', () => openTaskPanel({ compose: true })));
+      head.append(node('strong', '', 'D-Day 관리'), action('+ 추가', () => editDday()));
       management.append(head);
-      items.forEach(item => {
+      state.ddays.forEach(dday => {
         const row = node('div', 'dday-management-row');
         const label = node('div');
-        label.append(node('strong', '', item.task.title), node('span', '', taskDate(item.task)));
-        const edit = action('수정', () => {
-          const host = document.querySelector('.home-card-dday .home-focus-extra');
-          if (host) global.TaskPanel?.editFromHome(item.task, host);
-        });
-        const remove = action('삭제', () => global.TaskPanel?.deleteFromHome(item.task, remove));
+        label.append(node('strong', '', dday.title), node('span', '', dday.targetDate));
+        const edit = action('수정', () => editDday(dday));
+        const remove = action('삭제', () => deleteDday(dday));
         row.append(label, edit, remove);
         management.append(row);
       });
@@ -579,14 +625,15 @@
       state.apiFetch('/api/notifications'),
       state.apiFetch('/api/mail/status'),
       state.apiFetch('/api/vault/notes?excludeNoteType=paper&limit=6'),
+      state.apiFetch('/api/ddays'),
     ]);
     const read = async (result, fallback) => {
       if (result.status !== 'fulfilled' || !result.value.ok) return fallback;
       return result.value.json().catch(() => fallback);
     };
-    const [summary, tasks, completed, notifications, mail, notes] = await Promise.all([
+    const [summary, tasks, completed, notifications, mail, notes, ddays] = await Promise.all([
       read(requests[0], null), read(requests[1], {}), read(requests[2], {}),
-      read(requests[3], {}), read(requests[4], null), read(requests[5], {}),
+      read(requests[3], {}), read(requests[4], null), read(requests[5], {}), read(requests[6], {}),
     ]);
     state.summary = summary;
     state.tasks = Array.isArray(tasks?.tasks) ? tasks.tasks : [
@@ -598,6 +645,7 @@
     state.recentSaves = Array.isArray(notifications?.recentSaves) ? notifications.recentSaves : [];
     state.mail = mail;
     state.notes = Array.isArray(notes?.notes) ? notes.notes : [];
+    state.ddays = Array.isArray(ddays?.ddays) ? ddays.ddays : [];
     if (state.route === 'home' && state.homeView === 'overview') renderOverview();
     void loadWeather().catch(() => {});
   }

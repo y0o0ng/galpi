@@ -38,6 +38,7 @@ const {
 } = require('./lib/codex-model-catalog');
 const { registerModelRuntimeRoutes } = require('./lib/model-runtime-routes');
 const { registerAssistantTaskRoutes } = require('./lib/assistant-task-routes');
+const { registerDdayRoutes } = require('./lib/dday-routes');
 const { readAssistantPushConfig } = require('./lib/assistant-push-config');
 const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createMailStore } = require('./lib/mail/store');
@@ -4552,6 +4553,7 @@ registerAssistantTaskRoutes({
   seriesEnabled: ASSISTANT_TASK_SERIES_ENABLED,
   onTaskMutation: () => assistantScheduleNoteProjector.tick(),
 });
+registerDdayRoutes({ app, db });
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
 registerNewsRoutes({
   app,

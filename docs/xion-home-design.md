@@ -111,11 +111,15 @@ Calendar focus의 오른쪽 상단은 날짜 pill·세로 구분선·전체 일�
 
 ## 6. 데이터와 행동 정본
 
-Home은 projection이며 독립 저장소가 아니다.
+Home의 기존 카드들은 각 도메인의 projection이다. D-Day는 일정과 별도로 사용자가 직접
+이름·날짜를 등록하는 기능이므로 자체 저장소를 쓴다. 일정의 생성·변경·알림·완료와
+연동하지 않으며, 홈에는 오늘 이후의 가까운 D-Day 세 건을 표시한다. Focus 카드의
+`D-Day 관리`에서 추가·수정·삭제한다. 반복 규칙은 현재 제품 범위에 없다.
 
 | 카드/화면 | 기존 정본 |
 |---|---|
-| Tasks, Calendar, D-Day | `/api/tasks/summary`, task API, `TaskPanel` |
+| Tasks, Calendar | `/api/tasks/summary`, task API, `TaskPanel` |
+| D-Day | `ddays` 테이블, `/api/ddays` |
 | Mail | `/api/mail/status`, mail settings/preferences, Attention, body/requeue 동작 |
 | Notifications | `/api/notifications`, `NotificationPanel` |
 | Notes | vault note API, `NotePanel` |
@@ -125,6 +129,9 @@ Home은 projection이며 독립 저장소가 아니다.
 
 한 소스의 실패가 다른 카드까지 막지 않도록 독립 요청을 `Promise.allSettled`로 읽는다.
 서버 검증과 기존 mutation 의미가 항상 우선한다.
+
+Pad·Phone의 Chat 화면은 전역 헤더만 보이고 Chat 전용 헤더는 숨긴다. 웹 사용량은 이
+화면에서만 전역 헤더의 알림 아이콘 옆에 둔다. 데스크톱 Chat 헤더는 유지한다.
 
 위치는 `getCurrentPosition()`으로 한 번 얻고 마지막 좌표 한 건만 기기의
 `councilLastLocation`에 둔다. 서버·DB에는 위치 이력을 저장하지 않는다. 15분 날씨 캐시와

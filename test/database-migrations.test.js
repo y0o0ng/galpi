@@ -279,8 +279,9 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
   assert.deepEqual(result.applied, [
     { version: 25, name: 'voice_shortcut_conversation_control' },
     { version: 26, name: 'retrieval_query_resolution_trace' },
+    { version: 27, name: 'independent_ddays' },
   ]);
-  assert.equal(result.currentVersion, 26);
+  assert.equal(result.currentVersion, 27);
   assert.deepEqual(
     db.prepare(`SELECT can_continue AS canContinue FROM voice_shortcut_receipts`).get(),
     { canContinue: 0 },
@@ -295,7 +296,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     /CHECK/,
   );
   assert.deepEqual(
-    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`).all(),
+    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name != 'ddays' ORDER BY name`).all(),
     tablesBefore,
   );
   assert.deepEqual(

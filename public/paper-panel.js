@@ -83,6 +83,7 @@
     el.panel.classList.add('open');
     el.backdrop.hidden = false;
     el.toggle.setAttribute('aria-expanded', 'true');
+    document.getElementById('shell-knowledge-panel-toggle')?.setAttribute('aria-expanded', 'true');
     document.body.classList.add('knowledge-panel-open');
   }
 
@@ -91,6 +92,7 @@
     el.panel.classList.remove('open');
     el.backdrop.hidden = true;
     el.toggle.setAttribute('aria-expanded', 'false');
+    document.getElementById('shell-knowledge-panel-toggle')?.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('knowledge-panel-open');
   }
 
@@ -430,6 +432,7 @@
       if (el.panel.classList.contains('open')) close();
       else open();
     });
+    document.getElementById('shell-knowledge-panel-toggle')?.addEventListener('click', () => el.toggle.click());
     el.close.addEventListener('click', close);
     el.backdrop.addEventListener('click', close);
     el.tabs.forEach(button => button.addEventListener('click', () => setTab(button.dataset.panelTab)));

@@ -321,22 +321,26 @@ function runAssistantTool(command) {
 }
 
 function renderWebUsagePill(webSearch) {
-  const pill = document.getElementById('web-usage-pill');
-  if (!pill) return;
+  const pills = document.querySelectorAll('.web-usage-pill');
+  if (!pills.length) return;
 
   if (!webSearch?.enabled) {
-    pill.textContent = 'Web off';
-    pill.classList.remove('warn');
-    pill.title = '외부 검색 비활성화';
+    pills.forEach(pill => {
+      pill.textContent = 'Web off';
+      pill.classList.remove('warn');
+      pill.title = '외부 검색 비활성화';
+    });
     return;
   }
 
   const credits = Number(webSearch.usage?.credits || 0);
   const softLimit = Number(webSearch.softLimit || 0);
   const requestCount = Number(webSearch.usage?.requestCount || 0);
-  pill.textContent = softLimit > 0 ? `Web ${credits}/${softLimit}` : `Web ${credits}`;
-  pill.classList.toggle('warn', softLimit > 0 && credits >= softLimit * 0.8);
-  pill.title = `이번 달 ${webSearch.provider || 'web'} 사용량: ${credits} credits / ${softLimit || 'limit 없음'} · ${requestCount} requests`;
+  pills.forEach(pill => {
+    pill.textContent = softLimit > 0 ? `Web ${credits}/${softLimit}` : `Web ${credits}`;
+    pill.classList.toggle('warn', softLimit > 0 && credits >= softLimit * 0.8);
+    pill.title = `이번 달 ${webSearch.provider || 'web'} 사용량: ${credits} credits / ${softLimit || 'limit 없음'} · ${requestCount} requests`;
+  });
 }
 
 async function refreshWebUsagePill() {

@@ -228,6 +228,23 @@ test('phone focus keeps Calendar, Mail, and Notes in their Overview order', () =
   assert.match(mobile, /#home-grid\.has-focus \.home-card-notes \{ order: 8 !important; \}/);
 });
 
+test('D-Day uses its own API and the pad/phone card leaves room below three rows', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /state\.apiFetch\('\/api\/ddays'\)/);
+  assert.match(home, /return state\.ddays\.map\(dday =>/);
+  assert.doesNotMatch(home.slice(home.indexOf('function ddayItems()'), home.indexOf('function renderLecture()')), /TaskPanel|state\.tasks/);
+  assert.match(css, /#home-grid \.home-card-dday \{ height: 190px; padding-bottom: 24px; \}/);
+});
+
+test('pad and phone hide only the Chat header and show web usage beside shell notifications', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
+  const mobile = allBlocks(css, '@media (max-width: 1100px)').join('\n');
+  assert.match(mobile, /#app #header \{ display: none; \}/);
+  assert.match(mobile, /body\[data-product-route="chat"\] #shell-web-usage-pill \{ display: inline-flex/);
+  assert.match(html, /id="shell-web-usage-pill"[\s\S]*?aria-label="알림 보기"/);
+  assert.match(html, /id="shell-knowledge-panel-toggle"/);
+});
+
 test('every desktop focus layout fits the original three-row Home canvas without overlap', () => {
   assert.match(css, /#home-grid\.has-focus \{ grid-template-rows: repeat\(3, 210px\); \}/);
   assert.match(css, /#home-grid\.has-focus\.focus-mail \{ grid-template-rows: 95px 440px 95px; \}/);

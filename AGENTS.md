@@ -67,6 +67,7 @@
 ## UI 현재 계약
 
 - 전역 제품 구조는 Home·Chat·Notes·Settings다. Home은 Overview·Agents, Chat 지식 패널은 Notes·Papers만 쓰며 반응형·focus·이전 링크 호환 정본은 `docs/xion-home-design.md`다.
+- Home `다가오는 날`은 일정과 독립된 제목·날짜 저장 기능이다. Pad·Phone Chat은 전용 헤더를 숨기고 전역 헤더에 웹 사용량을 표시한다. 상세 계약은 `docs/xion-home-design.md`다.
 - 방향은 미니멀리즘 기반 Apple Human Interface다. 기능보다 장식을 늘리지 않는다.
 - Markdown 말풍선은 `.bubble.md { white-space: normal; }`과 `marked`의 `breaks:true`를 함께 유지한다.
 - 공통 거터는 16px, 본문·입력 읽기 폭은 600px, 모바일 동작 타깃은 44px 이상, 경계선은 테마별 `--hairline`을 쓴다.
