@@ -5692,12 +5692,11 @@ textarea:focus-visible {
   .home-card-calendar.focused .calendar-month-head { order: 1; margin-bottom: 6px; }
   .home-card-calendar.focused .calendar-month-grid { order: 2; margin-bottom: 12px; }
   .home-card-calendar.focused .calendar-day { height: 44px; font-size: 14px; }
-  .home-card-calendar.focused .home-card-actions { order: 3; margin-top: 0; padding-top: 8px; justify-content: space-between; border-top: 1px solid var(--hairline); }
+  .home-card-calendar.focused .home-card-actions { order: 3; margin-top: 0; padding-top: 8px; border-top: 1px solid var(--hairline); }
   .home-card-calendar.focused .calendar-agenda { order: 4; margin-top: 14px; padding-top: 0; border-top: 0; }
   .home-card-calendar.focused .home-focus-extra { order: 5; }
   #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-day { height: 38px; font-size: 14px; border-bottom: 0; border-radius: 50%; }
   #home-grid.has-focus.focus-calendar .home-card-calendar.focused .calendar-weekday { font-size: 10px; }
-  #home-grid.has-focus.focus-calendar .home-card-calendar.focused .home-card-actions { display: flex; }
 
   #home-focus-collapse:not([hidden]) {
     position: sticky;
