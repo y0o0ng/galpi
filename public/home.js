@@ -359,6 +359,10 @@
     return state.notifications.filter(item => item.source === 'mail');
   }
 
+  function notificationResolved(id) {
+    state.notifications = state.notifications.filter(item => item.id !== id);
+  }
+
   function renderMail() {
     const body = node('div', 'mail-card-content');
     const analysis = state.mail?.analysis || {};
@@ -859,5 +863,5 @@
     void refresh();
   }
 
-  global.HomeDashboard = { init, refresh, setRoute, setHomeView, setFocusedCard, openNotifications, openTasks, handleInitialUrl };
+  global.HomeDashboard = { init, refresh, setRoute, setHomeView, setFocusedCard, openNotifications, openTasks, handleInitialUrl, notificationResolved };
 })(window);

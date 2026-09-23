@@ -11,6 +11,7 @@
     showToast: null,
     onSplit: null,
     openNote: null,
+    onResolved: null,
   };
 
   function elements() {
@@ -111,6 +112,7 @@
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || '알림 처리 실패');
       state.notifications = state.notifications.filter(notification => notification.id !== item.id);
+      state.onResolved?.(item.id);
       renderItems();
       state.showToast(action === 'approve' ? doneMessage(item) : '무시됨');
     } catch (error) {
@@ -385,6 +387,7 @@
       state.showToast(kind === 'done' ? '완료로 표시했어' : '3시간 뒤에 다시 알려줄게');
       // 목록에서 즉시 빼서 화면과 서버가 어긋나 보이지 않게 한다.
       state.notifications = state.notifications.filter(entry => entry.id !== item.id);
+      state.onResolved?.(item.id);
       renderItems();
     } catch (error) {
       state.showToast(error.message);
@@ -590,7 +593,7 @@
     refresh();
   }
 
-  function init({ apiFetch, showToast, onSplit, openNote }) {
+  function init({ apiFetch, showToast, onSplit, openNote, onResolved }) {
     if (state.initialized) return;
     const el = elements();
     if (
@@ -598,6 +601,7 @@
       || typeof showToast !== 'function'
       || typeof onSplit !== 'function'
       || typeof openNote !== 'function'
+      || (onResolved != null && typeof onResolved !== 'function')
       || !el.panel || !el.refresh || !el.content || el.tabs.length !== 5
     ) {
       throw new TypeError('알림 패널 초기화 인자가 올바르지 않습니다.');
@@ -606,6 +610,7 @@
     state.showToast = showToast;
     state.onSplit = onSplit;
     state.openNote = openNote;
+    state.onResolved = onResolved;
     el.refresh.addEventListener('click', refresh);
     el.tabs.forEach(tab => tab.addEventListener('click', () => selectFilter(tab.dataset.notificationFilter)));
     state.initialized = true;

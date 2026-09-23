@@ -1212,6 +1212,7 @@ function initPaperPanel() {
         window.PaperPanel?.open('notes');
         window.NotePanel?.open(note);
       },
+      onResolved: id => window.HomeDashboard?.notificationResolved?.(id),
     });
     window.AgentPanel.init({
       apiFetch,
