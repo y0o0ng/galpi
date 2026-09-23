@@ -221,6 +221,13 @@ test('Home uses the approved 16-column geometry and responsive card flow', () =>
   assert.match(css, /#home-grid\.has-focus \.home-card\.focused:is\(\.home-card-calendar, \.home-card-mail, \.home-card-notes\) \{[^}]*grid-column-end: span 12/s);
 });
 
+test('phone focus keeps Calendar, Mail, and Notes in their Overview order', () => {
+  const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
+  assert.match(mobile, /#home-grid\.has-focus \.home-card-calendar \{ order: 5 !important; \}/);
+  assert.match(mobile, /#home-grid\.has-focus \.home-card-mail \{ order: 6 !important; \}/);
+  assert.match(mobile, /#home-grid\.has-focus \.home-card-notes \{ order: 8 !important; \}/);
+});
+
 test('every desktop focus layout fits the original three-row Home canvas without overlap', () => {
   assert.match(css, /#home-grid\.has-focus \{ grid-template-rows: repeat\(3, 210px\); \}/);
   assert.match(css, /#home-grid\.has-focus\.focus-mail \{ grid-template-rows: 95px 440px 95px; \}/);

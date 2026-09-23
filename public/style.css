@@ -5641,6 +5641,9 @@ textarea:focus-visible {
   #home-grid .home-card-mail { order: 6 !important; height: 209px; }
   #home-grid .home-card-dday { order: 7 !important; height: 166px; }
   #home-grid .home-card-notes { order: 8 !important; height: 203px; }
+  #home-grid.has-focus .home-card-calendar { order: 5 !important; }
+  #home-grid.has-focus .home-card-mail { order: 6 !important; }
+  #home-grid.has-focus .home-card-notes { order: 8 !important; }
 
   #home-grid.has-focus { display: flex; flex-direction: column; gap: 16px; }
   #home-grid.has-focus .home-grid-column .home-card,
