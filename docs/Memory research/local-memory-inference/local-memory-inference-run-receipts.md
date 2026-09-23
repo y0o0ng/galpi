@@ -5027,3 +5027,24 @@ accepted pool stays **93**.
 
 Tests run locally: `…-batch-003-targeted-v3-human-review-packet` with the raw bytes supplied
 (9/9).
+
+#### P1-B6 batch-003 TARGET-boundary realization failure — `2da4e54e` / `5269c91f` RESOLVED / fresh candidates PENDING GATES
+
+Realization failure, not a contract failure: v3 and both skeletons unchanged and active.
+Contracts are in the design section "Batch-003 TARGET-boundary realization failure".
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-003-target-boundary-resolution-receipt.json` | 16 rows (12 + 4) → `INELIGIBLE`, prior status quoted |
+| `fixtures/local-memory-inference-p1b6-surface-target-boundary-candidate.json` | `p1b6-item-tb1-001` / `-002`, fresh, no inherited review |
+
+- withdrawn: 6 provisional agreements and the current validity of corrections `072`, `142`,
+  `145`; historical evidence immutable.
+- invariant `p1b6-applicability-membership-target-anchor-v1` checks the declared
+  `targetAnchorRole` only.
+- accepted pool **93**; `b002-047` untouched. No acceptance, freeze, FINAL selection, HELD
+  release or training.
+
+Tests run locally: the new `…-batch-003-target-boundary-resolution` suite (9/9) and every
+`test/memory-inference-p1b6-*.test.js` suite (299 tests: 296 pass / 0 fail / 3 skipped — the
+raw-bytes tests). No CI result is claimed.

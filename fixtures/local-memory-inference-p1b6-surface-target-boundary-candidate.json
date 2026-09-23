@@ -1,0 +1,173 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-target-boundary-candidate-v1",
+  "status": "FRESH_REALIZATION_CANDIDATE_AWAITING_SOURCE_AUDIT_AND_V3_REVIEW",
+  "interpretationRule": "P1B6_SEMANTIC_CONTRACT_V3",
+  "realizationInvariant": "p1b6-applicability-membership-target-anchor-v1",
+  "provenance": {
+    "resolutionReceipt": "xion-local-memory-inference-p1b6-batch-003-target-boundary-resolution-receipt-v1",
+    "semanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "note": "Fresh content under new IDs. No batch-003 text, ID, source-audit result, model or HUMAN decision is carried over."
+  },
+  "pending": {
+    "freshSourceAudit": true,
+    "freshV3SemanticReview": true,
+    "humanAdjudicationWhereRouted": true
+  },
+  "authority": {
+    "historicalReviewTransferred": false,
+    "sourceAuditPerformed": false,
+    "semanticReviewPerformed": false,
+    "humanReviewPerformed": false,
+    "accepted": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-tb1-001",
+      "sourceFamilyId": "p1b6-sf-tb1-001",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 동네 수영장은 일반 이용자한테 1회 입장료 6천 원을 받아."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "구민은 예외로 절반만 내면 된대."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "주말에 사촌 동생을 데려가기로 했어."
+        },
+        {
+          "turnId": "t4",
+          "role": "ASSISTANT",
+          "text": "좋네요."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "가기 전에 동생 입장료를 미리 챙겨 줘야 해."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-tb1-002",
+      "sourceFamilyId": "p1b6-sf-tb1-002",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이 서점은 우수 회원한테만 신간을 하루 먼저 보내 줘."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "안내를 보니 우수 회원은 보통 연 30만 원 넘게 사고 리뷰도 자주 쓰는 사람이래."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "나는 작년에 40만 원어치 샀는데 리뷰는 한 번도 안 남겼어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "내가 우수 회원에 들어가는지 서점에 물어봐야겠어."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-tb1-001",
+      "sourceEpisodeId": "p1b6-se-tb1-001",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 14,
+        "endByte": 30
+      },
+      "anchorText": "동생 입장료",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 84
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 44
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 50
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 59
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-tb1-001",
+      "targetAnchorRole": "RULE_RESULT",
+      "intendedUnresolvedReadings": [
+        "the cousin is a district resident and the fee is the halved exception rate",
+        "the cousin is not a district resident and the fee is the general 6,000 won"
+      ]
+    },
+    {
+      "itemId": "p1b6-item-tb1-002",
+      "sourceEpisodeId": "p1b6-se-tb1-002",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 7,
+        "endByte": 39
+      },
+      "anchorText": "우수 회원에 들어가는지",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 72
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 106
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 78
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 69
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-tb1-002",
+      "targetAnchorRole": "CATEGORY_MEMBERSHIP",
+      "intendedUnresolvedReadings": [
+        "the spending threshold alone makes the user a premium member",
+        "the missing reviews keep the user outside the premium-member category"
+      ]
+    }
+  ]
+}

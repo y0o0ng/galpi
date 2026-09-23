@@ -31,8 +31,10 @@ gates are:
   reversed skeletons — the fresh strong-model review is **reconciled at 19 agree / 5
   HUMAN-routed** (see "Batch-003 targeted v3 re-reconciliation"); the 8-row blind HUMAN
   packet (5 mandatory + 3 calibration) was HUMAN-reviewed on 2026-09-23: **7 FIX / 1 KEEP
-  ESCALATE, nothing eligible**, and the self-stating-TARGET observation on `2da4e54e` /
-  `5269c91f` is open (see "HUMAN review result — attempt 001" below).
+  ESCALATE, nothing eligible**. The self-stating-TARGET finding on `2da4e54e` / `5269c91f`
+  is **resolved as a realization failure** (see "Batch-003 TARGET-boundary realization
+  failure" below): all 16 batch-003 surfaces on the two skeletons are current-ineligible and
+  one fresh candidate per skeleton awaits the normal gates.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1652,7 +1654,7 @@ ingested by the same builder (`--results <raw> --date <YYYY-MM-DD> --receipt <pa
   matches v3 and stays `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. No row becomes
   `HUMAN_ADJUDICATED`.
 
-**Observation — OPEN / not adopted.** Every reviewed row on `2da4e54e` and `5269c91f` is FIX
+**Observation — superseded by the TARGET-boundary resolution below.** Every reviewed row on `2da4e54e` and `5269c91f` is FIX
 for the same reason: the TARGET span is the user's own stated fact (`작년에 24번 탔어`,
 `다른 이메일로 새로 가입`), which is self-evidencing and CLEAR when judged as itself, while
 both skeleton contracts define the TARGET status as rule applicability or category membership
@@ -1665,6 +1667,57 @@ amending or re-authoring the two skeletons is a separate semantic-contract decis
 
 Nothing is accepted or frozen; replacement-skeleton authoring is separately pending and the
 accepted pool stays **93**.
+
+### Batch-003 TARGET-boundary realization failure — `2da4e54e` / `5269c91f`
+
+**This is a realization failure, not a semantic-contract failure.** Semantic contract v3 is
+unchanged and both skeletons stay active v3 ESCALATE skeletons with unchanged meaning:
+`2da4e54e` (rule + exception subcategory, exception membership not given → applicability
+unknown) and `5269c91f` (category described only by typical features, membership not given).
+Every batch-003 realization on them anchors TARGET on a supporting fact — a person, a date,
+a signup action, a product property — so judged as itself under v3 `targetBoundary` it is
+self-evidencing and the intended boundary exists only downstream.
+
+`scripts/build-memory-inference-p1b6-batch-003-target-boundary-resolution.js`
+(`npm run build:memory-inference-p1b6-batch-003-target-boundary-resolution`) derives the
+population from the two skeleton IDs and the frozen batch-003 only — **16 rows, 12 + 4**
+(`071`–`082`, `142`–`145`) — and writes
+`fixtures/local-memory-inference-p1b6-batch-003-target-boundary-resolution-receipt.json`
+(`TARGET_BOUNDARY_REALIZATION_FAILURE`). The receipt binds v3, the v3 receipt, batch-003,
+the batch-003 resolution receipt, the repair candidate, the targeted strong-model and HUMAN
+receipts and the batch-002 acceptance by identity and raw SHA, quotes each row's prior
+current status from the latest layer that governed it, and sets **every row
+`INELIGIBLE`**. That withdraws the six provisional agreements (`071`, `073`, `074`, `078`,
+`079`, `081`) and the current validity of the semantic-contract corrections `072`, `142`,
+`145`. The earlier source-audit, v2 HUMAN, correction, strong-model and HUMAN evidence stays
+immutable history of what was reviewed under the authority in force; none is rewritten or
+reinterpreted as wrong.
+
+**Realization invariant** (`p1b6-applicability-membership-target-anchor-v1`, scoped to the
+two skeletons): a valid realization anchors TARGET on the unresolved materially relevant
+status itself — applicability or eligibility, category membership, or the amount / duration
+/ status that results from the rule — not on an observed fact used to infer it. If the
+marked TARGET directly states a supporting fact and the intended ambiguity is only in a
+downstream consequence, the realization is invalid for the skeleton. Fresh realizations on
+the two skeletons declare `targetAnchorRole` (`APPLICABILITY_STATUS`, `CATEGORY_MEMBERSHIP`
+or `RULE_RESULT`), and the builder rejects anything else. **The check reads the declared
+role only; whether the span really plays it is for the fresh audit and review gates.** The
+field never enters a blind packet.
+
+**Fresh realizations.**
+`fixtures/local-memory-inference-p1b6-surface-target-boundary-candidate.json` holds one
+proof-of-realizability candidate per skeleton under new IDs (`p1b6-item-tb1-001` TRAIN on
+`2da4e54e`, TARGET `동생 입장료`, `RULE_RESULT`; `p1b6-item-tb1-002` DEV on `5269c91f`, TARGET
+`우수 회원에 들어가는지`, `CATEGORY_MEMBERSHIP`). They pass the batch-003 leakage check against
+every prior source plus the whole batch-003 and its repairs, inherit no source-audit, model
+or HUMAN result, and await a fresh source/bundle audit, a fresh v3 semantic review and HUMAN
+adjudication where routing requires it. They are **not a replacement count**: ordinary top-up
+after review losses decides how many fresh surfaces are needed, and no class-balance target
+is restored.
+
+`p1b6-item-b002-047` (accepted, `5269c91f`, TARGET `resident rate`) is out of scope; the
+accepted pool stays **93**. No acceptance, reference freeze, FINAL selection, HELD release or
+training.
 
 ## Closed Selection and Freeze Constraints
 

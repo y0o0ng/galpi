@@ -1,0 +1,297 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-target-boundary-resolution-receipt-v1",
+  "status": "COMPLETE_BATCH_003_REALIZATIONS_INELIGIBLE_FRESH_REALIZATION_PENDING_GATES",
+  "decisionsSource": "REPOSITORY_OWNER_SEMANTIC_ADJUDICATION",
+  "resolutionType": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+  "statement": [
+    "This is a realization failure, not a semantic-contract failure. Both skeletons stay active v3 ESCALATE skeletons with unchanged meaning.",
+    "Every batch-003 realization on the two skeletons anchors TARGET on a supporting fact, so under v3 targetBoundary the intended applicability or membership boundary is only downstream. All of them are current-ineligible.",
+    "Earlier source-audit, v2 HUMAN, semantic-contract-correction, targeted strong-model and targeted HUMAN evidence stays immutable history of what was reviewed under the authority in force at the time. It is not reinterpreted as wrong and is not rewritten.",
+    "Fresh realizations are required; ordinary top-up after review losses, not one-for-one replacement, determines how many."
+  ],
+  "inputs": {
+    "v3": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "v3Receipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+      "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1"
+    },
+    "batch": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+      "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68"
+    },
+    "resolution": {
+      "identity": "xion-local-memory-inference-p1b6-batch-003-resolution-receipt-v1",
+      "rawSha256": "61c29218a360bf914c6453758c7fc243e629f1b5d400e38426d9d18720cb1ffe"
+    },
+    "repairCandidate": {
+      "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-003-v1",
+      "rawSha256": "8f6254946eef8d8d0920485bde431ca137a83577a5060889f3676b8857b4aa9b"
+    },
+    "targetedStrongModel": {
+      "identity": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+      "rawSha256": "8db917801426d77f3d024bb843592208f008f490ca49f6a8499306d157f4d283"
+    },
+    "targetedHuman": {
+      "identity": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+      "rawSha256": "a70efc875376894460740d74b35de78a3206bffa544d31c7a955d758d83e97e6"
+    },
+    "acceptance": {
+      "identity": "xion-local-memory-inference-p1b6-batch-002-acceptance-v1",
+      "rawSha256": "c03b8dcf4ddcb2c5f8b193cde8247b9ad64b8ea676da51cab1d709795b273598"
+    }
+  },
+  "affectedSkeletonIds": [
+    "p1b6-sk-2da4e54e6609e34b",
+    "p1b6-sk-5269c91fcfb6c2cd"
+  ],
+  "realizationInvariant": {
+    "id": "p1b6-applicability-membership-target-anchor-v1",
+    "scopeSkeletonIds": [
+      "p1b6-sk-2da4e54e6609e34b",
+      "p1b6-sk-5269c91fcfb6c2cd"
+    ],
+    "allowedTargetAnchorRoles": [
+      "APPLICABILITY_STATUS",
+      "CATEGORY_MEMBERSHIP",
+      "RULE_RESULT"
+    ],
+    "rejectedTargetAnchorRoles": [
+      "SUPPORTING_FACT",
+      "IDENTITY",
+      "DATE",
+      "ACTION",
+      "PROPERTY"
+    ],
+    "statement": "A valid realization anchors TARGET on the unresolved materially relevant status itself — applicability or eligibility, category membership, or the amount / duration / status that results from the rule — not on an observed fact that would be used to infer that status. If the marked TARGET directly states a supporting fact and the intended ambiguity exists only in a downstream consequence, the realization is invalid for this skeleton.",
+    "limitation": "Checks the declared role only. Lexical or declared-role checks do not prove semantic validity."
+  },
+  "summary": {
+    "total": 16,
+    "bySkeleton": {
+      "p1b6-sk-2da4e54e6609e34b": 12,
+      "p1b6-sk-5269c91fcfb6c2cd": 4
+    },
+    "priorProvisionalWithdrawn": 6,
+    "priorSemanticContractCorrectionWithdrawn": 3
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b003-071",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+        "disposition": "KEEP",
+        "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+        "eligibility": "PROVISIONAL"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-072",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-resolution-receipt-v1",
+        "resolution": "SEMANTIC_CONTRACT_CORRECTION",
+        "resolvedLabel": "ESCALATE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-073",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+        "disposition": "KEEP",
+        "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+        "eligibility": "PROVISIONAL"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-074",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+        "disposition": "KEEP",
+        "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+        "eligibility": "PROVISIONAL"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-075",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+        "disposition": "FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-076",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+        "disposition": "FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE_PENDING_RESOLUTION"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-077",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+        "disposition": "FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-078",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+        "disposition": "KEEP",
+        "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+        "eligibility": "PROVISIONAL"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-079",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+        "disposition": "KEEP",
+        "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+        "eligibility": "PROVISIONAL"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-080",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+        "disposition": "FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-081",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001-receipt-v1",
+        "disposition": "KEEP",
+        "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+        "eligibility": "PROVISIONAL"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-082",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+        "disposition": "FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-142",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-resolution-receipt-v1",
+        "resolution": "SEMANTIC_CONTRACT_CORRECTION",
+        "resolvedLabel": "ESCALATE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-143",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+        "disposition": "FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-144",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-targeted-v3-human-review-attempt-001-receipt-v1",
+        "disposition": "FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE_PENDING_RESOLUTION"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b003-145",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "priorCurrentStatus": {
+        "source": "xion-local-memory-inference-p1b6-batch-003-resolution-receipt-v1",
+        "resolution": "SEMANTIC_CONTRACT_CORRECTION",
+        "resolvedLabel": "ESCALATE"
+      },
+      "resolution": "TARGET_BOUNDARY_REALIZATION_FAILURE",
+      "currentEligibility": "INELIGIBLE"
+    }
+  ],
+  "freshRealization": {
+    "candidateArtifact": "xion-local-memory-inference-p1b6-surface-target-boundary-candidate-v1",
+    "role": "PROOF_OF_REALIZABILITY_NOT_A_REPLACEMENT_COUNT",
+    "pendingGates": [
+      "fresh source/bundle audit",
+      "fresh v3 semantic realization review",
+      "HUMAN adjudication where current routing requires it"
+    ]
+  },
+  "acceptedPool": {
+    "cumulativeAcceptedSurfacePool": 93,
+    "reopened": false,
+    "note": "p1b6-item-b002-047 on 5269c91f is part of the accepted pool and is out of scope here."
+  },
+  "authority": {
+    "historicalArtifactsRewritten": false,
+    "skeletonRetired": false,
+    "replacementSkeletonCreated": false,
+    "semanticContractAmended": false,
+    "acceptedPoolReopened": false,
+    "historicalReviewTransferredToFreshRealizations": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}
