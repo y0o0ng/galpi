@@ -193,7 +193,7 @@
     const today = kstDate(Date.now() / 1000);
     const compactAnchor = state.selectedDate || today;
     const compactWeek = Math.max(0, Math.floor(days.findIndex(item => item.key === compactAnchor) / 7));
-    const compactPairStart = Math.min(compactWeek, days.length / 7 - 2);
+    const compactPairStart = Math.max(0, Math.min(compactWeek - 1, days.length / 7 - 2));
     days.forEach(item => {
       const day = node('button', 'calendar-day');
       day.type = 'button';

@@ -4532,6 +4532,8 @@ textarea:focus-visible {
   #home-grid.focus-mail .home-card-dday .dday-row:not(:first-child),
   #home-grid.focus-mail .home-card-notes .home-note-row:not(:first-child) { display: none; }
   #home-grid.focus-mail .home-card-tasks .home-count-summary p { display: none; }
+  #home-grid.focus-mail .home-card-tasks .home-count-summary { margin-bottom: 0; }
+  #home-grid.focus-mail .home-card-tasks .home-task-progress { margin-top: 3px; }
   #home-grid.focus-mail .home-card-notifications { align-self: stretch; height: 440px; padding: 18px; }
   #home-grid.focus-mail .home-card-calendar .calendar-weekday { display: none; }
   #home-grid.focus-mail .home-card-calendar .calendar-day { height: 20px; }
@@ -5493,6 +5495,7 @@ textarea:focus-visible {
   .home-grid-right { grid-column: 2; }
   #home-grid .home-grid-column .home-card { grid-area: auto; width: 100%; flex: 0 0 auto; }
   #home-grid .home-card-weather { height: 150px; }
+  #home-grid .home-card-weather .weather-main { margin: 8px 4px 4px; }
   #home-grid .home-card-tasks { height: 273px; }
   #home-grid .home-card-lecture { height: 153px; }
   #home-grid .home-card-notes { height: 203px; }
@@ -5545,8 +5548,8 @@ textarea:focus-visible {
   #home-grid.has-focus:is(.focus-mail, .focus-notes) .home-card-calendar:not(.focused) :is(.calendar-weekday, .calendar-day.outside-compact-week) { display: none; }
   #home-grid.has-focus .home-grid-right:has(.focused) .home-card-calendar:not(.focused) .calendar-day,
   #home-grid.has-focus:is(.focus-mail, .focus-notes) .home-card-calendar:not(.focused) .calendar-day { height: 38px; }
-  .home-card-calendar.focused .calendar-card-content { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; }
-  .home-card-calendar.focused .calendar-card-content::before { left: calc(50% - 14px); }
+  .home-card-calendar.focused .calendar-card-content { grid-template-columns: minmax(0, 269.304px) minmax(0, 1fr); column-gap: 41.5px; }
+  .home-card-calendar.focused .calendar-card-content::before { left: 290.054px; }
   .home-card-calendar.focused .home-card-actions { grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr); width: 100%; gap: 4px; margin-left: 0; }
   .home-card-calendar.focused .home-card-actions .home-card-action,
   .home-card-calendar.focused .calendar-selected-date { font-size: 10px; }
@@ -5566,6 +5569,15 @@ textarea:focus-visible {
     flex: 1;
     padding-bottom: 72px;
   }
+}
+
+@media (min-width: 641px) and (max-width: 1100px) {
+  #home-grid.has-focus { grid-template-rows: none; }
+  #home-grid.has-focus:is(.focus-calendar, .focus-mail, .focus-notes) .home-card.focused {
+    grid-row: auto;
+  }
+  #home-grid.has-focus .home-card-tasks:not(.focused) .home-task-list { display: none; }
+  #home-grid.has-focus .home-card-notifications:not(.focused) .home-notification-list li:nth-child(n+3) { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -5662,6 +5674,8 @@ textarea:focus-visible {
   #home-grid.has-focus .home-card:not(.focused) .home-notes-list,
   #home-grid.has-focus .home-card:not(.focused) .calendar-agenda,
   #home-grid.has-focus .home-card:not(.focused) .lecture-card-content p { display: none; }
+  #home-grid.has-focus .home-card-tasks:not(.focused) .home-count-summary { grid-template-rows: 35px 17px; margin-bottom: 0; }
+  #home-grid.has-focus .home-card-tasks:not(.focused) .home-count-summary strong { font-size: 34px; }
   #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-month-head { margin: 0; }
   #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; margin-top: 0; }
   #home-grid.has-focus .home-card-calendar:not(.focused) .calendar-day { height: 24px; font-size: 11px; }

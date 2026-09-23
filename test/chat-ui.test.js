@@ -320,6 +320,7 @@ test('Calendar keeps the Figma month and compact weeks with one event marker per
   assert.match(home, /selectedDate: null/);
   assert.match(home, /if \(task\?\.dueKind === 'date'\) return task\.dueDate \|\| ''/);
   assert.match(home, /const compactAnchor = state\.selectedDate \|\| today/);
+  assert.match(home, /compactPairStart = Math\.max\(0, Math\.min\(compactWeek - 1,/);
   assert.match(home, /const mondayOffset = \(first\.getUTCDay\(\) \+ 6\) % 7/);
   assert.match(home, /length: weeks \* 7/);
   assert.match(home, /days\.length === 42 \? ' six-weeks' : ''/);
@@ -332,6 +333,8 @@ test('Calendar keeps the Figma month and compact weeks with one event marker per
   assert.match(css, /\.home-card-calendar:not\(\.focused\) \.calendar-day\.outside-compact-week \{[^}]*display: none/s);
   assert.match(css, /#home-grid:is\(\.focus-mail, \.focus-notes\) \.home-card-calendar \.calendar-day\.outside-compact-week \{ display: none; \}/);
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?\.home-card-calendar:not\(\.focused\) \.calendar-day\.outside-compact-pair \{ display: none; \}/);
+  assert.match(css, /@media \(min-width: 641px\) and \(max-width: 1100px\) \{\s*#home-grid\.has-focus \{ grid-template-rows: none; \}/);
+  assert.match(css, /#home-grid\.has-focus:is\(\.focus-calendar, \.focus-mail, \.focus-notes\) \.home-card\.focused \{\s*grid-row: auto;/);
   const compact = css.slice(css.lastIndexOf('@media (min-width: 641px)'));
   assert.match(compact, /@container \(max-width: 150px\)[\s\S]*?\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{ width: 18px; height: 18px; margin: 0; \}/);
   assert.match(compact, /@media \(max-width: 640px\)[\s\S]*?\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{\s*width: 15px;\s*height: 15px;/);
