@@ -5447,7 +5447,7 @@ textarea:focus-visible {
 .settings-row span:first-child { display: grid; gap: 5px; }
 .settings-row small { color: var(--label); }
 
-@container (max-width: 250px) {
+@container (max-width: 180px) {
   .priority-p3 { display: none; }
 }
 

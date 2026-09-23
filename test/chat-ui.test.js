@@ -232,6 +232,14 @@ test('Home uses the approved 16-column geometry and responsive card flow', () =>
   assert.match(css, /#home-grid\.has-focus \.home-card\.focused:is\(\.home-card-calendar, \.home-card-mail, \.home-card-notes\) \{[^}]*grid-column-end: span 12/s);
 });
 
+test('the default Weather card keeps its existing short forecast message', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  const compact = css.match(/@container \(max-width: (\d+)px\) \{\s*\.priority-p3 \{ display: none; \}/);
+  assert.ok(compact);
+  assert.ok(Number(compact[1]) < 250 - 2 * 18 - 2, 'the 250px Weather card must not hide its message');
+  assert.match(home, /node\('p', 'priority-p3', state\.weather\?\.message/);
+});
+
 test('phone focus keeps Calendar, Mail, and Notes in their Overview order', () => {
   const mobile = allBlocks(css, '@media (max-width: 640px)').join('\n');
   assert.match(mobile, /#home-grid\.has-focus \.home-card-calendar \{ order: 5 !important; \}/);
