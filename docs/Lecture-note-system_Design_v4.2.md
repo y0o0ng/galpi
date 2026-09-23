@@ -1,7 +1,7 @@
 # 갈피 강의 노트 (Galpi Lecture Notes) — System Design
 
 **Version:** 4.2 + UX 설계 중간 합의
-**Date:** 2026-09-16
+**Date:** 2026-09-19
 **Status:** 설계 재검토 중 / 구현 미착수 / 구현 승인 아님
 **Primary device:** iPad + Apple Pencil
 **Core strategy:** 갈피 웹 통합 녹음·필기 우선 검증 → 집 PC 직접 전송 → 로컬 전사 우선 검토 + 외부 API 소개문 요약
@@ -11,21 +11,41 @@
 사용자와의 설계 대화에서 확정한 UX를 기존 v4.2에 반영한다. 구현 일정·Phase 순서·API·DB 스키마는 이번에 확정하거나 변경하지 않는다. **설계가 모두 잡힌 뒤 로드맵·AGENTS.md·CLAUDE.md 등 관련 문서를 일괄 갱신한다. 지금은 이 설계서만 수정한다.** 아래 과거 버전 변경 요약은 이력이고, 충돌 시 이번 합의와 해당 본문이 우선한다.
 
 - **합의:** 과거 화면 재현 대신 최종 필기의 재생 위치별 농도 표시 (§12.2). 지운 획은 되살리지 않으며 스트로크별 시각은 유지한다.
-- **합의:** 질문 포스트잇과 기존 필기 선택 → `시온에게 묻기`를 함께 제공한다. `시온:` 답변과 `ㄴ` 후속 대화를 보존한다 (§6.6).
-- **합의:** 일반 필기의 `?`·동그라미를 질문 호출로 해석하지 않는다. 강의 중 사용자가 명시적으로 요청하는 화면 Q&A는 허용하고 자동 질문·자동 답변은 만들지 않는다.
+- **합의:** 질문 포스트잇과 페이지 위 PDF/필기 내용 선택 → `시온에게 묻기`를 함께 제공한다. `시온:` 답변과 `ㄴ` 후속 대화를 보존한다 (§6.6).
+- **합의:** 일반 PDF 필기의 `?`·동그라미·`ㄴ`은 질문 호출로 해석하지 않는다. 예외는 포스트잇 안에서 사용자가 **Q&A로 명시적 전송하는 handwritten block의 첫 glyph** `?`/`ㄴ`뿐이며, marker만 썼다고 자동 호출하지 않는다 (§6.6).
 - **설계 방향:** AINOTE의 문맥 내 조작·통합 노트·작은 도구막대를 참고한다 (§6.7). 기기는 비용 때문에 구매하지 않고 보유 iPad를 기준으로 계속 설계한다.
-- **추가 합의:** 일반 질문은 질문만, 선택 질문은 선택 영역과 해당 PDF 페이지, 후속 질문은 같은 포스트잇의 Q&A와 기존 첨부를 전달한다. 손글씨는 매번 인식 결과를 확인시키지 않고 원본을 유지하며 필요할 때만 정정한다 (§6.6).
+- **추가 합의:** 포스트잇은 AI 전용 채팅창이 아니라 **자유 손글씨 메모와 Q&A가 함께 존재하는 공간**이다. Q&A로 명시적 전송할 손글씨 block의 첫 의미 있는 glyph가 `?`면 새 conversation chain의 root, `ㄴ`이면 현재 chain의 follow-up, 그 외는 일반 메모로 본다. 문장 중간의 `?`·`ㄴ`과 일반 PDF 필기의 같은 문자는 명령이 아니다. 인식 결과로 routing한 뒤 실제 관계는 구조화된 chain/parent 상태로 보존한다 (§6.6).
 - **추가 합의:** 포스트잇 접기·펼치기는 수동이다. 새 답변은 갈피 강조색 점, 실패는 별도 느낌표로 표시한다. 질문·초안을 보존하고, 재연결 때 기존 결과 확인은 자동·못 보낸 질문 재전송은 수동이다 (§6.6).
+- **추가 합의 — 포스트잇 배치:** 접힌 Q&A는 번호나 질문 첫 줄 대신 작은 말풍선 anchor로 표시한다. 같은 페이지에서 화면상 너무 가까운 접힌 anchor는 view-layer에서만 cluster하며 실제 anchor·Q&A identity는 합치거나 이동하지 않는다. 평상시 cluster badge는 포함된 포스트잇 수를, 하위 항목 중 하나라도 새 답변이 있으면 숫자 대신 알림 상태를 표시한다. cluster를 열면 compact numeric tab bar에서 어느 항목에 새 답변이 왔는지 개별 표시한다 (§6.6).
+- **추가 합의 — 카드 크기·이동:** 열린 포스트잇은 iPad 실사용상 한 변 약 3.5~5 cm 범위의 정방형을 기본 목표로 하고 정방형 비율을 유지한 채 최대 약 8×8 cm까지 사용자가 확대할 수 있다. 내용 때문에 자동으로 커지지 않고 내부를 스크롤한다. anchor와 열린 카드 위치는 PDF **page 좌표계에 종속**되지만 카드 자체의 화면상 크기는 PDF zoom과 독립이다. 여러 카드를 동시에 열 수 있고 최근 터치한 카드가 앞으로 온다. 카드는 열린 동안 자유롭게 옮길 수 있지만 이동 위치는 저장하지 않으며, 접었다 다시 열면 anchor 기준 초기 위치에서 다시 연다. 페이지가 화면 밖으로 나가면 카드도 함께 사라질 뿐 자동 collapse하지 않는다 (§6.6).
+- **추가 합의 — 시온 답변 표현:** 포스트잇의 시온 답변은 손글씨 스타일 폰트 기반의 plain-answer UI로 표시한다. Markdown heading/bold/italic marker, code fence, table, ASCII art 같은 장식적 문법은 생성·노출하지 않는다. 간단한 수식은 손글씨 스타일과 어울리게 표시하고 조판이 필요한 복잡한 수식만 별도 math renderer를 사용한다. 그림이 필요하면 본문에 억지로 그리지 않고 별도 이미지 첨부 경로를 쓰며, 첫 버전에서 자동 이미지 생성을 기본 동작으로 두지 않는다 (§6.6).
 - **추가 합의:** 펜을 대고 유지 → 원형 메뉴 → 방향 이동 → 떼어서 선택. 중앙에서 떼거나 입력 중단 시 취소하며, 필기를 시작한 뒤의 멈춤은 메뉴 호출이 아니다 (§6.8).
-- **추가 합의:** 원형 메뉴 항목은 펜·지우개·선택·질문 포스트잇 네 개다. 방향·임계값은 미정이다 (§6.8). 선택 질문은 선택 영역과 해당 PDF 페이지를 이미지로 전달하며 필수 OCR 파싱을 거치지 않는다. 전송 전 초안은 수정 가능하지만, 전송한 질문의 정정은 `ㄴ` 후속 대화로 남긴다 (§6.6).
+- **추가 합의:** 원형 메뉴 항목은 펜·지우개·선택·질문 포스트잇 네 개다. 방향·임계값은 미정이다 (§6.8). 선택 도구의 기본 제스처는 **올가미(lasso)**이며, PDF 내용·필기 stroke·둘이 섞인 영역을 같은 방식으로 선택한다. 선택 질문은 선택 영역과 해당 PDF 페이지를 이미지로 전달하며 필수 OCR 파싱을 거치지 않는다. 전송 전 초안은 수정 가능하지만, 전송한 질문의 정정은 `ㄴ` 후속 대화로 남긴다 (§6.6).
 - **조건부 방향:** 강의 중 갈피에 머무는 사용을 기준으로 웹앱 직접 녹음을 먼저 검증한다. 참고 검색 사이드바를 두되 범용 내장 브라우저는 만들지 않는다. 최대 3시간 필기·PDF·검색 병행, 앱 전환·잠금·복귀, 저장·시간 연결을 통과해야 녹음 방식을 채택한다 (§6.9·7·14).
 - **합의:** 노트 열기와 녹음 시작은 분리한다. 일시정지·재개는 같은 강의에 연결하고 비녹음 구간의 필기는 보존하되 가짜 오디오 위치를 주지 않는다. 종료 후에도 필기·질문은 가능하며, 중단 후 복원해도 마이크는 사용자 확인 없이 재개하지 않는다 (§6.1·6.5·8.3).
 - **합의 / 하드웨어 미구매:** 50~70만 원 PC에 갈피 서버·Whisper를 두고 향후 로컬 메모리 에이전트도 고려한다. 답변·요약 모델은 외부 API다. 보통 60~90분, 최대 3시간 강의를 학교 인터넷으로 전송하고 귀가 후 복습 시점에 결과가 준비되는 것이 목표다. 앞서 말한 종료 후 1시간은 엄격한 마감이 아니며 실시간 전사는 요구하지 않는다 (§11.2).
 - **합의:** 녹음 복습은 온라인 우선이다. iPad → 집 PC 직접 전송이 기본이고 iCloud는 선택적 보관 수단이다. PC 정상 저장 확인 전 단말 사본을 삭제하지 않으며, 확인 후 정리 시점·장기 보존 기간은 미정이다 (§5).
 - **합의:** 복습 독바는 스트로크 목록 대신 가사형 전사다. 현재 구간 강조·자동 따라가기·구간 탭 재생을 제공하고 수동 스크롤 중에는 따라가기를 멈춘다. 캔버스 농도 표시는 그대로이며 둘 다 오디오 재생 시각을 따른다 (§12.2).
+- **추가 합의 — 재생 농도·페이지 복귀:** 임의의 20초 표시 버킷은 폐기하고, 강의 중 stroke는 단일 대표 `t_ms`와 현재 재생 시각을 직접 비교해 미래 획만 연하게 표시한다. PDF 페이지는 재생에 맞춰 자동 전환하지 않으며, 지도 앱의 현위치 버튼처럼 `재생 위치로`를 눌렀을 때만 해당 시점에 사용자가 보고 있던 page로 이동한다. 과거 zoom/scroll 위치는 복원하지 않는다 (§12.2).
+- **추가 합의 — 비녹음 gap:** 같은 Session의 녹음 일시정지·중단 구간은 세션 시간에 gap으로 남기되 오디오 재생에서는 기다리지 않고 다음 `recording_span`으로 건너뛴다. UI는 녹음이 없었던 구간을 명시하고, gap 안의 필기를 임의의 전후 오디오에 붙이지 않는다 (§7.1·12.2).
+- **추가 합의 — 복습 필기·activity:** 강의 종료 뒤 복습하며 추가하는 stroke는 원래 강의 필기로 위장하지 않고 `source_session_id = null`을 유지한다. 원본 녹음을 들으며 쓴 경우 현재 source Session/playback 위치를 별도 review anchor로 자동 저장하고, 일시정지 중에는 고정된 cursor를 계속 사용한다. 다만 review anchor는 **무엇을 들으며 만들었는지에 대한 provenance/역점프용**이지 화면 농도의 시계가 아니다. 복습 필기는 `review_pen` 전용이며 초록 계열 팔레트만 제공하고, 예약된 초록 계열은 일반 강의 pen에서 사용할 수 없다. Document를 열거나 재생·pause·seek만 한 것으로는 복습 activity를 만들지 않고, `review_pen` stroke·일반 메모·보존되는 Q&A처럼 새 persistent learning artifact가 처음 생길 때 lazy-create한다. 기존 필기의 삭제·이동만으로는 새 activity를 만들지 않으며, 해당 Document viewer를 떠날 때 그 activity를 닫는다 (§8.2·12.2).
+- **추가 합의 — 일반 펜 색상 picker와 예약 green band:** 일반 강의 `pen`/형광펜의 빠른 색상 팔레트에서는 초록 계열을 노출하지 않는다. 더 많은 색을 고를 때는 iOS/system color picker를 그대로 사용할 수 있지만, picker 자체의 스펙트럼을 변형하지 않고 **선택 결과를 검증해 복습 전용 green band를 거부**한다. v1의 예약 범위는 HSV/HSL 계열 hue 기준 **105°–165°**로 잡고, 거의 회색에 가까운 저채도 색까지 잘못 막지 않도록 **saturation 하한은 실기기 tuning 값으로 남긴다**. 금지 색을 선택하면 실제 pen 색은 마지막 유효 색을 유지하고 `이 색상은 복습 필기 전용이에요`처럼 이유를 알려준다. `review_pen`은 계속 예약된 초록 계열만 사용하며, provenance의 정본은 색이 아니라 `review_pen` 타입/구조다 (§8.2).
+- **추가 합의 — Document 단일 활동 타임라인:** 같은 PDF의 강의와 복습은 별도 타임라인으로 갈라지지 않고 **실제로 학습 흔적이 추가된 순서**의 하나의 Document activity timeline을 가진다. Lecture는 실제 Session 시작 시각, 복습은 첫 persistent learning artifact가 생긴 시각을 기준으로 배치하며, review anchor가 과거 강의 위치를 가리켜도 복습 activity 자체를 과거로 이동시키지 않는다. 재생이 없을 때는 현재 누적 필기를 모두 원래 농도로 보여주고, 재생 중에는 현재 activity보다 이전 내용은 원래 농도, 현재 Lecture의 stroke는 그 Session cursor로 reveal, 이후 activity는 연하게 표시한다. Review activity는 내부 source anchor가 아니라 **자기 activity boundary를 통과할 때** 그 activity의 새 콘텐츠가 원래 농도가 된다. 복습끼리도 같은 규칙이다. 내부 activity ID/물리 스키마의 정확한 형태는 구현 설계에서 정한다 (§8.2·12.2).
+- **추가 합의 — Document 연결 오디오:** 오디오·전사의 정본 소유권은 Session에 유지한다. 다만 Document viewer에서는 여러 Session 중 **그 Document가 실제로 active였고 동시에 녹음이 존재한 구간**만 원본 Session에서 참조해 하나의 virtual audio/transcript stream으로 렌더링한다. 다른 Document가 active였던 녹음 구간은 현재 Document stream에서 제외하고 경계를 표시한다. 강의 폴더에서 해당 PDF를 열어도 별도 viewer를 만들지 않으며 같은 누적 Document stream에서 그 Session의 첫 관련 span으로 playhead만 맞춘다. Session 전체 원음·전사는 별도 전체 재생 기능으로 제공한다 (§6.3·10.1.1·12.2).
+- **추가 합의 — 복습 폴더 책임:** 사용자가 복습할 때마다 폴더나 PDF 사본을 만들지 않는다. `과목 / 자료 / 강의`는 탐색 projection이고, 복습은 같은 Document에 쌓이는 활동이다. 자료에서 PDF를 직접 열거나 강의에서 참조 PDF로 들어가도 같은 canonical Document를 사용하며, 복습 provenance/순서는 갈피가 내부적으로 보존한다 (§4.3·10.1.1).
 - **합의:** 요약은 노트 선택 화면의 짧은 2~3문장 소개문이다. 자동 주제 목차·구간별 요약은 초기 범위에서 뺀다. 전사는 필요할 때만 구간별로 수정하고 표시·검색에 반영하며, 원본 전사·녹음·시간 연결은 유지한다 (§11.4·12.3·12.4).
-- **미결정:** 녹음 시간 모델·저장/업로드 세부 구현·PC 사양/OS/STT 모델, 포스트잇 상세 배치, 20초 표시 구간, 계산 전용 경로, Q&A 저장·중복 방지, 교정 후 소개문 갱신 정책 (§20).
-- **다음 논의:** `이 구간 설명해줘`의 입력 문맥. 현재 전사와 PDF·필기 중 어디까지 전달할지 정한다. 아직 채택된 계약이 아니다 (§20.1).
+- **추가 합의 — Q&A 문맥 경계:** 강의 중 PDF/필기에서 시작한 질문은 **document-grounded Q&A**, 복습 중 전사 선택에서 시작한 질문은 **lecture-grounded Q&A**로 구분한다. lecture-grounded 질문은 선택 전사와 제한된 인접 전사를 기본 문맥으로 쓰고, 자료 문맥이 더 필요할 때만 Session timeline의 당시 Document/page를 후보로 PDF page context tool을 호출한다. 이 도구는 기존 `paper-fulltext`의 페이지 보존 PDF 파싱 코드를 재사용하되 논문 전문검색 workflow와는 결합하지 않는다. Q&A 모델에는 원본 오디오를 직접 보내지 않는다 (§6.6).
+- **추가 합의 — Q&A evidence 상한·PDF context:** lecture-grounded primary transcript는 최대 2분 또는 4,000자, 인접 전사는 앞뒤 각 최대 30초·합계 2,000자로 제한한다. PDF page context tool은 선택 전사 시간과 실제 active page span이 겹친 시간을 기준으로 Turn당 최대 2페이지까지만 후보로 사용한다. PDF는 text-first로 읽고, 텍스트만으로 부족하거나 시각 정보가 필요할 때 모델이 같은 후보 페이지의 원본 page image를 명시적으로 요청한다. 이미지 사용은 2페이지 budget을 늘리지 않는다 (§6.6).
+- **추가 합의 — Chain-local reference:** Sticky는 하나의 고정 spatial anchor와 immutable baseline evidence를 가진다. 사용자는 같은 Document 안에서 현재 Chain에 새 evidence reference를 명시적으로 추가할 수 있고, 추가 reference는 그 시점 이후 같은 Chain의 `ㄴ` follow-up에 계속 누적되지만 다른 `?` Chain에는 전파되지 않는다. Document 위에 별도 영구 anchor를 만들지 않고 Sticky 내부 compact reference UI로 표시하며 원본 위치로 jump-back할 수 있다. v1은 Chain당 baseline 제외 추가 reference 최대 3개, 자동 expiry/pruning/remove UX 없음, 동일 reference 재추가는 no-op으로 둔다 (§6.6).
+- **추가 합의 — 시간축 의미:** 필기·페이지·질문이 놓이는 세션 시간과 실제 녹음 매체의 오디오 시간을 분리한다. 일시정지·중단의 비녹음 구간은 세션에 남기고, 오디오와의 연결은 연속 녹음 구간별 `recording_span`으로만 만든다. 대응되지 않는 필기에는 가짜 오디오 위치를 주지 않는다. MediaRecorder 조각은 저장/복구 단위이지 시간 정본이 아니다 (§7).
+- **조건부 캡처 경로:** Path A는 보유 iPad의 Galpi Web 통합 녹음·필기다. 실측 게이트에서 실패할 때만 Path B(웹 필기 + 음성 메모/단축어 분리)를 검토한다. Path B의 사후 싱크·이중 조작 마찰이 실제 사용에서 반복 확인될 때만 Path C(저가 Android 태블릿 + 네이티브 Galpi Capture APK)를 검토한다. 하드웨어 구매는 이 근거보다 앞서지 않는다 (§14·15).
+- **추가 합의 — Document/Session 소유권:** 과목 안의 PDF/노트 문서는 여러 강의 세션에서 재사용할 수 있고, 한 세션도 여러 문서를 참조할 수 있다. **Document가 현재 누적 필기 상태의 정본**, **Session이 음성·전사·시간축·Q&A provenance의 정본**이다. 각 획은 생성된 `source_session_id`와 그 세션의 `t_ms`를 보존하며, 세션 밖에서 만든 필기는 세션 연결을 비워 둔다. Document↔Session은 many-to-many다 (§6.3·8·10).
+- **추가 합의 — 갈피 Finder:** 사용자에게 보이는 `과목 / 자료 / 강의(날짜)` 폴더는 갈피의 **논리 파일시스템 projection**이다. 날짜 폴더가 PDF 사본을 소유하지 않고 같은 Document를 참조한다. 날짜는 표시·탐색 기준이지 세션 identity가 아니다. 실제 서버/PC 저장 경로와 UI 폴더 구조를 동일하게 강제하지 않는다 (§5.4·10).
+- **추가 합의 — Container 유형:** Galpi Note의 상위 작업 공간은 생성 시 `과목(Course)` 또는 `일반(General)`을 선택한다. Course는 기존 `자료 + 강의(Session)` Home을 제공하고, General은 v1에서 `Documents[]`만 가지며 `자료 추가`와 `새 노트` 중심의 단순 Home을 제공한다. 두 유형은 동일한 canonical Document/Document Viewer를 공유하며 General에서도 PDF/백지 노트·annotation·Sticky·document-grounded Q&A를 그대로 사용한다. General에는 기본적으로 Lecture Session·녹음·전사·lecture-grounded Q&A를 만들지 않는다. container type은 v1에서 생성 후 변경하지 않으며 cross-type 이동/복제 UX는 후속 범위다 (§4.3·10.1.1).
+- **추가 합의 — 동기화:** 필기 중에는 iPad 로컬본에 먼저 저장하고, 서버 동기화 뒤에는 갈피 서버본을 정본으로 본다. PC 파일시스템·iCloud·Möbius Sync는 서버본의 복제/보관 경로이며, 외부 동기화 폴더의 직접 수정은 갈피로 자동 역수입하지 않는다. 같은 Document의 오래된 상태가 최신 상태를 덮어쓰지 않도록 기존 `base_revision` 충돌 검사는 유지한다 (§5.4·8.3).
+- **진입 게이트:** 캡처 시간축 스파이크는 지금 구현하지 않고 향후 Path A 채택 전 진입조건으로 둔다. 10분 smoke → 90분 실제 길이 → 90분 통과 뒤 3시간 stress 순서로 검증하며, 초기 제품 기준은 90분 동안 손상/유실 없음과 오디오–필기 기준점 최대 오차 약 ±500ms 이내, 누적 drift 없음이다. 앱 전환·잠금 실패만으로 즉시 탈락시키지는 않지만 중단을 숨기거나 `녹음 중`으로 거짓 표시하면 치명적 실패다 (§14.1).
+- **미결정:** 녹음 저장/업로드 세부 구현·브라우저 재실행 경계의 수집 방식·PC 사양/OS/STT 모델, 포스트잇 손글씨 block 경계의 실기기 판정·OCR/필체 인식 방식·거리/크기 tuning, 계산 전용 경로, Q&A의 정확한 endpoint/migration·tombstone 보존 기간·이미지 payload 세부, 교정 후 소개문 갱신 정책 (§20). Q&A의 정본 저장소와 Turn/Attempt/Sticky 책임 경계는 이번 합의로 닫았다.
+- **다음 논의:** `?`/`ㄴ` chain semantics, Q&A 저장 경계, transcript/PDF evidence 상한, PDF text/image 전환, same-Document Chain-local reference 추가와 3개 hard limit까지 닫았다. 남은 것은 이미지 해상도·용량 같은 payload 세부, 정확한 reference chip/preview 시각 표현, 원형 메뉴/실기기 UI 수치와 최소 구현 범위다 (§20.1).
 
 ## v4.2 변경 요약
 
@@ -185,6 +205,9 @@ Markdown에는 사람이 읽는 정보와 작은 메타데이터만. 스트로�
 ### 2.7 네이티브 전환에는 증거가 필요하다
 웹 통합 녹음·필기를 먼저 검증한다. 캡처 안정성·싱크·필기감이 기준을 통과하지 못하면 녹음/캡처 경로만 다른 방식으로 검토하고 갈피 전체를 네이티브로 재작성하지 않는다.
 
+### 2.8 논리 파일시스템과 저장소를 분리한다
+사용자가 보는 폴더 구조는 갈피의 논리 객체 관계를 표현하는 UI다. 실제 OS 경로·iCloud/Möbius 동기화 폴더·브라우저 저장소를 곧바로 identity나 source of truth로 사용하지 않는다. Document/Session identity와 revision은 갈피가 관리하고, 외부 파일시스템은 복제·백업·열람 경로로 취급한다. 초기 범위에서 mutable state를 여러 파일시스템 writer가 동시에 수정하게 만들지 않는다.
+
 ---
 
 ## 3. Confirmed Decisions
@@ -197,14 +220,22 @@ Markdown에는 사람이 읽는 정보와 작은 메타데이터만. 스트로�
 6. 원본은 보존한다. 녹음 종료 후 전송하고, 수신 이후 전사·소개문 생성·인덱싱을 진행한다. 재인코딩·청크 크기는 구현 전 검증 대상으로 남긴다.
 7. 전사는 필요할 때 구간별로 수정한다. 원본 전사·오디오는 유지하고 수정문을 표시·검색에 반영한다. 자동 전공 지식 보완으로 실제 발화를 바꾸지 않는다.
 8. 필기 데이터는 IndexedDB에 즉시 저장하고, `base_revision` 충돌 검사를 포함한 주기적 상태 업로드를 사용한다.
-9. 오디오–필기 정합은 녹음 시각과 필기 시각의 연결로 관리한다. 일시정지·재개·중단·앱 재실행을 포함하는 시간 모델은 아직 미정이며 파일당 단일 오프셋만으로 해결됐다고 보지 않는다 (§7).
-10. 강의 자료 PDF를 세션에 첨부하고 캔버스 배경으로 사용한다.
-11. 중요·나중에 볼 북마크는 명시적 조작으로 남긴다. 일반 손글씨 도형·물음표를 명령으로 해석하지 않으며 시온 질문과 북마크를 구분한다 (§6.4·6.6).
+9. 세션 시간과 오디오 시간을 분리한다. 일시정지·중단 중에도 세션의 필기·페이지 이벤트는 남고, 실제 녹음이 존재하는 연속 구간만 `recording_span`으로 오디오 시간에 연결한다. 비녹음 구간에는 오디오 위치가 없으며 파일당 단일 오프셋을 일반 해법으로 쓰지 않는다. 브라우저 재실행 경계의 수집 방법과 파일 분할 방식은 구현 전 검증한다 (§7).
+10. 강의 자료 PDF/백지 노트는 Course의 재사용 가능한 Document로 두고 Session이 참조한다. 한 Session은 여러 Document를 오갈 수 있으며 필기는 Document annotation으로 누적한다.
+11. 중요·나중에 볼 북마크는 명시적 조작으로 남긴다. 일반 PDF 손글씨 도형·물음표를 명령으로 해석하지 않으며 시온 질문과 북마크를 구분한다. 포스트잇에서 Q&A로 명시적 전송하는 block의 첫 `?`/`ㄴ` prefix는 §6.6의 제한된 routing 문법으로만 사용한다.
 12. 세션 스키마는 강의 전용이 아니라 컨테이너 기반으로 일반화한다.
 13. Boox 또는 네이티브 캡처 앱은 실사용 데이터 확보 후 조건부 검토한다.
 14. 재생 화면은 최종 필기의 농도 표시이며, 지우기·실행 취소 이력을 재생하는 과거 화면 복원이 아니다 (§12.2).
 15. 질문 포스트잇과 기존 필기 선택 질문은 같은 대화 구조를 사용하고, 원본 필기를 지워도 질문·답변은 남는다 (§6.6).
 16. 복습 독바는 가사형 전사다. 소개문은 노트 목록에 두고 초기 스트로크 목록·자동 주제 목차·구간별 요약은 제외한다 (§12).
+17. 하나의 PDF/문서는 여러 강의 세션에 걸쳐 계속 쓰며, 한 세션에서도 여러 문서를 오갈 수 있다. Document는 현재 누적 annotation의 정본이고 Session은 음성·전사·시간·Q&A provenance의 정본이다.
+18. 녹음은 active Session에 속하며 갈피 내부에서 PDF를 바꿔도 끊거나 새로 시작하지 않는다. 획은 자신이 생성된 `source_session_id`와 `t_ms`로 해당 세션의 음성에 연결된다.
+19. 필기는 iPad 로컬에 먼저 저장하고 서버 동기화 뒤에는 갈피 서버본을 정본으로 본다. PC/iCloud/Möbius는 복제·보관 경로이며 외부 폴더 직접 수정은 자동 역동기화하지 않는다. Document 업로드는 `base_revision` 충돌 검사를 유지한다 (§5.4·8.3).
+17. 강의 중 PDF/필기 질문과 복습 중 전사 질문은 같은 대화 UI를 공유하지만 evidence contract를 분리한다. 전사 질문은 선택 전사를 primary로 하고 제한된 인접 전사를 기본 보조 문맥으로 사용한다. PDF는 자동 첨부하지 않고, 자료 문맥이 더 필요할 때만 Session timeline의 당시 Document/page 후보를 통해 page context tool로 조회한다. 조회된 PDF 페이지는 secondary evidence이며 primary anchor는 전사 선택으로 유지한다. 원본 오디오는 Q&A 입력에서 제외한다 (§6.6).
+18. 캡처 경로는 비용이 낮은 순서로 승격한다. Path A(iPad Web) → 검증 실패 시 Path B(Voice Memos/Shortcut 분리) → Path B의 반복적인 실사용 마찰이 확인될 때만 Path C(저가 Android 네이티브). iPad 네이티브는 유료 개발자 계정 비용 때문에 현재 기본 폴백이 아니다 (§14·15).
+19. Galpi Note의 상위 container는 생성 시 `Course | General` 유형을 가진다. Course는 Documents와 Lecture Sessions를, General은 v1에서 Documents만 제공한다.
+20. Course와 General은 서로 다른 Document 모델을 만들지 않는다. 동일 canonical Document/Document Viewer를 공유하며 PDF·백지 노트·annotation·Sticky·document-grounded Q&A 계약도 공유한다. General에는 Lecture Session·녹음·전사·lecture-grounded Q&A를 기본 제공하지 않는다.
+21. container type은 v1에서 생성 후 변경하지 않는다. Course↔General 타입 변환과 cross-type 이동/복제 UX는 후속 범위다 (§4.3·10.1.1).
 
 ---
 
@@ -214,26 +245,41 @@ Markdown에는 사람이 읽는 정보와 작은 메타데이터만. 스트로�
 
 ```text
 iPad · Galpi Web
-  노트/PDF·필기·질문 포스트잇·참고 검색
-  명시적 녹음 시작 → 일시정지/재개 → 종료
-  필기/녹음 중간 로컬 저장 + 시간 연결
-        │ 종료 후 원본 저장 확인 · HTTPS 직접 전송/재시도
+  Container 생성 시 type 선택: Course | General
+
+  Course
+    ├─ Documents[]
+    └─ Lecture Sessions[]
+       Active Session은 PDF 전환과 독립적으로 녹음·시간축 유지
+       Document annotation + Session audio/Q&A를 로컬 작업본에 저장
+
+  General
+    └─ Documents[]
+       자료 추가 / 새 노트 → 같은 canonical Document Viewer
+       PDF·백지 노트·annotation·Sticky·document-grounded Q&A 사용
+       v1에서는 Lecture Session·녹음·전사 없음
+
+        │ canonical revision 업로드/재시도
         ▼
 집 PC · 갈피 서버 (구매/이전 미실행)
+  Document: Course/General이 공유하는 현재 누적 annotation 정본
+  Session: Course의 audio · transcript · timeline · Q&A provenance 정본
+  Course에서는 Document↔Session many-to-many 관계 관리
   원본 보존 → 로컬 전사 → 외부 API 소개문 → 검색 인덱스
-  Vault: 소개문 Markdown + 오디오/PDF/필기/전사/시간 연결
-  Q&A 보존 (DB/sidecar 배치는 미정)
-        │ 온라인 조회·오디오 재생
+        │ canonical state를 PC/iCloud/Möbius 등에 mirror 가능
         ▼
 Galpi Review
-  노트 목록: 짧은 소개문
-  PDF·필기: 재생 위치별 농도
-  전사 독바: 현재 구간 강조·탭 재생·필요할 때 교정
+  Document viewer: Course/General에서 같은 viewer와 누적 필기·질문 anchor 사용
+  Course Document는 여러 Session의 Document-active 녹음/전사를 virtual stream으로 projection
+  강의 목록: 날짜/세션별 전체 녹음·전사·Q&A 탐색
+  강의에서 PDF 열기: 같은 Document viewer의 해당 Session 관련 span으로 deep-link
+  Session 전체 재생: PDF 필터 없이 그 Session 원음·전사를 별도 재생
+  획 → canonical source Session/audio 위치로 역점프
 ```
 
 ### 4.1 컴포넌트 경계
 
-**Capture Web Client** — 세션 생성·표시, PDF 배경, 필기 캔버스, 시각 태그, 녹음 조작, 중간 로컬 저장, 업로드·복구, 질문 포스트잇·이미지 선택 질문, 참고 검색, 캡처 중 자동 소리 재생 차단
+**Capture Web Client** — 상위 container(`Course | General`) 탐색, 공통 Document Viewer, 여러 PDF/백지 노트 전환, 누적 필기 annotation, 질문 포스트잇·이미지 선택 질문, 참고 검색, 중간 로컬 저장·업로드·복구를 담당한다. Course에서는 active Session 생성·표시·녹음 조작과 캡처 중 자동 소리 재생 차단을 추가로 제공하며, 갈피 내부 Document 전환은 active Session/녹음의 수명을 끝내지 않는다. General은 v1에서 Session을 만들지 않는다.
 
 **전송** — 웹 캡처에서 집 PC로 직접 전송. 외부 녹음·단축어는 웹 녹음 검증 실패 시 다시 검토할 대안이지 필수 컴포넌트가 아니다.
 
@@ -241,7 +287,7 @@ Galpi Review
 
 **Review Client** — 소개문이 있는 노트 선택 화면, 가사형 전사 독바, 타임코드 점프, PDF·최종 필기 농도 표시, 필기 → 음성 역점프, 보존된 Q&A, 필요할 때 전사 교정. 과목 허브·시험 범위 기능의 상세 범위는 미정이다.
 
-강의 중 Q&A는 강의 후 Processing 완료를 기다리는 경로가 아니다. 입력 문맥과 사용자에게 보이는 동작은 §6.6을 따르고, 저장·API 연결의 구현 계약은 §20.1에서 별도로 확정한다.
+강의 중 Q&A는 강의 후 Processing 완료를 기다리는 경로가 아니다. 강의 중 PDF/필기 기반 질문은 document-grounded, 복습 중 전사 선택 질문은 lecture-grounded로 분리하며 둘 다 §6.6을 따른다. Q&A 모델에는 원본 오디오를 직접 전달하지 않는다. 저장·API 연결·요청 멱등성은 §20.1에서 별도로 확정한다.
 
 ### 4.2 공유 blob 경계
 
@@ -249,7 +295,40 @@ Galpi Review
 
 강의가 별도로 소유한다 — 세션, 대용량·재개 업로드, 오디오 파트 관리, 청크 전사, 학기별 보존 정책.
 
-사람이 보는 강의 Markdown은 평면 Vault에, 바이너리와 기계 sidecar는 `_attachments/lectures/<session_id>/`에 둔다.
+사람이 보는 강의 Markdown은 평면 Vault에 두되, 현재의 `_attachments/lectures/<session_id>/` 예시는 Session 자산 배치 초안이다. Document annotation은 Session 자산이 아니라 Document 소유로 재해석하며 실제 디스크 layout은 전체 설계 뒤 확정한다.
+
+### 4.3 논리 파일 트리 — 합의
+
+Galpi Note에서 상위 작업 공간을 만들 때 사용자는 **`과목(Course)` 또는 `일반(General)`**을 선택한다. 둘은 서로 다른 파일 포맷이 아니라 같은 Document 시스템에 다른 Home/navigation과 허용 activity를 얹는 container type이다.
+
+```text
+Galpi Note
+└─ Container (type = course | general)
+   ├─ Course
+   │  ├─ 자료 / Documents[]   # 여러 Session이 공유
+   │  └─ 강의 / Sessions[]    # 날짜/제목으로 표시, session_id가 identity
+   │
+   │  Document ↔ Session = many-to-many
+   │
+   └─ General
+      └─ Documents[]          # PDF/백지 노트, v1에는 Lecture Session 없음
+```
+
+**Course Home**은 기존 계약을 유지한다. `자료`와 `강의`를 나눈 Finder형 탐색을 제공하고, `동역학 / 자료 / Chapter 3.pdf`와 `동역학 / 강의 / 2026-09-16`처럼 보일 수 있지만 날짜 강의 폴더 안에 PDF 사본을 복제하지 않는다. `자료`와 `강의`는 사용자가 먼저 만드는 실제 폴더가 아니라 Course가 기본 제공하는 논리적 구분이다.
+
+**General Home**은 v1에서 더 단순하다. `Documents[]` 목록과 `자료 추가`, `새 노트`를 중심으로 하고 Lecture Session/날짜별 강의 목록을 만들지 않는다. General의 PDF와 백지 노트도 Course와 같은 canonical Document/Document Viewer를 사용하므로 annotation, Sticky, 선택 질문과 document-grounded Q&A를 그대로 사용할 수 있다. Session이 없으므로 녹음·전사·lecture-grounded Q&A·Session virtual audio는 기본 제공하지 않는다.
+
+- Course 화면에서 PDF를 추가하면 `자료`의 새 Document가 된다.
+- Session 안에서 새 PDF를 추가하면 Course `자료`에 Document를 만들고 현재 Session이 그 Document를 참조한다.
+- 이미 Course에 있는 Document를 Session에서 열면 사본을 만들지 않고 기존 `document_id`를 참조한다.
+- General에서 `자료 추가`는 PDF 등의 새 Document를 만들고, `새 노트`는 백지 Document를 만든다.
+- 홈에서 바로 파일을 추가하는 경우에는 기존 container를 고르거나 임시 `미분류`에 둘 수 있다. 새 폴더 생성을 강제하지 않는다.
+- 사용자 정의 하위 폴더는 선택적 정리 기능이며 초기 캡처 흐름의 선행 조건이 아니다.
+- container type은 생성 시 정하고 **v1에서는 Course↔General 타입 변환을 지원하지 않는다.** 기존 Document를 다른 type container로 옮기거나 복제하는 UX도 후속 범위다.
+
+사용자가 보는 폴더는 projection이고 서버의 실제 blob/metadata 경로와 1:1일 필요가 없다. rename·이동 같은 사용자 조작도 identity를 파일 경로로 바꾸지 않고 갈피의 논리 객체 관계를 수정하는 것으로 해석한다. 실제 OS 파일시스템을 갈피의 primary namespace로 만들지 않는다.
+
+**복습은 사용자 관리 폴더가 아니다.** 사용자가 복습할 때마다 `복습/날짜` 폴더를 만들거나 PDF를 다시 불러오게 하지 않는다. Course의 자료/강의와 General의 Document 목록은 각 container가 제공하는 탐색 projection이고, 복습은 같은 Document에 추가되는 활동/provenance로 취급한다. 내부 review activity의 정확한 ID·수명·저장 스키마는 구현 설계에서 정하되, 사용자에게 저장 위치 선택 책임을 요구하지 않는다.
 
 ---
 
@@ -269,9 +348,9 @@ Galpi Review
 - 정상 저장 확인 후 단말 사본을 언제 정리할지, 원본을 얼마나 오래 보관할지는 미정이다. 전사·소개문 완료가 오디오 삭제 조건은 아니다.
 - 집 PC가 꺼지거나 연결되지 않으면 온라인 오디오 복습을 사용할 수 없다. 이 경우 원본이 삭제됐다고 표시하지 않는다.
 
-### 5.3 iCloud는 선택적 보관 수단
+### 5.3 iCloud·Möbius Sync는 선택적 복제 수단
 
-사용자는 iCloud를 사용하지만 **iPad → 집 PC 직접 전송이 기본**이다. iCloud 연동은 필수 조건이 아니고 이를 위해 PC 운영체제를 결정하지 않는다. 향후 내보내기를 지원한다면 오디오뿐 아니라 PDF·필기·시간 연결·전사·Q&A도 함께 복원할 수 있어야 한다. 내보내기 형식·자동 연동 구현은 미승인이다.
+기본 전송은 **iPad → 갈피 서버/집 PC 직접 업로드**다. iCloud Drive나 Möbius Sync 같은 외부 파일 동기화는 canonical 파일의 보관·복제·다른 기기 열람을 돕는 선택적 transport로 사용할 수 있지만, **갈피 revision을 판정하는 sync engine으로 사용하지 않는다.** 외부 동기화 폴더에서 생긴 수정·conflict copy를 더 최신이라는 이유만으로 자동 승격하지 않는다.
 
 기술 경계의 근거:
 - [WebKit의 origin-private 저장소](https://webkit.org/blog/12257/the-file-system-access-api-with-origin-private-file-system/)는 웹앱 내부 저장소다. iCloud Drive에 자동으로 나타나는 파일과 같지 않다.
@@ -279,7 +358,18 @@ Galpi Review
 - [iPad 다운로드 유지](https://support.apple.com/en-om/guide/ipad/ipad8139864c/ipados)는 로컬 사본을 유지하는 기능이다. 클라우드에만 있는 파일의 오프라인 재생이나 갈피에서의 자동 접근을 보장하지 않는다.
 - [iCloud Drive 동기화](https://support.apple.com/en-gb/guide/icloud/mm19ef899373/icloud)는 삭제도 반영한다. 독립 백업과 동일하게 취급하지 않는다.
 
-참조는 2026-09-16 설계 검토 근거이며 실제 기기의 설정 확인이나 연동 인수를 뜻하지 않는다.
+참조는 2026-09-16 설계 검토 근거이며 실제 기기의 설정 확인이나 연동 인수를 뜻하지 않는다. Möbius Sync의 구체 폴더·양방향 설정은 구현 시점 선택이며 이 문서에서는 갈피의 권한 계약만 고정한다.
+
+### 5.4 논리 파일시스템·동기화 — 합의
+
+갈피의 Finder형 구조와 실제 파일 복제는 분리한다.
+
+- **캡처 중:** 필기·녹음은 iPad 로컬에 먼저 저장한다. 서버 연결이 끊겨도 캡처를 계속한다.
+- **서버 동기화 뒤:** 갈피 서버본을 정본으로 본다.
+- **PC / iCloud / Möbius Sync:** 서버본을 복제·보관·열람하는 경로다. 이 폴더에서 직접 수정한 내용을 갈피로 자동 역수입하지 않는다.
+- **충돌:** 같은 Document의 오래된 상태가 최신 상태를 덮어쓰지 않도록 기존 `base_revision` 검사를 유지한다. revision이 맞지 않으면 자동 덮어쓰거나 합치지 않고 충돌로 표시한다.
+
+초기 범위에서는 iPad와 PC가 같은 Document를 동시에 편집하는 multi-writer 동기화를 만들지 않는다. PC에서 직접 편집하는 요구가 실제로 생길 때 별도 설계한다.
 
 ---
 
@@ -308,11 +398,16 @@ Galpi Review
 
 **v3.2의 가장 큰 결함은 빈 캔버스를 전제한 것이다.** 대학 강의는 교수 슬라이드 위에 필기하는 것이 기본이고, 자료 없이 백지에 쓰는 설계는 필기감이 아무리 좋아도 실사용에서 밀려난다.
 
-- 세션 생성 시 또는 강의 중에 PDF를 첨부한다. 캔버스 페이지의 배경 레이어가 된다.
-- 필기는 별도 레이어이며 PDF 원본을 변경하지 않는다.
-- `page_change`는 사용자가 본 PDF 페이지와 시각의 연결이다. 교수가 그 페이지를 설명했다는 증거는 아니다. 자동 주제 경계·전사 교정의 확정 근거로 쓰지 않는다.
+- PDF/백지 노트는 Session에 종속된 일회성 첨부가 아니라 Course와 General이 공유하는 재사용 가능한 **Document**다. Course에서는 같은 Document를 여러 날짜의 Session이 계속 참조할 수 있고, 한 Session에서도 여러 Document를 오갈 수 있다. General에서는 같은 Document 모델을 Session 없이 직접 사용한다.
+- General Document도 PDF 배경 필기, 백지 노트, Document annotation, Sticky와 document-grounded Q&A를 동일하게 지원한다. v1 General에는 Lecture Session·녹음·전사·lecture-grounded Q&A를 자동으로 붙이지 않는다.
+- 강의 중 Document를 바꿔도 active Session과 녹음은 유지된다. 갈피 내부 SPA 전환은 녹음 종료/새 시작으로 취급하지 않는다. 새로 연 Document는 해당 Session의 참조 목록에 추가된다.
+- 필기는 PDF 원본과 분리된 **Document annotation**이며, 해당 Document의 현재 누적 상태가 정본이다. 각 획은 생성된 `source_session_id`와 그 세션의 `t_ms`를 보존해 서로 다른 날짜의 획이 같은 PDF 페이지에 있어도 각각 맞는 음성으로 돌아갈 수 있게 한다. 세션 밖 편집은 `source_session_id`를 비워 가짜 음성 연결을 만들지 않는다.
+- `page_change`는 Session timeline의 이벤트로, 사용자가 본 Document/page와 시각의 연결이다. 교수가 그 페이지를 설명했다는 증거는 아니다. 자동 주제 경계·전사 교정의 확정 근거로 쓰지 않는다.
+- Document를 어디서 열었는지와 무관하게 같은 canonical PDF와 누적 annotation을 렌더링한다. `자료`에서 직접 연 경우와 `강의(Session)`의 참조에서 연 경우에 별도 PDF 사본/viewer를 만들지 않는다. 날짜별 폴더마다 PDF를 복제하지 않는다.
+- Document viewer의 연결 오디오는 Session 전체를 그대로 붙이지 않는다. Session timeline에서 그 Document가 active였던 interval과 실제 `recording_span`의 교집합만 source span으로 사용한다. 다른 Document가 active였던 녹음 구간은 현재 Document stream에서 제외하고 `다른 자료` 경계로 구분한다. 이는 교수가 그 PDF만 설명했다는 의미가 아니라 **사용자가 그 Document를 보고 있던 동안의 녹음**이라는 약한 provenance다.
+- 여러 Session의 source span은 실제 파일을 새로 합쳐 저장하지 않고 하나의 **virtual Document audio/transcript stream**으로 projection한다. 강의에서 해당 Document를 열면 같은 stream의 그 Session 첫 관련 span으로 초기 playhead만 맞춘다. 그날 전체 녹음을 연속으로 듣고 싶을 때는 별도의 Session 전체 재생을 사용한다.
 - 복습에서 당시 페이지로 돌아가는 연결과 명시적 선택 질문의 첨부에 활용한다. 답변에서 페이지를 근거로 제시하려면 실제 해당 자료를 확인해야 한다.
-- 자료가 없는 강의는 빈 페이지로 폴백한다. PDF는 필수가 아니라 있으면 강해지는 신호다.
+- 자료가 없는 강의는 재사용 가능한 백지 Document 또는 임시 백지 페이지로 폴백할 수 있다. 구체 생성 UX는 미정이다.
 
 ### 6.4 마커
 
@@ -323,7 +418,7 @@ Galpi Review
 
 한 번 탭하면 현재 시각에 이벤트를 남기고, 길게 누르면 최근 마커를 취소한다.
 
-**`?` 마커는 자동 답변을 생성하지 않는다.** 역할은 "여기 몰랐음, 나중에 볼 것"이라는 북마크다. 실제 질문은 §6.6의 명시적인 질문 흐름을 사용한다. 복습 화면의 `이 구간 설명해줘`도 온디맨드 진입점이며, 강의 후 전사 구간을 참조하는 이 입구의 세부 문맥은 별도로 정한다 (§20.1).
+**`?` 마커는 자동 답변을 생성하지 않는다.** 역할은 "여기 몰랐음, 나중에 볼 것"이라는 북마크다. 실제 질문은 §6.6의 명시적인 질문 흐름을 사용한다. 복습 화면의 `이 구간 설명해줘`는 lecture-grounded Q&A 진입점으로, 선택 전사를 primary evidence로 사용하는 §6.6 계약을 따른다.
 
 옛 `★`의 구간 요약 강제 포함 규칙은 소개문 계약과 충돌하므로 적용하지 않는다. 명시적 북마크의 보존과 요약 생성은 별개다.
 
@@ -338,26 +433,36 @@ Galpi Review
 
 ---
 
-### 6.6 질문 포스트잇 · 기존 필기 선택 질문 — 합의
+### 6.6 질문 포스트잇 · 페이지 내용 선택 질문 — 합의
 
-**입구는 둘, 대화 구조는 하나다.** 질문의 문장 모양이나 물음표 유무가 아니라 사용자가 질문 흐름으로 들어와 전송한 행위가 시온을 향한 요청을 구분한다.
+**입구는 둘, Q&A 체계는 하나다.** AI 호출의 최종 경계는 여전히 사용자의 **명시적 전송**이다. 일반 손글씨의 물음표만 보고 자동 호출하지 않는다. 다만 포스트잇 내부에서는 전송할 handwritten block의 첫 glyph `?`/`ㄴ`을 새 root/follow-up routing marker로 사용한다. **포스트잇 하나를 conversation thread 하나와 동일시하지 않는다.** 포스트잇은 화면상의 anchor와 최초 evidence origin/bundle을 공유하는 자유 메모/Q&A 공간이고, 그 안에 서로 독립적인 conversation chain이 여러 개 존재할 수 있다.
 
-1. **새 질문:** 빈 질문 포스트잇 열기 → 손글씨로 질문 작성 → 명시적 전송.
-2. **기존 내용 질문:** 선택 도구로 필기 범위를 둘러싸기 → 선택 영역 근처의 `시온에게 묻기` → 선택 내용이 붙은 질문 초안 → 필요한 질문을 덧붙여 전송.
+1. **새 포스트잇:** 빈 포스트잇 열기 → 자유 손글씨 메모 또는 `?`/`ㄴ` prefix를 사용한 Q&A block 작성 → Q&A는 명시적으로 전송.
+2. **기존 내용 질문:** 선택 도구의 올가미로 페이지 위 **PDF 내용·필기 stroke·둘의 혼합 영역**을 둘러싸기 → 선택 영역 근처의 `시온에게 묻기` → 선택 내용이 붙은 질문 초안 → 필요한 질문을 덧붙여 전송.
 
-선택한 수식만으로 계산·설명·검산 중 의도를 단정하지 않는다. 선택이나 포스트잇 열기 자체는 AI 호출이 아니고, 글쓰기를 잠시 멈췄다고 자동 전송하지 않는다. 일반 필기 모드의 원·별·물음표는 계속 필기다. 선택 모드가 켜진 동안의 둘러싸기만 선택으로 취급한다.
+선택한 수식만으로 계산·설명·검산 중 의도를 단정하지 않는다. 선택이나 포스트잇 열기 자체는 AI 호출이 아니고, 글쓰기를 잠시 멈췄다고 자동 전송하지 않는다. 일반 필기 모드의 원·별·물음표는 계속 필기다. **선택 모드가 켜진 동안의 올가미 둘러싸기만 선택으로 취급**하며, PDF와 필기를 서로 다른 선택 도구로 나누지 않는다.
 
-**대화 표시**
+**대화 표시와 chain 의미**
 
 ```text
 [선택한 필기 사본 — 있는 경우]
-질문: 여기서 부호가 왜 음수야?
+질문 A: 여기서 부호가 왜 음수야?
 시온: …
   ㄴ 반대 방향으로 돌면 어떻게 돼?
      시온: …
+
+질문 B: 그런데 이 식의 물리적 의미는 뭐야?
+시온: …
 ```
 
-포스트잇 안에서 이어 쓰는 질문은 같은 대화의 후속 질문이고, 새 포스트잇은 새 질문이다. `ㄴ`은 후속 대화를 표시하는 UI이며 일반 필기의 해당 기호를 자동 인식하는 호출 명령이 아니다. 구체적인 후속 입력 영역과 전송 조작은 미결정이다.
+- 포스트잇은 **자유 메모와 Q&A가 함께 존재하는 손글씨 공간**이다. 별도의 작은 질문 입력칸을 포스트잇 안에 다시 만들지 않는다.
+- 사용자가 Q&A로 **명시적으로 전송하는 손글씨 block의 첫 의미 있는 glyph**가 `?`이면 **새 conversation chain의 root**다. 답변 생성에는 그 포스트잇의 최초 evidence bundle과 새 질문을 주되, 다른 chain의 Q&A는 넣지 않는다.
+- 같은 전송 block의 첫 의미 있는 glyph가 `ㄴ`이면 **현재 chain의 follow-up**이다. 답변 생성에는 해당 chain의 앞선 사용자/시온 turn과 기존 evidence, 새 질문을 함께 준다. 새 root 질문이 시작된 뒤의 `ㄴ`은 그 새 chain에 이어진다.
+- `?`와 `ㄴ`이 block의 첫 의미 있는 glyph가 아닌 경우에는 **일반 문장부호/손글씨**다. 예를 들어 `이건 관성모멘트를 사용해야 하나? 아님 토크?`는 첫 glyph가 `이`이므로 일반 메모이며, 중간의 `? 아님 토크?`를 별도 질문으로 쪼개지 않는다.
+- 일반 PDF/필기 캔버스의 `?`·`ㄴ`도 명령이 아니다. 이 prefix 문법은 **포스트잇에서 사용자가 Q&A로 전송하는 현재 handwritten block**에만 적용한다. `?`나 `ㄴ`을 썼다는 사실만으로 자동 전송하거나 AI를 호출하지 않는다.
+- 전송 시 Q&A routing 단계에서 prefix를 판정하고, `?`/`ㄴ` marker는 routing 의미로 소비할 수 있다. 원본 손글씨에는 사용자가 쓴 marker를 그대로 보존한다. 판정 뒤에는 **구조화된 chain/parent relation이 source of truth**이며, 복원·재시도 때 OCR을 다시 돌려 관계를 재구성하지 않는다.
+- `?`/`ㄴ` 판정이 애매하거나 handwritten block 경계가 불확실할 때는 새 root/follow-up 중 하나를 임의로 고르지 않고 사용자에게 최소 확인을 받는다. 정확한 stroke grouping·임계값과 개인 필체 학습 필요성은 실사용 표본을 보고 정한다.
+- 따라서 같은 포스트잇은 같은 위치·근거를 공유하는 작업 공간이지, 그 안의 모든 손글씨나 질문이 서로 문맥을 공유한다는 뜻이 아니다.
 
 **보존할 의미**
 
@@ -367,22 +472,59 @@ Galpi Review
 - 시온 답변은 교수 발화나 전사 정본이 아니다. 강의 근거와 사용자·시온 대화의 출처를 섞지 않는다.
 - 이는 제품 보존 계약이다. 아래에서 초안·실패·재전송의 UX를 정하며, 구체 필드·DB/sidecar·요청 식별·사용자 삭제 정책은 아직 확정하지 않았다 (§20.1).
 
-**질문 입력 문맥 — 합의**
+**질문 입력 문맥 — 합의: document-grounded와 lecture-grounded를 분리한다**
 
-| 진입 방식 | 기본 전달 내용 |
-|---|---|
-| 빈 포스트잇의 새 질문 | 질문만 |
-| 기존 필기·원문 선택 질문 | 질문 + 선택 영역 + 그 영역이 속한 PDF 페이지. PDF 없는 백지 필기는 선택 영역만 첨부 |
-| 같은 포스트잇의 후속 질문 | 그 포스트잇의 앞선 Q&A + 기존 첨부 자료 + 새 질문 |
+같은 `시온에게 묻기`와 같은 포스트잇 대화 UI를 쓰더라도 **질문이 어디서 시작됐는지가 primary evidence를 고정한다.** 모델이 임의로 질문 origin을 바꾸거나 주변 자료 전체를 끌어오지 않는다.
 
-원문 참조 여부를 모델이 추측해 주변 자료를 자동으로 붙이지 않는다. 진입 방식이 기본값을 정하고, 사용자는 `PDF 14쪽 첨부됨` 같은 표시를 보고 첨부를 빼거나 일반 질문에도 페이지를 추가할 수 있다. 현재 화면을 다른 페이지로 넘겨도 기존 질문의 첨부는 자동 교체되지 않는다. 페이지는 원문의 조건·그림·기호 정의를 보여주는 용도이며, 주변 손글씨 전체·다른 페이지·강의 전사는 기본으로 보내지 않는다. 문맥이 부족하면 필요한 자료를 묻는다. 강의 중 업로드·전사되지 않은 음성을 시온이 이미 들었다고 가정하지 않는다.
+| 진입 방식 | 질문 종류 | Primary evidence | 기본 supporting evidence |
+|---|---|---|---|
+| 강의 중 빈 포스트잇의 최초 root | document-grounded | 질문 자체 | 없음. 사용자가 원하면 현재 PDF 페이지를 명시적으로 추가 |
+| 강의 중 PDF/필기 선택 → `시온에게 묻기`의 최초 root | document-grounded | 선택 영역 이미지 | 그 영역이 속한 PDF 페이지 이미지. PDF 없는 백지 필기는 선택 영역만 |
+| 복습 중 전사 범위 선택 → `시온에게 묻기` / `이 구간 설명해줘`의 최초 root | lecture-grounded | 선택한 전사 범위 | 제한된 인접 전사 세그먼트. PDF·주변 손글씨는 기본 자동 첨부하지 않음 |
+| 같은 포스트잇의 `?` prefix root | 기존 grounding origin 유지, 새 chain | 새 질문 | 포스트잇의 최초 evidence bundle을 기본 재사용. 이전 chain의 Q&A는 전달하지 않음 |
+| 같은 포스트잇의 `ㄴ` prefix follow-up | 현재 chain 유지 | 해당 chain의 앞선 Q&A + 새 질문 | 최초 evidence bundle과 그 chain에서 사용자가 명시적으로 추가한 evidence를 재사용 |
+
+각 전송 turn이 실제로 사용한 evidence snapshot은 불변으로 보존한다. 사용자는 허용된 자료를 현재 Chain에 명시적으로 추가할 수 있지만, 이미 전송된 Turn의 evidence를 소급 변경하지 않고 **prefix routing으로 다른 chain의 대화를 조용히 섞지 않는다.** `?` root는 이전 Q&A와 다른 Chain의 추가 reference를 받지 않고, `ㄴ` follow-up은 현재 chain만 이어받는다.
+
+**원본 오디오는 어느 Q&A 경로에서도 모델 입력으로 직접 보내지 않는다.** 복습 전사 질문은 전사를 사용하고, 필요하면 해당 위치로 원음을 사용자가 직접 재생할 수 있게 연결한다.
+
+**lecture-grounded PDF 보조 문맥 — 합의**
+
+복습 중 전사 질문의 기본 입력은 **선택한 전사 + 제한된 인접 전사**다. 당시 화면에 보였다는 이유만으로 PDF 페이지를 매번 자동 첨부하지 않는다. 선택 전사만으로 답하기 부족하고 슬라이드·교재의 자료 문맥이 더 필요할 때, Q&A가 별도의 **PDF page context tool**을 사용할 수 있다.
+
+이 도구는 선택 전사의 Session 시간 범위를 기준으로 timeline에서 당시 열려 있던 `document_id/page`를 **후보**로 찾는다. `page_change`는 사용자가 그 페이지를 보고 있었다는 사실일 뿐 교수가 그 페이지를 설명했다는 확정 근거는 아니므로, 후보 페이지를 primary evidence로 승격하지 않는다. 조회된 페이지 문맥은 **secondary evidence**이고 질문의 primary anchor는 계속 전사 선택이다.
+
+PDF 텍스트 추출 구현은 현재 `lib/paper-fulltext.js`가 export하는 페이지 보존 파싱 코드(`extractPdfPages`)를 재사용한다. 반대로 `paper-fulltext-tools.js`의 논문 후보 선정·다운로드·색인·chunk search/read workflow, `paper_id` 중심 계약은 lecture Q&A에 재사용하지 않는다. 즉 **파싱 코드만 재사용하고 두 기능을 같은 subsystem으로 묶지 않는다.** 페이지 추출 결과의 캐시·저장 위치와 tool payload의 정확한 형태는 구현 설계에서 정한다.
+
+document-grounded 질문은 나중에 전사가 완성돼도 기존 evidence가 자동으로 바뀌지 않는다. 강의 중 PDF만 보고 받은 답에 사후 전사를 몰래 붙여 답의 근거를 바꾸지 않는다. 필요하면 새 후속 질문에서 강의 전사를 명시적으로 추가한다.
+
+lecture-grounded 질문의 선택 범위는 단순 문자열만 저장하지 않는다. 질문 당시 무엇을 가리켰는지 보존하기 위해 **전사 세그먼트 식별자, 시작·종료 시각, 선택 텍스트 snapshot, 사용한 transcript revision**을 함께 가리키는 것을 제품 계약으로 둔다. 실제 필드명은 구현 시 정한다. 전사가 나중에 교정돼도 질문 당시 evidence snapshot은 남고 현재 전사의 대응 위치로 돌아갈 수 있어야 한다.
+
+인접 전사는 선택 문장의 지시어·생략된 맥락을 풀기 위한 bounded context다. **lecture-grounded primary transcript 선택은 최대 2분 또는 4,000자 중 먼저 닿는 상한**을 적용한다. 초과 선택을 조용히 truncate하지 않고 사용자에게 범위를 줄여 달라고 한다. supporting transcript는 **선택 범위 앞뒤 각각 최대 30초, 합계 최대 2,000자**로 제한한다. 가능하면 STT segment를 쪼개지 않고 완전한 segment 단위로 넣으며 문자 상한을 넘으면 선택 범위에서 가장 먼 바깥 segment부터 제외한다. 강의 전체 전사나 주변 손글씨 전체를 자동 첨부하지 않는다.
+
+PDF page context tool은 선택 전사의 Session 시간 범위에 겹치는 Document/page span을 만든다. 선택 시작 시점에 이미 active였던 page와 범위 안의 `page_change`를 모두 고려하고, **전사 선택 범위와 겹친 시간이 긴 순서로 한 Turn당 최대 2페이지**만 자동 사용한다. 이 순위는 사용자가 오래 보고 있던 후보 순위일 뿐 교수 설명 페이지라는 의미가 아니다. 두 페이지로 부족하면 추가 페이지를 조용히 확장하지 않고 사용자가 자료를 더 지정하거나 질문을 좁히게 한다.
+
+PDF page context는 **text-first**다. 먼저 후보 페이지의 추출 텍스트를 제공하고, 텍스트만으로 부족하거나 질문이 수식 배치·그래프·도표·그림 같은 시각 정보를 요구하거나 추출 텍스트가 충분하지 않을 때 모델이 **같은 후보 페이지의 원본 PDF page image를 명시적으로 요청**한다. 이 판단을 위해 별도 서버 classifier를 추가하지 않는다. page image를 더 보더라도 새로운 후보 페이지를 추가한 것으로 보지 않으며, `page text + 같은 page image`는 여전히 하나의 page evidence다. 따라서 text/image 전환 때문에 Turn당 최대 2페이지 상한이 늘어나지 않는다. 정확한 이미지 해상도·용량 상한은 구현 전 모델/API 조건과 실측으로 정한다.
+
+**Chain-local reference 추가 — 합의**
+
+Sticky는 하나의 **고정 spatial anchor와 immutable baseline evidence**를 가진다. 대화 도중 다른 자료를 더 보고 싶어져도 Sticky의 anchor나 baseline을 갈아끼우지 않는다. 추가 참조는 별도의 conversation evidence reference다.
+
+- v1에서 새 reference는 **현재 Sticky/Chain 안의 `참조 추가` 조작으로 시작**한다. 시작 순간 `target_sticky_id`와 `target_chain_id`를 고정하고, 사용자가 같은 Document viewer 안에서 허용된 자료 하나를 선택·확인하면 그 Chain에 추가한 뒤 capture mode를 종료한다. 선택 중 다른 Sticky나 Chain을 열어도 target을 암묵적으로 바꾸지 않는다. target Sticky가 삭제되면 추가를 실패시킨다.
+- v1 reference 범위는 **same-Document**로 제한한다. 현재 Document의 PDF 영역/page, 연결된 Session transcript 범위, 현재 Document의 handwriting 영역을 참조할 수 있다. Finder를 거쳐 다른 Document까지 넘나드는 cross-document reference는 초기 범위에 넣지 않는다.
+- 추가 reference는 **Document 위에 새 영구 말풍선/anchor를 만들지 않는다.** Sticky 내부에서 compact preview/chip 형태로 표시한다. reference를 누르면 원본 PDF/필기 위치 또는 전사 범위로 이동하고 해당 영역을 일시적으로 highlight한다. 정확한 chip 크기·아이콘·썸네일 배치는 Figma/실기기 UI tuning으로 남긴다.
+- **현재 Chain의 누적 reference set과 각 Turn의 immutable evidence record를 구분한다.** 어떤 reference를 A2에서 처음 추가했다면 A1의 과거 evidence에는 소급 반영하지 않는다. A2 이후의 같은 Chain `ㄴ` follow-up에는 계속 사용할 수 있다. 새 `?` Chain은 Sticky baseline에서 다시 시작하며 다른 Chain이 추가한 reference를 자동으로 상속하지 않는다.
+- 추가 reference는 해당 Chain이 끝날 때까지 **누적 유지**한다. v1에는 자동 expiry, 자동 pruning, oldest-drop, 수동 remove UX를 두지 않는다. Sticky baseline은 제거할 수 없는 기준 evidence다.
+- hard limit은 **Chain당 baseline 제외 추가 reference 최대 3개**다. 한 번의 사용자 선택을 하나의 logical reference로 센다. PDF 영역 선택은 선택 crop과 containing page가 함께 쓰여도 1개, transcript 범위는 bounded adjacent transcript가 붙어도 1개, handwriting 영역도 1개다. 네 번째 추가 시 자동 삭제·교체하지 않고 추가를 막는다. 정확히 동일한 reference를 다시 추가하는 것은 no-op이며 슬롯을 더 소비하지 않는다.
+
+현재 화면을 다른 페이지로 넘겨도 이미 전송한 질문의 첨부는 자동 교체되지 않는다. 문맥이 부족하면 필요한 자료를 묻는다. 강의 중 업로드·전사되지 않은 음성을 시온이 이미 들었다고 가정하지 않는다.
 
 **이미지 입력 — 추가 합의**
 
-- 선택 영역은 텍스트 파싱을 필수로 거치지 않고 이미지로 전달한다. 사진·도표·수식도 같은 경로를 사용한다.
+- 선택 도구는 **하나의 올가미 제스처**로 PDF 내용, 필기 stroke, 둘이 섞인 영역을 모두 선택한다. 선택 대상의 종류에 따라 사용자 조작을 나누지 않으며, 선택 영역은 텍스트 파싱을 필수로 거치지 않고 이미지로 전달한다. 사진·도표·수식도 같은 경로를 사용한다.
 - 선택 질문은 질문 + 선택 영역 이미지 + 해당 PDF 페이지 이미지를 기본으로 한다. 손글씨 질문도 이미지 원본으로 전달하고, 백지 필기는 PDF 페이지 없이 처리한다.
 - 이미지는 현재 화면을 그대로 캡처하지 않고 원본 PDF·필기에서 만든다. 확대율에 따라 해상도가 떨어지거나 메뉴·선택 테두리·재생 농도 효과가 입력에 섞이지 않게 한다.
-- 선택한 필기는 선택 이미지에 포함한다. 해당 PDF 페이지 이미지에 주변 손글씨 전체까지 자동으로 붙이지 않는다.
+- PDF 내용이 포함된 선택은 원본 PDF의 해당 영역을 바탕으로 선택 이미지를 만들고, 선택된 필기 stroke가 겹치면 함께 포함한다. 필기만 선택한 경우에도 같은 이미지 경로를 사용한다. 해당 PDF 페이지 이미지에 **선택 밖 주변 손글씨 전체**까지 자동으로 붙이지 않는다.
 - 원본 PDF·필기 벡터·선택 위치와 실제 보낸 이미지 사본을 구분해 보존한다. PDF의 향후 텍스트 검색 가능성을 없애는 결정은 아니다. 해상도·용량 상한·모델은 구현 전 확정한다.
 
 **손글씨 인식·정정 — 합의**
@@ -391,23 +533,88 @@ Galpi Review
 - 손글씨 원본을 질문 입력으로 유지한다. 인식 텍스트를 생성하더라도 원본을 버리거나 인식문만으로 대체하지 않는다.
 - 전송 전 초안은 자유롭게 수정한다. 전송한 질문·이미지·기존 답변은 유지하고, 잘못 읽었을 때는 `ㄴ 저건 2가 아니라 z야`처럼 후속 질문으로 정정해 새 답변을 받는다. 질문만 바꿔 옛 답변이 수정된 질문에 대한 답처럼 보이게 하지 않는다.
 - 부호·문자처럼 읽기에 따라 답이 달라지는 부분이 모호하면 그 부분만 되묻는다. 이전 오답은 자동 삭제하지 않으며 접어 읽는 상세 UI는 미정이다.
-- 정정을 대화에서 참고하는 것과 사용자 필체로 모델 자체를 학습하는 것은 별개다. 개인화 학습은 이번 범위에 넣지 않으며 실제 오독 표본을 보고 별도로 판단한다. 모델·인식 파이프라인은 아직 확정하지 않았다.
+- 정정을 대화에서 참고하는 것과 사용자 필체로 전체 OCR 모델을 학습하는 것은 별개다. 다만 `?`/`ㄴ` prefix 판정은 의미가 작고 명확한 분류 문제이므로, 실사용에서 오인식이 반복되면 사용자의 수정 표본을 이용한 작은 개인화 recognizer를 검토할 수 있다. 처음부터 한글 전체 OCR 재학습을 전제로 하지 않으며 모델·인식 파이프라인은 아직 확정하지 않았다.
 
-**수동 접기·펼치기와 답변 표시 — 합의**
+**접힌 anchor·cluster·열린 카드 — 합의**
 
-- 포스트잇은 필요할 때 펼쳐 보며, 접기와 펼치기는 모두 사용자 조작으로만 한다. 전송·답변 도착·페이지 이동 때문에 자동으로 접거나 펼치지 않는다.
-- 접힌 포스트잇에 새 답변이 오면 갈피 강조색의 작은 점으로 표시한다. 빨간색을 새로 고정하거나 숫자·소리·깜빡임을 추가하지 않는다.
-- 사용자가 펼쳐 새 답변을 확인하면 점을 없앤다. 답변 도착 전에 펼쳤다가 접은 행위는 새 답변 확인으로 치지 않는다. 펼친 상태에서도 아직 보지 못한 답변의 확인 판정은 구현 전에 정한다.
-- 펼쳐진 상태에서 답변이 와도 포스트잇 크기·읽던 위치·필기 중인 페이지를 강제로 바꾸지 않는다.
-- 입력 보존은 접힘 상태와 무관하다. 접힌 표시의 질문 번호·첫 줄, 원본 근처 배치·이동·긴 답변 내부 스크롤·확대 읽기는 제안 상태이며 세부 배치는 미확정이다. 페이지에 소속시키는 방향과 페이지 전환 중 열린 포스트잇을 표시하는 방법도 함께 확정한다.
+- 포스트잇은 필요할 때 펼쳐 보며, 접기와 펼치기는 모두 사용자 조작으로만 한다. 전송·답변 도착 때문에 자동으로 접거나 펼치지 않는다.
+- 접힌 상태는 질문 번호나 첫 줄 대신 **작은 말풍선 아이콘**으로 표시한다. 실제 anchor는 질문이 놓인 위치에 고정하며 사용자가 옮기지 않는다.
+- 같은 페이지에서 현재 화면상 너무 가까운 **접힌 anchor들만 view-layer cluster**로 합칠 수 있다. 데이터상 포스트잇·anchor·conversation chain은 합치지 않고 원래 위치를 보존한다. 줌/화면 배율이 달라지면 cluster가 다시 계산될 수 있으며 구체 거리 임계값은 실기기에서 정한다.
+- 단일 포스트잇에 새 답변이 있으면 말풍선에 알림 상태를 표시한다. cluster가 평상시일 때 우상단 badge는 포함된 포스트잇 수를 보여주지만, 하위 포스트잇 중 하나라도 unread이면 **숫자 대신 알림 표시**를 보여준다.
+- cluster를 열면 상단에 compact numeric tab bar를 둔다. `1 2 3 …`은 영구 thread 번호가 아니라 **그 순간 cluster 안에서 생성 순으로 정렬한 UI ordinal**이며 저장 identity로 사용하지 않는다. 새 답변 때문에 순서를 바꾸지 않고, 공간이 부족하면 탭바만 가로 스크롤한다. 질문 첫 줄을 탭 제목으로 사용하지 않는다.
+- unread인 하위 포스트잇은 해당 숫자 탭에 개별 알림 표시를 붙인다. cluster를 열 때 unread가 있으면 가장 최근 새 답변이 온 탭을 우선 연다. 특정 탭의 새 최종 답변이 실제로 표시되어 사용자가 확인한 뒤 그 탭의 unread를 해제하고, 다른 unread 탭이 남아 있으면 바깥 cluster도 계속 알림 상태를 유지한다.
+- 열린 카드는 **iPad 실사용에서 한 변 약 3.5~5 cm 범위의 정방형**을 기본 목표로 한다. 정확한 CSS/point 값은 실기기에서 정한다. 사용자가 정방형 비율을 유지한 채 최대 약 `8 × 8 cm`까지 키울 수 있지만 내용 길이에 따라 자동으로 커지지는 않는다. 긴 질문·답변·일반 메모는 카드 내부에서 스크롤한다.
+- **anchor와 열린 카드의 위치는 PDF page 좌표계에 종속**한다. PDF를 스크롤하거나 페이지가 움직이면 함께 이동한다. 반면 카드 width/height는 화면/CSS 기준으로 유지해 PDF zoom을 키워도 카드 자체가 같이 확대되지 않게 한다. 정확한 edge-clamping·offset은 실기기 tuning 대상이다.
+- 카드의 최초 위치는 고정 anchor 또는 현재 cluster icon을 기준으로 계산한다. 열린 동안에는 사용자가 카드를 자유롭게 drag할 수 있지만 **그 이동 위치는 persistence하지 않는다.** 접었다 다시 열면 과거 drag 위치가 아니라 anchor/cluster 기준 초기 위치에서 다시 연다. cluster 내부에서 탭을 바꿔도 카드 위치는 바꾸지 않는다.
+- 사용자는 **여러 포스트잇을 동시에 펼칠 수 있다.** 다른 카드를 열어도 기존 카드를 자동으로 접지 않는다. 카드가 서로 겹치면 가장 최근에 터치한 카드를 앞으로 올리며, 자동 정렬·충돌 회피·밀어내기는 첫 버전에 넣지 않는다.
+- 페이지가 화면 밖으로 나가면 그 page overlay인 anchor와 열린 카드도 자연스럽게 화면 밖으로 나간다. 페이지 이동만으로 자동 collapse하지 않으며, 같은 page로 돌아오면 open 상태와 open-lifecycle의 임시 drag 위치를 유지한다. 사용자가 직접 접었다 다시 열 때만 anchor 기준 초기 위치로 되돌린다.
+- 펼쳐진 상태에서 답변이 와도 카드 크기·읽던 위치·현재 PDF 위치를 강제로 바꾸지 않는다.
+- 입력 보존은 접힘 상태와 무관하다. 자유 메모, 작성 중 Q&A block, 이미 전송한 Q&A는 카드의 열림/닫힘·drag·resize와 독립적으로 보존한다.
+
+**시온 답변 렌더링·출력 형식 — 합의**
+
+- 포스트잇의 시온 답변은 **손글씨 스타일 폰트 기반의 plain-answer UI**로 표시한다. 사용자 실제 Pencil stroke와 시온 답변은 출처를 구분할 수 있게 유지한다. 실제 폰트 선택과 향후 사용자 개인 필체 기반 폰트 제작 여부는 visual customization으로 남기며, 데이터·Q&A 계약으로 고정하지 않는다.
+- Q&A 모델에는 포스트잇용 출력 계약을 별도로 주어 Markdown heading, `**`/`_` 강조 marker, code fence, table, ASCII art, 장식용 bullet 남발처럼 손글씨 메모에 어울리지 않는 표현을 만들지 않게 한다. 렌더러도 이런 marker 노출을 정상 경로로 기대하지 않는다.
+- 한 줄짜리 기호식·간단한 수식은 선택한 손글씨 폰트가 지원하는 범위에서 같은 시각 스타일로 표시한다. 분수·행렬·적분 전개처럼 조판이 필요한 복잡한 수식은 별도 math renderer를 사용하되 포스트잇의 손글씨 분위기와 시각적으로 충돌하지 않는 폰트를 고른다.
+- 본문 안에서 ASCII diagram이나 텍스트 그림을 억지로 만들지 않는다. 그림이 실제 이해에 필요하면 **별도 이미지 첨부**로 다룬다. 첫 버전은 모델이 자동으로 이미지 생성을 시작하는 것을 기본 동작으로 두지 않으며, 이미지 생성/첨부를 언제 제안하거나 실행할지는 후속 구현 설계에서 정한다.
+- 답변 정본은 화면용 Markdown 문서를 전제로 하지 않는다. plain text와 필요한 수식/첨부 구조를 보존하는 방향으로 두며, 구체 저장 schema는 Q&A 물리 저장 설계에서 정한다 (§20.1).
 
 **오프라인·실패·재전송 — 합의**
 
 - 작성 중 초안은 기기에 저장한다. 포스트잇을 접거나 페이지를 넘겨도 사라지지 않는다.
 - 오프라인에서 전송을 누르면 질문·선택 필기·첨부 페이지를 보존하고 `전송 안 됨`으로 표시한다. 연결이 돌아와도 못 보낸 질문을 자동 전송하지 않는다.
 - 이미 보낸 뒤 연결이 끊기면 재연결 시 기존 요청의 결과부터 자동 확인한다. 답변을 못 받았다는 이유만으로 새 요청을 만들어 중복 전송하지 않는다.
-- 실제 요청 실패가 확인되면 내용을 유지하고 `다시 보내기`를 제공한다. 결과가 아직 불명인 상태를 곧바로 실패로 단정하지 않는다. 요청 식별·상태 조회·재시도 멱등성은 구현 계약으로 남긴다.
-- 접혔을 때 새 답변은 강조색 점, 실패·전송 안 됨은 별도 작은 느낌표로 구분한다. 펼치면 이유와 가능한 조치를 보여준다. 실패가 필기·녹음을 중단시키지 않는다.
+- 실제 요청 실패가 확인되면 내용을 유지하고 `다시 보내기`를 제공한다. 결과가 아직 불명인 상태를 곧바로 실패로 단정하지 않는다.
+- 접혔을 때 새 답변은 위의 unread 규칙으로 표시하고, 실패·전송 안 됨은 별도 작은 느낌표로 구분한다. 펼치면 이유와 가능한 조치를 보여준다. 실패가 필기·녹음을 중단시키지 않는다.
+
+**Q&A 요청 수명·중복 방지 — 제품 계약 합의**
+
+포스트잇 UI 구조와 모델 실행 수명을 분리한다.
+
+```text
+Sticky                     # anchor + baseline evidence를 공유하는 UI 공간
+├─ Conversation Chain A
+│  ├─ User Turn
+│  │   └─ immutable evidence snapshot
+│  │       ├─ Attempt 1 failed
+│  │       └─ Attempt 2 succeeded
+│  ├─ Assistant Turn
+│  └─ ㄴ User Turn → Assistant Turn
+└─ Conversation Chain B    # `?` prefix로 시작한 독립 root
+   └─ User Turn → Assistant Turn
+```
+
+- 클라이언트는 전송 직전에 안정적인 `client_request_id`를 만들고 질문 원본·evidence snapshot과 함께 로컬에 먼저 보존한다. 서버는 모델 호출 전에 해당 User Turn과 evidence snapshot을 받아들였다는 사실을 영속화해야 한다.
+- 같은 `client_request_id`와 같은 canonical payload가 다시 오면 **기존 Turn/현재 상태를 반환하고 새 모델 호출을 만들지 않는다.** 같은 ID인데 payload가 다르면 충돌로 fail-close하며 기존 Turn/evidence를 바꾸지 않는다. 새 ID만 새 User Turn을 만든다. 구체 hash·필드명·HTTP 형태는 구현 설계에서 정한다.
+- `unknown`은 우선 클라이언트가 결과를 모르는 상태로 해석한다. 재연결 시 `client_request_id`로 기존 요청의 결과/상태를 조회한 뒤에만 다음 행동을 결정한다. 서버 쪽에서도 모델 결과를 확정할 수 없는 상태가 생기면 자동으로 모델을 다시 부르지 않는다.
+- 사용자가 `다시 보내기`를 명시하면 **같은 User Turn의 새 Attempt**를 만들 수 있다. 이것을 동일 질문의 새 conversational turn으로 중복 표시하지 않는다.
+- 첫 버전의 화면 답변은 **완성된 최종 답변만 표시·보존**한다. 토큰 단위 partial answer를 Q&A 정본으로 만들지 않는다. 생성 중 취소 버튼도 두지 않고, 사용자는 포스트잇을 접어 강의로 돌아갈 수 있다.
+- 이전에 `thread = sticky`라고 부르던 시점에 합의한 삭제 단위는 새 용어에서 **Sticky 전체 삭제**로 승계한다. 첫 버전은 중간 Turn이나 개별 Chain만 골라 삭제하지 않는다. Sticky 삭제는 그 Q&A와 Q&A가 소유한 evidence snapshot을 제거하되 원본 Document/PDF annotation, 전사, 오디오를 건드리지 않는다. 삭제 뒤 늦게 도착한 결과가 포스트잇을 되살리지 않도록 최소 삭제 상태/식별자는 보존할 수 있다.
+- 구체 endpoint 이름·migration 번호·tombstone 보존 기간·이미지 payload 형식은 구현 계약으로 남긴다 (§20.1).
+
+**Q&A 물리 저장·실행 경계 — 합의**
+
+- Lecture Q&A의 **실시간 canonical state는 SQLite**다. sidecar/Markdown은 사람이 읽거나 백업·export하기 위한 derived projection일 수 있지만 서버 상태 판정의 두 번째 정본으로 사용하지 않는다.
+- Sticky의 공간적 실체(`sticky_id`, page anchor, 위치/크기, 손글씨 memo)는 **Document annotation이 소유**한다. SQLite Q&A는 `sticky_id`를 외부 identity로 참조하고 Conversation Chain / User Turn / Attempt / 최종 답변 수명을 소유한다. memo-only Sticky는 Q&A row를 강제로 만들 필요가 없다.
+- 개념적 물리 경계는 `chains`, `turns`, `attempts`, `sticky tombstone` 정도로 둔다. exact table/column 이름은 구현자가 현재 DB style에 맞춰 정한다. Evidence는 Turn에 붙는 **versioned immutable JSON manifest + immutable blob reference**를 기본으로 하고, 지금 요구되지 않은 evidence-item 정규화 테이블은 만들지 않는다.
+- Turn은 질문이라는 immutable conversational fact다. Attempt는 그 Turn에 답을 얻기 위한 처리 시도다. 같은 Turn retry는 새 conversational Turn을 만들지 않는다. 성공한 답의 정본은 Turn의 `accepted_attempt`와 final answer 하나로 승격한다.
+- Attempt 상태는 최소 `prepared → in_flight → succeeded|failed|result_unknown`과 명시적 retry 뒤의 `superseded`를 표현할 수 있어야 한다. 외부 provider 호출 전 DB에 `in_flight`를 먼저 확정하고, 재시작 시 결과 여부를 알 수 없는 `in_flight`는 자동 재호출하지 않고 `result_unknown`으로 취급한다. 성공 결과와 Turn final-answer 승격은 하나의 transaction으로 처리한다.
+- 사용자가 `다시 보내기`를 명시하면 기존 `result_unknown` Attempt는 `superseded`되어 final-answer 자격을 잃고 같은 Turn에 새 Attempt를 만든다. 이전 Attempt의 늦은 결과가 도착해도 Turn을 되살리거나 final answer를 덮어쓰지 않는다.
+- 별도 generic job queue/worker를 첫 버전에 만들지 않는다. **DB에 Turn/Attempt를 먼저 영속화 → 같은 서버 요청 경계에서 provider 호출 → 결과를 DB에 영속화**하는 최소 흐름으로 시작한다. HTTP 연결이 끊겨도 이미 받아들인 Turn을 취소로 간주하지 않으며, 클라이언트는 `client_request_id`로 기존 상태를 조회한다. exact endpoint path는 구현 설계에서 정한다.
+
+**시온 persona와 conversation session 경계 — 합의**
+
+- Lecture Q&A 모델은 일반 시온과 같은 persona/role core와 현재 허용된 공통 retrieval 능력을 사용하지만, **Shortcut/main chat transcript와는 동기화하지 않는 별도 conversational session**이다.
+- Sticky 안의 각 Conversation Chain도 서로 독립적인 working conversation이다. 다른 Sticky/다른 Chain/Shortcut chat의 transcript를 자동으로 섞지 않는다.
+- 같은 Chain의 unresolved User Turn은 하나만 허용해 직렬화한다. `ㄴ` follow-up은 전송 시 `chain_id + parent_turn_id`를 확정하며 parent가 아직 unresolved면 전송하지 않는다. 다른 Chain들은 서로 독립이므로 동시에 in-flight일 수 있다.
+- `?`는 같은 Sticky에서 새 독립 Chain을 만든다. Sticky의 최초 grounding/baseline evidence는 재사용하지만 다른 Chain의 Q&A history는 받지 않는다. 사용자가 이번 root에 명시적으로 추가한 evidence만 더해 전송 순간 immutable snapshot으로 고정한다.
+- `ㄴ`은 같은 Chain의 continuation이다. 최초 root의 evidence bundle, 그 Chain에서 사용자가 명시적으로 추가한 evidence, 같은 Chain의 앞선 accepted user/assistant conversation을 이어받는다. 검색/RAG 같은 augmentation은 각 새 Turn에서 별도로 수행할 수 있으며 raw retrieval 결과를 Chain baseline으로 승격시키지 않는다.
+
+**현재 note RAG augmentation — 최소 계약**
+
+- 아직 미구현인 장기기억 architecture를 Lecture Q&A에서 선제 설계하지 않는다. 현재는 note-based RAG만 Turn-local augmentation으로 본다. conversational query resolution/working retrieval context는 XION 공통 retrieval layer의 별도 설계 책임이며 Lecture subsystem에서 독자 framework를 만들지 않는다.
+- 실제 retrieval provenance는 full retrieved text snapshot을 영구 중복 저장하지 않고 최소한 `chunk_id`, `note_filename`, `content_sha256`과 필요 시 score를 보존한다.
+- 같은 User Turn의 Attempt retry는 같은 retrieval refs/hash를 재사용한다. source chunk가 바뀌거나 사라져 hash가 맞지 않으면 조용히 최신 RAG로 바꾸지 않고 fail-close한다. 최신 retrieval로 다시 묻는 것은 새 Turn이다.
 
 새 포스트잇은 §6.8 원형 메뉴에서 호출한다. 길게 누르기만으로 곧바로 포스트잇을 열던 후보는 이 방식으로 대체한다. 기존 도구막대도 대체 조작으로 유지한다.
 
@@ -450,147 +657,185 @@ Galpi Review
 
 ## 7. Audio–Canvas Synchronization
 
-### 7.1 시간축 계약
+### 7.1 두 시간축 — 합의
 
-**같은 앱에서 녹음한다고 시계 문제가 자동 해결되는 것은 아니다.** 버튼 시각·이벤트 수신 시각·실제 오디오 첫 샘플은 구분한다. 녹음 시작·일시정지·재개·중단을 오디오 위치와 연결하고 필기 시각이 그 관계를 참조해야 한다. 구체 수집 방법과 저장 필드는 미확정이다.
+**필기·페이지·질문이 놓이는 세션 시간과 실제 녹음 파일의 오디오 시간을 분리한다.** 같은 웹앱에서 둘을 시작하더라도 버튼 시각·이벤트 수신 시각·실제 첫 오디오 샘플이 같다고 가정하지 않는다.
 
-복습에서는 **전사와 필기가 서로를 기준으로 삼지 않고 모두 오디오 재생 시각을 따른다.** 전사 구간 길이와 20초 후보 필기 표시 구간은 별개다. 전사 미완료·실패가 원음 재생과 필기 농도 표시를 막지 않는다.
+- `session_t_ms` — 노트/강의 세션에서 경과한 논리적 시간. 녹음이 일시정지돼도 필기·페이지 이벤트는 계속 이 축에 놓인다.
+- `audio_local_ms` — 실제 오디오 매체 안의 재생 위치. 녹음되지 않은 시간은 이 축에 존재하지 않는다.
+- `recording_span` — 실제 녹음이 존재하는 **연속 구간**의 세션 시간 ↔ 오디오 시간 매핑.
 
-아래는 기존 별도 녹음 경로의 시간 표현이다. 변수의 역할을 설명하기 위해 남기되 새 통합 녹음의 확정 스키마로 취급하지 않는다.
+예를 들어 20분에 녹음을 일시정지하고 25분에 재개하면 20~25분에 쓴 필기는 세션에는 남지만 오디오 위치는 `null`이다. 재개 뒤 녹음은 새 `recording_span`으로 연결한다. 비녹음 시간을 오디오에 압축해서 붙이거나 가장 가까운 음성으로 임의 연결하지 않는다.
 
-- `session_t_ms` — 갈피 캡처 세션 시작 이후의 단조 증가 시간
-- `audio_local_ms` — 각 오디오 파일 내부의 재생 위치
-- `session_offset_ms` — 해당 오디오 파트의 첫 프레임이 세션 시간축에서 시작하는 위치
+**복습 재생에서는 비녹음 구간을 오디오로 재현하지 않는다.** 한 span의 끝에 도달하면 플레이어는 다음 span의 시작으로 즉시 넘어가며, session cursor도 다음 span 시작 시각으로 점프한다. 재생 UI에는 두 span 사이에 녹음이 없었던 **gap**이 존재했음을 표시한다. gap의 정확한 시각적 폭·표현은 실기기 tuning으로 남기되, gap을 침묵 오디오로 생성하거나 가장 가까운 전후 음성에 매핑하지 않는다. gap 안에서 생성된 강의 필기는 다음 span으로 넘어가는 순간 이미 지난 session 시각이 되므로 원래 농도로 전환될 수 있지만, 그 획 자체에 재생 가능한 오디오 위치가 생기는 것은 아니다.
 
-아래 단일 오프셋 변환은 **누락·시간 압축·drift 문제가 없는 연속 구간에만** 쓸 수 있다. 일시정지·재개를 포함한 파일 전체의 변환식으로 고정하지 않는다.
+개념 예시는 다음과 같다. 필드명·파일 배치는 아직 구현 스키마가 아니다.
 
-```text
-session_t_ms = audio_local_ms + audio_part.session_offset_ms
-audio_local_ms = session_t_ms - audio_part.session_offset_ms
+```json
+{
+  "recording_spans": [
+    {
+      "runtime_id": "rt_01",
+      "session_start_ms": 0,
+      "session_end_ms": 1200000,
+      "audio_part_id": "a1",
+      "audio_start_ms": 0,
+      "audio_end_ms": 1200120,
+      "mapping_status": "measured"
+    },
+    {
+      "runtime_id": "rt_01",
+      "session_start_ms": 1500000,
+      "session_end_ms": 3000000,
+      "audio_part_id": "a1",
+      "audio_start_ms": 1200120,
+      "audio_end_ms": 2700250,
+      "mapping_status": "measured"
+    }
+  ]
+}
 ```
 
-옛 음성 메모 경로의 `녹음 시작함` 버튼·단축어 완료 콜백은 실제 오디오 0초의 증거가 아니었다. 통합 경로도 UI 타이머나 녹음 데이터 조각 수만으로 시간을 확정하지 않는다. [MDN의 dataavailable 주의사항](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/dataavailable_event)은 조각 간격 지연·Safari 마이크 일시정지 가능성을 명시한다. 실제 시작·중단 감지와 최대 3시간 drift를 기기에서 검증한다.
+복습에서는 전사와 필기가 서로를 기준으로 삼지 않고 모두 이 매핑을 거쳐 오디오 재생 시각에 연결된다. 전사 미완료·실패가 원음 재생이나 이미 확인된 필기 ↔ 오디오 연결을 막지 않는다.
 
-v3.2의 임펄스 탐지(±30초 창에서 에너지 피크 검색)는 폐기한다. 강의실에는 기침, 의자, 문, 마이크 팝이 상시 존재해 오탐 가능성이 높고, 오탐이 나도 복습 시점까지 알기 어렵다.
+### 7.2 연속 구간 매핑과 복습 보정
 
-### 7.2 복습 보정
+한 `recording_span` 안에서 drift가 무시 가능한 수준으로 실측되면 단일 offset 형태의 변환을 내부 최적화로 사용할 수 있다. **하지만 파일 전체·세션 전체에 offset 하나를 적용하는 것은 계약이 아니다.** 일시정지·중단·재실행 경계를 건너면 새 span이다.
 
-통합 녹음에서도 보정이 필요할 수 있다. 아래는 기존 앵커 보정 후보이며 모든 강의에서 사용자에게 보정을 요구하기로 확정한 것이 아니다. 적용 가능한 연속 구간의 경계를 먼저 알아야 한다.
+실측에서 한 방향으로 drift가 누적되면 시작점 offset만으로 숨기지 않는다. span의 양 끝 기준점 또는 더 세분한 매핑이 필요하며, Path A의 허용 오차를 만족하지 못하면 §14.1의 캡처 경로 게이트에 따라 Path B를 검토한다.
 
-보정은 시스템이 대응 음성을 추측하는 버튼이 아니라, 사용자가 **같은 순간의 획과 음성을 지정하는 앵커 생성 흐름**이다.
+자동 매핑이 충분하지 않을 때의 수동 보정은 사용자가 **같은 순간의 획과 음성을 지정하는 앵커**다.
 
 ```text
 복습 화면에서 오디오를 해당 설명까지 탐색
 → 그때 작성한 획 선택
 → `이 소리가 이 획` 탭
-→ session_offset_ms 계산·저장
+→ 해당 recording_span의 보정 앵커 저장
 ```
 
-계산식:
+보정은 해당 연속 구간에만 적용한다. 누락 구간을 채우거나 여러 중단을 하나의 보정값으로 숨기지 않는다. 잘못 맞췄다면 다시 보정할 수 있어야 한다.
 
-```text
-audio_part.session_offset_ms
-  = selected_stroke.t_ms - audio_player.currentTime_ms
-```
+### 7.3 시계와 runtime 경계 — 의미는 확정, 수집 방식은 검증 대상
 
-보정은 해당 연속 구간에만 적용하며 누락 구간을 채우거나 여러 중단을 단일 오프셋으로 숨기지 않는다. 잘못 맞췄다면 다시 보정할 수 있어야 한다. drift까지 한 앵커로 해결됐다고 보지 않으며 구체 보정 단위는 실측 뒤 확정한다.
+- `created_at` — 사람이 읽고 시스템 간 대조하는 벽시계. 정밀 싱크 정본이 아니다.
+- `runtime_id` — 한 브라우저 실행/캡처 runtime을 식별한다.
+- runtime 내부 monotonic time — 필획·페이지 전환·녹음 시작/중단 이벤트의 순서와 경과시간을 잰다.
+- `session_t_ms` — 위 runtime 시간과 저장된 anchor를 세션 축에 놓은 값이다.
 
-### 7.3 시계 모델
+웹 Path A의 우선 후보는 runtime 내부에서 `performance.now()` 같은 monotonic clock을 사용하는 것이다. 다만 **브라우저 재실행·suspend·잠금 전후에 같은 monotonic clock이 이어진다고 가정하지 않는다.** 새 runtime은 새 `runtime_id`를 만들고 경계의 연결을 별도로 기록한다.
 
-- `created_at` — 사람이 읽고 시스템 간 대조하는 벽시계
-- `t_ms` — 세션 시작 이후 단조 증가 경과 시간
-- `session_offset_ms` — 오디오 로컬 시간을 세션 시간으로 옮기는 파트별 값
+경계의 실제 지속시간·첫 오디오 샘플 위치를 확정할 수 없으면 정밀 매핑을 추측하지 않고 `unknown`/미확정으로 남긴다. 이후 녹음은 새 span으로 정상 연결할 수 있다. 브라우저 재실행 전후 `session_t_ms`를 어떻게 anchor할지, 어떤 브라우저 이벤트를 신뢰할지는 §14.1 실측 뒤 구현 계약으로 닫는다.
 
-기기 벽시계가 조정돼도 스트로크 순서와 재생 위치가 깨지지 않아야 한다. 단조 시계는 페이지 실행 수명과 오디오 시계가 같다고 전제하지 않는다. 브라우저 재실행 전후의 연결, 녹음 중단 경계, 매핑 확실성의 표현을 구현 전에 정한다.
+### 7.4 MediaRecorder 조각과 오디오 파일
 
-### 7.4 오디오 다중 파트
+**MediaRecorder의 `dataavailable`/`timeslice` 조각은 저장·복구 단위이지 시간 정본이 아니다.** 조각 도착 간격이나 조각 개수로 세션 경과시간을 계산하지 않는다. 실제 iPad에서 조각 지연·마이크 중단·장시간 drift를 검증한다.
 
-같은 강의 안에서 일시정지·재개·중단 복구를 허용한다. 쉬는 동안의 필기는 남지만 녹음과 대응되지 않으며 중단 후에도 빈 구간을 유지한다. **재개마다 새 파일을 만드는지, 한 파일과 별도 시간 매핑을 쓰는지는 미정**이다. 아래 JSON은 기존 외부 파일 추가 경로의 예시이지 통합 녹음의 확정 계약이 아니다.
+같은 강의의 일시정지·재개·중단 복구를 허용한다. 재개마다 새 파일을 만드는지, 한 파일 안에 여러 span을 두는지는 아직 미정이다. 이 파일 배치 선택은 `recording_span` 의미를 바꾸지 않는다.
 
 ```json
 "audio_parts": [
   {
     "part": 1,
     "file": "part1.m4a",
-    "session_offset_ms": 0,
-    "duration_ms": 2700000,
-    "offset_source": "start_confirmation",
-    "calibrated": false
+    "duration_ms": 2700000
   },
   {
     "part": 2,
     "file": "part2.m4a",
-    "session_offset_ms": 3300000,
-    "duration_ms": 2400000,
-    "offset_source": "review_anchor",
-    "calibrated": true
+    "duration_ms": 2400000
   }
 ]
 ```
 
-파일 안에서 녹음이 멈춘 동안 시간이 압축될 수 있으므로 파일당 오프셋 하나·보정 한 번을 일반 보장으로 쓰지 않는다. 전사 시각은 오디오 내부 위치일 뿐 필기와의 시계 차이를 자동 복구하지 않는다. 미확정 매핑에는 정밀 점프를 보장하지 않고, 연결 가능한 구간만 사용한다.
+전사 타임코드는 오디오 내부 위치일 뿐 세션 시간과의 관계를 자동 해결하지 않는다. 어떤 파일 구조를 택해도 `recording_span`을 통해 연결하고, 미확정 구간에는 정밀 점프를 보장하지 않는다.
+
+v3.2의 임펄스 탐지(±30초 창에서 에너지 피크 검색)는 계속 폐기한다. 강의실 소음의 오탐을 시간 정본으로 쓰지 않는다.
 
 ---
 
 ## 8. Canvas Persistence
 
-### 8.1 저장 모델
+### 8.1 저장 모델 — Document annotation 정본
 
-v3.2의 이벤트 단위 동기화 프로토콜(`seq`, `from_seq`, `accepted_through_seq`, `duplicate_event_ids`, 멱등 재전송, `sync_state`)을 폐기한다. **강의 중 모든 필기 이벤트를 서버로 스트리밍하지 않는다.** 명시적 선택 질문의 입력 전달은 별도이며, 이를 위해 전체 필기 스트리밍을 되살리지 않는다.
+v3.2의 이벤트 단위 서버 스트리밍 프로토콜은 되살리지 않는다. 다만 **캔버스의 소유 단위를 Session에서 Document로 바꾼다.** 한 PDF를 여러 수업에서 이어 쓰는 UX에서 현재 필기 상태의 source of truth는 Document annotation이다. Session은 그 획이 언제 생겼는지와 어느 오디오로 이어지는지에 필요한 provenance를 제공한다.
 
 ```text
 Pointer event
-→ stroke 생성 (t_ms 부착)
-→ IndexedDB 즉시 append
+→ 현재 document_id에 stroke 생성
+   + active Session이 있으면 source_session_id + session t_ms 부착
+→ IndexedDB/OPFS 로컬 작업본에 즉시 append
 → 화면 렌더링
-→ (2~5분마다 / 화면 이탈 시 / 세션 종료 시)
-   revision 조건부 캔버스 상태 PUT
+→ (주기 / Document 전환 / Session 종료 / 화면 이탈 시)
+   document annotation revision 조건부 업로드
 ```
 
-앞 세 단계는 서버 없이 동작한다. 주기 업로드는 서버 복제 지연을 줄이는 수단이며, 오프라인·강제 종료·단말 손실의 보장 범위는 별도로 검증해야 한다 (§20.2).
+앞 단계는 서버가 잠시 없어도 동작해야 한다. 주기 업로드는 서버 복제 지연을 줄이는 수단이며 오프라인·강제 종료·단말 손실의 전체 보장을 뜻하지 않는다. 한 Session에서 여러 Document를 수정했다면 각각의 dirty annotation revision을 별도로 올린다.
 
-90분 필기 전체의 크기는 아직 가정하지 않는다. Tailscale 연결도 강의실에서는 인터넷 또는 핫스팟 업로드를 사용할 수 있다. Phase 1.5에서 **30분 원본 JSON·gzip 크기, 90분 예상 총전송량, 전체 PUT과 변경 페이지만 PUT할 때의 차이**를 실측한다. 전체 상태가 커지면 이벤트 스트리밍으로 돌아가지 않고 변경된 페이지 단위 dirty snapshot으로 축소한다.
+90분 필기 전체의 크기는 아직 가정하지 않는다. 실측에서는 **Document별 원본 JSON·gzip 크기, 한 Session이 여러 Document를 오갈 때의 dirty 범위, 전체 Document snapshot과 변경 page snapshot의 차이**를 측정한다. 전체 상태가 커지면 이벤트 스트리밍으로 돌아가지 않고 변경된 페이지 단위 snapshot을 우선 검토한다.
 
-### 8.2 캔버스 상태 형식
+### 8.2 Document annotation 상태 의미
+
+아래는 의미를 설명하는 초안이며 API/DB 확정 스키마가 아니다.
 
 ```json
 {
-  "session_id": "les_20260901_csds_0900_01",
+  "document_id": "doc_dynamics_ch03",
   "capture_device_id": "ipad-main",
   "base_revision": 11,
   "revision": 12,
   "pages": [
-    {"page_id": "p03", "slide_no": 14, "strokes": [
-      {"stroke_id": "s1042", "t_ms": 420312, "tool": "pen", "width": 1.8, "points": []}
-    ]}
-  ],
-  "markers": [
-    {"t_ms": 427820, "type": "question"},
-    {"t_ms": 511004, "type": "important"}
-  ],
-  "page_changes": [
-    {"t_ms": 431200, "page_id": "p04", "slide_no": 15}
+    {
+      "page_id": "p14",
+      "strokes": [
+        {
+          "stroke_id": "s1042",
+          "source_session_id": "les_20260916_dyn_01",
+          "t_ms": 420312,
+          "tool": "pen",
+          "width": 1.8,
+          "points": []
+        },
+        {
+          "stroke_id": "s1210",
+          "source_session_id": "les_20260918_dyn_01",
+          "t_ms": 158044,
+          "tool": "pen",
+          "width": 1.8,
+          "points": []
+        }
+      ]
+    }
   ]
 }
 ```
 
-스트로크마다 `t_ms`를 유지하는 것이 §1.2 방향 B(필기 → 음성)의 전제다. 이 필드는 최적화 대상이 아니다.
+같은 Document 페이지에 서로 다른 Session의 획이 함께 존재할 수 있다. `t_ms`는 반드시 `source_session_id`와 함께 해석한다. 해당 Session의 §7 `recording_span` 안에 있을 때만 오디오 위치로 변환하며, span 밖이거나 `source_session_id`가 없으면 원래 강의 오디오 위치가 없다. 강의 중 비녹음 gap에서 쓴 획은 `source_session_id + t_ms`를 그대로 가지되 오디오 위치는 `null`이다.
 
-위 JSON은 기존 캡처 스키마 초안이다. §12.2의 농도 표시는 현재 남아 있는 스트로크와 시각을 사용하고, 삭제된 획·지우개·실행 취소의 전체 이력은 복습을 위해 저장하지 않는다. Q&A는 이 캔버스 상태에 합쳐 지워지는 데이터가 아니며 §6.6의 보존 계약을 따른다. 복습 중 추가한 필기나 오디오와 대응되지 않는 필기에 가짜 녹음 시각을 부여하지 않는다. 해당 구분의 구체 스키마는 미결정이다.
+강의 종료 뒤 **복습 재생 중 추가하는 자유필기**는 원래 강의 중 작성물과 구분한다. 이 stroke는 `source_session_id = null`을 유지하고, 현재 복습 중인 Session과 playback cursor를 별도의 **review anchor**로 자동 보존한다. 필드명은 구현 스키마에서 정하되 의미는 `review_anchor_session_id + review_anchor_t_ms`에 해당한다. stroke는 짧으므로 시작/종료 시각을 따로 보존하지 않고 **stroke 시작 시점의 재생 위치 하나**를 대표 anchor로 사용한다. 오디오가 일시정지돼 있으면 cursor가 움직이지 않으므로 그동안 작성한 stroke들은 같은 review anchor를 공유할 수 있다. 사용자가 seek한 뒤 쓰면 새 cursor 위치를 사용한다. 복습 재생 없이 자료만 보며 추가한 stroke에는 review anchor를 만들지 않는다.
 
-**이 포맷은 입력 구현에 중립적으로 유지하는 것이 목표다.** 웹 캔버스와 향후 PencilKit 경로에서 서버·복습 렌더링을 재사용하기 위한 방향이며, 실제 전환 때 시간 모델·복구·포맷 변환까지 다시 검증한다 (§15.4).
+복습용 자유필기는 별도 `review_pen` 도구로 저장한다. `review_pen`은 여러 단계의 **초록 계열 전용 팔레트**만 제공하고, 그 예약된 초록 계열은 일반 강의 `pen`에서 선택할 수 없다. 일반 `pen`/형광펜의 빠른 팔레트에서는 초록을 제외한다. 사용자가 iOS/system color picker를 열었을 때는 시스템 picker의 스펙트럼 자체를 변형하지 않고 선택 결과를 검증한다. v1에서 예약 green band는 hue **105°–165°**로 잡고, 저채도 회녹색까지 과도하게 막지 않도록 saturation 하한은 실기기에서 조정한다. 예약 범위에 해당하는 색을 고르면 변경을 적용하지 않고 마지막 유효 색을 유지하며, `이 색상은 복습 필기 전용이에요`처럼 이유를 표시한다. 색은 사람이 provenance를 즉시 알아보게 하는 UX 계약이며, 내부 의미의 source of truth는 색 추론이 아니라 `review_pen`/review anchor 구조다.
+
+같은 Document 안의 강의 작성과 복습 작성은 서로 분리된 파일/타임라인이 아니라 **하나의 Document 활동 순서**를 이룬다. 예를 들어 `Lecture A → Review A → Lecture B → Review B`의 순서를 보존하며 복습끼리도 동일하게 이전/현재/이후 관계를 가진다. Lecture는 Session의 실제 시작 시각, 복습 activity는 첫 persistent learning artifact가 생성된 wall-clock 시각으로 순서를 정한다. `review_anchor`가 과거 Lecture의 source audio를 가리켜도 review activity 자체의 timeline 위치는 바뀌지 않는다.
+
+복습 activity는 **lazy-create**한다. Document viewer를 열거나 audio 재생·pause·seek·page 이동만 한 것은 activity가 아니다. `review_pen` stroke, 실제 내용이 남은 일반 memo sticky, 보존되는 Q&A처럼 새 persistent learning artifact가 처음 만들어질 때 activity를 만들고, 해당 Document viewer를 떠날 때 닫는다. 기존 필기 삭제·이동만으로는 새 activity를 만들지 않는다. 다시 같은 Document를 열어 새 학습 흔적을 남기면 별도 후속 activity다. `ReviewActivity`라는 물리 타입명·ID 필드의 정확한 스키마는 구현 설계에서 정하되 이 수명과 순서 의미는 고정한다.
+
+`page_change`, 마커, recording span처럼 Session 시간축 자체에 속하는 이벤트는 Document annotation에 넣지 않고 Session timeline에 둔다. Q&A 대화도 annotation 삭제와 함께 사라지는 데이터가 아니며 Session provenance를 유지하면서 필요한 경우 `document_id/page/selection`을 anchor로 참조한다.
+
+§12.2의 농도 표시는 현재 Document에 남아 있는 최종 획을 그리되 **Document activity timeline**을 visibility clock으로 사용한다. 재생하지 않는 평상시 Document view에서는 누적 최종 필기를 모두 원래 농도로 보여준다. 재생이 시작되면 이미 지난 activity의 내용은 원래 농도, 현재 Lecture activity의 획은 `source_session_id + t_ms`와 현재 source cursor로 reveal, 이후 activity의 내용은 연하게 표시한다. Review activity의 `review_anchor`는 provenance/역점프용이며 visibility clock으로 쓰지 않는다. Review activity의 새 콘텐츠는 그 activity boundary를 통과할 때 원래 농도가 된다. 서로 다른 Session의 `t_ms`를 하나의 Session 시간값으로 합치지 않는다.
+
+**입력 구현 중립 원칙은 유지한다.** 웹 캔버스나 향후 Android/iPad 네이티브 캡처가 같은 Document/Session 의미 계약을 생성해야 하며 저장 포맷 변환은 그 경계를 보존해야 한다.
 
 ### 8.3 복구
 
 - 새로고침·브라우저 강제 종료 후 마지막으로 저장 완료된 로컬 상태 복구
 - 업로드 실패 시 다음 주기에 자동 재시도
-- PUT에는 `base_revision`을 보내고 서버 현재 revision과 다르면 `409 Conflict`를 반환
-- 충돌 시 자동 덮어쓰지 않고 서버본·로컬본·기기 ID·수정 시각을 보여준 뒤 복구 선택
-- 단일 기기 정상 경로에서는 ACK된 서버 revision을 다음 `base_revision`으로 저장
-- 세션 종료 시 미업로드 또는 충돌 미해결 상태면 경고
+- Document annotation 업로드에는 `base_revision`을 보내고 서버 current revision과 다르면 충돌로 처리
+- 충돌 시 자동 덮어쓰거나 merge하지 않고 로컬 상태를 보존한 채 사용자에게 알림
+- 정상 업로드 뒤 서버 revision을 다음 `base_revision`으로 사용
+- Session 종료 시 그 Session에서 수정한 Document 중 미업로드 또는 충돌 미해결 상태가 있으면 경고
 - 캡처 중 원본을 유지하고 PC 정상 저장 확인 전 자동 정리 금지. 저장 확인 뒤 사본 정리 시점은 미정 (§5.2).
 
-단말 로컬본은 캡처 중 가장 중요한 원본이지만, **오래된 탭이 항상 진실인 것은 아니다.** 이벤트 단위 동기화를 폐기한 결정과 revision 충돌 검사는 양립한다.
+단말 로컬본은 캡처 중 데이터 생존을 위한 작업본이고, 서버 동기화 뒤에는 서버 revision을 기준으로 한다. PC/iCloud/Möbius의 복제본은 이 revision을 자동으로 바꾸지 않는다.
 
 과거 화면 복원용 중간 snapshot 전략은 사용하지 않는다. §12.2는 현재 남아 있는 필기를 그리고 시각에 따라 농도만 조절한다. 저장·복구에 필요한 상태 snapshot과는 다른 문제다.
 
@@ -618,7 +863,7 @@ processing_status  pending → ready → (failed)
 기존 `READY` 공식도 개정 전 초안이다. 노트 편집 종료를 전사 이용의 필수 조건으로 적용하지 않으며, 소개문 완료 여부로 원음 재생을 막지 않는다.
 
 ```text
-READY = capture closed AND audio stored AND 캔버스 최종 업로드 완료
+READY = capture closed AND audio stored AND 해당 Session에서 수정한 Document annotation 업로드 확인
         AND transcript · summary · index 확정
 ```
 
@@ -649,6 +894,40 @@ lecture_no
 week               표시·검색 보조용 파생값
 ```
 
+### 10.1.1 Container · Course · General · Document · Session 관계 — 합의
+
+내부 identity는 폴더 경로나 날짜가 아니라 객체 ID다. 사용자 UI는 이를 Finder처럼 projection한다. `Course | General`은 같은 Document 모델 위에 탐색/활동 계약을 나누는 container type이다.
+
+```text
+Container
+├─ type = course
+│  ├─ Documents[]
+│  │   └─ Document = PDF/백지 노트 + 현재 annotation revision
+│  └─ Sessions[]
+│      └─ Session = 날짜/제목 + audio + transcript + timeline + Q&A provenance
+│
+│  Document  * ←→ *  Session
+│
+└─ type = general
+   └─ Documents[]
+       └─ Document = 같은 PDF/백지 노트 + 현재 annotation revision
+       # v1: Lecture Session 없음
+```
+
+- Course와 General의 Document identity/annotation/Q&A anchor 계약은 동일하다. General이라고 별도 Document 포맷이나 별도 viewer를 만들지 않는다.
+- General에는 v1에서 Lecture Session이 없으므로 source Session이 없는 일반 필기/Sticky는 기존 세션 밖 Document activity 의미를 사용한다. document-grounded Q&A는 가능하지만 lecture-grounded Q&A와 Session virtual audio/transcript stream은 없다.
+- container type은 생성 시 고정하고 v1에서는 `course ↔ general` 변환을 지원하지 않는다. cross-type Document 이동/복제는 별도 후속 설계다.
+- 같은 Document는 여러 Session에서 이어서 사용한다.
+- 한 Session은 여러 Document를 참조할 수 있다.
+- Document의 획은 자신이 생긴 `source_session_id + t_ms`를 가질 수 있다.
+- Session의 날짜/폴더명은 display metadata이며 identity는 `session_id`다.
+- Q&A thread는 Session provenance를 기본으로 하되 document-grounded 질문은 `document_id/page/selection` anchor를 가진다. 자료 화면에서는 여러 Session의 anchor를 함께 projection할 수 있다.
+- Document는 강의·복습 활동의 안정적인 전체 순서를 보존해야 한다. 이 순서는 별도 PDF 복사본을 만들기 위한 것이 아니라 누적 필기 농도와 복습 provenance를 projection하기 위한 논리 타임라인이다. 구체 activity 스키마는 미정이다.
+- 오디오·전사 정본은 계속 Session에 속한다. Document의 virtual audio/transcript stream은 `page_change`/Document 활성 interval과 `recording_span`을 이용해 source Session 구간을 참조해 만든 파생 view이며 별도 합성 오디오 파일이 정본이 아니다. virtual stream의 누적 재생 위치도 정본 anchor로 저장하지 않는다.
+- review anchor와 필기→음성 점프는 virtual offset 대신 canonical `source_session_id + source audio position`(또는 이에 동등한 원본 참조)을 저장한다. stream 구성이나 앞 구간이 바뀌어도 원본 연결이 밀리지 않아야 한다.
+- 사용자는 복습마다 폴더를 만들지 않는다. `자료`에서 Document를 직접 열거나 `강의`에서 참조 Document로 들어갈 수 있으며 둘 다 같은 viewer다. Session 경유 진입은 해당 Session의 첫 관련 source span을 초기 위치로 선택하는 deep-link다.
+- 실제 파일 경로는 identity가 아니다. PC mirror에서 rename/move가 발생해도 자동으로 이 관계를 바꾸지 않는다 (§5.4).
+
 ### 10.2 Frontmatter
 
 ```yaml
@@ -661,11 +940,12 @@ week: 2
 started_at: 2026-09-01T09:00:03+09:00
 duration_ms: 5412032
 status: ready
-slides: ./_attachments/lectures/les_20260901_csds_0900_01/slides.pdf
+documents:
+  - doc_data_structures_ch03
 audio: ./_attachments/lectures/les_20260901_csds_0900_01/audio.m4a
 transcript: ./_attachments/lectures/les_20260901_csds_0900_01/transcript.json
 timeline: ./_attachments/lectures/les_20260901_csds_0900_01/timeline.jsonl
-canvas: ./_attachments/lectures/les_20260901_csds_0900_01/canvas.json
+threads: ./_attachments/lectures/les_20260901_csds_0900_01/threads.json
 ```
 
 ### 10.3 Markdown 본문
@@ -686,10 +966,11 @@ canvas: ./_attachments/lectures/les_20260901_csds_0900_01/canvas.json
 ### 10.4 Sidecar
 
 ```json
-{"t_ms":420312,"type":"stroke","page_id":"p03","stroke_id":"s1042"}
 {"t_ms":427820,"type":"marker","marker":"question"}
-{"t_ms":431200,"type":"page_change","page_id":"p04","slide_no":15}
+{"t_ms":431200,"type":"page_change","document_id":"doc_data_structures_ch03","page_id":"p04","slide_no":15}
 ```
+
+Stroke 자체는 Session sidecar의 정본이 아니라 §8의 Document annotation에 있다. Session timeline은 어떤 Document/page를 보고 있었는지, 마커·녹음 span 같은 시간 사건을 보존한다.
 
 ```json
 {
@@ -797,26 +1078,41 @@ v3.2의 `prompt_sha256`, `parser_version`, `output_schema_version`은 감사 대
 
 소개문으로 강의를 알아보고, 세부 질문의 근거는 전사 구간에서 확인한다. 답변에는 실제 확인한 세션·오디오 시각과 필요한 경우 자료 페이지를 연결한다. 소개문을 발화 원문처럼 취급하지 않으며 원본 전사와 현재 교정문을 구분한다. 구체 회수·결합 알고리즘은 §11.5의 미결정 사항이다.
 
-### 12.2 세션 복습 화면
+### 12.2 Document 연결 복습 · Session 전체 재생
 
-- 오디오 플레이어 · 가사형 전사 독바. 구간별 요약 패널은 초기 범위에서 제외한다.
-- 연결된 PDF 페이지와 최종 필기 (재생 위치별 농도 표시)
-- **필기 → 음성 역점프** — 획을 탭하면 그 시각 재생
+Document를 자료에서 직접 열든 강의의 참조에서 열든 **같은 canonical Document viewer**를 사용한다. viewer는 누적 최종 필기와, 그 Document가 active였던 녹음 구간들을 여러 Session에서 모은 virtual audio/transcript stream을 함께 보여준다. 강의에서 들어온 경우 viewer 종류를 바꾸지 않고 그 Session의 첫 관련 source span으로 playhead를 맞춘다.
+
+- Document virtual 오디오 플레이어 · 가사형 전사 독바. 구간별 요약 패널은 초기 범위에서 제외한다.
+- 같은 Document의 누적 PDF/최종 필기 (Document 활동 순서와 재생 위치별 농도 표시)
+- **필기 → 음성 역점프** — 강의 stroke는 `source_session_id + t_ms`, review stroke는 review anchor의 canonical source 위치로 이동한다. virtual stream offset 자체를 영구 anchor로 저장하지 않는다.
 - 오디오를 맞는 설명까지 탐색한 뒤 획과 연결하는 `이 소리가 이 획` 보정 (§7.2)
 - ★ · ? 마커 타임라인
 - `이 구간 설명해줘` 온디맨드 버튼
-- 전사 구간의 별도 `수정` 조작. 일반 탭은 해당 구간 재생으로 유지한다 (§12.4).
+- 전사 구간의 별도 `수정` 조작. 일반 탭은 해당 source 구간 재생으로 유지한다 (§12.4).
+- **Session 전체 재생**은 별도 기능이다. 현재 Document가 active였는지와 무관하게 그 Session의 전체 원음·전체 전사를 연속 재생하며, PDF-linked virtual stream과 같은 것으로 취급하지 않는다.
 
 **과거 화면을 복원하지 않는다.** 현재 노트에 남은 최종 필기를 기준으로, 재생 위치에 따라 농도만 바꾼다. 지운 획은 재생 위치를 과거로 옮겨도 되살아나지 않는다. 획이 자라나는 애니메이션이나 모든 지우기·실행 취소 이력의 재생은 범위 밖이다.
 
 **합의한 표시 의미**
 
-- 재생 위치보다 뒤의 필기는 연하게, 현재 재생 구간과 이전 구간의 필기는 원래 색·농도로 표시한다.
-- 중간부터 재생하면 이전 구간의 필기도 즉시 원래 색·농도로 표시한다. 끝까지 재생하면 녹음과 대응되는 필기는 모두 원래 색·농도가 된다.
-- 뒤로 탐색하면 다시 미래가 된 필기는 연해진다. 이는 현재 재생 위치의 표시이지, 사용자가 한 번 들은 부분을 영구히 진하게 남기는 청취 이력이 아니다.
-- 복습 중 추가한 필기·녹음과 대응되지 않는 필기는 별도로 구분하며 과거 녹음에 임의로 끼워 넣지 않는다. Q&A 표시 시점·접힘 상태는 아직 미결정이다.
+- 임의의 20초 버킷이나 STT 세그먼트 경계를 쓰지 않는다. 각 짧은 stroke는 **대표 시각 하나**만 가지며 시작/끝 시간을 별도로 유지하지 않는다.
+- 같은 PDF의 강의와 복습은 하나의 **Document activity timeline**을 가진다. 재생이 없을 때는 누적 최종 필기를 모두 원래 색·농도로 표시한다. 재생 중에는 현재 activity보다 앞선 내용은 원래 농도, 현재 Lecture의 필기는 canonical source cursor에 따라 reveal, 이후 activity의 내용은 연하게 표시한다. Review activity는 source audio anchor가 아니라 자기 activity boundary를 지날 때 그 activity의 새 콘텐츠가 원래 농도가 된다. 복습끼리도 같은 이전/현재/이후 규칙을 적용한다.
+- 현재 source Session에서 강의 중 생성된 stroke는 `t_ms <= 현재 session cursor`면 원래 색·농도, 더 미래면 연하게 표시한다. 중간부터 재생하거나 뒤로 탐색할 때도 같은 규칙을 즉시 다시 적용한다. 이는 청취 완료 이력이 아니라 현재 재생 위치의 시각화다.
+- 강의 중 비녹음 gap에서 생성된 stroke는 해당 Session의 `t_ms`를 유지하지만 오디오 위치는 없다. 플레이어가 gap을 건너 다음 `recording_span`으로 이동하면 session cursor도 점프하며, gap에서 쓴 stroke들은 그 시점에 이미 지난 필기로 원래 농도가 된다.
+- 복습 중 원본 녹음을 들으며 `review_pen`으로 추가한 stroke는 원래 강의 `t_ms`를 갖지 않고 review anchor를 가진다. 일시정지 상태에서 쓴 획은 고정된 playback cursor를 anchor로 사용하고, seek 뒤에 쓴 획은 새 cursor를 anchor로 사용한다. 이 anchor는 **어떤 source를 들으며 썼는지와 역점프 위치**를 보존하며 농도 reveal 시점을 정하지 않는다.
+- audio 없이 Document 자체를 보며 추가한 review content는 source audio anchor가 없을 수 있다. 이런 silent review activity도 Document timeline에는 **비재생 boundary**로 존재하며, virtual stream이 그 boundary를 통과할 때 해당 activity에서 새로 생긴 콘텐츠가 미래 상태에서 과거 상태로 바뀐다. 기다리는 무음 길이를 삽입하지 않는다. boundary의 실제 표시 모양·폭·클릭 동작은 UI 설계에서 정한다.
+- 포스트잇은 재생 농도 체계와 **별개**다. 말풍선 anchor, 열린 카드, 자유 메모, Q&A 답변은 재생 시각 때문에 흐려지거나 숨지 않으며 항상 현재 저장 상태와 원래 스타일로 표시한다. 과거의 답변 생성 전/후 상태를 재현하지 않는다.
 
-**20초 구간은 후보이지 확정값이 아니다.** 채택한다면 현재 표시 구간 전체를 진하게 하므로 구간 안에서는 실제 재생 위치보다 조금 뒤에 쓴 획도 보인다. 이 표시 구간은 STT 공급자의 전사 세그먼트와 별개다. 길이·경계·농도 값은 실기기 확인 후 정한다.
+**Document virtual audio/transcript stream — 합의.** 오디오 파일 자체의 정본 소유권은 Session에 남긴다. Document viewer는 각 Session에서 해당 Document가 active였던 interval과 실제 녹음 `recording_span`의 교집합만 source span으로 취해 시간순으로 이어 보여준다. 실제 오디오 파일을 새로 합쳐 canonical asset으로 만들지 않는다.
+
+- 같은 Session 안에서 `동역학.pdf 0~20분 → 예제.pdf 20~35분 → 동역학.pdf 35~60분`이었다면 동역학 Document stream에는 0~20분과 35~60분만 들어간다.
+- 20~35분은 오디오가 없는 것이 아니라 **다른 Document가 active였기 때문에 현재 view에서 제외된 구간**이다. `녹음 없음` gap과 의미를 구분하고, 경계에서 생략 사실/기간을 표시한다. 구체 시각 표현은 tuning 대상이다.
+- 한 Document를 여러 강의에서 사용했다면 각 Session의 관련 source span을 누적해 하나의 virtual stream처럼 탐색한다. 복습 중 원본 오디오를 다시 들었다고 같은 source audio를 stream에 중복 삽입하지 않는다.
+- `강의 B → 이 PDF`로 들어오면 같은 누적 stream에서 B의 첫 관련 span으로 초기 playhead를 맞춘다. 이후 viewer 자체는 자료에서 직접 연 경우와 동일하다.
+- virtual stream의 `42:18` 같은 누적 offset은 파생 UI 값이다. review anchor·역점프·Q&A provenance는 원본 Session과 실제 source audio 위치를 보존한다.
+- Session 전체 원음/전사가 필요하면 별도의 **Session 전체 재생**을 사용한다. 이 기능은 Document-active 여부로 음성을 필터링하지 않는다.
+
+**페이지 이동 — 자동 추적하지 않는다.** `page_change`는 그 시점에 사용자가 보고 있던 Document/page 기록일 뿐 교수의 설명 페이지를 뜻하지 않는다. 재생·탐색이 진행돼도 현재 PDF 페이지를 강제로 바꾸지 않는다. 대신 지도 앱의 현위치 버튼처럼 `재생 위치로` 조작을 제공해, 사용자가 원할 때만 현재 재생 시점의 마지막 `page_change`가 가리키는 page로 한 번 점프한다. 과거 zoom/scroll viewport는 복원하지 않고 현재 표시 정책으로 해당 page만 보이게 한다. 이미 그 page를 보고 있다면 버튼은 비활성 또는 약화할 수 있다.
 
 **전사 독바 — 기존 스트로크 목록 후보를 대체하는 합의**
 
@@ -827,7 +1123,7 @@ v3.2의 `prompt_sha256`, `parser_version`, `output_schema_version`은 감사 대
 - 전사와 필기는 모두 오디오 재생 시각을 참조한다. 전사 구간 길이가 필기 표시 구간 길이를 정하지 않는다.
 - 전사 미완료·실패 상태에서도 원음 재생·필기 싱크는 사용 가능해야 한다. 독바에는 전사 상태를 보여주며 가짜 전사를 만들지 않는다.
 - 개별 스트로크 목록은 초기 범위에서 뺀다. 캔버스의 필기 → 음성 역점프 자체는 유지한다.
-- PDF 페이지를 전사 독바에 함께 표시할지, 재생/탐색에 따라 페이지를 자동 이동할지는 미정이다. 사용자의 페이지 열람 기록을 교수 발화의 페이지로 단정하지 않는다.
+- 전사 독바가 PDF page 번호를 항상 함께 표시할지는 미정이다. 다만 재생/탐색에 따라 PDF를 자동 이동하지 않고 `재생 위치로` 버튼으로만 사용자가 명시적으로 점프한다.
 
 ### 12.3 노트 선택 화면과 소개문 — 합의
 
@@ -855,7 +1151,7 @@ v3.2의 `prompt_sha256`, `parser_version`, `output_schema_version`은 감사 대
 POST /api/lecture/sessions
 GET  /api/lecture/sessions/active
 GET  /api/lecture/sessions/{id}
-PUT  /api/lecture/sessions/{id}/canvas        # base_revision 조건부 상태
+# Document annotation은 Session 소유가 아님. exact endpoint는 전체 설계 뒤 확정.
 POST /api/lecture/sessions/{id}/audio         # 파트 추가
 POST /api/lecture/sessions/{id}/slides
 POST /api/lecture/sessions/{id}/offset
@@ -867,7 +1163,7 @@ GET  /api/lecture/containers/{id}             # 과목 허브
 GET  /api/lecture/containers/{id}/range       # 시험 범위 뷰
 ```
 
-캔버스 PUT은 `capture_device_id`, `base_revision`, 새 `revision`을 받는다. 서버 현재 revision과 `base_revision`이 다르면 `409 Conflict`와 현재 메타데이터를 반환한다. 이벤트 배치·중복 처리 엔드포인트는 만들지 않는다. 오디오 업로드와 캔버스 상태 업로드 모두 네트워크 재시도를 허용하되, 캔버스는 충돌을 자동 덮어쓰지 않는다.
+Document annotation 저장은 §5.4·8의 `base_revision` fail-close 계약을 따라야 한다. exact endpoint·payload는 아직 확정하지 않는다. 이벤트 배치 동기화를 되살리지 않으며, annotation 업로드는 네트워크 재시도를 허용하되 revision 충돌을 자동 덮어쓰지 않는다.
 
 ---
 
@@ -880,9 +1176,41 @@ GET  /api/lecture/containers/{id}/range       # 시험 범위 뷰
 - **녹음:** 보통 60~90분·최대 3시간 동안 필기·PDF 이동·참고 검색을 함께 사용한다. 시작 확인·일시정지/재개·전환/잠금/복귀·마이크 중단·장시간 drift·배터리/메모리를 확인한다. 녹음 상태를 UI 타이머만으로 판정하지 않는다.
 - **복구·전송:** 진행 중 저장, 강제 종료 후 저장 완료분 복원, 미저장분/누락·미확정 경계 표시, 자동 마이크 재개 금지, 같은 강의에 재개, 원본 저장 확인 전 정리 금지, 끊긴 전송 재시도·중복 방지를 확인한다. 앱 오프라인 재실행 가능성은 계속 캡처와 별도로 검증한다.
 - **로컬 전사:** 실제 한국어 전공 강의의 용어·수식·숫자·타임코드 품질과 최대 3시간 처리 시간을 측정한다. 업로드/대기/소개문을 포함해 귀가 후 복습 준비 목표를 확인하며 공개 벤치마크로 대체하지 않는다.
-- **질문·도구:** 이미지 질문이 확대율·메뉴·재생 농도의 영향을 받지 않는지, 첨부 기본값/페이지 유지, 전송 질문 불변·후속 정정·Q&A 보존, 일반 물음표/원 미호출, 초안 생존·중복 요청 방지, 수동 접기/미확인 점, 원형 메뉴 네 도구·중앙 취소·정상 점/획 보존을 확인한다.
-- **복습:** 중간 시작·뒤로 탐색의 농도, 삭제 획 미복원, 전사 강조·탭 재생·수동 스크롤 중 따라가기 중지·현재 위치 복귀, 독바 접기, 전사 미완료 시 원음/필기 사용, 온라인 오디오 실패 표시를 확인한다.
+- **질문·도구:** 올가미가 PDF-only·필기-only·PDF+필기 혼합 영역을 같은 selection tool로 다루는지, 이미지 질문이 확대율·메뉴·선택 테두리·재생 농도의 영향을 받지 않는지, 첨부 기본값/페이지 유지, 전송 질문 불변·후속 정정·Q&A 보존, 일반 물음표/원 미호출, 초안 생존·중복 요청 방지, 수동 접기/미확인 점, 원형 메뉴 네 도구·중앙 취소·정상 점/획 보존을 확인한다.
+- **복습:** 중간 시작·뒤로 탐색의 stroke 시각 기반 농도, 삭제 획 미복원, 비녹음 gap 건너뛰기와 session cursor 점프, review anchor/일시정지 cursor 고정, `review_pen` 전용 초록 팔레트, 포스트잇의 재생 농도 비종속, `재생 위치로` page 점프(zoom/scroll 미복원), 전사 강조·탭 재생·수동 스크롤 중 따라가기 중지, 독바 접기, 전사 미완료 시 원음/필기 사용, 온라인 오디오 실패 표시를 확인한다.
 - **소개문·교정:** 소개문이 목록 설명이고 Q&A/웹 설명을 강의 사실로 섞지 않는지, 전사 수정과 재생 조작이 충돌하지 않는지, 원문 보존·표시/검색 갱신·타임코드/필기 연결 불변을 확인한다. 전사 교정 뒤 소개문 갱신·오래된 작업 결과 처리는 §20의 선결 사항이다.
+
+### 14.1 캡처 시간축 스파이크 — 향후 Path A 진입 게이트
+
+이 스파이크는 **지금 구현할 작업이 아니다.** 설계 구멍을 먼저 닫은 뒤 실제 캡처 구현에 들어갈 때 Path A(iPad Galpi Web)를 채택할지 판정하는 최소 실험으로 사용한다. 강의노트 UI 전체를 만드는 실험이 아니라 녹음·시간 연결·복구만 검증한다.
+
+| 단계 | 목적 | 초기 통과 기준 |
+|---|---|---|
+| 10분 smoke | 녹음 시작/일시정지/재개/종료, Pencil 기준점, 중간 저장의 기본 동작 확인 | 파일 재생·저장 정상, 비녹음 gap 구분, 이미 저장된 조각 복구 가능 |
+| 90분 gate | 실제 강의 길이에서 PDF·필기·참고 검색과 함께 동작 확인 | 녹음 손상/유실 0, 기준점 오차 최대 약 ±500ms 이내, 시간에 따라 한 방향으로 누적되는 drift 없음, pause/resume 뒤 매핑 정상 |
+| 3시간 stress | 최대 계약 확인 | 90분 gate를 통과한 뒤에만 실행. 장시간 메모리·저장·drift·배터리 한계 확인 |
+
+싱크 측정은 Pencil `pointerdown` 시각과 같은 순간 화면/기기를 두드려 녹음에 남는 명확한 소리의 실제 위치를 비교하는 방식을 우선한다. 시작 시 존재하는 상수 offset 자체보다 **시간에 따라 offset이 누적되는 drift**를 더 중요하게 본다. ±500ms는 현재 사용성에 대한 초기 제품 기준이며 실측 결과가 아니라 사용자 승인된 gate 값이다.
+
+앱 전환·잠금은 별도 장애 시험이다. foreground 90분 경로가 안정적이고 이탈 시 녹음 중단을 확실히 감지·표시할 수 있다면 `foreground-only` 제품 계약으로 Path A를 유지할 수 있다. 반대로 실제 녹음이 죽었는데 UI가 계속 `녹음 중`이라고 표시하거나 저장된 오디오가 조용히 잘리면 치명적 실패다.
+
+**판정 순서**
+
+```text
+Path A — iPad + Galpi Web 통합 녹음/필기
+  PASS → 그대로 채택
+  FAIL → Path B 검토
+
+Path B — Galpi Web 필기 + Voice Memos/Shortcut 녹음 분리
+  실사용에서 사후 싱크·이중 조작 마찰을 관찰
+  반복 문제가 실제로 확인될 때만 ↓
+
+Path C — 저가 Android 태블릿 + Galpi Capture APK
+  녹음·펜 이벤트를 네이티브 한 앱에서 제어
+  하드웨어 구매는 이 시점 전에는 하지 않음
+```
+
+Path B 실패를 가정해 곧바로 Android를 구매하지 않는다. Path C의 장점은 단일 네이티브 캡처 경계지만, 추가 하드웨어 비용과 플랫폼별 클라이언트 유지비를 실제 문제로 정당화해야 한다.
 
 <details>
 <summary>개정 전 Phase 계획 — 비교용 기록, 현재 실행 승인 아님</summary>
@@ -943,7 +1271,7 @@ pdf.js로 슬라이드를 띄우고 Pointer Events로 펜 그리기만 붙여 30
 - PDF 배경 위에서도 필기 지연이 거슬리지 않음
 - 메모리 사용이 시간에 따라 비정상 증가하지 않음
 - 30분 원본 JSON·gzip 크기와 90분 예상 총전송량이 측정됨
-- 전체 PUT이 부담되면 페이지 단위 dirty snapshot으로 줄일 수 있음
+- 전체 Document annotation snapshot이 부담되면 변경 page 단위 dirty snapshot으로 줄일 수 있음
 - 두 탭 또는 stale revision 충돌에서 최신 필기가 자동으로 덮어써지지 않음
 - 단축어 실행 뒤 사용자가 구성한 음성 메모·갈피 창 배치가 실사용 가능한 수준으로 복원됨
 
@@ -978,7 +1306,15 @@ pdf.js로 슬라이드를 띄우고 Pointer Events로 펜 그리기만 붙여 30
 
 ## 15. Native / E-Ink Gates
 
-검토하더라도 갈피 전체를 네이티브로 다시 만들지 않는다. 캡처(녹음·PencilKit·로컬 DB·업로드 큐)만 네이티브로 가고, 전사·요약·검색·Q&A·볼트·복습 화면은 웹에 남는다.
+검토하더라도 갈피 전체를 네이티브로 다시 만들지 않는다. 캡처 클라이언트만 교체하고 전사·요약·검색·Q&A·볼트·복습 구조는 최대한 유지한다. 현재 캡처 폴백의 우선순위는 iPad 네이티브가 아니라 **비용이 낮은 경로부터 단계적으로 승격하는 것**이다.
+
+### 15.0 현재 캡처 경로 사다리 — 합의
+
+1. **Path A — iPad + Galpi Web.** 보유 장비만 사용한다. 녹음·필기를 같은 웹 runtime에서 먼저 검증한다.
+2. **Path B — iPad Galpi Web + Voice Memos/Shortcut.** Path A가 §14.1 gate를 통과하지 못할 때만 녹음 주체를 분리한다. 사후 시간 매핑과 이중 조작 비용을 감수하는 대신 추가 하드웨어 비용은 없다.
+3. **Path C — 저가 Android + Galpi Capture APK.** Path B를 실제로 써 본 뒤 사후 싱크·녹음 시작/종료 이중 조작이 반복 문제로 확인될 때만 검토한다. 네이티브 앱이 녹음과 stylus event를 직접 제어해 공통 monotonic timebase를 만들 수 있는지가 핵심 가치다. 실제 기기·펜·마이크·Android API 동작은 구매 전에 다시 검증한다.
+
+iPad 네이티브 경로는 기술적으로 가능하지만 무료 서명의 7일 만료와 유료 개발자 계정 비용 때문에 **현재 기본 폴백에서 제외**한다. 사용자가 나중에 해당 운영비를 받아들이거나 다른 이유가 생기면 다시 열 수 있다.
 
 ### 15.1 개발 환경 실현 가능성 (2026-08 확인)
 
@@ -1017,13 +1353,16 @@ macOS Tahoe가 인텔 지원 마지막 릴리스이며 이후 3년간 보안 업
 
 ### 15.4 결정 시점과 전환 비용
 
-**현재 방향은 웹 통합 녹음·필기 우선 검증이다.** 최대 3시간 사용·중단 복구·시간 연결을 통과해야 채택한다. 실패하면 녹음/캡처 경로만 다른 방식으로 검토한다. 녹음 주체 변경은 시간 모델·파일 수명·복구에 영향을 주므로 옛 "Phase 1까지 완전히 동일, 전환 비용 0" 단정은 적용하지 않는다. Phase 재배정은 아직 하지 않는다.
+**현재 실행 후보는 Path A 하나다.** §14.1의 90분 gate 전에는 Voice Memos 분리나 Android 구매를 선제 구현하지 않는다.
 
-웹에서 네이티브로 전환하더라도 서버·복습 화면·필기 포맷을 최대한 유지하는 것이 목표다. 실제 교체 범위는 녹음 파일·시간 매핑·복구 계약까지 보고 판단하며, 입력 경로만 바꾸면 된다고 보장하지 않는다.
+- Path A가 foreground 정상 경로에서 녹음 손상·유실·허용 범위를 넘는 drift를 보이면 Path B를 검토한다.
+- 앱 전환·잠금만 실패하더라도 중단을 정확히 감지하고 `foreground-only` 계약으로 쓸 수 있으면 Path A를 유지할 수 있다.
+- Path B를 실제로 사용한 뒤 사후 싱크 보정, 녹음 시작/종료 이중 조작, 필기 ↔ 음성 점프 정확도가 반복적으로 사용을 방해할 때만 Path C를 검토한다.
+- Path C를 선택해도 서버·복습·Q&A·전사·canonical stroke/time 의미를 재설계하지 않는 것이 목표다. Android에서 캡처한 native timestamp를 동일한 세션/recording-span 의미로 변환한다.
 
-필기감뿐 아니라 녹음·검색 병행·저장·복구를 실측한다. 30분 필기나 반나절 시험만으로 최대 3시간 전체 계약이 검증됐다고 보지 않는다.
+Android 네이티브는 APK 사이드로드가 가능해 iPad 무료 서명의 7일 운영 문제를 피할 수 있지만, 새 태블릿 비용과 Android capture client 유지비가 생긴다. 따라서 **하드웨어는 해결해야 할 반복 문제가 실측으로 존재한 뒤 산다.**
 
-**검토 조건** — 웹 녹음이 중단을 숨기거나 복구 기준을 못 지킬 때, 웹 캔버스 지연·유실이 수업을 방해할 때, 동기화 오차가 허용 범위를 넘을 때, PDF·검색 병행 성능이 부족할 때.
+기존 iPad 네이티브 분석(§15.1~15.3)은 기술적 대안의 기록으로 남긴다. 현재 우선순위를 다시 iPad 네이티브로 바꾸는 근거는 아니다.
 
 ### 15.5 e-ink
 
@@ -1043,7 +1382,7 @@ macOS Tahoe가 인텔 지원 마지막 릴리스이며 이후 3년간 보안 업
 
 - 로컬 STT: 새 PC에서 오디오 처리 우선 검토. 외부 STT를 비교/폴백으로 쓸 경우 오디오 외부 전송은 별도 결정
 - 소개문 LLM: 전사와 필요한 강의 문맥. 구체 범위는 미정
-- 질문/검색: 명시적으로 보낸 질문·선택 이미지·PDF 페이지 이미지, 검색어와 참고 결과. 일반 질문에 주변 강의 자료 전체를 자동 첨부하지 않음
+- 질문/검색: document-grounded 질문은 명시적 질문·선택 이미지·PDF 페이지 이미지를 사용한다. lecture-grounded 질문은 선택 전사·제한된 인접 전사를 기본 문맥으로 쓰고, 자료 문맥이 더 필요할 때만 Session timeline에서 당시 Document/page 후보를 찾아 PDF page context tool로 조회한다. **Q&A 모델에 원본 오디오는 직접 보내지 않는다.** 일반 질문에 주변 강의 자료 전체를 자동 첨부하지 않음
 - 결과물: 주변 학생 발화나 수업 중 민감한 내용이 포함될 수 있음
 
 답변·소개문 모델을 외부 API로 사용하는 방향은 합의했다. 다만 학교/교수의 녹음·자료 처리 허용 범위와 공급자별 보존·학습·로그 정책을 확인하는 절차는 여전히 필요하다. 외부 AI를 쓸 수 없더라도 로컬 캡처·로컬 전사까지 기술적으로 불가능해지는 것은 아니며, 허용되지 않는 외부 단계만 구분한다.
@@ -1075,7 +1414,7 @@ macOS Tahoe가 인텔 지원 마지막 릴리스이며 이후 3년간 보안 업
 
 ### 16.10 저장 증가와 백업
 32kbps mono 기준 90분 약 22MB는 압축 오디오만의 계산이며 원본·PDF·필기·Q&A 이미지·중간 저장·백업 크기는 포함하지 않는다. 실제 녹음 형식과 최대 3시간 데이터를 실측한다.
-**완화** — PC 정상 저장 확인 전 단말 원본을 유지한다. 온라인 복습이 기본이며 단말 사본 정리·장기 보존·독립 백업은 별도 정책이다. iCloud는 선택적 동기화/보관 수단이지 독립 백업을 자동 대체하지 않는다 (§5).
+**완화** — PC 정상 저장 확인 전 단말 원본을 유지한다. 온라인 복습이 기본이며 단말 사본 정리·장기 보존·독립 백업은 별도 정책이다. iCloud/Möbius 등은 선택적 복제 transport이지 canonical revision authority나 독립 백업을 자동 대체하지 않는다 (§5.3·5.4).
 
 ### 16.11 슬라이드 자료
 저작권이 있는 자료를 볼트에 보관한다. 개인 학습 범위를 벗어나 공유하지 않는다. PDF 용량도 저장 계산에 포함한다.
@@ -1150,7 +1489,8 @@ V4.5-M 단일 GPT
 | 별도 계산 전용 경로 | 같은 질문 UI에서 계산과 설명을 구분할 필요·수식 인식 품질 확인 후 결정 |
 | 단축어·외부 녹음 연결 | 웹 통합 녹음 검증 실패 뒤 캡처 대안을 선택할 때 |
 | 한국어 특화 상용 STT | whisper 계열 정확도가 부족할 때 (어댑터로 교체) |
-| 네이티브 캡처 | §14 통합 캡처 검증 실패 시 §15.4. 실제 기기·개발 도구 지원은 선택 전에 재확인 |
+| iPad 네이티브 캡처 | 현재 기본 폴백에서 제외. 유료 개발자 계정·OS 업데이트 운영비를 받아들일 새 근거가 생길 때 재검토 |
+| Android 네이티브 캡처 | Path A 실패 → Path B 실사용 후에도 사후 싱크·이중 조작이 반복 문제로 확인되고 새 하드웨어 비용을 정당화할 때 (§14.1·15.0) |
 | e-ink | §15.5 조건. 네이티브와 양립 가능하지만 별도 캡처 클라이언트 유지비 발생 |
 | 복습용 오프라인 다운로드 | 실제 오프라인 듣기 필요가 생기면 선택한 강의 단위로 검토 |
 | iCloud 내보내기 | 보관 사본 요구가 구체화되면 강의 묶음 복원·동기화/삭제 경계부터 검토 |
@@ -1166,29 +1506,34 @@ V4.5-M 단일 GPT
 3. **자동 전사 교정·용어 사전·STT prompt** — 필요 시 사용자 교정은 합의했다. 자동으로 실제 발화를 고쳐 쓰는 범위는 열지 않았고 표본·입력 한도를 확인한 뒤 별도 결정한다.
 4. **오디오 보존** — PC 정상 저장 확인 전 단말 정리 금지와 온라인 복습은 합의했다. 확인 후 단말 사본 정리·장기 원본 보존·독립 백업 주기·iCloud 내보내기는 미정이다.
 5. **슬라이드 PDF 텍스트 활용** — 선택 질문은 이미지 입력으로 합의했다. 향후 텍스트 검색·사전·소개문 문맥에 PDF를 쓰는 구체 범위는 별도 결정이며 사용자 페이지 전환을 교수 발화와 동일시하지 않는다.
-6. **웹 통합 녹음 채택** — 우선 검증 방향은 합의했다. 최대 3시간 필기·PDF·검색 병행과 중단/복구/시간 연결을 실제 iPad에서 확인해야 한다. 기종·OS는 아직 답을 받지 못했다.
-7. **유료 개발자 계정** — 네이티브가 확정된 뒤에 결제한다. 학교 차원의 개발자 프로그램 지원 여부는 확인되지 않았다.
-8. **아이패드 OS 업데이트 정책** — 네이티브를 택할 경우에만 결정 사항이 된다(§15.1).
-9. **녹음 시간·저장·전송 구현** — 첫 샘플 기준, 일시정지/재개 매핑, 브라우저 재실행 경계, 연속 구간/파일 관계, 중간 저장 주기·손실 범위, 백그라운드 전송·재개·ACK 의미를 정한다.
-10. **캔버스 업로드 단위** — Phase 1.5의 JSON·gzip·총전송량 실측 뒤 전체 상태 또는 변경 페이지 PUT 중 결정한다.
+6. **웹 통합 녹음 채택** — Path A 우선과 §14.1 gate는 합의했다. 10분/90분/3시간 순으로 실제 iPad에서 확인하며 90분 gate 전에는 Path B/C를 선제 구현하지 않는다.
+7. **iPad 네이티브 운영비** — 현재 기본 폴백이 아니므로 유료 개발자 계정도 구매하지 않는다. 향후 iPad 네이티브를 다시 열 때만 학교 지원·서명·OS 업데이트 정책을 함께 검토한다.
+8. **Android Path C 기기 조건** — 현재 구매하지 않는다. Path B 실사용 마찰이 반복 확인된 뒤에만 active stylus·마이크·배터리·APK 운영 조건과 중고가를 조사해 구매 여부를 정한다.
+9. **녹음 저장·전송 구현** — 세션 시간/오디오 시간 분리와 `recording_span` 의미는 §7로 합의했다. 남은 것은 첫 샘플 확인 방법, runtime 재실행 anchor, span을 파일에 배치하는 방식, 중간 저장 주기·손실 범위, 백그라운드 전송·재개·ACK 의미다.
+10. **Document annotation 업로드 단위** — §8의 소유권과 §5.4 revision authority는 합의했다. Phase 1.5의 JSON·gzip·총전송량 실측 뒤 전체 Document 상태 또는 변경 page snapshot 중 전송 단위를 결정한다.
 11. **검색 결합** — 소개문은 노트 단위, 전사는 시간 구간 단위다. 옛 구간 요약 prior·top-k 결합을 그대로 쓰지 않고 세부 회수·평가·상한을 다시 정한다.
+
+**닫힌 계약 — 파일/동기화:** Document가 annotation 정본, Session이 시간/음성/전사/Q&A provenance 정본이며 Course 안에서 Document↔Session은 many-to-many다. 캡처 중에는 iPad 로컬에 먼저 저장하고 서버 동기화 뒤에는 서버본을 정본으로 본다. PC/iCloud/Möbius는 복제·보관 경로이며 외부 폴더 직접 수정은 자동 역수입하지 않는다. Document 충돌은 `base_revision`으로 감지하고 자동 덮어쓰기/merge를 하지 않는다 (§5.4·8·10.1.1).
+
+**닫힌 계약 — Container 유형:** Galpi Note container는 생성 시 `Course | General`을 선택한다. Course는 Documents + Lecture Sessions와 `자료/강의/새 강의 시작` Home을, General은 v1에서 Documents와 `자료 추가/새 노트` 중심 Home을 제공한다. 둘은 동일 canonical Document/Document Viewer와 document-grounded Sticky Q&A를 공유한다. General에는 기본 Lecture Session·녹음·전사·lecture-grounded Q&A가 없으며, v1에서는 container type 변환과 cross-type 이동/복제를 지원하지 않는다 (§4.3·6.3·10.1.1).
 
 ### 20.1 UX 설계의 다음 계약 — OPEN
 
-1. **다음 논의: `이 구간 설명해줘`의 입력 문맥.** 가사형 전사 독바는 §12.2로 합의했다. 질문이 가리킬 구간·주변 전사·PDF/필기 첨부와 강의 밖 설명의 표시를 정한다. 아직 제안/미결정이며 일반 질문의 §6.6 기본값을 조용히 넓히지 않는다.
-2. **포스트잇 상세 배치.** 수동 접기·펼치기와 알림 표시는 §6.6으로 합의했다. 접힌 표시의 내용·크기·이동·긴 답변 읽기, 페이지 전환 중 열린 포스트잇의 표시, `ㄴ` 후속 입력·전송, PDF 공간이 부족한 경우와 미확인 답변 판정의 세부 조건을 정한다.
-3. **질문 입력·원형 메뉴 상세.** 선택 영역/해당 PDF 페이지 이미지와 전송 후 후속 정정은 §6.6, 펜·지우개·선택·질문 네 도구는 §6.8로 합의했다. 모델·이미지 해상도/용량·메뉴 방향·누름 시간·이동 허용치·가장자리 동작은 미정이다. 단순 계산 경로·사용자 필체 학습·임의 코드 실행은 승인하지 않았다.
-4. **재생 표시 상세.** 20초 표시 구간·농도·여러 오디오 파트/빈 구간·복습 추가 필기/Q&A 표시, 전사 독바의 페이지 표시/이동, 검색 사이드바와 공간 공유를 정한다. 개별 스트로크 독바 목록은 초기 범위에서 제외했다.
-5. **Q&A 저장 구현·삭제.** 초안 보존·재연결 시 기존 결과 자동 확인·못 보낸 질문 수동 재전송·전송 질문 불변/후속 정정은 §6.6으로 합의했다. DB/sidecar, 요청 식별·멱등성·상태 조회, 부분 답변 보존, 요청 취소, Q&A 자체 삭제는 미정이다.
-6. **최소 구현 범위.** 필기·저장, 재생 농도, Q&A 보존을 우선하자는 제안은 있으나 기존 Phase를 대체하는 일정은 확정하지 않았다. 모든 설계가 잡힌 뒤 관련 문서를 함께 갱신한다.
-7. **교정·소개문·진행 표시.** 전사는 별도 수정 동작으로 필요할 때만 고치고 표시/검색에 반영한다 (§12.4). 편집 UI·소개문 재생성·오래됨 표시·완료 알림·긴 질문 대화 입력 한도는 별도로 정한다.
+`이 구간 설명해줘`의 문맥 경계와 Q&A 요청 수명은 §6.6에서 닫았다. document-grounded와 lecture-grounded Q&A를 구분하고 Q&A 원본 오디오 입력을 제외한다. Sticky / Conversation Chain / Turn / Attempt를 분리하며, 동일 request replay는 새 호출을 만들지 않는다. 포스트잇은 자유 메모와 Q&A가 공존하는 page overlay이고, `?`/`ㄴ` handwritten prefix, 말풍선 anchor·cluster·numeric tabs, page 좌표 기반 위치/zoom 독립 크기, 여러 카드 동시 open, 손글씨 스타일 답변 출력까지 제품 방향을 닫았다. 남은 것은 아래다.
+
+1. **다음 논의: evidence payload/UI의 남은 세부.** lecture-grounded primary는 2분/4,000자, 인접 전사는 앞뒤 각 30초·합계 2,000자, PDF page context는 overlap이 긴 순서로 Turn당 최대 2페이지, text-first + 필요 시 같은 candidate page image 요청으로 닫았다. same-Document Chain-local reference 추가, Sticky 내부 preview/jump-back, 누적 유지, baseline 제외 3개 hard limit도 닫았다. 남은 것은 이미지 해상도·용량, reference chip/preview의 정확한 시각 표현, 답변 모델, 메뉴 방향·누름 시간·이동 허용치·가장자리 동작이다. 단순 계산 전용 경로와 임의 코드 실행은 승인하지 않았다.
+2. **포스트잇 손글씨 인식·실기기 tuning.** `?`/`ㄴ`은 Q&A로 명시적 전송하는 handwritten block의 첫 의미 있는 glyph일 때만 routing marker다. 남은 것은 block grouping/line boundary의 구체 임계값, `?`/`ㄴ` recognizer 선택·confidence 기준·모호성 확인 UX, 필요 시 개인 필체 학습 범위, 기본 카드 한 변을 3.5~5 cm 중 어디에 둘지, cluster 거리 임계값, 화면 가장자리 최초 배치/edge-clamping 같은 실기기 수치다. 이 값들은 데이터 계약으로 만들지 않는다.
+3. **Q&A 물리 저장/API.** SQLite를 실시간 정본으로 두고 Sticky 공간 상태는 Document annotation, Chain/Turn/Attempt와 final answer는 Q&A DB가 소유한다. Evidence는 versioned immutable JSON manifest + blob ref, 동일 request replay/409 fail-close, `prepared/in_flight/succeeded/failed/result_unknown/superseded`, 명시적 retry supersede, same-chain serial/different-chain parallel, no background queue 원칙까지 닫았다. 남은 것은 exact table/column·endpoint 이름, migration, tombstone 보존 기간, plain text/수식/이미지 payload 세부다. 삭제한 Sticky의 late-result 부활 금지는 유지한다.
+4. **재생 표시 상세.** 20초 버킷 폐기, stroke 단일 대표 시각 기반 농도, 비녹음 gap 건너뛰기, 포스트잇 재생 농도 비종속, `재생 위치로`, 초록 `review_pen`, 강의/복습 단일 Document timeline, virtual audio/transcript stream, Session deep-link/전체 재생을 닫았다. Review activity는 첫 persistent learning artifact에서 lazy-create하고 Document viewer를 떠날 때 닫으며, review anchor는 provenance/역점프용이고 visibility clock은 activity timeline이다. silent review activity는 비재생 boundary로 통과한다. 일반 pen의 기본 팔레트에서 초록을 제외하고 system color picker 결과를 hue 105°–165° 예약 band로 검증하는 계약도 닫았다. **saturation 하한과 review 전용 초록 팔레트의 정확한 shade/UI는 실기기 tuning으로 남는다.** 그 밖에 미래 필기의 실제 opacity 값, `녹음 없음`/`다른 자료`/`복습` boundary의 구체 시각 표현, activity의 exact ID/schema, 전사 독바 page 번호, 검색 사이드바와 공간 공유 같은 실기기/저장 UX tuning이 남는다. 개별 스트로크 독바 목록은 초기 범위에서 제외했다.
+5. **최소 구현 범위.** 필기·저장, 재생 농도, Q&A 보존을 우선하자는 제안은 있으나 기존 Phase를 대체하는 일정은 확정하지 않았다. 모든 설계가 잡힌 뒤 관련 문서를 함께 갱신한다.
+6. **교정·소개문·진행 표시.** 전사는 별도 수정 동작으로 필요할 때만 고치고 표시/검색에 반영한다 (§12.4). 편집 UI·소개문 재생성·오래됨 표시·완료 알림·긴 질문 대화 입력 한도는 별도로 정한다.
 
 ### 20.2 앞선 v4.2 검토에서 남은 구현 전 과제 — OPEN / 해결 미승인
 
 UX 단순화만으로 아래 문제가 해결된 것은 아니다. 기존 본문의 공식·예시·수치는 해당 전제가 성립할 때의 초안으로 읽는다.
 
-- **시간축:** 시작·일시정지/재개·중단 후 수동 재개는 합의했다. 다만 §7의 단일 오프셋은 파일 내부의 시간 압축을 설명하지 못한다. 브라우저 재실행 후 시계 연결·첫 샘플 기준·누락 경계·drift 보정은 여전히 미정이다.
-- **로컬 생존:** 오프라인 상태의 계속 필기와 앱의 오프라인 재실행은 다르다. 앱 파일의 오프라인 가용성·IndexedDB 복구·단말 손실을 구분해 검증해야 하며, 2~5분 업로드 주기는 전체 손실 상한이 아니다.
+- **시간축:** 세션 시간/오디오 시간 분리, 비녹음 gap, 연속 `recording_span`, MediaRecorder 조각 비정본 원칙은 §7에서 합의했다. 남은 것은 실제 iPad에서 첫 샘플을 확인하는 방법, runtime 재실행 anchor, span별 drift 측정/보정과 파일 배치다. 미확정 경계를 정밀하게 보이는 값으로 추측하지 않는다.
+- **로컬 생존:** 오프라인 상태의 계속 필기와 앱의 오프라인 재실행은 다르다. IndexedDB/OPFS 작업본의 오프라인 가용성·복구·저장소 삭제/용량 부족·단말 손실을 구분해 검증해야 하며, 주기 업로드만으로 전체 손실 상한을 약속하지 않는다. 이 검증은 §5.4의 서버 revision authority를 다시 여는 문제가 아니다.
 - **자료의 시간 의미:** `page_change`는 사용자가 본 PDF 페이지이지 교수가 설명 중인 슬라이드의 증거가 아니다. 강한 자동 매핑 설명은 §6.3·11.3에서 정정했지만 PDF 근거 연결·독바 페이지 이동의 구현은 미정이다.
 - **파생본 갱신:** 전사 교정·오디오 추가·보정 변경 때 소개문과 인덱스의 재생성 범위, 처리 중 입력 변경과 늦게 끝난 작업의 결과 승격 조건이 미정이다. §9·10·11.6의 옛 상태/메타데이터 초안만으로 해결됐다고 보지 않는다. 재인덱싱만으로 오래된 소개문이 갱신되지는 않는다.
 - **STT 폴백:** 텍스트를 반환하는 것과 세그먼트 타임코드를 제공하는 것은 다르다. 공급자·모델별 출력 형식과 타임코드 확보 경로를 검증해야 한다. [OpenAI 전사 API](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create), [Groq STT](https://console.groq.com/docs/speech-to-text)를 근거로 구현 시점에 재확인한다.
@@ -1199,19 +1544,34 @@ UX 단순화만으로 아래 문제가 해결된 것은 아니다. 기존 본문
 ## 21. Final Product Definition
 
 ```text
-[갈피 강의 노트 열기 · PDF/필기 준비]
-      ↓
-[명시적 녹음 시작 · 필기/질문/참고 검색]   (웹 직접 녹음은 검증 후 채택)
-      ↓
-[중간 저장 · 일시정지/재개 · 중단 시 수동 재개/빈 구간 보존]
-      ↓
-[녹음 종료 → 원본 저장 확인 → 학교 인터넷으로 집 PC 직접 전송]
-      ↓
-[로컬 전사 우선 검토 → 외부 API 소개문 → 인덱스/볼트]   (귀가 후 복습 준비 목표)
-      ↓
-[노트 목록: 짧은 소개문 → PDF·필기 + 가사형 전사 독바 · 온라인 녹음]
-      ↓
-[시간을 따라 필기 농도 표시 · 전사 탭 재생 · 필요할 때 교정 · 보존된 시온 Q&A]
+[Galpi Note container 생성/선택]
+      ├─ Course
+      │    [자료(Document) 또는 날짜별 강의(Session) 선택]
+      │          ↓
+      │    [명시적 Session 녹음 시작 · PDF A/B를 오가며 누적 필기/질문/참고 검색]
+      │          │  PDF를 바꿔도 active Session·녹음은 유지
+      │          ↓
+      │    [Document annotation 로컬 작업본 + Session audio/timeline 중간 저장]
+      │          ↓
+      │    [서버 동기화 · revision 충돌 시 자동 덮어쓰기 금지 · 녹음 종료 후 원본 저장 확인]
+      │          ↓
+      │    [집 PC 갈피 서버 → 로컬 전사 → 외부 API 소개문 → 인덱스/볼트]
+      │          ↓
+      │    [같은 Document viewer의 누적 필기 + virtual audio/transcript stream]
+      │          │  강의에서 PDF 진입 시 해당 Session 첫 관련 span으로 deep-link
+      │          │  그날 전체 음성은 별도 Session 전체 재생
+      │          ↓
+      │    [강의 획 source_session_id+t_ms / review anchor → canonical 원음 위치]
+      │
+      └─ General
+           [자료 추가 또는 새 노트]
+                 ↓
+           [같은 canonical Document Viewer]
+           [PDF/백지 노트 · annotation · Sticky · document-grounded Q&A]
+           [v1: Lecture Session·녹음·전사·lecture-grounded Q&A 없음]
+
+Course와 General 모두 Document revision/sync 계약은 공유한다.
+container type은 v1에서 생성 후 바꾸지 않는다.
 ```
 
 최종 판단 기준은 기능 개수가 아니다.
