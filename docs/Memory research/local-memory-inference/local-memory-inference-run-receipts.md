@@ -4883,3 +4883,26 @@ HUMAN review stays unopened until all audited rows `PASS`. Replacement-skeleton
 surface authoring and the v3 re-reconciliation of the other surfaces on the three
 reversed skeletons are unchanged and still pending. No acceptance, freeze, HELD
 release or training; the accepted pool stays **93**.
+
+#### P1-B6 batch-003 repair source audit — COMPLETE_PASS 2/2 / HUMAN REVIEW NOT BUILT
+
+The fresh source audit of repaired items `162` and `214` returned **2 PASS / 0 FAIL /
+0 UNCERTAIN**. Contracts are in the design section "Batch-003 repair source-audit
+result".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| audited blind packet (not committed) | `b32f57a45ad9728a5f1636e9b0298776a38b757ccfb02b1b47b95e4a622ba679` |
+| external result `p1b6-b003-repair-source-audit-results.json` (not committed) | `fcf8265ddafc26733b80ca8579c0f25a44eae7a3c4a88b05e14b03fed8d96963` |
+| `fixtures/local-memory-inference-p1b6-batch-003-repair-source-audit-attempt-001.json` | `60191c33f71a7531488ff7767fe281538a3498028944fae370c7b39e098f7b13` |
+
+Execution provenance: Claude Code, `claude-opus-5-5`, reasoning setting not
+recorded, in a session separate from every authoring/repair session and judging
+only from the blind packet. No historical batch-003 audit result was inherited.
+The fresh blind HUMAN review under v3 is unblocked but not built. Replacement-skeleton
+authoring and the v3 re-reconciliation of the three reversed skeletons are unchanged
+and still pending. No acceptance, freeze, HELD release or training; the accepted pool
+stays **93**.
+
+Tests run locally: `node --test test/memory-inference-p1b6-batch-003-repair-source-audit-packet.test.js`
+(9/9 pass, including the new receipt-binding test).

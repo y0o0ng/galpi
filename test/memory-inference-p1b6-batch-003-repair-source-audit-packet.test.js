@@ -173,3 +173,19 @@ test('historical and canonical artifacts are unchanged by packet construction', 
     assert.equal(sha256RawBytes(read(`fixtures/${pinned.fixture}`)), pinned.rawSha256);
   }
 });
+
+test('the attempt-001 receipt binds this packet and passes both rows', () => {
+  const receipt = readJson('fixtures/local-memory-inference-p1b6-batch-003-repair-source-audit-attempt-001.json');
+  const packet = build();
+  assert.equal(receipt.auditPacketIdentity, packet.name);
+  assert.equal(receipt.auditPacketSha256, PACKET_SHA256);
+  assert.equal(receipt.sourceAuditProtocol.sha256, packet.sourceAuditProtocol.rawSha256);
+  assert.equal(receipt.auditedRepairCandidate.rawSha256, packet.repairCandidate.rawSha256);
+  assert.deepEqual(receipt.rows.map(row => row.auditRowId), packet.rows.map(row => row.auditRowId));
+  assert.equal(receipt.rows.every(row => row.disposition === 'PASS' && row.reason), true);
+  assert.deepEqual(receipt.summary, { total: 2, PASS: 2, FAIL: 0, UNCERTAIN: 0 });
+  assert.equal(receipt.status, 'COMPLETE_PASS');
+  const { sourceBundleGatePassedForRepairedCandidates, ...claims } = receipt.authority;
+  assert.equal(sourceBundleGatePassedForRepairedCandidates, true);
+  assert.equal(Object.values(claims).every(value => value === false), true);
+});

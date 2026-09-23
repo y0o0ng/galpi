@@ -22,9 +22,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 gates are:
 
 - fresh source audit and fresh blind HUMAN review under v3 for the repaired
-  `162` / `214` candidates — the 2-row blind source-audit packet is
-  **constructed but the audit is NOT RUN** (see "Batch-003 repair source-audit
-  packet"); HUMAN review stays closed until both rows `PASS`;
+  `162` / `214` candidates — the fresh source audit is **COMPLETE_PASS at 2/2**
+  (see "Batch-003 repair source-audit result"); the blind HUMAN review under v3
+  is now open and not yet built or run;
 - fresh surface authoring, then the normal source-audit and blind-review gates,
   for the two replacement skeletons;
 - re-reconciliation under v3 of the remaining batch-003 surfaces on the three
@@ -916,8 +916,8 @@ v3](#semantic-contract-v3).
 
 **Current next gates:**
 
-- fresh source audit (packet constructed, audit **NOT RUN**) and fresh blind
-  HUMAN review under v3 for the `162` / `214` repair candidates;
+- fresh blind HUMAN review under v3 for the `162` / `214` repair candidates
+  (source audit **COMPLETE_PASS 2/2**);
 - fresh surface authoring, then source audit and blind review, for the two
   replacement skeletons `53ab6351` and `0768ea20`;
 - re-reconciliation against v3 of the other batch-003 surfaces on the three
@@ -1263,7 +1263,9 @@ no SHA, no HUMAN packet, no calibration, no acceptance.
 - HUMAN adjudication of the 34 routed rows: **DONE** (attempt 001, below);
 - resolution of the 26 ineligible realizations: **DONE** (see "Batch-003
   26-row resolution" below);
-- fresh gates for the 162 / 214 repair candidates and for replacement-skeleton
+- fresh source audit for the 162 / 214 repair candidates: **DONE**
+  (`COMPLETE_PASS` 2/2, below);
+- fresh HUMAN review for 162 / 214, fresh gates for replacement-skeleton
   surfaces, acceptance, reference-label freeze, FINAL selection, HELD second
   review, training and evaluation: **NOT RUN**.
 
@@ -1447,9 +1449,30 @@ intended reading. The packet is transient and gitignored; it is deterministic at
 raw SHA-256 `b32f57a45ad9728a5f1636e9b0298776a38b757ccfb02b1b47b95e4a622ba679`
 (2 rows).
 
-**The audit has NOT been run.** Both rows need fresh `PASS` / `FAIL` /
-`UNCERTAIN` judgments under the unchanged protocol; only `PASS` may proceed, and
-the fresh blind HUMAN review stays unopened until every audited row passes.
+**The audit is now COMPLETE_PASS at 2/2**; see the next section.
+
+### Batch-003 repair source-audit result
+
+The fresh audit returned **2 PASS / 0 FAIL / 0 UNCERTAIN**, committed at
+`fixtures/local-memory-inference-p1b6-batch-003-repair-source-audit-attempt-001.json`
+(attempt `p1b6-batch-003-repair-source-audit-attempt-001`). The receipt binds by
+identity and raw SHA to the blind packet (`b32f57a4…`), the repair candidate
+(`8f625494…`), v3 (`89a48264…`), the unamended protocol (`63a2c70c…`) and the
+external raw result artifact by filename and SHA; the raw result stays outside
+the repository by convention.
+
+**Execution provenance** is the auditor session's own record: Claude Code,
+`claude-opus-5-5`, reasoning setting not recorded. The session was separate from
+every session that authored or repaired these surfaces. It had repository
+instructions loaded, which name `162` / `214` as repair candidates — as the
+packet header already does — but judged only from the blind packet, with no row
+text, label, skeleton or rationale. The protocol question came from the
+user-supplied auditor prompt; the packet binds the protocol by SHA only.
+
+The receipt's authority records only that the source/bundle gate passed for these
+two rows. **No HUMAN semantic review occurred, no HUMAN gold was assigned or
+frozen, no acceptance, HELD release or training occurred.** The fresh blind HUMAN
+review under v3 is now unblocked but not built.
 
 ## Closed Selection and Freeze Constraints
 

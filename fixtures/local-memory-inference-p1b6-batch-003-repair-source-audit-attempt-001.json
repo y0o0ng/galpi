@@ -1,0 +1,62 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-repair-source-audit-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-003-repair-source-audit-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-batch-003-repair-source-audit-packet-v1",
+  "auditPacketSha256": "b32f57a45ad9728a5f1636e9b0298776a38b757ccfb02b1b47b95e4a622ba679",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedRepairCandidate": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-003-v1",
+    "rawSha256": "8f6254946eef8d8d0920485bde431ca137a83577a5060889f3676b8857b4aa9b"
+  },
+  "semanticAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b003-repair-source-audit-results.json",
+    "sha256": "fcf8265ddafc26733b80ca8579c0f25a44eae7a3c4a88b05e14b03fed8d96963"
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "AUDITOR_SESSION_SELF_REPORT",
+    "surface": "Claude Code",
+    "model": "claude-opus-5-5",
+    "reasoningSetting": "NOT_RECORDED",
+    "sessionRelationship": "separate from every session that authored or repaired these surfaces; the audit session had repository instructions loaded (which name 162/214 as repair candidates, as the packet header also does) but read only the blind packet for the judgment and no row text, label, skeleton or rationale",
+    "protocolQuestionSource": "the protocol question as quoted in the user-supplied auditor prompt; the packet binds the protocol by identity and SHA only"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "The repaired source text is new evidence. Both rows received a fresh judgment and no historical batch-003 source-audit result carried forward."
+  },
+  "summary": {
+    "total": 2,
+    "PASS": 2,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassedForRepairedCandidates": true,
+    "humanSemanticReviewOccurred": false,
+    "humanGoldAssignedOrFrozen": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-b003-repair-audit-fe2c1104beceb70c",
+      "disposition": "PASS",
+      "reason": "빠진 턴 t1·t3·t5·t7은 정수기·필터·컵 받침 이야기이고, t8은 대상 없이 받아주는 어시스턴트 응답이다. 파란 mug가 어느 것인지(흠집·장소·시점·바닥의 이름)에 관한 증거는 t2·t4·t6에만 있고 셋 다 번들에 들어 있다. 빠진 원문 가운데 TARGET의 해석을 좁히거나 반박하거나 바꾸는 내용은 없다."
+    },
+    {
+      "auditRowId": "p1b6-b003-repair-audit-54a22bf0d059f4ba",
+      "disposition": "PASS",
+      "reason": "빠진 턴 t2(지갑 정리)·t4(영수증 버림)는 어느 연장 요청을 가리키는지에 관한 정보를 담고 있지 않다. 정기권도 주차권도 가리키지 않아 연장 대상이 정해지지 않는다. 두 선택지 질문(t1·t3)과 TARGET 턴(t5)은 원래 순서대로 모두 번들에 있다. 번들에서는 t3과 t5가 붙어 보이지만 원문에서도 t3이 t5 바로 앞의 마지막 어시스턴트 질문이다. 그래서 빠진 턴이 지시 대상 판단을 바꾸지 않는다."
+    }
+  ]
+}
