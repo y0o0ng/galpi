@@ -122,6 +122,12 @@ Notes 확장은 Note/Paper 패널 DOM과 controller를 그대로 옮겨 쓴다. 
 ## 8. Agents
 
 Agents는 과거 세 줄 요약이 아니라 세 운영 카드다.
+Figma `Home - Agents`의 Desktop은 폭 1058px·높이 210px 카드 셋을 21px 간격으로,
+Pad는 폭 740px에 높이 238/234/246px을 16px 간격으로, Phone은 폭 358px에
+Mail 334px·일정 286px·Codex 362px을 세로로 둔다. 내용이 길면 카드 높이는 늘어난다.
+Desktop은 계정/분석/알림, 일정 수/현재 마감/다음 알림, 모델/정리 상태/대기열의 3열이다.
+Pad는 각 카드가 2열로 재배치되고 Phone은 한 열로 압축된다. 운영 요약 안에 주간 달력을
+넣지 않는다. 주간 달력과 상세 진단은 기존 에이전트 상세 화면에 남긴다.
 
 - Mail 에이전트: 계정 상태, 분석 수, 알림 상태, 규칙과 status를 보인다. Push, 방해 금지,
   규칙 되돌리기는 기존 mail settings/preferences API를 호출한다.

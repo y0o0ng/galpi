@@ -285,7 +285,22 @@ test('Home actions reuse TaskPanel, Mail settings, and Codex settings', () => {
   assert.match(panel, /state\.apiFetch\('\/api\/mail\/settings', \{\s*method: 'PUT'/s);
   assert.match(panel, /state\.apiFetch\('\/api\/models\/codex'\)/);
   assert.match(panel, /state\.apiFetch\('\/api\/settings\/codex-models', \{\s*method: 'PUT'/s);
-  assert.match(panel, /makeMailAgentCard\(\), makeScheduleAgentCard\(\), codex/);
+  assert.match(panel, /makeMailAgentCard\(\), makeScheduleAgentCard\(\), makeCodexAgentCard\(\)/);
+  assert.match(panel, /saveMailSettings\(\{ notificationsEnabled:/);
+  assert.match(panel, /button\('대기열 정리', organizeQueuedNotes\)|button\(state\.organizeRunning \? '시작하는 중…' : '대기열 정리', organizeQueuedNotes\)/);
+});
+
+test('Agents summary matches the three Figma operational cards without embedding the task calendar', () => {
+  const panel = fs.readFileSync(path.join(ROOT, 'public/agent-panel.js'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8');
+  const summary = panel.slice(panel.indexOf('function makeMailAgentCard()'), panel.indexOf('function makeDetailHead('));
+  assert.doesNotMatch(summary, /makeCalendar\(|makeScheduleBlock\(/);
+  assert.match(summary, /agentSummarySection\('계정'/);
+  assert.match(summary, /agentSummarySection\('정리 상태'/);
+  assert.match(css, /#agent-panel-content > \.agents-operational-card \{[^}]*min-height: 210px/s);
+  assert.match(css, /#agent-panel-content > \.mail-agent-card \{ min-height: 238px; \}/);
+  assert.match(css, /#agent-panel-content > \.schedule-agent-card \{ min-height: 286px; \}/);
+  assert.match(css, /\.home-page-head \{[^}]*min-height: 78px/s);
 });
 
 test('legacy task and notification links route into working Home surfaces', () => {

@@ -4971,63 +4971,179 @@ textarea:focus-visible {
 
 #agent-panel-content {
   display: grid;
-  gap: 20px;
+  gap: 21px;
 }
 
 #agent-panel-content > .agents-operational-card {
   width: 100%;
-  min-height: 190px;
+  min-height: 210px;
   margin: 0;
-  padding: 20px;
+  padding: 0;
   border: 1px solid var(--hairline);
   border-radius: 12px;
   background: var(--ai-bubble);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
-#agent-panel-content .schedule-agent-calendar {
-  grid-column: 1 / -1;
+.agent-summary-head {
+  position: relative;
+  min-height: 77px;
+  padding: 15px 18px 0;
 }
 
-#agent-panel-content .schedule-agent-block.agents-operational-card {
+.agent-summary-title {
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ai-text);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-summary-head p {
+  max-width: calc(100% - 110px);
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--label);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-summary-compact-description { display: none; }
+
+.agent-summary-head .schedule-agent-status {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  padding: 5px 11px;
+  border: 0;
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.agent-summary-head .schedule-agent-status::before {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+  vertical-align: 1px;
+}
+
+.agent-summary-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.72fr);
-  gap: 14px 28px;
+  grid-template-columns: minmax(0, 432fr) minmax(0, 340fr) minmax(0, 250fr);
+  min-height: 116px;
+  margin: 0 18px 15px;
 }
 
-#agent-panel-content .schedule-agent-block.agents-operational-card > .schedule-agent-head,
-#agent-panel-content .schedule-agent-block.agents-operational-card > .schedule-agent-actions,
-#agent-panel-content .schedule-agent-block.agents-operational-card > .schedule-agent-empty {
-  grid-column: 1 / -1;
+.agent-summary-columns > section {
+  min-width: 0;
+  padding-right: 16px;
 }
 
-#agent-panel-content .codex-agent-block.agents-operational-card {
+.agent-summary-columns > section + section {
+  padding-left: 34px;
+  border-left: 1px solid var(--hairline);
+}
+
+.agent-summary-columns h3 {
+  margin: 0 0 10px;
+  color: var(--label);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.agent-account-rows { display: grid; gap: 9px; }
+.agent-account-row { display: grid; grid-template-columns: minmax(0, 245px) minmax(0, 145px); gap: 10px; align-items: baseline; }
+.agent-account-row span,
+.agent-account-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-account-row span { font-size: 11px; }
+.agent-account-row small,
+.agent-summary-columns small { color: var(--label); font-size: 10px; }
+.agent-account-compact,
+.agent-summary-accounts > small { display: none; }
+
+.agent-summary-metric-list {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
-  gap: 12px 28px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  text-align: center;
+}
+.agent-summary-counts .agent-summary-metric-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.agent-summary-metric-list div { min-width: 0; }
+.agent-summary-metric-list dt { margin-bottom: 7px; color: var(--label); font-size: 10px; }
+.agent-summary-metric-list dd { margin: 0; color: var(--ai-text); font-size: 25px; font-weight: 700; line-height: 1; }
+
+.agent-summary-columns p {
+  margin: 0;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-summary-alerts small,
+.agent-summary-queue small { display: block; margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-next-due { display: none; }
+
+.agent-summary-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.agent-summary-actions .schedule-agent-action {
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  white-space: nowrap;
 }
 
-#agent-panel-content .codex-agent-block.agents-operational-card > .schedule-agent-head,
-#agent-panel-content .codex-agent-block.agents-operational-card > .codex-agent-description,
-#agent-panel-content .codex-agent-block.agents-operational-card > .codex-agent-actions {
-  grid-column: 1 / -1;
+.agent-summary-models .codex-model-field {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
 }
+.agent-summary-models .codex-model-field > span { font-size: 10px; font-weight: 500; }
+.agent-summary-models .codex-model-field select { min-height: 30px; padding-left: 8px; font-size: 11px; }
+.agent-summary-unavailable { display: flex; align-items: center; gap: 16px; padding: 8px 18px 18px; }
+.agent-summary-unavailable p { color: var(--label); font-size: 12px; }
+.agent-summary-unavailable .schedule-agent-action { min-height: 30px; }
 
-#agent-panel-content .mail-agent-card > .codex-agent-description,
-#agent-panel-content .mail-agent-card > .codex-agent-message {
-  grid-column: 1;
-}
-
-#agent-panel-content .mail-agent-card > .schedule-agent-section {
-  grid-column: 2;
-}
-
-#agent-panel-content .mail-agent-card > .schedule-agent-section + .schedule-agent-section {
-  grid-column: 2;
-}
-
-#agent-panel-content .codex-agent-actions {
-  flex-wrap: wrap;
+@media (max-width: 1100px) {
+  #agent-panel-content { gap: 16px; }
+  #agent-panel-content > .mail-agent-card { min-height: 238px; }
+  #agent-panel-content > .schedule-agent-card { min-height: 234px; }
+  #agent-panel-content > .librarian-agent-card { min-height: 246px; }
+  .agent-summary-head { min-height: 83px; padding-top: 15px; margin: 0 18px; padding-inline: 0; border-bottom: 1px solid var(--hairline); }
+  .agent-summary-head .schedule-agent-status { right: 0; }
+  .agent-summary-columns { grid-template-columns: minmax(0, 392fr) minmax(0, 312fr); min-height: 0; margin-top: 13px; }
+  .agent-summary-columns > section + section { padding-left: 21px; }
+  .agent-account-row { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 8px; }
+  .mail-agent-card .agent-summary-columns { grid-template-areas: 'accounts metrics' 'accounts alerts'; }
+  .agent-summary-accounts { grid-area: accounts; }
+  .agent-summary-metrics { grid-area: metrics; }
+  .agent-summary-alerts { grid-area: alerts; padding-top: 7px; border-left: 1px solid var(--hairline); }
+  .agent-summary-alerts h3 { display: none; }
+  .agent-summary-alerts small { display: none; }
+  .agent-summary-alerts .agent-summary-actions { margin-top: 6px; }
+  .schedule-agent-card .agent-summary-columns { grid-template-areas: 'counts next'; }
+  .agent-summary-counts { grid-area: counts; }
+  .agent-summary-due { display: none; }
+  .agent-summary-next { grid-area: next; }
+  .agent-next-due { display: block; }
+  .librarian-agent-card .agent-summary-columns { grid-template-areas: 'models metrics' 'models queue'; }
+  .agent-summary-models { grid-area: models; }
+  .agent-summary-codex-metrics { grid-area: metrics; }
+  .agent-summary-queue { grid-area: queue; padding-top: 7px; border-left: 1px solid var(--hairline); }
+  .agent-summary-queue h3 { display: none; }
+  .agent-summary-queue .agent-summary-actions { margin-top: 10px; }
+  .agent-summary-models .codex-model-field { grid-template-columns: 82px minmax(0, 1fr); gap: 8px; margin-bottom: 8px; }
 }
 
 /* Notes and Settings destinations reuse the existing panel controls. */
@@ -5254,17 +5370,6 @@ textarea:focus-visible {
   #home-grid.focus-calendar .home-card-calendar.focused .home-card-actions { display: none; }
   #home-grid.focus-calendar .home-card-calendar.focused .calendar-agenda { margin-top: 12px; border-top: 1px solid var(--hairline); }
 
-  #agent-panel-content .schedule-agent-block.agents-operational-card,
-  #agent-panel-content .codex-agent-block.agents-operational-card {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  #agent-panel-content .schedule-agent-block.agents-operational-card > *,
-  #agent-panel-content .codex-agent-block.agents-operational-card > *,
-  #agent-panel-content .mail-agent-card > * {
-    grid-column: 1;
-  }
-
   #app.product-page.active {
     height: auto;
     flex: 1;
@@ -5274,7 +5379,7 @@ textarea:focus-visible {
 
 @media (max-width: 640px) {
   #mobile-shell-header {
-    min-height: 52px;
+    min-height: 56px;
     padding-inline: 16px;
   }
 
@@ -5291,10 +5396,13 @@ textarea:focus-visible {
   }
 
   .home-page-head {
-    display: block;
-    min-height: 126px;
-    padding: 24px 0 12px;
+    position: relative;
+    min-height: 78px;
+    padding: 20px 0 0;
   }
+  .home-page-head > div { display: block; }
+  .home-page-head #home-now { margin-top: 6px; }
+  .home-page-head .home-view-switch { position: absolute; right: -16px; bottom: 0; margin: 0; }
 
   .home-page-head h1,
   .library-page-head h1,
@@ -5305,7 +5413,7 @@ textarea:focus-visible {
     margin-top: 13px;
   }
 
-  #home-overview { padding-bottom: 20px; }
+  #home-overview { padding-top: 8px; padding-bottom: 20px; }
 
   #home-grid {
     display: flex;
@@ -5430,22 +5538,52 @@ textarea:focus-visible {
   .weather-main strong { font-size: 42px; }
   .priority-p3 { display: none; }
 
-  #home-agents { padding-bottom: 20px; }
+  #home-agents { padding-top: 8px; padding-bottom: 20px; }
   #agent-panel-content { gap: 16px; }
   #agent-panel-content > .agents-operational-card {
     min-height: 0;
-    padding: 16px;
-    overflow: hidden;
+    padding: 0;
+    overflow: visible;
   }
-  #agent-panel-content .schedule-agent-actions,
-  #agent-panel-content .codex-agent-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  #agent-panel-content .schedule-agent-action {
-    min-width: 0;
-    white-space: normal;
-  }
+  #agent-panel-content > .mail-agent-card { min-height: 334px; }
+  #agent-panel-content > .schedule-agent-card { min-height: 286px; }
+  #agent-panel-content > .librarian-agent-card { min-height: 376px; }
+  .agent-summary-head { min-height: 70px; margin-inline: 16px; padding-top: 14px; }
+  .agent-summary-head p { max-width: calc(100% - 90px); margin-top: 7px; }
+  .agent-summary-head p > span:first-child { display: none; }
+  .agent-summary-compact-description { display: inline; }
+  .agent-summary-columns { display: flex; flex-direction: column; gap: 0; margin: 0 16px 12px; }
+  .agent-summary-columns > section,
+  .agent-summary-columns > section + section { padding: 0; border-left: 0; }
+  .agent-summary-columns h3 { margin-bottom: 8px; }
+  .agent-summary-accounts { min-height: 83px; padding-top: 13px !important; }
+  .agent-account-rows { display: none; }
+  .agent-account-compact,
+  .agent-summary-accounts > small { display: block; }
+  .agent-account-compact { margin-bottom: 6px; font-size: 12px; }
+  .mail-agent-card .agent-summary-metrics { min-height: 75px; border-bottom: 1px solid var(--hairline); }
+  .mail-agent-card .agent-summary-metrics h3 { display: none; }
+  .agent-summary-metric-list dd { font-size: 30px; }
+  .agent-summary-alerts { padding-top: 12px !important; }
+  .agent-summary-alerts h3 { display: block; }
+  .agent-summary-alerts .agent-summary-actions { margin-top: 10px; }
+  .agent-summary-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .agent-summary-actions .schedule-agent-action { min-width: 0; min-height: 44px; padding-inline: 4px; white-space: normal; }
+  .schedule-agent-card .agent-summary-counts { min-height: 93px; padding-top: 12px !important; border-bottom: 1px solid var(--hairline); }
+  .schedule-agent-card .agent-summary-counts h3 { display: none; }
+  .schedule-agent-card .agent-summary-next { padding-top: 12px !important; }
+  .schedule-agent-card .agent-summary-next .agent-summary-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 17px; }
+  .agent-summary-next .agent-next-due { display: none; }
+  .librarian-agent-card .agent-summary-models { min-height: 114px; padding-top: 12px !important; border-bottom: 1px solid var(--hairline); }
+  .librarian-agent-card .agent-summary-models h3 { margin-bottom: 5px; }
+  .agent-summary-models .codex-model-field { grid-template-columns: 72px minmax(0, 1fr); margin-bottom: 6px; }
+  .agent-summary-models .codex-model-field select { min-height: 44px; }
+  .librarian-agent-card .agent-summary-codex-metrics { min-height: 88px; padding-top: 12px !important; border-bottom: 1px solid var(--hairline); }
+  .librarian-agent-card .agent-summary-codex-metrics h3 { display: none; }
+  .agent-summary-queue { padding-top: 12px !important; }
+  .agent-summary-queue h3 { display: none; }
+  .agent-summary-queue small { margin-top: 4px; }
+  .agent-summary-queue .agent-summary-actions { margin-top: 10px; }
 
   .library-page-head,
   .settings-page-head { padding: 26px 0 18px; }
