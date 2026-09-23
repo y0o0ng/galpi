@@ -254,6 +254,8 @@ test('pad and phone hide only the Chat header and show web usage beside shell no
   assert.match(mobile, /body\[data-product-route="chat"\] #shell-web-usage-pill \{ display: inline-flex/);
   assert.match(html, /id="shell-web-usage-pill"[\s\S]*?aria-label="알림 보기"/);
   assert.match(html, /id="shell-knowledge-panel-toggle"/);
+  assert.match(css, /#mobile-shell-header #shell-knowledge-panel-toggle \{ display: none; \}/);
+  assert.match(css, /body\[data-product-route="chat"\] #mobile-shell-header #shell-knowledge-panel-toggle \{ display: grid; \}/);
 });
 
 test('every desktop focus layout fits the original three-row Home canvas without overlap', () => {
