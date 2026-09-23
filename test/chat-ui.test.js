@@ -212,6 +212,10 @@ test('Home uses the approved 16-column geometry and responsive card flow', () =>
   assert.match(css, /\.home-card-calendar \{ grid-column: 12 \/ span 5/);
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 360px\)\)/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#home-grid \{[^}]*display: flex;[^}]*flex-direction: column/s);
+  assert.match(css, /\.home-grid-left \{ grid-column: 1; \}/);
+  assert.match(css, /\.home-grid-right \{ grid-column: 2; \}/);
+  assert.match(css, /#home-grid \.home-card-calendar \{ height: 260px; \}/);
+  assert.doesNotMatch(css, /\.home-card-calendar \{ grid-column: 1 \/ -1; grid-row: auto \/ span 2; \}/);
   assert.match(css, /#home-grid\.focus-calendar \.home-card-calendar \{ grid-area: 1 \/ 5 \/ span 2 \/ span 12; \}/);
   assert.match(css, /#home-grid\.focus-calendar \.home-card-lecture \{ grid-area: 3 \/ 3 \/ span 1 \/ span 7; \}/);
   assert.match(css, /#home-grid\.has-focus \.home-card\.focused:is\(\.home-card-calendar, \.home-card-mail, \.home-card-notes\) \{[^}]*grid-column-end: span 12/s);
@@ -256,12 +260,23 @@ test('Home keeps one focus state and the platform-specific collapse contracts', 
   assert.match(home, /if \(state\.focusedCard === 'notes'\) mountLibrary\(\)/);
   assert.match(home, /card\.animate\(\[/);
   assert.match(home, /prefers-reduced-motion: reduce/);
-  assert.match(home, /before\.get\(nextCard\)[\s\S]*?focus-spacer-height/s);
+  assert.match(home, /grid\.querySelectorAll\('\.home-card'\)/);
   assert.match(home, /!event\.target\.closest\('\.home-card\.focused'\)[\s\S]*?collapseFocus\(\)/);
   assert.match(css, /#home-focus-collapse:not\(\[hidden\]\) \{[^}]*position: sticky/s);
   assert.match(css, /#home-grid\.focus-calendar \.home-card-calendar \{ grid-area: 1 \/ 5 \/ span 2 \/ span 12; \}/);
-  assert.match(css, /#home-grid\.has-focus\.focus-calendar \.home-card-calendar\.focused \{ grid-area: 1 \/ 2 \/ span 4 \/ span 3; height: 684px; \}/);
-  assert.match(css, /#home-grid\.has-focus\.has-spacer::before \{[^}]*height: var\(--focus-spacer-height\)/s);
+  assert.match(css, /#home-grid\.has-focus:is\(\.focus-calendar, \.focus-mail, \.focus-notes\) \.home-card\.focused \{[^}]*grid-column: 1 \/ -1;[^}]*height: 440px/s);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#home-grid\.has-focus \{ display: flex; flex-direction: column; gap: 16px; \}/);
+  assert.doesNotMatch(css, /has-spacer|focus-spacer-height/);
+});
+
+test('focused Tasks follows the Figma count, progress and list without extra form buttons', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  const tasks = home.slice(home.indexOf('function renderTasks()'), home.indexOf('function kstDate('));
+  assert.match(tasks, /home-task-progress/);
+  assert.match(tasks, /state\.completedToday \/ progressTotal/);
+  assert.doesNotMatch(tasks, /일정 추가|전체 일정/);
+  assert.match(home, /\/api\/tasks\?view=history&status=done&limit=100/);
+  assert.match(css, /#home-grid\.has-focus \.home-card\.focused:is\(\.home-card-tasks, \.home-card-notifications\) \{ height: 440px; \}/);
 });
 
 test('Home uses the Figma shell assets and the existing Notes and Mail controllers in focused cards', () => {
@@ -270,7 +285,7 @@ test('Home uses the Figma shell assets and the existing Notes and Mail controlle
   const note = fs.readFileSync(path.join(ROOT, 'public/note-panel.js'), 'utf8');
   const paper = fs.readFileSync(path.join(ROOT, 'public/paper-panel.js'), 'utf8');
   const notifications = fs.readFileSync(path.join(ROOT, 'public/notification-panel.js'), 'utf8');
-  for (const asset of ['galpi-logo.svg', 'bell.svg', 'moon.svg', 'more.svg', 'left.svg', 'nav-dot.svg', 'nav-active-dot.svg', 'task-open.svg', 'calendar-today.svg', 'calendar-selected.svg', 'calendar-event-dot.svg']) {
+  for (const asset of ['galpi-logo.svg', 'bell.svg', 'moon.svg', 'more.svg', 'left.svg', 'nav-dot.svg', 'nav-active-dot.svg', 'task-open.svg', 'task-done.svg', 'calendar-today.svg', 'calendar-selected.svg', 'calendar-event-dot.svg']) {
     assert.ok(fs.existsSync(path.join(ROOT, 'public/assets/figma', asset)));
   }
   assert.match(html, /assets\/figma\/galpi-logo\.svg/);

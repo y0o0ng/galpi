@@ -16,6 +16,8 @@
     selectedDate: null,
     summary: null,
     tasks: [],
+    completedToday: 0,
+    completedTasks: [],
     notifications: [],
     recentSaves: [],
     mail: null,
@@ -101,13 +103,20 @@
 
   function taskRows(limit = 5) {
     const list = node('div', 'home-task-list');
-    const rows = Array.isArray(state.summary?.preview) ? state.summary.preview.slice(0, limit) : [];
+    const today = kstDate(Date.now() / 1000);
+    const rows = [
+      ...state.completedTasks.map(task => ({ taskId: task.id, title: task.title, dueAt: task.dueAt, bucket: 'done' })),
+      ...state.tasks.filter(task => taskDate(task) && taskDate(task) <= today)
+        .map(task => ({ taskId: task.id, title: task.title, dueAt: task.dueAt, bucket: taskDate(task) < today ? 'overdue' : 'today' })),
+    ].sort((a, b) => (a.dueAt || 0) - (b.dueAt || 0)).slice(0, limit);
+    if (!rows.length && Array.isArray(state.summary?.preview)) rows.push(...state.summary.preview.slice(0, limit));
     if (!rows.length) list.append(node('p', 'home-card-empty', '오늘 확인할 일정 없음'));
     rows.forEach(item => {
       const row = node('div', 'home-task-row');
-      row.append(node('span', `task-dot ${item.bucket === 'overdue' ? 'overdue' : ''}`), node('time', '', item.dueAt ? formatDateTime(item.dueAt).split(' ').slice(-1)[0] : ''), node('strong', '', item.title || '제목 없는 일정'));
+      row.classList.toggle('done', item.bucket === 'done');
+      row.append(node('span', `task-dot ${item.bucket}`), node('time', '', item.dueAt ? formatDateTime(item.dueAt).split(' ').slice(-1)[0] : ''), node('strong', '', item.title || '제목 없는 일정'));
       const task = state.tasks.find(entry => entry.id === item.taskId);
-      if (state.focusedCard === 'tasks' && task) {
+      if (state.focusedCard === 'tasks' && task && item.bucket !== 'done') {
         const controls = node('div', 'home-task-row-actions');
         const complete = action('완료', () => global.TaskPanel?.completeFromHome(task, complete));
         controls.append(complete, action('지연', () => {
@@ -126,11 +135,22 @@
     const total = Number(counts().overdue || 0) + Number(counts().today || 0);
     const summary = node('div', 'home-count-summary');
     summary.append(node('strong', '', String(total)), node('span', '', '할 일'), node('p', '', `지연 ${counts().overdue || 0} · 예정 ${counts().upcoming || 0}`));
+    const progressTotal = total + state.completedToday;
+    if (progressTotal) {
+      const progress = node('div', 'home-task-progress');
+      progress.setAttribute('role', 'progressbar');
+      progress.setAttribute('aria-label', '오늘 일정 완료율');
+      progress.setAttribute('aria-valuemin', '0');
+      progress.setAttribute('aria-valuemax', String(progressTotal));
+      progress.setAttribute('aria-valuenow', String(state.completedToday));
+      const fill = node('div', 'home-task-progress-fill');
+      fill.style.width = `${state.completedToday / progressTotal * 100}%`;
+      progress.append(fill);
+      summary.insertBefore(progress, summary.lastChild);
+    }
     body.append(summary, taskRows(state.focusedCard === 'tasks' ? 8 : 5));
     if (state.focusedCard === 'tasks') {
-      const actions = node('div', 'home-card-actions');
-      actions.append(action('일정 추가', () => openTaskPanel({ compose: true }), true), action('전체 일정', () => openTaskPanel({ view: 'today' })));
-      body.append(actions, node('div', 'home-focus-extra'));
+      body.append(node('div', 'home-focus-extra'));
     }
     return card('tasks', '할일', 'Today', body);
   }
@@ -422,11 +442,12 @@
     if (!grid) return;
     parkSharedPanels();
     grid.className = state.focusedCard ? `has-focus focus-${state.focusedCard}` : '';
-    grid.replaceChildren(
-      renderWeather(), renderTasks(), renderCalendar(), renderMail(),
-      renderNotifications(), renderDday(), renderLecture(), renderNotes(),
-    );
-    [...grid.children].forEach(item => item.classList.toggle('focused', item.dataset.cardId === state.focusedCard));
+    const left = node('div', 'home-grid-column home-grid-left');
+    const right = node('div', 'home-grid-column home-grid-right');
+    left.append(renderWeather(), renderTasks(), renderLecture(), renderNotes());
+    right.append(renderCalendar(), renderNotifications(), renderMail(), renderDday());
+    grid.replaceChildren(left, right);
+    grid.querySelectorAll('.home-card').forEach(item => item.classList.toggle('focused', item.dataset.cardId === state.focusedCard));
     const collapse = document.getElementById('home-focus-collapse');
     collapse.hidden = !state.focusedCard;
     if (state.focusedCard === 'mail') mountNotification('mail');
@@ -437,27 +458,16 @@
     const grid = document.getElementById('home-grid');
     const previousFocus = state.focusedCard;
     const anchorId = nextCard || previousFocus;
-    const oldGridTop = grid.getBoundingClientRect().top;
-    const before = new Map([...grid.children].map(card => [card.dataset.cardId, card.getBoundingClientRect()]));
+    const before = new Map([...grid.querySelectorAll('.home-card')].map(card => [card.dataset.cardId, card.getBoundingClientRect()]));
     state.focusedCard = nextCard;
-    grid.style.removeProperty('--focus-spacer-height');
     renderOverview();
     const phone = matchMedia('(max-width: 640px)').matches;
-    if (nextCard && phone) {
-      const previous = before.get(nextCard);
-      const current = grid.querySelector(`[data-card-id="${nextCard}"]`)?.getBoundingClientRect();
-      const delta = previous && current ? previous.top - oldGridTop - (current.top - grid.getBoundingClientRect().top) : 0;
-      if (delta > 16) {
-        grid.style.setProperty('--focus-spacer-height', `${delta - 16}px`);
-        grid.classList.add('has-spacer');
-      }
-    }
     if (phone && anchorId && before.has(anchorId)) {
       const current = grid.querySelector(`[data-card-id="${anchorId}"]`)?.getBoundingClientRect();
       if (current) document.getElementById('home-page').scrollTop += current.top - before.get(anchorId).top;
     }
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    [...grid.children].forEach(card => {
+    grid.querySelectorAll('.home-card').forEach(card => {
       const previous = before.get(card.dataset.cardId);
       if (!previous) return;
       const current = card.getBoundingClientRect();
@@ -565,6 +575,7 @@
     const requests = await Promise.allSettled([
       state.apiFetch('/api/tasks/summary'),
       state.apiFetch('/api/tasks?view=all&limit=100'),
+      state.apiFetch('/api/tasks?view=history&status=done&limit=100'),
       state.apiFetch('/api/notifications'),
       state.apiFetch('/api/mail/status'),
       state.apiFetch('/api/vault/notes?excludeNoteType=paper&limit=6'),
@@ -573,13 +584,16 @@
       if (result.status !== 'fulfilled' || !result.value.ok) return fallback;
       return result.value.json().catch(() => fallback);
     };
-    const [summary, tasks, notifications, mail, notes] = await Promise.all([
-      read(requests[0], null), read(requests[1], {}), read(requests[2], {}), read(requests[3], null), read(requests[4], {}),
+    const [summary, tasks, completed, notifications, mail, notes] = await Promise.all([
+      read(requests[0], null), read(requests[1], {}), read(requests[2], {}),
+      read(requests[3], {}), read(requests[4], null), read(requests[5], {}),
     ]);
     state.summary = summary;
     state.tasks = Array.isArray(tasks?.tasks) ? tasks.tasks : [
       ...(tasks?.overdue || []), ...(tasks?.today || []), ...(tasks?.upcoming || []),
     ];
+    state.completedTasks = (completed?.tasks || []).filter(task => task.closedAt && kstDate(task.closedAt) === kstDate(Date.now() / 1000));
+    state.completedToday = state.completedTasks.length;
     state.notifications = Array.isArray(notifications?.notifications) ? notifications.notifications : [];
     state.recentSaves = Array.isArray(notifications?.recentSaves) ? notifications.recentSaves : [];
     state.mail = mail;
