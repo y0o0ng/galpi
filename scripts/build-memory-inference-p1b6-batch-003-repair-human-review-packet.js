@@ -4,10 +4,11 @@
 // Fresh blind HUMAN review packet for the two repaired batch-003 candidates (162, 214), under
 // semantic contract v3.
 //
-// This step CONSTRUCTS the packet. It makes no HUMAN decision, embeds no expected
-// CLEAR/ESCALATE answer, ingests no result, accepts no row, freezes no label, releases no HELD
-// and trains nothing. The visible bundles come straight from the mechanically rebuilt audited
-// source-audit packet, so the reviewer sees byte-for-byte what passed source audit.
+// Building the packet makes no HUMAN decision and embeds no expected CLEAR/ESCALATE answer.
+// The owner's attempt-001 result is validated against the packet below; neither step accepts
+// a row, freezes a label, releases HELD or trains anything. The visible bundles come straight
+// from the mechanically rebuilt audited source-audit packet, so the reviewer sees
+// byte-for-byte what passed source audit.
 //
 // The historical batch-002 repair HUMAN builder and the batch-003 v2 calibration protocol are
 // not reused: the former is pinned to batch-002, the latter carries the superseded v2 rule.
@@ -231,6 +232,155 @@ function loadCanonicalInputs() {
   };
 }
 
+// ---- HUMAN result (attempt-001) ----------------------------------------------------------
+// The raw result stays outside the repository; its bytes are pinned so the committed receipt
+// cannot re-point at a different result.
+
+const HUMAN_ATTEMPT_ID = 'p1b6-batch-003-repair-human-review-attempt-001';
+const HUMAN_RECEIPT_IDENTITY =
+  'xion-local-memory-inference-p1b6-batch-003-repair-human-review-attempt-001-receipt-v1';
+const HUMAN_RECEIPT_FIXTURE =
+  'local-memory-inference-p1b6-batch-003-repair-human-review-attempt-001.json';
+const HUMAN_RAW_RESULT_FILENAME = 'p1b6-b003-repair-human-review-results.json';
+const HUMAN_RAW_RESULT_SHA256 = 'cc37eef9a77e73a489eaa58acb05f82315d225b2a0470491ccd584942fc6fd82';
+const OUTCOMES = Object.freeze(['KEEP:CLEAR', 'KEEP:ESCALATE', 'FIX:null', 'REJECT:null']);
+
+// Validates the SHAPE of result rows against the packet, never their answers.
+function validateResultRows(rows, packet) {
+  const expected = packet.rows.map(row => row.reviewRowId);
+  if (!Array.isArray(rows) || rows.length !== expected.length
+    || JSON.stringify(rows.map(row => row?.reviewRowId).toSorted())
+      !== JSON.stringify(expected)) {
+    fail('HUMAN result rows are missing, extra, duplicated, or unknown');
+  }
+  for (const row of rows) {
+    if (!exactKeys(row, ['reviewRowId', 'disposition', 'decision', 'reason'])
+      || !OUTCOMES.includes(`${row.disposition}:${row.decision}`)
+      || typeof row.reason !== 'string' || row.reason.trim() === '') {
+      fail(`HUMAN result row is invalid: ${row.reviewRowId}`);
+    }
+  }
+  return rows;
+}
+
+function validateHumanRawResult(rawBytes, packet) {
+  if (!Buffer.isBuffer(rawBytes) && !ArrayBuffer.isView(rawBytes)) {
+    fail('HUMAN raw result bytes were not supplied');
+  }
+  if (sha256RawBytes(rawBytes) !== HUMAN_RAW_RESULT_SHA256) {
+    fail('HUMAN raw result bytes are not the recorded evidence');
+  }
+  const result = JSON.parse(Buffer.from(rawBytes).toString('utf8'));
+  if (!exactKeys(result, ['results'])) fail('HUMAN raw result container is invalid');
+  return validateResultRows(result.results, packet);
+}
+
+// Hidden roles are restored from canonical artifacts after validation, never from the result.
+function compareWithV3Reference(rows, canonicalInputs) {
+  const candidate = JSON.parse(Buffer.from(canonicalInputs.audit.repairCandidate).toString('utf8'));
+  const v3 = JSON.parse(Buffer.from(canonicalInputs.audit.semanticAuthority).toString('utf8'));
+  const candidateSha256 = auditPacketBuilder.CANONICAL_INPUTS.repairCandidate.rawSha256;
+  const reference = new Map(candidate.items.map(item => [
+    opaqueReviewRowId(candidateSha256, item.itemId),
+    v3.candidates.find(row => row.semanticSkeletonId === item.semanticSkeletonId).humanLabel,
+  ]));
+  const kept = rows.filter(row => row.disposition === 'KEEP');
+  const matching = kept.filter(row => row.decision === reference.get(row.reviewRowId)).length;
+  return { matching, opposing: kept.length - matching };
+}
+
+function validateHumanReviewReceipt(receipt, rawResultBytes,
+  canonicalInputs = loadCanonicalInputs()) {
+  const packet = buildRepairHumanReviewPacket(canonicalInputs);
+  const packetSha256 = sha256RawBytes(packetBytes(packet));
+
+  if (!exactKeys(receipt, [
+    'name', 'attemptId', 'status', 'reviewDate', 'humanReviewPacket', 'reviewProtocol',
+    'semanticAuthority', 'reviewedRepairCandidate', 'sourceAuditPrerequisite',
+    'rawResultArtifact', 'reviewProvenance', 'reviewIndependence', 'summary',
+    'v3ReferenceComparison', 'authority', 'rows',
+  ]) || receipt.name !== HUMAN_RECEIPT_IDENTITY
+    || receipt.attemptId !== HUMAN_ATTEMPT_ID
+    || JSON.stringify(receipt.humanReviewPacket)
+      !== JSON.stringify({ identity: PACKET_IDENTITY, rawSha256: packetSha256 })
+    || JSON.stringify(receipt.reviewProtocol) !== JSON.stringify(packet.reviewProtocol)
+    || JSON.stringify(receipt.semanticAuthority) !== JSON.stringify(packet.semanticAuthority)
+    || JSON.stringify(receipt.reviewedRepairCandidate)
+      !== JSON.stringify(packet.reviewedRepairCandidate)
+    || JSON.stringify(receipt.sourceAuditPrerequisite)
+      !== JSON.stringify(packet.sourceAuditPrerequisite)
+    || JSON.stringify(receipt.rawResultArtifact) !== JSON.stringify(
+      { filename: HUMAN_RAW_RESULT_FILENAME, sha256: HUMAN_RAW_RESULT_SHA256 })) {
+    fail('HUMAN review receipt binding is invalid');
+  }
+
+  // Row blindness is not independence: the reviewer took part in resolving these repairs.
+  const independence = receipt.reviewIndependence;
+  if (!exactKeys(independence, [
+    'packetBlindToRowIdentity', 'packetCarriedNoLabelRationaleOrAuditReason',
+    'reviewerParticipatedInRepairResolution',
+    'reviewerKnewEveryPresentedRowWasARepairedRealization', 'limitation',
+  ]) || independence.packetBlindToRowIdentity !== true
+    || independence.packetCarriedNoLabelRationaleOrAuditReason !== true
+    || independence.reviewerParticipatedInRepairResolution !== true
+    || independence.reviewerKnewEveryPresentedRowWasARepairedRealization !== true
+    || typeof independence.limitation !== 'string'
+    || !independence.limitation.includes('does NOT establish')) {
+    fail('HUMAN review receipt does not record its independence limitation');
+  }
+
+  if (!exactKeys(receipt.authority, [
+    'reviewCompletedForAllPresentedRows', 'decisionsSource',
+    'modelInferenceUsedForHumanDecisions', 'surfaceAccepted', 'datasetAcceptancePerformed',
+    'referenceLabelFrozen', 'heldOutReleasePerformed', 'trainingOccurred',
+  ]) || receipt.authority.reviewCompletedForAllPresentedRows !== true
+    || receipt.authority.decisionsSource !== 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER'
+    || ['modelInferenceUsedForHumanDecisions', 'surfaceAccepted', 'datasetAcceptancePerformed',
+      'referenceLabelFrozen', 'heldOutReleasePerformed', 'trainingOccurred']
+      .some(key => receipt.authority[key] !== false)) {
+    fail('HUMAN review receipt claims authority it does not have');
+  }
+
+  const rows = validateResultRows(receipt.rows, packet);
+  if (JSON.stringify(rows.map(row => row.reviewRowId))
+    !== JSON.stringify(packet.rows.map(row => row.reviewRowId))) {
+    fail('HUMAN review receipt rows are not in packet order');
+  }
+  // With the raw bytes present, the receipt rows must be exactly the recorded result.
+  if (rawResultBytes !== undefined) {
+    const raw = validateHumanRawResult(rawResultBytes, packet)
+      .toSorted((left, right) => (left.reviewRowId < right.reviewRowId ? -1 : 1));
+    if (JSON.stringify(raw) !== JSON.stringify(rows)) {
+      fail('HUMAN review receipt rows differ from the raw result');
+    }
+  }
+
+  const count = (field, value) => rows.filter(row => row[field] === value).length;
+  const summary = {
+    total: rows.length,
+    KEEP: count('disposition', 'KEEP'),
+    FIX: count('disposition', 'FIX'),
+    REJECT: count('disposition', 'REJECT'),
+    CLEAR: count('decision', 'CLEAR'),
+    ESCALATE: count('decision', 'ESCALATE'),
+  };
+  if (JSON.stringify(receipt.summary) !== JSON.stringify(summary)
+    || receipt.status !== (summary.KEEP === rows.length ? 'COMPLETE_ALL_KEEP' : 'COMPLETE_NEEDS_FIX')) {
+    fail('HUMAN review summary or status does not follow from its rows');
+  }
+  const comparison = compareWithV3Reference(rows, canonicalInputs);
+  if (!exactKeys(receipt.v3ReferenceComparison, ['matching', 'opposing', 'note'])
+    || receipt.v3ReferenceComparison.matching !== comparison.matching
+    || receipt.v3ReferenceComparison.opposing !== comparison.opposing) {
+    fail('HUMAN review v3 comparison does not follow from its rows');
+  }
+  return { receipt, packet, packetSha256 };
+}
+
+function loadHumanReviewReceipt() {
+  return JSON.parse(fs.readFileSync(path.join(ROOT, 'fixtures', HUMAN_RECEIPT_FIXTURE), 'utf8'));
+}
+
 function writeRepairHumanReviewPacket(outputPath) {
   if (fs.existsSync(outputPath)) {
     throw new Error(`Existing output will not be overwritten: ${outputPath}`);
@@ -254,15 +404,20 @@ function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   CANONICAL_INPUTS,
+  HUMAN_RAW_RESULT_SHA256,
+  HUMAN_RECEIPT_FIXTURE,
   PACKET_IDENTITY,
   PACKET_STATUS,
   REVIEW_ID_NAMESPACE,
   buildRepairHumanReviewPacket,
   loadCanonicalInputs,
+  loadHumanReviewReceipt,
   main,
   opaqueReviewRowId,
   packetBytes,
   validateAuditReceipt,
+  validateHumanRawResult,
+  validateHumanReviewReceipt,
   validateProtocol,
   writeRepairHumanReviewPacket,
 };

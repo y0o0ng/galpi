@@ -4928,3 +4928,22 @@ Tests run locally: the new `…-batch-003-repair-human-review-packet` suite (14/
 every `test/memory-inference-p1b6-*.test.js` suite (261 tests: 259 pass / 0 fail /
 2 skipped — the raw-bytes tests, which skip without the uncommitted artifacts). No CI
 result is claimed.
+
+#### P1-B6 batch-003 repair blind HUMAN review — COMPLETE_ALL_KEEP 2/2 ESCALATE / NOT ACCEPTED
+
+Reviewed 2026-09-23 by the repository owner (row presentation by a model the owner
+identified as "5.6솔"; the owner made each decision). Contracts are in the design section
+"Batch-003 repair blind HUMAN review result — attempt 001".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw result `p1b6-b003-repair-human-review-results.json` (pasted text stored verbatim, not committed) | `cc37eef9a77e73a489eaa58acb05f82315d225b2a0470491ccd584942fc6fd82` |
+| `fixtures/local-memory-inference-p1b6-batch-003-repair-human-review-attempt-001.json` | `d3507563fcbad057d734b1d0b5d9a684e39f6cfa29f54bcd33e8d8bb3a6c6f66` |
+
+Both rows `KEEP` + `ESCALATE`, matching the v3 reference (2 / 0). Not reviewer-independent.
+**No surface is accepted**, no label frozen, no HELD release or training; replacement-skeleton
+authoring and the v3 re-reconciliation of the three reversed skeletons are still pending;
+the accepted pool stays **93**.
+
+Tests run locally: the `…-batch-003-repair-human-review-packet` suite with the raw bytes
+supplied (17/17) and without (16 pass / 1 skipped).

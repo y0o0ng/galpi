@@ -1,0 +1,84 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-repair-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-003-repair-human-review-attempt-001",
+  "status": "COMPLETE_ALL_KEEP",
+  "reviewDate": "2026-09-23",
+  "humanReviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-003-repair-human-review-packet-v1",
+    "rawSha256": "2d58d919f94ce32520b9fd4e74974581364fb7b291a0ee148fe89ae795e381a7"
+  },
+  "reviewProtocol": {
+    "identity": "xion-local-memory-inference-p1b6-batch-003-repair-human-review-protocol-v1",
+    "protocolIdentity": "p1b6-batch-003-repair-blind-human-review-v3-v1",
+    "rawSha256": "bb7c79d484b35df0ef91c8cf29781d048e15cef481b878d1cd18e8b88311e10d"
+  },
+  "semanticAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+  },
+  "reviewedRepairCandidate": {
+    "identity": "xion-local-memory-inference-p1b6-surface-repair-candidate-batch-003-v1",
+    "rawSha256": "8f6254946eef8d8d0920485bde431ca137a83577a5060889f3676b8857b4aa9b"
+  },
+  "sourceAuditPrerequisite": {
+    "attemptId": "p1b6-batch-003-repair-source-audit-attempt-001",
+    "receiptRawSha256": "60191c33f71a7531488ff7767fe281538a3498028944fae370c7b39e098f7b13",
+    "status": "COMPLETE_PASS",
+    "allRowsPassed": true
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b003-repair-human-review-results.json",
+    "sha256": "cc37eef9a77e73a489eaa58acb05f82315d225b2a0470491ccd584942fc6fd82"
+  },
+  "reviewProvenance": {
+    "evidenceBasis": "REPOSITORY_OWNER_STATEMENT",
+    "decisionsMadeBy": "repository owner",
+    "rowPresentation": "A model the owner identified as \"5.6솔\" presented the packet rows to the owner one at a time; the owner made each decision.",
+    "notRecorded": "Who drafted the reason wording and assembled the result JSON, and what else the presenting model saw besides the packet, were not recorded.",
+    "resultBytes": "No original result file exists. The owner pasted the result text into the session and it was stored verbatim, without a trailing newline; the SHA above is of those bytes."
+  },
+  "reviewIndependence": {
+    "packetBlindToRowIdentity": true,
+    "packetCarriedNoLabelRationaleOrAuditReason": true,
+    "reviewerParticipatedInRepairResolution": true,
+    "reviewerKnewEveryPresentedRowWasARepairedRealization": true,
+    "limitation": "The packet was blind at row level, but the reviewer is the repository owner who took part in resolving these repairs and knew the whole presented population consisted of repaired realizations intended to restore ambiguity. ESCALATE is the expected direction, so this attempt does NOT establish reviewer-independent confirmation that the repairs restored the intended ambiguity."
+  },
+  "summary": {
+    "total": 2,
+    "KEEP": 2,
+    "FIX": 0,
+    "REJECT": 0,
+    "CLEAR": 0,
+    "ESCALATE": 2
+  },
+  "v3ReferenceComparison": {
+    "matching": 2,
+    "opposing": 0,
+    "note": "Computed after validation by restoring hidden roles from canonical artifacts. Agreement with the v3 reference neither accepts a surface nor freezes a label."
+  },
+  "authority": {
+    "reviewCompletedForAllPresentedRows": true,
+    "decisionsSource": "REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER",
+    "modelInferenceUsedForHumanDecisions": false,
+    "surfaceAccepted": false,
+    "datasetAcceptancePerformed": false,
+    "referenceLabelFrozen": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-b003-repair-review-6701ef82b132d5e7",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "지난달 mug와 어제 mug가 같은 개체인지 비슷한 다른 개체인지 visible evidence만으로 정해지지 않는다."
+    },
+    {
+      "reviewRowId": "p1b6-b003-repair-review-b9be449d12cebdd7",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "정기권과 주차권 두 연장 후보가 모두 제시되어 TARGET '연장해 줘'의 지시 대상이 visible evidence만으로 정해지지 않는다."
+    }
+  ]
+}

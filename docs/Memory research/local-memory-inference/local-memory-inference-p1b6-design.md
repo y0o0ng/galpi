@@ -1512,6 +1512,32 @@ repository owner, who took part in resolving these repairs and knows the populat
 is repaired realizations; row blindness is therefore not an independent
 confirmation, and the eventual HUMAN result receipt must record that limitation.
 
+### Batch-003 repair blind HUMAN review result — attempt 001
+
+The owner's review returned **2 KEEP / 2 ESCALATE / 0 FIX / 0 REJECT** (reviewed
+2026-09-23), committed at
+`fixtures/local-memory-inference-p1b6-batch-003-repair-human-review-attempt-001.json`
+(`COMPLETE_ALL_KEEP`). The receipt binds by identity and raw SHA to the packet
+(`2d58d919…`), the protocol (`bb7c79d4…`), v3, the candidate and the audit receipt, and
+to the raw result `p1b6-b003-repair-human-review-results.json` (`cc37eef9…`). No original
+result file existed: the owner pasted the result text and it was stored verbatim outside
+the repository, without a trailing newline. The validator in the packet builder checks
+bindings, rows (exactly the packet's IDs, allowed outcomes, non-empty reasons), summary,
+status and, when the raw bytes are supplied (`P1B6_B003_REPAIR_HUMAN_RESULTS`), that the
+receipt rows equal them.
+
+**Provenance, per the owner's statement:** the owner made each decision; a model the
+owner identified as "5.6솔" presented the rows one at a time. Who drafted the reason
+wording and assembled the JSON, and what else the presenting model saw, were not
+recorded. **Independence limitation:** the owner took part in resolving these repairs
+and knew the population was repaired realizations meant to restore ambiguity, so this
+does NOT establish reviewer-independent confirmation.
+
+After validation the hidden roles were restored from canonical artifacts: both decisions
+**match the v3 reference (`ESCALATE`)**, 2 matching / 0 opposing. The match accepts no
+surface and freezes no label; batch-003 acceptance, HELD release and training remain
+unopened and the accepted pool stays **93**.
+
 ## Closed Selection and Freeze Constraints
 
 The accepted surface pool is selected through a deterministic, constrained,

@@ -2,9 +2,9 @@
 
 // Blind v3 HUMAN review packet for the two repaired batch-003 candidates (162, 214).
 //
-// Constructing the packet is not the review: nothing here produces a HUMAN decision, ingests a
-// result or accepts a row. These tests pin the gate on the completed source audit, the v3
-// protocol, blindness, and that the visible bundles are exactly the audited bytes.
+// Constructing the packet is not the review: nothing here produces a HUMAN decision or accepts a
+// row. These tests pin the gate on the completed source audit, the v3 protocol, blindness, that
+// the visible bundles are exactly the audited bytes, and the owner's attempt-001 result receipt.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -296,3 +296,73 @@ test('historical builders and artifacts are unchanged by packet construction', (
     assert.equal(sha256RawBytes(read(file)), sha, file);
   }
 });
+
+// ---- HUMAN result attempt-001 --------------------------------------------------------------
+// The raw result bytes are not committed; the raw-bytes test skips unless
+// P1B6_B003_REPAIR_HUMAN_RESULTS points at them.
+
+const HUMAN_RECEIPT = `fixtures/${builder.HUMAN_RECEIPT_FIXTURE}`;
+const HUMAN_RAW = process.env.P1B6_B003_REPAIR_HUMAN_RESULTS;
+const validateHuman = (change, raw) => {
+  const receipt = readJson(HUMAN_RECEIPT);
+  change(receipt);
+  return () => builder.validateHumanReviewReceipt(receipt, raw);
+};
+
+test('the attempt-001 HUMAN receipt binds this packet and records 2 KEEP ESCALATE', () => {
+  assert.equal(sha256RawBytes(read(HUMAN_RECEIPT)),
+    'd3507563fcbad057d734b1d0b5d9a684e39f6cfa29f54bcd33e8d8bb3a6c6f66');
+  const { receipt, packetSha256 } = builder.validateHumanReviewReceipt(readJson(HUMAN_RECEIPT));
+  assert.equal(packetSha256, PACKET_SHA256);
+  assert.equal(receipt.status, 'COMPLETE_ALL_KEEP');
+  assert.deepEqual(receipt.summary, { total: 2, KEEP: 2, FIX: 0, REJECT: 0, CLEAR: 0, ESCALATE: 2 });
+  assert.equal(receipt.v3ReferenceComparison.matching, 2);
+  assert.equal(receipt.v3ReferenceComparison.opposing, 0);
+  const { reviewCompletedForAllPresentedRows, decisionsSource, ...claims } = receipt.authority;
+  assert.equal(reviewCompletedForAllPresentedRows, true);
+  assert.equal(decisionsSource, 'REPOSITORY_OWNER_PRIMARY_HUMAN_REVIEWER');
+  assert.equal(Object.values(claims).every(value => value === false), true);
+});
+
+test('the HUMAN receipt fails closed on binding, row, summary, independence or authority drift', () => {
+  for (const [label, change, message] of [
+    ['packet sha', r => { r.humanReviewPacket.rawSha256 = 'a'.repeat(64); }, /binding/],
+    ['protocol', r => { r.reviewProtocol.rawSha256 = 'a'.repeat(64); }, /binding/],
+    ['v3', r => { r.semanticAuthority.rawSha256 = 'a'.repeat(64); }, /binding/],
+    ['audit', r => { r.sourceAuditPrerequisite.status = 'COMPLETE_NEEDS_FIX'; }, /binding/],
+    ['raw sha', r => { r.rawResultArtifact.sha256 = 'a'.repeat(64); }, /binding/],
+    ['missing row', r => { r.rows.pop(); }, /missing, extra, duplicated, or unknown/],
+    ['duplicate row', r => { r.rows[1] = { ...r.rows[0] }; }, /missing, extra, duplicated, or unknown/],
+    ['unknown row', r => { r.rows[0].reviewRowId = 'p1b6-b003-repair-review-0000000000000000'; }, /unknown/],
+    ['reordered', r => { r.rows.reverse(); }, /packet order/],
+    ['keep null', r => { r.rows[0].decision = null; }, /row is invalid/],
+    ['fix with label', r => { r.rows[0].disposition = 'FIX'; }, /row is invalid/],
+    ['empty reason', r => { r.rows[0].reason = ' '; }, /row is invalid/],
+    ['summary', r => { r.summary.ESCALATE = 1; r.summary.CLEAR = 1; }, /summary or status/],
+    ['status', r => { r.status = 'COMPLETE_NEEDS_FIX'; }, /summary or status/],
+    ['comparison', r => { r.v3ReferenceComparison.opposing = 1; }, /v3 comparison/],
+    ['independence', r => { r.reviewIndependence.reviewerParticipatedInRepairResolution = false; }, /independence/],
+    ['limitation', r => { r.reviewIndependence.limitation = 'independent'; }, /independence/],
+    ['model decisions', r => { r.authority.modelInferenceUsedForHumanDecisions = true; }, /authority/],
+    ['accepted', r => { r.authority.surfaceAccepted = true; }, /authority/],
+    ['frozen', r => { r.authority.referenceLabelFrozen = true; }, /authority/],
+    ['extra authority', r => { r.authority.batch003Accepted = false; }, /authority/],
+  ]) {
+    assert.throws(validateHuman(change), message, label);
+  }
+  // An opposing decision is valid shape: it is recorded, not rejected, and relabels nothing.
+  assert.doesNotThrow(validateHuman(r => {
+    r.rows[0].decision = 'CLEAR';
+    r.summary.CLEAR = 1; r.summary.ESCALATE = 1;
+    r.v3ReferenceComparison.matching = 1; r.v3ReferenceComparison.opposing = 1;
+  }));
+});
+
+test('the HUMAN receipt rows equal the raw result bytes',
+  { skip: !HUMAN_RAW && 'P1B6_B003_REPAIR_HUMAN_RESULTS is not set; raw bytes are not committed' }, () => {
+    const raw = fs.readFileSync(HUMAN_RAW);
+    assert.equal(sha256RawBytes(raw), builder.HUMAN_RAW_RESULT_SHA256);
+    assert.doesNotThrow(validateHuman(() => {}, raw));
+    assert.throws(validateHuman(r => { r.rows[0].reason += '.'; }, raw), /differ from the raw result/);
+    assert.throws(validateHuman(() => {}, Buffer.concat([raw, Buffer.from('\n')])), /not the recorded evidence/);
+  });
