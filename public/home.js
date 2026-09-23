@@ -12,6 +12,7 @@
     route: 'home',
     homeView: 'overview',
     focusedCard: null,
+    notesView: 'notes',
     selectedDate: null,
     summary: null,
     tasks: [],
@@ -249,19 +250,43 @@
     ];
     groups.forEach(([label, value, handler]) => {
       const item = node('li');
-      if (state.focusedCard === 'notifications') item.append(action(`${label} ${value}개`, handler));
-      else item.append(node('span', '', label), node('span', '', `${value}개`));
+      if (state.focusedCard === 'notifications') {
+        const button = action('', handler);
+        button.append(node('span', '', label), node('span', '', `${value}개`));
+        item.append(button);
+      } else item.append(node('span', '', label), node('span', '', `${value}개`));
       list.append(item);
     });
     body.append(summary, list);
     if (state.focusedCard === 'notifications') {
       const detail = node('div', 'home-notification-groups');
-      [['시스템 알림', state.notifications.filter(item => item.source === 'system' || item.source === 'codex').length],
-        ['새 메일', mailNotifications().length],
-        ['일정 알림', state.notifications.filter(item => item.type === 'task_reminder').length],
-        ['강의 노트', '준비 중']].forEach(([label, value]) => {
+      const system = state.notifications.filter(item => item.source === 'system' || item.source === 'codex');
+      const mail = mailNotifications();
+      const reminders = state.notifications.filter(item => item.type === 'task_reminder');
+      const groups = [
+        ['시스템 알림', system.length, [
+          ['병합 검토', system.filter(item => item.type === 'merge').length],
+          ['분리 검토', system.filter(item => item.type === 'split').length],
+          ['기타', system.filter(item => !['merge', 'split'].includes(item.type)).length],
+        ]],
+        ['새 메일', mail.length, [
+          ['Gmail', mail.filter(item => item.provider === 'gmail').length],
+          ['Works', mail.filter(item => item.provider === 'works').length],
+          ['Naver', mail.filter(item => item.provider === 'naver').length],
+        ]],
+        ['일정 알림', reminders.length, [['일정 알림', reminders.length]]],
+        ['강의 노트', '준비 중', [['전사 완료', '준비 중']]],
+      ];
+      groups.forEach(([label, value, rows]) => {
         const group = node('div', 'home-notification-group');
-        group.append(node('strong', '', label), node('span', '', typeof value === 'number' ? `${value}개` : value));
+        const heading = node('div', 'home-notification-group-head');
+        heading.append(node('strong', '', label), node('span', '', typeof value === 'number' ? `${value}개` : value));
+        group.append(heading);
+        rows.forEach(([name, count]) => {
+          const row = node('div', 'home-notification-detail-row');
+          row.append(node('span', '', name), node('span', '', typeof count === 'number' ? String(count) : count));
+          group.append(row);
+        });
         detail.append(group);
       });
       body.append(detail, node('div', 'home-focus-extra'));
@@ -354,8 +379,9 @@
     if (knowledge && paper && paper.parentElement !== knowledge) knowledge.appendChild(paper);
   }
 
-  function mountLibrary(tab = 'notes', host = document.querySelector('.home-card-notes .home-focus-extra')) {
+  function mountLibrary(tab = state.notesView, host = document.querySelector('.home-card-notes .home-focus-extra')) {
     if (!host) return;
+    state.notesView = tab;
     const note = document.getElementById('note-panel');
     const paper = document.getElementById('paper-panel');
     if (!document.getElementById('home-note-detail')) note.append(node('div', 'home-library-detail'));
@@ -391,7 +417,7 @@
     const collapse = document.getElementById('home-focus-collapse');
     collapse.hidden = !state.focusedCard;
     if (state.focusedCard === 'mail') mountNotification('mail');
-    if (state.focusedCard === 'notes') mountLibrary('notes');
+    if (state.focusedCard === 'notes') mountLibrary();
   }
 
   function transitionOverview(nextCard) {

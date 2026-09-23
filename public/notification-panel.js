@@ -517,23 +517,35 @@
       const detail = document.createElement('div');
       detail.className = 'home-mail-workspace-detail';
       items.forEach(item => {
-        const row = document.createElement('button');
-        row.type = 'button';
+        const row = document.createElement('div');
         row.className = 'home-mail-workspace-row';
+        const select = document.createElement('button');
+        select.type = 'button';
+        select.className = 'home-mail-workspace-select';
         const sender = document.createElement('strong');
         sender.textContent = item.sender || '보낸사람 없음';
         const subject = document.createElement('span');
         subject.textContent = item.title || '(제목 없음)';
-        row.append(sender, subject);
-        row.addEventListener('click', () => {
+        const source = document.createElement('small');
+        source.textContent = providerLabel(item.provider);
+        select.append(sender, subject, source);
+        select.addEventListener('click', () => {
           list.querySelector('.active')?.classList.remove('active');
           row.classList.add('active');
           detail.replaceChildren(makeMailCard(item));
         });
+        const actions = document.createElement('div');
+        actions.className = 'home-mail-workspace-actions';
+        actions.append(
+          makeMailAction('완료', () => mailAction(item, 'done')),
+          makeMailAction('나중에', () => mailAction(item, 'snooze')),
+        );
+        if (item.senderAddress) actions.append(makeMailAction('알림 끄기', () => suppressSender(item)));
+        row.append(select, actions);
         list.appendChild(row);
       });
       content.append(list, detail);
-      list.firstElementChild.click();
+      list.firstElementChild.querySelector('.home-mail-workspace-select').click();
       return;
     }
     items.forEach(item => content.appendChild(
