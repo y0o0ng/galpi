@@ -1474,6 +1474,44 @@ two rows. **No HUMAN semantic review occurred, no HUMAN gold was assigned or
 frozen, no acceptance, HELD release or training occurred.** The fresh blind HUMAN
 review under v3 is now unblocked but not built.
 
+### Batch-003 repair blind HUMAN review packet
+
+The fresh blind HUMAN review of `162` and `214` has its own protocol,
+`fixtures/local-memory-inference-p1b6-batch-003-repair-human-review-protocol.json`
+(`p1b6-batch-003-repair-blind-human-review-v3-v1`, raw SHA-256
+`bb7c79d484b35df0ef91c8cf29781d048e15cef481b878d1cd18e8b88311e10d`). The batch-003
+v2 adjudication/calibration protocol is not reused because its question carries the
+superseded v2 `unknownIsNotAmbiguity` clause. The new protocol binds v3 (`89a48264…`)
+and its contract receipt (`10f8a10e…`) by identity and raw SHA, and quotes the v3
+`clear` / `escalate` / `uncertaintyDistinction` / `targetBoundary` /
+`pragmaticResolution` texts and the retained `noAddedPremise` clause verbatim.
+Outcomes are `KEEP`+`CLEAR`, `KEEP`+`ESCALATE`, `FIX`+`null`, `REJECT`+`null`
+with a non-empty reason. A HUMAN decision opposing the v3 reference label does not
+relabel the skeleton or accept the surface; ingestion and acceptance are later,
+separate steps. The protocol names no row and no expected answer.
+
+`scripts/build-memory-inference-p1b6-batch-003-repair-human-review-packet.js`
+(`npm run build:memory-inference-p1b6-batch-003-repair-human-review-packet --
+--output <path>`) pins the audit receipt (`60191c33…`) and the protocol by raw SHA,
+rebuilds the audit packet and fails closed unless the receipt binds it (`b32f57a4…`),
+the candidate, the source-audit protocol and v3; is `COMPLETE_PASS` with summary
+exactly `2 PASS / 0 FAIL / 0 UNCERTAIN`; covers exactly the two rebuilt opaque audit
+IDs once each, all `PASS` with a reason; records fresh judgments with nothing
+inherited; and claims only source-bundle gate passage.
+
+Each row carries only an opaque `p1b6-b003-repair-review-` ID (hash of packet
+identity, candidate SHA and the hidden item ID; disjoint from every prior review and
+audit namespace) and the `selectedBundle` bytes taken from the audited packet row —
+no source episode, identity, split, boundary, label, history, audit reason, repair
+rationale or intended reading. Rows are sorted by opaque ID. The packet is transient
+and gitignored; it is deterministic at raw SHA-256
+`2d58d919f94ce32520b9fd4e74974581364fb7b291a0ee148fe89ae795e381a7` (2 rows).
+
+**The HUMAN review is NOT RUN and no HUMAN decision exists.** The reviewer is the
+repository owner, who took part in resolving these repairs and knows the population
+is repaired realizations; row blindness is therefore not an independent
+confirmation, and the eventual HUMAN result receipt must record that limitation.
+
 ## Closed Selection and Freeze Constraints
 
 The accepted surface pool is selected through a deterministic, constrained,

@@ -4906,3 +4906,25 @@ stays **93**.
 
 Tests run locally: `node --test test/memory-inference-p1b6-batch-003-repair-source-audit-packet.test.js`
 (9/9 pass, including the new receipt-binding test).
+
+#### P1-B6 batch-003 repair blind HUMAN review packet — CONSTRUCTED / HUMAN REVIEW NOT RUN
+
+The repair source audit stays **COMPLETE_PASS 2/2**. The blind v3 HUMAN review packet
+for `162` and `214` is built; contracts are in the design section "Batch-003 repair
+blind HUMAN review packet".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-003-repair-human-review-protocol.json` (`p1b6-batch-003-repair-blind-human-review-v3-v1`) | `bb7c79d484b35df0ef91c8cf29781d048e15cef481b878d1cd18e8b88311e10d` |
+| blind HUMAN packet (not committed, 2 rows) | `2d58d919f94ce32520b9fd4e74974581364fb7b291a0ee148fe89ae795e381a7` |
+
+**No HUMAN review was run and no HUMAN decision exists. No surface is accepted.**
+Replacement-skeleton authoring and the v3 re-reconciliation of the other surfaces on
+the three reversed skeletons are unchanged and still pending. No acceptance, freeze,
+HELD release or training; the accepted pool stays **93**.
+
+Tests run locally: the new `…-batch-003-repair-human-review-packet` suite (14/14),
+`…-batch-003-repair-source-audit-packet` and `…-batch-003-resolution` (15/15), and
+every `test/memory-inference-p1b6-*.test.js` suite (261 tests: 259 pass / 0 fail /
+2 skipped — the raw-bytes tests, which skip without the uncommitted artifacts). No CI
+result is claimed.

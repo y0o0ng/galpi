@@ -1,0 +1,89 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-repair-human-review-protocol-v1",
+  "protocolIdentity": "p1b6-batch-003-repair-blind-human-review-v3-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "isHumanProtocol": true,
+  "isSourceAuditProtocol": false,
+  "semanticContract": {
+    "interpretationRuleIdentity": "P1B6_SEMANTIC_CONTRACT_V3",
+    "semanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "semanticContractReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+      "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1"
+    },
+    "notUsed": "The batch-003 v2 adjudication/calibration protocol is not reused: its question carries the superseded v2 unknownIsNotAmbiguity clause."
+  },
+  "question": {
+    "task": "Reading only the visible selected bundle and its single marked TARGET, judge the realization under semantic contract v3.",
+    "clear": "CLEAR when the visible evidence provides the TARGET's materially relevant semantic status. The provided status does not need to be exact or final: an approximate, tentative, conditional, attributed, explicitly undecided, or otherwise uncertain status is CLEAR when that uncertain status itself is what the visible evidence gives.",
+    "escalate": "ESCALATE when the visible evidence does not provide the TARGET's materially relevant semantic status, either because multiple materially different readings remain unresolved or because a fact or relation necessary to state the TARGET status is absent from the visible evidence.",
+    "uncertaintyDistinction": "An uncertain status that is itself given is CLEAR. A TARGET status that cannot be stated without additional information, yielding only 'unknown / cannot tell', is ESCALATE.",
+    "targetBoundary": "Judge the TARGET itself, not a downstream inference derived from it. Do not ESCALATE merely because downstream eligibility, policy application, cause, durability, or another consequence remains unknown when the TARGET status itself is given. Conversely, do not invent missing facts or rules to turn an unknown TARGET status into CLEAR.",
+    "pragmaticResolution": "Ordinary pragmatic resolution remains allowed when it is actually supported by the visible discourse. The standard is not literal mathematical explicitness.",
+    "noAddedPremise": "Do not preserve a competing reading that requires an unstated event, identity assumption, grandfathering or effective-time rule, old ordering, hidden preference, category rule, exception, or other added premise."
+  },
+  "sourceAuditPrerequisite": {
+    "receiptIdentity": "xion-local-memory-inference-p1b6-batch-003-repair-source-audit-attempt-001-receipt-v1",
+    "requiredStatus": "COMPLETE_PASS",
+    "requiredSummary": { "total": 2, "PASS": 2, "FAIL": 0, "UNCERTAIN": 0 }
+  },
+  "population": {
+    "rows": 2,
+    "derivation": "mechanically from the canonical batch-003 repair candidate and the rebuilt, audited repair source-audit packet; never from a supplied list",
+    "visibleBundleSource": "the selectedBundle bytes of the audited source-audit packet row, unchanged"
+  },
+  "reviewer": {
+    "role": "repository owner, blind HUMAN semantic realization reviewer",
+    "mayAmendCatalog": false,
+    "participatedInRepairResolution": true,
+    "knowsPopulationIsRepairedRealizations": true,
+    "independenceNote": "Row blindness does not make this an independent confirmation. The eventual HUMAN result receipt must record this limitation."
+  },
+  "visibleToReviewer": [
+    "an opaque HUMAN review row ID",
+    "the exact audited selected bundle with its single TARGET marking"
+  ],
+  "blindFields": [
+    "item ID",
+    "source episode ID",
+    "family ID",
+    "semantic skeleton ID",
+    "split",
+    "boundary class",
+    "v3 reference label",
+    "v2 label",
+    "historical HUMAN decision",
+    "source-audit disposition or reason",
+    "repair rationale",
+    "intended unresolved readings",
+    "expected result",
+    "construction type of the row",
+    "source artifact row order",
+    "full source episode"
+  ],
+  "ordering": "ascending opaque review row ID, not source item order",
+  "outputContract": {
+    "container": "a JSON object whose only key is results, an array with exactly one row per packet row",
+    "required": ["reviewRowId", "disposition", "decision", "reason"],
+    "allowedOutcomes": [
+      { "disposition": "KEEP", "decision": "CLEAR" },
+      { "disposition": "KEEP", "decision": "ESCALATE" },
+      { "disposition": "FIX", "decision": null },
+      { "disposition": "REJECT", "decision": null }
+    ],
+    "reason": "Non-empty short semantic or construction reason."
+  },
+  "dispositions": {
+    "KEEP": "The visible realization supports a stable semantic judgment. Requires decision CLEAR or ESCALATE.",
+    "FIX": "The visible realization appears repairable but is not clean enough to accept. Uses decision null.",
+    "REJECT": "The realization is ill-defined, incoherent, implausible, or lacks a meaningful stable semantic judgment. Uses decision null."
+  },
+  "constraints": [
+    "A HUMAN decision opposing the v3 reference label does NOT silently relabel the skeleton, amend the catalog, or automatically accept the surface.",
+    "No HUMAN decision, by itself, accepts a surface; result ingestion and any acceptance are separate later steps.",
+    "This protocol authorizes no acceptance, no reference-label freeze, no batch-003 acceptance, no reconciliation of other surfaces, no replacement-skeleton authoring, no HELD release and no training."
+  ]
+}
