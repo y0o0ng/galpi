@@ -57,6 +57,10 @@ Calendar·Tasks는 1행, Mail·Notifications·Notes는 2행, D-Day는 3행을 �
 삼는다. 특히 Notes가 Calendar의 포커스 위치로 이동해서는 안 된다. 주변 카드만 빈 자리와
 윗줄로 재배치한다.
 
+Mail focus에서는 다른 카드를 윗줄로 옮기지 않는다. 기존 1·2·3행의 순서를 유지하면서
+행 높이를 95·440·95px로 바꿔 메일이 원래 2행에서 790×440으로 커진다. 총 높이는
+기본 격자와 같은 670px이다.
+
 Calendar focus의 데스크톱 기준은 왼쪽 115×210 카드 네 개, 오른쪽 790×440 Calendar,
 아래 D-Day 115×210·Lecture Notes 452.5×210·Notes 452.5×210이다. Pad portrait는 왼쪽
 230×150 카드 네 개, 오른쪽 490×684 Calendar, 그 아래 알림·메일·D-Day 세 카드다.
@@ -92,6 +96,9 @@ Calendar의 P1은 사라지지 않고 표현을 바꾼다. 데스크톱 기본 �
 
 확장 Calendar의 일정 추가·전체 일정·등록·변경은 기존 `TaskPanel`과 task API를 사용한다.
 별도 일정 form이나 상태 기계를 만들지 않는다.
+Calendar focus의 오른쪽 상단은 날짜 pill·세로 구분선·전체 일정·세로 구분선·일정 추가하기의
+25px 선택기이며, 일정 제목과 목록은 그 아래에 둔다. Notes focus의 노트·논문 선택기는
+카드 헤더 안의 16px 텍스트와 세로 구분선이다. 각 상세 목록·동작은 기존 NotePanel/PaperPanel을 쓴다.
 
 셸의 갈피 로고, 탐색 점, 알림·테마·더보기 아이콘과 일정 체크 원은 Figma 원본 SVG를
 `public/assets/figma/`에 보관해 사용한다. 날씨 이모지는 Figma 원본에서도 문자로 표현된다.

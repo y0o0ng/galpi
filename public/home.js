@@ -210,7 +210,13 @@
     body.append(monthHead, grid, agenda);
     if (state.focusedCard === 'calendar') {
       const actions = node('div', 'home-card-actions');
-      actions.append(node('span', 'calendar-selected-date', selectedLabel), action('전체 일정', () => openTaskPanel({ view: 'today' })), action('일정 추가하기', () => openTaskPanel({ compose: true }), true));
+      actions.append(
+        node('span', 'calendar-selected-date', selectedLabel),
+        node('span', 'calendar-action-divider'),
+        action('전체 일정', () => openTaskPanel({ view: 'today' })),
+        node('span', 'calendar-action-divider'),
+        action('일정 추가하기', () => openTaskPanel({ compose: true })),
+      );
       body.append(actions, node('div', 'home-focus-extra'));
     }
     return card('calendar', '달력', '', body);
@@ -362,8 +368,12 @@
     if (state.focusedCard !== 'notes') body.append(list);
     if (state.focusedCard === 'notes') {
       const tabs = node('nav', 'home-library-tabs');
-      tabs.append(action('노트', () => mountLibrary('notes'), true), action('논문', () => mountLibrary('papers')));
-      body.append(tabs, node('div', 'home-focus-extra'));
+      tabs.setAttribute('aria-label', '노트 보기 선택');
+      tabs.append(action('노트', () => mountLibrary('notes'), true), node('span', 'home-library-divider'), action('논문', () => mountLibrary('papers')));
+      body.append(node('div', 'home-focus-extra'));
+      const article = card('notes', '노트', '최근 저장 노트', body);
+      article.querySelector('.home-card-head').replaceChildren(tabs, node('span', 'home-library-meta', '최근 저장 노트'));
+      return article;
     }
     return card('notes', '노트', '최근 저장 노트', body);
   }
@@ -389,9 +399,12 @@
     note.lastElementChild.id = 'home-note-detail';
     paper.lastElementChild.id = 'home-paper-detail';
     host.append(note, paper);
-    const [noteTab, paperTab] = host.parentElement.querySelectorAll('.home-library-tabs button');
+    const [noteTab, paperTab] = host.closest('.home-card-notes').querySelectorAll('.home-library-tabs button');
     noteTab?.classList.toggle('primary', tab === 'notes');
     paperTab?.classList.toggle('primary', tab === 'papers');
+    noteTab?.setAttribute('aria-pressed', String(tab === 'notes'));
+    paperTab?.setAttribute('aria-pressed', String(tab === 'papers'));
+    host.closest('.home-card-notes').querySelector('.home-library-meta').textContent = tab === 'notes' ? '최근 저장 노트' : '저장된 논문';
     global.PaperPanel?.setTab(tab);
   }
 

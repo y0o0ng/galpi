@@ -148,8 +148,8 @@ test('turns are spaced wider than the paragraphs inside one answer', () => {
 });
 
 test('control radii keep one step instead of three values a pixel apart', () => {
-  // 8·9·10px은 눈으로 구분되지 않는다. 세 값이 공존하면 규칙이 아니라 사고로 읽힌다.
-  assert.doesNotMatch(css, /border-radius: 8px;/);
+  // 집중 노트 목록의 8px은 Figma 값이고, 나머지 공통 컨트롤은 기존 단계를 유지한다.
+  assert.match(css, /\.home-card-notes\.focused \.note-library-card,[^}]*border-radius: 8px;/s);
   assert.doesNotMatch(css, /border-radius: 9px;/);
   // 40px 컨트롤은 옆의 원과 같은 가족이 되도록 높이의 절반을 쓴다.
   assert.match(css, /#chat-model-button \{[^}]*height: 40px;[^}]*border-radius: 20px/s);
@@ -219,6 +219,7 @@ test('Home uses the approved 16-column geometry and responsive card flow', () =>
 
 test('every desktop focus layout fits the original three-row Home canvas without overlap', () => {
   assert.match(css, /#home-grid\.has-focus \{ grid-template-rows: repeat\(3, 210px\); \}/);
+  assert.match(css, /#home-grid\.has-focus\.focus-mail \{ grid-template-rows: 95px 440px 95px; \}/);
   const cards = ['weather', 'tasks', 'calendar', 'mail', 'notifications', 'dday', 'lecture', 'notes'];
   for (const focus of ['calendar', 'tasks', 'mail', 'notifications', 'dday', 'notes']) {
     const occupied = new Set();
@@ -240,6 +241,9 @@ test('every desktop focus layout fits the original three-row Home canvas without
     ['notifications', 2, 5], ['dday', 3, 1], ['notes', 2, 5],
   ]) {
     assert.match(css, new RegExp(`#home-grid\\.focus-${card} \\.home-card-${card} \\{ grid-area: ${row} \\/ ${column} \\/ span`));
+  }
+  for (const [card, row] of [['weather', 1], ['tasks', 1], ['calendar', 1], ['mail', 2], ['notifications', 2], ['dday', 3], ['lecture', 3], ['notes', 3]]) {
+    assert.match(css, new RegExp(`#home-grid\\.focus-mail \\.home-card-${card} \\{ grid-area: ${row} \\/`));
   }
 });
 
@@ -316,6 +320,18 @@ test('Calendar keeps the Figma month and compact weeks with one event marker per
   const compact = css.slice(css.lastIndexOf('@media (min-width: 641px)'));
   assert.match(compact, /@container \(max-width: 150px\)[\s\S]*?\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{ width: 18px; height: 18px; margin: 0; \}/);
   assert.match(compact, /@media \(max-width: 640px\)[\s\S]*?\.calendar-day\.selected:not\(\.today\) \.calendar-day-number \{\s*width: 15px;\s*height: 15px;/);
+  assert.match(home, /node\('span', 'calendar-action-divider'\)/);
+  assert.match(css, /grid-template-columns: minmax\(0, 287\.5px\) minmax\(0, 1fr\);\s*grid-template-rows: 24px minmax\(0, 1fr\);\s*column-gap: 41\.5px/s);
+  assert.match(css, /grid-template-columns: 110px 1px 110px 1px 110px/);
+  assert.match(css, /\.home-card-calendar\.focused \.calendar-agenda \{[^}]*padding-top: 31px/s);
+});
+
+test('focused Notes uses the Figma text selector in its card header', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
+  assert.match(home, /article\.querySelector\('\.home-card-head'\)\.replaceChildren\(tabs,/);
+  assert.match(home, /node\('span', 'home-library-divider'\)/);
+  assert.match(home, /host\.closest\('\.home-card-notes'\)\.querySelectorAll\('\.home-library-tabs button'\)/);
+  assert.match(css, /\.home-card-notes\.focused \.home-library-tabs \.home-card-action \{[^}]*background: transparent;[^}]*font-size: 16px/s);
 });
 
 test('Home actions reuse TaskPanel, Mail settings, and Codex settings', () => {

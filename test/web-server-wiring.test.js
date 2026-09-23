@@ -65,7 +65,7 @@ function textResponse(index) {
   };
 }
 
-async function startServer(t, { webEnabled, responseMode = 'final' }) {
+async function startServer(t, { webEnabled, responseMode = 'final', voiceEnabled = false }) {
   const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'web-wiring-server-'));
   const vaultPath = path.join(appRoot, 'vault');
   await fs.mkdir(vaultPath);
@@ -154,6 +154,7 @@ async function startServer(t, { webEnabled, responseMode = 'final' }) {
       CODEX_RUNNER_MODE: 'heuristic',
       ASSISTANT_TASKS_ENABLED: 'false',
       WEB_PUSH_ENABLED: 'false',
+      VOICE_HALFDUPLEX_ENABLED: voiceEnabled ? 'true' : 'false',
       MAIL_AGENT_ENABLED: 'false',
       NEWS_AGENT_ENABLED: 'false',
       GITHUB_MCP_CHAT_ENABLED: 'false',
@@ -179,6 +180,7 @@ async function startServer(t, { webEnabled, responseMode = 'final' }) {
   await waitForServer(child, url, logs);
 
   return {
+    url,
     responseRequests,
     tavilyRequests,
     async ask(message, source) {
@@ -198,6 +200,14 @@ async function startServer(t, { webEnabled, responseMode = 'final' }) {
     },
   };
 }
+
+test('enabled half-duplex is published to the chat composer by the server', async t => {
+  const { url } = await startServer(t, { webEnabled: false, voiceEnabled: true });
+  const response = await fetch(`${url}/api/config`, { headers: { 'X-API-Token': API_TOKEN } });
+  assert.equal(response.status, 200);
+  const config = await response.json();
+  assert.equal(config.halfDuplexVoice.halfDuplexEnabled, true);
+});
 
 test('disabled web policy exposes neither web model tool', async t => {
   const server = await startServer(t, { webEnabled: false });
