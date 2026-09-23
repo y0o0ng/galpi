@@ -28,7 +28,9 @@ gates are:
 - fresh surface authoring, then the normal source-audit and blind-review gates,
   for the two replacement skeletons;
 - re-reconciliation under v3 of the remaining batch-003 surfaces on the three
-  reversed skeletons.
+  reversed skeletons — the fresh strong-model review is **reconciled at 19 agree / 5
+  HUMAN-routed** (see "Batch-003 targeted v3 re-reconciliation"); the 8-row blind HUMAN
+  packet (5 mandatory + 3 calibration) is not yet built or run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1538,7 +1540,7 @@ After validation the hidden roles were restored from canonical artifacts: both d
 surface and freezes no label; batch-003 acceptance, HELD release and training remain
 unopened and the accepted pool stays **93**.
 
-### Batch-003 targeted v3 re-reconciliation — preregistered, strong-model review NOT RUN
+### Batch-003 targeted v3 re-reconciliation — strong-model review reconciled, HUMAN NOT RUN
 
 The three v3 reversals (`2da4e54e`, `5269c91f`, `b8e64a03`, CLEAR → ESCALATE) change the
 semantic authority over batch-003 surfaces whose text did not change. The remaining **24**
@@ -1590,8 +1592,31 @@ byte-identical to the historical 301-row packet's bundle for the same item. The 
 transient and gitignored; it is deterministic at raw SHA-256
 `665755e2e9704240d55d99749af68c17c5882f3c73a9f0867286883f82db1b74` (24 rows).
 
-**The strong-model review is NOT RUN.** No result exists, nothing is ingested, accepted or
-frozen; replacement-skeleton authoring is separately pending and the accepted pool stays **93**.
+**Strong-model review result — attempt 001.** Run externally in a fresh Claude Code CLI
+session started in the home directory (no project instructions or memory loaded), given only
+the protocol and packet paths. The result artifact carries no model metadata; the repository
+owner reported the reviewer as Claude Opus 5.5, the same model family as the reconciling
+session, in a separate fresh session. An earlier in-session attempt was discarded unrecorded
+because that session had project context naming the reversed skeletons.
+
+`scripts/reconcile-memory-inference-p1b6-batch-003-targeted-v3-strong-model-review.js`
+rebuilds the issued packet, derives the references from v3, applies the plan routing and
+writes
+`fixtures/local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001.json`
+(raw result SHA-256 `7fa5cd590046760f261db313d4d49139cf84319bcaedf675c24f7ae859e16fa8`,
+not committed).
+
+- raw: 24 KEEP; 19 ESCALATE / 5 CLEAR. All 24 v3 references are ESCALATE.
+- **19 clean agreements** → `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, not HUMAN gold.
+  They include `073`, `076` and `144`, whose v2 `HUMAN_ADJUDICATED` CLEAR stays immutable
+  history and is not a v3 decision.
+- **5 mandatory HUMAN rows**, all `DECISION_DISAGREEMENT` (model CLEAR vs reference
+  ESCALATE): `075`, `077`, `080`, `082` (`2da4e54e`) and `143` (`5269c91f`).
+- **3 calibration rows**: `076` (`2da4e54e`, pool 7), `144` (`5269c91f`, pool 1), `235`
+  (`b8e64a03`, pool 11).
+
+The 8-row blind HUMAN packet is **not built or run**. Nothing is accepted or frozen;
+replacement-skeleton authoring is separately pending and the accepted pool stays **93**.
 
 ## Closed Selection and Freeze Constraints
 

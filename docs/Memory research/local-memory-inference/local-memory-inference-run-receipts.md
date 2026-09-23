@@ -4970,3 +4970,28 @@ Tests run locally: the new `…-batch-003-targeted-v3-strong-model-review-packet
 (12/12), `…-batch-003-strong-model-review` (17/17), `…-skeleton-semantic-contract-v3` (8/8),
 `…-batch-003-resolution` (6/6), and every `test/memory-inference-p1b6-*.test.js` suite (276
 tests: 273 pass / 0 fail / 3 skipped — the raw-bytes tests). No CI result is claimed.
+
+#### P1-B6 batch-003 targeted v3 re-reconciliation — strong-model review attempt 001 RECONCILED / HUMAN NOT RUN
+
+Run externally in a fresh Claude Code CLI session in the home directory, given only the
+protocol and packet paths. Reviewer model as reported by the repository owner: Claude Opus
+5.5 (the result artifact carries no model metadata). Contracts and routing are in the design
+section "Batch-003 targeted v3 re-reconciliation".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw result `p1b6-v3-review-results.json` (not committed, 24 rows) | `7fa5cd590046760f261db313d4d49139cf84319bcaedf675c24f7ae859e16fa8` |
+| blind packet it answers (not committed) | `665755e2e9704240d55d99749af68c17c5882f3c73a9f0867286883f82db1b74` |
+| `fixtures/local-memory-inference-p1b6-targeted-v3-strong-model-review-batch-003-attempt-001.json` | receipt |
+
+- 24 KEEP; 19 ESCALATE / 5 CLEAR against 24 v3 ESCALATE references.
+- 19 agree → `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`.
+- 5 mandatory HUMAN (`DECISION_DISAGREEMENT`): `075`, `077`, `080`, `082`, `143`.
+- 3 calibration: `076`, `144`, `235`.
+
+The 8-row blind HUMAN packet is not built. No acceptance, reference freeze, HELD release or
+training; the accepted pool stays **93**.
+
+Tests run locally: the new `…-batch-003-targeted-v3-strong-model-review` suite (5/5) and
+every `test/memory-inference-p1b6-*.test.js` suite (281 tests: 278 pass / 0 fail / 3 skipped —
+the raw-bytes tests). No CI result is claimed.
