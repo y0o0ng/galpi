@@ -1,0 +1,71 @@
+{
+  "name": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-protocol-v1",
+  "protocolIdentity": "p1b6-targeted-v3-semantic-realization-review-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "isHumanProtocol": false,
+  "isSourceAuditProtocol": false,
+  "authorizedBy": {
+    "identity": "xion-local-memory-inference-p1b6-large-batch-review-authority-amendment-v1",
+    "amendmentId": "p1b6-large-batch-review-authority-v1",
+    "rawSha256": "821b0cb07580b4c2ac776014d88c78333263900759ca94d1746b4934964ffc0e"
+  },
+  "semanticContract": {
+    "interpretationRuleIdentity": "P1B6_SEMANTIC_CONTRACT_V3",
+    "semanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "semanticContractReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+      "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1"
+    }
+  },
+  "reviewer": {
+    "role": "fresh separate strong-model semantic realization reviewer",
+    "humanGoldAuthority": false,
+    "freshSessionRequired": true,
+    "knowsIntendedAnswer": false,
+    "knowsReferenceLabel": false,
+    "mayAmendCatalog": false
+  },
+  "question": {
+    "task": "Reading only the visible selected bundle and its single marked TARGET, judge the realization under semantic contract v3.",
+    "clear": "CLEAR when the visible evidence provides the TARGET's materially relevant semantic status. The provided status does not need to be exact or final: an approximate, tentative, conditional, attributed, explicitly undecided, or otherwise uncertain status is CLEAR when that uncertain status itself is what the visible evidence gives.",
+    "escalate": "ESCALATE when the visible evidence does not provide the TARGET's materially relevant semantic status, either because multiple materially different readings remain unresolved or because a fact or relation necessary to state the TARGET status is absent from the visible evidence.",
+    "uncertaintyDistinction": "An uncertain status that is itself given is CLEAR. A TARGET status that cannot be stated without additional information, yielding only 'unknown / cannot tell', is ESCALATE.",
+    "targetBoundary": "Judge the TARGET itself, not a downstream inference derived from it. Do not ESCALATE merely because downstream eligibility, policy application, cause, durability, or another consequence remains unknown when the TARGET status itself is given. Conversely, do not invent missing facts or rules to turn an unknown TARGET status into CLEAR.",
+    "pragmaticResolution": "Ordinary pragmatic resolution remains allowed when it is actually supported by the visible discourse. The standard is not literal mathematical explicitness.",
+    "noAddedPremise": "Do not preserve a competing reading that requires an unstated event, identity assumption, grandfathering or effective-time rule, old ordering, hidden preference, category rule, exception, or other added premise."
+  },
+  "visibleToReviewer": [
+    "an opaque review row ID",
+    "the exact selected bundle with its single TARGET marking"
+  ],
+  "sourceEpisodeExposure": {
+    "fullUnselectedSourceEpisodeShown": false,
+    "rationale": "Source and bundle completeness is a separate, earlier gate. This review is about the realization the reviewer actually sees."
+  },
+  "outputContract": {
+    "container": "a JSON object whose only key is results, an array with exactly one row per packet row",
+    "required": ["reviewRowId", "disposition", "decision", "reason"],
+    "allowedOutcomes": [
+      { "disposition": "KEEP", "decision": "CLEAR" },
+      { "disposition": "KEEP", "decision": "ESCALATE" },
+      { "disposition": "FIX", "decision": null },
+      { "disposition": "REJECT", "decision": null }
+    ],
+    "reason": "Non-empty short semantic or construction reason. It is not gold."
+  },
+  "dispositions": {
+    "KEEP": "The visible realization supports a stable semantic judgment. Requires decision CLEAR or ESCALATE.",
+    "FIX": "The visible realization appears repairable but is not clean enough to accept. Uses decision null.",
+    "REJECT": "The realization is ill-defined, incoherent, implausible, or lacks a meaningful stable semantic judgment. Uses decision null."
+  },
+  "constraints": [
+    "The reviewer runs in a fresh session separate from every authoring, repair and earlier review session.",
+    "The reviewer does not know any intended or reference answer and does not amend the catalog.",
+    "A REJECT is not an automatic ESCALATE.",
+    "Output is semantic QA evidence, not HUMAN gold.",
+    "This protocol authorizes no source edit, no acceptance, no label freeze, no HELD release, no training and no production use."
+  ]
+}

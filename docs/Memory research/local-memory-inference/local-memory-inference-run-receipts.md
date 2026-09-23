@@ -4947,3 +4947,26 @@ the accepted pool stays **93**.
 
 Tests run locally: the `…-batch-003-repair-human-review-packet` suite with the raw bytes
 supplied (17/17) and without (16 pass / 1 skipped).
+
+#### P1-B6 batch-003 targeted v3 re-reconciliation — PREREGISTERED / 24-row strong-model packet CONSTRUCTED / REVIEW NOT RUN
+
+`162` / `214` fresh HUMAN review stays complete at 2 KEEP + ESCALATE, not accepted. The
+other 24 surfaces on the three v3-reversed skeletons get a fresh v3 strong-model review;
+contracts are in the design section "Batch-003 targeted v3 re-reconciliation".
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-003-v3-rereconciliation-plan.json` (internal) | `ab0db3a730b5f2abc00d3209755f492f9a2f7bbf08ef9c4986b98e3e6ec1a887` |
+| `fixtures/local-memory-inference-p1b6-targeted-v3-strong-model-review-protocol.json` (`p1b6-targeted-v3-semantic-realization-review-v1`) | `8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892` |
+| blind strong-model packet (not committed, 24 rows) | `665755e2e9704240d55d99749af68c17c5882f3c73a9f0867286883f82db1b74` |
+
+Source audit is inherited, not rerun, only after the unchanged batch bytes and a mechanical
+PASS mapping for all 24 rows. Historical v2 semantic and HUMAN decisions are not transferred
+as v3 decisions. **The review is NOT RUN.** Replacement-skeleton authoring is separately
+pending. No acceptance, reference freeze, HELD release or training; the accepted pool stays
+**93**.
+
+Tests run locally: the new `…-batch-003-targeted-v3-strong-model-review-packet` suite
+(12/12), `…-batch-003-strong-model-review` (17/17), `…-skeleton-semantic-contract-v3` (8/8),
+`…-batch-003-resolution` (6/6), and every `test/memory-inference-p1b6-*.test.js` suite (276
+tests: 273 pass / 0 fail / 3 skipped — the raw-bytes tests). No CI result is claimed.

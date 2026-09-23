@@ -1538,6 +1538,61 @@ After validation the hidden roles were restored from canonical artifacts: both d
 surface and freezes no label; batch-003 acceptance, HELD release and training remain
 unopened and the accepted pool stays **93**.
 
+### Batch-003 targeted v3 re-reconciliation — preregistered, strong-model review NOT RUN
+
+The three v3 reversals (`2da4e54e`, `5269c91f`, `b8e64a03`, CLEAR → ESCALATE) change the
+semantic authority over batch-003 surfaces whose text did not change. The remaining **24**
+surfaces on those skeletons need a fresh v3 semantic review; historical v2 strong-model
+answers, the four v2 `HUMAN_ADJUDICATED` rows (`073`, `076`, `143`, `144`), the calibration
+row (`075`) and the 19 unsampled agreements stay immutable evidence but are **not
+transferred as v3 judgments**.
+
+**Internal plan** —
+`fixtures/local-memory-inference-p1b6-batch-003-v3-rereconciliation-plan.json`
+(raw SHA-256 `ab0db3a730b5f2abc00d3209755f492f9a2f7bbf08ef9c4986b98e3e6ec1a887`),
+never shown to the reviewer. It binds the historical batch, the batch-003 source-audit
+receipt, the v3 receipt and catalog, the resolution receipt, the review-authority amendment
+and the new protocol by identity and raw SHA, and preregisters:
+
+- population: v3 amendments with `reversesV2Amendment`, CLEAR → ESCALATE; every batch-003
+  item on those skeletons; minus the rows closed as `SEMANTIC_CONTRACT_CORRECTION` (`072`,
+  `142`, `145`, `231`, which must equal the amendments' `resolvesBatch003ItemIds`); exactly
+  24 rows at 11 / 2 / 11; every row source-audit PASS. No caller-supplied list is accepted.
+- source audit is not rerun: it is inherited only because the batch bytes are unchanged and
+  every row maps mechanically to PASS in the committed receipt.
+- routing after the result: `KEEP` + v3 reference → `CATALOG_STRONG_MODEL_CONFIRMED` /
+  `PROVISIONAL` (not HUMAN gold); `FIX`, `REJECT`, opposing `KEEP`, missing or invalid →
+  mandatory blind HUMAN adjudication.
+- calibration: per amended skeleton, if a fresh clean agreement exists, exactly one — the
+  lowest `sha256("p1b6-b003-v3-rereconciliation-calibration-v1" NUL itemId)`; size 0–3, no
+  cross-skeleton substitution, disjoint from mandatory rows, combined with them in one blind
+  HUMAN packet, not extrapolated. HUMAN semantics: mandatory matching `KEEP` →
+  `HUMAN_ADJUDICATED`, eligible; opposing / `FIX` / `REJECT` → ineligible; calibration
+  matching `KEEP` stays `CATALOG_STRONG_MODEL_CONFIRMED`; otherwise ineligible pending
+  explicit resolution.
+
+**Reviewer protocol** —
+`fixtures/local-memory-inference-p1b6-targeted-v3-strong-model-review-protocol.json`
+(`p1b6-targeted-v3-semantic-realization-review-v1`, raw SHA-256
+`8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892`). It quotes the v3
+rules and `noAddedPremise` verbatim, binds v3, its receipt and the amendment, and names no
+skeleton, item, reference label, reversal or expected direction. Reviewer: fresh separate
+session, no HUMAN-gold authority, no knowledge of reference labels.
+
+**Packet** —
+`scripts/build-memory-inference-p1b6-batch-003-targeted-v3-strong-model-review-packet.js`
+(`npm run build:memory-inference-p1b6-batch-003-targeted-v3-strong-model-review-packet --
+--output <path>`) pins every input by raw SHA, validates the audit receipt through the
+unchanged historical validator (which rebuilds the audit packet and maps opaque audit IDs),
+derives the population as above and renders bundles with the canonical renderer. Rows carry
+only a `p1b6-v3smreview-` ID and the `selectedBundle`, sorted by ID; each bundle is
+byte-identical to the historical 301-row packet's bundle for the same item. The packet is
+transient and gitignored; it is deterministic at raw SHA-256
+`665755e2e9704240d55d99749af68c17c5882f3c73a9f0867286883f82db1b74` (24 rows).
+
+**The strong-model review is NOT RUN.** No result exists, nothing is ingested, accepted or
+frozen; replacement-skeleton authoring is separately pending and the accepted pool stays **93**.
+
 ## Closed Selection and Freeze Constraints
 
 The accepted surface pool is selected through a deterministic, constrained,

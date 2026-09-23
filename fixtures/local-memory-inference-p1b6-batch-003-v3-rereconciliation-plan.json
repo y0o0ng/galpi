@@ -1,0 +1,113 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-v3-rereconciliation-plan-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "visibility": "REPOSITORY_INTERNAL_NEVER_SHOWN_TO_THE_STRONG_MODEL_REVIEWER",
+  "inputs": {
+    "historicalSourceBatch": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+      "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68"
+    },
+    "sourceAuditReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-source-audit-batch-003-attempt-001-receipt-v1",
+      "rawSha256": "3c840476bea6eccb522800248a3ace277b26a5334ec56b5f6b10bbf4d5821221"
+    },
+    "semanticContractV3Receipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+      "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1"
+    },
+    "semanticAuthorityV3": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "resolutionReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-batch-003-resolution-receipt-v1",
+      "rawSha256": "61c29218a360bf914c6453758c7fc243e629f1b5d400e38426d9d18720cb1ffe"
+    },
+    "reviewAuthorityAmendment": {
+      "identity": "xion-local-memory-inference-p1b6-large-batch-review-authority-amendment-v1",
+      "rawSha256": "821b0cb07580b4c2ac776014d88c78333263900759ca94d1746b4934964ffc0e"
+    },
+    "strongModelReviewProtocol": {
+      "identity": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-protocol-v1",
+      "rawSha256": "8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892"
+    }
+  },
+  "population": {
+    "rule": [
+      "take the v3 receipt amendments with reversesV2Amendment true, fromHumanLabel CLEAR and toHumanLabel ESCALATE",
+      "collect every historical batch-003 item whose semanticSkeletonId is one of those skeletons",
+      "remove the rows the resolution receipt already closed as SEMANTIC_CONTRACT_CORRECTION",
+      "require exactly 24 remaining rows, 11 / 2 / 11 across the three skeletons",
+      "require every remaining row to map mechanically to source-audit PASS"
+    ],
+    "callerSuppliedListsAccepted": false,
+    "expectedCount": 24,
+    "expectedPerSkeleton": {
+      "p1b6-sk-2da4e54e6609e34b": 11,
+      "p1b6-sk-5269c91fcfb6c2cd": 2,
+      "p1b6-sk-b8e64a03d97f251c": 11
+    }
+  },
+  "sourceAuditInheritance": {
+    "freshSourceAudit": false,
+    "basis": "The historical batch bytes are unchanged and each targeted row maps mechanically, through the rebuilt audit-row ID mapping, to PASS in the committed batch-003 source-audit receipt. The selected bundles are byte-identical to those the historical strong-model packet rendered."
+  },
+  "historicalSemanticEvidence": {
+    "preserved": true,
+    "transferredAsV3Decision": false,
+    "note": "Historical v2 strong-model answers, HUMAN adjudications and calibration results stay immutable evidence. None is reinterpreted as a v3 judgment; every targeted row needs a fresh v3 semantic review.",
+    "v2HumanAdjudicatedItemIds": ["p1b6-item-b003-073", "p1b6-item-b003-076", "p1b6-item-b003-143", "p1b6-item-b003-144"],
+    "v2HumanCalibrationItemIds": ["p1b6-item-b003-075"],
+    "v2UnsampledCatalogStrongModelConfirmedCount": 19
+  },
+  "freshSemanticReviewRequiredForAll": true,
+  "routing": {
+    "cleanAgreement": {
+      "condition": "disposition KEEP and decision equal to the v3 reference label",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "createsHumanGold": false
+    },
+    "mandatoryHumanAdjudication": {
+      "routeWhen": [
+        "disposition FIX",
+        "disposition REJECT",
+        "KEEP decision differs from the v3 reference label",
+        "result missing or invalid"
+      ]
+    },
+    "calibration": {
+      "population": "FRESH_V3_CLEAN_AGREEMENT_ROWS_ONLY",
+      "hashDomain": "p1b6-b003-v3-rereconciliation-calibration-v1",
+      "rule": "For each of the three amended skeletons separately, if at least one fresh clean-agreement row exists, select exactly one: the row with the lowest sha256 of the hash domain, a NUL separator and the itemId.",
+      "sizeRange": [0, 3],
+      "substituteAcrossSkeletons": false,
+      "disjointFromMandatoryHuman": true,
+      "extrapolatedToUnsampledAgreements": false
+    },
+    "humanPacket": "mandatory and calibration rows are combined in one blind HUMAN packet that does not reveal row role",
+    "humanSemantics": {
+      "mandatory": {
+        "KEEP_matching_v3_reference": "HUMAN_ADJUDICATED; eligible",
+        "KEEP_opposing_v3_reference": "ineligible pending explicit surface resolution",
+        "FIX": "ineligible",
+        "REJECT": "ineligible"
+      },
+      "calibration": {
+        "KEEP_matching_v3_reference": "stays CATALOG_STRONG_MODEL_CONFIRMED; not promoted to HUMAN_ADJUDICATED or HUMAN gold",
+        "KEEP_opposing_v3_reference": "ineligible pending explicit resolution",
+        "FIX": "ineligible pending explicit resolution",
+        "REJECT": "ineligible pending explicit resolution"
+      }
+    }
+  },
+  "authority": {
+    "strongModelReviewRun": false,
+    "resultIngested": false,
+    "humanReviewRun": false,
+    "surfaceAccepted": false,
+    "referenceLabelFrozen": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  }
+}
