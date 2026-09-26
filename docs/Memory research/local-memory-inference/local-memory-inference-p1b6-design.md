@@ -1774,6 +1774,18 @@ result, so the result is not an independent confirmation. Both rows are calibrat
 matching KEEP stays `CATALOG_STRONG_MODEL_CONFIRMED` and is not promoted to
 `HUMAN_ADJUDICATED`.
 
+**HUMAN review result — attempt 001 (2026-09-26).** Decisions are the owner's; a model
+presented the rows and helped format the JSON without judging (owner-reported: GPT-5.6 sol).
+Raw result `p1b6-tb1-human-review-results.json` (raw SHA-256
+`ac4f1882b4d840e12a3302dc34311e72f88c7a537abcb10a136a274e78ef6231`, not committed) is
+ingested by the same builder (`--results <raw> --date <YYYY-MM-DD>`) into
+`fixtures/local-memory-inference-p1b6-target-boundary-human-review-attempt-001.json`: **both
+KEEP ESCALATE, matching v3**. As calibration rows they stay `CATALOG_STRONG_MODEL_CONFIRMED` /
+`PROVISIONAL`; none becomes `HUMAN_ADJUDICATED`, and this is not an independent confirmation.
+**Both skeletons are shown to be realizable under v3 with TARGET on the applicability /
+membership status itself.** How many fresh surfaces the corpus needs is left to ordinary
+top-up; nothing is accepted and the accepted pool stays **93**.
+
 `p1b6-item-b002-047` (accepted, `5269c91f`, TARGET `resident rate`) is out of scope; the
 accepted pool stays **93**. No acceptance, reference freeze, FINAL selection, HELD release or
 training.

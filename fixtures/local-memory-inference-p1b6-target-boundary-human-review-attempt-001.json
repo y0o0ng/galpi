@@ -1,0 +1,70 @@
+{
+  "name": "xion-local-memory-inference-p1b6-target-boundary-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-target-boundary-human-review-attempt-001",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-09-26",
+  "reviewProtocol": {
+    "identity": "p1b6-target-boundary-blind-human-review-v1",
+    "sha256": "e8b9f7281d3200f9b41599782847950d94082026fdfaf15d98d2e3c71a392ade"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-target-boundary-human-review-packet-v1",
+    "sha256": "74f1886e502292fd189bd286c6dff1a8a626c4d600d7b9897c23c5e2038e8a3b",
+    "rows": 2
+  },
+  "v3ReviewReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-target-boundary-v3-review-attempt-001-receipt-v1",
+    "rawSha256": "f8042d1800f64e06a978e97318d3c17428fe5d6ecce252a6ab1533ff0392e58c"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-tb1-human-review-results.json",
+    "sha256": "ac4f1882b4d840e12a3302dc34311e72f88c7a537abcb10a136a274e78ef6231",
+    "committed": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "presentationAid": "a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)",
+    "independentConfirmation": false,
+    "limitation": "The owner specified the realization prototypes, knew both skeletons' v3 reference is ESCALATE and was told the strong-model result; row blindness hid only which row was which."
+  },
+  "summary": {
+    "total": 2,
+    "matchingV3Reference": 2,
+    "humanAdjudicated": 0
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-tb1-hreview-d492de3c7e6daf42",
+      "itemId": "p1b6-item-tb1-001",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "동생은 문맥상 사촌동생으로 고정되지만, 사촌동생이 구민인지 아닌지에 대한 정보가 없어 TARGET인 동생 입장료를 결정하려면 추가 정보가 필요하다.",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-tb1-hreview-311b4672451ab788",
+      "itemId": "p1b6-item-tb1-002",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "TARGET인 우수 회원 여부에 대한 실제 결과가 대화에 없고, 사용자도 서점에 물어봐야 한다고만 했으므로 추가 정보가 필요하다.",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "authority": {
+    "promotedToHumanAdjudicated": false,
+    "catalogAmendedByThisResult": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

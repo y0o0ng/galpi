@@ -5102,3 +5102,17 @@ No review, HUMAN review or acceptance; the accepted pool stays **93**.
 Fresh external session, reviewer reported as Claude Opus 5.5: 2 KEEP ESCALATE, matching v3;
 both rows are per-skeleton calibration rows. No HUMAN review or acceptance; the accepted pool
 stays **93**.
+
+#### P1-B6 TARGET-boundary candidates — HUMAN review attempt 001 RECORDED (2026-09-26)
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw HUMAN result `p1b6-tb1-human-review-results.json` (not committed, 2 rows) | `ac4f1882b4d840e12a3302dc34311e72f88c7a537abcb10a136a274e78ef6231` |
+| blind HUMAN packet it answers (not committed) | `74f1886e502292fd189bd286c6dff1a8a626c4d600d7b9897c23c5e2038e8a3b` |
+| `fixtures/local-memory-inference-p1b6-target-boundary-human-review-attempt-001.json` | receipt |
+
+Owner decisions, model as row presenter and JSON formatter only. 2 KEEP ESCALATE matching v3;
+both calibration rows stay `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, 0
+`HUMAN_ADJUDICATED`. Not independent. No acceptance; the accepted pool stays **93**.
+
+Tests run locally: `…-target-boundary-human-review-packet` with the raw bytes supplied (6/6).

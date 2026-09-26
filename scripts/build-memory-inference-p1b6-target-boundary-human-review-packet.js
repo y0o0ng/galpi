@@ -95,13 +95,104 @@ function buildHumanReviewPacket() {
   };
 }
 
+const RECEIPT_FIXTURE = 'local-memory-inference-p1b6-target-boundary-human-review-attempt-001.json';
+const RAW_RESULT_FILENAME = 'p1b6-tb1-human-review-results.json';
+
+// Routing preregistered in the internal TARGET-boundary v3 review plan.
+function routeHumanResult(role, referenceLabel, row) {
+  const matches = row.disposition === 'KEEP' && row.decision === referenceLabel;
+  if (role === 'mandatory') {
+    return matches ? { provenance: 'HUMAN_ADJUDICATED', eligibility: 'ELIGIBLE' }
+      : { provenance: null, eligibility: 'INELIGIBLE' };
+  }
+  return matches ? { provenance: 'CATALOG_STRONG_MODEL_CONFIRMED', eligibility: 'PROVISIONAL' }
+    : { provenance: null, eligibility: 'INELIGIBLE_PENDING_RESOLUTION' };
+}
+
+function buildHumanResultReceipt(rawResultBytes, reviewDate) {
+  const packet = buildHumanReviewPacket();
+  const reviewReceipt = load('reviewReceipt');
+  const parsed = JSON.parse(Buffer.from(rawResultBytes).toString('utf8'));
+  if (!parsed || JSON.stringify(Object.keys(parsed)) !== '["results"]' || !Array.isArray(parsed.results)) {
+    fail('result artifact must be an object whose only key is results');
+  }
+  if (JSON.stringify(parsed.results.map(row => row.reviewRowId).toSorted())
+    !== JSON.stringify(packet.rows.map(row => row.reviewRowId))) {
+    fail('result rows are not exactly the packet rows');
+  }
+  for (const row of parsed.results) {
+    const ok = JSON.stringify(Object.keys(row).toSorted()) === '["decision","disposition","reason","reviewRowId"]'
+      && typeof row.reason === 'string' && row.reason.trim() !== ''
+      && (row.disposition === 'KEEP' ? ['CLEAR', 'ESCALATE'].includes(row.decision)
+        : ['FIX', 'REJECT'].includes(row.disposition) && row.decision === null);
+    if (!ok) fail(`result row is malformed: ${row.reviewRowId}`);
+  }
+  const candidateSha256 = packet.sourceCandidate.sha256;
+  const byItem = new Map(reviewReceipt.rows.map(row => [row.itemId, row]));
+  const rows = derivePopulation(reviewReceipt).map(itemId => {
+    const raw = parsed.results.find(row => row.reviewRowId === opaqueReviewRowId(candidateSha256, itemId));
+    const reference = byItem.get(itemId);
+    const role = reviewReceipt.mandatoryHumanItemIds.includes(itemId) ? 'mandatory' : 'calibration';
+    return {
+      reviewRowId: raw.reviewRowId,
+      itemId,
+      semanticSkeletonId: reference.semanticSkeletonId,
+      role,
+      referenceLabel: reference.referenceLabel,
+      disposition: raw.disposition,
+      decision: raw.decision,
+      reason: raw.reason,
+      ...routeHumanResult(role, reference.referenceLabel, raw),
+    };
+  }).toSorted((a, b) => (a.itemId < b.itemId ? -1 : 1));
+  return {
+    name: 'xion-local-memory-inference-p1b6-target-boundary-human-review-attempt-001-receipt-v1',
+    attemptId: 'p1b6-target-boundary-human-review-attempt-001',
+    status: 'COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3',
+    reviewDate,
+    reviewProtocol: { identity: packet.reviewProtocol.identity, sha256: PINNED.protocol.rawSha256 },
+    reviewPacket: { identity: PACKET_IDENTITY, sha256: sha256RawBytes(packetBytes(packet)), rows: packet.rows.length },
+    v3ReviewReceipt: { identity: PINNED.reviewReceipt.identity, rawSha256: PINNED.reviewReceipt.rawSha256 },
+    rawResultArtifact: { filename: RAW_RESULT_FILENAME, sha256: sha256RawBytes(rawResultBytes), committed: false },
+    reviewer: {
+      role: 'repository owner',
+      decisionsBy: 'repository owner',
+      presentationAid: 'a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)',
+      independentConfirmation: false,
+      limitation: 'The owner specified the realization prototypes, knew both skeletons\' v3 reference is ESCALATE and was told the strong-model result; row blindness hid only which row was which.',
+    },
+    summary: {
+      total: rows.length,
+      matchingV3Reference: rows.filter(row => row.disposition === 'KEEP' && row.decision === row.referenceLabel).length,
+      humanAdjudicated: rows.filter(row => row.provenance === 'HUMAN_ADJUDICATED').length,
+    },
+    rows,
+    authority: {
+      promotedToHumanAdjudicated: false,
+      catalogAmendedByThisResult: false,
+      surfaceAcceptancePerformed: false,
+      referenceLabelFreezePerformed: false,
+      finalSelectionPerformed: false,
+      trainingOrEvaluationOccurred: false,
+    },
+  };
+}
+
 function packetBytes(packet) {
   return Buffer.from(`${JSON.stringify(packet, null, 2)}\n`, 'utf8');
 }
 
 function main(argv = process.argv.slice(2)) {
+  if (argv.length === 4 && argv[0] === '--results' && argv[2] === '--date') {
+    const output = path.join(ROOT, 'fixtures', RECEIPT_FIXTURE);
+    if (fs.existsSync(output)) throw new Error(`Existing output will not be overwritten: ${output}`);
+    const receipt = buildHumanResultReceipt(fs.readFileSync(argv[1]), argv[3]);
+    fs.writeFileSync(output, `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx' });
+    process.stdout.write(`Recorded HUMAN result: ${JSON.stringify(receipt.summary)} -> fixtures/${RECEIPT_FIXTURE}\n`);
+    return 0;
+  }
   if (argv.length !== 2 || argv[0] !== '--output' || !argv[1]) {
-    throw new Error('Usage: --output <target-boundary-human-review-packet.json>');
+    throw new Error('Usage: --output <packet.json> | --results <raw.json> --date <YYYY-MM-DD>');
   }
   if (fs.existsSync(argv[1])) throw new Error(`Existing output will not be overwritten: ${argv[1]}`);
   const bytes = packetBytes(buildHumanReviewPacket());
@@ -114,7 +205,9 @@ function main(argv = process.argv.slice(2)) {
 module.exports = {
   PACKET_IDENTITY,
   PINNED,
+  RECEIPT_FIXTURE,
   REVIEW_ID_NAMESPACE,
+  buildHumanResultReceipt,
   buildHumanReviewPacket,
   derivePopulation,
   main,
