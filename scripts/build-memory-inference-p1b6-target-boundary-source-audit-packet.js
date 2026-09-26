@@ -109,6 +109,66 @@ function buildSourceAuditPacket(canonicalInputs) {
   };
 }
 
+const RECEIPT_FIXTURE = 'local-memory-inference-p1b6-target-boundary-source-audit-attempt-001.json';
+const RAW_RESULT_FILENAME = 'p1b6-tb1-source-audit-results.json';
+
+// Builds the audit receipt from the raw result bytes, against the rebuilt packet.
+function buildSourceAuditReceipt(rawResultBytes, canonicalInputs = loadCanonicalInputs()) {
+  const packet = buildSourceAuditPacket(canonicalInputs);
+  const parsed = JSON.parse(Buffer.from(rawResultBytes).toString('utf8'));
+  if (!parsed || JSON.stringify(Object.keys(parsed)) !== '["results"]' || !Array.isArray(parsed.results)) {
+    fail('result artifact must be an object whose only key is results');
+  }
+  const ids = packet.rows.map(row => row.auditRowId);
+  if (JSON.stringify(parsed.results.map(row => row.auditRowId).toSorted()) !== JSON.stringify(ids)) {
+    fail('result rows are not exactly the packet rows');
+  }
+  for (const row of parsed.results) {
+    if (JSON.stringify(Object.keys(row).toSorted()) !== '["auditRowId","disposition","reason"]'
+      || !['PASS', 'FAIL', 'UNCERTAIN'].includes(row.disposition)
+      || typeof row.reason !== 'string' || row.reason.trim() === '') {
+      fail(`result row is malformed: ${row.auditRowId}`);
+    }
+  }
+  const rows = parsed.results.map(row => ({ ...row }))
+    .toSorted((a, b) => (a.auditRowId < b.auditRowId ? -1 : 1));
+  const count = disposition => rows.filter(row => row.disposition === disposition).length;
+  const allPass = count('PASS') === rows.length;
+  return {
+    name: 'xion-local-memory-inference-p1b6-target-boundary-source-audit-attempt-001-receipt-v1',
+    attemptId: 'p1b6-target-boundary-source-audit-attempt-001',
+    status: allPass ? 'COMPLETE_PASS' : 'COMPLETE_NEEDS_FIX',
+    auditPacketIdentity: PACKET_IDENTITY,
+    auditPacketSha256: sha256RawBytes(packetBytes(packet)),
+    sourceAuditProtocol: { identity: packet.sourceAuditProtocol.identity, sha256: CANONICAL_INPUTS.sourceAuditProtocol.rawSha256 },
+    auditedCandidate: { identity: packet.candidate.identity, rawSha256: CANONICAL_INPUTS.candidate.rawSha256 },
+    resolutionReceipt: { identity: packet.resolutionReceipt.identity, rawSha256: CANONICAL_INPUTS.resolutionReceipt.rawSha256 },
+    rawResultArtifact: { filename: RAW_RESULT_FILENAME, sha256: sha256RawBytes(rawResultBytes), committed: false },
+    auditorExecutionProvenance: {
+      evidenceBasis: 'REPORTED_BY_REPOSITORY_OWNER',
+      surface: 'Claude Code',
+      model: 'Claude Opus 5.5',
+      reasoningSetting: 'NOT_RECORDED',
+      sessionRelationship: 'a fresh Claude Code CLI session started in the home directory (no project instructions or memory loaded), separate from the session that authored the candidates, given only the protocol and packet paths',
+    },
+    freshness: {
+      freshJudgmentsForEveryRow: true,
+      historicalSourceAuditResultInherited: false,
+      note: 'Fresh realizations under new IDs; no historical source-audit result carried forward.',
+    },
+    summary: { total: rows.length, PASS: count('PASS'), FAIL: count('FAIL'), UNCERTAIN: count('UNCERTAIN') },
+    authority: {
+      sourceBundleGatePassedForCandidates: allPass,
+      semanticReviewOccurred: false,
+      humanReviewOccurred: false,
+      datasetAcceptancePerformed: false,
+      heldOutReleasePerformed: false,
+      trainingOccurred: false,
+    },
+    rows,
+  };
+}
+
 function loadCanonicalInputs() {
   return Object.fromEntries(Object.entries(CANONICAL_INPUTS)
     .map(([key, pinned]) => [key, fs.readFileSync(path.join(ROOT, 'fixtures', pinned.fixture))]));
@@ -119,8 +179,16 @@ function packetBytes(packet) {
 }
 
 function main(argv = process.argv.slice(2)) {
+  if (argv.length === 2 && argv[0] === '--results' && argv[1]) {
+    const output = path.join(ROOT, 'fixtures', RECEIPT_FIXTURE);
+    if (fs.existsSync(output)) throw new Error(`Existing output will not be overwritten: ${output}`);
+    const receipt = buildSourceAuditReceipt(fs.readFileSync(argv[1]));
+    fs.writeFileSync(output, `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx' });
+    process.stdout.write(`Recorded source audit: ${JSON.stringify(receipt.summary)} -> fixtures/${RECEIPT_FIXTURE}\n`);
+    return 0;
+  }
   if (argv.length !== 2 || argv[0] !== '--output' || !argv[1]) {
-    throw new Error('Usage: --output <target-boundary-source-audit-packet.json>');
+    throw new Error('Usage: --output <packet.json> | --results <raw-results.json>');
   }
   if (fs.existsSync(argv[1])) throw new Error(`Existing output will not be overwritten: ${argv[1]}`);
   const bytes = packetBytes(buildSourceAuditPacket(loadCanonicalInputs()));
@@ -135,7 +203,9 @@ module.exports = {
   CANONICAL_INPUTS,
   EXPECTED_ITEM_IDS,
   PACKET_IDENTITY,
+  RECEIPT_FIXTURE,
   buildSourceAuditPacket,
+  buildSourceAuditReceipt,
   loadCanonicalInputs,
   main,
   opaqueAuditRowId,

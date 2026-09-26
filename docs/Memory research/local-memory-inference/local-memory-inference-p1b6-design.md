@@ -1725,8 +1725,18 @@ full source episode and selected bundle with the batch-002 repair renderer. Rows
 `p1b6-tb1-audit-` ID, the episode turns and the bundle, sorted by ID; no skeleton, split,
 `targetAnchorRole` or intended reading reaches the packet. The packet is gitignored and
 deterministic at raw SHA-256
-`457d84682420f443e2bc3becc88b51b8c2e01e51c7be53c2b12ec4a5e73af712` (2 rows). The audit runs
-externally in a fresh session.
+`457d84682420f443e2bc3becc88b51b8c2e01e51c7be53c2b12ec4a5e73af712` (2 rows).
+
+**Source-audit result — attempt 001: COMPLETE_PASS, 2/2.** Run externally in a fresh Claude
+Code CLI session started in the home directory, given only the protocol and packet paths;
+auditor model as reported by the repository owner: Claude Opus 5.5. The raw result
+`p1b6-tb1-source-audit-results.json` (raw SHA-256
+`5de3751faa93682ae1de3fe1345f066c12fa0fa26decda966c0c18d9d6f7cde0`, not committed) is
+ingested by the same builder (`--results <raw>`) into
+`fixtures/local-memory-inference-p1b6-target-boundary-source-audit-attempt-001.json`. Both
+rows PASS: `tb1-002`'s bundle is its whole episode, and `tb1-001` omits only the
+content-free assistant acknowledgment. The source/bundle gate is passed; the fresh v3
+semantic review and any routed HUMAN review are next, and nothing is accepted.
 
 `p1b6-item-b002-047` (accepted, `5269c91f`, TARGET `resident rate`) is out of scope; the
 accepted pool stays **93**. No acceptance, reference freeze, FINAL selection, HELD release or

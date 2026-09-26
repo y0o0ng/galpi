@@ -1,0 +1,62 @@
+{
+  "name": "xion-local-memory-inference-p1b6-target-boundary-source-audit-attempt-001-receipt-v1",
+  "attemptId": "p1b6-target-boundary-source-audit-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-target-boundary-source-audit-packet-v1",
+  "auditPacketSha256": "457d84682420f443e2bc3becc88b51b8c2e01e51c7be53c2b12ec4a5e73af712",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedCandidate": {
+    "identity": "xion-local-memory-inference-p1b6-surface-target-boundary-candidate-v1",
+    "rawSha256": "5a4253506a9a9885118781c68cdcc407d91b6497b4b1af2105a675332ef8a7f5"
+  },
+  "resolutionReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-batch-003-target-boundary-resolution-receipt-v1",
+    "rawSha256": "614ba543e99b765eafe82f5ebaa59dd0f015c5e0d53f5342ad93b28122c91254"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-tb1-source-audit-results.json",
+    "sha256": "5de3751faa93682ae1de3fe1345f066c12fa0fa26decda966c0c18d9d6f7cde0",
+    "committed": false
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "surface": "Claude Code",
+    "model": "Claude Opus 5.5",
+    "reasoningSetting": "NOT_RECORDED",
+    "sessionRelationship": "a fresh Claude Code CLI session started in the home directory (no project instructions or memory loaded), separate from the session that authored the candidates, given only the protocol and packet paths"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "Fresh realizations under new IDs; no historical source-audit result carried forward."
+  },
+  "summary": {
+    "total": 2,
+    "PASS": 2,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassedForCandidates": true,
+    "semanticReviewOccurred": false,
+    "humanReviewOccurred": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-tb1-audit-2817cc153060c75f",
+      "disposition": "PASS",
+      "reason": "Bundle contains all four source turns verbatim; nothing omitted, TARGET anchored on the correct span in t4."
+    },
+    {
+      "auditRowId": "p1b6-tb1-audit-e5c844cfe8a3c076",
+      "disposition": "PASS",
+      "reason": "Only omitted turn is assistant t4 '좋네요.', a content-free acknowledgment; all fee/residency evidence (t1-t3) and TARGET turn t5 retained verbatim."
+    }
+  ]
+}

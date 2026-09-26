@@ -5066,3 +5066,16 @@ No audit, semantic review, HUMAN review or acceptance; the accepted pool stays *
 Tests run locally: the new `…-target-boundary-source-audit-packet` suite (4/4) and every
 `test/memory-inference-p1b6-*.test.js` suite (304 tests: 301 pass / 0 fail / 3 skipped — the
 raw-bytes tests). No CI result is claimed here.
+
+#### P1-B6 TARGET-boundary candidates — source audit attempt 001 COMPLETE_PASS (2/2)
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw audit result `p1b6-tb1-source-audit-results.json` (not committed, 2 rows) | `5de3751faa93682ae1de3fe1345f066c12fa0fa26decda966c0c18d9d6f7cde0` |
+| blind packet it answers (not committed) | `457d84682420f443e2bc3becc88b51b8c2e01e51c7be53c2b12ec4a5e73af712` |
+| `fixtures/local-memory-inference-p1b6-target-boundary-source-audit-attempt-001.json` | receipt |
+
+Fresh external session; auditor reported by the owner as Claude Opus 5.5. 2 PASS / 0 FAIL / 0
+UNCERTAIN. No semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
+
+Tests run locally: `…-target-boundary-source-audit-packet` with the raw bytes supplied (7/7).
