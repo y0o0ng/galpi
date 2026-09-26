@@ -86,7 +86,7 @@ test('minimal PWA has stable scope and a push-only service worker', () => {
   assert.equal(manifest.start_url, '/');
   assert.equal(manifest.scope, '/');
   assert.equal(manifest.display, 'standalone');
-  assert.equal(manifest.theme_color, '#FAFBF9');
+  assert.equal(manifest.theme_color, '#F3F5F2');
   assert.deepEqual(
     manifest.icons.map(icon => [icon.src, icon.sizes, icon.type, icon.purpose]),
     [
@@ -216,7 +216,7 @@ test('push permission is requested only by explicit enable after canonical-origi
 test('runtime flag hides task entry points and foreground refresh stays separate from chat polling', () => {
   const app = read('public/app.js');
 
-  assert.match(app, /meta\[name="theme-color"\][\s\S]*dark \? '#151A18' : '#FAFBF9'/);
+  assert.match(app, /meta\[name="theme-color"\][\s\S]*dark \? '#151A18' : '#F3F5F2'/);
   assert.match(app, /tasksEnabled = config\.tasksEnabled === true/);
   assert.match(app, /command\.feature !== 'tasks' \|\| tasksEnabled/);
   assert.match(app, /window\.HomeDashboard\?\.openTasks/);

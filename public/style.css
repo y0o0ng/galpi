@@ -5669,12 +5669,14 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
+  /* 폰은 카드가 가로를 채운다. 셸까지 흰 면이면 화면 전체가 흰색으로 읽히므로 셸은 배경색에 두고 흰 면은 카드만 남긴다. */
   #mobile-shell-header {
     min-height: 56px;
     padding-inline: 16px;
+    background: var(--bg);
   }
 
-  #bottom-nav { min-height: 68px; }
+  #bottom-nav { min-height: 68px; background: var(--bg); }
 
   .home-page-head,
   .library-page-head,
@@ -5693,14 +5695,14 @@ textarea:focus-visible {
   }
   .home-page-head > div { display: block; }
   .home-page-head #home-now { margin-top: 6px; }
-  .home-page-head .home-view-switch { position: absolute; right: -16px; bottom: 0; margin: 0; }
+  .home-page-head .home-view-switch { position: absolute; right: 0; bottom: 0; margin: 0; }
 
   .home-page-head h1,
   .library-page-head h1,
   .settings-page-head h1 { font-size: 28px; }
 
   .home-view-switch {
-    gap: 22px;
+    gap: 4px;
     margin-top: 13px;
   }
 
