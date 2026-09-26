@@ -1738,6 +1738,19 @@ rows PASS: `tb1-002`'s bundle is its whole episode, and `tb1-001` omits only the
 content-free assistant acknowledgment. The source/bundle gate is passed; the fresh v3
 semantic review and any routed HUMAN review are next, and nothing is accepted.
 
+**Fresh v3 semantic-review packet — built, NOT RUN.** The internal plan
+`fixtures/local-memory-inference-p1b6-target-boundary-v3-review-plan.json` (raw SHA-256
+`be85f33e6234c4ed58a0a245dfaefc8def7e3bbfb2862165de37007cb53ff7dc`, never shown to the
+reviewer) takes the population from the audit receipt's PASS rows, reuses the neutral
+targeted v3 protocol (`p1b6-targeted-v3-semantic-realization-review-v1`, unchanged) and
+preregisters the same routing as the targeted re-reconciliation: KEEP matching v3 →
+`CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; FIX, REJECT, opposing KEEP or a missing
+row → mandatory HUMAN; one lowest-hash calibration row per skeleton among agreements (domain
+`p1b6-tb1-v3-review-calibration-v1`). With one row per skeleton, every row reaches HUMAN review.
+`scripts/build-memory-inference-p1b6-target-boundary-v3-review-packet.js` renders the audited
+bundles under `p1b6-tb1-v3smreview-` IDs; the packet is gitignored and deterministic at raw
+SHA-256 `b1644cc6f1db1419c86058fb667d0f5591b7b2668381593d5cf94720f3412872` (2 rows).
+
 `p1b6-item-b002-047` (accepted, `5269c91f`, TARGET `resident rate`) is out of scope; the
 accepted pool stays **93**. No acceptance, reference freeze, FINAL selection, HELD release or
 training.

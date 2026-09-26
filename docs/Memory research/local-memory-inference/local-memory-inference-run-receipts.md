@@ -5079,3 +5079,13 @@ Fresh external session; auditor reported by the owner as Claude Opus 5.5. 2 PASS
 UNCERTAIN. No semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
 
 Tests run locally: `…-target-boundary-source-audit-packet` with the raw bytes supplied (7/7).
+
+#### P1-B6 TARGET-boundary candidates — v3 semantic-review packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-target-boundary-v3-review-plan.json` (internal) | `be85f33e6234c4ed58a0a245dfaefc8def7e3bbfb2862165de37007cb53ff7dc` |
+| reused protocol `…-targeted-v3-strong-model-review-protocol.json` | `8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892` |
+| blind review packet (not committed, 2 rows) | `b1644cc6f1db1419c86058fb667d0f5591b7b2668381593d5cf94720f3412872` |
+
+No review, HUMAN review or acceptance; the accepted pool stays **93**.
