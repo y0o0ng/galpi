@@ -5048,3 +5048,21 @@ Contracts are in the design section "Batch-003 TARGET-boundary realization failu
 Tests run locally: the new `…-batch-003-target-boundary-resolution` suite (9/9) and every
 `test/memory-inference-p1b6-*.test.js` suite (299 tests: 296 pass / 0 fail / 3 skipped — the
 raw-bytes tests). No CI result is claimed.
+
+#### P1-B6 TARGET-boundary candidates — tb1-002 reading metadata corrected / fresh source-audit packet BUILT / NOT RUN
+
+`tb1-002`'s `intendedUnresolvedReadings` were corrected to the two actual membership states
+(the typical features do not settle it); its text, TARGET, IDs and split are unchanged and
+the resolution receipt bytes are unchanged.
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-target-boundary-candidate.json` | `5a4253506a9a9885118781c68cdcc407d91b6497b4b1af2105a675332ef8a7f5` |
+| `fixtures/local-memory-inference-p1b6-batch-003-target-boundary-resolution-receipt.json` | `614ba543e99b765eafe82f5ebaa59dd0f015c5e0d53f5342ad93b28122c91254` |
+| blind source-audit packet (not committed, 2 rows) | `457d84682420f443e2bc3becc88b51b8c2e01e51c7be53c2b12ec4a5e73af712` |
+
+No audit, semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
+
+Tests run locally: the new `…-target-boundary-source-audit-packet` suite (4/4) and every
+`test/memory-inference-p1b6-*.test.js` suite (304 tests: 301 pass / 0 fail / 3 skipped — the
+raw-bytes tests). No CI result is claimed here.

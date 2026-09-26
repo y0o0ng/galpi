@@ -46,6 +46,7 @@
     "reconcile:memory-inference-p1b6-batch-003-targeted-v3-strong-model-review": "node scripts/reconcile-memory-inference-p1b6-batch-003-targeted-v3-strong-model-review.js",
     "build:memory-inference-p1b6-batch-003-targeted-v3-human-review-packet": "node scripts/build-memory-inference-p1b6-batch-003-targeted-v3-human-review-packet.js",
     "build:memory-inference-p1b6-batch-003-target-boundary-resolution": "node scripts/build-memory-inference-p1b6-batch-003-target-boundary-resolution.js",
+    "build:memory-inference-p1b6-target-boundary-source-audit-packet": "node scripts/build-memory-inference-p1b6-target-boundary-source-audit-packet.js",
     "build:memory-inference-p1b6-surface-repair-human-review-packet": "node scripts/build-memory-inference-p1b6-surface-repair-human-review-packet.js",
     "build:memory-inference-p1b6-batch-003-materialize": "node scripts/build-memory-inference-p1b6-batch-003-materialize.js",
     "build:memory-inference-p1b6-batch-002-finalization": "node scripts/build-memory-inference-p1b6-batch-002-finalization.js",

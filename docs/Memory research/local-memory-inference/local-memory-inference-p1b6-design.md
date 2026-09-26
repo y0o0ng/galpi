@@ -1715,6 +1715,19 @@ adjudication where routing requires it. They are **not a replacement count**: or
 after review losses decides how many fresh surfaces are needed, and no class-balance target
 is restored.
 
+**Fresh source-audit packet — built, NOT RUN.**
+`scripts/build-memory-inference-p1b6-target-boundary-source-audit-packet.js`
+(`npm run build:memory-inference-p1b6-target-boundary-source-audit-packet -- --output
+<path>`) pins the candidate (`5a425350…`), the resolution receipt (`614ba543…`) and the
+unchanged source-audit protocol (`p1b6-source-bundle-completeness-audit-v1`), requires the
+candidate to be byte-identical to the builder's deterministic output, and renders each row's
+full source episode and selected bundle with the batch-002 repair renderer. Rows carry only a
+`p1b6-tb1-audit-` ID, the episode turns and the bundle, sorted by ID; no skeleton, split,
+`targetAnchorRole` or intended reading reaches the packet. The packet is gitignored and
+deterministic at raw SHA-256
+`457d84682420f443e2bc3becc88b51b8c2e01e51c7be53c2b12ec4a5e73af712` (2 rows). The audit runs
+externally in a fresh session.
+
 `p1b6-item-b002-047` (accepted, `5269c91f`, TARGET `resident rate`) is out of scope; the
 accepted pool stays **93**. No acceptance, reference freeze, FINAL selection, HELD release or
 training.
