@@ -1751,6 +1751,29 @@ row → mandatory HUMAN; one lowest-hash calibration row per skeleton among agre
 bundles under `p1b6-tb1-v3smreview-` IDs; the packet is gitignored and deterministic at raw
 SHA-256 `b1644cc6f1db1419c86058fb667d0f5591b7b2668381593d5cf94720f3412872` (2 rows).
 
+**v3 review result — attempt 001.** Run externally in a fresh Claude Code CLI session in the
+home directory, given only the protocol and packet paths; reviewer reported by the owner as
+Claude Opus 5.5. Raw result `p1b6-tb1-v3-review-results.json` (raw SHA-256
+`a26d37957c26b66f117f63f14f666d262f66cd8315587fc46b207e6ba5c8575a`, not committed),
+reconciled by the same builder (`--results <raw>`) into
+`fixtures/local-memory-inference-p1b6-target-boundary-v3-review-attempt-001.json`: **both
+KEEP ESCALATE, matching v3** → `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, no mandatory
+HUMAN row. The per-skeleton calibration rule selects both rows.
+
+**Blind HUMAN packet — built, NOT RUN.**
+`scripts/build-memory-inference-p1b6-target-boundary-human-review-packet.js` takes the
+receipt's mandatory and calibration rows (re-checking the calibration rule) and renders the
+same bundles under `p1b6-tb1-hreview-` IDs with the protocol
+`fixtures/local-memory-inference-p1b6-target-boundary-human-review-protocol.json`
+(`p1b6-target-boundary-blind-human-review-v1`, raw SHA-256
+`e8b9f7281d3200f9b41599782847950d94082026fdfaf15d98d2e3c71a392ade`, v3 verbatim). The
+packet is gitignored and deterministic at raw SHA-256
+`74f1886e502292fd189bd286c6dff1a8a626c4d600d7b9897c23c5e2038e8a3b` (2 rows). The reviewer is
+the owner, who specified the prototypes, knows the v3 reference and was told the model
+result, so the result is not an independent confirmation. Both rows are calibration rows: a
+matching KEEP stays `CATALOG_STRONG_MODEL_CONFIRMED` and is not promoted to
+`HUMAN_ADJUDICATED`.
+
 `p1b6-item-b002-047` (accepted, `5269c91f`, TARGET `resident rate`) is out of scope; the
 accepted pool stays **93**. No acceptance, reference freeze, FINAL selection, HELD release or
 training.

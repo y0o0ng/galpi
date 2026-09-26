@@ -92,13 +92,117 @@ function buildReviewPacket() {
   };
 }
 
+const RECEIPT_FIXTURE = 'local-memory-inference-p1b6-target-boundary-v3-review-attempt-001.json';
+const RAW_RESULT_FILENAME = 'p1b6-tb1-v3-review-results.json';
+const V3_FIXTURE = 'local-memory-inference-p1b6-skeleton-effective-current-v3.json';
+
+function calibrationHash(hashDomain, itemId) {
+  return crypto.createHash('sha256').update(`${hashDomain}\0${itemId}`).digest('hex');
+}
+
+// Routes the raw result exactly as the internal plan preregistered.
+function reconcile(rawResultBytes) {
+  const plan = load('plan');
+  const v3Bytes = fs.readFileSync(path.join(ROOT, 'fixtures', V3_FIXTURE));
+  if (sha256RawBytes(v3Bytes) !== plan.referenceAuthority.rawSha256) fail('v3 bytes are not the plan authority');
+  const labels = new Map(JSON.parse(v3Bytes.toString('utf8')).candidates
+    .map(row => [row.semanticSkeletonId, row.humanLabel]));
+  const packet = buildReviewPacket();
+  const { candidateSha256, population } = derivePopulation();
+  const parsed = JSON.parse(Buffer.from(rawResultBytes).toString('utf8'));
+  if (!parsed || JSON.stringify(Object.keys(parsed)) !== '["results"]' || !Array.isArray(parsed.results)) {
+    fail('result artifact must be an object whose only key is results');
+  }
+  const known = new Set(packet.rows.map(row => row.reviewRowId));
+  const byId = new Map();
+  for (const row of parsed.results) {
+    if (!known.has(row?.reviewRowId)) fail(`result row is not a packet row: ${row?.reviewRowId}`);
+    if (byId.has(row.reviewRowId)) fail(`result duplicates a packet row: ${row.reviewRowId}`);
+    byId.set(row.reviewRowId, row);
+  }
+  const rows = population.map(item => {
+    const reviewRowId = opaqueReviewRowId(candidateSha256, item.itemId);
+    const row = byId.get(reviewRowId);
+    const referenceLabel = labels.get(item.semanticSkeletonId);
+    const wellFormed = row
+      && JSON.stringify(Object.keys(row).toSorted()) === '["decision","disposition","reason","reviewRowId"]'
+      && typeof row.reason === 'string' && row.reason.trim() !== ''
+      && (row.disposition === 'KEEP' ? ['CLEAR', 'ESCALATE'].includes(row.decision)
+        : ['FIX', 'REJECT'].includes(row.disposition) && row.decision === null);
+    let route = 'CLEAN_AGREEMENT';
+    if (!wellFormed) route = 'MISSING_OR_INVALID_RESULT';
+    else if (row.disposition !== 'KEEP') route = row.disposition;
+    else if (row.decision !== referenceLabel) route = 'DECISION_DISAGREEMENT';
+    return {
+      itemId: item.itemId,
+      semanticSkeletonId: item.semanticSkeletonId,
+      referenceLabel,
+      disposition: row?.disposition ?? null,
+      decision: row?.decision ?? null,
+      reason: row?.reason ?? null,
+      route,
+      ...(route === 'CLEAN_AGREEMENT'
+        ? { provenance: 'CATALOG_STRONG_MODEL_CONFIRMED', eligibility: 'PROVISIONAL' }
+        : { provenance: null, eligibility: 'PENDING_MANDATORY_HUMAN' }),
+    };
+  });
+  const { hashDomain } = plan.routing.calibration;
+  const skeletons = [...new Set(rows.map(row => row.semanticSkeletonId))];
+  const calibrationItemIds = skeletons.flatMap(skeletonId => {
+    const pool = rows.filter(row => row.semanticSkeletonId === skeletonId && row.route === 'CLEAN_AGREEMENT')
+      .map(row => row.itemId)
+      .toSorted((a, b) => (calibrationHash(hashDomain, a) < calibrationHash(hashDomain, b) ? -1 : 1));
+    return pool.length ? [pool[0]] : [];
+  });
+  const mandatory = rows.filter(row => row.route !== 'CLEAN_AGREEMENT').map(row => row.itemId);
+  return {
+    name: 'xion-local-memory-inference-p1b6-target-boundary-v3-review-attempt-001-receipt-v1',
+    attemptId: 'p1b6-target-boundary-v3-review-attempt-001',
+    status: 'COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3',
+    reviewProtocol: { identity: packet.reviewProtocol.identity, sha256: PINNED.protocol.rawSha256 },
+    reviewPacket: { identity: PACKET_IDENTITY, sha256: sha256RawBytes(packetBytes(packet)), rows: packet.rows.length },
+    reviewPlan: { identity: PINNED.plan.identity, rawSha256: PINNED.plan.rawSha256 },
+    referenceAuthority: { identity: plan.referenceAuthority.identity, rawSha256: plan.referenceAuthority.rawSha256 },
+    rawResultArtifact: { filename: RAW_RESULT_FILENAME, sha256: sha256RawBytes(rawResultBytes), committed: false },
+    reviewerExecutionProvenance: {
+      evidenceBasis: 'REPORTED_BY_REPOSITORY_OWNER',
+      reportedModel: 'Claude Opus 5.5',
+      session: 'fresh Claude Code CLI session started in the home directory, given only the protocol and packet paths',
+    },
+    summary: {
+      total: rows.length,
+      cleanAgreements: rows.length - mandatory.length,
+      mandatoryHuman: mandatory.length,
+      calibration: calibrationItemIds.length,
+    },
+    rows,
+    mandatoryHumanItemIds: mandatory,
+    calibrationItemIds,
+    authority: {
+      humanPacketBuilt: false,
+      humanReviewPerformed: false,
+      surfaceAcceptancePerformed: false,
+      referenceLabelFreezePerformed: false,
+      trainingOrEvaluationOccurred: false,
+    },
+  };
+}
+
 function packetBytes(packet) {
   return Buffer.from(`${JSON.stringify(packet, null, 2)}\n`, 'utf8');
 }
 
 function main(argv = process.argv.slice(2)) {
+  if (argv.length === 2 && argv[0] === '--results' && argv[1]) {
+    const output = path.join(ROOT, 'fixtures', RECEIPT_FIXTURE);
+    if (fs.existsSync(output)) throw new Error(`Existing output will not be overwritten: ${output}`);
+    const receipt = reconcile(fs.readFileSync(argv[1]));
+    fs.writeFileSync(output, `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx' });
+    process.stdout.write(`Reconciled: ${JSON.stringify(receipt.summary)} -> fixtures/${RECEIPT_FIXTURE}\n`);
+    return 0;
+  }
   if (argv.length !== 2 || argv[0] !== '--output' || !argv[1]) {
-    throw new Error('Usage: --output <target-boundary-v3-review-packet.json>');
+    throw new Error('Usage: --output <packet.json> | --results <raw-results.json>');
   }
   if (fs.existsSync(argv[1])) throw new Error(`Existing output will not be overwritten: ${argv[1]}`);
   const bytes = packetBytes(buildReviewPacket());
@@ -111,8 +215,11 @@ function main(argv = process.argv.slice(2)) {
 module.exports = {
   PACKET_IDENTITY,
   PINNED,
+  RECEIPT_FIXTURE,
   REVIEW_ID_NAMESPACE,
   buildReviewPacket,
+  calibrationHash,
+  reconcile,
   derivePopulation,
   main,
   opaqueReviewRowId,

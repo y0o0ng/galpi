@@ -57,3 +57,45 @@ test('the internal plan preregisters routing and opens no gate', () => {
   assert.equal(plan.routing.calibration.substituteAcrossSkeletons, false);
   for (const [key, value] of Object.entries(plan.authority)) assert.equal(value, false, key);
 });
+
+const os = require('node:os');
+const RAW = path.join(os.homedir(), 'p1b6-tb1-v3-review-results.json');
+const synthetic = mutate => {
+  const results = builder.buildReviewPacket().rows.map(row => ({
+    reviewRowId: row.reviewRowId, disposition: 'KEEP', decision: 'ESCALATE', reason: 'r',
+  }));
+  mutate(results);
+  return Buffer.from(JSON.stringify({ results }));
+};
+
+test('reconciliation routes as preregistered', () => {
+  const clean = builder.reconcile(synthetic(() => {}));
+  assert.deepEqual(clean.summary, { total: 2, cleanAgreements: 2, mandatoryHuman: 0, calibration: 2 });
+  const mixed = builder.reconcile(synthetic(rows => {
+    rows[0].decision = 'CLEAR';
+    rows[1] = { ...rows[1], disposition: 'FIX', decision: null };
+  }));
+  assert.equal(mixed.summary.mandatoryHuman, 2);
+  assert.deepEqual(mixed.calibrationItemIds, []);
+  assert.equal(mixed.rows.some(row => row.eligibility === 'PROVISIONAL'), false);
+  const missing = builder.reconcile(synthetic(rows => rows.pop()));
+  assert.equal(missing.rows.filter(row => row.route === 'MISSING_OR_INVALID_RESULT').length, 1);
+  assert.throws(() => builder.reconcile(synthetic(rows => rows.push({ ...rows[0] }))), /duplicates/);
+  assert.throws(() => builder.reconcile(synthetic(rows => { rows[0].reviewRowId = 'x'; })), /not a packet row/);
+});
+
+test('the committed review receipt: 2 clean agreements, both calibration, no HUMAN gold', () => {
+  const receipt = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE)));
+  assert.equal(receipt.reviewPacket.sha256, PACKET_SHA256);
+  assert.deepEqual(receipt.calibrationItemIds, ['p1b6-item-tb1-001', 'p1b6-item-tb1-002']);
+  assert.deepEqual(receipt.mandatoryHumanItemIds, []);
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  for (const row of receipt.rows) assert.equal(row.provenance, 'CATALOG_STRONG_MODEL_CONFIRMED');
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
+
+test('the review receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  assert.deepEqual(builder.reconcile(fs.readFileSync(RAW)),
+    JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE))));
+});

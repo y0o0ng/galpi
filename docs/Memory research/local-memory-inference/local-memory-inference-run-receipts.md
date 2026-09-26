@@ -5089,3 +5089,16 @@ Tests run locally: `…-target-boundary-source-audit-packet` with the raw bytes 
 | blind review packet (not committed, 2 rows) | `b1644cc6f1db1419c86058fb667d0f5591b7b2668381593d5cf94720f3412872` |
 
 No review, HUMAN review or acceptance; the accepted pool stays **93**.
+
+#### P1-B6 TARGET-boundary candidates — v3 review attempt 001 RECONCILED / 2-row HUMAN packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw v3 review result `p1b6-tb1-v3-review-results.json` (not committed, 2 rows) | `a26d37957c26b66f117f63f14f666d262f66cd8315587fc46b207e6ba5c8575a` |
+| `fixtures/local-memory-inference-p1b6-target-boundary-v3-review-attempt-001.json` | `f8042d1800f64e06a978e97318d3c17428fe5d6ecce252a6ab1533ff0392e58c` |
+| `fixtures/local-memory-inference-p1b6-target-boundary-human-review-protocol.json` | `e8b9f7281d3200f9b41599782847950d94082026fdfaf15d98d2e3c71a392ade` |
+| blind HUMAN packet (not committed, 2 rows) | `74f1886e502292fd189bd286c6dff1a8a626c4d600d7b9897c23c5e2038e8a3b` |
+
+Fresh external session, reviewer reported as Claude Opus 5.5: 2 KEEP ESCALATE, matching v3;
+both rows are per-skeleton calibration rows. No HUMAN review or acceptance; the accepted pool
+stays **93**.

@@ -1,0 +1,74 @@
+{
+  "name": "xion-local-memory-inference-p1b6-target-boundary-v3-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-target-boundary-v3-review-attempt-001",
+  "status": "COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewProtocol": {
+    "identity": "p1b6-targeted-v3-semantic-realization-review-v1",
+    "sha256": "8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-target-boundary-v3-review-packet-v1",
+    "sha256": "b1644cc6f1db1419c86058fb667d0f5591b7b2668381593d5cf94720f3412872",
+    "rows": 2
+  },
+  "reviewPlan": {
+    "identity": "xion-local-memory-inference-p1b6-target-boundary-v3-review-plan-v1",
+    "rawSha256": "be85f33e6234c4ed58a0a245dfaefc8def7e3bbfb2862165de37007cb53ff7dc"
+  },
+  "referenceAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-tb1-v3-review-results.json",
+    "sha256": "a26d37957c26b66f117f63f14f666d262f66cd8315587fc46b207e6ba5c8575a",
+    "committed": false
+  },
+  "reviewerExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "reportedModel": "Claude Opus 5.5",
+    "session": "fresh Claude Code CLI session started in the home directory, given only the protocol and packet paths"
+  },
+  "summary": {
+    "total": 2,
+    "cleanAgreements": 2,
+    "mandatoryHuman": 0,
+    "calibration": 2
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-tb1-001",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Fee is 6,000 or 3,000 depending on whether the cousin is a 구민; the cousin's residency is never stated, so the TARGET fee cannot be determined without an added premise.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-tb1-002",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Criteria are only described as typical ('보통'), not as a rule; the user meets the spending trait but not the review trait, and no membership status is given, so qualification cannot be stated from visible evidence.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "mandatoryHumanItemIds": [],
+  "calibrationItemIds": [
+    "p1b6-item-tb1-001",
+    "p1b6-item-tb1-002"
+  ],
+  "authority": {
+    "humanPacketBuilt": false,
+    "humanReviewPerformed": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}
