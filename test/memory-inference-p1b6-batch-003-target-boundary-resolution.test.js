@@ -145,3 +145,21 @@ test('fresh candidates pass leakage and sit in their skeleton split', () => {
     assert.equal(episode.splitAssignment, splits.get(row.semanticSkeletonId));
   }
 });
+
+test('tb1-002 readings are alternative actual membership states, not hard feature criteria', () => {
+  const row = candidate.items.find(entry => entry.itemId === 'p1b6-item-tb1-002');
+  const [member, nonMember] = row.intendedUnresolvedReadings;
+  assert.match(member, /in fact classified as a premium member/);
+  assert.match(nonMember, /in fact not classified as a premium member/);
+  for (const reading of row.intendedUnresolvedReadings) {
+    assert.match(reading, /typical-feature description does not settle it/);
+    // `보통` features must not become a deterministic membership rule.
+    assert.doesNotMatch(reading, /spending|threshold|review|makes the user|keep the user/i);
+  }
+  // Only the readings changed: text, TARGET, IDs and split are the authored ones.
+  const episode = candidate.sourceEpisodes.find(entry => entry.sourceEpisodeId === row.sourceEpisodeId);
+  assert.equal(row.anchorText, '우수 회원에 들어가는지');
+  assert.equal(episode.sourceEpisodeId, 'p1b6-se-tb1-002');
+  assert.equal(episode.splitAssignment, 'DEV');
+  assert.equal(episode.turns[3].text, '내가 우수 회원에 들어가는지 서점에 물어봐야겠어.');
+});

@@ -165,8 +165,8 @@
       "surfaceFamilyId": "p1b6-surface-family-tb1-002",
       "targetAnchorRole": "CATEGORY_MEMBERSHIP",
       "intendedUnresolvedReadings": [
-        "the spending threshold alone makes the user a premium member",
-        "the missing reviews keep the user outside the premium-member category"
+        "the user is in fact classified as a premium member; the typical-feature description does not settle it",
+        "the user is in fact not classified as a premium member; the typical-feature description does not settle it"
       ]
     }
   ]

@@ -136,8 +136,8 @@ const AUTHORED = Object.freeze([
     anchorText: '우수 회원에 들어가는지',
     evidenceTurnIds: ['t1', 't2', 't3', 't4'],
     intendedUnresolvedReadings: [
-      'the spending threshold alone makes the user a premium member',
-      'the missing reviews keep the user outside the premium-member category',
+      'the user is in fact classified as a premium member; the typical-feature description does not settle it',
+      'the user is in fact not classified as a premium member; the typical-feature description does not settle it',
     ],
   },
 ]);
