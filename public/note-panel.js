@@ -243,5 +243,5 @@
     state.initialized = true;
   }
 
-  global.NotePanel = { init, show, loadNotes, open, queueOpen };
+  global.NotePanel = { init, show, loadNotes, open, queueOpen, noteTypeLabel, formatUpdatedAt };
 })(window);

@@ -148,8 +148,8 @@ test('turns are spaced wider than the paragraphs inside one answer', () => {
 });
 
 test('control radii keep one step instead of three values a pixel apart', () => {
-  // 집중 노트 목록의 8px은 Figma 값이고, 나머지 공통 컨트롤은 기존 단계를 유지한다.
-  assert.match(css, /\.home-card-notes\.focused \.note-library-card,[^}]*border-radius: 8px;/s);
+  // 집중 노트 목록은 테두리 없는 행이고, 선택·hover 면만 일반 컨트롤 단계(10px)를 쓴다.
+  assert.match(css, /\.home-card-notes\.focused \.note-library-card,[^}]*border: 0;[^}]*border-radius: 10px;/s);
   assert.doesNotMatch(css, /border-radius: 9px;/);
   // 40px 컨트롤은 옆의 원과 같은 가족이 되도록 높이의 절반을 쓴다.
   assert.match(css, /#chat-model-button \{[^}]*height: 40px;[^}]*border-radius: 20px/s);
@@ -492,8 +492,8 @@ test('the chat column and the composer share one inline padding rule', () => {
 });
 
 test('the header hairline is themed so it survives dark mode', () => {
-  // 검정 6%를 그대로 쓰면 어두운 배경에서 경계가 사라진다.
-  assert.match(css, /:root \{[\s\S]*?--hairline:\s*rgba\(0, 0, 0, 0\.06\)/);
+  // 검정 6%를 그대로 쓰면 어두운 배경에서 경계가 사라진다. 라이트는 Figma Color/Border와 같은 녹회색이다.
+  assert.match(css, /:root \{[\s\S]*?--hairline:\s*#D7DED9/);
   assert.match(css, /\[data-theme="dark"\] \{[\s\S]*?--hairline:\s*rgba\(255, 255, 255, 0\.10\)/);
   assert.match(css, /#header \{[^}]*border-bottom: 1px solid var\(--hairline\)/s);
   assert.match(css, /#input-area \{[^}]*border-top: 1px solid var\(--hairline\)/s);

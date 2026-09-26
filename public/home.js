@@ -108,9 +108,12 @@
 
   function renderWeather() {
     const body = node('div', 'weather-card-content');
-    const line = node('div', 'weather-main');
-    line.append(node('span', 'weather-symbol', state.weather?.icon || '–'), node('strong', '', state.weather ? `${Math.round(state.weather.temperature)}°` : '—°'));
-    body.append(line, node('p', 'priority-p3', state.weather?.message || (state.weatherEnabled ? '현재 위치의 날씨를 확인하고 있어.' : '날씨 정보 없음')));
+    if (state.weather) {
+      const line = node('div', 'weather-main');
+      line.append(node('span', 'weather-symbol', state.weather.icon || ''), node('strong', '', `${Math.round(state.weather.temperature)}°`));
+      body.append(line);
+    }
+    body.append(node('p', 'priority-p3', state.weather?.message || (state.weatherEnabled ? '현재 위치의 날씨를 확인하고 있어.' : '날씨 정보 없음')));
     return card('weather', '날씨', state.weather?.sourceLabel || '', body, { focusable: false });
   }
 
@@ -127,7 +130,7 @@
     rows.forEach(item => {
       const row = node('div', 'home-task-row');
       row.classList.toggle('done', item.bucket === 'done');
-      row.append(node('span', `task-dot ${item.bucket}`), node('time', '', item.dueAt ? formatDateTime(item.dueAt).split(' ').slice(-1)[0] : ''), node('strong', '', item.title || '제목 없는 일정'));
+      row.append(node('span', `task-dot ${item.bucket}`), node('time', '', item.dueAt ? formatDateTime(item.dueAt).split(' ').slice(-1)[0] : '종일'), node('strong', '', item.title || '제목 없는 일정'));
       const task = state.tasks.find(entry => entry.id === item.taskId);
       if (state.focusedCard === 'tasks' && task && item.bucket !== 'done') {
         const controls = node('div', 'home-task-row-actions');
@@ -165,7 +168,7 @@
     if (state.focusedCard === 'tasks') {
       body.append(node('div', 'home-focus-extra'));
     }
-    return card('tasks', '할일', 'Today', body);
+    return card('tasks', '할일', '', body);
   }
 
   function kstDate(seconds) {
@@ -236,7 +239,7 @@
     agenda.append(node('strong', '', `${state.focusedCard === 'calendar' ? '' : `${selectedLabel} · `}일정 ${allSelectedTasks.length}개`));
     selectedTasks.forEach(task => {
       const row = node('p', 'calendar-event-row');
-      row.append(node('time', '', task.dueAt ? formatDateTime(task.dueAt).split(' ').slice(-1)[0] : ''), node('span', '', task.title));
+      row.append(node('time', '', task.dueAt ? formatDateTime(task.dueAt).split(' ').slice(-1)[0] : '종일'), node('span', '', task.title));
       agenda.append(row);
     });
     if (!selectedTasks.length) agenda.append(node('p', 'home-card-empty', '등록된 일정 없음'));
@@ -443,7 +446,7 @@
     if (!list.childElementCount) list.append(node('p', 'home-card-empty', `분석 대기 ${analysis.pending || 0} · 완료 ${analysis.done || 0}`));
     body.append(summary, list);
     if (state.focusedCard === 'mail') body.append(node('div', 'home-focus-extra'));
-    return card('mail', '메일', 'Today', body);
+    return card('mail', '메일', '', body);
   }
 
   function renderNotifications() {
@@ -500,7 +503,7 @@
       });
       body.append(detail, node('div', 'home-focus-extra'));
     }
-    return card('notifications', '알림', 'Today', body);
+    return card('notifications', '알림', '', body);
   }
 
   function ddayItems() {
@@ -604,7 +607,13 @@
     state.notes.slice(0, 3).forEach(note => {
       const item = node('button', 'home-note-row');
       item.type = 'button';
-      item.append(node('strong', '', note.title || note.filename), node('span', '', note.noteType || '노트'));
+      const head = node('span', 'home-note-row-head');
+      head.append(
+        node('span', 'home-note-type', global.NotePanel?.noteTypeLabel(note.noteType) || '노트'),
+        node('strong', '', note.title || note.filename),
+        node('time', '', global.NotePanel?.formatUpdatedAt(note.updatedAt) || ''),
+      );
+      item.append(head, node('small', '', note.filename));
       item.addEventListener('click', event => {
         event.stopPropagation();
         global.NotePanel?.queueOpen(note);

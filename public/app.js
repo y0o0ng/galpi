@@ -2983,7 +2983,7 @@ function applyTheme(dark) {
     document.documentElement.removeAttribute('data-theme');
   }
   document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', dark ? '#151A18' : '#F3F5F2');
+    ?.setAttribute('content', dark ? '#151A18' : '#FAFBF9');
   document.getElementById('icon-moon').style.display = dark ? 'none' : '';
   document.getElementById('icon-sun').style.display  = dark ? ''     : 'none';
 }
