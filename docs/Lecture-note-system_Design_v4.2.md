@@ -1089,7 +1089,8 @@ Document를 자료에서 직접 열든 강의의 참조에서 열든 **같은 ca
 - ★ · ? 마커 타임라인
 - `이 구간 설명해줘` 온디맨드 버튼
 - 전사 구간의 별도 `수정` 조작. 일반 탭은 해당 source 구간 재생으로 유지한다 (§12.4).
-- **Session 전체 재생**은 별도 기능이다. 현재 Document가 active였는지와 무관하게 그 Session의 전체 원음·전체 전사를 연속 재생하며, PDF-linked virtual stream과 같은 것으로 취급하지 않는다.
+- **Session 전체 재생**은 별도 기능이다. 현재 Document가 active였는지와 무관하게 그 Session의 전체 원음·전체 전사를 연속 재생하며, PDF-linked virtual stream과 같은 것으로 취급하지 않는다. 원음·전사와 함께 Session timeline의 `page_change`로 당시 보고 있던 Document/page를 시간순으로 표시하되, 이 표시는 §6.3의 약한 의미(사용자가 그 page를 보고 있었다)만 가진다.
+- Session 전체 재생에서 Document/page 연결을 누르면 Session 전용 PDF renderer나 사본을 띄우지 않고 **같은 canonical Document viewer**로 이동한다. 초기 page는 그 `page_change`가 가리키는 page다. 이후 viewer 동작은 자료에서 직접 연 경우와 같다.
 
 **과거 화면을 복원하지 않는다.** 현재 노트에 남은 최종 필기를 기준으로, 재생 위치에 따라 농도만 바꾼다. 지운 획은 재생 위치를 과거로 옮겨도 되살아나지 않는다. 획이 자라나는 애니메이션이나 모든 지우기·실행 취소 이력의 재생은 범위 밖이다.
 
