@@ -5,7 +5,6 @@
   const LOCATION_KEY = 'councilLastLocation';
   const WEATHER_CACHE_MS = 15 * 60 * 1000;
   const LOCATION_FALLBACK_MAX_AGE_MS = 6 * 60 * 60 * 1000;
-  let scrollAnchorFrame = 0;
   const state = {
     initialized: false,
     apiFetch: null,
@@ -77,6 +76,7 @@
   function card(id, title, meta, content, { focusable = true } = {}) {
     const article = node('article', `home-card home-card-${id}`);
     article.dataset.cardId = id;
+    article.style.viewTransitionName = `home-card-${id}`;
     const head = node('header', 'home-card-head');
     head.append(node('h2', '', title), node('span', '', meta || ''));
     article.append(head, content);
@@ -693,7 +693,6 @@
   }
 
   function transitionOverview(nextCard) {
-    cancelAnimationFrame(scrollAnchorFrame);
     if (state.focusedCard === 'calendar' && nextCard !== 'calendar') {
       state.calendarRequest += 1;
       state.calendarCandidate = null;
@@ -718,26 +717,31 @@
       else if (visibleBottom > visibleTop) anchorY = (visibleTop + visibleBottom) / 2;
       else anchorY = Math.max(viewport.top, Math.min((oldAnchor.top + oldAnchor.bottom) / 2, bottom));
     }
-    state.focusedCard = nextCard;
-    renderOverview();
-    grid.style.paddingBottom = '';
-    const alignCard = () => {
+    const update = () => {
+      state.focusedCard = nextCard;
+      renderOverview();
+      grid.style.paddingBottom = '';
       const card = grid.querySelector(`[data-card-id="${anchorId}"]`);
-      const current = card?.getBoundingClientRect();
-      if (!current) return;
-      const currentY = nextCard ? current.top : current.top + current.height / 2;
-      const wanted = Math.max(0, page.scrollTop + currentY - anchorY);
-      const extra = parseFloat(grid.style.paddingBottom) || 0;
-      const naturalMax = Math.max(0, page.scrollHeight - page.clientHeight - extra);
-      const missing = wanted - naturalMax;
-      grid.style.paddingBottom = !nextCard && missing > 0 ? `${Math.ceil(missing)}px` : '';
-      page.scrollTop = wanted;
+      if (anchorY != null && card) {
+        const current = card.getBoundingClientRect();
+        const currentY = nextCard ? current.top : current.top + current.height / 2;
+        const wanted = Math.max(0, page.scrollTop + currentY - anchorY);
+        const missing = wanted - Math.max(0, page.scrollHeight - page.clientHeight);
+        grid.style.paddingBottom = !nextCard && missing > 0 ? `${Math.ceil(missing)}px` : '';
+        page.scrollTop = wanted;
+      }
+      if (nextCard || anchorY != null) card?.focus({ preventScroll: true });
     };
-    if (anchorY != null) {
-      alignCard();
-      if (!nextCard) grid.querySelector(`[data-card-id="${anchorId}"]`)?.focus({ preventScroll: true });
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 폰은 카드가 세로로 쌓여 높이 애니메이션이 매 프레임 아래 카드 전부를 다시 배치한다.
+    // 스냅샷 전환은 새 배치를 한 번만 계산하고 사이를 합성으로 잇는다.
+    if (phone) {
+      if (!reduced && document.startViewTransition) document.startViewTransition(update);
+      else update();
+      return;
     }
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    update();
+    if (reduced) return;
     grid.querySelectorAll('.home-card').forEach(card => {
       const previous = before.get(card.dataset.cardId);
       if (!previous) return;
@@ -748,14 +752,6 @@
         { transform: 'none', width: `${current.width}px`, height: `${current.height}px` },
       ], { duration: 320, easing: 'cubic-bezier(.2,.7,.2,1)' });
     });
-    if (phone && !nextCard && anchorY != null) {
-      const until = performance.now() + 350;
-      const followCard = () => {
-        alignCard();
-        scrollAnchorFrame = performance.now() < until ? requestAnimationFrame(followCard) : 0;
-      };
-      scrollAnchorFrame = requestAnimationFrame(followCard);
-    }
   }
 
   function setFocusedCard(id) {
@@ -765,7 +761,6 @@
       state.calendarPopup = false;
     }
     transitionOverview(id);
-    document.querySelector(`.home-card[data-card-id="${id}"]`)?.focus({ preventScroll: true });
   }
 
   function collapseFocus() {
@@ -783,7 +778,6 @@
   function setHomeView(view) {
     state.homeView = view === 'agents' ? 'agents' : 'overview';
     if (state.homeView !== 'overview') {
-      cancelAnimationFrame(scrollAnchorFrame);
       document.getElementById('home-grid').style.paddingBottom = '';
     }
     document.querySelectorAll('[data-home-view]').forEach(button => {
@@ -804,7 +798,6 @@
   function setRoute(route, homeView) {
     if (!['home', 'chat', 'notes', 'settings'].includes(route)) route = 'home';
     if (route !== 'home') {
-      cancelAnimationFrame(scrollAnchorFrame);
       document.getElementById('home-grid').style.paddingBottom = '';
     }
     state.route = route;

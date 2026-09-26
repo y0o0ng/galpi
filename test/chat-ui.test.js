@@ -307,7 +307,10 @@ test('Home keeps one focus state and the platform-specific collapse contracts', 
   assert.match(home, /prefers-reduced-motion: reduce/);
   assert.match(home, /grid\.querySelectorAll\('\.home-card'\)/);
   assert.match(home, /!event\.target\.closest\('\.home-card\.focused'\)[\s\S]*?collapseFocus\(\)/);
-  assert.match(css, /#home-focus-collapse:not\(\[hidden\]\) \{[^}]*position: sticky/s);
+  assert.match(css, /#home-focus-collapse:not\(\[hidden\]\) \{[^}]*position: fixed;[^}]*right: 16px;[^}]*bottom: calc\(/s);
+  // 폰은 높이 애니메이션 대신 스냅샷 전환을 쓴다. 매 프레임 스크롤을 쫓는 루프로 돌아가지 않는다.
+  assert.match(home, /if \(phone\) \{[\s\S]*?document\.startViewTransition\(update\)/);
+  assert.doesNotMatch(home, /requestAnimationFrame\(followCard\)/);
   assert.match(css, /#home-grid\.focus-calendar \.home-card-calendar \{ grid-area: 1 \/ 5 \/ span 2 \/ span 12; \}/);
   assert.match(css, /#home-grid\.has-focus:is\(\.focus-calendar, \.focus-mail, \.focus-notes\) \.home-card\.focused \{[^}]*grid-column: 1 \/ -1;[^}]*height: 440px/s);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?#home-grid\.has-focus \{ display: flex; flex-direction: column; gap: 16px; \}/);
