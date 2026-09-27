@@ -5145,3 +5145,12 @@ No audit, review or acceptance; the accepted pool stays **93**.
 
 Fresh external session, auditor reported as Claude Opus 5.5. 2 PASS / 0 FAIL / 0 UNCERTAIN. No
 semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
+
+#### P1-B6 v3 replacement candidates — v3 semantic-review packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-v3-replacement-v3-review-plan.json` (internal) | `6ccd866e9e50985c5db77951990b7d4df23d0645bb83ee138fd144815b6c6b6c` |
+| blind review packet (not committed, 2 rows) | `b32aabeeeeb6c06c7ddd4e39110dc864eeb63ccd2fa76cc3ec7fe4427b3d1776` |
+
+No review, HUMAN review or acceptance; the accepted pool stays **93**.

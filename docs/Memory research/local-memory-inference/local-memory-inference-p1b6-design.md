@@ -31,7 +31,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
 - **current coverage gate: surface authoring for the two replacement skeletons.** One fresh
   candidate each for `53ab6351` and `0768ea20` is authored (see "V3 replacement-skeleton surface candidates")
-  and has passed a fresh source audit 2/2; the v3 semantic review is next.
+  and has passed a fresh source audit 2/2; its v3 review packet is built and the external review is next.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1831,7 +1831,20 @@ the home directory, given only the protocol and packet paths; auditor reported b
 Claude Opus 5.5. Raw result `p1b6-rp1-source-audit-results.json` (raw SHA-256
 `9b42279e1e5e11e614a2cd75de00546799094d8dee77af139be7c19b16048be8`, not committed) is recorded
 in `fixtures/local-memory-inference-p1b6-v3-replacement-source-audit-attempt-001.json`. Both
-bundles are their whole episodes. **Next: the fresh v3 semantic review of both rows.**
+bundles are their whole episodes.
+
+**Fresh v3 semantic-review packet — built, NOT RUN.** The internal plan
+`fixtures/local-memory-inference-p1b6-v3-replacement-v3-review-plan.json` (raw SHA-256
+`6ccd866e9e50985c5db77951990b7d4df23d0645bb83ee138fd144815b6c6b6c`, never shown to the
+reviewer) mirrors the TARGET-boundary plan: population = the audit receipt's PASS rows,
+the neutral targeted v3 protocol reused unchanged, KEEP matching v3 →
+`CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, FIX / REJECT / opposing / missing →
+mandatory HUMAN, one lowest-hash calibration row per skeleton (domain
+`p1b6-rp1-v3-review-calibration-v1`) — so with one row per skeleton every row reaches HUMAN
+review. `scripts/build-memory-inference-p1b6-v3-replacement-v3-review-packet.js` renders the
+audited bundles under `p1b6-rp1-v3smreview-` IDs; the packet is gitignored and deterministic
+at raw SHA-256 `b32aabeeeeb6c06c7ddd4e39110dc864eeb63ccd2fa76cc3ec7fe4427b3d1776` (2 rows). The
+review runs externally in a fresh session.
 
 ## Closed Selection and Freeze Constraints
 
