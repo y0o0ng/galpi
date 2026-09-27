@@ -18,23 +18,20 @@ authority is [semantic contract v3](#semantic-contract-v3)
 reversed the v2 CLEAR amendments of `2da4e54e`, `5269c91f` and `b8e64a03` to
 ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 `28736b74`, replacing them in place with `53ab6351` and `0768ea20`. The batch-003
-26-row resolution is **CLOSED** (see "Batch-003 26-row resolution"). The next
-gates are:
+26-row resolution is **CLOSED** (see "Batch-003 26-row resolution"). Current facts:
 
-- fresh source audit and fresh blind HUMAN review under v3 for the repaired
-  `162` / `214` candidates — the fresh source audit is **COMPLETE_PASS at 2/2**
-  (see "Batch-003 repair source-audit result"); the blind HUMAN review under v3
-  is now open and not yet built or run;
-- fresh surface authoring, then the normal source-audit and blind-review gates,
-  for the two replacement skeletons;
-- re-reconciliation under v3 of the remaining batch-003 surfaces on the three
-  reversed skeletons — the fresh strong-model review is **reconciled at 19 agree / 5
-  HUMAN-routed** (see "Batch-003 targeted v3 re-reconciliation"); the 8-row blind HUMAN
-  packet (5 mandatory + 3 calibration) was HUMAN-reviewed on 2026-09-23: **7 FIX / 1 KEEP
-  ESCALATE, nothing eligible**. The self-stating-TARGET finding on `2da4e54e` / `5269c91f`
-  is **resolved as a realization failure** (see "Batch-003 TARGET-boundary realization
-  failure" below): all 16 batch-003 surfaces on the two skeletons are current-ineligible and
-  one fresh candidate per skeleton awaits the normal gates.
+- repaired `162` / `214`: fresh source audit **COMPLETE_PASS 2/2**, fresh blind HUMAN review
+  under v3 **2 KEEP ESCALATE**; no acceptance yet.
+- targeted re-reconciliation under v3 of the three reversed skeletons: **completed**. The
+  TARGET-boundary defect on `2da4e54e` / `5269c91f` is resolved by making all 16 old batch-003
+  realizations on them current-ineligible (see "Batch-003 TARGET-boundary realization
+  failure").
+- fresh TARGET-boundary candidates `tb1-001` / `tb1-002`: source audit 2/2 PASS, external v3
+  review 2 KEEP ESCALATE, owner calibration 2 KEEP ESCALATE; they remain
+  `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
+- **current coverage gate: surface authoring for the two replacement skeletons.** One fresh
+  candidate each for `53ab6351` and `0768ea20` is authored (see "V3 replacement-skeleton surface candidates")
+  and awaits a fresh source/bundle audit.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1789,6 +1786,35 @@ top-up; nothing is accepted and the accepted pool stays **93**.
 `p1b6-item-b002-047` (accepted, `5269c91f`, TARGET `resident rate`) is out of scope; the
 accepted pool stays **93**. No acceptance, reference freeze, FINAL selection, HELD release or
 training.
+
+### V3 replacement-skeleton surface candidates — authored, awaiting source audit
+
+The first fresh realization for each v3 replacement skeleton —
+`53ab6351` (retired `f58debd8`; TRAIN / APPROXIMATION / RANGE / ESCALATE; contrast group
+`p1b6-cg-084af1a6a0723538`) and `0768ea20` (retired `28736b74`; same class; no contrast
+group) — is in
+`fixtures/local-memory-inference-p1b6-surface-v3-replacement-candidate.json`, built by
+`scripts/build-memory-inference-p1b6-v3-replacement-candidate.js`
+(`npm run build:memory-inference-p1b6-v3-replacement-candidate`) under the new `rp1`
+namespace:
+
+- `p1b6-item-rp1-001` on `53ab6351`: work quantity (20 tasks) and total schedule (4 weeks)
+  stay jointly active; TARGET `반 정도 남았어` names neither dimension.
+- `p1b6-item-rp1-002` on `0768ea20`: the first panel's width and height are both given and
+  the second differs on both; TARGET `두 번째가 한 5cm 정도 더 길어` carries the amount and
+  unit only, following the v3 receipt prototype.
+
+Each row's `intendedUnresolvedReadings` are the v3 receipt's own (work vs time remaining;
+horizontal vs vertical difference), recorded as **author intent hidden from every blind
+packet**, not gold. The builder checks the skeletons are the frozen active replacements, no
+retired skeleton ID appears, every ID is fresh against batch-003, its repairs and the tb1
+candidates, anchors decode inside selected evidence, fragments are 1..5, and the batch-003
+leakage check passes against all prior sources. **These checks are structural; they do not
+prove the ambiguity.** Nothing from the retired skeletons' historical surfaces transfers. The
+two rows are first coverage, not a replacement count; top-up after the reviewed pool is
+consolidated sets any further quantity. **Next: a fresh source/bundle audit of these two
+candidates**, then the v3 semantic review. No review, acceptance, freeze or training; the
+accepted pool stays **93**.
 
 ## Closed Selection and Freeze Constraints
 

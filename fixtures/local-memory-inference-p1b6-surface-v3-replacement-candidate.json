@@ -1,0 +1,159 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-v3-replacement-candidate-v1",
+  "status": "FRESH_REALIZATION_CANDIDATE_AWAITING_SOURCE_AUDIT_AND_V3_REVIEW",
+  "interpretationRule": "P1B6_SEMANTIC_CONTRACT_V3",
+  "provenance": {
+    "semanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "semanticContractReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+      "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1"
+    },
+    "note": "Fresh content under new IDs for the two v3 replacement skeletons. No retired-skeleton surface, ID, text, source-audit result, model or HUMAN decision, eligibility or provenance is carried over. First coverage, not a replacement count; top-up decides later quantity.",
+    "intendedUnresolvedReadingsNote": "intendedUnresolvedReadings are the v3 receipt's author intent for each skeleton. They are hidden from every blind audit and review packet and are not gold."
+  },
+  "pending": {
+    "freshSourceAudit": true,
+    "freshV3SemanticReview": true,
+    "humanAdjudicationWhereRouted": true
+  },
+  "authority": {
+    "historicalReviewTransferred": false,
+    "sourceAuditPerformed": false,
+    "semanticReviewPerformed": false,
+    "humanReviewPerformed": false,
+    "accepted": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-rp1-001",
+      "sourceFamilyId": "p1b6-sf-rp1-001",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이번 프로젝트는 해야 할 작업이 20개고 전체 일정은 4주로 잡혀 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "작업 수랑 일정은 매주 금요일에 같이 팀에 공유해."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "지금 보니까 반 정도 남았어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-rp1-002",
+      "sourceFamilyId": "p1b6-sf-rp1-002",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "거실 벽에 걸 판넬 두 개를 비교하고 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "첫 번째는 가로 60cm, 세로 35cm야."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "두 번째는 가로도 세로도 첫 번째랑 달라."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "재 보니까 두 번째가 한 5cm 정도 더 길어."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-rp1-001",
+      "sourceEpisodeId": "p1b6-se-rp1-001",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "anchorSpanRef": {
+        "turnId": "t3",
+        "startByte": 17,
+        "endByte": 37
+      },
+      "anchorText": "반 정도 남았어",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 92
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 68
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 38
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-rp1-001",
+      "intendedUnresolvedReadings": [
+        "작업량이 약 절반 남아 있음",
+        "마감까지 주어진 시간이 약 절반 남아 있음"
+      ]
+    },
+    {
+      "itemId": "p1b6-item-rp1-002",
+      "sourceEpisodeId": "p1b6-se-rp1-002",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 14,
+        "endByte": 53
+      },
+      "anchorText": "두 번째가 한 5cm 정도 더 길어",
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 56
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 42
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 55
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 54
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-rp1-002",
+      "intendedUnresolvedReadings": [
+        "가로 차이가 약 5cm",
+        "세로 차이가 약 5cm"
+      ]
+    }
+  ]
+}

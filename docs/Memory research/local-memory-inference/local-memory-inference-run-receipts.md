@@ -5116,3 +5116,13 @@ both calibration rows stay `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, 0
 `HUMAN_ADJUDICATED`. Not independent. No acceptance; the accepted pool stays **93**.
 
 Tests run locally: `…-target-boundary-human-review-packet` with the raw bytes supplied (6/6).
+
+#### P1-B6 v3 replacement skeletons — first fresh candidates AUTHORED / awaiting source audit
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-v3-replacement-candidate.json` | `p1b6-item-rp1-001` (`53ab6351`), `p1b6-item-rp1-002` (`0768ea20`) |
+
+Fresh content under new IDs; no retired-skeleton surface or judgment carried; no audit,
+review or acceptance. v3 catalog and receipt unchanged; the accepted pool stays **93**.
+Contracts are in the design section "V3 replacement-skeleton surface candidates".
