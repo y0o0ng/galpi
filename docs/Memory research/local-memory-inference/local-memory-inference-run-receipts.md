@@ -5126,3 +5126,12 @@ Tests run locally: `…-target-boundary-human-review-packet` with the raw bytes 
 Fresh content under new IDs; no retired-skeleton surface or judgment carried; no audit,
 review or acceptance. v3 catalog and receipt unchanged; the accepted pool stays **93**.
 Contracts are in the design section "V3 replacement-skeleton surface candidates".
+
+#### P1-B6 v3 replacement candidates — fresh source-audit packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-v3-replacement-candidate.json` | `8c3ff152cfb42abfe4a327e4ba84b833904946c7400332ab5e560980a9af47cc` |
+| blind source-audit packet (not committed, 2 rows) | `306290286bc26d534e84d83f6dbe5f6015ce7a38439216abf02b382652067d76` |
+
+No audit, review or acceptance; the accepted pool stays **93**.

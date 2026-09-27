@@ -31,7 +31,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
 - **current coverage gate: surface authoring for the two replacement skeletons.** One fresh
   candidate each for `53ab6351` and `0768ea20` is authored (see "V3 replacement-skeleton surface candidates")
-  and awaits a fresh source/bundle audit.
+  and its fresh source-audit packet is built; the external audit is next.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1812,9 +1812,19 @@ candidates, anchors decode inside selected evidence, fragments are 1..5, and the
 leakage check passes against all prior sources. **These checks are structural; they do not
 prove the ambiguity.** Nothing from the retired skeletons' historical surfaces transfers. The
 two rows are first coverage, not a replacement count; top-up after the reviewed pool is
-consolidated sets any further quantity. **Next: a fresh source/bundle audit of these two
-candidates**, then the v3 semantic review. No review, acceptance, freeze or training; the
+consolidated sets any further quantity. No review, acceptance, freeze or training; the
 accepted pool stays **93**.
+
+**Fresh source-audit packet — built, NOT RUN.**
+`scripts/build-memory-inference-p1b6-v3-replacement-source-audit-packet.js`
+(`npm run build:memory-inference-p1b6-v3-replacement-source-audit-packet -- --output
+<path>`, and `--results <raw>` to record the result) follows the TARGET-boundary audit
+builder: it pins the candidate (`8c3ff152…`) and the unchanged source-audit protocol,
+requires the candidate to equal the authoring builder's output, and renders each row's full
+episode and bundle under `p1b6-rp1-audit-` IDs, sorted, with no skeleton, split, reading or
+label. The packet is gitignored and deterministic at raw SHA-256
+`306290286bc26d534e84d83f6dbe5f6015ce7a38439216abf02b382652067d76` (2 rows). The audit runs
+externally in a fresh session; the v3 semantic review follows only for PASS rows.
 
 ## Closed Selection and Freeze Constraints
 
