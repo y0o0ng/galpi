@@ -1,0 +1,58 @@
+{
+  "name": "xion-local-memory-inference-p1b6-v3-replacement-source-audit-attempt-001-receipt-v1",
+  "attemptId": "p1b6-v3-replacement-source-audit-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-v3-replacement-source-audit-packet-v1",
+  "auditPacketSha256": "306290286bc26d534e84d83f6dbe5f6015ce7a38439216abf02b382652067d76",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedCandidate": {
+    "identity": "xion-local-memory-inference-p1b6-surface-v3-replacement-candidate-v1",
+    "rawSha256": "8c3ff152cfb42abfe4a327e4ba84b833904946c7400332ab5e560980a9af47cc"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-rp1-source-audit-results.json",
+    "sha256": "9b42279e1e5e11e614a2cd75de00546799094d8dee77af139be7c19b16048be8",
+    "committed": false
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "surface": "Claude Code",
+    "model": "Claude Opus 5.5",
+    "reasoningSetting": "NOT_RECORDED",
+    "sessionRelationship": "a fresh Claude Code CLI session started in the home directory (no project instructions or memory loaded), separate from the session that authored the candidates, given only the protocol and packet paths"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "Fresh realizations under new IDs; no historical source-audit result carried forward."
+  },
+  "summary": {
+    "total": 2,
+    "PASS": 2,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassedForCandidates": true,
+    "semanticReviewOccurred": false,
+    "humanReviewOccurred": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-rp1-audit-a517ba283cf10451",
+      "disposition": "PASS",
+      "reason": "Bundle reproduces all four source turns verbatim; TARGET span matches t4 text; no source material omitted."
+    },
+    {
+      "auditRowId": "p1b6-rp1-audit-c9a4b09f70b501a3",
+      "disposition": "PASS",
+      "reason": "Bundle reproduces all three source turns verbatim; TARGET span matches t3 text; no source material omitted."
+    }
+  ]
+}

@@ -4,6 +4,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { sha256RawBytes } = require('../lib/memory-inference-p1b6-skeletons');
 const builder = require('../scripts/build-memory-inference-p1b6-v3-replacement-source-audit-packet');
 
@@ -45,4 +48,38 @@ test('the packet leaks no identity, skeleton, reading or label', () => {
     'f58debd8', '28736b74', 'APPROXIMATION']) {
     assert.equal(text.includes(value), false, value);
   }
+});
+
+const RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const RAW = path.join(os.homedir(), 'p1b6-rp1-source-audit-results.json');
+const synthetic = mutate => {
+  const results = build().rows.map(row => ({ auditRowId: row.auditRowId, disposition: 'PASS', reason: 'r' }));
+  mutate(results);
+  return Buffer.from(JSON.stringify({ results }));
+};
+
+test('audit results are bound to the packet rows and fail closed on drift', () => {
+  assert.equal(builder.buildSourceAuditReceipt(synthetic(() => {})).status, 'COMPLETE_PASS');
+  const fail = builder.buildSourceAuditReceipt(synthetic(rows => { rows[0].disposition = 'FAIL'; }));
+  assert.equal(fail.status, 'COMPLETE_NEEDS_FIX');
+  assert.equal(fail.authority.sourceBundleGatePassedForCandidates, false);
+  assert.throws(() => builder.buildSourceAuditReceipt(synthetic(rows => rows.pop())), /exactly the packet rows/);
+  assert.throws(() => builder.buildSourceAuditReceipt(synthetic(rows => { rows[0].reason = ''; })), /malformed/);
+});
+
+test('the committed audit receipt records 2/2 PASS and opens no semantic gate', () => {
+  const receipt = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.equal(receipt.status, 'COMPLETE_PASS');
+  assert.equal(receipt.auditPacketSha256, PACKET_SHA256);
+  assert.deepEqual(receipt.summary, { total: 2, PASS: 2, FAIL: 0, UNCERTAIN: 0 });
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  assert.equal(receipt.freshness.historicalSourceAuditResultInherited, false);
+  for (const key of ['semanticReviewOccurred', 'humanReviewOccurred', 'datasetAcceptancePerformed',
+    'heldOutReleasePerformed', 'trainingOccurred']) {
+    assert.equal(receipt.authority[key], false, key);
+  }
+});
+
+test('the audit receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  assert.deepEqual(builder.buildSourceAuditReceipt(fs.readFileSync(RAW)), JSON.parse(fs.readFileSync(RECEIPT)));
 });

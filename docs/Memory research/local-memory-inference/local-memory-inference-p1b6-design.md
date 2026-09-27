@@ -31,7 +31,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
 - **current coverage gate: surface authoring for the two replacement skeletons.** One fresh
   candidate each for `53ab6351` and `0768ea20` is authored (see "V3 replacement-skeleton surface candidates")
-  and its fresh source-audit packet is built; the external audit is next.
+  and has passed a fresh source audit 2/2; the v3 semantic review is next.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1825,6 +1825,13 @@ episode and bundle under `p1b6-rp1-audit-` IDs, sorted, with no skeleton, split,
 label. The packet is gitignored and deterministic at raw SHA-256
 `306290286bc26d534e84d83f6dbe5f6015ce7a38439216abf02b382652067d76` (2 rows). The audit runs
 externally in a fresh session; the v3 semantic review follows only for PASS rows.
+
+**Source-audit result — attempt 001: COMPLETE_PASS, 2/2.** Fresh Claude Code CLI session in
+the home directory, given only the protocol and packet paths; auditor reported by the owner as
+Claude Opus 5.5. Raw result `p1b6-rp1-source-audit-results.json` (raw SHA-256
+`9b42279e1e5e11e614a2cd75de00546799094d8dee77af139be7c19b16048be8`, not committed) is recorded
+in `fixtures/local-memory-inference-p1b6-v3-replacement-source-audit-attempt-001.json`. Both
+bundles are their whole episodes. **Next: the fresh v3 semantic review of both rows.**
 
 ## Closed Selection and Freeze Constraints
 

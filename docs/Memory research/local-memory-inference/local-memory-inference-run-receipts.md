@@ -5135,3 +5135,13 @@ Contracts are in the design section "V3 replacement-skeleton surface candidates"
 | blind source-audit packet (not committed, 2 rows) | `306290286bc26d534e84d83f6dbe5f6015ce7a38439216abf02b382652067d76` |
 
 No audit, review or acceptance; the accepted pool stays **93**.
+
+#### P1-B6 v3 replacement candidates — source audit attempt 001 COMPLETE_PASS (2/2)
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw audit result `p1b6-rp1-source-audit-results.json` (not committed, 2 rows) | `9b42279e1e5e11e614a2cd75de00546799094d8dee77af139be7c19b16048be8` |
+| `fixtures/local-memory-inference-p1b6-v3-replacement-source-audit-attempt-001.json` | receipt |
+
+Fresh external session, auditor reported as Claude Opus 5.5. 2 PASS / 0 FAIL / 0 UNCERTAIN. No
+semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
