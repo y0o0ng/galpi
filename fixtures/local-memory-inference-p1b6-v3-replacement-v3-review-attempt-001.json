@@ -1,0 +1,74 @@
+{
+  "name": "xion-local-memory-inference-p1b6-v3-replacement-v3-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-v3-replacement-v3-review-attempt-001",
+  "status": "COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewProtocol": {
+    "identity": "p1b6-targeted-v3-semantic-realization-review-v1",
+    "sha256": "8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-v3-replacement-v3-review-packet-v1",
+    "sha256": "b32aabeeeeb6c06c7ddd4e39110dc864eeb63ccd2fa76cc3ec7fe4427b3d1776",
+    "rows": 2
+  },
+  "reviewPlan": {
+    "identity": "xion-local-memory-inference-p1b6-v3-replacement-v3-review-plan-v1",
+    "rawSha256": "6ccd866e9e50985c5db77951990b7d4df23d0645bb83ee138fd144815b6c6b6c"
+  },
+  "referenceAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-rp1-v3-review-results.json",
+    "sha256": "97f5f71d596c4ae39361011c93b95723cf3743217c033ca24a06414d693f6135",
+    "committed": false
+  },
+  "reviewerExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "reportedModel": "Claude Opus 5.5",
+    "session": "fresh Claude Code CLI session started in the home directory, given only the protocol and packet paths"
+  },
+  "summary": {
+    "total": 2,
+    "cleanAgreements": 2,
+    "mandatoryHuman": 0,
+    "calibration": 2
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-rp1-001",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Two co-reported quantities (20 tasks, 4-week schedule); '반 정도 남았어' could mean ~10 tasks or ~2 weeks remaining, and the discourse does not resolve which.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-rp1-002",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Second panel differs in both width and height; '약 5cm 더 길어' does not say which dimension (가로 vs 세로) is ~5cm longer, so materially different readings remain unresolved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "mandatoryHumanItemIds": [],
+  "calibrationItemIds": [
+    "p1b6-item-rp1-001",
+    "p1b6-item-rp1-002"
+  ],
+  "authority": {
+    "humanPacketBuilt": false,
+    "humanReviewPerformed": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

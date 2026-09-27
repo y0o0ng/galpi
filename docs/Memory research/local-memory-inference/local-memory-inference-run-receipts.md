@@ -5154,3 +5154,16 @@ semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
 | blind review packet (not committed, 2 rows) | `b32aabeeeeb6c06c7ddd4e39110dc864eeb63ccd2fa76cc3ec7fe4427b3d1776` |
 
 No review, HUMAN review or acceptance; the accepted pool stays **93**.
+
+#### P1-B6 v3 replacement candidates — v3 review attempt 001 RECONCILED / 2-row HUMAN packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw v3 review result `p1b6-rp1-v3-review-results.json` (not committed, 2 rows) | `97f5f71d596c4ae39361011c93b95723cf3743217c033ca24a06414d693f6135` |
+| `fixtures/local-memory-inference-p1b6-v3-replacement-v3-review-attempt-001.json` | `a42c4e7e1e8e35c65760504bb87283af7b0bea015e211fd1cca35673a36e50bc` |
+| `fixtures/local-memory-inference-p1b6-v3-replacement-human-review-protocol.json` | `4314f45a4ecc74d37efbebfe13ea140e33101da8f5c43c5f5beabc239fd60963` |
+| blind HUMAN packet (not committed, 2 rows) | `1d02df06cf983f6999ccbd0086705f5e480d19c9765067465983edc2cb6a7e3e` |
+
+Fresh external session, reviewer reported as Claude Opus 5.5: 2 KEEP ESCALATE, matching v3;
+both rows are per-skeleton calibration rows. No HUMAN review or acceptance; the accepted pool
+stays **93**.

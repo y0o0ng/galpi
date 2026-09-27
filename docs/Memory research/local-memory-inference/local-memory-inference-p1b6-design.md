@@ -31,7 +31,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
 - **current coverage gate: surface authoring for the two replacement skeletons.** One fresh
   candidate each for `53ab6351` and `0768ea20` is authored (see "V3 replacement-skeleton surface candidates")
-  and has passed a fresh source audit 2/2; its v3 review packet is built and the external review is next.
+  and has passed a fresh source audit 2/2; the external v3 review matched v3 on both (2 KEEP ESCALATE) and the 2-row HUMAN calibration packet is built.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1843,8 +1843,25 @@ mandatory HUMAN, one lowest-hash calibration row per skeleton (domain
 `p1b6-rp1-v3-review-calibration-v1`) — so with one row per skeleton every row reaches HUMAN
 review. `scripts/build-memory-inference-p1b6-v3-replacement-v3-review-packet.js` renders the
 audited bundles under `p1b6-rp1-v3smreview-` IDs; the packet is gitignored and deterministic
-at raw SHA-256 `b32aabeeeeb6c06c7ddd4e39110dc864eeb63ccd2fa76cc3ec7fe4427b3d1776` (2 rows). The
-review runs externally in a fresh session.
+at raw SHA-256 `b32aabeeeeb6c06c7ddd4e39110dc864eeb63ccd2fa76cc3ec7fe4427b3d1776` (2 rows).
+
+**v3 review result — attempt 001.** Fresh Claude Code CLI session in the home directory,
+reviewer reported by the owner as Claude Opus 5.5. Raw result `p1b6-rp1-v3-review-results.json`
+(raw SHA-256 `97f5f71d596c4ae39361011c93b95723cf3743217c033ca24a06414d693f6135`, not committed)
+reconciled into `fixtures/local-memory-inference-p1b6-v3-replacement-v3-review-attempt-001.json`:
+**both KEEP ESCALATE, matching v3** → `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; the
+per-skeleton calibration rule selects both rows.
+
+**Blind HUMAN packet — built, NOT RUN.**
+`scripts/build-memory-inference-p1b6-v3-replacement-human-review-packet.js` renders both rows
+under `p1b6-rp1-hreview-` IDs with the protocol
+`fixtures/local-memory-inference-p1b6-v3-replacement-human-review-protocol.json`
+(`p1b6-v3-replacement-blind-human-review-v1`, raw SHA-256
+`4314f45a4ecc74d37efbebfe13ea140e33101da8f5c43c5f5beabc239fd60963`, v3 verbatim); the packet is
+gitignored and deterministic at raw SHA-256
+`1d02df06cf983f6999ccbd0086705f5e480d19c9765067465983edc2cb6a7e3e`. The owner approved the
+wording and knows the reference and the model result, so the result is not an independent
+confirmation, and matching calibration rows stay `CATALOG_STRONG_MODEL_CONFIRMED`.
 
 ## Closed Selection and Freeze Constraints
 
