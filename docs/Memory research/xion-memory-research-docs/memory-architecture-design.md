@@ -12044,6 +12044,27 @@ same protocol for every exact ΔR case = required
 P0-B를 시작한 뒤 case가 많다는 이유로 일부만 보는 것으로 바꾸지 않는다.
 비용/규모 때문에 census가 불가능해지면 실행 전에 protocol을 다시 열어 사용자 결정을 받는다.
 
+### P0-B retrospective replay execution amendment — 2026-09-28
+
+위 exact historical `S`·exact ΔR census 요구는 원래 사전등록 계약으로 보존한다.
+하지만 고정된 28일 창의 409 organic invocation에 대해 retained telemetry만으로
+historical query/corpus/embedding 상태를 완전히 복원할 수 없다.
+저장소 주인은 P0-B 연구 진행을 그 복원이 가능해질 때까지 막지 않기로 결정했다.
+이 결정은 §53.2 Coverage-gap rule로 strict exact-historical trigger를 증명했다는 뜻이 아니다.
+
+전향적 P0-B 실행 입력은 같은 409건의 production query-resolution semantics와
+보존된 corpus를 사용한 **best-available reproducible replay census**로 동결한다.
+재생 불가능하거나 알려진 중요한 불일치가 있는 invocation은 `PIT_UNCERTAIN`으로 남기고,
+case별로 검출할 수 없는 현재 note embedding·삭제/변경된 historical chunk 등의
+잔여 PIT 근사는 study-wide caveat로 별도 기록한다.
+Operational `REPLAY_SENSITIVE` 전수를 후속 generation의 primary set으로 쓰되
+`PIT_UNCERTAIN`을 추측해 포함하거나 제외하지 않는다. Operational replay 결과를
+exact historical `S`·exact ΔR 또는 strict preregistered gate 결과로 부르지 않는다.
+
+고정 창·409건 universe·D0 한 변수 비교·threshold 20/50·양 arm당 2회 생성·
+blind HUMAN 판정·adaptive retry/sequential sampling 금지·M/N/U 의미·
+production mutation 금지는 그대로다. Answer generation은 별도 작업이다.
+
 ### Experiment-time answer-stack snapshot
 
 P0-B 시작 직전에 experiment-time production answer stack 하나를 freeze한다.

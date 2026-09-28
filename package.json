@@ -61,6 +61,7 @@
     "build:memory-inference-p1b6-batch-002-finalization": "node scripts/build-memory-inference-p1b6-batch-002-finalization.js",
     "review:retrieval-policy": "node scripts/review-retrieval-policy.js",
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",
+    "research:memory-p0b-census": "node scripts/freeze-memory-p0-b-census.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
     "smoke:openai-responses": "node scripts/smoke-openai-responses.js",
     "smoke:github-mcp": "node scripts/smoke-github-mcp.js",
