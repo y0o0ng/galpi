@@ -35,7 +35,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 - anchor-quality follow-up (see "Batch-003 anchor-quality follow-up"): `869c7127` 4/4
   ANCHOR_QUALITY_PASS, unchanged; `aebbf047` 5/5 REANCHOR, materialized as an
   anchorSpanRef-only candidate. Semantics unchanged for both. **Next gate: a fresh source/bundle
-  audit of exactly the five reanchored candidates.**
+  audit of exactly the five reanchored candidates** — its packet is built; the external audit
+  is next.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1910,6 +1911,17 @@ remain evidence about the old marked bundle only; nothing transfers. The five ro
 source/bundle audit and a fresh v3 semantic review, with HUMAN review only where routing
 requires it. No acceptance, freeze, selection, HELD release or training; the accepted pool
 stays **93**.
+
+**Fresh source-audit packet — built, NOT RUN.**
+`scripts/build-memory-inference-p1b6-batch-003-anchor-repair-source-audit-packet.js`
+(`npm run build:memory-inference-p1b6-batch-003-anchor-repair-source-audit-packet -- --output
+<path>`, and `--results <raw>` to record the result) pins the candidate (`19eea01d…`) and the
+unchanged source-audit protocol, requires the candidate to equal the anchor-quality builder's
+output, and renders each row's full episode and reanchored bundle under
+`p1b6-b003-anchor-audit-` IDs (disjoint from the historical batch-003 audit IDs), sorted, with
+no skeleton, label or resolution metadata. The packet is gitignored and deterministic at raw
+SHA-256 `c75e53e09b3eb7dcb8685cc727c92d71792d38124268b7a8c035b1fa2059fe00` (5 rows). The audit
+runs externally in a fresh session.
 
 ## Closed Selection and Freeze Constraints
 

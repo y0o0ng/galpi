@@ -5190,3 +5190,12 @@ accepted pool stays **93**.
 
 Not a semantic amendment; batch-003 and historical evidence unchanged and not transferred.
 Next: fresh source/bundle audit of the five reanchored candidates. The accepted pool stays **93**.
+
+#### P1-B6 batch-003 anchor repair — fresh source-audit packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-anchor-repair-candidate-batch-003.json` | `19eea01def0a05c32c1ceb236fa97305e7b29822c9e56b70cc0331f3a873599f` |
+| blind source-audit packet (not committed, 5 rows) | `c75e53e09b3eb7dcb8685cc727c92d71792d38124268b7a8c035b1fa2059fe00` |
+
+No audit, review or acceptance; the accepted pool stays **93**.
