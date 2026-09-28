@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "baselineCommit": "e5bbf773ddcc2c20ccb9e3047a15f975215f00d3",
+  "baselineCommit": "8fb933bd5a04f1eefb1267bebc8a6ce479b15ffc",
   "censusSha256": "1be22e876918cf890bed6cf64755c554663c353d09e60a0ef5f49fe40598a01d",
   "censusSensitiveCount": 79,
   "answerStack": {
-    "codeCommit": "e5bbf773ddcc2c20ccb9e3047a15f975215f00d3",
+    "codeCommit": "8fb933bd5a04f1eefb1267bebc8a6ce479b15ffc",
     "sourceSha256": {
       "server.js": "aff8366f2ccb315c10b190f67c9c56e0b7c783f6f5c63913c09fa632ec7f3f8e",
       "lib/assistant-retrieval.js": "6a43b784105d78d583cd36955bd7dc3881f4987e3ff6274f1f48854720d3a2a1",
@@ -12,6 +12,9 @@
       "lib/memory-p0-research.js": "af4e8ad3d34c57654a51858867c9324f148f9dc0fb7b51ecb703c224b94d4bf4",
       "lib/openai-model-catalog.js": "18e6f6b3f0539e4210f6cb63eae71fac000ee966b4b8c061506fcf2501c0c2b6",
       "lib/openai-responses-tool-loop.js": "cbed042e15076f0ca17e62935308714587a857c29c7b4f4167303f9389345b14",
+      "lib/assistant-tasks.js": "6cfee11d1121a46c0e503d465a34d376b2852f389d5e2b79a9f1381459dee323",
+      "lib/assistant-task-series.js": "8bf7bf9a038d222d69668b6024052da947ae0c744c33c2c09f52d07939056925",
+      "lib/assistant-schedule-notes.js": "03fe45a1b89352e126bbc6d5e00745ab5ac8d90ce30fb9979789a83a7a7a0c56",
       "config/codex-policy.json": "aac9c929fb17d46e77e75362bd388eada008173d2fae881558e7c363111d204c"
     },
     "selection": "gpt-6-luna",
@@ -68,14 +71,21 @@
     },
     "targetTimePolicy": "canonical target messages.created_at (KST rendering)"
   },
-  "answerStackSha256": "d2e59c58eb76fe987a43a4653afbbe905f1080ce0c7ff60b9e92493796f49981",
+  "answerStackSha256": "b3d720a359079b6115454abe1dc501bd1e0440a7d50d8ff437482877166e0b1e",
   "counts": {
-    "GENERATION_READY": 0,
+    "GENERATION_READY": 18,
     "INDETERMINATE_HISTORY_REPLAY": 0,
-    "INDETERMINATE_TOOL_REPLAY": 79,
+    "INDETERMINATE_TOOL_REPLAY": 61,
     "INDETERMINATE_RETRIEVAL_RECONSTRUCTION": 0
   },
-  "privateBundleSha256": "8d17df7e789e9e8c7646fff2299c92699788a1f17e88ae580adeba5065f91c68",
+  "scheduleCounts": {
+    "EMPTY": 0,
+    "ACTIVE": 20,
+    "UNRECOVERABLE": 59,
+    "DISABLED": 0,
+    "NOT_REACHED": 0
+  },
+  "privateBundleSha256": "b94b4927d3707e017b6fef90479c72a7c8989e431e527f3c0392296eba3b349f",
   "safety": {
     "sqliteReadonly": true,
     "sqliteQueryOnly": true,
@@ -94,6 +104,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788103721,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         881,
         882,
@@ -131,6 +142,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788103780,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         883,
         884,
@@ -168,6 +180,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788103839,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         885,
         886,
@@ -205,6 +218,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788104200,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         895,
         896,
@@ -242,6 +256,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788104575,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         907,
         908,
@@ -279,6 +294,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788175123,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         913,
         914,
@@ -316,6 +332,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788179610,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         917,
         918,
@@ -353,6 +370,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788179773,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         921,
         922,
@@ -390,6 +408,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788180247,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         933,
         934,
@@ -427,6 +446,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788180400,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         937,
         938,
@@ -464,6 +484,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788180473,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         939,
         940,
@@ -501,6 +522,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788180568,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         941,
         942,
@@ -538,6 +560,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788180736,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         943,
         944,
@@ -575,6 +598,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788180773,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         945,
         946,
@@ -612,6 +636,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788180838,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         947,
         948,
@@ -649,6 +674,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788181000,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         951,
         952,
@@ -686,6 +712,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788253468,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         955,
         956,
@@ -723,6 +750,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788276501,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         975,
         976,
@@ -760,6 +788,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788329253,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1010,
         1011
@@ -780,6 +809,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788360598,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1023,
         1024,
@@ -817,6 +847,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788360660,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1025,
         1026,
@@ -854,6 +885,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788360700,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1027,
         1028,
@@ -891,6 +923,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788360744,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1029,
         1030,
@@ -928,6 +961,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788444483,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1051,
         1052,
@@ -965,6 +999,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788447884,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1055,
         1056,
@@ -1002,6 +1037,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448088,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1063,
         1064,
@@ -1039,6 +1075,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448166,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1065,
         1066,
@@ -1076,6 +1113,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448276,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1069,
         1070,
@@ -1113,6 +1151,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448461,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1077,
         1078,
@@ -1150,6 +1189,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448634,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1081,
         1082,
@@ -1187,6 +1227,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448691,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1083,
         1084,
@@ -1224,6 +1265,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448754,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1087,
         1088,
@@ -1261,6 +1303,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448838,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1089,
         1090,
@@ -1298,6 +1341,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788448900,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1091,
         1092,
@@ -1335,6 +1379,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788449052,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1095,
         1096,
@@ -1372,6 +1417,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788449087,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1097,
         1098,
@@ -1409,6 +1455,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788449114,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1099,
         1100,
@@ -1446,6 +1493,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788489104,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1105,
         1106,
@@ -1483,6 +1531,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788675725,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1119,
         1120,
@@ -1520,6 +1569,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788752027,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1129,
         1130,
@@ -1557,6 +1607,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788752095,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1131,
         1132,
@@ -1594,6 +1645,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788752174,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1133,
         1134,
@@ -1631,6 +1683,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788752242,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1135,
         1136,
@@ -1668,6 +1721,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788752315,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1137,
         1138,
@@ -1705,6 +1759,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788779872,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1143,
         1144,
@@ -1742,6 +1797,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788854242,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1145,
         1146,
@@ -1779,6 +1835,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788881766,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1157,
         1158,
@@ -1816,6 +1873,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788881814,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1159,
         1160,
@@ -1853,6 +1911,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788881957,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1165,
         1166,
@@ -1890,6 +1949,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788882082,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1169,
         1170,
@@ -1927,6 +1987,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788882132,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1171,
         1172,
@@ -1964,6 +2025,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788964250,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1203,
         1204,
@@ -2001,6 +2063,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1788964357,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1207,
         1208,
@@ -2038,6 +2101,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1789022331,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1215,
         1216,
@@ -2075,6 +2139,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1789095603,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1225,
         1226,
@@ -2112,6 +2177,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1789101620,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1233,
         1234,
@@ -2149,6 +2215,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1789133954,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1343,
         1344,
@@ -2186,6 +2253,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1789135352,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1373,
         1374,
@@ -2223,6 +2291,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1789136241,
+      "scheduleReplay": "UNRECOVERABLE",
       "prefixMessageIds": [
         1405,
         1406,
@@ -2255,11 +2324,10 @@
       "traceId": 576,
       "messageId": 1438,
       "querySha256": "d1ea291a294016cbcf5ec0c273835385d7bc94f9891eb147731e22f00808f984",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789306254,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1419,
         1420,
@@ -2282,21 +2350,20 @@
         1437
       ],
       "prefixSha256": "380da99ee3982bcb725ef4135e34383e5ea3f0a0758974633f8d0b4f330888a3",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "6c913102c77e54d189f4c8cc642c5e285d60e089393bb44a13366f811b5071bf",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
-      "armWithoutD0Sha256": "1302f1b761d5e6f57835bb29f86604ecae87cf255456a5c276148f5b60714b82",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "61f8223c85d3e37d0b139b1a656911aaa4b7a2af2d1d3c03255d52285baf3b56",
+      "privateCaseSha256": "4665d5707eef0401872287341bf7775577f18d0221f13035be9ebdf48ce40101"
     },
     {
       "traceId": 585,
       "messageId": 1456,
       "querySha256": "373c528e410e4f343c1d8dae3f3cd0719f443b730d8c433fe2b221cf3da8ad8a",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789307008,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1437,
         1438,
@@ -2319,21 +2386,20 @@
         1455
       ],
       "prefixSha256": "350a33f6a0ced3c042372a81884de128c945e6755e4f5a162618e9b432ed2c68",
-      "sharedContextSha256": "42ea4f5af78d6b4b5dd7d929aabfd0424c74c17aeb180e2f85dfd21710dd6b8e",
+      "sharedContextSha256": "885a55af0eba58c2ab196e98236fe7d001b89f69e3dbf8b4dda0cdc87c9bd147",
       "hardContextSha256": "cda140f8b75ea2032a8d04ddca9e3c3536e68bc75e7ee669e1b19353b9477171",
       "globalContextSha256": "30a82530ebb0682b93d592288a6bcbbc77489522dfcb78d7c14c2860cf62f2fc",
-      "armWithoutD0Sha256": "e2d09e2f61fb812c618674afd78fc12c122ef8c140d73a64c6295a5884fc4ce5",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "6cedf0ae26affd84736903d8a33f8fb1430ca82d8ca74d47173e67834483f4b4",
+      "privateCaseSha256": "58fc788b33899756c3c955ada112dfaccdbfd8f84a58103b47b9dbebcac72efb"
     },
     {
       "traceId": 586,
       "messageId": 1458,
       "querySha256": "22da4572ff20c58d33bfce1ba9ab18b0a9ce90ccde274aec490d208d49832cbd",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789384823,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1439,
         1440,
@@ -2356,21 +2422,20 @@
         1457
       ],
       "prefixSha256": "7649107906bc7087a9bd644bba285cc0b760139c45ae97b5759dc14894af521d",
-      "sharedContextSha256": "e973116fef26b3b656211dd82bcd9232c452751c40425f9856e1c179d4aff9df",
+      "sharedContextSha256": "de7907474a2084ab7b939b7c630723f532c3c22d2905f292586fbcd1d5f2181d",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "72e14df2848745f7b4574ab9086f76a14ce090b68b219a8be05130554be76902",
-      "armWithoutD0Sha256": "873fb7ecfbc81e18de3f71a7efe1fe5ba20a37c9182c839cb2882001b66c1a52",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "dac92a6cb2528c4868d1762ce208bf2c25b08708eb37f51f1d209447bdf4bdb1",
+      "privateCaseSha256": "36a389bdfb5229ca01e07357ad3fae720e818f272970ed9ab19c4348450aba76"
     },
     {
       "traceId": 597,
       "messageId": 1480,
       "querySha256": "b8a6d7a5555c27c245f6cb7e58f889957911df4aaed3a63572eea8ef45d53df0",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789399911,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1461,
         1462,
@@ -2393,21 +2458,20 @@
         1479
       ],
       "prefixSha256": "9bbe702d1a963fe8cc2c6e0db90997981a78086b4fc04cbe62e32af9e453b18e",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "b510dadaa6da2f1d69749123af49dc27e3baa135a87af55cf644af776b455bbd",
       "hardContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
       "globalContextSha256": "8c2ff07e8bcdeb6ba0032b7a8c4bff6f18fde8f05eddac219194d4d7c8f958c1",
-      "armWithoutD0Sha256": "28090cf53556dfacc2db04a4dba8058e9447c5d945659d609d4ad7466f36f477",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "6eaed422465ac7b7b79362d9ada1d564520e744b04d459531f58c00477f67440",
+      "privateCaseSha256": "df199698c1da8ba9b069ace3c796beaa136d91ffa81c36c2ccfaeca4114dd2c9"
     },
     {
       "traceId": 608,
       "messageId": 1502,
       "querySha256": "6a30e87182ecfcc3a901585821df5d163ad58c4e71f9efa11684238b8aaaadf2",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789400190,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1483,
         1484,
@@ -2430,21 +2494,20 @@
         1501
       ],
       "prefixSha256": "464b88f2ccba0cc81ffe9e9b4d35a4335b4915cfb7f41f2ae210114b9aedb947",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "0318ce6b920444e971f9d7caae882735cb59da19d6507eb98c7c97c15d293cf7",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
-      "armWithoutD0Sha256": "f57fe96e560f203f67527b2f4efd6aad1f7a07ddd3ff05e88ffca7c98925eb0d",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "d848be9b8682deb103392087b5940579f1531a94335640e15b495654c36c6204",
+      "privateCaseSha256": "25dce8d9b525bfa2ad7c430a9748439c1164ae7d78e7d14cff13c904799091e2"
     },
     {
       "traceId": 609,
       "messageId": 1504,
       "querySha256": "6a30e87182ecfcc3a901585821df5d163ad58c4e71f9efa11684238b8aaaadf2",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789400208,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1485,
         1486,
@@ -2467,21 +2530,20 @@
         1503
       ],
       "prefixSha256": "5841ea459cc6425f45bd3bf5f421e75665173ba835a1713e88cfe28292b1bf72",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "0318ce6b920444e971f9d7caae882735cb59da19d6507eb98c7c97c15d293cf7",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
-      "armWithoutD0Sha256": "ef48f5bb85856b5d570f17e9778bf8670536921c233326c29e781d0d4dd4a523",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "6bad0dcdbce885655986acb043aa981aef177b333c70723bec9f7f5c36d6e986",
+      "privateCaseSha256": "185e9e55083204e82b059306079b472c51410e0cbff6722a29884f5c32ce2dca"
     },
     {
       "traceId": 613,
       "messageId": 1512,
       "querySha256": "41150d2b598479a7b1fc084c15a271a9d9dba23b9ace45f0f2b3723ca857b3e1",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789400319,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1493,
         1494,
@@ -2504,21 +2566,20 @@
         1511
       ],
       "prefixSha256": "d82735d7b4701e3f0a1cd488692def94565e6c6fddb23d376ba860a9b8a8854d",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "c6ba532b5698fbfe714a3fec15eb5e293645eb2851bfd68d3ed61e9619c7e19b",
       "hardContextSha256": "35899cb099dbd72b078194cc3de75419ed0f41c58d821a15f41632010683029f",
       "globalContextSha256": "6d26267114d5aa74e9dac8c396beb0a9c4285b990903cd254242fcc92fee22b1",
-      "armWithoutD0Sha256": "13e7c4a11b6091c504dbd188d3132f5f41061aae5dde2cd32b415481ad72795d",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "916487474582267980feae478f455f5f5158f5a3b99b80f68b89949c464d8d4f",
+      "privateCaseSha256": "b63b853b5984ee8eb649fc14a0b727aa73381c5db04b2ffa714cbbeeb05b3c0b"
     },
     {
       "traceId": 617,
       "messageId": 1520,
       "querySha256": "c7aa5781273b078a7fe06ec6d2cd33cddf6b4bdcd2d1af8f61253ac98c8efd48",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789400439,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1501,
         1502,
@@ -2541,21 +2602,20 @@
         1519
       ],
       "prefixSha256": "5f8ca1f64b5fafdf55914f716d1973a771a23bfe0fd3941d63074e6a0f9395fd",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "0475abe707709de8052a6c6bf7958327714f0bf173aafb9359df2bf9c62d4dfe",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
-      "armWithoutD0Sha256": "1cd4bc7781bfff538ffe7413d4500fd1b0b595d0bde30fb6d42be42842c1e8fe",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "7b33e7ff1fb5ee11a7519565370f576122fc1f7305e01daf05acda6ab4e601b8",
+      "privateCaseSha256": "bc7be1637533847ef72ad6aa6f86b0d38e0bdb168706a1bdb7a5cee28fe01da9"
     },
     {
       "traceId": 622,
       "messageId": 1530,
       "querySha256": "93a9ffbcfeecc78c04c9b5d813c4d2d40cf240f48ff3b46f944ee913a5c2c6cc",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789401166,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1511,
         1512,
@@ -2578,21 +2638,20 @@
         1529
       ],
       "prefixSha256": "8bca89f7fff5f16586895ae0c90cad94174cdd934a0002f9b3fcc7480b799f86",
-      "sharedContextSha256": "782ef74910cfe7aa64bb62de4f5be2a232592634275206396462393c51c7c24f",
+      "sharedContextSha256": "017a4948b74f0f960dcc08b60a9742c165a3aeb0546a3b5403a2738f7d719773",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "910649140f61edc867ce1396d823c4d7b14e0939581fc3f2c46a08f6d48c386b",
-      "armWithoutD0Sha256": "fb3cba0602855bf99b4f9170fa0112ea5a42c2471df6e316df0fee337f6be06f",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "ab1091a3e99d7a2541f1503a4dd79a5de8355905f2442989761421d76a824a93",
+      "privateCaseSha256": "2347fdb296ff5a728eaa52ce56feee3171933890453b6119e9348b63d1dd6b95"
     },
     {
       "traceId": 626,
       "messageId": 1538,
       "querySha256": "d86413035ae8c70f9f853dc239f0cb670237e6b99dfc14fda4a137fb569da3c5",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789401291,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1519,
         1520,
@@ -2615,21 +2674,20 @@
         1537
       ],
       "prefixSha256": "0ee21da609920d494269fb9f69bc0465383f49bc9b8d8fe6118867adbac605f7",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "6bc4dc5872a5f8a0b6b680b10276b642164a81db0d45b30c8169afc58218a2ba",
       "hardContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
       "globalContextSha256": "11aee565bbed30a2083c27e80bf6de0b588e444cdfd246cd36b09e28266b30f2",
-      "armWithoutD0Sha256": "2e56bf461b5d48e953ae923ed12f4c598dc029c95a11188b9c80da69cd543aa5",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "eecac6db99f9e0dd15e9847c7a8a7fb9a5f2335ca7a33745f090477901fa0613",
+      "privateCaseSha256": "bef709e910e999279ee5b688a785289c1919281a39e85bf7f88a12a3cf74e6fd"
     },
     {
       "traceId": 629,
       "messageId": 1544,
       "querySha256": "5e9225781c7f4c3d913e68a412719717e2c960fe7704afb292e8b8c669489703",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789401379,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1525,
         1526,
@@ -2652,21 +2710,20 @@
         1543
       ],
       "prefixSha256": "484291b64696c4541334f7058b20857dec1fd4027e4870e4953f7de1b912411c",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "3559bb29e089c12cf6b8568a724461bff9fe855b0f58fd07f23cf3780d71e4af",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "198df004e467f111160b020e52db2a6430483374a423033a6ef4d0594aaaa8e2",
-      "armWithoutD0Sha256": "be48f65b3d94509cf5ef5c9a6c08c35aadb7c1659b116d5ade587f70a09959bf",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "e0c512509651f1b75f25137c127af850c716e4ac1c45fae7a2bc1f3cd65735a3",
+      "privateCaseSha256": "033188a69507608bb0253574f110bcc967a8a4f7117073a8a49eee31dbb355a4"
     },
     {
       "traceId": 632,
       "messageId": 1550,
       "querySha256": "578afc23c2a505826ffc101dbfd05dbadcde187f674db9cedfbfda87274c0eb0",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789401479,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1531,
         1532,
@@ -2689,21 +2746,20 @@
         1549
       ],
       "prefixSha256": "7d1327afcc3d6b6eb6184fb57add8feeb2a6dd3ad04815c520f371bcf98eea67",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "fbf96d62d22bdd9f78ab574acec3c051aa079d1aae683e20188642fd8412a76d",
       "hardContextSha256": "e6ad46c19393aee72c6889415aacd5ed163670cb61f8f72a1feb349de1ba8e9f",
       "globalContextSha256": "da90d447b40f6bd2cc8aa01899269c71c16449f6ccc3c838e1bbc3deae459468",
-      "armWithoutD0Sha256": "965c3ba2560b3a72d08285ae82d8d7180a2a80b7ac263301ad0862a6af15019c",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "78dca8e3050d4ea5093bf56d0895a1290d72ad7e132e5cd2e71c0784c29ea1ae",
+      "privateCaseSha256": "db9a8971a2917ee1eb1fef643f656eaf7105ac91d15f31981705570bb94ee8eb"
     },
     {
       "traceId": 647,
       "messageId": 1580,
       "querySha256": "6503e77cd828ec6c2c822675a13b865dccd7e27b650f0bbd623ba802d85f806b",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789623409,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1561,
         1562,
@@ -2726,21 +2782,20 @@
         1579
       ],
       "prefixSha256": "cd7eabd7b1fb7cec0ed1767be792a162f6af06001f188629178c3f027797fece",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "7f599b1d5bb6856254e248e5ab6314bfd7cb03cbc26afdf3b84888d1d9c892df",
       "hardContextSha256": "63e52281d02640bdaccd5a62bb57e0f1d7439cd81313548a2b77d4d4f8045c69",
       "globalContextSha256": "43b25a55e252c7c93f4e17526ac98438ae2793a9276fe289cb3ffc26718e1cb5",
-      "armWithoutD0Sha256": "1b7bac66815797bec0d06e160780ba4e7751f767c579e0dd5ebcd12ef271fbce",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "c40b3c47b7ead310a47300a50ea915da7fa2b08d43800b0758826ba19d447e60",
+      "privateCaseSha256": "f279ee306cd5bc8efec9c5df1b9e10be39fe07cdb3be73330213748f949e561a"
     },
     {
       "traceId": 659,
       "messageId": 1604,
       "querySha256": "ca425fb1de1efe1ef05d8661fc8d468c8850f48b292d5ee67231927873ff6c6e",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789625010,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1585,
         1586,
@@ -2763,21 +2818,20 @@
         1603
       ],
       "prefixSha256": "5dc6916074d87a2357aae4b6df8b32804d9f27af38020389cf7ca0348b3e0548",
-      "sharedContextSha256": "069de23647f460e17962dcedc5d72dbef42b5b5de0b6f19511d12be1d0e8729a",
+      "sharedContextSha256": "4b0eaed2ff194ea5e8f033cf0984879ea939610d36a6de41011b9b1294619a65",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
-      "armWithoutD0Sha256": "903da7b214c9e76e5025fe8f3f6fce0f801a578f0b82cbaf69dd280c44f1ea44",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "35d8b4bec329904d2c544bced5960cf3ef535272867b00ec3405e519afe9120d",
+      "privateCaseSha256": "ee931a5aa7ff9491e7967637430a7d55b7f55d81252c93e7dd199aeeca39649d"
     },
     {
       "traceId": 660,
       "messageId": 1606,
       "querySha256": "320a2461eee7712af2b7801d278de0390b268d056f6ebbb4be97894108e799af",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789625046,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1587,
         1588,
@@ -2800,21 +2854,20 @@
         1605
       ],
       "prefixSha256": "460cbd7b82f2664a2d835809988f595cf2b1afc05800073f17e6901c2a369bec",
-      "sharedContextSha256": "d68b9e2932d58986497b6f7245a6c04120feb3aa76cb4ebf3f49f4a656efcc88",
+      "sharedContextSha256": "6574ef6f27d5f7ffd013df8731e95df987aeeaa9b56e3eea6ab57bec9680566e",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "2523cc8e1a42d311a02fa4b5c8c2c5c553324158c49b285a28b520d79c7ed6ed",
-      "armWithoutD0Sha256": "83a54d44aa8dcda72c8aa91b397e75c6dc56b038fbf2bb8c3578878523e2aa34",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "d8e0052f3e7ee98247c3a30072b9e6a6d9260482dd3fb1b6b1780770b0f62e37",
+      "privateCaseSha256": "d828e7c8d4ed864ddd1fa3b6042cd426283dfbcc5b6a284a2dbd844267f7ad58"
     },
     {
       "traceId": 667,
       "messageId": 1620,
       "querySha256": "f4500fa68243e3d09d08b4abbfa7245d090b00e094ea4ee9e6bd012ace9b13af",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789625236,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1601,
         1602,
@@ -2837,21 +2890,20 @@
         1619
       ],
       "prefixSha256": "e95af11791a50f7bbfd7fa5ee51281fb120b8450effeefbfc84055d2054505e3",
-      "sharedContextSha256": "42ea4f5af78d6b4b5dd7d929aabfd0424c74c17aeb180e2f85dfd21710dd6b8e",
+      "sharedContextSha256": "00d0ffc5ba092f54e3c5041bcfef46ad65afa3ed1479c8bed718a744c65b47bd",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
-      "armWithoutD0Sha256": "bc3ab7c37aced1efd60f18a306d75207cafb8108aed4a960f179d799797e9e92",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "5cc471f03188fb388fd86c6419d8fbe629d73af160f1655a4a9ea7874d878c65",
+      "privateCaseSha256": "92b7f82efdb0c6cad8451314e5b3d7cea82d579f6689d8381a5e112cc556f53a"
     },
     {
       "traceId": 669,
       "messageId": 1624,
       "querySha256": "f30d04556e608c92247d7bca31261c5b469a0fbf81873fe19c0de4cc94433bc0",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789625328,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1605,
         1606,
@@ -2874,21 +2926,20 @@
         1623
       ],
       "prefixSha256": "b7fedcc823452fa9b41199638eb7f6d2f8f78a0e7e6e4d728c3f7afc0cc56c24",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "a4ca0fb9749fcfef1a4ddc167272fb76dffb96b8cfe9efb3cc04eaa72dfc322b",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "d556bfd77f070b828c1ffb6423f8f8ffcc3af1a2c41c6ef980e96c0b907cd766",
-      "armWithoutD0Sha256": "8d4c8db62e67ac86db11c166ef5daaa8bb830dbdc31d20e833614999e2ff3ad9",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "9f54a396d59aa81dd0ba0df5dc3791bfda8ca592663a0137a19e0f7786d80d99",
+      "privateCaseSha256": "0f0d60057cab4c06d9ecace922797cbf3ef5754e8a32249bf3b172b2ba6b0638"
     },
     {
       "traceId": 692,
       "messageId": 1670,
       "querySha256": "417b9c8da0ef969f300cabc7ac45425d892a46403a2e4edd88031462a8784d47",
-      "disposition": "INDETERMINATE_TOOL_REPLAY",
-      "reasons": [
-        "INDETERMINATE_TOOL_REPLAY"
-      ],
+      "disposition": "GENERATION_READY",
+      "reasons": [],
       "targetCreatedAt": 1789738165,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1651,
         1652,
@@ -2911,11 +2962,11 @@
         1669
       ],
       "prefixSha256": "f7a3f259e2eee1a619f91ae26122269bb0c093ac80ff6dae8ded0187959f02c4",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "4e33d698c47be38353e1e5f50e85a597d5e51e9de39b6d54cf2346b6b954b23d",
       "hardContextSha256": "874e860d5b05f4d8afed6df2b138bfbb6818c5072a27092c820a75f94da7e2d9",
       "globalContextSha256": "3f198fad94660264aa0137019fd03bc136d5b4c14655699ccf40c41c3fd1be49",
-      "armWithoutD0Sha256": "59a1b7c2ffef529d5f931a1612862a64f1e7dcae7592feb763849cb68d9724ac",
-      "privateCaseSha256": null
+      "armWithoutD0Sha256": "ea0ed97f72d9d7eeb0e131fe21e2754eb1e3f89d70965f32d93f81ef004c5956",
+      "privateCaseSha256": "5929f5565287685cf5389d5c0280a1797d4b4d6ccc73d88395b9fc927e6c88df"
     },
     {
       "traceId": 704,
@@ -2926,6 +2977,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1789910756,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1675,
         1676,
@@ -2948,10 +3000,10 @@
         1693
       ],
       "prefixSha256": "566541d1f4313bb0a4d47de4402cc129e5e63b512c7e757cb75c3918fa6e2663",
-      "sharedContextSha256": "b596f15105e06cdc3916bb82f36bc6380f5dc88bf4ea6b831df929b5b9b17300",
+      "sharedContextSha256": "0e65eafd5d3d67b86c75ac2327219d16fd499fdb846a771d27650249f36ccc88",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "5e6b67871d527ef4fd57bb3a801273f716bc473f1e4c873833194f7455f410d1",
-      "armWithoutD0Sha256": "beab407b277f38611e34493077661640ed3eca2403d0c87ec4414fcbc333e74c",
+      "armWithoutD0Sha256": "7d74c9a062434e9e0e133e82a4970d723bef8b5a8797a4566d151e078e954660",
       "privateCaseSha256": null
     },
     {
@@ -2963,6 +3015,7 @@
         "INDETERMINATE_TOOL_REPLAY"
       ],
       "targetCreatedAt": 1790083590,
+      "scheduleReplay": "ACTIVE",
       "prefixMessageIds": [
         1681,
         1682,
@@ -2985,10 +3038,10 @@
         1699
       ],
       "prefixSha256": "da75d83af37cfcd0e20a8222cfce2ce6de494fcc81ae1a55fa131f6532d48e93",
-      "sharedContextSha256": "988dfafa06b6b635074652f46e673b2c2380f3b3c43bb26a69e6353be4a80987",
+      "sharedContextSha256": "a36d4b97bc9d603cb96e8521455e46197c9b4eb8e3383680e4894a27cb03b9b8",
       "hardContextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "globalContextSha256": "a64d0f464e4e78fc4bb2f88dde065388db2bc85e2c40055206d28db0d7bdb9b0",
-      "armWithoutD0Sha256": "6ef09f9e2793eb4b96e1bd14f8a43cff7ecebab1d0b5f3952597eb98a39ae13a",
+      "armWithoutD0Sha256": "05aec3a37065deb1b126037eb33e7baf78e5b4dd1a2d94e262bd43eea0b07c7d",
       "privateCaseSha256": null
     }
   ]

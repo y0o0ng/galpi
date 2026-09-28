@@ -70,3 +70,39 @@ The Pi runtime has `ASSISTANT_TASKS_ENABLED=true`, so production `buildContextMe
 - Final focused P0 tests: **29 passed**. Final full `npm test`: **1,654 passed / 0 failed / 3 skipped** (1,657 total). A sandboxed run hit `listen EPERM` on localhost; the unrestricted rerun passed.
 
 P0-B remains **OPEN / ANSWER GENERATION NOT STARTED**. Under the chosen strict historical-context rule, the ready set is empty and the frozen 2×2 generation protocol cannot begin. The next decision requires a faithful durable recovery of historical schedule context or an explicitly approved prospective amendment for that shared input; this receipt makes neither change.
+
+## Historical schedule replay refinement — 2026-09-28
+
+> **CURRENT INPUT FREEZE — 18 GENERATION_READY / 61 INDETERMINATE_TOOL_REPLAY**
+>
+> **ANSWER GENERATION NOT STARTED — STRICT HISTORICAL EXACT S UNPROVEN**
+
+The preceding **0/79** preflight is preserved as the historical first attempt but is **superseded**: it treated any task created before a target as an unreconstructable schedule. Production actually exposes only `status='active' AND lifecycle='active'` tasks. This follow-up retains the same strict faithful-reconstruction rule and the same frozen 79-case operational census; it changes only historical schedule reconstruction.
+
+- Latest GitHub `main` baseline: `e2b68f2ab4fc3348997c49ca9c4ce637e7608f11`; execution code commit: `8fb933bd5a04f1eefb1267bebc8a6ce479b15ffc`. Pi schedule/task/series/server source hashes matched that baseline. The frozen 409-case census, D0 policy and P0 contract were unchanged.
+- Each retained task's `assistant_task_events` chronology reconstructs target-time status and lifecycle. A target-time active task uses its retained title, detail and due fields only when no later `updated` event can have changed them. Reminder creation, firing, acknowledgement and cancellation timestamps reconstruct the target-time live `pending`/`fired` reminder. Relevant same-second mutations fail closed. `buildActiveScheduleContext(...)` receives the reconstructed task list in production all-view order, including series collapse and the 20-task limit.
+- A later series edit/end can physically remove untouched occurrence rows and their events. Without a durable historical rule/occurrence snapshot, the affected earlier targets remain `INDETERMINATE_TOOL_REPLAY`; later targets are not blocked solely because the series existed. Current schedule values were not substituted for historical values.
+
+| Historical schedule reconstruction | Cases |
+| --- | ---: |
+| Exact empty schedule | 0 |
+| Exact active schedule | 20 |
+| Unrecoverable schedule | 59 |
+| **Total** | **79** |
+
+| Current input-freeze disposition | Cases |
+| --- | ---: |
+| `GENERATION_READY` | 18 |
+| `INDETERMINATE_HISTORY_REPLAY` | 0 |
+| `INDETERMINATE_TOOL_REPLAY` | 61 |
+| `INDETERMINATE_RETRIEVAL_RECONSTRUCTION` | 0 |
+| **Total** | **79** |
+
+The 61 tool-indeterminate cases are 59 schedule-unrecoverable cases and 2 cases with a reconstructable schedule but attachment-dependent target/prefix input. The existing target, bounded history, historical request time, shared-input equality and both frozen D0 context-hash checks still apply before a case becomes ready. Non-ready cases stay in the 79-case denominator; no answer was generated and no final ΔA or GREEN/AMBER/RED result is claimed.
+
+- Frozen privacy-safe manifest: `fixtures/memory-r3-p0b-generation-input-freeze.json`, SHA256 `af674739a1cdf5b74e2b4f52994955fec4c84c48bbcb5434f9ffe3194beaf338`. It holds IDs, hashes, schedule/disposition codes and answer-stack settings, with no raw question, answer, note or schedule text.
+- Private generation bundle: `/private/tmp/galpi-p0b-generation-inputs-schedule-freeze.json` (outside Git, mode `0600`), SHA256 `b94b4927d3707e017b6fef90479c72a7c8989e431e527f3c0392296eba3b349f`; it contains exactly the 18 ready cases. The fixed `gpt-6-luna` Responses answer stack still uses catalog generation **125**, reasoning effort `medium`, 8,192 max output tokens, `store=false`, `current_turn` reasoning context and `LIVE_TOOLS_DISABLED`; the refreshed snapshot SHA256 is `b3d720a359079b6115454abe1dc501bd1e0440a7d50d8ff437482877166e0b1e` because its source hashes now also pin the task, series and schedule-context modules.
+- Two final Pi read-only executions produced byte-identical outputs. SQLite was opened with `readonly=true`, `query_only=true`, `total_changes()` delta **0**. DB, WAL, SHM and Vault fingerprints all matched before/after that final paired-run interval. An earlier interval saw live-service WAL/SHM drift and was not used for the invariance claim. No Pi script/artifact installation, production write, service restart, external API call, live tool execution or answer generation occurred.
+- Focused P0-B tests: **20 passed**. Full `npm test`: **1,663 passed / 0 failed / 3 skipped** (1,666 total). `git diff --check` passed.
+
+P0-B remains **OPEN / ANSWER GENERATION NOT STARTED**. The next phase may apply the frozen 2×2 generation protocol only to the 18 `GENERATION_READY` inputs; the 61 indeterminate cases remain visible for final bounds. Strict exact historical `S` and census membership remain unproven under the retained-telemetry limits.
