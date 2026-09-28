@@ -118,11 +118,18 @@
   // ---- 펜 기준점 ----
   const pad = $('pad');
   const ctx = pad.getContext('2d');
-  // 캔버스 버퍼 크기를 실제 표시 크기에 맞춘다. 회전 직후 resize 이벤트는 배치 전 값을 줄 수 있어서
-  // ResizeObserver로 크기가 실제로 바뀔 때마다 다시 맞춘다. 좌표는 매 입력마다 현재 크기로 환산한다.
-  new ResizeObserver(() => { const r = pad.getBoundingClientRect(); pad.width = Math.round(r.width * devicePixelRatio); pad.height = Math.round(r.height * devicePixelRatio); }).observe(pad);
-  const point = e => { const r = pad.getBoundingClientRect(); return { x: (e.clientX - r.left) * (pad.width / r.width), y: (e.clientY - r.top) * (pad.height / r.height) }; };
-  let last = null;
+  // 획은 CSS 픽셀 좌표로 메모리에 들고 있다. 캔버스 크기를 바꾸면 브라우저가 그림을 지우므로
+  // 회전 등으로 크기가 바뀌면(ResizeObserver) 버퍼를 맞춘 뒤 모든 획을 다시 그린다.
+  const strokes = [];
+  const scale = () => pad.width / pad.getBoundingClientRect().width;
+  const point = e => { const r = pad.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  function dot(p) { const s = scale(); ctx.fillStyle = '#FF3B30'; ctx.beginPath(); ctx.arc(p.x * s, p.y * s, 6 * s, 0, 7); ctx.fill(); }
+  function seg(a, b) { const s = scale(); ctx.strokeStyle = '#1D2622'; ctx.lineWidth = 2 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(a.x * s, a.y * s); ctx.lineTo(b.x * s, b.y * s); ctx.stroke(); }
+  new ResizeObserver(() => {
+    const r = pad.getBoundingClientRect(); pad.width = Math.round(r.width * devicePixelRatio); pad.height = Math.round(r.height * devicePixelRatio);
+    for (const st of strokes) { if (st.sync) dot(st.pts[0]); else for (let i = 1; i < st.pts.length; i++) seg(st.pts[i - 1], st.pts[i]); }
+  }).observe(pad);
+  let last = null, current = null;
   // 선택·길게 누르기 메뉴·스크롤이 펜 입력을 가로채지 않게 한다.
   for (const type of ['selectstart', 'contextmenu', 'touchstart', 'touchmove']) pad.addEventListener(type, e => e.preventDefault(), { passive: false });
   pad.addEventListener('pointerdown', e => {
@@ -131,15 +138,14 @@
     pad.setPointerCapture(e.pointerId);
     const p = point(e);
     log('pen_down', { sync: syncMode, x: Math.round(p.x), y: Math.round(p.y) }, e.timeStamp);
-    if (syncMode) { ctx.fillStyle = '#FF3B30'; ctx.beginPath(); ctx.arc(p.x, p.y, 6 * devicePixelRatio, 0, 7); ctx.fill(); last = null; return; }
-    last = p;
+    if (syncMode) { strokes.push({ sync: true, pts: [p] }); dot(p); last = null; return; }
+    current = { sync: false, pts: [p] }; strokes.push(current); last = p;
   });
   // 이전 점에서 새 점까지만 그린다. 매번 획 전체를 다시 그리면 긴 획에서 끊긴다.
   pad.addEventListener('pointermove', e => {
     if (!last || e.pointerType !== 'pen') return;
-    ctx.strokeStyle = '#1D2622'; ctx.lineWidth = 2 * devicePixelRatio; ctx.lineCap = 'round';
     for (const ce of (e.getCoalescedEvents ? e.getCoalescedEvents() : [e])) {
-      const p = point(ce); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p;
+      const p = point(ce); seg(last, p); current.pts.push(p); last = p;
     }
   });
   for (const type of ['pointerup', 'pointercancel']) pad.addEventListener(type, e => { if (type === 'pointercancel') log('pen_cancel', {}, e.timeStamp); last = null; });
