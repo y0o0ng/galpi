@@ -5199,3 +5199,13 @@ Next: fresh source/bundle audit of the five reanchored candidates. The accepted 
 | blind source-audit packet (not committed, 5 rows) | `c75e53e09b3eb7dcb8685cc727c92d71792d38124268b7a8c035b1fa2059fe00` |
 
 No audit, review or acceptance; the accepted pool stays **93**.
+
+#### P1-B6 batch-003 anchor repair — source audit attempt 001 COMPLETE_PASS (5/5)
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw audit result `p1b6-b003-anchor-source-audit-results.json` (not committed, 5 rows) | `907a0fbf1b378fe4702e6ec1ab28274626f881f80435ab75d37b7d30074d6ce9` |
+| `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-source-audit-attempt-001.json` | receipt |
+
+Fresh external session, auditor reported as Claude Opus 5.5. 5 PASS / 0 FAIL / 0 UNCERTAIN. No
+semantic review, HUMAN review or acceptance; the accepted pool stays **93**.

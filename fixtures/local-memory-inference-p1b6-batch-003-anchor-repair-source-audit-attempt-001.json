@@ -1,0 +1,73 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-anchor-repair-source-audit-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-003-anchor-repair-source-audit-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-batch-003-anchor-repair-source-audit-packet-v1",
+  "auditPacketSha256": "c75e53e09b3eb7dcb8685cc727c92d71792d38124268b7a8c035b1fa2059fe00",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedCandidate": {
+    "identity": "xion-local-memory-inference-p1b6-surface-anchor-repair-candidate-batch-003-v1",
+    "rawSha256": "19eea01def0a05c32c1ceb236fa97305e7b29822c9e56b70cc0331f3a873599f"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b003-anchor-source-audit-results.json",
+    "sha256": "907a0fbf1b378fe4702e6ec1ab28274626f881f80435ab75d37b7d30074d6ce9",
+    "committed": false
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "surface": "Claude Code",
+    "model": "Claude Opus 5.5",
+    "reasoningSetting": "NOT_RECORDED",
+    "sessionRelationship": "a fresh Claude Code CLI session started in the home directory (no project instructions or memory loaded), separate from the session that reanchored the candidates, given only the protocol and packet paths"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "The TARGET marker moved, so the bundles are new; no historical batch-003 source-audit result carried forward."
+  },
+  "summary": {
+    "total": 5,
+    "PASS": 5,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "authority": {
+    "sourceBundleGatePassedForCandidates": true,
+    "semanticReviewOccurred": false,
+    "humanReviewOccurred": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-b003-anchor-audit-2aa2e3a7aae4e663",
+      "disposition": "PASS",
+      "reason": "Single-turn source fully included; TARGET anchors the sole candidate; nothing omitted."
+    },
+    {
+      "auditRowId": "p1b6-b003-anchor-audit-42cbaae5c43243dc",
+      "disposition": "PASS",
+      "reason": "Only omitted turn t2 (flipping calendar) is an unrelated daily action with no stated period rollover; all value-bearing turns and the confirmation are included."
+    },
+    {
+      "auditRowId": "p1b6-b003-anchor-audit-9d0bcc593a1b82c8",
+      "disposition": "PASS",
+      "reason": "Omitted t2/t4/t6 (locking warehouse, keys, lights) are irrelevant to stock counts; both source counts and the summary turn are included."
+    },
+    {
+      "auditRowId": "p1b6-b003-anchor-audit-bef0791ce277413d",
+      "disposition": "PASS",
+      "reason": "Omitted t2 (erasing whiteboard) is unrelated; both staffing sources are included."
+    },
+    {
+      "auditRowId": "p1b6-b003-anchor-audit-d972040179fd3e7c",
+      "disposition": "PASS",
+      "reason": "Omitted t2/t4 (wiping laptop screen) are unrelated; topic turn, both channel figures, and assistant reply are included."
+    }
+  ]
+}

@@ -4,6 +4,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { sha256RawBytes } = require('../lib/memory-inference-p1b6-skeletons');
 const builder = require('../scripts/build-memory-inference-p1b6-batch-003-anchor-repair-source-audit-packet');
 const historicalAudit = require('../scripts/build-memory-inference-p1b6-source-audit-packet');
@@ -49,4 +52,38 @@ test('the packet leaks no identity, skeleton, label, old anchor or resolution me
     'CLEAR', 'ESCALATE', 'DEV', 'REANCHOR', 'ANCHOR_QUALITY', 'approvedAnchorText', 'currentAnchorText']) {
     assert.equal(text.includes(value), false, value);
   }
+});
+
+const RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const RAW = path.join(os.homedir(), 'p1b6-b003-anchor-source-audit-results.json');
+const synthetic = mutate => {
+  const results = build().rows.map(row => ({ auditRowId: row.auditRowId, disposition: 'PASS', reason: 'r' }));
+  mutate(results);
+  return Buffer.from(JSON.stringify({ results }));
+};
+
+test('audit results are bound to the packet rows and fail closed on drift', () => {
+  assert.equal(builder.buildSourceAuditReceipt(synthetic(() => {})).status, 'COMPLETE_PASS');
+  const needsFix = builder.buildSourceAuditReceipt(synthetic(rows => { rows[0].disposition = 'UNCERTAIN'; }));
+  assert.equal(needsFix.status, 'COMPLETE_NEEDS_FIX');
+  assert.equal(needsFix.authority.sourceBundleGatePassedForCandidates, false);
+  assert.throws(() => builder.buildSourceAuditReceipt(synthetic(rows => rows.pop())), /exactly the packet rows/);
+  assert.throws(() => builder.buildSourceAuditReceipt(synthetic(rows => { rows[0].reason = ''; })), /malformed/);
+});
+
+test('the committed audit receipt records 5/5 PASS and opens no semantic gate', () => {
+  const receipt = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.equal(receipt.status, 'COMPLETE_PASS');
+  assert.equal(receipt.auditPacketSha256, PACKET_SHA256);
+  assert.deepEqual(receipt.summary, { total: 5, PASS: 5, FAIL: 0, UNCERTAIN: 0 });
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  assert.equal(receipt.freshness.historicalSourceAuditResultInherited, false);
+  for (const key of ['semanticReviewOccurred', 'humanReviewOccurred', 'datasetAcceptancePerformed',
+    'heldOutReleasePerformed', 'trainingOccurred']) {
+    assert.equal(receipt.authority[key], false, key);
+  }
+});
+
+test('the audit receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  assert.deepEqual(builder.buildSourceAuditReceipt(fs.readFileSync(RAW)), JSON.parse(fs.readFileSync(RECEIPT)));
 });

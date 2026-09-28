@@ -35,8 +35,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 - anchor-quality follow-up (see "Batch-003 anchor-quality follow-up"): `869c7127` 4/4
   ANCHOR_QUALITY_PASS, unchanged; `aebbf047` 5/5 REANCHOR, materialized as an
   anchorSpanRef-only candidate. Semantics unchanged for both. **Next gate: a fresh source/bundle
-  audit of exactly the five reanchored candidates** — its packet is built; the external audit
-  is next.
+  audit of exactly the five reanchored candidates** — **passed 5/5**; the fresh v3 semantic
+  review is next.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1920,8 +1920,15 @@ unchanged source-audit protocol, requires the candidate to equal the anchor-qual
 output, and renders each row's full episode and reanchored bundle under
 `p1b6-b003-anchor-audit-` IDs (disjoint from the historical batch-003 audit IDs), sorted, with
 no skeleton, label or resolution metadata. The packet is gitignored and deterministic at raw
-SHA-256 `c75e53e09b3eb7dcb8685cc727c92d71792d38124268b7a8c035b1fa2059fe00` (5 rows). The audit
-runs externally in a fresh session.
+SHA-256 `c75e53e09b3eb7dcb8685cc727c92d71792d38124268b7a8c035b1fa2059fe00` (5 rows).
+
+**Source-audit result — attempt 001: COMPLETE_PASS, 5/5.** Fresh Claude Code CLI session in the
+home directory, given only the protocol and packet paths; auditor reported by the owner as
+Claude Opus 5.5. Raw result `p1b6-b003-anchor-source-audit-results.json` (raw SHA-256
+`907a0fbf1b378fe4702e6ec1ab28274626f881f80435ab75d37b7d30074d6ce9`, not committed) is recorded
+in `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-source-audit-attempt-001.json`.
+Omitted turns are unrelated daily actions; every value-bearing turn is in the bundle. **Next:
+the fresh v3 semantic review of the five reanchored rows.**
 
 ## Closed Selection and Freeze Constraints
 
