@@ -260,18 +260,20 @@ function assertOnlyD0Diff(shared, hard, global) {
 
 function historicalSchedule(db, target, runtime) {
   if (runtime.ASSISTANT_TASKS_ENABLED !== 'true') return { reconstructable: true, kind: 'DISABLED', text: '' };
-  const uncertain = { reconstructable: false, kind: 'UNRECOVERABLE', text: '' };
+  const uncertain = reason => ({ reconstructable: false, kind: 'UNRECOVERABLE', reason, text: '' });
   const time = target.createdAt;
   const series = db.prepare(`SELECT id, freq, by_weekday AS byWeekday,
     by_monthday AS byMonthday, time_kind AS timeKind, time_of_day AS timeOfDay,
     status, version, created_at AS createdAt, updated_at AS updatedAt,
     ended_at AS endedAt FROM assistant_task_series WHERE created_at <= ?`).all(time);
   for (const row of series) {
-    if (row.createdAt === time) return uncertain;
+    if (row.createdAt === time) return uncertain('SERIES_CREATED_SAME_SECOND');
     // A rule edit or end can physically delete future occurrence tasks and their events.
     // Version 1 with a later materialization has only added new rows, not changed the rule.
     if (row.updatedAt >= time && row.version > 1 && (row.endedAt === null || row.endedAt >= time)) {
-      return uncertain;
+      return uncertain(row.endedAt > time ? 'SERIES_ENDED_AFTER_TARGET'
+        : row.endedAt === time ? 'SERIES_END_SAME_SECOND'
+          : 'SERIES_HISTORICAL_RULE_UNAVAILABLE');
     }
   }
   const seriesById = new Map(series.map(row => [row.id, row]));
@@ -288,40 +290,46 @@ function historicalSchedule(db, target, runtime) {
     due_kind AS dueKind, due_date AS dueDate, due_at AS dueAt,
     series_id AS seriesId, version, created_at AS createdAt
     FROM assistant_tasks WHERE created_at <= ? ORDER BY id`).all(time)) {
-    if (task.createdAt === time) return uncertain;
+    if (task.createdAt === time) return uncertain('TASK_CREATED_SAME_SECOND');
     const events = eventsFor.all(task.id);
     if (!events.length || events[0].type !== 'created'
-      || events[0].occurredAt !== task.createdAt || events.length !== task.version) return uncertain;
+      || events[0].occurredAt !== task.createdAt || events.length !== task.version) {
+      return uncertain('TASK_EVENT_CHAIN_INVALID');
+    }
     let state = { status: null, lifecycle: null };
     let historical = null;
     let historicalUpdatedAt = null;
     for (let index = 0; index < events.length; index += 1) {
       const event = events[index];
       if (event.version !== index + 1 || event.fromStatus !== state.status
-        || event.fromLifecycle !== state.lifecycle) return uncertain;
+        || event.fromLifecycle !== state.lifecycle) return uncertain('TASK_EVENT_CHAIN_INVALID');
       if (event.occurredAt === time && (event.fromLifecycle === 'active'
-        || event.toLifecycle === 'active')) return uncertain;
+        || event.toLifecycle === 'active')) return uncertain('TASK_EVENT_SAME_SECOND');
       state = { status: event.toStatus, lifecycle: event.toLifecycle };
       if (event.occurredAt < time) {
         historical = state;
         historicalUpdatedAt = event.occurredAt;
       }
     }
-    if (state.status !== task.status || state.lifecycle !== task.lifecycle || !historical) return uncertain;
+    if (state.status !== task.status || state.lifecycle !== task.lifecycle || !historical) {
+      return uncertain('TASK_EVENT_CHAIN_INVALID');
+    }
     if (historical.status !== 'active' || historical.lifecycle !== 'active') continue;
     // Only an `updated` task event can change title, detail or due fields.
-    if (events.some(event => event.type === 'updated' && event.occurredAt >= time)) return uncertain;
+    if (events.some(event => event.type === 'updated' && event.occurredAt >= time)) {
+      return uncertain('TASK_LATER_FIELD_UPDATE');
+    }
     const reminderCandidates = [];
     for (const reminder of remindersFor.all(task.id)) {
       if ([reminder.createdAt, reminder.firedAt, reminder.acknowledgedAt,
-        reminder.cancelledAt].includes(time)) return uncertain;
+        reminder.cancelledAt].includes(time)) return uncertain('REMINDER_SAME_SECOND');
       if (reminder.createdAt > time) continue;
       if (reminder.acknowledgedAt !== null && reminder.acknowledgedAt < time) continue;
       if (reminder.cancelledAt !== null && reminder.cancelledAt < time) continue;
       const status = reminder.firedAt !== null && reminder.firedAt < time ? 'fired' : 'pending';
       reminderCandidates.push({ id: reminder.id, remindAt: reminder.remindAt, status });
     }
-    if (reminderCandidates.length > 1) return uncertain;
+    if (reminderCandidates.length > 1) return uncertain('MULTIPLE_HISTORICAL_LIVE_REMINDERS');
     tasks.push({ ...task, status: 'active', lifecycle: 'active',
       updatedAt: historicalUpdatedAt, reminder: reminderCandidates[0] || null });
   }
@@ -342,7 +350,7 @@ function historicalSchedule(db, target, runtime) {
   for (const task of visible) {
     if (task.seriesId === null) continue;
     const rule = seriesById.get(task.seriesId);
-    if (!rule) return uncertain;
+    if (!rule) return uncertain('MISSING_SERIES_RULE');
     task.series = { ...rule, remaining: totals.get(task.seriesId) - 1 };
   }
   visible.sort((a, b) => {

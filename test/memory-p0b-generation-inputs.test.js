@@ -12,6 +12,7 @@ const {
   contextMessage, pastMessages, assertOnlyD0Diff,
   historicalSchedule, main,
 } = require('../scripts/freeze-memory-p0-b-generation-inputs');
+const { attachmentBlocker, diagnose } = require('../scripts/diagnose-memory-p0-b-generation-blockers');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
@@ -112,9 +113,9 @@ test('arm payloads have the same non-D0 canonical input and no tool definitions'
   assert.equal(Object.hasOwn(right, 'tools'), false);
 });
 
-function scheduleFixture(t) {
-  const db = new Database(':memory:');
-  t.after(() => db.close());
+function scheduleFixture(t, filename = ':memory:') {
+  const db = new Database(filename);
+  t.after(() => { if (db.open) db.close(); });
   db.exec(`
     CREATE TABLE assistant_tasks (id INTEGER PRIMARY KEY, title TEXT, detail TEXT,
       status TEXT, lifecycle TEXT, due_kind TEXT, due_date TEXT, due_at INTEGER,
@@ -158,6 +159,7 @@ test('historical schedule excludes completed, deleted and unrelated past tasks',
   addTask(3, [['created', 5, 'active', 'active'], ['completed', 6, 'done', 'closed'],
     ['reopened', 110, 'active', 'active'], ['updated', 120, 'active', 'active']]);
   assert.equal(at(100).kind, 'EMPTY');
+  assert.equal(Object.hasOwn(at(100), 'reason'), false);
   assert.match(at(100).text, /활성 일정: 없음/);
   assert.equal(at(100).reconstructable, true);
 });
@@ -166,6 +168,7 @@ test('historical active task uses retained fields only without a later update', 
   const { addTask, at } = scheduleFixture(t);
   addTask(1, [['created', 10, 'active', 'active']], { title: 'stable title' });
   assert.equal(at(100).kind, 'ACTIVE');
+  assert.equal(Object.hasOwn(at(100), 'reason'), false);
   assert.match(at(100).text, /stable title/);
 });
 
@@ -183,7 +186,7 @@ test('later field update is unrecoverable but earlier update is retained', t => 
     { title: 'after earlier edit' });
   assert.match(at(100).text, /after earlier edit/);
   addTask(2, [['created', 20, 'active', 'active'], ['updated', 110, 'active', 'active']]);
-  assert.equal(at(100).kind, 'UNRECOVERABLE');
+  assert.equal(at(100).reason, 'TASK_LATER_FIELD_UPDATE');
 });
 
 test('reopened and restored events determine active status at target', t => {
@@ -207,10 +210,10 @@ test('same-second task or reminder mutation fails closed', t => {
   const { db, addTask, at } = scheduleFixture(t);
   addTask(1, [['created', 10, 'active', 'active']]);
   db.prepare(`INSERT INTO assistant_reminders VALUES (1,1,90,'cancelled',10,NULL,NULL,100)`).run();
-  assert.equal(at(100).kind, 'UNRECOVERABLE');
+  assert.equal(at(100).reason, 'REMINDER_SAME_SECOND');
   db.prepare('DELETE FROM assistant_reminders').run();
   addTask(2, [['created', 20, 'active', 'active'], ['completed', 100, 'done', 'closed']]);
-  assert.equal(at(100).kind, 'UNRECOVERABLE');
+  assert.equal(at(100).reason, 'TASK_EVENT_SAME_SECOND');
 });
 
 test('later series rule change or end fails closed only while affected', t => {
@@ -219,7 +222,7 @@ test('later series rule change or end fails closed only while affected', t => {
     (1,'daily',NULL,NULL,'date',NULL,'ended',3,10,120,120)`).run();
   addTask(1, [['created', 10, 'active', 'active'], ['completed', 40, 'done', 'closed']],
     { seriesId: 1 });
-  assert.equal(at(100).kind, 'UNRECOVERABLE');
+  assert.equal(at(100).reason, 'SERIES_ENDED_AFTER_TARGET');
   assert.equal(at(130).kind, 'EMPTY');
 });
 
@@ -228,12 +231,37 @@ test('later series rule edit lacks a historical snapshot; later materialization 
   db.prepare(`INSERT INTO assistant_task_series VALUES
     (1,'daily',NULL,NULL,'date',NULL,'active',2,10,120,NULL)`).run();
   addTask(1, [['created', 20, 'active', 'active']], { seriesId: 1 });
-  assert.equal(at(100).kind, 'UNRECOVERABLE');
+  assert.equal(at(100).reason, 'SERIES_HISTORICAL_RULE_UNAVAILABLE');
   db.prepare('UPDATE assistant_task_series SET version=1 WHERE id=1').run();
   assert.equal(at(100).kind, 'ACTIVE');
   assert.match(at(100).text, /반복 #1 매일/);
-  db.prepare('UPDATE assistant_task_series SET version=2, updated_at=100 WHERE id=1').run();
-  assert.equal(at(100).kind, 'UNRECOVERABLE');
+  db.prepare("UPDATE assistant_task_series SET version=2, updated_at=100, status='ended', ended_at=100 WHERE id=1").run();
+  assert.equal(at(100).reason, 'SERIES_END_SAME_SECOND');
+});
+
+test('schedule diagnostic reasons cover creation overlap and broken event chronology', t => {
+  const { db, addTask, at } = scheduleFixture(t);
+  db.prepare(`INSERT INTO assistant_task_series VALUES
+    (1,'daily',NULL,NULL,'date',NULL,'active',1,100,100,NULL)`).run();
+  assert.equal(at(100).reason, 'SERIES_CREATED_SAME_SECOND');
+  db.prepare('DELETE FROM assistant_task_series').run();
+  addTask(1, [['created', 100, 'active', 'active']]);
+  assert.equal(at(100).reason, 'TASK_CREATED_SAME_SECOND');
+  db.prepare('DELETE FROM assistant_task_events').run();
+  db.prepare('DELETE FROM assistant_tasks').run();
+  addTask(2, [['created', 10, 'active', 'active']]);
+  db.prepare('UPDATE assistant_task_events SET task_version=3 WHERE task_id=2').run();
+  assert.equal(at(100).reason, 'TASK_EVENT_CHAIN_INVALID');
+});
+
+test('schedule diagnostic distinguishes overlapping reminders and missing series rule', t => {
+  const { db, addTask, at } = scheduleFixture(t);
+  addTask(1, [['created', 10, 'active', 'active']], { seriesId: 99 });
+  assert.equal(at(100).reason, 'MISSING_SERIES_RULE');
+  db.prepare('UPDATE assistant_tasks SET series_id=NULL WHERE id=1').run();
+  db.prepare(`INSERT INTO assistant_reminders VALUES (1,1,90,'cancelled',10,NULL,NULL,120)`).run();
+  db.prepare(`INSERT INTO assistant_reminders VALUES (2,1,95,'cancelled',20,NULL,NULL,130)`).run();
+  assert.equal(at(100).reason, 'MULTIPLE_HISTORICAL_LIVE_REMINDERS');
 });
 
 test('historical schedule sorts retained active tasks as production all-view does', t => {
@@ -242,6 +270,74 @@ test('historical schedule sorts retained active tasks as production all-view doe
   addTask(2, [['created', 20, 'active', 'active']], { title: 'earlier date', dueDate: '2026-09-30' });
   const text = at(100).text;
   assert.ok(text.indexOf('earlier date') < text.indexOf('later date'));
+});
+
+test('attachment blocker preserves target, prefix and both-case precedence', () => {
+  assert.equal(attachmentBlocker(1, 0), 'TARGET_ATTACHMENT_UNREPLAYABLE');
+  assert.equal(attachmentBlocker(0, 2), 'PREFIX_ATTACHMENT_UNREPLAYABLE');
+  assert.equal(attachmentBlocker(1, 2), 'TARGET_AND_PREFIX_ATTACHMENT_UNREPLAYABLE');
+  assert.equal(attachmentBlocker(0, 0), null);
+});
+
+test('blocker diagnostic keeps all 79 frozen dispositions, privacy and deterministic readonly output', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'p0b-blocker-diagnostic-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const filename = path.join(dir, 'test.db');
+  const { db, addTask } = scheduleFixture(t, filename);
+  db.exec(`
+    CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, created_at INTEGER);
+    CREATE TABLE attachment_blobs (id INTEGER PRIMARY KEY, status TEXT);
+    CREATE TABLE attachments (id TEXT PRIMARY KEY, blob_id INTEGER, scope TEXT, lifecycle_status TEXT);
+    CREATE TABLE message_attachments (message_id INTEGER, attachment_id TEXT, position INTEGER);
+  `);
+  const manifestBytes = fs.readFileSync(path.join(root, 'fixtures/memory-r3-p0b-generation-input-freeze.json'));
+  const manifest = JSON.parse(manifestBytes);
+  const historicalDispositions = manifest.cases.map(item => item.disposition);
+  const blocked = manifest.cases.filter(item => item.disposition === 'INDETERMINATE_TOOL_REPLAY');
+  const scheduleCases = blocked.filter(item => item.scheduleReplay === 'UNRECOVERABLE');
+  const attachmentCases = blocked.filter(item => item.scheduleReplay === 'ACTIVE');
+  const cutoff = Math.floor((Math.max(...scheduleCases.map(item => item.targetCreatedAt))
+    + Math.min(...attachmentCases.map(item => item.targetCreatedAt))) / 2);
+  db.prepare(`INSERT INTO assistant_task_series VALUES
+    (1,'daily',NULL,NULL,'date',NULL,'ended',2,1,?,?)`).run(cutoff, cutoff);
+  addTask(1, [['created', cutoff + 1, 'active', 'active']]);
+  const insertMessage = db.prepare('INSERT INTO messages VALUES (?, ?, ?)');
+  blocked.forEach(item => insertMessage.run(item.messageId, 'session', item.targetCreatedAt));
+  db.prepare("INSERT INTO attachment_blobs VALUES (1,'deleted'),(2,'deleted')").run();
+  db.prepare("INSERT INTO attachments VALUES ('a',1,'temporary','deleted'),('b',2,'temporary','deleted')").run();
+  db.prepare('INSERT INTO message_attachments VALUES (?, ?, 0)').run(attachmentCases[0].messageId, 'a');
+  const secondPrefixId = attachmentCases[1].prefixMessageIds
+    .find(id => id !== attachmentCases[0].messageId
+      && !attachmentCases[0].prefixMessageIds.includes(id));
+  db.prepare('INSERT INTO message_attachments VALUES (?, ?, 0)').run(secondPrefixId, 'b');
+  assert.throws(() => diagnose({ db, manifestBytes,
+    baselineCommit: 'a'.repeat(40), implementationCommit: 'b'.repeat(40) }), /readonly/);
+  db.close();
+  const readonly = new Database(filename, { readonly: true, fileMustExist: true });
+  t.after(() => readonly.close());
+  readonly.pragma('query_only=ON');
+  const options = { db: readonly, manifestBytes,
+    baselineCommit: 'a'.repeat(40), implementationCommit: 'b'.repeat(40) };
+  const first = diagnose(options);
+  const second = diagnose(options);
+  assert.equal(first.bytes, second.bytes);
+  assert.deepEqual(first.artifact.blockerCounts, {
+    PREFIX_ATTACHMENT_UNREPLAYABLE: 1,
+    SERIES_ENDED_AFTER_TARGET: 59,
+    TARGET_ATTACHMENT_UNREPLAYABLE: 1,
+  });
+  assert.deepEqual(first.artifact.scheduleBlockerCounts, { SERIES_ENDED_AFTER_TARGET: 59 });
+  assert.deepEqual(first.artifact.attachmentOnlyCounts, {
+    PREFIX_ATTACHMENT_UNREPLAYABLE: 1, TARGET_ATTACHMENT_UNREPLAYABLE: 1,
+  });
+  assert.equal(first.artifact.cases.length, 79);
+  assert.equal(first.artifact.cases.filter(item => item.blocker === null).length, 18);
+  assert.deepEqual(manifest.cases.map(item => item.disposition), historicalDispositions);
+  assert.equal(first.artifact.safety.totalChangesDelta, 0);
+  assert.equal(first.artifact.safety.externalApiCalls, 0);
+  assert.equal(first.artifact.safety.answerGenerations, 0);
+  assert.doesNotMatch(first.bytes, /"(?:question|answer|title|filename|content|scope)"\s*:/i);
+  assert.throws(() => diagnose({ ...options, manifestBytes: Buffer.from(`${manifestBytes} `) }), /SHA/);
 });
 
 test('private bundle CLI refuses a repository-tracked destination', async () => {
