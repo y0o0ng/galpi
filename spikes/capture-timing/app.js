@@ -118,17 +118,31 @@
   // ---- 펜 기준점 ----
   const pad = $('pad');
   const ctx = pad.getContext('2d');
-  function fit() { const r = pad.getBoundingClientRect(); pad.width = r.width * devicePixelRatio; pad.height = r.height * devicePixelRatio; ctx.scale(devicePixelRatio, devicePixelRatio); ctx.lineCap = 'round'; }
-  fit(); addEventListener('resize', fit);
-  let drawing = false;
+  // 캔버스 버퍼 크기를 실제 표시 크기에 맞춘다. 회전 직후 resize 이벤트는 배치 전 값을 줄 수 있어서
+  // ResizeObserver로 크기가 실제로 바뀔 때마다 다시 맞춘다. 좌표는 매 입력마다 현재 크기로 환산한다.
+  new ResizeObserver(() => { const r = pad.getBoundingClientRect(); pad.width = Math.round(r.width * devicePixelRatio); pad.height = Math.round(r.height * devicePixelRatio); }).observe(pad);
+  const point = e => { const r = pad.getBoundingClientRect(); return { x: (e.clientX - r.left) * (pad.width / r.width), y: (e.clientY - r.top) * (pad.height / r.height) }; };
+  let last = null;
+  // 선택·길게 누르기 메뉴·스크롤이 펜 입력을 가로채지 않게 한다.
+  for (const type of ['selectstart', 'contextmenu', 'touchstart', 'touchmove']) pad.addEventListener(type, e => e.preventDefault(), { passive: false });
   pad.addEventListener('pointerdown', e => {
     if (e.pointerType !== 'pen') return;
-    log('pen_down', { sync: syncMode, x: Math.round(e.offsetX), y: Math.round(e.offsetY) }, e.timeStamp);
-    drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY);
-    if (syncMode) { ctx.fillStyle = '#FF3B30'; ctx.beginPath(); ctx.arc(e.offsetX, e.offsetY, 6, 0, 7); ctx.fill(); drawing = false; }
+    e.preventDefault();
+    pad.setPointerCapture(e.pointerId);
+    const p = point(e);
+    log('pen_down', { sync: syncMode, x: Math.round(p.x), y: Math.round(p.y) }, e.timeStamp);
+    if (syncMode) { ctx.fillStyle = '#FF3B30'; ctx.beginPath(); ctx.arc(p.x, p.y, 6 * devicePixelRatio, 0, 7); ctx.fill(); last = null; return; }
+    last = p;
   });
-  pad.addEventListener('pointermove', e => { if (!drawing || e.pointerType !== 'pen') return; ctx.strokeStyle = '#1D2622'; ctx.lineWidth = 2; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); });
-  addEventListener('pointerup', () => { drawing = false; });
+  // 이전 점에서 새 점까지만 그린다. 매번 획 전체를 다시 그리면 긴 획에서 끊긴다.
+  pad.addEventListener('pointermove', e => {
+    if (!last || e.pointerType !== 'pen') return;
+    ctx.strokeStyle = '#1D2622'; ctx.lineWidth = 2 * devicePixelRatio; ctx.lineCap = 'round';
+    for (const ce of (e.getCoalescedEvents ? e.getCoalescedEvents() : [e])) {
+      const p = point(ce); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p;
+    }
+  });
+  for (const type of ['pointerup', 'pointercancel']) pad.addEventListener(type, e => { if (type === 'pointercancel') log('pen_cancel', {}, e.timeStamp); last = null; });
   $('btn-sync').onclick = () => { syncMode = !syncMode; $('btn-sync').classList.toggle('on', syncMode); log('sync_mode', { on: syncMode }); };
 
   // ---- 분석 ----
@@ -176,7 +190,7 @@
       <div class="muted">${partRows.join('<br>')}</div>`;
     $('taps').innerHTML = '<tr><th>#</th><th>세션 시각</th><th>조각</th><th>오차</th></tr>' + rows.map(r =>
       `<tr><td>${r.i + 1}</td><td>${(r.sessionMs / 1000).toFixed(2)}s</td><td>${r.gap ? '녹음 없음' : r.partId}</td><td>${r.gap ? '측정 대상 아님' : r.offsetMs === null ? '못 찾음' : r.offsetMs + 'ms'}</td></tr>`).join('');
-    log('analysis', { runtime, ...sum, gapTaps, parts: partRows });
+    log('analysis', { runtime, ...sum, gapTaps, parts: partRows, rows: rows.map(r => ({ sessionMs: r.sessionMs, partId: r.partId ?? null, gap: !!r.gap, offsetMs: r.offsetMs })) });
   }
 
   // ---- 복구·내보내기 ----

@@ -23,22 +23,25 @@
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   }
 
-  // 예상 시각 주변 창에서 배경보다 뚜렷하게 커지는 첫 지점을 찾는다.
-  // 창 안에 뚜렷한 소리가 없으면 null이다. 추측한 값을 내지 않는다.
-  function findOnset(envelope, centerSec, windowSec = 1.5, ratio = 8) {
+  // 예상 시각 주변에서 배경보다 뚜렷하게 커지는 지점(상승 교차) 중 예상 시각에 가장 가까운 것을 고른다.
+  // "가장 먼저"나 "가장 큰" 소리를 고르면 가까이 붙은 다른 탭을 잡는다. 후보가 없으면 null이다.
+  function findOnset(envelope, centerSec, windowSec = 1.0, ratio = 8, floorSec = 3) {
     const { times, energy } = envelope;
-    const idx = [];
+    const around = [];
     for (let i = 0; i < times.length; i++) {
-      if (times[i] >= centerSec - windowSec && times[i] <= centerSec + windowSec) idx.push(i);
+      if (Math.abs(times[i] - centerSec) <= floorSec) around.push(energy[i]);
     }
-    if (idx.length < 3) return null;
-    const values = idx.map(i => energy[i]);
-    const floor = median(values);
-    const peak = Math.max(...values);
-    if (peak <= 0 || peak < floor * ratio) return null;
-    const threshold = Math.max(floor * ratio, peak * 0.3);
-    for (const i of idx) if (energy[i] >= threshold) return times[i];
-    return null;
+    if (around.length < 3) return null;
+    const threshold = median(around) * ratio;
+    if (threshold <= 0) return null;
+    let best = null;
+    for (let i = 1; i < times.length; i++) {
+      if (Math.abs(times[i] - centerSec) > windowSec) continue;
+      if (energy[i] >= threshold && energy[i - 1] < threshold) {
+        if (best === null || Math.abs(times[i] - centerSec) < Math.abs(best - centerSec)) best = times[i];
+      }
+    }
+    return best;
   }
 
   function linearFit(xs, ys) {

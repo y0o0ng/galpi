@@ -23,6 +23,17 @@ test('finds a tap click within one hop of its true start', () => {
   assert.ok(Math.abs(findOnset(env, 6.1) - 6.37) <= 0.01);
 });
 
+test('picks the tap nearest the expected time when a louder tap sits one second later', () => {
+  const sr = 16000;
+  const samples = synth(sr, 6, []);
+  const click = (t, amp) => { const s = Math.round(t * sr); for (let i = 0; i < sr * 0.01; i++) samples[s + i] += Math.sin(i / 3) * amp; };
+  click(2.0, 0.15); // 약한 첫 탭
+  click(3.08, 0.9); // 1.08초 뒤 강한 둘째 탭
+  const env = energyEnvelope(samples, sr);
+  assert.ok(Math.abs(findOnset(env, 2.0) - 2.0) <= 0.01);
+  assert.ok(Math.abs(findOnset(env, 3.08) - 3.08) <= 0.01);
+});
+
 test('returns null instead of guessing when the window has no distinct sound', () => {
   const sr = 16000;
   const env = energyEnvelope(synth(sr, 10, [2.0]), sr);
