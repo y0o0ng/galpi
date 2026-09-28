@@ -5180,3 +5180,13 @@ Owner decisions, model as row presenter and JSON formatter only. Row-ID correcti
 instruction, decisions and reasons unchanged. 2 KEEP ESCALATE matching v3; both calibration rows
 stay `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. Not independent. No acceptance; the
 accepted pool stays **93**.
+
+#### P1-B6 batch-003 anchor-quality follow-up — `869c7127` 4 PASS / `aebbf047` 5 REANCHOR candidate MATERIALIZED
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-003-anchor-quality-resolution-receipt.json` | 9 rows: 4 ANCHOR_QUALITY_PASS, 5 REANCHOR |
+| `fixtures/local-memory-inference-p1b6-surface-anchor-repair-candidate-batch-003.json` | 5 anchorSpanRef-only candidates (`224`–`228`) |
+
+Not a semantic amendment; batch-003 and historical evidence unchanged and not transferred.
+Next: fresh source/bundle audit of the five reanchored candidates. The accepted pool stays **93**.

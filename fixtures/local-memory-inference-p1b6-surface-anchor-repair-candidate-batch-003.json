@@ -1,0 +1,308 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-anchor-repair-candidate-batch-003-v1",
+  "status": "ANCHOR_REPAIR_CANDIDATE_AWAITING_FRESH_SOURCE_AUDIT_AND_V3_REVIEW",
+  "interpretationRule": "P1B6_SEMANTIC_CONTRACT_V3",
+  "provenance": {
+    "resolutionReceipt": "xion-local-memory-inference-p1b6-batch-003-anchor-quality-resolution-receipt-v1",
+    "historicalSourceBatch": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-003-v1",
+      "rawSha256": "90b453c3680bccaa537fd0d23db74bbc303882e1a35a2ddcea0b75b013fcaa68"
+    },
+    "note": "Only anchorSpanRef changed, recomputed from the unchanged source bytes. IDs, source text, evidence spans, split, language and discourse pattern are the historical ones. Old source-audit, strong-model and HUMAN judgments were about the old marked bundle and do not transfer."
+  },
+  "pending": {
+    "freshSourceAudit": true,
+    "freshV3SemanticReview": true,
+    "humanAdjudicationWhereRouted": true
+  },
+  "authority": {
+    "historicalReviewTransferred": false,
+    "sourceAuditPerformed": false,
+    "semanticReviewPerformed": false,
+    "humanReviewPerformed": false,
+    "accepted": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-b003-224",
+      "sourceFamilyId": "p1b6-sf-b003-224",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "아, 다시 말할게. 이번 출장비는 본사 예산에 30만 원이 잡혀 있고, 팀 예산에도 30만 원이 잡혀 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b003-225",
+      "sourceFamilyId": "p1b6-sf-b003-225",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이번 프로젝트 인력은 개발팀 배정표에 두 명으로 적혀 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 회의실 화이트보드를 지웠어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "디자인팀 배정표에도 두 명으로 적혀 있고."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b003-226",
+      "sourceFamilyId": "p1b6-sf-b003-226",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "결론만 말하면 재고가 양쪽에 다 잡혀 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 창고 문을 잠갔어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "본점 재고표에는 이 상품이 열 개로 돼 있어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "열쇠는 사무실에 뒀어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "물류창고 재고표에도 열 개로 돼 있고."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "창고 조명은 꺼 놨어."
+        },
+        {
+          "turnId": "t7",
+          "role": "ASSISTANT",
+          "text": "그 내용 그대로요."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b003-227",
+      "sourceFamilyId": "p1b6-sf-b003-227",
+      "splitAssignment": "DEV",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이번 달 광고 예산 얘기인데."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 노트북 화면을 닦았어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "online 채널 계획서에 500만 원이 적혀 있고, offline 채널 계획서에도 500만 원이 적혀 있어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "화면에 지문이 많더라."
+        },
+        {
+          "turnId": "t5",
+          "role": "ASSISTANT",
+          "text": "알겠어요, 그렇게요."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b003-228",
+      "sourceFamilyId": "p1b6-sf-b003-228",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "내 연차는 인사 시스템에 닷새 남은 걸로 나오고, 팀 엑셀에도 닷새 남은 걸로 돼 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 달력을 넘겼어."
+        },
+        {
+          "turnId": "t3",
+          "role": "ASSISTANT",
+          "text": "닷새요?"
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "응, 양쪽 다."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-b003-224",
+      "sourceEpisodeId": "p1b6-se-b003-224",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 23,
+        "endByte": 39
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 132
+        }
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "surfaceFamilyId": "p1b6-surface-family-b003-224"
+    },
+    {
+      "itemId": "p1b6-item-b003-225",
+      "sourceEpisodeId": "p1b6-se-b003-225",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 26
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 81
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 57
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b003-225"
+    },
+    {
+      "itemId": "p1b6-item-b003-226",
+      "sourceEpisodeId": "p1b6-se-b003-226",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 20,
+        "endByte": 26
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 58
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 59
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 51
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 24
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b003-226"
+    },
+    {
+      "itemId": "p1b6-item-b003-227",
+      "sourceEpisodeId": "p1b6-se-b003-227",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 24
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 38
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 115
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 27
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b003-227"
+    },
+    {
+      "itemId": "p1b6-item-b003-228",
+      "sourceEpisodeId": "p1b6-se-b003-228",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 10
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 115
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 10
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 16
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b003-228"
+    }
+  ]
+}

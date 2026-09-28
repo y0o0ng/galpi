@@ -32,6 +32,10 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 - **current coverage gate: surface authoring for the two replacement skeletons.** One fresh
   candidate each for `53ab6351` and `0768ea20` is authored (see "V3 replacement-skeleton surface candidates")
   and has passed a fresh source audit 2/2; source audit 2/2 PASS, external v3 review 2 KEEP ESCALATE, owner calibration 2 KEEP ESCALATE; they remain `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
+- anchor-quality follow-up (see "Batch-003 anchor-quality follow-up"): `869c7127` 4/4
+  ANCHOR_QUALITY_PASS, unchanged; `aebbf047` 5/5 REANCHOR, materialized as an
+  anchorSpanRef-only candidate. Semantics unchanged for both. **Next gate: a fresh source/bundle
+  audit of exactly the five reanchored candidates.**
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1877,6 +1881,35 @@ correction: **both KEEP ESCALATE, matching v3**; as calibration rows they stay
 not an independent confirmation. **Both replacement skeletons now have one fresh realization
 that has passed every current gate short of acceptance.** Further quantity is left to top-up;
 nothing is accepted and the accepted pool stays **93**.
+
+### Batch-003 anchor-quality follow-up — `aebbf047` / `869c7127`
+
+An anchor-quality resolution under the closed anchor contract (the anchor names the
+candidate/topic, not a proposition, value or supporting fact), **not a semantic amendment**:
+both skeletons keep their v3 CLEAR semantics (`aebbf047` DEV / COMPLEMENTARY EVIDENCE,
+`869c7127` FINAL_HELD_OUT / ACTUALITY). `scripts/build-memory-inference-p1b6-batch-003-anchor-quality-resolution.js`
+(`npm run build:memory-inference-p1b6-batch-003-anchor-quality-resolution`) derives the nine
+batch-003 rows from the two skeleton IDs, fails closed unless it finds exactly 5 + 4, checks
+each current anchor against its bytes, and writes
+`fixtures/local-memory-inference-p1b6-batch-003-anchor-quality-resolution-receipt.json`:
+
+- `869c7127` (`192`–`195`): **4/4 ANCHOR_QUALITY_PASS**. Each span is the observed state
+  itself (`dark mode로 떠 있어` …), not the unknown cause or a supporting fact. Unchanged; no
+  model-visible bundle changes, so no fresh review opens.
+- `aebbf047` (`224`–`228`): **5/5 REANCHOR**. Each span was a one-sided value sub-span (`본사
+  예산에 30만 원이 잡혀 있고` …); the approved topic spans are `이번 출장비`, `이번 프로젝트
+  인력`, `재고`, `이번 달 광고 예산`, `내 연차`, all in t1 (for `226`, t1 is the topic mention;
+  t3 / t5 contain `재고` only inside `재고표`).
+
+`fixtures/local-memory-inference-p1b6-surface-anchor-repair-candidate-batch-003.json` holds the
+five reanchored rows. Only `anchorSpanRef` changes, recomputed from the unchanged bytes; IDs,
+source text, evidence spans, split, language and discourse pattern are the historical ones,
+and the rendered bundle differs only in the `[TARGET]` placement with an unchanged fragment
+count. Frozen batch-003 and every historical audit / model / HUMAN result stay as they are and
+remain evidence about the old marked bundle only; nothing transfers. The five rows need a fresh
+source/bundle audit and a fresh v3 semantic review, with HUMAN review only where routing
+requires it. No acceptance, freeze, selection, HELD release or training; the accepted pool
+stays **93**.
 
 ## Closed Selection and Freeze Constraints
 
