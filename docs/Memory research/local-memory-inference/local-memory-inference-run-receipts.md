@@ -5219,3 +5219,15 @@ semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
 
 At most one calibration row (single skeleton). No review, HUMAN review or acceptance; the
 accepted pool stays **93**.
+
+#### P1-B6 batch-003 anchor repair — v3 review attempt 001 RECONCILED (1 agree / 4 HUMAN) / 5-row HUMAN packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw v3 review result `p1b6-b003-anchor-v3-review-results.json` (not committed, 5 rows) | `337eb0b106ac9e80e4e127f54f48db36a1e41ba02d3f78c91c271f9d6e40eb15` |
+| `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-v3-review-attempt-001.json` | `1195b6fc886dc81de010d1347f783a3f02269cd38c4fa1c0a241d4097acb6ca4` |
+| `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-human-review-protocol.json` | `cf8c20bb66b082897316476efeb76fd03e3f3f2264b2ccb3348bba34da95a1c7` |
+| blind HUMAN packet (not committed, 5 rows) | `626557153094f0f5c79fe41c77fe787c7e0770a8e12fb42ab4553fdd24683f3f` |
+
+Reviewer reported as Claude Opus 5.5: `224`–`227` KEEP ESCALATE vs CLEAR (mandatory HUMAN),
+`228` KEEP CLEAR (calibration). No HUMAN review or acceptance; the accepted pool stays **93**.

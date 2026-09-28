@@ -35,8 +35,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 - anchor-quality follow-up (see "Batch-003 anchor-quality follow-up"): `869c7127` 4/4
   ANCHOR_QUALITY_PASS, unchanged; `aebbf047` 5/5 REANCHOR, materialized as an
   anchorSpanRef-only candidate. Semantics unchanged for both. **Next gate: a fresh source/bundle
-  audit of exactly the five reanchored candidates** — **passed 5/5**; the fresh v3 semantic
-  review packet is built and the external review is next.
+  audit of exactly the five reanchored candidates** — **passed 5/5**; the external v3 review
+  gave 4 ESCALATE against the CLEAR reference and 1 CLEAR, so all five go to a blind HUMAN review
+  (4 mandatory + 1 calibration), whose packet is built.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1940,8 +1941,30 @@ one clean agreement goes to HUMAN calibration** and the rest stay provisional wi
 review. `scripts/build-memory-inference-p1b6-batch-003-anchor-repair-v3-review-packet.js`
 renders the audited bundles under `p1b6-b003-anchor-v3smreview-` IDs; the packet is gitignored
 and deterministic at raw SHA-256
-`5c0c5362081c7e29c62a928ed334ff4c1f862e01d4d999bd5da09307abf155e7` (5 rows). The review runs
-externally in a fresh session.
+`5c0c5362081c7e29c62a928ed334ff4c1f862e01d4d999bd5da09307abf155e7` (5 rows).
+
+**v3 review result — attempt 001.** Fresh Claude Code CLI session in the home directory,
+reviewer reported by the owner as Claude Opus 5.5. Raw result
+`p1b6-b003-anchor-v3-review-results.json` (raw SHA-256
+`337eb0b106ac9e80e4e127f54f48db36a1e41ba02d3f78c91c271f9d6e40eb15`, not committed) reconciled
+into `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-v3-review-attempt-001.json`:
+**4 KEEP ESCALATE opposing the v3 CLEAR reference** (`224`–`227`, all `DECISION_DISAGREEMENT` →
+mandatory HUMAN) and **1 KEEP CLEAR matching** (`228` → `PROVISIONAL`, the calibration row). The
+four ESCALATE reasons all read the topic-level TARGET as possibly an aggregate (one value
+recorded twice vs two contributions to be summed); whether that reading is licensed or needs an
+added premise is for the HUMAN review. Nothing is decided here.
+
+**Blind HUMAN packet — built, NOT RUN.**
+`scripts/build-memory-inference-p1b6-batch-003-anchor-repair-human-review-packet.js` renders the
+four mandatory rows and the calibration row together under `p1b6-b003-anchor-hreview-` IDs,
+sorted, so row role is hidden, with the protocol
+`fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-human-review-protocol.json`
+(`p1b6-batch-003-anchor-repair-blind-human-review-v1`, raw SHA-256
+`cf8c20bb66b082897316476efeb76fd03e3f3f2264b2ccb3348bba34da95a1c7`, v3 verbatim); the packet
+is gitignored and deterministic at raw SHA-256
+`626557153094f0f5c79fe41c77fe787c7e0770a8e12fb42ab4553fdd24683f3f`. The owner decided the
+reanchoring and knows the reference and the model result, so the result is not an independent
+confirmation.
 
 ## Closed Selection and Freeze Constraints
 

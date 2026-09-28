@@ -57,3 +57,23 @@ test('the internal plan samples at most one calibration row on the single skelet
   assert.deepEqual(receipt.summary, { total: 5, cleanAgreements: 5, mandatoryHuman: 0, calibration: 1 });
   for (const [key, value] of Object.entries(plan.authority)) assert.equal(value, false, key);
 });
+
+const os = require('node:os');
+const RAW = path.join(os.homedir(), 'p1b6-b003-anchor-v3-review-results.json');
+const RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+
+test('the committed review receipt: 4 mandatory disagreements, 1 calibration agreement', () => {
+  const receipt = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.equal(receipt.reviewPacket.sha256, PACKET_SHA256);
+  assert.deepEqual(receipt.summary, { total: 5, cleanAgreements: 1, mandatoryHuman: 4, calibration: 1 });
+  assert.deepEqual(receipt.mandatoryHumanItemIds, ITEMS.slice(0, 4));
+  assert.deepEqual(receipt.calibrationItemIds, [ITEMS[4]]);
+  for (const row of receipt.rows) assert.equal(row.referenceLabel, 'CLEAR');
+  assert.equal(receipt.rows.filter(row => row.route === 'DECISION_DISAGREEMENT').every(row => row.decision === 'ESCALATE'), true);
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
+
+test('the review receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  assert.deepEqual(builder.reconcile(fs.readFileSync(RAW)), JSON.parse(fs.readFileSync(RECEIPT)));
+});
