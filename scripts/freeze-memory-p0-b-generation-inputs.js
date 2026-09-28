@@ -78,7 +78,9 @@ function answerStack(db, root, env, codeCommit) {
   const sources = [
     'server.js', 'lib/assistant-retrieval.js', 'lib/assistant-retrieval-shadow.js',
     'lib/memory-p0-research.js', 'lib/openai-model-catalog.js',
-    'lib/openai-responses-tool-loop.js', 'config/codex-policy.json',
+    'lib/openai-responses-tool-loop.js', 'lib/assistant-tasks.js',
+    'lib/assistant-task-series.js', 'lib/assistant-schedule-notes.js',
+    'config/codex-policy.json',
   ];
   return {
     codeCommit,
@@ -257,16 +259,100 @@ function assertOnlyD0Diff(shared, hard, global) {
 }
 
 function historicalSchedule(db, target, runtime) {
-  if (runtime.ASSISTANT_TASKS_ENABLED !== 'true') return { reconstructable: true, text: '' };
-  // The task event log omits historical title, due time, details and reminder state.
-  // A genuinely empty past task universe is the only exact state recoverable from retained rows.
-  const prior = db.prepare('SELECT 1 FROM assistant_tasks WHERE created_at <= ? LIMIT 1')
-    .get(target.createdAt);
-  return prior
-    ? { reconstructable: false, text: '' }
-    : { reconstructable: true, text: buildActiveScheduleContext({
-      capturedAt: target.createdAt, tasks: [],
-    }) };
+  if (runtime.ASSISTANT_TASKS_ENABLED !== 'true') return { reconstructable: true, kind: 'DISABLED', text: '' };
+  const uncertain = { reconstructable: false, kind: 'UNRECOVERABLE', text: '' };
+  const time = target.createdAt;
+  const series = db.prepare(`SELECT id, freq, by_weekday AS byWeekday,
+    by_monthday AS byMonthday, time_kind AS timeKind, time_of_day AS timeOfDay,
+    status, version, created_at AS createdAt, updated_at AS updatedAt,
+    ended_at AS endedAt FROM assistant_task_series WHERE created_at <= ?`).all(time);
+  for (const row of series) {
+    if (row.createdAt === time) return uncertain;
+    // A rule edit or end can physically delete future occurrence tasks and their events.
+    // Version 1 with a later materialization has only added new rows, not changed the rule.
+    if (row.updatedAt >= time && row.version > 1 && (row.endedAt === null || row.endedAt >= time)) {
+      return uncertain;
+    }
+  }
+  const seriesById = new Map(series.map(row => [row.id, row]));
+  const eventsFor = db.prepare(`SELECT event_type AS type, from_status AS fromStatus,
+    to_status AS toStatus, from_lifecycle AS fromLifecycle,
+    to_lifecycle AS toLifecycle, task_version AS version, occurred_at AS occurredAt
+    FROM assistant_task_events WHERE task_id=? ORDER BY occurred_at, id`);
+  const remindersFor = db.prepare(`SELECT id, remind_at AS remindAt, status,
+    created_at AS createdAt, fired_at AS firedAt,
+    acknowledged_at AS acknowledgedAt, cancelled_at AS cancelledAt
+    FROM assistant_reminders WHERE task_id=? ORDER BY id`);
+  const tasks = [];
+  for (const task of db.prepare(`SELECT id, title, detail, status, lifecycle,
+    due_kind AS dueKind, due_date AS dueDate, due_at AS dueAt,
+    series_id AS seriesId, version, created_at AS createdAt
+    FROM assistant_tasks WHERE created_at <= ? ORDER BY id`).all(time)) {
+    if (task.createdAt === time) return uncertain;
+    const events = eventsFor.all(task.id);
+    if (!events.length || events[0].type !== 'created'
+      || events[0].occurredAt !== task.createdAt || events.length !== task.version) return uncertain;
+    let state = { status: null, lifecycle: null };
+    let historical = null;
+    let historicalUpdatedAt = null;
+    for (let index = 0; index < events.length; index += 1) {
+      const event = events[index];
+      if (event.version !== index + 1 || event.fromStatus !== state.status
+        || event.fromLifecycle !== state.lifecycle) return uncertain;
+      if (event.occurredAt === time && (event.fromLifecycle === 'active'
+        || event.toLifecycle === 'active')) return uncertain;
+      state = { status: event.toStatus, lifecycle: event.toLifecycle };
+      if (event.occurredAt < time) {
+        historical = state;
+        historicalUpdatedAt = event.occurredAt;
+      }
+    }
+    if (state.status !== task.status || state.lifecycle !== task.lifecycle || !historical) return uncertain;
+    if (historical.status !== 'active' || historical.lifecycle !== 'active') continue;
+    // Only an `updated` task event can change title, detail or due fields.
+    if (events.some(event => event.type === 'updated' && event.occurredAt >= time)) return uncertain;
+    const reminderCandidates = [];
+    for (const reminder of remindersFor.all(task.id)) {
+      if ([reminder.createdAt, reminder.firedAt, reminder.acknowledgedAt,
+        reminder.cancelledAt].includes(time)) return uncertain;
+      if (reminder.createdAt > time) continue;
+      if (reminder.acknowledgedAt !== null && reminder.acknowledgedAt < time) continue;
+      if (reminder.cancelledAt !== null && reminder.cancelledAt < time) continue;
+      const status = reminder.firedAt !== null && reminder.firedAt < time ? 'fired' : 'pending';
+      reminderCandidates.push({ id: reminder.id, remindAt: reminder.remindAt, status });
+    }
+    if (reminderCandidates.length > 1) return uncertain;
+    tasks.push({ ...task, status: 'active', lifecycle: 'active',
+      updatedAt: historicalUpdatedAt, reminder: reminderCandidates[0] || null });
+  }
+  const dueEpoch = task => task.dueKind === 'datetime' ? task.dueAt
+    : task.dueKind === 'date' ? Date.parse(`${task.dueDate}T00:00:00+09:00`) / 1000
+      : Number.POSITIVE_INFINITY;
+  const compareDue = (a, b) => dueEpoch(a) - dueEpoch(b)
+    || (a.dueKind !== b.dueKind ? (a.dueKind === 'datetime' ? -1 : 1) : a.id - b.id);
+  const earliest = new Map();
+  const totals = new Map();
+  for (const task of tasks) {
+    if (task.seriesId === null) continue;
+    totals.set(task.seriesId, (totals.get(task.seriesId) || 0) + 1);
+    const previous = earliest.get(task.seriesId);
+    if (!previous || compareDue(task, previous) < 0) earliest.set(task.seriesId, task);
+  }
+  const visible = tasks.filter(task => task.seriesId === null || earliest.get(task.seriesId)?.id === task.id);
+  for (const task of visible) {
+    if (task.seriesId === null) continue;
+    const rule = seriesById.get(task.seriesId);
+    if (!rule) return uncertain;
+    task.series = { ...rule, remaining: totals.get(task.seriesId) - 1 };
+  }
+  visible.sort((a, b) => {
+    if (a.dueKind === 'none' && b.dueKind !== 'none') return 1;
+    if (a.dueKind !== 'none' && b.dueKind === 'none') return -1;
+    if (a.dueKind === 'none') return b.updatedAt - a.updatedAt || b.id - a.id;
+    return compareDue(a, b);
+  });
+  return { reconstructable: true, kind: visible.length ? 'ACTIVE' : 'EMPTY',
+    text: buildActiveScheduleContext({ capturedAt: time, tasks: visible.slice(0, 20) }) };
 }
 
 async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = ROOT, env = null }) {
@@ -306,6 +392,7 @@ async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = R
     const record = {
       traceId: item.traceId, messageId: item.messageId, querySha256: item.querySha256,
       disposition: null, reasons: [], targetCreatedAt: null,
+      scheduleReplay: null,
       prefixMessageIds: [], prefixSha256: null, sharedContextSha256: null,
       hardContextSha256: null, globalContextSha256: null,
       armWithoutD0Sha256: null, privateCaseSha256: null,
@@ -361,6 +448,7 @@ async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = R
     const past = pastMessages(db, queryEmbedding, target);
     const previous = prefix.at(-1)?.createdAt ?? null;
     const schedule = historicalSchedule(db, target, runtime);
+    record.scheduleReplay = schedule.kind;
     const shared = {
       model: stack.exactModelId, store: false, max_output_tokens: stack.maxOutputTokens,
       reasoning: { effort: stack.reasoningEffort, context: stack.reasoningContext },
@@ -407,6 +495,8 @@ async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = R
   const privateBytes = canonical(privateBundle);
   const counts = Object.fromEntries(['GENERATION_READY', ...Object.values(REASONS)].map(name => [name, 0]));
   for (const item of cases) counts[item.disposition] += 1;
+  const scheduleCounts = Object.fromEntries(['EMPTY', 'ACTIVE', 'UNRECOVERABLE', 'DISABLED', 'NOT_REACHED']
+    .map(name => [name, cases.filter(item => (item.scheduleReplay || 'NOT_REACHED') === name).length]));
   if (Object.values(counts).reduce((sum, count) => sum + count, 0) !== EXPECTED_SENSITIVE) {
     throw new Error('79건 disposition 합계 불일치');
   }
@@ -414,7 +504,7 @@ async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = R
     schemaVersion: 1, baselineCommit: codeCommit,
     censusSha256: byteHash(censusBytes), censusSensitiveCount: EXPECTED_SENSITIVE,
     answerStack: stack, answerStackSha256: stackSha256,
-    counts, privateBundleSha256: byteHash(privateBytes),
+    counts, scheduleCounts, privateBundleSha256: byteHash(privateBytes),
     safety: { sqliteReadonly: db.readonly, sqliteQueryOnly: true,
       totalChangesDelta: afterChanges - beforeChanges, externalApiCalls: 0,
       answerGenerations: 0, liveToolExecutions: 0 },
