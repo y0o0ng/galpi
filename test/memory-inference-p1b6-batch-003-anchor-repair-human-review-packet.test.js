@@ -52,3 +52,71 @@ test('the protocol carries v3 and records the reviewer limitation', () => {
   assert.equal(protocol.reviewer.decidedTheReanchoring, true);
   assert.match(protocol.reviewer.independenceNote, /not an independent confirmation/);
 });
+
+// HUMAN result ingestion: row routing drives the receipt-level promotion flag.
+const MANDATORY = ['224', '225', '226', '227'].map(n => `p1b6-item-b003-${n}`);
+const CALIBRATION = 'p1b6-item-b003-228';
+const rowIdOf = itemId => builder.opaqueReviewRowId(builder.buildHumanReviewPacket().sourceCandidate.sha256, itemId);
+const result = (overrides = {}) => Buffer.from(JSON.stringify({
+  results: builder.buildHumanReviewPacket().rows.map(row => ({
+    reviewRowId: row.reviewRowId, disposition: 'KEEP', decision: 'ESCALATE', reason: 'r',
+    ...overrides[row.reviewRowId],
+  })),
+}));
+const ingest = bytes => builder.buildHumanResultReceipt(bytes, '2026-09-28');
+const byItem = built => new Map(built.rows.map(row => [row.itemId, row]));
+
+test('a mandatory KEEP CLEAR matching v3 is HUMAN_ADJUDICATED and sets the promotion flag', () => {
+  const built = ingest(result({ [rowIdOf(MANDATORY[0])]: { decision: 'CLEAR' } }));
+  const row = byItem(built).get(MANDATORY[0]);
+  assert.deepEqual([row.role, row.provenance, row.eligibility], ['mandatory', 'HUMAN_ADJUDICATED', 'ELIGIBLE']);
+  assert.equal(built.authority.promotedToHumanAdjudicated, true);
+  assert.equal(built.summary.humanAdjudicated, 1);
+});
+
+test('opposing, FIX or REJECT mandatory rows promote nothing', () => {
+  const built = ingest(result({
+    [rowIdOf(MANDATORY[1])]: { disposition: 'FIX', decision: null },
+    [rowIdOf(MANDATORY[2])]: { disposition: 'REJECT', decision: null },
+  }));
+  assert.equal(built.rows.some(row => row.provenance === 'HUMAN_ADJUDICATED'), false);
+  assert.equal(built.authority.promotedToHumanAdjudicated, false);
+  assert.equal(built.summary.humanAdjudicated, 0);
+  for (const itemId of MANDATORY) assert.equal(byItem(built).get(itemId).eligibility, 'INELIGIBLE', itemId);
+});
+
+test('a calibration match alone stays provisional and does not set the promotion flag', () => {
+  const built = ingest(result({ [rowIdOf(CALIBRATION)]: { decision: 'CLEAR' } }));
+  const row = byItem(built).get(CALIBRATION);
+  assert.deepEqual([row.role, row.provenance, row.eligibility],
+    ['calibration', 'CATALOG_STRONG_MODEL_CONFIRMED', 'PROVISIONAL']);
+  assert.equal(built.authority.promotedToHumanAdjudicated, false);
+  assert.equal(built.summary.humanAdjudicated, 0);
+});
+
+test('summary humanAdjudicated counts the HUMAN_ADJUDICATED rows exactly', () => {
+  const built = ingest(result(Object.fromEntries([...MANDATORY.slice(0, 3), CALIBRATION]
+    .map(itemId => [rowIdOf(itemId), { decision: 'CLEAR' }]))));
+  assert.equal(built.summary.humanAdjudicated, built.rows.filter(row => row.provenance === 'HUMAN_ADJUDICATED').length);
+  assert.equal(built.summary.humanAdjudicated, 3);
+  assert.equal(built.authority.promotedToHumanAdjudicated, true);
+});
+
+test('unknown, missing or duplicate review row IDs fail closed', () => {
+  const rows = JSON.parse(result().toString('utf8')).results;
+  const encode = list => Buffer.from(JSON.stringify({ results: list }));
+  const unknown = { ...rows[0], reviewRowId: 'p1b6-b003-anchor-hreview-0000000000000000' };
+  assert.throws(() => ingest(encode([...rows.slice(1), unknown])), /exactly the packet rows/);
+  assert.throws(() => ingest(encode(rows.slice(1))), /exactly the packet rows/);
+  assert.throws(() => ingest(encode([...rows, rows[0]])), /exactly the packet rows/);
+});
+
+test('frozen packet, protocol and v3 review receipt bytes are unchanged; no HUMAN receipt exists', () => {
+  const fixtures = path.join(__dirname, '..', 'fixtures');
+  assert.equal(sha256RawBytes(builder.packetBytes(builder.buildHumanReviewPacket())), PACKET_SHA256);
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(fixtures, builder.PINNED.protocol.fixture))),
+    'cf8c20bb66b082897316476efeb76fd03e3f3f2264b2ccb3348bba34da95a1c7');
+  assert.equal(sha256RawBytes(fs.readFileSync(path.join(fixtures, builder.PINNED.reviewReceipt.fixture))),
+    '1195b6fc886dc81de010d1347f783a3f02269cd38c4fa1c0a241d4097acb6ca4');
+  assert.equal(fs.existsSync(path.join(fixtures, builder.RECEIPT_FIXTURE)), false);
+});

@@ -167,7 +167,8 @@ function buildHumanResultReceipt(rawResultBytes, reviewDate) {
     },
     rows,
     authority: {
-      promotedToHumanAdjudicated: false,
+      // Only mandatory matching rows become HUMAN_ADJUDICATED (routeHumanResult).
+      promotedToHumanAdjudicated: rows.some(row => row.provenance === 'HUMAN_ADJUDICATED'),
       catalogAmendedByThisResult: false,
       surfaceAcceptancePerformed: false,
       referenceLabelFreezePerformed: false,
