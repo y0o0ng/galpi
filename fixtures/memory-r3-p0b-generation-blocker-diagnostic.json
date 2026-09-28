@@ -1,0 +1,650 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "6cf5a6ef0c6be040a5b953a3285f2a9c25ca9c75",
+  "implementationCommit": "aa0429d033307438ab0c37634b3a1ca9acf8f725",
+  "inputManifestSha256": "af674739a1cdf5b74e2b4f52994955fec4c84c48bbcb5434f9ffe3194beaf338",
+  "counts": {
+    "GENERATION_READY": 18,
+    "INDETERMINATE_TOOL_REPLAY": 61
+  },
+  "blockerCounts": {
+    "PREFIX_ATTACHMENT_UNREPLAYABLE": 11,
+    "SERIES_ENDED_AFTER_TARGET": 48,
+    "TARGET_AND_PREFIX_ATTACHMENT_UNREPLAYABLE": 1,
+    "TARGET_ATTACHMENT_UNREPLAYABLE": 1
+  },
+  "scheduleBlockerCounts": {
+    "SERIES_ENDED_AFTER_TARGET": 59
+  },
+  "attachmentOnlyCounts": {
+    "PREFIX_ATTACHMENT_UNREPLAYABLE": 1,
+    "TARGET_ATTACHMENT_UNREPLAYABLE": 1
+  },
+  "safety": {
+    "sqliteReadonly": true,
+    "sqliteQueryOnly": true,
+    "totalChangesDelta": 0,
+    "externalApiCalls": 0,
+    "answerGenerations": 0
+  },
+  "cases": [
+    {
+      "traceId": 307,
+      "messageId": 900,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 4,
+        "deletedOriginalCount": 3
+      }
+    },
+    {
+      "traceId": 308,
+      "messageId": 902,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 4,
+        "deletedOriginalCount": 3
+      }
+    },
+    {
+      "traceId": 309,
+      "messageId": 904,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 2,
+        "deletedOriginalCount": 1
+      }
+    },
+    {
+      "traceId": 314,
+      "messageId": 914,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 320,
+      "messageId": 926,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 1,
+        "deletedOriginalCount": 0
+      }
+    },
+    {
+      "traceId": 323,
+      "messageId": 932,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 1,
+        "deletedOriginalCount": 0
+      }
+    },
+    {
+      "traceId": 325,
+      "messageId": 936,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 1,
+        "deletedOriginalCount": 0
+      }
+    },
+    {
+      "traceId": 327,
+      "messageId": 940,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 1,
+        "deletedOriginalCount": 0
+      }
+    },
+    {
+      "traceId": 333,
+      "messageId": 952,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 335,
+      "messageId": 956,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 336,
+      "messageId": 958,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 337,
+      "messageId": 960,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 338,
+      "messageId": 962,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 339,
+      "messageId": 964,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 340,
+      "messageId": 966,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 342,
+      "messageId": 970,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 344,
+      "messageId": 974,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 354,
+      "messageId": 994,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 3,
+        "deletedOriginalCount": 3
+      }
+    },
+    {
+      "traceId": 363,
+      "messageId": 1012,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 378,
+      "messageId": 1042,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 379,
+      "messageId": 1044,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 380,
+      "messageId": 1046,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 381,
+      "messageId": 1048,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 392,
+      "messageId": 1070,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 394,
+      "messageId": 1074,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 398,
+      "messageId": 1082,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 399,
+      "messageId": 1084,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 401,
+      "messageId": 1088,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 405,
+      "messageId": 1096,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 407,
+      "messageId": 1100,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 408,
+      "messageId": 1102,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 410,
+      "messageId": 1106,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 411,
+      "messageId": 1108,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 412,
+      "messageId": 1110,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 414,
+      "messageId": 1114,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 415,
+      "messageId": 1116,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 416,
+      "messageId": 1118,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 419,
+      "messageId": 1124,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 426,
+      "messageId": 1138,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 431,
+      "messageId": 1148,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 432,
+      "messageId": 1150,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 433,
+      "messageId": 1152,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 434,
+      "messageId": 1154,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 435,
+      "messageId": 1156,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 438,
+      "messageId": 1162,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 439,
+      "messageId": 1164,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 445,
+      "messageId": 1176,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 446,
+      "messageId": 1178,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 449,
+      "messageId": 1184,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 451,
+      "messageId": 1188,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 452,
+      "messageId": 1190,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 468,
+      "messageId": 1222,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 470,
+      "messageId": 1226,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 474,
+      "messageId": 1234,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 479,
+      "messageId": 1244,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 483,
+      "messageId": 1252,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "SERIES_ENDED_AFTER_TARGET",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET"
+    },
+    {
+      "traceId": 538,
+      "messageId": 1362,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "TARGET_AND_PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 3,
+        "prefixCount": 3,
+        "deletedOriginalCount": 6
+      }
+    },
+    {
+      "traceId": 553,
+      "messageId": 1392,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 3,
+        "deletedOriginalCount": 3
+      }
+    },
+    {
+      "traceId": 569,
+      "messageId": 1424,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": "SERIES_ENDED_AFTER_TARGET",
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 2,
+        "deletedOriginalCount": 2
+      }
+    },
+    {
+      "traceId": 576,
+      "messageId": 1438,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 585,
+      "messageId": 1456,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 586,
+      "messageId": 1458,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 597,
+      "messageId": 1480,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 608,
+      "messageId": 1502,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 609,
+      "messageId": 1504,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 613,
+      "messageId": 1512,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 617,
+      "messageId": 1520,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 622,
+      "messageId": 1530,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 626,
+      "messageId": 1538,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 629,
+      "messageId": 1544,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 632,
+      "messageId": 1550,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 647,
+      "messageId": 1580,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 659,
+      "messageId": 1604,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 660,
+      "messageId": 1606,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 667,
+      "messageId": 1620,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 669,
+      "messageId": 1624,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 692,
+      "messageId": 1670,
+      "disposition": "GENERATION_READY",
+      "blocker": null,
+      "scheduleBlocker": null
+    },
+    {
+      "traceId": 704,
+      "messageId": 1694,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "TARGET_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": null,
+      "attachment": {
+        "targetCount": 1,
+        "prefixCount": 0,
+        "deletedOriginalCount": 1
+      }
+    },
+    {
+      "traceId": 707,
+      "messageId": 1700,
+      "disposition": "INDETERMINATE_TOOL_REPLAY",
+      "blocker": "PREFIX_ATTACHMENT_UNREPLAYABLE",
+      "scheduleBlocker": null,
+      "attachment": {
+        "targetCount": 0,
+        "prefixCount": 2,
+        "deletedOriginalCount": 2
+      }
+    }
+  ]
+}

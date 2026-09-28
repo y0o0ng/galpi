@@ -106,3 +106,25 @@ The 61 tool-indeterminate cases are 59 schedule-unrecoverable cases and 2 cases 
 - Focused P0-B tests: **20 passed**. Full `npm test`: **1,663 passed / 0 failed / 3 skipped** (1,666 total). `git diff --check` passed.
 
 P0-B remains **OPEN / ANSWER GENERATION NOT STARTED**. The next phase may apply the frozen 2×2 generation protocol only to the 18 `GENERATION_READY` inputs; the 61 indeterminate cases remain visible for final bounds. Strict exact historical `S` and census membership remain unproven under the retained-telemetry limits.
+
+## Generation-input blocker diagnostic — 2026-09-28
+
+The latest GitHub `main` baseline was `6cf5a6ef0c6be040a5b953a3285f2a9c25ca9c75`; diagnostic execution code is `aa0429d033307438ab0c37634b3a1ca9acf8f725`. The frozen input manifest (SHA256 `af674739a1cdf5b74e2b4f52994955fec4c84c48bbcb5434f9ffe3194beaf338`) still has **18 `GENERATION_READY` / 61 `INDETERMINATE_TOOL_REPLAY`**. This read-only pass records reasons only; it neither changes those dispositions nor starts generation.
+
+| First preflight blocker (attachment check precedes schedule check) | Cases |
+| --- | ---: |
+| `SERIES_ENDED_AFTER_TARGET` | 48 |
+| `PREFIX_ATTACHMENT_UNREPLAYABLE` | 11 |
+| `TARGET_AND_PREFIX_ATTACHMENT_UNREPLAYABLE` | 1 |
+| `TARGET_ATTACHMENT_UNREPLAYABLE` | 1 |
+| **Blocked total** | **61** |
+
+The schedule result is a separate, overlapping diagnostic: **all 59 / 59** `UNRECOVERABLE` schedules first fail in `historicalSchedule(...)` at `SERIES_ENDED_AFTER_TARGET`. Of these, **11** also have an attachment blocker that the original preflight checks first (10 prefix-only, one target-and-prefix); the other **48** have schedule as their first blocker. The **two attachment-only** cases have reconstructable schedules: one target attachment, one bounded-prefix attachment. Their retained temporary attachment originals and blobs are `deleted` (one target original, two prefix originals). Thus 59 schedule-unrecoverable plus two attachment-only cases accounts for the 61 without hiding the overlap. No further failure reason is inferred after the first schedule fail-close.
+
+Recovery assessment for the **current retained DB/Vault**: **A 0 / B 61 / C 0**. The 59 schedule cases all depend on the same post-target series end: the retained series is `ended`, version **3**, and the end path can physically delete untouched future occurrence tasks, reminders and events; there is no durable historical rule/occurrence snapshot in these tables. The two attachment-only cases have deleted originals and blobs. Consequently none is safely promotable from retained state by a narrower deterministic reconstruction. A separately preserved historical backup, if one exists, would require its own provenance and faithful-replay assessment; this diagnostic did not inspect or substitute one.
+
+- Privacy-safe artifact: `fixtures/memory-r3-p0b-generation-blocker-diagnostic.json`, SHA256 `f79634918b3870b264f5c241cd328335408c3421c7e16f92cf6b2cda4a758f46`. It records trace/message IDs, disposition, first blocker, overlapping schedule blocker and attachment counts/status counts, without raw question, schedule text, title/detail, attachment name/content or note text.
+- Two Pi executions streamed the diagnostic code over SSH and yielded byte-identical artifact bytes. SQLite `readonly=true`, `query_only=true`, `total_changes()` delta **0**; DB, WAL, SHM and Vault byte fingerprints matched before and after the paired run. No Pi script/artifact installation, production write, external API call or answer generation occurred.
+- Focused P0-B tests: **19 passed**. Full `npm test`: **1,674 passed / 0 failed / 3 skipped** (1,677 total). A first sandboxed full run hit localhost `listen EPERM`; the unrestricted run passed. `git diff --check` passed.
+
+The P0 protocol, 79-case census, 18 ready inputs, and strict historical replay rule are unchanged. The only possible next recovery avenue worth separate review is an independently preserved historical series/attachment snapshot; no recovery or generation was performed here.
