@@ -31,7 +31,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
 - **current coverage gate: surface authoring for the two replacement skeletons.** One fresh
   candidate each for `53ab6351` and `0768ea20` is authored (see "V3 replacement-skeleton surface candidates")
-  and has passed a fresh source audit 2/2; the external v3 review matched v3 on both (2 KEEP ESCALATE) and the 2-row HUMAN calibration packet is built.
+  and has passed a fresh source audit 2/2; source audit 2/2 PASS, external v3 review 2 KEEP ESCALATE, owner calibration 2 KEEP ESCALATE; they remain `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; no acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1862,6 +1862,21 @@ gitignored and deterministic at raw SHA-256
 `1d02df06cf983f6999ccbd0086705f5e480d19c9765067465983edc2cb6a7e3e`. The owner approved the
 wording and knows the reference and the model result, so the result is not an independent
 confirmation, and matching calibration rows stay `CATALOG_STRONG_MODEL_CONFIRMED`.
+
+**HUMAN review result — attempt 001 (2026-09-28).** Decisions are the owner's; a model presented
+the rows and helped format the JSON without judging (owner-reported: GPT-5.6 sol). The first
+submission (raw SHA-256 `801773f5c97f0646d4abc7a94043dd653aaaeca81992e9271c21a91166092375`)
+carried an unknown row ID for its second row and was rejected fail-closed; at the owner's
+instruction the ID alone was corrected to the only remaining packet row (the panel bundle,
+which the unchanged reason describes). The corrected raw result
+`p1b6-rp1-human-review-results.json` (raw SHA-256
+`02df4974fff75b85c2e9dc7511ca210edc0d9c15b238a7c2fc3211a48a12135e`, not committed) is recorded
+in `fixtures/local-memory-inference-p1b6-v3-replacement-human-review-attempt-001.json` with the
+correction: **both KEEP ESCALATE, matching v3**; as calibration rows they stay
+`CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, none becomes `HUMAN_ADJUDICATED`, and this is
+not an independent confirmation. **Both replacement skeletons now have one fresh realization
+that has passed every current gate short of acceptance.** Further quantity is left to top-up;
+nothing is accepted and the accepted pool stays **93**.
 
 ## Closed Selection and Freeze Constraints
 

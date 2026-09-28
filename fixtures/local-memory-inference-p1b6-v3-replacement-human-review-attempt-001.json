@@ -1,0 +1,86 @@
+{
+  "name": "xion-local-memory-inference-p1b6-v3-replacement-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-v3-replacement-human-review-attempt-001",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-09-28",
+  "reviewProtocol": {
+    "identity": "p1b6-v3-replacement-blind-human-review-v1",
+    "sha256": "4314f45a4ecc74d37efbebfe13ea140e33101da8f5c43c5f5beabc239fd60963"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-v3-replacement-human-review-packet-v1",
+    "sha256": "1d02df06cf983f6999ccbd0086705f5e480d19c9765067465983edc2cb6a7e3e",
+    "rows": 2
+  },
+  "v3ReviewReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-v3-replacement-v3-review-attempt-001-receipt-v1",
+    "rawSha256": "a42c4e7e1e8e35c65760504bb87283af7b0bea015e211fd1cca35673a36e50bc"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-rp1-human-review-results.json",
+    "sha256": "02df4974fff75b85c2e9dc7511ca210edc0d9c15b238a7c2fc3211a48a12135e",
+    "committed": false
+  },
+  "submissionCorrection": {
+    "originalSubmission": {
+      "filename": "p1b6-rp1-human-review-results.original.json",
+      "sha256": "801773f5c97f0646d4abc7a94043dd653aaaeca81992e9271c21a91166092375",
+      "committed": false,
+      "status": "REJECTED_UNKNOWN_ROW_ID"
+    },
+    "rowIdFrom": "p1b6-rp1-hreview-b445279996e5a5fc",
+    "rowIdTo": "p1b6-rp1-hreview-cffbe323d1bf0dc1",
+    "correctedBy": "the assistant, at the repository owner's explicit instruction",
+    "basis": "The unknown ID appears nowhere in the repository; the other submitted row matched its packet ID; the only remaining packet row is the panel bundle, which the submitted reason describes.",
+    "changedFields": [
+      "reviewRowId"
+    ],
+    "decisionsOrReasonsChanged": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "presentationAid": "a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)",
+    "independentConfirmation": false,
+    "limitation": "The owner approved the candidates' wording and the replacement contracts, knew both skeletons' v3 reference is ESCALATE and was told the strong-model result; row blindness hid only which row was which."
+  },
+  "summary": {
+    "total": 2,
+    "matchingV3Reference": 2,
+    "humanAdjudicated": 0
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-rp1-hreview-1d3479569880603e",
+      "itemId": "p1b6-item-rp1-001",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "TARGET인 '반 정도 남았어'가 남은 작업량을 뜻하는지 남은 일정을 뜻하는지 visible evidence만으로 결정되지 않는다.",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-rp1-hreview-cffbe323d1bf0dc1",
+      "itemId": "p1b6-item-rp1-002",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "두 번째 판넬은 가로와 세로가 모두 첫 번째와 다르지만 TARGET인 '한 5cm 정도 더 길어'가 어느 축의 차이를 말하는지 visible evidence만으로 결정되지 않는다.",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "authority": {
+    "promotedToHumanAdjudicated": false,
+    "catalogAmendedByThisResult": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

@@ -5167,3 +5167,16 @@ No review, HUMAN review or acceptance; the accepted pool stays **93**.
 Fresh external session, reviewer reported as Claude Opus 5.5: 2 KEEP ESCALATE, matching v3;
 both rows are per-skeleton calibration rows. No HUMAN review or acceptance; the accepted pool
 stays **93**.
+
+#### P1-B6 v3 replacement candidates — HUMAN review attempt 001 RECORDED (2026-09-28)
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| original submission `p1b6-rp1-human-review-results.original.json` (not committed; unknown row ID, rejected) | `801773f5c97f0646d4abc7a94043dd653aaaeca81992e9271c21a91166092375` |
+| corrected raw result `p1b6-rp1-human-review-results.json` (not committed; row ID only) | `02df4974fff75b85c2e9dc7511ca210edc0d9c15b238a7c2fc3211a48a12135e` |
+| `fixtures/local-memory-inference-p1b6-v3-replacement-human-review-attempt-001.json` | receipt |
+
+Owner decisions, model as row presenter and JSON formatter only. Row-ID correction at the owner's
+instruction, decisions and reasons unchanged. 2 KEEP ESCALATE matching v3; both calibration rows
+stay `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. Not independent. No acceptance; the
+accepted pool stays **93**.

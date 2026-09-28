@@ -97,6 +97,23 @@ function buildHumanReviewPacket() {
 
 const RECEIPT_FIXTURE = 'local-memory-inference-p1b6-v3-replacement-human-review-attempt-001.json';
 const RAW_RESULT_FILENAME = 'p1b6-rp1-human-review-results.json';
+// The owner's first submission carried a row ID that is not in the packet. At the owner's
+// instruction it was corrected to the only remaining packet row, whose bundle the unchanged
+// reason describes; decisions and reasons were not touched.
+const SUBMISSION_CORRECTION = Object.freeze({
+  originalSubmission: Object.freeze({
+    filename: 'p1b6-rp1-human-review-results.original.json',
+    sha256: '801773f5c97f0646d4abc7a94043dd653aaaeca81992e9271c21a91166092375',
+    committed: false,
+    status: 'REJECTED_UNKNOWN_ROW_ID',
+  }),
+  rowIdFrom: 'p1b6-rp1-hreview-b445279996e5a5fc',
+  rowIdTo: 'p1b6-rp1-hreview-cffbe323d1bf0dc1',
+  correctedBy: 'the assistant, at the repository owner\'s explicit instruction',
+  basis: 'The unknown ID appears nowhere in the repository; the other submitted row matched its packet ID; the only remaining packet row is the panel bundle, which the submitted reason describes.',
+  changedFields: Object.freeze(['reviewRowId']),
+  decisionsOrReasonsChanged: false,
+});
 
 // Routing preregistered in the internal v3 replacement v3 review plan.
 function routeHumanResult(role, referenceLabel, row) {
@@ -154,6 +171,7 @@ function buildHumanResultReceipt(rawResultBytes, reviewDate) {
     reviewPacket: { identity: PACKET_IDENTITY, sha256: sha256RawBytes(packetBytes(packet)), rows: packet.rows.length },
     v3ReviewReceipt: { identity: PINNED.reviewReceipt.identity, rawSha256: PINNED.reviewReceipt.rawSha256 },
     rawResultArtifact: { filename: RAW_RESULT_FILENAME, sha256: sha256RawBytes(rawResultBytes), committed: false },
+    submissionCorrection: SUBMISSION_CORRECTION,
     reviewer: {
       role: 'repository owner',
       decisionsBy: 'repository owner',
@@ -207,6 +225,7 @@ module.exports = {
   PINNED,
   RECEIPT_FIXTURE,
   REVIEW_ID_NAMESPACE,
+  SUBMISSION_CORRECTION,
   buildHumanResultReceipt,
   buildHumanReviewPacket,
   derivePopulation,

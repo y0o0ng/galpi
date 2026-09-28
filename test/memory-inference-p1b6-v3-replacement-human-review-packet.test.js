@@ -49,3 +49,51 @@ test('the protocol carries v3 and records the reviewer limitation', () => {
   assert.equal(protocol.reviewer.knowsStrongModelResult, true);
   assert.match(protocol.reviewer.independenceNote, /not an independent confirmation/);
 });
+
+const os = require('node:os');
+const RAW = path.join(os.homedir(), 'p1b6-rp1-human-review-results.json');
+const ORIGINAL = path.join(os.homedir(), 'p1b6-rp1-human-review-results.original.json');
+const HUMAN_RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const synthetic = mutate => {
+  const results = builder.buildHumanReviewPacket().rows.map(row => ({
+    reviewRowId: row.reviewRowId, disposition: 'KEEP', decision: 'ESCALATE', reason: 'r',
+  }));
+  mutate(results);
+  return Buffer.from(JSON.stringify({ results }));
+};
+
+test('HUMAN calibration rows are never promoted; unknown row IDs fail closed', () => {
+  for (const row of builder.buildHumanResultReceipt(synthetic(() => {}), '2026-09-28').rows) {
+    assert.equal(row.role, 'calibration');
+    assert.equal(row.provenance, 'CATALOG_STRONG_MODEL_CONFIRMED');
+  }
+  const opposing = builder.buildHumanResultReceipt(synthetic(rows => { rows[0].decision = 'CLEAR'; }), 'd');
+  assert.equal(opposing.rows.some(row => row.eligibility === 'INELIGIBLE_PENDING_RESOLUTION'), true);
+  assert.throws(() => builder.buildHumanResultReceipt(synthetic(rows => {
+    rows[1].reviewRowId = builder.SUBMISSION_CORRECTION.rowIdFrom;
+  }), 'd'), /exactly the packet rows/);
+});
+
+test('the committed HUMAN receipt: 2 KEEP ESCALATE, provisional, correction recorded', () => {
+  const receipt = JSON.parse(fs.readFileSync(HUMAN_RECEIPT));
+  assert.equal(receipt.reviewPacket.sha256, PACKET_SHA256);
+  assert.equal(receipt.reviewDate, '2026-09-28');
+  assert.deepEqual(receipt.summary, { total: 2, matchingV3Reference: 2, humanAdjudicated: 0 });
+  for (const row of receipt.rows) assert.equal(row.eligibility, 'PROVISIONAL');
+  assert.equal(receipt.reviewer.independentConfirmation, false);
+  assert.deepEqual(receipt.submissionCorrection.changedFields, ['reviewRowId']);
+  assert.equal(receipt.submissionCorrection.decisionsOrReasonsChanged, false);
+  assert.equal(receipt.submissionCorrection.rowIdTo,
+    builder.buildHumanReviewPacket().rows.find(row => row.reviewRowId !== 'p1b6-rp1-hreview-1d3479569880603e').reviewRowId);
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
+
+test('the HUMAN receipt equals the corrected raw bytes, which differ from the original only in the row ID',
+  { skip: !fs.existsSync(RAW) || !fs.existsSync(ORIGINAL) }, () => {
+    const committed = JSON.parse(fs.readFileSync(HUMAN_RECEIPT));
+    assert.deepEqual(builder.buildHumanResultReceipt(fs.readFileSync(RAW), committed.reviewDate), committed);
+    const original = fs.readFileSync(ORIGINAL);
+    assert.equal(sha256RawBytes(original), builder.SUBMISSION_CORRECTION.originalSubmission.sha256);
+    assert.equal(original.toString('utf8').replace(builder.SUBMISSION_CORRECTION.rowIdFrom,
+      builder.SUBMISSION_CORRECTION.rowIdTo), fs.readFileSync(RAW, 'utf8'));
+  });
