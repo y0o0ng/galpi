@@ -33,6 +33,7 @@
   - `momentum-v2` (CLOSED/FROZEN): `docs/trading/momentum-v2-roadmap.md`
   - `quality-value`는 2026-09-16 자체 데이터 구축을 종료하고 `DATA_NOT_READY`로 보류했다. 종료 정본은 `trading/runs/qv-data-audit/README.md` §11, 연구 계약은 `docs/trading/strategies/quality-value-roadmap.md`다.
 - 메일 에이전트(독립 트랙 MAIL-1~4): `docs/xion-mail-agent-design-final.md`. 스키마·Phase·통과 기준이 전부 그 문서에 있다.
+- 강의 노트(전역 탐색 `Notes`): `docs/Lecture-note-system_Design_v4.3.md`. 화면 정본은 Figma `Galpi-Note-UI-design`(`X1lEkV2OT3rJc6HtS9bmaH`)이고, 셸·토큰은 `galpi-home-design`(`8EafrARqh4NwKmaRvwRkZM`)의 Pad 정본을 따른다.
 - 세부 설계는 각 기능 문서를 단일 기준으로 삼고, 이 파일에 상세 이력을 복제하지 않는다.
 
 ## 현재 제품과 운영 경계
@@ -119,6 +120,11 @@
 - **batch-003의 `CLEAR141 / ESCALATE163` authoring 배분은 역사 메타데이터다.** 옛 균형·v1 카탈로그 아래 수치이고 현재 의미 진실을 구속하지 않는다. 304개 표면도 고정 프로토콜도 다시 만들지 않는다.
 - **accepted pool은 여전히 93이다.** batch-003의 수용·reference label 동결·FINAL 선정·학습은 하나도 열리지 않았다.
 - 상세 실행 이력·아티팩트 SHA는 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 `…/local-memory-inference-run-receipts.md`에 있다. 여기에 복제하지 않는다.
+
+### 강의 노트 — 설계 v4.3, 구현 미착수
+
+- **설계와 화면은 정리됐지만 구현 승인이 아니다.** 계약은 설계서 §0 합의 목록과 §20이 정본이고 여기에 복제하지 않는다. 구현 진입 관문은 §14.1 캡처 시간축 스파이크(10분 → 90분 → 3시간 iPad 실측)이며 전사용 PC·STT는 미정이다.
+- **Figma에서 SF Pro 텍스트는 파일에 SF Pro가 한 번도 쓰이지 않았을 때 플러그인 측정 폭이 0이다.** 텍스트 스타일에 묶어 두고, 폭이 0이면 사용자가 데스크톱 앱에서 스타일 글꼴만 바꾸게 한다.
 
 ### 메일 — 닫혔다, 관측만 남았다
 

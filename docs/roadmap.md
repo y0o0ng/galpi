@@ -464,7 +464,8 @@ API 직접 호출에는 상용 챗봇처럼 날짜를 몰래 넣어주는 레이
 - temporary 첨부는 연결 시 현재 `CONTEXT_N`을 `replay_window_turns`로 snapshot한다. 현재 로컬·Pi 값은 사용자 턴 10개이며, origin turn이 창에서 밀려나는 다음 사용자 턴의 모델 호출 전에 만료·비동기 삭제한다.
 - `CONTEXT_N`을 나중에 5로 바꾸면 새 첨부부터 5턴을 쓰며 기존 첨부에는 소급하지 않는다. 자연어 재언급은 수명을 늘리지 않고 명시적 `다시 첨부`만 새 연결을 만든다.
 - library는 명시적 승인 뒤 Vault로 승격하고 자동 만료하지 않는다. 미연결 upload는 60분 orphan TTL로 정리한다.
-- 강의 Phase 0은 개발 없이 지금 검증할 수 있다. 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 시작한다. 상세는 [갈피 강의 노트 설계](Lecture-note-system_Design_v4.2.md)다.
+- 강의 Phase 0은 개발 없이 지금 검증할 수 있다. 코드 Phase 1 이상은 V4.5-M과 일반 첨부의 인증 blob 패턴 뒤에 시작한다. 상세는 [갈피 강의 노트 설계](Lecture-note-system_Design_v4.3.md)다.
+- 강의 노트 UX 설계는 2026-09-28 v4.3으로 정리했다(구현 미착수·구현 승인 아님). 화면 정본은 Figma `Galpi-Note-UI-design`이고 셸·토큰은 `galpi-home-design` Pad 정본을 따른다. 구현 진입 관문은 설계 §14.1 캡처 시간축 스파이크(10분 → 90분 → 3시간)이며, 전사용 PC·STT 선정은 미정이다.
 - iPad 음성 단축어·credential은 지금 미리 등록하지 않고, 강의 노트 구현을 시작할 때 강의 캡처 흐름과 함께 필요성을 판단한다.
 - 강의 전체 구현은 V5-B 시작 전 또는 `PAPER_AUTONOMOUS` 관찰 기간에 병행할 수 있다. 거래 DB·worker queue·scheduler budget·API cost ledger를 공유하지 않는다.
 
