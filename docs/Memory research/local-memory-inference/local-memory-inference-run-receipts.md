@@ -5231,3 +5231,18 @@ accepted pool stays **93**.
 
 Reviewer reported as Claude Opus 5.5: `224`–`227` KEEP ESCALATE vs CLEAR (mandatory HUMAN),
 `228` KEEP CLEAR (calibration). No HUMAN review or acceptance; the accepted pool stays **93**.
+
+#### P1-B6 batch-003 anchor repair — HUMAN review attempt 001 COMPLETE (2026-09-28)
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| raw HUMAN result `p1b6-b003-anchor-human-review-results.json` (not committed, 5 rows) | `3a45b91ab1be6395f4a029a90f0c12cf877cd8509d97a5044be335c4cdeaf84b` |
+| blind HUMAN packet it answers (not committed) | `626557153094f0f5c79fe41c77fe787c7e0770a8e12fb42ab4553fdd24683f3f` |
+| `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-human-review-attempt-001.json` | receipt |
+
+Owner decisions, model as row presenter and JSON formatter only: 3 KEEP CLEAR / 2 KEEP ESCALATE.
+`226`, `227` HUMAN_ADJUDICATED / ELIGIBLE; `228` CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL;
+`224`, `225` INELIGIBLE. `promotedToHumanAdjudicated: true`. No skeleton or catalog amendment, no
+acceptance; the accepted pool stays **93**.
+
+Tests run locally: `…-batch-003-anchor-repair-human-review-packet` with the raw bytes supplied (11/11).

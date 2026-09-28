@@ -35,9 +35,10 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 - anchor-quality follow-up (see "Batch-003 anchor-quality follow-up"): `869c7127` 4/4
   ANCHOR_QUALITY_PASS, unchanged; `aebbf047` 5/5 REANCHOR, materialized as an
   anchorSpanRef-only candidate. Semantics unchanged for both. **Next gate: a fresh source/bundle
-  audit of exactly the five reanchored candidates** — **passed 5/5**; the external v3 review
-  gave 4 ESCALATE against the CLEAR reference and 1 CLEAR, so all five go to a blind HUMAN review
-  (4 mandatory + 1 calibration), whose packet is built.
+  audit of exactly the five reanchored candidates** — **passed 5/5**; external v3 review 4
+  ESCALATE / 1 CLEAR; owner HUMAN review **3 KEEP CLEAR / 2 KEEP ESCALATE**: `226`, `227`
+  `HUMAN_ADJUDICATED` / `ELIGIBLE`, `228` `PROVISIONAL`, `224`, `225` `INELIGIBLE`. No skeleton
+  amendment, no acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1965,6 +1966,26 @@ is gitignored and deterministic at raw SHA-256
 `626557153094f0f5c79fe41c77fe787c7e0770a8e12fb42ab4553fdd24683f3f`. The owner decided the
 reanchoring and knows the reference and the model result, so the result is not an independent
 confirmation.
+
+**HUMAN review result — attempt 001 (2026-09-28): COMPLETE.** Decisions are the owner's; a model
+presented the rows and helped format the JSON without judging (owner-reported: GPT-5.6 sol). One
+row (`225`) was tentatively called CLEAR during the interactive review and changed to ESCALATE
+before the review was finalized; only the final answer is recorded. Raw result
+`p1b6-b003-anchor-human-review-results.json` (raw SHA-256
+`3a45b91ab1be6395f4a029a90f0c12cf877cd8509d97a5044be335c4cdeaf84b`, not committed) is ingested
+into `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-human-review-attempt-001.json`:
+**3 KEEP CLEAR / 2 KEEP ESCALATE**.
+
+- `226`, `227` (mandatory, KEEP CLEAR matching v3) → `HUMAN_ADJUDICATED` / `ELIGIBLE`.
+- `228` (calibration, KEEP CLEAR) → stays `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`.
+- `224`, `225` (mandatory, KEEP ESCALATE opposing the CLEAR reference) → `INELIGIBLE`. These
+  are realization-level disagreements with the skeleton reference; they are current
+  ineligible realizations and do not amend `aebbf047`, change its v3 CLEAR reference, relabel
+  either row, or authorize another repair, a skeleton rejection or reopening the batch.
+
+`authority.promotedToHumanAdjudicated` is `true` (derived from the rows). Not an independent
+confirmation. No catalog or skeleton amendment, no surface acceptance; the accepted pool stays
+**93**.
 
 ## Closed Selection and Freeze Constraints
 

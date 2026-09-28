@@ -1,0 +1,106 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-003-anchor-repair-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-003-anchor-repair-human-review-attempt-001",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-09-28",
+  "reviewProtocol": {
+    "identity": "p1b6-batch-003-anchor-repair-blind-human-review-v1",
+    "sha256": "cf8c20bb66b082897316476efeb76fd03e3f3f2264b2ccb3348bba34da95a1c7"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-003-anchor-repair-human-review-packet-v1",
+    "sha256": "626557153094f0f5c79fe41c77fe787c7e0770a8e12fb42ab4553fdd24683f3f",
+    "rows": 5
+  },
+  "v3ReviewReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-batch-003-anchor-repair-v3-review-attempt-001-receipt-v1",
+    "rawSha256": "1195b6fc886dc81de010d1347f783a3f02269cd38c4fa1c0a241d4097acb6ca4"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b003-anchor-human-review-results.json",
+    "sha256": "3a45b91ab1be6395f4a029a90f0c12cf877cd8509d97a5044be335c4cdeaf84b",
+    "committed": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "presentationAid": "a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)",
+    "independentConfirmation": false,
+    "limitation": "The owner decided the reanchoring, knew the skeleton's v3 reference is CLEAR and was told the strong-model result; row blindness hid only which row was which and which rows were mandatory."
+  },
+  "summary": {
+    "total": 5,
+    "matchingV3Reference": 3,
+    "humanAdjudicated": 2
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-b003-anchor-hreview-9f1e06f8373bcff6",
+      "itemId": "p1b6-item-b003-224",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "role": "mandatory",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "본사 예산과 팀 예산에 각각 30만 원이 잡혀 있지만 같은 30만 원의 중복 표기인지 각각 별도 30만 원인지 알 수 없어 이번 출장비의 전체 상태를 정할 수 없다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-b003-anchor-hreview-9eac6f1e743661d7",
+      "itemId": "p1b6-item-b003-225",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "role": "mandatory",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "개발팀 배정표와 디자인팀 배정표가 각각 두 명을 제시하지만 같은 두 명의 중복 표기인지 각 팀 두 명씩인지 알 수 없어 프로젝트 전체 인력 상태를 정할 수 없다.",
+      "provenance": null,
+      "eligibility": "INELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-b003-anchor-hreview-e02df45b15755911",
+      "itemId": "p1b6-item-b003-226",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "role": "mandatory",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "'재고가 양쪽에 다 잡혀 있어'라는 표현과 본점 및 물류창고 각각 열 개라는 후속 설명을 함께 보면 각 장소에 열 개씩 있다는 해석이 자연스럽다.",
+      "provenance": "HUMAN_ADJUDICATED",
+      "eligibility": "ELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-b003-anchor-hreview-efed63feea0f8fa7",
+      "itemId": "p1b6-item-b003-227",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "role": "mandatory",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "online과 offline이라는 별도 채널 계획서에 각각 500만 원이 기재됐다는 표현은 각 채널에 500만 원씩 배정된 상태로 해석하는 것이 자연스럽다.",
+      "provenance": "HUMAN_ADJUDICATED",
+      "eligibility": "ELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-b003-anchor-hreview-5462404c8b36b53d",
+      "itemId": "p1b6-item-b003-228",
+      "semanticSkeletonId": "p1b6-sk-aebbf047d6864a35",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "인사 시스템과 팀 엑셀이 모두 연차가 닷새 남았다고 제시하고 사용자가 양쪽 모두 그렇다고 확인하므로 TARGET의 상태는 닷새 남음으로 주어져 있다.",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "authority": {
+    "promotedToHumanAdjudicated": true,
+    "catalogAmendedByThisResult": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

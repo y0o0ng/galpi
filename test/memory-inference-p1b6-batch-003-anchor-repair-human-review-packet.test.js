@@ -111,12 +111,55 @@ test('unknown, missing or duplicate review row IDs fail closed', () => {
   assert.throws(() => ingest(encode([...rows, rows[0]])), /exactly the packet rows/);
 });
 
-test('frozen packet, protocol and v3 review receipt bytes are unchanged; no HUMAN receipt exists', () => {
+test('frozen packet, protocol and v3 review receipt bytes are unchanged', () => {
   const fixtures = path.join(__dirname, '..', 'fixtures');
   assert.equal(sha256RawBytes(builder.packetBytes(builder.buildHumanReviewPacket())), PACKET_SHA256);
   assert.equal(sha256RawBytes(fs.readFileSync(path.join(fixtures, builder.PINNED.protocol.fixture))),
     'cf8c20bb66b082897316476efeb76fd03e3f3f2264b2ccb3348bba34da95a1c7');
   assert.equal(sha256RawBytes(fs.readFileSync(path.join(fixtures, builder.PINNED.reviewReceipt.fixture))),
     '1195b6fc886dc81de010d1347f783a3f02269cd38c4fa1c0a241d4097acb6ca4');
-  assert.equal(fs.existsSync(path.join(fixtures, builder.RECEIPT_FIXTURE)), false);
 });
+
+const os = require('node:os');
+const RAW = path.join(os.homedir(), 'p1b6-b003-anchor-human-review-results.json');
+const HUMAN_RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+
+test('the committed HUMAN receipt: 226/227 promoted, 228 provisional, 224/225 ineligible', () => {
+  const built = JSON.parse(fs.readFileSync(HUMAN_RECEIPT));
+  assert.equal(built.reviewPacket.sha256, PACKET_SHA256);
+  assert.equal(built.reviewDate, '2026-09-28');
+  assert.equal(built.rawResultArtifact.committed, false);
+  assert.match(built.rawResultArtifact.sha256, /^[0-9a-f]{64}$/u);
+  const rows = byItem(built);
+  const shape = itemId => {
+    const row = rows.get(itemId);
+    return [row.role, row.disposition, row.decision, row.referenceLabel, row.provenance, row.eligibility];
+  };
+  for (const itemId of MANDATORY.slice(0, 2)) {
+    assert.deepEqual(shape(itemId), ['mandatory', 'KEEP', 'ESCALATE', 'CLEAR', null, 'INELIGIBLE'], itemId);
+  }
+  for (const itemId of MANDATORY.slice(2)) {
+    assert.deepEqual(shape(itemId), ['mandatory', 'KEEP', 'CLEAR', 'CLEAR', 'HUMAN_ADJUDICATED', 'ELIGIBLE'], itemId);
+  }
+  assert.deepEqual(shape(CALIBRATION),
+    ['calibration', 'KEEP', 'CLEAR', 'CLEAR', 'CATALOG_STRONG_MODEL_CONFIRMED', 'PROVISIONAL']);
+  assert.deepEqual(built.summary, { total: 5, matchingV3Reference: 3, humanAdjudicated: 2 });
+  assert.equal(built.authority.promotedToHumanAdjudicated, true);
+  for (const key of ['catalogAmendedByThisResult', 'surfaceAcceptancePerformed', 'referenceLabelFreezePerformed',
+    'finalSelectionPerformed', 'trainingOrEvaluationOccurred']) {
+    assert.equal(built.authority[key], false, key);
+  }
+  assert.equal(built.reviewer.independentConfirmation, false);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures',
+    'local-memory-inference-p1b6-batch-002-acceptance.json'))).corpusGrowth.cumulativeAcceptedSurfacePool, 93);
+});
+
+test('the HUMAN receipt equals the raw result bytes, which hold exactly the packet rows',
+  { skip: !fs.existsSync(RAW) }, () => {
+    const raw = fs.readFileSync(RAW);
+    const committed = JSON.parse(fs.readFileSync(HUMAN_RECEIPT));
+    assert.equal(sha256RawBytes(raw), committed.rawResultArtifact.sha256);
+    assert.deepEqual(JSON.parse(raw).results.map(row => row.reviewRowId).toSorted(),
+      builder.buildHumanReviewPacket().rows.map(row => row.reviewRowId));
+    assert.deepEqual(builder.buildHumanResultReceipt(raw, committed.reviewDate), committed);
+  });
