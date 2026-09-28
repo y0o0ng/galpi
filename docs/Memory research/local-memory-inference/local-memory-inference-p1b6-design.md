@@ -36,7 +36,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   ANCHOR_QUALITY_PASS, unchanged; `aebbf047` 5/5 REANCHOR, materialized as an
   anchorSpanRef-only candidate. Semantics unchanged for both. **Next gate: a fresh source/bundle
   audit of exactly the five reanchored candidates** — **passed 5/5**; the fresh v3 semantic
-  review is next.
+  review packet is built and the external review is next.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1927,8 +1927,21 @@ home directory, given only the protocol and packet paths; auditor reported by th
 Claude Opus 5.5. Raw result `p1b6-b003-anchor-source-audit-results.json` (raw SHA-256
 `907a0fbf1b378fe4702e6ec1ab28274626f881f80435ab75d37b7d30074d6ce9`, not committed) is recorded
 in `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-source-audit-attempt-001.json`.
-Omitted turns are unrelated daily actions; every value-bearing turn is in the bundle. **Next:
-the fresh v3 semantic review of the five reanchored rows.**
+Omitted turns are unrelated daily actions; every value-bearing turn is in the bundle.
+
+**Fresh v3 semantic-review packet — built, NOT RUN.** The internal plan
+`fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-v3-review-plan.json` (raw SHA-256
+`4849f7dd0f9abdc75a1f79a76858fb6b78b5ea673f9339931bcaf42aa70f2e14`, never shown to the reviewer)
+uses the same routing as the earlier targeted plans (neutral v3 protocol reused; KEEP matching
+v3 → `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`; FIX / REJECT / opposing / missing →
+mandatory HUMAN; one lowest-hash calibration row per skeleton, domain
+`p1b6-b003-anchor-v3-review-calibration-v1`). Because all five rows are on `aebbf047`, **at most
+one clean agreement goes to HUMAN calibration** and the rest stay provisional without HUMAN
+review. `scripts/build-memory-inference-p1b6-batch-003-anchor-repair-v3-review-packet.js`
+renders the audited bundles under `p1b6-b003-anchor-v3smreview-` IDs; the packet is gitignored
+and deterministic at raw SHA-256
+`5c0c5362081c7e29c62a928ed334ff4c1f862e01d4d999bd5da09307abf155e7` (5 rows). The review runs
+externally in a fresh session.
 
 ## Closed Selection and Freeze Constraints
 

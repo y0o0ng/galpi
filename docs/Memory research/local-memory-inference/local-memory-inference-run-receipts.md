@@ -5209,3 +5209,13 @@ No audit, review or acceptance; the accepted pool stays **93**.
 
 Fresh external session, auditor reported as Claude Opus 5.5. 5 PASS / 0 FAIL / 0 UNCERTAIN. No
 semantic review, HUMAN review or acceptance; the accepted pool stays **93**.
+
+#### P1-B6 batch-003 anchor repair — v3 semantic-review packet BUILT / NOT RUN
+
+| artifact | raw SHA-256 |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-v3-review-plan.json` (internal) | `4849f7dd0f9abdc75a1f79a76858fb6b78b5ea673f9339931bcaf42aa70f2e14` |
+| blind review packet (not committed, 5 rows) | `5c0c5362081c7e29c62a928ed334ff4c1f862e01d4d999bd5da09307abf155e7` |
+
+At most one calibration row (single skeleton). No review, HUMAN review or acceptance; the
+accepted pool stays **93**.
