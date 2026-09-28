@@ -146,7 +146,7 @@ test('missing mapping, active-note telemetry, query hash and embedding fail clos
   assert.equal(artifact.counts.dispositions.PIT_UNCERTAIN, 5);
 });
 
-test('corpus mismatch, missing historical chunk and post-trace update remain uncertain', async t => {
+test('corpus mismatch, missing historical chunk and same-or-later update remain uncertain', async t => {
   const mismatch = fixture(t);
   addChunk(mismatch, { createdAt: START + 20 });
   addInvocation(mismatch.db, { at: START + 1100, outcome: 'pass' });
@@ -157,6 +157,13 @@ test('corpus mismatch, missing historical chunk and post-trace update remain unc
   addInvocation(missing.db, { at: START + 1100, outcome: 'pass',
     chunks: [{ chunkId: 'deleted', noteFilename: 'private.md' }] });
   assert.deepEqual((await run(missing, 1)).cases[0].uncertaintyReasons,
+    ['PIT_UNCERTAIN_CORPUS_REPLAY']);
+
+  const sameSecond = fixture(t);
+  addChunk(sameSecond, { createdAt: START + 20, updatedAt: START + 1100 });
+  addInvocation(sameSecond.db, { at: START + 1100, outcome: 'pass',
+    chunks: [{ chunkId: 'chunk-1', noteFilename: 'private.md' }] });
+  assert.deepEqual((await run(sameSecond, 1)).cases[0].uncertaintyReasons,
     ['PIT_UNCERTAIN_CORPUS_REPLAY']);
 
   const updated = fixture(t);

@@ -241,7 +241,7 @@ async function buildReplayCensus({ db, vaultPath, baselineCommit, expectedEligib
     const selected = [...actual, ...review.hardGated.chunks, ...replayGlobal];
     const missingOrChanged = selected.some(chunk => {
       const retained = chunksByIdentity.get(JSON.stringify([chunk.chunkId, chunk.noteFilename]));
-      return !retained || retained.updatedAt > item.createdAt;
+      return !retained || retained.updatedAt >= item.createdAt;
     });
     if (missingOrChanged || identityHash(actual) !== identityHash(replayGlobal)) {
       item.disposition = 'PIT_UNCERTAIN';
