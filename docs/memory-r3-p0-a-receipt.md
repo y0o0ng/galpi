@@ -1,6 +1,6 @@
 # XION Memory R3-P0-A Feasibility Measurement Receipt
 
-> 현재 상태: **P0-A COMPLETE — P0-B TRIGGER SATISFIED; P0-B OPEN / NOT STARTED**
+> 현재 상태: **P0-A COMPLETE — P0-B OPEN / NOT STARTED (저장소 주인 결정; exact trigger 미증명)**
 >
 > 초기 측정 기준 시각: 2026-08-29 KST. 역사 결과는 아래에 보존하고, 최신 관측은 마지막 follow-up에 기록한다.
 
@@ -246,7 +246,7 @@ Local/Pi PASS와 GitHub CI의 독립 재현 성공을 확인했다.
 
 ## Follow-up — Preregistered exact 28-day observation window
 
-> 상태: **P0-A COMPLETE — P0-B TRIGGER SATISFIED**
+> 상태: **P0-A COMPLETE — P0-B OPEN / NOT STARTED (저장소 주인 결정; exact trigger 미증명)**
 >
 > P0-B: **OPEN / NOT STARTED** — answer generation·`ΔA` 측정은 시작하지 않았다.
 >
@@ -264,7 +264,7 @@ Local/Pi PASS와 GitHub CI의 독립 재현 성공을 확인했다.
 - context chars: 평균 **784.43**, p50 **0**, p95 **3,877**, 최대 **8,000**; saturation **5 / 409**
 - 날짜별 저장된 사용자 대화 수와 A2 trace 수가 일치했다. Trace가 0인 **5일**에는 저장된 사용자 대화도 0이었다. 이 대조에서 logging coverage gap은 발견되지 않았다.
 
-### Replay-derived trigger assessment
+### Replay-derived estimate and P0-B opening decision
 
 기존 current-invocation replay는 sensitive **96**을 출력하지만, 이 숫자를 exact `S`로 사용하지 않는다. Production의 query-resolution 경로가 2026-09-17에 추가된 뒤 replay에는 반영되지 않았다.
 
@@ -273,9 +273,11 @@ Local/Pi PASS와 GitHub CI의 독립 재현 성공을 확인했다.
 - 원문 검색 경로로 비교 가능한 나머지 **399건**의 replay-sensitive count는 **93**이다. 재작성 3건을 미확정으로 두면 현재 방어 가능한 **replay-derived count range는 93..96**이다.
 - `GLOBAL-SOFT-PRIOR` replay 청크와 actual trace 청크가 다른 **10건**이 있다. 현재 note embedding 재사용과 당시 chunk의 삭제·변경 가능성도 남아 있으므로 이 범위는 exact point-in-time `S`나 exact census membership이 아니다.
 
-사전등록된 trigger 경계는 `S < 20 → RED_PROVEN / no P0-B`, `S >= 20 → P0-B census`다. §53.2 Coverage-gap rule은 불확실성의 양끝이 같은 gate region에 있으면 disposition을 허용한다. 현재 replay-derived 하한 **93 >= 20**이고 범위 전체가 trigger 경계 위에 있으므로 **P0-B TRIGGER = SATISFIED**로 닫는다. 이는 exact `S`, exact `ΔR`, exact P0-B census membership, `ΔA`, 최종 GREEN/AMBER/RED를 확정한 판정이 아니다.
+사전등록된 trigger 경계는 `S < 20 → RED_PROVEN / no P0-B`, `S >= 20 → P0-B census`다. 하지만 **93..96은 replay-derived 범위**이고, 위의 10건 불일치·현재 note embedding 재사용·과거 chunk 삭제/변경 가능성까지 포함한 exact `S`의 보수적 경계가 아니다. 따라서 §53.2 Coverage-gap rule이나 기존 §53.6 계약만으로 사전등록된 exact trigger가 증명됐다고 선언하지 않는다.
 
-P0-B는 **OPEN / NOT STARTED**다. Answer generation 전에 production query-resolution semantics와 replay semantics의 차이를 정리하고, exact `S`와 모든 exact ΔR case의 census membership을 동결해야 한다. Primary protocol은 sampling이 아닌 전수 census이므로 membership 동결 전 generation을 시작하지 않는다. Trigger 판단에 충분한 범위와 census 실행에 필요한 정확도는 별개다.
+저장소 주인은 replay-derived **93..96**이 threshold **20**과 충분히 떨어져 있다는 관측을 근거로, 추가 P0-A 정밀화를 P0-B 연구 개시의 blocker로 두지 않기로 결정했다. 이 결정은 exact `S`, exact `ΔR`, exact P0-B census membership, `ΔA`, 최종 GREEN/AMBER/RED 판정이 아니다. Threshold와 P0-B 전수 census 계약은 그대로다.
+
+P0-B는 **OPEN / NOT STARTED**다. Answer generation 전에 production query-resolution semantics와 replay semantics의 차이를 정리하고, exact `S`와 모든 exact ΔR case의 census membership을 동결해야 한다. Primary protocol은 sampling이 아닌 전수 census이므로 membership 동결 전 generation을 시작하지 않는다. 연구 트랙을 여는 결정과 census 실행에 필요한 정확도는 별개다.
 
 ### Read-only safety
 
