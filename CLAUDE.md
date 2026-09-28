@@ -91,7 +91,7 @@
 ### 장기기억 연구
 
 - **구조 검토 보완 제안 3건은 OPEN / 미채택이다.** 갱신 실패 중 읽기 상태·동일 원천 중복 지지/자기 재진술·유효 시점과 인지 시점의 구분 및 원본 직접 회수 주의점은 `docs/Memory research/xion-memory-research-docs/memory-architecture-design.md` §54에 있다. 기존 R2 계약·R3 사전등록은 그대로다.
-- **R3-P0-A complete; exact historical `S`는 미증명이다.** 28일 409건의 best-available operational replay census를 동결했다(`REPLAY_SENSITIVE` 79 / `PIT_UNCERTAIN` 22, `fixtures/memory-r3-p0b-replay-census-freeze.json`). P0-B answer generation은 미시작이며 다음은 answer stack 동결 후 frozen 79건 전수 실행이다. 정본은 `docs/memory-r3-p0-b-receipt.md`다.
+- **R3-P0-A complete; exact historical `S`는 미증명이다.** 28일 409건의 same-second chunk 경계까지 fail-close한 operational replay census를 동결했다(`REPLAY_SENSITIVE` 79 / `PIT_UNCERTAIN` 22, `fixtures/memory-r3-p0b-replay-census-freeze.json`). P0-B answer generation은 미시작이며 다음은 answer stack 동결 후 frozen 79건 전수 실행이다. 정본은 `docs/memory-r3-p0-b-receipt.md`다.
 - **Local Memory Inference Study P1-B2c는 `CLOSED / COMPLETE / FAIL_FRESH_SYNTHETIC_VALIDATION`, P1-B2d는 `CLOSED / COMPLETE — NO CLEAN TRIAGE PROMPT CANDIDATE SELECTED`, P1-B3는 `CLOSED / COMPLETE / NO_SPECIALIZED_TRAINING_SIGNAL`이다.** 결과 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
 - **P1-B4는 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** exact run artifacts와 결과 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`에 있다.
 - **P1-B5는 frozen successor gate에 따라 `CLOSED / COMPLETE / NO_RAW_EPISODE_SUCCESSOR_SIGNAL`이다.** 실제 결과와 검증 receipt 정본은 `docs/Memory research/local-memory-inference/local-memory-inference-run-receipts.md`다.
