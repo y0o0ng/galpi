@@ -283,3 +283,5 @@ P0-B는 **OPEN / NOT STARTED**다. Answer generation 전에 production query-res
 
 - 운영 Pi 조회는 SQLite `readonly=true`·`query_only=true`였고 `total_changes()` delta는 **0**이다. DB·Vault·schema·Pi production 변경과 P0-B answer generation은 없었다. 운영 조회 당시 repository mutation도 없었다.
 - 누락된 message embedding **3건**의 질문 원문을 OpenAI로 보내 메모리 안에서 생성하려던 호출은 자동 승인 심사에서 거절됐다. 사유는 read-only telemetry inspection 승인에 질문 원문의 외부 전송 승인이 포함되지 않았다는 것이다. 후속 확인에서 세 턴 모두 production이 검색하지 않은 턴으로 밝혀져 embedding 생성 자체가 불필요했다. **질문 원문 외부 전송 0, OpenAI embedding 호출 0**이며 이 거절은 measurement failure가 아니다.
+
+후속 전향적 P0-B execution amendment와 operational replay census freeze는 `docs/memory-r3-p0-b-receipt.md`에 기록했다. 위 P0-A 역사 결과와 당시 exact-census prerequisite는 소급 수정하지 않는다.

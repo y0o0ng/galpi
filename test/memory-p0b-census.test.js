@@ -147,19 +147,24 @@ test('missing mapping, active-note telemetry, query hash and embedding fail clos
 });
 
 test('corpus mismatch, missing historical chunk and post-trace update remain uncertain', async t => {
-  const f = fixture(t);
-  addChunk(f, { createdAt: START + 20, updatedAt: START + 2500 });
-  addInvocation(f.db, { at: START + 1100, outcome: 'pass' });
-  addInvocation(f.db, { at: START + 1200, outcome: 'pass',
+  const mismatch = fixture(t);
+  addChunk(mismatch, { createdAt: START + 20 });
+  addInvocation(mismatch.db, { at: START + 1100, outcome: 'pass' });
+  assert.deepEqual((await run(mismatch, 1)).cases[0].uncertaintyReasons,
+    ['PIT_UNCERTAIN_CORPUS_REPLAY']);
+
+  const missing = fixture(t);
+  addInvocation(missing.db, { at: START + 1100, outcome: 'pass',
     chunks: [{ chunkId: 'deleted', noteFilename: 'private.md' }] });
-  addInvocation(f.db, { at: START + 1300, outcome: 'pass',
+  assert.deepEqual((await run(missing, 1)).cases[0].uncertaintyReasons,
+    ['PIT_UNCERTAIN_CORPUS_REPLAY']);
+
+  const updated = fixture(t);
+  addChunk(updated, { createdAt: START + 20, updatedAt: START + 2500 });
+  addInvocation(updated.db, { at: START + 1100, outcome: 'pass',
     chunks: [{ chunkId: 'chunk-1', noteFilename: 'private.md' }] });
-  const artifact = await run(f, 3);
-  assert.deepEqual(artifact.cases.map(item => item.uncertaintyReasons), [
-    ['PIT_UNCERTAIN_CORPUS_REPLAY'],
-    ['PIT_UNCERTAIN_CORPUS_REPLAY'],
-    ['PIT_UNCERTAIN_CORPUS_REPLAY'],
-  ]);
+  assert.deepEqual((await run(updated, 1)).cases[0].uncertaintyReasons,
+    ['PIT_UNCERTAIN_CORPUS_REPLAY']);
 });
 
 test('future chunks are excluded, repeated text stays invocation-weighted, artifact is private and deterministic', async t => {
