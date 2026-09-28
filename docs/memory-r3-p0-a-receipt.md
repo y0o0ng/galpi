@@ -1,8 +1,8 @@
 # XION Memory R3-P0-A Feasibility Measurement Receipt
 
-> 상태: **P0-A COMPLETE — P0-B NOT STARTED**
+> 현재 상태: **P0-A COMPLETE — P0-B TRIGGER SATISFIED; P0-B OPEN / NOT STARTED**
 >
-> 측정 기준 시각: 2026-08-29 KST
+> 초기 측정 기준 시각: 2026-08-29 KST. 역사 결과는 아래에 보존하고, 최신 관측은 마지막 follow-up에 기록한다.
 
 ## Baseline
 
@@ -243,3 +243,41 @@ Traffic represents current development-stage organic usage and is not assumed to
 - GitHub CI: commit `306e484f0c968cbe65110038c4558f2f26fc1af6`의 [Docker workflow run 33259547321](https://github.com/y0o0ng/galpi/actions/runs/33259547321) **success** — native `npm test`, container test, linux/amd64·linux/arm64 runtime build
 
 Local/Pi PASS와 GitHub CI의 독립 재현 성공을 확인했다.
+
+## Follow-up — Preregistered exact 28-day observation window
+
+> 상태: **P0-A COMPLETE — P0-B TRIGGER SATISFIED**
+>
+> P0-B: **OPEN / NOT STARTED** — answer generation·`ΔA` 측정은 시작하지 않았다.
+>
+> 운영 관측 확인일: 2026-09-28 KST
+
+### Window and observed telemetry
+
+- 작업 전 fetch·fast-forward pull로 확인한 최신 GitHub `main`: `238260880f256f869c73be7a9f3b6a1fd13a379d`
+- 사전등록 창: `2026-08-31 00:00 KST <= trace < 2026-09-28 00:00 KST` — 28 calendar days, 창 이동·연장·조기 종료 없음
+- 범위: regular `/api/chat`의 `chat:<runtimeGeneration>:a2` trace. Typed chat와 같은 경로의 half-duplex voice를 포함하고, 별도 realtime/voice·council·manual preview/eval은 제외한다. 반복 질문은 invocation마다 센다.
+- eligible traces: **409**, `E = 409 / 28 = 14.61/day`; runtime generation `gpt-single-v1` **409**
+- 각 trace에 대응하는 저장된 사용자 질문: **409 / 409**
+- `active_notes_json` input 관측: **409 / 409** (`[]` 328, 비어 있지 않은 목록 81, `NULL` 0). 이전 historical `INDETERMINATE_PIT`의 active-note input instrumentation gap은 이 창에서 해소됐다.
+- activation **142 / 409**, abstention **267 / 409**; errors **0**, missing query hashes **0**, invalid `chunks_json` **0**
+- context chars: 평균 **784.43**, p50 **0**, p95 **3,877**, 최대 **8,000**; saturation **5 / 409**
+- 날짜별 저장된 사용자 대화 수와 A2 trace 수가 일치했다. Trace가 0인 **5일**에는 저장된 사용자 대화도 0이었다. 이 대조에서 logging coverage gap은 발견되지 않았다.
+
+### Replay-derived trigger assessment
+
+기존 current-invocation replay는 sensitive **96**을 출력하지만, 이 숫자를 exact `S`로 사용하지 않는다. Production의 query-resolution 경로가 2026-09-17에 추가된 뒤 replay에는 반영되지 않았다.
+
+- Production에서 검색하지 않은 `no_retrieval` **5건**과 `ambiguous` **2건**은 기존 replay에서 검색 대상으로 취급된다. 이 7건은 production semantics상 D0 차이를 만들지 않는다.
+- Production이 검색어를 재작성한 `resolved` **3건**은 기존 replay가 원문 질문으로 계산하므로 classification과 census membership을 확정할 수 없다.
+- 원문 검색 경로로 비교 가능한 나머지 **399건**의 replay-sensitive count는 **93**이다. 재작성 3건을 미확정으로 두면 현재 방어 가능한 **replay-derived count range는 93..96**이다.
+- `GLOBAL-SOFT-PRIOR` replay 청크와 actual trace 청크가 다른 **10건**이 있다. 현재 note embedding 재사용과 당시 chunk의 삭제·변경 가능성도 남아 있으므로 이 범위는 exact point-in-time `S`나 exact census membership이 아니다.
+
+사전등록된 trigger 경계는 `S < 20 → RED_PROVEN / no P0-B`, `S >= 20 → P0-B census`다. §53.2 Coverage-gap rule은 불확실성의 양끝이 같은 gate region에 있으면 disposition을 허용한다. 현재 replay-derived 하한 **93 >= 20**이고 범위 전체가 trigger 경계 위에 있으므로 **P0-B TRIGGER = SATISFIED**로 닫는다. 이는 exact `S`, exact `ΔR`, exact P0-B census membership, `ΔA`, 최종 GREEN/AMBER/RED를 확정한 판정이 아니다.
+
+P0-B는 **OPEN / NOT STARTED**다. Answer generation 전에 production query-resolution semantics와 replay semantics의 차이를 정리하고, exact `S`와 모든 exact ΔR case의 census membership을 동결해야 한다. Primary protocol은 sampling이 아닌 전수 census이므로 membership 동결 전 generation을 시작하지 않는다. Trigger 판단에 충분한 범위와 census 실행에 필요한 정확도는 별개다.
+
+### Read-only safety
+
+- 운영 Pi 조회는 SQLite `readonly=true`·`query_only=true`였고 `total_changes()` delta는 **0**이다. DB·Vault·schema·Pi production 변경과 P0-B answer generation은 없었다. 운영 조회 당시 repository mutation도 없었다.
+- 누락된 message embedding **3건**의 질문 원문을 OpenAI로 보내 메모리 안에서 생성하려던 호출은 자동 승인 심사에서 거절됐다. 사유는 read-only telemetry inspection 승인에 질문 원문의 외부 전송 승인이 포함되지 않았다는 것이다. 후속 확인에서 세 턴 모두 production이 검색하지 않은 턴으로 밝혀져 embedding 생성 자체가 불필요했다. **질문 원문 외부 전송 0, OpenAI embedding 호출 0**이며 이 거절은 measurement failure가 아니다.
