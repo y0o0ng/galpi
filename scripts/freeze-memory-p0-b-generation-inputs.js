@@ -28,6 +28,9 @@ const {
 const ROOT = path.resolve(__dirname, '..');
 const EXPECTED_SENSITIVE = 79;
 const CENSUS_SHA256 = '1be22e876918cf890bed6cf64755c554663c353d09e60a0ef5f49fe40598a01d';
+const SCHEDULE_CONTEXT_POLICY = 'OMITTED_IDENTICALLY_FOR_ALL_P0B_CASES';
+const STRICT_MANIFEST_SHA256 = 'af674739a1cdf5b74e2b4f52994955fec4c84c48bbcb5434f9ffe3194beaf338';
+const BLOCKER_DIAGNOSTIC_SHA256 = 'f79634918b3870b264f5c241cd328335408c3421c7e16f92cf6b2cda4a758f46';
 const INSTRUCTIONS = '사용자가 쓴 언어로 답변하라. 한국어, 영어, 중국어, 일본어, 스페인어, 프랑스어, 독일어, 포르투갈어, 러시아어, 아랍어만 사용하라.';
 const REASONS = Object.freeze({
   HISTORY: 'INDETERMINATE_HISTORY_REPLAY',
@@ -363,14 +366,46 @@ function historicalSchedule(db, target, runtime) {
     text: buildActiveScheduleContext({ capturedAt: time, tasks: visible.slice(0, 20) }) };
 }
 
-async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = ROOT, env = null }) {
+function generationSchedule(db, target, runtime, scheduleContext = 'strict') {
+  return scheduleContext === 'omit'
+    ? { reconstructable: true, kind: 'OMITTED_BY_AMENDMENT', text: '' }
+    : historicalSchedule(db, target, runtime);
+}
+
+function amendedAnswerStack(current, strictManifestBytes) {
+  if (byteHash(strictManifestBytes) !== STRICT_MANIFEST_SHA256) {
+    throw new Error('strict predecessor manifest SHA 불일치');
+  }
+  const frozen = JSON.parse(strictManifestBytes).answerStack;
+  for (const key of Object.keys(frozen)) {
+    if (key !== 'codeCommit' && key !== 'modelCatalogGeneration'
+      && JSON.stringify(current[key]) !== JSON.stringify(frozen[key])) {
+      throw new Error(`frozen answer-stack 설정 불일치: ${key}`);
+    }
+  }
+  return { ...current, modelCatalogGeneration: frozen.modelCatalogGeneration,
+    scheduleContextPolicy: SCHEDULE_CONTEXT_POLICY };
+}
+
+async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = ROOT, env = null,
+  scheduleContext = 'strict', strictManifestBytes = null, blockerDiagnosticBytes = null }) {
+  if (!['strict', 'omit'].includes(scheduleContext)) throw new Error('schedule-context는 strict 또는 omit이어야 합니다.');
   if (!db.readonly || db.pragma('query_only', { simple: true }) !== 1) {
     throw new Error('readonly=true/query_only=true 연결이 필요합니다.');
   }
   const beforeChanges = db.prepare('SELECT total_changes() AS count').get().count;
   const selected = selectCensus(census, censusBytes);
   const runtime = env || readRuntime(root);
-  const stack = answerStack(db, root, runtime, codeCommit);
+  const currentStack = answerStack(db, root, runtime, codeCommit);
+  if (scheduleContext === 'omit') {
+    strictManifestBytes ||= fs.readFileSync(path.join(root, 'fixtures/memory-r3-p0b-generation-input-freeze.json'));
+    blockerDiagnosticBytes ||= fs.readFileSync(path.join(root, 'fixtures/memory-r3-p0b-generation-blocker-diagnostic.json'));
+    if (byteHash(blockerDiagnosticBytes) !== BLOCKER_DIAGNOSTIC_SHA256) {
+      throw new Error('blocker diagnostic SHA 불일치');
+    }
+  }
+  const stack = scheduleContext === 'omit'
+    ? amendedAnswerStack(currentStack, strictManifestBytes) : currentStack;
   const stackSha256 = byteHash(canonical(stack));
   const memory = readMemory(vaultPath);
   const notes = loadNotes(db, vaultPath);
@@ -455,7 +490,7 @@ async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = R
         limit: stack.maxNoteContextChars }));
     const past = pastMessages(db, queryEmbedding, target);
     const previous = prefix.at(-1)?.createdAt ?? null;
-    const schedule = historicalSchedule(db, target, runtime);
+    const schedule = generationSchedule(db, target, runtime, scheduleContext);
     record.scheduleReplay = schedule.kind;
     const shared = {
       model: stack.exactModelId, store: false, max_output_tokens: stack.maxOutputTokens,
@@ -503,10 +538,15 @@ async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = R
   const privateBytes = canonical(privateBundle);
   const counts = Object.fromEntries(['GENERATION_READY', ...Object.values(REASONS)].map(name => [name, 0]));
   for (const item of cases) counts[item.disposition] += 1;
-  const scheduleCounts = Object.fromEntries(['EMPTY', 'ACTIVE', 'UNRECOVERABLE', 'DISABLED', 'NOT_REACHED']
+  const scheduleCounts = Object.fromEntries((scheduleContext === 'omit'
+    ? ['OMITTED_BY_AMENDMENT', 'NOT_REACHED']
+    : ['EMPTY', 'ACTIVE', 'UNRECOVERABLE', 'DISABLED', 'NOT_REACHED'])
     .map(name => [name, cases.filter(item => (item.scheduleReplay || 'NOT_REACHED') === name).length]));
   if (Object.values(counts).reduce((sum, count) => sum + count, 0) !== EXPECTED_SENSITIVE) {
     throw new Error('79건 disposition 합계 불일치');
+  }
+  if (scheduleContext === 'omit' && scheduleCounts.OMITTED_BY_AMENDMENT !== EXPECTED_SENSITIVE) {
+    throw new Error('79건 일정 채널 동일 생략 불변식 실패');
   }
   const manifest = {
     schemaVersion: 1, baselineCommit: codeCommit,
@@ -518,19 +558,29 @@ async function freeze({ db, vaultPath, census, censusBytes, codeCommit, root = R
       answerGenerations: 0, liveToolExecutions: 0 },
     cases,
   };
+  if (scheduleContext === 'omit') Object.assign(manifest, {
+    scheduleContextPolicy: SCHEDULE_CONTEXT_POLICY,
+    amendmentDate: '2026-09-29',
+    predecessorStrictManifestSha256: STRICT_MANIFEST_SHA256,
+    blockerDiagnosticSha256: BLOCKER_DIAGNOSTIC_SHA256,
+    currentModelCatalogGenerationObserved: currentStack.modelCatalogGeneration,
+  });
   return { manifest, privateBundle, manifestBytes: canonical(manifest), privateBytes };
 }
 
 async function main(argv = process.argv.slice(2)) {
   const args = {};
   for (let i = 0; i < argv.length; i += 2) {
-    if (!['--db', '--vault', '--census', '--code-commit',
+    if (!['--db', '--vault', '--census', '--code-commit', '--schedule-context',
       '--manifest-output', '--private-output'].includes(argv[i]) || !argv[i + 1]) {
-      throw new Error('사용법: --db PATH --vault PATH --census PATH --code-commit SHA --manifest-output PATH --private-output PATH');
+      throw new Error('사용법: --db PATH --vault PATH --census PATH --code-commit SHA [--schedule-context strict|omit] --manifest-output PATH --private-output PATH');
     }
     args[argv[i]] = argv[i + 1];
   }
   if (!/^[0-9a-f]{40}$/.test(args['--code-commit'] || '')) throw new Error('code commit SHA가 필요합니다.');
+  if (args['--schedule-context'] && !['strict', 'omit'].includes(args['--schedule-context'])) {
+    throw new Error('schedule-context는 strict 또는 omit이어야 합니다.');
+  }
   if (!args['--manifest-output'] || !args['--private-output']) throw new Error('두 output 경로가 필요합니다.');
   const privatePath = path.resolve(args['--private-output']);
   const relative = path.relative(ROOT, privatePath);
@@ -542,7 +592,8 @@ async function main(argv = process.argv.slice(2)) {
   db.pragma('query_only=ON');
   try {
     const result = await freeze({ db, vaultPath: args['--vault'],
-      census: JSON.parse(censusBytes), censusBytes, codeCommit: args['--code-commit'] });
+      census: JSON.parse(censusBytes), censusBytes, codeCommit: args['--code-commit'],
+      scheduleContext: args['--schedule-context'] || 'strict' });
     fs.writeFileSync(privatePath, result.privateBytes, { flag: 'wx', mode: 0o600 });
     fs.writeFileSync(args['--manifest-output'], result.manifestBytes, { flag: 'wx' });
     process.stdout.write(`${JSON.stringify({ counts: result.manifest.counts,
@@ -553,7 +604,7 @@ async function main(argv = process.argv.slice(2)) {
 
 module.exports = { selectCensus, answerStack, historicalPrefix, formatHistory,
   timeLine, contextMessage, pastMessages, d0Contexts, assertOnlyD0Diff,
-  historicalSchedule, freeze, main };
+  historicalSchedule, generationSchedule, amendedAnswerStack, freeze, main };
 if (require.main === module) {
   main().catch(error => { console.error(`P0-B input freeze failed: ${error.message}`); process.exitCode = 1; });
 }

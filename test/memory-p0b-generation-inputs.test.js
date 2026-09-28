@@ -10,7 +10,7 @@ const Database = require('better-sqlite3');
 const {
   selectCensus, historicalPrefix, formatHistory, timeLine,
   contextMessage, pastMessages, assertOnlyD0Diff,
-  historicalSchedule, main,
+  historicalSchedule, generationSchedule, amendedAnswerStack, main,
 } = require('../scripts/freeze-memory-p0-b-generation-inputs');
 const { attachmentBlocker, diagnose } = require('../scripts/diagnose-memory-p0-b-generation-blockers');
 
@@ -100,6 +100,7 @@ test('history and context formatting match current production functions', () => 
     context.schedule, context.d0, '',
   ));
   assert.doesNotMatch(contextMessage(context), /2026-09-28/);
+  assert.doesNotMatch(contextMessage(context), /<schedule>|활성 일정: 없음/);
 });
 
 test('arm payloads have the same non-D0 canonical input and no tool definitions', () => {
@@ -270,6 +271,29 @@ test('historical schedule sorts retained active tasks as production all-view doe
   addTask(2, [['created', 20, 'active', 'active']], { title: 'earlier date', dueDate: '2026-09-30' });
   const text = at(100).text;
   assert.ok(text.indexOf('earlier date') < text.indexOf('later date'));
+});
+
+test('strict schedule remains the default; omit never synthesizes an empty historical schedule', t => {
+  const { db, addTask } = scheduleFixture(t);
+  addTask(1, [['created', 10, 'active', 'active'], ['updated', 110, 'active', 'active']]);
+  const target = { createdAt: 100 };
+  const runtime = { ASSISTANT_TASKS_ENABLED: 'true' };
+  assert.equal(generationSchedule(db, target, runtime).reason, 'TASK_LATER_FIELD_UPDATE');
+  assert.deepEqual(generationSchedule(db, target, runtime, 'omit'), {
+    reconstructable: true, kind: 'OMITTED_BY_AMENDMENT', text: '',
+  });
+});
+
+test('amended stack keeps the frozen model/config and catalog provenance', () => {
+  const bytes = fs.readFileSync(path.join(root, 'fixtures/memory-r3-p0b-generation-input-freeze.json'));
+  const frozen = JSON.parse(bytes).answerStack;
+  const current = { ...frozen, codeCommit: 'a'.repeat(40), modelCatalogGeneration: 126 };
+  const amended = amendedAnswerStack(current, bytes);
+  assert.equal(amended.exactModelId, frozen.exactModelId);
+  assert.equal(amended.modelCatalogGeneration, 125);
+  assert.equal(amended.scheduleContextPolicy, 'OMITTED_IDENTICALLY_FOR_ALL_P0B_CASES');
+  assert.throws(() => amendedAnswerStack({ ...current, exactModelId: 'other' }, bytes), /설정 불일치/);
+  assert.throws(() => amendedAnswerStack(current, Buffer.from(`${bytes} `)), /SHA/);
 });
 
 test('attachment blocker preserves target, prefix and both-case precedence', () => {

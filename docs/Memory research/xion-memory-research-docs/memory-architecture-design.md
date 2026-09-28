@@ -12143,6 +12143,14 @@ external action
 other durable/side-effecting operation
 ```
 
+### P0-B schedule-context omission amendment — 2026-09-29
+
+위 historical non-memory context replay 요구와 18/79 ready·61/79 tool-indeterminate strict input freeze는 역사 기록으로 보존한다. 그 strict preflight에서 59/79가 같은 destructive `SERIES_ENDED_AFTER_TARGET` history loss로 막혔다. 보존된 task/series 기록의 narrower deterministic recovery와 Pi historical backup search 모두 실패했고 answer generation은 아직 시작되지 않았다. 저장소 주인 결정에 따라 **P0-B primary generation의 79 operational `REPLAY_SENSITIVE` case 전부에서 schedule context channel을 동일하게 비활성화**한다: `OMITTED_IDENTICALLY_FOR_ALL_P0B_CASES`. 이는 당시 활성 일정이 없었다는 추정이나 `활성 일정: 없음` 블록의 대체 주입이 아니다. 실험 입력에 `<schedule>` 블록 자체를 넣지 않는다.
+
+이 전향적 예외는 일정 채널에만 적용한다. Target 또는 bounded prefix의 attachment와 다른 material external context는 위 strict replay rule대로 faithful하게 복원할 수 없으면 `INDETERMINATE_TOOL_REPLAY`로 남긴다. 양 arm·모든 replicate에서 같은 생략 정책과 나머지 frozen shared input을 사용하며 D0 retrieval context만 달라진다. 기존 79-case operational census·denominator, D0 policy, 모델/생성 횟수, blind HUMAN adjudication, P0 threshold와 production runtime은 바꾸지 않는다. 이 결정은 exact historical answer reproduction, exact `S`/ΔR, ΔA 또는 GREEN/AMBER/RED 판정이 아니다.
+
+이후 ΔA의 estimand는 **frozen experiment-time XION answer stack에서 schedule-context channel을 모든 case에 동일하게 생략했을 때, organic request 분포에서 관측된 D0 retrieval 차이가 얼마나 자주 material answer difference로 이어지는가**다. 동일한 생략은 내부 D0 한 변수 비교를 유지하지만 full production context로의 external validity를 좁힌다. 일정이 답변에 무관하다는 주장이나 full production-context effect의 추정으로 해석하지 않는다.
+
 ### Independent generation and stability
 
 각 ΔR case에서 같은 frozen model/input/runtime conditions로 independent generation을 수행한다.
