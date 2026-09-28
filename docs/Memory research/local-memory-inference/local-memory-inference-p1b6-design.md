@@ -39,6 +39,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   ESCALATE / 1 CLEAR; owner HUMAN review **3 KEEP CLEAR / 2 KEEP ESCALATE**: `226`, `227`
   `HUMAN_ADJUDICATED` / `ELIGIBLE`, `228` `PROVISIONAL`, `224`, `225` `INELIGIBLE`. No skeleton
   amendment, no acceptance.
+- **reviewed pool consolidated** (see "Reviewed-pool ledger and shortage"): **349** in-pool rows
+  under the owner's pool rule A; marginal top-up lower bound **34** (TRAIN 32 / DEV 2). Top-up is
+  not yet authored.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1986,6 +1989,37 @@ into `fixtures/local-memory-inference-p1b6-batch-003-anchor-repair-human-review-
 `authority.promotedToHumanAdjudicated` is `true` (derived from the rows). Not an independent
 confirmation. No catalog or skeleton amendment, no surface acceptance; the accepted pool stays
 **93**.
+
+### Reviewed-pool ledger and shortage
+
+`scripts/build-memory-inference-p1b6-reviewed-pool-ledger.js`
+(`npm run build:memory-inference-p1b6-reviewed-pool-ledger`) derives every row's current status
+by applying the committed review layers in order (batch-003 source audit → v2 strong-model →
+v2 HUMAN → 26-row resolution → targeted v3 strong-model and HUMAN → TARGET-boundary resolution
+→ 162 / 214 repair HUMAN → anchor-repair HUMAN), adds the accepted batch-001/002 seed (rebuilt
+by the batch-003 plan's `reconstructAcceptedSeed`) and the four fresh candidates, and fails
+closed on any unresolved routed row or unclassified status. It writes
+`fixtures/local-memory-inference-p1b6-reviewed-pool-ledger.json` (401 rows) and
+`fixtures/local-memory-inference-p1b6-shortage-receipt.json`.
+
+**Owner pool rule A.** In pool: accepted HUMAN gold on active skeletons, `HUMAN_ADJUDICATED`,
+`CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, the two repaired rows whose HUMAN review
+matched v3, and the four rows whose label an owner resolution fixed (`040`, `103`, `231`,
+`259`). Out: ineligible, rejected, audit-failed and retired-skeleton surfaces, and the **6
+accepted surfaces on retired skeletons** (`b001-030`, `b002-021`/`026`/`031`/`036`/`041`),
+which are flagged but whose acceptance records are not rewritten. The **12 accepted surfaces
+whose immutable HUMAN gold differs from the current v3 label** stay in the pool with their
+HUMAN label and a flag; reconciling them with v3 is a separate migration decision.
+
+**Pool: 349** — 87 accepted, 245 provisional, 11 HUMAN_ADJUDICATED, 4 owner-resolution, 2
+repaired. Against the frozen 380 constraints (label balance abolished): split TRAIN 208 / 240,
+DEV 58 / 60, HELD 83 / 80; language KO 247 / 266, MIXED 68 / 76, EN 34 / 38; fragments
+67 / 88 / 111 / 65 / 18 against 70 / 100 / 120 / 70 / 20. Every HELD skeleton already has ≥ 5
+pooled surfaces and no active skeleton is uncovered. **Marginal top-up lower bound: 34**
+(split-aware: TRAIN 32 + DEV 2; language and fragment deficits each total 31 and must be met
+inside that top-up). This is a necessary lower bound, not a joint-feasibility proof; the
+top-up plan must add a review-loss buffer, and joint feasibility is checked at deterministic
+selection. No top-up is authored and nothing is accepted.
 
 ## Closed Selection and Freeze Constraints
 

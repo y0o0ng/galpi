@@ -5246,3 +5246,14 @@ Owner decisions, model as row presenter and JSON formatter only: 3 KEEP CLEAR / 
 acceptance; the accepted pool stays **93**.
 
 Tests run locally: `…-batch-003-anchor-repair-human-review-packet` with the raw bytes supplied (11/11).
+
+#### P1-B6 reviewed-pool ledger and shortage — CONSOLIDATED (pool 349, top-up lower bound 34)
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger.json` | 401 rows, current status per committed layer, owner pool rule A |
+| `fixtures/local-memory-inference-p1b6-shortage-receipt.json` | marginal deficits vs frozen 380 constraints |
+
+349 in pool; 6 accepted-on-retired excluded (flagged), 12 HUMAN-gold-vs-v3 differences kept and
+flagged. Lower bound 34 (TRAIN 32 / DEV 2). No top-up, acceptance, selection or freeze; the
+accepted pool record stays **93**.
