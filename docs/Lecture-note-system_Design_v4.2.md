@@ -33,7 +33,7 @@
 - **추가 합의 — 일반 펜 색상 picker와 예약 green band:** 일반 강의 `pen`/형광펜의 빠른 색상 팔레트에서는 초록 계열을 노출하지 않는다. 더 많은 색을 고를 때는 iOS/system color picker를 그대로 사용할 수 있지만, picker 자체의 스펙트럼을 변형하지 않고 **선택 결과를 검증해 복습 전용 green band를 거부**한다. v1의 예약 범위는 HSV/HSL 계열 hue 기준 **105°–165°**로 잡고, 거의 회색에 가까운 저채도 색까지 잘못 막지 않도록 **saturation 하한은 실기기 tuning 값으로 남긴다**. 금지 색을 선택하면 실제 pen 색은 마지막 유효 색을 유지하고 `이 색상은 복습 필기 전용이에요`처럼 이유를 알려준다. `review_pen`은 계속 예약된 초록 계열만 사용하며, provenance의 정본은 색이 아니라 `review_pen` 타입/구조다 (§8.2).
 - **추가 합의 — Document 단일 활동 타임라인:** 같은 PDF의 강의와 복습은 별도 타임라인으로 갈라지지 않고 **실제로 학습 흔적이 추가된 순서**의 하나의 Document activity timeline을 가진다. Lecture는 실제 Session 시작 시각, 복습은 첫 persistent learning artifact가 생긴 시각을 기준으로 배치하며, review anchor가 과거 강의 위치를 가리켜도 복습 activity 자체를 과거로 이동시키지 않는다. 재생이 없을 때는 현재 누적 필기를 모두 원래 농도로 보여주고, 재생 중에는 현재 activity보다 이전 내용은 원래 농도, 현재 Lecture의 stroke는 그 Session cursor로 reveal, 이후 activity는 연하게 표시한다. Review activity는 내부 source anchor가 아니라 **자기 activity boundary를 통과할 때** 그 activity의 새 콘텐츠가 원래 농도가 된다. 복습끼리도 같은 규칙이다. 내부 activity ID/물리 스키마의 정확한 형태는 구현 설계에서 정한다 (§8.2·12.2).
 - **추가 합의 — `강의 · 복습` 모드 토글:** 새 흔적이 강의 필기인지 복습 흔적인지는 펜 색이나 녹음 여부로 추론하지 않고 Viewer 헤더의 `강의 · 복습` 토글이 정한다. 토글은 필기뿐 아니라 포스트잇 메모·Q&A 같은 모든 새 persistent learning artifact의 소속을 정한다. 녹음 중에는 항상 `강의`이며 토글이 잠긴다. Viewer를 열 때 같은 Course의 오늘 Session이 열려 있고 일시정지 상태면 `강의`, 그 밖에는 `복습`으로 연다. 사용자는 언제든 바꿀 수 있다. 토글을 켜는 것만으로 복습 activity를 만들지 않으며(lazy-create 유지), `복습`에서는 `review_pen` 초록 팔레트만, `강의`에서는 일반 pen만 보여준다. `복습`에서 `강의`로 바꾸면 열려 있던 복습 activity를 닫는다 (§8.2·12.2).
-- **추가 합의 — Document 연결 오디오:** 오디오·전사의 정본 소유권은 Session에 유지한다. 다만 Document viewer에서는 여러 Session 중 **그 Document가 실제로 active였고 동시에 녹음이 존재한 구간**만 원본 Session에서 참조해 하나의 virtual audio/transcript stream으로 렌더링한다. 다른 Document가 active였던 녹음 구간은 현재 Document stream에서 제외하고 경계를 표시한다. 강의 폴더에서 해당 PDF를 열어도 별도 viewer를 만들지 않으며 같은 누적 Document stream에서 그 Session의 첫 관련 span으로 playhead만 맞춘다. Session 전체 원음·전사는 별도 전체 재생 기능으로 제공한다 (§6.3·10.1.1·12.2).
+- **추가 합의 — Document 연결 오디오:** 오디오·전사의 정본 소유권은 Session에 유지한다. 다만 Document viewer에서는 여러 Session 중 **그 Document가 실제로 active였고 동시에 녹음이 존재한 구간**만 원본 Session에서 참조해 하나의 virtual audio/transcript stream으로 렌더링한다. 다른 Document가 active였던 녹음 구간은 현재 Document stream에서 제외하고 경계를 표시한다. 강의 폴더에서 해당 PDF를 열어도 별도 viewer를 만들지 않으며 같은 누적 Document stream에서 그 Session의 첫 관련 span으로 playhead만 맞춘다. `다른 자료` 경계를 누르면 그 Document의 viewer로 이동해 이어 듣고, Session 전체 원음·전사를 연속 재생하는 별도 화면은 후속 범위다 (§6.3·10.1.1·12.2).
 - **추가 합의 — 복습 폴더 책임:** 사용자가 복습할 때마다 폴더나 PDF 사본을 만들지 않는다. `과목 / 자료 / 강의`는 탐색 projection이고, 복습은 같은 Document에 쌓이는 활동이다. 자료에서 PDF를 직접 열거나 강의에서 참조 PDF로 들어가도 같은 canonical Document를 사용하며, 복습 provenance/순서는 갈피가 내부적으로 보존한다 (§4.3·10.1.1).
 - **합의:** 요약은 노트 선택 화면의 짧은 2~3문장 소개문이다. 자동 주제 목차·구간별 요약은 초기 범위에서 뺀다. 전사는 필요할 때만 구간별로 수정하고 표시·검색에 반영하며, 원본 전사·녹음·시간 연결은 유지한다 (§11.4·12.3·12.4).
 - **추가 합의 — Q&A 문맥 경계:** 강의 중 PDF/필기에서 시작한 질문은 **document-grounded Q&A**, 복습 중 전사 선택에서 시작한 질문은 **lecture-grounded Q&A**로 구분한다. lecture-grounded 질문은 선택 전사와 제한된 인접 전사를 기본 문맥으로 쓰고, 자료 문맥이 더 필요할 때만 Session timeline의 당시 Document/page를 후보로 PDF page context tool을 호출한다. 이 도구는 기존 `paper-fulltext`의 페이지 보존 PDF 파싱 코드를 재사용하되 논문 전문검색 workflow와는 결합하지 않는다. Q&A 모델에는 원본 오디오를 직접 보내지 않는다 (§6.6).
@@ -275,7 +275,7 @@ Galpi Review
   Course Document는 여러 Session의 Document-active 녹음/전사를 virtual stream으로 projection
   강의 목록: 날짜/세션별 전체 녹음·전사·Q&A 탐색
   강의에서 PDF 열기: 같은 Document viewer의 해당 Session 관련 span으로 deep-link
-  Session 전체 재생: PDF 필터 없이 그 Session 원음·전사를 별도 재생
+  다른 자료 경계: 그 구간의 Document viewer로 이동해 이어 듣기 (Session 전체 재생은 후속 범위)
   획 → canonical source Session/audio 위치로 역점프
 ```
 
@@ -407,7 +407,7 @@ Galpi Note
 - `page_change`는 Session timeline의 이벤트로, 사용자가 본 Document/page와 시각의 연결이다. 교수가 그 페이지를 설명했다는 증거는 아니다. 자동 주제 경계·전사 교정의 확정 근거로 쓰지 않는다.
 - Document를 어디서 열었는지와 무관하게 같은 canonical PDF와 누적 annotation을 렌더링한다. `자료`에서 직접 연 경우와 `강의(Session)`의 참조에서 연 경우에 별도 PDF 사본/viewer를 만들지 않는다. 날짜별 폴더마다 PDF를 복제하지 않는다.
 - Document viewer의 연결 오디오는 Session 전체를 그대로 붙이지 않는다. Session timeline에서 그 Document가 active였던 interval과 실제 `recording_span`의 교집합만 source span으로 사용한다. 다른 Document가 active였던 녹음 구간은 현재 Document stream에서 제외하고 `다른 자료` 경계로 구분한다. 이는 교수가 그 PDF만 설명했다는 의미가 아니라 **사용자가 그 Document를 보고 있던 동안의 녹음**이라는 약한 provenance다.
-- 여러 Session의 source span은 실제 파일을 새로 합쳐 저장하지 않고 하나의 **virtual Document audio/transcript stream**으로 projection한다. 강의에서 해당 Document를 열면 같은 stream의 그 Session 첫 관련 span으로 초기 playhead만 맞춘다. 그날 전체 녹음을 연속으로 듣고 싶을 때는 별도의 Session 전체 재생을 사용한다.
+- 여러 Session의 source span은 실제 파일을 새로 합쳐 저장하지 않고 하나의 **virtual Document audio/transcript stream**으로 projection한다. 강의에서 해당 Document를 열면 같은 stream의 그 Session 첫 관련 span으로 초기 playhead만 맞춘다. 다른 Document가 active였던 구간은 `다른 자료` 경계를 눌러 그 Document viewer에서 이어 듣는다. PDF 없이 그날 전체 녹음을 연속으로 듣는 별도 화면은 후속 범위다.
 - 복습에서 당시 페이지로 돌아가는 연결과 명시적 선택 질문의 첨부에 활용한다. 답변에서 페이지를 근거로 제시하려면 실제 해당 자료를 확인해야 한다.
 - 자료가 없는 강의는 재사용 가능한 백지 Document 또는 임시 백지 페이지로 폴백할 수 있다. 구체 생성 UX는 미정이다.
 
@@ -1088,7 +1088,7 @@ v3.2의 `prompt_sha256`, `parser_version`, `output_schema_version`은 감사 대
 
 소개문으로 강의를 알아보고, 세부 질문의 근거는 전사 구간에서 확인한다. 답변에는 실제 확인한 세션·오디오 시각과 필요한 경우 자료 페이지를 연결한다. 소개문을 발화 원문처럼 취급하지 않으며 원본 전사와 현재 교정문을 구분한다. 구체 회수·결합 알고리즘은 §11.5의 미결정 사항이다.
 
-### 12.2 Document 연결 복습 · Session 전체 재생
+### 12.2 Document 연결 복습
 
 Document를 자료에서 직접 열든 강의의 참조에서 열든 **같은 canonical Document viewer**를 사용한다. viewer는 누적 최종 필기와, 그 Document가 active였던 녹음 구간들을 여러 Session에서 모은 virtual audio/transcript stream을 함께 보여준다. 강의에서 들어온 경우 viewer 종류를 바꾸지 않고 그 Session의 첫 관련 source span으로 playhead를 맞춘다.
 
@@ -1099,8 +1099,9 @@ Document를 자료에서 직접 열든 강의의 참조에서 열든 **같은 ca
 - ★ · ? 마커 타임라인
 - `이 구간 설명해줘` 온디맨드 버튼
 - 전사 구간의 별도 `수정` 조작. 일반 탭은 해당 source 구간 재생으로 유지한다 (§12.4).
-- **Session 전체 재생**은 별도 기능이다. 현재 Document가 active였는지와 무관하게 그 Session의 전체 원음·전체 전사를 연속 재생하며, PDF-linked virtual stream과 같은 것으로 취급하지 않는다. 원음·전사와 함께 Session timeline의 `page_change`로 당시 보고 있던 Document/page를 시간순으로 표시하되, 이 표시는 §6.3의 약한 의미(사용자가 그 page를 보고 있었다)만 가진다.
-- Session 전체 재생에서 Document/page 연결을 누르면 Session 전용 PDF renderer나 사본을 띄우지 않고 **같은 canonical Document viewer**로 이동한다. 초기 page는 그 `page_change`가 가리키는 page다. 이후 viewer 동작은 자료에서 직접 연 경우와 같다.
+- **`다른 자료` 경계 이동 — 합의.** 전사 독바의 `다른 자료` 경계를 누르면 그 구간에 active였던 Document의 같은 canonical viewer를 열고, 그 Session의 해당 source 위치로 playhead를 맞춘다. 초기 page는 그 시각의 `page_change`가 가리키는 page다. 녹음은 항상 어떤 Document viewer 안에서 시작하므로 한 Session의 모든 녹음 구간은 어느 Document stream에든 속하며, 이 이동으로 Document 사이를 이어 들을 수 있다.
+- **강의 진입 — 합의.** Course Home에서 강의(Session)를 누르면 그 Session이 처음 참조한 Document의 viewer를 열고 그 Session의 첫 관련 span으로 playhead를 맞춘다 (아래 `강의 B → 이 PDF`와 같은 deep-link).
+- **Session 전체 재생 — 후속 범위.** Document-active 여부와 무관하게 한 Session의 전체 원음·전사를 연속 재생하는 별도 화면은 v1에서 만들지 않는다. PDF 없이 강의를 처음부터 끝까지 듣는 사용이 실제로 필요해질 때 다시 연다. 그때도 Document/page 연결은 Session 전용 renderer 없이 같은 canonical viewer로 이동하고, `page_change` 표시는 §6.3의 약한 의미만 가진다.
 
 **과거 화면을 복원하지 않는다.** 현재 노트에 남은 최종 필기를 기준으로, 재생 위치에 따라 농도만 바꾼다. 지운 획은 재생 위치를 과거로 옮겨도 되살아나지 않는다. 획이 자라나는 애니메이션이나 모든 지우기·실행 취소 이력의 재생은 범위 밖이다.
 
@@ -1121,7 +1122,7 @@ Document를 자료에서 직접 열든 강의의 참조에서 열든 **같은 ca
 - 한 Document를 여러 강의에서 사용했다면 각 Session의 관련 source span을 누적해 하나의 virtual stream처럼 탐색한다. 복습 중 원본 오디오를 다시 들었다고 같은 source audio를 stream에 중복 삽입하지 않는다.
 - `강의 B → 이 PDF`로 들어오면 같은 누적 stream에서 B의 첫 관련 span으로 초기 playhead를 맞춘다. 이후 viewer 자체는 자료에서 직접 연 경우와 동일하다.
 - virtual stream의 `42:18` 같은 누적 offset은 파생 UI 값이다. review anchor·역점프·Q&A provenance는 원본 Session과 실제 source audio 위치를 보존한다.
-- Session 전체 원음/전사가 필요하면 별도의 **Session 전체 재생**을 사용한다. 이 기능은 Document-active 여부로 음성을 필터링하지 않는다.
+- 다른 Document 구간을 이어 듣고 싶으면 `다른 자료` 경계를 눌러 그 Document viewer로 이동한다. Document-active 여부로 필터링하지 않는 Session 전체 재생은 후속 범위다.
 
 **페이지 이동 — 자동 추적하지 않는다.** `page_change`는 그 시점에 사용자가 보고 있던 Document/page 기록일 뿐 교수의 설명 페이지를 뜻하지 않는다. 재생·탐색이 진행돼도 현재 PDF 페이지를 강제로 바꾸지 않는다. 대신 지도 앱의 현위치 버튼처럼 `재생 위치로` 조작을 제공해, 사용자가 원할 때만 현재 재생 시점의 마지막 `page_change`가 가리키는 page로 한 번 점프한다. 과거 zoom/scroll viewport는 복원하지 않고 현재 표시 정책으로 해당 page만 보이게 한다. 이미 그 page를 보고 있다면 버튼은 비활성 또는 약화할 수 있다.
 
@@ -1535,7 +1536,7 @@ V4.5-M 단일 GPT
 1. **다음 논의: evidence payload/UI의 남은 세부.** lecture-grounded primary는 2분/4,000자, 인접 전사는 앞뒤 각 30초·합계 2,000자, PDF page context는 overlap이 긴 순서로 Turn당 최대 2페이지, text-first + 필요 시 같은 candidate page image 요청으로 닫았다. same-Document Chain-local reference 추가, Sticky 내부 preview/jump-back, 누적 유지, baseline 제외 3개 hard limit도 닫았다. 남은 것은 이미지 해상도·용량, reference chip/preview의 정확한 시각 표현, 답변 모델, 메뉴 방향·누름 시간·이동 허용치·가장자리 동작이다. 단순 계산 전용 경로와 임의 코드 실행은 승인하지 않았다.
 2. **포스트잇 손글씨 인식·실기기 tuning.** `?`/`ㄴ`은 Q&A로 명시적 전송하는 handwritten block의 첫 의미 있는 glyph일 때만 routing marker다. 남은 것은 block grouping/line boundary의 구체 임계값, `?`/`ㄴ` recognizer 선택·confidence 기준·모호성 확인 UX, 필요 시 개인 필체 학습 범위, 기본 카드 한 변을 3.5~5 cm 중 어디에 둘지, cluster 거리 임계값, 화면 가장자리 최초 배치/edge-clamping 같은 실기기 수치다. 이 값들은 데이터 계약으로 만들지 않는다.
 3. **Q&A 물리 저장/API.** SQLite를 실시간 정본으로 두고 Sticky 공간 상태는 Document annotation, Chain/Turn/Attempt와 final answer는 Q&A DB가 소유한다. Evidence는 versioned immutable JSON manifest + blob ref, 동일 request replay/409 fail-close, `prepared/in_flight/succeeded/failed/result_unknown/superseded`, 명시적 retry supersede, same-chain serial/different-chain parallel, no background queue 원칙까지 닫았다. 남은 것은 exact table/column·endpoint 이름, migration, tombstone 보존 기간, plain text/수식/이미지 payload 세부다. 삭제한 Sticky의 late-result 부활 금지는 유지한다.
-4. **재생 표시 상세.** 20초 버킷 폐기, stroke 단일 대표 시각 기반 농도, 비녹음 gap 건너뛰기, 포스트잇 재생 농도 비종속, `재생 위치로`, 초록 `review_pen`, 강의/복습 단일 Document timeline, virtual audio/transcript stream, Session deep-link/전체 재생을 닫았다. Review activity는 첫 persistent learning artifact에서 lazy-create하고 Document viewer를 떠날 때 닫으며, review anchor는 provenance/역점프용이고 visibility clock은 activity timeline이다. silent review activity는 비재생 boundary로 통과한다. 일반 pen의 기본 팔레트에서 초록을 제외하고 system color picker 결과를 hue 105°–165° 예약 band로 검증하는 계약도 닫았다. **saturation 하한과 review 전용 초록 팔레트의 정확한 shade/UI는 실기기 tuning으로 남는다.** 그 밖에 미래 필기의 실제 opacity 값, `녹음 없음`/`다른 자료`/`복습` boundary의 구체 시각 표현, activity의 exact ID/schema, 전사 독바 page 번호, 검색 사이드바와 공간 공유 같은 실기기/저장 UX tuning이 남는다. 개별 스트로크 독바 목록은 초기 범위에서 제외했다.
+4. **재생 표시 상세.** 20초 버킷 폐기, stroke 단일 대표 시각 기반 농도, 비녹음 gap 건너뛰기, 포스트잇 재생 농도 비종속, `재생 위치로`, 초록 `review_pen`, 강의/복습 단일 Document timeline, virtual audio/transcript stream, Session deep-link·`다른 자료` 경계 이동을 닫았다(Session 전체 재생은 후속 범위). Review activity는 첫 persistent learning artifact에서 lazy-create하고 Document viewer를 떠날 때 닫으며, review anchor는 provenance/역점프용이고 visibility clock은 activity timeline이다. silent review activity는 비재생 boundary로 통과한다. 일반 pen의 기본 팔레트에서 초록을 제외하고 system color picker 결과를 hue 105°–165° 예약 band로 검증하는 계약도 닫았다. **saturation 하한과 review 전용 초록 팔레트의 정확한 shade/UI는 실기기 tuning으로 남는다.** 그 밖에 미래 필기의 실제 opacity 값, `녹음 없음`/`다른 자료`/`복습` boundary의 구체 시각 표현, activity의 exact ID/schema, 전사 독바 page 번호, 검색 사이드바와 공간 공유 같은 실기기/저장 UX tuning이 남는다. 개별 스트로크 독바 목록은 초기 범위에서 제외했다.
 5. **최소 구현 범위.** 필기·저장, 재생 농도, Q&A 보존을 우선하자는 제안은 있으나 기존 Phase를 대체하는 일정은 확정하지 않았다. 모든 설계가 잡힌 뒤 관련 문서를 함께 갱신한다.
 6. **교정·소개문·진행 표시.** 전사는 별도 수정 동작으로 필요할 때만 고치고 표시/검색에 반영한다 (§12.4). 편집 UI·소개문 재생성·오래됨 표시·완료 알림·긴 질문 대화 입력 한도는 별도로 정한다.
 
@@ -1570,7 +1571,7 @@ UX 단순화만으로 아래 문제가 해결된 것은 아니다. 기존 본문
       │          ↓
       │    [같은 Document viewer의 누적 필기 + virtual audio/transcript stream]
       │          │  강의에서 PDF 진입 시 해당 Session 첫 관련 span으로 deep-link
-      │          │  그날 전체 음성은 별도 Session 전체 재생
+      │          │  다른 자료 구간은 경계를 눌러 그 viewer로 이동
       │          ↓
       │    [강의 획 source_session_id+t_ms / review anchor → canonical 원음 위치]
       │
