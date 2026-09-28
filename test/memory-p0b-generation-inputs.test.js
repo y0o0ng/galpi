@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -294,6 +295,39 @@ test('amended stack keeps the frozen model/config and catalog provenance', () =>
   assert.equal(amended.scheduleContextPolicy, 'OMITTED_IDENTICALLY_FOR_ALL_P0B_CASES');
   assert.throws(() => amendedAnswerStack({ ...current, exactModelId: 'other' }, bytes), /설정 불일치/);
   assert.throws(() => amendedAnswerStack(current, Buffer.from(`${bytes} `)), /SHA/);
+});
+
+test('amended freeze preserves the 79-case census and only attachment-dependent cases remain blocked', () => {
+  const fixture = name => fs.readFileSync(path.join(root, 'fixtures', name));
+  const manifestBytes = fixture('memory-r3-p0b-generation-input-freeze-schedule-omitted.json');
+  const manifest = JSON.parse(manifestBytes);
+  const strictBytes = fixture('memory-r3-p0b-generation-input-freeze.json');
+  const diagnosticBytes = fixture('memory-r3-p0b-generation-blocker-diagnostic.json');
+  const census = JSON.parse(fixture('memory-r3-p0b-replay-census-freeze.json'));
+  const diagnostic = JSON.parse(diagnosticBytes);
+  const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+  assert.equal(manifest.predecessorStrictManifestSha256, hash(strictBytes));
+  assert.equal(manifest.blockerDiagnosticSha256, hash(diagnosticBytes));
+  assert.equal(manifest.scheduleContextPolicy, 'OMITTED_IDENTICALLY_FOR_ALL_P0B_CASES');
+  assert.equal(manifest.answerStack.modelCatalogGeneration, 125);
+  assert.equal(manifest.scheduleCounts.OMITTED_BY_AMENDMENT, 79);
+  assert.equal(manifest.cases.length, 79);
+  assert.ok(manifest.cases.every(item => item.scheduleReplay === 'OMITTED_BY_AMENDMENT'));
+  assert.equal(Object.values(manifest.counts).reduce((sum, count) => sum + count, 0), 79);
+  const sensitive = census.cases.filter(item => item.disposition === 'REPLAY_SENSITIVE');
+  const byTrace = new Map(sensitive.map(item => [item.traceId, item]));
+  for (const item of manifest.cases) {
+    const frozen = byTrace.get(item.traceId);
+    assert.equal(item.messageId, frozen?.messageId);
+    assert.equal(item.hardContextSha256, frozen.hardContextSha256);
+    assert.equal(item.globalContextSha256, frozen.globalContextSha256);
+  }
+  const blocked = manifest.cases.filter(item => item.disposition === 'INDETERMINATE_TOOL_REPLAY')
+    .map(item => item.traceId).sort((a, b) => a - b);
+  const attached = diagnostic.cases.filter(item => item.blocker?.includes('ATTACHMENT_UNREPLAYABLE'))
+    .map(item => item.traceId).sort((a, b) => a - b);
+  assert.deepEqual(blocked, attached);
+  assert.doesNotMatch(manifestBytes.toString(), /"(?:question|answer|title|filename|content|schedule|hardRequest|globalRequest)"\s*:/i);
 });
 
 test('attachment blocker preserves target, prefix and both-case precedence', () => {
