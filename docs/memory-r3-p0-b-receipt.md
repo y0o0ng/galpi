@@ -41,4 +41,32 @@ Study-wide residual PIT caveats remain even for cases with a replay disposition:
 - External API calls **0**; question-text external transmission **0**; P0-B answer generations **0**.
 - Local focused P0 tests **23/23**, including same-second and strictly-later chunk updates; full `npm test` **1,648 passed / 0 failed / 3 skipped** (1,651 total). The first sandboxed full run hit `listen EPERM` on localhost; the unrestricted rerun passed. `git diff --check` and manifest privacy/determinism checks passed.
 
-Next: freeze one experiment-time answer stack, reconstruct each frozen `REPLAY_SENSITIVE` case's historical prefix and allowable non-memory context, then execute the separately preregistered two-generations-per-arm, blind HUMAN P0-B protocol. This receipt does not start that phase.
+At the census freeze, the next step was to freeze one experiment-time answer stack, reconstruct each frozen `REPLAY_SENSITIVE` case's historical prefix and allowable non-memory context, then execute the separately preregistered two-generations-per-arm, blind HUMAN P0-B protocol. This census-stage receipt did not start that phase.
+
+## Generation-input preflight follow-up — 2026-09-28
+
+> **INPUT PREFLIGHT COMPLETE — 0 GENERATION_READY / 79 INDETERMINATE_TOOL_REPLAY**
+>
+> **ANSWER GENERATION NOT STARTED — STRICT HISTORICAL EXACT S UNPROVEN**
+
+- Latest GitHub `main` baseline before this work: `3475843c431cd118c19112fb669ca70ddc479cb7`. Read-only execution code commit: `e5bbf773ddcc2c20ccb9e3047a15f975215f00d3`. The original 409-case census artifact and §53 P0 contract were not changed.
+- Input universe: all **79 / 79** frozen `REPLAY_SENSITIVE` cases from `fixtures/memory-r3-p0b-replay-census-freeze.json` (SHA256 `1be22e876918cf890bed6cf64755c554663c353d09e60a0ef5f49fe40598a01d`). Each canonical user message ID, session, query hash, trace identity and preceding same-session DB order was checked. The experiment-time history window is 20 messages including the target; target request time, not execution time, drives the prompt's KST time line. Cross-session past-message candidates and their assistant replies are cut off by target ID and time.
+- One answer-stack snapshot: `chat.model_selection=gpt-6-luna`, resolved exact model `gpt-6-luna`, retained OpenAI catalog generation **125**, runtime `gpt-single-v1`, reasoning effort `medium`, Responses API, `max_output_tokens=8192`, `store=false`, reasoning context `current_turn`. Primary tool policy is `LIVE_TOOLS_DISABLED` with no tool definitions or tool rounds; no live web, attachment, schedule, mail, news, paper or GitHub tools were run. `CONTEXT_N=10`, history messages **20**, memory limit **20 items / 1,200 chars**, active notes **8**, note context **5,000 chars**. D0 limits remain the existing **3 notes / 6 chunks / 8,000 final context chars**; source and configuration hashes are in the manifest. Answer-stack snapshot SHA256: `d2e59c58eb76fe987a43a4653afbbe905f1080ce0c7ff60b9e92493796f49981`.
+- Both D0 context strings were reconstructed with the frozen census policy and matched their HARD-GATED and GLOBAL-SOFT-PRIOR census hashes for **79 / 79** cases. Historical active-note filename selection came from each trace; current note content and `_system/memory.md` were read only for shared experiment-time inputs. No new ranking or changed context was accepted in place of a census hash.
+
+| Input-freeze disposition | Cases |
+| --- | ---: |
+| `GENERATION_READY` | 0 |
+| `INDETERMINATE_HISTORY_REPLAY` | 0 |
+| `INDETERMINATE_TOOL_REPLAY` | 79 |
+| `INDETERMINATE_RETRIEVAL_RECONSTRUCTION` | 0 |
+| **Total** | **79** |
+
+The Pi runtime has `ASSISTANT_TASKS_ENABLED=true`, so production `buildContextMessage(...)` receives `getActiveScheduleContext()` on every chat turn. All 79 historical targets have earlier task state, while `assistant_task_events` does not retain the earlier title, detail, due and reminder values needed to reconstruct that model-visible schedule block. Under the repository owner's explicit strict replay decision, today's task state is not substituted for the historical block. Every case therefore fails closed as `INDETERMINATE_TOOL_REPLAY`; the 79 D0 hash matches do **not** make any case generation-ready. Attachment and other tool dependencies were not claimed to be fully resolved after this sufficient blocker. The existing study-wide census PIT caveats and unproven exact historical `S` remain unchanged.
+
+- Privacy-safe manifest: `fixtures/memory-r3-p0b-generation-input-freeze.json`, SHA256 `bff69b5fe672e2319d7484323c33cc90a689626e956d54bb71c9e8f6054b314e`. It contains IDs, hashes, dispositions and stack settings, with no raw question, answer, note title/filename/body, attachment name/content, tool output or schedule text.
+- Private bundle: `/private/tmp/galpi-p0b-generation-inputs-final.json` (outside Git, mode `0600`), SHA256 `8d17df7e789e9e8c7646fff2299c92699788a1f17e88ae580adeba5065f91c68`. It has **0** generation-ready case payloads; there is no hidden 79-case generation set.
+- The committed script was streamed over SSH; no script, artifact, schema, production config or service was installed or changed on Pi. Two final Pi executions were byte-identical. SQLite `readonly=true`, `query_only=true`, `total_changes()` delta **0**; the final paired-run interval left DB, WAL, SHM and all **108** Vault file bytes unchanged. Earlier preflight intervals saw WAL/SHM drift while the live service continued, so those intervals were not used as the byte-invariance claim. External API calls **0**, live tool executions **0**, answer generations **0**, DB/Vault research writes **0**, service restarts **0**.
+- Final focused P0 tests: **29 passed**. Final full `npm test`: **1,654 passed / 0 failed / 3 skipped** (1,657 total). A sandboxed run hit `listen EPERM` on localhost; the unrestricted rerun passed.
+
+P0-B remains **OPEN / ANSWER GENERATION NOT STARTED**. Under the chosen strict historical-context rule, the ready set is empty and the frozen 2×2 generation protocol cannot begin. The next decision requires a faithful durable recovery of historical schedule context or an explicitly approved prospective amendment for that shared input; this receipt makes neither change.
