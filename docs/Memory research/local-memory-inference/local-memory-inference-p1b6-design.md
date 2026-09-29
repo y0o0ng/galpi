@@ -41,8 +41,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   amendment, no acceptance.
 - **reviewed pool consolidated** (see "Reviewed-pool ledger and shortage"): **349** in-pool rows
   under the owner's pool rule A; marginal top-up lower bound **34** (TRAIN 32 / DEV 2). The
-  **batch-004 top-up plan (41 slots) is preregistered** (see "Batch-004 top-up plan"); no
-  surface is authored yet.
+  **batch-004 top-up plan (41 slots) is preregistered and its 41 surfaces are materialized**
+  (see "Batch-004 top-up plan"); they await the owner's pre-audit review.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2043,7 +2043,20 @@ ledger and shortage receipt with the owner-approved parameters:
   mandatory HUMAN for disagreement / FIX / REJECT / missing, and a **20% (8-row)** HUMAN
   calibration of the lowest-hash clean agreements (domain `p1b6-b004-v3-review-calibration-v1`).
 
-Nothing is authored, audited, reviewed or accepted.
+**Materialized — awaiting owner pre-audit review.** The authored content is
+`scripts/data/memory-inference-p1b6-batch-004-content.js`;
+`scripts/build-memory-inference-p1b6-batch-004-materialize.js`
+(`npm run build:memory-inference-p1b6-batch-004-materialize`) writes
+`fixtures/local-memory-inference-p1b6-surface-batch-004.json` (41 items, `b004` namespace) and
+`…-surface-batch-004-materialization-receipt.json`. It fails closed unless every slot matches its
+skeleton, language, discourse pattern and fragment count; computes offsets and IDs from the
+text; requires an allowed declared `targetAnchorRole` on the six TARGET-boundary slots (recorded
+in the receipt, not on the items, so the fixture keeps the shared item shape); runs the shared
+structural validator against v3; and runs the batch-003 leakage check against every prior batch
+and candidate. Before materializing, four wordings that would tilt an ESCALATE reading were
+changed (`001` `더 커` → `차이 나`, `002` `확인해 보니` → `지금 보니까`, `023` dropped the
+additive `그리고`, `037` dropped `also`). These checks are structural; semantic validity is for
+the owner review and the gates. Nothing is audited, reviewed or accepted.
 
 ## Closed Selection and Freeze Constraints
 

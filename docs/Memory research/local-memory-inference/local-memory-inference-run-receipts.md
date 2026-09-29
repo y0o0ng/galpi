@@ -5265,3 +5265,12 @@ accepted pool record stays **93**.
 | `fixtures/local-memory-inference-p1b6-surface-batch-004-authoring-protocol.json` | 41 slots (TRAIN 38 / DEV 3), cap 4 per skeleton, 8-row calibration |
 
 Nothing authored or reviewed; the accepted pool record stays **93**.
+
+#### P1-B6 batch-004 — 41 surfaces MATERIALIZED / awaiting owner pre-audit review
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-004.json` | 41 items, `b004` namespace |
+| `fixtures/local-memory-inference-p1b6-surface-batch-004-materialization-receipt.json` | marginals, TARGET-boundary roles, checks |
+
+No audit, review or acceptance; the accepted pool record stays **93**.

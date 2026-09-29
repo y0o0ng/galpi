@@ -1,0 +1,88 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-004-materialization-receipt-v1",
+  "status": "MATERIALIZED_AWAITING_OWNER_PRE_AUDIT_REVIEW",
+  "batch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-004-v1",
+    "rawSha256": "97d10603593b1a59feb15f0be78b56c79c65bd822c0ac2cf8a6b21296b6a44c5",
+    "items": 41
+  },
+  "protocol": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-004-authoring-protocol-v1",
+    "rawSha256": "b6295fed0cb38ca7bebca3d41d91deed80f55d0505b71287e0d425368b413a9c"
+  },
+  "marginals": {
+    "split": {
+      "TRAIN": 38,
+      "DEV": 3
+    },
+    "language": {
+      "KO": 26,
+      "MIXED": 10,
+      "EN": 5
+    },
+    "fragments": {
+      "1": 5,
+      "2": 15,
+      "3": 12,
+      "4": 7,
+      "5": 2
+    },
+    "discoursePatterns": {
+      "CANONICAL": 6,
+      "INTERLEAVED": 5,
+      "RETURN_TO_TOPIC": 5,
+      "CONTEXT_FIRST": 5,
+      "SELF_REVISION": 5,
+      "ELLIPTICAL_REPLY": 5,
+      "CONCLUSION_FIRST": 5,
+      "PROGRESSIVE_REFINEMENT": 5
+    }
+  },
+  "targetBoundaryRoles": [
+    {
+      "itemId": "p1b6-item-b004-004",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "targetAnchorRole": "RULE_RESULT"
+    },
+    {
+      "itemId": "p1b6-item-b004-007",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "targetAnchorRole": "RULE_RESULT"
+    },
+    {
+      "itemId": "p1b6-item-b004-010",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "targetAnchorRole": "RULE_RESULT"
+    },
+    {
+      "itemId": "p1b6-item-b004-012",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "targetAnchorRole": "RULE_RESULT"
+    },
+    {
+      "itemId": "p1b6-item-b004-039",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "targetAnchorRole": "CATEGORY_MEMBERSHIP"
+    },
+    {
+      "itemId": "p1b6-item-b004-041",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "targetAnchorRole": "APPLICABILITY_STATUS"
+    }
+  ],
+  "checks": [
+    "every slot matches its preregistered skeleton, language, discourse pattern and fragment count",
+    "offsets and IDs are computed from the authored text",
+    "TARGET-boundary slots declare an allowed targetAnchorRole (declared role only; semantics are for the gates)",
+    "shared structural validator against the v3 catalog",
+    "batch-003 leakage check against every prior batch and candidate artifact"
+  ],
+  "authority": {
+    "ownerPreAuditReviewPerformed": false,
+    "sourceAuditRun": false,
+    "semanticReviewRun": false,
+    "humanReviewRun": false,
+    "acceptancePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

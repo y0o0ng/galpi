@@ -1,0 +1,2570 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-004-v1",
+  "batchId": "p1b6-surface-batch-004",
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-b004-001",
+      "sourceFamilyId": "p1b6-sf-b004-001",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "책장 두 개를 놓고 어느 걸 살지 보는 중이야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "왼쪽 책장은 폭 80cm에 높이 180cm래."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오른쪽은 두 치수가 모두 왼쪽이랑 달라."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "줄자로 재 보니 오른쪽이 왼쪽이랑 10cm쯤 차이 나."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-002",
+      "sourceFamilyId": "p1b6-sf-b004-002",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이번 이사 짐은 상자 30개 분량이고 준비 기간은 열흘로 잡았어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "어제 동네 빵집에서 식빵을 한 봉지 샀어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "지금 보니까 한 3분의 1쯤 남았어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-003",
+      "sourceFamilyId": "p1b6-sf-b004-003",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "새로 살 monitor 두 대를 비교하고 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "첫 번째는 가로 60cm, 세로 36cm 정도야."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "참, 어제 키보드 keycap을 새로 바꿨어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "두 번째 monitor는 가로도 세로도 첫 번째랑 달라."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "keycap 색은 회색으로 골랐고."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "아까 monitor 얘기로 돌아가면, 두 번째가 4cm 정도 차이 나."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "책상 정리도 좀 해야겠어."
+        },
+        {
+          "turnId": "t8",
+          "role": "ASSISTANT",
+          "text": "기억해 둘게요."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-004",
+      "sourceFamilyId": "p1b6-sf-b004-004",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 구립 도서관 열람실은 한 번 예약하면 2시간까지 쓸 수 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "수험생으로 등록한 회원만 예외로 4시간을 준대."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 아침엔 커피를 두 잔이나 마셨어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "저녁엔 대학 동기랑 같이 가서 친구 좌석 이용 시간을 먼저 확인해야 해."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-005",
+      "sourceFamilyId": "p1b6-sf-b004-005",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이번 sprint에는 처리할 ticket이 24개 있고 기간은 2주야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "점심은 회사 앞 국숫집에서 먹었어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "아, 다시 말할게. ticket이 24개가 아니라 20개였어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "국숫집은 줄이 좀 있었고."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "지금 기준으로 절반 정도 남았어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-006",
+      "sourceFamilyId": "p1b6-sf-b004-006",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "거실에 깔 러그를 두 장 비교하고 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "하나는 가로 160cm, 세로 230cm짜리야."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "다른 하나는 가로도 세로도 이것보다 작아."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "두 번째가 20cm쯤 작더라."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-007",
+      "sourceFamilyId": "p1b6-sf-b004-007",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 회사 우편실은 도착한 택배를 사흘 동안 보관해 줘."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 회의실 예약이 꼬여서 한참 헤맸어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "냉장이 필요한 택배만 예외로 그날 안에 찾아가야 한대."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "회의는 결국 옆 방에서 했어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "어제 온 내 택배 보관 기한을 모르겠어서 우편실에 들러야겠어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-008",
+      "sourceFamilyId": "p1b6-sf-b004-008",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "The community garden has 40 beds to plant, and we were given six weeks."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "I repainted the shed door on Saturday."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "The volunteers log beds and weeks on the same board."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "The paint still needs a second coat."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "Both counts go into the grant report."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "Someone brought lemonade, which was nice."
+        },
+        {
+          "turnId": "t7",
+          "role": "ASSISTANT",
+          "text": "So how much is left?"
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "About a quarter."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-009",
+      "sourceFamilyId": "p1b6-sf-b004-009",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "결론부터 말하면 새 액자가 기존 액자보다 3cm 정도 커."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 벽에 난 못 자국을 메웠어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "기존 액자는 가로 40cm, 세로 50cm인데 새 건 두 치수가 다 달라."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-010",
+      "sourceFamilyId": "p1b6-sf-b004-010",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 팀 laptop 대여는 기본 기간이 5일이야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "아, 다시 말할게. 기본은 5일이 아니라 7일이야."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 모니터 받침대를 새로 받았어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "외부 contractor는 예외로 30일까지 빌릴 수 있고."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "받침대 높이가 딱 맞더라."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "다음 주에 오는 새 동료의 laptop 대여 기간을 정리해 둬야 해."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-011",
+      "sourceFamilyId": "p1b6-sf-b004-011",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이번 학기 과제는 읽어야 할 논문이 12편이고 제출까지 6주가 주어졌어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "어제는 동아리 방을 청소했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 따져 보니까 한 3분의 2는 남았어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-012",
+      "sourceFamilyId": "p1b6-sf-b004-012",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이번 주말 전시 해설 투어는 참가비가 만 원이야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "정확히는, 근처 대학 재학생이면 절반만 받는대."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "어제 우산을 지하철에 두고 내렸어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "거기에 오래된 친구도 데려가기로 했어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "우산은 분실물 센터에 문의해 뒀고."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "그래서 친구 참가비를 같이 계산해야 해."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-013",
+      "sourceFamilyId": "p1b6-sf-b004-013",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "I'm thinking about switching to a standing desk."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "The printer jammed twice this morning."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "I measured the corner where it would go."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "I finally cleared the jam with a butter knife."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "A coworker lent me hers for a day to try it out."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "The printer seems fine now."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "I haven't decided anything yet."
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "Lunch was leftover soup."
+        },
+        {
+          "turnId": "t9",
+          "role": "ASSISTANT",
+          "text": "Still weighing it, then?"
+        },
+        {
+          "turnId": "t10",
+          "role": "USER",
+          "text": "Yeah, still weighing it."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-014",
+      "sourceFamilyId": "p1b6-sf-b004-014",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "요즘 주말 요가 수업에 등록할지 생각하고 있어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 세탁기 필터를 청소했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "시간표랑 가격은 봤는데 아직 신청은 안 했어. 계속 고민 중이야."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-015",
+      "sourceFamilyId": "p1b6-sf-b004-015",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "팀장님이 이번 release가 다음 주로 밀린다고 했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "참, 오늘 사무실 plant에 물을 줬어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "그 얘기는 회의 끝나고 복도에서 들은 거야."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "잎이 좀 누렇게 변했더라."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "아까 release 얘기로 돌아가면, 나는 아직 공식 공지를 못 봤어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "영양제를 하나 사야겠어."
+        },
+        {
+          "turnId": "t7",
+          "role": "ASSISTANT",
+          "text": "팀장님 말씀으로 적어 둘게요."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-016",
+      "sourceFamilyId": "p1b6-sf-b004-016",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "작년부터 쓰던 가계부 앱이 유료로 바뀌었어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "그래서 다른 앱으로 옮길지 따져 보는 중이야. 아직 결정은 안 했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘은 퇴근길에 비가 그쳤더라."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "옮기면 기존 기록을 내보내야 해서 그것도 보고 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-017",
+      "sourceFamilyId": "p1b6-sf-b004-017",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 아파트 gym은 저녁 10시에 문을 닫아."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 택배 상자를 분리수거했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "아, 다시 말할게. 10시가 아니라 9시에 닫아."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "상자 테이프 떼는 게 제일 귀찮더라."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "다만 관리실에 night shift로 등록한 사람은 예외로 자정까지 쓸 수 있고, 나도 그렇게 등록돼 있어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "오늘도 퇴근하고 11시쯤 gym에 갈 거야."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-018",
+      "sourceFamilyId": "p1b6-sf-b004-018",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "다음 달 워크숍 장소는 제주도로 잡혔다고 들었어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "방금 인사팀 메일로도 제주도로 확정됐다고 왔어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-019",
+      "sourceFamilyId": "p1b6-sf-b004-019",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "어제 동생한테 빌린 전동 드릴을 아직 못 돌려줬어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 점심은 김밥이었어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "이번 주말에 그거 꼭 가져다줘야 해."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-020",
+      "sourceFamilyId": "p1b6-sf-b004-020",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "My landlord said the rent is going up in March."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "I bought new curtains yesterday."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "He mentioned it in passing at the mailbox."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "The curtains are a bit too long."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "Nothing has come in writing yet."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "I might hem them myself."
+        },
+        {
+          "turnId": "t7",
+          "role": "ASSISTANT",
+          "text": "So that's what he told you?"
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "Right, his words."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-021",
+      "sourceFamilyId": "p1b6-sf-b004-021",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "결론만 말하면 치과 예약은 목요일로 바뀌었어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 아침엔 버스가 조금 늦게 왔어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "원래는 화요일이었는데 병원에서 전화가 와서 목요일로 옮겼어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-022",
+      "sourceFamilyId": "p1b6-sf-b004-022",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "나는 아침마다 한강에서 running을 해."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 새 earphone을 샀어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "아, 다시 말할게. 아침마다가 아니라 평일 아침마다야."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "노이즈 캔슬링이 생각보다 좋더라."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "지난주엔 발목 때문에 쉬었는데, 발목은 이제 다 나았어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-023",
+      "sourceFamilyId": "p1b6-sf-b004-023",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "올해 운동은 일주일에 세 번 하기로 정했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "헬스장 개인 레슨은 일주일에 두 번으로 잡았어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘은 운동화 끈을 새로 갈았어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "이번 주 운동 횟수를 달력에 적어 두려고."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-024",
+      "sourceFamilyId": "p1b6-sf-b004-024",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "나는 매주 토요일마다 부모님 댁에 반찬을 갖다드려."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 책상 서랍을 정리했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "정확히는, 부모님이 여행 가신 이번 달 초 2주 동안은 쉬었어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "서랍에서 오래된 영수증이 잔뜩 나왔고."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "지난주부터 다시 토요일마다 갖다드리고 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-025",
+      "sourceFamilyId": "p1b6-sf-b004-025",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "The drive to my aunt's place takes two to three hours."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "I cleaned out the glove box today."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "That's the usual range, depending on traffic."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "Found three old parking tickets in there."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "I always plan around that window."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "They were all paid, luckily."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "Nobody has ever quoted me a different figure."
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "I also found a spare phone charger."
+        },
+        {
+          "turnId": "t9",
+          "role": "ASSISTANT",
+          "text": "Two to three hours, then?"
+        },
+        {
+          "turnId": "t10",
+          "role": "USER",
+          "text": "Yep, that's the range."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-026",
+      "sourceFamilyId": "p1b6-sf-b004-026",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "결론부터 말하면 대학원에 지원할지는 아직 고민 중이야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "어제 오랜만에 대청소를 했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "지원 요강은 다 읽어 봤는데 마음을 못 정했어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-027",
+      "sourceFamilyId": "p1b6-sf-b004-027",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 회사 coffee machine은 오후 6시 이후엔 잠겨."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "참, 오늘 laptop 배터리가 금방 닳더라."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "다만 당직자로 지정된 사람은 예외로 밤새 쓸 수 있어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "충전기를 집에 두고 왔어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "아까 coffee machine 얘기로 돌아가면, 이번 주 당직자가 바로 나야."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "충전기는 옆자리에서 빌렸고."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "그래서 오늘 밤에 coffee machine 쓰는 건 문제없어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-028",
+      "sourceFamilyId": "p1b6-sf-b004-028",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "동생 결혼식 날짜 얘기를 먼저 해야겠다."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "엄마 말로는 10월 셋째 주 토요일이래."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 회사 엘리베이터가 점검 중이었어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "동생한테 직접 물어보니 똑같이 10월 셋째 주 토요일이라고 하더라."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-029",
+      "sourceFamilyId": "p1b6-sf-b004-029",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "지난주에 산 겨울 코트 소매가 좀 길어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 저녁엔 라면을 끓여 먹었어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "정확히는 오른쪽 소매가 왼쪽보다 조금 더 길어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "라면에 계란도 하나 넣었고."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "내일 수선집에 그걸 맡기려고."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-030",
+      "sourceFamilyId": "p1b6-sf-b004-030",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "여름휴가는 부산보다 강릉이 더 끌려."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "그래도 실제로 어디로 갈지는 아직 안 정했어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-031",
+      "sourceFamilyId": "p1b6-sf-b004-031",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "옆집 아저씨가 이번 겨울에 우리 건물 보일러를 교체한다고 하더라."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 현관 매트를 새로 깔았어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "관리사무소 공지는 아직 없고, 아저씨한테 들은 게 전부야."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-032",
+      "sourceFamilyId": "p1b6-sf-b004-032",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "ASSISTANT",
+          "text": "내일 오전 stand-up meeting을 30분 늦출까요?"
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "아, 창밖에 비가 오기 시작했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "참석자 중에 오전 외근이 있는 사람이 둘이야."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "우산은 사물함에 있을 거야."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "아까 meeting 얘기로 돌아가면, 그 두 사람은 10시 반에 들어와."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "사물함 열쇠는 책상 위에 있고."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "응, 그렇게 해줘."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-033",
+      "sourceFamilyId": "p1b6-sf-b004-033",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "결론부터 말하면 동호회 모임 장소가 합정으로 바뀌었어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 헬멧 끈이 끊어져서 새로 샀어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "처음엔 신촌에서 하기로 했는데 회장님이 합정으로 옮긴다고 공지했어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-034",
+      "sourceFamilyId": "p1b6-sf-b004-034",
+      "splitAssignment": "TRAIN",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "다음 주 client 미팅은 화요일 오후 2시, 3층 회의실이야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 printer 토너를 갈았어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "아, 다시 말할게. 시간은 2시가 아니라 4시로 바뀌었어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "토너 가루가 손에 좀 묻었고."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "장소도 3층이 아니라 5층 회의실로 옮겨졌대."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-035",
+      "sourceFamilyId": "p1b6-sf-b004-035",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이사 오고 나서 인터넷 설치 전까지는 휴대폰 핫스팟을 쓰기로 했어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 오후에 기사님이 와서 인터넷 설치를 끝냈어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-036",
+      "sourceFamilyId": "p1b6-sf-b004-036",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "나는 퇴근 후에 매일 강아지 산책을 시켜."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 회사 복도에 새 화분이 들어왔어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "정확히는 장마 기간엔 비가 많이 와서 산책을 쉬었어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "화분 이름표에 몬스테라라고 적혀 있더라."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "장마는 지난주에 끝났어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-037",
+      "sourceFamilyId": "p1b6-sf-b004-037",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "I set my monthly book budget at 50 dollars."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "My sister's birthday is next week."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "Comics get 20 dollars a month."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "I still need to find her a card."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "I'm writing both into my spending app tonight."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "Maybe a card with a cat on it."
+        },
+        {
+          "turnId": "t7",
+          "role": "ASSISTANT",
+          "text": "What's the book total for the month, then?"
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "That's the part I'm entering now."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-038",
+      "sourceFamilyId": "p1b6-sf-b004-038",
+      "splitAssignment": "TRAIN",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "결론부터 말하면 영어 회화 스터디는 다시 매주 수요일에 나가."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 신발장 정리를 했어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "시험 기간 한 달 동안은 쉬었다가 이번 주부터 다시 나가기 시작했어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-039",
+      "sourceFamilyId": "p1b6-sf-b004-039",
+      "splitAssignment": "DEV",
+      "language": "MIXED",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이 coworking space는 장기 이용자한테만 locker를 무료로 줘."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "참, 오늘 노트북에 스티커를 새로 붙였어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "안내문을 보면 장기 이용자는 보통 6개월 넘게 다니고 월 정기권을 끊은 사람이래."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "스티커는 고양이 그림이야."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "아까 locker 얘기로 돌아가면, 나는 8개월째 다니는데 매번 일일권으로 결제했어. 내가 장기 이용자에 들어가는지 내일 물어봐야겠어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-040",
+      "sourceFamilyId": "p1b6-sf-b004-040",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "나는 원래 매주 월요일에 분리수거 당번이야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "이번 달부터는 금요일 음식물 쓰레기 당번도 같이 맡게 됐어. 월요일 당번은 그대로고."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "오늘 베란다 창문을 닦았어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "반장님이 두 당번 모두 계속 맡아 달라고 했어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b004-041",
+      "sourceFamilyId": "p1b6-sf-b004-041",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 동네 문화센터는 지역 주민에게만 강좌 할인을 해 줘."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 자전거 바퀴에 바람을 넣었어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "정확히는, 안내문에 지역 주민은 보통 이 동네에 1년 넘게 살고 주민센터에 등록한 사람이라고 돼 있어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "바퀴 바람이 생각보다 금방 빠지더라."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "나는 이 동네로 이사 온 지 두 달 됐고 주민센터 등록은 해 뒀어. 내가 지역 주민 할인 대상인지는 센터에 전화해 봐야겠어."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-b004-001",
+      "sourceEpisodeId": "p1b6-se-b004-001",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 21,
+        "endByte": 65
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 60
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 45
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 54
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 66
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b004-001"
+    },
+    {
+      "itemId": "p1b6-item-b004-002",
+      "sourceEpisodeId": "p1b6-se-b004-002",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "anchorSpanRef": {
+        "turnId": "t3",
+        "startByte": 21,
+        "endByte": 43
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 84
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 44
+        }
+      ],
+      "discoursePattern": "INTERLEAVED",
+      "surfaceFamilyId": "p1b6-surface-family-b004-002"
+    },
+    {
+      "itemId": "p1b6-item-b004-003",
+      "sourceEpisodeId": "p1b6-se-b004-003",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "anchorSpanRef": {
+        "turnId": "t6",
+        "startByte": 39,
+        "endByte": 74
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 50
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 49
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 63
+        },
+        {
+          "turnId": "t6",
+          "startByte": 0,
+          "endByte": 75
+        },
+        {
+          "turnId": "t8",
+          "startByte": 0,
+          "endByte": 20
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b004-003"
+    },
+    {
+      "itemId": "p1b6-item-b004-004",
+      "sourceEpisodeId": "p1b6-se-b004-004",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 41,
+        "endByte": 68
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 87
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 64
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 96
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-004"
+    },
+    {
+      "itemId": "p1b6-item-b004-005",
+      "sourceEpisodeId": "p1b6-se-b004-005",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 20,
+        "endByte": 43
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 71
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 64
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 44
+        }
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "surfaceFamilyId": "p1b6-surface-family-b004-005"
+    },
+    {
+      "itemId": "p1b6-item-b004-006",
+      "sourceEpisodeId": "p1b6-se-b004-006",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 0,
+        "endByte": 31
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 52
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 46
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 57
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 32
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b004-006"
+    },
+    {
+      "itemId": "p1b6-item-b004-007",
+      "sourceEpisodeId": "p1b6-se-b004-007",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 11,
+        "endByte": 35
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 75
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 74
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 84
+        }
+      ],
+      "discoursePattern": "INTERLEAVED",
+      "surfaceFamilyId": "p1b6-surface-family-b004-007"
+    },
+    {
+      "itemId": "p1b6-item-b004-008",
+      "sourceEpisodeId": "p1b6-se-b004-008",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "anchorSpanRef": {
+        "turnId": "t8",
+        "startByte": 0,
+        "endByte": 15
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 71
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 52
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 37
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 20
+        },
+        {
+          "turnId": "t8",
+          "startByte": 0,
+          "endByte": 16
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b004-008"
+    },
+    {
+      "itemId": "p1b6-item-b004-009",
+      "sourceEpisodeId": "p1b6-se-b004-009",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 23,
+        "endByte": 71
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 72
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 81
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-009"
+    },
+    {
+      "itemId": "p1b6-item-b004-010",
+      "sourceEpisodeId": "p1b6-se-b004-010",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "anchorSpanRef": {
+        "turnId": "t6",
+        "startByte": 35,
+        "endByte": 55
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 56
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 62
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 61
+        },
+        {
+          "turnId": "t6",
+          "startByte": 0,
+          "endByte": 80
+        }
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "surfaceFamilyId": "p1b6-surface-family-b004-010"
+    },
+    {
+      "itemId": "p1b6-item-b004-011",
+      "sourceEpisodeId": "p1b6-se-b004-011",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "anchorSpanRef": {
+        "turnId": "t3",
+        "startByte": 24,
+        "endByte": 50
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 94
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 51
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-011"
+    },
+    {
+      "itemId": "p1b6-item-b004-012",
+      "sourceEpisodeId": "p1b6-se-b004-012",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "anchorSpanRef": {
+        "turnId": "t6",
+        "startByte": 10,
+        "endByte": 26
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 65
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 64
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 53
+        },
+        {
+          "turnId": "t6",
+          "startByte": 0,
+          "endByte": 54
+        }
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "surfaceFamilyId": "p1b6-surface-family-b004-012"
+    },
+    {
+      "itemId": "p1b6-item-b004-013",
+      "sourceEpisodeId": "p1b6-se-b004-013",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 19,
+        "endByte": 47
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 48
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 40
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 48
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 31
+        },
+        {
+          "turnId": "t9",
+          "startByte": 0,
+          "endByte": 24
+        },
+        {
+          "turnId": "t10",
+          "startByte": 0,
+          "endByte": 24
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b004-013"
+    },
+    {
+      "itemId": "p1b6-item-b004-014",
+      "sourceEpisodeId": "p1b6-se-b004-014",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 7,
+        "endByte": 43
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 64
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 86
+        }
+      ],
+      "discoursePattern": "INTERLEAVED",
+      "surfaceFamilyId": "p1b6-surface-family-b004-014"
+    },
+    {
+      "itemId": "p1b6-item-b004-015",
+      "sourceEpisodeId": "p1b6-se-b004-015",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 13,
+        "endByte": 57
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 65
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 58
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 81
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 40
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b004-015"
+    },
+    {
+      "itemId": "p1b6-item-b004-016",
+      "sourceEpisodeId": "p1b6-se-b004-016",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "anchorSpanRef": {
+        "turnId": "t2",
+        "startByte": 10,
+        "endByte": 36
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 60
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 90
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 71
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-016"
+    },
+    {
+      "itemId": "p1b6-item-b004-017",
+      "sourceEpisodeId": "p1b6-se-b004-017",
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "anchorSpanRef": {
+        "turnId": "t6",
+        "startByte": 23,
+        "endByte": 49
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 54
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 57
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 128
+        },
+        {
+          "turnId": "t6",
+          "startByte": 0,
+          "endByte": 50
+        }
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "surfaceFamilyId": "p1b6-surface-family-b004-017"
+    },
+    {
+      "itemId": "p1b6-item-b004-018",
+      "sourceEpisodeId": "p1b6-se-b004-018",
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 27
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 67
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 66
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b004-018"
+    },
+    {
+      "itemId": "p1b6-item-b004-019",
+      "sourceEpisodeId": "p1b6-se-b004-019",
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "anchorSpanRef": {
+        "turnId": "t3",
+        "startByte": 17,
+        "endByte": 23
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 68
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 48
+        }
+      ],
+      "discoursePattern": "INTERLEAVED",
+      "surfaceFamilyId": "p1b6-surface-family-b004-019"
+    },
+    {
+      "itemId": "p1b6-item-b004-020",
+      "sourceEpisodeId": "p1b6-se-b004-020",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 17,
+        "endByte": 46
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 47
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 42
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 32
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 27
+        },
+        {
+          "turnId": "t8",
+          "startByte": 0,
+          "endByte": 17
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b004-020"
+    },
+    {
+      "itemId": "p1b6-item-b004-021",
+      "sourceEpisodeId": "p1b6-se-b004-021",
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 20,
+        "endByte": 33
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 63
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 85
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-021"
+    },
+    {
+      "itemId": "p1b6-item-b004-022",
+      "sourceEpisodeId": "p1b6-se-b004-022",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 20,
+        "endByte": 47
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 48
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 72
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 75
+        }
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "surfaceFamilyId": "p1b6-surface-family-b004-022"
+    },
+    {
+      "itemId": "p1b6-item-b004-023",
+      "sourceEpisodeId": "p1b6-se-b004-023",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 0,
+        "endByte": 24
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 58
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 64
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 55
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b004-023"
+    },
+    {
+      "itemId": "p1b6-item-b004-024",
+      "sourceEpisodeId": "p1b6-se-b004-024",
+      "semanticSkeletonId": "p1b6-sk-f03b5a7c91e2486d",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 30,
+        "endByte": 69
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 70
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 81
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 62
+        }
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "surfaceFamilyId": "p1b6-surface-family-b004-024"
+    },
+    {
+      "itemId": "p1b6-item-b004-025",
+      "sourceEpisodeId": "p1b6-se-b004-025",
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 35,
+        "endByte": 53
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 54
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 45
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 33
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 45
+        },
+        {
+          "turnId": "t9",
+          "startByte": 0,
+          "endByte": 25
+        },
+        {
+          "turnId": "t10",
+          "startByte": 0,
+          "endByte": 22
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b004-025"
+    },
+    {
+      "itemId": "p1b6-item-b004-026",
+      "sourceEpisodeId": "p1b6-se-b004-026",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 23,
+        "endByte": 48
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 76
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 62
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-026"
+    },
+    {
+      "itemId": "p1b6-item-b004-027",
+      "sourceEpisodeId": "p1b6-se-b004-027",
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "anchorSpanRef": {
+        "turnId": "t7",
+        "startByte": 10,
+        "endByte": 49
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 61
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 72
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 84
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 63
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b004-027"
+    },
+    {
+      "itemId": "p1b6-item-b004-028",
+      "sourceEpisodeId": "p1b6-se-b004-028",
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 23
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 54
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 50
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 89
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-028"
+    },
+    {
+      "itemId": "p1b6-item-b004-029",
+      "sourceEpisodeId": "p1b6-se-b004-029",
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 20,
+        "endByte": 26
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 52
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 64
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 40
+        }
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "surfaceFamilyId": "p1b6-surface-family-b004-029"
+    },
+    {
+      "itemId": "p1b6-item-b004-030",
+      "sourceEpisodeId": "p1b6-se-b004-030",
+      "semanticSkeletonId": "p1b6-sk-2b6f4ac9e15d8307",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 12
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 50
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 61
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b004-030"
+    },
+    {
+      "itemId": "p1b6-item-b004-031",
+      "sourceEpisodeId": "p1b6-se-b004-031",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 37,
+        "endByte": 79
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 90
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 78
+        }
+      ],
+      "discoursePattern": "INTERLEAVED",
+      "surfaceFamilyId": "p1b6-surface-family-b004-031"
+    },
+    {
+      "itemId": "p1b6-item-b004-032",
+      "sourceEpisodeId": "p1b6-se-b004-032",
+      "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
+      "anchorSpanRef": {
+        "turnId": "t7",
+        "startByte": 5,
+        "endByte": 21
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 53
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 61
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 80
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 22
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b004-032"
+    },
+    {
+      "itemId": "p1b6-item-b004-033",
+      "sourceEpisodeId": "p1b6-se-b004-033",
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 23,
+        "endByte": 46
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 76
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 95
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-033"
+    },
+    {
+      "itemId": "p1b6-item-b004-034",
+      "sourceEpisodeId": "p1b6-se-b004-034",
+      "semanticSkeletonId": "p1b6-sk-82149f27c2f521ae",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 0,
+        "endByte": 24
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 72
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 72
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 59
+        }
+      ],
+      "discoursePattern": "SELF_REVISION",
+      "surfaceFamilyId": "p1b6-surface-family-b004-034"
+    },
+    {
+      "itemId": "p1b6-item-b004-035",
+      "sourceEpisodeId": "p1b6-se-b004-035",
+      "semanticSkeletonId": "p1b6-sk-8a41f0d92c7e6b35",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 51,
+        "endByte": 83
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 91
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 67
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b004-035"
+    },
+    {
+      "itemId": "p1b6-item-b004-036",
+      "sourceEpisodeId": "p1b6-se-b004-036",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 28,
+        "endByte": 54
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 55
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 71
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 33
+        }
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "surfaceFamilyId": "p1b6-surface-family-b004-036"
+    },
+    {
+      "itemId": "p1b6-item-b004-037",
+      "sourceEpisodeId": "p1b6-se-b004-037",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 9,
+        "endByte": 28
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 43
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 30
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 46
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 42
+        },
+        {
+          "turnId": "t8",
+          "startByte": 0,
+          "endByte": 33
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b004-037"
+    },
+    {
+      "itemId": "p1b6-item-b004-038",
+      "sourceEpisodeId": "p1b6-se-b004-038",
+      "semanticSkeletonId": "p1b6-sk-f03b5a7c91e2486d",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 23,
+        "endByte": 46
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 84
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 92
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-038"
+    },
+    {
+      "itemId": "p1b6-item-b004-039",
+      "sourceEpisodeId": "p1b6-se-b004-039",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 113,
+        "endByte": 148
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 73
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 109
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 175
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b004-039"
+    },
+    {
+      "itemId": "p1b6-item-b004-040",
+      "sourceEpisodeId": "p1b6-se-b004-040",
+      "semanticSkeletonId": "p1b6-sk-47c9b12e0a6f83d5",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 21,
+        "endByte": 53
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 60
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 115
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 62
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b004-040"
+    },
+    {
+      "itemId": "p1b6-item-b004-041",
+      "sourceEpisodeId": "p1b6-se-b004-041",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 93,
+        "endByte": 126
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 78
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 137
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 163
+        }
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "surfaceFamilyId": "p1b6-surface-family-b004-041"
+    }
+  ]
+}
