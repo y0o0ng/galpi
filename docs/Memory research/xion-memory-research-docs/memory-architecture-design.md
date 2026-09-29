@@ -12179,6 +12179,7 @@ mixed cross-arm result
 ```
 
 Primary P0-B에서는 adaptive third generation, retry, majority voting을 하지 않는다.
+Planned replicate의 API call이 실패하거나 dispatch outcome을 확정할 수 없으면 해당 case는 `INDETERMINATE_GENERATION_FAILURE`로 남긴다. 같은 slot의 retry·대체 generation은 하지 않는다. 이는 기존 no-retry 계약의 실행상 fail-close reason이며 gate·materiality 기준을 바꾸지 않는다.
 Temperature 0 / fixed seed 등 provider가 제공하는 deterministic controls는 사용할 수 있지만,
 empirical replicate stability를 대체하지 않는다.
 
