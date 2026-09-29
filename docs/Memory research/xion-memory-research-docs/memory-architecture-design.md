@@ -39,12 +39,15 @@ Skill Contract
 현재 phase:
 
 ```text
-R2 semantic architecture = CLOSED enough for synthesis
-R3 empirical policy selection = OPEN, **CONDITIONAL ON R3-P0 FEASIBILITY**
-implementation schema/service design = NOT YET FIXED
+R2 semantic architecture = CLOSED enough for implementation design
+implementation schema/service design = OPEN; may proceed under CLOSED R2 contracts
+R3 empirical policy selection = OPEN
+legacy HARD-GATED vs GLOBAL-SOFT-PRIOR D0/P0 != gate for R2 implementation or architecture-native R3 lanes
 ```
 
 이 문서 후반의 §51은 hard-boundary consolidated map, §52는 reduced R3 experiment queue다.
+§52–§53의 legacy D0-first P0 preregistration은 역사 기록으로 보존하되,
+현재 적용되는 범위와 종료 결정은 §53.11이 우선한다.
 §54는 2026-09-05 구조 검토에서 남긴 **미채택 보완 제안**이며, 기존 확정 계약과 구분한다.
 
 ---
@@ -239,6 +242,9 @@ Ranking formatter는 이를 재생성한다.
 
 # 6. First Experimental Target
 
+아래 D0는 당시 **current Galpi note/chunk retrieval**의 첫 비교 축으로 고정했다.
+§53.11 이후 canonical R2 read path 전체의 mandatory proxy나 첫 architecture-native 실험은 아니다.
+
 첫 실제 비교 축:
 
 ```text
@@ -258,6 +264,9 @@ Routing winner를 고르는 것은 두 번째 목적이다.
 ---
 
 # 7. Locked Experimental Decisions
+
+아래 D0–D6는 이 legacy/current retrieval 실험의 당시 고정 결정으로 보존한다.
+Architecture-native R3의 선행 gate나 새 실험 순서를 정하지 않는다(§53.11).
 
 ## D0 — Routing
 
@@ -337,6 +346,7 @@ IR interleaving의 이론/실증이 LLM context에서 유지되는지 조사.
 # 9. First Experiment Baseline
 
 Primary baseline은 interleaving이 아니라 paired shadow comparison.
+이는 당시의 legacy/current retrieval baseline이며 §53.11의 범위 정정을 따른다.
 
 ```text
 same request
@@ -11077,12 +11087,17 @@ R3 experiment winners
 
 # 52. R3 Experiment Set Reduction
 
-> 상태: **R3 REDUCED QUEUE — P0 FEASIBILITY GATE ACCEPTED; POLICY WINNERS OPEN**
+> 상태: **R3 EMPIRICAL QUESTIONS OPEN — LEGACY D0/P0 GLOBAL GATE SUPERSEDED BY §53.11**
 >
 > 목적: R1에서 나온 모든 실험 아이디어를 병렬로 구현하지 않고,
 > R2가 실제로 unresolved로 남긴 empirical questions만 최소 lane으로 줄인다.
 >
 > 기존 Locked Experimental Decisions D0~D6와 F1~F6는 유지한다.
+
+§52.2–§52.12의 P0-first 순서·mandatory/first/only-after 표기는 당시
+legacy/current Galpi note/chunk D0 비교를 전제로 한 사전등록 기록이다.
+§53.11의 현행 범위 정정 이후에는 R2 architecture 구현이나 architecture-native
+R3 lane의 선행 조건으로 적용하지 않는다. 대체 R3 queue는 여기서 정하지 않는다.
 
 ## 52.1 Reduction principle
 
@@ -11107,7 +11122,7 @@ provenance != association
 
 이런 항목은 이미 design contract다.
 
-## 52.2 R3-P0 — Feasibility Preflight — **MANDATORY BEFORE R3-0**
+## 52.2 R3-P0 — Feasibility Preflight — **HISTORICAL LEGACY D0 GATE**
 
 R2 semantic closure를 다시 여는 단계가 아니다.
 
@@ -11290,7 +11305,7 @@ known measurement caveats
 숫자가 낮아도 실패가 아니다.
 그 경우 올바른 결과는 **실험 큐를 현실적인 데이터 속도에 맞게 줄이는 것**이다.
 
-## 52.3 R3-0 — Instrument Validity Gate — **MANDATORY AFTER P0**
+## 52.3 R3-0 — Instrument Validity Gate — **HISTORICAL POST-P0 STEP**
 
 첫 실험은 policy winner를 찾는 실험이 아니다.
 
@@ -11426,6 +11441,8 @@ but faithfulness and LOO contribution remain different measurements.
 ### R3-0 quantitative exit structure
 
 `instrumentation blind spots are understood`만으로 PASS하지 않는다.
+다음은 당시 D0-first queue의 exit structure이며 현행 architecture-native
+instrumentation gate에 이 exact legacy P0 결과를 요구하지 않는다(§53.11).
 
 최소 exit structure:
 
@@ -11444,9 +11461,9 @@ but faithfulness and LOO contribution remain different measurements.
 
 이 gate를 통과하지 못하면 learned routing/OPE 같은 후속 연구를 진행하지 않는다.
 
-## 52.4 R3-1 — Retrieval / Context Assembly baseline — **FIRST POLICY COMPARISON**
+## 52.4 R3-1 — Legacy/current Galpi note/chunk retrieval baseline — **HISTORICAL D0 COMPARISON**
 
-Primary baseline remains:
+당시 first policy comparison으로 고정한 legacy/current retrieval baseline:
 
 ```text
 same request
@@ -11476,10 +11493,11 @@ which requests are actually decision-sensitive to retrieval policy?
 
 를 찾는 것이다.
 
-## 52.5 R3-2 — Context Assembly value decomposition — **ONLY AFTER R3-1**
+## 52.5 R3-2 — Context Assembly value decomposition — **HISTORICAL FOLLOW-ON**
 
-R3-1에서 retrieval policy가 실제 answer를 바꾸는 충분한 사례가 확인되면
+당시 계획은 R3-1에서 retrieval policy가 실제 answer를 바꾸는 충분한 사례가 확인되면
 Context Assembly 내부 mechanism을 하나씩 추가한다.
+이 legacy D0 결과는 architecture-native Context Assembly 연구의 현행 선행 조건이 아니다(§53.11).
 
 Recommended one-variable sequence:
 
@@ -11622,6 +11640,9 @@ valid exposure traces
 observable delayed/censored outcomes
 ```
 
+이 목록의 `P0 feasibility`는 당시 D0-first queue 조건이다. 현행 architecture-native
+learned-policy support를 종료된 legacy D0/P0 결과에 종속시키지 않는다(§53.11).
+
 그 뒤에만:
 
 ```text
@@ -11642,7 +11663,10 @@ support = 0
 
 따라서 `Neural Memory Controller`를 먼저 구현하고 데이터를 나중에 맞추는 순서는 금지한다.
 
-## 52.10 Reduced R3 execution order
+## 52.10 Historical reduced R3 execution order
+
+아래 순서는 legacy D0/P0를 전제로 한 당시 사전등록이다. 현재의 R2 구현·
+architecture-native R3 dependency는 §53.11이 정정하며 대체 순서는 미정이다.
 
 ```text
 R3-P0 Feasibility Preflight
@@ -11695,7 +11719,7 @@ exact retrieval-set action learning
 concrete requirement가 없거나,
 더 작은 experiment가 먼저 필요한 항목이다.
 
-## 52.12 R3 exit target
+## 52.12 Historical R3 exit target
 
 R3의 목적은 모든 knob를 최적화하는 것이 아니다.
 
@@ -11715,12 +11739,15 @@ R3의 목적은 모든 knob를 최적화하는 것이 아니다.
 이 정도가 확보되면 minimal coherent architecture를
 실험 가능한 baseline + swappable policy seams로 설계할 수 있다.
 
+이는 당시 empirical queue의 exit target이다. CLOSED R2 semantic architecture의
+implementation schema/service design을 시작하기 위한 현행 prerequisite는 아니다(§53.11).
+
 
 ---
 
 # 53. R3-P0 Measurement Contract — Code Reality Check
 
-> 상태: **P0-A COMPLETE — CURRENT RESULT `INDETERMINATE_PIT`; PROSPECTIVE EXACT-WINDOW / P0-B CONTRACT ACCEPTED**
+> 상태: **P0-A COMPLETE — P0-B PRIMARY HUMAN ADJUDICATION TERMINATED BEFORE COMPLETION; NO FEASIBILITY DISPOSITION (§53.11)**
 >
 > 최초 code-reality 기준 Galpi `main`: `71025861d07521f88c21b8c88360280ec6f3c604`.
 >
@@ -11728,6 +11755,9 @@ R3의 목적은 모든 knob를 최적화하는 것이 아니다.
 >
 > 목적: §52의 P0를 실제 current Galpi trace/replay 코드에 연결하면서,
 > 기존 도구를 잘못 해석해 feasibility 숫자를 오염시키지 않도록 측정 계약을 고정한다.
+
+§53.1–§53.10은 원래 P0 사전등록과 실행 중 채택한 amendment의 역사 기록이다.
+이 exact legacy D0 run의 현재 효력과 종료 상태는 §53.11이 정한다.
 
 ## 53.1 Current-code finding — default shadow report does not measure current A2 traffic
 
@@ -11783,7 +11813,7 @@ online volume도 moving denominator를 피하기 위해 28 calendar-day half-ope
 최초 P0-A와 current invocation-weighted follow-up은
 `docs/memory-r3-p0-a-receipt.md`에 기록된 historical measurement이며,
 historical active-note input을 복원할 수 없어 결과는 `INDETERMINATE_PIT`다.
-P0-B는 시작하지 않았다.
+이 최초 P0-A 기록 시점에는 P0-B가 시작되지 않았다.
 
 Future trace에는 exact input filename 목록을 뜻하는 nullable `active_notes_json` telemetry가
 2026-08-30 00:05:40 KST service restart부터 operational하다.
@@ -12270,10 +12300,10 @@ P0-B는 live tool execution, normal conversation/topic/task writes,
 그 밖의 production mutation을 수행하지 않는다.
 Generated outputs are research artifacts only unless separately approved.
 
-## 53.8 P0 receipts
+## 53.8 Historical P0 receipt requirements
 
 완료된 historical P0-A receipt는 `docs/memory-r3-p0-a-receipt.md`이며 소급 수정하지 않는다.
-Future exact-window remeasurement receipt에는 최소 다음을 남긴다.
+당시 예정한 exact-window remeasurement receipt에는 최소 다음을 남기기로 했다.
 
 ```text
 baseline commit
@@ -12344,9 +12374,9 @@ new long-lived telemetry field unless P0 proves it is necessary
 If existing scripts need reusable extraction helpers,
 refactor only the minimum necessary and preserve current CLI/output compatibility.
 
-## 53.10 P0 go/no-go and next user decision
+## 53.10 Historical P0 go/no-go and next user decision
 
-현재 protocol choice는 닫혔고 P0-B는 아직 시작하지 않았다.
+당시 protocol choice는 닫혔고 이 go/no-go 기록 시점에는 P0-B가 아직 시작하지 않았다.
 
 ```text
 complete first exact window
@@ -12367,9 +12397,49 @@ OR
 a newly discovered semantic/result-affecting choice is not fixed by this contract
 ```
 
-그 밖에는 preregistered §52 gate가 queue disposition을 통제한다.
+당시 계획에서는 그 밖에 preregistered §52 gate가 queue disposition을 통제했다.
+현재는 §53.11에 따라 이 legacy D0/P0 run을 global architecture gate로 적용하지 않는다.
 P0는 policy correctness/winner를 결정하지 않으며,
 R3 retrieval/context policy winner와 후속 lane의 empirical choices는 계속 OPEN이다.
+
+## 53.11 P0 construct-validity scope correction / primary adjudication termination — 2026-09-29
+
+저장소 주인은 **current P0-B primary blind HUMAN adjudication을 완료 전에 종료**했다.
+고정 409-invocation operational replay census, 79 operational `REPLAY_SENSITIVE` case,
+schedule-omitted generation-ready 66건, attachment/tool-indeterminate 13건,
+264/264 frozen answer generation과 private blind packet·review harness는 역사 산출물로 보존한다.
+부분 HUMAN 판단이 있더라도 66건 완료 census로 외삽하지 않는다. 이 run은 완료된
+M/N/U census, ΔA, projected informative-case estimate, GREEN/AMBER/RED disposition,
+retrieval-policy winner를 산출하지 않았다. Private partial-review provenance는
+`docs/memory-r3-p0-b-receipt.md`에 내용·라벨 집계 없이 기록한다.
+
+종료는 P0 실패나 RED 판정이 아니다. 사유는 비용이 아니라 **construct scope**다.
+D0는 같은 current
+Galpi note/chunk corpus·representation·chunk granularity·기본 ranking substrate·
+final context budget에서 candidate-note hard gate와 global soft prior만 바꾼다.
+Blind review 중 저장소 주인이 정성적으로 관찰한 우려는, 필요한 정보가 corpus에
+저장되지 않았거나 필요한 chunk 자체가 낮게 rank되거나 양 arm의 representation이
+부족하거나 더 넓은 source/event context의 재구성이 필요한 답변에서는 이 한 변수
+차이가 핵심 실패 원인을 포착하지 못할 수 있다는 것이다. 이는 동기와 범위 판단이지
+빈도나 policy 성능을 계량한 결과가 아니다.
+
+Canonical R2는 owning source에서 EvidenceRef/address, derivation/dependency provenance,
+provenance-aware Derived-State Transition과 derived state·projection을 거쳐,
+직접 anchor·bounded reconstruction·typed semantic-association expansion·
+temporal validity/accessibility·typed Working Set을 포함하는 Context Assembly로 읽는다
+(§46, §51). 기존 flat note/chunk gate-vs-prior 답변 민감도는 이 storage/formation/
+representation/read 경로의 feasibility에 대한 **유효한 estimator로 확립되지 않았다**.
+이 비교가 legacy retrieval 자체에 쓸모없다는 뜻은 아니다.
+
+따라서 D0/P0 산출물은 **legacy/current Galpi retrieval sensitivity study**와
+**paired-generation / blind-HUMAN evaluation-harness baseline**으로 재분류한다.
+§52–§53.10의 exact-window·threshold·GREEN/AMBER/RED·D0-first queue 규칙은
+당시 사전등록으로 남지만, 이 종료된 run의 결과를 기다리도록 R2 architecture 구현,
+storage implementation design 또는 architecture-native R3 lane을 막지 않는다.
+R2 semantic/authority contracts는 CLOSED 상태를 유지하며 implementation schema/service
+design은 그 계약 아래 진행할 수 있다. Architecture-native empirical questions는 OPEN이고,
+그 mechanism이 구현된 뒤 실제 경로에 붙여 feasibility/effect를 측정해야 한다.
+이 amendment는 대체 gate·threshold·R3 queue를 만들거나 새 policy winner를 정하지 않는다.
 
 ---
 

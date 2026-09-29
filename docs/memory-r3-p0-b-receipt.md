@@ -1,8 +1,8 @@
 # XION Memory R3-P0-B Operational Replay Census Freeze Receipt
 
-> **P0-B 2×2 GENERATION COMPLETE — PRIMARY HUMAN ADJUDICATION NOT STARTED**
+> **P0-B 2×2 GENERATION COMPLETE — PRIMARY HUMAN ADJUDICATION TERMINATED BEFORE COMPLETION**
 >
-> **STRICT HISTORICAL EXACT S UNPROVEN**
+> **NO ΔA / GREEN / AMBER / RED RESULT OR POLICY WINNER — STRICT HISTORICAL EXACT S UNPROVEN**
 
 ## Scope and authority
 
@@ -168,3 +168,17 @@ This amended freeze estimates later ΔA only for the frozen answer stack **with 
 - A private Pi audit verified 264 unique planned slots, exactly one durable `DISPATCHING` and one `SUCCESS` per slot in planned order, request and response hashes, 66 complete packet cases, neutral packet structure and unfilled HUMAN fields. Generation read only the frozen private bundle, committed manifest, code and `.env`; it did not read or write production DB/Vault, run live tools, mutate chat/task/note state or restart the service. The only external provider calls were the **264** frozen OpenAI Responses requests. Focused P0-B tests: **28 passed**; full `npm test`: **1,693 passed / 0 failed / 3 skipped** (1,696 total); `git diff --check` passed.
 
 Next: the repository owner performs the primary blind HUMAN adjudication on the private packet. No `MATERIAL_CHANGE`/`NO_MATERIAL_CHANGE` label, ΔA, policy winner or GREEN/AMBER/RED feasibility result is assigned here. The 13 attachment/tool-indeterminate cases remain in the operational 79-case denominator.
+
+## Primary adjudication termination and construct-scope correction — 2026-09-29
+
+> **PRIMARY HUMAN ADJUDICATION TERMINATED BEFORE COMPLETION**
+>
+> **NO COMPLETED M/N/U CENSUS, ΔA, GREEN/AMBER/RED DISPOSITION OR POLICY WINNER**
+
+The repository owner stopped the primary blind review after identifying a construct-scope mismatch, not a failed P0 result, RED result or winning retrieval arm. Latest GitHub `main` inspected before this correction: `7ad14fbe47f7a5a08706f22ece5d45599a2ab5e3`. The prior **264/264** successful generations, **66** frozen four-answer blind cases, **13** attachment/tool-indeterminate cases, and unproven strict historical exact `S` remain unchanged historical facts. The private packet, generation artifacts and review harness remain preserved; this section does not alter their bytes or unblind X/Y.
+
+The Pi private adjudication journal existed at `/home/pi/p0b-research-private/adjudication/galpi-p0b-human-adjudication-journal.jsonl` (mode `0600`). Read-only provenance inspection verified **18** sequential submitted case records bound to the frozen blind-packet SHA256; journal SHA256 `1858e73dcf76ed213672d5c1493cd197258010dc28730a710a17596867172e7e`. Review was incomplete (**18/66**); no completed 66-case artifact existed. The journal stays private and was not committed. No partial HUMAN label/reason distribution was counted, no X/Y mapping was read or joined, and no partial judgments were extrapolated into M/N/U, ΔA or a gate result. The Pi review server was no longer running; the local SSH review tunnel was closed. No further adjudication was performed in this task.
+
+The reviewer's qualitative concern was that varying the candidate-note hard gate versus a global soft prior inside the same existing note/chunk corpus leaves other answer-failure mechanisms untouched: absent stored information, low-ranked needed chunks, weak representations in both arms, and missing broader source/event reconstruction. No prevalence or comparative arm performance is inferred from those observations. Canonical R2 also includes evidence addressing, provenance-aware derived-state transitions, projections and richer Context Assembly mechanisms beyond this D0 seam. Thus answer sensitivity to this legacy D0 distinction is **not established as a valid estimator** of feasibility for the canonical R2 architecture. The §53.11 amendment reclassifies these artifacts as a legacy/current Galpi retrieval study and paired-generation/blind-HUMAN evaluation-harness baseline. The earlier preregistration remains auditable, while its global architecture gate no longer applies.
+
+Next long-term-memory work may start independently from the CLOSED R2 contracts: storage topology / authority map, followed by the post-extraction storage-routing boundary. No storage implementation, replacement R3 experiment, new threshold or production change is made here.
