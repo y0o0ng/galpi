@@ -5257,3 +5257,11 @@ Tests run locally: `…-batch-003-anchor-repair-human-review-packet` with the ra
 349 in pool; 6 accepted-on-retired excluded (flagged), 12 HUMAN-gold-vs-v3 differences kept and
 flagged. Lower bound 34 (TRAIN 32 / DEV 2). No top-up, acceptance, selection or freeze; the
 accepted pool record stays **93**.
+
+#### P1-B6 batch-004 top-up plan — PREREGISTERED / NOT AUTHORED
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-004-authoring-protocol.json` | 41 slots (TRAIN 38 / DEV 3), cap 4 per skeleton, 8-row calibration |
+
+Nothing authored or reviewed; the accepted pool record stays **93**.

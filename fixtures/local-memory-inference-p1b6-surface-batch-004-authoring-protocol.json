@@ -1,0 +1,504 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-004-authoring-protocol-v1",
+  "status": "PREREGISTERED_NOT_AUTHORED",
+  "decisionsSource": "REPOSITORY_OWNER_APPROVED_TOP_UP_PARAMETERS",
+  "inputs": {
+    "ledger": {
+      "identity": "xion-local-memory-inference-p1b6-reviewed-pool-ledger-v1",
+      "rawSha256": "0c1e293c01e12aafa9863d8b15a25e4ce803f1f21de7035a952c3fb7b2c3742c"
+    },
+    "shortage": {
+      "identity": "xion-local-memory-inference-p1b6-shortage-receipt-v1",
+      "rawSha256": "44d7d92d8e8d271b4b86d58fc5cf157d4f61654ae169976ee4c7548c0e84c048"
+    },
+    "v3": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    }
+  },
+  "derivation": {
+    "survivalAssumption": 0.85,
+    "splitRule": "ceil(split deficit / survival assumption); HELD is zero because every HELD skeleton already has >= 5 pooled surfaces",
+    "marginalRule": "deficit first, remaining slots by largest remainder over the frozen 380 targets in canonical key order",
+    "skeletonRule": "within each split, the skeleton with the lowest pooled coverage plus planned slots, ties by skeleton ID (the batch-003 rule), capped at 4 slots per skeleton",
+    "spreadRule": "language, fragment and discourse values are laid out by index * 17 mod tranche size",
+    "labelRule": "authoring target label follows the v3 skeleton; label balance is not a target"
+  },
+  "tranche": {
+    "total": 41,
+    "lowerBound": 34,
+    "buffer": 7,
+    "split": {
+      "TRAIN": 38,
+      "DEV": 3,
+      "FINAL_HELD_OUT": 0
+    },
+    "language": {
+      "KO": 26,
+      "MIXED": 10,
+      "EN": 5
+    },
+    "fragments": {
+      "1": 5,
+      "2": 15,
+      "3": 12,
+      "4": 7,
+      "5": 2
+    },
+    "discoursePatterns": {
+      "CANONICAL": 6,
+      "CONTEXT_FIRST": 5,
+      "CONCLUSION_FIRST": 5,
+      "INTERLEAVED": 5,
+      "PROGRESSIVE_REFINEMENT": 5,
+      "SELF_REVISION": 5,
+      "RETURN_TO_TOPIC": 5,
+      "ELLIPTICAL_REPLY": 5
+    }
+  },
+  "slots": [
+    {
+      "slot": "001",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "CANONICAL",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "002",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "INTERLEAVED",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "003",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "MIXED",
+      "fragments": 4,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "004",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONTEXT_FIRST",
+      "targetBoundaryInvariant": true
+    },
+    {
+      "slot": "005",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "MIXED",
+      "fragments": 3,
+      "discoursePattern": "SELF_REVISION",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "006",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "CANONICAL",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "007",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "INTERLEAVED",
+      "targetBoundaryInvariant": true
+    },
+    {
+      "slot": "008",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "EN",
+      "fragments": 4,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "009",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "010",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "MIXED",
+      "fragments": 3,
+      "discoursePattern": "SELF_REVISION",
+      "targetBoundaryInvariant": true
+    },
+    {
+      "slot": "011",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONTEXT_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "012",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "targetBoundaryInvariant": true
+    },
+    {
+      "slot": "013",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "authoringTargetLabel": "CLEAR",
+      "language": "EN",
+      "fragments": 5,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "014",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "INTERLEAVED",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "015",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "authoringTargetLabel": "CLEAR",
+      "language": "MIXED",
+      "fragments": 4,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "016",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONTEXT_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "017",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "authoringTargetLabel": "CLEAR",
+      "language": "MIXED",
+      "fragments": 3,
+      "discoursePattern": "SELF_REVISION",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "018",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "CANONICAL",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "019",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "INTERLEAVED",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "020",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "authoringTargetLabel": "CLEAR",
+      "language": "EN",
+      "fragments": 4,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "021",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "022",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "authoringTargetLabel": "CLEAR",
+      "language": "MIXED",
+      "fragments": 3,
+      "discoursePattern": "SELF_REVISION",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "023",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CANONICAL",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "024",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-f03b5a7c91e2486d",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "025",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "authoringTargetLabel": "CLEAR",
+      "language": "EN",
+      "fragments": 5,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "026",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "027",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "authoringTargetLabel": "CLEAR",
+      "language": "MIXED",
+      "fragments": 4,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "028",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONTEXT_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "029",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "030",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-2b6f4ac9e15d8307",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "CANONICAL",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "031",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "INTERLEAVED",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "032",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
+      "authoringTargetLabel": "CLEAR",
+      "language": "MIXED",
+      "fragments": 4,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "033",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "034",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-82149f27c2f521ae",
+      "authoringTargetLabel": "CLEAR",
+      "language": "MIXED",
+      "fragments": 3,
+      "discoursePattern": "SELF_REVISION",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "035",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-8a41f0d92c7e6b35",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 1,
+      "discoursePattern": "CANONICAL",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "036",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "037",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "EN",
+      "fragments": 4,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "038",
+      "splitAssignment": "TRAIN",
+      "semanticSkeletonId": "p1b6-sk-f03b5a7c91e2486d",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "039",
+      "splitAssignment": "DEV",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "MIXED",
+      "fragments": 3,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "targetBoundaryInvariant": true
+    },
+    {
+      "slot": "040",
+      "splitAssignment": "DEV",
+      "semanticSkeletonId": "p1b6-sk-47c9b12e0a6f83d5",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "CONTEXT_FIRST",
+      "targetBoundaryInvariant": false
+    },
+    {
+      "slot": "041",
+      "splitAssignment": "DEV",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "targetBoundaryInvariant": true
+    }
+  ],
+  "authoringRules": [
+    "Fresh content under the b004 namespace; no reuse of any prior text, ID or review result.",
+    "The batch-003 leakage check runs fail-closed against every prior batch and candidate artifact.",
+    "Slots on 2da4e54e / 5269c91f must satisfy the TARGET-boundary realization invariant (declared targetAnchorRole).",
+    "Authoring target labels are generator targets, not HUMAN gold, and never enter a blind packet.",
+    "The owner reviews the authored text before the source audit."
+  ],
+  "gates": {
+    "order": [
+      "owner pre-audit authoring review",
+      "fresh source/bundle audit (FAIL / UNCERTAIN excluded)",
+      "blind v3 strong-model semantic review",
+      "mandatory HUMAN for disagreement / FIX / REJECT / missing",
+      "HUMAN calibration sample of clean agreements"
+    ],
+    "calibration": {
+      "fraction": 0.2,
+      "size": 8,
+      "rule": "the clean agreements with the lowest sha256 of the hash domain, a NUL separator and the itemId; all of them if fewer exist",
+      "hashDomain": "p1b6-b004-v3-review-calibration-v1",
+      "matchingKeepSemantics": "stays CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL; not promoted"
+    },
+    "mandatoryMatchingKeepSemantics": "HUMAN_ADJUDICATED / ELIGIBLE"
+  },
+  "authority": {
+    "surfacesAuthored": false,
+    "sourceAuditRun": false,
+    "semanticReviewRun": false,
+    "humanReviewRun": false,
+    "acceptancePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

@@ -58,6 +58,7 @@
     "build:memory-inference-p1b6-batch-003-anchor-repair-v3-review-packet": "node scripts/build-memory-inference-p1b6-batch-003-anchor-repair-v3-review-packet.js",
     "build:memory-inference-p1b6-batch-003-anchor-repair-human-review-packet": "node scripts/build-memory-inference-p1b6-batch-003-anchor-repair-human-review-packet.js",
     "build:memory-inference-p1b6-reviewed-pool-ledger": "node scripts/build-memory-inference-p1b6-reviewed-pool-ledger.js",
+    "build:memory-inference-p1b6-batch-004-authoring-plan": "node scripts/build-memory-inference-p1b6-batch-004-authoring-plan.js",
     "build:memory-inference-p1b6-surface-repair-human-review-packet": "node scripts/build-memory-inference-p1b6-surface-repair-human-review-packet.js",
     "build:memory-inference-p1b6-batch-003-materialize": "node scripts/build-memory-inference-p1b6-batch-003-materialize.js",
     "build:memory-inference-p1b6-batch-002-finalization": "node scripts/build-memory-inference-p1b6-batch-002-finalization.js",

@@ -40,8 +40,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `HUMAN_ADJUDICATED` / `ELIGIBLE`, `228` `PROVISIONAL`, `224`, `225` `INELIGIBLE`. No skeleton
   amendment, no acceptance.
 - **reviewed pool consolidated** (see "Reviewed-pool ledger and shortage"): **349** in-pool rows
-  under the owner's pool rule A; marginal top-up lower bound **34** (TRAIN 32 / DEV 2). Top-up is
-  not yet authored.
+  under the owner's pool rule A; marginal top-up lower bound **34** (TRAIN 32 / DEV 2). The
+  **batch-004 top-up plan (41 slots) is preregistered** (see "Batch-004 top-up plan"); no
+  surface is authored yet.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2020,6 +2021,29 @@ pooled surfaces and no active skeleton is uncovered. **Marginal top-up lower bou
 inside that top-up). This is a necessary lower bound, not a joint-feasibility proof; the
 top-up plan must add a review-loss buffer, and joint feasibility is checked at deterministic
 selection. No top-up is authored and nothing is accepted.
+
+### Batch-004 top-up plan — preregistered, NOT AUTHORED
+
+`scripts/build-memory-inference-p1b6-batch-004-authoring-plan.js`
+(`npm run build:memory-inference-p1b6-batch-004-authoring-plan`) derives
+`fixtures/local-memory-inference-p1b6-surface-batch-004-authoring-protocol.json` from the pinned
+ledger and shortage receipt with the owner-approved parameters:
+
+- **size 41** = lower bound 34 + buffer 7, from `ceil(split deficit / 0.85)` (batch-003
+  survival was 84.9%, 90.8% without retired-skeleton rows): TRAIN 38, DEV 3, HELD 0.
+- language KO 26 / MIXED 10 / EN 5 and fragments 5 / 15 / 12 / 7 / 2 — deficits first, the rest by
+  largest remainder over the frozen 380 targets; discourse patterns 6 / 5 × 7.
+- skeletons: the batch-003 lowest-prospective-coverage rule with an **owner cap of 4 per
+  skeleton** (uncapped, 23 of 38 TRAIN slots would land on `53ab6351` / `0768ea20` / `2da4e54e`).
+  Result: those three take 4 each, the other TRAIN slots spread over 13 CLEAR skeletons plus
+  `be0efa30`, and DEV takes `5269c91f` 2 / `47c9b12e` 1. Authoring target labels follow the
+  skeletons (CLEAR 25 / ESCALATE 16); label balance is not a target.
+- the six slots on `2da4e54e` / `5269c91f` must satisfy the TARGET-boundary invariant.
+- gates: **owner pre-audit authoring review**, fresh source audit, blind v3 strong-model review,
+  mandatory HUMAN for disagreement / FIX / REJECT / missing, and a **20% (8-row)** HUMAN
+  calibration of the lowest-hash clean agreements (domain `p1b6-b004-v3-review-calibration-v1`).
+
+Nothing is authored, audited, reviewed or accepted.
 
 ## Closed Selection and Freeze Constraints
 
