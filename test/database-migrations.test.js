@@ -280,8 +280,9 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 25, name: 'voice_shortcut_conversation_control' },
     { version: 26, name: 'retrieval_query_resolution_trace' },
     { version: 27, name: 'independent_ddays' },
+    { version: 28, name: 'memory_evidence_refs' },
   ]);
-  assert.equal(result.currentVersion, 27);
+  assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
     db.prepare(`SELECT can_continue AS canContinue FROM voice_shortcut_receipts`).get(),
     { canContinue: 0 },
@@ -296,7 +297,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     /CHECK/,
   );
   assert.deepEqual(
-    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name != 'ddays' ORDER BY name`).all(),
+    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('ddays', 'memory_evidence_refs') ORDER BY name`).all(),
     tablesBefore,
   );
   assert.deepEqual(
@@ -974,5 +975,28 @@ test('schema v21 widens the provider check without cutting the children loose', 
     () => db.prepare("INSERT INTO mail_accounts (provider, address) VALUES ('works', 'other@korea.ac.kr')").run(),
     /UNIQUE/,
   );
+  db.close();
+});
+
+test('schema v28 adds the narrow EvidenceRef address registry from v27', () => {
+  const db = createLegacyDatabase();
+  migrateThrough(db, 27);
+  assert.deepEqual(runDatabaseMigrations(db).applied,
+    [{ version: 28, name: 'memory_evidence_refs' }]);
+  assert.deepEqual(runDatabaseMigrations(db).applied, []);
+  const insert = db.prepare(`
+    INSERT INTO memory_evidence_refs
+      (evidence_id, source_domain, source_key, locator, source_version, content_sha256)
+    VALUES (?, 'conversation_message', '1', '', '', ?)
+  `);
+  insert.run('ev1_a', 'a'.repeat(64));
+  assert.throws(() => insert.run('ev1_b', 'a'.repeat(64)), /UNIQUE/);
+  assert.throws(() => insert.run('ev1_c', 'short'), /CHECK/);
+  assert.throws(() => insert.run('ev1_c', 'G'.repeat(64)), /CHECK/);
+  assert.throws(() => db.prepare(`
+    INSERT INTO memory_evidence_refs
+      (evidence_id, source_domain, source_key, locator, source_version, content_sha256)
+    VALUES ('ev1_d', 'conversation_message', '1', NULL, '', ?)
+  `).run('a'.repeat(64)), /NOT NULL/);
   db.close();
 });
