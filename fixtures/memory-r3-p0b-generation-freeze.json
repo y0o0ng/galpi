@@ -1,0 +1,363 @@
+{
+  "schemaVersion": 1,
+  "inputManifestSha256": "c03332b19dc5158e9e866033b689f6538ec554719b168fea1aa0405090ee3455",
+  "privateBundleSha256": "08441a3c683b69e09a4bea91e82bee2deee235c613e2b95d456061996661db54",
+  "answerStackSha256": "c092d529cbcf41636cb45aa00e964056037db44cd9ca6f9f8764dc3b8b5af201",
+  "generationCodeCommit": "28ff11104b05f2581a7281a6e828764653309081",
+  "model": "gpt-6-luna",
+  "reasoning": {
+    "effort": "medium",
+    "context": "current_turn"
+  },
+  "maxOutputTokens": 8192,
+  "store": false,
+  "toolsAbsent": true,
+  "maxRetries": 0,
+  "plannedSlots": 264,
+  "attemptedSlots": 264,
+  "successfulSlots": 264,
+  "failedSlots": 0,
+  "ambiguousSlots": 0,
+  "generationCompleteCases": 66,
+  "generationFailureCases": 0,
+  "preexistingToolIndeterminate": 13,
+  "planSha256": "e7608b7ea4303b5f13498b7a7e6906e5bd9461c28be79510f3078c3b2fc75e8d",
+  "privateRawResultSha256": "4bd2a6a43bef5817c1786d6d9ad06bc00339e807d54c1929b803f0c095387ff8",
+  "blindMappingSha256": "397fb6944d505f4ed004248afb8cd02a147d1c94f54dbf6f7013b2b8fad57363",
+  "blindPacketSha256": "092a91d11c9ee2d8c235ed59051d60fbfc9a4b9d1a7797f91c5b08cef6d4c707",
+  "externalApiCalls": 264,
+  "productionMutations": 0,
+  "humanAdjudications": 0,
+  "cases": [
+    {
+      "traceId": 314,
+      "messageId": 914,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 333,
+      "messageId": 952,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 335,
+      "messageId": 956,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 336,
+      "messageId": 958,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 337,
+      "messageId": 960,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 338,
+      "messageId": 962,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 339,
+      "messageId": 964,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 340,
+      "messageId": 966,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 342,
+      "messageId": 970,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 344,
+      "messageId": 974,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 363,
+      "messageId": 1012,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 378,
+      "messageId": 1042,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 379,
+      "messageId": 1044,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 380,
+      "messageId": 1046,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 381,
+      "messageId": 1048,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 392,
+      "messageId": 1070,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 394,
+      "messageId": 1074,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 398,
+      "messageId": 1082,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 399,
+      "messageId": 1084,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 401,
+      "messageId": 1088,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 405,
+      "messageId": 1096,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 407,
+      "messageId": 1100,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 408,
+      "messageId": 1102,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 410,
+      "messageId": 1106,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 411,
+      "messageId": 1108,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 412,
+      "messageId": 1110,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 414,
+      "messageId": 1114,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 415,
+      "messageId": 1116,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 416,
+      "messageId": 1118,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 419,
+      "messageId": 1124,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 426,
+      "messageId": 1138,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 431,
+      "messageId": 1148,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 432,
+      "messageId": 1150,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 433,
+      "messageId": 1152,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 434,
+      "messageId": 1154,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 435,
+      "messageId": 1156,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 438,
+      "messageId": 1162,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 439,
+      "messageId": 1164,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 445,
+      "messageId": 1176,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 446,
+      "messageId": 1178,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 449,
+      "messageId": 1184,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 451,
+      "messageId": 1188,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 452,
+      "messageId": 1190,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 468,
+      "messageId": 1222,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 470,
+      "messageId": 1226,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 474,
+      "messageId": 1234,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 479,
+      "messageId": 1244,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 483,
+      "messageId": 1252,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 576,
+      "messageId": 1438,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 585,
+      "messageId": 1456,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 586,
+      "messageId": 1458,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 597,
+      "messageId": 1480,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 608,
+      "messageId": 1502,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 609,
+      "messageId": 1504,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 613,
+      "messageId": 1512,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 617,
+      "messageId": 1520,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 622,
+      "messageId": 1530,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 626,
+      "messageId": 1538,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 629,
+      "messageId": 1544,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 632,
+      "messageId": 1550,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 647,
+      "messageId": 1580,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 659,
+      "messageId": 1604,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 660,
+      "messageId": 1606,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 667,
+      "messageId": 1620,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 669,
+      "messageId": 1624,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    },
+    {
+      "traceId": 692,
+      "messageId": 1670,
+      "generationStatus": "FOUR_RESPONSES_COMPLETE"
+    }
+  ]
+}

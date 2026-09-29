@@ -1,8 +1,8 @@
 # XION Memory R3-P0-B Operational Replay Census Freeze Receipt
 
-> **P0-B PREPARATION COMPLETE — OPERATIONAL REPLAY CENSUS FROZEN**
+> **P0-B 2×2 GENERATION COMPLETE — PRIMARY HUMAN ADJUDICATION NOT STARTED**
 >
-> **ANSWER GENERATION NOT STARTED — STRICT HISTORICAL EXACT S UNPROVEN**
+> **STRICT HISTORICAL EXACT S UNPROVEN**
 
 ## Scope and authority
 
@@ -144,3 +144,27 @@ The repository owner adopted the §53.7 pre-generation amendment after strict re
 - Focused P0-B tests: **22 passed**. Full `npm test`: **1,687 passed / 0 failed / 3 skipped** (1,690 total). `git diff --check` and manifest privacy/determinism checks passed.
 
 This amended freeze estimates later ΔA only for the frozen answer stack **with schedule context omitted**, narrowing external validity relative to full production context. It does not imply that the historical schedule was empty or irrelevant, reproduce historical production answers, prove strict historical `S`/ΔR, or determine ΔA or GREEN/AMBER/RED. Next: run the frozen 2×2 generation protocol on the 66 ready inputs, with blind HUMAN adjudication and the 13 indeterminate cases retained for final bounds.
+
+## Frozen 2×2 answer generation and blind packet — 2026-09-29
+
+> **264/264 PLANNED SLOTS SUCCEEDED — 66 FOUR-ANSWER CASES FROZEN**
+>
+> **PRIMARY HUMAN ADJUDICATION NOT STARTED — NO ΔA OR GREEN/AMBER/RED RESULT**
+
+- Latest GitHub `main` baseline: `0d42368c67c627b0338eb80d1f0106764bc90980`; generation implementation commit: `28ff11104b05f2581a7281a6e828764653309081`. The §53.7 generation-failure clarification applies the existing no-retry fail-close rule; no threshold, D0, schedule, census or materiality rule changed.
+- Frozen committed input manifest SHA256 `c03332b19dc5158e9e866033b689f6538ec554719b168fea1aa0405090ee3455`; 66-case private bundle SHA256 `08441a3c683b69e09a4bea91e82bee2deee235c613e2b95d456061996661db54`; answer-stack SHA256 `c092d529cbcf41636cb45aa00e964056037db44cd9ca6f9f8764dc3b8b5af201`. Exact request model was `gpt-6-luna` for every call (Responses API, `medium`/`current_turn`, 8,192 max output tokens, `store=false`, no tools); the frozen catalog-generation provenance remained **125**. The provider reported `gpt-6-luna` on all successful responses. `OPENAI_BASE_URL` was empty, and SDK/client and per-request `maxRetries=0` were tested against 429, 500 and transport failures.
+- The frozen 66-case private bundle was retained on the local research host rather than the Pi at generation start. Before generation it was transferred byte-for-byte to the Pi private research path `/home/pi/p0b-research-private/galpi-p0b-generation-inputs-schedule-omitted.json`; source, transferred temporary file, and final Pi file all matched SHA256 `08441a3c683b69e09a4bea91e82bee2deee235c613e2b95d456061996661db54`. The bundle was **not regenerated** from current DB/Vault state. Pi `/private/tmp` did not exist and required unavailable sudo access, so the repository owner approved the Pi home private path. The directory is mode `0700`, the bundle and all private artifacts mode `0600`.
+- Before the first API call, the deterministic 264-slot interleaved plan (SHA256 `e7608b7ea4303b5f13498b7a7e6906e5bd9461c28be79510f3078c3b2fc75e8d`) and secret X/Y mapping (SHA256 `397fb6944d505f4ed004248afb8cd02a147d1c94f54dbf6f7013b2b8fad57363`) were durably frozen. The mapping and arm identities are private and are not disclosed in this receipt or the blind packet. Calls ran sequentially, one attempt per planned slot, with no replacement generation or early stopping.
+
+| Generation result | Count |
+| --- | ---: |
+| Planned logical slots / SDK dispatches | 264 / 264 |
+| Successful / failed / ambiguous slots | 264 / 0 / 0 |
+| Complete four-answer cases | 66 |
+| `INDETERMINATE_GENERATION_FAILURE` cases | 0 |
+| Pre-existing `INDETERMINATE_TOOL_REPLAY` cases | 13 |
+
+- Raw result artifact remains private on Pi at `/home/pi/p0b-research-private/generation/galpi-p0b-generation-results.json`, SHA256 `4bd2a6a43bef5817c1786d6d9ad06bc00339e807d54c1929b803f0c095387ff8`. The private blind HUMAN packet at `/home/pi/p0b-research-private/generation/galpi-p0b-generation-packet.json` contains 66 cases with original request, bounded historical conversation context and two responses per neutral X/Y group; decision fields are null. Packet SHA256 `092a91d11c9ee2d8c235ed59051d60fbfc9a4b9d1a7797f91c5b08cef6d4c707`. The privacy-safe committed [generation manifest](../fixtures/memory-r3-p0b-generation-freeze.json) has SHA256 `885481e55e0ece3beccdbaa104d237b088af0be17f2bbcd3507de2c82ec1d192` and contains no raw request, history, answer, mapping or retrieval context.
+- A private Pi audit verified 264 unique planned slots, exactly one durable `DISPATCHING` and one `SUCCESS` per slot in planned order, request and response hashes, 66 complete packet cases, neutral packet structure and unfilled HUMAN fields. Generation read only the frozen private bundle, committed manifest, code and `.env`; it did not read or write production DB/Vault, run live tools, mutate chat/task/note state or restart the service. The only external provider calls were the **264** frozen OpenAI Responses requests. Focused P0-B tests: **28 passed**; full `npm test`: **1,693 passed / 0 failed / 3 skipped** (1,696 total); `git diff --check` passed.
+
+Next: the repository owner performs the primary blind HUMAN adjudication on the private packet. No `MATERIAL_CHANGE`/`NO_MATERIAL_CHANGE` label, ΔA, policy winner or GREEN/AMBER/RED feasibility result is assigned here. The 13 attachment/tool-indeterminate cases remain in the operational 79-case denominator.
