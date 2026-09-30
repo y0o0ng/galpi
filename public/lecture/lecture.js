@@ -651,6 +651,8 @@
       page.ink.setPointerCapture(event.pointerId);
       v.pens.close();
       const pen = v.pens.current();
+      // 마지막 방어선: 복습 전용 초록은 강의 펜으로 그리지 않는다(§8.2).
+      if (pen.tool !== 'eraser' && global.LecturePens.isReviewGreen(pen.color)) return toast('이 색상은 복습 필기 전용이에요');
       if (pen.tool === 'eraser') {
         v.erasing = { page, pointerId: event.pointerId, last: pagePoint(page, event), radius: ERASER_RADIUS * pen.width / v.zoom };
         eraseAt(v, page, v.erasing.last, v.erasing.radius);

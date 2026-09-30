@@ -5,21 +5,26 @@
 // - 레일은 세로·가로를 바꿀 수 있고 전환 버튼은 레일 끝이다. 펜은 끝선 안에 숨고 고른 펜만 나온다.
 // - 초록 계열은 복습 펜 전용이라 일반 펜·형광펜에서 고를 수 없다(§8.2).
 (function (global) {
-  const STORAGE_KEY = 'galpi-lecture-pens';
+  // v2: 기본 펜을 Figma 레일 구성으로 바꾸면서 옛 저장값을 한 번 버린다.
+  const STORAGE_KEY = 'galpi-lecture-pens-v2';
   const MAX_PENS = 15;
   // 굵기 1.0이 페이지 폭의 0.24%다(A4 폭 약 0.5mm).
   const WIDTH_UNIT = 0.0024;
   const HIGHLIGHT_ALPHA = 0.35;
-  const PALETTE = ['#1D2622', '#6B7670', '#C95B55', '#4A6FA5', '#7A67A8', '#D4A72C'];
-  const HIGHLIGHT_PALETTE = ['#F2D14B', '#F5A55B', '#E88BD6', '#8EC5F2', '#C9A3F0', '#B8BEC0'];
+  // Figma `Pen settings popover`의 빠른 팔레트. 형광펜은 레일 기본값의 두 색을 앞에 둔다.
+  const PALETTE = ['#1D2622', '#6E7772', '#C65C58', '#4A6FA5', '#7966A8', '#D2A72A'];
+  const HIGHLIGHT_PALETTE = ['#F2F456', '#DD56F4', '#F5A55B', '#8EC5F2', '#C9A3F0', '#B8BEC0'];
   // 복습 전용 초록 대역. 채도 하한은 설계상 실기기 튜닝 값이다(§8.2) — 회녹색까지 막으면 올린다.
   const REVIEW_GREEN_HUE = [105, 165];
   const REVIEW_GREEN_MIN_SATURATION = 0.25;
+  // Figma `Floating Toolbar` 기본 구성.
   const DEFAULT_PENS = [
-    { tool: 'pen', color: '#1D2622', width: 1 },
-    { tool: 'pen', color: '#C95B55', width: 1 },
-    { tool: 'pen', color: '#4A6FA5', width: 1 },
-    { tool: 'highlighter', color: '#F2D14B', width: 3 },
+    { tool: 'pen', color: '#000000', width: 1 },
+    { tool: 'pen', color: '#5F6E66', width: 1 },
+    { tool: 'pen', color: '#D33538', width: 1 },
+    { tool: 'pen', color: '#0088FF', width: 1 },
+    { tool: 'highlighter', color: '#DD56F4', width: 3 },
+    { tool: 'highlighter', color: '#F2F456', width: 3 },
     { tool: 'eraser', color: null, width: 1 },
   ];
 
@@ -39,6 +44,8 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (Array.isArray(saved?.pens) && saved.pens.length) {
+        // 저장값이 어떻게든 초록을 들고 있으면 버린다(복습 전용 색).
+        saved.pens.forEach(pen => { if (pen.tool !== 'eraser' && isReviewGreen(pen.color)) pen.color = PALETTE[0]; });
         return { pens: saved.pens.slice(0, MAX_PENS), selected: Math.min(saved.selected || 0, saved.pens.length - 1), orientation: saved.orientation === 'horizontal' ? 'horizontal' : 'vertical' };
       }
     } catch { /* 기본값으로 */ }
@@ -58,12 +65,13 @@
     wrap.setAttribute('aria-hidden', 'true');
     return wrap;
   }
-  const penSvg = color => `<svg viewBox="0 0 40 16" width="40" height="16"><path d="M0 3h24v10H0z" fill="#FAFBF9" stroke="#1D2622" stroke-width="1"/><path d="M0 3h9v10H0z" fill="${color}"/><path d="M24 3l12 5-12 5z" fill="${color}" stroke="#1D2622" stroke-width="1" stroke-linejoin="round"/></svg>`;
-  const highlighterSvg = color => `<svg viewBox="0 0 40 16" width="40" height="16"><path d="M0 2h22v12H0z" fill="#FAFBF9" stroke="#1D2622" stroke-width="1"/><path d="M0 2h9v12H0z" fill="${color}"/><path d="M22 3.5h8l4 2v5l-4 2h-8z" fill="${color}" stroke="#1D2622" stroke-width="1" stroke-linejoin="round"/></svg>`;
-  const ERASER_SVG = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 15.5 13.5 6l5 5L9 20.5H5.5L4 19z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 10.5 14 15.5M9 20.5h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-  const PLUS_SVG = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  // 세로↔가로 전환. 회전해도 잉크가 가운데 있게 중심 대칭으로 그린다.
-  const ROTATE_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><rect x="4" y="4" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/><path d="M8 12l4-4M9 8h3v3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // Figma `pen 1`·`highlighter`·`eraser` 컴포넌트(78:1128·78:1214·78:1229)의 경로다. 몸통 색만 펜 색으로 바꾼다.
+  const penSvg = color => `<svg viewBox="0 0 21 41" width="21" height="41"><path d="M0.25 0.25V20.2757H0.661765H5.5H9H13.8382H14.25V0.25H0.25Z" fill="${color}"/><path d="M6.01471 33.793L7.25 38.2988L8.48529 33.793H6.01471Z" fill="${color}"/><path d="M0.661765 20.2757H5.5H9H13.8382M0.661765 20.2757H0.25V0.25H14.25V20.2757H13.8382M0.661765 20.2757V21.7776L5.60294 33.793H6.01471M13.8382 20.2757V21.7776L9 33.793H8.48529M6.01471 33.793L7.25 38.2988L8.48529 33.793M6.01471 33.793H8.48529" fill="none" stroke="#000000" stroke-width="0.5"/></svg>`;
+  const highlighterSvg = color => `<svg viewBox="0 0 21 41" width="21" height="41"><path d="M0.25 0.25V20.2757H0.691176H5.875H9.625H14.8608H15.25V0.25H0.25Z" fill="${color}"/><path d="M5.60714 33.75L5.75 38.25L9.25 37.75L9.89286 33.75H5.60714Z" fill="${color}"/><path d="M0.691176 20.2757H5.875H9.625H14.8608M0.691176 20.2757H0.25V0.25H15.25V20.2757H14.8608M0.691176 20.2757V21.7776C1.32143 26.75 4.53571 31.25 4.53571 31.25L5.07143 33.75H5.60714M14.8608 20.2757L14.8088 21.7776C14.1081 26.75 10.9643 31.25 10.9643 31.25L10.4286 33.75H9.89286M5.60714 33.75L5.75 38.25L9.25 37.75L9.89286 33.75M5.60714 33.75H9.89286" fill="none" stroke="#000000" stroke-width="0.5"/></svg>`;
+  const ERASER_PEN_SVG = '<svg viewBox="0 0 21 41" width="21" height="41"><path d="M0.46902 23.25C0.170912 24.0287 0.233563 23.9723 0.525454 24.75H14.0146C14.3312 23.948 14.3164 24.0113 14.0145 23.25H0.46902Z" fill="#2C2C29"/><path d="M0.46902 21.75C0.184727 22.531 0.17669 22.469 0.46902 23.25H14.0145C14.3158 22.4594 14.3152 22.5198 14.0145 21.75H0.46902Z" fill="#2C2C29"/><path d="M0.46902 20.2757C0.165906 21.0655 0.188295 21.0035 0.46902 21.75H14.0145C14.3265 20.9489 14.3233 21.0351 14.0145 20.2757H0.46902Z" fill="#2C2C29"/><path d="M0.46902 0.25V20.2757H14.0145V0.25H0.46902Z" fill="#E8CA37"/><path d="M14.0146 24.75H0.525454V28.25C0.637207 31.4027 1.56073 34.25 7.27004 34.25C12.7299 34.25 13.8093 31.2748 13.9928 28.25L14.0146 24.75Z" fill="#F56062"/><path d="M0.46902 20.2757V0.25H14.0145V20.2757M0.46902 20.2757C0.165906 21.0655 0.188295 21.0035 0.46902 21.75M0.46902 20.2757H14.0145M14.0145 20.2757C14.3233 21.0351 14.3265 20.9489 14.0145 21.75M0.525454 24.75C0.233563 23.9723 0.170912 24.0287 0.46902 23.25M0.525454 24.75H14.0146M0.525454 24.75V28.25C0.637207 31.4027 1.56073 34.25 7.27004 34.25C12.7299 34.25 13.8093 31.2748 13.9928 28.25L14.0146 24.75M0.46902 23.25C0.17669 22.469 0.184727 22.531 0.46902 21.75M0.46902 23.25H14.0145M0.46902 21.75H14.0145M14.0145 21.75C14.3152 22.5198 14.3158 22.4594 14.0145 23.25M14.0145 23.25C14.3164 24.0113 14.3312 23.948 14.0146 24.75" fill="none" stroke="#000000" stroke-width="0.5"/></svg>';
+  const toolSvg = pen => (pen.tool === 'eraser' ? ERASER_PEN_SVG : pen.tool === 'highlighter' ? highlighterSvg(pen.color) : penSvg(pen.color));
+  const PLUS_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 3.75V16.25M3.75 10H16.25" stroke="currentColor" stroke-width="1.875" stroke-linecap="round"/></svg>';
+  const ROTATE_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M14 3H6C4.34315 3 3 4.34315 3 6V14C3 15.6569 4.34315 17 6 17H14C15.6569 17 17 15.6569 17 14V6C17 4.34315 15.6569 3 14 3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M8 8H13V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 8L7 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
   const toolLabel = { pen: '펜', highlighter: '형광펜', eraser: '지우개' };
 
   function buildRail({ toast }) {
@@ -100,8 +108,7 @@
         const button = el('button', `lecture-rail-pen is-${pen.tool}${index === settings.selected ? ' active' : ''}`);
         button.type = 'button';
         button.setAttribute('aria-label', `${toolLabel[pen.tool]} ${index + 1}${index === settings.selected ? ' · 다시 누르면 설정' : ''}`);
-        button.append(icon(pen.tool === 'eraser' ? ERASER_SVG : pen.tool === 'highlighter' ? highlighterSvg(pen.color) : penSvg(pen.color)));
-        if (pen.tool !== 'eraser') button.append(el('span', 'lecture-rail-width', pen.width.toFixed(1)));
+        button.append(icon(toolSvg(pen)), el('span', 'lecture-rail-width', pen.width.toFixed(1)));
         button.addEventListener('click', () => {
           if (index === settings.selected) return menu ? closeMenu() : openMenu(button);
           settings.selected = index;
@@ -117,10 +124,12 @@
       closeMenu();
       const pen = settings.pens[settings.selected];
       menu = el('div', 'lecture-pen-menu');
-      const tools = el('div', 'lecture-segment is-three');
+      const tools = el('div', 'lecture-menu-tools');
       Object.entries(toolLabel).forEach(([tool, label]) => {
-        const option = el('button', tool === pen.tool ? 'active' : '', label);
+        const option = el('button', `lecture-menu-tool${tool === pen.tool ? ' active' : ''}`);
         option.type = 'button';
+        option.setAttribute('aria-label', label);
+        option.append(icon(toolSvg({ tool, color: pen.color || (tool === 'highlighter' ? HIGHLIGHT_PALETTE[0] : PALETTE[0]) })));
         option.addEventListener('click', () => {
           pen.tool = tool;
           if (tool === 'eraser') pen.color = null;
@@ -130,7 +139,7 @@
         });
         tools.append(option);
       });
-      menu.append(tools);
+      menu.append(tools, el('hr', 'lecture-menu-divider'));
 
       if (pen.tool !== 'eraser') {
         const swatches = el('div', 'lecture-swatches');
@@ -148,12 +157,15 @@
         const input = el('input');
         input.type = 'color';
         input.value = pen.color || '#1D2622';
+        // iPadOS 선택기는 열린 채로 고른 색을 표시하므로, 거부하면 선택기를 닫아 적용된 것처럼 보이지 않게 한다.
+        const reject = () => {
+          toast('이 색상은 복습 필기 전용이에요');
+          input.value = pen.color;
+          input.blur();
+        };
+        input.addEventListener('input', () => { if (isReviewGreen(input.value)) reject(); });
         input.addEventListener('change', () => {
-          if (isReviewGreen(input.value)) {
-            toast('이 색상은 복습 필기 전용이에요');
-            input.value = pen.color;
-            return;
-          }
+          if (isReviewGreen(input.value)) return reject();
           pen.color = input.value;
           persist(); render(); openMenu(pensEl.children[settings.selected]);
         });
@@ -171,13 +183,16 @@
       slider.max = '20';
       slider.step = '0.1';
       slider.value = String(pen.width);
-      slider.addEventListener('input', () => { pen.width = Number(slider.value); value.textContent = pen.width.toFixed(1); });
+      const fill = () => slider.style.setProperty('--fill', `${((pen.width - 0.3) / (20 - 0.3)) * 100}%`);
+      fill();
+      slider.addEventListener('input', () => { pen.width = Number(slider.value); value.textContent = pen.width.toFixed(1); fill(); });
       slider.addEventListener('change', () => { persist(); render(); });
       const range = el('div', 'lecture-menu-range');
       range.append(el('span', '', '0.3'), el('span', '', '20.0'));
       menu.append(widthRow, slider, range);
 
       if (settings.pens.length > 1) {
+        menu.append(el('hr', 'lecture-menu-divider'));
         const remove = el('button', 'lecture-menu-danger', '삭제');
         remove.type = 'button';
         remove.addEventListener('click', () => {
