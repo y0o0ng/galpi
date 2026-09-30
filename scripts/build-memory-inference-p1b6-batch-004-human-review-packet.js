@@ -177,6 +177,7 @@ function buildHumanResultReceipt(rawResultBytes, reviewDate) {
     reviewer: {
       role: 'repository owner',
       decisionsBy: 'repository owner',
+      presentationAid: 'a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)',
       independentConfirmation: false,
       limitation: 'The owner reviewed every surface before audit with its authoring target label, directed both repairs of 037, and had seen the v3 review summary including the mandatory and calibration item IDs; row blindness hid only which opaque row was which.',
     },

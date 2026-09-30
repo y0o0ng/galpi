@@ -1,0 +1,366 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-004-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-004-human-review-attempt-001",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-09-30",
+  "reviewProtocol": {
+    "identity": "p1b6-batch-004-blind-human-adjudication-calibration-v1",
+    "sha256": "c40d19b58ac65582556543be9639b5be1236924eb6ec496fc3158b6c245a4b4e"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-004-human-review-packet-v1",
+    "sha256": "b1f2f4a08d0bf13dec03eea2094fdd698c0b8633fe64b0ac639fcb411bf19104",
+    "rows": 10
+  },
+  "v3ReviewReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-batch-004-v3-review-attempt-001-receipt-v1",
+    "rawSha256": "08a30720c19490f04da8ffcc0943eb849fac1da6c5051919a0eaab02145587a0"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b004-human-review-results.json",
+    "sha256": "59fb05fd3f3be21ba38dadc15e1b386c3ab44487e3306ccef383c0adc3499786",
+    "committed": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "presentationAid": "a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)",
+    "independentConfirmation": false,
+    "limitation": "The owner reviewed every surface before audit with its authoring target label, directed both repairs of 037, and had seen the v3 review summary including the mandatory and calibration item IDs; row blindness hid only which opaque row was which."
+  },
+  "summary": {
+    "total": 10,
+    "mandatory": 2,
+    "calibration": 8,
+    "matchingV3Reference": 8,
+    "humanAdjudicated": 1,
+    "unsampledCleanAgreements": 30
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-b004-hreview-6dee015687d271a2",
+      "itemId": "p1b6-item-b004-001",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "It is unclear which dimension differs by about 10 cm.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-2157eb5992fe2992",
+      "itemId": "p1b6-item-b004-002",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "It is unclear whether one third of the preparation period or one third of the moving boxes remains.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-be59a4e5bcab3683",
+      "itemId": "p1b6-item-b004-006",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "It is unclear which rug dimension is about 20 cm smaller.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-e289b2bcaa7f42b4",
+      "itemId": "p1b6-item-b004-009",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Because both dimensions are stated to differ, the natural reading is that the new frame is about 3 cm larger in each dimension.",
+      "outcome": "CALIBRATION_DECISION_MISMATCH",
+      "provenance": null,
+      "eligibility": "INELIGIBLE",
+      "resolutionRequired": true
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-aacf5d2f96a15075",
+      "itemId": "p1b6-item-b004-015",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The release delay is clearly presented as the team lead's attributed statement, even though no official notice has been seen.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-db81de1eb42b88ff",
+      "itemId": "p1b6-item-b004-026",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The TARGET itself is explicitly an undecided status: the user is still considering whether to apply.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-10f064b706bc3228",
+      "itemId": "p1b6-item-b004-032",
+      "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
+      "role": "mandatory",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The final '그렇게 해줘' naturally confirms the proposed 30-minute stand-up delay.",
+      "outcome": "MANDATORY_MATCH",
+      "provenance": "HUMAN_ADJUDICATED",
+      "eligibility": "ELIGIBLE"
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-2508e99353e33333",
+      "itemId": "p1b6-item-b004-036",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The daily dog-walk habit is stated directly, with the rainy-season interruption explicitly bounded and already ended.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-e88fd25275de210e",
+      "itemId": "p1b6-item-b004-037",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "role": "mandatory",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The tomato plot is naturally read as the same vegetable plot; the clarification is appositive, not an alternative.",
+      "outcome": "MANDATORY_DECISION_MISMATCH",
+      "provenance": null,
+      "eligibility": "INELIGIBLE",
+      "resolutionRequired": true
+    },
+    {
+      "reviewRowId": "p1b6-b004-hreview-6f4142df6d691b98",
+      "itemId": "p1b6-item-b004-040",
+      "semanticSkeletonId": "p1b6-sk-47c9b12e0a6f83d5",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The Monday recycling duty is explicitly said to remain in place alongside the added Friday duty.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "unsampledCleanAgreements": [
+    {
+      "itemId": "p1b6-item-b004-003",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-004",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-005",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-007",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-010",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-011",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-012",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-013",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-014",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-016",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-017",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-018",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-019",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-020",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-021",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-022",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-023",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-024",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-025",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-027",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-028",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-029",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-030",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-031",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-033",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-034",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-035",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-038",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-039",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    },
+    {
+      "itemId": "p1b6-item-b004-041",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL",
+      "calibrationExtrapolated": false
+    }
+  ],
+  "sourceAuditExcluded": [
+    "p1b6-item-b004-008"
+  ],
+  "authority": {
+    "promotedToHumanAdjudicated": true,
+    "catalogAmendedByThisResult": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

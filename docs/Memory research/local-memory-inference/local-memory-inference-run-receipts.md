@@ -5333,3 +5333,15 @@ the accepted pool record stays **93**.
 
 Reviewer is the repository owner, not independent. 30 unsampled clean agreements stay
 `PROVISIONAL`; `008` stays excluded. No HUMAN review or acceptance; the accepted pool record stays **93**.
+
+#### P1-B6 batch-004 HUMAN review attempt-001 (2026-09-30) — 8 / 10 MATCH v3
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-004-human-review-attempt-001.json` | receipt, `b83c60e5…` |
+| `~/p1b6-b004-human-review-results.json` (not committed) | raw results, `59fb05fd3f3be21ba38dadc15e1b386c3ab44487e3306ccef383c0adc3499786` |
+
+Owner decisions; GPT-5.6 sol presentation aid only (owner-reported); not independent. `032`
+`HUMAN_ADJUDICATED`; seven calibration matches stay `PROVISIONAL`; `037` (mandatory) and `009`
+(calibration) KEEP CLEAR against v3 ESCALATE, `INELIGIBLE` pending explicit resolution. No
+acceptance; the accepted pool record stays **93**.

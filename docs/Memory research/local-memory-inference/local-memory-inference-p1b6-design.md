@@ -46,8 +46,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   repaired twice before closure). The fresh source/bundle audit of all 41 rows is **40 PASS /
   1 UNCERTAIN** (`008`, fail-closed and excluded). **Next gate: blind v3 strong-model review of
   the 40 PASS rows** — **38 clean agreements / 2 mandatory HUMAN** (`032`, `037`) and an
-  8-row calibration sample. The 10-row blind HUMAN protocol and packet are built; the HUMAN
-  review has not run.
+  8-row calibration sample. Owner HUMAN review (2026-09-30): **8/10 match v3** — `032`
+  `HUMAN_ADJUDICATED` / `ELIGIBLE`; `037` (mandatory) and `009` (calibration) are KEEP CLEAR
+  against v3 ESCALATE and `INELIGIBLE` pending explicit resolution. No acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2143,6 +2144,20 @@ stay `PROVISIONAL` with nothing extrapolated, and `008` stays out, unrepaired. *
 packet with a non-independent reviewer**: the owner authored and pre-audited the surfaces,
 directed both `037` repairs and has seen the upstream summary including the mandatory and
 calibration item IDs. The protocol records this, and the result receipt will too.
+
+**HUMAN review attempt-001 (2026-09-30) — 8 / 10 match v3.** Receipt:
+`fixtures/local-memory-inference-p1b6-batch-004-human-review-attempt-001.json`, bound to the packet
+(`b1f2f4a0…`), protocol, v3 review receipt and raw result bytes (`59fb05fd…`, not committed).
+The owner decided every row; GPT-5.6 sol presented rows and formatted the JSON with no judgment
+(owner-reported); `independentConfirmation: false`. Mandatory: `032` KEEP CLEAR matches →
+`HUMAN_ADJUDICATED` / `ELIGIBLE`; `037` KEEP CLEAR against v3 ESCALATE →
+`MANDATORY_DECISION_MISMATCH`, `INELIGIBLE` (owner reason: the tomato plot reads as the same
+vegetable plot, the clarification appositive). Calibration: `001`, `002`, `006`, `015`, `026`,
+`036`, `040` `CALIBRATION_MATCH` (stay `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`); `009`
+(`0768ea20`) KEEP CLEAR against v3 ESCALATE → `CALIBRATION_DECISION_MISMATCH`, `INELIGIBLE`
+(owner reason: both dimensions are said to differ, so about 3 cm larger in each). The two
+mismatches need explicit resolution; nothing relabels the catalog. The 30 unsampled agreements
+stay `PROVISIONAL`, `008` stays excluded, and nothing is accepted, frozen, selected or trained.
 
 ## Closed Selection and Freeze Constraints
 

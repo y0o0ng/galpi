@@ -138,3 +138,27 @@ test('opposing, FIX and REJECT outcomes route per the preregistered contract', (
   assert.equal(receipt.authority.promotedToHumanAdjudicated, false);
   assert.equal(receipt.unsampledCleanAgreements.length, 30);
 });
+
+const os = require('node:os');
+const RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const RAW = path.join(os.homedir(), 'p1b6-b004-human-review-results.json');
+
+test('the committed HUMAN receipt: 032 adjudicated, 037 and 009 ineligible pending resolution, nothing accepted', () => {
+  const receipt = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.equal(receipt.reviewPacket.sha256, PACKET_SHA256);
+  assert.equal(receipt.reviewer.independentConfirmation, false);
+  const outcome = Object.fromEntries(receipt.rows.map(row => [row.itemId.slice(-3), row.outcome]));
+  assert.deepEqual(outcome, {
+    '001': 'CALIBRATION_MATCH', '002': 'CALIBRATION_MATCH', '006': 'CALIBRATION_MATCH',
+    '009': 'CALIBRATION_DECISION_MISMATCH', '015': 'CALIBRATION_MATCH', '026': 'CALIBRATION_MATCH',
+    '032': 'MANDATORY_MATCH', '036': 'CALIBRATION_MATCH', '037': 'MANDATORY_DECISION_MISMATCH', '040': 'CALIBRATION_MATCH',
+  });
+  assert.equal(receipt.summary.humanAdjudicated, 1);
+  assert.equal(receipt.unsampledCleanAgreements.length, 30);
+  assert.equal(receipt.authority.surfaceAcceptancePerformed, false);
+});
+
+test('the HUMAN receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  const receipt = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.deepEqual(builder.buildHumanResultReceipt(fs.readFileSync(RAW), receipt.reviewDate), receipt);
+});
