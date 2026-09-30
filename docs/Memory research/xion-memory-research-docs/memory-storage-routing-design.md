@@ -93,6 +93,14 @@ Proposal shape is `{ changeClass, transition, evidenceIds, rationale }`; validat
 
 EXPAND, FORK and KEEP_AMBIGUOUS execution is not implemented. Such proposals fail closed and remain pending with their actual classification; they are not silently mapped to overwrite or a different change class. Future family extensions must decide their representations. The SINGLE implementation is not a claim that canonical R2 disallows multiple hypotheses.
 
+### Initial development approval boundary — owner decision, 2026-09-30
+
+For the first connected General Fact development workflow, the semantic proposer produces an evidence-backed transition proposal; code checks its shape, EvidenceRef bindings, supported transition constraints and replay snapshot integrity; the repository owner reviews and approves the **semantic judgment** before atomic commit. A model proposal, structurally valid JSON or successful mechanical checks alone must not authorize commit. Until that HUMAN approval is supplied, the candidate remains pending and the stable state is unchanged.
+
+Approval applies to the reviewed proposal and replay snapshot. A changed snapshot requires fresh review rather than carrying approval to a different target/evidence package. The existing stale-replay check remains mandatory.
+
+This selects the initial development authority boundary, not a permanent requirement to manually approve every future memory. Automatic semantic approval conditions remain OPEN and must be evaluated against the actual proposer/validator before adoption. Local-model use remains an option. The HUMAN review/resume interface and provider adapter are not implemented by the current storage core; synthetic test callbacks are not production approval authority. This decision instantiates canonical §42.2 SI-10 / §42.6 without changing their shared transition semantics.
+
 ### Physical state and provenance — schema v31
 
 | Family-local table | Responsibility |
@@ -112,4 +120,4 @@ Commit re-reads and compares the complete canonical replay snapshot, including o
 
 Synthetic SQLite tests cover USER/attribute/value boundaries; null retraction; source binding and unchanged owning rows; replay of original support and counterevidence; required semantic callbacks; CREATE/SUPERSEDE/REVISE/INVALIDATE/NO_CHANGE; unsupported proposals; idempotence; stale/tampered replay; source integrity; atomic provenance rollback; and invalid slot histories. Migration tests cover schema-30 upgrade, repeat migration, uniqueness, foreign keys and transition mapping constraints.
 
-Next is to choose and evaluate the actual semantic proposer/domain-validation policy (local model remains an option), then connect a production accepted-candidate adapter only after its gates are specified. No model provider, semantic approval gate, production integration, active elicitation, Projection or Context Assembly is delivered by this core.
+Next is to design the proposal review workflow under the initial HUMAN approval boundary and choose/evaluate the actual semantic proposer (local model remains an option), then connect a production accepted-candidate adapter only after its gates are specified. No model provider, HUMAN review interface, production integration, active elicitation, Projection or Context Assembly is delivered by this core; automatic semantic approval remains OPEN.
