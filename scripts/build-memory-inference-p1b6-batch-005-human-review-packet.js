@@ -108,6 +108,26 @@ function buildHumanReviewPacket() {
 const RECEIPT_FIXTURE = 'local-memory-inference-p1b6-batch-005-human-review-attempt-001.json';
 const RAW_RESULT_FILENAME = 'p1b6-b005-human-review-results.json';
 
+// The owner's first submission carried two row IDs that are not in the packet. At the owner's
+// instruction each was corrected to the packet row whose bundle its unchanged reason describes;
+// decisions and reasons were not touched.
+const SUBMISSION_CORRECTION = Object.freeze({
+  originalSubmission: Object.freeze({
+    filename: 'p1b6-b005-human-review-results.original.json',
+    sha256: '39e08f32410b4d306d2e4750981af573b82f60b3ad237b227763a24e72ffb4a8',
+    committed: false,
+    status: 'REJECTED_UNKNOWN_ROW_IDS',
+  }),
+  rowIds: Object.freeze([
+    Object.freeze({ from: 'p1b6-b005-hreview-b934c64160c5a1e7', to: 'p1b6-b005-hreview-13b05bf2b1799709', basis: 'the reason describes the 3 to 4 p.m. landing window, which is only in this packet row' }),
+    Object.freeze({ from: 'p1b6-b005-hreview-e58e99c3ff87744b', to: 'p1b6-b005-hreview-dbdc07ba6fb4763d', basis: 'the reason describes the 5 cm width-or-depth increase, which is only in this packet row' }),
+  ]),
+  correctedBy: 'the assistant, at the repository owner\'s explicit instruction',
+  cause: 'owner-reported transcription error by the presentation aid',
+  changedFields: Object.freeze(['reviewRowId']),
+  decisionsOrReasonsChanged: false,
+});
+
 // The preregistered semantics of the batch-005 HUMAN protocol.
 function routeHumanResult(role, referenceLabel, row) {
   const prefix = role === 'mandatory' ? 'MANDATORY' : 'CALIBRATION';
@@ -166,9 +186,11 @@ function buildHumanResultReceipt(rawResultBytes, reviewDate) {
     reviewPacket: { identity: PACKET_IDENTITY, sha256: sha256RawBytes(packetBytes(packet)), rows: packet.rows.length },
     v3ReviewReceipt: { identity: PINNED.reviewReceipt.identity, rawSha256: PINNED.reviewReceipt.rawSha256 },
     rawResultArtifact: { filename: RAW_RESULT_FILENAME, sha256: sha256RawBytes(rawResultBytes), committed: false },
+    submissionCorrection: SUBMISSION_CORRECTION,
     reviewer: {
       role: 'repository owner',
       decisionsBy: 'repository owner',
+      presentationAid: 'a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)',
       independentConfirmation: false,
       limitation: 'The owner chose the batch-005 allocation, reviewed both surfaces before audit with their authoring target labels, and had seen the v3 review summary (both rows calibration); row blindness hid only which opaque row was which.',
     },
@@ -224,6 +246,7 @@ module.exports = {
   PACKET_IDENTITY,
   PINNED,
   RECEIPT_FIXTURE,
+  SUBMISSION_CORRECTION,
   REVIEW_ID_NAMESPACE,
   buildHumanResultReceipt,
   buildHumanReviewPacket,

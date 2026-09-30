@@ -1,0 +1,102 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-005-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-005-human-review-attempt-001",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-10-01",
+  "reviewProtocol": {
+    "identity": "p1b6-batch-005-blind-human-adjudication-calibration-v1",
+    "sha256": "134b72c0e96f68cfbbd142bcb1c364a8f0711d1d7a045798e6ab8b5087cdef30"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-005-human-review-packet-v1",
+    "sha256": "8b1a5b85102bb4167dbea954d1430d46a15de95ceb36254f82ac3dc3bcaadc08",
+    "rows": 2
+  },
+  "v3ReviewReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-batch-005-v3-review-attempt-001-receipt-v1",
+    "rawSha256": "23b50a93cbd12009b8cb0af56ef4da90b30f5022ee7d7faa95389892452d8159"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b005-human-review-results.json",
+    "sha256": "8559cbcf0518fed7af25fe713aa5463e691c8ef0aadcadf6359400c931359018",
+    "committed": false
+  },
+  "submissionCorrection": {
+    "originalSubmission": {
+      "filename": "p1b6-b005-human-review-results.original.json",
+      "sha256": "39e08f32410b4d306d2e4750981af573b82f60b3ad237b227763a24e72ffb4a8",
+      "committed": false,
+      "status": "REJECTED_UNKNOWN_ROW_IDS"
+    },
+    "rowIds": [
+      {
+        "from": "p1b6-b005-hreview-b934c64160c5a1e7",
+        "to": "p1b6-b005-hreview-13b05bf2b1799709",
+        "basis": "the reason describes the 3 to 4 p.m. landing window, which is only in this packet row"
+      },
+      {
+        "from": "p1b6-b005-hreview-e58e99c3ff87744b",
+        "to": "p1b6-b005-hreview-dbdc07ba6fb4763d",
+        "basis": "the reason describes the 5 cm width-or-depth increase, which is only in this packet row"
+      }
+    ],
+    "correctedBy": "the assistant, at the repository owner's explicit instruction",
+    "cause": "owner-reported transcription error by the presentation aid",
+    "changedFields": [
+      "reviewRowId"
+    ],
+    "decisionsOrReasonsChanged": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "presentationAid": "a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)",
+    "independentConfirmation": false,
+    "limitation": "The owner chose the batch-005 allocation, reviewed both surfaces before audit with their authoring target labels, and had seen the v3 review summary (both rows calibration); row blindness hid only which opaque row was which."
+  },
+  "summary": {
+    "total": 2,
+    "mandatory": 0,
+    "calibration": 2,
+    "matchingV3Reference": 2,
+    "humanAdjudicated": 0,
+    "unsampledCleanAgreements": 0
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-b005-hreview-dbdc07ba6fb4763d",
+      "itemId": "p1b6-item-b005-001",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "role": "calibration",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "It is unclear whether the roughly 5 cm increase applies to the width or the depth, leaving two materially different readings.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b005-hreview-13b05bf2b1799709",
+      "itemId": "p1b6-item-b005-002",
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The landing time is explicitly given as an approximate window between 3 and 4 p.m.; the uncertain status itself is stated.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "unsampledCleanAgreements": [],
+  "authority": {
+    "promotedToHumanAdjudicated": false,
+    "catalogAmendedByThisResult": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

@@ -54,3 +54,28 @@ test('calibration results route per the preregistered contract and never promote
   assert.deepEqual(mixed.rows.map(row => row.outcome), ['CALIBRATION_FIX', 'CALIBRATION_MATCH']);
   assert.throws(() => builder.buildHumanResultReceipt(Buffer.from(JSON.stringify({ results: [] })), 'd'), /exactly the packet rows/);
 });
+
+const os = require('node:os');
+const RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const RAW = path.join(os.homedir(), 'p1b6-b005-human-review-results.json');
+
+test('the committed HUMAN receipt: 2 calibration matches, ID-only submission correction, nothing promoted', () => {
+  const committed = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.equal(committed.reviewPacket.sha256, PACKET_SHA256);
+  assert.deepEqual(committed.rows.map(row => [row.itemId, row.outcome, row.eligibility]),
+    ITEMS.map(itemId => [itemId, 'CALIBRATION_MATCH', 'PROVISIONAL']));
+  assert.equal(committed.submissionCorrection.decisionsOrReasonsChanged, false);
+  assert.deepEqual(committed.submissionCorrection.changedFields, ['reviewRowId']);
+  const packetIds = new Set(builder.buildHumanReviewPacket().rows.map(row => row.reviewRowId));
+  for (const { from, to } of committed.submissionCorrection.rowIds) {
+    assert.equal(packetIds.has(from), false, from);
+    assert.equal(packetIds.has(to), true, to);
+  }
+  assert.equal(committed.authority.promotedToHumanAdjudicated, false);
+  assert.equal(committed.reviewer.independentConfirmation, false);
+});
+
+test('the HUMAN receipt equals the corrected raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  const committed = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.deepEqual(builder.buildHumanResultReceipt(fs.readFileSync(RAW), committed.reviewDate), committed);
+});

@@ -5395,3 +5395,15 @@ acceptance; the accepted pool record stays **93**.
 
 Reviewer: Claude Opus 5.5 (owner-reported). No HUMAN review or acceptance; the accepted pool
 record stays **93**.
+
+#### P1-B6 batch-005 HUMAN calibration attempt-001 (2026-10-01) — 2/2 MATCH; ledger v3 — pool 389, all marginals met
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-005-human-review-attempt-001.json` | receipt, `2bc7a1ea…`; corrected raw `8559cbcf0518fed7af25fe713aa5463e691c8ef0aadcadf6359400c931359018`, original `39e08f32410b4d306d2e4750981af573b82f60b3ad237b227763a24e72ffb4a8` (neither committed) |
+| `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v3.json` | v2 (unchanged) + 2 batch-005 rows; 389 in pool |
+| `fixtures/local-memory-inference-p1b6-shortage-receipt-v3.json` | every marginal met; minimum top-up lower bound 0 |
+
+Owner decisions, GPT-5.6 sol presentation aid (owner-reported), not independent; two row IDs
+corrected at the owner's instruction, decisions and reasons unchanged. No acceptance, freeze or
+selection; the accepted pool record stays **93**.
