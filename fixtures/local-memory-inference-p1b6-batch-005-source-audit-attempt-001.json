@@ -1,0 +1,60 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-005-source-audit-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-005-source-audit-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-batch-005-source-audit-packet-v1",
+  "auditPacketSha256": "bcc144bda59e754ce8082958126ce67a2a3baf4bf73233b3806e3f9202d6bd2f",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-005-v1",
+    "rawSha256": "98f28dfe844cf07e766c9d0cfb91c00f02c0a79ea6c67e845d70f14f088b2713"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b005-source-audit-results.json",
+    "sha256": "5e25728055d63028f43434d3479cec80c010bf5e716ce4077bc6f1ab20181148",
+    "committed": false
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "surface": "Claude Code",
+    "model": "Claude Opus 5.5",
+    "reasoningSetting": "NOT_RECORDED",
+    "sessionRelationship": "a fresh Claude Code CLI session started in the home directory (no project instructions or memory loaded), separate from the session that authored the surfaces, given only the protocol and packet paths"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "Fresh realizations under new IDs; no historical source-audit result carried forward."
+  },
+  "summary": {
+    "total": 2,
+    "PASS": 2,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "failClosedRows": [],
+  "authority": {
+    "sourceBundleGatePassedForPassRows": true,
+    "failClosedRowsExcludedFromSemanticReview": true,
+    "semanticReviewOccurred": false,
+    "humanReviewOccurred": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-b005-audit-08dd1ebf620a62eb",
+      "disposition": "PASS",
+      "reason": "Omitted t2 (garage remote batteries) and t4 (milk) are unrelated distractors; all flight/arrival-timing turns are included."
+    },
+    {
+      "auditRowId": "p1b6-b005-audit-0cd6eaf8c38afe90",
+      "disposition": "PASS",
+      "reason": "Only omitted turn t3 (coffee went cold) is irrelevant; comparison context and first mat's dimensions are included."
+    }
+  ]
+}

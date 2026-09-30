@@ -36,3 +36,22 @@ test('2 sorted opaque rows with the full episode, one TARGET and no leaked metad
     assert.equal(text.includes(value), false, value);
   }
 });
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const RAW = path.join(os.homedir(), 'p1b6-b005-source-audit-results.json');
+
+test('the committed audit receipt records 2/2 PASS and opens no semantic gate', () => {
+  const receipt = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.equal(receipt.status, 'COMPLETE_PASS');
+  assert.equal(receipt.auditPacketSha256, PACKET_SHA256);
+  assert.deepEqual(receipt.summary, { total: 2, PASS: 2, FAIL: 0, UNCERTAIN: 0 });
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  assert.equal(receipt.authority.semanticReviewOccurred, false);
+});
+
+test('the audit receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  assert.deepEqual(builder.buildSourceAuditReceipt(fs.readFileSync(RAW)), JSON.parse(fs.readFileSync(RECEIPT)));
+});

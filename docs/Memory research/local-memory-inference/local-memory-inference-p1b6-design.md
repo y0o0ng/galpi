@@ -50,8 +50,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `HUMAN_ADJUDICATED` / `ELIGIBLE`; `037` (mandatory) and `009` (calibration) are KEEP CLEAR
   against v3 ESCALATE; the owner closed both as current-realization failures. **Ledger v2: pool
   387; the only marginal shortage is EN, by one (37 / 38).** A 2-row EN batch-005 top-up is
-  preregistered and materialized; the owner pre-audit review passed 2/2, and the blind source-audit
-  packet is built, not run. No acceptance.
+  preregistered and materialized; owner pre-audit 2/2 PASS, source audit **2/2 PASS**; the v3
+  strong-model review packet is built, not run. No acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2197,7 +2197,20 @@ packet builder `scripts/build-memory-inference-p1b6-batch-005-source-audit-packe
 (`npm run build:memory-inference-p1b6-batch-005-source-audit-packet -- --output <path>`) follows
 the batch-004 builder: batch-005 (`98f28dfe…`) and the unchanged protocol pinned by raw SHA, the
 batch rebuilt byte-for-byte, 2 sorted opaque rows in the `p1b6-b005-audit` namespace. The packet
-(`bcc144bd…`) is not committed; no audit has run.
+(`bcc144bd…`) is not committed.
+
+**Source audit attempt-001 — 2/2 PASS (`COMPLETE_PASS`).** Fresh Claude Code CLI session in the
+home directory, Claude Opus 5.5 (owner-reported). Receipt
+`fixtures/local-memory-inference-p1b6-batch-005-source-audit-attempt-001.json` binds the packet,
+protocol, batch and raw result bytes (`5e257280…`, not committed).
+
+**v3 strong-model review packet — built, not run.**
+`scripts/build-memory-inference-p1b6-batch-005-v3-review-packet.js`
+(`npm run build:memory-inference-p1b6-batch-005-v3-review-packet -- --output <path>`) follows the
+batch-004 builder: population from the audit receipt (both rows), unchanged neutral v3
+protocol, `p1b6-b005-v3smreview` namespace, and reconciliation against v3 with the batch-005
+rule — non-clean routes go to mandatory HUMAN and **every clean agreement is calibration**. The
+packet (`dfafb7fe…`) is not committed.
 
 ## Closed Selection and Freeze Constraints
 
