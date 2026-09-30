@@ -334,7 +334,12 @@
         v.body = draft.body;
         v.dirty = true;
         v.baseRevision = draft.baseRevision;
-        if (draft.baseRevision !== server.revision) v.conflict = { revision: server.revision, body: server.body };
+        // 서버의 최신본을 이 기기가 썼다면(업로드는 도착했는데 응답 전에 앱이 죽은 경우) 작업본이 그 내용을
+        // 이미 담고 있으므로 충돌이 아니다. 다른 기기가 쓴 경우만 충돌로 알린다.
+        if (draft.baseRevision !== server.revision) {
+          if (server.deviceId === deviceId()) v.baseRevision = server.revision;
+          else v.conflict = { revision: server.revision, body: server.body };
+        }
       } else {
         v.body = server.body;
         v.baseRevision = server.revision;
@@ -791,7 +796,10 @@
     try {
       const res = await global.apiFetch(`/api/lecture/documents/${v.documentId}/annotations`, jsonOptions('PUT', { baseRevision: v.baseRevision, body: v.body, deviceId: deviceId() }));
       const result = await res.json().catch(() => ({}));
-      if (res.status === 409) {
+      if (res.status === 409 && result.deviceId === deviceId()) {
+        // 앞선 업로드가 도착했는데 응답만 잃은 경우다. 이 기기 작업본이 그 위에 있으므로 다음 업로드로 잇는다.
+        v.baseRevision = result.revision;
+      } else if (res.status === 409) {
         v.conflict = { revision: result.revision, body: result.body };
       } else if (res.ok) {
         v.baseRevision = result.revision;

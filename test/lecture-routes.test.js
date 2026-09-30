@@ -60,15 +60,19 @@ test('lecture containers, documents and revision-checked annotations', async () 
     assert.equal((await call('GET', `/containers/${course.id}/documents`)).body.documents.length, 3);
 
     const url = `/documents/${blank.id}/annotations`;
-    assert.deepEqual((await call('GET', url)).body, { revision: 0, body: { pages: {} } });
+    assert.deepEqual((await call('GET', url)).body, { revision: 0, body: { pages: {} }, deviceId: null });
     const stroke = { pages: { 1: [{ color: 'ink', points: [[1, 2, 0.5]] }] } };
     assert.equal((await call('PUT', url, { baseRevision: 0, body: stroke })).body.revision, 1);
     assert.equal((await call('PUT', url, { baseRevision: 1, body: { pages: {} } })).body.revision, 2);
-    const stale = await call('PUT', url, { baseRevision: 1, body: stroke });
+    const stale = await call('PUT', url, { baseRevision: 1, body: stroke, deviceId: 'dev_other' });
     assert.equal(stale.status, 409);
+    assert.equal(stale.body.deviceId, null);
     assert.equal(stale.body.revision, 2);
     assert.deepEqual(stale.body.body, { pages: {} });
     assert.equal((await call('PUT', url, { baseRevision: 2, body: [] })).status, 400);
+    assert.equal((await call('PUT', url, { baseRevision: 2, body: stroke, deviceId: 'dev_ipad' })).body.revision, 3);
+    assert.equal((await call('GET', url)).body.deviceId, 'dev_ipad');
+    assert.equal((await call('PUT', url, { baseRevision: 2, body: stroke, deviceId: 'dev_ipad' })).body.deviceId, 'dev_ipad');
     assert.equal((await call('GET', '/containers')).body.containers[0].documentCount, 3);
   } finally {
     server.close();
