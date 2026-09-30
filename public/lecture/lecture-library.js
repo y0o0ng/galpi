@@ -120,7 +120,13 @@
       rows.forEach(([label, value]) => info.append(el('dt', '', label), el('dd', '', value)));
       const rename = el('button', '', '이름 변경');
       rename.type = 'button';
-      rename.addEventListener('click', () => { menu.remove(); renameFolder(item, button); });
+      rename.addEventListener('click', () => {
+        menu.remove();
+        askName({ heading: '이름 변경', label: '폴더 이름', value: item.name, maxLength: 60, submitText: '저장', anchor: button, run: async name => {
+          await api(`/api/lecture/containers/${item.id}`, jsonOptions('PATCH', { name }));
+          show();
+        } });
+      });
       const remove = el('button', 'is-danger', '삭제');
       remove.type = 'button';
       remove.addEventListener('click', async () => {
@@ -146,29 +152,29 @@
     return button;
   }
 
-  function renameFolder(item, anchor) {
+  // 이름 하나를 묻는 작은 창(폴더 이름 변경·새 노트). run이 실패하면 창을 닫지 않고 알린다.
+  function askName({ heading, label, value, maxLength, submitText, anchor, run }) {
     const dialog = el('dialog', 'lecture-dialog');
     const form = el('form');
     form.method = 'dialog';
     const name = el('input');
     name.required = true;
-    name.maxLength = 60;
-    name.value = item.name;
-    name.setAttribute('aria-label', '폴더 이름');
+    name.maxLength = maxLength;
+    name.value = value;
+    name.setAttribute('aria-label', label);
     const actions = el('div', 'lecture-dialog-actions');
     const cancel = el('button', 'lecture-pill is-plain', '취소');
     cancel.type = 'button';
     cancel.addEventListener('click', () => dialog.close());
-    const submit = el('button', 'lecture-pill', '저장');
+    const submit = el('button', 'lecture-pill', submitText);
     submit.type = 'submit';
     actions.append(cancel, submit);
-    form.append(el('h2', '', '이름 변경'), name, actions);
+    form.append(el('h2', '', heading), name, actions);
     form.addEventListener('submit', async event => {
       event.preventDefault();
       try {
-        await api(`/api/lecture/containers/${item.id}`, jsonOptions('PATCH', { name: name.value }));
+        await run(name.value.trim());
         dialog.close();
-        show();
       } catch (error) { toast(error.message); }
     });
     dialog.append(form);
@@ -351,12 +357,10 @@
     const blank = el('button', 'lecture-pill is-plain');
     blank.type = 'button';
     blank.append(svg(ICON_PLUS), document.createTextNode('새 노트'));
-    blank.addEventListener('click', async () => {
-      try {
-        const { document: doc } = await api(`/api/lecture/containers/${container.id}/blank`, jsonOptions('POST', {}));
-        openViewer(doc.id);
-      } catch (error) { toast(error.message); }
-    });
+    blank.addEventListener('click', () => askName({ heading: '새 노트', label: '노트 이름', value: '새 노트', maxLength: 120, submitText: '만들기', anchor: blank, run: async title => {
+      const { document: doc } = await api(`/api/lecture/containers/${container.id}/blank`, jsonOptions('POST', { title }));
+      openViewer(doc.id);
+    } }));
     actions.append(blank, ...uploadButton('lecture-pill'));
     head().replaceChildren(title, actions);
 
