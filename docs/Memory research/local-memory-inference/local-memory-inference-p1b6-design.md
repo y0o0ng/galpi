@@ -51,8 +51,10 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   against v3 ESCALATE; the owner closed both as current-realization failures. **Ledger v2: pool
   387; the only marginal shortage is EN, by one (37 / 38).** A 2-row EN batch-005 top-up is
   preregistered and materialized; owner pre-audit 2/2 PASS, source audit **2/2 PASS**, v3
-  strong-model review **2/2 clean agreements** (both calibration); the 2-row blind HUMAN packet is
-  built, not run. No acceptance.
+  strong-model review **2/2 clean agreements**, owner HUMAN calibration **2/2 match** (both
+  `PROVISIONAL`). **Ledger v3: pool 389; every marginal (split, language, fragments) is met and the
+  minimum top-up lower bound is 0** — a marginal bound, not a joint-feasibility proof. No
+  acceptance, freeze, selection or training.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2227,6 +2229,26 @@ statement. `scripts/build-memory-inference-p1b6-batch-005-human-review-packet.js
 population from the receipt under the every-clean-agreement rule, uses the `p1b6-b005-hreview`
 namespace and requires bundles equal to the strong-model packet. Packet `8b1a5b85…`, not
 committed.
+
+**HUMAN calibration attempt-001 (2026-10-01) — 2/2 match v3.** Receipt
+`fixtures/local-memory-inference-p1b6-batch-005-human-review-attempt-001.json`. The owner decided
+both rows; GPT-5.6 sol presented rows and formatted the JSON (owner-reported); not independent.
+`001` KEEP ESCALATE and `002` KEEP CLEAR are `CALIBRATION_MATCH` and stay
+`CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. **Submission correction:** the first submission
+(`39e08f32…`, kept, not committed) carried two row IDs absent from the packet. At the owner's
+instruction each was changed to the packet row its unchanged reason describes (the landing
+window, the width-or-depth increase); decisions and reasons are untouched, and the receipt binds
+the corrected bytes (`8559cbcf…`) and records the mapping.
+
+**Ledger v3 and shortage v3.** `scripts/build-memory-inference-p1b6-reviewed-pool-ledger-v3.js`
+(`npm run build:memory-inference-p1b6-reviewed-pool-ledger-v3`) pins ledger v2 (unchanged) and the
+batch-005 receipts and appends the two rows under pool rule A:
+`fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v3.json` has 444 rows, **389 in
+pool**. `…-shortage-receipt-v3.json`: split 245 / 61 / 83 against 240 / 60 / 80, language KO 272,
+MIXED 78, EN 39 against 266 / 76 / 38, fragments 72 / 103 / 124 / 70 / 20 against
+70 / 100 / 120 / 70 / 20, no HELD per-skeleton need; **minimum top-up lower bound 0**. Whether one
+380-row selection satisfies all constraints jointly is decided only at deterministic selection,
+which has not been opened.
 
 ## Closed Selection and Freeze Constraints
 
