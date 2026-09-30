@@ -19,6 +19,8 @@
   const ICON_BACK = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const ICON_PLUS = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   const ICON_CHEVRON = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // Figma `Folder Card`의 `icon/star`(18px). 켜짐은 채우기, 꺼짐은 외곽선 — CSS가 정한다.
+  const ICON_STAR = '<svg viewBox="0 0 18 18" width="18" height="18"><path transform="translate(2.025 2.025)" d="M6.975 0 9.1125 4.3875 13.95 5.0625 10.4625 8.4375 11.25 13.275 6.975 11.025 2.7 13.275 3.4875 8.4375 0 5.0625 4.8375 4.3875 6.975 0Z" stroke-linejoin="round"/></svg>';
   // Figma `Icon / coolicons / more`(69:3).
   const ICON_MORE = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M17 12C17 12.5523 17.4477 13 18 13C18.5523 13 19 12.5523 19 12C19 11.4477 18.5523 11 18 11C17.4477 11 17 11.4477 17 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 12C11 12.5523 11.4477 13 12 13C12.5523 13 13 12.5523 13 12C13 11.4477 12.5523 11 12 11C11.4477 11 11 11.4477 11 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12C5 12.5523 5.44772 13 6 13C6.55228 13 7 12.5523 7 12C7 11.4477 6.55228 11 6 11C5.44772 11 5 11.4477 5 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const ICON_SEARCH = '<svg viewBox="0 0 16 16" width="16" height="16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
@@ -62,6 +64,6 @@
 
   global.LectureCommon = {
     el, svg, api, jsonOptions, formatDay, kindLabel, Recorder, clock, toast, isRecordingHere,
-    ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH, ICON_MORE,
+    ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH, ICON_MORE, ICON_STAR,
   };
 })(window);

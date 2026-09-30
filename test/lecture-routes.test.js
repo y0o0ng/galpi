@@ -211,6 +211,20 @@ test('lecture trash hides documents and sessions, restores them, and purges sess
     await call('DELETE', `/trash/document/${pdfB.id}`);
     assert.equal(fs.readdirSync(path.join(dataDir, 'lecture', 'documents')).length, 0);
     assert.equal((await call('POST', '/trash/folder/1/restore')).status, 404);
+
+    // 폴더 삭제: 안의 자료가 함께 숨고 목록엔 폴더 하나만 보인다. 영구 삭제하면 안쪽까지 지워진다.
+    const info = (await call('GET', '/containers')).body.containers[0];
+    assert.deepEqual([info.pdfCount, info.blankCount, info.sessionCount], [0, 1, 0]);
+    assert.equal((await call('DELETE', `/containers/${course.id}`)).body.trashed, true);
+    assert.deepEqual((await call('GET', '/containers')).body.containers, []);
+    assert.equal((await call('GET', `/documents/${blank.id}`)).status, 404);
+    assert.deepEqual((await call('GET', '/trash')).body.items.map(item => item.type), ['folder']);
+    await call('POST', `/trash/folder/${course.id}/restore`);
+    assert.equal((await call('GET', `/documents/${blank.id}`)).status, 200);
+    await call('DELETE', `/containers/${course.id}`);
+    assert.equal((await call('DELETE', `/trash/folder/${course.id}`)).body.purged, true);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM lecture_documents').get().n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM lecture_sessions').get().n, 0);
   } finally {
     server.close();
     db.close();

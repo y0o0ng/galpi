@@ -3,7 +3,7 @@
 // 강의 노트 목록 화면: Notes 홈 · 폴더(과목 강의 타임라인·자료 목록) · 새 강의 시트 · PDF 올리기.
 // 설계 정본은 docs/Lecture-note-system_Design_v4.3.md §4.3·§6.5·§10.1.1이다.
 (function (global) {
-  const { el, svg, api, jsonOptions, formatDay, kindLabel, Recorder, toast, ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH, ICON_MORE } = global.LectureCommon;
+  const { el, svg, api, jsonOptions, formatDay, kindLabel, Recorder, toast, ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH, ICON_MORE, ICON_STAR } = global.LectureCommon;
 
   // view: 과목 폴더는 'home'(강의 타임라인)과 'docs'(자료 목록)를 오간다. 일반 폴더는 자료 목록뿐이다.
   const state = { containers: [], container: null, documents: [], sessions: [], view: 'home', search: '', loaded: false };
@@ -70,12 +70,13 @@
     const now = Date.now() / 1000;
     items.forEach(item => {
       const row = el('div', 'lecture-doc-row lecture-trash-row');
-      const name = item.type === 'session'
+      const name = item.type === 'folder' ? item.title : item.type === 'session'
         ? `${dateOf(item.title).getMonth() + 1}월 ${dateOf(item.title).getDate()}일 강의 · ${item.detail < 60000 ? '1분 미만' : `${Math.round(item.detail / 60000)}분`}`
         : item.title;
       const days = Math.max(0, Math.ceil((item.purgeAt - now) / 86400));
       const info = el('div');
-      info.append(el('strong', '', name), el('span', 'lecture-meta', `${item.containerName} · ${item.type === 'session' ? '강의' : kindLabel(item.detail)} · ${days}일 남음`));
+      const where = item.type === 'folder' ? `${item.detail === 'course' ? '과목' : '일반'} 폴더 · 안의 자료·강의 포함` : `${item.containerName} · ${item.type === 'session' ? '강의' : kindLabel(item.detail)}`;
+      info.append(el('strong', '', name), el('span', 'lecture-meta', `${where} · ${days}일 남음`));
       const restore = el('button', 'lecture-pill is-plain', '되돌리기');
       restore.type = 'button';
       restore.addEventListener('click', async () => {
@@ -84,7 +85,7 @@
       const purge = el('button', 'lecture-pill is-danger', '바로 삭제');
       purge.type = 'button';
       purge.addEventListener('click', async () => {
-        const warning = item.type === 'session' ? '녹음과 그 강의 중에 쓴 필기가 완전히 지워져.' : '필기까지 완전히 지워져.';
+        const warning = { folder: '안의 자료·강의·필기·녹음이 모두 완전히 지워져.', session: '녹음과 그 강의 중에 쓴 필기가 완전히 지워져.', document: '필기까지 완전히 지워져.' }[item.type];
         if (!confirm(`'${name}'을 완전히 지울까? ${warning} 되돌릴 수 없어.`)) return;
         try { await api(`/api/lecture/trash/${item.type}/${item.id}`, { method: 'DELETE' }); openTrash(); } catch (error) { toast(error.message); }
       });
@@ -96,7 +97,91 @@
     root().replaceChildren(list);
   }
 
-  // 목록 항목의 `…` 메뉴. 지금은 삭제뿐이고 폴더 메뉴(이름 변경·즐겨찾기)가 같은 모양을 쓴다.
+  // 폴더 `…` 메뉴(Figma `폴더 ··· 메뉴 상태` 44:57): 폴더 정보와 이름 변경·삭제.
+  function folderMenuButton(item) {
+    const button = el('button', 'lecture-more');
+    button.type = 'button';
+    button.setAttribute('aria-label', `${item.name} 메뉴`);
+    button.append(svg(ICON_MORE));
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      document.querySelector('.lecture-item-menu')?.remove();
+      const menu = el('div', 'lecture-item-menu lecture-folder-menu');
+      const heading = el('div', 'lecture-folder-menu-head');
+      heading.append(el('strong', '', item.name), el('span', '', item.type === 'course' ? '과목' : '일반'));
+      const stamp = seconds => {
+        const date = new Date(seconds * 1000);
+        const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        return date.toDateString() === new Date().toDateString() ? `오늘 ${time}` : `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}. ${time}`;
+      };
+      const rows = [['생성', stamp(item.createdAt)], ['최근 수정', stamp(item.lastActivityAt)],
+        ...(item.type === 'course' ? [['자료', `${item.documentCount}개`], ['강의', `${item.sessionCount}개`]] : [['노트', `${item.blankCount}개`], ['자료', `${item.pdfCount}개`]])];
+      const info = el('dl', 'lecture-folder-menu-info');
+      rows.forEach(([label, value]) => info.append(el('dt', '', label), el('dd', '', value)));
+      const rename = el('button', '', '이름 변경');
+      rename.type = 'button';
+      rename.addEventListener('click', () => { menu.remove(); renameFolder(item, button); });
+      const remove = el('button', 'is-danger', '삭제');
+      remove.type = 'button';
+      remove.addEventListener('click', async () => {
+        menu.remove();
+        const recording = ['starting', 'recording'].includes(Recorder().state.status) && Recorder().state.containerId === item.id;
+        if (recording) return toast('녹음 중인 폴더는 지울 수 없어. 먼저 일시정지해줘.');
+        if (!confirm(`'${item.name}' 폴더를 삭제할까? 안의 자료와 강의도 함께 최근 삭제로 가고, 30일 동안 되돌릴 수 있어.`)) return;
+        try {
+          await api(`/api/lecture/containers/${item.id}`, { method: 'DELETE' });
+          if (Recorder().state.containerId === item.id) Recorder().forgetSession(Recorder().state.session?.id);
+          show();
+        } catch (error) { toast(error.message); }
+      });
+      menu.append(heading, info, el('hr', 'lecture-menu-divider'), rename, remove);
+      document.body.append(menu);
+      const box = button.getBoundingClientRect();
+      menu.style.top = `${Math.min(box.bottom + 6, innerHeight - menu.offsetHeight - 16)}px`;
+      menu.style.left = `${Math.max(16, box.right - menu.offsetWidth)}px`;
+      setTimeout(() => document.addEventListener('pointerdown', function close(e) {
+        if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('pointerdown', close); }
+      }), 0);
+    });
+    return button;
+  }
+
+  function renameFolder(item, anchor) {
+    const dialog = el('dialog', 'lecture-dialog');
+    const form = el('form');
+    form.method = 'dialog';
+    const name = el('input');
+    name.required = true;
+    name.maxLength = 60;
+    name.value = item.name;
+    name.setAttribute('aria-label', '폴더 이름');
+    const actions = el('div', 'lecture-dialog-actions');
+    const cancel = el('button', 'lecture-pill is-plain', '취소');
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => dialog.close());
+    const submit = el('button', 'lecture-pill', '저장');
+    submit.type = 'submit';
+    actions.append(cancel, submit);
+    form.append(el('h2', '', '이름 변경'), name, actions);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      try {
+        await api(`/api/lecture/containers/${item.id}`, jsonOptions('PATCH', { name: name.value }));
+        dialog.close();
+        show();
+      } catch (error) { toast(error.message); }
+    });
+    dialog.append(form);
+    dialog.addEventListener('close', () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+    const rect = anchor.getBoundingClientRect();
+    dialog.style.top = `${rect.bottom + 8}px`;
+    dialog.style.left = `${Math.max(16, Math.min(rect.right - dialog.offsetWidth, innerWidth - dialog.offsetWidth - 16))}px`;
+    name.select();
+  }
+
+  // 목록 항목의 `…` 메뉴. 자료·강의는 지금 삭제뿐이다.
   function itemMenuButton(label, actions) {
     const button = el('button', 'lecture-more');
     button.type = 'button';
@@ -140,10 +225,26 @@
       return;
     }
     grid.replaceChildren(...items.map(item => {
-      const card = el('button', `lecture-folder-card is-${item.type}`);
-      card.type = 'button';
+      // 안에 별·`…` 버튼이 있어 카드 자체는 button이 아니라 div다.
+      const card = el('div', `lecture-folder-card is-${item.type}`);
+      card.setAttribute('role', 'button');
+      card.tabIndex = 0;
       const top = el('div', 'lecture-folder-top');
-      top.append(el('span', 'lecture-dot'), el('strong', '', item.name), el('span', 'lecture-tag', item.type === 'course' ? '과목' : '일반'));
+      // 즐겨찾기는 메뉴가 아니라 카드의 별을 직접 눌러 켜고 끈다(Figma `Folder Card` Favorite=On/Off).
+      const star = el('button', `lecture-star${item.favorite ? ' is-on' : ''}`);
+      star.type = 'button';
+      star.setAttribute('aria-pressed', String(Boolean(item.favorite)));
+      star.setAttribute('aria-label', '즐겨찾기');
+      star.append(svg(ICON_STAR));
+      star.addEventListener('click', async event => {
+        event.stopPropagation();
+        try {
+          await api(`/api/lecture/containers/${item.id}`, jsonOptions('PATCH', { favorite: !item.favorite }));
+          state.containers = (await api('/api/lecture/containers')).containers;
+          renderFolderGrid(grid);
+        } catch (error) { toast(error.message); }
+      });
+      top.append(el('span', 'lecture-dot'), el('strong', '', item.name), el('span', 'lecture-tag', item.type === 'course' ? '과목' : '일반'), star, folderMenuButton(item));
       card.append(top, el('span', 'lecture-folder-recent', item.lastDocumentTitle || '아직 자료가 없어'));
       const meta = item.lastDocumentAt ? `${formatDay(item.lastDocumentAt)} 수정 · ${kindLabel(item.lastDocumentKind)}` : `${formatDay(item.createdAt)} 생성`;
       card.append(el('span', 'lecture-meta', meta));

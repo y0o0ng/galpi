@@ -366,7 +366,27 @@ body.lecture-viewer-open { overflow: hidden; }
 }
 .lecture-item-menu button.is-danger { color: #B45A55; }
 .lecture-pill.is-danger { border-color: #D7DED9; background: none; color: #B45A55; }
-.lecture-trash-link { margin-top: 20px; }
+.lecture-trash-link { width: 100%; margin-top: 20px; }
 .lecture-trash-row { display: flex; align-items: center; gap: 12px; cursor: default; }
 .lecture-trash-row > div:first-child { display: grid; flex: 1; gap: 4px; min-width: 0; }
 @media (max-width: 700px) { .lecture-trash-row { flex-wrap: wrap; } }
+
+/* ─── 폴더 카드 별·메뉴 (Figma `Folder Card` 137:89 · `폴더 ··· 메뉴 상태` 44:57) ─── */
+
+.lecture-folder-top .lecture-star, .lecture-folder-top .lecture-more { margin: -12px 0; }
+.lecture-folder-top .lecture-more { margin-right: -12px; }
+.lecture-star {
+  display: grid; flex: none; place-items: center; width: 36px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
+}
+.lecture-star path { fill: none; stroke: #5F6E66; stroke-width: 1.4625; }
+.lecture-star.is-on path { fill: #2F6B57; stroke: none; }
+.lecture-folder-menu { width: 190px; min-width: 0; padding: 16px 18px 10px; border-radius: 16px; }
+.lecture-folder-menu-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+.lecture-folder-menu-head strong { overflow: hidden; color: #1D2622; font-size: 17px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.lecture-folder-menu-head span { flex: none; color: #2F6B57; font-size: 11px; font-weight: 500; }
+.lecture-folder-menu-info { display: grid; grid-template-columns: auto 1fr; row-gap: 7px; margin: 0 0 10px; font-size: 12px; }
+.lecture-folder-menu-info dt { color: #5F6E66; }
+.lecture-folder-menu-info dd { margin: 0; color: #1D2622; font-weight: 500; text-align: right; }
+.lecture-folder-menu .lecture-menu-divider { margin: 0 0 4px; }
+.lecture-folder-menu button { min-height: 32px; padding: 0; font-size: 12px; font-weight: 500; }
+.lecture-folder-menu button.is-danger { color: #A34B45; }
