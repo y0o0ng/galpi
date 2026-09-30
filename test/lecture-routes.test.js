@@ -13,7 +13,7 @@ const { registerLectureRoutes, isLectureAnnotationPut } = require('../lib/lectur
 test('lecture containers, documents and revision-checked annotations', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  [28, 30].forEach(version => migrations.find(item => item.version === version).up(db));
+  [28, 30, 33].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json({ limit: '40mb' }));
   registerLectureRoutes({ app, db, dataDir });
@@ -90,7 +90,7 @@ test('only the annotation PUT skips the global 1MB JSON parser', () => {
 test('lecture sessions append by date, store audio parts idempotently and dedupe events', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  [28, 30].forEach(version => migrations.find(item => item.version === version).up(db));
+  [28, 30, 33].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json());
   registerLectureRoutes({ app, db, dataDir });
@@ -137,6 +137,14 @@ test('lecture sessions append by date, store audio parts idempotently and dedupe
     assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [event] })).body.inserted, 0);
     assert.deepEqual((await call('GET', `/containers/${course.id}/sessions`)).body.sessions.find(item => item.id === first.id).documents.map(item => item.id), [doc.id]);
     assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [{ ...event, key: 'ev_eeeeeeee', documentId: 999 }] })).status, 400);
+
+    const marker = { key: 'mk_ffffffff', kind: 'important', runtimeId: 'rt_bbbbbbbb', t: 7000, documentId: doc.id, page: 1 };
+    assert.equal((await call('POST', `/sessions/${first.id}/markers`, marker)).status, 201);
+    assert.equal((await call('POST', `/sessions/${first.id}/markers`, marker)).status, 200);
+    assert.equal((await call('POST', `/sessions/${first.id}/markers`, { ...marker, key: 'mk_gggggggg', kind: 'question' })).status, 400);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM lecture_session_markers').get().n, 1);
+    assert.equal((await call('DELETE', `/sessions/${first.id}/markers/mk_ffffffff`)).body.deleted, 1);
+    assert.equal((await call('DELETE', `/sessions/${first.id}/markers/mk_ffffffff`)).body.deleted, 0);
   } finally {
     server.close();
     db.close();

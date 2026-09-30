@@ -89,7 +89,7 @@ test('general_fact migrations upgrade schema 30 once and enforce transition/prov
       .run('session', 'user', 'owning source');
     const before = db.prepare('SELECT * FROM messages').all();
     const result = runDatabaseMigrations(db);
-    assert.deepEqual(result.applied, [
+    assert.deepEqual(result.applied.slice(0, 2), [
       { version: 31, name: 'memory_general_fact_storage' },
       { version: 32, name: 'memory_general_fact_reviews' },
     ]);
@@ -124,7 +124,7 @@ test('review migration upgrades schema 31 once and constrains complete decision 
   const db = createLegacyDatabase();
   try {
     migrateThrough(db, 31);
-    assert.deepEqual(runDatabaseMigrations(db).applied, [{ version: 32, name: 'memory_general_fact_reviews' }]);
+    assert.deepEqual(runDatabaseMigrations(db).applied.slice(0, 1), [{ version: 32, name: 'memory_general_fact_reviews' }]);
     assert.deepEqual(runDatabaseMigrations(db).applied, []);
     db.pragma('foreign_keys = ON');
     db.prepare(`INSERT INTO memory_general_fact_candidates
@@ -351,6 +351,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 30, name: 'lecture_sessions_capture' },
     { version: 31, name: 'memory_general_fact_storage' },
     { version: 32, name: 'memory_general_fact_reviews' },
+    { version: 33, name: 'lecture_session_markers' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(

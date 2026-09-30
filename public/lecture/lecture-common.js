@@ -20,8 +20,6 @@
   const ICON_PLUS = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   const ICON_CHEVRON = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const ICON_SEARCH = '<svg viewBox="0 0 16 16" width="16" height="16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
-  const ICON_MIC = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  const ICON_RECORDING = '<svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="5.5" fill="currentColor"/></svg>';
 
   async function api(url, options) {
     const res = await global.apiFetch(url, options);
@@ -62,6 +60,6 @@
 
   global.LectureCommon = {
     el, svg, api, jsonOptions, formatDay, kindLabel, Recorder, clock, toast, isRecordingHere,
-    ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH, ICON_MIC, ICON_RECORDING,
+    ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH,
   };
 })(window);

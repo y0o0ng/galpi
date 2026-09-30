@@ -3,7 +3,7 @@
 // 강의 노트 Document Viewer: 페이지·PDF 렌더·확대·`강의·복습` 모드·마이크·필기 저장과 충돌 처리.
 // 설계 정본은 docs/Lecture-note-system_Design_v4.3.md §6·§7·§8, 구현 기록은 §17이다.
 (function (global) {
-  const { el, svg, api, jsonOptions, Recorder, clock, toast, isRecordingHere, ICON_BACK, ICON_PLUS, ICON_MIC, ICON_RECORDING } = global.LectureCommon;
+  const { el, svg, api, jsonOptions, Recorder, clock, toast, isRecordingHere, ICON_BACK, ICON_PLUS } = global.LectureCommon;
   const { bindInk, drawInk } = global.LectureInk;
 
   const PDFJS_BASE = '/lib/pdfjs/';
@@ -57,6 +57,7 @@
     };
     viewer = v;
     v.changed = () => markChanged(v);
+    v.markers = { add: kind => addMarker(v, kind) };
     v.el = buildViewerShell(v);
     document.body.append(v.el);
     document.body.classList.add('lecture-viewer-open');
@@ -338,20 +339,29 @@
     renderStatus(v);
   }
 
+  // Figma `Record Control`(160:67)의 경로. 마이크는 대기일 때 가운데, 시간·상태 글자가 붙으면 위로 올라간다.
+  const MIC_PATHS = y => `<path d="M25 ${10 + y}C25 ${8.34315 + y} 23.6569 ${7 + y} 22 ${7 + y}C20.3431 ${7 + y} 19 ${8.34315 + y} 19 ${10 + y}V${15 + y}C19 ${16.6569 + y} 20.3431 ${18 + y} 22 ${18 + y}C23.6569 ${18 + y} 25 ${16.6569 + y} 25 ${15 + y}V${10 + y}Z" stroke="currentColor" stroke-width="2"/><path d="M28.5 ${15 + y}C28.5 ${16.7239 + y} 27.8152 ${18.3772 + y} 26.5962 ${19.5962 + y}C25.3772 ${20.8152 + y} 23.7239 ${21.5 + y} 22 ${21.5 + y}C20.2761 ${21.5 + y} 18.6228 ${20.8152 + y} 17.4038 ${19.5962 + y}C16.1848 ${18.3772 + y} 15.5 ${16.7239 + y} 15.5 ${15 + y}M22 ${21.5 + y}V${25 + y}" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`;
+  const RECORDING_PATHS = '<circle cx="22" cy="16" r="10" stroke="currentColor" stroke-width="2"/><rect x="18" y="12" width="8" height="8" rx="2" fill="currentColor"/>';
+  const STAR_PATHS = '<path d="M18.0001 14.9167L20.1667 19.3334L25.0834 20.0834L21.5001 23.5001L22.3334 28.3334L18.0001 26.0834L13.6667 28.3334L14.5001 23.5001L10.9167 20.0834L15.8334 19.3334L18.0001 14.9167Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>';
+  const LATER_PATHS = '<g transform="translate(-36 0)"><path d="M54 29.5C58.1421 29.5 61.5 26.1421 61.5 22C61.5 17.8579 58.1421 14.5 54 14.5C49.8579 14.5 46.5 17.8579 46.5 22C46.5 26.1421 49.8579 29.5 54 29.5Z" stroke="currentColor" stroke-width="1.5"/><path d="M51.9167 19.9166C51.9181 19.5414 52.0207 19.1734 52.2139 18.8516C52.407 18.5298 52.6835 18.2662 53.0142 18.0886C53.3448 17.911 53.7172 17.826 54.0921 17.8426C54.4671 17.8592 54.8306 17.9768 55.1442 18.1829C55.4578 18.389 55.71 18.676 55.874 19.0135C56.038 19.3511 56.1077 19.7267 56.0759 20.1006C56.0441 20.4746 55.9118 20.833 55.6931 21.138C55.4744 21.4429 55.1774 21.6832 54.8334 21.8333C54.3334 22.0833 54.0001 22.5 54.0001 23.0833V23.6666" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M53.9999 27.0833C54.5062 27.0833 54.9166 26.6729 54.9166 26.1667C54.9166 25.6604 54.5062 25.25 53.9999 25.25C53.4937 25.25 53.0833 25.6604 53.0833 26.1667C53.0833 26.6729 53.4937 27.0833 53.9999 27.0833Z" fill="currentColor"/></g>';
+  const iconSvg = (paths, width = 44) => svg(`<svg viewBox="0 0 ${width} 44" width="${width}" height="44" fill="none">${paths}</svg>`);
+
   function renderMic(v) {
     const recorder = Recorder().state;
     const elsewhere = ['starting', 'recording'].includes(recorder.status) && recorder.containerId !== v.container.id;
     const mine = recorder.containerId === v.container.id;
-    const status = mine ? recorder.status : 'idle';
+    const recorded = mine ? Recorder().elapsedMs() : (v.session?.recordedMs || 0);
+    // 오늘 녹음이 있으면 초록 마이크와 누적 시간(`State=Paused`), 없으면 회색 마이크(`State=Idle`)다.
+    let status = mine ? recorder.status : 'idle';
+    if (status === 'idle' && recorded) status = 'paused';
     const button = el('button', `lecture-mic is-${status}`);
     button.type = 'button';
     button.disabled = elsewhere || status === 'starting';
     const label = { idle: '녹음 시작', paused: '이어 녹음', interrupted: '이어 녹음', starting: '녹음 시작 확인 중', recording: '일시정지' }[status];
     button.setAttribute('aria-label', elsewhere ? `${recorder.containerName} 녹음 중` : label);
-    button.append(svg(status === 'recording' ? ICON_RECORDING : ICON_MIC));
-    const recorded = mine ? Recorder().elapsedMs() : (v.session?.recordedMs || 0);
-    const time = el('span', 'lecture-mic-time', status === 'starting' ? '확인 중' : (recorded || status === 'recording' ? clock(recorded) : ''));
-    button.append(time);
+    button.append(iconSvg(status === 'recording' ? RECORDING_PATHS : MIC_PATHS(status === 'idle' ? 6 : 0)));
+    const caption = status === 'starting' ? '시작 중' : status === 'idle' ? '' : clock(recorded);
+    button.append(el('span', 'lecture-mic-time', caption));
     button.addEventListener('click', async () => {
       if (status === 'recording') return Recorder().pause();
       try {
@@ -363,7 +373,20 @@
         }
       } catch (error) { toast(error.message); }
     });
-    v.mic.replaceChildren(button);
+    // 녹음 중에는 녹음 표시 옆에 `★`·`?` 버튼이 보인다 — 원형 메뉴를 몰라도 마커를 남길 수 있다(§6.4).
+    if (mine && recorder.status === 'recording') {
+      const marker = (kind, paths, text) => {
+        const node = el('button', 'lecture-marker');
+        node.type = 'button';
+        node.setAttribute('aria-label', text);
+        node.append(iconSvg(paths, 36));
+        node.addEventListener('click', () => addMarker(v, kind));
+        return node;
+      };
+      v.mic.replaceChildren(marker('important', STAR_PATHS, '★ 중요'), marker('later', LATER_PATHS, '? 나중에 볼 것'), el('span', 'lecture-mic-divider'), button);
+    } else {
+      v.mic.replaceChildren(button);
+    }
 
     v.alert.hidden = !(mine && recorder.status === 'interrupted');
     if (!v.alert.hidden) {
@@ -377,6 +400,28 @@
       text.append(el('strong', '', '녹음이 중단됐어'), el('span', 'lecture-meta', `${clock(recorder.interruptedAtMs || 0)}까지 저장됨 · 그 뒤는 빈 구간으로 남아`));
       v.alert.replaceChildren(el('span', 'lecture-alert-dot'), text, resume);
     }
+  }
+
+  // ─── 마커(§6.4) ───────────────────────────────────────────────────────────
+  // 녹음 중에만 남긴다. 남긴 직후 `★ 중요 · 32:18 · 취소` 알림을 띄우고, 거기서 바로 지울 수 있다.
+  const MARKER_TOAST_MS = 4000;
+  const markerLabel = { important: '★ 중요', later: '? 나중에 볼 것' };
+
+  function addMarker(v, kind) {
+    const session = Recorder().state.session;
+    if (!isRecordingHere(v) || !session) return;
+    const key = Recorder().addMarker(session, kind, v.documentId, currentPage(v));
+    document.querySelector('.lecture-marker-toast')?.remove();
+    const note = el('div', 'lecture-marker-toast');
+    const cancel = el('button', '', '취소');
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => {
+      Recorder().cancelMarker(session, key);
+      note.remove();
+    });
+    note.append(el('span', '', `${markerLabel[kind]} · ${clock(Recorder().elapsedMs())}`), cancel);
+    document.body.append(note);
+    setTimeout(() => note.remove(), MARKER_TOAST_MS);
   }
 
   async function addBlankPage(v) {

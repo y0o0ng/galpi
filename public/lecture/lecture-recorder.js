@@ -261,6 +261,44 @@
     if (eventQueue.length) eventTimer = setTimeout(flushEvents, RETRY_MS);
   }
 
+  // 마커(§6.4). 추가·취소를 순서대로 보내고 끊기면 다시 보낸다. 아직 안 보낸 마커를 취소하면 보내지 않는다.
+  const markerQueue = [];
+  let markerTimer = null;
+  let markerSending = false;
+  function addMarker(session, kind, documentId, page) {
+    const key = `mk_${Date.now().toString(36)}${random()}`;
+    markerQueue.push({ sessionId: session.id, op: 'add', body: { key, kind, runtimeId, t: sessionT(session), documentId, page: page ?? null } });
+    flushMarkers();
+    return key;
+  }
+  function cancelMarker(session, key) {
+    const pending = markerQueue.findIndex(item => item.op === 'add' && item.body.key === key);
+    if (pending > 0 || (pending === 0 && !markerSending)) markerQueue.splice(pending, 1);
+    else markerQueue.push({ sessionId: session.id, op: 'delete', key });
+    flushMarkers();
+  }
+  async function flushMarkers() {
+    if (markerSending) return;
+    clearTimeout(markerTimer);
+    markerSending = true;
+    while (markerQueue.length) {
+      const item = markerQueue[0];
+      try {
+        await api(item.op === 'add' ? `/api/lecture/sessions/${item.sessionId}/markers` : `/api/lecture/sessions/${item.sessionId}/markers/${item.key}`,
+          item.op === 'add'
+            ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item.body) }
+            : { method: 'DELETE' });
+      } catch (error) {
+        if (error.status !== 400 && error.status !== 404) {
+          markerTimer = setTimeout(flushMarkers, RETRY_MS);
+          break;
+        }
+      }
+      markerQueue.shift();
+    }
+    markerSending = false;
+  }
+
   // 녹음 중 데이터가 끊기면 중단으로 바꾼다. 시작 뒤 첫 데이터가 오지 않아도 마찬가지다(실측 첫 데이터 약 2초).
   setInterval(() => {
     const silentFor = performance.now() - lastDataAt;
@@ -281,6 +319,8 @@
     start,
     pause,
     logEvent,
+    addMarker,
+    cancelMarker,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     // 앱을 다시 열었을 때 남아 있던 파트를 올린다. 마이크는 자동으로 켜지 않는다(§8.3).
     resume() {

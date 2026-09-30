@@ -203,17 +203,34 @@ body.lecture-viewer-open { overflow: hidden; }
 
 /* ─── 녹음(L1b) ─── */
 
-.lecture-mic-slot { display: flex; justify-content: flex-end; }
-.lecture-mic {
-  display: grid; justify-items: center; align-content: center; gap: 1px;
-  min-width: 44px; min-height: 44px; padding: 0 4px;
-  border: 0; background: none; color: var(--brand-ink); font: inherit; cursor: pointer;
+/* Figma `Record Control` 160:67 */
+.lecture-mic-slot { display: flex; align-items: center; justify-content: flex-end; }
+.lecture-mic, .lecture-marker {
+  position: relative; display: flex; justify-content: center; width: 44px; height: 44px; padding: 0;
+  border: 0; background: none; color: #5F6E66; font: inherit; cursor: pointer;
 }
-.lecture-mic:disabled { color: var(--label); opacity: 0.5; cursor: default; }
-.lecture-mic.is-recording { color: var(--danger); }
-.lecture-mic.is-starting { color: var(--label); }
-.lecture-mic-time { color: var(--label); font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1; }
-.lecture-mic-time:empty { display: none; }
+.lecture-marker { width: 36px; }
+.lecture-mic:disabled { opacity: 0.5; cursor: default; }
+.lecture-mic.is-paused, .lecture-mic.is-interrupted { color: #2F6B57; }
+.lecture-mic.is-recording { color: #FF3B30; }
+.lecture-mic-time {
+  position: absolute; left: 0; right: 0; top: 28px; color: #5F6E66;
+  font-size: 10px; font-variant-numeric: tabular-nums; line-height: 12px; text-align: center; white-space: nowrap;
+}
+.lecture-mic.is-recording .lecture-mic-time { color: #1D2622; }
+.lecture-mic.is-starting .lecture-mic-time { opacity: 0.68; }
+.lecture-mic-divider { width: 1px; height: 20px; background: #D7DED9; }
+
+/* 마커를 남긴 직후 알림 (Figma Capture ⑤ `Marker toast`) */
+.lecture-marker-toast {
+  position: fixed; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom)); z-index: 1003; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 14px; border-radius: 999px;
+  background: #1D2622; color: #FAFBF9; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.lecture-marker-toast button {
+  min-height: 24px; padding: 4px 10px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.16);
+  color: #FAFBF9; font: inherit; cursor: pointer;
+}
 
 .lecture-alert {
   display: flex; align-items: center; gap: 10px;
@@ -247,7 +264,7 @@ body.lecture-viewer-open { overflow: hidden; }
 }
 .lecture-mode button.active { background: #FAFBF9; color: #1D2622; box-shadow: var(--shadow-sm); }
 .lecture-mode button:disabled { cursor: default; }
-.lecture-mode.is-locked { cursor: not-allowed; }
+.lecture-mode.is-locked { opacity: 0.6; cursor: not-allowed; }
 .lecture-mode-dot { width: 6px; height: 6px; border-radius: 50%; background: #2E8B57; opacity: 0.5; }
 .lecture-mode button.active .lecture-mode-dot { opacity: 1; }
 

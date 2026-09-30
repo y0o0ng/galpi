@@ -196,7 +196,7 @@
       x: hold.x,
       y: hold.y,
       // 선택(올가미)·포스트잇은 아직 없다. 마커는 녹음 중에만 쓸 수 있다(§6.4).
-      enabled: { pen: true, eraser: true, select: false, sticky: false, important: recording && Boolean(v.markers), later: recording && Boolean(v.markers) },
+      enabled: { pen: true, eraser: true, select: false, sticky: false, important: recording, later: recording },
     });
   }
 
