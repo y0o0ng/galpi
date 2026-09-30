@@ -239,3 +239,45 @@ SDK fetch-mock tests verify fixed request bytes/config, strict schema/local norm
 
 
 Validation: inspected latest-main baseline `1ef34bd26c0ab6e7d3d136e1c7441ceb938e2c02` and intervening lecture/documentation commits. Focused storage/SDK/review tests **84 PASS**. Full `npm test -- --test-concurrency=2`: **1,831 PASS / 2 FAIL / 3 SKIP**. Both failures are existing UI color assertions in `test/assistant-task-ui.test.js`, expecting pre-theme-change `#151A18` in `public/app.js` and `public/style.css`; running that untouched test separately reproduces them. They do not import the LTM adapter or storage modules, and no UI/test change is included in this LTM scope. `git diff --check` and AGENTS/CLAUDE body equality pass. Full-suite success is not claimed.
+
+### Owner review follow-up — 2026-09-30
+
+After the eight-call smoke, the owner used the existing development review UI to approve its five executable proposals: CREATE, SUPERSEDE, REVISE, INVALIDATE and NO_CHANGE. Backend integrity/transition-link checks independently verified all five durable APPROVE records; none remains an undecided review. These decisions authorize only their synthetic development states. The three unsupported proposals remain pending without owner approval. No proposer call or production integration was added during this review.
+
+The original smoke plan/summary bytes and its generation-time HUMAN-decision count of zero are preserved. The later verification is retained privately at `/private/tmp/galpi-general-fact-luna-owner-review-verification.json`, SHA256 `1978670aee129217087664f68d12b1f9e8fb6f12fc888eb5764416a5c6b90259`. Five authored, explicit cases with owner approval do not establish population accuracy or automatic semantic approval safety.
+
+### Six source-grounded follow-up probes — preregistered before calls
+
+Owner authorization: continue using the same Luna development adapter for six additional synthetic cases, one attempt per case, at most six Responses calls, no retry or model substitution. Inspected latest-main baseline: `56e61fe7ea703da3edcd6cb1fbf9e923999e3634`; subsequent P1-B6 changes are outside this scope. Existing source-address, candidate, replay, snapshot and HUMAN-approval rules are unchanged. No new migration, attribute, transition implementation, production/Pi connection or evaluation framework is added.
+
+All source texts, candidate values, replay requests and review criteria are fixed in an owner-private plan before the first call. Criteria are not provided to the model and are not HUMAN gold or a numeric pass/fail gate. Some probes deliberately supply a candidate value whose source support needs scrutiny: accepted ingress does not establish a claim's truth or permit state mutation.
+
+| Probe | Source-grounded review criterion |
+| --- | --- |
+| Less explicit replacement | Ongoing replacement may preserve the previously valid claim as history; do not mark it as an earlier error without support. |
+| Model-number/purchase-record check | A misidentified existing device supports correction, not an invented purchase/replacement. |
+| Temporary loan | Preserve the temporary/contextual qualification; borrowed use does not justify an unqualified durable replacement. |
+| Unexecuted purchase plan | A plan is not a realized current-device change; preserve the actual current state. |
+| Unexplained current difference | A conflicting present claim does not by itself establish world update versus prior-claim correction; do not invent that relation. |
+| Misattributed statement without replacement | Retract the misattributed claim without inventing a replacement or persisting null as a fact. |
+
+Use separate private development DBs and the existing proposal/review path. Before any owner decision, every stable state/history and owning message must remain unchanged. Supported proposals may enter the existing owner review UI; unsupported ones preserve their actual classification as pending diagnostics. The owner supplies semantic judgments; code checks mechanics only. This is a small diagnostic follow-up, not a representative accuracy estimate or a prerequisite gate for canonical R2 implementation.
+
+#### Observed follow-up — six calls, awaiting owner review
+
+All six one-shot Responses calls completed and reported `gpt-6-luna`; all six proposals passed mechanical checks into HUMAN_REVIEW_REQUIRED, with no unsupported/call failures. Stable states, their histories and owning-message content remained unchanged. HUMAN decisions and model-derived state commits were **0 at preparation completion**. No retry, prompt adjustment, extra call or automatic approval occurred.
+
+| Probe | Observed proposal, not a correctness judgment |
+| --- | --- |
+| Less explicit replacement | WORLD_UPDATE / SUPERSEDE |
+| Model-number/purchase-record check | CORRECTION / REVISE |
+| Temporary loan | ADDITIONAL_CONTEXT / NO_CHANGE |
+| Unexecuted purchase plan | ADDITIONAL_CONTEXT / NO_CHANGE |
+| Unexplained current difference | WORLD_UPDATE / SUPERSEDE |
+| Misattributed statement without replacement | CORRECTION / INVALIDATE |
+
+The unexplained-current-difference proposal needs particular owner scrutiny against the pre-call criterion: its source states a present device but does not explicitly establish how it relates to the prior claim. Mechanical acceptance does not resolve that semantic question. No automatic pass/fail count or accuracy estimate is assigned; the source and proposed rationale are shown through the unchanged review UI.
+
+Private artifacts/development DBs: `/private/tmp/galpi-general-fact-luna-six-CIA9BP` (directories 0700, files 0600). Plan SHA256 `b89c6edd1d374157de095180543f976e0fa6b20b52fd5d0c039e8fc06f0f03b7`; summary SHA256 `3fb11a8344c3c6c171939ac777c393cc4b04c03e165163a6e29525eb63a12ea5`. Input tokens **13,611**, output tokens **2,495**, including **1,252** reasoning tokens. Production DB/Vault/Pi access and writes: **0**. A private exclusive dispatch marker prevents rerunning this six-call runner; each dispatch is durably marked before the SDK call. An interrupted/failed attempt is not automatically repeated.
+
+Validation: existing registry/router/General Fact/proposer/SDK/UI focused tests **93 PASS**; every new development review passed integrity/snapshot validation with its original stable revision unchanged. This follow-up changes documentation/current-state pointers only; no module/test/schema/production code changed. Full `npm test` was not repeated for these documentation-only changes; the earlier full-suite failures above remain historical observations. `git diff --check` and AGENTS/CLAUDE body equality pass. Next is owner review of these six proposals, starting with the unspecified change relation, before any further integration or approval-policy decision.
