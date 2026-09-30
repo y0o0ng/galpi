@@ -50,7 +50,15 @@ Focused tests cover canonical IDs and addresses, migration/unique constraints, i
 
 The Phase-1 statements above preserve that phase's boundary. Phase 2 adds a narrow `general_fact` core under canonical §§42.2–42.4, 50.4 C1/C2 and 51.4–51.5. It is a provenance-backed derived claim/state, not a Projection or an unrestricted memory bucket. Preferences, routines, relationships and operational commitments are not routed into this family.
 
-All storage modules live together in `lib/memory-storage/`: `evidence-registry.js`, `router.js`, `general-fact.js`, and the Phase-3 `general-fact-review.js`. The shared migration runner remains `lib/database-migrations.js`. No production candidate producer or registered production handler is connected; existing retrieval and source ownership are unchanged.
+All storage modules live together in `lib/memory-storage/`: `evidence-registry.js`, `router.js`, `general-fact.js`, and the Phase-3 `general-fact-review.js`. Existing schema v29/v31/v32 remain in `lib/database-migrations.js`; future storage changes follow the migration boundary below. No production candidate producer or registered production handler is connected; existing retrieval and source ownership are unchanged.
+
+### Future migration boundary — owner decision, 2026-09-30
+
+Unconnected LTM development must not require a Pi schema upgrade or block lecture-note deployment. Existing shared migrations v29, v31 and v32 retain their SQL, numbers and application history; they are not removed, renumbered or skipped. V31/v32 add family-local tables and indexes only, without rewriting existing conversation/lecture data or activating a production memory path. Their actual Pi application status is not established by this decision.
+
+Starting with the next LTM schema change, migrations and an independent module-version record belong under `lib/memory-storage/`, rather than consuming another shared `schema_version` number. Apply them explicitly to a separate development/test SQLite DB. Do not import or execute that migration runner from production server startup. A Pi application path requires a separately approved production-integration step; deploying unrelated features must not apply these future LTM changes.
+
+This separates schema release timing, not source authority or the selected production storage topology. It does not require a second production database or copy owning evidence. Development fixtures remain synthetic or separately authorized. No empty migration runner/version table is introduced now; implement the narrow module runner with the first actual module migration. Production migration numbering remains available to lecture-note and other production work.
 
 ### Accepted ingress and target identity
 
