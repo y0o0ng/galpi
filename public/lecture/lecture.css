@@ -324,7 +324,9 @@ body.lecture-viewer-open { overflow: hidden; }
 
 /* `+ 새 강의` 시트 (Figma Course Home v0.5 · 새 강의 sheet) */
 .lecture-sheet {
-  display: grid; gap: 12px; width: min(420px, calc(100% - 32px)); margin: auto; padding: 18px;
+  display: grid; align-content: start; gap: 12px; width: min(420px, calc(100% - 32px)); margin: auto; padding: 18px;
+  /* iPad Safari는 모달 창을 위아래로 늘려서, 높이를 내용에 맞추지 않으면 grid 줄 사이가 벌어진다. */
+  height: fit-content; max-height: calc(100% - 64px);
   border: 1px solid #D7DED9; border-radius: 12px; background: #FAFBF9; color: #1D2622; box-shadow: var(--shadow-md);
 }
 .lecture-sheet:not([open]) { display: none; }
