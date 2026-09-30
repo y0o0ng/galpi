@@ -117,6 +117,7 @@
     let mode = MODES[modeName];
     let settings = load(modeName);
     let orientation = loadOrientation();
+    let lastDraw = settings.selected;
     const rail = el('div', 'lecture-rail');
     rail.setAttribute('role', 'toolbar');
     rail.setAttribute('aria-label', '필기 도구');
@@ -142,6 +143,7 @@
     }
 
     function render() {
+      if (settings.pens[settings.selected]?.tool !== 'eraser') lastDraw = settings.selected;
       rail.classList.toggle('is-horizontal', orientation === 'horizontal');
       rail.dataset.mode = modeName;
       turn.setAttribute('aria-label', orientation === 'horizontal' ? '세로 레일로' : '가로 레일로');
@@ -276,6 +278,15 @@
       current: () => settings.pens[settings.selected],
       close: closeMenu,
       mode: () => modeName,
+      // 원형 메뉴의 `펜`·`지우개`. 펜은 이 모드에서 마지막으로 쓴 필기 도구로, 지우개는 목록의 첫 지우개로 간다.
+      choose(kind) {
+        const index = kind === 'eraser'
+          ? settings.pens.findIndex(pen => pen.tool === 'eraser')
+          : (settings.pens[lastDraw]?.tool !== 'eraser' && settings.pens[lastDraw] ? lastDraw : settings.pens.findIndex(pen => pen.tool !== 'eraser'));
+        if (index < 0) return;
+        settings.selected = index;
+        persist(); closeMenu(); render();
+      },
       allows: color => mode.allows(color),
       refusal: () => mode.refusal,
       setMode(next) {
@@ -283,6 +294,7 @@
         modeName = next;
         mode = MODES[next];
         settings = load(next);
+        lastDraw = settings.selected;
         closeMenu();
         render();
       },

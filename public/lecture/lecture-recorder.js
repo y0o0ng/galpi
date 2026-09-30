@@ -118,7 +118,8 @@
     try { if (recorder && recorder.state !== 'inactive') recorder.stop(); else stopTracks(); } catch { stopTracks(); }
   }
 
-  async function start(container) {
+  // forceNew: `+ 새 강의`로 연 자료의 첫 녹음은 오늘 Session이 있어도 새 Session을 만든다(§6.5).
+  async function start(container, { forceNew = false } = {}) {
     if (['starting', 'recording'].includes(state.status)) return;
     const previous = state.status;
     recorder = null;
@@ -130,7 +131,7 @@
       const { session } = await api(`/api/lecture/containers/${container.id}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ localDate: localDate(), startedAtMs: Date.now() }),
+        body: JSON.stringify({ localDate: localDate(), startedAtMs: Date.now(), forceNew }),
       });
       state.session = session;
       todayCache.set(container.id, session);

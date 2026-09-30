@@ -112,6 +112,10 @@ test('lecture sessions append by date, store audio parts idempotently and dedupe
     assert.equal(again.startedAtMs, 1000);
     const nextDay = (await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-10-01', startedAtMs: 2000 })).body.session;
     assert.notEqual(nextDay.id, first.id);
+    // `+ 새 강의`는 같은 날에도 새 Session을 만들고, 그 뒤 일반 녹음은 가장 최근 Session에 붙는다.
+    const split = (await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-10-01', startedAtMs: 3000, forceNew: true })).body.session;
+    assert.notEqual(split.id, nextDay.id);
+    assert.equal((await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-10-01', startedAtMs: 4000 })).body.session.id, split.id);
 
     const audio = Buffer.from('fake-mp4-bytes');
     const partUrl = `/sessions/${first.id}/parts/part_aaaaaaaa?runtime=rt_bbbbbbbb&start=100&end=60100&status=paused`;
@@ -126,11 +130,12 @@ test('lecture sessions append by date, store audio parts idempotently and dedupe
     assert.deepEqual(fs.readFileSync(path.join(dataDir, 'lecture', 'audio', String(first.id), 'part_aaaaaaaa.m4a')), audio);
 
     const sessions = (await call('GET', `/containers/${course.id}/sessions`)).body.sessions;
-    assert.deepEqual(sessions.map(item => [item.localDate, item.partCount, item.recordedMs]), [['2026-10-01', 0, 0], ['2026-09-30', 1, 60000]]);
+    assert.deepEqual(sessions.map(item => [item.localDate, item.partCount, item.recordedMs]), [['2026-10-01', 0, 0], ['2026-10-01', 0, 0], ['2026-09-30', 1, 60000]]);
 
     const event = { key: 'ev_cccccccc', type: 'page_change', runtimeId: 'rt_bbbbbbbb', t: 5000, documentId: doc.id, page: 2 };
     assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [event, { ...event, key: 'ev_dddddddd', type: 'document_open', page: null }] })).body.inserted, 2);
     assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [event] })).body.inserted, 0);
+    assert.deepEqual((await call('GET', `/containers/${course.id}/sessions`)).body.sessions.find(item => item.id === first.id).documents.map(item => item.id), [doc.id]);
     assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [{ ...event, key: 'ev_eeeeeeee', documentId: 999 }] })).status, 400);
   } finally {
     server.close();

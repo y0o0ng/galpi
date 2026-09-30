@@ -9,12 +9,16 @@
   // 지우개 크기 1.0의 반경(페이지 폭 비율). 확대해도 화면에서 같은 크기로 닿게 배율로 나눈다.
   const ERASER_RADIUS = 0.012;
   const MAX_ZOOM = 3;
+  // 원형 메뉴 호출: 누른 채 이 시간 동안 이 거리 안에 머물면 연다. 설계상 실기기에서 정하는 값이다(§6.8).
+  const HOLD_MS = 450;
+  const HOLD_TOLERANCE_PX = 6;
   // iPad Safari 캔버스 면적 한도(16,777,216)보다 조금 아래. 넘으면 해상도를 낮춰 그린다.
   const MAX_CANVAS_PIXELS = 16000000;
   const UPLOAD_DELAY_MS = 2000;
   const UPLOAD_INTERVAL_MS = 20000;
 
-  const state = { containers: [], container: null, documents: [], search: '', loaded: false };
+  // view: 과목 폴더는 'home'(강의 타임라인)과 'docs'(자료 목록)를 오간다. 일반 폴더는 자료 목록뿐이다.
+  const state = { containers: [], container: null, documents: [], sessions: [], view: 'home', search: '', loaded: false };
   let viewer = null;
 
   const root = () => document.getElementById('lecture-root');
@@ -36,6 +40,7 @@
   }
   const ICON_BACK = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const ICON_PLUS = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const ICON_CHEVRON = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const ICON_SEARCH = '<svg viewBox="0 0 16 16" width="16" height="16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   const ICON_MIC = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   const ICON_RECORDING = '<svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="5.5" fill="currentColor"/></svg>';
@@ -126,7 +131,7 @@
       card.append(top, el('span', 'lecture-folder-recent', item.lastDocumentTitle || '아직 자료가 없어'));
       const meta = item.lastDocumentAt ? `${formatDay(item.lastDocumentAt)} 수정 · ${kindLabel(item.lastDocumentKind)}` : `${formatDay(item.createdAt)} 생성`;
       card.append(el('span', 'lecture-meta', meta));
-      card.addEventListener('click', () => openContainer(item.id));
+      card.addEventListener('click', () => { state.view = 'home'; openContainer(item.id); });
       return card;
     }));
   }
@@ -192,13 +197,15 @@
 
   async function openContainer(id) {
     try {
-      const [{ containers }, { documents }] = await Promise.all([
+      const [{ containers }, { documents }, { sessions }] = await Promise.all([
         api('/api/lecture/containers'),
         api(`/api/lecture/containers/${id}/documents`),
+        api(`/api/lecture/containers/${id}/sessions`),
       ]);
       state.containers = containers;
       state.container = containers.find(item => item.id === id) || null;
       state.documents = documents;
+      state.sessions = sessions;
     } catch (error) {
       state.container = null;
       toast(error.message);
@@ -209,13 +216,19 @@
   }
 
   function renderContainer() {
+    if (state.container.type === 'course' && state.view === 'home') return renderCourseHome();
     const container = state.container;
+    const inCourse = container.type === 'course';
     const back = el('button', 'lecture-back');
     back.type = 'button';
-    back.append(svg(ICON_BACK), document.createTextNode('Notes'));
-    back.addEventListener('click', () => { state.container = null; show(); });
+    back.append(svg(ICON_BACK), document.createTextNode(inCourse ? container.name : 'Notes'));
+    back.addEventListener('click', () => {
+      if (inCourse) { state.view = 'home'; return renderContainer(); }
+      state.container = null;
+      return show();
+    });
     const title = el('div');
-    title.append(back, el('h1', '', container.name), el('p', 'lecture-sub', `${container.type === 'course' ? '과목' : '일반'} · 자료 ${state.documents.length}`));
+    title.append(back, el('h1', '', inCourse ? '자료' : container.name), el('p', 'lecture-sub', inCourse ? `${container.name} · 자료 ${state.documents.length}` : `일반 · 자료 ${state.documents.length}`));
 
     const actions = el('div', 'lecture-actions');
     const blank = el('button', 'lecture-pill is-plain');
@@ -227,16 +240,7 @@
         openViewer(doc.id);
       } catch (error) { toast(error.message); }
     });
-    const file = el('input');
-    file.type = 'file';
-    file.accept = 'application/pdf,.pdf';
-    file.hidden = true;
-    file.addEventListener('change', () => uploadPdf(file));
-    const upload = el('button', 'lecture-pill');
-    upload.type = 'button';
-    upload.append(svg(ICON_PLUS), document.createTextNode('자료 추가'));
-    upload.addEventListener('click', () => file.click());
-    actions.append(blank, upload, file);
+    actions.append(blank, ...uploadButton('lecture-pill'));
     head().replaceChildren(title, actions);
 
     const list = el('div', 'lecture-doc-list');
@@ -251,6 +255,127 @@
       list.append(row);
     });
     root().replaceChildren(list);
+  }
+
+  function uploadButton(className) {
+    const file = el('input');
+    file.type = 'file';
+    file.accept = 'application/pdf,.pdf';
+    file.hidden = true;
+    file.addEventListener('change', () => uploadPdf(file));
+    const upload = el('button', className);
+    upload.type = 'button';
+    upload.append(svg(ICON_PLUS), document.createTextNode('자료 추가'));
+    upload.addEventListener('click', () => file.click());
+    return [upload, file];
+  }
+
+  // ─── Course Home: 강의 타임라인(Figma Course Home v0.5 · `Timeline Item` 144:122) ─────────────
+
+  const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+  const dateOf = localDate => new Date(`${localDate}T00:00:00`);
+
+  function renderCourseHome() {
+    const container = state.container;
+    const back = el('button', 'lecture-back');
+    back.type = 'button';
+    back.append(svg(ICON_BACK), document.createTextNode('Notes'));
+    back.addEventListener('click', () => { state.container = null; show(); });
+    const title = el('div');
+    title.append(back, el('h1', '', container.name), el('p', 'lecture-sub', `강의 ${state.sessions.filter(session => session.partCount > 0).length} · 자료 ${state.documents.length}`));
+    const actions = el('div', 'lecture-actions');
+    const lecture = el('button', 'lecture-pill');
+    lecture.type = 'button';
+    lecture.append(svg(ICON_PLUS), document.createTextNode('새 강의'));
+    lecture.addEventListener('click', openNewLectureSheet);
+    actions.append(lecture, ...uploadButton('lecture-pill is-plain'));
+    head().replaceChildren(title, actions);
+
+    // 마이크 권한 실패 등으로 녹음 없이 남은 Session은 오늘 것이 아니면 보이지 않는다.
+    const today = Recorder().localDate();
+    const sessions = state.sessions.filter(session => session.partCount > 0 || session.localDate === today);
+    const body = el('div', 'lecture-course');
+    const timeline = el('div', 'lecture-timeline');
+    if (!sessions.length) timeline.append(el('p', 'lecture-empty', '아직 녹음한 강의가 없어. 자료를 열고 마이크를 누르면 여기에 쌓여.'));
+    let month = null;
+    sessions.forEach((session, index) => {
+      const date = dateOf(session.localDate);
+      if (date.getMonth() !== month) {
+        month = date.getMonth();
+        timeline.append(el('p', 'lecture-month', `${month + 1}월`));
+      }
+      // 마이크가 이어 붙는 오늘의 가장 최근 Session 하나만 진행 중이다. 목록이 최신순이라 오늘 것 중 첫째다.
+      const live = session.localDate === today && sessions.findIndex(item => item.localDate === today) === index;
+      const item = el('div', `lecture-tl-item${live ? ' is-live' : ''}`);
+      const day = el('div', 'lecture-tl-date');
+      day.append(el('strong', '', String(date.getDate())), el('span', '', WEEKDAYS[date.getDay()]));
+      const rail = el('div', 'lecture-tl-rail');
+      rail.append(el('span', 'lecture-tl-dot'), el('span', 'lecture-tl-line'));
+      const card = el('div', 'lecture-tl-card');
+      const minutes = Math.round(session.recordedMs / 60000);
+      const length = session.recordedMs < 60000 ? '1분 미만' : `${minutes}분`;
+      const cardHead = el('div', 'lecture-tl-head');
+      // 제목·소개문은 전사 뒤 소개문 요약이 채운다(§11.4). 그 전에는 순번과 안내만 보인다.
+      cardHead.append(el('strong', '', `강의 ${sessions.length - index}`), el('span', 'lecture-tl-status', live ? `오늘 · ${length}` : `${length} · 전사 대기`));
+      card.append(cardHead, el('p', 'lecture-tl-intro', '전사가 끝나면 소개문이 생겨요.'));
+      if (session.documents.length) {
+        const chips = el('div', 'lecture-tl-docs');
+        session.documents.forEach(doc => {
+          const chip = el('button', 'lecture-chip', doc.title);
+          chip.type = 'button';
+          chip.addEventListener('click', event => { event.stopPropagation(); openViewer(doc.id); });
+          chips.append(chip);
+        });
+        card.append(chips);
+        card.addEventListener('click', () => openViewer(session.documents[0].id));
+        card.setAttribute('role', 'button');
+        card.tabIndex = 0;
+      }
+      item.append(day, rail, card);
+      timeline.append(item);
+    });
+
+    const docs = el('button', 'lecture-docs-link');
+    docs.type = 'button';
+    docs.append(el('strong', '', '자료'), el('span', 'lecture-docs-count', `${state.documents.length}개`), el('span', 'lecture-docs-names', state.documents.map(doc => doc.title).join(' · ')), svg(ICON_CHEVRON));
+    docs.addEventListener('click', () => { state.view = 'docs'; renderContainer(); });
+    body.append(timeline, docs);
+    root().replaceChildren(body);
+  }
+
+  // `+ 새 강의`: 자료를 고르거나 새 백지 노트로 연다. 그 뷰어의 첫 녹음만 오늘 Session과 따로 기록된다(§6.5).
+  function openNewLectureSheet() {
+    const dialog = el('dialog', 'lecture-sheet');
+    const close = () => dialog.close();
+    const list = el('div', 'lecture-sheet-docs');
+    [...state.documents].sort((a, b) => b.updatedAt - a.updatedAt).forEach(doc => {
+      const row = el('button', 'lecture-sheet-doc');
+      row.type = 'button';
+      const pages = doc.kind === 'blank' ? `${doc.blankPages}쪽` : 'PDF';
+      const updated = new Date(doc.updatedAt * 1000);
+      row.append(el('strong', '', doc.title), el('span', '', `${pages} · 최근 ${updated.getMonth() + 1}/${updated.getDate()}`));
+      row.addEventListener('click', () => { close(); openViewer(doc.id, { newLecture: true }); });
+      list.append(row);
+    });
+    if (!state.documents.length) list.append(el('p', 'lecture-meta', '아직 자료가 없어.'));
+    const blank = el('button', 'lecture-sheet-blank');
+    blank.type = 'button';
+    blank.append(svg(ICON_PLUS), document.createTextNode('자료 없이 백지 노트로 시작'));
+    blank.addEventListener('click', async () => {
+      try {
+        const { document: doc } = await api(`/api/lecture/containers/${state.container.id}/blank`, jsonOptions('POST', {}));
+        close();
+        openViewer(doc.id, { newLecture: true });
+      } catch (error) { toast(error.message); }
+    });
+    dialog.append(el('h2', '', '새 강의'), el('p', 'lecture-sheet-hint', '오늘 강의와 따로 기록돼. 마이크는 자료를 연 뒤에 직접 눌러.'), el('p', 'lecture-sheet-section', '자료 고르기'), list, blank);
+    dialog.addEventListener('click', event => {
+      const box = dialog.getBoundingClientRect();
+      if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) close();
+    });
+    dialog.addEventListener('close', () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
   }
 
   async function uploadPdf(input) {
@@ -301,10 +426,10 @@
     return pdfjsPromise;
   }
 
-  async function openViewer(documentId) {
+  async function openViewer(documentId, { newLecture = false } = {}) {
     if (viewer) return;
     const v = {
-      documentId, doc: null, container: null, pdf: null, sizes: [], pages: [],
+      documentId, newLecture, doc: null, container: null, pdf: null, sizes: [], pages: [],
       body: { pages: {} }, baseRevision: 0, dirty: false, changeSeq: 0,
       uploading: false, conflict: null, offline: false,
       zoom: 1, stroke: null, erasing: false,
@@ -367,11 +492,12 @@
     if (viewer !== v) return;
     buildPages(v);
     if (v.container?.type === 'course') {
-      v.session = await Recorder().todaySession(v.container.id).catch(() => null);
+      // `+ 새 강의`로 열었으면 오늘의 기존 Session을 붙이지 않는다. 첫 녹음이 새 Session을 만든다.
+      v.session = v.newLecture ? null : await Recorder().todaySession(v.container.id).catch(() => null);
       if (viewer !== v) return;
       if (v.session) logDocumentOpen(v);
       // 녹음 중이거나 오늘 이 과목 Session이 있으면 `강의`, 아니면 `복습`으로 연다(§8.2).
-      setMode(v, isRecordingHere(v) || v.session ? 'lecture' : 'review');
+      setMode(v, isRecordingHere(v) || v.session || v.newLecture ? 'lecture' : 'review');
       v.unsubscribe = Recorder().subscribe(() => onRecorderChange(v));
       v.ticker = setInterval(() => {
         const time = v.mic.querySelector('.lecture-mic-time');
@@ -584,7 +710,7 @@
     if (isRecordingHere(v) && v.mode !== 'lecture') setMode(v, 'lecture');
     else renderModeToggle(v);
     // 이 뷰어에서 첫 녹음을 시작하면 그때 생긴 Session을 붙이고 자료 열기를 남긴다.
-    if (!v.session && recorder.session?.containerId === v.container.id) {
+    if (!v.session && !v.newLecture && recorder.session?.containerId === v.container.id) {
       v.session = recorder.session;
       logDocumentOpen(v);
     }
@@ -608,7 +734,14 @@
     button.append(time);
     button.addEventListener('click', async () => {
       if (status === 'recording') return Recorder().pause();
-      try { await Recorder().start(v.container); } catch (error) { toast(error.message); }
+      try {
+        await Recorder().start(v.container, { forceNew: v.newLecture });
+        if (v.newLecture) {
+          v.newLecture = false;
+          v.session = Recorder().state.session;
+          logDocumentOpen(v);
+        }
+      } catch (error) { toast(error.message); }
     });
     v.mic.replaceChildren(button);
 
@@ -688,6 +821,7 @@
       const pen = v.pens.current();
       // 마지막 방어선: 강의 펜은 초록을, 복습 펜은 초록이 아닌 색을 쓰지 않는다(§8.2).
       if (pen.tool !== 'eraser' && !v.pens.allows(pen.color)) return toast(v.pens.refusal());
+      startHold(v, page, event);
       if (pen.tool === 'eraser') {
         v.erasing = { page, pointerId: event.pointerId, last: pagePoint(page, event), radius: ERASER_RADIUS * pen.width / v.zoom };
         eraseAt(v, page, v.erasing.last, v.erasing.radius);
@@ -716,6 +850,11 @@
       drawStroke(target.getContext('2d'), { ...v.stroke.data, tool: 'pen' }, target.width);
     });
     page.ink.addEventListener('pointermove', event => {
+      if (v.hold?.pointerId === event.pointerId) {
+        if (v.radial) return v.radial.move(event.clientX, event.clientY);
+        // 획을 긋기 시작하면 도중에 멈춰도 메뉴를 열지 않는다.
+        if (Math.hypot(event.clientX - v.hold.x, event.clientY - v.hold.y) > HOLD_TOLERANCE_PX) cancelHold(v);
+      }
       if (v.erasing?.pointerId === event.pointerId) {
         // 이벤트 사이도 훑는다. 빠르게 문지르면 두 이벤트 사이에 있는 획을 건너뛴다.
         (event.getCoalescedEvents?.() || [event]).forEach(item => {
@@ -749,6 +888,16 @@
     });
     // pointercancel도 끝으로 본다. 실측에서 필기 도중 cancel이 났고, 그린 만큼은 남기는 편이 낫다.
     const end = event => {
+      if (v.hold?.pointerId === event.pointerId) {
+        const radial = v.radial;
+        cancelHold(v);
+        // 떼는 순간 고른 항목을 실행한다. 입력이 중단되면(pointercancel) 아무것도 실행하지 않는다.
+        if (radial) {
+          const choice = event.type === 'pointerup' ? radial.release() : (radial.cancel(), null);
+          if (choice) runRadial(v, choice);
+          return;
+        }
+      }
       if (v.erasing?.pointerId === event.pointerId) {
         v.erasing = null;
         return;
@@ -818,6 +967,45 @@
     // 손가락 사이에 있던 내용이 손을 뗀 자리에 오게 스크롤을 맞춘다.
     v.scroller.scrollLeft = pinch.originX * factor - pinch.current.x;
     v.scroller.scrollTop = pinch.originY * factor - pinch.current.y;
+  }
+
+  // ─── 원형 메뉴(§6.8) ─────────────────────────────────────────────────────
+
+  function startHold(v, page, event) {
+    cancelHold(v);
+    v.hold = { page, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    v.hold.timer = setTimeout(() => openRadial(v), HOLD_MS);
+  }
+
+  function cancelHold(v) {
+    if (!v.hold) return;
+    clearTimeout(v.hold.timer);
+    v.hold = null;
+    v.radial = null;
+  }
+
+  function openRadial(v) {
+    const hold = v.hold;
+    if (!hold) return;
+    // 메뉴를 부른 점은 필기로 남기지 않는다. 그 전에 끝난 획은 그대로다.
+    if (v.stroke?.pointerId === hold.pointerId) {
+      if (v.stroke.target !== hold.page.ink) v.stroke.target.remove();
+      v.stroke = null;
+      drawInk(v, hold.page);
+    }
+    if (v.erasing?.pointerId === hold.pointerId) v.erasing = null;
+    const recording = isRecordingHere(v);
+    v.radial = global.LectureRadial.open({
+      x: hold.x,
+      y: hold.y,
+      // 선택(올가미)·포스트잇은 아직 없다. 마커는 녹음 중에만 쓸 수 있다(§6.4).
+      enabled: { pen: true, eraser: true, select: false, sticky: false, important: recording && Boolean(v.markers), later: recording && Boolean(v.markers) },
+    });
+  }
+
+  function runRadial(v, choice) {
+    if (choice === 'pen' || choice === 'eraser') v.pens.choose(choice === 'eraser' ? 'eraser' : 'draw');
+    else if (choice === 'important' || choice === 'later') v.markers?.add(choice);
   }
 
   function segmentDistance(point, a, b) {

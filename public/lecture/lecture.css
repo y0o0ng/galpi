@@ -250,3 +250,80 @@ body.lecture-viewer-open { overflow: hidden; }
 .lecture-mode.is-locked { cursor: not-allowed; }
 .lecture-mode-dot { width: 6px; height: 6px; border-radius: 50%; background: #2E8B57; opacity: 0.5; }
 .lecture-mode button.active .lecture-mode-dot { opacity: 1; }
+
+/* ─── 원형 메뉴 (Figma `Radial Menu` 182:162) ─── */
+
+.lecture-radial { position: fixed; z-index: 1003; width: 208px; height: 208px; pointer-events: none; filter: drop-shadow(0 6px 9px rgba(29, 38, 34, 0.16)); }
+.lecture-radial-backdrop { fill: #D7DED9; }
+.lecture-radial-segment { fill: #FAFBF9; }
+.lecture-radial-icon { fill: none; stroke: #5F6E66; stroke-width: 1.65; }
+.lecture-radial-icon .is-fill { fill: #5F6E66; stroke: none; }
+.lecture-radial-item.is-active .lecture-radial-segment { fill: #2F6B57; }
+.lecture-radial-item.is-active .lecture-radial-icon { stroke: #FAFBF9; }
+.lecture-radial-item.is-active .lecture-radial-icon .is-fill { fill: #FAFBF9; }
+.lecture-radial-item.is-disabled .lecture-radial-segment { opacity: 0.55; }
+.lecture-radial-item.is-disabled .lecture-radial-icon { opacity: 0.35; }
+
+/* ─── Course Home 강의 타임라인 (Figma Course Home v0.5 · `Timeline Item` 144:122) ─── */
+
+.lecture-course { display: grid; gap: 24px; padding-bottom: 40px; }
+.lecture-timeline { display: grid; }
+.lecture-month { margin: 0 0 16px; color: #5F6E66; opacity: 0.68; font-size: 12px; font-weight: 500; }
+.lecture-month:not(:first-child) { margin-top: 8px; }
+.lecture-tl-item { display: grid; grid-template-columns: 36px 8px minmax(0, 1fr); gap: 12px; padding-bottom: 16px; }
+.lecture-tl-date { display: grid; justify-items: center; align-content: start; padding-top: 14px; }
+.lecture-tl-date strong { color: #1D2622; font-size: 16px; font-weight: 600; line-height: 20px; }
+.lecture-tl-date span { color: #5F6E66; opacity: 0.68; font-size: 12px; line-height: 16px; }
+.lecture-tl-rail { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 20px; margin-bottom: -16px; }
+.lecture-tl-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #2F6B57; }
+.lecture-tl-line { flex: 1; width: 1px; background: #D7DED9; }
+.lecture-tl-item:last-child .lecture-tl-line { display: none; }
+.lecture-tl-card {
+  display: grid; gap: 8px; padding: 14px 16px; border: 1px solid #D7DED9; border-radius: 12px; background: #FAFBF9; cursor: pointer;
+}
+.lecture-tl-head { display: flex; align-items: baseline; gap: 12px; }
+.lecture-tl-head strong { color: #1D2622; font-size: 16px; font-weight: 600; }
+.lecture-tl-status { color: #5F6E66; opacity: 0.68; font-size: 12px; }
+.lecture-tl-intro { margin: 0; color: #5F6E66; font-size: 14px; line-height: 18px; }
+.lecture-tl-docs { display: flex; flex-wrap: wrap; gap: 6px; }
+.lecture-chip {
+  min-height: 24px; padding: 3px 8px; border: 1px solid #D7DED9; border-radius: 999px; background: #F3F5F2;
+  color: #5F6E66; font: inherit; font-size: 12px; cursor: pointer;
+}
+/* 진행 중(오늘) 강의: Figma `State=Processing` */
+.lecture-tl-item.is-live .lecture-tl-date strong { color: #5F6E66; }
+.lecture-tl-item.is-live .lecture-tl-dot { background: none; box-shadow: inset 0 0 0 1.5px #2EA16B; }
+.lecture-tl-item.is-live .lecture-tl-card { border-color: #2EA16B; background: #F2FBF8; }
+.lecture-tl-item.is-live .lecture-tl-status { color: #2EA16B; opacity: 1; font-weight: 600; }
+.lecture-tl-item.is-live .lecture-tl-intro { opacity: 0.68; }
+
+.lecture-docs-link {
+  display: flex; align-items: center; gap: 8px; min-height: 50px; padding: 14px 12px 14px 16px;
+  border: 1px solid #D7DED9; border-radius: 12px; background: #FAFBF9; color: #5F6E66; font: inherit; text-align: left; cursor: pointer;
+}
+.lecture-docs-link strong { color: #1D2622; font-size: 16px; font-weight: 600; }
+.lecture-docs-count { opacity: 0.68; font-size: 12px; font-weight: 500; }
+.lecture-docs-names { flex: 1; min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* `+ 새 강의` 시트 (Figma Course Home v0.5 · 새 강의 sheet) */
+.lecture-sheet {
+  display: grid; gap: 12px; width: min(420px, calc(100% - 32px)); margin: auto; padding: 18px;
+  border: 1px solid #D7DED9; border-radius: 12px; background: #FAFBF9; color: #1D2622; box-shadow: var(--shadow-md);
+}
+.lecture-sheet:not([open]) { display: none; }
+.lecture-sheet::backdrop { background: rgba(29, 38, 34, 0.28); }
+.lecture-sheet h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.lecture-sheet-hint { margin: 0; color: #5F6E66; font-size: 12px; }
+.lecture-sheet-section { margin: 0; color: #5F6E66; opacity: 0.68; font-size: 12px; font-weight: 500; }
+.lecture-sheet-docs { display: grid; max-height: 50vh; overflow: auto; }
+.lecture-sheet-doc {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 44px; padding: 10px 0;
+  border: 0; border-top: 1px solid #D7DED9; background: none; font: inherit; text-align: left; cursor: pointer;
+}
+.lecture-sheet-doc:first-child { border-top: 0; }
+.lecture-sheet-doc strong { color: #1D2622; font-size: 14px; font-weight: 500; }
+.lecture-sheet-doc span { flex: none; color: #5F6E66; opacity: 0.68; font-size: 12px; }
+.lecture-sheet-blank {
+  display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 10px 12px;
+  border: 1px solid #D7DED9; border-radius: 10px; background: none; color: #5F6E66; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+}
