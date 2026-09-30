@@ -13,7 +13,7 @@ const { registerLectureRoutes, isLectureAnnotationPut } = require('../lib/lectur
 test('lecture containers, documents and revision-checked annotations', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  migrations.find(item => item.version === 29).up(db);
+  migrations.find(item => item.version === 28).up(db);
   const app = express();
   app.use(express.json({ limit: '40mb' }));
   registerLectureRoutes({ app, db, dataDir });
