@@ -55,6 +55,11 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `PROVISIONAL`). **Ledger v3: pool 389; every marginal (split, language, fragments) is met and the
   minimum top-up lower bound is 0** — a marginal bound, not a joint-feasibility proof. No
   acceptance, freeze, selection or training.
+- **accepted-row v3 migration (owner, 2026-10-01)** (see "Accepted-row v3 migration"): the 6
+  accepted-on-retired rows stay permanently out; the 12 accepted rows whose HUMAN gold
+  (ESCALATE) differs from v3 (CLEAR) are re-reviewed under v3 — fresh source audit and blind v3
+  strong-model review for all 12, HUMAN for TRAIN / DEV only. Plan and blind packets are built;
+  nothing has run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2249,6 +2254,35 @@ MIXED 78, EN 39 against 266 / 76 / 38, fragments 72 / 103 / 124 / 70 / 20 agains
 70 / 100 / 120 / 70 / 20, no HELD per-skeleton need; **minimum top-up lower bound 0**. Whether one
 380-row selection satisfies all constraints jointly is decided only at deterministic selection,
 which has not been opened.
+
+## Accepted-row v3 migration
+
+**Owner decision (2026-10-01).** Ledger v3 flags two accepted groups. The **6 accepted surfaces
+on retired skeletons** stay permanently out of the pool; their acceptance records and HUMAN gold
+are unchanged, and no replacement is owed. The **12 accepted surfaces whose immutable HUMAN gold
+differs from v3** are all historical ESCALATE against v3 CLEAR: `b001-015`, `-031`, `b002-051`
+(DEV), `b002-025`, `-030`, `-035`, `-040` (TRAIN, all `cc054a42`), and `b001-020`, `-024`,
+`b002-059`, `-061`, `-063` (HELD). Keeping the old label would put labels that contradict the
+current authority in the corpus, relabelling without review would silently overturn HUMAN gold,
+and dropping all 12 leaves the pool at 377, short in DEV (2), HELD (2 overall; `2fa39ece` 3,
+`a19bb9e9` 1, `869c7127` 1 per skeleton), KO (3) and fragments 4 (2) and 5 (3). So they are
+**re-reviewed under v3**; historical records stay immutable and the old label does not carry.
+
+`scripts/build-memory-inference-p1b6-accepted-v3-migration.js`
+(`npm run build:memory-inference-p1b6-accepted-v3-migration`, plus `-- --audit-packet <out>` /
+`-- --review-packet <out>`) pins ledger v3, v3, the batch-001 and batch-002 successor surfaces and
+both unchanged protocols, derives the 12 and the 6 from the ledger flags, and writes
+`fixtures/local-memory-inference-p1b6-accepted-v3-migration-plan.json` (internal; it never reaches
+a packet). The acceptance records do not bind a per-row source-audit result, so no audit is
+inherited: all 12 get a **fresh blind source audit** (`p1b6-mig-audit`, packet `ee7b67cc…`) and,
+in a separate session, a **fresh blind v3 strong-model review** (`p1b6-mig-v3smreview`, packet
+`0f399590…`), whose results count only for audit-PASS rows. Routing: TRAIN / DEV clean agreements
+become `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL` with the v3 label and get HUMAN
+calibration; non-clean TRAIN / DEV rows get mandatory HUMAN (matching KEEP → `HUMAN_ADJUDICATED`
+/ `ELIGIBLE`, else `INELIGIBLE`). HELD rows get **no HUMAN review**, because repeated HELD review
+stays unopened: a clean agreement becomes `PROVISIONAL` with the v3 label (the post-selection
+independent second strong-model review still applies); anything else is `INELIGIBLE`. A later
+ledger version applies the outcome and re-measures the shortage. Nothing has run.
 
 ## Closed Selection and Freeze Constraints
 

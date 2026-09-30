@@ -5407,3 +5407,13 @@ record stays **93**.
 Owner decisions, GPT-5.6 sol presentation aid (owner-reported), not independent; two row IDs
 corrected at the owner's instruction, decisions and reasons unchanged. No acceptance, freeze or
 selection; the accepted pool record stays **93**.
+
+#### P1-B6 accepted-row v3 migration — PREREGISTERED / packets BUILT / NOT RUN
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-accepted-v3-migration-plan.json` | owner decision and routing: 6 retired-skeleton rows permanently out, 12 gold-vs-v3 rows re-reviewed |
+| source-audit packet (not committed) | 12 rows, `p1b6-mig-audit`, raw SHA `ee7b67cc153971819579de19520083431359fcabfc03db77bebad77fe22d79d1` |
+| v3 review packet (not committed) | 12 rows, `p1b6-mig-v3smreview`, raw SHA `0f3995903af65bf42822289bc7508ba1bfbb663917737a93deca10b07ba9a38e` |
+
+Historical acceptance and HUMAN gold unchanged. Nothing has run; the accepted pool record stays **93**.

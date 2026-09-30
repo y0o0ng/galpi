@@ -1,0 +1,152 @@
+{
+  "name": "xion-local-memory-inference-p1b6-accepted-v3-migration-plan-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "decisionsSource": "REPOSITORY_OWNER",
+  "decisionDate": "2026-10-01",
+  "inputs": {
+    "ledgerV3": {
+      "identity": "xion-local-memory-inference-p1b6-reviewed-pool-ledger-v3",
+      "rawSha256": "c572ac2d930cc7b614e23d7c48359f3131819db29891921d5c87032e705ba04c"
+    },
+    "v3": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "batch001": {
+      "identity": "xion-local-memory-inference-p1b6-surface-batch-001-v1",
+      "rawSha256": "2a4605f5550118754c315e26700aef1be96a3129a3ef0065fd2accdad5352a36"
+    },
+    "batch002Successor": {
+      "identity": "xion-local-memory-inference-p1b6-surface-effective-current-batch-002-v1",
+      "rawSha256": "9701db8902ae99dc5c08cffb176bf9247443884910e3002b77548ac5436157d1"
+    },
+    "sourceAuditProtocol": {
+      "identity": "xion-local-memory-inference-p1b6-source-audit-protocol-v1",
+      "rawSha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+    },
+    "reviewProtocol": {
+      "identity": "xion-local-memory-inference-p1b6-targeted-v3-strong-model-review-protocol-v1",
+      "rawSha256": "8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892"
+    }
+  },
+  "retiredSkeletonAccepted": {
+    "itemIds": [
+      "p1b6-item-b001-030",
+      "p1b6-item-b002-021",
+      "p1b6-item-b002-026",
+      "p1b6-item-b002-031",
+      "p1b6-item-b002-036",
+      "p1b6-item-b002-041"
+    ],
+    "decision": "PERMANENTLY_OUT_OF_POOL",
+    "note": "acceptance records and HUMAN gold are not rewritten; no replacement is owed"
+  },
+  "migration": {
+    "rows": [
+      {
+        "itemId": "p1b6-item-b001-015",
+        "semanticSkeletonId": "p1b6-sk-66ecb02cbfc40c3c",
+        "splitAssignment": "DEV",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b001-020",
+        "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+        "splitAssignment": "FINAL_HELD_OUT",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b001-024",
+        "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+        "splitAssignment": "FINAL_HELD_OUT",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b001-031",
+        "semanticSkeletonId": "p1b6-sk-16697b52f83abeba",
+        "splitAssignment": "DEV",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-025",
+        "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+        "splitAssignment": "TRAIN",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-030",
+        "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+        "splitAssignment": "TRAIN",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-035",
+        "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+        "splitAssignment": "TRAIN",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-040",
+        "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+        "splitAssignment": "TRAIN",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-061",
+        "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+        "splitAssignment": "FINAL_HELD_OUT",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-051",
+        "semanticSkeletonId": "p1b6-sk-e7fe317a78077d37",
+        "splitAssignment": "DEV",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-059",
+        "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+        "splitAssignment": "FINAL_HELD_OUT",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      },
+      {
+        "itemId": "p1b6-item-b002-063",
+        "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+        "splitAssignment": "FINAL_HELD_OUT",
+        "historicalHumanGold": "ESCALATE",
+        "v3Reference": "CLEAR"
+      }
+    ],
+    "historicalRecords": "batch-001 / batch-002 acceptance and HUMAN gold stay immutable; the old label does not carry into the pool",
+    "surfaces": "the accepted surface bytes, pinned through the batch-001 and batch-002 successor artifacts; nothing is re-authored"
+  },
+  "gates": {
+    "sourceAudit": "a fresh blind source/bundle audit of all 12 under the unchanged protocol; the acceptance records do not bind a per-row audit result, so none is inherited. FAIL / UNCERTAIN rows leave the pool.",
+    "v3Review": "a fresh blind v3 strong-model review of all 12 under the unchanged neutral protocol, run in a separate session; results count only for audit-PASS rows.",
+    "routing": {
+      "trainDev": "clean agreement with v3 → CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL with the v3 label, and HUMAN calibration of every clean agreement; disagreement / FIX / REJECT / missing → mandatory HUMAN (KEEP matching v3 → HUMAN_ADJUDICATED / ELIGIBLE, anything else → INELIGIBLE)",
+      "held": "no HUMAN review, because repeated HELD review stays unopened: clean agreement → CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL with the v3 label (the post-selection independent second strong-model review still applies); anything else → INELIGIBLE"
+    },
+    "afterMigration": "a new ledger version drops the humanGoldDiffersFromV3 flag for migrated rows and re-measures the shortage; any loss is topped up separately"
+  },
+  "authority": {
+    "sourceAuditRun": false,
+    "semanticReviewRun": false,
+    "humanReviewRun": false,
+    "historicalRecordsRewritten": false,
+    "acceptancePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}
