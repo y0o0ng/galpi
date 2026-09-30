@@ -55,11 +55,12 @@
 .lecture-doc-row.is-pending { cursor: default; opacity: 0.6; }
 
 .lecture-dialog {
-  width: min(360px, calc(100% - 32px)); padding: 20px;
+  position: fixed; margin: 0;
+  width: min(320px, calc(100% - 32px)); padding: 16px;
   border: 1px solid var(--hairline); border-radius: 12px; background: var(--ai-bubble); color: var(--ai-text);
   box-shadow: var(--shadow-md);
 }
-.lecture-dialog::backdrop { background: rgba(29, 38, 34, 0.24); }
+.lecture-dialog::backdrop { background: transparent; }
 .lecture-dialog h2 { margin: 0; font-size: 17px; }
 .lecture-dialog form { display: grid; gap: 12px; }
 .lecture-dialog form > input {

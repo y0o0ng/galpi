@@ -88,7 +88,7 @@
     const add = el('button', 'lecture-pill');
     add.type = 'button';
     add.append(svg(ICON_PLUS), document.createTextNode('새 폴더'));
-    add.addEventListener('click', openFolderDialog);
+    add.addEventListener('click', () => openFolderDialog(add));
     head().replaceChildren(title, add);
 
     const search = el('label', 'lecture-search');
@@ -123,7 +123,7 @@
     }));
   }
 
-  function openFolderDialog() {
+  function openFolderDialog(anchor) {
     const dialog = el('dialog', 'lecture-dialog');
     const form = el('form');
     form.method = 'dialog';
@@ -167,6 +167,16 @@
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog);
     dialog.showModal();
+    // Figma의 `새 강의`처럼 누른 버튼 바로 아래에서 펼친다. 오른쪽 끝을 버튼에 맞춘다.
+    const rect = anchor.getBoundingClientRect();
+    dialog.style.top = `${rect.bottom + 8}px`;
+    dialog.style.left = `${Math.max(16, rect.right - dialog.offsetWidth)}px`;
+    const close = () => dialog.close();
+    window.addEventListener('resize', close, { once: true });
+    dialog.addEventListener('click', event => {
+      const box = dialog.getBoundingClientRect();
+      if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
+    });
     name.focus();
   }
 
@@ -390,8 +400,9 @@
 
     v.onVisibility = () => { if (document.visibilityState === 'hidden') flush(v); };
     document.addEventListener('visibilitychange', v.onVisibility);
-    v.onResize = () => layoutPages(v);
-    window.addEventListener('resize', v.onResize);
+    // window resize는 iPad 회전 중 레이아웃이 바뀌기 전 폭으로 올 때가 있어 스크롤 영역 자체를 본다.
+    v.resizeObserver = new ResizeObserver(() => { if (v.pages.length) layoutPages(v); });
+    v.resizeObserver.observe(v.scroller);
     return shell;
   }
 
@@ -454,18 +465,24 @@
         else hidePage(page);
       });
     }, { root: v.scroller, rootMargin: '100% 0px' });
+    v.pageWidth = 0;
     layoutPages(v);
     v.pages.forEach(page => v.observer.observe(page.el));
   }
 
   function layoutPages(v) {
     const width = Math.min(v.scroller.clientWidth - 32, 900);
+    if (width === v.pageWidth) return;
+    // 폭이 바뀌면 페이지 높이도 바뀌므로, 보던 페이지와 그 안의 비율 위치를 다시 맞춘다.
+    const anchor = v.pageWidth && v.pages.find(page => page.el.offsetTop + page.el.offsetHeight > v.scroller.scrollTop);
+    const within = anchor ? (v.scroller.scrollTop - anchor.el.offsetTop) / anchor.el.offsetHeight : 0;
     v.pageWidth = width;
     v.pages.forEach(page => {
       page.el.style.width = `${width}px`;
       page.el.style.height = `${Math.round(width * page.aspect)}px`;
       if (page.visible) showPage(v, page);
     });
+    if (anchor) v.scroller.scrollTop = anchor.el.offsetTop + within * anchor.el.offsetHeight;
     updatePageIndicator(v);
   }
 
@@ -771,7 +788,7 @@
     v.observer?.disconnect();
     v.pdf?.destroy();
     document.removeEventListener('visibilitychange', v.onVisibility);
-    window.removeEventListener('resize', v.onResize);
+    v.resizeObserver.disconnect();
     v.el.remove();
     document.body.classList.remove('lecture-viewer-open');
     if (state.container) openContainer(state.container.id);
