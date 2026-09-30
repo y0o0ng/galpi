@@ -50,8 +50,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `HUMAN_ADJUDICATED` / `ELIGIBLE`; `037` (mandatory) and `009` (calibration) are KEEP CLEAR
   against v3 ESCALATE; the owner closed both as current-realization failures. **Ledger v2: pool
   387; the only marginal shortage is EN, by one (37 / 38).** A 2-row EN batch-005 top-up is
-  preregistered and materialized; owner pre-audit 2/2 PASS, source audit **2/2 PASS**; the v3
-  strong-model review packet is built, not run. No acceptance.
+  preregistered and materialized; owner pre-audit 2/2 PASS, source audit **2/2 PASS**, v3
+  strong-model review **2/2 clean agreements** (both calibration); the 2-row blind HUMAN packet is
+  built, not run. No acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2211,6 +2212,21 @@ batch-004 builder: population from the audit receipt (both rows), unchanged neut
 protocol, `p1b6-b005-v3smreview` namespace, and reconciliation against v3 with the batch-005
 rule — non-clean routes go to mandatory HUMAN and **every clean agreement is calibration**. The
 packet (`dfafb7fe…`) is not committed.
+
+**v3 strong-model review attempt-001 — 2/2 clean agreements.** Fresh Claude Code CLI session,
+Claude Opus 5.5 (owner-reported): `001` KEEP ESCALATE (which side is bigger is unspecified),
+`002` KEEP CLEAR (attributed approximate window). Receipt
+`fixtures/local-memory-inference-p1b6-batch-005-v3-review-attempt-001.json` (raw results
+`937f3c9e…`, not committed). Both rows are calibration; none is mandatory.
+
+**Blind HUMAN calibration — preregistered and built, not run.** Protocol
+`fixtures/local-memory-inference-p1b6-batch-005-human-adjudication-calibration-protocol.json`
+(`134b72c0…`) is the batch-004 protocol with the batch-005 population (0 mandatory + 2
+calibration, nothing unsampled or excluded) and the same result semantics and non-independence
+statement. `scripts/build-memory-inference-p1b6-batch-005-human-review-packet.js` derives the
+population from the receipt under the every-clean-agreement rule, uses the `p1b6-b005-hreview`
+namespace and requires bundles equal to the strong-model packet. Packet `8b1a5b85…`, not
+committed.
 
 ## Closed Selection and Freeze Constraints
 

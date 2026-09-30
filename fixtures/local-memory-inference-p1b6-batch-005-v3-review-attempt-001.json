@@ -1,0 +1,74 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-005-v3-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-005-v3-review-attempt-001",
+  "status": "COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewProtocol": {
+    "identity": "p1b6-targeted-v3-semantic-realization-review-v1",
+    "sha256": "8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-005-v3-review-packet-v1",
+    "sha256": "dfafb7fe5bd45d61bbf788aafb40aa72a5f90dd5a869115ea54fc0409a949b88",
+    "rows": 2
+  },
+  "routingAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-005-authoring-protocol-v1",
+    "rawSha256": "cb79564a9d9591538add3c78b015fcf5fd59bf807ad0bb83aee632e1df1ba74c"
+  },
+  "referenceAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b005-v3-review-results.json",
+    "sha256": "937f3c9ecd6ab5ee17ec8357d1ebd89a10d7d7802e75784ddf902dd380ac1f24",
+    "committed": false
+  },
+  "reviewerExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "reportedModel": "Claude Opus 5.5",
+    "session": "fresh Claude Code CLI session started in the home directory, given only the protocol and packet paths"
+  },
+  "summary": {
+    "total": 2,
+    "cleanAgreements": 2,
+    "mandatoryHuman": 0,
+    "calibration": 2
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b005-001",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Which side is ~5 cm bigger is unspecified; width (~85x40) vs depth (80x~45) are materially different readings the visible discourse does not resolve.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b005-002",
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Landing time is given as an attributed approximate window (3-4 p.m., per the sister); the uncertain status itself is provided.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "mandatoryHumanItemIds": [],
+  "calibrationItemIds": [
+    "p1b6-item-b005-001",
+    "p1b6-item-b005-002"
+  ],
+  "authority": {
+    "humanPacketBuilt": false,
+    "humanReviewPerformed": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

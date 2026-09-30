@@ -38,3 +38,14 @@ test('reconciliation routes disagreements to HUMAN and takes every clean agreeme
   assert.deepEqual(routed.mandatoryHumanItemIds, ['p1b6-item-b005-001']);
   assert.deepEqual(routed.calibrationItemIds, ['p1b6-item-b005-002']);
 });
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+test('the committed v3 review receipt: 2 clean agreements, both calibration, no HUMAN gate opened', () => {
+  const receipt = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE)));
+  assert.equal(receipt.reviewPacket.sha256, PACKET_SHA256);
+  assert.deepEqual(receipt.summary, { total: 2, cleanAgreements: 2, mandatoryHuman: 0, calibration: 2 });
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
