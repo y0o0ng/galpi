@@ -45,7 +45,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   (see "Batch-004 top-up plan"); the **owner pre-audit review is complete — 41/41 PASS** (`037`
   repaired twice before closure). The fresh source/bundle audit of all 41 rows is **40 PASS /
   1 UNCERTAIN** (`008`, fail-closed and excluded). **Next gate: blind v3 strong-model review of
-  the 40 PASS rows.**
+  the 40 PASS rows** — the packet is built; no review has run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2093,6 +2093,18 @@ mapping fail-closed rows back to items mechanically. The UNCERTAIN row is `008` 
 bundle drops competing antecedents. It is excluded from semantic review and not repaired now;
 the tranche buffer of 7 absorbs review loss. No semantic review, HUMAN review, acceptance, final
 selection or training has occurred.
+
+**v3 strong-model review packet — built, not run.**
+`scripts/build-memory-inference-p1b6-batch-004-v3-review-packet.js`
+(`npm run build:memory-inference-p1b6-batch-004-v3-review-packet -- --output <path>`) derives
+the population from the committed audit receipt (the 40 PASS rows, mapped back through the audit
+IDs and pinned as every slot except `008`) and renders 40 sorted opaque rows in the new
+`p1b6-b004-v3smreview` namespace, each only an ID and the exact selected bundle, under the
+unchanged neutral targeted v3 protocol (`8a48c2df…`). No separate review plan is written: routing
+and the 8-row calibration are read from the batch-004 authoring protocol's preregistered
+`gates` — disagreement / FIX / REJECT / missing go to mandatory HUMAN, and calibration is the 8
+clean agreements with the lowest `sha256(p1b6-b004-v3-review-calibration-v1 NUL itemId)`.
+`--results <raw>` reconciles against v3 (`89a48264…`). The packet (`95df87e3…`) is not committed.
 
 ## Closed Selection and Freeze Constraints
 

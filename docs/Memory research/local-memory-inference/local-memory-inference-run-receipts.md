@@ -5300,3 +5300,13 @@ Auditor: fresh Claude Code CLI session in the home directory, Claude Opus 5.5 (o
 UNCERTAIN: `008` (dropped competing antecedents for `So how much is left?`), fail-closed and
 excluded, not repaired. No semantic review, HUMAN review or acceptance; the accepted pool record
 stays **93**.
+
+#### P1-B6 batch-004 v3 strong-model review packet — BUILT / NOT RUN
+
+| artifact | role |
+| --- | --- |
+| `scripts/build-memory-inference-p1b6-batch-004-v3-review-packet.js` | packet builder and preregistered reconciliation |
+| `fixtures/local-memory-inference-p1b6-targeted-v3-strong-model-review-protocol.json` | unchanged neutral v3 protocol, `8a48c2df…` |
+| packet (not committed) | 40 audit-PASS rows, `p1b6-b004-v3smreview` namespace, raw SHA `95df87e3137adee24b7ab805636e0e30794880cbced7f63afbc5feb3f54d0cbb` |
+
+No review has run; the accepted pool record stays **93**.
