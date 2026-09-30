@@ -13,7 +13,7 @@ const { registerLectureRoutes, isLectureAnnotationPut } = require('../lib/lectur
 test('lecture containers, documents and revision-checked annotations', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  [28, 30, 33].forEach(version => migrations.find(item => item.version === version).up(db));
+  [28, 30, 33, 34].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json({ limit: '40mb' }));
   registerLectureRoutes({ app, db, dataDir });
@@ -90,7 +90,7 @@ test('only the annotation PUT skips the global 1MB JSON parser', () => {
 test('lecture sessions append by date, store audio parts idempotently and dedupe events', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  [28, 30, 33].forEach(version => migrations.find(item => item.version === version).up(db));
+  [28, 30, 33, 34].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json());
   registerLectureRoutes({ app, db, dataDir });
@@ -145,6 +145,72 @@ test('lecture sessions append by date, store audio parts idempotently and dedupe
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM lecture_session_markers').get().n, 1);
     assert.equal((await call('DELETE', `/sessions/${first.id}/markers/mk_ffffffff`)).body.deleted, 1);
     assert.equal((await call('DELETE', `/sessions/${first.id}/markers/mk_ffffffff`)).body.deleted, 0);
+  } finally {
+    server.close();
+    db.close();
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('lecture trash hides documents and sessions, restores them, and purges session strokes', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
+  const db = new Database(':memory:');
+  [28, 30, 33, 34].forEach(version => migrations.find(item => item.version === version).up(db));
+  const app = express();
+  app.use(express.json());
+  registerLectureRoutes({ app, db, dataDir });
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}/api/lecture`;
+  const call = async (method, url, body) => {
+    const res = await fetch(base + url, { method, headers: body instanceof FormData ? undefined : { 'content-type': 'application/json' }, body: body instanceof FormData ? body : body && JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  const pdfForm = () => {
+    const form = new FormData();
+    form.append('file', new Blob([Buffer.from('%PDF-1.4\n%%EOF\n')], { type: 'application/pdf' }), 'a.pdf');
+    return form;
+  };
+  try {
+    const course = (await call('POST', '/containers', { type: 'course', name: '동역학' })).body.container;
+    const pdfA = (await call('POST', `/containers/${course.id}/documents`, pdfForm())).body.document;
+    const pdfB = (await call('POST', `/containers/${course.id}/documents`, pdfForm())).body.document;
+    const blank = (await call('POST', `/containers/${course.id}/blank`, {})).body.document;
+    const session = (await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-09-30', startedAtMs: 1 })).body.session;
+    const strokes = { pages: { 1: [{ id: 'keep', source_session_id: null }, { id: 'gone', source_session_id: session.id }] } };
+    await call('PUT', `/documents/${blank.id}/annotations`, { baseRevision: 0, body: strokes, deviceId: 'dev_ipad' });
+
+    // 자료 삭제: 목록·뷰어에서 사라지고, 되돌리면 돌아온다.
+    assert.equal((await call('DELETE', `/documents/${pdfA.id}`)).body.trashed, true);
+    assert.deepEqual((await call('GET', `/containers/${course.id}/documents`)).body.documents.map(doc => doc.id).sort(), [pdfB.id, blank.id].sort());
+    assert.equal((await call('GET', `/documents/${pdfA.id}`)).status, 404);
+    assert.equal((await call('POST', `/trash/document/${pdfA.id}/restore`)).body.restored, true);
+    assert.equal((await call('GET', `/documents/${pdfA.id}`)).status, 200);
+
+    // 강의 삭제: 타임라인에서 사라지고, 새 녹음은 휴지통 강의에 붙지 않는다. 획은 숨김 목록으로만 알린다.
+    await call('DELETE', `/sessions/${session.id}`);
+    assert.deepEqual((await call('GET', `/containers/${course.id}/sessions`)).body.sessions, []);
+    assert.deepEqual((await call('GET', `/documents/${blank.id}`)).body.hiddenSessionIds, [session.id]);
+    const fresh = (await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-09-30', startedAtMs: 2 })).body.session;
+    assert.notEqual(fresh.id, session.id);
+    const trash = (await call('GET', '/trash')).body.items;
+    assert.deepEqual(trash.map(item => [item.type, item.id]), [['session', session.id]]);
+    assert.equal(trash[0].purgeAt - trash[0].deletedAt, 30 * 24 * 60 * 60);
+
+    // 강의 영구 삭제: 그 강의 획만 필기에서 빠지고 revision이 오른다.
+    assert.equal((await call('DELETE', `/trash/session/${session.id}`)).body.purged, true);
+    const after = (await call('GET', `/documents/${blank.id}/annotations`)).body;
+    assert.deepEqual(after.body.pages[1].map(stroke => stroke.id), ['keep']);
+    assert.equal(after.revision, 2);
+    assert.equal(after.deviceId, 'server:lecture-trash');
+
+    // 같은 PDF를 두 자료가 쓰면 하나를 영구 삭제해도 파일은 남는다.
+    await call('DELETE', `/documents/${pdfA.id}`);
+    await call('DELETE', `/trash/document/${pdfA.id}`);
+    assert.equal(fs.readdirSync(path.join(dataDir, 'lecture', 'documents')).length, 1);
+    await call('DELETE', `/documents/${pdfB.id}`);
+    await call('DELETE', `/trash/document/${pdfB.id}`);
+    assert.equal(fs.readdirSync(path.join(dataDir, 'lecture', 'documents')).length, 0);
+    assert.equal((await call('POST', '/trash/folder/1/restore')).status, 404);
   } finally {
     server.close();
     db.close();

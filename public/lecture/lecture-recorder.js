@@ -319,6 +319,15 @@
     start,
     pause,
     logEvent,
+    // 강의를 휴지통으로 보냈으면 다음 녹음이 그 강의에 이어 붙지 않게 잊는다.
+    forgetSession(id) {
+      if (state.session?.id !== id || ['starting', 'recording'].includes(state.status)) return;
+      state.session = null;
+      state.status = 'idle';
+      state.committedMs = 0;
+      todayCache.clear();
+      emit();
+    },
     addMarker,
     cancelMarker,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },

@@ -3,7 +3,7 @@
 // 강의 노트 목록 화면: Notes 홈 · 폴더(과목 강의 타임라인·자료 목록) · 새 강의 시트 · PDF 올리기.
 // 설계 정본은 docs/Lecture-note-system_Design_v4.3.md §4.3·§6.5·§10.1.1이다.
 (function (global) {
-  const { el, svg, api, jsonOptions, formatDay, kindLabel, Recorder, toast, ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH } = global.LectureCommon;
+  const { el, svg, api, jsonOptions, formatDay, kindLabel, Recorder, toast, ICON_BACK, ICON_PLUS, ICON_CHEVRON, ICON_SEARCH, ICON_MORE } = global.LectureCommon;
 
   // view: 과목 폴더는 'home'(강의 타임라인)과 'docs'(자료 목록)를 오간다. 일반 폴더는 자료 목록뿐이다.
   const state = { containers: [], container: null, documents: [], sessions: [], view: 'home', search: '', loaded: false };
@@ -46,7 +46,90 @@
     search.append(svg(ICON_SEARCH), input);
     const grid = el('div', 'lecture-folder-grid');
     renderFolderGrid(grid);
-    root().replaceChildren(search, grid);
+    const trash = el('button', 'lecture-docs-link lecture-trash-link');
+    trash.type = 'button';
+    trash.append(el('strong', '', '최근 삭제'), el('span', 'lecture-docs-names', '30일 동안 되돌릴 수 있어'), svg(ICON_CHEVRON));
+    trash.addEventListener('click', openTrash);
+    root().replaceChildren(search, grid, trash);
+  }
+
+  // ─── 최근 삭제(2026-09-30 사용자 결정: 30일 보관) ────────────────────────────
+
+  async function openTrash() {
+    let items;
+    try { ({ items } = await api('/api/lecture/trash')); } catch (error) { return toast(error.message); }
+    const back = el('button', 'lecture-back');
+    back.type = 'button';
+    back.append(svg(ICON_BACK), document.createTextNode('Notes'));
+    back.addEventListener('click', show);
+    const title = el('div');
+    title.append(back, el('h1', '', '최근 삭제'), el('p', 'lecture-sub', '지운 자료와 강의는 30일 뒤 완전히 지워져. 강의를 완전히 지우면 그 강의 중에 쓴 필기도 함께 지워져.'));
+    head().replaceChildren(title);
+    const list = el('div', 'lecture-doc-list');
+    if (!items.length) list.append(el('p', 'lecture-empty', '최근 삭제한 항목이 없어.'));
+    const now = Date.now() / 1000;
+    items.forEach(item => {
+      const row = el('div', 'lecture-doc-row lecture-trash-row');
+      const name = item.type === 'session'
+        ? `${dateOf(item.title).getMonth() + 1}월 ${dateOf(item.title).getDate()}일 강의 · ${item.detail < 60000 ? '1분 미만' : `${Math.round(item.detail / 60000)}분`}`
+        : item.title;
+      const days = Math.max(0, Math.ceil((item.purgeAt - now) / 86400));
+      const info = el('div');
+      info.append(el('strong', '', name), el('span', 'lecture-meta', `${item.containerName} · ${item.type === 'session' ? '강의' : kindLabel(item.detail)} · ${days}일 남음`));
+      const restore = el('button', 'lecture-pill is-plain', '되돌리기');
+      restore.type = 'button';
+      restore.addEventListener('click', async () => {
+        try { await api(`/api/lecture/trash/${item.type}/${item.id}/restore`, { method: 'POST' }); openTrash(); } catch (error) { toast(error.message); }
+      });
+      const purge = el('button', 'lecture-pill is-danger', '바로 삭제');
+      purge.type = 'button';
+      purge.addEventListener('click', async () => {
+        const warning = item.type === 'session' ? '녹음과 그 강의 중에 쓴 필기가 완전히 지워져.' : '필기까지 완전히 지워져.';
+        if (!confirm(`'${name}'을 완전히 지울까? ${warning} 되돌릴 수 없어.`)) return;
+        try { await api(`/api/lecture/trash/${item.type}/${item.id}`, { method: 'DELETE' }); openTrash(); } catch (error) { toast(error.message); }
+      });
+      const actions = el('div', 'lecture-actions');
+      actions.append(restore, purge);
+      row.append(info, actions);
+      list.append(row);
+    });
+    root().replaceChildren(list);
+  }
+
+  // 목록 항목의 `…` 메뉴. 지금은 삭제뿐이고 폴더 메뉴(이름 변경·즐겨찾기)가 같은 모양을 쓴다.
+  function itemMenuButton(label, actions) {
+    const button = el('button', 'lecture-more');
+    button.type = 'button';
+    button.setAttribute('aria-label', `${label} 메뉴`);
+    button.append(svg(ICON_MORE));
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      document.querySelector('.lecture-item-menu')?.remove();
+      const menu = el('div', 'lecture-item-menu');
+      actions.forEach(({ text, danger, run }) => {
+        const action = el('button', danger ? 'is-danger' : '', text);
+        action.type = 'button';
+        action.addEventListener('click', () => { menu.remove(); run(); });
+        menu.append(action);
+      });
+      document.body.append(menu);
+      const box = button.getBoundingClientRect();
+      menu.style.top = `${box.bottom + 6}px`;
+      menu.style.left = `${Math.max(16, box.right - menu.offsetWidth)}px`;
+      setTimeout(() => document.addEventListener('pointerdown', function close(e) {
+        if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('pointerdown', close); }
+      }), 0);
+    });
+    return button;
+  }
+
+  async function trashItem(type, id, name, extra) {
+    if (!confirm(`'${name}'을 삭제할까? 최근 삭제에서 30일 동안 되돌릴 수 있어.${extra || ''}`)) return;
+    try {
+      await api(`/api/lecture/${type === 'session' ? 'sessions' : 'documents'}/${id}`, { method: 'DELETE' });
+      if (type === 'session') Recorder().forgetSession(id);
+      openContainer(state.container.id);
+    } catch (error) { toast(error.message); }
   }
 
   function renderFolderGrid(grid) {
@@ -180,10 +263,13 @@
     list.id = 'lecture-doc-list';
     if (!state.documents.length) list.append(el('p', 'lecture-empty', 'PDF 자료를 추가하거나 새 노트를 만들어.'));
     state.documents.forEach(doc => {
-      const row = el('button', 'lecture-doc-row');
-      row.type = 'button';
+      const row = el('div', 'lecture-doc-row has-menu');
+      row.setAttribute('role', 'button');
+      row.tabIndex = 0;
       const pages = doc.kind === 'blank' ? ` · ${doc.blankPages}쪽` : '';
-      row.append(el('strong', '', doc.title), el('span', 'lecture-meta', `${kindLabel(doc.kind)}${pages} · ${formatDay(doc.updatedAt)} 수정`));
+      const info = el('div');
+      info.append(el('strong', '', doc.title), el('span', 'lecture-meta', `${kindLabel(doc.kind)}${pages} · ${formatDay(doc.updatedAt)} 수정`));
+      row.append(info, itemMenuButton(doc.title, [{ text: '삭제', danger: true, run: () => trashItem('document', doc.id, doc.title) }]));
       row.addEventListener('click', () => openViewer(doc.id));
       list.append(row);
     });
@@ -264,6 +350,13 @@
         card.setAttribute('role', 'button');
         card.tabIndex = 0;
       }
+      // 녹음 중인 강의는 지울 수 없다.
+      const recordingThis = ['starting', 'recording'].includes(Recorder().state.status) && Recorder().state.session?.id === session.id;
+      cardHead.append(itemMenuButton(`강의 ${sessions.length - index}`, [{
+        text: '삭제',
+        danger: true,
+        run: () => (recordingThis ? toast('녹음 중인 강의는 지울 수 없어. 먼저 일시정지해줘.') : trashItem('session', session.id, `강의 ${sessions.length - index}`, ' 그 강의 중에 쓴 필기도 함께 숨겨져.')),
+      }]));
       item.append(day, rail, card);
       timeline.append(item);
     });

@@ -38,11 +38,14 @@
     ctx.globalAlpha = 1;
   }
 
+  const isHidden = (v, stroke) => stroke.source_session_id != null && v.hiddenSessionIds?.has(stroke.source_session_id);
+
   function drawInk(v, page) {
     if (!page.ink.width) return;
     const ctx = page.ink.getContext('2d');
     ctx.clearRect(0, 0, page.ink.width, page.ink.height);
-    (v.body.pages[page.number] || []).forEach(stroke => drawStroke(ctx, stroke, page.ink.width));
+    // 휴지통에 있는 강의의 획은 필기에 남아 있지만 보이지 않는다(되돌리면 다시 보인다).
+    (v.body.pages[page.number] || []).filter(stroke => !isHidden(v, stroke)).forEach(stroke => drawStroke(ctx, stroke, page.ink.width));
   }
 
   // 좌표는 페이지 폭을 1로 둔 값이다. 회전·크기 변화에도 같은 자리에 다시 그려진다.
@@ -218,7 +221,7 @@
   function eraseAt(v, page, point, radius) {
     const strokes = v.body.pages[page.number];
     if (!strokes?.length) return;
-    const kept = strokes.filter(stroke => !stroke.points.some((current, index) => {
+    const kept = strokes.filter(stroke => isHidden(v, stroke) || !stroke.points.some((current, index) => {
       const previous = stroke.points[index - 1] || current;
       return segmentDistance(point, previous, current) <= radius + stroke.width / 2;
     }));

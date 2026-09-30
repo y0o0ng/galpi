@@ -63,13 +63,14 @@
     document.body.classList.add('lecture-viewer-open');
     renderLive();
     try {
-      const [{ document: doc, container }, server, draft] = await Promise.all([
+      const [{ document: doc, container, hiddenSessionIds }, server, draft] = await Promise.all([
         api(`/api/lecture/documents/${documentId}`),
         api(`/api/lecture/documents/${documentId}/annotations`),
         readDraft(documentId),
       ]);
       v.doc = doc;
       v.container = container;
+      v.hiddenSessionIds = new Set(hiddenSessionIds || []);
       v.back.lastChild.textContent = container?.name || 'Notes';
       v.title.textContent = doc.title;
       // 올리지 못한 기기 작업본이 있으면 버리지 않는다. 같은 revision 위에서 쓴 것이면 이어서 올리고,

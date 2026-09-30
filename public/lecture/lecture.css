@@ -346,3 +346,27 @@ body.lecture-viewer-open { overflow: hidden; }
   display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 10px 12px;
   border: 1px solid #D7DED9; border-radius: 10px; background: none; color: #5F6E66; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
 }
+
+/* ─── `…` 메뉴 · 최근 삭제 ─── */
+
+.lecture-doc-row.has-menu { display: flex; align-items: center; gap: 8px; }
+.lecture-doc-row.has-menu > div { display: grid; flex: 1; gap: 4px; min-width: 0; }
+.lecture-more {
+  display: grid; flex: none; place-items: center; width: 44px; height: 44px; margin: -10px -10px -10px 0; padding: 0;
+  border: 0; border-radius: 10px; background: none; color: #5F6E66; cursor: pointer;
+}
+.lecture-tl-head .lecture-more { margin: -12px -12px -12px auto; }
+.lecture-item-menu {
+  position: fixed; z-index: 1003; display: grid; min-width: 160px; padding: 6px;
+  border: 1px solid #D7DED9; border-radius: 12px; background: #FAFBF9; box-shadow: var(--shadow-md);
+}
+.lecture-item-menu button {
+  min-height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: none;
+  color: #1D2622; font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.lecture-item-menu button.is-danger { color: #B45A55; }
+.lecture-pill.is-danger { border-color: #D7DED9; background: none; color: #B45A55; }
+.lecture-trash-link { margin-top: 20px; }
+.lecture-trash-row { display: flex; align-items: center; gap: 12px; cursor: default; }
+.lecture-trash-row > div:first-child { display: grid; flex: 1; gap: 4px; min-width: 0; }
+@media (max-width: 700px) { .lecture-trash-row { flex-wrap: wrap; } }
