@@ -125,6 +125,7 @@
 ### 강의 노트 — 설계 v4.3, L1a 구현 중
 
 - **L1a(폴더·자료·필기)를 구현했고 Pi·iPad 인수 전이다.** schema v28(`lecture_containers`·`lecture_documents`·`lecture_annotations`), 서버 `lib/lecture-routes.js`, 화면 `public/lecture/`다. 필기는 Document당 JSON 한 벌과 revision이고 `baseRevision`이 다르면 409로 덮어쓰지 않는다. 자료 파일은 `<dataDir>/lecture/documents/<sha256>.pdf`이고 **아직 백업 대상이 아니다**(사용자 결정, 실사용 전 다시 정한다). pdf.js는 저장소에 사본을 두지 않고 고정 의존성 `pdfjs-dist`를 `/lib/pdfjs/`로 내보낸다. 다음은 L1b(녹음·Session)이고 전사는 전사용 PC를 산 뒤다.
+- **Pi의 `lib/database-migrations.js`는 저장소 파일에서 v29(`memory_evidence_refs`)를 뺀 판이다(2026-09-30, 사용자 결정).** Pi는 v28에 있고, R2를 배포할 때 저장소 파일을 그대로 복사하면 v29만 이어서 붙는다. 그 전까지 이 파일은 SHA 대조에서 저장소와 다른 것이 정상이다. 강의 자료 파일은 Pi에서 `/home/pi/galpi/lecture/documents/`에 쌓인다.
 - **설계와 화면은 정리됐지만 L1 밖의 구현 승인은 아니다.** 계약은 설계서 §0 합의 목록과 §20이 정본이고 여기에 복제하지 않는다. §14.1 캡처 스파이크는 10분 smoke와 90분 gate(대체 음원, 앱 전환·잠금 포함)를 통과해 Path A(iPad 웹 통합 녹음) 채택 조건을 충족했다. 3시간 stress는 선택 항목으로 미뤘고(90분 외삽으로 drift·저장 문제 없음) 강의실 조건은 복학 뒤이며, 전사용 PC·STT는 미정이다. 실측은 `docs/lecture-capture-spike-receipts.md`가 정본이다.
 - **Figma에서 SF Pro 텍스트는 파일에 SF Pro가 한 번도 쓰이지 않았을 때 플러그인 측정 폭이 0이다.** 텍스트 스타일에 묶어 두고, 폭이 0이면 사용자가 데스크톱 앱에서 스타일 글꼴만 바꾸게 한다.
 
