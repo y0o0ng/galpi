@@ -48,7 +48,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   the 40 PASS rows** — **38 clean agreements / 2 mandatory HUMAN** (`032`, `037`) and an
   8-row calibration sample. Owner HUMAN review (2026-09-30): **8/10 match v3** — `032`
   `HUMAN_ADJUDICATED` / `ELIGIBLE`; `037` (mandatory) and `009` (calibration) are KEEP CLEAR
-  against v3 ESCALATE and `INELIGIBLE` pending explicit resolution. No acceptance.
+  against v3 ESCALATE; the owner closed both as current-realization failures. **Ledger v2: pool
+  387; the only marginal shortage is EN, by one (37 / 38).** No acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2158,6 +2159,22 @@ vegetable plot, the clarification appositive). Calibration: `001`, `002`, `006`,
 (owner reason: both dimensions are said to differ, so about 3 cm larger in each). The two
 mismatches need explicit resolution; nothing relabels the catalog. The 30 unsampled agreements
 stay `PROVISIONAL`, `008` stays excluded, and nothing is accepted, frozen, selected or trained.
+
+**Owner resolution and ledger v2 (2026-09-30).** The owner closed `009` and `037` as
+current-realization failures: the realizations stay `INELIGIBLE`, their skeletons and v3 are
+unchanged, and no replacement surface is owed. The v1 ledger and shortage receipt stay
+byte-identical because the batch-004 authoring protocol pins them.
+`scripts/build-memory-inference-p1b6-reviewed-pool-ledger-v2.js`
+(`npm run build:memory-inference-p1b6-reviewed-pool-ledger-v2`) pins v1 and the batch-004
+batch, audit, v3 review and HUMAN receipts by raw SHA and appends the 41 batch-004 rows under
+the same pool rule A (audit → v3 route → HUMAN outcome, later overriding): 37 `PROVISIONAL`,
+1 `HUMAN_ADJUDICATED` (`032`), 2 `INELIGIBLE` (`009`, `037`) and 1 `EXCLUDED_AUDIT_UNCERTAIN`
+(`008`). It records the owner resolutions in the ledger and reuses the v1 shortage measure.
+`fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v2.json`: 442 rows, **387 in
+pool**. `…-shortage-receipt-v2.json`: split 243 / 61 / 83 against 240 / 60 / 80, fragments all
+met, language KO 272 / 266, MIXED 78 / 76, **EN 37 / 38**, no HELD per-skeleton need. The
+minimum marginal top-up is **1 (EN)**. This is a marginal lower bound, not a joint-feasibility
+proof.
 
 ## Closed Selection and Freeze Constraints
 

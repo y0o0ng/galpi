@@ -333,6 +333,7 @@ module.exports = {
   artifactBytes,
   batch003Statuses,
   buildArtifacts,
+  buildShortage,
   loadSources,
   main,
   verifySources,

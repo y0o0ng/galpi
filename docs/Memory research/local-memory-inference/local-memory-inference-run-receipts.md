@@ -5345,3 +5345,13 @@ Owner decisions; GPT-5.6 sol presentation aid only (owner-reported); not indepen
 `HUMAN_ADJUDICATED`; seven calibration matches stay `PROVISIONAL`; `037` (mandatory) and `009`
 (calibration) KEEP CLEAR against v3 ESCALATE, `INELIGIBLE` pending explicit resolution. No
 acceptance; the accepted pool record stays **93**.
+
+#### P1-B6 reviewed-pool ledger v2 — pool 387 / only EN short by 1
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v2.json` | v1 (unchanged) + 41 batch-004 rows; owner closed `009`, `037` as realization failures |
+| `fixtures/local-memory-inference-p1b6-shortage-receipt-v2.json` | marginal deficits: EN 37 / 38; split and fragments met |
+
+Minimum top-up lower bound **1 (EN)**. No top-up authored, no acceptance; the accepted pool record
+stays **93**.
