@@ -498,7 +498,8 @@ test('the chat column and the composer share one inline padding rule', () => {
 test('the header hairline is themed so it survives dark mode', () => {
   // 검정 6%를 그대로 쓰면 어두운 배경에서 경계가 사라진다. 라이트는 Figma Color/Border와 같은 녹회색이다.
   assert.match(css, /:root \{[\s\S]*?--hairline:\s*#D7DED9/);
-  assert.match(css, /\[data-theme="dark"\] \{[\s\S]*?--hairline:\s*rgba\(255, 255, 255, 0\.10\)/);
+  // 다크는 카드와 바탕을 가를 만큼 보이는 실선이다(흰색 10%는 카드가 뭉개져 2026-09-30에 올렸다).
+  assert.match(css, /\[data-theme="dark"\] \{[\s\S]*?--hairline:\s*#3A4640/);
   assert.match(css, /#header \{[^}]*border-bottom: 1px solid var\(--hairline\)/s);
   assert.match(css, /#input-area \{[^}]*border-top: 1px solid var\(--hairline\)/s);
 });

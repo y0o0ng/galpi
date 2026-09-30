@@ -37,25 +37,26 @@
   --ease-out:    cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
+/* 다크는 라이트와 같은 층 구조(바탕 < 카드 < 옅은 면)를 한 단계씩 분명히 둔다. 바탕과 카드가 거의 같고
+   경계가 흰색 10%였을 때는 카드가 뭉개져 시인성이 나빴다(2026-09-30 사용자 지적). Figma에는 다크 정본이 없다. */
 [data-theme="dark"] {
-  --bg:          #151A18;
-  --header-bg:   rgba(21, 26, 24, 0.90);
-  --border:      #323C37;
-  /* 어두운 배경 위에서는 밝은 쪽으로 그어야 보인다. */
-  --hairline:    rgba(255, 255, 255, 0.10);
+  --bg:          #1B211E;
+  --header-bg:   rgba(27, 33, 30, 0.92);
+  --border:      #3A4640;
+  --hairline:    #3A4640;
   --brand-hover: #3A7A64;
-  --brand-ink:   #7FB99F;
-  --brand-soft:  rgba(127, 185, 159, 0.12);
-  --brand-soft-strong: rgba(127, 185, 159, 0.18);
-  --brand-border: rgba(127, 185, 159, 0.42);
-  --brand-shadow: rgba(0, 0, 0, 0.28);
-  --brand-ring:  rgba(127, 185, 159, 0.22);
-  --user-bubble: #26372F;
+  --brand-ink:   #8CC4AA;
+  --brand-soft:  rgba(140, 196, 170, 0.14);
+  --brand-soft-strong: rgba(140, 196, 170, 0.22);
+  --brand-border: rgba(140, 196, 170, 0.46);
+  --brand-shadow: rgba(0, 0, 0, 0.32);
+  --brand-ring:  rgba(140, 196, 170, 0.26);
+  --user-bubble: #2E3A34;
   --user-text:   #E7EDE9;
   --ai-text:     #E7EDE9;
-  --ai-bubble:   #1E2521;
-  --label:       #A8B4AD;
-  --panel-bg:    rgba(30, 37, 33, 0.78);
+  --ai-bubble:   #252D29;
+  --label:       #AEBAB3;
+  --panel-bg:    rgba(37, 45, 41, 0.82);
 }
 
 html, body {
