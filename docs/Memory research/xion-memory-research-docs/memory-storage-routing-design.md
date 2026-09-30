@@ -50,7 +50,7 @@ Focused tests cover canonical IDs and addresses, migration/unique constraints, i
 
 The Phase-1 statements above preserve that phase's boundary. Phase 2 adds a narrow `general_fact` core under canonical §§42.2–42.4, 50.4 C1/C2 and 51.4–51.5. It is a provenance-backed derived claim/state, not a Projection or an unrestricted memory bucket. Preferences, routines, relationships and operational commitments are not routed into this family.
 
-All storage modules live together in `lib/memory-storage/`: `evidence-registry.js`, `router.js`, `general-fact.js`, and the Phase-3 `general-fact-review.js`. Existing schema v29/v31/v32 remain in `lib/database-migrations.js`; future storage changes follow the migration boundary below. No production candidate producer or registered production handler is connected; existing retrieval and source ownership are unchanged.
+All storage modules live together in `lib/memory-storage/`: `evidence-registry.js`, `router.js`, `general-fact.js`, the Phase-3 `general-fact-review.js`, and the Phase-4 `review-ui.js`. Existing schema v29/v31/v32 remain in `lib/database-migrations.js`; future storage changes follow the migration boundary below. No production candidate producer or registered production handler is connected; existing retrieval and source ownership are unchanged.
 
 ### Future migration boundary — owner decision, 2026-09-30
 
@@ -107,7 +107,7 @@ For the first connected General Fact development workflow, the semantic proposer
 
 Approval applies to the reviewed proposal and replay snapshot. A changed snapshot requires fresh review rather than carrying approval to a different target/evidence package. The existing stale-replay check remains mandatory.
 
-This selects the initial development authority boundary, not a permanent requirement to manually approve every future memory. Automatic semantic approval conditions remain OPEN and must be evaluated against the actual proposer/validator before adoption. Local-model use remains an option. Phase 3 below implements the review persistence/decision backend; the browser review interface and provider adapter remain unimplemented. Synthetic test callbacks are not production approval authority. This decision instantiates canonical §42.2 SI-10 / §42.6 without changing their shared transition semantics.
+This selects the initial development authority boundary, not a permanent requirement to manually approve every future memory. Automatic semantic approval conditions remain OPEN and must be evaluated against the actual proposer/validator before adoption. Local-model use remains an option. Phase 3 implements the review persistence/decision backend and Phase 4 adds its development-only browser interface; the provider adapter remains unimplemented. Synthetic test callbacks are not production approval authority. This decision instantiates canonical §42.2 SI-10 / §42.6 without changing their shared transition semantics.
 
 The owner has also accepted three development review choices:
 
@@ -117,7 +117,7 @@ The owner has also accepted three development review choices:
 | Hold | Evidence is insufficient to judge; preserve the stable state and pending candidate/evidence without commit |
 | Reject proposal | Judge this transition proposal wrong; preserve the stable state and pending candidate/evidence for possible later evaluation without commit |
 
-Hold and rejection remain distinguishable review decisions, even though both leave the candidate pending. Rejection is not source deletion, candidate disposal, a new NO_WRITE triage decision, or automatic INVALIDATE of the existing claim. These are review-contract choices, not new derived-state statuses; their persistence is implemented in Phase 3, while the browser review interface remains to be implemented.
+Hold and rejection remain distinguishable review decisions, even though both leave the candidate pending. Rejection is not source deletion, candidate disposal, a new NO_WRITE triage decision, or automatic INVALIDATE of the existing claim. These are review-contract choices, not new derived-state statuses; their persistence is implemented in Phase 3 and their development browser interface in Phase 4.
 
 The owner has accepted four information groups for each proposal review:
 
@@ -128,7 +128,7 @@ The owner has accepted four information groups for each proposal review:
 | Proposed change and resulting state | The proposed change class/transition and the state that would result if approved and committed; clearly marked as a proposal, not an already-written fact |
 | Judgment rationale | Why the proposer classified this as a world update, correction or other named class; rationale is a proposed interpretation, not approval authority |
 
-These are presentation groups, not a reduction of the replay package. Relevant history, unresolved candidates and known counterevidence already present in the replay must remain inspectable, consistent with canonical §42.2 SI-7: derived summaries alone are insufficient. The reviewer must be able to check original source evidence rather than having only a model summary available. This fixes the review information contract; Phase 3 binds a review to the replay fingerprint without copying source text, and screen layout remains implementation work.
+These are presentation groups, not a reduction of the replay package. Relevant history, unresolved candidates and known counterevidence already present in the replay must remain inspectable, consistent with canonical §42.2 SI-7: derived summaries alone are insufficient. The reviewer must be able to check original source evidence rather than having only a model summary available. Phase 3 binds a review to the replay fingerprint without copying source text; Phase 4 presents these groups and the remaining replay details.
 
 ### Physical state and provenance — schema v31
 
@@ -173,4 +173,23 @@ The `decide` entry point is for a trusted repository-owner review adapter. It re
 
 Focused synthetic tests cover no-write review creation, restart/resume, source-copy absence, proposal/package integrity, choices, immutable/idempotent decisions, current/stale snapshots, source integrity, competing reviews, proposed invalidation, approval/transition audit binding, and transaction rollback in both directions. Migration tests cover schema-31 upgrade, repeat migration, foreign keys and complete decision constraints.
 
-Next is the owner-facing review interface and evaluation of the actual semantic proposer (local model remains an option), followed by production ingress only after its gates are specified. Automatic semantic approval, active elicitation, Projection and Context Assembly remain outside this implementation.
+The Phase-4 interface below implements the development review adapter. Evaluation of the actual semantic proposer (local model remains an option) remains next, followed by production ingress only after its gates are specified. Automatic semantic approval, active elicitation, Projection and Context Assembly remain outside this implementation.
+
+## Phase 4 — Development-only owner review UI
+
+`lib/memory-storage/review-ui.js` is a standalone Node HTTP server bound to `127.0.0.1:8766`, using the existing Phase-3 store. It opens an explicitly supplied, existing development database; it neither runs migrations nor constructs candidates/proposals. There are no model/provider calls, production routes, Pi deployment, new schema or production DB/Vault integration.
+
+```sh
+npm run review:memory-general-fact -- \
+  --development-db /private/development-directory/general-fact-development.db
+```
+
+The example directory is operator-supplied, not a new default runtime path. The DB must live outside the repository in an owner-private directory (0700), be an owner-private regular file (0600, no hard links), and have that explicit development filename. Real paths are checked, and only the seven existing development `messages`/LTM tables are permitted. Missing schemas and production-shaped DBs are rejected without automatic repair or migration. Synthetic fixtures are used for UI verification; pointing at a production DB is not authorized by this command. Existing developer setup must prepare the LTM schema, owning-message fixtures and persisted proposals before review.
+
+The Korean browser view presents incoming candidate/source evidence, current claim/original support, an explicitly uncommitted transition/result preview, and the proposal rationale. Full history, counterevidence, unresolved candidates and all resolved original evidence remain inspectable in an expandable section. All source/proposal text uses `textContent`, not HTML interpolation; no external assets or browser storage are used.
+
+The operator selects a pending review and confirms APPROVE, HOLD or REJECT_PROPOSAL with an optional reason. The browser supplies only those HUMAN choices plus the displayed review/package identity. The server requires that the same package was displayed in that process, validates local Host/Origin/fetch-site and a per-process request token, and delegates to the existing transactional `decide` operation. Conflicting submissions, integrity failures and stale approval fail closed without leaking exception/source text. A rejected or held attempt disappears from the undecided queue, while its candidate and recorded choice remain; a new attempt must be explicitly prepared elsewhere. No edit, automatic re-proposal, semantic classifier or approval heuristic is provided.
+
+Progress/decisions persist in the existing development SQLite review rows and resume after browser/server restart. The local process and private OS account are the authority boundary; this is an owner-operated development adapter, not multiuser authentication or proof that every arbitrary local program is a HUMAN. It must not be exposed as a production approval endpoint.
+
+Focused synthetic HTTP/SQLite tests cover private DB eligibility, absent-schema/production rejection, source/state preservation on display, all three durable choices, restart, immutable/idempotent decisions, exact displayed-package binding, stale/source failure, CSRF/rebinding guards and safe rendering. Synthetic Chromium validation covers desktop/mobile reading, cancellation before commit, approval, reload, and literal rendering of hostile-looking source text. These verify mechanics and ergonomics, not semantic accuracy of a real proposer. Next is selecting/evaluating that proposer against source-grounded change distinctions and creating its development proposal path; the production accepted-candidate producer remains unconnected.

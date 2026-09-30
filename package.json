@@ -70,6 +70,7 @@
     "research:memory-p0": "node scripts/measure-memory-p0-a.js",
     "research:memory-p0b-census": "node scripts/freeze-memory-p0-b-census.js",
     "review:memory-p0b-blind": "node scripts/review-memory-p0-b-blind.js",
+    "review:memory-general-fact": "node lib/memory-storage/review-ui.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
     "smoke:openai-responses": "node scripts/smoke-openai-responses.js",
     "smoke:github-mcp": "node scripts/smoke-github-mcp.js",
