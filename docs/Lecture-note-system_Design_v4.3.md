@@ -1490,6 +1490,17 @@ V4.5-M 단일 GPT
 - **인수.** 로컬 전체 테스트와 헤드리스 확인 뒤 Pi에 배포했다(백업 `galpi-20260930-1349-…`, 코드 복구본 `code-before-lecture-l1a-20260930-134935`). Pi의 `lib/database-migrations.js`는 v29를 뺀 판이다. iPad 인수에서 두 가지를 고쳤다 — 전역 margin 초기화로 좌상단에 붙던 새 폴더 창을 버튼 아래 팝오버로, 회전 뒤 페이지가 넘치던 것을 스크롤 영역 ResizeObserver 기반 재배치로. 그 뒤 사용자가 전체 흐름을 확인했다.
 - **L1a에서 뺀 것.** 확대·축소, 레일 가로·세로 전환, `강의·복습` 토글, 원형 메뉴, 포스트잇, 올가미, 사이드바, 복습 펜, 색 선택기, 폴더 이름 바꾸기·즐겨찾기 화면(API는 있다).
 
+### 17.3 구현 기록 — L1b 녹음·Session (2026-09-30, Pi·iPad 인수)
+
+- **스키마 v30 `lecture_sessions_capture`.** `lecture_sessions`(과목, 기기 로컬 날짜, 시작 벽시계 ms) · `lecture_audio_parts`(파트 하나 = 일시정지로 끝나는 `recording_span` 하나, `part_key` 멱등, `session_start_ms`·`session_end_ms`, `end_status` `paused|interrupted`) · `lecture_session_events`(`document_open`·`page_change`, `event_key` 멱등). v29 `memory_evidence_refs`(장기기억 R2의 빈 표)도 같은 배포로 Pi에 적용했다 — 실행기가 번호 공백을 거부하기 때문이고, 그걸 쓰는 코드는 배포하지 않았다(사용자 결정).
+- **Session(§6.5·§10.1.1).** 과목에서만, 마이크를 누를 때만 만든다. 같은 과목·같은 로컬 날짜면 가장 최근 Session에 이어 붙이고, 날짜가 바뀌면 다음 녹음이 새 Session이 된다 — 이것이 '닫힘'이다. 녹음하지 않은 날은 Session이 없다.
+- **시간축(§7.1·§7.3).** runtime마다 벽시계로 한 번 고정하고 그 안에서는 `performance.now()`(이벤트 `timeStamp`와 같은 기준)로 잰다. `session_t_ms = 고정 벽시계 + (monotonic − 고정 monotonic) − Session 시작 벽시계`. 구간 시작·끝은 MediaRecorder의 start/stop 이벤트 시각이고 조각 도착은 시간 정본이 아니다(§7.4). 오늘 이 과목 Session이 있으면 새 획에 `source_session_id`·`t_ms`를 붙인다 — `강의·복습` 토글이 아직 없어서 같은 날 복습 필기도 강의 필기로 들어간다.
+- **녹음기 `public/lecture/lecture-recorder.js`.** 뷰어와 분리돼 자료를 바꾸거나 뷰어를 나가도 녹음이 이어지고, 뷰어 밖에서는 화면 위 `● 녹음 중` 표시로 멈춘다. `녹음 중`은 첫 오디오 데이터 뒤에만 표시한다. 트랙 종료·음소거·녹음기 오류·3.5초 무데이터(시작 뒤 6초 무데이터)는 `중단됨`과 `이어 녹음하기`로 바꾼다. 멈출 때 마지막 조각이 한 번 더 오므로 '어디까지 저장됐는지'는 stop 뒤에 정한다. 일시정지 중에는 마이크 트랙을 끄고 다시 누르면 새로 요청한다.
+- **전송·복구(§5.1·§8.3).** 조각은 IndexedDB(`galpi-lecture` v2, 필기 작업본과 같은 DB)에 쌓이고 일시정지마다 파트 하나로 합쳐 원본 바이트 그대로 `PUT /api/lecture/sessions/:id/parts/:partKey`로 올린다. 서버 sha256이 기기 것과 같을 때만 기기 사본을 지운다. 끝 기록 없이 남은 파트(강제 종료)는 다음 실행 때 마지막 조각 시각까지 `interrupted`로 올린다. 파일은 `<dataDir>/lecture/audio/<session>/<partKey>.m4a`이고 파트당 600MB 상한이다. 전사 PC가 오기 전까지 Pi가 이 역할의 정본 저장소다.
+- **필기 충돌 오탐 수정.** 업로드는 서버에 도착했는데 응답 전에 앱이 죽으면 작업본이 옛 revision 기준으로 남아 다시 열 때 충돌처럼 보였다. 필기 조회·409가 마지막으로 쓴 기기 ID를 돌려주고, 그것이 이 기기면 작업본이 이미 그 내용을 담고 있으므로 충돌 없이 서버 revision 위에서 잇는다. 다른 기기가 쓴 경우만 충돌이다.
+- **인수.** 로컬 전체 테스트와 가짜 마이크 헤드리스 확인(첫 데이터 뒤 표시, 획 Session 시각, 이벤트, 업로드 뒤 기기 사본 정리, 새로고침 복구, 무데이터 중단 배너) 뒤 Pi에 배포했다(백업 `galpi-20260930-1636-…`, 코드 복구본 `code-before-lecture-l1b-20260930-163653`). iPad에서 녹음·일시정지·이어 녹음·강제 종료 복구를 확인했고 Pi에 받은 AAC 48kHz 파일의 실제 길이가 서버 구간과 10~41ms 안에서 맞았다. 강제 종료 뒤 충돌 오탐을 위처럼 고친 뒤 사용자가 재확인했다.
+- **L1b에서 뺀 것.** `+ 새 강의`(같은 날 Session 나누기), 마커(`★`·`?`), 녹음 드롭다운의 재생(복습 재생은 L2), 전사·소개문(전사 PC 뒤), Course Home의 강의 타임라인, 녹음 파일 백업.
+
 ---
 
 ## 18. Non-Goals

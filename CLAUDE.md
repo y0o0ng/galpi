@@ -122,11 +122,11 @@
 - **검토된 풀을 정리했다 — 주인 규칙 A로 349행, top-up 하한 34(TRAIN 32 / DEV 2).** 원장은 `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger.json`, 부족분은 `…-shortage-receipt.json`이다. 은퇴 skeleton 위 accepted 6건은 풀 밖(기록 불변), HUMAN gold가 v3와 다른 accepted 12건은 풀 안에 두고 플래그만 달았다 — 둘 다 별도 migration 결정이다. 하한은 결합 가능성 증명이 아니다. **batch-004 top-up 계획 41행(TRAIN 38 / DEV 3, skeleton당 상한 4, calibration 8행)을 사전등록했고**(`fixtures/local-memory-inference-p1b6-surface-batch-004-authoring-protocol.json`) 41건을 materialize했다(`fixtures/local-memory-inference-p1b6-surface-batch-004.json`). **주인 사전 검토는 41건 전부 PASS로 닫혔고**(`037`은 두 번 재authoring한 현재 채소 밭 실현이 최종 검토본) 다음 게이트는 41행 전체의 새 source/bundle audit이다 — 전용 builder로 만든 blind 패킷은 커밋하지 않고, audit·의미 검토·HUMAN·수용·선정·학습은 아직 없다.
 - 상세 실행 이력·아티팩트 SHA는 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 `…/local-memory-inference-run-receipts.md`에 있다. 여기에 복제하지 않는다.
 
-### 강의 노트 — L1a 인수, 다음은 L1b(녹음·Session)
+### 강의 노트 — L1(캡처) 인수, 다음은 L2(복습 재생)
 
-- **L1a(폴더·자료·필기)는 2026-09-30 Pi·iPad 인수로 닫혔다.** 계약·배포 기록은 설계서 §17.2다. 강의 자료 파일(Pi `/home/pi/galpi/lecture/documents/`)은 **아직 백업 대상이 아니다**(사용자 결정, 실사용 전 다시 정한다). 전사는 전사용 PC를 산 뒤다.
-- **L1b(Session·녹음)는 Pi에 배포했고 iPad 인수 전이다**(schema v30, `public/lecture/lecture-recorder.js`). 같은 배포로 R2의 v29 `memory_evidence_refs` 빈 테이블도 Pi에 적용됐다(사용자 결정, 그걸 쓰는 코드는 미배포). 녹음 파일은 Pi `/home/pi/galpi/lecture/audio/<session>/`이다.
-- **설계와 화면은 정리됐지만 L1 밖의 구현 승인은 아니다.** 계약은 설계서 §0 합의 목록과 §20이 정본이고 여기에 복제하지 않는다. §14.1 캡처 스파이크는 10분 smoke와 90분 gate(대체 음원, 앱 전환·잠금 포함)를 통과해 Path A(iPad 웹 통합 녹음) 채택 조건을 충족했다. 3시간 stress는 선택 항목으로 미뤘고(90분 외삽으로 drift·저장 문제 없음) 강의실 조건은 복학 뒤이며, 전사용 PC·STT는 미정이다. 실측은 `docs/lecture-capture-spike-receipts.md`가 정본이다.
+- **L1a(폴더·자료·필기)와 L1b(녹음·Session)는 2026-09-30 Pi·iPad 인수로 닫혔다.** 계약·배포 기록은 설계서 §17.2·§17.3이다. 강의 자료·녹음 파일(Pi `/home/pi/galpi/lecture/`)은 **아직 백업 대상이 아니다**(사용자 결정, 실사용 전 다시 정한다). Pi에는 R2의 v29 `memory_evidence_refs` 빈 표도 적용돼 있다(쓰는 코드는 미배포).
+- **전사는 전사용 PC가 온 뒤다.** 사용자가 Ryzen 7 8845HS(내장 780M, 외장 GPU 없음) 미니 PC를 검토 중이다. 도착하면 Pi에 쌓인 실제 녹음으로 whisper.cpp(Vulkan)와 CPU 전사 속도·한국어 품질을 먼저 잰다.
+- **설계와 화면은 정리됐지만 L2 이후의 구현 승인은 아니다.** 계약은 설계서 §0 합의 목록과 §20이 정본이고 여기에 복제하지 않는다. §14.1 캡처 스파이크는 10분 smoke와 90분 gate(대체 음원, 앱 전환·잠금 포함)를 통과해 Path A(iPad 웹 통합 녹음) 채택 조건을 충족했다. 3시간 stress는 선택 항목으로 미뤘고(90분 외삽으로 drift·저장 문제 없음) 강의실 조건은 복학 뒤이며, 전사용 PC·STT는 미정이다. 실측은 `docs/lecture-capture-spike-receipts.md`가 정본이다.
 - **Figma에서 SF Pro 텍스트는 파일에 SF Pro가 한 번도 쓰이지 않았을 때 플러그인 측정 폭이 0이다.** 텍스트 스타일에 묶어 두고, 폭이 0이면 사용자가 데스크톱 앱에서 스타일 글꼴만 바꾸게 한다.
 
 ### 메일 — 닫혔다, 관측만 남았다
