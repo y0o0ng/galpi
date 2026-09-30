@@ -7,9 +7,11 @@
 // byte offset. `role` is the declared TARGET anchor role, required on the TARGET-boundary
 // skeletons (2da4e54e, 5269c91f).
 //
-// CLEAR entries make one status the natural dominant reading of the visible evidence. ESCALATE
-// entries make the visible evidence itself license two materially different statuses, without
-// relying on missing context alone or an invented premise.
+// Semantic contract v3: CLEAR when the visible evidence provides the TARGET's materially
+// relevant status, including an approximate, tentative, conditional, attributed or explicitly
+// undecided status. ESCALATE when the visible evidence does not provide the TARGET status, because
+// materially different readings remain unresolved or a fact / relation necessary to state the
+// TARGET status is absent. Missing premises are never invented.
 
 module.exports = [
   // 001 | 0768ea20 | TRAIN/ESCALATE | KO | 1 fragment | CANONICAL
@@ -443,16 +445,16 @@ module.exports = [
   {
     sk: 'p1b6-sk-be0efa305956d111', lang: 'EN', dp: 'ELLIPTICAL_REPLY',
     turns: [
-      ['USER', 'I set my monthly book budget at 50 dollars.'],
-      ['USER', "My sister's birthday is next week."],
-      ['USER', 'Comics get 20 dollars a month.'],
-      ['USER', 'I still need to find her a card.'],
-      ['USER', "I'm writing both into my spending app tonight."],
-      ['USER', 'Maybe a card with a cat on it.'],
-      ['ASSISTANT', "What's the book total for the month, then?"],
-      ['USER', "That's the part I'm entering now."],
+      ['USER', 'Quiet hours in my building start at 10 p.m.'],
+      ['USER', 'The hallway lights got replaced this morning.'],
+      ['USER', 'The basement music room stays open until 11.'],
+      ['USER', 'I left my umbrella at the gym again.'],
+      ['USER', 'I want to get some drum practice in at 10:30 tonight.'],
+      ['USER', 'Probably pizza for dinner.'],
+      ['ASSISTANT', 'Down in the music room, you mean?'],
+      ['USER', 'Yeah, that one.'],
     ],
-    ev: [0, 2, 4, 6, 7], anchor: [0, 'monthly book budget'],
+    ev: [0, 2, 4, 6, 7], anchor: [4, 'drum practice in at 10:30 tonight'],
   },
   // 038 | f03b5a7c | TRAIN/CLEAR | KO | 2 fragments | CONCLUSION_FIRST
   {

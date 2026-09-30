@@ -1174,42 +1174,42 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "I set my monthly book budget at 50 dollars."
+          "text": "Quiet hours in my building start at 10 p.m."
         },
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "My sister's birthday is next week."
+          "text": "The hallway lights got replaced this morning."
         },
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "Comics get 20 dollars a month."
+          "text": "The basement music room stays open until 11."
         },
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "I still need to find her a card."
+          "text": "I left my umbrella at the gym again."
         },
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "I'm writing both into my spending app tonight."
+          "text": "I want to get some drum practice in at 10:30 tonight."
         },
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "Maybe a card with a cat on it."
+          "text": "Probably pizza for dinner."
         },
         {
           "turnId": "t7",
           "role": "ASSISTANT",
-          "text": "What's the book total for the month, then?"
+          "text": "Down in the music room, you mean?"
         },
         {
           "turnId": "t8",
           "role": "USER",
-          "text": "That's the part I'm entering now."
+          "text": "Yeah, that one."
         }
       ]
     },
@@ -2421,9 +2421,9 @@
       "sourceEpisodeId": "p1b6-se-b004-037",
       "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
       "anchorSpanRef": {
-        "turnId": "t1",
-        "startByte": 9,
-        "endByte": 28
+        "turnId": "t5",
+        "startByte": 19,
+        "endByte": 52
       },
       "evidenceSpanRefs": [
         {
@@ -2434,22 +2434,22 @@
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 30
+          "endByte": 44
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 46
+          "endByte": 53
         },
         {
           "turnId": "t7",
           "startByte": 0,
-          "endByte": 42
+          "endByte": 33
         },
         {
           "turnId": "t8",
           "startByte": 0,
-          "endByte": 33
+          "endByte": 15
         }
       ],
       "discoursePattern": "ELLIPTICAL_REPLY",
