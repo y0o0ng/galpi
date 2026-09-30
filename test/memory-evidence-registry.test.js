@@ -7,7 +7,7 @@ const Database = require('better-sqlite3');
 const { migrations } = require('../lib/database-migrations');
 const {
   canonicalAddress, evidenceIdFor, createMemoryEvidenceRegistry,
-} = require('../lib/memory-evidence-registry');
+} = require('../lib/memory-storage/evidence-registry');
 
 function fixture() {
   const db = new Database(':memory:');

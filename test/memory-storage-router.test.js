@@ -4,8 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
 const { migrations } = require('../lib/database-migrations');
-const { createMemoryEvidenceRegistry } = require('../lib/memory-evidence-registry');
-const { createMemoryStorageRouter } = require('../lib/memory-storage-router');
+const { createMemoryEvidenceRegistry } = require('../lib/memory-storage/evidence-registry');
+const { createMemoryStorageRouter } = require('../lib/memory-storage/router');
 
 function fixture() {
   const db = new Database(':memory:');

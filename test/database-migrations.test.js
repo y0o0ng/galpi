@@ -81,6 +81,42 @@ function migrateThrough(db, lastVersion) {
   }
 }
 
+test('general_fact migration upgrades schema 30 once and enforces transition/provenance constraints', () => {
+  const db = createLegacyDatabase();
+  try {
+    migrateThrough(db, 30);
+    db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (1, ?, ?, ?, 100)')
+      .run('session', 'user', 'owning source');
+    const before = db.prepare('SELECT * FROM messages').all();
+    const result = runDatabaseMigrations(db);
+    assert.deepEqual(result.applied, [{ version: 31, name: 'memory_general_fact_storage' }]);
+    assert.deepEqual(runDatabaseMigrations(db).applied, []);
+    assert.deepEqual(db.prepare('SELECT * FROM messages').all(), before);
+    db.pragma('foreign_keys = ON');
+    const insertCandidate = db.prepare(`INSERT INTO memory_general_fact_candidates
+      (candidate_id, subject, attribute_key, candidate_json, evidence_ids_json)
+      VALUES (?, 'USER', 'primary_laptop', '{}', '[]')`);
+    for (const id of ['c1', 'c2', 'c3']) insertCandidate.run(id);
+    const insertState = db.prepare('INSERT INTO memory_general_fact_states (state_id, candidate_id, value) VALUES (?, ?, ?)');
+    insertState.run('s1', 'c1', 'First');
+    insertState.run('s2', 'c2', 'Second');
+    assert.throws(() => insertState.run('duplicate', 'c1', 'Other'), /UNIQUE/);
+    assert.throws(() => insertState.run('null', 'c3', null), /NOT NULL/);
+    const insert = db.prepare(`INSERT INTO memory_general_fact_transitions
+      (transition_id, subject, attribute_key, revision, candidate_id, previous_state_id,
+       next_state_id, transition, change_class, replay_sha256)
+      VALUES (?, 'USER', 'primary_laptop', ?, ?, ?, ?, ?, ?, ?)`);
+    const sha = 'a'.repeat(64);
+    insert.run('t1', 1, 'c1', null, 's1', 'CREATE', null, sha);
+    assert.throws(() => insert.run('t2', 1, 'c2', 's1', 's2', 'SUPERSEDE', 'WORLD_UPDATE', sha), /UNIQUE/);
+    assert.throws(() => insert.run('t2', 2, 'c2', 's1', 's2', 'SUPERSEDE', null, sha), /CHECK/);
+    assert.throws(() => insert.run('t2', 2, 'c2', 's1', 's2', 'REVISE', 'WORLD_UPDATE', sha), /CHECK/);
+    assert.throws(() => insert.run('t2', 2, 'c2', 's1', null, 'NO_CHANGE', 'ADDITIONAL_CONTEXT', sha), /CHECK/);
+    assert.throws(() => db.prepare('INSERT INTO memory_general_fact_transition_evidence VALUES (?, ?)')
+      .run('t1', 'missing'), /FOREIGN KEY/);
+  } finally { db.close(); }
+});
+
 test('database migrations upgrade a legacy DB sequentially and remain idempotent', () => {
   const db = createLegacyDatabase();
   db.prepare(`
@@ -283,6 +319,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 28, name: 'lecture_notes_capture' },
     { version: 29, name: 'memory_evidence_refs' },
     { version: 30, name: 'lecture_sessions_capture' },
+    { version: 31, name: 'memory_general_fact_storage' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -299,7 +336,10 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     /CHECK/,
   );
   assert.deepEqual(
-    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('ddays', 'memory_evidence_refs') AND name NOT LIKE 'lecture_%' ORDER BY name`).all(),
+    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN (
+      'ddays', 'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
+      'memory_general_fact_transitions', 'memory_general_fact_transition_evidence'
+    ) AND name NOT LIKE 'lecture_%' ORDER BY name`).all(),
     tablesBefore,
   );
   assert.deepEqual(
