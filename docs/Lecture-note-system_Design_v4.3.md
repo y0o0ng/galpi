@@ -1478,6 +1478,18 @@ V4.5-M 단일 GPT
 → V5-B 시작 또는 PAPER 관찰과 Lecture field test 병행
 ```
 
+### 17.2 구현 기록 — L1a 폴더·자료·필기 (2026-09-30, Pi·iPad 인수)
+
+전사용 PC 없이 캡처부터 구현한다는 사용자 결정으로 위 순서 대신 **L1 = 캡처 전체**로 시작했다. 저장은 Pi, 전사는 PC 구매 뒤, 강의 파일 백업은 **지금은 없음**(실사용 전 다시 정한다)이다. L1은 L1a(폴더·자료·필기)와 L1b(녹음·Session)로 나눴고 이 절은 L1a다.
+
+- **스키마 v28 `lecture_notes_capture`.** `lecture_containers`(type `course|general`, 이름, 즐겨찾기) · `lecture_documents`(kind `pdf|blank`, PDF는 경로·sha256, 백지는 쪽수) · `lecture_annotations`(Document당 JSON 한 벌 + revision). 유형은 생성 뒤 바꾸지 않는다(§4.3). 저장소의 장기기억 `memory_evidence_refs`는 원래 v28이었으나 아무 데도 적용되기 전에 v29로 옮겼다 — 실행기가 번호 공백을 거부하기 때문이다.
+- **서버 `lib/lecture-routes.js`.** 폴더 목록·생성·수정, 자료 목록, PDF 업로드(첨부 업로드 리더 재사용, PDF만, 200MB, `<dataDir>/lecture/documents/<sha256>.pdf`로 내용 중복 제거), 백지 노트·쪽수 변경, 인증된 PDF 스트림, 필기 조회·저장. 삭제는 L1에 없다. 필기 PUT은 전역 1MB JSON 파서를 건너뛰고 인증 뒤 32MB 한도로 따로 파싱한다.
+- **필기 저장(§8.1·§8.3).** 획은 `{id, tool, color, width, points[[x,y,pressure]], source_session_id, t_ms, created_at}`이고 좌표는 페이지 폭을 1로 둔 값이라 회전·크기 변화에도 같은 자리에 그려진다. L1a에서 `source_session_id`·`t_ms`는 null이다. 획을 끝내면 IndexedDB 작업본에 쓰고 2초 뒤·20초마다·화면 이탈·뷰어 종료 때 `baseRevision`과 함께 올린다. revision이 다르면 서버는 409와 현재본을 돌려주고, 화면은 기기 필기를 보관한 채 `서버 필기 불러오기` / `이 기기 필기로 저장` 중 사용자가 고르게 한다. 올리지 못한 작업본은 다시 열 때 버리지 않는다.
+- **화면 `public/lecture/`.** Notes 홈(폴더 검색·2열 카드·버튼 아래 팝오버로 새 폴더), 폴더 홈(자료 목록·`새 노트`·`자료 추가`), 전체 화면 Document Viewer(pdf.js 렌더, 떠 있는 세로 레일의 펜 3색·획 지우개, 쪽 표시). Pencil은 그리고 손가락은 스크롤한다(Safari의 stylus 터치만 막는다). 화면 근처 페이지만 캔버스를 잡아 iPad 캔버스 메모리를 넘기지 않는다. `pointercancel`은 획의 끝으로 보고 그린 만큼 남긴다.
+- **pdf.js.** 저장소에 사본을 두지 않고 고정 의존성 `pdfjs-dist 5.4.296`의 `build`·`cmaps`·`standard_fonts`·`wasm`만 `/lib/pdfjs/`로 내보낸다. CSP가 WebAssembly를 막아 JPEG2000 이미지는 그리지 못할 수 있다 — 실제 자료에서 빠진 이미지가 보이면 `'wasm-unsafe-eval'` 추가를 정한다.
+- **인수.** 로컬 전체 테스트와 헤드리스 확인 뒤 Pi에 배포했다(백업 `galpi-20260930-1349-…`, 코드 복구본 `code-before-lecture-l1a-20260930-134935`). Pi의 `lib/database-migrations.js`는 v29를 뺀 판이다. iPad 인수에서 두 가지를 고쳤다 — 전역 margin 초기화로 좌상단에 붙던 새 폴더 창을 버튼 아래 팝오버로, 회전 뒤 페이지가 넘치던 것을 스크롤 영역 ResizeObserver 기반 재배치로. 그 뒤 사용자가 전체 흐름을 확인했다.
+- **L1a에서 뺀 것.** 확대·축소, 레일 가로·세로 전환, `강의·복습` 토글, 원형 메뉴, 포스트잇, 올가미, 사이드바, 복습 펜, 색 선택기, 폴더 이름 바꾸기·즐겨찾기 화면(API는 있다).
+
 ---
 
 ## 18. Non-Goals
