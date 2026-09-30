@@ -3,7 +3,7 @@
   "status": "MATERIALIZED_AWAITING_OWNER_PRE_AUDIT_REVIEW",
   "batch": {
     "identity": "xion-local-memory-inference-p1b6-surface-batch-004-v1",
-    "rawSha256": "8516df94ee25e77d624b6e2886ef61bf883b4f9a9f35b0480edf7c8b46b4f036",
+    "rawSha256": "f640198f9d472c00046b8cb22083407b12887534bf0544cd808620691c5bc0c1",
     "items": 41
   },
   "protocol": {

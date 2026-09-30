@@ -1174,42 +1174,42 @@
         {
           "turnId": "t1",
           "role": "USER",
-          "text": "Quiet hours in my building start at 10 p.m."
+          "text": "At the community garden, vegetable plots get watered at 7 a.m."
         },
         {
           "turnId": "t2",
           "role": "USER",
-          "text": "The hallway lights got replaced this morning."
+          "text": "I bought new gloves on the way home."
         },
         {
           "turnId": "t3",
           "role": "USER",
-          "text": "The basement music room stays open until 11."
+          "text": "Shaded plots are on the evening watering round."
         },
         {
           "turnId": "t4",
           "role": "USER",
-          "text": "I left my umbrella at the gym again."
+          "text": "The gloves are a bit too big."
         },
         {
           "turnId": "t5",
           "role": "USER",
-          "text": "I want to get some drum practice in at 10:30 tonight."
+          "text": "The new fence next door shades my tomato plot most of the day now."
         },
         {
           "turnId": "t6",
           "role": "USER",
-          "text": "Probably pizza for dinner."
+          "text": "Might return them this weekend."
         },
         {
           "turnId": "t7",
           "role": "ASSISTANT",
-          "text": "Down in the music room, you mean?"
+          "text": "The tomato plot, your vegetable one?"
         },
         {
           "turnId": "t8",
           "role": "USER",
-          "text": "Yeah, that one."
+          "text": "Same one."
         }
       ]
     },
@@ -2421,35 +2421,35 @@
       "sourceEpisodeId": "p1b6-se-b004-037",
       "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
       "anchorSpanRef": {
-        "turnId": "t5",
-        "startByte": 19,
-        "endByte": 52
+        "turnId": "t1",
+        "startByte": 25,
+        "endByte": 62
       },
       "evidenceSpanRefs": [
         {
           "turnId": "t1",
           "startByte": 0,
-          "endByte": 43
+          "endByte": 62
         },
         {
           "turnId": "t3",
           "startByte": 0,
-          "endByte": 44
+          "endByte": 47
         },
         {
           "turnId": "t5",
           "startByte": 0,
-          "endByte": 53
+          "endByte": 66
         },
         {
           "turnId": "t7",
           "startByte": 0,
-          "endByte": 33
+          "endByte": 36
         },
         {
           "turnId": "t8",
           "startByte": 0,
-          "endByte": 15
+          "endByte": 9
         }
       ],
       "discoursePattern": "ELLIPTICAL_REPLY",

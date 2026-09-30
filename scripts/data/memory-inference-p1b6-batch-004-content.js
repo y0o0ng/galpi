@@ -445,16 +445,16 @@ module.exports = [
   {
     sk: 'p1b6-sk-be0efa305956d111', lang: 'EN', dp: 'ELLIPTICAL_REPLY',
     turns: [
-      ['USER', 'Quiet hours in my building start at 10 p.m.'],
-      ['USER', 'The hallway lights got replaced this morning.'],
-      ['USER', 'The basement music room stays open until 11.'],
-      ['USER', 'I left my umbrella at the gym again.'],
-      ['USER', 'I want to get some drum practice in at 10:30 tonight.'],
-      ['USER', 'Probably pizza for dinner.'],
-      ['ASSISTANT', 'Down in the music room, you mean?'],
-      ['USER', 'Yeah, that one.'],
+      ['USER', 'At the community garden, vegetable plots get watered at 7 a.m.'],
+      ['USER', 'I bought new gloves on the way home.'],
+      ['USER', 'Shaded plots are on the evening watering round.'],
+      ['USER', 'The gloves are a bit too big.'],
+      ['USER', "The new fence next door shades my tomato plot most of the day now."],
+      ['USER', 'Might return them this weekend.'],
+      ['ASSISTANT', 'The tomato plot, your vegetable one?'],
+      ['USER', 'Same one.'],
     ],
-    ev: [0, 2, 4, 6, 7], anchor: [4, 'drum practice in at 10:30 tonight'],
+    ev: [0, 2, 4, 6, 7], anchor: [0, 'vegetable plots get watered at 7 a.m.'],
   },
   // 038 | f03b5a7c | TRAIN/CLEAR | KO | 2 fragments | CONCLUSION_FIRST
   {
