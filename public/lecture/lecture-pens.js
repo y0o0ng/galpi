@@ -4,13 +4,14 @@
 // - 펜은 한 번 눌러 고르고, 고른 펜을 다시 누르면 설정이 열린다. `+`로 최대 15개까지 만든다.
 // - 레일은 세로·가로를 바꿀 수 있고 전환 버튼은 레일 끝이다. 펜은 끝선 안에 숨고 고른 펜만 나온다.
 // - 초록 계열은 복습 펜 전용이라 일반 펜·형광펜에서 고를 수 없다(§8.2).
+// - `강의`·`복습` 모드마다 펜 목록이 따로다. 복습에서는 review_pen(초록만)과 지우개만 보인다.
 (function (global) {
-  // v2: 기본 펜을 Figma 레일 구성으로 바꾸면서 옛 저장값을 한 번 버린다.
-  const STORAGE_KEY = 'galpi-lecture-pens-v2';
+  const ORIENTATION_KEY = 'galpi-lecture-rail-orientation';
   const MAX_PENS = 15;
   // 굵기 1.0이 페이지 폭의 0.24%다(A4 폭 약 0.5mm).
   const WIDTH_UNIT = 0.0024;
-  const HIGHLIGHT_ALPHA = 0.35;
+  // Figma `Annotation rendering` 형광펜 견본의 불투명도.
+  const HIGHLIGHT_ALPHA = 0.42;
   // Figma `Pen settings popover`의 빠른 팔레트. 형광펜은 레일 기본값의 두 색을 앞에 둔다.
   const PALETTE = ['#1D2622', '#6E7772', '#C65C58', '#4A6FA5', '#7966A8', '#D2A72A'];
   const HIGHLIGHT_PALETTE = ['#F2F456', '#DD56F4', '#F5A55B', '#8EC5F2', '#C9A3F0', '#B8BEC0'];
@@ -28,6 +29,14 @@
     { tool: 'highlighter', color: '#F2F456', width: 3 },
     { tool: 'eraser', color: null, width: 1 },
   ];
+  // 복습 펜은 초록 계열만(Figma `review_pen` 견본 #2F6B57). 모두 예약 대역 안이다.
+  const REVIEW_PALETTE = ['#2F6B57', '#2E8B57', '#4FA37F', '#1E4D3E', '#7BBF9E', '#5C9E3A'];
+  const REVIEW_PENS = [
+    { tool: 'review_pen', color: '#2F6B57', width: 1 },
+    { tool: 'review_pen', color: '#4FA37F', width: 1 },
+    { tool: 'review_pen', color: '#7BBF9E', width: 5 },
+    { tool: 'eraser', color: null, width: 1 },
+  ];
 
   function isReviewGreen(hex) {
     const value = /^#([0-9a-f]{6})$/i.exec(hex || '');
@@ -41,18 +50,46 @@
     return normalized >= REVIEW_GREEN_HUE[0] && normalized <= REVIEW_GREEN_HUE[1] && delta / max >= REVIEW_GREEN_MIN_SATURATION;
   }
 
-  function load() {
+  const MODES = {
+    // v2: 기본 펜을 Figma 레일 구성으로 바꾸면서 옛 저장값을 한 번 버렸다.
+    lecture: {
+      key: 'galpi-lecture-pens-v2',
+      defaults: DEFAULT_PENS,
+      tools: { pen: '펜', highlighter: '형광펜', eraser: '지우개' },
+      palette: tool => (tool === 'highlighter' ? HIGHLIGHT_PALETTE : PALETTE),
+      allows: color => !isReviewGreen(color),
+      refusal: '이 색상은 복습 필기 전용이에요',
+      drawTool: 'pen',
+    },
+    review: {
+      key: 'galpi-lecture-review-pens-v1',
+      defaults: REVIEW_PENS,
+      tools: { review_pen: '복습 펜', eraser: '지우개' },
+      palette: () => REVIEW_PALETTE,
+      allows: isReviewGreen,
+      refusal: '복습 필기는 초록 계열만 쓸 수 있어요',
+      drawTool: 'review_pen',
+    },
+  };
+
+  // 저장값이 모드 밖의 도구나 허용되지 않는 색을 들고 있으면 기본값으로 돌린다.
+  function load(modeName) {
+    const mode = MODES[modeName];
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (Array.isArray(saved?.pens) && saved.pens.length) {
-        // 저장값이 어떻게든 초록을 들고 있으면 버린다(복습 전용 색).
-        saved.pens.forEach(pen => { if (pen.tool !== 'eraser' && isReviewGreen(pen.color)) pen.color = PALETTE[0]; });
-        return { pens: saved.pens.slice(0, MAX_PENS), selected: Math.min(saved.selected || 0, saved.pens.length - 1), orientation: saved.orientation === 'horizontal' ? 'horizontal' : 'vertical' };
-      }
+      const saved = JSON.parse(localStorage.getItem(mode.key));
+      const pens = Array.isArray(saved?.pens) ? saved.pens.filter(pen => pen.tool in mode.tools).slice(0, MAX_PENS) : [];
+      pens.forEach(pen => { if (pen.tool !== 'eraser' && !mode.allows(pen.color)) pen.color = mode.palette(pen.tool)[0]; });
+      if (pens.length) return { pens, selected: Math.min(saved.selected || 0, pens.length - 1) };
     } catch { /* 기본값으로 */ }
-    return { pens: DEFAULT_PENS.map(pen => ({ ...pen })), selected: 0, orientation: 'vertical' };
+    return { pens: mode.defaults.map(pen => ({ ...pen })), selected: 0 };
   }
-  const save = settings => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* 이번 실행에서만 유지 */ } };
+  const store = (key, value) => { try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch { /* 이번 실행에서만 유지 */ } };
+  function loadOrientation() {
+    try {
+      const saved = localStorage.getItem(ORIENTATION_KEY) || JSON.parse(localStorage.getItem(MODES.lecture.key))?.orientation;
+      return saved === 'horizontal' ? 'horizontal' : 'vertical';
+    } catch { return 'vertical'; }
+  }
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -71,12 +108,15 @@
   const highlighterSvg = color => `<svg viewBox="0 0 21 41" width="21" height="41"><path d="M0.25 0.25V20.2757H0.691176H5.875H9.625H14.8608H15.25V0.25H0.25Z" fill="${color}"/><path d="M5.60714 33.75L5.75 38.25L9.25 37.75L9.89286 33.75H5.60714Z" fill="${color}"/><path d="M0.691176 20.2757H5.875H9.625H14.8608M0.691176 20.2757H0.25V0.25H15.25V20.2757H14.8608M0.691176 20.2757V21.7776C1.32143 26.75 4.53571 31.25 4.53571 31.25L5.07143 33.75H5.60714M14.8608 20.2757L14.8088 21.7776C14.1081 26.75 10.9643 31.25 10.9643 31.25L10.4286 33.75H9.89286M5.60714 33.75L5.75 38.25L9.25 37.75L9.89286 33.75M5.60714 33.75H9.89286" fill="none" stroke="#000000" stroke-width="0.5"/></svg>`;
   const ERASER_PEN_SVG = '<svg viewBox="0 0 21 41" width="21" height="41"><path d="M0.46902 23.25C0.170912 24.0287 0.233563 23.9723 0.525454 24.75H14.0146C14.3312 23.948 14.3164 24.0113 14.0145 23.25H0.46902Z" fill="#2C2C29"/><path d="M0.46902 21.75C0.184727 22.531 0.17669 22.469 0.46902 23.25H14.0145C14.3158 22.4594 14.3152 22.5198 14.0145 21.75H0.46902Z" fill="#2C2C29"/><path d="M0.46902 20.2757C0.165906 21.0655 0.188295 21.0035 0.46902 21.75H14.0145C14.3265 20.9489 14.3233 21.0351 14.0145 20.2757H0.46902Z" fill="#2C2C29"/><path d="M0.46902 0.25V20.2757H14.0145V0.25H0.46902Z" fill="#E8CA37"/><path d="M14.0146 24.75H0.525454V28.25C0.637207 31.4027 1.56073 34.25 7.27004 34.25C12.7299 34.25 13.8093 31.2748 13.9928 28.25L14.0146 24.75Z" fill="#F56062"/><path d="M0.46902 20.2757V0.25H14.0145V20.2757M0.46902 20.2757C0.165906 21.0655 0.188295 21.0035 0.46902 21.75M0.46902 20.2757H14.0145M14.0145 20.2757C14.3233 21.0351 14.3265 20.9489 14.0145 21.75M0.525454 24.75C0.233563 23.9723 0.170912 24.0287 0.46902 23.25M0.525454 24.75H14.0146M0.525454 24.75V28.25C0.637207 31.4027 1.56073 34.25 7.27004 34.25C12.7299 34.25 13.8093 31.2748 13.9928 28.25L14.0146 24.75M0.46902 23.25C0.17669 22.469 0.184727 22.531 0.46902 21.75M0.46902 23.25H14.0145M0.46902 21.75H14.0145M14.0145 21.75C14.3152 22.5198 14.3158 22.4594 14.0145 23.25M14.0145 23.25C14.3164 24.0113 14.3312 23.948 14.0146 24.75" fill="none" stroke="#000000" stroke-width="0.5"/></svg>';
   const toolSvg = pen => (pen.tool === 'eraser' ? ERASER_PEN_SVG : pen.tool === 'highlighter' ? highlighterSvg(pen.color) : penSvg(pen.color));
+  const toolName = tool => ({ ...MODES.lecture.tools, ...MODES.review.tools })[tool];
   const PLUS_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 3.75V16.25M3.75 10H16.25" stroke="currentColor" stroke-width="1.875" stroke-linecap="round"/></svg>';
   const ROTATE_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M14 3H6C4.34315 3 3 4.34315 3 6V14C3 15.6569 4.34315 17 6 17H14C15.6569 17 17 15.6569 17 14V6C17 4.34315 15.6569 3 14 3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M8 8H13V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 8L7 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-  const toolLabel = { pen: '펜', highlighter: '형광펜', eraser: '지우개' };
 
-  function buildRail({ toast }) {
-    const settings = load();
+  function buildRail({ toast, mode: initialMode = 'lecture' }) {
+    let modeName = initialMode;
+    let mode = MODES[modeName];
+    let settings = load(modeName);
+    let orientation = loadOrientation();
     const rail = el('div', 'lecture-rail');
     rail.setAttribute('role', 'toolbar');
     rail.setAttribute('aria-label', '필기 도구');
@@ -91,7 +131,7 @@
     rail.append(pensEl, add, el('span', 'lecture-rail-divider'), turn);
     let menu = null;
 
-    const persist = () => save(settings);
+    const persist = () => store(mode.key, settings);
     function closeMenu() {
       menu?.remove();
       menu = null;
@@ -102,13 +142,14 @@
     }
 
     function render() {
-      rail.classList.toggle('is-horizontal', settings.orientation === 'horizontal');
-      turn.setAttribute('aria-label', settings.orientation === 'horizontal' ? '세로 레일로' : '가로 레일로');
+      rail.classList.toggle('is-horizontal', orientation === 'horizontal');
+      rail.dataset.mode = modeName;
+      turn.setAttribute('aria-label', orientation === 'horizontal' ? '세로 레일로' : '가로 레일로');
       add.disabled = settings.pens.length >= MAX_PENS;
       pensEl.replaceChildren(...settings.pens.map((pen, index) => {
         const button = el('button', `lecture-rail-pen is-${pen.tool}${index === settings.selected ? ' active' : ''}`);
         button.type = 'button';
-        button.setAttribute('aria-label', `${toolLabel[pen.tool]} ${index + 1}${index === settings.selected ? ' · 다시 누르면 설정' : ''}`);
+        button.setAttribute('aria-label', `${toolName(pen.tool)} ${index + 1}${index === settings.selected ? ' · 다시 누르면 설정' : ''}`);
         button.append(icon(toolSvg(pen)), el('span', 'lecture-rail-width', pen.width.toFixed(1)));
         button.addEventListener('click', () => {
           if (index === settings.selected) return menu ? closeMenu() : openMenu(button);
@@ -126,15 +167,15 @@
       const pen = settings.pens[settings.selected];
       menu = el('div', 'lecture-pen-menu');
       const tools = el('div', 'lecture-menu-tools');
-      Object.entries(toolLabel).forEach(([tool, label]) => {
+      Object.entries(mode.tools).forEach(([tool, label]) => {
         const option = el('button', `lecture-menu-tool${tool === pen.tool ? ' active' : ''}`);
         option.type = 'button';
         option.setAttribute('aria-label', label);
-        option.append(icon(toolSvg({ tool, color: pen.color || (tool === 'highlighter' ? HIGHLIGHT_PALETTE[0] : PALETTE[0]) })));
+        option.append(icon(toolSvg({ tool, color: pen.color || mode.palette(tool)[0] })));
         option.addEventListener('click', () => {
           pen.tool = tool;
           if (tool === 'eraser') pen.color = null;
-          else if (!pen.color) pen.color = tool === 'highlighter' ? HIGHLIGHT_PALETTE[0] : PALETTE[0];
+          else if (!pen.color) pen.color = mode.palette(tool)[0];
           if (tool === 'highlighter' && pen.width < 2) pen.width = 3;
           persist(); render(); openMenu(pensEl.children[settings.selected]);
         });
@@ -144,7 +185,7 @@
 
       if (pen.tool !== 'eraser') {
         const swatches = el('div', 'lecture-swatches');
-        (pen.tool === 'highlighter' ? HIGHLIGHT_PALETTE : PALETTE).forEach(color => {
+        mode.palette(pen.tool).forEach(color => {
           const swatch = el('button', `lecture-swatch${color.toLowerCase() === pen.color?.toLowerCase() ? ' active' : ''}`);
           swatch.type = 'button';
           swatch.style.setProperty('--swatch', color);
@@ -153,6 +194,7 @@
           swatches.append(swatch);
         });
         // 무지개 버튼은 기기의 기본 색 선택기다. 스펙트럼은 바꾸지 않고 고른 결과만 검증한다(§8.2).
+        // 강의에서는 초록을, 복습에서는 초록이 아닌 색을 거부한다.
         const custom = el('label', 'lecture-swatch is-custom');
         custom.setAttribute('aria-label', '다른 색');
         const input = el('input');
@@ -161,8 +203,8 @@
         // 드래그 중에는 막지 않는다. 막으면 슬라이더가 대역 경계에서 멈춰 그 경계색(눈으로는 초록)이 확정된다.
         // 손을 뗀 최종색만 검사하고, 초록이면 원래 쓰던 색으로 되돌린 뒤 선택기를 닫는다.
         input.addEventListener('change', () => {
-          if (isReviewGreen(input.value)) {
-            toast('이 색상은 복습 필기 전용이에요');
+          if (!mode.allows(input.value)) {
+            toast(mode.refusal);
             input.value = pen.color;
             input.blur();
             return;
@@ -206,7 +248,7 @@
 
       document.body.append(menu);
       const box = anchor.getBoundingClientRect();
-      const horizontal = settings.orientation === 'horizontal';
+      const horizontal = orientation === 'horizontal';
       const left = horizontal ? box.left : box.right + 12;
       const top = horizontal ? box.bottom + 12 : box.top - 20;
       menu.style.left = `${Math.max(16, Math.min(left, innerWidth - menu.offsetWidth - 16))}px`;
@@ -217,14 +259,15 @@
     add.addEventListener('click', () => {
       if (settings.pens.length >= MAX_PENS) return;
       const base = settings.pens[settings.selected];
-      settings.pens.push({ ...base, tool: base.tool === 'eraser' ? 'pen' : base.tool, color: base.color || PALETTE[0] });
+      settings.pens.push({ ...base, tool: base.tool === 'eraser' ? mode.drawTool : base.tool, color: base.color || mode.palette(mode.drawTool)[0] });
       settings.selected = settings.pens.length - 1;
       persist(); closeMenu(); render();
       pensEl.lastElementChild?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
     turn.addEventListener('click', () => {
-      settings.orientation = settings.orientation === 'horizontal' ? 'vertical' : 'horizontal';
-      persist(); closeMenu(); render();
+      orientation = orientation === 'horizontal' ? 'vertical' : 'horizontal';
+      store(ORIENTATION_KEY, orientation);
+      closeMenu(); render();
     });
     render();
 
@@ -232,8 +275,19 @@
       el: rail,
       current: () => settings.pens[settings.selected],
       close: closeMenu,
+      mode: () => modeName,
+      allows: color => mode.allows(color),
+      refusal: () => mode.refusal,
+      setMode(next) {
+        if (next === modeName || !MODES[next]) return;
+        modeName = next;
+        mode = MODES[next];
+        settings = load(next);
+        closeMenu();
+        render();
+      },
     };
   }
 
-  global.LecturePens = { buildRail, isReviewGreen, WIDTH_UNIT, HIGHLIGHT_ALPHA };
+  global.LecturePens = { buildRail, isReviewGreen, WIDTH_UNIT, HIGHLIGHT_ALPHA, REVIEW_PALETTE, PALETTE, HIGHLIGHT_PALETTE };
 })(window);

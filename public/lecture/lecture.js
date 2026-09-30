@@ -370,6 +370,8 @@
       v.session = await Recorder().todaySession(v.container.id).catch(() => null);
       if (viewer !== v) return;
       if (v.session) logDocumentOpen(v);
+      // 녹음 중이거나 오늘 이 과목 Session이 있으면 `강의`, 아니면 `복습`으로 연다(§8.2).
+      setMode(v, isRecordingHere(v) || v.session ? 'lecture' : 'review');
       v.unsubscribe = Recorder().subscribe(() => onRecorderChange(v));
       v.ticker = setInterval(() => {
         const time = v.mic.querySelector('.lecture-mic-time');
@@ -394,7 +396,11 @@
     v.status = el('span', 'lecture-meta', '');
     center.append(v.title, v.status);
     v.mic = el('div', 'lecture-mic-slot');
-    header.append(v.back, center, v.mic);
+    v.modeToggle = el('div', 'lecture-mode');
+    v.modeToggle.hidden = true;
+    const left = el('div', 'lecture-viewer-left');
+    left.append(v.back, v.modeToggle);
+    header.append(left, center, v.mic);
     v.alert = el('div', 'lecture-alert');
     v.alert.hidden = true;
 
@@ -546,8 +552,37 @@
 
   // ─── 녹음(L1b) ────────────────────────────────────────────────────────────
 
+  const isRecordingHere = v => ['starting', 'recording'].includes(Recorder().state.status) && Recorder().state.containerId === v.container.id;
+
+  // `강의·복습` 토글. 새 흔적의 소속을 정하고 녹음 중에는 `강의`로 잠긴다(§8.2). 일반 폴더에는 없다.
+  function setMode(v, mode) {
+    v.mode = mode;
+    v.pens.setMode(mode);
+    renderModeToggle(v);
+  }
+
+  function renderModeToggle(v) {
+    const locked = isRecordingHere(v);
+    v.modeToggle.hidden = false;
+    v.modeToggle.classList.toggle('is-locked', locked);
+    v.modeToggle.replaceChildren(...[['lecture', '강의'], ['review', '복습']].map(([mode, label]) => {
+      const button = el('button', mode === v.mode ? 'active' : '');
+      button.type = 'button';
+      button.disabled = locked && mode !== 'lecture';
+      button.setAttribute('aria-pressed', String(mode === v.mode));
+      if (mode === 'review') button.append(el('span', 'lecture-mode-dot'));
+      button.append(document.createTextNode(label));
+      button.addEventListener('click', () => { if (!locked && mode !== v.mode) setMode(v, mode); });
+      return button;
+    }));
+    if (locked) v.modeToggle.title = '녹음 중에는 강의 필기로 고정돼';
+    else v.modeToggle.removeAttribute('title');
+  }
+
   function onRecorderChange(v) {
     const recorder = Recorder().state;
+    if (isRecordingHere(v) && v.mode !== 'lecture') setMode(v, 'lecture');
+    else renderModeToggle(v);
     // 이 뷰어에서 첫 녹음을 시작하면 그때 생긴 Session을 붙이고 자료 열기를 남긴다.
     if (!v.session && recorder.session?.containerId === v.container.id) {
       v.session = recorder.session;
@@ -651,8 +686,8 @@
       page.ink.setPointerCapture(event.pointerId);
       v.pens.close();
       const pen = v.pens.current();
-      // 마지막 방어선: 복습 전용 초록은 강의 펜으로 그리지 않는다(§8.2).
-      if (pen.tool !== 'eraser' && global.LecturePens.isReviewGreen(pen.color)) return toast('이 색상은 복습 필기 전용이에요');
+      // 마지막 방어선: 강의 펜은 초록을, 복습 펜은 초록이 아닌 색을 쓰지 않는다(§8.2).
+      if (pen.tool !== 'eraser' && !v.pens.allows(pen.color)) return toast(v.pens.refusal());
       if (pen.tool === 'eraser') {
         v.erasing = { page, pointerId: event.pointerId, last: pagePoint(page, event), radius: ERASER_RADIUS * pen.width / v.zoom };
         eraseAt(v, page, v.erasing.last, v.erasing.radius);
@@ -670,10 +705,10 @@
           color: pen.color,
           width: Math.round(pen.width * global.LecturePens.WIDTH_UNIT * 100000) / 100000,
           points: [pagePoint(page, event)],
-          // 오늘 이 과목 Session이 있으면 강의 필기다. 녹음이 멈춘 동안의 획도 Session 시각은 갖되
-          // 오디오 위치는 recording_span 밖이라 없다(§8.2). `강의·복습` 토글은 아직 없다.
-          source_session_id: v.session?.id ?? null,
-          t_ms: v.session ? Recorder().sessionT(v.session, event.timeStamp) : null,
+          // `강의`면 오늘 Session의 시각을 갖는다. 녹음이 멈춘 동안의 획도 Session 시각은 갖되 오디오 위치는
+          // recording_span 밖이라 없다. `복습`은 review_pen이고 Session을 갖지 않는다(§8.2). 재생 위치 앵커는 L2다.
+          source_session_id: v.mode === 'lecture' ? v.session?.id ?? null : null,
+          t_ms: v.mode === 'lecture' && v.session ? Recorder().sessionT(v.session, event.timeStamp) : null,
           created_at: Date.now(),
         },
       };
