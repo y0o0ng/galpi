@@ -111,6 +111,17 @@ The owner has also accepted three development review choices:
 
 Hold and rejection remain distinguishable review decisions, even though both leave the candidate pending. Rejection is not source deletion, candidate disposal, a new NO_WRITE triage decision, or automatic INVALIDATE of the existing claim. These are review-contract choices, not new derived-state statuses; the review interface and durable choice representation remain to be implemented.
 
+The owner has accepted four information groups for each proposal review:
+
+| Review information | Required content |
+| --- | --- |
+| Incoming candidate and evidence | The accepted structured candidate and inspectable owning-source text for its bound EvidenceRefs |
+| Existing fact and support | The current claim (or explicit absence of a current claim) and inspectable original support evidence |
+| Proposed change and resulting state | The proposed change class/transition and the state that would result if approved and committed; clearly marked as a proposal, not an already-written fact |
+| Judgment rationale | Why the proposer classified this as a world update, correction or other named class; rationale is a proposed interpretation, not approval authority |
+
+These are presentation groups, not a reduction of the replay package. Relevant history, unresolved candidates and known counterevidence already present in the replay must remain inspectable, consistent with canonical §42.2 SI-7: derived summaries alone are insufficient. The reviewer must be able to check original source evidence rather than having only a model summary available. This fixes the review information contract; screen layout and review-package persistence remain implementation work.
+
 ### Physical state and provenance — schema v31
 
 | Family-local table | Responsibility |
