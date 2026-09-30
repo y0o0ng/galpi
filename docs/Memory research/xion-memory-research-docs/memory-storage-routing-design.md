@@ -107,7 +107,7 @@ For the first connected General Fact development workflow, the semantic proposer
 
 Approval applies to the reviewed proposal and replay snapshot. A changed snapshot requires fresh review rather than carrying approval to a different target/evidence package. The existing stale-replay check remains mandatory.
 
-This selects the initial development authority boundary, not a permanent requirement to manually approve every future memory. Automatic semantic approval conditions remain OPEN and must be evaluated against the actual proposer/validator before adoption. Local-model use remains an option. Phase 3 implements the review persistence/decision backend and Phase 4 adds its development-only browser interface; Phase 5 adds the provider-neutral mock-tested proposal path; the actual model/provider adapter remains unimplemented. Synthetic test callbacks are not production approval authority. This decision instantiates canonical §42.2 SI-10 / §42.6 without changing their shared transition semantics.
+This selects the initial development authority boundary, not a permanent requirement to manually approve every future memory. Automatic semantic approval conditions remain OPEN and must be evaluated against the actual proposer/validator before adoption. Local-model use remains an option. Phase 3 implements the review persistence/decision backend and Phase 4 adds its development-only browser interface; Phase 5 adds the provider-neutral mock-tested proposal path; Phase 6 adds the explicitly invoked Luna development adapter. Production remains unconnected. Synthetic test callbacks are not production approval authority. This decision instantiates canonical §42.2 SI-10 / §42.6 without changing their shared transition semantics.
 
 The owner has also accepted three development review choices:
 
@@ -206,3 +206,36 @@ Each explicit attempt calls the supplied proposer once. The callback returns a p
 Malformed/call-failed/unsupported/stale attempts preserve the bound candidate/evidence and old stable state. Valid unsupported proposals retain their actual classification as pending diagnostics. Callback failures use only PROPOSER_CALL_FAILED rather than persisting provider error bodies; malformed output is not persisted. No raw source replay copy is added to review rows. Existing HOLD/REJECT records remain immutable; a fresh proposal requires an explicit new attempt. The callback's transport, timeout, model/runtime contract and semantic evaluation are not implemented in this phase.
 
 Synthetic SQLite/router/mock tests cover deterministic full replay input, all five executable transitions awaiting HUMAN approval, malformed output and binding/mapping failures, unsupported classifications, call failure without retry, source/replay changes, committed-candidate idempotency and explicit re-proposal after HOLD. These validate plumbing and mutation authority, not a model's ability to distinguish WORLD_UPDATE from CORRECTION. No new migration, Pi deployment, production input, network/model call or automatic approval is introduced. Next is choosing an actual proposer/runtime and evaluating source-grounded semantic judgments before connecting it.
+
+
+## Phase 6 — Luna development proposer / synthetic smoke, 2026-09-30
+
+Owner decision: start with `gpt-6-luna` / reasoning `medium` as the development semantic proposer; permit at most ten synthetic API calls to verify the connection. This does not select permanent production approval authority or close local-model alternatives. The existing HUMAN approval boundary and semantic/storage contracts are unchanged.
+
+`lib/memory-storage/general-fact-openai.js` supplies `createOpenAIGeneralFactProposer({ apiKey })`, passed explicitly to `createGeneralFactReviewHandler`. Imports do not load credentials or dispatch requests. The existing OpenAI SDK makes Responses requests with fixed model `gpt-6-luna`, reasoning `medium` / `current_turn`, maximum output 4096, `store:false`, no tools or streaming, a 60-second timeout, and SDK/request `maxRetries:0`. The endpoint is fixed to the default OpenAI API; no production model selection, catalog refresh, current-context injection or fallback model is used. Optional `fetch` injection exists for SDK transport tests. Credentials and raw provider errors are never logged or persisted by the adapter.
+
+The strict output JSON schema is generated from the existing core's change/transition vocabulary and exported as `GENERAL_FACT_PROPOSAL_SCHEMA`. It does not change the accepted proposal shape or semantic mappings. Existing `normalizeProposal` still verifies output locally, and the review backend still checks evidence/target/mapping/replay integrity. Non-completed, refusal, empty, malformed or call-failed responses fail closed without retry; the preparation handler records PROPOSER_CALL_FAILED for callback failures and preserves pending evidence/stable state. Strict JSON is shape enforcement, not proof of semantic support or authority to commit. See [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) and [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
+
+### Observed synthetic smoke — eight planned, one-shot calls
+
+All eight inputs were fixed before dispatch, in separate owner-private development DBs outside Git. Only authored synthetic owning-message text and replay packages were transmitted. Existing migrations were explicitly applied to these scratch fixtures, without a new migration or Pi/startup connection. Deterministic synthetic initial states were seeded before calls with SYNTHETIC_FIXTURE_SETUP_ONLY; these setup records are not HUMAN judgments or approved model outputs. The development DB privacy/schema validator accepted every fixture. Every resulting stable state/history and owning message remained unchanged after proposal processing.
+
+| Authored scenario (not adjudicated gold) | Observed change class / transition | Preparation outcome |
+| --- | --- | --- |
+| Initial fact | null / CREATE | HUMAN_REVIEW_REQUIRED |
+| Explicit device replacement | WORLD_UPDATE / SUPERSEDE | HUMAN_REVIEW_REQUIRED |
+| Explicit earlier statement correction | CORRECTION / REVISE | HUMAN_REVIEW_REQUIRED |
+| Retraction without replacement | CORRECTION / INVALIDATE | HUMAN_REVIEW_REQUIRED |
+| Same device reaffirmed | ADDITIONAL_CONTEXT / NO_CHANGE | HUMAN_REVIEW_REQUIRED |
+| Uncertain replacement vs correction relation | AMBIGUOUS / KEEP_AMBIGUOUS | UNSUPPORTED_TRANSITION / pending |
+| Uncertain current device | AMBIGUOUS / KEEP_AMBIGUOUS | UNSUPPORTED_TRANSITION / pending |
+| Extra device detail | EXPANSION / EXPAND | UNSUPPORTED_TRANSITION / pending |
+
+Actual provider dispatches: **8**; completed responses: **8**; review-pending: **5**; unsupported-pending: **3**; other failures: **0**. No ninth/tenth call, retry, answer-based adjustment or model substitution occurred. Every response reported `gpt-6-luna`. Input tokens **17,245**, output tokens **2,287** (including **732** reasoning tokens). Observed per-call latency **3,099..4,174 ms**, median **3,512 ms**; this small local measurement is not a production latency/quality estimate.
+
+The private plan, responses, development DBs and summary are retained at `/private/tmp/galpi-general-fact-luna-mRmA9s` (directories 0700, files 0600), outside Git. Plan SHA256: `75d9bc7e0186436994e9f80adf520b48ac6b869af0397ddbcbe6165f3d28c9f7`; summary SHA256: `97a76c682abdf651c7af32647a858d6da160dc11f0b636a55aba16772f269535`. Real HUMAN decisions **0**, model-derived state commits **0**, production DB/Vault/Pi reads/writes **0**. No production integration or schema change occurred.
+
+SDK fetch-mock tests verify fixed request bytes/config, strict schema/local normalization, automatic retry disabled on HTTP/network/timeout failures, refusal/incomplete/empty/malformed responses, explicit-key/prompt requirements and the proposal→pending review/no-commit invariant. These are mechanics tests. The eight authored probes do not establish semantic accuracy, ambiguity calibration, robustness or automatic approval safety. Next is a separately designed source-grounded semantic evaluation and owner review of actual proposals; production ingress and automatic approval remain unconnected.
+
+
+Validation: inspected latest-main baseline `1ef34bd26c0ab6e7d3d136e1c7441ceb938e2c02` and intervening lecture/documentation commits. Focused storage/SDK/review tests **84 PASS**. Full `npm test -- --test-concurrency=2`: **1,831 PASS / 2 FAIL / 3 SKIP**. Both failures are existing UI color assertions in `test/assistant-task-ui.test.js`, expecting pre-theme-change `#151A18` in `public/app.js` and `public/style.css`; running that untouched test separately reproduces them. They do not import the LTM adapter or storage modules, and no UI/test change is included in this LTM scope. `git diff --check` and AGENTS/CLAUDE body equality pass. Full-suite success is not claimed.
