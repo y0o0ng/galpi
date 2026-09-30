@@ -125,7 +125,7 @@
 ### 강의 노트 — L1a 인수, 다음은 L1b(녹음·Session)
 
 - **L1a(폴더·자료·필기)는 2026-09-30 Pi·iPad 인수로 닫혔다.** 계약·배포 기록은 설계서 §17.2다. 강의 자료 파일(Pi `/home/pi/galpi/lecture/documents/`)은 **아직 백업 대상이 아니다**(사용자 결정, 실사용 전 다시 정한다). 전사는 전사용 PC를 산 뒤다.
-- **Pi의 `lib/database-migrations.js`는 저장소 파일에서 v29(`memory_evidence_refs`)를 뺀 판이다.** Pi는 v28(`lecture_notes_capture`)에 있고, R2를 배포할 때 저장소 파일을 그대로 복사하면 v29만 이어서 붙는다. 그 전까지 이 파일은 SHA 대조에서 저장소와 다른 것이 정상이다.
+- **L1b(Session·녹음)는 Pi에 배포했고 iPad 인수 전이다**(schema v30, `public/lecture/lecture-recorder.js`). 같은 배포로 R2의 v29 `memory_evidence_refs` 빈 테이블도 Pi에 적용됐다(사용자 결정, 그걸 쓰는 코드는 미배포). 녹음 파일은 Pi `/home/pi/galpi/lecture/audio/<session>/`이다.
 - **설계와 화면은 정리됐지만 L1 밖의 구현 승인은 아니다.** 계약은 설계서 §0 합의 목록과 §20이 정본이고 여기에 복제하지 않는다. §14.1 캡처 스파이크는 10분 smoke와 90분 gate(대체 음원, 앱 전환·잠금 포함)를 통과해 Path A(iPad 웹 통합 녹음) 채택 조건을 충족했다. 3시간 stress는 선택 항목으로 미뤘고(90분 외삽으로 drift·저장 문제 없음) 강의실 조건은 복학 뒤이며, 전사용 PC·STT는 미정이다. 실측은 `docs/lecture-capture-spike-receipts.md`가 정본이다.
 - **Figma에서 SF Pro 텍스트는 파일에 SF Pro가 한 번도 쓰이지 않았을 때 플러그인 측정 폭이 0이다.** 텍스트 스타일에 묶어 두고, 폭이 0이면 사용자가 데스크톱 앱에서 스타일 글꼴만 바꾸게 한다.
 
