@@ -81,7 +81,7 @@ function migrateThrough(db, lastVersion) {
   }
 }
 
-test('general_fact migration upgrades schema 30 once and enforces transition/provenance constraints', () => {
+test('general_fact migrations upgrade schema 30 once and enforce transition/provenance constraints', () => {
   const db = createLegacyDatabase();
   try {
     migrateThrough(db, 30);
@@ -89,7 +89,10 @@ test('general_fact migration upgrades schema 30 once and enforces transition/pro
       .run('session', 'user', 'owning source');
     const before = db.prepare('SELECT * FROM messages').all();
     const result = runDatabaseMigrations(db);
-    assert.deepEqual(result.applied, [{ version: 31, name: 'memory_general_fact_storage' }]);
+    assert.deepEqual(result.applied, [
+      { version: 31, name: 'memory_general_fact_storage' },
+      { version: 32, name: 'memory_general_fact_reviews' },
+    ]);
     assert.deepEqual(runDatabaseMigrations(db).applied, []);
     assert.deepEqual(db.prepare('SELECT * FROM messages').all(), before);
     db.pragma('foreign_keys = ON');
@@ -114,6 +117,33 @@ test('general_fact migration upgrades schema 30 once and enforces transition/pro
     assert.throws(() => insert.run('t2', 2, 'c2', 's1', null, 'NO_CHANGE', 'ADDITIONAL_CONTEXT', sha), /CHECK/);
     assert.throws(() => db.prepare('INSERT INTO memory_general_fact_transition_evidence VALUES (?, ?)')
       .run('t1', 'missing'), /FOREIGN KEY/);
+  } finally { db.close(); }
+});
+
+test('review migration upgrades schema 31 once and constrains complete decision records', () => {
+  const db = createLegacyDatabase();
+  try {
+    migrateThrough(db, 31);
+    assert.deepEqual(runDatabaseMigrations(db).applied, [{ version: 32, name: 'memory_general_fact_reviews' }]);
+    assert.deepEqual(runDatabaseMigrations(db).applied, []);
+    db.pragma('foreign_keys = ON');
+    db.prepare(`INSERT INTO memory_general_fact_candidates
+      (candidate_id, subject, attribute_key, candidate_json, evidence_ids_json)
+      VALUES ('c', 'USER', 'primary_laptop', '{}', '[]')`).run();
+    const insert = db.prepare(`INSERT INTO memory_general_fact_reviews
+      (review_id, candidate_id, replay_sha256, proposal_json, proposal_sha256, package_sha256)
+      VALUES (?, ?, ?, '{}', ?, ?)`);
+    const sha = 'a'.repeat(64);
+    insert.run('r', 'c', sha, sha, sha);
+    assert.throws(() => insert.run('r', 'c', sha, sha, sha), /UNIQUE/);
+    assert.throws(() => insert.run('bad', 'missing', sha, sha, sha), /FOREIGN KEY/);
+    assert.throws(() => db.prepare(`UPDATE memory_general_fact_reviews
+      SET decision = 'APPROVE', decision_reason = '', decided_at = 100 WHERE review_id = 'r'`).run(), /CHECK/);
+    assert.throws(() => db.prepare(`UPDATE memory_general_fact_reviews
+      SET decision = 'HOLD', decided_at = 100 WHERE review_id = 'r'`).run(), /CHECK/);
+    db.prepare(`UPDATE memory_general_fact_reviews
+      SET decision = 'HOLD', decision_reason = '', decided_at = 100 WHERE review_id = 'r'`).run();
+    assert.equal(db.prepare('SELECT decision FROM memory_general_fact_reviews').get().decision, 'HOLD');
   } finally { db.close(); }
 });
 
@@ -320,6 +350,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 29, name: 'memory_evidence_refs' },
     { version: 30, name: 'lecture_sessions_capture' },
     { version: 31, name: 'memory_general_fact_storage' },
+    { version: 32, name: 'memory_general_fact_reviews' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -338,7 +369,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
   assert.deepEqual(
     db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN (
       'ddays', 'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
-      'memory_general_fact_transitions', 'memory_general_fact_transition_evidence'
+      'memory_general_fact_transitions', 'memory_general_fact_transition_evidence', 'memory_general_fact_reviews'
     ) AND name NOT LIKE 'lecture_%' ORDER BY name`).all(),
     tablesBefore,
   );
