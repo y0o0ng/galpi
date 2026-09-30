@@ -407,3 +407,76 @@ body.lecture-viewer-open { overflow: hidden; }
 
 /* 다크에서는 검정 잉크 색 동그라미가 팝오버에 묻힌다. 라이트는 Figma 그대로 테두리가 없다. */
 [data-theme="dark"] .lecture-swatch:not(.is-custom) { box-shadow: inset 0 0 0 1px var(--hairline); }
+
+/* ─── 복습 사이드바 (Figma 03 `Linked Lecture Sidebar`) ─── */
+
+/* 숨겨진 배너가 grid 행을 비우면 본문이 남은 높이를 못 받으므로 세로 flex로 둔다. */
+.lecture-viewer { display: flex; flex-direction: column; }
+.lecture-viewer-body { display: flex; flex: 1; min-height: 0; }
+.lecture-viewer-body > .lecture-scroller { flex: 1; min-width: 0; }
+.lecture-viewer-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.lecture-side-button {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px;
+  background: none; color: var(--label); cursor: pointer;
+}
+.lecture-side-button[hidden] { display: none; }
+.lecture-side-button.active { background: var(--user-bubble); color: var(--ai-text); }
+.lecture-side {
+  display: flex; flex-direction: column; gap: 16px; flex: none; width: 300px; padding: 16px; overflow-y: auto;
+  border-left: 1px solid var(--hairline); background: var(--ai-bubble);
+}
+.lecture-side[hidden] { display: none; }
+.lecture-side-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--hairline); }
+.lecture-side-tabs button {
+  display: flex; align-items: baseline; gap: 5px; padding: 0 0 8px; border: 0; border-bottom: 1px solid transparent; margin-bottom: -1px;
+  background: none; color: var(--label); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
+}
+.lecture-side-tabs button.active { border-bottom-color: var(--ai-text); color: var(--ai-text); }
+.lecture-side-tabs button:disabled { cursor: default; opacity: 0.6; }
+.lecture-side-tabs button span { color: var(--label); opacity: 0.68; font-size: 12px; font-weight: 500; }
+.lecture-side-player { display: grid; gap: 10px; }
+.lecture-side-source { margin: 0; color: var(--label); font-size: 12px; }
+.lecture-side-ticks { position: relative; height: 14px; }
+.lecture-side-ticks button {
+  position: absolute; top: -8px; min-width: 24px; height: 30px; padding: 0; transform: translateX(-50%);
+  border: 0; background: none; color: var(--label); font: inherit; font-size: 11px; font-weight: 500; cursor: pointer;
+}
+.lecture-side-ticks button.is-important { color: var(--brand-ink); }
+.lecture-side-bar { position: relative; height: 4px; margin: 4px 0; border-radius: 999px; background: var(--hairline); cursor: pointer; touch-action: none; }
+.lecture-side-bar::before { content: ''; position: absolute; inset: -14px 0; }
+.lecture-side-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--brand-ink); }
+.lecture-side-knob { position: absolute; top: -4px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--brand-ink); }
+.lecture-side-times { display: flex; justify-content: space-between; color: var(--label); font-size: 12px; font-variant-numeric: tabular-nums; }
+.lecture-side-times span:last-child { opacity: 0.68; }
+.lecture-side-controls { display: flex; justify-content: center; align-items: center; gap: 20px; }
+.lecture-side-controls button {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%;
+  background: none; color: var(--lc-ink-2); cursor: pointer;
+}
+.lecture-side-controls button:disabled { opacity: 0.35; cursor: default; }
+.lecture-side-controls .lecture-side-toggle { background: var(--user-bubble); }
+.lecture-side-locate {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 12px;
+  border: 1px solid var(--hairline); border-radius: 12px; background: none; color: var(--label); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+}
+.lecture-side-locate:disabled { opacity: 0.5; cursor: default; }
+.lecture-side-error { margin: 0; color: var(--lc-danger); font-size: 12px; }
+.lecture-side-note { margin: 0; color: var(--label); opacity: 0.68; font-size: 12px; }
+.lecture-side-divider { width: 100%; height: 0; margin: 0; border: 0; border-top: 1px solid var(--hairline); }
+.lecture-side-list { display: grid; gap: 4px; }
+.lecture-side-row {
+  display: flex; gap: 10px; min-height: 36px; padding: 8px 10px; border: 0; border-radius: 10px; background: none;
+  color: var(--label); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.lecture-side-row.is-current { background: var(--user-bubble); color: var(--ai-text); font-weight: 500; }
+.lecture-side-row.is-marker { font-size: 13px; }
+.lecture-side-time { flex: none; width: 44px; color: var(--label); opacity: 0.68; font-size: 12px; font-variant-numeric: tabular-nums; }
+.lecture-side-row.is-current .lecture-side-time { color: var(--brand-ink); opacity: 1; }
+.lecture-side-boundary {
+  display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 8px 10px; border: 0; background: none;
+  color: var(--label); font: inherit; font-size: 12px; text-align: center;
+}
+.lecture-side-boundary > span:nth-child(2) { flex: 1; opacity: 0.68; }
+button.lecture-side-boundary { cursor: pointer; }
+.lecture-side-rule { flex: none; width: 12px; height: 1px; background: var(--hairline); }
+@media (max-width: 700px) { .lecture-side { position: fixed; inset: auto 0 0 0; width: auto; max-height: 60vh; z-index: 2; border-left: 0; border-top: 1px solid var(--hairline); } }

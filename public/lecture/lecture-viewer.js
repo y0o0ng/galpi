@@ -46,7 +46,8 @@
     return pdfjsPromise;
   }
 
-  async function openViewer(documentId, { newLecture = false } = {}) {
+  // playSession·playAt: 강의 카드·`다른 자료`에서 들어오면 그 강의의 해당 위치로 재생 위치를 맞춘다(§12.2).
+  async function openViewer(documentId, { newLecture = false, playSession = null, playAt = 0 } = {}) {
     if (viewer) return;
     const v = {
       documentId, newLecture, doc: null, container: null, pdf: null, sizes: [], pages: [],
@@ -122,6 +123,24 @@
       // 녹음 중이거나 오늘 이 과목 Session이 있으면 `강의`, 아니면 `복습`으로 연다(§8.2).
       setMode(v, isRecordingHere(v) || v.session || v.newLecture ? 'lecture' : 'review');
       v.unsubscribe = Recorder().subscribe(() => onRecorderChange(v));
+      // 복습 사이드바(L2). 이 자료를 보며 녹음한 강의들을 이어 듣는다.
+      v.review = global.LectureReview.attach(v, {
+        goToPage: page => v.pages[page - 1]?.el.scrollIntoView({ block: 'start' }),
+        openDocumentAt: (documentId, sessionId, t) => {
+          closeViewer();
+          openViewer(documentId, { playSession: sessionId, playAt: t });
+        },
+        redrawInk: () => v.pages.forEach(page => { if (page.visible) drawInk(v, page); }),
+        onToggle: open => v.sideButton.classList.toggle('active', open),
+      });
+      v.main.append(v.review.el);
+      v.sideButton.hidden = false;
+      v.onStrokeTap = stroke => {
+        if (!v.review.jump(stroke.source_session_id, stroke.t_ms)) toast('이 획을 쓴 때의 녹음이 없어.');
+      };
+      await v.review.load();
+      if (viewer !== v) return;
+      if (playSession) v.review.jump(playSession, playAt);
       v.ticker = setInterval(() => {
         const time = v.mic.querySelector('.lecture-mic-time');
         if (time && Recorder().state.status === 'recording' && Recorder().state.containerId === v.container.id) time.textContent = clock(Recorder().elapsedMs());
@@ -149,7 +168,19 @@
     v.modeToggle.hidden = true;
     const left = el('div', 'lecture-viewer-left');
     left.append(v.back, v.modeToggle);
-    header.append(left, center, v.mic);
+    // Figma `System / Bar_Right`: 복습 사이드바 열기·닫기. 과목 자료에서만 보인다.
+    v.sideButton = el('button', 'lecture-side-button');
+    v.sideButton.type = 'button';
+    v.sideButton.hidden = true;
+    v.sideButton.setAttribute('aria-label', '강의 사이드바');
+    v.sideButton.append(svg('<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M15 4L15 20M15 4H7.2002C6.08009 4 5.51962 4 5.0918 4.21799C4.71547 4.40973 4.40973 4.71547 4.21799 5.0918C4 5.51962 4 6.08009 4 7.2002V16.8002C4 17.9203 4 18.4796 4.21799 18.9074C4.40973 19.2837 4.71547 19.5905 5.0918 19.7822C5.51921 20 6.07901 20 7.19694 20L15 20M15 4H16.8002C17.9203 4 18.4796 4 18.9074 4.21799C19.2837 4.40973 19.5905 4.71547 19.7822 5.0918C20 5.5192 20 6.079 20 7.19691L20 16.8031C20 17.921 20 18.48 19.7822 18.9074C19.5905 19.2837 19.2837 19.5905 18.9074 19.7822C18.48 20 17.921 20 16.8031 20H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'));
+    v.sideButton.addEventListener('click', () => {
+      if (v.review.isOpen()) v.review.close();
+      else v.review.open();
+    });
+    const tools = el('div', 'lecture-viewer-tools');
+    tools.append(v.mic, v.sideButton);
+    header.append(left, center, tools);
     v.alert = el('div', 'lecture-alert');
     v.alert.hidden = true;
 
@@ -175,7 +206,9 @@
     v.pens = global.LecturePens.buildRail({ toast });
     v.rail = v.pens.el;
     v.indicator = el('div', 'lecture-page-pill', '');
-    shell.append(header, v.banner, v.alert, v.scroller, v.rail, v.indicator);
+    v.main = el('div', 'lecture-viewer-body');
+    v.main.append(v.scroller);
+    shell.append(header, v.banner, v.alert, v.main, v.rail, v.indicator);
 
     v.onVisibility = () => { if (document.visibilityState === 'hidden') flush(v); };
     document.addEventListener('visibilitychange', v.onVisibility);
@@ -589,6 +622,7 @@
     clearTimeout(v.uploadTimer);
     v.observer?.disconnect();
     v.pdf?.destroy();
+    v.review?.destroy();
     document.removeEventListener('visibilitychange', v.onVisibility);
     v.resizeObserver.disconnect();
     v.el.remove();

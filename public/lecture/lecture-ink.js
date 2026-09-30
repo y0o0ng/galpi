@@ -10,15 +10,19 @@
   // 원형 메뉴 호출: 누른 채 이 시간 동안 이 거리 안에 머물면 연다. 설계상 실기기에서 정하는 값이다(§6.8).
   const HOLD_MS = 300; // 2026-09-30 iPad 실사용 뒤 450ms에서 줄였다.
   const HOLD_TOLERANCE_PX = 6;
+  // 필기 역점프 탭: 이만큼 안에서 짧게 뗀 손가락만 탭이다.
+  const TAP_TOLERANCE_PX = 8;
+  const TAP_MAX_MS = 350;
+  const TAP_RADIUS = 0.012;
 
   // ─── 필기 ─────────────────────────────────────────────────────────────────
 
   const pageStrokes = (v, number) => (v.body.pages[number] ||= []);
 
-  function drawStroke(ctx, stroke, scale) {
+  function drawStroke(ctx, stroke, scale, alpha = 1) {
     const points = stroke.points;
     if (!points.length) return;
-    ctx.globalAlpha = stroke.tool === 'highlighter' ? global.LecturePens.HIGHLIGHT_ALPHA : 1;
+    ctx.globalAlpha = (stroke.tool === 'highlighter' ? global.LecturePens.HIGHLIGHT_ALPHA : 1) * alpha;
     ctx.strokeStyle = stroke.color;
     ctx.fillStyle = stroke.color;
     ctx.lineWidth = Math.max(stroke.width * scale, 1);
@@ -45,7 +49,7 @@
     const ctx = page.ink.getContext('2d');
     ctx.clearRect(0, 0, page.ink.width, page.ink.height);
     // 휴지통에 있는 강의의 획은 필기에 남아 있지만 보이지 않는다(되돌리면 다시 보인다).
-    (v.body.pages[page.number] || []).filter(stroke => !isHidden(v, stroke)).forEach(stroke => drawStroke(ctx, stroke, page.ink.width));
+    (v.body.pages[page.number] || []).filter(stroke => !isHidden(v, stroke)).forEach(stroke => drawStroke(ctx, stroke, page.ink.width, v.inkAlpha ? v.inkAlpha(stroke) : 1));
   }
 
   // 좌표는 페이지 폭을 1로 둔 값이다. 회전·크기 변화에도 같은 자리에 다시 그려진다.
@@ -57,6 +61,20 @@
 
   function bindInk(v, page) {
     const canDraw = event => event.pointerType === 'pen' || (event.pointerType === 'mouse' && event.button === 0);
+    // 손가락으로 강의 획을 짧게 탭하면 그 획을 쓴 녹음 위치로 간다(§12.2 필기 → 음성 역점프).
+    page.ink.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'touch') v.tap = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, at: event.timeStamp };
+    });
+    page.ink.addEventListener('pointerup', event => {
+      const tap = v.tap;
+      v.tap = null;
+      if (event.pointerType !== 'touch' || tap?.pointerId !== event.pointerId || !v.onStrokeTap) return;
+      if (Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > TAP_TOLERANCE_PX || event.timeStamp - tap.at > TAP_MAX_MS) return;
+      const point = pagePoint(page, event);
+      const hit = [...(v.body.pages[page.number] || [])].reverse().find(stroke => stroke.source_session_id != null && stroke.t_ms != null
+        && !isHidden(v, stroke) && stroke.points.some((current, index) => segmentDistance(point, stroke.points[index - 1] || current, current) <= TAP_RADIUS + stroke.width / 2));
+      if (hit) v.onStrokeTap(hit);
+    });
     page.ink.addEventListener('pointerdown', event => {
       if (!canDraw(event) || v.conflict) return;
       event.preventDefault();
@@ -88,6 +106,8 @@
           source_session_id: v.mode === 'lecture' ? v.session?.id ?? null : null,
           t_ms: v.mode === 'lecture' && v.session ? Recorder().sessionT(v.session, event.timeStamp) : null,
           created_at: Date.now(),
+          // 복습 중 녹음을 들으며 쓴 획은 무엇을 들었는지(원본 Session·위치)를 남긴다. 농도 기준이 아니라 역점프용이다.
+          ...(v.mode === 'review' && v.reviewAnchor?.() ? { review_anchor_session_id: v.reviewAnchor().sessionId, review_anchor_t_ms: v.reviewAnchor().t } : {}),
         },
       };
       v.stroke.target = target;

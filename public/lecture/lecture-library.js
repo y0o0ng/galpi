@@ -443,11 +443,12 @@
         session.documents.forEach(doc => {
           const chip = el('button', 'lecture-chip', doc.title);
           chip.type = 'button';
-          chip.addEventListener('click', event => { event.stopPropagation(); openViewer(doc.id); });
+          // 강의에서 자료로 들어가면 그 강의의 첫 구간으로 재생 위치를 맞춘다(§12.2 강의 진입).
+          chip.addEventListener('click', event => { event.stopPropagation(); openViewer(doc.id, { playSession: session.id }); });
           chips.append(chip);
         });
         card.append(chips);
-        card.addEventListener('click', () => openViewer(session.documents[0].id));
+        card.addEventListener('click', () => openViewer(session.documents[0].id, { playSession: session.id }));
         card.setAttribute('role', 'button');
         card.tabIndex = 0;
       }
