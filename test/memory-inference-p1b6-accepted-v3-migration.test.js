@@ -47,3 +47,39 @@ test('both packets: 12 sorted opaque rows with one TARGET and no leaked metadata
   }
   assert.deepEqual(Object.keys(builder.buildReviewPacket(a).rows[0]), ['reviewRowId', 'selectedBundle']);
 });
+
+const os = require('node:os');
+const receipt = JSON.parse(read(builder.RECEIPT_FILE));
+const RAW = ['p1b6-mig-source-audit-results.json', 'p1b6-mig-v3-review-results.json'].map(file => path.join(os.homedir(), file));
+
+test('committed migration receipt: 12 audit PASS, 6 clean, 2 mandatory, 5 calibration, 4 HELD ineligible', () => {
+  assert.deepEqual(receipt.summary, { total: 12, auditPass: 12, cleanAgreements: 6, mandatoryHuman: 2, calibration: 5, heldIneligible: 4 });
+  const by = Object.fromEntries(receipt.rows.map(row => [row.itemId, [row.route, row.eligibility, row.human]]));
+  assert.deepEqual(by['p1b6-item-b001-015'], ['DECISION_DISAGREEMENT', 'PENDING_MANDATORY_HUMAN', 'mandatory']);
+  assert.deepEqual(by['p1b6-item-b002-063'], ['CLEAN_AGREEMENT', 'PROVISIONAL', null]);
+  assert.deepEqual(by['p1b6-item-b001-020'], ['DECISION_DISAGREEMENT', 'INELIGIBLE', null]);
+  assert.equal(receipt.rows.some(row => row.splitAssignment === 'FINAL_HELD_OUT' && row.human), false);
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
+
+test('the receipt equals the reconciled raw result bytes when they are supplied', { skip: !RAW.every(file => fs.existsSync(file)) }, () => {
+  assert.deepEqual(builder.reconcile(...RAW.map(file => fs.readFileSync(file)), a), receipt);
+});
+
+test('HUMAN packet: 7 sorted opaque rows, bundles equal the strong-model packet, no HELD, no leaks', () => {
+  assert.equal(sha256RawBytes(read(builder.HUMAN_PROTOCOL.fixture)), builder.HUMAN_PROTOCOL.rawSha256);
+  const packet = builder.buildHumanPacket(receipt, a);
+  const ids = packet.rows.map(row => row.reviewRowId);
+  assert.equal(ids.length, 7);
+  assert.deepEqual(ids, ids.toSorted());
+  const members = receipt.rows.filter(row => row.human).map(row => row.itemId);
+  assert.deepEqual(members.map(builder.humanRowId).toSorted(), ids);
+  const strong = new Map(builder.buildReviewPacket(a).rows.map(row => [row.reviewRowId, row.selectedBundle]));
+  for (const itemId of members) {
+    assert.equal(packet.rows.find(row => row.reviewRowId === builder.humanRowId(itemId)).selectedBundle, strong.get(builder.reviewRowId(itemId)));
+  }
+  const text = JSON.stringify(packet.rows);
+  for (const value of ['p1b6-item-', 'p1b6-sk-', 'CLEAR', 'ESCALATE', 'TRAIN', 'DEV', 'mandatory', 'calibration']) {
+    assert.equal(text.includes(value), false, value);
+  }
+});

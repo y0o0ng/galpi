@@ -148,6 +148,115 @@ function buildReviewPacket(a) {
   };
 }
 
+const RECEIPT_FILE = 'local-memory-inference-p1b6-accepted-v3-migration-review-attempt-001.json';
+const HUMAN_PACKET_IDENTITY = 'xion-local-memory-inference-p1b6-accepted-v3-migration-human-review-packet-v1';
+const HUMAN_ID_NAMESPACE = 'p1b6-mig-hreview';
+const HUMAN_PROTOCOL = Object.freeze({
+  identity: 'xion-local-memory-inference-p1b6-accepted-v3-migration-human-review-protocol-v1',
+  rawSha256: '68b4f39d78fecc81f69c4c710a6002f740c8931bed9369e556d83435dd83db9b',
+  fixture: 'local-memory-inference-p1b6-accepted-v3-migration-human-review-protocol.json',
+});
+
+function parseResults(rawBytes, key, known, validRow) {
+  const parsed = JSON.parse(Buffer.from(rawBytes).toString('utf8'));
+  if (!parsed || JSON.stringify(Object.keys(parsed)) !== '["results"]' || !Array.isArray(parsed.results)) {
+    fail('result artifact must be an object whose only key is results');
+  }
+  if (JSON.stringify(parsed.results.map(row => row?.[key]).toSorted()) !== JSON.stringify([...known].toSorted())) {
+    fail(`${key} result rows are not exactly the packet rows`);
+  }
+  for (const row of parsed.results) if (!validRow(row)) fail(`result row is malformed: ${row[key]}`);
+  return new Map(parsed.results.map(row => [row[key], row]));
+}
+
+// Applies the plan's preregistered routing to the fresh audit and v3 review results.
+function reconcile(auditBytes, reviewBytes, a = verifySources(loadSources())) {
+  const { rows } = derivePopulation(a);
+  const audits = parseResults(auditBytes, 'auditRowId', rows.map(({ item }) => auditRowId(item.itemId)), row =>
+    JSON.stringify(Object.keys(row).toSorted()) === '["auditRowId","disposition","reason"]'
+    && ['PASS', 'FAIL', 'UNCERTAIN'].includes(row.disposition) && typeof row.reason === 'string' && row.reason.trim() !== '');
+  const reviews = parseResults(reviewBytes, 'reviewRowId', rows.map(({ item }) => reviewRowId(item.itemId)), row =>
+    JSON.stringify(Object.keys(row).toSorted()) === '["decision","disposition","reason","reviewRowId"]'
+    && typeof row.reason === 'string' && row.reason.trim() !== ''
+    && (row.disposition === 'KEEP' ? ['CLEAR', 'ESCALATE'].includes(row.decision)
+      : ['FIX', 'REJECT'].includes(row.disposition) && row.decision === null));
+  const routed = rows.map(({ row, v3Label }) => {
+    const auditRow = audits.get(auditRowId(row.itemId));
+    const review = reviews.get(reviewRowId(row.itemId));
+    const held = row.splitAssignment === 'FINAL_HELD_OUT';
+    let route;
+    if (auditRow.disposition !== 'PASS') route = 'EXCLUDED_AUDIT';
+    else if (review.disposition !== 'KEEP') route = review.disposition;
+    else route = review.decision === v3Label ? 'CLEAN_AGREEMENT' : 'DECISION_DISAGREEMENT';
+    const clean = route === 'CLEAN_AGREEMENT';
+    return {
+      itemId: row.itemId,
+      semanticSkeletonId: row.semanticSkeletonId,
+      splitAssignment: row.splitAssignment,
+      v3Reference: v3Label,
+      auditDisposition: auditRow.disposition,
+      auditReason: auditRow.reason,
+      reviewDisposition: review.disposition,
+      reviewDecision: review.decision,
+      reviewReason: review.reason,
+      route,
+      ...(clean ? { provenance: 'CATALOG_STRONG_MODEL_CONFIRMED', eligibility: 'PROVISIONAL', human: held ? null : 'calibration' }
+        : route === 'EXCLUDED_AUDIT' || held ? { provenance: null, eligibility: 'INELIGIBLE', human: null }
+          : { provenance: null, eligibility: 'PENDING_MANDATORY_HUMAN', human: 'mandatory' }),
+    };
+  });
+  return {
+    name: 'xion-local-memory-inference-p1b6-accepted-v3-migration-review-attempt-001-receipt-v1',
+    status: 'COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3',
+    plan: { identity: PLAN_IDENTITY, rawSha256: sha256RawBytes(artifactBytes(buildPlan(a))) },
+    auditPacketSha256: sha256RawBytes(artifactBytes(buildAuditPacket(a))),
+    reviewPacketSha256: sha256RawBytes(artifactBytes(buildReviewPacket(a))),
+    rawResultArtifacts: {
+      sourceAudit: { filename: 'p1b6-mig-source-audit-results.json', sha256: sha256RawBytes(auditBytes), committed: false },
+      v3Review: { filename: 'p1b6-mig-v3-review-results.json', sha256: sha256RawBytes(reviewBytes), committed: false },
+    },
+    executionProvenance: {
+      evidenceBasis: 'REPORTED_BY_REPOSITORY_OWNER',
+      reportedModel: 'Claude Opus 5.5',
+      session: 'two fresh Claude Code CLI sessions started in the home directory, one per packet, each given only its protocol and packet paths',
+    },
+    summary: {
+      total: routed.length,
+      auditPass: routed.filter(row => row.auditDisposition === 'PASS').length,
+      cleanAgreements: routed.filter(row => row.route === 'CLEAN_AGREEMENT').length,
+      mandatoryHuman: routed.filter(row => row.human === 'mandatory').length,
+      calibration: routed.filter(row => row.human === 'calibration').length,
+      heldIneligible: routed.filter(row => row.splitAssignment === 'FINAL_HELD_OUT' && row.eligibility === 'INELIGIBLE').length,
+    },
+    rows: routed,
+    authority: {
+      humanReviewPerformed: false, historicalRecordsRewritten: false, acceptancePerformed: false,
+      referenceLabelFreezePerformed: false, finalSelectionPerformed: false, trainingOrEvaluationOccurred: false,
+    },
+  };
+}
+
+const humanRowId = itemId => idFor(HUMAN_ID_NAMESPACE, HUMAN_PROTOCOL.identity, itemId);
+
+// Mandatory and calibration rows of the committed receipt, one blind packet; bundles must equal
+// the strong-model packet's.
+function buildHumanPacket(receipt, a = verifySources(loadSources())) {
+  const { rows } = derivePopulation(a);
+  const members = new Set(receipt.rows.filter(row => row.human).map(row => row.itemId));
+  const strong = new Map(buildReviewPacket(a).rows.map(row => [row.reviewRowId, row.selectedBundle]));
+  return {
+    name: HUMAN_PACKET_IDENTITY,
+    status: 'BLIND_HUMAN_REVIEW_PACKET_NOT_RUN',
+    reviewProtocol: { identity: HUMAN_PROTOCOL.identity, rawSha256: HUMAN_PROTOCOL.rawSha256 },
+    rendererIdentity: RENDERER_IDENTITY,
+    rows: rows.filter(({ item }) => members.has(item.itemId)).map(({ artifact, item }) => {
+      const selectedBundle = renderCandidateBundle(artifact, item);
+      if (selectedBundle !== strong.get(reviewRowId(item.itemId))) fail(`bundle differs from the strong-model packet: ${item.itemId}`);
+      return { reviewRowId: humanRowId(item.itemId), selectedBundle };
+    }).sort((left, right) => (left.reviewRowId < right.reviewRowId ? -1 : 1)),
+  };
+}
+
 const artifactBytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8');
 
 function main(argv = process.argv.slice(2)) {
@@ -157,8 +266,22 @@ function main(argv = process.argv.slice(2)) {
     process.stdout.write(`Wrote fixtures/${PLAN_FILE}\n`);
     return 0;
   }
-  const build = { '--audit-packet': buildAuditPacket, '--review-packet': buildReviewPacket }[argv[0]];
-  if (argv.length !== 2 || !build) throw new Error('Usage: [--audit-packet <out> | --review-packet <out>]');
+  if (argv.length === 4 && argv[0] === '--audit-results' && argv[2] === '--review-results') {
+    const output = path.join(ROOT, 'fixtures', RECEIPT_FILE);
+    if (fs.existsSync(output)) throw new Error(`Existing output will not be overwritten: ${output}`);
+    const receipt = reconcile(fs.readFileSync(argv[1]), fs.readFileSync(argv[3]), a);
+    fs.writeFileSync(output, artifactBytes(receipt), { flag: 'wx' });
+    process.stdout.write(`Reconciled: ${JSON.stringify(receipt.summary)} -> fixtures/${RECEIPT_FILE}
+`);
+    return 0;
+  }
+  const humanPacket = () => {
+    const bytes = fs.readFileSync(path.join(ROOT, 'fixtures', HUMAN_PROTOCOL.fixture));
+    if (sha256RawBytes(bytes) !== HUMAN_PROTOCOL.rawSha256) fail('HUMAN protocol bytes are not the pinned artifact');
+    return buildHumanPacket(JSON.parse(fs.readFileSync(path.join(ROOT, 'fixtures', RECEIPT_FILE))), a);
+  };
+  const build = { '--audit-packet': buildAuditPacket, '--review-packet': buildReviewPacket, '--human-packet': humanPacket }[argv[0]];
+  if (argv.length !== 2 || !build) throw new Error('Usage: [--audit-packet <out> | --review-packet <out> | --human-packet <out> | --audit-results <raw> --review-results <raw>]');
   if (fs.existsSync(argv[1])) throw new Error(`Existing output will not be overwritten: ${argv[1]}`);
   const bytes = artifactBytes(build(a));
   fs.writeFileSync(argv[1], bytes, { flag: 'wx' });
@@ -167,8 +290,8 @@ function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
-  PLAN_FILE, SOURCES, artifactBytes, auditRowId, buildAuditPacket, buildPlan, buildReviewPacket,
-  derivePopulation, loadSources, main, reviewRowId, verifySources,
+  HUMAN_PROTOCOL, PLAN_FILE, RECEIPT_FILE, SOURCES, artifactBytes, auditRowId, buildAuditPacket, buildHumanPacket,
+  buildPlan, buildReviewPacket, derivePopulation, humanRowId, loadSources, main, reconcile, reviewRowId, verifySources,
 };
 
 if (require.main === module) process.exit(main());

@@ -5417,3 +5417,15 @@ selection; the accepted pool record stays **93**.
 | v3 review packet (not committed) | 12 rows, `p1b6-mig-v3smreview`, raw SHA `0f3995903af65bf42822289bc7508ba1bfbb663917737a93deca10b07ba9a38e` |
 
 Historical acceptance and HUMAN gold unchanged. Nothing has run; the accepted pool record stays **93**.
+
+#### P1-B6 accepted-row v3 migration review attempt-001 — audit 12/12 PASS; v3 6 clean / 6 disagreement; HUMAN packet BUILT
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-accepted-v3-migration-review-attempt-001.json` | receipt, `04bee65d…`; raw `735280c416a28136826f8080d09fb06623b0bc7e3a6c428a210da3ad1823e8e1` (audit), `e19f7f3b68981a2b0a062429c769f655e97ffcfb70207a1c7ac4bafc7fc2807e` (v3), not committed |
+| `fixtures/local-memory-inference-p1b6-accepted-v3-migration-human-review-protocol.json` | HUMAN protocol, `68b4f39d78fecc81f69c4c710a6002f740c8931bed9369e556d83435dd83db9b` |
+| HUMAN packet (not committed) | 7 rows (2 mandatory + 5 calibration), raw SHA `4587d5ba785dd57fd9a37769089ce8d5a4af816a44d08ff909eb6a5e547df752` |
+
+Claude Opus 5.5 (owner-reported), two fresh sessions. HELD `b001-020`, `-024`, `b002-059`, `-061`
+`INELIGIBLE`; HELD `b002-063` `PROVISIONAL`. No HUMAN review or acceptance; the accepted pool
+record stays **93**.

@@ -58,8 +58,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 - **accepted-row v3 migration (owner, 2026-10-01)** (see "Accepted-row v3 migration"): the 6
   accepted-on-retired rows stay permanently out; the 12 accepted rows whose HUMAN gold
   (ESCALATE) differs from v3 (CLEAR) are re-reviewed under v3 — fresh source audit and blind v3
-  strong-model review for all 12, HUMAN for TRAIN / DEV only. Plan and blind packets are built;
-  nothing has run.
+  strong-model review for all 12, HUMAN for TRAIN / DEV only. Source audit **12/12 PASS**; v3
+  review **6 clean / 6 disagreement**; 4 HELD rows `INELIGIBLE`; the 7-row HUMAN packet is built,
+  not run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2282,7 +2283,27 @@ calibration; non-clean TRAIN / DEV rows get mandatory HUMAN (matching KEEP → `
 / `ELIGIBLE`, else `INELIGIBLE`). HELD rows get **no HUMAN review**, because repeated HELD review
 stays unopened: a clean agreement becomes `PROVISIONAL` with the v3 label (the post-selection
 independent second strong-model review still applies); anything else is `INELIGIBLE`. A later
-ledger version applies the outcome and re-measures the shortage. Nothing has run.
+ledger version applies the outcome and re-measures the shortage.
+
+**Migration review attempt-001 — audit 12/12 PASS; v3 review 6 clean / 6 disagreement.** Two
+fresh Claude Code CLI sessions in the home directory, Claude Opus 5.5 (owner-reported), one per
+packet. `--audit-results <raw> --review-results <raw>` on the same builder writes
+`fixtures/local-memory-inference-p1b6-accepted-v3-migration-review-attempt-001.json`, bound to the
+plan, both packets and both raw result files (`735280c4…`, `e19f7f3b…`, not committed). Every
+disagreement is the model's ESCALATE against v3 CLEAR, the same direction as the historical gold.
+Routing as preregistered: TRAIN `b002-025`, `-030`, `-035`, `-040` and DEV `b002-051` clean →
+`PROVISIONAL` with the v3 label, HUMAN calibration; DEV `b001-015`, `-031` → mandatory HUMAN;
+HELD `b002-063` clean → `PROVISIONAL`; HELD `b001-020`, `-024`, `b002-059`, `-061` →
+`INELIGIBLE` with no HUMAN step. The HELD losses create per-skeleton HELD shortfalls
+(`2fa39ece` 2, `a19bb9e9` 1, `869c7127` 1) that a later top-up must author.
+
+**Migration HUMAN review — preregistered and built, not run.** Protocol
+`fixtures/local-memory-inference-p1b6-accepted-v3-migration-human-review-protocol.json`
+(`68b4f39d…`): semantic contract v3 and the KEEP / FIX / REJECT contract, 2 mandatory + 5
+calibration, no HELD row. **Not independent:** the owner made the historical HUMAN judgments on
+these surfaces, chose the migration and has seen the review summary; the historical judgments are
+not reused as answers. `--human-packet <out>` builds the 7-row packet (`p1b6-mig-hreview`,
+`4587d5ba…`, not committed) from the receipt, with bundles equal to the strong-model packet's.
 
 ## Closed Selection and Freeze Constraints
 
