@@ -282,6 +282,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 27, name: 'independent_ddays' },
     { version: 28, name: 'lecture_notes_capture' },
     { version: 29, name: 'memory_evidence_refs' },
+    { version: 30, name: 'lecture_sessions_capture' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -982,7 +983,7 @@ test('schema v21 widens the provider check without cutting the children loose', 
 test('schema v29 adds the narrow EvidenceRef address registry from v28', () => {
   const db = createLegacyDatabase();
   migrateThrough(db, 28);
-  assert.deepEqual(runDatabaseMigrations(db).applied,
+  assert.deepEqual(runDatabaseMigrations(db).applied.slice(0, 1),
     [{ version: 29, name: 'memory_evidence_refs' }]);
   assert.deepEqual(runDatabaseMigrations(db).applied, []);
   const insert = db.prepare(`

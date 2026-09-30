@@ -39,6 +39,8 @@
   const ICON_PLUS = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   const ICON_SEARCH = '<svg viewBox="0 0 16 16" width="16" height="16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   const ICON_ERASER = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 15.5 13.5 6l5 5L9 20.5H5.5L4 19z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 10.5 14 15.5M9 20.5h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  const ICON_MIC = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const ICON_RECORDING = '<svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="5.5" fill="currentColor"/></svg>';
   const penIcon = color => `<svg viewBox="0 0 40 16" width="40" height="16"><path d="M0 3h24v10H0z" fill="#FAFBF9" stroke="#1D2622" stroke-width="1"/><path d="M0 3h9v10H0z" fill="${color}"/><path d="M24 3l12 5-12 5z" fill="${color}" stroke="#1D2622" stroke-width="1" stroke-linejoin="round"/></svg>`;
 
   async function api(url, options) {
@@ -61,6 +63,14 @@
   }
   const kindLabel = kind => (kind === 'pdf' ? 'PDF' : '백지 노트');
 
+  const Recorder = () => global.LectureRecorder;
+  function clock(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const hours = Math.floor(seconds / 3600);
+    const pad = value => String(value).padStart(2, '0');
+    return hours ? `${hours}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}` : `${Math.floor(seconds / 60)}:${pad(seconds % 60)}`;
+  }
+
   function toast(message) {
     const node = el('div', 'lecture-toast', message);
     document.body.append(node);
@@ -70,6 +80,7 @@
   // ─── Notes 홈 ──────────────────────────────────────────────────────────────
 
   async function show() {
+    Recorder().resume();
     if (viewer) return;
     if (state.container) return openContainer(state.container.id);
     try {
@@ -265,16 +276,7 @@
 
   // ─── 기기 작업본(IndexedDB) ─────────────────────────────────────────────────
 
-  let dbPromise = null;
-  function draftStore(mode) {
-    dbPromise ||= new Promise((resolve, reject) => {
-      const request = indexedDB.open('galpi-lecture', 1);
-      request.onupgradeneeded = () => request.result.createObjectStore('drafts', { keyPath: 'documentId' });
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    return dbPromise.then(db => db.transaction('drafts', mode).objectStore('drafts'));
-  }
+  const draftStore = async mode => (await global.LectureRecorder.openDb()).transaction('drafts', mode).objectStore('drafts');
   const idb = request => new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -315,6 +317,7 @@
     v.el = buildViewerShell(v);
     document.body.append(v.el);
     document.body.classList.add('lecture-viewer-open');
+    renderLive();
     try {
       const [{ document: doc, container }, server, draft] = await Promise.all([
         api(`/api/lecture/documents/${documentId}`),
@@ -361,6 +364,17 @@
     }
     if (viewer !== v) return;
     buildPages(v);
+    if (v.container?.type === 'course') {
+      v.session = await Recorder().todaySession(v.container.id).catch(() => null);
+      if (viewer !== v) return;
+      if (v.session) logDocumentOpen(v);
+      v.unsubscribe = Recorder().subscribe(() => onRecorderChange(v));
+      v.ticker = setInterval(() => {
+        const time = v.mic.querySelector('.lecture-mic-time');
+        if (time && Recorder().state.status === 'recording' && Recorder().state.containerId === v.container.id) time.textContent = clock(Recorder().elapsedMs());
+      }, 1000);
+      renderMic(v);
+    }
     renderStatus(v);
     v.interval = setInterval(() => upload(v), UPLOAD_INTERVAL_MS);
     if (v.dirty && !v.conflict) scheduleUpload(v);
@@ -377,7 +391,10 @@
     v.title = el('strong', '', '불러오는 중…');
     v.status = el('span', 'lecture-meta', '');
     center.append(v.title, v.status);
-    header.append(v.back, center, el('span'));
+    v.mic = el('div', 'lecture-mic-slot');
+    header.append(v.back, center, v.mic);
+    v.alert = el('div', 'lecture-alert');
+    v.alert.hidden = true;
 
     v.banner = el('div', 'lecture-conflict');
     v.banner.hidden = true;
@@ -396,7 +413,7 @@
 
     v.rail = buildRail(v);
     v.indicator = el('div', 'lecture-page-pill', '');
-    shell.append(header, v.banner, v.scroller, v.rail, v.indicator);
+    shell.append(header, v.banner, v.alert, v.scroller, v.rail, v.indicator);
 
     v.onVisibility = () => { if (document.visibilityState === 'hidden') flush(v); };
     document.addEventListener('visibilitychange', v.onVisibility);
@@ -534,6 +551,66 @@
     const middle = v.scroller.getBoundingClientRect().top + v.scroller.clientHeight / 2;
     const current = v.pages.find(page => page.el.getBoundingClientRect().bottom >= middle) || v.pages[v.pages.length - 1];
     v.indicator.textContent = `${current.number} / ${v.pages.length}`;
+    if (v.session && v.lastLoggedPage !== current.number) {
+      v.lastLoggedPage = current.number;
+      Recorder().logEvent(v.session, 'page_change', v.documentId, current.number);
+    }
+  }
+
+  function currentPage(v) {
+    return Number(v.indicator.textContent.split(' / ')[0]) || 1;
+  }
+
+  function logDocumentOpen(v) {
+    v.lastLoggedPage = currentPage(v);
+    Recorder().logEvent(v.session, 'document_open', v.documentId, v.lastLoggedPage);
+  }
+
+  // ─── 녹음(L1b) ────────────────────────────────────────────────────────────
+
+  function onRecorderChange(v) {
+    const recorder = Recorder().state;
+    // 이 뷰어에서 첫 녹음을 시작하면 그때 생긴 Session을 붙이고 자료 열기를 남긴다.
+    if (!v.session && recorder.session?.containerId === v.container.id) {
+      v.session = recorder.session;
+      logDocumentOpen(v);
+    }
+    renderMic(v);
+    renderStatus(v);
+  }
+
+  function renderMic(v) {
+    const recorder = Recorder().state;
+    const elsewhere = ['starting', 'recording'].includes(recorder.status) && recorder.containerId !== v.container.id;
+    const mine = recorder.containerId === v.container.id;
+    const status = mine ? recorder.status : 'idle';
+    const button = el('button', `lecture-mic is-${status}`);
+    button.type = 'button';
+    button.disabled = elsewhere || status === 'starting';
+    const label = { idle: '녹음 시작', paused: '이어 녹음', interrupted: '이어 녹음', starting: '녹음 시작 확인 중', recording: '일시정지' }[status];
+    button.setAttribute('aria-label', elsewhere ? `${recorder.containerName} 녹음 중` : label);
+    button.append(svg(status === 'recording' ? ICON_RECORDING : ICON_MIC));
+    const recorded = mine ? Recorder().elapsedMs() : (v.session?.recordedMs || 0);
+    const time = el('span', 'lecture-mic-time', status === 'starting' ? '확인 중' : (recorded || status === 'recording' ? clock(recorded) : ''));
+    button.append(time);
+    button.addEventListener('click', async () => {
+      if (status === 'recording') return Recorder().pause();
+      try { await Recorder().start(v.container); } catch (error) { toast(error.message); }
+    });
+    v.mic.replaceChildren(button);
+
+    v.alert.hidden = !(mine && recorder.status === 'interrupted');
+    if (!v.alert.hidden) {
+      const resume = el('button', 'lecture-pill');
+      resume.type = 'button';
+      resume.append(svg(ICON_PLUS), document.createTextNode('이어 녹음하기'));
+      resume.addEventListener('click', async () => {
+        try { await Recorder().start(v.container); } catch (error) { toast(error.message); }
+      });
+      const text = el('div');
+      text.append(el('strong', '', '녹음이 중단됐어'), el('span', 'lecture-meta', `${clock(recorder.interruptedAtMs || 0)}까지 저장됨 · 그 뒤는 빈 구간으로 남아`));
+      v.alert.replaceChildren(el('span', 'lecture-alert-dot'), text, resume);
+    }
   }
 
   async function addBlankPage(v) {
@@ -606,9 +683,10 @@
           color: pen.color,
           width: pen.width,
           points: [pagePoint(page, event)],
-          // L1b에서 녹음 Session이 생기면 여기에 source_session_id와 t_ms가 들어간다(§8.2).
-          source_session_id: null,
-          t_ms: null,
+          // 오늘 이 과목 Session이 있으면 강의 필기다. 녹음이 멈춘 동안의 획도 Session 시각은 갖되
+          // 오디오 위치는 recording_span 밖이라 없다(§8.2). `강의·복습` 토글은 아직 없다.
+          source_session_id: v.session?.id ?? null,
+          t_ms: v.session ? Recorder().sessionT(v.session, event.timeStamp) : null,
           created_at: Date.now(),
         },
       };
@@ -747,7 +825,8 @@
     else if (v.uploading) status = '저장 중…';
     else if (v.offline && v.dirty) status = '오프라인 · 기기에 보관 중';
     else if (v.dirty) status = '기기에 저장됨';
-    v.status.textContent = `${pages} · ${status}`;
+    const audio = { pending: '녹음 기기에 보관 중', uploading: '녹음 올리는 중…', failed: '녹음 전송 실패 · 기기에 보관 중' }[Recorder().state.upload];
+    v.status.textContent = [pages, status, audio].filter(Boolean).join(' · ');
     renderConflict(v);
   }
 
@@ -784,6 +863,8 @@
     viewer = null;
     flush(v);
     clearInterval(v.interval);
+    clearInterval(v.ticker);
+    v.unsubscribe?.();
     clearTimeout(v.uploadTimer);
     v.observer?.disconnect();
     v.pdf?.destroy();
@@ -791,7 +872,36 @@
     v.resizeObserver.disconnect();
     v.el.remove();
     document.body.classList.remove('lecture-viewer-open');
+    renderLive();
     if (state.container) openContainer(state.container.id);
+  }
+
+  // 뷰어 밖(폴더·다른 탭)에서도 녹음 상태를 보이고 멈출 수 있게 한다. 모르는 채 녹음이 이어지면 안 된다.
+  function renderLive() {
+    const recorder = Recorder().state;
+    let live = document.getElementById('lecture-live');
+    const visible = !viewer && ['starting', 'recording', 'interrupted'].includes(recorder.status);
+    if (!visible) { live?.remove(); return; }
+    if (!live) {
+      live = el('button', 'lecture-live');
+      live.id = 'lecture-live';
+      live.type = 'button';
+      live.addEventListener('click', async () => {
+        const current = Recorder().state;
+        if (current.status === 'recording') return Recorder().pause();
+        if (current.status === 'interrupted') {
+          try { await Recorder().start({ id: current.containerId, name: current.containerName }); } catch (error) { toast(error.message); }
+        }
+      });
+      document.body.append(live);
+    }
+    live.className = `lecture-live is-${recorder.status}`;
+    const text = { starting: '녹음 시작 확인 중', recording: `녹음 중 · ${recorder.containerName} · ${clock(Recorder().elapsedMs())} · 눌러서 일시정지`, interrupted: `녹음이 중단됐어 · ${recorder.containerName} · 눌러서 이어 녹음` }[recorder.status];
+    live.replaceChildren(el('span', 'lecture-alert-dot'), document.createTextNode(text));
+  }
+  if (global.LectureRecorder) {
+    global.LectureRecorder.subscribe(renderLive);
+    setInterval(() => { if (Recorder().state.status === 'recording') renderLive(); }, 1000);
   }
 
   global.LectureNotes = { show };

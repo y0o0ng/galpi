@@ -13,7 +13,7 @@ const { registerLectureRoutes, isLectureAnnotationPut } = require('../lib/lectur
 test('lecture containers, documents and revision-checked annotations', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  migrations.find(item => item.version === 28).up(db);
+  [28, 30].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json({ limit: '40mb' }));
   registerLectureRoutes({ app, db, dataDir });
@@ -81,4 +81,56 @@ test('only the annotation PUT skips the global 1MB JSON parser', () => {
   assert.equal(isLectureAnnotationPut({ method: 'PUT', path: '/api/lecture/documents/3/annotations' }), true);
   assert.equal(isLectureAnnotationPut({ method: 'GET', path: '/api/lecture/documents/3/annotations' }), false);
   assert.equal(isLectureAnnotationPut({ method: 'PUT', path: '/api/lecture/containers/3' }), false);
+});
+
+test('lecture sessions append by date, store audio parts idempotently and dedupe events', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
+  const db = new Database(':memory:');
+  [28, 30].forEach(version => migrations.find(item => item.version === version).up(db));
+  const app = express();
+  app.use(express.json());
+  registerLectureRoutes({ app, db, dataDir });
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}/api/lecture`;
+  const call = async (method, url, body, headers = { 'content-type': 'application/json' }) => {
+    const res = await fetch(base + url, { method, headers, body: Buffer.isBuffer(body) ? body : body && JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  try {
+    const course = (await call('POST', '/containers', { type: 'course', name: '동역학' })).body.container;
+    const general = (await call('POST', '/containers', { type: 'general', name: '개인' })).body.container;
+    const doc = (await call('POST', `/containers/${course.id}/blank`, {})).body.document;
+    assert.equal((await call('POST', `/containers/${general.id}/sessions`, { localDate: '2026-09-30', startedAtMs: 1 })).status, 400);
+
+    const first = (await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-09-30', startedAtMs: 1000 })).body.session;
+    const again = (await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-09-30', startedAtMs: 9000 })).body.session;
+    assert.equal(again.id, first.id);
+    assert.equal(again.startedAtMs, 1000);
+    const nextDay = (await call('POST', `/containers/${course.id}/sessions`, { localDate: '2026-10-01', startedAtMs: 2000 })).body.session;
+    assert.notEqual(nextDay.id, first.id);
+
+    const audio = Buffer.from('fake-mp4-bytes');
+    const partUrl = `/sessions/${first.id}/parts/part_aaaaaaaa?runtime=rt_bbbbbbbb&start=100&end=60100&status=paused`;
+    const audioHeaders = { 'content-type': 'audio/mp4' };
+    const stored = await call('PUT', partUrl, audio, audioHeaders);
+    assert.equal(stored.status, 201);
+    assert.equal(stored.body.sha256, require('node:crypto').createHash('sha256').update(audio).digest('hex'));
+    assert.equal((await call('PUT', partUrl, audio, audioHeaders)).body.duplicate, true);
+    assert.equal((await call('PUT', partUrl, Buffer.from('other'), audioHeaders)).status, 409);
+    assert.equal((await call('PUT', partUrl, audio, { 'content-type': 'text/plain' })).status, 415);
+    assert.equal((await call('PUT', partUrl.replace('end=60100', 'end=50'), audio, audioHeaders)).status, 400);
+    assert.deepEqual(fs.readFileSync(path.join(dataDir, 'lecture', 'audio', String(first.id), 'part_aaaaaaaa.m4a')), audio);
+
+    const sessions = (await call('GET', `/containers/${course.id}/sessions`)).body.sessions;
+    assert.deepEqual(sessions.map(item => [item.localDate, item.partCount, item.recordedMs]), [['2026-10-01', 0, 0], ['2026-09-30', 1, 60000]]);
+
+    const event = { key: 'ev_cccccccc', type: 'page_change', runtimeId: 'rt_bbbbbbbb', t: 5000, documentId: doc.id, page: 2 };
+    assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [event, { ...event, key: 'ev_dddddddd', type: 'document_open', page: null }] })).body.inserted, 2);
+    assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [event] })).body.inserted, 0);
+    assert.equal((await call('POST', `/sessions/${first.id}/events`, { events: [{ ...event, key: 'ev_eeeeeeee', documentId: 999 }] })).status, 400);
+  } finally {
+    server.close();
+    db.close();
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
 });
