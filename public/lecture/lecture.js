@@ -6,12 +6,11 @@
 (function (global) {
   const PDFJS_BASE = '/lib/pdfjs/';
   const BLANK_ASPECT = Math.SQRT2;
-  const PENS = [
-    { color: '#1D2622', width: 0.0024 },
-    { color: '#3B6FD8', width: 0.0024 },
-    { color: '#D8453B', width: 0.0024 },
-  ];
+  // 지우개 크기 1.0의 반경(페이지 폭 비율). 확대해도 화면에서 같은 크기로 닿게 배율로 나눈다.
   const ERASER_RADIUS = 0.012;
+  const MAX_ZOOM = 3;
+  // iPad Safari 캔버스 면적 한도(16,777,216)보다 조금 아래. 넘으면 해상도를 낮춰 그린다.
+  const MAX_CANVAS_PIXELS = 16000000;
   const UPLOAD_DELAY_MS = 2000;
   const UPLOAD_INTERVAL_MS = 20000;
 
@@ -38,10 +37,8 @@
   const ICON_BACK = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const ICON_PLUS = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   const ICON_SEARCH = '<svg viewBox="0 0 16 16" width="16" height="16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
-  const ICON_ERASER = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 15.5 13.5 6l5 5L9 20.5H5.5L4 19z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 10.5 14 15.5M9 20.5h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
   const ICON_MIC = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   const ICON_RECORDING = '<svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="5.5" fill="currentColor"/></svg>';
-  const penIcon = color => `<svg viewBox="0 0 40 16" width="40" height="16"><path d="M0 3h24v10H0z" fill="#FAFBF9" stroke="#1D2622" stroke-width="1"/><path d="M0 3h9v10H0z" fill="${color}"/><path d="M24 3l12 5-12 5z" fill="${color}" stroke="#1D2622" stroke-width="1" stroke-linejoin="round"/></svg>`;
 
   async function api(url, options) {
     const res = await global.apiFetch(url, options);
@@ -310,7 +307,7 @@
       documentId, doc: null, container: null, pdf: null, sizes: [], pages: [],
       body: { pages: {} }, baseRevision: 0, dirty: false, changeSeq: 0,
       uploading: false, conflict: null, offline: false,
-      tool: { type: 'pen', pen: 0 }, stroke: null, erasing: false,
+      zoom: 1, stroke: null, erasing: false,
       uploadTimer: null, draftTimer: null, interval: null,
     };
     viewer = v;
@@ -410,13 +407,18 @@
     // Pencil은 그리고 손가락은 스크롤한다. Safari는 stylus 터치도 스크롤로 먹으므로 그것만 막는다.
     v.scroller.addEventListener('touchstart', event => {
       if ([...event.touches].some(touch => touch.touchType === 'stylus')) event.preventDefault();
+      else if (event.touches.length === 2) startPinch(v, event);
     }, { passive: false });
     v.scroller.addEventListener('touchmove', event => {
       if ([...event.touches].some(touch => touch.touchType === 'stylus')) event.preventDefault();
+      else if (v.pinch && event.touches.length === 2) { event.preventDefault(); movePinch(v, event); }
     }, { passive: false });
+    v.scroller.addEventListener('touchend', event => { if (v.pinch && event.touches.length < 2) endPinch(v); });
+    v.scroller.addEventListener('touchcancel', () => { if (v.pinch) endPinch(v); });
     v.scroller.addEventListener('scroll', () => requestAnimationFrame(() => updatePageIndicator(v)), { passive: true });
 
-    v.rail = buildRail(v);
+    v.pens = global.LecturePens.buildRail({ toast });
+    v.rail = v.pens.el;
     v.indicator = el('div', 'lecture-page-pill', '');
     shell.append(header, v.banner, v.alert, v.scroller, v.rail, v.indicator);
 
@@ -426,36 +428,6 @@
     v.resizeObserver = new ResizeObserver(() => { if (v.pages.length) layoutPages(v); });
     v.resizeObserver.observe(v.scroller);
     return shell;
-  }
-
-  function buildRail(v) {
-    const rail = el('div', 'lecture-rail');
-    rail.setAttribute('role', 'toolbar');
-    rail.setAttribute('aria-label', '필기 도구');
-    const buttons = [];
-    const select = tool => {
-      v.tool = tool;
-      buttons.forEach(({ button, match }) => button.classList.toggle('active', match(tool)));
-    };
-    PENS.forEach((pen, index) => {
-      const button = el('button', 'lecture-rail-pen');
-      button.type = 'button';
-      button.setAttribute('aria-label', `펜 ${index + 1}`);
-      button.append(svg(penIcon(pen.color)));
-      button.addEventListener('click', () => select({ type: 'pen', pen: index }));
-      buttons.push({ button, match: tool => tool.type === 'pen' && tool.pen === index });
-      rail.append(button);
-    });
-    rail.append(el('span', 'lecture-rail-divider'));
-    const eraser = el('button', 'lecture-rail-tool');
-    eraser.type = 'button';
-    eraser.setAttribute('aria-label', '지우개');
-    eraser.append(svg(ICON_ERASER));
-    eraser.addEventListener('click', () => select({ type: 'eraser' }));
-    buttons.push({ button: eraser, match: tool => tool.type === 'eraser' });
-    rail.append(eraser);
-    select(v.tool);
-    return rail;
   }
 
   function buildPages(v) {
@@ -492,11 +464,11 @@
     v.pages.forEach(page => v.observer.observe(page.el));
   }
 
-  function layoutPages(v) {
-    const width = Math.min(v.scroller.clientWidth - 32, 900);
+  function layoutPages(v, keepScroll = false) {
+    const width = Math.round(Math.min(v.scroller.clientWidth - 32, 900) * v.zoom);
     if (width === v.pageWidth) return;
     // 폭이 바뀌면 페이지 높이도 바뀌므로, 보던 페이지와 그 안의 비율 위치를 다시 맞춘다.
-    const anchor = v.pageWidth && v.pages.find(page => page.el.offsetTop + page.el.offsetHeight > v.scroller.scrollTop);
+    const anchor = !keepScroll && v.pageWidth && v.pages.find(page => page.el.offsetTop + page.el.offsetHeight > v.scroller.scrollTop);
     const within = anchor ? (v.scroller.scrollTop - anchor.el.offsetTop) / anchor.el.offsetHeight : 0;
     v.pageWidth = width;
     v.pages.forEach(page => {
@@ -510,7 +482,8 @@
 
   function showPage(v, page) {
     page.visible = true;
-    const dpr = Math.min(global.devicePixelRatio || 1, 2);
+    const cssArea = v.pageWidth * v.pageWidth * page.aspect;
+    const dpr = Math.min(global.devicePixelRatio || 1, 2, Math.sqrt(MAX_CANVAS_PIXELS / cssArea));
     const width = Math.round(v.pageWidth * dpr);
     const height = Math.round(v.pageWidth * page.aspect * dpr);
     if (page.ink.width !== width || page.ink.height !== height) {
@@ -636,6 +609,7 @@
   function drawStroke(ctx, stroke, scale) {
     const points = stroke.points;
     if (!points.length) return;
+    ctx.globalAlpha = stroke.tool === 'highlighter' ? global.LecturePens.HIGHLIGHT_ALPHA : 1;
     ctx.strokeStyle = stroke.color;
     ctx.fillStyle = stroke.color;
     ctx.lineWidth = Math.max(stroke.width * scale, 1);
@@ -645,12 +619,14 @@
       ctx.beginPath();
       ctx.arc(points[0][0] * scale, points[0][1] * scale, ctx.lineWidth / 2, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
       return;
     }
     ctx.beginPath();
     ctx.moveTo(points[0][0] * scale, points[0][1] * scale);
     for (let index = 1; index < points.length; index += 1) ctx.lineTo(points[index][0] * scale, points[index][1] * scale);
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   function drawInk(v, page) {
@@ -673,20 +649,24 @@
       if (!canDraw(event) || v.conflict) return;
       event.preventDefault();
       page.ink.setPointerCapture(event.pointerId);
-      if (v.tool.type === 'eraser') {
-        v.erasing = { page, pointerId: event.pointerId, last: pagePoint(page, event) };
-        eraseAt(v, page, v.erasing.last);
+      v.pens.close();
+      const pen = v.pens.current();
+      if (pen.tool === 'eraser') {
+        v.erasing = { page, pointerId: event.pointerId, last: pagePoint(page, event), radius: ERASER_RADIUS * pen.width / v.zoom };
+        eraseAt(v, page, v.erasing.last, v.erasing.radius);
         return;
       }
-      const pen = PENS[v.tool.pen];
+      // 형광펜은 따로 겹친 캔버스에 불투명하게 그리고 그 캔버스를 반투명으로 보인다. 조각마다 반투명으로
+      // 그리면 이음새가 진해진다. 획이 끝나면 페이지 잉크에 한 경로로 다시 그린다.
+      const target = pen.tool === 'highlighter' ? liveCanvas(page) : page.ink;
       v.stroke = {
         page,
         pointerId: event.pointerId,
         data: {
           id: `s_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-          tool: 'pen',
+          tool: pen.tool,
           color: pen.color,
-          width: pen.width,
+          width: Math.round(pen.width * global.LecturePens.WIDTH_UNIT * 100000) / 100000,
           points: [pagePoint(page, event)],
           // 오늘 이 과목 Session이 있으면 강의 필기다. 녹음이 멈춘 동안의 획도 Session 시각은 갖되
           // 오디오 위치는 recording_span 밖이라 없다(§8.2). `강의·복습` 토글은 아직 없다.
@@ -695,7 +675,8 @@
           created_at: Date.now(),
         },
       };
-      drawStroke(page.ink.getContext('2d'), v.stroke.data, page.ink.width);
+      v.stroke.target = target;
+      drawStroke(target.getContext('2d'), { ...v.stroke.data, tool: 'pen' }, target.width);
     });
     page.ink.addEventListener('pointermove', event => {
       if (v.erasing?.pointerId === event.pointerId) {
@@ -703,9 +684,9 @@
         (event.getCoalescedEvents?.() || [event]).forEach(item => {
           const to = pagePoint(page, item);
           const from = v.erasing.last;
-          const steps = Math.max(1, Math.ceil(Math.hypot(to[0] - from[0], to[1] - from[1]) / (ERASER_RADIUS / 2)));
+          const steps = Math.max(1, Math.ceil(Math.hypot(to[0] - from[0], to[1] - from[1]) / (v.erasing.radius / 2)));
           for (let step = 1; step <= steps; step += 1) {
-            eraseAt(v, page, [from[0] + (to[0] - from[0]) * step / steps, from[1] + (to[1] - from[1]) * step / steps]);
+            eraseAt(v, page, [from[0] + (to[0] - from[0]) * step / steps, from[1] + (to[1] - from[1]) * step / steps], v.erasing.radius);
           }
           v.erasing.last = to;
         });
@@ -713,8 +694,8 @@
       }
       const active = v.stroke;
       if (!active || active.pointerId !== event.pointerId) return;
-      const ctx = page.ink.getContext('2d');
-      const scale = page.ink.width;
+      const ctx = active.target.getContext('2d');
+      const scale = active.target.width;
       ctx.strokeStyle = active.data.color;
       ctx.lineWidth = Math.max(active.data.width * scale, 1);
       ctx.lineCap = 'round';
@@ -739,10 +720,67 @@
       if (!active || active.pointerId !== event.pointerId) return;
       v.stroke = null;
       pageStrokes(v, page.number).push(active.data);
+      if (active.target !== page.ink) {
+        active.target.remove();
+        drawInk(v, page);
+      }
       markChanged(v);
     };
     page.ink.addEventListener('pointerup', end);
     page.ink.addEventListener('pointercancel', end);
+  }
+
+  function liveCanvas(page) {
+    const canvas = el('canvas', 'lecture-page-live');
+    canvas.width = page.ink.width;
+    canvas.height = page.ink.height;
+    canvas.style.opacity = String(global.LecturePens.HIGHLIGHT_ALPHA);
+    page.el.append(canvas);
+    return canvas;
+  }
+
+  // ─── 확대·축소 ────────────────────────────────────────────────────────────
+  // 두 손가락 사이 지점을 기준으로 1~3배. 움직이는 동안은 CSS transform으로만 보이고,
+  // 손을 떼면 페이지 폭을 실제로 바꿔 다시 그린다. 필기 좌표는 페이지 비율이라 그대로 맞는다.
+
+  function pinchState(event, scroller) {
+    const [a, b] = event.touches;
+    const box = scroller.getBoundingClientRect();
+    return {
+      distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+      x: (a.clientX + b.clientX) / 2 - box.left,
+      y: (a.clientY + b.clientY) / 2 - box.top,
+    };
+  }
+
+  function startPinch(v, event) {
+    if (!v.pages.length || v.stroke) return;
+    const start = pinchState(event, v.scroller);
+    v.pinch = { start, scale: 1, current: start, originX: v.scroller.scrollLeft + start.x, originY: v.scroller.scrollTop + start.y };
+    v.pagesEl.style.transformOrigin = `${v.pinch.originX}px ${v.pinch.originY}px`;
+  }
+
+  function movePinch(v, event) {
+    const now = pinchState(event, v.scroller);
+    const pinch = v.pinch;
+    pinch.scale = Math.max(1 / v.zoom, Math.min(MAX_ZOOM / v.zoom, now.distance / pinch.start.distance));
+    pinch.current = now;
+    v.pagesEl.style.transform = `translate(${now.x - pinch.start.x}px, ${now.y - pinch.start.y}px) scale(${pinch.scale})`;
+  }
+
+  function endPinch(v) {
+    const pinch = v.pinch;
+    v.pinch = null;
+    v.pagesEl.style.transform = '';
+    v.pagesEl.style.transformOrigin = '';
+    const zoom = Math.max(1, Math.min(MAX_ZOOM, v.zoom * pinch.scale));
+    if (Math.abs(zoom - v.zoom) < 0.01) return;
+    const factor = zoom / v.zoom;
+    v.zoom = zoom;
+    layoutPages(v, true);
+    // 손가락 사이에 있던 내용이 손을 뗀 자리에 오게 스크롤을 맞춘다.
+    v.scroller.scrollLeft = pinch.originX * factor - pinch.current.x;
+    v.scroller.scrollTop = pinch.originY * factor - pinch.current.y;
   }
 
   function segmentDistance(point, a, b) {
@@ -754,12 +792,13 @@
   }
 
   // 획 지우개다. 닿은 획을 통째로 지운다.
-  function eraseAt(v, page, point) {
+  // 획의 두께도 닿는 범위다. 굵은 형광펜은 가장자리를 문질러도 지워진다.
+  function eraseAt(v, page, point, radius) {
     const strokes = v.body.pages[page.number];
     if (!strokes?.length) return;
     const kept = strokes.filter(stroke => !stroke.points.some((current, index) => {
       const previous = stroke.points[index - 1] || current;
-      return segmentDistance(point, previous, current) <= ERASER_RADIUS;
+      return segmentDistance(point, previous, current) <= radius + stroke.width / 2;
     }));
     if (kept.length === strokes.length) return;
     v.body.pages[page.number] = kept;

@@ -106,8 +106,10 @@ body.lecture-viewer-open { overflow: hidden; }
 .lecture-conflict span { flex: 1 1 240px; }
 .lecture-conflict[hidden] { display: none; }
 
-.lecture-scroller { overflow: auto; -webkit-overflow-scrolling: touch; }
-.lecture-pages { display: grid; justify-items: center; gap: 16px; padding: 16px 16px 96px; }
+/* 두 손가락 확대는 뷰어가 직접 처리한다. 브라우저 페이지 확대가 끼어들지 않게 스크롤만 맡긴다. */
+.lecture-scroller { overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+/* 확대해 페이지가 화면보다 넓어지면 왼쪽 끝까지 스크롤할 수 있게 내용 폭을 따른다. */
+.lecture-pages { display: grid; justify-items: center; gap: 16px; width: max-content; min-width: 100%; padding: 16px 16px 96px; }
 .lecture-page {
   position: relative; background: #fff; box-shadow: var(--shadow-sm);
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
@@ -117,22 +119,68 @@ body.lecture-viewer-open { overflow: hidden; }
 
 .lecture-rail {
   position: fixed; left: 16px; top: 50%; z-index: 1;
-  display: grid; justify-items: start; gap: 4px;
-  width: 44px; padding: 10px 0; overflow: hidden; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: flex-start;
+  width: 44px; max-height: calc(100% - 180px); padding: 8px 0; overflow: hidden; transform: translateY(-50%);
   border: 1px solid var(--hairline); border-radius: 12px; background: var(--ai-bubble); box-shadow: var(--shadow-md);
 }
+/* 펜이 많으면 펜 영역만 스크롤한다. `+`와 전환 버튼은 항상 보인다. */
+.lecture-rail-pens { display: flex; flex-direction: column; min-height: 0; overflow: auto; scrollbar-width: none; }
+.lecture-rail-pens::-webkit-scrollbar { display: none; }
 .lecture-rail button {
-  display: flex; align-items: center; width: 44px; min-height: 44px; padding: 0;
+  position: relative; display: flex; flex: none; align-items: center; width: 44px; min-height: 44px; padding: 0;
   border: 0; background: none; color: var(--label); cursor: pointer;
 }
 /* 펜은 레일 안쪽으로 들어가 있고 고른 펜만 밖으로 나온다. */
 .lecture-rail-pen .lecture-icon { transform: translateX(-9px); transition: transform 0.18s var(--ease-out); }
 .lecture-rail-pen.active .lecture-icon { transform: translateX(-2px); }
+.lecture-rail-pen.is-eraser { justify-content: center; }
+.lecture-rail-pen.is-eraser .lecture-icon { width: 34px; height: 34px; transform: none; }
+.lecture-rail-pen.is-eraser.active { color: var(--brand-ink); }
+.lecture-rail-pen.is-eraser.active .lecture-icon { border-radius: 10px; background: var(--brand-soft-strong); }
+.lecture-rail-width { position: absolute; right: 3px; bottom: 3px; color: var(--label); font-size: 8px; font-variant-numeric: tabular-nums; line-height: 1; }
 .lecture-rail-tool { justify-content: center; }
-.lecture-rail-tool.active { color: var(--brand-ink); }
-.lecture-rail-tool.active .lecture-icon { border-radius: 10px; background: var(--brand-soft-strong); }
-.lecture-rail-tool .lecture-icon { width: 34px; height: 34px; }
-.lecture-rail-divider { width: 24px; height: 1px; margin: 4px 10px; background: var(--hairline); }
+.lecture-rail-tool:disabled { opacity: 0.35; }
+.lecture-rail-divider { flex: none; width: 24px; height: 1px; margin: 4px 10px; background: var(--hairline); }
+
+/* 가로 레일: 헤더 아래 왼쪽. 펜 끝이 아래를 향한다. */
+.lecture-rail.is-horizontal {
+  top: 64px; flex-direction: row; align-items: flex-start;
+  width: auto; max-width: calc(100% - 32px); max-height: none; padding: 0 8px; transform: none;
+}
+.lecture-rail.is-horizontal .lecture-rail-pens { flex-direction: row; min-width: 0; }
+.lecture-rail.is-horizontal button { justify-content: center; }
+.lecture-rail.is-horizontal .lecture-rail-pen .lecture-icon { transform: translateY(-9px) rotate(90deg); }
+.lecture-rail.is-horizontal .lecture-rail-pen.active .lecture-icon { transform: translateY(-2px) rotate(90deg); }
+.lecture-rail.is-horizontal .lecture-rail-pen.is-eraser .lecture-icon { transform: none; }
+.lecture-rail.is-horizontal .lecture-rail-divider { width: 1px; height: 24px; margin: 10px 4px; }
+
+.lecture-pen-menu {
+  position: fixed; z-index: 1002; display: grid; gap: 10px; width: 264px; padding: 14px;
+  border: 1px solid var(--hairline); border-radius: 12px; background: var(--ai-bubble); box-shadow: var(--shadow-md);
+  color: var(--ai-text); font-size: 13px;
+}
+.lecture-segment.is-three { grid-template-columns: repeat(3, 1fr); }
+.lecture-segment > button {
+  min-height: 34px; border: 0; border-radius: 10px; background: none; color: var(--label); font: inherit; font-size: 13px; cursor: pointer;
+}
+.lecture-segment > button.active { background: var(--ai-bubble); color: var(--ai-text); font-weight: 600; box-shadow: var(--shadow-sm); }
+.lecture-menu-label { color: var(--label); font-size: 12px; }
+.lecture-swatches { display: flex; flex-wrap: wrap; gap: 5px; }
+.lecture-swatch {
+  position: relative; width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 50%;
+  background: var(--swatch); box-shadow: inset 0 0 0 1px rgba(29, 38, 34, 0.12); cursor: pointer;
+}
+.lecture-swatch.active { border-color: var(--ai-bubble); box-shadow: 0 0 0 2px var(--ai-text); }
+.lecture-swatch.is-custom { background: conic-gradient(#e45656, #e4c156, #56b0e4, #9b6fe4, #e456b8, #e45656); overflow: hidden; }
+.lecture-swatch.is-custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.lecture-menu-row { display: flex; justify-content: space-between; align-items: baseline; }
+.lecture-menu-value { color: var(--brand-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.lecture-slider { width: 100%; accent-color: var(--brand); }
+.lecture-menu-range { display: flex; justify-content: space-between; margin-top: -6px; color: var(--label); font-size: 10px; }
+.lecture-menu-danger {
+  justify-self: start; min-height: 36px; padding: 0; border: 0; background: none;
+  color: var(--danger); font: inherit; font-size: 13px; cursor: pointer;
+}
 
 .lecture-page-pill {
   position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%);
