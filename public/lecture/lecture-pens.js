@@ -14,8 +14,9 @@
   // Figma `Pen settings popover`의 빠른 팔레트. 형광펜은 레일 기본값의 두 색을 앞에 둔다.
   const PALETTE = ['#1D2622', '#6E7772', '#C65C58', '#4A6FA5', '#7966A8', '#D2A72A'];
   const HIGHLIGHT_PALETTE = ['#F2F456', '#DD56F4', '#F5A55B', '#8EC5F2', '#C9A3F0', '#B8BEC0'];
-  // 복습 전용 초록 대역. 채도 하한은 설계상 실기기 튜닝 값이다(§8.2) — 회녹색까지 막으면 올린다.
-  const REVIEW_GREEN_HUE = [105, 165];
+  // 복습 전용 초록 대역. 2026-09-30 iPad 실측에서 105°–165°로는 연두·라임이 통과해 80°–170°로 넓혔다(§8.2).
+  // 채도 하한은 설계상 실기기 튜닝 값이다 — 회녹색까지 막으면 올린다.
+  const REVIEW_GREEN_HUE = [80, 170];
   const REVIEW_GREEN_MIN_SATURATION = 0.25;
   // Figma `Floating Toolbar` 기본 구성.
   const DEFAULT_PENS = [
@@ -157,15 +158,15 @@
         const input = el('input');
         input.type = 'color';
         input.value = pen.color || '#1D2622';
-        // iPadOS 선택기는 열린 채로 고른 색을 표시하므로, 거부하면 선택기를 닫아 적용된 것처럼 보이지 않게 한다.
-        const reject = () => {
-          toast('이 색상은 복습 필기 전용이에요');
-          input.value = pen.color;
-          input.blur();
-        };
-        input.addEventListener('input', () => { if (isReviewGreen(input.value)) reject(); });
+        // 드래그 중에는 막지 않는다. 막으면 슬라이더가 대역 경계에서 멈춰 그 경계색(눈으로는 초록)이 확정된다.
+        // 손을 뗀 최종색만 검사하고, 초록이면 원래 쓰던 색으로 되돌린 뒤 선택기를 닫는다.
         input.addEventListener('change', () => {
-          if (isReviewGreen(input.value)) return reject();
+          if (isReviewGreen(input.value)) {
+            toast('이 색상은 복습 필기 전용이에요');
+            input.value = pen.color;
+            input.blur();
+            return;
+          }
           pen.color = input.value;
           persist(); render(); openMenu(pensEl.children[settings.selected]);
         });
