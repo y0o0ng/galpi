@@ -46,7 +46,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   repaired twice before closure). The fresh source/bundle audit of all 41 rows is **40 PASS /
   1 UNCERTAIN** (`008`, fail-closed and excluded). **Next gate: blind v3 strong-model review of
   the 40 PASS rows** — **38 clean agreements / 2 mandatory HUMAN** (`032`, `037`) and an
-  8-row calibration sample; next is a 10-row blind HUMAN review.
+  8-row calibration sample. The 10-row blind HUMAN protocol and packet are built; the HUMAN
+  review has not run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2118,6 +2119,30 @@ vegetable-plot rule while the contested point is the tomato plot's precedence). 
 (lowest preregistered hash): `001`, `015`, `009`, `040`, `036`, `026`, `002`, `006`. Clean
 agreements stay `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. No HUMAN review, acceptance,
 selection or training has occurred.
+
+**Blind HUMAN adjudication / calibration — preregistered and built, not run.** Protocol:
+`fixtures/local-memory-inference-p1b6-batch-004-human-adjudication-calibration-protocol.json`
+(`c40d19b5…`), semantic contract v3 verbatim with the KEEP / FIX / REJECT output contract.
+`scripts/build-memory-inference-p1b6-batch-004-human-review-packet.js`
+(`npm run build:memory-inference-p1b6-batch-004-human-review-packet -- --output <path>`)
+verifies that the committed v3 review receipt binds the review packet, routing authority, v3
+and protocol and that its rows are the source-audit PASS population; takes every non-clean route
+as mandatory (`032`, `037`); recomputes the calibration sample from the authoring protocol's
+rule and requires it to equal the receipt (`001`, `015`, `009`, `040`, `036`, `026`, `002`,
+`006`); and asserts the two sets are disjoint, exclude `008` and total 10. The 30 unsampled
+clean agreements are derived separately. Rows are sorted opaque IDs in the new
+`p1b6-b004-hreview` namespace, each only the selected bundle, which must equal the strong-model
+packet's byte-for-byte. The packet (`b1f2f4a0…`) is not committed.
+
+Preregistered semantics: a mandatory KEEP matching v3 is `HUMAN_ADJUDICATED` / `ELIGIBLE`; an
+opposing KEEP is `INELIGIBLE` with explicit resolution required and no catalog change; FIX /
+REJECT are `INELIGIBLE`. A calibration KEEP matching v3 is `CALIBRATION_MATCH` and stays
+`CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`, never promoted; opposing, FIX and REJECT are
+`CALIBRATION_DECISION_MISMATCH` / `_FIX` / `_REJECT`, `INELIGIBLE`. The 30 unsampled agreements
+stay `PROVISIONAL` with nothing extrapolated, and `008` stays out, unrepaired. **This is a blind
+packet with a non-independent reviewer**: the owner authored and pre-audited the surfaces,
+directed both `037` repairs and has seen the upstream summary including the mandatory and
+calibration item IDs. The protocol records this, and the result receipt will too.
 
 ## Closed Selection and Freeze Constraints
 

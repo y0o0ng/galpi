@@ -5322,3 +5322,14 @@ Reviewer: fresh Claude Code CLI session in the home directory, Claude Opus 5.5 (
 24 KEEP CLEAR / 15 KEEP ESCALATE / 1 FIX. Mandatory HUMAN `032` (decision disagreement), `037`
 (FIX); calibration `001` `015` `009` `040` `036` `026` `002` `006`. No HUMAN review or acceptance;
 the accepted pool record stays **93**.
+
+#### P1-B6 batch-004 blind HUMAN adjudication / calibration — PREREGISTERED / PACKET BUILT / NOT RUN
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-004-human-adjudication-calibration-protocol.json` | HUMAN protocol, `c40d19b58ac65582556543be9639b5be1236924eb6ec496fc3158b6c245a4b4e` |
+| `scripts/build-memory-inference-p1b6-batch-004-human-review-packet.js` | packet builder and preregistered result routing |
+| packet (not committed) | 10 rows (2 mandatory + 8 calibration, roles hidden), `p1b6-b004-hreview` namespace, raw SHA `b1f2f4a08d0bf13dec03eea2094fdd698c0b8633fe64b0ac639fcb411bf19104` |
+
+Reviewer is the repository owner, not independent. 30 unsampled clean agreements stay
+`PROVISIONAL`; `008` stays excluded. No HUMAN review or acceptance; the accepted pool record stays **93**.
