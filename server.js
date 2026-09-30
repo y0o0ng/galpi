@@ -40,6 +40,7 @@ const {
 const { registerModelRuntimeRoutes } = require('./lib/model-runtime-routes');
 const { registerAssistantTaskRoutes } = require('./lib/assistant-task-routes');
 const { registerDdayRoutes } = require('./lib/dday-routes');
+const { registerLectureRoutes, isLectureAnnotationPut } = require('./lib/lecture-routes');
 const { readAssistantPushConfig } = require('./lib/assistant-push-config');
 const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createMailStore } = require('./lib/mail/store');
@@ -541,8 +542,14 @@ app.use((_req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   next();
 });
-app.use(express.json({ limit: '1mb' }));
+// 강의 필기는 Document당 JSON 한 벌이라 1MB를 넘는다. 그 경로만 인증 뒤 라우트에서 따로 파싱한다.
+const globalJsonParser = express.json({ limit: '1mb' });
+app.use((req, res, next) => (isLectureAnnotationPut(req) ? next() : globalJsonParser(req, res, next)));
 app.use(express.static(path.join(__dirname, 'public')));
+// 강의 노트 뷰어의 PDF 렌더러. 저장소에 사본을 두지 않고 고정 버전 패키지에서 필요한 폴더만 내보낸다.
+for (const dir of ['build', 'cmaps', 'standard_fonts', 'wasm']) {
+  app.use(`/lib/pdfjs/${dir}`, express.static(path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), dir)));
+}
 
 function safeTokenEqual(a, b) {
   const ab = Buffer.from(String(a));
@@ -4632,6 +4639,7 @@ app.post('/api/tasks/prepare-natural', async (req, res) => {
   }
 });
 registerDdayRoutes({ app, db });
+registerLectureRoutes({ app, db, dataDir: DATA_DIR });
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
 registerNewsRoutes({
   app,

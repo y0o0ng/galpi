@@ -4342,7 +4342,7 @@ textarea:focus-visible {
 .settings-list,
 #home-overview,
 #home-agents,
-.lecture-notes-placeholder {
+#lecture-root {
   width: min(1060px, calc(100% - 64px));
   margin-inline: auto;
 }
@@ -5451,10 +5451,6 @@ textarea:focus-visible {
   justify-content: space-between;
 }
 
-.lecture-notes-placeholder { display: grid; min-height: 40vh; align-content: center; gap: 8px; color: var(--label); text-align: center; }
-.lecture-notes-placeholder strong { font-size: 22px; }
-.lecture-notes-placeholder p { font-size: 14px; }
-
 .settings-list {
   display: grid;
   gap: 12px;
@@ -5545,7 +5541,7 @@ textarea:focus-visible {
   .settings-list,
   #home-overview,
   #home-agents,
-  .lecture-notes-placeholder {
+  #lecture-root {
     width: min(740px, calc(100% - 28px));
   }
 
@@ -5684,7 +5680,7 @@ textarea:focus-visible {
   .settings-list,
   #home-overview,
   #home-agents,
-  .lecture-notes-placeholder {
+  #lecture-root {
     width: calc(100% - 32px);
   }
 

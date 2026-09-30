@@ -807,6 +807,7 @@
     global.PaperPanel?.close();
     if (route !== 'home') parkSharedPanels();
     if (route === 'chat') global.PaperPanel?.setTab('notes');
+    if (route === 'notes') global.LectureNotes?.show();
     if (route === 'home') setHomeView(homeView || state.homeView);
   }
 

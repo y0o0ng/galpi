@@ -122,9 +122,10 @@
 - **검토된 풀을 정리했다 — 주인 규칙 A로 349행, top-up 하한 34(TRAIN 32 / DEV 2).** 원장은 `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger.json`, 부족분은 `…-shortage-receipt.json`이다. 은퇴 skeleton 위 accepted 6건은 풀 밖(기록 불변), HUMAN gold가 v3와 다른 accepted 12건은 풀 안에 두고 플래그만 달았다 — 둘 다 별도 migration 결정이다. 하한은 결합 가능성 증명이 아니다. **batch-004 top-up 계획 41행(TRAIN 38 / DEV 3, skeleton당 상한 4, calibration 8행)을 사전등록했고**(`fixtures/local-memory-inference-p1b6-surface-batch-004-authoring-protocol.json`) 41건을 materialize했고(`fixtures/local-memory-inference-p1b6-surface-batch-004.json`) audit 전 주인 검토를 기다린다.
 - 상세 실행 이력·아티팩트 SHA는 `docs/Memory research/local-memory-inference/local-memory-inference-p1b6-design.md`와 `…/local-memory-inference-run-receipts.md`에 있다. 여기에 복제하지 않는다.
 
-### 강의 노트 — 설계 v4.3, 구현 미착수
+### 강의 노트 — 설계 v4.3, L1a 구현 중
 
-- **설계와 화면은 정리됐지만 구현 승인이 아니다.** 계약은 설계서 §0 합의 목록과 §20이 정본이고 여기에 복제하지 않는다. §14.1 캡처 스파이크는 10분 smoke와 90분 gate(대체 음원, 앱 전환·잠금 포함)를 통과해 Path A(iPad 웹 통합 녹음) 채택 조건을 충족했다. 3시간 stress는 선택 항목으로 미뤘고(90분 외삽으로 drift·저장 문제 없음) 강의실 조건은 복학 뒤이며, 전사용 PC·STT는 미정이다. 실측은 `docs/lecture-capture-spike-receipts.md`가 정본이다.
+- **L1a(폴더·자료·필기)를 구현했고 Pi·iPad 인수 전이다.** schema v29(`lecture_containers`·`lecture_documents`·`lecture_annotations`), 서버 `lib/lecture-routes.js`, 화면 `public/lecture/`다. 필기는 Document당 JSON 한 벌과 revision이고 `baseRevision`이 다르면 409로 덮어쓰지 않는다. 자료 파일은 `<dataDir>/lecture/documents/<sha256>.pdf`이고 **아직 백업 대상이 아니다**(사용자 결정, 실사용 전 다시 정한다). pdf.js는 저장소에 사본을 두지 않고 고정 의존성 `pdfjs-dist`를 `/lib/pdfjs/`로 내보낸다. 다음은 L1b(녹음·Session)이고 전사는 전사용 PC를 산 뒤다.
+- **설계와 화면은 정리됐지만 L1 밖의 구현 승인은 아니다.** 계약은 설계서 §0 합의 목록과 §20이 정본이고 여기에 복제하지 않는다. §14.1 캡처 스파이크는 10분 smoke와 90분 gate(대체 음원, 앱 전환·잠금 포함)를 통과해 Path A(iPad 웹 통합 녹음) 채택 조건을 충족했다. 3시간 stress는 선택 항목으로 미뤘고(90분 외삽으로 drift·저장 문제 없음) 강의실 조건은 복학 뒤이며, 전사용 PC·STT는 미정이다. 실측은 `docs/lecture-capture-spike-receipts.md`가 정본이다.
 - **Figma에서 SF Pro 텍스트는 파일에 SF Pro가 한 번도 쓰이지 않았을 때 플러그인 측정 폭이 0이다.** 텍스트 스타일에 묶어 두고, 폭이 0이면 사용자가 데스크톱 앱에서 스타일 글꼴만 바꾸게 한다.
 
 ### 메일 — 닫혔다, 관측만 남았다

@@ -281,6 +281,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 26, name: 'retrieval_query_resolution_trace' },
     { version: 27, name: 'independent_ddays' },
     { version: 28, name: 'memory_evidence_refs' },
+    { version: 29, name: 'lecture_notes_capture' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -297,7 +298,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     /CHECK/,
   );
   assert.deepEqual(
-    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('ddays', 'memory_evidence_refs') ORDER BY name`).all(),
+    db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('ddays', 'memory_evidence_refs') AND name NOT LIKE 'lecture_%' ORDER BY name`).all(),
     tablesBefore,
   );
   assert.deepEqual(
@@ -981,7 +982,7 @@ test('schema v21 widens the provider check without cutting the children loose', 
 test('schema v28 adds the narrow EvidenceRef address registry from v27', () => {
   const db = createLegacyDatabase();
   migrateThrough(db, 27);
-  assert.deepEqual(runDatabaseMigrations(db).applied,
+  assert.deepEqual(runDatabaseMigrations(db).applied.slice(0, 1),
     [{ version: 28, name: 'memory_evidence_refs' }]);
   assert.deepEqual(runDatabaseMigrations(db).applied, []);
   const insert = db.prepare(`

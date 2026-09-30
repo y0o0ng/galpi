@@ -205,11 +205,12 @@ test('the product shell exposes the four approved destinations on desktop and mo
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?#bottom-nav \{[^}]*display: grid/s);
 });
 
-test('global Notes is a lecture-note placeholder while Chat keeps topic notes and papers', () => {
+test('global Notes hosts lecture notes while Chat keeps topic notes and papers', () => {
   const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
   const home = fs.readFileSync(path.join(ROOT, 'public/home.js'), 'utf8');
   const notesPage = html.slice(html.indexOf('id="notes-page"'), html.indexOf('id="settings-page"'));
-  assert.match(notesPage, /강의 노트[\s\S]*준비 중/);
+  assert.match(notesPage, /id="lecture-root"/);
+  assert.match(home, /if \(route === 'notes'\) global\.LectureNotes\?\.show\(\)/);
   assert.doesNotMatch(notesPage, /data-panel-tab|notes-page-views|note-panel|paper-panel/);
   assert.match(home, /if \(route !== 'home'\) parkSharedPanels\(\)/);
   assert.doesNotMatch(home, /if \(route === 'notes'\) global\.NotePanel\?\.show\(\)/);
