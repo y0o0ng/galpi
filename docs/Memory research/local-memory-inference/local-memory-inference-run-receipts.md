@@ -5364,3 +5364,12 @@ stays **93**.
 | `fixtures/local-memory-inference-p1b6-surface-batch-005.json` | 2 items, `b005` namespace |
 
 No audit, review or acceptance; the accepted pool record stays **93**.
+
+#### P1-B6 batch-005 owner pre-audit — PASS 2/2; source-audit packet BUILT / NOT RUN
+
+| artifact | role |
+| --- | --- |
+| `scripts/build-memory-inference-p1b6-batch-005-source-audit-packet.js` | blind packet builder |
+| packet (not committed) | 2 rows, `p1b6-b005-audit` namespace, raw SHA `bcc144bda59e754ce8082958126ce67a2a3baf4bf73233b3806e3f9202d6bd2f` |
+
+No audit has run; the accepted pool record stays **93**.

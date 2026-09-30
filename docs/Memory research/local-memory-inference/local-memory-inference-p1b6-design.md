@@ -50,7 +50,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   `HUMAN_ADJUDICATED` / `ELIGIBLE`; `037` (mandatory) and `009` (calibration) are KEEP CLEAR
   against v3 ESCALATE; the owner closed both as current-realization failures. **Ledger v2: pool
   387; the only marginal shortage is EN, by one (37 / 38).** A 2-row EN batch-005 top-up is
-  preregistered and materialized and awaits the owner's pre-audit review. No acceptance.
+  preregistered and materialized; the owner pre-audit review passed 2/2, and the blind source-audit
+  packet is built, not run. No acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2190,6 +2191,13 @@ shared validator against v3 and the leakage check against every prior batch and 
 including batch-004. `001` states that exactly one side of a mat is about 5 cm bigger and the
 other is the same, without saying which side (after `009` collapsed to "each side");
 `002` gives an attributed landing range. Nothing is audited, reviewed or accepted.
+
+**Owner pre-audit review — COMPLETE / PASS, 2/2 (2026-09-30).** No change. The source-audit
+packet builder `scripts/build-memory-inference-p1b6-batch-005-source-audit-packet.js`
+(`npm run build:memory-inference-p1b6-batch-005-source-audit-packet -- --output <path>`) follows
+the batch-004 builder: batch-005 (`98f28dfe…`) and the unchanged protocol pinned by raw SHA, the
+batch rebuilt byte-for-byte, 2 sorted opaque rows in the `p1b6-b005-audit` namespace. The packet
+(`bcc144bd…`) is not committed; no audit has run.
 
 ## Closed Selection and Freeze Constraints
 
