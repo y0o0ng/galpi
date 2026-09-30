@@ -1,0 +1,261 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-004-source-audit-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-004-source-audit-attempt-001",
+  "status": "COMPLETE_NEEDS_FIX",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-batch-004-source-audit-packet-v1",
+  "auditPacketSha256": "4f7cc2890d795a3dfabb20856cafc2d2a5e9d4948854911a35f04330240b0c3c",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-004-v1",
+    "rawSha256": "f640198f9d472c00046b8cb22083407b12887534bf0544cd808620691c5bc0c1"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b004-source-audit-results.json",
+    "sha256": "8c417502a4583846f814d5d3644b5368f2a4895b08c3d87e92e5c6e340b6a39b",
+    "committed": false
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "surface": "Claude Code",
+    "model": "Claude Opus 5.5",
+    "reasoningSetting": "NOT_RECORDED",
+    "sessionRelationship": "a fresh Claude Code CLI session started in the home directory (no project instructions or memory loaded), separate from the session that authored the surfaces, given only the protocol and packet paths"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "Fresh realizations under new IDs; no historical source-audit result carried forward."
+  },
+  "summary": {
+    "total": 41,
+    "PASS": 40,
+    "FAIL": 0,
+    "UNCERTAIN": 1
+  },
+  "failClosedRows": [
+    {
+      "auditRowId": "p1b6-b004-audit-baba9f38f99817ba",
+      "itemId": "p1b6-item-b004-008",
+      "disposition": "UNCERTAIN"
+    }
+  ],
+  "authority": {
+    "sourceBundleGatePassedForPassRows": true,
+    "failClosedRowsExcludedFromSemanticReview": true,
+    "semanticReviewOccurred": false,
+    "humanReviewOccurred": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-b004-audit-00f269afbae4bfe6",
+      "disposition": "PASS",
+      "reason": "Omitted umbrella turns are unrelated; fee rule, student discount and friend turns are all included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-2187cc385fa0a06e",
+      "disposition": "PASS",
+      "reason": "Omitted drawer/receipt turns are unrelated; habit, pause and resumption turns are all included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-222347330bb5e337",
+      "disposition": "PASS",
+      "reason": "Bundle contains the full source episode."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-2fee9e66bdd57067",
+      "disposition": "PASS",
+      "reason": "Omitted elevator turn is unrelated; both date reports are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-322936591468c210",
+      "disposition": "PASS",
+      "reason": "Omitted glove-box turns are unrelated; ASSISTANT check explicitly names the range."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-395ed337da2b5659",
+      "disposition": "PASS",
+      "reason": "Omitted nail-hole turn is unrelated; both frame-size turns are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-3c093cbb69151cab",
+      "disposition": "PASS",
+      "reason": "Omitted keycap/desk turns are unrelated; generic ASSISTANT ack does not depend on them."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-43c7bf6c2523452f",
+      "disposition": "PASS",
+      "reason": "Omitted glove turns are unrelated; watering rules, shade fact and plot identity are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-4a317d7ad94d4452",
+      "disposition": "PASS",
+      "reason": "Omitted curtain turns are unrelated; source and no-written-notice turns are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-4b35ba3d9691aeef",
+      "disposition": "PASS",
+      "reason": "Omitted laptop/charger turns are unrelated; rule, exception and duty status are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-4d552b56402b359e",
+      "disposition": "PASS",
+      "reason": "Omitted plant turns are unrelated; hearsay context and ASSISTANT turn are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-53eab2eb03ce5eeb",
+      "disposition": "PASS",
+      "reason": "Omitted shoe-cabinet turn is unrelated; pause/resume turn is included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-5603a1334cfa963a",
+      "disposition": "PASS",
+      "reason": "Omitted meeting-room turns are unrelated; rule and refrigeration exception are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-588c2c2bc1e0a754",
+      "disposition": "PASS",
+      "reason": "Omitted club-room turn is unrelated; both quantities and the remaining-fraction turn are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-5bbc6a09f58f235b",
+      "disposition": "PASS",
+      "reason": "Bundle contains the full source episode."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-65e297bece13de31",
+      "disposition": "PASS",
+      "reason": "Omitted weather turn is unrelated; decision-state turns are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-6e8f225ea4edd795",
+      "disposition": "PASS",
+      "reason": "Omitted lunch turn is not a plausible referent for returning an item; drill antecedent is included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-70ef4b1984969d2d",
+      "disposition": "PASS",
+      "reason": "Omitted bus turn is unrelated; original and changed dates are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-7799c8dbf59cdf23",
+      "disposition": "PASS",
+      "reason": "Omitted window turn is unrelated; both duty turns and continuation are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-77d2a5f496bf7358",
+      "disposition": "PASS",
+      "reason": "Omitted noodle-shop turns are unrelated; correction and remaining turn are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-78f0e9794a56d282",
+      "disposition": "PASS",
+      "reason": "Omitted plant turns are unrelated; pause and rainy-season end are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-7bd08b9676cb5324",
+      "disposition": "PASS",
+      "reason": "Omitted monitor-stand turns are unrelated; correction and contractor exception are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-7d1fc79e891482d9",
+      "disposition": "PASS",
+      "reason": "Omitted doormat turn is unrelated; hearsay and no-notice turn are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-8f44f2fce78fb497",
+      "disposition": "PASS",
+      "reason": "Bundle contains the full source episode."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-93f5de444f99fd02",
+      "disposition": "PASS",
+      "reason": "Omitted earphone turns are unrelated; correction and recovery turn are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-9d960e6e28df16d2",
+      "disposition": "PASS",
+      "reason": "Omitted washer turn is unrelated; undecided-state turn is included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-b2fc4203dc2d4330",
+      "disposition": "PASS",
+      "reason": "Omitted helmet turn is unrelated; original and new venue turn is included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-b34679abfc0f3016",
+      "disposition": "PASS",
+      "reason": "Bundle contains the full source episode."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-b6ea28353e773441",
+      "disposition": "PASS",
+      "reason": "Omitted box turns are unrelated; correction, exception and registration are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-b913f82551689816",
+      "disposition": "PASS",
+      "reason": "Omitted sticker turns are unrelated; rule, criteria and user facts are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-baba9f38f99817ba",
+      "disposition": "UNCERTAIN",
+      "reason": "Underspecified 'So how much is left?' immediately follows omitted lemonade/second-coat paint turns in source; bundle removes these competing antecedents, so completeness of the referent context is unclear."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-be4b517aa72cd859",
+      "disposition": "PASS",
+      "reason": "Omitted ramen turns are not plausible tailoring referents; sleeve turns are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-bfcec99dd6230bce",
+      "disposition": "PASS",
+      "reason": "Omitted coffee turn is unrelated; rule and exam-registrant exception are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-c18a6989ab343a2d",
+      "disposition": "PASS",
+      "reason": "Omitted printer/lunch turns are unrelated; ASSISTANT check and decision-state turns are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-c7b27c410a784466",
+      "disposition": "PASS",
+      "reason": "Omitted bread turn is unrelated; both quantities and remaining-fraction turn are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-cc07c73a459ef8be",
+      "disposition": "PASS",
+      "reason": "Omitted cleaning turn is unrelated; undecided-state turn is included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-e82aceaf034dd590",
+      "disposition": "PASS",
+      "reason": "Omitted toner turns are unrelated; both time and place corrections are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-ecbb99bf6615687c",
+      "disposition": "PASS",
+      "reason": "Bundle contains the full source episode."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-ece84d5dbdacfe74",
+      "disposition": "PASS",
+      "reason": "Omitted bike-tire turns are unrelated; rule, criteria and user facts are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-edd6ac58132f2799",
+      "disposition": "PASS",
+      "reason": "Omitted rain/locker turns are unrelated; ASSISTANT proposal and meeting facts are included."
+    },
+    {
+      "auditRowId": "p1b6-b004-audit-f35a101f27a5d8c8",
+      "disposition": "PASS",
+      "reason": "Omitted shoelace turn is unrelated; both frequency statements are included."
+    }
+  ]
+}

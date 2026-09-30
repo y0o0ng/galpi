@@ -43,8 +43,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   under the owner's pool rule A; marginal top-up lower bound **34** (TRAIN 32 / DEV 2). The
   **batch-004 top-up plan (41 slots) is preregistered and its 41 surfaces are materialized**
   (see "Batch-004 top-up plan"); the **owner pre-audit review is complete — 41/41 PASS** (`037`
-  repaired twice before closure). **Next gate: a fresh source/bundle audit of all 41 rows** — the
-  blind packet is built; no audit has run.
+  repaired twice before closure). The fresh source/bundle audit of all 41 rows is **40 PASS /
+  1 UNCERTAIN** (`008`, fail-closed and excluded). **Next gate: blind v3 strong-model review of
+  the 40 PASS rows.**
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2080,8 +2081,18 @@ the v3-era candidate builders: batch-004 and the unchanged source-audit protocol
 SHA, the batch rebuilt byte-for-byte by its materializer, 41 sorted opaque rows in the new
 `p1b6-b004-audit` namespace, each with the complete source episode and the exact selected
 bundle, and no item / skeleton / split / pattern / label / role / disposition. The packet
-(`4f7cc289…`) is not committed. No source audit, semantic review, HUMAN review, acceptance,
-final selection or training has occurred.
+(`4f7cc289…`) is not committed.
+
+**Source audit attempt-001 — 40 PASS / 0 FAIL / 1 UNCERTAIN (`COMPLETE_NEEDS_FIX`).** A fresh
+Claude Code CLI session (Claude Opus 5.5, reported by the owner) started in the home directory
+audited the packet under the unchanged protocol. `--results <raw>` on the same builder writes
+`fixtures/local-memory-inference-p1b6-batch-004-source-audit-attempt-001.json`, binding the
+rebuilt packet, protocol, batch and raw result bytes (`8c417502…`, not committed) by SHA and
+mapping fail-closed rows back to items mechanically. The UNCERTAIN row is `008` (`53ab6351`):
+`So how much is left?` directly follows omitted lemonade and second-coat paint turns, so the
+bundle drops competing antecedents. It is excluded from semantic review and not repaired now;
+the tranche buffer of 7 absorbs review loss. No semantic review, HUMAN review, acceptance, final
+selection or training has occurred.
 
 ## Closed Selection and Freeze Constraints
 

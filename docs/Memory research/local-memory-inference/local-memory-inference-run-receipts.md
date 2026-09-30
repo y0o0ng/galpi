@@ -5288,3 +5288,15 @@ closure: `f640198f9d472c00046b8cb22083407b12887534bf0544cd808620691c5bc0c1`.
 | packet (not committed) | 41 rows, `p1b6-b004-audit` namespace, raw SHA `4f7cc2890d795a3dfabb20856cafc2d2a5e9d4948854911a35f04330240b0c3c` |
 
 No source audit, semantic review, HUMAN review or acceptance; the accepted pool record stays **93**.
+
+#### P1-B6 batch-004 source audit attempt-001 — 40 PASS / 1 UNCERTAIN / COMPLETE_NEEDS_FIX
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-004-source-audit-attempt-001.json` | receipt, `870ac2ed…` |
+| `~/p1b6-b004-source-audit-results.json` (not committed) | raw results, `8c417502a4583846f814d5d3644b5368f2a4895b08c3d87e92e5c6e340b6a39b` |
+
+Auditor: fresh Claude Code CLI session in the home directory, Claude Opus 5.5 (owner-reported).
+UNCERTAIN: `008` (dropped competing antecedents for `So how much is left?`), fail-closed and
+excluded, not repaired. No semantic review, HUMAN review or acceptance; the accepted pool record
+stays **93**.
