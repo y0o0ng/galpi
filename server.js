@@ -40,7 +40,7 @@ const {
 const { registerModelRuntimeRoutes } = require('./lib/model-runtime-routes');
 const { registerAssistantTaskRoutes } = require('./lib/assistant-task-routes');
 const { registerDdayRoutes } = require('./lib/dday-routes');
-const { registerLectureRoutes, isLectureAnnotationPut } = require('./lib/lecture-routes');
+const { registerLectureRoutes, isLectureAnnotationPut } = require('./lib/lecture');
 const { readAssistantPushConfig } = require('./lib/assistant-push-config');
 const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createMailStore } = require('./lib/mail/store');

@@ -8,7 +8,7 @@ const path = require('node:path');
 const express = require('express');
 const Database = require('better-sqlite3');
 const { migrations } = require('../lib/database-migrations');
-const { registerLectureRoutes, isLectureAnnotationPut } = require('../lib/lecture-routes');
+const { registerLectureRoutes, isLectureAnnotationPut } = require('../lib/lecture');
 
 test('lecture containers, documents and revision-checked annotations', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
