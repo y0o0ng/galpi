@@ -42,7 +42,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
 - **reviewed pool consolidated** (see "Reviewed-pool ledger and shortage"): **349** in-pool rows
   under the owner's pool rule A; marginal top-up lower bound **34** (TRAIN 32 / DEV 2). The
   **batch-004 top-up plan (41 slots) is preregistered and its 41 surfaces are materialized**
-  (see "Batch-004 top-up plan"); they await the owner's pre-audit review.
+  (see "Batch-004 top-up plan"); the **owner pre-audit review is complete — 41/41 PASS** (`037`
+  repaired twice before closure). **Next gate: a fresh source/bundle audit of all 41 rows** — the
+  blind packet is built; no audit has run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2057,6 +2059,29 @@ and candidate. Before materializing, four wordings that would tilt an ESCALATE r
 changed (`001` `더 커` → `차이 나`, `002` `확인해 보니` → `지금 보니까`, `023` dropped the
 additive `그리고`, `037` dropped `also`). These checks are structural; semantic validity is for
 the owner review and the gates. Nothing is audited, reviewed or accepted.
+
+**Owner pre-audit review — COMPLETE / PASS, 41/41.** The owner reviewed all 41 surfaces; no
+surface remains blocked. Only `037` (`be0efa30`) was repaired before closure, twice: the first
+realization anchored a monthly book budget the evidence states directly (the nested-or-additive
+comics amount only moved a derived total); the second anchored a stated intention to practise
+drums, and an open music room does not license a noise exception. The final reviewed
+realization anchors the rule itself — `vegetable plots get watered at 7 a.m.` — while a
+cross-cutting, same-level `shaded plots` evening round covers the same plot and nothing says
+whether it overrides or coexists. Repairs went through the materializer only; slot metadata and
+marginals are unchanged, and the materialization receipt stays a snapshot of authority at
+materialization time (`ownerPreAuditReviewPerformed: false` there is not a workflow status). The
+batch raw SHA at closure is `f640198f…`.
+
+**Source-audit packet — built, not run.** The generic source-audit builder validates against the
+historical Exact56 catalog, which lacks the v3 replacement skeletons (`53ab6351`, `0768ea20`), so
+`scripts/build-memory-inference-p1b6-batch-004-source-audit-packet.js`
+(`npm run build:memory-inference-p1b6-batch-004-source-audit-packet -- --output <path>`) follows
+the v3-era candidate builders: batch-004 and the unchanged source-audit protocol pinned by raw
+SHA, the batch rebuilt byte-for-byte by its materializer, 41 sorted opaque rows in the new
+`p1b6-b004-audit` namespace, each with the complete source episode and the exact selected
+bundle, and no item / skeleton / split / pattern / label / role / disposition. The packet
+(`4f7cc289…`) is not committed. No source audit, semantic review, HUMAN review, acceptance,
+final selection or training has occurred.
 
 ## Closed Selection and Freeze Constraints
 

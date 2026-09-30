@@ -5274,3 +5274,17 @@ Nothing authored or reviewed; the accepted pool record stays **93**.
 | `fixtures/local-memory-inference-p1b6-surface-batch-004-materialization-receipt.json` | marginals, TARGET-boundary roles, checks |
 
 No audit, review or acceptance; the accepted pool record stays **93**.
+
+#### P1-B6 batch-004 owner pre-audit review — COMPLETE / PASS 41/41; source-audit packet BUILT / NOT RUN
+
+The owner reviewed all 41 surfaces; `037` was re-authored twice before closure (`0b672d1`,
+`8c22adb`) and its current vegetable-plot realization is the reviewed one. Batch raw SHA at
+closure: `f640198f9d472c00046b8cb22083407b12887534bf0544cd808620691c5bc0c1`.
+
+| artifact | role |
+| --- | --- |
+| `scripts/build-memory-inference-p1b6-batch-004-source-audit-packet.js` | blind packet builder (v3-era pattern; generic builder is Exact56-only) |
+| `fixtures/local-memory-inference-p1b6-source-audit-protocol.json` | unchanged protocol, `63a2c70c…` |
+| packet (not committed) | 41 rows, `p1b6-b004-audit` namespace, raw SHA `4f7cc2890d795a3dfabb20856cafc2d2a5e9d4948854911a35f04330240b0c3c` |
+
+No source audit, semantic review, HUMAN review or acceptance; the accepted pool record stays **93**.
