@@ -182,3 +182,32 @@ test('frontend safely renders sources, requires confirmation and submits only ra
   assert.match(code, /server\.listen\(PORT, '127\.0\.0\.1'/);
   assert.doesNotMatch(code, /require\(['"].*(openai|dotenv|database-migrations|server|runtime-paths|vault)/);
 });
+
+test('SUPERSEDE display and approval confirmation explain current value plus preserved history', async () => {
+  class Element {
+    constructor(tag) { this.tag = tag; this.children = []; this.handlers = {}; this.classList = { add() {} }; }
+    append(...nodes) { this.children.push(...nodes); }
+    replaceChildren() { this.children = []; }
+    addEventListener(name, handler) { this.handlers[name] = handler; }
+  }
+  const app = new Element('main'), notice = new Element('div');
+  let confirmation;
+  const context = vm.createContext({
+    document: { getElementById: id => id === 'app' ? app : notice, createElement: tag => new Element(tag) },
+    fetch: async () => ({ ok: true, json: async () => [] }),
+    confirm: text => { confirmation = text; return false; },
+    view: { review: { proposal: { transition: 'SUPERSEDE', changeClass: 'WORLD_UPDATE', evidenceIds: [], rationale: 'Synthetic' } },
+      preview: { currentValue: 'Old laptop', resultingCurrentValue: 'New laptop', previousStateDisposition: 'HISTORICAL' },
+      replayPackage: { candidate: { payload: { value: 'New laptop' } }, newEvidence: [], originalSupport: [], evidence: [], states: [], history: [] } },
+  });
+  vm.runInContext(APP, context);
+  vm.runInContext('render(view)', context);
+  const descendants = node => [node, ...node.children.flatMap(descendants)];
+  const nodes = descendants(app), text = nodes.map(node => node.textContent || '').join('\n');
+  assert.match(text, /승인 전 현재 값\nOld laptop/);
+  assert.match(text, /승인 후 현재 값\nNew laptop/);
+  assert.match(text, /유효했던 과거 사실로 보존/);
+  assert.match(text, /기존 값과 원문 근거는 과거 이력으로 함께 보존/);
+  await nodes.find(node => node.tag === 'button' && node.textContent === '승인').handlers.click();
+  assert.match(confirmation, /기존 값을 삭제하거나 이전 발언이 틀렸다고 판정하는 동작이 아니야/);
+});

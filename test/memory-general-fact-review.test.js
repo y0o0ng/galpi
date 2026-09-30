@@ -111,18 +111,20 @@ for (const choice of ['HOLD', 'REJECT_PROPOSAL']) {
   });
 }
 
-test('new review after HOLD keeps the earlier decision immutable', t => {
-  const f = fixture(t);
-  const input = f.prepare().input;
-  const first = f.reviews.create(input);
-  f.reviews.decide(first.reviewId, f.decision(first, 'HOLD'));
-  assert.throws(() => f.reviews.decide(first.reviewId, f.decision(first, 'APPROVE')), /REVIEW_DECISION_CONFLICT/);
-  const next = f.reviews.create(input);
-  assert.notEqual(next.reviewId, first.reviewId);
-  f.reviews.decide(next.reviewId, f.decision(next, 'APPROVE'));
-  assert.equal(f.reviews.get(first.reviewId).decision, 'HOLD');
-  assert.equal(f.target().revision, 1);
-});
+for (const choice of ['HOLD', 'REJECT_PROPOSAL']) {
+  test(`new review after ${choice} keeps the earlier decision immutable`, t => {
+    const f = fixture(t);
+    const input = f.prepare().input;
+    const first = f.reviews.create(input);
+    f.reviews.decide(first.reviewId, f.decision(first, choice));
+    assert.throws(() => f.reviews.decide(first.reviewId, f.decision(first, 'APPROVE')), /REVIEW_DECISION_CONFLICT/);
+    const next = f.reviews.create(input);
+    assert.notEqual(next.reviewId, first.reviewId);
+    f.reviews.decide(next.reviewId, f.decision(next, 'APPROVE'));
+    assert.equal(f.reviews.get(first.reviewId).decision, choice);
+    assert.equal(f.target().revision, 1);
+  });
+}
 
 test('identical decision retransmission is idempotent; conflicting choice/reason is rejected', t => {
   const f = fixture(t);
