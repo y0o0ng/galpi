@@ -60,3 +60,22 @@ test('reconciliation routes per the preregistered gates and samples 8 calibratio
   assert.equal(routed.calibrationItemIds.some(id => routed.mandatoryHumanItemIds.includes(id)), false);
   assert.throws(() => builder.reconcile(Buffer.from(JSON.stringify({ results: [{ reviewRowId: 'x' }] }))), /not a packet row/);
 });
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const RAW = path.join(os.homedir(), 'p1b6-b004-v3-review-results.json');
+
+test('the committed receipt routes 032 and 037 to HUMAN and opens no HUMAN gate', () => {
+  const receipt = JSON.parse(fs.readFileSync(RECEIPT));
+  assert.equal(receipt.reviewPacket.sha256, PACKET_SHA256);
+  assert.deepEqual(receipt.summary, { total: 40, cleanAgreements: 38, mandatoryHuman: 2, calibration: 8 });
+  assert.deepEqual(receipt.mandatoryHumanItemIds, ['p1b6-item-b004-032', 'p1b6-item-b004-037']);
+  assert.equal(receipt.rawResultArtifact.committed, false);
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
+
+test('the receipt equals the reconciled raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  assert.deepEqual(builder.reconcile(fs.readFileSync(RAW)), JSON.parse(fs.readFileSync(RECEIPT)));
+});

@@ -45,7 +45,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   (see "Batch-004 top-up plan"); the **owner pre-audit review is complete — 41/41 PASS** (`037`
   repaired twice before closure). The fresh source/bundle audit of all 41 rows is **40 PASS /
   1 UNCERTAIN** (`008`, fail-closed and excluded). **Next gate: blind v3 strong-model review of
-  the 40 PASS rows** — the packet is built; no review has run.
+  the 40 PASS rows** — **38 clean agreements / 2 mandatory HUMAN** (`032`, `037`) and an
+  8-row calibration sample; next is a 10-row blind HUMAN review.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2105,6 +2106,18 @@ and the 8-row calibration are read from the batch-004 authoring protocol's prere
 `gates` — disagreement / FIX / REJECT / missing go to mandatory HUMAN, and calibration is the 8
 clean agreements with the lowest `sha256(p1b6-b004-v3-review-calibration-v1 NUL itemId)`.
 `--results <raw>` reconciles against v3 (`89a48264…`). The packet (`95df87e3…`) is not committed.
+
+**v3 strong-model review attempt-001 — 38 clean agreements / 2 mandatory HUMAN.** A fresh
+Claude Code CLI session (Claude Opus 5.5, owner-reported) in the home directory returned 24
+KEEP CLEAR / 15 KEEP ESCALATE / 1 FIX. Receipt:
+`fixtures/local-memory-inference-p1b6-batch-004-v3-review-attempt-001.json`, bound to the packet,
+protocol, routing authority, v3 and the raw result bytes (`5cf63491…`, not committed). Mandatory
+HUMAN: `032` (`4bbd5559`, model ESCALATE vs v3 CLEAR — `그렇게 해줘` read as approving either a
+30-minute delay or a move to 10:30) and `037` (`be0efa30`, FIX — the TARGET marks the general
+vegetable-plot rule while the contested point is the tomato plot's precedence). Calibration
+(lowest preregistered hash): `001`, `015`, `009`, `040`, `036`, `026`, `002`, `006`. Clean
+agreements stay `CATALOG_STRONG_MODEL_CONFIRMED` / `PROVISIONAL`. No HUMAN review, acceptance,
+selection or training has occurred.
 
 ## Closed Selection and Freeze Constraints
 

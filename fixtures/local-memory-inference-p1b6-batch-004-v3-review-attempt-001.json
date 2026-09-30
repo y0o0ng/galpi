@@ -1,0 +1,501 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-004-v3-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-004-v3-review-attempt-001",
+  "status": "COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewProtocol": {
+    "identity": "p1b6-targeted-v3-semantic-realization-review-v1",
+    "sha256": "8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-004-v3-review-packet-v1",
+    "sha256": "95df87e3137adee24b7ab805636e0e30794880cbced7f63afbc5feb3f54d0cbb",
+    "rows": 40
+  },
+  "routingAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-004-authoring-protocol-v1",
+    "rawSha256": "b6295fed0cb38ca7bebca3d41d91deed80f55d0505b71287e0d425368b413a9c"
+  },
+  "referenceAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b004-v3-review-results.json",
+    "sha256": "5cf63491c1e772027db0e645112490eeeb02c806607b2317bf66c826d05900ee",
+    "committed": false
+  },
+  "reviewerExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "reportedModel": "Claude Opus 5.5",
+    "session": "fresh Claude Code CLI session started in the home directory, given only the protocol and packet paths"
+  },
+  "summary": {
+    "total": 40,
+    "cleanAgreements": 38,
+    "mandatoryHuman": 2,
+    "calibration": 8
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b004-001",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Both dimensions differ; '10cm difference' gives neither the dimension nor the direction.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-002",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "'About a third left' could refer to the 30 boxes or the 10-day prep period; materially different readings unresolved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-003",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Both dimensions differ; '4cm difference' gives neither the dimension nor the direction, so the second monitor's size is unresolved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-004",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Friend's seat time depends on exam-candidate registration, which is not stated.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-005",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "'Half left' could refer to the 20 tickets or the 2-week period; unresolved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-006",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Both dimensions are smaller, but '20cm smaller' does not say which dimension (or both); second rug's size cannot be stated.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-007",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Deadline depends on whether the parcel needs refrigeration, which is not stated.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-009",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Both dimensions differ; '3cm bigger' does not say which dimension or whether both, so the new frame's size is unresolved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-010",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Rental period depends on whether the new colleague is an external contractor, which is not stated.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-011",
+      "semanticSkeletonId": "p1b6-sk-53ab63517113df16",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "'Two-thirds left' could mean the 12 papers or the 6 weeks; unresolved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-012",
+      "semanticSkeletonId": "p1b6-sk-2da4e54e6609e34b",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Friend's fee depends on whether they are a nearby university student, which is not stated.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-013",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Standing-desk switch is explicitly still undecided; the undecided status itself is given.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-014",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Yoga registration is explicitly still under consideration, not applied.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-015",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Release delay is given as the team lead's attributed, not-yet-official statement.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-016",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Switching apps is explicitly undecided and still being weighed.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-017",
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "User plans ~11pm gym; user is registered for the night-shift exception allowing use until midnight.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-018",
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Workshop venue is Jeju, heard then confirmed by HR email.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-019",
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "'그거' resolves unambiguously to the borrowed electric drill.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-020",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Rent increase is explicitly given as the landlord's attributed, unconfirmed verbal claim.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-021",
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Dental appointment moved from Tuesday to Thursday.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-022",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Habit is stated in present tense and corrected to weekday mornings; last week's break was temporary and the cause has resolved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-023",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Unclear whether the 2 PT sessions are part of the 3 workouts or additional; weekly count could be 3 or 5.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-024",
+      "semanticSkeletonId": "p1b6-sk-f03b5a7c91e2486d",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Saturday delivery habit paused two weeks and explicitly resumed since last week.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-025",
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Drive time is given as a stable approximate range of two to three hours.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-026",
+      "semanticSkeletonId": "p1b6-sk-000035b8df850b3e",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Grad-school application is explicitly still undecided.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-027",
+      "semanticSkeletonId": "p1b6-sk-0767dc2f59b57601",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "User is this week's designated duty person, so the exception permits night use.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-028",
+      "semanticSkeletonId": "p1b6-sk-0ed5b52f4c5735e9",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Two consistent sources give the wedding as the third Saturday of October.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-029",
+      "semanticSkeletonId": "p1b6-sk-187292f8cbc0126c",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "'그걸' resolves to the coat (with the longer right sleeve) being taken for alteration.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-030",
+      "semanticSkeletonId": "p1b6-sk-2b6f4ac9e15d8307",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Given status: leaning toward Gangneung over Busan, destination not yet decided.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-031",
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Boiler replacement is given as the neighbor's hearsay claim with no official notice.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-032",
+      "semanticSkeletonId": "p1b6-sk-4bbd555977190591",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "'그렇게 해줘' could approve the 30-minute delay or a move to 10:30; original stand-up time is not given, so readings may differ.",
+      "route": "DECISION_DISAGREEMENT",
+      "provenance": null,
+      "eligibility": "PENDING_MANDATORY_HUMAN"
+    },
+    {
+      "itemId": "p1b6-item-b004-033",
+      "semanticSkeletonId": "p1b6-sk-6e493bbfafdb22de",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Club meeting venue changed from Sinchon to Hapjeong by the president's notice.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-034",
+      "semanticSkeletonId": "p1b6-sk-82149f27c2f521ae",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Explicit corrections give the meeting as Tuesday 4pm, 5th-floor room.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-035",
+      "semanticSkeletonId": "p1b6-sk-8a41f0d92c7e6b35",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Hotspot plan was bounded by internet installation, which is now completed, so the plan has ended.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-036",
+      "semanticSkeletonId": "p1b6-sk-8dd28ec6b22a18ad",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Daily walk habit stated in present tense with a rainy-season exception that has now ended.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-037",
+      "semanticSkeletonId": "p1b6-sk-be0efa305956d111",
+      "referenceLabel": "ESCALATE",
+      "disposition": "FIX",
+      "decision": null,
+      "reason": "TARGET marks the general vegetable-plot rule, but the bundle's material issue (tomato plot is both vegetable and shaded, no precedence given) is not what is targeted; retarget or restructure.",
+      "route": "FIX",
+      "provenance": null,
+      "eligibility": "PENDING_MANDATORY_HUMAN"
+    },
+    {
+      "itemId": "p1b6-item-b004-038",
+      "semanticSkeletonId": "p1b6-sk-f03b5a7c91e2486d",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Study resumed weekly on Wednesdays after the exam-period break.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-039",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Long-term user definition is hedged and user meets the duration but not the monthly-pass criterion; status unknown.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-040",
+      "semanticSkeletonId": "p1b6-sk-47c9b12e0a6f83d5",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Monday recycling duty explicitly continues alongside the new Friday duty.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b004-041",
+      "semanticSkeletonId": "p1b6-sk-5269c91fcfb6c2cd",
+      "referenceLabel": "ESCALATE",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Resident definition is hedged ('usually' >1 year and registered); user has 2 months + registration, so eligibility is unknown.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "mandatoryHumanItemIds": [
+    "p1b6-item-b004-032",
+    "p1b6-item-b004-037"
+  ],
+  "calibrationItemIds": [
+    "p1b6-item-b004-001",
+    "p1b6-item-b004-015",
+    "p1b6-item-b004-009",
+    "p1b6-item-b004-040",
+    "p1b6-item-b004-036",
+    "p1b6-item-b004-026",
+    "p1b6-item-b004-002",
+    "p1b6-item-b004-006"
+  ],
+  "authority": {
+    "humanPacketBuilt": false,
+    "humanReviewPerformed": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

@@ -5310,3 +5310,15 @@ stays **93**.
 | packet (not committed) | 40 audit-PASS rows, `p1b6-b004-v3smreview` namespace, raw SHA `95df87e3137adee24b7ab805636e0e30794880cbced7f63afbc5feb3f54d0cbb` |
 
 No review has run; the accepted pool record stays **93**.
+
+#### P1-B6 batch-004 v3 strong-model review attempt-001 — 38 CLEAN / 2 MANDATORY HUMAN
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-004-v3-review-attempt-001.json` | reconciled receipt |
+| `~/p1b6-b004-v3-review-results.json` (not committed) | raw results, `5cf63491c1e772027db0e645112490eeeb02c806607b2317bf66c826d05900ee` |
+
+Reviewer: fresh Claude Code CLI session in the home directory, Claude Opus 5.5 (owner-reported).
+24 KEEP CLEAR / 15 KEEP ESCALATE / 1 FIX. Mandatory HUMAN `032` (decision disagreement), `037`
+(FIX); calibration `001` `015` `009` `040` `036` `026` `002` `006`. No HUMAN review or acceptance;
+the accepted pool record stays **93**.
