@@ -6,15 +6,12 @@
   --lc-danger: #B45A55;
   --lc-live: #2EA16B;
   --lc-live-bg: #F2FBF8;
-  --lc-pen-outline: #000000;
 }
 [data-theme="dark"] {
   --lc-ink-2: #C9D2CD;
   --lc-danger: #E0857F;
   --lc-live: #5CC795;
   --lc-live-bg: rgba(46, 161, 107, 0.14);
-  /* 검정 외곽선은 어두운 레일에서 펜 모양이 사라진다. */
-  --lc-pen-outline: #C9D2CD;
 }
 
 .lecture-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; }
