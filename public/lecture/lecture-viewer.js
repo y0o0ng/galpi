@@ -114,6 +114,9 @@
       return;
     }
     if (viewer !== v) return;
+    // 포스트잇은 자료 필기에 들어 있어 필기와 함께 저장된다. `시온에게 묻기`는 선택을 붙인 포스트잇을 연다(L3a).
+    v.sticky = global.LectureSticky.attach(v);
+    v.lasso = global.LectureLasso.create(v, { onAsk: (page, selection) => v.sticky.create(page, [selection.bbox[2], selection.bbox[1]], selection) });
     buildPages(v);
     if (v.container?.type === 'course') {
       // `+ 새 강의`로 열었으면 오늘의 기존 Session을 붙이지 않는다. 첫 녹음이 새 Session을 만든다.
@@ -191,19 +194,25 @@
     v.pagesEl = el('div', 'lecture-pages');
     v.scroller.append(v.pagesEl);
     // Pencil은 그리고 손가락은 스크롤한다. Safari는 stylus 터치도 스크롤로 먹으므로 그것만 막는다.
+    // 버튼(`시온에게 묻기`·말풍선·포스트잇 카드)은 막지 않는다 — 막으면 Pencil 탭이 click이 되지 않는다.
+    const stylus = event => !event.target.closest?.('button') && [...event.touches].some(touch => touch.touchType === 'stylus');
     v.scroller.addEventListener('touchstart', event => {
-      if ([...event.touches].some(touch => touch.touchType === 'stylus')) event.preventDefault();
+      if (stylus(event)) event.preventDefault();
       else if (event.touches.length === 2) startPinch(v, event);
     }, { passive: false });
     v.scroller.addEventListener('touchmove', event => {
-      if ([...event.touches].some(touch => touch.touchType === 'stylus')) event.preventDefault();
+      if (stylus(event)) event.preventDefault();
       else if (v.pinch && event.touches.length === 2) { event.preventDefault(); movePinch(v, event); }
     }, { passive: false });
     v.scroller.addEventListener('touchend', event => { if (v.pinch && event.touches.length < 2) endPinch(v); });
     v.scroller.addEventListener('touchcancel', () => { if (v.pinch) endPinch(v); });
     v.scroller.addEventListener('scroll', () => requestAnimationFrame(() => updatePageIndicator(v)), { passive: true });
 
-    v.pens = global.LecturePens.buildRail({ toast });
+    v.pens = global.LecturePens.buildRail({
+      toast,
+      onSticky: () => v.sticky?.createAtView(currentPage(v)),
+      onSelect: on => { if (!on) v.lasso?.clear(); },
+    });
     v.rail = v.pens.el;
     v.indicator = el('div', 'lecture-page-pill', '');
     v.main = el('div', 'lecture-viewer-body');
@@ -250,6 +259,7 @@
     v.pageWidth = 0;
     layoutPages(v);
     v.pages.forEach(page => v.observer.observe(page.el));
+    v.sticky.render();
   }
 
   function layoutPages(v, keepScroll = false) {
@@ -265,6 +275,7 @@
       if (page.visible) showPage(v, page);
     });
     if (anchor) v.scroller.scrollTop = anchor.el.offsetTop + within * anchor.el.offsetHeight;
+    v.sticky.layout();
     updatePageIndicator(v);
   }
 
@@ -597,6 +608,7 @@
       v.conflict = null;
       v.dirty = false;
       v.pages.forEach(page => drawInk(v, page));
+      v.sticky.render();
       saveDraft(v);
       renderStatus(v);
     });

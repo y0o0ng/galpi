@@ -111,9 +111,13 @@
   const toolSvg = pen => (pen.tool === 'eraser' ? ERASER_PEN_SVG : pen.tool === 'highlighter' ? highlighterSvg(pen.color) : penSvg(pen.color));
   const toolName = tool => ({ ...MODES.lecture.tools, ...MODES.review.tools })[tool];
   const PLUS_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 3.75V16.25M3.75 10H16.25" stroke="currentColor" stroke-width="1.875" stroke-linecap="round"/></svg>';
+  // Figma `Floating Toolbar`의 `Lasso`(150:93)·`Sticky`(150:97) 아이콘.
+  const LASSO_SVG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M5.5 14.5C3.6 13.3 3 11.8 3 10.5C3 6.9 7 4 12 4C17 4 21 6.9 21 10.5C21 14.1 17 17 12 17C10.7 17 9.5 16.8 8.4 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.5 2.5"/><path d="M6 13.5C7.2 13.5 8.2 14.5 8.2 15.7C8.2 16.9 7.2 18 6 18C4.8 18 4.5 18.8 4.5 19.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const STICKY_SVG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M13 19.9991C12.9051 20 12.7986 20 12.677 20H7.19691C6.07899 20 5.5192 20 5.0918 19.7822C4.71547 19.5905 4.40973 19.2842 4.21799 18.9079C4 18.4801 4 17.9203 4 16.8002V7.2002C4 6.08009 4 5.51962 4.21799 5.0918C4.40973 4.71547 4.71547 4.40973 5.0918 4.21799C5.51962 4 6.08009 4 7.2002 4H16.8002C17.9203 4 18.4796 4 18.9074 4.21799C19.2837 4.40973 19.5905 4.71547 19.7822 5.0918C20 5.5192 20 6.07899 20 7.19691V12.6747C20 12.7973 20 12.9045 19.9991 13C19.9964 13.2855 19.9857 13.4659 19.9443 13.6384C19.8953 13.8424 19.8142 14.0379 19.7046 14.2168C19.5809 14.4186 19.4089 14.5916 19.063 14.9375L14.9375 19.063C14.5916 19.4089 14.4186 19.5814 14.2168 19.705C14.0379 19.8147 13.8429 19.8958 13.6388 19.9448C13.4663 19.9862 13.2857 19.9966 13 19.9991ZM19.9991 13H14.5996C14.0396 13 13.7598 13 13.5459 13.109C13.3577 13.2049 13.2049 13.3577 13.109 13.5459C13 13.7598 13 14.04 13 14.6001V19.9991" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const ROTATE_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M14 3H6C4.34315 3 3 4.34315 3 6V14C3 15.6569 4.34315 17 6 17H14C15.6569 17 17 15.6569 17 14V6C17 4.34315 15.6569 3 14 3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M8 8H13V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 8L7 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
-  function buildRail({ toast, mode: initialMode = 'lecture' }) {
+  // onSticky: 레일 포스트잇 버튼. onSelect(on): 올가미 선택 모드가 켜지고 꺼질 때.
+  function buildRail({ toast, mode: initialMode = 'lecture', onSticky = () => {}, onSelect = () => {} }) {
     let modeName = initialMode;
     let mode = MODES[modeName];
     let settings = load(modeName);
@@ -130,8 +134,24 @@
     const turn = el('button', 'lecture-rail-tool lecture-rail-turn');
     turn.type = 'button';
     turn.append(icon(ROTATE_SVG));
-    rail.append(pensEl, add, el('span', 'lecture-rail-divider'), turn);
+    const lasso = el('button', 'lecture-rail-tool lecture-rail-lasso');
+    lasso.type = 'button';
+    lasso.setAttribute('aria-label', '올가미 선택');
+    lasso.append(icon(LASSO_SVG));
+    const sticky = el('button', 'lecture-rail-tool lecture-rail-sticky');
+    sticky.type = 'button';
+    sticky.setAttribute('aria-label', '포스트잇');
+    sticky.append(icon(STICKY_SVG));
+    rail.append(pensEl, add, el('span', 'lecture-rail-divider'), lasso, sticky, el('span', 'lecture-rail-divider'), turn);
     let menu = null;
+    // 선택 모드는 펜 대신 켜지는 도구다. 펜을 고르면 꺼진다.
+    let selecting = false;
+    function setSelecting(on) {
+      if (selecting === on) return;
+      selecting = on;
+      onSelect(on);
+      render();
+    }
 
     const persist = () => store(mode.key, settings);
     function closeMenu() {
@@ -147,14 +167,21 @@
       if (settings.pens[settings.selected]?.tool !== 'eraser') lastDraw = settings.selected;
       rail.classList.toggle('is-horizontal', orientation === 'horizontal');
       rail.dataset.mode = modeName;
+      lasso.classList.toggle('active', selecting);
+      lasso.setAttribute('aria-pressed', String(selecting));
       turn.setAttribute('aria-label', orientation === 'horizontal' ? '세로 레일로' : '가로 레일로');
       add.disabled = settings.pens.length >= MAX_PENS;
       pensEl.replaceChildren(...settings.pens.map((pen, index) => {
-        const button = el('button', `lecture-rail-pen is-${pen.tool}${index === settings.selected ? ' active' : ''}`);
+        const button = el('button', `lecture-rail-pen is-${pen.tool}${index === settings.selected && !selecting ? ' active' : ''}`);
         button.type = 'button';
         button.setAttribute('aria-label', `${toolName(pen.tool)} ${index + 1}${index === settings.selected ? ' · 다시 누르면 설정' : ''}`);
         button.append(icon(toolSvg(pen)), el('span', 'lecture-rail-width', pen.width.toFixed(1)));
         button.addEventListener('click', () => {
+          if (selecting) {
+            settings.selected = index;
+            persist();
+            return setSelecting(false);
+          }
           if (index === settings.selected) return menu ? closeMenu() : openMenu(button);
           settings.selected = index;
           persist();
@@ -267,6 +294,8 @@
       persist(); closeMenu(); render();
       pensEl.lastElementChild?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
+    lasso.addEventListener('click', () => { closeMenu(); setSelecting(!selecting); });
+    sticky.addEventListener('click', () => { closeMenu(); onSticky(); });
     turn.addEventListener('click', () => {
       orientation = orientation === 'horizontal' ? 'vertical' : 'horizontal';
       store(ORIENTATION_KEY, orientation);
@@ -279,8 +308,12 @@
       current: () => settings.pens[settings.selected],
       close: closeMenu,
       mode: () => modeName,
+      selecting: () => selecting,
+      setSelecting,
       // 원형 메뉴의 `펜`·`지우개`. 펜은 이 모드에서 마지막으로 쓴 필기 도구로, 지우개는 목록의 첫 지우개로 간다.
       choose(kind) {
+        if (kind === 'select') return setSelecting(true);
+        if (selecting) { selecting = false; onSelect(false); }
         const index = kind === 'eraser'
           ? settings.pens.findIndex(pen => pen.tool === 'eraser')
           : (settings.pens[lastDraw]?.tool !== 'eraser' && settings.pens[lastDraw] ? lastDraw : settings.pens.findIndex(pen => pen.tool !== 'eraser'));

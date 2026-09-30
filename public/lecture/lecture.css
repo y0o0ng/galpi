@@ -480,3 +480,46 @@ body.lecture-viewer-open { overflow: hidden; }
 button.lecture-side-boundary { cursor: pointer; }
 .lecture-side-rule { flex: none; width: 12px; height: 1px; background: var(--hairline); }
 @media (max-width: 700px) { .lecture-side { position: fixed; inset: auto 0 0 0; width: auto; max-height: 60vh; z-index: 2; border-left: 0; border-top: 1px solid var(--hairline); } }
+
+/* ─── L3a 올가미·포스트잇. Figma `04 — Sticky Q&A` S1–S3·`Sticky Anchor`(175:75). ─── */
+.lecture-rail-lasso.active, .lecture-rail-sticky:active { background: var(--brand-soft-strong); color: var(--brand-ink); }
+
+.lecture-lasso { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.lecture-lasso path { fill: none; stroke: #2F6B57; stroke-width: 1.5; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.lecture-lasso.is-closed path { fill: rgba(47, 107, 87, 0.06); }
+/* 선택 오른쪽 위에 걸친다(Figma S3 177:318). */
+.lecture-ask {
+  position: absolute; z-index: 3; display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px; transform: translate(-40px, -44px); white-space: nowrap;
+  border: 1px solid var(--hairline); border-radius: 12px; background: var(--ai-bubble); color: var(--ai-text);
+  box-shadow: 0 4px 12px rgba(29, 38, 34, 0.1); font: inherit; font-size: 14px; font-weight: 510; cursor: pointer;
+}
+.lecture-ask .lecture-icon { color: var(--brand-ink); }
+
+/* 말풍선은 포스트잇 위치에 중심을 둔다. 확대와 상관없이 같은 크기다. */
+.lecture-sticky-anchor {
+  position: absolute; z-index: 2; display: flex; width: 44px; height: 44px; padding: 0; transform: translate(-22px, -22px);
+  border: 0; background: none; cursor: pointer; touch-action: manipulation;
+}
+/* 포스트잇 종이는 테마와 상관없이 옅은 로즈다(§6.6). */
+.lecture-sticky-card {
+  position: absolute; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid #EFC7D4; border-radius: 12px; background: #FBEAF0; color: #1D2622;
+  box-shadow: 0 6px 16px rgba(29, 38, 34, 0.14);
+}
+.lecture-sticky-head { display: flex; flex: none; align-items: center; gap: 6px; height: 40px; padding: 8px 6px 4px 10px; cursor: grab; touch-action: none; }
+.lecture-sticky-tabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.lecture-sticky-tabs button {
+  flex: none; height: 22px; padding: 0 9px; border: 0; border-radius: 999px; background: none;
+  color: #5F6E66; font: inherit; font-size: 12px; font-weight: 510; cursor: pointer;
+}
+.lecture-sticky-tabs button.active { background: rgba(255, 255, 255, 0.8); color: #1D2622; }
+.lecture-sticky-collapse { display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; margin-left: auto; padding: 0; border: 0; background: none; cursor: pointer; }
+.lecture-sticky-body { position: relative; flex: 1; min-height: 0; padding: 2px 12px 0; overflow: auto; touch-action: pan-y; }
+/* `.lecture-page canvas`의 꽉 채움을 카드 안에서는 풀어 준다. */
+.lecture-sticky-card canvas { position: static; display: block; width: auto; height: auto; }
+.lecture-sticky-card .lecture-sticky-selection { max-width: 100%; max-height: 120px; margin-bottom: 8px; border-radius: 10px; background: #fff; }
+.lecture-sticky-card .lecture-sticky-memo { width: 100%; touch-action: pan-y; }
+.lecture-sticky-foot { display: flex; flex: none; align-items: center; justify-content: space-between; height: 38px; padding: 6px 8px 8px 10px; }
+.lecture-sticky-delete { padding: 0; border: 0; background: none; color: #5F6E66; font: inherit; font-size: 12px; font-weight: 510; cursor: pointer; }
+.lecture-sticky-resize { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; background: none; cursor: nwse-resize; touch-action: none; }

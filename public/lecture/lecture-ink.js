@@ -80,6 +80,11 @@
       event.preventDefault();
       page.ink.setPointerCapture(event.pointerId);
       v.pens.close();
+      // 선택 모드에서는 펜이 올가미를 그린다. 길게 누르면 원형 메뉴는 그대로 뜬다(§6.6).
+      if (v.pens.selecting()) {
+        startHold(v, page, event);
+        return v.lasso.start(page, event);
+      }
       const pen = v.pens.current();
       // 마지막 방어선: 강의 펜은 초록을, 복습 펜은 초록이 아닌 색을 쓰지 않는다(§8.2).
       if (pen.tool !== 'eraser' && !v.pens.allows(pen.color)) return toast(v.pens.refusal());
@@ -119,6 +124,7 @@
         // 획을 긋기 시작하면 도중에 멈춰도 메뉴를 열지 않는다.
         if (Math.hypot(event.clientX - v.hold.x, event.clientY - v.hold.y) > HOLD_TOLERANCE_PX) cancelHold(v);
       }
+      if (v.lasso?.active(event.pointerId)) return v.lasso.move(page, event);
       if (v.erasing?.pointerId === event.pointerId) {
         // 이벤트 사이도 훑는다. 빠르게 문지르면 두 이벤트 사이에 있는 획을 건너뛴다.
         (event.getCoalescedEvents?.() || [event]).forEach(item => {
@@ -154,14 +160,16 @@
     const end = event => {
       if (v.hold?.pointerId === event.pointerId) {
         const radial = v.radial;
+        const { page: holdPage, x, y } = v.hold;
         cancelHold(v);
         // 떼는 순간 고른 항목을 실행한다. 입력이 중단되면(pointercancel) 아무것도 실행하지 않는다.
         if (radial) {
           const choice = event.type === 'pointerup' ? radial.release() : (radial.cancel(), null);
-          if (choice) runRadial(v, choice);
+          if (choice) runRadial(v, choice, holdPage, pagePoint(holdPage, { clientX: x, clientY: y }));
           return;
         }
       }
+      if (v.lasso?.active(event.pointerId)) return v.lasso.end(page, event.type === 'pointerup');
       if (v.erasing?.pointerId === event.pointerId) {
         v.erasing = null;
         return;
@@ -214,17 +222,21 @@
       drawInk(v, hold.page);
     }
     if (v.erasing?.pointerId === hold.pointerId) v.erasing = null;
+    if (v.lasso?.active(hold.pointerId)) v.lasso.clear();
     const recording = isRecordingHere(v);
     v.radial = global.LectureRadial.open({
       x: hold.x,
       y: hold.y,
-      // 선택(올가미)·포스트잇은 아직 없다. 마커는 녹음 중에만 쓸 수 있다(§6.4).
-      enabled: { pen: true, eraser: true, select: false, sticky: false, important: recording, later: recording },
+      // 마커는 녹음 중에만 쓸 수 있다(§6.4).
+      enabled: { pen: true, eraser: true, select: true, sticky: true, important: recording, later: recording },
     });
   }
 
-  function runRadial(v, choice) {
+  // 포스트잇은 메뉴를 부른 자리에 만든다. 만들기만 하고 아무것도 보내지 않는다(§6.8).
+  function runRadial(v, choice, page, point) {
     if (choice === 'pen' || choice === 'eraser') v.pens.choose(choice === 'eraser' ? 'eraser' : 'draw');
+    else if (choice === 'select') v.pens.choose('select');
+    else if (choice === 'sticky') v.sticky.create(page, point);
     else if (choice === 'important' || choice === 'later') v.markers?.add(choice);
   }
 
@@ -251,5 +263,5 @@
     v.changed();
   }
 
-  global.LectureInk = { bindInk, drawInk };
+  global.LectureInk = { bindInk, drawInk, drawStroke, pagePoint, segmentDistance };
 })(window);
