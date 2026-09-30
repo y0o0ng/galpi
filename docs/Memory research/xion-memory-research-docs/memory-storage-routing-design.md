@@ -101,6 +101,16 @@ Approval applies to the reviewed proposal and replay snapshot. A changed snapsho
 
 This selects the initial development authority boundary, not a permanent requirement to manually approve every future memory. Automatic semantic approval conditions remain OPEN and must be evaluated against the actual proposer/validator before adoption. Local-model use remains an option. The HUMAN review/resume interface and provider adapter are not implemented by the current storage core; synthetic test callbacks are not production approval authority. This decision instantiates canonical §42.2 SI-10 / §42.6 without changing their shared transition semantics.
 
+The owner has also accepted three development review choices:
+
+| HUMAN choice | Meaning and effect |
+| --- | --- |
+| Approve | Accept the proposed semantic judgment and transition for the reviewed snapshot; commit is permitted only after the existing mechanical and snapshot checks pass |
+| Hold | Evidence is insufficient to judge; preserve the stable state and pending candidate/evidence without commit |
+| Reject proposal | Judge this transition proposal wrong; preserve the stable state and pending candidate/evidence for possible later evaluation without commit |
+
+Hold and rejection remain distinguishable review decisions, even though both leave the candidate pending. Rejection is not source deletion, candidate disposal, a new NO_WRITE triage decision, or automatic INVALIDATE of the existing claim. These are review-contract choices, not new derived-state statuses; the review interface and durable choice representation remain to be implemented.
+
 ### Physical state and provenance — schema v31
 
 | Family-local table | Responsibility |
