@@ -5355,3 +5355,12 @@ acceptance; the accepted pool record stays **93**.
 
 Minimum top-up lower bound **1 (EN)**. No top-up authored, no acceptance; the accepted pool record
 stays **93**.
+
+#### P1-B6 batch-005 EN top-up — 2 slots PREREGISTERED / MATERIALIZED / awaiting owner pre-audit review
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-005-authoring-protocol.json` | 2 EN TRAIN slots: `0768ea20` (ESCALATE target), `f4d809ae` (CLEAR target, owner exception) |
+| `fixtures/local-memory-inference-p1b6-surface-batch-005.json` | 2 items, `b005` namespace |
+
+No audit, review or acceptance; the accepted pool record stays **93**.

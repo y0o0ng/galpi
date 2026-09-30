@@ -1,0 +1,127 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-005-v1",
+  "batchId": "p1b6-surface-batch-005",
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-b005-001",
+      "sourceFamilyId": "p1b6-sf-b005-001",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "I'm comparing two desk mats for my office."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "The first one is 80 cm wide and 40 cm deep."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "My coffee went cold while I was measuring."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "The second one is about 5 cm bigger on one side, and the other side is the same."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b005-002",
+      "sourceFamilyId": "p1b6-sf-b005-002",
+      "splitAssignment": "TRAIN",
+      "language": "EN",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "For context, my sister is flying in for the holidays."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "The garage door remote needs new batteries."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "She said her flight lands sometime between 3 and 4 p.m."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "The milk is almost gone."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "I'll leave for the airport around 2:30."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-b005-001",
+      "sourceEpisodeId": "p1b6-se-b005-001",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 18,
+        "endByte": 47
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 42
+        },
+        {
+          "turnId": "t2",
+          "startByte": 0,
+          "endByte": 43
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 80
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b005-001"
+    },
+    {
+      "itemId": "p1b6-item-b005-002",
+      "sourceEpisodeId": "p1b6-se-b005-002",
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "anchorSpanRef": {
+        "turnId": "t3",
+        "startByte": 35,
+        "endByte": 55
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 53
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 55
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 39
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b005-002"
+    }
+  ]
+}

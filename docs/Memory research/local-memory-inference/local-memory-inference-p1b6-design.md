@@ -49,7 +49,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   8-row calibration sample. Owner HUMAN review (2026-09-30): **8/10 match v3** — `032`
   `HUMAN_ADJUDICATED` / `ELIGIBLE`; `037` (mandatory) and `009` (calibration) are KEEP CLEAR
   against v3 ESCALATE; the owner closed both as current-realization failures. **Ledger v2: pool
-  387; the only marginal shortage is EN, by one (37 / 38).** No acceptance.
+  387; the only marginal shortage is EN, by one (37 / 38).** A 2-row EN batch-005 top-up is
+  preregistered and materialized and awaits the owner's pre-audit review. No acceptance.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2175,6 +2176,20 @@ pool**. `…-shortage-receipt-v2.json`: split 243 / 61 / 83 against 240 / 60 / 8
 met, language KO 272 / 266, MIXED 78 / 76, **EN 37 / 38**, no HELD per-skeleton need. The
 minimum marginal top-up is **1 (EN)**. This is a marginal lower bound, not a joint-feasibility
 proof.
+
+**Batch-005 EN top-up — preregistered and materialized, awaiting owner pre-audit review.** The
+owner chose two EN TRAIN slots (one buffer) and a mixed allocation:
+`scripts/build-memory-inference-p1b6-batch-005.js` (`npm run build:memory-inference-p1b6-batch-005`)
+writes `fixtures/local-memory-inference-p1b6-surface-batch-005-authoring-protocol.json` and
+`…-surface-batch-005.json`. Slot `001` goes to `0768ea20` (ESCALATE target), the
+lowest-coverage TRAIN skeleton under the batch-004 rule; slot `002` goes to `f4d809ae` (CLEAR
+target) as an owner exception, the lowest-coverage CLEAR TRAIN skeleton, so that a loss on the
+harder skeleton is absorbed. This choice is by survival, not a label target. Calibration is every
+clean agreement. The builder pins v3 and ledger / shortage v2, computes offsets and IDs, runs the
+shared validator against v3 and the leakage check against every prior batch and candidate
+including batch-004. `001` states that exactly one side of a mat is about 5 cm bigger and the
+other is the same, without saying which side (after `009` collapsed to "each side");
+`002` gives an attributed landing range. Nothing is audited, reviewed or accepted.
 
 ## Closed Selection and Freeze Constraints
 

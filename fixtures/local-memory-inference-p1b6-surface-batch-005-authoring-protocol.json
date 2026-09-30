@@ -1,0 +1,82 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-005-authoring-protocol-v1",
+  "status": "PREREGISTERED",
+  "decisionsSource": "REPOSITORY_OWNER_APPROVED_TOP_UP_PARAMETERS",
+  "inputs": {
+    "v3": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "ledgerV2": {
+      "identity": "xion-local-memory-inference-p1b6-reviewed-pool-ledger-v2",
+      "rawSha256": "853de398664ced6fd2c11299be77c20f8ce452615bff51bfd51c331388b1329d"
+    },
+    "shortageV2": {
+      "identity": "xion-local-memory-inference-p1b6-shortage-receipt-v2",
+      "rawSha256": "9c6bbda80521f2f6db707e905f04ba3923360f67028e595962b5a430d60792cd"
+    }
+  },
+  "tranche": {
+    "total": 2,
+    "lowerBound": 1,
+    "buffer": 1,
+    "split": {
+      "TRAIN": 2,
+      "DEV": 0,
+      "FINAL_HELD_OUT": 0
+    },
+    "language": {
+      "EN": 2
+    }
+  },
+  "slots": [
+    {
+      "slot": "001",
+      "semanticSkeletonId": "p1b6-sk-0768ea2028f18511",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "ESCALATE",
+      "language": "EN",
+      "fragments": 2,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "lowest pooled coverage in TRAIN, ties by skeleton ID (batch-004 rule)"
+    },
+    {
+      "slot": "002",
+      "semanticSkeletonId": "p1b6-sk-f4d809ae085dbac9",
+      "splitAssignment": "TRAIN",
+      "authoringTargetLabel": "CLEAR",
+      "language": "EN",
+      "fragments": 3,
+      "discoursePattern": "CONTEXT_FIRST",
+      "allocationRule": "owner exception: lowest pooled coverage among CLEAR TRAIN skeletons, to absorb a loss on the harder slot"
+    }
+  ],
+  "authoringRules": [
+    "Fresh content under the b005 namespace; no reuse of any prior text, ID or review result.",
+    "The batch-003 leakage check runs fail-closed against every prior batch and candidate artifact, including batch-004.",
+    "Authoring target labels are generator targets, not HUMAN gold, and never enter a blind packet.",
+    "The owner reviews the authored text before the source audit."
+  ],
+  "gates": {
+    "order": [
+      "owner pre-audit authoring review",
+      "fresh source/bundle audit (FAIL / UNCERTAIN excluded)",
+      "blind v3 strong-model semantic review",
+      "mandatory HUMAN for disagreement / FIX / REJECT / missing",
+      "HUMAN calibration of every clean agreement"
+    ],
+    "calibration": {
+      "rule": "every clean agreement",
+      "matchingKeepSemantics": "stays CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL; not promoted"
+    },
+    "mandatoryMatchingKeepSemantics": "HUMAN_ADJUDICATED / ELIGIBLE"
+  },
+  "authority": {
+    "sourceAuditRun": false,
+    "semanticReviewRun": false,
+    "humanReviewRun": false,
+    "acceptancePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}
