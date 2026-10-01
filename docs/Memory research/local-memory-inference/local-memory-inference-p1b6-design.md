@@ -1199,6 +1199,15 @@ their current status. Semantic rows need IN_SCOPE and a KEEP matching v4 (mandat
 independent: the owner wrote the clarification and decided v4. Packet `p1b6-v4-hreview`,
 `73b9f178…`, not committed.
 
+**Contract freeze for P1-B6 (owner, 2026-10-01).** v4 is the last semantic contract for this
+corpus. A contract issue found from here on is recorded for a successor version (P1-B7 or later)
+and does not reopen P1-B6. The remaining path is fixed as one pass: (1) the owner's 28-row HUMAN
+review; (2) ledger v6 and the shortage; (3) one top-up — at least HELD `11e63b75` 2 and
+`a19bb9e9` 1 plus any other shortfall, with user-centered scope checked at authoring, then source
+audit and v4 review; (4) deterministic 380 selection; (5) the independent second strong-model
+review of the 80 selected HELD rows; (6) freeze. Surface defects found on that path are handled by
+the existing gates (exclusion, top-up), not by contract changes.
+
 ## Supervised Corpus
 
 The new supervised corpus has exactly 380 surface items:
