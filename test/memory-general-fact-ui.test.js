@@ -42,8 +42,8 @@ function fixture(t) {
   return { dir, filename, db, review, reviews, store };
 }
 
-async function serving(t, reviews, prepareInput) {
-  const server = createReviewServer(reviews, prepareInput);
+async function serving(t, reviews, prepareInput, proposer) {
+  const server = createReviewServer(reviews, prepareInput, proposer);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -152,14 +152,14 @@ test('call failure/unsupported proposal persist pending input and cannot repeat 
   assert.equal(f.store.readTarget('USER', 'primary_laptop').currentState, null);
 });
 
-test('frontend explains an unsupported proposal as preserved pending evidence, not a save failure', async t => {
+for (const proposer of ['luna', 'qwen']) test(`${proposer} frontend names its provider and preserves unsupported proposals as pending`, async t => {
   const f = fixture(t);
   f.reviews.decide(f.review.reviewId, { choice: 'APPROVE', packageSha256: f.review.packageSha256 });
   const before = f.store.readTarget('USER', 'primary_laptop');
   let calls = 0;
   const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
     proposeTransition: request => { calls++; return proposed(request, 'KEEP_AMBIGUOUS', 'AMBIGUOUS'); } });
-  const { base } = await serving(t, f.reviews, prepare);
+  const { base } = await serving(t, f.reviews, prepare, proposer);
   const script = await (await fetch(`${base}/app.js`)).text();
   class Element {
     constructor(tag) { this.tag = tag; this.children = []; this.handlers = {}; this.value = ''; this.checked = false; }
@@ -178,12 +178,20 @@ test('frontend explains an unsupported proposal as preserved pending evidence, n
   await vm.runInContext(script, context);
   const descendants = node => [node, ...node.children.flatMap(descendants)];
   const nodes = descendants(panel);
+  const modelName = proposer === 'qwen' ? 'Qwen' : 'Luna';
+  assert.ok(nodes.some(node => node.textContent === modelName+' 제안 준비'));
+  const explanation = nodes.find(node => node.tag === 'p' && node.textContent?.startsWith('제안 준비를 누르면'));
+  if (proposer === 'qwen') {
+    assert.match(explanation.textContent, /로컬 서버/);
+    assert.match(explanation.textContent, /외부 API는 호출하지 않아/);
+    assert.doesNotMatch(explanation.textContent, /OpenAI|Luna/);
+  }
   nodes.find(node => node.id === 'source-text').value = 'Synthetic uncertain device relation';
   nodes.find(node => node.id === 'attribute-key').value = 'primary_laptop';
   nodes.find(node => node.id === 'candidate-value').value = 'Synthetic Different Laptop';
   const submit = nodes.find(node => node.tag === 'form').handlers.submit;
   await submit({ preventDefault() {} });
-  const status = nodes.find(node => node.tag === 'p' && node.textContent?.startsWith('Luna 제안은 보류'));
+  const status = nodes.find(node => node.tag === 'p' && node.textContent?.startsWith(modelName+' 제안은 보류'));
   assert.ok(status);
   assert.match(status.textContent, /검토 카드는 만들지 않았어/);
   assert.match(status.textContent, /원문·후보·제안은 보존/);
@@ -265,6 +273,29 @@ test('production-shaped or incomplete DB fails without adding tables', t => {
   assert.equal(f.db.prepare("SELECT name FROM sqlite_master WHERE name = 'memory_general_fact_reviews'").get(), undefined);
   assert.throws(() => main([]), /development-db/);
   assert.throws(() => main(['--db', f.filename]), /development-db/);
+});
+
+test('explicit Qwen startup avoids OpenAI configuration and makes no model call', t => {
+  const f = fixture(t);
+  const listen = http.Server.prototype.listen;
+  const oldKey = process.env.OPENAI_API_KEY, oldUrl = process.env.OPENAI_BASE_URL;
+  // Do not claim the owner's real review port; exercise startup before any submission.
+  http.Server.prototype.listen = function () { return this; };
+  process.env.OPENAI_API_KEY = '';
+  process.env.OPENAI_BASE_URL = 'https://must-not-be-used.invalid';
+  let server;
+  try {
+    server = main(['--development-db', f.filename, '--candidate-input', '--proposer', 'qwen']);
+    assert.ok(server instanceof http.Server);
+    assert.throws(() => main(['--development-db', f.filename, '--candidate-input', '--proposer', 'other']));
+    assert.throws(() => main(['--development-db', f.filename, '--proposer', 'qwen']));
+    assert.equal(f.db.prepare('SELECT count(*) AS n FROM messages').get().n, 1);
+  } finally {
+    if (server) server.emit('close');
+    http.Server.prototype.listen = listen;
+    if (oldKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = oldKey;
+    if (oldUrl === undefined) delete process.env.OPENAI_BASE_URL; else process.env.OPENAI_BASE_URL = oldUrl;
+  }
 });
 
 test('display has four information groups and full replay without mutating the source or state', async t => {
