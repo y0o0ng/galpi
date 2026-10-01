@@ -152,13 +152,16 @@ test('call failure/unsupported proposal persist pending input and cannot repeat 
   assert.equal(f.store.readTarget('USER', 'primary_laptop').currentState, null);
 });
 
-for (const proposer of ['luna', 'qwen']) test(`${proposer} frontend names its provider and preserves unsupported proposals as pending`, async t => {
+for (const [blocker, transition, changeClass] of [
+  ['UNSUPPORTED_TRANSITION', 'KEEP_AMBIGUOUS', 'AMBIGUOUS'],
+  ['INVALID_TRANSITION_TARGET', 'SUPERSEDE', 'EXPANSION'],
+]) for (const proposer of ['luna', 'qwen']) test(`${proposer} frontend explains ${blocker} as preserved pending evidence`, async t => {
   const f = fixture(t);
-  f.reviews.decide(f.review.reviewId, { choice: 'APPROVE', packageSha256: f.review.packageSha256 });
+  f.reviews.decide(f.review.reviewId, { choice: blocker === 'INVALID_TRANSITION_TARGET' ? 'HOLD' : 'APPROVE', packageSha256: f.review.packageSha256 });
   const before = f.store.readTarget('USER', 'primary_laptop');
   let calls = 0;
   const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
-    proposeTransition: request => { calls++; return proposed(request, 'KEEP_AMBIGUOUS', 'AMBIGUOUS'); } });
+    proposeTransition: request => { calls++; return proposed(request, transition, changeClass); } });
   const { base } = await serving(t, f.reviews, prepare, proposer);
   const script = await (await fetch(`${base}/app.js`)).text();
   class Element {
@@ -196,13 +199,17 @@ for (const proposer of ['luna', 'qwen']) test(`${proposer} frontend names its pr
   assert.match(status.textContent, /검토 카드는 만들지 않았어/);
   assert.match(status.textContent, /원문·후보·제안은 보존/);
   assert.doesNotMatch(status.textContent, /검토를 열거나 저장할 수 없어/);
+  if (blocker === 'INVALID_TRANSITION_TARGET') {
+    assert.match(status.textContent, /현재 사실의 유무/);
+    assert.match(status.textContent, /최초 형성은 CREATE/);
+  }
   await submit({ preventDefault() {} });
   assert.equal(calls, 1, 'no automatic retry or repeat submission');
   assert.deepEqual(f.reviews.listPending(), []);
-  const pending = f.db.prepare("SELECT pending_reason, proposal_json FROM memory_general_fact_candidates WHERE status = 'PENDING'").all();
+  const pending = f.db.prepare("SELECT pending_reason, proposal_json FROM memory_general_fact_candidates WHERE status = 'PENDING' AND pending_reason = ?").all(blocker);
   assert.equal(pending.length, 1);
-  assert.equal(pending[0].pending_reason, 'UNSUPPORTED_TRANSITION');
-  assert.equal(JSON.parse(pending[0].proposal_json).transition, 'KEEP_AMBIGUOUS');
+  assert.equal(pending[0].pending_reason, blocker);
+  assert.equal(JSON.parse(pending[0].proposal_json).transition, transition);
   assert.deepEqual(f.store.readTarget('USER', 'primary_laptop').states, before.states);
 });
 
