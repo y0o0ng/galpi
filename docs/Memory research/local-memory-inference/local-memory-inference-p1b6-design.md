@@ -68,7 +68,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   migrate. **Ledger v4: pool 379; minimum top-up 5** (DEV 1, HELD per-skeleton 4). A 7-row
   batch-006 top-up (HELD 5, DEV 2) is preregistered and materialized; HELD slots skip owner and
   HUMAN review; DEV owner pre-audit 2/2 PASS; source audit **7/7 PASS**; v3 review **7/7 clean**
-  (HELD 5 `PROVISIONAL`); the 2-row DEV HUMAN calibration packet is built, not run.
+  (HELD 5 `PROVISIONAL`); DEV HUMAN calibration **2/2 match**. **Ledger v5: pool 386; every
+  marginal and every HELD per-skeleton need is met (minimum top-up 0).** Next: preregister the
+  deterministic 380 selection.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the

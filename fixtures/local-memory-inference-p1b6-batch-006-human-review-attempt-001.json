@@ -1,0 +1,75 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-006-human-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-006-human-review-attempt-001",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-10-01",
+  "reviewProtocol": {
+    "identity": "p1b6-batch-006-blind-human-adjudication-calibration-v1",
+    "sha256": "f037b1798827ff44cfae00838c7c5da3c229357141b87008621b83af1a874e6f"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-006-human-review-packet-v1",
+    "sha256": "24dbf13a813190fbe38695f59bf56e66b8e9df8acd466672d634998301c9f07a",
+    "rows": 2
+  },
+  "v3ReviewReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-batch-006-v3-review-attempt-001-receipt-v1",
+    "rawSha256": "5b96f4470b4eaeba90a0025a313c365762adce045ddbb53c955e8cdb910b68ba"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b006-human-review-results.json",
+    "sha256": "1b07840b5ea8e2722c75138a854c9596ae1ff4e4f0ffeb357425c0957442984d",
+    "committed": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "independentConfirmation": false,
+    "limitation": "The owner approved the batch-006 allocation, reviewed both DEV surfaces before audit with their authoring target labels and kept the 007 TARGET, and had seen the v3 review summary (both DEV rows calibration); row blindness hid only which opaque row was which."
+  },
+  "summary": {
+    "total": 2,
+    "mandatory": 0,
+    "calibration": 2,
+    "matchingV3Reference": 2,
+    "humanAdjudicated": 0,
+    "unsampledCleanAgreements": 0
+  },
+  "rows": [
+    {
+      "reviewRowId": "p1b6-b006-hreview-af9a39f82d64a94d",
+      "itemId": "p1b6-item-b006-006",
+      "semanticSkeletonId": "p1b6-sk-5d2a9c70e4b18f63",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The reunion is stated to be either Saturday or Sunday, and Sunday is ruled out because the restaurant cannot be booked, so Saturday is pragmatically determined.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "reviewRowId": "p1b6-b006-hreview-d298762d3633f062",
+      "itemId": "p1b6-item-b006-007",
+      "semanticSkeletonId": "p1b6-sk-61cb1285dd1df651",
+      "role": "calibration",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The user plans to view another place next week that is cheaper than the 600,000 won studio already viewed, so the TARGET's status is sufficiently specified.",
+      "outcome": "CALIBRATION_MATCH",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "unsampledCleanAgreements": [],
+  "authority": {
+    "promotedToHumanAdjudicated": false,
+    "catalogAmendedByThisResult": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

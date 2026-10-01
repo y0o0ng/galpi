@@ -39,3 +39,20 @@ test('committed v3 review receipt: 7 clean, HELD all PROVISIONAL, only DEV route
   assert.deepEqual(receipt.calibrationItemIds, ITEMS);
   assert.equal(receipt.rows.filter(row => row.splitAssignment === 'FINAL_HELD_OUT').every(row => row.eligibility === 'PROVISIONAL'), true);
 });
+
+const os = require('node:os');
+const HUMAN_RECEIPT = path.join(__dirname, '..', 'fixtures', builder.RECEIPT_FIXTURE);
+const RAW = path.join(os.homedir(), 'p1b6-b006-human-review-results.json');
+
+test('the committed HUMAN receipt: both DEV rows are calibration matches, nothing promoted', () => {
+  const human = JSON.parse(fs.readFileSync(HUMAN_RECEIPT));
+  assert.deepEqual(human.rows.map(row => [row.itemId, row.outcome, row.eligibility]),
+    ITEMS.map(itemId => [itemId, 'CALIBRATION_MATCH', 'PROVISIONAL']));
+  assert.equal(human.authority.promotedToHumanAdjudicated, false);
+  assert.equal(human.reviewer.independentConfirmation, false);
+});
+
+test('the HUMAN receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(RAW) }, () => {
+  const human = JSON.parse(fs.readFileSync(HUMAN_RECEIPT));
+  assert.deepEqual(builder.buildHumanResultReceipt(fs.readFileSync(RAW), human.reviewDate), human);
+});

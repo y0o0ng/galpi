@@ -1,0 +1,207 @@
+{
+  "name": "xion-local-memory-inference-p1b6-shortage-receipt-v5",
+  "status": "MARGINAL_SHORTAGE_MEASURED_TOP_UP_NOT_AUTHORED",
+  "ledger": {
+    "identity": "xion-local-memory-inference-p1b6-reviewed-pool-ledger-v5"
+  },
+  "frozenConstraints": {
+    "total": 380,
+    "split": {
+      "TRAIN": 240,
+      "DEV": 60,
+      "FINAL_HELD_OUT": 80
+    },
+    "language": {
+      "KO": 266,
+      "MIXED": 76,
+      "EN": 38
+    },
+    "fragments": {
+      "1": 70,
+      "2": 100,
+      "3": 120,
+      "4": 70,
+      "5": 20
+    },
+    "heldSurfacesPerSkeleton": 5,
+    "labelBalance": "ABOLISHED_BY_SEMANTIC_CONTRACT_V3_NOT_MEASURED"
+  },
+  "pool": {
+    "total": 386,
+    "split": {
+      "TRAIN": {
+        "pool": 241,
+        "target": 240,
+        "deficit": 0,
+        "surplus": 1
+      },
+      "DEV": {
+        "pool": 61,
+        "target": 60,
+        "deficit": 0,
+        "surplus": 1
+      },
+      "FINAL_HELD_OUT": {
+        "pool": 84,
+        "target": 80,
+        "deficit": 0,
+        "surplus": 4
+      }
+    },
+    "language": {
+      "KO": {
+        "pool": 271,
+        "target": 266,
+        "deficit": 0,
+        "surplus": 5
+      },
+      "MIXED": {
+        "pool": 77,
+        "target": 76,
+        "deficit": 0,
+        "surplus": 1
+      },
+      "EN": {
+        "pool": 38,
+        "target": 38,
+        "deficit": 0,
+        "surplus": 0
+      }
+    },
+    "fragments": {
+      "1": {
+        "pool": 70,
+        "target": 70,
+        "deficit": 0,
+        "surplus": 0
+      },
+      "2": {
+        "pool": 102,
+        "target": 100,
+        "deficit": 0,
+        "surplus": 2
+      },
+      "3": {
+        "pool": 124,
+        "target": 120,
+        "deficit": 0,
+        "surplus": 4
+      },
+      "4": {
+        "pool": 70,
+        "target": 70,
+        "deficit": 0,
+        "surplus": 0
+      },
+      "5": {
+        "pool": 20,
+        "target": 20,
+        "deficit": 0,
+        "surplus": 0
+      }
+    }
+  },
+  "heldSkeletons": [
+    {
+      "semanticSkeletonId": "p1b6-sk-001178537fb93442",
+      "pool": 6,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11a3e916ff9b8129",
+      "pool": 6,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-11e63b75bdf266dd",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-135ab77919a554dc",
+      "pool": 6,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-155420007d75f36f",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-1e2014a2b5e70a20",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "pool": 6,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-32f27410e2beb10c",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-379bd3b3dd05d85e",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-6b74f6c163e7fa5d",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-75fe9a38eb99ab90",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-95b3c63acff8f020",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-c3d0e91a74b6f258",
+      "pool": 5,
+      "needTo5": 0
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-fa8ae6d4b81d50a8",
+      "pool": 5,
+      "needTo5": 0
+    }
+  ],
+  "heldPerSkeletonNeed": 0,
+  "zeroCoveredActiveSkeletons": [],
+  "lowerBounds": {
+    "total": 0,
+    "splitAware": 0,
+    "language": 0,
+    "fragments": 0
+  },
+  "minimumTopUpLowerBound": 0,
+  "statement": [
+    "Marginal lower bounds against the frozen 380 constraints; a top-up of this size is necessary but not proven sufficient.",
+    "Joint feasibility across split, skeleton, language and fragment cells is checked only at deterministic selection; a top-up plan must add buffer for review losses.",
+    "Surplus in one cell cannot fill a deficit in another. Label balance is not a target under semantic contract v3."
+  ],
+  "authority": {
+    "topUpAuthored": false,
+    "acceptancePerformed": false,
+    "finalSelectionPerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}
