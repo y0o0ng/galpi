@@ -538,6 +538,48 @@ These checks do not establish semantic model quality. The full suite was not
 repeated for this prompt/document change; the initial probe's full-suite result
 below remains historical. New external/model calls and storage commits: **0**.
 
+### Current independent-target granularity — 2026-10-01
+
+Further owner clarification: **anchor = adjudication target = storage target**.
+These identify the same user-centered semantic item across stages; the
+Extractor changes its representation, not its identity or scope. A bundle
+contains one such target, and only that target can proceed to storage after its
+own gates. Evidence may mention other targets without authorizing their storage.
+
+The former broad-topic merge rule is superseded for the development Builder.
+Independent user states require separate anchors/bundles even within one topic,
+turn or sentence. In the housing example, search status, lease-choice status,
+budget, university and walking-distance preference are separate targets. Their
+source evidence may overlap. Conditions, exceptions and corrections that
+determine one target's meaning remain its evidence; they must not be discarded
+or promoted into unrelated claims. This is not keyword-level splitting.
+
+The current request is `memory-evidence-bundle-selection-user-state-v1`, with the
+same source/selection schema. Earlier request versions fail before dispatch.
+The whole-message evidence view contains exactly one TARGET marker per bundle;
+another bundle can mark another occurrence in that same source message. No
+interpreted claim value, storage attribute/family, ambiguity verdict or WRITE
+decision is produced by discovery. Prompt compliance remains a semantic question.
+
+This development clarification does not edit the separate, now-frozen P1-B6 v4
+catalog, dataset, labels or review protocol. The original eight- and six-bundle
+probe artifacts below remain immutable historical attempts, not approved
+examples of this latest granularity.
+
+Owner-approved next probe: first freeze five operator-authored housing reference
+bundles from the same retained 30-message episode, then make one Luna discovery
+call on that episode under the new request. The reference covers these five
+targets only; it is not an exhaustive episode gold set and has no CLEAR/ESCALATE
+or WRITE labels. Compare raw anchor/evidence selections and preserve any defect;
+no retry or storage execution. Local-model comparison remains a later phase.
+
+Pre-dispatch validation: Builder/adapter tests **20/20 PASS**; complete focused
+storage/router/proposer/review set **146/146 PASS**. The same-message regression
+checks distinct bundle identities, shared evidence and one marker per rendered
+view, not semantic model quality. Full-suite testing is not repeated for this
+prompt-only implementation change. `git diff --check` and handoff-body equality
+pass; no study fixtures or storage schema change.
+
 ### Existing development mechanics and initial probe
 
 `lib/memory-storage/bundle-builder.js` reads an explicitly selected inclusive message range in one session from a `readonly:true` / `query_only=ON` connection and a single SQLite read transaction. Ordering is the current conversation ordering `(created_at, id)`, including same-second ID tie-breaking. Both endpoints must exist in that session; other sessions and messages after the endpoint are excluded. No automatic session/topic segmentation, semantic search, DB migration, evidence registration or state write is performed. Message text is preserved verbatim, including multiline content, and roles remain explicit. Source timestamps are metadata, not adoption of §54.4.
@@ -546,7 +588,7 @@ The private development episode has schema version 1, `sourceDomain: conversatio
 
 The provider-neutral `discoverEvidenceBundles(episode, selectBundles)` supplies the full frozen episode to one explicitly provided selector. Its output is only `{bundles: [{anchor: {turnId, text}, evidenceTurnIds}]}`. The first development selection granularity is whole messages; proper subranges remain a later extension. An anchor must be one unique verbatim occurrence in a selected turn; ambiguous occurrence locations fail closed rather than choosing the first. Source text containing reserved TARGET marker syntax also fails closed. No generated topic label, resolved referent, family, attribute, value, ambiguity label, durability verdict or transition is accepted from this step.
 
-The prompt follows P1-B6's Candidate Granularity / Evidence Bundle Builder / Anchors contracts: use the coarsest coherent independently adjudicable topic/state/decision thread; keep its conditions, exceptions and unresolved parts together; merge uncertain boundaries; select one source-grounded representative anchor. A source episode may yield 0..N bundles and independent bundles may share source turns. Zero discovered bundles does not constitute NO_WRITE. Assistant statements remain attributed conversation evidence, not automatically user facts or independent support.
+The initial-probe prompt followed P1-B6's coarse-topic Candidate Granularity / Evidence Bundle Builder / Anchors contracts: use the coarsest coherent independently adjudicable topic/state/decision thread; keep its conditions, exceptions and unresolved parts together; merge uncertain boundaries; select one source-grounded representative anchor. That broad merge instruction is superseded for the current development Builder by the independent-target clarification above. A source episode may yield 0..N bundles and independent bundles may share source turns. Zero discovered bundles does not constitute NO_WRITE. Assistant statements remain attributed conversation evidence, not automatically user facts or independent support.
 
 Mechanical validation rejects nonexistent/duplicate evidence IDs, an unselected/invented/repeated anchor, malformed output and exact duplicate bundles. Selected turns are canonically ordered, UTF-8 anchor offsets are computed from the actual source, and existing pure P1-B6 `decodeSpan` / `computeFragments` helpers are reused without invoking research corpus validation or importing labels/splits. Visible text uses role prefixes, one `[TARGET]...[/TARGET]` pair and `\n---\n` between disjoint selected regions. Private result IDs/hashes are deterministic for the same source and selection. Discovery and evidence completeness are semantic questions: results explicitly remain `semanticCompleteness: NOT_VALIDATED`. Selection omission must not be relabeled as legitimate ambiguity.
 

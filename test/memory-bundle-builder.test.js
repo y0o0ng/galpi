@@ -135,7 +135,7 @@ test('invented/omitted anchors, nonexistent or duplicate evidence and exact dupl
 test('request preserves full episode/role attribution and separates bundle discovery from semantic downstream judgments', () => {
   const request = builder.buildBundleSelectionRequest(episode());
   assert.deepEqual(JSON.parse(request.input), episode());
-  assert.match(request.instructions, /경계가 불확실하면 합친다/);
+  assert.match(request.instructions, /같은 주제·같은 문장이어도 독립적으로 판정하고 저장할 대상이면 별도 앵커와 별도 bundle로 나눈다/);
   assert.match(request.instructions, /근거 누락을 의미적 모호성으로 정당화하지 않는다/);
   assert.match(request.instructions, /ASSISTANT 발언은 귀속된 발언/);
   assert.ok(Object.isFrozen(request));
@@ -146,22 +146,43 @@ test('user-centered discovery excludes acquaintance claims as targets, preserves
   e.turns[0].text = '민지는 이른 회의에서 집중이 잘된대. 나는 조용한 건 좋아.';
   e.turns[2].text = '민지는 내 동료야.';
   const request = builder.buildBundleSelectionRequest(e);
-  assert.equal(request.promptVersion, 'memory-evidence-bundle-selection-user-centered-v1');
+  assert.equal(request.promptVersion, 'memory-evidence-bundle-selection-user-state-v1');
   assert.deepEqual(JSON.parse(request.input), e);
   assert.match(request.instructions, /지인의 발언·상태 자체를 저장 대상으로 삼는 bundle은 만들지 않는다/);
   assert.match(request.instructions, /근거\/맥락으로 보존한다/);
   assert.match(request.instructions, /사용자와 지인의 관계 자체는 제외하지 않는다/);
   assert.match(request.instructions, /사용자의 동의·채택·선호가 결정됐다고 보지 않는다/);
   assert.match(request.instructions, /각 bundle은 후속 단계에서 한 저장 후보의 판정 단위/);
+  assert.match(request.instructions, /앵커 = 판정대상 = 저장대상/);
+  assert.match(request.instructions, /후속 Extractor는 대상의 표현 형식을 바꿀 뿐 다른 대상을 추출하지 않는다/);
+  assert.ok(!request.instructions.includes('경계가 불확실하면 합친다'));
   // Prompt-contract regression only; no synthetic model result proves semantic compliance.
 });
 
 test('superseded discovery request fails before provider dispatch', async () => {
   let calls = 0;
   const selector = createOpenAIBundleSelector({ apiKey: 'synthetic-test-key', fetch: async () => { calls++; } });
-  await assert.rejects(selector({ ...builder.buildBundleSelectionRequest(episode()),
-    promptVersion: 'memory-evidence-bundle-selection-v1' }), { code: 'INVALID_BUNDLE_REQUEST' });
+  for (const promptVersion of ['memory-evidence-bundle-selection-v1', 'memory-evidence-bundle-selection-user-centered-v1']) {
+    await assert.rejects(selector({ ...builder.buildBundleSelectionRequest(episode()), promptVersion }), { code: 'INVALID_BUNDLE_REQUEST' });
+  }
   assert.equal(calls, 0);
+});
+
+test('independent targets in the same source message share evidence but remain separate single-anchor bundles', () => {
+  const e = episode();
+  e.turns[0].text = '집 알아보려고. 월세는 고민 중이야.';
+  e.turns[1].text = '아직 계약 방식은 정하지 않았구나.';
+  const result = builder.buildEvidenceBundles(e, { bundles: [
+    { anchor: { turnId: 'm1', text: '집 알아보려고' }, evidenceTurnIds: ['m1', 'm2'] },
+    { anchor: { turnId: 'm1', text: '월세는 고민 중이야' }, evidenceTurnIds: ['m1', 'm2'] },
+  ] });
+  const [search, lease] = result.bundles;
+  assert.notEqual(search.bundleId, lease.bundleId);
+  assert.deepEqual(search.evidenceSpanRefs, lease.evidenceSpanRefs);
+  assert.equal(search.selectedBundle, 'USER: [TARGET]집 알아보려고[/TARGET]. 월세는 고민 중이야.\nASSISTANT: 아직 계약 방식은 정하지 않았구나.');
+  assert.equal(lease.selectedBundle, 'USER: 집 알아보려고. [TARGET]월세는 고민 중이야[/TARGET].\nASSISTANT: 아직 계약 방식은 정하지 않았구나.');
+  for (const item of result.bundles) assert.equal(item.selectedBundle.split('[TARGET]').length - 1, 1);
+  assert.equal(result.semanticCompleteness, 'NOT_VALIDATED');
 });
 
 test('selector invoked once with frozen input; no source mutation or silent retry after failure/malformed output', async () => {
