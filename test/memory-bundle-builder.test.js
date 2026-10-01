@@ -200,6 +200,73 @@ test('selector invoked once with frozen input; no source mutation or silent retr
   await assert.rejects(builder.discoverEvidenceBundles(e), { code: 'BUNDLE_SELECTOR_REQUIRED' });
 });
 
+test('fixed-anchor evidence selection preserves full source and target while reusing bundle construction', async () => {
+  const e = episode();
+  e.turns[0].role = 'ASSISTANT'; e.turns[0].text = '보증금과 월세는 어느 정도로 생각해?';
+  e.turns[1].role = 'USER'; e.turns[1].text = '1000에 50 언저리 정도?';
+  const anchor = { turnId: 'm2', text: e.turns[1].text };
+  const before = structuredClone(e);
+  const selected = { bundles: [{ anchor: { ...anchor }, evidenceTurnIds: ['m2', 'm1'] }] };
+  let calls = 0;
+  const result = await builder.discoverEvidenceBundles(e, request => {
+    calls++;
+    assert.equal(request.promptVersion, 'memory-fixed-anchor-evidence-selection-v1');
+    assert.deepEqual(JSON.parse(request.input), { anchor, episode: e });
+    anchor.text = 'caller mutation cannot change the frozen target';
+    return selected;
+  }, anchor);
+  assert.equal(calls, 1); assert.deepEqual(e, before);
+  assert.deepEqual(result, builder.buildEvidenceBundles(e, selected));
+  assert.equal(result.bundles[0].selectedBundle,
+    'ASSISTANT: 보증금과 월세는 어느 정도로 생각해?\nUSER: [TARGET]1000에 50 언저리 정도?[/TARGET]');
+  assert.equal(result.semanticCompleteness, 'NOT_VALIDATED');
+});
+
+test('fixed anchor must be uniquely source-grounded before selector dispatch', async () => {
+  let calls = 0;
+  for (const anchor of [null, {}, { turnId: 'missing', text: '커피' }, { turnId: 'm1', text: 'invented' }]) {
+    await assert.rejects(builder.discoverEvidenceBundles(episode(), () => { calls++; return selection(); }, anchor));
+  }
+  const e = episode(); e.turns[0].text = '커피 그리고 커피';
+  await assert.rejects(builder.discoverEvidenceBundles(e, () => { calls++; return selection(); }, selection().bundles[0].anchor),
+    { code: 'ANCHOR_NOT_UNIQUE_IN_SOURCE' });
+  assert.equal(calls, 0);
+});
+
+test('fixed-anchor response cannot replace/widen target, omit it, or discover additional bundles; no retry', async () => {
+  const anchor = selection().bundles[0].anchor;
+  const outputs = [
+    { bundles: [] },
+    { bundles: [{ anchor: { turnId: 'm1', text: '커피는 평일 한 잔' }, evidenceTurnIds: ['m1'] }] },
+    { bundles: [{ anchor: { turnId: 'm3', text: '독서 계획' }, evidenceTurnIds: ['m3'] }] },
+    { bundles: [...selection().bundles, { anchor: { turnId: 'm3', text: '독서 계획' }, evidenceTurnIds: ['m3'] }] },
+  ];
+  for (const output of outputs) {
+    let calls = 0;
+    await assert.rejects(builder.discoverEvidenceBundles(episode(), () => { calls++; return output; }, anchor),
+      { code: 'FIXED_ANCHOR_CHANGED' });
+    assert.equal(calls, 1);
+  }
+  await assert.rejects(builder.discoverEvidenceBundles(episode(), () => ({ bundles: [{ anchor, evidenceTurnIds: ['m2'] }] }), anchor),
+    { code: 'INVALID_BUNDLE_SELECTION' });
+});
+
+test('fixed-anchor request uses the same one-shot Luna transport without discovery or downstream output', async () => {
+  const request = builder.buildBundleSelectionRequest(episode(), selection().bundles[0].anchor);
+  let calls = 0;
+  const selector = createOpenAIBundleSelector({ apiKey: 'synthetic-test-key', fetch: async (url, options) => {
+    calls++; const body = JSON.parse(options.body);
+    assert.equal(body.input, request.input); assert.equal(body.instructions, request.instructions);
+    assert.equal(body.model, 'gpt-6-luna'); assert.equal(body.store, false); assert.equal(body.tools, undefined);
+    assert.deepEqual(body.text.format.schema, builder.BUNDLE_SELECTION_SCHEMA);
+    return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', role: 'assistant',
+      content: [{ type: 'output_text', text: JSON.stringify(selection()) }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+  } });
+  assert.deepEqual(await builder.discoverEvidenceBundles(episode(), selector, selection().bundles[0].anchor),
+    builder.buildEvidenceBundles(episode(), selection()));
+  assert.equal(calls, 1);
+});
+
 test('repeated results and private freeze bytes are deterministic; exclusive 0600 creation outside repo', t => {
   const { dir } = sourceFixture(t);
   const result = builder.buildEvidenceBundles(episode(), selection());

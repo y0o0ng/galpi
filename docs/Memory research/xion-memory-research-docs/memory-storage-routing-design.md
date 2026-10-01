@@ -693,3 +693,35 @@ Focused Builder/adapter tests **20/20 PASS**; complete focused storage/SDK/UI se
 repeated. Next: inspect target-specific evidence completeness before feeding
 these candidates downstream or comparing a local selector; the one-call budget
 is exhausted and no automatic retry is permitted.
+
+### Fixed-anchor evidence selection — 2026-10-01
+
+The owner authorized separating anchor selection from evidence selection for one
+development case. The existing discovery API/CLI retains its behavior. Passing
+an explicit source-grounded `anchor` to `buildBundleSelectionRequest` and
+`discoverEvidenceBundles` instead uses
+`memory-fixed-anchor-evidence-selection-v1`: the whole retained episode is
+visible, but the selector may only select evidence for that already-fixed target.
+The existing bundle schema, source validation and constructor are reused. An
+invalid/nonunique anchor fails before dispatch; a changed anchor, zero bundles
+or additional bundles fails after selection. There is no repair/retry or
+downstream judgment, and semantic completeness remains NOT_VALIDATED.
+
+This is not a conclusion that anchor-first evidence selection is impossible.
+The earlier combined discovery probes exposed omissions; they did not test a
+separate fixed-target evidence-selection step. Full-episode evidence remains a
+possible comparison, not the adopted replacement for target-specific selection.
+
+Pre-dispatch scope: use the same private 30-message episode (1706–1735), with raw
+SHA256 `553759bb83a6144caf096af8a2716ceb3d6cd0ee94d83b43e49a930a9585760e`,
+and fix the budget anchor at message 1726 before the call. One Luna call is
+authorized, with the existing model/config and maxRetries=0. No expected
+evidence-turn list is supplied to the model. Inspect whether relevant preceding
+question/context is retained against the original episode; this is a known
+development example, not held-out evaluation. No DB/Vault reread, automatic
+anchor discovery, Ambiguity/Durability/Extractor judgment or state commit is in
+scope. Mechanical tests do not establish evidence completeness.
+
+Pre-dispatch validation: Bundle Builder/adapter **24/24 PASS**; complete focused
+storage/SDK/UI regression **150/150 PASS**. `git diff --check` passes. The full
+repository suite was not repeated for this isolated development path.
