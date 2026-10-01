@@ -2,6 +2,87 @@
 
 This is an implementation design subordinate to [the canonical R2 architecture](memory-architecture-design.md), especially §§42, 45–47, 50–51 and 54. It does not change semantic authority. The accepted choice is one **logical** EvidenceRef/address layer over existing owning stores (Option B); SQLite is the Phase-1 physical implementation of that layer, not a unified evidence ledger.
 
+## Agreed formation front-end and storage flow — 2026-10-01
+
+This records the end-to-end responsibility boundaries, not a claim that every stage is implemented. The canonical transition semantics remain in §§42.2–42.6; the family-specific v1 constraints below still apply.
+
+```text
+Local-memory / formation front-end
+
+source episode
+↓
+Bundle Builder
+    - candidate/topic discovery
+    - source-grounded anchor selection
+    - relevant evidence bundle selection
+↓
+Ambiguity / Escalation
+    - can this visible bundle sufficiently determine the candidate's meaning?
+    - CLEAR → next stage
+    - ESCALATE → stronger path / unresolved
+↓
+Durability
+    - is this a candidate worth remembering long-term?
+    - WRITE candidate / NO_WRITE
+↓
+Extractor
+    - source-grounded structured representation
+↓
+accepted structured candidate
+    - semantic family
+    - subject
+    - attribute / relation
+    - value
+    - source refs
+
+────────── R2 LTM storage boundary ──────────
+↓
+Storage Router
+    - EvidenceRef binding
+    - semantic-family handler dispatch
+↓
+Target Lookup
+    - does the same state identity already exist?
+    - NEW / no target → initial formation evaluation
+↓
+Build Replay Package
+    - new evidence
+    - current state
+    - original support
+    - relevant history
+    - counterevidence / exceptions
+    - assumptions, where applicable
+↓
+Change Classification
+    - EXPANSION
+    - WORLD_UPDATE
+    - CORRECTION
+    - ADDITIONAL_CONTEXT
+    - CONTRADICTION
+    - TEMPORAL_SCOPE_CHANGE
+    - INTERPRETATION_REVISION
+    - AMBIGUOUS / UNRESOLVED
+↓
+Propose Transition
+    - NO_CHANGE
+    - CREATE
+    - EXPAND
+    - SUPERSEDE
+    - REVISE
+    - FORK / KEEP_AMBIGUOUS
+    - INVALIDATE
+↓
+Domain-specific validation
+↓
+atomic commit
+    - derived state
+    - derivation / dependency provenance
+```
+
+Front-end ambiguity concerns whether the source/bundle determines the candidate's meaning; change classification concerns that structured candidate's relationship to an existing derived state. `WRITE` admits a candidate to durable formation evaluation, not state-mutation authority. `NEW / no target` is a lookup outcome, not an additional change class or automatic CREATE; justified initial formation uses `changeClass = null` under the existing General Fact contract.
+
+The front-end stages are not implemented by the manual candidate-input UI. The current General Fact storage path supports only the executable transitions documented below, with separate owner HUMAN semantic approval before atomic commit. This flow does not open arbitrary subjects, attributes/relations, assumptions or unsupported transitions in v1, and does not connect production ingress.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
