@@ -1,0 +1,557 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-006-v1",
+  "batchId": "p1b6-surface-batch-006",
+  "sourceEpisodes": [
+    {
+      "sourceEpisodeId": "p1b6-se-b006-001",
+      "sourceFamilyId": "p1b6-sf-b006-001",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "냉동실 맨 아래 칸 얘기 좀 할게."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 아침에 비가 좀 왔어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "그 칸에 들어 있는 건 이번 주말에 전부 꺼내서 버리기로 했어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "우산을 현관에 두고 나왔더라."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "자리가 없어서 어제 남은 떡을 그 칸에 넣어 뒀어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "점심은 회사 근처에서 먹었고."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "주말 정리는 내가 맡기로 했어."
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "저녁엔 운동 갈 거야."
+        },
+        {
+          "turnId": "t9",
+          "role": "USER",
+          "text": "떡은 봉지째로 넣어 놨어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b006-002",
+      "sourceFamilyId": "p1b6-sf-b006-002",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "회사 1층 우산꽂이에 있는 우산은 금요일 저녁에 전부 분실물 센터로 보낸대."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "점심 메뉴 투표는 또 김치찌개가 이겼어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "총무팀 공지에 그렇게 적혀 있었어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "김치찌개는 이번 주만 세 번째야."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "나는 수요일 아침에 내 장우산을 그 우산꽂이에 꽂아 뒀고, 아직 거기 있어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "내일은 국수가 이겼으면 좋겠다."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "오늘은 목요일이야."
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "팀장님은 국수파야."
+        },
+        {
+          "turnId": "t9",
+          "role": "USER",
+          "text": "장우산은 검은색이야."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b006-003",
+      "sourceFamilyId": "p1b6-sf-b006-003",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "배경부터 말하면, 우리 동네 도서관 반납함 얘기야."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 회사에서 회의가 길었어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "반납함에 들어 있는 책은 매일 밤 9시에 사서가 꺼내서 반납 처리한대."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "회의 끝나고 커피를 두 잔이나 마셨어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "퇴근길에 빌렸던 소설 두 권을 반납함에 넣었어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "커피 때문에 잠이 안 올 것 같아."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "넣은 건 저녁 8시쯤이었어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b006-004",
+      "sourceFamilyId": "p1b6-sf-b006-004",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "회사 노트북이 요즘 30분 동안 손을 안 대면 화면이 자동으로 잠겨."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "아 그리고 이번 달 관리비가 좀 올랐더라."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "잠기면 비밀번호를 다시 쳐야 해."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "관리비는 난방 때문인 것 같아."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "다시 노트북 얘기로 돌아가면, 오늘도 회의 다녀오니까 잠겨 있었어."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "난방은 좀 줄여야겠다."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "설정 화면에도 잠금 시간이 30분으로 나와."
+        },
+        {
+          "turnId": "t8",
+          "role": "USER",
+          "text": "관리비 고지서는 냉장고에 붙여 놨어."
+        },
+        {
+          "turnId": "t9",
+          "role": "USER",
+          "text": "잠금 풀고 바로 메일부터 확인했어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b006-005",
+      "sourceFamilyId": "p1b6-sf-b006-005",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "우리 아파트 헬스장은 원래 입주민이면 누구나 쓸 수 있었어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 택배가 두 개 왔어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "그런데 이번 달부터는 관리비를 낸 세대만 쓸 수 있게 바뀌었어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "하나는 신발이고 하나는 책이야."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "정확히는 관리비가 한 달이라도 밀린 세대는 못 쓰는 걸로 정리됐대."
+        },
+        {
+          "turnId": "t6",
+          "role": "USER",
+          "text": "신발은 사이즈가 딱 맞아."
+        },
+        {
+          "turnId": "t7",
+          "role": "USER",
+          "text": "우리 옆집은 지난달 관리비가 아직 밀려 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b006-006",
+      "sourceFamilyId": "p1b6-sf-b006-006",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "결론부터 말하면 동창회는 이번 주 토요일이나 일요일 중 하루에 해."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "오늘 세탁기를 두 번 돌렸어."
+        },
+        {
+          "turnId": "t3",
+          "role": "USER",
+          "text": "총무가 일요일은 식당 예약이 안 돼서 안 된다고 했어."
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "빨래가 아직 덜 말랐어."
+        },
+        {
+          "turnId": "t5",
+          "role": "USER",
+          "text": "그래서 그 주말엔 다른 약속을 안 잡고 있어."
+        }
+      ]
+    },
+    {
+      "sourceEpisodeId": "p1b6-se-b006-007",
+      "sourceFamilyId": "p1b6-sf-b006-007",
+      "splitAssignment": "DEV",
+      "language": "KO",
+      "turns": [
+        {
+          "turnId": "t1",
+          "role": "USER",
+          "text": "이사할 집 후보로 월세 60만 원짜리 역 앞 원룸을 보고 왔어."
+        },
+        {
+          "turnId": "t2",
+          "role": "USER",
+          "text": "가는 길에 붕어빵을 사 먹었어."
+        },
+        {
+          "turnId": "t3",
+          "role": "ASSISTANT",
+          "text": "거기 말고 다른 곳은 안 봤어?"
+        },
+        {
+          "turnId": "t4",
+          "role": "USER",
+          "text": "응, 그래서 다음 주에 더 싼 데를 하나 더 보려고."
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "p1b6-item-b006-001",
+      "sourceEpisodeId": "p1b6-se-b006-001",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 20,
+        "endByte": 37
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 43
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 83
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 66
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 41
+        },
+        {
+          "turnId": "t9",
+          "startByte": 0,
+          "endByte": 34
+        }
+      ],
+      "discoursePattern": "CANONICAL",
+      "surfaceFamilyId": "p1b6-surface-family-b006-001"
+    },
+    {
+      "itemId": "p1b6-item-b006-002",
+      "sourceEpisodeId": "p1b6-se-b006-002",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 27,
+        "endByte": 40
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 102
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 47
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 100
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 26
+        },
+        {
+          "turnId": "t9",
+          "startByte": 0,
+          "endByte": 29
+        }
+      ],
+      "discoursePattern": "INTERLEAVED",
+      "surfaceFamilyId": "p1b6-surface-family-b006-002"
+    },
+    {
+      "itemId": "p1b6-item-b006-003",
+      "sourceEpisodeId": "p1b6-se-b006-003",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "anchorSpanRef": {
+        "turnId": "t5",
+        "startByte": 13,
+        "endByte": 37
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 68
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 93
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 64
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 35
+        }
+      ],
+      "discoursePattern": "CONTEXT_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b006-003"
+    },
+    {
+      "itemId": "p1b6-item-b006-004",
+      "sourceEpisodeId": "p1b6-se-b006-004",
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 27,
+        "endByte": 87
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 88
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 44
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 91
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 56
+        },
+        {
+          "turnId": "t9",
+          "startByte": 0,
+          "endByte": 47
+        }
+      ],
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "surfaceFamilyId": "p1b6-surface-family-b006-004"
+    },
+    {
+      "itemId": "p1b6-item-b006-005",
+      "sourceEpisodeId": "p1b6-se-b006-005",
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "anchorSpanRef": {
+        "turnId": "t7",
+        "startByte": 0,
+        "endByte": 13
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 81
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 85
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 91
+        },
+        {
+          "turnId": "t7",
+          "startByte": 0,
+          "endByte": 61
+        }
+      ],
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "surfaceFamilyId": "p1b6-surface-family-b006-005"
+    },
+    {
+      "itemId": "p1b6-item-b006-006",
+      "sourceEpisodeId": "p1b6-se-b006-006",
+      "semanticSkeletonId": "p1b6-sk-5d2a9c70e4b18f63",
+      "anchorSpanRef": {
+        "turnId": "t1",
+        "startByte": 23,
+        "endByte": 32
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 91
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 72
+        },
+        {
+          "turnId": "t5",
+          "startByte": 0,
+          "endByte": 59
+        }
+      ],
+      "discoursePattern": "CONCLUSION_FIRST",
+      "surfaceFamilyId": "p1b6-surface-family-b006-006"
+    },
+    {
+      "itemId": "p1b6-item-b006-007",
+      "sourceEpisodeId": "p1b6-se-b006-007",
+      "semanticSkeletonId": "p1b6-sk-61cb1285dd1df651",
+      "anchorSpanRef": {
+        "turnId": "t4",
+        "startByte": 29,
+        "endByte": 40
+      },
+      "evidenceSpanRefs": [
+        {
+          "turnId": "t1",
+          "startByte": 0,
+          "endByte": 79
+        },
+        {
+          "turnId": "t3",
+          "startByte": 0,
+          "endByte": 39
+        },
+        {
+          "turnId": "t4",
+          "startByte": 0,
+          "endByte": 65
+        }
+      ],
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "surfaceFamilyId": "p1b6-surface-family-b006-007"
+    }
+  ]
+}

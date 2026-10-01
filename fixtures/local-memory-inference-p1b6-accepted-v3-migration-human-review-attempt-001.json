@@ -1,0 +1,193 @@
+{
+  "name": "xion-local-memory-inference-p1b6-accepted-v3-migration-human-review-attempt-001-receipt-v1",
+  "status": "COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewDate": "2026-10-01",
+  "reviewProtocol": {
+    "identity": "xion-local-memory-inference-p1b6-accepted-v3-migration-human-review-protocol-v1",
+    "rawSha256": "68b4f39d78fecc81f69c4c710a6002f740c8931bed9369e556d83435dd83db9b"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-accepted-v3-migration-human-review-packet-v1",
+    "sha256": "4587d5ba785dd57fd9a37769089ce8d5a4af816a44d08ff909eb6a5e547df752",
+    "rows": 7
+  },
+  "migrationReviewReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-accepted-v3-migration-review-attempt-001-receipt-v1",
+    "rawSha256": "04bee65d3f0a34b82038aec77cbf44df22d3258151df9d47d19f25d78c7f4cc8"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-mig-human-review-results.json",
+    "sha256": "9c36f9d8a61a30781e6e2ca885989728179736f35aeba976cb94f20cb5eca979",
+    "committed": false
+  },
+  "reviewer": {
+    "role": "repository owner",
+    "decisionsBy": "repository owner",
+    "presentationAid": "a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)",
+    "independentConfirmation": false,
+    "limitation": "The owner made the historical HUMAN judgments on these surfaces, chose the migration and had seen the review summary; row blindness hid only which opaque row was which."
+  },
+  "ownerClosure": {
+    "decisionsSource": "REPOSITORY_OWNER",
+    "date": "2026-10-01",
+    "decision": "every mismatch is closed as a current-realization failure: INELIGIBLE, no catalog amendment, no relabel, historical records unchanged",
+    "observation": "all four cc054a42 rows were KEEP ESCALATE against v3 CLEAR: the owner read the TARGET as the user's stance on the attributed proposal, the v3 contract treats the unadopted facet as a given attributed status. The owner kept the v3 contract; any revisit is a separate gate."
+  },
+  "summary": {
+    "reviewed": 7,
+    "matchingV3": 1,
+    "migratedIntoPool": [
+      "p1b6-item-b002-051",
+      "p1b6-item-b002-063"
+    ],
+    "ineligible": [
+      "p1b6-item-b001-015",
+      "p1b6-item-b001-020",
+      "p1b6-item-b001-024",
+      "p1b6-item-b001-031",
+      "p1b6-item-b002-025",
+      "p1b6-item-b002-030",
+      "p1b6-item-b002-035",
+      "p1b6-item-b002-040",
+      "p1b6-item-b002-061",
+      "p1b6-item-b002-059"
+    ]
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b001-015",
+      "splitAssignment": "DEV",
+      "role": "mandatory",
+      "reviewRowId": "p1b6-mig-hreview-77939be0b2a2fde8",
+      "v3Reference": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "The numbering scheme was explicitly left undecided before 'the second one' was used, so the TARGET referent is not fixed.",
+      "outcome": "MANDATORY_DECISION_MISMATCH",
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b001-020",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "role": null,
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b001-024",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "role": null,
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b001-031",
+      "splitAssignment": "DEV",
+      "role": "mandatory",
+      "reviewRowId": "p1b6-mig-hreview-5d31db95945b1e36",
+      "v3Reference": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Because the numbering scheme remains undecided, it is unclear whether 'there' refers to the 500,000 won draft or the prior 400,000 won approved budget.",
+      "outcome": "MANDATORY_DECISION_MISMATCH",
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b002-025",
+      "splitAssignment": "TRAIN",
+      "role": "calibration",
+      "reviewRowId": "p1b6-mig-hreview-ea21bb36b75a7caa",
+      "v3Reference": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "The user's agreement is only with mornings being quiet; it does not state agreement with the TARGET claim that early meetings improve concentration.",
+      "outcome": "CALIBRATION_DECISION_MISMATCH",
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b002-030",
+      "splitAssignment": "TRAIN",
+      "role": "calibration",
+      "reviewRowId": "p1b6-mig-hreview-e6a52c601ccd59da",
+      "v3Reference": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "The user agrees only that turning screens off early helps sleep; that does not state agreement with the TARGET claim that phones should be banned after 10 p.m.",
+      "outcome": "CALIBRATION_DECISION_MISMATCH",
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b002-035",
+      "splitAssignment": "TRAIN",
+      "role": "calibration",
+      "reviewRowId": "p1b6-mig-hreview-341ae38c6ef3d89b",
+      "v3Reference": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "The visible evidence agrees only that leaving the purifier on reduces dust; it does not state whether the user agrees with the TARGET proposal to keep it on all the time.",
+      "outcome": "CALIBRATION_DECISION_MISMATCH",
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b002-040",
+      "splitAssignment": "TRAIN",
+      "role": "calibration",
+      "reviewRowId": "p1b6-mig-hreview-9d062d0961808e80",
+      "v3Reference": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "ESCALATE",
+      "reason": "Saying warm lighting would create a good atmosphere is a reaction to its effect, not a clear opinion on the TARGET proposal to use warm lighting.",
+      "outcome": "CALIBRATION_DECISION_MISMATCH",
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b002-061",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "role": null,
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b002-051",
+      "splitAssignment": "DEV",
+      "role": "calibration",
+      "reviewRowId": "p1b6-mig-hreview-7508ebe54f680259",
+      "v3Reference": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "The user's current preference for Option B is stated explicitly; the later comparison of A and C does not erase that stated preference.",
+      "outcome": "CALIBRATION_MATCH",
+      "finalProvenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "finalEligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b002-059",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "role": null,
+      "finalProvenance": null,
+      "finalEligibility": "INELIGIBLE"
+    },
+    {
+      "itemId": "p1b6-item-b002-063",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "role": null,
+      "finalProvenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "finalEligibility": "PROVISIONAL"
+    }
+  ],
+  "authority": {
+    "promotedToHumanAdjudicated": false,
+    "catalogAmendedByThisResult": false,
+    "historicalRecordsRewritten": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

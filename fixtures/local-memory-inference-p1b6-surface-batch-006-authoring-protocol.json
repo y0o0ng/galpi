@@ -1,0 +1,144 @@
+{
+  "name": "xion-local-memory-inference-p1b6-surface-batch-006-authoring-protocol-v1",
+  "status": "PREREGISTERED",
+  "decisionsSource": "REPOSITORY_OWNER_APPROVED_TOP_UP_PARAMETERS",
+  "inputs": {
+    "v3": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "ledgerV4": {
+      "identity": "xion-local-memory-inference-p1b6-reviewed-pool-ledger-v4",
+      "rawSha256": "ef9fa69d34576995f597e044b4d3fe672c6353f8298f7921fe654d62e1f4e8fa"
+    },
+    "shortageV4": {
+      "identity": "xion-local-memory-inference-p1b6-shortage-receipt-v4",
+      "rawSha256": "3970c6f1b29b34c84853194828aa4b1a26674d0b8b1b9c5a73083297ad22a714"
+    }
+  },
+  "tranche": {
+    "total": 7,
+    "lowerBound": 5,
+    "buffer": 2,
+    "split": {
+      "TRAIN": 0,
+      "DEV": 2,
+      "FINAL_HELD_OUT": 5
+    },
+    "language": {
+      "KO": 7
+    },
+    "fragments": {
+      "2": 1,
+      "3": 1,
+      "4": 2,
+      "5": 3
+    }
+  },
+  "slots": [
+    {
+      "slot": "001",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 5,
+      "discoursePattern": "CANONICAL",
+      "allocationRule": "HELD per-skeleton need"
+    },
+    {
+      "slot": "002",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 5,
+      "discoursePattern": "INTERLEAVED",
+      "allocationRule": "HELD per-skeleton need"
+    },
+    {
+      "slot": "003",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "CONTEXT_FIRST",
+      "allocationRule": "buffer on the largest HELD need"
+    },
+    {
+      "slot": "004",
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 5,
+      "discoursePattern": "RETURN_TO_TOPIC",
+      "allocationRule": "HELD per-skeleton need"
+    },
+    {
+      "slot": "005",
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 4,
+      "discoursePattern": "PROGRESSIVE_REFINEMENT",
+      "allocationRule": "HELD per-skeleton need"
+    },
+    {
+      "slot": "006",
+      "semanticSkeletonId": "p1b6-sk-5d2a9c70e4b18f63",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 3,
+      "discoursePattern": "CONCLUSION_FIRST",
+      "allocationRule": "DEV need: lowest pooled coverage, ties by skeleton ID"
+    },
+    {
+      "slot": "007",
+      "semanticSkeletonId": "p1b6-sk-61cb1285dd1df651",
+      "splitAssignment": "DEV",
+      "authoringTargetLabel": "CLEAR",
+      "language": "KO",
+      "fragments": 2,
+      "discoursePattern": "ELLIPTICAL_REPLY",
+      "allocationRule": "DEV buffer: next lowest pooled coverage, ties by skeleton ID"
+    }
+  ],
+  "authoringRules": [
+    "Fresh content under the b006 namespace; no reuse of any prior text, ID or review result.",
+    "The batch-003 leakage check runs fail-closed against every prior batch and candidate artifact, including batch-004 and batch-005.",
+    "Authoring target labels are generator targets, not HUMAN gold, and never enter a blind packet.",
+    "HELD slots are authored by the assistant and are never shown to the owner."
+  ],
+  "gates": {
+    "held": {
+      "order": [
+        "fresh source/bundle audit (FAIL / UNCERTAIN excluded)",
+        "blind v3 strong-model semantic review"
+      ],
+      "routing": "clean agreement → CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL (the post-selection independent second strong-model review still applies); anything else → INELIGIBLE; no owner pre-audit and no HUMAN review because repeated HELD review stays unopened"
+    },
+    "dev": {
+      "order": [
+        "owner pre-audit authoring review",
+        "fresh source/bundle audit (FAIL / UNCERTAIN excluded)",
+        "blind v3 strong-model semantic review",
+        "mandatory HUMAN for disagreement / FIX / REJECT / missing",
+        "HUMAN calibration of every clean agreement"
+      ],
+      "mandatoryMatchingKeepSemantics": "HUMAN_ADJUDICATED / ELIGIBLE",
+      "calibrationMatchingKeepSemantics": "stays CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL; not promoted"
+    }
+  },
+  "authority": {
+    "sourceAuditRun": false,
+    "semanticReviewRun": false,
+    "humanReviewRun": false,
+    "acceptancePerformed": false,
+    "finalSelectionPerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

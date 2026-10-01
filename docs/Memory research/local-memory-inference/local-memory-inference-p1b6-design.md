@@ -59,8 +59,10 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   accepted-on-retired rows stay permanently out; the 12 accepted rows whose HUMAN gold
   (ESCALATE) differs from v3 (CLEAR) are re-reviewed under v3 — fresh source audit and blind v3
   strong-model review for all 12, HUMAN for TRAIN / DEV only. Source audit **12/12 PASS**; v3
-  review **6 clean / 6 disagreement**; 4 HELD rows `INELIGIBLE`; the 7-row HUMAN packet is built,
-  not run.
+  review **6 clean / 6 disagreement**; owner HUMAN **1/7 match**. Only `b002-051` and `b002-063`
+  migrate. **Ledger v4: pool 379; minimum top-up 5** (DEV 1, HELD per-skeleton 4). A 7-row
+  batch-006 top-up (HELD 5, DEV 2) is preregistered and materialized; HELD slots skip owner and
+  HUMAN review; the DEV slots await the owner's pre-audit review.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2304,6 +2306,44 @@ calibration, no HELD row. **Not independent:** the owner made the historical HUM
 these surfaces, chose the migration and has seen the review summary; the historical judgments are
 not reused as answers. `--human-packet <out>` builds the 7-row packet (`p1b6-mig-hreview`,
 `4587d5ba…`, not committed) from the receipt, with bundles equal to the strong-model packet's.
+
+**Migration HUMAN review attempt-001 (2026-10-01) — 1 / 7 match v3.** `--human-results <raw>
+--date <d>` writes `fixtures/local-memory-inference-p1b6-accepted-v3-migration-human-review-attempt-001.json`
+(raw `9c36f9d8…`, not committed). The owner decided every row; GPT-5.6 sol presented rows and
+formatted the JSON (owner-reported); not independent. Mandatory `b001-015` and `b001-031` and
+calibration `b002-025`, `-030`, `-035`, `-040` were KEEP ESCALATE against v3 CLEAR; calibration
+`b002-051` was KEEP CLEAR. **Owner closure:** every mismatch is a current-realization failure —
+`INELIGIBLE`, no catalog amendment, no relabel, historical records unchanged. **Observation:** all
+four `cc054a42` rows split on the same point. The owner read the TARGET as the user's stance on
+the attributed proposal, while the v3 contract treats the unadopted facet as a given attributed
+status. The owner kept v3; a revisit would be a separate gate and would also touch the batch-003
+`cc054a42` surfaces in the pool.
+
+**Ledger v4 and shortage v4.** `scripts/build-memory-inference-p1b6-reviewed-pool-ledger-v4.js`
+(`npm run build:memory-inference-p1b6-reviewed-pool-ledger-v4`) pins ledger v3 (unchanged) and the
+migration HUMAN receipt. Migrated rows (`b002-051`, `b002-063`) enter the pool as `PROVISIONAL`
+with the v3 label; the other ten leave; historical gold stays on each row, and no in-pool label
+differs from v3. `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v4.json`: **379 in
+pool**. `…-shortage-receipt-v4.json`: split 241 / 59 / 79, language 264 / 77 / 38, fragments
+70 / 101 / 123 / 68 / 17; HELD per skeleton `2fa39ece` 3, `869c7127` 4, `a19bb9e9` 4. **Minimum
+top-up lower bound 5** — DEV 1 plus the four HELD per-skeleton slots; KO 2, fragment 4 (2) and
+fragment 5 (3) can overlap with them. EN is exactly 38, with no slack.
+
+**Batch-006 top-up — preregistered and materialized.** Owner-approved (2026-10-01): seven KO
+slots, all CLEAR targets. HELD: `2fa39ece` ×3 (need 2 + 1 buffer), `869c7127` ×1, `a19bb9e9` ×1;
+DEV: `5d2a9c70` (need) and `61cb1285` (buffer), the two lowest-coverage DEV skeletons with ties
+by ID. Fragments 5 / 5 / 4 / 5 / 4 on HELD and 3 / 2 on DEV also cover the KO and fragment-4 / 5
+shortfalls. `scripts/build-memory-inference-p1b6-batch-006.js`
+(`npm run build:memory-inference-p1b6-batch-006`) writes
+`fixtures/local-memory-inference-p1b6-surface-batch-006-authoring-protocol.json` and
+`…-surface-batch-006.json` under the batch-005 checks, with leakage now also against batch-005.
+**These are the first newly authored HELD surfaces.** The assistant authored them and they are
+not shown to the owner. Because repeated HELD review stays unopened, HELD slots get no owner
+pre-audit and no HUMAN review: a fresh source audit, then blind v3 strong-model review, where a
+clean agreement is `PROVISIONAL` and anything else `INELIGIBLE`, and the post-selection
+independent second strong-model review still applies. The HELD surfaces avoid the explicit "the
+policy / I can't tell" framing that led the migration HELD rows to ESCALATE readings. DEV slots
+follow the batch-004 gates. Nothing is audited or reviewed.
 
 ## Closed Selection and Freeze Constraints
 
