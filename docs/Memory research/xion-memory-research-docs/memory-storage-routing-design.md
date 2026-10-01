@@ -725,3 +725,36 @@ scope. Mechanical tests do not establish evidence completeness.
 Pre-dispatch validation: Bundle Builder/adapter **24/24 PASS**; complete focused
 storage/SDK/UI regression **150/150 PASS**. `git diff --check` passes. The full
 repository suite was not repeated for this isolated development path.
+
+#### Observed fixed-budget-anchor probe
+
+Execution code commit: `c3b939cabd066bdf8994cb51e5abb682ee6222fe`.
+Before dispatch the source/request/code hashes, fixed anchor and one-call budget
+were frozen under `/private/tmp/galpi-bundle-fixed-anchor-qeuaqm4q` (0700; files
+0600). Plan SHA256:
+`256b83f131685d85c65ef75e473852fd89a6f63db37b02715c539a498011baa0`;
+request SHA256:
+`08b7787811e67b3213af042ddaeb8150d1b49de369c020320627584a25468b15`.
+
+Observed: **1 completed provider dispatch / 0 retries**, `gpt-6-luna`, but **0
+accepted bundles**. The provider widened the fixed budget span to include the
+following school question in the same message. The wrapper rejected this with
+`FIXED_ANCHOR_CHANGED`. Its selected evidence IDs were 1725–1728, including the
+preceding budget question absent from the combined-discovery selection. This
+presence check is not evidence-completeness approval or a downstream label.
+No output was repaired, adopted or automatically retried. This single rejected
+attempt does not establish that anchor-first selection is infeasible; the model
+was unnecessarily required to echo the immutable target as well as choose its
+evidence. Returning evidence IDs only is a possible next interface simplification,
+not implemented or tested by this attempt.
+
+Retained provider-response SHA256:
+`14ae33de27d2d00af1a8df23561e19059303cc1b7776eda83ce5e403bd63ac62`;
+retained selection SHA256:
+`1710d0d281663dbbcb5723f6889ea8512836a2f8c6ab11df95fcdb49374b55e6`.
+Usage: **3,491 input / 508 output tokens** (432 reasoning), total **3,999**.
+The original episode bytes/hash remain unchanged. Production DB/Vault
+reads/writes, EvidenceRef registration, downstream judgments and state commits
+were **0**. The one-call budget is exhausted. Next: remove target rewriting from
+the selector's responsibility before another separately authorized probe; no
+local selector or downstream pipeline execution has begun.
