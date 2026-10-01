@@ -5459,3 +5459,12 @@ No audit, review or acceptance; the accepted pool record stays **93**.
 | packet (not committed) | 7 rows, `p1b6-b006-audit`, raw SHA `1196e1729b539dc6b6a6c345a92b7741c9d3c88f4abf2a54c83cc7c881b8b612` |
 
 `007` TARGET kept as `더 싼 데` by owner decision. No audit has run; the accepted pool record stays **93**.
+
+#### P1-B6 batch-006 source audit attempt-001 — 7/7 PASS; v3 review packet BUILT / NOT RUN
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-006-source-audit-attempt-001.json` | receipt; raw `c88ee34b5c0c856de855e8c501acf19f3630c5c5eaf35a5ca8b7419db1de01f6` (not committed) |
+| v3 review packet (not committed) | 7 rows, raw SHA `4f9ce9470943282f41803c6ad4e91a99d7f50371e172a242dc62a4878e731859` |
+
+Claude Opus 5.5 (owner-reported). No semantic review or acceptance; the accepted pool record stays **93**.

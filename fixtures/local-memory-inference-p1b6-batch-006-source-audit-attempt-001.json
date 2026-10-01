@@ -1,0 +1,85 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-006-source-audit-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-006-source-audit-attempt-001",
+  "status": "COMPLETE_PASS",
+  "auditPacketIdentity": "xion-local-memory-inference-p1b6-batch-006-source-audit-packet-v1",
+  "auditPacketSha256": "1196e1729b539dc6b6a6c345a92b7741c9d3c88f4abf2a54c83cc7c881b8b612",
+  "sourceAuditProtocol": {
+    "identity": "p1b6-source-bundle-completeness-audit-v1",
+    "sha256": "63a2c70c3af608d60fb817f092e16c62986b1b5ba09a6d19300fa34e24582a1d"
+  },
+  "auditedBatch": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-006-v1",
+    "rawSha256": "c058b752ca9a353ffc10475cf9d74796e3682f4084cfd06b7164851922724e64"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b006-source-audit-results.json",
+    "sha256": "c88ee34b5c0c856de855e8c501acf19f3630c5c5eaf35a5ca8b7419db1de01f6",
+    "committed": false
+  },
+  "auditorExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "surface": "Claude Code",
+    "model": "Claude Opus 5.5",
+    "reasoningSetting": "NOT_RECORDED",
+    "sessionRelationship": "a fresh Claude Code CLI session started in the home directory (no project instructions or memory loaded), separate from the session that authored the surfaces, given only the protocol and packet paths"
+  },
+  "freshness": {
+    "freshJudgmentsForEveryRow": true,
+    "historicalSourceAuditResultInherited": false,
+    "note": "Fresh realizations under new IDs; no historical source-audit result carried forward."
+  },
+  "summary": {
+    "total": 7,
+    "PASS": 7,
+    "FAIL": 0,
+    "UNCERTAIN": 0
+  },
+  "failClosedRows": [],
+  "authority": {
+    "sourceBundleGatePassedForPassRows": true,
+    "failClosedRowsExcludedFromSemanticReview": true,
+    "semanticReviewOccurred": false,
+    "humanReviewOccurred": false,
+    "datasetAcceptancePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false
+  },
+  "rows": [
+    {
+      "auditRowId": "p1b6-b006-audit-0a5d85932f7a9c98",
+      "disposition": "PASS",
+      "reason": "Omitted turns (lunch vote, kimchi stew, noodles, team lead) are unrelated; rule, source, placement, current day and umbrella identity are all in bundle."
+    },
+    {
+      "auditRowId": "p1b6-b006-audit-7be556e24ac0a5e7",
+      "disposition": "PASS",
+      "reason": "Omitted turns concern management fee/heating/bill only; all laptop auto-lock evidence is retained."
+    },
+    {
+      "auditRowId": "p1b6-b006-audit-7c2887caa4458988",
+      "disposition": "PASS",
+      "reason": "Omitted turns (meeting, coffee, sleep) are unrelated; return-box rule, drop of the novels and drop time are retained."
+    },
+    {
+      "auditRowId": "p1b6-b006-audit-824d9ed5b60b43a9",
+      "disposition": "PASS",
+      "reason": "Omitted turns (rain, umbrella, lunch, exercise) are unrelated; disposal rule, placement of rice cake and cleanup ownership are retained."
+    },
+    {
+      "auditRowId": "p1b6-b006-audit-b0b3b87c1b59285b",
+      "disposition": "PASS",
+      "reason": "Only omitted turn is buying fish-shaped bread on the way; reference point (60만 원 room) and the assistant question are retained."
+    },
+    {
+      "auditRowId": "p1b6-b006-audit-e4b6376b410f247f",
+      "disposition": "PASS",
+      "reason": "Omitted turns (parcels, shoes, book) are unrelated; original rule, change, precise arrears rule and neighbor's arrears are retained."
+    },
+    {
+      "auditRowId": "p1b6-b006-audit-f15490be24df780e",
+      "disposition": "PASS",
+      "reason": "Omitted turns (laundry) are unrelated; Sat/Sun options, Sunday exclusion and the user's hold are retained."
+    }
+  ]
+}
