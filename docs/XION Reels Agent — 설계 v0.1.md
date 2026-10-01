@@ -153,7 +153,6 @@ candidate ─(검토1 선택)→ selected → scripted → rendered ─(검토2 
 - TTS 엔진 선택 (한국어 품질, 비용)
 - 렌더 워커와 Pi의 통신 방식
 - 계정 핸들
-- 2편 확정 (후보: CPU 투기적 실행)
 
 ## 부록 — 1편 대본: 하모닉 드라이브
 
@@ -175,3 +174,45 @@ candidate ─(검토1 선택)→ selected → scripted → rendered ─(검토2 
 3. 웨이브 제너레이터 한 바퀴 → 플렉스플라인 반대 방향 톱니 두 개 (Harmonic Drive 공식 설명)
 4. 202개/200개 → 100:1, 서큘러 스플라인 고정·웨이브 제너레이터 입력·플렉스플라인 출력 기준 (Wikipedia "Strain wave gearing")
 5. "여러 단을 겹쳐야 한다"는 일반 원리 — 직접 확인
+
+## 부록 — 2편 대본: 투기적 실행
+
+**훅 카드:** **답을 알기도 전에, 먼저 해 버린다** / SPECULATIVE EXECUTION / 투기적 실행
+
+| 시간 | 화면 (템플릿) | 내레이션 |
+| --- | --- | --- |
+| 0–4초 | 훅 카드. 갈림길 한쪽으로 블록이 먼저 출발, 시온 놀람 | CPU는 답이 나오기도 전에, 다음 일을 먼저 해요. |
+| 4–11초 | `WAIT` vs `GUESS` 카드 (비교). 키커 `BRANCH ?`. WAIT 카드는 멈춘 블록 + `100s OF CYCLES`, GUESS 카드는 달리는 블록 | 갈 길을 정할 값이 메모리에서 오기까지, 수백 클럭이 걸리기도 해요. 기다리면 그동안 놀게 되죠. |
+| 11–15초 | 칩 `SAVE` → `GUESS + RUN` → `CHECK` (단계). 무대: 갈림길에서 상태 스냅샷 → 한쪽 길로 블록 진행 → 값 도착, `CHECK` 점등 | 그래서 상태를 저장해 두고, 한쪽 길을 골라 미리 실행해요. |
+| 15–23초 | `RIGHT` vs `WRONG` 카드 (비교). RIGHT: 블록 유지 `KEEP`. WRONG: 블록이 지워지고 `UNDO`, 아래 `≈ WAIT`. 시온 가리키기로 `≈ WAIT` 지목 | 값이 와서 맞았으면 시간을 번 거고, 틀렸으면 저장한 상태로 되돌려요. 손해는 기다린 것과 비슷할 뿐이에요. |
+| 23–27초 | 칩 그림에서 한 칸이 커지며 `BRANCH PREDICTOR`, 그 아래 지난 갈림길 기록 점 줄 (단면도 확대) | 추측은 지난 기록을 보고 하는데, 거의 다 맞혀요. |
+| 27–40초 | 칩 `WRONG PATH` → `CACHE TRACE` → `FIX` (단계). 키커 `SPECTRE 2018`. 무대: 칩 옆 `CACHE` 상자 등장 → 틀린 길의 블록은 지워지는데 `CACHE` 상자에 점 하나가 `--danger` 색으로 남음 → 마지막에 갈림길 위험 구간에 막대(차단) | 그런데 빠른 저장소인 캐시에는, 되돌려도 흔적이 남아요. 2018년 Spectre 연구는 이 흔적으로 비밀을 읽어냈어요. 막는 방법 하나는, 위험한 자리에서 추측을 멈추는 거예요. |
+| 40–45초 | `IDLE` vs `SPECULATE` 타임라인 막대 (비교, 수치 없는 도식), 시온 반짝임 | 놀지 않으려고 미리 추측하기, 요즘 CPU가 빠른 비결 중 하나예요. |
+
+자막은 1편처럼 문장 단위로 쪼갠다. 화면 글자는 `SPECULATIVE EXECUTION`, `BRANCH`, `WAIT`, `GUESS`, `SAVE`, `CHECK`, `RIGHT`, `WRONG`, `KEEP`, `UNDO`, `BRANCH PREDICTOR`, `WRONG PATH`, `CACHE`, `CACHE TRACE`, `SPECTRE 2018`, `FIX`, `IDLE`, `SPECULATE`, `100s OF CYCLES`, `≈`, `?` 만 쓴다. Spectre 장면에 캐시 흔적을 읽는 관찰자·측정 화살표는 그리지 않는다(보안 규칙).
+
+### 사실 확인 목록
+
+출처 약칭 — **[Spectre]** Kocher et al., "Spectre Attacks: Exploiting Speculative Execution", https://spectreattack.com/spectre.pdf · **[Lin-Tarsa]** Lin & Tarsa (Intel), "Branch Prediction Is Not A Solved Problem" (2019), https://arxiv.org/abs/1906.08170 · **[PZ]** Google Project Zero, "Reading privileged memory with a side-channel", https://googleprojectzero.blogspot.com/2018/01/reading-privileged-memory-with-side.html
+
+인용은 원문 텍스트층에서 그대로 복사했다(PDF 하이픈 줄바꿈만 이어 붙임). 아포스트로피는 원문대로 `’`(U+2019)다. 한 행에 인용이 둘 이상이면 각각 원문에 따로 있다.
+
+| # | 주장 (대본 문장) | 출처 | 원문 인용 |
+| --- | --- | --- | --- |
+| 1 | CPU는 답이 나오기도 전에 다음 일을 먼저 한다 | [Spectre] Abstract https://spectreattack.com/spectre.pdf | "if the destination of a branch depends on a memory value that is in the process of being read, CPUs will try to guess the destination and attempt to execute ahead." |
+| 2 | 갈 길을 정할 값이 메모리에서 오기까지 수백 클럭이 걸리기도 한다 | [Spectre] §I https://spectreattack.com/spectre.pdf | "an uncached value located in external physical memory. As this memory is much slower than the CPU, it often takes several hundred clock cycles before the value becomes known." |
+| 3 | 기다리면 그동안 논다 | [Spectre] §I https://spectreattack.com/spectre.pdf | "Rather than wasting these cycles by idling" |
+| 4 | 상태를 저장해 두고 한쪽 길을 골라 미리 실행한다 | [Spectre] §I https://spectreattack.com/spectre.pdf | "saves a checkpoint of its register state, and proceeds to speculatively execute the program on the guessed path." |
+| 5 | 값이 오면 맞았는지 확인한다 | [Spectre] §I https://spectreattack.com/spectre.pdf | "When the value eventually arrives from memory, the CPU checks the correctness of its initial guess." |
+| 6 | 맞았으면 시간을 번 것이다 | [Spectre] §I https://spectreattack.com/spectre.pdf | "if the guess was correct, the speculative execution results are committed" / "useful work was accomplished during the delay." |
+| 7 | 틀렸으면 저장한 상태로 되돌리고, 손해는 기다린 것과 비슷하다 | [Spectre] §I https://spectreattack.com/spectre.pdf | "If the guess was wrong, the CPU discards the incorrect speculative execution by reverting the register state back to the stored checkpoint, resulting in performance comparable to idling." |
+| 8 | 추측은 지난 기록을 보고 한다 | [Spectre] §II-E https://spectreattack.com/spectre.pdf / [Lin-Tarsa] §I https://arxiv.org/abs/1906.08170 | "they maintain state that depends on past program behavior and assume that future behavior is similar to or related to past behavior." / "BPUs work by training statistical models of branch directions observed as instructions are retired, and then using these models to predict unresolved directions for subsequent branches as they are fetched." |
+| 9 | 거의 다 맞힌다 | [Lin-Tarsa] Abstract https://arxiv.org/abs/1906.08170 | "Modern branch predictors predict the vast majority of conditional branch instructions with near-perfect accuracy" |
+| 10 | Spectre는 2018년에 공개됐다 | [PZ] https://googleprojectzero.blogspot.com/2018/01/reading-privileged-memory-with-side.html | 게시일 "2018-Jan-03" / "their [writeups/blogposts/paper drafts] are at:" 다음 목록의 "Spectre (variants 1 and 2)" / "We have discovered that CPU data cache timing can be abused to efficiently leak information out of mis-speculated execution" |
+| 11 | 되돌려도 캐시에는 흔적이 남는다 | [Spectre] §I-B https://spectreattack.com/spectre.pdf | "When the result of the bounds check is eventually determined, the CPU discovers its error and reverts any changes made to its nominal microarchitectural state. However, changes made to the cache state are not reverted" |
+| 12 | 그 흔적으로 비밀을 읽어냈다 | [Spectre] §I-A https://spectreattack.com/spectre.pdf / [PZ] | "Using this technique, we are able to read memory from the victim’s address space, including the secrets stored within it." / (캐시 흔적과의 연결은 10번 [PZ] 세 번째 인용) |
+| 13 | 막는 방법 하나는 위험한 자리에서 추측을 멈추는 것이다 | [Spectre] §VII-A https://spectreattack.com/spectre.pdf | "speculation blocking instructions that ensure that instructions following them are not executed speculatively. Intel and AMD recommend the use of the lfence instruction" / "An improved approach is to use static analysis [36] to reduce the number of speculation blocking instructions required, since many code paths do not have the potential to read and leak out-of-bounds memory." |
+| 14 | 미리 추측하기는 CPU가 빠른 비결 중 하나다 | [Spectre] §I https://spectreattack.com/spectre.pdf / [Lin-Tarsa] §I https://arxiv.org/abs/1906.08170 | "speculative execution, which is widely used to increase performance" / "BPU predictions drive speculative execution, a key technique for hiding latency in out-of-order CPUs." |
+| 15 | 캐시는 (CPU가 쓰는) 빠른 저장소다 | [Spectre] §II-D https://spectreattack.com/spectre.pdf | "To bridge the speed gap between the faster processor and the slower memory, processors use a hierarchy of successively smaller but faster caches." |
+
+화면 전용 표기 `100s OF CYCLES`는 2번, `≈ WAIT`는 7번, `CACHE`는 15번, `SPECTRE 2018`은 10번에 묶인다. 마지막 장면의 `IDLE` vs `SPECULATE` 막대는 수치가 아닌 도식이므로 길이 비율을 실측값처럼 보이게 그리지 않는다.

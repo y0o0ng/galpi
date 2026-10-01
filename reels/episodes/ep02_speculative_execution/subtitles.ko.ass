@@ -1,0 +1,29 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Narration,Apple SD Gothic Neo,54,&H00E9EDE7,&H00E9EDE7,&H00181A15,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,2,90,90,330,1
+Style: HookTitle,Apple SD Gothic Neo,68,&H00E9EDE7,&H00E9EDE7,&H00181A15,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,8,80,80,150,1
+Style: HookSub,Apple SD Gothic Neo,50,&H00ADB4A8,&H00ADB4A8,&H00181A15,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,8,80,80,370,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:04.00,HookTitle,,0,0,0,,답을 알기도 전에, 먼저 해 버린다
+Dialogue: 0,0:00:00.00,0:00:04.00,HookSub,,0,0,0,,투기적 실행
+Dialogue: 0,0:00:00.30,0:00:03.90,Narration,,0,0,0,,CPU는 답이 나오기도 전에, 다음 일을 먼저 해요.
+Dialogue: 0,0:00:04.10,0:00:08.40,Narration,,0,0,0,,갈 길을 정할 값이 메모리에서 오기까지, 수백 클럭이 걸리기도 해요.
+Dialogue: 0,0:00:08.60,0:00:10.90,Narration,,0,0,0,,기다리면 그동안 놀게 되죠.
+Dialogue: 0,0:00:11.10,0:00:14.90,Narration,,0,0,0,,그래서 상태를 저장해 두고, 한쪽 길을 골라 미리 실행해요.
+Dialogue: 0,0:00:15.10,0:00:17.90,Narration,,0,0,0,,값이 와서 맞았으면 시간을 번 거고,
+Dialogue: 0,0:00:18.00,0:00:20.40,Narration,,0,0,0,,틀렸으면 저장한 상태로 되돌려요.
+Dialogue: 0,0:00:20.50,0:00:22.90,Narration,,0,0,0,,손해는 기다린 것과 비슷할 뿐이에요.
+Dialogue: 0,0:00:23.10,0:00:26.90,Narration,,0,0,0,,추측은 지난 기록을 보고 하는데, 거의 다 맞혀요.
+Dialogue: 0,0:00:27.10,0:00:31.00,Narration,,0,0,0,,그런데 빠른 저장소인 캐시에는, 되돌려도 흔적이 남아요.
+Dialogue: 0,0:00:31.20,0:00:35.80,Narration,,0,0,0,,2018년 Spectre 연구는 이 흔적으로 비밀을 읽어냈어요.
+Dialogue: 0,0:00:36.00,0:00:39.90,Narration,,0,0,0,,막는 방법 하나는, 위험한 자리에서 추측을 멈추는 거예요.
+Dialogue: 0,0:00:40.10,0:00:44.90,Narration,,0,0,0,,놀지 않으려고 미리 추측하기, 요즘 CPU가 빠른 비결 중 하나예요.
