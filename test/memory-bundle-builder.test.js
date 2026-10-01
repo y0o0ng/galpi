@@ -162,7 +162,8 @@ test('user-centered discovery excludes acquaintance claims as targets, preserves
 test('superseded discovery request fails before provider dispatch', async () => {
   let calls = 0;
   const selector = createOpenAIBundleSelector({ apiKey: 'synthetic-test-key', fetch: async () => { calls++; } });
-  for (const promptVersion of ['memory-evidence-bundle-selection-v1', 'memory-evidence-bundle-selection-user-centered-v1']) {
+  for (const promptVersion of ['memory-evidence-bundle-selection-v1', 'memory-evidence-bundle-selection-user-centered-v1',
+    'memory-fixed-anchor-evidence-selection-v1']) {
     await assert.rejects(selector({ ...builder.buildBundleSelectionRequest(episode()), promptVersion }), { code: 'INVALID_BUNDLE_REQUEST' });
   }
   assert.equal(calls, 0);
@@ -210,10 +211,10 @@ test('fixed-anchor evidence selection preserves full source and target while reu
   let calls = 0;
   const result = await builder.discoverEvidenceBundles(e, request => {
     calls++;
-    assert.equal(request.promptVersion, 'memory-fixed-anchor-evidence-selection-v1');
+    assert.equal(request.promptVersion, 'memory-fixed-anchor-evidence-ids-v1');
     assert.deepEqual(JSON.parse(request.input), { anchor, episode: e });
     anchor.text = 'caller mutation cannot change the frozen target';
-    return selected;
+    return { evidenceTurnIds: ['m2', 'm1'] };
   }, anchor);
   assert.equal(calls, 1); assert.deepEqual(e, before);
   assert.deepEqual(result, builder.buildEvidenceBundles(e, selected));
@@ -233,22 +234,23 @@ test('fixed anchor must be uniquely source-grounded before selector dispatch', a
   assert.equal(calls, 0);
 });
 
-test('fixed-anchor response cannot replace/widen target, omit it, or discover additional bundles; no retry', async () => {
+test('fixed-anchor response accepts only evidence IDs, rejecting target replacement, missing/duplicate/invented evidence; no retry', async () => {
   const anchor = selection().bundles[0].anchor;
   const outputs = [
     { bundles: [] },
     { bundles: [{ anchor: { turnId: 'm1', text: '커피는 평일 한 잔' }, evidenceTurnIds: ['m1'] }] },
-    { bundles: [{ anchor: { turnId: 'm3', text: '독서 계획' }, evidenceTurnIds: ['m3'] }] },
-    { bundles: [...selection().bundles, { anchor: { turnId: 'm3', text: '독서 계획' }, evidenceTurnIds: ['m3'] }] },
+    { anchor: { turnId: 'm3', text: '독서 계획' }, evidenceTurnIds: ['m1'] },
+    { evidenceTurnIds: ['m1'], value: 'invented claim' },
+    { evidenceTurnIds: [] }, { evidenceTurnIds: ['m2'] },
+    { evidenceTurnIds: ['m1', 'm1'] }, { evidenceTurnIds: ['m1', 'missing'] },
+    { evidenceTurnIds: 'm1' },
   ];
   for (const output of outputs) {
     let calls = 0;
     await assert.rejects(builder.discoverEvidenceBundles(episode(), () => { calls++; return output; }, anchor),
-      { code: 'FIXED_ANCHOR_CHANGED' });
+      { code: 'INVALID_BUNDLE_SELECTION' });
     assert.equal(calls, 1);
   }
-  await assert.rejects(builder.discoverEvidenceBundles(episode(), () => ({ bundles: [{ anchor, evidenceTurnIds: ['m2'] }] }), anchor),
-    { code: 'INVALID_BUNDLE_SELECTION' });
 });
 
 test('fixed-anchor request uses the same one-shot Luna transport without discovery or downstream output', async () => {
@@ -258,13 +260,39 @@ test('fixed-anchor request uses the same one-shot Luna transport without discove
     calls++; const body = JSON.parse(options.body);
     assert.equal(body.input, request.input); assert.equal(body.instructions, request.instructions);
     assert.equal(body.model, 'gpt-6-luna'); assert.equal(body.store, false); assert.equal(body.tools, undefined);
-    assert.deepEqual(body.text.format.schema, builder.BUNDLE_SELECTION_SCHEMA);
+    assert.deepEqual(body.text.format.schema, builder.ANCHOR_EVIDENCE_SELECTION_SCHEMA);
     return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', role: 'assistant',
-      content: [{ type: 'output_text', text: JSON.stringify(selection()) }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      content: [{ type: 'output_text', text: JSON.stringify({ evidenceTurnIds: selection().bundles[0].evidenceTurnIds }) }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
   } });
   assert.deepEqual(await builder.discoverEvidenceBundles(episode(), selector, selection().bundles[0].anchor),
     builder.buildEvidenceBundles(episode(), selection()));
   assert.equal(calls, 1);
+});
+
+test('low/medium fixed-anchor requests differ only in effort and leave the default medium unchanged', async () => {
+  const bodies = [];
+  for (const options of [{ reasoningEffort: 'low' }, { reasoningEffort: 'medium' }, {}]) {
+    let calls = 0;
+    const selector = createOpenAIBundleSelector({ apiKey: 'synthetic-test-key', ...options,
+      fetch: async (url, request) => {
+        calls++; bodies.push(JSON.parse(request.body));
+        return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', role: 'assistant',
+          content: [{ type: 'output_text', text: '{"evidenceTurnIds":["m1"]}' }] }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } });
+      } });
+    const result = await builder.discoverEvidenceBundles(episode(), selector, selection().bundles[0].anchor);
+    assert.equal(calls, 1); assert.equal(result.bundles.length, 1);
+    assert.equal(result.semanticCompleteness, 'NOT_VALIDATED');
+  }
+  assert.equal(bodies[0].reasoning.effort, 'low');
+  assert.equal(bodies[1].reasoning.effort, 'medium');
+  assert.deepEqual(bodies[1], bodies[2]);
+  const comparable = structuredClone(bodies[0]); comparable.reasoning.effort = 'medium';
+  assert.deepEqual(comparable, bodies[1]);
+  for (const effort of ['', 'none', 'high', null]) {
+    assert.throws(() => createOpenAIBundleSelector({ apiKey: 'synthetic-test-key', reasoningEffort: effort }),
+      { code: 'INVALID_BUNDLE_REASONING_EFFORT' });
+  }
 });
 
 test('repeated results and private freeze bytes are deterministic; exclusive 0600 creation outside repo', t => {

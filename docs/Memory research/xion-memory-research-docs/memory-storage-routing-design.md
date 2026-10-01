@@ -758,3 +758,39 @@ reads/writes, EvidenceRef registration, downstream judgments and state commits
 were **0**. The one-call budget is exhausted. Next: remove target rewriting from
 the selector's responsibility before another separately authorized probe; no
 local selector or downstream pipeline execution has begun.
+
+### Evidence-IDs-only interface / low–medium comparison — 2026-10-01
+
+Owner-approved scope: retain the fixed-anchor-first pipeline, return only
+`{evidenceTurnIds: [...]}` from the selector, then compare low/medium on the same
+known budget target. The current fixed-anchor request is
+`memory-fixed-anchor-evidence-ids-v1`; the earlier anchor-echo request above is
+historical and rejected before new provider dispatch. The code keeps the
+validated immutable anchor from the frozen request and constructs exactly one
+bundle using the returned IDs. Extra fields, including an echoed/replaced anchor,
+fail closed. Existing nonempty/unique/source-bound evidence and mandatory anchor
+turn checks remain; omitted evidence is not silently added. Discovery behavior
+and the default CLI/selector reasoning effort remain medium. The development
+adapter accepts explicit low/medium for this comparison, with no production
+configuration or model-selection change.
+
+Before answers, fix the same retained 30-message episode/hash and message-1726
+budget anchor, common prompt/schema/model/config and execution order **low then
+medium**, one independent call per effort. Only `reasoning.effort` differs in the
+API bodies. Maximum total dispatches **2**, no retries, additional cases or
+output repair. Inspect selected source turns for the preceding question,
+referents/units, relevant conditions/corrections and unrelated context; preserve
+both selections. Do not supply an expected evidence list to the provider.
+
+This is a two-call development comparison on a known example, not a causal
+quality estimate or a model/effort winner. Generation variation is not controlled
+by one sample per effort. No Ambiguity/Durability/Extractor labels or storage
+commits are produced; evidence completeness remains NOT_VALIDATED. The previous
+failed attempt and earlier discovery probes remain unchanged. No current
+DB/Vault access, Pi deployment or local-model run is in scope.
+
+Pre-dispatch validation: Builder/adapter **25/25 PASS**, complete focused
+storage/SDK/UI regression **151/151 PASS**, and `git diff --check` PASS. Synthetic
+transport tests compare entire low/medium API bodies and the unchanged default
+medium body. The full repository suite was not repeated for this isolated
+development change; these checks do not establish semantic selection quality.
