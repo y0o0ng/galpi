@@ -2380,6 +2380,21 @@ DEV rows are calibration: protocol
 statement), builder `scripts/build-memory-inference-p1b6-batch-006-human-review-packet.js`, packet
 `24dbf13a…` (not committed). No HELD row is in the HUMAN packet.
 
+**DEV HUMAN calibration attempt-001 (2026-10-01) — 2/2 match.** Receipt
+`fixtures/local-memory-inference-p1b6-batch-006-human-review-attempt-001.json` (raw `1b07840b…`,
+not committed). The owner decided both rows; no presentation aid was reported, so none is
+recorded; not independent. `006` and `007` are `CALIBRATION_MATCH` and stay `PROVISIONAL`.
+
+**Ledger v5 and shortage v5.** `scripts/build-memory-inference-p1b6-reviewed-pool-ledger-v5.js`
+(`npm run build:memory-inference-p1b6-reviewed-pool-ledger-v5`) pins ledger v4 (unchanged) and the
+batch-006 receipts and appends the seven rows, all `PROVISIONAL`:
+`fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v5.json` has 451 rows, **386 in
+pool**, and no in-pool label differs from v3. `…-shortage-receipt-v5.json`: split 241 / 61 / 84,
+language KO 271, MIXED 77, EN 38, fragments 70 / 102 / 124 / 70 / 20, every HELD skeleton at 5 or
+more; **minimum top-up lower bound 0**. Slack is zero for EN and for fragments 1, 4 and 5, so the
+deterministic selection must take every pooled row in those cells. Whether one 380-row selection
+meets all constraints jointly is decided only there.
+
 ## Closed Selection and Freeze Constraints
 
 The accepted surface pool is selected through a deterministic, constrained,
