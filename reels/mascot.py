@@ -44,6 +44,7 @@ def mascot(expression="base", height=2.0, aim=None):
             face.add(Arc(radius=4 * s, start_angle=7 * PI / 6, angle=2 * PI / 3,
                          arc_center=P(0, 3.5), color=S.BG, stroke_width=5))
     m = VGroup(body, face)
+    m.sfx = {"sparkle": "chime", "pointing": "select"}.get(expression)  # FadeIn되면 timeline.play가 소리를 낸다
     m.anchor = Dot(ORIGIN, radius=0, fill_opacity=0)  # 별 중심 추적용
     m.add(m.anchor)
     return m

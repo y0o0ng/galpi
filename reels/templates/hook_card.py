@@ -14,5 +14,6 @@ def hook_card(term, art, mascot):
     art.set_height(ART_H).move_to(np.array([0, ART_Y, 0]))
     at(mascot, MASCOT_POS)
     card = VGroup(term_g, art, mascot)
+    art.sfx = "pop"
     card.term, card.art, card.mascot = term_g, art, mascot
     return card

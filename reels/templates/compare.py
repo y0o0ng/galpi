@@ -13,7 +13,9 @@ def _card(label, art, w, h):
     if art.width > w - 0.5:
         art.set_width(w - 0.5)
     art.move_to(box.get_center() + DOWN * 0.3)
-    return VGroup(box, title, art)
+    card = VGroup(box, title, art)
+    card.sfx = box.sfx = "pop"  # 장면이 FadeIn하면 timeline.play가 소리를 낸다
+    return card
 
 
 def compare(cards, links, title, y=0.8, h=4.2):

@@ -40,7 +40,7 @@
 
 ### 주제 기준 (후보 생성 프롬프트에 넣는다)
 
-- 30\~45초 안에 그림으로 설명할 개념이 있다.
+- 60\~120초 안에 그림으로 설명할 개념이 있다. 늘어난 시간은 새 개념이 아니라 같은 개념의 깊이(왜, 숫자, 한계)에 쓴다.
 - 며칠 안에 나온 뉴스다. (단, 개념 자체는 오래가도 된다.)
 - 기존 템플릿 중 하나에 맞는다.
 - 투자 유치·출시 발표처럼 기술 내용이 없는 뉴스는 제외한다.
@@ -84,7 +84,8 @@ candidate ─(검토1 선택)→ selected → scripted → rendered ─(검토2 
 
 ## 5. 영상 규격과 템플릿
 
-- 세로 9:16, 1080×1920, 30\~45초, 존댓말(해요체), TTS 목소리는 하나로 고정.
+- 세로 9:16, 1080×1920, 60\~120초(4편부터; 1\~3편은 30\~45초 버전으로 남긴다), 존댓말(해요체), TTS 목소리는 하나로 고정.
+- TTS는 edge-tts `ko-KR-SunHiNeural`, 속도 `+16%`로 고정한다(2026-10-02 귀로 비교해 결정, +13%에서 올림; GPT TTS는 품질·비용에서 탈락). edge-tts는 비공식 경로라 3단계 게시 전에 이용 조건을 다시 확인하고, 막히면 로컬 MeloTTS(MIT)를 대안으로 잰다.
 
 ### 템플릿 v1
 
@@ -150,7 +151,6 @@ candidate ─(검토1 선택)→ selected → scripted → rendered ─(검토2 
 
 ## 9. 열린 질문
 
-- TTS 엔진 선택 (한국어 품질, 비용)
 - 렌더 워커와 Pi의 통신 방식
 - 계정 핸들
 
@@ -216,3 +216,54 @@ candidate ─(검토1 선택)→ selected → scripted → rendered ─(검토2 
 | 15 | 캐시는 (CPU가 쓰는) 빠른 저장소다 | [Spectre] §II-D https://spectreattack.com/spectre.pdf | "To bridge the speed gap between the faster processor and the slower memory, processors use a hierarchy of successively smaller but faster caches." |
 
 화면 전용 표기 `100s OF CYCLES`는 2번, `≈ WAIT`는 7번, `CACHE`는 15번, `SPECTRE 2018`은 10번에 묶인다. 마지막 장면의 `IDLE` vs `SPECULATE` 막대는 수치가 아닌 도식이므로 길이 비율을 실측값처럼 보이게 그리지 않는다.
+
+## 부록 — 3편 대본: 자연 순환
+
+**훅 카드:** **펌프 없이, 물이 혼자 돈다** / NATURAL CIRCULATION / 자연 순환
+
+| 시간 | 화면 (템플릿) | 내레이션 |
+| --- | --- | --- |
+| 0–7초 | 훅 카드. 용기 단면 안에서 고리가 돈다. 키커 `BWRX-300`, 시온 놀람 | 노심의 물을 펌프 없이 돌리는 소형 원자로, BWRX-300이 미국에서 첫 건설 허가를 받았어요. |
+| 7–13초 | `FORCED` vs `NATURAL` 카드 (비교). 두 카드 모두 같은 사각 고리(가운데 위로, 바깥 아래로)가 흐른다. FORCED는 내려가는 줄 위에 `PUMP` 상자를 두고 화살표가 거기서 밀려 나간다. NATURAL은 같은 자리에 점선 빈 상자 `NO PUMP`를 두고 화살표는 그대로 돈다 | 끓는 물 원자로는 대부분 펌프로 물을 밀어 돌려요. 그런데 여기선 물이 스스로 돌아요. |
+| 13–18초 | 흐름 화살표 ① 상승. `rise`만 켠다. `CORE`에서 LIGHT 색 화살표가 위로 가고, 노심 중간부터 `CHIMNEY` 안에 기포(빈 원)가 섞여 올라간다 | 노심에서 데워진 물은 끓어서 증기가 섞이고, 가벼워져서 위로 올라가요. |
+| 18–28초 | 흐름 화살표 ② 분리·하강. `steam_out` → `down_left`·`down_right` → `fw_in` 순서로 켠다. 범례 `LIGHT`/`HEAVY`가 나타난다 | 증기는 위에서 빠져나가 터빈을 돌리고, 남은 물은 새로 들어온 물과 섞여 바깥 통로로 내려와요. 증기가 없는 물은 무거워서 가라앉죠. |
+| 28–35초 | 흐름 화살표 ③ 높이. 한 바퀴 흐른 뒤 `highlight(['rise','down_left','down_right'])`, 굴뚝 높이 막대 `↕`. 시온이 가리키기로 `CHIMNEY` 라벨을 지목 | 이 무게 차이가 펌프 대신 물을 밀어요. 이 힘은 높이가 길수록 세져서, 노심 위에 긴 굴뚝을 세웠어요. |
+| 35–40초 | `LIGHT ↑` vs `HEAVY ↓` 카드 (비교). LIGHT는 기포 섞인 물방울과 위쪽 화살표, HEAVY는 기포 없는 물방울과 아래쪽 화살표. 시온 반짝임 | 가벼우면 뜨고 무거우면 가라앉는 힘, 그 힘만으로 물이 도는 거예요. |
+
+자막은 1·2편처럼 문장 단위로 쪼갠다. 다음 편 예고는 없다. 길이는 2편 자막 속도(약 5.6음절/초, 쉼 포함)로 잰 추정치이고, TTS로 실제 잰 값이 아니다. 45초를 넘으면 A-3의 순서대로 줄인다.
+
+### 화면 글자 목록
+
+`NATURAL CIRCULATION`, `BWRX-300`, `FORCED`, `NATURAL`, `PUMP`, `NO PUMP`, `CORE`, `CHIMNEY`, `DOWNCOMER`, `STEAM`, `FEEDWATER`, `LIGHT`, `HEAVY`, `↑`, `↓`, `↕`, `→` 만 쓴다. 온도·유량·높이 숫자는 화면에 쓰지 않는다.
+
+### 사실 확인 목록
+
+출처 약칭
+- **[PR]** GE Vernova 보도자료, "NRC issues first U.S. construction permit for a BWRX-300 small modular reactor at Tennessee Valley Authority’s Clinch River site" (KNOXVILLE, TN, September 29, 2026), https://www.gevernova.com/news/press-releases/nrc-issues-first-us-construction-permit-bwrx-300-small-modular-reactor-tva-clinch-river
+- **[GD]** GE Vernova Hitachi Nuclear Energy, "BWRX-300 General Description", 005N9751 Revision J (제조사 1차 기술 자료), https://www.gevernova.com/content/dam/gevernova-nuclear/global/en_us/documents/carbon-free-power/005N9751-BWRX-300-General-Description.pdf. 쪽 번호는 "Page N of 129"이고 PDF 쪽과 같다.
+- **[ACRS]** U.S. NRC Advisory Committee on Reactor Safeguards, BWRX-300 Clinch River 건설 허가 신청 안전성 보고 서한, 2026-06-20, ADAMS ML26058A279, https://www.nrc.gov/docs/ML2605/ML26058A279.pdf. NRC 스태프 SER이 아니라 자문위원회 서한이다. nrc.gov는 curl에 403을 돌려준다.
+- **[IAEA]** IAEA-TECDOC-1474, "Natural circulation in water cooled nuclear power plants" (2005), https://www-pub.iaea.org/MTCD/Publications/PDF/TE_1474_web.pdf. 쪽 번호는 PDF 쪽이다.
+
+인용은 PDF 텍스트층에서 그대로 복사했고 줄바꿈은 공백으로 이었다. 7번과 11번의 `steam-water`는 원문에서 `steam-` 뒤에 줄이 바뀐다. 실제 복합어 하이픈이므로 하이픈은 남기고 줄바꿈만 지웠다. 3번에는 원문 합자 `ﬁ`·`ﬂ`가 그대로 있다. [PR]의 아포스트로피는 원문 그대로 `’`(U+2019)다. 한 칸에 인용이 둘 이상이면 각각 원문의 다른 자리에 있다.
+
+| # | 주장 (대본 문장) | 출처 | 원문 인용 |
+| --- | --- | --- | --- |
+| 1 | BWRX-300(소형 원자로)이 미국에서 첫 건설 허가를 받았다 | [PR] | "today welcomed the U.S. Nuclear Regulatory Commission’s (NRC) issuance of a construction permit to the Tennessee Valley Authority (TVA) for a BWRX-300 small modular reactor at its Clinch River site in Oak Ridge, Tennessee." / "The permit is the first issued in the United States for a BWRX-300" |
+| 2 | 이 원자로는 노심의 물을 펌프 없이 돌린다 | [GD] p.30 / [ACRS] p.2 | "Flow through the core is by natural circulation; pumps are not required to force reactor coolant through the RPV." / "The BWRX-300 Clinch River design is a nominal 300 MWe (870 MWth) BWR with core heat removal by natural circulation." |
+| 3 | 끓는 물 원자로는 대부분 펌프로 물을 밀어 돌린다 | [GD] p.12 | "Most BWRs deployed to date have used forced circulation, including the BWR/1s through BWR/6s and the ABWR." / "Later plants were simpliﬁed by the introduction of internal jet pumps. These pumps boosted recirculation ﬂow" |
+| 4 | 여기(BWRX-300)선 물이 스스로 돈다 | [GD] p.30 / [GD] p.12 | "Flow through the core is by natural circulation" / "The BWRX-300 continues the cost-saving advances of the SBWR and ESBWR with a tall vessel design to achieve natural circulation but without the need for a shorter core." |
+| 5 | 노심에서 데워진 물은 가벼워진다 | [IAEA] p.27 | "The fluid in contact with the heat source is being heated so that its density is decreasing." |
+| 6 | 끓어서 증기가 섞이면 가벼워진다 | [IAEA] p.27 / [IAEA] p.104 | "Fluid density differences can be created by changes in temperature or by changes in phase (i.e. vapor/liquid), as is the case for two-phase fluids." / "With two-phase systems, it is possible to obtain larger density differences and hence larger flow rates than in single-phase systems." |
+| 7 | 노심을 나온, 증기 섞인 물이 위로 올라간다 | [GD] p.33 | "The chimney forms the annulus separating the subcooled recirculation downward flow from the upward steam-water mixture flow exiting the core." |
+| 8 | 가벼운 쪽은 올라가고 무거운 쪽은 가라앉는다 | [IAEA] p.99 | "At the source, the fluid absorbs heat becomes lighter and rises. At the sink the fluid rejects heat becomes heavier and sinks thus establishing a circulation." |
+| 9 | 증기는 위에서 빠져나가 터빈을 돌린다 | [GD] p.33 / [GD] p.33 / [GD] p.30 | "In each separator, the steam-water mixture rising through the standpipe passes through vanes to separate the water from the steam." / "removes the moisture from the steam before it exits the reactor." / "generates steam to drive the High Pressure (HP) and Low Pressure (LP) turbines." |
+| 10 | 남은 물은 바깥 통로(downcomer)로 내려온다 | [GD] p.33 | "The separated water flows from the lower portion of the steam separator into the downcomer region." / "This partition separates the core region from the downcomer annulus." |
+| 11 | 내려오는 물은 새로 들어온 물과 섞인 물이고, 증기가 없다 | [GD] p.33 / [GD] p.33 / [IAEA] p.109 | "The recirculation flow consists of reactor coolant returning from the steam separators and FW makeup." / "subcooled recirculation downward flow" / "Usually single-phase flow prevails in the downcomer." |
+| 12 | 이 무게(밀도) 차이가 펌프 대신 물을 민다 | [IAEA] p.27 | "This density difference, acted upon by gravity over the difference in elevation between the source and the sink, produces a buoyancy force that drives the fluid through the loop. This behavior is known as natural circulation." |
+| 13 | 이 힘은 높이가 길수록 세진다 | [IAEA] p.27 / [IAEA] p.109 | "acted upon by gravity over the difference in elevation between the source and the sink" / "Increasing riser height promotes natural circulation flow. An equivalent term used in vessel type BWRs is the chimney." |
+| 14 | 그래서 노심 위에 긴 굴뚝을 세웠다 | [GD] p.30 / [GD] p.33 | "Natural circulation is enabled by a tall chimney between the top of the core at the top guide to the bottom of the steam separators." / "The chimney provides additional downcomer height for the driving head necessary to sustain natural circulation flow." |
+| 15 | 뜨고 가라앉는 힘만으로 (노심의) 물이 돈다 | [IAEA] p.27 / [GD] p.30 | "produces a buoyancy force that drives the fluid through the loop. This behavior is known as natural circulation." / "pumps are not required to force reactor coolant through the RPV." |
+| G1 | (그림) 안쪽 원통이 노심과 굴뚝을 함께 둘러싸고, 바깥 고리 통로와 나눈다 | [GD] p.33 | "provides a partition to separate the upward flow of coolant through the core from the downward recirculation flow." |
+| G2 | (그림) 노즐은 모두 노심보다 한참 위에 있다 | [GD] p.30 | "All nozzles are located significantly above the level of active fuel" |
+
+화면 표기와 행의 연결: `BWRX-300`은 1번, `FORCED`·`PUMP`는 3번, `NATURAL`·`NO PUMP`는 2·4번, `CORE`·`CHIMNEY`·`DOWNCOMER`·`STEAM`은 7·9·10·14번과 G1, `FEEDWATER`는 11번, `LIGHT ↑`는 5·6·8번, `HEAVY ↓`는 8·11번, `↕`는 13번이다. 훅의 "펌프 없이, 물이 혼자 돈다"는 2·4번이다.
