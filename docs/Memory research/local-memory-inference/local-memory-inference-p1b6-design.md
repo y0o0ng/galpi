@@ -9,6 +9,11 @@
 > current contracts for the next surface/source-episode phase; historical
 > review and execution evidence is in
 > [`local-memory-inference-run-receipts.md`](local-memory-inference-run-receipts.md).
+>
+> **Latest formation-input scope clarification (owner, 2026-10-01):** TARGET
+> judgment is user-centered; see [User-centered TARGET clarification](#user-centered-target-clarification--2026-10-01).
+> This prospective clarification does not edit the frozen v3 catalog or
+> retroactively relabel its corpus/review history.
 
 ## Status / Current Next Step
 
@@ -2456,6 +2461,45 @@ no syntheticEvidence table, per-turn hashes, dataset-local PIT cutoff, replica
 Evidence DB, or storage/service abstraction is required by this contract.
 Fixture-level freeze and raw-byte hashing are sufficient unless a concrete
 requirement later proves otherwise.
+
+## User-centered TARGET clarification — 2026-10-01
+
+The repository owner clarified the current formation implementation contract:
+each TARGET is evaluated for the **user's own state, stance, plan, or relationship**.
+Knowing what an acquaintance said does not establish the user's adoption of that
+claim. An explicitly tentative/undecided user state can still be CLEAR; a user
+state that cannot be determined from the visible bundle remains ESCALATE. Do not
+infer either agreement or disagreement merely from missing adoption evidence.
+
+For the owner-provided early-meeting example, the acquaintance's concentration
+claim is reported, while the user agrees only that mornings are quiet. The
+TARGET's user-centered stance on early meetings helping concentration is not
+determined: **ESCALATE**. Do not substitute the easier question of whether the
+acquaintance made the statement. For the cheaper-housing example, the user's
+intention to view another, cheaper place next week is given: **CLEAR**, without
+inventing the property's identity, an exact appointment or operational task
+registration. These are illustrative owner decisions, not new corpus gold.
+
+The current implementation does **not** discover/store acquaintance statements
+or their personal states as standalone memory candidates. Such speech may remain
+source evidence/context when needed for a user-centered TARGET. This is **not**
+an exclusion of relationship memory: a relationship involving the user may be
+a candidate. It does not open an arbitrary-entity storage handler or make every
+relationship durable; Durability and family-specific validation still apply.
+
+One anchor corresponds to one evaluation bundle, and one bundle to one anchor.
+If its downstream gates pass, that bundle yields **one logical storage candidate**,
+not multiple independent extracted memories. Other independent candidates need
+their own anchors/bundles and judgments; they may reuse evidence. One logical
+candidate may have supporting properties/conditions and does not imply one SQL
+row or one Projection.
+
+**Historical authority boundary:** the frozen v3 attributed-status clause and
+`cc054a42` migration decisions remain auditable historical contracts. The new
+user-centered judgment cannot inherit their labels as proof of compatibility.
+Applying this scope to the research catalog/corpus requires a separately
+versioned successor and affected-item review; neither is performed here. No
+fixtures, accepted-pool membership, gold labels or historical receipts change.
 
 ## Candidate Granularity
 

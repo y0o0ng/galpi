@@ -496,6 +496,50 @@ After the transition-target failure, the repository owner paused adoption of the
 
 Owner decision: implement the formation front-end's Bundle Builder while the separate local-memory track develops ambiguity inference. Use accumulated conversation as private development material; permit one Luna call on one source episode fixed before dispatch. This does not connect the ambiguity specialist, Durability, Extractor or Storage Router, and does not modify the P1-B6 corpus, labels or study protocol.
 
+### Current user-centered scope / one-bundle boundary — 2026-10-01
+
+After the initial probe, the owner clarified the current formation contract:
+**one anchor ↔ one evaluation bundle → one logical storage candidate**, if the
+ambiguity, durability and extraction gates pass. An episode may yield multiple
+independently anchored bundles that reuse evidence; a bundle's judgment does not
+authorize extraction/storage of other independently judged facts. This is not a
+one-SQL-row constraint or a change to Derived State → 0..N Projections.
+
+TARGET judgment concerns the user's own state, stance, plan or relationship.
+An acquaintance's reported statement being clear does not make the user's
+adoption of it clear. The owner's early-meeting example is ESCALATE for the
+user's stance, whereas the cheaper-place example gives a CLEAR user visit plan.
+A missing adoption statement is not automatically a denial or an explicitly
+undecided user state. CLEAR still does not mean WRITE, and a remembered plan
+does not confer authority to create a task/reminder.
+
+Do not discover/store acquaintances' statements or personal states as standalone
+memory candidates in the current implementation. Preserve their words in source
+evidence/context when needed; do not strip them from the episode. User-involving
+relationships remain eligible for candidate discovery, subject to later gates.
+No Relationship handler or arbitrary-entity identity resolver is opened here;
+the existing General Fact implementation remains within its registered v1 scope.
+
+The development request is now versioned
+`memory-evidence-bundle-selection-user-centered-v1`; the adapter rejects the old
+request version before dispatch. Its prompt carries these scope rules without
+adding interpreted propositions or judgment labels to the selection schema.
+Mechanical validation cannot prove user-centered semantic compliance; results
+remain NOT_VALIDATED. Ambiguity, Durability, Extractor and production storage are
+still unconnected. No new model call or reclassification of the retained eight
+bundles is performed. The initial probe below retains its exact original bytes
+and request hash. The [local-memory design clarification](../local-memory-inference/local-memory-inference-p1b6-design.md#user-centered-target-clarification--2026-10-01)
+records the distinction from the frozen v3 catalog; no research labels change.
+
+Validation: Bundle Builder/adapter focused tests **19/19 PASS**, including full
+source preservation, the new prompt contract and rejection of the old request
+version before dispatch. `git diff --check` and AGENTS/CLAUDE body equality pass.
+These checks do not establish semantic model quality. The full suite was not
+repeated for this prompt/document change; the initial probe's full-suite result
+below remains historical. New external/model calls and storage commits: **0**.
+
+### Existing development mechanics and initial probe
+
 `lib/memory-storage/bundle-builder.js` reads an explicitly selected inclusive message range in one session from a `readonly:true` / `query_only=ON` connection and a single SQLite read transaction. Ordering is the current conversation ordering `(created_at, id)`, including same-second ID tie-breaking. Both endpoints must exist in that session; other sessions and messages after the endpoint are excluded. No automatic session/topic segmentation, semantic search, DB migration, evidence registration or state write is performed. Message text is preserved verbatim, including multiline content, and roles remain explicit. Source timestamps are metadata, not adoption of §54.4.
 
 The private development episode has schema version 1, `sourceDomain: conversation_message`, session/range identities and ordered turns with message IDs, timestamps, roles and original text. This is a development source snapshot, not a new owning store or canonical production episode/address schema. `freeze:memory-source-episode` writes canonical JSON only to an owner-private directory outside Git; files are created exclusively with mode 0600 and fsynced. Existing freezes are not overwritten. Episode length, automatic boundaries and retrieval of context outside the declared episode remain OPEN.

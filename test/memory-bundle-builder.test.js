@@ -141,6 +141,29 @@ test('request preserves full episode/role attribution and separates bundle disco
   assert.ok(Object.isFrozen(request));
 });
 
+test('user-centered discovery excludes acquaintance claims as targets, preserves relation/evidence scope and one-candidate focus', () => {
+  const e = episode();
+  e.turns[0].text = '민지는 이른 회의에서 집중이 잘된대. 나는 조용한 건 좋아.';
+  e.turns[2].text = '민지는 내 동료야.';
+  const request = builder.buildBundleSelectionRequest(e);
+  assert.equal(request.promptVersion, 'memory-evidence-bundle-selection-user-centered-v1');
+  assert.deepEqual(JSON.parse(request.input), e);
+  assert.match(request.instructions, /지인의 발언·상태 자체를 저장 대상으로 삼는 bundle은 만들지 않는다/);
+  assert.match(request.instructions, /근거\/맥락으로 보존한다/);
+  assert.match(request.instructions, /사용자와 지인의 관계 자체는 제외하지 않는다/);
+  assert.match(request.instructions, /사용자의 동의·채택·선호가 결정됐다고 보지 않는다/);
+  assert.match(request.instructions, /각 bundle은 후속 단계에서 한 저장 후보의 판정 단위/);
+  // Prompt-contract regression only; no synthetic model result proves semantic compliance.
+});
+
+test('superseded discovery request fails before provider dispatch', async () => {
+  let calls = 0;
+  const selector = createOpenAIBundleSelector({ apiKey: 'synthetic-test-key', fetch: async () => { calls++; } });
+  await assert.rejects(selector({ ...builder.buildBundleSelectionRequest(episode()),
+    promptVersion: 'memory-evidence-bundle-selection-v1' }), { code: 'INVALID_BUNDLE_REQUEST' });
+  assert.equal(calls, 0);
+});
+
 test('selector invoked once with frozen input; no source mutation or silent retry after failure/malformed output', async () => {
   const e = episode(); const before = structuredClone(e); let calls = 0;
   const result = await builder.discoverEvidenceBundles(e, async request => {
