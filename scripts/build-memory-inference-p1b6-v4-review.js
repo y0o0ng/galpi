@@ -169,6 +169,117 @@ function buildReviewPacket(a) {
 
 const artifactBytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8');
 
+const RECEIPT_FILE = 'local-memory-inference-p1b6-v4-pool-review-attempt-001.json';
+const HUMAN_NAMESPACE = 'p1b6-v4-hreview';
+const HUMAN_PROTOCOL = Object.freeze({
+  identity: 'xion-local-memory-inference-p1b6-v4-human-review-protocol-v1',
+  rawSha256: 'ee09adb967ec1cc35adfbc6ccfd695b801ee8b71a60dc377f2ff4aac84d42acb',
+  fixture: 'local-memory-inference-p1b6-v4-human-review-protocol.json',
+});
+// Owner decisions after seeing the results (2026-10-01).
+const OWNER_DECISIONS = Object.freeze({
+  date: '2026-10-01',
+  scopeReviewWithoutProtocolFile: 'kept: the scope reviewer ran before the protocol file reached the working checkout and judged from the prompt, which carried the same IN / OUT / UNCERTAIN definitions; flagged TRAIN / DEV rows still get the owner check',
+  nonRealizationSkeletonIds: Object.freeze(['p1b6-sk-43016ef6da889a87']),
+  nonRealization: 'every historical surface on 43016ef6 marks the quoted content itself as the TARGET, which the v4 contract says is not a realization of the redefined skeleton; they leave the pool without HUMAN review, replacing the preregistered mandatory-HUMAN route for these rows',
+});
+
+function parseResults(rawBytes, ids, validRow) {
+  const parsed = JSON.parse(Buffer.from(rawBytes).toString('utf8'));
+  if (!parsed || JSON.stringify(Object.keys(parsed)) !== '["results"]' || !Array.isArray(parsed.results)) {
+    fail('result artifact must be an object whose only key is results');
+  }
+  if (JSON.stringify(parsed.results.map(row => row?.reviewRowId).toSorted()) !== JSON.stringify([...ids].toSorted())) {
+    fail('result rows are not exactly the packet rows');
+  }
+  for (const row of parsed.results) if (!validRow(row)) fail(`result row is malformed: ${row.reviewRowId}`);
+  return new Map(parsed.results.map(row => [row.reviewRowId, row]));
+}
+
+const validSemantic = row => typeof row.reason === 'string' && row.reason.trim() !== ''
+  && (row.disposition === 'KEEP' ? ['CLEAR', 'ESCALATE'].includes(row.decision)
+    : ['FIX', 'REJECT'].includes(row.disposition) && row.decision === null);
+const calibrationHash = itemId => crypto.createHash('sha256').update(`${CALIBRATION_HASH_DOMAIN}\0${itemId}`).digest('hex');
+
+// Applies the plan's routing and the owner decisions to the scope and v4 review results.
+function reconcile(scopeBytes, reviewBytes, a = verifySources(loadSources())) {
+  const { pool, v4Review } = derivePopulations(a);
+  const labels = new Map(a.v4.candidates.map(row => [row.semanticSkeletonId, row.humanLabel]));
+  const scope = parseResults(scopeBytes, pool.map(({ item }) => scopeRowId(item.itemId)), row =>
+    JSON.stringify(Object.keys(row).toSorted()) === '["reason","reviewRowId","scope"]'
+    && ['IN_SCOPE', 'OUT_OF_SCOPE', 'UNCERTAIN'].includes(row.scope) && typeof row.reason === 'string' && row.reason.trim() !== '');
+  const review = parseResults(reviewBytes, v4Review.map(({ item }) => reviewRowId(item.itemId)), row =>
+    JSON.stringify(Object.keys(row).toSorted()) === '["decision","disposition","reason","reviewRowId"]' && validSemantic(row));
+  const nonRealization = new Set(OWNER_DECISIONS.nonRealizationSkeletonIds);
+  const v4Items = new Set(v4Review.map(({ item }) => item.itemId));
+  const rows = pool.map(({ row }) => {
+    const s = scope.get(scopeRowId(row.itemId));
+    const held = row.splitAssignment === 'FINAL_HELD_OUT';
+    const entry = { itemId: row.itemId, semanticSkeletonId: row.semanticSkeletonId, splitAssignment: row.splitAssignment, scope: s.scope, scopeReason: s.reason };
+    if (v4Items.has(row.itemId)) {
+      const r = review.get(reviewRowId(row.itemId));
+      Object.assign(entry, { v4Reference: labels.get(row.semanticSkeletonId), reviewDisposition: r.disposition, reviewDecision: r.decision, reviewReason: r.reason });
+      if (nonRealization.has(row.semanticSkeletonId)) return { ...entry, outcome: 'OWNER_NON_REALIZATION', eligibility: 'INELIGIBLE', human: null };
+      const clean = r.disposition === 'KEEP' && r.decision === entry.v4Reference;
+      return { ...entry, outcome: clean ? 'V4_CLEAN_AGREEMENT' : 'V4_DISAGREEMENT', eligibility: clean ? 'PROVISIONAL' : 'PENDING_MANDATORY_HUMAN', human: clean ? 'pending-calibration' : 'mandatory' };
+    }
+    if (s.scope === 'IN_SCOPE') return { ...entry, outcome: 'IN_SCOPE', eligibility: 'UNCHANGED', human: null };
+    return held ? { ...entry, outcome: 'HELD_SCOPE_FLAGGED', eligibility: 'INELIGIBLE', human: null }
+      : { ...entry, outcome: 'SCOPE_FLAGGED', eligibility: 'PENDING_HUMAN_SCOPE_CHECK', human: 'scope' };
+  });
+  const clean = rows.filter(row => row.human === 'pending-calibration');
+  const size = Math.round(v4Review.length * CALIBRATION_FRACTION);
+  const calibration = new Set(clean.map(row => row.itemId)
+    .toSorted((x, y) => (calibrationHash(x) < calibrationHash(y) ? -1 : 1)).slice(0, size));
+  for (const row of rows) if (row.human === 'pending-calibration') row.human = calibration.has(row.itemId) ? 'calibration' : null;
+  const count = predicate => rows.filter(predicate).length;
+  return {
+    name: 'xion-local-memory-inference-p1b6-v4-pool-review-attempt-001-receipt-v1',
+    status: 'COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V4',
+    plan: { identity: PLAN_IDENTITY, rawSha256: sha256RawBytes(artifactBytes(buildPlan(a))) },
+    scopePacketSha256: sha256RawBytes(artifactBytes(buildScopePacket(a))),
+    reviewPacketSha256: sha256RawBytes(artifactBytes(buildReviewPacket(a))),
+    rawResultArtifacts: {
+      scope: { filename: 'p1b6-v4-scope-review-results.json', sha256: sha256RawBytes(scopeBytes), committed: false },
+      v4Review: { filename: 'p1b6-v4-review-results.json', sha256: sha256RawBytes(reviewBytes), committed: false },
+    },
+    executionProvenance: {
+      evidenceBasis: 'REPORTED_BY_REPOSITORY_OWNER',
+      reportedModel: 'Claude Opus 5.5',
+      session: 'two fresh Claude Code CLI sessions started in the home directory, one per packet',
+      limitation: 'the scope session ran before its protocol file reached the working checkout and judged from the prompt\'s inline definitions',
+    },
+    ownerDecisions: OWNER_DECISIONS,
+    summary: {
+      pool: rows.length,
+      scope: { IN_SCOPE: count(row => row.scope === 'IN_SCOPE'), OUT_OF_SCOPE: count(row => row.scope === 'OUT_OF_SCOPE'), UNCERTAIN: count(row => row.scope === 'UNCERTAIN') },
+      heldScopeIneligible: count(row => row.outcome === 'HELD_SCOPE_FLAGGED'),
+      nonRealizationIneligible: count(row => row.outcome === 'OWNER_NON_REALIZATION'),
+      v4CleanAgreements: clean.length,
+      human: { scope: count(row => row.human === 'scope'), mandatory: count(row => row.human === 'mandatory'), calibration: count(row => row.human === 'calibration') },
+    },
+    rows,
+    authority: { humanReviewPerformed: false, historicalRecordsRewritten: false, acceptancePerformed: false, finalSelectionPerformed: false, trainingOrEvaluationOccurred: false },
+  };
+}
+
+const humanRowId = itemId => opaqueId(HUMAN_NAMESPACE, HUMAN_PROTOCOL.identity, itemId);
+
+// Every row the receipt routes to the owner, one blind packet; each row gets the same two questions.
+function buildHumanPacket(receipt, a = verifySources(loadSources())) {
+  const { pool } = derivePopulations(a);
+  const members = new Set(receipt.rows.filter(row => row.human).map(row => row.itemId));
+  return {
+    name: 'xion-local-memory-inference-p1b6-v4-human-review-packet-v1',
+    status: 'BLIND_HUMAN_REVIEW_PACKET_NOT_RUN',
+    reviewProtocol: { identity: HUMAN_PROTOCOL.identity, rawSha256: HUMAN_PROTOCOL.rawSha256 },
+    rendererIdentity: RENDERER_IDENTITY,
+    rows: pool.filter(({ item }) => members.has(item.itemId))
+      .map(({ artifact, item }) => ({ reviewRowId: humanRowId(item.itemId), selectedBundle: renderCandidateBundle(artifact, item) }))
+      .sort((left, right) => (left.reviewRowId < right.reviewRowId ? -1 : 1)),
+  };
+}
+
 function main(argv = process.argv.slice(2)) {
   const a = verifySources(loadSources());
   if (argv.length === 0) {
@@ -176,8 +287,22 @@ function main(argv = process.argv.slice(2)) {
     process.stdout.write(`Wrote fixtures/${PLAN_FILE}\n`);
     return 0;
   }
-  const build = { '--scope-packet': buildScopePacket, '--review-packet': buildReviewPacket }[argv[0]];
-  if (argv.length !== 2 || !build) throw new Error('Usage: [--scope-packet <out> | --review-packet <out>]');
+  if (argv.length === 4 && argv[0] === '--scope-results' && argv[2] === '--review-results') {
+    const output = path.join(ROOT, 'fixtures', RECEIPT_FILE);
+    if (fs.existsSync(output)) throw new Error(`Existing output will not be overwritten: ${output}`);
+    const receipt = reconcile(fs.readFileSync(argv[1]), fs.readFileSync(argv[3]), a);
+    fs.writeFileSync(output, artifactBytes(receipt), { flag: 'wx' });
+    process.stdout.write(`Reconciled: ${JSON.stringify(receipt.summary)} -> fixtures/${RECEIPT_FILE}\n`);
+    return 0;
+  }
+  const humanPacket = () => {
+    if (sha256RawBytes(fs.readFileSync(path.join(ROOT, 'fixtures', HUMAN_PROTOCOL.fixture))) !== HUMAN_PROTOCOL.rawSha256) {
+      fail('HUMAN protocol bytes are not the pinned artifact');
+    }
+    return buildHumanPacket(JSON.parse(fs.readFileSync(path.join(ROOT, 'fixtures', RECEIPT_FILE))), a);
+  };
+  const build = { '--scope-packet': buildScopePacket, '--review-packet': buildReviewPacket, '--human-packet': humanPacket }[argv[0]];
+  if (argv.length !== 2 || !build) throw new Error('Usage: [--scope-packet <out> | --review-packet <out> | --human-packet <out> | --scope-results <raw> --review-results <raw>]');
   if (fs.existsSync(argv[1])) throw new Error(`Existing output will not be overwritten: ${argv[1]}`);
   const bytes = artifactBytes(build(a));
   fs.writeFileSync(argv[1], bytes, { flag: 'wx' });
@@ -186,8 +311,9 @@ function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
-  CALIBRATION_HASH_DOMAIN, PLAN_FILE, SOURCES, artifactBytes, buildPlan, buildReviewPacket, buildScopePacket,
-  derivePopulations, loadSources, main, reviewRowId, scopeRowId, verifySources,
+  CALIBRATION_HASH_DOMAIN, HUMAN_PROTOCOL, OWNER_DECISIONS, PLAN_FILE, RECEIPT_FILE, SOURCES, artifactBytes, buildHumanPacket,
+  buildPlan, buildReviewPacket, buildScopePacket, derivePopulations, humanRowId, loadSources, main, reconcile, reviewRowId,
+  scopeRowId, verifySources,
 };
 
 if (require.main === module) process.exit(main());

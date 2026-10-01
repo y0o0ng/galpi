@@ -71,9 +71,10 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   (HELD 5 `PROVISIONAL`); DEV HUMAN calibration **2/2 match**. **Ledger v5: pool 386; every
   marginal and every HELD per-skeleton need is met (minimum top-up 0).**
 - **semantic contract v4 (owner, 2026-10-01)** (see "Semantic contract v4"): the user-centered
-  successor; `cc054a42` and `43016ef6` move to ESCALATE. The 386-row scope review and the 19-row
-  v4 review are preregistered and their blind packets built; nothing has run. Deterministic
-  selection waits for the ledger that applies them.
+  successor; `cc054a42` and `43016ef6` move to ESCALATE. Scope review 361 IN / 23 OUT / 2
+  UNCERTAIN; v4 review `cc054a42` 4 match / 5 disagree, `43016ef6` all CLEAR. Owner: `43016ef6`
+  surfaces are non-realizations (out), flagged HELD rows out; a 28-row HUMAN packet is built, not
+  run. Deterministic selection waits for the ledger that applies them.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1165,6 +1166,38 @@ and every surface artifact, and writes `fixtures/local-memory-inference-p1b6-v4-
   committed.
 - A row stays in the pool only if it survives both. A new ledger applies the results under v4 and
   re-measures the shortage; deterministic selection waits for it.
+
+**Pool review attempt-001 (2026-10-01).** Two fresh Claude Code CLI sessions, Claude Opus 5.5
+(owner-reported). `--scope-results <raw> --review-results <raw>` writes
+`fixtures/local-memory-inference-p1b6-v4-pool-review-attempt-001.json` (raw `5fe9b1aa…`,
+`d5fd8e2d…`, not committed). **Limitation:** the scope session ran before the protocol file
+reached the working checkout (the protocols were committed from a separate worktree) and judged
+from the prompt's inline definitions, which match the protocol; the owner kept the result.
+
+- **Scope:** 361 IN_SCOPE, 23 OUT_OF_SCOPE, 2 UNCERTAIN. The flagged rows are third-party states
+  (a sibling's move, a father's medication, a cousin's fee, a colleague's loan period, a sister's
+  flight, a neighbour's arrears), facts with no visible user tie (`5fc872af` unidentified-object
+  observations, a shop's closing day, a market price), and all three `714725ee` role-play rows.
+  Two assistant-authored surfaces are among them (`b005-002`, `b006-005`): user-centered scope
+  was not checked at authoring. HELD flagged rows (`b002-052`, `b003-037` on `11e63b75`;
+  `b006-005`) are `INELIGIBLE`.
+- **v4 semantic:** `cc054a42` 4 KEEP ESCALATE (match) and 5 KEEP CLEAR — the reviewer read an
+  explicitly scoped partial endorsement as a given partial-adoption status. `43016ef6` 10 KEEP
+  CLEAR: every historical surface marks the quoted content as the TARGET, so the reviewer judged an
+  attributed claim.
+- **Owner decisions:** the scope result is kept with its limitation; the ten `43016ef6` surfaces are
+  **non-realizations** of the redefined skeleton (the v4 contract excludes a quoted-speech TARGET)
+  and leave the pool without HUMAN review, replacing their preregistered mandatory-HUMAN route.
+
+**Blind HUMAN review — preregistered and built, not run.** Protocol
+`fixtures/local-memory-inference-p1b6-v4-human-review-protocol.json` (`ee09adb9…`): 28 rows (19
+TRAIN / DEV scope checks, 5 `cc054a42` mandatory, 4 `cc054a42` calibration), no HELD row. Every row
+asks the same two questions — scope and KEEP / FIX / REJECT with CLEAR / ESCALATE — so the packet
+does not reveal which rows are which. Scope rows answered OUT / UNCERTAIN leave the pool; IN keeps
+their current status. Semantic rows need IN_SCOPE and a KEEP matching v4 (mandatory →
+`HUMAN_ADJUDICATED`, calibration → stays `PROVISIONAL`); anything else is `INELIGIBLE`. Not
+independent: the owner wrote the clarification and decided v4. Packet `p1b6-v4-hreview`,
+`73b9f178…`, not committed.
 
 ## Supervised Corpus
 

@@ -5503,3 +5503,15 @@ the accepted pool record stays **93**.
 | v4 review packet (not committed) | 19 rows, raw SHA `783bdf4da1094604ba78ed4b756bf5410bb2fe154cea941de80d35af911f2c3c` |
 
 v3 unchanged. No review has run; the accepted pool record stays **93**.
+
+#### P1-B6 v4 pool review attempt-001 — scope 361 / 23 / 2; v4 cc054a42 4 / 5, 43016ef6 non-realization; HUMAN packet BUILT
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-v4-pool-review-attempt-001.json` | receipt, `3941ce00…`; raw `5fe9b1aa96bde24ca25a4eb9333bd3df3acfcdd1994fcf390f4b214f7cb18242` (scope), `d5fd8e2d9422863c11c0f92c9666a8f119d8e51e7e2e64dd98e473be2b8f32d0` (v4), not committed |
+| `fixtures/local-memory-inference-p1b6-v4-human-review-protocol.json` | HUMAN protocol, `ee09adb967ec1cc35adfbc6ccfd695b801ee8b71a60dc377f2ff4aac84d42acb` |
+| HUMAN packet (not committed) | 28 rows, raw SHA `73b9f178319187f8cc5fd486839d5d96c8507ac9e295ae1b74295b0c6897f4eb` |
+
+Claude Opus 5.5 (owner-reported); scope session ran without its protocol file (owner kept it).
+`43016ef6` 10 rows and HELD scope-flagged 3 rows `INELIGIBLE`. No HUMAN review or acceptance; the
+accepted pool record stays **93**.

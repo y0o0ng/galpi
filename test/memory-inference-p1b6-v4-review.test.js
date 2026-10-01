@@ -43,3 +43,35 @@ test('both packets: sorted unique opaque IDs, one TARGET each, no leaked metadat
     for (const value of ['p1b6-item-', 'p1b6-sk-', 'CLEAR', 'ESCALATE', 'TRAIN', 'FINAL_HELD_OUT']) assert.equal(text.includes(value), false, value);
   }
 });
+
+const os = require('node:os');
+const receipt = JSON.parse(read(builder.RECEIPT_FILE));
+const RAW = ['p1b6-v4-scope-review-results.json', 'p1b6-v4-review-results.json'].map(file => path.join(os.homedir(), file));
+
+test('committed v4 pool review receipt: owner decisions applied, 28 rows to HUMAN, no HELD row routed', () => {
+  assert.deepEqual(receipt.summary, {
+    pool: 386, scope: { IN_SCOPE: 361, OUT_OF_SCOPE: 23, UNCERTAIN: 2 }, heldScopeIneligible: 3,
+    nonRealizationIneligible: 10, v4CleanAgreements: 4, human: { scope: 19, mandatory: 5, calibration: 4 },
+  });
+  assert.equal(receipt.rows.filter(row => row.semanticSkeletonId === 'p1b6-sk-43016ef6da889a87').every(row => row.outcome === 'OWNER_NON_REALIZATION'), true);
+  assert.equal(receipt.rows.some(row => row.splitAssignment === 'FINAL_HELD_OUT' && row.human), false);
+  assert.match(receipt.executionProvenance.limitation, /before its protocol file/u);
+  for (const [key, value] of Object.entries(receipt.authority)) assert.equal(value, false, key);
+});
+
+test('the receipt equals the reconciled raw result bytes when they are supplied', { skip: !RAW.every(file => fs.existsSync(file)) }, () => {
+  assert.deepEqual(builder.reconcile(...RAW.map(file => fs.readFileSync(file)), a), receipt);
+});
+
+test('HUMAN packet: 28 sorted opaque rows, same questions for every row, no leaked role', () => {
+  assert.equal(sha256RawBytes(read(builder.HUMAN_PROTOCOL.fixture)), builder.HUMAN_PROTOCOL.rawSha256);
+  const packet = builder.buildHumanPacket(receipt, a);
+  const ids = packet.rows.map(row => row.reviewRowId);
+  assert.equal(new Set(ids).size, 28);
+  assert.deepEqual(ids, ids.toSorted());
+  assert.deepEqual(receipt.rows.filter(row => row.human).map(row => builder.humanRowId(row.itemId)).toSorted(), ids);
+  const text = JSON.stringify(packet.rows);
+  for (const value of ['p1b6-item-', 'p1b6-sk-', 'CLEAR', 'ESCALATE', 'TRAIN', 'DEV', 'mandatory', 'calibration', 'scope']) {
+    assert.equal(text.includes(value), false, value);
+  }
+});

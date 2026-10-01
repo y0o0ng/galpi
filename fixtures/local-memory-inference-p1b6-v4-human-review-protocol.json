@@ -1,0 +1,110 @@
+{
+  "name": "xion-local-memory-inference-p1b6-v4-human-review-protocol-v1",
+  "protocolIdentity": "p1b6-v4-blind-human-scope-and-semantic-review-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "isHumanProtocol": true,
+  "isSourceAuditProtocol": false,
+  "semanticContract": {
+    "interpretationRuleIdentity": "P1B6_SEMANTIC_CONTRACT_V4",
+    "semanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v4",
+      "rawSha256": "a53debe1b065e9bbd5a94f32036f8ac2586eae72b2f5a6bdf9fae0a93dfed194"
+    },
+    "semanticContractReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v4-receipt-v1",
+      "rawSha256": "702f643497c2cadbb52b020ad808c8cedc1e28b4ec882182b580f1efb93a6fd4"
+    }
+  },
+  "prerequisite": {
+    "receiptIdentity": "xion-local-memory-inference-p1b6-v4-pool-review-attempt-001-receipt-v1",
+    "receiptRawSha256": "3941ce00f3648bc9e4104fa75c2d365e38f7189c16d427235a129217ca3a7e1f"
+  },
+  "population": {
+    "rows": 28,
+    "scopeCheck": 19,
+    "mandatory": 5,
+    "calibration": 4,
+    "held": 0,
+    "derivation": "mechanically from the committed v4 pool review receipt: every row it routes to the owner; HELD rows never enter; never from a supplied list"
+  },
+  "question": {
+    "task": "For every row, answer two questions from the visible selected bundle and its single marked TARGET only.",
+    "scope": {
+      "task": "Reading only the visible selected bundle and its single marked TARGET, decide whether the TARGET is about the user. Do not judge CLEAR or ESCALATE.",
+      "inScope": "IN_SCOPE when the TARGET denotes the user's own state, stance, plan, preference, commitment, habit, situation, or a relationship that involves the user, including the user's stance toward something another person said, and including a rule, object, or system state as it applies to the user or the user's own things.",
+      "outOfScope": "OUT_OF_SCOPE when the TARGET denotes only another person's state, claim, or situation, or a fact about the world that the visible evidence does not connect to the user.",
+      "uncertain": "UNCERTAIN when the visible bundle does not let you tell whom the TARGET is about.",
+      "note": "Another person's speech may appear as evidence; that alone does not make the TARGET out of scope. What matters is whom the marked TARGET is about."
+    },
+    "semantic": {
+      "task": "Reading only the visible selected bundle and its single marked TARGET, judge the realization under semantic contract v4.",
+      "userCenteredTarget": "Every TARGET is evaluated for the user's own state, stance, plan, or relationship. What another speaker said is source evidence, not the user's state: a reported claim establishes the user's stance only through visible adoption, and missing adoption evidence supports neither agreement nor disagreement.",
+      "clear": "CLEAR when the visible evidence provides the TARGET's materially relevant semantic status for the user. The provided status does not need to be exact or final: an approximate, tentative, conditional, explicitly undecided, or otherwise uncertain user status is CLEAR when that uncertain status itself is what the visible evidence gives.",
+      "escalate": "ESCALATE when the visible evidence does not provide the TARGET's materially relevant semantic status, either because multiple materially different readings remain unresolved or because a fact or relation necessary to state the TARGET status is absent from the visible evidence.",
+      "uncertaintyDistinction": "An uncertain status that is itself given is CLEAR. A TARGET status that cannot be stated without additional information, yielding only 'unknown / cannot tell', is ESCALATE.",
+      "targetBoundary": "Judge the TARGET itself, not a downstream inference derived from it. Do not ESCALATE merely because downstream eligibility, policy application, cause, durability, or another consequence remains unknown when the TARGET status itself is given. Conversely, do not invent missing facts or rules to turn an unknown TARGET status into CLEAR.",
+      "pragmaticResolution": "Ordinary pragmatic resolution remains allowed when it is actually supported by the visible discourse. The standard is not literal mathematical explicitness.",
+      "noAddedPremise": "Do not preserve a competing reading that requires an unstated event, identity assumption, grandfathering or effective-time rule, old ordering, hidden preference, category rule, exception, or other added premise."
+    }
+  },
+  "reviewer": {
+    "role": "repository owner, blind HUMAN reviewer",
+    "mayAmendCatalog": false,
+    "independentConfirmation": false,
+    "independenceNote": "The owner wrote the user-centered clarification, decided v4, and has seen the review summary, including which skeletons were flagged. Every row gets the same two questions so row blindness hides which rows are scope checks and which are semantic rows. This is not an independent confirmation, and the eventual receipt must record this limitation."
+  },
+  "visibleToReviewer": [
+    "an opaque review row ID",
+    "the exact selected bundle with its single TARGET marking"
+  ],
+  "ordering": "ascending opaque review row ID, not source item order",
+  "outputContract": {
+    "container": "a JSON object whose only key is results, an array with exactly one row per packet row",
+    "required": [
+      "reviewRowId",
+      "scope",
+      "disposition",
+      "decision",
+      "reason"
+    ],
+    "allowedScope": [
+      "IN_SCOPE",
+      "OUT_OF_SCOPE",
+      "UNCERTAIN"
+    ],
+    "allowedOutcomes": [
+      {
+        "disposition": "KEEP",
+        "decision": "CLEAR"
+      },
+      {
+        "disposition": "KEEP",
+        "decision": "ESCALATE"
+      },
+      {
+        "disposition": "FIX",
+        "decision": null
+      },
+      {
+        "disposition": "REJECT",
+        "decision": null
+      }
+    ],
+    "reason": "Non-empty short reason."
+  },
+  "dispositions": {
+    "KEEP": "The visible realization supports a stable semantic judgment. Requires decision CLEAR or ESCALATE.",
+    "FIX": "The visible realization appears repairable but is not clean enough to accept. Uses decision null.",
+    "REJECT": "The realization is ill-defined, incoherent, implausible, or lacks a meaningful stable semantic judgment. Uses decision null."
+  },
+  "semanticsAfterResult": {
+    "scopeRows": "scope OUT_OF_SCOPE or UNCERTAIN → INELIGIBLE; IN_SCOPE → the row keeps its current provenance and eligibility; the semantic answer is recorded but does not relabel",
+    "mandatory": "IN_SCOPE and KEEP matching v4 → HUMAN_ADJUDICATED / ELIGIBLE; anything else → INELIGIBLE",
+    "calibration": "IN_SCOPE and KEEP matching v4 → CALIBRATION_MATCH, stays CATALOG_STRONG_MODEL_CONFIRMED / PROVISIONAL, not promoted; anything else → INELIGIBLE"
+  },
+  "constraints": [
+    "A HUMAN decision opposing the v4 reference label does NOT relabel the skeleton or amend the catalog.",
+    "No HUMAN decision, by itself, accepts a surface.",
+    "This protocol authorizes no repair, acceptance, label freeze, final selection, HELD review, training or evaluation."
+  ]
+}
