@@ -82,6 +82,11 @@
     () => `ㄴ ${pick(SYMBOLS)} 아니고 ${pick(SYMBOLS)}`, () => `ㄴ 그럼 ${pick(TERMS)} 두 배면?`, () => `ㄴ ${pick(EQUATIONS)} 다시 써줘`,
     () => `ㄴ ${pick(TERMS)}도 보존돼?`, () => `${pick(MEMOS)}. ${pick(TERMS)}`, () => `${pick(EQUATIONS)} ${pick(MEMOS)}`,
   ];
+  // 1회차 시험지 문장에 통째로 들어 있는 수식·메모 구절은 쓰지 않는다 — 학습에 들어가면 OCR이 그 구절을 외워
+  // 시험지 점수가 부푼다(2026-10-02 2회차에서 발견). 용어 낱말은 실제 쓰임 그대로 둔다.
+  const unseen = list => list.filter(item => !PROMPTS.some(prompt => prompt.label.includes(item)));
+  EQUATIONS.splice(0, EQUATIONS.length, ...unseen(EQUATIONS));
+  MEMOS.splice(0, MEMOS.length, ...unseen(MEMOS));
   function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
   function generated() {
     const label = pick(TEMPLATES)();
