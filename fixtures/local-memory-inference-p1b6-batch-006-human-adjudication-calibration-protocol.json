@@ -1,0 +1,173 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-006-human-adjudication-calibration-protocol-v1",
+  "protocolIdentity": "p1b6-batch-006-blind-human-adjudication-calibration-v1",
+  "status": "PREREGISTERED_NOT_RUN",
+  "isHumanProtocol": true,
+  "isSourceAuditProtocol": false,
+  "semanticContract": {
+    "interpretationRuleIdentity": "P1B6_SEMANTIC_CONTRACT_V3",
+    "semanticAuthority": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+      "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+    },
+    "semanticContractReceipt": {
+      "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+      "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1"
+    }
+  },
+  "question": {
+    "task": "Reading only the visible selected bundle and its single marked TARGET, judge the realization under semantic contract v3.",
+    "clear": "CLEAR when the visible evidence provides the TARGET's materially relevant semantic status. The provided status does not need to be exact or final: an approximate, tentative, conditional, attributed, explicitly undecided, or otherwise uncertain status is CLEAR when that uncertain status itself is what the visible evidence gives.",
+    "escalate": "ESCALATE when the visible evidence does not provide the TARGET's materially relevant semantic status, either because multiple materially different readings remain unresolved or because a fact or relation necessary to state the TARGET status is absent from the visible evidence.",
+    "uncertaintyDistinction": "An uncertain status that is itself given is CLEAR. A TARGET status that cannot be stated without additional information, yielding only 'unknown / cannot tell', is ESCALATE.",
+    "targetBoundary": "Judge the TARGET itself, not a downstream inference derived from it. Do not ESCALATE merely because downstream eligibility, policy application, cause, durability, or another consequence remains unknown when the TARGET status itself is given. Conversely, do not invent missing facts or rules to turn an unknown TARGET status into CLEAR.",
+    "pragmaticResolution": "Ordinary pragmatic resolution remains allowed when it is actually supported by the visible discourse. The standard is not literal mathematical explicitness.",
+    "noAddedPremise": "Do not preserve a competing reading that requires an unstated event, identity assumption, grandfathering or effective-time rule, old ordering, hidden preference, category rule, exception, or other added premise."
+  },
+  "strongModelPrerequisite": {
+    "receiptIdentity": "xion-local-memory-inference-p1b6-batch-006-v3-review-attempt-001-receipt-v1",
+    "receiptRawSha256": "5b96f4470b4eaeba90a0025a313c365762adce045ddbb53c955e8cdb910b68ba",
+    "requiredStatus": "COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3"
+  },
+  "population": {
+    "rows": 2,
+    "mandatory": 0,
+    "calibration": 2,
+    "unsampledCleanAgreements": 0,
+    "sourceAuditExcluded": [],
+    "heldRows": 0,
+    "derivation": "mechanically from the committed batch-006 v3 review receipt: DEV rows only (HELD rows never enter because repeated HELD review stays unopened); mandatory rows are DEV non-clean routes, calibration is every DEV clean agreement; never from a supplied list",
+    "visibleBundleSource": "the audited selected bundle, byte-identical to the v3 strong-model review packet"
+  },
+  "reviewer": {
+    "role": "repository owner, blind HUMAN semantic realization reviewer",
+    "mayAmendCatalog": false,
+    "authoredOrPreAuditedTheSurfaces": true,
+    "knowsV3ReferenceForWholePopulation": true,
+    "knowsStrongModelSummary": true,
+    "independentConfirmation": false,
+    "independenceNote": "The owner approved the batch-006 allocation, reviewed both DEV surfaces before audit with their authoring target labels (and decided to keep the 007 TARGET), and has seen the upstream summary (both DEV rows are clean agreements and therefore calibration). The owner has not seen the HELD rows. Row blindness hides only which opaque row is which. This is not an independent confirmation, and the eventual receipt must record this limitation.",
+    "knowsRowRoles": true
+  },
+  "visibleToReviewer": [
+    "an opaque HUMAN review row ID",
+    "the exact audited selected bundle with its single TARGET marking"
+  ],
+  "blindFields": [
+    "item ID",
+    "source episode ID",
+    "family ID",
+    "surface family ID",
+    "semantic skeleton ID",
+    "split",
+    "boundary class",
+    "discourse pattern",
+    "language quota",
+    "authoring target label",
+    "v3 reference label",
+    "source-audit disposition or reason",
+    "strong-model disposition, decision or reason",
+    "row role (mandatory or calibration)",
+    "TARGET anchor role",
+    "source artifact row order",
+    "full source episode",
+    "expected result"
+  ],
+  "ordering": "ascending opaque review row ID, not source item order",
+  "outputContract": {
+    "container": "a JSON object whose only key is results, an array with exactly one row per packet row",
+    "required": [
+      "reviewRowId",
+      "disposition",
+      "decision",
+      "reason"
+    ],
+    "allowedOutcomes": [
+      {
+        "disposition": "KEEP",
+        "decision": "CLEAR"
+      },
+      {
+        "disposition": "KEEP",
+        "decision": "ESCALATE"
+      },
+      {
+        "disposition": "FIX",
+        "decision": null
+      },
+      {
+        "disposition": "REJECT",
+        "decision": null
+      }
+    ],
+    "reason": "Non-empty short semantic or construction reason."
+  },
+  "dispositions": {
+    "KEEP": "The visible realization supports a stable semantic judgment. Requires decision CLEAR or ESCALATE.",
+    "FIX": "The visible realization appears repairable but is not clean enough to accept. Uses decision null.",
+    "REJECT": "The realization is ill-defined, incoherent, implausible, or lacks a meaningful stable semantic judgment. Uses decision null."
+  },
+  "semanticsAfterResult": {
+    "mandatory": {
+      "keepMatchingV3": {
+        "outcome": "MANDATORY_MATCH",
+        "provenance": "HUMAN_ADJUDICATED",
+        "eligibility": "ELIGIBLE"
+      },
+      "keepOpposingV3": {
+        "outcome": "MANDATORY_DECISION_MISMATCH",
+        "provenance": null,
+        "eligibility": "INELIGIBLE",
+        "note": "explicit later resolution required; the catalog is not amended or relabelled"
+      },
+      "fix": {
+        "outcome": "MANDATORY_FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      },
+      "reject": {
+        "outcome": "MANDATORY_REJECT",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      }
+    },
+    "calibration": {
+      "keepMatchingV3": {
+        "outcome": "CALIBRATION_MATCH",
+        "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+        "eligibility": "PROVISIONAL",
+        "note": "not promoted to HUMAN_ADJUDICATED"
+      },
+      "keepOpposingV3": {
+        "outcome": "CALIBRATION_DECISION_MISMATCH",
+        "provenance": null,
+        "eligibility": "INELIGIBLE",
+        "note": "pending explicit resolution"
+      },
+      "fix": {
+        "outcome": "CALIBRATION_FIX",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      },
+      "reject": {
+        "outcome": "CALIBRATION_REJECT",
+        "provenance": null,
+        "eligibility": "INELIGIBLE"
+      }
+    },
+    "unsampledCleanAgreements": {
+      "note": "none: every clean agreement is calibration"
+    },
+    "sourceAuditExcluded": {
+      "note": "none: both rows passed the source audit"
+    },
+    "held": {
+      "note": "HELD rows are outside this review; all five are PROVISIONAL from the v3 review"
+    }
+  },
+  "constraints": [
+    "A HUMAN decision opposing the v3 reference label does NOT silently relabel the skeleton, amend the catalog, or automatically accept the surface.",
+    "No HUMAN decision, by itself, accepts a surface; result ingestion and any acceptance are separate later steps.",
+    "This protocol authorizes no repair, no acceptance, no reference-label freeze, no final selection, no HELD release and no training or evaluation."
+  ]
+}

@@ -1,0 +1,137 @@
+{
+  "name": "xion-local-memory-inference-p1b6-batch-006-v3-review-attempt-001-receipt-v1",
+  "attemptId": "p1b6-batch-006-v3-review-attempt-001",
+  "status": "COMPLETE_RECONCILED_AGAINST_SEMANTIC_CONTRACT_V3",
+  "reviewProtocol": {
+    "identity": "p1b6-targeted-v3-semantic-realization-review-v1",
+    "sha256": "8a48c2df77374659e10dc2f48f16c3c2c40851669eb07b7377fbeeaf4337a892"
+  },
+  "reviewPacket": {
+    "identity": "xion-local-memory-inference-p1b6-batch-006-v3-review-packet-v1",
+    "sha256": "4f9ce9470943282f41803c6ad4e91a99d7f50371e172a242dc62a4878e731859",
+    "rows": 7
+  },
+  "routingAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-surface-batch-006-authoring-protocol-v1",
+    "rawSha256": "4b8153da5da0698cfa932e1b26d9512f1323eb268738020de30e2b4d53c7bd90"
+  },
+  "referenceAuthority": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9"
+  },
+  "rawResultArtifact": {
+    "filename": "p1b6-b006-v3-review-results.json",
+    "sha256": "12d3f2700a203992a438f4bae8fa8372c56e5cfcdfb9c0c2ddc43990750b452d",
+    "committed": false
+  },
+  "reviewerExecutionProvenance": {
+    "evidenceBasis": "REPORTED_BY_REPOSITORY_OWNER",
+    "reportedModel": "Claude Opus 5.5",
+    "session": "fresh Claude Code CLI session started in the home directory, given only the protocol and packet paths"
+  },
+  "summary": {
+    "total": 7,
+    "cleanAgreements": 7,
+    "mandatoryHuman": 0,
+    "calibration": 2,
+    "heldIneligible": 0
+  },
+  "rows": [
+    {
+      "itemId": "p1b6-item-b006-001",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Rice cake is in the bottom compartment, and everything there is to be thrown out this weekend. Exempting later additions would need an unstated grandfathering premise.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b006-002",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Umbrella is stated to be in the rack now (Thursday), and the notice says rack contents go to lost-and-found Friday evening. Status given as currently there and due to be moved.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b006-003",
+      "semanticSkeletonId": "p1b6-sk-2fa39ece4157b2b8",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Books went into the return box around 8pm, before the nightly 9pm pickup, so their status is given: deposited and due for processing that night.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b006-004",
+      "semanticSkeletonId": "p1b6-sk-869c71279b6b8a33",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "30-minute idle auto-lock is stated directly and backed by the settings screen and today's lock. The 'back to the laptop' marker is a little odd but harmless.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b006-005",
+      "semanticSkeletonId": "p1b6-sk-a19bb9e94e9a416b",
+      "splitAssignment": "FINAL_HELD_OUT",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Neighbor's last-month fees are stated as still overdue. Under this month's rule (any arrears means no access), that household's status is clear.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b006-006",
+      "semanticSkeletonId": "p1b6-sk-5d2a9c70e4b18f63",
+      "splitAssignment": "DEV",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "Reunion is Saturday or Sunday; treasurer rules out Sunday (no restaurant booking), so ordinary pragmatic resolution gives Saturday.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    },
+    {
+      "itemId": "p1b6-item-b006-007",
+      "semanticSkeletonId": "p1b6-sk-61cb1285dd1df651",
+      "splitAssignment": "DEV",
+      "referenceLabel": "CLEAR",
+      "disposition": "KEEP",
+      "decision": "CLEAR",
+      "reason": "'Cheaper place' is a planned viewing next week of a not-yet-chosen place with rent under 600,000 won. The comparison point comes from the conversation, and it being unspecified is itself the stated status.",
+      "route": "CLEAN_AGREEMENT",
+      "provenance": "CATALOG_STRONG_MODEL_CONFIRMED",
+      "eligibility": "PROVISIONAL"
+    }
+  ],
+  "mandatoryHumanItemIds": [],
+  "calibrationItemIds": [
+    "p1b6-item-b006-006",
+    "p1b6-item-b006-007"
+  ],
+  "authority": {
+    "humanPacketBuilt": false,
+    "humanReviewPerformed": false,
+    "surfaceAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "trainingOrEvaluationOccurred": false
+  }
+}

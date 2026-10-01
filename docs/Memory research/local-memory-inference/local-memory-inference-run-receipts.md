@@ -5468,3 +5468,13 @@ No audit, review or acceptance; the accepted pool record stays **93**.
 | v3 review packet (not committed) | 7 rows, raw SHA `4f9ce9470943282f41803c6ad4e91a99d7f50371e172a242dc62a4878e731859` |
 
 Claude Opus 5.5 (owner-reported). No semantic review or acceptance; the accepted pool record stays **93**.
+
+#### P1-B6 batch-006 v3 strong-model review attempt-001 — 7/7 CLEAN; DEV HUMAN packet BUILT / NOT RUN
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-006-v3-review-attempt-001.json` | receipt, `5b96f447…`; raw `12d3f2700a203992a438f4bae8fa8372c56e5cfcdfb9c0c2ddc43990750b452d` (not committed) |
+| `fixtures/local-memory-inference-p1b6-batch-006-human-adjudication-calibration-protocol.json` | HUMAN protocol, `f037b1798827ff44cfae00838c7c5da3c229357141b87008621b83af1a874e6f` |
+| HUMAN packet (not committed) | 2 DEV calibration rows, raw SHA `24dbf13a813190fbe38695f59bf56e66b8e9df8acd466672d634998301c9f07a` |
+
+HELD 5 `PROVISIONAL`. No HUMAN review or acceptance; the accepted pool record stays **93**.

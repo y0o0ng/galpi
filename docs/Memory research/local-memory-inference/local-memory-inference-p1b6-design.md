@@ -67,8 +67,8 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   review **6 clean / 6 disagreement**; owner HUMAN **1/7 match**. Only `b002-051` and `b002-063`
   migrate. **Ledger v4: pool 379; minimum top-up 5** (DEV 1, HELD per-skeleton 4). A 7-row
   batch-006 top-up (HELD 5, DEV 2) is preregistered and materialized; HELD slots skip owner and
-  HUMAN review; DEV owner pre-audit 2/2 PASS; source audit **7/7 PASS**; the v3 review packet is
-  built, not run.
+  HUMAN review; DEV owner pre-audit 2/2 PASS; source audit **7/7 PASS**; v3 review **7/7 clean**
+  (HELD 5 `PROVISIONAL`); the 2-row DEV HUMAN calibration packet is built, not run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2367,6 +2367,16 @@ batch-005 one (`p1b6-b006-audit`, packet `1196e172…`, not committed).
 with per-split routing: a HELD clean agreement is `PROVISIONAL`, any other HELD result
 `INELIGIBLE` with no HUMAN step; DEV disagreements go to mandatory HUMAN and every DEV clean
 agreement is calibration. Packet `4f9ce947…`, not committed.
+
+**v3 strong-model review attempt-001 — 7/7 clean.** Fresh Claude Code CLI session, Claude Opus
+5.5 (owner-reported); receipt `fixtures/local-memory-inference-p1b6-batch-006-v3-review-attempt-001.json`
+(raw `12d3f270…`, not committed). All five HELD rows are `CATALOG_STRONG_MODEL_CONFIRMED` /
+`PROVISIONAL`, subject to the post-selection independent second strong-model review. The two
+DEV rows are calibration: protocol
+`fixtures/local-memory-inference-p1b6-batch-006-human-adjudication-calibration-protocol.json`
+(`f037b179…`, the batch-005 protocol with DEV-only population and the same non-independence
+statement), builder `scripts/build-memory-inference-p1b6-batch-006-human-review-packet.js`, packet
+`24dbf13a…` (not committed). No HELD row is in the HUMAN packet.
 
 ## Closed Selection and Freeze Constraints
 
