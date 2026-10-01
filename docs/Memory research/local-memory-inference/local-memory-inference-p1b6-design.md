@@ -60,7 +60,9 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   (ESCALATE) differs from v3 (CLEAR) are re-reviewed under v3 — fresh source audit and blind v3
   strong-model review for all 12, HUMAN for TRAIN / DEV only. Source audit **12/12 PASS**; v3
   review **6 clean / 6 disagreement**; owner HUMAN **1/7 match**. Only `b002-051` and `b002-063`
-  migrate. **Ledger v4: pool 379; minimum top-up 5** (DEV 1, HELD per-skeleton 4).
+  migrate. **Ledger v4: pool 379; minimum top-up 5** (DEV 1, HELD per-skeleton 4). A 7-row
+  batch-006 top-up (HELD 5, DEV 2) is preregistered and materialized; HELD slots skip owner and
+  HUMAN review; the DEV slots await the owner's pre-audit review.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2326,6 +2328,22 @@ pool**. `…-shortage-receipt-v4.json`: split 241 / 59 / 79, language 264 / 77 /
 70 / 101 / 123 / 68 / 17; HELD per skeleton `2fa39ece` 3, `869c7127` 4, `a19bb9e9` 4. **Minimum
 top-up lower bound 5** — DEV 1 plus the four HELD per-skeleton slots; KO 2, fragment 4 (2) and
 fragment 5 (3) can overlap with them. EN is exactly 38, with no slack.
+
+**Batch-006 top-up — preregistered and materialized.** Owner-approved (2026-10-01): seven KO
+slots, all CLEAR targets. HELD: `2fa39ece` ×3 (need 2 + 1 buffer), `869c7127` ×1, `a19bb9e9` ×1;
+DEV: `5d2a9c70` (need) and `61cb1285` (buffer), the two lowest-coverage DEV skeletons with ties
+by ID. Fragments 5 / 5 / 4 / 5 / 4 on HELD and 3 / 2 on DEV also cover the KO and fragment-4 / 5
+shortfalls. `scripts/build-memory-inference-p1b6-batch-006.js`
+(`npm run build:memory-inference-p1b6-batch-006`) writes
+`fixtures/local-memory-inference-p1b6-surface-batch-006-authoring-protocol.json` and
+`…-surface-batch-006.json` under the batch-005 checks, with leakage now also against batch-005.
+**These are the first newly authored HELD surfaces.** The assistant authored them and they are
+not shown to the owner. Because repeated HELD review stays unopened, HELD slots get no owner
+pre-audit and no HUMAN review: a fresh source audit, then blind v3 strong-model review, where a
+clean agreement is `PROVISIONAL` and anything else `INELIGIBLE`, and the post-selection
+independent second strong-model review still applies. The HELD surfaces avoid the explicit "the
+policy / I can't tell" framing that led the migration HELD rows to ESCALATE readings. DEV slots
+follow the batch-004 gates. Nothing is audited or reviewed.
 
 ## Closed Selection and Freeze Constraints
 

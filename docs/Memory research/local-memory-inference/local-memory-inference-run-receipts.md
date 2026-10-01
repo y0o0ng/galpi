@@ -5441,3 +5441,12 @@ record stays **93**.
 Owner decisions, GPT-5.6 sol presentation aid (owner-reported), not independent. Mismatches closed
 as realization failures; `cc054a42` contract divergence recorded, v3 kept. No acceptance; the
 accepted pool record stays **93**.
+
+#### P1-B6 batch-006 top-up — 7 slots PREREGISTERED / MATERIALIZED (HELD 5 not shown to owner; DEV 2 await pre-audit)
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-surface-batch-006-authoring-protocol.json` | HELD 5 (`2fa39ece` 3, `869c7127` 1, `a19bb9e9` 1), DEV 2 (`5d2a9c70`, `61cb1285`); per-split gates |
+| `fixtures/local-memory-inference-p1b6-surface-batch-006.json` | 7 items, `b006` namespace |
+
+No audit, review or acceptance; the accepted pool record stays **93**.
