@@ -81,6 +81,8 @@
     "review:memory-p0b-blind": "node scripts/review-memory-p0-b-blind.js",
     "review:memory-general-fact": "node lib/memory-storage/review-ui.js",
     "prepare:memory-general-fact": "node lib/memory-storage/prepare-general-fact-review.js",
+    "freeze:memory-source-episode": "node lib/memory-storage/bundle-builder.js",
+    "build:memory-bundles": "node lib/memory-storage/bundle-openai.js",
     "check:codex-runner": "node scripts/check-codex-runner.js",
     "smoke:openai-responses": "node scripts/smoke-openai-responses.js",
     "smoke:github-mcp": "node scripts/smoke-github-mcp.js",
