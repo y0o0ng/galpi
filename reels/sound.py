@@ -13,6 +13,7 @@ EVENTS = {
     "chime": ("glass_002.ogg", 0),       # 결론 반짝임
     "danger": ("glitch_001.ogg", -4),    # 위험 표시 (파일이 큰 편)
     "bubbles": ("bubbles.wav", -6),       # 끓음·기포 (sfx/bubbles.py로 합성)
+    "ticks3": ("ticks3.wav", -6),         # 딸깍 3번 (sfx/ticks.py로 합성)
 }
 _scene, _times = None, []
 

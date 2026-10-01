@@ -267,3 +267,57 @@ candidate ─(검토1 선택)→ selected → scripted → rendered ─(검토2 
 | G2 | (그림) 노즐은 모두 노심보다 한참 위에 있다 | [GD] p.30 | "All nozzles are located significantly above the level of active fuel" |
 
 화면 표기와 행의 연결: `BWRX-300`은 1번, `FORCED`·`PUMP`는 3번, `NATURAL`·`NO PUMP`는 2·4번, `CORE`·`CHIMNEY`·`DOWNCOMER`·`STEAM`은 7·9·10·14번과 G1, `FEEDWATER`는 11번, `LIGHT ↑`는 5·6·8번, `HEAVY ↓`는 8·11번, `↕`는 13번이다. 훅의 "펌프 없이, 물이 혼자 돈다"는 2·4번이다.
+
+## 부록 — 4편 대본: 라이프니츠 계단 드럼
+
+**훅 카드:** **훅 카드:** 톱니 길이만 바꿨는데, **기계가 곱셈을 한다** / STEPPED DRUM / 라이프니츠 계단 드럼
+
+| 시간 | 화면 (템플릿) | 내레이션 |
+| --- | --- | --- |
+| 0–15초 `hook` | **훅 카드.** 용어 `STEPPED\nDRUM`, 그림은 계단 드럼 옆모습 + 작은 기어(1절), 시온 놀람. 훅 카드 템플릿 그대로 | S1 톱니 길이만 다르게 했을 뿐인데, 기계가 곱셈을 해요. S2 최근 한 유튜버가 손바닥만 한 기계식 계산기를 3D 프린팅해 만들었는데요, S3 그 심장이 17세기에 라이프니츠가 고안한 계단 드럼이에요. |
+| 15–28초 `problem` | **비교.** 키커 `STEPPED DRUM`. 카드 2장 `3 × 2` / `3 + 3`, 연결 기호 `=`. 왼쪽 카드 먼저(S4), 오른쪽 카드와 `=`는 S5에서. S6에서 오른쪽 카드의 두 `3`이 같은 색으로 깜빡여 "같은 수"를 보인다 | S4 이런 기계에게 곱셈은, 같은 수를 여러 번 더하는 거예요. S5 3 곱하기 2는, 3을 두 번 더하면 되죠. S6 그러려면 넣은 숫자를 기계가 기억해 두고, 몇 번이든 다시 보낼 수 있어야 해요. |
+| 28–42초 `drum` | **단면도 확대.** 키커 `STEPPED DRUM`. 무대(ART_CENTER)에 펼친 드럼(5절): 톱니 9줄이 위끝에서 나란히 시작해 길이 1~9칸 계단을 이룬다. 왼쪽에 자리 눈금 `9`(위)~`0`(아래). 범례 `STEPPED DRUM`(S7~S8) → `GEAR`(S9, 펼친 드럼 위에 기어 등장, 자리 `0`) → `COUNTER`(S10, 오른쪽에 숫자창 `0`) 순서로 켠다 | S7 라이프니츠의 답은 원통이었어요. S8 길이가 서로 다른 톱니 아홉 개를 계단처럼 붙였죠. S9 드럼 옆에는 기어가 하나 있고, S10 이 기어가 돈 만큼 결과 숫자가 올라가요. |
+| 42–61초 `set` | **단계.** 칩 `SET 3` → `TURN` → `+3`. 무대는 앞 장면의 펼친 드럼·기어·숫자창. ① S11 `SET 3` 켜짐, 기어가 눈금 `3` 자리로 미끄러진다. ② S12 시작에 기어 자리까지 닿는 톱니 3줄(가장 긴 3줄)만 밝아지고, 같은 순간 시온 가리키기가 그 3줄을 지목. ③ S13 `TURN` 켜짐, 회전 한 바퀴(5절): 밝은 3줄이 기어 밑을 지날 때마다 기어가 한 칸 돌고 숫자창이 `1`→`2`→`3`(뜻 있는 소리 1). 바퀴가 끝나면 칩 `+3` 켜짐. ④ S14 숫자창 `3`을 그대로 둔 채 기어를 `0` 자리로 옮겨 한 바퀴 돌리면 어느 톱니에도 닿지 않고 숫자창이 그대로(소리 없음). 끝나면 기어를 `3` 자리로 되돌린다 | S11 3을 넣으면, 기어가 드럼의 3번 자리에 맞춰져요. S12 그 자리까지 닿는 톱니는 딱 세 개예요. S13 크랭크를 한 바퀴 돌리면 그 세 개만 기어를 쳐서, 결과 바퀴가 세 칸 돌아요. S14 0에 두면 어떤 톱니에도 닿지 않아서, 한 칸도 안 돌고요. |
+| 61–73초 `repeat` | **비교.** 키커 `STEPPED DRUM`. 카드 `TURN ×1` (작은 펼친 드럼, 기어는 `3` 자리, 밝은 3줄, 숫자창 `3`) / `TURN ×2` (같은 그림, 숫자창 `3`), 연결 기호 `→`. **두 카드와 `→`를 장면 시작에 함께 켠다.** S16에서 오른쪽 카드 숫자창만 딸깍마다 `4`→`5`→`6`(뜻 있는 소리 2). 기어는 움직이지 않는다 | S15 기어 자리는 그대로니까, 드럼이 3을 기억하고 있는 셈이에요. S16 한 번 더 돌리면 또 3이 더해져서 6이 돼요. S17 3 곱하기 2를 크랭크 두 바퀴로 푼 거예요. |
+| 73–90초 `shift` | **비교.** 키커 `× 12`. 카드 `NO SHIFT` (크랭크 아이콘 + `12 TURNS`) / `SHIFT` (두 줄: `2 TURNS → 6`, `1 TURN → 30`, 아래 `= 36`), 카드 사이는 세로 구분선(3편 `A.divider()`와 같은 것). S18에서 왼쪽, S19에서 오른쪽 카드 틀, S20에서 두 줄이 차례로, S21에서 `= 36` | S18 그런데 3에 12를 곱하려면, 열두 바퀴를 돌려야 할까요? S19 라이프니츠는 입력을 한 자리씩 옮기는 장치도 넣었어요. S20 12를 10과 2로 나누면, 두 바퀴로 6, 한 자리 옮겨 한 바퀴로 30. S21 세 바퀴면 36이 나와요. |
+| 90–104초 `finale` | **비교.** 키커 `STEPPED DRUM`. 카드 `SET` (펼친 드럼, 기어 `3` 자리, 밝은 톱니 3줄) / `TURN` (크랭크 아이콘 + `×2`), 연결 기호 `×`, 아래 `= 6`. S22에서 두 카드, S23에서 `= 6`, S24에서 시온 반짝임 | S22 손으로 돌리는 작은 계산기 쿠르타도, 같은 계단 드럼 원리를 썼어요. S23 기어 자리로 숫자를 기억하고, 돌릴 때마다 그 수를 더하기. S24 그게 계단 드럼이 곱셈을 하는 방법이에요. |
+
+자막은 앞 편들처럼 문장 단위로 쪼갠다. 다음 편 예고는 없다.
+
+장면별 실측(초): hook 14.6 · problem 13.9 · drum 13.9 · set 18.3 · repeat 12.0 · shift 17.4 · finale 13.8. 문장별 음성 길이는 4.06 / 5.30 / 4.27 · 4.03 / 3.43 / 5.45 · 2.83 / 3.77 / 2.69 / 3.38 · 3.98 / 3.14 / 5.54 / 4.46 · 4.37 / 3.43 / 3.22 · 4.32 / 4.10 / 5.16 / 2.62 · 5.11 / 4.49 / 3.17초다. 넘칠 때 줄이는 순서는 0절 A-1이다.
+
+### 사실 확인 목록
+
+출처 약칭
+- **[REG]** The Register, Brandon Vigliarolo, "YouTube lunatic designed and 3D printed a working mechanical calculator" (2026-09-30, 계기 뉴스), https://www.theregister.com/offbeat/2026/09/30/youtube-lunatic-designed-and-3d-printed-a-working-mechanical-calculator/5300273
+- **[ARI]** Arithmeum (Universität Bonn 계산기 박물관·연구소), 소장품 "Leibniz machina arithmetica (Replik)" 해설(독일어), https://www.arithmeum.uni-bonn.de/sammlungen/rechnen-einst/objekt.html?tx_arithinventory%5Bobject%5D=4251
+- **[DM]** Deutsches Museum Digital, 소장품 56956 "Rechenmaschine von Gottfried Wilhelm Leibniz, Nachbildung" 해설(독일어), https://digital.deutsches-museum.de/de/digital-catalogue/collection-object/56956/
+- **[NASM]** Smithsonian National Air and Space Museum, 소장품 "Curta Mechanical Calculator" (A20070038000), https://airandspace.si.edu/collection-objects/curta-mechanical-calculator/nasm_A20070038000
+
+인용은 각 페이지 HTML 본문 텍스트에서 그대로 복사했다. [REG]의 아포스트로피는 원문 그대로 `’`(U+2019), [NASM]은 곧은 `'`다. [ARI]의 `0 – 9`는 원문 그대로 앞뒤 공백이 있는 en dash(U+2013)다. 한 칸에 인용이 둘 이상이면 각각 원문의 다른 자리에 있다.
+
+| # | 주장 (대본 문장) | 출처 | 원문 인용 |
+| --- | --- | --- | --- |
+| 1 | (S1) 톱니 길이를 다르게 한 것이 이 기계들의 핵심이고, 기계는 그것으로 같은 수를 반복해 더해 곱셈을 한다 | [REG] | "The core concept of the calculator’s central mechanism, like that of many other mechanical calculators, is the Leibniz drum’s teeth of different lengths." / "the addition of a multi-wheel enables it to also do multiplication by simply performing multiple sequences of adding the same number." |
+| 2 | (S2) 최근 한 유튜버가 손바닥만 한 기계식 계산기를 3D 프린팅해 만들었다 | [REG] | "YouTube lunatic designed and 3D printed a working mechanical calculator" / "As a result of wanting to keep the 3D printed calc’s build palm-sized" |
+| 3 | (S3) 그 계산기의 심장은 라이프니츠의 계단 드럼이다 | [REG] | "relies on a more than 200-year-old component known as the Leibniz stepped drum, named for its inventor, German philosopher and mathematician Gottfried Wilhelm Leibniz." |
+| 4 | (S3) 라이프니츠가 계단 드럼을 고안한 것은 17세기(1670년 무렵)다 | [DM] / [ARI] | "führte um 1670 als Schaltorgan einer Vierspeziesmaschine die Staffelwalze ein, eine Anordnung von Zahnrippen gestaffelter Länge." / "Die erste Rechenmaschine zur mechanischen Lösung aller vier Grundrechenarten wurde 1671 vom Philosophen, Mathematiker und Universalgelehrten Gottfried Wilhelm Leibniz (1646-1716) erfunden." |
+| 5 | (S4) 이런 기계에게 곱셈은 같은 수를 여러 번 더하는 것이다 | [ARI] / [REG] | "Leibniz hatte die Idee, dass seine Rechenmaschine durch sukzessive Additionen multiplizieren können sollte" / "multiplication by simply performing multiple sequences of adding the same number." |
+| 6 | (S6) 그러려면 넣은 숫자를 기계가 기억해 두고 몇 번이든 다시 보낼 수 있어야 한다 | [ARI] | "Zu diesem Zweck benötigte Leibniz mechanische Zahlenspeicher, um eine eingestellte Zahl mehrfach ins Ergebniswerk seiner Rechenmaschine übertragen zu können." |
+| 7 | (S7·S8) 라이프니츠의 답은 길이가 서로 다른 톱니 아홉 개를 계단처럼 붙인 원통이다 | [ARI] / [REG] | "ersann er stattdessen eine Walze mit 9 unterschiedlich langen gestaffelten Rippen darauf, die sogenannte Staffelwalze." / "There are nine teeth per drum, representing values one through nine, while a zero setting engages none of them." |
+| 8 | (S9·S10) 드럼 옆에 기어가 있고, 그 기어가 돈 만큼 결과가 올라간다 | [ARI] | "konnten sie bei einer Kurbelumdrehung das Übernahmezahnrad des Ergebniswerks um 0 – 9 Zähne weiterdrehen." |
+| 9 | (S11·S12) 숫자를 넣으면 기어가 드럼의 그 숫자 자리에 맞춰지고, 그러면 그 수만큼의 톱니만 기어에 닿는다 | [REG] / [ARI] | "You use a lever to move a gear up the drum so that it only activates as many teeth as are needed for a particular number." / "Entsprechend ihrer jeweiligen Positionierung durch die Einstellknöpfe am Einstellwerk der Maschine konnten sie bei einer Kurbelumdrehung das Übernahmezahnrad des Ergebniswerks um 0 – 9 Zähne weiterdrehen." |
+| 10 | (S13) 크랭크 한 바퀴에 결과 바퀴가 그 수만큼(0~9칸) 돈다 | [ARI] | "bei einer Kurbelumdrehung das Übernahmezahnrad des Ergebniswerks um 0 – 9 Zähne weiterdrehen." |
+| 11 | (S14) 0에 두면 어떤 톱니에도 닿지 않는다 | [REG] | "while a zero setting engages none of them." |
+| 12 | (S15) 기어 자리가 그대로인 동안 드럼이 넣은 수를 기억하고 있는 셈이다 | [ARI] | "mechanische Zahlenspeicher, um eine eingestellte Zahl mehrfach ins Ergebniswerk seiner Rechenmaschine übertragen zu können." |
+| 13 | (S16·S17) 한 번 더 돌리면 같은 수가 또 더해진다 — 곱셈을 크랭크 횟수로 푼다 | [REG] / [ARI] | "multiplication by simply performing multiple sequences of adding the same number." / "durch sukzessive Additionen multiplizieren können sollte" |
+| 14 | (S19) 라이프니츠는 입력을 결과 쪽에 대해 한 자리씩(10배씩) 옮기는 장치를 넣었다 | [ARI] | "hat Leibniz eine Stellenverschiebung vorgesehen, bei der das Einstellwerk gegenüber dem Ergebniswerk um 10er-Potenzen verschoben werden kann." |
+| 15 | (S18·S20·S21) 그래서 12를 곱할 때 12바퀴가 아니라 3바퀴면 된다 | [ARI] | "Eine Multiplikation mit 12 bedeutet somit nicht 12, sondern lediglich 3 Kurbeldrehungen." |
+| 16 | (S22) 쿠르타는 손으로 돌리는 작은 계산기다 | [NASM] | "The Curta was a small, hand-cranked mechanical calculator invented by Curt Herzstark and introduced in 1948." |
+| 17 | (S22) 쿠르타도 같은 계단 드럼 원리를 썼다 | [NASM] / [REG] | "The Curta's design is a variant of Gottfried Leibniz's Arithmometer, accumulating values on cogs, which are added or complemented by a stepped drum mechanism." / "The same concept is used to input values into the Curta" |
+| 18 | (S23·S24) 요약: 기어 자리로 숫자를 붙잡고, 돌릴 때마다 그 수를 더하는 것이 계단 드럼의 곱셈 방법이다 | [ARI] / [REG] | "um eine eingestellte Zahl mehrfach ins Ergebniswerk seiner Rechenmaschine übertragen zu können." / "multiplication by simply performing multiple sequences of adding the same number." |
+| G1 | (그림) 톱니 줄은 드럼 둘레 전체가 아니라 약 절반(약 180°)에만 있다 | [ARI] | "deren Rippen nur ca. 180° des Umfangs der Walze bedecken" |
+
+S5·S20·S21의 계산(`3×2 = 6`, `12 = 10 + 2`, 한 자리 옮긴 한 바퀴 `30`, `6 + 30 = 36`)은 출처의 주장이 아니라 산수다. 15번 행은 "12는 3바퀴"라는 사실만 받친다.
+
+화면 표기와 행의 연결: `STEPPED DRUM`은 3·7번, `GEAR`는 8·9번, `COUNTER`는 8·10번, 자리 눈금 `0`~`9`는 7·11번, `SET 3`·`SET`은 9번, `TURN`·`+3`은 10번, `TURN ×1`·`TURN ×2`·`3`·`6`은 12·13번, `× 12`·`12 TURNS`·`SHIFT`·`NO SHIFT`·`2 TURNS`·`1 TURN`은 14·15번이다. 훅의 "톱니 길이만 바꿨는데, 기계가 곱셈을 한다"는 1번이다.

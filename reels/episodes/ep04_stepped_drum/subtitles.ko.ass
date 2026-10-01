@@ -1,0 +1,41 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Narration,Apple SD Gothic Neo,54,&H00E9EDE7,&H00E9EDE7,&H00181A15,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,2,90,90,330,1
+Style: HookTitle,Apple SD Gothic Neo,68,&H00E9EDE7,&H00E9EDE7,&H00181A15,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,8,80,80,150,1
+Style: HookSub,Apple SD Gothic Neo,50,&H00ADB4A8,&H00ADB4A8,&H00181A15,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,8,80,80,370,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:14.63,HookTitle,,0,0,0,,톱니 길이만 바꿨는데, 기계가 곱셈을 한다
+Dialogue: 0,0:00:00.00,0:00:14.63,HookSub,,0,0,0,,라이프니츠 계단 드럼
+Dialogue: 0,0:00:00.30,0:00:04.36,Narration,,0,0,0,,톱니 길이만 다르게 했을 뿐인데, 기계가 곱셈을 해요.
+Dialogue: 0,0:00:04.56,0:00:09.86,Narration,,0,0,0,,최근 한 유튜버가 손바닥만 한 기계식 계산기를 3D 프린팅해 만들었는데요,
+Dialogue: 0,0:00:10.06,0:00:14.33,Narration,,0,0,0,,그 심장이 17세기에 라이프니츠가 고안한 계단 드럼이에요.
+Dialogue: 0,0:00:14.93,0:00:18.96,Narration,,0,0,0,,이런 기계에게 곱셈은, 같은 수를 여러 번 더하는 거예요.
+Dialogue: 0,0:00:19.16,0:00:22.60,Narration,,0,0,0,,3 곱하기 2는, 3을 두 번 더하면 되죠.
+Dialogue: 0,0:00:22.80,0:00:28.24,Narration,,0,0,0,,그러려면 넣은 숫자를 기계가 기억해 두고, 몇 번이든 다시 보낼 수 있어야 해요.
+Dialogue: 0,0:00:28.84,0:00:31.68,Narration,,0,0,0,,라이프니츠의 답은 원통이었어요.
+Dialogue: 0,0:00:31.88,0:00:35.64,Narration,,0,0,0,,길이가 서로 다른 톱니 아홉 개를 계단처럼 붙였죠.
+Dialogue: 0,0:00:35.84,0:00:38.53,Narration,,0,0,0,,드럼 옆에는 기어가 하나 있고,
+Dialogue: 0,0:00:38.73,0:00:42.12,Narration,,0,0,0,,이 기어가 돈 만큼 결과 숫자가 올라가요.
+Dialogue: 0,0:00:42.72,0:00:46.70,Narration,,0,0,0,,3을 넣으면, 기어가 드럼의 3번 자리에 맞춰져요.
+Dialogue: 0,0:00:46.90,0:00:50.04,Narration,,0,0,0,,그 자리까지 닿는 톱니는 딱 세 개예요.
+Dialogue: 0,0:00:50.24,0:00:55.79,Narration,,0,0,0,,크랭크를 한 바퀴 돌리면 그 세 개만 기어를 쳐서, 결과 바퀴가 세 칸 돌아요.
+Dialogue: 0,0:00:55.99,0:01:00.45,Narration,,0,0,0,,0에 두면 어떤 톱니에도 닿지 않아서, 한 칸도 안 돌고요.
+Dialogue: 0,0:01:02.22,0:01:06.58,Narration,,0,0,0,,기어 자리는 그대로니까, 드럼이 3을 기억하고 있는 셈이에요.
+Dialogue: 0,0:01:06.78,0:01:10.22,Narration,,0,0,0,,한 번 더 돌리면 또 3이 더해져서 6이 돼요.
+Dialogue: 0,0:01:10.42,0:01:13.63,Narration,,0,0,0,,3 곱하기 2를 크랭크 두 바퀴로 푼 거예요.
+Dialogue: 0,0:01:14.23,0:01:18.55,Narration,,0,0,0,,그런데 3에 12를 곱하려면, 열두 바퀴를 돌려야 할까요?
+Dialogue: 0,0:01:18.75,0:01:22.86,Narration,,0,0,0,,라이프니츠는 입력을 한 자리씩 옮기는 장치도 넣었어요.
+Dialogue: 0,0:01:23.06,0:01:28.22,Narration,,0,0,0,,12를 10과 2로 나누면, 두 바퀴로 6, 한 자리 옮겨 한 바퀴로 30.
+Dialogue: 0,0:01:28.42,0:01:31.03,Narration,,0,0,0,,세 바퀴면 36이 나와요.
+Dialogue: 0,0:01:31.63,0:01:36.74,Narration,,0,0,0,,손으로 돌리는 작은 계산기 쿠르타도, 같은 계단 드럼 원리를 썼어요.
+Dialogue: 0,0:01:36.94,0:01:41.43,Narration,,0,0,0,,기어 자리로 숫자를 기억하고, 돌릴 때마다 그 수를 더하기.
+Dialogue: 0,0:01:41.63,0:01:44.80,Narration,,0,0,0,,그게 계단 드럼이 곱셈을 하는 방법이에요.
