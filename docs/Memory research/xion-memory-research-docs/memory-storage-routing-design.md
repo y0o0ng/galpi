@@ -942,3 +942,29 @@ DB/Vault reads/writes, downstream model calls, state commits, migrations and Pi
 deployment: **0**. Both outputs remain NOT_VALIDATED; the two-call budget is
 exhausted. No general low-effort quality/latency claim or default-setting change
 follows from these examples.
+
+#### Owner-requested unchanged repeat — 2026-10-02
+
+At owner request, repeat both preceding targets once, walking then lease choice,
+from baseline `d64cd117053626e6e74ce6e0a81728da9f6bb82c`. The intervening OCR
+commit did not change this selector. This is a separately authorized development
+repeat, not an automatic retry or repair of the preceding frozen selections.
+Before dispatch, the private plan fixed a new two-call budget and verified that
+both request files, complete API bodies and selector code hashes matched the
+preceding trial exactly. Source bytes, anchors, low configuration and no-retry
+policy were unchanged; no expected evidence IDs were supplied to the model.
+
+Private directory: `/private/tmp/galpi-bundle-referent-condition-repeat-_lgzuh7z`.
+Plan SHA256: `44df844a9c2ce14002190d504d1dfe21d582007492e91e17afc2baec85b99476`.
+Observed: **2 completed dispatches / 0 retries**, walking 2,062 ms and lease choice
+2,113 ms. Walking again selected 1730–1732; lease choice again selected 1722–1725.
+Both frozen bundle files are byte-identical to their predecessors, with the same
+bundle hashes. Offline reconstruction from the new retained selections also
+reproduced both bundles byte-identically without further calls. The walking
+antecedent omission therefore remains; repeated identical output does not prove
+semantic completeness. Neither output was repaired or promoted to semantic gold.
+Summary SHA256: `0087b69216805d7288435fb42f0b24df5a4d365a473ce42c2df5b46f6f8818b2`.
+Production DB/Vault access, downstream model calls and storage commits remain
+**0**. No code or default changed; semantic completeness remains NOT_VALIDATED.
+No full-suite rerun was needed for this documentation-only probe record; the
+private request/body/source and offline reconstruction checks above were run.
