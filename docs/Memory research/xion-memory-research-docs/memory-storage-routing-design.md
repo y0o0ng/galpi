@@ -843,3 +843,102 @@ commits: **0**. Both results remain **NOT_VALIDATED** for evidence completeness;
 the two-call budget is exhausted. Default medium is unchanged, and no effort
 winner/production policy is selected. Next: owner inspection of these two
 target-specific views before any downstream or separately budgeted probe.
+
+### Fixed-target low probes / formation walkthrough — 2026-10-02
+
+The owner authorized two additional development selections, one each for the
+walking-distance preference and tentative rental-choice targets in the same
+retained 30-message episode. Baseline: `5c60a088566799e7813cd7b605bfe2c3418817fd`;
+selector implementation remains `85f23e4`. No code change is required.
+
+Before dispatch freeze both source-grounded anchors (messages 1732 and 1724),
+requests, complete API bodies and execution order **walking then lease choice**.
+Use gpt-6-luna/low, current_turn, 4096 output tokens, store:false, tools absent
+and maxRetries:0. Maximum dispatches **2**, one per target, no retry, repair or
+additional case. Reuse the original episode raw hash
+`553759bb83a6144caf096af8a2716ceb3d6cd0ee94d83b43e49a930a9585760e`;
+do not reread current DB/Vault. The selector receives no expected evidence list.
+Inspect referent/question context for walking distance and conditional/tentative
+lease-choice context against the full source.
+
+After inspecting the retained selections, trace one bundle through the agreed
+Ambiguity → Durability → Extractor responsibility boundaries as an **operator
+design walkthrough**, not execution of those model stages, owner gold or an
+accepted ingress candidate. No separate downstream calls or semantic labels in
+Builder output are authorized. Preserve the one-target boundary, conditions
+and attribution. Current USER/primary_laptop storage does not accept contextual
+housing preferences/choice states; do not invent an attribute, generic scope or
+family registration to make the example writable. Source binding and actual
+commit remain unperformed. The separate P1-B6 research contract is unchanged.
+
+Pre-dispatch validation: existing Builder/adapter **25/25 PASS**. The full suite
+is not repeated for this no-code development probe; previous regression results
+remain historical. Source/anchor/body checks will also run in private preflight.
+
+#### Observed selections and operator walkthrough
+
+The two-call plan/request/code hashes were frozen before dispatch in
+`/private/tmp/galpi-bundle-referent-condition-f4920s4a` (0700; files 0600).
+Plan SHA256:
+`be0dd86e5ebc46b0ccca147edf48d7e69ceb01ebcb64355b6d4c4913dfd45879`.
+Request SHA256: walking
+`714c8fabb75f510748bd7181ffb2741c8f71a9e9554f8cd5d6d52fe59bcde0a9`;
+lease choice `70ecbededa2745451eb2f8d780f422788042f69d22fb53f1f857535317ab026d`.
+
+Observed: **2 completed gpt-6-luna/low dispatches / 0 retries**. Both produced
+one mechanically valid, fixed-anchor bundle without output repair:
+
+| Target | Selected message IDs | Count / fragments | Input / output / reported reasoning tokens | Call latency |
+|---|---|---|---|---|
+| Walking preference | 1730–1732 | 3 / 1 | 3,432 / 31 / 0 | 13,422 ms |
+| Tentative lease choice | 1722–1725 | 4 / 1 | 3,432 / 35 / 0 | 1,943 ms |
+
+Operator source comparison: walking includes the school-distance choice
+question and user reply, but retains the earlier affirmation without its
+available antecedent question (1729). The destination mention in assistant
+context does not independently prove the user's campus confirmation. This is a
+retained evidence-link concern, not automatic ESCALATE for the narrower walking
+preference target. No omitted turn was patched into the frozen output.
+
+Lease choice includes the preceding question and the original tentative status,
+conditional graduate-school possibility and possible stay duration. These
+conditions inform the single target; they do not authorize separate confirmed
+education/duration/contract claims. Assistant advice remains attributed context.
+These are operator observations, not formal bundle-audit PASS or owner gold.
+
+The private **operator design walkthrough** uses the lease-choice bundle. Under
+the given-status rule (retained in the frozen P1-B6 v4 contract), a supplied
+tentative/undecided choice can illustrate CLEAR without resolving the eventual
+choice. Durability is illustrated as a candidate for the ongoing search, not a
+lifelong preference or mutation authority. Extraction must preserve that one
+tentative choice and its conditions, with owning-source/span references; it
+must not convert conditions into separate confirmed claims. No downstream model
+stage, accepted candidate, EvidenceRef registration or semantic approval was
+performed. The illustrative readings are not Builder labels or research gold.
+
+This exposes an unimplemented representation boundary: the current General Fact
+handler supports only USER/primary_laptop, not contextual/conditional housing
+choice states. No family, attribute, generic scope or candidate schema is opened
+by this walkthrough. Before a real Extractor/Router connection, its output must
+distinguish a representable supported candidate from an unsupported target while
+preserving the original target/evidence. This is the next design question, not
+an adopted new ingress shape or a request to implement another family now.
+
+Bundle SHA256: walking
+`d549f1276990f85324a743a077d9806a961e49281a7469f14c6e692c64392947`;
+lease choice `055f526ac9b0fbaddc540122f7e2b9b368cf0302b9e897f190823af50f62acc6`.
+Provider-response SHA256: walking
+`014f870398317367ff60884506dcf6b5e5059bba24ee7be964d3990618a6137a`;
+lease choice `c4b96bafabe85b481332611f5bdaa03f8e3c3855204b76bee0dbe4c4e1b4b5fb`.
+Probe summary SHA256:
+`48fe858881850e508da297f4dfd21579950ae723b6df0502e6fbd534f49cc3d1`.
+Private operator-observation SHA256:
+`c76b7b94febdda1a37a59124d80c0ebfa8765e5950a5aebb107cbdb8b60df905`;
+private illustrative walkthrough SHA256:
+`576546ca87e19186a45825608b13472306576fdf5adc84345463a9ac771f1b2f`.
+Both bundles reproduced byte-identically from retained selections with **0
+additional calls**. Original episode bytes/hash remain unchanged. Production
+DB/Vault reads/writes, downstream model calls, state commits, migrations and Pi
+deployment: **0**. Both outputs remain NOT_VALIDATED; the two-call budget is
+exhausted. No general low-effort quality/latency claim or default-setting change
+follows from these examples.
