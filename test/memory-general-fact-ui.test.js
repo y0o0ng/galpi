@@ -152,6 +152,52 @@ test('call failure/unsupported proposal persist pending input and cannot repeat 
   assert.equal(f.store.readTarget('USER', 'primary_laptop').currentState, null);
 });
 
+test('frontend explains an unsupported proposal as preserved pending evidence, not a save failure', async t => {
+  const f = fixture(t);
+  f.reviews.decide(f.review.reviewId, { choice: 'APPROVE', packageSha256: f.review.packageSha256 });
+  const before = f.store.readTarget('USER', 'primary_laptop');
+  let calls = 0;
+  const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
+    proposeTransition: request => { calls++; return proposed(request, 'KEEP_AMBIGUOUS', 'AMBIGUOUS'); } });
+  const { base } = await serving(t, f.reviews, prepare);
+  const script = await (await fetch(`${base}/app.js`)).text();
+  class Element {
+    constructor(tag) { this.tag = tag; this.children = []; this.handlers = {}; this.value = ''; this.checked = false; }
+    append(...nodes) { this.children.push(...nodes); }
+    replaceChildren() { this.children = []; }
+    addEventListener(name, handler) { this.handlers[name] = handler; }
+    setAttribute() {}
+    reportValidity() { return true; }
+  }
+  const app = new Element('main'), panel = new Element('section'), notice = new Element('div');
+  const context = vm.createContext({
+    document: { getElementById: id => ({ app, notice, 'candidate-input': panel })[id], createElement: tag => new Element(tag) },
+    crypto: { randomUUID }, confirm: () => true,
+    fetch: (url, options) => fetch(`${base}${url}`, options),
+  });
+  await vm.runInContext(script, context);
+  const descendants = node => [node, ...node.children.flatMap(descendants)];
+  const nodes = descendants(panel);
+  nodes.find(node => node.id === 'source-text').value = 'Synthetic uncertain device relation';
+  nodes.find(node => node.id === 'attribute-key').value = 'primary_laptop';
+  nodes.find(node => node.id === 'candidate-value').value = 'Synthetic Different Laptop';
+  const submit = nodes.find(node => node.tag === 'form').handlers.submit;
+  await submit({ preventDefault() {} });
+  const status = nodes.find(node => node.tag === 'p' && node.textContent?.startsWith('Luna 제안은 보류'));
+  assert.ok(status);
+  assert.match(status.textContent, /검토 카드는 만들지 않았어/);
+  assert.match(status.textContent, /원문·후보·제안은 보존/);
+  assert.doesNotMatch(status.textContent, /검토를 열거나 저장할 수 없어/);
+  await submit({ preventDefault() {} });
+  assert.equal(calls, 1, 'no automatic retry or repeat submission');
+  assert.deepEqual(f.reviews.listPending(), []);
+  const pending = f.db.prepare("SELECT pending_reason, proposal_json FROM memory_general_fact_candidates WHERE status = 'PENDING'").all();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].pending_reason, 'UNSUPPORTED_TRANSITION');
+  assert.equal(JSON.parse(pending[0].proposal_json).transition, 'KEEP_AMBIGUOUS');
+  assert.deepEqual(f.store.readTarget('USER', 'primary_laptop').states, before.states);
+});
+
 test('source/candidate preflight rolls back together and parallel input is rejected without writes', async t => {
   const f = fixture(t);
   let release, calls = 0;
