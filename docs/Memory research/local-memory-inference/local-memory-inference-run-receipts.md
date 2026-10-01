@@ -5478,3 +5478,14 @@ Claude Opus 5.5 (owner-reported). No semantic review or acceptance; the accepted
 | HUMAN packet (not committed) | 2 DEV calibration rows, raw SHA `24dbf13a813190fbe38695f59bf56e66b8e9df8acd466672d634998301c9f07a` |
 
 HELD 5 `PROVISIONAL`. No HUMAN review or acceptance; the accepted pool record stays **93**.
+
+#### P1-B6 batch-006 DEV HUMAN calibration attempt-001 (2026-10-01) — 2/2 MATCH; ledger v5 — pool 386, all needs met
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-batch-006-human-review-attempt-001.json` | receipt, `c463b743…`; raw `1b07840b5ea8e2722c75138a854c9596ae1ff4e4f0ffeb357425c0957442984d` (not committed) |
+| `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v5.json` | ledger v4 (unchanged) + 7 batch-006 rows; 386 in pool |
+| `fixtures/local-memory-inference-p1b6-shortage-receipt-v5.json` | every marginal and HELD per-skeleton need met; minimum top-up 0 |
+
+Owner decisions, no presentation aid reported, not independent. No acceptance, freeze or selection;
+the accepted pool record stays **93**.
