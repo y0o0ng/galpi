@@ -794,3 +794,52 @@ storage/SDK/UI regression **151/151 PASS**, and `git diff --check` PASS. Synthet
 transport tests compare entire low/medium API bodies and the unchanged default
 medium body. The full repository suite was not repeated for this isolated
 development change; these checks do not establish semantic selection quality.
+
+#### Observed low–medium fixed-budget comparison
+
+Execution code commit: `85f23e4fc9cd9b4603c97a5c9da2b21b95634503`;
+baseline: `1d7a89436d7c2de05d7d44ba7caf9596da971cd7`. The common
+episode/anchor/request, both complete API bodies and low-then-medium call order
+were frozen before dispatch under
+`/private/tmp/galpi-bundle-anchor-effort-356htlug` (0700; files 0600).
+Plan SHA256:
+`e671bb93654bb937b307ac36508b462b3b374ff7a1d6956002605e5621d59196`;
+common request SHA256:
+`0598efedeba2f254d4da01d7c4316dc92b47ac95a7301712743c7a995d0d8dd5`.
+Pre-dispatch mock capture and actual transport body checks established that
+only reasoning effort differed. No expected evidence list was supplied.
+
+Observed: **2 completed provider dispatches / 0 retries**, both `gpt-6-luna`.
+Each produced one mechanically valid bundle with the original fixed anchor
+preserved by code, without output repair. Source IDs/counts are observations,
+not semantic accuracy scores:
+
+| Effort | Selected message IDs | Count / fragments | Input / output / reported reasoning tokens | Call latency |
+|---|---|---|---|---|
+| low | 1723–1726 | 4 / 1 | 3,433 / 35 / 0 | 1,986 ms |
+| medium | 1724–1730 | 7 / 1 | 3,433 / 540 / 491 | 7,691 ms |
+
+Operator comparison against the retained source: both include the immediate
+preceding budget question and the user's tentative lease-choice context. Low
+selects a narrower preceding-context view; medium also selects subsequent
+school/campus confirmation. This does not establish that the extra context is
+always unnecessary or that low is generally better. The whole anchor message
+still includes another question as evidence, without adding another storage
+target. Assistant interpretation of monetary units is not independently adopted
+as a user fact. No ambiguity/durability/extraction verdict was made.
+
+Bundle SHA256: low
+`a056725d2419a19aeae8070506e5601a13b9a27bf563b168778b5fc6498ebe03`;
+medium `83ac26dc85c359a153fcba473803c1ca45775613e48f92f89c1a7c1e27a1e67d`.
+Provider-response SHA256: low
+`bbc40368546c6e68ecf85e0bfb822bc2929053fa4062db4490e218fb432e463a`;
+medium `092f9d193e2a2db179097e576fe4120a17cd87838b7461ca9af817df9009b1a4`.
+Comparison summary SHA256:
+`e4a581ab09e36f6a5306c470e8098a097c5f8f2ad97eae49096d7c4755f6ebfa`.
+Both bundles reproduced byte-identically from retained IDs/source with **0
+additional calls**. Original episode bytes/hash are unchanged. Production
+DB/Vault reads/writes, EvidenceRef registrations, downstream judgments and state
+commits: **0**. Both results remain **NOT_VALIDATED** for evidence completeness;
+the two-call budget is exhausted. Default medium is unchanged, and no effort
+winner/production policy is selected. Next: owner inspection of these two
+target-specific views before any downstream or separately budgeted probe.
