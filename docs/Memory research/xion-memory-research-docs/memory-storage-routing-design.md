@@ -567,3 +567,41 @@ Execution code commit: `0791e4c`. The pre-dispatch private plan recorded the cod
 Observed request usage: 3,461 input tokens / 1,279 output tokens (855 reasoning tokens), 4,740 total; elapsed 12,980 ms for this single local probe, not a production performance estimate. The private `bundles.json` SHA256 is `1b78b348b736caca26142034283c8eda3056b454d655fa4f533e3c97b16cb5cf`; raw `provider-response.json` SHA256 is `d01ae457e4b67d3a4299a8d5762e667ed8e39ea0b0c2d4f98eb5fd83c9b11829`; `probe-summary.json` SHA256 is `482638d7eae4074cd9073d21535a63c252190fb1ca4fcf55cd855c151d4fab10`. All are 0600 under the same 0700 private directory outside Git. Rebuilding from the frozen source and retained selection produced byte-identical bundle output with **0 additional calls**.
 
 Production DB writes, Vault reads/writes, migrations, Pi deployment/restart, EvidenceRef registrations, derived-state commits and downstream ambiguity/durability/extraction judgments were all **0**. Generation used the already-frozen local episode and did not reread production inputs. Next: review candidate granularity and source/bundle completeness against this full episode before feeding any bundle into the ambiguity path; episode-boundary adequacy and selection quality remain OPEN.
+
+### Same-episode user-centered discovery probe — 2026-10-01
+
+The owner authorized one additional Luna discovery call using the same retained
+episode bytes and the new user-centered request. Execution code commit:
+`c3c32fb`; episode SHA256 remains
+`553759bb83a6144caf096af8a2716ceb3d6cd0ee94d83b43e49a930a9585760e`.
+The previous request/result were not overwritten. Before dispatch, a new request
+and one-call plan were frozen under
+`/private/tmp/galpi-bundle-user-centered-z2u43qpi` (0700; files 0600).
+Request SHA256:
+`896029fc55c790b3fac80ee84740b55ac1db113781f9cfc03ee00385915deb51`.
+
+Observed: **1 completed provider dispatch / 0 retries**, `gpt-6-luna`, **6
+bundles**, selected-turn counts **1 / 1 / 1 / 1 / 9 / 1**, fragment counts
+**1 / 1 / 1 / 1 / 3 / 1**. Input/output tokens: **3,594 / 1,544** (1,193
+reasoning), total **5,138**; elapsed **15,546 ms** for this probe. Bundle SHA256:
+`1425873c20f79839759406d06dd0b11570748b59560ab73c657b379a8bd99596`;
+retained provider-response SHA256:
+`824e005739eb451d8e8bf0d934eca6a6aea7207cba3528e34ab5ec5a58d842c4`.
+Rebuilding from retained source/selection was byte-identical, with no new calls.
+
+All six pass mechanical source/anchor validation and remain **NOT_VALIDATED**.
+Operator comparison flags evidence-completeness concerns in the third and
+fourth bundles: their one-turn selections omit available preceding object or
+question context. This is not formal source-audit PASS/FAIL, owner semantic
+approval or a downstream CLEAR/ESCALATE verdict. The former seventh candidate
+is now the fifth, still one coherent decision-thread proposal with contextual
+properties; those properties are not independently authorized storage items.
+The change from eight to six does not establish improved discovery quality or
+NO_WRITE for omitted candidates; prompt change and generation variation are
+not disentangled by this one probe.
+
+Focused bundle/adapter tests **19/19 PASS** and `git diff --check` pass. Current
+probe: production DB/Vault reads/writes, deployment, migrations, downstream
+judgments and storage commits **0**. Next: inspect and correct evidence selection
+against the full frozen episode before ambiguity/durability/extraction; no
+further model dispatch is covered by this probe's exhausted one-call budget.
