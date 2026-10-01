@@ -5429,3 +5429,15 @@ Historical acceptance and HUMAN gold unchanged. Nothing has run; the accepted po
 Claude Opus 5.5 (owner-reported), two fresh sessions. HELD `b001-020`, `-024`, `b002-059`, `-061`
 `INELIGIBLE`; HELD `b002-063` `PROVISIONAL`. No HUMAN review or acceptance; the accepted pool
 record stays **93**.
+
+#### P1-B6 accepted-row v3 migration HUMAN attempt-001 (2026-10-01) — 1/7 MATCH; ledger v4 — pool 379, top-up ≥ 5
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-accepted-v3-migration-human-review-attempt-001.json` | receipt, `370c49ca…`; raw `9c36f9d8a61a30781e6e2ca885989728179736f35aeba976cb94f20cb5eca979` (not committed) |
+| `fixtures/local-memory-inference-p1b6-reviewed-pool-ledger-v4.json` | ledger v3 (unchanged) + migration applied; 379 in pool |
+| `fixtures/local-memory-inference-p1b6-shortage-receipt-v4.json` | DEV 1, HELD per-skeleton 4, KO 2, fragments 4 / 5 short; minimum top-up 5 |
+
+Owner decisions, GPT-5.6 sol presentation aid (owner-reported), not independent. Mismatches closed
+as realization failures; `cc054a42` contract divergence recorded, v3 kept. No acceptance; the
+accepted pool record stays **93**.

@@ -257,6 +257,83 @@ function buildHumanPacket(receipt, a = verifySources(loadSources())) {
   };
 }
 
+const HUMAN_RECEIPT_FILE = 'local-memory-inference-p1b6-accepted-v3-migration-human-review-attempt-001.json';
+
+// Preregistered HUMAN semantics; the owner closed every mismatch as a current-realization
+// failure (2026-10-01): no catalog change, no relabel.
+function routeHuman(role, v3Reference, row) {
+  const prefix = role === 'mandatory' ? 'MANDATORY' : 'CALIBRATION';
+  if (row.disposition !== 'KEEP') return { outcome: `${prefix}_${row.disposition}`, provenance: null, eligibility: 'INELIGIBLE' };
+  if (row.decision !== v3Reference) return { outcome: `${prefix}_DECISION_MISMATCH`, provenance: null, eligibility: 'INELIGIBLE' };
+  return role === 'mandatory'
+    ? { outcome: 'MANDATORY_MATCH', provenance: 'HUMAN_ADJUDICATED', eligibility: 'ELIGIBLE' }
+    : { outcome: 'CALIBRATION_MATCH', provenance: 'CATALOG_STRONG_MODEL_CONFIRMED', eligibility: 'PROVISIONAL' };
+}
+
+function buildHumanReceipt(rawResultBytes, reviewDate, receipt, a = verifySources(loadSources())) {
+  const packet = buildHumanPacket(receipt, a);
+  const results = parseResults(rawResultBytes, 'reviewRowId', packet.rows.map(row => row.reviewRowId), row =>
+    JSON.stringify(Object.keys(row).toSorted()) === '["decision","disposition","reason","reviewRowId"]'
+    && typeof row.reason === 'string' && row.reason.trim() !== ''
+    && (row.disposition === 'KEEP' ? ['CLEAR', 'ESCALATE'].includes(row.decision)
+      : ['FIX', 'REJECT'].includes(row.disposition) && row.decision === null));
+  const rows = receipt.rows.map(row => {
+    if (!row.human) {
+      return { itemId: row.itemId, splitAssignment: row.splitAssignment, role: null, finalProvenance: row.provenance, finalEligibility: row.eligibility };
+    }
+    const raw = results.get(humanRowId(row.itemId));
+    const routed = routeHuman(row.human, row.v3Reference, raw);
+    return {
+      itemId: row.itemId,
+      splitAssignment: row.splitAssignment,
+      role: row.human,
+      reviewRowId: raw.reviewRowId,
+      v3Reference: row.v3Reference,
+      disposition: raw.disposition,
+      decision: raw.decision,
+      reason: raw.reason,
+      outcome: routed.outcome,
+      finalProvenance: routed.provenance,
+      finalEligibility: routed.eligibility,
+    };
+  });
+  const reviewed = rows.filter(row => row.role);
+  return {
+    name: 'xion-local-memory-inference-p1b6-accepted-v3-migration-human-review-attempt-001-receipt-v1',
+    status: 'COMPLETE_HUMAN_REVIEWED_AGAINST_SEMANTIC_CONTRACT_V3',
+    reviewDate,
+    reviewProtocol: { identity: HUMAN_PROTOCOL.identity, rawSha256: HUMAN_PROTOCOL.rawSha256 },
+    reviewPacket: { identity: HUMAN_PACKET_IDENTITY, sha256: sha256RawBytes(artifactBytes(packet)), rows: packet.rows.length },
+    migrationReviewReceipt: { identity: receipt.name, rawSha256: sha256RawBytes(artifactBytes(receipt)) },
+    rawResultArtifact: { filename: 'p1b6-mig-human-review-results.json', sha256: sha256RawBytes(rawResultBytes), committed: false },
+    reviewer: {
+      role: 'repository owner',
+      decisionsBy: 'repository owner',
+      presentationAid: 'a model presented packet rows and helped format the JSON, and made no judgment (owner-reported: GPT-5.6 sol)',
+      independentConfirmation: false,
+      limitation: 'The owner made the historical HUMAN judgments on these surfaces, chose the migration and had seen the review summary; row blindness hid only which opaque row was which.',
+    },
+    ownerClosure: {
+      decisionsSource: 'REPOSITORY_OWNER',
+      date: reviewDate,
+      decision: 'every mismatch is closed as a current-realization failure: INELIGIBLE, no catalog amendment, no relabel, historical records unchanged',
+      observation: 'all four cc054a42 rows were KEEP ESCALATE against v3 CLEAR: the owner read the TARGET as the user\'s stance on the attributed proposal, the v3 contract treats the unadopted facet as a given attributed status. The owner kept the v3 contract; any revisit is a separate gate.',
+    },
+    summary: {
+      reviewed: reviewed.length,
+      matchingV3: reviewed.filter(row => row.outcome.endsWith('_MATCH')).length,
+      migratedIntoPool: rows.filter(row => ['PROVISIONAL', 'ELIGIBLE'].includes(row.finalEligibility)).map(row => row.itemId),
+      ineligible: rows.filter(row => row.finalEligibility === 'INELIGIBLE').map(row => row.itemId),
+    },
+    rows,
+    authority: {
+      promotedToHumanAdjudicated: rows.some(row => row.finalProvenance === 'HUMAN_ADJUDICATED'),
+      catalogAmendedByThisResult: false, historicalRecordsRewritten: false, surfaceAcceptancePerformed: false,
+      referenceLabelFreezePerformed: false, finalSelectionPerformed: false, trainingOrEvaluationOccurred: false,
+    },
+  };
+}
+
 const artifactBytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8');
 
 function main(argv = process.argv.slice(2)) {
@@ -275,6 +352,15 @@ function main(argv = process.argv.slice(2)) {
 `);
     return 0;
   }
+  if (argv.length === 4 && argv[0] === '--human-results' && argv[2] === '--date') {
+    const output = path.join(ROOT, 'fixtures', HUMAN_RECEIPT_FILE);
+    if (fs.existsSync(output)) throw new Error(`Existing output will not be overwritten: ${output}`);
+    const receipt = JSON.parse(fs.readFileSync(path.join(ROOT, 'fixtures', RECEIPT_FILE)));
+    const human = buildHumanReceipt(fs.readFileSync(argv[1]), argv[3], receipt, a);
+    fs.writeFileSync(output, artifactBytes(human), { flag: 'wx' });
+    process.stdout.write(`Recorded HUMAN result: ${JSON.stringify(human.summary)} -> fixtures/${HUMAN_RECEIPT_FILE}\n`);
+    return 0;
+  }
   const humanPacket = () => {
     const bytes = fs.readFileSync(path.join(ROOT, 'fixtures', HUMAN_PROTOCOL.fixture));
     if (sha256RawBytes(bytes) !== HUMAN_PROTOCOL.rawSha256) fail('HUMAN protocol bytes are not the pinned artifact');
@@ -290,7 +376,7 @@ function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
-  HUMAN_PROTOCOL, PLAN_FILE, RECEIPT_FILE, SOURCES, artifactBytes, auditRowId, buildAuditPacket, buildHumanPacket,
+  HUMAN_PROTOCOL, HUMAN_RECEIPT_FILE, PLAN_FILE, RECEIPT_FILE, SOURCES, artifactBytes, auditRowId, buildAuditPacket, buildHumanPacket, buildHumanReceipt,
   buildPlan, buildReviewPacket, derivePopulation, humanRowId, loadSources, main, reconcile, reviewRowId, verifySources,
 };
 

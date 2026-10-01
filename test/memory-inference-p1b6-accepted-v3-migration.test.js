@@ -83,3 +83,20 @@ test('HUMAN packet: 7 sorted opaque rows, bundles equal the strong-model packet,
     assert.equal(text.includes(value), false, value);
   }
 });
+
+const HUMAN_RAW = path.join(os.homedir(), 'p1b6-mig-human-review-results.json');
+const human = JSON.parse(read(builder.HUMAN_RECEIPT_FILE));
+
+test('committed migration HUMAN receipt: 1 of 7 matches v3; 2 rows migrate; mismatches closed without catalog change', () => {
+  assert.equal(human.summary.reviewed, 7);
+  assert.equal(human.summary.matchingV3, 1);
+  assert.deepEqual(human.summary.migratedIntoPool, ['p1b6-item-b002-051', 'p1b6-item-b002-063']);
+  assert.equal(human.summary.ineligible.length, 10);
+  assert.equal(human.reviewer.independentConfirmation, false);
+  assert.equal(human.authority.catalogAmendedByThisResult, false);
+  assert.equal(human.authority.historicalRecordsRewritten, false);
+});
+
+test('the HUMAN receipt equals the raw result bytes when they are supplied', { skip: !fs.existsSync(HUMAN_RAW) }, () => {
+  assert.deepEqual(builder.buildHumanReceipt(fs.readFileSync(HUMAN_RAW), human.reviewDate, receipt, a), human);
+});
