@@ -69,8 +69,11 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   batch-006 top-up (HELD 5, DEV 2) is preregistered and materialized; HELD slots skip owner and
   HUMAN review; DEV owner pre-audit 2/2 PASS; source audit **7/7 PASS**; v3 review **7/7 clean**
   (HELD 5 `PROVISIONAL`); DEV HUMAN calibration **2/2 match**. **Ledger v5: pool 386; every
-  marginal and every HELD per-skeleton need is met (minimum top-up 0).** Next: preregister the
-  deterministic 380 selection.
+  marginal and every HELD per-skeleton need is met (minimum top-up 0).**
+- **semantic contract v4 (owner, 2026-10-01)** (see "Semantic contract v4"): the user-centered
+  successor; `cc054a42` and `43016ef6` move to ESCALATE. The 386-row scope review and the 19-row
+  v4 review are preregistered and their blind packets built; nothing has run. Deterministic
+  selection waits for the ledger that applies them.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -1115,6 +1118,53 @@ semantics of `aebbf047` and `869c7127`, which have a separate anchor-quality
 follow-up before final acceptance). v3 keeps 56 slots, TRAIN / DEV / HELD
 24 / 16 / 16, **42 CLEAR / 14 ESCALATE**; the label-balancing retirement of v2
 stands and no ratio is targeted.
+
+### Semantic contract v4
+
+**Owner decision (2026-10-01).** The "User-centered TARGET clarification" requires a separately
+versioned successor before the research corpus uses it, and the owner chose to build it before
+deterministic selection rather than freeze a v3 corpus. Receipt
+`fixtures/local-memory-inference-p1b6-skeleton-semantic-contract-v4-receipt.json`; catalog
+`fixtures/local-memory-inference-p1b6-skeleton-effective-current-v4.json` (**40 CLEAR / 16
+ESCALATE**), built by `scripts/build-memory-inference-p1b6-skeleton-semantic-contract-v4.js`
+(`npm run build:memory-inference-p1b6-skeleton-semantic-contract-v4`) from v3's exact raw bytes.
+v3 and its receipt stay byte-identical.
+
+- **Interpretation rule.** A new `userCenteredTarget` clause: every TARGET is the user's own
+  state, stance, plan, or relationship; another speaker's claim is source evidence, establishes the
+  user's stance only through visible adoption, and missing adoption evidence supports neither
+  agreement nor disagreement. "Attributed" is removed from the CLEAR list. The ESCALATE,
+  uncertainty, TARGET-boundary, pragmatic-resolution and no-added-premise clauses are unchanged.
+- **`cc054a42` → ESCALATE.** The TARGET is the user's stance on the facet they did not endorse;
+  partial endorsement is not adoption of the rest and gives no stance. This is the owner's
+  early-meeting example and matches the four migration HUMAN decisions.
+- **`43016ef6` → ESCALATE, redefined.** The TARGET moves from the quoted content to the user's own
+  stance on it; with no adoption or rejection evidence that stance is not given. A surface whose
+  TARGET is the quoted speech itself is not a realization.
+- **`714725ee` stays CLEAR**, re-encoded: role-play content is not the user's actual state, and
+  the role-play relation gives that status.
+- Everything else (53 skeletons, splits, boundary classes, contrast groups, mixed-realization set,
+  corpus label contract) is inherited unchanged; nothing is retired.
+
+**Pool review under v4 — preregistered, packets built, not run.**
+`scripts/build-memory-inference-p1b6-v4-review.js` (`npm run build:memory-inference-p1b6-v4-review`,
+plus `-- --scope-packet <out>` / `-- --review-packet <out>`) pins ledger v5, v4, both protocols
+and every surface artifact, and writes `fixtures/local-memory-inference-p1b6-v4-pool-review-plan.json`.
+
+- **Scope review, all 386 pool rows** under
+  `fixtures/local-memory-inference-p1b6-user-centered-scope-review-protocol.json`: is the marked
+  TARGET about the user (`IN_SCOPE` / `OUT_OF_SCOPE` / `UNCERTAIN`)? Another person's speech as
+  evidence does not by itself put a TARGET out of scope. TRAIN / DEV rows judged out of scope or
+  uncertain get an owner HUMAN scope check; HELD rows so judged become `INELIGIBLE` with no HUMAN
+  step. Packet `p1b6-v4-scope`, `540f32b2…`, not committed.
+- **v4 semantic review, the 19 pool rows on `cc054a42` (9) and `43016ef6` (10)**, all TRAIN, under
+  `fixtures/local-memory-inference-p1b6-v4-strong-model-review-protocol.json`. No v3 label, review
+  result or HUMAN decision carries over. Clean agreements become `PROVISIONAL` with the v4 label;
+  anything else goes to mandatory owner HUMAN; 4 calibration rows by the lowest
+  `sha256(p1b6-v4-review-calibration-v1 NUL itemId)`. Packet `p1b6-v4-smreview`, `783bdf4d…`, not
+  committed.
+- A row stays in the pool only if it survives both. A new ledger applies the results under v4 and
+  re-measures the shortage; deterministic selection waits for it.
 
 ## Supervised Corpus
 

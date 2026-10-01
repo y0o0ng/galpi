@@ -1,0 +1,116 @@
+{
+  "name": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v4-receipt-v1",
+  "status": "COMPLETE_PROSPECTIVE_SEMANTIC_CONTRACT_SUCCESSION",
+  "contractVersion": "v4",
+  "decisionsSource": "REPOSITORY_OWNER_SEMANTIC_ADJUDICATION",
+  "decisionDate": "2026-10-01",
+  "basis": "the owner's user-centered TARGET clarification (P1-B6 design, \"User-centered TARGET clarification — 2026-10-01\"), applied to the research catalog as the separately versioned successor that clarification requires",
+  "interpretationRule": {
+    "identity": "P1B6_SEMANTIC_CONTRACT_V4",
+    "supersedesProspectively": "P1B6_SEMANTIC_CONTRACT_V3",
+    "userCenteredTarget": "Every TARGET is evaluated for the user's own state, stance, plan, or relationship. What another speaker said is source evidence, not the user's state: a reported claim establishes the user's stance only through visible adoption, and missing adoption evidence supports neither agreement nor disagreement.",
+    "clear": "CLEAR when the visible evidence provides the TARGET's materially relevant semantic status for the user. The provided status does not need to be exact or final: an approximate, tentative, conditional, explicitly undecided, or otherwise uncertain user status is CLEAR when that uncertain status itself is what the visible evidence gives.",
+    "escalate": "ESCALATE when the visible evidence does not provide the TARGET's materially relevant semantic status, either because multiple materially different readings remain unresolved or because a fact or relation necessary to state the TARGET status is absent from the visible evidence.",
+    "uncertaintyDistinction": "An uncertain status that is itself given is CLEAR. A TARGET status that cannot be stated without additional information, yielding only 'unknown / cannot tell', is ESCALATE.",
+    "targetBoundary": "Judge the TARGET itself, not a downstream inference derived from it. Do not ESCALATE merely because downstream eligibility, policy application, cause, durability, or another consequence remains unknown when the TARGET status itself is given. Conversely, do not invent missing facts or rules to turn an unknown TARGET status into CLEAR.",
+    "pragmaticResolution": "Ordinary pragmatic resolution remains allowed when it is actually supported by the visible discourse. The standard is not literal mathematical explicitness.",
+    "supersededV3Clauses": [
+      "attributed status counts as a given TARGET status (v3 clear clause)"
+    ],
+    "retainedV2Clauses": {
+      "noAddedPremise": "Do not preserve a competing reading that requires an unstated event, identity assumption, grandfathering or effective-time rule, old ordering, hidden preference, category rule, exception, or other added premise."
+    },
+    "supersessionNote": "v3 listed an attributed status among the given statuses that are CLEAR. Under the user-centered TARGET, another speaker's claim is not the user's state, so attribution alone no longer gives the TARGET status. v3 and its receipt are not rewritten."
+  },
+  "derivationBase": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v3",
+    "rawSha256": "89a48264d6b09710f976a4ab85235ff161cf81ff44896e37553d5dc7753c65b9",
+    "role": "IMMUTABLE_HISTORICAL_PRIOR_PROSPECTIVE_AUTHORITY_AND_DERIVATION_BASE",
+    "note": "v3 remains committed and byte-identical. v4 is derived from its exact raw bytes and does not overwrite it."
+  },
+  "priorContractReceipt": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-semantic-contract-v3-receipt-v1",
+    "rawSha256": "10f8a10eb3325b86c9d9282fc951ee53b2037918c4258c89a7694822df9a98e1",
+    "role": "IMMUTABLE_HISTORICAL_AMENDMENT_EVIDENCE"
+  },
+  "successorCatalog": {
+    "identity": "xion-local-memory-inference-p1b6-skeleton-effective-current-v4",
+    "role": "PROSPECTIVE_CURRENT_SEMANTIC_AUTHORITY"
+  },
+  "summary": {
+    "amended": 3,
+    "labelChanges": 2,
+    "reencodedWithoutLabelChange": 1,
+    "retired": 0,
+    "humanLabelCounts": {
+      "from": {
+        "CLEAR": 42,
+        "ESCALATE": 14
+      },
+      "to": {
+        "CLEAR": 40,
+        "ESCALATE": 16
+      }
+    }
+  },
+  "amendments": [
+    {
+      "semanticSkeletonId": "p1b6-sk-43016ef6da889a87",
+      "fromHumanLabel": "CLEAR",
+      "toHumanLabel": "ESCALATE",
+      "candidateFocus": "다른 사람이 말한 내용에 대한 사용자 자신의 입장",
+      "semanticRelations": [
+        "다른 사람이 어떤 상태나 주장을 진술한 것으로 인용된다.",
+        "TARGET은 그 인용된 내용에 대한 사용자 자신의 입장이나 상태다.",
+        "사용자가 그 내용을 채택하거나 거부했음을 보여 주는 관계는 없다."
+      ],
+      "interpretationContract": "다른 사람이 그렇게 말했다는 사실은 사용자의 상태가 아니다. 인용만 있고 채택이나 거부의 근거가 없으면 사용자의 입장을 말할 수 없으므로 ESCALATE한다. 채택 근거가 없다는 것을 거부로 읽지도 않는다. 인용된 발언 자체를 TARGET으로 삼는 표면은 이 skeleton의 실현이 아니다.",
+      "note": "redefined: the TARGET moves from the quoted content to the user's stance on it"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-cc054a4227cdafef",
+      "fromHumanLabel": "CLEAR",
+      "toHumanLabel": "ESCALATE",
+      "candidateFocus": "다면 보고 중 한 면에만 동조했을 때 나머지 면에 대한 사용자 자신의 입장",
+      "semanticRelations": [
+        "다른 화자가 여러 면을 담은 주장을 보고한다.",
+        "사용자가 그중 식별 가능한 한 면에만 명시적으로 동조한다.",
+        "TARGET은 동조하지 않은 면에 대한 사용자 자신의 입장이다.",
+        "그 면을 채택하거나 거부했음을 지지하는 관계는 없다."
+      ],
+      "interpretationContract": "한 면에 대한 동조는 나머지 면의 채택이 아니고, 채택 근거가 없다는 것이 거부도 아니다. 동조하지 않은 면에 대한 사용자의 입장을 말할 수 없으므로 ESCALATE한다. 보고 전체를 채택했다는 근거가 보이면 그 표면은 이 skeleton의 실현이 아니다.",
+      "note": "owner's early-meeting example; matches the owner's migration HUMAN decisions on four cc054a42 rows"
+    },
+    {
+      "semanticSkeletonId": "p1b6-sk-714725eea477a631",
+      "fromHumanLabel": "CLEAR",
+      "toHumanLabel": "CLEAR",
+      "candidateFocus": "역할극 틀 안에서 한 말과 사용자 자신의 실제 상태의 관계",
+      "semanticRelations": [
+        "역할극 틀이 대상 내용에 대해 활성화되어 있다.",
+        "대상 내용은 그 틀 안에서 맡은 역할의 발화다.",
+        "TARGET 전에 역할극 틀을 벗어나는 관계는 없다."
+      ],
+      "interpretationContract": "역할 안의 발화는 사용자 자신의 실제 상태로 채택되지 않는다. 사용자가 역할극을 하고 있다는 관계가 주어져 있으므로, 그 내용이 역할 안의 주장이고 사용자의 실제 상태가 아니라는 지위가 결정되어 있어 CLEAR다.",
+      "note": "label kept by owner decision; re-encoded for the user-centered TARGET"
+    }
+  ],
+  "retirements": [],
+  "unchangedByThisSuccession": "the other 53 skeletons, every split, boundary class and contrast group, the mixed-realization set, and the corpus label contract",
+  "itemConsequences": {
+    "labelChangedSkeletons": "surfaces on 43016ef6 and cc054a42 keep no v3 label or review result as a v4 judgment; they need a fresh v4 review",
+    "reencodedSkeleton": "surfaces on 714725ee keep their label; the scope review checks their TARGET",
+    "allPoolRows": "a separate blind scope review checks whether every pool row's TARGET is the user's own state; this receipt does not perform it"
+  },
+  "authority": {
+    "historicalV3Overwritten": false,
+    "historicalHumanDecisionsAltered": false,
+    "strongModelOutputRelabeled": false,
+    "surfacesRegenerated": false,
+    "datasetAcceptancePerformed": false,
+    "referenceLabelFreezePerformed": false,
+    "heldOutReleasePerformed": false,
+    "trainingOccurred": false,
+    "productionBehaviorChanged": false
+  }
+}

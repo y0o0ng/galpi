@@ -5489,3 +5489,17 @@ HELD 5 `PROVISIONAL`. No HUMAN review or acceptance; the accepted pool record st
 
 Owner decisions, no presentation aid reported, not independent. No acceptance, freeze or selection;
 the accepted pool record stays **93**.
+
+#### P1-B6 semantic contract v4 — user-centered successor; pool review PREREGISTERED / packets BUILT / NOT RUN
+
+| artifact | role |
+| --- | --- |
+| `fixtures/local-memory-inference-p1b6-skeleton-semantic-contract-v4-receipt.json` | owner decisions, `702f6434…` |
+| `fixtures/local-memory-inference-p1b6-skeleton-effective-current-v4.json` | v4 catalog, 40 CLEAR / 16 ESCALATE, `a53debe1…` |
+| `fixtures/local-memory-inference-p1b6-v4-pool-review-plan.json` | routing for the 386-row scope review and the 19-row v4 review |
+| `fixtures/local-memory-inference-p1b6-user-centered-scope-review-protocol.json` | scope protocol, `38eef07a…` |
+| `fixtures/local-memory-inference-p1b6-v4-strong-model-review-protocol.json` | v4 semantic protocol, `229d0026…` |
+| scope packet (not committed) | 386 rows, raw SHA `540f32b278310b91f8286b21eb02ca5f3af2892c9476f49eee87486cf52302e2` |
+| v4 review packet (not committed) | 19 rows, raw SHA `783bdf4da1094604ba78ed4b756bf5410bb2fe154cea941de80d35af911f2c3c` |
+
+v3 unchanged. No review has run; the accepted pool record stays **93**.
