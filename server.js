@@ -40,7 +40,7 @@ const {
 const { registerModelRuntimeRoutes } = require('./lib/model-runtime-routes');
 const { registerAssistantTaskRoutes } = require('./lib/assistant-task-routes');
 const { registerDdayRoutes } = require('./lib/dday-routes');
-const { registerLectureRoutes, isLectureAnnotationPut } = require('./lib/lecture');
+const { registerLectureRoutes, isLectureLargeJson } = require('./lib/lecture');
 const { readAssistantPushConfig } = require('./lib/assistant-push-config');
 const { registerAssistantPushRoutes } = require('./lib/assistant-push-routes');
 const { createMailStore } = require('./lib/mail/store');
@@ -542,9 +542,10 @@ app.use((_req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   next();
 });
-// 강의 필기는 Document당 JSON 한 벌이라 1MB를 넘는다. 그 경로만 인증 뒤 라우트에서 따로 파싱한다.
+// 강의 필기는 Document당 JSON 한 벌이고 포스트잇 Q&A는 이미지를 담아 1MB를 넘는다. 그 경로만 인증 뒤
+// 라우트에서 따로 파싱한다.
 const globalJsonParser = express.json({ limit: '1mb' });
-app.use((req, res, next) => (isLectureAnnotationPut(req) ? next() : globalJsonParser(req, res, next)));
+app.use((req, res, next) => (isLectureLargeJson(req) ? next() : globalJsonParser(req, res, next)));
 app.use(express.static(path.join(__dirname, 'public')));
 // 강의 노트 뷰어의 PDF 렌더러. 저장소에 사본을 두지 않고 고정 버전 패키지에서 필요한 폴더만 내보낸다.
 for (const dir of ['build', 'cmaps', 'standard_fonts', 'wasm']) {
@@ -4639,7 +4640,34 @@ app.post('/api/tasks/prepare-natural', async (req, res) => {
   }
 });
 registerDdayRoutes({ app, db });
-registerLectureRoutes({ app, db, dataDir: DATA_DIR });
+// 포스트잇 시온 Q&A는 메인 채팅 모델 설정을 호출마다 따른다(2026-09-30 사용자 결정). 이미지를 못 받는 모델이면
+// 다른 모델로 바꾸지 않고 실패시킨다.
+registerLectureRoutes({
+  app,
+  db,
+  dataDir: DATA_DIR,
+  askModel: HAS_GPT ? async ({ system, content, schema }) => {
+    const snapshot = resolveChatModelSelection({
+      selection: modelSettings.get('chat.model_selection')?.value || CHAT_SELECTION_AUTO,
+      catalogRow: modelCatalogs.get('openai_api'),
+      bootstrapModel: GPT_CHAT_BOOTSTRAP_MODEL,
+      reasoningEffort: GPT_CHAT_REASONING_EFFORT,
+      requireImageInput: true,
+    });
+    const response = await openai.responses.create({
+      model: snapshot.modelId,
+      input: [{ role: 'system', content: system }, { role: 'user', content }],
+      store: false,
+      max_output_tokens: snapshot.reasoningEffort === 'none' ? 2048 : 12000,
+      reasoning: { effort: snapshot.reasoningEffort, context: 'current_turn' },
+      text: { format: { type: 'json_schema', name: 'sticky_answer', strict: true, schema } },
+    }, { timeout: 180000 });
+    if (response?.status && response.status !== 'completed') {
+      throw Object.assign(new Error(`포스트잇 답이 완료되지 않았습니다: ${response.status}`), { code: 'LECTURE_QA_INCOMPLETE' });
+    }
+    return { model: snapshot.modelId, output: JSON.parse(extractSmallResponseText(response)) };
+  } : null,
+});
 registerAssistantPushRoutes({ app, service: assistantPush, config: ASSISTANT_PUSH_CONFIG });
 registerNewsRoutes({
   app,

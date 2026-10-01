@@ -35,7 +35,13 @@
     add.type = 'button';
     add.append(svg(ICON_PLUS), document.createTextNode('새 폴더'));
     add.addEventListener('click', () => openFolderDialog(add));
-    head().replaceChildren(title, add);
+    // 필체 등록: 포스트잇 손글씨 OCR을 위한 표본 모으기.
+    const handwriting = el('button', 'lecture-pill is-plain', '필체 등록');
+    handwriting.type = 'button';
+    handwriting.addEventListener('click', () => global.LectureHandwriting.open());
+    const actions = el('div', 'lecture-actions');
+    actions.append(handwriting, add);
+    head().replaceChildren(title, actions);
 
     const search = el('label', 'lecture-search');
     const input = el('input');

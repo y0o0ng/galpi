@@ -228,7 +228,7 @@
       x: hold.x,
       y: hold.y,
       // 마커는 녹음 중에만 쓸 수 있다(§6.4).
-      enabled: { pen: true, eraser: true, select: true, sticky: true, important: recording, later: recording },
+      enabled: { pen: true, eraser: true, select: true, sticky: true, text: true, important: recording, later: recording },
     });
   }
 
@@ -237,6 +237,7 @@
     if (choice === 'pen' || choice === 'eraser') v.pens.choose(choice === 'eraser' ? 'eraser' : 'draw');
     else if (choice === 'select') v.pens.choose('select');
     else if (choice === 'sticky') v.sticky.create(page, point);
+    else if (choice === 'text') v.texts.create(page, point);
     else if (choice === 'important' || choice === 'later') v.markers?.add(choice);
   }
 

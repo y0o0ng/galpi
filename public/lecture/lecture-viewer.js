@@ -116,8 +116,12 @@
     if (viewer !== v) return;
     // 포스트잇은 자료 필기에 들어 있어 필기와 함께 저장된다. `시온에게 묻기`는 선택을 붙인 포스트잇을 연다(L3a).
     v.sticky = global.LectureSticky.attach(v);
+    v.texts = global.LectureText.attach(v);
+    // 포스트잇 시온 Q&A(L3b). 답이 오면 말풍선·열린 카드를 다시 그린다.
+    v.qa = global.LectureQa.create(v, { onChange: () => v.sticky.refresh() });
     v.lasso = global.LectureLasso.create(v, { onAsk: (page, selection) => v.sticky.create(page, [selection.bbox[2], selection.bbox[1]], selection) });
     buildPages(v);
+    v.qa.load();
     if (v.container?.type === 'course') {
       // `+ 새 강의`로 열었으면 오늘의 기존 Session을 붙이지 않는다. 첫 녹음이 새 Session을 만든다.
       v.session = v.newLecture ? null : await Recorder().todaySession(v.container.id).catch(() => null);
@@ -194,8 +198,9 @@
     v.pagesEl = el('div', 'lecture-pages');
     v.scroller.append(v.pagesEl);
     // Pencil은 그리고 손가락은 스크롤한다. Safari는 stylus 터치도 스크롤로 먹으므로 그것만 막는다.
-    // 버튼(`시온에게 묻기`·말풍선·포스트잇 카드)은 막지 않는다 — 막으면 Pencil 탭이 click이 되지 않는다.
-    const stylus = event => !event.target.closest?.('button') && [...event.touches].some(touch => touch.touchType === 'stylus');
+    // 버튼(`시온에게 묻기`·말풍선·포스트잇 카드)과 입력칸(텍스트 상자·포스트잇 타이핑)은 막지 않는다 — 막으면
+    // Pencil 탭이 click·포커스가 되지 않는다.
+    const stylus = event => !event.target.closest?.('button, input, [contenteditable]') && [...event.touches].some(touch => touch.touchType === 'stylus');
     v.scroller.addEventListener('touchstart', event => {
       if (stylus(event)) event.preventDefault();
       else if (event.touches.length === 2) startPinch(v, event);
@@ -211,6 +216,7 @@
     v.pens = global.LecturePens.buildRail({
       toast,
       onSticky: () => v.sticky?.createAtView(currentPage(v)),
+      onText: () => v.texts?.createAtView(currentPage(v)),
       onSelect: on => { if (!on) v.lasso?.clear(); },
     });
     v.rail = v.pens.el;
@@ -260,6 +266,7 @@
     layoutPages(v);
     v.pages.forEach(page => v.observer.observe(page.el));
     v.sticky.render();
+    v.texts.render();
   }
 
   function layoutPages(v, keepScroll = false) {
@@ -276,6 +283,7 @@
     });
     if (anchor) v.scroller.scrollTop = anchor.el.offsetTop + within * anchor.el.offsetHeight;
     v.sticky.layout();
+    v.texts.layout();
     updatePageIndicator(v);
   }
 
@@ -609,6 +617,7 @@
       v.dirty = false;
       v.pages.forEach(page => drawInk(v, page));
       v.sticky.render();
+      v.texts.render();
       saveDraft(v);
       renderStatus(v);
     });
@@ -635,6 +644,7 @@
     v.observer?.disconnect();
     v.pdf?.destroy();
     v.review?.destroy();
+    v.qa?.destroy();
     document.removeEventListener('visibilitychange', v.onVisibility);
     v.resizeObserver.disconnect();
     v.el.remove();

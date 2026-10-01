@@ -515,11 +515,70 @@ button.lecture-side-boundary { cursor: pointer; }
 }
 .lecture-sticky-tabs button.active { background: rgba(255, 255, 255, 0.8); color: #1D2622; }
 .lecture-sticky-collapse { display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; margin-left: auto; padding: 0; border: 0; background: none; cursor: pointer; }
-.lecture-sticky-body { position: relative; flex: 1; min-height: 0; padding: 2px 12px 0; overflow: auto; touch-action: pan-y; }
+.lecture-sticky-body { position: relative; flex: 1; min-height: 0; padding: 2px 12px 0; overflow: auto; touch-action: pan-x pan-y; }
 /* `.lecture-page canvas`의 꽉 채움을 카드 안에서는 풀어 준다. */
 .lecture-sticky-card canvas { position: static; display: block; width: auto; height: auto; }
 .lecture-sticky-card .lecture-sticky-selection { max-width: 100%; max-height: 120px; margin-bottom: 8px; border-radius: 10px; background: #fff; }
-.lecture-sticky-card .lecture-sticky-memo { width: 100%; touch-action: pan-y; }
+.lecture-sticky-card .lecture-sticky-memo { touch-action: pan-x pan-y; }
 .lecture-sticky-foot { display: flex; flex: none; align-items: center; justify-content: space-between; height: 38px; padding: 6px 8px 8px 10px; }
 .lecture-sticky-delete { padding: 0; border: 0; background: none; color: #5F6E66; font: inherit; font-size: 12px; font-weight: 510; cursor: pointer; }
 .lecture-sticky-resize { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; background: none; cursor: nwse-resize; touch-action: none; }
+
+/* ─── 필체 등록 ─── */
+.lecture-hw { position: fixed; inset: 0; z-index: 1002; display: flex; flex-direction: column; background: var(--bg); color: var(--ai-text); }
+.lecture-hw-bar { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--hairline); }
+.lecture-hw-bar strong { font-size: 15px; }
+.lecture-hw-bar .lecture-pill { margin-left: auto; }
+.lecture-hw-bar .lecture-pill[hidden] { display: none; }
+.lecture-hw-body { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 760px; margin: 0 auto; padding: 16px; overflow: auto; }
+.lecture-hw-prompt { margin: 8px 0 0; font-size: 22px; font-weight: 600; line-height: 1.4; }
+/* 종이처럼 흰 칸. 다크 테마에서도 검은 획이 보이게 흰색을 유지한다. */
+.lecture-hw-canvas { display: block; width: 100%; border: 1px solid var(--hairline); border-radius: 12px; background: #fff; touch-action: none; }
+.lecture-hw-label { min-height: 40px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--ai-bubble); color: var(--ai-text); font: inherit; font-size: 15px; }
+.lecture-hw-body .lecture-actions { justify-content: flex-end; }
+
+/* ─── L3b 시온 답 자리. Figma S1 `Xion answer (손글씨 스타일)`·`Pending`. ─── */
+@font-face { font-family: 'Gaegu'; src: url('fonts/Gaegu-Regular.woff2') format('woff2'); font-display: swap; }
+.lecture-sticky-memo-wrap { position: relative; }
+.lecture-qa-slot { position: absolute; left: 0; display: flex; flex-direction: column; gap: 4px; }
+.lecture-qa-read { margin: 0; color: rgba(95, 110, 102, 0.68); font-size: 11px; line-height: 15px; }
+.lecture-qa-answer { margin: 0; color: #2F6B57; font-family: 'Gaegu', sans-serif; font-size: 15px; line-height: 1.15; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lecture-qa-pending { display: flex; align-items: center; gap: 6px; margin: 0; color: rgba(95, 110, 102, 0.68); font-size: 12px; line-height: 16px; }
+.lecture-qa-pending::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: lecture-qa-pulse 1.2s ease-in-out infinite; }
+@keyframes lecture-qa-pulse { 50% { opacity: 0.3; } }
+.lecture-qa-note { margin: 0; color: #B4443F; font-size: 12px; line-height: 16px; }
+.lecture-qa-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lecture-qa-chip {
+  height: 24px; padding: 0 10px; border: 1px solid #EFC7D4; border-radius: 999px; background: rgba(255, 255, 255, 0.8);
+  color: #1D2622; font: inherit; font-size: 12px; font-weight: 510; cursor: pointer;
+}
+.lecture-qa-slot > .lecture-qa-chip { align-self: flex-start; }
+.lecture-sticky-foot-right { display: flex; align-items: center; gap: 6px; }
+/* Figma `전송` 47×24 */
+.lecture-sticky-send { height: 24px; padding: 0 12px; border: 0; border-radius: 999px; background: #2F6B57; color: #FAFBF9; font: inherit; font-size: 12px; font-weight: 510; cursor: pointer; }
+.lecture-sticky-send:disabled { opacity: 0.4; cursor: default; }
+/* Figma `Tab 3` 점 */
+.lecture-sticky-tab-dot { display: inline-block; width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: #2F6B57; vertical-align: middle; }
+
+/* ─── 텍스트 상자(2026-10-01). 위치·폭·글자 크기는 페이지 폭 비율이다(--lc-page-w). ─── */
+.lecture-textbox { position: absolute; z-index: 1; min-width: 24px; }
+.lecture-textbox-input {
+  min-height: 1.35em; padding: 0.25em; border: 1px dashed transparent; border-radius: 4px; outline: none;
+  font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: inherit; line-height: 1.35;
+  white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; -webkit-user-select: text; user-select: text;
+}
+.lecture-textbox:hover .lecture-textbox-input { border-color: rgba(47, 107, 87, 0.3); }
+.lecture-textbox:focus-within .lecture-textbox-input { border-color: #2F6B57; background: rgba(255, 255, 255, 0.85); }
+.lecture-textbox-grip, .lecture-textbox-resize, .lecture-textbox-delete { position: absolute; display: none; padding: 0; border: 0; cursor: pointer; touch-action: none; }
+.lecture-textbox:focus-within :is(.lecture-textbox-grip, .lecture-textbox-resize, .lecture-textbox-delete) { display: block; }
+/* 손잡이: 상자 위쪽 가운데의 막대. 폭 조절: 오른쪽 끝. 지우기: 오른쪽 위. */
+.lecture-textbox-grip { top: -14px; left: 50%; width: 36px; height: 12px; margin-left: -18px; border-radius: 999px; background: #2F6B57; cursor: grab; }
+.lecture-textbox-resize { top: 50%; right: -7px; width: 10px; height: 24px; margin-top: -12px; border-radius: 999px; background: #2F6B57; cursor: ew-resize; }
+.lecture-textbox-delete { top: -10px; right: -10px; width: 20px; height: 20px; border-radius: 50%; background: #2F6B57; }
+.lecture-textbox-delete .lecture-icon { display: flex; }
+.lecture-sticky-type {
+  flex: none; height: 28px; margin: 6px 10px 0; padding: 0 10px; border: 1px solid #EFC7D4; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7); color: #1D2622; font: inherit; font-size: 12px; outline: none;
+}
+.lecture-sticky-type:focus { border-color: #C0708A; }
+.lecture-sticky-type::placeholder { color: rgba(95, 110, 102, 0.68); }

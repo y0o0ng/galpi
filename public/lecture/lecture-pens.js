@@ -114,10 +114,12 @@
   // Figma `Floating Toolbar`의 `Lasso`(150:93)·`Sticky`(150:97) 아이콘.
   const LASSO_SVG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M5.5 14.5C3.6 13.3 3 11.8 3 10.5C3 6.9 7 4 12 4C17 4 21 6.9 21 10.5C21 14.1 17 17 12 17C10.7 17 9.5 16.8 8.4 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.5 2.5"/><path d="M6 13.5C7.2 13.5 8.2 14.5 8.2 15.7C8.2 16.9 7.2 18 6 18C4.8 18 4.5 18.8 4.5 19.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const STICKY_SVG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M13 19.9991C12.9051 20 12.7986 20 12.677 20H7.19691C6.07899 20 5.5192 20 5.0918 19.7822C4.71547 19.5905 4.40973 19.2842 4.21799 18.9079C4 18.4801 4 17.9203 4 16.8002V7.2002C4 6.08009 4 5.51962 4.21799 5.0918C4.40973 4.71547 4.71547 4.40973 5.0918 4.21799C5.51962 4 6.08009 4 7.2002 4H16.8002C17.9203 4 18.4796 4 18.9074 4.21799C19.2837 4.40973 19.5905 4.71547 19.7822 5.0918C20 5.5192 20 6.07899 20 7.19691V12.6747C20 12.7973 20 12.9045 19.9991 13C19.9964 13.2855 19.9857 13.4659 19.9443 13.6384C19.8953 13.8424 19.8142 14.0379 19.7046 14.2168C19.5809 14.4186 19.4089 14.5916 19.063 14.9375L14.9375 19.063C14.5916 19.4089 14.4186 19.5814 14.2168 19.705C14.0379 19.8147 13.8429 19.8958 13.6388 19.9448C13.4663 19.9862 13.2857 19.9966 13 19.9991ZM19.9991 13H14.5996C14.0396 13 13.7598 13 13.5459 13.109C13.3577 13.2049 13.2049 13.3577 13.109 13.5459C13 13.7598 13 14.04 13 14.6001V19.9991" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // 텍스트 상자 버튼. Figma에 아이콘이 없어 레일 아이콘과 같은 굵기로 그린 `T`다.
+  const TEXT_SVG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M6 5.5H18M12 5.5V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const ROTATE_SVG = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M14 3H6C4.34315 3 3 4.34315 3 6V14C3 15.6569 4.34315 17 6 17H14C15.6569 17 17 15.6569 17 14V6C17 4.34315 15.6569 3 14 3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M8 8H13V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 8L7 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
-  // onSticky: 레일 포스트잇 버튼. onSelect(on): 올가미 선택 모드가 켜지고 꺼질 때.
-  function buildRail({ toast, mode: initialMode = 'lecture', onSticky = () => {}, onSelect = () => {} }) {
+  // onSticky·onText: 레일 포스트잇·텍스트 버튼. onSelect(on): 올가미 선택 모드가 켜지고 꺼질 때.
+  function buildRail({ toast, mode: initialMode = 'lecture', onSticky = () => {}, onText = () => {}, onSelect = () => {} }) {
     let modeName = initialMode;
     let mode = MODES[modeName];
     let settings = load(modeName);
@@ -142,7 +144,11 @@
     sticky.type = 'button';
     sticky.setAttribute('aria-label', '포스트잇');
     sticky.append(icon(STICKY_SVG));
-    rail.append(pensEl, add, el('span', 'lecture-rail-divider'), lasso, sticky, el('span', 'lecture-rail-divider'), turn);
+    const textButton = el('button', 'lecture-rail-tool lecture-rail-text');
+    textButton.type = 'button';
+    textButton.setAttribute('aria-label', '텍스트 상자');
+    textButton.append(icon(TEXT_SVG));
+    rail.append(pensEl, add, el('span', 'lecture-rail-divider'), lasso, sticky, textButton, el('span', 'lecture-rail-divider'), turn);
     let menu = null;
     // 선택 모드는 펜 대신 켜지는 도구다. 펜을 고르면 꺼진다.
     let selecting = false;
@@ -296,6 +302,7 @@
     });
     lasso.addEventListener('click', () => { closeMenu(); setSelecting(!selecting); });
     sticky.addEventListener('click', () => { closeMenu(); onSticky(); });
+    textButton.addEventListener('click', () => { closeMenu(); onText(); });
     turn.addEventListener('click', () => {
       orientation = orientation === 'horizontal' ? 'vertical' : 'horizontal';
       store(ORIENTATION_KEY, orientation);

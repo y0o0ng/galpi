@@ -8,12 +8,12 @@ const path = require('node:path');
 const express = require('express');
 const Database = require('better-sqlite3');
 const { migrations } = require('../lib/database-migrations');
-const { registerLectureRoutes, isLectureAnnotationPut } = require('../lib/lecture');
+const { registerLectureRoutes, isLectureLargeJson } = require('../lib/lecture');
 
 test('lecture containers, documents and revision-checked annotations', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  [28, 30, 33, 34].forEach(version => migrations.find(item => item.version === version).up(db));
+  [28, 30, 33, 34, 35, 36].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json({ limit: '40mb' }));
   registerLectureRoutes({ app, db, dataDir });
@@ -81,16 +81,18 @@ test('lecture containers, documents and revision-checked annotations', async () 
   }
 });
 
-test('only the annotation PUT skips the global 1MB JSON parser', () => {
-  assert.equal(isLectureAnnotationPut({ method: 'PUT', path: '/api/lecture/documents/3/annotations' }), true);
-  assert.equal(isLectureAnnotationPut({ method: 'GET', path: '/api/lecture/documents/3/annotations' }), false);
-  assert.equal(isLectureAnnotationPut({ method: 'PUT', path: '/api/lecture/containers/3' }), false);
+test('only the annotation PUT and the sticky Q&A POST skip the global 1MB JSON parser', () => {
+  assert.equal(isLectureLargeJson({ method: 'PUT', path: '/api/lecture/documents/3/annotations' }), true);
+  assert.equal(isLectureLargeJson({ method: 'GET', path: '/api/lecture/documents/3/annotations' }), false);
+  assert.equal(isLectureLargeJson({ method: 'PUT', path: '/api/lecture/containers/3' }), false);
+  assert.equal(isLectureLargeJson({ method: 'POST', path: '/api/lecture/qa/turns' }), true);
+  assert.equal(isLectureLargeJson({ method: 'POST', path: '/api/lecture/qa/turns/3/retry' }), false);
 });
 
 test('lecture sessions append by date, store audio parts idempotently and dedupe events', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  [28, 30, 33, 34].forEach(version => migrations.find(item => item.version === version).up(db));
+  [28, 30, 33, 34, 35, 36].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json());
   registerLectureRoutes({ app, db, dataDir });
@@ -155,7 +157,7 @@ test('lecture sessions append by date, store audio parts idempotently and dedupe
 test('lecture trash hides documents and sessions, restores them, and purges session strokes', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
   const db = new Database(':memory:');
-  [28, 30, 33, 34].forEach(version => migrations.find(item => item.version === version).up(db));
+  [28, 30, 33, 34, 35, 36].forEach(version => migrations.find(item => item.version === version).up(db));
   const app = express();
   app.use(express.json());
   registerLectureRoutes({ app, db, dataDir });
@@ -225,6 +227,133 @@ test('lecture trash hides documents and sessions, restores them, and purges sess
     assert.equal((await call('DELETE', `/trash/folder/${course.id}`)).body.purged, true);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM lecture_documents').get().n, 0);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM lecture_sessions').get().n, 0);
+  } finally {
+    server.close();
+    db.close();
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('handwriting samples store strokes with their label, list written prompts and export', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
+  const db = new Database(':memory:');
+  [28, 30, 33, 34, 35, 36].forEach(version => migrations.find(item => item.version === version).up(db));
+  const app = express();
+  app.use(express.json());
+  registerLectureRoutes({ app, db, dataDir });
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}/api/lecture/handwriting`;
+  const call = async (method, url, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json' }, body: body && JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  const strokes = [{ tool: 'pen', color: '#000000', width: 0.004, points: [[0.1, 0.1, 0.5], [0.2, 0.15, 0.5]] }];
+  try {
+    const saved = await call('POST', '', { promptId: 'q-001', label: '? 운동량 보존은 언제 성립해?', strokes, aspect: 0.25 });
+    assert.equal(saved.status, 201);
+    assert.equal(saved.body.count, 1);
+    assert.equal((await call('POST', '', { promptId: 'q-002', label: '', strokes, aspect: 0.25 })).status, 400);
+    assert.equal((await call('POST', '', { promptId: 'q-002', label: 'x', strokes: [], aspect: 0.25 })).status, 400);
+    assert.equal((await call('POST', '', { promptId: 'q-002', label: 'x', strokes: [{ width: 1, points: [[0, 'a']] }], aspect: 0.25 })).status, 400);
+    assert.deepEqual((await call('GET', '')).body, { count: 1, promptIds: ['q-001'] });
+    const exported = (await call('GET', '/export')).body.samples;
+    assert.equal(exported[0].label, '? 운동량 보존은 언제 성립해?');
+    assert.deepEqual(exported[0].strokes, strokes);
+    assert.equal((await call('DELETE', `/${saved.body.id}`)).body.count, 0);
+  } finally {
+    server.close();
+    db.close();
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('sticky Q&A routes by the first glyph, keeps chains, is idempotent and respects deleted stickies', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lecture-'));
+  const db = new Database(':memory:');
+  [28, 30, 33, 34, 35, 36].forEach(version => migrations.find(item => item.version === version).up(db));
+  const calls = [];
+  const replies = [];
+  const askModel = async request => {
+    calls.push(request);
+    const reply = replies.shift();
+    if (reply instanceof Error) throw reply;
+    return { model: 'fake-model', output: reply };
+  };
+  const app = express();
+  app.use(express.json());
+  registerLectureRoutes({ app, db, dataDir, askModel });
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}/api/lecture`;
+  const call = async (method, url, body) => {
+    const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json' }, body: body && JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  const png = `data:image/png;base64,${Buffer.from('fake-png').toString('base64')}`;
+  const send = (clientRequestId, extra = {}) => call('POST', '/qa/turns', { clientRequestId, documentId: doc.id, stickyId: 'k_sticky01', strokeIds: ['s_1'], inkBottom: 0.2, images: { question: png }, ...extra });
+  let doc;
+  try {
+    const { body: { container } } = await call('POST', '/containers', { type: 'general', name: '동역학' });
+    doc = (await call('POST', `/containers/${container.id}/blank`, { title: '노트' })).body.document;
+
+    replies.push({ route: 'new', question: '? 운동량 보존은 언제?', answer: '외력의 합이 0일 때야.' });
+    const first = (await send('req-00000001')).body.turn;
+    assert.equal(first.status, 'answered');
+    assert.equal(first.answerText, '외력의 합이 0일 때야.');
+    assert.equal(first.read, false);
+    assert.equal(calls[0].content[1].type, 'input_image');
+    // 같은 요청을 다시 보내면 모델을 다시 부르지 않는다.
+    assert.equal((await send('req-00000001')).body.turn.id, first.id);
+    assert.equal(calls.length, 1);
+
+    replies.push({ route: 'follow', question: 'ㄴ 외력이 있으면?', answer: '충돌처럼 짧으면 무시해도 돼.' });
+    const follow = (await send('req-00000002', { strokeIds: ['s_2'] })).body.turn;
+    assert.equal(follow.chainId, first.chainId);
+    assert.match(calls[1].content[0].text, /외력의 합이 0일 때야/);
+
+    // 첫 글자가 애매하면 답하지 않고, 사용자가 고른 경로로 다시 보낸다. 새 질문에는 앞 대화를 넣지 않는다.
+    replies.push({ route: 'unclear', question: '여기서 v₂가 뭐야', answer: '' });
+    const unclear = (await send('req-00000003', { strokeIds: ['s_3'] })).body.turn;
+    assert.equal(unclear.status, 'needs_route');
+    replies.push({ route: 'new', question: '? 여기서 v₂가 뭐야', answer: '충돌 뒤 속도야.' });
+    const routed = (await call('POST', `/qa/turns/${unclear.id}/retry`, { route: 'new' })).body.turn;
+    assert.equal(routed.status, 'answered');
+    assert.notEqual(routed.chainId, first.chainId);
+    assert.doesNotMatch(calls[3].content[0].text, /previous_chain/);
+
+    replies.push({ route: 'memo', question: '시험에 나올 듯', answer: '' });
+    assert.equal((await send('req-00000004', { strokeIds: ['s_4'] })).body.turn.status, 'memo');
+
+    replies.push(Object.assign(new Error('boom'), { code: 'ETIMEDOUT' }));
+    const failed = (await send('req-00000005', { strokeIds: ['s_5'] })).body.turn;
+    assert.equal(failed.status, 'failed');
+    assert.equal(db.prepare('SELECT status, error_code AS code FROM lecture_qa_attempts ORDER BY id DESC').get().code, 'ETIMEDOUT');
+    replies.push({ route: 'new', question: '? 다시', answer: '다시 답했어.' });
+    assert.equal((await call('POST', `/qa/turns/${failed.id}/retry`)).body.turn.status, 'answered');
+
+    assert.equal((await send('req-00000006', { images: { question: 'data:image/gif;base64,AAAA' } })).status, 400);
+    // 타이핑한 질문은 질문 이미지 없이 글로 간다.
+    replies.push({ route: 'follow', question: 'ㄴ 그럼 마찰이 있으면?', answer: '마찰은 외력이라 보존이 깨져.' });
+    const typed = (await send('req-00000009', { strokeIds: [], typedText: 'ㄴ 그럼 마찰이 있으면?', images: {} })).body.turn;
+    assert.equal(typed.status, 'answered');
+    assert.equal(typed.typedText, 'ㄴ 그럼 마찰이 있으면?');
+    assert.match(calls.at(-1).content[0].text, /<typed_question>\nㄴ 그럼 마찰이 있으면\?/);
+    assert.equal(calls.at(-1).content.length, 1);
+    assert.equal((await send('req-00000010', { strokeIds: [], images: {} })).status, 400);
+    assert.equal((await call('POST', `/qa/turns/${first.id}/read`)).body.turn.read, true);
+    assert.equal((await call('GET', `/qa?documentId=${doc.id}`)).body.turns.length, 6);
+
+    // 포스트잇을 지우면 Q&A와 근거 사본이 사라지고, 같은 포스트잇으로는 다시 보낼 수 없다.
+    assert.equal(fs.existsSync(path.join(dataDir, 'lecture', 'qa', String(first.id), 'question.png')), true);
+    await call('DELETE', `/qa/stickies/k_sticky01?documentId=${doc.id}`);
+    assert.equal((await call('GET', `/qa?documentId=${doc.id}`)).body.turns.length, 0);
+    assert.equal(fs.existsSync(path.join(dataDir, 'lecture', 'qa', String(first.id))), false);
+    assert.equal((await send('req-00000007')).status, 410);
+
+    // 기동 때 걸려 있던 요청은 결과 불명으로 바꾸고 다시 부르지 않는다.
+    db.prepare("INSERT INTO lecture_qa_turns (client_request_id, document_id, sticky_id, stroke_ids, ink_bottom, evidence, status) VALUES ('req-00000008', ?, 'k_sticky02', '[]', 0, '{}', 'pending')").run(doc.id);
+    registerLectureRoutes({ app: express(), db, dataDir, askModel });
+    assert.equal(db.prepare("SELECT status FROM lecture_qa_turns WHERE client_request_id = 'req-00000008'").get().status, 'unknown');
+    assert.equal(calls.length, 8);
   } finally {
     server.close();
     db.close();

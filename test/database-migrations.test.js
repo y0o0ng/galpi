@@ -353,6 +353,8 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 32, name: 'memory_general_fact_reviews' },
     { version: 33, name: 'lecture_session_markers' },
     { version: 34, name: 'lecture_trash' },
+    { version: 35, name: 'lecture_handwriting_samples' },
+    { version: 36, name: 'lecture_sticky_qa' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
