@@ -647,3 +647,49 @@ probe: production DB/Vault reads/writes, deployment, migrations, downstream
 judgments and storage commits **0**. Next: inspect and correct evidence selection
 against the full frozen episode before ambiguity/durability/extraction; no
 further model dispatch is covered by this probe's exhausted one-call budget.
+
+### Independent-user-state discovery / partial reference comparison — 2026-10-01
+
+Latest inspected baseline: `3e0fe03`; implementation/execution code commit:
+`62a85ec`. Five operator-authored housing reference bundles were source-validated
+and frozen before the call under `/private/tmp/galpi-bundle-user-state-Wcrxmn`
+(0700; files 0600), reference SHA256:
+`4cfc40320717a9c61ccd1daabad227d09bff34d85d960e990ba7a022a474d567`.
+This is a partial development reference, not an exhaustive gold set, semantic
+adjudication or a study fixture. The full original 30-message episode was reused
+byte-for-byte; no DB/Vault reread. The revised instructions contain the known
+housing-target example, so this is a development probe, not a blind/held-out
+generalization measurement.
+
+One preplanned `gpt-6-luna` call completed, **1 dispatch / 0 retries**, yielding
+**12 bundles**. Each mechanically validated bundle has one fragment; selected
+turn counts are **1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 2 / 1**.
+There are **6 housing anchors**: all five reference source locations appear as
+separate selections, plus a separate location-confirmation response. This is
+an observed location-level correspondence, not 5/5 semantic accuracy or
+exhaustive discovery coverage. The current output does not include one personal
+comparison present in the previous six-bundle proposal; neither inclusion nor
+omission is a WRITE/NO_WRITE result.
+
+Operator inspection flags that the budget and walking-preference bundles omit
+their preceding questions/context, the completion bundle still omits its object
+context, and the lease-choice anchor remains wider than the reference and needs
+review. No result is repaired or assigned a downstream label. More individual
+anchors do not establish adequate evidence selection; all outputs remain
+**NOT_VALIDATED**. Local-model comparison and storage execution were not started.
+
+Private hashes: request
+`83a73b9488e50fb809d904066509d4bb47ed22c54ccc8345ffe85bf0118ab271`;
+bundles `4ce523c2ac125a0165bdea044e07b4efd54089adc6070cd1861f21e1582d6ca2`;
+retained provider response
+`9a650c96a1438f5809e5c7a4903cb2c5c19d0aefe80d010853026744ba192131`.
+Reproduction from retained source/selection was byte-identical with no new call.
+Usage: **3,750 input / 1,489 output tokens** (1,034 reasoning), total **5,239**;
+latency **16,138 ms** for this probe. Production DB/Vault reads/writes, migrations,
+deployment, EvidenceRef binding and state commits: **0**.
+
+Focused Builder/adapter tests **20/20 PASS**; complete focused storage/SDK/UI set
+**146/146 PASS**, diff check and handoff-body equality pass. Full suite was not
+repeated. Next: inspect target-specific evidence completeness before feeding
+these candidates downstream or comparing a local selector; the one-call budget
+is exhausted and no automatic retry is permitted.
