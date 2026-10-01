@@ -67,7 +67,7 @@ ESCALATE, and retired the two APPROXIMATION / RANGE skeletons `f58debd8` and
   review **6 clean / 6 disagreement**; owner HUMAN **1/7 match**. Only `b002-051` and `b002-063`
   migrate. **Ledger v4: pool 379; minimum top-up 5** (DEV 1, HELD per-skeleton 4). A 7-row
   batch-006 top-up (HELD 5, DEV 2) is preregistered and materialized; HELD slots skip owner and
-  HUMAN review; the DEV slots await the owner's pre-audit review.
+  HUMAN review; DEV owner pre-audit 2/2 PASS; the 7-row source-audit packet is built, not run.
 
 No batch-003 acceptance, reference-label freeze, HELD release or training has
 occurred; the accepted pool is 93. **Everything below in this section is the
@@ -2349,6 +2349,15 @@ clean agreement is `PROVISIONAL` and anything else `INELIGIBLE`, and the post-se
 independent second strong-model review still applies. The HELD surfaces avoid the explicit "the
 policy / I can't tell" framing that led the migration HELD rows to ESCALATE readings. DEV slots
 follow the batch-004 gates. Nothing is audited or reviewed.
+
+**DEV owner pre-audit — PASS 2/2 (2026-10-01).** The owner questioned `007`, whose TARGET
+`더 싼 데` reaches past the skeleton's comparison standard to the place the user plans to view.
+The assistant proposed narrowing it to `더 싼`; the owner kept `더 싼 데`: both readings (the
+standard is the only prior alternative; the plan to view a cheaper place next week is given) are
+CLEAR, and the comparison alone would be useless as a memory, where the plan is the useful
+state. Recorded as an owner authoring decision; the surface is unchanged. The source-audit
+packet builder `scripts/build-memory-inference-p1b6-batch-006-source-audit-packet.js` follows the
+batch-005 one (`p1b6-b006-audit`, packet `1196e172…`, not committed).
 
 ## Closed Selection and Freeze Constraints
 
