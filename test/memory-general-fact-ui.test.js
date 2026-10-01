@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const vm = require('node:vm');
+const { randomUUID } = require('node:crypto');
 const test = require('node:test');
 const Database = require('better-sqlite3');
 const { migrations } = require('../lib/database-migrations');
@@ -13,6 +14,7 @@ const { createMemoryEvidenceRegistry } = require('../lib/memory-storage/evidence
 const { createGeneralFactStore } = require('../lib/memory-storage/general-fact');
 const { createGeneralFactReviewStore } = require('../lib/memory-storage/general-fact-review');
 const { openDevelopmentDb, createReviewServer, main, HTML, CSS, APP } = require('../lib/memory-storage/review-ui');
+const { createDevelopmentCandidateInput } = require('../lib/memory-storage/candidate-input');
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'general-fact-ui-'));
@@ -40,8 +42,8 @@ function fixture(t) {
   return { dir, filename, db, review, reviews, store };
 }
 
-async function serving(t, reviews) {
-  const server = createReviewServer(reviews);
+async function serving(t, reviews, prepareInput) {
+  const server = createReviewServer(reviews, prepareInput);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -51,8 +53,139 @@ async function serving(t, reviews) {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Review-Token': token, ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
-  return { server, base, post };
+  const input = (body, headers = {}) => fetch(`${base}/api/candidate-input`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Review-Token': token, ...headers },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+  return { server, base, post, input };
 }
+
+function candidateInput(payload = { subject: 'USER', attributeKey: 'primary_laptop', value: 'Synthetic New Laptop' }) {
+  return { submissionId: randomUUID(), sourceText: '<img src=x onerror=alert(1)> synthetic new source', payload };
+}
+
+function proposed(request, transition = 'CREATE', changeClass = null) {
+  return { transition, changeClass, rationale: 'Synthetic input proposal',
+    evidenceIds: JSON.parse(request.input).replayPackage.newEvidence.map(item => item.evidenceRef.evidenceId) };
+}
+
+test('default review mode exposes no input form capability or model ingress', async t => {
+  const f = fixture(t);
+  const { base, input } = await serving(t, f.reviews);
+  assert.deepEqual(await (await fetch(`${base}/api/input-config`)).json(), { enabled: false, attributes: {} });
+  assert.equal((await input(candidateInput())).status, 404);
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM messages').get().n, 1);
+});
+
+test('explicit input saves owning source/candidate before one proposal and requires separate HUMAN decision', async t => {
+  const f = fixture(t);
+  let calls = 0;
+  const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
+    proposeTransition: request => { calls++;
+      assert.equal(f.db.prepare('SELECT count(*) AS n FROM messages').get().n, 2);
+      assert.equal(f.db.prepare('SELECT count(*) AS n FROM memory_general_fact_candidates').get().n, 2);
+      const replay = JSON.parse(request.input).replayPackage;
+      assert.equal(replay.newEvidence[0].source.content, '<img src=x onerror=alert(1)> synthetic new source');
+      assert.equal(replay.currentState, null);
+      return proposed(request);
+    } });
+  const { base, input, post } = await serving(t, f.reviews, prepare);
+  const config = await (await fetch(`${base}/api/input-config`)).json();
+  assert.equal(config.enabled, true);
+  assert.deepEqual(Object.keys(config.attributes), ['primary_laptop']);
+  const body = candidateInput();
+  const response = await input(body); assert.equal(response.status, 200);
+  const result = await response.json(); assert.equal(calls, 1);
+  assert.equal(f.reviews.get(result.reviewId).decision, null);
+  assert.equal(f.store.readTarget('USER', 'primary_laptop').currentState, null);
+  assert.equal(JSON.stringify(result).includes('synthetic new source'), false);
+  assert.equal((await input(body)).status, 409); assert.equal(calls, 1);
+  const view = await (await fetch(`${base}/api/review?reviewId=${result.reviewId}`)).json();
+  assert.equal(view.replayPackage.newEvidence[0].source.content, body.sourceText);
+  assert.equal((await post({ reviewId: result.reviewId, choice: 'APPROVE', packageSha256: view.review.packageSha256 })).status, 200);
+  assert.equal(f.store.readTarget('USER', 'primary_laptop').currentState.value, body.payload.value);
+  const rows = f.db.prepare('SELECT * FROM messages ORDER BY id').all();
+  assert.equal(rows[0].content, '<img src=x onerror=alert(1)> synthetic source');
+  assert.equal(rows[1].content, body.sourceText);
+});
+
+test('input validation, CSRF and body limits fail before writes/provider calls', async t => {
+  const f = fixture(t);
+  const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
+    proposeTransition: () => assert.fail('Must not call provider') });
+  const { input } = await serving(t, f.reviews, prepare);
+  for (const value of [null, {}, { ...candidateInput(), submissionId: 'not-a-uuid' },
+    { ...candidateInput(), sourceText: '' }, { ...candidateInput(), sourceText: 'a'.repeat(8001) },
+    { ...candidateInput(), approved: true }, candidateInput({ subject: 'OTHER', attributeKey: 'primary_laptop', value: 'X' }),
+    candidateInput({ subject: 'USER', attributeKey: 'invented', value: 'X' }),
+    candidateInput({ subject: 'USER', attributeKey: 'primary_laptop', value: '' }),
+    candidateInput({ subject: 'USER', attributeKey: 'primary_laptop', value: 'X', scope: 'now' })]) {
+    assert.ok((await input(value)).status >= 400);
+  }
+  assert.equal((await input(candidateInput(), { 'X-Review-Token': 'wrong' })).status, 403);
+  assert.equal((await input(candidateInput(), { Origin: 'https://other.invalid' })).status, 403);
+  assert.equal((await input('{invalid')).status, 400);
+  assert.equal((await input('a'.repeat(32769))).status, 413);
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM messages').get().n, 1);
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM memory_general_fact_candidates').get().n, 1);
+});
+
+test('call failure/unsupported proposal persist pending input and cannot repeat after restart', async t => {
+  const f = fixture(t);
+  for (const unsupported of [false, true]) {
+    let calls = 0;
+    const body = candidateInput();
+    const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
+      proposeTransition: request => { calls++; if (!unsupported) throw new Error('private-provider-body');
+        return proposed(request, 'KEEP_AMBIGUOUS', 'UNRESOLVED'); } });
+    await assert.rejects(prepare(body), { code: unsupported ? 'UNSUPPORTED_TRANSITION' : 'PROPOSER_CALL_FAILED' });
+    assert.equal(calls, 1);
+    const sessionId = `general-fact-development-input:${body.submissionId}`;
+    assert.equal(f.db.prepare('SELECT content FROM messages WHERE session_id = ?').get(sessionId).content, body.sourceText);
+    const second = openDevelopmentDb(f.filename);
+    try {
+      const restarted = createDevelopmentCandidateInput({ db: second, evidenceRegistry: createMemoryEvidenceRegistry(second),
+        proposeTransition: () => assert.fail('No retry') });
+      await assert.rejects(restarted(body), { code: 'CANDIDATE_INPUT_ALREADY_SUBMITTED' });
+    } finally { second.close(); }
+  }
+  assert.equal(f.store.readTarget('USER', 'primary_laptop').currentState, null);
+});
+
+test('source/candidate preflight rolls back together and parallel input is rejected without writes', async t => {
+  const f = fixture(t);
+  let release, calls = 0;
+  const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
+    proposeTransition: request => { calls++; return new Promise(resolve => { release = () => resolve(proposed(request)); }); } });
+  const firstBody = candidateInput();
+  const first = prepare(firstBody);
+  await assert.rejects(prepare(candidateInput()), { code: 'CANDIDATE_INPUT_IN_PROGRESS' });
+  await assert.rejects(prepare(firstBody), { code: 'CANDIDATE_INPUT_ALREADY_SUBMITTED' });
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM messages').get().n, 2);
+  release(); await first; assert.equal(calls, 1);
+  f.db.exec("CREATE TRIGGER deny_candidate BEFORE INSERT ON memory_general_fact_candidates BEGIN SELECT RAISE(ABORT,'synthetic failure'); END");
+  await assert.rejects(prepare(candidateInput()));
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM messages').get().n, 2);
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM memory_evidence_refs').get().n, 2);
+  assert.equal(calls, 1);
+});
+
+test('null input stays a retraction candidate; approved state/support is available in next proposal', async t => {
+  const f = fixture(t);
+  f.reviews.decide(f.review.reviewId, { choice: 'APPROVE', packageSha256: f.review.packageSha256 });
+  const before = f.store.readTarget('USER', 'primary_laptop');
+  const prepare = createDevelopmentCandidateInput({ db: f.db, evidenceRegistry: createMemoryEvidenceRegistry(f.db),
+    proposeTransition: request => {
+      const replay = JSON.parse(request.input).replayPackage;
+      assert.equal(replay.candidate.payload.value, null);
+      assert.equal(replay.currentState.value, 'Synthetic Laptop');
+      assert.equal(replay.originalSupport[0].source.id, 1);
+      return proposed(request, 'INVALIDATE', 'CORRECTION');
+    } });
+  const result = await prepare(candidateInput({ subject: 'USER', attributeKey: 'primary_laptop', value: null }));
+  assert.equal(f.reviews.get(result.reviewId).decision, null);
+  assert.deepEqual(f.store.readTarget('USER', 'primary_laptop').states, before.states);
+});
 
 test('development DB is existing, private and outside the repo; no automatic schema creation', t => {
   const f = fixture(t);
