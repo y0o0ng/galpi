@@ -83,6 +83,33 @@ Front-end ambiguity concerns whether the source/bundle determines the candidate'
 
 The front-end stages are not implemented by the manual candidate-input UI. The current General Fact storage path supports only the executable transitions documented below, with separate owner HUMAN semantic approval before atomic commit. This flow does not open arbitrary subjects, attributes/relations, assumptions or unsupported transitions in v1, and does not connect production ingress.
 
+### Agreed development execution boundary — 2026-10-03
+
+Design outside-in: the existing pipeline's processing order is not the order in
+which this track must implement its components. Ambiguity inference belongs to
+the separate local-memory track. Preserve the existing Builder contracts and
+storage implementation; first establish their outer execution boundary.
+
+The owner accepted **one explicit source episode in → per-bundle processing
+results out**. Each result keeps the same bundle identity, anchor and original
+evidence references throughout the run. The result explains where processing
+stopped and why, rather than returning only whole-run success/failure:
+
+| Outcome | Retained information |
+| --- | --- |
+| Meaning judgment deferred | Original bundle and deferral reason |
+| NO_WRITE | Original bundle and durability reason |
+| Processing error | Original bundle and failed stage |
+| Storage review prepared | Original bundle, extracted candidate and existing review identity |
+
+These are execution outcomes, not new Derived-State statuses or semantic labels.
+The first development connection ends at HUMAN review preparation; actual state
+mutation continues to require the existing approval path. This is an agreed outer
+contract, not an implemented runner. Next is its minimal component wiring, using
+existing Builder/storage functions and explicit synthetic stage results for
+connection tests. Internal model design, new families and production integration
+remain separate work; no additional model call is authorized by this design step.
+
 ## Storage topology and authority
 
 | Current code/store | Present authority | Phase-1 treatment |
