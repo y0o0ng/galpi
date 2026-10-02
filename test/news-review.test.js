@@ -441,3 +441,27 @@ test('질문이 끝난 뒤에는 같은 관심에 새 질문을 만들 수 있�
   assert.equal(first.interestId, 'news-b202');
   db.close();
 });
+
+test('공용 dispatcher에 붙이면 질문 알림이 실제로 나간다 (enabled가 없으면 dispatcher가 아무것도 안 한다)', async () => {
+  const { createAssistantPushDispatcher } = require('../lib/assistant-push');
+  const db = createDatabase();
+  const store = createNewsStore(db, { now: () => NOW });
+  addSubscription(db, 'https://a.example/1');
+  const candidate = store.createReviewCandidate({ interestId: 'news-b202', question: '질문' });
+  const service = createNewsPushService(db, { enabled: true, now: () => NOW, quietHours: () => ({ enabled: false }) });
+  service.enqueueCandidate(candidate.id, NOW);
+
+  const sent = [];
+  const dispatcher = createAssistantPushDispatcher(service, {
+    now: () => NOW,
+    transport: { async send(target, payload) { sent.push(JSON.parse(payload)); return { statusCode: 201 }; } },
+    buildPayload: buildNewsPushPayload,
+    buildSendOptions: buildNewsSendOptions,
+  });
+  assert.equal(service.enabled, true);
+  await dispatcher.tick();
+  assert.equal(sent.length, 1);
+  assert.deepEqual(Object.keys(sent[0]).sort(), [...NEWS_PUSH_PAYLOAD_KEYS].sort());
+  assert.equal(db.prepare('SELECT status FROM news_push_deliveries').get().status, 'accepted');
+  db.close();
+});

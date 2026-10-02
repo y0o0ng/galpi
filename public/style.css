@@ -5957,3 +5957,12 @@ textarea:focus-visible {
     margin: 0;
   }
 }
+
+/* Reels 후보 카드 */
+.reels-cards { display: grid; gap: 14px; margin: 13px 18px 15px; }
+.reels-card { display: grid; gap: 6px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.reels-card:first-child { padding-top: 0; border-top: 0; }
+.reels-card p { margin: 0; color: var(--label); font-size: 11px; line-height: 1.45; }
+.reels-card-title { color: var(--ai-text); font-size: 14px; font-weight: 650; text-decoration: none; }
+.reels-card .schedule-agent-action { justify-self: start; min-height: 30px; padding: 0 10px; border-radius: 10px; font-size: 11px; }
+.reels-actions { margin: 0 18px 15px; }

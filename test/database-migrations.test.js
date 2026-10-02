@@ -355,6 +355,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     { version: 34, name: 'lecture_trash' },
     { version: 35, name: 'lecture_handwriting_samples' },
     { version: 36, name: 'lecture_sticky_qa' },
+    { version: 37, name: 'reels_candidates' },
   ]);
   assert.equal(result.currentVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(
@@ -374,7 +375,7 @@ test('schema v25 preserves historical shortcut replay behavior and constrains ca
     db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN (
       'ddays', 'memory_evidence_refs', 'memory_general_fact_candidates', 'memory_general_fact_states',
       'memory_general_fact_transitions', 'memory_general_fact_transition_evidence', 'memory_general_fact_reviews'
-    ) AND name NOT LIKE 'lecture_%' ORDER BY name`).all(),
+    ) AND name NOT LIKE 'lecture_%' AND name NOT LIKE 'reels_%' ORDER BY name`).all(),
     tablesBefore,
   );
   assert.deepEqual(

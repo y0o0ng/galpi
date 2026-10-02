@@ -70,6 +70,14 @@ const { createNewsStore } = require('./lib/news/store');
 const { createNewsCollector } = require('./lib/news/collect');
 const { createNewsAnalyzer } = require('./lib/news/analyze');
 const { registerNewsRoutes } = require('./lib/news/routes');
+const { createReelsStore } = require('./lib/reels/store');
+const { createReelsWorker } = require('./lib/reels/worker');
+const { registerReelsRoutes } = require('./lib/reels/routes');
+const {
+  buildReelsPushPayload,
+  buildReelsSendOptions,
+  createReelsPushService,
+} = require('./lib/reels/push');
 const { createWeatherService } = require('./lib/weather');
 const { registerWeatherRoutes } = require('./lib/weather-routes');
 const { createNewsSearchSession } = require('./lib/news/search-tool');
@@ -228,6 +236,9 @@ const NEWS_AGENT_ENABLED = process.env.NEWS_AGENT_ENABLED === 'true';
 // 홈 노출만 따로 연다. 표본을 모으려면 수집을 켜야 하는데, 수집을 켜면 아직 정하지
 // 못한 문턱으로 홈 판정이 시작된다. 문턱을 실데이터로 정한 뒤에 켠다.
 const NEWS_SURFACE_ENABLED = process.env.NEWS_SURFACE_ENABLED === 'true';
+// XION Reels 1단계. 켜면 하루 1회 실제 수집과 claude(Opus) 호출이 나간다(설계 v0.2). Pi에서만 켠다.
+const REELS_AGENT_ENABLED = process.env.REELS_AGENT_ENABLED === 'true';
+const REELS_CLAUDE_BIN = process.env.REELS_CLAUDE_BIN || '/home/pi/.local/bin/claude';
 // XION 홈 머리줄의 날씨. 기상청 단기예보 하나만 쓰고 판단은 결정론적 규칙이라
 // LLM을 부르지 않는다(설계 0절). 키는 브라우저로 절대 나가지 않는다.
 const KMA_SERVICE_KEY = process.env.KMA_SERVICE_KEY || '';
@@ -986,6 +997,36 @@ const newsPushDispatcher = newsPushService
       const detail = context?.httpStatus ? ` http${context.httpStatus} · ${context.reason || '-'}` : '';
       console.error(`News push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}${detail}`);
     },
+  })
+  : null;
+
+const reelsStore = createReelsStore(db);
+const reelsPushService = REELS_AGENT_ENABLED && ASSISTANT_PUSH_CONFIG.enabled
+  ? createReelsPushService(db, { quietHours: () => mailStore.getMailSettings().quietHours })
+  : null;
+const reelsPushDispatcher = reelsPushService
+  ? createAssistantPushDispatcher(reelsPushService, {
+    transport: createWebPushTransport(webPush, {
+      subject: ASSISTANT_PUSH_CONFIG.subject,
+      publicKey: ASSISTANT_PUSH_CONFIG.publicKey,
+      privateKey: ASSISTANT_PUSH_CONFIG.privateKey,
+    }),
+    buildPayload: buildReelsPushPayload,
+    buildSendOptions: buildReelsSendOptions,
+    onError(error, context) {
+      const detail = context?.httpStatus ? ` http${context.httpStatus} · ${context.reason || '-'}` : '';
+      console.error(`Reels push dispatcher 오류: ${error?.code || error?.name || 'UNKNOWN'}${detail}`);
+    },
+  })
+  : null;
+const reelsWorker = REELS_AGENT_ENABLED
+  ? createReelsWorker({
+    store: reelsStore,
+    pushService: reelsPushService,
+    pushDispatcher: reelsPushDispatcher,
+    bin: REELS_CLAUDE_BIN,
+    // 기사 제목이 로그에 남지 않게 오류 코드만 적는다.
+    onError: error => console.error(`Reels 후보 오류: ${error?.code || error?.name || 'UNKNOWN'}`),
   })
   : null;
 
@@ -4679,6 +4720,8 @@ registerNewsRoutes({
     return interests;
   },
 });
+
+registerReelsRoutes({ app, store: reelsStore, config: { enabled: REELS_AGENT_ENABLED } });
 
 // 서버 상태도 DB도 없다. 요청 중에 좌표를 격자로 바꿔 기상청에 묻고 끝난다.
 registerWeatherRoutes({
@@ -8412,6 +8455,11 @@ const httpServer = app.listen(PORT, HOST, () => {
     newsCollector.start();
     console.log(`   뉴스:     수집 worker 실행 중 (15분 tick, 관심별 6시간, 월 ${newsStore.monthlyCreditLimit} credits)`);
   }
+  if (reelsWorker) {
+    reelsWorker.start();
+    console.log('   릴스:     후보 worker 실행 중 (하루 1회 08:00 KST)');
+  }
+  if (reelsPushDispatcher) reelsPushDispatcher.start();
   if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
     console.log('   뉴스:     홈 노출 꺼짐 (문턱 미확정, NEWS_SURFACE_ENABLED)');
   }
@@ -8482,6 +8530,8 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
     newsCollector?.stop();
     newsAnalyzer?.stop();
     newsPushDispatcher?.stop();
+    reelsWorker?.stop();
+    reelsPushDispatcher?.stop();
     if (modelCatalogRefreshTimer) clearInterval(modelCatalogRefreshTimer);
     let finished = false;
     const finish = async () => {

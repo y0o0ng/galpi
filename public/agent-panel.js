@@ -35,6 +35,7 @@
     mailPreferences: null,
     mailPreferenceSaving: false,
     news: null,
+    reels: null,
     weatherEnabled: false,
     weather: null,
     weatherAt: 0,
@@ -1187,6 +1188,61 @@
     return block;
   }
 
+  const REELS_STATUS = { candidate: '선택 대기', held: '보류 중', selected: '선택됨', dropped: '거절됨' };
+
+  // 후보 텍스트는 모델이 만든 비신뢰 문자열이라 textContent로만 넣는다.
+  function makeReelsAgentCard() {
+    const batch = state.reels?.batch;
+    const block = document.createElement('section');
+    block.className = 'agents-operational-card reels-agent-card';
+    block.appendChild(agentSummaryHead('Reels 에이전트', '오늘의 영상 주제 후보 3개 중 하나를 골라.',
+      batch ? REELS_STATUS[batch.status] : '후보 없음', refresh));
+    if (!batch) {
+      block.appendChild(agentSummaryMessage('아직 후보가 없어. 하루 한 번 아침에 올라와.'));
+      return block;
+    }
+    const open = batch.status === 'candidate' || batch.status === 'held';
+    const list = document.createElement('div');
+    list.className = 'reels-cards';
+    batch.cards.forEach(card => {
+      const item = document.createElement('article');
+      item.className = 'reels-card';
+      const title = document.createElement('a');
+      title.className = 'reels-card-title';
+      title.href = card.url;
+      title.target = '_blank';
+      title.rel = 'noopener noreferrer';
+      title.textContent = card.title;
+      const lines = [card.why, `${card.concept}: ${card.bridge}`, `${card.template} · ${card.hookParadox} / ${card.hookTerm} / ${card.hookSubtitle}`, `위험·불확실: ${card.risk}`]
+        .map(text => {
+          const line = document.createElement('p');
+          line.textContent = text;
+          return line;
+        });
+      item.append(title, ...lines);
+      if (open) item.appendChild(button('이걸로', () => decideReels(`/api/reels/candidates/${card.id}/select`), true));
+      list.appendChild(item);
+    });
+    block.appendChild(list);
+    if (open) {
+      const actions = document.createElement('div');
+      actions.className = 'agent-summary-actions reels-actions';
+      actions.append(button('전부 거절', () => decideReels(`/api/reels/batches/${batch.batchId}/reject`)));
+      if (batch.status === 'candidate') actions.appendChild(button('보류', () => decideReels(`/api/reels/batches/${batch.batchId}/hold`)));
+      block.appendChild(actions);
+    }
+    return block;
+  }
+
+  async function decideReels(path) {
+    const response = await state.apiFetch(path, { method: 'POST' });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      state.showToast(data.error || '처리하지 못했어.');
+    }
+    await refresh();
+  }
+
   function agentSummaryHead(titleText, description, statusText, onOpen, compactDescription = description) {
     const head = document.createElement('header');
     head.className = 'agent-summary-head';
@@ -1244,6 +1300,7 @@
   function renderSummary() {
     state.container.replaceChildren();
     state.container.append(makeMailAgentCard(), makeScheduleAgentCard(), makeCodexAgentCard());
+    if (state.reels) state.container.appendChild(makeReelsAgentCard());
   }
 
   // 사용자가 만지는 값은 둘뿐이다. 잠금화면 미리보기 설정은 없앴다. 그 설정이
@@ -1587,6 +1644,19 @@
     }
     if (!response.ok) throw new Error(data.error || '뉴스를 불러오지 못했습니다.');
     state.news = data;
+    return true;
+  }
+
+  // 플래그가 꺼진 것은 오류가 아니다. 꺼져 있으면 카드 자체를 그리지 않는다.
+  async function loadReelsLatest() {
+    const response = await state.apiFetch('/api/reels/latest');
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 503 && data.code === 'REELS_AGENT_DISABLED') {
+      state.reels = null;
+      return true;
+    }
+    if (!response.ok) throw new Error(data.error || 'Reels 후보를 불러오지 못했습니다.');
+    state.reels = data;
     return true;
   }
 
@@ -1945,6 +2015,7 @@
       loadMailData(),
       loadMailSettings(),
       loadMailPreferences(),
+      loadReelsLatest(),
     ]);
     state.scheduleError = scheduleResult.status === 'rejected'
       ? scheduleResult.reason.message
