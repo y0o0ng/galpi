@@ -1015,3 +1015,39 @@ No unrelated UI repair is included. `git diff --check` and AGENTS/CLAUDE body
 equality pass. Synthetic callback results validate mechanics, not audit judgment
 quality. Actual external/model calls, production DB/Vault/Pi access, source binding
 and state commits: **0**.
+
+#### Retained two-bundle audit probe — 2026-10-02
+
+The owner authorized a bounded actual audit of the retained walking/lease-choice
+bundles and requested their exact selected views. Baseline: `92228e29ef48390965864d2d40217741bd8adecc`.
+A private runner reused the existing audit request/result functions and OpenAI SDK
+transport; no repository adapter, production connection or prompt change was made.
+Before dispatch, freeze source/bundle/request/body/code hashes and walking-then-lease
+order: gpt-6-luna, medium/current_turn, 4096 output tokens, store:false, tools absent,
+60-second timeout and SDK/request maxRetries:0. Budget **2**, one call per bundle,
+no retry, selection repair, downstream classification or storage.
+
+Private directory: `/private/tmp/galpi-bundle-audit-Cpbqd8` (0700; files 0600).
+Plan SHA256: `ffe3fb53a3667f0b6aa89c31bc7980a54929e80bcf9ee49fc09e5b0d968c2746`.
+Two synthetic transport preflight checks passed before actual calls. Requests:
+walking `5fdec4532f75d7fd8e76c3a19e83c54e19a1cfd562b5133cdf4886df99794b33`;
+lease `cd2e99d4406dbd3c1aab0e40938d4dbaf2bd4b53dc5b32acb0d6462ce0bbe3f7`.
+
+Observed **2 completed dispatches / 0 retries**, both **PASS**, neither reporting
+missing evidence IDs. Walking: 3,720 input / 239 output (154 reasoning) tokens,
+4,183 ms. Lease: 4,085 input / 687 output (587 reasoning) tokens, 6,658 ms.
+The auditor considered the selected immediate question/context sufficient for
+the walking target; the earlier affirmation's omitted antecedent was not judged
+material to that target. Lease conditions were judged preserved; other later
+independent details were not required for this target. These are model audit
+observations, not independently validated completeness, ambiguity labels or owner
+gold. No omitted evidence was inserted and no original output was changed.
+
+Report SHA256: walking `5b90277621424d1ab75712e539d0990c1d59d2549876cee47a409880ef2095fe`;
+lease `7761e4dc4971795039a5aaf1c2811679cbefb2c820a271c6803424af0f83dad0`.
+Summary SHA256: `bc0fd682ce7c9106b85ac1dec9b986e586267cd8844e37c0a090125c6cbb5668`.
+Original source and both bundle raw hashes remain unchanged. Production DB/Vault
+access, Pi access, EvidenceRef registrations, downstream model calls and state
+commits: **0**. Raw source, bundle views, provider responses and audit reasons
+remain private outside Git. No full regression rerun was required for this no-code
+probe receipt; the previous implementation validation remains historical.
