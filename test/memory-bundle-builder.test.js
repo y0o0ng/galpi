@@ -21,6 +21,103 @@ const episode = () => ({ schemaVersion: 1, sourceDomain: 'conversation_message',
 const selection = () => ({ bundles: [{ anchor: { turnId: 'm1', text: '커피' }, evidenceTurnIds: ['m1', 'm2', 'm4'] }] });
 const hash = filename => createHash('sha256').update(fs.readFileSync(filename)).digest('hex');
 
+test('audit request binds full source and the exact selected bundle without declaring semantic completeness', () => {
+  const e = episode(); const bundle = builder.buildEvidenceBundles(e, selection()).bundles[0];
+  const request = builder.buildBundleAuditRequest(e, bundle);
+  assert.equal(request.promptVersion, 'memory-evidence-bundle-audit-v1');
+  assert.deepEqual(JSON.parse(request.input), { episode: e, bundle });
+  assert.ok(Object.isFrozen(request));
+  assert.match(request.instructions, /실질/);
+  assert.match(request.instructions, /CLEAR\/ESCALATE/);
+  assert.match(request.instructions, /자동으로 실패/);
+});
+
+test('audit PASS/FAIL/UNCERTAIN are separate source-bound diagnostics; no repair, labels or input mutation', async () => {
+  const e = episode(); const bundle = builder.buildEvidenceBundles(e, selection()).bundles[0];
+  const before = structuredClone({ e, bundle });
+  for (const [disposition, missingEvidenceTurnIds] of [['PASS', []], ['FAIL', ['m3']], ['UNCERTAIN', []]]) {
+    let calls = 0;
+    const report = await builder.auditEvidenceBundle(e, bundle, request => {
+      calls++; assert.deepEqual(JSON.parse(request.input), { episode: e, bundle });
+      return JSON.stringify({ disposition, missingEvidenceTurnIds, reason: 'Synthetic completeness observation' });
+    });
+    assert.equal(calls, 1); assert.equal(report.disposition, disposition);
+    assert.deepEqual(report.missingEvidenceTurnIds, missingEvidenceTurnIds);
+    assert.equal(report.bundleId, bundle.bundleId);
+    assert.equal(report.bundleSha256, createHash('sha256').update(require('../lib/memory-storage/general-fact').canonicalJson(bundle)).digest('hex'));
+    assert.equal(report.semanticApproval, false);
+    assert.equal(report.humanGold, false);
+    assert.deepEqual({ e, bundle }, before);
+    assert.ok(!Object.hasOwn(report, 'clear')); assert.ok(!Object.hasOwn(report, 'write'));
+  }
+});
+
+test('forged audit input fails before auditor execution, including source/hash/span/context/order drift', async () => {
+  const e = episode(); const original = builder.buildEvidenceBundles(e, selection()).bundles[0];
+  let calls = 0;
+  for (const mutate of [
+    b => { b.bundleId = 'forged'; }, b => { b.selectedBundle = 'edited context'; },
+    b => { b.fragmentCount = 99; }, b => { b.anchorSpanRef.endByte = 999; },
+    b => { b.evidenceSpanRefs[0].endByte -= 1; }, b => { b.evidenceSpanRefs.reverse(); },
+    b => { b.evidenceSpanRefs.push({ turnId: 'future', startByte: 0, endByte: 1 }); },
+    b => { b.extra = true; },
+  ]) {
+    const bundle = structuredClone(original); mutate(bundle);
+    await assert.rejects(builder.auditEvidenceBundle(e, bundle, () => { calls++; }), { code: 'INVALID_AUDIT_BUNDLE' });
+  }
+  const changed = structuredClone(e); changed.turns[2].text = 'changed omitted source';
+  await assert.rejects(builder.auditEvidenceBundle(changed, original, () => { calls++; }), { code: 'INVALID_AUDIT_BUNDLE' });
+  assert.equal(calls, 0);
+});
+
+test('audit result rejects invented/selected/duplicate missing IDs and contradictory or downstream output', async () => {
+  const e = episode(); const bundle = builder.buildEvidenceBundles(e, selection()).bundles[0];
+  const valid = { disposition: 'FAIL', missingEvidenceTurnIds: ['m3'], reason: 'Synthetic omission' };
+  for (const mutate of [
+    r => { r.disposition = 'CLEAR'; }, r => { r.disposition = 'PASS'; },
+    r => { r.missingEvidenceTurnIds = ['future']; }, r => { r.missingEvidenceTurnIds = ['m1']; },
+    r => { r.missingEvidenceTurnIds = ['m3', 'm3']; }, r => { r.missingEvidenceTurnIds = null; },
+    r => { r.reason = ' '; }, r => { r.reason = null; }, r => { r.write = true; },
+    r => { r.anchor = { turnId: 'm3', text: '독서' }; }, r => { r.clear = true; },
+  ]) {
+    const result = structuredClone(valid); mutate(result); let calls = 0;
+    await assert.rejects(builder.auditEvidenceBundle(e, bundle, () => { calls++; return result; }), { code: 'INVALID_BUNDLE_AUDIT_RESULT' });
+    assert.equal(calls, 1);
+  }
+  // FAIL may describe another selection defect without inventing a missing ID.
+  assert.equal((await builder.auditEvidenceBundle(e, bundle, () => ({ ...valid, missingEvidenceTurnIds: [] }))).disposition, 'FAIL');
+});
+
+test('audit failure/malformed JSON is masked and never retried; no implicit auditor exists', async () => {
+  const e = episode(); const bundle = builder.buildEvidenceBundles(e, selection()).bundles[0];
+  await assert.rejects(builder.auditEvidenceBundle(e, bundle), { code: 'BUNDLE_AUDITOR_REQUIRED' });
+  for (const [callback, code] of [
+    [() => { throw Error('PRIVATE PROVIDER SENTINEL'); }, 'BUNDLE_AUDITOR_CALL_FAILED'],
+    [() => '```json\n{}\n```', 'INVALID_BUNDLE_AUDIT_RESULT'],
+    [() => null, 'INVALID_BUNDLE_AUDIT_RESULT'],
+  ]) {
+    let calls = 0;
+    await assert.rejects(builder.auditEvidenceBundle(e, bundle, request => { calls++; return callback(request); }), { code, message: code });
+    assert.equal(calls, 1);
+  }
+});
+
+test('audit output remains bound to its frozen request if caller changes inputs; missing IDs canonicalize in source order', async () => {
+  const e = episode();
+  const bundle = builder.buildEvidenceBundles(e, { bundles: [{ anchor: { turnId: 'm1', text: '커피' }, evidenceTurnIds: ['m1'] }] }).bundles[0];
+  const original = structuredClone({ e, bundle });
+  const report = await builder.auditEvidenceBundle(e, bundle, request => {
+    assert.deepEqual(JSON.parse(request.input), { episode: original.e, bundle: original.bundle });
+    e.turns[0].text = 'caller changed source'; bundle.bundleId = 'caller changed identity';
+    return { disposition: 'FAIL', missingEvidenceTurnIds: ['m4', 'm2'], reason: 'Synthetic missing correction' };
+  });
+  assert.equal(report.bundleId, original.bundle.bundleId);
+  assert.deepEqual(report.missingEvidenceTurnIds, ['m2', 'm4']);
+  const repeated = await builder.auditEvidenceBundle(original.e, original.bundle, () => ({ disposition: 'FAIL',
+    missingEvidenceTurnIds: ['m2', 'm4'], reason: 'Synthetic missing correction' }));
+  assert.deepEqual(report, repeated);
+});
+
 function sourceFixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'galpi-bundle-test-'));
   fs.chmodSync(dir, 0o700);

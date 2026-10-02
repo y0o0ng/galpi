@@ -968,3 +968,50 @@ Production DB/Vault access, downstream model calls and storage commits remain
 **0**. No code or default changed; semantic completeness remains NOT_VALIDATED.
 No full-suite rerun was needed for this documentation-only probe record; the
 private request/body/source and offline reconstruction checks above were run.
+
+### Development bundle-completeness audit seam — 2026-10-02
+
+Owner-approved scope at baseline `771f7b03121affbe8699671f2d07a7fdb477f5af`:
+add the audit request/result boundary and synthetic tests only, with actual model
+calls **0**. Reuse `lib/memory-storage/bundle-builder.js`; no new provider, CLI,
+production route, schema or automatic pipeline connection is introduced.
+
+`buildBundleAuditRequest(episode, bundle)` reconstructs the exact existing bundle
+through the source/anchor constructor before accepting it. Edited source, spans,
+selection order, context, identity or fragment metadata fail before the auditor
+is invoked. The immutable request contains the full frozen source and one exact
+selected bundle under `memory-evidence-bundle-audit-v1`.
+
+The audit asks whether omitted evidence or another selection defect materially
+changes the interpretation of **this TARGET**. An omitted preceding question is
+not automatically a failure; target-relevant interpretation is the criterion.
+This follows the source-completeness question already used in the separate
+local-memory study, without importing that study's labels, authority or gate.
+
+`auditEvidenceBundle(episode, bundle, auditBundle)` requires an explicit auditor
+callback and invokes it once. It accepts only `disposition` (PASS / FAIL /
+UNCERTAIN), `missingEvidenceTurnIds` and a nonempty diagnostic `reason`. Missing
+IDs must exist in the frozen episode, be absent from the selection, and be unique;
+PASS requires an empty list. FAIL may describe another selection defect without
+a missing ID. The report binds source/bundle hashes and canonicalizes IDs in source
+order. Malformed results/provider failure fail closed without retry or repair.
+
+The original selection and `semanticCompleteness: NOT_VALIDATED` are preserved.
+An audit PASS is not semantic approval, HUMAN gold, CLEAR/ESCALATE, WRITE or
+storage authority; FAIL/UNCERTAIN must not be silently promoted for downstream
+use. Actual auditor/provider evaluation and downstream wiring remain OPEN. No
+current private bundle was adjudicated by these synthetic tests. Audit reasons
+may contain private source details and belong in private artifacts, not Git/logs.
+Next is an explicitly bounded audit probe on the retained walking/lease bundles;
+selection repair and later Ambiguity/Durability/Extractor are separate work.
+
+Validation: added six synthetic audit tests (the initial red run failed on the
+absent helpers), then the complete focused Builder/storage/proposer/review set
+passed **157/157**, including all **31** Builder/audit tests. Local
+`npm test -- --test-concurrency=2`: **1,958 PASS / 2 FAIL / 3 SKIP** (1,963 total).
+Failures are the existing dark-theme assertions in `test/assistant-task-ui.test.js`
+(lines 219 and 312); the test and checked app/CSS bytes match the pre-edit baseline.
+No unrelated UI repair is included. `git diff --check` and AGENTS/CLAUDE body
+equality pass. Synthetic callback results validate mechanics, not audit judgment
+quality. Actual external/model calls, production DB/Vault/Pi access, source binding
+and state commits: **0**.
