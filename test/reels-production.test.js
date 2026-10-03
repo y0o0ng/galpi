@@ -54,12 +54,13 @@ function fakeSpawn(handler, { stdout = JSON.stringify({ result: 'ok', total_cost
   return spawn;
 }
 
+const FINAL = '# 대본\n- **[A]** 출처, https://e.com/a\n\n## 게시 문구\n훅\n한 줄이에요.\n\n출처:\nA https://e.com/a\n\n#시온의원리노트\n';
 const write = (file, text = 'x') => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
 
 function happy(f, { must = 2 } = {}) {
   return (_call, n) => {
     if (n === 1) write(path.join(f.workDir, 'draft.md'));
-    if (n === 2) write(path.join(f.workDir, 'final.md'));
+    if (n === 2) write(path.join(f.workDir, 'final.md'), FINAL);
     if (n === 3) {
       write(MP4(f.reelsDir)); write(MP4(f.reelsDir).replace('.mp4', '_cover.png'));
       write(path.join(f.workDir, 'build_report.md'));
@@ -210,7 +211,7 @@ test('실제 프롬프트 다섯 개의 칸이 단계 값과 정확히 맞는다
 
 test('from: 앞 단계 결과가 남아 있으면 그 단계부터 다시 돌고 옛 기록은 남긴다', async () => {
   const f = fixture();
-  write(path.join(f.workDir, 'draft.md')); write(path.join(f.workDir, 'final.md'));
+  write(path.join(f.workDir, 'draft.md')); write(path.join(f.workDir, 'final.md'), FINAL);
   write(path.join(f.workDir, 'production.json'), '{"outcome":"failed"}');
   const build = happy(f);
   const spawn = fakeSpawn((call, n) => build(call, n + 2));          // 첫 호출이 build
@@ -229,4 +230,20 @@ test('from: 앞 단계 결과가 없으면 claude를 부르지 않고 멈춘다'
   assert.equal(record.outcome, 'failed');
   assert.equal(record.stages[0].code, 'REELS_NO_DRAFT');
   assert.equal(spawn.calls.length, 0);
+});
+
+test('게시 문구: 검토 단계가 caption.txt를 꺼내고, 절이 없거나 목록 밖 링크가 있으면 멈춘다', async () => {
+  const ok = fixture();
+  await run(ok, fakeSpawn(happy(ok)));
+  assert.equal(fs.readFileSync(path.join(ok.workDir, 'caption.txt'), 'utf8'), '훅\n한 줄이에요.\n\n출처:\nA https://e.com/a\n\n#시온의원리노트\n');
+
+  for (const [final, code] of [['# 대본\n', 'REELS_NO_CAPTION'],
+    [FINAL.replace('A https://e.com/a\n\n#', 'B https://evil.example/x\n\n#'), 'REELS_CAPTION_SOURCE']]) {
+    const f = fixture();
+    const base = happy(f);
+    const record = await run(f, fakeSpawn((call, n) => (n === 2 ? write(path.join(f.workDir, 'final.md'), final) : base(call, n))));
+    assert.equal(record.outcome, 'failed');
+    assert.equal(record.stages[1].code, code);
+    assert.equal(fs.existsSync(path.join(f.workDir, 'caption.txt')), false);
+  }
 });
