@@ -200,6 +200,7 @@ def encode(frame_fn, n_frames, wav, out):
     cmd = ["nice", "-n", "19", ffmpeg_exe(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
            "-s", f"{W * SCALE}x{H * SCALE}", "-r", str(FPS_OUT), "-i", "-", "-i", str(wav),
            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "12", "-tune", "animation",
+           "-threads", "1", "-x264-params", "rc-lookahead=5:ref=2:bframes=2",   # Pi 2GB: ffmpeg 1.26GB → 0.91GB
            "-c:a", "aac", "-b:a", "160k", "-shortest", "-f", "mp4", str(tmp)]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     fails, iso = [], []

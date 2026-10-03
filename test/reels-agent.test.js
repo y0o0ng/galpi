@@ -15,8 +15,8 @@ const {
 const { registerReelsRoutes } = require('../lib/reels/routes');
 const { createAssistantPushDispatcher } = require('../lib/assistant-push');
 
-// 2026-10-02 09:00 KST
-const NOW = Math.floor(Date.parse('2026-10-02T00:00:00Z') / 1000);
+// 2026-10-02 19:00 KST
+const NOW = Math.floor(Date.parse('2026-10-02T10:00:00Z') / 1000);
 
 function createDatabase() {
   const db = new Database(':memory:');
@@ -238,11 +238,11 @@ test('worker: 실패한 날은 폭주하지 않고 다음 날 새로 시도한�
   db.close();
 });
 
-test('worker: 08:00 KST 전에는 아무것도 하지 않는다', async () => {
+test('worker: 19:00 KST 전에는 아무것도 하지 않는다', async () => {
   const { db, store } = setup();
   let touched = 0;
   const worker = createReelsWorker({
-    store, bin: '/fake', now: () => NOW - 3 * 3600, // 06:00 KST
+    store, bin: '/fake', now: () => NOW - 3 * 3600, // 16:00 KST
     fetchImpl: async () => { touched += 1; return { ok: false }; }, spawn: () => { touched += 1; },
   });
   await worker.tick();

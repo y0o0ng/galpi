@@ -8457,7 +8457,7 @@ const httpServer = app.listen(PORT, HOST, () => {
   }
   if (reelsWorker) {
     reelsWorker.start();
-    console.log('   릴스:     후보 worker 실행 중 (하루 1회 08:00 KST)');
+    console.log('   릴스:     후보 worker 실행 중 (하루 1회 19:00 KST)');
   }
   if (reelsPushDispatcher) reelsPushDispatcher.start();
   if (NEWS_AGENT_ENABLED && !NEWS_SURFACE_ENABLED) {
