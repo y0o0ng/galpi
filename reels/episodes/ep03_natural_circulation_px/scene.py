@@ -7,9 +7,8 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 from px import engine as E, templates  # noqa: E402
-from px.sprite_anim import Anim  # noqa: E402
-from px.templates import SPARKLE_MASCOT, Episode, compare, flow, mascot_frame  # noqa: E402
-from px.timeline import at, ease_out, span, step, tween  # noqa: E402
+from px.templates import SPARKLE_MASCOT, Episode, compare, flow, kicker, pointer  # noqa: E402
+from px.timeline import at, ease_out, span  # noqa: E402
 import art as A  # noqa: E402
 
 DRAW = {}
@@ -17,11 +16,6 @@ ep = Episode(HERE, ("hook", "pump", "flow", "finale"), DRAW, "ep03_px_preview")
 nar = ep.nar
 COLOR = {"rise": A.LIGHT, "steam_out": A.LIGHT, "down_left": A.HEAVY, "down_right": A.HEAVY, "fw_in": A.HEAVY}
 CYCLE = ("rise", "down_left", "down_right")
-
-
-def kick(img):
-    """키커: `NATURAL CIRCULATION`은 bold 2배면 292px라 1배(146px)."""
-    E.text(img, (10, 10), "NATURAL CIRCULATION", "bold", E.INK)
 
 
 # ---------------- hook ----------------
@@ -54,7 +48,7 @@ def loop(img, d, ta, y0, u):
 
 
 def pump_scene(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "NATURAL CIRCULATION", scale=1)    # bold 2배면 292px라 1배(146px)
     t1 = at(T, 1, 0.2)                            # NATURAL 카드가 뜨는 때(문장 1)
 
     def forced(img, d, t, ta, y0):
@@ -73,11 +67,10 @@ def pump_scene(img, d, t, ta, T):
 
 # ---------------- flow ----------------
 SHORT = 30                                        # 문장 6 전까지의 짧은 굴뚝: 지금 높이보다 30px 낮다(용기 맨 위도 함께)
-POINT = Anim([mascot_frame("pointing")], mode="once", flip=True)       # 거울상: 눈동자가 왼쪽(굴뚝 쪽)
 
 
 def flow_scene(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "NATURAL CIRCULATION", scale=1)    # bold 2배면 292px라 1배(146px)
     r0, s0, d0 = at(T, 0, 0.7), at(T, 2, 0.1), at(T, 3, 0.2)
     f0, lg, hl, g0, h0, x0 = d0 + 1.4, at(T, 4), at(T, 5, 0.1), at(T, 6, 0.05), at(T, 6, 0.3), at(T, 6, 0.85)
     grow = lambda s: ease_out(span(s, g0, g0 + 1.3))             # 문장 6: 굴뚝이 지금 높이로 늘어난다(1.3초)
@@ -111,9 +104,7 @@ def flow_scene(img, d, t, ta, T):
             E.text(img, (18, y), name, "label", E.TEXT)
     if t >= g0:                                   # 높이 막대: 굴뚝과 함께 늘어난다
         A.height_bar(d, 175, V.P(0, .72)[1], V.P(0, .32)[1])
-    if h0 <= t < x0 + 0.4:                        # 마스코트: 늘어난 뒤 오른쪽에서 CHIMNEY 라벨 바로 아래로 들어와 가리키고 퇴장
-        x = tween(step(t), h0, h0 + 0.34, 190, 152, rnd=True) if t < x0 else tween(step(t), x0, x0 + 0.4, 152, 190, rnd=True)
-        POINT.paste(img, 0, (x, 195))
+    pointer(img, t, h0, x0, 152, 195)             # 마스코트: 늘어난 뒤 오른쪽에서 CHIMNEY 라벨 바로 아래로 들어와 가리키고 퇴장
     T.sfx = [(0.3, "pop"), (r0, "bubbles"), (s0, "pop"), (d0, "pop"), (h0, "sparkle")]
 
 
@@ -122,7 +113,7 @@ BOB = (0, 2, 4, 5, 6, 6, 5, 4, 2, 0, 0, 0)        # 방울이 12fps 12칸으로 
 
 
 def finale(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "NATURAL CIRCULATION", scale=1)    # bold 2배면 292px라 1배(146px)
     m0 = at(T, 1, 0.1)
     k = BOB[round(ta * 12) % 12]
 

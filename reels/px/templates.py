@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 from px import audio, engine as E
 from px.sprite import sprite, sparkles
 from px.sprite_anim import Anim
-from px.timeline import step
+from px.timeline import step, tween
 
 ROOT = Path(__file__).parents[1]
 
@@ -94,8 +94,8 @@ def chip(img, x, y, w, label, active):
     E.text(img, (x + (w - E.text_w(label, "label")) // 2 + 1, y + 4), label, "label", E.TEXT if active else E.LABEL)
 
 
-def kicker(img, s):
-    E.text(img, (10, 10), s, "bold", E.INK, 2)
+def kicker(img, s, scale=2):
+    E.text(img, (10, 10), s, "bold", E.INK, scale)
 
 
 def mascot_frame(mood, sparks=False):
@@ -187,3 +187,13 @@ def head(d, x, y, ax, ay, color):
     for a in range(-2, 1):
         for b in range(a, 1 - a):
             d.point((x + ax * a - ay * b, y + ay * a + ax * b), fill=color)
+
+
+POINT_MASCOT = Anim([mascot_frame("pointing")], mode="once", flip=True)       # 거울상: 눈동자가 왼쪽
+
+
+def pointer(img, t, t_in, t_out, x, y, x_out=190):
+    """가리키기 마스코트: t_in에 오른쪽(x_out)에서 0.34초 들어와 x에 멈추고, t_out에 0.4초 동안 다시 나간다."""
+    if t_in <= t < t_out + 0.4:
+        px = tween(step(t), t_in, t_in + 0.34, x_out, x, rnd=True) if t < t_out else tween(step(t), t_out, t_out + 0.4, x, x_out, rnd=True)
+        POINT_MASCOT.paste(img, 0, (px, y))

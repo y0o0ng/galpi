@@ -7,15 +7,13 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 from px import draw as D, engine as E, templates  # noqa: E402
-from px.sprite_anim import Anim  # noqa: E402
-from px.templates import SPARKLE_MASCOT, Episode, chip, kicker, mascot_frame  # noqa: E402
-from px.timeline import at, span, step, tween  # noqa: E402
+from px.templates import SPARKLE_MASCOT, Episode, chip, kicker, pointer  # noqa: E402
+from px.timeline import at, span  # noqa: E402
 import mech as M  # noqa: E402
 
 DRAW = {}
 ep = Episode(HERE, ("hook", "motor", "stack", "parts", "turn", "ratio"), DRAW, "ep01_px_preview")
 SCENES, nar = ep.scenes, ep.nar
-PARTS_MASCOT = Anim([mascot_frame("pointing")], mode="once", flip=True)    # 거울상: 눈동자가 기구 쪽
 
 
 # ---------------- hook (확정) ----------------
@@ -113,10 +111,7 @@ def parts(img, d, t, ta, T):
             E.text(img, (20, 205 + i * 12), name, "label", E.TEXT if hl else col)
     # 마스코트: 캠을 켤 때 들어와 가리키고, 링을 켠 뒤 퇴장
     out0 = reveal["ring"] + 1.0
-    if reveal["cam"] <= t < out0 + 0.4:
-        x = (tween(step(t), reveal["cam"], reveal["cam"] + 0.34, 190, 134, rnd=True) if t < out0
-             else tween(step(t), out0, out0 + 0.4, 134, 190, rnd=True))
-        PARTS_MASCOT.paste(img, 0, (x + 20, 192))
+    pointer(img, t, reveal["cam"], out0, 154, 192, 210)
     T.sfx = [(0.3, "pop"), (reveal["cam"], "sparkle"), (s2, "pop")]
 
 

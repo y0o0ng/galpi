@@ -7,9 +7,8 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 from px import engine as E, templates  # noqa: E402
-from px.sprite_anim import Anim  # noqa: E402
-from px.templates import SPARKLE_MASCOT, Episode, compare, kicker, mascot_frame, steps  # noqa: E402
-from px.timeline import at, back, ease_in_out, ease_out, step, tween  # noqa: E402
+from px.templates import SPARKLE_MASCOT, Episode, compare, kicker, pointer, steps  # noqa: E402
+from px.timeline import at, back, ease_in_out, ease_out, tween  # noqa: E402
 import art as A  # noqa: E402
 
 DRAW = {}
@@ -86,7 +85,6 @@ def steps_scene(img, d, t, ta, T):
 
 
 # ---------------- check ----------------
-POINT = Anim([mascot_frame("pointing")], mode="once", flip=True)       # 거울상: 눈동자가 왼쪽(≈ WAIT 쪽)
 
 
 def check(img, d, t, ta, T):
@@ -112,9 +110,7 @@ def check(img, d, t, ta, T):
             E.text(img, (95, y0 + 38), "WAIT", "bold", E.INK)
 
     compare(img, d, t, ta, (("RIGHT", E.LABEL, right), ("WRONG", E.LABEL, wrong)), at(T, 1))
-    if m0 <= t < m1 + 0.4:                           # 마스코트: 오른쪽에서 들어와 가리키고 퇴장
-        x = tween(step(t), m0, m0 + 0.34, 190, 152, rnd=True) if t < m1 else tween(step(t), m1, m1 + 0.4, 152, 190, rnd=True)
-        POINT.paste(img, 0, (x, 246))
+    pointer(img, t, m0, m1, 152, 246)                # 마스코트: 오른쪽에서 들어와 가리키고 퇴장
     T.sfx = [(0.3, "pop"), (u0, "pop"), (m0, "sparkle")]
 
 

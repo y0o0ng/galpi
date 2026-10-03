@@ -8,9 +8,8 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 from px import engine as E, templates  # noqa: E402
-from px.sprite_anim import Anim  # noqa: E402
-from px.templates import SPARKLE_MASCOT, Episode, compare, kicker, mascot_frame, steps  # noqa: E402
-from px.timeline import at, ease_in_out, ease_out, span, step, tween  # noqa: E402
+from px.templates import SPARKLE_MASCOT, Episode, compare, kicker, pointer, steps  # noqa: E402
+from px.timeline import at, ease_in_out, ease_out, span, tween  # noqa: E402
 import art as A  # noqa: E402
 
 DRAW = {}
@@ -18,10 +17,6 @@ ep = Episode(HERE, ("hook", "problem", "drum", "set", "repeat", "shift", "finale
 nar = ep.nar
 TURN, PX = 4.0, 1                                 # 큰 무대 크랭크 한 바퀴(초)와 느린 구간의 프레임당 px(아래 set_shift)
 TURN_SMALL, PX_SMALL = 4.5, 1                     # 카드 안 작은 드럼: 54px ÷ 1 ÷ 12 = 4.5초
-
-
-def kick(img):
-    E.text(img, (10, 10), "STEPPED DRUM", "bold", E.INK)
 
 
 # ---------------- hook ----------------
@@ -48,7 +43,7 @@ def hook(img, d, t, ta, T):
 
 # ---------------- problem ----------------
 def problem(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "STEPPED DRUM", scale=1)
     t1, b0 = at(T, 1), at(T, 2, 0.3)
 
     def left(img, d, t, ta, y0):
@@ -120,7 +115,7 @@ def spin(ta, s0, turn=TURN, px=PX, w=BIG.W):
 
 # ---------------- drum ----------------
 def drum(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "STEPPED DRUM", scale=1)
     f0, g0, ge, ce = at(T, 0, 0.2), at(T, 1, 0.1), at(T, 2, 0.2), at(T, 3, 0.2)
     grow = [ease_out(span(ta, g0 + 0.2 * i, g0 + 0.2 * i + 0.6)) for i in range(9)]    # 톱니 아홉 개가 길이만큼 차례로 자란다
     if t >= f0:
@@ -140,11 +135,10 @@ def drum(img, d, t, ta, T):
 
 
 # ---------------- set ----------------
-POINT = Anim([mascot_frame("pointing")], mode="once", flip=True)               # 거울상: 눈동자가 왼쪽(밝아진 톱니 쪽)
 
 
 def set_scene(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "STEPPED DRUM", scale=1)
     s0 = at(T, 0, 0.3)                                                        # 문장 1: 기어가 3번 자리로 미끄러진다
     s1 = s0 + 1.0
     lit0 = m0 = at(T, 1)                                                      # 문장 2: 가장 긴 세 줄이 밝아지고 시온이 가리킨다
@@ -179,9 +173,7 @@ def set_scene(img, d, t, ta, T):
     stage(img, d, gy=gy, lit=3 if lit_on else 0, shift=shift, deg=deg, value=value, hot=hot, flash=flash)
     cur = (0 if t >= back1 else -1) if t >= to0 else 2 if t >= sp1 + TURN else 1 if t >= sp1 else 0 if t >= 0.4 else -1   # S14: 0 자리라 +3도 꺼 둔다
     steps(img, ("SET 3", "TURN", "+3"), cur)
-    if m0 <= t < sp1 + 0.4:                                                   # 시온: 오른쪽에서 들어와 가리키고 한 바퀴 시작에 퇴장
-        x = tween(step(t), m0, m0 + 0.34, 200, 152, rnd=True) if t < sp1 else tween(step(t), sp1, sp1 + 0.4, 152, 200, rnd=True)
-        POINT.paste(img, 0, (x, 208))
+    pointer(img, t, m0, sp1, 152, 208, 200)                                   # 시온: 오른쪽에서 들어와 가리키고 한 바퀴 시작에 퇴장
     T.sfx = [(0.3, "pop"), (m0, "sparkle"), (frame_time(sp1, next(k for k in range(49) if set_shift(k) >= BIG.cross(0))), "ticks_slow")]
 
 
@@ -199,7 +191,7 @@ def small_drum(img, d, y0, lit=3, shift=0, deg=0, value=3, border=E.PURPLE):
 
 
 def repeat(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "STEPPED DRUM", scale=1)
     sp, ind = at(T, 1), at(T, 2, 0.1)
     k, s = spin(ta, sp, TURN_SMALL, PX_SMALL, 54)
     dr = A.Drum(82, 0, 3, 2, 6)
@@ -252,7 +244,7 @@ def shift_scene(img, d, t, ta, T):
 
 # ---------------- finale ----------------
 def finale(img, d, t, ta, T):
-    kick(img)
+    kicker(img, "STEPPED DRUM", scale=1)
     r0, m0 = at(T, 1), at(T, 2)
 
     def setting(img, d, t, ta, y0):
