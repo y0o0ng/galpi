@@ -1,4 +1,4 @@
-"""렌더된 프레임 검사. 캔버스(180x320): 팔레트 밖 색(실패)·고립된 1픽셀 점(보고). 출력 프레임: 6x6 블록 균일(실패)."""
+"""렌더된 프레임 검사. 캔버스(180x320): 팔레트 밖 색(실패)·고립된 1픽셀 점(보고). 출력 프레임: k×k 블록 균일(실패)."""
 import numpy as np
 
 
@@ -28,7 +28,7 @@ def check_canvas(img, palette, ignore=()):
     return bad, int(iso.sum())
 
 
-def check_output(arr, k=6):
+def check_output(arr, k):
     """출력 프레임이 k×k 블록 단위인지(도트 크기 섞임 검사): 블록 안 가로는 같고, 세로는 마지막 줄(주사선)만 다르다."""
     h, w = arr.shape[0] // k, arr.shape[1] // k
     b = arr.reshape(h, k, w, k, 3)

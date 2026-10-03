@@ -71,22 +71,14 @@ class Episode:
         sfx, kept = audio.place_sfx(events, self.total)
         return audio.bgm(self.total), audio.typing(typed, self.total), sfx, kept, events
 
-    COVER_DY = 30                                       # 커버: 그림을 내리는 캔버스 px(1~4편 훅이 전부 격자 y 40~280에 들어가는 값)
-
-    def cover(self, dy=COVER_DY):
-        """훅 끝 무렵(전부 나온 뒤) 자막 카드 없이, 배경 위 그림만 dy px 내려 media/<out>_cover.png(1080x1920)와
-        _cover_grid.png(가운데 3:4, 1080x1440)로 쓴다. 맨 위 빈칸은 배경 그대로."""
+    def cover(self):
+        """훅 끝 무렵(전부 나온 뒤) 자막 카드 없이 media/<out>_cover.png(1080x1920)와
+        _cover_grid.png(가운데 3:4, 1080x1440)로 쓴다. 출력 배치(위 여백 200px)에서 그림이 격자 y 240~1680에 든다."""
         i = round(self.scenes[0].length * E.FPS_OUT) - 1
-        img = self.frame(i, card=False)
-        base = np.asarray(_bg(), dtype=np.uint8)
-        a = np.asarray(img, dtype=np.uint8)
-        fg = (a != base).any(axis=2)                     # 배경과 다른 점만 그림이다(배경 디더는 제자리)
-        out = base.copy()
-        out[dy:][fg[:E.H - dy]] = a[:E.H - dy][fg[:E.H - dy]]
-        out = Image.fromarray(out)
+        out = self.frame(i, card=False)
         assert not E.lint.check_canvas(out, E.PALETTE, ignore=(E.BG, E.DITHER))[0]
         arr = E.to_output(out)
-        assert E.lint.check_output(arr)
+        assert E.lint.check_output(arr, E.SCALE)
         pic = Image.fromarray(arr)
         base_path = ROOT / "media" / self.out
         pic.save(f"{base_path}_cover.png")
@@ -102,7 +94,7 @@ class Episode:
         audio.write_wav(wav, b + ty + sf)
         iso_max, iso_sum = E.encode(self.frame, round(self.total * E.FPS_OUT), wav, out)
         wav.unlink()
-        print(f"lint OK (팔레트 밖 0, 6x6 블록 균일); 고립 1px 점: 프레임당 최대 {iso_max}, 합계 {iso_sum}")
+        print(f"lint OK (팔레트 밖 0, 5x5 블록 균일); 고립 1px 점: 프레임당 최대 {iso_max}, 합계 {iso_sum}")
         print("total", round(self.total, 2), "s; frames", round(self.total * E.FPS_OUT))
         for T, off in zip(self.scenes, self.starts):
             print(f"[{T.id}] start {off:.2f} length {T.length:.2f} (min {self.mins[T.id]})")

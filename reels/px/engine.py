@@ -1,4 +1,4 @@
-"""도트 엔진: 180x320 캔버스, 1비트 그리기, 자막 카드, 6배 최근접 확대 + 주사선, mp4 인코딩."""
+"""도트 엔진: 180x320 캔버스, 1비트 그리기, 자막 카드, 안전 영역 여백을 붙인 5배 최근접 확대 + 주사선, mp4 인코딩."""
 import subprocess
 from pathlib import Path
 
@@ -8,7 +8,13 @@ from PIL import Image, ImageDraw, ImageFont
 from px import draw, lint
 
 D = Path(__file__).parent
-W, H, SCALE, FPS_OUT, FPS_ANIM = 180, 320, 6, 24, 12
+W, H, FPS_OUT, FPS_ANIM = 180, 320, 24, 12
+# 출력 배치: 인스타·쇼츠 UI가 위 ~240px, 아래 ~210px(1710~), 오른쪽 x>=920, 양옆 ~50px을 가린다(1편 스크린샷 실측).
+# 그래서 장면 캔버스(180x320)를 확장 캔버스(216x384) 안 SAFE_OFFSET에 붙여 5배 확대한다(1080x1920).
+SCALE = 5
+SAFE_OFFSET = (12, 40)             # 4의 배수여야 배경 Bayer 위상이 맞는다
+EXT_W, EXT_H = 1080 // SCALE, 1920 // SCALE
+OUT_W, OUT_H = EXT_W * SCALE, EXT_H * SCALE
 READ_CPS = 5                       # 카드 시간 = 글자 수(공백 제외) / READ_CPS (글자당 0.2초; 2026-10-03 7에서 늦춤)
 MIN_CARD = 1.5                     # 카드 한 장의 최소 시간(초) — 짧은 조각이 깜빡 지나가지 않게
 TYPE_CPS = 14                      # 카드 타자 속도(글자/초; 2026-10-03 12에서 올림, 5편부터); 카드 시간의 75%를 넘지 않게 압축
@@ -40,6 +46,25 @@ def background():
             if BAYER[y % 4][x % 4] < level:
                 px[x, y] = tuple(int(DITHER[i:i + 2], 16) for i in (1, 3, 5))
     return img
+
+
+_EXT_BG = None
+
+
+def ext_background():
+    """확장 캔버스 전체의 배경. background()와 같은 공식을 장면 좌표(x-12, y-40)에 적용 — 위는 단색, 아래는 마지막 농도 유지."""
+    global _EXT_BG
+    if _EXT_BG is None:
+        ox, oy = SAFE_OFFSET
+        ys = np.arange(EXT_H)[:, None] - oy
+        xs = np.arange(EXT_W)[None, :] - ox
+        level = np.clip(ys - 160, 0, H - 1 - 160) / (H - 160) * 17
+        mask = (BAYER[ys % 4, xs % 4] < level) & (ys >= 160)
+        a = np.empty((EXT_H, EXT_W, 3), np.uint8)
+        a[:] = tuple(int(BG[i:i + 2], 16) for i in (1, 3, 5))
+        a[mask] = tuple(int(DITHER[i:i + 2], 16) for i in (1, 3, 5))
+        _EXT_BG = a
+    return _EXT_BG
 
 
 def _draw(img):
@@ -181,10 +206,13 @@ def draw_card(img, card, typed):
 
 
 def to_output(img):
-    a = np.asarray(draw.scale(img, SCALE)).copy()
-    a = a.reshape(H, SCALE, W * SCALE, 3)
+    ox, oy = SAFE_OFFSET
+    ext = ext_background().copy()
+    ext[oy:oy + H, ox:ox + W] = np.asarray(img.convert("RGB"))
+    a = np.asarray(draw.scale(Image.fromarray(ext), SCALE)).copy()
+    a = a.reshape(EXT_H, SCALE, OUT_W, 3)
     a[:, SCALE - 1] = (a[:, SCALE - 1] * SCANLINE).astype(np.uint8)   # 도트 줄마다 마지막 출력 줄을 어둡게
-    return a.reshape(H * SCALE, W * SCALE, 3)
+    return a.reshape(OUT_H, OUT_W, 3)
 
 
 def ffmpeg_exe():
@@ -198,7 +226,7 @@ def encode(frame_fn, n_frames, wav, out):
     out = Path(out)
     tmp = out.with_suffix(".tmp.mp4")
     cmd = ["nice", "-n", "19", ffmpeg_exe(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-           "-s", f"{W * SCALE}x{H * SCALE}", "-r", str(FPS_OUT), "-i", "-", "-i", str(wav),
+           "-s", f"{OUT_W}x{OUT_H}", "-r", str(FPS_OUT), "-i", "-", "-i", str(wav),
            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "12", "-tune", "animation",
            "-threads", "1", "-x264-params", "rc-lookahead=5:ref=2:bframes=2",   # Pi 2GB: ffmpeg 1.26GB → 0.91GB
            "-c:a", "aac", "-b:a", "160k", "-shortest", "-f", "mp4", str(tmp)]
@@ -208,7 +236,7 @@ def encode(frame_fn, n_frames, wav, out):
         img = frame_fn(i)
         bad, n_iso = lint.check_canvas(img, PALETTE, ignore=(BG, DITHER))
         arr = to_output(img)
-        if bad or not lint.check_output(arr):
+        if bad or not lint.check_output(arr, SCALE):
             fails.append((i, bad))
         iso.append(n_iso)
         p.stdin.write(arr.tobytes())
