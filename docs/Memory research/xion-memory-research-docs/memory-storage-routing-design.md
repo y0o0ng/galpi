@@ -99,16 +99,158 @@ stopped and why, rather than returning only whole-run success/failure:
 | --- | --- |
 | Meaning judgment deferred | Original bundle and deferral reason |
 | NO_WRITE | Original bundle and durability reason |
+| Extraction deferred | Original bundle and representation-deferral reason; no candidate |
 | Processing error | Original bundle and failed stage |
 | Storage review prepared | Original bundle, extracted candidate and existing review identity |
 
 These are execution outcomes, not new Derived-State statuses or semantic labels.
 The first development connection ends at HUMAN review preparation; actual state
-mutation continues to require the existing approval path. This is an agreed outer
-contract, not an implemented runner. Next is its minimal component wiring, using
-existing Builder/storage functions and explicit synthetic stage results for
-connection tests. Internal model design, new families and production integration
-remain separate work; no additional model call is authorized by this design step.
+mutation continues to require the existing approval path. The initial agreement
+was an outer contract only; the development runner below now implements its wiring
+with explicit callbacks and synthetic connection tests. Internal model design,
+new families and production integration remain separate work; no additional model
+call is authorized by this design step.
+
+### Agreed stage inputs and advisory durability reason — 2026-10-03
+
+Stage execution order does not imply forwarding every preceding judgment to the
+next model. The runner retains each result against the unchanged bundle identity,
+anchor and source references, and uses gate outcomes to control progression.
+
+| Stage | Judgment input | Output responsibility |
+| --- | --- | --- |
+| Ambiguity | Anchor and evidence bundle | CLEAR / ESCALATE and reason |
+| Durability | The same anchor and evidence bundle, without the Ambiguity judgment/reason | WRITE / NO_WRITE and a short durability reason |
+| Extractor | The same anchor and evidence bundle, plus the WRITE durability reason | Source-grounded structured representation of that one target |
+
+The durability reason is advisory context for extraction, not source evidence or
+authority to broaden the anchor. Every extracted claim must remain supported by
+the original bundle; source references point to original evidence, never to the
+durability explanation. Durability does not produce the extracted claim or choose
+its semantic family/attribute. Conditions and uncertainty belonging to the target
+must survive extraction even if the advisory reason misstates or omits them.
+
+This is an accepted interface design, not an implementation or measured quality
+improvement. An explanation may help preserve relevant conditions, but may also
+propagate an upstream interpretation error; its performance benefit remains
+unverified. Ambiguity, Durability and Extractor remain unimplemented here.
+
+### Agreed extraction success / deferral boundary — 2026-10-03
+
+After CLEAR and WRITE, extraction has two semantic outcomes:
+
+- Success: one structured candidate faithfully representing the anchor, with
+  original source references and the target's conditions/uncertainty preserved.
+- Deferral: no candidate, with a specific reason why faithful representation
+  could not be produced within the supported extraction contract. Retain the
+  original bundle, anchor and evidence references for review.
+
+Extraction deferral is not NO_WRITE and does not overturn the earlier judgments.
+Do not force an unsupported target into an unrelated registered family/attribute
+or omit material conditions merely to produce a valid candidate. A malformed
+response or execution failure remains a processing error, not a semantic deferral.
+Success does not authorize state mutation or bypass Router/transition validation
+and HUMAN review. The development callback shape is specified below; this
+agreement adds no family, storage schema or model call.
+
+### Agreed direction for attribute proposals — 2026-10-03
+
+New attribute creation belongs to a separate proposal/review path, not inline
+runtime invention by the Extractor. Preserve an unsupported bundle as deferred;
+a future proposal path checks existing attributes for overlap and presents the
+proposed meaning, value shape and need to the owner through a notification/review
+flow. Initial authority is HUMAN approval, modification, hold or rejection.
+After a definition is supported and registered, the original bundle can be
+extracted again. Attribute approval is not approval to store an individual fact.
+
+Not every representation failure is a missing attribute: unsupported cardinality,
+conditional structure or semantic family requires its own implementation design,
+not a new name that bypasses existing constraints. Current developer-registered
+attributes remain the executable contract. Model-assisted registration and its
+notification UI are future work; later automation requires a separate decision
+based on observed proposal/review quality. No automatic registration, semantic
+family expansion or notification implementation is adopted by this direction.
+
+### Agreed extraction output / source binding responsibility — 2026-10-03
+
+Successful extraction reuses the existing candidate-v1 Router shape rather than
+introducing a second storage ingress. The model returns the semantic family,
+family-specific payload and the IDs of evidence it used from the supplied bundle.
+Code verifies those IDs against that bundle and maps them to owning-source
+addresses to construct `sources`; the model does not invent database addresses or
+EvidenceRef IDs. The runner preserves the original bundle identity and anchor
+outside the fixed candidate shape. EvidenceRef registration remains the Router's
+responsibility.
+
+The initial supported payload remains `general_fact` with `subject: USER`,
+`attributeKey: primary_laptop` and the existing string/no-replacement-null value
+contract. Deferral produces no candidate and retains its reason; a missing
+attribute may later enter the separate proposal path above. Structural and
+source-ID validation does not establish semantic faithfulness. This records the
+accepted division of responsibility; the outer runner below implements the
+connection, while the three semantic-stage model adapters remain unimplemented.
+
+### Development formation runner — 2026-10-03
+
+`lib/memory-storage/formation-runner.js` exports
+`runFormationEpisode(episode, { selectBundles, assessAmbiguity, assessDurability,
+extractCandidate, prepareReview })`. Every callback is explicitly supplied by
+trusted development code; there is no default model, CLI, provider, retry,
+production connection or automatic approval. It reuses `discoverEvidenceBundles`
+and the existing Router candidate validator. The review callback is the existing
+Router composed with `createGeneralFactReviewHandler`, not the committing handler.
+
+The runner snapshots the explicit episode, selects bundles once, then processes
+each bundle sequentially. Each semantic callback receives a fresh copy of
+`{ bundle, evidence }`; evidence contains only selected source turns with IDs,
+roles, text and source timestamps. Extraction alone additionally receives
+`durabilityReason`. Previous decisions/reasons remain in the returned execution
+record and are not otherwise forwarded into judgment inputs.
+
+- Ambiguity returns exactly `{ disposition: CLEAR | ESCALATE, reason }`.
+- Durability returns exactly `{ disposition: WRITE | NO_WRITE, reason }`.
+- Extraction returns `{ disposition: EXTRACTED, semanticFamily, payload,
+  evidenceTurnIds }` or `{ disposition: DEFERRED, reason }`.
+
+These callbacks return objects; future model adapters must parse their own
+responses. Unknown/additional fields, empty reasons, malformed candidates and
+empty/duplicate/out-of-bundle evidence IDs fail closed. The code derives source
+addresses in original source order, never accepts model-supplied addresses, and
+passes a separate candidate copy to review preparation. Original bundle/span
+identity remains outside the fixed Router candidate shape. Owning-source and
+family validation remain in the existing storage modules; no semantic correctness
+is inferred from the structural checks.
+
+Per-bundle outcomes are `MEANING_DEFERRED`, `NO_WRITE`, `EXTRACTION_DEFERRED`,
+`REVIEW_PREPARED` or `PROCESSING_ERROR` with the failed stage. The existing
+handler's idempotent return for an already HUMAN-committed candidate is reported
+as `ALREADY_COMMITTED`, not as a new commit or review. A stopped bundle does not
+stop unrelated bundles, and no callback is retried. Invalid source/configuration
+or failed discovery rejects the episode before downstream stages; zero bundles
+returns zero results, not NO_WRITE. Exceptions are sanitized rather than copying
+provider/private error bodies into results. The report is returned in memory and
+contains private source/candidate material; it is not a public artifact or durable
+resume journal. The Builder's `NOT_VALIDATED` completeness marker is preserved;
+this connection does not replace the separate bundle audit or create an audit gate.
+
+Validation uses synthetic stage judgments and an in-memory SQLite development
+database with existing migrations explicitly applied. The existing Router/review
+path creates a pending HUMAN review, leaves messages and derived state unchanged,
+and only an explicit synthetic approval in the test commits a fact. Tests also
+cover gates, extraction deferral, error isolation, input-copy protection, selected
+source binding, idempotent prior commits and malformed callback outputs. No real
+HUMAN judgment, external/model call, Pi access, schema change or production write
+occurs. The three semantic-stage implementations and attribute proposal workflow
+remain future work.
+
+Validation at baseline `80e7210e3cce89d7667e2ffb7f6355d375886578`: new runner
+tests **6/6 PASS**; focused Builder/storage/proposer/review tests **163/163 PASS**.
+`npm test -- --test-concurrency=2`: **1,989 PASS / 2 FAIL / 3 SKIP** (1,994 tests).
+The failures are the existing theme assertions at
+`test/assistant-task-ui.test.js:219` and `:312`; that test and its `public/app.js`
+and `public/style.css` inputs are byte-identical to the baseline. No UI fix is
+included. `git diff --check` and AGENTS/CLAUDE body equality pass. These are local
+mechanical tests with synthetic judgments, not a semantic model evaluation.
 
 ## Storage topology and authority
 
