@@ -55,7 +55,7 @@ const fetchOk = async () => ({
 });
 
 // 실제 claude를 실행하지 않는다.
-function fakeSpawn() {
+function fakeSpawn({ code = 0, stdout = JSON.stringify({ cards: CARDS }) } = {}) {
   const spawn = () => {
     spawn.count += 1;
     const child = new EventEmitter();
@@ -63,7 +63,7 @@ function fakeSpawn() {
     child.stderr = new EventEmitter();
     child.kill = () => {};
     child.stdin = { on() {}, end() {} };
-    setImmediate(() => { child.stdout.emit('data', JSON.stringify({ cards: CARDS })); child.emit('close', 0); });
+    setImmediate(() => { child.stdout.emit('data', stdout); child.emit('close', code); });
     return child;
   };
   spawn.count = 0;
@@ -163,7 +163,57 @@ test('worker: 성공하면 배치를 저장하고 push를 건다', async () => {
   db.close();
 });
 
-test('worker: 실패한 날은 다시 부르지 않고(폭주 없음) 다음 날 새로 시도한다', async () => {
+test('worker: 실패하면 그날 1시간 간격으로 최대 3번까지 다시 하고 이유를 남긴다', async () => {
+  const { db, store, clock } = setup();
+  let fail = true;
+  const worker = createReelsWorker({
+    store, bin: '/fake', now: () => clock.now, fetchImpl: fetchOk,
+    spawn: (...a) => (fail ? fakeSpawn({ code: 1, stdout: JSON.stringify({ is_error: true, result: 'Usage limit reached' }) }) : fakeSpawn())(...a),
+  });
+  const runs = () => db.prepare('SELECT outcome, attempts, error_code AS code, error_detail AS detail FROM reels_runs').get();
+  await worker.tick();
+  assert.deepEqual(runs(), { outcome: 'failed', attempts: 1, code: 'REELS_CLAUDE_EXIT', detail: 'Usage limit reached' });
+  clock.now += 30 * 60;
+  await worker.tick();                       // 1시간이 안 돼서 다시 안 한다
+  assert.equal(runs().attempts, 1);
+  clock.now += 31 * 60;
+  await worker.tick();
+  assert.equal(runs().attempts, 2);
+  clock.now += 61 * 60;
+  await worker.tick();
+  assert.equal(runs().attempts, 3);
+  clock.now += 61 * 60;
+  fail = false;
+  await worker.tick();                       // 3번을 다 썼다
+  assert.equal(runs().attempts, 3);
+  assert.equal(runs().outcome, 'failed');
+  db.close();
+});
+
+test('worker: 재시도 끝에 성공하면 배치를 저장한다', async () => {
+  const { db, store, clock } = setup();
+  let fail = true;
+  const worker = createReelsWorker({
+    store, bin: '/fake', now: () => clock.now, fetchImpl: fetchOk,
+    spawn: (...a) => (fail ? fakeSpawn({ code: 1 }) : fakeSpawn())(...a),
+  });
+  await worker.tick();
+  fail = false;
+  clock.now += 61 * 60;
+  await worker.tick();
+  assert.equal(db.prepare('SELECT outcome FROM reels_runs').get().outcome, 'ok');
+  assert.equal(store.latestBatch().cards.length, 3);
+  db.close();
+});
+
+test('마이그레이션 전부터 있던 실행 기록은 재시도하지 않는다(v38 기본값 = 다 씀)', () => {
+  const db = createDatabase();
+  db.prepare("INSERT INTO reels_runs (day, outcome, created_at) VALUES ('2026-10-03', 'failed', 1)").run();
+  assert.equal(db.prepare('SELECT attempts FROM reels_runs').get().attempts, 3);
+  db.close();
+});
+
+test('worker: 실패한 날은 폭주하지 않고 다음 날 새로 시도한다', async () => {
   const { db, store, clock } = setup();
   const spawn = fakeSpawn();
   let collectOk = false;

@@ -28,6 +28,7 @@ FONT = {k: ImageFont.truetype(str(D / "fonts" / f), s) for k, (f, s) in
 BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
 CARD_BOX = (10, 252, 170, 290)     # x0,y0,x1,y1 (포함)
 CARD_INNER_W = 148
+CARD_FONT, CARD_LINE_GAP, CARD_TOP = "label", 14, 8   # 자막 카드: 갈무리9 10px(2026-10-03 12px에서 줄임), 줄당 한글 14자
 
 
 def background():
@@ -74,6 +75,10 @@ def center_text(img, y, s, font="body", fill=TEXT, scale=1):
     text(img, ((W - text_w(s, font, scale)) // 2, y), s, font, fill, scale)
 
 
+# 줄을 끊어도 자연스러운 낱말 끝(조사·연결 어미·쉼표)
+BREAK_AFTER = tuple(",.는이가을를에로와과도만면고서며데지요죠")  # "은"·"의"는 꾸미는 말(좁은, 부품값의)에도 붙어 뺀다 + ("보다", "부터", "까지", "처럼", "만큼")
+
+
 def split_lines(s, max_w=CARD_INNER_W, font="body"):
     """띄어쓰기에서 끊고, 쉼표 뒤에서는 줄을 바꾼다."""
     lines, cur = [], ""
@@ -89,6 +94,14 @@ def split_lines(s, max_w=CARD_INNER_W, font="body"):
             cur = ""
     if cur:
         lines.append(cur)
+    if len(lines) == 2 and not lines[0].endswith(","):  # 두 줄이면 길이를 고르게(말 덩어리가 앞 줄 끝에 홀로 붙지 않게)
+        words = s.split()
+        splits = [(" ".join(words[:k]), " ".join(words[k:])) for k in range(1, len(words))]
+        fits = [p for p in splits if max(text_w(p[0], font), text_w(p[1], font)) <= max_w]
+        # 조사·어미 뒤에서 끊는다("여러 / 단을"처럼 꾸미는 말과 꾸밈받는 말이 갈리지 않게). 그런 자리가 없을 때만 아무 데나.
+        good = [p for p in fits if p[0].endswith(BREAK_AFTER)] or fits
+        if good:
+            lines = list(min(good, key=lambda p: max(text_w(p[0], font), text_w(p[1], font))))
     for i in range(1, len(lines)):                    # 쉼표로 홀로 남은 짧은 줄은 앞 줄 마지막 낱말을 데려온다
         head, tail = lines[i - 1].rsplit(" ", 1) if " " in lines[i - 1] else (None, None)
         if head and " " not in lines[i] and len(lines[i]) <= 3:
@@ -105,7 +118,7 @@ def split_cards(sentence):
     """문장 → 두 줄짜리 카드 목록(각 카드는 줄 목록). 대본의 ` / `에서 먼저 나누고, 넘치면 폭으로 끊는다."""
     cards = []
     for seg in sentence.split(" / "):
-        lines = split_lines(seg)
+        lines = split_lines(seg, font=CARD_FONT)
         cards += [lines[i:i + 2] for i in range(0, len(lines), 2)]
     return cards
 
@@ -159,12 +172,12 @@ def draw_card(img, card, typed):
     shape(1, 1, SHADOW, None)
     shape(0, 0, CARD, None)
     shape(0, 0, None, INK)
-    left, ty = typed, y0 + 6
+    left, ty = typed, y0 + CARD_TOP
     for ln in card:
-        w = text_w(ln)
-        text(img, ((W - w) // 2, ty), ln[:max(left, 0)])
+        w = text_w(ln, CARD_FONT)
+        text(img, ((W - w) // 2, ty), ln[:max(left, 0)], font=CARD_FONT)
         left -= len(ln)
-        ty += 16
+        ty += CARD_LINE_GAP
 
 
 def to_output(img):

@@ -1026,7 +1026,7 @@ const reelsWorker = REELS_AGENT_ENABLED
     pushDispatcher: reelsPushDispatcher,
     bin: REELS_CLAUDE_BIN,
     // 기사 제목이 로그에 남지 않게 오류 코드만 적는다.
-    onError: error => console.error(`Reels 후보 오류: ${error?.code || error?.name || 'UNKNOWN'}`),
+    onError: error => console.error(`Reels 후보 오류: ${error?.code || error?.name || 'UNKNOWN'}${error?.detail ? ` · ${error.detail}` : ''}`),
   })
   : null;
 

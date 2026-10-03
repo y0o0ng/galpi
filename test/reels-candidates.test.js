@@ -102,7 +102,7 @@ test('result 문자열 JSON도 받고, 종료 코드·깨진 JSON·시간 초과
   await assert.rejects(generateCandidates({ ...args, spawn: fakeSpawn({ stdout: 'not json' }) }), { code: 'REELS_OUTPUT_PARSE' });
   await assert.rejects(
     generateCandidates({ ...args, spawn: fakeSpawn({ stdout: JSON.stringify({ is_error: true, result: 'x' }) }) }),
-    { code: 'REELS_OUTPUT_PARSE' },
+    { code: 'REELS_CLAUDE_ERROR', detail: 'x' },   // 실패 이유(CLI 오류 문구)를 남긴다
   );
   const hung = fakeSpawn({ hang: true });
   await assert.rejects(generateCandidates({ ...args, spawn: hung, timeoutMs: 20 }), { code: 'REELS_CLAUDE_TIMEOUT' });
