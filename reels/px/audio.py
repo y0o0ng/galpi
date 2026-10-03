@@ -54,11 +54,28 @@ def _bubbles():
     return out * SFX_VOL
 
 
+TICKS = ((262, .06), (330, .06), (392, .06))   # (Hz, 길이 초); 사이 0.25초(12fps 3프레임), 숫자창이 오를 때마다 한 음씩
+
+
+def _ticks(gap=0.25):
+    """낮은 사인파 딸깍 세 번(gap초 간격): 둥근(hann) 엔벌로프, 한 음씩 올라간다."""
+    out = np.zeros(int((2 * gap + 0.1) * SR))
+    for k, (f, dur) in enumerate(TICKS):
+        n = int(dur * SR)
+        i = int(gap * k * SR)
+        out[i:i + n] += np.sin(2 * np.pi * f * np.arange(n) / SR) * np.hanning(n)
+    return out * SFX_VOL
+
+
 def sfx(kind):
     """사인파, 느린 어택·릴리즈. pop: 250→600Hz 상승, sparkle: 659Hz→880Hz 두 음, danger: 330Hz→247Hz 낮고 내려가는 두 음,
-    bubbles: 300~520Hz 짧은 방울 다섯 개."""
+    bubbles: 300~520Hz 짧은 방울 다섯 개, ticks: 262·330·392Hz 딸깍 세 번(0.25초 간격), ticks_slow: 같은 소리를 0.5초 간격으로."""
     if kind == "bubbles":
         return _bubbles()
+    if kind == "ticks":
+        return _ticks()
+    if kind == "ticks_slow":
+        return _ticks(0.5)
     n = int(0.26 * SR)
     t = np.arange(n) / SR
     if kind == "pop":
