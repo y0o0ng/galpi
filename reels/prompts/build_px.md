@@ -1,15 +1,14 @@
 # 작업 지시: XION Reels {{episode}}편 도트판
 
-저장소 `{{repo}}`. 앞 편 도트판들이 `reels/episodes/*_px/`에 있고 사용자가 승인했다. **가장 최근 편 도트판이 형식 기준이다.** 이번 편은 공용 엔진·템플릿을 재사용해서 만든다.
+저장소 `{{repo}}`. 앞 편 도트판들이 `reels/episodes/*_px/`에 있고 사용자가 승인했다. **가장 최근 편 도트판이 형식 기준이다.** 이번 편은 공용 엔진·템플릿을 재사용해서 만든다. 디자인 지시는 따로 없다 — 아래 정본들과 승인된 앞 편만 보고 판단하라.
 
 ## 먼저 읽을 것
-1. `reels/px/reels-pixel-handoff.md` — 도트 트랙 정본(화면·팔레트·자막 카드·시간·소리·마스코트·그림·"말한 변화는 화면에서 일어난다"·도트 그리기 규칙)
-2. `reels/px/templates.py`와 앞 편 도트판 `scene.py`·`art.py` — 구조 기준
-3. 이 편의 Manim판 `reels/episodes/{{manim_dir}}/` (`scene.py`·`art.py`·`narration.ko.json`·`scenes.json`) — **장면 흐름과 타이밍(`self.when(i, frac)` ↔ `at(T, i, frac)`)은 Manim판을 따른다**
-4. 설계 문서 `{{doc_path}}`의 이 편 부록(대본 표, 사실 확인 목록, **제작 제약**, **화면 글자 목록**). 그림은 제작 제약의 물리·논리 조건을 어기면 안 되고, 화면 글자는 그 목록에 있는 것만 쓴다.
+1. **확정 대본(유일한 내용 정본): `{{final_path}}`** — 훅 카드, 시간|화면|내레이션 표, 사실 확인 목록, **제작 제약**(물리·논리 조건, 그리면 안 되는 것, 화면 글자 목록, 뜻 있는 효과음). 문장·화면 글자를 바꾸지 않는다. 그림으로 안 되는 게 있으면 바꾸지 말고 보고하라.
+2. `reels/px/reels-pixel-handoff.md` — 도트 트랙 규칙 정본(읽는 법 절부터)
+3. `reels/px/templates.py`와 앞 편 도트판 `scene.py`·`art.py` — 구조 기준
 
 ## 만들 것
-`reels/episodes/{{episode_dir}}/` — `narration.ko.json`·`scenes.json`은 Manim판에서 복사(글자 바꾸지 않음), `art.py`(이 편 그림), `scene.py`(`Episode` 실행기). 출력 `reels/media/{{out_name}}.mp4`.
+`reels/episodes/{{episode_dir}}/` — `narration.ko.json`(훅 제목·부제와 장면별 문장, 대본 표의 글자 그대로), `scenes.json`(장면 순서와 연출에 필요한 최소 길이), `art.py`(이 편 그림), `scene.py`(`Episode` 실행기, 연출은 `at(T, 문장번호, 비율)`로 문장에 묶는다). 출력 `reels/media/{{out_name}}.mp4`.
 
 - 카드 분할은 엔진이 한다. 한두 마디만 혼자 뜨는 꼬리 카드가 생기면 쉼표 뒤 공백 자리에만 ` / `를 넣을 수 있다(글자는 그대로). 넣은 자리를 보고.
 - 새 배치가 필요하면 `px/templates.py`에 이번 편이 실제로 쓰는 것만 더한다. 기존 함수의 동작은 바꾸지 않는다(새 인자는 기본값이 옛 동작).
@@ -18,7 +17,7 @@
 
 ## 경계
 - **앞 편 도트판의 화면·소리는 픽셀 하나도 안 바뀌어야 한다.** 작업 전에 HEAD 기준(`git archive HEAD`로 따로 풀기 등)으로 앞 편마다 전체 프레임 `frame(i).tobytes()`와 `sound()` 세 트랙 해시를 떠 두고, 끝나면 비교해 보고하라.
-- Manim 트랙 파일(`reels/episodes/`의 `_px` 아닌 폴더, `reels/templates/`, `style.py`, `mascot.py`, 최상위 `timeline.py`, `sound.py`, `tts.py`, `render.sh`) 수정 금지. `reels/` 밖 금지. 패키지 설치·git 금지. `px/bgm.py`·`px/sprite.py`·`px/engine.py` 수정 금지. 쓰는 곳 없는 함수 금지.
+- Manim 트랙(동결) 파일(`reels/episodes/`의 `_px` 아닌 폴더, `reels/templates/`, `style.py`, `mascot.py`, 최상위 `timeline.py`, `sound.py`, `tts.py`, `render.sh`) 수정 금지. `reels/` 밖 금지. 패키지 설치·git 금지. `px/bgm.py`·`px/sprite.py`·`px/engine.py` 수정 금지. 쓰는 곳 없는 함수 금지.
 - 렌더는 `nice -n 19`로 한 번에 하나, 파이썬은 `reels/.venv/bin/python`.
 
 ## 완료 조건
