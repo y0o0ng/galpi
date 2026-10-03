@@ -1,8 +1,10 @@
 """도트 트랙 공통 부품: 장면 실행기(Episode), chip·kicker·마스코트, hook 배치. 편마다 다른 것은 인자로 받는다."""
 import json
+import sys
 from functools import lru_cache
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw
 
 from px import audio, engine as E
@@ -46,13 +48,13 @@ class Episode:
         i = max(j for j, s in enumerate(self.starts) if s <= t + 1e-9)
         return self.scenes[i], t - self.starts[i]
 
-    def frame(self, i):
+    def frame(self, i, card=True):
         T, t = self.which(i / E.FPS_OUT)
         ta = step(t)                                    # 애니메이션은 12fps로 끊는다
         img = _bg().copy()
         d = ImageDraw.Draw(img)
         self.draw[T.id](img, d, t, ta, T)
-        for card, start, dur in T.plan:
+        for card, start, dur in (T.plan if card else ()):
             if start <= t < start + dur or (start <= t and card is T.plan[-1][0]):
                 typed = sum(ct <= t for ct in E.char_times(card, start, dur))
                 E.draw_card(img, card, typed)
@@ -69,7 +71,31 @@ class Episode:
         sfx, kept = audio.place_sfx(events, self.total)
         return audio.bgm(self.total), audio.typing(typed, self.total), sfx, kept, events
 
+    COVER_DY = 30                                       # 커버: 그림을 내리는 캔버스 px(1~4편 훅이 전부 격자 y 40~280에 들어가는 값)
+
+    def cover(self, dy=COVER_DY):
+        """훅 끝 무렵(전부 나온 뒤) 자막 카드 없이, 배경 위 그림만 dy px 내려 media/<out>_cover.png(1080x1920)와
+        _cover_grid.png(가운데 3:4, 1080x1440)로 쓴다. 맨 위 빈칸은 배경 그대로."""
+        i = round(self.scenes[0].length * E.FPS_OUT) - 1
+        img = self.frame(i, card=False)
+        base = np.asarray(_bg(), dtype=np.uint8)
+        a = np.asarray(img, dtype=np.uint8)
+        fg = (a != base).any(axis=2)                     # 배경과 다른 점만 그림이다(배경 디더는 제자리)
+        out = base.copy()
+        out[dy:][fg[:E.H - dy]] = a[:E.H - dy][fg[:E.H - dy]]
+        out = Image.fromarray(out)
+        assert not E.lint.check_canvas(out, E.PALETTE, ignore=(E.BG, E.DITHER))[0]
+        arr = E.to_output(out)
+        assert E.lint.check_output(arr)
+        pic = Image.fromarray(arr)
+        base_path = ROOT / "media" / self.out
+        pic.save(f"{base_path}_cover.png")
+        top = (arr.shape[0] - arr.shape[1] * 4 // 3) // 2
+        pic.crop((0, top, arr.shape[1], top + arr.shape[1] * 4 // 3)).save(f"{base_path}_cover_grid.png")
+
     def main(self):
+        if "--cover" in sys.argv:
+            return self.cover()
         out = ROOT / "media" / f"{self.out}.mp4"
         b, ty, sf, kept, events = self.sound()
         wav = out.with_suffix(".wav")
@@ -82,6 +108,7 @@ class Episode:
             print(f"[{T.id}] start {off:.2f} length {T.length:.2f} (min {self.mins[T.id]})")
             for card, start, dur in T.plan:
                 print(f"   card {card!r} start {start:.2f}s dur {dur:.2f}s")
+        self.cover()
         print("sfx kept", [(round(t, 2), k) for t, k in kept])
         print("sfx dropped", [(round(t, 2), k) for t, k in sorted(events) if (t, k) not in kept])
         for name, x in (("bgm", b), ("typing", ty), ("sfx", sf)):
