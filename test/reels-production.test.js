@@ -207,3 +207,26 @@ test('실제 프롬프트 다섯 개의 칸이 단계 값과 정확히 맞는다
   }
   assert.ok(claudeArgs(defs.script).includes('--restricted'));
 });
+
+test('from: 앞 단계 결과가 남아 있으면 그 단계부터 다시 돌고 옛 기록은 남긴다', async () => {
+  const f = fixture();
+  write(path.join(f.workDir, 'draft.md')); write(path.join(f.workDir, 'final.md'));
+  write(path.join(f.workDir, 'production.json'), '{"outcome":"failed"}');
+  const build = happy(f);
+  const spawn = fakeSpawn((call, n) => build(call, n + 2));          // 첫 호출이 build
+  const record = await produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake/claude', spawn, from: 'build' });
+  assert.equal(record.outcome, 'ok');
+  assert.deepEqual(record.stages.map(s => s.result), ['kept', 'kept', 'ok', 'ok', 'ok']);
+  assert.equal(spawn.calls.length, 3);
+  assert.equal(flag(spawn.calls[0].args, '--model'), 'sonnet');
+  assert.ok(fs.readdirSync(f.workDir).some(n => /^production-\d+\.json$/.test(n)));
+});
+
+test('from: 앞 단계 결과가 없으면 claude를 부르지 않고 멈춘다', async () => {
+  const f = fixture();
+  const spawn = fakeSpawn(() => {});
+  const record = await produceEpisode({ card: CARD, reelsDir: f.reelsDir, workDir: f.workDir, bin: '/fake/claude', spawn, from: 'build' });
+  assert.equal(record.outcome, 'failed');
+  assert.equal(record.stages[0].code, 'REELS_NO_DRAFT');
+  assert.equal(spawn.calls.length, 0);
+});
