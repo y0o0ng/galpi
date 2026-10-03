@@ -40,11 +40,13 @@ def typing(times, secs):
 
 
 def sfx(kind):
-    """사인파, 느린 어택·릴리즈. pop: 250→600Hz 상승, sparkle: 659Hz→880Hz 두 음."""
+    """사인파, 느린 어택·릴리즈. pop: 250→600Hz 상승, sparkle: 659Hz→880Hz 두 음, danger: 330Hz→247Hz 낮고 내려가는 두 음."""
     n = int(0.26 * SR)
     t = np.arange(n) / SR
     if kind == "pop":
         w = np.sin(2 * np.pi * np.cumsum(250 + 350 * t / 0.26) / SR)
+    elif kind == "danger":
+        w = np.sin(2 * np.pi * np.where(t < 0.12, 330, 247) * t)
     else:
         w = np.sin(2 * np.pi * np.where(t < 0.13, 659, 880) * t)
     return w * _env(n, 0.012, 0.12) * SFX_VOL

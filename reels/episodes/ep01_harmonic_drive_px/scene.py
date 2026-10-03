@@ -1,108 +1,41 @@
 """1편 도트판 전체(hook~ratio). 실행: reels/.venv/bin/python episodes/ep01_harmonic_drive_px/scene.py"""
-import json
 import sys
-from functools import lru_cache
 from pathlib import Path
-
-from PIL import Image, ImageDraw
 
 HERE = Path(__file__).parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
-from px import audio, draw as D, engine as E  # noqa: E402
-from px.sprite import sprite, sparkles  # noqa: E402
+from px import draw as D, engine as E, templates  # noqa: E402
 from px.sprite_anim import Anim  # noqa: E402
+from px.templates import SPARKLE_MASCOT, Episode, chip, kicker, mascot_frame  # noqa: E402
 from px.timeline import at, span, step, tween  # noqa: E402
 import mech as M  # noqa: E402
 
-nar = json.loads((HERE / "narration.ko.json").read_text())
-mins = {s["id"]: s["min"] for s in json.loads((HERE / "scenes.json").read_text())}
-
-
-class Scene:
-    def __init__(self, sid):
-        self.id, self.sents = sid, nar["scenes"][sid]
-        self.plan = E.plan(self.sents)
-        self.sstart, t = [], E.LEAD
-        for s in self.sents:
-            self.sstart.append(t)
-            t += E.sentence_secs(s)
-        self.sdur = [E.sentence_secs(s) for s in self.sents]
-        self.length = max(t + E.TAIL, mins[sid])
-        self.sfx = []                                  # (장면 시각, 종류)
-
-
-SCENES = [Scene(k) for k in ("hook", "motor", "stack", "parts", "turn", "ratio")]
-STARTS = [sum(s.length for s in SCENES[:i]) for i in range(len(SCENES))]
-TOTAL = sum(s.length for s in SCENES)
-
-
-@lru_cache(None)
-def _bg():
-    return E.background()
-
-
-def chip(img, x, y, w, label, active):
-    d = ImageDraw.Draw(img)
-    d.rectangle((x, y, x + w, y + 17), fill=E.DEEP if active else E.BG, outline=E.INK if active else E.LABEL)
-    E.text(img, (x + (w - E.text_w(label, "label")) // 2 + 1, y + 4), label, "label", E.TEXT if active else E.LABEL)
-
-
-def kicker(img, s):
-    E.text(img, (10, 10), s, "bold", E.INK, 2)
-
-
-def mascot_frame(mood, sparks=False):
-    """스프라이트에 반짝이를 얹을 여백을 둔 캔버스(좌우·위 8px, 발밑은 바닥). 발밑 가운데가 기본 앵커."""
-    sp = sprite(mood)
-    c = Image.new("RGBA", (sp.width + 16, sp.height + 8), (0, 0, 0, 0))
-    c.paste(sp, (8, 8), sp)
-    if sparks:
-        sparkles(c, 9, 9)
-    return c
-
-
-HOP = [(0, 0), (0, -4), (0, -6), (0, -4), (0, 0), (0, -2), (0, 0)]       # 통통(12fps 7칸)
-HOOK_MASCOT = Anim([mascot_frame("surprised")] * 6 + [mascot_frame("sparkle", True)] * 6 + [mascot_frame("base")],
-                   durs=[1 / 12] * 12 + [1e9], mode="once", offsets=HOP + [(0, 0)] * 6)   # 놀람 → 반짝 → 기본
-RATIO_MASCOT = Anim([mascot_frame("sparkle"), mascot_frame("sparkle", True)] * 50, mode="once",
-                    offsets=HOP + [(0, 0)] * 93)                          # 통통 뒤 12fps 반짝 깜빡
+DRAW = {}
+ep = Episode(HERE, ("hook", "motor", "stack", "parts", "turn", "ratio"), DRAW, "ep01_px_preview")
+SCENES, nar = ep.scenes, ep.nar
 PARTS_MASCOT = Anim([mascot_frame("pointing")], mode="once", flip=True)    # 거울상: 눈동자가 기구 쪽
 
 
 # ---------------- hook (확정) ----------------
-T_BIG, T_SPRITE = 0.3, 2.4                       # 큰 제목이 뜨는 때, 마스코트가 튀어나오는 때
-SCENES[0].sfx = [(T_BIG, "pop"), (T_SPRITE, "sparkle")]
+def joint(img, d, t, ta):
+    # 관절: 위팔·아래팔 + 둥근 하우징(바깥 원·보라 링·축). 하모닉 드라이브가 들어갈 자리
+    for box in ((16, 130, 36, 200), (26, 190, 102, 210)):
+        d.rounded_rectangle((box[0] + 1, box[1] + 1, box[2] + 1, box[3] + 1), 5, fill=E.SHADOW)
+        d.rounded_rectangle(box, 5, fill=E.DEEP, outline=E.OUTLINE)
+        d.line((box[0] + 3, box[1] + 1, box[0] + 3, box[3] - 3), fill=E.INK)
+    cx, cy = 26, 200
+    d.ellipse((cx - 19, cy - 19, cx + 20, cy + 20), fill=E.OUTLINE)
+    d.ellipse((cx - 18, cy - 18, cx + 19, cy + 19), fill=E.DEEP)
+    d.ellipse((cx - 17, cy - 17, cx + 18, cy + 18), outline=E.INK, width=2)
+    r = 10 + int(ta * E.FPS_ANIM) % 2
+    d.ellipse((cx - r, cy - r, cx + r + 1, cy + r + 1), outline=E.PURPLE, width=2)
+    d.rectangle((cx - 1, cy - 1, cx + 1, cy + 1), fill=E.TEXT)
 
 
 def hook(img, d, t, ta, T):
-    # 위쪽 제목(한국어): 쉼표에서 두 줄
-    l1, l2 = E.split_lines(nar["hook"]["title"])
-    E.center_text(img, 14, l1)
-    E.center_text(img, 29, l2, "bold")
-    E.center_text(img, 47, nar["hook"]["sub"], "label", E.LABEL)
-    # 큰 영문 제목(2배): 두 단어가 차례로
-    if t >= T_BIG:
-        E.center_text(img, 68, "HARMONIC", "bold", E.INK, 2)
-    if t >= T_BIG + 0.3:
-        E.center_text(img, 96, "DRIVE", "bold", E.INK, 2)
-    # 관절: 위팔·아래팔 + 둥근 하우징(바깥 원·보라 링·축). 하모닉 드라이브가 들어갈 자리
-    if t >= T_BIG + 0.6:
-        for box in ((16, 130, 36, 200), (26, 190, 102, 210)):
-            d.rounded_rectangle((box[0] + 1, box[1] + 1, box[2] + 1, box[3] + 1), 5, fill=E.SHADOW)
-            d.rounded_rectangle(box, 5, fill=E.DEEP, outline=E.OUTLINE)
-            d.line((box[0] + 3, box[1] + 1, box[0] + 3, box[3] - 3), fill=E.INK)
-        cx, cy = 26, 200
-        d.ellipse((cx - 19, cy - 19, cx + 20, cy + 20), fill=E.OUTLINE)
-        d.ellipse((cx - 18, cy - 18, cx + 19, cy + 19), fill=E.DEEP)
-        d.ellipse((cx - 17, cy - 17, cx + 18, cy + 18), outline=E.INK, width=2)
-        r = 10 + int(ta * E.FPS_ANIM) % 2
-        d.ellipse((cx - r, cy - r, cx + r + 1, cy + r + 1), outline=E.PURPLE, width=2)
-        d.rectangle((cx - 1, cy - 1, cx + 1, cy + 1), fill=E.TEXT)
-    # 마스코트
-    if t >= T_SPRITE:
-        HOOK_MASCOT.paste(img, t - T_SPRITE, (131, 193))
+    templates.hook(img, d, t, ta, T, nar["hook"], ("HARMONIC", "DRIVE"), joint)
 
 
 # ---------------- motor ----------------
@@ -229,57 +162,11 @@ def ratio(img, d, t, ta, T):
             else:
                 d.rectangle((ox - 4, oy - 2, ox + 4, oy - 1), fill=E.LABEL); d.rectangle((ox - 4, oy + 3, ox + 4, oy + 4), fill=E.LABEL)
     if t >= s1:
-        RATIO_MASCOT.paste(img, t - s1, (89, 202))
+        SPARKLE_MASCOT.paste(img, t - s1, (89, 202))
     T.sfx = [(0.3, "pop"), (s1, "sparkle")]
 
 
-DRAW = {"hook": hook, "motor": motor, "stack": stack, "parts": parts, "turn": turn, "ratio": ratio}
-
-
-def which(t):
-    i = max(j for j, s in enumerate(STARTS) if s <= t + 1e-9)
-    return SCENES[i], t - STARTS[i]
-
-
-def frame(i):
-    T, t = which(i / E.FPS_OUT)
-    ta = step(t)                                    # 애니메이션은 12fps로 끊는다
-    img = _bg().copy()
-    d = ImageDraw.Draw(img)
-    DRAW[T.id](img, d, t, ta, T)
-    for card, start, dur in T.plan:
-        if start <= t < start + dur or (start <= t and card is T.plan[-1][0]):
-            typed = sum(ct <= t for ct in E.char_times(card, start, dur))
-            E.draw_card(img, card, typed)
-    return img
-
-
-def sound():
-    typed, events = [], []
-    for T, off in zip(SCENES, STARTS):
-        frame(round((off + T.length / 2) * E.FPS_OUT))      # 장면 함수가 T.sfx를 채운다
-        events += [(off + t, k) for t, k in T.sfx]
-        for card, start, dur in T.plan:
-            chars = [c for ln in card for c in ln]
-            typed += [off + ct for ct, c in zip(E.char_times(card, start, dur), chars) if c not in " ,.?!"]
-    sfx, kept = audio.place_sfx(events, TOTAL)
-    return audio.bgm(TOTAL), audio.typing(typed, TOTAL), sfx, kept, events
-
+DRAW.update(hook=hook, motor=motor, stack=stack, parts=parts, turn=turn, ratio=ratio)
 
 if __name__ == "__main__":
-    out = ROOT / "media" / "ep01_px_preview.mp4"
-    b, ty, sf, kept, events = sound()
-    wav = ROOT / "media" / "ep01_px_preview.wav"
-    audio.write_wav(wav, b + ty + sf)
-    iso_max, iso_sum = E.encode(frame, round(TOTAL * E.FPS_OUT), wav, out)
-    wav.unlink()
-    print(f"lint OK (팔레트 밖 0, 6x6 블록 균일); 고립 1px 점: 프레임당 최대 {iso_max}, 합계 {iso_sum}")
-    print("total", round(TOTAL, 2), "s; frames", round(TOTAL * E.FPS_OUT))
-    for T, off in zip(SCENES, STARTS):
-        print(f"[{T.id}] start {off:.2f} length {T.length:.2f} (min {mins[T.id]})")
-        for card, start, dur in T.plan:
-            print(f"   card {card!r} start {start:.2f}s dur {dur:.2f}s")
-    print("sfx kept", [(round(t, 2), k) for t, k in kept])
-    print("sfx dropped", [(round(t, 2), k) for t, k in sorted(events) if (t, k) not in kept])
-    for name, x in (("bgm", b), ("typing", ty), ("sfx", sf)):
-        print(f"{name}: rms whole {audio.rms_db(x):.1f} dB, active {audio.rms_db(x, True):.1f} dB")
+    ep.main()
