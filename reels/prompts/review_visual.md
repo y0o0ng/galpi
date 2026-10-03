@@ -3,7 +3,7 @@
 ## 읽을 것
 - 프레임: `{{frames_dir}}`의 PNG **전부**(장면마다 mid·end와 주요 순간; 파일 이름이 장면·순간이다). 하나도 건너뛰지 말고 직접 열어 본다.
 - 제작 보고(장면 길이, 카드 표, 효과음 kept/dropped, 확신 없는 곳): `{{build_report}}`
-- 확정 대본: `{{final_path}}`(시간|화면|내레이션 표, 사실 확인 목록, **제작 제약**, **화면 글자 목록**). 영상의 문장은 `reels/episodes/{{episode_dir}}/narration.ko.json`.
+- 확정 대본: `{{final_path}}`(시간|화면|내레이션 표, 사실 확인 목록, **제작 제약**, **화면 글자 목록**). 영상의 문장은 `{{episode_path}}/narration.ko.json`.
 - 도트 트랙 규칙 정본: `{{handoff_path}}` (읽는 법 절부터 — 예시는 정답이 아니고, 승인된 앞 편 화면이 가장 확실한 기준)
 - 앞 편 프레임(사용자가 승인한 기준): `{{reference_frames}}`
 

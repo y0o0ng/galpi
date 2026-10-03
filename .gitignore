@@ -42,3 +42,4 @@ __pycache__/
 reels/.venv/
 reels/media/
 reels/px/fonts/*.ttf
+reels/work/
