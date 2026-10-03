@@ -39,8 +39,26 @@ def typing(times, secs):
     return out * TYPE_VOL
 
 
+BUBBLES = ((420, .050), (520, .045), (350, .055), (480, .045), (300, .060))   # (Hz, 길이 초); 사이 75ms, 갈수록 작게
+
+
+def _bubbles():
+    """낮은 사인파 방울 다섯 개: 각자 살짝 오르는 음, 둥근(hann) 엔벌로프, 아래로 갈수록 작게."""
+    out = np.zeros(int(0.6 * SR))
+    for k, (f, dur) in enumerate(BUBBLES):
+        n = int(dur * SR)
+        t = np.arange(n) / SR
+        w = np.sin(2 * np.pi * np.cumsum(f * (1 + 0.25 * t / dur)) / SR) * np.hanning(n) * (1 - 0.15 * k)
+        i = int(sum(d + 0.075 for _, d in BUBBLES[:k]) * SR)
+        out[i:i + n] += w
+    return out * SFX_VOL
+
+
 def sfx(kind):
-    """사인파, 느린 어택·릴리즈. pop: 250→600Hz 상승, sparkle: 659Hz→880Hz 두 음, danger: 330Hz→247Hz 낮고 내려가는 두 음."""
+    """사인파, 느린 어택·릴리즈. pop: 250→600Hz 상승, sparkle: 659Hz→880Hz 두 음, danger: 330Hz→247Hz 낮고 내려가는 두 음,
+    bubbles: 300~520Hz 짧은 방울 다섯 개."""
+    if kind == "bubbles":
+        return _bubbles()
     n = int(0.26 * SR)
     t = np.arange(n) / SR
     if kind == "pop":

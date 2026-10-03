@@ -148,3 +148,42 @@ def steps(img, labels, cur):
     """아래쪽 chip 세 개 줄. cur번째만 활성(-1이면 전부 비활성)."""
     for i, lab in enumerate(labels):
         chip(img, 10 + i * 54, 224, 50, lab, i == cur)
+
+
+FLOW_DOT, FLOW_PERIOD, FLOW_STEP = 2, 5, 2      # 흐름 점선: 2px 점, 3px 간격, 12fps마다 2px 전진
+
+
+@lru_cache(None)
+def _lattice(pts):
+    """꺾인 선(수평·수직·45°만) → 1px 걸음마다의 도트 목록."""
+    out = [pts[0]]
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        dx, dy = x1 - x0, y1 - y0
+        if dx and dy and abs(dx) != abs(dy):
+            raise ValueError(f"깔끔한 기울기가 아니다: {(x0, y0)}->{(x1, y1)}")
+        sx, sy = (dx > 0) - (dx < 0), (dy > 0) - (dy < 0)
+        out += [(x0 + sx * i, y0 + sy * i) for i in range(1, max(abs(dx), abs(dy)) + 1)]
+    return tuple(out)
+
+
+def flow(d, ta, pts, color, u=1.0, thick=False, phase=None):
+    """행진하는 점선 흐름. pts: 꺾인 선(마지막 구간은 수평·수직), u: 앞으로 뻗은 진행도 0~1(1이면 끝에 도트 화살촉),
+    thick: 점을 3px로 굵게(강조). ta는 12fps로 끊은 시각.
+    phase: 점선이 지금까지 전진한 px(기본은 프레임당 FLOW_STEP로 일정; 속도가 변하는 장면이 누적값을 넘긴다)."""
+    path = _lattice(tuple(map(tuple, pts)))
+    n = round(u * (len(path) - 1)) + 1
+    k = 3 if thick else FLOW_DOT
+    phase = round(ta * 12) * FLOW_STEP if phase is None else phase
+    for i in range(n):
+        if (i - phase) % FLOW_PERIOD == 0:
+            x, y = path[i]
+            d.rectangle((x, y, x + k - 1, y + k - 1), fill=color)
+    if u >= 1:
+        head(d, *path[-1], path[-1][0] - path[-2][0], path[-1][1] - path[-2][1], color)
+
+
+def head(d, x, y, ax, ay, color):
+    """도트 화살촉: 끝점 (x, y), 방향 (ax, ay)(수평·수직 단위). 깊이 3 × 폭 5·3·1."""
+    for a in range(-2, 1):
+        for b in range(a, 1 - a):
+            d.point((x + ax * a - ay * b, y + ay * a + ax * b), fill=color)
